@@ -3694,10 +3694,17 @@ int blk_mq_update_nr_requests(struct request_queue *q, unsigned int nr)
 			ret = blk_mq_tag_update_depth(hctx, &hctx->sched_tags,
 						      nr, true);
 			if (blk_mq_is_sbitmap_shared(set->flags)) {
+				int j;
+
 				hctx->sched_tags->bitmap_tags =
 					&q->sched_bitmap_tags;
 				hctx->sched_tags->breserved_tags =
 					&q->sched_breserved_tags;
+
+				for (j = 0;j < hctx->sched_tags->nr_tags; j++) {
+					hctx->sched_tags->static_rqs[j] =
+							q->static_rqs[j];
+				}
 			}
 		} else {
 			ret = blk_mq_tag_update_depth(hctx, &hctx->tags, nr,
@@ -3708,7 +3715,18 @@ int blk_mq_update_nr_requests(struct request_queue *q, unsigned int nr)
 		if (q->elevator && q->elevator->type->ops.depth_updated)
 			q->elevator->type->ops.depth_updated(hctx);
 	}
-	if (!ret) {
+	if (ret) {
+		if (blk_mq_is_sbitmap_shared(set->flags) && (q->elevator)) {
+			/*
+			 * If we error'ed, then we need to revert to the
+			 * lowest size, otherwise we may attempt to reference
+			 * unset hctx->sched_tags->static_rqs[]
+			 */
+			q->nr_requests = min((unsigned long)nr,
+					     q->nr_requests);
+			blk_mq_tag_resize_sched_shared_sbitmap(q);
+		}
+	} else {
 		q->nr_requests = nr;
 		if (blk_mq_is_sbitmap_shared(set->flags)) {
 			if (q->elevator) {
