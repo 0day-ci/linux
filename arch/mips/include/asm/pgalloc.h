@@ -61,7 +61,7 @@ static inline pmd_t *pmd_alloc_one(struct mm_struct *mm, unsigned long address)
 	pmd_t *pmd = NULL;
 	struct page *pg;
 
-	pg = alloc_pages(GFP_KERNEL | __GFP_ACCOUNT, PMD_ORDER);
+	pg = alloc_pages(GFP_KERNEL | __GFP_ACCOUNT, PMD_TABLE_ORDER);
 	if (pg) {
 		pgtable_pmd_page_ctor(pg);
 		pmd = (pmd_t *)page_address(pg);
