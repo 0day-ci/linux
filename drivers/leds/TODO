@@ -1,10 +1,6 @@
 -*- org -*-
 
 * On/off LEDs should have max_brightness of 1
-* Get rid of led_brightness
-
-It is really an integer, as maximum is configurable. Get rid of it, or
-make it into typedef or something.
 
 * Review atomicity requirements in LED subsystem
 
