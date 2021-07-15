@@ -76,11 +76,19 @@ void amdgpu_show_fdinfo(struct seq_file *m, struct file *f)
 	}
 	amdgpu_vm_get_memory(&fpriv->vm, &vram_mem, &gtt_mem, &cpu_mem);
 	amdgpu_bo_unreserve(fpriv->vm.root.bo);
-	seq_printf(m, "pdev:\t%04x:%02x:%02x.%d\npasid:\t%u\n", domain, bus,
+
+	/*
+	 * ******************************************************************
+	 * For text output format description please see drm-usage-stats.rst!
+	 * ******************************************************************
+	 */
+
+	seq_puts(m, "drm-driver: amdgpu\n");
+	seq_printf(m, "drm-pdev:\t%04x:%02x:%02x.%d\npasid:\t%u\n", domain, bus,
 			dev, fn, fpriv->vm.pasid);
-	seq_printf(m, "vram mem:\t%llu kB\n", vram_mem/1024UL);
-	seq_printf(m, "gtt mem:\t%llu kB\n", gtt_mem/1024UL);
-	seq_printf(m, "cpu mem:\t%llu kB\n", cpu_mem/1024UL);
+	seq_printf(m, "drm-memory-vram:\t%llu KiB\n", vram_mem/1024UL);
+	seq_printf(m, "drm-memory-gtt:\t%llu KiB\n", gtt_mem/1024UL);
+	seq_printf(m, "drm-memory-cpu:\t%llu KiB\n", cpu_mem/1024UL);
 	for (i = 0; i < AMDGPU_HW_IP_NUM; i++) {
 		uint32_t count = amdgpu_ctx_num_entities[i];
 		int idx = 0;
@@ -96,7 +104,7 @@ void amdgpu_show_fdinfo(struct seq_file *m, struct file *f)
 			perc = div64_u64(10000 * total, min);
 			frac = perc % 100;
 
-			seq_printf(m, "%s%d:\t%d.%d%%\n",
+			seq_printf(m, "drm-engine-%s%d:\t%d.%d %%\n",
 					amdgpu_ip_name[i],
 					idx, perc/100, frac);
 		}
