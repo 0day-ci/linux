@@ -6076,6 +6076,9 @@
 			brightness level.
 			default: 1
 
+	virtiopartscan
+		Enable virtio block device partition scanning omission based on VIRTIO_BLK_F_NO_PART_SCAN feature flag.
+
 	virtio_mmio.device=
 			[VMMIO] Memory mapped virtio (platform) device.
 

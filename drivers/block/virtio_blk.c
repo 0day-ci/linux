@@ -692,6 +692,19 @@ static const struct blk_mq_ops virtio_mq_ops = {
 static unsigned int virtblk_queue_depth;
 module_param_named(queue_depth, virtblk_queue_depth, uint, 0444);
 
+#ifndef MODULE
+#ifdef CONFIG_VIRTIO_BLK_NO_PART_SCAN
+static int partitions_scanning_disable __read_mostly;
+
+static int __init partitions_scanning_setup(char *__unused)
+{
+	partitions_scanning_disable = 1;
+	return 1;
+}
+__setup("nopartscan", partitions_scanning_setup);
+#endif
+#endif
+
 static int virtblk_probe(struct virtio_device *vdev)
 {
 	struct virtio_blk *vblk;
@@ -789,6 +802,13 @@ static int virtblk_probe(struct virtio_device *vdev)
 	vblk->disk->fops = &virtblk_fops;
 	vblk->disk->flags |= GENHD_FL_EXT_DEVT;
 	vblk->index = index;
+
+#ifdef CONFIG_VIRTIO_BLK_NO_PART_SCAN
+	if (unlikely(partitions_scanning_disable))
+		/* disable partitions scanning if it was stated in virtio features*/
+		if (virtio_has_feature(vdev, VIRTIO_BLK_F_NO_PART_SCAN))
+			vblk->disk->flags |= GENHD_FL_NO_PART_SCAN;
+#endif
 
 	/* configure queue flush support */
 	virtblk_update_cache_mode(vdev);
@@ -966,6 +986,9 @@ static unsigned int features_legacy[] = {
 	VIRTIO_BLK_F_RO, VIRTIO_BLK_F_BLK_SIZE,
 	VIRTIO_BLK_F_FLUSH, VIRTIO_BLK_F_TOPOLOGY, VIRTIO_BLK_F_CONFIG_WCE,
 	VIRTIO_BLK_F_MQ, VIRTIO_BLK_F_DISCARD, VIRTIO_BLK_F_WRITE_ZEROES,
+#ifdef CONFIG_VIRTIO_BLK_NO_PART_SCAN
+	VIRTIO_BLK_F_NO_PART_SCAN,
+#endif
 }
 ;
 static unsigned int features[] = {
@@ -973,6 +996,9 @@ static unsigned int features[] = {
 	VIRTIO_BLK_F_RO, VIRTIO_BLK_F_BLK_SIZE,
 	VIRTIO_BLK_F_FLUSH, VIRTIO_BLK_F_TOPOLOGY, VIRTIO_BLK_F_CONFIG_WCE,
 	VIRTIO_BLK_F_MQ, VIRTIO_BLK_F_DISCARD, VIRTIO_BLK_F_WRITE_ZEROES,
+#ifdef CONFIG_VIRTIO_BLK_NO_PART_SCAN
+	VIRTIO_BLK_F_NO_PART_SCAN,
+#endif
 };
 
 static struct virtio_driver virtio_blk = {

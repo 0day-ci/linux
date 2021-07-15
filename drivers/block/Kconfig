@@ -399,6 +399,13 @@ config VIRTIO_BLK
 	  This is the virtual block driver for virtio.  It can be used with
           QEMU based VMMs (like KVM or Xen).  Say Y or M.
 
+config VIRTIO_BLK_NO_PART_SCAN
+	bool "Disable partition scanning for devices with no partitions"
+	depends on VIRTIO_BLK
+	help
+	  Disable partition scanning for devices with no partitions.
+	  Can reduce the kernel start time for tiny systems like squashfs images.
+
 config BLK_DEV_RBD
 	tristate "Rados block device (RBD)"
 	depends on INET && BLOCK
