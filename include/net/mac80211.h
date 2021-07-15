@@ -4893,12 +4893,14 @@ void ieee80211_report_low_ack(struct ieee80211_sta *sta, u32 num_packets);
  * @cntdwn_counter_offs: array of IEEE80211_MAX_CNTDWN_COUNTERS_NUM offsets
  *	to countdown counters.  This array can contain zero values which
  *	should be ignored.
+ * @mbssid_offset: position of the multiple bssid element
  */
 struct ieee80211_mutable_offsets {
 	u16 tim_offset;
 	u16 tim_length;
 
 	u16 cntdwn_counter_offs[IEEE80211_MAX_CNTDWN_COUNTERS_NUM];
+	u16 mbssid_offset;
 };
 
 /**
@@ -4924,6 +4926,93 @@ struct sk_buff *
 ieee80211_beacon_get_template(struct ieee80211_hw *hw,
 			      struct ieee80211_vif *vif,
 			      struct ieee80211_mutable_offsets *offs);
+
+/**
+ * enum ieee80211_bcn_tmpl_ema - EMA beacon generation type
+ *
+ * When enhanced multi-BSSID advertisements (EMA) mode is enabled, the
+ * non-transmitting profiles from the multiple BSSID set are split into more
+ * than one multiple BSSID elements if required. Each EMA beacon includes only
+ * one element to reduce the total size. The number of beacons required to
+ * cover all profiles is called as the profile periodicity of the set.
+ *
+ * In MAC80211, the multiple BSSID elements passed by the application are
+ * stored in a array and the index of the next element (starting from 0) to be
+ * included in the beacon template is tracked through the member ema_index of
+ * struct beacon_data.
+ *
+ * @IEEE80211_BCN_EMA_NONE: Used when EMA is disabled. Only one beacon
+ *	template will be generated which includes all multiple BSSID elements.
+ * @IEEE80211_BCN_EMA_NEXT: Used when EMA is enabled. Includes the next
+ *	multiple BSSID element while generating the beacon template.
+ * @IEEE80211_BCN_EMA_BASE: Used when EMA is enabled. Beacon template includes
+ *	the multiple MBSSID element at a specified index which should be set
+ *	to a value more than or equal to IEEE80211_BCN_EMA_BASE.
+ */
+enum ieee80211_bcn_tmpl_ema {
+	IEEE80211_BCN_EMA_NONE = -2,
+	IEEE80211_BCN_EMA_NEXT = -1,
+	IEEE80211_BCN_EMA_BASE = 0,
+};
+
+/**
+ * ieee80211_beacon_get_template_ema_next - EMA beacon template generation
+ *	function for drivers using the sw offload path.
+ * @hw: pointer obtained from ieee80211_alloc_hw().
+ * @vif: &struct ieee80211_vif pointer from the add_interface callback.
+ * @offs: &struct ieee80211_mutable_offsets pointer to struct that will
+ *	receive the offsets that may be updated by the driver.
+ *
+ * This function follows the same rules as ieee80211_beacon_get_template()
+ * but returns a beacon template which includes the next multiple BSSID
+ * element.
+ *
+ * Return: The beacon template. %NULL on error.
+ */
+struct sk_buff *ieee80211_beacon_get_template_ema_next(struct ieee80211_hw *hw,
+						       struct ieee80211_vif *vif,
+						       struct ieee80211_mutable_offsets *offs);
+
+/**
+ * struct ieee80211_ema_bcn_list - list entry of an EMA beacon
+ * @list: the list pointer.
+ * @skb: the skb containing this specific beacon
+ * @offs: &struct ieee80211_mutable_offsets pointer to struct that will
+ *	receive the offsets that may be updated by the driver.
+ */
+struct ieee80211_ema_bcn_list {
+	struct list_head list;
+	struct sk_buff *skb;
+	struct ieee80211_mutable_offsets offs;
+};
+
+/**
+ * ieee80211_beacon_get_template_ema_list - EMA beacon template generation
+ *	function for drivers using the hw offload.
+ * @hw: pointer obtained from ieee80211_alloc_hw().
+ * @vif: &struct ieee80211_vif pointer from the add_interface callback.
+ * @head: linked list head that will get populated with
+ *	&struct ieee80211_ema_bcn_list pointers.
+ *
+ * This function follows the same rules as ieee80211_beacon_get_template()
+ * but returns a linked list of all beacon templates required to cover all
+ * profiles in the multiple BSSID set. Each template includes only one multiple
+ * BSSID element.
+ *
+ * Return: The nuber of entries in the list or 0 on error.
+ */
+int ieee80211_beacon_get_template_ema_list(struct ieee80211_hw *hw,
+					   struct ieee80211_vif *vif,
+					   struct list_head *head);
+
+/**
+ * ieee80211_beacon_free_ema_list - free an EMA beacon template list
+ * @head: linked list head containing &struct ieee80211_ema_bcn_list pointers.
+ *
+ * This function will free a list previously acquired by calling
+ * ieee80211_beacon_get_template_ema_list()
+ */
+void ieee80211_beacon_free_ema_list(struct list_head *head);
 
 /**
  * ieee80211_beacon_get_tim - beacon generation function
