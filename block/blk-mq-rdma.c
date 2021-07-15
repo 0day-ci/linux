@@ -36,6 +36,9 @@ int blk_mq_rdma_map_queues(struct blk_mq_queue_map *map,
 			map->mq_map[cpu] = map->queue_offset + queue;
 	}
 
+	/* So far RDMA doesn't use managed irq */
+	map->use_managed_irq = false;
+
 	return 0;
 
 fallback:
