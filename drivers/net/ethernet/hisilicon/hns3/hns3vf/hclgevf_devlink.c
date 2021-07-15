@@ -34,6 +34,37 @@ static int hclgevf_devlink_info_get(struct devlink *devlink,
 						version_str);
 }
 
+static void hclgevf_devlink_get_param_setting(struct devlink *devlink)
+{
+	struct hclgevf_devlink_priv *priv = devlink_priv(devlink);
+	struct hclgevf_dev *hdev = priv->hdev;
+	struct pci_dev *pdev = hdev->pdev;
+	union devlink_param_value val;
+	int i, ret;
+
+	ret = devlink_param_driverinit_value_get(devlink,
+						 HCLGEVF_DEVLINK_PARAM_ID_RX_BUF_LEN,
+						 &val);
+	if (!ret) {
+		hdev->rx_buf_len = val.vu32;
+		hdev->nic.kinfo.rx_buf_len = hdev->rx_buf_len;
+		for (i = 0; i < hdev->num_tqps; i++)
+			hdev->htqp[i].q.buf_size = hdev->rx_buf_len;
+	} else {
+		dev_err(&pdev->dev,
+			"failed to get rx buffer size, ret = %d\n", ret);
+	}
+
+	ret = devlink_param_driverinit_value_get(devlink,
+						 HCLGEVF_DEVLINK_PARAM_ID_TX_BUF_SIZE,
+						 &val);
+	if (!ret)
+		hdev->nic.kinfo.devlink_tx_spare_buf_size = val.vu32;
+	else
+		dev_err(&pdev->dev,
+			"failed to get tx buffer size, ret = %d\n", ret);
+}
+
 static int hclgevf_devlink_reload_down(struct devlink *devlink,
 				       bool netns_change,
 				       enum devlink_reload_action action,
@@ -106,6 +137,49 @@ static const struct devlink_ops hclgevf_devlink_ops = {
 	.reload_up = hclgevf_devlink_reload_up,
 };
 
+static int
+hclgevf_devlink_rx_buffer_size_validate(struct devlink *devlink, u32 id,
+					union devlink_param_value val,
+					struct netlink_ext_ack *extack)
+{
+#define HCLGEVF_RX_BUF_LEN_2K	2048
+#define HCLGEVF_RX_BUF_LEN_4K	4096
+
+	if (val.vu32 != HCLGEVF_RX_BUF_LEN_2K &&
+	    val.vu32 != HCLGEVF_RX_BUF_LEN_4K) {
+		NL_SET_ERR_MSG_MOD(extack, "Supported size is 2048 or 4096");
+		return -EOPNOTSUPP;
+	}
+
+	return 0;
+}
+
+static const struct devlink_param hclgevf_devlink_params[] = {
+	DEVLINK_PARAM_DRIVER(HCLGEVF_DEVLINK_PARAM_ID_RX_BUF_LEN,
+			     "rx_buffer_len", DEVLINK_PARAM_TYPE_U32,
+			     BIT(DEVLINK_PARAM_CMODE_DRIVERINIT),
+			     NULL, NULL,
+			     hclgevf_devlink_rx_buffer_size_validate),
+	DEVLINK_PARAM_DRIVER(HCLGEVF_DEVLINK_PARAM_ID_TX_BUF_SIZE,
+			     "tx_buffer_size", DEVLINK_PARAM_TYPE_U32,
+			     BIT(DEVLINK_PARAM_CMODE_DRIVERINIT),
+			     NULL, NULL, NULL),
+};
+
+void hclgevf_devlink_set_params_init_values(struct hclgevf_dev *hdev)
+{
+	union devlink_param_value value;
+
+	value.vu32 = hdev->rx_buf_len;
+	devlink_param_driverinit_value_set(hdev->devlink,
+					   HCLGEVF_DEVLINK_PARAM_ID_RX_BUF_LEN,
+					   value);
+	value.vu32 = 0;
+	devlink_param_driverinit_value_set(hdev->devlink,
+					   HCLGEVF_DEVLINK_PARAM_ID_TX_BUF_SIZE,
+					   value);
+}
+
 int hclgevf_devlink_init(struct hclgevf_dev *hdev)
 {
 	struct pci_dev *pdev = hdev->pdev;
@@ -130,10 +204,20 @@ int hclgevf_devlink_init(struct hclgevf_dev *hdev)
 
 	hdev->devlink = devlink;
 
+	ret = devlink_params_register(devlink, hclgevf_devlink_params,
+				      ARRAY_SIZE(hclgevf_devlink_params));
+	if (ret) {
+		dev_err(&pdev->dev,
+			"failed to register devlink params, ret = %d\n", ret);
+		goto out_param_reg_fail;
+	}
+
 	devlink_reload_enable(devlink);
 
 	return 0;
-
+out_param_reg_fail:
+	hdev->devlink = NULL;
+	devlink_unregister(devlink);
 out_reg_fail:
 	devlink_free(devlink);
 	return ret;
@@ -148,6 +232,8 @@ void hclgevf_devlink_uninit(struct hclgevf_dev *hdev)
 
 	devlink_reload_disable(devlink);
 
+	devlink_params_unregister(devlink, hclgevf_devlink_params,
+				  ARRAY_SIZE(hclgevf_devlink_params));
 	devlink_unregister(devlink);
 
 	devlink_free(devlink);
