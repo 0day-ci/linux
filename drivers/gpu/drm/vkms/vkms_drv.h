@@ -19,6 +19,10 @@
 #define XRES_MAX  8192
 #define YRES_MAX  8192
 
+struct vkms_writeback_job {
+	struct dma_buf_map map[DRM_FORMAT_MAX_PLANES];
+};
+
 struct vkms_composer {
 	struct drm_framebuffer fb;
 	struct drm_rect src, dst;
@@ -55,7 +59,7 @@ struct vkms_crtc_state {
 	int num_active_planes;
 	/* stack of active planes for crc computation, should be in z order */
 	struct vkms_plane_state **active_planes;
-	void *active_writeback;
+	struct vkms_writeback_job *active_writeback;
 
 	/* below four are protected by vkms_output.composer_lock */
 	bool crc_pending;
