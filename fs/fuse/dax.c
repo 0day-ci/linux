@@ -1338,7 +1338,7 @@ static const struct address_space_operations fuse_dax_file_aops  = {
 	.invalidatepage	= noop_invalidatepage,
 };
 
-static bool fuse_should_enable_dax(struct inode *inode)
+static bool fuse_should_enable_dax(struct inode *inode, unsigned int flags)
 {
 	struct fuse_conn *fc = get_fuse_conn(inode);
 	unsigned int mode;
@@ -1351,16 +1351,36 @@ static bool fuse_should_enable_dax(struct inode *inode)
 	if (mode == FUSE_DAX_MOUNT_NEVER)
 		return false;
 
-	return true;
+	if (mode == FUSE_DAX_MOUNT_ALWAYS)
+		return true;
+
+	WARN_ON(mode != FUSE_DAX_MOUNT_INODE);
+	return flags & FUSE_ATTR_DAX;
 }
 
-void fuse_dax_inode_init(struct inode *inode)
+void fuse_dax_inode_init(struct inode *inode, unsigned int flags)
 {
-	if (!fuse_should_enable_dax(inode))
+	if (!fuse_should_enable_dax(inode, flags))
 		return;
 
 	inode->i_flags |= S_DAX;
 	inode->i_data.a_ops = &fuse_dax_file_aops;
+}
+
+void fuse_update_dax(struct inode *inode, unsigned int flags)
+{
+	bool oldstate, newstate;
+	struct fuse_conn *fc = get_fuse_conn(inode);
+
+	if (!IS_ENABLED(CONFIG_FUSE_DAX) || !fc->dax ||
+	    fc->dax->mode != FUSE_DAX_MOUNT_INODE)
+		return;
+
+	oldstate = IS_DAX(inode);
+	newstate = flags & FUSE_ATTR_DAX;
+
+	if (oldstate != newstate)
+		d_mark_dontcache(inode);
 }
 
 bool fuse_dax_check_alignment(struct fuse_conn *fc, unsigned int map_alignment)
