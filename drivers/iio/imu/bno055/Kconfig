@@ -1,0 +1,7 @@
+# SPDX-License-Identifier: GPL-2.0-only
+#
+# driver for Bosh bmo055
+#
+
+config BOSH_BNO055_IIO
+	tristate
