@@ -127,7 +127,12 @@ again:
 	if (dev_set) {
 		dev_set->device_count++;
 		xa_unlock(&vfio_device_set_xa);
+
+		mutex_lock(&dev_set->lock);
 		device->dev_set = dev_set;
+		list_add_tail(&device->dev_set_list, &dev_set->device_list);
+		mutex_unlock(&dev_set->lock);
+
 		if (dev_set != alloc_dev_set)
 			kfree(alloc_dev_set);
 		return 0;
@@ -141,6 +146,7 @@ again:
 	if (!alloc_dev_set)
 		return -ENOMEM;
 	mutex_init(&alloc_dev_set->lock);
+	INIT_LIST_HEAD(&alloc_dev_set->device_list);
 	alloc_dev_set->set_id = set_id;
 	goto again;
 }
@@ -152,6 +158,10 @@ static void vfio_release_device_set(struct vfio_device *device)
 
 	if (!dev_set)
 		return;
+
+	mutex_lock(&dev_set->lock);
+	list_del(&device->dev_set_list);
+	mutex_unlock(&dev_set->lock);
 
 	xa_lock(&vfio_device_set_xa);
 	dev_set->device_count--;

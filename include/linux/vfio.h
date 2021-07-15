@@ -23,6 +23,7 @@
 struct vfio_device_set {
 	void *set_id;
 	struct mutex lock;
+	struct list_head device_list;
 	unsigned int device_count;
 };
 
@@ -31,6 +32,7 @@ struct vfio_device {
 	const struct vfio_device_ops *ops;
 	struct vfio_group *group;
 	struct vfio_device_set *dev_set;
+	struct list_head dev_set_list;
 
 	/* Members below here are private, not for driver use */
 	refcount_t refcount;
