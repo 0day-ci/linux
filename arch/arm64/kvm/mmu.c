@@ -1229,8 +1229,10 @@ bool kvm_check_ioguard_page(struct kvm_vcpu *vcpu, gpa_t ipa)
 	ret = __check_ioguard_page(vcpu, ipa & PAGE_MASK);
 	spin_unlock(&vcpu->kvm->mmu_lock);
 
-	if (!ret)
+	if (!ret) {
+		trace_kvm_failed_mmio_check(*vcpu_pc(vcpu), ipa);
 		kvm_inject_dabt(vcpu, kvm_vcpu_get_hfar(vcpu));
+	}
 
 	return ret;
 }
