@@ -78,8 +78,8 @@ static size_t pci_vpd_size(struct pci_dev *dev, size_t old_size)
 	while (off < old_size && pci_read_vpd(dev, off, 1, header) == 1) {
 		unsigned char tag;
 
-		if (!header[0] && !off) {
-			pci_info(dev, "Invalid VPD tag 00, assume missing optional VPD EPROM\n");
+		if ((!header[0] || header[0] == 0xff) && !off) {
+			pci_info(dev, "Invalid VPD tag 00/FF, assume missing optional VPD EPROM\n");
 			return 0;
 		}
 
