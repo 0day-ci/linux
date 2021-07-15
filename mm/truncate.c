@@ -619,10 +619,7 @@ static int invalidate_complete_folio2(struct address_space *mapping,
 	__filemap_remove_folio(folio, NULL);
 	xa_unlock_irqrestore(&mapping->i_pages, flags);
 
-	if (mapping->a_ops->freepage)
-		mapping->a_ops->freepage(&folio->page);
-
-	folio_ref_sub(folio, folio_nr_pages(folio));	/* pagecache ref */
+	filemap_free_folio(mapping, folio);
 	return 1;
 failed:
 	xa_unlock_irqrestore(&mapping->i_pages, flags);
