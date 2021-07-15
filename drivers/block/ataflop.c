@@ -1988,6 +1988,23 @@ static int ataflop_alloc_disk(unsigned int drive, unsigned int type)
 
 static DEFINE_MUTEX(ataflop_probe_lock);
 
+static void atari_floppy_disk_remove(void)
+{
+	int i, type;
+
+	for (i = 0; i < FD_MAX_UNITS; i++) {
+		for (type = 0; type < NUM_DISK_MINORS; type++) {
+			if (!unit[i].disk[type])
+				continue;
+			del_gendisk(unit[i].disk[type]);
+			blk_cleanup_disk(unit[i].disk[0]);
+		}
+		blk_mq_free_tag_set(&unit[i].tag_set);
+	}
+	unregister_blkdev(FLOPPY_MAJOR, "fd");
+
+}
+
 static void ataflop_probe(dev_t dev)
 {
 	int drive = MINOR(dev) & 3;
@@ -2127,19 +2144,7 @@ __setup("floppy=", atari_floppy_setup);
 
 static void __exit atari_floppy_exit(void)
 {
-	int i, type;
-
-	for (i = 0; i < FD_MAX_UNITS; i++) {
-		for (type = 0; type < NUM_DISK_MINORS; type++) {
-			if (!unit[i].disk[type])
-				continue;
-			del_gendisk(unit[i].disk[type]);
-			blk_cleanup_disk(unit[i].disk[0]);
-		}
-		blk_mq_free_tag_set(&unit[i].tag_set);
-	}
-	unregister_blkdev(FLOPPY_MAJOR, "fd");
-
+	atari_floppy_disk_remove();
 	del_timer_sync(&fd_timer);
 	atari_stram_free( DMABuffer );
 }
