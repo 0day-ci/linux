@@ -988,6 +988,13 @@ static int me_huge_page(struct page *p, unsigned long pfn)
 	if (mapping) {
 		res = truncate_error_page(hpage, pfn, mapping);
 		unlock_page(hpage);
+		if (ret == MF_RECOVERED) {
+			put_page(hpage);
+			if (__page_handle_poison(p))
+				page_ref_inc(p);
+			else
+				ret = MF_FAILED;
+		}
 	} else {
 		res = MF_FAILED;
 		unlock_page(hpage);
