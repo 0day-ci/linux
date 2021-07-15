@@ -429,10 +429,11 @@ out_free_dev:
 	return err;
 }
 
-static void brd_probe(dev_t dev)
+static int brd_probe(dev_t dev)
 {
 	int i = MINOR(dev) / max_part;
 	struct brd_device *brd;
+	int err = 0;
 
 	mutex_lock(&brd_devices_mutex);
 	list_for_each_entry(brd, &brd_devices, brd_list) {
@@ -440,9 +441,11 @@ static void brd_probe(dev_t dev)
 			goto out_unlock;
 	}
 
-	brd_alloc(i);
+	err = brd_alloc(i);
 out_unlock:
 	mutex_unlock(&brd_devices_mutex);
+
+	return err;
 }
 
 static void brd_del_one(struct brd_device *brd)

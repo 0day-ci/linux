@@ -2005,22 +2005,32 @@ static void atari_floppy_disk_remove(void)
 
 }
 
-static void ataflop_probe(dev_t dev)
+static int ataflop_probe(dev_t dev)
 {
 	int drive = MINOR(dev) & 3;
 	int type  = MINOR(dev) >> 2;
+	int err = -ENODEV;
 
 	if (type)
 		type--;
 
-	if (drive >= FD_MAX_UNITS || type >= NUM_DISK_MINORS)
-		return;
+	if (drive >= FD_MAX_UNITS || type >= NUM_DISK_MINORS) {
+		err = -EINVAL;
+		goto out;
+	}
+
 	mutex_lock(&ataflop_probe_lock);
 	if (!unit[drive].disk[type]) {
-		if (ataflop_alloc_disk(drive, type) == 0)
-			add_disk(unit[drive].disk[type]);
+		if (ataflop_alloc_disk(drive, type) == 0) {
+			err = add_disk(unit[drive].disk[type]);
+			if (err)
+				blk_cleanup_disk(unit[drive].disk[type]);
+		}
 	}
 	mutex_unlock(&ataflop_probe_lock);
+
+out:
+	return err;
 }
 
 static int __init atari_floppy_init (void)

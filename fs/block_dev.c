@@ -1326,10 +1326,13 @@ struct block_device *blkdev_get_no_open(dev_t dev)
 {
 	struct block_device *bdev;
 	struct gendisk *disk;
+	int err;
 
 	bdev = bdget(dev);
 	if (!bdev) {
-		blk_request_module(dev);
+		err = blk_request_module(dev);
+		if (err)
+			return NULL;
 		bdev = bdget(dev);
 		if (!bdev)
 			return NULL;
