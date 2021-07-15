@@ -5,6 +5,8 @@
 
 #include <linux/init.h>
 #include <linux/interrupt.h>
+#include <linux/module.h>
+#include <linux/platform_device.h>
 
 #include "timer-of.h"
 
@@ -141,7 +143,7 @@ static struct timer_of to = {
 	},
 };
 
-static int __init sprd_timer_init(struct device_node *np)
+static int sprd_timer_init(struct device_node *np)
 {
 	int ret;
 
@@ -190,7 +192,7 @@ static struct clocksource suspend_clocksource = {
 	.flags	= CLOCK_SOURCE_IS_CONTINUOUS | CLOCK_SOURCE_SUSPEND_NONSTOP,
 };
 
-static int __init sprd_suspend_timer_init(struct device_node *np)
+static int sprd_suspend_timer_init(struct device_node *np)
 {
 	int ret;
 
@@ -204,6 +206,9 @@ static int __init sprd_suspend_timer_init(struct device_node *np)
 	return 0;
 }
 
-TIMER_OF_DECLARE(sc9860_timer, "sprd,sc9860-timer", sprd_timer_init);
-TIMER_OF_DECLARE(sc9860_persistent_timer, "sprd,sc9860-suspend-timer",
-		 sprd_suspend_timer_init);
+TIMER_PLATFORM_DRIVER_BEGIN(sprd_timer)
+TIMER_MATCH("sprd,sc9860-timer", sprd_timer_init)
+TIMER_MATCH("sprd,sc9860-suspend-timer", sprd_suspend_timer_init)
+TIMER_PLATFORM_DRIVER_END(sprd_timer);
+MODULE_DESCRIPTION("Unisoc broadcast timer module");
+MODULE_LICENSE("GPL");
