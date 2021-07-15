@@ -67,9 +67,88 @@ static bool prepend_name(struct prepend_buffer *p, const struct qstr *name)
 	return true;
 }
 
+/**
+ * prepend_name_with_len - prepend a pathname in front of current buffer
+ * pointer with limited orig_buflen.
+ * @p: prepend buffer which contains buffer pointer and allocated length
+ * @name: name string and length qstr structure
+ * @orig_buflen: original length of the buffer
+ *
+ * p.ptr is updated each time when prepends dentry name and its parent.
+ * Given the orginal buffer length might be less than name string, the
+ * dentry name can be moved or truncated. Returns at once if !buf or
+ * original length is not positive to avoid memory copy.
+ *
+ * Load acquire is needed to make sure that we see that terminating NUL,
+ * which is similar to prepend_name().
+ */
+static bool prepend_name_with_len(struct prepend_buffer *p,
+				  const struct qstr *name, int orig_buflen)
+{
+	/*
+	 * The load acquire is to order against the subsequent READ_ONCE()
+	 * of ->len. It is paired with the store release in __d_alloc(),
+	 */
+	const char *dname = smp_load_acquire(&name->name);
+	int dlen = READ_ONCE(name->len);
+	int last_len = p->len;
+	char *s;
+
+	p->len -= dlen + 1;
+
+	if (unlikely(!p->buf))
+		return false;
+
+	if (orig_buflen <= 0)
+		return false;
+
+	/*
+	 * The first time we overflow the buffer. Then fill the string
+	 * partially from the beginning
+	 */
+	if (unlikely(p->len < 0)) {
+		int buflen = strlen(p->buf);
+
+		/* memcpy src */
+		s = p->buf;
+
+		/* Still have small space to fill partially */
+		if (last_len > 0) {
+			p->buf -= last_len;
+			buflen += last_len;
+		}
+
+		if (buflen > dlen + 1) {
+			/* Dentry name can be fully filled into the space */
+			memmove(p->buf + dlen + 1, s, buflen - dlen - 1);
+			p->buf[0] = '/';
+			memcpy(p->buf + 1, dname, dlen);
+		} else if (buflen > 0) {
+			/* Can be partially filled, and drop last dentry */
+			p->buf[0] = '/';
+			memcpy(p->buf + 1, dname, buflen - 1);
+		}
+
+		return false;
+	}
+
+	s = p->buf -= dlen + 1;
+	*s++ = '/';
+	while (dlen--) {
+		char c = *dname++;
+
+		if (!c)
+			break;
+		*s++ = c;
+	}
+	return true;
+}
+
 static int __prepend_path(const struct dentry *dentry, const struct mount *mnt,
 			  const struct path *root, struct prepend_buffer *p)
 {
+	int orig_buflen = p->len;
+
 	while (dentry != root->dentry || &mnt->mnt != root->mnt) {
 		const struct dentry *parent = READ_ONCE(dentry->d_parent);
 
@@ -96,8 +175,7 @@ static int __prepend_path(const struct dentry *dentry, const struct mount *mnt,
 			return 3;
 
 		prefetch(parent);
-		if (!prepend_name(p, &dentry->d_name))
-			break;
+		prepend_name_with_len(p, &dentry->d_name, orig_buflen);
 		dentry = parent;
 	}
 	return 0;
@@ -260,6 +338,42 @@ char *d_path(const struct path *path, char *buf, int buflen)
 	return extract_string(&b);
 }
 EXPORT_SYMBOL(d_path);
+
+/**
+ * d_path_unsafe - return the full path of a dentry without taking
+ * any seqlock/spinlock. This helper is typical for debugging purposes.
+ * @path: path to report
+ * @buf: buffer to return value in
+ * @buflen: buffer length
+ * @prepend_len: prepended length when going through the full path
+ *
+ * Convert a dentry into an ASCII path name.
+ *
+ * Returns a pointer into the buffer or an error code if the path was
+ * errous.
+ *
+ * @buf can be NULL, and @buflen can be 0 or negative. But NULL @buf
+ * and buflen>0 is considered as an obvious caller bug.
+ *
+ */
+char *d_path_unsafe(const struct path *path, char *buf, int buflen,
+		    int *prepend_len)
+{
+	struct mount *mnt = real_mount(path->mnt);
+	DECLARE_BUFFER(b, buf, buflen);
+	struct path root;
+
+	rcu_read_lock();
+	get_fs_root_rcu(current->fs, &root);
+
+	prepend(&b, "", 1);
+	__prepend_path(path->dentry, mnt, &root, &b);
+	rcu_read_unlock();
+
+	*prepend_len = b.len;
+
+	return b.buf;
+}
 
 /*
  * Helper function for dentry_operations.d_dname() members
