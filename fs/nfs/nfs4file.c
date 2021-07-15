@@ -113,7 +113,7 @@ nfs4_file_flush(struct file *file, fl_owner_t id)
 	struct inode	*inode = file_inode(file);
 	errseq_t since;
 
-	dprintk("NFS: flush(%pD2)\n", file);
+	dprintk("NFS: flush(%pD)\n", file);
 
 	nfs_inc_stats(inode, NFSIOS_VFSFLUSH);
 	if ((file->f_mode & FMODE_WRITE) == 0)

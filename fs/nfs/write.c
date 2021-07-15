@@ -1368,7 +1368,7 @@ int nfs_updatepage(struct file *file, struct page *page,
 
 	nfs_inc_stats(inode, NFSIOS_VFSUPDATEPAGE);
 
-	dprintk("NFS:       nfs_updatepage(%pD2 %d@%lld)\n",
+	dprintk("NFS:       nfs_updatepage(%pD %d@%lld)\n",
 		file, count, (long long)(page_file_offset(page) + offset));
 
 	if (!count)

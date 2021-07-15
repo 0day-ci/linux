@@ -66,7 +66,7 @@ nfs_file_open(struct inode *inode, struct file *filp)
 {
 	int res;
 
-	dprintk("NFS: open file(%pD2)\n", filp);
+	dprintk("NFS: open file(%pD)\n", filp);
 
 	nfs_inc_stats(inode, NFSIOS_VFSOPEN);
 	res = nfs_check_flags(filp->f_flags);
@@ -80,7 +80,7 @@ nfs_file_open(struct inode *inode, struct file *filp)
 int
 nfs_file_release(struct inode *inode, struct file *filp)
 {
-	dprintk("NFS: release(%pD2)\n", filp);
+	dprintk("NFS: release(%pD)\n", filp);
 
 	nfs_inc_stats(inode, NFSIOS_VFSRELEASE);
 	nfs_file_clear_open_context(filp);
@@ -114,7 +114,7 @@ force_reval:
 
 loff_t nfs_file_llseek(struct file *filp, loff_t offset, int whence)
 {
-	dprintk("NFS: llseek file(%pD2, %lld, %d)\n",
+	dprintk("NFS: llseek file(%pD, %lld, %d)\n",
 			filp, offset, whence);
 
 	/*
@@ -142,7 +142,7 @@ nfs_file_flush(struct file *file, fl_owner_t id)
 	struct inode	*inode = file_inode(file);
 	errseq_t since;
 
-	dprintk("NFS: flush(%pD2)\n", file);
+	dprintk("NFS: flush(%pD)\n", file);
 
 	nfs_inc_stats(inode, NFSIOS_VFSFLUSH);
 	if ((file->f_mode & FMODE_WRITE) == 0)
@@ -163,7 +163,7 @@ nfs_file_read(struct kiocb *iocb, struct iov_iter *to)
 	if (iocb->ki_flags & IOCB_DIRECT)
 		return nfs_file_direct_read(iocb, to);
 
-	dprintk("NFS: read(%pD2, %zu@%lu)\n",
+	dprintk("NFS: read(%pD, %zu@%lu)\n",
 		iocb->ki_filp,
 		iov_iter_count(to), (unsigned long) iocb->ki_pos);
 
@@ -185,7 +185,7 @@ nfs_file_mmap(struct file * file, struct vm_area_struct * vma)
 	struct inode *inode = file_inode(file);
 	int	status;
 
-	dprintk("NFS: mmap(%pD2)\n", file);
+	dprintk("NFS: mmap(%pD)\n", file);
 
 	/* Note: generic_file_mmap() returns ENOSYS on nommu systems
 	 *       so we call that before revalidating the mapping
@@ -210,7 +210,7 @@ nfs_file_fsync_commit(struct file *file, int datasync)
 	struct inode *inode = file_inode(file);
 	int ret;
 
-	dprintk("NFS: fsync file(%pD2) datasync %d\n", file, datasync);
+	dprintk("NFS: fsync file(%pD) datasync %d\n", file, datasync);
 
 	nfs_inc_stats(inode, NFSIOS_VFSFSYNC);
 	ret = nfs_commit_inode(inode, FLUSH_SYNC);
@@ -325,7 +325,7 @@ static int nfs_write_begin(struct file *file, struct address_space *mapping,
 	struct page *page;
 	int once_thru = 0;
 
-	dfprintk(PAGECACHE, "NFS: write_begin(%pD2(%lu), %u@%lld)\n",
+	dfprintk(PAGECACHE, "NFS: write_begin(%pD(%lu), %u@%lld)\n",
 		file, mapping->host->i_ino, len, (long long) pos);
 
 start:
@@ -357,7 +357,7 @@ static int nfs_write_end(struct file *file, struct address_space *mapping,
 	struct nfs_open_context *ctx = nfs_file_open_context(file);
 	int status;
 
-	dfprintk(PAGECACHE, "NFS: write_end(%pD2(%lu), %u@%lld)\n",
+	dfprintk(PAGECACHE, "NFS: write_end(%pD(%lu), %u@%lld)\n",
 		file, mapping->host->i_ino, len, (long long) pos);
 
 	/*
@@ -548,7 +548,7 @@ static vm_fault_t nfs_vm_page_mkwrite(struct vm_fault *vmf)
 	vm_fault_t ret = VM_FAULT_NOPAGE;
 	struct address_space *mapping;
 
-	dfprintk(PAGECACHE, "NFS: vm_page_mkwrite(%pD2(%lu), offset %lld)\n",
+	dfprintk(PAGECACHE, "NFS: vm_page_mkwrite(%pD(%lu), offset %lld)\n",
 		filp, filp->f_mapping->host->i_ino,
 		(long long)page_offset(page));
 
@@ -618,7 +618,7 @@ ssize_t nfs_file_write(struct kiocb *iocb, struct iov_iter *from)
 	if (iocb->ki_flags & IOCB_DIRECT)
 		return nfs_file_direct_write(iocb, from);
 
-	dprintk("NFS: write(%pD2, %zu@%Ld)\n",
+	dprintk("NFS: write(%pD, %zu@%Ld)\n",
 		file, iov_iter_count(from), (long long) iocb->ki_pos);
 
 	if (IS_SWAPFILE(inode))
@@ -800,7 +800,7 @@ int nfs_lock(struct file *filp, int cmd, struct file_lock *fl)
 	int ret = -ENOLCK;
 	int is_local = 0;
 
-	dprintk("NFS: lock(%pD2, t=%x, fl=%x, r=%lld:%lld)\n",
+	dprintk("NFS: lock(%pD, t=%x, fl=%x, r=%lld:%lld)\n",
 			filp, fl->fl_type, fl->fl_flags,
 			(long long)fl->fl_start, (long long)fl->fl_end);
 
@@ -838,7 +838,7 @@ int nfs_flock(struct file *filp, int cmd, struct file_lock *fl)
 	struct inode *inode = filp->f_mapping->host;
 	int is_local = 0;
 
-	dprintk("NFS: flock(%pD2, t=%x, fl=%x)\n",
+	dprintk("NFS: flock(%pD, t=%x, fl=%x)\n",
 			filp, fl->fl_type, fl->fl_flags);
 
 	if (!(fl->fl_flags & FL_FLOCK))

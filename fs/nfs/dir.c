@@ -108,7 +108,7 @@ nfs_opendir(struct inode *inode, struct file *filp)
 	int res = 0;
 	struct nfs_open_dir_context *ctx;
 
-	dfprintk(FILE, "NFS: open dir(%pD2)\n", filp);
+	dfprintk(FILE, "NFS: open dir(%pD)\n", filp);
 
 	nfs_inc_stats(inode, NFSIOS_VFSOPEN);
 
@@ -453,7 +453,7 @@ static int nfs_readdir_search_for_cookie(struct nfs_cache_array *array,
 				if (desc->duped > 0
 				    && desc->dup_cookie == desc->dir_cookie) {
 					if (printk_ratelimit()) {
-						pr_notice("NFS: directory %pD2 contains a readdir loop."
+						pr_notice("NFS: directory %pD contains a readdir loop."
 								"Please contact your server vendor.  "
 								"The file: %s has duplicate cookie %llu\n",
 								desc->file, array->array[i].name, desc->dir_cookie);
@@ -1081,7 +1081,7 @@ static int nfs_readdir(struct file *file, struct dir_context *ctx)
 	struct nfs_readdir_descriptor *desc;
 	int res;
 
-	dfprintk(FILE, "NFS: readdir(%pD2) starting at cookie %llu\n",
+	dfprintk(FILE, "NFS: readdir(%pD) starting at cookie %llu\n",
 			file, (long long)ctx->pos);
 	nfs_inc_stats(inode, NFSIOS_VFSGETDENTS);
 
@@ -1155,7 +1155,7 @@ static int nfs_readdir(struct file *file, struct dir_context *ctx)
 	kfree(desc);
 
 out:
-	dfprintk(FILE, "NFS: readdir(%pD2) returns %d\n", file, res);
+	dfprintk(FILE, "NFS: readdir(%pD) returns %d\n", file, res);
 	return res;
 }
 
@@ -1163,7 +1163,7 @@ static loff_t nfs_llseek_dir(struct file *filp, loff_t offset, int whence)
 {
 	struct nfs_open_dir_context *dir_ctx = filp->private_data;
 
-	dfprintk(FILE, "NFS: llseek dir(%pD2, %lld, %d)\n",
+	dfprintk(FILE, "NFS: llseek dir(%pD, %lld, %d)\n",
 			filp, offset, whence);
 
 	switch (whence) {
@@ -1205,7 +1205,7 @@ static loff_t nfs_llseek_dir(struct file *filp, loff_t offset, int whence)
 static int nfs_fsync_dir(struct file *filp, loff_t start, loff_t end,
 			 int datasync)
 {
-	dfprintk(FILE, "NFS: fsync dir(%pD2) datasync %d\n", filp, datasync);
+	dfprintk(FILE, "NFS: fsync dir(%pD) datasync %d\n", filp, datasync);
 
 	nfs_inc_stats(file_inode(filp), NFSIOS_VFSFSYNC);
 	return 0;
