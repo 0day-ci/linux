@@ -77,11 +77,7 @@ static size_t pci_vpd_size(struct pci_dev *dev, size_t old_size)
 
 	while (off < old_size && pci_read_vpd(dev, off, 1, header) == 1) {
 		unsigned char tag;
-
-		if (!header[0] && !off) {
-			pci_info(dev, "Invalid VPD tag 00, assume missing optional VPD EPROM\n");
-			return 0;
-		}
+		size_t size;
 
 		if (header[0] & PCI_VPD_LRDT) {
 			/* Large Resource Data Type Tag */
@@ -96,8 +92,16 @@ static size_t pci_vpd_size(struct pci_dev *dev, size_t old_size)
 						 off + 1);
 					return 0;
 				}
-				off += PCI_VPD_LRDT_TAG_SIZE +
-					pci_vpd_lrdt_size(header);
+				size = pci_vpd_lrdt_size(header);
+
+				/*
+				 * Missing EEPROM may read as 0xff.
+				 * Length of 0xffff (65535) cannot be valid
+				 * because VPD can't be that large.
+				 */
+				if (size > PCI_VPD_MAX_SIZE)
+					goto error;
+				off += PCI_VPD_LRDT_TAG_SIZE + size;
 			} else {
 				pci_warn(dev, "invalid large VPD tag %02x at offset %zu",
 					 tag, off);
@@ -105,13 +109,27 @@ static size_t pci_vpd_size(struct pci_dev *dev, size_t old_size)
 			}
 		} else {
 			/* Short Resource Data Type Tag */
-			off += PCI_VPD_SRDT_TAG_SIZE +
-				pci_vpd_srdt_size(header);
 			tag = pci_vpd_srdt_tag(header);
+			size = pci_vpd_srdt_size(header);
+
+			/*
+			 * Missing EEPROM may read as 0x00.  A small item
+			 * must be at least 2 bytes.
+			 */
+			if (size == 0)
+				goto error;
+
+			off += PCI_VPD_SRDT_TAG_SIZE + size;
 			if (tag == PCI_VPD_STIN_END)	/* End tag descriptor */
 				return off;
 		}
 	}
+	return 0;
+
+error:
+	pci_info(dev, "invalid VPD tag %#04x at offset %zu%s\n",
+		 header[0], off, off == 0 ?
+		 "; assume missing optional EEPROM" : "");
 	return 0;
 }
 
