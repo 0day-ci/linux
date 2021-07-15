@@ -969,28 +969,17 @@ static void glk_force_audio_cdclk(struct drm_i915_private *dev_priv,
 	if (!crtc)
 		return;
 
-	drm_modeset_acquire_init(&ctx, 0);
 	state = drm_atomic_state_alloc(&dev_priv->drm);
 	if (drm_WARN_ON(&dev_priv->drm, !state))
 		return;
 
-	state->acquire_ctx = &ctx;
-
-retry:
-	ret = glk_force_audio_cdclk_commit(to_intel_atomic_state(state), crtc,
-					   enable);
-	if (ret == -EDEADLK) {
-		drm_atomic_state_clear(state);
-		drm_modeset_backoff(&ctx);
-		goto retry;
-	}
+	drm_modeset_lock_ctx_retry(&ctx, state, 0, ret)
+		ret = glk_force_audio_cdclk_commit(to_intel_atomic_state(state),
+						   crtc, enable);
 
 	drm_WARN_ON(&dev_priv->drm, ret);
 
 	drm_atomic_state_put(state);
-
-	drm_modeset_drop_locks(&ctx);
-	drm_modeset_acquire_fini(&ctx);
 }
 
 static unsigned long i915_audio_component_get_power(struct device *kdev)

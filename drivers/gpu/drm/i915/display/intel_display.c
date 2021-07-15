@@ -12054,40 +12054,30 @@ static void sanitize_watermarks(struct drm_i915_private *dev_priv)
 
 	intel_state = to_intel_atomic_state(state);
 
-	drm_modeset_acquire_init(&ctx, 0);
+	drm_modeset_lock_ctx_retry(&ctx, state, 0, ret) {
+		/*
+		 * Hardware readout is the only time we don't want to calculate
+		 * intermediate watermarks (since we don't trust the current
+		 * watermarks).
+		 */
+		if (!HAS_GMCH(dev_priv))
+			intel_state->skip_intermediate_wm = true;
 
-retry:
-	state->acquire_ctx = &ctx;
+		ret = sanitize_watermarks_add_affected(state);
+		if (ret)
+			continue;
 
-	/*
-	 * Hardware readout is the only time we don't want to calculate
-	 * intermediate watermarks (since we don't trust the current
-	 * watermarks).
-	 */
-	if (!HAS_GMCH(dev_priv))
-		intel_state->skip_intermediate_wm = true;
+		ret = intel_atomic_check(&dev_priv->drm, state);
+		if (ret)
+			continue;
 
-	ret = sanitize_watermarks_add_affected(state);
-	if (ret)
-		goto fail;
+		/* Write calculated watermark values back */
+		for_each_new_intel_crtc_in_state(intel_state, crtc, crtc_state, i) {
+			crtc_state->wm.need_postvbl_update = true;
+			dev_priv->display.optimize_watermarks(intel_state, crtc);
 
-	ret = intel_atomic_check(&dev_priv->drm, state);
-	if (ret)
-		goto fail;
-
-	/* Write calculated watermark values back */
-	for_each_new_intel_crtc_in_state(intel_state, crtc, crtc_state, i) {
-		crtc_state->wm.need_postvbl_update = true;
-		dev_priv->display.optimize_watermarks(intel_state, crtc);
-
-		to_intel_crtc_state(crtc->base.state)->wm = crtc_state->wm;
-	}
-
-fail:
-	if (ret == -EDEADLK) {
-		drm_atomic_state_clear(state);
-		drm_modeset_backoff(&ctx);
-		goto retry;
+			to_intel_crtc_state(crtc->base.state)->wm = crtc_state->wm;
+		}
 	}
 
 	/*
@@ -12105,9 +12095,6 @@ fail:
 		 "Could not determine valid watermarks for inherited state\n");
 
 	drm_atomic_state_put(state);
-
-	drm_modeset_drop_locks(&ctx);
-	drm_modeset_acquire_fini(&ctx);
 }
 
 static void intel_update_fdi_pll_freq(struct drm_i915_private *dev_priv)
@@ -12178,37 +12165,27 @@ static int intel_initial_commit(struct drm_device *dev)
 {
 	struct drm_modeset_acquire_ctx ctx;
 	struct drm_atomic_state *state;
-	struct intel_crtc *crtc;
 	int ret;
 
 	state = drm_atomic_state_alloc(dev);
 	if (!state)
 		return -ENOMEM;
 
-	drm_modeset_acquire_init(&ctx, 0);
+	drm_modeset_lock_ctx_retry(&ctx, state, 0, ret) {
+		struct intel_crtc *crtc;
 
-retry:
-	state->acquire_ctx = &ctx;
-
-	for_each_intel_crtc(dev, crtc) {
-		ret = intel_crtc_initial_commit(to_intel_atomic_state(state), crtc);
+		for_each_intel_crtc(dev, crtc) {
+			ret = intel_crtc_initial_commit(to_intel_atomic_state(state), crtc);
+			if (ret)
+				break;
+		}
 		if (ret)
-			goto out;
-	}
+			continue;
 
-	ret = drm_atomic_commit(state);
-
-out:
-	if (ret == -EDEADLK) {
-		drm_atomic_state_clear(state);
-		drm_modeset_backoff(&ctx);
-		goto retry;
+		ret = drm_atomic_commit(state);
 	}
 
 	drm_atomic_state_put(state);
-
-	drm_modeset_drop_locks(&ctx);
-	drm_modeset_acquire_fini(&ctx);
 
 	return ret;
 }
@@ -13320,25 +13297,14 @@ void intel_display_resume(struct drm_device *dev)
 		return;
 
 	dev_priv->modeset_restore_state = NULL;
-	if (state)
-		state->acquire_ctx = &ctx;
 
-	drm_modeset_acquire_init(&ctx, 0);
-
-	while (1) {
-		ret = drm_modeset_lock_all_ctx(dev, &ctx);
-		if (ret != -EDEADLK)
-			break;
-
-		drm_modeset_backoff(&ctx);
-	}
-
-	if (!ret)
+	drm_modeset_lock_all_ctx_retry(dev, &ctx, state, 0, ret) {
 		ret = __intel_display_resume(dev, state, &ctx);
+		if (ret)
+			continue;
 
-	intel_enable_ipc(dev_priv);
-	drm_modeset_drop_locks(&ctx);
-	drm_modeset_acquire_fini(&ctx);
+		intel_enable_ipc(dev_priv);
+	}
 
 	if (ret)
 		drm_err(&dev_priv->drm,

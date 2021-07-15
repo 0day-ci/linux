@@ -2294,44 +2294,32 @@ static int i915_dsc_fec_support_show(struct seq_file *m, void *data)
 {
 	struct drm_connector *connector = m->private;
 	struct drm_device *dev = connector->dev;
-	struct drm_crtc *crtc;
-	struct intel_dp *intel_dp;
 	struct drm_modeset_acquire_ctx ctx;
-	struct intel_crtc_state *crtc_state = NULL;
-	int ret = 0;
-	bool try_again = false;
+	int ret;
 
-	drm_modeset_acquire_init(&ctx, DRM_MODESET_ACQUIRE_INTERRUPTIBLE);
+	drm_modeset_lock_ctx_retry(&ctx, NULL, DRM_MODESET_ACQUIRE_INTERRUPTIBLE, ret) {
+		struct intel_crtc_state *crtc_state;
+		struct intel_dp *intel_dp;
+		struct drm_crtc *crtc;
 
-	do {
-		try_again = false;
 		ret = drm_modeset_lock(&dev->mode_config.connection_mutex,
 				       &ctx);
-		if (ret) {
-			if (ret == -EDEADLK && !drm_modeset_backoff(&ctx)) {
-				try_again = true;
-				continue;
-			}
-			break;
-		}
+		if (ret)
+			continue;
+
 		crtc = connector->state->crtc;
 		if (connector->status != connector_status_connected || !crtc) {
 			ret = -ENODEV;
-			break;
+			continue;
 		}
+
 		ret = drm_modeset_lock(&crtc->mutex, &ctx);
-		if (ret == -EDEADLK) {
-			ret = drm_modeset_backoff(&ctx);
-			if (!ret) {
-				try_again = true;
-				continue;
-			}
-			break;
-		} else if (ret) {
-			break;
-		}
+		if (ret)
+			continue;
+
 		intel_dp = intel_attached_dp(to_intel_connector(connector));
 		crtc_state = to_intel_crtc_state(crtc->state);
+
 		seq_printf(m, "DSC_Enabled: %s\n",
 			   yesno(crtc_state->dsc.compression_enable));
 		seq_printf(m, "DSC_Sink_Support: %s\n",
@@ -2341,10 +2329,7 @@ static int i915_dsc_fec_support_show(struct seq_file *m, void *data)
 		if (!intel_dp_is_edp(intel_dp))
 			seq_printf(m, "FEC_Sink_Support: %s\n",
 				   yesno(drm_dp_sink_supports_fec(intel_dp->fec_capable)));
-	} while (try_again);
-
-	drm_modeset_drop_locks(&ctx);
-	drm_modeset_acquire_fini(&ctx);
+	}
 
 	return ret;
 }
