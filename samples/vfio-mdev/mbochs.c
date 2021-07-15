@@ -1274,11 +1274,6 @@ static long mbochs_ioctl(struct vfio_device *vdev, unsigned int cmd,
 	return -ENOTTY;
 }
 
-static int mbochs_open(struct vfio_device *vdev)
-{
-	return 0;
-}
-
 static void mbochs_close(struct vfio_device *vdev)
 {
 	struct mdev_state *mdev_state =
@@ -1397,7 +1392,6 @@ static struct attribute_group *mdev_type_groups[] = {
 };
 
 static const struct vfio_device_ops mbochs_dev_ops = {
-	.open = mbochs_open,
 	.release = mbochs_close,
 	.read = mbochs_read,
 	.write = mbochs_write,
