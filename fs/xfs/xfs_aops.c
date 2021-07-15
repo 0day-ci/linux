@@ -432,10 +432,11 @@ xfs_discard_page(
 	struct page		*page,
 	loff_t			fileoff)
 {
-	struct inode		*inode = page->mapping->host;
+	struct folio		*folio = page_folio(page);
+	struct inode		*inode = folio->mapping->host;
 	struct xfs_inode	*ip = XFS_I(inode);
 	struct xfs_mount	*mp = ip->i_mount;
-	unsigned int		pageoff = offset_in_page(fileoff);
+	size_t			pageoff = offset_in_folio(folio, fileoff);
 	xfs_fileoff_t		start_fsb = XFS_B_TO_FSBT(mp, fileoff);
 	xfs_fileoff_t		pageoff_fsb = XFS_B_TO_FSBT(mp, pageoff);
 	int			error;
@@ -445,14 +446,14 @@ xfs_discard_page(
 
 	xfs_alert_ratelimited(mp,
 		"page discard on page "PTR_FMT", inode 0x%llx, offset %llu.",
-			page, ip->i_ino, fileoff);
+			folio, ip->i_ino, fileoff);
 
 	error = xfs_bmap_punch_delalloc_range(ip, start_fsb,
-			i_blocks_per_page(inode, page) - pageoff_fsb);
+			i_blocks_per_folio(inode, folio) - pageoff_fsb);
 	if (error && !XFS_FORCED_SHUTDOWN(mp))
 		xfs_alert(mp, "page discard unable to remove delalloc mapping.");
 out_invalidate:
-	iomap_invalidatepage(page, pageoff, PAGE_SIZE - pageoff);
+	iomap_invalidatepage(&folio->page, pageoff, folio_size(folio) - pageoff);
 }
 
 static const struct iomap_writeback_ops xfs_writeback_ops = {
