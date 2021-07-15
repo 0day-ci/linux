@@ -619,12 +619,16 @@ static int stage2_map_walker_try_leaf(u64 addr, u64 end, u32 level,
 	}
 
 	/* Perform CMOs before installation of the guest stage-2 PTE */
-	if (mm_ops->dcache_clean_inval_poc && stage2_pte_cacheable(pgt, new))
-		mm_ops->dcache_clean_inval_poc(kvm_pte_follow(new, mm_ops),
-						granule);
-
-	if (mm_ops->icache_inval_pou && stage2_pte_executable(new))
-		mm_ops->icache_inval_pou(kvm_pte_follow(new, mm_ops), granule);
+	if (kvm_phys_is_valid(phys)) {
+		if (mm_ops->dcache_clean_inval_poc &&
+		    stage2_pte_cacheable(pgt, new))
+			mm_ops->dcache_clean_inval_poc(kvm_pte_follow(new,
+								      mm_ops),
+						       granule);
+		if (mm_ops->icache_inval_pou && stage2_pte_executable(new))
+			mm_ops->icache_inval_pou(kvm_pte_follow(new, mm_ops),
+						 granule);
+	}
 
 	smp_store_release(ptep, new);
 	if (stage2_pte_is_counted(new))
