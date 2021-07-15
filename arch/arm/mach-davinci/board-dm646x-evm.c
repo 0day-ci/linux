@@ -20,6 +20,7 @@
 #include <linux/init.h>
 #include <linux/leds.h>
 #include <linux/gpio.h>
+#include <linux/gpio/machine.h>
 #include <linux/platform_device.h>
 #include <linux/i2c.h>
 #include <linux/property.h>
@@ -202,10 +203,10 @@ static struct i2c_driver dm6467evm_cpld_driver = {
 /* LEDS */
 
 static struct gpio_led evm_leds[] = {
-	{ .name = "DS1", .active_low = 1, },
-	{ .name = "DS2", .active_low = 1, },
-	{ .name = "DS3", .active_low = 1, },
-	{ .name = "DS4", .active_low = 1, },
+	{ .name = "DS1" },
+	{ .name = "DS2" },
+	{ .name = "DS3" },
+	{ .name = "DS4" },
 };
 
 static const struct gpio_led_platform_data evm_led_data = {
@@ -213,18 +214,32 @@ static const struct gpio_led_platform_data evm_led_data = {
 	.leds     = evm_leds,
 };
 
+static struct gpiod_lookup_table evm_leds_gpio_table = {
+	.dev_id = "leds-gpio.0",
+	.table = {
+		/*
+		 * These GPIOs are on a PCF8574a GPIO expander, which
+		 * is in turn named after the I2C device name. This is
+		 * device "u2" on I2C bus 1 with address 0x38. These
+		 * leds are at offset 4, 5, 6, 7.
+		 */
+		GPIO_LOOKUP_IDX("i2c-u2", 4, NULL, 0, GPIO_ACTIVE_LOW),
+		GPIO_LOOKUP_IDX("i2c-u2", 5, NULL, 1, GPIO_ACTIVE_LOW),
+		GPIO_LOOKUP_IDX("i2c-u2", 6, NULL, 2, GPIO_ACTIVE_LOW),
+		GPIO_LOOKUP_IDX("i2c-u2", 7, NULL, 3, GPIO_ACTIVE_LOW),
+		{ },
+	},
+};
+
 static struct platform_device *evm_led_dev;
 
 static int evm_led_setup(struct i2c_client *client, int gpio,
 			unsigned int ngpio, void *c)
 {
-	struct gpio_led *leds = evm_leds;
 	int status;
 
-	while (ngpio--) {
-		leds->gpio = gpio++;
-		leds++;
-	}
+	/* Add the lookup table */
+	gpiod_add_lookup_table(&evm_leds_gpio_table);
 
 	evm_led_dev = platform_device_alloc("leds-gpio", 0);
 	platform_device_add_data(evm_led_dev, &evm_led_data,
@@ -438,6 +453,7 @@ static struct i2c_board_info __initdata i2c_info[] =  {
 	},
 	{
 		I2C_BOARD_INFO("pcf8574a", 0x38),
+		.dev_name = "u2",
 		.platform_data	= &pcf_data,
 	},
 	{
