@@ -73,13 +73,7 @@ static int iomap_swapfile_add_extent(struct iomap_swapfile_info *isi)
 
 static int iomap_swapfile_fail(struct iomap_swapfile_info *isi, const char *str)
 {
-	char *buf, *p = ERR_PTR(-ENOMEM);
-
-	buf = kmalloc(PATH_MAX, GFP_KERNEL);
-	if (buf)
-		p = file_path(isi->file, buf, PATH_MAX);
-	pr_err("swapon: file %s %s\n", IS_ERR(p) ? "<unknown>" : p, str);
-	kfree(buf);
+	pr_err("swapon: file %pD %s\n", isi->file, str);
 	return -EINVAL;
 }
 

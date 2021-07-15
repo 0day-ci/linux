@@ -426,7 +426,7 @@ iomap_dio_actor(struct inode *inode, loff_t pos, loff_t length,
 		 * iomap_apply() call in the DIO path, then it will see the
 		 * DELALLOC block that the page-mkwrite allocated.
 		 */
-		pr_warn_ratelimited("Direct I/O collision with buffered writes! File: %pD4 Comm: %.20s\n",
+		pr_warn_ratelimited("Direct I/O collision with buffered writes! File: %pD Comm: %.20s\n",
 				    dio->iocb->ki_filp, current->comm);
 		return -EIO;
 	default:
