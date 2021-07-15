@@ -2738,7 +2738,6 @@ int fsg_common_create_lun(struct fsg_common *common, struct fsg_lun_config *cfg,
 			  const char **name_pfx)
 {
 	struct fsg_lun *lun;
-	char *pathbuf, *p;
 	int rc = -ENOMEM;
 
 	if (id >= ARRAY_SIZE(common->luns))
@@ -2790,22 +2789,17 @@ int fsg_common_create_lun(struct fsg_common *common, struct fsg_lun_config *cfg,
 			goto error_lun;
 	}
 
-	pathbuf = kmalloc(PATH_MAX, GFP_KERNEL);
-	p = "(no medium)";
-	if (fsg_lun_is_open(lun)) {
-		p = "(error)";
-		if (pathbuf) {
-			p = file_path(lun->filp, pathbuf, PATH_MAX);
-			if (IS_ERR(p))
-				p = "(error)";
-		}
-	}
-	pr_info("LUN: %s%s%sfile: %s\n",
-	      lun->removable ? "removable " : "",
-	      lun->ro ? "read only " : "",
-	      lun->cdrom ? "CD-ROM " : "",
-	      p);
-	kfree(pathbuf);
+	if (fsg_lun_is_open(lun))
+		pr_info("LUN: %s%s%sfile: %pD\n",
+			lun->removable ? "removable " : "",
+			lun->ro ? "read only " : "",
+			lun->cdrom ? "CD-ROM " : "",
+			lun->filp);
+	else
+		pr_info("LUN: %s%s%sfile: (no medium)\n",
+			lun->removable ? "removable " : "",
+			lun->ro ? "read only " : "",
+			lun->cdrom ? "CD-ROM " : "");
 
 	return 0;
 
