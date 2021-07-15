@@ -5217,18 +5217,14 @@ void print_vma_addr(char *prefix, unsigned long ip)
 	vma = find_vma(mm, ip);
 	if (vma && vma->vm_file) {
 		struct file *f = vma->vm_file;
-		char *buf = (char *)__get_free_page(GFP_NOWAIT);
-		if (buf) {
-			char *p;
 
-			p = file_path(f, buf, PAGE_SIZE);
-			if (IS_ERR(p))
-				p = "?";
-			printk("%s%s[%lx+%lx]", prefix, kbasename(p),
+		if (f)
+			printk("%s%pd[%lx+%lx]", prefix, f->f_path.dentry,
 					vma->vm_start,
 					vma->vm_end - vma->vm_start);
-			free_page((unsigned long)buf);
-		}
+		else
+			printk("%s?[%lx+%lx]", prefix, vma->vm_start,
+					vma->vm_end - vma->vm_start);
 	}
 	mmap_read_unlock(mm);
 }
