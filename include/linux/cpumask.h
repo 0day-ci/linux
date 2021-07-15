@@ -983,6 +983,69 @@ cpumap_print_to_pagebuf(bool list, char *buf, const struct cpumask *mask)
 				      nr_cpu_ids);
 }
 
+/**
+ * cpumap_print_to_buf  - copies the cpumask into the buffer
+ * @list: indicates whether the cpumap must be list
+ *      true:  print in decimal list format
+ *      false: print in hexadecimal bitmask format
+ *
+ * The existing cpumap_print_to_pagebuf() is used by cpu topology and other
+ * drivers to export hexadecimal bitmask and decimal list to userspace by
+ * sysfs ABI.
+ * Drivers might be using a normal attribute for this kind of ABIs. A
+ * normal attribute typically has show entry as below:
+ * static ssize_t example_attribute_show(struct device *dev,
+ * 		struct device_attribute *attr, char *buf)
+ * {
+ * 	...
+ * 	return cpumap_print_to_pagebuf(true, buf, &pmu_mmdc->cpu);
+ * }
+ * show entry of attribute has no offset and count parameters. this means
+ * the file is limited to one page only.
+ * cpumap_print_to_pagebuf() API works terribly well for this kind of
+ * normal attribute with buf parameter and without offset, count:
+ * cpumap_print_to_pagebuf(bool list, char *buf, const struct cpumask *mask)
+ * {
+ * }
+ * The problem is once we have many cpus, we have a chance to make bitmask
+ * or list more than one page. Especially for list, it could be as complex
+ * as 0,3,5,7,9,... We have no simple way to know it exact size.
+ * It turns out bin_attribute is a way to break this limit. bin_attribute
+ * has show entry as below:
+ * static ssize_t
+ * example_bin_attribute_show(struct file *filp, struct kobject *kobj,
+ * 		struct bin_attribute *attr, char *buf,
+ * 		loff_t offset, size_t count)
+ * {
+ * 	...
+ * }
+ * With the new offset and count parameters, this makes sysfs ABI be able
+ * to support file size more than one page. For example, offset could be
+ * >= 4096.
+ * cpumap_print_to_buf() makes those drivers be able to to support large
+ * bitmask and list after they move to use bin_attribute. In result, we
+ * have to pass the corresponding parameters such as off, count from
+ * bin_attribute show entry to this API.
+ *
+ * @mask: the cpumask to copy
+ * @buf: the buffer to copy into
+ * @off: in the string from which we are copying, We copy to @buf
+ * @count: the maximum number of bytes to print
+ *
+ * The function copies the cpumask into the buffer either as comma-separated
+ * list of cpus or hex values of cpumask; Typically used by bin_attribute to
+ * export cpumask bitmask and list ABI.
+ *
+ * Returns the length of how many bytes have been copied.
+ */
+static inline ssize_t
+cpumap_print_to_buf(bool list, char *buf, const struct cpumask *mask,
+		loff_t off, size_t count)
+{
+	return bitmap_print_to_buf(list, buf, cpumask_bits(mask),
+				   nr_cpu_ids, off, count);
+}
+
 #if NR_CPUS <= BITS_PER_LONG
 #define CPU_MASK_ALL							\
 (cpumask_t) { {								\
