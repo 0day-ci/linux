@@ -28,10 +28,21 @@ early_param("nohugeiomap", set_nohugeiomap);
 static const unsigned int iomap_max_page_shift = PAGE_SHIFT;
 #endif	/* CONFIG_HAVE_ARCH_HUGE_VMAP */
 
+void __weak ioremap_page_range_hook(unsigned long addr, unsigned long end,
+				    phys_addr_t phys_addr, pgprot_t prot)
+{
+}
+
 int ioremap_page_range(unsigned long addr,
 		       unsigned long end, phys_addr_t phys_addr, pgprot_t prot)
 {
-	return vmap_range(addr, end, phys_addr, prot, iomap_max_page_shift);
+	int ret;
+
+	ret = vmap_range(addr, end, phys_addr, prot, iomap_max_page_shift);
+	if (!ret)
+		ioremap_page_range_hook(addr, end, phys_addr, prot);
+
+	return ret;
 }
 
 #ifdef CONFIG_GENERIC_IOREMAP
