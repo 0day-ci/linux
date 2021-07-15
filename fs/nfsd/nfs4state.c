@@ -2456,7 +2456,7 @@ static void states_stop(struct seq_file *s, void *v)
 
 static void nfs4_show_fname(struct seq_file *s, struct nfsd_file *f)
 {
-         seq_printf(s, "filename: \"%pD2\"", f->nf_file);
+	seq_printf(s, "filename: \"%pD\"", f->nf_file);
 }
 
 static void nfs4_show_superblock(struct seq_file *s, struct nfsd_file *f)
