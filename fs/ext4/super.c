@@ -803,31 +803,27 @@ void __ext4_error_file(struct file *file, const char *function,
 	va_list args;
 	struct va_format vaf;
 	struct inode *inode = file_inode(file);
-	char pathname[80], *path;
 
 	if (unlikely(ext4_forced_shutdown(EXT4_SB(inode->i_sb))))
 		return;
 
 	trace_ext4_error(inode->i_sb, function, line);
 	if (ext4_error_ratelimit(inode->i_sb)) {
-		path = file_path(file, pathname, sizeof(pathname));
-		if (IS_ERR(path))
-			path = "(unknown)";
 		va_start(args, fmt);
 		vaf.fmt = fmt;
 		vaf.va = &args;
 		if (block)
 			printk(KERN_CRIT
 			       "EXT4-fs error (device %s): %s:%d: inode #%lu: "
-			       "block %llu: comm %s: path %s: %pV\n",
+			       "block %llu: comm %s: path %pD: %pV\n",
 			       inode->i_sb->s_id, function, line, inode->i_ino,
-			       block, current->comm, path, &vaf);
+			       block, current->comm, file, &vaf);
 		else
 			printk(KERN_CRIT
 			       "EXT4-fs error (device %s): %s:%d: inode #%lu: "
-			       "comm %s: path %s: %pV\n",
+			       "comm %s: path %pD: %pV\n",
 			       inode->i_sb->s_id, function, line, inode->i_ino,
-			       current->comm, path, &vaf);
+			       current->comm, file, &vaf);
 		va_end(args);
 	}
 	ext4_handle_error(inode->i_sb, false, EFSCORRUPTED, inode->i_ino, block,
