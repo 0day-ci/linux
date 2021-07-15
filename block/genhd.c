@@ -399,6 +399,31 @@ static void disk_announce(struct gendisk *disk)
 	disk_uevent(disk, KOBJ_ADD);
 }
 
+static void disk_invalidate(struct gendisk *disk)
+{
+	if (!(disk->flags & GENHD_FL_HIDDEN)) {
+		sysfs_remove_link(&disk_to_dev(disk)->kobj, "bdi");
+
+		/*
+		 * Unregister bdi before releasing device numbers (as they can
+		 * get reused and we'd get clashes in sysfs).
+		 */
+		bdi_unregister(disk->queue->backing_dev_info);
+	}
+
+	blk_unregister_queue(disk);
+
+	kobject_put(disk->part0->bd_holder_dir);
+	kobject_put(disk->slave_dir);
+
+	part_stat_set_all(disk->part0, 0);
+	disk->part0->bd_stamp = 0;
+	if (!sysfs_deprecated)
+		sysfs_remove_link(block_depr, dev_name(disk_to_dev(disk)));
+	pm_runtime_set_memalloc_noio(disk_to_dev(disk), false);
+	device_del(disk_to_dev(disk));
+}
+
 static void register_disk(struct device *parent, struct gendisk *disk,
 			  const struct attribute_group **groups)
 {
@@ -606,27 +631,7 @@ void del_gendisk(struct gendisk *disk)
 
 	set_capacity(disk, 0);
 
-	if (!(disk->flags & GENHD_FL_HIDDEN)) {
-		sysfs_remove_link(&disk_to_dev(disk)->kobj, "bdi");
-
-		/*
-		 * Unregister bdi before releasing device numbers (as they can
-		 * get reused and we'd get clashes in sysfs).
-		 */
-		bdi_unregister(disk->queue->backing_dev_info);
-	}
-
-	blk_unregister_queue(disk);
-
-	kobject_put(disk->part0->bd_holder_dir);
-	kobject_put(disk->slave_dir);
-
-	part_stat_set_all(disk->part0, 0);
-	disk->part0->bd_stamp = 0;
-	if (!sysfs_deprecated)
-		sysfs_remove_link(block_depr, dev_name(disk_to_dev(disk)));
-	pm_runtime_set_memalloc_noio(disk_to_dev(disk), false);
-	device_del(disk_to_dev(disk));
+	disk_invalidate(disk);
 }
 EXPORT_SYMBOL(del_gendisk);
 
