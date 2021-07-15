@@ -156,35 +156,17 @@ int cn_esc_printf(struct core_name *cn, const char *fmt, ...)
 static int cn_print_exe_file(struct core_name *cn, bool name_only)
 {
 	struct file *exe_file;
-	char *pathbuf, *path, *ptr;
 	int ret;
 
 	exe_file = get_mm_exe_file(current->mm);
 	if (!exe_file)
 		return cn_esc_printf(cn, "%s (path unknown)", current->comm);
 
-	pathbuf = kmalloc(PATH_MAX, GFP_KERNEL);
-	if (!pathbuf) {
-		ret = -ENOMEM;
-		goto put_exe_file;
-	}
+	if (name_only)
+		ret = cn_esc_printf(cn, "%pd", exe_file->f_path.dentry);
+	else
+		ret = cn_esc_printf(cn, "%pD", exe_file);
 
-	path = file_path(exe_file, pathbuf, PATH_MAX);
-	if (IS_ERR(path)) {
-		ret = PTR_ERR(path);
-		goto free_buf;
-	}
-
-	if (name_only) {
-		ptr = strrchr(path, '/');
-		if (ptr)
-			path = ptr + 1;
-	}
-	ret = cn_esc_printf(cn, "%s", path);
-
-free_buf:
-	kfree(pathbuf);
-put_exe_file:
 	fput(exe_file);
 	return ret;
 }
