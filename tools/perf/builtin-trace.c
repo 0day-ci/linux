@@ -4701,6 +4701,15 @@ out:
 	return err;
 }
 
+static void trace__exit(struct trace *trace)
+{
+	strlist__delete(trace->ev_qualifier);
+	free(trace->ev_qualifier_ids.entries);
+	free(trace->syscalls.table);
+	syscalltbl__delete(trace->sctbl);
+	zfree(&trace->perfconfig_events);
+}
+
 int cmd_trace(int argc, const char **argv)
 {
 	const char *trace_usage[] = {
@@ -4731,6 +4740,12 @@ int cmd_trace(int argc, const char **argv)
 		.kernel_syscallchains = false,
 		.max_stack = UINT_MAX,
 		.max_events = ULONG_MAX,
+		.ev_qualifier = NULL,
+		.sctbl = NULL,
+		.ev_qualifier_ids = {
+			.entries = NULL,
+			.nr = 0,
+		},
 	};
 	const char *map_dump_str = NULL;
 	const char *output_name = NULL;
@@ -5135,6 +5150,6 @@ out_close:
 	if (output_name != NULL)
 		fclose(trace.output);
 out:
-	zfree(&trace.perfconfig_events);
+	trace__exit(&trace);
 	return err;
 }
