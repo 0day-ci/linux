@@ -3244,8 +3244,19 @@ void ieee80211_csa_finish(struct ieee80211_vif *vif)
 {
 	struct ieee80211_sub_if_data *sdata = vif_to_sdata(vif);
 
-	ieee80211_queue_work(&sdata->local->hw,
-			     &sdata->csa_finalize_work);
+	if (vif->mbssid_tx_vif == vif) {
+		struct ieee80211_sub_if_data *child, *tmp;
+
+		list_for_each_entry_safe(child, tmp,
+					 &sdata->local->interfaces, list)
+			if (child != sdata && child->vif.mbssid_tx_vif == vif &&
+			    ieee80211_sdata_running(child)) {
+				ieee80211_queue_work(&child->local->hw,
+						     &child->csa_finalize_work);
+			}
+	}
+
+	ieee80211_queue_work(&sdata->local->hw, &sdata->csa_finalize_work);
 }
 EXPORT_SYMBOL(ieee80211_csa_finish);
 
