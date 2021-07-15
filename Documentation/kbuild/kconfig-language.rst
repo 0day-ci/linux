@@ -417,6 +417,9 @@ definitions of that choice. If a [symbol] is associated to the choice,
 then you may define the same choice (i.e. with the same entries) in another
 place.
 
+The default value of a choice is set to the first visible choice element.
+Choice elements do not support the default attribute like menu entries do.
+
 comment::
 
 	"comment" <prompt>
