@@ -3506,7 +3506,7 @@ static int sd_probe(struct device *dev)
  out_free_index:
 	ida_free(&sd_index_ida, index);
  out_put:
-	put_disk(gd);
+	blk_cleanup_disk(gd);
  out_free:
 	sd_zbc_release_disk(sdkp);
 	kfree(sdkp);
