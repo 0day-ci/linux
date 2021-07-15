@@ -61,7 +61,7 @@ static struct dentry *afs_mntpt_lookup(struct inode *dir,
  */
 static int afs_mntpt_open(struct inode *inode, struct file *file)
 {
-	_enter("%p,%p{%pD2}", inode, file, file);
+	_enter("%p,%p{%pD}", inode, file, file);
 	return -EREMOTE;
 }
 
