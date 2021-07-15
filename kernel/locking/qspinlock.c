@@ -355,7 +355,7 @@ void queued_spin_lock_slowpath(struct qspinlock *lock, u32 val)
 	 * If we observe contention, there is a concurrent locker.
 	 *
 	 * Undo and queue; our setting of PENDING might have made the
-	 * n,0,0 -> 0,0,0 transition fail and it will now be waiting
+	 * n,0,0 -> 0,0,1 transition fail and it will now be waiting
 	 * on @next to become !NULL.
 	 */
 	if (unlikely(val & ~_Q_LOCKED_MASK)) {
