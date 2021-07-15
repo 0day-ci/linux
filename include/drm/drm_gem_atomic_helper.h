@@ -5,6 +5,7 @@
 
 #include <linux/dma-buf-map.h>
 
+#include <drm/drm_fourcc.h>
 #include <drm/drm_plane.h>
 
 struct drm_simple_display_pipe;
