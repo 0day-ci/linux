@@ -2023,11 +2023,6 @@ static inline bool intel_panel_use_ssc(struct drm_i915_private *dev_priv)
 		&& !(dev_priv->quirks & QUIRK_LVDS_SSC_DISABLE);
 }
 
-static inline u32 i9xx_dpll_compute_fp(struct dpll *dpll)
-{
-	return dpll->n << 16 | dpll->m1 << 8 | dpll->m2;
-}
-
 static inline u32 intel_fdi_link_freq(struct drm_i915_private *dev_priv,
 				      const struct intel_crtc_state *pipe_config)
 {
