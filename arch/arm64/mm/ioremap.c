@@ -9,13 +9,69 @@
  * Copyright (C) 2012 ARM Ltd.
  */
 
+#define pr_fmt(fmt)	"ioremap: " fmt
+
 #include <linux/export.h>
 #include <linux/mm.h>
 #include <linux/vmalloc.h>
 #include <linux/io.h>
+#include <linux/arm-smccc.h>
 
 #include <asm/fixmap.h>
 #include <asm/tlbflush.h>
+#include <asm/hypervisor.h>
+
+static DEFINE_STATIC_KEY_FALSE(ioremap_guard_key);
+
+void ioremap_page_range_hook(unsigned long addr, unsigned long end,
+			     phys_addr_t phys_addr, pgprot_t prot)
+{
+	size_t size = end - addr;
+
+	if (!static_branch_unlikely(&ioremap_guard_key))
+		return;
+
+	if (pfn_valid(__phys_to_pfn(phys_addr)))
+		return;
+
+	while (size) {
+		struct arm_smccc_res res;
+
+		arm_smccc_1_1_hvc(ARM_SMCCC_VENDOR_HYP_KVM_MMIO_GUARD_MAP_FUNC_ID,
+				  phys_addr, prot, &res);
+		if (res.a0 != SMCCC_RET_SUCCESS) {
+			pr_warn_ratelimited("Failed to register %llx\n",
+					    phys_addr);
+			return;
+		}
+
+		size -= PAGE_SIZE;
+		phys_addr += PAGE_SIZE;
+	}
+}
+
+void iounmap_page_range_hook(phys_addr_t phys_addr, size_t size)
+{
+	if (!static_branch_unlikely(&ioremap_guard_key))
+		return;
+
+	VM_BUG_ON(phys_addr & ~PAGE_MASK || size & ~PAGE_MASK);
+
+	while (size) {
+		struct arm_smccc_res res;
+
+		arm_smccc_1_1_hvc(ARM_SMCCC_VENDOR_HYP_KVM_MMIO_GUARD_UNMAP_FUNC_ID,
+				  phys_addr, &res);
+		if (res.a0 != SMCCC_RET_SUCCESS) {
+			pr_warn_ratelimited("Failed to unregister %llx\n",
+					    phys_addr);
+			return;
+		}
+
+		size -= PAGE_SIZE;
+		phys_addr += PAGE_SIZE;
+	}
+}
 
 static void __iomem *__ioremap_caller(phys_addr_t phys_addr, size_t size,
 				      pgprot_t prot, void *caller)
