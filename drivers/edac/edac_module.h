@@ -123,8 +123,9 @@ extern void edac_pci_handle_npe(struct edac_pci_ctl_info *pci,
 #define edac_sysfs_pci_teardown()
 #define edac_pci_get_check_errors()
 #define edac_pci_get_poll_msec()
-#define edac_pci_handle_pe()
-#define edac_pci_handle_npe()
+#define edac_pci_remove_sysfs(pci)
+#define edac_pci_handle_pe(pci, msg)
+#define edac_pci_handle_npe(pci, msg)
 #endif				/* CONFIG_PCI */
 
 #endif				/* __EDAC_MODULE_H__ */
