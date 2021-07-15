@@ -16,6 +16,7 @@
 
 #include <linux/bitmap.h>
 #include <linux/dcache.h>
+#include <linux/fs.h>
 #include <linux/socket.h>
 #include <linux/in.h>
 
@@ -37,8 +38,8 @@ static char *alloced_buffer __initdata;
 
 extern bool no_hash_pointers;
 
-static int __printf(4, 0) __init
-do_test(int bufsize, const char *expect, int elen,
+static int __printf(5, 0) __init
+do_test(int bufsize, const char *expect, int elen, bool using_scratch_space,
 	const char *fmt, va_list ap)
 {
 	va_list aq;
@@ -78,7 +79,7 @@ do_test(int bufsize, const char *expect, int elen,
 		return 1;
 	}
 
-	if (memchr_inv(test_buffer + written + 1, FILL_CHAR, bufsize - (written + 1))) {
+	if (!using_scratch_space && memchr_inv(test_buffer + written + 1, FILL_CHAR, bufsize - (written + 1))) {
 		pr_warn("vsnprintf(buf, %d, \"%s\", ...) wrote beyond the nul-terminator\n",
 			bufsize, fmt);
 		return 1;
@@ -97,8 +98,9 @@ do_test(int bufsize, const char *expect, int elen,
 	return 0;
 }
 
-static void __printf(3, 4) __init
-__test(const char *expect, int elen, const char *fmt, ...)
+static void __printf(4, 5) __init
+__test(const char *expect, int elen, bool using_scratch_space,
+	const char *fmt, ...)
 {
 	va_list ap;
 	int rand;
@@ -119,11 +121,11 @@ __test(const char *expect, int elen, const char *fmt, ...)
 	 * enough and 0), and then we also test that kvasprintf would
 	 * be able to print it as expected.
 	 */
-	failed_tests += do_test(BUF_SIZE, expect, elen, fmt, ap);
+	failed_tests += do_test(BUF_SIZE, expect, elen, using_scratch_space, fmt, ap);
 	rand = 1 + prandom_u32_max(elen+1);
 	/* Since elen < BUF_SIZE, we have 1 <= rand <= BUF_SIZE. */
-	failed_tests += do_test(rand, expect, elen, fmt, ap);
-	failed_tests += do_test(0, expect, elen, fmt, ap);
+	failed_tests += do_test(rand, expect, elen, using_scratch_space, fmt, ap);
+	failed_tests += do_test(0, expect, elen, using_scratch_space, fmt, ap);
 
 	p = kvasprintf(GFP_KERNEL, fmt, ap);
 	if (p) {
@@ -138,8 +140,15 @@ __test(const char *expect, int elen, const char *fmt, ...)
 	va_end(ap);
 }
 
+/*
+ * More relaxed test for non-standard formats that are using the provided buffer
+ * as a scratch space and write beyond the trailing '\0'.
+ */
+#define test_using_scratch_space(expect, fmt, ...)			\
+	__test(expect, strlen(expect), true, fmt, ##__VA_ARGS__)
+
 #define test(expect, fmt, ...)					\
-	__test(expect, strlen(expect), fmt, ##__VA_ARGS__)
+	__test(expect, strlen(expect), false, fmt, ##__VA_ARGS__)
 
 static void __init
 test_basic(void)
@@ -150,7 +159,7 @@ test_basic(void)
 	test("", &nul);
 	test("100%", "100%%");
 	test("xxx%yyy", "xxx%cyyy", '%');
-	__test("xxx\0yyy", 7, "xxx%cyyy", '\0');
+	__test("xxx\0yyy", 7, false, "xxx%cyyy", '\0');
 }
 
 static void __init
@@ -501,6 +510,25 @@ dentry(void)
 	test("  bravo/alfa|  bravo/alfa", "%12pd2|%*pd2", &test_dentry[2], 12, &test_dentry[2]);
 }
 
+static struct vfsmount test_vfsmnt __initdata = {};
+
+static struct file test_file __initdata = {
+	.f_path = { .dentry = &test_dentry[2],
+		    .mnt = &test_vfsmnt,
+	},
+};
+
+static void __init
+f_d_path(void)
+{
+	test("(null)", "%pD", NULL);
+	test("(efault)", "%pD", PTR_INVALID);
+
+	test_using_scratch_space("/bravo/alfa   |/bravo/alfa   ", "%-14pD|%*pD", &test_file, -14, &test_file);
+	test_using_scratch_space("   /bravo/alfa|   /bravo/alfa", "%14pD|%*pD", &test_file, 14, &test_file);
+	test_using_scratch_space("   /bravo/alfa|/bravo/alfa   ", "%14pD|%-14pD", &test_file, &test_file);
+}
+
 static void __init
 struct_va_format(void)
 {
@@ -789,6 +817,7 @@ test_pointer(void)
 	ip();
 	uuid();
 	dentry();
+	f_d_path();
 	struct_va_format();
 	time_and_date();
 	struct_clk();
