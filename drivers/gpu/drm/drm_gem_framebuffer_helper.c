@@ -333,8 +333,10 @@ int drm_gem_fb_vmap(struct drm_framebuffer *fb, struct dma_buf_map map[DRM_FORMA
 
 	for (i = 0; i < DRM_FORMAT_MAX_PLANES; ++i) {
 		obj = drm_gem_fb_get_obj(fb, i);
-		if (!obj)
+		if (!obj) {
+			dma_buf_map_clear(&map[i]);
 			continue;
+		}
 		ret = drm_gem_vmap(obj, &map[i]);
 		if (ret)
 			goto err_drm_gem_vunmap;
@@ -372,6 +374,8 @@ void drm_gem_fb_vunmap(struct drm_framebuffer *fb, struct dma_buf_map map[DRM_FO
 		--i;
 		obj = drm_gem_fb_get_obj(fb, i);
 		if (!obj)
+			continue;
+		if (dma_buf_map_is_null(&map[i]))
 			continue;
 		drm_gem_vunmap(obj, &map[i]);
 	}
