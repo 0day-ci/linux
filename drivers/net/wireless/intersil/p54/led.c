@@ -62,7 +62,7 @@ static void p54_update_leds(struct work_struct *work)
 }
 
 static void p54_led_brightness_set(struct led_classdev *led_dev,
-				   enum led_brightness brightness)
+				   led_brightness brightness)
 {
 	struct p54_led_dev *led = container_of(led_dev, struct p54_led_dev,
 					       led_dev);

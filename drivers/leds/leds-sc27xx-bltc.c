@@ -84,7 +84,7 @@ static u32 sc27xx_led_get_offset(struct sc27xx_led *leds)
 	return leds->priv->base + SC27XX_LEDS_OFFSET * leds->line;
 }
 
-static int sc27xx_led_enable(struct sc27xx_led *leds, enum led_brightness value)
+static int sc27xx_led_enable(struct sc27xx_led *leds, led_brightness value)
 {
 	u32 base = sc27xx_led_get_offset(leds);
 	u32 ctrl_base = leds->priv->base + SC27XX_LEDS_CTRL;
@@ -114,7 +114,7 @@ static int sc27xx_led_disable(struct sc27xx_led *leds)
 			(SC27XX_LED_RUN | SC27XX_LED_TYPE) << ctrl_shift, 0);
 }
 
-static int sc27xx_led_set(struct led_classdev *ldev, enum led_brightness value)
+static int sc27xx_led_set(struct led_classdev *ldev, led_brightness value)
 {
 	struct sc27xx_led *leds = to_sc27xx_led(ldev);
 	int err;

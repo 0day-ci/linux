@@ -511,7 +511,7 @@ struct ath9k_htc_priv {
 	bool ps_idle;
 
 #ifdef CONFIG_MAC80211_LEDS
-	enum led_brightness brightness;
+	led_brightness brightness;
 	bool led_registered;
 	char led_name[32];
 	struct led_classdev led_cdev;

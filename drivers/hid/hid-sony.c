@@ -1984,7 +1984,7 @@ static void sony_set_leds(struct sony_sc *sc)
 }
 
 static void sony_led_set_brightness(struct led_classdev *led,
-				    enum led_brightness value)
+				    led_brightness value)
 {
 	struct device *dev = led->dev->parent;
 	struct hid_device *hdev = to_hid_device(dev);
@@ -2026,7 +2026,7 @@ static void sony_led_set_brightness(struct led_classdev *led,
 	}
 }
 
-static enum led_brightness sony_led_get_brightness(struct led_classdev *led)
+static led_brightness sony_led_get_brightness(struct led_classdev *led)
 {
 	struct device *dev = led->dev->parent;
 	struct hid_device *hdev = to_hid_device(dev);

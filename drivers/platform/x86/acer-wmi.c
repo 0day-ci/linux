@@ -1440,7 +1440,7 @@ static void __init acer_commandline_init(void)
  * LED device (Mail LED only, no other LEDs known yet)
  */
 static void mail_led_set(struct led_classdev *led_cdev,
-enum led_brightness value)
+led_brightness value)
 {
 	set_u32(value, ACER_CAP_MAILLED);
 }

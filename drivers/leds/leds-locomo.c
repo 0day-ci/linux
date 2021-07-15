@@ -15,7 +15,7 @@
 #include <asm/hardware/locomo.h>
 
 static void locomoled_brightness_set(struct led_classdev *led_cdev,
-				enum led_brightness value, int offset)
+				led_brightness value, int offset)
 {
 	struct locomo_dev *locomo_dev = LOCOMO_DEV(led_cdev->dev->parent);
 	unsigned long flags;
@@ -29,13 +29,13 @@ static void locomoled_brightness_set(struct led_classdev *led_cdev,
 }
 
 static void locomoled_brightness_set0(struct led_classdev *led_cdev,
-				enum led_brightness value)
+				led_brightness value)
 {
 	locomoled_brightness_set(led_cdev, value, LOCOMO_LPT0);
 }
 
 static void locomoled_brightness_set1(struct led_classdev *led_cdev,
-				enum led_brightness value)
+				led_brightness value)
 {
 	locomoled_brightness_set(led_cdev, value, LOCOMO_LPT1);
 }

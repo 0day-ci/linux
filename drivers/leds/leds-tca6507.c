@@ -545,7 +545,7 @@ static int led_assign(struct tca6507_led *led)
 }
 
 static void tca6507_brightness_set(struct led_classdev *led_cdev,
-				   enum led_brightness brightness)
+				   led_brightness brightness)
 {
 	struct tca6507_led *led = container_of(led_cdev, struct tca6507_led,
 					       led_cdev);

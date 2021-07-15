@@ -166,7 +166,7 @@ static int netxbig_led_blink_set(struct led_classdev *led_cdev,
 }
 
 static void netxbig_led_set(struct led_classdev *led_cdev,
-			    enum led_brightness value)
+			    led_brightness value)
 {
 	struct netxbig_led_data *led_dat =
 		container_of(led_cdev, struct netxbig_led_data, cdev);

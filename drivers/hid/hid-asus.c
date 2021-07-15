@@ -481,7 +481,7 @@ static int rog_nkey_led_init(struct hid_device *hdev)
 }
 
 static void asus_kbd_backlight_set(struct led_classdev *led_cdev,
-				   enum led_brightness brightness)
+				   led_brightness brightness)
 {
 	struct asus_kbd_leds *led = container_of(led_cdev, struct asus_kbd_leds,
 						 cdev);
@@ -492,7 +492,7 @@ static void asus_kbd_backlight_set(struct led_classdev *led_cdev,
 	schedule_work(&led->work);
 }
 
-static enum led_brightness asus_kbd_backlight_get(struct led_classdev *led_cdev)
+static led_brightness asus_kbd_backlight_get(struct led_classdev *led_cdev)
 {
 	struct asus_kbd_leds *led = container_of(led_cdev, struct asus_kbd_leds,
 						 cdev);

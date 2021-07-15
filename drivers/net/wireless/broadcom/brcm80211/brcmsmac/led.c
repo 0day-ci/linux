@@ -33,7 +33,7 @@ static void brcms_radio_led_ctrl(struct brcms_info *wl, bool state)
 
 /* Callback from the LED subsystem. */
 static void brcms_led_brightness_set(struct led_classdev *led_dev,
-				   enum led_brightness brightness)
+				   led_brightness brightness)
 {
 	struct brcms_info *wl = container_of(led_dev,
 		struct brcms_info, led_dev);

@@ -160,7 +160,7 @@ static void cr0014114_recount_work(struct work_struct *work)
 }
 
 static int cr0014114_set_sync(struct led_classdev *ldev,
-			      enum led_brightness brightness)
+			      led_brightness brightness)
 {
 	int			ret;
 	struct cr0014114_led    *led = container_of(ldev,

@@ -46,7 +46,7 @@ struct gt683r_led {
 	struct led_classdev led_devs[GT683R_LED_COUNT];
 	struct mutex lock;
 	struct work_struct work;
-	enum led_brightness brightnesses[GT683R_LED_COUNT];
+	led_brightness brightnesses[GT683R_LED_COUNT];
 	enum gt683r_led_mode mode;
 };
 
@@ -57,7 +57,7 @@ static const struct hid_device_id gt683r_led_id[] = {
 MODULE_DEVICE_TABLE(hid, gt683r_led_id);
 
 static void gt683r_brightness_set(struct led_classdev *led_cdev,
-				enum led_brightness brightness)
+				led_brightness brightness)
 {
 	int i;
 	struct device *dev = led_cdev->dev->parent;

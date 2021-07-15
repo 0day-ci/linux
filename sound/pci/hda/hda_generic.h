@@ -346,9 +346,9 @@ int snd_hda_gen_fix_pin_power(struct hda_codec *codec, hda_nid_t pin);
 
 int snd_hda_gen_add_mute_led_cdev(struct hda_codec *codec,
 				  int (*callback)(struct led_classdev *,
-						  enum led_brightness));
+						  led_brightness));
 int snd_hda_gen_add_micmute_led_cdev(struct hda_codec *codec,
 				     int (*callback)(struct led_classdev *,
-						     enum led_brightness));
+						     led_brightness));
 
 #endif /* __SOUND_HDA_GENERIC_H */

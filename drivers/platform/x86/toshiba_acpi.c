@@ -473,7 +473,7 @@ static void toshiba_illumination_available(struct toshiba_acpi_dev *dev)
 }
 
 static void toshiba_illumination_set(struct led_classdev *cdev,
-				     enum led_brightness brightness)
+				     led_brightness brightness)
 {
 	struct toshiba_acpi_dev *dev = container_of(cdev,
 			struct toshiba_acpi_dev, led_dev);
@@ -492,7 +492,7 @@ static void toshiba_illumination_set(struct led_classdev *cdev,
 		pr_err("ACPI call for illumination failed\n");
 }
 
-static enum led_brightness toshiba_illumination_get(struct led_classdev *cdev)
+static led_brightness toshiba_illumination_get(struct led_classdev *cdev)
 {
 	struct toshiba_acpi_dev *dev = container_of(cdev,
 			struct toshiba_acpi_dev, led_dev);
@@ -591,7 +591,7 @@ static int toshiba_kbd_illum_status_get(struct toshiba_acpi_dev *dev, u32 *time)
 	return result == TOS_SUCCESS ? 0 : -EIO;
 }
 
-static enum led_brightness toshiba_kbd_backlight_get(struct led_classdev *cdev)
+static led_brightness toshiba_kbd_backlight_get(struct led_classdev *cdev)
 {
 	struct toshiba_acpi_dev *dev = container_of(cdev,
 			struct toshiba_acpi_dev, kbd_led);
@@ -611,7 +611,7 @@ static enum led_brightness toshiba_kbd_backlight_get(struct led_classdev *cdev)
 }
 
 static void toshiba_kbd_backlight_set(struct led_classdev *cdev,
-				     enum led_brightness brightness)
+				     led_brightness brightness)
 {
 	struct toshiba_acpi_dev *dev = container_of(cdev,
 			struct toshiba_acpi_dev, kbd_led);
@@ -699,7 +699,7 @@ static void toshiba_eco_mode_available(struct toshiba_acpi_dev *dev)
 	}
 }
 
-static enum led_brightness
+static led_brightness
 toshiba_eco_mode_get_status(struct led_classdev *cdev)
 {
 	struct toshiba_acpi_dev *dev = container_of(cdev,
@@ -721,7 +721,7 @@ toshiba_eco_mode_get_status(struct led_classdev *cdev)
 }
 
 static void toshiba_eco_mode_set_status(struct led_classdev *cdev,
-				     enum led_brightness brightness)
+				     led_brightness brightness)
 {
 	struct toshiba_acpi_dev *dev = container_of(cdev,
 			struct toshiba_acpi_dev, eco_led);

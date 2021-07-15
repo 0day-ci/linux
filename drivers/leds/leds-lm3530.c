@@ -108,7 +108,7 @@ struct lm3530_data {
 	struct lm3530_platform_data *pdata;
 	enum lm3530_mode mode;
 	struct regulator *regulator;
-	enum led_brightness brightness;
+	led_brightness brightness;
 	bool enable;
 };
 
@@ -302,7 +302,7 @@ static int lm3530_init_registers(struct lm3530_data *drvdata)
 }
 
 static void lm3530_brightness_set(struct led_classdev *led_cdev,
-				     enum led_brightness brt_val)
+				     led_brightness brt_val)
 {
 	int err;
 	struct lm3530_data *drvdata =

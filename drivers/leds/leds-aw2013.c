@@ -150,7 +150,7 @@ static bool aw2013_chip_in_use(struct aw2013 *chip)
 }
 
 static int aw2013_brightness_set(struct led_classdev *cdev,
-				 enum led_brightness brightness)
+				 led_brightness brightness)
 {
 	struct aw2013_led *led = container_of(cdev, struct aw2013_led, cdev);
 	int ret, num;

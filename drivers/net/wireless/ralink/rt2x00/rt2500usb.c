@@ -263,7 +263,7 @@ static int rt2500usb_rfkill_poll(struct rt2x00_dev *rt2x00dev)
 
 #ifdef CONFIG_RT2X00_LIB_LEDS
 static void rt2500usb_brightness_set(struct led_classdev *led_cdev,
-				     enum led_brightness brightness)
+				     led_brightness brightness)
 {
 	struct rt2x00_led *led =
 	    container_of(led_cdev, struct rt2x00_led, led_dev);

@@ -26,12 +26,11 @@ struct device_node;
  */
 
 /* This is obsolete/useless. We now support variable maximum brightness. */
-enum led_brightness {
-	LED_OFF		= 0,
-	LED_ON		= 1,
-	LED_HALF	= 127,
-	LED_FULL	= 255,
-};
+typedef u8 led_brightness;
+#define LED_OFF 0
+#define LED_ON 1
+#define LED_HALF 127
+#define LED_FULL 255
 
 struct led_init_data {
 	/* device fwnode handle */
@@ -95,15 +94,15 @@ struct led_classdev {
 	 * that can sleep while setting brightness.
 	 */
 	void		(*brightness_set)(struct led_classdev *led_cdev,
-					  enum led_brightness brightness);
+					  led_brightness brightness);
 	/*
 	 * Set LED brightness level immediately - it can block the caller for
 	 * the time required for accessing a LED device register.
 	 */
 	int (*brightness_set_blocking)(struct led_classdev *led_cdev,
-				       enum led_brightness brightness);
+				       led_brightness brightness);
 	/* Get LED brightness level */
-	enum led_brightness (*brightness_get)(struct led_classdev *led_cdev);
+	led_brightness (*brightness_get)(struct led_classdev *led_cdev);
 
 	/*
 	 * Activate hardware accelerated blink, delays are in milliseconds
@@ -381,7 +380,7 @@ int devm_led_trigger_register(struct device *dev,
 void led_trigger_register_simple(const char *name,
 				struct led_trigger **trigger);
 void led_trigger_unregister_simple(struct led_trigger *trigger);
-void led_trigger_event(struct led_trigger *trigger,  enum led_brightness event);
+void led_trigger_event(struct led_trigger *trigger,  led_brightness event);
 void led_trigger_blink(struct led_trigger *trigger, unsigned long *delay_on,
 		       unsigned long *delay_off);
 void led_trigger_blink_oneshot(struct led_trigger *trigger,
@@ -434,7 +433,7 @@ static inline void led_trigger_register_simple(const char *name,
 					struct led_trigger **trigger) {}
 static inline void led_trigger_unregister_simple(struct led_trigger *trigger) {}
 static inline void led_trigger_event(struct led_trigger *trigger,
-				enum led_brightness event) {}
+				led_brightness event) {}
 static inline void led_trigger_blink(struct led_trigger *trigger,
 				      unsigned long *delay_on,
 				      unsigned long *delay_off) {}
@@ -566,7 +565,7 @@ void led_classdev_notify_brightness_hw_changed(
 	struct led_classdev *led_cdev, unsigned int brightness);
 #else
 static inline void led_classdev_notify_brightness_hw_changed(
-	struct led_classdev *led_cdev, enum led_brightness brightness) { }
+	struct led_classdev *led_cdev, led_brightness brightness) { }
 #endif
 
 /**
@@ -586,15 +585,15 @@ enum led_audio {
 };
 
 #if IS_ENABLED(CONFIG_LEDS_TRIGGER_AUDIO)
-enum led_brightness ledtrig_audio_get(enum led_audio type);
-void ledtrig_audio_set(enum led_audio type, enum led_brightness state);
+led_brightness ledtrig_audio_get(enum led_audio type);
+void ledtrig_audio_set(enum led_audio type, led_brightness state);
 #else
-static inline enum led_brightness ledtrig_audio_get(enum led_audio type)
+static inline led_brightness ledtrig_audio_get(enum led_audio type)
 {
 	return LED_OFF;
 }
 static inline void ledtrig_audio_set(enum led_audio type,
-				     enum led_brightness state)
+				     led_brightness state)
 {
 }
 #endif

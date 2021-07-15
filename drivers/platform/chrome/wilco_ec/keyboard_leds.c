@@ -76,7 +76,7 @@ static int send_kbbl_msg(struct wilco_ec_device *ec,
 	return 0;
 }
 
-static int set_kbbl(struct wilco_ec_device *ec, enum led_brightness brightness)
+static int set_kbbl(struct wilco_ec_device *ec, led_brightness brightness)
 {
 	struct wilco_keyboard_leds_msg request;
 	struct wilco_keyboard_leds_msg response;
@@ -163,7 +163,7 @@ static int kbbl_init(struct wilco_ec_device *ec)
 }
 
 static int wilco_keyboard_leds_set(struct led_classdev *cdev,
-				   enum led_brightness brightness)
+				   led_brightness brightness)
 {
 	struct wilco_keyboard_leds *wkl =
 		container_of(cdev, struct wilco_keyboard_leds, keyboard);

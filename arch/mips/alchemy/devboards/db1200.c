@@ -409,7 +409,7 @@ static int db1200_mmc_card_inserted(void *mmc_host)
 }
 
 static void db1200_mmcled_set(struct led_classdev *led,
-			      enum led_brightness brightness)
+			      led_brightness brightness)
 {
 	if (brightness != LED_OFF)
 		bcsr_mod(BCSR_LEDS, BCSR_LEDS_LED0, 0);
@@ -481,7 +481,7 @@ out:
 }
 
 static void pb1200_mmc1led_set(struct led_classdev *led,
-			enum led_brightness brightness)
+			led_brightness brightness)
 {
 	if (brightness != LED_OFF)
 			bcsr_mod(BCSR_LEDS, BCSR_LEDS_LED1, 0);

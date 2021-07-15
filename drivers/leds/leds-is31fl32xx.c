@@ -221,7 +221,7 @@ static int is31fl3216_software_shutdown(struct is31fl32xx_priv *priv,
  * register writes up to that point.
  */
 static int is31fl32xx_brightness_set(struct led_classdev *led_cdev,
-				     enum led_brightness brightness)
+				     led_brightness brightness)
 {
 	const struct is31fl32xx_led_data *led_data =
 		container_of(led_cdev, struct is31fl32xx_led_data, cdev);

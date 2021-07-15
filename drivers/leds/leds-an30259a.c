@@ -79,7 +79,7 @@ struct an30259a {
 };
 
 static int an30259a_brightness_set(struct led_classdev *cdev,
-				   enum led_brightness brightness)
+				   led_brightness brightness)
 {
 	struct an30259a_led *led;
 	int ret;

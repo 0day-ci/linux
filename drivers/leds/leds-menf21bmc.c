@@ -50,7 +50,7 @@ static struct menf21bmc_led leds[] = {
 static DEFINE_MUTEX(led_lock);
 
 static void
-menf21bmc_led_set(struct led_classdev *led_cdev, enum led_brightness value)
+menf21bmc_led_set(struct led_classdev *led_cdev, led_brightness value)
 {
 	int led_val;
 	struct menf21bmc_led *led = container_of(led_cdev,

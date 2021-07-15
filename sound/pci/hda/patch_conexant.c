@@ -138,7 +138,7 @@ static void cx_auto_vmaster_hook(void *private_data, int enabled)
 
 /* turn on/off EAPD according to Master switch (inversely!) for mute LED */
 static int cx_auto_vmaster_mute_led(struct led_classdev *led_cdev,
-				    enum led_brightness brightness)
+				    led_brightness brightness)
 {
 	struct hda_codec *codec = dev_to_hda_codec(led_cdev->dev->parent);
 	struct conexant_spec *spec = codec->spec;
@@ -651,7 +651,7 @@ static void cxt_update_gpio_led(struct hda_codec *codec, unsigned int mask,
 
 /* turn on/off mute LED via GPIO per vmaster hook */
 static int cxt_gpio_mute_update(struct led_classdev *led_cdev,
-				enum led_brightness brightness)
+				led_brightness brightness)
 {
 	struct hda_codec *codec = dev_to_hda_codec(led_cdev->dev->parent);
 	struct conexant_spec *spec = codec->spec;
@@ -662,7 +662,7 @@ static int cxt_gpio_mute_update(struct led_classdev *led_cdev,
 
 /* turn on/off mic-mute LED via GPIO per capture hook */
 static int cxt_gpio_micmute_update(struct led_classdev *led_cdev,
-				   enum led_brightness brightness)
+				   led_brightness brightness)
 {
 	struct hda_codec *codec = dev_to_hda_codec(led_cdev->dev->parent);
 	struct conexant_spec *spec = codec->spec;

@@ -19,7 +19,7 @@ DEFINE_LED_TRIGGER(ledtrig_torch);
 
 void ledtrig_flash_ctrl(bool on)
 {
-	enum led_brightness brt = on ? LED_FULL : LED_OFF;
+	led_brightness brt = on ? LED_FULL : LED_OFF;
 
 	led_trigger_event(ledtrig_flash, brt);
 }
@@ -27,7 +27,7 @@ EXPORT_SYMBOL_GPL(ledtrig_flash_ctrl);
 
 void ledtrig_torch_ctrl(bool on)
 {
-	enum led_brightness brt = on ? LED_FULL : LED_OFF;
+	led_brightness brt = on ? LED_FULL : LED_OFF;
 
 	led_trigger_event(ledtrig_torch, brt);
 }

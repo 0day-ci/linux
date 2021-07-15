@@ -1433,7 +1433,7 @@ static void xpad_identify_controller(struct usb_xpad *xpad)
 }
 
 static void xpad_led_set(struct led_classdev *led_cdev,
-			 enum led_brightness value)
+			 led_brightness value)
 {
 	struct xpad_led *xpad_led = container_of(led_cdev,
 						 struct xpad_led, led_cdev);

@@ -945,7 +945,7 @@ out:
 #define IMS_PCU_MAX_BRIGHTNESS		31998
 
 static int ims_pcu_backlight_set_brightness(struct led_classdev *cdev,
-					    enum led_brightness value)
+					    led_brightness value)
 {
 	struct ims_pcu_backlight *backlight =
 			container_of(cdev, struct ims_pcu_backlight, cdev);
@@ -968,7 +968,7 @@ static int ims_pcu_backlight_set_brightness(struct led_classdev *cdev,
 	return error;
 }
 
-static enum led_brightness
+static led_brightness
 ims_pcu_backlight_get_brightness(struct led_classdev *cdev)
 {
 	struct ims_pcu_backlight *backlight =

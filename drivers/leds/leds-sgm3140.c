@@ -97,7 +97,7 @@ static const struct led_flash_ops sgm3140_flash_ops = {
 };
 
 static int sgm3140_brightness_set(struct led_classdev *led_cdev,
-				  enum led_brightness brightness)
+				  led_brightness brightness)
 {
 	struct led_classdev_flash *fled_cdev = lcdev_to_flcdev(led_cdev);
 	struct sgm3140 *priv = flcdev_to_sgm3140(fled_cdev);

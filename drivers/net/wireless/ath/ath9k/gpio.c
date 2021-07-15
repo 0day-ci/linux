@@ -49,7 +49,7 @@ static void ath_fill_led_pin(struct ath_softc *sc)
 }
 
 static void ath_led_brightness(struct led_classdev *led_cdev,
-			       enum led_brightness brightness)
+			       led_brightness brightness)
 {
 	struct ath_softc *sc = container_of(led_cdev, struct ath_softc, led_cdev);
 	u32 val = (brightness == LED_OFF);

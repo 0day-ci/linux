@@ -637,7 +637,7 @@ static const struct {
 	{ "dm365evm::ds9", "heartbeat", },
 };
 
-static void cpld_led_set(struct led_classdev *cdev, enum led_brightness b)
+static void cpld_led_set(struct led_classdev *cdev, led_brightness b)
 {
 	struct cpld_led *led = container_of(cdev, struct cpld_led, cdev);
 	u8 reg = __raw_readb(cpld + CPLD_LEDS);
@@ -649,7 +649,7 @@ static void cpld_led_set(struct led_classdev *cdev, enum led_brightness b)
 	__raw_writeb(reg, cpld + CPLD_LEDS);
 }
 
-static enum led_brightness cpld_led_get(struct led_classdev *cdev)
+static led_brightness cpld_led_get(struct led_classdev *cdev)
 {
 	struct cpld_led *led = container_of(cdev, struct cpld_led, cdev);
 	u8 reg = __raw_readb(cpld + CPLD_LEDS);

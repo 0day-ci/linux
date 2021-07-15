@@ -55,7 +55,7 @@ struct aat1290_led_config_data {
 	/* external strobe capability */
 	bool has_external_strobe;
 	/* max LED brightness level */
-	enum led_brightness max_brightness;
+	led_brightness max_brightness;
 };
 
 struct aat1290_led {
@@ -138,7 +138,7 @@ static void aat1290_set_flash_safety_timer(struct aat1290_led *led,
 /* LED subsystem callbacks */
 
 static int aat1290_led_brightness_set(struct led_classdev *led_cdev,
-					enum led_brightness brightness)
+					led_brightness brightness)
 {
 	struct led_classdev_flash *fled_cdev = led_cdev_to_fled_cdev(led_cdev);
 	struct aat1290_led *led = fled_cdev_to_led(fled_cdev);
@@ -370,7 +370,7 @@ static void aat1290_init_flash_timeout(struct aat1290_led *led,
 }
 
 #if IS_ENABLED(CONFIG_V4L2_FLASH_LED_CLASS)
-static enum led_brightness aat1290_intensity_to_brightness(
+static led_brightness aat1290_intensity_to_brightness(
 					struct v4l2_flash *v4l2_flash,
 					s32 intensity)
 {
@@ -386,7 +386,7 @@ static enum led_brightness aat1290_intensity_to_brightness(
 }
 
 static s32 aat1290_brightness_to_intensity(struct v4l2_flash *v4l2_flash,
-					enum led_brightness brightness)
+					led_brightness brightness)
 {
 	struct led_classdev_flash *fled_cdev = v4l2_flash->fled_cdev;
 	struct aat1290_led *led = fled_cdev_to_led(fled_cdev);

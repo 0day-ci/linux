@@ -1263,7 +1263,7 @@ static const struct mmc_host_ops rtsx_usb_sdmmc_ops = {
 
 #ifdef RTSX_USB_USE_LEDS_CLASS
 static void rtsx_usb_led_control(struct led_classdev *led,
-	enum led_brightness brightness)
+	led_brightness brightness)
 {
 	struct rtsx_usb_sdmmc *host = container_of(led,
 			struct rtsx_usb_sdmmc, led);

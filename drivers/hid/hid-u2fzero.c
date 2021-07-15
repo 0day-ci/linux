@@ -164,7 +164,7 @@ static int u2fzero_blink(struct led_classdev *ldev)
 }
 
 static int u2fzero_brightness_set(struct led_classdev *ldev,
-				  enum led_brightness brightness)
+				  led_brightness brightness)
 {
 	ldev->brightness = LED_OFF;
 	if (brightness)

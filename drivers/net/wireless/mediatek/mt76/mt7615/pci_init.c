@@ -118,7 +118,7 @@ mt7615_led_set_blink(struct led_classdev *led_cdev,
 
 static void
 mt7615_led_set_brightness(struct led_classdev *led_cdev,
-			  enum led_brightness brightness)
+			  led_brightness brightness)
 {
 	if (!brightness)
 		mt7615_led_set_config(led_cdev, 0, 0xff);

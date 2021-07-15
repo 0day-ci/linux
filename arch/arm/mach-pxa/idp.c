@@ -213,7 +213,7 @@ static const struct {
 };
 
 static void idp_led_set(struct led_classdev *cdev,
-		enum led_brightness b)
+		led_brightness b)
 {
 	struct idp_led *led = container_of(cdev,
 			struct idp_led, cdev);
@@ -227,7 +227,7 @@ static void idp_led_set(struct led_classdev *cdev,
 	IDP_CPLD_LED_CONTROL = reg;
 }
 
-static enum led_brightness idp_led_get(struct led_classdev *cdev)
+static led_brightness idp_led_get(struct led_classdev *cdev)
 {
 	struct idp_led *led = container_of(cdev,
 			struct idp_led, cdev);

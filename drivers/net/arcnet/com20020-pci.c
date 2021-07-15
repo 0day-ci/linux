@@ -64,7 +64,7 @@ module_param(clockm, int, 0);
 MODULE_LICENSE("GPL");
 
 static void led_tx_set(struct led_classdev *led_cdev,
-			     enum led_brightness value)
+			     led_brightness value)
 {
 	struct com20020_dev *card;
 	struct com20020_priv *priv;
@@ -79,7 +79,7 @@ static void led_tx_set(struct led_classdev *led_cdev,
 }
 
 static void led_recon_set(struct led_classdev *led_cdev,
-			     enum led_brightness value)
+			     led_brightness value)
 {
 	struct com20020_dev *card;
 	struct com20020_priv *priv;

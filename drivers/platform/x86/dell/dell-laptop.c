@@ -967,7 +967,7 @@ static void touchpad_led_off(void)
 }
 
 static void touchpad_led_set(struct led_classdev *led_cdev,
-	enum led_brightness value)
+	led_brightness value)
 {
 	if (value > 0)
 		touchpad_led_on();
@@ -1191,7 +1191,7 @@ static u8 kbd_previous_mode_bit;
 
 static bool kbd_led_present;
 static DEFINE_MUTEX(kbd_led_mutex);
-static enum led_brightness kbd_led_level;
+static led_brightness kbd_led_level;
 
 /*
  * NOTE: there are three ways to set the keyboard backlight level.
@@ -1986,7 +1986,7 @@ static const struct attribute_group *kbd_led_groups[] = {
 	NULL,
 };
 
-static enum led_brightness kbd_led_level_get(struct led_classdev *led_cdev)
+static led_brightness kbd_led_level_get(struct led_classdev *led_cdev)
 {
 	int ret;
 	u16 num;
@@ -2018,9 +2018,9 @@ static enum led_brightness kbd_led_level_get(struct led_classdev *led_cdev)
 }
 
 static int kbd_led_level_set(struct led_classdev *led_cdev,
-			     enum led_brightness value)
+			     led_brightness value)
 {
-	enum led_brightness new_value = value;
+	led_brightness new_value = value;
 	struct kbd_state state;
 	struct kbd_state new_state;
 	u16 num;
@@ -2091,7 +2091,7 @@ static int __init kbd_led_init(struct device *dev)
 }
 
 static void brightness_set_exit(struct led_classdev *led_cdev,
-				enum led_brightness value)
+				led_brightness value)
 {
 	/* Don't change backlight level on exit */
 };
@@ -2108,7 +2108,7 @@ static int dell_laptop_notifier_call(struct notifier_block *nb,
 				     unsigned long action, void *data)
 {
 	bool changed = false;
-	enum led_brightness new_kbd_led_level;
+	led_brightness new_kbd_led_level;
 
 	switch (action) {
 	case DELL_LAPTOP_KBD_BACKLIGHT_BRIGHTNESS_CHANGED:
@@ -2137,7 +2137,7 @@ static struct notifier_block dell_laptop_notifier = {
 };
 
 static int micmute_led_set(struct led_classdev *led_cdev,
-			   enum led_brightness brightness)
+			   led_brightness brightness)
 {
 	struct calling_interface_buffer buffer;
 	struct calling_interface_token *token;

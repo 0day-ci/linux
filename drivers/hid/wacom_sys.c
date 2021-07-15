@@ -1302,7 +1302,7 @@ static int wacom_devm_kfifo_alloc(struct wacom *wacom)
 	return 0;
 }
 
-enum led_brightness wacom_leds_brightness_get(struct wacom_led *led)
+led_brightness wacom_leds_brightness_get(struct wacom_led *led)
 {
 	struct wacom *wacom = led->wacom;
 
@@ -1316,7 +1316,7 @@ enum led_brightness wacom_leds_brightness_get(struct wacom_led *led)
 	return LED_FULL;
 }
 
-static enum led_brightness __wacom_led_brightness_get(struct led_classdev *cdev)
+static led_brightness __wacom_led_brightness_get(struct led_classdev *cdev)
 {
 	struct wacom_led *led = container_of(cdev, struct wacom_led, cdev);
 	struct wacom *wacom = led->wacom;
@@ -1328,7 +1328,7 @@ static enum led_brightness __wacom_led_brightness_get(struct led_classdev *cdev)
 }
 
 static int wacom_led_brightness_set(struct led_classdev *cdev,
-				    enum led_brightness brightness)
+				    led_brightness brightness)
 {
 	struct wacom_led *led = container_of(cdev, struct wacom_led, cdev);
 	struct wacom *wacom = led->wacom;
@@ -1356,7 +1356,7 @@ out:
 }
 
 static void wacom_led_readonly_brightness_set(struct led_classdev *cdev,
-					       enum led_brightness brightness)
+					       led_brightness brightness)
 {
 }
 

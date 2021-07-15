@@ -33,7 +33,7 @@
 #include "nouveau_led.h"
 #include <nvkm/subdev/gpio.h>
 
-static enum led_brightness
+static led_brightness
 nouveau_led_get_brightness(struct led_classdev *led)
 {
 	struct drm_device *drm_dev = container_of(led, struct nouveau_led, led)->dev;
@@ -51,7 +51,7 @@ nouveau_led_get_brightness(struct led_classdev *led)
 }
 
 static void
-nouveau_led_set_brightness(struct led_classdev *led, enum led_brightness value)
+nouveau_led_set_brightness(struct led_classdev *led, led_brightness value)
 {
 	struct drm_device *drm_dev = container_of(led, struct nouveau_led, led)->dev;
 	struct nouveau_drm *drm = nouveau_drm(drm_dev);

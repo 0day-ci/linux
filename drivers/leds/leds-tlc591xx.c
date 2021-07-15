@@ -107,7 +107,7 @@ tlc591xx_set_pwm(struct tlc591xx_priv *priv, struct tlc591xx_led *led,
 
 static int
 tlc591xx_brightness_set(struct led_classdev *led_cdev,
-			enum led_brightness brightness)
+			led_brightness brightness)
 {
 	struct tlc591xx_led *led = ldev_to_led(led_cdev);
 	struct tlc591xx_priv *priv = led->priv;

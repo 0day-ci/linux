@@ -918,7 +918,7 @@ static int applespi_set_capsl_led(struct applespi_data *applespi,
 }
 
 static void applespi_set_bl_level(struct led_classdev *led_cdev,
-				  enum led_brightness value)
+				  led_brightness value)
 {
 	struct applespi_data *applespi =
 		container_of(led_cdev, struct applespi_data, backlight_info);

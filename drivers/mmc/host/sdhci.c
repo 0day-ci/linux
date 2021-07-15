@@ -385,7 +385,7 @@ static void __sdhci_led_deactivate(struct sdhci_host *host)
 
 #if IS_REACHABLE(CONFIG_LEDS_CLASS)
 static void sdhci_led_control(struct led_classdev *led,
-			      enum led_brightness brightness)
+			      led_brightness brightness)
 {
 	struct sdhci_host *host = container_of(led, struct sdhci_host, led);
 	unsigned long flags;

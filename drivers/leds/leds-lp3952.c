@@ -56,7 +56,7 @@ static void lp3952_on_off(struct lp3952_led_array *priv,
  * values 0-4. 0 meaning turn off.
  */
 static int lp3952_set_brightness(struct led_classdev *cdev,
-				 enum led_brightness value)
+				 led_brightness value)
 {
 	unsigned int reg, shift_val;
 	struct lp3952_ctrl_hdl *led = container_of(cdev,

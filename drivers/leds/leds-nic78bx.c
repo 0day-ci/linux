@@ -42,7 +42,7 @@ static inline struct nic78bx_led *to_nic78bx_led(struct led_classdev *cdev)
 }
 
 static void nic78bx_brightness_set(struct led_classdev *cdev,
-				  enum led_brightness brightness)
+				  led_brightness brightness)
 {
 	struct nic78bx_led *nled = to_nic78bx_led(cdev);
 	unsigned long flags;
@@ -62,7 +62,7 @@ static void nic78bx_brightness_set(struct led_classdev *cdev,
 	spin_unlock_irqrestore(&nled->data->lock, flags);
 }
 
-static enum led_brightness nic78bx_brightness_get(struct led_classdev *cdev)
+static led_brightness nic78bx_brightness_get(struct led_classdev *cdev)
 {
 	struct nic78bx_led *nled = to_nic78bx_led(cdev);
 	unsigned long flags;

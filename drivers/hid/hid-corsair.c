@@ -142,7 +142,7 @@ MODULE_PARM_DESC(profilekey_codes, "Key codes for the profile buttons");
 #define K90_BACKLIGHT_LED_SUFFIX "::backlight"
 #define K90_RECORD_LED_SUFFIX "::record"
 
-static enum led_brightness k90_backlight_get(struct led_classdev *led_cdev)
+static led_brightness k90_backlight_get(struct led_classdev *led_cdev)
 {
 	int ret;
 	struct k90_led *led = container_of(led_cdev, struct k90_led, cdev);
@@ -182,7 +182,7 @@ out:
 	return ret;
 }
 
-static enum led_brightness k90_record_led_get(struct led_classdev *led_cdev)
+static led_brightness k90_record_led_get(struct led_classdev *led_cdev)
 {
 	struct k90_led *led = container_of(led_cdev, struct k90_led, cdev);
 
@@ -190,7 +190,7 @@ static enum led_brightness k90_record_led_get(struct led_classdev *led_cdev)
 }
 
 static void k90_brightness_set(struct led_classdev *led_cdev,
-			       enum led_brightness brightness)
+			       led_brightness brightness)
 {
 	struct k90_led *led = container_of(led_cdev, struct k90_led, cdev);
 

@@ -101,7 +101,7 @@ exit_unlock:
 }
 
 static void ns2_led_set(struct led_classdev *led_cdev,
-			enum led_brightness value)
+			led_brightness value)
 {
 	struct ns2_led *led = container_of(led_cdev, struct ns2_led, cdev);
 	enum ns2_led_modes mode;
@@ -117,7 +117,7 @@ static void ns2_led_set(struct led_classdev *led_cdev,
 }
 
 static int ns2_led_set_blocking(struct led_classdev *led_cdev,
-			enum led_brightness value)
+			led_brightness value)
 {
 	ns2_led_set(led_cdev, value);
 	return 0;

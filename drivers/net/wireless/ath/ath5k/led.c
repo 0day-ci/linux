@@ -111,7 +111,7 @@ void ath5k_led_off(struct ath5k_hw *ah)
 
 static void
 ath5k_led_brightness_set(struct led_classdev *led_dev,
-	enum led_brightness brightness)
+	led_brightness brightness)
 {
 	struct ath5k_led *led = container_of(led_dev, struct ath5k_led,
 		led_dev);

@@ -429,7 +429,7 @@ static int __gb_lights_brightness_set(struct gb_channel *channel)
 }
 
 static int gb_brightness_set(struct led_classdev *cdev,
-			     enum led_brightness value)
+			     led_brightness value)
 {
 	struct gb_channel *channel = get_channel_from_cdev(cdev);
 
@@ -438,7 +438,7 @@ static int gb_brightness_set(struct led_classdev *cdev,
 	return __gb_lights_brightness_set(channel);
 }
 
-static enum led_brightness gb_brightness_get(struct led_classdev *cdev)
+static led_brightness gb_brightness_get(struct led_classdev *cdev)
 
 {
 	struct gb_channel *channel = get_channel_from_cdev(cdev);

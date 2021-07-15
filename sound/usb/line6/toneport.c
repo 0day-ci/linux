@@ -294,7 +294,7 @@ static void toneport_update_led(struct usb_line6_toneport *toneport)
 }
 
 static void toneport_led_brightness_set(struct led_classdev *led_cdev,
-					enum led_brightness brightness)
+					led_brightness brightness)
 {
 	struct toneport_led *leds =
 		container_of(led_cdev, struct toneport_led, dev);

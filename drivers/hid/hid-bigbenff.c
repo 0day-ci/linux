@@ -252,7 +252,7 @@ static int hid_bigben_play_effect(struct input_dev *dev, void *data,
 }
 
 static void bigben_set_led(struct led_classdev *led,
-	enum led_brightness value)
+	led_brightness value)
 {
 	struct device *dev = led->dev->parent;
 	struct hid_device *hid = to_hid_device(dev);
@@ -284,7 +284,7 @@ static void bigben_set_led(struct led_classdev *led,
 	}
 }
 
-static enum led_brightness bigben_get_led(struct led_classdev *led)
+static led_brightness bigben_get_led(struct led_classdev *led)
 {
 	struct device *dev = led->dev->parent;
 	struct hid_device *hid = to_hid_device(dev);

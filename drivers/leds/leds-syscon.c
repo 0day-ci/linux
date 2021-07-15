@@ -33,7 +33,7 @@ struct syscon_led {
 };
 
 static void syscon_led_set(struct led_classdev *led_cdev,
-	enum led_brightness value)
+	led_brightness value)
 {
 	struct syscon_led *sled =
 		container_of(led_cdev, struct syscon_led, cdev);

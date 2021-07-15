@@ -849,7 +849,7 @@ out:
 	return ret;
 }
 
-static void redrat3_brightness_set(struct led_classdev *led_dev, enum
+static void redrat3_brightness_set(struct led_classdev *led_dev,
 						led_brightness brightness)
 {
 	struct redrat3_dev *rr3 = container_of(led_dev, struct redrat3_dev,

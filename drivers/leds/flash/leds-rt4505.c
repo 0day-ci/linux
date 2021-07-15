@@ -50,7 +50,7 @@ struct rt4505_priv {
 };
 
 static int rt4505_torch_brightness_set(struct led_classdev *lcdev,
-				       enum led_brightness level)
+				       led_brightness level)
 {
 	struct rt4505_priv *priv =
 		container_of(lcdev, struct rt4505_priv, flash.led_cdev);
@@ -77,7 +77,7 @@ unlock:
 	return ret;
 }
 
-static enum led_brightness rt4505_torch_brightness_get(
+static led_brightness rt4505_torch_brightness_get(
 						struct led_classdev *lcdev)
 {
 	struct rt4505_priv *priv =

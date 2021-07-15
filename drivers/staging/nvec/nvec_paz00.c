@@ -27,7 +27,7 @@ struct nvec_led {
 };
 
 static void nvec_led_brightness_set(struct led_classdev *led_cdev,
-				    enum led_brightness value)
+				    led_brightness value)
 {
 	struct nvec_led *led = to_nvec_led(led_cdev);
 	unsigned char buf[] = NVEC_LED_REQ;

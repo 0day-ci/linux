@@ -32,7 +32,7 @@ static inline struct gpio_led_data *
 }
 
 static void gpio_led_set(struct led_classdev *led_cdev,
-	enum led_brightness value)
+	led_brightness value)
 {
 	struct gpio_led_data *led_dat = cdev_to_gpio_led_data(led_cdev);
 	int level;
@@ -55,7 +55,7 @@ static void gpio_led_set(struct led_classdev *led_cdev,
 }
 
 static int gpio_led_set_blocking(struct led_classdev *led_cdev,
-	enum led_brightness value)
+	led_brightness value)
 {
 	gpio_led_set(led_cdev, value);
 	return 0;

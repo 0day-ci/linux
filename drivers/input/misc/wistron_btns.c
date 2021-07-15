@@ -1037,14 +1037,14 @@ static bool bluetooth_enabled;
 
  /* led management */
 static void wistron_mail_led_set(struct led_classdev *led_cdev,
-				enum led_brightness value)
+				led_brightness value)
 {
 	bios_set_state(MAIL_LED, (value != LED_OFF) ? 1 : 0);
 }
 
 /* same as setting up wifi card, but for laptops on which the led is managed */
 static void wistron_wifi_led_set(struct led_classdev *led_cdev,
-				enum led_brightness value)
+				led_brightness value)
 {
 	bios_set_state(WIFI, (value != LED_OFF) ? 1 : 0);
 }

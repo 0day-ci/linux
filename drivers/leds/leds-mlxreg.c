@@ -95,7 +95,7 @@ access_error:
 	return ret;
 }
 
-static enum led_brightness
+static led_brightness
 mlxreg_led_get_hw(struct mlxreg_led_data *led_data)
 {
 	struct mlxreg_led_priv_data *priv = led_data->data_parent;
@@ -133,7 +133,7 @@ mlxreg_led_get_hw(struct mlxreg_led_data *led_data)
 }
 
 static int
-mlxreg_led_brightness_set(struct led_classdev *cled, enum led_brightness value)
+mlxreg_led_brightness_set(struct led_classdev *cled, led_brightness value)
 {
 	struct mlxreg_led_data *led_data = cdev_to_priv(cled);
 
@@ -143,7 +143,7 @@ mlxreg_led_brightness_set(struct led_classdev *cled, enum led_brightness value)
 		return mlxreg_led_store_hw(led_data, MLXREG_LED_IS_OFF);
 }
 
-static enum led_brightness
+static led_brightness
 mlxreg_led_brightness_get(struct led_classdev *cled)
 {
 	struct mlxreg_led_data *led_data = cdev_to_priv(cled);
@@ -188,7 +188,7 @@ static int mlxreg_led_config(struct mlxreg_led_priv_data *priv)
 	struct mlxreg_core_data *data = led_pdata->data;
 	struct mlxreg_led_data *led_data;
 	struct led_classdev *led_cdev;
-	enum led_brightness brightness;
+	led_brightness brightness;
 	u32 regval;
 	int i;
 	int err;

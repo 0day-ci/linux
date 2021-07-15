@@ -321,7 +321,7 @@ static void stac_gpio_set(struct hda_codec *codec, unsigned int mask,
 
 /* hook for controlling mic-mute LED GPIO */
 static int stac_capture_led_update(struct led_classdev *led_cdev,
-				   enum led_brightness brightness)
+				   led_brightness brightness)
 {
 	struct hda_codec *codec = dev_to_hda_codec(led_cdev->dev->parent);
 	struct sigmatel_spec *spec = codec->spec;
@@ -396,7 +396,7 @@ static void stac_update_led_status(struct hda_codec *codec, bool muted)
 
 /* vmaster hook to update mute LED */
 static int stac_vmaster_hook(struct led_classdev *led_cdev,
-			     enum led_brightness brightness)
+			     led_brightness brightness)
 {
 	struct hda_codec *codec = dev_to_hda_codec(led_cdev->dev->parent);
 

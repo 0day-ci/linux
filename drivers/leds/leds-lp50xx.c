@@ -303,7 +303,7 @@ static struct lp50xx_led *mcled_cdev_to_led(struct led_classdev_mc *mc_cdev)
 }
 
 static int lp50xx_brightness_set(struct led_classdev *cdev,
-			     enum led_brightness brightness)
+			     led_brightness brightness)
 {
 	struct led_classdev_mc *mc_dev = lcdev_to_mccdev(cdev);
 	struct lp50xx_led *led = mcled_cdev_to_led(mc_dev);

@@ -86,7 +86,7 @@ static int lp8788_led_enable(struct lp8788_led *led,
 }
 
 static int lp8788_brightness_set(struct led_classdev *led_cdev,
-				enum led_brightness val)
+				led_brightness val)
 {
 	struct lp8788_led *led =
 			container_of(led_cdev, struct lp8788_led, led_dev);

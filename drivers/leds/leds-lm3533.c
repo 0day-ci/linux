@@ -116,7 +116,7 @@ out:
 }
 
 static int lm3533_led_set(struct led_classdev *cdev,
-						enum led_brightness value)
+						led_brightness value)
 {
 	struct lm3533_led *led = to_lm3533_led(cdev);
 
@@ -128,7 +128,7 @@ static int lm3533_led_set(struct led_classdev *cdev,
 	return lm3533_ctrlbank_set_brightness(&led->cb, value);
 }
 
-static enum led_brightness lm3533_led_get(struct led_classdev *cdev)
+static led_brightness lm3533_led_get(struct led_classdev *cdev)
 {
 	struct lm3533_led *led = to_lm3533_led(cdev);
 	u8 val;

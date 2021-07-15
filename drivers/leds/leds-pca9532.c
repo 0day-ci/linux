@@ -114,7 +114,7 @@ static struct i2c_driver pca9532_driver = {
  * leds that are not ON/OFF.
  * */
 static int pca9532_calcpwm(struct i2c_client *client, int pwm, int blink,
-	enum led_brightness value)
+	led_brightness value)
 {
 	int a = 0, b = 0, i = 0;
 	struct pca9532_data *data = i2c_get_clientdata(client);
@@ -172,7 +172,7 @@ static void pca9532_setled(struct pca9532_led *led)
 }
 
 static int pca9532_set_brightness(struct led_classdev *led_cdev,
-	enum led_brightness value)
+	led_brightness value)
 {
 	int err = 0;
 	struct pca9532_led *led = ldev_to_led(led_cdev);

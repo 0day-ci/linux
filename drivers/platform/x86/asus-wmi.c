@@ -540,7 +540,7 @@ static void tpd_led_update(struct work_struct *work)
 }
 
 static void tpd_led_set(struct led_classdev *led_cdev,
-			enum led_brightness value)
+			led_brightness value)
 {
 	struct asus_wmi *asus;
 
@@ -555,7 +555,7 @@ static int read_tpd_led_state(struct asus_wmi *asus)
 	return asus_wmi_get_devstate_simple(asus, ASUS_WMI_DEVID_TOUCHPAD_LED);
 }
 
-static enum led_brightness tpd_led_get(struct led_classdev *led_cdev)
+static led_brightness tpd_led_get(struct led_classdev *led_cdev)
 {
 	struct asus_wmi *asus;
 
@@ -612,7 +612,7 @@ static void do_kbd_led_set(struct led_classdev *led_cdev, int value)
 }
 
 static void kbd_led_set(struct led_classdev *led_cdev,
-			enum led_brightness value)
+			led_brightness value)
 {
 	/* Prevent disabling keyboard backlight on module unregister */
 	if (led_cdev->flags & LED_UNREGISTERING)
@@ -621,7 +621,7 @@ static void kbd_led_set(struct led_classdev *led_cdev,
 	do_kbd_led_set(led_cdev, value);
 }
 
-static void kbd_led_set_by_kbd(struct asus_wmi *asus, enum led_brightness value)
+static void kbd_led_set_by_kbd(struct asus_wmi *asus, led_brightness value)
 {
 	struct led_classdev *led_cdev = &asus->kbd_led;
 
@@ -629,7 +629,7 @@ static void kbd_led_set_by_kbd(struct asus_wmi *asus, enum led_brightness value)
 	led_classdev_notify_brightness_hw_changed(led_cdev, asus->kbd_led_wk);
 }
 
-static enum led_brightness kbd_led_get(struct led_classdev *led_cdev)
+static led_brightness kbd_led_get(struct led_classdev *led_cdev)
 {
 	struct asus_wmi *asus;
 	int retval, value;
@@ -664,7 +664,7 @@ static void wlan_led_update(struct work_struct *work)
 }
 
 static void wlan_led_set(struct led_classdev *led_cdev,
-			 enum led_brightness value)
+			 led_brightness value)
 {
 	struct asus_wmi *asus;
 
@@ -674,7 +674,7 @@ static void wlan_led_set(struct led_classdev *led_cdev,
 	queue_work(asus->led_workqueue, &asus->wlan_led_work);
 }
 
-static enum led_brightness wlan_led_get(struct led_classdev *led_cdev)
+static led_brightness wlan_led_get(struct led_classdev *led_cdev)
 {
 	struct asus_wmi *asus;
 	u32 result;
@@ -697,7 +697,7 @@ static void lightbar_led_update(struct work_struct *work)
 }
 
 static void lightbar_led_set(struct led_classdev *led_cdev,
-			     enum led_brightness value)
+			     led_brightness value)
 {
 	struct asus_wmi *asus;
 
@@ -707,7 +707,7 @@ static void lightbar_led_set(struct led_classdev *led_cdev,
 	queue_work(asus->led_workqueue, &asus->lightbar_led_work);
 }
 
-static enum led_brightness lightbar_led_get(struct led_classdev *led_cdev)
+static led_brightness lightbar_led_get(struct led_classdev *led_cdev)
 {
 	struct asus_wmi *asus;
 	u32 result;

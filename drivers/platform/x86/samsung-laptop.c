@@ -1113,7 +1113,7 @@ static void kbd_led_update(struct work_struct *work)
 }
 
 static void kbd_led_set(struct led_classdev *led_cdev,
-			enum led_brightness value)
+			led_brightness value)
 {
 	struct samsung_laptop *samsung;
 
@@ -1128,7 +1128,7 @@ static void kbd_led_set(struct led_classdev *led_cdev,
 	queue_work(samsung->led_workqueue, &samsung->kbd_led_work);
 }
 
-static enum led_brightness kbd_led_get(struct led_classdev *led_cdev)
+static led_brightness kbd_led_get(struct led_classdev *led_cdev)
 {
 	struct samsung_laptop *samsung;
 

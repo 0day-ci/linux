@@ -516,7 +516,7 @@ static struct device_attribute *bd2802_attributes[] = {
 
 #define BD2802_CONTROL_RGBS(name, id, clr)				\
 static int bd2802_set_##name##_brightness(struct led_classdev *led_cdev,\
-					enum led_brightness value)	\
+					led_brightness value)	\
 {									\
 	struct bd2802_led *led =					\
 		container_of(led_cdev, struct bd2802_led, cdev_##name);	\

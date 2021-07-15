@@ -686,7 +686,7 @@ static const struct {
  *  - clearing bit means turn on LED
  */
 static void netwinder_led_set(struct led_classdev *cdev,
-		enum led_brightness b)
+		led_brightness b)
 {
 	struct netwinder_led *led = container_of(cdev,
 			struct netwinder_led, cdev);
@@ -703,7 +703,7 @@ static void netwinder_led_set(struct led_classdev *cdev,
 	raw_spin_unlock_irqrestore(&nw_gpio_lock, flags);
 }
 
-static enum led_brightness netwinder_led_get(struct led_classdev *cdev)
+static led_brightness netwinder_led_get(struct led_classdev *cdev)
 {
 	struct netwinder_led *led = container_of(cdev,
 			struct netwinder_led, cdev);

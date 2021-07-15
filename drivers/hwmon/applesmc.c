@@ -968,7 +968,7 @@ static void applesmc_backlight_set(struct work_struct *work)
 static DECLARE_WORK(backlight_work, &applesmc_backlight_set);
 
 static void applesmc_brightness_set(struct led_classdev *led_cdev,
-						enum led_brightness value)
+						led_brightness value)
 {
 	int ret;
 

@@ -134,7 +134,7 @@ static int iwl_led_cmd(struct iwl_priv *priv,
 }
 
 static void iwl_led_brightness_set(struct led_classdev *led_cdev,
-				   enum led_brightness brightness)
+				   led_brightness brightness)
 {
 	struct iwl_priv *priv = container_of(led_cdev, struct iwl_priv, led);
 	unsigned long on = 0;

@@ -42,7 +42,7 @@ struct omnia_leds {
 };
 
 static int omnia_led_brightness_set_blocking(struct led_classdev *cdev,
-					     enum led_brightness brightness)
+					     led_brightness brightness)
 {
 	struct led_classdev_mc *mc_cdev = lcdev_to_mccdev(cdev);
 	struct omnia_leds *leds = dev_get_drvdata(cdev->dev->parent);

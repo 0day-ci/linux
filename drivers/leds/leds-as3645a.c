@@ -309,7 +309,7 @@ static unsigned int as3645a_current_to_reg(struct as3645a *flash, bool is_flash,
 }
 
 static int as3645a_set_indicator_brightness(struct led_classdev *iled_cdev,
-					    enum led_brightness brightness)
+					    led_brightness brightness)
 {
 	struct as3645a *flash = iled_cdev_to_as3645a(iled_cdev);
 	int rval;
@@ -324,7 +324,7 @@ static int as3645a_set_indicator_brightness(struct led_classdev *iled_cdev,
 }
 
 static int as3645a_set_assist_brightness(struct led_classdev *fled_cdev,
-					 enum led_brightness brightness)
+					 led_brightness brightness)
 {
 	struct led_classdev_flash *fled = lcdev_to_flcdev(fled_cdev);
 	struct as3645a *flash = fled_to_as3645a(fled);

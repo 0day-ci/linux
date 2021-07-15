@@ -196,7 +196,7 @@ struct rbtx4939_led_data {
 
 /* Use "dot" in 7seg LEDs */
 static void rbtx4939_led_brightness_set(struct led_classdev *led_cdev,
-					enum led_brightness value)
+					led_brightness value)
 {
 	struct rbtx4939_led_data *led_dat =
 		container_of(led_cdev, struct rbtx4939_led_data, cdev);

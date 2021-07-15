@@ -15,7 +15,7 @@
 #include <mach/hp6xx.h>
 
 static void hp6xxled_green_set(struct led_classdev *led_cdev,
-			       enum led_brightness value)
+			       led_brightness value)
 {
 	u8 v8;
 
@@ -27,7 +27,7 @@ static void hp6xxled_green_set(struct led_classdev *led_cdev,
 }
 
 static void hp6xxled_red_set(struct led_classdev *led_cdev,
-			     enum led_brightness value)
+			     led_brightness value)
 {
 	u16 v16;
 

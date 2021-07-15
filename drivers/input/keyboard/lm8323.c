@@ -495,7 +495,7 @@ static void lm8323_pwm_work(struct work_struct *work)
 }
 
 static void lm8323_pwm_set_brightness(struct led_classdev *led_cdev,
-				      enum led_brightness brightness)
+				      led_brightness brightness)
 {
 	struct lm8323_pwm *pwm = cdev_to_pwm(led_cdev);
 	struct lm8323_chip *lm = pwm->chip;

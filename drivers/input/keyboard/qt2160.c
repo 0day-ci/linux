@@ -47,7 +47,7 @@ struct qt2160_led {
 	struct led_classdev cdev;
 	char name[32];
 	int id;
-	enum led_brightness brightness;
+	led_brightness brightness;
 };
 #endif
 
@@ -68,7 +68,7 @@ static int qt2160_write(struct i2c_client *client, u8 reg, u8 data);
 #ifdef CONFIG_LEDS_CLASS
 
 static int qt2160_led_set(struct led_classdev *cdev,
-			  enum led_brightness value)
+			  led_brightness value)
 {
 	struct qt2160_led *led = container_of(cdev, struct qt2160_led, cdev);
 	struct qt2160_data *qt2160 = led->qt2160;

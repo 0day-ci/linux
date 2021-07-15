@@ -127,7 +127,7 @@ mt76x02_led_set_blink(struct led_classdev *led_cdev,
 
 static void
 mt76x02_led_set_brightness(struct led_classdev *led_cdev,
-			   enum led_brightness brightness)
+			   led_brightness brightness)
 {
 	struct mt76_dev *mdev = container_of(led_cdev, struct mt76_dev,
 					     led_cdev);

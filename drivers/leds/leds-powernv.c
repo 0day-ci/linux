@@ -74,7 +74,7 @@ static int powernv_get_led_type(const char *led_type_desc)
  * scheduled. This function can sleep at opal_async_wait_response call.
  */
 static int powernv_led_set(struct powernv_led_data *powernv_led,
-			    enum led_brightness value)
+			    led_brightness value)
 {
 	int rc, token;
 	u64 led_mask, led_value = 0;
@@ -128,7 +128,7 @@ out_token:
  * This function fetches the LED state for a given LED type for
  * mentioned LED classdev structure.
  */
-static enum led_brightness powernv_led_get(struct powernv_led_data *powernv_led)
+static led_brightness powernv_led_get(struct powernv_led_data *powernv_led)
 {
 	int rc;
 	__be64 mask, value, max_type;
@@ -171,7 +171,7 @@ static enum led_brightness powernv_led_get(struct powernv_led_data *powernv_led)
  * to update LED state.
  */
 static int powernv_brightness_set(struct led_classdev *led_cdev,
-				   enum led_brightness value)
+				   led_brightness value)
 {
 	struct powernv_led_data *powernv_led =
 		container_of(led_cdev, struct powernv_led_data, cdev);
@@ -190,7 +190,7 @@ static int powernv_brightness_set(struct led_classdev *led_cdev,
 }
 
 /* LED classdev 'brightness_get' function */
-static enum led_brightness powernv_brightness_get(struct led_classdev *led_cdev)
+static led_brightness powernv_brightness_get(struct led_classdev *led_cdev)
 {
 	struct powernv_led_data *powernv_led =
 		container_of(led_cdev, struct powernv_led_data, cdev);

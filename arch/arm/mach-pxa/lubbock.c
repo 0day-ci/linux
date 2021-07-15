@@ -564,7 +564,7 @@ static const struct {
 };
 
 static void lubbock_led_set(struct led_classdev *cdev,
-			      enum led_brightness b)
+			      led_brightness b)
 {
 	struct lubbock_led *led = container_of(cdev,
 					 struct lubbock_led, cdev);
@@ -578,7 +578,7 @@ static void lubbock_led_set(struct led_classdev *cdev,
 	LUB_DISC_BLNK_LED = reg;
 }
 
-static enum led_brightness lubbock_led_get(struct led_classdev *cdev)
+static led_brightness lubbock_led_get(struct led_classdev *cdev)
 {
 	struct lubbock_led *led = container_of(cdev,
 					 struct lubbock_led, cdev);

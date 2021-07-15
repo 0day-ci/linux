@@ -46,7 +46,7 @@ static unsigned char hw_led_state;
 static void __iomem *xbus;
 
 static void ebsa285_led_set(struct led_classdev *cdev,
-		enum led_brightness b)
+		led_brightness b)
 {
 	struct ebsa285_led *led = container_of(cdev,
 			struct ebsa285_led, cdev);
@@ -58,7 +58,7 @@ static void ebsa285_led_set(struct led_classdev *cdev,
 	writeb(hw_led_state, xbus);
 }
 
-static enum led_brightness ebsa285_led_get(struct led_classdev *cdev)
+static led_brightness ebsa285_led_get(struct led_classdev *cdev)
 {
 	struct ebsa285_led *led = container_of(cdev,
 			struct ebsa285_led, cdev);

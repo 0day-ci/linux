@@ -48,7 +48,7 @@ static void pmu_req_done(struct adb_request * req)
 }
 
 static void pmu_led_set(struct led_classdev *led_cdev,
-			enum led_brightness brightness)
+			led_brightness brightness)
 {
 	unsigned long flags;
 

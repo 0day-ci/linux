@@ -234,7 +234,7 @@ void ath9k_led_work(struct work_struct *work)
 }
 
 static void ath9k_led_brightness(struct led_classdev *led_cdev,
-				 enum led_brightness brightness)
+				 led_brightness brightness)
 {
 	struct ath9k_htc_priv *priv = container_of(led_cdev,
 						   struct ath9k_htc_priv,

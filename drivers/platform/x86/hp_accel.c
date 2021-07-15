@@ -37,10 +37,10 @@
 struct delayed_led_classdev {
 	struct led_classdev led_classdev;
 	struct work_struct work;
-	enum led_brightness new_brightness;
+	led_brightness new_brightness;
 
 	unsigned int led;		/* For driver */
-	void (*set_brightness)(struct delayed_led_classdev *data, enum led_brightness value);
+	void (*set_brightness)(struct delayed_led_classdev *data, led_brightness value);
 };
 
 static inline void delayed_set_status_worker(struct work_struct *work)
@@ -52,7 +52,7 @@ static inline void delayed_set_status_worker(struct work_struct *work)
 }
 
 static inline void delayed_sysfs_set(struct led_classdev *led_cdev,
-			      enum led_brightness brightness)
+			      led_brightness brightness)
 {
 	struct delayed_led_classdev *data = container_of(led_cdev,
 			     struct delayed_led_classdev, led_classdev);
@@ -255,7 +255,7 @@ static const struct dmi_system_id lis3lv02d_dmi_ids[] = {
  */
 };
 
-static void hpled_set(struct delayed_led_classdev *led_cdev, enum led_brightness value)
+static void hpled_set(struct delayed_led_classdev *led_cdev, led_brightness value)
 {
 	struct acpi_device *dev = lis3_dev.bus_priv;
 	unsigned long long ret; /* Not used when writing */

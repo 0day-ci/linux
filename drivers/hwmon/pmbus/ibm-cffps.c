@@ -365,7 +365,7 @@ static int ibm_cffps_read_word_data(struct i2c_client *client, int page,
 }
 
 static int ibm_cffps_led_brightness_set(struct led_classdev *led_cdev,
-					enum led_brightness brightness)
+					led_brightness brightness)
 {
 	int rc;
 	u8 next_led_state;

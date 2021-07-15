@@ -74,7 +74,7 @@ static acpi_status asus_wireless_method(acpi_handle handle, const char *method,
 	return s;
 }
 
-static enum led_brightness led_state_get(struct led_classdev *led)
+static led_brightness led_state_get(struct led_classdev *led)
 {
 	struct asus_wireless_data *data;
 	acpi_status s;
@@ -98,7 +98,7 @@ static void led_state_update(struct work_struct *work)
 			     data->led_state, &ret);
 }
 
-static void led_state_set(struct led_classdev *led, enum led_brightness value)
+static void led_state_set(struct led_classdev *led, led_brightness value)
 {
 	struct asus_wireless_data *data;
 

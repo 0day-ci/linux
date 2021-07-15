@@ -301,7 +301,7 @@ struct hammer_kbd_leds {
 };
 
 static int hammer_kbd_brightness_set_blocking(struct led_classdev *cdev,
-		enum led_brightness br)
+		led_brightness br)
 {
 	struct hammer_kbd_leds *led = container_of(cdev,
 						   struct hammer_kbd_leds,

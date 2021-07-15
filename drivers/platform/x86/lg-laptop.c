@@ -516,7 +516,7 @@ static const struct attribute_group dev_attribute_group = {
 };
 
 static void tpad_led_set(struct led_classdev *cdev,
-			 enum led_brightness brightness)
+			 led_brightness brightness)
 {
 	union acpi_object *r;
 
@@ -524,7 +524,7 @@ static void tpad_led_set(struct led_classdev *cdev,
 	kfree(r);
 }
 
-static enum led_brightness tpad_led_get(struct led_classdev *cdev)
+static led_brightness tpad_led_get(struct led_classdev *cdev)
 {
 	return ggov(GOV_TLED) > 0 ? LED_ON : LED_OFF;
 }
@@ -532,7 +532,7 @@ static enum led_brightness tpad_led_get(struct led_classdev *cdev)
 static LED_DEVICE(tpad_led, 1);
 
 static void kbd_backlight_set(struct led_classdev *cdev,
-			      enum led_brightness brightness)
+			      led_brightness brightness)
 {
 	u32 val;
 	union acpi_object *r;
@@ -546,7 +546,7 @@ static void kbd_backlight_set(struct led_classdev *cdev,
 	kfree(r);
 }
 
-static enum led_brightness kbd_backlight_get(struct led_classdev *cdev)
+static led_brightness kbd_backlight_get(struct led_classdev *cdev)
 {
 	union acpi_object *r;
 	int val;

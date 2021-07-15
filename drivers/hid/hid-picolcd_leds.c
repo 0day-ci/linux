@@ -48,7 +48,7 @@ void picolcd_leds_set(struct picolcd_data *data)
 }
 
 static void picolcd_led_set_brightness(struct led_classdev *led_cdev,
-			enum led_brightness value)
+			led_brightness value)
 {
 	struct device *dev;
 	struct hid_device *hdev;
@@ -75,7 +75,7 @@ static void picolcd_led_set_brightness(struct led_classdev *led_cdev,
 	}
 }
 
-static enum led_brightness picolcd_led_get_brightness(struct led_classdev *led_cdev)
+static led_brightness picolcd_led_get_brightness(struct led_classdev *led_cdev)
 {
 	struct device *dev;
 	struct hid_device *hdev;

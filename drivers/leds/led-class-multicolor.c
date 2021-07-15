@@ -13,7 +13,7 @@
 #include "leds.h"
 
 int led_mc_calc_color_components(struct led_classdev_mc *mcled_cdev,
-				 enum led_brightness brightness)
+				 led_brightness brightness)
 {
 	struct led_classdev *led_cdev = &mcled_cdev->led_cdev;
 	int i;

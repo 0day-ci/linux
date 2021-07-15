@@ -54,7 +54,7 @@ static void b43legacy_led_turn_off(struct b43legacy_wldev *dev, u8 led_index,
 
 /* Callback from the LED subsystem. */
 static void b43legacy_led_brightness_set(struct led_classdev *led_dev,
-				   enum led_brightness brightness)
+				   led_brightness brightness)
 {
 	struct b43legacy_led *led = container_of(led_dev, struct b43legacy_led,
 				    led_dev);

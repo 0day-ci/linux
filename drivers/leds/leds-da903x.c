@@ -38,7 +38,7 @@ struct da903x_led {
 #define DA9034_LED_OFFSET(id)	((id) - DA9034_ID_LED_1)
 
 static int da903x_led_set(struct led_classdev *led_cdev,
-			   enum led_brightness value)
+			   led_brightness value)
 {
 	struct da903x_led *led =
 			container_of(led_cdev, struct da903x_led, cdev);

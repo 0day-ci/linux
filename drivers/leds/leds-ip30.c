@@ -18,7 +18,7 @@ struct ip30_led {
 };
 
 static void ip30led_set(struct led_classdev *led_cdev,
-			enum led_brightness value)
+			led_brightness value)
 {
 	struct ip30_led *led = container_of(led_cdev, struct ip30_led, cdev);
 

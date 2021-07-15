@@ -34,7 +34,7 @@ static const unsigned int led_n_base[ASIC3_NUM_LEDS] = {
 };
 
 static void brightness_set(struct led_classdev *cdev,
-	enum led_brightness value)
+	led_brightness value)
 {
 	struct platform_device *pdev = to_platform_device(cdev->dev->parent);
 	const struct mfd_cell *cell = mfd_get_cell(pdev);

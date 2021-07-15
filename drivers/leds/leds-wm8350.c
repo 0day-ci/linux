@@ -139,7 +139,7 @@ static int wm8350_led_disable(struct wm8350_led *led)
 }
 
 static int wm8350_led_set(struct led_classdev *led_cdev,
-			   enum led_brightness value)
+			   led_brightness value)
 {
 	struct wm8350_led *led = to_wm8350_led(led_cdev);
 	unsigned long flags;

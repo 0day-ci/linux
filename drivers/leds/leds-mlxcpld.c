@@ -99,7 +99,7 @@ struct mlxcpld_led_profile {
 	u8 offset;
 	u8 mask;
 	u8 base_color;
-	enum led_brightness brightness;
+	led_brightness brightness;
 	const char *name;
 };
 
@@ -280,7 +280,7 @@ static void mlxcpld_led_store_hw(u8 mask, u8 off, u8 vset)
 }
 
 static void mlxcpld_led_brightness_set(struct led_classdev *led,
-				       enum led_brightness value)
+				       led_brightness value)
 {
 	struct mlxcpld_led_priv *pled = cdev_to_priv(led);
 

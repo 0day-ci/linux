@@ -3915,7 +3915,7 @@ static int parse_mic_boost(struct hda_codec *codec)
 
 static int create_mute_led_cdev(struct hda_codec *codec,
 				int (*callback)(struct led_classdev *,
-						enum led_brightness),
+						led_brightness),
 				bool micmute)
 {
 	struct led_classdev *cdev;
@@ -3941,7 +3941,7 @@ static int create_mute_led_cdev(struct hda_codec *codec,
  */
 int snd_hda_gen_add_mute_led_cdev(struct hda_codec *codec,
 				  int (*callback)(struct led_classdev *,
-						  enum led_brightness))
+						  led_brightness))
 {
 	struct hda_gen_spec *spec = codec->spec;
 	int err;
@@ -3978,7 +3978,7 @@ EXPORT_SYMBOL_GPL(snd_hda_gen_add_mute_led_cdev);
  */
 int snd_hda_gen_add_micmute_led_cdev(struct hda_codec *codec,
 				     int (*callback)(struct led_classdev *,
-						     enum led_brightness))
+						     led_brightness))
 {
 	struct hda_gen_spec *spec = codec->spec;
 	int err;

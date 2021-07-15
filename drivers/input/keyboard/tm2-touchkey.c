@@ -84,7 +84,7 @@ static const struct touchkey_variant tc360_touchkey_variant = {
 };
 
 static int tm2_touchkey_led_brightness_set(struct led_classdev *led_dev,
-					    enum led_brightness brightness)
+					    led_brightness brightness)
 {
 	struct tm2_touchkey_data *touchkey =
 		container_of(led_dev, struct tm2_touchkey_data, led_dev);

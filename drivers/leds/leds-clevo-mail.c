@@ -93,7 +93,7 @@ static const struct dmi_system_id clevo_mail_led_dmi_table[] __initconst = {
 MODULE_DEVICE_TABLE(dmi, clevo_mail_led_dmi_table);
 
 static void clevo_mail_led_set(struct led_classdev *led_cdev,
-				enum led_brightness value)
+				led_brightness value)
 {
 	i8042_lock_chip();
 

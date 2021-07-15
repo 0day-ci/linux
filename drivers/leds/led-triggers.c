@@ -375,7 +375,7 @@ EXPORT_SYMBOL_GPL(devm_led_trigger_register);
 /* Simple LED Trigger Interface */
 
 void led_trigger_event(struct led_trigger *trig,
-			enum led_brightness brightness)
+			led_brightness brightness)
 {
 	struct led_classdev *led_cdev;
 	unsigned long flags;

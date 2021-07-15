@@ -344,7 +344,7 @@ static int lm3532_led_disable(struct lm3532_led *led_data)
 }
 
 static int lm3532_brightness_set(struct led_classdev *led_cdev,
-				 enum led_brightness brt_val)
+				 led_brightness brt_val)
 {
 	struct lm3532_led *led =
 			container_of(led_cdev, struct lm3532_led, led_dev);

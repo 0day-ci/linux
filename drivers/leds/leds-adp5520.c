@@ -27,7 +27,7 @@ struct adp5520_led {
 };
 
 static int adp5520_led_set(struct led_classdev *led_cdev,
-			   enum led_brightness value)
+			   led_brightness value)
 {
 	struct adp5520_led *led;
 

@@ -135,7 +135,7 @@ static void steelseries_srws1_set_leds(struct hid_device *hdev, __u16 leds)
 }
 
 static void steelseries_srws1_led_all_set_brightness(struct led_classdev *led_cdev,
-			enum led_brightness value)
+			led_brightness value)
 {
 	struct device *dev = led_cdev->dev->parent;
 	struct hid_device *hid = to_hid_device(dev);
@@ -154,7 +154,7 @@ static void steelseries_srws1_led_all_set_brightness(struct led_classdev *led_cd
 	steelseries_srws1_set_leds(hid, drv_data->led_state);
 }
 
-static enum led_brightness steelseries_srws1_led_all_get_brightness(struct led_classdev *led_cdev)
+static led_brightness steelseries_srws1_led_all_get_brightness(struct led_classdev *led_cdev)
 {
 	struct device *dev = led_cdev->dev->parent;
 	struct hid_device *hid = to_hid_device(dev);
@@ -171,7 +171,7 @@ static enum led_brightness steelseries_srws1_led_all_get_brightness(struct led_c
 }
 
 static void steelseries_srws1_led_set_brightness(struct led_classdev *led_cdev,
-			enum led_brightness value)
+			led_brightness value)
 {
 	struct device *dev = led_cdev->dev->parent;
 	struct hid_device *hid = to_hid_device(dev);
@@ -199,7 +199,7 @@ static void steelseries_srws1_led_set_brightness(struct led_classdev *led_cdev,
 	}
 }
 
-static enum led_brightness steelseries_srws1_led_get_brightness(struct led_classdev *led_cdev)
+static led_brightness steelseries_srws1_led_get_brightness(struct led_classdev *led_cdev)
 {
 	struct device *dev = led_cdev->dev->parent;
 	struct hid_device *hid = to_hid_device(dev);

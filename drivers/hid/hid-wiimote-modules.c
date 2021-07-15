@@ -291,7 +291,7 @@ static const struct wiimod_ops wiimod_battery = {
  * State is managed by wiimote core.
  */
 
-static enum led_brightness wiimod_led_get(struct led_classdev *led_dev)
+static led_brightness wiimod_led_get(struct led_classdev *led_dev)
 {
 	struct device *dev = led_dev->dev->parent;
 	struct wiimote_data *wdata = dev_to_wii(dev);
@@ -312,7 +312,7 @@ static enum led_brightness wiimod_led_get(struct led_classdev *led_dev)
 }
 
 static void wiimod_led_set(struct led_classdev *led_dev,
-			   enum led_brightness value)
+			   led_brightness value)
 {
 	struct device *dev = led_dev->dev->parent;
 	struct wiimote_data *wdata = dev_to_wii(dev);

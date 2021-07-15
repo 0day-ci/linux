@@ -229,12 +229,12 @@ static struct platform_device ts5500_dio2_pdev = {
 };
 
 static void ts5500_led_set(struct led_classdev *led_cdev,
-			   enum led_brightness brightness)
+			   led_brightness brightness)
 {
 	outb(!!brightness, TS5500_LED_JP_ADDR);
 }
 
-static enum led_brightness ts5500_led_get(struct led_classdev *led_cdev)
+static led_brightness ts5500_led_get(struct led_classdev *led_cdev)
 {
 	return (inb(TS5500_LED_JP_ADDR) & TS5500_LED) ? LED_FULL : LED_OFF;
 }

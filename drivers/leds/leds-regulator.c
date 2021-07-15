@@ -46,7 +46,7 @@ static inline int led_regulator_get_max_brightness(struct regulator *supply)
 }
 
 static int led_regulator_get_voltage(struct regulator *supply,
-		enum led_brightness brightness)
+		led_brightness brightness)
 {
 	if (brightness == 0)
 		return -EINVAL;
@@ -88,7 +88,7 @@ static void regulator_led_disable(struct regulator_led *led)
 }
 
 static int regulator_led_brightness_set(struct led_classdev *led_cdev,
-					 enum led_brightness value)
+					 led_brightness value)
 {
 	struct regulator_led *led = to_regulator_led(led_cdev);
 	int voltage;

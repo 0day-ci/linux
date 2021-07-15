@@ -94,7 +94,7 @@ out_unlock:
 
 /* Callback from the LED subsystem. */
 static void b43_led_brightness_set(struct led_classdev *led_dev,
-				   enum led_brightness brightness)
+				   led_brightness brightness)
 {
 	struct b43_led *led = container_of(led_dev, struct b43_led, led_dev);
 	struct b43_wl *wl = led->wl;

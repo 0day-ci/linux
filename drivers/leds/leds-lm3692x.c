@@ -323,7 +323,7 @@ static int lm3692x_leds_disable(struct lm3692x_led *led)
 }
 
 static int lm3692x_brightness_set(struct led_classdev *led_cdev,
-				enum led_brightness brt_val)
+				led_brightness brt_val)
 {
 	struct lm3692x_led *led =
 			container_of(led_cdev, struct lm3692x_led, led_dev);
@@ -362,7 +362,7 @@ out:
 	return ret;
 }
 
-static enum led_brightness lm3692x_max_brightness(struct lm3692x_led *led,
+static led_brightness lm3692x_max_brightness(struct lm3692x_led *led,
 						  u32 max_cur)
 {
 	u32 max_code;

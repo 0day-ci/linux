@@ -42,7 +42,7 @@ struct lm36274 {
 };
 
 static int lm36274_brightness_set(struct led_classdev *led_cdev,
-				  enum led_brightness brt_val)
+				  led_brightness brt_val)
 {
 	struct lm36274 *chip = container_of(led_cdev, struct lm36274, led_dev);
 

@@ -31,7 +31,7 @@ struct dac124s085 {
 #define POWER_DOWN_OUTPUT	(3 << 12)
 
 static int dac124s085_set_brightness(struct led_classdev *ldev,
-				      enum led_brightness brightness)
+				      led_brightness brightness)
 {
 	struct dac124s085_led *led = container_of(ldev, struct dac124s085_led,
 						  ldev);

@@ -73,7 +73,7 @@ static unsigned long bcm6358_led_busy(void __iomem *mem)
 }
 
 static void bcm6358_led_set(struct led_classdev *led_cdev,
-			    enum led_brightness value)
+			    led_brightness value)
 {
 	struct bcm6358_led *led =
 		container_of(led_cdev, struct bcm6358_led, cdev);

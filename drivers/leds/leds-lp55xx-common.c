@@ -135,7 +135,7 @@ static struct attribute *lp55xx_led_attrs[] = {
 ATTRIBUTE_GROUPS(lp55xx_led);
 
 static int lp55xx_set_mc_brightness(struct led_classdev *cdev,
-				    enum led_brightness brightness)
+				    led_brightness brightness)
 {
 	struct led_classdev_mc *mc_dev = lcdev_to_mccdev(cdev);
 	struct lp55xx_led *led = mcled_cdev_to_led(mc_dev);
@@ -147,7 +147,7 @@ static int lp55xx_set_mc_brightness(struct led_classdev *cdev,
 }
 
 static int lp55xx_set_brightness(struct led_classdev *cdev,
-			     enum led_brightness brightness)
+			     led_brightness brightness)
 {
 	struct lp55xx_led *led = cdev_to_lp55xx_led(cdev);
 	struct lp55xx_device_config *cfg = led->chip->cfg;

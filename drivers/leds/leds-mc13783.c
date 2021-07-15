@@ -50,7 +50,7 @@ static unsigned int mc13xxx_max_brightness(int id)
 }
 
 static int mc13xxx_led_set(struct led_classdev *led_cdev,
-			    enum led_brightness value)
+			    led_brightness value)
 {
 	struct mc13xxx_led *led =
 		container_of(led_cdev, struct mc13xxx_led, cdev);

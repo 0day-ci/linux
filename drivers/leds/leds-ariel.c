@@ -31,7 +31,7 @@ struct ariel_led {
 
 #define led_cdev_to_ariel_led(c) container_of(c, struct ariel_led, led_cdev)
 
-static enum led_brightness ariel_led_get(struct led_classdev *led_cdev)
+static led_brightness ariel_led_get(struct led_classdev *led_cdev)
 {
 	struct ariel_led *led = led_cdev_to_ariel_led(led_cdev);
 	unsigned int led_status = 0;
@@ -46,7 +46,7 @@ static enum led_brightness ariel_led_get(struct led_classdev *led_cdev)
 }
 
 static void ariel_led_set(struct led_classdev *led_cdev,
-			  enum led_brightness brightness)
+			  led_brightness brightness)
 {
 	struct ariel_led *led = led_cdev_to_ariel_led(led_cdev);
 

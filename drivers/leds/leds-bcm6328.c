@@ -125,7 +125,7 @@ static void bcm6328_led_mode(struct bcm6328_led *led, unsigned long value)
 }
 
 static void bcm6328_led_set(struct led_classdev *led_cdev,
-			    enum led_brightness value)
+			    led_brightness value)
 {
 	struct bcm6328_led *led =
 		container_of(led_cdev, struct bcm6328_led, cdev);

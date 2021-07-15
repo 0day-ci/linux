@@ -180,7 +180,7 @@ static void shark_led_work(struct work_struct *work)
 }
 
 static void shark_led_set_blue(struct led_classdev *led_cdev,
-			       enum led_brightness value)
+			       led_brightness value)
 {
 	struct shark_device *shark =
 		container_of(led_cdev, struct shark_device, leds[BLUE_LED]);
@@ -192,7 +192,7 @@ static void shark_led_set_blue(struct led_classdev *led_cdev,
 }
 
 static void shark_led_set_blue_pulse(struct led_classdev *led_cdev,
-				     enum led_brightness value)
+				     led_brightness value)
 {
 	struct shark_device *shark = container_of(led_cdev,
 				struct shark_device, leds[BLUE_PULSE_LED]);
@@ -204,7 +204,7 @@ static void shark_led_set_blue_pulse(struct led_classdev *led_cdev,
 }
 
 static void shark_led_set_red(struct led_classdev *led_cdev,
-			      enum led_brightness value)
+			      led_brightness value)
 {
 	struct shark_device *shark =
 		container_of(led_cdev, struct shark_device, leds[RED_LED]);

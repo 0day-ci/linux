@@ -21,7 +21,7 @@
 #define ACPI_KEYBOARD_BACKLIGHT_MAX		100
 
 static void keyboard_led_set_brightness(struct led_classdev *cdev,
-					enum led_brightness brightness)
+					led_brightness brightness)
 {
 	union acpi_object param;
 	struct acpi_object_list input;
@@ -39,7 +39,7 @@ static void keyboard_led_set_brightness(struct led_classdev *cdev,
 			status);
 }
 
-static enum led_brightness
+static led_brightness
 keyboard_led_get_brightness(struct led_classdev *cdev)
 {
 	unsigned long long brightness;

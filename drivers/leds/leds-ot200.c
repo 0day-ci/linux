@@ -90,7 +90,7 @@ static u8 leds_back;
 static u8 leds_front;
 
 static void ot200_led_brightness_set(struct led_classdev *led_cdev,
-		enum led_brightness value)
+		led_brightness value)
 {
 	struct ot200_led *led = container_of(led_cdev, struct ot200_led, cdev);
 	u8 *val;

@@ -35,7 +35,7 @@ static const struct reg_sequence a500_ec_orange_led_enable_seq[] = {
 };
 
 static int a500_ec_led_brightness_set(struct led_classdev *led_cdev,
-				      enum led_brightness value)
+				      led_brightness value)
 {
 	struct a500_led *led = container_of(led_cdev, struct a500_led, cdev);
 	struct reg_sequence control_seq[2];

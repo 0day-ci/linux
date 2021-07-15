@@ -217,7 +217,7 @@ static DEVICE_ATTR(bled_mode, S_IWUSR, NULL, lm3639_bled_mode_store);
 
 /* torch */
 static void lm3639_torch_brightness_set(struct led_classdev *cdev,
-					enum led_brightness brightness)
+					led_brightness brightness)
 {
 	int ret;
 	unsigned int reg_val;
@@ -254,7 +254,7 @@ out:
 
 /* flash */
 static void lm3639_flash_brightness_set(struct led_classdev *cdev,
-					enum led_brightness brightness)
+					led_brightness brightness)
 {
 	int ret;
 	unsigned int reg_val;

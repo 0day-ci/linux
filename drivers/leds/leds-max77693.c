@@ -459,7 +459,7 @@ static int max77693_setup(struct max77693_led_device *led,
 
 /* LED subsystem callbacks */
 static int max77693_led_brightness_set(struct led_classdev *led_cdev,
-					enum led_brightness value)
+					led_brightness value)
 {
 	struct led_classdev_flash *fled_cdev = lcdev_to_flcdev(led_cdev);
 	struct max77693_sub_led *sub_led = flcdev_to_sub_led(fled_cdev);

@@ -37,7 +37,7 @@ static unsigned char led_reg[] = {
 };
 
 static int da9052_set_led_brightness(struct da9052_led *led,
-				     enum led_brightness brightness)
+				     led_brightness brightness)
 {
 	u8 val;
 	int error;
@@ -52,7 +52,7 @@ static int da9052_set_led_brightness(struct da9052_led *led,
 }
 
 static int da9052_led_set(struct led_classdev *led_cdev,
-			   enum led_brightness value)
+			   led_brightness value)
 {
 	struct da9052_led *led =
 			container_of(led_cdev, struct da9052_led, cdev);

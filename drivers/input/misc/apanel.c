@@ -112,7 +112,7 @@ static void apanel_poll(struct input_dev *idev)
 }
 
 static int mail_led_set(struct led_classdev *led,
-			 enum led_brightness value)
+			 led_brightness value)
 {
 	struct apanel *ap = container_of(led, struct apanel, mail_led);
 	u16 led_bits = value != LED_OFF ? 0x8000 : 0x0000;

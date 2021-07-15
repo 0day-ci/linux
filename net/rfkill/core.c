@@ -174,7 +174,7 @@ static struct work_struct rfkill_global_led_trigger_work;
 
 static void rfkill_global_led_trigger_worker(struct work_struct *work)
 {
-	enum led_brightness brightness = LED_OFF;
+	led_brightness brightness = LED_OFF;
 	struct rfkill *rfkill;
 
 	mutex_lock(&rfkill_global_mutex);

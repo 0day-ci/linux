@@ -255,7 +255,7 @@ wbcir_set_irqmask(struct wbcir_data *data, u8 irqmask)
 	data->irqmask = irqmask;
 }
 
-static enum led_brightness
+static led_brightness
 wbcir_led_brightness_get(struct led_classdev *led_cdev)
 {
 	struct wbcir_data *data = container_of(led_cdev,
@@ -270,7 +270,7 @@ wbcir_led_brightness_get(struct led_classdev *led_cdev)
 
 static void
 wbcir_led_brightness_set(struct led_classdev *led_cdev,
-			 enum led_brightness brightness)
+			 led_brightness brightness)
 {
 	struct wbcir_data *data = container_of(led_cdev,
 					       struct wbcir_data,

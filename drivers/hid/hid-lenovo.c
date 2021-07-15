@@ -66,7 +66,7 @@ struct lenovo_drvdata {
 #define TP10UBKBD_LED_ON		2
 
 static int lenovo_led_set_tp10ubkbd(struct hid_device *hdev, u8 led_code,
-				    enum led_brightness value)
+				    led_brightness value)
 {
 	struct lenovo_drvdata *data = hid_get_drvdata(hdev);
 	int ret;
@@ -830,7 +830,7 @@ static void lenovo_led_set_tpkbd(struct hid_device *hdev)
 }
 
 static int lenovo_led_brightness_set(struct led_classdev *led_cdev,
-			enum led_brightness value)
+			led_brightness value)
 {
 	struct device *dev = led_cdev->dev->parent;
 	struct hid_device *hdev = to_hid_device(dev);

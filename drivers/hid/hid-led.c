@@ -71,12 +71,12 @@ struct hidled_config {
 	enum hidled_type	type;
 	const char		*name;
 	const char		*short_name;
-	enum led_brightness	max_brightness;
+	led_brightness	max_brightness;
 	int			num_leds;
 	size_t			report_size;
 	enum hidled_report_type	report_type;
 	int (*init)(struct hidled_device *ldev);
-	int (*write)(struct led_classdev *cdev, enum led_brightness br);
+	int (*write)(struct led_classdev *cdev, led_brightness br);
 };
 
 struct hidled_led {
@@ -174,7 +174,7 @@ err:
 
 static u8 riso_kagaku_index(struct hidled_rgb *rgb)
 {
-	enum led_brightness r, g, b;
+	led_brightness r, g, b;
 
 	r = rgb->red.cdev.brightness;
 	g = rgb->green.cdev.brightness;
@@ -186,7 +186,7 @@ static u8 riso_kagaku_index(struct hidled_rgb *rgb)
 		return RISO_KAGAKU_IX(r, g, b);
 }
 
-static int riso_kagaku_write(struct led_classdev *cdev, enum led_brightness br)
+static int riso_kagaku_write(struct led_classdev *cdev, led_brightness br)
 {
 	struct hidled_led *led = to_hidled_led(cdev);
 	struct hidled_rgb *rgb = led->rgb;
@@ -197,7 +197,7 @@ static int riso_kagaku_write(struct led_classdev *cdev, enum led_brightness br)
 	return hidled_send(rgb->ldev, buf);
 }
 
-static int dream_cheeky_write(struct led_classdev *cdev, enum led_brightness br)
+static int dream_cheeky_write(struct led_classdev *cdev, led_brightness br)
 {
 	struct hidled_led *led = to_hidled_led(cdev);
 	struct hidled_rgb *rgb = led->rgb;
@@ -226,7 +226,7 @@ static int dream_cheeky_init(struct hidled_device *ldev)
 	return hidled_send(ldev, buf);
 }
 
-static int _thingm_write(struct led_classdev *cdev, enum led_brightness br,
+static int _thingm_write(struct led_classdev *cdev, led_brightness br,
 			 u8 offset)
 {
 	struct hidled_led *led = to_hidled_led(cdev);
@@ -240,12 +240,12 @@ static int _thingm_write(struct led_classdev *cdev, enum led_brightness br,
 	return hidled_send(led->rgb->ldev, buf);
 }
 
-static int thingm_write_v1(struct led_classdev *cdev, enum led_brightness br)
+static int thingm_write_v1(struct led_classdev *cdev, led_brightness br)
 {
 	return _thingm_write(cdev, br, 0);
 }
 
-static int thingm_write(struct led_classdev *cdev, enum led_brightness br)
+static int thingm_write(struct led_classdev *cdev, led_brightness br)
 {
 	return _thingm_write(cdev, br, 1);
 }
@@ -306,7 +306,7 @@ static int delcom_set_pwm(struct hidled_led *led)
 	return hidled_send(led->rgb->ldev, dp.data);
 }
 
-static int delcom_write(struct led_classdev *cdev, enum led_brightness br)
+static int delcom_write(struct led_classdev *cdev, led_brightness br)
 {
 	struct hidled_led *led = to_hidled_led(cdev);
 	int ret;
@@ -338,7 +338,7 @@ static int delcom_init(struct hidled_device *ldev)
 	return le16_to_cpu(dp.fw.family_code) == 2 ? 0 : -ENODEV;
 }
 
-static int luxafor_write(struct led_classdev *cdev, enum led_brightness br)
+static int luxafor_write(struct led_classdev *cdev, led_brightness br)
 {
 	struct hidled_led *led = to_hidled_led(cdev);
 	__u8 buf[MAX_REPORT_SIZE] = { [1] = 1 };

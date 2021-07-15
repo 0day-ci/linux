@@ -120,7 +120,7 @@ struct adp8870_led {
 	struct led_classdev	cdev;
 	struct work_struct	work;
 	struct i2c_client	*client;
-	enum led_brightness	new_brightness;
+	led_brightness	new_brightness;
 	int			id;
 	int			flags;
 };
@@ -201,7 +201,7 @@ static void adp8870_led_work(struct work_struct *work)
 }
 
 static void adp8870_led_set(struct led_classdev *led_cdev,
-			   enum led_brightness value)
+			   led_brightness value)
 {
 	struct adp8870_led *led;
 

@@ -254,7 +254,7 @@ fail_cmd:
 /* LEDs */
 
 static int huawei_wmi_micmute_led_set(struct led_classdev *led_cdev,
-		enum led_brightness brightness)
+		led_brightness brightness)
 {
 	/* This is a workaround until the "legacy" interface is implemented. */
 	if (quirks && quirks->ec_micmute) {

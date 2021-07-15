@@ -104,7 +104,7 @@ static void carl9170_led_update(struct work_struct *work)
 }
 
 static void carl9170_led_set_brightness(struct led_classdev *led,
-					enum led_brightness brightness)
+					led_brightness brightness)
 {
 	struct carl9170_led *arl = container_of(led, struct carl9170_led, l);
 	struct ar9170 *ar = arl->ar;

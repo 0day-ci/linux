@@ -368,7 +368,7 @@ static int wmax_brightness(int brightness)
 }
 
 static void global_led_set(struct led_classdev *led_cdev,
-			   enum led_brightness brightness)
+			   led_brightness brightness)
 {
 	int ret;
 	global_brightness = brightness;
@@ -380,7 +380,7 @@ static void global_led_set(struct led_classdev *led_cdev,
 		pr_err("LED brightness update failed\n");
 }
 
-static enum led_brightness global_led_get(struct led_classdev *led_cdev)
+static led_brightness global_led_get(struct led_classdev *led_cdev)
 {
 	return global_brightness;
 }

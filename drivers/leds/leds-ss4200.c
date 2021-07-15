@@ -217,7 +217,7 @@ static u32 nasgpio_led_get_attr(struct led_classdev *led_cdev, u32 port)
  * in this driver.
  */
 static void nasgpio_led_set_brightness(struct led_classdev *led_cdev,
-				       enum led_brightness brightness)
+				       led_brightness brightness)
 {
 	u32 setting = 0;
 	if (brightness >= LED_HALF)

@@ -237,7 +237,7 @@ static int pca955x_read_ls(struct i2c_client *client, int n, u8 *val)
 }
 
 static int pca955x_led_set(struct led_classdev *led_cdev,
-			    enum led_brightness value)
+			    led_brightness value)
 {
 	struct pca955x_led *pca955x_led;
 	struct pca955x *pca955x;

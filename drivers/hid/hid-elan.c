@@ -411,7 +411,7 @@ static int elan_start_multitouch(struct hid_device *hdev)
 }
 
 static int elan_mute_led_set_brigtness(struct led_classdev *led_cdev,
-				       enum led_brightness value)
+				       led_brightness value)
 {
 	int ret;
 	u8 led_state;

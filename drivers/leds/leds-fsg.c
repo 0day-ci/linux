@@ -30,7 +30,7 @@ static unsigned short latch_value;
 
 
 static void fsg_led_wlan_set(struct led_classdev *led_cdev,
-			     enum led_brightness value)
+			     led_brightness value)
 {
 	if (value) {
 		latch_value &= ~(1 << FSG_LED_WLAN_BIT);
@@ -42,7 +42,7 @@ static void fsg_led_wlan_set(struct led_classdev *led_cdev,
 }
 
 static void fsg_led_wan_set(struct led_classdev *led_cdev,
-			    enum led_brightness value)
+			    led_brightness value)
 {
 	if (value) {
 		latch_value &= ~(1 << FSG_LED_WAN_BIT);
@@ -54,7 +54,7 @@ static void fsg_led_wan_set(struct led_classdev *led_cdev,
 }
 
 static void fsg_led_sata_set(struct led_classdev *led_cdev,
-			     enum led_brightness value)
+			     led_brightness value)
 {
 	if (value) {
 		latch_value &= ~(1 << FSG_LED_SATA_BIT);
@@ -66,7 +66,7 @@ static void fsg_led_sata_set(struct led_classdev *led_cdev,
 }
 
 static void fsg_led_usb_set(struct led_classdev *led_cdev,
-			    enum led_brightness value)
+			    led_brightness value)
 {
 	if (value) {
 		latch_value &= ~(1 << FSG_LED_USB_BIT);
@@ -78,7 +78,7 @@ static void fsg_led_usb_set(struct led_classdev *led_cdev,
 }
 
 static void fsg_led_sync_set(struct led_classdev *led_cdev,
-			     enum led_brightness value)
+			     led_brightness value)
 {
 	if (value) {
 		latch_value &= ~(1 << FSG_LED_SYNC_BIT);
@@ -90,7 +90,7 @@ static void fsg_led_sync_set(struct led_classdev *led_cdev,
 }
 
 static void fsg_led_ring_set(struct led_classdev *led_cdev,
-			     enum led_brightness value)
+			     led_brightness value)
 {
 	if (value) {
 		latch_value &= ~(1 << FSG_LED_RING_BIT);

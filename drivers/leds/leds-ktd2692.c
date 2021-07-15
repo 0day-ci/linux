@@ -68,7 +68,7 @@ struct ktd2692_led_config_data {
 	/* maximum flash timeout */
 	u32 flash_max_timeout;
 	/* max LED brightness level */
-	enum led_brightness max_brightness;
+	led_brightness max_brightness;
 };
 
 struct ktd2692_context {
@@ -83,7 +83,7 @@ struct ktd2692_context {
 	struct gpio_desc *ctrl_gpio;
 
 	enum ktd2692_led_mode mode;
-	enum led_brightness torch_brightness;
+	led_brightness torch_brightness;
 };
 
 static struct ktd2692_context *fled_cdev_to_led(
@@ -154,7 +154,7 @@ static void ktd2692_expresswire_write(struct ktd2692_context *led, u8 value)
 }
 
 static int ktd2692_led_brightness_set(struct led_classdev *led_cdev,
-				       enum led_brightness brightness)
+				       led_brightness brightness)
 {
 	struct led_classdev_flash *fled_cdev = lcdev_to_flcdev(led_cdev);
 	struct ktd2692_context *led = fled_cdev_to_led(fled_cdev);

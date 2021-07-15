@@ -44,7 +44,7 @@ enum lg_g15_led_type {
 
 struct lg_g15_led {
 	struct led_classdev cdev;
-	enum led_brightness brightness;
+	led_brightness brightness;
 	enum lg_g15_led_type led;
 	u8 red, green, blue;
 };
@@ -91,12 +91,12 @@ static int lg_g15_update_led_brightness(struct lg_g15_data *g15)
 	return 0;
 }
 
-static enum led_brightness lg_g15_led_get(struct led_classdev *led_cdev)
+static led_brightness lg_g15_led_get(struct led_classdev *led_cdev)
 {
 	struct lg_g15_led *g15_led =
 		container_of(led_cdev, struct lg_g15_led, cdev);
 	struct lg_g15_data *g15 = dev_get_drvdata(led_cdev->dev->parent);
-	enum led_brightness brightness;
+	led_brightness brightness;
 
 	mutex_lock(&g15->mutex);
 	lg_g15_update_led_brightness(g15);
@@ -107,7 +107,7 @@ static enum led_brightness lg_g15_led_get(struct led_classdev *led_cdev)
 }
 
 static int lg_g15_led_set(struct led_classdev *led_cdev,
-			  enum led_brightness brightness)
+			  led_brightness brightness)
 {
 	struct lg_g15_led *g15_led =
 		container_of(led_cdev, struct lg_g15_led, cdev);
@@ -162,8 +162,8 @@ static int lg_g15_led_set(struct led_classdev *led_cdev,
 static void lg_g15_leds_changed_work(struct work_struct *work)
 {
 	struct lg_g15_data *g15 = container_of(work, struct lg_g15_data, work);
-	enum led_brightness old_brightness[LG_G15_BRIGHTNESS_MAX];
-	enum led_brightness brightness[LG_G15_BRIGHTNESS_MAX];
+	led_brightness old_brightness[LG_G15_BRIGHTNESS_MAX];
+	led_brightness brightness[LG_G15_BRIGHTNESS_MAX];
 	int i, ret;
 
 	mutex_lock(&g15->mutex);
@@ -226,7 +226,7 @@ static int lg_g510_get_initial_led_brightness(struct lg_g15_data *g15, int i)
 /* Must be called with g15->mutex locked */
 static int lg_g510_kbd_led_write(struct lg_g15_data *g15,
 				 struct lg_g15_led *g15_led,
-				 enum led_brightness brightness)
+				 led_brightness brightness)
 {
 	int ret;
 
@@ -255,7 +255,7 @@ static int lg_g510_kbd_led_write(struct lg_g15_data *g15,
 }
 
 static int lg_g510_kbd_led_set(struct led_classdev *led_cdev,
-			       enum led_brightness brightness)
+			       led_brightness brightness)
 {
 	struct lg_g15_led *g15_led =
 		container_of(led_cdev, struct lg_g15_led, cdev);
@@ -273,7 +273,7 @@ static int lg_g510_kbd_led_set(struct led_classdev *led_cdev,
 	return ret;
 }
 
-static enum led_brightness lg_g510_kbd_led_get(struct led_classdev *led_cdev)
+static led_brightness lg_g510_kbd_led_get(struct led_classdev *led_cdev)
 {
 	struct lg_g15_led *g15_led =
 		container_of(led_cdev, struct lg_g15_led, cdev);
@@ -378,12 +378,12 @@ static int lg_g510_update_mkey_led_brightness(struct lg_g15_data *g15)
 	return 0;
 }
 
-static enum led_brightness lg_g510_mkey_led_get(struct led_classdev *led_cdev)
+static led_brightness lg_g510_mkey_led_get(struct led_classdev *led_cdev)
 {
 	struct lg_g15_led *g15_led =
 		container_of(led_cdev, struct lg_g15_led, cdev);
 	struct lg_g15_data *g15 = dev_get_drvdata(led_cdev->dev->parent);
-	enum led_brightness brightness;
+	led_brightness brightness;
 
 	mutex_lock(&g15->mutex);
 	lg_g510_update_mkey_led_brightness(g15);
@@ -394,7 +394,7 @@ static enum led_brightness lg_g510_mkey_led_get(struct led_classdev *led_cdev)
 }
 
 static int lg_g510_mkey_led_set(struct led_classdev *led_cdev,
-				enum led_brightness brightness)
+				led_brightness brightness)
 {
 	struct lg_g15_led *g15_led =
 		container_of(led_cdev, struct lg_g15_led, cdev);

@@ -168,7 +168,7 @@ static int lm3601x_read_faults(struct lm3601x_led *led)
 }
 
 static int lm3601x_brightness_set(struct led_classdev *cdev,
-					enum led_brightness brightness)
+					led_brightness brightness)
 {
 	struct led_classdev_flash *fled_cdev = lcdev_to_flcdev(cdev);
 	struct lm3601x_led *led = fled_cdev_to_led(fled_cdev);

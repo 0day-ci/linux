@@ -43,7 +43,7 @@ static void iwl_mvm_led_set(struct iwl_mvm *mvm, bool on)
 }
 
 static void iwl_led_brightness_set(struct led_classdev *led_cdev,
-				   enum led_brightness brightness)
+				   led_brightness brightness)
 {
 	struct iwl_mvm *mvm = container_of(led_cdev, struct iwl_mvm, led);
 

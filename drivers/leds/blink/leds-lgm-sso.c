@@ -230,7 +230,7 @@ static void sso_led_freq_set(struct sso_led_priv *priv, u32 pin, int freq_idx)
 }
 
 static void sso_led_brightness_set(struct led_classdev *led_cdev,
-				   enum led_brightness brightness)
+				   led_brightness brightness)
 {
 	struct sso_led_priv *priv;
 	struct sso_led_desc *desc;
@@ -263,11 +263,11 @@ static void sso_led_brightness_set(struct led_classdev *led_cdev,
 		gpiod_set_value(led->gpiod, val);
 }
 
-static enum led_brightness sso_led_brightness_get(struct led_classdev *led_cdev)
+static led_brightness sso_led_brightness_get(struct led_classdev *led_cdev)
 {
 	struct sso_led *led = cdev_to_sso_led_data(led_cdev);
 
-	return (enum led_brightness)led->desc.brightness;
+	return (led_brightness)led->desc.brightness;
 }
 
 static int

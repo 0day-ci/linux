@@ -24,7 +24,7 @@
 static struct platform_device *pdev;
 
 static void wrap_power_led_set(struct led_classdev *led_cdev,
-		enum led_brightness value)
+		led_brightness value)
 {
 	if (value)
 		scx200_gpio_set_low(WRAP_POWER_LED_GPIO);
@@ -33,7 +33,7 @@ static void wrap_power_led_set(struct led_classdev *led_cdev,
 }
 
 static void wrap_error_led_set(struct led_classdev *led_cdev,
-		enum led_brightness value)
+		led_brightness value)
 {
 	if (value)
 		scx200_gpio_set_low(WRAP_ERROR_LED_GPIO);
@@ -42,7 +42,7 @@ static void wrap_error_led_set(struct led_classdev *led_cdev,
 }
 
 static void wrap_extra_led_set(struct led_classdev *led_cdev,
-		enum led_brightness value)
+		led_brightness value)
 {
 	if (value)
 		scx200_gpio_set_low(WRAP_EXTRA_LED_GPIO);

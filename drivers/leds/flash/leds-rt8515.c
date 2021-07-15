@@ -88,7 +88,7 @@ static void rt8515_gpio_brightness_commit(struct gpio_desc *gpiod,
 
 /* This is setting the torch light level */
 static int rt8515_led_brightness_set(struct led_classdev *led,
-				     enum led_brightness brightness)
+				     led_brightness brightness)
 {
 	struct led_classdev_flash *fled = lcdev_to_flcdev(led);
 	struct rt8515 *rt = to_rt8515(fled);

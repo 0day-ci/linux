@@ -17,7 +17,7 @@
 #include <asm/mach-rc32434/rb.h>
 
 static void rb532_led_set(struct led_classdev *cdev,
-			  enum led_brightness brightness)
+			  led_brightness brightness)
 {
 	if (brightness)
 		set_latch_u5(LO_ULED, 0);
@@ -25,7 +25,7 @@ static void rb532_led_set(struct led_classdev *cdev,
 		set_latch_u5(0, LO_ULED);
 }
 
-static enum led_brightness rb532_led_get(struct led_classdev *cdev)
+static led_brightness rb532_led_get(struct led_classdev *cdev)
 {
 	return (get_latch_u5() & LO_ULED) ? LED_FULL : LED_OFF;
 }

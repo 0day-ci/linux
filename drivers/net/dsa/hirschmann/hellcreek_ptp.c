@@ -239,14 +239,14 @@ static void hellcreek_ptp_overflow_check(struct work_struct *work)
 			      HELLCREEK_OVERFLOW_PERIOD);
 }
 
-static enum led_brightness hellcreek_get_brightness(struct hellcreek *hellcreek,
+static led_brightness hellcreek_get_brightness(struct hellcreek *hellcreek,
 						    int led)
 {
 	return (hellcreek->status_out & led) ? 1 : 0;
 }
 
 static void hellcreek_set_brightness(struct hellcreek *hellcreek, int led,
-				     enum led_brightness b)
+				     led_brightness b)
 {
 	mutex_lock(&hellcreek->ptp_lock);
 
@@ -261,14 +261,14 @@ static void hellcreek_set_brightness(struct hellcreek *hellcreek, int led,
 }
 
 static void hellcreek_led_sync_good_set(struct led_classdev *ldev,
-					enum led_brightness b)
+					led_brightness b)
 {
 	struct hellcreek *hellcreek = led_to_hellcreek(ldev, led_sync_good);
 
 	hellcreek_set_brightness(hellcreek, STATUS_OUT_SYNC_GOOD, b);
 }
 
-static enum led_brightness hellcreek_led_sync_good_get(struct led_classdev *ldev)
+static led_brightness hellcreek_led_sync_good_get(struct led_classdev *ldev)
 {
 	struct hellcreek *hellcreek = led_to_hellcreek(ldev, led_sync_good);
 
@@ -276,14 +276,14 @@ static enum led_brightness hellcreek_led_sync_good_get(struct led_classdev *ldev
 }
 
 static void hellcreek_led_is_gm_set(struct led_classdev *ldev,
-				    enum led_brightness b)
+				    led_brightness b)
 {
 	struct hellcreek *hellcreek = led_to_hellcreek(ldev, led_is_gm);
 
 	hellcreek_set_brightness(hellcreek, STATUS_OUT_IS_GM, b);
 }
 
-static enum led_brightness hellcreek_led_is_gm_get(struct led_classdev *ldev)
+static led_brightness hellcreek_led_is_gm_get(struct led_classdev *ldev)
 {
 	struct hellcreek *hellcreek = led_to_hellcreek(ldev, led_is_gm);
 

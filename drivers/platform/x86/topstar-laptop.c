@@ -35,13 +35,13 @@ struct topstar_laptop {
  * LED
  */
 
-static enum led_brightness topstar_led_get(struct led_classdev *led)
+static led_brightness topstar_led_get(struct led_classdev *led)
 {
 	return led->brightness;
 }
 
 static int topstar_led_set(struct led_classdev *led,
-		enum led_brightness state)
+		led_brightness state)
 {
 	struct topstar_laptop *topstar = container_of(led,
 			struct topstar_laptop, led);

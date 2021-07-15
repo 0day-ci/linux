@@ -26,7 +26,7 @@ struct pm8058_led {
 };
 
 static void pm8058_led_set(struct led_classdev *cled,
-	enum led_brightness value)
+	led_brightness value)
 {
 	struct pm8058_led *led;
 	int ret = 0;
@@ -53,7 +53,7 @@ static void pm8058_led_set(struct led_classdev *cled,
 		pr_err("Failed to set LED brightness\n");
 }
 
-static enum led_brightness pm8058_led_get(struct led_classdev *cled)
+static led_brightness pm8058_led_get(struct led_classdev *cled)
 {
 	struct pm8058_led *led;
 	int ret;
@@ -94,7 +94,7 @@ static int pm8058_led_probe(struct platform_device *pdev)
 	int ret;
 	struct regmap *map;
 	const char *state;
-	enum led_brightness maxbright;
+	led_brightness maxbright;
 
 	led = devm_kzalloc(dev, sizeof(*led), GFP_KERNEL);
 	if (!led)

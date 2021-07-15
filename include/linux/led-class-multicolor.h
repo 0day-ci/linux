@@ -56,7 +56,7 @@ void led_classdev_multicolor_unregister(struct led_classdev_mc *mcled_cdev);
 
 /* Calculate brightness for the monochrome LED cluster */
 int led_mc_calc_color_components(struct led_classdev_mc *mcled_cdev,
-				 enum led_brightness brightness);
+				 led_brightness brightness);
 
 int devm_led_classdev_multicolor_register_ext(struct device *parent,
 					  struct led_classdev_mc *mcled_cdev,
@@ -75,7 +75,7 @@ static inline int led_classdev_multicolor_register_ext(struct device *parent,
 
 static inline void led_classdev_multicolor_unregister(struct led_classdev_mc *mcled_cdev) {};
 static inline int led_mc_calc_color_components(struct led_classdev_mc *mcled_cdev,
-					       enum led_brightness brightness)
+					       led_brightness brightness)
 {
 	return 0;
 }

@@ -83,7 +83,7 @@ struct mt6323_led {
 	int			id;
 	struct mt6323_leds	*parent;
 	struct led_classdev	cdev;
-	enum led_brightness	current_brightness;
+	led_brightness	current_brightness;
 };
 
 /**
@@ -105,7 +105,7 @@ struct mt6323_leds {
 };
 
 static int mt6323_led_hw_brightness(struct led_classdev *cdev,
-				    enum led_brightness brightness)
+				    led_brightness brightness)
 {
 	struct mt6323_led *led = container_of(cdev, struct mt6323_led, cdev);
 	struct mt6323_leds *leds = led->parent;
@@ -153,7 +153,7 @@ static int mt6323_led_hw_off(struct led_classdev *cdev)
 	return 0;
 }
 
-static enum led_brightness
+static led_brightness
 mt6323_get_led_hw_brightness(struct led_classdev *cdev)
 {
 	struct mt6323_led *led = container_of(cdev, struct mt6323_led, cdev);
@@ -185,7 +185,7 @@ mt6323_get_led_hw_brightness(struct led_classdev *cdev)
 }
 
 static int mt6323_led_hw_on(struct led_classdev *cdev,
-			    enum led_brightness brightness)
+			    led_brightness brightness)
 {
 	struct mt6323_led *led = container_of(cdev, struct mt6323_led, cdev);
 	struct mt6323_leds *leds = led->parent;
@@ -306,7 +306,7 @@ out:
 }
 
 static int mt6323_led_set_brightness(struct led_classdev *cdev,
-				     enum led_brightness brightness)
+				     led_brightness brightness)
 {
 	struct mt6323_led *led = container_of(cdev, struct mt6323_led, cdev);
 	struct mt6323_leds *leds = led->parent;

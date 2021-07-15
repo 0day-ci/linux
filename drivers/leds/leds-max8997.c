@@ -114,7 +114,7 @@ static void max8997_led_enable(struct max8997_led *led, bool enable)
 }
 
 static void max8997_led_set_current(struct max8997_led *led,
-				enum led_brightness value)
+				led_brightness value)
 {
 	int ret;
 	struct i2c_client *client = led->iodev->i2c;
@@ -146,7 +146,7 @@ static void max8997_led_set_current(struct max8997_led *led,
 }
 
 static void max8997_led_brightness_set(struct led_classdev *led_cdev,
-				enum led_brightness value)
+				led_brightness value)
 {
 	struct max8997_led *led =
 			container_of(led_cdev, struct max8997_led, cdev);

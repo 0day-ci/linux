@@ -277,7 +277,7 @@ static int lp3944_led_set_blink(struct led_classdev *led_cdev,
 }
 
 static int lp3944_led_set_brightness(struct led_classdev *led_cdev,
-				      enum led_brightness brightness)
+				      led_brightness brightness)
 {
 	struct lp3944_led_data *led = ldev_to_led(led_cdev);
 
@@ -321,7 +321,7 @@ static int lp3944_configure(struct i2c_client *client,
 
 			/* to expose the default value to userspace */
 			led->ldev.brightness =
-					(enum led_brightness) pled->status;
+					(led_brightness) pled->status;
 
 			/* Set the default led status */
 			err = lp3944_led_set(led, pled->status);

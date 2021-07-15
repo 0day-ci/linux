@@ -120,7 +120,7 @@ static int led_blink(unsigned char on_eighths, unsigned char off_eighths)
 }
 
 static void dell_led_set(struct led_classdev *led_cdev,
-			 enum led_brightness value)
+			 led_brightness value)
 {
 	if (value == LED_OFF)
 		led_off();

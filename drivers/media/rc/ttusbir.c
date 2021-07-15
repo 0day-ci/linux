@@ -40,7 +40,7 @@ struct ttusbir {
 	char phys[64];
 };
 
-static enum led_brightness ttusbir_brightness_get(struct led_classdev *led_dev)
+static led_brightness ttusbir_brightness_get(struct led_classdev *led_dev)
 {
 	struct ttusbir *tt = container_of(led_dev, struct ttusbir, led);
 
@@ -65,7 +65,7 @@ static void ttusbir_set_led(struct ttusbir *tt)
 	}
 }
 
-static void ttusbir_brightness_set(struct led_classdev *led_dev, enum
+static void ttusbir_brightness_set(struct led_classdev *led_dev,
 						led_brightness brightness)
 {
 	struct ttusbir *tt = container_of(led_dev, struct ttusbir, led);

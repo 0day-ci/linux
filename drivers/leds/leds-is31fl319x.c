@@ -108,7 +108,7 @@ static const struct of_device_id of_is31fl319x_match[] = {
 MODULE_DEVICE_TABLE(of, of_is31fl319x_match);
 
 static int is31fl319x_brightness_set(struct led_classdev *cdev,
-				     enum led_brightness brightness)
+				     led_brightness brightness)
 {
 	struct is31fl319x_led *led = container_of(cdev, struct is31fl319x_led,
 						  cdev);

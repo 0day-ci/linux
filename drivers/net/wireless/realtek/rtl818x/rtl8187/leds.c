@@ -97,7 +97,7 @@ static void led_turn_off(struct work_struct *work)
 
 /* Callback from the LED subsystem. */
 static void rtl8187_led_brightness_set(struct led_classdev *led_dev,
-				   enum led_brightness brightness)
+				   led_brightness brightness)
 {
 	struct rtl8187_led *led = container_of(led_dev, struct rtl8187_led,
 					       led_dev);

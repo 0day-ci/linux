@@ -712,7 +712,7 @@ struct wm8350_led {
 	struct platform_device *pdev;
 	struct work_struct work;
 	spinlock_t value_lock;
-	enum led_brightness value;
+	led_brightness value;
 	struct led_classdev cdev;
 	int max_uA_index;
 	int enabled;

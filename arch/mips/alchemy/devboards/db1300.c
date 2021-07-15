@@ -520,7 +520,7 @@ out:
 }
 
 static void db1300_mmcled_set(struct led_classdev *led,
-			      enum led_brightness brightness)
+			      led_brightness brightness)
 {
 	if (brightness != LED_OFF)
 		bcsr_mod(BCSR_LEDS, BCSR_LEDS_LED0, 0);
@@ -587,7 +587,7 @@ static int db1300_movinand_readonly(void *mmc_host)
 }
 
 static void db1300_movinand_led_set(struct led_classdev *led,
-				    enum led_brightness brightness)
+				    led_brightness brightness)
 {
 	if (brightness != LED_OFF)
 		bcsr_mod(BCSR_LEDS, BCSR_LEDS_LED1, 0);

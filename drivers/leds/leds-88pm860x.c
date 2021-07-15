@@ -64,7 +64,7 @@ static int led_power_set(struct pm860x_chip *chip, int port, int on)
 }
 
 static int pm860x_led_set(struct led_classdev *cdev,
-			   enum led_brightness value)
+			   led_brightness value)
 {
 	struct pm860x_led *led = container_of(cdev, struct pm860x_led, cdev);
 	struct pm860x_chip *chip;

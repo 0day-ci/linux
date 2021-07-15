@@ -196,7 +196,7 @@ static ssize_t torch_pin_store(struct device *dev,
 static DEVICE_ATTR_WO(torch_pin);
 
 static int lm3642_torch_brightness_set(struct led_classdev *cdev,
-					enum led_brightness brightness)
+					led_brightness brightness)
 {
 	struct lm3642_chip_data *chip =
 	    container_of(cdev, struct lm3642_chip_data, cdev_torch);
@@ -243,7 +243,7 @@ static ssize_t strobe_pin_store(struct device *dev,
 static DEVICE_ATTR_WO(strobe_pin);
 
 static int lm3642_strobe_brightness_set(struct led_classdev *cdev,
-					 enum led_brightness brightness)
+					 led_brightness brightness)
 {
 	struct lm3642_chip_data *chip =
 	    container_of(cdev, struct lm3642_chip_data, cdev_flash);
@@ -258,7 +258,7 @@ static int lm3642_strobe_brightness_set(struct led_classdev *cdev,
 
 /* indicator */
 static int lm3642_indicator_brightness_set(struct led_classdev *cdev,
-					    enum led_brightness brightness)
+					    led_brightness brightness)
 {
 	struct lm3642_chip_data *chip =
 	    container_of(cdev, struct lm3642_chip_data, cdev_indicator);

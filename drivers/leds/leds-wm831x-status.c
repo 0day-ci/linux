@@ -29,7 +29,7 @@ struct wm831x_status {
 	int blink_time;
 	int blink_cyc;
 	int src;
-	enum led_brightness brightness;
+	led_brightness brightness;
 };
 
 #define to_wm831x_status(led_cdev) \
@@ -64,7 +64,7 @@ static void wm831x_status_set(struct wm831x_status *led)
 }
 
 static int wm831x_status_brightness_set(struct led_classdev *led_cdev,
-					 enum led_brightness value)
+					 led_brightness value)
 {
 	struct wm831x_status *led = to_wm831x_status(led_cdev);
 	unsigned long flags;

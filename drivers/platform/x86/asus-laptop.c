@@ -552,7 +552,7 @@ static int asus_led_set(struct asus_laptop *asus, const char *method,
  */
 /* /sys/class/led handlers */
 static void asus_led_cdev_set(struct led_classdev *led_cdev,
-			 enum led_brightness value)
+			 led_brightness value)
 {
 	struct asus_led *led = container_of(led_cdev, struct asus_led, led);
 	struct asus_laptop *asus = led->asus;
@@ -569,7 +569,7 @@ static void asus_led_cdev_update(struct work_struct *work)
 	asus_led_set(asus, led->method, led->wk);
 }
 
-static enum led_brightness asus_led_cdev_get(struct led_classdev *led_cdev)
+static led_brightness asus_led_cdev_get(struct led_classdev *led_cdev)
 {
 	return led_cdev->brightness;
 }
@@ -613,7 +613,7 @@ static int asus_kled_set(struct asus_laptop *asus, int kblv)
 }
 
 static void asus_kled_cdev_set(struct led_classdev *led_cdev,
-			      enum led_brightness value)
+			      led_brightness value)
 {
 	struct asus_led *led = container_of(led_cdev, struct asus_led, led);
 	struct asus_laptop *asus = led->asus;
@@ -630,7 +630,7 @@ static void asus_kled_cdev_update(struct work_struct *work)
 	asus_kled_set(asus, led->wk);
 }
 
-static enum led_brightness asus_kled_cdev_get(struct led_classdev *led_cdev)
+static led_brightness asus_kled_cdev_get(struct led_classdev *led_cdev)
 {
 	struct asus_led *led = container_of(led_cdev, struct asus_led, led);
 	struct asus_laptop *asus = led->asus;

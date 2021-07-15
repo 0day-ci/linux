@@ -21,8 +21,8 @@ struct system76_data {
 	struct acpi_device *acpi_dev;
 	struct led_classdev ap_led;
 	struct led_classdev kb_led;
-	enum led_brightness kb_brightness;
-	enum led_brightness kb_toggle_brightness;
+	led_brightness kb_brightness;
+	led_brightness kb_toggle_brightness;
 	int kb_color;
 };
 
@@ -33,7 +33,7 @@ static const struct acpi_device_id device_ids[] = {
 MODULE_DEVICE_TABLE(acpi, device_ids);
 
 // Array of keyboard LED brightness levels
-static const enum led_brightness kb_levels[] = {
+static const led_brightness kb_levels[] = {
 	48,
 	72,
 	96,
@@ -89,7 +89,7 @@ static int system76_set(struct system76_data *data, char *method, int value)
 }
 
 // Get the airplane mode LED brightness
-static enum led_brightness ap_led_get(struct led_classdev *led)
+static led_brightness ap_led_get(struct led_classdev *led)
 {
 	struct system76_data *data;
 	int value;
@@ -97,13 +97,13 @@ static enum led_brightness ap_led_get(struct led_classdev *led)
 	data = container_of(led, struct system76_data, ap_led);
 	value = system76_get(data, "GAPL");
 	if (value > 0)
-		return (enum led_brightness)value;
+		return (led_brightness)value;
 	else
 		return LED_OFF;
 }
 
 // Set the airplane mode LED brightness
-static int ap_led_set(struct led_classdev *led, enum led_brightness value)
+static int ap_led_set(struct led_classdev *led, led_brightness value)
 {
 	struct system76_data *data;
 
@@ -112,7 +112,7 @@ static int ap_led_set(struct led_classdev *led, enum led_brightness value)
 }
 
 // Get the last set keyboard LED brightness
-static enum led_brightness kb_led_get(struct led_classdev *led)
+static led_brightness kb_led_get(struct led_classdev *led)
 {
 	struct system76_data *data;
 
@@ -121,7 +121,7 @@ static enum led_brightness kb_led_get(struct led_classdev *led)
 }
 
 // Set the keyboard LED brightness
-static int kb_led_set(struct led_classdev *led, enum led_brightness value)
+static int kb_led_set(struct led_classdev *led, led_brightness value)
 {
 	struct system76_data *data;
 

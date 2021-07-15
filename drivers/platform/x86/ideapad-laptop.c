@@ -1274,7 +1274,7 @@ static int ideapad_kbd_bl_brightness_get(struct ideapad_private *priv)
 	return !!test_bit(HALS_KBD_BL_STATE_BIT, &hals);
 }
 
-static enum led_brightness ideapad_kbd_bl_led_cdev_brightness_get(struct led_classdev *led_cdev)
+static led_brightness ideapad_kbd_bl_led_cdev_brightness_get(struct led_classdev *led_cdev)
 {
 	struct ideapad_private *priv = container_of(led_cdev, struct ideapad_private, kbd_bl.led);
 
@@ -1294,7 +1294,7 @@ static int ideapad_kbd_bl_brightness_set(struct ideapad_private *priv, unsigned 
 }
 
 static int ideapad_kbd_bl_led_cdev_brightness_set(struct led_classdev *led_cdev,
-						  enum led_brightness brightness)
+						  led_brightness brightness)
 {
 	struct ideapad_private *priv = container_of(led_cdev, struct ideapad_private, kbd_bl.led);
 

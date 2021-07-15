@@ -492,7 +492,7 @@ static void tpd_led_update(struct work_struct *work)
 }
 
 static void tpd_led_set(struct led_classdev *led_cdev,
-			enum led_brightness value)
+			led_brightness value)
 {
 	struct eeepc_laptop *eeepc;
 
@@ -502,7 +502,7 @@ static void tpd_led_set(struct led_classdev *led_cdev,
 	queue_work(eeepc->led_workqueue, &eeepc->tpd_led_work);
 }
 
-static enum led_brightness tpd_led_get(struct led_classdev *led_cdev)
+static led_brightness tpd_led_get(struct led_classdev *led_cdev)
 {
 	struct eeepc_laptop *eeepc;
 

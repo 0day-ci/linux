@@ -510,7 +510,7 @@ il_led_cmd(struct il_priv *il, unsigned long on, unsigned long off)
 
 static void
 il_led_brightness_set(struct led_classdev *led_cdev,
-		      enum led_brightness brightness)
+		      led_brightness brightness)
 {
 	struct il_priv *il = container_of(led_cdev, struct il_priv, led);
 	unsigned long on = 0;

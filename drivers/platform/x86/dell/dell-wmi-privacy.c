@@ -241,7 +241,7 @@ obj_free:
 }
 
 static int dell_privacy_micmute_led_set(struct led_classdev *led_cdev,
-					enum led_brightness brightness)
+					led_brightness brightness)
 {
 	struct privacy_wmi_data *priv = led_to_priv(led_cdev);
 	static char *acpi_method = (char *)"ECAK";

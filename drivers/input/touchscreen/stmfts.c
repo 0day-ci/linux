@@ -107,7 +107,7 @@ struct stmfts_data {
 };
 
 static int stmfts_brightness_set(struct led_classdev *led_cdev,
-					enum led_brightness value)
+					led_brightness value)
 {
 	struct stmfts_data *sdata = container_of(led_cdev,
 					struct stmfts_data, led_cdev);
@@ -131,7 +131,7 @@ static int stmfts_brightness_set(struct led_classdev *led_cdev,
 	return 0;
 }
 
-static enum led_brightness stmfts_brightness_get(struct led_classdev *led_cdev)
+static led_brightness stmfts_brightness_get(struct led_classdev *led_cdev)
 {
 	struct stmfts_data *sdata = container_of(led_cdev,
 						struct stmfts_data, led_cdev);

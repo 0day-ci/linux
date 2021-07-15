@@ -229,7 +229,7 @@ static void cap11xx_input_close(struct input_dev *idev)
 
 #ifdef CONFIG_LEDS_CLASS
 static int cap11xx_led_set(struct led_classdev *cdev,
-			    enum led_brightness value)
+			    led_brightness value)
 {
 	struct cap11xx_led *led = container_of(cdev, struct cap11xx_led, cdev);
 	struct cap11xx_priv *priv = led->priv;

@@ -100,7 +100,7 @@ static int cpcap_led_set_power(struct cpcap_led *led, bool status)
 	return 0;
 }
 
-static int cpcap_led_set(struct led_classdev *ledc, enum led_brightness value)
+static int cpcap_led_set(struct led_classdev *ledc, led_brightness value)
 {
 	struct cpcap_led *led = container_of(ledc, struct cpcap_led, led);
 	int brightness;

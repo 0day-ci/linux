@@ -77,7 +77,7 @@ static const struct {
  * LED triggers are compiled in.
  */
 static void dbg_led_set(struct led_classdev *cdev,
-			      enum led_brightness b)
+			      led_brightness b)
 {
 	struct dbg_led *led = container_of(cdev, struct dbg_led, cdev);
 	u16 reg;
@@ -90,7 +90,7 @@ static void dbg_led_set(struct led_classdev *cdev,
 	writew_relaxed(reg, &fpga->leds);
 }
 
-static enum led_brightness dbg_led_get(struct led_classdev *cdev)
+static led_brightness dbg_led_get(struct led_classdev *cdev)
 {
 	struct dbg_led *led = container_of(cdev, struct dbg_led, cdev);
 	u16 reg;

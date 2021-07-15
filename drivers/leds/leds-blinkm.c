@@ -420,7 +420,7 @@ static int blinkm_transfer_hw(struct i2c_client *client, int cmd)
 }
 
 static int blinkm_led_common_set(struct led_classdev *led_cdev,
-				 enum led_brightness value, int color)
+				 led_brightness value, int color)
 {
 	/* led_brightness is 0, 127 or 255 - we just use it here as-is */
 	struct blinkm_led *led = cdev_to_blmled(led_cdev);
@@ -461,19 +461,19 @@ static int blinkm_led_common_set(struct led_classdev *led_cdev,
 }
 
 static int blinkm_led_red_set(struct led_classdev *led_cdev,
-			       enum led_brightness value)
+			       led_brightness value)
 {
 	return blinkm_led_common_set(led_cdev, value, RED);
 }
 
 static int blinkm_led_green_set(struct led_classdev *led_cdev,
-				 enum led_brightness value)
+				 led_brightness value)
 {
 	return blinkm_led_common_set(led_cdev, value, GREEN);
 }
 
 static int blinkm_led_blue_set(struct led_classdev *led_cdev,
-				enum led_brightness value)
+				led_brightness value)
 {
 	return blinkm_led_common_set(led_cdev, value, BLUE);
 }

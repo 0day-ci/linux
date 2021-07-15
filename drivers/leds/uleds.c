@@ -37,7 +37,7 @@ struct uleds_device {
 static struct miscdevice uleds_misc;
 
 static void uleds_brightness_set(struct led_classdev *led_cdev,
-				 enum led_brightness brightness)
+				 led_brightness brightness)
 {
 	struct uleds_device *udev = container_of(led_cdev, struct uleds_device,
 						 led_cdev);

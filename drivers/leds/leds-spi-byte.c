@@ -63,7 +63,7 @@ static const struct of_device_id spi_byte_dt_ids[] = {
 MODULE_DEVICE_TABLE(of, spi_byte_dt_ids);
 
 static int spi_byte_brightness_set_blocking(struct led_classdev *dev,
-					    enum led_brightness brightness)
+					    led_brightness brightness)
 {
 	struct spi_byte_led *led = container_of(dev, struct spi_byte_led, ldev);
 	u8 value;

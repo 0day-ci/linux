@@ -1517,7 +1517,7 @@ EXPORT_SYMBOL_GPL(rt2800_rfkill_poll);
 
 #ifdef CONFIG_RT2X00_LIB_LEDS
 static void rt2800_brightness_set(struct led_classdev *led_cdev,
-				  enum led_brightness brightness)
+				  led_brightness brightness)
 {
 	struct rt2x00_led *led =
 	    container_of(led_cdev, struct rt2x00_led, led_dev);

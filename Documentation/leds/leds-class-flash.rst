@@ -52,7 +52,7 @@ V4L2 subsystem. The function takes six arguments:
 		strobe start with exposure start,
 	* intensity_to_led_brightness and led_brightness_to_intensity
 		perform
-		enum led_brightness <-> V4L2 intensity conversion in a device
+		led_brightness <-> V4L2 intensity conversion in a device
 		specific manner - they can be used for devices with non-linear
 		LED current scale.
 - config:

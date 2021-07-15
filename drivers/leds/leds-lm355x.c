@@ -306,7 +306,7 @@ out:
 /* torch */
 
 static int lm355x_torch_brightness_set(struct led_classdev *cdev,
-					enum led_brightness brightness)
+					led_brightness brightness)
 {
 	struct lm355x_chip_data *chip =
 	    container_of(cdev, struct lm355x_chip_data, cdev_torch);
@@ -321,7 +321,7 @@ static int lm355x_torch_brightness_set(struct led_classdev *cdev,
 /* flash */
 
 static int lm355x_strobe_brightness_set(struct led_classdev *cdev,
-					 enum led_brightness brightness)
+					 led_brightness brightness)
 {
 	struct lm355x_chip_data *chip =
 	    container_of(cdev, struct lm355x_chip_data, cdev_flash);
@@ -336,7 +336,7 @@ static int lm355x_strobe_brightness_set(struct led_classdev *cdev,
 /* indicator */
 
 static int lm355x_indicator_brightness_set(struct led_classdev *cdev,
-					    enum led_brightness brightness)
+					    led_brightness brightness)
 {
 	struct lm355x_chip_data *chip =
 	    container_of(cdev, struct lm355x_chip_data, cdev_indicator);

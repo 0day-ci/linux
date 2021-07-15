@@ -115,7 +115,7 @@ static const struct regmap_config lm3697_regmap_config = {
 };
 
 static int lm3697_brightness_set(struct led_classdev *led_cdev,
-				enum led_brightness brt_val)
+				led_brightness brt_val)
 {
 	struct lm3697_led *led = container_of(led_cdev, struct lm3697_led,
 					      led_dev);

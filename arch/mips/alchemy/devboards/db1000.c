@@ -239,7 +239,7 @@ static void db1100_mmc_set_power(void *mmc_host, int state)
 		bcsr_mod(BCSR_BOARD, bit, 0);
 }
 
-static void db1100_mmcled_set(struct led_classdev *led, enum led_brightness b)
+static void db1100_mmcled_set(struct led_classdev *led, led_brightness b)
 {
 	if (b != LED_OFF)
 		bcsr_mod(BCSR_LEDS, BCSR_LEDS_LED0, 0);
@@ -277,7 +277,7 @@ static void db1100_mmc1_set_power(void *mmc_host, int state)
 		bcsr_mod(BCSR_BOARD, bit, 0);
 }
 
-static void db1100_mmc1led_set(struct led_classdev *led, enum led_brightness b)
+static void db1100_mmc1led_set(struct led_classdev *led, led_brightness b)
 {
 	if (b != LED_OFF)
 		bcsr_mod(BCSR_LEDS, BCSR_LEDS_LED1, 0);

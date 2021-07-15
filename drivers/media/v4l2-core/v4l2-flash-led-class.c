@@ -40,7 +40,7 @@ enum ctrl_init_data_id {
 	NUM_FLASH_CTRLS,
 };
 
-static enum led_brightness __intensity_to_led_brightness(
+static led_brightness __intensity_to_led_brightness(
 					struct v4l2_ctrl *ctrl, s32 intensity)
 {
 	intensity -= ctrl->minimum;
@@ -59,7 +59,7 @@ static enum led_brightness __intensity_to_led_brightness(
 }
 
 static s32 __led_brightness_to_intensity(struct v4l2_ctrl *ctrl,
-					 enum led_brightness brightness)
+					 led_brightness brightness)
 {
 	/*
 	 * Indicator LEDs, unlike torch LEDs, are turned on/off basing on
@@ -80,7 +80,7 @@ static void v4l2_flash_set_led_brightness(struct v4l2_flash *v4l2_flash,
 					struct v4l2_ctrl *ctrl)
 {
 	struct v4l2_ctrl **ctrls = v4l2_flash->ctrls;
-	enum led_brightness brightness;
+	led_brightness brightness;
 
 	if (has_flash_op(v4l2_flash, intensity_to_led_brightness))
 		brightness = call_flash_op(v4l2_flash,

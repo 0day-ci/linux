@@ -28,7 +28,7 @@ struct sunfire_led {
 #define	to_sunfire_led(d) container_of(d, struct sunfire_led, led_cdev)
 
 static void __clockboard_set(struct led_classdev *led_cdev,
-			     enum led_brightness led_val, u8 bit)
+			     led_brightness led_val, u8 bit)
 {
 	struct sunfire_led *p = to_sunfire_led(led_cdev);
 	u8 reg = upa_readb(p->reg);
@@ -52,25 +52,25 @@ static void __clockboard_set(struct led_classdev *led_cdev,
 }
 
 static void clockboard_left_set(struct led_classdev *led_cdev,
-				enum led_brightness led_val)
+				led_brightness led_val)
 {
 	__clockboard_set(led_cdev, led_val, CLOCK_CTRL_LLED);
 }
 
 static void clockboard_middle_set(struct led_classdev *led_cdev,
-				  enum led_brightness led_val)
+				  led_brightness led_val)
 {
 	__clockboard_set(led_cdev, led_val, CLOCK_CTRL_MLED);
 }
 
 static void clockboard_right_set(struct led_classdev *led_cdev,
-				 enum led_brightness led_val)
+				 led_brightness led_val)
 {
 	__clockboard_set(led_cdev, led_val, CLOCK_CTRL_RLED);
 }
 
 static void __fhc_set(struct led_classdev *led_cdev,
-			     enum led_brightness led_val, u32 bit)
+			     led_brightness led_val, u32 bit)
 {
 	struct sunfire_led *p = to_sunfire_led(led_cdev);
 	u32 reg = upa_readl(p->reg);
@@ -94,24 +94,24 @@ static void __fhc_set(struct led_classdev *led_cdev,
 }
 
 static void fhc_left_set(struct led_classdev *led_cdev,
-			 enum led_brightness led_val)
+			 led_brightness led_val)
 {
 	__fhc_set(led_cdev, led_val, FHC_CONTROL_LLED);
 }
 
 static void fhc_middle_set(struct led_classdev *led_cdev,
-			   enum led_brightness led_val)
+			   led_brightness led_val)
 {
 	__fhc_set(led_cdev, led_val, FHC_CONTROL_MLED);
 }
 
 static void fhc_right_set(struct led_classdev *led_cdev,
-			  enum led_brightness led_val)
+			  led_brightness led_val)
 {
 	__fhc_set(led_cdev, led_val, FHC_CONTROL_RLED);
 }
 
-typedef void (*set_handler)(struct led_classdev *, enum led_brightness);
+typedef void (*set_handler)(struct led_classdev *, led_brightness);
 struct led_type {
 	const char	*name;
 	set_handler	handler;

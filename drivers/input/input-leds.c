@@ -47,7 +47,7 @@ struct input_leds {
 	struct input_led leds[];
 };
 
-static enum led_brightness input_leds_brightness_get(struct led_classdev *cdev)
+static led_brightness input_leds_brightness_get(struct led_classdev *cdev)
 {
 	struct input_led *led = container_of(cdev, struct input_led, cdev);
 	struct input_dev *input = led->handle->dev;
@@ -56,7 +56,7 @@ static enum led_brightness input_leds_brightness_get(struct led_classdev *cdev)
 }
 
 static void input_leds_brightness_set(struct led_classdev *cdev,
-				      enum led_brightness brightness)
+				      led_brightness brightness)
 {
 	struct input_led *led = container_of(cdev, struct input_led, cdev);
 

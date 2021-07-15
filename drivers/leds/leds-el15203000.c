@@ -128,7 +128,7 @@ static int el15203000_cmd(struct el15203000_led *led, u8 brightness)
 }
 
 static int el15203000_set_blocking(struct led_classdev *ldev,
-				   enum led_brightness brightness)
+				   led_brightness brightness)
 {
 	struct el15203000_led *led = to_el15203000_led(ldev);
 

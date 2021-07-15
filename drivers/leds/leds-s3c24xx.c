@@ -30,7 +30,7 @@ static inline struct s3c24xx_gpio_led *to_gpio(struct led_classdev *led_cdev)
 }
 
 static void s3c24xx_led_set(struct led_classdev *led_cdev,
-			    enum led_brightness value)
+			    led_brightness value)
 {
 	struct s3c24xx_gpio_led *led = to_gpio(led_cdev);
 

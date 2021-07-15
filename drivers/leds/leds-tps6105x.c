@@ -23,7 +23,7 @@ static void tps6105x_handle_put(void *data)
 }
 
 static int tps6105x_brightness_set(struct led_classdev *cdev,
-				  enum led_brightness brightness)
+				  led_brightness brightness)
 {
 	struct tps6105x_priv *priv = container_of(cdev, struct tps6105x_priv,
 							cdev);

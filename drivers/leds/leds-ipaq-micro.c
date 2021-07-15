@@ -19,7 +19,7 @@
 #define LED_ALWAYS   (1 << 6) /* LED Interrupt Mask 0:No mask, 1:mask         */
 
 static int micro_leds_brightness_set(struct led_classdev *led_cdev,
-				      enum led_brightness value)
+				      led_brightness value)
 {
 	struct ipaq_micro *micro = dev_get_drvdata(led_cdev->dev->parent->parent);
 	/*

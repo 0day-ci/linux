@@ -114,7 +114,7 @@ struct pca963x {
 };
 
 static int pca963x_brightness(struct pca963x_led *led,
-			      enum led_brightness brightness)
+			      led_brightness brightness)
 {
 	struct i2c_client *client = led->chip->client;
 	struct pca963x_chipdef *chipdef = led->chip->chipdef;
@@ -202,7 +202,7 @@ static int pca963x_power_state(struct pca963x_led *led)
 }
 
 static int pca963x_led_set(struct led_classdev *led_cdev,
-			   enum led_brightness value)
+			   led_brightness value)
 {
 	struct pca963x_led *led;
 	int ret;

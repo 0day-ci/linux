@@ -23,7 +23,7 @@
 static struct platform_device *pdev;
 
 static void net48xx_error_led_set(struct led_classdev *led_cdev,
-		enum led_brightness value)
+		led_brightness value)
 {
 	scx200_gpio_ops.gpio_set(NET48XX_ERROR_LED_GPIO, value ? 1 : 0);
 }

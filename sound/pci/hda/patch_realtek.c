@@ -4191,7 +4191,7 @@ static void alc_update_vref_led(struct hda_codec *codec, hda_nid_t pin,
 
 /* update mute-LED according to the speaker mute state via mic VREF pin */
 static int vref_mute_led_set(struct led_classdev *led_cdev,
-			     enum led_brightness brightness)
+			     led_brightness brightness)
 {
 	struct hda_codec *codec = dev_to_hda_codec(led_cdev->dev->parent);
 	struct alc_spec *spec = codec->spec;
@@ -4288,7 +4288,7 @@ static void alc_update_gpio_led(struct hda_codec *codec, unsigned int mask,
 
 /* turn on/off mute LED via GPIO per vmaster hook */
 static int gpio_mute_led_set(struct led_classdev *led_cdev,
-			     enum led_brightness brightness)
+			     led_brightness brightness)
 {
 	struct hda_codec *codec = dev_to_hda_codec(led_cdev->dev->parent);
 	struct alc_spec *spec = codec->spec;
@@ -4300,7 +4300,7 @@ static int gpio_mute_led_set(struct led_classdev *led_cdev,
 
 /* turn on/off mic-mute LED via GPIO per capture hook */
 static int micmute_led_set(struct led_classdev *led_cdev,
-			   enum led_brightness brightness)
+			   led_brightness brightness)
 {
 	struct hda_codec *codec = dev_to_hda_codec(led_cdev->dev->parent);
 	struct alc_spec *spec = codec->spec;
@@ -4364,7 +4364,7 @@ static void alc287_fixup_hp_gpio_led(struct hda_codec *codec,
 
 /* turn on/off mic-mute LED per capture hook via VREF change */
 static int vref_micmute_led_set(struct led_classdev *led_cdev,
-				enum led_brightness brightness)
+				led_brightness brightness)
 {
 	struct hda_codec *codec = dev_to_hda_codec(led_cdev->dev->parent);
 	struct alc_spec *spec = codec->spec;
@@ -4469,7 +4469,7 @@ static void alc_update_coef_led(struct hda_codec *codec,
 
 /* update mute-LED according to the speaker mute state via COEF bit */
 static int coef_mute_led_set(struct led_classdev *led_cdev,
-			     enum led_brightness brightness)
+			     led_brightness brightness)
 {
 	struct hda_codec *codec = dev_to_hda_codec(led_cdev->dev->parent);
 	struct alc_spec *spec = codec->spec;
@@ -4513,7 +4513,7 @@ static void alc236_fixup_hp_mute_led_coefbit(struct hda_codec *codec,
 
 /* turn on/off mic-mute LED per capture hook by coef bit */
 static int coef_micmute_led_set(struct led_classdev *led_cdev,
-				enum led_brightness brightness)
+				led_brightness brightness)
 {
 	struct hda_codec *codec = dev_to_hda_codec(led_cdev->dev->parent);
 	struct alc_spec *spec = codec->spec;

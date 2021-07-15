@@ -5322,7 +5322,7 @@ static struct ibm_struct video_driver_data = {
  * Keyboard backlight subdriver
  */
 
-static enum led_brightness kbdlight_brightness;
+static led_brightness kbdlight_brightness;
 static DEFINE_MUTEX(kbdlight_mutex);
 
 static int kbdlight_set_level(int level)
@@ -5406,12 +5406,12 @@ static bool kbdlight_is_supported(void)
 }
 
 static int kbdlight_sysfs_set(struct led_classdev *led_cdev,
-			enum led_brightness brightness)
+			led_brightness brightness)
 {
 	return kbdlight_set_level(brightness);
 }
 
-static enum led_brightness kbdlight_sysfs_get(struct led_classdev *led_cdev)
+static led_brightness kbdlight_sysfs_get(struct led_classdev *led_cdev)
 {
 	int level;
 
@@ -5588,13 +5588,13 @@ static int light_set_status(int status)
 }
 
 static int light_sysfs_set(struct led_classdev *led_cdev,
-			enum led_brightness brightness)
+			led_brightness brightness)
 {
 	return light_set_status((brightness != LED_OFF) ?
 				TPACPI_LED_ON : TPACPI_LED_OFF);
 }
 
-static enum led_brightness light_sysfs_get(struct led_classdev *led_cdev)
+static led_brightness light_sysfs_get(struct led_classdev *led_cdev)
 {
 	return (light_get_status() == 1) ? LED_FULL : LED_OFF;
 }
@@ -5918,7 +5918,7 @@ static int led_set_status(const unsigned int led,
 }
 
 static int led_sysfs_set(struct led_classdev *led_cdev,
-			enum led_brightness brightness)
+			led_brightness brightness)
 {
 	struct tpacpi_led_classdev *data = container_of(led_cdev,
 			     struct tpacpi_led_classdev, led_classdev);
@@ -5951,7 +5951,7 @@ static int led_sysfs_blink_set(struct led_classdev *led_cdev,
 	return led_set_status(data->led, TPACPI_LED_BLINK);
 }
 
-static enum led_brightness led_sysfs_get(struct led_classdev *led_cdev)
+static led_brightness led_sysfs_get(struct led_classdev *led_cdev)
 {
 	int rc;
 
@@ -9318,13 +9318,13 @@ static int tpacpi_led_set(int whichled, bool on)
 }
 
 static int tpacpi_led_mute_set(struct led_classdev *led_cdev,
-			       enum led_brightness brightness)
+			       led_brightness brightness)
 {
 	return tpacpi_led_set(LED_AUDIO_MUTE, brightness != LED_OFF);
 }
 
 static int tpacpi_led_micmute_set(struct led_classdev *led_cdev,
-				  enum led_brightness brightness)
+				  led_brightness brightness)
 {
 	return tpacpi_led_set(LED_AUDIO_MICMUTE, brightness != LED_OFF);
 }
@@ -10686,7 +10686,7 @@ static void tpacpi_driver_event(const unsigned int hkey_event)
 		}
 	}
 	if (tp_features.kbdlight && hkey_event == TP_HKEY_EV_KBD_LIGHT) {
-		enum led_brightness brightness;
+		led_brightness brightness;
 
 		mutex_lock(&kbdlight_mutex);
 

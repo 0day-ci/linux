@@ -21,7 +21,7 @@ static u8 led_value;
 static DEFINE_SPINLOCK(led_value_lock);
 
 static void raq_web_led_set(struct led_classdev *led_cdev,
-			    enum led_brightness brightness)
+			    led_brightness brightness)
 {
 	unsigned long flags;
 
@@ -42,7 +42,7 @@ static struct led_classdev raq_web_led = {
 };
 
 static void raq_power_off_led_set(struct led_classdev *led_cdev,
-				  enum led_brightness brightness)
+				  led_brightness brightness)
 {
 	unsigned long flags;
 

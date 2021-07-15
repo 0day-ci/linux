@@ -64,7 +64,7 @@ struct apu_led_priv {
 /* LED profile */
 struct apu_led_profile {
 	const char *name;
-	enum led_brightness brightness;
+	led_brightness brightness;
 	unsigned long offset; /* for devm_ioremap */
 };
 
@@ -103,7 +103,7 @@ static const struct dmi_system_id apu_led_dmi_table[] __initconst = {
 };
 MODULE_DEVICE_TABLE(dmi, apu_led_dmi_table);
 
-static void apu1_led_brightness_set(struct led_classdev *led, enum led_brightness value)
+static void apu1_led_brightness_set(struct led_classdev *led, led_brightness value)
 {
 	struct apu_led_priv *pled = cdev_to_priv(led);
 

@@ -655,7 +655,7 @@ static const struct {
 };
 
 static void mainstone_led_set(struct led_classdev *cdev,
-			      enum led_brightness b)
+			      led_brightness b)
 {
 	struct mainstone_led *led = container_of(cdev,
 					 struct mainstone_led, cdev);
@@ -669,7 +669,7 @@ static void mainstone_led_set(struct led_classdev *cdev,
 	MST_LEDCTRL = reg;
 }
 
-static enum led_brightness mainstone_led_get(struct led_classdev *cdev)
+static led_brightness mainstone_led_get(struct led_classdev *cdev)
 {
 	struct mainstone_led *led = container_of(cdev,
 					 struct mainstone_led, cdev);

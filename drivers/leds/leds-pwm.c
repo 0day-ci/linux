@@ -37,7 +37,7 @@ struct led_pwm_priv {
 };
 
 static int led_pwm_set(struct led_classdev *led_cdev,
-		       enum led_brightness brightness)
+		       led_brightness brightness)
 {
 	struct led_pwm_data *led_dat =
 		container_of(led_cdev, struct led_pwm_data, cdev);
