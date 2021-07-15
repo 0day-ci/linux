@@ -372,6 +372,9 @@ void blk_cleanup_queue(struct request_queue *q)
 	/* cannot be called from atomic context */
 	might_sleep();
 
+	if (!q)
+		return;
+
 	WARN_ON_ONCE(blk_queue_registered(q));
 
 	/* mark @q DYING, no new request or merges will be allowed afterwards */
