@@ -1037,8 +1037,12 @@ static void hns3_init_tx_spare_buffer(struct hns3_enet_ring *ring)
 	dma_addr_t dma;
 	int order;
 
-	alloc_size = tx_spare_buf_size ? tx_spare_buf_size :
-		     ring->tqp->handle->kinfo.tx_spare_buf_size;
+	if (ring->tqp->handle->kinfo.devlink_tx_spare_buf_size)
+		alloc_size = ring->tqp->handle->kinfo.devlink_tx_spare_buf_size;
+	else if (tx_spare_buf_size)
+		alloc_size = tx_spare_buf_size;
+	else
+		alloc_size = ring->tqp->handle->kinfo.tx_spare_buf_size;
 	if (!alloc_size)
 		return;
 
