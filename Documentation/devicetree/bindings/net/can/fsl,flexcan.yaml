@@ -18,7 +18,6 @@ properties:
     oneOf:
       - enum:
           - fsl,imx8qm-flexcan
-          - fsl,imx8mp-flexcan
           - fsl,imx6q-flexcan
           - fsl,imx28-flexcan
           - fsl,imx25-flexcan
@@ -33,6 +32,7 @@ properties:
           - const: fsl,imx25-flexcan
       - items:
           - enum:
+              - fsl,imx8mp-flexcan
               - fsl,imx7d-flexcan
               - fsl,imx6ul-flexcan
               - fsl,imx6sx-flexcan
