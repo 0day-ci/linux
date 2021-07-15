@@ -1699,7 +1699,7 @@ static int init_dma_rx_desc_rings(struct net_device *dev, gfp_t flags)
 	return 0;
 
 err_init_rx_buffers:
-	while (queue >= 0) {
+	do {
 		struct stmmac_rx_queue *rx_q = &priv->rx_queue[queue];
 
 		if (rx_q->xsk_pool)
@@ -1710,11 +1710,7 @@ err_init_rx_buffers:
 		rx_q->buf_alloc_num = 0;
 		rx_q->xsk_pool = NULL;
 
-		if (queue == 0)
-			break;
-
-		queue--;
-	}
+	} while (queue--);
 
 	return ret;
 }
