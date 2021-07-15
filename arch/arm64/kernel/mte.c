@@ -35,7 +35,7 @@ EXPORT_SYMBOL_GPL(mte_async_mode);
 static void mte_sync_page_tags(struct page *page, pte_t old_pte,
 			       bool check_swap, bool pte_is_tagged)
 {
-	if (check_swap && is_swap_pte(old_pte)) {
+	if (check_swap && pte_has_swap_entry(old_pte)) {
 		swp_entry_t entry = pte_to_swp_entry(old_pte);
 
 		if (!non_swap_entry(entry) && mte_restore_tags(entry, page))

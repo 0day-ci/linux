@@ -1951,7 +1951,7 @@ static int unuse_pte_range(struct vm_area_struct *vma, pmd_t *pmd,
 	si = swap_info[type];
 	pte = pte_offset_map(pmd, addr);
 	do {
-		if (!is_swap_pte(*pte))
+		if (!pte_has_swap_entry(*pte))
 			continue;
 
 		entry = pte_to_swp_entry(*pte);
