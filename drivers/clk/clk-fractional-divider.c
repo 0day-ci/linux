@@ -84,7 +84,7 @@ void clk_fractional_divider_general_approximation(struct clk_hw *hw,
 	 * by (scale - fd->nwidth) bits.
 	 */
 	scale = fls_long(*parent_rate / rate - 1);
-	if (scale > fd->nwidth)
+	if (scale > fd->nwidth && !(fd->flags & CLK_FRAC_DIVIDER_NO_PRESCALER))
 		rate <<= scale - fd->nwidth;
 
 	rational_best_approximation(rate, *parent_rate,
