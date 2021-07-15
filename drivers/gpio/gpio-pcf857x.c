@@ -311,7 +311,7 @@ static int pcf857x_probe(struct i2c_client *client,
 	if (status < 0)
 		goto fail;
 
-	gpio->chip.label = client->name;
+	gpio->chip.label = dev_name(&client->dev);
 
 	gpio->client = client;
 	i2c_set_clientdata(client, gpio);
