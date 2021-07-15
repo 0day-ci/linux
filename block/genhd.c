@@ -449,8 +449,9 @@ static void unregister_disk(struct gendisk *disk)
 	disk_invalidate(disk);
 }
 
-static void register_disk(struct device *parent, struct gendisk *disk,
-			  const struct attribute_group **groups)
+static int __must_check register_disk(struct device *parent,
+				      struct gendisk *disk,
+				      const struct attribute_group **groups)
 {
 	struct device *ddev = disk_to_dev(disk);
 	int err;
@@ -466,15 +467,21 @@ static void register_disk(struct device *parent, struct gendisk *disk,
 		WARN_ON(ddev->groups);
 		ddev->groups = groups;
 	}
-	if (device_add(ddev))
-		return;
+	err = device_add(ddev);
+	if (err) {
+		/*
+		 * We don't put_device(ddev), the driver is responsible to
+		 * issue the last put_device(ddev), however it does this
+		 * inderectly with put_disk(), or typically more often with
+		 * just blk_cleanup_disk().
+		 */
+		return err;
+	}
 	if (!sysfs_deprecated) {
 		err = sysfs_create_link(block_depr, &ddev->kobj,
 					kobject_name(&ddev->kobj));
-		if (err) {
-			device_del(ddev);
-			return;
-		}
+		if (err)
+			goto exit_del_device;
 	}
 
 	/*
@@ -489,7 +496,7 @@ static void register_disk(struct device *parent, struct gendisk *disk,
 	disk->slave_dir = kobject_create_and_add("slaves", &ddev->kobj);
 
 	if (disk->flags & GENHD_FL_HIDDEN)
-		return;
+		return 0;
 
 	disk_scan_partitions(disk);
 	disk_announce(disk);
@@ -498,8 +505,19 @@ static void register_disk(struct device *parent, struct gendisk *disk,
 		err = sysfs_create_link(&ddev->kobj,
 			  &disk->queue->backing_dev_info->dev->kobj,
 			  "bdi");
-		WARN_ON(err);
+		if (WARN_ON(err))
+			goto exit_del_block_depr;
 	}
+	return 0;
+
+exit_del_block_depr:
+	unregister_disk_partitions(disk);
+	if (!sysfs_deprecated)
+		sysfs_remove_link(block_depr, dev_name(disk_to_dev(disk)));
+exit_del_device:
+	device_del(ddev);
+
+	return err;
 }
 
 /**
@@ -512,22 +530,24 @@ static void register_disk(struct device *parent, struct gendisk *disk,
  * This function registers the partitioning information in @disk
  * with the kernel.
  *
- * FIXME: error handling
  */
-static void __device_add_disk(struct device *parent, struct gendisk *disk,
-			      const struct attribute_group **groups,
-			      bool register_queue)
+static int __device_add_disk(struct device *parent, struct gendisk *disk,
+			     const struct attribute_group **groups,
+			     bool register_queue)
 {
 	int ret;
 
 	/*
 	 * Take an extra ref on queue which will be put on disk_release()
-	 * so that it sticks around as long as @disk is there.
+	 * so that it sticks around as long as @disk is there. The driver
+	 * must call blk_cleanup_disk() on error from this function.
 	 */
-	if (blk_get_queue(disk->queue))
-		set_bit(GD_QUEUE_REF, &disk->state);
-	else
-		WARN_ON_ONCE(1);
+	if (WARN_ON_ONCE(!blk_get_queue(disk->queue))) {
+		disk->queue = NULL;
+		return -ESHUTDOWN;
+	}
+
+	set_bit(GD_QUEUE_REF, &disk->state);
 
 	/*
 	 * The disk queue should now be all set with enough information about
@@ -546,7 +566,8 @@ static void __device_add_disk(struct device *parent, struct gendisk *disk,
 	 * and all partitions from the extended dev_t space.
 	 */
 	if (disk->major) {
-		WARN_ON(!disk->minors);
+		if (WARN_ON(!disk->minors))
+			return -EINVAL;
 
 		if (disk->minors > DISK_MAX_PARTS) {
 			pr_err("block: can't allocate more than %d partitions\n",
@@ -554,12 +575,13 @@ static void __device_add_disk(struct device *parent, struct gendisk *disk,
 			disk->minors = DISK_MAX_PARTS;
 		}
 	} else {
-		WARN_ON(disk->minors);
+		if (WARN_ON(disk->minors))
+			return -EINVAL;
 
 		ret = blk_alloc_ext_minor();
 		if (ret < 0) {
 			WARN_ON(1);
-			return;
+			return ret;
 		}
 		disk->major = BLOCK_EXT_MAJOR;
 		disk->first_minor = MINOR(ret);
@@ -568,7 +590,9 @@ static void __device_add_disk(struct device *parent, struct gendisk *disk,
 
 	disk->flags |= GENHD_FL_UP;
 
-	disk_alloc_events(disk);
+	ret = disk_alloc_events(disk);
+	if (ret)
+		goto exit_free_ext_minor;
 
 	if (disk->flags & GENHD_FL_HIDDEN) {
 		/*
@@ -585,29 +609,57 @@ static void __device_add_disk(struct device *parent, struct gendisk *disk,
 		dev->devt = MKDEV(disk->major, disk->first_minor);
 		ret = bdi_register(bdi, "%u:%u",
 				   disk->major, disk->first_minor);
-		WARN_ON(ret);
+		if (WARN_ON(ret))
+			goto exit_disk_release_events;
 		bdi_set_owner(bdi, dev);
 		bdev_add(disk->part0, dev->devt);
 	}
-	register_disk(parent, disk, groups);
-	if (register_queue)
-		blk_register_queue(disk);
+	ret = register_disk(parent, disk, groups);
+	if (ret)
+		goto exit_unregister_bdi;
+
+	if (register_queue) {
+		ret = blk_register_queue(disk);
+		if (ret)
+			goto exit_unregister_disk;
+	}
 
 	disk_add_events(disk);
-	blk_integrity_add(disk);
+
+	ret = blk_integrity_add(disk);
+	if (ret)
+		goto exit_del_events;
+
+	return 0;
+exit_del_events:
+	disk_del_events(disk);
+exit_unregister_disk:
+	unregister_disk(disk);
+	return ret;
+
+exit_unregister_bdi:
+	if (disk->queue && !(disk->flags & GENHD_FL_HIDDEN))
+		bdi_unregister(disk->queue->backing_dev_info);
+exit_disk_release_events:
+	disk_release_events(disk);
+exit_free_ext_minor:
+	if (disk->major == BLOCK_EXT_MAJOR)
+		blk_free_ext_minor(disk->first_minor);
+
+	return ret;
 }
 
-void device_add_disk(struct device *parent, struct gendisk *disk,
-		     const struct attribute_group **groups)
+int device_add_disk(struct device *parent, struct gendisk *disk,
+		    const struct attribute_group **groups)
 
 {
-	__device_add_disk(parent, disk, groups, true);
+	return __device_add_disk(parent, disk, groups, true);
 }
 EXPORT_SYMBOL(device_add_disk);
 
-void device_add_disk_no_queue_reg(struct device *parent, struct gendisk *disk)
+int device_add_disk_no_queue_reg(struct device *parent, struct gendisk *disk)
 {
-	__device_add_disk(parent, disk, NULL, false);
+	return __device_add_disk(parent, disk, NULL, false);
 }
 EXPORT_SYMBOL(device_add_disk_no_queue_reg);
 

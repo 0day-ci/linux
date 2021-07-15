@@ -862,9 +862,10 @@ int blk_register_queue(struct gendisk *disk)
 	if (WARN_ON(!q))
 		return -ENXIO;
 
-	WARN_ONCE(blk_queue_registered(q),
+	if (WARN_ONCE(blk_queue_registered(q),
 		  "%s is registering an already registered queue\n",
-		  kobject_name(&dev->kobj));
+		  kobject_name(&dev->kobj)))
+		return -ENXIO;
 
 	blk_queue_update_readahead(q);
 
