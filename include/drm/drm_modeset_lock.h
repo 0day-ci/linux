@@ -223,4 +223,10 @@ void _drm_modeset_lock_end(struct drm_modeset_acquire_ctx *ctx,
 	     _drm_modeset_lock_loop(&(ret)); \
 	     _drm_modeset_lock_end((ctx), (state), &(ret)))
 
+#define drm_modeset_lock_all_ctx_retry(dev, ctx, state, flags, ret) \
+	for (_drm_modeset_lock_begin((ctx), (state), (flags), &(ret)); \
+	     _drm_modeset_lock_loop(&(ret)); \
+	     _drm_modeset_lock_end((ctx), (state), &(ret))) \
+		for_each_if(((ret) = drm_modeset_lock_all_ctx((dev), (ctx))) == 0)
+
 #endif /* DRM_MODESET_LOCK_H_ */
