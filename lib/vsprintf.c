@@ -26,6 +26,7 @@
 #include <linux/types.h>
 #include <linux/string.h>
 #include <linux/ctype.h>
+#include <linux/dcache.h>
 #include <linux/kernel.h>
 #include <linux/kallsyms.h>
 #include <linux/math64.h>
@@ -947,13 +948,44 @@ char *dentry_name(char *buf, char *end, const struct dentry *d, struct printf_sp
 }
 
 static noinline_for_stack
-char *file_dentry_name(char *buf, char *end, const struct file *f,
+char *file_d_path_name(char *buf, char *end, const struct file *f,
 			struct printf_spec spec, const char *fmt)
 {
+	int prepend_len, widen_len, dpath_len;
+	const struct path *path;
+	char *p;
+
 	if (check_pointer(&buf, end, f, spec))
 		return buf;
 
-	return dentry_name(buf, end, f->f_path.dentry, spec, fmt);
+	path = &f->f_path;
+	if (check_pointer(&buf, end, path, spec))
+		return buf;
+
+	p = d_path_unsafe(path, buf, end - buf, &prepend_len);
+
+	/* Calculate the full d_path length, ignoring the tail '\0' */
+	dpath_len = end - buf - prepend_len - 1;
+
+	widen_len = max_t(int, dpath_len, spec.field_width);
+
+	/* Case 1: Already started past the buffer. Just forward @buf. */
+	if (buf >= end)
+		return buf + widen_len;
+
+	/*
+	 * Case 2: The entire remaining space of the buffer filled by
+	 * the truncated path. Still need to get moved right when
+	 * the field width is greater than the full path length.
+	 */
+	if (prepend_len < 0)
+		return widen_string(buf + dpath_len, dpath_len, end, spec);
+
+	/*
+	 * Case 3: The full path is printed at the end of the buffer.
+	 * Print it at the right location in the same buffer.
+	 */
+	return string_nocheck(buf, end, p, spec);
 }
 #ifdef CONFIG_BLOCK
 static noinline_for_stack
@@ -2341,7 +2373,7 @@ early_param("no_hash_pointers", no_hash_pointers_enable);
  * - 'a[pd]' For address types [p] phys_addr_t, [d] dma_addr_t and derivatives
  *           (default assumed to be phys_addr_t, passed by reference)
  * - 'd[234]' For a dentry name (optionally 2-4 last components)
- * - 'D[234]' Same as 'd' but for a struct file
+ * - 'D' For the full path name of a struct file
  * - 'g' For block_device name (gendisk + partition number)
  * - 't[RT][dt][r][s]' For time and date as represented by:
  *      R    struct rtc_time
@@ -2440,7 +2472,7 @@ char *pointer(const char *fmt, char *buf, char *end, void *ptr,
 	case 'C':
 		return clock(buf, end, ptr, spec, fmt);
 	case 'D':
-		return file_dentry_name(buf, end, ptr, spec, fmt);
+		return file_d_path_name(buf, end, ptr, spec, fmt);
 #ifdef CONFIG_BLOCK
 	case 'g':
 		return bdev_name(buf, end, ptr, spec, fmt);

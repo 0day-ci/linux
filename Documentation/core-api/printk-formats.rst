@@ -418,12 +418,15 @@ dentry names
 ::
 
 	%pd{,2,3,4}
-	%pD{,2,3,4}
+	%pD
 
 For printing dentry name; if we race with :c:func:`d_move`, the name might
 be a mix of old and new ones, but it won't oops.  %pd dentry is a safer
 equivalent of %s dentry->d_name.name we used to use, %pd<n> prints ``n``
-last components.  %pD does the same thing for struct file.
+last components. %pD prints full file path together with mount-related
+parenthood. %pD uses the entire given buffer as a scratch space. It might
+write something behind the trailing '\0' but never write beyond the
+scratch space.
 
 Passed by reference.
 
