@@ -2396,32 +2396,32 @@ unlock:
 	return error;
 }
 
-static int filemap_create_page(struct file *file,
+static int filemap_create_folio(struct file *file,
 		struct address_space *mapping, pgoff_t index,
 		struct pagevec *pvec)
 {
-	struct page *page;
+	struct folio *folio;
 	int error;
 
-	page = page_cache_alloc(mapping);
-	if (!page)
+	folio = filemap_alloc_folio(mapping_gfp_mask(mapping), 0);
+	if (!folio)
 		return -ENOMEM;
 
-	error = add_to_page_cache_lru(page, mapping, index,
+	error = filemap_add_folio(mapping, folio, index,
 			mapping_gfp_constraint(mapping, GFP_KERNEL));
 	if (error == -EEXIST)
 		error = AOP_TRUNCATED_PAGE;
 	if (error)
 		goto error;
 
-	error = filemap_read_folio(file, mapping, page_folio(page));
+	error = filemap_read_folio(file, mapping, folio);
 	if (error)
 		goto error;
 
-	pagevec_add(pvec, page);
+	pagevec_add(pvec, &folio->page);
 	return 0;
 error:
-	put_page(page);
+	folio_put(folio);
 	return error;
 }
 
@@ -2463,7 +2463,7 @@ retry:
 	if (!pagevec_count(pvec)) {
 		if (iocb->ki_flags & (IOCB_NOWAIT | IOCB_WAITQ))
 			return -EAGAIN;
-		err = filemap_create_page(filp, mapping,
+		err = filemap_create_folio(filp, mapping,
 				iocb->ki_pos >> PAGE_SHIFT, pvec);
 		if (err == AOP_TRUNCATED_PAGE)
 			goto retry;
