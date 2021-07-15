@@ -258,6 +258,7 @@ int line6_create_audio_in_urbs(struct snd_line6_pcm *line6pcm)
 {
 	struct usb_line6 *line6 = line6pcm->line6;
 	int i;
+	int ret;
 
 	line6pcm->in.urbs = kcalloc(line6->iso_buffers, sizeof(struct urb *),
 				    GFP_KERNEL);
@@ -272,8 +273,10 @@ int line6_create_audio_in_urbs(struct snd_line6_pcm *line6pcm)
 		urb = line6pcm->in.urbs[i] =
 		    usb_alloc_urb(LINE6_ISO_PACKETS, GFP_KERNEL);
 
-		if (urb == NULL)
-			return -ENOMEM;
+		if (urb == NULL) {
+			ret = -ENOMEM;
+			goto enomem;
+		}
 
 		urb->dev = line6->usbdev;
 		urb->pipe =
@@ -286,9 +289,20 @@ int line6_create_audio_in_urbs(struct snd_line6_pcm *line6pcm)
 		urb->interval = LINE6_ISO_INTERVAL;
 		urb->error_count = 0;
 		urb->complete = audio_in_callback;
-		if (usb_urb_ep_type_check(urb))
-			return -EINVAL;
+		if (usb_urb_ep_type_check(urb)) {
+			ret = -EINVAL;
+			goto einval;
+		}
 	}
 
 	return 0;
+
+enomem:
+	i--;
+
+einval:
+	while (i >= 0)
+		usb_free_urb(line6pcm->in.urbs[i--]);
+
+	return ret;
 }
