@@ -96,6 +96,7 @@
 #include "intel_wakeref.h"
 #include "intel_wopcm.h"
 
+#include "i915_drm_client.h"
 #include "i915_gem.h"
 #include "i915_gem_gtt.h"
 #include "i915_gpu_error.h"
@@ -284,6 +285,8 @@ struct drm_i915_file_private {
 	/** ban_score: Accumulated score of all ctx bans and fast hangs. */
 	atomic_t ban_score;
 	unsigned long hang_timestamp;
+
+	struct i915_drm_client *client;
 };
 
 /* Interface history:
@@ -1217,6 +1220,8 @@ struct drm_i915_private {
 	} lpe_audio;
 
 	struct i915_pmu pmu;
+
+	struct i915_drm_clients clients;
 
 	struct i915_hdcp_comp_master *hdcp_master;
 	bool hdcp_comp_added;
