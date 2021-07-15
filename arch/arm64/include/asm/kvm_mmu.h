@@ -170,6 +170,11 @@ phys_addr_t kvm_mmu_get_httbr(void);
 phys_addr_t kvm_get_idmap_vector(void);
 int kvm_mmu_init(u32 *hyp_va_bits);
 
+/* MMIO guard */
+bool kvm_install_ioguard_page(struct kvm_vcpu *vcpu, gpa_t ipa);
+bool kvm_remove_ioguard_page(struct kvm_vcpu *vcpu, gpa_t ipa);
+bool kvm_check_ioguard_page(struct kvm_vcpu *vcpu, gpa_t ipa);
+
 static inline void *__kvm_vector_slot2addr(void *base,
 					   enum arm64_hyp_spectre_vector slot)
 {
