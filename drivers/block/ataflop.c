@@ -2081,7 +2081,9 @@ static int __init atari_floppy_init (void)
 	for (i = 0; i < FD_MAX_UNITS; i++) {
 		unit[i].track = -1;
 		unit[i].flags = 0;
-		add_disk(unit[i].disk[0]);
+		ret = add_disk(unit[i].disk[0]);
+		if (ret)
+			goto err_out_dma;
 	}
 
 	printk(KERN_INFO "Atari floppy driver: max. %cD, %strack buffering\n",
@@ -2091,13 +2093,10 @@ static int __init atari_floppy_init (void)
 
 	return 0;
 
+err_out_dma:
+	atari_stram_free(DMABuffer);
 err:
-	while (--i >= 0) {
-		blk_cleanup_disk(unit[i].disk[0]);
-		blk_mq_free_tag_set(&unit[i].tag_set);
-	}
-
-	unregister_blkdev(FLOPPY_MAJOR, "fd");
+	atari_floppy_disk_remove();
 out_unlock:
 	mutex_unlock(&ataflop_probe_lock);
 	return ret;
