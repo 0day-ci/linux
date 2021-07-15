@@ -1717,6 +1717,8 @@ extern void user_shm_unlock(size_t, struct ucounts *);
 
 /* Whether to check page->mapping when zapping */
 #define  ZAP_FLAG_CHECK_MAPPING             BIT(0)
+/* Whether to skip zapping swap entries */
+#define  ZAP_FLAG_SKIP_SWAP                 BIT(1)
 
 /*
  * Parameter block passed down to zap_pte_range in exceptional cases.
@@ -1738,6 +1740,16 @@ zap_skip_check_mapping(struct zap_details *details, struct page *page)
 		return false;
 
 	return details->zap_mapping != page_rmapping(page);
+}
+
+/* Return true if skip swap entries, false otherwise */
+static inline bool
+zap_skip_swap(struct zap_details *details)
+{
+	if (!details)
+		return false;
+
+	return details->zap_flags & ZAP_FLAG_SKIP_SWAP;
 }
 
 struct page *vm_normal_page(struct vm_area_struct *vma, unsigned long addr,
