@@ -24,7 +24,7 @@ static const struct drm_mode_config_funcs loongson_mode_funcs = {
 	.mode_valid = drm_vram_helper_mode_valid
 };
 
-static int loongson_device_init(struct drm_device *dev, uint32_t flags)
+static int loongson_device_init(struct drm_device *dev)
 {
 	struct loongson_device *ldev = dev->dev_private;
 	struct pci_dev *gpu_pdev;
@@ -131,7 +131,7 @@ int loongson_modeset_init(struct loongson_device *ldev)
 	return 0;
 }
 
-static int loongson_drm_load(struct drm_device *dev, unsigned long flags)
+static int loongson_drm_load(struct drm_device *dev)
 {
 	struct loongson_device *ldev;
 	int ret;
@@ -143,7 +143,7 @@ static int loongson_drm_load(struct drm_device *dev, unsigned long flags)
 	dev->dev_private = ldev;
 	ldev->dev = dev;
 
-	ret = loongson_device_init(dev, flags);
+	ret = loongson_device_init(dev);
 	if (ret)
 		goto err;
 
@@ -164,8 +164,16 @@ static int loongson_drm_load(struct drm_device *dev, unsigned long flags)
 	pci_set_drvdata(dev->pdev, dev);
 
 	ret = loongson_modeset_init(ldev);
-	if (ret)
+	if (ret) {
 		dev_err(dev->dev, "Fatal error during modeset init: %d\n", ret);
+		goto err;
+	}
+
+	ret = loongson_irq_init(ldev);
+	if (ret) {
+		dev_err(dev->dev, "Fatal error during irq init: %d\n", ret);
+		goto err;
+	}
 
 	drm_kms_helper_poll_init(dev);
 	drm_mode_config_reset(dev);
@@ -191,6 +199,10 @@ static struct drm_driver loongson_drm_driver = {
 	.driver_features = DRIVER_MODESET | DRIVER_GEM | DRIVER_ATOMIC,
 	.fops = &fops,
 	DRM_GEM_VRAM_DRIVER,
+
+	.irq_handler = loongson_irq_handler,
+	.irq_preinstall = loongson_irq_preinstall,
+	.irq_uninstall = loongson_irq_uninstall,
 
 	.name = DRIVER_NAME,
 	.desc = DRIVER_DESC,
@@ -221,7 +233,7 @@ static int loongson_pci_probe(struct pci_dev *pdev,
 		goto err_free;
 	}
 
-	ret = loongson_drm_load(dev, 0x0);
+	ret = loongson_drm_load(dev);
 	if (ret) {
 		drm_err(dev, "failed to load loongson: %d\n", ret);
 		goto err_pdev;
