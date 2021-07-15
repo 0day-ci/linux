@@ -1224,7 +1224,8 @@ int pci_alloc_irq_vectors_affinity(struct pci_dev *dev, unsigned int min_vecs,
 			 * for the single interrupt case.
 			 */
 			if (affd)
-				irq_create_affinity_masks(1, affd);
+				WARN_ON_ONCE(irq_affinity_calc_sets(1, affd));
+
 			pci_intx(dev, 1);
 			return 1;
 		}
