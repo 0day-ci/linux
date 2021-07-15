@@ -5,3 +5,8 @@
 
 config BOSH_BNO055_IIO
 	tristate
+
+config BOSH_BNO055_SERIAL
+	tristate "Bosh BNO055 attached via serial bus"
+	depends on SERIAL_DEV_BUS
+	select BOSH_BNO055_IIO
