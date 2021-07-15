@@ -388,6 +388,13 @@ int devm_platform_get_irqs_affinity(struct platform_device *dev,
 				ptr->irq[i], ret);
 			goto err_free_desc;
 		}
+
+		/*
+		 * mark the device as irq affinity managed if any irq affinity
+		 * descriptor is managed
+		 */
+		if (desc[i].is_managed)
+			dev->dev.irq_affinity_managed = true;
 	}
 
 	devres_add(&dev->dev, ptr);

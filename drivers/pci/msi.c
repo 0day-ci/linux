@@ -1197,6 +1197,7 @@ int pci_alloc_irq_vectors_affinity(struct pci_dev *dev, unsigned int min_vecs,
 	if (flags & PCI_IRQ_AFFINITY) {
 		if (!affd)
 			affd = &msi_default_affd;
+		dev->dev.irq_affinity_managed = true;
 	} else {
 		if (WARN_ON(affd))
 			affd = NULL;
@@ -1214,6 +1215,8 @@ int pci_alloc_irq_vectors_affinity(struct pci_dev *dev, unsigned int min_vecs,
 		if (nvecs > 0)
 			return nvecs;
 	}
+
+	dev->dev.irq_affinity_managed = false;
 
 	/* use legacy IRQ if allowed */
 	if (flags & PCI_IRQ_LEGACY) {
