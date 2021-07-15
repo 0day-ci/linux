@@ -12126,12 +12126,60 @@ static void intel_update_fdi_pll_freq(struct drm_i915_private *dev_priv)
 	drm_dbg(&dev_priv->drm, "FDI PLL freq=%d\n", dev_priv->fdi_pll_freq);
 }
 
+static int intel_crtc_initial_commit(struct intel_atomic_state *state,
+				     struct intel_crtc *crtc)
+{
+	struct intel_crtc_state *crtc_state;
+	struct intel_encoder *encoder;
+	int ret;
+
+	crtc_state = intel_atomic_get_crtc_state(&state->base, crtc);
+	if (IS_ERR(crtc_state))
+		return PTR_ERR(crtc_state);
+
+	if (!crtc_state->hw.active)
+		return 0;
+
+	/*
+	 * We've not yet detected sink capabilities
+	 * (audio,infoframes,etc.) and thus we don't want to
+	 * force a full state recomputation yet. We want that to
+	 * happen only for the first real commit from userspace.
+	 * So preserve the inherited flag for the time being.
+	 */
+	crtc_state->inherited = true;
+
+	ret = drm_atomic_add_affected_planes(&state->base, &crtc->base);
+	if (ret)
+		return ret;
+
+	/*
+	 * FIXME hack to force a LUT update to avoid the
+	 * plane update forcing the pipe gamma on without
+	 * having a proper LUT loaded. Remove once we
+	 * have readout for pipe gamma enable.
+	 */
+	crtc_state->uapi.color_mgmt_changed = true;
+
+	for_each_intel_encoder_mask(state->base.dev, encoder, crtc_state->uapi.encoder_mask) {
+		if (encoder->initial_fastset_check &&
+		    !encoder->initial_fastset_check(encoder, crtc_state)) {
+			ret = drm_atomic_add_affected_connectors(&state->base,
+								 &crtc->base);
+			if (ret)
+				return ret;
+		}
+	}
+
+	return 0;
+}
+
 static int intel_initial_commit(struct drm_device *dev)
 {
-	struct drm_atomic_state *state = NULL;
 	struct drm_modeset_acquire_ctx ctx;
+	struct drm_atomic_state *state;
 	struct intel_crtc *crtc;
-	int ret = 0;
+	int ret;
 
 	state = drm_atomic_state_alloc(dev);
 	if (!state)
@@ -12143,49 +12191,9 @@ retry:
 	state->acquire_ctx = &ctx;
 
 	for_each_intel_crtc(dev, crtc) {
-		struct intel_crtc_state *crtc_state =
-			intel_atomic_get_crtc_state(state, crtc);
-
-		if (IS_ERR(crtc_state)) {
-			ret = PTR_ERR(crtc_state);
+		ret = intel_crtc_initial_commit(to_intel_atomic_state(state), crtc);
+		if (ret)
 			goto out;
-		}
-
-		if (crtc_state->hw.active) {
-			struct intel_encoder *encoder;
-
-			/*
-			 * We've not yet detected sink capabilities
-			 * (audio,infoframes,etc.) and thus we don't want to
-			 * force a full state recomputation yet. We want that to
-			 * happen only for the first real commit from userspace.
-			 * So preserve the inherited flag for the time being.
-			 */
-			crtc_state->inherited = true;
-
-			ret = drm_atomic_add_affected_planes(state, &crtc->base);
-			if (ret)
-				goto out;
-
-			/*
-			 * FIXME hack to force a LUT update to avoid the
-			 * plane update forcing the pipe gamma on without
-			 * having a proper LUT loaded. Remove once we
-			 * have readout for pipe gamma enable.
-			 */
-			crtc_state->uapi.color_mgmt_changed = true;
-
-			for_each_intel_encoder_mask(dev, encoder,
-						    crtc_state->uapi.encoder_mask) {
-				if (encoder->initial_fastset_check &&
-				    !encoder->initial_fastset_check(encoder, crtc_state)) {
-					ret = drm_atomic_add_affected_connectors(state,
-										 &crtc->base);
-					if (ret)
-						goto out;
-				}
-			}
-		}
 	}
 
 	ret = drm_atomic_commit(state);
