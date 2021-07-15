@@ -1092,6 +1092,27 @@ out:
 	return IRQ_RETVAL(handled);
 }
 
+static void carm_free_disk(struct carm_host *host, unsigned int port_no)
+{
+	struct carm_port *port = &host->port[port_no];
+	struct gendisk *disk = port->disk;
+
+	if (!disk)
+		return;
+
+	del_gendisk(disk);
+	blk_cleanup_disk(disk);
+}
+
+static void carm_free_all_disks(struct carm_host *host)
+{
+	unsigned int i;
+
+	for (i = 0; i < CARM_MAX_PORTS; i++)
+		carm_free_disk(host, i);
+	unregister_blkdev(host->major, host->name);
+}
+
 static void carm_fsm_task (struct work_struct *work)
 {
 	struct carm_host *host =
@@ -1365,18 +1386,6 @@ static int carm_init_disk(struct carm_host *host, unsigned int port_no)
 	return 0;
 }
 
-static void carm_free_disk(struct carm_host *host, unsigned int port_no)
-{
-	struct carm_port *port = &host->port[port_no];
-	struct gendisk *disk = port->disk;
-
-	if (!disk)
-		return;
-
-	del_gendisk(disk);
-	blk_cleanup_disk(disk);
-}
-
 static int carm_init_shm(struct carm_host *host)
 {
 	host->shm = dma_alloc_coherent(&host->pdev->dev, CARM_SHM_SIZE,
@@ -1520,9 +1529,7 @@ static int carm_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 err_out_free_irq:
 	free_irq(pdev->irq, host);
 err_out_blkdev_disks:
-	for (i = 0; i < CARM_MAX_PORTS; i++)
-		carm_free_disk(host, i);
-	unregister_blkdev(host->major, host->name);
+	carm_free_all_disks(host);
 err_out_free_majors:
 	if (host->major == 160)
 		clear_bit(0, &carm_major_alloc);
@@ -1546,7 +1553,6 @@ err_out:
 static void carm_remove_one (struct pci_dev *pdev)
 {
 	struct carm_host *host = pci_get_drvdata(pdev);
-	unsigned int i;
 
 	if (!host) {
 		printk(KERN_ERR PFX "BUG: no host data for PCI(%s)\n",
@@ -1555,9 +1561,7 @@ static void carm_remove_one (struct pci_dev *pdev)
 	}
 
 	free_irq(pdev->irq, host);
-	for (i = 0; i < CARM_MAX_PORTS; i++)
-		carm_free_disk(host, i);
-	unregister_blkdev(host->major, host->name);
+	carm_free_all_disks(host);
 	if (host->major == 160)
 		clear_bit(0, &carm_major_alloc);
 	else if (host->major == 161)
