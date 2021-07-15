@@ -319,17 +319,14 @@ static struct platform_device rtc_dev = {
 /* U2 -- LEDs */
 
 static struct gpio_led evm_leds[] = {
-	{ .name = "DS8", .active_low = 1,
-		.default_trigger = "heartbeat", },
-	{ .name = "DS7", .active_low = 1, },
-	{ .name = "DS6", .active_low = 1, },
-	{ .name = "DS5", .active_low = 1, },
-	{ .name = "DS4", .active_low = 1, },
-	{ .name = "DS3", .active_low = 1, },
-	{ .name = "DS2", .active_low = 1,
-		.default_trigger = "mmc0", },
-	{ .name = "DS1", .active_low = 1,
-		.default_trigger = "disk-activity", },
+	{ .name = "DS8", .default_trigger = "heartbeat", },
+	{ .name = "DS7", },
+	{ .name = "DS6", },
+	{ .name = "DS5", },
+	{ .name = "DS4", },
+	{ .name = "DS3", },
+	{ .name = "DS2", .default_trigger = "mmc0", },
+	{ .name = "DS1", .default_trigger = "disk-activity", },
 };
 
 static const struct gpio_led_platform_data evm_led_data = {
@@ -337,18 +334,35 @@ static const struct gpio_led_platform_data evm_led_data = {
 	.leds		= evm_leds,
 };
 
+static struct gpiod_lookup_table evm_leds_gpio_table = {
+	.dev_id = "leds-gpio.0",
+	.table = {
+		/*
+		 * These GPIOs are on a PCF8574 GPIO expander, which
+		 * is in turn named after the I2C device name. This is
+		 * device "u2" on I2C bus 1 with address 0x38.
+		 */
+		GPIO_LOOKUP_IDX("i2c-u2", 0, NULL, 0, GPIO_ACTIVE_LOW),
+		GPIO_LOOKUP_IDX("i2c-u2", 1, NULL, 1, GPIO_ACTIVE_LOW),
+		GPIO_LOOKUP_IDX("i2c-u2", 2, NULL, 2, GPIO_ACTIVE_LOW),
+		GPIO_LOOKUP_IDX("i2c-u2", 3, NULL, 3, GPIO_ACTIVE_LOW),
+		GPIO_LOOKUP_IDX("i2c-u2", 4, NULL, 4, GPIO_ACTIVE_LOW),
+		GPIO_LOOKUP_IDX("i2c-u2", 5, NULL, 5, GPIO_ACTIVE_LOW),
+		GPIO_LOOKUP_IDX("i2c-u2", 6, NULL, 6, GPIO_ACTIVE_LOW),
+		GPIO_LOOKUP_IDX("i2c-u2", 7, NULL, 7, GPIO_ACTIVE_LOW),
+		{ },
+	},
+};
+
 static struct platform_device *evm_led_dev;
 
 static int
 evm_led_setup(struct i2c_client *client, int gpio, unsigned ngpio, void *c)
 {
-	struct gpio_led *leds = evm_leds;
 	int status;
 
-	while (ngpio--) {
-		leds->gpio = gpio++;
-		leds++;
-	}
+	/* Add the lookup table */
+	gpiod_add_lookup_table(&evm_leds_gpio_table);
 
 	/* what an extremely annoying way to be forced to handle
 	 * device unregistration ...
@@ -639,14 +653,17 @@ static struct i2c_board_info __initdata i2c_info[] =  {
 	},
 	{
 		I2C_BOARD_INFO("pcf8574", 0x38),
+		.dev_name = "u2",
 		.platform_data	= &pcf_data_u2,
 	},
 	{
 		I2C_BOARD_INFO("pcf8574", 0x39),
+		.dev_name = "u18",
 		.platform_data	= &pcf_data_u18,
 	},
 	{
 		I2C_BOARD_INFO("pcf8574", 0x3a),
+		.dev_name = "u35",
 		.platform_data	= &pcf_data_u35,
 	},
 	{
