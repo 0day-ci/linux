@@ -245,6 +245,15 @@ unlock:
 	return ret;
 }
 
+#define KVM_INVALID_PTE_OWNER_MASK	GENMASK(63, 56)
+#define KVM_MAX_OWNER_ID		1
+
+static kvm_pte_t kvm_init_invalid_leaf_owner(u8 owner_id)
+{
+	BUG_ON(owner_id > KVM_MAX_OWNER_ID);
+	return FIELD_PREP(KVM_INVALID_PTE_OWNER_MASK, owner_id);
+}
+
 int __pkvm_mark_hyp(phys_addr_t start, phys_addr_t end)
 {
 	int ret;
@@ -257,8 +266,9 @@ int __pkvm_mark_hyp(phys_addr_t start, phys_addr_t end)
 		return -EINVAL;
 
 	hyp_spin_lock(&host_kvm.lock);
-	ret = kvm_pgtable_stage2_set_owner(&host_kvm.pgt, start, end - start,
-					   &host_s2_pool, pkvm_hyp_id);
+	ret = kvm_pgtable_stage2_annotate(&host_kvm.pgt, start, end - start,
+					  &host_s2_pool,
+					  kvm_init_invalid_leaf_owner(pkvm_hyp_id));
 	hyp_spin_unlock(&host_kvm.lock);
 
 	return ret != -EAGAIN ? ret : 0;
