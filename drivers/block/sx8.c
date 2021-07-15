@@ -1373,8 +1373,7 @@ static void carm_free_disk(struct carm_host *host, unsigned int port_no)
 	if (!disk)
 		return;
 
-	if (disk->flags & GENHD_FL_UP)
-		del_gendisk(disk);
+	del_gendisk(disk);
 	blk_cleanup_disk(disk);
 }
 
