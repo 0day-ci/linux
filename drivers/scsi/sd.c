@@ -3485,7 +3485,11 @@ static int sd_probe(struct device *dev)
 		pm_runtime_set_autosuspend_delay(dev,
 			sdp->host->hostt->rpm_autosuspend_delay);
 	}
-	device_add_disk(dev, gd, NULL);
+
+	error = device_add_disk(dev, gd, NULL);
+	if (error)
+		goto out_free_index;
+
 	if (sdkp->capacity)
 		sd_dif_config_host(sdkp);
 
