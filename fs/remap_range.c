@@ -212,6 +212,7 @@ static int vfs_dedupe_file_range_compare(struct inode *src, loff_t srcoff,
 	loff_t cmp_len;
 	bool same;
 	int error;
+	const uint8_t block_size = sizeof(unsigned long);
 
 	error = -EINVAL;
 	same = true;
@@ -256,9 +257,35 @@ static int vfs_dedupe_file_range_compare(struct inode *src, loff_t srcoff,
 		flush_dcache_page(src_page);
 		flush_dcache_page(dest_page);
 
-		if (memcmp(src_addr + src_poff, dest_addr + dest_poff, cmp_len))
-			same = false;
 
+		if (!IS_ALIGNED((unsigned long)(src_addr + src_poff), block_size) ||
+		    !IS_ALIGNED((unsigned long)(dest_addr + dest_poff), block_size) ||
+		    cmp_len < block_size) {
+			if (memcmp(src_addr + src_poff, dest_addr + dest_poff,
+				   cmp_len))
+				same = false;
+		} else {
+			int i;
+			size_t blocks = cmp_len / block_size;
+			loff_t rem_len = cmp_len - (blocks * block_size);
+			unsigned long *src = src_addr + src_poff;
+			unsigned long *dst = dest_addr + src_poff;
+
+			for (i = 0; i < blocks; i++) {
+				if (src[i] - dst[i]) {
+					same = false;
+					goto finished;
+				}
+			}
+
+			if (rem_len) {
+				src_addr += src_poff + (blocks * block_size);
+				dest_addr += dest_poff + (blocks * block_size);
+				if (memcmp(src_addr, dest_addr, rem_len))
+					same = false;
+			}
+		}
+finished:
 		kunmap_atomic(dest_addr);
 		kunmap_atomic(src_addr);
 unlock:
