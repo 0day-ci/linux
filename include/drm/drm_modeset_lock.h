@@ -26,6 +26,7 @@
 
 #include <linux/ww_mutex.h>
 
+struct drm_atomic_state;
 struct drm_modeset_lock;
 
 /**
@@ -202,5 +203,24 @@ modeset_lock_fail:							\
 	drm_modeset_acquire_fini(&ctx);					\
 	if (!drm_drv_uses_atomic_modeset(dev))				\
 		mutex_unlock(&dev->mode_config.mutex);
+
+void _drm_modeset_lock_begin(struct drm_modeset_acquire_ctx *ctx,
+			     struct drm_atomic_state *state,
+			     unsigned int flags,
+			     int *ret);
+bool _drm_modeset_lock_loop(int *ret);
+void _drm_modeset_lock_end(struct drm_modeset_acquire_ctx *ctx,
+			   struct drm_atomic_state *state,
+			   int *ret);
+
+/*
+ * Note that one must always use "continue" rather than
+ * "break" or "return" to handle errors within the
+ * drm_modeset_lock_ctx_retry() block.
+ */
+#define drm_modeset_lock_ctx_retry(ctx, state, flags, ret) \
+	for (_drm_modeset_lock_begin((ctx), (state), (flags), &(ret)); \
+	     _drm_modeset_lock_loop(&(ret)); \
+	     _drm_modeset_lock_end((ctx), (state), &(ret)))
 
 #endif /* DRM_MODESET_LOCK_H_ */

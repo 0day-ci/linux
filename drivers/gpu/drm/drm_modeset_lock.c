@@ -425,3 +425,47 @@ int drm_modeset_lock_all_ctx(struct drm_device *dev,
 	return 0;
 }
 EXPORT_SYMBOL(drm_modeset_lock_all_ctx);
+
+void _drm_modeset_lock_begin(struct drm_modeset_acquire_ctx *ctx,
+			     struct drm_atomic_state *state,
+			     unsigned int flags, int *ret)
+{
+	drm_modeset_acquire_init(ctx, flags);
+
+	if (state)
+		state->acquire_ctx = ctx;
+
+	*ret = -EDEADLK;
+}
+EXPORT_SYMBOL(_drm_modeset_lock_begin);
+
+bool _drm_modeset_lock_loop(int *ret)
+{
+	if (*ret == -EDEADLK) {
+		*ret = 0;
+		return true;
+	}
+
+	return false;
+}
+EXPORT_SYMBOL(_drm_modeset_lock_loop);
+
+void _drm_modeset_lock_end(struct drm_modeset_acquire_ctx *ctx,
+			   struct drm_atomic_state *state,
+			   int *ret)
+{
+	if (*ret == -EDEADLK) {
+		if (state)
+			drm_atomic_state_clear(state);
+
+		*ret = drm_modeset_backoff(ctx);
+		if (*ret == 0) {
+			*ret = -EDEADLK;
+			return;
+		}
+	}
+
+	drm_modeset_drop_locks(ctx);
+	drm_modeset_acquire_fini(ctx);
+}
+EXPORT_SYMBOL(_drm_modeset_lock_end);
