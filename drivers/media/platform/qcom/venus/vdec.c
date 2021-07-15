@@ -1297,6 +1297,7 @@ static void vdec_buf_done(struct venus_inst *inst, unsigned int buf_type,
 	struct vb2_v4l2_buffer *vbuf;
 	struct vb2_buffer *vb;
 	unsigned int type;
+	struct intbuf *dpb_buf;
 
 	vdec_pm_touch(inst);
 
@@ -1306,8 +1307,18 @@ static void vdec_buf_done(struct venus_inst *inst, unsigned int buf_type,
 		type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
 
 	vbuf = venus_helper_find_buf(inst, type, tag);
-	if (!vbuf)
+	if (!vbuf) {
+		if (type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE &&
+		    buf_type == HFI_BUFFER_OUTPUT) {
+			list_for_each_entry(dpb_buf, &inst->dpbbufs, list) {
+				if (dpb_buf->dpb_out_tag == tag) {
+					dpb_buf->owned_by = DRIVER;
+					break;
+				}
+			}
+		}
 		return;
+	}
 
 	vbuf->flags = flags;
 	vbuf->field = V4L2_FIELD_NONE;
@@ -1542,6 +1553,14 @@ static int m2m_queue_init(void *priv, struct vb2_queue *src_vq,
 	return vb2_queue_init(dst_vq);
 }
 
+void dpb_out_tag_init(struct venus_inst *inst)
+{
+	u32 i;
+
+	for (i = 0; i < VB2_MAX_FRAME; i++)
+		inst->dpb_out_tag[i] = 0;
+}
+
 static int vdec_open(struct file *file)
 {
 	struct venus_core *core = video_drvdata(file);
@@ -1579,6 +1598,8 @@ static int vdec_open(struct file *file)
 		goto err_ctrl_deinit;
 
 	vdec_inst_init(inst);
+
+	dpb_out_tag_init(inst);
 
 	/*
 	 * create m2m device for every instance, the m2m context scheduling
@@ -1622,6 +1643,8 @@ static int vdec_close(struct file *file)
 
 	vdec_pm_get(inst);
 
+	venus_helper_free_dpb_bufs(inst);
+	INIT_LIST_HEAD(&inst->dpbbufs);
 	v4l2_m2m_ctx_release(inst->m2m_ctx);
 	v4l2_m2m_release(inst->m2m_dev);
 	vdec_ctrl_deinit(inst);
