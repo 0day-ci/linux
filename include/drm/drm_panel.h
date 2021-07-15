@@ -144,8 +144,9 @@ struct drm_panel {
 	 * Backlight device, used to turn on backlight after the call
 	 * to enable(), and to turn off backlight before the call to
 	 * disable().
-	 * backlight is set by drm_panel_of_backlight() and drivers
-	 * shall not assign it.
+	 * External backlight is assigned by drm_panel_of_backlight() while
+	 * panel-internal backlight is assigned directly to this member by the
+	 * panel driver.
 	 */
 	struct backlight_device *backlight;
 
