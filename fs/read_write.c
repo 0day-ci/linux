@@ -422,7 +422,7 @@ static ssize_t new_sync_read(struct file *filp, char __user *buf, size_t len, lo
 static int warn_unsupported(struct file *file, const char *op)
 {
 	pr_warn_ratelimited(
-		"kernel %s not supported for file %pD4 (pid: %d comm: %.20s)\n",
+		"kernel %s not supported for file %pD (pid: %d comm: %.20s)\n",
 		op, file, current->pid, current->comm);
 	return -EINVAL;
 }

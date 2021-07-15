@@ -811,7 +811,7 @@ int setup_arg_pages(struct linux_binprm *bprm,
 	BUG_ON(prev != vma);
 
 	if (unlikely(vm_flags & VM_EXEC)) {
-		pr_warn_once("process '%pD4' started with executable stack\n",
+		pr_warn_once("process '%pD' started with executable stack\n",
 			     bprm->file);
 	}
 
