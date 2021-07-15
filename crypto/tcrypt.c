@@ -22,6 +22,7 @@
 #include <crypto/aead.h>
 #include <crypto/hash.h>
 #include <crypto/skcipher.h>
+#include <kunit/test.h>
 #include <linux/err.h>
 #include <linux/fips.h>
 #include <linux/init.h>
@@ -1652,7 +1653,7 @@ static void test_available(void)
 	}
 }
 
-static inline int tcrypt_test(const char *alg)
+static inline void tcrypt_test(struct kunit *test, const char *alg)
 {
 	int ret;
 
@@ -1662,376 +1663,376 @@ static inline int tcrypt_test(const char *alg)
 	/* non-fips algs return -EINVAL in fips mode */
 	if (fips_enabled && ret == -EINVAL)
 		ret = 0;
-	return ret;
+	KUNIT_EXPECT_EQ_MSG(test, ret, 0, "alg_test(%s) failed", alg);
 }
 
-static int do_test(const char *alg, u32 type, u32 mask, int m, u32 num_mb)
+static void do_test(struct kunit *test, const char *alg, u32 type, u32 mask,
+		    int m, u32 num_mb)
 {
 	int i;
-	int ret = 0;
 
 	switch (m) {
 	case 0:
 		if (alg) {
 			if (!crypto_has_alg(alg, type,
 					    mask ?: CRYPTO_ALG_TYPE_MASK))
-				ret = -ENOENT;
+				KUNIT_FAIL(test, "don't have alg '%s'", alg);
 			break;
 		}
 
 		for (i = 1; i < 200; i++)
-			ret += do_test(NULL, 0, 0, i, num_mb);
+			do_test(test, NULL, 0, 0, i, num_mb);
 		break;
 
 	case 1:
-		ret += tcrypt_test("md5");
+		tcrypt_test(test, "md5");
 		break;
 
 	case 2:
-		ret += tcrypt_test("sha1");
+		tcrypt_test(test, "sha1");
 		break;
 
 	case 3:
-		ret += tcrypt_test("ecb(des)");
-		ret += tcrypt_test("cbc(des)");
-		ret += tcrypt_test("ctr(des)");
+		tcrypt_test(test, "ecb(des)");
+		tcrypt_test(test, "cbc(des)");
+		tcrypt_test(test, "ctr(des)");
 		break;
 
 	case 4:
-		ret += tcrypt_test("ecb(des3_ede)");
-		ret += tcrypt_test("cbc(des3_ede)");
-		ret += tcrypt_test("ctr(des3_ede)");
+		tcrypt_test(test, "ecb(des3_ede)");
+		tcrypt_test(test, "cbc(des3_ede)");
+		tcrypt_test(test, "ctr(des3_ede)");
 		break;
 
 	case 5:
-		ret += tcrypt_test("md4");
+		tcrypt_test(test, "md4");
 		break;
 
 	case 6:
-		ret += tcrypt_test("sha256");
+		tcrypt_test(test, "sha256");
 		break;
 
 	case 7:
-		ret += tcrypt_test("ecb(blowfish)");
-		ret += tcrypt_test("cbc(blowfish)");
-		ret += tcrypt_test("ctr(blowfish)");
+		tcrypt_test(test, "ecb(blowfish)");
+		tcrypt_test(test, "cbc(blowfish)");
+		tcrypt_test(test, "ctr(blowfish)");
 		break;
 
 	case 8:
-		ret += tcrypt_test("ecb(twofish)");
-		ret += tcrypt_test("cbc(twofish)");
-		ret += tcrypt_test("ctr(twofish)");
-		ret += tcrypt_test("lrw(twofish)");
-		ret += tcrypt_test("xts(twofish)");
+		tcrypt_test(test, "ecb(twofish)");
+		tcrypt_test(test, "cbc(twofish)");
+		tcrypt_test(test, "ctr(twofish)");
+		tcrypt_test(test, "lrw(twofish)");
+		tcrypt_test(test, "xts(twofish)");
 		break;
 
 	case 9:
-		ret += tcrypt_test("ecb(serpent)");
-		ret += tcrypt_test("cbc(serpent)");
-		ret += tcrypt_test("ctr(serpent)");
-		ret += tcrypt_test("lrw(serpent)");
-		ret += tcrypt_test("xts(serpent)");
+		tcrypt_test(test, "ecb(serpent)");
+		tcrypt_test(test, "cbc(serpent)");
+		tcrypt_test(test, "ctr(serpent)");
+		tcrypt_test(test, "lrw(serpent)");
+		tcrypt_test(test, "xts(serpent)");
 		break;
 
 	case 10:
-		ret += tcrypt_test("ecb(aes)");
-		ret += tcrypt_test("cbc(aes)");
-		ret += tcrypt_test("lrw(aes)");
-		ret += tcrypt_test("xts(aes)");
-		ret += tcrypt_test("ctr(aes)");
-		ret += tcrypt_test("rfc3686(ctr(aes))");
-		ret += tcrypt_test("ofb(aes)");
-		ret += tcrypt_test("cfb(aes)");
+		tcrypt_test(test, "ecb(aes)");
+		tcrypt_test(test, "cbc(aes)");
+		tcrypt_test(test, "lrw(aes)");
+		tcrypt_test(test, "xts(aes)");
+		tcrypt_test(test, "ctr(aes)");
+		tcrypt_test(test, "rfc3686(ctr(aes))");
+		tcrypt_test(test, "ofb(aes)");
+		tcrypt_test(test, "cfb(aes)");
 		break;
 
 	case 11:
-		ret += tcrypt_test("sha384");
+		tcrypt_test(test, "sha384");
 		break;
 
 	case 12:
-		ret += tcrypt_test("sha512");
+		tcrypt_test(test, "sha512");
 		break;
 
 	case 13:
-		ret += tcrypt_test("deflate");
+		tcrypt_test(test, "deflate");
 		break;
 
 	case 14:
-		ret += tcrypt_test("ecb(cast5)");
-		ret += tcrypt_test("cbc(cast5)");
-		ret += tcrypt_test("ctr(cast5)");
+		tcrypt_test(test, "ecb(cast5)");
+		tcrypt_test(test, "cbc(cast5)");
+		tcrypt_test(test, "ctr(cast5)");
 		break;
 
 	case 15:
-		ret += tcrypt_test("ecb(cast6)");
-		ret += tcrypt_test("cbc(cast6)");
-		ret += tcrypt_test("ctr(cast6)");
-		ret += tcrypt_test("lrw(cast6)");
-		ret += tcrypt_test("xts(cast6)");
+		tcrypt_test(test, "ecb(cast6)");
+		tcrypt_test(test, "cbc(cast6)");
+		tcrypt_test(test, "ctr(cast6)");
+		tcrypt_test(test, "lrw(cast6)");
+		tcrypt_test(test, "xts(cast6)");
 		break;
 
 	case 16:
-		ret += tcrypt_test("ecb(arc4)");
+		tcrypt_test(test, "ecb(arc4)");
 		break;
 
 	case 17:
-		ret += tcrypt_test("michael_mic");
+		tcrypt_test(test, "michael_mic");
 		break;
 
 	case 18:
-		ret += tcrypt_test("crc32c");
+		tcrypt_test(test, "crc32c");
 		break;
 
 	case 19:
-		ret += tcrypt_test("ecb(tea)");
+		tcrypt_test(test, "ecb(tea)");
 		break;
 
 	case 20:
-		ret += tcrypt_test("ecb(xtea)");
+		tcrypt_test(test, "ecb(xtea)");
 		break;
 
 	case 21:
-		ret += tcrypt_test("ecb(khazad)");
+		tcrypt_test(test, "ecb(khazad)");
 		break;
 
 	case 22:
-		ret += tcrypt_test("wp512");
+		tcrypt_test(test, "wp512");
 		break;
 
 	case 23:
-		ret += tcrypt_test("wp384");
+		tcrypt_test(test, "wp384");
 		break;
 
 	case 24:
-		ret += tcrypt_test("wp256");
+		tcrypt_test(test, "wp256");
 		break;
 
 	case 26:
-		ret += tcrypt_test("ecb(anubis)");
-		ret += tcrypt_test("cbc(anubis)");
+		tcrypt_test(test, "ecb(anubis)");
+		tcrypt_test(test, "cbc(anubis)");
 		break;
 
 	case 30:
-		ret += tcrypt_test("ecb(xeta)");
+		tcrypt_test(test, "ecb(xeta)");
 		break;
 
 	case 31:
-		ret += tcrypt_test("pcbc(fcrypt)");
+		tcrypt_test(test, "pcbc(fcrypt)");
 		break;
 
 	case 32:
-		ret += tcrypt_test("ecb(camellia)");
-		ret += tcrypt_test("cbc(camellia)");
-		ret += tcrypt_test("ctr(camellia)");
-		ret += tcrypt_test("lrw(camellia)");
-		ret += tcrypt_test("xts(camellia)");
+		tcrypt_test(test, "ecb(camellia)");
+		tcrypt_test(test, "cbc(camellia)");
+		tcrypt_test(test, "ctr(camellia)");
+		tcrypt_test(test, "lrw(camellia)");
+		tcrypt_test(test, "xts(camellia)");
 		break;
 
 	case 33:
-		ret += tcrypt_test("sha224");
+		tcrypt_test(test, "sha224");
 		break;
 
 	case 35:
-		ret += tcrypt_test("gcm(aes)");
+		tcrypt_test(test, "gcm(aes)");
 		break;
 
 	case 36:
-		ret += tcrypt_test("lzo");
+		tcrypt_test(test, "lzo");
 		break;
 
 	case 37:
-		ret += tcrypt_test("ccm(aes)");
+		tcrypt_test(test, "ccm(aes)");
 		break;
 
 	case 38:
-		ret += tcrypt_test("cts(cbc(aes))");
+		tcrypt_test(test, "cts(cbc(aes))");
 		break;
 
         case 39:
-		ret += tcrypt_test("xxhash64");
+		tcrypt_test(test, "xxhash64");
 		break;
 
         case 40:
-		ret += tcrypt_test("rmd160");
+		tcrypt_test(test, "rmd160");
 		break;
 
 	case 41:
-		ret += tcrypt_test("blake2s-256");
+		tcrypt_test(test, "blake2s-256");
 		break;
 
 	case 42:
-		ret += tcrypt_test("blake2b-512");
+		tcrypt_test(test, "blake2b-512");
 		break;
 
 	case 43:
-		ret += tcrypt_test("ecb(seed)");
+		tcrypt_test(test, "ecb(seed)");
 		break;
 
 	case 45:
-		ret += tcrypt_test("rfc4309(ccm(aes))");
+		tcrypt_test(test, "rfc4309(ccm(aes))");
 		break;
 
 	case 46:
-		ret += tcrypt_test("ghash");
+		tcrypt_test(test, "ghash");
 		break;
 
 	case 47:
-		ret += tcrypt_test("crct10dif");
+		tcrypt_test(test, "crct10dif");
 		break;
 
 	case 48:
-		ret += tcrypt_test("sha3-224");
+		tcrypt_test(test, "sha3-224");
 		break;
 
 	case 49:
-		ret += tcrypt_test("sha3-256");
+		tcrypt_test(test, "sha3-256");
 		break;
 
 	case 50:
-		ret += tcrypt_test("sha3-384");
+		tcrypt_test(test, "sha3-384");
 		break;
 
 	case 51:
-		ret += tcrypt_test("sha3-512");
+		tcrypt_test(test, "sha3-512");
 		break;
 
 	case 52:
-		ret += tcrypt_test("sm3");
+		tcrypt_test(test, "sm3");
 		break;
 
 	case 53:
-		ret += tcrypt_test("streebog256");
+		tcrypt_test(test, "streebog256");
 		break;
 
 	case 54:
-		ret += tcrypt_test("streebog512");
+		tcrypt_test(test, "streebog512");
 		break;
 
 	case 100:
-		ret += tcrypt_test("hmac(md5)");
+		tcrypt_test(test, "hmac(md5)");
 		break;
 
 	case 101:
-		ret += tcrypt_test("hmac(sha1)");
+		tcrypt_test(test, "hmac(sha1)");
 		break;
 
 	case 102:
-		ret += tcrypt_test("hmac(sha256)");
+		tcrypt_test(test, "hmac(sha256)");
 		break;
 
 	case 103:
-		ret += tcrypt_test("hmac(sha384)");
+		tcrypt_test(test, "hmac(sha384)");
 		break;
 
 	case 104:
-		ret += tcrypt_test("hmac(sha512)");
+		tcrypt_test(test, "hmac(sha512)");
 		break;
 
 	case 105:
-		ret += tcrypt_test("hmac(sha224)");
+		tcrypt_test(test, "hmac(sha224)");
 		break;
 
 	case 106:
-		ret += tcrypt_test("xcbc(aes)");
+		tcrypt_test(test, "xcbc(aes)");
 		break;
 
 	case 108:
-		ret += tcrypt_test("hmac(rmd160)");
+		tcrypt_test(test, "hmac(rmd160)");
 		break;
 
 	case 109:
-		ret += tcrypt_test("vmac64(aes)");
+		tcrypt_test(test, "vmac64(aes)");
 		break;
 
 	case 111:
-		ret += tcrypt_test("hmac(sha3-224)");
+		tcrypt_test(test, "hmac(sha3-224)");
 		break;
 
 	case 112:
-		ret += tcrypt_test("hmac(sha3-256)");
+		tcrypt_test(test, "hmac(sha3-256)");
 		break;
 
 	case 113:
-		ret += tcrypt_test("hmac(sha3-384)");
+		tcrypt_test(test, "hmac(sha3-384)");
 		break;
 
 	case 114:
-		ret += tcrypt_test("hmac(sha3-512)");
+		tcrypt_test(test, "hmac(sha3-512)");
 		break;
 
 	case 115:
-		ret += tcrypt_test("hmac(streebog256)");
+		tcrypt_test(test, "hmac(streebog256)");
 		break;
 
 	case 116:
-		ret += tcrypt_test("hmac(streebog512)");
+		tcrypt_test(test, "hmac(streebog512)");
 		break;
 
 	case 150:
-		ret += tcrypt_test("ansi_cprng");
+		tcrypt_test(test, "ansi_cprng");
 		break;
 
 	case 151:
-		ret += tcrypt_test("rfc4106(gcm(aes))");
+		tcrypt_test(test, "rfc4106(gcm(aes))");
 		break;
 
 	case 152:
-		ret += tcrypt_test("rfc4543(gcm(aes))");
+		tcrypt_test(test, "rfc4543(gcm(aes))");
 		break;
 
 	case 153:
-		ret += tcrypt_test("cmac(aes)");
+		tcrypt_test(test, "cmac(aes)");
 		break;
 
 	case 154:
-		ret += tcrypt_test("cmac(des3_ede)");
+		tcrypt_test(test, "cmac(des3_ede)");
 		break;
 
 	case 155:
-		ret += tcrypt_test("authenc(hmac(sha1),cbc(aes))");
+		tcrypt_test(test, "authenc(hmac(sha1),cbc(aes))");
 		break;
 
 	case 156:
-		ret += tcrypt_test("authenc(hmac(md5),ecb(cipher_null))");
+		tcrypt_test(test, "authenc(hmac(md5),ecb(cipher_null))");
 		break;
 
 	case 157:
-		ret += tcrypt_test("authenc(hmac(sha1),ecb(cipher_null))");
+		tcrypt_test(test, "authenc(hmac(sha1),ecb(cipher_null))");
 		break;
 	case 181:
-		ret += tcrypt_test("authenc(hmac(sha1),cbc(des))");
+		tcrypt_test(test, "authenc(hmac(sha1),cbc(des))");
 		break;
 	case 182:
-		ret += tcrypt_test("authenc(hmac(sha1),cbc(des3_ede))");
+		tcrypt_test(test, "authenc(hmac(sha1),cbc(des3_ede))");
 		break;
 	case 183:
-		ret += tcrypt_test("authenc(hmac(sha224),cbc(des))");
+		tcrypt_test(test, "authenc(hmac(sha224),cbc(des))");
 		break;
 	case 184:
-		ret += tcrypt_test("authenc(hmac(sha224),cbc(des3_ede))");
+		tcrypt_test(test, "authenc(hmac(sha224),cbc(des3_ede))");
 		break;
 	case 185:
-		ret += tcrypt_test("authenc(hmac(sha256),cbc(des))");
+		tcrypt_test(test, "authenc(hmac(sha256),cbc(des))");
 		break;
 	case 186:
-		ret += tcrypt_test("authenc(hmac(sha256),cbc(des3_ede))");
+		tcrypt_test(test, "authenc(hmac(sha256),cbc(des3_ede))");
 		break;
 	case 187:
-		ret += tcrypt_test("authenc(hmac(sha384),cbc(des))");
+		tcrypt_test(test, "authenc(hmac(sha384),cbc(des))");
 		break;
 	case 188:
-		ret += tcrypt_test("authenc(hmac(sha384),cbc(des3_ede))");
+		tcrypt_test(test, "authenc(hmac(sha384),cbc(des3_ede))");
 		break;
 	case 189:
-		ret += tcrypt_test("authenc(hmac(sha512),cbc(des))");
+		tcrypt_test(test, "authenc(hmac(sha512),cbc(des))");
 		break;
 	case 190:
-		ret += tcrypt_test("authenc(hmac(sha512),cbc(des3_ede))");
+		tcrypt_test(test, "authenc(hmac(sha512),cbc(des3_ede))");
 		break;
 	case 191:
-		ret += tcrypt_test("ecb(sm4)");
-		ret += tcrypt_test("cbc(sm4)");
-		ret += tcrypt_test("ctr(sm4)");
+		tcrypt_test(test, "ecb(sm4)");
+		tcrypt_test(test, "cbc(sm4)");
+		tcrypt_test(test, "ctr(sm4)");
 		break;
 	case 200:
 		test_cipher_speed("ecb(aes)", ENCRYPT, sec, NULL, 0,
@@ -2973,55 +2974,35 @@ static int do_test(const char *alg, u32 type, u32 mask, int m, u32 num_mb)
 		test_available();
 		break;
 	}
-
-	return ret;
 }
 
-static int __init tcrypt_mod_init(void)
+static void tcrypt(struct kunit *test)
 {
-	int err = -ENOMEM;
 	int i;
 
 	for (i = 0; i < TVMEMSIZE; i++) {
-		tvmem[i] = (void *)__get_free_page(GFP_KERNEL);
-		if (!tvmem[i])
-			goto err_free_tv;
+		// TODO: is this properly equivalent to __get_free_page?
+		// Or do they really really need these to be individual pages???
+		tvmem[i] = kunit_kmalloc(test, PAGE_SIZE, GFP_KERNEL);
+		KUNIT_ASSERT_NOT_ERR_OR_NULL(test, tvmem[i]);
 	}
 
-	err = do_test(alg, type, mask, mode, num_mb);
-
-	if (err) {
-		printk(KERN_ERR "tcrypt: one or more tests failed!\n");
-		goto err_free_tv;
-	} else {
-		pr_debug("all tests passed\n");
-	}
-
-	/* We intentionaly return -EAGAIN to prevent keeping the module,
-	 * unless we're running in fips mode. It does all its work from
-	 * init() and doesn't offer any runtime functionality, but in
-	 * the fips case, checking for a successful load is helpful.
-	 * => we don't need it in the memory, do we?
-	 *                                        -- mludvig
-	 */
-	if (!fips_enabled)
-		err = -EAGAIN;
-
-err_free_tv:
-	for (i = 0; i < TVMEMSIZE && tvmem[i]; i++)
-		free_page((unsigned long)tvmem[i]);
-
-	return err;
+	do_test(test, alg, type, mask, mode, num_mb);
+	// TODO: I don't think we need to return -EAGAIN if !fips_enabled, do
+	// we?
 }
 
-/*
- * If an init function is provided, an exit function must also be provided
- * to allow module unload.
- */
-static void __exit tcrypt_mod_fini(void) { }
+static struct kunit_case crypto_test_cases[] = {
+	KUNIT_CASE(tcrypt),
+	{}
+};
 
-late_initcall(tcrypt_mod_init);
-module_exit(tcrypt_mod_fini);
+static struct kunit_suite crypto_test_suite = {
+	.name = "tcrypt",
+	.test_cases = crypto_test_cases,
+};
+
+kunit_test_suites(&crypto_test_suite);
 
 module_param(alg, charp, 0);
 module_param(type, uint, 0);

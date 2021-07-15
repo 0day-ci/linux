@@ -200,9 +200,8 @@ config CRYPTO_AUTHENC
 	  This is required for IPSec.
 
 config CRYPTO_TEST
-	tristate "Testing module"
-	depends on m || EXPERT
-	select CRYPTO_MANAGER
+	tristate "Testing module" if !KUNIT_ALL_TESTS
+	depends on CRYPTO_MANAGER && KUNIT
 	help
 	  Quick & dirty crypto test module.
 
