@@ -738,7 +738,8 @@ static bool log_access_ok(void __user *log_base, u64 addr, unsigned long sz)
 static bool vhost_overflow(u64 uaddr, u64 size)
 {
 	/* Make sure 64 bit math will not overflow. */
-	return uaddr > ULONG_MAX || size > ULONG_MAX || uaddr > ULONG_MAX - size;
+	return uaddr > ULONG_MAX || size > ULONG_MAX ||
+	       uaddr - 1 > ULONG_MAX - size;
 }
 
 /* Caller should have vq mutex and device mutex. */
