@@ -222,6 +222,7 @@ iomap_read_inline_data(struct inode *inode, struct page *page,
 	memcpy(addr, iomap->inline_data, size);
 	memset(addr + size, 0, PAGE_SIZE - size);
 	kunmap_atomic(addr);
+	flush_dcache_page(page);
 	SetPageUptodate(page);
 }
 
