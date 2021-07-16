@@ -33,7 +33,7 @@ void phy_led_trigger_change_speed(struct phy_device *phy)
 	if (!phy->link)
 		return phy_led_trigger_no_link(phy);
 
-	if (phy->speed == 0)
+	if (phy->speed == 0 || phy->speed == SPEED_UNKNOWN)
 		return;
 
 	plt = phy_speed_to_led_trigger(phy, phy->speed);
