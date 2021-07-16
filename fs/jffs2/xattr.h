@@ -14,6 +14,7 @@
 
 #include <linux/xattr.h>
 #include <linux/list.h>
+#include <linux/refcount.h>
 
 #define JFFS2_XFLAGS_HOT	(0x01)	/* This datum is HOT */
 #define JFFS2_XFLAGS_BIND	(0x02)	/* This datum is not reclaimed */
@@ -29,7 +30,7 @@ struct jffs2_xattr_datum
 	uint16_t xprefix;		/* see JFFS2_XATTR_PREFIX_* */
 
 	struct list_head xindex;	/* chained from c->xattrindex[n] */
-	atomic_t refcnt;		/* # of xattr_ref refers this */
+	refcount_t refcnt;		/* # of xattr_ref refers this */
 	uint32_t xid;
 	uint32_t version;
 

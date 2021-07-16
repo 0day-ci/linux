@@ -352,7 +352,7 @@ static struct jffs2_xattr_datum *create_xattr_datum(struct jffs2_sb_info *c,
 		    && xd->value_len==xsize
 		    && !strcmp(xd->xname, xname)
 		    && !memcmp(xd->xvalue, xvalue, xsize)) {
-			atomic_inc(&xd->refcnt);
+			refcount_inc(&xd->refcnt);
 			return xd;
 		}
 	}
@@ -372,7 +372,7 @@ static struct jffs2_xattr_datum *create_xattr_datum(struct jffs2_sb_info *c,
 	strcpy(data, xname);
 	memcpy(data + name_len + 1, xvalue, xsize);
 
-	atomic_set(&xd->refcnt, 1);
+	refcount_set(&xd->refcnt, 1);
 	xd->xid = ++c->highest_xid;
 	xd->flags |= JFFS2_XFLAGS_HOT;
 	xd->xprefix = xprefix;
@@ -404,7 +404,7 @@ static struct jffs2_xattr_datum *create_xattr_datum(struct jffs2_sb_info *c,
 static void unrefer_xattr_datum(struct jffs2_sb_info *c, struct jffs2_xattr_datum *xd)
 {
 	/* must be called under down_write(xattr_sem) */
-	if (atomic_dec_and_lock(&xd->refcnt, &c->erase_completion_lock)) {
+	if (refcount_dec_and_lock(&xd->refcnt, &c->erase_completion_lock)) {
 		unload_xattr_datum(c, xd);
 		xd->flags |= JFFS2_XFLAGS_DEAD;
 		if (xd->node == (void *)xd) {
@@ -621,7 +621,7 @@ void jffs2_xattr_free_inode(struct jffs2_sb_info *c, struct jffs2_inode_cache *i
 	for (ref = ic->xref; ref; ref = _ref) {
 		_ref = ref->next;
 		xd = ref->xd;
-		if (atomic_dec_and_test(&xd->refcnt)) {
+		if (refcount_dec_and_test(&xd->refcnt)) {
 			unload_xattr_datum(c, xd);
 			jffs2_free_xattr_datum(xd);
 		}
@@ -851,7 +851,7 @@ void jffs2_build_xattr_subsystem(struct jffs2_sb_info *c)
 			}
 			ref->xd = xd;
 			ref->ic = ic;
-			atomic_inc(&xd->refcnt);
+			refcount_inc(&xd->refcnt);
 			ref->next = ic->xref;
 			ic->xref = ref;
 		}
@@ -862,7 +862,7 @@ void jffs2_build_xattr_subsystem(struct jffs2_sb_info *c)
 		list_for_each_entry_safe(xd, _xd, &c->xattrindex[i], xindex) {
 			xdatum_count++;
 			list_del_init(&xd->xindex);
-			if (!atomic_read(&xd->refcnt)) {
+			if (!refcount_read(&xd->refcnt)) {
 				dbg_xattr("xdatum(xid=%u, version=%u) is orphan.\n",
 					  xd->xid, xd->version);
 				xd->flags |= JFFS2_XFLAGS_DEAD;
@@ -1322,7 +1322,7 @@ int jffs2_verify_xattr(struct jffs2_sb_info *c)
 void jffs2_release_xattr_datum(struct jffs2_sb_info *c, struct jffs2_xattr_datum *xd)
 {
 	/* must be called under spin_lock(&c->erase_completion_lock) */
-	if (atomic_read(&xd->refcnt) || xd->node != (void *)xd)
+	if (refcount_read(&xd->refcnt) || xd->node != (void *)xd)
 		return;
 
 	list_del(&xd->xindex);
