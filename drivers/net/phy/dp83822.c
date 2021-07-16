@@ -72,6 +72,10 @@
 #define DP83822_ANEG_ERR_INT_EN		BIT(6)
 #define DP83822_EEE_ERROR_CHANGE_INT_EN	BIT(7)
 
+/* RCSR bits */
+#define DP83822_RGMII_RX_CLOCK_SHIFT	BIT(12)
+#define DP83822_RGMII_TX_CLOCK_SHIFT	BIT(11)
+
 /* INT_STAT1 bits */
 #define DP83822_WOL_INT_EN	BIT(4)
 #define DP83822_WOL_INT_STAT	BIT(12)
@@ -326,11 +330,36 @@ static irqreturn_t dp83822_handle_interrupt(struct phy_device *phydev)
 
 static int dp8382x_disable_wol(struct phy_device *phydev)
 {
-	int value = DP83822_WOL_EN | DP83822_WOL_MAGIC_EN |
-		    DP83822_WOL_SECURE_ON;
+	u16 val = DP83822_WOL_EN | DP83822_WOL_MAGIC_EN | DP83822_WOL_SECURE_ON;
 
-	return phy_clear_bits_mmd(phydev, DP83822_DEVADDR,
-				  MII_DP83822_WOL_CFG, value);
+	ret = phy_clear_bits_mmd(phydev, DP83822_DEVADDR,
+				 MII_DP83822_WOL_CFG, val);
+	if (ret < 0)
+		return ret;
+
+	if (phydev->interface == PHY_INTERFACE_MODE_RGMII_ID ||
+	    phydev->interface == PHY_INTERFACE_MODE_RGMII_RXID) {
+		ret = phy_modify_mmd(phydev, DP83822_DEVADDR, MII_DP83822_RCSR,
+				     DP83822_RGMII_RX_CLOCK_SHIFT,
+				     DP83822_RGMII_RX_CLOCK_SHIFT);
+	} else {
+		ret = phy_modify_mmd(phydev, DP83822_DEVADDR, MII_DP83822_RCSR,
+				     DP83822_RGMII_RX_CLOCK_SHIFT, 0);
+	}
+	if (ret < 0)
+		return ret;
+
+	if (phydev->interface == PHY_INTERFACE_MODE_RGMII_ID ||
+	    phydev->interface == PHY_INTERFACE_MODE_RGMII_TXID) {
+		ret = phy_modify_mmd(phydev, DP83822_DEVADDR, MII_DP83822_RCSR,
+				     DP83822_RGMII_TX_CLOCK_SHIFT,
+				     DP83822_RGMII_TX_CLOCK_SHIFT);
+	} else {
+		ret = phy_modify_mmd(phydev, DP83822_DEVADDR, MII_DP83822_RCSR,
+				     DP83822_RGMII_TX_CLOCK_SHIFT, 0);
+	}
+
+	return ret;
 }
 
 static int dp83822_read_status(struct phy_device *phydev)
