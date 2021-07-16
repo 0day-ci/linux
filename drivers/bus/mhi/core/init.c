@@ -1065,7 +1065,7 @@ int mhi_prepare_for_power_up(struct mhi_controller *mhi_cntrl)
 {
 	struct device *dev = &mhi_cntrl->mhi_dev->dev;
 	u32 bhi_off, bhie_off;
-	int ret;
+	int i, ret;
 
 	mutex_lock(&mhi_cntrl->pm_mutex);
 
@@ -1123,6 +1123,21 @@ int mhi_prepare_for_power_up(struct mhi_controller *mhi_cntrl)
 	}
 
 	mutex_unlock(&mhi_cntrl->pm_mutex);
+
+	/* save hardware info from BHI */
+	ret = mhi_read_reg(mhi_cntrl, mhi_cntrl->bhi, BHI_SERIALNU,
+			   &mhi_cntrl->serial_number);
+	if (ret)
+		dev_err(dev, "Could not capture serial number via BHI\n");
+
+	for (i = 0; i < ARRAY_SIZE(mhi_cntrl->oem_pk_hash); i++) {
+		ret = mhi_read_reg(mhi_cntrl, mhi_cntrl->bhi, BHI_OEMPKHASH(i),
+				   &mhi_cntrl->oem_pk_hash[i]);
+		if (ret) {
+			dev_err(dev, "Could not capture OEM PK HASH via BHI\n");
+			break;
+		}
+	}
 
 	return 0;
 
