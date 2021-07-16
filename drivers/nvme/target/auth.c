@@ -13,6 +13,8 @@
 #include <crypto/kpp.h>
 #include <crypto/dh.h>
 #include <crypto/ffdhe.h>
+#include <crypto/ecdh.h>
+#include <crypto/curve25519.h>
 #include <linux/crc32.h>
 #include <linux/base64.h>
 #include <linux/ctype.h>
@@ -498,6 +500,27 @@ int nvmet_auth_ctrl_exponential(struct nvmet_req *req,
 				 ret);
 			goto out;
 		}
+	} else if (ctrl->dh_gid == NVME_AUTH_DHCHAP_DHGROUP_ECDH) {
+		struct ecdh p = {0};
+
+		pkey_len = crypto_ecdh_key_len(&p);
+		pkey = kmalloc(pkey_len, GFP_KERNEL);
+		if (!pkey)
+			return -ENOMEM;
+
+		get_random_bytes(pkey, pkey_len);
+		ret = crypto_ecdh_encode_key(pkey, pkey_len, &p);
+		if (ret) {
+			pr_debug("failed to encode private key, error %d\n",
+				 ret);
+			goto out;
+		}
+	} else if (ctrl->dh_gid == NVME_AUTH_DHCHAP_DHGROUP_25519) {
+		pkey_len = CURVE25519_KEY_SIZE;
+		pkey = kmalloc(pkey_len, GFP_KERNEL);
+		if (!pkey)
+			return -ENOMEM;
+		get_random_bytes(pkey, pkey_len);
 	} else {
 		pr_warn("invalid dh group %d\n", ctrl->dh_gid);
 		return -EINVAL;
