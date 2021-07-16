@@ -156,7 +156,7 @@ static int igt_vma_create(void *arg)
 	IGT_TIMEOUT(end_time);
 	LIST_HEAD(contexts);
 	LIST_HEAD(objects);
-	int err = -ENOMEM;
+	int err;
 
 	/* Exercise creating many vma amonst many objections, checking the
 	 * vma creation and lookup routines.
@@ -166,8 +166,10 @@ static int igt_vma_create(void *arg)
 	for_each_prime_number(num_obj, ULONG_MAX - 1) {
 		for (; no < num_obj; no++) {
 			obj = i915_gem_object_create_internal(i915, PAGE_SIZE);
-			if (IS_ERR(obj))
+			if (IS_ERR(obj)) {
+				err = PTR_ERR(obj);
 				goto out;
+			}
 
 			list_add(&obj->st_link, &objects);
 		}
@@ -176,8 +178,10 @@ static int igt_vma_create(void *arg)
 		for_each_prime_number(num_ctx, 2 * BITS_PER_LONG) {
 			for (; nc < num_ctx; nc++) {
 				ctx = mock_context(i915, "mock");
-				if (!ctx)
+				if (!ctx) {
+					err = -ENOMEM;
 					goto out;
+				}
 
 				list_move(&ctx->link, &contexts);
 			}
