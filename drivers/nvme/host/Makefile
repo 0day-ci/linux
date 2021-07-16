@@ -20,6 +20,7 @@ nvme-core-$(CONFIG_NVME_HWMON)		+= hwmon.o
 nvme-y					+= pci.o
 
 nvme-fabrics-y				+= fabrics.o
+nvme-fabrics-$(CONFIG_NVME_AUTH)	+= auth.o
 
 nvme-rdma-y				+= rdma.o
 

@@ -85,3 +85,14 @@ config NVME_TCP
 	  from https://github.com/linux-nvme/nvme-cli.
 
 	  If unsure, say N.
+
+config NVME_AUTH
+	bool "NVM Express over Fabrics In-Band Authentication"
+	depends on NVME_TCP
+	select CRYPTO_SHA256
+	select CRYPTO_SHA512
+	help
+	  This provides support for NVMe over Fabrics In-Band Authentication
+	  for the NVMe over TCP transport.
+
+	  If unsure, say N.

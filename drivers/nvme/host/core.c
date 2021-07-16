@@ -708,7 +708,9 @@ bool __nvme_check_ready(struct nvme_ctrl *ctrl, struct request *rq,
 		switch (ctrl->state) {
 		case NVME_CTRL_CONNECTING:
 			if (blk_rq_is_passthrough(rq) && nvme_is_fabrics(req->cmd) &&
-			    req->cmd->fabrics.fctype == nvme_fabrics_type_connect)
+			    (req->cmd->fabrics.fctype == nvme_fabrics_type_connect ||
+			     req->cmd->fabrics.fctype == nvme_fabrics_type_auth_send ||
+			     req->cmd->fabrics.fctype == nvme_fabrics_type_auth_receive))
 				return true;
 			break;
 		default:
@@ -3426,6 +3428,66 @@ static ssize_t nvme_ctrl_fast_io_fail_tmo_store(struct device *dev,
 static DEVICE_ATTR(fast_io_fail_tmo, S_IRUGO | S_IWUSR,
 	nvme_ctrl_fast_io_fail_tmo_show, nvme_ctrl_fast_io_fail_tmo_store);
 
+#ifdef CONFIG_NVME_AUTH
+struct nvmet_dhchap_hash_map {
+	int id;
+	const char name[15];
+} hash_map[] = {
+	{.id = NVME_AUTH_DHCHAP_HASH_SHA256,
+	 .name = "hmac(sha256)", },
+	{.id = NVME_AUTH_DHCHAP_HASH_SHA384,
+	 .name = "hmac(sha384)", },
+	{.id = NVME_AUTH_DHCHAP_HASH_SHA512,
+	 .name = "hmac(sha512)", },
+};
+
+static ssize_t dhchap_hash_show(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	struct nvme_ctrl *ctrl = dev_get_drvdata(dev);
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(hash_map); i++) {
+		if (hash_map[i].id == ctrl->dhchap_hash)
+			return sprintf(buf, "%s\n", hash_map[i].name);
+	}
+	return sprintf(buf, "none\n");
+}
+DEVICE_ATTR_RO(dhchap_hash);
+
+struct nvmet_dhchap_group_map {
+	int id;
+	const char name[15];
+} dhgroup_map[] = {
+	{.id = NVME_AUTH_DHCHAP_DHGROUP_NULL,
+	 .name = "NULL", },
+	{.id = NVME_AUTH_DHCHAP_DHGROUP_2048,
+	 .name = "ffdhe2048", },
+	{.id = NVME_AUTH_DHCHAP_DHGROUP_3072,
+	 .name = "ffdhe3072", },
+	{.id = NVME_AUTH_DHCHAP_DHGROUP_4096,
+	 .name = "ffdhe4096", },
+	{.id = NVME_AUTH_DHCHAP_DHGROUP_6144,
+	 .name = "ffdhe6144", },
+	{.id = NVME_AUTH_DHCHAP_DHGROUP_8192,
+	 .name = "ffdhe8192", },
+};
+
+static ssize_t dhchap_dhgroup_show(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	struct nvme_ctrl *ctrl = dev_get_drvdata(dev);
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(dhgroup_map); i++) {
+		if (hash_map[i].id == ctrl->dhchap_dhgroup)
+			return sprintf(buf, "%s\n", dhgroup_map[i].name);
+	}
+	return sprintf(buf, "none\n");
+}
+DEVICE_ATTR_RO(dhchap_dhgroup);
+#endif
+
 static struct attribute *nvme_dev_attrs[] = {
 	&dev_attr_reset_controller.attr,
 	&dev_attr_rescan_controller.attr,
@@ -3447,6 +3509,10 @@ static struct attribute *nvme_dev_attrs[] = {
 	&dev_attr_reconnect_delay.attr,
 	&dev_attr_fast_io_fail_tmo.attr,
 	&dev_attr_kato.attr,
+#ifdef CONFIG_NVME_AUTH
+	&dev_attr_dhchap_hash.attr,
+	&dev_attr_dhchap_dhgroup.attr,
+#endif
 	NULL
 };
 
@@ -3470,6 +3536,10 @@ static umode_t nvme_dev_attrs_are_visible(struct kobject *kobj,
 		return 0;
 	if (a == &dev_attr_fast_io_fail_tmo.attr && !ctrl->opts)
 		return 0;
+#ifdef CONFIG_NVME_AUTH
+	if (a == &dev_attr_dhchap_hash.attr && !ctrl->opts)
+		return 0;
+#endif
 
 	return a->mode;
 }
@@ -4581,6 +4651,11 @@ static inline void _nvme_check_size(void)
 	BUILD_BUG_ON(sizeof(struct nvme_smart_log) != 512);
 	BUILD_BUG_ON(sizeof(struct nvme_dbbuf) != 64);
 	BUILD_BUG_ON(sizeof(struct nvme_directive_cmd) != 64);
+	BUILD_BUG_ON(sizeof(struct nvmf_auth_dhchap_negotiate_data) != 8);
+	BUILD_BUG_ON(sizeof(struct nvmf_auth_dhchap_challenge_data) != 16);
+	BUILD_BUG_ON(sizeof(struct nvmf_auth_dhchap_reply_data) != 16);
+	BUILD_BUG_ON(sizeof(struct nvmf_auth_dhchap_success1_data) != 16);
+	BUILD_BUG_ON(sizeof(struct nvmf_auth_dhchap_success2_data) != 16);
 }
 
 

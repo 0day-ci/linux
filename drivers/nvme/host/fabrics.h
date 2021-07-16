@@ -67,6 +67,9 @@ enum {
 	NVMF_OPT_TOS		= 1 << 19,
 	NVMF_OPT_FAIL_FAST_TMO	= 1 << 20,
 	NVMF_OPT_HOST_IFACE	= 1 << 21,
+	NVMF_OPT_DHCHAP_SECRET	= 1 << 22,
+	NVMF_OPT_DHCHAP_AUTH	= 1 << 23,
+	NVMF_OPT_DHCHAP_GROUP	= 1 << 24,
 };
 
 /**
@@ -96,6 +99,8 @@ enum {
  * @max_reconnects: maximum number of allowed reconnect attempts before removing
  *              the controller, (-1) means reconnect forever, zero means remove
  *              immediately;
+ * @dhchap_secret: DH-HMAC-CHAP secret
+ * @dhchap_auth: DH-HMAC-CHAP authenticate controller
  * @disable_sqflow: disable controller sq flow control
  * @hdr_digest: generate/verify header digest (TCP)
  * @data_digest: generate/verify data digest (TCP)
@@ -120,6 +125,9 @@ struct nvmf_ctrl_options {
 	unsigned int		kato;
 	struct nvmf_host	*host;
 	int			max_reconnects;
+	char			*dhchap_secret;
+	int			dhchap_group;
+	bool			dhchap_auth;
 	bool			disable_sqflow;
 	bool			hdr_digest;
 	bool			data_digest;
