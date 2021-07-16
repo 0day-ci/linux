@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * HID driver for CMedia CM6533 audio jack controls
+ * and HS100B mute buttons
  *
  * Copyright (C) 2015 Ben Chen <ben_chen@bizlinktech.com>
+ * Copyright (C) 2021 Thomas Weißschuh <linux@weissschuh.net>
  */
 
 #include <linux/device.h>
@@ -11,12 +13,15 @@
 #include "hid-ids.h"
 
 MODULE_AUTHOR("Ben Chen");
-MODULE_DESCRIPTION("CM6533 HID jack controls");
+MODULE_AUTHOR("Thomas Weißschuh");
+MODULE_DESCRIPTION("CM6533 HID jack controls and HS100B mute button");
 MODULE_LICENSE("GPL");
 
 #define CM6533_JD_TYPE_COUNT      1
 #define CM6533_JD_RAWEV_LEN	 16
 #define CM6533_JD_SFX_OFFSET	  8
+
+#define HS100B_RDESC_ORIG_SIZE   60
 
 /*
 *
@@ -40,13 +45,51 @@ static int jack_switch_types[CM6533_JD_TYPE_COUNT] = {
 	SW_HEADPHONE_INSERT,
 };
 
-struct cmhid {
+struct cmhid_cm6533 {
 	struct input_dev *input_dev;
 	struct hid_device *hid;
 	unsigned short switch_map[CM6533_JD_TYPE_COUNT];
 };
 
-static void hp_ev(struct hid_device *hid, struct cmhid *cm, int value)
+/* Fixed report descriptor of HS-100B audio chip
+ * Bit 4 is an abolute Microphone mute usage instead of being unassigned.
+ */
+static __u8 hs100b_rdesc_fixed[] = {
+	0x05, 0x0C,         /*  Usage Page (Consumer),          */
+	0x09, 0x01,         /*  Usage (Consumer Control),       */
+	0xA1, 0x01,         /*  Collection (Application),       */
+	0x15, 0x00,         /*      Logical Minimum (0),        */
+	0x25, 0x01,         /*      Logical Maximum (1),        */
+	0x09, 0xE9,         /*      Usage (Volume Inc),         */
+	0x09, 0xEA,         /*      Usage (Volume Dec),         */
+	0x75, 0x01,         /*      Report Size (1),            */
+	0x95, 0x02,         /*      Report Count (2),           */
+	0x81, 0x02,         /*      Input (Variable),           */
+	0x09, 0xE2,         /*      Usage (Mute),               */
+	0x95, 0x01,         /*      Report Count (1),           */
+	0x81, 0x06,         /*      Input (Variable, Relative), */
+	0x05, 0x0B,         /*      Usage Page (Telephony),     */
+	0x09, 0x2F,         /*      Usage (2Fh),                */
+	0x81, 0x02,         /*      Input (Variable),           */
+	0x09, 0x20,         /*      Usage (20h),                */
+	0x81, 0x06,         /*      Input (Variable, Relative), */
+	0x05, 0x0C,         /*      Usage Page (Consumer),      */
+	0x09, 0x00,         /*      Usage (00h),                */
+	0x95, 0x03,         /*      Report Count (3),           */
+	0x81, 0x02,         /*      Input (Variable),           */
+	0x26, 0xFF, 0x00,   /*      Logical Maximum (255),      */
+	0x09, 0x00,         /*      Usage (00h),                */
+	0x75, 0x08,         /*      Report Size (8),            */
+	0x95, 0x03,         /*      Report Count (3),           */
+	0x81, 0x02,         /*      Input (Variable),           */
+	0x09, 0x00,         /*      Usage (00h),                */
+	0x95, 0x04,         /*      Report Count (4),           */
+	0x91, 0x02,         /*      Output (Variable),          */
+	0xC0                /*  End Collection                  */
+};
+
+
+static void hp_ev(struct hid_device *hid, struct cmhid_cm6533 *cm, int value)
 {
 	input_report_switch(cm->input_dev, SW_HEADPHONE_INSERT, value);
 	input_sync(cm->input_dev);
@@ -55,7 +98,12 @@ static void hp_ev(struct hid_device *hid, struct cmhid *cm, int value)
 static int cmhid_raw_event(struct hid_device *hid, struct hid_report *report,
 	 u8 *data, int len)
 {
-	struct cmhid *cm = hid_get_drvdata(hid);
+	struct cmhid_cm6533 *cm;
+
+	if (hid->product != USB_DEVICE_ID_CM6533)
+		return 0;
+
+	cm = hid_get_drvdata(hid);
 
 	if (len != CM6533_JD_RAWEV_LEN)
 		goto out;
@@ -79,8 +127,11 @@ static int cmhid_input_configured(struct hid_device *hid,
 		struct hid_input *hidinput)
 {
 	struct input_dev *input_dev = hidinput->input;
-	struct cmhid *cm = hid_get_drvdata(hid);
+	struct cmhid_cm6533 *cm = hid_get_drvdata(hid);
 	int i;
+
+	if (hid->product != USB_DEVICE_ID_CM6533)
+		return 0;
 
 	cm->input_dev = input_dev;
 	memcpy(cm->switch_map, jack_switch_types, sizeof(cm->switch_map));
@@ -95,15 +146,27 @@ static int cmhid_input_mapping(struct hid_device *hid,
 		struct hid_input *hi, struct hid_field *field,
 		struct hid_usage *usage, unsigned long **bit, int *max)
 {
-	return -1;
+	switch (hid->product) {
+		case USB_DEVICE_ID_CM6533:
+			return -1;
+		default:
+			return 0;
+	}
 }
 
 static int cmhid_probe(struct hid_device *hid, const struct hid_device_id *id)
 {
 	int ret;
-	struct cmhid *cm;
+	struct cmhid_cm6533 *cm;
 
-	cm = kzalloc(sizeof(struct cmhid), GFP_KERNEL);
+	if (hid->product != USB_DEVICE_ID_CM6533) {
+		ret = hid_open_report(hid);
+		if (!ret)
+			ret = hid_hw_start(hid, HID_CONNECT_DEFAULT);
+		return ret;
+	}
+
+	cm = kzalloc(sizeof(*cm), GFP_KERNEL);
 	if (!cm) {
 		ret = -ENOMEM;
 		goto allocfail;
@@ -132,7 +195,6 @@ fail:
 allocfail:
 	return ret;
 }
-
 static void cmhid_remove(struct hid_device *hid)
 {
 	struct cmhid *cm = hid_get_drvdata(hid);
@@ -141,20 +203,36 @@ static void cmhid_remove(struct hid_device *hid)
 	kfree(cm);
 }
 
+static __u8 *cmhid_report_fixup(struct hid_device *hid, __u8 *rdesc,
+		unsigned int *rsize)
+{
+	switch (hid->product) {
+	case USB_DEVICE_ID_CMEDIA_HS100B:
+		if (*rsize == HS100B_RDESC_ORIG_SIZE) {
+			hid_info(hid, "Fixing CMedia HS-100B report descriptor\n");
+			rdesc = hs100b_rdesc_fixed;
+			*rsize = sizeof(hs100b_rdesc_fixed);
+		}
+		break;
+	}
+	return rdesc;
+}
+
 static const struct hid_device_id cmhid_devices[] = {
 	{ HID_USB_DEVICE(USB_VENDOR_ID_CMEDIA, USB_DEVICE_ID_CM6533) },
+	{ HID_USB_DEVICE(USB_VENDOR_ID_CMEDIA, USB_DEVICE_ID_CMEDIA_HS100B) },
 	{ }
 };
 MODULE_DEVICE_TABLE(hid, cmhid_devices);
 
 static struct hid_driver cmhid_driver = {
-	.name = "cm6533_jd",
+	.name = "cmedia",
 	.id_table = cmhid_devices,
 	.raw_event = cmhid_raw_event,
 	.input_configured = cmhid_input_configured,
 	.probe = cmhid_probe,
 	.remove = cmhid_remove,
+	.report_fixup = cmhid_report_fixup,
 	.input_mapping = cmhid_input_mapping,
 };
 module_hid_driver(cmhid_driver);
-
