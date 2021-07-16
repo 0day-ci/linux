@@ -58,7 +58,7 @@ static int lima_devfreq_get_dev_status(struct device *dev,
 	struct lima_devfreq *devfreq = &ldev->devfreq;
 	unsigned long irqflags;
 
-	status->current_frequency = clk_get_rate(ldev->clk_gpu);
+	status->current_frequency = clk_get_rate(devfreq->clk_gpu);
 
 	spin_lock_irqsave(&devfreq->lock, irqflags);
 
@@ -110,11 +110,22 @@ int lima_devfreq_init(struct lima_device *ldev)
 	struct lima_devfreq *ldevfreq = &ldev->devfreq;
 	struct dev_pm_opp *opp;
 	unsigned long cur_freq;
-	int ret;
+	int i, ret;
 
 	if (!device_property_present(dev, "operating-points-v2"))
 		/* Optional, continue without devfreq */
 		return 0;
+
+	/* Find first clock which are not "bus" clock */
+	for (i = 0; i < ldev->nr_clks; i++) {
+		if (!strcmp(ldev->clks[i].id, "bus"))
+			continue;
+		ldevfreq->clk_gpu = ldev->clks[i].clk;
+		break;
+	}
+
+	if (!ldevfreq->clk_gpu)
+		return -ENODEV;
 
 	spin_lock_init(&ldevfreq->lock);
 
@@ -135,7 +146,7 @@ int lima_devfreq_init(struct lima_device *ldev)
 
 	lima_devfreq_reset(ldevfreq);
 
-	cur_freq = clk_get_rate(ldev->clk_gpu);
+	cur_freq = clk_get_rate(ldevfreq->clk_gpu);
 
 	opp = devfreq_recommended_opp(dev, &cur_freq, 0);
 	if (IS_ERR(opp))

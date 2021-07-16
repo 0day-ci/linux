@@ -85,29 +85,23 @@ static int lima_clk_enable(struct lima_device *dev)
 {
 	int err;
 
-	err = clk_prepare_enable(dev->clk_bus);
+	err = clk_bulk_prepare_enable(dev->nr_clks, dev->clks);
 	if (err)
 		return err;
-
-	err = clk_prepare_enable(dev->clk_gpu);
-	if (err)
-		goto error_out0;
 
 	if (dev->reset) {
 		err = reset_control_deassert(dev->reset);
 		if (err) {
 			dev_err(dev->dev,
 				"reset controller deassert failed %d\n", err);
-			goto error_out1;
+			goto error;
 		}
 	}
 
 	return 0;
 
-error_out1:
-	clk_disable_unprepare(dev->clk_gpu);
-error_out0:
-	clk_disable_unprepare(dev->clk_bus);
+error:
+	clk_bulk_disable_unprepare(dev->nr_clks, dev->clks);
 	return err;
 }
 
@@ -115,31 +109,23 @@ static void lima_clk_disable(struct lima_device *dev)
 {
 	if (dev->reset)
 		reset_control_assert(dev->reset);
-	clk_disable_unprepare(dev->clk_gpu);
-	clk_disable_unprepare(dev->clk_bus);
+	clk_bulk_disable_unprepare(dev->nr_clks, dev->clks);
 }
 
 static int lima_clk_init(struct lima_device *dev)
 {
 	int err;
 
-	dev->clk_bus = devm_clk_get(dev->dev, "bus");
-	if (IS_ERR(dev->clk_bus)) {
-		err = PTR_ERR(dev->clk_bus);
+	err = devm_clk_bulk_get_all(dev->dev, &dev->clks);
+	if (err < 1) {
+		if (err == 0)	/* No clock at all is an error too */
+			err = -ENODEV;
 		if (err != -EPROBE_DEFER)
-			dev_err(dev->dev, "get bus clk failed %d\n", err);
-		dev->clk_bus = NULL;
+			dev_err(dev->dev, "get clk failed %d\n", err);
 		return err;
 	}
 
-	dev->clk_gpu = devm_clk_get(dev->dev, "core");
-	if (IS_ERR(dev->clk_gpu)) {
-		err = PTR_ERR(dev->clk_gpu);
-		if (err != -EPROBE_DEFER)
-			dev_err(dev->dev, "get core clk failed %d\n", err);
-		dev->clk_gpu = NULL;
-		return err;
-	}
+	dev->nr_clks = err;
 
 	dev->reset = devm_reset_control_array_get_optional_shared(dev->dev);
 	if (IS_ERR(dev->reset)) {
@@ -412,8 +398,10 @@ int lima_device_init(struct lima_device *ldev)
 	INIT_LIST_HEAD(&ldev->error_task_list);
 	mutex_init(&ldev->error_task_list_lock);
 
-	dev_info(ldev->dev, "bus rate = %lu\n", clk_get_rate(ldev->clk_bus));
-	dev_info(ldev->dev, "mod rate = %lu", clk_get_rate(ldev->clk_gpu));
+	for (i = 0; i < ldev->nr_clks; i++) {
+		dev_info(ldev->dev, "clk %s = %lu Hz\n", ldev->clks[i].id,
+			 clk_get_rate(ldev->clks[i].clk));
+	}
 
 	return 0;
 
