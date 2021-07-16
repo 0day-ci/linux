@@ -55,8 +55,24 @@ nf_nat_masquerade_ipv4(struct sk_buff *skb, unsigned int hooknum,
 	newrange.flags       = range->flags | NF_NAT_RANGE_MAP_IPS;
 	newrange.min_addr.ip = newsrc;
 	newrange.max_addr.ip = newsrc;
-	newrange.min_proto   = range->min_proto;
-	newrange.max_proto   = range->max_proto;
+
+	if (range->flags & NF_NAT_RANGE_PSID) {
+		u16 base = ntohs(range->base_proto.all);
+		u16 min =  ntohs(range->min_proto.all);
+		u16 off = 0;
+
+		/* If offset=0, port range is in one contiguous block */
+		if (base)
+			off = prandom_u32() % (((1 << 16) / base) - 1);
+
+		newrange.min_proto.all   = htons(min + base * off);
+		newrange.max_proto.all   = htons(ntohs(newrange.min_proto.all) + ntohs(range->max_proto.all) - min);
+		newrange.base_proto      = range->base_proto;
+		newrange.flags           = newrange.flags | NF_NAT_RANGE_PROTO_SPECIFIED;
+	} else {
+		newrange.min_proto       = range->min_proto;
+		newrange.max_proto       = range->max_proto;
+	}
 
 	/* Hand modified range to generic setup. */
 	return nf_nat_setup_info(ct, &newrange, NF_NAT_MANIP_SRC);

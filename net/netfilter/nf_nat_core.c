@@ -195,13 +195,36 @@ static bool nf_nat_inet_in_range(const struct nf_conntrack_tuple *t,
 static bool l4proto_in_range(const struct nf_conntrack_tuple *tuple,
 			     enum nf_nat_manip_type maniptype,
 			     const union nf_conntrack_man_proto *min,
-			     const union nf_conntrack_man_proto *max)
+			     const union nf_conntrack_man_proto *max,
+			     const union nf_conntrack_man_proto *base,
+			     bool is_psid)
 {
 	__be16 port;
+	u16 psid, psid_mask, offset_mask;
+
+	/* In this case we are in PSID mode, avoid checking all ranges by computing bitmasks */
+	if (is_psid) {
+		u16 power_j = ntohs(max->all) - ntohs(min->all) + 1;
+		u32 offset = ntohs(base->all);
+		u16 power_a;
+
+		if (offset == 0)
+			offset = 1 << 16;
+
+		power_a = (1 << 16) / offset;
+		offset_mask = (power_a - 1) * offset;
+		psid_mask = ((offset / power_j) << 1) - 1;
+		psid = ntohs(min->all) & psid_mask;
+	}
 
 	switch (tuple->dst.protonum) {
 	case IPPROTO_ICMP:
 	case IPPROTO_ICMPV6:
+		if (is_psid) {
+			return (offset_mask == 0 ||
+				(ntohs(tuple->src.u.icmp.id) & offset_mask) != 0) &&
+				((ntohs(tuple->src.u.icmp.id) & psid_mask) == psid);
+		}
 		return ntohs(tuple->src.u.icmp.id) >= ntohs(min->icmp.id) &&
 		       ntohs(tuple->src.u.icmp.id) <= ntohs(max->icmp.id);
 	case IPPROTO_GRE: /* all fall though */
@@ -215,6 +238,10 @@ static bool l4proto_in_range(const struct nf_conntrack_tuple *tuple,
 		else
 			port = tuple->dst.u.all;
 
+		if (is_psid) {
+			return (offset_mask == 0 || (ntohs(port) & offset_mask) != 0) &&
+				((ntohs(port) & psid_mask) == psid);
+		}
 		return ntohs(port) >= ntohs(min->all) &&
 		       ntohs(port) <= ntohs(max->all);
 	default:
@@ -239,7 +266,8 @@ static int in_range(const struct nf_conntrack_tuple *tuple,
 		return 1;
 
 	return l4proto_in_range(tuple, NF_NAT_MANIP_SRC,
-				&range->min_proto, &range->max_proto);
+				&range->min_proto, &range->max_proto, &range->base_proto,
+				range->flags & NF_NAT_RANGE_PSID);
 }
 
 static inline int
@@ -532,8 +560,11 @@ get_unique_tuple(struct nf_conntrack_tuple *tuple,
 		if (range->flags & NF_NAT_RANGE_PROTO_SPECIFIED) {
 			if (!(range->flags & NF_NAT_RANGE_PROTO_OFFSET) &&
 			    l4proto_in_range(tuple, maniptype,
-			          &range->min_proto,
-			          &range->max_proto) &&
+				  &range->min_proto,
+				  &range->max_proto,
+				  &range->base_proto,
+				  range->flags &
+				  NF_NAT_RANGE_PSID) &&
 			    (range->min_proto.all == range->max_proto.all ||
 			     !nf_nat_used_tuple(tuple, ct)))
 				return;
