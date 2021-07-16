@@ -76,7 +76,9 @@ static ssize_t profiling_store(struct kobject *kobj,
 	 * has a ton of callers and is not const.  It is
 	 * easiest to cast it away here.
 	 */
-	profile_setup((char *)buf);
+	ret = profile_setup((char *)buf);
+	if (!ret)
+		return -EINVAL;
 	ret = profile_init();
 	if (ret)
 		return ret;

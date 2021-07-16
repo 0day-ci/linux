@@ -42,6 +42,7 @@ struct profile_hit {
 
 static atomic_t *prof_buffer;
 static unsigned long prof_len, prof_shift;
+#define MAX_PROF_SHIFT			sizeof(prof_shift) * 8
 
 int prof_on __read_mostly;
 EXPORT_SYMBOL_GPL(prof_on);
@@ -66,8 +67,11 @@ int profile_setup(char *str)
 		prof_on = SLEEP_PROFILING;
 		if (str[strlen(sleepstr)] == ',')
 			str += strlen(sleepstr) + 1;
-		if (get_option(&str, &par))
+		if (get_option(&str, &par)) {
+			if (par >= MAX_PROF_SHIFT)
+				return 0;
 			prof_shift = par;
+		}
 		pr_info("kernel sleep profiling enabled (shift: %ld)\n",
 			prof_shift);
 #else
@@ -77,19 +81,27 @@ int profile_setup(char *str)
 		prof_on = SCHED_PROFILING;
 		if (str[strlen(schedstr)] == ',')
 			str += strlen(schedstr) + 1;
-		if (get_option(&str, &par))
+		if (get_option(&str, &par)) {
+			if (par >= MAX_PROF_SHIFT)
+				return 0;
 			prof_shift = par;
+		}
 		pr_info("kernel schedule profiling enabled (shift: %ld)\n",
 			prof_shift);
 	} else if (!strncmp(str, kvmstr, strlen(kvmstr))) {
 		prof_on = KVM_PROFILING;
 		if (str[strlen(kvmstr)] == ',')
 			str += strlen(kvmstr) + 1;
-		if (get_option(&str, &par))
+		if (get_option(&str, &par)) {
+			if (par >= MAX_PROF_SHIFT)
+				return 0;
 			prof_shift = par;
+		}
 		pr_info("kernel KVM profiling enabled (shift: %ld)\n",
 			prof_shift);
 	} else if (get_option(&str, &par)) {
+		if (par >= MAX_PROF_SHIFT)
+			return 0;
 		prof_shift = par;
 		prof_on = CPU_PROFILING;
 		pr_info("kernel profiling enabled (shift: %ld)\n",
