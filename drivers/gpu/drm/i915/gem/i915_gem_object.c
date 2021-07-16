@@ -25,6 +25,7 @@
 #include <linux/sched/mm.h>
 
 #include "display/intel_frontbuffer.h"
+#include "pxp/intel_pxp.h"
 #include "i915_drv.h"
 #include "i915_gem_clflush.h"
 #include "i915_gem_context.h"
@@ -76,6 +77,8 @@ void i915_gem_object_init(struct drm_i915_gem_object *obj,
 
 	INIT_LIST_HEAD(&obj->lut_list);
 	spin_lock_init(&obj->lut_lock);
+
+	INIT_LIST_HEAD(&obj->pxp_link);
 
 	spin_lock_init(&obj->mmo.lock);
 	obj->mmo.offsets = RB_ROOT;
@@ -234,6 +237,9 @@ void __i915_gem_free_object(struct drm_i915_gem_object *obj)
 		}
 		spin_unlock(&obj->vma.lock);
 	}
+
+	if (i915_gem_object_has_valid_protection(obj))
+		intel_pxp_object_remove(obj);
 
 	__i915_gem_object_free_mmaps(obj);
 

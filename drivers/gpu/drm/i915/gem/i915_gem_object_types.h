@@ -205,6 +205,11 @@ struct drm_i915_gem_object {
 	} mmo;
 
 	I915_SELFTEST_DECLARE(struct list_head st_link);
+	/**
+	 * @user_flags: small set of booleans set by the user
+	 */
+	unsigned long user_flags;
+#define I915_GEM_OBJECT_PROTECTED BIT(0)
 
 	unsigned long flags;
 #define I915_BO_ALLOC_CONTIGUOUS BIT(0)
@@ -350,6 +355,14 @@ struct drm_i915_gem_object {
 		struct i915_gem_object_page_iter get_io_page;
 		bool created:1;
 	} ttm;
+
+	/*
+	 * When the PXP session is invalidated, we need to mark all protected
+	 * objects as invalid. To easily do so we add them all to a list. The
+	 * presence on the list is used to check if the encryption is valid or
+	 * not.
+	 */
+	struct list_head pxp_link;
 
 	/** Record of address bit 17 of each page at last unbind. */
 	unsigned long *bit_17;

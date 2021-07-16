@@ -292,6 +292,18 @@ i915_gem_object_never_mmap(const struct drm_i915_gem_object *obj)
 }
 
 static inline bool
+i915_gem_object_is_protected(const struct drm_i915_gem_object *obj)
+{
+	return obj->user_flags & I915_GEM_OBJECT_PROTECTED;
+}
+
+static inline bool
+i915_gem_object_has_valid_protection(const struct drm_i915_gem_object *obj)
+{
+	return i915_gem_object_is_protected(obj) && !list_empty(&obj->pxp_link);
+}
+
+static inline bool
 i915_gem_object_is_framebuffer(const struct drm_i915_gem_object *obj)
 {
 	return READ_ONCE(obj->frontbuffer);

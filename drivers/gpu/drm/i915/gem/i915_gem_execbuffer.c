@@ -21,6 +21,8 @@
 #include "gt/intel_gt_pm.h"
 #include "gt/intel_ring.h"
 
+#include "pxp/intel_pxp.h"
+
 #include "i915_drv.h"
 #include "i915_gem_clflush.h"
 #include "i915_gem_context.h"
@@ -753,6 +755,11 @@ static int eb_select_context(struct i915_execbuffer *eb)
 	if (unlikely(IS_ERR(ctx)))
 		return PTR_ERR(ctx);
 
+	if (i915_gem_context_invalidated(ctx)) {
+		i915_gem_context_put(ctx);
+		return -EACCES;
+	}
+
 	eb->gem_context = ctx;
 	if (rcu_access_pointer(ctx->vm))
 		eb->invalid_flags |= EXEC_OBJECT_NEEDS_GTT;
@@ -821,7 +828,7 @@ static struct i915_vma *eb_lookup_vma(struct i915_execbuffer *eb, u32 handle)
 	do {
 		struct drm_i915_gem_object *obj;
 		struct i915_vma *vma;
-		int err;
+		int err = 0;
 
 		rcu_read_lock();
 		vma = radix_tree_lookup(&eb->gem_context->handles_vma, handle);
@@ -834,6 +841,26 @@ static struct i915_vma *eb_lookup_vma(struct i915_execbuffer *eb, u32 handle)
 		obj = i915_gem_object_lookup(eb->file, handle);
 		if (unlikely(!obj))
 			return ERR_PTR(-ENOENT);
+
+		/*
+		 * If the user has opted-in for protected-object tracking, make
+		 * sure the object encryption can be used.
+		 * We only need to do this when the object is first used with
+		 * this context, because the context itself will be banned when
+		 * the protected objects become invalid.
+		 */
+		if (i915_gem_context_uses_protected_content(eb->gem_context) &&
+		    i915_gem_object_is_protected(obj)) {
+			if (!intel_pxp_is_active(&vm->gt->pxp))
+				err = -ENODEV;
+			else if (!i915_gem_object_has_valid_protection(obj))
+				err = -ENOEXEC;
+
+			if (err) {
+				i915_gem_object_put(obj);
+				return ERR_PTR(err);
+			}
+		}
 
 		vma = i915_vma_instance(obj, vm, NULL);
 		if (IS_ERR(vma)) {
@@ -2952,6 +2979,17 @@ eb_select_engine(struct i915_execbuffer *eb)
 		return PTR_ERR(ce);
 
 	intel_gt_pm_get(ce->engine->gt);
+
+	if (i915_gem_context_uses_protected_content(eb->gem_context)) {
+		err = intel_pxp_wait_for_arb_start(&ce->engine->gt->pxp);
+		if (err)
+			goto err;
+
+		if (i915_gem_context_invalidated(eb->gem_context)) {
+			err = -EACCES;
+			goto err;
+		}
+	}
 
 	if (!test_bit(CONTEXT_ALLOC_BIT, &ce->flags)) {
 		err = intel_context_alloc_state(ce);

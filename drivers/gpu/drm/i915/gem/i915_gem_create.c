@@ -6,6 +6,7 @@
 #include "gem/i915_gem_ioctls.h"
 #include "gem/i915_gem_lmem.h"
 #include "gem/i915_gem_region.h"
+#include "pxp/intel_pxp.h"
 
 #include "i915_drv.h"
 #include "i915_trace.h"
@@ -96,7 +97,11 @@ i915_gem_setup(struct drm_i915_gem_object *obj, u64 size)
 
 	GEM_BUG_ON(size != obj->base.size);
 
+	if (obj->user_flags & I915_GEM_OBJECT_PROTECTED)
+		intel_pxp_object_add(obj);
+
 	trace_i915_gem_object_create(obj);
+
 	return 0;
 }
 
@@ -341,8 +346,29 @@ static int ext_set_placements(struct i915_user_extension __user *base,
 	return set_placements(&ext, data);
 }
 
+static int ext_set_protected(struct i915_user_extension __user *base, void *data)
+{
+	struct drm_i915_gem_create_ext_protected_content ext;
+	struct create_ext *ext_data = data;
+
+	if (copy_from_user(&ext, base, sizeof(ext)))
+		return -EFAULT;
+
+	if (ext.flags)
+		return -EINVAL;
+
+	if (!intel_pxp_is_enabled(&ext_data->i915->gt.pxp))
+		return -ENODEV;
+
+	ext_data->vanilla_object->user_flags |= I915_GEM_OBJECT_PROTECTED;
+
+	return 0;
+}
+
+
 static const i915_user_extension_fn create_extensions[] = {
 	[I915_GEM_CREATE_EXT_MEMORY_REGIONS] = ext_set_placements,
+	[I915_GEM_CREATE_EXT_PROTECTED_CONTENT] = ext_set_protected,
 };
 
 /**

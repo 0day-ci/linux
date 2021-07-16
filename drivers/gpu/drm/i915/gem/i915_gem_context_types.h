@@ -301,6 +301,7 @@ struct i915_gem_context {
 #define UCONTEXT_BANNABLE		2
 #define UCONTEXT_RECOVERABLE		3
 #define UCONTEXT_PERSISTENCE		4
+#define UCONTEXT_PROTECTED		5
 
 	/**
 	 * @flags: small set of booleans
@@ -308,6 +309,7 @@ struct i915_gem_context {
 	unsigned long flags;
 #define CONTEXT_CLOSED			0
 #define CONTEXT_USER_ENGINES		1
+#define CONTEXT_INVALID			2
 
 	/** @mutex: guards everything that isn't engines or handles_vma */
 	struct mutex mutex;
