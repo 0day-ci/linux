@@ -3243,10 +3243,9 @@ static inline void f2fs_update_iostat(struct f2fs_sb_info *sbi,
 			sbi->rw_iostat[APP_WRITE_IO] -
 			sbi->rw_iostat[APP_DIRECT_IO];
 
-	if (type == APP_READ_IO || type == APP_DIRECT_READ_IO)
-		sbi->rw_iostat[APP_BUFFERED_READ_IO] =
-			sbi->rw_iostat[APP_READ_IO] -
-			sbi->rw_iostat[APP_DIRECT_READ_IO];
+	if (type == APP_BUFFERED_READ_IO || type == APP_DIRECT_READ_IO)
+		sbi->rw_iostat[APP_READ_IO] += io_bytes;
+
 	spin_unlock(&sbi->iostat_lock);
 
 	f2fs_record_iostat(sbi);
