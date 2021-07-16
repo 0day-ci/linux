@@ -323,7 +323,8 @@
 #define H_SCM_PERFORMANCE_STATS 0x418
 #define H_RPT_INVALIDATE	0x448
 #define H_SCM_FLUSH		0x44C
-#define MAX_HCALL_OPCODE	H_SCM_FLUSH
+#define H_GET_ENERGY_SCALE_INFO	0x450
+#define MAX_HCALL_OPCODE	H_GET_ENERGY_SCALE_INFO
 
 /* Scope args for H_SCM_UNBIND_ALL */
 #define H_UNBIND_SCOPE_ALL (0x1)
@@ -640,6 +641,27 @@ struct hv_gpci_request_buffer {
 	struct hv_get_perf_counter_info_params params;
 	uint8_t bytes[HGPCI_MAX_DATA_BYTES];
 } __packed;
+
+#define ESI_VERSION	0x1
+#define MAX_ESI_ATTRS	10
+#define MAX_BUF_SZ	(sizeof(struct h_energy_scale_info_hdr) + \
+			(sizeof(struct energy_scale_attribute) * MAX_ESI_ATTRS))
+
+struct energy_scale_attribute {
+	__be64 id;
+	__be64 value;
+	unsigned char desc[64];
+	unsigned char value_desc[64];
+} __packed;
+
+struct h_energy_scale_info_hdr {
+	__be64 num_attrs;
+	__be64 array_offset;
+	__u8 data_header_version;
+} __packed;
+
+/* /sys/firmware/papr */
+extern struct kobject *papr_kobj;
 
 #endif /* __ASSEMBLY__ */
 #endif /* __KERNEL__ */
