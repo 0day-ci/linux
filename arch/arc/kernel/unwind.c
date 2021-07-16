@@ -13,6 +13,7 @@
 #include <linux/sched.h>
 #include <linux/module.h>
 #include <linux/memblock.h>
+#include <linux/overflow.h>
 #include <linux/sort.h>
 #include <linux/slab.h>
 #include <linux/stop_machine.h>
@@ -311,9 +312,7 @@ static void init_unwind_hdr(struct unwind_table *table,
 	if (tableSize || !n)
 		goto ret_err;
 
-	hdrSize = 4 + sizeof(unsigned long) + sizeof(unsigned int)
-	    + 2 * n * sizeof(unsigned long);
-
+	hdrSize = struct_size(header, table, n);
 	header = alloc(hdrSize);
 	if (!header)
 		goto ret_err;
