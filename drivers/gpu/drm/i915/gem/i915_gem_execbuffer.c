@@ -2981,9 +2981,11 @@ eb_select_engine(struct i915_execbuffer *eb)
 	intel_gt_pm_get(ce->engine->gt);
 
 	if (i915_gem_context_uses_protected_content(eb->gem_context)) {
-		err = intel_pxp_wait_for_arb_start(&ce->engine->gt->pxp);
-		if (err)
-			goto err;
+		if (!intel_pxp_is_active(&ce->engine->gt->pxp)) {
+			err = intel_pxp_start(&ce->engine->gt->pxp);
+			if (err)
+				goto err;
+		}
 
 		if (i915_gem_context_invalidated(eb->gem_context)) {
 			err = -EACCES;
