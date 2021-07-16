@@ -131,7 +131,8 @@ static struct pci_ops rtas_pci_ops =
 
 volatile struct Hydra __iomem *Hydra = NULL;
 
-static int __init hydra_init(void)
+int __init
+hydra_init(void)
 {
 	struct device_node *np;
 	struct resource r;
@@ -313,14 +314,6 @@ chrp_find_bridges(void)
 		}
 	}
 	of_node_put(root);
-
-	/*
-	 *  "Temporary" fixes for PCI devices.
-	 *  -- Geert
-	 */
-	hydra_init();		/* Mac I/O */
-
-	pci_create_OF_bus_map();
 }
 
 /* SL82C105 IDE Control/Status Register */
