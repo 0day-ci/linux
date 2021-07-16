@@ -206,7 +206,7 @@ struct iomap_readpage_ctx {
 };
 
 static void
-iomap_read_inline_data(struct inode *inode, struct page *page,
+iomap_read_inline_page(struct inode *inode, struct page *page,
 		struct iomap *iomap)
 {
 	size_t size = i_size_read(inode);
@@ -225,10 +225,33 @@ iomap_read_inline_data(struct inode *inode, struct page *page,
 	SetPageUptodate(page);
 }
 
+/*
+ * Different from iomap_read_inline_page, which makes the range of
+ * some tail blocks in the page uptodate and doesn't clean post-EOF.
+ */
+static void
+iomap_read_inline_data(struct inode *inode, struct page *page,
+		struct iomap *iomap, loff_t pos, unsigned int plen)
+{
+	unsigned int poff = offset_in_page(pos);
+	unsigned int delta = pos - iomap->offset;
+	unsigned int alignedsize = roundup(plen, i_blocksize(inode));
+	void *addr;
+
+	/* make sure that inline_data doesn't cross page boundary */
+	BUG_ON(plen > PAGE_SIZE - offset_in_page(iomap->inline_data));
+	BUG_ON(plen != i_size_read(inode) - pos);
+	addr = kmap_atomic(page);
+	memcpy(addr + poff, iomap->inline_data + delta, plen);
+	memset(addr + poff + plen, 0, alignedsize - plen);
+	kunmap_atomic(addr);
+	iomap_set_range_uptodate(page, poff, alignedsize);
+}
+
 static inline bool iomap_block_needs_zeroing(struct inode *inode,
 		struct iomap *iomap, loff_t pos)
 {
-	return iomap->type != IOMAP_MAPPED ||
+	return (iomap->type != IOMAP_MAPPED && iomap->type != IOMAP_INLINE) ||
 		(iomap->flags & IOMAP_F_NEW) ||
 		pos >= i_size_read(inode);
 }
@@ -245,9 +268,8 @@ iomap_readpage_actor(struct inode *inode, loff_t pos, loff_t length, void *data,
 	unsigned poff, plen;
 	sector_t sector;
 
-	if (iomap->type == IOMAP_INLINE) {
-		WARN_ON_ONCE(pos);
-		iomap_read_inline_data(inode, page, iomap);
+	if (iomap->type == IOMAP_INLINE && !pos) {
+		iomap_read_inline_page(inode, page, iomap);
 		return PAGE_SIZE;
 	}
 
@@ -262,6 +284,10 @@ iomap_readpage_actor(struct inode *inode, loff_t pos, loff_t length, void *data,
 		goto done;
 	}
 
+	if (iomap->type == IOMAP_INLINE) {
+		iomap_read_inline_data(inode, page, iomap, pos, plen);
+		goto done;
+	}
 	ctx->cur_page_in_bio = true;
 	if (iop)
 		atomic_add(plen, &iop->read_bytes_pending);
@@ -598,6 +624,9 @@ iomap_write_begin(struct inode *inode, loff_t pos, unsigned len, unsigned flags,
 	BUG_ON(pos + len > iomap->offset + iomap->length);
 	if (srcmap != iomap)
 		BUG_ON(pos + len > srcmap->offset + srcmap->length);
+	/* no available tail-packing write user yet, never allow it for now */
+	if (WARN_ON_ONCE(srcmap->type == IOMAP_INLINE && iomap->offset))
+		return -EIO;
 
 	if (fatal_signal_pending(current))
 		return -EINTR;
@@ -616,7 +645,7 @@ iomap_write_begin(struct inode *inode, loff_t pos, unsigned len, unsigned flags,
 	}
 
 	if (srcmap->type == IOMAP_INLINE)
-		iomap_read_inline_data(inode, page, srcmap);
+		iomap_read_inline_page(inode, page, srcmap);
 	else if (iomap->flags & IOMAP_F_BUFFER_HEAD)
 		status = __block_write_begin_int(page, pos, len, NULL, srcmap);
 	else
