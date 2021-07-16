@@ -1363,11 +1363,6 @@ alloc:
 		f2fs_invalidate_compress_page(sbi, old_blkaddr);
 	}
 	f2fs_update_data_blkaddr(dn, dn->data_blkaddr);
-
-	/*
-	 * i_size will be updated by direct_IO. Otherwise, we'll get stale
-	 * data from unwritten block via dio_read.
-	 */
 	return 0;
 }
 
@@ -3130,7 +3125,7 @@ static int f2fs_write_data_pages(struct address_space *mapping,
 			FS_CP_DATA_IO : FS_DATA_IO);
 }
 
-static void f2fs_write_failed(struct inode *inode, loff_t to)
+void f2fs_write_failed(struct inode *inode, loff_t to)
 {
 	loff_t i_size = i_size_read(inode);
 
