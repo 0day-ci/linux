@@ -1231,8 +1231,10 @@ static int ast_get_modes(struct drm_connector *connector)
 		ret = drm_add_edid_modes(connector, edid);
 		kfree(edid);
 		return ret;
-	} else
+	} else {
 		drm_connector_update_edid_property(&ast_connector->base, NULL);
+		return -ENXIO;
+	}
 	return 0;
 }
 
