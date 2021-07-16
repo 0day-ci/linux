@@ -835,7 +835,7 @@ static int fileattr_set_prepare(struct inode *inode,
 	 * It is only valid to set the DAX flag on regular files and
 	 * directories on filesystems.
 	 */
-	if ((fa->fsx_xflags & FS_XFLAG_DAX) &&
+	if ((fa->fsx_xflags & FS_XFLAG_DAX || fa->flags & FS_DAX_FL) &&
 	    !(S_ISREG(inode->i_mode) || S_ISDIR(inode->i_mode)))
 		return -EINVAL;
 
