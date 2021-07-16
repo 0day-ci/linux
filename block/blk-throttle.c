@@ -2176,6 +2176,40 @@ static inline void throtl_update_latency_buckets(struct throtl_data *td)
 }
 #endif
 
+void blk_throtl_recharge_bio(struct bio *bio)
+{
+	bool rw = bio_data_dir(bio);
+	struct blkcg_gq *blkg = bio->bi_blkg;
+	struct throtl_grp *tg = blkg_to_tg(blkg);
+	u32 iops_limit = tg_iops_limit(tg, rw);
+
+	if (iops_limit == UINT_MAX)
+		return;
+
+	/*
+	 * If previous slice expired, start a new one otherwise renew/extend
+	 * existing slice to make sure it is at least throtl_slice interval
+	 * long since now. New slice is started only for empty throttle group.
+	 * If there is queued bio, that means there should be an active
+	 * slice and it should be extended instead.
+	 */
+	if (throtl_slice_used(tg, rw) && !(tg->service_queue.nr_queued[rw]))
+		throtl_start_new_slice(tg, rw);
+	else {
+		if (time_before(tg->slice_end[rw],
+		    jiffies + tg->td->throtl_slice))
+			throtl_extend_slice(tg, rw,
+				jiffies + tg->td->throtl_slice);
+	}
+
+	/* Recharge the bio to the group, as some BIOs will be further split
+	 * after passing through the throttle, causing the actual IOPS to
+	 * be greater than the expected value.
+	 */
+	tg->last_io_disp[rw]++;
+	tg->io_disp[rw]++;
+}
+
 bool blk_throtl_bio(struct bio *bio)
 {
 	struct request_queue *q = bio->bi_bdev->bd_disk->queue;
