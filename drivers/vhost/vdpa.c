@@ -615,6 +615,7 @@ static int vhost_vdpa_process_iotlb_update(struct vhost_vdpa *v,
 	int ret = 0;
 
 	if (msg->iova < v->range.first ||
+	    msg->iova - 1 > U64_MAX - msg->size ||
 	    msg->iova + msg->size - 1 > v->range.last)
 		return -EINVAL;
 
