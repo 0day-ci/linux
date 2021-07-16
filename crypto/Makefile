@@ -177,6 +177,7 @@ obj-$(CONFIG_CRYPTO_OFB) += ofb.o
 obj-$(CONFIG_CRYPTO_ECC) += ecc.o
 obj-$(CONFIG_CRYPTO_ESSIV) += essiv.o
 obj-$(CONFIG_CRYPTO_CURVE25519) += curve25519-generic.o
+obj-$(CONFIG_CRYPTO_FFDHE) += ffdhe_helper.o
 
 ecdh_generic-y += ecdh.o
 ecdh_generic-y += ecdh_helper.o
