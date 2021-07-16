@@ -38,6 +38,7 @@
 #include <linux/kref.h>
 #include <linux/mutex.h>
 #include <linux/radix-tree.h>
+#include <linux/refcount.h>
 
 #include "gt/intel_gtt.h"
 
@@ -243,7 +244,7 @@ struct intel_vgpu_oos_page {
 
 /* Represent a vgpu shadow page table. */
 struct intel_vgpu_ppgtt_spt {
-	atomic_t refcount;
+	refcount_t refcount;
 	struct intel_vgpu *vgpu;
 
 	struct {

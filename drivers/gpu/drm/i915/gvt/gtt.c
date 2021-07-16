@@ -841,7 +841,7 @@ retry:
 	}
 
 	spt->vgpu = vgpu;
-	atomic_set(&spt->refcount, 1);
+	refcount_set(&spt->refcount, 1);
 	INIT_LIST_HEAD(&spt->post_shadow_list);
 
 	/*
@@ -927,18 +927,19 @@ static struct intel_vgpu_ppgtt_spt *ppgtt_alloc_spt_gfn(
 
 static inline void ppgtt_get_spt(struct intel_vgpu_ppgtt_spt *spt)
 {
-	int v = atomic_read(&spt->refcount);
+	int v = refcount_read(&spt->refcount);
 
 	trace_spt_refcount(spt->vgpu->id, "inc", spt, v, (v + 1));
-	atomic_inc(&spt->refcount);
+	refcount_inc(&spt->refcount);
 }
 
 static inline int ppgtt_put_spt(struct intel_vgpu_ppgtt_spt *spt)
 {
-	int v = atomic_read(&spt->refcount);
+	int v = refcount_read(&spt->refcount);
 
 	trace_spt_refcount(spt->vgpu->id, "dec", spt, v, (v - 1));
-	return atomic_dec_return(&spt->refcount);
+	refcount_dec(&spt->refcount);
+	return refcount_read(&spt->refcount);
 }
 
 static int ppgtt_invalidate_spt(struct intel_vgpu_ppgtt_spt *spt);
