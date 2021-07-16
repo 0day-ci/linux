@@ -3914,6 +3914,8 @@ static void run_state_machine(struct tcpm_port *port)
 		if (port->ams == POWER_ROLE_SWAP ||
 		    port->ams == FAST_ROLE_SWAP)
 			tcpm_ams_finish(port);
+		if (!port->nr_src_pdo)
+			tcpm_set_state(port, SRC_READY, 0);
 		port->upcoming_state = SRC_SEND_CAPABILITIES;
 		tcpm_ams_start(port, POWER_NEGOTIATION);
 		break;
@@ -4161,7 +4163,10 @@ static void run_state_machine(struct tcpm_port *port)
 				current_lim = PD_P_SNK_STDBY_MW / 5;
 			tcpm_set_current_limit(port, current_lim, 5000);
 			tcpm_set_charge(port, true);
-			tcpm_set_state(port, SNK_WAIT_CAPABILITIES, 0);
+			if (!port->nr_snk_pdo)
+				tcpm_set_state(port, SNK_READY, 0);
+			else
+				tcpm_set_state(port, SNK_WAIT_CAPABILITIES, 0);
 			break;
 		}
 		/*
@@ -5939,15 +5944,17 @@ static int tcpm_fw_get_caps(struct tcpm_port *port,
 
 	/* Get source pdos */
 	ret = fwnode_property_count_u32(fwnode, "source-pdos");
-	if (ret <= 0)
-		return -EINVAL;
+	if (ret < 0)
+		ret = 0;
 
 	port->nr_src_pdo = min(ret, PDO_MAX_OBJECTS);
-	ret = fwnode_property_read_u32_array(fwnode, "source-pdos",
-					     port->src_pdo, port->nr_src_pdo);
-	if ((ret < 0) || tcpm_validate_caps(port, port->src_pdo,
-					    port->nr_src_pdo))
-		return -EINVAL;
+	if (port->nr_src_pdo) {
+		ret = fwnode_property_read_u32_array(fwnode, "source-pdos",
+						     port->src_pdo, port->nr_src_pdo);
+		if ((ret < 0) || tcpm_validate_caps(port, port->src_pdo,
+						    port->nr_src_pdo))
+			return -EINVAL;
+	}
 
 	if (port->port_type == TYPEC_PORT_SRC)
 		return 0;
@@ -5963,19 +5970,21 @@ static int tcpm_fw_get_caps(struct tcpm_port *port,
 sink:
 	/* Get sink pdos */
 	ret = fwnode_property_count_u32(fwnode, "sink-pdos");
-	if (ret <= 0)
-		return -EINVAL;
+	if (ret < 0)
+		ret = 0;
 
 	port->nr_snk_pdo = min(ret, PDO_MAX_OBJECTS);
-	ret = fwnode_property_read_u32_array(fwnode, "sink-pdos",
-					     port->snk_pdo, port->nr_snk_pdo);
-	if ((ret < 0) || tcpm_validate_caps(port, port->snk_pdo,
-					    port->nr_snk_pdo))
-		return -EINVAL;
+	if (port->nr_snk_pdo) {
+		ret = fwnode_property_read_u32_array(fwnode, "sink-pdos",
+						     port->snk_pdo, port->nr_snk_pdo);
+		if ((ret < 0) || tcpm_validate_caps(port, port->snk_pdo,
+						    port->nr_snk_pdo))
+			return -EINVAL;
 
-	if (fwnode_property_read_u32(fwnode, "op-sink-microwatt", &mw) < 0)
-		return -EINVAL;
-	port->operating_snk_mw = mw / 1000;
+		if (fwnode_property_read_u32(fwnode, "op-sink-microwatt", &mw) < 0)
+			return -EINVAL;
+		port->operating_snk_mw = mw / 1000;
+	}
 
 	port->self_powered = fwnode_property_read_bool(fwnode, "self-powered");
 
@@ -6283,9 +6292,8 @@ struct tcpm_port *tcpm_register_port(struct device *dev, struct tcpc_dev *tcpc)
 	int err;
 
 	if (!dev || !tcpc ||
-	    !tcpc->get_vbus || !tcpc->set_cc || !tcpc->get_cc ||
-	    !tcpc->set_polarity || !tcpc->set_vconn || !tcpc->set_vbus ||
-	    !tcpc->set_pd_rx || !tcpc->set_roles || !tcpc->pd_transmit)
+	    !tcpc->get_vbus || !tcpc->set_cc || !tcpc->get_cc || !tcpc->set_polarity ||
+	    !tcpc->set_vconn || !tcpc->set_vbus || !tcpc->set_roles)
 		return ERR_PTR(-EINVAL);
 
 	port = devm_kzalloc(dev, sizeof(*port), GFP_KERNEL);
