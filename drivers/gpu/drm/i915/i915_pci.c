@@ -1196,13 +1196,20 @@ static int __init i915_init(void)
 	bool use_kms = true;
 	int err;
 
+	/* We use this to detect early returns from i915_init() so we don't
+	 * tear anything down in i915_exit()
+	 */
+	i915_pci_driver.driver.owner = NULL;
+
 	err = i915_globals_init();
 	if (err)
 		return err;
 
 	err = i915_mock_selftests();
-	if (err)
-		return err > 0 ? 0 : err;
+	if (err) {
+		err = err > 0 ? 0 : err;
+		goto globals_exit;
+	}
 
 	/*
 	 * Enable KMS by default, unless explicitly overriden by
@@ -1225,13 +1232,17 @@ static int __init i915_init(void)
 	i915_pmu_init();
 
 	err = pci_register_driver(&i915_pci_driver);
-	if (err) {
-		i915_pmu_exit();
-		return err;
-	}
+	if (err)
+		goto pmu_exit;
 
 	i915_perf_sysctl_register();
 	return 0;
+
+pmu_exit:
+	i915_pmu_exit();
+globals_exit:
+	i915_globals_exit();
+	return err;
 }
 
 static void __exit i915_exit(void)
