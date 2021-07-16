@@ -69,6 +69,9 @@ struct fuse_inode_dax {
 };
 
 struct fuse_conn_dax {
+	/** dax mode: FUSE_DAX_MOUNT_* (always, never or per-file) **/
+	unsigned int mode;
+
 	/* DAX device */
 	struct dax_device *dev;
 
@@ -1285,7 +1288,8 @@ out_err:
 	return ret;
 }
 
-int fuse_dax_conn_alloc(struct fuse_conn *fc, struct dax_device *dax_dev)
+int fuse_dax_conn_alloc(struct fuse_conn *fc, unsigned int mode,
+			struct dax_device *dax_dev)
 {
 	struct fuse_conn_dax *fcd;
 	int err;
@@ -1298,6 +1302,7 @@ int fuse_dax_conn_alloc(struct fuse_conn *fc, struct dax_device *dax_dev)
 		return -ENOMEM;
 
 	spin_lock_init(&fcd->lock);
+	fcd->mode = mode;
 	fcd->dev = dax_dev;
 	err = fuse_dax_mem_range_init(fcd);
 	if (err) {
@@ -1336,8 +1341,14 @@ static const struct address_space_operations fuse_dax_file_aops  = {
 static bool fuse_should_enable_dax(struct inode *inode)
 {
 	struct fuse_conn *fc = get_fuse_conn(inode);
+	unsigned int mode;
 
 	if (!fc->dax)
+		return false;
+
+	mode = fc->dax->mode;
+
+	if (mode == FUSE_DAX_MOUNT_NEVER)
 		return false;
 
 	return true;
