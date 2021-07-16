@@ -1763,9 +1763,11 @@ static void btusb_work(struct work_struct *work)
 			/* Because mSBC frames do not need to be aligned to the
 			 * SCO packet boundary. If support the Alt 3, use the
 			 * Alt 3 for HCI payload >= 60 Bytes let air packet
-			 * data satisfy 60 bytes.
+			 * data satisfy 60 bytes. USB Alt 3 support also needs
+			 * HFP transparent MTU >= 72 Bytes.
 			 */
-			if (new_alts == 1 && btusb_find_altsetting(data, 3))
+			if (new_alts == 1 && hdev->sco_mtu >= 72 &&
+			    btusb_find_altsetting(data, 3))
 				new_alts = 3;
 		}
 
