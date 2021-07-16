@@ -177,6 +177,7 @@ const struct address_space_operations hfsplus_aops = {
 const struct dentry_operations hfsplus_dentry_operations = {
 	.d_hash       = hfsplus_hash_dentry,
 	.d_compare    = hfsplus_compare_dentry,
+	.d_revalidate = hfsplus_revalidate_dentry,
 };
 
 static void hfsplus_get_perms(struct inode *inode,
