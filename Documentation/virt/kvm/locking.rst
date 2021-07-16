@@ -30,6 +30,9 @@ On x86:
   holding kvm->arch.mmu_lock (typically with ``read_lock``, otherwise
   there's no need to take kvm->arch.tdp_mmu_pages_lock at all).
 
+- kvm->arch.tsc_write_lock is taken outside
+  kvm->arch.pvclock_gtod_sync_lock
+
 Everything else is a leaf: no other lock is taken inside the critical
 sections.
 
@@ -215,6 +218,14 @@ time it will be set using the Dirty tracking mechanism described above.
 :Protects:	- hardware virtualization enable/disable
 :Comment:	'raw' because hardware enabling/disabling must be atomic /wrt
 		migration.
+
+:Name:		kvm_arch::pvclock_gtod_sync_lock
+:Type:		raw_spinlock_t
+:Arch:		x86
+:Protects:	kvm_arch::{cur_tsc_generation,cur_tsc_nsec,cur_tsc_write,
+			cur_tsc_offset,nr_vcpus_matched_tsc}
+:Comment:	'raw' because updating the kvm master clock must not be
+		preempted.
 
 :Name:		kvm_arch::tsc_write_lock
 :Type:		raw_spinlock
