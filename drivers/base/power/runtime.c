@@ -639,11 +639,11 @@ static int rpm_suspend(struct device *dev, int rpmflags)
 	__update_runtime_status(dev, RPM_SUSPENDING);
 
 	callback = RPM_GET_CALLBACK(dev, runtime_suspend);
-
-	dev_pm_enable_wake_irq_check(dev, true);
 	retval = rpm_callback(callback, dev);
 	if (retval)
 		goto fail;
+
+	dev_pm_enable_wake_irq_check(dev, true);
 
  no_callback:
 	__update_runtime_status(dev, RPM_SUSPENDED);
@@ -690,7 +690,6 @@ static int rpm_suspend(struct device *dev, int rpmflags)
 	return retval;
 
  fail:
-	dev_pm_disable_wake_irq_check(dev);
 	__update_runtime_status(dev, RPM_ACTIVE);
 	dev->power.deferred_resume = false;
 	wake_up_all(&dev->power.wait_queue);
