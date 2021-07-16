@@ -77,11 +77,6 @@ u64 pvclock_clocksource_read(struct pvclock_vcpu_time_info *src)
 		flags = src->flags;
 	} while (pvclock_read_retry(src, version));
 
-	if (unlikely((flags & PVCLOCK_GUEST_STOPPED) != 0)) {
-		src->flags &= ~PVCLOCK_GUEST_STOPPED;
-		pvclock_touch_watchdogs();
-	}
-
 	if ((valid_flags & PVCLOCK_TSC_STABLE_BIT) &&
 		(flags & PVCLOCK_TSC_STABLE_BIT))
 		return ret;
