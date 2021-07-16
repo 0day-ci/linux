@@ -460,6 +460,7 @@ int fuse_fileattr_set(struct user_namespace *mnt_userns,
 	struct fuse_file *ff;
 	unsigned int flags = fa->flags;
 	struct fsxattr xfa;
+	bool newdax;
 	int err;
 
 	ff = fuse_priv_ioctl_prepare(inode);
@@ -467,10 +468,9 @@ int fuse_fileattr_set(struct user_namespace *mnt_userns,
 		return PTR_ERR(ff);
 
 	if (fa->flags_valid) {
+		newdax = flags & FS_DAX_FL;
 		err = fuse_priv_ioctl(inode, ff, FS_IOC_SETFLAGS,
 				      &flags, sizeof(flags));
-		if (err)
-			goto cleanup;
 	} else {
 		memset(&xfa, 0, sizeof(xfa));
 		xfa.fsx_xflags = fa->fsx_xflags;
@@ -479,11 +479,14 @@ int fuse_fileattr_set(struct user_namespace *mnt_userns,
 		xfa.fsx_projid = fa->fsx_projid;
 		xfa.fsx_cowextsize = fa->fsx_cowextsize;
 
+		newdax = fa->fsx_xflags & FS_XFLAG_DAX;
 		err = fuse_priv_ioctl(inode, ff, FS_IOC_FSSETXATTR,
 				      &xfa, sizeof(xfa));
 	}
 
-cleanup:
+	if (!err && IS_ENABLED(CONFIG_FUSE_DAX))
+		fuse_dax_dontcache(inode, newdax);
+
 	fuse_priv_ioctl_cleanup(inode, ff);
 
 	return err;
