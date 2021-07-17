@@ -5,6 +5,7 @@
  * virtio-net server in host kernel.
  */
 
+#include <linux/refcount.h>
 #include <linux/compat.h>
 #include <linux/eventfd.h>
 #include <linux/vhost.h>
@@ -92,7 +93,7 @@ struct vhost_net_ubuf_ref {
 	 *  1: no outstanding ubufs
 	 * >1: outstanding ubufs
 	 */
-	atomic_t refcount;
+	refcount_t refcount;
 	wait_queue_head_t wait;
 	struct vhost_virtqueue *vq;
 };
@@ -240,7 +241,7 @@ vhost_net_ubuf_alloc(struct vhost_virtqueue *vq, bool zcopy)
 	ubufs = kmalloc(sizeof(*ubufs), GFP_KERNEL);
 	if (!ubufs)
 		return ERR_PTR(-ENOMEM);
-	atomic_set(&ubufs->refcount, 1);
+	refcount_set(&ubufs->refcount, 1);
 	init_waitqueue_head(&ubufs->wait);
 	ubufs->vq = vq;
 	return ubufs;
@@ -248,7 +249,8 @@ vhost_net_ubuf_alloc(struct vhost_virtqueue *vq, bool zcopy)
 
 static int vhost_net_ubuf_put(struct vhost_net_ubuf_ref *ubufs)
 {
-	int r = atomic_sub_return(1, &ubufs->refcount);
+	refcount_dec(&ubufs->refcount);
+	int r = refcount_read(&ubufs->refcount);
 	if (unlikely(!r))
 		wake_up(&ubufs->wait);
 	return r;
@@ -257,7 +259,7 @@ static int vhost_net_ubuf_put(struct vhost_net_ubuf_ref *ubufs)
 static void vhost_net_ubuf_put_and_wait(struct vhost_net_ubuf_ref *ubufs)
 {
 	vhost_net_ubuf_put(ubufs);
-	wait_event(ubufs->wait, !atomic_read(&ubufs->refcount));
+	wait_event(ubufs->wait, !refcount_read(&ubufs->refcount));
 }
 
 static void vhost_net_ubuf_put_wait_and_free(struct vhost_net_ubuf_ref *ubufs)
@@ -909,7 +911,7 @@ static void handle_tx_zerocopy(struct vhost_net *net, struct socket *sock)
 			ctl.ptr = ubuf;
 			msg.msg_controllen = sizeof(ctl);
 			ubufs = nvq->ubufs;
-			atomic_inc(&ubufs->refcount);
+			refcount_inc(&ubufs->refcount);
 			nvq->upend_idx = (nvq->upend_idx + 1) % UIO_MAXIOV;
 		} else {
 			msg.msg_control = NULL;
@@ -1384,7 +1386,7 @@ static void vhost_net_flush(struct vhost_net *n)
 		vhost_net_ubuf_put_and_wait(n->vqs[VHOST_NET_VQ_TX].ubufs);
 		mutex_lock(&n->vqs[VHOST_NET_VQ_TX].vq.mutex);
 		n->tx_flush = false;
-		atomic_set(&n->vqs[VHOST_NET_VQ_TX].ubufs->refcount, 1);
+		refcount_set(&n->vqs[VHOST_NET_VQ_TX].ubufs->refcount, 1);
 		mutex_unlock(&n->vqs[VHOST_NET_VQ_TX].vq.mutex);
 	}
 }
