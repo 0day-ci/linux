@@ -1448,7 +1448,7 @@ static void psr_force_hw_tracking_exit(struct intel_dp *intel_dp)
 {
 	struct drm_i915_private *dev_priv = dp_to_i915(intel_dp);
 
-	if (DISPLAY_VER(dev_priv) >= 9)
+	if (DISPLAY_VER(dev_priv) >= 9 && !intel_dp->psr.psr2_sel_fetch_enabled)
 		/*
 		 * Display WA #0884: skl+
 		 * This documented WA for bxt can be safely applied
