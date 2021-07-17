@@ -69,7 +69,8 @@ static inline unsigned int vlan_prio(const struct l2t_entry *e)
 
 static inline void l2t_hold(struct l2t_data *d, struct l2t_entry *e)
 {
-	if (atomic_add_return(1, &e->refcnt) == 1)  /* 0 -> 1 transition */
+	refcount_inc(&e->refcnt);
+	if (refcount_read(&e->refcnt) == 1)  /* 0 -> 1 transition */
 		atomic_dec(&d->nfree);
 }
 
@@ -270,10 +271,10 @@ static struct l2t_entry *alloc_l2e(struct l2t_data *d)
 
 	/* there's definitely a free entry */
 	for (e = d->rover, end = &d->l2tab[d->l2t_size]; e != end; ++e)
-		if (atomic_read(&e->refcnt) == 0)
+		if (refcount_read(&e->refcnt) == 0)
 			goto found;
 
-	for (e = d->l2tab; atomic_read(&e->refcnt); ++e)
+	for (e = d->l2tab; refcount_read(&e->refcnt); ++e)
 		;
 found:
 	d->rover = e + 1;
@@ -302,7 +303,7 @@ static struct l2t_entry *find_or_alloc_l2e(struct l2t_data *d, u16 vlan,
 	struct l2t_entry *first_free = NULL;
 
 	for (e = &d->l2tab[0], end = &d->l2tab[d->l2t_size]; e != end; ++e) {
-		if (atomic_read(&e->refcnt) == 0) {
+		if (refcount_read(&e->refcnt) == 0) {
 			if (!first_free)
 				first_free = e;
 		} else {
@@ -352,7 +353,7 @@ static void _t4_l2e_free(struct l2t_entry *e)
 {
 	struct l2t_data *d;
 
-	if (atomic_read(&e->refcnt) == 0) {  /* hasn't been recycled */
+	if (refcount_read(&e->refcnt) == 0) {  /* hasn't been recycled */
 		if (e->neigh) {
 			neigh_release(e->neigh);
 			e->neigh = NULL;
@@ -370,7 +371,7 @@ static void t4_l2e_free(struct l2t_entry *e)
 	struct l2t_data *d;
 
 	spin_lock_bh(&e->lock);
-	if (atomic_read(&e->refcnt) == 0) {  /* hasn't been recycled */
+	if (refcount_read(&e->refcnt) == 0) {  /* hasn't been recycled */
 		if (e->neigh) {
 			neigh_release(e->neigh);
 			e->neigh = NULL;
@@ -385,7 +386,7 @@ static void t4_l2e_free(struct l2t_entry *e)
 
 void cxgb4_l2t_release(struct l2t_entry *e)
 {
-	if (atomic_dec_and_test(&e->refcnt))
+	if (refcount_dec_and_test(&e->refcnt))
 		t4_l2e_free(e);
 }
 EXPORT_SYMBOL(cxgb4_l2t_release);
@@ -441,7 +442,7 @@ struct l2t_entry *cxgb4_l2t_get(struct l2t_data *d, struct neighbour *neigh,
 		if (!addreq(e, addr) && e->ifindex == ifidx &&
 		    e->vlan == vlan && e->lport == lport) {
 			l2t_hold(d, e);
-			if (atomic_read(&e->refcnt) == 1)
+			if (refcount_read(&e->refcnt) == 1)
 				reuse_entry(e, neigh);
 			goto done;
 		}
@@ -458,7 +459,7 @@ struct l2t_entry *cxgb4_l2t_get(struct l2t_data *d, struct neighbour *neigh,
 		e->hash = hash;
 		e->lport = lport;
 		e->v6 = addr_len == 16;
-		atomic_set(&e->refcnt, 1);
+		refcount_set(&e->refcnt, 1);
 		neigh_replace(e, neigh);
 		e->vlan = vlan;
 		e->next = d->l2tab[hash].first;
@@ -520,7 +521,7 @@ void t4_l2t_update(struct adapter *adap, struct neighbour *neigh)
 	for (e = d->l2tab[hash].first; e; e = e->next)
 		if (!addreq(e, addr) && e->ifindex == ifidx) {
 			spin_lock(&e->lock);
-			if (atomic_read(&e->refcnt))
+			if (refcount_read(&e->refcnt))
 				goto found;
 			spin_unlock(&e->lock);
 			break;
@@ -585,12 +586,12 @@ struct l2t_entry *t4_l2t_alloc_switching(struct adapter *adap, u16 vlan,
 	e = find_or_alloc_l2e(d, vlan, port, eth_addr);
 	if (e) {
 		spin_lock(&e->lock);          /* avoid race with t4_l2t_free */
-		if (!atomic_read(&e->refcnt)) {
+		if (!refcount_read(&e->refcnt)) {
 			e->state = L2T_STATE_SWITCHING;
 			e->vlan = vlan;
 			e->lport = port;
 			ether_addr_copy(e->dmac, eth_addr);
-			atomic_set(&e->refcnt, 1);
+			refcount_set(&e->refcnt, 1);
 			ret = write_l2e(adap, e, 0);
 			if (ret < 0) {
 				_t4_l2e_free(e);
@@ -599,7 +600,7 @@ struct l2t_entry *t4_l2t_alloc_switching(struct adapter *adap, u16 vlan,
 				return NULL;
 			}
 		} else {
-			atomic_inc(&e->refcnt);
+			refcount_inc(&e->refcnt);
 		}
 
 		spin_unlock(&e->lock);
@@ -654,7 +655,7 @@ struct l2t_data *t4_init_l2t(unsigned int l2t_start, unsigned int l2t_end)
 		d->l2tab[i].idx = i;
 		d->l2tab[i].state = L2T_STATE_UNUSED;
 		spin_lock_init(&d->l2tab[i].lock);
-		atomic_set(&d->l2tab[i].refcnt, 0);
+		refcount_set(&d->l2tab[i].refcnt, 0);
 		skb_queue_head_init(&d->l2tab[i].arpq);
 	}
 	return d;
@@ -726,7 +727,7 @@ static int l2t_seq_show(struct seq_file *seq, void *v)
 		seq_printf(seq, "%4u %-25s %17pM %4d %u %2u   %c   %5u %s\n",
 			   e->idx + d->l2t_start, ip, e->dmac,
 			   e->vlan & VLAN_VID_MASK, vlan_prio(e), e->lport,
-			   l2e_state(e), atomic_read(&e->refcnt),
+			   l2e_state(e), refcount_read(&e->refcnt),
 			   e->neigh ? e->neigh->dev->name : "");
 		spin_unlock_bh(&e->lock);
 	}

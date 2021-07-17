@@ -38,6 +38,7 @@
 #include <linux/spinlock.h>
 #include <linux/if_ether.h>
 #include <linux/atomic.h>
+#include <linux/refcount.h>
 
 #define VLAN_NONE 0xfff
 
@@ -80,7 +81,7 @@ struct l2t_entry {
 	struct l2t_entry *next;     /* next l2t_entry on chain */
 	struct sk_buff_head arpq;   /* packet queue awaiting resolution */
 	spinlock_t lock;
-	atomic_t refcnt;            /* entry reference count */
+	refcount_t refcnt;            /* entry reference count */
 	u16 hash;                   /* hash bucket the entry is on */
 	u16 vlan;                   /* VLAN TCI (id: bits 0-11, prio: 13-15 */
 	u8 v6;                      /* whether entry is for IPv6 */
