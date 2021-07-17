@@ -2418,6 +2418,17 @@ static void __unfreeze_partials(struct kmem_cache *s, struct page *partial_page)
 	if (n)
 		spin_unlock_irqrestore(&n->list_lock, flags);
 
+	/*
+	 * If we got here via __slab_free() -> put_cpu_partial(),
+	 * memcg_free_page_obj_cgroups() ->kfree() may send us
+	 * back to __slab_free() -> put_cpu_partial() for an
+	 * unfortunate second encounter with cpu_slab->lock.
+	 */
+	if (IS_ENABLED(CONFIG_PREEMPT_RT) && memcg_kmem_enabled()) {
+		lockdep_assert_held(this_cpu_ptr(&s->cpu_slab->lock.lock));
+		local_unlock(&s->cpu_slab->lock);
+	}
+
 	while (discard_page) {
 		page = discard_page;
 		discard_page = discard_page->next;
@@ -2426,6 +2437,9 @@ static void __unfreeze_partials(struct kmem_cache *s, struct page *partial_page)
 		discard_slab(s, page);
 		stat(s, FREE_SLAB);
 	}
+
+	if (IS_ENABLED(CONFIG_PREEMPT_RT) && memcg_kmem_enabled())
+		local_lock(&s->cpu_slab->lock);
 }
 
 /*
@@ -2497,7 +2511,9 @@ static void put_cpu_partial(struct kmem_cache *s, struct page *page, int drain)
 				 * partial array is full. Move the existing
 				 * set to the per node partial list.
 				 */
+				local_lock(&s->cpu_slab->lock);
 				unfreeze_partials(s);
+				local_unlock(&s->cpu_slab->lock);
 				oldpage = NULL;
 				pobjects = 0;
 				pages = 0;
@@ -2579,7 +2595,9 @@ static void flush_cpu_slab(struct work_struct *w)
 	if (c->page)
 		flush_slab(s, c, true);
 
+	local_lock(&s->cpu_slab->lock);
 	unfreeze_partials(s);
+	local_unlock(&s->cpu_slab->lock);
 }
 
 static bool has_cpu_slab(int cpu, struct kmem_cache *s)
@@ -2632,8 +2650,11 @@ static int slub_cpu_dead(unsigned int cpu)
 	struct kmem_cache *s;
 
 	mutex_lock(&slab_mutex);
-	list_for_each_entry(s, &slab_caches, list)
+	list_for_each_entry(s, &slab_caches, list) {
+		local_lock(&s->cpu_slab->lock);
 		__flush_cpu_slab(s, cpu);
+		local_unlock(&s->cpu_slab->lock);
+	}
 	mutex_unlock(&slab_mutex);
 	return 0;
 }
