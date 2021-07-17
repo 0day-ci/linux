@@ -1701,18 +1701,15 @@ int hci_get_conn_list(void __user *arg)
 	return err ? -EFAULT : 0;
 }
 
-int hci_get_conn_info(struct hci_dev *hdev, void __user *arg)
+int hci_get_conn_info(struct hci_dev *hdev, void __user *arg,
+		      struct hci_conn_info_req *req)
 {
-	struct hci_conn_info_req req;
 	struct hci_conn_info ci;
 	struct hci_conn *conn;
-	char __user *ptr = arg + sizeof(req);
-
-	if (copy_from_user(&req, arg, sizeof(req)))
-		return -EFAULT;
+	char __user *ptr = (char *)arg + sizeof(*req);
 
 	hci_dev_lock(hdev);
-	conn = hci_conn_hash_lookup_ba(hdev, req.type, &req.bdaddr);
+	conn = hci_conn_hash_lookup_ba(hdev, req->type, &req->bdaddr);
 	if (conn) {
 		bacpy(&ci.bdaddr, &conn->dst);
 		ci.handle = conn->handle;
@@ -1729,24 +1726,21 @@ int hci_get_conn_info(struct hci_dev *hdev, void __user *arg)
 	return copy_to_user(ptr, &ci, sizeof(ci)) ? -EFAULT : 0;
 }
 
-int hci_get_auth_info(struct hci_dev *hdev, void __user *arg)
+int hci_get_auth_info(struct hci_dev *hdev, void __user *arg,
+		      struct hci_auth_info_req *req)
 {
-	struct hci_auth_info_req req;
 	struct hci_conn *conn;
 
-	if (copy_from_user(&req, arg, sizeof(req)))
-		return -EFAULT;
-
 	hci_dev_lock(hdev);
-	conn = hci_conn_hash_lookup_ba(hdev, ACL_LINK, &req.bdaddr);
+	conn = hci_conn_hash_lookup_ba(hdev, ACL_LINK, &req->bdaddr);
 	if (conn)
-		req.type = conn->auth_type;
+		req->type = conn->auth_type;
 	hci_dev_unlock(hdev);
 
 	if (!conn)
 		return -ENOENT;
 
-	return copy_to_user(arg, &req, sizeof(req)) ? -EFAULT : 0;
+	return copy_to_user(arg, req, sizeof(*req)) ? -EFAULT : 0;
 }
 
 struct hci_chan *hci_chan_create(struct hci_conn *conn)

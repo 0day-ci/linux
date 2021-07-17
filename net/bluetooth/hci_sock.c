@@ -50,7 +50,7 @@ static atomic_t monitor_promisc = ATOMIC_INIT(0);
 
 struct hci_pinfo {
 	struct bt_sock    bt;
-	struct hci_dev    *hdev;
+	int               dev;
 	struct hci_filter filter;
 	__u8              cmsg_mask;
 	unsigned short    channel;
@@ -200,7 +200,8 @@ void hci_send_to_sock(struct hci_dev *hdev, struct sk_buff *skb)
 	sk_for_each(sk, &hci_sk_list.head) {
 		struct sk_buff *nskb;
 
-		if (sk->sk_state != BT_BOUND || hci_pi(sk)->hdev != hdev)
+		if (sk->sk_state != BT_BOUND ||
+		    (hdev && hci_pi(sk)->dev != hdev->id))
 			continue;
 
 		/* Don't send frame to the socket it came from */
@@ -536,8 +537,8 @@ static struct sk_buff *create_monitor_ctrl_open(struct sock *sk)
 
 	hdr = skb_push(skb, HCI_MON_HDR_SIZE);
 	hdr->opcode = cpu_to_le16(HCI_MON_CTRL_OPEN);
-	if (hci_pi(sk)->hdev)
-		hdr->index = cpu_to_le16(hci_pi(sk)->hdev->id);
+	if (hci_pi(sk)->dev >= 0)
+		hdr->index = cpu_to_le16(hci_pi(sk)->dev);
 	else
 		hdr->index = cpu_to_le16(HCI_DEV_NONE);
 	hdr->len = cpu_to_le16(skb->len - HCI_MON_HDR_SIZE);
@@ -574,8 +575,8 @@ static struct sk_buff *create_monitor_ctrl_close(struct sock *sk)
 
 	hdr = skb_push(skb, HCI_MON_HDR_SIZE);
 	hdr->opcode = cpu_to_le16(HCI_MON_CTRL_CLOSE);
-	if (hci_pi(sk)->hdev)
-		hdr->index = cpu_to_le16(hci_pi(sk)->hdev->id);
+	if (hci_pi(sk)->dev >= 0)
+		hdr->index = cpu_to_le16(hci_pi(sk)->dev);
 	else
 		hdr->index = cpu_to_le16(HCI_DEV_NONE);
 	hdr->len = cpu_to_le16(skb->len - HCI_MON_HDR_SIZE);
@@ -762,16 +763,13 @@ void hci_sock_dev_event(struct hci_dev *hdev, int event)
 		/* Detach sockets from device */
 		read_lock(&hci_sk_list.lock);
 		sk_for_each(sk, &hci_sk_list.head) {
-			lock_sock(sk);
-			if (hci_pi(sk)->hdev == hdev) {
-				hci_pi(sk)->hdev = NULL;
+			bh_lock_sock_nested(sk);
+			if (hci_pi(sk)->dev == hdev->id) {
 				sk->sk_err = EPIPE;
 				sk->sk_state = BT_OPEN;
 				sk->sk_state_change(sk);
-
-				hci_dev_put(hdev);
 			}
-			release_sock(sk);
+			bh_unlock_sock(sk);
 		}
 		read_unlock(&hci_sk_list.lock);
 	}
@@ -861,7 +859,7 @@ static int hci_sock_release(struct socket *sock)
 
 	bt_sock_unlink(&hci_sk_list, sk);
 
-	hdev = hci_pi(sk)->hdev;
+	hdev = hci_dev_get(hci_pi(sk)->dev);
 	if (hdev) {
 		if (hci_pi(sk)->channel == HCI_CHANNEL_USER) {
 			/* When releasing a user channel exclusive access,
@@ -892,82 +890,161 @@ static int hci_sock_release(struct socket *sock)
 	return 0;
 }
 
-static int hci_sock_reject_list_add(struct hci_dev *hdev, void __user *arg)
+static int hci_sock_reject_list_add(struct sock *sk, void __user *arg)
 {
+	struct hci_dev *hdev;
 	bdaddr_t bdaddr;
 	int err;
 
 	if (copy_from_user(&bdaddr, arg, sizeof(bdaddr)))
 		return -EFAULT;
+
+	hdev = hci_dev_get(hci_pi(sk)->dev);
+	if (!hdev)
+		return -EBADF;
 
 	hci_dev_lock(hdev);
 
 	err = hci_bdaddr_list_add(&hdev->reject_list, &bdaddr, BDADDR_BREDR);
 
 	hci_dev_unlock(hdev);
+	hci_dev_put(hdev);
 
 	return err;
 }
 
-static int hci_sock_reject_list_del(struct hci_dev *hdev, void __user *arg)
+static int hci_sock_reject_list_del(struct sock *sk, void __user *arg)
 {
+	struct hci_dev *hdev;
 	bdaddr_t bdaddr;
 	int err;
 
 	if (copy_from_user(&bdaddr, arg, sizeof(bdaddr)))
 		return -EFAULT;
 
+	hdev = hci_dev_get(hci_pi(sk)->dev);
+	if (!hdev)
+		return -EBADF;
+
 	hci_dev_lock(hdev);
 
 	err = hci_bdaddr_list_del(&hdev->reject_list, &bdaddr, BDADDR_BREDR);
 
 	hci_dev_unlock(hdev);
+	hci_dev_put(hdev);
 
 	return err;
+}
+
+static int hci_sock_get_conn_info(struct sock *sk, void __user *arg)
+{
+	struct hci_dev *hdev;
+	struct hci_conn_info_req req;
+	int ret;
+
+	if (copy_from_user(&req, arg, sizeof(req)))
+		return -EFAULT;
+
+	hdev = hci_dev_get(hci_pi(sk)->dev);
+	if (!hdev)
+		return -EBADF;
+
+	ret = hci_get_conn_info(hdev, arg, &req);
+
+	hci_dev_put(hdev);
+
+	return ret;
+}
+
+static int hci_sock_get_auth_info(struct sock *sk, void __user *arg)
+{
+	struct hci_dev *hdev;
+	struct hci_auth_info_req req;
+	int ret;
+
+	if (copy_from_user(&req, arg, sizeof(req)))
+		return -EFAULT;
+
+	hdev = hci_dev_get(hci_pi(sk)->dev);
+	if (!hdev)
+		return -EBADF;
+
+	ret = hci_get_auth_info(hdev, arg, &req);
+
+	hci_dev_put(hdev);
+
+	return ret;
 }
 
 /* Ioctls that require bound socket */
 static int hci_sock_bound_ioctl(struct sock *sk, unsigned int cmd,
 				unsigned long arg)
 {
-	struct hci_dev *hdev = hci_pi(sk)->hdev;
+	struct hci_dev *hdev = hci_dev_get(hci_pi(sk)->dev);
+	int ret;
 
 	if (!hdev)
 		return -EBADFD;
 
-	if (hci_dev_test_flag(hdev, HCI_USER_CHANNEL))
-		return -EBUSY;
+	if (hci_dev_test_flag(hdev, HCI_USER_CHANNEL)) {
+		ret = -EBUSY;
+		goto done;
+	}
 
-	if (hci_dev_test_flag(hdev, HCI_UNCONFIGURED))
-		return -EOPNOTSUPP;
+	if (hci_dev_test_flag(hdev, HCI_UNCONFIGURED)) {
+		ret = -EOPNOTSUPP;
+		goto done;
+	}
 
-	if (hdev->dev_type != HCI_PRIMARY)
-		return -EOPNOTSUPP;
+	if (hdev->dev_type != HCI_PRIMARY) {
+		ret = -EOPNOTSUPP;
+		goto done;
+	}
+
+	/* Commands may use copy_from_user which is unsafe while holding hdev as
+	 * it could be unregistered in the meantime.
+	 */
+	hci_dev_put(hdev);
+	hdev = NULL;
 
 	switch (cmd) {
 	case HCISETRAW:
 		if (!capable(CAP_NET_ADMIN))
-			return -EPERM;
-		return -EOPNOTSUPP;
+			ret = -EPERM;
+		else
+			ret = -EOPNOTSUPP;
+		break;
 
 	case HCIGETCONNINFO:
-		return hci_get_conn_info(hdev, (void __user *)arg);
+		ret = hci_sock_get_conn_info(sk, (void __user *)arg);
+		break;
 
 	case HCIGETAUTHINFO:
-		return hci_get_auth_info(hdev, (void __user *)arg);
+		ret = hci_sock_get_auth_info(sk, (void __user *)arg);
+		break;
 
 	case HCIBLOCKADDR:
 		if (!capable(CAP_NET_ADMIN))
-			return -EPERM;
-		return hci_sock_reject_list_add(hdev, (void __user *)arg);
+			ret = -EPERM;
+		else
+			ret = hci_sock_reject_list_add(sk, (void __user *)arg);
+		break;
 
 	case HCIUNBLOCKADDR:
 		if (!capable(CAP_NET_ADMIN))
-			return -EPERM;
-		return hci_sock_reject_list_del(hdev, (void __user *)arg);
+			ret = -EPERM;
+		else
+			ret = hci_sock_reject_list_del(sk, (void __user *)arg);
+		break;
+	default:
+		ret = -ENOIOCTLCMD;
 	}
 
-	return -ENOIOCTLCMD;
+done:
+	if (hdev)
+		hci_dev_put(hdev);
+
+	return ret;
 }
 
 static int hci_sock_ioctl(struct socket *sock, unsigned int cmd,
@@ -1110,7 +1187,7 @@ static int hci_sock_bind(struct socket *sock, struct sockaddr *addr,
 
 	switch (haddr.hci_channel) {
 	case HCI_CHANNEL_RAW:
-		if (hci_pi(sk)->hdev) {
+		if (hci_pi(sk)->dev >= 0) {
 			err = -EALREADY;
 			goto done;
 		}
@@ -1145,7 +1222,10 @@ static int hci_sock_bind(struct socket *sock, struct sockaddr *addr,
 		if (capable(CAP_NET_ADMIN))
 			hci_sock_set_flag(sk, HCI_SOCK_TRUSTED);
 
-		hci_pi(sk)->hdev = hdev;
+		if (hdev) {
+			hci_pi(sk)->dev = hdev->id;
+			hci_dev_put(hdev);
+		}
 
 		/* Send event to monitor */
 		skb = create_monitor_ctrl_open(sk);
@@ -1157,7 +1237,7 @@ static int hci_sock_bind(struct socket *sock, struct sockaddr *addr,
 		break;
 
 	case HCI_CHANNEL_USER:
-		if (hci_pi(sk)->hdev) {
+		if (hci_pi(sk)->dev >= 0) {
 			err = -EALREADY;
 			goto done;
 		}
@@ -1236,7 +1316,8 @@ static int hci_sock_bind(struct socket *sock, struct sockaddr *addr,
 		 */
 		hci_sock_set_flag(sk, HCI_SOCK_TRUSTED);
 
-		hci_pi(sk)->hdev = hdev;
+		hci_pi(sk)->dev = hdev->id;
+		hci_dev_put(hdev);
 
 		/* Send event to monitor */
 		skb = create_monitor_ctrl_open(sk);
@@ -1379,7 +1460,7 @@ static int hci_sock_getname(struct socket *sock, struct sockaddr *addr,
 
 	lock_sock(sk);
 
-	hdev = hci_pi(sk)->hdev;
+	hdev = hci_dev_get(hci_pi(sk)->dev);
 	if (!hdev) {
 		err = -EBADFD;
 		goto done;
@@ -1389,6 +1470,7 @@ static int hci_sock_getname(struct socket *sock, struct sockaddr *addr,
 	haddr->hci_dev    = hdev->id;
 	haddr->hci_channel= hci_pi(sk)->channel;
 	err = sizeof(*haddr);
+	hci_dev_put(hdev);
 
 done:
 	release_sock(sk);
@@ -1703,7 +1785,7 @@ static int hci_sock_sendmsg(struct socket *sock, struct msghdr *msg,
 {
 	struct sock *sk = sock->sk;
 	struct hci_mgmt_chan *chan;
-	struct hci_dev *hdev;
+	struct hci_dev *hdev = NULL;
 	struct sk_buff *skb;
 	int err;
 
@@ -1743,7 +1825,7 @@ static int hci_sock_sendmsg(struct socket *sock, struct msghdr *msg,
 		goto done;
 	}
 
-	hdev = hci_pi(sk)->hdev;
+	hdev = hci_dev_get(hci_pi(sk)->dev);
 	if (!hdev) {
 		err = -EBADFD;
 		goto done;
@@ -1832,6 +1914,9 @@ static int hci_sock_sendmsg(struct socket *sock, struct msghdr *msg,
 	err = len;
 
 done:
+	if (hdev)
+		hci_dev_put(hdev);
+
 	release_sock(sk);
 	return err;
 
@@ -2049,6 +2134,7 @@ static int hci_sock_create(struct net *net, struct socket *sock, int protocol,
 	sock->state = SS_UNCONNECTED;
 	sk->sk_state = BT_OPEN;
 
+	hci_pi(sk)->dev = -1;
 	bt_sock_link(&hci_sk_list, sk);
 	return 0;
 }
