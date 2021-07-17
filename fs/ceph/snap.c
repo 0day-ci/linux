@@ -68,14 +68,15 @@ void ceph_get_snap_realm(struct ceph_mds_client *mdsc,
 	lockdep_assert_held(&mdsc->snap_rwsem);
 
 	dout("get_realm %p %d -> %d\n", realm,
-	     atomic_read(&realm->nref), atomic_read(&realm->nref)+1);
+	     refcount_read(&realm->nref), refcount_read(&realm->nref)+1);
 	/*
 	 * since we _only_ increment realm refs or empty the empty
 	 * list with snap_rwsem held, adjusting the empty list here is
 	 * safe.  we do need to protect against concurrent empty list
 	 * additions, however.
 	 */
-	if (atomic_inc_return(&realm->nref) == 1) {
+	refcount_inc(&realm->nref);
+	if (refcount_read(&realm->nref) == 1) {
 		spin_lock(&mdsc->snap_empty_lock);
 		list_del_init(&realm->empty_item);
 		spin_unlock(&mdsc->snap_empty_lock);
@@ -121,7 +122,7 @@ static struct ceph_snap_realm *ceph_create_snap_realm(
 	if (!realm)
 		return ERR_PTR(-ENOMEM);
 
-	atomic_set(&realm->nref, 1);    /* for caller */
+	refcount_set(&realm->nref, 1);    /* for caller */
 	realm->ino = ino;
 	INIT_LIST_HEAD(&realm->children);
 	INIT_LIST_HEAD(&realm->child_item);
@@ -209,8 +210,8 @@ static void __put_snap_realm(struct ceph_mds_client *mdsc,
 	lockdep_assert_held_write(&mdsc->snap_rwsem);
 
 	dout("__put_snap_realm %llx %p %d -> %d\n", realm->ino, realm,
-	     atomic_read(&realm->nref), atomic_read(&realm->nref)-1);
-	if (atomic_dec_and_test(&realm->nref))
+	     refcount_read(&realm->nref), refcount_read(&realm->nref)-1);
+	if (refcount_dec_and_test(&realm->nref))
 		__destroy_snap_realm(mdsc, realm);
 }
 
@@ -221,8 +222,8 @@ void ceph_put_snap_realm(struct ceph_mds_client *mdsc,
 			 struct ceph_snap_realm *realm)
 {
 	dout("put_snap_realm %llx %p %d -> %d\n", realm->ino, realm,
-	     atomic_read(&realm->nref), atomic_read(&realm->nref)-1);
-	if (!atomic_dec_and_test(&realm->nref))
+	     refcount_read(&realm->nref), refcount_read(&realm->nref)-1);
+	if (!refcount_dec_and_test(&realm->nref))
 		return;
 
 	if (down_write_trylock(&mdsc->snap_rwsem)) {

@@ -2,6 +2,7 @@
 #ifndef _FS_CEPH_SUPER_H
 #define _FS_CEPH_SUPER_H
 
+#include <linux/refcount.h>
 #include <linux/ceph/ceph_debug.h>
 
 #include <asm/unaligned.h>
@@ -859,7 +860,7 @@ struct ceph_readdir_cache_control {
 struct ceph_snap_realm {
 	u64 ino;
 	struct inode *inode;
-	atomic_t nref;
+	refcount_t nref;
 	struct rb_node node;
 
 	u64 created, seq;
