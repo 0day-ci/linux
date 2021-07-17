@@ -10,6 +10,7 @@
 #ifndef _LINUX_SUNRPC_CLNT_H
 #define _LINUX_SUNRPC_CLNT_H
 
+#include <linux/refcount.h>
 #include <linux/types.h>
 #include <linux/socket.h>
 #include <linux/in.h>
@@ -34,7 +35,7 @@ struct rpc_inode;
  * The high-level client handle
  */
 struct rpc_clnt {
-	atomic_t		cl_count;	/* Number of references */
+	refcount_t		cl_count;	/* Number of references */
 	unsigned int		cl_clid;	/* client id */
 	struct list_head	cl_clients;	/* Global list of clients */
 	struct list_head	cl_tasks;	/* List of tasks */
