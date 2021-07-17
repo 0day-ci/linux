@@ -1,0 +1,24 @@
+* Marvell Armada 3720 UART clocks
+
+Required properties:
+- compatible: "marvell,armada-3700-uart-clock"
+- reg: two 4-bytes registers: UART Clock Control and UART 2 Baud Rate Divisor
+- #clock-cells : from common clock binding; shall be set to 1
+- clocks: List of parent clocks suitable for UART from following set:
+		"TBG-A-P", "TBG-B-P", "TBG-A-S", "TBG-B-S", "xtal"
+	UART clock can use one from this set and when more are provided
+	then kernel would choose and configure the most suitable one.
+	It is suggest to specify at least one TBG clock to achieve
+	baudrates above 230400 and also to specify clock which bootloader
+	used for UART (most probably xtal) for smooth boot log on UART.
+
+Example:
+	uartclk: uartclk@12000 {
+		compatible = "marvell,armada-3700-uart-clock";
+		reg = <0x12010 0x4>, <0x12210 0x4>;
+		clocks = <&tbg 0>, <&tbg 1>, <&tbg 2>,
+			<&tbg 3>, <&xtalclk>;
+		clock-names = "TBG-A-P", "TBG-B-P", "TBG-A-S",
+			"TBG-B-S", "xtal";
+		#clock-cells = <1>;
+	};
