@@ -562,12 +562,16 @@ static ssize_t param_attr_store(struct module_attribute *mattr,
 	if (!attribute->param->ops->set)
 		return -EPERM;
 
+	if (!try_module_get(mk->mod))
+		return -ENODEV;
+
 	kernel_param_lock(mk->mod);
 	if (param_check_unsafe(attribute->param))
 		err = attribute->param->ops->set(buf, attribute->param);
 	else
 		err = -EPERM;
 	kernel_param_unlock(mk->mod);
+	module_put(mk->mod);
 	if (!err)
 		return len;
 	return err;
