@@ -56,6 +56,14 @@
 		regulator-max-microvolt = <1500000>;
 		regulator-boot-on;
 	};
+
+	vcc_wifi: regulator@3 {
+		compatible = "regulator-fixed";
+		regulator-name = "vcc_wifi";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		gpios = <&gpio SSD20XD_GPIO_GPIO14 0>;
+	};
 };
 
 &pm_uart {
