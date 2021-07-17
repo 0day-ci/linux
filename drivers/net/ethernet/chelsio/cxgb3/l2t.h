@@ -35,6 +35,7 @@
 #include <linux/spinlock.h>
 #include "t3cdev.h"
 #include <linux/atomic.h>
+#include <linux/refcount.h>
 
 enum {
 	L2T_STATE_VALID,	/* entry is up to date */
@@ -66,7 +67,7 @@ struct l2t_entry {
 	struct l2t_entry *next;	/* next l2t_entry on chain */
 	struct sk_buff_head arpq;	/* queue of packets awaiting resolution */
 	spinlock_t lock;
-	atomic_t refcnt;	/* entry reference count */
+	refcount_t refcnt;	/* entry reference count */
 	u8 dmac[6];		/* neighbour's MAC address */
 };
 
@@ -133,7 +134,7 @@ static inline void l2t_release(struct t3cdev *t, struct l2t_entry *e)
 	rcu_read_lock();
 	d = L2DATA(t);
 
-	if (atomic_dec_and_test(&e->refcnt) && d)
+	if (refcount_dec_and_test(&e->refcnt) && d)
 		t3_l2e_free(d, e);
 
 	rcu_read_unlock();
@@ -141,7 +142,10 @@ static inline void l2t_release(struct t3cdev *t, struct l2t_entry *e)
 
 static inline void l2t_hold(struct l2t_data *d, struct l2t_entry *e)
 {
-	if (d && atomic_add_return(1, &e->refcnt) == 1)	/* 0 -> 1 transition */
+	if (!d)
+		return;
+	refcount_inc(&e->refcnt);
+	if (refcount_read(&e->refcnt) == 1)	/* 0 -> 1 transition */
 		atomic_dec(&d->nfree);
 }
 

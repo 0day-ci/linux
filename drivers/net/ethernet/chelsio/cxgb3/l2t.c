@@ -225,10 +225,11 @@ static struct l2t_entry *alloc_l2e(struct l2t_data *d)
 
 	/* there's definitely a free entry */
 	for (e = d->rover, end = &d->l2tab[d->nentries]; e != end; ++e)
-		if (atomic_read(&e->refcnt) == 0)
+		if (refcount_read(&e->refcnt) == 0)
 			goto found;
 
-	for (e = &d->l2tab[1]; atomic_read(&e->refcnt); ++e) ;
+	for (e = &d->l2tab[1]; refcount_read(&e->refcnt); ++e)
+		;
 found:
 	d->rover = e + 1;
 	atomic_dec(&d->nfree);
@@ -264,7 +265,7 @@ found:
 void t3_l2e_free(struct l2t_data *d, struct l2t_entry *e)
 {
 	spin_lock_bh(&e->lock);
-	if (atomic_read(&e->refcnt) == 0) {	/* hasn't been recycled */
+	if (refcount_read(&e->refcnt) == 0) {	/* hasn't been recycled */
 		if (e->neigh) {
 			neigh_release(e->neigh);
 			e->neigh = NULL;
@@ -335,7 +336,7 @@ struct l2t_entry *t3_l2t_get(struct t3cdev *cdev, struct dst_entry *dst,
 		if (e->addr == addr && e->ifindex == ifidx &&
 		    e->smt_idx == smt_idx) {
 			l2t_hold(d, e);
-			if (atomic_read(&e->refcnt) == 1)
+			if (refcount_read(&e->refcnt) == 1)
 				reuse_entry(e, neigh);
 			goto done_unlock;
 		}
@@ -350,7 +351,7 @@ struct l2t_entry *t3_l2t_get(struct t3cdev *cdev, struct dst_entry *dst,
 		e->addr = addr;
 		e->ifindex = ifidx;
 		e->smt_idx = smt_idx;
-		atomic_set(&e->refcnt, 1);
+		refcount_set(&e->refcnt, 1);
 		neigh_replace(e, neigh);
 		if (is_vlan_dev(neigh->dev))
 			e->vlan = vlan_dev_vlan_id(neigh->dev);
@@ -418,7 +419,7 @@ found:
 	__skb_queue_head_init(&arpq);
 
 	read_unlock(&d->lock);
-	if (atomic_read(&e->refcnt)) {
+	if (refcount_read(&e->refcnt)) {
 		if (neigh != e->neigh)
 			neigh_replace(e, neigh);
 
@@ -459,7 +460,7 @@ struct l2t_data *t3_init_l2t(unsigned int l2t_capacity)
 		d->l2tab[i].state = L2T_STATE_UNUSED;
 		__skb_queue_head_init(&d->l2tab[i].arpq);
 		spin_lock_init(&d->l2tab[i].lock);
-		atomic_set(&d->l2tab[i].refcnt, 0);
+		refcount_set(&d->l2tab[i].refcnt, 0);
 	}
 	return d;
 }
