@@ -40,6 +40,14 @@
 		regulator-max-microvolt = <900000>;
 		regulator-boot-on;
 	};
+
+	vcc_io: regulator@1 {
+		compatible = "regulator-fixed";
+		regulator-name = "vcc_io";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		regulator-boot-on;
+	};
 };
 
 &pm_uart {
