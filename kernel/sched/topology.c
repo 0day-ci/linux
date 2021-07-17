@@ -482,11 +482,11 @@ void rq_attach_root(struct rq *rq, struct root_domain *rd)
 		 * set old_rd to NULL to skip the freeing later
 		 * in this function:
 		 */
-		if (!atomic_dec_and_test(&old_rd->refcount))
+		if (!refcount_dec_and_test(&old_rd->refcount))
 			old_rd = NULL;
 	}
 
-	atomic_inc(&rd->refcount);
+	refcount_inc(&rd->refcount);
 	rq->rd = rd;
 
 	cpumask_set_cpu(rq->cpu, rd->span);
@@ -501,12 +501,12 @@ void rq_attach_root(struct rq *rq, struct root_domain *rd)
 
 void sched_get_rd(struct root_domain *rd)
 {
-	atomic_inc(&rd->refcount);
+	refcount_inc(&rd->refcount);
 }
 
 void sched_put_rd(struct root_domain *rd)
 {
-	if (!atomic_dec_and_test(&rd->refcount))
+	if (!refcount_dec_and_test(&rd->refcount))
 		return;
 
 	call_rcu(&rd->rcu, free_rootdomain);
@@ -562,7 +562,7 @@ void init_defrootdomain(void)
 {
 	init_rootdomain(&def_root_domain);
 
-	atomic_set(&def_root_domain.refcount, 1);
+	refcount_set(&def_root_domain.refcount, 1);
 }
 
 static struct root_domain *alloc_rootdomain(void)
@@ -1419,7 +1419,7 @@ static void __free_domain_allocs(struct s_data *d, enum s_alloc what,
 {
 	switch (what) {
 	case sa_rootdomain:
-		if (!atomic_read(&d->rd->refcount))
+		if (!refcount_read(&d->rd->refcount))
 			free_rootdomain(&d->rd->rcu);
 		fallthrough;
 	case sa_sd:

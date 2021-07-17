@@ -3,6 +3,7 @@
  * Scheduler internal types and methods:
  */
 #include <linux/sched.h>
+#include <linux/refcount.h>
 
 #include <linux/sched/autogroup.h>
 #include <linux/sched/clock.h>
@@ -784,7 +785,7 @@ struct perf_domain {
  *
  */
 struct root_domain {
-	atomic_t		refcount;
+	refcount_t		refcount;
 	atomic_t		rto_count;
 	struct rcu_head		rcu;
 	cpumask_var_t		span;
