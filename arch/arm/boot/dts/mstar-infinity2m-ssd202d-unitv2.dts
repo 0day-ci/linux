@@ -48,6 +48,14 @@
 		regulator-max-microvolt = <3300000>;
 		regulator-boot-on;
 	};
+
+	vcc_dram: regulator@2 {
+		compatible = "regulator-fixed";
+		regulator-name = "vcc_dram";
+		regulator-min-microvolt = <1500000>;
+		regulator-max-microvolt = <1500000>;
+		regulator-boot-on;
+	};
 };
 
 &pm_uart {
