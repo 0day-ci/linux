@@ -433,6 +433,44 @@ int create_hyp_exec_mappings(phys_addr_t phys_addr, size_t size,
 	return 0;
 }
 
+static struct kvm_pgtable_mm_ops kvm_user_mm_ops = {
+	/* We shouldn't need any other callback to walk the PT */
+	.phys_to_virt		= kvm_host_va,
+};
+
+struct user_walk_data {
+	u32	level;
+};
+
+static int user_walker(u64 addr, u64 end, u32 level, kvm_pte_t *ptep,
+		       enum kvm_pgtable_walk_flags flag, void * const arg)
+{
+	struct user_walk_data *data = arg;
+
+	data->level = level;
+	return 0;
+}
+
+static int get_user_mapping_size(struct kvm *kvm, u64 addr)
+{
+	struct user_walk_data data;
+	struct kvm_pgtable pgt = {
+		.pgd		= (kvm_pte_t *)kvm->mm->pgd,
+		.ia_bits	= VA_BITS,
+		.start_level	= 4 - CONFIG_PGTABLE_LEVELS,
+		.mm_ops		= &kvm_user_mm_ops,
+	};
+	struct kvm_pgtable_walker walker = {
+		.cb		= user_walker,
+		.flags		= KVM_PGTABLE_WALK_LEAF,
+		.arg		= &data,
+	};
+
+	kvm_pgtable_walk(&pgt, ALIGN_DOWN(addr, PAGE_SIZE), PAGE_SIZE, &walker);
+
+	return BIT(ARM64_HW_PGTABLE_LEVEL_SHIFT(data.level));
+}
+
 static struct kvm_pgtable_mm_ops kvm_s2_mm_ops = {
 	.zalloc_page		= stage2_memcache_zalloc_page,
 	.zalloc_pages_exact	= kvm_host_zalloc_pages_exact,
@@ -780,7 +818,7 @@ static bool fault_supports_stage2_huge_mapping(struct kvm_memory_slot *memslot,
  * Returns the size of the mapping.
  */
 static unsigned long
-transparent_hugepage_adjust(struct kvm_memory_slot *memslot,
+transparent_hugepage_adjust(struct kvm *kvm, struct kvm_memory_slot *memslot,
 			    unsigned long hva, kvm_pfn_t *pfnp,
 			    phys_addr_t *ipap)
 {
@@ -791,8 +829,8 @@ transparent_hugepage_adjust(struct kvm_memory_slot *memslot,
 	 * sure that the HVA and IPA are sufficiently aligned and that the
 	 * block map is contained within the memslot.
 	 */
-	if (kvm_is_transparent_hugepage(pfn) &&
-	    fault_supports_stage2_huge_mapping(memslot, hva, PMD_SIZE)) {
+	if (fault_supports_stage2_huge_mapping(memslot, hva, PMD_SIZE) &&
+	    get_user_mapping_size(kvm, hva) >= PMD_SIZE) {
 		/*
 		 * The address we faulted on is backed by a transparent huge
 		 * page.  However, because we map the compound huge page and
@@ -1051,7 +1089,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
 	 * backed by a THP and thus use block mapping if possible.
 	 */
 	if (vma_pagesize == PAGE_SIZE && !(force_pte || device))
-		vma_pagesize = transparent_hugepage_adjust(memslot, hva,
+		vma_pagesize = transparent_hugepage_adjust(kvm, memslot, hva,
 							   &pfn, &fault_ipa);
 
 	if (fault_status != FSC_PERM && !device && kvm_has_mte(kvm)) {
