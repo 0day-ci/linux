@@ -543,7 +543,7 @@ int rtllib_wx_get_name(struct rtllib_device *ieee,
 			     struct iw_request_info *info,
 			     union iwreq_data *wrqu, char *extra)
 {
-	strcpy(wrqu->name, "802.11");
+	strscpy(wrqu->name, "802.11", sizeof(wrqu->name));
 
 	if (ieee->modulation & RTLLIB_CCK_MODULATION)
 		strcat(wrqu->name, "b");
