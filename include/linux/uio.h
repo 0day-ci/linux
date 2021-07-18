@@ -18,6 +18,9 @@ struct kvec {
 };
 
 enum iter_type {
+	/* set if get_user_pages should use FOLL_FAST_ONLY */
+	ITER_FLAG_FAST_ONLY = 2,
+
 	/* iter types */
 	ITER_IOVEC = 4,
 	ITER_KVEC = 8,
@@ -30,8 +33,9 @@ enum iter_type {
 struct iov_iter {
 	/*
 	 * Bit 0 is the read/write bit, set if we're writing.
-	 * Bit 1 is the BVEC_FLAG_NO_REF bit, set if type is a bvec and
-	 * the caller isn't expecting to drop a page reference when done.
+	 * Bit 1 is the ITER_FLAG_FAST_ONLY bit, set if get_user_pages
+	 * should use the FOLL_FAST_ONLY flag when trying to fault in pages
+	 * (only useful for type ITER_IOVEC).
 	 */
 	unsigned int type;
 	size_t iov_offset;
@@ -55,7 +59,7 @@ struct iov_iter {
 
 static inline enum iter_type iov_iter_type(const struct iov_iter *i)
 {
-	return i->type & ~(READ | WRITE);
+	return i->type & ~(READ | WRITE | ITER_FLAG_FAST_ONLY);
 }
 
 static inline bool iter_is_iovec(const struct iov_iter *i)
@@ -91,6 +95,11 @@ static inline bool iov_iter_is_xarray(const struct iov_iter *i)
 static inline unsigned char iov_iter_rw(const struct iov_iter *i)
 {
 	return i->type & (READ | WRITE);
+}
+
+static inline bool iov_iter_is_fast_only(const struct iov_iter *i)
+{
+	return i->type & ITER_FLAG_FAST_ONLY;
 }
 
 /*
