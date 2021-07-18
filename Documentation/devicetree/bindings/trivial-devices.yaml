@@ -41,6 +41,8 @@ properties:
           - adi,adp5589
             # +/-1C TDM Extended Temp Range I.C
           - adi,adt7461
+            # ADXL355:- 3-Axis Low noise MEMS Accelerometer.
+          - adi,adxl355
             # +/-1C TDM Extended Temp Range I.C
           - adt7461
             # AMS iAQ-Core VOC Sensor
