@@ -1037,7 +1037,7 @@ int fbtft_init_display(struct fbtft_par *par)
 		case -1:
 			i++;
 			/* make debug message */
-			strcpy(msg, "");
+			msg[0] = 0;
 			j = i + 1;
 			while (par->init_sequence[j] >= 0) {
 				sprintf(str, "0x%02X ", par->init_sequence[j]);
