@@ -501,6 +501,81 @@ bool process_shares_mm(struct task_struct *p, struct mm_struct *mm)
 	return false;
 }
 
+static inline bool __task_will_free_mem(struct task_struct *task)
+{
+	struct signal_struct *sig = task->signal;
+
+	/*
+	 * A coredumping process may sleep for an extended period in exit_mm(),
+	 * so the oom killer cannot assume that the process will promptly exit
+	 * and release memory.
+	 */
+	if (sig->flags & SIGNAL_GROUP_COREDUMP)
+		return false;
+
+	if (sig->flags & SIGNAL_GROUP_EXIT)
+		return true;
+
+	if (thread_group_empty(task) && (task->flags & PF_EXITING))
+		return true;
+
+	return false;
+}
+
+/*
+ * Checks whether the given task is dying or exiting and likely to
+ * release its address space. This means that all threads and processes
+ * sharing the same mm have to be killed or exiting.
+ * Caller has to make sure that task->mm is stable (hold task_lock or
+ * it operates on the current).
+ */
+static bool task_will_free_mem(struct task_struct *task)
+{
+	struct mm_struct *mm = task->mm;
+	struct task_struct *p;
+	bool ret = true;
+
+	/*
+	 * Skip tasks without mm because it might have passed its exit_mm and
+	 * exit_oom_victim. oom_reaper could have rescued that but do not rely
+	 * on that for now. We can consider find_lock_task_mm in future.
+	 */
+	if (!mm)
+		return false;
+
+	if (!__task_will_free_mem(task))
+		return false;
+
+	/*
+	 * This task has already been drained by the oom reaper so there are
+	 * only small chances it will free some more
+	 */
+	if (test_bit(MMF_OOM_SKIP, &mm->flags))
+		return false;
+
+	if (atomic_read(&mm->mm_users) <= 1)
+		return true;
+
+	/*
+	 * Make sure that all tasks which share the mm with the given tasks
+	 * are dying as well to make sure that a) nobody pins its mm and
+	 * b) the task is also reapable by the oom reaper.
+	 */
+	rcu_read_lock();
+	for_each_process(p) {
+		if (!process_shares_mm(p, mm))
+			continue;
+		if (same_thread_group(task, p))
+			continue;
+		ret = __task_will_free_mem(p);
+		if (!ret)
+			break;
+	}
+	rcu_read_unlock();
+
+	return ret;
+}
+
 #ifdef CONFIG_MMU
 /*
  * OOM Reaper kernel thread which tries to reap the memory used by the OOM
@@ -779,81 +854,6 @@ bool oom_killer_disable(signed long timeout)
 	pr_info("OOM killer disabled.\n");
 
 	return true;
-}
-
-static inline bool __task_will_free_mem(struct task_struct *task)
-{
-	struct signal_struct *sig = task->signal;
-
-	/*
-	 * A coredumping process may sleep for an extended period in exit_mm(),
-	 * so the oom killer cannot assume that the process will promptly exit
-	 * and release memory.
-	 */
-	if (sig->flags & SIGNAL_GROUP_COREDUMP)
-		return false;
-
-	if (sig->flags & SIGNAL_GROUP_EXIT)
-		return true;
-
-	if (thread_group_empty(task) && (task->flags & PF_EXITING))
-		return true;
-
-	return false;
-}
-
-/*
- * Checks whether the given task is dying or exiting and likely to
- * release its address space. This means that all threads and processes
- * sharing the same mm have to be killed or exiting.
- * Caller has to make sure that task->mm is stable (hold task_lock or
- * it operates on the current).
- */
-static bool task_will_free_mem(struct task_struct *task)
-{
-	struct mm_struct *mm = task->mm;
-	struct task_struct *p;
-	bool ret = true;
-
-	/*
-	 * Skip tasks without mm because it might have passed its exit_mm and
-	 * exit_oom_victim. oom_reaper could have rescued that but do not rely
-	 * on that for now. We can consider find_lock_task_mm in future.
-	 */
-	if (!mm)
-		return false;
-
-	if (!__task_will_free_mem(task))
-		return false;
-
-	/*
-	 * This task has already been drained by the oom reaper so there are
-	 * only small chances it will free some more
-	 */
-	if (test_bit(MMF_OOM_SKIP, &mm->flags))
-		return false;
-
-	if (atomic_read(&mm->mm_users) <= 1)
-		return true;
-
-	/*
-	 * Make sure that all tasks which share the mm with the given tasks
-	 * are dying as well to make sure that a) nobody pins its mm and
-	 * b) the task is also reapable by the oom reaper.
-	 */
-	rcu_read_lock();
-	for_each_process(p) {
-		if (!process_shares_mm(p, mm))
-			continue;
-		if (same_thread_group(task, p))
-			continue;
-		ret = __task_will_free_mem(p);
-		if (!ret)
-			break;
-	}
-	rcu_read_unlock();
-
-	return ret;
 }
 
 static void __oom_kill_process(struct task_struct *victim, const char *message)
