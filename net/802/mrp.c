@@ -834,6 +834,16 @@ static void mrp_release_port(struct net_device *dev)
 	kfree_rcu(port, rcu);
 }
 
+static void mrp_destroy_remaining_attrs(struct mrp_applicant *app)
+{
+	while (!RB_EMPTY_ROOT(&app->mad)) {
+		struct mrp_attr *attr =
+			rb_entry(rb_first(&app->mad),
+				 struct mrp_attr, node);
+		mrp_attr_destroy(app, attr);
+	}
+}
+
 int mrp_init_applicant(struct net_device *dev, struct mrp_application *appl)
 {
 	struct mrp_applicant *app;
@@ -896,6 +906,13 @@ void mrp_uninit_applicant(struct net_device *dev, struct mrp_application *appl)
 	spin_lock_bh(&app->lock);
 	mrp_mad_event(app, MRP_EVENT_TX);
 	mrp_pdu_queue(app);
+
+	/* We need to free remaining attrs since this scenario is possible:
+	 *	mrp_request_join()
+	 *	mrp_request_leave()
+	 *	mrp_uninit_applicant()
+	 */
+	mrp_destroy_remaining_attrs(app);
 	spin_unlock_bh(&app->lock);
 
 	mrp_queue_xmit(app);
