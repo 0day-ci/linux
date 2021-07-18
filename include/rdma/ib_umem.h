@@ -27,8 +27,7 @@ struct ib_umem {
 	u32 is_dmabuf : 1;
 	struct work_struct	work;
 	struct sg_table sg_head;
-	int             nmap;
-	unsigned int    sg_nents;
+	unsigned int total_nents;
 };
 
 struct ib_umem_dmabuf {

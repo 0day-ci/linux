@@ -390,7 +390,7 @@ static int vmw_ttm_map_dma(struct vmw_ttm_tt *vmw_tt)
 				vsgt->num_pages, 0,
 				(unsigned long) vsgt->num_pages << PAGE_SHIFT,
 				dma_get_max_seg_size(dev_priv->drm.dev),
-				NULL, 0, GFP_KERNEL);
+				NULL, 0, GFP_KERNEL, NULL);
 		if (IS_ERR(sg)) {
 			ret = PTR_ERR(sg);
 			goto out_sg_alloc_fail;

@@ -282,6 +282,7 @@ typedef void (sg_free_fn)(struct scatterlist *, unsigned int);
 void __sg_free_table(struct sg_table *, unsigned int, unsigned int,
 		     sg_free_fn *);
 void sg_free_table(struct sg_table *);
+void sg_free_table_entries(struct sg_table *sgt, unsigned int num_entries);
 int __sg_alloc_table(struct sg_table *, unsigned int, unsigned int,
 		     struct scatterlist *, unsigned int, gfp_t, sg_alloc_fn *);
 int sg_alloc_table(struct sg_table *, unsigned int, gfp_t);
@@ -289,7 +290,7 @@ struct scatterlist *__sg_alloc_table_from_pages(struct sg_table *sgt,
 		struct page **pages, unsigned int n_pages, unsigned int offset,
 		unsigned long size, unsigned int max_segment,
 		struct scatterlist *prv, unsigned int left_pages,
-		gfp_t gfp_mask);
+		gfp_t gfp_mask, unsigned int *total_nents);
 int sg_alloc_table_from_pages(struct sg_table *sgt, struct page **pages,
 			      unsigned int n_pages, unsigned int offset,
 			      unsigned long size, gfp_t gfp_mask);

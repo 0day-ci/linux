@@ -821,7 +821,7 @@ struct sg_table *drm_prime_pages_to_sg(struct drm_device *dev,
 	sge = __sg_alloc_table_from_pages(sg, pages, nr_pages, 0,
 					  nr_pages << PAGE_SHIFT,
 					  max_segment,
-					  NULL, 0, GFP_KERNEL);
+					  NULL, 0, GFP_KERNEL, NULL);
 	if (IS_ERR(sge)) {
 		kfree(sg);
 		sg = ERR_CAST(sge);

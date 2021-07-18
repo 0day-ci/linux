@@ -59,7 +59,7 @@ static void __ib_umem_release(struct ib_device *dev, struct ib_umem *umem, int d
 		unpin_user_page_range_dirty_lock(sg_page(sg),
 			DIV_ROUND_UP(sg->length, PAGE_SIZE), make_dirty);
 
-	sg_free_table(&umem->sg_head);
+	sg_free_table_entries(&umem->sg_head, umem->total_nents);
 }
 
 /**
@@ -229,8 +229,7 @@ struct ib_umem *ib_umem_get(struct ib_device *device, unsigned long addr,
 		sg = __sg_alloc_table_from_pages(&umem->sg_head, page_list, ret,
 				0, ret << PAGE_SHIFT,
 				ib_dma_max_seg_size(device), sg, npages,
-				GFP_KERNEL);
-		umem->sg_nents = umem->sg_head.nents;
+				GFP_KERNEL, &umem->total_nents);
 		if (IS_ERR(sg)) {
 			unpin_user_pages_dirty_lock(page_list, ret, 0);
 			ret = PTR_ERR(sg);

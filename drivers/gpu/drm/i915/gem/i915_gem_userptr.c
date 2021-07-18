@@ -155,7 +155,7 @@ static int i915_gem_userptr_get_pages(struct drm_i915_gem_object *obj)
 alloc_table:
 	sg = __sg_alloc_table_from_pages(st, pvec, num_pages, 0,
 					 num_pages << PAGE_SHIFT, max_segment,
-					 NULL, 0, GFP_KERNEL);
+					 NULL, 0, GFP_KERNEL, NULL);
 	if (IS_ERR(sg)) {
 		ret = PTR_ERR(sg);
 		goto err;

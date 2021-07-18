@@ -175,22 +175,11 @@ static void sg_kfree(struct scatterlist *sg, unsigned int nents)
 		kfree(sg);
 }
 
-/**
- * __sg_free_table - Free a previously mapped sg table
- * @table:	The sg table header to use
- * @max_ents:	The maximum number of entries per single scatterlist
- * @nents_first_chunk: Number of entries int the (preallocated) first
- * 	scatterlist chunk, 0 means no such preallocated first chunk
- * @free_fn:	Free function
- *
- *  Description:
- *    Free an sg table previously allocated and setup with
- *    __sg_alloc_table().  The @max_ents value must be identical to
- *    that previously used with __sg_alloc_table().
- *
- **/
-void __sg_free_table(struct sg_table *table, unsigned int max_ents,
-		     unsigned int nents_first_chunk, sg_free_fn *free_fn)
+static void __sg_free_table_entries(struct sg_table *table,
+				    unsigned int max_ents,
+				    unsigned int nents_first_chunk,
+				    sg_free_fn *free_fn,
+				    unsigned int num_entries)
 {
 	struct scatterlist *sgl, *next;
 	unsigned curr_max_ents = nents_first_chunk ?: max_ents;
@@ -199,8 +188,8 @@ void __sg_free_table(struct sg_table *table, unsigned int max_ents,
 		return;
 
 	sgl = table->sgl;
-	while (table->orig_nents) {
-		unsigned int alloc_size = table->orig_nents;
+	while (num_entries) {
+		unsigned int alloc_size = num_entries;
 		unsigned int sg_size;
 
 		/*
@@ -218,7 +207,7 @@ void __sg_free_table(struct sg_table *table, unsigned int max_ents,
 			next = NULL;
 		}
 
-		table->orig_nents -= sg_size;
+		num_entries -= sg_size;
 		if (nents_first_chunk)
 			nents_first_chunk = 0;
 		else
@@ -229,6 +218,43 @@ void __sg_free_table(struct sg_table *table, unsigned int max_ents,
 
 	table->sgl = NULL;
 }
+
+/**
+ * sg_free_table_entries - Free a previously allocated sg table according to
+ *                         the total number of entries in the table.
+ * @table:	 The mapped sg table header
+ * @num_entries: The number of entries in the table.
+ *
+ **/
+void sg_free_table_entries(struct sg_table *table, unsigned int num_entries)
+{
+	__sg_free_table_entries(table, SG_MAX_SINGLE_ALLOC, false, sg_kfree,
+				num_entries);
+}
+EXPORT_SYMBOL(sg_free_table_entries);
+
+/**
+ * __sg_free_table - Free a previously mapped sg table
+ * @table:	The sg table header to use
+ * @max_ents:	The maximum number of entries per single scatterlist
+ * @total_ents:	The total number of entries in the table
+ * @nents_first_chunk: Number of entries int the (preallocated) first
+ *                     scatterlist chunk, 0 means no such preallocated
+ *                     first chunk
+ * @free_fn:	Free function
+ *
+ *  Description:
+ *    Free an sg table previously allocated and setup with
+ *    __sg_alloc_table().  The @max_ents value must be identical to
+ *    that previously used with __sg_alloc_table().
+ *
+ **/
+void __sg_free_table(struct sg_table *table, unsigned int max_ents,
+		     unsigned int nents_first_chunk, sg_free_fn *free_fn)
+{
+	__sg_free_table_entries(table, max_ents, nents_first_chunk, free_fn,
+				table->orig_nents);
+}
 EXPORT_SYMBOL(__sg_free_table);
 
 /**
@@ -238,7 +264,8 @@ EXPORT_SYMBOL(__sg_free_table);
  **/
 void sg_free_table(struct sg_table *table)
 {
-	__sg_free_table(table, SG_MAX_SINGLE_ALLOC, false, sg_kfree);
+	__sg_free_table_entries(table, SG_MAX_SINGLE_ALLOC, false, sg_kfree,
+				table->orig_nents);
 }
 EXPORT_SYMBOL(sg_free_table);
 
@@ -368,7 +395,8 @@ EXPORT_SYMBOL(sg_alloc_table);
 static struct scatterlist *get_next_sg(struct sg_table *table,
 				       struct scatterlist *cur,
 				       unsigned long needed_sges,
-				       gfp_t gfp_mask)
+				       gfp_t gfp_mask,
+				       unsigned int *total_nents)
 {
 	struct scatterlist *new_sg, *next_sg;
 	unsigned int alloc_size;
@@ -386,12 +414,14 @@ static struct scatterlist *get_next_sg(struct sg_table *table,
 		return ERR_PTR(-ENOMEM);
 	sg_init_table(new_sg, alloc_size);
 	if (cur) {
+		if (total_nents)
+			*total_nents += alloc_size - 1;
 		__sg_chain(next_sg, new_sg);
-		table->orig_nents += alloc_size - 1;
 	} else {
 		table->sgl = new_sg;
-		table->orig_nents = alloc_size;
 		table->nents = 0;
+		if (total_nents)
+			*total_nents = alloc_size;
 	}
 	return new_sg;
 }
@@ -408,6 +438,7 @@ static struct scatterlist *get_next_sg(struct sg_table *table,
  * @prv:	 Last populated sge in sgt
  * @left_pages:  Left pages caller have to set after this call
  * @gfp_mask:	 GFP allocation mask
+ * @total_nents: Output of total number of entries in the table
  *
  * Description:
  *    If @prv is NULL, allocate and initialize an sg table from a list of pages,
@@ -419,7 +450,8 @@ static struct scatterlist *get_next_sg(struct sg_table *table,
  *
  * Returns:
  *   Last SGE in sgt on success, PTR_ERR on otherwise.
- *   The allocation in @sgt must be released by sg_free_table.
+ *   The allocation in @sgt must be released by sg_free_table or
+ *   sg_free_table_entries.
  *
  * Notes:
  *   If this function returns non-0 (eg failure), the caller must call
@@ -429,7 +461,7 @@ struct scatterlist *__sg_alloc_table_from_pages(struct sg_table *sgt,
 		struct page **pages, unsigned int n_pages, unsigned int offset,
 		unsigned long size, unsigned int max_segment,
 		struct scatterlist *prv, unsigned int left_pages,
-		gfp_t gfp_mask)
+		gfp_t gfp_mask, unsigned int *total_nents)
 {
 	unsigned int chunks, cur_page, seg_len, i, prv_len = 0;
 	unsigned int added_nents = 0;
@@ -496,7 +528,8 @@ struct scatterlist *__sg_alloc_table_from_pages(struct sg_table *sgt,
 		}
 
 		/* Pass how many chunks might be left */
-		s = get_next_sg(sgt, s, chunks - i + left_pages, gfp_mask);
+		s = get_next_sg(sgt, s, chunks - i + left_pages, gfp_mask,
+				total_nents);
 		if (IS_ERR(s)) {
 			/*
 			 * Adjust entry length to be as before function was
@@ -515,6 +548,7 @@ struct scatterlist *__sg_alloc_table_from_pages(struct sg_table *sgt,
 		cur_page = j;
 	}
 	sgt->nents += added_nents;
+	sgt->orig_nents = sgt->nents;
 out:
 	if (!left_pages)
 		sg_mark_end(s);
@@ -547,7 +581,7 @@ int sg_alloc_table_from_pages(struct sg_table *sgt, struct page **pages,
 			      unsigned long size, gfp_t gfp_mask)
 {
 	return PTR_ERR_OR_ZERO(__sg_alloc_table_from_pages(sgt, pages, n_pages,
-			offset, size, UINT_MAX, NULL, 0, gfp_mask));
+			offset, size, UINT_MAX, NULL, 0, gfp_mask, NULL));
 }
 EXPORT_SYMBOL(sg_alloc_table_from_pages);
 

@@ -88,11 +88,14 @@ int main(void)
 		struct page *pages[MAX_PAGES];
 		struct sg_table st;
 		struct scatterlist *sg;
+		unsigned int total_nents;
 
 		set_pages(pages, test->pfn, test->num_pages);
 
 		sg = __sg_alloc_table_from_pages(&st, pages, test->num_pages, 0,
-				test->size, test->max_seg, NULL, left_pages, GFP_KERNEL);
+						 test->size, test->max_seg,
+						 NULL, left_pages, GFP_KERNEL,
+						 &total_nents);
 		assert(PTR_ERR_OR_ZERO(sg) == test->alloc_ret);
 
 		if (test->alloc_ret)
@@ -100,8 +103,9 @@ int main(void)
 
 		if (test->pfn_app) {
 			set_pages(pages, test->pfn_app, test->num_pages);
-			sg = __sg_alloc_table_from_pages(&st, pages, test->num_pages, 0,
-					test->size, test->max_seg, sg, 0, GFP_KERNEL);
+			sg = __sg_alloc_table_from_pages(
+				&st, pages, test->num_pages, 0, test->size,
+				test->max_seg, sg, 0, GFP_KERNEL, &total_nents);
 
 			assert(PTR_ERR_OR_ZERO(sg) == test->alloc_ret);
 		}
@@ -110,7 +114,10 @@ int main(void)
 		if (!test->pfn_app)
 			VALIDATE(st.orig_nents == test->expected_segments, &st, test);
 
-		sg_free_table(&st);
+		if (test->pfn_app)
+			sg_free_table_entries(&st, total_nents);
+		else
+			sg_free_table(&st);
 	}
 
 	assert(i == (sizeof(tests) / sizeof(tests[0])) - 1);
