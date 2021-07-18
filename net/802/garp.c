@@ -553,6 +553,16 @@ static void garp_release_port(struct net_device *dev)
 	kfree_rcu(port, rcu);
 }
 
+static void garp_destroy_remaining_attrs(struct garp_applicant *app)
+{
+	while (!RB_EMPTY_ROOT(&app->gid)) {
+		struct garp_attr *attr =
+			rb_entry(rb_first(&app->gid),
+				 struct garp_attr, node);
+		garp_attr_destroy(app, attr);
+	}
+}
+
 int garp_init_applicant(struct net_device *dev, struct garp_application *appl)
 {
 	struct garp_applicant *app;
@@ -610,6 +620,13 @@ void garp_uninit_applicant(struct net_device *dev, struct garp_application *appl
 	spin_lock_bh(&app->lock);
 	garp_gid_event(app, GARP_EVENT_TRANSMIT_PDU);
 	garp_pdu_queue(app);
+
+	/* We need to free remaining attrs since this scenario is possible:
+	 *	garp_request_join()
+	 *	garp_request_leave()
+	 *	garp_uninit_applicant()
+	 */
+	garp_destroy_remaining_attrs(app);
 	spin_unlock_bh(&app->lock);
 
 	garp_queue_xmit(app);
