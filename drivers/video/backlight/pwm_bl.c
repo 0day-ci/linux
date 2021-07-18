@@ -445,7 +445,7 @@ static int pwm_backlight_probe(struct platform_device *pdev)
 	struct device_node *node = pdev->dev.of_node;
 	struct pwm_bl_data *pb;
 	struct pwm_state state;
-	unsigned int i;
+	unsigned int i, dir, val;
 	int ret;
 
 	if (!data) {
@@ -487,16 +487,31 @@ static int pwm_backlight_probe(struct platform_device *pdev)
 	}
 
 	/*
-	 * If the GPIO is not known to be already configured as output, that
-	 * is, if gpiod_get_direction returns either 1 or -EINVAL, change the
-	 * direction to output and set the GPIO as active.
-	 * Do not force the GPIO to active when it was already output as it
-	 * could cause backlight flickering or we would enable the backlight too
-	 * early. Leave the decision of the initial backlight state for later.
+	 * If the GPIO is not known to be already configured as output, then:
+	 * - if the GPIO direction is input, read its current value to find out
+	 *   whether the pin is pulled high or low (it is backlight control, so
+	 *   it cannot be floating), change the direction to output and set the
+	 *   GPIO such that it drives this strapped value.
+	 *   Do not force the GPIO to state which is different than that to
+	 *   which the GPIO was pulled to, this could cause backlight flicker
+	 *   on boot e.g. in case the PWM is not ready yet.
+	 * - if the GPIO direction is unknown, tahat is, if gpiod_get_direction
+	 *   returns -EINVAL, change the direction to output and set the GPIO
+	 *   as active.
+	 *   Do not force the GPIO to active when it was already output as it
+	 *   could cause backlight flickering or we would enable the backlight
+	 *   too early. Leave the decision of the initial backlight state for
+	 *   later.
 	 */
-	if (pb->enable_gpio &&
-	    gpiod_get_direction(pb->enable_gpio) != 0)
-		gpiod_direction_output(pb->enable_gpio, 1);
+	if (pb->enable_gpio) {
+		dir = gpiod_get_direction(pb->enable_gpio);
+		if (dir != 0) {
+			val = 1;
+			if (dir == 1)
+				val = gpiod_get_value_cansleep(pb->enable_gpio);
+			gpiod_direction_output(pb->enable_gpio, val);
+		}
+	}
 
 	pb->power_supply = devm_regulator_get(&pdev->dev, "power");
 	if (IS_ERR(pb->power_supply)) {
