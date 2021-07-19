@@ -1,22 +1,22 @@
 # SPDX-License-Identifier: GPL-2.0
 r8188eu-y :=				\
-		core/rtw_ap.o		\
-		core/rtw_cmd.o		\
-		core/rtw_efuse.o	\
-		core/rtw_ieee80211.o	\
-		core/rtw_ioctl_set.o	\
-		core/rtw_iol.o		\
-		core/rtw_led.o		\
-		core/rtw_mlme.o		\
-		core/rtw_mlme_ext.o	\
-		core/rtw_pwrctrl.o	\
-		core/rtw_recv.o		\
-		core/rtw_rf.o		\
-		core/rtw_security.o	\
-		core/rtw_sreset.o	\
-		core/rtw_sta_mgt.o	\
-		core/rtw_wlan_util.o	\
-		core/rtw_xmit.o		\
+		rtw_ap.o		\
+		rtw_cmd.o		\
+		rtw_efuse.o		\
+		rtw_ieee80211.o		\
+		rtw_ioctl_set.o		\
+		rtw_iol.o		\
+		rtw_led.o		\
+		rtw_mlme.o		\
+		rtw_mlme_ext.o		\
+		rtw_pwrctrl.o		\
+		rtw_recv.o		\
+		rtw_rf.o		\
+		rtw_security.o		\
+		rtw_sreset.o		\
+		rtw_sta_mgt.o		\
+		rtw_wlan_util.o		\
+		rtw_xmit.o		\
 		hal/fw.o	\
 		hal/mac_cfg.o \
 		hal/bb_cfg.o \
