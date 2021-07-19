@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-only
-#define pr_fmt(fmt) "min_heap_test: " fmt
-
 /*
  * Test cases for the min max heap.
  */
+
+#include <kunit/test.h>
 
 #include <linux/log2.h>
 #include <linux/min_heap.h>
@@ -11,17 +11,17 @@
 #include <linux/printk.h>
 #include <linux/random.h>
 
-static __init bool less_than(const void *lhs, const void *rhs)
+static bool less_than(const void *lhs, const void *rhs)
 {
 	return *(int *)lhs < *(int *)rhs;
 }
 
-static __init bool greater_than(const void *lhs, const void *rhs)
+static bool greater_than(const void *lhs, const void *rhs)
 {
 	return *(int *)lhs > *(int *)rhs;
 }
 
-static __init void swap_ints(void *lhs, void *rhs)
+static void swap_ints(void *lhs, void *rhs)
 {
 	int temp = *(int *)lhs;
 
@@ -29,37 +29,27 @@ static __init void swap_ints(void *lhs, void *rhs)
 	*(int *)rhs = temp;
 }
 
-static __init int pop_verify_heap(bool min_heap,
-				struct min_heap *heap,
-				const struct min_heap_callbacks *funcs)
+static void pop_verify_heap(struct kunit *test, bool min_heap,
+			    struct min_heap *heap,
+			    const struct min_heap_callbacks *funcs)
 {
 	int *values = heap->data;
-	int err = 0;
 	int last;
 
 	last = values[0];
 	min_heap_pop(heap, funcs);
 	while (heap->nr > 0) {
 		if (min_heap) {
-			if (last > values[0]) {
-				pr_err("error: expected %d <= %d\n", last,
-					values[0]);
-				err++;
-			}
+			KUNIT_EXPECT_LE(test, last, values[0]);
 		} else {
-			if (last < values[0]) {
-				pr_err("error: expected %d >= %d\n", last,
-					values[0]);
-				err++;
-			}
+			KUNIT_EXPECT_GE(test, last, values[0]);
 		}
 		last = values[0];
 		min_heap_pop(heap, funcs);
 	}
-	return err;
 }
 
-static __init int test_heapify_all(bool min_heap)
+static void test_heapify_all(struct kunit *test, bool min_heap)
 {
 	int values[] = { 3, 1, 2, 4, 0x8000000, 0x7FFFFFF, 0,
 			 -3, -1, -2, -4, 0x8000000, 0x7FFFFFF };
@@ -73,11 +63,11 @@ static __init int test_heapify_all(bool min_heap)
 		.less = min_heap ? less_than : greater_than,
 		.swp = swap_ints,
 	};
-	int i, err;
+	int i;
 
 	/* Test with known set of values. */
 	min_heapify_all(&heap, &funcs);
-	err = pop_verify_heap(min_heap, &heap, &funcs);
+	pop_verify_heap(test, min_heap, &heap, &funcs);
 
 
 	/* Test with randomly generated values. */
@@ -86,12 +76,10 @@ static __init int test_heapify_all(bool min_heap)
 		values[i] = get_random_int();
 
 	min_heapify_all(&heap, &funcs);
-	err += pop_verify_heap(min_heap, &heap, &funcs);
-
-	return err;
+	pop_verify_heap(test, min_heap, &heap, &funcs);
 }
 
-static __init int test_heap_push(bool min_heap)
+static void test_heap_push(struct kunit *test, bool min_heap)
 {
 	const int data[] = { 3, 1, 2, 4, 0x80000000, 0x7FFFFFFF, 0,
 			     -3, -1, -2, -4, 0x80000000, 0x7FFFFFFF };
@@ -106,25 +94,23 @@ static __init int test_heap_push(bool min_heap)
 		.less = min_heap ? less_than : greater_than,
 		.swp = swap_ints,
 	};
-	int i, temp, err;
+	int i, temp;
 
 	/* Test with known set of values copied from data. */
 	for (i = 0; i < ARRAY_SIZE(data); i++)
 		min_heap_push(&heap, &data[i], &funcs);
 
-	err = pop_verify_heap(min_heap, &heap, &funcs);
+	pop_verify_heap(test, min_heap, &heap, &funcs);
 
 	/* Test with randomly generated values. */
 	while (heap.nr < heap.size) {
 		temp = get_random_int();
 		min_heap_push(&heap, &temp, &funcs);
 	}
-	err += pop_verify_heap(min_heap, &heap, &funcs);
-
-	return err;
+	pop_verify_heap(test, min_heap, &heap, &funcs);
 }
 
-static __init int test_heap_pop_push(bool min_heap)
+static void test_heap_pop_push(struct kunit *test, bool min_heap)
 {
 	const int data[] = { 3, 1, 2, 4, 0x80000000, 0x7FFFFFFF, 0,
 			     -3, -1, -2, -4, 0x80000000, 0x7FFFFFFF };
@@ -139,7 +125,7 @@ static __init int test_heap_pop_push(bool min_heap)
 		.less = min_heap ? less_than : greater_than,
 		.swp = swap_ints,
 	};
-	int i, temp, err;
+	int i, temp;
 
 	/* Fill values with data to pop and replace. */
 	temp = min_heap ? 0x80000000 : 0x7FFFFFFF;
@@ -150,7 +136,7 @@ static __init int test_heap_pop_push(bool min_heap)
 	for (i = 0; i < ARRAY_SIZE(data); i++)
 		min_heap_pop_push(&heap, &data[i], &funcs);
 
-	err = pop_verify_heap(min_heap, &heap, &funcs);
+	pop_verify_heap(test, min_heap, &heap, &funcs);
 
 	heap.nr = 0;
 	for (i = 0; i < ARRAY_SIZE(data); i++)
@@ -161,34 +147,38 @@ static __init int test_heap_pop_push(bool min_heap)
 		temp = get_random_int();
 		min_heap_pop_push(&heap, &temp, &funcs);
 	}
-	err += pop_verify_heap(min_heap, &heap, &funcs);
-
-	return err;
+	pop_verify_heap(test, min_heap, &heap, &funcs);
 }
 
-static int __init test_min_heap_init(void)
+static void test_heap(struct kunit *test, bool min_heap)
 {
-	int err = 0;
-
-	err += test_heapify_all(true);
-	err += test_heapify_all(false);
-	err += test_heap_push(true);
-	err += test_heap_push(false);
-	err += test_heap_pop_push(true);
-	err += test_heap_pop_push(false);
-	if (err) {
-		pr_err("test failed with %d errors\n", err);
-		return -EINVAL;
-	}
-	pr_info("test passed\n");
-	return 0;
+	test_heapify_all(test, min_heap);
+	test_heap_push(test, min_heap);
+	test_heap_pop_push(test, min_heap);
 }
-module_init(test_min_heap_init);
 
-static void __exit test_min_heap_exit(void)
+static void test_min_heap(struct kunit *test)
 {
-	/* do nothing */
+	test_heap(test, true);
 }
-module_exit(test_min_heap_exit);
+
+static void test_max_heap(struct kunit *test)
+{
+	test_heap(test, false);
+}
+
+static struct kunit_case __refdata minmax_heap_test_cases[] = {
+	KUNIT_CASE(test_min_heap),
+	KUNIT_CASE(test_max_heap),
+	{}
+};
+
+static struct kunit_suite minmax_heap_test_suite = {
+	.name = "lib_minmax_heap",
+	.test_cases = minmax_heap_test_cases,
+};
+
+kunit_test_suites(&minmax_heap_test_suite);
+
 
 MODULE_LICENSE("GPL");
