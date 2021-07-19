@@ -12,6 +12,7 @@
 #include <linux/fs.h>
 #include <linux/sched/signal.h>
 #include <linux/kernel.h>
+#include <linux/local_lock.h>
 #include <linux/slab.h>
 #include <linux/list.h>
 #include <linux/spinlock.h>
@@ -24,8 +25,6 @@
 #include <linux/seq_file.h>
 #include <linux/idr.h>
 #include <linux/uio.h>
-
-DEFINE_PER_CPU(int, eventfd_wake_count);
 
 static DEFINE_IDA(eventfd_ida);
 
@@ -44,6 +43,20 @@ struct eventfd_ctx {
 	unsigned int flags;
 	int id;
 };
+
+struct event_fd_recursion {
+	local_lock_t lock;
+	int count;
+};
+
+static DEFINE_PER_CPU(struct event_fd_recursion, event_fd_recursion) = {
+	.lock = INIT_LOCAL_LOCK(lock),
+};
+
+bool eventfd_signal_count(void)
+{
+	return this_cpu_read(event_fd_recursion.count);
+}
 
 /**
  * eventfd_signal - Adds @n to the eventfd counter.
@@ -71,18 +84,22 @@ __u64 eventfd_signal(struct eventfd_ctx *ctx, __u64 n)
 	 * it returns true, the eventfd_signal() call should be deferred to a
 	 * safe context.
 	 */
-	if (WARN_ON_ONCE(this_cpu_read(eventfd_wake_count)))
+	local_lock(&event_fd_recursion.lock);
+	if (WARN_ON_ONCE(this_cpu_read(event_fd_recursion.count))) {
+		local_unlock(&event_fd_recursion.lock);
 		return 0;
+	}
 
 	spin_lock_irqsave(&ctx->wqh.lock, flags);
-	this_cpu_inc(eventfd_wake_count);
+	this_cpu_inc(event_fd_recursion.count);
 	if (ULLONG_MAX - ctx->count < n)
 		n = ULLONG_MAX - ctx->count;
 	ctx->count += n;
 	if (waitqueue_active(&ctx->wqh))
 		wake_up_locked_poll(&ctx->wqh, EPOLLIN);
-	this_cpu_dec(eventfd_wake_count);
+	this_cpu_dec(event_fd_recursion.count);
 	spin_unlock_irqrestore(&ctx->wqh.lock, flags);
+	local_unlock(&event_fd_recursion.lock);
 
 	return n;
 }
