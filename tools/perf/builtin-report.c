@@ -1405,7 +1405,7 @@ int cmd_report(int argc, const char **argv)
 	data.force = symbol_conf.force;
 
 repeat:
-	session = perf_session__new(&data, false, &report.tool);
+	session = perf_session__new(&data, &report.tool);
 	if (IS_ERR(session))
 		return PTR_ERR(session);
 
