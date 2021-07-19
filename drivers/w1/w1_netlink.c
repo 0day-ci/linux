@@ -3,6 +3,7 @@
  * Copyright (c) 2003 Evgeniy Polyakov <zbr@ioremap.net>
  */
 
+#include <linux/refcount.h>
 #include <linux/slab.h>
 #include <linux/skbuff.h>
 #include <linux/netlink.h>
@@ -17,7 +18,7 @@
  * allocation.
  */
 struct w1_cb_block {
-	atomic_t refcnt;
+	refcount_t refcnt;
 	u32 portid; /* Sending process port ID */
 	/* maximum value for first_cn->len */
 	u16 maxlen;
@@ -61,7 +62,7 @@ static u16 w1_reply_len(struct w1_cb_block *block)
 
 static void w1_unref_block(struct w1_cb_block *block)
 {
-	if (atomic_sub_return(1, &block->refcnt) == 0) {
+	if (refcount_dec_and_test(&block->refcnt)) {
 		u16 len = w1_reply_len(block);
 		if (len) {
 			cn_netlink_send_mult(block->first_cn, len,
@@ -609,7 +610,7 @@ static void w1_cn_callback(struct cn_msg *cn, struct netlink_skb_parms *nsp)
 			w1_netlink_send_error(cn, msg, nsp->portid, -ENOMEM);
 			return;
 		}
-		atomic_set(&block->refcnt, 1);
+		refcount_set(&block->refcnt, 1);
 		block->portid = nsp->portid;
 		memcpy(&block->request_cn, cn, sizeof(*cn) + cn->len);
 		node = (struct w1_cb_node *)(block->request_cn.data + cn->len);
@@ -675,7 +676,7 @@ static void w1_cn_callback(struct cn_msg *cn, struct netlink_skb_parms *nsp)
 
 		err = 0;
 
-		atomic_inc(&block->refcnt);
+		refcount_inc(&block->refcnt);
 		node->async.cb = w1_process_cb;
 		node->block = block;
 		node->msg = (struct w1_netlink_msg *)((u8 *)&block->request_cn +
