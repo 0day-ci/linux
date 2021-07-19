@@ -1196,14 +1196,6 @@ static int __init i915_init(void)
 	bool use_kms = true;
 	int err;
 
-	err = i915_globals_init();
-	if (err)
-		return err;
-
-	err = i915_mock_selftests();
-	if (err)
-		return err > 0 ? 0 : err;
-
 	/*
 	 * Enable KMS by default, unless explicitly overriden by
 	 * either the i915.modeset prarameter or by the
@@ -1221,6 +1213,14 @@ static int __init i915_init(void)
 		DRM_DEBUG_DRIVER("KMS disabled.\n");
 		return 0;
 	}
+
+	err = i915_globals_init();
+	if (err)
+		return err;
+
+	err = i915_mock_selftests();
+	if (err)
+		return err > 0 ? 0 : err;
 
 	i915_pmu_init();
 
