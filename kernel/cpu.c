@@ -160,6 +160,7 @@ static int cpuhp_invoke_callback(unsigned int cpu, enum cpuhp_state state,
 	struct cpuhp_step *step = cpuhp_get_step(state);
 	int (*cbm)(unsigned int cpu, struct hlist_node *node);
 	int (*cb)(unsigned int cpu);
+	unsigned long j, j1;
 	int ret, cnt;
 
 	if (st->fail == state) {
@@ -177,7 +178,10 @@ static int cpuhp_invoke_callback(unsigned int cpu, enum cpuhp_state state,
 		cb = bringup ? step->startup.single : step->teardown.single;
 
 		trace_cpuhp_enter(cpu, st->target, state, cb);
+		j = jiffies;
 		ret = cb(cpu);
+		j1 = jiffies;
+		WARN_ONCE(time_after(j1, j + 100 * HZ), "CPU-hotplug notifier %ps took %ld jiffies\n", cb, j1 - j);
 		trace_cpuhp_exit(cpu, st->state, state, ret);
 		return ret;
 	}
@@ -187,7 +191,10 @@ static int cpuhp_invoke_callback(unsigned int cpu, enum cpuhp_state state,
 	if (node) {
 		WARN_ON_ONCE(lastp && *lastp);
 		trace_cpuhp_multi_enter(cpu, st->target, state, cbm, node);
+		j = jiffies;
 		ret = cbm(cpu, node);
+		j1 = jiffies;
+		WARN_ONCE(time_after(j1, j + 100 * HZ), "CPU-hotplug notifier %ps took %ld jiffies\n", cbm, j1 - j);
 		trace_cpuhp_exit(cpu, st->state, state, ret);
 		return ret;
 	}
@@ -199,7 +206,10 @@ static int cpuhp_invoke_callback(unsigned int cpu, enum cpuhp_state state,
 			break;
 
 		trace_cpuhp_multi_enter(cpu, st->target, state, cbm, node);
+		j = jiffies;
 		ret = cbm(cpu, node);
+		j1 = jiffies;
+		WARN_ONCE(time_after(j1, j + 100 * HZ), "CPU-hotplug notifier %ps took %ld jiffies\n", cbm, j1 - j);
 		trace_cpuhp_exit(cpu, st->state, state, ret);
 		if (ret) {
 			if (!lastp)
@@ -224,7 +234,10 @@ err:
 			break;
 
 		trace_cpuhp_multi_enter(cpu, st->target, state, cbm, node);
+		j = jiffies;
 		ret = cbm(cpu, node);
+		j1 = jiffies;
+		WARN_ONCE(time_after(j1, j + 100 * HZ), "CPU-hotplug notifier %ps took %ld jiffies\n", cbm, j1 - j);
 		trace_cpuhp_exit(cpu, st->state, state, ret);
 		/*
 		 * Rollback must not fail,
