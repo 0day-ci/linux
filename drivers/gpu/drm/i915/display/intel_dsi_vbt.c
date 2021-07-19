@@ -43,6 +43,7 @@
 #include "intel_display_types.h"
 #include "intel_dsi.h"
 #include "intel_sideband.h"
+#include "intel_de.h"
 
 #define MIPI_TRANSFER_MODE_SHIFT	0
 #define MIPI_VIRTUAL_CHANNEL_SHIFT	1
@@ -354,7 +355,48 @@ static void bxt_exec_gpio(struct drm_i915_private *dev_priv,
 static void icl_exec_gpio(struct drm_i915_private *dev_priv,
 			  u8 gpio_source, u8 gpio_index, bool value)
 {
-	drm_dbg_kms(&dev_priv->drm, "Skipping ICL GPIO element execution\n");
+	u32 val;
+
+	switch (gpio_index) {
+	case ICL_GPIO_L_VDDEN_1:
+		val = intel_de_read(dev_priv, ICP_PP_CONTROL(1));
+		if (value)
+			val |= PWR_STATE_TARGET;
+		else
+			val &= ~PWR_STATE_TARGET;
+		intel_de_write(dev_priv, ICP_PP_CONTROL(1), val);
+		break;
+	case ICL_GPIO_L_BKLTEN_1:
+		val = intel_de_read(dev_priv, ICP_PP_CONTROL(1));
+		if (value)
+			val |= BACKLIGHT_ENABLE;
+		else
+			val &= ~BACKLIGHT_ENABLE;
+		intel_de_write(dev_priv, ICP_PP_CONTROL(1), val);
+		break;
+	case ICL_GPIO_DDPA_CTRLCLK_1:
+		val = intel_de_read(dev_priv, GPIO(1));
+		if (value)
+			val |= GPIO_CLOCK_VAL_OUT;
+		else
+			val &= ~GPIO_CLOCK_VAL_OUT;
+		val |= GPIO_CLOCK_DIR_MASK | GPIO_CLOCK_DIR_OUT | GPIO_CLOCK_VAL_MASK;
+		intel_de_write(dev_priv, GPIO(1), val);
+		break;
+	case ICL_GPIO_DDPA_CTRLDATA_1:
+		val = intel_de_read(dev_priv, GPIO(1));
+		if (value)
+			val |= GPIO_DATA_VAL_OUT;
+		else
+			val &= ~GPIO_DATA_VAL_OUT;
+		val |= GPIO_DATA_DIR_MASK | GPIO_DATA_DIR_OUT | GPIO_DATA_VAL_MASK;
+		intel_de_write(dev_priv, GPIO(1), val);
+		break;
+	default:
+		/* TODO: Add support for remaining GPIOs */
+		DRM_ERROR("Invalid GPIO number (%d) from VBT\n", gpio_index);
+		break;
+	}
 }
 
 static const u8 *mipi_exec_gpio(struct intel_dsi *intel_dsi, const u8 *data)
