@@ -11,6 +11,7 @@
 #define _LINUX_NTFS_INODE_H
 
 #include <linux/atomic.h>
+#include <linux/refcount.h>
 
 #include <linux/fs.h>
 #include <linux/list.h>
@@ -38,7 +39,7 @@ struct _ntfs_inode {
 				   See ntfs_inode_state_bits below. */
 	unsigned long mft_no;	/* Number of the mft record / inode. */
 	u16 seq_no;		/* Sequence number of the mft record. */
-	atomic_t count;		/* Inode reference count for book keeping. */
+	refcount_t count;		/* Inode reference count for book keeping. */
 	ntfs_volume *vol;	/* Pointer to the ntfs volume of this inode. */
 	/*
 	 * If NInoAttr() is true, the below fields describe the attribute which

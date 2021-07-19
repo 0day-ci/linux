@@ -1272,7 +1272,7 @@ unm_done:
 				tni == base_tni ? "base" : "extent",
 				tni->mft_no);
 		mutex_unlock(&tni->mrec_lock);
-		atomic_dec(&tni->count);
+		refcount_dec(&tni->count);
 		iput(VFS_I(base_tni));
 	}
 	SetPageUptodate(page);

@@ -342,7 +342,7 @@ static void ntfs_destroy_extent_inode(ntfs_inode *ni)
 {
 	ntfs_debug("Entering.");
 	BUG_ON(ni->page);
-	if (!atomic_dec_and_test(&ni->count))
+	if (!refcount_dec_and_test(&ni->count))
 		BUG();
 	kmem_cache_free(ntfs_inode_cache, ni);
 }
@@ -371,7 +371,7 @@ void __ntfs_init_inode(struct super_block *sb, ntfs_inode *ni)
 	rwlock_init(&ni->size_lock);
 	ni->initialized_size = ni->allocated_size = 0;
 	ni->seq_no = 0;
-	atomic_set(&ni->count, 1);
+	refcount_set(&ni->count, 1);
 	ni->vol = NTFS_SB(sb);
 	ntfs_init_runlist(&ni->runlist);
 	mutex_init(&ni->mrec_lock);
@@ -2275,7 +2275,7 @@ void ntfs_evict_big_inode(struct inode *vi)
 		}
 	}
 	BUG_ON(ni->page);
-	if (!atomic_dec_and_test(&ni->count))
+	if (!refcount_dec_and_test(&ni->count))
 		BUG();
 	return;
 }
