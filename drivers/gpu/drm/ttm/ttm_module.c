@@ -72,17 +72,13 @@ pgprot_t ttm_prot_from_caching(enum ttm_caching caching, pgprot_t tmp)
 	return tmp;
 }
 
-struct dentry *ttm_debugfs_root;
-
 static int __init ttm_init(void)
 {
-	ttm_debugfs_root = debugfs_create_dir("ttm", NULL);
 	return 0;
 }
 
 static void __exit ttm_exit(void)
 {
-	debugfs_remove(ttm_debugfs_root);
 }
 
 module_init(ttm_init);
