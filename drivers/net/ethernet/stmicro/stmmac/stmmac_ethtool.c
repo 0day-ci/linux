@@ -15,6 +15,7 @@
 #include <linux/phylink.h>
 #include <linux/net_tstamp.h>
 #include <asm/io.h>
+#include <linux/pm_runtime.h>
 
 #include "stmmac.h"
 #include "dwmac_dma.h"
@@ -412,8 +413,10 @@ static void stmmac_ethtool_setmsglevel(struct net_device *dev, u32 level)
 
 static int stmmac_check_if_running(struct net_device *dev)
 {
-	if (!netif_running(dev))
-		return -EBUSY;
+	struct stmmac_priv *priv = netdev_priv(dev);
+
+	pm_runtime_get_sync(priv->device);
+
 	return 0;
 }
 
