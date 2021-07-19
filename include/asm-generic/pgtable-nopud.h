@@ -2,11 +2,17 @@
 #ifndef _PGTABLE_NOPUD_H
 #define _PGTABLE_NOPUD_H
 
-#ifndef __ASSEMBLY__
-
 #include <asm-generic/pgtable-nop4d.h>
+#include <linux/const.h>
 
 #define __PAGETABLE_PUD_FOLDED 1
+
+#define PUD_SHIFT	P4D_SHIFT
+#define PTRS_PER_PUD	1
+#define PUD_SIZE  	(_UL(1) << PUD_SHIFT)
+#define PUD_MASK  	(~(PUD_SIZE-1))
+
+#ifndef __ASSEMBLY__
 
 /*
  * Having the pud type consist of a p4d gets the size right, and allows
@@ -14,11 +20,6 @@
  * without casting.
  */
 typedef struct { p4d_t p4d; } pud_t;
-
-#define PUD_SHIFT	P4D_SHIFT
-#define PTRS_PER_PUD	1
-#define PUD_SIZE  	(1UL << PUD_SHIFT)
-#define PUD_MASK  	(~(PUD_SIZE-1))
 
 /*
  * The "p4d_xxx()" functions here are trivial for a folded two-level

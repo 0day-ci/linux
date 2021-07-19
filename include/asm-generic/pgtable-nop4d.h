@@ -2,16 +2,18 @@
 #ifndef _PGTABLE_NOP4D_H
 #define _PGTABLE_NOP4D_H
 
-#ifndef __ASSEMBLY__
+#include <linux/const.h>
 
 #define __PAGETABLE_P4D_FOLDED 1
 
-typedef struct { pgd_t pgd; } p4d_t;
-
 #define P4D_SHIFT		PGDIR_SHIFT
 #define PTRS_PER_P4D		1
-#define P4D_SIZE		(1UL << P4D_SHIFT)
+#define P4D_SIZE		(_UL(1) << P4D_SHIFT)
 #define P4D_MASK		(~(P4D_SIZE-1))
+
+#ifndef __ASSEMBLY__
+
+typedef struct { pgd_t pgd; } p4d_t;
 
 /*
  * The "pgd_xxx()" functions here are trivial for a folded two-level

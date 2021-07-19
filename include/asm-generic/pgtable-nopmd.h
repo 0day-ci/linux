@@ -2,13 +2,19 @@
 #ifndef _PGTABLE_NOPMD_H
 #define _PGTABLE_NOPMD_H
 
-#ifndef __ASSEMBLY__
-
 #include <asm-generic/pgtable-nopud.h>
-
-struct mm_struct;
+#include <linux/const.h>
 
 #define __PAGETABLE_PMD_FOLDED 1
+
+#define PMD_SHIFT	PUD_SHIFT
+#define PTRS_PER_PMD	1
+#define PMD_SIZE  	(_UL(1) << PMD_SHIFT)
+#define PMD_MASK  	(~(PMD_SIZE-1))
+
+#ifndef __ASSEMBLY__
+
+struct mm_struct;
 
 /*
  * Having the pmd type consist of a pud gets the size right, and allows
@@ -16,11 +22,6 @@ struct mm_struct;
  * without casting.
  */
 typedef struct { pud_t pud; } pmd_t;
-
-#define PMD_SHIFT	PUD_SHIFT
-#define PTRS_PER_PMD	1
-#define PMD_SIZE  	(1UL << PMD_SHIFT)
-#define PMD_MASK  	(~(PMD_SIZE-1))
 
 /*
  * The "pud_xxx()" functions here are trivial for a folded two-level
