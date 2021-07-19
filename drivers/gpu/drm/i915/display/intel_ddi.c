@@ -3412,6 +3412,8 @@ static void intel_ddi_set_link_train(struct intel_dp *intel_dp,
 		break;
 	case DP_TRAINING_PATTERN_4:
 		temp |= DP_TP_CTL_LINK_TRAIN_PAT4;
+		temp &= ~DP_TP_CTL_TRAIN_PAT4_SEL_MASK;
+		temp |= DP_TP_CTL_TRAIN_PAT4_SEL_TP4a;
 		break;
 	}
 
