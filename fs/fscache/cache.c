@@ -29,7 +29,7 @@ struct fscache_cache_tag *__fscache_lookup_cache_tag(const char *name)
 
 	list_for_each_entry(tag, &fscache_cache_tag_list, link) {
 		if (strcmp(tag->name, name) == 0) {
-			atomic_inc(&tag->usage);
+			refcount_inc(&tag->usage);
 			up_read(&fscache_addremove_sem);
 			return tag;
 		}
@@ -43,7 +43,7 @@ struct fscache_cache_tag *__fscache_lookup_cache_tag(const char *name)
 		/* return a dummy tag if out of memory */
 		return ERR_PTR(-ENOMEM);
 
-	atomic_set(&xtag->usage, 1);
+	refcount_set(&xtag->usage, 1);
 	strcpy(xtag->name, name);
 
 	/* write lock, search again and add if still not present */
@@ -51,7 +51,7 @@ struct fscache_cache_tag *__fscache_lookup_cache_tag(const char *name)
 
 	list_for_each_entry(tag, &fscache_cache_tag_list, link) {
 		if (strcmp(tag->name, name) == 0) {
-			atomic_inc(&tag->usage);
+			refcount_inc(&tag->usage);
 			up_write(&fscache_addremove_sem);
 			kfree(xtag);
 			return tag;
@@ -71,7 +71,7 @@ void __fscache_release_cache_tag(struct fscache_cache_tag *tag)
 	if (tag != ERR_PTR(-ENOMEM)) {
 		down_write(&fscache_addremove_sem);
 
-		if (atomic_dec_and_test(&tag->usage))
+		if (refcount_dec_and_test(&tag->usage))
 			list_del_init(&tag->link);
 		else
 			tag = NULL;

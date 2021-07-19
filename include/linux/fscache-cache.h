@@ -14,6 +14,7 @@
 #ifndef _LINUX_FSCACHE_CACHE_H
 #define _LINUX_FSCACHE_CACHE_H
 
+#include <linux/refcount.h>
 #include <linux/fscache.h>
 #include <linux/sched.h>
 #include <linux/workqueue.h>
@@ -45,7 +46,7 @@ struct fscache_cache_tag {
 	struct fscache_cache	*cache;		/* cache referred to by this tag */
 	unsigned long		flags;
 #define FSCACHE_TAG_RESERVED	0		/* T if tag is reserved for a cache */
-	atomic_t		usage;
+	refcount_t		usage;
 	char			name[];	/* tag name */
 };
 
