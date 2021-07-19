@@ -1292,9 +1292,11 @@ static irqreturn_t stm32_dfsdm_irq(int irq, void *arg)
 	struct stm32_dfsdm_adc *adc = iio_priv(indio_dev);
 	struct regmap *regmap = adc->dfsdm->regmap;
 	unsigned int status, int_en;
+	int ret;
 
-	regmap_read(regmap, DFSDM_ISR(adc->fl_id), &status);
-	regmap_read(regmap, DFSDM_CR2(adc->fl_id), &int_en);
+	ret = regmap_read(regmap, DFSDM_ISR(adc->fl_id), &status);
+	if (ret)
+		return IRQ_HANDLED;
 
 	if (status & DFSDM_ISR_REOCF_MASK) {
 		/* Read the data register clean the IRQ status */
@@ -1303,6 +1305,9 @@ static irqreturn_t stm32_dfsdm_irq(int irq, void *arg)
 	}
 
 	if (status & DFSDM_ISR_ROVRF_MASK) {
+		ret = regmap_read(regmap, DFSDM_CR2(adc->fl_id), &int_en);
+		if (ret)
+			return IRQ_HANDLED;
 		if (int_en & DFSDM_CR2_ROVRIE_MASK)
 			dev_warn(&indio_dev->dev, "Overrun detected\n");
 		regmap_update_bits(regmap, DFSDM_ICR(adc->fl_id),
