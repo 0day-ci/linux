@@ -412,8 +412,10 @@ static void stmmac_ethtool_setmsglevel(struct net_device *dev, u32 level)
 
 static int stmmac_check_if_running(struct net_device *dev)
 {
-	if (!netif_running(dev))
-		return -EBUSY;
+	struct stmmac_priv *priv = netdev_priv(ndev);
+
+	pm_runtime_get_sync(priv->device);
+
 	return 0;
 }
 
