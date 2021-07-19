@@ -5902,6 +5902,14 @@ static void __init wq_numa_init(void)
 		return;
 	}
 
+	for_each_possible_cpu(cpu) {
+		if (WARN_ON(cpu_to_node(cpu) == NUMA_NO_NODE)) {
+			pr_warn("workqueue: NUMA node mapping not available for cpu%d, disabling NUMA support\n", cpu);
+			/* happens iff arch is bonkers, let's just proceed */
+			return;
+		}
+	}
+
 	wq_update_unbound_numa_attrs_buf = alloc_workqueue_attrs();
 	BUG_ON(!wq_update_unbound_numa_attrs_buf);
 
@@ -5913,18 +5921,11 @@ static void __init wq_numa_init(void)
 	tbl = kcalloc(nr_node_ids, sizeof(tbl[0]), GFP_KERNEL);
 	BUG_ON(!tbl);
 
-	for_each_node(node)
+	for_each_node(node) {
 		BUG_ON(!zalloc_cpumask_var_node(&tbl[node], GFP_KERNEL,
 				node_online(node) ? node : NUMA_NO_NODE));
 
-	for_each_possible_cpu(cpu) {
-		node = cpu_to_node(cpu);
-		if (WARN_ON(node == NUMA_NO_NODE)) {
-			pr_warn("workqueue: NUMA node mapping not available for cpu%d, disabling NUMA support\n", cpu);
-			/* happens iff arch is bonkers, let's just proceed */
-			return;
-		}
-		cpumask_set_cpu(cpu, tbl[node]);
+		cpumask_copy(tbl[node], cpumask_of_node(node));
 	}
 
 	wq_numa_possible_cpumask = tbl;
