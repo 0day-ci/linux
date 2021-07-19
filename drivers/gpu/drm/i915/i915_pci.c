@@ -1194,18 +1194,31 @@ static struct pci_driver i915_pci_driver = {
 	.driver.pm = &i915_pm_ops,
 };
 
+static bool i915_fully_loaded = false;
+
 static int __init i915_init(void)
 {
 	bool use_kms = true;
 	int err;
 
+	i915_fully_loaded = false;
+
 	err = i915_globals_init();
 	if (err)
 		return err;
 
+	/* i915_mock_selftests() only returns zero if no mock subtests were
+	 * run.  If we get any non-zero error code, we return early here.
+	 * We always return success because selftests may have allocated
+	 * objects from slabs which will get cleaned up by i915_exit().  We
+	 * could attempt to clean up immediately and fail module load but,
+	 * thanks to interactions with other parts of the kernel (struct
+	 * file, in particular), it's safer to let the module fully load
+	 * and then clean up on unload.
+	 */
 	err = i915_mock_selftests();
 	if (err)
-		return err > 0 ? 0 : err;
+		return 0;
 
 	/*
 	 * Enable KMS by default, unless explicitly overriden by
@@ -1225,6 +1238,12 @@ static int __init i915_init(void)
 		return 0;
 	}
 
+	/* After this point, i915_init() must either fully succeed or
+	 * properly tear everything down and fail.  We don't have separate
+	 * flags for each set-up bit.
+	 */
+	i915_fully_loaded = true;
+
 	i915_pmu_init();
 
 	err = pci_register_driver(&i915_pci_driver);
@@ -1240,12 +1259,11 @@ static int __init i915_init(void)
 
 static void __exit i915_exit(void)
 {
-	if (!i915_pci_driver.driver.owner)
-		return;
-
-	i915_perf_sysctl_unregister();
-	pci_unregister_driver(&i915_pci_driver);
-	i915_pmu_exit();
+	if (i915_fully_loaded) {
+		i915_perf_sysctl_unregister();
+		pci_unregister_driver(&i915_pci_driver);
+		i915_pmu_exit();
+	}
 	i915_globals_exit();
 }
 
