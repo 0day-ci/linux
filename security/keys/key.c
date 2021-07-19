@@ -279,7 +279,7 @@ struct key *key_alloc(struct key_type *type, const char *desc,
 		goto no_memory_2;
 
 	key->index_key.desc_len = desclen;
-	key->index_key.description = kmemdup(desc, desclen + 1, GFP_KERNEL);
+	key->index_key.description = kmemdup(desc, desclen + 1, GFP_KERNEL_ACCOUNT);
 	if (!key->index_key.description)
 		goto no_memory_3;
 	key->index_key.type = type;
@@ -1202,7 +1202,7 @@ void __init key_init(void)
 {
 	/* allocate a slab in which we can store keys */
 	key_jar = kmem_cache_create("key_jar", sizeof(struct key),
-			0, SLAB_HWCACHE_ALIGN|SLAB_PANIC, NULL);
+			0, SLAB_HWCACHE_ALIGN|SLAB_PANIC|SLAB_ACCOUNT, NULL);
 
 	/* add the special key types */
 	list_add_tail(&key_type_keyring.link, &key_types_list);

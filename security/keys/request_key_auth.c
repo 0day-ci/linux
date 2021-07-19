@@ -171,10 +171,10 @@ struct key *request_key_auth_new(struct key *target, const char *op,
 	kenter("%d,", target->serial);
 
 	/* allocate a auth record */
-	rka = kzalloc(sizeof(*rka), GFP_KERNEL);
+	rka = kzalloc(sizeof(*rka), GFP_KERNEL_ACCOUNT);
 	if (!rka)
 		goto error;
-	rka->callout_info = kmemdup(callout_info, callout_len, GFP_KERNEL);
+	rka->callout_info = kmemdup(callout_info, callout_len, GFP_KERNEL_ACCOUNT);
 	if (!rka->callout_info)
 		goto error_free_rka;
 	rka->callout_len = callout_len;
