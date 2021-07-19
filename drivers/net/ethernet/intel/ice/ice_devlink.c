@@ -654,7 +654,10 @@ int ice_devlink_create_pf_port(struct ice_pf *pf)
 	dev = ice_pf_to_dev(pf);
 
 	devlink_port = &pf->devlink_port;
+
 	vsi = ice_get_main_vsi(pf);
+	if (!vsi)
+		return -EIO;
 
 	attrs.flavour = DEVLINK_PORT_FLAVOUR_PHYSICAL;
 	attrs.phys.port_number = pf->hw.bus.func;
