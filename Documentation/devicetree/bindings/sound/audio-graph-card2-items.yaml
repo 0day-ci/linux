@@ -1,0 +1,80 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/sound/audio-graph-card2-items.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Audio Graph Card2 Items Bindings
+
+maintainers:
+  - Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+
+properties:
+  compatible:
+    enum:
+      - audio-graph-card2-dsp
+      - audio-graph-card2-multi
+      - audio-graph-card2-codec2codec
+
+  "#address-cells":
+    const: 1
+
+  "#size-cells":
+    const: 0
+
+patternProperties:
+  "^ports(@[0-1])?$":
+    $ref: /schemas/graph.yaml#/properties/ports
+    properties:
+      port(@[0-9a-f]+)?:
+        $ref: audio-graph-port.yaml#
+        unevaluatedProperties: false
+    additionalProperties: true
+
+required:
+  - compatible
+
+additionalProperties: true
+
+examples:
+  - |
+    mix {
+        compatible = "audio-graph-card2-dsp";
+
+        /* sample ports
+        ports@0 {
+            port@0 { mix_fe0_ep: endpoint { remote-endpoint = <&cpu0_ep>; }; };
+            port@1 { mix_fe1_ep: endpoint { remote-endpoint = <&cpu1_ep>; }; };
+        };
+        ports@1 {
+            port@0 { mix_be0_ep: endpoint { remote-endpoint = <&codec0_ep>; }; };
+        };
+        */
+    };
+
+    multi {
+        compatible = "audio-graph-card2-multi";
+
+        /* sample ports
+        ports@0 {
+            port@0 { multi_00_ep: endpoint { remote-endpoint = <&cpu2_ep>; }; };
+            port@1 { multi_01_ep: endpoint { remote-endpoint = <&cpu3_ep>; }; };
+        };
+        ports@1 {
+            port@0 { multi_10_ep: endpoint { remote-endpoint = <&codec1_ep>; }; };
+            port@1 { multi_11_ep: endpoint { remote-endpoint = <&codec2_ep>; }; };
+        };
+        */
+    };
+
+    codec2codec {
+        compatible = "audio-graph-card2-codec2codec";
+
+        /* sample ports
+        rate = <48000>;
+        ports {
+            port@0 { c2c_0_ep: endpoint { remote-endpoint = <&codec3_ep>; }; };
+            port@1 { c2c_1_ep: endpoint { remote-endpoint = <&codec4_ep>; }; };
+        };
+        */
+    };
