@@ -2474,7 +2474,8 @@ drm_dp_mst_handle_link_address_port(struct drm_dp_mst_branch *mstb,
 
 	if (port->connector)
 		drm_modeset_unlock(&mgr->base.lock);
-	else if (!port->input)
+	else if (!port->input && port->pdt != DP_PEER_DEVICE_NONE &&
+		 drm_dp_mst_is_end_device(port->pdt, port->mcs))
 		drm_dp_mst_port_add_connector(mstb, port);
 
 	if (send_link_addr && port->mstb) {
@@ -2556,6 +2557,10 @@ drm_dp_mst_handle_conn_stat(struct drm_dp_mst_branch *mstb,
 		drm_err(mgr->dev, "Failed to change PDT for port %p: %d\n", port, ret);
 		dowork = false;
 	}
+
+	if (!port->input && !port->connector && new_pdt != DP_PEER_DEVICE_NONE &&
+	    drm_dp_mst_is_end_device(new_pdt, new_mcs))
+		create_connector = true;
 
 	if (port->connector)
 		drm_modeset_unlock(&mgr->base.lock);
