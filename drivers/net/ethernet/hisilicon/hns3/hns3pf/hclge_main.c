@@ -76,6 +76,10 @@ static struct hnae3_ae_algo ae_algo;
 
 static struct workqueue_struct *hclge_wq;
 
+static unsigned int wq_unbound;
+module_param(wq_unbound, uint, 0400);
+MODULE_PARM_DESC(wq_unbound, "Specifies WQ_UNBOUND flag for the workqueue, non-zero value takes effect");
+
 static const struct pci_device_id ae_algo_pci_tbl[] = {
 	{PCI_VDEVICE(HUAWEI, HNAE3_DEV_ID_GE), 0},
 	{PCI_VDEVICE(HUAWEI, HNAE3_DEV_ID_25GE), 0},
@@ -12936,7 +12940,11 @@ static int hclge_init(void)
 {
 	pr_info("%s is initializing\n", HCLGE_NAME);
 
-	hclge_wq = alloc_workqueue("%s", 0, 0, HCLGE_NAME);
+	if (wq_unbound)
+		hclge_wq = alloc_workqueue("%s", WQ_UNBOUND, 0, HCLGE_NAME);
+	else
+		hclge_wq = alloc_workqueue("%s", 0, 0, HCLGE_NAME);
+
 	if (!hclge_wq) {
 		pr_err("%s: failed to create workqueue\n", HCLGE_NAME);
 		return -ENOMEM;
