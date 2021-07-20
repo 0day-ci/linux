@@ -38,12 +38,10 @@ void lrc_destroy(struct kref *kref);
 int
 lrc_pre_pin(struct intel_context *ce,
 	    struct intel_engine_cs *engine,
-	    struct i915_gem_ww_ctx *ww,
-	    void **vaddr);
+	    struct i915_gem_ww_ctx *ww);
 int
 lrc_pin(struct intel_context *ce,
-	struct intel_engine_cs *engine,
-	void *vaddr);
+	struct intel_engine_cs *engine);
 void lrc_unpin(struct intel_context *ce);
 void lrc_post_unpin(struct intel_context *ce);
 

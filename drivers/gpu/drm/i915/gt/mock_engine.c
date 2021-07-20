@@ -167,12 +167,12 @@ static int mock_context_alloc(struct intel_context *ce)
 }
 
 static int mock_context_pre_pin(struct intel_context *ce,
-				struct i915_gem_ww_ctx *ww, void **unused)
+				struct i915_gem_ww_ctx *ww)
 {
 	return 0;
 }
 
-static int mock_context_pin(struct intel_context *ce, void *unused)
+static int mock_context_pin(struct intel_context *ce)
 {
 	return 0;
 }
