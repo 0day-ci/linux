@@ -651,6 +651,39 @@ static int vmd_alloc_irqs(struct vmd_dev *vmd)
 	return 0;
 }
 
+
+static void vmd_domain_reset_windows(struct vmd_dev *vmd)
+{
+	u8 hdr_type;
+	char __iomem *addr;
+	int dev_seq;
+	u8 functions;
+	u8 fn_seq;
+	int max_devs = resource_size(&vmd->resources[0]) * 32;
+
+	for (dev_seq = 0; dev_seq < max_devs; dev_seq++) {
+		addr = VMD_DEVICE_BASE(vmd, dev_seq) + PCI_VENDOR_ID;
+		if (readw(addr) != PCI_VENDOR_ID_INTEL)
+			continue;
+
+		addr = VMD_DEVICE_BASE(vmd, dev_seq) + PCI_HEADER_TYPE;
+		hdr_type = readb(addr) & PCI_HEADER_TYPE_MASK;
+		if (hdr_type != PCI_HEADER_TYPE_BRIDGE)
+			continue;
+
+		functions = !!(hdr_type & 0x80) ? 8 : 1;
+		for (fn_seq = 0; fn_seq < functions; fn_seq++)
+		{
+			addr = VMD_FUNCTION_BASE(vmd, dev_seq, fn_seq) + PCI_VENDOR_ID;
+			if (readw(addr) != PCI_VENDOR_ID_INTEL)
+				continue;
+
+			memset_io((VMD_FUNCTION_BASE(vmd, dev_seq, fn_seq) + PCI_IO_BASE),
+			 0, PCI_ROM_ADDRESS1 - PCI_IO_BASE);
+		}
+	}
+}
+
 static int vmd_enable_domain(struct vmd_dev *vmd, unsigned long features)
 {
 	struct pci_sysdata *sd = &vmd->sysdata;
@@ -740,6 +773,8 @@ static int vmd_enable_domain(struct vmd_dev *vmd, unsigned long features)
 		.flags = flags,
 		.parent = res,
 	};
+
+	vmd_domain_reset_windows(vmd);
 
 	sd->vmd_dev = vmd->dev;
 	sd->domain = vmd_find_free_domain();
