@@ -95,6 +95,15 @@ struct compat_iovec {
 	compat_size_t	iov_len;
 };
 
+struct compat_ifmap {
+	compat_ulong_t mem_start;
+	compat_ulong_t mem_end;
+	unsigned short base_addr;
+	unsigned char irq;
+	unsigned char dma;
+	unsigned char port;
+};
+
 #ifdef CONFIG_COMPAT
 
 #ifndef compat_user_stack_pointer
@@ -316,15 +325,6 @@ typedef struct compat_sigevent {
 		} _sigev_thread;
 	} _sigev_un;
 } compat_sigevent_t;
-
-struct compat_ifmap {
-	compat_ulong_t mem_start;
-	compat_ulong_t mem_end;
-	unsigned short base_addr;
-	unsigned char irq;
-	unsigned char dma;
-	unsigned char port;
-};
 
 struct compat_if_settings {
 	unsigned int type;	/* Type of physical device or protocol */
