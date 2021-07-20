@@ -2478,6 +2478,12 @@ drm_dp_mst_handle_link_address_port(struct drm_dp_mst_branch *mstb,
 		 drm_dp_mst_is_end_device(port->pdt, port->mcs))
 		drm_dp_mst_port_add_connector(mstb, port);
 
+	if (port->connector && port->pdt == DP_PEER_DEVICE_NONE) {
+		drm_connector_unregister(port->connector);
+		drm_connector_put(port->connector);
+		port->connector = NULL;
+	}
+
 	if (send_link_addr && port->mstb) {
 		ret = drm_dp_send_link_address(mgr, port->mstb);
 		if (ret == 1) /* MSTB below us changed */
