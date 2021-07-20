@@ -139,6 +139,12 @@ enum {
 	 * the GPU. Here we track such boost requests on a per-request basis.
 	 */
 	I915_FENCE_FLAG_BOOST,
+
+	/*
+	 * I915_FENCE_FLAG_GUC_ID_NOT_PINNED - Set to signal the GuC submission
+	 * tasklet that the guc_id isn't pinned.
+	 */
+	I915_FENCE_FLAG_GUC_ID_NOT_PINNED,
 };
 
 /**

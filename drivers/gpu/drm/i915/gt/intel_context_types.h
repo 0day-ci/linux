@@ -185,6 +185,9 @@ struct intel_context {
 	/* GuC LRC descriptor reference count */
 	atomic_t guc_id_ref;
 
+	/* Number of rq submitted without a guc_id */
+	u16 guc_num_rq_submit_no_id;
+
 	/*
 	 * GuC ID link - in list when unpinned but guc_id still valid in GuC
 	 */

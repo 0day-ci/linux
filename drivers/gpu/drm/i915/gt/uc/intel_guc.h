@@ -33,7 +33,28 @@ struct intel_guc {
 
 	/* Global engine used to submit requests to GuC */
 	struct i915_sched_engine *sched_engine;
-	struct i915_request *stalled_request;
+
+	/* Global state related to submission tasklet */
+	struct i915_request *stalled_rq;
+	struct intel_context *stalled_context;
+	struct work_struct retire_worker;
+	unsigned long flags;
+	int total_num_rq_with_no_guc_id;
+
+	/*
+	 * Submisson stall reason. See intel_guc_submission.c for detailed
+	 * description.
+	 */
+	enum {
+		STALL_NONE,
+		STALL_GUC_ID_WORKQUEUE,
+		STALL_GUC_ID_TASKLET,
+		STALL_SCHED_DISABLE,
+		STALL_REGISTER_CONTEXT,
+		STALL_DEREGISTER_CONTEXT,
+		STALL_MOVE_LRC_TAIL,
+		STALL_ADD_REQUEST,
+	} submission_stall_reason;
 
 	/* intel_guc_recv interrupt related state */
 	spinlock_t irq_lock;
@@ -55,7 +76,8 @@ struct intel_guc {
 	struct ida guc_ids;
 	u32 num_guc_ids;
 	u32 max_guc_ids;
-	struct list_head guc_id_list;
+	struct list_head guc_id_list_no_ref;
+	struct list_head guc_id_list_unpinned;
 
 	bool submission_supported;
 	bool submission_selected;
