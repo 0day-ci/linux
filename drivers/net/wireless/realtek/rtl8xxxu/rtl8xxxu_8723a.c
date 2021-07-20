@@ -264,10 +264,8 @@ static int rtl8723a_emu_to_active(struct rtl8xxxu_priv *priv)
 		udelay(10);
 	}
 
-	if (!count) {
-		ret = -EBUSY;
-		goto exit;
-	}
+	if (!count)
+		return -EBUSY;
 
 	/* We should be able to optimize the following three entries into one */
 
@@ -300,10 +298,8 @@ static int rtl8723a_emu_to_active(struct rtl8xxxu_priv *priv)
 		udelay(10);
 	}
 
-	if (!count) {
-		ret = -EBUSY;
-		goto exit;
-	}
+	if (!count)
+		return -EBUSY;
 
 	/* 0x4C[23] = 0x4E[7] = 1, switch DPDT_SEL_P output from WL BB */
 	/*
@@ -315,7 +311,6 @@ static int rtl8723a_emu_to_active(struct rtl8xxxu_priv *priv)
 	val8 &= ~LEDCFG2_DPDT_SELECT;
 	rtl8xxxu_write8(priv, REG_LEDCFG2, val8);
 
-exit:
 	return ret;
 }
 
@@ -335,7 +330,7 @@ static int rtl8723au_power_on(struct rtl8xxxu_priv *priv)
 
 	ret = rtl8723a_emu_to_active(priv);
 	if (ret)
-		goto exit;
+		return ret;
 
 	/*
 	 * 0x0004[19] = 1, reset 8051
@@ -361,7 +356,7 @@ static int rtl8723au_power_on(struct rtl8xxxu_priv *priv)
 	val32 &= ~(BIT(28) | BIT(29) | BIT(30));
 	val32 |= (0x06 << 28);
 	rtl8xxxu_write32(priv, REG_EFUSE_CTRL, val32);
-exit:
+
 	return ret;
 }
 
