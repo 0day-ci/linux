@@ -3149,11 +3149,10 @@ i915_gem_do_execbuffer(struct drm_device *dev,
 		       struct drm_i915_gem_exec_object2 *exec,
 		       struct dma_fence *in_fence,
 		       struct dma_fence *exec_fence,
-		       int out_fence_fd)
+		       struct dma_fence **out_fence)
 {
 	struct drm_i915_private *i915 = to_i915(dev);
 	struct i915_execbuffer eb;
-	struct sync_file *out_fence = NULL;
 	struct i915_vma *batch;
 	int err;
 
@@ -3277,14 +3276,6 @@ i915_gem_do_execbuffer(struct drm_device *dev,
 			goto err_request;
 	}
 
-	if (out_fence_fd >= 0) {
-		out_fence = sync_file_create(&eb.request->fence);
-		if (!out_fence) {
-			err = -ENOMEM;
-			goto err_request;
-		}
-	}
-
 	/*
 	 * Whilst this request exists, batch_obj will be on the
 	 * active_list, and so will hold the active reference. Only when this
@@ -3306,12 +3297,8 @@ err_request:
 	if (eb.fences)
 		signal_fence_array(&eb);
 
-	if (out_fence) {
-		if (err == 0)
-			fd_install(out_fence_fd, out_fence->file);
-		else
-			fput(out_fence->file);
-	}
+	if (!err && out_fence)
+		*out_fence = dma_fence_get(&eb.request->fence);
 
 	if (unlikely(eb.gem_context->syncobj)) {
 		drm_syncobj_replace_fence(eb.gem_context->syncobj,
@@ -3369,6 +3356,8 @@ i915_gem_execbuffer2_ioctl(struct drm_device *dev, void *data,
 	struct drm_i915_private *i915 = to_i915(dev);
 	struct drm_i915_gem_execbuffer2 *args = data;
 	struct drm_i915_gem_exec_object2 *exec2_list;
+	struct dma_fence **out_fence_p = NULL;
+	struct dma_fence *out_fence = NULL;
 	struct dma_fence *in_fence = NULL;
 	struct dma_fence *exec_fence = NULL;
 	int out_fence_fd = -1;
@@ -3421,6 +3410,7 @@ i915_gem_execbuffer2_ioctl(struct drm_device *dev, void *data,
 			err = out_fence_fd;
 			goto err_out_fence;
 		}
+		out_fence_p = &out_fence;
 	}
 
 	/* Allocate extra slots for use by the command parser */
@@ -3441,7 +3431,7 @@ i915_gem_execbuffer2_ioctl(struct drm_device *dev, void *data,
 	}
 
 	err = i915_gem_do_execbuffer(dev, file, args, exec2_list, in_fence,
-				     exec_fence, out_fence_fd);
+				     exec_fence, out_fence_p);
 
 	/*
 	 * Now that we have begun execution of the batchbuffer, we ignore
@@ -3482,9 +3472,18 @@ end:;
 	}
 
 	if (!err && out_fence_fd >= 0) {
-		args->rsvd2 &= GENMASK_ULL(31, 0); /* keep in-fence */
-		args->rsvd2 |= (u64)out_fence_fd << 32;
-		out_fence_fd = -1;
+		struct sync_file *sync_fence;
+
+		sync_fence = sync_file_create(out_fence);
+		if (sync_fence) {
+			fd_install(out_fence_fd, sync_fence->file);
+			args->rsvd2 &= GENMASK_ULL(31, 0); /* keep in-fence */
+			args->rsvd2 |= (u64)out_fence_fd << 32;
+			out_fence_fd = -1;
+		}
+		dma_fence_put(out_fence);
+	} else if (out_fence) {
+		dma_fence_put(out_fence);
 	}
 
 	args->flags &= ~__I915_EXEC_UNKNOWN_FLAGS;
