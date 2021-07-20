@@ -1,0 +1,21 @@
+.. SPDX-License-Identifier: GPL-2.0
+
+.. include:: ../disclaimer-zh_CN.rst
+
+:Original: Documentation/accounting/index.rst
+:Translator: Yang Yang <yang.yang29@zte.com.cn>
+
+.. _cn_accounting_index:
+
+==========
+计数
+==========
+
+.. toctree::
+   :maxdepth: 1
+
+   cgroupstats
+   delay-accounting
+   psi
+   taskstats
+   taskstats-struct
