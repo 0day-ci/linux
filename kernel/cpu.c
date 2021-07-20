@@ -691,8 +691,10 @@ static int cpuhp_up_callbacks(unsigned int cpu, struct cpuhp_cpu_state *st,
 			      enum cpuhp_state target)
 {
 	enum cpuhp_state prev_state = st->state;
+	unsigned long j, j1;
 	int ret = 0;
 
+	j = jiffies;
 	ret = cpuhp_invoke_callback_range(true, cpu, st, target);
 	if (ret) {
 		cpuhp_reset_state(st, prev_state);
@@ -700,6 +702,8 @@ static int cpuhp_up_callbacks(unsigned int cpu, struct cpuhp_cpu_state *st,
 			WARN_ON(cpuhp_invoke_callback_range(false, cpu, st,
 							    prev_state));
 	}
+	j1 = jiffies;
+	WARN_ONCE(time_after(j1, j + 100 * HZ), "%s took %ld jiffies\n", __func__, j1 - j);
 	return ret;
 }
 
