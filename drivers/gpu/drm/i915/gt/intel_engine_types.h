@@ -272,6 +272,7 @@ struct intel_engine_cs {
 	unsigned int guc_id;
 
 	intel_engine_mask_t mask;
+	intel_engine_mask_t logical_mask;
 
 	u8 class;
 	u8 instance;
