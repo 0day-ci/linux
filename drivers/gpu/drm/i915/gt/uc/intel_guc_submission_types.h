@@ -22,6 +22,16 @@ struct guc_virtual_engine {
 /*
  * Object which encapsulates the globally operated on i915_sched_engine +
  * the GuC submission state machine described in intel_guc_submission.c.
+ *
+ * Currently we have two instances of these per GuC. One for single-lrc and one
+ * for multi-lrc submission. We split these into two submission engines as they
+ * can operate in parallel allowing a blocking condition on one not to affect
+ * the other. i.e. guc_ids are statically allocated between these two submission
+ * modes. One mode may have guc_ids exhausted which requires blocking while the
+ * other has plenty of guc_ids and can make forward progres.
+ *
+ * In the future if different submission use cases arise we can simply
+ * instantiate another of these objects and assign it to the context.
  */
 struct guc_submit_engine {
 	struct i915_sched_engine sched_engine;
