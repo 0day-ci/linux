@@ -116,6 +116,8 @@ struct intel_context {
 #define CONTEXT_FORCE_SINGLE_SUBMISSION	7
 #define CONTEXT_NOPREEMPT		8
 #define CONTEXT_LRCA_DIRTY		9
+#define CONTEXT_PIN_TO_PARENT		10
+#define CONTEXT_PIN_CHILDREN		11
 
 	struct {
 		u64 timeout_us;
