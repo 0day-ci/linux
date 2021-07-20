@@ -560,6 +560,7 @@ static int mbochs_probe(struct mdev_device *mdev)
 err_bytes:
 	mbochs_used_mbytes -= mdev_state->type->mbytes;
 err_mem:
+	vfio_uninit_group_dev(&mdev_state->vdev);
 	kfree(mdev_state->pages);
 	kfree(mdev_state->vconfig);
 	kfree(mdev_state);
@@ -572,6 +573,7 @@ static void mbochs_remove(struct mdev_device *mdev)
 
 	vfio_unregister_group_dev(&mdev_state->vdev);
 	mbochs_used_mbytes -= mdev_state->type->mbytes;
+	vfio_uninit_group_dev(&mdev_state->vdev);
 	kfree(mdev_state->pages);
 	kfree(mdev_state->vconfig);
 	kfree(mdev_state);
