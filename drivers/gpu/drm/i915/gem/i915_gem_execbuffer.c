@@ -3148,13 +3148,13 @@ i915_gem_do_execbuffer(struct drm_device *dev,
 		       struct drm_i915_gem_execbuffer2 *args,
 		       struct drm_i915_gem_exec_object2 *exec,
 		       struct dma_fence *in_fence,
-		       struct dma_fence *exec_fence)
+		       struct dma_fence *exec_fence,
+		       int out_fence_fd)
 {
 	struct drm_i915_private *i915 = to_i915(dev);
 	struct i915_execbuffer eb;
 	struct sync_file *out_fence = NULL;
 	struct i915_vma *batch;
-	int out_fence_fd = -1;
 	int err;
 
 	BUILD_BUG_ON(__EXEC_INTERNAL_FLAGS & ~__I915_EXEC_ILLEGAL_FLAGS);
@@ -3198,15 +3198,9 @@ i915_gem_do_execbuffer(struct drm_device *dev,
 	if (err)
 		goto err_ext;
 
-	if (args->flags & I915_EXEC_FENCE_OUT) {
-		out_fence_fd = get_unused_fd_flags(O_CLOEXEC);
-		if (out_fence_fd < 0)
-			goto err_ext;
-	}
-
 	err = eb_create(&eb);
 	if (err)
-		goto err_out_fence;
+		goto err_ext;
 
 	GEM_BUG_ON(!eb.lut_size);
 
@@ -3283,7 +3277,7 @@ i915_gem_do_execbuffer(struct drm_device *dev,
 			goto err_request;
 	}
 
-	if (out_fence_fd != -1) {
+	if (out_fence_fd >= 0) {
 		out_fence = sync_file_create(&eb.request->fence);
 		if (!out_fence) {
 			err = -ENOMEM;
@@ -3313,14 +3307,10 @@ err_request:
 		signal_fence_array(&eb);
 
 	if (out_fence) {
-		if (err == 0) {
+		if (err == 0)
 			fd_install(out_fence_fd, out_fence->file);
-			args->rsvd2 &= GENMASK_ULL(31, 0); /* keep in-fence */
-			args->rsvd2 |= (u64)out_fence_fd << 32;
-			out_fence_fd = -1;
-		} else {
+		else
 			fput(out_fence->file);
-		}
 	}
 
 	if (unlikely(eb.gem_context->syncobj)) {
@@ -3349,9 +3339,6 @@ err_context:
 	i915_gem_context_put(eb.gem_context);
 err_destroy:
 	eb_destroy(&eb);
-err_out_fence:
-	if (out_fence_fd != -1)
-		put_unused_fd(out_fence_fd);
 err_ext:
 	put_fence_array(eb.fences, eb.num_fences);
 	return err;
@@ -3384,6 +3371,7 @@ i915_gem_execbuffer2_ioctl(struct drm_device *dev, void *data,
 	struct drm_i915_gem_exec_object2 *exec2_list;
 	struct dma_fence *in_fence = NULL;
 	struct dma_fence *exec_fence = NULL;
+	int out_fence_fd = -1;
 	const size_t count = args->buffer_count;
 	int err;
 
@@ -3427,6 +3415,14 @@ i915_gem_execbuffer2_ioctl(struct drm_device *dev, void *data,
 		}
 	}
 
+	if (args->flags & I915_EXEC_FENCE_OUT) {
+		out_fence_fd = get_unused_fd_flags(O_CLOEXEC);
+		if (out_fence_fd < 0) {
+			err = out_fence_fd;
+			goto err_out_fence;
+		}
+	}
+
 	/* Allocate extra slots for use by the command parser */
 	exec2_list = kvmalloc_array(count + 2, eb_element_size(),
 				    __GFP_NOWARN | GFP_KERNEL);
@@ -3445,7 +3441,7 @@ i915_gem_execbuffer2_ioctl(struct drm_device *dev, void *data,
 	}
 
 	err = i915_gem_do_execbuffer(dev, file, args, exec2_list, in_fence,
-				     exec_fence);
+				     exec_fence, out_fence_fd);
 
 	/*
 	 * Now that we have begun execution of the batchbuffer, we ignore
@@ -3485,11 +3481,20 @@ end_user:
 end:;
 	}
 
+	if (!err && out_fence_fd >= 0) {
+		args->rsvd2 &= GENMASK_ULL(31, 0); /* keep in-fence */
+		args->rsvd2 |= (u64)out_fence_fd << 32;
+		out_fence_fd = -1;
+	}
+
 	args->flags &= ~__I915_EXEC_UNKNOWN_FLAGS;
 
 err_copy:
 	kvfree(exec2_list);
 err_alloc:
+	if (out_fence_fd >= 0)
+		put_unused_fd(out_fence_fd);
+err_out_fence:
 	dma_fence_put(exec_fence);
 err_exec_fence:
 	dma_fence_put(in_fence);
