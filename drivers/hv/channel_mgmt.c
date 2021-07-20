@@ -26,6 +26,21 @@
 
 static void init_vp_index(struct vmbus_channel *channel);
 
+/*
+ * For some VMBUS devices, Hyper-v also presents certain PCIE devices as
+ * part of the host device implementation. Those devices have no real
+ * PCI implementation in Hyper-V, and should be ignored and not presented
+ * to the PCI layer.
+ */
+static const guid_t vpci_ignore_instances[] = {
+	/*
+	 * Azure Blob instance ID in VPCI
+	 * {d4573da2-2caa-4711-a8f9-bbabf4ee9685}
+	 */
+	GUID_INIT(0xd4573da2, 0x2caa, 0x4711, 0xa8, 0xf9,
+		  0xbb, 0xab, 0xf4, 0xee, 0x96, 0x85),
+};
+
 const struct vmbus_device vmbus_devs[] = {
 	/* IDE */
 	{ .dev_type = HV_IDE,
@@ -187,20 +202,19 @@ static bool is_unsupported_vmbus_devs(const guid_t *guid)
 	return false;
 }
 
-static u16 hv_get_dev_type(const struct vmbus_channel *channel)
+static u16 hv_get_dev_type(const guid_t *guid)
 {
-	const guid_t *guid = &channel->offermsg.offer.if_type;
 	u16 i;
 
-	if (is_hvsock_channel(channel) || is_unsupported_vmbus_devs(guid))
+	if (is_unsupported_vmbus_devs(guid))
 		return HV_UNKNOWN;
 
 	for (i = HV_IDE; i < HV_UNKNOWN; i++) {
 		if (guid_equal(guid, &vmbus_devs[i].guid))
-			return i;
+			return vmbus_devs[i].dev_type;
 	}
 	pr_info("Unknown GUID: %pUl\n", guid);
-	return i;
+	return HV_UNKNOWN;
 }
 
 /**
@@ -485,6 +499,16 @@ void vmbus_free_channels(void)
 
 		vmbus_device_unregister(channel->device_obj);
 	}
+}
+
+static bool ignore_pcie_device(guid_t *if_instance)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(vpci_ignore_instances); i++)
+		if (guid_equal(&vpci_ignore_instances[i], if_instance))
+			return true;
+	return false;
 }
 
 /* Note: the function can run concurrently for primary/sub channels. */
@@ -910,7 +934,11 @@ static void vmbus_setup_channel_state(struct vmbus_channel *channel,
 	       sizeof(struct vmbus_channel_offer_channel));
 	channel->monitor_grp = (u8)offer->monitorid / 32;
 	channel->monitor_bit = (u8)offer->monitorid % 32;
-	channel->device_id = hv_get_dev_type(channel);
+	if (is_hvsock_channel(channel))
+		channel->device_id = HV_UNKNOWN;
+	else
+		channel->device_id =
+			hv_get_dev_type(&channel->offermsg.offer.if_type);
 }
 
 /*
@@ -971,6 +999,14 @@ static void vmbus_onoffer(struct vmbus_channel_message_header *hdr)
 	offer = (struct vmbus_channel_offer_channel *)hdr;
 
 	trace_vmbus_onoffer(offer);
+
+	/* Check to see if we should ignore this PCIe channel */
+	if (hv_get_dev_type(&offer->offer.if_type) == HV_PCIE &&
+	    ignore_pcie_device(&offer->offer.if_instance)) {
+		pr_debug("Ignore instance %pUl over VPCI\n",
+			 &offer->offer.if_instance);
+		return;
+	}
 
 	if (!vmbus_is_valid_device(&offer->offer.if_type)) {
 		pr_err_ratelimited("Invalid offer %d from the host supporting isolation\n",
