@@ -3765,12 +3765,26 @@ int drm_dp_mst_topology_mgr_set_mst(struct drm_dp_mst_topology_mgr *mgr, bool ms
 
 		ret = 0;
 	} else {
+		int i;
+		struct drm_dp_vcpi *vcpi;
+		struct drm_dp_mst_port *port;
 		/* disable MST on the device */
 		mstb = mgr->mst_primary;
 		mgr->mst_primary = NULL;
 		/* this can fail if the device is gone */
 		drm_dp_dpcd_writeb(mgr->aux, DP_MSTM_CTRL, 0);
 		ret = 0;
+
+		for (i = 0; i < mgr->max_payloads; i++) {
+			vcpi = mgr->proposed_vcpis[i];
+			if (vcpi) {
+				port = container_of(vcpi, struct drm_dp_mst_port,
+						    vcpi);
+				if (port)
+					drm_dp_mst_put_port_malloc(port);
+			}
+		}
+
 		memset(mgr->payloads, 0,
 		       mgr->max_payloads * sizeof(mgr->payloads[0]));
 		memset(mgr->proposed_vcpis, 0,
