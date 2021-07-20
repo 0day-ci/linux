@@ -56,6 +56,10 @@ struct partition_meta_info {
  * Must not be set for devices which are removed entirely when the
  * media is removed.
  *
+ * ``GENHD_FL_DISK_ADDED`` (0x0002): used to clarify that the
+ * respective add_disk*() call completed successfully, so that
+ * we know we can safely process del_gendisk() on the disk.
+ *
  * ``GENHD_FL_CD`` (0x0008): the block device is a CD-ROM-style
  * device.
  * Affects responses to the ``CDROM_GET_CAPABILITY`` ioctl.
@@ -94,7 +98,7 @@ struct partition_meta_info {
  * Used for multipath devices.
  */
 #define GENHD_FL_REMOVABLE			0x0001
-/* 2 is unused (used to be GENHD_FL_DRIVERFS) */
+#define GENHD_FL_DISK_ADDED			0x0002
 /* 4 is unused (used to be GENHD_FL_MEDIA_CHANGE_NOTIFY) */
 #define GENHD_FL_CD				0x0008
 #define GENHD_FL_UP				0x0010
@@ -188,6 +192,11 @@ struct gendisk {
 #else
 #define disk_to_cdi(disk)	NULL
 #endif
+
+static inline bool blk_disk_added(struct gendisk *disk)
+{
+	return disk && (disk->flags & GENHD_FL_DISK_ADDED);
+}
 
 static inline int disk_max_parts(struct gendisk *disk)
 {
