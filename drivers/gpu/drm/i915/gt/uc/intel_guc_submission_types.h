@@ -47,6 +47,8 @@ struct guc_submit_engine {
 		STALL_MOVE_LRC_TAIL,
 		STALL_ADD_REQUEST,
 	} submission_stall_reason;
+
+	I915_SELFTEST_DECLARE(u64 tasklets_submit_count;)
 };
 
 #endif
