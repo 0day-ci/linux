@@ -235,6 +235,15 @@ struct intel_context {
 
 	/* Last request submitted on a parent */
 	struct i915_request *last_rq;
+
+	/* Parallel submission mutex */
+	struct mutex parallel_submit;
+
+	/* Fence context for parallel submission */
+	u64 fence_context;
+
+	/* Seqno for parallel submission */
+	u32 seqno;
 };
 
 #endif /* __INTEL_CONTEXT_TYPES__ */
