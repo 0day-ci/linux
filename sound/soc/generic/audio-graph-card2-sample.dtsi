@@ -20,6 +20,8 @@
 	/*
 	 * cpu0 <--> codec0	// Normal
 	 * cpu1 <--> codec1	// Normal
+	 * cpu2 <--> codec2	// DPCM
+	 * cpu3 <-/		// DPCM
 	 */
 	card2 {
 		/*
@@ -30,8 +32,25 @@
 		 */
 		compatible = "sample-custom-card";
 
+		routing = "TC DAI2 Playback", "DAI2 Playback",
+			  "TC DAI2 Playback", "DAI3 Playback",
+			  "DAI2 Capture", "TC DAI2 Capture",
+			  "DAI3 Capture", "TC DAI2 Capture";
+
 		links = <&cpu0 &cpu1			/* normal: cpu side only  */
+			 &mix_fe0 &mix_fe1 &mix_be0	/* dsp   : both fe/be     */
 		>;
+	};
+
+	mix {
+		compatible = "audio-graph-card2-dsp";
+		DSP_FE: ports@0 {
+			mix_fe0: port@0 { mix_fe0_ep: endpoint { remote-endpoint = <&cpu2_ep>; }; };
+			mix_fe1: port@1 { mix_fe1_ep: endpoint { remote-endpoint = <&cpu3_ep>; }; };
+		};
+		DSP_BE: ports@1 {
+			mix_be0: port   { mix_be0_ep: endpoint { remote-endpoint = <&codec2_ep>; }; };
+		};
 	};
 
 	test_cpu {
@@ -48,6 +67,8 @@
 			frame-master;
 			cpu0: port@0 { cpu0_ep: endpoint { remote-endpoint = <&codec0_ep>; }; };
 			cpu1: port@1 { cpu1_ep: endpoint { remote-endpoint = <&codec1_ep>; }; };
+			      port@2 { cpu2_ep: endpoint { remote-endpoint = <&mix_fe0_ep>; }; };
+			      port@3 { cpu3_ep: endpoint { remote-endpoint = <&mix_fe1_ep>; }; };
 		};
 	};
 
@@ -61,8 +82,15 @@
 		 */
 		compatible = "test-codec";
 		ports {
+			/*
+			 * prefix can be added to *component*,
+			 * see card2::routing
+			 */
+			prefix = "TC";
+
 			port@0 { codec0_ep: endpoint { remote-endpoint = <&cpu0_ep>; }; };
 			port@1 { codec1_ep: endpoint { remote-endpoint = <&cpu1_ep>; }; };
+			port@2 { codec2_ep: endpoint { remote-endpoint = <&mix_be0_ep>; }; };
 		};
 	};
 };
