@@ -1417,7 +1417,8 @@ static int nozomi_card_init(struct pci_dev *pdev,
 
 err_free_tty:
 	for (i--; i >= 0; i--) {
-		tty_unregister_device(ntty_driver, dc->index_start + i);
+		tty_port_unregister_device(&dc->port[i].port, ntty_driver,
+				dc->index_start + i);
 		tty_port_destroy(&dc->port[i].port);
 	}
 	free_irq(pdev->irq, dc);
