@@ -5341,6 +5341,9 @@ static int intel_iommu_enable_sva(struct device *dev)
 	if (!(iommu->flags & VTD_FLAG_SVM_CAPABLE))
 		return -ENODEV;
 
+	if (!dev->dma_mask || *dev->dma_mask != DMA_BIT_MASK(64))
+		return -ENODEV;
+
 	if (intel_iommu_enable_pasid(iommu, dev))
 		return -ENODEV;
 
