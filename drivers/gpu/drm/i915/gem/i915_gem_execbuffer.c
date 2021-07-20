@@ -2239,7 +2239,7 @@ slow:
 	return err;
 }
 
-static int eb_move_to_gpu(struct i915_execbuffer *eb)
+static int eb_move_to_gpu(struct i915_execbuffer *eb, bool first)
 {
 	const unsigned int count = eb->buffer_count;
 	unsigned int i = count;
@@ -2281,7 +2281,7 @@ static int eb_move_to_gpu(struct i915_execbuffer *eb)
 				flags &= ~EXEC_OBJECT_ASYNC;
 		}
 
-		if (err == 0 && !(flags & EXEC_OBJECT_ASYNC)) {
+		if (err == 0 && first && !(flags & EXEC_OBJECT_ASYNC)) {
 			err = i915_request_await_object
 				(eb->request, obj, flags & EXEC_OBJECT_WRITE);
 		}
@@ -2525,14 +2525,15 @@ err:
 	return err;
 }
 
-static int eb_submit(struct i915_execbuffer *eb, struct i915_vma *batch)
+static int eb_submit(struct i915_execbuffer *eb, struct i915_vma *batch,
+		     bool first)
 {
 	int err;
 
 	if (intel_context_nopreempt(eb->context))
 		__set_bit(I915_FENCE_FLAG_NOPREEMPT, &eb->request->fence.flags);
 
-	err = eb_move_to_gpu(eb);
+	err = eb_move_to_gpu(eb, first);
 	if (err)
 		return err;
 
@@ -3304,7 +3305,7 @@ i915_gem_do_execbuffer(struct drm_device *dev,
 		intel_gt_buffer_pool_mark_active(eb.batch_pool, eb.request);
 
 	trace_i915_request_queue(eb.request, eb.batch_flags);
-	err = eb_submit(&eb, batch);
+	err = eb_submit(&eb, batch, true);
 
 err_request:
 	i915_request_get(eb.request);
