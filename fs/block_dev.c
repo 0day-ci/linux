@@ -1338,7 +1338,8 @@ struct block_device *blkdev_get_no_open(dev_t dev)
 	disk = bdev->bd_disk;
 	if (!kobject_get_unless_zero(&disk_to_dev(disk)->kobj))
 		goto bdput;
-	if ((disk->flags & (GENHD_FL_UP | GENHD_FL_HIDDEN)) != GENHD_FL_UP)
+	if ((disk->flags &
+	    (GENHD_FL_DISK_ADDED | GENHD_FL_HIDDEN)) != GENHD_FL_DISK_ADDED)
 		goto put_disk;
 	if (!try_module_get(bdev->bd_disk->fops->owner))
 		goto put_disk;
@@ -1407,7 +1408,7 @@ struct block_device *blkdev_get_by_dev(dev_t dev, fmode_t mode, void *holder)
 
 	mutex_lock(&disk->open_mutex);
 	ret = -ENXIO;
-	if (!(disk->flags & GENHD_FL_UP))
+	if (!blk_disk_added(disk))
 		goto abort_claiming;
 	if (bdev_is_partition(bdev))
 		ret = blkdev_get_part(bdev, mode);
