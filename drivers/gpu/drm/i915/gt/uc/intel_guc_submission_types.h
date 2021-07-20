@@ -6,6 +6,8 @@
 #ifndef _INTEL_GUC_SUBMISSION_TYPES_H_
 #define _INTEL_GUC_SUBMISSION_TYPES_H_
 
+#include <linux/xarray.h>
+
 #include "gt/intel_engine_types.h"
 #include "gt/intel_context_types.h"
 #include "i915_scheduler_types.h"
@@ -41,6 +43,7 @@ struct guc_submit_engine {
 	unsigned long flags;
 	int total_num_rq_with_no_guc_id;
 	atomic_t num_guc_ids_not_ready;
+	struct hrtimer hang_timer;
 	int id;
 
 	/*
