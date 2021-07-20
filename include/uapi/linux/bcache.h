@@ -288,7 +288,7 @@ BITMASK(CACHE_REPLACEMENT,		struct cache_sb, flags, 2, 3);
 #define CACHE_REPLACEMENT_FIFO		1U
 #define CACHE_REPLACEMENT_RANDOM	2U
 
-BITMASK(BDEV_CACHE_MODE,		struct cache_sb, flags, 0, 4);
+BITMASK(BDEV_CACHE_MODE,		struct cache_sb, flags, 5, 4);
 #define CACHE_MODE_WRITETHROUGH		0U
 #define CACHE_MODE_WRITEBACK		1U
 #define CACHE_MODE_WRITEAROUND		2U
