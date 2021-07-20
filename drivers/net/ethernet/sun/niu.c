@@ -8192,7 +8192,7 @@ static int niu_pci_vpd_fetch(struct niu *np, u32 start)
 		if (err < 0)
 			return err;
 		if (err == 1)
-			return -EINVAL;
+			return 0;
 	}
 	return 0;
 }
