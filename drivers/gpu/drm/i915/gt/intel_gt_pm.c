@@ -93,6 +93,13 @@ static int __gt_unpark(struct intel_wakeref *wf)
 	return 0;
 }
 
+static void __gt_unpark_work_queue(struct intel_wakeref *wf)
+{
+	struct intel_gt *gt = container_of(wf, typeof(*gt), wakeref);
+
+	intel_gt_pm_unpark_work_queue(gt);
+}
+
 static int __gt_park(struct intel_wakeref *wf)
 {
 	struct intel_gt *gt = container_of(wf, typeof(*gt), wakeref);
@@ -123,6 +130,7 @@ static int __gt_park(struct intel_wakeref *wf)
 
 static const struct intel_wakeref_ops wf_ops = {
 	.get = __gt_unpark,
+	.post_get = __gt_unpark_work_queue,
 	.put = __gt_park,
 };
 
