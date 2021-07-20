@@ -22,6 +22,7 @@
  * If both the fiber and copper ports are connected, the first to gain
  * link takes priority and the other port is completely locked out.
  */
+#include <linux/bitfield.h>
 #include <linux/ctype.h>
 #include <linux/delay.h>
 #include <linux/hwmon.h>
@@ -32,6 +33,8 @@
 
 #define MV_PHY_ALASKA_NBT_QUIRK_MASK	0xfffffffe
 #define MV_PHY_ALASKA_NBT_QUIRK_REV	(MARVELL_PHY_ID_88X3310 | 0xa)
+
+#define MV_VERSION(a,b,c,d) ((a) << 24 | (b) << 16 | (c) << 8 | (d))
 
 enum {
 	MV_PMA_FW_VER0		= 0xc011,
@@ -61,6 +64,15 @@ enum {
 	MV_PCS_CSCR1_MDIX_MDI	= 0x0000,
 	MV_PCS_CSCR1_MDIX_MDIX	= 0x0020,
 	MV_PCS_CSCR1_MDIX_AUTO	= 0x0060,
+
+	MV_PCS_DSC1		= 0x8003,
+	MV_PCS_DSC1_ENABLE	= BIT(9),
+	MV_PCS_DSC1_10GBT	= 0x01c0,
+	MV_PCS_DSC1_1GBR	= 0x0038,
+	MV_PCS_DSC1_100BTX	= 0x0007,
+	MV_PCS_DSC2		= 0x8004,
+	MV_PCS_DSC2_2P5G	= 0xf000,
+	MV_PCS_DSC2_5G		= 0x0f00,
 
 	MV_PCS_CSSR1		= 0x8008,
 	MV_PCS_CSSR1_SPD1_MASK	= 0xc000,
@@ -328,6 +340,66 @@ static int mv3310_reset(struct phy_device *phydev, u32 unit)
 					 unit + MDIO_CTRL1, val,
 					 !(val & MDIO_CTRL1_RESET),
 					 5000, 100000, true);
+}
+
+static int mv3310_get_downshift(struct phy_device *phydev, u8 *ds)
+{
+	struct mv3310_priv *priv = dev_get_drvdata(&phydev->mdio.dev);
+	int val;
+
+	if (priv->firmware_ver < MV_VERSION(0,3,5,0))
+		return -EOPNOTSUPP;
+
+	val = phy_read_mmd(phydev, MDIO_MMD_PCS, MV_PCS_DSC1);
+	if (val < 0)
+		return val;
+
+	if (val & MV_PCS_DSC1_ENABLE)
+		/* assume that all fields are the same */
+		*ds = 1 + FIELD_GET(MV_PCS_DSC1_10GBT, (u16)val);
+	else
+		*ds = DOWNSHIFT_DEV_DISABLE;
+
+	return 0;
+}
+
+static int mv3310_set_downshift(struct phy_device *phydev, u8 ds)
+{
+	struct mv3310_priv *priv = dev_get_drvdata(&phydev->mdio.dev);
+	u16 val;
+	int err;
+
+	/* Fails to downshift with v0.3.5.0 and earlier */
+	if (priv->firmware_ver < MV_VERSION(0,3,5,0))
+		return -EOPNOTSUPP;
+
+	if (ds == DOWNSHIFT_DEV_DISABLE)
+		return phy_clear_bits_mmd(phydev, MDIO_MMD_PCS, MV_PCS_DSC1,
+					  MV_PCS_DSC1_ENABLE);
+
+	/* FIXME: The default is disabled, so should we disable? */
+	if (ds == DOWNSHIFT_DEV_DEFAULT_COUNT)
+		ds = 2;
+
+	if (ds > 8)
+		return -E2BIG;
+
+	ds -= 1;
+	val = FIELD_PREP(MV_PCS_DSC2_2P5G, ds);
+	val |= FIELD_PREP(MV_PCS_DSC2_5G, ds);
+	err = phy_modify_mmd(phydev, MDIO_MMD_PCS, MV_PCS_DSC2,
+			     MV_PCS_DSC2_2P5G | MV_PCS_DSC2_5G, val);
+	if (err < 0)
+		return err;
+
+	val = MV_PCS_DSC1_ENABLE;
+	val |= FIELD_PREP(MV_PCS_DSC1_10GBT, ds);
+	val |= FIELD_PREP(MV_PCS_DSC1_1GBR, ds);
+	val |= FIELD_PREP(MV_PCS_DSC1_100BTX, ds);
+
+	return phy_modify_mmd(phydev, MDIO_MMD_PCS, MV_PCS_DSC1,
+			      MV_PCS_DSC1_ENABLE | MV_PCS_DSC1_10GBT |
+			      MV_PCS_DSC1_1GBR | MV_PCS_DSC1_100BTX, val);
 }
 
 static int mv3310_get_edpd(struct phy_device *phydev, u16 *edpd)
@@ -616,7 +688,16 @@ static int mv3310_config_init(struct phy_device *phydev)
 	}
 
 	/* Enable EDPD mode - saving 600mW */
-	return mv3310_set_edpd(phydev, ETHTOOL_PHY_EDPD_DFLT_TX_MSECS);
+	err = mv3310_set_edpd(phydev, ETHTOOL_PHY_EDPD_DFLT_TX_MSECS);
+	if (err)
+		return err;
+
+	/* Allow downshift */
+	err = mv3310_set_downshift(phydev, DOWNSHIFT_DEV_DEFAULT_COUNT);
+	if (err && err != -EOPNOTSUPP)
+		return err;
+
+	return 0;
 }
 
 static int mv3310_get_features(struct phy_device *phydev)
@@ -886,6 +967,8 @@ static int mv3310_get_tunable(struct phy_device *phydev,
 			      struct ethtool_tunable *tuna, void *data)
 {
 	switch (tuna->id) {
+	case ETHTOOL_PHY_DOWNSHIFT:
+		return mv3310_get_downshift(phydev, data);
 	case ETHTOOL_PHY_EDPD:
 		return mv3310_get_edpd(phydev, data);
 	default:
@@ -897,6 +980,8 @@ static int mv3310_set_tunable(struct phy_device *phydev,
 			      struct ethtool_tunable *tuna, const void *data)
 {
 	switch (tuna->id) {
+	case ETHTOOL_PHY_DOWNSHIFT:
+		return mv3310_set_downshift(phydev, *(u8 *)data);
 	case ETHTOOL_PHY_EDPD:
 		return mv3310_set_edpd(phydev, *(u16 *)data);
 	default:
