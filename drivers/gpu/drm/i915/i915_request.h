@@ -145,6 +145,14 @@ enum {
 	 * tasklet that the guc_id isn't pinned.
 	 */
 	I915_FENCE_FLAG_GUC_ID_NOT_PINNED,
+
+	/*
+	 * I915_FENCE_FLAG_SUBMIT_PARALLEL - request with a context in a
+	 * parent-child relationship (parallel submission, multi-lrc) should
+	 * trigger a submission to the GuC rather than just moving the context
+	 * tail.
+	 */
+	I915_FENCE_FLAG_SUBMIT_PARALLEL,
 };
 
 /**
