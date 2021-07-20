@@ -109,6 +109,33 @@ struct compat_ifconf {
 	compat_uptr_t	ifcbuf;
 };
 
+struct compat_if_settings {
+	unsigned int type;	/* Type of physical device or protocol */
+	unsigned int size;	/* Size of the data allocated by the caller */
+	compat_uptr_t ifs_ifsu;	/* union of pointers */
+};
+
+struct compat_ifreq {
+	union {
+		char	ifrn_name[IFNAMSIZ];    /* if name, e.g. "en0" */
+	} ifr_ifrn;
+	union {
+		struct	sockaddr ifru_addr;
+		struct	sockaddr ifru_dstaddr;
+		struct	sockaddr ifru_broadaddr;
+		struct	sockaddr ifru_netmask;
+		struct	sockaddr ifru_hwaddr;
+		short	ifru_flags;
+		compat_int_t	ifru_ivalue;
+		compat_int_t	ifru_mtu;
+		struct	compat_ifmap ifru_map;
+		char	ifru_slave[IFNAMSIZ];   /* Just fits the size */
+		char	ifru_newname[IFNAMSIZ];
+		compat_uptr_t	ifru_data;
+		struct	compat_if_settings ifru_settings;
+	} ifr_ifru;
+};
+
 #ifdef CONFIG_COMPAT
 
 #ifndef compat_user_stack_pointer
@@ -330,32 +357,6 @@ typedef struct compat_sigevent {
 		} _sigev_thread;
 	} _sigev_un;
 } compat_sigevent_t;
-
-struct compat_ifreq {
-	union {
-		char	ifrn_name[IFNAMSIZ];    /* if name, e.g. "en0" */
-	} ifr_ifrn;
-	union {
-		struct	sockaddr ifru_addr;
-		struct	sockaddr ifru_dstaddr;
-		struct	sockaddr ifru_broadaddr;
-		struct	sockaddr ifru_netmask;
-		struct	sockaddr ifru_hwaddr;
-		short	ifru_flags;
-		compat_int_t	ifru_ivalue;
-		compat_int_t	ifru_mtu;
-		struct	compat_ifmap ifru_map;
-		char	ifru_slave[IFNAMSIZ];   /* Just fits the size */
-		char	ifru_newname[IFNAMSIZ];
-		compat_caddr_t	ifru_data;
-		struct	compat_if_settings ifru_settings;
-	} ifr_ifru;
-};
-
-struct compat_ifconf {
-	compat_int_t	ifc_len;                /* size of buffer */
-	compat_caddr_t  ifcbuf;
-};
 
 struct compat_robust_list {
 	compat_uptr_t			next;
