@@ -104,6 +104,11 @@ struct compat_ifmap {
 	unsigned char port;
 };
 
+struct compat_ifconf {
+	compat_int_t	ifc_len;                /* size of buffer */
+	compat_uptr_t	ifcbuf;
+};
+
 #ifdef CONFIG_COMPAT
 
 #ifndef compat_user_stack_pointer
@@ -325,12 +330,6 @@ typedef struct compat_sigevent {
 		} _sigev_thread;
 	} _sigev_un;
 } compat_sigevent_t;
-
-struct compat_if_settings {
-	unsigned int type;	/* Type of physical device or protocol */
-	unsigned int size;	/* Size of the data allocated by the caller */
-	compat_uptr_t ifs_ifsu;	/* union of pointers */
-};
 
 struct compat_ifreq {
 	union {
