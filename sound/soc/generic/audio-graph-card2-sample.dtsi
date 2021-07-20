@@ -1,0 +1,68 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * audio-graph-card2-sample dtsi
+ *
+ *
+ * This sample indicates how to use audio-graph-card2 and its
+ * custom driver. "sample-custom-card" is the custome driver
+ * which is using audio-graph-card2.
+ *
+ * You can easily use this sample by adding below line on your DT file,
+ * and add new CONFIG to your .config.
+ *
+ *	#include "../../../../../sound/soc/generic/audio-graph-card2-sample.dtsi"
+ *
+ *	CONFIG_SND_AUDIO_GRAPH_CARD2
+ *	CONFIG_SND_SAMPLE_CUSTOM_CARD
+ *	CONFIG_SND_TEST_COMPONENT
+ */
+/ {
+	/*
+	 * cpu0 <--> codec0	// Normal
+	 * cpu1 <--> codec1	// Normal
+	 */
+	card2 {
+		/*
+		 * You can use audio-graph-card2 directly
+		 * by using
+		 *
+		 * compatible = "audio-graph-card2";
+		 */
+		compatible = "sample-custom-card";
+
+		links = <&cpu0 &cpu1			/* normal: cpu side only  */
+		>;
+	};
+
+	test_cpu {
+		/*
+		 * update compatible to indicate more detail behaviour
+		 * if you want. see test-compatible for more detail.
+		 *
+		 *	- compatible = "test-cpu";
+		 *	+ compatible = "test-cpu-nv";
+		 */
+		compatible = "test-cpu";
+		ports {
+			bitclock-master;
+			frame-master;
+			cpu0: port@0 { cpu0_ep: endpoint { remote-endpoint = <&codec0_ep>; }; };
+			cpu1: port@1 { cpu1_ep: endpoint { remote-endpoint = <&codec1_ep>; }; };
+		};
+	};
+
+	test_codec {
+		/*
+		 * update compatible to indicate more detail behaviour
+		 * if you want. see test-compatible for more detail.
+		 *
+		 *	- compatible = "test-codec";
+		 *	+ compatible = "test-codec-nv";
+		 */
+		compatible = "test-codec";
+		ports {
+			port@0 { codec0_ep: endpoint { remote-endpoint = <&cpu0_ep>; }; };
+			port@1 { codec1_ep: endpoint { remote-endpoint = <&cpu1_ep>; }; };
+		};
+	};
+};
