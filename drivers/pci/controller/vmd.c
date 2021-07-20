@@ -15,6 +15,7 @@
 #include <linux/srcu.h>
 #include <linux/rculist.h>
 #include <linux/rcupdate.h>
+#include <linux/delay.h>
 
 #include <asm/irqdomain.h>
 #include <asm/device.h>
@@ -447,6 +448,49 @@ static struct pci_ops vmd_ops = {
 	.write		= vmd_pci_write,
 };
 
+#define PCI_HEADER_TYPE_MASK 0x7f
+#define PCI_CLASS_BRIDGE_PCI 0x0604
+#define DEVICE_SPACE (8 * 4096)
+#define VMD_DEVICE_BASE(vmd, device) ((vmd)->cfgbar + (device) * DEVICE_SPACE)
+#define VMD_FUNCTION_BASE(vmd, device, fn) ((vmd)->cfgbar + (device) * (DEVICE_SPACE + (fn*4096)))
+static void vmd_domain_sbr(struct vmd_dev *vmd)
+{
+	char __iomem *base;
+	u16 ctl;
+	int dev_seq;
+	int max_devs = resource_size(&vmd->resources[0]) * 32;
+
+	/*
+	* Subdevice config space may or many not be mapped linearly using 4k config
+	* space.
+	*/
+	for (dev_seq = 0; dev_seq < max_devs; dev_seq++) {
+		base = VMD_DEVICE_BASE(vmd, dev_seq);
+		if (readw(base + PCI_VENDOR_ID) != PCI_VENDOR_ID_INTEL)
+			continue;
+
+		if ((readb(base + PCI_HEADER_TYPE) & PCI_HEADER_TYPE_MASK) !=
+		    PCI_HEADER_TYPE_BRIDGE)
+			continue;
+
+		if (readw(base + PCI_CLASS_DEVICE) != PCI_CLASS_BRIDGE_PCI)
+			continue;
+
+		/* pci_reset_secondary_bus() */
+		ctl = readw(base + PCI_BRIDGE_CONTROL);
+		ctl |= PCI_BRIDGE_CTL_BUS_RESET;
+		writew(ctl, base + PCI_BRIDGE_CONTROL);
+		readw(base + PCI_BRIDGE_CONTROL);
+		msleep(2);
+
+		ctl &= ~PCI_BRIDGE_CTL_BUS_RESET;
+		writew(ctl, base + PCI_BRIDGE_CONTROL);
+		readw(base + PCI_BRIDGE_CONTROL);
+
+	}
+	ssleep(1);
+}
+
 static void vmd_attach_resources(struct vmd_dev *vmd)
 {
 	vmd->dev->resource[VMD_MEMBAR1].child = &vmd->resources[1];
@@ -746,6 +790,8 @@ static int vmd_enable_domain(struct vmd_dev *vmd, unsigned long features)
 	vmd_attach_resources(vmd);
 	if (vmd->irq_domain)
 		dev_set_msi_domain(&vmd->bus->dev, vmd->irq_domain);
+
+	vmd_domain_sbr(vmd);
 
 	pci_scan_child_bus(vmd->bus);
 	pci_assign_unassigned_bus_resources(vmd->bus);
