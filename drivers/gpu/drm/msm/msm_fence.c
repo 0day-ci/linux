@@ -38,11 +38,10 @@ static inline bool fence_completed(struct msm_fence_context *fctx, uint32_t fenc
 	return (int32_t)(fctx->completed_fence - fence) >= 0;
 }
 
-/* legacy path for WAIT_FENCE ioctl: */
-int msm_wait_fence(struct msm_fence_context *fctx, uint32_t fence,
-		ktime_t *timeout, bool interruptible)
+static signed long wait_fence(struct msm_fence_context *fctx, uint32_t fence,
+		signed long remaining_jiffies, bool interruptible)
 {
-	int ret;
+	signed long ret;
 
 	if (fence > fctx->last_fence) {
 		DRM_ERROR_RATELIMITED("%s: waiting on invalid fence: %u (of %u)\n",
@@ -50,31 +49,32 @@ int msm_wait_fence(struct msm_fence_context *fctx, uint32_t fence,
 		return -EINVAL;
 	}
 
-	if (!timeout) {
-		/* no-wait: */
-		ret = fence_completed(fctx, fence) ? 0 : -EBUSY;
+	if (interruptible) {
+		ret = wait_event_interruptible_timeout(fctx->event,
+			fence_completed(fctx, fence),
+			remaining_jiffies);
 	} else {
-		unsigned long remaining_jiffies = timeout_to_jiffies(timeout);
+		ret = wait_event_timeout(fctx->event,
+			fence_completed(fctx, fence),
+			remaining_jiffies);
+	}
 
-		if (interruptible)
-			ret = wait_event_interruptible_timeout(fctx->event,
-				fence_completed(fctx, fence),
-				remaining_jiffies);
-		else
-			ret = wait_event_timeout(fctx->event,
-				fence_completed(fctx, fence),
-				remaining_jiffies);
-
-		if (ret == 0) {
-			DBG("timeout waiting for fence: %u (completed: %u)",
-					fence, fctx->completed_fence);
-			ret = -ETIMEDOUT;
-		} else if (ret != -ERESTARTSYS) {
-			ret = 0;
-		}
+	if (ret == 0) {
+		DBG("timeout waiting for fence: %u (completed: %u)",
+				fence, fctx->completed_fence);
+		ret = -ETIMEDOUT;
+	} else if (ret != -ERESTARTSYS) {
+		ret = 0;
 	}
 
 	return ret;
+}
+
+/* legacy path for WAIT_FENCE ioctl: */
+int msm_wait_fence(struct msm_fence_context *fctx, uint32_t fence,
+		ktime_t *timeout, bool interruptible)
+{
+	return wait_fence(fctx, fence, timeout_to_jiffies(timeout), interruptible);
 }
 
 /* called from workqueue */
@@ -114,10 +114,19 @@ static bool msm_fence_signaled(struct dma_fence *fence)
 	return fence_completed(f->fctx, f->base.seqno);
 }
 
+static signed long msm_fence_wait(struct dma_fence *fence, bool intr,
+		signed long timeout)
+{
+	struct msm_fence *f = to_msm_fence(fence);
+
+	return wait_fence(f->fctx, fence->seqno, timeout, intr);
+}
+
 static const struct dma_fence_ops msm_fence_ops = {
 	.get_driver_name = msm_fence_get_driver_name,
 	.get_timeline_name = msm_fence_get_timeline_name,
 	.signaled = msm_fence_signaled,
+	.wait = msm_fence_wait,
 };
 
 struct dma_fence *
