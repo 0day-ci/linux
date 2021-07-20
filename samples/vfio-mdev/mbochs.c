@@ -553,11 +553,14 @@ static int mbochs_probe(struct mdev_device *mdev)
 
 	ret = vfio_register_group_dev(&mdev_state->vdev);
 	if (ret)
-		goto err_mem;
+		goto err_bytes;
 	dev_set_drvdata(&mdev->dev, mdev_state);
 	return 0;
 
+err_bytes:
+	mbochs_used_mbytes -= mdev_state->type->mbytes;
 err_mem:
+	kfree(mdev_state->pages);
 	kfree(mdev_state->vconfig);
 	kfree(mdev_state);
 	return ret;
@@ -567,8 +570,8 @@ static void mbochs_remove(struct mdev_device *mdev)
 {
 	struct mdev_state *mdev_state = dev_get_drvdata(&mdev->dev);
 
-	mbochs_used_mbytes -= mdev_state->type->mbytes;
 	vfio_unregister_group_dev(&mdev_state->vdev);
+	mbochs_used_mbytes -= mdev_state->type->mbytes;
 	kfree(mdev_state->pages);
 	kfree(mdev_state->vconfig);
 	kfree(mdev_state);
