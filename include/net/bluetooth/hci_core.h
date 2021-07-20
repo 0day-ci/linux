@@ -1208,6 +1208,7 @@ static inline struct hci_dev *hci_dev_hold(struct hci_dev *d)
 }
 
 #define hci_dev_lock(d)		mutex_lock(&d->lock)
+#define hci_dev_lock_killable(d) mutex_lock_killable(&d->lock)
 #define hci_dev_unlock(d)	mutex_unlock(&d->lock)
 
 #define to_hci_dev(d) container_of(d, struct hci_dev, dev)
