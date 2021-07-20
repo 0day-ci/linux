@@ -252,6 +252,9 @@ struct i915_execbuffer {
 	struct eb_vma *batch; /** identity of the batch obj/vma */
 	struct i915_vma *trampoline; /** trampoline used for chaining */
 
+	/* batch_index in vma list */
+	unsigned int batch_index;
+
 	/** actual size of execobj[] as we may extend it for the cmdparser */
 	unsigned int buffer_count;
 
@@ -360,6 +363,11 @@ static int eb_create(struct i915_execbuffer *eb)
 	} else {
 		eb->lut_size = -eb->buffer_count;
 	}
+
+	if (eb->args->flags & I915_EXEC_BATCH_FIRST)
+		eb->batch_index = 0;
+	else
+		eb->batch_index = eb->args->buffer_count - 1;
 
 	return 0;
 }
@@ -735,14 +743,6 @@ static int eb_reserve(struct i915_execbuffer *eb)
 	} while (1);
 }
 
-static unsigned int eb_batch_index(const struct i915_execbuffer *eb)
-{
-	if (eb->args->flags & I915_EXEC_BATCH_FIRST)
-		return 0;
-	else
-		return eb->buffer_count - 1;
-}
-
 static int eb_select_context(struct i915_execbuffer *eb)
 {
 	struct i915_gem_context *ctx;
@@ -852,7 +852,6 @@ static struct i915_vma *eb_lookup_vma(struct i915_execbuffer *eb, u32 handle)
 static int eb_lookup_vmas(struct i915_execbuffer *eb)
 {
 	struct drm_i915_private *i915 = eb->i915;
-	unsigned int batch = eb_batch_index(eb);
 	unsigned int i;
 	int err = 0;
 
@@ -873,7 +872,7 @@ static int eb_lookup_vmas(struct i915_execbuffer *eb)
 			goto err;
 		}
 
-		eb_add_vma(eb, i, batch, vma);
+		eb_add_vma(eb, i, eb->batch_index, vma);
 
 		if (i915_gem_object_is_userptr(vma->obj)) {
 			err = i915_gem_object_userptr_submit_init(vma->obj);
