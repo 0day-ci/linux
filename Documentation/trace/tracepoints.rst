@@ -66,7 +66,6 @@ In subsys/file.c (where the tracing statement must be added)::
 	#include <trace/events/subsys.h>
 
 	#define CREATE_TRACE_POINTS
-	DEFINE_TRACE(subsys_eventname);
 
 	void somefct(void)
 	{
