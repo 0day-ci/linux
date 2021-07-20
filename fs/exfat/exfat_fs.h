@@ -428,6 +428,9 @@ long exfat_ioctl(struct file *filp, unsigned int cmd, unsigned long arg);
 long exfat_compat_ioctl(struct file *filp, unsigned int cmd,
 				unsigned long arg);
 
+extern int exfat_fiemap(struct inode *inode, struct fiemap_extent_info *fieinfo,
+	u64 start, u64 len);
+
 /* namei.c */
 extern const struct dentry_operations exfat_dentry_ops;
 extern const struct dentry_operations exfat_utf8_dentry_ops;

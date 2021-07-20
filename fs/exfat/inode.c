@@ -13,6 +13,7 @@
 #include <linux/uio.h>
 #include <linux/random.h>
 #include <linux/iversion.h>
+#include <linux/fiemap.h>
 
 #include "exfat_raw.h"
 #include "exfat_fs.h"
@@ -356,6 +357,13 @@ done:
 unlock_ret:
 	mutex_unlock(&sbi->s_lock);
 	return err;
+}
+
+int exfat_fiemap(struct inode *inode, struct fiemap_extent_info *fieinfo,
+		u64 start, u64 len)
+{
+	return generic_block_fiemap(inode, fieinfo, start, len,
+			exfat_get_block);
 }
 
 static int exfat_readpage(struct file *file, struct page *page)

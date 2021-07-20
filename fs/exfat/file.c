@@ -432,4 +432,5 @@ const struct file_operations exfat_file_operations = {
 const struct inode_operations exfat_file_inode_operations = {
 	.setattr     = exfat_setattr,
 	.getattr     = exfat_getattr,
+	.fiemap	     = exfat_fiemap,
 };
