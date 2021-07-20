@@ -3184,19 +3184,8 @@ i915_gem_do_execbuffer(struct drm_device *dev,
 	eb.num_fences = 0;
 
 	eb.batch_flags = 0;
-	if (args->flags & I915_EXEC_SECURE) {
-		if (GRAPHICS_VER(i915) >= 11)
-			return -ENODEV;
-
-		/* Return -EPERM to trigger fallback code on old binaries. */
-		if (!HAS_SECURE_BATCHES(i915))
-			return -EPERM;
-
-		if (!drm_is_current_master(file) || !capable(CAP_SYS_ADMIN))
-			return -EPERM;
-
+	if (args->flags & I915_EXEC_SECURE)
 		eb.batch_flags |= I915_DISPATCH_SECURE;
-	}
 	if (args->flags & I915_EXEC_IS_PINNED)
 		eb.batch_flags |= I915_DISPATCH_PINNED;
 
@@ -3414,6 +3403,18 @@ i915_gem_execbuffer2_ioctl(struct drm_device *dev, void *data,
 		return -EINVAL;
 	}
 
+	if (args->flags & I915_EXEC_SECURE) {
+		if (GRAPHICS_VER(i915) >= 11)
+			return -ENODEV;
+
+		/* Return -EPERM to trigger fallback code on old binaries. */
+		if (!HAS_SECURE_BATCHES(i915))
+			return -EPERM;
+
+		if (!drm_is_current_master(file) || !capable(CAP_SYS_ADMIN))
+			return -EPERM;
+	}
+
 	err = i915_gem_check_execbuffer(args);
 	if (err)
 		return err;
@@ -3430,8 +3431,8 @@ i915_gem_execbuffer2_ioctl(struct drm_device *dev, void *data,
 			   u64_to_user_ptr(args->buffers_ptr),
 			   sizeof(*exec2_list) * count)) {
 		drm_dbg(&i915->drm, "copy %zd exec entries failed\n", count);
-		kvfree(exec2_list);
-		return -EFAULT;
+		err = -EFAULT;
+		goto err_copy;
 	}
 
 	err = i915_gem_do_execbuffer(dev, file, args, exec2_list);
@@ -3476,6 +3477,12 @@ end:;
 
 	args->flags &= ~__I915_EXEC_UNKNOWN_FLAGS;
 	kvfree(exec2_list);
+
+	return err;
+
+err_copy:
+	kvfree(exec2_list);
+
 	return err;
 }
 
