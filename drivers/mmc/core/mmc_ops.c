@@ -435,7 +435,7 @@ static int mmc_busy_cb(void *cb_data, bool *busy)
 	u32 status = 0;
 	int err;
 
-	if (host->ops->card_busy) {
+	if (mmc_hw_busy_detect(host)) {
 		*busy = host->ops->card_busy(host);
 		return 0;
 	}
@@ -597,7 +597,7 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
 	 * when it's not allowed to poll by using CMD13, then we need to rely on
 	 * waiting the stated timeout to be sufficient.
 	 */
-	if (!send_status && !host->ops->card_busy) {
+	if (!send_status && !mmc_hw_busy_detect(host)) {
 		mmc_delay(timeout_ms);
 		goto out_tim;
 	}

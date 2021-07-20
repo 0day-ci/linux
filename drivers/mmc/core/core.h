@@ -181,4 +181,21 @@ static inline int mmc_flush_cache(struct mmc_host *host)
 	return 0;
 }
 
+/**
+ * mmc_hw_busy_detect() - Can we use hw busy detection?
+ * @host: the host in question
+ */
+static inline bool mmc_hw_busy_detect(struct mmc_host *host)
+{
+	struct mmc_card *card = host->card;
+	bool has_ops;
+	bool able = true;
+
+	has_ops = (host->ops->card_busy != NULL);
+	if (card)
+		able = !(card->quirks & MMC_QUIRK_BROKEN_HW_BUSY_DETECT);
+
+	return (has_ops && able);
+}
+
 #endif
