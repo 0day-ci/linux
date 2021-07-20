@@ -222,6 +222,9 @@ struct intel_context {
 	/* Number of children if parent */
 	u8 guc_number_children;
 
+	/* Child index if child */
+	u8 guc_child_index;
+
 	u8 parent_page; /* if set, page num reserved for parent context */
 
 	/*
