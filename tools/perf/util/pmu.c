@@ -742,27 +742,6 @@ struct pmu_events_map *__weak pmu_events_map__find(void)
 	return perf_pmu__find_map(NULL);
 }
 
-static bool perf_pmu__valid_suffix(char *pmu_name, char *tok)
-{
-	char *p;
-
-	if (strncmp(pmu_name, tok, strlen(tok)))
-		return false;
-
-	p = pmu_name + strlen(tok);
-	if (*p == 0)
-		return true;
-
-	if (*p != '_')
-		return false;
-
-	++p;
-	if (*p == 0 || !isdigit(*p))
-		return false;
-
-	return true;
-}
-
 bool pmu_uncore_alias_match(const char *pmu_name, const char *name)
 {
 	char *tmp = NULL, *tok, *str;
@@ -1912,4 +1891,10 @@ int perf_pmu__match(char *pattern, char *name, char *tok)
 		return -1;
 
 	return 0;
+}
+
+bool __weak perf_pmu__valid_suffix(char *pmu_name __maybe_unused,
+				   char *tok __maybe_unused)
+{
+	return true;
 }
