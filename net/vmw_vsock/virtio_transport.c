@@ -639,6 +639,8 @@ static int virtio_vsock_probe(struct virtio_device *vdev)
 
 	mutex_unlock(&the_virtio_vsock_mutex);
 
+	virtio_device_ready(vdev);
+
 	return 0;
 
 out:
