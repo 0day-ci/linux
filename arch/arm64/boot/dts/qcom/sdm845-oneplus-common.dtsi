@@ -331,8 +331,6 @@
 
 		vddio-supply = <&vreg_l14a_1p88>;
 
-		reset-gpios = <&tlmm 6 GPIO_ACTIVE_LOW>;
-
 		pinctrl-names = "default";
 		pinctrl-0 = <&panel_reset_pins &panel_te_pin &panel_esd_pin>;
 
@@ -615,7 +613,7 @@
 			pins = "gpio6", "gpio25", "gpio26";
 			function = "gpio";
 			drive-strength = <8>;
-			bias-disable = <0>;
+			bias-disable;
 		};
 	};
 

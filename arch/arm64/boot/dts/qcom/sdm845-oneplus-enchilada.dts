@@ -16,4 +16,6 @@
 	status = "okay";
 
 	compatible = "samsung,sofef00";
+
+	reset-gpios = <&tlmm 6 GPIO_ACTIVE_LOW>;
 };
