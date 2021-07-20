@@ -79,6 +79,27 @@ trace_get_syscall_nr(struct task_struct *task, struct pt_regs *regs)
 }
 #endif /* ARCH_TRACE_IGNORE_COMPAT_SYSCALLS */
 
+#if defined(CONFIG_CFI_CLANG) && defined(CONFIG_LTO_CLANG_THIN)
+/*
+ * For a syscall symbol, clang generated non-canonical local jump tables
+ * will have entry as <syscall>.cfi_jt and address of this entry
+ * will be used to replace references to the syscall symbol.
+ * so we will strip the postfix from appended symbol name.
+ */
+static inline bool cleanup_syscall_symbol_name(char *s)
+{
+	char *res;
+
+	res = strrchr(s, '.');
+	if (res)
+		*res = '\0';
+
+	return res != NULL;
+}
+#else
+static inline bool cleanup_syscall_symbol_name(char *s) { return false; }
+#endif
+
 static __init struct syscall_metadata *
 find_syscall_meta(unsigned long syscall)
 {
@@ -90,6 +111,7 @@ find_syscall_meta(unsigned long syscall)
 	start = __start_syscalls_metadata;
 	stop = __stop_syscalls_metadata;
 	kallsyms_lookup(syscall, NULL, NULL, NULL, str);
+	cleanup_syscall_symbol_name(str);
 
 	if (arch_syscall_match_sym_name(str, "sys_ni_syscall"))
 		return NULL;
