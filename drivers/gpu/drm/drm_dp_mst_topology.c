@@ -2567,6 +2567,12 @@ drm_dp_mst_handle_conn_stat(struct drm_dp_mst_branch *mstb,
 	else if (create_connector)
 		drm_dp_mst_port_add_connector(mstb, port);
 
+	if (port->connector && port->pdt == DP_PEER_DEVICE_NONE) {
+		drm_connector_unregister(port->connector);
+		drm_connector_put(port->connector);
+		port->connector = NULL;
+	}
+
 out:
 	drm_dp_mst_topology_put_port(port);
 	if (dowork)
@@ -4442,10 +4448,12 @@ int drm_dp_atomic_find_vcpi_slots(struct drm_atomic_state *state,
 	req_slots = DIV_ROUND_UP(pbn, pbn_div);
 
 	drm_dbg_atomic(mgr->dev, "[CONNECTOR:%d:%s] [MST PORT:%p] VCPI %d -> %d\n",
-		       port->connector->base.id, port->connector->name,
+		       port->connector ? port->connector->base.id : 0,
+		       port->connector ? port->connector->name : "NULL",
 		       port, prev_slots, req_slots);
 	drm_dbg_atomic(mgr->dev, "[CONNECTOR:%d:%s] [MST PORT:%p] PBN %d -> %d\n",
-		       port->connector->base.id, port->connector->name,
+		       port->connector ? port->connector->base.id : 0,
+		       port->connector ? port->connector->name : "NULL",
 		       port, prev_bw, pbn);
 
 	/* Add the new allocation to the state */
