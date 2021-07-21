@@ -670,6 +670,13 @@ struct ata_ering {
 	struct ata_ering_entry	ring[ATA_ERING_SIZE];
 };
 
+struct ata_cpr {
+	u8			num;
+	u8			num_storage_elements;
+	u64			start_lba;
+	u64			num_lbas;
+};
+
 struct ata_device {
 	struct ata_link		*link;
 	unsigned int		devno;		/* 0 or 1 */
@@ -728,6 +735,10 @@ struct ata_device {
 	u32			zac_zones_optimal_open;
 	u32			zac_zones_optimal_nonseq;
 	u32			zac_zones_max_open;
+
+	/* Concurrent positioning ranges */
+	u8			nr_cpr;
+	struct ata_cpr		*cpr;
 
 	/* error history */
 	int			spdn_cnt;
