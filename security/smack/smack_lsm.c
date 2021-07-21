@@ -3840,10 +3840,10 @@ static int smk_skb_to_addr_ipv6(struct sk_buff *skb, struct sockaddr_in6 *sip)
 #ifdef CONFIG_NETWORK_SECMARK
 static struct smack_known *smack_from_skb(struct sk_buff *skb)
 {
-	if (skb == NULL || skb->secmark == 0)
+	if (skb == NULL || skb_secmark(skb) == 0)
 		return NULL;
 
-	return smack_from_secid(skb->secmark);
+	return smack_from_secid(skb_secmark(skb));
 }
 #else
 static inline struct smack_known *smack_from_skb(struct sk_buff *skb)

@@ -31,13 +31,13 @@ MODULE_ALIAS("ip6t_CONNSECMARK");
  */
 static void secmark_save(const struct sk_buff *skb)
 {
-	if (skb->secmark) {
+	if (skb_secmark(skb)) {
 		struct nf_conn *ct;
 		enum ip_conntrack_info ctinfo;
 
 		ct = nf_ct_get(skb, &ctinfo);
 		if (ct && !ct->secmark) {
-			ct->secmark = skb->secmark;
+			ct->secmark = skb_secmark(skb);
 			nf_conntrack_event_cache(IPCT_SECMARK, ct);
 		}
 	}
@@ -49,13 +49,13 @@ static void secmark_save(const struct sk_buff *skb)
  */
 static void secmark_restore(struct sk_buff *skb)
 {
-	if (!skb->secmark) {
+	if (!skb_secmark(skb)) {
 		const struct nf_conn *ct;
 		enum ip_conntrack_info ctinfo;
 
 		ct = nf_ct_get(skb, &ctinfo);
 		if (ct && ct->secmark)
-			skb->secmark = ct->secmark;
+			skb_set_secmark(skb, ct->secmark);
 	}
 }
 

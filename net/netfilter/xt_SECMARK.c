@@ -36,7 +36,7 @@ secmark_tg(struct sk_buff *skb, const struct xt_secmark_target_info_v1 *info)
 		BUG();
 	}
 
-	skb->secmark = secmark;
+	skb_set_secmark(skb, secmark);
 	return XT_CONTINUE;
 }
 

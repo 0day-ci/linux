@@ -31,7 +31,7 @@ static unsigned int smack_ipv6_output(void *priv,
 	if (sk && sk->sk_security) {
 		ssp = sk->sk_security;
 		skp = ssp->smk_out;
-		skb->secmark = skp->smk_secid;
+		skb_set_secmark(skb, skp->smk_secid);
 	}
 
 	return NF_ACCEPT;
@@ -49,7 +49,7 @@ static unsigned int smack_ipv4_output(void *priv,
 	if (sk && sk->sk_security) {
 		ssp = sk->sk_security;
 		skp = ssp->smk_out;
-		skb->secmark = skp->smk_secid;
+		skb_set_secmark(skb, skp->smk_secid);
 	}
 
 	return NF_ACCEPT;

@@ -1009,6 +1009,10 @@ static void __copy_skb_header(struct sk_buff *new, const struct sk_buff *old)
 	__skb_copy_inner_headers(new, old);
 	if (old->vlan_present)
 		new->vlan_info = old->vlan_info;
+#ifdef CONFIG_NETWORK_SECMARK
+	if (old->_secmark)
+		new->_secmark = old->_secmark;
+#endif
 
 	/* Note : this field could be in headers_start/headers_end section
 	 * It is not yet because we do not want to have a 16 bit hole
@@ -1030,9 +1034,6 @@ static void __copy_skb_header(struct sk_buff *new, const struct sk_buff *old)
 	CHECK_SKB_FIELD(network_header);
 	CHECK_SKB_FIELD(mac_header);
 	CHECK_SKB_FIELD(mark);
-#ifdef CONFIG_NETWORK_SECMARK
-	CHECK_SKB_FIELD(secmark);
-#endif
 #ifdef CONFIG_NET_RX_BUSY_POLL
 	CHECK_SKB_FIELD(napi_id);
 #endif

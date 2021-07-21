@@ -688,6 +688,7 @@ typedef unsigned char *sk_buff_data_t;
  *		CHECKSUM_UNNECESSARY (max 3)
  *	@dst_pending_confirm: need to confirm neighbour
  *	@decrypted: Decrypted SKB
+ *	@secmark_present: the secmark tag is present
  *	@_state: bitmap reporting the presence of some skb state info
  *	@has_nfct: @_state bit for nfct info
  *	@has_dst: @_state bit for dst pointer
@@ -695,7 +696,7 @@ typedef unsigned char *sk_buff_data_t;
  *	@active_extensions: @_state bits for active extensions (skb_ext_id types)
  *	@napi_id: id of the NAPI struct this skb came from
  *	@sender_cpu: (aka @napi_id) source CPU in XPS
- *	@secmark: security marking
+ *	@_secmark: security marking
  *	@mark: Generic packet mark
  *	@reserved_tailroom: (aka @mark) number of bytes of free space available
  *		at the tail of an sk_buff
@@ -871,6 +872,9 @@ struct sk_buff {
 #ifdef CONFIG_TLS_DEVICE
 	__u8			decrypted:1;
 #endif
+#ifdef CONFIG_NETWORK_SECMARK
+	__u8			secmark_present:1;
+#endif
 	union {
 		__u8		_state;		/* state of extended fields */
 		struct {
@@ -902,9 +906,6 @@ struct sk_buff {
 		unsigned int	napi_id;
 		unsigned int	sender_cpu;
 	};
-#endif
-#ifdef CONFIG_NETWORK_SECMARK
-	__u32		secmark;
 #endif
 
 	union {
@@ -961,6 +962,9 @@ struct sk_buff {
 		};
 		__u32		vlan_info;
 	};
+#ifdef CONFIG_NETWORK_SECMARK
+	__u32			_secmark;
+#endif
 };
 
 #ifdef __KERNEL__
@@ -4228,6 +4232,23 @@ static inline void skb_remcsum_process(struct sk_buff *skb, void *ptr,
 	skb->csum = csum_add(skb->csum, delta);
 }
 
+static inline __u32 skb_secmark(const struct sk_buff *skb)
+{
+#if IS_ENABLED(CONFIG_NETWORK_SECMARK)
+	return skb->secmark_present ? skb->_secmark : 0;
+#else
+	return NULL;
+#endif
+}
+
+static inline void skb_set_secmark(struct sk_buff *skb, __u32 secmark)
+{
+#if IS_ENABLED(CONFIG_NETWORK_SECMARK)
+	skb->secmark_present = 1;
+	skb->_secmark = secmark;
+#endif
+}
+
 static inline struct nf_conntrack *skb_nfct(const struct sk_buff *skb)
 {
 #if IS_ENABLED(CONFIG_NF_CONNTRACK)
@@ -4414,19 +4435,14 @@ static inline void nf_copy(struct sk_buff *dst, const struct sk_buff *src)
 #ifdef CONFIG_NETWORK_SECMARK
 static inline void skb_copy_secmark(struct sk_buff *to, const struct sk_buff *from)
 {
-	to->secmark = from->secmark;
-}
-
-static inline void skb_init_secmark(struct sk_buff *skb)
-{
-	skb->secmark = 0;
+	to->secmark_present = from->secmark_present;
+	if (from->_secmark)
+		to->_secmark = from->_secmark;
 }
 #else
 static inline void skb_copy_secmark(struct sk_buff *to, const struct sk_buff *from)
 { }
 
-static inline void skb_init_secmark(struct sk_buff *skb)
-{ }
 #endif
 
 static inline int secpath_exists(const struct sk_buff *skb)

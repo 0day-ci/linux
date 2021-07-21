@@ -304,14 +304,16 @@ nla_put_failure:
 static u32 nfqnl_get_sk_secctx(struct sk_buff *skb, char **secdata)
 {
 	u32 seclen = 0;
+	u32 secmark;
 #if IS_ENABLED(CONFIG_NETWORK_SECMARK)
 	if (!skb || !sk_fullsock(skb->sk))
 		return 0;
 
 	read_lock_bh(&skb->sk->sk_callback_lock);
 
-	if (skb->secmark)
-		security_secid_to_secctx(skb->secmark, secdata, &seclen);
+	secmark = skb_secmark(skb);
+	if (secmark)
+		security_secid_to_secctx(secmark, secdata, &seclen);
 
 	read_unlock_bh(&skb->sk->sk_callback_lock);
 #endif

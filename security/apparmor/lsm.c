@@ -1053,12 +1053,13 @@ static int apparmor_socket_shutdown(struct socket *sock, int how)
 static int apparmor_socket_sock_rcv_skb(struct sock *sk, struct sk_buff *skb)
 {
 	struct aa_sk_ctx *ctx = SK_CTX(sk);
+	u32 secmark = skb_secmark(skb);
 
-	if (!skb->secmark)
+	if (!secmark)
 		return 0;
 
 	return apparmor_secmark_check(ctx->label, OP_RECVMSG, AA_MAY_RECEIVE,
-				      skb->secmark, sk);
+				      secmark, sk);
 }
 #endif
 
@@ -1160,12 +1161,13 @@ static int apparmor_inet_conn_request(const struct sock *sk, struct sk_buff *skb
 				      struct request_sock *req)
 {
 	struct aa_sk_ctx *ctx = SK_CTX(sk);
+	u32 secmark = skb_secmark(skb);
 
-	if (!skb->secmark)
+	if (!secmark)
 		return 0;
 
 	return apparmor_secmark_check(ctx->label, OP_CONNECT, AA_MAY_CONNECT,
-				      skb->secmark, sk);
+				      secmark, sk);
 }
 #endif
 
@@ -1754,10 +1756,11 @@ static unsigned int apparmor_ip_postroute(void *priv,
 					  struct sk_buff *skb,
 					  const struct nf_hook_state *state)
 {
+	u32 secmark = skb_secmark(skb);
 	struct aa_sk_ctx *ctx;
 	struct sock *sk;
 
-	if (!skb->secmark)
+	if (!secmark)
 		return NF_ACCEPT;
 
 	sk = skb_to_full_sk(skb);
@@ -1766,7 +1769,7 @@ static unsigned int apparmor_ip_postroute(void *priv,
 
 	ctx = SK_CTX(sk);
 	if (!apparmor_secmark_check(ctx->label, OP_SENDMSG, AA_MAY_SEND,
-				    skb->secmark, sk))
+				    secmark, sk))
 		return NF_ACCEPT;
 
 	return NF_DROP_ERR(-ECONNREFUSED);
