@@ -120,7 +120,7 @@ int create_user_ns(struct cred *new)
 	ns->group = group;
 	INIT_WORK(&ns->work, free_user_ns);
 	for (i = 0; i < MAX_PER_NAMESPACE_UCOUNTS; i++) {
-		ns->ucount_max[i] = INT_MAX;
+		ns->ucount_max[i] = LONG_MAX;
 	}
 	set_rlimit_ucount_max(ns, UCOUNT_RLIMIT_NPROC, rlimit(RLIMIT_NPROC));
 	set_rlimit_ucount_max(ns, UCOUNT_RLIMIT_MSGQUEUE, rlimit(RLIMIT_MSGQUEUE));
