@@ -187,8 +187,12 @@ int generic_parse_monolithic(struct fs_context *fc, void *data)
 	if (ret)
 		return ret;
 
+	/* 'sloppy' should be parsed first */
+	if (strstr((const char *)data, "sloppy") != NULL)
+		vfs_parse_fs_string(fc, "sloppy", NULL, 0);
+
 	while ((key = strsep(&options, ",")) != NULL) {
-		if (*key) {
+		if (*key && strcmp(key, "sloppy")) {
 			size_t v_len = 0;
 			char *value = strchr(key, '=');
 
