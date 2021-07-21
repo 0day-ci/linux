@@ -693,6 +693,20 @@ static void __aer_print_error(struct pci_dev *dev,
 		pci_printk(level, dev, "   [%2d] %-22s%s\n", i, errmsg,
 				info->first_error == i ? " (First)" : "");
 	}
+
+	if (info->severity == AER_CORRECTABLE &&
+	    (status & PCI_ERR_COR_ADV_NFAT)) {
+		status = info->nf_status;
+		pci_printk(level, dev, "   Non-Fatal errors signaled as Correctable error:");
+		for_each_set_bit(i, &status, 32) {
+			errmsg = aer_uncorrectable_error_string[i];
+			if (!errmsg)
+				errmsg = "Unknown Error Bit";
+
+			pci_printk(level, dev, "   [%2d] %-22s\n", i, errmsg);
+		}
+	}
+
 	pci_dev_aer_stats_incr(dev, info);
 }
 
@@ -783,6 +797,7 @@ void cper_print_aer(struct pci_dev *dev, int aer_severity,
 	info.status = status;
 	info.mask = mask;
 	info.first_error = PCI_ERR_CAP_FEP(aer->cap_control);
+	info.nf_status = aer->uncor_status;
 
 	pci_err(dev, "aer_status: 0x%08x, aer_mask: 0x%08x\n", status, mask);
 	__aer_print_error(dev, &info);
@@ -948,9 +963,13 @@ static void handle_error_source(struct pci_dev *dev, struct aer_err_info *info)
 		 * Correctable error does not need software intervention.
 		 * No need to go through error recovery process.
 		 */
-		if (aer)
+		if (aer) {
 			pci_write_config_dword(dev, aer + PCI_ERR_COR_STATUS,
 					info->status);
+			if (info->status & PCI_ERR_COR_ADV_NFAT)
+				pci_write_config_dword(dev, aer + PCI_ERR_UNCOR_STATUS,
+						       info->nf_status);
+		}
 		if (pcie_aer_is_native(dev))
 			pcie_clear_device_status(dev);
 	} else if (info->severity == AER_NONFATAL)
@@ -1060,6 +1079,8 @@ int aer_get_device_error_info(struct pci_dev *dev, struct aer_err_info *info)
 			&info->mask);
 		if (!(info->status & ~info->mask))
 			return 0;
+		if (info->status & PCI_ERR_COR_ADV_NFAT)
+			pci_read_config_dword(dev, aer + PCI_ERR_UNCOR_STATUS, &info->nf_status);
 	} else if (type == PCI_EXP_TYPE_ROOT_PORT ||
 		   type == PCI_EXP_TYPE_RC_EC ||
 		   type == PCI_EXP_TYPE_DOWNSTREAM ||

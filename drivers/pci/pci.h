@@ -419,6 +419,7 @@ struct aer_err_info {
 
 	unsigned int status;		/* COR/UNCOR Error Status */
 	unsigned int mask;		/* COR/UNCOR Error Mask */
+	unsigned int nf_status;		/* Non-Fatal Error Status signaled as COR Error */
 	struct aer_header_log_regs tlp;	/* TLP Header */
 };
 
