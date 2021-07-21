@@ -1624,6 +1624,14 @@ static int cpsw_probe(struct platform_device *pdev)
 		goto clean_cpts;
 	}
 
+	/* adjust max_mtu to match module parameter rx_packet_max */
+	if (cpsw->rx_packet_max > CPSW_MAX_PACKET_SIZE) {
+		ndev->max_mtu = ETH_DATA_LEN + (cpsw->rx_packet_max -
+				CPSW_MAX_PACKET_SIZE);
+		dev_info(dev, "overriding default MTU to %d\n\n",
+			 ndev->max_mtu);
+	}
+
 	priv = netdev_priv(ndev);
 	priv->cpsw = cpsw;
 	priv->ndev = ndev;
