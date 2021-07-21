@@ -31,12 +31,18 @@ allOf:
 
 properties:
   compatible:
-    contains:
-      const: panel-lvds
-    description:
-      Shall contain "panel-lvds" in addition to a mandatory panel-specific
-      compatible string defined in individual panel bindings. The "panel-lvds"
-      value shall never be used on its own.
+    items:
+      - enum:
+          - advantech,idk-1110wr
+          - advantech,idk-2121wr
+          - auo,b101ew05
+          - innolux,ee101ia-01d
+          - mitsubishi,aa104xd12
+          - mitsubishi,aa121td01
+          - sgd,gktw70sdae4se
+          - sharp,lq150x1lg11
+          - tbs,a711-panel
+      - const: panel-lvds
 
   data-mapping:
     enum:
