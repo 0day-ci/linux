@@ -75,6 +75,17 @@
 #define TM_DEBUG(x...) do { } while(0)
 #endif
 
+/*
+ * Track whether the kernel is using the FPU state
+ * currently.
+ *
+ * This flag is used:
+ *
+ *   - kernel_fpu_begin()/end() correctness
+ *   - kernel_fpu_enabled info
+ */
+static DEFINE_PER_CPU(bool, in_kernel_fpu);
+
 extern unsigned long _get_SP(void);
 
 #ifdef CONFIG_PPC_TRANSACTIONAL_MEM
@@ -212,6 +223,9 @@ void enable_kernel_fp(void)
 	unsigned long cpumsr;
 
 	WARN_ON(preemptible());
+	WARN_ON_ONCE(this_cpu_read(in_kernel_fpu));
+
+	this_cpu_write(in_kernel_fpu, true);
 
 	cpumsr = msr_check_and_set(MSR_FP);
 
@@ -231,6 +245,15 @@ void enable_kernel_fp(void)
 	}
 }
 EXPORT_SYMBOL(enable_kernel_fp);
+
+void disable_kernel_fp(void)
+{
+	WARN_ON_ONCE(!this_cpu_read(in_kernel_fpu));
+
+	this_cpu_write(in_kernel_fpu, false);
+	msr_check_and_clear(MSR_FP);
+}
+EXPORT_SYMBOL(disable_kernel_fp);
 #else
 static inline void __giveup_fpu(struct task_struct *tsk) { }
 #endif /* CONFIG_PPC_FPU */
@@ -263,6 +286,9 @@ void enable_kernel_altivec(void)
 	unsigned long cpumsr;
 
 	WARN_ON(preemptible());
+	WARN_ON_ONCE(this_cpu_read(in_kernel_fpu));
+
+	this_cpu_write(in_kernel_fpu, true);
 
 	cpumsr = msr_check_and_set(MSR_VEC);
 
@@ -283,6 +309,14 @@ void enable_kernel_altivec(void)
 }
 EXPORT_SYMBOL(enable_kernel_altivec);
 
+void disable_kernel_altivec(void)
+{
+	WARN_ON_ONCE(!this_cpu_read(in_kernel_fpu));
+
+	this_cpu_write(in_kernel_fpu, false);
+	msr_check_and_clear(MSR_VEC);
+}
+EXPORT_SYMBOL(disable_kernel_altivec);
 /*
  * Make sure the VMX/Altivec register state in the
  * the thread_struct is up to date for task tsk.
@@ -333,6 +367,9 @@ void enable_kernel_vsx(void)
 	unsigned long cpumsr;
 
 	WARN_ON(preemptible());
+	WARN_ON_ONCE(this_cpu_read(in_kernel_fpu));
+
+	this_cpu_write(in_kernel_fpu, true);
 
 	cpumsr = msr_check_and_set(MSR_FP|MSR_VEC|MSR_VSX);
 
@@ -353,6 +390,15 @@ void enable_kernel_vsx(void)
 	}
 }
 EXPORT_SYMBOL(enable_kernel_vsx);
+
+void disable_kernel_vsx(void)
+{
+	WARN_ON_ONCE(!this_cpu_read(in_kernel_fpu));
+
+	this_cpu_write(in_kernel_fpu, false);
+	msr_check_and_clear(MSR_FP|MSR_VEC|MSR_VSX);
+}
+EXPORT_SYMBOL(disable_kernel_vsx);
 
 void flush_vsx_to_thread(struct task_struct *tsk)
 {
@@ -405,6 +451,90 @@ void flush_spe_to_thread(struct task_struct *tsk)
 	}
 }
 #endif /* CONFIG_SPE */
+
+static bool fpu_support(void)
+{
+	if (cpu_has_feature(CPU_FTR_VSX_COMP)) {
+		return true;
+	} else if (cpu_has_feature(CPU_FTR_ALTIVEC_COMP)) {
+		return true;
+	} else if (!cpu_has_feature(CPU_FTR_FPU_UNAVAILABLE)) {
+		return true;
+	}
+
+	return false;
+}
+
+bool kernel_fpu_enabled(void)
+{
+	return this_cpu_read(in_kernel_fpu);
+}
+EXPORT_SYMBOL_GPL(kernel_fpu_enabled);
+
+void kernel_fpu_begin(void)
+{
+	if (!fpu_support()) {
+		WARN_ON_ONCE(1);
+		return;
+	}
+
+	preempt_disable();
+
+#ifdef CONFIG_VSX
+	if (cpu_has_feature(CPU_FTR_VSX_COMP)) {
+		enable_kernel_vsx();
+		return;
+	}
+#endif
+
+#ifdef CONFIG_ALTIVEC
+	if (cpu_has_feature(CPU_FTR_ALTIVEC_COMP)) {
+		enable_kernel_altivec();
+		return;
+	}
+#endif
+
+#ifdef CONFIG_PPC_FPU
+	if (!cpu_has_feature(CPU_FTR_FPU_UNAVAILABLE)) {
+		enable_kernel_fp();
+		return;
+	}
+#endif
+}
+EXPORT_SYMBOL_GPL(kernel_fpu_begin);
+
+void kernel_fpu_end(void)
+{
+	if (!fpu_support()) {
+		WARN_ON_ONCE(1);
+		return;
+	}
+
+#ifdef CONFIG_VSX
+	if (cpu_has_feature(CPU_FTR_VSX_COMP)) {
+		disable_kernel_vsx();
+		goto done;
+	}
+#endif
+
+#ifdef CONFIG_ALTIVEC
+	if (cpu_has_feature(CPU_FTR_ALTIVEC_COMP)) {
+		disable_kernel_altivec();
+		goto done;
+	}
+#endif
+
+#ifdef CONFIG_PPC_FPU
+	if (!cpu_has_feature(CPU_FTR_FPU_UNAVAILABLE)) {
+		disable_kernel_fp();
+		goto done;
+	}
+#endif
+
+done:
+	preempt_enable();
+}
+EXPORT_SYMBOL_GPL(kernel_fpu_end);
 
 static unsigned long msr_all_available;
 
