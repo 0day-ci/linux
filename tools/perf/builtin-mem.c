@@ -89,7 +89,7 @@ static int __cmd_record(int argc, const char **argv, struct perf_mem *mem)
 	}
 
 	argc = parse_options(argc, argv, options, record_mem_usage,
-			     PARSE_OPT_KEEP_UNKNOWN);
+			     PARSE_OPT_STOP_AT_NON_OPTION);
 
 	if (!perf_pmu__has_hybrid())
 		rec_argc = argc + 9; /* max number of arguments */
@@ -484,8 +484,13 @@ int cmd_mem(int argc, const char **argv)
 		NULL
 	};
 
-	argc = parse_options_subcommand(argc, argv, mem_options, mem_subcommands,
+	if (!strncmp(argv[1], "rec", 3))
+		argc = parse_options_subcommand(argc, argv, mem_options, mem_subcommands,
+					mem_usage, PARSE_OPT_STOP_AT_NON_OPTION);
+	else
+		argc = parse_options_subcommand(argc, argv, mem_options, mem_subcommands,
 					mem_usage, PARSE_OPT_KEEP_UNKNOWN);
+
 
 	if (!argc || !(strncmp(argv[0], "rec", 3) || mem.operation))
 		usage_with_options(mem_usage, mem_options);
