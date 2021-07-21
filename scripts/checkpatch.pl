@@ -7439,9 +7439,14 @@ sub process {
 	print report_dump();
 	if ($summary && !($clean == 1 && $quiet == 1)) {
 		print "$filename " if ($summary_file);
-		print "total: $cnt_error errors, $cnt_warn warnings, " .
-			(($check)? "$cnt_chk checks, " : "") .
-			"$cnt_lines lines checked\n";
+		my $errors_str = ($cnt_error == 1) ? "error" : "errors";
+		my $warnings_str = ($cnt_warn == 1) ? "warning" : "warnings";
+		my $checks_str = ($cnt_chk == 1) ? "check" : "checks";
+		my $lines_str = ($cnt_lines == 1) ? "line" : "lines";
+		print "total: $cnt_error $errors_str, " .
+			"$cnt_warn $warnings_str, " .
+			(($check)? "$cnt_chk $checks_str, " : "") .
+			"$cnt_lines $lines_str checked\n";
 	}
 
 	if ($quiet == 0) {
