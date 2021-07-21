@@ -1245,6 +1245,9 @@ unsigned int sysctl_sched_uclamp_util_max = SCHED_CAPACITY_SCALE;
  */
 unsigned int sysctl_sched_uclamp_util_min_rt_default = SCHED_CAPACITY_SCALE;
 
+/* map util clamp_min to boost */
+unsigned int sysctl_sched_uclamp_min_to_boost;
+
 /* All clamps are required to be less or equal than these values */
 static struct uclamp_se uclamp_default[UCLAMP_CNT];
 
@@ -1446,6 +1449,22 @@ uclamp_eff_get(struct task_struct *p, enum uclamp_id clamp_id)
 		return uc_max;
 
 	return uc_req;
+}
+
+unsigned long uclamp_transform_boost(unsigned long util, unsigned long uclamp_min,
+				    unsigned long uclamp_max)
+{
+	unsigned long margin;
+
+	if (unlikely(uclamp_min > uclamp_max))
+		return util;
+
+	if (util >= uclamp_max)
+		return uclamp_max;
+
+	margin = DIV_ROUND_CLOSEST_ULL(uclamp_min * (uclamp_max - util),
+					SCHED_CAPACITY_SCALE);
+	return util + margin;
 }
 
 unsigned long uclamp_eff_value(struct task_struct *p, enum uclamp_id clamp_id)
