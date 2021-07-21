@@ -1342,9 +1342,16 @@ struct block_device *blkdev_get_no_open(dev_t dev)
 		goto bdput;
 	if ((disk->flags & (GENHD_FL_UP | GENHD_FL_HIDDEN)) != GENHD_FL_UP)
 		goto put_disk;
-	if (!try_module_get(bdev->bd_disk->fops->owner))
+	if (!try_module_get(disk->fops->owner))
 		goto put_disk;
+
+	/* switch to a device model reference instead of the inode one: */
+	if (!kobject_get_unless_zero(&bdev->bd_device.kobj))
+		goto put_module;
+	bdput(bdev);
 	return bdev;
+put_module:
+	module_put(disk->fops->owner);
 put_disk:
 	put_disk(disk);
 bdput:
@@ -1356,7 +1363,7 @@ void blkdev_put_no_open(struct block_device *bdev)
 {
 	module_put(bdev->bd_disk->fops->owner);
 	put_disk(bdev->bd_disk);
-	bdput(bdev);
+	put_device(&bdev->bd_device);
 }
 
 /**
