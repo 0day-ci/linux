@@ -8,6 +8,7 @@
 
 #include "intel_guc_submission.h"
 #include "intel_guc_slpc_types.h"
+#include "abi/guc_actions_slpc_abi.h"
 
 static inline bool intel_guc_slpc_is_supported(struct intel_guc *guc)
 {
