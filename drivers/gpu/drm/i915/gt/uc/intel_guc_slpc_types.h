@@ -9,6 +9,8 @@
 #include <linux/types.h>
 #include "abi/guc_actions_slpc_abi.h"
 
+#define SLPC_RESET_TIMEOUT_MS 5
+
 struct intel_guc_slpc {
 
 	struct i915_vma *vma;
