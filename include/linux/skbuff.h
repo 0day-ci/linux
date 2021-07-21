@@ -670,7 +670,6 @@ typedef unsigned char *sk_buff_data_t;
  *	@pfmemalloc: skbuff was allocated from PFMEMALLOC reserves
  *	@pp_recycle: mark the packet for recycling instead of freeing (implies
  *		page_pool support on driver)
- *	@active_extensions: active extensions (skb_ext_id types)
  *	@ndisc_nodetype: router type (from link layer)
  *	@ooo_okay: allow the mapping of a socket to a queue to be changed
  *	@l4_hash: indicate hash is a canonical 4-tuple hash over transport
@@ -692,6 +691,7 @@ typedef unsigned char *sk_buff_data_t;
  *	@_state: bitmap reporting the presence of some skb state info
  *	@has_nfct: @_state bit for nfct info
  *	@has_dst: @_state bit for dst pointer
+ *	@active_extensions: @_state bits for active extensions (skb_ext_id types)
  *	@napi_id: id of the NAPI struct this skb came from
  *	@sender_cpu: (aka @napi_id) source CPU in XPS
  *	@secmark: security marking
@@ -796,9 +796,6 @@ struct sk_buff {
 				head_frag:1,
 				pfmemalloc:1,
 				pp_recycle:1; /* page_pool recycle indicator */
-#ifdef CONFIG_SKB_EXTENSIONS
-	__u8			active_extensions;
-#endif
 
 	/* fields enclosed in headers_start/headers_end are copied
 	 * using a single memcpy() in __copy_skb_header()
@@ -875,6 +872,9 @@ struct sk_buff {
 		struct {
 			__u8	has_nfct:1;
 			__u8	has_dst:1;
+#ifdef CONFIG_SKB_EXTENSIONS
+			__u8	active_extensions:5;
+#endif
 		};
 	};
 
@@ -4283,8 +4283,6 @@ static inline void skb_ext_put(struct sk_buff *skb)
 static inline void __skb_ext_copy(struct sk_buff *dst,
 				  const struct sk_buff *src)
 {
-	dst->active_extensions = src->active_extensions;
-
 	if (src->active_extensions) {
 		struct skb_ext *ext = src->extensions;
 
@@ -4296,6 +4294,7 @@ static inline void __skb_ext_copy(struct sk_buff *dst,
 static inline void skb_ext_copy(struct sk_buff *dst, const struct sk_buff *src)
 {
 	skb_ext_put(dst);
+	dst->active_extensions = src->active_extensions;
 	__skb_ext_copy(dst, src);
 }
 
