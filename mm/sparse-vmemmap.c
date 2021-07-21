@@ -43,6 +43,15 @@
  * @reuse_addr:		the virtual address of the @reuse_page page.
  * @vmemmap_pages:	the list head of the vmemmap pages that can be freed
  *			or is mapped from.
+ * @demote_mask		demote specific.  mask to know virtual address of
+ *			where to start mapping pages during a demote operation.
+ * @demote_map_pages	demote specific.  number of pages which mapped for
+ *			each demoted page.
+ * @demote_tmp_count	demote specific.  counter for the number of pages
+ *			mapped per page.
+ * @demote_tmp_addr	demote specific.  when more then one page must be
+ *			mapped for each demoted size page, virtual address
+ *			of the next page to be mapped.
  */
 struct vmemmap_remap_walk {
 	void (*remap_pte)(pte_t *pte, unsigned long addr,
@@ -51,6 +60,10 @@ struct vmemmap_remap_walk {
 	struct page *reuse_page;
 	unsigned long reuse_addr;
 	struct list_head *vmemmap_pages;
+	unsigned long demote_mask;
+	unsigned long demote_map_pages;
+	unsigned long demote_tmp_count;
+	unsigned long demote_tmp_addr;
 };
 
 static int split_vmemmap_huge_pmd(pmd_t *pmd, unsigned long start,
@@ -262,6 +275,51 @@ static void vmemmap_restore_pte(pte_t *pte, unsigned long addr,
 	set_pte_at(&init_mm, addr, pte, mk_pte(page, pgprot));
 }
 
+static void vmemmap_demote_pte(pte_t *pte, unsigned long addr,
+				struct vmemmap_remap_walk *walk)
+{
+	pgprot_t pgprot = PAGE_KERNEL;
+	struct page *page;
+	void *to;
+
+	if (!(addr & walk->demote_mask)) {
+		/* head page */
+		page = list_first_entry(walk->vmemmap_pages, struct page, lru);
+		list_del(&page->lru);
+		to = page_to_virt(page);
+		copy_page(to, (void *)walk->reuse_addr);
+		set_pte_at(&init_mm, addr, pte, mk_pte(page, pgprot));
+		/*
+		 * after mapping head page, set demote_tmp_reuse for
+		 * the following tail page to be mapped (if any).
+		 */
+		walk->demote_tmp_count = walk->demote_map_pages;
+		if (--walk->demote_tmp_count)
+			walk->demote_tmp_addr = addr + PAGE_SIZE;
+	} else if (addr == walk->demote_tmp_addr) {
+		/* first tall page */
+		page = list_first_entry(walk->vmemmap_pages, struct page, lru);
+		list_del(&page->lru);
+		to = page_to_virt(page);
+		copy_page(to, (void *)walk->reuse_addr);
+		set_pte_at(&init_mm, addr, pte, mk_pte(page, pgprot));
+		if (--walk->demote_tmp_count) {
+			walk->demote_tmp_addr = addr + PAGE_SIZE;
+		} else {
+			walk->demote_tmp_addr = 0UL;
+			/* remaining tail pages mapped to this page */
+			walk->reuse_page = page;
+		}
+	} else {
+		/* remaining tail pages */
+		pgprot_t pgprot = PAGE_KERNEL_RO;
+		pte_t entry = mk_pte(walk->reuse_page, pgprot);
+
+		page = pte_page(*pte);
+		set_pte_at(&init_mm, addr, pte, entry);
+	}
+}
+
 /**
  * vmemmap_remap_free - remap the vmemmap virtual address range [@start, @end)
  *			to the page which @reuse is mapped to, then free vmemmap
@@ -327,11 +385,9 @@ int vmemmap_remap_free(unsigned long start, unsigned long end,
 	return ret;
 }
 
-static int alloc_vmemmap_page_list(unsigned long start, unsigned long end,
+static int __alloc_vmemmap_pages(unsigned long nr_pages, int nid,
 				   gfp_t gfp_mask, struct list_head *list)
 {
-	unsigned long nr_pages = (end - start) >> PAGE_SHIFT;
-	int nid = page_to_nid((struct page *)start);
 	struct page *page, *next;
 
 	while (nr_pages--) {
@@ -346,6 +402,21 @@ out:
 	list_for_each_entry_safe(page, next, list, lru)
 		__free_pages(page, 0);
 	return -ENOMEM;
+}
+
+static int alloc_vmemmap_pages(unsigned long nr_pages, int nid,
+				   gfp_t gfp_mask, struct list_head *list)
+{
+	return __alloc_vmemmap_pages(nr_pages, nid, gfp_mask, list);
+}
+
+static int alloc_vmemmap_range(unsigned long start, unsigned long end,
+				   gfp_t gfp_mask, struct list_head *list)
+{
+	unsigned long nr_pages = (end - start) >> PAGE_SHIFT;
+	int nid = page_to_nid((struct page *)start);
+
+	return __alloc_vmemmap_pages(nr_pages, nid, gfp_mask, list);
 }
 
 /**
@@ -374,7 +445,51 @@ int vmemmap_remap_alloc(unsigned long start, unsigned long end,
 	/* See the comment in the vmemmap_remap_free(). */
 	BUG_ON(start - reuse != PAGE_SIZE);
 
-	if (alloc_vmemmap_page_list(start, end, gfp_mask, &vmemmap_pages))
+	if (alloc_vmemmap_range(start, end, gfp_mask, &vmemmap_pages))
+		return -ENOMEM;
+
+	mmap_read_lock(&init_mm);
+	vmemmap_remap_range(reuse, end, &walk);
+	mmap_read_unlock(&init_mm);
+
+	return 0;
+}
+
+/**
+ * vmemmap_remap_demote - remap the optimized vmemmap virtual address range
+ *		for a huge page to accommodate splitting that huge
+ *		page into pages of a smaller size.  That smaller size
+ *		is specified by demote_mask.
+ * @start:	start address of the vmemmap virtual address range to remap
+ *		for smaller pages.
+ * @end:	end address of the vmemmap virtual address range to remap.
+ * @reuse:	reuse address.
+ * @demote_nr_pages: number of vmammap pages to allocate for remapping.
+ * @demote_mask: mask specifying where to perform remapping within the passed
+ *		 range.
+ * @demote_map_pages: number of pages to map for each demoted page
+ * @gfp_mask:	GFP flag for allocating vmemmap pages.
+ *
+ * Return: %0 on success, negative error code otherwise.
+ */
+int vmemmap_remap_demote(unsigned long start, unsigned long end,
+			unsigned long reuse, unsigned long demote_nr_pages,
+			unsigned long demote_mask,
+			unsigned long demote_map_pages, gfp_t gfp_mask)
+{
+	LIST_HEAD(vmemmap_pages);
+	int nid = page_to_nid((struct page *)start);
+	struct vmemmap_remap_walk walk = {
+		.remap_pte	= vmemmap_demote_pte,
+		.reuse_addr	= reuse,
+		.vmemmap_pages	= &vmemmap_pages,
+		.demote_mask	= demote_mask,
+		.demote_map_pages = demote_map_pages,
+	};
+
+	might_sleep_if(gfpflags_allow_blocking(gfp_mask));
+
+	if (alloc_vmemmap_pages(demote_nr_pages, nid, gfp_mask, &vmemmap_pages))
 		return -ENOMEM;
 
 	mmap_read_lock(&init_mm);

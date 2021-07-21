@@ -264,6 +264,66 @@ void free_huge_page_vmemmap(struct hstate *h, struct page *head)
 		SetHPageVmemmapOptimized(head);
 }
 
+/*
+ * vmammap pages will be allocated and mapped such that this range which
+ * previously represented a single huge page will now represent a set of
+ * pages of a smaller size.
+ */
+int demote_huge_page_vmemmap(struct hstate *h, struct page *head)
+{
+	int ret;
+	unsigned long vmemmap_addr = (unsigned long)head;
+	unsigned long vmemmap_end, vmemmap_reuse;
+	unsigned long demote_mask;
+	unsigned long demote_nr_pages;
+	struct hstate *target;
+
+	VM_BUG_ON(!h->demote_order);
+	if (!HPageVmemmapOptimized(head))
+		return 0;
+
+	target = size_to_hstate(PAGE_SIZE << h->demote_order);
+
+	/* Number of vmemmap pages required to demote page */
+	demote_nr_pages = pages_per_huge_page(h) / pages_per_huge_page(target);
+	demote_nr_pages *= RESERVE_VMEMMAP_NR;
+	demote_nr_pages -= RESERVE_VMEMMAP_NR;	/* pages currently present */
+
+	/*
+	 * mask to identify where within the range new smaller pages will
+	 * reside.  This will be used to map new vmemmap pages.
+	 */
+	demote_mask = ((unsigned long) pages_per_huge_page(target) *
+			sizeof(struct page)) - 1;
+
+	vmemmap_addr += RESERVE_VMEMMAP_SIZE;
+	vmemmap_end = vmemmap_addr + free_vmemmap_pages_size_per_hpage(h);
+	vmemmap_reuse = vmemmap_addr - PAGE_SIZE;
+	/*
+	 * The range [@vmemmap_addr, @vmemmap_end) represents a single huge
+	 * page of size h->order.  It is vmemmap optimized and is only mapped
+	 * with RESERVE_VMEMMAP_NR pages.  The huge page will be split into
+	 * multiple pages of a smaller size (h->demote_order).  vmemmap pages
+	 * must be callocated for each of these smaller size pages and
+	 * appropriately mapped.
+	 */
+	ret = vmemmap_remap_demote(vmemmap_addr, vmemmap_end, vmemmap_reuse,
+				  demote_nr_pages, demote_mask,
+				  RESERVE_VMEMMAP_NR,
+				  GFP_KERNEL | __GFP_NORETRY | __GFP_THISNODE);
+
+	if (!ret) {
+		int i;
+
+		for (i = pages_per_huge_page(target);
+					i < pages_per_huge_page(h);
+					i += pages_per_huge_page(target))
+			SetHPageVmemmapOptimized(head + i);
+	}
+
+	return ret;
+}
+
 void __init hugetlb_vmemmap_init(struct hstate *h)
 {
 	unsigned int nr_pages = pages_per_huge_page(h);
