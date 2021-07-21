@@ -921,16 +921,6 @@ void bdev_add(struct block_device *bdev, dev_t dev)
 	insert_inode_hash(bdev->bd_inode);
 }
 
-static struct block_device *bdget(dev_t dev)
-{
-	struct inode *inode;
-
-	inode = ilookup(blockdev_superblock, dev);
-	if (!inode)
-		return NULL;
-	return &BDEV_I(inode)->bdev;
-}
-
 long nr_blockdev_pages(void)
 {
 	struct inode *inode;
@@ -944,12 +934,6 @@ long nr_blockdev_pages(void)
 	return ret;
 }
 
-void bdput(struct block_device *bdev)
-{
-	iput(bdev->bd_inode);
-}
-EXPORT_SYMBOL(bdput);
- 
 /**
  * bd_may_claim - test whether a block device can be claimed
  * @bdev: block device of interest
@@ -1308,18 +1292,20 @@ struct block_device *blkdev_get_no_open(dev_t dev)
 {
 	struct block_device *bdev;
 	struct gendisk *disk;
+	struct inode *inode;
 
-	bdev = bdget(dev);
-	if (!bdev) {
+	inode = ilookup(blockdev_superblock, dev);
+	if (!inode) {
 		blk_request_module(dev);
-		bdev = bdget(dev);
-		if (!bdev)
+		inode = ilookup(blockdev_superblock, dev);
+		if (!inode)
 			return NULL;
 	}
 
+	bdev = &BDEV_I(inode)->bdev;
 	disk = bdev->bd_disk;
 	if (!kobject_get_unless_zero(&disk_to_dev(disk)->kobj))
-		goto bdput;
+		goto iput;
 	if ((disk->flags & (GENHD_FL_UP | GENHD_FL_HIDDEN)) != GENHD_FL_UP)
 		goto put_disk;
 	if (!try_module_get(disk->fops->owner))
@@ -1328,14 +1314,14 @@ struct block_device *blkdev_get_no_open(dev_t dev)
 	/* switch to a device model reference instead of the inode one: */
 	if (!kobject_get_unless_zero(&bdev->bd_device.kobj))
 		goto put_module;
-	bdput(bdev);
+	iput(bdev->bd_inode);
 	return bdev;
 put_module:
 	module_put(disk->fops->owner);
 put_disk:
 	put_disk(disk);
-bdput:
-	bdput(bdev);
+iput:
+	iput(bdev->bd_inode);
 	return NULL;
 }
 

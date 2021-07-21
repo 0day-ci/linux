@@ -261,7 +261,7 @@ static void part_release(struct device *dev)
 {
 	if (MAJOR(dev->devt) == BLOCK_EXT_MAJOR)
 		blk_free_ext_minor(MINOR(dev->devt));
-	bdput(dev_to_bdev(dev));
+	iput(dev_to_bdev(dev)->bd_inode);
 }
 
 static int part_uevent(struct device *dev, struct kobj_uevent_env *env)
@@ -360,7 +360,7 @@ static struct block_device *add_partition(struct gendisk *disk, int partno,
 		err = -ENOMEM;
 		bdev->bd_meta_info = kmemdup(info, sizeof(*info), GFP_KERNEL);
 		if (!bdev->bd_meta_info)
-			goto out_bdput;
+			goto out_iput;
 	}
 
 	pdev = &bdev->bd_device;
@@ -415,8 +415,8 @@ static struct block_device *add_partition(struct gendisk *disk, int partno,
 		kobject_uevent(&pdev->kobj, KOBJ_ADD);
 	return bdev;
 
-out_bdput:
-	bdput(bdev);
+out_iput:
+	iput(bdev->bd_inode);
 	return ERR_PTR(err);
 out_del:
 	kobject_put(bdev->bd_holder_dir);
