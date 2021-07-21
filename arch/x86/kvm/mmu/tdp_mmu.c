@@ -446,12 +446,10 @@ static void __handle_changed_spte(struct kvm *kvm, int as_id, gfn_t gfn,
 
 	trace_kvm_tdp_mmu_spte_changed(as_id, gfn, level, old_spte, new_spte);
 
-	if (is_large_pte(old_spte) != is_large_pte(new_spte)) {
-		if (is_large_pte(old_spte))
-			atomic64_sub(1, (atomic64_t*)&kvm->stat.lpages);
-		else
-			atomic64_add(1, (atomic64_t*)&kvm->stat.lpages);
-	}
+	if (is_large_pte(old_spte) && !is_large_pte(new_spte))
+		kvm_update_page_stats(kvm, old_spte, level, -1);
+	else if (!is_large_pte(old_spte) && is_large_pte(new_spte))
+		kvm_update_page_stats(kvm, new_spte, level, 1);
 
 	/*
 	 * The only times a SPTE should be changed from a non-present to

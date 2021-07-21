@@ -588,16 +588,33 @@ static bool mmu_spte_update(u64 *sptep, u64 new_spte)
 	return flush;
 }
 
+void kvm_update_page_stats(struct kvm *kvm, u64 spte, int level, int count)
+{
+	if (!is_last_spte(spte, level))
+		return;
+	/*
+	 * If the backing page is a large page, update the lpages stat first,
+	 * then log the specific type of backing page. Only log pages at highter
+	 * levels if they are marked as large pages. (As opposed to simply
+	 * pointing to another level of page tables.).
+	 */
+	if (is_large_pte(spte))
+		atomic64_add(count, (atomic64_t *)&kvm->stat.lpages);
+	atomic64_add(count,
+		(atomic64_t *)&kvm->stat.page_stats.pages[level-1]);
+}
+
 /*
  * Rules for using mmu_spte_clear_track_bits:
  * It sets the sptep from present to nonpresent, and track the
  * state bits, it is used to clear the last level sptep.
  * Returns non-zero if the PTE was previously valid.
  */
-static int mmu_spte_clear_track_bits(u64 *sptep)
+static int mmu_spte_clear_track_bits(struct kvm *kvm, u64 *sptep)
 {
 	kvm_pfn_t pfn;
 	u64 old_spte = *sptep;
+	int level = sptep_to_sp(sptep)->role.level;
 
 	if (!spte_has_volatile_bits(old_spte))
 		__update_clear_spte_fast(sptep, 0ull);
@@ -606,6 +623,8 @@ static int mmu_spte_clear_track_bits(u64 *sptep)
 
 	if (!is_shadow_present_pte(old_spte))
 		return 0;
+
+	kvm_update_page_stats(kvm, old_spte, level, -1);
 
 	pfn = spte_to_pfn(old_spte);
 
@@ -984,9 +1003,10 @@ static void __pte_list_remove(u64 *spte, struct kvm_rmap_head *rmap_head)
 	}
 }
 
-static void pte_list_remove(struct kvm_rmap_head *rmap_head, u64 *sptep)
+static void pte_list_remove(struct kvm *kvm, struct kvm_rmap_head *rmap_head,
+			    u64 *sptep)
 {
-	mmu_spte_clear_track_bits(sptep);
+	mmu_spte_clear_track_bits(kvm, sptep);
 	__pte_list_remove(sptep, rmap_head);
 }
 
@@ -1119,7 +1139,7 @@ out:
 
 static void drop_spte(struct kvm *kvm, u64 *sptep)
 {
-	if (mmu_spte_clear_track_bits(sptep))
+	if (mmu_spte_clear_track_bits(kvm, sptep))
 		rmap_remove(kvm, sptep);
 }
 
@@ -1129,7 +1149,6 @@ static bool __drop_large_spte(struct kvm *kvm, u64 *sptep)
 	if (is_large_pte(*sptep)) {
 		WARN_ON(sptep_to_sp(sptep)->role.level == PG_LEVEL_4K);
 		drop_spte(kvm, sptep);
-		--kvm->stat.lpages;
 		return true;
 	}
 
@@ -1386,7 +1405,7 @@ static bool kvm_zap_rmapp(struct kvm *kvm, struct kvm_rmap_head *rmap_head,
 	while ((sptep = rmap_get_first(rmap_head, &iter))) {
 		rmap_printk("spte %p %llx.\n", sptep, *sptep);
 
-		pte_list_remove(rmap_head, sptep);
+		pte_list_remove(kvm, rmap_head, sptep);
 		flush = true;
 	}
 
@@ -1421,13 +1440,13 @@ restart:
 		need_flush = 1;
 
 		if (pte_write(pte)) {
-			pte_list_remove(rmap_head, sptep);
+			pte_list_remove(kvm, rmap_head, sptep);
 			goto restart;
 		} else {
 			new_spte = kvm_mmu_changed_pte_notifier_make_spte(
 					*sptep, new_pfn);
 
-			mmu_spte_clear_track_bits(sptep);
+			mmu_spte_clear_track_bits(kvm, sptep);
 			mmu_spte_set(sptep, new_spte);
 		}
 	}
@@ -2232,8 +2251,6 @@ static int mmu_page_zap_pte(struct kvm *kvm, struct kvm_mmu_page *sp,
 	if (is_shadow_present_pte(pte)) {
 		if (is_last_spte(pte, sp->role.level)) {
 			drop_spte(kvm, spte);
-			if (is_large_pte(pte))
-				--kvm->stat.lpages;
 		} else {
 			child = to_shadow_page(pte & PT64_BASE_ADDR_MASK);
 			drop_parent_pte(child, spte);
@@ -2690,10 +2707,10 @@ static int mmu_set_spte(struct kvm_vcpu *vcpu, u64 *sptep,
 
 	pgprintk("%s: setting spte %llx\n", __func__, *sptep);
 	trace_kvm_mmu_set_spte(level, gfn, sptep);
-	if (!was_rmapped && is_large_pte(*sptep))
-		++vcpu->kvm->stat.lpages;
 
 	if (!was_rmapped) {
+		kvm_update_page_stats(vcpu->kvm, *sptep,
+			sptep_to_sp(sptep)->role.level, 1);
 		rmap_count = rmap_add(vcpu, sptep, gfn);
 		if (rmap_count > RMAP_RECYCLE_THRESHOLD)
 			rmap_recycle(vcpu, sptep, gfn);
@@ -5669,7 +5686,7 @@ restart:
 		if (sp->role.direct && !kvm_is_reserved_pfn(pfn) &&
 		    sp->role.level < kvm_mmu_max_mapping_level(kvm, slot, sp->gfn,
 							       pfn, PG_LEVEL_NUM)) {
-			pte_list_remove(rmap_head, sptep);
+			pte_list_remove(kvm, rmap_head, sptep);
 
 			if (kvm_available_flush_tlb_with_range())
 				kvm_flush_remote_tlbs_with_address(kvm, sp->gfn,
