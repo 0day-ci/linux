@@ -126,7 +126,8 @@ ITS Restore Sequence:
 The following ordering must be followed when restoring the GIC and the ITS:
 
 a) restore all guest memory and create vcpus
-b) restore all redistributors
+b) restore all redistributors:
+   make sure restore GICR_CTLR after GICR_PROPBASER and GICR_PENDBASER
 c) provide the ITS base address
    (KVM_DEV_ARM_VGIC_GRP_ADDR)
 d) restore the ITS in the following order:
