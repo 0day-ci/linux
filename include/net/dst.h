@@ -272,11 +272,13 @@ static inline void skb_dst_drop(struct sk_buff *skb)
 	if (skb->_skb_refdst) {
 		refdst_drop(skb->_skb_refdst);
 		skb->_skb_refdst = 0UL;
+		skb->has_dst = 0;
 	}
 }
 
 static inline void __skb_dst_copy(struct sk_buff *nskb, unsigned long refdst)
 {
+	nskb->has_dst = !!refdst;
 	nskb->_skb_refdst = refdst;
 	if (!(nskb->_skb_refdst & SKB_DST_NOREF))
 		dst_clone(skb_dst(nskb));
@@ -316,6 +318,7 @@ static inline bool skb_dst_force(struct sk_buff *skb)
 			dst = NULL;
 
 		skb->_skb_refdst = (unsigned long)dst;
+		skb->has_dst = !!dst;
 	}
 
 	return skb->_skb_refdst != 0UL;
