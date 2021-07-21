@@ -689,6 +689,8 @@ typedef unsigned char *sk_buff_data_t;
  *		CHECKSUM_UNNECESSARY (max 3)
  *	@dst_pending_confirm: need to confirm neighbour
  *	@decrypted: Decrypted SKB
+ *	@_state: bitmap reporting the presence of some skb state info
+ *	@has_nfct: @_state bit for nfct info
  *	@napi_id: id of the NAPI struct this skb came from
  *	@sender_cpu: (aka @napi_id) source CPU in XPS
  *	@secmark: security marking
@@ -765,9 +767,6 @@ struct sk_buff {
 #endif
 	};
 
-#if defined(CONFIG_NF_CONNTRACK) || defined(CONFIG_NF_CONNTRACK_MODULE)
-	unsigned long		 _nfct;
-#endif
 	unsigned int		len,
 				data_len;
 	__u16			mac_len,
@@ -870,6 +869,12 @@ struct sk_buff {
 #ifdef CONFIG_TLS_DEVICE
 	__u8			decrypted:1;
 #endif
+	union {
+		__u8		_state;		/* state of extended fields */
+		struct {
+			__u8	has_nfct:1;
+		};
+	};
 
 #ifdef CONFIG_NET_SCHED
 	__u16			tc_index;	/* traffic control index */
@@ -935,6 +940,9 @@ struct sk_buff {
 #ifdef CONFIG_SKB_EXTENSIONS
 	/* only useable after checking ->active_extensions != 0 */
 	struct skb_ext		*extensions;
+#endif
+#if defined(CONFIG_NF_CONNTRACK) || defined(CONFIG_NF_CONNTRACK_MODULE)
+	unsigned long		 _nfct;
 #endif
 };
 
@@ -4198,7 +4206,7 @@ static inline void skb_remcsum_process(struct sk_buff *skb, void *ptr,
 static inline struct nf_conntrack *skb_nfct(const struct sk_buff *skb)
 {
 #if IS_ENABLED(CONFIG_NF_CONNTRACK)
-	return (void *)(skb->_nfct & NFCT_PTRMASK);
+	return skb->has_nfct ? (void *)(skb->_nfct & NFCT_PTRMASK) : NULL;
 #else
 	return NULL;
 #endif
@@ -4207,7 +4215,7 @@ static inline struct nf_conntrack *skb_nfct(const struct sk_buff *skb)
 static inline unsigned long skb_get_nfct(const struct sk_buff *skb)
 {
 #if IS_ENABLED(CONFIG_NF_CONNTRACK)
-	return skb->_nfct;
+	return skb->has_nfct ? skb->_nfct : 0;
 #else
 	return 0UL;
 #endif
@@ -4216,6 +4224,7 @@ static inline unsigned long skb_get_nfct(const struct sk_buff *skb)
 static inline void skb_set_nfct(struct sk_buff *skb, unsigned long nfct)
 {
 #if IS_ENABLED(CONFIG_NF_CONNTRACK)
+	skb->has_nfct = !!nfct;
 	skb->_nfct = nfct;
 #endif
 }
