@@ -44,12 +44,9 @@ int rescale_process_scale(struct rescale *rescale, int scale_type,
 		*val2 = rescale->denominator;
 		return IIO_VAL_FRACTIONAL;
 	case IIO_VAL_FRACTIONAL_LOG2:
-		tmp = *val * 1000000000LL;
-		do_div(tmp, rescale->denominator);
-		tmp *= rescale->numerator;
-		do_div(tmp, 1000000000LL);
-		*val = tmp;
-		return scale_type;
+		*val = rescale->numerator * *val;
+		*val2 = rescale->denominator * (1 << *val2);
+		return IIO_VAL_FRACTIONAL;
 	case IIO_VAL_INT_PLUS_NANO:
 		tmp = ((s64)*val * 1000000000LL + *val2) * rescale->numerator;
 		tmp = div_s64(tmp, rescale->denominator);
