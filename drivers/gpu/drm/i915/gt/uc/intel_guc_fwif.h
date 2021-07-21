@@ -95,6 +95,7 @@
 #define GUC_CTL_WA			1
 #define GUC_CTL_FEATURE			2
 #define   GUC_CTL_DISABLE_SCHEDULER	(1 << 14)
+#define   GUC_CTL_ENABLE_SLPC		BIT(2)
 
 #define GUC_CTL_DEBUG			3
 #define   GUC_LOG_VERBOSITY_SHIFT	0
