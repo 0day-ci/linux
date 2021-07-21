@@ -140,10 +140,12 @@ static void sco_chan_del(struct sock *sk, int err)
 	BT_DBG("sk %p, conn %p, err %d", sk, conn, err);
 
 	if (conn) {
+		local_bh_disable();
 		sco_conn_lock(conn);
 		conn->sk = NULL;
 		sco_pi(sk)->conn = NULL;
 		sco_conn_unlock(conn);
+		local_bh_enable();
 
 		if (conn->hcon)
 			hci_conn_drop(conn->hcon);
@@ -167,16 +169,22 @@ static void sco_conn_del(struct hci_conn *hcon, int err)
 	BT_DBG("hcon %p conn %p, err %d", hcon, conn, err);
 
 	/* Kill socket */
+	local_bh_disable();
 	sco_conn_lock(conn);
 	sk = conn->sk;
 	sco_conn_unlock(conn);
+	local_bh_enable();
 
 	if (sk) {
 		sock_hold(sk);
+
+		local_bh_disable();
 		bh_lock_sock(sk);
 		sco_sock_clear_timer(sk);
 		sco_chan_del(sk, err);
 		bh_unlock_sock(sk);
+		local_bh_enable();
+
 		sco_sock_kill(sk);
 		sock_put(sk);
 	}
@@ -202,6 +210,7 @@ static int sco_chan_add(struct sco_conn *conn, struct sock *sk,
 {
 	int err = 0;
 
+	local_bh_disable();
 	sco_conn_lock(conn);
 	if (conn->sk)
 		err = -EBUSY;
@@ -209,6 +218,7 @@ static int sco_chan_add(struct sco_conn *conn, struct sock *sk,
 		__sco_chan_add(conn, sk, parent);
 
 	sco_conn_unlock(conn);
+	local_bh_enable();
 	return err;
 }
 
@@ -303,9 +313,11 @@ static void sco_recv_frame(struct sco_conn *conn, struct sk_buff *skb)
 {
 	struct sock *sk;
 
+	local_bh_disable();
 	sco_conn_lock(conn);
 	sk = conn->sk;
 	sco_conn_unlock(conn);
+	local_bh_enable();
 
 	if (!sk)
 		goto drop;
@@ -420,10 +432,12 @@ static void __sco_sock_close(struct sock *sk)
 		if (sco_pi(sk)->conn->hcon) {
 			sk->sk_state = BT_DISCONN;
 			sco_sock_set_timer(sk, SCO_DISCONN_TIMEOUT);
+			local_bh_disable();
 			sco_conn_lock(sco_pi(sk)->conn);
 			hci_conn_drop(sco_pi(sk)->conn->hcon);
 			sco_pi(sk)->conn->hcon = NULL;
 			sco_conn_unlock(sco_pi(sk)->conn);
+			local_bh_enable();
 		} else
 			sco_chan_del(sk, ECONNRESET);
 		break;
@@ -1084,21 +1098,26 @@ static void sco_conn_ready(struct sco_conn *conn)
 
 	if (sk) {
 		sco_sock_clear_timer(sk);
+		local_bh_disable();
 		bh_lock_sock(sk);
 		sk->sk_state = BT_CONNECTED;
 		sk->sk_state_change(sk);
 		bh_unlock_sock(sk);
+		local_bh_enable();
 	} else {
+		local_bh_disable();
 		sco_conn_lock(conn);
 
 		if (!conn->hcon) {
 			sco_conn_unlock(conn);
+			local_bh_enable();
 			return;
 		}
 
 		parent = sco_get_sock_listen(&conn->hcon->src);
 		if (!parent) {
 			sco_conn_unlock(conn);
+			local_bh_enable();
 			return;
 		}
 
@@ -1109,6 +1128,7 @@ static void sco_conn_ready(struct sco_conn *conn)
 		if (!sk) {
 			bh_unlock_sock(parent);
 			sco_conn_unlock(conn);
+			local_bh_enable();
 			return;
 		}
 
@@ -1131,6 +1151,7 @@ static void sco_conn_ready(struct sco_conn *conn)
 		bh_unlock_sock(parent);
 
 		sco_conn_unlock(conn);
+		local_bh_enable();
 	}
 }
 
