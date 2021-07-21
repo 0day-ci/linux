@@ -976,8 +976,7 @@ int c4iw_destroy_cq(struct ib_cq *ib_cq, struct ib_udata *udata)
 	chp = to_c4iw_cq(ib_cq);
 
 	xa_erase_irq(&chp->rhp->cqs, chp->cq.cqid);
-	refcount_dec(&chp->refcnt);
-	wait_event(chp->wait, !refcount_read(&chp->refcnt));
+	wait_event(chp->wait, refcount_dec_if_one(&chp->refcnt));
 
 	ucontext = rdma_udata_to_drv_context(udata, struct c4iw_ucontext,
 					     ibucontext);
