@@ -632,7 +632,7 @@ struct bfq_data {
 	u64 tot_sectors_dispatched;
 	/* max rq size seen during current observation interval (sectors) */
 	u32 last_rq_max_size;
-	/* time elapsed from first dispatch in current observ. interval (us) */
+	/* time elapsed from first dispatch in current observ. interval (ns) */
 	u64 delta_from_first;
 	/*
 	 * Current estimate of the device peak rate, measured in
