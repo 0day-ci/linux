@@ -408,6 +408,21 @@ static netdev_tx_t peak_usb_ndo_start_xmit(struct sk_buff *skb,
 	return NETDEV_TX_OK;
 }
 
+static int peak_usb_ndo_get_phys_port_name(struct net_device *netdev,
+					   char *name, size_t len)
+{
+	const struct peak_usb_device *dev = netdev_priv(netdev);
+	int err;
+
+	err = snprintf(name, len, "%u", dev->device_number);
+
+	if (err >= len || err <= 0) {
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
 /*
  * start the CAN interface.
  * Rx and Tx urbs are allocated here. Rx urbs are submitted here.
@@ -769,6 +784,7 @@ static const struct net_device_ops peak_usb_netdev_ops = {
 	.ndo_stop = peak_usb_ndo_stop,
 	.ndo_start_xmit = peak_usb_ndo_start_xmit,
 	.ndo_change_mtu = can_change_mtu,
+	.ndo_get_phys_port_name = peak_usb_ndo_get_phys_port_name,
 };
 
 /*
