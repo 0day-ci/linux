@@ -1282,16 +1282,14 @@ static void blkdev_put_whole(struct block_device *bdev, fmode_t mode)
 static int blkdev_get_part(struct block_device *part, fmode_t mode)
 {
 	struct gendisk *disk = part->bd_disk;
-	struct block_device *whole;
 	int ret;
 
 	if (part->bd_openers)
 		goto done;
 
-	whole = bdgrab(disk->part0);
-	ret = blkdev_get_whole(whole, mode);
+	ret = blkdev_get_whole(bdev_whole(part), mode);
 	if (ret)
-		goto out_put_whole;
+		return ret;
 
 	ret = -ENXIO;
 	if (!bdev_nr_sectors(part))
@@ -1306,9 +1304,7 @@ done:
 	return 0;
 
 out_blkdev_put:
-	blkdev_put_whole(whole, mode);
-out_put_whole:
-	bdput(whole);
+	blkdev_put_whole(bdev_whole(part), mode);
 	return ret;
 }
 
@@ -1321,7 +1317,6 @@ static void blkdev_put_part(struct block_device *part, fmode_t mode)
 	blkdev_flush_mapping(part);
 	whole->bd_disk->open_partitions--;
 	blkdev_put_whole(whole, mode);
-	bdput(whole);
 }
 
 struct block_device *blkdev_get_no_open(dev_t dev)
