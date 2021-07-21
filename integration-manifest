@@ -1,0 +1,28 @@
+drm drm-fixes 2734d6c1b1a089fb593ef6a23d4b70903526fe0c
+	Linux 5.14-rc2
+drm-misc drm-misc-fixes 235c3610d5f02ee91244239b43cd9ae8b4859dff
+	drm/ttm: Force re-init if ttm_global_init() fails
+drm-intel drm-intel-fixes 3761baae908a7b5012be08d70fa553cc2eb82305
+	Revert "drm/i915: Propagate errors on awaiting already signaled fences"
+drm drm-next 588b3eee528873d73bf777f329d35b2e65e24777
+	Merge tag 'drm-misc-next-2021-07-16' of git://anongit.freedesktop.org/drm/drm-misc into drm-next
+drm-misc drm-misc-next-fixes 85fd4a8a84316166640102676a356755ddec80e0
+	drm/ttm: Fix COW check
+drm-intel drm-intel-next-fixes 21c355b09711e95f8f0e7c1890b343c6cd350042
+	Merge tag 'drm-misc-next-fixes-2021-07-01' of git://anongit.freedesktop.org/drm/drm-misc into drm-next
+drm-misc drm-misc-next bf44e8cecc03c9c6197c0b65d54703746a62fb35
+	vgaarb: don't pass a cookie to vga_client_register
+drm-intel drm-intel-next 76e50ea054ae2369040494208a4099eee70cc5c3
+	drm/i915/display: Fix shared dpll mismatch for bigjoiner slave
+drm-intel drm-intel-gt-next aef7b67a79564f6cff488aff7f4b89438ca80b23
+	drm/i915/uapi: convert drm_i915_gem_userptr to kernel doc
+sound-upstream for-linus 7cf3dead1ad70c72edb03e2d98e1f3dcd332cdb2
+	Linux 5.13
+sound-upstream for-next 7cf3dead1ad70c72edb03e2d98e1f3dcd332cdb2
+	Linux 5.13
+drm-intel topic/core-for-CI fae352efb12196e7110f98bc1297ce533472764d
+	drm/i915: allow DG1 autoprobe for CONFIG_BROKEN
+drm topic/nouveau-ampere-modeset 584265dfec70e78ce2085b82ed389f27e06fbca0
+	Merge branch '04.01-ampere-lite' of git://github.com/skeggsb/linux into topic/nouveau-ampere-modeset
+drm-misc topic/i915-ttm cf3e3e86d77970211e0983130e896ae242601003
+	drm/i915: Use ttm mmap handling for ttm bo's.
