@@ -59,8 +59,13 @@ static const struct ath11k_hw_params ath11k_hw_params[] = {
 		.vdev_start_delay = false,
 		.htt_peer_map_v2 = true,
 		.tcl_0_only = false,
-		.spectral_fft_sz = 2,
-
+		.spectral = {
+			.fft_sz = 2,
+			/* HW bug, expected BIN size is 2 bytes but HW report as 4 bytes.
+			 * so added pad size as 2 bytes to compensate the BIN size
+			 */
+			.fft_pad_sz = 2,
+		},
 		.interface_modes = BIT(NL80211_IFTYPE_STATION) |
 					BIT(NL80211_IFTYPE_AP) |
 					BIT(NL80211_IFTYPE_MESH_POINT),
@@ -100,8 +105,10 @@ static const struct ath11k_hw_params ath11k_hw_params[] = {
 		.vdev_start_delay = false,
 		.htt_peer_map_v2 = true,
 		.tcl_0_only = false,
-		.spectral_fft_sz = 4,
-
+		.spectral = {
+			.fft_sz = 4,
+			.fft_pad_sz = 0,
+		},
 		.interface_modes = BIT(NL80211_IFTYPE_STATION) |
 					BIT(NL80211_IFTYPE_AP) |
 					BIT(NL80211_IFTYPE_MESH_POINT),
@@ -141,8 +148,10 @@ static const struct ath11k_hw_params ath11k_hw_params[] = {
 		.vdev_start_delay = true,
 		.htt_peer_map_v2 = false,
 		.tcl_0_only = true,
-		.spectral_fft_sz = 0,
-
+		.spectral = {
+			.fft_sz = 0,
+			.fft_pad_sz = 0,
+		},
 		.interface_modes = BIT(NL80211_IFTYPE_STATION) |
 					BIT(NL80211_IFTYPE_AP),
 		.supports_monitor = false,
@@ -219,8 +228,10 @@ static const struct ath11k_hw_params ath11k_hw_params[] = {
 		.vdev_start_delay = true,
 		.htt_peer_map_v2 = false,
 		.tcl_0_only = true,
-		.spectral_fft_sz = 0,
-
+		.spectral = {
+			.fft_sz = 0,
+			.fft_pad_sz = 0,
+		},
 		.interface_modes = BIT(NL80211_IFTYPE_STATION) |
 					BIT(NL80211_IFTYPE_AP),
 		.supports_monitor = false,
