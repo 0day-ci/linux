@@ -897,8 +897,6 @@ struct sk_buff {
 	__u32			priority;
 	int			skb_iif;
 	__u32			hash;
-	__be16			vlan_proto;
-	__u16			vlan_tci;
 #if defined(CONFIG_NET_RX_BUSY_POLL) || defined(CONFIG_XPS)
 	union {
 		unsigned int	napi_id;
@@ -954,6 +952,14 @@ struct sk_buff {
 			__u16	inner_mac_header;
 		};
 		__u64		inner_headers;
+	};
+
+	union {
+		struct {
+			__be16	vlan_proto;
+			__u16	vlan_tci;
+		};
+		__u32		vlan_info;
 	};
 };
 

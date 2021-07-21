@@ -1007,6 +1007,8 @@ static void __copy_skb_header(struct sk_buff *new, const struct sk_buff *old)
 	__skb_ext_copy(new, old);
 	__nf_copy(new, old, false);
 	__skb_copy_inner_headers(new, old);
+	if (old->vlan_present)
+		new->vlan_info = old->vlan_info;
 
 	/* Note : this field could be in headers_start/headers_end section
 	 * It is not yet because we do not want to have a 16 bit hole
@@ -1018,13 +1020,12 @@ static void __copy_skb_header(struct sk_buff *new, const struct sk_buff *old)
 	       offsetof(struct sk_buff, headers_start));
 	CHECK_SKB_FIELD(_state);
 	CHECK_SKB_FIELD(__pkt_encapsulation_offset);
+	CHECK_SKB_FIELD(__pkt_vlan_present_offset);
 	CHECK_SKB_FIELD(protocol);
 	CHECK_SKB_FIELD(csum);
 	CHECK_SKB_FIELD(hash);
 	CHECK_SKB_FIELD(priority);
 	CHECK_SKB_FIELD(skb_iif);
-	CHECK_SKB_FIELD(vlan_proto);
-	CHECK_SKB_FIELD(vlan_tci);
 	CHECK_SKB_FIELD(transport_header);
 	CHECK_SKB_FIELD(network_header);
 	CHECK_SKB_FIELD(mac_header);
