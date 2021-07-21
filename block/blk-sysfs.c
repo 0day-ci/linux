@@ -899,9 +899,21 @@ int blk_register_queue(struct gendisk *disk)
 	}
 
 	mutex_lock(&q->sysfs_lock);
+
+	ret = blk_register_cranges(disk, NULL);
+	if (ret) {
+		mutex_unlock(&q->sysfs_lock);
+		mutex_unlock(&q->sysfs_dir_lock);
+		kobject_del(&q->kobj);
+		blk_trace_remove_sysfs(dev);
+		kobject_put(&dev->kobj);
+		return ret;
+	}
+
 	if (q->elevator) {
 		ret = elv_register_queue(q, false);
 		if (ret) {
+			blk_unregister_cranges(disk);
 			mutex_unlock(&q->sysfs_lock);
 			mutex_unlock(&q->sysfs_dir_lock);
 			kobject_del(&q->kobj);
@@ -985,6 +997,7 @@ void blk_unregister_queue(struct gendisk *disk)
 	mutex_lock(&q->sysfs_lock);
 	if (q->elevator)
 		elv_unregister_queue(q);
+	blk_unregister_cranges(disk);
 	mutex_unlock(&q->sysfs_lock);
 	mutex_unlock(&q->sysfs_dir_lock);
 

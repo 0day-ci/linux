@@ -368,4 +368,7 @@ extern struct device_attribute dev_attr_events;
 extern struct device_attribute dev_attr_events_async;
 extern struct device_attribute dev_attr_events_poll_msecs;
 
+int blk_register_cranges(struct gendisk *disk, struct blk_cranges *new_cranges);
+void blk_unregister_cranges(struct gendisk *disk);
+
 #endif /* BLK_INTERNAL_H */
