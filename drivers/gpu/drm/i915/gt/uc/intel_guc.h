@@ -59,6 +59,8 @@ struct intel_guc {
 
 	bool submission_supported;
 	bool submission_selected;
+	bool rc_supported;
+	bool rc_selected;
 	bool slpc_supported;
 	bool slpc_selected;
 
