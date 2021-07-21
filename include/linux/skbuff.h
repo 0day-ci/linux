@@ -822,6 +822,9 @@ struct sk_buff {
 	__u8			ip_summed:2;
 	__u8			ooo_okay:1;
 
+	/* private: */
+	__u8			__pkt_encapsulation_offset[0];
+	/* public: */
 	__u8			l4_hash:1;
 	__u8			sw_hash:1;
 	__u8			wifi_acked_valid:1;
@@ -911,15 +914,6 @@ struct sk_buff {
 		__u32		reserved_tailroom;
 	};
 
-	union {
-		__be16		inner_protocol;
-		__u8		inner_ipproto;
-	};
-
-	__u16			inner_transport_header;
-	__u16			inner_network_header;
-	__u16			inner_mac_header;
-
 	__be16			protocol;
 	__u16			transport_header;
 	__u16			network_header;
@@ -948,6 +942,19 @@ struct sk_buff {
 #if defined(CONFIG_NF_CONNTRACK) || defined(CONFIG_NF_CONNTRACK_MODULE)
 	unsigned long		 _nfct;
 #endif
+	union {
+		struct {
+			union {
+			__be16	inner_protocol;
+			__u8	inner_ipproto;
+			};
+
+			__u16	inner_transport_header;
+			__u16	inner_network_header;
+			__u16	inner_mac_header;
+		};
+		__u64		inner_headers;
+	};
 };
 
 #ifdef __KERNEL__
@@ -2448,6 +2455,12 @@ static inline void skb_tailroom_reserve(struct sk_buff *skb, unsigned int mtu,
 
 #define ENCAP_TYPE_ETHER	0
 #define ENCAP_TYPE_IPPROTO	1
+
+static inline void __skb_copy_inner_headers(struct sk_buff *dst, const struct sk_buff *src)
+{
+	if (src->encapsulation)
+		dst->inner_headers = src->inner_headers;
+}
 
 static inline void skb_set_inner_protocol(struct sk_buff *skb,
 					  __be16 protocol)
