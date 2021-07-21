@@ -3153,10 +3153,12 @@ struct bio *btrfs_io_bio_alloc(unsigned int nr_iovecs)
 	return bio;
 }
 
-struct bio *btrfs_bio_clone_partial(struct bio *orig, int offset, int size)
+struct bio *btrfs_bio_clone_partial(struct bio *orig, u64 offset, u64 size)
 {
 	struct bio *bio;
 	struct btrfs_io_bio *btrfs_bio;
+
+	ASSERT(offset <= UINT_MAX && size <= UINT_MAX);
 
 	/* this will never fail when it's backed by a bioset */
 	bio = bio_clone_fast(orig, GFP_NOFS, &btrfs_bioset);
@@ -3165,7 +3167,7 @@ struct bio *btrfs_bio_clone_partial(struct bio *orig, int offset, int size)
 	btrfs_bio = btrfs_io_bio(bio);
 	btrfs_io_bio_init(btrfs_bio);
 
-	bio_trim(bio, offset >> 9, size >> 9);
+	bio_trim(bio, (sector_t)offset >> 9, (sector_t)size >> 9);
 	btrfs_bio->iter = bio->bi_iter;
 	return bio;
 }
