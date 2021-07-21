@@ -691,6 +691,7 @@ typedef unsigned char *sk_buff_data_t;
  *	@_state: bitmap reporting the presence of some skb state info
  *	@has_nfct: @_state bit for nfct info
  *	@has_dst: @_state bit for dst pointer
+ *	@has_sk: @_state bit for sk pointer, only relevant at GRO time
  *	@active_extensions: @_state bits for active extensions (skb_ext_id types)
  *	@napi_id: id of the NAPI struct this skb came from
  *	@sender_cpu: (aka @napi_id) source CPU in XPS
@@ -872,6 +873,7 @@ struct sk_buff {
 		struct {
 			__u8	has_nfct:1;
 			__u8	has_dst:1;
+			__u8	has_sk:1;
 #ifdef CONFIG_SKB_EXTENSIONS
 			__u8	active_extensions:5;
 #endif
