@@ -1362,20 +1362,16 @@ void btrfs_rewrite_logical_zoned(struct btrfs_ordered_extent *ordered)
 	struct extent_map_tree *em_tree;
 	struct extent_map *em;
 	struct btrfs_ordered_sum *sum;
-	struct block_device *bdev;
 	u64 orig_logical = ordered->disk_bytenr;
 	u64 *logical = NULL;
 	int nr, stripe_len;
 
 	/* Zoned devices should not have partitions. So, we can assume it is 0 */
 	ASSERT(ordered->partno == 0);
-	bdev = bdgrab(ordered->disk->part0);
-	if (WARN_ON(!bdev))
-		return;
 
-	if (WARN_ON(btrfs_rmap_block(fs_info, orig_logical, bdev,
-				     ordered->physical, &logical, &nr,
-				     &stripe_len)))
+	if (WARN_ON(btrfs_rmap_block(fs_info, orig_logical,
+			ordered->disk->part0, ordered->physical, &logical,
+			&nr, &stripe_len)))
 		goto out;
 
 	WARN_ON(nr != 1);
@@ -1402,7 +1398,6 @@ void btrfs_rewrite_logical_zoned(struct btrfs_ordered_extent *ordered)
 
 out:
 	kfree(logical);
-	bdput(bdev);
 }
 
 bool btrfs_check_meta_write_pointer(struct btrfs_fs_info *fs_info,
