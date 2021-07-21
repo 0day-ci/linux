@@ -41,6 +41,20 @@ int rescale_process_scale(struct rescale *rescale, int scale_type,
 		do_div(tmp, 1000000000LL);
 		*val = tmp;
 		return scale_type;
+	case IIO_VAL_INT_PLUS_NANO:
+		tmp = ((s64)*val * 1000000000LL + *val2) * rescale->numerator;
+		tmp = div_s64(tmp, rescale->denominator);
+
+		*val = div_s64(tmp, 1000000000LL);
+		*val2 = tmp - *val * 1000000000LL;
+		return scale_type;
+	case IIO_VAL_INT_PLUS_MICRO:
+		tmp = ((s64)*val * 1000000LL + *val2) * rescale->numerator;
+		tmp = div_s64(tmp, rescale->denominator);
+
+		*val = div_s64(tmp, 1000000);
+		*val2 = tmp - *val * 1000000;
+		return scale_type;
 	default:
 		return -EOPNOTSUPP;
 	}
