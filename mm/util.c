@@ -618,6 +618,13 @@ void *kvmalloc_node(size_t size, gfp_t flags, int node)
 	if (ret || size <= PAGE_SIZE)
 		return ret;
 
+	/*
+	 * Succeeding for sizes above 2GiB can lead to truncation if
+	 * someone casts the size to an int.
+	 */
+	if (size > INT_MAX)
+		return NULL;
+
 	return __vmalloc_node(size, 1, flags, node,
 			__builtin_return_address(0));
 }
