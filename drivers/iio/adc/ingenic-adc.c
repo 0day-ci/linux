@@ -632,7 +632,7 @@ static int ingenic_adc_read_chan_info_raw(struct iio_dev *iio_dev,
 					  struct iio_chan_spec const *chan,
 					  int *val)
 {
-	int bit, ret, engine = (chan->channel == INGENIC_ADC_BATTERY);
+	int cmd, ret, engine = (chan->channel == INGENIC_ADC_BATTERY);
 	struct ingenic_adc *adc = iio_priv(iio_dev);
 
 	ret = clk_enable(adc->clk);
@@ -642,11 +642,22 @@ static int ingenic_adc_read_chan_info_raw(struct iio_dev *iio_dev,
 		return ret;
 	}
 
-	/* We cannot sample AUX/AUX2 in parallel. */
+	/* We cannot sample the aux channels in parallel. */
 	mutex_lock(&adc->aux_lock);
 	if (adc->soc_data->has_aux_md && engine == 0) {
-		bit = BIT(chan->channel == INGENIC_ADC_AUX2);
-		ingenic_adc_set_config(adc, JZ_ADC_REG_CFG_AUX_MD, bit);
+		switch (chan->channel) {
+		case INGENIC_ADC_AUX0:
+			cmd = 0;
+			break;
+		case INGENIC_ADC_AUX:
+			cmd = 1;
+			break;
+		case INGENIC_ADC_AUX2:
+			cmd = 2;
+			break;
+		}
+             
+		ingenic_adc_set_config(adc, JZ_ADC_REG_CFG_AUX_MD, cmd);
 	}
 
 	ret = ingenic_adc_capture(adc, engine);
@@ -654,6 +665,7 @@ static int ingenic_adc_read_chan_info_raw(struct iio_dev *iio_dev,
 		goto out;
 
 	switch (chan->channel) {
+	case INGENIC_ADC_AUX0:
 	case INGENIC_ADC_AUX:
 	case INGENIC_ADC_AUX2:
 		*val = readw(adc->base + JZ_ADC_REG_ADSDAT);
