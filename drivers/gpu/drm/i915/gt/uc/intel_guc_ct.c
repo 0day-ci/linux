@@ -73,6 +73,7 @@ static inline struct drm_device *ct_to_drm(struct intel_guc_ct *ct)
 #define CTB_DESC_SIZE		ALIGN(sizeof(struct guc_ct_buffer_desc), SZ_2K)
 #define CTB_H2G_BUFFER_SIZE	(SZ_4K)
 #define CTB_G2H_BUFFER_SIZE	(4 * CTB_H2G_BUFFER_SIZE)
+#define G2H_ROOM_BUFFER_SIZE	(CTB_G2H_BUFFER_SIZE / 4)
 
 struct ct_request {
 	struct list_head link;
@@ -108,6 +109,7 @@ void intel_guc_ct_init_early(struct intel_guc_ct *ct)
 	INIT_LIST_HEAD(&ct->requests.incoming);
 	INIT_WORK(&ct->requests.worker, ct_incoming_request_worker_func);
 	tasklet_setup(&ct->receive_tasklet, ct_receive_tasklet_func);
+	init_waitqueue_head(&ct->wq);
 }
 
 static inline const char *guc_ct_buffer_type_to_str(u32 type)
@@ -129,23 +131,27 @@ static void guc_ct_buffer_desc_init(struct guc_ct_buffer_desc *desc)
 
 static void guc_ct_buffer_reset(struct intel_guc_ct_buffer *ctb)
 {
+	u32 space;
+
 	ctb->broken = false;
 	ctb->tail = 0;
 	ctb->head = 0;
-	ctb->space = CIRC_SPACE(ctb->tail, ctb->head, ctb->size);
+	space = CIRC_SPACE(ctb->tail, ctb->head, ctb->size) - ctb->resv_space;
+	atomic_set(&ctb->space, space);
 
 	guc_ct_buffer_desc_init(ctb->desc);
 }
 
 static void guc_ct_buffer_init(struct intel_guc_ct_buffer *ctb,
 			       struct guc_ct_buffer_desc *desc,
-			       u32 *cmds, u32 size_in_bytes)
+			       u32 *cmds, u32 size_in_bytes, u32 resv_space)
 {
 	GEM_BUG_ON(size_in_bytes % 4);
 
 	ctb->desc = desc;
 	ctb->cmds = cmds;
 	ctb->size = size_in_bytes / 4;
+	ctb->resv_space = resv_space / 4;
 
 	guc_ct_buffer_reset(ctb);
 }
@@ -226,6 +232,7 @@ int intel_guc_ct_init(struct intel_guc_ct *ct)
 	struct guc_ct_buffer_desc *desc;
 	u32 blob_size;
 	u32 cmds_size;
+	u32 resv_space;
 	void *blob;
 	u32 *cmds;
 	int err;
@@ -250,19 +257,23 @@ int intel_guc_ct_init(struct intel_guc_ct *ct)
 	desc = blob;
 	cmds = blob + 2 * CTB_DESC_SIZE;
 	cmds_size = CTB_H2G_BUFFER_SIZE;
-	CT_DEBUG(ct, "%s desc %#tx cmds %#tx size %u\n", "send",
-		 ptrdiff(desc, blob), ptrdiff(cmds, blob), cmds_size);
+	resv_space = 0;
+	CT_DEBUG(ct, "%s desc %#tx cmds %#tx size %u/%u\n", "send",
+		 ptrdiff(desc, blob), ptrdiff(cmds, blob), cmds_size,
+		 resv_space);
 
-	guc_ct_buffer_init(&ct->ctbs.send, desc, cmds, cmds_size);
+	guc_ct_buffer_init(&ct->ctbs.send, desc, cmds, cmds_size, resv_space);
 
 	/* store pointers to desc and cmds for recv ctb */
 	desc = blob + CTB_DESC_SIZE;
 	cmds = blob + 2 * CTB_DESC_SIZE + CTB_H2G_BUFFER_SIZE;
 	cmds_size = CTB_G2H_BUFFER_SIZE;
-	CT_DEBUG(ct, "%s desc %#tx cmds %#tx size %u\n", "recv",
-		 ptrdiff(desc, blob), ptrdiff(cmds, blob), cmds_size);
+	resv_space = G2H_ROOM_BUFFER_SIZE;
+	CT_DEBUG(ct, "%s desc %#tx cmds %#tx size %u/%u\n", "recv",
+		 ptrdiff(desc, blob), ptrdiff(cmds, blob), cmds_size,
+		 resv_space);
 
-	guc_ct_buffer_init(&ct->ctbs.recv, desc, cmds, cmds_size);
+	guc_ct_buffer_init(&ct->ctbs.recv, desc, cmds, cmds_size, resv_space);
 
 	return 0;
 }
@@ -461,8 +472,8 @@ static int ct_write(struct intel_guc_ct *ct,
 
 	/* update local copies */
 	ctb->tail = tail;
-	GEM_BUG_ON(ctb->space < len + GUC_CTB_HDR_LEN);
-	ctb->space -= len + GUC_CTB_HDR_LEN;
+	GEM_BUG_ON(atomic_read(&ctb->space) < len + GUC_CTB_HDR_LEN);
+	atomic_sub(len + GUC_CTB_HDR_LEN, &ctb->space);
 
 	/* now update descriptor */
 	WRITE_ONCE(desc->tail, tail);
@@ -537,6 +548,32 @@ static inline bool ct_deadlocked(struct intel_guc_ct *ct)
 	return ret;
 }
 
+static inline bool g2h_has_room(struct intel_guc_ct *ct, u32 g2h_len_dw)
+{
+	struct intel_guc_ct_buffer *ctb = &ct->ctbs.recv;
+
+	/*
+	 * We leave a certain amount of space in the G2H CTB buffer for
+	 * unexpected G2H CTBs (e.g. logging, engine hang, etc...)
+	 */
+	return !g2h_len_dw || atomic_read(&ctb->space) >= g2h_len_dw;
+}
+
+static inline void g2h_reserve_space(struct intel_guc_ct *ct, u32 g2h_len_dw)
+{
+	lockdep_assert_held(&ct->ctbs.send.lock);
+
+	GEM_BUG_ON(!g2h_has_room(ct, g2h_len_dw));
+
+	if (g2h_len_dw)
+		atomic_sub(g2h_len_dw, &ct->ctbs.recv.space);
+}
+
+static inline void g2h_release_space(struct intel_guc_ct *ct, u32 g2h_len_dw)
+{
+	atomic_add(g2h_len_dw, &ct->ctbs.recv.space);
+}
+
 static inline bool h2g_has_room(struct intel_guc_ct *ct, u32 len_dw)
 {
 	struct intel_guc_ct_buffer *ctb = &ct->ctbs.send;
@@ -544,7 +581,7 @@ static inline bool h2g_has_room(struct intel_guc_ct *ct, u32 len_dw)
 	u32 head;
 	u32 space;
 
-	if (ctb->space >= len_dw)
+	if (atomic_read(&ctb->space) >= len_dw)
 		return true;
 
 	head = READ_ONCE(desc->head);
@@ -557,16 +594,16 @@ static inline bool h2g_has_room(struct intel_guc_ct *ct, u32 len_dw)
 	}
 
 	space = CIRC_SPACE(ctb->tail, head, ctb->size);
-	ctb->space = space;
+	atomic_set(&ctb->space, space);
 
 	return space >= len_dw;
 }
 
-static int has_room_nb(struct intel_guc_ct *ct, u32 len_dw)
+static int has_room_nb(struct intel_guc_ct *ct, u32 h2g_dw, u32 g2h_dw)
 {
 	lockdep_assert_held(&ct->ctbs.send.lock);
 
-	if (unlikely(!h2g_has_room(ct, len_dw))) {
+	if (unlikely(!h2g_has_room(ct, h2g_dw) || !g2h_has_room(ct, g2h_dw))) {
 		if (ct->stall_time == KTIME_MAX)
 			ct->stall_time = ktime_get();
 
@@ -580,6 +617,10 @@ static int has_room_nb(struct intel_guc_ct *ct, u32 len_dw)
 	return 0;
 }
 
+#define G2H_LEN_DW(f) ({ typeof (f) f_ = (f); \
+	 FIELD_GET(INTEL_GUC_CT_SEND_G2H_DW_MASK, f_) ? \
+	 FIELD_GET(INTEL_GUC_CT_SEND_G2H_DW_MASK, f_) + \
+	 GUC_CTB_HXG_MSG_MIN_LEN : 0; })
 static int ct_send_nb(struct intel_guc_ct *ct,
 		      const u32 *action,
 		      u32 len,
@@ -587,12 +628,13 @@ static int ct_send_nb(struct intel_guc_ct *ct,
 {
 	struct intel_guc_ct_buffer *ctb = &ct->ctbs.send;
 	unsigned long spin_flags;
+	u32 g2h_len_dw = G2H_LEN_DW(flags);
 	u32 fence;
 	int ret;
 
 	spin_lock_irqsave(&ctb->lock, spin_flags);
 
-	ret = has_room_nb(ct, len + GUC_CTB_HDR_LEN);
+	ret = has_room_nb(ct, len + GUC_CTB_HDR_LEN, g2h_len_dw);
 	if (unlikely(ret))
 		goto out;
 
@@ -601,6 +643,7 @@ static int ct_send_nb(struct intel_guc_ct *ct,
 	if (unlikely(ret))
 		goto out;
 
+	g2h_reserve_space(ct, g2h_len_dw);
 	intel_guc_notify(ct_to_guc(ct));
 
 out:
@@ -632,11 +675,13 @@ static int ct_send(struct intel_guc_ct *ct,
 	/*
 	 * We use a lazy spin wait loop here as we believe that if the CT
 	 * buffers are sized correctly the flow control condition should be
-	 * rare.
+	 * rare. Reserving the maximum size in the G2H credits as we don't know
+	 * how big the response is going to be.
 	 */
 retry:
 	spin_lock_irqsave(&ctb->lock, flags);
-	if (unlikely(!h2g_has_room(ct, len + GUC_CTB_HDR_LEN))) {
+	if (unlikely(!h2g_has_room(ct, len + GUC_CTB_HDR_LEN) ||
+		     !g2h_has_room(ct, GUC_CTB_HXG_MSG_MAX_LEN))) {
 		if (ct->stall_time == KTIME_MAX)
 			ct->stall_time = ktime_get();
 		spin_unlock_irqrestore(&ctb->lock, flags);
@@ -664,6 +709,7 @@ retry:
 	spin_unlock(&ct->requests.lock);
 
 	err = ct_write(ct, action, len, fence, 0);
+	g2h_reserve_space(ct, GUC_CTB_HXG_MSG_MAX_LEN);
 
 	spin_unlock_irqrestore(&ctb->lock, flags);
 
@@ -673,6 +719,7 @@ retry:
 	intel_guc_notify(ct_to_guc(ct));
 
 	err = wait_for_ct_request_update(&request, status);
+	g2h_release_space(ct, GUC_CTB_HXG_MSG_MAX_LEN);
 	if (unlikely(err))
 		goto unlink;
 
@@ -711,7 +758,10 @@ int intel_guc_ct_send(struct intel_guc_ct *ct, const u32 *action, u32 len,
 	int ret;
 
 	if (unlikely(!ct->enabled)) {
-		WARN(1, "Unexpected send: action=%#x\n", *action);
+		struct intel_guc *guc = ct_to_guc(ct);
+		struct intel_uc *uc = container_of(guc, struct intel_uc, guc);
+
+		WARN(!uc->reset_in_progress, "Unexpected send: action=%#x\n", *action);
 		return -ENODEV;
 	}
 
@@ -928,6 +978,19 @@ static int ct_process_request(struct intel_guc_ct *ct, struct ct_incoming_msg *r
 	case INTEL_GUC_ACTION_DEFAULT:
 		ret = intel_guc_to_host_process_recv_msg(guc, payload, len);
 		break;
+	case INTEL_GUC_ACTION_DEREGISTER_CONTEXT_DONE:
+		ret = intel_guc_deregister_done_process_msg(guc, payload,
+							    len);
+		break;
+	case INTEL_GUC_ACTION_SCHED_CONTEXT_MODE_DONE:
+		ret = intel_guc_sched_done_process_msg(guc, payload, len);
+		break;
+	case INTEL_GUC_ACTION_CONTEXT_RESET_NOTIFICATION:
+		ret = intel_guc_context_reset_process_msg(guc, payload, len);
+		break;
+	case INTEL_GUC_ACTION_ENGINE_FAILURE_NOTIFICATION:
+		ret = intel_guc_engine_failure_process_msg(guc, payload, len);
+		break;
 	default:
 		ret = -EOPNOTSUPP;
 		break;
@@ -985,9 +1048,21 @@ static void ct_incoming_request_worker_func(struct work_struct *w)
 static int ct_handle_event(struct intel_guc_ct *ct, struct ct_incoming_msg *request)
 {
 	const u32 *hxg = &request->msg[GUC_CTB_MSG_MIN_LEN];
+	u32 action = FIELD_GET(GUC_HXG_EVENT_MSG_0_ACTION, hxg[0]);
 	unsigned long flags;
 
 	GEM_BUG_ON(FIELD_GET(GUC_HXG_MSG_0_TYPE, hxg[0]) != GUC_HXG_TYPE_EVENT);
+
+	/*
+	 * Adjusting the space must be done in IRQ or deadlock can occur as the
+	 * CTB processing in the below workqueue can send CTBs which creates a
+	 * circular dependency if the space was returned there.
+	 */
+	switch (action) {
+	case INTEL_GUC_ACTION_SCHED_CONTEXT_MODE_DONE:
+	case INTEL_GUC_ACTION_DEREGISTER_CONTEXT_DONE:
+		g2h_release_space(ct, request->size);
+	}
 
 	spin_lock_irqsave(&ct->requests.lock, flags);
 	list_add_tail(&request->link, &ct->requests.incoming);
@@ -1105,4 +1180,26 @@ void intel_guc_ct_event_handler(struct intel_guc_ct *ct)
 	}
 
 	ct_try_receive_message(ct);
+}
+
+void intel_guc_ct_print_info(struct intel_guc_ct *ct,
+			     struct drm_printer *p)
+{
+	drm_printf(p, "CT %s\n", enableddisabled(ct->enabled));
+
+	if (!ct->enabled)
+		return;
+
+	drm_printf(p, "H2G Space: %u\n",
+		   atomic_read(&ct->ctbs.send.space) * 4);
+	drm_printf(p, "Head: %u\n",
+		   ct->ctbs.send.desc->head);
+	drm_printf(p, "Tail: %u\n",
+		   ct->ctbs.send.desc->tail);
+	drm_printf(p, "G2H Space: %u\n",
+		   atomic_read(&ct->ctbs.recv.space) * 4);
+	drm_printf(p, "Head: %u\n",
+		   ct->ctbs.recv.desc->head);
+	drm_printf(p, "Tail: %u\n",
+		   ct->ctbs.recv.desc->tail);
 }
