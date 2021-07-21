@@ -870,10 +870,11 @@ static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
 
 	if (type != IOMMU_DOMAIN_UNMANAGED &&
 	    type != IOMMU_DOMAIN_DMA &&
+	    type != IOMMU_DOMAIN_DMA_FQ &&
 	    type != IOMMU_DOMAIN_IDENTITY)
 		return NULL;
 
-	if (type == IOMMU_DOMAIN_DMA && using_legacy_binding)
+	if ((type & __IOMMU_DOMAIN_DMA_API) && using_legacy_binding)
 		return NULL;
 	/*
 	 * Allocate the domain and initialise some of its data structures.
