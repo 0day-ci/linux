@@ -37,6 +37,11 @@
  *
  * For enumeration and bitmask properties this structure stores the symbolic
  * decoding for each value. This is used for example for the rotation property.
+ *
+ * If the property has the type &DRM_MODE_PROP_BITMASK, @value stores a
+ * bitshift, not a bitmask. In other words, the enum entry is enabled if the
+ * bit number @value is set in the property's value. This enum entry has the
+ * bitmask ``1 << value``.
  */
 struct drm_property_enum {
 	uint64_t value;
