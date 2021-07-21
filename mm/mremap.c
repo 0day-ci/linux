@@ -708,8 +708,7 @@ static unsigned long move_vma(struct vm_area_struct *vma,
 }
 
 static struct vm_area_struct *vma_to_resize(unsigned long addr,
-	unsigned long old_len, unsigned long new_len, unsigned long flags,
-	unsigned long *p)
+	unsigned long old_len, unsigned long new_len, unsigned long flags)
 {
 	struct mm_struct *mm = current->mm;
 	struct vm_area_struct *vma;
@@ -768,13 +767,6 @@ static struct vm_area_struct *vma_to_resize(unsigned long addr,
 				(new_len - old_len) >> PAGE_SHIFT))
 		return ERR_PTR(-ENOMEM);
 
-	if (vma->vm_flags & VM_ACCOUNT) {
-		unsigned long charged = (new_len - old_len) >> PAGE_SHIFT;
-		if (security_vm_enough_memory_mm(mm, charged))
-			return ERR_PTR(-ENOMEM);
-		*p = charged;
-	}
-
 	return vma;
 }
 
@@ -787,7 +779,6 @@ static unsigned long mremap_to(unsigned long addr, unsigned long old_len,
 	struct mm_struct *mm = current->mm;
 	struct vm_area_struct *vma;
 	unsigned long ret = -EINVAL;
-	unsigned long charged = 0;
 	unsigned long map_flags = 0;
 
 	if (offset_in_page(new_addr))
@@ -830,7 +821,7 @@ static unsigned long mremap_to(unsigned long addr, unsigned long old_len,
 		old_len = new_len;
 	}
 
-	vma = vma_to_resize(addr, old_len, new_len, flags, &charged);
+	vma = vma_to_resize(addr, old_len, new_len, flags);
 	if (IS_ERR(vma)) {
 		ret = PTR_ERR(vma);
 		goto out;
@@ -853,7 +844,7 @@ static unsigned long mremap_to(unsigned long addr, unsigned long old_len,
 				((addr - vma->vm_start) >> PAGE_SHIFT),
 				map_flags);
 	if (IS_ERR_VALUE(ret))
-		goto out1;
+		goto out;
 
 	/* We got a new mapping */
 	if (!(flags & MREMAP_FIXED))
@@ -861,12 +852,6 @@ static unsigned long mremap_to(unsigned long addr, unsigned long old_len,
 
 	ret = move_vma(vma, addr, old_len, new_len, new_addr, locked, flags, uf,
 		       uf_unmap);
-
-	if (!(offset_in_page(ret)))
-		goto out;
-
-out1:
-	vm_unacct_memory(charged);
 
 out:
 	return ret;
@@ -899,7 +884,6 @@ SYSCALL_DEFINE5(mremap, unsigned long, addr, unsigned long, old_len,
 	struct mm_struct *mm = current->mm;
 	struct vm_area_struct *vma;
 	unsigned long ret = -EINVAL;
-	unsigned long charged = 0;
 	bool locked = false;
 	bool downgraded = false;
 	struct vm_userfaultfd_ctx uf = NULL_VM_UFFD_CTX;
@@ -981,7 +965,7 @@ SYSCALL_DEFINE5(mremap, unsigned long, addr, unsigned long, old_len,
 	/*
 	 * Ok, we need to grow..
 	 */
-	vma = vma_to_resize(addr, old_len, new_len, flags, &charged);
+	vma = vma_to_resize(addr, old_len, new_len, flags);
 	if (IS_ERR(vma)) {
 		ret = PTR_ERR(vma);
 		goto out;
@@ -994,8 +978,16 @@ SYSCALL_DEFINE5(mremap, unsigned long, addr, unsigned long, old_len,
 		if (vma_expandable(vma, new_len - old_len)) {
 			int pages = (new_len - old_len) >> PAGE_SHIFT;
 
+			if (vma->vm_flags & VM_ACCOUNT) {
+				if (security_vm_enough_memory_mm(mm, pages)) {
+					ret = -ENOMEM;
+					goto out;
+				}
+			}
+
 			if (vma_adjust(vma, vma->vm_start, addr + new_len,
 				       vma->vm_pgoff, NULL)) {
+				vm_unacct_memory(pages);
 				ret = -ENOMEM;
 				goto out;
 			}
@@ -1034,10 +1026,8 @@ SYSCALL_DEFINE5(mremap, unsigned long, addr, unsigned long, old_len,
 			       &locked, flags, &uf, &uf_unmap);
 	}
 out:
-	if (offset_in_page(ret)) {
-		vm_unacct_memory(charged);
+	if (offset_in_page(ret))
 		locked = false;
-	}
 	if (downgraded)
 		mmap_read_unlock(current->mm);
 	else
