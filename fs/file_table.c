@@ -29,6 +29,7 @@
 #include <linux/swap.h>
 
 #include <linux/atomic.h>
+#include <linux/misc_cgroup.h>
 
 #include "internal.h"
 
@@ -53,8 +54,14 @@ static void file_free_rcu(struct rcu_head *head)
 static inline void file_free(struct file *f)
 {
 	security_file_free(f);
-	if (!(f->f_mode & FMODE_NOACCOUNT))
+	if (!(f->f_mode & FMODE_NOACCOUNT)) {
+		struct misc_cg *misc_cg = css_misc(f->f_css);
+
+		misc_cg_uncharge(MISC_CG_RES_NOFILE, misc_cg, 1);
+		put_misc_cg(misc_cg);
+
 		percpu_counter_dec(&nr_files);
+	}
 	call_rcu(&f->f_u.fu_rcuhead, file_free_rcu);
 }
 
@@ -148,8 +155,20 @@ struct file *alloc_empty_file(int flags, const struct cred *cred)
 	}
 
 	f = __alloc_file(flags, cred);
-	if (!IS_ERR(f))
+	if (!IS_ERR(f)) {
+		struct misc_cg *misc_cg = get_current_misc_cg();
+		int ret;
+
+		ret = misc_cg_try_charge(MISC_CG_RES_NOFILE, misc_cg, 1);
+		if (ret < 0) {
+			put_misc_cg(misc_cg);
+			file_free(f);
+			goto out;
+		}
+
 		percpu_counter_inc(&nr_files);
+		f->f_css = &misc_cg->css;
+	}
 
 	return f;
 
@@ -159,6 +178,7 @@ over:
 		pr_info("VFS: file-max limit %lu reached\n", get_max_files());
 		old_max = get_nr_files();
 	}
+ out:
 	return ERR_PTR(-ENFILE);
 }
 
@@ -397,4 +417,5 @@ void __init files_maxfiles_init(void)
 	n = ((nr_pages - memreserve) * (PAGE_SIZE / 1024)) / 10;
 
 	files_stat.max_files = max_t(unsigned long, n, NR_FILE);
+	misc_cg_set_capacity(MISC_CG_RES_NOFILE, files_stat.max_files);
 }

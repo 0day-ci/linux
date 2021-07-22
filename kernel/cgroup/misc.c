@@ -24,6 +24,7 @@ static const char *const misc_res_name[] = {
 	/* AMD SEV-ES ASIDs resource */
 	"sev_es",
 #endif
+	"nofile"
 };
 
 /* Root misc cgroup */
