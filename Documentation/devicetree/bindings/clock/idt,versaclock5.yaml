@@ -30,6 +30,21 @@ description: |
     3 -- OUT3
     4 -- OUT4
 
+  The idt,(en|dis)able-shutdown and idt,output-enable-active-(high|low)
+  properties control the SH (en_global_shutdown) and SP bits of the
+  Primary Source and Shutdown Register, respectively. Their behavior is
+  summarized by the following table:
+
+  SH SP Output when the SD/OE pin is Low/High
+  == == =====================================
+   0  0 Active/Inactive
+   0  1 Inactive/Active
+   1  0 Active/Shutdown
+   1  1 Inactive/Shutdown
+
+  One of idt,(en|dis)able-shutdown and one of
+  idt,output-enable-active-(high|low) should be specified.
+
 maintainers:
   - Luca Ceresoli <luca@lucaceresoli.net>
 
@@ -63,6 +78,34 @@ properties:
     minimum: 9000
     maximum: 22760
     description: Optional load capacitor for XTAL1 and XTAL2
+
+  idt,enable-shutdown:
+    $ref: /schemas/types.yaml#/definitions/flag
+    description: |
+      Enable the shutdown functionality. The chip will be shut down if
+      the SD/OE pin is driven high. This corresponds to setting the SH
+      bit of the Primary Source and Shutdown Register.
+
+  idt,disable-shutdown:
+    $ref: /schemas/types.yaml#/definitions/flag
+    description: |
+      Disable the shutdown functionality. The chip will never be shut
+      down based on the value of the SD/OE pin. This corresponds to
+      clearing the SH bit of the Primary Source and Shutdown Register.
+
+  idt,output-enable-active-high:
+    $ref: /schemas/types.yaml#/definitions/flag
+    description: |
+      This enables output when the SD/OE pin is high, and disables
+      output when the SD/OE pin is low. This corresponds to setting the
+      SP bit of the Primary Source and Shutdown Register.
+
+  idt,output-enable-active-low:
+    $ref: /schemas/types.yaml#/definitions/flag
+    description: |
+      This disables output when the SD/OE pin is high, and enables
+      output when the SD/OE pin is low. This corresponds to clearing the
+      SP bit of the Primary Source and Shutdown Register.
 
 patternProperties:
   "^OUT[1-4]$":
@@ -109,6 +152,16 @@ allOf:
       required:
         - clock-names
         - clocks
+  - oneOf:
+      - required:
+          - idt,enable-shutdown
+      - required:
+          - idt,disable-shutdown
+  - oneOf:
+      - required:
+          - idt,output-enable-active-high
+      - required:
+          - idt,output-enable-active-low
 
 additionalProperties: false
 
@@ -137,6 +190,10 @@ examples:
             /* Connect XIN input to 25MHz reference */
             clocks = <&ref25m>;
             clock-names = "xin";
+
+            /* Set the SD/OE pin's settings */
+            idt,disable-shutdown;
+            idt,output-enable-active-low;
 
             OUT1 {
                 idt,drive-mode = <VC5_CMOSD>;
