@@ -875,7 +875,7 @@ static int l2cap_sock_setsockopt(struct socket *sock, int level, int optname,
 	struct bt_power pwr;
 	struct l2cap_conn *conn;
 	int len, err = 0;
-	u32 opt;
+	u32 opt, phys;
 
 	BT_DBG("sk %p", sk);
 
@@ -1069,6 +1069,25 @@ static int l2cap_sock_setsockopt(struct socket *sock, int level, int optname,
 		else
 			chan->imtu = opt;
 
+		break;
+
+	case BT_PHY:
+		if (sk->sk_state != BT_CONNECTED) {
+			err = -ENOTCONN;
+			break;
+		}
+
+		if (copy_from_sockptr(&phys, optval, sizeof(u32))) {
+			err = -EFAULT;
+			break;
+		}
+
+		err = hci_conn_set_phy(chan->conn->hcon, phys);
+
+		if (err)
+			break;
+
+		BT_DBG("phys %u", phys);
 		break;
 
 	case BT_MODE:

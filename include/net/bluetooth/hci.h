@@ -1677,9 +1677,21 @@ struct hci_cp_le_set_default_phy {
 	__u8    rx_phys;
 } __packed;
 
+#define HCI_OP_LE_SET_PHY	0x2032
+struct hci_cp_le_set_phy {
+	__le16	handle;
+	__u8	all_phys;
+	__u8	tx_phys;
+	__u8	rx_phys;
+	__le16	phy_opt;
+} __packed;
+
 #define HCI_LE_SET_PHY_1M		0x01
 #define HCI_LE_SET_PHY_2M		0x02
 #define HCI_LE_SET_PHY_CODED		0x04
+
+#define HCI_LE_PHY_CODED_S2		0x01
+#define HCI_LE_PHY_CODED_S8		0x02
 
 #define HCI_LE_READ_PHY_1M		0x01
 #define HCI_LE_READ_PHY_2M		0x02

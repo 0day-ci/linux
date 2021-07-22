@@ -1935,3 +1935,59 @@ u32 hci_conn_get_phy(struct hci_conn *conn)
 
 	return phys;
 }
+
+int hci_conn_set_phy(struct hci_conn *conn, u32 phys)
+{
+	struct hci_cp_le_set_phy cp_phy;
+	u16 phy_opt = 0;
+
+	if (conn->type != LE_LINK)
+		return -ENOTCONN;
+
+	/* Check whether HCI_LE_Set_PHY command is supported or not */
+	if (!(conn->hdev->commands[35] & 0x40))
+		return -EOPNOTSUPP;
+
+	hci_dev_lock(conn->hdev);
+
+	memset(&cp_phy, 0, sizeof(cp_phy));
+	cp_phy.handle = cpu_to_le16(conn->handle);
+
+	if (!(phys & BT_PHY_LE_TX_MASK))
+		cp_phy.all_phys |= 0x01;
+
+	if (!(phys & BT_PHY_LE_RX_MASK))
+		cp_phy.all_phys |= 0x02;
+
+	if (phys & BT_PHY_LE_1M_TX)
+		cp_phy.tx_phys |= HCI_LE_SET_PHY_1M;
+
+	if (phys & BT_PHY_LE_2M_TX)
+		cp_phy.tx_phys |= HCI_LE_SET_PHY_2M;
+
+	if (phys & BT_PHY_LE_CODED_TX)
+		cp_phy.tx_phys |= HCI_LE_SET_PHY_CODED;
+
+	if (phys & BT_PHY_LE_1M_RX)
+		cp_phy.rx_phys |= HCI_LE_SET_PHY_1M;
+
+	if (phys & BT_PHY_LE_2M_RX)
+		cp_phy.rx_phys |= HCI_LE_SET_PHY_2M;
+
+	if (phys & BT_PHY_LE_CODED_RX)
+		cp_phy.rx_phys |= HCI_LE_SET_PHY_CODED;
+
+	if (phys & BT_PHY_LE_CODED_S2)
+		phy_opt |= HCI_LE_PHY_CODED_S2;
+
+	if (phys & BT_PHY_LE_CODED_S8)
+		phy_opt |= HCI_LE_PHY_CODED_S8;
+
+	cp_phy.phy_opt = cpu_to_le16(phy_opt);
+
+	hci_send_cmd(conn->hdev, HCI_OP_LE_SET_PHY, sizeof(cp_phy), &cp_phy);
+
+	hci_dev_unlock(conn->hdev);
+
+	return 0;
+}

@@ -140,6 +140,13 @@ struct bt_voice {
 #define BT_PHY_LE_2M_RX		0x00001000
 #define BT_PHY_LE_CODED_TX	0x00002000
 #define BT_PHY_LE_CODED_RX	0x00004000
+#define BT_PHY_LE_CODED_S2      0x00008000
+#define BT_PHY_LE_CODED_S8      0x00010000
+
+#define BT_PHY_LE_TX_MASK (BT_PHY_LE_1M_TX | BT_PHY_LE_2M_TX | \
+			     BT_PHY_LE_CODED_TX)
+#define BT_PHY_LE_RX_MASK (BT_PHY_LE_1M_RX | BT_PHY_LE_2M_RX | \
+			     BT_PHY_LE_CODED_RX)
 
 #define BT_MODE			15
 
