@@ -80,6 +80,12 @@ struct msm_gpu_fault_info {
 	const char *block;
 };
 
+struct msm_gpu_devfreq {
+	struct devfreq *devfreq;
+	u64 busy_cycles;
+	ktime_t time;
+};
+
 struct msm_gpu {
 	const char *name;
 	struct drm_device *dev;
@@ -151,11 +157,7 @@ struct msm_gpu {
 
 	struct drm_gem_object *memptrs_bo;
 
-	struct {
-		struct devfreq *devfreq;
-		u64 busy_cycles;
-		ktime_t time;
-	} devfreq;
+	struct msm_gpu_devfreq devfreq;
 
 	uint32_t suspend_count;
 
@@ -301,7 +303,11 @@ static inline void gpu_write64(struct msm_gpu *gpu, u32 lo, u32 hi, u64 val)
 
 int msm_gpu_pm_suspend(struct msm_gpu *gpu);
 int msm_gpu_pm_resume(struct msm_gpu *gpu);
-void msm_gpu_resume_devfreq(struct msm_gpu *gpu);
+
+void msm_devfreq_init(struct msm_gpu *gpu);
+void msm_devfreq_cleanup(struct msm_gpu *gpu);
+void msm_devfreq_resume(struct msm_gpu *gpu);
+void msm_devfreq_suspend(struct msm_gpu *gpu);
 
 int msm_gpu_hw_init(struct msm_gpu *gpu);
 
