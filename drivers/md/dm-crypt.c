@@ -2421,61 +2421,14 @@ static bool contains_whitespace(const char *str)
 	return false;
 }
 
-static int set_key_user(struct crypt_config *cc, struct key *key)
-{
-	const struct user_key_payload *ukp;
-
-	ukp = user_key_payload_locked(key);
-	if (!ukp)
-		return -EKEYREVOKED;
-
-	if (cc->key_size != ukp->datalen)
-		return -EINVAL;
-
-	memcpy(cc->key, ukp->data, cc->key_size);
-
-	return 0;
-}
-
-static int set_key_encrypted(struct crypt_config *cc, struct key *key)
-{
-	const struct encrypted_key_payload *ekp;
-
-	ekp = key->payload.data[0];
-	if (!ekp)
-		return -EKEYREVOKED;
-
-	if (cc->key_size != ekp->decrypted_datalen)
-		return -EINVAL;
-
-	memcpy(cc->key, ekp->decrypted_data, cc->key_size);
-
-	return 0;
-}
-
-static int set_key_trusted(struct crypt_config *cc, struct key *key)
-{
-	const struct trusted_key_payload *tkp;
-
-	tkp = key->payload.data[0];
-	if (!tkp)
-		return -EKEYREVOKED;
-
-	if (cc->key_size != tkp->key_len)
-		return -EINVAL;
-
-	memcpy(cc->key, tkp->key, cc->key_size);
-
-	return 0;
-}
-
 static int crypt_set_keyring_key(struct crypt_config *cc, const char *key_string)
 {
 	char *new_key_string, *key_desc;
 	int ret;
+	unsigned int len;
 	struct key_type *type;
 	struct key *key;
-	int (*set_key)(struct crypt_config *cc, struct key *key);
+	const void *key_material;
 
 	/*
 	 * Reject key_string with whitespace. dm core currently lacks code for
@@ -2493,18 +2446,14 @@ static int crypt_set_keyring_key(struct crypt_config *cc, const char *key_string
 
 	if (!strncmp(key_string, "logon:", key_desc - key_string + 1)) {
 		type = &key_type_logon;
-		set_key = set_key_user;
 	} else if (!strncmp(key_string, "user:", key_desc - key_string + 1)) {
 		type = &key_type_user;
-		set_key = set_key_user;
 	} else if (IS_ENABLED(CONFIG_ENCRYPTED_KEYS) &&
 		   !strncmp(key_string, "encrypted:", key_desc - key_string + 1)) {
 		type = &key_type_encrypted;
-		set_key = set_key_encrypted;
 	} else if (IS_ENABLED(CONFIG_TRUSTED_KEYS) &&
 	           !strncmp(key_string, "trusted:", key_desc - key_string + 1)) {
 		type = &key_type_trusted;
-		set_key = set_key_trusted;
 	} else {
 		return -EINVAL;
 	}
@@ -2521,13 +2470,17 @@ static int crypt_set_keyring_key(struct crypt_config *cc, const char *key_string
 
 	down_read(&key->sem);
 
-	ret = set_key(cc, key);
-	if (ret < 0) {
+	key_material = key_extract_material(key, &len);
+	if (!IS_ERR(key_material) && len != cc->key_size)
+		key_material = ERR_PTR(-EINVAL);
+	if (IS_ERR(key_material)) {
 		up_read(&key->sem);
 		key_put(key);
 		kfree_sensitive(new_key_string);
-		return ret;
+		return PTR_ERR(key_material);
 	}
+
+	memcpy(cc->key, key_material, len);
 
 	up_read(&key->sem);
 	key_put(key);
