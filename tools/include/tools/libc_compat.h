@@ -17,4 +17,11 @@ static inline void *reallocarray(void *ptr, size_t nmemb, size_t size)
 	return realloc(ptr, bytes);
 }
 #endif
+
+#ifndef HAVE_GETTID
+static inline pid_t gettid(void)
+{
+	return (pid_t)syscall(__NR_gettid);
+}
+#endif
 #endif
