@@ -211,41 +211,6 @@ get_lvds_fp_timing(const struct bdb_header *bdb,
 	return (const struct lvds_fp_timing *)((const u8 *)bdb + ofs);
 }
 
-/*
- * Parse and set vbt.panel_type, it will be used by the VBT blocks that are
- * not being called from parse_integrated_panel() yet.
- */
-static void parse_panel_type(struct drm_i915_private *i915,
-			     const struct bdb_header *bdb)
-{
-	const struct bdb_lvds_options *lvds_options;
-	int ret, panel_type;
-
-	lvds_options = find_section(bdb, BDB_LVDS_OPTIONS);
-	if (!lvds_options)
-		return;
-
-	ret = intel_opregion_get_panel_type(i915);
-	if (ret >= 0) {
-		drm_WARN_ON(&i915->drm, ret > 0xf);
-		panel_type = ret;
-		drm_dbg_kms(&i915->drm, "Panel type: %d (OpRegion)\n",
-			    panel_type);
-	} else {
-		if (lvds_options->panel_type > 0xf) {
-			drm_dbg_kms(&i915->drm,
-				    "Invalid VBT panel type 0x%x\n",
-				    lvds_options->panel_type);
-			return;
-		}
-		panel_type = lvds_options->panel_type;
-		drm_dbg_kms(&i915->drm, "Panel type: %d (VBT)\n",
-			    panel_type);
-	}
-
-	i915->vbt.panel_type = panel_type;
-}
-
 /* Parse general panel options */
 static void
 parse_panel_options(struct drm_i915_private *i915,
@@ -2489,7 +2454,6 @@ void intel_bios_init(struct drm_i915_private *i915)
 	/* Grab useful general definitions */
 	parse_general_features(i915, bdb);
 	parse_general_definitions(i915, bdb);
-	parse_panel_type(i915, bdb);
 	parse_sdvo_panel_data(i915, bdb);
 	parse_driver_features(i915, bdb);
 
