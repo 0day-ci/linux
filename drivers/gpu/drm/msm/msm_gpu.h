@@ -84,6 +84,10 @@ struct msm_gpu_devfreq {
 	struct devfreq *devfreq;
 	u64 busy_cycles;
 	ktime_t time;
+
+	/* Time and freq of last transition to idle: */
+	ktime_t idle_time;
+	unsigned long idle_freq;
 };
 
 struct msm_gpu {
@@ -114,6 +118,9 @@ struct msm_gpu {
 	 * msm_drm_private::mm_lock
 	 */
 	struct list_head active_list;
+
+	/* number of in-flight submits: */
+	atomic_t active_submits;
 
 	/* does gpu need hw_init? */
 	bool needs_hw_init;
@@ -308,6 +315,8 @@ void msm_devfreq_init(struct msm_gpu *gpu);
 void msm_devfreq_cleanup(struct msm_gpu *gpu);
 void msm_devfreq_resume(struct msm_gpu *gpu);
 void msm_devfreq_suspend(struct msm_gpu *gpu);
+void msm_devfreq_active(struct msm_gpu *gpu);
+void msm_devfreq_idle(struct msm_gpu *gpu);
 
 int msm_gpu_hw_init(struct msm_gpu *gpu);
 

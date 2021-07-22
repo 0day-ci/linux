@@ -675,6 +675,10 @@ static void retire_submit(struct msm_gpu *gpu, struct msm_ringbuffer *ring,
 	list_del(&submit->node);
 	spin_unlock(&ring->submit_lock);
 
+	/* Update devfreq on transition from active->idle: */
+	if (atomic_dec_return(&gpu->active_submits) == 0)
+		msm_devfreq_idle(gpu);
+
 	msm_gem_submit_put(submit);
 }
 
@@ -772,6 +776,10 @@ void msm_gpu_submit(struct msm_gpu *gpu, struct msm_gem_submit *submit)
 	spin_lock(&ring->submit_lock);
 	list_add_tail(&submit->node, &ring->submits);
 	spin_unlock(&ring->submit_lock);
+
+	/* Update devfreq on transition from idle->active: */
+	if (atomic_inc_return(&gpu->active_submits) == 1)
+		msm_devfreq_active(gpu);
 
 	gpu->funcs->submit(gpu, submit);
 	priv->lastctx = submit->queue->ctx;
