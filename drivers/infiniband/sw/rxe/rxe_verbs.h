@@ -46,7 +46,6 @@ struct rxe_pd {
 struct rxe_ah {
 	struct ib_ah		ibah;
 	struct rxe_pool_entry	pelem;
-	struct rxe_pd		*pd;
 	struct rxe_av		av;
 	bool			is_user;
 	int			ah_num;
@@ -484,6 +483,11 @@ static inline u32 mr_lkey(struct rxe_mr *mr)
 static inline u32 mr_rkey(struct rxe_mr *mr)
 {
 	return mr->ibmr.rkey;
+}
+
+static inline struct rxe_pd *rxe_ah_pd(struct rxe_ah *ah)
+{
+	return to_rpd(ah->ibah.pd);
 }
 
 static inline struct rxe_pd *rxe_mw_pd(struct rxe_mw *mw)
