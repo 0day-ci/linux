@@ -1060,6 +1060,36 @@ err_out:
 	return ERR_PTR(err);
 }
 
+/* offload the tc command after inserted */
+int tcf_action_offload_cmd(struct tc_action *actions[],
+			   struct netlink_ext_ack *extack)
+{
+	struct flow_offload_action *fl_act;
+	int err = 0;
+
+	fl_act = flow_action_alloc(tcf_act_num_actions(actions));
+	if (!fl_act)
+		return -ENOMEM;
+
+	fl_act->extack = extack;
+	err = tc_setup_action(&fl_act->action, actions);
+	if (err) {
+		NL_SET_ERR_MSG_MOD(extack,
+				   "Failed to setup tc actions for offload\n");
+		goto err_out;
+	}
+	fl_act->command = FLOW_ACT_REPLACE;
+
+	flow_indr_dev_setup_offload(NULL, NULL, TC_SETUP_ACT, fl_act, NULL, NULL);
+
+	tc_cleanup_flow_action(&fl_act->action);
+
+err_out:
+	kfree(fl_act);
+	return err;
+}
+EXPORT_SYMBOL(tcf_action_offload_cmd);
+
 /* Returns numbers of initialized actions or negative error. */
 
 int tcf_action_init(struct net *net, struct tcf_proto *tp, struct nlattr *nla,
@@ -1513,6 +1543,9 @@ static int tcf_action_add(struct net *net, struct nlattr *nla,
 	if (ret < 0)
 		return ret;
 	ret = tcf_add_notify(net, n, actions, portid, attr_size, extack);
+
+	/* offload actions to hardware if possible */
+	tcf_action_offload_cmd(actions, extack);
 
 	/* only put existing actions */
 	for (i = 0; i < TCA_ACT_MAX_PRIO; i++)
