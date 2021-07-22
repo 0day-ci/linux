@@ -1915,22 +1915,19 @@ u32 hci_conn_get_phy(struct hci_conn *conn)
 		break;
 
 	case LE_LINK:
-		if (conn->le_tx_phy & HCI_LE_SET_PHY_1M)
+
+		if (conn->le_tx_phy == HCI_LE_READ_PHY_1M)
 			phys |= BT_PHY_LE_1M_TX;
-
-		if (conn->le_rx_phy & HCI_LE_SET_PHY_1M)
-			phys |= BT_PHY_LE_1M_RX;
-
-		if (conn->le_tx_phy & HCI_LE_SET_PHY_2M)
+		else if (conn->le_tx_phy == HCI_LE_READ_PHY_2M)
 			phys |= BT_PHY_LE_2M_TX;
-
-		if (conn->le_rx_phy & HCI_LE_SET_PHY_2M)
-			phys |= BT_PHY_LE_2M_RX;
-
-		if (conn->le_tx_phy & HCI_LE_SET_PHY_CODED)
+		else if (conn->le_tx_phy == HCI_LE_READ_PHY_CODED)
 			phys |= BT_PHY_LE_CODED_TX;
 
-		if (conn->le_rx_phy & HCI_LE_SET_PHY_CODED)
+		if (conn->le_rx_phy == HCI_LE_READ_PHY_1M)
+			phys |= BT_PHY_LE_1M_RX;
+		else if (conn->le_rx_phy == HCI_LE_READ_PHY_2M)
+			phys |= BT_PHY_LE_2M_RX;
+		else if (conn->le_rx_phy == HCI_LE_READ_PHY_CODED)
 			phys |= BT_PHY_LE_CODED_RX;
 
 		break;

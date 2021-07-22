@@ -1681,6 +1681,10 @@ struct hci_cp_le_set_default_phy {
 #define HCI_LE_SET_PHY_2M		0x02
 #define HCI_LE_SET_PHY_CODED		0x04
 
+#define HCI_LE_READ_PHY_1M		0x01
+#define HCI_LE_READ_PHY_2M		0x02
+#define HCI_LE_READ_PHY_CODED		0x03
+
 #define HCI_OP_LE_SET_EXT_SCAN_PARAMS   0x2041
 struct hci_cp_le_set_ext_scan_params {
 	__u8    own_addr_type;
