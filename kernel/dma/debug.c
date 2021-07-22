@@ -913,7 +913,7 @@ static int dma_debug_init(void)
 	pr_info("debugging enabled by kernel config\n");
 	return 0;
 }
-core_initcall(dma_debug_init);
+postcore_initcall(dma_debug_init);
 
 static __init int dma_debug_cmdline(char *str)
 {
