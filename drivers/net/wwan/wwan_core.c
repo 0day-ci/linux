@@ -866,6 +866,10 @@ static int wwan_rtnl_newlink(struct net *src_net, struct net_device *dev,
 	else
 		ret = register_netdevice(dev);
 
+	/* Link initialized, notify new link */
+	if (!ret)
+		rtnl_configure_link(dev, NULL);
+
 out:
 	/* release the reference */
 	put_device(&wwandev->dev);
