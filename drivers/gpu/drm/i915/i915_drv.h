@@ -642,6 +642,13 @@ i915_fence_timeout(const struct drm_i915_private *i915)
 
 #define HAS_HW_SAGV_WM(i915) (DISPLAY_VER(i915) >= 13 && !IS_DGFX(i915))
 
+enum psr_lines_to_wait {
+	PSR_0_LINES_TO_WAIT = 0,
+	PSR_1_LINE_TO_WAIT,
+	PSR_4_LINES_TO_WAIT,
+	PSR_8_LINES_TO_WAIT
+};
+
 struct ddi_vbt_port_info {
 	/* Non-NULL if port present. */
 	struct intel_bios_encoder_data *devdata;
@@ -681,13 +688,17 @@ struct ddi_vbt_port_info {
 		struct edp_power_seq pps;
 		bool hobl;
 	} edp;
-};
 
-enum psr_lines_to_wait {
-	PSR_0_LINES_TO_WAIT = 0,
-	PSR_1_LINE_TO_WAIT,
-	PSR_4_LINES_TO_WAIT,
-	PSR_8_LINES_TO_WAIT
+	struct vbt_psr_info {
+		bool enable;
+		bool full_link;
+		bool require_aux_wakeup;
+		int idle_frames;
+		enum psr_lines_to_wait lines_to_wait;
+		int tp1_wakeup_time_us;
+		int tp2_tp3_wakeup_time_us;
+		int psr2_tp2_tp3_wakeup_time_us;
+	} psr;
 };
 
 struct intel_vbt_data {
@@ -707,17 +718,6 @@ struct intel_vbt_data {
 	int lvds_ssc_freq;
 	unsigned int bios_lvds_val; /* initial [PCH_]LVDS reg val in VBIOS */
 	enum drm_panel_orientation orientation;
-
-	struct {
-		bool enable;
-		bool full_link;
-		bool require_aux_wakeup;
-		int idle_frames;
-		enum psr_lines_to_wait lines_to_wait;
-		int tp1_wakeup_time_us;
-		int tp2_tp3_wakeup_time_us;
-		int psr2_tp2_tp3_wakeup_time_us;
-	} psr;
 
 	/* MIPI DSI */
 	struct {

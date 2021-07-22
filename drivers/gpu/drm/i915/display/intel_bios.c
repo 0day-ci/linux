@@ -729,15 +729,12 @@ parse_driver_features(struct drm_i915_private *i915,
 		    driver->lvds_config != BDB_DRIVER_FEATURE_INT_SDVO_LVDS)
 			i915->vbt.int_lvds_support = 0;
 	}
-
-	if (bdb->version < 228)
-		i915->vbt.psr.enable = driver->psr_enabled;
 }
 
 static void
-parse_driver_features_drrs_only(struct drm_i915_private *i915,
-				const struct bdb_header *bdb,
-				struct ddi_vbt_port_info *info)
+parse_driver_features_drrs_psr_only(struct drm_i915_private *i915,
+				    const struct bdb_header *bdb,
+				    struct ddi_vbt_port_info *info)
 {
 	const struct bdb_driver_features *driver;
 
@@ -757,6 +754,8 @@ parse_driver_features_drrs_only(struct drm_i915_private *i915,
 	 */
 	if (!driver->drrs_enabled)
 		info->drrs_type = DRRS_NOT_SUPPORTED;
+
+	info->psr.enable = driver->psr_enabled;
 }
 
 static void
@@ -774,7 +773,7 @@ parse_power_conservation_features(struct drm_i915_private *i915,
 	if (!power)
 		return;
 
-	i915->vbt.psr.enable = power->psr & BIT(panel_index);
+	info->psr.enable = power->psr & BIT(panel_index);
 
 	/*
 	 * If DRRS is not supported, drrs_type has to be set to 0.
@@ -905,11 +904,11 @@ parse_edp(struct drm_i915_private *i915, const struct bdb_header *bdb,
 }
 
 static void
-parse_psr(struct drm_i915_private *i915, const struct bdb_header *bdb)
+parse_psr(struct drm_i915_private *i915, const struct bdb_header *bdb,
+	  struct ddi_vbt_port_info *info, int panel_index)
 {
 	const struct bdb_psr *psr;
 	const struct psr_table *psr_table;
-	int panel_type = i915->vbt.panel_type;
 
 	psr = find_section(bdb, BDB_PSR);
 	if (!psr) {
@@ -917,27 +916,27 @@ parse_psr(struct drm_i915_private *i915, const struct bdb_header *bdb)
 		return;
 	}
 
-	psr_table = &psr->psr_table[panel_type];
+	psr_table = &psr->psr_table[panel_index];
 
-	i915->vbt.psr.full_link = psr_table->full_link;
-	i915->vbt.psr.require_aux_wakeup = psr_table->require_aux_to_wakeup;
+	info->psr.full_link = psr_table->full_link;
+	info->psr.require_aux_wakeup = psr_table->require_aux_to_wakeup;
 
 	/* Allowed VBT values goes from 0 to 15 */
-	i915->vbt.psr.idle_frames = psr_table->idle_frames < 0 ? 0 :
+	info->psr.idle_frames = psr_table->idle_frames < 0 ? 0 :
 		psr_table->idle_frames > 15 ? 15 : psr_table->idle_frames;
 
 	switch (psr_table->lines_to_wait) {
 	case 0:
-		i915->vbt.psr.lines_to_wait = PSR_0_LINES_TO_WAIT;
+		info->psr.lines_to_wait = PSR_0_LINES_TO_WAIT;
 		break;
 	case 1:
-		i915->vbt.psr.lines_to_wait = PSR_1_LINE_TO_WAIT;
+		info->psr.lines_to_wait = PSR_1_LINE_TO_WAIT;
 		break;
 	case 2:
-		i915->vbt.psr.lines_to_wait = PSR_4_LINES_TO_WAIT;
+		info->psr.lines_to_wait = PSR_4_LINES_TO_WAIT;
 		break;
 	case 3:
-		i915->vbt.psr.lines_to_wait = PSR_8_LINES_TO_WAIT;
+		info->psr.lines_to_wait = PSR_8_LINES_TO_WAIT;
 		break;
 	default:
 		drm_dbg_kms(&i915->drm,
@@ -954,13 +953,13 @@ parse_psr(struct drm_i915_private *i915, const struct bdb_header *bdb)
 	    (DISPLAY_VER(i915) >= 9 && !IS_BROXTON(i915))) {
 		switch (psr_table->tp1_wakeup_time) {
 		case 0:
-			i915->vbt.psr.tp1_wakeup_time_us = 500;
+			info->psr.tp1_wakeup_time_us = 500;
 			break;
 		case 1:
-			i915->vbt.psr.tp1_wakeup_time_us = 100;
+			info->psr.tp1_wakeup_time_us = 100;
 			break;
 		case 3:
-			i915->vbt.psr.tp1_wakeup_time_us = 0;
+			info->psr.tp1_wakeup_time_us = 0;
 			break;
 		default:
 			drm_dbg_kms(&i915->drm,
@@ -968,19 +967,19 @@ parse_psr(struct drm_i915_private *i915, const struct bdb_header *bdb)
 				    psr_table->tp1_wakeup_time);
 			fallthrough;
 		case 2:
-			i915->vbt.psr.tp1_wakeup_time_us = 2500;
+			info->psr.tp1_wakeup_time_us = 2500;
 			break;
 		}
 
 		switch (psr_table->tp2_tp3_wakeup_time) {
 		case 0:
-			i915->vbt.psr.tp2_tp3_wakeup_time_us = 500;
+			info->psr.tp2_tp3_wakeup_time_us = 500;
 			break;
 		case 1:
-			i915->vbt.psr.tp2_tp3_wakeup_time_us = 100;
+			info->psr.tp2_tp3_wakeup_time_us = 100;
 			break;
 		case 3:
-			i915->vbt.psr.tp2_tp3_wakeup_time_us = 0;
+			info->psr.tp2_tp3_wakeup_time_us = 0;
 			break;
 		default:
 			drm_dbg_kms(&i915->drm,
@@ -988,18 +987,18 @@ parse_psr(struct drm_i915_private *i915, const struct bdb_header *bdb)
 				    psr_table->tp2_tp3_wakeup_time);
 			fallthrough;
 		case 2:
-			i915->vbt.psr.tp2_tp3_wakeup_time_us = 2500;
+			info->psr.tp2_tp3_wakeup_time_us = 2500;
 		break;
 		}
 	} else {
-		i915->vbt.psr.tp1_wakeup_time_us = psr_table->tp1_wakeup_time * 100;
-		i915->vbt.psr.tp2_tp3_wakeup_time_us = psr_table->tp2_tp3_wakeup_time * 100;
+		info->psr.tp1_wakeup_time_us = psr_table->tp1_wakeup_time * 100;
+		info->psr.tp2_tp3_wakeup_time_us = psr_table->tp2_tp3_wakeup_time * 100;
 	}
 
 	if (bdb->version >= 226) {
 		u32 wakeup_time = psr->psr2_tp2_tp3_wakeup_time;
 
-		wakeup_time = (wakeup_time >> (2 * panel_type)) & 0x3;
+		wakeup_time = (wakeup_time >> (2 * panel_index)) & 0x3;
 		switch (wakeup_time) {
 		case 0:
 			wakeup_time = 500;
@@ -1015,10 +1014,10 @@ parse_psr(struct drm_i915_private *i915, const struct bdb_header *bdb)
 			wakeup_time = 2500;
 			break;
 		}
-		i915->vbt.psr.psr2_tp2_tp3_wakeup_time_us = wakeup_time;
+		info->psr.psr2_tp2_tp3_wakeup_time_us = wakeup_time;
 	} else {
 		/* Reusing PSR1 wakeup time for PSR2 in older VBTs */
-		i915->vbt.psr.psr2_tp2_tp3_wakeup_time_us = i915->vbt.psr.tp2_tp3_wakeup_time_us;
+		info->psr.psr2_tp2_tp3_wakeup_time_us = info->psr.tp2_tp3_wakeup_time_us;
 	}
 }
 
@@ -1986,10 +1985,11 @@ static void parse_integrated_panel(struct drm_i915_private *i915,
 
 	parse_panel_options(i915, bdb, info, panel_index);
 	parse_power_conservation_features(i915, bdb, info, panel_index);
-	parse_driver_features_drrs_only(i915, bdb, info);
+	parse_driver_features_drrs_psr_only(i915, bdb, info);
 	parse_panel_dtd(i915, bdb, info, panel_index);
 	parse_lfp_backlight(i915, bdb, info, panel_index);
 	parse_edp(i915, bdb, info, panel_index);
+	parse_psr(i915, bdb, info, panel_index);
 }
 
 static void parse_ddi_port(struct drm_i915_private *i915,
@@ -2486,7 +2486,6 @@ void intel_bios_init(struct drm_i915_private *i915)
 	parse_panel_type(i915, bdb);
 	parse_sdvo_panel_data(i915, bdb);
 	parse_driver_features(i915, bdb);
-	parse_psr(i915, bdb);
 	parse_mipi_config(i915, bdb);
 	parse_mipi_sequence(i915, bdb);
 
@@ -3139,4 +3138,14 @@ intel_bios_edp_info(struct intel_encoder *encoder)
 	struct drm_i915_private *i915 = to_i915(encoder->base.dev);
 
 	return &i915->vbt.ddi_port_info[encoder->port].edp;
+}
+
+const struct vbt_psr_info *
+intel_bios_psr_info(struct intel_dp *intel_dp)
+{
+	struct drm_i915_private *i915 = dp_to_i915(intel_dp);
+	struct intel_digital_port *dig_port = dp_to_dig_port(intel_dp);
+	struct intel_encoder *encoder = &dig_port->base;
+
+	return &i915->vbt.ddi_port_info[encoder->port].psr;
 }
