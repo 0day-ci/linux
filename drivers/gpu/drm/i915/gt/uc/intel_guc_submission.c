@@ -81,6 +81,11 @@ guc_create_virtual(struct intel_engine_cs **siblings, unsigned int count);
  */
 #define SCHED_STATE_NO_LOCK_ENABLED			BIT(0)
 #define SCHED_STATE_NO_LOCK_PENDING_ENABLE		BIT(1)
+#define SCHED_STATE_NO_LOCK_BLOCKED_SHIFT		2
+#define SCHED_STATE_NO_LOCK_BLOCKED \
+	BIT(SCHED_STATE_NO_LOCK_BLOCKED_SHIFT)
+#define SCHED_STATE_NO_LOCK_BLOCKED_MASK \
+	(0xffff << SCHED_STATE_NO_LOCK_BLOCKED_SHIFT)
 static inline bool context_enabled(struct intel_context *ce)
 {
 	return (atomic_read(&ce->guc_sched_state_no_lock) &
@@ -113,6 +118,30 @@ static inline void set_context_pending_enable(struct intel_context *ce)
 static inline void clr_context_pending_enable(struct intel_context *ce)
 {
 	atomic_and((u32)~SCHED_STATE_NO_LOCK_PENDING_ENABLE,
+		   &ce->guc_sched_state_no_lock);
+}
+
+static inline u32 context_blocked(struct intel_context *ce)
+{
+	return (atomic_read(&ce->guc_sched_state_no_lock) &
+		SCHED_STATE_NO_LOCK_BLOCKED_MASK) >>
+		SCHED_STATE_NO_LOCK_BLOCKED_SHIFT;
+}
+
+static inline void incr_context_blocked(struct intel_context *ce)
+{
+	lockdep_assert_held(&ce->engine->sched_engine->lock);
+	atomic_add(SCHED_STATE_NO_LOCK_BLOCKED,
+		   &ce->guc_sched_state_no_lock);
+	GEM_BUG_ON(!context_blocked(ce));	/* Overflow check */
+}
+
+static inline void decr_context_blocked(struct intel_context *ce)
+{
+	lockdep_assert_held(&ce->engine->sched_engine->lock);
+	GEM_BUG_ON(!context_blocked(ce));
+
+	atomic_sub(SCHED_STATE_NO_LOCK_BLOCKED,
 		   &ce->guc_sched_state_no_lock);
 }
 
@@ -404,6 +433,14 @@ static int guc_add_request(struct intel_guc *guc, struct i915_request *rq)
 		if (unlikely(err))
 			goto out;
 	}
+
+	/*
+	 * The request / context will be run on the hardware when scheduling
+	 * gets enabled in the unblock.
+	 */
+	if (unlikely(context_blocked(ce)))
+		goto out;
+
 	enabled = context_enabled(ce);
 
 	if (!enabled) {
@@ -532,6 +569,7 @@ static void __guc_context_destroy(struct intel_context *ce);
 static void release_guc_id(struct intel_guc *guc, struct intel_context *ce);
 static void guc_signal_context_fence(struct intel_context *ce);
 static void guc_cancel_context_requests(struct intel_context *ce);
+static void guc_blocked_fence_complete(struct intel_context *ce);
 
 static void scrub_guc_desc_for_outstanding_g2h(struct intel_guc *guc)
 {
@@ -579,6 +617,10 @@ static void scrub_guc_desc_for_outstanding_g2h(struct intel_guc *guc)
 			}
 			intel_context_sched_disable_unpin(ce);
 			atomic_dec(&guc->outstanding_submission_g2h);
+			spin_lock_irqsave(&ce->guc_state.lock, flags);
+			guc_blocked_fence_complete(ce);
+			spin_unlock_irqrestore(&ce->guc_state.lock, flags);
+
 			intel_context_put(ce);
 		}
 	}
@@ -1353,6 +1395,21 @@ static void guc_context_post_unpin(struct intel_context *ce)
 	lrc_post_unpin(ce);
 }
 
+static void __guc_context_sched_enable(struct intel_guc *guc,
+				       struct intel_context *ce)
+{
+	u32 action[] = {
+		INTEL_GUC_ACTION_SCHED_CONTEXT_MODE_SET,
+		ce->guc_id,
+		GUC_CONTEXT_ENABLE
+	};
+
+	trace_intel_context_sched_enable(ce);
+
+	guc_submission_send_busy_loop(guc, action, ARRAY_SIZE(action),
+				      G2H_LEN_DW_SCHED_CONTEXT_MODE_SET, true);
+}
+
 static void __guc_context_sched_disable(struct intel_guc *guc,
 					struct intel_context *ce,
 					u16 guc_id)
@@ -1371,15 +1428,128 @@ static void __guc_context_sched_disable(struct intel_guc *guc,
 				      G2H_LEN_DW_SCHED_CONTEXT_MODE_SET, true);
 }
 
+static void guc_blocked_fence_complete(struct intel_context *ce)
+{
+	lockdep_assert_held(&ce->guc_state.lock);
+
+	if (!i915_sw_fence_done(&ce->guc_blocked))
+		i915_sw_fence_complete(&ce->guc_blocked);
+}
+
+static void guc_blocked_fence_reinit(struct intel_context *ce)
+{
+	lockdep_assert_held(&ce->guc_state.lock);
+	GEM_BUG_ON(!i915_sw_fence_done(&ce->guc_blocked));
+
+	/*
+	 * This fence is always complete unless a pending schedule disable is
+	 * outstanding. We arm the fence here and complete it when we receive
+	 * the pending schedule disable complete message.
+	 */
+	i915_sw_fence_fini(&ce->guc_blocked);
+	i915_sw_fence_reinit(&ce->guc_blocked);
+	i915_sw_fence_await(&ce->guc_blocked);
+	i915_sw_fence_commit(&ce->guc_blocked);
+}
+
 static u16 prep_context_pending_disable(struct intel_context *ce)
 {
 	lockdep_assert_held(&ce->guc_state.lock);
 
 	set_context_pending_disable(ce);
 	clr_context_enabled(ce);
+	guc_blocked_fence_reinit(ce);
 	intel_context_get(ce);
 
 	return ce->guc_id;
+}
+
+static struct i915_sw_fence *guc_context_block(struct intel_context *ce)
+{
+	struct intel_guc *guc = ce_to_guc(ce);
+	struct i915_sched_engine *sched_engine = ce->engine->sched_engine;
+	unsigned long flags;
+	struct intel_runtime_pm *runtime_pm = ce->engine->uncore->rpm;
+	intel_wakeref_t wakeref;
+	u16 guc_id;
+	bool enabled;
+
+	/* Sync with submission path and unblock */
+	spin_lock_irqsave(&sched_engine->lock, flags);
+	incr_context_blocked(ce);
+	spin_unlock_irqrestore(&sched_engine->lock, flags);
+
+	spin_lock_irqsave(&ce->guc_state.lock, flags);
+	enabled = context_enabled(ce);
+	if (unlikely(!enabled || submission_disabled(guc))) {
+		if (enabled)
+			clr_context_enabled(ce);
+		spin_unlock_irqrestore(&ce->guc_state.lock, flags);
+		return &ce->guc_blocked;
+	}
+
+	/*
+	 * We add +2 here as the schedule disable complete CTB handler calls
+	 * intel_context_sched_disable_unpin (-2 to pin_count).
+	 */
+	atomic_add(2, &ce->pin_count);
+
+	guc_id = prep_context_pending_disable(ce);
+	spin_unlock_irqrestore(&ce->guc_state.lock, flags);
+
+	with_intel_runtime_pm(runtime_pm, wakeref)
+		__guc_context_sched_disable(guc, ce, guc_id);
+
+	return &ce->guc_blocked;
+}
+
+static void guc_context_unblock(struct intel_context *ce)
+{
+	struct intel_guc *guc = ce_to_guc(ce);
+	struct i915_sched_engine *sched_engine = ce->engine->sched_engine;
+	unsigned long flags;
+	struct intel_runtime_pm *runtime_pm = ce->engine->uncore->rpm;
+	intel_wakeref_t wakeref;
+
+	GEM_BUG_ON(context_enabled(ce));
+
+	spin_lock_irqsave(&ce->guc_state.lock, flags);
+	if (unlikely(submission_disabled(guc) ||
+		     !intel_context_is_pinned(ce) ||
+		     context_pending_disable(ce) ||
+		     context_blocked(ce) > 1)) {
+		spin_unlock_irqrestore(&ce->guc_state.lock, flags);
+		goto out;
+	}
+
+	set_context_pending_enable(ce);
+	set_context_enabled(ce);
+	intel_context_get(ce);
+	spin_unlock_irqrestore(&ce->guc_state.lock, flags);
+
+	with_intel_runtime_pm(runtime_pm, wakeref)
+		__guc_context_sched_enable(guc, ce);
+
+out:
+	spin_lock_irqsave(&sched_engine->lock, flags);
+	decr_context_blocked(ce);
+	spin_unlock_irqrestore(&sched_engine->lock, flags);
+}
+
+static void guc_context_cancel_request(struct intel_context *ce,
+				       struct i915_request *rq)
+{
+	if (i915_sw_fence_signaled(&rq->submit)) {
+		struct i915_sw_fence *fence = guc_context_block(ce);
+
+		i915_sw_fence_wait(fence);
+		if (!i915_request_completed(rq)) {
+			__i915_request_skip(rq);
+			guc_reset_state(ce, intel_ring_wrap(ce->ring, rq->head),
+					true);
+		}
+		guc_context_unblock(ce);
+	}
 }
 
 static void __guc_context_set_preemption_timeout(struct intel_guc *guc,
@@ -1641,6 +1811,8 @@ static const struct intel_context_ops guc_context_ops = {
 
 	.ban = guc_context_ban,
 
+	.cancel_request = guc_context_cancel_request,
+
 	.enter = intel_context_enter_engine,
 	.exit = intel_context_exit_engine,
 
@@ -1835,6 +2007,8 @@ static const struct intel_context_ops virtual_guc_context_ops = {
 	.post_unpin = guc_context_post_unpin,
 
 	.ban = guc_context_ban,
+
+	.cancel_request = guc_context_cancel_request,
 
 	.enter = guc_virtual_context_enter,
 	.exit = guc_virtual_context_exit,
@@ -2294,6 +2468,7 @@ int intel_guc_sched_done_process_msg(struct intel_guc *guc,
 		clr_context_banned(ce);
 		clr_context_pending_disable(ce);
 		__guc_signal_context_fence(ce);
+		guc_blocked_fence_complete(ce);
 		spin_unlock_irqrestore(&ce->guc_state.lock, flags);
 
 		if (banned) {
