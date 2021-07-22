@@ -1041,8 +1041,6 @@ enum count_type {
 	F2FS_RD_DATA,
 	F2FS_RD_NODE,
 	F2FS_RD_META,
-	F2FS_DIO_WRITE,
-	F2FS_DIO_READ,
 	NR_COUNT_TYPE,
 };
 
@@ -1623,6 +1621,10 @@ struct f2fs_sb_info {
 
 	/* # of pages, see count_type */
 	atomic_t nr_pages[NR_COUNT_TYPE];
+
+	/* # of inflight direct IO request */
+	atomic_t nr_dio_req[2];
+
 	/* # of allocated blocks */
 	struct percpu_counter alloc_valid_block_count;
 
@@ -1748,13 +1750,6 @@ struct f2fs_sb_info {
 	unsigned int compress_watermark;	/* cache page watermark */
 	atomic_t compress_page_hit;		/* cache hit count */
 #endif
-};
-
-struct f2fs_private_dio {
-	struct inode *inode;
-	void *orig_private;
-	bio_end_io_t *orig_end_io;
-	bool write;
 };
 
 #ifdef CONFIG_F2FS_FAULT_INJECTION
@@ -2276,6 +2271,18 @@ static inline void dec_page_count(struct f2fs_sb_info *sbi, int count_type)
 	atomic_dec(&sbi->nr_pages[count_type]);
 }
 
+static inline void inc_dio_req_count(struct f2fs_sb_info *sbi,
+							unsigned int rw)
+{
+	atomic_inc(&sbi->nr_dio_req[rw]);
+}
+
+static inline void dec_dio_req_count(struct f2fs_sb_info *sbi,
+							unsigned int rw)
+{
+	atomic_dec(&sbi->nr_dio_req[rw]);
+}
+
 static inline void inode_dec_dirty_pages(struct inode *inode)
 {
 	if (!S_ISDIR(inode->i_mode) && !S_ISREG(inode->i_mode) &&
@@ -2604,8 +2611,8 @@ static inline bool is_inflight_io(struct f2fs_sb_info *sbi, int type)
 	if (get_pages(sbi, F2FS_RD_DATA) || get_pages(sbi, F2FS_RD_NODE) ||
 		get_pages(sbi, F2FS_RD_META) || get_pages(sbi, F2FS_WB_DATA) ||
 		get_pages(sbi, F2FS_WB_CP_DATA) ||
-		get_pages(sbi, F2FS_DIO_READ) ||
-		get_pages(sbi, F2FS_DIO_WRITE))
+		atomic_read(&sbi->nr_dio_req[READ]) ||
+		atomic_read(&sbi->nr_dio_req[WRITE]))
 		return true;
 
 	if (type != DISCARD_TIME && SM_I(sbi) && SM_I(sbi)->dcc_info &&
@@ -3683,7 +3690,7 @@ struct f2fs_stat_info {
 	int total_count, utilization;
 	int bg_gc, nr_wb_cp_data, nr_wb_data;
 	int nr_rd_data, nr_rd_node, nr_rd_meta;
-	int nr_dio_read, nr_dio_write;
+	int nr_dio_req[2];
 	unsigned int io_skip_bggc, other_skip_bggc;
 	int nr_flushing, nr_flushed, flush_list_empty;
 	int nr_discarding, nr_discarded;

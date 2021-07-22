@@ -1720,6 +1720,9 @@ static int __get_data_block(struct inode *inode, sector_t iblock,
 		map_bh(bh, inode->i_sb, map.m_pblk);
 		bh->b_state = (bh->b_state & ~F2FS_MAP_FLAGS) | map.m_flags;
 		bh->b_size = blks_to_bytes(inode, map.m_len);
+
+		if (flag == F2FS_GET_BLOCK_DIO)
+			bh->b_private = (void *)may_write;
 	}
 	return err;
 }
@@ -3487,48 +3490,23 @@ static int check_direct_IO(struct inode *inode, struct iov_iter *iter,
 	return 0;
 }
 
-static void f2fs_dio_end_io(struct bio *bio)
+static int f2fs_dio_end_io(struct kiocb *iocb, loff_t offset,
+					ssize_t bytes, void *private)
 {
-	struct f2fs_private_dio *dio = bio->bi_private;
+	struct inode *inode = file_inode(iocb->ki_filp);
+	bool may_write = private;
 
-	dec_page_count(F2FS_I_SB(dio->inode),
-			dio->write ? F2FS_DIO_WRITE : F2FS_DIO_READ);
-
-	bio->bi_private = dio->orig_private;
-	bio->bi_end_io = dio->orig_end_io;
-
-	kfree(dio);
-
-	bio_endio(bio);
+	dec_dio_req_count(F2FS_I_SB(inode), may_write ? WRITE : READ);
+	return 0;
 }
 
 static void f2fs_dio_submit_bio(struct bio *bio, struct inode *inode,
 							loff_t file_offset)
 {
-	struct f2fs_private_dio *dio;
-	bool write = (bio_op(bio) == REQ_OP_WRITE);
-
-	dio = f2fs_kzalloc(F2FS_I_SB(inode),
-			sizeof(struct f2fs_private_dio), GFP_NOFS);
-	if (!dio)
-		goto out;
-
-	dio->inode = inode;
-	dio->orig_end_io = bio->bi_end_io;
-	dio->orig_private = bio->bi_private;
-	dio->write = write;
-
-	bio->bi_end_io = f2fs_dio_end_io;
-	bio->bi_private = dio;
-
-	inc_page_count(F2FS_I_SB(inode),
-			write ? F2FS_DIO_WRITE : F2FS_DIO_READ);
+	inc_dio_req_count(F2FS_I_SB(inode),
+			op_is_write(bio_op(bio)) ? WRITE : READ);
 
 	submit_bio(bio);
-	return;
-out:
-	bio->bi_status = BLK_STS_IOERR;
-	bio_endio(bio);
 }
 
 static ssize_t f2fs_direct_IO(struct kiocb *iocb, struct iov_iter *iter)
@@ -3579,7 +3557,8 @@ static ssize_t f2fs_direct_IO(struct kiocb *iocb, struct iov_iter *iter)
 
 	err = __blockdev_direct_IO(iocb, inode, inode->i_sb->s_bdev,
 			iter, rw == WRITE ? get_data_block_dio_write :
-			get_data_block_dio, NULL, f2fs_dio_submit_bio,
+			get_data_block_dio,
+			f2fs_dio_end_io, f2fs_dio_submit_bio,
 			rw == WRITE ? DIO_LOCKING | DIO_SKIP_HOLES :
 			DIO_SKIP_HOLES);
 

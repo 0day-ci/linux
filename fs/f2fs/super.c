@@ -3424,6 +3424,9 @@ static void init_sb_info(struct f2fs_sb_info *sbi)
 	for (i = 0; i < NR_COUNT_TYPE; i++)
 		atomic_set(&sbi->nr_pages[i], 0);
 
+	atomic_set(&sbi->nr_dio_req[READ], 0);
+	atomic_set(&sbi->nr_dio_req[WRITE], 0);
+
 	for (i = 0; i < META; i++)
 		atomic_set(&sbi->wb_sync_req[i], 0);
 
