@@ -1066,6 +1066,28 @@ void __module_get(struct module *module)
 }
 EXPORT_SYMBOL(__module_get);
 
+/**
+ * try_module_get - yields to module removal and bumps reference count otherwise
+ * @module: the module we should check for
+ *
+ * This can be used to check if userspace has requested to remove a module,
+ * and if so let the caller give up. Otherwise it takes a reference count to
+ * ensure a request from userspace to remove the module cannot happen.
+ *
+ * Care must be taken to ensure the module cannot be removed during
+ * try_module_get(). This can be done by having another entity other than the
+ * module itself increment the module reference count, or through some other
+ * means which gaurantees the module could not be removed during an operation.
+ * An example of this later case is using this call in a sysfs file which the
+ * module created. The sysfs store / read file operation is ensured to exist
+ * and still be present by kernfs's active reference. If a sysfs file operation
+ * is being run, the module which created it must still exist as the module is
+ * in charge of removal of the sysfs file.
+ *
+ * The real value to try_module_get() is the module_is_live() check which
+ * ensures this the caller of try_module_get() can yields to userspace module
+ * removal requests and fail whatever it was about to process.
+ */
 bool try_module_get(struct module *module)
 {
 	bool ret = true;
