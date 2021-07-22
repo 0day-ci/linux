@@ -2180,6 +2180,7 @@ static int sev_es_validate_vmgexit(struct vcpu_svm *svm)
 	case SVM_VMGEXIT_AP_HLT_LOOP:
 	case SVM_VMGEXIT_AP_JUMP_TABLE:
 	case SVM_VMGEXIT_UNSUPPORTED_EVENT:
+	case SVM_VMGEXIT_HV_FT:
 		break;
 	default:
 		goto vmgexit_err;
@@ -2361,6 +2362,16 @@ static void set_ghcb_msr_ap_rst_resp(struct vcpu_svm *svm, u64 value)
 	svm->vmcb->control.ghcb_gpa = GHCB_MSR_AP_RESET_HOLD_RESP | (value << GHCB_DATA_LOW);
 }
 
+static void set_ghcb_msr_hv_feat_resp(struct vcpu_svm *svm, u64 value)
+{
+	u64 msr;
+
+	msr  = GHCB_MSR_HV_FT_RESP;
+	msr |= (value << GHCB_DATA_LOW);
+
+	svm->vmcb->control.ghcb_gpa = msr;
+}
+
 static void set_ghcb_msr(struct vcpu_svm *svm, u64 value)
 {
 	svm->vmcb->control.ghcb_gpa = value;
@@ -2423,6 +2434,10 @@ static int sev_handle_vmgexit_msr_protocol(struct vcpu_svm *svm)
 		 */
 		set_ghcb_msr_ap_rst_resp(svm, 0);
 
+		break;
+	}
+	case GHCB_MSR_HV_FT_REQ: {
+		set_ghcb_msr_hv_feat_resp(svm, GHCB_HV_FT_SUPPORTED);
 		break;
 	}
 	case GHCB_MSR_TERM_REQ: {
@@ -2533,6 +2548,12 @@ int sev_handle_vmgexit(struct kvm_vcpu *vcpu)
 						SVM_EVTINJ_TYPE_EXEPT |
 						SVM_EVTINJ_VALID);
 		}
+
+		ret = 1;
+		break;
+	}
+	case SVM_VMGEXIT_HV_FT: {
+		ghcb_set_sw_exit_info_2(ghcb, GHCB_HV_FT_SUPPORTED);
 
 		ret = 1;
 		break;
