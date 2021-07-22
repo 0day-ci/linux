@@ -20,6 +20,8 @@
 #include <linux/assoc_array.h>
 #include <linux/refcount.h>
 #include <linux/time64.h>
+#include <linux/err.h>
+#include <linux/kconfig.h>
 
 #ifdef __KERNEL__
 #include <linux/uidgid.h>
@@ -487,6 +489,48 @@ extern void key_fsuid_changed(struct cred *new_cred);
 extern void key_fsgid_changed(struct cred *new_cred);
 extern void key_init(void);
 
+/*
+ * internal use, so key core code need not link against
+ * all supported key types
+ * */
+enum __key_type {
+	KEY_TYPE_UNKNOWN, KEY_TYPE_USER, KEY_TYPE_ENCRYPTED, KEY_TYPE_TRUSTED
+};
+
+const void *__key_extract_material(const struct key *key, enum __key_type type,
+				   unsigned int *len);
+
+/**
+ * key_extract_material - Extract decrypted data out of a key
+ * @key: a logon, user, encrypted or trusted key
+ * @len: pointer to variable to store key size into
+ *
+ * Extract decrypted data out of supported key types
+ *
+ * Returns a pointer to the key material if successfull or an error
+ * pointer if key type is not compiled in, the buffer is too
+ * small or the key was revoked.
+ */
+static inline const void *key_extract_material(const struct key *key,
+					       unsigned int *len)
+{
+	extern struct key_type key_type_user;
+	extern struct key_type key_type_logon;
+	extern struct key_type key_type_encrypted;
+	extern struct key_type key_type_trusted;
+	enum __key_type type = KEY_TYPE_UNKNOWN;
+	const struct key_type *t = key->type;
+
+	if (t == &key_type_logon || t == &key_type_user)
+		type = KEY_TYPE_USER;
+	else if (IS_REACHABLE(CONFIG_ENCRYPTED_KEYS) && t == &key_type_encrypted)
+		type = KEY_TYPE_ENCRYPTED;
+	else if (IS_REACHABLE(CONFIG_TRUSTED_KEYS) && t == &key_type_trusted)
+		type = KEY_TYPE_TRUSTED;
+
+	return __key_extract_material(key, type, len);
+}
+
 #else /* CONFIG_KEYS */
 
 #define key_validate(k)			0
@@ -504,6 +548,7 @@ extern void key_init(void);
 #define key_init()			do { } while(0)
 #define key_free_user_ns(ns)		do { } while(0)
 #define key_remove_domain(d)		do { } while(0)
+#define key_extract_material(k, l)	ERR_PTR(-EINVAL)
 
 #endif /* CONFIG_KEYS */
 #endif /* __KERNEL__ */

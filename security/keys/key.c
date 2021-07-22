@@ -15,6 +15,9 @@
 #include <linux/random.h>
 #include <linux/ima.h>
 #include <linux/err.h>
+#include <keys/user-type.h>
+#include <keys/encrypted-type.h>
+#include <keys/trusted-type.h>
 #include "internal.h"
 
 struct kmem_cache *key_jar;
@@ -1139,6 +1142,43 @@ int generic_key_instantiate(struct key *key, struct key_preparsed_payload *prep)
 	return ret;
 }
 EXPORT_SYMBOL(generic_key_instantiate);
+
+const void *__key_extract_material(const struct key *key,
+				   enum __key_type type, unsigned int *len)
+{
+	const struct encrypted_key_payload *ekp;
+	const struct trusted_key_payload *tkp;
+	const struct user_key_payload *ukp;
+
+	switch (type) {
+	case KEY_TYPE_USER:
+		ukp = user_key_payload_locked(key);
+		if (!ukp)
+			break;
+
+		*len = ukp->datalen;
+		return ukp->data;
+	case KEY_TYPE_ENCRYPTED:
+		ekp = key->payload.data[0];
+		if (!ekp)
+			break;
+
+		*len = ekp->decrypted_datalen;
+		return ekp->decrypted_data;
+	case KEY_TYPE_TRUSTED:
+		tkp = key->payload.data[0];
+		if (!tkp)
+			break;
+
+		*len = tkp->key_len;
+		return tkp->key;
+	default:
+		return ERR_PTR(-EINVAL);
+	}
+
+	return ERR_PTR(-EKEYREVOKED);
+}
+EXPORT_SYMBOL(__key_extract_material);
 
 /**
  * register_key_type - Register a type of key.
