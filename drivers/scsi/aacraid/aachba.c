@@ -485,8 +485,8 @@ int aac_get_containers(struct aac_dev *dev)
 	if (status != -ERESTARTSYS)
 		aac_fib_free(fibptr);
 
-	if (maximum_num_containers < MAXIMUM_NUM_CONTAINERS)
-		maximum_num_containers = MAXIMUM_NUM_CONTAINERS;
+	maximum_num_containers = max(maximum_num_containers, MAXIMUM_NUM_CONTAINERS);
+
 	if (dev->fsa_dev == NULL ||
 		dev->maximum_num_containers != maximum_num_containers) {
 
