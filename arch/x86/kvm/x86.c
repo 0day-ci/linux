@@ -8504,9 +8504,12 @@ int kvm_emulate_halt(struct kvm_vcpu *vcpu)
 }
 EXPORT_SYMBOL_GPL(kvm_emulate_halt);
 
-int kvm_emulate_ap_reset_hold(struct kvm_vcpu *vcpu)
+int kvm_emulate_ap_reset_hold(struct kvm_vcpu *vcpu,
+			      enum ap_reset_hold_type type)
 {
 	int ret = kvm_skip_emulated_instruction(vcpu);
+
+	vcpu->arch.reset_hold_type = type;
 
 	return __kvm_vcpu_halt(vcpu, KVM_MP_STATE_AP_RESET_HOLD, KVM_EXIT_AP_RESET_HOLD) && ret;
 }
