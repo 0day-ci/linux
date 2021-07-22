@@ -272,5 +272,6 @@ const struct drm_display_mode *intel_bios_lfp_lvds_info(struct intel_encoder *en
 const struct vbt_backlight_info *intel_bios_backlight_info(struct intel_encoder *encoder);
 struct vbt_edp_info *intel_bios_edp_info(struct intel_encoder *encoder);
 const struct vbt_psr_info *intel_bios_psr_info(struct intel_dp *intel_dp);
+const struct vbt_dsi_info *intel_bios_dsi_info(struct intel_encoder *encoder);
 
 #endif /* _INTEL_BIOS_H_ */

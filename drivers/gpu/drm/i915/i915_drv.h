@@ -699,6 +699,21 @@ struct ddi_vbt_port_info {
 		int tp2_tp3_wakeup_time_us;
 		int psr2_tp2_tp3_wakeup_time_us;
 	} psr;
+
+	/* MIPI DSI */
+	struct vbt_dsi_info {
+		u16 panel_id;
+		struct mipi_config *config;
+		struct mipi_pps_data *pps;
+		u16 bl_ports;
+		u16 cabc_ports;
+		u8 seq_version;
+		u32 size;
+		u8 *data;
+		const u8 *sequence[MIPI_SEQ_MAX];
+		u8 *deassert_seq; /* Used by fixup_mipi_sequences() */
+		enum drm_panel_orientation orientation;
+	} dsi;
 };
 
 struct intel_vbt_data {
@@ -718,21 +733,6 @@ struct intel_vbt_data {
 	int lvds_ssc_freq;
 	unsigned int bios_lvds_val; /* initial [PCH_]LVDS reg val in VBIOS */
 	enum drm_panel_orientation orientation;
-
-	/* MIPI DSI */
-	struct {
-		u16 panel_id;
-		struct mipi_config *config;
-		struct mipi_pps_data *pps;
-		u16 bl_ports;
-		u16 cabc_ports;
-		u8 seq_version;
-		u32 size;
-		u8 *data;
-		const u8 *sequence[MIPI_SEQ_MAX];
-		u8 *deassert_seq; /* Used by fixup_mipi_sequences() */
-		enum drm_panel_orientation orientation;
-	} dsi;
 
 	int crt_ddc_pin;
 

@@ -1022,55 +1022,56 @@ parse_psr(struct drm_i915_private *i915, const struct bdb_header *bdb,
 }
 
 static void parse_dsi_backlight_ports(struct drm_i915_private *i915,
-				      u16 version, enum port port)
+				      u16 version, enum port port,
+				      struct ddi_vbt_port_info *info)
 {
-	if (!i915->vbt.dsi.config->dual_link || version < 197) {
-		i915->vbt.dsi.bl_ports = BIT(port);
-		if (i915->vbt.dsi.config->cabc_supported)
-			i915->vbt.dsi.cabc_ports = BIT(port);
+	if (!info->dsi.config->dual_link || version < 197) {
+		info->dsi.bl_ports = BIT(port);
+		if (info->dsi.config->cabc_supported)
+			info->dsi.cabc_ports = BIT(port);
 
 		return;
 	}
 
-	switch (i915->vbt.dsi.config->dl_dcs_backlight_ports) {
+	switch (info->dsi.config->dl_dcs_backlight_ports) {
 	case DL_DCS_PORT_A:
-		i915->vbt.dsi.bl_ports = BIT(PORT_A);
+		info->dsi.bl_ports = BIT(PORT_A);
 		break;
 	case DL_DCS_PORT_C:
-		i915->vbt.dsi.bl_ports = BIT(PORT_C);
+		info->dsi.bl_ports = BIT(PORT_C);
 		break;
 	default:
 	case DL_DCS_PORT_A_AND_C:
-		i915->vbt.dsi.bl_ports = BIT(PORT_A) | BIT(PORT_C);
+		info->dsi.bl_ports = BIT(PORT_A) | BIT(PORT_C);
 		break;
 	}
 
-	if (!i915->vbt.dsi.config->cabc_supported)
+	if (!info->dsi.config->cabc_supported)
 		return;
 
-	switch (i915->vbt.dsi.config->dl_dcs_cabc_ports) {
+	switch (info->dsi.config->dl_dcs_cabc_ports) {
 	case DL_DCS_PORT_A:
-		i915->vbt.dsi.cabc_ports = BIT(PORT_A);
+		info->dsi.cabc_ports = BIT(PORT_A);
 		break;
 	case DL_DCS_PORT_C:
-		i915->vbt.dsi.cabc_ports = BIT(PORT_C);
+		info->dsi.cabc_ports = BIT(PORT_C);
 		break;
 	default:
 	case DL_DCS_PORT_A_AND_C:
-		i915->vbt.dsi.cabc_ports =
-					BIT(PORT_A) | BIT(PORT_C);
+		info->dsi.cabc_ports = BIT(PORT_A) | BIT(PORT_C);
 		break;
 	}
 }
 
 static void
 parse_mipi_config(struct drm_i915_private *i915,
-		  const struct bdb_header *bdb)
+		  const struct bdb_header *bdb,
+		  struct ddi_vbt_port_info *info,
+		  int panel_index)
 {
 	const struct bdb_mipi_config *start;
 	const struct mipi_config *config;
 	const struct mipi_pps_data *pps;
-	int panel_type = i915->vbt.panel_type;
 	enum port port;
 
 	/* parse MIPI blocks only if LFP type is MIPI */
@@ -1078,14 +1079,14 @@ parse_mipi_config(struct drm_i915_private *i915,
 		return;
 
 	/* Initialize this to undefined indicating no generic MIPI support */
-	i915->vbt.dsi.panel_id = MIPI_DSI_UNDEFINED_PANEL_ID;
+	info->dsi.panel_id = MIPI_DSI_UNDEFINED_PANEL_ID;
 
 	/* Block #40 is already parsed and panel_fixed_mode is
 	 * stored in i915->lfp_lvds_vbt_mode
 	 * resuse this when needed
 	 */
 
-	/* Parse #52 for panel index used from panel_type already
+	/* Parse #52 for panel index used from panel_index already
 	 * parsed
 	 */
 	start = find_section(bdb, BDB_MIPI_CONFIG);
@@ -1095,27 +1096,27 @@ parse_mipi_config(struct drm_i915_private *i915,
 	}
 
 	drm_dbg(&i915->drm, "Found MIPI Config block, panel index = %d\n",
-		panel_type);
+		panel_index);
 
 	/*
 	 * get hold of the correct configuration block and pps data as per
-	 * the panel_type as index
+	 * the panel_index as index
 	 */
-	config = &start->config[panel_type];
-	pps = &start->pps[panel_type];
+	config = &start->config[panel_index];
+	pps = &start->pps[panel_index];
 
 	/* store as of now full data. Trim when we realise all is not needed */
-	i915->vbt.dsi.config = kmemdup(config, sizeof(struct mipi_config), GFP_KERNEL);
-	if (!i915->vbt.dsi.config)
+	info->dsi.config = kmemdup(config, sizeof(struct mipi_config), GFP_KERNEL);
+	if (!info->dsi.config)
 		return;
 
-	i915->vbt.dsi.pps = kmemdup(pps, sizeof(struct mipi_pps_data), GFP_KERNEL);
-	if (!i915->vbt.dsi.pps) {
-		kfree(i915->vbt.dsi.config);
+	info->dsi.pps = kmemdup(pps, sizeof(struct mipi_pps_data), GFP_KERNEL);
+	if (!info->dsi.pps) {
+		kfree(info->dsi.config);
 		return;
 	}
 
-	parse_dsi_backlight_ports(i915, bdb->version, port);
+	parse_dsi_backlight_ports(i915, bdb->version, port, info);
 
 	/* FIXME is the 90 vs. 270 correct? */
 	switch (config->rotation) {
@@ -1124,25 +1125,25 @@ parse_mipi_config(struct drm_i915_private *i915,
 		 * Most (all?) VBTs claim 0 degrees despite having
 		 * an upside down panel, thus we do not trust this.
 		 */
-		i915->vbt.dsi.orientation =
+		info->dsi.orientation =
 			DRM_MODE_PANEL_ORIENTATION_UNKNOWN;
 		break;
 	case ENABLE_ROTATION_90:
-		i915->vbt.dsi.orientation =
+		info->dsi.orientation =
 			DRM_MODE_PANEL_ORIENTATION_RIGHT_UP;
 		break;
 	case ENABLE_ROTATION_180:
-		i915->vbt.dsi.orientation =
+		info->dsi.orientation =
 			DRM_MODE_PANEL_ORIENTATION_BOTTOM_UP;
 		break;
 	case ENABLE_ROTATION_270:
-		i915->vbt.dsi.orientation =
+		info->dsi.orientation =
 			DRM_MODE_PANEL_ORIENTATION_LEFT_UP;
 		break;
 	}
 
 	/* We have mandatory mipi config blocks. Initialize as generic panel */
-	i915->vbt.dsi.panel_id = MIPI_DSI_GENERIC_PANEL_ID;
+	info->dsi.panel_id = MIPI_DSI_GENERIC_PANEL_ID;
 }
 
 /* Find the sequence block and size for the given panel. */
@@ -1305,13 +1306,14 @@ static int goto_next_sequence_v3(const u8 *data, int index, int total)
  * Get len of pre-fixed deassert fragment from a v1 init OTP sequence,
  * skip all delay + gpio operands and stop at the first DSI packet op.
  */
-static int get_init_otp_deassert_fragment_len(struct drm_i915_private *i915)
+static int get_init_otp_deassert_fragment_len(struct drm_i915_private *i915,
+					      struct ddi_vbt_port_info *info)
 {
-	const u8 *data = i915->vbt.dsi.sequence[MIPI_SEQ_INIT_OTP];
+	const u8 *data = info->dsi.sequence[MIPI_SEQ_INIT_OTP];
 	int index, len;
 
 	if (drm_WARN_ON(&i915->drm,
-			!data || i915->vbt.dsi.seq_version != 1))
+			!data || info->dsi.seq_version != 1))
 		return 0;
 
 	/* index = 1 to skip sequence byte */
@@ -1339,7 +1341,8 @@ static int get_init_otp_deassert_fragment_len(struct drm_i915_private *i915)
  * these devices we split the init OTP sequence into a deassert sequence and
  * the actual init OTP part.
  */
-static void fixup_mipi_sequences(struct drm_i915_private *i915)
+static void fixup_mipi_sequences(struct drm_i915_private *i915,
+				 struct ddi_vbt_port_info *info)
 {
 	u8 *init_otp;
 	int len;
@@ -1349,18 +1352,18 @@ static void fixup_mipi_sequences(struct drm_i915_private *i915)
 		return;
 
 	/* Limit this to v1 vid-mode sequences */
-	if (i915->vbt.dsi.config->is_cmd_mode ||
-	    i915->vbt.dsi.seq_version != 1)
+	if (info->dsi.config->is_cmd_mode ||
+	    info->dsi.seq_version != 1)
 		return;
 
 	/* Only do this if there are otp and assert seqs and no deassert seq */
-	if (!i915->vbt.dsi.sequence[MIPI_SEQ_INIT_OTP] ||
-	    !i915->vbt.dsi.sequence[MIPI_SEQ_ASSERT_RESET] ||
-	    i915->vbt.dsi.sequence[MIPI_SEQ_DEASSERT_RESET])
+	if (!info->dsi.sequence[MIPI_SEQ_INIT_OTP] ||
+	    !info->dsi.sequence[MIPI_SEQ_ASSERT_RESET] ||
+	    info->dsi.sequence[MIPI_SEQ_DEASSERT_RESET])
 		return;
 
 	/* The deassert-sequence ends at the first DSI packet */
-	len = get_init_otp_deassert_fragment_len(i915);
+	len = get_init_otp_deassert_fragment_len(i915, info);
 	if (!len)
 		return;
 
@@ -1368,26 +1371,27 @@ static void fixup_mipi_sequences(struct drm_i915_private *i915)
 		    "Using init OTP fragment to deassert reset\n");
 
 	/* Copy the fragment, update seq byte and terminate it */
-	init_otp = (u8 *)i915->vbt.dsi.sequence[MIPI_SEQ_INIT_OTP];
-	i915->vbt.dsi.deassert_seq = kmemdup(init_otp, len + 1, GFP_KERNEL);
-	if (!i915->vbt.dsi.deassert_seq)
+	init_otp = (u8 *)info->dsi.sequence[MIPI_SEQ_INIT_OTP];
+	info->dsi.deassert_seq = kmemdup(init_otp, len + 1, GFP_KERNEL);
+	if (!info->dsi.deassert_seq)
 		return;
-	i915->vbt.dsi.deassert_seq[0] = MIPI_SEQ_DEASSERT_RESET;
-	i915->vbt.dsi.deassert_seq[len] = MIPI_SEQ_ELEM_END;
+	info->dsi.deassert_seq[0] = MIPI_SEQ_DEASSERT_RESET;
+	info->dsi.deassert_seq[len] = MIPI_SEQ_ELEM_END;
 	/* Use the copy for deassert */
-	i915->vbt.dsi.sequence[MIPI_SEQ_DEASSERT_RESET] =
-		i915->vbt.dsi.deassert_seq;
+	info->dsi.sequence[MIPI_SEQ_DEASSERT_RESET] =
+		info->dsi.deassert_seq;
 	/* Replace the last byte of the fragment with init OTP seq byte */
 	init_otp[len - 1] = MIPI_SEQ_INIT_OTP;
 	/* And make MIPI_MIPI_SEQ_INIT_OTP point to it */
-	i915->vbt.dsi.sequence[MIPI_SEQ_INIT_OTP] = init_otp + len - 1;
+	info->dsi.sequence[MIPI_SEQ_INIT_OTP] = init_otp + len - 1;
 }
 
 static void
 parse_mipi_sequence(struct drm_i915_private *i915,
-		    const struct bdb_header *bdb)
+		    const struct bdb_header *bdb,
+		    struct ddi_vbt_port_info *info,
+		    int panel_index)
 {
-	int panel_type = i915->vbt.panel_type;
 	const struct bdb_mipi_sequence *sequence;
 	const u8 *seq_data;
 	u32 seq_size;
@@ -1395,7 +1399,7 @@ parse_mipi_sequence(struct drm_i915_private *i915,
 	int index = 0;
 
 	/* Only our generic panel driver uses the sequence block. */
-	if (i915->vbt.dsi.panel_id != MIPI_DSI_GENERIC_PANEL_ID)
+	if (info->dsi.panel_id != MIPI_DSI_GENERIC_PANEL_ID)
 		return;
 
 	sequence = find_section(bdb, BDB_MIPI_SEQUENCE);
@@ -1416,7 +1420,7 @@ parse_mipi_sequence(struct drm_i915_private *i915,
 	drm_dbg(&i915->drm, "Found MIPI sequence block v%u\n",
 		sequence->version);
 
-	seq_data = find_panel_sequence_block(sequence, panel_type, &seq_size);
+	seq_data = find_panel_sequence_block(sequence, panel_index, &seq_size);
 	if (!seq_data)
 		return;
 
@@ -1441,7 +1445,7 @@ parse_mipi_sequence(struct drm_i915_private *i915,
 			drm_dbg_kms(&i915->drm,
 				    "Unsupported sequence %u\n", seq_id);
 
-		i915->vbt.dsi.sequence[seq_id] = data + index;
+		info->dsi.sequence[seq_id] = data + index;
 
 		if (sequence->version >= 3)
 			index = goto_next_sequence_v3(data, index, seq_size);
@@ -1454,18 +1458,18 @@ parse_mipi_sequence(struct drm_i915_private *i915,
 		}
 	}
 
-	i915->vbt.dsi.data = data;
-	i915->vbt.dsi.size = seq_size;
-	i915->vbt.dsi.seq_version = sequence->version;
+	info->dsi.data = data;
+	info->dsi.size = seq_size;
+	info->dsi.seq_version = sequence->version;
 
-	fixup_mipi_sequences(i915);
+	fixup_mipi_sequences(i915, info);
 
 	drm_dbg(&i915->drm, "MIPI related VBT parsing complete\n");
 	return;
 
 err:
 	kfree(data);
-	memset(i915->vbt.dsi.sequence, 0, sizeof(i915->vbt.dsi.sequence));
+	memset(info->dsi.sequence, 0, sizeof(info->dsi.sequence));
 }
 
 static void
@@ -1990,6 +1994,8 @@ static void parse_integrated_panel(struct drm_i915_private *i915,
 	parse_lfp_backlight(i915, bdb, info, panel_index);
 	parse_edp(i915, bdb, info, panel_index);
 	parse_psr(i915, bdb, info, panel_index);
+	parse_mipi_config(i915, bdb, info, panel_index);
+	parse_mipi_sequence(i915, bdb, info, panel_index);
 }
 
 static void parse_ddi_port(struct drm_i915_private *i915,
@@ -2486,8 +2492,6 @@ void intel_bios_init(struct drm_i915_private *i915)
 	parse_panel_type(i915, bdb);
 	parse_sdvo_panel_data(i915, bdb);
 	parse_driver_features(i915, bdb);
-	parse_mipi_config(i915, bdb);
-	parse_mipi_sequence(i915, bdb);
 
 	/* Depends on child device list */
 	parse_compression_parameters(i915, bdb);
@@ -2522,20 +2526,23 @@ void intel_bios_driver_remove(struct drm_i915_private *i915)
 	}
 
 	for (i = 0; i < I915_MAX_PORTS; i++) {
-		kfree(i915->vbt.ddi_port_info[i].lfp_lvds_vbt_mode);
-		i915->vbt.ddi_port_info[i].lfp_lvds_vbt_mode = NULL;
+		struct ddi_vbt_port_info *info = &i915->vbt.ddi_port_info[i];
+
+		kfree(info->lfp_lvds_vbt_mode);
+		info->lfp_lvds_vbt_mode = NULL;
+
+		kfree(info->dsi.data);
+		info->dsi.data = NULL;
+		kfree(info->dsi.pps);
+		info->dsi.pps = NULL;
+		kfree(info->dsi.config);
+		info->dsi.config = NULL;
+		kfree(info->dsi.deassert_seq);
+		info->dsi.deassert_seq = NULL;
 	}
 
 	kfree(i915->vbt.sdvo_lvds_vbt_mode);
 	i915->vbt.sdvo_lvds_vbt_mode = NULL;
-	kfree(i915->vbt.dsi.data);
-	i915->vbt.dsi.data = NULL;
-	kfree(i915->vbt.dsi.pps);
-	i915->vbt.dsi.pps = NULL;
-	kfree(i915->vbt.dsi.config);
-	i915->vbt.dsi.config = NULL;
-	kfree(i915->vbt.dsi.deassert_seq);
-	i915->vbt.dsi.deassert_seq = NULL;
 }
 
 /**
@@ -3148,4 +3155,12 @@ intel_bios_psr_info(struct intel_dp *intel_dp)
 	struct intel_encoder *encoder = &dig_port->base;
 
 	return &i915->vbt.ddi_port_info[encoder->port].psr;
+}
+
+const struct vbt_dsi_info *
+intel_bios_dsi_info(struct intel_encoder *encoder)
+{
+	struct drm_i915_private *i915 = to_i915(encoder->base.dev);
+
+	return &i915->vbt.ddi_port_info[encoder->port].dsi;
 }
