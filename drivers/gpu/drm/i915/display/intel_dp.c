@@ -5133,6 +5133,7 @@ intel_dp_drrs_init(struct intel_connector *connector,
 {
 	struct drm_i915_private *dev_priv = to_i915(connector->base.dev);
 	struct drm_display_mode *downclock_mode = NULL;
+	enum drrs_support_type drrs_type = intel_bios_drrs_type(connector->encoder);
 
 	INIT_DELAYED_WORK(&dev_priv->drrs.work, intel_edp_drrs_downclock_work);
 	mutex_init(&dev_priv->drrs.mutex);
@@ -5143,7 +5144,7 @@ intel_dp_drrs_init(struct intel_connector *connector,
 		return NULL;
 	}
 
-	if (dev_priv->vbt.drrs_type != SEAMLESS_DRRS_SUPPORT) {
+	if (drrs_type != SEAMLESS_DRRS_SUPPORT) {
 		drm_dbg_kms(&dev_priv->drm, "VBT doesn't support DRRS\n");
 		return NULL;
 	}
@@ -5155,7 +5156,7 @@ intel_dp_drrs_init(struct intel_connector *connector,
 		return NULL;
 	}
 
-	dev_priv->drrs.type = dev_priv->vbt.drrs_type;
+	dev_priv->drrs.type = drrs_type;
 
 	dev_priv->drrs.refresh_rate_type = DRRS_HIGH_RR;
 	drm_dbg_kms(&dev_priv->drm,

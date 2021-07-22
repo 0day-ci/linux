@@ -211,21 +211,19 @@ get_lvds_fp_timing(const struct bdb_header *bdb,
 	return (const struct lvds_fp_timing *)((const u8 *)bdb + ofs);
 }
 
-/* Parse general panel options */
-static void
-parse_panel_options(struct drm_i915_private *i915,
-		    const struct bdb_header *bdb)
+/*
+ * Parse and set vbt.panel_type, it will be used by the VBT blocks that are
+ * not being called from parse_integrated_panel() yet.
+ */
+static void parse_panel_type(struct drm_i915_private *i915,
+			     const struct bdb_header *bdb)
 {
 	const struct bdb_lvds_options *lvds_options;
-	int panel_type;
-	int drrs_mode;
-	int ret;
+	int ret, panel_type;
 
 	lvds_options = find_section(bdb, BDB_LVDS_OPTIONS);
 	if (!lvds_options)
 		return;
-
-	i915->vbt.lvds_dither = lvds_options->pixel_dither;
 
 	ret = intel_opregion_get_panel_type(i915);
 	if (ret >= 0) {
@@ -246,9 +244,25 @@ parse_panel_options(struct drm_i915_private *i915,
 	}
 
 	i915->vbt.panel_type = panel_type;
+}
 
-	drrs_mode = (lvds_options->dps_panel_type_bits
-				>> (panel_type * 2)) & MODE_MASK;
+/* Parse general panel options */
+static void
+parse_panel_options(struct drm_i915_private *i915,
+		    const struct bdb_header *bdb,
+		    struct ddi_vbt_port_info *info,
+		    int panel_index)
+{
+	const struct bdb_lvds_options *lvds_options;
+	int drrs_mode;
+
+	lvds_options = find_section(bdb, BDB_LVDS_OPTIONS);
+	if (!lvds_options)
+		return;
+
+	drrs_mode = lvds_options->dps_panel_type_bits >> (panel_index * 2);
+	drrs_mode &= MODE_MASK;
+
 	/*
 	 * VBT has static DRRS = 0 and seamless DRRS = 2.
 	 * The below piece of code is required to adjust vbt.drrs_type
@@ -256,16 +270,16 @@ parse_panel_options(struct drm_i915_private *i915,
 	 */
 	switch (drrs_mode) {
 	case 0:
-		i915->vbt.drrs_type = STATIC_DRRS_SUPPORT;
+		info->drrs_type = STATIC_DRRS_SUPPORT;
 		drm_dbg_kms(&i915->drm, "DRRS supported mode is static\n");
 		break;
 	case 2:
-		i915->vbt.drrs_type = SEAMLESS_DRRS_SUPPORT;
+		info->drrs_type = SEAMLESS_DRRS_SUPPORT;
 		drm_dbg_kms(&i915->drm,
 			    "DRRS supported mode is seamless\n");
 		break;
 	default:
-		i915->vbt.drrs_type = DRRS_NOT_SUPPORTED;
+		info->drrs_type = DRRS_NOT_SUPPORTED;
 		drm_dbg_kms(&i915->drm,
 			    "DRRS not supported (VBT input)\n");
 		break;
@@ -710,28 +724,42 @@ parse_driver_features(struct drm_i915_private *i915,
 			i915->vbt.int_lvds_support = 0;
 	}
 
-	if (bdb->version < 228) {
-		drm_dbg_kms(&i915->drm, "DRRS State Enabled:%d\n",
-			    driver->drrs_enabled);
-		/*
-		 * If DRRS is not supported, drrs_type has to be set to 0.
-		 * This is because, VBT is configured in such a way that
-		 * static DRRS is 0 and DRRS not supported is represented by
-		 * driver->drrs_enabled=false
-		 */
-		if (!driver->drrs_enabled)
-			i915->vbt.drrs_type = DRRS_NOT_SUPPORTED;
-
+	if (bdb->version < 228)
 		i915->vbt.psr.enable = driver->psr_enabled;
-	}
+}
+
+static void
+parse_driver_features_drrs_only(struct drm_i915_private *i915,
+				const struct bdb_header *bdb,
+				struct ddi_vbt_port_info *info)
+{
+	const struct bdb_driver_features *driver;
+
+	if (bdb->version >= 228)
+		return;
+
+	driver = find_section(bdb, BDB_DRIVER_FEATURES);
+	if (!driver)
+		return;
+
+	drm_dbg_kms(&i915->drm, "DRRS State Enabled:%d\n", driver->drrs_enabled);
+	/*
+	 * If DRRS is not supported, drrs_type has to be set to 0.
+	 * This is because, VBT is configured in such a way that
+	 * static DRRS is 0 and DRRS not supported is represented by
+	 * driver->drrs_enabled=false
+	 */
+	if (!driver->drrs_enabled)
+		info->drrs_type = DRRS_NOT_SUPPORTED;
 }
 
 static void
 parse_power_conservation_features(struct drm_i915_private *i915,
-				  const struct bdb_header *bdb)
+				  const struct bdb_header *bdb,
+				  struct ddi_vbt_port_info *info,
+				  int panel_index)
 {
 	const struct bdb_lfp_power *power;
-	u8 panel_type = i915->vbt.panel_type;
 
 	if (bdb->version < 228)
 		return;
@@ -740,7 +768,7 @@ parse_power_conservation_features(struct drm_i915_private *i915,
 	if (!power)
 		return;
 
-	i915->vbt.psr.enable = power->psr & BIT(panel_type);
+	i915->vbt.psr.enable = power->psr & BIT(panel_index);
 
 	/*
 	 * If DRRS is not supported, drrs_type has to be set to 0.
@@ -748,11 +776,11 @@ parse_power_conservation_features(struct drm_i915_private *i915,
 	 * static DRRS is 0 and DRRS not supported is represented by
 	 * power->drrs & BIT(panel_type)=false
 	 */
-	if (!(power->drrs & BIT(panel_type)))
-		i915->vbt.drrs_type = DRRS_NOT_SUPPORTED;
+	if (!(power->drrs & BIT(panel_index)))
+		info->drrs_type = DRRS_NOT_SUPPORTED;
 
 	if (bdb->version >= 232)
-		i915->vbt.edp.hobl = power->hobl & BIT(panel_type);
+		i915->vbt.edp.hobl = power->hobl & BIT(panel_index);
 }
 
 static void
@@ -1887,6 +1915,74 @@ static bool is_port_valid(struct drm_i915_private *i915, enum port port)
 	return true;
 }
 
+static const struct bdb_header *get_bdb_header(const struct vbt_header *vbt)
+{
+	const void *_vbt = vbt;
+
+	return _vbt + vbt->bdb_offset;
+}
+
+static int
+get_lfp_panel_index(struct drm_i915_private *i915,
+		    const struct bdb_header *bdb, int lfp_panel_instance)
+{
+	const struct bdb_lvds_options *lvds_options;
+
+	lvds_options = find_section(bdb, BDB_LVDS_OPTIONS);
+	if (!lvds_options)
+		return -1;
+
+	switch (lfp_panel_instance) {
+	case 1:
+		return lvds_options->panel_type;
+	case 2:
+		return lvds_options->panel_type2;
+	default:
+		break;
+	}
+
+	return -1;
+}
+
+static void parse_integrated_panel(struct drm_i915_private *i915,
+				   struct intel_bios_encoder_data *devdata,
+				   struct ddi_vbt_port_info *info)
+{
+	const struct vbt_header *vbt = i915->opregion.vbt;
+	const struct bdb_header *bdb;
+	int lfp_inst = 0, panel_index, opregion_panel_index;
+
+	if (devdata->child.handle == HANDLE_LFP_1)
+		lfp_inst = 1;
+	else if (devdata->child.handle == HANDLE_LFP_2)
+		lfp_inst = 2;
+
+	if (lfp_inst == 0)
+		return;
+
+	bdb = get_bdb_header(vbt);
+	panel_index = get_lfp_panel_index(i915, bdb, lfp_inst);
+
+	opregion_panel_index = intel_opregion_get_panel_type(i915);
+	/*
+	 * TODO: the current implementation always use the panel index from
+	 * opregion if available due to issues with old platforms.
+	 * But this do not supports two panels and in SKL or newer I never saw a
+	 * system were this call returns a valid value.
+	 * So will change this to only use opregion up to BDW in a separated
+	 * commit.
+	 */
+	if (opregion_panel_index >= 0)
+		panel_index = opregion_panel_index;
+
+	if (panel_index == -1)
+		return;
+
+	parse_panel_options(i915, bdb, info, panel_index);
+	parse_power_conservation_features(i915, bdb, info, panel_index);
+	parse_driver_features_drrs_only(i915, bdb, info);
+}
+
 static void parse_ddi_port(struct drm_i915_private *i915,
 			   struct intel_bios_encoder_data *devdata)
 {
@@ -2018,6 +2114,8 @@ static void parse_ddi_port(struct drm_i915_private *i915,
 			    port_name(port), info->dp_max_link_rate);
 	}
 
+	parse_integrated_panel(i915, devdata, info);
+
 	info->devdata = devdata;
 }
 
@@ -2144,9 +2242,6 @@ init_vbt_defaults(struct drm_i915_private *i915)
 	/* Default to having backlight */
 	i915->vbt.backlight.present = true;
 
-	/* LFP panel data */
-	i915->vbt.lvds_dither = 1;
-
 	/* SDVO panel data */
 	i915->vbt.sdvo_lvds_vbt_mode = NULL;
 
@@ -2224,13 +2319,6 @@ init_vbt_missing_defaults(struct drm_i915_private *i915)
 
 	/* Bypass some minimum baseline VBT version checks */
 	i915->vbt.version = 155;
-}
-
-static const struct bdb_header *get_bdb_header(const struct vbt_header *vbt)
-{
-	const void *_vbt = vbt;
-
-	return _vbt + vbt->bdb_offset;
 }
 
 /**
@@ -2386,12 +2474,11 @@ void intel_bios_init(struct drm_i915_private *i915)
 	/* Grab useful general definitions */
 	parse_general_features(i915, bdb);
 	parse_general_definitions(i915, bdb);
-	parse_panel_options(i915, bdb);
+	parse_panel_type(i915, bdb);
 	parse_panel_dtd(i915, bdb);
 	parse_lfp_backlight(i915, bdb);
 	parse_sdvo_panel_data(i915, bdb);
 	parse_driver_features(i915, bdb);
-	parse_power_conservation_features(i915, bdb);
 	parse_edp(i915, bdb);
 	parse_psr(i915, bdb);
 	parse_mipi_config(i915, bdb);
@@ -3010,4 +3097,12 @@ const struct intel_bios_encoder_data *
 intel_bios_encoder_data_lookup(struct drm_i915_private *i915, enum port port)
 {
 	return i915->vbt.ddi_port_info[port].devdata;
+}
+
+enum drrs_support_type
+intel_bios_drrs_type(struct intel_encoder *encoder)
+{
+	struct drm_i915_private *i915 = to_i915(encoder->base.dev);
+
+	return i915->vbt.ddi_port_info[encoder->port].drrs_type;
 }

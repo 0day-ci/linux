@@ -266,4 +266,6 @@ bool intel_bios_encoder_supports_tbt(const struct intel_bios_encoder_data *devda
 int intel_bios_encoder_dp_boost_level(const struct intel_bios_encoder_data *devdata);
 int intel_bios_encoder_hdmi_boost_level(const struct intel_bios_encoder_data *devdata);
 
+enum drrs_support_type intel_bios_drrs_type(struct intel_encoder *encoder);
+
 #endif /* _INTEL_BIOS_H_ */

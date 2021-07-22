@@ -656,6 +656,8 @@ struct ddi_vbt_port_info {
 	u8 alternate_ddc_pin;
 
 	int dp_max_link_rate;		/* 0 for not limited by VBT */
+
+	enum drrs_support_type drrs_type;
 };
 
 enum psr_lines_to_wait {
@@ -674,7 +676,6 @@ struct intel_vbt_data {
 
 	/* Feature bits */
 	unsigned int int_tv_support:1;
-	unsigned int lvds_dither:1;
 	unsigned int int_crt_support:1;
 	unsigned int lvds_use_ssc:1;
 	unsigned int int_lvds_support:1;
@@ -684,8 +685,6 @@ struct intel_vbt_data {
 	int lvds_ssc_freq;
 	unsigned int bios_lvds_val; /* initial [PCH_]LVDS reg val in VBIOS */
 	enum drm_panel_orientation orientation;
-
-	enum drrs_support_type drrs_type;
 
 	struct {
 		int rate;
