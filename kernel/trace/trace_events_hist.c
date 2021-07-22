@@ -1395,17 +1395,17 @@ static int hist_trigger_elt_data_alloc(struct tracing_map_elt *elt)
 	struct hist_trigger_data *hist_data = elt->map->private_data;
 	unsigned int size = TASK_COMM_LEN;
 	struct hist_elt_data *elt_data;
-	struct hist_field *key_field;
+	struct hist_field *hist_field;
 	unsigned int i, n_str;
 
 	elt_data = kzalloc(sizeof(*elt_data), GFP_KERNEL);
 	if (!elt_data)
 		return -ENOMEM;
 
-	for_each_hist_key_field(i, hist_data) {
-		key_field = hist_data->fields[i];
+	for_each_hist_field(i, hist_data) {
+		hist_field = hist_data->fields[i];
 
-		if (key_field->flags & HIST_FIELD_FL_EXECNAME) {
+		if (hist_field->flags & HIST_FIELD_FL_EXECNAME) {
 			elt_data->comm = kzalloc(size, GFP_KERNEL);
 			if (!elt_data->comm) {
 				kfree(elt_data);
@@ -1582,7 +1582,9 @@ static void __destroy_hist_field(struct hist_field *hist_field)
 
 	kfree(hist_field->var.name);
 	kfree(hist_field->name);
-	kfree(hist_field->type);
+
+	/* execname vars use a constant type */
+	kfree_const(hist_field->type);
 
 	kfree(hist_field->system);
 	kfree(hist_field->event_name);
@@ -3688,6 +3690,40 @@ static int create_val_field(struct hist_trigger_data *hist_data,
 	return __create_val_field(hist_data, val_idx, file, NULL, field_str, 0);
 }
 
+static const char *no_comm = "(no comm)";
+
+static u64 hist_field_execname(struct hist_field *hist_field,
+			       struct tracing_map_elt *elt,
+			       struct trace_buffer *buffer,
+			       struct ring_buffer_event *rbe,
+			       void *event)
+{
+	struct hist_elt_data *elt_data;
+
+	if (WARN_ON_ONCE(!elt))
+		return (u64)(unsigned long)no_comm;
+
+	elt_data = elt->private_data;
+
+	if (WARN_ON_ONCE(!elt_data->comm))
+		return (u64)(unsigned long)no_comm;
+
+	return (u64)(unsigned long)(elt_data->comm);
+}
+
+/* Convert a var that points to common_pid.execname to a string */
+static void update_var_execname(struct hist_field *hist_field)
+{
+	hist_field->flags = HIST_FIELD_FL_STRING | HIST_FIELD_FL_VAR |
+		HIST_FIELD_FL_EXECNAME;
+	hist_field->size = MAX_FILTER_STR_VAL;
+	hist_field->is_signed = 0;
+	kfree(hist_field->type);
+	/* This uses kfree_const() to free */
+	hist_field->type = "char[]";
+	hist_field->fn = hist_field_execname;
+}
+
 static int create_var_field(struct hist_trigger_data *hist_data,
 			    unsigned int val_idx,
 			    struct trace_event_file *file,
@@ -3711,6 +3747,9 @@ static int create_var_field(struct hist_trigger_data *hist_data,
 		return -EINVAL;
 
 	ret = __create_val_field(hist_data, val_idx, file, var_name, expr_str, flags);
+
+	if (!ret && hist_data->fields[val_idx]->flags & HIST_FIELD_FL_EXECNAME)
+		update_var_execname(hist_data->fields[val_idx]);
 
 	if (!ret && hist_data->fields[val_idx]->flags & HIST_FIELD_FL_STRING)
 		hist_data->fields[val_idx]->var_str_idx = hist_data->n_var_str++;
