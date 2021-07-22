@@ -875,10 +875,10 @@ static void rbd_client_release(struct kref *kref)
 {
 	struct rbd_client *rbdc = container_of(kref, struct rbd_client, kref);
 
-	dout("%s: rbdc %p\n", __func__, rbdc);
-	spin_lock(&rbd_client_list_lock);
 	list_del(&rbdc->node);
 	spin_unlock(&rbd_client_list_lock);
+
+	dout("%s: rbdc %p\n", __func__, rbdc);
 
 	ceph_destroy_client(rbdc->client);
 	kfree(rbdc);
@@ -891,7 +891,8 @@ static void rbd_client_release(struct kref *kref)
 static void rbd_put_client(struct rbd_client *rbdc)
 {
 	if (rbdc)
-		kref_put(&rbdc->kref, rbd_client_release);
+		kref_put_lock(&rbdc->kref,
+			      rbd_client_release, &rbd_client_list_lock);
 }
 
 /*
