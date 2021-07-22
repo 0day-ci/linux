@@ -12,6 +12,8 @@
 #include <linux/mod_devicetable.h>
 #include <linux/nvmem-provider.h>
 #include <linux/platform_device.h>
+#include <linux/pm_domain.h>
+#include <linux/pm_runtime.h>
 #include <linux/property.h>
 #include <linux/regulator/consumer.h>
 
@@ -149,6 +151,11 @@ static void qfprom_disable_fuse_blowing(const struct qfprom_priv *priv,
 	if (ret)
 		dev_warn(priv->dev, "Failed to set 0 voltage (ignoring)\n");
 
+	if (priv->dev->pm_domain) {
+		dev_pm_genpd_set_performance_state(priv->dev, 0);
+		pm_runtime_put(priv->dev);
+	}
+
 	ret = regulator_disable(priv->vcc);
 	if (ret)
 		dev_warn(priv->dev, "Failed to disable regulator (ignoring)\n");
@@ -212,6 +219,16 @@ static int qfprom_enable_fuse_blowing(const struct qfprom_priv *priv,
 		goto err_clk_rate_set;
 	}
 
+	if (priv->dev->pm_domain) {
+		ret = pm_runtime_get_sync(priv->dev);
+		if (ret < 0) {
+			pm_runtime_put_noidle(priv->dev);
+			dev_err(priv->dev, "Failed to enable power-domain\n");
+			goto err_reg_enable;
+		}
+		dev_pm_genpd_set_performance_state(priv->dev, INT_MAX);
+	}
+
 	old->timer_val = readl(priv->qfpconf + QFPROM_BLOW_TIMER_OFFSET);
 	old->accel_val = readl(priv->qfpconf + QFPROM_ACCEL_OFFSET);
 	writel(priv->soc_data->qfprom_blow_timer_value,
@@ -221,6 +238,8 @@ static int qfprom_enable_fuse_blowing(const struct qfprom_priv *priv,
 
 	return 0;
 
+err_reg_enable:
+	regulator_disable(priv->vcc);
 err_clk_rate_set:
 	clk_set_rate(priv->secclk, old->clk_rate);
 err_clk_prepared:
@@ -419,6 +438,9 @@ static int qfprom_probe(struct platform_device *pdev)
 		if (priv->soc_data)
 			econfig.reg_write = qfprom_reg_write;
 	}
+
+	if (dev->pm_domain)
+		pm_runtime_enable(dev);
 
 	nvmem = devm_nvmem_register(dev, &econfig);
 
