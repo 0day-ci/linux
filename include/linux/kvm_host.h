@@ -268,7 +268,10 @@ static inline bool kvm_vcpu_mapped(struct kvm_host_map *map)
 
 static inline bool kvm_vcpu_can_poll(ktime_t cur, ktime_t stop)
 {
-	return single_task_running() && !need_resched() && ktime_before(cur, stop);
+	return single_task_running() &&
+		   !need_resched() &&
+		   ktime_before(cur, stop) &&
+		   is_core_idle(raw_smp_processor_id());
 }
 
 /*
