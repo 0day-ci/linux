@@ -660,6 +660,15 @@ struct ddi_vbt_port_info {
 	enum drrs_support_type drrs_type;
 
 	struct drm_display_mode *lfp_lvds_vbt_mode; /* if any */
+
+	struct vbt_backlight_info {
+		u16 pwm_freq_hz;
+		bool present;
+		bool active_low_pwm;
+		u8 min_brightness;	/* min_brightness/255 of max */
+		u8 controller;		/* brightness controller number */
+		enum intel_backlight_type type;
+	} backlight;
 };
 
 enum psr_lines_to_wait {
@@ -709,15 +718,6 @@ struct intel_vbt_data {
 		int tp2_tp3_wakeup_time_us;
 		int psr2_tp2_tp3_wakeup_time_us;
 	} psr;
-
-	struct {
-		u16 pwm_freq_hz;
-		bool present;
-		bool active_low_pwm;
-		u8 min_brightness;	/* min_brightness/255 of max */
-		u8 controller;		/* brightness controller number */
-		enum intel_backlight_type type;
-	} backlight;
 
 	/* MIPI DSI */
 	struct {

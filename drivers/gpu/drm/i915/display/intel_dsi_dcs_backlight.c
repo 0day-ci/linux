@@ -166,11 +166,12 @@ static const struct intel_panel_bl_funcs dcs_bl_funcs = {
 int intel_dsi_dcs_init_backlight_funcs(struct intel_connector *intel_connector)
 {
 	struct drm_device *dev = intel_connector->base.dev;
-	struct drm_i915_private *dev_priv = to_i915(dev);
 	struct intel_encoder *encoder = intel_attached_encoder(intel_connector);
 	struct intel_panel *panel = &intel_connector->panel;
+	const struct vbt_backlight_info *backlight_info;
 
-	if (dev_priv->vbt.backlight.type != INTEL_BACKLIGHT_DSI_DCS)
+	backlight_info = intel_bios_backlight_info(encoder);
+	if (backlight_info->type != INTEL_BACKLIGHT_DSI_DCS)
 		return -ENODEV;
 
 	if (drm_WARN_ON(dev, encoder->type != INTEL_OUTPUT_DSI))

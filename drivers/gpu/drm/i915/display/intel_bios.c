@@ -441,11 +441,12 @@ parse_panel_dtd(struct drm_i915_private *i915,
 
 static void
 parse_lfp_backlight(struct drm_i915_private *i915,
-		    const struct bdb_header *bdb)
+		    const struct bdb_header *bdb,
+		    struct ddi_vbt_port_info *info,
+		    int panel_index)
 {
 	const struct bdb_lfp_backlight_data *backlight_data;
 	const struct lfp_backlight_data_entry *entry;
-	int panel_type = i915->vbt.panel_type;
 	u16 level;
 
 	backlight_data = find_section(bdb, BDB_LVDS_BACKLIGHT);
@@ -459,38 +460,38 @@ parse_lfp_backlight(struct drm_i915_private *i915,
 		return;
 	}
 
-	entry = &backlight_data->data[panel_type];
+	entry = &backlight_data->data[panel_index];
 
-	i915->vbt.backlight.present = entry->type == BDB_BACKLIGHT_TYPE_PWM;
-	if (!i915->vbt.backlight.present) {
+	info->backlight.present = entry->type == BDB_BACKLIGHT_TYPE_PWM;
+	if (!info->backlight.present) {
 		drm_dbg_kms(&i915->drm,
 			    "PWM backlight not present in VBT (type %u)\n",
 			    entry->type);
 		return;
 	}
 
-	i915->vbt.backlight.type = INTEL_BACKLIGHT_DISPLAY_DDI;
+	info->backlight.type = INTEL_BACKLIGHT_DISPLAY_DDI;
 	if (bdb->version >= 191 &&
 	    get_blocksize(backlight_data) >= sizeof(*backlight_data)) {
 		const struct lfp_backlight_control_method *method;
 
-		method = &backlight_data->backlight_control[panel_type];
-		i915->vbt.backlight.type = method->type;
-		i915->vbt.backlight.controller = method->controller;
+		method = &backlight_data->backlight_control[panel_index];
+		info->backlight.type = method->type;
+		info->backlight.controller = method->controller;
 	}
 
-	i915->vbt.backlight.pwm_freq_hz = entry->pwm_freq_hz;
-	i915->vbt.backlight.active_low_pwm = entry->active_low_pwm;
+	info->backlight.pwm_freq_hz = entry->pwm_freq_hz;
+	info->backlight.active_low_pwm = entry->active_low_pwm;
 
 	if (bdb->version >= 234) {
 		u16 min_level;
 		bool scale;
 
-		level = backlight_data->brightness_level[panel_type].level;
-		min_level = backlight_data->brightness_min_level[panel_type].level;
+		level = backlight_data->brightness_level[panel_index].level;
+		min_level = backlight_data->brightness_min_level[panel_index].level;
 
 		if (bdb->version >= 236)
-			scale = backlight_data->brightness_precision_bits[panel_type] == 16;
+			scale = backlight_data->brightness_precision_bits[panel_index] == 16;
 		else
 			scale = level > 255;
 
@@ -501,20 +502,20 @@ parse_lfp_backlight(struct drm_i915_private *i915,
 			drm_warn(&i915->drm, "Brightness min level > 255\n");
 			level = 255;
 		}
-		i915->vbt.backlight.min_brightness = min_level;
+		info->backlight.min_brightness = min_level;
 	} else {
-		level = backlight_data->level[panel_type];
-		i915->vbt.backlight.min_brightness = entry->min_brightness;
+		level = backlight_data->level[panel_index];
+		info->backlight.min_brightness = entry->min_brightness;
 	}
 
 	drm_dbg_kms(&i915->drm,
 		    "VBT backlight PWM modulation frequency %u Hz, "
 		    "active %s, min brightness %u, level %u, controller %u\n",
-		    i915->vbt.backlight.pwm_freq_hz,
-		    i915->vbt.backlight.active_low_pwm ? "low" : "high",
-		    i915->vbt.backlight.min_brightness,
+		    info->backlight.pwm_freq_hz,
+		    info->backlight.active_low_pwm ? "low" : "high",
+		    info->backlight.min_brightness,
 		    level,
-		    i915->vbt.backlight.controller);
+		    info->backlight.controller);
 }
 
 /* Try to find sdvo panel data */
@@ -1987,6 +1988,7 @@ static void parse_integrated_panel(struct drm_i915_private *i915,
 	parse_power_conservation_features(i915, bdb, info, panel_index);
 	parse_driver_features_drrs_only(i915, bdb, info);
 	parse_panel_dtd(i915, bdb, info, panel_index);
+	parse_lfp_backlight(i915, bdb, info, panel_index);
 }
 
 static void parse_ddi_port(struct drm_i915_private *i915,
@@ -2120,6 +2122,9 @@ static void parse_ddi_port(struct drm_i915_private *i915,
 			    port_name(port), info->dp_max_link_rate);
 	}
 
+	/* Default to having backlight */
+	info->backlight.present = true;
+
 	parse_integrated_panel(i915, devdata, info);
 
 	info->devdata = devdata;
@@ -2244,9 +2249,6 @@ static void
 init_vbt_defaults(struct drm_i915_private *i915)
 {
 	i915->vbt.crt_ddc_pin = GMBUS_PIN_VGADDC;
-
-	/* Default to having backlight */
-	i915->vbt.backlight.present = true;
 
 	/* SDVO panel data */
 	i915->vbt.sdvo_lvds_vbt_mode = NULL;
@@ -2481,7 +2483,6 @@ void intel_bios_init(struct drm_i915_private *i915)
 	parse_general_features(i915, bdb);
 	parse_general_definitions(i915, bdb);
 	parse_panel_type(i915, bdb);
-	parse_lfp_backlight(i915, bdb);
 	parse_sdvo_panel_data(i915, bdb);
 	parse_driver_features(i915, bdb);
 	parse_edp(i915, bdb);
@@ -3122,4 +3123,12 @@ intel_bios_lfp_lvds_info(struct intel_encoder *encoder)
 	struct drm_i915_private *i915 = to_i915(encoder->base.dev);
 
 	return i915->vbt.ddi_port_info[encoder->port].lfp_lvds_vbt_mode;
+}
+
+const struct vbt_backlight_info *
+intel_bios_backlight_info(struct intel_encoder *encoder)
+{
+	struct drm_i915_private *i915 = to_i915(encoder->base.dev);
+
+	return &i915->vbt.ddi_port_info[encoder->port].backlight;
 }

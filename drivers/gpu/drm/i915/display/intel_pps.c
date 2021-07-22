@@ -207,7 +207,13 @@ static int
 bxt_power_sequencer_idx(struct intel_dp *intel_dp)
 {
 	struct drm_i915_private *dev_priv = dp_to_i915(intel_dp);
-	int backlight_controller = dev_priv->vbt.backlight.controller;
+	struct intel_digital_port *dig_port = dp_to_dig_port(intel_dp);
+	struct intel_encoder *encoder = &dig_port->base;
+	const struct vbt_backlight_info *backlight_info;
+	int backlight_controller;
+
+	backlight_info = intel_bios_backlight_info(encoder);
+	backlight_controller = backlight_info->controller;
 
 	lockdep_assert_held(&dev_priv->pps_mutex);
 

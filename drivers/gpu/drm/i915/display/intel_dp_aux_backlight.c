@@ -310,13 +310,14 @@ static int intel_dp_aux_vesa_setup_backlight(struct intel_connector *connector, 
 {
 	struct intel_dp *intel_dp = intel_attached_dp(connector);
 	struct intel_panel *panel = &connector->panel;
-	struct drm_i915_private *i915 = dp_to_i915(intel_dp);
+	const struct vbt_backlight_info *backlight_info;
 	u16 current_level;
 	u8 current_mode;
 	int ret;
 
+	backlight_info = intel_bios_backlight_info(connector->encoder);
 	ret = drm_edp_backlight_init(&intel_dp->aux, &panel->backlight.edp.vesa.info,
-				     i915->vbt.backlight.pwm_freq_hz, intel_dp->edp_dpcd,
+				     backlight_info->pwm_freq_hz, intel_dp->edp_dpcd,
 				     &current_level, &current_mode);
 	if (ret < 0)
 		return ret;
@@ -383,7 +384,9 @@ int intel_dp_aux_init_backlight_funcs(struct intel_connector *connector)
 	struct intel_dp *intel_dp = enc_to_intel_dp(connector->encoder);
 	struct drm_i915_private *i915 = dp_to_i915(intel_dp);
 	bool try_intel_interface = false, try_vesa_interface = false;
+	const struct vbt_backlight_info *backlight_info;
 
+	backlight_info = intel_bios_backlight_info(connector->encoder);
 	/* Check the VBT and user's module parameters to figure out which
 	 * interfaces to probe
 	 */
@@ -391,7 +394,7 @@ int intel_dp_aux_init_backlight_funcs(struct intel_connector *connector)
 	case INTEL_DP_AUX_BACKLIGHT_OFF:
 		return -ENODEV;
 	case INTEL_DP_AUX_BACKLIGHT_AUTO:
-		switch (i915->vbt.backlight.type) {
+		switch (backlight_info->type) {
 		case INTEL_BACKLIGHT_VESA_EDP_AUX_INTERFACE:
 			try_vesa_interface = true;
 			break;
@@ -403,7 +406,7 @@ int intel_dp_aux_init_backlight_funcs(struct intel_connector *connector)
 		}
 		break;
 	case INTEL_DP_AUX_BACKLIGHT_ON:
-		if (i915->vbt.backlight.type != INTEL_BACKLIGHT_VESA_EDP_AUX_INTERFACE)
+		if (backlight_info->type != INTEL_BACKLIGHT_VESA_EDP_AUX_INTERFACE)
 			try_intel_interface = true;
 
 		try_vesa_interface = true;
