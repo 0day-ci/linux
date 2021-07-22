@@ -567,13 +567,13 @@ int f2fs_get_node_info(struct f2fs_sb_info *sbi, nid_t nid,
 	memset(&ne, 0, sizeof(struct f2fs_nat_entry));
 
 	/* Check current segment summary */
-	down_read(&curseg->journal_rwsem);
+	read_lock(&curseg->journal_rwlock);
 	i = f2fs_lookup_journal_in_cursum(journal, NAT_JOURNAL, nid, 0);
 	if (i >= 0) {
 		ne = nat_in_journal(journal, i);
 		node_info_from_raw_nat(ni, &ne);
 	}
-	up_read(&curseg->journal_rwsem);
+	read_unlock(&curseg->journal_rwlock);
 	if (i >= 0) {
 		up_read(&nm_i->nat_tree_lock);
 		goto cache;
@@ -2338,7 +2338,7 @@ static void scan_curseg_cache(struct f2fs_sb_info *sbi)
 	struct f2fs_journal *journal = curseg->journal;
 	int i;
 
-	down_read(&curseg->journal_rwsem);
+	read_lock(&curseg->journal_rwlock);
 	for (i = 0; i < nats_in_cursum(journal); i++) {
 		block_t addr;
 		nid_t nid;
@@ -2350,7 +2350,7 @@ static void scan_curseg_cache(struct f2fs_sb_info *sbi)
 		else
 			remove_free_nid(sbi, nid);
 	}
-	up_read(&curseg->journal_rwsem);
+	read_unlock(&curseg->journal_rwlock);
 }
 
 static void scan_free_nid_bits(struct f2fs_sb_info *sbi)
@@ -2799,7 +2799,7 @@ static void remove_nats_in_journal(struct f2fs_sb_info *sbi)
 	struct f2fs_journal *journal = curseg->journal;
 	int i;
 
-	down_write(&curseg->journal_rwsem);
+	write_lock(&curseg->journal_rwlock);
 	for (i = 0; i < nats_in_cursum(journal); i++) {
 		struct nat_entry *ne;
 		struct f2fs_nat_entry raw_ne;
@@ -2831,7 +2831,7 @@ static void remove_nats_in_journal(struct f2fs_sb_info *sbi)
 		__set_nat_cache_dirty(nm_i, ne);
 	}
 	update_nats_in_cursum(journal, -i);
-	up_write(&curseg->journal_rwsem);
+	write_unlock(&curseg->journal_rwlock);
 }
 
 static void __adjust_nat_entry_set(struct nat_entry_set *nes,
@@ -2906,7 +2906,7 @@ static int __flush_nat_entry_set(struct f2fs_sb_info *sbi,
 		to_journal = false;
 
 	if (to_journal) {
-		down_write(&curseg->journal_rwsem);
+		write_lock(&curseg->journal_rwlock);
 	} else {
 		page = get_next_nat_page(sbi, start_nid);
 		if (IS_ERR(page))
@@ -2946,7 +2946,7 @@ static int __flush_nat_entry_set(struct f2fs_sb_info *sbi,
 	}
 
 	if (to_journal) {
-		up_write(&curseg->journal_rwsem);
+		write_unlock(&curseg->journal_rwlock);
 	} else {
 		__update_nat_bits(sbi, start_nid, page);
 		f2fs_put_page(page, 1);

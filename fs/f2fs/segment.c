@@ -2442,9 +2442,9 @@ static void write_current_sum_page(struct f2fs_sb_info *sbi,
 
 	mutex_lock(&curseg->curseg_mutex);
 
-	down_read(&curseg->journal_rwsem);
+	read_lock(&curseg->journal_rwlock);
 	memcpy(&dst->journal, curseg->journal, SUM_JOURNAL_SIZE);
-	up_read(&curseg->journal_rwsem);
+	read_unlock(&curseg->journal_rwlock);
 
 	memcpy(dst->entries, src->entries, SUM_ENTRY_SIZE);
 	memcpy(&dst->footer, &src->footer, SUM_FOOTER_SIZE);
@@ -3876,9 +3876,9 @@ static int read_normal_summaries(struct f2fs_sb_info *sbi, int type)
 	mutex_lock(&curseg->curseg_mutex);
 
 	/* update journal info */
-	down_write(&curseg->journal_rwsem);
+	write_lock(&curseg->journal_rwlock);
 	memcpy(curseg->journal, &sum->journal, SUM_JOURNAL_SIZE);
-	up_write(&curseg->journal_rwsem);
+	write_unlock(&curseg->journal_rwlock);
 
 	memcpy(curseg->sum_blk->entries, sum->entries, SUM_ENTRY_SIZE);
 	memcpy(&curseg->sum_blk->footer, &sum->footer, SUM_FOOTER_SIZE);
@@ -4136,7 +4136,7 @@ static void remove_sits_in_journal(struct f2fs_sb_info *sbi)
 	struct f2fs_journal *journal = curseg->journal;
 	int i;
 
-	down_write(&curseg->journal_rwsem);
+	write_lock(&curseg->journal_rwlock);
 	for (i = 0; i < sits_in_cursum(journal); i++) {
 		unsigned int segno;
 		bool dirtied;
@@ -4148,7 +4148,7 @@ static void remove_sits_in_journal(struct f2fs_sb_info *sbi)
 			add_sit_entry(segno, &SM_I(sbi)->sit_entry_set);
 	}
 	update_sits_in_cursum(journal, -i);
-	up_write(&curseg->journal_rwsem);
+	write_unlock(&curseg->journal_rwlock);
 }
 
 /*
@@ -4204,7 +4204,7 @@ void f2fs_flush_sit_entries(struct f2fs_sb_info *sbi, struct cp_control *cpc)
 			to_journal = false;
 
 		if (to_journal) {
-			down_write(&curseg->journal_rwsem);
+			write_lock(&curseg->journal_rwlock);
 		} else {
 			page = get_next_sit_page(sbi, start_segno);
 			raw_sit = page_address(page);
@@ -4251,7 +4251,7 @@ void f2fs_flush_sit_entries(struct f2fs_sb_info *sbi, struct cp_control *cpc)
 		}
 
 		if (to_journal)
-			up_write(&curseg->journal_rwsem);
+			write_unlock(&curseg->journal_rwlock);
 		else
 			f2fs_put_page(page, 1);
 
@@ -4432,7 +4432,7 @@ static int build_curseg(struct f2fs_sb_info *sbi)
 		array[i].sum_blk = f2fs_kzalloc(sbi, PAGE_SIZE, GFP_KERNEL);
 		if (!array[i].sum_blk)
 			return -ENOMEM;
-		init_rwsem(&array[i].journal_rwsem);
+		rwlock_init(&array[i].journal_rwlock);
 		array[i].journal = f2fs_kzalloc(sbi,
 				sizeof(struct f2fs_journal), GFP_KERNEL);
 		if (!array[i].journal)
@@ -4509,7 +4509,7 @@ static int build_sit_entries(struct f2fs_sb_info *sbi)
 		start_blk += readed;
 	} while (start_blk < sit_blk_cnt);
 
-	down_read(&curseg->journal_rwsem);
+	read_lock(&curseg->journal_rwlock);
 	for (i = 0; i < sits_in_cursum(journal); i++) {
 		unsigned int old_valid_blocks;
 
@@ -4551,7 +4551,7 @@ static int build_sit_entries(struct f2fs_sb_info *sbi)
 							old_valid_blocks;
 		}
 	}
-	up_read(&curseg->journal_rwsem);
+	read_unlock(&curseg->journal_rwlock);
 
 	if (!err && total_node_blocks != valid_node_count(sbi)) {
 		f2fs_err(sbi, "SIT is corrupted node# %u vs %u",
