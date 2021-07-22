@@ -99,4 +99,21 @@ int page_cpupid_xchg_last(struct page *page, int cpupid)
 
 	return last_cpupid;
 }
+
+unsigned int xchg_page_access_time(struct page *page, unsigned int time)
+{
+	unsigned long old_flags, flags;
+	unsigned int last_time;
+
+	time >>= PAGE_ACCESS_TIME_BUCKETS;
+	do {
+		old_flags = flags = page->flags;
+		last_time = (flags >> LAST_CPUPID_PGSHIFT) & LAST_CPUPID_MASK;
+
+		flags &= ~(LAST_CPUPID_MASK << LAST_CPUPID_PGSHIFT);
+		flags |= (time & LAST_CPUPID_MASK) << LAST_CPUPID_PGSHIFT;
+	} while (unlikely(cmpxchg(&page->flags, old_flags, flags) != old_flags));
+
+	return last_time << PAGE_ACCESS_TIME_BUCKETS;
+}
 #endif
