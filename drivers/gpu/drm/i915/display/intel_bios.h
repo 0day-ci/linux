@@ -267,5 +267,6 @@ int intel_bios_encoder_dp_boost_level(const struct intel_bios_encoder_data *devd
 int intel_bios_encoder_hdmi_boost_level(const struct intel_bios_encoder_data *devdata);
 
 enum drrs_support_type intel_bios_drrs_type(struct intel_encoder *encoder);
+const struct drm_display_mode *intel_bios_lfp_lvds_info(struct intel_encoder *encoder);
 
 #endif /* _INTEL_BIOS_H_ */

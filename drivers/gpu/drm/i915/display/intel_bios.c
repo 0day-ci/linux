@@ -289,14 +289,15 @@ parse_panel_options(struct drm_i915_private *i915,
 /* Try to find integrated panel timing data */
 static void
 parse_lfp_panel_dtd(struct drm_i915_private *i915,
-		    const struct bdb_header *bdb)
+		    const struct bdb_header *bdb,
+		    struct ddi_vbt_port_info *info,
+		    int panel_index)
 {
 	const struct bdb_lvds_lfp_data *lvds_lfp_data;
 	const struct bdb_lvds_lfp_data_ptrs *lvds_lfp_data_ptrs;
 	const struct lvds_dvo_timing *panel_dvo_timing;
 	const struct lvds_fp_timing *fp_timing;
 	struct drm_display_mode *panel_fixed_mode;
-	int panel_type = i915->vbt.panel_type;
 
 	lvds_lfp_data = find_section(bdb, BDB_LVDS_LFP_DATA);
 	if (!lvds_lfp_data)
@@ -308,7 +309,7 @@ parse_lfp_panel_dtd(struct drm_i915_private *i915,
 
 	panel_dvo_timing = get_lvds_dvo_timing(lvds_lfp_data,
 					       lvds_lfp_data_ptrs,
-					       panel_type);
+					       panel_index);
 
 	panel_fixed_mode = kzalloc(sizeof(*panel_fixed_mode), GFP_KERNEL);
 	if (!panel_fixed_mode)
@@ -316,7 +317,7 @@ parse_lfp_panel_dtd(struct drm_i915_private *i915,
 
 	fill_detail_timing_data(panel_fixed_mode, panel_dvo_timing);
 
-	i915->vbt.lfp_lvds_vbt_mode = panel_fixed_mode;
+	info->lfp_lvds_vbt_mode = panel_fixed_mode;
 
 	drm_dbg_kms(&i915->drm,
 		    "Found panel mode in BIOS VBT legacy lfp table:\n");
@@ -324,7 +325,7 @@ parse_lfp_panel_dtd(struct drm_i915_private *i915,
 
 	fp_timing = get_lvds_fp_timing(bdb, lvds_lfp_data,
 				       lvds_lfp_data_ptrs,
-				       panel_type);
+				       panel_index);
 	if (fp_timing) {
 		/* check the resolution, just to be sure */
 		if (fp_timing->x_res == panel_fixed_mode->hdisplay &&
@@ -339,7 +340,9 @@ parse_lfp_panel_dtd(struct drm_i915_private *i915,
 
 static void
 parse_generic_dtd(struct drm_i915_private *i915,
-		  const struct bdb_header *bdb)
+		  const struct bdb_header *bdb,
+		  struct ddi_vbt_port_info *info,
+		  int panel_index)
 {
 	const struct bdb_generic_dtd *generic_dtd;
 	const struct generic_dtd_entry *dtd;
@@ -363,14 +366,14 @@ parse_generic_dtd(struct drm_i915_private *i915,
 
 	num_dtd = (get_blocksize(generic_dtd) -
 		   sizeof(struct bdb_generic_dtd)) / generic_dtd->gdtd_size;
-	if (i915->vbt.panel_type >= num_dtd) {
+	if (panel_index >= num_dtd) {
 		drm_err(&i915->drm,
-			"Panel type %d not found in table of %d DTD's\n",
-			i915->vbt.panel_type, num_dtd);
+			"Panel index %d not found in table of %d DTD's\n",
+			panel_index, num_dtd);
 		return;
 	}
 
-	dtd = &generic_dtd->dtd[i915->vbt.panel_type];
+	dtd = &generic_dtd->dtd[panel_index];
 
 	panel_fixed_mode = kzalloc(sizeof(*panel_fixed_mode), GFP_KERNEL);
 	if (!panel_fixed_mode)
@@ -413,12 +416,14 @@ parse_generic_dtd(struct drm_i915_private *i915,
 		    "Found panel mode in BIOS VBT generic dtd table:\n");
 	drm_mode_debug_printmodeline(panel_fixed_mode);
 
-	i915->vbt.lfp_lvds_vbt_mode = panel_fixed_mode;
+	info->lfp_lvds_vbt_mode = panel_fixed_mode;
 }
 
 static void
 parse_panel_dtd(struct drm_i915_private *i915,
-		const struct bdb_header *bdb)
+		const struct bdb_header *bdb,
+		struct ddi_vbt_port_info *info,
+		int panel_index)
 {
 	/*
 	 * Older VBTs provided provided DTD information for internal displays
@@ -429,9 +434,9 @@ parse_panel_dtd(struct drm_i915_private *i915,
 	 * back to trying the old LFP block if that fails.
 	 */
 	if (bdb->version >= 229)
-		parse_generic_dtd(i915, bdb);
-	if (!i915->vbt.lfp_lvds_vbt_mode)
-		parse_lfp_panel_dtd(i915, bdb);
+		parse_generic_dtd(i915, bdb, info, panel_index);
+	if (!info->lfp_lvds_vbt_mode)
+		parse_lfp_panel_dtd(i915, bdb, info, panel_index);
 }
 
 static void
@@ -1981,6 +1986,7 @@ static void parse_integrated_panel(struct drm_i915_private *i915,
 	parse_panel_options(i915, bdb, info, panel_index);
 	parse_power_conservation_features(i915, bdb, info, panel_index);
 	parse_driver_features_drrs_only(i915, bdb, info);
+	parse_panel_dtd(i915, bdb, info, panel_index);
 }
 
 static void parse_ddi_port(struct drm_i915_private *i915,
@@ -2475,7 +2481,6 @@ void intel_bios_init(struct drm_i915_private *i915)
 	parse_general_features(i915, bdb);
 	parse_general_definitions(i915, bdb);
 	parse_panel_type(i915, bdb);
-	parse_panel_dtd(i915, bdb);
 	parse_lfp_backlight(i915, bdb);
 	parse_sdvo_panel_data(i915, bdb);
 	parse_driver_features(i915, bdb);
@@ -2508,6 +2513,7 @@ out:
 void intel_bios_driver_remove(struct drm_i915_private *i915)
 {
 	struct intel_bios_encoder_data *devdata, *n;
+	int i;
 
 	list_for_each_entry_safe(devdata, n, &i915->vbt.display_devices, node) {
 		list_del(&devdata->node);
@@ -2515,10 +2521,13 @@ void intel_bios_driver_remove(struct drm_i915_private *i915)
 		kfree(devdata);
 	}
 
+	for (i = 0; i < I915_MAX_PORTS; i++) {
+		kfree(i915->vbt.ddi_port_info[i].lfp_lvds_vbt_mode);
+		i915->vbt.ddi_port_info[i].lfp_lvds_vbt_mode = NULL;
+	}
+
 	kfree(i915->vbt.sdvo_lvds_vbt_mode);
 	i915->vbt.sdvo_lvds_vbt_mode = NULL;
-	kfree(i915->vbt.lfp_lvds_vbt_mode);
-	i915->vbt.lfp_lvds_vbt_mode = NULL;
 	kfree(i915->vbt.dsi.data);
 	i915->vbt.dsi.data = NULL;
 	kfree(i915->vbt.dsi.pps);
@@ -3105,4 +3114,12 @@ intel_bios_drrs_type(struct intel_encoder *encoder)
 	struct drm_i915_private *i915 = to_i915(encoder->base.dev);
 
 	return i915->vbt.ddi_port_info[encoder->port].drrs_type;
+}
+
+const struct drm_display_mode *
+intel_bios_lfp_lvds_info(struct intel_encoder *encoder)
+{
+	struct drm_i915_private *i915 = to_i915(encoder->base.dev);
+
+	return i915->vbt.ddi_port_info[encoder->port].lfp_lvds_vbt_mode;
 }

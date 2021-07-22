@@ -658,6 +658,8 @@ struct ddi_vbt_port_info {
 	int dp_max_link_rate;		/* 0 for not limited by VBT */
 
 	enum drrs_support_type drrs_type;
+
+	struct drm_display_mode *lfp_lvds_vbt_mode; /* if any */
 };
 
 enum psr_lines_to_wait {
@@ -671,7 +673,6 @@ struct intel_vbt_data {
 	/* bdb version */
 	u16 version;
 
-	struct drm_display_mode *lfp_lvds_vbt_mode; /* if any */
 	struct drm_display_mode *sdvo_lvds_vbt_mode; /* if any */
 
 	/* Feature bits */

@@ -153,12 +153,13 @@ intel_panel_vbt_fixed_mode(struct intel_connector *connector)
 	struct drm_i915_private *dev_priv = to_i915(connector->base.dev);
 	struct drm_display_info *info = &connector->base.display_info;
 	struct drm_display_mode *fixed_mode;
+	const struct drm_display_mode *lfp_lvds_vbt_mode;
 
-	if (!dev_priv->vbt.lfp_lvds_vbt_mode)
+	lfp_lvds_vbt_mode = intel_bios_lfp_lvds_info(connector->encoder);
+	if (!lfp_lvds_vbt_mode)
 		return NULL;
 
-	fixed_mode = drm_mode_duplicate(&dev_priv->drm,
-					dev_priv->vbt.lfp_lvds_vbt_mode);
+	fixed_mode = drm_mode_duplicate(&dev_priv->drm, lfp_lvds_vbt_mode);
 	if (!fixed_mode)
 		return NULL;
 

@@ -729,9 +729,14 @@ bool intel_dsi_vbt_init(struct intel_dsi *intel_dsi, u16 panel_id)
 	struct drm_i915_private *dev_priv = to_i915(dev);
 	struct mipi_config *mipi_config = dev_priv->vbt.dsi.config;
 	struct mipi_pps_data *pps = dev_priv->vbt.dsi.pps;
-	struct drm_display_mode *mode = dev_priv->vbt.lfp_lvds_vbt_mode;
+	const struct drm_display_mode *mode = intel_bios_lfp_lvds_info(&intel_dsi->base);
 	u16 burst_mode_ratio;
 	enum port port;
+
+	if (!mode) {
+		drm_dbg_kms(&dev_priv->drm, "lfp_lvds_vbt_mode not set\n");
+		return false;
+	}
 
 	drm_dbg_kms(&dev_priv->drm, "\n");
 
