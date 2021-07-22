@@ -195,6 +195,7 @@ unsigned int comedi_8254_status(struct comedi_8254 *i8254, unsigned int counter)
 
 	return __i8254_read(i8254, counter);
 }
+
 EXPORT_SYMBOL_GPL(comedi_8254_status);
 
 /**
@@ -219,6 +220,7 @@ unsigned int comedi_8254_read(struct comedi_8254 *i8254, unsigned int counter)
 
 	return val;
 }
+
 EXPORT_SYMBOL_GPL(comedi_8254_read);
 
 /**
@@ -243,6 +245,7 @@ void comedi_8254_write(struct comedi_8254 *i8254,
 	byte = (val >> 8) & 0xff;
 	__i8254_write(i8254, byte, counter);
 }
+
 EXPORT_SYMBOL_GPL(comedi_8254_write);
 
 /**
@@ -262,12 +265,13 @@ int comedi_8254_set_mode(struct comedi_8254 *i8254, unsigned int counter,
 		return -EINVAL;
 
 	byte = I8254_CTRL_SEL_CTR(counter) |	/* select counter */
-	       I8254_CTRL_LSB_MSB |		/* load LSB then MSB */
-	       mode;				/* mode and BCD|binary */
+	    I8254_CTRL_LSB_MSB |	/* load LSB then MSB */
+	    mode;		/* mode and BCD|binary */
 	__i8254_write(i8254, byte, I8254_CTRL_REG);
 
 	return 0;
 }
+
 EXPORT_SYMBOL_GPL(comedi_8254_set_mode);
 
 /**
@@ -292,6 +296,7 @@ int comedi_8254_load(struct comedi_8254 *i8254, unsigned int counter,
 
 	return 0;
 }
+
 EXPORT_SYMBOL_GPL(comedi_8254_load);
 
 /**
@@ -303,8 +308,7 @@ EXPORT_SYMBOL_GPL(comedi_8254_load);
  */
 void comedi_8254_pacer_enable(struct comedi_8254 *i8254,
 			      unsigned int counter1,
-			      unsigned int counter2,
-			      bool enable)
+			      unsigned int counter2, bool enable)
 {
 	unsigned int mode;
 
@@ -329,6 +333,7 @@ void comedi_8254_pacer_enable(struct comedi_8254 *i8254,
 		comedi_8254_write(i8254, counter1, i8254->divisor1);
 	}
 }
+
 EXPORT_SYMBOL_GPL(comedi_8254_pacer_enable);
 
 /**
@@ -342,6 +347,7 @@ void comedi_8254_update_divisors(struct comedi_8254 *i8254)
 	i8254->divisor1 = i8254->next_div1 & 0xffff;
 	i8254->divisor2 = i8254->next_div2 & 0xffff;
 }
+
 EXPORT_SYMBOL_GPL(comedi_8254_update_divisors);
 
 /**
@@ -351,8 +357,7 @@ EXPORT_SYMBOL_GPL(comedi_8254_update_divisors);
  * @flags:	comedi_cmd flags
  */
 void comedi_8254_cascade_ns_to_timer(struct comedi_8254 *i8254,
-				     unsigned int *nanosec,
-				     unsigned int flags)
+				     unsigned int *nanosec, unsigned int flags)
 {
 	unsigned int d1 = i8254->next_div1 ? i8254->next_div1 : I8254_MAX_COUNT;
 	unsigned int d2 = i8254->next_div2 ? i8254->next_div2 : I8254_MAX_COUNT;
@@ -427,6 +432,7 @@ void comedi_8254_cascade_ns_to_timer(struct comedi_8254 *i8254,
 	i8254->next_div1 = d1;
 	i8254->next_div2 = d2;
 }
+
 EXPORT_SYMBOL_GPL(comedi_8254_cascade_ns_to_timer);
 
 /**
@@ -460,6 +466,7 @@ void comedi_8254_ns_to_timer(struct comedi_8254 *i8254,
 	*nanosec = divisor * i8254->osc_base;
 	i8254->next_div = divisor;
 }
+
 EXPORT_SYMBOL_GPL(comedi_8254_ns_to_timer);
 
 /**
@@ -474,12 +481,12 @@ void comedi_8254_set_busy(struct comedi_8254 *i8254,
 	if (counter < 3)
 		i8254->busy[counter] = busy;
 }
+
 EXPORT_SYMBOL_GPL(comedi_8254_set_busy);
 
 static int comedi_8254_insn_read(struct comedi_device *dev,
 				 struct comedi_subdevice *s,
-				 struct comedi_insn *insn,
-				 unsigned int *data)
+				 struct comedi_insn *insn, unsigned int *data)
 {
 	struct comedi_8254 *i8254 = s->private;
 	unsigned int chan = CR_CHAN(insn->chanspec);
@@ -496,8 +503,7 @@ static int comedi_8254_insn_read(struct comedi_device *dev,
 
 static int comedi_8254_insn_write(struct comedi_device *dev,
 				  struct comedi_subdevice *s,
-				  struct comedi_insn *insn,
-				  unsigned int *data)
+				  struct comedi_insn *insn, unsigned int *data)
 {
 	struct comedi_8254 *i8254 = s->private;
 	unsigned int chan = CR_CHAN(insn->chanspec);
@@ -513,8 +519,7 @@ static int comedi_8254_insn_write(struct comedi_device *dev,
 
 static int comedi_8254_insn_config(struct comedi_device *dev,
 				   struct comedi_subdevice *s,
-				   struct comedi_insn *insn,
-				   unsigned int *data)
+				   struct comedi_insn *insn, unsigned int *data)
 {
 	struct comedi_8254 *i8254 = s->private;
 	unsigned int chan = CR_CHAN(insn->chanspec);
@@ -560,17 +565,18 @@ static int comedi_8254_insn_config(struct comedi_device *dev,
 void comedi_8254_subdevice_init(struct comedi_subdevice *s,
 				struct comedi_8254 *i8254)
 {
-	s->type		= COMEDI_SUBD_COUNTER;
-	s->subdev_flags	= SDF_READABLE | SDF_WRITABLE;
-	s->n_chan	= 3;
-	s->maxdata	= 0xffff;
-	s->range_table	= &range_unknown;
-	s->insn_read	= comedi_8254_insn_read;
-	s->insn_write	= comedi_8254_insn_write;
-	s->insn_config	= comedi_8254_insn_config;
+	s->type = COMEDI_SUBD_COUNTER;
+	s->subdev_flags = SDF_READABLE | SDF_WRITABLE;
+	s->n_chan = 3;
+	s->maxdata = 0xffff;
+	s->range_table = &range_unknown;
+	s->insn_read = comedi_8254_insn_read;
+	s->insn_write = comedi_8254_insn_write;
+	s->insn_config = comedi_8254_insn_config;
 
-	s->private	= i8254;
+	s->private = i8254;
 }
+
 EXPORT_SYMBOL_GPL(comedi_8254_subdevice_init);
 
 static struct comedi_8254 *__i8254_init(unsigned long iobase,
@@ -591,13 +597,13 @@ static struct comedi_8254 *__i8254_init(unsigned long iobase,
 	if (!i8254)
 		return NULL;
 
-	i8254->iobase	= iobase;
-	i8254->mmio	= mmio;
-	i8254->iosize	= iosize;
-	i8254->regshift	= regshift;
+	i8254->iobase = iobase;
+	i8254->mmio = mmio;
+	i8254->iosize = iosize;
+	i8254->regshift = regshift;
 
 	/* default osc_base to the max speed of a generic 8254 timer */
-	i8254->osc_base	= osc_base ? osc_base : I8254_OSC_BASE_10MHZ;
+	i8254->osc_base = osc_base ? osc_base : I8254_OSC_BASE_10MHZ;
 
 	/* reset all the counters by setting them to I8254_MODE0 */
 	for (i = 0; i < 3; i++)
@@ -616,11 +622,11 @@ static struct comedi_8254 *__i8254_init(unsigned long iobase,
  */
 struct comedi_8254 *comedi_8254_init(unsigned long iobase,
 				     unsigned int osc_base,
-				     unsigned int iosize,
-				     unsigned int regshift)
+				     unsigned int iosize, unsigned int regshift)
 {
 	return __i8254_init(iobase, NULL, osc_base, iosize, regshift);
 }
+
 EXPORT_SYMBOL_GPL(comedi_8254_init);
 
 /**
@@ -638,17 +644,20 @@ struct comedi_8254 *comedi_8254_mm_init(void __iomem *mmio,
 {
 	return __i8254_init(0, mmio, osc_base, iosize, regshift);
 }
+
 EXPORT_SYMBOL_GPL(comedi_8254_mm_init);
 
 static int __init comedi_8254_module_init(void)
 {
 	return 0;
 }
+
 module_init(comedi_8254_module_init);
 
 static void __exit comedi_8254_module_exit(void)
 {
 }
+
 module_exit(comedi_8254_module_exit);
 
 MODULE_AUTHOR("H Hartley Sweeten <hsweeten@visionengravers.com>");

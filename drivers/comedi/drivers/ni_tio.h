@@ -108,22 +108,28 @@ struct ni_gpct_device {
 	struct ni_gpct *counters;
 	unsigned int num_counters;
 	unsigned int num_chips;
-	unsigned int (*regs)[NITIO_NUM_REGS]; /* [num_chips][NITIO_NUM_REGS] */
-	spinlock_t regs_lock;		/* protects 'regs' */
-	const struct ni_route_tables *routing_tables; /* link to routes */
+	unsigned int (*regs)[NITIO_NUM_REGS];	/* [num_chips][NITIO_NUM_REGS] */
+	spinlock_t regs_lock;	/* protects 'regs' */
+	const struct ni_route_tables *routing_tables;	/* link to routes */
 };
 
-struct ni_gpct_device *
-ni_gpct_device_construct(struct comedi_device *dev,
-			 void (*write)(struct ni_gpct *counter,
-				       unsigned int value,
-				       enum ni_gpct_register),
-			 unsigned int (*read)(struct ni_gpct *counter,
-					      enum ni_gpct_register),
-			 enum ni_gpct_variant,
-			 unsigned int num_counters,
-			 unsigned int counters_per_chip,
-			 const struct ni_route_tables *routing_tables);
+struct ni_gpct_device *ni_gpct_device_construct(struct comedi_device *dev,
+						void (*write)(struct ni_gpct *
+							      counter,
+							      unsigned int
+							      value,
+							      enum
+							      ni_gpct_register),
+						unsigned int (*read)(struct
+								    ni_gpct *
+								    counter,
+								    enum
+								    ni_gpct_register),
+						enum ni_gpct_variant,
+						unsigned int num_counters,
+						unsigned int counters_per_chip,
+						const struct ni_route_tables
+						*routing_tables);
 void ni_gpct_device_destroy(struct ni_gpct_device *counter_dev);
 void ni_tio_init_counter(struct ni_gpct *counter);
 int ni_tio_insn_read(struct comedi_device *dev, struct comedi_subdevice *s,

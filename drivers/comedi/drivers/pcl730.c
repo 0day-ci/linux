@@ -115,104 +115,116 @@ struct pcl730_board {
 
 static const struct pcl730_board pcl730_boards[] = {
 	{
-		.name		= "pcl730",
-		.io_range	= 0x04,
-		.has_ttl_io	= 1,
-		.n_subdevs	= 4,
-		.n_iso_out_chan	= 16,
-		.n_iso_in_chan	= 16,
-		.n_ttl_chan	= 16,
-	}, {
-		.name		= "iso730",
-		.io_range	= 0x04,
-		.n_subdevs	= 4,
-		.n_iso_out_chan	= 16,
-		.n_iso_in_chan	= 16,
-		.n_ttl_chan	= 16,
-	}, {
-		.name		= "acl7130",
-		.io_range	= 0x08,
-		.has_ttl_io	= 1,
-		.n_subdevs	= 4,
-		.n_iso_out_chan	= 16,
-		.n_iso_in_chan	= 16,
-		.n_ttl_chan	= 16,
-	}, {
-		.name		= "pcm3730",
-		.io_range	= 0x04,
-		.has_ttl_io	= 1,
-		.n_subdevs	= 4,
-		.n_iso_out_chan	= 8,
-		.n_iso_in_chan	= 8,
-		.n_ttl_chan	= 16,
-	}, {
-		.name		= "pcl725",
-		.io_range	= 0x02,
-		.is_pcl725	= 1,
-		.n_subdevs	= 2,
-		.n_iso_out_chan	= 8,
-		.n_iso_in_chan	= 8,
-	}, {
-		.name		= "p8r8dio",
-		.io_range	= 0x02,
-		.is_pcl725	= 1,
-		.has_readback	= 1,
-		.n_subdevs	= 2,
-		.n_iso_out_chan	= 8,
-		.n_iso_in_chan	= 8,
-	}, {
-		.name		= "acl7225b",
-		.io_range	= 0x08,		/* only 4 are used */
-		.is_acl7225b	= 1,
-		.has_readback	= 1,
-		.n_subdevs	= 2,
-		.n_iso_out_chan	= 16,
-		.n_iso_in_chan	= 16,
-	}, {
-		.name		= "p16r16dio",
-		.io_range	= 0x04,
-		.is_acl7225b	= 1,
-		.has_readback	= 1,
-		.n_subdevs	= 2,
-		.n_iso_out_chan	= 16,
-		.n_iso_in_chan	= 16,
-	}, {
-		.name		= "pcl733",
-		.io_range	= 0x04,
-		.n_subdevs	= 1,
-		.n_iso_in_chan	= 32,
-	}, {
-		.name		= "pcl734",
-		.io_range	= 0x04,
-		.n_subdevs	= 1,
-		.n_iso_out_chan	= 32,
-	}, {
-		.name		= "opmm-1616-xt",
-		.io_range	= 0x10,
-		.is_acl7225b	= 1,
-		.has_readback	= 1,
-		.n_subdevs	= 2,
-		.n_iso_out_chan	= 16,
-		.n_iso_in_chan	= 16,
-	}, {
-		.name		= "pearl-mm-p",
-		.io_range	= 0x02,
-		.n_subdevs	= 1,
-		.n_iso_out_chan	= 16,
-	}, {
-		.name		= "ir104-pbf",
-		.io_range	= 0x08,
-		.is_ir104	= 1,
-		.has_readback	= 1,
-		.n_iso_out_chan	= 20,
-		.n_iso_in_chan	= 20,
-	},
+	 .name = "pcl730",
+	 .io_range = 0x04,
+	 .has_ttl_io = 1,
+	 .n_subdevs = 4,
+	 .n_iso_out_chan = 16,
+	 .n_iso_in_chan = 16,
+	 .n_ttl_chan = 16,
+	  }, {
+	      .name = "iso730",
+	      .io_range = 0x04,
+	      .n_subdevs = 4,
+	      .n_iso_out_chan = 16,
+	      .n_iso_in_chan = 16,
+	      .n_ttl_chan = 16,
+	       }, {
+		   .name = "acl7130",
+		   .io_range = 0x08,
+		   .has_ttl_io = 1,
+		   .n_subdevs = 4,
+		   .n_iso_out_chan = 16,
+		   .n_iso_in_chan = 16,
+		   .n_ttl_chan = 16,
+		    }, {
+			.name = "pcm3730",
+			.io_range = 0x04,
+			.has_ttl_io = 1,
+			.n_subdevs = 4,
+			.n_iso_out_chan = 8,
+			.n_iso_in_chan = 8,
+			.n_ttl_chan = 16,
+			 }, {
+			     .name = "pcl725",
+			     .io_range = 0x02,
+			     .is_pcl725 = 1,
+			     .n_subdevs = 2,
+			     .n_iso_out_chan = 8,
+			     .n_iso_in_chan = 8,
+			      }, {
+				  .name = "p8r8dio",
+				  .io_range = 0x02,
+				  .is_pcl725 = 1,
+				  .has_readback = 1,
+				  .n_subdevs = 2,
+				  .n_iso_out_chan = 8,
+				  .n_iso_in_chan = 8,
+				   }, {
+				       .name = "acl7225b",
+				       .io_range = 0x08,	/* only 4 are used */
+				       .is_acl7225b = 1,
+				       .has_readback = 1,
+				       .n_subdevs = 2,
+				       .n_iso_out_chan = 16,
+				       .n_iso_in_chan = 16,
+					}, {
+					    .name = "p16r16dio",
+					    .io_range = 0x04,
+					    .is_acl7225b = 1,
+					    .has_readback = 1,
+					    .n_subdevs = 2,
+					    .n_iso_out_chan = 16,
+					    .n_iso_in_chan = 16,
+					     }, {
+						 .name = "pcl733",
+						 .io_range = 0x04,
+						 .n_subdevs = 1,
+						 .n_iso_in_chan = 32,
+						  }, {
+						      .name = "pcl734",
+						      .io_range = 0x04,
+						      .n_subdevs = 1,
+						      .n_iso_out_chan = 32,
+						       }, {
+							   .name =
+							   "opmm-1616-xt",
+							   .io_range = 0x10,
+							   .is_acl7225b = 1,
+							   .has_readback = 1,
+							   .n_subdevs = 2,
+							   .n_iso_out_chan = 16,
+							   .n_iso_in_chan = 16,
+							    }, {
+								.name =
+								"pearl-mm-p",
+								.io_range =
+								0x02,
+								.n_subdevs = 1,
+								.n_iso_out_chan
+								= 16,
+								 }, {
+								     .name =
+								     "ir104-pbf",
+								     .io_range =
+								     0x08,
+								     .is_ir104 =
+								     1,
+								     .
+								     has_readback
+								     = 1,
+								     .
+								     n_iso_out_chan
+								     = 20,
+								     .
+								     n_iso_in_chan
+								     = 20,
+								      },
 };
 
 static int pcl730_do_insn_bits(struct comedi_device *dev,
 			       struct comedi_subdevice *s,
-			       struct comedi_insn *insn,
-			       unsigned int *data)
+			       struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned long reg = (unsigned long)s->private;
 	unsigned int mask;
@@ -253,16 +265,14 @@ static unsigned int pcl730_get_bits(struct comedi_device *dev,
 
 static int pcl730_di_insn_bits(struct comedi_device *dev,
 			       struct comedi_subdevice *s,
-			       struct comedi_insn *insn,
-			       unsigned int *data)
+			       struct comedi_insn *insn, unsigned int *data)
 {
 	data[1] = pcl730_get_bits(dev, s);
 
 	return insn->n;
 }
 
-static int pcl730_attach(struct comedi_device *dev,
-			 struct comedi_devconfig *it)
+static int pcl730_attach(struct comedi_device *dev, struct comedi_devconfig *it)
 {
 	const struct pcl730_board *board = dev->board_ptr;
 	struct comedi_subdevice *s;
@@ -282,13 +292,13 @@ static int pcl730_attach(struct comedi_device *dev,
 	if (board->n_iso_out_chan) {
 		/* Isolated Digital Outputs */
 		s = &dev->subdevices[subdev++];
-		s->type		= COMEDI_SUBD_DO;
-		s->subdev_flags	= SDF_WRITABLE;
-		s->n_chan	= board->n_iso_out_chan;
-		s->maxdata	= 1;
-		s->range_table	= &range_digital;
-		s->insn_bits	= pcl730_do_insn_bits;
-		s->private	= (void *)0;
+		s->type = COMEDI_SUBD_DO;
+		s->subdev_flags = SDF_WRITABLE;
+		s->n_chan = board->n_iso_out_chan;
+		s->maxdata = 1;
+		s->range_table = &range_digital;
+		s->insn_bits = pcl730_do_insn_bits;
+		s->private = (void *)0;
 
 		/* get the initial state if supported */
 		if (board->has_readback)
@@ -298,51 +308,52 @@ static int pcl730_attach(struct comedi_device *dev,
 	if (board->n_iso_in_chan) {
 		/* Isolated Digital Inputs */
 		s = &dev->subdevices[subdev++];
-		s->type		= COMEDI_SUBD_DI;
-		s->subdev_flags	= SDF_READABLE;
-		s->n_chan	= board->n_iso_in_chan;
-		s->maxdata	= 1;
-		s->range_table	= &range_digital;
-		s->insn_bits	= pcl730_di_insn_bits;
-		s->private	= board->is_ir104 ? (void *)4 :
-				  board->is_acl7225b ? (void *)2 :
-				  board->is_pcl725 ? (void *)1 : (void *)0;
+		s->type = COMEDI_SUBD_DI;
+		s->subdev_flags = SDF_READABLE;
+		s->n_chan = board->n_iso_in_chan;
+		s->maxdata = 1;
+		s->range_table = &range_digital;
+		s->insn_bits = pcl730_di_insn_bits;
+		s->private = board->is_ir104 ? (void *)4 :
+		    board->is_acl7225b ? (void *)2 :
+		    board->is_pcl725 ? (void *)1 : (void *)0;
 	}
 
 	if (board->has_ttl_io) {
 		/* TTL Digital Outputs */
 		s = &dev->subdevices[subdev++];
-		s->type		= COMEDI_SUBD_DO;
-		s->subdev_flags	= SDF_WRITABLE;
-		s->n_chan	= board->n_ttl_chan;
-		s->maxdata	= 1;
-		s->range_table	= &range_digital;
-		s->insn_bits	= pcl730_do_insn_bits;
-		s->private	= (void *)2;
+		s->type = COMEDI_SUBD_DO;
+		s->subdev_flags = SDF_WRITABLE;
+		s->n_chan = board->n_ttl_chan;
+		s->maxdata = 1;
+		s->range_table = &range_digital;
+		s->insn_bits = pcl730_do_insn_bits;
+		s->private = (void *)2;
 
 		/* TTL Digital Inputs */
 		s = &dev->subdevices[subdev++];
-		s->type		= COMEDI_SUBD_DI;
-		s->subdev_flags	= SDF_READABLE;
-		s->n_chan	= board->n_ttl_chan;
-		s->maxdata	= 1;
-		s->range_table	= &range_digital;
-		s->insn_bits	= pcl730_di_insn_bits;
-		s->private	= (void *)2;
+		s->type = COMEDI_SUBD_DI;
+		s->subdev_flags = SDF_READABLE;
+		s->n_chan = board->n_ttl_chan;
+		s->maxdata = 1;
+		s->range_table = &range_digital;
+		s->insn_bits = pcl730_di_insn_bits;
+		s->private = (void *)2;
 	}
 
 	return 0;
 }
 
 static struct comedi_driver pcl730_driver = {
-	.driver_name	= "pcl730",
-	.module		= THIS_MODULE,
-	.attach		= pcl730_attach,
-	.detach		= comedi_legacy_detach,
-	.board_name	= &pcl730_boards[0].name,
-	.num_names	= ARRAY_SIZE(pcl730_boards),
-	.offset		= sizeof(struct pcl730_board),
+	.driver_name = "pcl730",
+	.module = THIS_MODULE,
+	.attach = pcl730_attach,
+	.detach = comedi_legacy_detach,
+	.board_name = &pcl730_boards[0].name,
+	.num_names = ARRAY_SIZE(pcl730_boards),
+	.offset = sizeof(struct pcl730_board),
 };
+
 module_comedi_driver(pcl730_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

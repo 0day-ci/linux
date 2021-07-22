@@ -6,7 +6,7 @@
 
 static inline u16 get_u16(const u32 __iomem *p)
 {
-	return (u16)readl(p);
+	return (u16) readl(p);
 }
 
 static inline void set_u16(u32 __iomem *p, u16 val)
@@ -16,7 +16,7 @@ static inline void set_u16(u32 __iomem *p, u16 val)
 
 static inline s16 get_s16(const s32 __iomem *p)
 {
-	return (s16)readl(p);
+	return (s16) readl(p);
 }
 
 static inline void set_s16(s32 __iomem *p, s16 val)
@@ -319,8 +319,8 @@ struct jr3_sensor {
 	 * command (10) set new full scales (pg. 38).
 	 */
 
-	struct six_axis_array shunts;		/* offset 0x0060 */
-	s32 reserved2[2];			/* offset 0x0066 */
+	struct six_axis_array shunts;	/* offset 0x0060 */
+	s32 reserved2[2];	/* offset 0x0066 */
 
 	/*
 	 * Default_FS contains the full scale that is used if the user does
@@ -328,7 +328,7 @@ struct jr3_sensor {
 	 */
 
 	struct six_axis_array default_FS;	/* offset 0x0068 */
-	s32 reserved3;				/* offset 0x006e */
+	s32 reserved3;		/* offset 0x006e */
 
 	/*
 	 * Load_envelope_num is the load envelope number that is currently
@@ -336,7 +336,7 @@ struct jr3_sensor {
 	 * envelopes has been initialized.
 	 */
 
-	s32 load_envelope_num;			/* offset 0x006f */
+	s32 load_envelope_num;	/* offset 0x006f */
 
 	/* Min_full_scale is the recommend minimum full scale. */
 
@@ -367,7 +367,7 @@ struct jr3_sensor {
 	 */
 
 	struct six_axis_array min_full_scale;	/* offset 0x0070 */
-	s32 reserved4;				/* offset 0x0076 */
+	s32 reserved4;		/* offset 0x0076 */
 
 	/*
 	 * Transform_num is the transform number that is currently in use.
@@ -375,7 +375,7 @@ struct jr3_sensor {
 	 * (5) use transform # (pg. 33).
 	 */
 
-	s32 transform_num;			/* offset 0x0077 */
+	s32 transform_num;	/* offset 0x0077 */
 
 	/*
 	 * Max_full_scale is the recommended maximum full scale.
@@ -383,7 +383,7 @@ struct jr3_sensor {
 	 */
 
 	struct six_axis_array max_full_scale;	/* offset 0x0078 */
-	s32 reserved5;				/* offset 0x007e */
+	s32 reserved5;		/* offset 0x007e */
 
 	/*
 	 * Peak_address is the address of the data which will be monitored
@@ -392,7 +392,7 @@ struct jr3_sensor {
 	 * (ex. to watch filter3 data for peaks, set this value to 0x00a8).
 	 */
 
-	s32 peak_address;			/* offset 0x007f */
+	s32 peak_address;	/* offset 0x007f */
 
 	/*
 	 * Full_scale is the sensor full scales which are currently in use.
@@ -407,7 +407,7 @@ struct jr3_sensor {
 	 * axes used for each vector respectively.
 	 */
 
-	struct force_array full_scale;		/* offset 0x0080 */
+	struct force_array full_scale;	/* offset 0x0080 */
 
 	/*
 	 * Offsets contains the sensor offsets. These values are subtracted from
@@ -423,7 +423,7 @@ struct jr3_sensor {
 	 * about Z by 90 degrees, FY would be 5 and all others would be zero.
 	 */
 
-	struct six_axis_array offsets;		/* offset 0x0088 */
+	struct six_axis_array offsets;	/* offset 0x0088 */
 
 	/*
 	 * Offset_num is the number of the offset currently in use. This
@@ -431,7 +431,7 @@ struct jr3_sensor {
 	 * offset # command (pg. 34). It can vary between 0 and 15.
 	 */
 
-	s32 offset_num;				/* offset 0x008e */
+	s32 offset_num;		/* offset 0x008e */
 
 	/*
 	 * Vect_axes is a bit map showing which of the axes are being used
@@ -439,7 +439,7 @@ struct jr3_sensor {
 	 * after the user has executed the set vector axes command (pg. 37).
 	 */
 
-	u32 vect_axes;				/* offset 0x008f */
+	u32 vect_axes;		/* offset 0x008f */
 
 	/*
 	 * Filter0 is the decoupled, unfiltered data from the JR3 sensor.
@@ -454,15 +454,15 @@ struct jr3_sensor {
 	 * cutoff at 125 Hz, 31.25 Hz, 7.813 Hz, 1.953 Hz and 0.4883 Hz.
 	 */
 
-	struct force_array filter[7];		/*
-						 * offset 0x0090,
-						 * offset 0x0098,
-						 * offset 0x00a0,
-						 * offset 0x00a8,
-						 * offset 0x00b0,
-						 * offset 0x00b8,
-						 * offset 0x00c0
-						 */
+	struct force_array filter[7];	/*
+					 * offset 0x0090,
+					 * offset 0x0098,
+					 * offset 0x00a0,
+					 * offset 0x00a8,
+					 * offset 0x00b0,
+					 * offset 0x00b8,
+					 * offset 0x00c0
+					 */
 
 	/*
 	 * Rate_data is the calculated rate data. It is a first derivative
@@ -471,7 +471,7 @@ struct jr3_sensor {
 	 * calculated is specified by the variable rate_address (pg. 12).
 	 */
 
-	struct force_array rate_data;		/* offset 0x00c8 */
+	struct force_array rate_data;	/* offset 0x00c8 */
 
 	/*
 	 * Minimum_data & maximum_data are the minimum and maximum (peak)
@@ -504,8 +504,8 @@ struct jr3_sensor {
 	 *   sat_value = 32768 - 2^(16 - ADC bits)
 	 */
 
-	s32 near_sat_value;			/* offset 0x00e0 */
-	s32 sat_value;				/* offset 0x00e1 */
+	s32 near_sat_value;	/* offset 0x00e0 */
+	s32 sat_value;		/* offset 0x00e1 */
 
 	/*
 	 * Rate_address, rate_divisor & rate_count contain the data used to
@@ -525,9 +525,9 @@ struct jr3_sensor {
 	 * will minimize the time necessary to start the rate calculations.
 	 */
 
-	s32 rate_address;			/* offset 0x00e2 */
-	u32 rate_divisor;			/* offset 0x00e3 */
-	u32 rate_count;				/* offset 0x00e4 */
+	s32 rate_address;	/* offset 0x00e2 */
+	u32 rate_divisor;	/* offset 0x00e3 */
+	u32 rate_count;		/* offset 0x00e4 */
 
 	/*
 	 * Command_word2 through command_word0 are the locations used to
@@ -543,9 +543,9 @@ struct jr3_sensor {
 	 * command_word1).
 	 */
 
-	s32 command_word2;			/* offset 0x00e5 */
-	s32 command_word1;			/* offset 0x00e6 */
-	s32 command_word0;			/* offset 0x00e7 */
+	s32 command_word2;	/* offset 0x00e5 */
+	s32 command_word1;	/* offset 0x00e6 */
+	s32 command_word0;	/* offset 0x00e7 */
 
 	/*
 	 * Count1 through count6 are unsigned counters which are incremented
@@ -560,12 +560,12 @@ struct jr3_sensor {
 	 * once.
 	 */
 
-	u32 count1;				/* offset 0x00e8 */
-	u32 count2;				/* offset 0x00e9 */
-	u32 count3;				/* offset 0x00ea */
-	u32 count4;				/* offset 0x00eb */
-	u32 count5;				/* offset 0x00ec */
-	u32 count6;				/* offset 0x00ed */
+	u32 count1;		/* offset 0x00e8 */
+	u32 count2;		/* offset 0x00e9 */
+	u32 count3;		/* offset 0x00ea */
+	u32 count4;		/* offset 0x00eb */
+	u32 count5;		/* offset 0x00ec */
+	u32 count6;		/* offset 0x00ed */
 
 	/*
 	 * Error_count is a running count of data reception errors. If this
@@ -578,7 +578,7 @@ struct jr3_sensor {
 	 * where this counter counts a bad sample, that sample is ignored.
 	 */
 
-	u32 error_count;			/* offset 0x00ee */
+	u32 error_count;	/* offset 0x00ee */
 
 	/*
 	 * Count_x is a counter which is incremented every time the JR3 DSP
@@ -588,7 +588,7 @@ struct jr3_sensor {
 	 * Issues section on pg. 49 for more details.
 	 */
 
-	u32 count_x;				/* offset 0x00ef */
+	u32 count_x;		/* offset 0x00ef */
 
 	/*
 	 * Warnings & errors contain the warning and error bits
@@ -596,8 +596,8 @@ struct jr3_sensor {
 	 * 21 under the headings warnings_bits and error_bits.
 	 */
 
-	u32 warnings;				/* offset 0x00f0 */
-	u32 errors;				/* offset 0x00f1 */
+	u32 warnings;		/* offset 0x00f0 */
+	u32 errors;		/* offset 0x00f1 */
 
 	/*
 	 * Threshold_bits is a word containing the bits that are set by the
@@ -605,7 +605,7 @@ struct jr3_sensor {
 	 * (pg. 23) for more details.
 	 */
 
-	s32 threshold_bits;			/* offset 0x00f2 */
+	s32 threshold_bits;	/* offset 0x00f2 */
 
 	/*
 	 * Last_crc is the value that shows the actual calculated CRC. CRC
@@ -613,7 +613,7 @@ struct jr3_sensor {
 	 * description for cal_crc_bad (pg. 21) for more information.
 	 */
 
-	s32 last_CRC;				/* offset 0x00f3 */
+	s32 last_CRC;		/* offset 0x00f3 */
 
 	/*
 	 * EEProm_ver_no contains the version number of the sensor EEProm.
@@ -622,8 +622,8 @@ struct jr3_sensor {
 	 * 3.02 would be stored as 302.
 	 */
 
-	s32 eeprom_ver_no;			/* offset 0x00f4 */
-	s32 software_ver_no;			/* offset 0x00f5 */
+	s32 eeprom_ver_no;	/* offset 0x00f4 */
+	s32 software_ver_no;	/* offset 0x00f5 */
 
 	/*
 	 * Software_day & software_year are the release date of the software
@@ -632,8 +632,8 @@ struct jr3_sensor {
 	 * years.
 	 */
 
-	s32 software_day;			/* offset 0x00f6 */
-	s32 software_year;			/* offset 0x00f7 */
+	s32 software_day;	/* offset 0x00f6 */
+	s32 software_year;	/* offset 0x00f7 */
 
 	/*
 	 * Serial_no & model_no are the two values which uniquely identify a
@@ -642,8 +642,8 @@ struct jr3_sensor {
 	 * different sensor configurations.
 	 */
 
-	u32 serial_no;				/* offset 0x00f8 */
-	u32 model_no;				/* offset 0x00f9 */
+	u32 serial_no;		/* offset 0x00f8 */
+	u32 model_no;		/* offset 0x00f9 */
 
 	/*
 	 * Cal_day & cal_year are the sensor calibration date. Day is the
@@ -651,8 +651,8 @@ struct jr3_sensor {
 	 * 366 for leap years.
 	 */
 
-	s32 cal_day;				/* offset 0x00fa */
-	s32 cal_year;				/* offset 0x00fb */
+	s32 cal_day;		/* offset 0x00fa */
+	s32 cal_year;		/* offset 0x00fb */
 
 	/*
 	 * Units is an enumerated read only value defining the engineering
@@ -678,9 +678,9 @@ struct jr3_sensor {
 	 * received.
 	 */
 
-	u32 units;				/* offset 0x00fc */
-	s32 bits;				/* offset 0x00fd */
-	s32 channels;				/* offset 0x00fe */
+	u32 units;		/* offset 0x00fc */
+	s32 bits;		/* offset 0x00fd */
+	s32 channels;		/* offset 0x00fe */
 
 	/*
 	 * Thickness specifies the overall thickness of the sensor from
@@ -690,7 +690,7 @@ struct jr3_sensor {
 	 * transformation from the center of the sensor to either flange.
 	 */
 
-	s32 thickness;				/* offset 0x00ff */
+	s32 thickness;		/* offset 0x00ff */
 
 	/*
 	 * Load_envelopes is a table containing the load envelope
@@ -726,10 +726,10 @@ struct jr3_sensor {
 };
 
 struct jr3_block {
-	u32 program_lo[0x4000];		/*  0x00000 - 0x10000 */
+	u32 program_lo[0x4000];	/*  0x00000 - 0x10000 */
 	struct jr3_sensor sensor;	/*  0x10000 - 0x10c00 */
 	char pad2[0x30000 - 0x00c00];	/*  0x10c00 - 0x40000 */
-	u32 program_hi[0x8000];		/*  0x40000 - 0x60000 */
-	u32 reset;			/*  0x60000 - 0x60004 */
+	u32 program_hi[0x8000];	/*  0x40000 - 0x60000 */
+	u32 reset;		/*  0x60000 - 0x60004 */
 	char pad3[0x20000 - 0x00004];	/*  0x60004 - 0x80000 */
 };

@@ -80,8 +80,7 @@ static void multiq3_set_ctrl(struct comedi_device *dev, unsigned int bits)
 
 static int multiq3_ai_status(struct comedi_device *dev,
 			     struct comedi_subdevice *s,
-			     struct comedi_insn *insn,
-			     unsigned long context)
+			     struct comedi_insn *insn, unsigned long context)
 {
 	unsigned int status;
 
@@ -93,8 +92,7 @@ static int multiq3_ai_status(struct comedi_device *dev,
 
 static int multiq3_ai_insn_read(struct comedi_device *dev,
 				struct comedi_subdevice *s,
-				struct comedi_insn *insn,
-				unsigned int *data)
+				struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 	unsigned int val;
@@ -130,8 +128,7 @@ static int multiq3_ai_insn_read(struct comedi_device *dev,
 
 static int multiq3_ao_insn_write(struct comedi_device *dev,
 				 struct comedi_subdevice *s,
-				 struct comedi_insn *insn,
-				 unsigned int *data)
+				 struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 	unsigned int val = s->readback[chan];
@@ -140,7 +137,7 @@ static int multiq3_ao_insn_write(struct comedi_device *dev,
 	for (i = 0; i < insn->n; i++) {
 		val = data[i];
 		multiq3_set_ctrl(dev, MULTIQ3_CTRL_LD |
-				      MULTIQ3_CTRL_AO_CHAN(chan));
+				 MULTIQ3_CTRL_AO_CHAN(chan));
 		outw(val, dev->iobase + MULTIQ3_AO_REG);
 		multiq3_set_ctrl(dev, 0);
 	}
@@ -160,8 +157,7 @@ static int multiq3_di_insn_bits(struct comedi_device *dev,
 
 static int multiq3_do_insn_bits(struct comedi_device *dev,
 				struct comedi_subdevice *s,
-				struct comedi_insn *insn,
-				unsigned int *data)
+				struct comedi_insn *insn, unsigned int *data)
 {
 	if (comedi_dio_update_state(s, data))
 		outw(s->state, dev->iobase + MULTIQ3_DO_REG);
@@ -183,7 +179,7 @@ static int multiq3_encoder_insn_read(struct comedi_device *dev,
 	for (i = 0; i < insn->n; i++) {
 		/* select encoder channel */
 		multiq3_set_ctrl(dev, MULTIQ3_CTRL_EN |
-				      MULTIQ3_CTRL_E_CHAN(chan));
+				 MULTIQ3_CTRL_E_CHAN(chan));
 
 		/* reset the byte pointer */
 		outb(MULTIQ3_BP_RESET, dev->iobase + MULTIQ3_ENC_CTRL_REG);
@@ -200,10 +196,10 @@ static int multiq3_encoder_insn_read(struct comedi_device *dev,
 		 * Munge the data so that the reset value is in the middle
 		 * of the maxdata range, i.e.:
 		 *
-		 * real value	comedi value
-		 * 0xffffff	0x7fffff	1 negative count
-		 * 0x000000	0x800000	reset value
-		 * 0x000001	0x800001	1 positive count
+		 * real value   comedi value
+		 * 0xffffff     0x7fffff        1 negative count
+		 * 0x000000     0x800000        reset value
+		 * 0x000001     0x800001        1 positive count
 		 *
 		 * It's possible for the 24-bit counter to overflow but it
 		 * would normally take _quite_ a few turns. A 2000 line
@@ -217,8 +213,7 @@ static int multiq3_encoder_insn_read(struct comedi_device *dev,
 	return insn->n;
 }
 
-static void multiq3_encoder_reset(struct comedi_device *dev,
-				  unsigned int chan)
+static void multiq3_encoder_reset(struct comedi_device *dev, unsigned int chan)
 {
 	multiq3_set_ctrl(dev, MULTIQ3_CTRL_EN | MULTIQ3_CTRL_E_CHAN(chan));
 	outb(MULTIQ3_EFLAG_RESET, dev->iobase + MULTIQ3_ENC_CTRL_REG);
@@ -265,21 +260,21 @@ static int multiq3_attach(struct comedi_device *dev,
 
 	/* Analog Input subdevice */
 	s = &dev->subdevices[0];
-	s->type		= COMEDI_SUBD_AI;
-	s->subdev_flags	= SDF_READABLE | SDF_GROUND;
-	s->n_chan	= 8;
-	s->maxdata	= 0x1fff;
-	s->range_table	= &range_bipolar5;
-	s->insn_read	= multiq3_ai_insn_read;
+	s->type = COMEDI_SUBD_AI;
+	s->subdev_flags = SDF_READABLE | SDF_GROUND;
+	s->n_chan = 8;
+	s->maxdata = 0x1fff;
+	s->range_table = &range_bipolar5;
+	s->insn_read = multiq3_ai_insn_read;
 
 	/* Analog Output subdevice */
 	s = &dev->subdevices[1];
-	s->type		= COMEDI_SUBD_AO;
-	s->subdev_flags	= SDF_WRITABLE;
-	s->n_chan	= 8;
-	s->maxdata	= 0x0fff;
-	s->range_table	= &range_bipolar5;
-	s->insn_write	= multiq3_ao_insn_write;
+	s->type = COMEDI_SUBD_AO;
+	s->subdev_flags = SDF_WRITABLE;
+	s->n_chan = 8;
+	s->maxdata = 0x0fff;
+	s->range_table = &range_bipolar5;
+	s->insn_write = multiq3_ao_insn_write;
 
 	ret = comedi_alloc_subdev_readback(s);
 	if (ret)
@@ -287,31 +282,31 @@ static int multiq3_attach(struct comedi_device *dev,
 
 	/* Digital Input subdevice */
 	s = &dev->subdevices[2];
-	s->type		= COMEDI_SUBD_DI;
-	s->subdev_flags	= SDF_READABLE;
-	s->n_chan	= 16;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_bits	= multiq3_di_insn_bits;
+	s->type = COMEDI_SUBD_DI;
+	s->subdev_flags = SDF_READABLE;
+	s->n_chan = 16;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_bits = multiq3_di_insn_bits;
 
 	/* Digital Output subdevice */
 	s = &dev->subdevices[3];
-	s->type		= COMEDI_SUBD_DO;
-	s->subdev_flags	= SDF_WRITABLE;
-	s->n_chan	= 16;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_bits	= multiq3_do_insn_bits;
+	s->type = COMEDI_SUBD_DO;
+	s->subdev_flags = SDF_WRITABLE;
+	s->n_chan = 16;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_bits = multiq3_do_insn_bits;
 
 	/* Encoder (Counter) subdevice */
 	s = &dev->subdevices[4];
-	s->type		= COMEDI_SUBD_COUNTER;
-	s->subdev_flags	= SDF_READABLE | SDF_LSAMPL;
-	s->n_chan	= it->options[2] * 2;
-	s->maxdata	= 0x00ffffff;
-	s->range_table	= &range_unknown;
-	s->insn_read	= multiq3_encoder_insn_read;
-	s->insn_config	= multiq3_encoder_insn_config;
+	s->type = COMEDI_SUBD_COUNTER;
+	s->subdev_flags = SDF_READABLE | SDF_LSAMPL;
+	s->n_chan = it->options[2] * 2;
+	s->maxdata = 0x00ffffff;
+	s->range_table = &range_unknown;
+	s->insn_read = multiq3_encoder_insn_read;
+	s->insn_config = multiq3_encoder_insn_config;
 
 	for (i = 0; i < s->n_chan; i++)
 		multiq3_encoder_reset(dev, i);
@@ -320,11 +315,12 @@ static int multiq3_attach(struct comedi_device *dev,
 }
 
 static struct comedi_driver multiq3_driver = {
-	.driver_name	= "multiq3",
-	.module		= THIS_MODULE,
-	.attach		= multiq3_attach,
-	.detach		= comedi_legacy_detach,
+	.driver_name = "multiq3",
+	.module = THIS_MODULE,
+	.attach = multiq3_attach,
+	.detach = comedi_legacy_detach,
 };
+
 module_comedi_driver(multiq3_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

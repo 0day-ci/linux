@@ -93,56 +93,66 @@
 #define	NI6501_TIMEOUT	1000
 
 /* Port request packets */
-static const u8 READ_PORT_REQUEST[]	= {0x00, 0x01, 0x00, 0x10,
-					   0x00, 0x0C, 0x01, 0x0E,
-					   0x02, 0x10, 0x00, 0x00,
-					   0x00, 0x03, 0x00, 0x00};
+static const u8 READ_PORT_REQUEST[] = { 0x00, 0x01, 0x00, 0x10,
+	0x00, 0x0C, 0x01, 0x0E,
+	0x02, 0x10, 0x00, 0x00,
+	0x00, 0x03, 0x00, 0x00
+};
 
-static const u8 WRITE_PORT_REQUEST[]	= {0x00, 0x01, 0x00, 0x14,
-					   0x00, 0x10, 0x01, 0x0F,
-					   0x02, 0x10, 0x00, 0x00,
-					   0x00, 0x03, 0x00, 0x00,
-					   0x03, 0x00, 0x00, 0x00};
+static const u8 WRITE_PORT_REQUEST[] = { 0x00, 0x01, 0x00, 0x14,
+	0x00, 0x10, 0x01, 0x0F,
+	0x02, 0x10, 0x00, 0x00,
+	0x00, 0x03, 0x00, 0x00,
+	0x03, 0x00, 0x00, 0x00
+};
 
-static const u8 SET_PORT_DIR_REQUEST[]	= {0x00, 0x01, 0x00, 0x18,
-					   0x00, 0x14, 0x01, 0x12,
-					   0x02, 0x10, 0x00, 0x00,
-					   0x00, 0x05, 0x00, 0x00,
-					   0x00, 0x00, 0x05, 0x00,
-					   0x00, 0x00, 0x00, 0x00};
+static const u8 SET_PORT_DIR_REQUEST[] = { 0x00, 0x01, 0x00, 0x18,
+	0x00, 0x14, 0x01, 0x12,
+	0x02, 0x10, 0x00, 0x00,
+	0x00, 0x05, 0x00, 0x00,
+	0x00, 0x00, 0x05, 0x00,
+	0x00, 0x00, 0x00, 0x00
+};
 
 /* Counter request packets */
-static const u8 START_COUNTER_REQUEST[]	= {0x00, 0x01, 0x00, 0x0C,
-					   0x00, 0x08, 0x01, 0x09,
-					   0x02, 0x20, 0x00, 0x00};
+static const u8 START_COUNTER_REQUEST[] = { 0x00, 0x01, 0x00, 0x0C,
+	0x00, 0x08, 0x01, 0x09,
+	0x02, 0x20, 0x00, 0x00
+};
 
-static const u8 STOP_COUNTER_REQUEST[]	= {0x00, 0x01, 0x00, 0x0C,
-					   0x00, 0x08, 0x01, 0x0C,
-					   0x02, 0x20, 0x00, 0x00};
+static const u8 STOP_COUNTER_REQUEST[] = { 0x00, 0x01, 0x00, 0x0C,
+	0x00, 0x08, 0x01, 0x0C,
+	0x02, 0x20, 0x00, 0x00
+};
 
-static const u8 READ_COUNTER_REQUEST[]	= {0x00, 0x01, 0x00, 0x0C,
-					   0x00, 0x08, 0x01, 0x0E,
-					   0x02, 0x20, 0x00, 0x00};
+static const u8 READ_COUNTER_REQUEST[] = { 0x00, 0x01, 0x00, 0x0C,
+	0x00, 0x08, 0x01, 0x0E,
+	0x02, 0x20, 0x00, 0x00
+};
 
-static const u8 WRITE_COUNTER_REQUEST[]	= {0x00, 0x01, 0x00, 0x10,
-					   0x00, 0x0C, 0x01, 0x0F,
-					   0x02, 0x20, 0x00, 0x00,
-					   0x00, 0x00, 0x00, 0x00};
+static const u8 WRITE_COUNTER_REQUEST[] = { 0x00, 0x01, 0x00, 0x10,
+	0x00, 0x0C, 0x01, 0x0F,
+	0x02, 0x20, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00
+};
 
 /* Response packets */
-static const u8 GENERIC_RESPONSE[]	= {0x00, 0x01, 0x00, 0x0C,
-					   0x00, 0x08, 0x01, 0x00,
-					   0x00, 0x00, 0x00, 0x02};
+static const u8 GENERIC_RESPONSE[] = { 0x00, 0x01, 0x00, 0x0C,
+	0x00, 0x08, 0x01, 0x00,
+	0x00, 0x00, 0x00, 0x02
+};
 
-static const u8 READ_PORT_RESPONSE[]	= {0x00, 0x01, 0x00, 0x10,
-					   0x00, 0x0C, 0x01, 0x00,
-					   0x00, 0x00, 0x00, 0x02,
-					   0x00, 0x03, 0x00, 0x00};
+static const u8 READ_PORT_RESPONSE[] = { 0x00, 0x01, 0x00, 0x10,
+	0x00, 0x0C, 0x01, 0x00,
+	0x00, 0x00, 0x00, 0x02,
+	0x00, 0x03, 0x00, 0x00
+};
 
-static const u8 READ_COUNTER_RESPONSE[]	= {0x00, 0x01, 0x00, 0x10,
-					   0x00, 0x0C, 0x01, 0x00,
-					   0x00, 0x00, 0x00, 0x02,
-					   0x00, 0x00, 0x00, 0x00};
+static const u8 READ_COUNTER_RESPONSE[] = { 0x00, 0x01, 0x00, 0x10,
+	0x00, 0x0C, 0x01, 0x00,
+	0x00, 0x00, 0x00, 0x02,
+	0x00, 0x00, 0x00, 0x00
+};
 
 enum commands {
 	READ_PORT,
@@ -207,9 +217,7 @@ static int ni6501_port_command(struct comedi_device *dev, int command,
 			   usb_sndbulkpipe(usb,
 					   devpriv->ep_tx->bEndpointAddress),
 			   devpriv->usb_tx_buf,
-			   request_size,
-			   NULL,
-			   NI6501_TIMEOUT);
+			   request_size, NULL, NI6501_TIMEOUT);
 	if (ret)
 		goto end;
 
@@ -217,9 +225,7 @@ static int ni6501_port_command(struct comedi_device *dev, int command,
 			   usb_rcvbulkpipe(usb,
 					   devpriv->ep_rx->bEndpointAddress),
 			   devpriv->usb_rx_buf,
-			   response_size,
-			   NULL,
-			   NI6501_TIMEOUT);
+			   response_size, NULL, NI6501_TIMEOUT);
 	if (ret)
 		goto end;
 
@@ -253,7 +259,7 @@ static int ni6501_counter_command(struct comedi_device *dev, int command,
 	u8 *tx = devpriv->usb_tx_buf;
 	int ret;
 
-	if ((command == READ_COUNTER || command ==  WRITE_COUNTER) && !val)
+	if ((command == READ_COUNTER || command == WRITE_COUNTER) && !val)
 		return -EINVAL;
 
 	mutex_lock(&devpriv->mut);
@@ -279,8 +285,8 @@ static int ni6501_counter_command(struct comedi_device *dev, int command,
 		response_size = sizeof(GENERIC_RESPONSE);
 		memcpy(tx, WRITE_COUNTER_REQUEST, request_size);
 		/* Setup tx packet: bytes 12,13,14,15 hold the */
-		/* u32 counter value (Big Endian)	       */
-		*((__be32 *)&tx[12]) = cpu_to_be32(*val);
+		/* u32 counter value (Big Endian)              */
+		*((__be32 *) &tx[12]) = cpu_to_be32(*val);
 		break;
 	default:
 		ret = -EINVAL;
@@ -291,9 +297,7 @@ static int ni6501_counter_command(struct comedi_device *dev, int command,
 			   usb_sndbulkpipe(usb,
 					   devpriv->ep_tx->bEndpointAddress),
 			   devpriv->usb_tx_buf,
-			   request_size,
-			   NULL,
-			   NI6501_TIMEOUT);
+			   request_size, NULL, NI6501_TIMEOUT);
 	if (ret)
 		goto end;
 
@@ -301,9 +305,7 @@ static int ni6501_counter_command(struct comedi_device *dev, int command,
 			   usb_rcvbulkpipe(usb,
 					   devpriv->ep_rx->bEndpointAddress),
 			   devpriv->usb_rx_buf,
-			   response_size,
-			   NULL,
-			   NI6501_TIMEOUT);
+			   response_size, NULL, NI6501_TIMEOUT);
 	if (ret)
 		goto end;
 
@@ -313,8 +315,8 @@ static int ni6501_counter_command(struct comedi_device *dev, int command,
 		int i;
 
 		/* Read counter value: bytes 12,13,14,15 of rx packet */
-		/* hold the u32 counter value (Big Endian)	      */
-		*val = be32_to_cpu(*((__be32 *)&devpriv->usb_rx_buf[12]));
+		/* hold the u32 counter value (Big Endian)            */
+		*val = be32_to_cpu(*((__be32 *) &devpriv->usb_rx_buf[12]));
 
 		/* mask counter value for comparing */
 		for (i = 12; i < sizeof(READ_COUNTER_RESPONSE); ++i)
@@ -336,8 +338,7 @@ end:
 
 static int ni6501_dio_insn_config(struct comedi_device *dev,
 				  struct comedi_subdevice *s,
-				  struct comedi_insn *insn,
-				  unsigned int *data)
+				  struct comedi_insn *insn, unsigned int *data)
 {
 	int ret;
 
@@ -354,8 +355,7 @@ static int ni6501_dio_insn_config(struct comedi_device *dev,
 
 static int ni6501_dio_insn_bits(struct comedi_device *dev,
 				struct comedi_subdevice *s,
-				struct comedi_insn *insn,
-				unsigned int *data)
+				struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int mask;
 	int ret;
@@ -388,8 +388,7 @@ static int ni6501_dio_insn_bits(struct comedi_device *dev,
 
 static int ni6501_cnt_insn_config(struct comedi_device *dev,
 				  struct comedi_subdevice *s,
-				  struct comedi_insn *insn,
-				  unsigned int *data)
+				  struct comedi_insn *insn, unsigned int *data)
 {
 	int ret;
 	u32 val = 0;
@@ -416,15 +415,14 @@ static int ni6501_cnt_insn_config(struct comedi_device *dev,
 
 static int ni6501_cnt_insn_read(struct comedi_device *dev,
 				struct comedi_subdevice *s,
-				struct comedi_insn *insn,
-				unsigned int *data)
+				struct comedi_insn *insn, unsigned int *data)
 {
 	int ret;
 	u32 val;
 	unsigned int i;
 
 	for (i = 0; i < insn->n; i++) {
-		ret = ni6501_counter_command(dev, READ_COUNTER,	&val);
+		ret = ni6501_counter_command(dev, READ_COUNTER, &val);
 		if (ret)
 			return ret;
 		data[i] = val;
@@ -435,8 +433,7 @@ static int ni6501_cnt_insn_read(struct comedi_device *dev,
 
 static int ni6501_cnt_insn_write(struct comedi_device *dev,
 				 struct comedi_subdevice *s,
-				 struct comedi_insn *insn,
-				 unsigned int *data)
+				 struct comedi_insn *insn, unsigned int *data)
 {
 	int ret;
 
@@ -504,8 +501,7 @@ static int ni6501_find_endpoints(struct comedi_device *dev)
 	return 0;
 }
 
-static int ni6501_auto_attach(struct comedi_device *dev,
-			      unsigned long context)
+static int ni6501_auto_attach(struct comedi_device *dev, unsigned long context)
 {
 	struct usb_interface *intf = comedi_to_usb_interface(dev);
 	struct ni6501_private *devpriv;
@@ -533,23 +529,23 @@ static int ni6501_auto_attach(struct comedi_device *dev,
 
 	/* Digital Input/Output subdevice */
 	s = &dev->subdevices[0];
-	s->type		= COMEDI_SUBD_DIO;
-	s->subdev_flags	= SDF_READABLE | SDF_WRITABLE;
-	s->n_chan	= 24;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_bits	= ni6501_dio_insn_bits;
-	s->insn_config	= ni6501_dio_insn_config;
+	s->type = COMEDI_SUBD_DIO;
+	s->subdev_flags = SDF_READABLE | SDF_WRITABLE;
+	s->n_chan = 24;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_bits = ni6501_dio_insn_bits;
+	s->insn_config = ni6501_dio_insn_config;
 
 	/* Counter subdevice */
 	s = &dev->subdevices[1];
-	s->type		= COMEDI_SUBD_COUNTER;
-	s->subdev_flags	= SDF_READABLE | SDF_WRITABLE | SDF_LSAMPL;
-	s->n_chan	= 1;
-	s->maxdata	= 0xffffffff;
-	s->insn_read	= ni6501_cnt_insn_read;
-	s->insn_write	= ni6501_cnt_insn_write;
-	s->insn_config	= ni6501_cnt_insn_config;
+	s->type = COMEDI_SUBD_COUNTER;
+	s->subdev_flags = SDF_READABLE | SDF_WRITABLE | SDF_LSAMPL;
+	s->n_chan = 1;
+	s->maxdata = 0xffffffff;
+	s->insn_read = ni6501_cnt_insn_read;
+	s->insn_write = ni6501_cnt_insn_write;
+	s->insn_config = ni6501_cnt_insn_config;
 
 	return 0;
 }
@@ -571,10 +567,10 @@ static void ni6501_detach(struct comedi_device *dev)
 }
 
 static struct comedi_driver ni6501_driver = {
-	.module		= THIS_MODULE,
-	.driver_name	= "ni6501",
-	.auto_attach	= ni6501_auto_attach,
-	.detach		= ni6501_detach,
+	.module = THIS_MODULE,
+	.driver_name = "ni6501",
+	.auto_attach = ni6501_auto_attach,
+	.detach = ni6501_detach,
 };
 
 static int ni6501_usb_probe(struct usb_interface *intf,
@@ -587,14 +583,16 @@ static const struct usb_device_id ni6501_usb_table[] = {
 	{ USB_DEVICE(0x3923, 0x718a) },
 	{ }
 };
+
 MODULE_DEVICE_TABLE(usb, ni6501_usb_table);
 
 static struct usb_driver ni6501_usb_driver = {
-	.name		= "ni6501",
-	.id_table	= ni6501_usb_table,
-	.probe		= ni6501_usb_probe,
-	.disconnect	= comedi_usb_auto_unconfig,
+	.name = "ni6501",
+	.id_table = ni6501_usb_table,
+	.probe = ni6501_usb_probe,
+	.disconnect = comedi_usb_auto_unconfig,
 };
+
 module_comedi_usb_driver(ni6501_driver, ni6501_usb_driver);
 
 MODULE_AUTHOR("Luca Ellero");

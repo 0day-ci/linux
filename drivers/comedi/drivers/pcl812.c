@@ -152,182 +152,182 @@
 
 static const struct comedi_lrange range_pcl812pg_ai = {
 	5, {
-		BIP_RANGE(5),
-		BIP_RANGE(2.5),
-		BIP_RANGE(1.25),
-		BIP_RANGE(0.625),
-		BIP_RANGE(0.3125)
+	    BIP_RANGE(5),
+	    BIP_RANGE(2.5),
+	    BIP_RANGE(1.25),
+	    BIP_RANGE(0.625),
+	    BIP_RANGE(0.3125)
 	}
 };
 
 static const struct comedi_lrange range_pcl812pg2_ai = {
 	5, {
-		BIP_RANGE(10),
-		BIP_RANGE(5),
-		BIP_RANGE(2.5),
-		BIP_RANGE(1.25),
-		BIP_RANGE(0.625)
+	    BIP_RANGE(10),
+	    BIP_RANGE(5),
+	    BIP_RANGE(2.5),
+	    BIP_RANGE(1.25),
+	    BIP_RANGE(0.625)
 	}
 };
 
 static const struct comedi_lrange range812_bipolar1_25 = {
 	1, {
-		BIP_RANGE(1.25)
+	    BIP_RANGE(1.25)
 	}
 };
 
 static const struct comedi_lrange range812_bipolar0_625 = {
 	1, {
-		BIP_RANGE(0.625)
+	    BIP_RANGE(0.625)
 	}
 };
 
 static const struct comedi_lrange range812_bipolar0_3125 = {
 	1, {
-		BIP_RANGE(0.3125)
+	    BIP_RANGE(0.3125)
 	}
 };
 
 static const struct comedi_lrange range_pcl813b_ai = {
 	4, {
-		BIP_RANGE(5),
-		BIP_RANGE(2.5),
-		BIP_RANGE(1.25),
-		BIP_RANGE(0.625)
+	    BIP_RANGE(5),
+	    BIP_RANGE(2.5),
+	    BIP_RANGE(1.25),
+	    BIP_RANGE(0.625)
 	}
 };
 
 static const struct comedi_lrange range_pcl813b2_ai = {
 	4, {
-		UNI_RANGE(10),
-		UNI_RANGE(5),
-		UNI_RANGE(2.5),
-		UNI_RANGE(1.25)
+	    UNI_RANGE(10),
+	    UNI_RANGE(5),
+	    UNI_RANGE(2.5),
+	    UNI_RANGE(1.25)
 	}
 };
 
 static const struct comedi_lrange range_iso813_1_ai = {
 	5, {
-		BIP_RANGE(5),
-		BIP_RANGE(2.5),
-		BIP_RANGE(1.25),
-		BIP_RANGE(0.625),
-		BIP_RANGE(0.3125)
+	    BIP_RANGE(5),
+	    BIP_RANGE(2.5),
+	    BIP_RANGE(1.25),
+	    BIP_RANGE(0.625),
+	    BIP_RANGE(0.3125)
 	}
 };
 
 static const struct comedi_lrange range_iso813_1_2_ai = {
 	5, {
-		UNI_RANGE(10),
-		UNI_RANGE(5),
-		UNI_RANGE(2.5),
-		UNI_RANGE(1.25),
-		UNI_RANGE(0.625)
+	    UNI_RANGE(10),
+	    UNI_RANGE(5),
+	    UNI_RANGE(2.5),
+	    UNI_RANGE(1.25),
+	    UNI_RANGE(0.625)
 	}
 };
 
 static const struct comedi_lrange range_iso813_2_ai = {
 	4, {
-		BIP_RANGE(5),
-		BIP_RANGE(2.5),
-		BIP_RANGE(1.25),
-		BIP_RANGE(0.625)
+	    BIP_RANGE(5),
+	    BIP_RANGE(2.5),
+	    BIP_RANGE(1.25),
+	    BIP_RANGE(0.625)
 	}
 };
 
 static const struct comedi_lrange range_iso813_2_2_ai = {
 	4, {
-		UNI_RANGE(10),
-		UNI_RANGE(5),
-		UNI_RANGE(2.5),
-		UNI_RANGE(1.25)
+	    UNI_RANGE(10),
+	    UNI_RANGE(5),
+	    UNI_RANGE(2.5),
+	    UNI_RANGE(1.25)
 	}
 };
 
 static const struct comedi_lrange range_acl8113_1_ai = {
 	4, {
-		BIP_RANGE(5),
-		BIP_RANGE(2.5),
-		BIP_RANGE(1.25),
-		BIP_RANGE(0.625)
+	    BIP_RANGE(5),
+	    BIP_RANGE(2.5),
+	    BIP_RANGE(1.25),
+	    BIP_RANGE(0.625)
 	}
 };
 
 static const struct comedi_lrange range_acl8113_1_2_ai = {
 	4, {
-		UNI_RANGE(10),
-		UNI_RANGE(5),
-		UNI_RANGE(2.5),
-		UNI_RANGE(1.25)
+	    UNI_RANGE(10),
+	    UNI_RANGE(5),
+	    UNI_RANGE(2.5),
+	    UNI_RANGE(1.25)
 	}
 };
 
 static const struct comedi_lrange range_acl8113_2_ai = {
 	3, {
-		BIP_RANGE(5),
-		BIP_RANGE(2.5),
-		BIP_RANGE(1.25)
+	    BIP_RANGE(5),
+	    BIP_RANGE(2.5),
+	    BIP_RANGE(1.25)
 	}
 };
 
 static const struct comedi_lrange range_acl8113_2_2_ai = {
 	3, {
-		UNI_RANGE(10),
-		UNI_RANGE(5),
-		UNI_RANGE(2.5)
+	    UNI_RANGE(10),
+	    UNI_RANGE(5),
+	    UNI_RANGE(2.5)
 	}
 };
 
 static const struct comedi_lrange range_acl8112dg_ai = {
 	9, {
-		BIP_RANGE(5),
-		BIP_RANGE(2.5),
-		BIP_RANGE(1.25),
-		BIP_RANGE(0.625),
-		UNI_RANGE(10),
-		UNI_RANGE(5),
-		UNI_RANGE(2.5),
-		UNI_RANGE(1.25),
-		BIP_RANGE(10)
+	    BIP_RANGE(5),
+	    BIP_RANGE(2.5),
+	    BIP_RANGE(1.25),
+	    BIP_RANGE(0.625),
+	    UNI_RANGE(10),
+	    UNI_RANGE(5),
+	    UNI_RANGE(2.5),
+	    UNI_RANGE(1.25),
+	    BIP_RANGE(10)
 	}
 };
 
 static const struct comedi_lrange range_acl8112hg_ai = {
 	12, {
-		BIP_RANGE(5),
-		BIP_RANGE(0.5),
-		BIP_RANGE(0.05),
-		BIP_RANGE(0.005),
-		UNI_RANGE(10),
-		UNI_RANGE(1),
-		UNI_RANGE(0.1),
-		UNI_RANGE(0.01),
-		BIP_RANGE(10),
-		BIP_RANGE(1),
-		BIP_RANGE(0.1),
-		BIP_RANGE(0.01)
+	     BIP_RANGE(5),
+	     BIP_RANGE(0.5),
+	     BIP_RANGE(0.05),
+	     BIP_RANGE(0.005),
+	     UNI_RANGE(10),
+	     UNI_RANGE(1),
+	     UNI_RANGE(0.1),
+	     UNI_RANGE(0.01),
+	     BIP_RANGE(10),
+	     BIP_RANGE(1),
+	     BIP_RANGE(0.1),
+	     BIP_RANGE(0.01)
 	}
 };
 
 static const struct comedi_lrange range_a821pgh_ai = {
 	4, {
-		BIP_RANGE(5),
-		BIP_RANGE(0.5),
-		BIP_RANGE(0.05),
-		BIP_RANGE(0.005)
+	    BIP_RANGE(5),
+	    BIP_RANGE(0.5),
+	    BIP_RANGE(0.05),
+	    BIP_RANGE(0.005)
 	}
 };
 
 enum pcl812_boardtype {
-	BOARD_PCL812PG	= 0,	/* and ACL-8112PG */
-	BOARD_PCL813B	= 1,
-	BOARD_PCL812	= 2,
-	BOARD_PCL813	= 3,
-	BOARD_ISO813	= 5,
-	BOARD_ACL8113	= 6,
-	BOARD_ACL8112	= 7,	/* ACL-8112DG/HG, A-822PGL/PGH, A-823PGL/PGH */
-	BOARD_ACL8216	= 8,	/* and ICP DAS A-826PG */
-	BOARD_A821	= 9,	/* PGH, PGL, PGL/NDA versions */
+	BOARD_PCL812PG = 0,	/* and ACL-8112PG */
+	BOARD_PCL813B = 1,
+	BOARD_PCL812 = 2,
+	BOARD_PCL813 = 3,
+	BOARD_ISO813 = 5,
+	BOARD_ACL8113 = 6,
+	BOARD_ACL8112 = 7,	/* ACL-8112DG/HG, A-822PGL/PGH, A-823PGL/PGH */
+	BOARD_ACL8216 = 8,	/* and ICP DAS A-826PG */
+	BOARD_A821 = 9,		/* PGH, PGL, PGL/NDA versions */
 };
 
 struct pcl812_board {
@@ -346,175 +346,283 @@ struct pcl812_board {
 
 static const struct pcl812_board boardtypes[] = {
 	{
-		.name		= "pcl812",
-		.board_type	= BOARD_PCL812,
-		.n_aichan	= 16,
-		.n_aochan	= 2,
-		.ai_ns_min	= 33000,
-		.rangelist_ai	= &range_bipolar10,
-		.irq_bits	= 0xdcfc,
-		.has_dma	= 1,
-		.has_dio	= 1,
-	}, {
-		.name		= "pcl812pg",
-		.board_type	= BOARD_PCL812PG,
-		.n_aichan	= 16,
-		.n_aochan	= 2,
-		.ai_ns_min	= 33000,
-		.rangelist_ai	= &range_pcl812pg_ai,
-		.irq_bits	= 0xdcfc,
-		.has_dma	= 1,
-		.has_dio	= 1,
-	}, {
-		.name		= "acl8112pg",
-		.board_type	= BOARD_PCL812PG,
-		.n_aichan	= 16,
-		.n_aochan	= 2,
-		.ai_ns_min	= 10000,
-		.rangelist_ai	= &range_pcl812pg_ai,
-		.irq_bits	= 0xdcfc,
-		.has_dma	= 1,
-		.has_dio	= 1,
-	}, {
-		.name		= "acl8112dg",
-		.board_type	= BOARD_ACL8112,
-		.n_aichan	= 16,	/* 8 differential */
-		.n_aochan	= 2,
-		.ai_ns_min	= 10000,
-		.rangelist_ai	= &range_acl8112dg_ai,
-		.irq_bits	= 0xdcfc,
-		.has_dma	= 1,
-		.has_mpc508_mux	= 1,
-		.has_dio	= 1,
-	}, {
-		.name		= "acl8112hg",
-		.board_type	= BOARD_ACL8112,
-		.n_aichan	= 16,	/* 8 differential */
-		.n_aochan	= 2,
-		.ai_ns_min	= 10000,
-		.rangelist_ai	= &range_acl8112hg_ai,
-		.irq_bits	= 0xdcfc,
-		.has_dma	= 1,
-		.has_mpc508_mux	= 1,
-		.has_dio	= 1,
-	}, {
-		.name		= "a821pgl",
-		.board_type	= BOARD_A821,
-		.n_aichan	= 16,	/* 8 differential */
-		.n_aochan	= 1,
-		.ai_ns_min	= 10000,
-		.rangelist_ai	= &range_pcl813b_ai,
-		.irq_bits	= 0x000c,
-		.has_dio	= 1,
-	}, {
-		.name		= "a821pglnda",
-		.board_type	= BOARD_A821,
-		.n_aichan	= 16,	/* 8 differential */
-		.ai_ns_min	= 10000,
-		.rangelist_ai	= &range_pcl813b_ai,
-		.irq_bits	= 0x000c,
-	}, {
-		.name		= "a821pgh",
-		.board_type	= BOARD_A821,
-		.n_aichan	= 16,	/* 8 differential */
-		.n_aochan	= 1,
-		.ai_ns_min	= 10000,
-		.rangelist_ai	= &range_a821pgh_ai,
-		.irq_bits	= 0x000c,
-		.has_dio	= 1,
-	}, {
-		.name		= "a822pgl",
-		.board_type	= BOARD_ACL8112,
-		.n_aichan	= 16,	/* 8 differential */
-		.n_aochan	= 2,
-		.ai_ns_min	= 10000,
-		.rangelist_ai	= &range_acl8112dg_ai,
-		.irq_bits	= 0xdcfc,
-		.has_dma	= 1,
-		.has_dio	= 1,
-	}, {
-		.name		= "a822pgh",
-		.board_type	= BOARD_ACL8112,
-		.n_aichan	= 16,	/* 8 differential */
-		.n_aochan	= 2,
-		.ai_ns_min	= 10000,
-		.rangelist_ai	= &range_acl8112hg_ai,
-		.irq_bits	= 0xdcfc,
-		.has_dma	= 1,
-		.has_dio	= 1,
-	}, {
-		.name		= "a823pgl",
-		.board_type	= BOARD_ACL8112,
-		.n_aichan	= 16,	/* 8 differential */
-		.n_aochan	= 2,
-		.ai_ns_min	= 8000,
-		.rangelist_ai	= &range_acl8112dg_ai,
-		.irq_bits	= 0xdcfc,
-		.has_dma	= 1,
-		.has_dio	= 1,
-	}, {
-		.name		= "a823pgh",
-		.board_type	= BOARD_ACL8112,
-		.n_aichan	= 16,	/* 8 differential */
-		.n_aochan	= 2,
-		.ai_ns_min	= 8000,
-		.rangelist_ai	= &range_acl8112hg_ai,
-		.irq_bits	= 0xdcfc,
-		.has_dma	= 1,
-		.has_dio	= 1,
-	}, {
-		.name		= "pcl813",
-		.board_type	= BOARD_PCL813,
-		.n_aichan	= 32,
-		.rangelist_ai	= &range_pcl813b_ai,
-	}, {
-		.name		= "pcl813b",
-		.board_type	= BOARD_PCL813B,
-		.n_aichan	= 32,
-		.rangelist_ai	= &range_pcl813b_ai,
-	}, {
-		.name		= "acl8113",
-		.board_type	= BOARD_ACL8113,
-		.n_aichan	= 32,
-		.rangelist_ai	= &range_acl8113_1_ai,
-	}, {
-		.name		= "iso813",
-		.board_type	= BOARD_ISO813,
-		.n_aichan	= 32,
-		.rangelist_ai	= &range_iso813_1_ai,
-	}, {
-		.name		= "acl8216",
-		.board_type	= BOARD_ACL8216,
-		.n_aichan	= 16,	/* 8 differential */
-		.n_aochan	= 2,
-		.ai_ns_min	= 10000,
-		.rangelist_ai	= &range_pcl813b2_ai,
-		.irq_bits	= 0xdcfc,
-		.has_dma	= 1,
-		.has_16bit_ai	= 1,
-		.has_mpc508_mux	= 1,
-		.has_dio	= 1,
-	}, {
-		.name		= "a826pg",
-		.board_type	= BOARD_ACL8216,
-		.n_aichan	= 16,	/* 8 differential */
-		.n_aochan	= 2,
-		.ai_ns_min	= 10000,
-		.rangelist_ai	= &range_pcl813b2_ai,
-		.irq_bits	= 0xdcfc,
-		.has_dma	= 1,
-		.has_16bit_ai	= 1,
-		.has_dio	= 1,
-	},
+	 .name = "pcl812",
+	 .board_type = BOARD_PCL812,
+	 .n_aichan = 16,
+	 .n_aochan = 2,
+	 .ai_ns_min = 33000,
+	 .rangelist_ai = &range_bipolar10,
+	 .irq_bits = 0xdcfc,
+	 .has_dma = 1,
+	 .has_dio = 1,
+	  }, {
+	      .name = "pcl812pg",
+	      .board_type = BOARD_PCL812PG,
+	      .n_aichan = 16,
+	      .n_aochan = 2,
+	      .ai_ns_min = 33000,
+	      .rangelist_ai = &range_pcl812pg_ai,
+	      .irq_bits = 0xdcfc,
+	      .has_dma = 1,
+	      .has_dio = 1,
+	       }, {
+		   .name = "acl8112pg",
+		   .board_type = BOARD_PCL812PG,
+		   .n_aichan = 16,
+		   .n_aochan = 2,
+		   .ai_ns_min = 10000,
+		   .rangelist_ai = &range_pcl812pg_ai,
+		   .irq_bits = 0xdcfc,
+		   .has_dma = 1,
+		   .has_dio = 1,
+		    }, {
+			.name = "acl8112dg",
+			.board_type = BOARD_ACL8112,
+			.n_aichan = 16,	/* 8 differential */
+			.n_aochan = 2,
+			.ai_ns_min = 10000,
+			.rangelist_ai = &range_acl8112dg_ai,
+			.irq_bits = 0xdcfc,
+			.has_dma = 1,
+			.has_mpc508_mux = 1,
+			.has_dio = 1,
+			 }, {
+			     .name = "acl8112hg",
+			     .board_type = BOARD_ACL8112,
+			     .n_aichan = 16,	/* 8 differential */
+			     .n_aochan = 2,
+			     .ai_ns_min = 10000,
+			     .rangelist_ai = &range_acl8112hg_ai,
+			     .irq_bits = 0xdcfc,
+			     .has_dma = 1,
+			     .has_mpc508_mux = 1,
+			     .has_dio = 1,
+			      }, {
+				  .name = "a821pgl",
+				  .board_type = BOARD_A821,
+				  .n_aichan = 16,	/* 8 differential */
+				  .n_aochan = 1,
+				  .ai_ns_min = 10000,
+				  .rangelist_ai = &range_pcl813b_ai,
+				  .irq_bits = 0x000c,
+				  .has_dio = 1,
+				   }, {
+				       .name = "a821pglnda",
+				       .board_type = BOARD_A821,
+				       .n_aichan = 16,	/* 8 differential */
+				       .ai_ns_min = 10000,
+				       .rangelist_ai = &range_pcl813b_ai,
+				       .irq_bits = 0x000c,
+					}, {
+					    .name = "a821pgh",
+					    .board_type = BOARD_A821,
+					    .n_aichan = 16,	/* 8 differential */
+					    .n_aochan = 1,
+					    .ai_ns_min = 10000,
+					    .rangelist_ai = &range_a821pgh_ai,
+					    .irq_bits = 0x000c,
+					    .has_dio = 1,
+					     }, {
+						 .name = "a822pgl",
+						 .board_type = BOARD_ACL8112,
+						 .n_aichan = 16,	/* 8 differential */
+						 .n_aochan = 2,
+						 .ai_ns_min = 10000,
+						 .rangelist_ai =
+						 &range_acl8112dg_ai,
+						 .irq_bits = 0xdcfc,
+						 .has_dma = 1,
+						 .has_dio = 1,
+						  }, {
+						      .name = "a822pgh",
+						      .board_type =
+						      BOARD_ACL8112,
+						      .n_aichan = 16,	/* 8 differential */
+						      .n_aochan = 2,
+						      .ai_ns_min = 10000,
+						      .rangelist_ai =
+						      &range_acl8112hg_ai,
+						      .irq_bits = 0xdcfc,
+						      .has_dma = 1,
+						      .has_dio = 1,
+						       }, {
+							   .name = "a823pgl",
+							   .board_type =
+							   BOARD_ACL8112,
+							   .n_aichan = 16,	/* 8 differential */
+							   .n_aochan = 2,
+							   .ai_ns_min = 8000,
+							   .rangelist_ai =
+							   &range_acl8112dg_ai,
+							   .irq_bits = 0xdcfc,
+							   .has_dma = 1,
+							   .has_dio = 1,
+							    }, {
+								.name =
+								"a823pgh",
+								.board_type =
+								BOARD_ACL8112,
+								.n_aichan = 16,	/* 8 differential */
+								.n_aochan = 2,
+								.ai_ns_min =
+								8000,
+								.rangelist_ai =
+								&range_acl8112hg_ai,
+								.irq_bits =
+								0xdcfc,
+								.has_dma = 1,
+								.has_dio = 1,
+								 }, {
+								     .name =
+								     "pcl813",
+								     .board_type
+								     =
+								     BOARD_PCL813,
+								     .n_aichan =
+								     32,
+								     .
+								     rangelist_ai
+								     =
+								     &range_pcl813b_ai,
+								      }, {
+									  .name
+									  =
+									  "pcl813b",
+									  .
+									  board_type
+									  =
+									  BOARD_PCL813B,
+									  .
+									  n_aichan
+									  = 32,
+									  .
+									  rangelist_ai
+									  =
+									  &range_pcl813b_ai,
+									   }, {
+									       .
+									       name
+									       =
+									       "acl8113",
+									       .
+									       board_type
+									       =
+									       BOARD_ACL8113,
+									       .
+									       n_aichan
+									       =
+									       32,
+									       .
+									       rangelist_ai
+									       =
+									       &range_acl8113_1_ai,
+										}, {
+										    .
+										    name
+										    =
+										    "iso813",
+										    .
+										    board_type
+										    =
+										    BOARD_ISO813,
+										    .
+										    n_aichan
+										    =
+										    32,
+										    .
+										    rangelist_ai
+										    =
+										    &range_iso813_1_ai,
+										     }, {
+											 .
+											 name
+											 =
+											 "acl8216",
+											 .
+											 board_type
+											 =
+											 BOARD_ACL8216,
+											 .n_aichan = 16,	/* 8 differential */
+											 .
+											 n_aochan
+											 =
+											 2,
+											 .
+											 ai_ns_min
+											 =
+											 10000,
+											 .
+											 rangelist_ai
+											 =
+											 &range_pcl813b2_ai,
+											 .
+											 irq_bits
+											 =
+											 0xdcfc,
+											 .
+											 has_dma
+											 =
+											 1,
+											 .
+											 has_16bit_ai
+											 =
+											 1,
+											 .
+											 has_mpc508_mux
+											 =
+											 1,
+											 .
+											 has_dio
+											 =
+											 1,
+											  }, {
+											      .
+											      name
+											      =
+											      "a826pg",
+											      .
+											      board_type
+											      =
+											      BOARD_ACL8216,
+											      .n_aichan = 16,	/* 8 differential */
+											      .
+											      n_aochan
+											      =
+											      2,
+											      .
+											      ai_ns_min
+											      =
+											      10000,
+											      .
+											      rangelist_ai
+											      =
+											      &range_pcl813b2_ai,
+											      .
+											      irq_bits
+											      =
+											      0xdcfc,
+											      .
+											      has_dma
+											      =
+											      1,
+											      .
+											      has_16bit_ai
+											      =
+											      1,
+											      .
+											      has_dio
+											      =
+											      1,
+											       },
 };
 
 struct pcl812_private {
 	struct comedi_isadma *dma;
 	unsigned char range_correction;	/* =1 we must add 1 to range number */
 	unsigned int last_ai_chanspec;
-	unsigned char mode_reg_int; /* stored INT number for some cards */
-	unsigned int ai_poll_ptr; /* how many samples transfer poll */
-	unsigned int max_812_ai_mode0_rangewait; /* settling time for gain */
+	unsigned char mode_reg_int;	/* stored INT number for some cards */
+	unsigned int ai_poll_ptr;	/* how many samples transfer poll */
+	unsigned int max_812_ai_mode0_rangewait;	/* settling time for gain */
 	unsigned int use_diff:1;
 	unsigned int use_mpc508:1;
 	unsigned int use_ext_trg:1;
@@ -611,8 +719,7 @@ static unsigned int pcl812_ai_get_sample(struct comedi_device *dev,
 
 static int pcl812_ai_eoc(struct comedi_device *dev,
 			 struct comedi_subdevice *s,
-			 struct comedi_insn *insn,
-			 unsigned long context)
+			 struct comedi_insn *insn, unsigned long context)
 {
 	unsigned int status;
 
@@ -670,7 +777,7 @@ static int pcl812_ai_cmdtest(struct comedi_device *dev,
 	if (cmd->convert_src == TRIG_TIMER) {
 		err |= comedi_check_trigger_arg_min(&cmd->convert_arg,
 						    board->ai_ns_min);
-	} else {	/* TRIG_EXT */
+	} else {		/* TRIG_EXT */
 		err |= comedi_check_trigger_arg_is(&cmd->convert_arg, 0);
 	}
 
@@ -680,7 +787,7 @@ static int pcl812_ai_cmdtest(struct comedi_device *dev,
 
 	if (cmd->stop_src == TRIG_COUNT)
 		err |= comedi_check_trigger_arg_min(&cmd->stop_arg, 1);
-	else	/* TRIG_NONE */
+	else			/* TRIG_NONE */
 		err |= comedi_check_trigger_arg_is(&cmd->stop_arg, 0);
 
 	if (err)
@@ -711,7 +818,7 @@ static int pcl812_ai_cmd(struct comedi_device *dev, struct comedi_subdevice *s)
 
 	pcl812_ai_set_chan_range(dev, cmd->chanlist[0], 1);
 
-	if (dma) {	/*  check if we can use DMA transfer */
+	if (dma) {		/*  check if we can use DMA transfer */
 		devpriv->ai_dma = 1;
 		for (i = 1; i < cmd->chanlist_len; i++)
 			if (cmd->chanlist[0] != cmd->chanlist[i]) {
@@ -822,7 +929,7 @@ static void pcl812_handle_dma(struct comedi_device *dev,
 	int bufptr;
 
 	nsamples = comedi_bytes_to_samples(s, desc->size) -
-		   devpriv->ai_poll_ptr;
+	    devpriv->ai_poll_ptr;
 	bufptr = devpriv->ai_poll_ptr;
 	devpriv->ai_poll_ptr = 0;
 
@@ -908,8 +1015,7 @@ static int pcl812_ai_cancel(struct comedi_device *dev,
 
 static int pcl812_ai_insn_read(struct comedi_device *dev,
 			       struct comedi_subdevice *s,
-			       struct comedi_insn *insn,
-			       unsigned int *data)
+			       struct comedi_insn *insn, unsigned int *data)
 {
 	struct pcl812_private *devpriv = dev->private;
 	int ret = 0;
@@ -939,8 +1045,7 @@ static int pcl812_ai_insn_read(struct comedi_device *dev,
 
 static int pcl812_ao_insn_write(struct comedi_device *dev,
 				struct comedi_subdevice *s,
-				struct comedi_insn *insn,
-				unsigned int *data)
+				struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 	unsigned int val = s->readback[chan];
@@ -958,19 +1063,17 @@ static int pcl812_ao_insn_write(struct comedi_device *dev,
 
 static int pcl812_di_insn_bits(struct comedi_device *dev,
 			       struct comedi_subdevice *s,
-			       struct comedi_insn *insn,
-			       unsigned int *data)
+			       struct comedi_insn *insn, unsigned int *data)
 {
 	data[1] = inb(dev->iobase + PCL812_DI_LSB_REG) |
-		  (inb(dev->iobase + PCL812_DI_MSB_REG) << 8);
+	    (inb(dev->iobase + PCL812_DI_MSB_REG) << 8);
 
 	return insn->n;
 }
 
 static int pcl812_do_insn_bits(struct comedi_device *dev,
 			       struct comedi_subdevice *s,
-			       struct comedi_insn *insn,
-			       unsigned int *data)
+			       struct comedi_insn *insn, unsigned int *data)
 {
 	if (comedi_dio_update_state(s, data)) {
 		outb(s->state & 0xff, dev->iobase + PCL812_DO_LSB_REG);
@@ -1178,7 +1281,7 @@ static int pcl812_attach(struct comedi_device *dev, struct comedi_devconfig *it)
 		break;
 	}
 
-	n_subdevices = 1;		/* all boardtypes have analog inputs */
+	n_subdevices = 1;	/* all boardtypes have analog inputs */
 	if (board->n_aochan > 0)
 		n_subdevices++;
 	if (board->has_dio)
@@ -1192,29 +1295,29 @@ static int pcl812_attach(struct comedi_device *dev, struct comedi_devconfig *it)
 
 	/* Analog Input subdevice */
 	s = &dev->subdevices[subdev];
-	s->type		= COMEDI_SUBD_AI;
-	s->subdev_flags	= SDF_READABLE;
+	s->type = COMEDI_SUBD_AI;
+	s->subdev_flags = SDF_READABLE;
 	if (devpriv->use_diff) {
-		s->subdev_flags	|= SDF_DIFF;
-		s->n_chan	= board->n_aichan / 2;
+		s->subdev_flags |= SDF_DIFF;
+		s->n_chan = board->n_aichan / 2;
 	} else {
-		s->subdev_flags	|= SDF_GROUND;
-		s->n_chan	= board->n_aichan;
+		s->subdev_flags |= SDF_GROUND;
+		s->n_chan = board->n_aichan;
 	}
-	s->maxdata	= board->has_16bit_ai ? 0xffff : 0x0fff;
+	s->maxdata = board->has_16bit_ai ? 0xffff : 0x0fff;
 
 	pcl812_set_ai_range_table(dev, s, it);
 
-	s->insn_read	= pcl812_ai_insn_read;
+	s->insn_read = pcl812_ai_insn_read;
 
 	if (dev->irq) {
 		dev->read_subdev = s;
-		s->subdev_flags	|= SDF_CMD_READ;
-		s->len_chanlist	= MAX_CHANLIST_LEN;
-		s->do_cmdtest	= pcl812_ai_cmdtest;
-		s->do_cmd	= pcl812_ai_cmd;
-		s->poll		= pcl812_ai_poll;
-		s->cancel	= pcl812_ai_cancel;
+		s->subdev_flags |= SDF_CMD_READ;
+		s->len_chanlist = MAX_CHANLIST_LEN;
+		s->do_cmdtest = pcl812_ai_cmdtest;
+		s->do_cmd = pcl812_ai_cmd;
+		s->poll = pcl812_ai_poll;
+		s->cancel = pcl812_ai_cancel;
 	}
 
 	devpriv->use_mpc508 = board->has_mpc508_mux;
@@ -1224,10 +1327,10 @@ static int pcl812_attach(struct comedi_device *dev, struct comedi_devconfig *it)
 	/* analog output */
 	if (board->n_aochan > 0) {
 		s = &dev->subdevices[subdev];
-		s->type		= COMEDI_SUBD_AO;
-		s->subdev_flags	= SDF_WRITABLE | SDF_GROUND;
-		s->n_chan	= board->n_aochan;
-		s->maxdata	= 0xfff;
+		s->type = COMEDI_SUBD_AO;
+		s->subdev_flags = SDF_WRITABLE | SDF_GROUND;
+		s->n_chan = board->n_aochan;
+		s->maxdata = 0xfff;
 		switch (board->board_type) {
 		case BOARD_A821:
 			if (it->options[3] == 1)
@@ -1255,7 +1358,7 @@ static int pcl812_attach(struct comedi_device *dev, struct comedi_devconfig *it)
 			s->range_table = &range_unipolar5;
 			break;
 		}
-		s->insn_write	= pcl812_ao_insn_write;
+		s->insn_write = pcl812_ao_insn_write;
 
 		ret = comedi_alloc_subdev_readback(s);
 		if (ret)
@@ -1267,22 +1370,22 @@ static int pcl812_attach(struct comedi_device *dev, struct comedi_devconfig *it)
 	if (board->has_dio) {
 		/* Digital Input subdevice */
 		s = &dev->subdevices[subdev];
-		s->type		= COMEDI_SUBD_DI;
-		s->subdev_flags	= SDF_READABLE;
-		s->n_chan	= 16;
-		s->maxdata	= 1;
-		s->range_table	= &range_digital;
-		s->insn_bits	= pcl812_di_insn_bits;
+		s->type = COMEDI_SUBD_DI;
+		s->subdev_flags = SDF_READABLE;
+		s->n_chan = 16;
+		s->maxdata = 1;
+		s->range_table = &range_digital;
+		s->insn_bits = pcl812_di_insn_bits;
 		subdev++;
 
 		/* Digital Output subdevice */
 		s = &dev->subdevices[subdev];
-		s->type		= COMEDI_SUBD_DO;
-		s->subdev_flags	= SDF_WRITABLE;
-		s->n_chan	= 16;
-		s->maxdata	= 1;
-		s->range_table	= &range_digital;
-		s->insn_bits	= pcl812_do_insn_bits;
+		s->type = COMEDI_SUBD_DO;
+		s->subdev_flags = SDF_WRITABLE;
+		s->n_chan = 16;
+		s->maxdata = 1;
+		s->range_table = &range_digital;
+		s->insn_bits = pcl812_do_insn_bits;
 		subdev++;
 	}
 
@@ -1293,7 +1396,7 @@ static int pcl812_attach(struct comedi_device *dev, struct comedi_devconfig *it)
 	case BOARD_ACL8112:
 		devpriv->max_812_ai_mode0_rangewait = 1;
 		if (it->options[3] > 0)
-						/*  we use external trigger */
+			/*  we use external trigger */
 			devpriv->use_ext_trg = 1;
 		break;
 	case BOARD_A821:
@@ -1321,14 +1424,15 @@ static void pcl812_detach(struct comedi_device *dev)
 }
 
 static struct comedi_driver pcl812_driver = {
-	.driver_name	= "pcl812",
-	.module		= THIS_MODULE,
-	.attach		= pcl812_attach,
-	.detach		= pcl812_detach,
-	.board_name	= &boardtypes[0].name,
-	.num_names	= ARRAY_SIZE(boardtypes),
-	.offset		= sizeof(struct pcl812_board),
+	.driver_name = "pcl812",
+	.module = THIS_MODULE,
+	.attach = pcl812_attach,
+	.detach = pcl812_detach,
+	.board_name = &boardtypes[0].name,
+	.num_names = ARRAY_SIZE(boardtypes),
+	.offset = sizeof(struct pcl812_board),
 };
+
 module_comedi_driver(pcl812_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

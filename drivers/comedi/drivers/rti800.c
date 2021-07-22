@@ -73,28 +73,28 @@
 
 static const struct comedi_lrange range_rti800_ai_10_bipolar = {
 	4, {
-		BIP_RANGE(10),
-		BIP_RANGE(1),
-		BIP_RANGE(0.1),
-		BIP_RANGE(0.02)
+	    BIP_RANGE(10),
+	    BIP_RANGE(1),
+	    BIP_RANGE(0.1),
+	    BIP_RANGE(0.02)
 	}
 };
 
 static const struct comedi_lrange range_rti800_ai_5_bipolar = {
 	4, {
-		BIP_RANGE(5),
-		BIP_RANGE(0.5),
-		BIP_RANGE(0.05),
-		BIP_RANGE(0.01)
+	    BIP_RANGE(5),
+	    BIP_RANGE(0.5),
+	    BIP_RANGE(0.05),
+	    BIP_RANGE(0.01)
 	}
 };
 
 static const struct comedi_lrange range_rti800_ai_unipolar = {
 	4, {
-		UNI_RANGE(10),
-		UNI_RANGE(1),
-		UNI_RANGE(0.1),
-		UNI_RANGE(0.02)
+	    UNI_RANGE(10),
+	    UNI_RANGE(1),
+	    UNI_RANGE(0.1),
+	    UNI_RANGE(0.02)
 	}
 };
 
@@ -116,11 +116,11 @@ struct rti800_board {
 
 static const struct rti800_board rti800_boardtypes[] = {
 	{
-		.name		= "rti800",
-	}, {
-		.name		= "rti815",
-		.has_ao		= 1,
-	},
+	 .name = "rti800",
+	  }, {
+	      .name = "rti815",
+	      .has_ao = 1,
+	       },
 };
 
 struct rti800_private {
@@ -132,8 +132,7 @@ struct rti800_private {
 
 static int rti800_ai_eoc(struct comedi_device *dev,
 			 struct comedi_subdevice *s,
-			 struct comedi_insn *insn,
-			 unsigned long context)
+			 struct comedi_insn *insn, unsigned long context)
 {
 	unsigned char status;
 
@@ -149,8 +148,7 @@ static int rti800_ai_eoc(struct comedi_device *dev,
 
 static int rti800_ai_insn_read(struct comedi_device *dev,
 			       struct comedi_subdevice *s,
-			       struct comedi_insn *insn,
-			       unsigned int *data)
+			       struct comedi_insn *insn, unsigned int *data)
 {
 	struct rti800_private *devpriv = dev->private;
 	unsigned int chan = CR_CHAN(insn->chanspec);
@@ -172,8 +170,7 @@ static int rti800_ai_insn_read(struct comedi_device *dev,
 		 */
 		if (insn->n > 0) {
 			int delay = (gain == 0) ? 10 :
-				    (gain == 1) ? 20 :
-				    (gain == 2) ? 40 : 80;
+			    (gain == 1) ? 20 : (gain == 2) ? 40 : 80;
 
 			udelay(delay);
 		}
@@ -202,8 +199,7 @@ static int rti800_ai_insn_read(struct comedi_device *dev,
 
 static int rti800_ao_insn_write(struct comedi_device *dev,
 				struct comedi_subdevice *s,
-				struct comedi_insn *insn,
-				unsigned int *data)
+				struct comedi_insn *insn, unsigned int *data)
 {
 	struct rti800_private *devpriv = dev->private;
 	unsigned int chan = CR_CHAN(insn->chanspec);
@@ -228,8 +224,7 @@ static int rti800_ao_insn_write(struct comedi_device *dev,
 
 static int rti800_di_insn_bits(struct comedi_device *dev,
 			       struct comedi_subdevice *s,
-			       struct comedi_insn *insn,
-			       unsigned int *data)
+			       struct comedi_insn *insn, unsigned int *data)
 {
 	data[1] = inb(dev->iobase + RTI800_DI);
 	return insn->n;
@@ -237,8 +232,7 @@ static int rti800_di_insn_bits(struct comedi_device *dev,
 
 static int rti800_do_insn_bits(struct comedi_device *dev,
 			       struct comedi_subdevice *s,
-			       struct comedi_insn *insn,
-			       unsigned int *data)
+			       struct comedi_insn *insn, unsigned int *data)
 {
 	if (comedi_dio_update_state(s, data)) {
 		/* Outputs are inverted... */
@@ -281,57 +275,57 @@ static int rti800_attach(struct comedi_device *dev, struct comedi_devconfig *it)
 
 	s = &dev->subdevices[0];
 	/* ai subdevice */
-	s->type		= COMEDI_SUBD_AI;
-	s->subdev_flags	= SDF_READABLE | SDF_GROUND;
-	s->n_chan	= (it->options[2] ? 16 : 8);
-	s->insn_read	= rti800_ai_insn_read;
-	s->maxdata	= 0x0fff;
-	s->range_table	= (it->options[3] < ARRAY_SIZE(rti800_ai_ranges))
-				? rti800_ai_ranges[it->options[3]]
-				: &range_unknown;
+	s->type = COMEDI_SUBD_AI;
+	s->subdev_flags = SDF_READABLE | SDF_GROUND;
+	s->n_chan = (it->options[2] ? 16 : 8);
+	s->insn_read = rti800_ai_insn_read;
+	s->maxdata = 0x0fff;
+	s->range_table = (it->options[3] < ARRAY_SIZE(rti800_ai_ranges))
+	    ? rti800_ai_ranges[it->options[3]]
+	    : &range_unknown;
 
 	s = &dev->subdevices[1];
 	if (board->has_ao) {
 		/* ao subdevice (only on rti815) */
-		s->type		= COMEDI_SUBD_AO;
-		s->subdev_flags	= SDF_WRITABLE;
-		s->n_chan	= 2;
-		s->maxdata	= 0x0fff;
+		s->type = COMEDI_SUBD_AO;
+		s->subdev_flags = SDF_WRITABLE;
+		s->n_chan = 2;
+		s->maxdata = 0x0fff;
 		s->range_table_list = devpriv->ao_range_type_list;
 		devpriv->ao_range_type_list[0] =
-			(it->options[5] < ARRAY_SIZE(rti800_ao_ranges))
-				? rti800_ao_ranges[it->options[5]]
-				: &range_unknown;
+		    (it->options[5] < ARRAY_SIZE(rti800_ao_ranges))
+		    ? rti800_ao_ranges[it->options[5]]
+		    : &range_unknown;
 		devpriv->ao_range_type_list[1] =
-			(it->options[7] < ARRAY_SIZE(rti800_ao_ranges))
-				? rti800_ao_ranges[it->options[7]]
-				: &range_unknown;
-		s->insn_write	= rti800_ao_insn_write;
+		    (it->options[7] < ARRAY_SIZE(rti800_ao_ranges))
+		    ? rti800_ao_ranges[it->options[7]]
+		    : &range_unknown;
+		s->insn_write = rti800_ao_insn_write;
 
 		ret = comedi_alloc_subdev_readback(s);
 		if (ret)
 			return ret;
 	} else {
-		s->type		= COMEDI_SUBD_UNUSED;
+		s->type = COMEDI_SUBD_UNUSED;
 	}
 
 	s = &dev->subdevices[2];
 	/* di */
-	s->type		= COMEDI_SUBD_DI;
-	s->subdev_flags	= SDF_READABLE;
-	s->n_chan	= 8;
-	s->insn_bits	= rti800_di_insn_bits;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
+	s->type = COMEDI_SUBD_DI;
+	s->subdev_flags = SDF_READABLE;
+	s->n_chan = 8;
+	s->insn_bits = rti800_di_insn_bits;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
 
 	s = &dev->subdevices[3];
 	/* do */
-	s->type		= COMEDI_SUBD_DO;
-	s->subdev_flags	= SDF_WRITABLE;
-	s->n_chan	= 8;
-	s->insn_bits	= rti800_do_insn_bits;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
+	s->type = COMEDI_SUBD_DO;
+	s->subdev_flags = SDF_WRITABLE;
+	s->n_chan = 8;
+	s->insn_bits = rti800_do_insn_bits;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
 
 	/*
 	 * There is also an Am9513 timer on these boards. This subdevice
@@ -342,14 +336,15 @@ static int rti800_attach(struct comedi_device *dev, struct comedi_devconfig *it)
 }
 
 static struct comedi_driver rti800_driver = {
-	.driver_name	= "rti800",
-	.module		= THIS_MODULE,
-	.attach		= rti800_attach,
-	.detach		= comedi_legacy_detach,
-	.num_names	= ARRAY_SIZE(rti800_boardtypes),
-	.board_name	= &rti800_boardtypes[0].name,
-	.offset		= sizeof(struct rti800_board),
+	.driver_name = "rti800",
+	.module = THIS_MODULE,
+	.attach = rti800_attach,
+	.detach = comedi_legacy_detach,
+	.num_names = ARRAY_SIZE(rti800_boardtypes),
+	.board_name = &rti800_boardtypes[0].name,
+	.offset = sizeof(struct rti800_board),
 };
+
 module_comedi_driver(rti800_driver);
 
 MODULE_DESCRIPTION("Comedi: RTI-800 Multifunction Analog/Digital board");

@@ -159,8 +159,7 @@ static void enable_chan(struct comedi_device *dev, struct comedi_subdevice *s,
 /* overriding the 8255 insn config */
 static int subdev_3724_insn_config(struct comedi_device *dev,
 				   struct comedi_subdevice *s,
-				   struct comedi_insn *insn,
-				   unsigned int *data)
+				   struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 	unsigned int mask;
@@ -215,11 +214,12 @@ static int pcm3724_attach(struct comedi_device *dev,
 }
 
 static struct comedi_driver pcm3724_driver = {
-	.driver_name	= "pcm3724",
-	.module		= THIS_MODULE,
-	.attach		= pcm3724_attach,
-	.detach		= comedi_legacy_detach,
+	.driver_name = "pcm3724",
+	.module = THIS_MODULE,
+	.attach = pcm3724_attach,
+	.detach = comedi_legacy_detach,
 };
+
 module_comedi_driver(pcm3724_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

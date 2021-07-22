@@ -43,7 +43,7 @@
 					 DAS16CS_AI_MUX_LO_CHAN(x))
 #define DAS16CS_MISC1_REG		0x04
 #define DAS16CS_MISC1_INTE		BIT(15)	/* 1=enable; 0=disable */
-#define DAS16CS_MISC1_INT_SRC(x)	(((x) & 0x7) << 12) /* interrupt src */
+#define DAS16CS_MISC1_INT_SRC(x)	(((x) & 0x7) << 12)	/* interrupt src */
 #define DAS16CS_MISC1_INT_SRC_NONE	DAS16CS_MISC1_INT_SRC(0)
 #define DAS16CS_MISC1_INT_SRC_PACER	DAS16CS_MISC1_INT_SRC(1)
 #define DAS16CS_MISC1_INT_SRC_EXT	DAS16CS_MISC1_INT_SRC(2)
@@ -52,7 +52,7 @@
 #define DAS16CS_MISC1_INT_SRC_EOS	DAS16CS_MISC1_INT_SRC(5)
 #define DAS16CS_MISC1_INT_SRC_MASK	DAS16CS_MISC1_INT_SRC(7)
 #define DAS16CS_MISC1_OVR		BIT(10)	/* ro - 1=FIFO overflow */
-#define DAS16CS_MISC1_AI_CONV(x)	(((x) & 0x3) << 8) /* AI convert src */
+#define DAS16CS_MISC1_AI_CONV(x)	(((x) & 0x3) << 8)	/* AI convert src */
 #define DAS16CS_MISC1_AI_CONV_SW	DAS16CS_MISC1_AI_CONV(0)
 #define DAS16CS_MISC1_AI_CONV_EXT_NEG	DAS16CS_MISC1_AI_CONV(1)
 #define DAS16CS_MISC1_AI_CONV_EXT_POS	DAS16CS_MISC1_AI_CONV(2)
@@ -61,7 +61,7 @@
 #define DAS16CS_MISC1_EOC		BIT(7)	/* ro - 0=busy; 1=ready */
 #define DAS16CS_MISC1_SEDIFF		BIT(5)	/* 0=diff; 1=se */
 #define DAS16CS_MISC1_INTB		BIT(4)	/* ro - 0=latched; 1=cleared */
-#define DAS16CS_MISC1_MA_MASK		(0xf << 0) /* ro - current ai mux */
+#define DAS16CS_MISC1_MA_MASK		(0xf << 0)	/* ro - current ai mux */
 #define DAS16CS_MISC1_DAC1CS		BIT(3)	/* wo - DAC1 chip select */
 #define DAS16CS_MISC1_DACCLK		BIT(2)	/* wo - Serial DAC clock */
 #define DAS16CS_MISC1_DACSD		BIT(1)	/* wo - Serial DAC data */
@@ -69,11 +69,11 @@
 #define DAS16CS_MISC1_DAC_MASK		(0x0f << 0)
 #define DAS16CS_MISC2_REG		0x06
 #define DAS16CS_MISC2_BME		BIT(14)	/* 1=burst enable; 0=disable */
-#define DAS16CS_MISC2_AI_GAIN(x)	(((x) & 0xf) << 8) /* AI gain */
-#define DAS16CS_MISC2_AI_GAIN_1		DAS16CS_MISC2_AI_GAIN(4) /* +/-10V */
-#define DAS16CS_MISC2_AI_GAIN_2		DAS16CS_MISC2_AI_GAIN(0) /* +/-5V */
-#define DAS16CS_MISC2_AI_GAIN_4		DAS16CS_MISC2_AI_GAIN(1) /* +/-2.5V */
-#define DAS16CS_MISC2_AI_GAIN_8		DAS16CS_MISC2_AI_GAIN(2) /* +-1.25V */
+#define DAS16CS_MISC2_AI_GAIN(x)	(((x) & 0xf) << 8)	/* AI gain */
+#define DAS16CS_MISC2_AI_GAIN_1		DAS16CS_MISC2_AI_GAIN(4)	/* +/-10V */
+#define DAS16CS_MISC2_AI_GAIN_2		DAS16CS_MISC2_AI_GAIN(0)	/* +/-5V */
+#define DAS16CS_MISC2_AI_GAIN_4		DAS16CS_MISC2_AI_GAIN(1)	/* +/-2.5V */
+#define DAS16CS_MISC2_AI_GAIN_8		DAS16CS_MISC2_AI_GAIN(2)	/* +-1.25V */
 #define DAS16CS_MISC2_AI_GAIN_MASK	DAS16CS_MISC2_AI_GAIN(0xf)
 #define DAS16CS_MISC2_UDIR		BIT(7)	/* 1=dio7:4 output; 0=input */
 #define DAS16CS_MISC2_LDIR		BIT(6)	/* 1=dio3:0 output; 0=input */
@@ -96,17 +96,17 @@ struct das16cs_board {
 
 static const struct das16cs_board das16cs_boards[] = {
 	{
-		.name		= "PC-CARD DAS16/16-AO",
-		.device_id	= 0x0039,
-		.has_ao		= 1,
-		.has_4dio	= 1,
-	}, {
-		.name		= "PCM-DAS16s/16",
-		.device_id	= 0x4009,
-	}, {
-		.name		= "PC-CARD DAS16/16",
-		.device_id	= 0x0000,	/* unknown */
-	},
+	 .name = "PC-CARD DAS16/16-AO",
+	 .device_id = 0x0039,
+	 .has_ao = 1,
+	 .has_4dio = 1,
+	  }, {
+	      .name = "PCM-DAS16s/16",
+	      .device_id = 0x4009,
+	       }, {
+		   .name = "PC-CARD DAS16/16",
+		   .device_id = 0x0000,	/* unknown */
+		    },
 };
 
 struct das16cs_private {
@@ -116,17 +116,16 @@ struct das16cs_private {
 
 static const struct comedi_lrange das16cs_ai_range = {
 	4, {
-		BIP_RANGE(10),
-		BIP_RANGE(5),
-		BIP_RANGE(2.5),
-		BIP_RANGE(1.25),
+	    BIP_RANGE(10),
+	    BIP_RANGE(5),
+	    BIP_RANGE(2.5),
+	    BIP_RANGE(1.25),
 	}
 };
 
 static int das16cs_ai_eoc(struct comedi_device *dev,
 			  struct comedi_subdevice *s,
-			  struct comedi_insn *insn,
-			  unsigned long context)
+			  struct comedi_insn *insn, unsigned long context)
 {
 	unsigned int status;
 
@@ -138,8 +137,7 @@ static int das16cs_ai_eoc(struct comedi_device *dev,
 
 static int das16cs_ai_insn_read(struct comedi_device *dev,
 				struct comedi_subdevice *s,
-				struct comedi_insn *insn,
-				unsigned int *data)
+				struct comedi_insn *insn, unsigned int *data)
 {
 	struct das16cs_private *devpriv = dev->private;
 	int chan = CR_CHAN(insn->chanspec);
@@ -153,7 +151,7 @@ static int das16cs_ai_insn_read(struct comedi_device *dev,
 
 	/* disable interrupts, software convert */
 	devpriv->misc1 &= ~(DAS16CS_MISC1_INTE | DAS16CS_MISC1_INT_SRC_MASK |
-			      DAS16CS_MISC1_AI_CONV_MASK);
+			    DAS16CS_MISC1_AI_CONV_MASK);
 	if (aref == AREF_DIFF)
 		devpriv->misc1 &= ~DAS16CS_MISC1_SEDIFF;
 	else
@@ -192,8 +190,7 @@ static int das16cs_ai_insn_read(struct comedi_device *dev,
 
 static int das16cs_ao_insn_write(struct comedi_device *dev,
 				 struct comedi_subdevice *s,
-				 struct comedi_insn *insn,
-				 unsigned int *data)
+				 struct comedi_insn *insn, unsigned int *data)
 {
 	struct das16cs_private *devpriv = dev->private;
 	unsigned int chan = CR_CHAN(insn->chanspec);
@@ -243,8 +240,7 @@ static int das16cs_ao_insn_write(struct comedi_device *dev,
 
 static int das16cs_dio_insn_bits(struct comedi_device *dev,
 				 struct comedi_subdevice *s,
-				 struct comedi_insn *insn,
-				 unsigned int *data)
+				 struct comedi_insn *insn, unsigned int *data)
 {
 	if (comedi_dio_update_state(s, data))
 		outw(s->state, dev->iobase + DAS16CS_DIO_REG);
@@ -256,8 +252,7 @@ static int das16cs_dio_insn_bits(struct comedi_device *dev,
 
 static int das16cs_dio_insn_config(struct comedi_device *dev,
 				   struct comedi_subdevice *s,
-				   struct comedi_insn *insn,
-				   unsigned int *data)
+				   struct comedi_insn *insn, unsigned int *data)
 {
 	struct das16cs_private *devpriv = dev->private;
 	unsigned int chan = CR_CHAN(insn->chanspec);
@@ -338,8 +333,7 @@ static const void *das16cs_find_boardinfo(struct comedi_device *dev,
 	return NULL;
 }
 
-static int das16cs_auto_attach(struct comedi_device *dev,
-			       unsigned long context)
+static int das16cs_auto_attach(struct comedi_device *dev, unsigned long context)
 {
 	struct pcmcia_device *link = comedi_to_pcmcia_dev(dev);
 	const struct das16cs_board *board;
@@ -376,39 +370,39 @@ static int das16cs_auto_attach(struct comedi_device *dev,
 
 	/* Analog Input subdevice */
 	s = &dev->subdevices[0];
-	s->type		= COMEDI_SUBD_AI;
-	s->subdev_flags	= SDF_READABLE | SDF_GROUND | SDF_DIFF;
-	s->n_chan	= 16;
-	s->maxdata	= 0xffff;
-	s->range_table	= &das16cs_ai_range;
-	s->insn_read	= das16cs_ai_insn_read;
+	s->type = COMEDI_SUBD_AI;
+	s->subdev_flags = SDF_READABLE | SDF_GROUND | SDF_DIFF;
+	s->n_chan = 16;
+	s->maxdata = 0xffff;
+	s->range_table = &das16cs_ai_range;
+	s->insn_read = das16cs_ai_insn_read;
 
 	/* Analog Output subdevice */
 	s = &dev->subdevices[1];
 	if (board->has_ao) {
-		s->type		= COMEDI_SUBD_AO;
-		s->subdev_flags	= SDF_WRITABLE;
-		s->n_chan	= 2;
-		s->maxdata	= 0xffff;
-		s->range_table	= &range_bipolar10;
-		s->insn_write	= &das16cs_ao_insn_write;
+		s->type = COMEDI_SUBD_AO;
+		s->subdev_flags = SDF_WRITABLE;
+		s->n_chan = 2;
+		s->maxdata = 0xffff;
+		s->range_table = &range_bipolar10;
+		s->insn_write = &das16cs_ao_insn_write;
 
 		ret = comedi_alloc_subdev_readback(s);
 		if (ret)
 			return ret;
 	} else {
-		s->type		= COMEDI_SUBD_UNUSED;
+		s->type = COMEDI_SUBD_UNUSED;
 	}
 
 	/* Digital I/O subdevice */
 	s = &dev->subdevices[2];
-	s->type		= COMEDI_SUBD_DIO;
-	s->subdev_flags	= SDF_READABLE | SDF_WRITABLE;
-	s->n_chan	= board->has_4dio ? 4 : 8;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_bits	= das16cs_dio_insn_bits;
-	s->insn_config	= das16cs_dio_insn_config;
+	s->type = COMEDI_SUBD_DIO;
+	s->subdev_flags = SDF_READABLE | SDF_WRITABLE;
+	s->n_chan = board->has_4dio ? 4 : 8;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_bits = das16cs_dio_insn_bits;
+	s->insn_config = das16cs_dio_insn_config;
 
 	/* Counter subdevice (8254) */
 	s = &dev->subdevices[3];
@@ -424,10 +418,10 @@ static int das16cs_auto_attach(struct comedi_device *dev,
 }
 
 static struct comedi_driver driver_das16cs = {
-	.driver_name	= "cb_das16_cs",
-	.module		= THIS_MODULE,
-	.auto_attach	= das16cs_auto_attach,
-	.detach		= comedi_pcmcia_disable,
+	.driver_name = "cb_das16_cs",
+	.module = THIS_MODULE,
+	.auto_attach = das16cs_auto_attach,
+	.detach = comedi_pcmcia_disable,
 };
 
 static int das16cs_pcmcia_attach(struct pcmcia_device *link)
@@ -440,15 +434,17 @@ static const struct pcmcia_device_id das16cs_id_table[] = {
 	PCMCIA_DEVICE_MANF_CARD(0x01c5, 0x4009),
 	PCMCIA_DEVICE_NULL
 };
+
 MODULE_DEVICE_TABLE(pcmcia, das16cs_id_table);
 
 static struct pcmcia_driver das16cs_driver = {
-	.name		= "cb_das16_cs",
-	.owner		= THIS_MODULE,
-	.id_table	= das16cs_id_table,
-	.probe		= das16cs_pcmcia_attach,
-	.remove		= comedi_pcmcia_auto_unconfig,
+	.name = "cb_das16_cs",
+	.owner = THIS_MODULE,
+	.id_table = das16cs_id_table,
+	.probe = das16cs_pcmcia_attach,
+	.remove = comedi_pcmcia_auto_unconfig,
 };
+
 module_comedi_pcmcia_driver(driver_das16cs, das16cs_driver);
 
 MODULE_AUTHOR("David A. Schleef <ds@schleef.org>");

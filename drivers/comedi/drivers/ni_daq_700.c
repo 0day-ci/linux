@@ -60,21 +60,20 @@
 #define CMO_R		0x0B	/* RO 8bit */
 #define TIC_R		0x06	/* WO 8bit */
 /* daqcard700 modes */
-#define CMD_R3_DIFF     0x04    /* diff mode */
+#define CMD_R3_DIFF     0x04	/* diff mode */
 
 static const struct comedi_lrange range_daq700_ai = {
 	3,
 	{
-		BIP_RANGE(10),
-		BIP_RANGE(5),
-		BIP_RANGE(2.5)
+	 BIP_RANGE(10),
+	 BIP_RANGE(5),
+	 BIP_RANGE(2.5)
 	}
 };
 
 static int daq700_dio_insn_bits(struct comedi_device *dev,
 				struct comedi_subdevice *s,
-				struct comedi_insn *insn,
-				unsigned int *data)
+				struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int mask;
 	unsigned int val;
@@ -95,8 +94,7 @@ static int daq700_dio_insn_bits(struct comedi_device *dev,
 
 static int daq700_dio_insn_config(struct comedi_device *dev,
 				  struct comedi_subdevice *s,
-				  struct comedi_insn *insn,
-				  unsigned int *data)
+				  struct comedi_insn *insn, unsigned int *data)
 {
 	int ret;
 
@@ -112,8 +110,7 @@ static int daq700_dio_insn_config(struct comedi_device *dev,
 
 static int daq700_ai_eoc(struct comedi_device *dev,
 			 struct comedi_subdevice *s,
-			 struct comedi_insn *insn,
-			 unsigned long context)
+			 struct comedi_insn *insn, unsigned long context)
 {
 	unsigned int status;
 
@@ -135,17 +132,17 @@ static int daq700_ai_rinsn(struct comedi_device *dev,
 	int n;
 	int d;
 	int ret;
-	unsigned int chan	= CR_CHAN(insn->chanspec);
-	unsigned int aref	= CR_AREF(insn->chanspec);
-	unsigned int range	= CR_RANGE(insn->chanspec);
-	unsigned int r3_bits	= 0;
+	unsigned int chan = CR_CHAN(insn->chanspec);
+	unsigned int aref = CR_AREF(insn->chanspec);
+	unsigned int range = CR_RANGE(insn->chanspec);
+	unsigned int r3_bits = 0;
 
 	/* set channel input modes */
 	if (aref == AREF_DIFF)
 		r3_bits |= CMD_R3_DIFF;
 	/* write channel mode/range */
 	if (range >= 1)
-		range++;        /* convert range to hardware value */
+		range++;	/* convert range to hardware value */
 	outb(r3_bits | (range & 0x03), dev->iobase + CMD_R3);
 
 	/* write channel to multiplexer */
@@ -157,8 +154,8 @@ static int daq700_ai_rinsn(struct comedi_device *dev,
 	/* convert n samples */
 	for (n = 0; n < insn->n; n++) {
 		/* trigger conversion with out0 L to H */
-		outb(0x00, dev->iobase + CMD_R2); /* enable ADC conversions */
-		outb(0x30, dev->iobase + CMO_R); /* mode 0 out0 L, from H */
+		outb(0x00, dev->iobase + CMD_R2);	/* enable ADC conversions */
+		outb(0x30, dev->iobase + CMO_R);	/* mode 0 out0 L, from H */
 		outb(0x00, dev->iobase + ADCLEAR_R);	/* clear the ADC FIFO */
 		/* read 16bit junk from FIFO to clear */
 		inw(dev->iobase + ADFIFO_R);
@@ -203,11 +200,10 @@ static void daq700_ai_config(struct comedi_device *dev,
 	outb(0x32, iobase + CMO_R);	/* config counter mode1, out0 to H */
 	outb(0x00, iobase + TIC_R);	/* clear counter interrupt */
 	outb(0x00, iobase + ADCLEAR_R);	/* clear the ADC FIFO */
-	inw(iobase + ADFIFO_R);		/* read 16bit junk from FIFO to clear */
+	inw(iobase + ADFIFO_R);	/* read 16bit junk from FIFO to clear */
 }
 
-static int daq700_auto_attach(struct comedi_device *dev,
-			      unsigned long context)
+static int daq700_auto_attach(struct comedi_device *dev, unsigned long context)
 {
 	struct pcmcia_device *link = comedi_to_pcmcia_dev(dev);
 	struct comedi_subdevice *s;
@@ -225,14 +221,14 @@ static int daq700_auto_attach(struct comedi_device *dev,
 
 	/* DAQCard-700 dio */
 	s = &dev->subdevices[0];
-	s->type		= COMEDI_SUBD_DIO;
-	s->subdev_flags	= SDF_READABLE | SDF_WRITABLE;
-	s->n_chan	= 16;
-	s->range_table	= &range_digital;
-	s->maxdata	= 1;
-	s->insn_bits	= daq700_dio_insn_bits;
-	s->insn_config	= daq700_dio_insn_config;
-	s->io_bits	= 0x00ff;
+	s->type = COMEDI_SUBD_DIO;
+	s->subdev_flags = SDF_READABLE | SDF_WRITABLE;
+	s->n_chan = 16;
+	s->range_table = &range_digital;
+	s->maxdata = 1;
+	s->insn_bits = daq700_dio_insn_bits;
+	s->insn_config = daq700_dio_insn_config;
+	s->io_bits = 0x00ff;
 
 	/* DAQCard-700 ai */
 	s = &dev->subdevices[1];
@@ -248,10 +244,10 @@ static int daq700_auto_attach(struct comedi_device *dev,
 }
 
 static struct comedi_driver daq700_driver = {
-	.driver_name	= "ni_daq_700",
-	.module		= THIS_MODULE,
-	.auto_attach	= daq700_auto_attach,
-	.detach		= comedi_pcmcia_disable,
+	.driver_name = "ni_daq_700",
+	.module = THIS_MODULE,
+	.auto_attach = daq700_auto_attach,
+	.detach = comedi_pcmcia_disable,
 };
 
 static int daq700_cs_attach(struct pcmcia_device *link)
@@ -263,18 +259,20 @@ static const struct pcmcia_device_id daq700_cs_ids[] = {
 	PCMCIA_DEVICE_MANF_CARD(0x010b, 0x4743),
 	PCMCIA_DEVICE_NULL
 };
+
 MODULE_DEVICE_TABLE(pcmcia, daq700_cs_ids);
 
 static struct pcmcia_driver daq700_cs_driver = {
-	.name		= "ni_daq_700",
-	.owner		= THIS_MODULE,
-	.id_table	= daq700_cs_ids,
-	.probe		= daq700_cs_attach,
-	.remove		= comedi_pcmcia_auto_unconfig,
+	.name = "ni_daq_700",
+	.owner = THIS_MODULE,
+	.id_table = daq700_cs_ids,
+	.probe = daq700_cs_attach,
+	.remove = comedi_pcmcia_auto_unconfig,
 };
+
 module_comedi_pcmcia_driver(daq700_driver, daq700_cs_driver);
 
 MODULE_AUTHOR("Fred Brooks <nsaspook@nsaspook.com>");
-MODULE_DESCRIPTION(
-	"Comedi driver for National Instruments PCMCIA DAQCard-700 DIO/AI");
+MODULE_DESCRIPTION
+    ("Comedi driver for National Instruments PCMCIA DAQCard-700 DIO/AI");
 MODULE_LICENSE("GPL");

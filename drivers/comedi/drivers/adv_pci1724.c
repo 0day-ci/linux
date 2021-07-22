@@ -57,23 +57,22 @@
 #define PCI1724_SYNC_CTRL_DACSTAT	BIT(1)
 #define PCI1724_SYNC_CTRL_SYN		BIT(0)
 #define PCI1724_EEPROM_CTRL_REG		0x08
-#define PCI1724_SYNC_TRIG_REG		0x0c  /* any value works */
+#define PCI1724_SYNC_TRIG_REG		0x0c	/* any value works */
 #define PCI1724_BOARD_ID_REG		0x10
 #define PCI1724_BOARD_ID_MASK		(0xf << 0)
 
 static const struct comedi_lrange adv_pci1724_ao_ranges = {
 	4, {
-		BIP_RANGE(10),
-		RANGE_mA(0, 20),
-		RANGE_mA(4, 20),
-		RANGE_unitless(0, 1)
+	    BIP_RANGE(10),
+	    RANGE_mA(0, 20),
+	    RANGE_mA(4, 20),
+	    RANGE_unitless(0, 1)
 	}
 };
 
 static int adv_pci1724_dac_idle(struct comedi_device *dev,
 				struct comedi_subdevice *s,
-				struct comedi_insn *insn,
-				unsigned long context)
+				struct comedi_insn *insn, unsigned long context)
 {
 	unsigned int status;
 
@@ -85,8 +84,7 @@ static int adv_pci1724_dac_idle(struct comedi_device *dev,
 
 static int adv_pci1724_insn_write(struct comedi_device *dev,
 				  struct comedi_subdevice *s,
-				  struct comedi_insn *insn,
-				  unsigned int *data)
+				  struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned long mode = (unsigned long)s->private;
 	unsigned int chan = CR_CHAN(insn->chanspec);
@@ -138,13 +136,13 @@ static int adv_pci1724_auto_attach(struct comedi_device *dev,
 
 	/* Analog Output subdevice */
 	s = &dev->subdevices[0];
-	s->type		= COMEDI_SUBD_AO;
-	s->subdev_flags	= SDF_READABLE | SDF_WRITABLE | SDF_GROUND;
-	s->n_chan	= 32;
-	s->maxdata	= 0x3fff;
-	s->range_table	= &adv_pci1724_ao_ranges;
-	s->insn_write	= adv_pci1724_insn_write;
-	s->private	= (void *)PCI1724_DAC_CTRL_MODE_NORMAL;
+	s->type = COMEDI_SUBD_AO;
+	s->subdev_flags = SDF_READABLE | SDF_WRITABLE | SDF_GROUND;
+	s->n_chan = 32;
+	s->maxdata = 0x3fff;
+	s->range_table = &adv_pci1724_ao_ranges;
+	s->insn_write = adv_pci1724_insn_write;
+	s->private = (void *)PCI1724_DAC_CTRL_MODE_NORMAL;
 
 	ret = comedi_alloc_subdev_readback(s);
 	if (ret)
@@ -152,12 +150,12 @@ static int adv_pci1724_auto_attach(struct comedi_device *dev,
 
 	/* Offset Calibration subdevice */
 	s = &dev->subdevices[1];
-	s->type		= COMEDI_SUBD_CALIB;
-	s->subdev_flags	= SDF_READABLE | SDF_WRITABLE | SDF_INTERNAL;
-	s->n_chan	= 32;
-	s->maxdata	= 0x3fff;
-	s->insn_write	= adv_pci1724_insn_write;
-	s->private	= (void *)PCI1724_DAC_CTRL_MODE_OFFSET;
+	s->type = COMEDI_SUBD_CALIB;
+	s->subdev_flags = SDF_READABLE | SDF_WRITABLE | SDF_INTERNAL;
+	s->n_chan = 32;
+	s->maxdata = 0x3fff;
+	s->insn_write = adv_pci1724_insn_write;
+	s->private = (void *)PCI1724_DAC_CTRL_MODE_OFFSET;
 
 	ret = comedi_alloc_subdev_readback(s);
 	if (ret)
@@ -165,21 +163,21 @@ static int adv_pci1724_auto_attach(struct comedi_device *dev,
 
 	/* Gain Calibration subdevice */
 	s = &dev->subdevices[2];
-	s->type		= COMEDI_SUBD_CALIB;
-	s->subdev_flags	= SDF_READABLE | SDF_WRITABLE | SDF_INTERNAL;
-	s->n_chan	= 32;
-	s->maxdata	= 0x3fff;
-	s->insn_write	= adv_pci1724_insn_write;
-	s->private	= (void *)PCI1724_DAC_CTRL_MODE_GAIN;
+	s->type = COMEDI_SUBD_CALIB;
+	s->subdev_flags = SDF_READABLE | SDF_WRITABLE | SDF_INTERNAL;
+	s->n_chan = 32;
+	s->maxdata = 0x3fff;
+	s->insn_write = adv_pci1724_insn_write;
+	s->private = (void *)PCI1724_DAC_CTRL_MODE_GAIN;
 
 	return comedi_alloc_subdev_readback(s);
 }
 
 static struct comedi_driver adv_pci1724_driver = {
-	.driver_name	= "adv_pci1724",
-	.module		= THIS_MODULE,
-	.auto_attach	= adv_pci1724_auto_attach,
-	.detach		= comedi_pci_detach,
+	.driver_name = "adv_pci1724",
+	.module = THIS_MODULE,
+	.auto_attach = adv_pci1724_auto_attach,
+	.detach = comedi_pci_detach,
 };
 
 static int adv_pci1724_pci_probe(struct pci_dev *dev,
@@ -193,14 +191,16 @@ static const struct pci_device_id adv_pci1724_pci_table[] = {
 	{ PCI_DEVICE(PCI_VENDOR_ID_ADVANTECH, 0x1724) },
 	{ 0 }
 };
+
 MODULE_DEVICE_TABLE(pci, adv_pci1724_pci_table);
 
 static struct pci_driver adv_pci1724_pci_driver = {
-	.name		= "adv_pci1724",
-	.id_table	= adv_pci1724_pci_table,
-	.probe		= adv_pci1724_pci_probe,
-	.remove		= comedi_pci_auto_unconfig,
+	.name = "adv_pci1724",
+	.id_table = adv_pci1724_pci_table,
+	.probe = adv_pci1724_pci_probe,
+	.remove = comedi_pci_auto_unconfig,
 };
+
 module_comedi_pci_driver(adv_pci1724_driver, adv_pci1724_pci_driver);
 
 MODULE_AUTHOR("Frank Mori Hess <fmh6jj@gmail.com>");

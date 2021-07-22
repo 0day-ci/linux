@@ -22,7 +22,7 @@
 static void comedi_buf_map_kref_release(struct kref *kref)
 {
 	struct comedi_buf_map *bm =
-		container_of(kref, struct comedi_buf_map, refcount);
+	    container_of(kref, struct comedi_buf_map, refcount);
 	struct comedi_buf_page *buf;
 	unsigned int i;
 
@@ -71,9 +71,10 @@ static void __comedi_buf_free(struct comedi_device *dev,
 	comedi_buf_map_put(bm);
 }
 
-static struct comedi_buf_map *
-comedi_buf_map_alloc(struct comedi_device *dev, enum dma_data_direction dma_dir,
-		     unsigned int n_pages)
+static struct comedi_buf_map *comedi_buf_map_alloc(struct comedi_device *dev,
+						   enum dma_data_direction
+						   dma_dir,
+						   unsigned int n_pages)
 {
 	struct comedi_buf_map *bm;
 	struct comedi_buf_page *buf;
@@ -138,8 +139,7 @@ err:
 }
 
 static void __comedi_buf_alloc(struct comedi_device *dev,
-			       struct comedi_subdevice *s,
-			       unsigned int n_pages)
+			       struct comedi_subdevice *s, unsigned int n_pages)
 {
 	struct comedi_async *async = s->async;
 	struct page **pages = NULL;
@@ -225,8 +225,8 @@ int comedi_buf_map_access(struct comedi_buf_map *bm, unsigned long offset,
 }
 
 /* returns s->async->buf_map and increments its kref refcount */
-struct comedi_buf_map *
-comedi_buf_map_from_subdev_get(struct comedi_subdevice *s)
+struct comedi_buf_map *comedi_buf_map_from_subdev_get(struct comedi_subdevice
+						      *s)
 {
 	struct comedi_async *async = s->async;
 	struct comedi_buf_map *bm = NULL;
@@ -356,6 +356,7 @@ unsigned int comedi_buf_write_alloc(struct comedi_subdevice *s,
 
 	return nbytes;
 }
+
 EXPORT_SYMBOL_GPL(comedi_buf_write_alloc);
 
 /*
@@ -444,6 +445,7 @@ unsigned int comedi_buf_write_free(struct comedi_subdevice *s,
 
 	return nbytes;
 }
+
 EXPORT_SYMBOL_GPL(comedi_buf_write_free);
 
 /**
@@ -475,6 +477,7 @@ unsigned int comedi_buf_read_n_available(struct comedi_subdevice *s)
 
 	return num_bytes;
 }
+
 EXPORT_SYMBOL_GPL(comedi_buf_read_n_available);
 
 /**
@@ -512,6 +515,7 @@ unsigned int comedi_buf_read_alloc(struct comedi_subdevice *s,
 
 	return nbytes;
 }
+
 EXPORT_SYMBOL_GPL(comedi_buf_read_alloc);
 
 static unsigned int comedi_buf_read_n_allocated(struct comedi_async *async)
@@ -553,6 +557,7 @@ unsigned int comedi_buf_read_free(struct comedi_subdevice *s,
 	async->buf_read_ptr %= async->prealloc_bufsz;
 	return nbytes;
 }
+
 EXPORT_SYMBOL_GPL(comedi_buf_read_free);
 
 static void comedi_buf_memcpy_to(struct comedi_subdevice *s,
@@ -649,6 +654,7 @@ unsigned int comedi_buf_write_samples(struct comedi_subdevice *s,
 
 	return nbytes;
 }
+
 EXPORT_SYMBOL_GPL(comedi_buf_write_samples);
 
 /**
@@ -680,8 +686,7 @@ unsigned int comedi_buf_read_samples(struct comedi_subdevice *s,
 	if (nsamples == 0)
 		return 0;
 
-	nbytes = comedi_buf_read_alloc(s,
-				       comedi_samples_to_bytes(s, nsamples));
+	nbytes = comedi_buf_read_alloc(s, comedi_samples_to_bytes(s, nsamples));
 	comedi_buf_memcpy_from(s, data, nbytes);
 	comedi_buf_read_free(s, nbytes);
 	comedi_inc_scan_progress(s, nbytes);
@@ -689,4 +694,5 @@ unsigned int comedi_buf_read_samples(struct comedi_subdevice *s,
 
 	return nbytes;
 }
+
 EXPORT_SYMBOL_GPL(comedi_buf_read_samples);

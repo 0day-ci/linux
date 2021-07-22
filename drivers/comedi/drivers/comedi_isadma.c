@@ -30,6 +30,7 @@ void comedi_isadma_program(struct comedi_isadma_desc *desc)
 	enable_dma(desc->chan);
 	release_dma_lock(flags);
 }
+
 EXPORT_SYMBOL_GPL(comedi_isadma_program);
 
 /**
@@ -50,6 +51,7 @@ unsigned int comedi_isadma_disable(unsigned int dma_chan)
 
 	return residue;
 }
+
 EXPORT_SYMBOL_GPL(comedi_isadma_disable);
 
 /**
@@ -89,6 +91,7 @@ unsigned int comedi_isadma_disable_on_sample(unsigned int dma_chan,
 	}
 	return residue;
 }
+
 EXPORT_SYMBOL_GPL(comedi_isadma_disable_on_sample);
 
 /**
@@ -125,6 +128,7 @@ unsigned int comedi_isadma_poll(struct comedi_isadma *dma)
 		return 0;
 	return desc->size - result;
 }
+
 EXPORT_SYMBOL_GPL(comedi_isadma_poll);
 
 /**
@@ -135,8 +139,9 @@ EXPORT_SYMBOL_GPL(comedi_isadma_poll);
 void comedi_isadma_set_mode(struct comedi_isadma_desc *desc, char dma_dir)
 {
 	desc->mode = (dma_dir == COMEDI_ISADMA_READ) ? DMA_MODE_READ
-						     : DMA_MODE_WRITE;
+	    : DMA_MODE_WRITE;
 }
+
 EXPORT_SYMBOL_GPL(comedi_isadma_set_mode);
 
 /**
@@ -219,6 +224,7 @@ no_dma:
 	comedi_isadma_free(dma);
 	return NULL;
 }
+
 EXPORT_SYMBOL_GPL(comedi_isadma_alloc);
 
 /**
@@ -249,17 +255,20 @@ void comedi_isadma_free(struct comedi_isadma *dma)
 		free_dma(dma->chan);
 	kfree(dma);
 }
+
 EXPORT_SYMBOL_GPL(comedi_isadma_free);
 
 static int __init comedi_isadma_init(void)
 {
 	return 0;
 }
+
 module_init(comedi_isadma_init);
 
 static void __exit comedi_isadma_exit(void)
 {
 }
+
 module_exit(comedi_isadma_exit);
 
 MODULE_AUTHOR("H Hartley Sweeten <hsweeten@visionengravers.com>");

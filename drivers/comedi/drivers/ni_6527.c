@@ -69,11 +69,11 @@ struct ni6527_board {
 
 static const struct ni6527_board ni6527_boards[] = {
 	[BOARD_PCI6527] = {
-		.name		= "pci-6527",
-	},
+			   .name = "pci-6527",
+			    },
 	[BOARD_PXI6527] = {
-		.name		= "pxi-6527",
-	},
+			   .name = "pxi-6527",
+			    },
 };
 
 struct ni6527_private {
@@ -109,8 +109,7 @@ static void ni6527_set_filter_enable(struct comedi_device *dev,
 
 static int ni6527_di_insn_config(struct comedi_device *dev,
 				 struct comedi_subdevice *s,
-				 struct comedi_insn *insn,
-				 unsigned int *data)
+				 struct comedi_insn *insn, unsigned int *data)
 {
 	struct ni6527_private *devpriv = dev->private;
 	unsigned int chan = CR_CHAN(insn->chanspec);
@@ -143,8 +142,7 @@ static int ni6527_di_insn_config(struct comedi_device *dev,
 
 static int ni6527_di_insn_bits(struct comedi_device *dev,
 			       struct comedi_subdevice *s,
-			       struct comedi_insn *insn,
-			       unsigned int *data)
+			       struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int val;
 
@@ -159,8 +157,7 @@ static int ni6527_di_insn_bits(struct comedi_device *dev,
 
 static int ni6527_do_insn_bits(struct comedi_device *dev,
 			       struct comedi_subdevice *s,
-			       struct comedi_insn *insn,
-			       unsigned int *data)
+			       struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int mask;
 
@@ -172,8 +169,7 @@ static int ni6527_do_insn_bits(struct comedi_device *dev,
 		if (mask & 0x0000ff)
 			writeb(val & 0xff, dev->mmio + NI6527_DO_REG(0));
 		if (mask & 0x00ff00)
-			writeb((val >> 8) & 0xff,
-			       dev->mmio + NI6527_DO_REG(1));
+			writeb((val >> 8) & 0xff, dev->mmio + NI6527_DO_REG(1));
 		if (mask & 0xff0000)
 			writeb((val >> 16) & 0xff,
 			       dev->mmio + NI6527_DO_REG(2));
@@ -272,8 +268,7 @@ static int ni6527_intr_insn_bits(struct comedi_device *dev,
 
 static void ni6527_set_edge_detection(struct comedi_device *dev,
 				      unsigned int mask,
-				      unsigned int rising,
-				      unsigned int falling)
+				      unsigned int rising, unsigned int falling)
 {
 	unsigned int i;
 
@@ -285,11 +280,11 @@ static void ni6527_set_edge_detection(struct comedi_device *dev,
 				/* preserve rising-edge detection channels */
 				rising |= readb(dev->mmio +
 						NI6527_RISING_EDGE_REG(i)) &
-					  (~mask & 0xff);
+				    (~mask & 0xff);
 				/* preserve falling-edge detection channels */
 				falling |= readb(dev->mmio +
 						 NI6527_FALLING_EDGE_REG(i)) &
-					   (~mask & 0xff);
+				    (~mask & 0xff);
 			}
 			/* update rising-edge detection channels */
 			writeb(rising & 0xff,
@@ -306,8 +301,7 @@ static void ni6527_set_edge_detection(struct comedi_device *dev,
 
 static int ni6527_intr_insn_config(struct comedi_device *dev,
 				   struct comedi_subdevice *s,
-				   struct comedi_insn *insn,
-				   unsigned int *data)
+				   struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int mask = 0xffffffff;
 	unsigned int rising, falling, shift;
@@ -369,8 +363,7 @@ static void ni6527_reset(struct comedi_device *dev)
 	writeb(NI6527_CTRL_DISABLE_IRQS, dev->mmio + NI6527_CTRL_REG);
 }
 
-static int ni6527_auto_attach(struct comedi_device *dev,
-			      unsigned long context)
+static int ni6527_auto_attach(struct comedi_device *dev, unsigned long context)
 {
 	struct pci_dev *pcidev = comedi_to_pci_dev(dev);
 	const struct ni6527_board *board = NULL;
@@ -414,38 +407,38 @@ static int ni6527_auto_attach(struct comedi_device *dev,
 
 	/* Digital Input subdevice */
 	s = &dev->subdevices[0];
-	s->type		= COMEDI_SUBD_DI;
-	s->subdev_flags	= SDF_READABLE;
-	s->n_chan	= 24;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_config	= ni6527_di_insn_config;
-	s->insn_bits	= ni6527_di_insn_bits;
+	s->type = COMEDI_SUBD_DI;
+	s->subdev_flags = SDF_READABLE;
+	s->n_chan = 24;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_config = ni6527_di_insn_config;
+	s->insn_bits = ni6527_di_insn_bits;
 
 	/* Digital Output subdevice */
 	s = &dev->subdevices[1];
-	s->type		= COMEDI_SUBD_DO;
-	s->subdev_flags	= SDF_WRITABLE;
-	s->n_chan	= 24;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_bits	= ni6527_do_insn_bits;
+	s->type = COMEDI_SUBD_DO;
+	s->subdev_flags = SDF_WRITABLE;
+	s->n_chan = 24;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_bits = ni6527_do_insn_bits;
 
 	/* Edge detection interrupt subdevice */
 	s = &dev->subdevices[2];
 	if (dev->irq) {
 		dev->read_subdev = s;
-		s->type		= COMEDI_SUBD_DI;
-		s->subdev_flags	= SDF_READABLE | SDF_CMD_READ;
-		s->n_chan	= 1;
-		s->maxdata	= 1;
-		s->range_table	= &range_digital;
-		s->insn_config	= ni6527_intr_insn_config;
-		s->insn_bits	= ni6527_intr_insn_bits;
-		s->len_chanlist	= 1;
-		s->do_cmdtest	= ni6527_intr_cmdtest;
-		s->do_cmd	= ni6527_intr_cmd;
-		s->cancel	= ni6527_intr_cancel;
+		s->type = COMEDI_SUBD_DI;
+		s->subdev_flags = SDF_READABLE | SDF_CMD_READ;
+		s->n_chan = 1;
+		s->maxdata = 1;
+		s->range_table = &range_digital;
+		s->insn_config = ni6527_intr_insn_config;
+		s->insn_bits = ni6527_intr_insn_bits;
+		s->len_chanlist = 1;
+		s->do_cmdtest = ni6527_intr_cmdtest;
+		s->do_cmd = ni6527_intr_cmd;
+		s->cancel = ni6527_intr_cancel;
 	} else {
 		s->type = COMEDI_SUBD_UNUSED;
 	}
@@ -461,14 +454,13 @@ static void ni6527_detach(struct comedi_device *dev)
 }
 
 static struct comedi_driver ni6527_driver = {
-	.driver_name	= "ni_6527",
-	.module		= THIS_MODULE,
-	.auto_attach	= ni6527_auto_attach,
-	.detach		= ni6527_detach,
+	.driver_name = "ni_6527",
+	.module = THIS_MODULE,
+	.auto_attach = ni6527_auto_attach,
+	.detach = ni6527_detach,
 };
 
-static int ni6527_pci_probe(struct pci_dev *dev,
-			    const struct pci_device_id *id)
+static int ni6527_pci_probe(struct pci_dev *dev, const struct pci_device_id *id)
 {
 	return comedi_pci_auto_config(dev, &ni6527_driver, id->driver_data);
 }
@@ -478,14 +470,16 @@ static const struct pci_device_id ni6527_pci_table[] = {
 	{ PCI_VDEVICE(NI, 0x2b20), BOARD_PCI6527 },
 	{ 0 }
 };
+
 MODULE_DEVICE_TABLE(pci, ni6527_pci_table);
 
 static struct pci_driver ni6527_pci_driver = {
-	.name		= "ni_6527",
-	.id_table	= ni6527_pci_table,
-	.probe		= ni6527_pci_probe,
-	.remove		= comedi_pci_auto_unconfig,
+	.name = "ni_6527",
+	.id_table = ni6527_pci_table,
+	.probe = ni6527_pci_probe,
+	.remove = comedi_pci_auto_unconfig,
 };
+
 module_comedi_pci_driver(ni6527_driver, ni6527_pci_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

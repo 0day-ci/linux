@@ -251,70 +251,70 @@
  */
 static const struct comedi_lrange rtd_ai_7520_range = {
 	18, {
-		/* +-5V input range gain steps */
-		BIP_RANGE(5.0),
-		BIP_RANGE(5.0 / 2),
-		BIP_RANGE(5.0 / 4),
-		BIP_RANGE(5.0 / 8),
-		BIP_RANGE(5.0 / 16),
-		BIP_RANGE(5.0 / 32),
-		/* +-10V input range gain steps */
-		BIP_RANGE(10.0),
-		BIP_RANGE(10.0 / 2),
-		BIP_RANGE(10.0 / 4),
-		BIP_RANGE(10.0 / 8),
-		BIP_RANGE(10.0 / 16),
-		BIP_RANGE(10.0 / 32),
-		/* +10V input range gain steps */
-		UNI_RANGE(10.0),
-		UNI_RANGE(10.0 / 2),
-		UNI_RANGE(10.0 / 4),
-		UNI_RANGE(10.0 / 8),
-		UNI_RANGE(10.0 / 16),
-		UNI_RANGE(10.0 / 32),
+	     /* +-5V input range gain steps */
+	     BIP_RANGE(5.0),
+	     BIP_RANGE(5.0 / 2),
+	     BIP_RANGE(5.0 / 4),
+	     BIP_RANGE(5.0 / 8),
+	     BIP_RANGE(5.0 / 16),
+	     BIP_RANGE(5.0 / 32),
+	     /* +-10V input range gain steps */
+	     BIP_RANGE(10.0),
+	     BIP_RANGE(10.0 / 2),
+	     BIP_RANGE(10.0 / 4),
+	     BIP_RANGE(10.0 / 8),
+	     BIP_RANGE(10.0 / 16),
+	     BIP_RANGE(10.0 / 32),
+	     /* +10V input range gain steps */
+	     UNI_RANGE(10.0),
+	     UNI_RANGE(10.0 / 2),
+	     UNI_RANGE(10.0 / 4),
+	     UNI_RANGE(10.0 / 8),
+	     UNI_RANGE(10.0 / 16),
+	     UNI_RANGE(10.0 / 32),
 	}
 };
 
 /* PCI4520 has two more gains (6 more entries) */
 static const struct comedi_lrange rtd_ai_4520_range = {
 	24, {
-		/* +-5V input range gain steps */
-		BIP_RANGE(5.0),
-		BIP_RANGE(5.0 / 2),
-		BIP_RANGE(5.0 / 4),
-		BIP_RANGE(5.0 / 8),
-		BIP_RANGE(5.0 / 16),
-		BIP_RANGE(5.0 / 32),
-		BIP_RANGE(5.0 / 64),
-		BIP_RANGE(5.0 / 128),
-		/* +-10V input range gain steps */
-		BIP_RANGE(10.0),
-		BIP_RANGE(10.0 / 2),
-		BIP_RANGE(10.0 / 4),
-		BIP_RANGE(10.0 / 8),
-		BIP_RANGE(10.0 / 16),
-		BIP_RANGE(10.0 / 32),
-		BIP_RANGE(10.0 / 64),
-		BIP_RANGE(10.0 / 128),
-		/* +10V input range gain steps */
-		UNI_RANGE(10.0),
-		UNI_RANGE(10.0 / 2),
-		UNI_RANGE(10.0 / 4),
-		UNI_RANGE(10.0 / 8),
-		UNI_RANGE(10.0 / 16),
-		UNI_RANGE(10.0 / 32),
-		UNI_RANGE(10.0 / 64),
-		UNI_RANGE(10.0 / 128),
+	     /* +-5V input range gain steps */
+	     BIP_RANGE(5.0),
+	     BIP_RANGE(5.0 / 2),
+	     BIP_RANGE(5.0 / 4),
+	     BIP_RANGE(5.0 / 8),
+	     BIP_RANGE(5.0 / 16),
+	     BIP_RANGE(5.0 / 32),
+	     BIP_RANGE(5.0 / 64),
+	     BIP_RANGE(5.0 / 128),
+	     /* +-10V input range gain steps */
+	     BIP_RANGE(10.0),
+	     BIP_RANGE(10.0 / 2),
+	     BIP_RANGE(10.0 / 4),
+	     BIP_RANGE(10.0 / 8),
+	     BIP_RANGE(10.0 / 16),
+	     BIP_RANGE(10.0 / 32),
+	     BIP_RANGE(10.0 / 64),
+	     BIP_RANGE(10.0 / 128),
+	     /* +10V input range gain steps */
+	     UNI_RANGE(10.0),
+	     UNI_RANGE(10.0 / 2),
+	     UNI_RANGE(10.0 / 4),
+	     UNI_RANGE(10.0 / 8),
+	     UNI_RANGE(10.0 / 16),
+	     UNI_RANGE(10.0 / 32),
+	     UNI_RANGE(10.0 / 64),
+	     UNI_RANGE(10.0 / 128),
 	}
 };
 
 /* Table order matches range values */
 static const struct comedi_lrange rtd_ao_range = {
 	4, {
-		UNI_RANGE(5),
-		UNI_RANGE(10),
-		BIP_RANGE(5),
-		BIP_RANGE(10),
+	    UNI_RANGE(5),
+	    UNI_RANGE(10),
+	    BIP_RANGE(5),
+	    BIP_RANGE(10),
 	}
 };
 
@@ -332,17 +332,17 @@ struct rtd_boardinfo {
 
 static const struct rtd_boardinfo rtd520_boards[] = {
 	[BOARD_DM7520] = {
-		.name		= "DM7520",
-		.range_bip10	= 6,
-		.range_uni10	= 12,
-		.ai_range	= &rtd_ai_7520_range,
-	},
+			  .name = "DM7520",
+			  .range_bip10 = 6,
+			  .range_uni10 = 12,
+			  .ai_range = &rtd_ai_7520_range,
+			   },
 	[BOARD_PCI4520] = {
-		.name		= "PCI4520",
-		.range_bip10	= 8,
-		.range_uni10	= 16,
-		.ai_range	= &rtd_ai_4520_range,
-	},
+			   .name = "PCI4520",
+			   .range_bip10 = 8,
+			   .range_uni10 = 16,
+			   .ai_range = &rtd_ai_4520_range,
+			    },
 };
 
 struct rtd_private {
@@ -518,8 +518,7 @@ static int rtd520_probe_fifo_depth(struct comedi_device *dev)
 
 static int rtd_ai_eoc(struct comedi_device *dev,
 		      struct comedi_subdevice *s,
-		      struct comedi_insn *insn,
-		      unsigned long context)
+		      struct comedi_insn *insn, unsigned long context)
 {
 	unsigned int status;
 
@@ -794,7 +793,7 @@ static int rtd_ai_cmdtest(struct comedi_device *dev,
 
 	if (cmd->stop_src == TRIG_COUNT)
 		err |= comedi_check_trigger_arg_min(&cmd->stop_arg, 1);
-	else	/* TRIG_NONE */
+	else			/* TRIG_NONE */
 		err |= comedi_check_trigger_arg_is(&cmd->stop_arg, 0);
 
 	if (err)
@@ -815,8 +814,9 @@ static int rtd_ai_cmdtest(struct comedi_device *dev,
 
 		if (cmd->scan_begin_src == TRIG_TIMER) {
 			arg = cmd->convert_arg * cmd->scan_end_arg;
-			err |= comedi_check_trigger_arg_min(
-					&cmd->scan_begin_arg, arg);
+			err |=
+			    comedi_check_trigger_arg_min(&cmd->scan_begin_arg,
+							 arg);
 		}
 	}
 
@@ -992,8 +992,7 @@ static int rtd_ai_cancel(struct comedi_device *dev, struct comedi_subdevice *s)
 
 static int rtd_ao_eoc(struct comedi_device *dev,
 		      struct comedi_subdevice *s,
-		      struct comedi_insn *insn,
-		      unsigned long context)
+		      struct comedi_insn *insn, unsigned long context)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 	unsigned int bit = (chan == 0) ? FS_DAC1_NOT_EMPTY : FS_DAC2_NOT_EMPTY;
@@ -1007,8 +1006,7 @@ static int rtd_ao_eoc(struct comedi_device *dev,
 
 static int rtd_ao_insn_write(struct comedi_device *dev,
 			     struct comedi_subdevice *s,
-			     struct comedi_insn *insn,
-			     unsigned int *data)
+			     struct comedi_insn *insn, unsigned int *data)
 {
 	struct rtd_private *devpriv = dev->private;
 	unsigned int chan = CR_CHAN(insn->chanspec);
@@ -1046,8 +1044,7 @@ static int rtd_ao_insn_write(struct comedi_device *dev,
 
 static int rtd_dio_insn_bits(struct comedi_device *dev,
 			     struct comedi_subdevice *s,
-			     struct comedi_insn *insn,
-			     unsigned int *data)
+			     struct comedi_insn *insn, unsigned int *data)
 {
 	if (comedi_dio_update_state(s, data))
 		writew(s->state & 0xff, dev->mmio + LAS0_DIO0);
@@ -1059,8 +1056,7 @@ static int rtd_dio_insn_bits(struct comedi_device *dev,
 
 static int rtd_dio_insn_config(struct comedi_device *dev,
 			       struct comedi_subdevice *s,
-			       struct comedi_insn *insn,
-			       unsigned int *data)
+			       struct comedi_insn *insn, unsigned int *data)
 {
 	int ret;
 
@@ -1086,8 +1082,7 @@ static int rtd_dio_insn_config(struct comedi_device *dev,
 
 static int rtd_counter_insn_config(struct comedi_device *dev,
 				   struct comedi_subdevice *s,
-				   struct comedi_insn *insn,
-				   unsigned int *data)
+				   struct comedi_insn *insn, unsigned int *data)
 {
 	struct rtd_private *devpriv = dev->private;
 	unsigned int chan = CR_CHAN(insn->chanspec);
@@ -1204,8 +1199,7 @@ static void rtd_pci_latency_quirk(struct comedi_device *dev,
 	}
 }
 
-static int rtd_auto_attach(struct comedi_device *dev,
-			   unsigned long context)
+static int rtd_auto_attach(struct comedi_device *dev, unsigned long context)
 {
 	struct pci_dev *pcidev = comedi_to_pci_dev(dev);
 	const struct rtd_boardinfo *board = NULL;
@@ -1249,29 +1243,29 @@ static int rtd_auto_attach(struct comedi_device *dev,
 
 	s = &dev->subdevices[0];
 	/* analog input subdevice */
-	s->type		= COMEDI_SUBD_AI;
-	s->subdev_flags	= SDF_READABLE | SDF_GROUND | SDF_COMMON | SDF_DIFF;
-	s->n_chan	= 16;
-	s->maxdata	= 0x0fff;
-	s->range_table	= board->ai_range;
-	s->len_chanlist	= RTD_MAX_CHANLIST;
-	s->insn_read	= rtd_ai_rinsn;
+	s->type = COMEDI_SUBD_AI;
+	s->subdev_flags = SDF_READABLE | SDF_GROUND | SDF_COMMON | SDF_DIFF;
+	s->n_chan = 16;
+	s->maxdata = 0x0fff;
+	s->range_table = board->ai_range;
+	s->len_chanlist = RTD_MAX_CHANLIST;
+	s->insn_read = rtd_ai_rinsn;
 	if (dev->irq) {
 		dev->read_subdev = s;
-		s->subdev_flags	|= SDF_CMD_READ;
-		s->do_cmd	= rtd_ai_cmd;
-		s->do_cmdtest	= rtd_ai_cmdtest;
-		s->cancel	= rtd_ai_cancel;
+		s->subdev_flags |= SDF_CMD_READ;
+		s->do_cmd = rtd_ai_cmd;
+		s->do_cmdtest = rtd_ai_cmdtest;
+		s->cancel = rtd_ai_cancel;
 	}
 
 	s = &dev->subdevices[1];
 	/* analog output subdevice */
-	s->type		= COMEDI_SUBD_AO;
-	s->subdev_flags	= SDF_WRITABLE;
-	s->n_chan	= 2;
-	s->maxdata	= 0x0fff;
-	s->range_table	= &rtd_ao_range;
-	s->insn_write	= rtd_ao_insn_write;
+	s->type = COMEDI_SUBD_AO;
+	s->subdev_flags = SDF_WRITABLE;
+	s->n_chan = 2;
+	s->maxdata = 0x0fff;
+	s->range_table = &rtd_ao_range;
+	s->insn_write = rtd_ao_insn_write;
 
 	ret = comedi_alloc_subdev_readback(s);
 	if (ret)
@@ -1279,14 +1273,14 @@ static int rtd_auto_attach(struct comedi_device *dev,
 
 	s = &dev->subdevices[2];
 	/* digital i/o subdevice */
-	s->type		= COMEDI_SUBD_DIO;
-	s->subdev_flags	= SDF_READABLE | SDF_WRITABLE;
+	s->type = COMEDI_SUBD_DIO;
+	s->subdev_flags = SDF_READABLE | SDF_WRITABLE;
 	/* we only support port 0 right now.  Ignoring port 1 and user IO */
-	s->n_chan	= 8;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_bits	= rtd_dio_insn_bits;
-	s->insn_config	= rtd_dio_insn_config;
+	s->n_chan = 8;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_bits = rtd_dio_insn_bits;
+	s->insn_config = rtd_dio_insn_config;
 
 	/* 8254 Timer/Counter subdevice */
 	s = &dev->subdevices[3];
@@ -1333,14 +1327,13 @@ static void rtd_detach(struct comedi_device *dev)
 }
 
 static struct comedi_driver rtd520_driver = {
-	.driver_name	= "rtd520",
-	.module		= THIS_MODULE,
-	.auto_attach	= rtd_auto_attach,
-	.detach		= rtd_detach,
+	.driver_name = "rtd520",
+	.module = THIS_MODULE,
+	.auto_attach = rtd_auto_attach,
+	.detach = rtd_detach,
 };
 
-static int rtd520_pci_probe(struct pci_dev *dev,
-			    const struct pci_device_id *id)
+static int rtd520_pci_probe(struct pci_dev *dev, const struct pci_device_id *id)
 {
 	return comedi_pci_auto_config(dev, &rtd520_driver, id->driver_data);
 }
@@ -1350,14 +1343,16 @@ static const struct pci_device_id rtd520_pci_table[] = {
 	{ PCI_VDEVICE(RTD, 0x4520), BOARD_PCI4520 },
 	{ 0 }
 };
+
 MODULE_DEVICE_TABLE(pci, rtd520_pci_table);
 
 static struct pci_driver rtd520_pci_driver = {
-	.name		= "rtd520",
-	.id_table	= rtd520_pci_table,
-	.probe		= rtd520_pci_probe,
-	.remove		= comedi_pci_auto_unconfig,
+	.name = "rtd520",
+	.id_table = rtd520_pci_table,
+	.probe = rtd520_pci_probe,
+	.remove = comedi_pci_auto_unconfig,
 };
+
 module_comedi_pci_driver(rtd520_driver, rtd520_pci_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

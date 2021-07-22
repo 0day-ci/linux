@@ -191,43 +191,44 @@ static int aio_iiro_16_attach(struct comedi_device *dev,
 
 	/* Digital Output subdevice */
 	s = &dev->subdevices[0];
-	s->type		= COMEDI_SUBD_DO;
-	s->subdev_flags	= SDF_WRITABLE;
-	s->n_chan	= 16;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_bits	= aio_iiro_16_do_insn_bits;
+	s->type = COMEDI_SUBD_DO;
+	s->subdev_flags = SDF_WRITABLE;
+	s->n_chan = 16;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_bits = aio_iiro_16_do_insn_bits;
 
 	/* get the initial state of the relays */
 	s->state = inb(dev->iobase + AIO_IIRO_16_RELAY_0_7) |
-		   (inb(dev->iobase + AIO_IIRO_16_RELAY_8_15) << 8);
+	    (inb(dev->iobase + AIO_IIRO_16_RELAY_8_15) << 8);
 
 	/* Digital Input subdevice */
 	s = &dev->subdevices[1];
-	s->type		= COMEDI_SUBD_DI;
-	s->subdev_flags	= SDF_READABLE;
-	s->n_chan	= 16;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_bits	= aio_iiro_16_di_insn_bits;
+	s->type = COMEDI_SUBD_DI;
+	s->subdev_flags = SDF_READABLE;
+	s->n_chan = 16;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_bits = aio_iiro_16_di_insn_bits;
 	if (dev->irq) {
 		dev->read_subdev = s;
-		s->subdev_flags	|= SDF_CMD_READ | SDF_LSAMPL;
-		s->len_chanlist	= 1;
-		s->do_cmdtest	= aio_iiro_16_cos_cmdtest;
-		s->do_cmd	= aio_iiro_16_cos_cmd;
-		s->cancel	= aio_iiro_16_cos_cancel;
+		s->subdev_flags |= SDF_CMD_READ | SDF_LSAMPL;
+		s->len_chanlist = 1;
+		s->do_cmdtest = aio_iiro_16_cos_cmdtest;
+		s->do_cmd = aio_iiro_16_cos_cmd;
+		s->cancel = aio_iiro_16_cos_cancel;
 	}
 
 	return 0;
 }
 
 static struct comedi_driver aio_iiro_16_driver = {
-	.driver_name	= "aio_iiro_16",
-	.module		= THIS_MODULE,
-	.attach		= aio_iiro_16_attach,
-	.detach		= comedi_legacy_detach,
+	.driver_name = "aio_iiro_16",
+	.module = THIS_MODULE,
+	.attach = aio_iiro_16_attach,
+	.detach = comedi_legacy_detach,
 };
+
 module_comedi_driver(aio_iiro_16_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

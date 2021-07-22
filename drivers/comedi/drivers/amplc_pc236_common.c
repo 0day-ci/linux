@@ -166,7 +166,7 @@ int amplc_pc236_common_attach(struct comedi_device *dev, unsigned long iobase,
 			s->maxdata = 1;
 			s->range_table = &range_digital;
 			s->insn_bits = pc236_intr_insn;
-			s->len_chanlist	= 1;
+			s->len_chanlist = 1;
 			s->do_cmdtest = pc236_intr_cmdtest;
 			s->do_cmd = pc236_intr_cmd;
 			s->cancel = pc236_intr_cancel;
@@ -175,17 +175,20 @@ int amplc_pc236_common_attach(struct comedi_device *dev, unsigned long iobase,
 
 	return 0;
 }
+
 EXPORT_SYMBOL_GPL(amplc_pc236_common_attach);
 
 static int __init amplc_pc236_common_init(void)
 {
 	return 0;
 }
+
 module_init(amplc_pc236_common_init);
 
 static void __exit amplc_pc236_common_exit(void)
 {
 }
+
 module_exit(amplc_pc236_common_exit);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

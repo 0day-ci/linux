@@ -117,64 +117,64 @@
 
 static const struct comedi_lrange range_das1x01_bip = {
 	4, {
-		BIP_RANGE(10),
-		BIP_RANGE(1),
-		BIP_RANGE(0.1),
-		BIP_RANGE(0.01)
+	    BIP_RANGE(10),
+	    BIP_RANGE(1),
+	    BIP_RANGE(0.1),
+	    BIP_RANGE(0.01)
 	}
 };
 
 static const struct comedi_lrange range_das1x01_unip = {
 	4, {
-		UNI_RANGE(10),
-		UNI_RANGE(1),
-		UNI_RANGE(0.1),
-		UNI_RANGE(0.01)
+	    UNI_RANGE(10),
+	    UNI_RANGE(1),
+	    UNI_RANGE(0.1),
+	    UNI_RANGE(0.01)
 	}
 };
 
 static const struct comedi_lrange range_das1x02_bip = {
 	4, {
-		BIP_RANGE(10),
-		BIP_RANGE(5),
-		BIP_RANGE(2.5),
-		BIP_RANGE(1.25)
+	    BIP_RANGE(10),
+	    BIP_RANGE(5),
+	    BIP_RANGE(2.5),
+	    BIP_RANGE(1.25)
 	}
 };
 
 static const struct comedi_lrange range_das1x02_unip = {
 	4, {
-		UNI_RANGE(10),
-		UNI_RANGE(5),
-		UNI_RANGE(2.5),
-		UNI_RANGE(1.25)
+	    UNI_RANGE(10),
+	    UNI_RANGE(5),
+	    UNI_RANGE(2.5),
+	    UNI_RANGE(1.25)
 	}
 };
 
 static const struct comedi_lrange range_das16jr = {
 	9, {
-		BIP_RANGE(10),
-		BIP_RANGE(5),
-		BIP_RANGE(2.5),
-		BIP_RANGE(1.25),
-		BIP_RANGE(0.625),
-		UNI_RANGE(10),
-		UNI_RANGE(5),
-		UNI_RANGE(2.5),
-		UNI_RANGE(1.25)
+	    BIP_RANGE(10),
+	    BIP_RANGE(5),
+	    BIP_RANGE(2.5),
+	    BIP_RANGE(1.25),
+	    BIP_RANGE(0.625),
+	    UNI_RANGE(10),
+	    UNI_RANGE(5),
+	    UNI_RANGE(2.5),
+	    UNI_RANGE(1.25)
 	}
 };
 
 static const struct comedi_lrange range_das16jr_16 = {
 	8, {
-		BIP_RANGE(10),
-		BIP_RANGE(5),
-		BIP_RANGE(2.5),
-		BIP_RANGE(1.25),
-		UNI_RANGE(10),
-		UNI_RANGE(5),
-		UNI_RANGE(2.5),
-		UNI_RANGE(1.25)
+	    BIP_RANGE(10),
+	    BIP_RANGE(5),
+	    BIP_RANGE(2.5),
+	    BIP_RANGE(1.25),
+	    UNI_RANGE(10),
+	    UNI_RANGE(5),
+	    UNI_RANGE(2.5),
+	    UNI_RANGE(1.25)
 	}
 };
 
@@ -230,194 +230,406 @@ struct das16_board {
 
 static const struct das16_board das16_boards[] = {
 	{
-		.name		= "das-16",
-		.ai_maxdata	= 0x0fff,
-		.ai_speed	= 15000,
-		.ai_pg		= das16_pg_none,
-		.has_ao		= 1,
-		.has_8255	= 1,
-		.i8255_offset	= 0x10,
-		.size		= 0x14,
-		.id		= 0x00,
-	}, {
-		.name		= "das-16g",
-		.ai_maxdata	= 0x0fff,
-		.ai_speed	= 15000,
-		.ai_pg		= das16_pg_none,
-		.has_ao		= 1,
-		.has_8255	= 1,
-		.i8255_offset	= 0x10,
-		.size		= 0x14,
-		.id		= 0x00,
-	}, {
-		.name		= "das-16f",
-		.ai_maxdata	= 0x0fff,
-		.ai_speed	= 8500,
-		.ai_pg		= das16_pg_none,
-		.has_ao		= 1,
-		.has_8255	= 1,
-		.i8255_offset	= 0x10,
-		.size		= 0x14,
-		.id		= 0x00,
-	}, {
-		.name		= "cio-das16",
-		.ai_maxdata	= 0x0fff,
-		.ai_speed	= 20000,
-		.ai_pg		= das16_pg_none,
-		.has_ao		= 1,
-		.has_8255	= 1,
-		.i8255_offset	= 0x10,
-		.size		= 0x14,
-		.id		= 0x80,
-	}, {
-		.name		= "cio-das16/f",
-		.ai_maxdata	= 0x0fff,
-		.ai_speed	= 10000,
-		.ai_pg		= das16_pg_none,
-		.has_ao		= 1,
-		.has_8255	= 1,
-		.i8255_offset	= 0x10,
-		.size		= 0x14,
-		.id		= 0x80,
-	}, {
-		.name		= "cio-das16/jr",
-		.ai_maxdata	= 0x0fff,
-		.ai_speed	= 7692,
-		.ai_pg		= das16_pg_16jr,
-		.size		= 0x10,
-		.id		= 0x00,
-	}, {
-		.name		= "pc104-das16jr",
-		.ai_maxdata	= 0x0fff,
-		.ai_speed	= 3300,
-		.ai_pg		= das16_pg_16jr,
-		.size		= 0x10,
-		.id		= 0x00,
-	}, {
-		.name		= "cio-das16jr/16",
-		.ai_maxdata	= 0xffff,
-		.ai_speed	= 10000,
-		.ai_pg		= das16_pg_16jr_16,
-		.size		= 0x10,
-		.id		= 0x00,
-	}, {
-		.name		= "pc104-das16jr/16",
-		.ai_maxdata	= 0xffff,
-		.ai_speed	= 10000,
-		.ai_pg		= das16_pg_16jr_16,
-		.size		= 0x10,
-		.id		= 0x00,
-	}, {
-		.name		= "das-1201",
-		.ai_maxdata	= 0x0fff,
-		.ai_speed	= 20000,
-		.ai_pg		= das16_pg_none,
-		.has_8255	= 1,
-		.i8255_offset	= 0x400,
-		.size		= 0x408,
-		.id		= 0x20,
-	}, {
-		.name		= "das-1202",
-		.ai_maxdata	= 0x0fff,
-		.ai_speed	= 10000,
-		.ai_pg		= das16_pg_none,
-		.has_8255	= 1,
-		.i8255_offset	= 0x400,
-		.size		= 0x408,
-		.id		= 0x20,
-	}, {
-		.name		= "das-1401",
-		.ai_maxdata	= 0x0fff,
-		.ai_speed	= 10000,
-		.ai_pg		= das16_pg_1601,
-		.size		= 0x408,
-		.id		= 0xc0,
-	}, {
-		.name		= "das-1402",
-		.ai_maxdata	= 0x0fff,
-		.ai_speed	= 10000,
-		.ai_pg		= das16_pg_1602,
-		.size		= 0x408,
-		.id		= 0xc0,
-	}, {
-		.name		= "das-1601",
-		.ai_maxdata	= 0x0fff,
-		.ai_speed	= 10000,
-		.ai_pg		= das16_pg_1601,
-		.has_ao		= 1,
-		.has_8255	= 1,
-		.i8255_offset	= 0x400,
-		.size		= 0x408,
-		.id		= 0xc0,
-	}, {
-		.name		= "das-1602",
-		.ai_maxdata	= 0x0fff,
-		.ai_speed	= 10000,
-		.ai_pg		= das16_pg_1602,
-		.has_ao		= 1,
-		.has_8255	= 1,
-		.i8255_offset	= 0x400,
-		.size		= 0x408,
-		.id		= 0xc0,
-	}, {
-		.name		= "cio-das1401/12",
-		.ai_maxdata	= 0x0fff,
-		.ai_speed	= 6250,
-		.ai_pg		= das16_pg_1601,
-		.size		= 0x408,
-		.id		= 0xc0,
-	}, {
-		.name		= "cio-das1402/12",
-		.ai_maxdata	= 0x0fff,
-		.ai_speed	= 6250,
-		.ai_pg		= das16_pg_1602,
-		.size		= 0x408,
-		.id		= 0xc0,
-	}, {
-		.name		= "cio-das1402/16",
-		.ai_maxdata	= 0xffff,
-		.ai_speed	= 10000,
-		.ai_pg		= das16_pg_1602,
-		.size		= 0x408,
-		.id		= 0xc0,
-	}, {
-		.name		= "cio-das1601/12",
-		.ai_maxdata	= 0x0fff,
-		.ai_speed	= 6250,
-		.ai_pg		= das16_pg_1601,
-		.has_ao		= 1,
-		.has_8255	= 1,
-		.i8255_offset	= 0x400,
-		.size		= 0x408,
-		.id		= 0xc0,
-	}, {
-		.name		= "cio-das1602/12",
-		.ai_maxdata	= 0x0fff,
-		.ai_speed	= 10000,
-		.ai_pg		= das16_pg_1602,
-		.has_ao		= 1,
-		.has_8255	= 1,
-		.i8255_offset	= 0x400,
-		.size		= 0x408,
-		.id		= 0xc0,
-	}, {
-		.name		= "cio-das1602/16",
-		.ai_maxdata	= 0xffff,
-		.ai_speed	= 10000,
-		.ai_pg		= das16_pg_1602,
-		.has_ao		= 1,
-		.has_8255	= 1,
-		.i8255_offset	= 0x400,
-		.size		= 0x408,
-		.id		= 0xc0,
-	}, {
-		.name		= "cio-das16/330",
-		.ai_maxdata	= 0x0fff,
-		.ai_speed	= 3030,
-		.ai_pg		= das16_pg_16jr,
-		.size		= 0x14,
-		.id		= 0xf0,
-	},
+	 .name = "das-16",
+	 .ai_maxdata = 0x0fff,
+	 .ai_speed = 15000,
+	 .ai_pg = das16_pg_none,
+	 .has_ao = 1,
+	 .has_8255 = 1,
+	 .i8255_offset = 0x10,
+	 .size = 0x14,
+	 .id = 0x00,
+	  }, {
+	      .name = "das-16g",
+	      .ai_maxdata = 0x0fff,
+	      .ai_speed = 15000,
+	      .ai_pg = das16_pg_none,
+	      .has_ao = 1,
+	      .has_8255 = 1,
+	      .i8255_offset = 0x10,
+	      .size = 0x14,
+	      .id = 0x00,
+	       }, {
+		   .name = "das-16f",
+		   .ai_maxdata = 0x0fff,
+		   .ai_speed = 8500,
+		   .ai_pg = das16_pg_none,
+		   .has_ao = 1,
+		   .has_8255 = 1,
+		   .i8255_offset = 0x10,
+		   .size = 0x14,
+		   .id = 0x00,
+		    }, {
+			.name = "cio-das16",
+			.ai_maxdata = 0x0fff,
+			.ai_speed = 20000,
+			.ai_pg = das16_pg_none,
+			.has_ao = 1,
+			.has_8255 = 1,
+			.i8255_offset = 0x10,
+			.size = 0x14,
+			.id = 0x80,
+			 }, {
+			     .name = "cio-das16/f",
+			     .ai_maxdata = 0x0fff,
+			     .ai_speed = 10000,
+			     .ai_pg = das16_pg_none,
+			     .has_ao = 1,
+			     .has_8255 = 1,
+			     .i8255_offset = 0x10,
+			     .size = 0x14,
+			     .id = 0x80,
+			      }, {
+				  .name = "cio-das16/jr",
+				  .ai_maxdata = 0x0fff,
+				  .ai_speed = 7692,
+				  .ai_pg = das16_pg_16jr,
+				  .size = 0x10,
+				  .id = 0x00,
+				   }, {
+				       .name = "pc104-das16jr",
+				       .ai_maxdata = 0x0fff,
+				       .ai_speed = 3300,
+				       .ai_pg = das16_pg_16jr,
+				       .size = 0x10,
+				       .id = 0x00,
+					}, {
+					    .name = "cio-das16jr/16",
+					    .ai_maxdata = 0xffff,
+					    .ai_speed = 10000,
+					    .ai_pg = das16_pg_16jr_16,
+					    .size = 0x10,
+					    .id = 0x00,
+					     }, {
+						 .name = "pc104-das16jr/16",
+						 .ai_maxdata = 0xffff,
+						 .ai_speed = 10000,
+						 .ai_pg = das16_pg_16jr_16,
+						 .size = 0x10,
+						 .id = 0x00,
+						  }, {
+						      .name = "das-1201",
+						      .ai_maxdata = 0x0fff,
+						      .ai_speed = 20000,
+						      .ai_pg = das16_pg_none,
+						      .has_8255 = 1,
+						      .i8255_offset = 0x400,
+						      .size = 0x408,
+						      .id = 0x20,
+						       }, {
+							   .name = "das-1202",
+							   .ai_maxdata = 0x0fff,
+							   .ai_speed = 10000,
+							   .ai_pg =
+							   das16_pg_none,
+							   .has_8255 = 1,
+							   .i8255_offset =
+							   0x400,
+							   .size = 0x408,
+							   .id = 0x20,
+							    }, {
+								.name =
+								"das-1401",
+								.ai_maxdata =
+								0x0fff,
+								.ai_speed =
+								10000,
+								.ai_pg =
+								das16_pg_1601,
+								.size = 0x408,
+								.id = 0xc0,
+								 }, {
+								     .name =
+								     "das-1402",
+								     .ai_maxdata
+								     = 0x0fff,
+								     .ai_speed =
+								     10000,
+								     .ai_pg =
+								     das16_pg_1602,
+								     .size =
+								     0x408,
+								     .id = 0xc0,
+								      }, {
+									  .name
+									  =
+									  "das-1601",
+									  .
+									  ai_maxdata
+									  =
+									  0x0fff,
+									  .
+									  ai_speed
+									  =
+									  10000,
+									  .
+									  ai_pg
+									  =
+									  das16_pg_1601,
+									  .
+									  has_ao
+									  = 1,
+									  .
+									  has_8255
+									  = 1,
+									  .
+									  i8255_offset
+									  =
+									  0x400,
+									  .
+									  size =
+									  0x408,
+									  .id =
+									  0xc0,
+									   }, {
+									       .
+									       name
+									       =
+									       "das-1602",
+									       .
+									       ai_maxdata
+									       =
+									       0x0fff,
+									       .
+									       ai_speed
+									       =
+									       10000,
+									       .
+									       ai_pg
+									       =
+									       das16_pg_1602,
+									       .
+									       has_ao
+									       =
+									       1,
+									       .
+									       has_8255
+									       =
+									       1,
+									       .
+									       i8255_offset
+									       =
+									       0x400,
+									       .
+									       size
+									       =
+									       0x408,
+									       .
+									       id
+									       =
+									       0xc0,
+										}, {
+										    .
+										    name
+										    =
+										    "cio-das1401/12",
+										    .
+										    ai_maxdata
+										    =
+										    0x0fff,
+										    .
+										    ai_speed
+										    =
+										    6250,
+										    .
+										    ai_pg
+										    =
+										    das16_pg_1601,
+										    .
+										    size
+										    =
+										    0x408,
+										    .
+										    id
+										    =
+										    0xc0,
+										     }, {
+											 .
+											 name
+											 =
+											 "cio-das1402/12",
+											 .
+											 ai_maxdata
+											 =
+											 0x0fff,
+											 .
+											 ai_speed
+											 =
+											 6250,
+											 .
+											 ai_pg
+											 =
+											 das16_pg_1602,
+											 .
+											 size
+											 =
+											 0x408,
+											 .
+											 id
+											 =
+											 0xc0,
+											  }, {
+											      .
+											      name
+											      =
+											      "cio-das1402/16",
+											      .
+											      ai_maxdata
+											      =
+											      0xffff,
+											      .
+											      ai_speed
+											      =
+											      10000,
+											      .
+											      ai_pg
+											      =
+											      das16_pg_1602,
+											      .
+											      size
+											      =
+											      0x408,
+											      .
+											      id
+											      =
+											      0xc0,
+											       }, {
+												   .
+												   name
+												   =
+												   "cio-das1601/12",
+												   .
+												   ai_maxdata
+												   =
+												   0x0fff,
+												   .
+												   ai_speed
+												   =
+												   6250,
+												   .
+												   ai_pg
+												   =
+												   das16_pg_1601,
+												   .
+												   has_ao
+												   =
+												   1,
+												   .
+												   has_8255
+												   =
+												   1,
+												   .
+												   i8255_offset
+												   =
+												   0x400,
+												   .
+												   size
+												   =
+												   0x408,
+												   .
+												   id
+												   =
+												   0xc0,
+												    }, {
+													.
+													name
+													=
+													"cio-das1602/12",
+													.
+													ai_maxdata
+													=
+													0x0fff,
+													.
+													ai_speed
+													=
+													10000,
+													.
+													ai_pg
+													=
+													das16_pg_1602,
+													.
+													has_ao
+													=
+													1,
+													.
+													has_8255
+													=
+													1,
+													.
+													i8255_offset
+													=
+													0x400,
+													.
+													size
+													=
+													0x408,
+													.
+													id
+													=
+													0xc0,
+													 }, {
+													     .
+													     name
+													     =
+													     "cio-das1602/16",
+													     .
+													     ai_maxdata
+													     =
+													     0xffff,
+													     .
+													     ai_speed
+													     =
+													     10000,
+													     .
+													     ai_pg
+													     =
+													     das16_pg_1602,
+													     .
+													     has_ao
+													     =
+													     1,
+													     .
+													     has_8255
+													     =
+													     1,
+													     .
+													     i8255_offset
+													     =
+													     0x400,
+													     .
+													     size
+													     =
+													     0x408,
+													     .
+													     id
+													     =
+													     0xc0,
+													      }, {
+														  .
+														  name
+														  =
+														  "cio-das16/330",
+														  .
+														  ai_maxdata
+														  =
+														  0x0fff,
+														  .
+														  ai_speed
+														  =
+														  3030,
+														  .
+														  ai_pg
+														  =
+														  das16_pg_16jr,
+														  .
+														  size
+														  =
+														  0x14,
+														  .
+														  id
+														  =
+														  0xf0,
+														   },
 };
 
 /*
@@ -430,16 +642,16 @@ static inline int timer_period(void)
 }
 
 struct das16_private_struct {
-	struct comedi_isadma	*dma;
-	struct comedi_device	*dev;
-	unsigned int		clockbase;
-	unsigned int		ctrl_reg;
-	unsigned int		divisor1;
-	unsigned int		divisor2;
-	struct timer_list	timer;
-	unsigned long		extra_iobase;
-	unsigned int		can_burst:1;
-	unsigned int		timer_running:1;
+	struct comedi_isadma *dma;
+	struct comedi_device *dev;
+	unsigned int clockbase;
+	unsigned int ctrl_reg;
+	unsigned int divisor1;
+	unsigned int divisor2;
+	struct timer_list timer;
+	unsigned long extra_iobase;
+	unsigned int can_burst:1;
+	unsigned int timer_running:1;
 };
 
 static void das16_ai_setup_dma(struct comedi_device *dev,
@@ -533,8 +745,7 @@ static void das16_timer_interrupt(struct timer_list *t)
 
 static void das16_ai_set_mux_range(struct comedi_device *dev,
 				   unsigned int first_chan,
-				   unsigned int last_chan,
-				   unsigned int range)
+				   unsigned int last_chan, unsigned int range)
 {
 	const struct das16_board *board = dev->board_ptr;
 
@@ -652,7 +863,7 @@ static int das16_cmd_test(struct comedi_device *dev, struct comedi_subdevice *s,
 
 	if (cmd->stop_src == TRIG_COUNT)
 		err |= comedi_check_trigger_arg_min(&cmd->stop_arg, 1);
-	else	/* TRIG_NONE */
+	else			/* TRIG_NONE */
 		err |= comedi_check_trigger_arg_is(&cmd->stop_arg, 0);
 
 	if (err)
@@ -808,8 +1019,7 @@ static void das16_ai_munge(struct comedi_device *dev,
 
 static int das16_ai_eoc(struct comedi_device *dev,
 			struct comedi_subdevice *s,
-			struct comedi_insn *insn,
-			unsigned long context)
+			struct comedi_insn *insn, unsigned long context)
 {
 	unsigned int status;
 
@@ -821,8 +1031,7 @@ static int das16_ai_eoc(struct comedi_device *dev,
 
 static int das16_ai_insn_read(struct comedi_device *dev,
 			      struct comedi_subdevice *s,
-			      struct comedi_insn *insn,
-			      unsigned int *data)
+			      struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 	unsigned int range = CR_RANGE(insn->chanspec);
@@ -855,8 +1064,7 @@ static int das16_ai_insn_read(struct comedi_device *dev,
 
 static int das16_ao_insn_write(struct comedi_device *dev,
 			       struct comedi_subdevice *s,
-			       struct comedi_insn *insn,
-			       unsigned int *data)
+			       struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 	int i;
@@ -877,8 +1085,7 @@ static int das16_ao_insn_write(struct comedi_device *dev,
 
 static int das16_di_insn_bits(struct comedi_device *dev,
 			      struct comedi_subdevice *s,
-			      struct comedi_insn *insn,
-			      unsigned int *data)
+			      struct comedi_insn *insn, unsigned int *data)
 {
 	data[1] = inb(dev->iobase + DAS16_DIO_REG) & 0xf;
 
@@ -887,8 +1094,7 @@ static int das16_di_insn_bits(struct comedi_device *dev,
 
 static int das16_do_insn_bits(struct comedi_device *dev,
 			      struct comedi_subdevice *s,
-			      struct comedi_insn *insn,
-			      unsigned int *data)
+			      struct comedi_insn *insn, unsigned int *data)
 {
 	if (comedi_dio_update_state(s, data))
 		outb(s->state, dev->iobase + DAS16_DIO_REG);
@@ -1084,62 +1290,62 @@ static int das16_attach(struct comedi_device *dev, struct comedi_devconfig *it)
 
 	/* Analog Input subdevice */
 	s = &dev->subdevices[0];
-	s->type		= COMEDI_SUBD_AI;
-	s->subdev_flags	= SDF_READABLE;
+	s->type = COMEDI_SUBD_AI;
+	s->subdev_flags = SDF_READABLE;
 	if (status & DAS16_STATUS_MUXBIT) {
-		s->subdev_flags	|= SDF_GROUND;
-		s->n_chan	= 16;
+		s->subdev_flags |= SDF_GROUND;
+		s->n_chan = 16;
 	} else {
-		s->subdev_flags	|= SDF_DIFF;
-		s->n_chan	= 8;
+		s->subdev_flags |= SDF_DIFF;
+		s->n_chan = 8;
 	}
-	s->len_chanlist	= s->n_chan;
-	s->maxdata	= board->ai_maxdata;
-	s->range_table	= das16_ai_range(dev, s, it, board->ai_pg, status);
-	s->insn_read	= das16_ai_insn_read;
+	s->len_chanlist = s->n_chan;
+	s->maxdata = board->ai_maxdata;
+	s->range_table = das16_ai_range(dev, s, it, board->ai_pg, status);
+	s->insn_read = das16_ai_insn_read;
 	if (devpriv->dma) {
 		dev->read_subdev = s;
-		s->subdev_flags	|= SDF_CMD_READ;
-		s->do_cmdtest	= das16_cmd_test;
-		s->do_cmd	= das16_cmd_exec;
-		s->cancel	= das16_cancel;
-		s->munge	= das16_ai_munge;
+		s->subdev_flags |= SDF_CMD_READ;
+		s->do_cmdtest = das16_cmd_test;
+		s->do_cmd = das16_cmd_exec;
+		s->cancel = das16_cancel;
+		s->munge = das16_ai_munge;
 	}
 
 	/* Analog Output subdevice */
 	s = &dev->subdevices[1];
 	if (board->has_ao) {
-		s->type		= COMEDI_SUBD_AO;
-		s->subdev_flags	= SDF_WRITABLE;
-		s->n_chan	= 2;
-		s->maxdata	= 0x0fff;
-		s->range_table	= das16_ao_range(dev, s, it);
-		s->insn_write	= das16_ao_insn_write;
+		s->type = COMEDI_SUBD_AO;
+		s->subdev_flags = SDF_WRITABLE;
+		s->n_chan = 2;
+		s->maxdata = 0x0fff;
+		s->range_table = das16_ao_range(dev, s, it);
+		s->insn_write = das16_ao_insn_write;
 
 		ret = comedi_alloc_subdev_readback(s);
 		if (ret)
 			return ret;
 	} else {
-		s->type		= COMEDI_SUBD_UNUSED;
+		s->type = COMEDI_SUBD_UNUSED;
 	}
 
 	/* Digital Input subdevice */
 	s = &dev->subdevices[2];
-	s->type		= COMEDI_SUBD_DI;
-	s->subdev_flags	= SDF_READABLE;
-	s->n_chan	= 4;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_bits	= das16_di_insn_bits;
+	s->type = COMEDI_SUBD_DI;
+	s->subdev_flags = SDF_READABLE;
+	s->n_chan = 4;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_bits = das16_di_insn_bits;
 
 	/* Digital Output subdevice */
 	s = &dev->subdevices[3];
-	s->type		= COMEDI_SUBD_DO;
-	s->subdev_flags	= SDF_WRITABLE;
-	s->n_chan	= 4;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_bits	= das16_do_insn_bits;
+	s->type = COMEDI_SUBD_DO;
+	s->subdev_flags = SDF_WRITABLE;
+	s->n_chan = 4;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_bits = das16_do_insn_bits;
 
 	/* initialize digital output lines */
 	outb(s->state, dev->iobase + DAS16_DIO_REG);
@@ -1185,14 +1391,15 @@ static void das16_detach(struct comedi_device *dev)
 }
 
 static struct comedi_driver das16_driver = {
-	.driver_name	= "das16",
-	.module		= THIS_MODULE,
-	.attach		= das16_attach,
-	.detach		= das16_detach,
-	.board_name	= &das16_boards[0].name,
-	.num_names	= ARRAY_SIZE(das16_boards),
-	.offset		= sizeof(das16_boards[0]),
+	.driver_name = "das16",
+	.module = THIS_MODULE,
+	.attach = das16_attach,
+	.detach = das16_detach,
+	.board_name = &das16_boards[0].name,
+	.num_names = ARRAY_SIZE(das16_boards),
+	.offset = sizeof(das16_boards[0]),
 };
+
 module_comedi_driver(das16_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

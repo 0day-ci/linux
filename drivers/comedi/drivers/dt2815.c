@@ -57,8 +57,7 @@ struct dt2815_private {
 
 static int dt2815_ao_status(struct comedi_device *dev,
 			    struct comedi_subdevice *s,
-			    struct comedi_insn *insn,
-			    unsigned long context)
+			    struct comedi_insn *insn, unsigned long context)
 {
 	unsigned int status;
 
@@ -194,8 +193,7 @@ static int dt2815_attach(struct comedi_device *dev, struct comedi_devconfig *it)
 			break;
 		} else if (status != 0x00) {
 			dev_dbg(dev->class_dev,
-				"unexpected status 0x%x (@t=%d)\n",
-				status, i);
+				"unexpected status 0x%x (@t=%d)\n", status, i);
 			if (status & 0x60)
 				outb(0x00, dev->iobase + DT2815_STATUS);
 		}
@@ -205,11 +203,12 @@ static int dt2815_attach(struct comedi_device *dev, struct comedi_devconfig *it)
 }
 
 static struct comedi_driver dt2815_driver = {
-	.driver_name	= "dt2815",
-	.module		= THIS_MODULE,
-	.attach		= dt2815_attach,
-	.detach		= comedi_legacy_detach,
+	.driver_name = "dt2815",
+	.module = THIS_MODULE,
+	.attach = dt2815_attach,
+	.detach = comedi_legacy_detach,
 };
+
 module_comedi_driver(dt2815_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

@@ -56,10 +56,10 @@
 #define APCI3120_AO_DATA(x)			((x) << 0)
 #define APCI3120_TIMER_MODE_REG			0x0c
 #define APCI3120_TIMER_MODE(_t, _m)		((_m) << ((_t) * 2))
-#define APCI3120_TIMER_MODE0			0  /* I8254_MODE0 */
-#define APCI3120_TIMER_MODE2			1  /* I8254_MODE2 */
-#define APCI3120_TIMER_MODE4			2  /* I8254_MODE4 */
-#define APCI3120_TIMER_MODE5			3  /* I8254_MODE5 */
+#define APCI3120_TIMER_MODE0			0	/* I8254_MODE0 */
+#define APCI3120_TIMER_MODE2			1	/* I8254_MODE2 */
+#define APCI3120_TIMER_MODE4			2	/* I8254_MODE4 */
+#define APCI3120_TIMER_MODE5			3	/* I8254_MODE5 */
 #define APCI3120_TIMER_MODE_MASK(_t)		(3 << ((_t) * 2))
 #define APCI3120_CTR0_REG			0x0d
 #define APCI3120_CTR0_DO_BITS(x)		((x) << 4)
@@ -100,14 +100,14 @@
 
 static const struct comedi_lrange apci3120_ai_range = {
 	8, {
-		BIP_RANGE(10),
-		BIP_RANGE(5),
-		BIP_RANGE(2),
-		BIP_RANGE(1),
-		UNI_RANGE(10),
-		UNI_RANGE(5),
-		UNI_RANGE(2),
-		UNI_RANGE(1)
+	    BIP_RANGE(10),
+	    BIP_RANGE(5),
+	    BIP_RANGE(2),
+	    BIP_RANGE(1),
+	    UNI_RANGE(10),
+	    UNI_RANGE(5),
+	    UNI_RANGE(2),
+	    UNI_RANGE(1)
 	}
 };
 
@@ -124,13 +124,13 @@ struct apci3120_board {
 
 static const struct apci3120_board apci3120_boardtypes[] = {
 	[BOARD_APCI3120] = {
-		.name		= "apci3120",
-		.ai_is_16bit	= 1,
-		.has_ao		= 1,
-	},
+			    .name = "apci3120",
+			    .ai_is_16bit = 1,
+			    .has_ao = 1,
+			     },
 	[BOARD_APCI3001] = {
-		.name		= "apci3001",
-	},
+			    .name = "apci3001",
+			     },
 };
 
 struct apci3120_dmabuf {
@@ -267,8 +267,7 @@ static void apci3120_setup_dma(struct comedi_device *dev,
  */
 static unsigned int apci3120_ns_to_timer(struct comedi_device *dev,
 					 unsigned int timer,
-					 unsigned int ns,
-					 unsigned int flags)
+					 unsigned int ns, unsigned int flags)
 {
 	struct apci3120_private *devpriv = dev->private;
 	unsigned int prescale = (timer == 0) ? 10 : 1000;
@@ -317,8 +316,7 @@ static void apci3120_timer_write(struct comedi_device *dev,
 
 	/* write 16-bit value to timer (lower 16-bits of timer 2) */
 	outb(APCI3120_CTR0_DO_BITS(devpriv->do_bits) |
-	     APCI3120_CTR0_TIMER_SEL(timer),
-	     dev->iobase + APCI3120_CTR0_REG);
+	     APCI3120_CTR0_TIMER_SEL(timer), dev->iobase + APCI3120_CTR0_REG);
 	outw(val & 0xffff, dev->iobase + APCI3120_TIMER_REG);
 
 	if (timer == 2) {
@@ -338,8 +336,7 @@ static unsigned int apci3120_timer_read(struct comedi_device *dev,
 
 	/* read 16-bit value from timer (lower 16-bits of timer 2) */
 	outb(APCI3120_CTR0_DO_BITS(devpriv->do_bits) |
-	     APCI3120_CTR0_TIMER_SEL(timer),
-	     dev->iobase + APCI3120_CTR0_REG);
+	     APCI3120_CTR0_TIMER_SEL(timer), dev->iobase + APCI3120_CTR0_REG);
 	val = inw(dev->iobase + APCI3120_TIMER_REG);
 
 	if (timer == 2) {
@@ -400,8 +397,7 @@ static void apci3120_set_chanlist(struct comedi_device *dev,
 		unsigned int val;
 
 		val = APCI3120_CHANLIST_MUX(chan) |
-		      APCI3120_CHANLIST_GAIN(range) |
-		      APCI3120_CHANLIST_INDEX(i);
+		    APCI3120_CHANLIST_GAIN(range) | APCI3120_CHANLIST_INDEX(i);
 
 		if (comedi_range_is_unipolar(s, range))
 			val |= APCI3120_CHANLIST_UNIPOLAR;
@@ -479,8 +475,7 @@ static irqreturn_t apci3120_interrupt(int irq, void *d)
 	status = inw(dev->iobase + APCI3120_STATUS_REG);
 	int_amcc = inl(devpriv->amcc + AMCC_OP_REG_INTCSR);
 
-	if (!(status & APCI3120_STATUS_INT_MASK) &&
-	    !(int_amcc & ANY_S593X_INT)) {
+	if (!(status & APCI3120_STATUS_INT_MASK) && !(int_amcc & ANY_S593X_INT)) {
 		dev_err(dev->class_dev, "IRQ from unknown source\n");
 		return IRQ_NONE;
 	}
@@ -542,7 +537,7 @@ static int apci3120_ai_cmd(struct comedi_device *dev,
 
 	/* set default mode bits */
 	devpriv->mode = APCI3120_MODE_TIMER2_CLK_OSC |
-			APCI3120_MODE_TIMER2_AS_TIMER;
+	    APCI3120_MODE_TIMER2_AS_TIMER;
 
 	/* AMCC- Clear write complete interrupt (DMA) */
 	outl(AINT_WT_COMPLETE, devpriv->amcc + AMCC_OP_REG_INTCSR);
@@ -637,7 +632,7 @@ static int apci3120_ai_cmdtest(struct comedi_device *dev,
 
 	if (cmd->stop_src == TRIG_COUNT)
 		err |= comedi_check_trigger_arg_min(&cmd->stop_arg, 1);
-	else	/*  TRIG_NONE */
+	else			/*  TRIG_NONE */
 		err |= comedi_check_trigger_arg_is(&cmd->stop_arg, 0);
 
 	if (err)
@@ -689,8 +684,7 @@ static int apci3120_cancel(struct comedi_device *dev,
 
 static int apci3120_ai_eoc(struct comedi_device *dev,
 			   struct comedi_subdevice *s,
-			   struct comedi_insn *insn,
-			   unsigned long context)
+			   struct comedi_insn *insn, unsigned long context)
 {
 	unsigned int status;
 
@@ -702,8 +696,7 @@ static int apci3120_ai_eoc(struct comedi_device *dev,
 
 static int apci3120_ai_insn_read(struct comedi_device *dev,
 				 struct comedi_subdevice *s,
-				 struct comedi_insn *insn,
-				 unsigned int *data)
+				 struct comedi_insn *insn, unsigned int *data)
 {
 	struct apci3120_private *devpriv = dev->private;
 	unsigned int divisor;
@@ -712,7 +705,7 @@ static int apci3120_ai_insn_read(struct comedi_device *dev,
 
 	/* set mode for A/D conversions by software trigger with timer 0 */
 	devpriv->mode = APCI3120_MODE_TIMER2_CLK_OSC |
-			APCI3120_MODE_TIMER2_AS_TIMER;
+	    APCI3120_MODE_TIMER2_AS_TIMER;
 	outb(devpriv->mode, dev->iobase + APCI3120_MODE_REG);
 
 	/* load chanlist for single channel scan */
@@ -746,8 +739,7 @@ static int apci3120_ai_insn_read(struct comedi_device *dev,
 
 static int apci3120_ao_ready(struct comedi_device *dev,
 			     struct comedi_subdevice *s,
-			     struct comedi_insn *insn,
-			     unsigned long context)
+			     struct comedi_insn *insn, unsigned long context)
 {
 	unsigned int status;
 
@@ -759,8 +751,7 @@ static int apci3120_ao_ready(struct comedi_device *dev,
 
 static int apci3120_ao_insn_write(struct comedi_device *dev,
 				  struct comedi_subdevice *s,
-				  struct comedi_insn *insn,
-				  unsigned int *data)
+				  struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 	int i;
@@ -784,8 +775,7 @@ static int apci3120_ao_insn_write(struct comedi_device *dev,
 
 static int apci3120_di_insn_bits(struct comedi_device *dev,
 				 struct comedi_subdevice *s,
-				 struct comedi_insn *insn,
-				 unsigned int *data)
+				 struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int status;
 
@@ -797,8 +787,7 @@ static int apci3120_di_insn_bits(struct comedi_device *dev,
 
 static int apci3120_do_insn_bits(struct comedi_device *dev,
 				 struct comedi_subdevice *s,
-				 struct comedi_insn *insn,
-				 unsigned int *data)
+				 struct comedi_insn *insn, unsigned int *data)
 {
 	struct apci3120_private *devpriv = dev->private;
 
@@ -841,7 +830,7 @@ static int apci3120_timer_insn_config(struct comedi_device *dev,
 	case INSN_CONFIG_GET_COUNTER_STATUS:
 		data[1] = 0;
 		data[2] = COMEDI_COUNTER_ARMED | COMEDI_COUNTER_COUNTING |
-			  COMEDI_COUNTER_TERMINAL_COUNT;
+		    COMEDI_COUNTER_TERMINAL_COUNT;
 
 		if (devpriv->ctrl & APCI3120_CTRL_GATE(2)) {
 			data[1] |= COMEDI_COUNTER_ARMED;
@@ -1016,64 +1005,64 @@ static int apci3120_auto_attach(struct comedi_device *dev,
 
 	/* Analog Input subdevice */
 	s = &dev->subdevices[0];
-	s->type		= COMEDI_SUBD_AI;
-	s->subdev_flags	= SDF_READABLE | SDF_COMMON | SDF_GROUND | SDF_DIFF;
-	s->n_chan	= 16;
-	s->maxdata	= board->ai_is_16bit ? 0xffff : 0x0fff;
-	s->range_table	= &apci3120_ai_range;
-	s->insn_read	= apci3120_ai_insn_read;
+	s->type = COMEDI_SUBD_AI;
+	s->subdev_flags = SDF_READABLE | SDF_COMMON | SDF_GROUND | SDF_DIFF;
+	s->n_chan = 16;
+	s->maxdata = board->ai_is_16bit ? 0xffff : 0x0fff;
+	s->range_table = &apci3120_ai_range;
+	s->insn_read = apci3120_ai_insn_read;
 	if (dev->irq) {
 		dev->read_subdev = s;
-		s->subdev_flags	|= SDF_CMD_READ;
-		s->len_chanlist	= s->n_chan;
-		s->do_cmdtest	= apci3120_ai_cmdtest;
-		s->do_cmd	= apci3120_ai_cmd;
-		s->cancel	= apci3120_cancel;
+		s->subdev_flags |= SDF_CMD_READ;
+		s->len_chanlist = s->n_chan;
+		s->do_cmdtest = apci3120_ai_cmdtest;
+		s->do_cmd = apci3120_ai_cmd;
+		s->cancel = apci3120_cancel;
 	}
 
 	/* Analog Output subdevice */
 	s = &dev->subdevices[1];
 	if (board->has_ao) {
-		s->type		= COMEDI_SUBD_AO;
-		s->subdev_flags	= SDF_WRITABLE | SDF_GROUND | SDF_COMMON;
-		s->n_chan	= 8;
-		s->maxdata	= 0x3fff;
-		s->range_table	= &range_bipolar10;
-		s->insn_write	= apci3120_ao_insn_write;
+		s->type = COMEDI_SUBD_AO;
+		s->subdev_flags = SDF_WRITABLE | SDF_GROUND | SDF_COMMON;
+		s->n_chan = 8;
+		s->maxdata = 0x3fff;
+		s->range_table = &range_bipolar10;
+		s->insn_write = apci3120_ao_insn_write;
 
 		ret = comedi_alloc_subdev_readback(s);
 		if (ret)
 			return ret;
 	} else {
-		s->type		= COMEDI_SUBD_UNUSED;
+		s->type = COMEDI_SUBD_UNUSED;
 	}
 
 	/* Digital Input subdevice */
 	s = &dev->subdevices[2];
-	s->type		= COMEDI_SUBD_DI;
-	s->subdev_flags	= SDF_READABLE;
-	s->n_chan	= 4;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_bits	= apci3120_di_insn_bits;
+	s->type = COMEDI_SUBD_DI;
+	s->subdev_flags = SDF_READABLE;
+	s->n_chan = 4;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_bits = apci3120_di_insn_bits;
 
 	/* Digital Output subdevice */
 	s = &dev->subdevices[3];
-	s->type		= COMEDI_SUBD_DO;
-	s->subdev_flags	= SDF_WRITABLE;
-	s->n_chan	= 4;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_bits	= apci3120_do_insn_bits;
+	s->type = COMEDI_SUBD_DO;
+	s->subdev_flags = SDF_WRITABLE;
+	s->n_chan = 4;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_bits = apci3120_do_insn_bits;
 
 	/* Timer subdevice */
 	s = &dev->subdevices[4];
-	s->type		= COMEDI_SUBD_TIMER;
-	s->subdev_flags	= SDF_READABLE;
-	s->n_chan	= 1;
-	s->maxdata	= 0x00ffffff;
-	s->insn_config	= apci3120_timer_insn_config;
-	s->insn_read	= apci3120_timer_insn_read;
+	s->type = COMEDI_SUBD_TIMER;
+	s->subdev_flags = SDF_READABLE;
+	s->n_chan = 1;
+	s->maxdata = 0x00ffffff;
+	s->insn_config = apci3120_timer_insn_config;
+	s->insn_read = apci3120_timer_insn_read;
 
 	return 0;
 }
@@ -1085,10 +1074,10 @@ static void apci3120_detach(struct comedi_device *dev)
 }
 
 static struct comedi_driver apci3120_driver = {
-	.driver_name	= "addi_apci_3120",
-	.module		= THIS_MODULE,
-	.auto_attach	= apci3120_auto_attach,
-	.detach		= apci3120_detach,
+	.driver_name = "addi_apci_3120",
+	.module = THIS_MODULE,
+	.auto_attach = apci3120_auto_attach,
+	.detach = apci3120_detach,
 };
 
 static int apci3120_pci_probe(struct pci_dev *dev,
@@ -1102,14 +1091,16 @@ static const struct pci_device_id apci3120_pci_table[] = {
 	{ PCI_VDEVICE(AMCC, 0x828d), BOARD_APCI3001 },
 	{ 0 }
 };
+
 MODULE_DEVICE_TABLE(pci, apci3120_pci_table);
 
 static struct pci_driver apci3120_pci_driver = {
-	.name		= "addi_apci_3120",
-	.id_table	= apci3120_pci_table,
-	.probe		= apci3120_pci_probe,
-	.remove		= comedi_pci_auto_unconfig,
+	.name = "addi_apci_3120",
+	.id_table = apci3120_pci_table,
+	.probe = apci3120_pci_probe,
+	.remove = comedi_pci_auto_unconfig,
 };
+
 module_comedi_pci_driver(apci3120_driver, apci3120_pci_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

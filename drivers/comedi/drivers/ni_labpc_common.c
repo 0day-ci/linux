@@ -30,48 +30,48 @@ enum scan_mode {
 
 static const struct comedi_lrange range_labpc_plus_ai = {
 	16, {
-		BIP_RANGE(5),
-		BIP_RANGE(4),
-		BIP_RANGE(2.5),
-		BIP_RANGE(1),
-		BIP_RANGE(0.5),
-		BIP_RANGE(0.25),
-		BIP_RANGE(0.1),
-		BIP_RANGE(0.05),
-		UNI_RANGE(10),
-		UNI_RANGE(8),
-		UNI_RANGE(5),
-		UNI_RANGE(2),
-		UNI_RANGE(1),
-		UNI_RANGE(0.5),
-		UNI_RANGE(0.2),
-		UNI_RANGE(0.1)
+	     BIP_RANGE(5),
+	     BIP_RANGE(4),
+	     BIP_RANGE(2.5),
+	     BIP_RANGE(1),
+	     BIP_RANGE(0.5),
+	     BIP_RANGE(0.25),
+	     BIP_RANGE(0.1),
+	     BIP_RANGE(0.05),
+	     UNI_RANGE(10),
+	     UNI_RANGE(8),
+	     UNI_RANGE(5),
+	     UNI_RANGE(2),
+	     UNI_RANGE(1),
+	     UNI_RANGE(0.5),
+	     UNI_RANGE(0.2),
+	     UNI_RANGE(0.1)
 	}
 };
 
 static const struct comedi_lrange range_labpc_1200_ai = {
 	14, {
-		BIP_RANGE(5),
-		BIP_RANGE(2.5),
-		BIP_RANGE(1),
-		BIP_RANGE(0.5),
-		BIP_RANGE(0.25),
-		BIP_RANGE(0.1),
-		BIP_RANGE(0.05),
-		UNI_RANGE(10),
-		UNI_RANGE(5),
-		UNI_RANGE(2),
-		UNI_RANGE(1),
-		UNI_RANGE(0.5),
-		UNI_RANGE(0.2),
-		UNI_RANGE(0.1)
+	     BIP_RANGE(5),
+	     BIP_RANGE(2.5),
+	     BIP_RANGE(1),
+	     BIP_RANGE(0.5),
+	     BIP_RANGE(0.25),
+	     BIP_RANGE(0.1),
+	     BIP_RANGE(0.05),
+	     UNI_RANGE(10),
+	     UNI_RANGE(5),
+	     UNI_RANGE(2),
+	     UNI_RANGE(1),
+	     UNI_RANGE(0.5),
+	     UNI_RANGE(0.2),
+	     UNI_RANGE(0.1)
 	}
 };
 
 static const struct comedi_lrange range_labpc_ao = {
 	2, {
-		BIP_RANGE(5),
-		UNI_RANGE(10)
+	    BIP_RANGE(5),
+	    UNI_RANGE(10)
 	}
 };
 
@@ -120,8 +120,7 @@ static int labpc_cancel(struct comedi_device *dev, struct comedi_subdevice *s)
 static void labpc_ai_set_chan_and_gain(struct comedi_device *dev,
 				       enum scan_mode mode,
 				       unsigned int chan,
-				       unsigned int range,
-				       unsigned int aref)
+				       unsigned int range, unsigned int aref)
 {
 	const struct labpc_boardinfo *board = dev->board_ptr;
 	struct labpc_private *devpriv = dev->private;
@@ -150,8 +149,7 @@ static void labpc_setup_cmd6_reg(struct comedi_device *dev,
 				 enum scan_mode mode,
 				 enum transfer_type xfer,
 				 unsigned int range,
-				 unsigned int aref,
-				 bool ena_intr)
+				 unsigned int aref, bool ena_intr)
 {
 	const struct labpc_boardinfo *board = dev->board_ptr;
 	struct labpc_private *devpriv = dev->private;
@@ -211,8 +209,7 @@ static void labpc_clear_adc_fifo(struct comedi_device *dev)
 
 static int labpc_ai_eoc(struct comedi_device *dev,
 			struct comedi_subdevice *s,
-			struct comedi_insn *insn,
-			unsigned long context)
+			struct comedi_insn *insn, unsigned long context)
 {
 	struct labpc_private *devpriv = dev->private;
 
@@ -224,8 +221,7 @@ static int labpc_ai_eoc(struct comedi_device *dev,
 
 static int labpc_ai_insn_read(struct comedi_device *dev,
 			      struct comedi_subdevice *s,
-			      struct comedi_insn *insn,
-			      unsigned int *data)
+			      struct comedi_insn *insn, unsigned int *data)
 {
 	struct labpc_private *devpriv = dev->private;
 	unsigned int chan = CR_CHAN(insn->chanspec);
@@ -296,8 +292,7 @@ static void labpc_set_ai_convert_period(struct comedi_cmd *cmd,
 	if (cmd->convert_src != TRIG_TIMER)
 		return;
 
-	if (mode == MODE_SINGLE_CHAN &&
-	    cmd->scan_begin_src == TRIG_TIMER) {
+	if (mode == MODE_SINGLE_CHAN && cmd->scan_begin_src == TRIG_TIMER) {
 		cmd->scan_begin_arg = ns;
 		if (cmd->convert_arg > cmd->scan_begin_arg)
 			cmd->convert_arg = cmd->scan_begin_arg;
@@ -350,7 +345,7 @@ static void labpc_adc_timing(struct comedi_device *dev, struct comedi_cmd *cmd,
 		 * clock speed on convert and scan counters)
 		 */
 		pacer->next_div1 = (scan_period - 1) /
-				   (pacer->osc_base * I8254_MAX_COUNT) + 1;
+		    (pacer->osc_base * I8254_MAX_COUNT) + 1;
 
 		comedi_check_trigger_arg_min(&pacer->next_div1, 2);
 		comedi_check_trigger_arg_max(&pacer->next_div1,
@@ -560,13 +555,14 @@ static int labpc_ai_cmdtest(struct comedi_device *dev,
 	/* make sure scan timing is not too fast */
 	if (cmd->scan_begin_src == TRIG_TIMER) {
 		if (cmd->convert_src == TRIG_TIMER) {
-			err |= comedi_check_trigger_arg_min(
-					&cmd->scan_begin_arg,
-					cmd->convert_arg * cmd->chanlist_len);
+			err |=
+			    comedi_check_trigger_arg_min(&cmd->scan_begin_arg,
+							 cmd->convert_arg *
+							 cmd->chanlist_len);
 		}
-		err |= comedi_check_trigger_arg_min(
-					&cmd->scan_begin_arg,
-					board->ai_speed * cmd->chanlist_len);
+		err |= comedi_check_trigger_arg_min(&cmd->scan_begin_arg,
+						    board->ai_speed *
+						    cmd->chanlist_len);
 	}
 
 	switch (cmd->stop_src) {
@@ -617,8 +613,7 @@ static int labpc_ai_cmd(struct comedi_device *dev, struct comedi_subdevice *s)
 	struct comedi_cmd *cmd = &async->cmd;
 	enum scan_mode mode = labpc_ai_scan_mode(cmd);
 	unsigned int chanspec = (mode == MODE_MULT_CHAN_UP) ?
-				cmd->chanlist[cmd->chanlist_len - 1] :
-				cmd->chanlist[0];
+	    cmd->chanlist[cmd->chanlist_len - 1] : cmd->chanlist[0];
 	unsigned int chan = CR_CHAN(chanspec);
 	unsigned int range = CR_RANGE(chanspec);
 	unsigned int aref = CR_AREF(chanspec);
@@ -640,15 +635,14 @@ static int labpc_ai_cmd(struct comedi_device *dev, struct comedi_subdevice *s)
 		 */
 		comedi_8254_load(devpriv->counter, 1,
 				 3, I8254_MODE0 | I8254_BINARY);
-	} else	{
+	} else {
 		/* just put counter a1 in mode 0 to set its output low */
 		comedi_8254_set_mode(devpriv->counter, 1,
 				     I8254_MODE0 | I8254_BINARY);
 	}
 
 	/* figure out what method we will use to transfer data */
-	if (devpriv->dma &&
-	    (cmd->flags & (CMDF_WAKE_EOS | CMDF_PRIORITY)) == 0) {
+	if (devpriv->dma && (cmd->flags & (CMDF_WAKE_EOS | CMDF_PRIORITY)) == 0) {
 		/*
 		 * dma unsafe at RT priority,
 		 * and too much setup time for CMDF_WAKE_EOS
@@ -689,8 +683,7 @@ static int labpc_ai_cmd(struct comedi_device *dev, struct comedi_subdevice *s)
 	/*  load count */
 	devpriv->write_byte(dev, 0x1, INTERVAL_STROBE_REG);
 
-	if (cmd->convert_src == TRIG_TIMER ||
-	    cmd->scan_begin_src == TRIG_TIMER) {
+	if (cmd->convert_src == TRIG_TIMER || cmd->scan_begin_src == TRIG_TIMER) {
 		struct comedi_8254 *pacer = dev->pacer;
 		struct comedi_8254 *counter = devpriv->counter;
 
@@ -775,8 +768,7 @@ static int labpc_drain_fifo(struct comedi_device *dev)
 
 	devpriv->stat1 = devpriv->read_byte(dev, STAT1_REG);
 
-	for (i = 0; (devpriv->stat1 & STAT1_DAVAIL) && i < timeout;
-	     i++) {
+	for (i = 0; (devpriv->stat1 & STAT1_DAVAIL) && i < timeout; i++) {
 		/*  quit if we have all the data we want */
 		if (cmd->stop_src == TRIG_COUNT) {
 			if (devpriv->count == 0)
@@ -900,8 +892,7 @@ static void labpc_ao_write(struct comedi_device *dev,
 
 static int labpc_ao_insn_write(struct comedi_device *dev,
 			       struct comedi_subdevice *s,
-			       struct comedi_insn *insn,
-			       unsigned int *data)
+			       struct comedi_insn *insn, unsigned int *data)
 {
 	const struct labpc_boardinfo *board = dev->board_ptr;
 	struct labpc_private *devpriv = dev->private;
@@ -1119,8 +1110,7 @@ static void write_caldac(struct comedi_device *dev, unsigned int channel,
 
 static int labpc_calib_insn_write(struct comedi_device *dev,
 				  struct comedi_subdevice *s,
-				  struct comedi_insn *insn,
-				  unsigned int *data)
+				  struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 
@@ -1142,8 +1132,7 @@ static int labpc_calib_insn_write(struct comedi_device *dev,
 
 static int labpc_eeprom_ready(struct comedi_device *dev,
 			      struct comedi_subdevice *s,
-			      struct comedi_insn *insn,
-			      unsigned long context)
+			      struct comedi_insn *insn, unsigned long context)
 {
 	unsigned int status;
 
@@ -1156,8 +1145,7 @@ static int labpc_eeprom_ready(struct comedi_device *dev,
 
 static int labpc_eeprom_insn_write(struct comedi_device *dev,
 				   struct comedi_subdevice *s,
-				   struct comedi_insn *insn,
-				   unsigned int *data)
+				   struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 	int ret;
@@ -1248,31 +1236,31 @@ int labpc_common_attach(struct comedi_device *dev,
 
 	/* analog input subdevice */
 	s = &dev->subdevices[0];
-	s->type		= COMEDI_SUBD_AI;
-	s->subdev_flags	= SDF_READABLE | SDF_GROUND | SDF_COMMON | SDF_DIFF;
-	s->n_chan	= 8;
-	s->len_chanlist	= 8;
-	s->maxdata	= 0x0fff;
-	s->range_table	= board->is_labpc1200 ?
-			  &range_labpc_1200_ai : &range_labpc_plus_ai;
-	s->insn_read	= labpc_ai_insn_read;
+	s->type = COMEDI_SUBD_AI;
+	s->subdev_flags = SDF_READABLE | SDF_GROUND | SDF_COMMON | SDF_DIFF;
+	s->n_chan = 8;
+	s->len_chanlist = 8;
+	s->maxdata = 0x0fff;
+	s->range_table = board->is_labpc1200 ?
+	    &range_labpc_1200_ai : &range_labpc_plus_ai;
+	s->insn_read = labpc_ai_insn_read;
 	if (dev->irq) {
 		dev->read_subdev = s;
-		s->subdev_flags	|= SDF_CMD_READ;
-		s->do_cmd	= labpc_ai_cmd;
-		s->do_cmdtest	= labpc_ai_cmdtest;
-		s->cancel	= labpc_cancel;
+		s->subdev_flags |= SDF_CMD_READ;
+		s->do_cmd = labpc_ai_cmd;
+		s->do_cmdtest = labpc_ai_cmdtest;
+		s->cancel = labpc_cancel;
 	}
 
 	/* analog output */
 	s = &dev->subdevices[1];
 	if (board->has_ao) {
-		s->type		= COMEDI_SUBD_AO;
-		s->subdev_flags	= SDF_READABLE | SDF_WRITABLE | SDF_GROUND;
-		s->n_chan	= 2;
-		s->maxdata	= 0x0fff;
-		s->range_table	= &range_labpc_ao;
-		s->insn_write	= labpc_ao_insn_write;
+		s->type = COMEDI_SUBD_AO;
+		s->subdev_flags = SDF_READABLE | SDF_WRITABLE | SDF_GROUND;
+		s->n_chan = 2;
+		s->maxdata = 0x0fff;
+		s->range_table = &range_labpc_ao;
+		s->insn_write = labpc_ao_insn_write;
 
 		ret = comedi_alloc_subdev_readback(s);
 		if (ret)
@@ -1282,7 +1270,7 @@ int labpc_common_attach(struct comedi_device *dev,
 		for (i = 0; i < s->n_chan; i++)
 			labpc_ao_write(dev, s, i, s->maxdata / 2);
 	} else {
-		s->type		= COMEDI_SUBD_UNUSED;
+		s->type = COMEDI_SUBD_UNUSED;
 	}
 
 	/* 8255 dio */
@@ -1297,11 +1285,11 @@ int labpc_common_attach(struct comedi_device *dev,
 	/*  calibration subdevices for boards that have one */
 	s = &dev->subdevices[3];
 	if (board->is_labpc1200) {
-		s->type		= COMEDI_SUBD_CALIB;
-		s->subdev_flags	= SDF_READABLE | SDF_WRITABLE | SDF_INTERNAL;
-		s->n_chan	= 16;
-		s->maxdata	= 0xff;
-		s->insn_write	= labpc_calib_insn_write;
+		s->type = COMEDI_SUBD_CALIB;
+		s->subdev_flags = SDF_READABLE | SDF_WRITABLE | SDF_INTERNAL;
+		s->n_chan = 16;
+		s->maxdata = 0xff;
+		s->insn_write = labpc_calib_insn_write;
 
 		ret = comedi_alloc_subdev_readback(s);
 		if (ret)
@@ -1312,17 +1300,17 @@ int labpc_common_attach(struct comedi_device *dev,
 			s->readback[i] = s->maxdata / 2;
 		}
 	} else {
-		s->type		= COMEDI_SUBD_UNUSED;
+		s->type = COMEDI_SUBD_UNUSED;
 	}
 
 	/* EEPROM (256 bytes) */
 	s = &dev->subdevices[4];
 	if (board->is_labpc1200) {
-		s->type		= COMEDI_SUBD_MEMORY;
-		s->subdev_flags	= SDF_READABLE | SDF_WRITABLE | SDF_INTERNAL;
-		s->n_chan	= 256;
-		s->maxdata	= 0xff;
-		s->insn_write	= labpc_eeprom_insn_write;
+		s->type = COMEDI_SUBD_MEMORY;
+		s->subdev_flags = SDF_READABLE | SDF_WRITABLE | SDF_INTERNAL;
+		s->n_chan = 256;
+		s->maxdata = 0xff;
+		s->insn_write = labpc_eeprom_insn_write;
 
 		ret = comedi_alloc_subdev_readback(s);
 		if (ret)
@@ -1331,11 +1319,12 @@ int labpc_common_attach(struct comedi_device *dev,
 		for (i = 0; i < s->n_chan; i++)
 			s->readback[i] = labpc_eeprom_read(dev, i);
 	} else {
-		s->type		= COMEDI_SUBD_UNUSED;
+		s->type = COMEDI_SUBD_UNUSED;
 	}
 
 	return 0;
 }
+
 EXPORT_SYMBOL_GPL(labpc_common_attach);
 
 void labpc_common_detach(struct comedi_device *dev)
@@ -1345,17 +1334,20 @@ void labpc_common_detach(struct comedi_device *dev)
 	if (devpriv)
 		kfree(devpriv->counter);
 }
+
 EXPORT_SYMBOL_GPL(labpc_common_detach);
 
 static int __init labpc_common_init(void)
 {
 	return 0;
 }
+
 module_init(labpc_common_init);
 
 static void __exit labpc_common_exit(void)
 {
 }
+
 module_exit(labpc_common_exit);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

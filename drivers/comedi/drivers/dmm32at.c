@@ -37,19 +37,19 @@
 #define DMM32AT_AI_START_CONV_REG	0x00
 #define DMM32AT_AI_LSB_REG		0x00
 #define DMM32AT_AUX_DOUT_REG		0x01
-#define DMM32AT_AUX_DOUT2		BIT(2)  /* J3.42 - OUT2 (OUT2EN) */
-#define DMM32AT_AUX_DOUT1		BIT(1)  /* J3.43 */
-#define DMM32AT_AUX_DOUT0		BIT(0)  /* J3.44 - OUT0 (OUT0EN) */
+#define DMM32AT_AUX_DOUT2		BIT(2)	/* J3.42 - OUT2 (OUT2EN) */
+#define DMM32AT_AUX_DOUT1		BIT(1)	/* J3.43 */
+#define DMM32AT_AUX_DOUT0		BIT(0)	/* J3.44 - OUT0 (OUT0EN) */
 #define DMM32AT_AI_MSB_REG		0x01
 #define DMM32AT_AI_LO_CHAN_REG		0x02
 #define DMM32AT_AI_HI_CHAN_REG		0x03
 #define DMM32AT_AUX_DI_REG		0x04
 #define DMM32AT_AUX_DI_DACBUSY		BIT(7)
 #define DMM32AT_AUX_DI_CALBUSY		BIT(6)
-#define DMM32AT_AUX_DI3			BIT(3)  /* J3.45 - ADCLK (CLKSEL) */
-#define DMM32AT_AUX_DI2			BIT(2)  /* J3.46 - GATE12 (GT12EN) */
-#define DMM32AT_AUX_DI1			BIT(1)  /* J3.47 - GATE0 (GT0EN) */
-#define DMM32AT_AUX_DI0			BIT(0)  /* J3.48 - CLK0 (SRC0) */
+#define DMM32AT_AUX_DI3			BIT(3)	/* J3.45 - ADCLK (CLKSEL) */
+#define DMM32AT_AUX_DI2			BIT(2)	/* J3.46 - GATE12 (GT12EN) */
+#define DMM32AT_AUX_DI1			BIT(1)	/* J3.47 - GATE0 (GT0EN) */
+#define DMM32AT_AUX_DI0			BIT(0)	/* J3.48 - CLK0 (SRC0) */
 #define DMM32AT_AO_LSB_REG		0x04
 #define DMM32AT_AO_MSB_REG		0x05
 #define DMM32AT_AO_MSB_DACH(x)		((x) << 6)
@@ -83,27 +83,27 @@
 #define DMM32AT_INTCLK_ADINT		BIT(7)
 #define DMM32AT_INTCLK_DINT		BIT(6)
 #define DMM32AT_INTCLK_TINT		BIT(5)
-#define DMM32AT_INTCLK_CLKEN		BIT(1)  /* 1=see below  0=software */
-#define DMM32AT_INTCLK_CLKSEL		BIT(0)  /* 1=OUT2  0=EXTCLK */
+#define DMM32AT_INTCLK_CLKEN		BIT(1)	/* 1=see below  0=software */
+#define DMM32AT_INTCLK_CLKSEL		BIT(0)	/* 1=OUT2  0=EXTCLK */
 #define DMM32AT_CTRDIO_CFG_REG		0x0a
-#define DMM32AT_CTRDIO_CFG_FREQ12	BIT(7)  /* CLK12 1=100KHz 0=10MHz */
-#define DMM32AT_CTRDIO_CFG_FREQ0	BIT(6)  /* CLK0  1=10KHz  0=10MHz */
-#define DMM32AT_CTRDIO_CFG_OUT2EN	BIT(5)  /* J3.42 1=OUT2 is DOUT2 */
-#define DMM32AT_CTRDIO_CFG_OUT0EN	BIT(4)  /* J3,44 1=OUT0 is DOUT0 */
-#define DMM32AT_CTRDIO_CFG_GT0EN	BIT(2)  /* J3.47 1=DIN1 is GATE0 */
-#define DMM32AT_CTRDIO_CFG_SRC0		BIT(1)  /* CLK0 is 0=FREQ0 1=J3.48 */
-#define DMM32AT_CTRDIO_CFG_GT12EN	BIT(0)  /* J3.46 1=DIN2 is GATE12 */
+#define DMM32AT_CTRDIO_CFG_FREQ12	BIT(7)	/* CLK12 1=100KHz 0=10MHz */
+#define DMM32AT_CTRDIO_CFG_FREQ0	BIT(6)	/* CLK0  1=10KHz  0=10MHz */
+#define DMM32AT_CTRDIO_CFG_OUT2EN	BIT(5)	/* J3.42 1=OUT2 is DOUT2 */
+#define DMM32AT_CTRDIO_CFG_OUT0EN	BIT(4)	/* J3,44 1=OUT0 is DOUT0 */
+#define DMM32AT_CTRDIO_CFG_GT0EN	BIT(2)	/* J3.47 1=DIN1 is GATE0 */
+#define DMM32AT_CTRDIO_CFG_SRC0		BIT(1)	/* CLK0 is 0=FREQ0 1=J3.48 */
+#define DMM32AT_CTRDIO_CFG_GT12EN	BIT(0)	/* J3.46 1=DIN2 is GATE12 */
 #define DMM32AT_AI_CFG_REG		0x0b
 #define DMM32AT_AI_CFG_SCINT(x)		((x) << 4)
 #define DMM32AT_AI_CFG_SCINT_20US	DMM32AT_AI_CFG_SCINT(0)
 #define DMM32AT_AI_CFG_SCINT_15US	DMM32AT_AI_CFG_SCINT(1)
 #define DMM32AT_AI_CFG_SCINT_10US	DMM32AT_AI_CFG_SCINT(2)
 #define DMM32AT_AI_CFG_SCINT_5US	DMM32AT_AI_CFG_SCINT(3)
-#define DMM32AT_AI_CFG_RANGE		BIT(3)  /* 0=5V  1=10V */
-#define DMM32AT_AI_CFG_ADBU		BIT(2)  /* 0=bipolar  1=unipolar */
+#define DMM32AT_AI_CFG_RANGE		BIT(3)	/* 0=5V  1=10V */
+#define DMM32AT_AI_CFG_ADBU		BIT(2)	/* 0=bipolar  1=unipolar */
 #define DMM32AT_AI_CFG_GAIN(x)		((x) << 0)
 #define DMM32AT_AI_READBACK_REG		0x0b
-#define DMM32AT_AI_READBACK_WAIT	BIT(7)  /* DMM32AT_AI_STATUS_STS */
+#define DMM32AT_AI_READBACK_WAIT	BIT(7)	/* DMM32AT_AI_STATUS_STS */
 #define DMM32AT_AI_READBACK_RANGE	BIT(3)
 #define DMM32AT_AI_READBACK_ADBU	BIT(2)
 #define DMM32AT_AI_READBACK_GAIN_MASK	(3 << 0)
@@ -112,7 +112,7 @@
 #define DMM32AT_CLK2 0x0e
 #define DMM32AT_CLKCT 0x0f
 
-#define DMM32AT_8255_IOBASE		0x0c  /* Page 1 registers */
+#define DMM32AT_8255_IOBASE		0x0c	/* Page 1 registers */
 
 /* Board register values. */
 
@@ -129,10 +129,10 @@
 /* board AI ranges in comedi structure */
 static const struct comedi_lrange dmm32at_airanges = {
 	4, {
-		UNI_RANGE(10),
-		UNI_RANGE(5),
-		BIP_RANGE(10),
-		BIP_RANGE(5)
+	    UNI_RANGE(10),
+	    UNI_RANGE(5),
+	    BIP_RANGE(10),
+	    BIP_RANGE(5)
 	}
 };
 
@@ -149,10 +149,10 @@ static const unsigned char dmm32at_rangebits[] = {
  */
 static const struct comedi_lrange dmm32at_aoranges = {
 	4, {
-		UNI_RANGE(10),
-		UNI_RANGE(5),
-		BIP_RANGE(10),
-		BIP_RANGE(5)
+	    UNI_RANGE(10),
+	    UNI_RANGE(5),
+	    BIP_RANGE(10),
+	    BIP_RANGE(5)
 	}
 };
 
@@ -189,8 +189,7 @@ static unsigned int dmm32at_ai_get_sample(struct comedi_device *dev,
 
 static int dmm32at_ai_status(struct comedi_device *dev,
 			     struct comedi_subdevice *s,
-			     struct comedi_insn *insn,
-			     unsigned long context)
+			     struct comedi_insn *insn, unsigned long context)
 {
 	unsigned char status;
 
@@ -202,8 +201,7 @@ static int dmm32at_ai_status(struct comedi_device *dev,
 
 static int dmm32at_ai_insn_read(struct comedi_device *dev,
 				struct comedi_subdevice *s,
-				struct comedi_insn *insn,
-				unsigned int *data)
+				struct comedi_insn *insn, unsigned int *data)
 {
 	int ret;
 	int i;
@@ -305,7 +303,7 @@ static int dmm32at_ai_cmdtest(struct comedi_device *dev,
 
 	if (cmd->stop_src == TRIG_COUNT)
 		err |= comedi_check_trigger_arg_min(&cmd->stop_arg, 1);
-	else /* TRIG_NONE */
+	else			/* TRIG_NONE */
 		err |= comedi_check_trigger_arg_is(&cmd->stop_arg, 0);
 
 	if (err)
@@ -437,8 +435,7 @@ static irqreturn_t dmm32at_isr(int irq, void *d)
 
 static int dmm32at_ao_eoc(struct comedi_device *dev,
 			  struct comedi_subdevice *s,
-			  struct comedi_insn *insn,
-			  unsigned long context)
+			  struct comedi_insn *insn, unsigned long context)
 {
 	unsigned char status;
 
@@ -450,8 +447,7 @@ static int dmm32at_ao_eoc(struct comedi_device *dev,
 
 static int dmm32at_ao_insn_write(struct comedi_device *dev,
 				 struct comedi_subdevice *s,
-				 struct comedi_insn *insn,
-				 unsigned int *data)
+				 struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 	int i;
@@ -570,29 +566,29 @@ static int dmm32at_attach(struct comedi_device *dev,
 
 	/* Analog Input subdevice */
 	s = &dev->subdevices[0];
-	s->type		= COMEDI_SUBD_AI;
-	s->subdev_flags	= SDF_READABLE | SDF_GROUND | SDF_DIFF;
-	s->n_chan	= 32;
-	s->maxdata	= 0xffff;
-	s->range_table	= &dmm32at_airanges;
-	s->insn_read	= dmm32at_ai_insn_read;
+	s->type = COMEDI_SUBD_AI;
+	s->subdev_flags = SDF_READABLE | SDF_GROUND | SDF_DIFF;
+	s->n_chan = 32;
+	s->maxdata = 0xffff;
+	s->range_table = &dmm32at_airanges;
+	s->insn_read = dmm32at_ai_insn_read;
 	if (dev->irq) {
 		dev->read_subdev = s;
-		s->subdev_flags	|= SDF_CMD_READ;
-		s->len_chanlist	= s->n_chan;
-		s->do_cmd	= dmm32at_ai_cmd;
-		s->do_cmdtest	= dmm32at_ai_cmdtest;
-		s->cancel	= dmm32at_ai_cancel;
+		s->subdev_flags |= SDF_CMD_READ;
+		s->len_chanlist = s->n_chan;
+		s->do_cmd = dmm32at_ai_cmd;
+		s->do_cmdtest = dmm32at_ai_cmdtest;
+		s->cancel = dmm32at_ai_cancel;
 	}
 
 	/* Analog Output subdevice */
 	s = &dev->subdevices[1];
-	s->type		= COMEDI_SUBD_AO;
-	s->subdev_flags	= SDF_WRITABLE;
-	s->n_chan	= 4;
-	s->maxdata	= 0x0fff;
-	s->range_table	= &dmm32at_aoranges;
-	s->insn_write	= dmm32at_ao_insn_write;
+	s->type = COMEDI_SUBD_AO;
+	s->subdev_flags = SDF_WRITABLE;
+	s->n_chan = 4;
+	s->maxdata = 0x0fff;
+	s->range_table = &dmm32at_aoranges;
+	s->insn_write = dmm32at_ao_insn_write;
 
 	ret = comedi_alloc_subdev_readback(s);
 	if (ret)
@@ -604,11 +600,12 @@ static int dmm32at_attach(struct comedi_device *dev,
 }
 
 static struct comedi_driver dmm32at_driver = {
-	.driver_name	= "dmm32at",
-	.module		= THIS_MODULE,
-	.attach		= dmm32at_attach,
-	.detach		= comedi_legacy_detach,
+	.driver_name = "dmm32at",
+	.module = THIS_MODULE,
+	.attach = dmm32at_attach,
+	.detach = comedi_legacy_detach,
 };
+
 module_comedi_driver(dmm32at_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

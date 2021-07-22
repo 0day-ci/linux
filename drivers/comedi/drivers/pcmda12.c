@@ -45,9 +45,9 @@
 /* AI range is not configurable, it's set by jumpers on the board */
 static const struct comedi_lrange pcmda12_ranges = {
 	3, {
-		UNI_RANGE(5),
-		UNI_RANGE(10),
-		BIP_RANGE(5)
+	    UNI_RANGE(5),
+	    UNI_RANGE(10),
+	    BIP_RANGE(5)
 	}
 };
 
@@ -57,8 +57,7 @@ struct pcmda12_private {
 
 static int pcmda12_ao_insn_write(struct comedi_device *dev,
 				 struct comedi_subdevice *s,
-				 struct comedi_insn *insn,
-				 unsigned int *data)
+				 struct comedi_insn *insn, unsigned int *data)
 {
 	struct pcmda12_private *devpriv = dev->private;
 	unsigned int chan = CR_CHAN(insn->chanspec);
@@ -85,8 +84,7 @@ static int pcmda12_ao_insn_write(struct comedi_device *dev,
 
 static int pcmda12_ao_insn_read(struct comedi_device *dev,
 				struct comedi_subdevice *s,
-				struct comedi_insn *insn,
-				unsigned int *data)
+				struct comedi_insn *insn, unsigned int *data)
 {
 	struct pcmda12_private *devpriv = dev->private;
 
@@ -135,13 +133,13 @@ static int pcmda12_attach(struct comedi_device *dev,
 		return ret;
 
 	s = &dev->subdevices[0];
-	s->type		= COMEDI_SUBD_AO;
-	s->subdev_flags	= SDF_READABLE | SDF_WRITABLE;
-	s->n_chan	= 8;
-	s->maxdata	= 0x0fff;
-	s->range_table	= &pcmda12_ranges;
-	s->insn_write	= pcmda12_ao_insn_write;
-	s->insn_read	= pcmda12_ao_insn_read;
+	s->type = COMEDI_SUBD_AO;
+	s->subdev_flags = SDF_READABLE | SDF_WRITABLE;
+	s->n_chan = 8;
+	s->maxdata = 0x0fff;
+	s->range_table = &pcmda12_ranges;
+	s->insn_write = pcmda12_ao_insn_write;
+	s->insn_read = pcmda12_ao_insn_read;
 
 	ret = comedi_alloc_subdev_readback(s);
 	if (ret)
@@ -153,11 +151,12 @@ static int pcmda12_attach(struct comedi_device *dev,
 }
 
 static struct comedi_driver pcmda12_driver = {
-	.driver_name	= "pcmda12",
-	.module		= THIS_MODULE,
-	.attach		= pcmda12_attach,
-	.detach		= comedi_legacy_detach,
+	.driver_name = "pcmda12",
+	.module = THIS_MODULE,
+	.attach = pcmda12_attach,
+	.detach = comedi_legacy_detach,
 };
+
 module_comedi_driver(pcmda12_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

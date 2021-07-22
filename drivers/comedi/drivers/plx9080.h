@@ -55,12 +55,12 @@ struct plx_dma_desc {
 /* Local Address Space 1 Range Register */
 #define PLX_REG_LAS1RR		0x00f0
 
-#define PLX_LASRR_IO		BIT(0)		/* Map to: 1=I/O, 0=Mem */
+#define PLX_LASRR_IO		BIT(0)	/* Map to: 1=I/O, 0=Mem */
 #define PLX_LASRR_MLOC_ANY32	(BIT(1) * 0)	/* Locate anywhere in 32 bit */
 #define PLX_LASRR_MLOC_LT1MB	(BIT(1) * 1)	/* Locate in 1st meg */
 #define PLX_LASRR_MLOC_ANY64	(BIT(1) * 2)	/* Locate anywhere in 64 bit */
 #define PLX_LASRR_MLOC_MASK	GENMASK(2, 1)	/* Memory location bits */
-#define PLX_LASRR_PREFETCH	BIT(3)		/* Memory is prefetchable */
+#define PLX_LASRR_PREFETCH	BIT(3)	/* Memory is prefetchable */
 /* bits that specify range for memory space decode bits */
 #define PLX_LASRR_MEM_MASK	GENMASK(31, 4)
 /* bits that specify range for i/o space decode bits */
@@ -71,7 +71,7 @@ struct plx_dma_desc {
 /* Local Address Space 1 Local Base Address (Remap) Register */
 #define PLX_REG_LAS1BA		0x00f4
 
-#define PLX_LASBA_EN		BIT(0)		/* Enable slave decode */
+#define PLX_LASBA_EN		BIT(0)	/* Enable slave decode */
 /* bits that specify local base address for memory space */
 #define PLX_LASBA_MEM_MASK	GENMASK(31, 4)
 /* bits that specify local base address for i/o space */
@@ -441,7 +441,7 @@ struct plx_dma_desc {
 	 PLX_CNTRL_CCRDM_MASK | PLX_CNTRL_CCWDM_MASK)
 #define PLX_CNTRL_CC_NORMAL	\
 	(PLX_CNTRL_CCRDMA_NORMAL | PLX_CNTRL_CCWDMA_NORMAL | \
-	 PLX_CNTRL_CCRDM_NORMAL | PLX_CNTRL_CCWDM_NORMAL) /* val after reset */
+	 PLX_CNTRL_CCRDM_NORMAL | PLX_CNTRL_CCWDM_NORMAL)	/* val after reset */
 
 /* PCI Permanent Configuration ID Register (hard-coded PLX vendor and device) */
 #define PLX_REG_PCIHIDR		0x0070

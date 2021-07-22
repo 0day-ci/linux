@@ -33,9 +33,9 @@
 
 static const struct comedi_lrange range_pci1050_ai = {
 	3, {
-		BIP_RANGE(10),
-		BIP_RANGE(5),
-		UNI_RANGE(10)
+	    BIP_RANGE(10),
+	    BIP_RANGE(5),
+	    UNI_RANGE(10)
 	}
 };
 
@@ -48,8 +48,7 @@ struct dyna_pci10xx_private {
 
 static int dyna_pci10xx_ai_eoc(struct comedi_device *dev,
 			       struct comedi_subdevice *s,
-			       struct comedi_insn *insn,
-			       unsigned long context)
+			       struct comedi_insn *insn, unsigned long context)
 {
 	unsigned int status;
 
@@ -233,10 +232,10 @@ static void dyna_pci10xx_detach(struct comedi_device *dev)
 }
 
 static struct comedi_driver dyna_pci10xx_driver = {
-	.driver_name	= "dyna_pci10xx",
-	.module		= THIS_MODULE,
-	.auto_attach	= dyna_pci10xx_auto_attach,
-	.detach		= dyna_pci10xx_detach,
+	.driver_name = "dyna_pci10xx",
+	.module = THIS_MODULE,
+	.auto_attach = dyna_pci10xx_auto_attach,
+	.detach = dyna_pci10xx_detach,
 };
 
 static int dyna_pci10xx_pci_probe(struct pci_dev *dev,
@@ -250,14 +249,16 @@ static const struct pci_device_id dyna_pci10xx_pci_table[] = {
 	{ PCI_DEVICE(PCI_VENDOR_ID_PLX, 0x1050) },
 	{ 0 }
 };
+
 MODULE_DEVICE_TABLE(pci, dyna_pci10xx_pci_table);
 
 static struct pci_driver dyna_pci10xx_pci_driver = {
-	.name		= "dyna_pci10xx",
-	.id_table	= dyna_pci10xx_pci_table,
-	.probe		= dyna_pci10xx_pci_probe,
-	.remove		= comedi_pci_auto_unconfig,
+	.name = "dyna_pci10xx",
+	.id_table = dyna_pci10xx_pci_table,
+	.probe = dyna_pci10xx_pci_probe,
+	.remove = comedi_pci_auto_unconfig,
 };
+
 module_comedi_pci_driver(dyna_pci10xx_driver, dyna_pci10xx_pci_driver);
 
 MODULE_LICENSE("GPL");

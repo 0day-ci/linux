@@ -49,13 +49,13 @@
 #include <linux/delay.h>
 
 /* Offsets of different ports */
-#define MPC624_MASTER_CONTROL	0 /* not used */
-#define MPC624_GNMUXCH		1 /* Gain, Mux, Channel of ADC */
-#define MPC624_ADC		2 /* read/write to/from ADC */
-#define MPC624_EE		3 /* read/write to/from serial EEPROM via I2C */
-#define MPC624_LEDS		4 /* write to LEDs */
-#define MPC624_DIO		5 /* read/write to/from digital I/O ports */
-#define MPC624_IRQ_MASK		6 /* IRQ masking enable/disable */
+#define MPC624_MASTER_CONTROL	0	/* not used */
+#define MPC624_GNMUXCH		1	/* Gain, Mux, Channel of ADC */
+#define MPC624_ADC		2	/* read/write to/from ADC */
+#define MPC624_EE		3	/* read/write to/from serial EEPROM via I2C */
+#define MPC624_LEDS		4	/* write to LEDs */
+#define MPC624_DIO		5	/* read/write to/from digital I/O ports */
+#define MPC624_IRQ_MASK		6	/* IRQ masking enable/disable */
 
 /* Register bits' names */
 #define MPC624_ADBUSY		BIT(5)
@@ -141,19 +141,19 @@ static unsigned int mpc624_ai_get_sample(struct comedi_device *dev,
 
 	/*
 	 * Received 32-bit long value consist of:
-	 *	31: EOC - (End Of Transmission) bit - should be 0
-	 *	30: DMY - (Dummy) bit - should be 0
-	 *	29: SIG - (Sign) bit - 1 if positive, 0 if negative
-	 *	28: MSB - (Most Significant Bit) - the first bit of the
-	 *					   conversion result
-	 *	....
-	 *	05: LSB - (Least Significant Bit)- the last bit of the
-	 *					   conversion result
-	 *	04-00: sub-LSB - sub-LSBs are basically noise, but when
-	 *			 averaged properly, they can increase
-	 *			 conversion precision up to 29 bits;
-	 *			 they can be discarded without loss of
-	 *			 resolution.
+	 *      31: EOC - (End Of Transmission) bit - should be 0
+	 *      30: DMY - (Dummy) bit - should be 0
+	 *      29: SIG - (Sign) bit - 1 if positive, 0 if negative
+	 *      28: MSB - (Most Significant Bit) - the first bit of the
+	 *                                         conversion result
+	 *      ....
+	 *      05: LSB - (Least Significant Bit)- the last bit of the
+	 *                                         conversion result
+	 *      04-00: sub-LSB - sub-LSBs are basically noise, but when
+	 *                       averaged properly, they can increase
+	 *                       conversion precision up to 29 bits;
+	 *                       they can be discarded without loss of
+	 *                       resolution.
 	 */
 	if (data_in & MPC624_EOC_BIT)
 		dev_dbg(dev->class_dev, "EOC bit is set!");
@@ -187,8 +187,7 @@ static unsigned int mpc624_ai_get_sample(struct comedi_device *dev,
 
 static int mpc624_ai_eoc(struct comedi_device *dev,
 			 struct comedi_subdevice *s,
-			 struct comedi_insn *insn,
-			 unsigned long context)
+			 struct comedi_insn *insn, unsigned long context)
 {
 	unsigned char status;
 
@@ -200,8 +199,7 @@ static int mpc624_ai_eoc(struct comedi_device *dev,
 
 static int mpc624_ai_insn_read(struct comedi_device *dev,
 			       struct comedi_subdevice *s,
-			       struct comedi_insn *insn,
-			       unsigned int *data)
+			       struct comedi_insn *insn, unsigned int *data)
 {
 	int ret;
 	int i;
@@ -287,23 +285,24 @@ static int mpc624_attach(struct comedi_device *dev, struct comedi_devconfig *it)
 
 	/* Analog Input subdevice */
 	s = &dev->subdevices[0];
-	s->type		= COMEDI_SUBD_AI;
-	s->subdev_flags	= SDF_READABLE | SDF_DIFF;
-	s->n_chan	= 4;
-	s->maxdata	= 0x3fffffff;
-	s->range_table	= (it->options[1] == 0) ? &range_mpc624_bipolar1
-						: &range_mpc624_bipolar10;
-	s->insn_read	= mpc624_ai_insn_read;
+	s->type = COMEDI_SUBD_AI;
+	s->subdev_flags = SDF_READABLE | SDF_DIFF;
+	s->n_chan = 4;
+	s->maxdata = 0x3fffffff;
+	s->range_table = (it->options[1] == 0) ? &range_mpc624_bipolar1
+	    : &range_mpc624_bipolar10;
+	s->insn_read = mpc624_ai_insn_read;
 
 	return 0;
 }
 
 static struct comedi_driver mpc624_driver = {
-	.driver_name	= "mpc624",
-	.module		= THIS_MODULE,
-	.attach		= mpc624_attach,
-	.detach		= comedi_legacy_detach,
+	.driver_name = "mpc624",
+	.module = THIS_MODULE,
+	.attach = mpc624_attach,
+	.detach = comedi_legacy_detach,
 };
+
 module_comedi_driver(mpc624_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

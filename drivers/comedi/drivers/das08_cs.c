@@ -37,14 +37,14 @@
 
 static const struct das08_board_struct das08_cs_boards[] = {
 	{
-		.name		= "pcm-das08",
-		.ai_nbits	= 12,
-		.ai_pg		= das08_bipolar5,
-		.ai_encoding	= das08_pcm_encode12,
-		.di_nchan	= 3,
-		.do_nchan	= 3,
-		.iosize		= 16,
-	},
+	 .name = "pcm-das08",
+	 .ai_nbits = 12,
+	 .ai_pg = das08_bipolar5,
+	 .ai_encoding = das08_pcm_encode12,
+	 .di_nchan = 3,
+	 .do_nchan = 3,
+	 .iosize = 16,
+	  },
 };
 
 static int das08_cs_auto_attach(struct comedi_device *dev,
@@ -72,10 +72,10 @@ static int das08_cs_auto_attach(struct comedi_device *dev,
 }
 
 static struct comedi_driver driver_das08_cs = {
-	.driver_name	= "das08_cs",
-	.module		= THIS_MODULE,
-	.auto_attach	= das08_cs_auto_attach,
-	.detach		= comedi_pcmcia_disable,
+	.driver_name = "das08_cs",
+	.module = THIS_MODULE,
+	.auto_attach = das08_cs_auto_attach,
+	.detach = comedi_pcmcia_disable,
 };
 
 static int das08_pcmcia_attach(struct pcmcia_device *link)
@@ -87,15 +87,17 @@ static const struct pcmcia_device_id das08_cs_id_table[] = {
 	PCMCIA_DEVICE_MANF_CARD(0x01c5, 0x4001),
 	PCMCIA_DEVICE_NULL
 };
+
 MODULE_DEVICE_TABLE(pcmcia, das08_cs_id_table);
 
 static struct pcmcia_driver das08_cs_driver = {
-	.name		= "pcm-das08",
-	.owner		= THIS_MODULE,
-	.id_table	= das08_cs_id_table,
-	.probe		= das08_pcmcia_attach,
-	.remove		= comedi_pcmcia_auto_unconfig,
+	.name = "pcm-das08",
+	.owner = THIS_MODULE,
+	.id_table = das08_cs_id_table,
+	.probe = das08_pcmcia_attach,
+	.remove = comedi_pcmcia_auto_unconfig,
 };
+
 module_comedi_pcmcia_driver(driver_das08_cs, das08_cs_driver);
 
 MODULE_AUTHOR("David A. Schleef <ds@schleef.org>");

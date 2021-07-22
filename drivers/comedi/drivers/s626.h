@@ -31,7 +31,7 @@
 #define S626_INTEL		1	/* Intel bus type. */
 #define S626_MOTOROLA		2	/* Motorola bus type. */
 
-#define S626_PLATFORM		S626_INTEL /* *** SELECT PLATFORM TYPE *** */
+#define S626_PLATFORM		S626_INTEL	/* *** SELECT PLATFORM TYPE *** */
 
 #define S626_RANGE_5V		0x10	/* +/-5V range */
 #define S626_RANGE_10V		0x00	/* +/-10V range */
@@ -303,7 +303,7 @@
 
 /* Bit masks for MISC2 register writes. */
 #define S626_WRMISC2_WDCLEAR	0x8000	/* Reset watchdog timer to zero. */
-#define S626_WRMISC2_CHARGE_ENABLE 0x4000 /* Enable battery trickle charging. */
+#define S626_WRMISC2_CHARGE_ENABLE 0x4000	/* Enable battery trickle charging. */
 
 /* Bit masks for MISC2 register that are the same for reads and writes. */
 #define S626_MISC2_BATT_ENABLE	0x0008	/* Backup battery enable. */
@@ -416,20 +416,20 @@
 #define S626_EOS		0x00000001	/* End of superframe. */
 
 /* I2C configuration constants. */
-#define S626_I2C_CLKSEL		0x0400		/*
-						 * I2C bit rate =
-						 * PCIclk/480 = 68.75 KHz.
-						 */
-#define S626_I2C_BITRATE	68.75		/*
-						 * I2C bus data bit rate
-						 * (determined by
-						 * S626_I2C_CLKSEL) in KHz.
-						 */
-#define S626_I2C_WRTIME		15.0		/*
-						 * Worst case time, in msec,
-						 * for EEPROM internal write
-						 * op.
-						 */
+#define S626_I2C_CLKSEL		0x0400	/*
+					 * I2C bit rate =
+					 * PCIclk/480 = 68.75 KHz.
+					 */
+#define S626_I2C_BITRATE	68.75	/*
+					 * I2C bus data bit rate
+					 * (determined by
+					 * S626_I2C_CLKSEL) in KHz.
+					 */
+#define S626_I2C_WRTIME		15.0	/*
+					 * Worst case time, in msec,
+					 * for EEPROM internal write
+					 * op.
+					 */
 
 /* I2C manifest constants. */
 
@@ -721,11 +721,11 @@
 
 /* Bit field masks for CRB: */
 #define S626_CRBMSK_INTRESETCMD	S626_SET_CRB_INTRESETCMD(~0)	/* (w) */
-#define S626_CRBMSK_CNTDIR_B	S626_CRBMSK_INTRESETCMD		/* (r) */
+#define S626_CRBMSK_CNTDIR_B	S626_CRBMSK_INTRESETCMD	/* (r) */
 #define S626_CRBMSK_INTRESET_B	S626_SET_CRB_INTRESET_B(~0)	/* (w) */
-#define S626_CRBMSK_OVERDO_A	S626_CRBMSK_INTRESET_B		/* (r) */
+#define S626_CRBMSK_OVERDO_A	S626_CRBMSK_INTRESET_B	/* (r) */
 #define S626_CRBMSK_INTRESET_A	S626_SET_CRB_INTRESET_A(~0)	/* (w) */
-#define S626_CRBMSK_OVERDO_B	S626_CRBMSK_INTRESET_A		/* (r) */
+#define S626_CRBMSK_OVERDO_B	S626_CRBMSK_INTRESET_A	/* (r) */
 #define S626_CRBMSK_CLKENAB_A	S626_SET_CRB_CLKENAB_A(~0)
 #define S626_CRBMSK_INTSRC_B	S626_SET_CRB_INTSRC_B(~0)
 #define S626_CRBMSK_LATCHSRC	S626_SET_CRB_LATCHSRC(~0)

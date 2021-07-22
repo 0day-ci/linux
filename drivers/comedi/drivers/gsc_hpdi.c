@@ -50,7 +50,7 @@
 #define RX_FIFO_RESET_BIT			BIT(2)
 #define TX_ENABLE_BIT				BIT(4)
 #define RX_ENABLE_BIT				BIT(5)
-#define DEMAND_DMA_DIRECTION_TX_BIT		BIT(6)  /* ch 0 only */
+#define DEMAND_DMA_DIRECTION_TX_BIT		BIT(6)	/* ch 0 only */
 #define LINE_VALID_ON_STATUS_VALID_BIT		BIT(7)
 #define START_TX_BIT				BIT(8)
 #define CABLE_THROTTLE_ENABLE_BIT		BIT(9)
@@ -217,7 +217,7 @@ static irqreturn_t gsc_hpdi_interrupt(int irq, void *d)
 	spin_lock_irqsave(&dev->spinlock, flags);
 	dma1_status = readb(devpriv->plx9080_mmio + PLX_REG_DMACSR1);
 	if (plx_status & PLX_INTCSR_DMA1IA) {
-		/* XXX */ /* dma chan 1 interrupt */
+		/* XXX *//* dma chan 1 interrupt */
 		writeb((dma1_status & PLX_DMACSR_ENABLE) | PLX_DMACSR_CLEARINTR,
 		       devpriv->plx9080_mmio + PLX_REG_DMACSR1);
 	}
@@ -272,8 +272,7 @@ static int gsc_hpdi_cancel(struct comedi_device *dev,
 	return 0;
 }
 
-static int gsc_hpdi_cmd(struct comedi_device *dev,
-			struct comedi_subdevice *s)
+static int gsc_hpdi_cmd(struct comedi_device *dev, struct comedi_subdevice *s)
 {
 	struct hpdi_private *devpriv = dev->private;
 	struct comedi_async *async = s->async;
@@ -302,7 +301,7 @@ static int gsc_hpdi_cmd(struct comedi_device *dev,
 
 	/* give location of first dma descriptor */
 	bits = devpriv->dma_desc_phys_addr | PLX_DMADPR_DESCPCI |
-	       PLX_DMADPR_TCINTR | PLX_DMADPR_XFERL2P;
+	    PLX_DMADPR_TCINTR | PLX_DMADPR_XFERL2P;
 	writel(bits, devpriv->plx9080_mmio + PLX_REG_DMADPR0);
 
 	/* enable dma transfer */
@@ -347,8 +346,7 @@ static int gsc_hpdi_check_chanlist(struct comedi_device *dev,
 }
 
 static int gsc_hpdi_cmd_test(struct comedi_device *dev,
-			     struct comedi_subdevice *s,
-			     struct comedi_cmd *cmd)
+			     struct comedi_subdevice *s, struct comedi_cmd *cmd)
 {
 	int err = 0;
 
@@ -388,7 +386,7 @@ static int gsc_hpdi_cmd_test(struct comedi_device *dev,
 
 	if (cmd->stop_src == TRIG_COUNT)
 		err |= comedi_check_trigger_arg_min(&cmd->stop_arg, 1);
-	else	/* TRIG_NONE */
+	else			/* TRIG_NONE */
 		err |= comedi_check_trigger_arg_is(&cmd->stop_arg, 0);
 
 	if (err)
@@ -414,7 +412,7 @@ static int gsc_hpdi_setup_dma_descriptors(struct comedi_device *dev,
 	struct hpdi_private *devpriv = dev->private;
 	dma_addr_t phys_addr = devpriv->dma_desc_phys_addr;
 	u32 next_bits = PLX_DMADPR_DESCPCI | PLX_DMADPR_TCINTR |
-			PLX_DMADPR_XFERL2P;
+	    PLX_DMADPR_XFERL2P;
 	unsigned int offset = 0;
 	unsigned int idx = 0;
 	unsigned int i;
@@ -431,10 +429,14 @@ static int gsc_hpdi_setup_dma_descriptors(struct comedi_device *dev,
 		devpriv->dma_desc[i].local_start_addr = cpu_to_le32(FIFO_REG);
 		devpriv->dma_desc[i].transfer_size = cpu_to_le32(len);
 		devpriv->dma_desc[i].next = cpu_to_le32((phys_addr +
-			(i + 1) * sizeof(devpriv->dma_desc[0])) | next_bits);
+							 (i +
+							  1) *
+							 sizeof
+							 (devpriv->dma_desc[0]))
+							| next_bits);
 
 		devpriv->desc_dio_buffer[i] = devpriv->dio_buffer[idx] +
-					      (offset / sizeof(u32));
+		    (offset / sizeof(u32));
 
 		offset += len;
 		if (len + offset > DMA_BUFFER_SIZE) {
@@ -517,9 +519,9 @@ static int gsc_hpdi_init(struct comedi_device *dev)
 	       dev->mmio + TX_PROG_ALMOST_REG);
 
 	devpriv->tx_fifo_size = readl(dev->mmio + TX_FIFO_SIZE_REG) &
-				FIFO_SIZE_MASK;
+	    FIFO_SIZE_MASK;
 	devpriv->rx_fifo_size = readl(dev->mmio + RX_FIFO_SIZE_REG) &
-				FIFO_SIZE_MASK;
+	    FIFO_SIZE_MASK;
 
 	writel(0, dev->mmio + INTERRUPT_CONTROL_REG);
 
@@ -657,17 +659,17 @@ static int gsc_hpdi_auto_attach(struct comedi_device *dev,
 	/* Digital I/O subdevice */
 	s = &dev->subdevices[0];
 	dev->read_subdev = s;
-	s->type		= COMEDI_SUBD_DIO;
-	s->subdev_flags	= SDF_READABLE | SDF_WRITABLE | SDF_LSAMPL |
-			  SDF_CMD_READ;
-	s->n_chan	= 32;
-	s->len_chanlist	= 32;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_config	= gsc_hpdi_dio_insn_config;
-	s->do_cmd	= gsc_hpdi_cmd;
-	s->do_cmdtest	= gsc_hpdi_cmd_test;
-	s->cancel	= gsc_hpdi_cancel;
+	s->type = COMEDI_SUBD_DIO;
+	s->subdev_flags = SDF_READABLE | SDF_WRITABLE | SDF_LSAMPL |
+	    SDF_CMD_READ;
+	s->n_chan = 32;
+	s->len_chanlist = 32;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_config = gsc_hpdi_dio_insn_config;
+	s->do_cmd = gsc_hpdi_cmd;
+	s->do_cmdtest = gsc_hpdi_cmd_test;
+	s->cancel = gsc_hpdi_cancel;
 
 	return gsc_hpdi_init(dev);
 }
@@ -691,10 +693,10 @@ static void gsc_hpdi_detach(struct comedi_device *dev)
 }
 
 static struct comedi_driver gsc_hpdi_driver = {
-	.driver_name	= "gsc_hpdi",
-	.module		= THIS_MODULE,
-	.auto_attach	= gsc_hpdi_auto_attach,
-	.detach		= gsc_hpdi_detach,
+	.driver_name = "gsc_hpdi",
+	.module = THIS_MODULE,
+	.auto_attach = gsc_hpdi_auto_attach,
+	.detach = gsc_hpdi_detach,
 };
 
 static int gsc_hpdi_pci_probe(struct pci_dev *dev,
@@ -708,14 +710,16 @@ static const struct pci_device_id gsc_hpdi_pci_table[] = {
 			 PCI_VENDOR_ID_PLX, 0x2400) },
 	{ 0 }
 };
+
 MODULE_DEVICE_TABLE(pci, gsc_hpdi_pci_table);
 
 static struct pci_driver gsc_hpdi_pci_driver = {
-	.name		= "gsc_hpdi",
-	.id_table	= gsc_hpdi_pci_table,
-	.probe		= gsc_hpdi_pci_probe,
-	.remove		= comedi_pci_auto_unconfig,
+	.name = "gsc_hpdi",
+	.id_table = gsc_hpdi_pci_table,
+	.probe = gsc_hpdi_pci_probe,
+	.remove = comedi_pci_auto_unconfig,
 };
+
 module_comedi_pci_driver(gsc_hpdi_driver, gsc_hpdi_pci_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

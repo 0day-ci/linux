@@ -73,8 +73,8 @@
 #define   IRQ                   0x8
 #define   BUSY                  0x80
 #define DAS800_GAIN           3
-#define   CIO_FFOV              0x8   /* cio-das802/16 fifo overflow */
-#define   CIO_ENHF              0x90  /* cio-das802/16 fifo half full int ena */
+#define   CIO_FFOV              0x8	/* cio-das802/16 fifo overflow */
+#define   CIO_ENHF              0x90	/* cio-das802/16 fifo half full int ena */
 #define   CONTROL1              0x80
 #define   CONV_CONTROL          0xa0
 #define   SCAN_LIMITS           0xc0
@@ -96,56 +96,56 @@ struct das800_board {
 
 static const struct comedi_lrange range_das801_ai = {
 	9, {
-		BIP_RANGE(5),
-		BIP_RANGE(10),
-		UNI_RANGE(10),
-		BIP_RANGE(0.5),
-		UNI_RANGE(1),
-		BIP_RANGE(0.05),
-		UNI_RANGE(0.1),
-		BIP_RANGE(0.01),
-		UNI_RANGE(0.02)
+	    BIP_RANGE(5),
+	    BIP_RANGE(10),
+	    UNI_RANGE(10),
+	    BIP_RANGE(0.5),
+	    UNI_RANGE(1),
+	    BIP_RANGE(0.05),
+	    UNI_RANGE(0.1),
+	    BIP_RANGE(0.01),
+	    UNI_RANGE(0.02)
 	}
 };
 
 static const struct comedi_lrange range_cio_das801_ai = {
 	9, {
-		BIP_RANGE(5),
-		BIP_RANGE(10),
-		UNI_RANGE(10),
-		BIP_RANGE(0.5),
-		UNI_RANGE(1),
-		BIP_RANGE(0.05),
-		UNI_RANGE(0.1),
-		BIP_RANGE(0.005),
-		UNI_RANGE(0.01)
+	    BIP_RANGE(5),
+	    BIP_RANGE(10),
+	    UNI_RANGE(10),
+	    BIP_RANGE(0.5),
+	    UNI_RANGE(1),
+	    BIP_RANGE(0.05),
+	    UNI_RANGE(0.1),
+	    BIP_RANGE(0.005),
+	    UNI_RANGE(0.01)
 	}
 };
 
 static const struct comedi_lrange range_das802_ai = {
 	9, {
-		BIP_RANGE(5),
-		BIP_RANGE(10),
-		UNI_RANGE(10),
-		BIP_RANGE(2.5),
-		UNI_RANGE(5),
-		BIP_RANGE(1.25),
-		UNI_RANGE(2.5),
-		BIP_RANGE(0.625),
-		UNI_RANGE(1.25)
+	    BIP_RANGE(5),
+	    BIP_RANGE(10),
+	    UNI_RANGE(10),
+	    BIP_RANGE(2.5),
+	    UNI_RANGE(5),
+	    BIP_RANGE(1.25),
+	    UNI_RANGE(2.5),
+	    BIP_RANGE(0.625),
+	    UNI_RANGE(1.25)
 	}
 };
 
 static const struct comedi_lrange range_das80216_ai = {
 	8, {
-		BIP_RANGE(10),
-		UNI_RANGE(10),
-		BIP_RANGE(5),
-		UNI_RANGE(5),
-		BIP_RANGE(2.5),
-		UNI_RANGE(2.5),
-		BIP_RANGE(1.25),
-		UNI_RANGE(1.25)
+	    BIP_RANGE(10),
+	    UNI_RANGE(10),
+	    BIP_RANGE(5),
+	    UNI_RANGE(5),
+	    BIP_RANGE(2.5),
+	    UNI_RANGE(2.5),
+	    BIP_RANGE(1.25),
+	    UNI_RANGE(1.25)
 	}
 };
 
@@ -161,47 +161,47 @@ enum das800_boardinfo {
 
 static const struct das800_board das800_boards[] = {
 	[BOARD_DAS800] = {
-		.name		= "das-800",
-		.ai_speed	= 25000,
-		.ai_range	= &range_bipolar5,
-		.resolution	= 12,
-	},
+			  .name = "das-800",
+			  .ai_speed = 25000,
+			  .ai_range = &range_bipolar5,
+			  .resolution = 12,
+			   },
 	[BOARD_CIODAS800] = {
-		.name		= "cio-das800",
-		.ai_speed	= 20000,
-		.ai_range	= &range_bipolar5,
-		.resolution	= 12,
-	},
+			     .name = "cio-das800",
+			     .ai_speed = 20000,
+			     .ai_range = &range_bipolar5,
+			     .resolution = 12,
+			      },
 	[BOARD_DAS801] = {
-		.name		= "das-801",
-		.ai_speed	= 25000,
-		.ai_range	= &range_das801_ai,
-		.resolution	= 12,
-	},
+			  .name = "das-801",
+			  .ai_speed = 25000,
+			  .ai_range = &range_das801_ai,
+			  .resolution = 12,
+			   },
 	[BOARD_CIODAS801] = {
-		.name		= "cio-das801",
-		.ai_speed	= 20000,
-		.ai_range	= &range_cio_das801_ai,
-		.resolution	= 12,
-	},
+			     .name = "cio-das801",
+			     .ai_speed = 20000,
+			     .ai_range = &range_cio_das801_ai,
+			     .resolution = 12,
+			      },
 	[BOARD_DAS802] = {
-		.name		= "das-802",
-		.ai_speed	= 25000,
-		.ai_range	= &range_das802_ai,
-		.resolution	= 12,
-	},
+			  .name = "das-802",
+			  .ai_speed = 25000,
+			  .ai_range = &range_das802_ai,
+			  .resolution = 12,
+			   },
 	[BOARD_CIODAS802] = {
-		.name		= "cio-das802",
-		.ai_speed	= 20000,
-		.ai_range	= &range_das802_ai,
-		.resolution	= 12,
-	},
+			     .name = "cio-das802",
+			     .ai_speed = 20000,
+			     .ai_range = &range_das802_ai,
+			     .resolution = 12,
+			      },
 	[BOARD_CIODAS80216] = {
-		.name		= "cio-das802/16",
-		.ai_speed	= 10000,
-		.ai_range	= &range_das80216_ai,
-		.resolution	= 16,
-	},
+			       .name = "cio-das802/16",
+			       .ai_speed = 10000,
+			       .ai_range = &range_das80216_ai,
+			       .resolution = 16,
+				},
 };
 
 struct das800_private {
@@ -335,7 +335,7 @@ static int das800_ai_do_cmdtest(struct comedi_device *dev,
 
 	if (cmd->stop_src == TRIG_COUNT)
 		err |= comedi_check_trigger_arg_min(&cmd->stop_arg, 1);
-	else	/* TRIG_NONE */
+	else			/* TRIG_NONE */
 		err |= comedi_check_trigger_arg_is(&cmd->stop_arg, 0);
 
 	if (err)
@@ -463,7 +463,7 @@ static irqreturn_t das800_interrupt(int irq, void *d)
 			/* cio-das802/16 has no fifo empty status bit */
 			fifo_empty = false;
 			fifo_overflow = !!(inb(dev->iobase + DAS800_GAIN) &
-						CIO_FFOV);
+					   CIO_FFOV);
 		}
 		if (fifo_empty || fifo_overflow)
 			break;
@@ -507,8 +507,7 @@ static irqreturn_t das800_interrupt(int irq, void *d)
 
 static int das800_ai_eoc(struct comedi_device *dev,
 			 struct comedi_subdevice *s,
-			 struct comedi_insn *insn,
-			 unsigned long context)
+			 struct comedi_insn *insn, unsigned long context)
 {
 	unsigned int status;
 
@@ -520,8 +519,7 @@ static int das800_ai_eoc(struct comedi_device *dev,
 
 static int das800_ai_insn_read(struct comedi_device *dev,
 			       struct comedi_subdevice *s,
-			       struct comedi_insn *insn,
-			       unsigned int *data)
+			       struct comedi_insn *insn, unsigned int *data)
 {
 	struct das800_private *devpriv = dev->private;
 	unsigned int chan = CR_CHAN(insn->chanspec);
@@ -565,8 +563,7 @@ static int das800_ai_insn_read(struct comedi_device *dev,
 
 static int das800_di_insn_bits(struct comedi_device *dev,
 			       struct comedi_subdevice *s,
-			       struct comedi_insn *insn,
-			       unsigned int *data)
+			       struct comedi_insn *insn, unsigned int *data)
 {
 	data[1] = (inb(dev->iobase + DAS800_STATUS) >> 4) & 0x7;
 
@@ -575,8 +572,7 @@ static int das800_di_insn_bits(struct comedi_device *dev,
 
 static int das800_do_insn_bits(struct comedi_device *dev,
 			       struct comedi_subdevice *s,
-			       struct comedi_insn *insn,
-			       unsigned int *data)
+			       struct comedi_insn *insn, unsigned int *data)
 {
 	struct das800_private *devpriv = dev->private;
 	unsigned long irq_flags;
@@ -668,8 +664,7 @@ static int das800_attach(struct comedi_device *dev, struct comedi_devconfig *it)
 	dev->board_name = board->name;
 
 	if (irq > 1 && irq <= 7) {
-		ret = request_irq(irq, das800_interrupt, 0, "das800",
-				  dev);
+		ret = request_irq(irq, das800_interrupt, 0, "das800", dev);
 		if (ret == 0)
 			dev->irq = irq;
 	}
@@ -686,37 +681,37 @@ static int das800_attach(struct comedi_device *dev, struct comedi_devconfig *it)
 	/* Analog Input subdevice */
 	s = &dev->subdevices[0];
 	dev->read_subdev = s;
-	s->type		= COMEDI_SUBD_AI;
-	s->subdev_flags	= SDF_READABLE | SDF_GROUND;
-	s->n_chan	= 8;
-	s->maxdata	= (1 << board->resolution) - 1;
-	s->range_table	= board->ai_range;
-	s->insn_read	= das800_ai_insn_read;
+	s->type = COMEDI_SUBD_AI;
+	s->subdev_flags = SDF_READABLE | SDF_GROUND;
+	s->n_chan = 8;
+	s->maxdata = (1 << board->resolution) - 1;
+	s->range_table = board->ai_range;
+	s->insn_read = das800_ai_insn_read;
 	if (dev->irq) {
-		s->subdev_flags	|= SDF_CMD_READ;
-		s->len_chanlist	= 8;
-		s->do_cmdtest	= das800_ai_do_cmdtest;
-		s->do_cmd	= das800_ai_do_cmd;
-		s->cancel	= das800_cancel;
+		s->subdev_flags |= SDF_CMD_READ;
+		s->len_chanlist = 8;
+		s->do_cmdtest = das800_ai_do_cmdtest;
+		s->do_cmd = das800_ai_do_cmd;
+		s->cancel = das800_cancel;
 	}
 
 	/* Digital Input subdevice */
 	s = &dev->subdevices[1];
-	s->type		= COMEDI_SUBD_DI;
-	s->subdev_flags	= SDF_READABLE;
-	s->n_chan	= 3;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_bits	= das800_di_insn_bits;
+	s->type = COMEDI_SUBD_DI;
+	s->subdev_flags = SDF_READABLE;
+	s->n_chan = 3;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_bits = das800_di_insn_bits;
 
 	/* Digital Output subdevice */
 	s = &dev->subdevices[2];
-	s->type		= COMEDI_SUBD_DO;
-	s->subdev_flags	= SDF_WRITABLE;
-	s->n_chan	= 4;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_bits	= das800_do_insn_bits;
+	s->type = COMEDI_SUBD_DO;
+	s->subdev_flags = SDF_WRITABLE;
+	s->n_chan = 4;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_bits = das800_do_insn_bits;
 
 	das800_disable(dev);
 
@@ -729,14 +724,15 @@ static int das800_attach(struct comedi_device *dev, struct comedi_devconfig *it)
 };
 
 static struct comedi_driver driver_das800 = {
-	.driver_name	= "das800",
-	.module		= THIS_MODULE,
-	.attach		= das800_attach,
-	.detach		= comedi_legacy_detach,
-	.num_names	= ARRAY_SIZE(das800_boards),
-	.board_name	= &das800_boards[0].name,
-	.offset		= sizeof(struct das800_board),
+	.driver_name = "das800",
+	.module = THIS_MODULE,
+	.attach = das800_attach,
+	.detach = comedi_legacy_detach,
+	.num_names = ARRAY_SIZE(das800_boards),
+	.board_name = &das800_boards[0].name,
+	.offset = sizeof(struct das800_board),
 };
+
 module_comedi_driver(driver_das800);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

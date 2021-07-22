@@ -49,8 +49,7 @@
 
 static int dt2814_ai_notbusy(struct comedi_device *dev,
 			     struct comedi_subdevice *s,
-			     struct comedi_insn *insn,
-			     unsigned long context)
+			     struct comedi_insn *insn, unsigned long context)
 {
 	unsigned int status;
 
@@ -86,8 +85,7 @@ static int dt2814_ai_clear(struct comedi_device *dev)
 
 static int dt2814_ai_eoc(struct comedi_device *dev,
 			 struct comedi_subdevice *s,
-			 struct comedi_insn *insn,
-			 unsigned long context)
+			 struct comedi_insn *insn, unsigned long context)
 {
 	unsigned int status;
 
@@ -182,7 +180,7 @@ static int dt2814_ai_cmdtest(struct comedi_device *dev,
 
 	if (cmd->stop_src == TRIG_COUNT)
 		err |= comedi_check_trigger_arg_min(&cmd->stop_arg, 2);
-	else	/* TRIG_NONE */
+	else			/* TRIG_NONE */
 		err |= comedi_check_trigger_arg_is(&cmd->stop_arg, 0);
 
 	if (err)
@@ -280,7 +278,7 @@ static irqreturn_t dt2814_interrupt(int irq, void *d)
 	} else {
 		comedi_buf_write_samples(s, &data, 1);
 		if (async->cmd.stop_src == TRIG_COUNT &&
-		    async->scans_done >=  async->cmd.stop_arg) {
+		    async->scans_done >= async->cmd.stop_arg) {
 			async->events |= COMEDI_CB_EOA;
 		}
 	}
@@ -360,11 +358,12 @@ static void dt2814_detach(struct comedi_device *dev)
 }
 
 static struct comedi_driver dt2814_driver = {
-	.driver_name	= "dt2814",
-	.module		= THIS_MODULE,
-	.attach		= dt2814_attach,
-	.detach		= dt2814_detach,
+	.driver_name = "dt2814",
+	.module = THIS_MODULE,
+	.attach = dt2814_attach,
+	.detach = dt2814_detach,
 };
+
 module_comedi_driver(dt2814_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

@@ -103,41 +103,41 @@ struct pcl726_board {
 
 static const struct pcl726_board pcl726_boards[] = {
 	{
-		.name		= "pcl726",
-		.io_len		= 0x10,
-		.ao_ranges	= &rangelist_726[0],
-		.ao_num_ranges	= ARRAY_SIZE(rangelist_726),
-		.ao_nchan	= 6,
-		.have_dio	= 1,
-	}, {
-		.name		= "pcl727",
-		.io_len		= 0x20,
-		.ao_ranges	= &rangelist_727[0],
-		.ao_num_ranges	= ARRAY_SIZE(rangelist_727),
-		.ao_nchan	= 12,
-		.have_dio	= 1,
-		.is_pcl727	= 1,
-	}, {
-		.name		= "pcl728",
-		.io_len		= 0x08,
-		.ao_num_ranges	= ARRAY_SIZE(rangelist_728),
-		.ao_ranges	= &rangelist_728[0],
-		.ao_nchan	= 2,
-	}, {
-		.name		= "acl6126",
-		.io_len		= 0x10,
-		.irq_mask	= 0x96e8,
-		.ao_num_ranges	= ARRAY_SIZE(rangelist_726),
-		.ao_ranges	= &rangelist_726[0],
-		.ao_nchan	= 6,
-		.have_dio	= 1,
-	}, {
-		.name		= "acl6128",
-		.io_len		= 0x08,
-		.ao_num_ranges	= ARRAY_SIZE(rangelist_728),
-		.ao_ranges	= &rangelist_728[0],
-		.ao_nchan	= 2,
-	},
+	 .name = "pcl726",
+	 .io_len = 0x10,
+	 .ao_ranges = &rangelist_726[0],
+	 .ao_num_ranges = ARRAY_SIZE(rangelist_726),
+	 .ao_nchan = 6,
+	 .have_dio = 1,
+	  }, {
+	      .name = "pcl727",
+	      .io_len = 0x20,
+	      .ao_ranges = &rangelist_727[0],
+	      .ao_num_ranges = ARRAY_SIZE(rangelist_727),
+	      .ao_nchan = 12,
+	      .have_dio = 1,
+	      .is_pcl727 = 1,
+	       }, {
+		   .name = "pcl728",
+		   .io_len = 0x08,
+		   .ao_num_ranges = ARRAY_SIZE(rangelist_728),
+		   .ao_ranges = &rangelist_728[0],
+		   .ao_nchan = 2,
+		    }, {
+			.name = "acl6126",
+			.io_len = 0x10,
+			.irq_mask = 0x96e8,
+			.ao_num_ranges = ARRAY_SIZE(rangelist_726),
+			.ao_ranges = &rangelist_726[0],
+			.ao_nchan = 6,
+			.have_dio = 1,
+			 }, {
+			     .name = "acl6128",
+			     .io_len = 0x08,
+			     .ao_num_ranges = ARRAY_SIZE(rangelist_728),
+			     .ao_ranges = &rangelist_728[0],
+			     .ao_nchan = 2,
+			      },
 };
 
 struct pcl726_private {
@@ -147,8 +147,7 @@ struct pcl726_private {
 
 static int pcl726_intr_insn_bits(struct comedi_device *dev,
 				 struct comedi_subdevice *s,
-				 struct comedi_insn *insn,
-				 unsigned int *data)
+				 struct comedi_insn *insn, unsigned int *data)
 {
 	data[1] = 0;
 	return insn->n;
@@ -233,8 +232,7 @@ static irqreturn_t pcl726_interrupt(int irq, void *d)
 
 static int pcl726_ao_insn_write(struct comedi_device *dev,
 				struct comedi_subdevice *s,
-				struct comedi_insn *insn,
-				unsigned int *data)
+				struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 	unsigned int range = CR_RANGE(insn->chanspec);
@@ -259,8 +257,7 @@ static int pcl726_ao_insn_write(struct comedi_device *dev,
 
 static int pcl726_di_insn_bits(struct comedi_device *dev,
 			       struct comedi_subdevice *s,
-			       struct comedi_insn *insn,
-			       unsigned int *data)
+			       struct comedi_insn *insn, unsigned int *data)
 {
 	const struct pcl726_board *board = dev->board_ptr;
 	unsigned int val;
@@ -280,8 +277,7 @@ static int pcl726_di_insn_bits(struct comedi_device *dev,
 
 static int pcl726_do_insn_bits(struct comedi_device *dev,
 			       struct comedi_subdevice *s,
-			       struct comedi_insn *insn,
-			       unsigned int *data)
+			       struct comedi_insn *insn, unsigned int *data)
 {
 	const struct pcl726_board *board = dev->board_ptr;
 	unsigned long io = dev->iobase;
@@ -307,8 +303,7 @@ static int pcl726_do_insn_bits(struct comedi_device *dev,
 	return insn->n;
 }
 
-static int pcl726_attach(struct comedi_device *dev,
-			 struct comedi_devconfig *it)
+static int pcl726_attach(struct comedi_device *dev, struct comedi_devconfig *it)
 {
 	const struct pcl726_board *board = dev->board_ptr;
 	struct pcl726_private *devpriv;
@@ -359,12 +354,12 @@ static int pcl726_attach(struct comedi_device *dev,
 
 	/* Analog Output subdevice */
 	s = &dev->subdevices[subdev++];
-	s->type		= COMEDI_SUBD_AO;
-	s->subdev_flags	= SDF_WRITABLE | SDF_GROUND;
-	s->n_chan	= board->ao_nchan;
-	s->maxdata	= 0x0fff;
+	s->type = COMEDI_SUBD_AO;
+	s->subdev_flags = SDF_WRITABLE | SDF_GROUND;
+	s->n_chan = board->ao_nchan;
+	s->maxdata = 0x0fff;
 	s->range_table_list = devpriv->rangelist;
-	s->insn_write	= pcl726_ao_insn_write;
+	s->insn_write = pcl726_ao_insn_write;
 
 	ret = comedi_alloc_subdev_readback(s);
 	if (ret)
@@ -373,51 +368,52 @@ static int pcl726_attach(struct comedi_device *dev,
 	if (board->have_dio) {
 		/* Digital Input subdevice */
 		s = &dev->subdevices[subdev++];
-		s->type		= COMEDI_SUBD_DI;
-		s->subdev_flags	= SDF_READABLE;
-		s->n_chan	= 16;
-		s->maxdata	= 1;
-		s->insn_bits	= pcl726_di_insn_bits;
-		s->range_table	= &range_digital;
+		s->type = COMEDI_SUBD_DI;
+		s->subdev_flags = SDF_READABLE;
+		s->n_chan = 16;
+		s->maxdata = 1;
+		s->insn_bits = pcl726_di_insn_bits;
+		s->range_table = &range_digital;
 
 		/* Digital Output subdevice */
 		s = &dev->subdevices[subdev++];
-		s->type		= COMEDI_SUBD_DO;
-		s->subdev_flags	= SDF_WRITABLE;
-		s->n_chan	= 16;
-		s->maxdata	= 1;
-		s->insn_bits	= pcl726_do_insn_bits;
-		s->range_table	= &range_digital;
+		s->type = COMEDI_SUBD_DO;
+		s->subdev_flags = SDF_WRITABLE;
+		s->n_chan = 16;
+		s->maxdata = 1;
+		s->insn_bits = pcl726_do_insn_bits;
+		s->range_table = &range_digital;
 	}
 
 	if (dev->irq) {
 		/* Digital Input subdevice - Interrupt support */
 		s = &dev->subdevices[subdev++];
 		dev->read_subdev = s;
-		s->type		= COMEDI_SUBD_DI;
-		s->subdev_flags	= SDF_READABLE | SDF_CMD_READ;
-		s->n_chan	= 1;
-		s->maxdata	= 1;
-		s->range_table	= &range_digital;
-		s->insn_bits	= pcl726_intr_insn_bits;
-		s->len_chanlist	= 1;
-		s->do_cmdtest	= pcl726_intr_cmdtest;
-		s->do_cmd	= pcl726_intr_cmd;
-		s->cancel	= pcl726_intr_cancel;
+		s->type = COMEDI_SUBD_DI;
+		s->subdev_flags = SDF_READABLE | SDF_CMD_READ;
+		s->n_chan = 1;
+		s->maxdata = 1;
+		s->range_table = &range_digital;
+		s->insn_bits = pcl726_intr_insn_bits;
+		s->len_chanlist = 1;
+		s->do_cmdtest = pcl726_intr_cmdtest;
+		s->do_cmd = pcl726_intr_cmd;
+		s->cancel = pcl726_intr_cancel;
 	}
 
 	return 0;
 }
 
 static struct comedi_driver pcl726_driver = {
-	.driver_name	= "pcl726",
-	.module		= THIS_MODULE,
-	.attach		= pcl726_attach,
-	.detach		= comedi_legacy_detach,
-	.board_name	= &pcl726_boards[0].name,
-	.num_names	= ARRAY_SIZE(pcl726_boards),
-	.offset		= sizeof(struct pcl726_board),
+	.driver_name = "pcl726",
+	.module = THIS_MODULE,
+	.attach = pcl726_attach,
+	.detach = comedi_legacy_detach,
+	.board_name = &pcl726_boards[0].name,
+	.num_names = ARRAY_SIZE(pcl726_boards),
+	.offset = sizeof(struct pcl726_board),
 };
+
 module_comedi_driver(pcl726_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

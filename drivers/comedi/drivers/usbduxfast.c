@@ -135,8 +135,8 @@
  */
 static const struct comedi_lrange range_usbduxfast_ai_range = {
 	2, {
-		BIP_RANGE(0.75),
-		BIP_RANGE(0.5)
+	    BIP_RANGE(0.75),
+	    BIP_RANGE(0.5)
 	}
 };
 
@@ -171,8 +171,7 @@ static int usbduxfast_send_cmd(struct comedi_device *dev, int cmd_type)
 	devpriv->duxbuf[0] = cmd_type;
 
 	ret = usb_bulk_msg(usb, usb_sndbulkpipe(usb, CHANNELLISTEP),
-			   devpriv->duxbuf, SIZEOFDUXBUF,
-			   &nsent, 10000);
+			   devpriv->duxbuf, SIZEOFDUXBUF, &nsent, 10000);
 	if (ret < 0)
 		dev_err(dev->class_dev,
 			"could not transmit command to the usb-device, err=%d\n",
@@ -324,7 +323,8 @@ static int usbduxfast_ai_check_chanlist(struct comedi_device *dev,
 	int i;
 
 	if (cmd->chanlist_len > 3 && cmd->chanlist_len != 16) {
-		dev_err(dev->class_dev, "unsupported combination of channels\n");
+		dev_err(dev->class_dev,
+			"unsupported combination of channels\n");
 		return -EINVAL;
 	}
 
@@ -395,12 +395,12 @@ static int usbduxfast_ai_cmdtest(struct comedi_device *dev,
 	/*
 	 * Validate the conversion timing:
 	 * for 1 channel the timing in 30MHz "steps" is:
-	 *	steps <= MAX_SAMPLING_PERIOD
+	 *      steps <= MAX_SAMPLING_PERIOD
 	 * for all other chanlist_len it is:
-	 *	MIN_SAMPLING_PERIOD <= steps <= MAX_SAMPLING_PERIOD
+	 *      MIN_SAMPLING_PERIOD <= steps <= MAX_SAMPLING_PERIOD
 	 */
 	steps = (cmd->convert_arg * 30) / 1000;
-	if (cmd->chanlist_len !=  1)
+	if (cmd->chanlist_len != 1)
 		err2 |= comedi_check_trigger_arg_min(&steps,
 						     MIN_SAMPLING_PERIOD);
 	else
@@ -414,7 +414,7 @@ static int usbduxfast_ai_cmdtest(struct comedi_device *dev,
 
 	if (cmd->stop_src == TRIG_COUNT)
 		err |= comedi_check_trigger_arg_min(&cmd->stop_arg, 1);
-	else	/* TRIG_NONE */
+	else			/* TRIG_NONE */
 		err |= comedi_check_trigger_arg_is(&cmd->stop_arg, 0);
 
 	if (err)
@@ -562,8 +562,7 @@ static int usbduxfast_ai_cmd(struct comedi_device *dev,
 			/* branch back to state 1 */
 			/* deceision state w data */
 			/* doesn't matter */
-			usbduxfast_cmd_data(dev, 3,
-					    0x09, 0x03, rngmask, 0xff);
+			usbduxfast_cmd_data(dev, 3, 0x09, 0x03, rngmask, 0xff);
 		}
 		break;
 
@@ -595,7 +594,7 @@ static int usbduxfast_ai_cmd(struct comedi_device *dev,
 				    0x00, 0xfe & rngmask, 0x00);
 
 		/* and the second part */
-		usbduxfast_cmd_data(dev, 2, steps_tmp  - steps_tmp / 2,
+		usbduxfast_cmd_data(dev, 2, steps_tmp - steps_tmp / 2,
 				    0x00, rngmask, 0x00);
 
 		/* data */
@@ -661,8 +660,7 @@ static int usbduxfast_ai_cmd(struct comedi_device *dev,
 
 		/* commit data to the FIFO and do the first part of the delay */
 		/* data */
-		usbduxfast_cmd_data(dev, 4, steps_tmp / 2,
-				    0x02, rngmask, 0x00);
+		usbduxfast_cmd_data(dev, 4, steps_tmp / 2, 0x02, rngmask, 0x00);
 
 		if (CR_RANGE(cmd->chanlist[0]) > 0)
 			rngmask = 0xff - 0x04;
@@ -744,7 +742,7 @@ static int usbduxfast_ai_cmd(struct comedi_device *dev,
 			goto cmd_exit;
 		}
 		s->async->inttrig = NULL;
-	} else {	/* TRIG_INT */
+	} else {		/* TRIG_INT */
 		s->async->inttrig = usbduxfast_ai_inttrig;
 	}
 
@@ -759,8 +757,7 @@ cmd_exit:
  */
 static int usbduxfast_ai_insn_read(struct comedi_device *dev,
 				   struct comedi_subdevice *s,
-				   struct comedi_insn *insn,
-				   unsigned int *data)
+				   struct comedi_insn *insn, unsigned int *data)
 {
 	struct usb_device *usb = comedi_to_usb_dev(dev);
 	struct usbduxfast_private *devpriv = dev->private;
@@ -828,7 +825,7 @@ static int usbduxfast_ai_insn_read(struct comedi_device *dev,
 			return -EINVAL;
 		}
 		for (j = chan; (j < n) && (i < insn->n); j = j + 16) {
-			data[i] = ((u16 *)(devpriv->inbuf))[j];
+			data[i] = ((u16 *) (devpriv->inbuf))[j];
 			i++;
 		}
 	}
@@ -868,13 +865,11 @@ static int usbduxfast_upload_firmware(struct comedi_device *dev,
 	}
 
 	/* stop the current firmware on the device */
-	*tmp = 1;	/* 7f92 to one */
+	*tmp = 1;		/* 7f92 to one */
 	ret = usb_control_msg(usb, usb_sndctrlpipe(usb, 0),
 			      USBDUXFASTSUB_FIRMWARE,
 			      VENDOR_DIR_OUT,
-			      USBDUXFASTSUB_CPUCS, 0x0000,
-			      tmp, 1,
-			      EZTIMEOUT);
+			      USBDUXFASTSUB_CPUCS, 0x0000, tmp, 1, EZTIMEOUT);
 	if (ret < 0) {
 		dev_err(dev->class_dev, "can not stop firmware\n");
 		goto done;
@@ -883,23 +878,18 @@ static int usbduxfast_upload_firmware(struct comedi_device *dev,
 	/* upload the new firmware to the device */
 	ret = usb_control_msg(usb, usb_sndctrlpipe(usb, 0),
 			      USBDUXFASTSUB_FIRMWARE,
-			      VENDOR_DIR_OUT,
-			      0, 0x0000,
-			      buf, size,
-			      EZTIMEOUT);
+			      VENDOR_DIR_OUT, 0, 0x0000, buf, size, EZTIMEOUT);
 	if (ret < 0) {
 		dev_err(dev->class_dev, "firmware upload failed\n");
 		goto done;
 	}
 
 	/* start the new firmware on the device */
-	*tmp = 0;	/* 7f92 to zero */
+	*tmp = 0;		/* 7f92 to zero */
 	ret = usb_control_msg(usb, usb_sndctrlpipe(usb, 0),
 			      USBDUXFASTSUB_FIRMWARE,
 			      VENDOR_DIR_OUT,
-			      USBDUXFASTSUB_CPUCS, 0x0000,
-			      tmp, 1,
-			      EZTIMEOUT);
+			      USBDUXFASTSUB_CPUCS, 0x0000, tmp, 1, EZTIMEOUT);
 	if (ret < 0)
 		dev_err(dev->class_dev, "can not start firmware\n");
 
@@ -963,16 +953,16 @@ static int usbduxfast_auto_attach(struct comedi_device *dev,
 	/* Analog Input subdevice */
 	s = &dev->subdevices[0];
 	dev->read_subdev = s;
-	s->type		= COMEDI_SUBD_AI;
-	s->subdev_flags	= SDF_READABLE | SDF_GROUND | SDF_CMD_READ;
-	s->n_chan	= 16;
-	s->maxdata	= 0x1000;	/* 12-bit + 1 overflow bit */
-	s->range_table	= &range_usbduxfast_ai_range;
-	s->insn_read	= usbduxfast_ai_insn_read;
-	s->len_chanlist	= s->n_chan;
-	s->do_cmdtest	= usbduxfast_ai_cmdtest;
-	s->do_cmd	= usbduxfast_ai_cmd;
-	s->cancel	= usbduxfast_ai_cancel;
+	s->type = COMEDI_SUBD_AI;
+	s->subdev_flags = SDF_READABLE | SDF_GROUND | SDF_CMD_READ;
+	s->n_chan = 16;
+	s->maxdata = 0x1000;	/* 12-bit + 1 overflow bit */
+	s->range_table = &range_usbduxfast_ai_range;
+	s->insn_read = usbduxfast_ai_insn_read;
+	s->len_chanlist = s->n_chan;
+	s->do_cmdtest = usbduxfast_ai_cmdtest;
+	s->do_cmd = usbduxfast_ai_cmd;
+	s->cancel = usbduxfast_ai_cancel;
 
 	return 0;
 }
@@ -1005,10 +995,10 @@ static void usbduxfast_detach(struct comedi_device *dev)
 }
 
 static struct comedi_driver usbduxfast_driver = {
-	.driver_name	= "usbduxfast",
-	.module		= THIS_MODULE,
-	.auto_attach	= usbduxfast_auto_attach,
-	.detach		= usbduxfast_detach,
+	.driver_name = "usbduxfast",
+	.module = THIS_MODULE,
+	.auto_attach = usbduxfast_auto_attach,
+	.detach = usbduxfast_detach,
 };
 
 static int usbduxfast_usb_probe(struct usb_interface *intf,
@@ -1023,14 +1013,16 @@ static const struct usb_device_id usbduxfast_usb_table[] = {
 	{ USB_DEVICE(0x13d8, 0x0011) },	/* real ID */
 	{ }
 };
+
 MODULE_DEVICE_TABLE(usb, usbduxfast_usb_table);
 
 static struct usb_driver usbduxfast_usb_driver = {
-	.name		= "usbduxfast",
-	.probe		= usbduxfast_usb_probe,
-	.disconnect	= comedi_usb_auto_unconfig,
-	.id_table	= usbduxfast_usb_table,
+	.name = "usbduxfast",
+	.probe = usbduxfast_usb_probe,
+	.disconnect = comedi_usb_auto_unconfig,
+	.id_table = usbduxfast_usb_table,
 };
+
 module_comedi_usb_driver(usbduxfast_driver, usbduxfast_usb_driver);
 
 MODULE_AUTHOR("Bernd Porr, BerndPorr@f2s.com");

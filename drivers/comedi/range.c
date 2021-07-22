@@ -11,25 +11,35 @@
 #include "comedidev.h"
 #include "comedi_internal.h"
 
-const struct comedi_lrange range_bipolar10 = { 1, {BIP_RANGE(10)} };
+const struct comedi_lrange range_bipolar10 = { 1, { BIP_RANGE(10) } };
+
 EXPORT_SYMBOL_GPL(range_bipolar10);
-const struct comedi_lrange range_bipolar5 = { 1, {BIP_RANGE(5)} };
+const struct comedi_lrange range_bipolar5 = { 1, { BIP_RANGE(5) } };
+
 EXPORT_SYMBOL_GPL(range_bipolar5);
-const struct comedi_lrange range_bipolar2_5 = { 1, {BIP_RANGE(2.5)} };
+const struct comedi_lrange range_bipolar2_5 = { 1, { BIP_RANGE(2.5) } };
+
 EXPORT_SYMBOL_GPL(range_bipolar2_5);
-const struct comedi_lrange range_unipolar10 = { 1, {UNI_RANGE(10)} };
+const struct comedi_lrange range_unipolar10 = { 1, { UNI_RANGE(10) } };
+
 EXPORT_SYMBOL_GPL(range_unipolar10);
-const struct comedi_lrange range_unipolar5 = { 1, {UNI_RANGE(5)} };
+const struct comedi_lrange range_unipolar5 = { 1, { UNI_RANGE(5) } };
+
 EXPORT_SYMBOL_GPL(range_unipolar5);
-const struct comedi_lrange range_unipolar2_5 = { 1, {UNI_RANGE(2.5)} };
+const struct comedi_lrange range_unipolar2_5 = { 1, { UNI_RANGE(2.5) } };
+
 EXPORT_SYMBOL_GPL(range_unipolar2_5);
-const struct comedi_lrange range_0_20mA = { 1, {RANGE_mA(0, 20)} };
+const struct comedi_lrange range_0_20mA = { 1, { RANGE_mA(0, 20) } };
+
 EXPORT_SYMBOL_GPL(range_0_20mA);
-const struct comedi_lrange range_4_20mA = { 1, {RANGE_mA(4, 20)} };
+const struct comedi_lrange range_4_20mA = { 1, { RANGE_mA(4, 20) } };
+
 EXPORT_SYMBOL_GPL(range_4_20mA);
-const struct comedi_lrange range_0_32mA = { 1, {RANGE_mA(0, 32)} };
+const struct comedi_lrange range_0_32mA = { 1, { RANGE_mA(0, 32) } };
+
 EXPORT_SYMBOL_GPL(range_0_32mA);
-const struct comedi_lrange range_unknown = { 1, {{0, 1000000, UNIT_none} } };
+const struct comedi_lrange range_unknown = { 1, { { 0, 1000000, UNIT_none} } };
+
 EXPORT_SYMBOL_GPL(range_unknown);
 
 /*
@@ -45,8 +55,7 @@ EXPORT_SYMBOL_GPL(range_unknown);
  * writes:
  *	array of comedi_krange structures to rangeinfo->range_ptr pointer
  */
-int do_rangeinfo_ioctl(struct comedi_device *dev,
-		       struct comedi_rangeinfo *it)
+int do_rangeinfo_ioctl(struct comedi_device *dev, struct comedi_rangeinfo *it)
 {
 	int subd, chan;
 	const struct comedi_lrange *lr;
@@ -118,8 +127,7 @@ int comedi_check_chanlist(struct comedi_subdevice *s, int n,
 			range_len = s->range_table_list[chan]->length;
 		else
 			range_len = 0;
-		if (chan >= s->n_chan ||
-		    CR_RANGE(chanspec) >= range_len) {
+		if (chan >= s->n_chan || CR_RANGE(chanspec) >= range_len) {
 			dev_warn(dev->class_dev,
 				 "bad chanlist[%d]=0x%08x chan=%d range length=%d\n",
 				 i, chanspec, chan, range_len);
@@ -128,4 +136,5 @@ int comedi_check_chanlist(struct comedi_subdevice *s, int n,
 	}
 	return 0;
 }
+
 EXPORT_SYMBOL_GPL(comedi_check_chanlist);

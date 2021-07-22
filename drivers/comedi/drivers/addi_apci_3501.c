@@ -87,8 +87,8 @@ struct apci3501_private {
 
 static const struct comedi_lrange apci3501_ao_range = {
 	2, {
-		BIP_RANGE(10),
-		UNI_RANGE(10)
+	    BIP_RANGE(10),
+	    UNI_RANGE(10)
 	}
 };
 
@@ -105,8 +105,7 @@ static int apci3501_wait_for_dac(struct comedi_device *dev)
 
 static int apci3501_ao_insn_write(struct comedi_device *dev,
 				  struct comedi_subdevice *s,
-				  struct comedi_insn *insn,
-				  unsigned int *data)
+				  struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 	unsigned int range = CR_RANGE(insn->chanspec);
@@ -116,8 +115,8 @@ static int apci3501_ao_insn_write(struct comedi_device *dev,
 
 	/*
 	 * All analog output channels have the same output range.
-	 *	14-bit bipolar: 0-10V
-	 *	13-bit unipolar: +/-10V
+	 *      14-bit bipolar: 0-10V
+	 *      13-bit unipolar: +/-10V
 	 * Changing the range of one channel changes all of them!
 	 */
 	if (range) {
@@ -154,8 +153,7 @@ static int apci3501_ao_insn_write(struct comedi_device *dev,
 
 static int apci3501_di_insn_bits(struct comedi_device *dev,
 				 struct comedi_subdevice *s,
-				 struct comedi_insn *insn,
-				 unsigned int *data)
+				 struct comedi_insn *insn, unsigned int *data)
 {
 	data[1] = inl(dev->iobase + APCI3501_DI_REG) & 0x3;
 
@@ -164,8 +162,7 @@ static int apci3501_di_insn_bits(struct comedi_device *dev,
 
 static int apci3501_do_insn_bits(struct comedi_device *dev,
 				 struct comedi_subdevice *s,
-				 struct comedi_insn *insn,
-				 unsigned int *data)
+				 struct comedi_insn *insn, unsigned int *data)
 {
 	s->state = inl(dev->iobase + APCI3501_DO_REG);
 
@@ -330,49 +327,49 @@ static int apci3501_auto_attach(struct comedi_device *dev,
 	/* Initialize the analog output subdevice */
 	s = &dev->subdevices[0];
 	if (ao_n_chan) {
-		s->type		= COMEDI_SUBD_AO;
-		s->subdev_flags	= SDF_WRITABLE | SDF_GROUND | SDF_COMMON;
-		s->n_chan	= ao_n_chan;
-		s->maxdata	= 0x3fff;
-		s->range_table	= &apci3501_ao_range;
-		s->insn_write	= apci3501_ao_insn_write;
+		s->type = COMEDI_SUBD_AO;
+		s->subdev_flags = SDF_WRITABLE | SDF_GROUND | SDF_COMMON;
+		s->n_chan = ao_n_chan;
+		s->maxdata = 0x3fff;
+		s->range_table = &apci3501_ao_range;
+		s->insn_write = apci3501_ao_insn_write;
 
 		ret = comedi_alloc_subdev_readback(s);
 		if (ret)
 			return ret;
 	} else {
-		s->type		= COMEDI_SUBD_UNUSED;
+		s->type = COMEDI_SUBD_UNUSED;
 	}
 
 	/* Initialize the digital input subdevice */
 	s = &dev->subdevices[1];
-	s->type		= COMEDI_SUBD_DI;
-	s->subdev_flags	= SDF_READABLE;
-	s->n_chan	= 2;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_bits	= apci3501_di_insn_bits;
+	s->type = COMEDI_SUBD_DI;
+	s->subdev_flags = SDF_READABLE;
+	s->n_chan = 2;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_bits = apci3501_di_insn_bits;
 
 	/* Initialize the digital output subdevice */
 	s = &dev->subdevices[2];
-	s->type		= COMEDI_SUBD_DO;
-	s->subdev_flags	= SDF_WRITABLE;
-	s->n_chan	= 2;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_bits	= apci3501_do_insn_bits;
+	s->type = COMEDI_SUBD_DO;
+	s->subdev_flags = SDF_WRITABLE;
+	s->n_chan = 2;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_bits = apci3501_do_insn_bits;
 
 	/* Timer/Watchdog subdevice */
 	s = &dev->subdevices[3];
-	s->type		= COMEDI_SUBD_UNUSED;
+	s->type = COMEDI_SUBD_UNUSED;
 
 	/* Initialize the eeprom subdevice */
 	s = &dev->subdevices[4];
-	s->type		= COMEDI_SUBD_MEMORY;
-	s->subdev_flags	= SDF_READABLE | SDF_INTERNAL;
-	s->n_chan	= 256;
-	s->maxdata	= 0xffff;
-	s->insn_read	= apci3501_eeprom_insn_read;
+	s->type = COMEDI_SUBD_MEMORY;
+	s->subdev_flags = SDF_READABLE | SDF_INTERNAL;
+	s->n_chan = 256;
+	s->maxdata = 0xffff;
+	s->insn_read = apci3501_eeprom_insn_read;
 
 	apci3501_reset(dev);
 	return 0;
@@ -386,10 +383,10 @@ static void apci3501_detach(struct comedi_device *dev)
 }
 
 static struct comedi_driver apci3501_driver = {
-	.driver_name	= "addi_apci_3501",
-	.module		= THIS_MODULE,
-	.auto_attach	= apci3501_auto_attach,
-	.detach		= apci3501_detach,
+	.driver_name = "addi_apci_3501",
+	.module = THIS_MODULE,
+	.auto_attach = apci3501_auto_attach,
+	.detach = apci3501_detach,
 };
 
 static int apci3501_pci_probe(struct pci_dev *dev,
@@ -402,14 +399,16 @@ static const struct pci_device_id apci3501_pci_table[] = {
 	{ PCI_DEVICE(PCI_VENDOR_ID_ADDIDATA, 0x3001) },
 	{ 0 }
 };
+
 MODULE_DEVICE_TABLE(pci, apci3501_pci_table);
 
 static struct pci_driver apci3501_pci_driver = {
-	.name		= "addi_apci_3501",
-	.id_table	= apci3501_pci_table,
-	.probe		= apci3501_pci_probe,
-	.remove		= comedi_pci_auto_unconfig,
+	.name = "addi_apci_3501",
+	.id_table = apci3501_pci_table,
+	.probe = apci3501_pci_probe,
+	.remove = comedi_pci_auto_unconfig,
 };
+
 module_comedi_pci_driver(apci3501_driver, apci3501_pci_driver);
 
 MODULE_DESCRIPTION("ADDI-DATA APCI-3501 Analog output board");

@@ -96,104 +96,104 @@ struct ni_660x_register_data {
 };
 
 static const struct ni_660x_register_data ni_660x_reg_data[NI660X_NUM_REGS] = {
-	[NITIO_G0_INT_ACK]		= { 0x004, 2 },	/* write */
-	[NITIO_G0_STATUS]		= { 0x004, 2 },	/* read */
-	[NITIO_G1_INT_ACK]		= { 0x006, 2 },	/* write */
-	[NITIO_G1_STATUS]		= { 0x006, 2 },	/* read */
-	[NITIO_G01_STATUS]		= { 0x008, 2 },	/* read */
-	[NITIO_G0_CMD]			= { 0x00c, 2 },	/* write */
-	[NI660X_STC_DIO_PARALLEL_INPUT]	= { 0x00e, 2 },	/* read */
-	[NITIO_G1_CMD]			= { 0x00e, 2 },	/* write */
-	[NITIO_G0_HW_SAVE]		= { 0x010, 4 },	/* read */
-	[NITIO_G1_HW_SAVE]		= { 0x014, 4 },	/* read */
-	[NI660X_STC_DIO_OUTPUT]		= { 0x014, 2 },	/* write */
-	[NI660X_STC_DIO_CONTROL]	= { 0x016, 2 },	/* write */
-	[NITIO_G0_SW_SAVE]		= { 0x018, 4 },	/* read */
-	[NITIO_G1_SW_SAVE]		= { 0x01c, 4 },	/* read */
-	[NITIO_G0_MODE]			= { 0x034, 2 },	/* write */
-	[NITIO_G01_STATUS1]		= { 0x036, 2 },	/* read */
-	[NITIO_G1_MODE]			= { 0x036, 2 },	/* write */
-	[NI660X_STC_DIO_SERIAL_INPUT]	= { 0x038, 2 },	/* read */
-	[NITIO_G0_LOADA]		= { 0x038, 4 },	/* write */
-	[NITIO_G01_STATUS2]		= { 0x03a, 2 },	/* read */
-	[NITIO_G0_LOADB]		= { 0x03c, 4 },	/* write */
-	[NITIO_G1_LOADA]		= { 0x040, 4 },	/* write */
-	[NITIO_G1_LOADB]		= { 0x044, 4 },	/* write */
-	[NITIO_G0_INPUT_SEL]		= { 0x048, 2 },	/* write */
-	[NITIO_G1_INPUT_SEL]		= { 0x04a, 2 },	/* write */
-	[NITIO_G0_AUTO_INC]		= { 0x088, 2 },	/* write */
-	[NITIO_G1_AUTO_INC]		= { 0x08a, 2 },	/* write */
-	[NITIO_G01_RESET]		= { 0x090, 2 },	/* write */
-	[NITIO_G0_INT_ENA]		= { 0x092, 2 },	/* write */
-	[NITIO_G1_INT_ENA]		= { 0x096, 2 },	/* write */
-	[NITIO_G0_CNT_MODE]		= { 0x0b0, 2 },	/* write */
-	[NITIO_G1_CNT_MODE]		= { 0x0b2, 2 },	/* write */
-	[NITIO_G0_GATE2]		= { 0x0b4, 2 },	/* write */
-	[NITIO_G1_GATE2]		= { 0x0b6, 2 },	/* write */
-	[NITIO_G0_DMA_CFG]		= { 0x0b8, 2 },	/* write */
-	[NITIO_G0_DMA_STATUS]		= { 0x0b8, 2 },	/* read */
-	[NITIO_G1_DMA_CFG]		= { 0x0ba, 2 },	/* write */
-	[NITIO_G1_DMA_STATUS]		= { 0x0ba, 2 },	/* read */
-	[NITIO_G2_INT_ACK]		= { 0x104, 2 },	/* write */
-	[NITIO_G2_STATUS]		= { 0x104, 2 },	/* read */
-	[NITIO_G3_INT_ACK]		= { 0x106, 2 },	/* write */
-	[NITIO_G3_STATUS]		= { 0x106, 2 },	/* read */
-	[NITIO_G23_STATUS]		= { 0x108, 2 },	/* read */
-	[NITIO_G2_CMD]			= { 0x10c, 2 },	/* write */
-	[NITIO_G3_CMD]			= { 0x10e, 2 },	/* write */
-	[NITIO_G2_HW_SAVE]		= { 0x110, 4 },	/* read */
-	[NITIO_G3_HW_SAVE]		= { 0x114, 4 },	/* read */
-	[NITIO_G2_SW_SAVE]		= { 0x118, 4 },	/* read */
-	[NITIO_G3_SW_SAVE]		= { 0x11c, 4 },	/* read */
-	[NITIO_G2_MODE]			= { 0x134, 2 },	/* write */
-	[NITIO_G23_STATUS1]		= { 0x136, 2 },	/* read */
-	[NITIO_G3_MODE]			= { 0x136, 2 },	/* write */
-	[NITIO_G2_LOADA]		= { 0x138, 4 },	/* write */
-	[NITIO_G23_STATUS2]		= { 0x13a, 2 },	/* read */
-	[NITIO_G2_LOADB]		= { 0x13c, 4 },	/* write */
-	[NITIO_G3_LOADA]		= { 0x140, 4 },	/* write */
-	[NITIO_G3_LOADB]		= { 0x144, 4 },	/* write */
-	[NITIO_G2_INPUT_SEL]		= { 0x148, 2 },	/* write */
-	[NITIO_G3_INPUT_SEL]		= { 0x14a, 2 },	/* write */
-	[NITIO_G2_AUTO_INC]		= { 0x188, 2 },	/* write */
-	[NITIO_G3_AUTO_INC]		= { 0x18a, 2 },	/* write */
-	[NITIO_G23_RESET]		= { 0x190, 2 },	/* write */
-	[NITIO_G2_INT_ENA]		= { 0x192, 2 },	/* write */
-	[NITIO_G3_INT_ENA]		= { 0x196, 2 },	/* write */
-	[NITIO_G2_CNT_MODE]		= { 0x1b0, 2 },	/* write */
-	[NITIO_G3_CNT_MODE]		= { 0x1b2, 2 },	/* write */
-	[NITIO_G2_GATE2]		= { 0x1b4, 2 },	/* write */
-	[NITIO_G3_GATE2]		= { 0x1b6, 2 },	/* write */
-	[NITIO_G2_DMA_CFG]		= { 0x1b8, 2 },	/* write */
-	[NITIO_G2_DMA_STATUS]		= { 0x1b8, 2 },	/* read */
-	[NITIO_G3_DMA_CFG]		= { 0x1ba, 2 },	/* write */
-	[NITIO_G3_DMA_STATUS]		= { 0x1ba, 2 },	/* read */
-	[NI660X_DIO32_INPUT]		= { 0x414, 4 },	/* read */
-	[NI660X_DIO32_OUTPUT]		= { 0x510, 4 },	/* write */
-	[NI660X_CLK_CFG]		= { 0x73c, 4 },	/* write */
-	[NI660X_GLOBAL_INT_STATUS]	= { 0x754, 4 },	/* read */
-	[NI660X_DMA_CFG]		= { 0x76c, 4 },	/* write */
-	[NI660X_GLOBAL_INT_CFG]		= { 0x770, 4 },	/* write */
-	[NI660X_IO_CFG_0_1]		= { 0x77c, 2 },	/* read/write */
-	[NI660X_IO_CFG_2_3]		= { 0x77e, 2 },	/* read/write */
-	[NI660X_IO_CFG_4_5]		= { 0x780, 2 },	/* read/write */
-	[NI660X_IO_CFG_6_7]		= { 0x782, 2 },	/* read/write */
-	[NI660X_IO_CFG_8_9]		= { 0x784, 2 },	/* read/write */
-	[NI660X_IO_CFG_10_11]		= { 0x786, 2 },	/* read/write */
-	[NI660X_IO_CFG_12_13]		= { 0x788, 2 },	/* read/write */
-	[NI660X_IO_CFG_14_15]		= { 0x78a, 2 },	/* read/write */
-	[NI660X_IO_CFG_16_17]		= { 0x78c, 2 },	/* read/write */
-	[NI660X_IO_CFG_18_19]		= { 0x78e, 2 },	/* read/write */
-	[NI660X_IO_CFG_20_21]		= { 0x790, 2 },	/* read/write */
-	[NI660X_IO_CFG_22_23]		= { 0x792, 2 },	/* read/write */
-	[NI660X_IO_CFG_24_25]		= { 0x794, 2 },	/* read/write */
-	[NI660X_IO_CFG_26_27]		= { 0x796, 2 },	/* read/write */
-	[NI660X_IO_CFG_28_29]		= { 0x798, 2 },	/* read/write */
-	[NI660X_IO_CFG_30_31]		= { 0x79a, 2 },	/* read/write */
-	[NI660X_IO_CFG_32_33]		= { 0x79c, 2 },	/* read/write */
-	[NI660X_IO_CFG_34_35]		= { 0x79e, 2 },	/* read/write */
-	[NI660X_IO_CFG_36_37]		= { 0x7a0, 2 },	/* read/write */
-	[NI660X_IO_CFG_38_39]		= { 0x7a2, 2 }	/* read/write */
+	[NITIO_G0_INT_ACK] = { 0x004, 2 },	/* write */
+	[NITIO_G0_STATUS] = { 0x004, 2 },	/* read */
+	[NITIO_G1_INT_ACK] = { 0x006, 2 },	/* write */
+	[NITIO_G1_STATUS] = { 0x006, 2 },	/* read */
+	[NITIO_G01_STATUS] = { 0x008, 2 },	/* read */
+	[NITIO_G0_CMD] = { 0x00c, 2 },	/* write */
+	[NI660X_STC_DIO_PARALLEL_INPUT] = { 0x00e, 2 },	/* read */
+	[NITIO_G1_CMD] = { 0x00e, 2 },	/* write */
+	[NITIO_G0_HW_SAVE] = { 0x010, 4 },	/* read */
+	[NITIO_G1_HW_SAVE] = { 0x014, 4 },	/* read */
+	[NI660X_STC_DIO_OUTPUT] = { 0x014, 2 },	/* write */
+	[NI660X_STC_DIO_CONTROL] = { 0x016, 2 },	/* write */
+	[NITIO_G0_SW_SAVE] = { 0x018, 4 },	/* read */
+	[NITIO_G1_SW_SAVE] = { 0x01c, 4 },	/* read */
+	[NITIO_G0_MODE] = { 0x034, 2 },	/* write */
+	[NITIO_G01_STATUS1] = { 0x036, 2 },	/* read */
+	[NITIO_G1_MODE] = { 0x036, 2 },	/* write */
+	[NI660X_STC_DIO_SERIAL_INPUT] = { 0x038, 2 },	/* read */
+	[NITIO_G0_LOADA] = { 0x038, 4 },	/* write */
+	[NITIO_G01_STATUS2] = { 0x03a, 2 },	/* read */
+	[NITIO_G0_LOADB] = { 0x03c, 4 },	/* write */
+	[NITIO_G1_LOADA] = { 0x040, 4 },	/* write */
+	[NITIO_G1_LOADB] = { 0x044, 4 },	/* write */
+	[NITIO_G0_INPUT_SEL] = { 0x048, 2 },	/* write */
+	[NITIO_G1_INPUT_SEL] = { 0x04a, 2 },	/* write */
+	[NITIO_G0_AUTO_INC] = { 0x088, 2 },	/* write */
+	[NITIO_G1_AUTO_INC] = { 0x08a, 2 },	/* write */
+	[NITIO_G01_RESET] = { 0x090, 2 },	/* write */
+	[NITIO_G0_INT_ENA] = { 0x092, 2 },	/* write */
+	[NITIO_G1_INT_ENA] = { 0x096, 2 },	/* write */
+	[NITIO_G0_CNT_MODE] = { 0x0b0, 2 },	/* write */
+	[NITIO_G1_CNT_MODE] = { 0x0b2, 2 },	/* write */
+	[NITIO_G0_GATE2] = { 0x0b4, 2 },	/* write */
+	[NITIO_G1_GATE2] = { 0x0b6, 2 },	/* write */
+	[NITIO_G0_DMA_CFG] = { 0x0b8, 2 },	/* write */
+	[NITIO_G0_DMA_STATUS] = { 0x0b8, 2 },	/* read */
+	[NITIO_G1_DMA_CFG] = { 0x0ba, 2 },	/* write */
+	[NITIO_G1_DMA_STATUS] = { 0x0ba, 2 },	/* read */
+	[NITIO_G2_INT_ACK] = { 0x104, 2 },	/* write */
+	[NITIO_G2_STATUS] = { 0x104, 2 },	/* read */
+	[NITIO_G3_INT_ACK] = { 0x106, 2 },	/* write */
+	[NITIO_G3_STATUS] = { 0x106, 2 },	/* read */
+	[NITIO_G23_STATUS] = { 0x108, 2 },	/* read */
+	[NITIO_G2_CMD] = { 0x10c, 2 },	/* write */
+	[NITIO_G3_CMD] = { 0x10e, 2 },	/* write */
+	[NITIO_G2_HW_SAVE] = { 0x110, 4 },	/* read */
+	[NITIO_G3_HW_SAVE] = { 0x114, 4 },	/* read */
+	[NITIO_G2_SW_SAVE] = { 0x118, 4 },	/* read */
+	[NITIO_G3_SW_SAVE] = { 0x11c, 4 },	/* read */
+	[NITIO_G2_MODE] = { 0x134, 2 },	/* write */
+	[NITIO_G23_STATUS1] = { 0x136, 2 },	/* read */
+	[NITIO_G3_MODE] = { 0x136, 2 },	/* write */
+	[NITIO_G2_LOADA] = { 0x138, 4 },	/* write */
+	[NITIO_G23_STATUS2] = { 0x13a, 2 },	/* read */
+	[NITIO_G2_LOADB] = { 0x13c, 4 },	/* write */
+	[NITIO_G3_LOADA] = { 0x140, 4 },	/* write */
+	[NITIO_G3_LOADB] = { 0x144, 4 },	/* write */
+	[NITIO_G2_INPUT_SEL] = { 0x148, 2 },	/* write */
+	[NITIO_G3_INPUT_SEL] = { 0x14a, 2 },	/* write */
+	[NITIO_G2_AUTO_INC] = { 0x188, 2 },	/* write */
+	[NITIO_G3_AUTO_INC] = { 0x18a, 2 },	/* write */
+	[NITIO_G23_RESET] = { 0x190, 2 },	/* write */
+	[NITIO_G2_INT_ENA] = { 0x192, 2 },	/* write */
+	[NITIO_G3_INT_ENA] = { 0x196, 2 },	/* write */
+	[NITIO_G2_CNT_MODE] = { 0x1b0, 2 },	/* write */
+	[NITIO_G3_CNT_MODE] = { 0x1b2, 2 },	/* write */
+	[NITIO_G2_GATE2] = { 0x1b4, 2 },	/* write */
+	[NITIO_G3_GATE2] = { 0x1b6, 2 },	/* write */
+	[NITIO_G2_DMA_CFG] = { 0x1b8, 2 },	/* write */
+	[NITIO_G2_DMA_STATUS] = { 0x1b8, 2 },	/* read */
+	[NITIO_G3_DMA_CFG] = { 0x1ba, 2 },	/* write */
+	[NITIO_G3_DMA_STATUS] = { 0x1ba, 2 },	/* read */
+	[NI660X_DIO32_INPUT] = { 0x414, 4 },	/* read */
+	[NI660X_DIO32_OUTPUT] = { 0x510, 4 },	/* write */
+	[NI660X_CLK_CFG] = { 0x73c, 4 },	/* write */
+	[NI660X_GLOBAL_INT_STATUS] = { 0x754, 4 },	/* read */
+	[NI660X_DMA_CFG] = { 0x76c, 4 },	/* write */
+	[NI660X_GLOBAL_INT_CFG] = { 0x770, 4 },	/* write */
+	[NI660X_IO_CFG_0_1] = { 0x77c, 2 },	/* read/write */
+	[NI660X_IO_CFG_2_3] = { 0x77e, 2 },	/* read/write */
+	[NI660X_IO_CFG_4_5] = { 0x780, 2 },	/* read/write */
+	[NI660X_IO_CFG_6_7] = { 0x782, 2 },	/* read/write */
+	[NI660X_IO_CFG_8_9] = { 0x784, 2 },	/* read/write */
+	[NI660X_IO_CFG_10_11] = { 0x786, 2 },	/* read/write */
+	[NI660X_IO_CFG_12_13] = { 0x788, 2 },	/* read/write */
+	[NI660X_IO_CFG_14_15] = { 0x78a, 2 },	/* read/write */
+	[NI660X_IO_CFG_16_17] = { 0x78c, 2 },	/* read/write */
+	[NI660X_IO_CFG_18_19] = { 0x78e, 2 },	/* read/write */
+	[NI660X_IO_CFG_20_21] = { 0x790, 2 },	/* read/write */
+	[NI660X_IO_CFG_22_23] = { 0x792, 2 },	/* read/write */
+	[NI660X_IO_CFG_24_25] = { 0x794, 2 },	/* read/write */
+	[NI660X_IO_CFG_26_27] = { 0x796, 2 },	/* read/write */
+	[NI660X_IO_CFG_28_29] = { 0x798, 2 },	/* read/write */
+	[NI660X_IO_CFG_30_31] = { 0x79a, 2 },	/* read/write */
+	[NI660X_IO_CFG_32_33] = { 0x79c, 2 },	/* read/write */
+	[NI660X_IO_CFG_34_35] = { 0x79e, 2 },	/* read/write */
+	[NI660X_IO_CFG_36_37] = { 0x7a0, 2 },	/* read/write */
+	[NI660X_IO_CFG_38_39] = { 0x7a2, 2 }	/* read/write */
 };
 
 #define NI660X_CHIP_OFFSET		0x800
@@ -215,33 +215,33 @@ struct ni_660x_board {
 
 static const struct ni_660x_board ni_660x_boards[] = {
 	[BOARD_PCI6601] = {
-		.name		= "PCI-6601",
-		.n_chips	= 1,
-	},
+			   .name = "PCI-6601",
+			   .n_chips = 1,
+			    },
 	[BOARD_PCI6602] = {
-		.name		= "PCI-6602",
-		.n_chips	= 2,
-	},
+			   .name = "PCI-6602",
+			   .n_chips = 2,
+			    },
 	[BOARD_PXI6602] = {
-		.name		= "PXI-6602",
-		.n_chips	= 2,
-	},
+			   .name = "PXI-6602",
+			   .n_chips = 2,
+			    },
 	[BOARD_PCI6608] = {
-		.name		= "PCI-6608",
-		.n_chips	= 2,
-	},
+			   .name = "PCI-6608",
+			   .n_chips = 2,
+			    },
 	[BOARD_PXI6608] = {
-		.name		= "PXI-6608",
-		.n_chips	= 2,
-	},
+			   .name = "PXI-6608",
+			   .n_chips = 2,
+			    },
 	[BOARD_PCI6624] = {
-		.name		= "PCI-6624",
-		.n_chips	= 2,
-	},
+			   .name = "PCI-6624",
+			   .n_chips = 2,
+			    },
 	[BOARD_PXI6624] = {
-		.name		= "PXI-6624",
-		.n_chips	= 2,
-	},
+			   .name = "PXI-6624",
+			   .n_chips = 2,
+			    },
 };
 
 #define NI660X_NUM_PFI_CHANNELS		40
@@ -272,7 +272,7 @@ static void ni_660x_write(struct comedi_device *dev, unsigned int chip,
 			  unsigned int bits, unsigned int reg)
 {
 	unsigned int addr = (chip * NI660X_CHIP_OFFSET) +
-			    ni_660x_reg_data[reg].offset;
+	    ni_660x_reg_data[reg].offset;
 
 	if (ni_660x_reg_data[reg].size == 2)
 		writew(bits, dev->mmio + addr);
@@ -284,7 +284,7 @@ static unsigned int ni_660x_read(struct comedi_device *dev,
 				 unsigned int chip, unsigned int reg)
 {
 	unsigned int addr = (chip * NI660X_CHIP_OFFSET) +
-			    ni_660x_reg_data[reg].offset;
+	    ni_660x_reg_data[reg].offset;
 
 	if (ni_660x_reg_data[reg].size == 2)
 		return readw(dev->mmio + addr);
@@ -318,8 +318,7 @@ static inline void ni_660x_set_dma_channel(struct comedi_device *dev,
 	devpriv->dma_cfg[chip] |= NI660X_DMA_CFG_SEL(mite_channel,
 						     counter->counter_index);
 	ni_660x_write(dev, chip, devpriv->dma_cfg[chip] |
-		      NI660X_DMA_CFG_RESET(mite_channel),
-		      NI660X_DMA_CFG);
+		      NI660X_DMA_CFG_RESET(mite_channel), NI660X_DMA_CFG);
 }
 
 static inline void ni_660x_unset_dma_channel(struct comedi_device *dev,
@@ -530,8 +529,7 @@ static void ni_660x_free_mite_rings(struct comedi_device *dev)
 
 static int ni_660x_dio_insn_bits(struct comedi_device *dev,
 				 struct comedi_subdevice *s,
-				 struct comedi_insn *insn,
-				 unsigned int *data)
+				 struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int shift = CR_CHAN(insn->chanspec);
 	unsigned int mask = data[0] << shift;
@@ -587,7 +585,7 @@ static void ni_660x_select_pfi_output(struct comedi_device *dev,
 		/* set the pfi channel to high-z on the inactive chip */
 		bits = ni_660x_read(dev, idle_chip, NI660X_IO_CFG(chan));
 		bits &= ~NI660X_IO_CFG_OUT_SEL_MASK(chan);
-		bits |= NI660X_IO_CFG_OUT_SEL(chan, 0);		/* high-z */
+		bits |= NI660X_IO_CFG_OUT_SEL(chan, 0);	/* high-z */
 		ni_660x_write(dev, idle_chip, bits, NI660X_IO_CFG(chan));
 	}
 
@@ -599,8 +597,7 @@ static void ni_660x_select_pfi_output(struct comedi_device *dev,
 }
 
 static void ni_660x_set_pfi_direction(struct comedi_device *dev,
-				      unsigned int chan,
-				      unsigned int direction)
+				      unsigned int chan, unsigned int direction)
 {
 	struct ni_660x_private *devpriv = dev->private;
 	u64 bit;
@@ -693,8 +690,7 @@ static void ni_660x_set_pfi_filter(struct comedi_device *dev,
 
 static int ni_660x_dio_insn_config(struct comedi_device *dev,
 				   struct comedi_subdevice *s,
-				   struct comedi_insn *insn,
-				   unsigned int *data)
+				   struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 	int ret;
@@ -767,18 +763,18 @@ static inline int get_output_select_source(int dest, struct comedi_device *dev)
 		 * The following can be enabled when RTSI routing info is
 		 * determined (not currently documented):
 		 * if (ni_get_rtsi_direction(dev, dest) == COMEDI_OUTPUT) {
-		 *	reg = ni_get_rtsi_routing(dev, dest);
+		 *      reg = ni_get_rtsi_routing(dev, dest);
 
-		 *	if (reg == NI_RTSI_OUTPUT_RGOUT0) {
-		 *		dest = NI_RGOUT0; ** prepare for lookup below **
-		 *		reg = get_rgout0_reg(dev);
-		 *	} else if (reg >= NI_RTSI_OUTPUT_RTSI_BRD(0) &&
-		 *		   reg <= NI_RTSI_OUTPUT_RTSI_BRD(3)) {
-		 *		const int i = reg - NI_RTSI_OUTPUT_RTSI_BRD(0);
+		 *      if (reg == NI_RTSI_OUTPUT_RGOUT0) {
+		 *              dest = NI_RGOUT0; ** prepare for lookup below **
+		 *              reg = get_rgout0_reg(dev);
+		 *      } else if (reg >= NI_RTSI_OUTPUT_RTSI_BRD(0) &&
+		 *                 reg <= NI_RTSI_OUTPUT_RTSI_BRD(3)) {
+		 *              const int i = reg - NI_RTSI_OUTPUT_RTSI_BRD(0);
 
-		 *		dest = NI_RTSI_BRD(i); ** prepare for lookup **
-		 *		reg = get_ith_rtsi_brd_reg(i, dev);
-		 *	}
+		 *              dest = NI_RTSI_BRD(i); ** prepare for lookup **
+		 *              reg = get_ith_rtsi_brd_reg(i, dev);
+		 *      }
 		 * }
 		 */
 	} else if (channel_is_ctr(dest)) {
@@ -852,20 +848,20 @@ static inline int connect_route(unsigned int src, unsigned int dest,
 		 * The following can be enabled when RTSI routing info is
 		 * determined (not currently documented):
 		 * if (reg == NI_RTSI_OUTPUT_RGOUT0) {
-		 *	int ret = incr_rgout0_src_use(src, dev);
+		 *      int ret = incr_rgout0_src_use(src, dev);
 
-		 *	if (ret < 0)
-		 *		return ret;
+		 *      if (ret < 0)
+		 *              return ret;
 		 * } else if (ni_rtsi_route_requires_mux(reg)) {
-		 *	** Attempt to allocate and  route (src->brd) **
-		 *	int brd = incr_rtsi_brd_src_use(src, dev);
+		 *      ** Attempt to allocate and  route (src->brd) **
+		 *      int brd = incr_rtsi_brd_src_use(src, dev);
 
-		 *	if (brd < 0)
-		 *		return brd;
+		 *      if (brd < 0)
+		 *              return brd;
 
-		 *	** Now lookup the register value for (brd->dest) **
-		 *	reg = ni_lookup_route_register(brd, CR_CHAN(dest),
-		 *				       &devpriv->routing_tables);
+		 *      ** Now lookup the register value for (brd->dest) **
+		 *      reg = ni_lookup_route_register(brd, CR_CHAN(dest),
+		 *                                     &devpriv->routing_tables);
 		 * }
 
 		 * ni_set_rtsi_direction(dev, dest, COMEDI_OUTPUT);
@@ -901,8 +897,7 @@ static inline int disconnect_route(unsigned int src, unsigned int dest,
 	/* The route is valid and is connected.  Now disconnect... */
 	if (channel_is_pfi(CR_CHAN(dest))) {
 		unsigned int source = ((CR_CHAN(dest) - NI_PFI(0)) < 8)
-					? NI_660X_PFI_OUTPUT_DIO
-					: NI_660X_PFI_OUTPUT_COUNTER;
+		    ? NI_660X_PFI_OUTPUT_DIO : NI_660X_PFI_OUTPUT_COUNTER;
 
 		/* set the pfi to high impedance, and disconnect */
 		ni_660x_set_pfi_direction(dev, dest, COMEDI_INPUT);
@@ -915,21 +910,21 @@ static inline int disconnect_route(unsigned int src, unsigned int dest,
 		 * The following can be enabled when RTSI routing info is
 		 * determined (not currently documented):
 		 * if (reg == NI_RTSI_OUTPUT_RGOUT0) {
-		 *	int ret = decr_rgout0_src_use(src, dev);
+		 *      int ret = decr_rgout0_src_use(src, dev);
 
-		 *	if (ret < 0)
-		 *		return ret;
+		 *      if (ret < 0)
+		 *              return ret;
 		 * } else if (ni_rtsi_route_requires_mux(reg)) {
-		 *	** find which RTSI_BRD line is source for rtsi pin **
-		 *	int brd = ni_find_route_source(
-		 *		ni_get_rtsi_routing(dev, dest), CR_CHAN(dest),
-		 *		&devpriv->routing_tables);
+		 *      ** find which RTSI_BRD line is source for rtsi pin **
+		 *      int brd = ni_find_route_source(
+		 *              ni_get_rtsi_routing(dev, dest), CR_CHAN(dest),
+		 *              &devpriv->routing_tables);
 
-		 *	if (brd < 0)
-		 *		return brd;
+		 *      if (brd < 0)
+		 *              return brd;
 
-		 *	** decrement/disconnect RTSI_BRD line from source **
-		 *	decr_rtsi_brd_src_use(src, brd, dev);
+		 *      ** decrement/disconnect RTSI_BRD line from source **
+		 *      decr_rtsi_brd_src_use(src, brd, dev);
 		 * }
 
 		 * ** set rtsi output selector to default state **
@@ -946,8 +941,7 @@ static inline int disconnect_route(unsigned int src, unsigned int dest,
 }
 
 static int ni_global_insn_config(struct comedi_device *dev,
-				 struct comedi_insn *insn,
-				 unsigned int *data)
+				 struct comedi_insn *insn, unsigned int *data)
 {
 	switch (data[0]) {
 	case INSN_DEVICE_CONFIG_TEST_ROUTE:
@@ -957,10 +951,10 @@ static int ni_global_insn_config(struct comedi_device *dev,
 		return connect_route(data[1], data[2], dev);
 	case INSN_DEVICE_CONFIG_DISCONNECT_ROUTE:
 		return disconnect_route(data[1], data[2], dev);
-	/*
-	 * This case is already handled one level up.
-	 * case INSN_DEVICE_CONFIG_GET_ROUTES:
-	 */
+		/*
+		 * This case is already handled one level up.
+		 * case INSN_DEVICE_CONFIG_GET_ROUTES:
+		 */
 	default:
 		return -EINVAL;
 	}
@@ -994,8 +988,7 @@ static void ni_660x_init_tio_chips(struct comedi_device *dev,
 	}
 }
 
-static int ni_660x_auto_attach(struct comedi_device *dev,
-			       unsigned long context)
+static int ni_660x_auto_attach(struct comedi_device *dev, unsigned long context)
 {
 	struct pci_dev *pcidev = comedi_to_pci_dev(dev);
 	const struct ni_660x_board *board = NULL;
@@ -1024,7 +1017,7 @@ static int ni_660x_auto_attach(struct comedi_device *dev,
 		return ret;
 	devpriv = dev->private;
 
-	devpriv->mite = mite_attach(dev, true);		/* use win1 */
+	devpriv->mite = mite_attach(dev, true);	/* use win1 */
 	if (!devpriv->mite)
 		return -ENOMEM;
 
@@ -1037,9 +1030,11 @@ static int ni_660x_auto_attach(struct comedi_device *dev,
 	/* prepare the device for globally-named routes. */
 	if (ni_assign_device_routes("ni_660x", board->name, NULL,
 				    &devpriv->routing_tables) < 0) {
-		dev_warn(dev->class_dev, "%s: %s device has no signal routing table.\n",
+		dev_warn(dev->class_dev,
+			 "%s: %s device has no signal routing table.\n",
 			 __func__, board->name);
-		dev_warn(dev->class_dev, "%s: High level NI signal names will not be available for this %s board.\n",
+		dev_warn(dev->class_dev,
+			 "%s: High level NI signal names will not be available for this %s board.\n",
 			 __func__, board->name);
 	} else {
 		/*
@@ -1081,70 +1076,70 @@ static int ni_660x_auto_attach(struct comedi_device *dev,
 	 * Counter 0-3 signals are from the first TIO chip.
 	 * Counter 4-7 signals are from the second TIO chip.
 	 *
-	 * Comedi	External
-	 * PFI Chan	DIO Chan        Counter Signal
-	 * -------	--------	--------------
-	 *     0	    0
-	 *     1	    1
-	 *     2	    2
-	 *     3	    3
-	 *     4	    4
-	 *     5	    5
-	 *     6	    6
-	 *     7	    7
-	 *     8	    8		CTR 7 OUT
-	 *     9	    9		CTR 7 AUX
-	 *    10	   10		CTR 7 GATE
-	 *    11	   11		CTR 7 SOURCE
-	 *    12	   12		CTR 6 OUT
-	 *    13	   13		CTR 6 AUX
-	 *    14	   14		CTR 6 GATE
-	 *    15	   15		CTR 6 SOURCE
-	 *    16	   16		CTR 5 OUT
-	 *    17	   17		CTR 5 AUX
-	 *    18	   18		CTR 5 GATE
-	 *    19	   19		CTR 5 SOURCE
-	 *    20	   20		CTR 4 OUT
-	 *    21	   21		CTR 4 AUX
-	 *    22	   22		CTR 4 GATE
-	 *    23	   23		CTR 4 SOURCE
-	 *    24	   24		CTR 3 OUT
-	 *    25	   25		CTR 3 AUX
-	 *    26	   26		CTR 3 GATE
-	 *    27	   27		CTR 3 SOURCE
-	 *    28	   28		CTR 2 OUT
-	 *    29	   29		CTR 2 AUX
-	 *    30	   30		CTR 2 GATE
-	 *    31	   31		CTR 2 SOURCE
-	 *    32			CTR 1 OUT
-	 *    33			CTR 1 AUX
-	 *    34			CTR 1 GATE
-	 *    35			CTR 1 SOURCE
-	 *    36			CTR 0 OUT
-	 *    37			CTR 0 AUX
-	 *    38			CTR 0 GATE
-	 *    39			CTR 0 SOURCE
+	 * Comedi       External
+	 * PFI Chan     DIO Chan        Counter Signal
+	 * -------      --------        --------------
+	 *     0            0
+	 *     1            1
+	 *     2            2
+	 *     3            3
+	 *     4            4
+	 *     5            5
+	 *     6            6
+	 *     7            7
+	 *     8            8           CTR 7 OUT
+	 *     9            9           CTR 7 AUX
+	 *    10           10           CTR 7 GATE
+	 *    11           11           CTR 7 SOURCE
+	 *    12           12           CTR 6 OUT
+	 *    13           13           CTR 6 AUX
+	 *    14           14           CTR 6 GATE
+	 *    15           15           CTR 6 SOURCE
+	 *    16           16           CTR 5 OUT
+	 *    17           17           CTR 5 AUX
+	 *    18           18           CTR 5 GATE
+	 *    19           19           CTR 5 SOURCE
+	 *    20           20           CTR 4 OUT
+	 *    21           21           CTR 4 AUX
+	 *    22           22           CTR 4 GATE
+	 *    23           23           CTR 4 SOURCE
+	 *    24           24           CTR 3 OUT
+	 *    25           25           CTR 3 AUX
+	 *    26           26           CTR 3 GATE
+	 *    27           27           CTR 3 SOURCE
+	 *    28           28           CTR 2 OUT
+	 *    29           29           CTR 2 AUX
+	 *    30           30           CTR 2 GATE
+	 *    31           31           CTR 2 SOURCE
+	 *    32                        CTR 1 OUT
+	 *    33                        CTR 1 AUX
+	 *    34                        CTR 1 GATE
+	 *    35                        CTR 1 SOURCE
+	 *    36                        CTR 0 OUT
+	 *    37                        CTR 0 AUX
+	 *    38                        CTR 0 GATE
+	 *    39                        CTR 0 SOURCE
 	 */
 	s = &dev->subdevices[subdev++];
-	s->type		= COMEDI_SUBD_DIO;
-	s->subdev_flags	= SDF_READABLE | SDF_WRITABLE;
-	s->n_chan	= NI660X_NUM_PFI_CHANNELS;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_bits	= ni_660x_dio_insn_bits;
-	s->insn_config	= ni_660x_dio_insn_config;
+	s->type = COMEDI_SUBD_DIO;
+	s->subdev_flags = SDF_READABLE | SDF_WRITABLE;
+	s->n_chan = NI660X_NUM_PFI_CHANNELS;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_bits = ni_660x_dio_insn_bits;
+	s->insn_config = ni_660x_dio_insn_config;
 
-	 /*
-	  * Default the DIO channels as:
-	  *   chan 0-7:  DIO inputs
-	  *   chan 8-39: counter signal inputs
-	  */
+	/*
+	 * Default the DIO channels as:
+	 *   chan 0-7:  DIO inputs
+	 *   chan 8-39: counter signal inputs
+	 */
 	for (i = 0; i < s->n_chan; ++i) {
 		unsigned int source = (i < 8) ? NI_660X_PFI_OUTPUT_DIO
-					      : NI_660X_PFI_OUTPUT_COUNTER;
+		    : NI_660X_PFI_OUTPUT_COUNTER;
 
 		ni_660x_set_pfi_routing(dev, i, source);
-		ni_660x_set_pfi_direction(dev, i, COMEDI_INPUT);/* high-z */
+		ni_660x_set_pfi_direction(dev, i, COMEDI_INPUT);	/* high-z */
 	}
 
 	/* Counter subdevices (4 NI TIO General Purpose Counters per chip) */
@@ -1153,26 +1148,26 @@ static int ni_660x_auto_attach(struct comedi_device *dev,
 		if (i < n_counters) {
 			struct ni_gpct *counter = &gpct_dev->counters[i];
 
-			s->type		= COMEDI_SUBD_COUNTER;
-			s->subdev_flags	= SDF_READABLE | SDF_WRITABLE |
-					  SDF_LSAMPL | SDF_CMD_READ;
-			s->n_chan	= 3;
-			s->maxdata	= 0xffffffff;
-			s->insn_read	= ni_tio_insn_read;
-			s->insn_write	= ni_tio_insn_write;
-			s->insn_config	= ni_tio_insn_config;
-			s->len_chanlist	= 1;
-			s->do_cmd	= ni_660x_cmd;
-			s->do_cmdtest	= ni_tio_cmdtest;
-			s->cancel	= ni_660x_cancel;
-			s->poll		= ni_660x_input_poll;
-			s->buf_change	= ni_660x_buf_change;
+			s->type = COMEDI_SUBD_COUNTER;
+			s->subdev_flags = SDF_READABLE | SDF_WRITABLE |
+			    SDF_LSAMPL | SDF_CMD_READ;
+			s->n_chan = 3;
+			s->maxdata = 0xffffffff;
+			s->insn_read = ni_tio_insn_read;
+			s->insn_write = ni_tio_insn_write;
+			s->insn_config = ni_tio_insn_config;
+			s->len_chanlist = 1;
+			s->do_cmd = ni_660x_cmd;
+			s->do_cmdtest = ni_tio_cmdtest;
+			s->cancel = ni_660x_cancel;
+			s->poll = ni_660x_input_poll;
+			s->buf_change = ni_660x_buf_change;
 			s->async_dma_dir = DMA_BIDIRECTIONAL;
-			s->private	= counter;
+			s->private = counter;
 
 			ni_tio_init_counter(counter);
 		} else {
-			s->type		= COMEDI_SUBD_UNUSED;
+			s->type = COMEDI_SUBD_UNUSED;
 		}
 	}
 
@@ -1218,10 +1213,10 @@ static void ni_660x_detach(struct comedi_device *dev)
 }
 
 static struct comedi_driver ni_660x_driver = {
-	.driver_name	= "ni_660x",
-	.module		= THIS_MODULE,
-	.auto_attach	= ni_660x_auto_attach,
-	.detach		= ni_660x_detach,
+	.driver_name = "ni_660x",
+	.module = THIS_MODULE,
+	.auto_attach = ni_660x_auto_attach,
+	.detach = ni_660x_detach,
 };
 
 static int ni_660x_pci_probe(struct pci_dev *dev,
@@ -1240,14 +1235,16 @@ static const struct pci_device_id ni_660x_pci_table[] = {
 	{ PCI_VDEVICE(NI, 0x1e40), BOARD_PXI6624 },
 	{ 0 }
 };
+
 MODULE_DEVICE_TABLE(pci, ni_660x_pci_table);
 
 static struct pci_driver ni_660x_pci_driver = {
-	.name		= "ni_660x",
-	.id_table	= ni_660x_pci_table,
-	.probe		= ni_660x_pci_probe,
-	.remove		= comedi_pci_auto_unconfig,
+	.name = "ni_660x",
+	.id_table = ni_660x_pci_table,
+	.probe = ni_660x_pci_probe,
+	.remove = comedi_pci_auto_unconfig,
 };
+
 module_comedi_pci_driver(ni_660x_driver, ni_660x_pci_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

@@ -43,18 +43,17 @@ struct pcmad_board_struct {
 
 static const struct pcmad_board_struct pcmad_boards[] = {
 	{
-		.name		= "pcmad12",
-		.ai_maxdata	= 0x0fff,
-	}, {
-		.name		= "pcmad16",
-		.ai_maxdata	= 0xffff,
-	},
+	 .name = "pcmad12",
+	 .ai_maxdata = 0x0fff,
+	  }, {
+	      .name = "pcmad16",
+	      .ai_maxdata = 0xffff,
+	       },
 };
 
 static int pcmad_ai_eoc(struct comedi_device *dev,
 			struct comedi_subdevice *s,
-			struct comedi_insn *insn,
-			unsigned long context)
+			struct comedi_insn *insn, unsigned long context)
 {
 	unsigned int status;
 
@@ -66,8 +65,7 @@ static int pcmad_ai_eoc(struct comedi_device *dev,
 
 static int pcmad_ai_insn_read(struct comedi_device *dev,
 			      struct comedi_subdevice *s,
-			      struct comedi_insn *insn,
-			      unsigned int *data)
+			      struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 	unsigned int range = CR_RANGE(insn->chanspec);
@@ -83,7 +81,7 @@ static int pcmad_ai_insn_read(struct comedi_device *dev,
 			return ret;
 
 		val = inb(dev->iobase + PCMAD_LSB) |
-		      (inb(dev->iobase + PCMAD_MSB) << 8);
+		    (inb(dev->iobase + PCMAD_MSB) << 8);
 
 		/* data is shifted on the pcmad12, fix it */
 		if (s->maxdata == 0x0fff)
@@ -115,33 +113,34 @@ static int pcmad_attach(struct comedi_device *dev, struct comedi_devconfig *it)
 		return ret;
 
 	s = &dev->subdevices[0];
-	s->type		= COMEDI_SUBD_AI;
+	s->type = COMEDI_SUBD_AI;
 	if (it->options[1]) {
 		/* 8 differential channels */
-		s->subdev_flags	= SDF_READABLE | AREF_DIFF;
-		s->n_chan	= 8;
+		s->subdev_flags = SDF_READABLE | AREF_DIFF;
+		s->n_chan = 8;
 	} else {
 		/* 16 single-ended channels */
-		s->subdev_flags	= SDF_READABLE | AREF_GROUND;
-		s->n_chan	= 16;
+		s->subdev_flags = SDF_READABLE | AREF_GROUND;
+		s->n_chan = 16;
 	}
-	s->len_chanlist	= 1;
-	s->maxdata	= board->ai_maxdata;
-	s->range_table	= it->options[2] ? &range_bipolar10 : &range_unipolar5;
-	s->insn_read	= pcmad_ai_insn_read;
+	s->len_chanlist = 1;
+	s->maxdata = board->ai_maxdata;
+	s->range_table = it->options[2] ? &range_bipolar10 : &range_unipolar5;
+	s->insn_read = pcmad_ai_insn_read;
 
 	return 0;
 }
 
 static struct comedi_driver pcmad_driver = {
-	.driver_name	= "pcmad",
-	.module		= THIS_MODULE,
-	.attach		= pcmad_attach,
-	.detach		= comedi_legacy_detach,
-	.board_name	= &pcmad_boards[0].name,
-	.num_names	= ARRAY_SIZE(pcmad_boards),
-	.offset		= sizeof(pcmad_boards[0]),
+	.driver_name = "pcmad",
+	.module = THIS_MODULE,
+	.attach = pcmad_attach,
+	.detach = comedi_legacy_detach,
+	.board_name = &pcmad_boards[0].name,
+	.num_names = ARRAY_SIZE(pcmad_boards),
+	.offset = sizeof(pcmad_boards[0]),
 };
+
 module_comedi_driver(pcmad_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

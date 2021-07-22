@@ -36,19 +36,18 @@ struct apci16xx_boardinfo {
 
 static const struct apci16xx_boardinfo apci16xx_boardtypes[] = {
 	[BOARD_APCI1648] = {
-		.name		= "apci1648",
-		.n_chan		= 48,		/* 2 subdevices */
-	},
+			    .name = "apci1648",
+			    .n_chan = 48,	/* 2 subdevices */
+			     },
 	[BOARD_APCI1696] = {
-		.name		= "apci1696",
-		.n_chan		= 96,		/* 3 subdevices */
-	},
+			    .name = "apci1696",
+			    .n_chan = 96,	/* 3 subdevices */
+			     },
 };
 
 static int apci16xx_insn_config(struct comedi_device *dev,
 				struct comedi_subdevice *s,
-				struct comedi_insn *insn,
-				unsigned int *data)
+				struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 	unsigned int mask;
@@ -74,8 +73,7 @@ static int apci16xx_insn_config(struct comedi_device *dev,
 
 static int apci16xx_dio_insn_bits(struct comedi_device *dev,
 				  struct comedi_subdevice *s,
-				  struct comedi_insn *insn,
-				  unsigned int *data)
+				  struct comedi_insn *insn, unsigned int *data)
 {
 	if (comedi_dio_update_state(s, data))
 		outl(s->state, dev->iobase + APCI16XX_OUT_REG(s->index));
@@ -129,16 +127,16 @@ static int apci16xx_auto_attach(struct comedi_device *dev,
 	/* Initialize the TTL digital i/o subdevices */
 	for (i = 0; i < n_subdevs; i++) {
 		s = &dev->subdevices[i];
-		s->type		= COMEDI_SUBD_DIO;
-		s->subdev_flags	= SDF_WRITABLE | SDF_READABLE;
-		s->n_chan	= ((i * 32) < board->n_chan) ? 32 : last;
-		s->maxdata	= 1;
-		s->range_table	= &range_digital;
-		s->insn_config	= apci16xx_insn_config;
-		s->insn_bits	= apci16xx_dio_insn_bits;
+		s->type = COMEDI_SUBD_DIO;
+		s->subdev_flags = SDF_WRITABLE | SDF_READABLE;
+		s->n_chan = ((i * 32) < board->n_chan) ? 32 : last;
+		s->maxdata = 1;
+		s->range_table = &range_digital;
+		s->insn_config = apci16xx_insn_config;
+		s->insn_bits = apci16xx_dio_insn_bits;
 
 		/* Default all channels to inputs */
-		s->io_bits	= 0;
+		s->io_bits = 0;
 		outl(s->io_bits, dev->iobase + APCI16XX_DIR_REG(i));
 	}
 
@@ -146,10 +144,10 @@ static int apci16xx_auto_attach(struct comedi_device *dev,
 }
 
 static struct comedi_driver apci16xx_driver = {
-	.driver_name	= "addi_apci_16xx",
-	.module		= THIS_MODULE,
-	.auto_attach	= apci16xx_auto_attach,
-	.detach		= comedi_pci_detach,
+	.driver_name = "addi_apci_16xx",
+	.module = THIS_MODULE,
+	.auto_attach = apci16xx_auto_attach,
+	.detach = comedi_pci_detach,
 };
 
 static int apci16xx_pci_probe(struct pci_dev *dev,
@@ -163,14 +161,16 @@ static const struct pci_device_id apci16xx_pci_table[] = {
 	{ PCI_VDEVICE(ADDIDATA, 0x100a), BOARD_APCI1696 },
 	{ 0 }
 };
+
 MODULE_DEVICE_TABLE(pci, apci16xx_pci_table);
 
 static struct pci_driver apci16xx_pci_driver = {
-	.name		= "addi_apci_16xx",
-	.id_table	= apci16xx_pci_table,
-	.probe		= apci16xx_pci_probe,
-	.remove		= comedi_pci_auto_unconfig,
+	.name = "addi_apci_16xx",
+	.id_table = apci16xx_pci_table,
+	.probe = apci16xx_pci_probe,
+	.remove = comedi_pci_auto_unconfig,
 };
+
 module_comedi_pci_driver(apci16xx_driver, apci16xx_pci_driver);
 
 MODULE_DESCRIPTION("ADDI-DATA APCI-1648/1696, TTL I/O boards");

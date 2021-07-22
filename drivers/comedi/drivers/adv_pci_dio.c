@@ -39,20 +39,20 @@
 #define PCI173X_INT_FLAG_REG	0x0010	/* R: status */
 #define PCI173X_INT_CLR_REG	0x0010	/* W: clear */
 
-#define PCI173X_INT_IDI0 0x01  /* IDI0 edge occurred */
-#define PCI173X_INT_IDI1 0x02  /* IDI1 edge occurred */
-#define PCI173X_INT_DI0  0x04  /* DI0 edge occurred */
-#define PCI173X_INT_DI1  0x08  /* DI1 edge occurred */
+#define PCI173X_INT_IDI0 0x01	/* IDI0 edge occurred */
+#define PCI173X_INT_IDI1 0x02	/* IDI1 edge occurred */
+#define PCI173X_INT_DI0  0x04	/* DI0 edge occurred */
+#define PCI173X_INT_DI1  0x08	/* DI1 edge occurred */
 
 /* PCI-1739U, PCI-1750, PCI1751 interrupt control registers */
 #define PCI1750_INT_REG		0x20	/* R/W: status/control */
 
 /* PCI-1753, PCI-1753E interrupt control registers */
-#define PCI1753_INT_REG(x)	(0x10 + (x)) /* R/W: control group 0 to 3 */
-#define PCI1753E_INT_REG(x)	(0x30 + (x)) /* R/W: control group 0 to 3 */
+#define PCI1753_INT_REG(x)	(0x10 + (x))	/* R/W: control group 0 to 3 */
+#define PCI1753E_INT_REG(x)	(0x30 + (x))	/* R/W: control group 0 to 3 */
 
 /* PCI-1754, PCI-1756 interrupt control registers */
-#define PCI1754_INT_REG(x)	(0x08 + (x) * 2) /* R/W: control group 0 to 3 */
+#define PCI1754_INT_REG(x)	(0x08 + (x) * 2)	/* R/W: control group 0 to 3 */
 
 /* PCI-1752, PCI-1756 special registers */
 #define PCI1752_CFC_REG		0x12	/* R/W: channel freeze function */
@@ -95,8 +95,8 @@ struct diosubd_data {
 };
 
 struct dio_irq_subd_data {
-	unsigned short int_en;		/* interrupt enable/status bit */
-	unsigned long addr;		/* PCI address offset */
+	unsigned short int_en;	/* interrupt enable/status bit */
+	unsigned long addr;	/* PCI address offset */
 };
 
 struct dio_boardtype {
@@ -113,114 +113,114 @@ struct dio_boardtype {
 
 static const struct dio_boardtype boardtypes[] = {
 	[TYPE_PCI1730] = {
-		.name		= "pci1730",
-		/* DI, IDI, DO, IDO, ID, IRQ_DI0, IRQ_DI1, IRQ_IDI0, IRQ_IDI1 */
-		.nsubdevs	= 9,
-		.sdi[0]		= { 16, 0x02, },	/* DI 0-15 */
-		.sdi[1]		= { 16, 0x00, },	/* ISO DI 0-15 */
-		.sdo[0]		= { 16, 0x02, },	/* DO 0-15 */
-		.sdo[1]		= { 16, 0x00, },	/* ISO DO 0-15 */
-		.id_reg		= 0x04,
-		.sdirq[0]	= { PCI173X_INT_DI0,  0x02, },	/* DI 0 */
-		.sdirq[1]	= { PCI173X_INT_DI1,  0x02, },	/* DI 1 */
-		.sdirq[2]	= { PCI173X_INT_IDI0, 0x00, },	/* ISO DI 0 */
-		.sdirq[3]	= { PCI173X_INT_IDI1, 0x00, },	/* ISO DI 1 */
-	},
+			  .name = "pci1730",
+			  /* DI, IDI, DO, IDO, ID, IRQ_DI0, IRQ_DI1, IRQ_IDI0, IRQ_IDI1 */
+			  .nsubdevs = 9,
+			  .sdi[0] = { 16, 0x02,},	/* DI 0-15 */
+			  .sdi[1] = { 16, 0x00,},	/* ISO DI 0-15 */
+			  .sdo[0] = { 16, 0x02,},	/* DO 0-15 */
+			  .sdo[1] = { 16, 0x00,},	/* ISO DO 0-15 */
+			  .id_reg = 0x04,
+			  .sdirq[0] = { PCI173X_INT_DI0, 0x02,},	/* DI 0 */
+			  .sdirq[1] = { PCI173X_INT_DI1, 0x02,},	/* DI 1 */
+			  .sdirq[2] = { PCI173X_INT_IDI0, 0x00,},	/* ISO DI 0 */
+			  .sdirq[3] = { PCI173X_INT_IDI1, 0x00,},	/* ISO DI 1 */
+			   },
 	[TYPE_PCI1733] = {
-		.name		= "pci1733",
-		.nsubdevs	= 2,
-		.sdi[1]		= { 32, 0x00, },	/* ISO DI 0-31 */
-		.id_reg		= 0x04,
-	},
+			  .name = "pci1733",
+			  .nsubdevs = 2,
+			  .sdi[1] = { 32, 0x00,},	/* ISO DI 0-31 */
+			  .id_reg = 0x04,
+			   },
 	[TYPE_PCI1734] = {
-		.name		= "pci1734",
-		.nsubdevs	= 2,
-		.sdo[1]		= { 32, 0x00, },	/* ISO DO 0-31 */
-		.id_reg		= 0x04,
-	},
+			  .name = "pci1734",
+			  .nsubdevs = 2,
+			  .sdo[1] = { 32, 0x00,},	/* ISO DO 0-31 */
+			  .id_reg = 0x04,
+			   },
 	[TYPE_PCI1735] = {
-		.name		= "pci1735",
-		.nsubdevs	= 4,
-		.sdi[0]		= { 32, 0x00, },	/* DI 0-31 */
-		.sdo[0]		= { 32, 0x00, },	/* DO 0-31 */
-		.id_reg		= 0x08,
-		.timer_regbase	= 0x04,
-	},
+			  .name = "pci1735",
+			  .nsubdevs = 4,
+			  .sdi[0] = { 32, 0x00,},	/* DI 0-31 */
+			  .sdo[0] = { 32, 0x00,},	/* DO 0-31 */
+			  .id_reg = 0x08,
+			  .timer_regbase = 0x04,
+			   },
 	[TYPE_PCI1736] = {
-		.name		= "pci1736",
-		.nsubdevs	= 3,
-		.sdi[1]		= { 16, 0x00, },	/* ISO DI 0-15 */
-		.sdo[1]		= { 16, 0x00, },	/* ISO DO 0-15 */
-		.id_reg		= 0x04,
-	},
+			  .name = "pci1736",
+			  .nsubdevs = 3,
+			  .sdi[1] = { 16, 0x00,},	/* ISO DI 0-15 */
+			  .sdo[1] = { 16, 0x00,},	/* ISO DO 0-15 */
+			  .id_reg = 0x04,
+			   },
 	[TYPE_PCI1739] = {
-		.name		= "pci1739",
-		.nsubdevs	= 3,
-		.sdio[0]	= { 2, 0x00, },		/* 8255 DIO */
-		.id_reg		= 0x08,
-	},
+			  .name = "pci1739",
+			  .nsubdevs = 3,
+			  .sdio[0] = { 2, 0x00,},	/* 8255 DIO */
+			  .id_reg = 0x08,
+			   },
 	[TYPE_PCI1750] = {
-		.name		= "pci1750",
-		.nsubdevs	= 2,
-		.sdi[1]		= { 16, 0x00, },	/* ISO DI 0-15 */
-		.sdo[1]		= { 16, 0x00, },	/* ISO DO 0-15 */
-	},
+			  .name = "pci1750",
+			  .nsubdevs = 2,
+			  .sdi[1] = { 16, 0x00,},	/* ISO DI 0-15 */
+			  .sdo[1] = { 16, 0x00,},	/* ISO DO 0-15 */
+			   },
 	[TYPE_PCI1751] = {
-		.name		= "pci1751",
-		.nsubdevs	= 3,
-		.sdio[0]	= { 2, 0x00, },		/* 8255 DIO */
-		.timer_regbase	= 0x18,
-	},
+			  .name = "pci1751",
+			  .nsubdevs = 3,
+			  .sdio[0] = { 2, 0x00,},	/* 8255 DIO */
+			  .timer_regbase = 0x18,
+			   },
 	[TYPE_PCI1752] = {
-		.name		= "pci1752",
-		.nsubdevs	= 3,
-		.sdo[0]		= { 32, 0x00, },	/* DO 0-31 */
-		.sdo[1]		= { 32, 0x04, },	/* DO 32-63 */
-		.id_reg		= 0x10,
-		.is_16bit	= 1,
-	},
+			  .name = "pci1752",
+			  .nsubdevs = 3,
+			  .sdo[0] = { 32, 0x00,},	/* DO 0-31 */
+			  .sdo[1] = { 32, 0x04,},	/* DO 32-63 */
+			  .id_reg = 0x10,
+			  .is_16bit = 1,
+			   },
 	[TYPE_PCI1753] = {
-		.name		= "pci1753",
-		.nsubdevs	= 4,
-		.sdio[0]	= { 4, 0x00, },		/* 8255 DIO */
-	},
+			  .name = "pci1753",
+			  .nsubdevs = 4,
+			  .sdio[0] = { 4, 0x00,},	/* 8255 DIO */
+			   },
 	[TYPE_PCI1753E] = {
-		.name		= "pci1753e",
-		.nsubdevs	= 8,
-		.sdio[0]	= { 4, 0x00, },		/* 8255 DIO */
-		.sdio[1]	= { 4, 0x20, },		/* 8255 DIO */
-	},
+			   .name = "pci1753e",
+			   .nsubdevs = 8,
+			   .sdio[0] = { 4, 0x00,},	/* 8255 DIO */
+			   .sdio[1] = { 4, 0x20,},	/* 8255 DIO */
+			    },
 	[TYPE_PCI1754] = {
-		.name		= "pci1754",
-		.nsubdevs	= 3,
-		.sdi[0]		= { 32, 0x00, },	/* DI 0-31 */
-		.sdi[1]		= { 32, 0x04, },	/* DI 32-63 */
-		.id_reg		= 0x10,
-		.is_16bit	= 1,
-	},
+			  .name = "pci1754",
+			  .nsubdevs = 3,
+			  .sdi[0] = { 32, 0x00,},	/* DI 0-31 */
+			  .sdi[1] = { 32, 0x04,},	/* DI 32-63 */
+			  .id_reg = 0x10,
+			  .is_16bit = 1,
+			   },
 	[TYPE_PCI1756] = {
-		.name		= "pci1756",
-		.nsubdevs	= 3,
-		.sdi[1]		= { 32, 0x00, },	/* DI 0-31 */
-		.sdo[1]		= { 32, 0x04, },	/* DO 0-31 */
-		.id_reg		= 0x10,
-		.is_16bit	= 1,
-	},
+			  .name = "pci1756",
+			  .nsubdevs = 3,
+			  .sdi[1] = { 32, 0x00,},	/* DI 0-31 */
+			  .sdo[1] = { 32, 0x04,},	/* DO 0-31 */
+			  .id_reg = 0x10,
+			  .is_16bit = 1,
+			   },
 	[TYPE_PCI1761] = {
-		.name		= "pci1761",
-		.nsubdevs	= 3,
-		.sdi[1]		= { 8, 0x01 },		/* ISO DI 0-7 */
-		.sdo[1]		= { 8, 0x00 },		/* RELAY DO 0-7 */
-		.id_reg		= 0x02,
-	},
+			  .name = "pci1761",
+			  .nsubdevs = 3,
+			  .sdi[1] = { 8, 0x01},	/* ISO DI 0-7 */
+			  .sdo[1] = { 8, 0x00},	/* RELAY DO 0-7 */
+			  .id_reg = 0x02,
+			   },
 	[TYPE_PCI1762] = {
-		.name		= "pci1762",
-		.nsubdevs	= 3,
-		.sdi[1]		= { 16, 0x02, },	/* ISO DI 0-15 */
-		.sdo[1]		= { 16, 0x00, },	/* ISO DO 0-15 */
-		.id_reg		= 0x04,
-		.is_16bit	= 1,
-	},
+			  .name = "pci1762",
+			  .nsubdevs = 3,
+			  .sdi[1] = { 16, 0x02,},	/* ISO DI 0-15 */
+			  .sdo[1] = { 16, 0x00,},	/* ISO DO 0-15 */
+			  .id_reg = 0x04,
+			  .is_16bit = 1,
+			   },
 };
 
 struct pci_dio_dev_private_data {
@@ -231,7 +231,7 @@ struct pci_dio_dev_private_data {
 };
 
 struct pci_dio_sd_private_data {
-	spinlock_t subd_slock;		/* spin-lock for cmd_running */
+	spinlock_t subd_slock;	/* spin-lock for cmd_running */
 	unsigned long port_offset;
 	short int cmd_running;
 };
@@ -407,8 +407,7 @@ static int pci_dio_insn_bits_dirq_b(struct comedi_device *dev,
 
 static int pci_dio_insn_bits_di_b(struct comedi_device *dev,
 				  struct comedi_subdevice *s,
-				  struct comedi_insn *insn,
-				  unsigned int *data)
+				  struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned long reg = (unsigned long)s->private;
 	unsigned long iobase = dev->iobase + reg;
@@ -426,8 +425,7 @@ static int pci_dio_insn_bits_di_b(struct comedi_device *dev,
 
 static int pci_dio_insn_bits_di_w(struct comedi_device *dev,
 				  struct comedi_subdevice *s,
-				  struct comedi_insn *insn,
-				  unsigned int *data)
+				  struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned long reg = (unsigned long)s->private;
 	unsigned long iobase = dev->iobase + reg;
@@ -441,8 +439,7 @@ static int pci_dio_insn_bits_di_w(struct comedi_device *dev,
 
 static int pci_dio_insn_bits_do_b(struct comedi_device *dev,
 				  struct comedi_subdevice *s,
-				  struct comedi_insn *insn,
-				  unsigned int *data)
+				  struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned long reg = (unsigned long)s->private;
 	unsigned long iobase = dev->iobase + reg;
@@ -464,8 +461,7 @@ static int pci_dio_insn_bits_do_b(struct comedi_device *dev,
 
 static int pci_dio_insn_bits_do_w(struct comedi_device *dev,
 				  struct comedi_subdevice *s,
-				  struct comedi_insn *insn,
-				  unsigned int *data)
+				  struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned long reg = (unsigned long)s->private;
 	unsigned long iobase = dev->iobase + reg;
@@ -546,8 +542,7 @@ static int pci_dio_reset(struct comedi_device *dev, unsigned long cardtype)
 	return 0;
 }
 
-static int pci_dio_auto_attach(struct comedi_device *dev,
-			       unsigned long context)
+static int pci_dio_auto_attach(struct comedi_device *dev, unsigned long context)
 {
 	struct pci_dev *pcidev = comedi_to_pci_dev(dev);
 	const struct dio_boardtype *board = NULL;
@@ -595,15 +590,14 @@ static int pci_dio_auto_attach(struct comedi_device *dev,
 
 		if (d->chans) {
 			s = &dev->subdevices[subdev++];
-			s->type		= COMEDI_SUBD_DI;
-			s->subdev_flags	= SDF_READABLE;
-			s->n_chan	= d->chans;
-			s->maxdata	= 1;
-			s->range_table	= &range_digital;
-			s->insn_bits	= board->is_16bit
-						? pci_dio_insn_bits_di_w
-						: pci_dio_insn_bits_di_b;
-			s->private	= (void *)d->addr;
+			s->type = COMEDI_SUBD_DI;
+			s->subdev_flags = SDF_READABLE;
+			s->n_chan = d->chans;
+			s->maxdata = 1;
+			s->range_table = &range_digital;
+			s->insn_bits = board->is_16bit
+			    ? pci_dio_insn_bits_di_w : pci_dio_insn_bits_di_b;
+			s->private = (void *)d->addr;
 		}
 	}
 
@@ -612,15 +606,14 @@ static int pci_dio_auto_attach(struct comedi_device *dev,
 
 		if (d->chans) {
 			s = &dev->subdevices[subdev++];
-			s->type		= COMEDI_SUBD_DO;
-			s->subdev_flags	= SDF_WRITABLE;
-			s->n_chan	= d->chans;
-			s->maxdata	= 1;
-			s->range_table	= &range_digital;
-			s->insn_bits	= board->is_16bit
-						? pci_dio_insn_bits_do_w
-						: pci_dio_insn_bits_do_b;
-			s->private	= (void *)d->addr;
+			s->type = COMEDI_SUBD_DO;
+			s->subdev_flags = SDF_WRITABLE;
+			s->n_chan = d->chans;
+			s->maxdata = 1;
+			s->range_table = &range_digital;
+			s->insn_bits = board->is_16bit
+			    ? pci_dio_insn_bits_do_w : pci_dio_insn_bits_do_b;
+			s->private = (void *)d->addr;
 
 			/* reset all outputs to 0 */
 			if (board->is_16bit) {
@@ -653,14 +646,14 @@ static int pci_dio_auto_attach(struct comedi_device *dev,
 
 	if (board->id_reg) {
 		s = &dev->subdevices[subdev++];
-		s->type		= COMEDI_SUBD_DI;
-		s->subdev_flags	= SDF_READABLE | SDF_INTERNAL;
-		s->n_chan	= 4;
-		s->maxdata	= 1;
-		s->range_table	= &range_digital;
-		s->insn_bits	= board->is_16bit ? pci_dio_insn_bits_di_w
-						  : pci_dio_insn_bits_di_b;
-		s->private	= (void *)board->id_reg;
+		s->type = COMEDI_SUBD_DI;
+		s->subdev_flags = SDF_READABLE | SDF_INTERNAL;
+		s->n_chan = 4;
+		s->maxdata = 1;
+		s->range_table = &range_digital;
+		s->insn_bits = board->is_16bit ? pci_dio_insn_bits_di_w
+		    : pci_dio_insn_bits_di_b;
+		s->private = (void *)board->id_reg;
 	}
 
 	if (board->timer_regbase) {
@@ -675,19 +668,19 @@ static int pci_dio_auto_attach(struct comedi_device *dev,
 		comedi_8254_subdevice_init(s, dev->pacer);
 	}
 
-	dev_private->irq_subd = subdev; /* first interrupt subdevice index */
+	dev_private->irq_subd = subdev;	/* first interrupt subdevice index */
 	for (i = 0; i < PCI_DIO_MAX_IRQ_SUBDEVS; ++i) {
 		struct pci_dio_sd_private_data *sd_priv = NULL;
 		const struct dio_irq_subd_data *d = &board->sdirq[i];
 
 		if (d->int_en) {
 			s = &dev->subdevices[subdev++];
-			s->type		= COMEDI_SUBD_DI;
-			s->subdev_flags	= SDF_READABLE;
-			s->n_chan	= 1;
-			s->maxdata	= 1;
-			s->range_table	= &range_digital;
-			s->insn_bits	= pci_dio_insn_bits_dirq_b;
+			s->type = COMEDI_SUBD_DI;
+			s->subdev_flags = SDF_READABLE;
+			s->n_chan = 1;
+			s->maxdata = 1;
+			s->range_table = &range_digital;
+			s->insn_bits = pci_dio_insn_bits_dirq_b;
 			sd_priv = comedi_alloc_spriv(s, sizeof(*sd_priv));
 			if (!sd_priv)
 				return -ENOMEM;
@@ -698,12 +691,12 @@ static int pci_dio_auto_attach(struct comedi_device *dev,
 
 			if (dev->irq) {
 				dev->read_subdev = s;
-				s->type		= COMEDI_SUBD_DI;
-				s->subdev_flags	= SDF_READABLE | SDF_CMD_READ;
-				s->len_chanlist	= 1;
-				s->do_cmdtest	= pci_dio_asy_cmdtest;
-				s->do_cmd	= pci_dio_asy_cmd;
-				s->cancel	= pci_dio_asy_cancel;
+				s->type = COMEDI_SUBD_DI;
+				s->subdev_flags = SDF_READABLE | SDF_CMD_READ;
+				s->len_chanlist = 1;
+				s->do_cmdtest = pci_dio_asy_cmdtest;
+				s->do_cmd = pci_dio_asy_cmd;
+				s->cancel = pci_dio_asy_cancel;
 			}
 		}
 	}
@@ -722,10 +715,10 @@ static void pci_dio_detach(struct comedi_device *dev)
 }
 
 static struct comedi_driver adv_pci_dio_driver = {
-	.driver_name	= "adv_pci_dio",
-	.module		= THIS_MODULE,
-	.auto_attach	= pci_dio_auto_attach,
-	.detach		= pci_dio_detach,
+	.driver_name = "adv_pci_dio",
+	.module = THIS_MODULE,
+	.auto_attach = pci_dio_auto_attach,
+	.detach = pci_dio_detach,
 };
 
 static unsigned long pci_dio_override_cardtype(struct pci_dev *pcidev,
@@ -786,14 +779,16 @@ static const struct pci_device_id adv_pci_dio_pci_table[] = {
 	{ PCI_VDEVICE(ADVANTECH, 0x1762), TYPE_PCI1762 },
 	{ 0 }
 };
+
 MODULE_DEVICE_TABLE(pci, adv_pci_dio_pci_table);
 
 static struct pci_driver adv_pci_dio_pci_driver = {
-	.name		= "adv_pci_dio",
-	.id_table	= adv_pci_dio_pci_table,
-	.probe		= adv_pci_dio_pci_probe,
-	.remove		= comedi_pci_auto_unconfig,
+	.name = "adv_pci_dio",
+	.id_table = adv_pci_dio_pci_table,
+	.probe = adv_pci_dio_pci_probe,
+	.remove = comedi_pci_auto_unconfig,
 };
+
 module_comedi_pci_driver(adv_pci_dio_driver, adv_pci_dio_pci_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

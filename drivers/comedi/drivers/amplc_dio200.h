@@ -34,7 +34,7 @@ struct dio200_board {
 	unsigned char sdinfo[DIO200_MAX_SUBDEVS];	/* depends on sdtype */
 	unsigned int has_int_sce:1;	/* has interrupt enable/status reg */
 	unsigned int has_clk_gat_sce:1;	/* has clock/gate selection registers */
-	unsigned int is_pcie:1;			/* has enhanced features */
+	unsigned int is_pcie:1;	/* has enhanced features */
 };
 
 int amplc_dio200_common_attach(struct comedi_device *dev, unsigned int irq,

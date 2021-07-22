@@ -109,28 +109,28 @@ struct atmio16_board_t {
 /* range structs */
 static const struct comedi_lrange range_atmio16d_ai_10_bipolar = {
 	4, {
-		BIP_RANGE(10),
-		BIP_RANGE(1),
-		BIP_RANGE(0.1),
-		BIP_RANGE(0.02)
+	    BIP_RANGE(10),
+	    BIP_RANGE(1),
+	    BIP_RANGE(0.1),
+	    BIP_RANGE(0.02)
 	}
 };
 
 static const struct comedi_lrange range_atmio16d_ai_5_bipolar = {
 	4, {
-		BIP_RANGE(5),
-		BIP_RANGE(0.5),
-		BIP_RANGE(0.05),
-		BIP_RANGE(0.01)
+	    BIP_RANGE(5),
+	    BIP_RANGE(0.5),
+	    BIP_RANGE(0.05),
+	    BIP_RANGE(0.01)
 	}
 };
 
 static const struct comedi_lrange range_atmio16d_ai_unipolar = {
 	4, {
-		UNI_RANGE(10),
-		UNI_RANGE(1),
-		UNI_RANGE(0.1),
-		UNI_RANGE(0.02)
+	    UNI_RANGE(10),
+	    UNI_RANGE(1),
+	    UNI_RANGE(0.1),
+	    UNI_RANGE(0.02)
 	}
 };
 
@@ -143,8 +143,8 @@ struct atmio16d_private {
 	enum { dac_internal, dac_external } dac0_reference, dac1_reference;
 	enum { dac_2comp, dac_straight } dac0_coding, dac1_coding;
 	const struct comedi_lrange *ao_range_type_list[2];
-	unsigned int com_reg_1_state; /* current state of command register 1 */
-	unsigned int com_reg_2_state; /* current state of command register 2 */
+	unsigned int com_reg_1_state;	/* current state of command register 1 */
+	unsigned int com_reg_2_state;	/* current state of command register 2 */
 };
 
 static void reset_counters(struct comedi_device *dev)
@@ -274,7 +274,7 @@ static int atmio16d_ai_cmdtest(struct comedi_device *dev,
 
 	if (cmd->stop_src == TRIG_COUNT)
 		err |= comedi_check_trigger_arg_min(&cmd->stop_arg, 1);
-	else	/* TRIG_NONE */
+	else			/* TRIG_NONE */
 		err |= comedi_check_trigger_arg_is(&cmd->stop_arg, 0);
 
 	if (err)
@@ -331,7 +331,7 @@ static int atmio16d_ai_cmd(struct comedi_device *dev,
 	} else if (cmd->convert_arg < 655360000) {
 		base_clock = CLOCK_100_KHZ;
 		timer = cmd->convert_arg / 10000;
-	} else /* cmd->convert_arg < 6553600000 */ {
+	} else {		/* cmd->convert_arg < 6553600000 */
 		base_clock = CLOCK_10_KHZ;
 		timer = cmd->convert_arg / 100000;
 	}
@@ -397,7 +397,7 @@ static int atmio16d_ai_cmd(struct comedi_device *dev,
 		} else if (cmd->scan_begin_arg < 655360000) {
 			base_clock = CLOCK_100_KHZ;
 			timer = cmd->scan_begin_arg / 10000;
-		} else /* cmd->scan_begin_arg < 6553600000 */ {
+		} else {	/* cmd->scan_begin_arg < 6553600000 */
 			base_clock = CLOCK_10_KHZ;
 			timer = cmd->scan_begin_arg / 100000;
 		}
@@ -440,8 +440,7 @@ static int atmio16d_ai_cancel(struct comedi_device *dev,
 
 static int atmio16d_ai_eoc(struct comedi_device *dev,
 			   struct comedi_subdevice *s,
-			   struct comedi_insn *insn,
-			   unsigned long context)
+			   struct comedi_insn *insn, unsigned long context)
 {
 	unsigned int status;
 
@@ -497,8 +496,7 @@ static int atmio16d_ai_insn_read(struct comedi_device *dev,
 
 static int atmio16d_ao_insn_write(struct comedi_device *dev,
 				  struct comedi_subdevice *s,
-				  struct comedi_insn *insn,
-				  unsigned int *data)
+				  struct comedi_insn *insn, unsigned int *data)
 {
 	struct atmio16d_private *devpriv = dev->private;
 	unsigned int chan = CR_CHAN(insn->chanspec);
@@ -527,8 +525,7 @@ static int atmio16d_ao_insn_write(struct comedi_device *dev,
 
 static int atmio16d_dio_insn_bits(struct comedi_device *dev,
 				  struct comedi_subdevice *s,
-				  struct comedi_insn *insn,
-				  unsigned int *data)
+				  struct comedi_insn *insn, unsigned int *data)
 {
 	if (comedi_dio_update_state(s, data))
 		outw(s->state, dev->iobase + MIO_16_DIG_OUT_REG);
@@ -693,7 +690,6 @@ static int atmio16d_attach(struct comedi_device *dev,
 	s->n_chan = 0;
 	s->maxdata = 0
 #endif
-
 	return 0;
 }
 
@@ -705,23 +701,24 @@ static void atmio16d_detach(struct comedi_device *dev)
 
 static const struct atmio16_board_t atmio16_boards[] = {
 	{
-		.name		= "atmio16",
-		.has_8255	= 0,
-	}, {
-		.name		= "atmio16d",
-		.has_8255	= 1,
-	},
+	 .name = "atmio16",
+	 .has_8255 = 0,
+	  }, {
+	      .name = "atmio16d",
+	      .has_8255 = 1,
+	       },
 };
 
 static struct comedi_driver atmio16d_driver = {
-	.driver_name	= "atmio16",
-	.module		= THIS_MODULE,
-	.attach		= atmio16d_attach,
-	.detach		= atmio16d_detach,
-	.board_name	= &atmio16_boards[0].name,
-	.num_names	= ARRAY_SIZE(atmio16_boards),
-	.offset		= sizeof(struct atmio16_board_t),
+	.driver_name = "atmio16",
+	.module = THIS_MODULE,
+	.attach = atmio16d_attach,
+	.detach = atmio16d_detach,
+	.board_name = &atmio16_boards[0].name,
+	.num_names = ARRAY_SIZE(atmio16_boards),
+	.offset = sizeof(struct atmio16_board_t),
 };
+
 module_comedi_driver(atmio16d_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

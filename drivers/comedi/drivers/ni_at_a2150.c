@@ -79,9 +79,9 @@
 /* dma terminal count interrupt has occurred */
 #define   DMA_TC_BIT		0x80
 #define   ID_BITS(x)		(((x) >> 8) & 0x3)
-#define IRQ_DMA_CNTRL_REG	0x12			/* write only */
-#define   DMA_CHAN_BITS(x)	((x) & 0x7)		/* sets dma channel */
-#define   DMA_EN_BIT		0x8			/* enables dma */
+#define IRQ_DMA_CNTRL_REG	0x12	/* write only */
+#define   DMA_CHAN_BITS(x)	((x) & 0x7)	/* sets dma channel */
+#define   DMA_EN_BIT		0x8	/* enables dma */
 #define   IRQ_LVL_BITS(x)	(((x) & 0xf) << 4)	/* sets irq level */
 #define   FIFO_INTR_EN_BIT	0x100	/* enable fifo interrupts */
 #define   FIFO_INTR_FHF_BIT	0x200	/* interrupt fifo half full */
@@ -100,7 +100,7 @@ struct a2150_board {
 /* analog input range */
 static const struct comedi_lrange range_a2150 = {
 	1, {
-		BIP_RANGE(2.828)
+	    BIP_RANGE(2.828)
 	}
 };
 
@@ -109,16 +109,16 @@ enum { a2150_c, a2150_s };
 static const struct a2150_board a2150_boards[] = {
 	{
 	 .name = "at-a2150c",
-	 .clock = {31250, 22676, 20833, 19531},
+	 .clock = { 31250, 22676, 20833, 19531},
 	 .num_clocks = 4,
 	 .ai_speed = 19531,
-	 },
+	  },
 	{
 	 .name = "at-a2150s",
-	 .clock = {62500, 50000, 41667, 0},
+	 .clock = { 62500, 50000, 41667, 0},
 	 .num_clocks = 3,
 	 .ai_speed = 41667,
-	 },
+	  },
 };
 
 struct a2150_private {
@@ -434,7 +434,7 @@ static int a2150_ai_cmdtest(struct comedi_device *dev,
 
 	if (cmd->stop_src == TRIG_COUNT)
 		err |= comedi_check_trigger_arg_min(&cmd->stop_arg, 1);
-	else	/* TRIG_NONE */
+	else			/* TRIG_NONE */
 		err |= comedi_check_trigger_arg_is(&cmd->stop_arg, 0);
 
 	if (err)
@@ -508,7 +508,7 @@ static int a2150_ai_cmd(struct comedi_device *dev, struct comedi_subdevice *s)
 	/* set size of transfer to fill in 1/3 second */
 #define ONE_THIRD_SECOND 333333333
 	desc->size = comedi_bytes_per_sample(s) * cmd->chanlist_len *
-		    ONE_THIRD_SECOND / cmd->scan_begin_arg;
+	    ONE_THIRD_SECOND / cmd->scan_begin_arg;
 	if (desc->size > desc->maxsize)
 		desc->size = desc->maxsize;
 	if (desc->size < comedi_bytes_per_sample(s))
@@ -564,8 +564,7 @@ static int a2150_ai_cmd(struct comedi_device *dev, struct comedi_subdevice *s)
 
 static int a2150_ai_eoc(struct comedi_device *dev,
 			struct comedi_subdevice *s,
-			struct comedi_insn *insn,
-			unsigned long context)
+			struct comedi_insn *insn, unsigned long context)
 {
 	unsigned int status;
 
@@ -661,7 +660,7 @@ static void a2150_alloc_irq_and_dma(struct comedi_device *dev,
 	} else {
 		dev->irq = irq_num;
 		devpriv->irq_dma_bits = IRQ_LVL_BITS(irq_num) |
-					DMA_CHAN_BITS(dma_chan);
+		    DMA_CHAN_BITS(dma_chan);
 	}
 }
 
@@ -770,11 +769,12 @@ static void a2150_detach(struct comedi_device *dev)
 };
 
 static struct comedi_driver ni_at_a2150_driver = {
-	.driver_name	= "ni_at_a2150",
-	.module		= THIS_MODULE,
-	.attach		= a2150_attach,
-	.detach		= a2150_detach,
+	.driver_name = "ni_at_a2150",
+	.module = THIS_MODULE,
+	.attach = a2150_attach,
+	.detach = a2150_detach,
 };
+
 module_comedi_driver(ni_at_a2150_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

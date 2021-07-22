@@ -61,8 +61,7 @@ static int subdev_8255_mmio(struct comedi_device *dev,
 
 static int subdev_8255_insn(struct comedi_device *dev,
 			    struct comedi_subdevice *s,
-			    struct comedi_insn *insn,
-			    unsigned int *data)
+			    struct comedi_insn *insn, unsigned int *data)
 {
 	struct subdev_8255_private *spriv = s->private;
 	unsigned long regbase = spriv->regbase;
@@ -114,8 +113,7 @@ static void subdev_8255_do_config(struct comedi_device *dev,
 
 static int subdev_8255_insn_config(struct comedi_device *dev,
 				   struct comedi_subdevice *s,
-				   struct comedi_insn *insn,
-				   unsigned int *data)
+				   struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 	unsigned int mask;
@@ -144,8 +142,7 @@ static int __subdev_8255_init(struct comedi_device *dev,
 			      int (*io)(struct comedi_device *dev,
 					int dir, int port, int data,
 					unsigned long regbase),
-			      unsigned long regbase,
-			      bool is_mmio)
+			      unsigned long regbase, bool is_mmio)
 {
 	struct subdev_8255_private *spriv;
 
@@ -159,15 +156,15 @@ static int __subdev_8255_init(struct comedi_device *dev,
 		spriv->io = subdev_8255_mmio;
 	else
 		spriv->io = subdev_8255_io;
-	spriv->regbase	= regbase;
+	spriv->regbase = regbase;
 
-	s->type		= COMEDI_SUBD_DIO;
-	s->subdev_flags	= SDF_READABLE | SDF_WRITABLE;
-	s->n_chan	= 24;
-	s->range_table	= &range_digital;
-	s->maxdata	= 1;
-	s->insn_bits	= subdev_8255_insn;
-	s->insn_config	= subdev_8255_insn_config;
+	s->type = COMEDI_SUBD_DIO;
+	s->subdev_flags = SDF_READABLE | SDF_WRITABLE;
+	s->n_chan = 24;
+	s->range_table = &range_digital;
+	s->maxdata = 1;
+	s->insn_bits = subdev_8255_insn;
+	s->insn_config = subdev_8255_insn_config;
 
 	subdev_8255_do_config(dev, s);
 
@@ -207,6 +204,7 @@ int subdev_8255_init(struct comedi_device *dev, struct comedi_subdevice *s,
 {
 	return __subdev_8255_init(dev, s, io, regbase, false);
 }
+
 EXPORT_SYMBOL_GPL(subdev_8255_init);
 
 /**
@@ -242,6 +240,7 @@ int subdev_8255_mm_init(struct comedi_device *dev, struct comedi_subdevice *s,
 {
 	return __subdev_8255_init(dev, s, io, regbase, true);
 }
+
 EXPORT_SYMBOL_GPL(subdev_8255_mm_init);
 
 /**
@@ -258,17 +257,20 @@ unsigned long subdev_8255_regbase(struct comedi_subdevice *s)
 
 	return spriv->regbase;
 }
+
 EXPORT_SYMBOL_GPL(subdev_8255_regbase);
 
 static int __init comedi_8255_module_init(void)
 {
 	return 0;
 }
+
 module_init(comedi_8255_module_init);
 
 static void __exit comedi_8255_module_exit(void)
 {
 }
+
 module_exit(comedi_8255_module_exit);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

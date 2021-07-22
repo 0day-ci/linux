@@ -106,60 +106,60 @@
 
 static const struct comedi_lrange db2k_ai_range = {
 	13, {
-		BIP_RANGE(10),
-		BIP_RANGE(5),
-		BIP_RANGE(2.5),
-		BIP_RANGE(1.25),
-		BIP_RANGE(0.625),
-		BIP_RANGE(0.3125),
-		BIP_RANGE(0.156),
-		UNI_RANGE(10),
-		UNI_RANGE(5),
-		UNI_RANGE(2.5),
-		UNI_RANGE(1.25),
-		UNI_RANGE(0.625),
-		UNI_RANGE(0.3125)
+	     BIP_RANGE(10),
+	     BIP_RANGE(5),
+	     BIP_RANGE(2.5),
+	     BIP_RANGE(1.25),
+	     BIP_RANGE(0.625),
+	     BIP_RANGE(0.3125),
+	     BIP_RANGE(0.156),
+	     UNI_RANGE(10),
+	     UNI_RANGE(5),
+	     UNI_RANGE(2.5),
+	     UNI_RANGE(1.25),
+	     UNI_RANGE(0.625),
+	     UNI_RANGE(0.3125)
 	}
 };
 
 /*
  * Register Memory Map
  */
-#define DB2K_REG_ACQ_CONTROL			0x00		/* u16 (w) */
-#define DB2K_REG_ACQ_STATUS			0x00		/* u16 (r) */
-#define DB2K_REG_ACQ_SCAN_LIST_FIFO		0x02		/* u16 */
-#define DB2K_REG_ACQ_PACER_CLOCK_DIV_LOW	0x04		/* u32 */
-#define DB2K_REG_ACQ_SCAN_COUNTER		0x08		/* u16 */
-#define DB2K_REG_ACQ_PACER_CLOCK_DIV_HIGH	0x0a		/* u16 */
-#define DB2K_REG_ACQ_TRIGGER_COUNT		0x0c		/* u16 */
-#define DB2K_REG_ACQ_RESULTS_FIFO		0x10		/* u16 */
-#define DB2K_REG_ACQ_RESULTS_SHADOW		0x14		/* u16 */
-#define DB2K_REG_ACQ_ADC_RESULT			0x18		/* u16 */
-#define DB2K_REG_DAC_SCAN_COUNTER		0x1c		/* u16 */
-#define DB2K_REG_DAC_CONTROL			0x20		/* u16 (w) */
-#define DB2K_REG_DAC_STATUS			0x20		/* u16 (r) */
-#define DB2K_REG_DAC_FIFO			0x24		/* s16 */
-#define DB2K_REG_DAC_PACER_CLOCK_DIV		0x2a		/* u16 */
-#define DB2K_REG_REF_DACS			0x2c		/* u16 */
-#define DB2K_REG_DIO_CONTROL			0x30		/* u16 */
-#define DB2K_REG_P3_HSIO_DATA			0x32		/* s16 */
-#define DB2K_REG_P3_CONTROL			0x34		/* u16 */
-#define DB2K_REG_CAL_EEPROM_CONTROL		0x36		/* u16 */
-#define DB2K_REG_DAC_SETTING(x)			(0x38 + (x) * 2) /* s16 */
-#define DB2K_REG_DIO_P2_EXP_IO_8_BIT		0x40		/* s16 */
-#define DB2K_REG_COUNTER_TIMER_CONTROL		0x80		/* u16 */
-#define DB2K_REG_COUNTER_INPUT(x)		(0x88 + (x) * 2) /* s16 */
-#define DB2K_REG_TIMER_DIV(x)			(0xa0 + (x) * 2) /* u16 */
-#define DB2K_REG_DMA_CONTROL			0xb0		/* u16 */
-#define DB2K_REG_TRIG_CONTROL			0xb2		/* u16 */
-#define DB2K_REG_CAL_EEPROM			0xb8		/* u16 */
-#define DB2K_REG_ACQ_DIGITAL_MARK		0xba		/* u16 */
-#define DB2K_REG_TRIG_DACS			0xbc		/* u16 */
-#define DB2K_REG_DIO_P2_EXP_IO_16_BIT(x)	(0xc0 + (x) * 2) /* s16 */
+#define DB2K_REG_ACQ_CONTROL			0x00	/* u16 (w) */
+#define DB2K_REG_ACQ_STATUS			0x00	/* u16 (r) */
+#define DB2K_REG_ACQ_SCAN_LIST_FIFO		0x02	/* u16 */
+#define DB2K_REG_ACQ_PACER_CLOCK_DIV_LOW	0x04	/* u32 */
+#define DB2K_REG_ACQ_SCAN_COUNTER		0x08	/* u16 */
+#define DB2K_REG_ACQ_PACER_CLOCK_DIV_HIGH	0x0a	/* u16 */
+#define DB2K_REG_ACQ_TRIGGER_COUNT		0x0c	/* u16 */
+#define DB2K_REG_ACQ_RESULTS_FIFO		0x10	/* u16 */
+#define DB2K_REG_ACQ_RESULTS_SHADOW		0x14	/* u16 */
+#define DB2K_REG_ACQ_ADC_RESULT			0x18	/* u16 */
+#define DB2K_REG_DAC_SCAN_COUNTER		0x1c	/* u16 */
+#define DB2K_REG_DAC_CONTROL			0x20	/* u16 (w) */
+#define DB2K_REG_DAC_STATUS			0x20	/* u16 (r) */
+#define DB2K_REG_DAC_FIFO			0x24	/* s16 */
+#define DB2K_REG_DAC_PACER_CLOCK_DIV		0x2a	/* u16 */
+#define DB2K_REG_REF_DACS			0x2c	/* u16 */
+#define DB2K_REG_DIO_CONTROL			0x30	/* u16 */
+#define DB2K_REG_P3_HSIO_DATA			0x32	/* s16 */
+#define DB2K_REG_P3_CONTROL			0x34	/* u16 */
+#define DB2K_REG_CAL_EEPROM_CONTROL		0x36	/* u16 */
+#define DB2K_REG_DAC_SETTING(x)			(0x38 + (x) * 2)	/* s16 */
+#define DB2K_REG_DIO_P2_EXP_IO_8_BIT		0x40	/* s16 */
+#define DB2K_REG_COUNTER_TIMER_CONTROL		0x80	/* u16 */
+#define DB2K_REG_COUNTER_INPUT(x)		(0x88 + (x) * 2)	/* s16 */
+#define DB2K_REG_TIMER_DIV(x)			(0xa0 + (x) * 2)	/* u16 */
+#define DB2K_REG_DMA_CONTROL			0xb0	/* u16 */
+#define DB2K_REG_TRIG_CONTROL			0xb2	/* u16 */
+#define DB2K_REG_CAL_EEPROM			0xb8	/* u16 */
+#define DB2K_REG_ACQ_DIGITAL_MARK		0xba	/* u16 */
+#define DB2K_REG_TRIG_DACS			0xbc	/* u16 */
+#define DB2K_REG_DIO_P2_EXP_IO_16_BIT(x)	(0xc0 + (x) * 2)	/* s16 */
 
 /* CPLD registers */
-#define DB2K_REG_CPLD_STATUS			0x1000		/* u16 (r) */
-#define DB2K_REG_CPLD_WDATA			0x1000		/* u16 (w) */
+#define DB2K_REG_CPLD_STATUS			0x1000	/* u16 (r) */
+#define DB2K_REG_CPLD_WDATA			0x1000	/* u16 (w) */
 
 /* Scan Sequencer programming */
 #define DB2K_ACQ_CONTROL_SEQ_START_SCAN_LIST		0x0011
@@ -240,17 +240,17 @@ enum db2k_boardid {
 
 struct db2k_boardtype {
 	const char *name;
-	unsigned int has_2_ao:1;/* false: 4 AO chans; true: 2 AO chans */
+	unsigned int has_2_ao:1;	/* false: 4 AO chans; true: 2 AO chans */
 };
 
 static const struct db2k_boardtype db2k_boardtypes[] = {
 	[BOARD_DAQBOARD2000] = {
-		.name		= "daqboard2000",
-		.has_2_ao	= true,
-	},
+				.name = "daqboard2000",
+				.has_2_ao = true,
+				 },
 	[BOARD_DAQBOARD2001] = {
-		.name		= "daqboard2001",
-	},
+				.name = "daqboard2001",
+				 },
 };
 
 struct db2k_private {
@@ -260,8 +260,7 @@ struct db2k_private {
 static void db2k_write_acq_scan_list_entry(struct comedi_device *dev, u16 entry)
 {
 	writew(entry & 0x00ff, dev->mmio + DB2K_REG_ACQ_SCAN_LIST_FIFO);
-	writew((entry >> 8) & 0x00ff,
-	       dev->mmio + DB2K_REG_ACQ_SCAN_LIST_FIFO);
+	writew((entry >> 8) & 0x00ff, dev->mmio + DB2K_REG_ACQ_SCAN_LIST_FIFO);
 }
 
 static void db2k_setup_sampling(struct comedi_device *dev, int chan, int gain)
@@ -365,8 +364,8 @@ static int db2k_ai_insn_read(struct comedi_device *dev,
 			return ret;
 
 		ret =
-		comedi_timeout(dev, s, insn, db2k_ai_status,
-			       DB2K_ACQ_STATUS_RESULTS_FIFO_HAS_DATA);
+		    comedi_timeout(dev, s, insn, db2k_ai_status,
+				   DB2K_ACQ_STATUS_RESULTS_FIFO_HAS_DATA);
 		if (ret)
 			return ret;
 
@@ -457,7 +456,7 @@ static void db2k_pulse_prog_pin(struct comedi_device *dev)
 	mdelay(10);
 	cntrl &= ~PLX_CNTRL_USERO;
 	writel(cntrl, devpriv->plx + PLX_REG_CNTRL);
-	mdelay(10);	/* Not in the original code, but I like symmetry... */
+	mdelay(10);		/* Not in the original code, but I like symmetry... */
 }
 
 static int db2k_wait_cpld_init(struct comedi_device *dev)
@@ -753,10 +752,10 @@ static void db2k_detach(struct comedi_device *dev)
 }
 
 static struct comedi_driver db2k_driver = {
-	.driver_name	= "daqboard2000",
-	.module		= THIS_MODULE,
-	.auto_attach	= db2k_auto_attach,
-	.detach		= db2k_detach,
+	.driver_name = "daqboard2000",
+	.module = THIS_MODULE,
+	.auto_attach = db2k_auto_attach,
+	.detach = db2k_detach,
 };
 
 static int db2k_pci_probe(struct pci_dev *dev, const struct pci_device_id *id)
@@ -771,14 +770,16 @@ static const struct pci_device_id db2k_pci_table[] = {
 			 0x0004), .driver_data = BOARD_DAQBOARD2001, },
 	{ 0 }
 };
+
 MODULE_DEVICE_TABLE(pci, db2k_pci_table);
 
 static struct pci_driver db2k_pci_driver = {
-	.name		= "daqboard2000",
-	.id_table	= db2k_pci_table,
-	.probe		= db2k_pci_probe,
-	.remove		= comedi_pci_auto_unconfig,
+	.name = "daqboard2000",
+	.id_table = db2k_pci_table,
+	.probe = db2k_pci_probe,
+	.remove = comedi_pci_auto_unconfig,
 };
+
 module_comedi_pci_driver(db2k_driver, db2k_pci_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

@@ -30,15 +30,15 @@
 
 static const struct das08_board_struct das08_pci_boards[] = {
 	{
-		.name		= "pci-das08",
-		.ai_nbits	= 12,
-		.ai_pg		= das08_bipolar5,
-		.ai_encoding	= das08_encode12,
-		.di_nchan	= 3,
-		.do_nchan	= 4,
-		.i8254_offset	= 4,
-		.iosize		= 8,
-	},
+	 .name = "pci-das08",
+	 .ai_nbits = 12,
+	 .ai_pg = das08_bipolar5,
+	 .ai_encoding = das08_encode12,
+	 .di_nchan = 3,
+	 .do_nchan = 4,
+	 .i8254_offset = 4,
+	 .iosize = 8,
+	  },
 };
 
 static int das08_pci_auto_attach(struct comedi_device *dev,
@@ -64,14 +64,13 @@ static int das08_pci_auto_attach(struct comedi_device *dev,
 }
 
 static struct comedi_driver das08_pci_comedi_driver = {
-	.driver_name	= "pci-das08",
-	.module		= THIS_MODULE,
-	.auto_attach	= das08_pci_auto_attach,
-	.detach		= comedi_pci_detach,
+	.driver_name = "pci-das08",
+	.module = THIS_MODULE,
+	.auto_attach = das08_pci_auto_attach,
+	.detach = comedi_pci_detach,
 };
 
-static int das08_pci_probe(struct pci_dev *dev,
-			   const struct pci_device_id *id)
+static int das08_pci_probe(struct pci_dev *dev, const struct pci_device_id *id)
 {
 	return comedi_pci_auto_config(dev, &das08_pci_comedi_driver,
 				      id->driver_data);
@@ -81,14 +80,16 @@ static const struct pci_device_id das08_pci_table[] = {
 	{ PCI_DEVICE(PCI_VENDOR_ID_CB, 0x0029) },
 	{ 0 }
 };
+
 MODULE_DEVICE_TABLE(pci, das08_pci_table);
 
 static struct pci_driver das08_pci_driver = {
-	.name		= "pci-das08",
-	.id_table	= das08_pci_table,
-	.probe		= das08_pci_probe,
-	.remove		= comedi_pci_auto_unconfig,
+	.name = "pci-das08",
+	.id_table = das08_pci_table,
+	.probe = das08_pci_probe,
+	.remove = comedi_pci_auto_unconfig,
 };
+
 module_comedi_pci_driver(das08_pci_comedi_driver, das08_pci_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

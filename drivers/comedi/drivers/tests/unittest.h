@@ -53,7 +53,7 @@ static inline void exec_unittests(const char *name,
 	pr_info("begin comedi:\"%s\" unittests\n", name);
 
 	for (; (*unit_tests) != NULL; ++unit_tests)
-		(*unit_tests)();
+		(*unit_tests) ();
 
 	pr_info("end of comedi:\"%s\" unittests - %i passed, %i failed\n", name,
 		unittest_results.passed, unittest_results.failed);

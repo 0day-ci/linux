@@ -43,7 +43,7 @@ static unsigned char clk_gat_sce(unsigned int which, unsigned int chan,
 				 unsigned int source)
 {
 	return (which << 5) | (chan << 3) |
-	       ((source & 030) << 3) | (source & 007);
+	    ((source & 030) << 3) | (source & 007);
 }
 
 /*
@@ -76,7 +76,7 @@ static const unsigned int ts_clock_period[TS_CONFIG_MAX_CLK_SRC + 1] = {
 };
 
 struct dio200_subdev_8255 {
-	unsigned int ofs;		/* DIO base offset */
+	unsigned int ofs;	/* DIO base offset */
 };
 
 struct dio200_subdev_intr {
@@ -381,7 +381,7 @@ static int dio200_subdev_intr_cmdtest(struct comedi_device *dev,
 
 	if (cmd->stop_src == TRIG_COUNT)
 		err |= comedi_check_trigger_arg_min(&cmd->stop_arg, 1);
-	else	/* TRIG_NONE */
+	else			/* TRIG_NONE */
 		err |= comedi_check_trigger_arg_is(&cmd->stop_arg, 0);
 
 	if (err)
@@ -407,7 +407,7 @@ static int dio200_subdev_intr_cmd(struct comedi_device *dev,
 
 	if (cmd->start_src == TRIG_INT)
 		s->async->inttrig = dio200_inttrig_start_intr;
-	else	/* TRIG_NOW */
+	else			/* TRIG_NOW */
 		dio200_start_intr(dev, s);
 
 	spin_unlock_irqrestore(&subpriv->spinlock, flags);
@@ -417,8 +417,7 @@ static int dio200_subdev_intr_cmd(struct comedi_device *dev,
 
 static int dio200_subdev_intr_init(struct comedi_device *dev,
 				   struct comedi_subdevice *s,
-				   unsigned int offset,
-				   unsigned int valid_isns)
+				   unsigned int offset, unsigned int valid_isns)
 {
 	const struct dio200_board *board = dev->board_ptr;
 	struct dio200_subdev_intr *subpriv;
@@ -471,8 +470,7 @@ static irqreturn_t dio200_interrupt(int irq, void *d)
 
 static void dio200_subdev_8254_set_gate_src(struct comedi_device *dev,
 					    struct comedi_subdevice *s,
-					    unsigned int chan,
-					    unsigned int src)
+					    unsigned int chan, unsigned int src)
 {
 	unsigned int offset = dio200_subdev_8254_offset(dev, s);
 
@@ -613,8 +611,7 @@ static void dio200_subdev_8255_set_dir(struct comedi_device *dev,
 
 static int dio200_subdev_8255_bits(struct comedi_device *dev,
 				   struct comedi_subdevice *s,
-				   struct comedi_insn *insn,
-				   unsigned int *data)
+				   struct comedi_insn *insn, unsigned int *data)
 {
 	struct dio200_subdev_8255 *subpriv = s->private;
 	unsigned int mask;
@@ -727,7 +724,7 @@ static void dio200_subdev_timer_get_clock_src(struct comedi_device *dev,
 	clk = dio200_read32(dev, DIO200_TS_CONFIG) & TS_CONFIG_CLK_SRC_MASK;
 	*src = clk;
 	*period = (clk < ARRAY_SIZE(ts_clock_period)) ?
-		  ts_clock_period[clk] : 0;
+	    ts_clock_period[clk] : 0;
 }
 
 static int dio200_subdev_timer_set_clock_src(struct comedi_device *dev,
@@ -770,6 +767,7 @@ void amplc_dio200_set_enhance(struct comedi_device *dev, unsigned char val)
 {
 	dio200_write8(dev, DIO200_ENHANCE, val);
 }
+
 EXPORT_SYMBOL_GPL(amplc_dio200_set_enhance);
 
 int amplc_dio200_common_attach(struct comedi_device *dev, unsigned int irq,
@@ -789,15 +787,13 @@ int amplc_dio200_common_attach(struct comedi_device *dev, unsigned int irq,
 		switch (board->sdtype[n]) {
 		case sd_8254:
 			/* counter subdevice (8254) */
-			ret = dio200_subdev_8254_init(dev, s,
-						      board->sdinfo[n]);
+			ret = dio200_subdev_8254_init(dev, s, board->sdinfo[n]);
 			if (ret < 0)
 				return ret;
 			break;
 		case sd_8255:
 			/* digital i/o subdevice (8255) */
-			ret = dio200_subdev_8255_init(dev, s,
-						      board->sdinfo[n]);
+			ret = dio200_subdev_8255_init(dev, s, board->sdinfo[n]);
 			if (ret < 0)
 				return ret;
 			break;
@@ -815,12 +811,12 @@ int amplc_dio200_common_attach(struct comedi_device *dev, unsigned int irq,
 			}
 			break;
 		case sd_timer:
-			s->type		= COMEDI_SUBD_TIMER;
-			s->subdev_flags	= SDF_READABLE | SDF_LSAMPL;
-			s->n_chan	= 1;
-			s->maxdata	= 0xffffffff;
-			s->insn_read	= dio200_subdev_timer_read;
-			s->insn_config	= dio200_subdev_timer_config;
+			s->type = COMEDI_SUBD_TIMER;
+			s->subdev_flags = SDF_READABLE | SDF_LSAMPL;
+			s->n_chan = 1;
+			s->maxdata = 0xffffffff;
+			s->insn_read = dio200_subdev_timer_read;
+			s->insn_config = dio200_subdev_timer_config;
 			break;
 		default:
 			s->type = COMEDI_SUBD_UNUSED;
@@ -840,17 +836,20 @@ int amplc_dio200_common_attach(struct comedi_device *dev, unsigned int irq,
 
 	return 0;
 }
+
 EXPORT_SYMBOL_GPL(amplc_dio200_common_attach);
 
 static int __init amplc_dio200_common_init(void)
 {
 	return 0;
 }
+
 module_init(amplc_dio200_common_init);
 
 static void __exit amplc_dio200_common_exit(void)
 {
 }
+
 module_exit(amplc_dio200_common_exit);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

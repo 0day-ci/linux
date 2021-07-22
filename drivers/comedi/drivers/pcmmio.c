@@ -157,21 +157,21 @@
 
 static const struct comedi_lrange pcmmio_ai_ranges = {
 	4, {
-		BIP_RANGE(5),
-		BIP_RANGE(10),
-		UNI_RANGE(5),
-		UNI_RANGE(10)
+	    BIP_RANGE(5),
+	    BIP_RANGE(10),
+	    UNI_RANGE(5),
+	    UNI_RANGE(10)
 	}
 };
 
 static const struct comedi_lrange pcmmio_ao_ranges = {
 	6, {
-		UNI_RANGE(5),
-		UNI_RANGE(10),
-		BIP_RANGE(5),
-		BIP_RANGE(10),
-		BIP_RANGE(2.5),
-		RANGE(-2.5, 7.5)
+	    UNI_RANGE(5),
+	    UNI_RANGE(10),
+	    BIP_RANGE(5),
+	    BIP_RANGE(10),
+	    BIP_RANGE(2.5),
+	    RANGE(-2.5, 7.5)
 	}
 };
 
@@ -241,8 +241,7 @@ static unsigned int pcmmio_dio_read(struct comedi_device *dev,
  */
 static int pcmmio_dio_insn_bits(struct comedi_device *dev,
 				struct comedi_subdevice *s,
-				struct comedi_insn *insn,
-				unsigned int *data)
+				struct comedi_insn *insn, unsigned int *data)
 {
 	/* subdevice 2 uses ports 0-2, subdevice 3 uses ports 3-5 */
 	int port = s->index == 2 ? 0 : 3;
@@ -276,8 +275,7 @@ static int pcmmio_dio_insn_bits(struct comedi_device *dev,
 
 static int pcmmio_dio_insn_config(struct comedi_device *dev,
 				  struct comedi_subdevice *s,
-				  struct comedi_insn *insn,
-				  unsigned int *data)
+				  struct comedi_insn *insn, unsigned int *data)
 {
 	/* subdevice 2 uses ports 0-2, subdevice 3 uses ports 3-5 */
 	int port = s->index == 2 ? 0 : 3;
@@ -456,7 +454,7 @@ static int pcmmio_cmd(struct comedi_device *dev, struct comedi_subdevice *s)
 	/* Set up start of acquisition. */
 	if (cmd->start_src == TRIG_INT)
 		s->async->inttrig = pcmmio_inttrig_start_intr;
-	else	/* TRIG_NOW */
+	else			/* TRIG_NOW */
 		pcmmio_start_intr(dev, s);
 
 	spin_unlock_irqrestore(&devpriv->spinlock, flags);
@@ -465,8 +463,7 @@ static int pcmmio_cmd(struct comedi_device *dev, struct comedi_subdevice *s)
 }
 
 static int pcmmio_cmdtest(struct comedi_device *dev,
-			  struct comedi_subdevice *s,
-			  struct comedi_cmd *cmd)
+			  struct comedi_subdevice *s, struct comedi_cmd *cmd)
 {
 	int err = 0;
 
@@ -501,7 +498,7 @@ static int pcmmio_cmdtest(struct comedi_device *dev,
 
 	if (cmd->stop_src == TRIG_COUNT)
 		err |= comedi_check_trigger_arg_min(&cmd->stop_arg, 1);
-	else	/* TRIG_NONE */
+	else			/* TRIG_NONE */
 		err |= comedi_check_trigger_arg_is(&cmd->stop_arg, 0);
 
 	if (err)
@@ -516,8 +513,7 @@ static int pcmmio_cmdtest(struct comedi_device *dev,
 
 static int pcmmio_ai_eoc(struct comedi_device *dev,
 			 struct comedi_subdevice *s,
-			 struct comedi_insn *insn,
-			 unsigned long context)
+			 struct comedi_insn *insn, unsigned long context)
 {
 	unsigned char status;
 
@@ -529,8 +525,7 @@ static int pcmmio_ai_eoc(struct comedi_device *dev,
 
 static int pcmmio_ai_insn_read(struct comedi_device *dev,
 			       struct comedi_subdevice *s,
-			       struct comedi_insn *insn,
-			       unsigned int *data)
+			       struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned long iobase = dev->iobase;
 	unsigned int chan = CR_CHAN(insn->chanspec);
@@ -599,8 +594,7 @@ static int pcmmio_ai_insn_read(struct comedi_device *dev,
 
 static int pcmmio_ao_eoc(struct comedi_device *dev,
 			 struct comedi_subdevice *s,
-			 struct comedi_insn *insn,
-			 unsigned long context)
+			 struct comedi_insn *insn, unsigned long context)
 {
 	unsigned char status;
 
@@ -612,8 +606,7 @@ static int pcmmio_ao_eoc(struct comedi_device *dev,
 
 static int pcmmio_ao_insn_write(struct comedi_device *dev,
 				struct comedi_subdevice *s,
-				struct comedi_insn *insn,
-				unsigned int *data)
+				struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned long iobase = dev->iobase;
 	unsigned int chan = CR_CHAN(insn->chanspec);
@@ -701,12 +694,12 @@ static int pcmmio_attach(struct comedi_device *dev, struct comedi_devconfig *it)
 
 	/* Analog Input subdevice */
 	s = &dev->subdevices[0];
-	s->type		= COMEDI_SUBD_AI;
-	s->subdev_flags	= SDF_READABLE | SDF_GROUND | SDF_DIFF;
-	s->n_chan	= 16;
-	s->maxdata	= 0xffff;
-	s->range_table	= &pcmmio_ai_ranges;
-	s->insn_read	= pcmmio_ai_insn_read;
+	s->type = COMEDI_SUBD_AI;
+	s->subdev_flags = SDF_READABLE | SDF_GROUND | SDF_DIFF;
+	s->n_chan = 16;
+	s->maxdata = 0xffff;
+	s->range_table = &pcmmio_ai_ranges;
+	s->insn_read = pcmmio_ai_insn_read;
 
 	/* initialize the resource enable register by clearing it */
 	outb(PCMMIO_AI_RES_ENA_CMD_REG_ACCESS,
@@ -716,12 +709,12 @@ static int pcmmio_attach(struct comedi_device *dev, struct comedi_devconfig *it)
 
 	/* Analog Output subdevice */
 	s = &dev->subdevices[1];
-	s->type		= COMEDI_SUBD_AO;
-	s->subdev_flags	= SDF_READABLE;
-	s->n_chan	= 8;
-	s->maxdata	= 0xffff;
-	s->range_table	= &pcmmio_ao_ranges;
-	s->insn_write	= pcmmio_ao_insn_write;
+	s->type = COMEDI_SUBD_AO;
+	s->subdev_flags = SDF_READABLE;
+	s->n_chan = 8;
+	s->maxdata = 0xffff;
+	s->range_table = &pcmmio_ao_ranges;
+	s->insn_write = pcmmio_ao_insn_write;
 
 	ret = comedi_alloc_subdev_readback(s);
 	if (ret)
@@ -730,46 +723,47 @@ static int pcmmio_attach(struct comedi_device *dev, struct comedi_devconfig *it)
 	/* initialize the resource enable register by clearing it */
 	outb(0, dev->iobase + PCMMIO_AO_RESOURCE_ENA_REG);
 	outb(0, dev->iobase + PCMMIO_AO_2ND_DAC_OFFSET +
-		PCMMIO_AO_RESOURCE_ENA_REG);
+	     PCMMIO_AO_RESOURCE_ENA_REG);
 
 	/* Digital I/O subdevice with interrupt support */
 	s = &dev->subdevices[2];
-	s->type		= COMEDI_SUBD_DIO;
-	s->subdev_flags	= SDF_READABLE | SDF_WRITABLE;
-	s->n_chan	= 24;
-	s->maxdata	= 1;
-	s->len_chanlist	= 1;
-	s->range_table	= &range_digital;
-	s->insn_bits	= pcmmio_dio_insn_bits;
-	s->insn_config	= pcmmio_dio_insn_config;
+	s->type = COMEDI_SUBD_DIO;
+	s->subdev_flags = SDF_READABLE | SDF_WRITABLE;
+	s->n_chan = 24;
+	s->maxdata = 1;
+	s->len_chanlist = 1;
+	s->range_table = &range_digital;
+	s->insn_bits = pcmmio_dio_insn_bits;
+	s->insn_config = pcmmio_dio_insn_config;
 	if (dev->irq) {
 		dev->read_subdev = s;
-		s->subdev_flags	|= SDF_CMD_READ | SDF_LSAMPL | SDF_PACKED;
-		s->len_chanlist	= s->n_chan;
-		s->cancel	= pcmmio_cancel;
-		s->do_cmd	= pcmmio_cmd;
-		s->do_cmdtest	= pcmmio_cmdtest;
+		s->subdev_flags |= SDF_CMD_READ | SDF_LSAMPL | SDF_PACKED;
+		s->len_chanlist = s->n_chan;
+		s->cancel = pcmmio_cancel;
+		s->do_cmd = pcmmio_cmd;
+		s->do_cmdtest = pcmmio_cmdtest;
 	}
 
 	/* Digital I/O subdevice */
 	s = &dev->subdevices[3];
-	s->type		= COMEDI_SUBD_DIO;
-	s->subdev_flags	= SDF_READABLE | SDF_WRITABLE;
-	s->n_chan	= 24;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_bits	= pcmmio_dio_insn_bits;
-	s->insn_config	= pcmmio_dio_insn_config;
+	s->type = COMEDI_SUBD_DIO;
+	s->subdev_flags = SDF_READABLE | SDF_WRITABLE;
+	s->n_chan = 24;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_bits = pcmmio_dio_insn_bits;
+	s->insn_config = pcmmio_dio_insn_config;
 
 	return 0;
 }
 
 static struct comedi_driver pcmmio_driver = {
-	.driver_name	= "pcmmio",
-	.module		= THIS_MODULE,
-	.attach		= pcmmio_attach,
-	.detach		= comedi_legacy_detach,
+	.driver_name = "pcmmio",
+	.module = THIS_MODULE,
+	.attach = pcmmio_attach,
+	.detach = comedi_legacy_detach,
 };
+
 module_comedi_driver(pcmmio_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

@@ -119,19 +119,19 @@
 /* the AO range is set by jumpers on the 20006M module */
 static const struct comedi_lrange ii20k_ao_ranges = {
 	3, {
-		BIP_RANGE(5),	/* Chan 0 - W1/W3 in   Chan 1 - W2/W4 in  */
-		UNI_RANGE(10),	/* Chan 0 - W1/W3 out  Chan 1 - W2/W4 in  */
-		BIP_RANGE(10)	/* Chan 0 - W1/W3 in   Chan 1 - W2/W4 out */
+	    BIP_RANGE(5),	/* Chan 0 - W1/W3 in   Chan 1 - W2/W4 in  */
+	    UNI_RANGE(10),	/* Chan 0 - W1/W3 out  Chan 1 - W2/W4 in  */
+	    BIP_RANGE(10)	/* Chan 0 - W1/W3 in   Chan 1 - W2/W4 out */
 	}
 };
 
 static const struct comedi_lrange ii20k_ai_ranges = {
 	4, {
-		BIP_RANGE(5),		/* gain 1 */
-		BIP_RANGE(0.5),		/* gain 10 */
-		BIP_RANGE(0.05),	/* gain 100 */
-		BIP_RANGE(0.025)	/* gain 200 */
-	},
+	    BIP_RANGE(5),	/* gain 1 */
+	    BIP_RANGE(0.5),	/* gain 10 */
+	    BIP_RANGE(0.05),	/* gain 100 */
+	    BIP_RANGE(0.025)	/* gain 200 */
+	     },
 };
 
 static void __iomem *ii20k_module_iobase(struct comedi_device *dev,
@@ -142,8 +142,7 @@ static void __iomem *ii20k_module_iobase(struct comedi_device *dev,
 
 static int ii20k_ao_insn_write(struct comedi_device *dev,
 			       struct comedi_subdevice *s,
-			       struct comedi_insn *insn,
-			       unsigned int *data)
+			       struct comedi_insn *insn, unsigned int *data)
 {
 	void __iomem *iobase = ii20k_module_iobase(dev, s);
 	unsigned int chan = CR_CHAN(insn->chanspec);
@@ -167,8 +166,7 @@ static int ii20k_ao_insn_write(struct comedi_device *dev,
 
 static int ii20k_ai_eoc(struct comedi_device *dev,
 			struct comedi_subdevice *s,
-			struct comedi_insn *insn,
-			unsigned long context)
+			struct comedi_insn *insn, unsigned long context)
 {
 	void __iomem *iobase = ii20k_module_iobase(dev, s);
 	unsigned char status;
@@ -180,8 +178,7 @@ static int ii20k_ai_eoc(struct comedi_device *dev,
 }
 
 static void ii20k_ai_setup(struct comedi_device *dev,
-			   struct comedi_subdevice *s,
-			   unsigned int chanspec)
+			   struct comedi_subdevice *s, unsigned int chanspec)
 {
 	void __iomem *iobase = ii20k_module_iobase(dev, s);
 	unsigned int chan = CR_CHAN(chanspec);
@@ -207,9 +204,8 @@ static void ii20k_ai_setup(struct comedi_device *dev,
 
 	/* set the channel list byte */
 	val = II20K_AI_CHANLIST_ONBOARD_ONLY |
-	      II20K_AI_CHANLIST_MUX_ENA |
-	      II20K_AI_CHANLIST_GAIN(range) |
-	      II20K_AI_CHANLIST_CHAN(chan);
+	    II20K_AI_CHANLIST_MUX_ENA |
+	    II20K_AI_CHANLIST_GAIN(range) | II20K_AI_CHANLIST_CHAN(chan);
 	writeb(val, iobase + II20K_AI_CHANLIST_REG);
 
 	/* reset settling time counter and trigger delay counter */
@@ -221,8 +217,7 @@ static void ii20k_ai_setup(struct comedi_device *dev,
 
 static int ii20k_ai_insn_read(struct comedi_device *dev,
 			      struct comedi_subdevice *s,
-			      struct comedi_insn *insn,
-			      unsigned int *data)
+			      struct comedi_insn *insn, unsigned int *data)
 {
 	void __iomem *iobase = ii20k_module_iobase(dev, s);
 	int ret;
@@ -316,8 +311,7 @@ static void ii20k_dio_config(struct comedi_device *dev,
 
 static int ii20k_dio_insn_config(struct comedi_device *dev,
 				 struct comedi_subdevice *s,
-				 struct comedi_insn *insn,
-				 unsigned int *data)
+				 struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 	unsigned int mask;
@@ -343,8 +337,7 @@ static int ii20k_dio_insn_config(struct comedi_device *dev,
 
 static int ii20k_dio_insn_bits(struct comedi_device *dev,
 			       struct comedi_subdevice *s,
-			       struct comedi_insn *insn,
-			       unsigned int *data)
+			       struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int mask;
 
@@ -384,12 +377,12 @@ static int ii20k_init_module(struct comedi_device *dev,
 	case II20K_ID_PCI20006M_1:
 	case II20K_ID_PCI20006M_2:
 		/* Analog Output subdevice */
-		s->type		= COMEDI_SUBD_AO;
-		s->subdev_flags	= SDF_WRITABLE;
-		s->n_chan	= (id == II20K_ID_PCI20006M_2) ? 2 : 1;
-		s->maxdata	= 0xffff;
-		s->range_table	= &ii20k_ao_ranges;
-		s->insn_write	= ii20k_ao_insn_write;
+		s->type = COMEDI_SUBD_AO;
+		s->subdev_flags = SDF_WRITABLE;
+		s->n_chan = (id == II20K_ID_PCI20006M_2) ? 2 : 1;
+		s->maxdata = 0xffff;
+		s->range_table = &ii20k_ao_ranges;
+		s->insn_write = ii20k_ao_insn_write;
 
 		ret = comedi_alloc_subdev_readback(s);
 		if (ret)
@@ -397,12 +390,12 @@ static int ii20k_init_module(struct comedi_device *dev,
 		break;
 	case II20K_ID_PCI20341M_1:
 		/* Analog Input subdevice */
-		s->type		= COMEDI_SUBD_AI;
-		s->subdev_flags	= SDF_READABLE | SDF_DIFF;
-		s->n_chan	= 4;
-		s->maxdata	= 0xffff;
-		s->range_table	= &ii20k_ai_ranges;
-		s->insn_read	= ii20k_ai_insn_read;
+		s->type = COMEDI_SUBD_AI;
+		s->subdev_flags = SDF_READABLE | SDF_DIFF;
+		s->n_chan = 4;
+		s->maxdata = 0xffff;
+		s->range_table = &ii20k_ai_ranges;
+		s->insn_read = ii20k_ai_insn_read;
 		break;
 	default:
 		s->type = COMEDI_SUBD_UNUSED;
@@ -412,8 +405,7 @@ static int ii20k_init_module(struct comedi_device *dev,
 	return 0;
 }
 
-static int ii20k_attach(struct comedi_device *dev,
-			struct comedi_devconfig *it)
+static int ii20k_attach(struct comedi_device *dev, struct comedi_devconfig *it)
 {
 	struct comedi_subdevice *s;
 	unsigned int membase;
@@ -486,13 +478,13 @@ static int ii20k_attach(struct comedi_device *dev,
 	/* Digital I/O subdevice */
 	s = &dev->subdevices[3];
 	if (has_dio) {
-		s->type		= COMEDI_SUBD_DIO;
-		s->subdev_flags	= SDF_READABLE | SDF_WRITABLE;
-		s->n_chan	= 32;
-		s->maxdata	= 1;
-		s->range_table	= &range_digital;
-		s->insn_bits	= ii20k_dio_insn_bits;
-		s->insn_config	= ii20k_dio_insn_config;
+		s->type = COMEDI_SUBD_DIO;
+		s->subdev_flags = SDF_READABLE | SDF_WRITABLE;
+		s->n_chan = 32;
+		s->maxdata = 1;
+		s->range_table = &range_digital;
+		s->insn_bits = ii20k_dio_insn_bits;
+		s->insn_config = ii20k_dio_insn_config;
 
 		/* default all channels to input */
 		ii20k_dio_config(dev, s);
@@ -512,11 +504,12 @@ static void ii20k_detach(struct comedi_device *dev)
 }
 
 static struct comedi_driver ii20k_driver = {
-	.driver_name	= "ii_pci20kc",
-	.module		= THIS_MODULE,
-	.attach		= ii20k_attach,
-	.detach		= ii20k_detach,
+	.driver_name = "ii_pci20kc",
+	.module = THIS_MODULE,
+	.attach = ii20k_attach,
+	.detach = ii20k_detach,
 };
+
 module_comedi_driver(ii20k_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

@@ -73,14 +73,14 @@
 
 static const struct comedi_lrange range_pcl816 = {
 	8, {
-		BIP_RANGE(10),
-		BIP_RANGE(5),
-		BIP_RANGE(2.5),
-		BIP_RANGE(1.25),
-		UNI_RANGE(10),
-		UNI_RANGE(5),
-		UNI_RANGE(2.5),
-		UNI_RANGE(1.25)
+	    BIP_RANGE(10),
+	    BIP_RANGE(5),
+	    BIP_RANGE(2.5),
+	    BIP_RANGE(1.25),
+	    UNI_RANGE(10),
+	    UNI_RANGE(5),
+	    UNI_RANGE(2.5),
+	    UNI_RANGE(1.25)
 	}
 };
 
@@ -92,14 +92,14 @@ struct pcl816_board {
 
 static const struct pcl816_board boardtypes[] = {
 	{
-		.name		= "pcl816",
-		.ai_maxdata	= 0xffff,
-		.ai_chanlist	= 1024,
-	}, {
-		.name		= "pcl814b",
-		.ai_maxdata	= 0x3fff,
-		.ai_chanlist	= 1024,
-	},
+	 .name = "pcl816",
+	 .ai_maxdata = 0xffff,
+	 .ai_chanlist = 1024,
+	  }, {
+	      .name = "pcl814b",
+	      .ai_maxdata = 0x3fff,
+	      .ai_chanlist = 1024,
+	       },
 };
 
 struct pcl816_private {
@@ -134,8 +134,7 @@ static void pcl816_ai_setup_dma(struct comedi_device *dev,
 }
 
 static void pcl816_ai_set_chan_range(struct comedi_device *dev,
-				     unsigned int chan,
-				     unsigned int range)
+				     unsigned int chan, unsigned int range)
 {
 	outb(chan, dev->iobase + PCL816_MUX_REG);
 	outb(range, dev->iobase + PCL816_RANGE_REG);
@@ -196,8 +195,7 @@ static unsigned int pcl816_ai_get_sample(struct comedi_device *dev,
 
 static int pcl816_ai_eoc(struct comedi_device *dev,
 			 struct comedi_subdevice *s,
-			 struct comedi_insn *insn,
-			 unsigned long context)
+			 struct comedi_insn *insn, unsigned long context)
 {
 	unsigned int status;
 
@@ -260,7 +258,7 @@ static irqreturn_t pcl816_interrupt(int irq, void *d)
 	}
 
 	nsamples = comedi_bytes_to_samples(s, desc->size) -
-		   devpriv->ai_poll_ptr;
+	    devpriv->ai_poll_ptr;
 	bufptr = devpriv->ai_poll_ptr;
 	devpriv->ai_poll_ptr = 0;
 
@@ -278,8 +276,7 @@ static irqreturn_t pcl816_interrupt(int irq, void *d)
 
 static int check_channel_list(struct comedi_device *dev,
 			      struct comedi_subdevice *s,
-			      unsigned int *chanlist,
-			      unsigned int chanlen)
+			      unsigned int *chanlist, unsigned int chanlen)
 {
 	unsigned int chansegment[16];
 	unsigned int i, nowmustbechan, seglen;
@@ -329,7 +326,7 @@ static int check_channel_list(struct comedi_device *dev,
 		seglen = 1;
 	}
 
-	return seglen;	/*  we can serve this with MUX logic */
+	return seglen;		/*  we can serve this with MUX logic */
 }
 
 static int pcl816_ai_cmdtest(struct comedi_device *dev,
@@ -366,7 +363,7 @@ static int pcl816_ai_cmdtest(struct comedi_device *dev,
 
 	if (cmd->convert_src == TRIG_TIMER)
 		err |= comedi_check_trigger_arg_min(&cmd->convert_arg, 10000);
-	else	/* TRIG_EXT */
+	else			/* TRIG_EXT */
 		err |= comedi_check_trigger_arg_is(&cmd->convert_arg, 0);
 
 	err |= comedi_check_trigger_arg_is(&cmd->scan_end_arg,
@@ -374,7 +371,7 @@ static int pcl816_ai_cmdtest(struct comedi_device *dev,
 
 	if (cmd->stop_src == TRIG_COUNT)
 		err |= comedi_check_trigger_arg_min(&cmd->stop_arg, 1);
-	else	/* TRIG_NONE */
+	else			/* TRIG_NONE */
 		err |= comedi_check_trigger_arg_is(&cmd->stop_arg, 0);
 
 	if (err)
@@ -434,15 +431,14 @@ static int pcl816_ai_cmd(struct comedi_device *dev, struct comedi_subdevice *s)
 	comedi_8254_pacer_enable(dev->pacer, 1, 2, true);
 
 	ctrl = PCL816_CTRL_INTEN | PCL816_CTRL_DMAEN |
-	       PCL816_CTRL_DMASRC_SLOT(0);
+	    PCL816_CTRL_DMASRC_SLOT(0);
 	if (cmd->convert_src == TRIG_TIMER)
 		ctrl |= PCL816_CTRL_PACER_TRIG;
-	else	/* TRIG_EXT */
+	else			/* TRIG_EXT */
 		ctrl |= PCL816_CTRL_EXT_TRIG;
 
 	outb(ctrl, dev->iobase + PCL816_CTRL_REG);
-	outb((dma->chan << 4) | dev->irq,
-	     dev->iobase + PCL816_STATUS_REG);
+	outb((dma->chan << 4) | dev->irq, dev->iobase + PCL816_STATUS_REG);
 
 	return 0;
 }
@@ -501,8 +497,7 @@ static int pcl816_ai_cancel(struct comedi_device *dev,
 
 static int pcl816_ai_insn_read(struct comedi_device *dev,
 			       struct comedi_subdevice *s,
-			       struct comedi_insn *insn,
-			       unsigned int *data)
+			       struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 	unsigned int range = CR_RANGE(insn->chanspec);
@@ -532,19 +527,17 @@ static int pcl816_ai_insn_read(struct comedi_device *dev,
 
 static int pcl816_di_insn_bits(struct comedi_device *dev,
 			       struct comedi_subdevice *s,
-			       struct comedi_insn *insn,
-			       unsigned int *data)
+			       struct comedi_insn *insn, unsigned int *data)
 {
 	data[1] = inb(dev->iobase + PCL816_DO_DI_LSB_REG) |
-		  (inb(dev->iobase + PCL816_DO_DI_MSB_REG) << 8);
+	    (inb(dev->iobase + PCL816_DO_DI_MSB_REG) << 8);
 
 	return insn->n;
 }
 
 static int pcl816_do_insn_bits(struct comedi_device *dev,
 			       struct comedi_subdevice *s,
-			       struct comedi_insn *insn,
-			       unsigned int *data)
+			       struct comedi_insn *insn, unsigned int *data)
 {
 	if (comedi_dio_update_state(s, data)) {
 		outb(s->state & 0xff, dev->iobase + PCL816_DO_DI_LSB_REG);
@@ -627,43 +620,43 @@ static int pcl816_attach(struct comedi_device *dev, struct comedi_devconfig *it)
 		return ret;
 
 	s = &dev->subdevices[0];
-	s->type		= COMEDI_SUBD_AI;
-	s->subdev_flags	= SDF_CMD_READ | SDF_DIFF;
-	s->n_chan	= 16;
-	s->maxdata	= board->ai_maxdata;
-	s->range_table	= &range_pcl816;
-	s->insn_read	= pcl816_ai_insn_read;
+	s->type = COMEDI_SUBD_AI;
+	s->subdev_flags = SDF_CMD_READ | SDF_DIFF;
+	s->n_chan = 16;
+	s->maxdata = board->ai_maxdata;
+	s->range_table = &range_pcl816;
+	s->insn_read = pcl816_ai_insn_read;
 	if (dev->irq) {
 		dev->read_subdev = s;
-		s->subdev_flags	|= SDF_CMD_READ;
-		s->len_chanlist	= board->ai_chanlist;
-		s->do_cmdtest	= pcl816_ai_cmdtest;
-		s->do_cmd	= pcl816_ai_cmd;
-		s->poll		= pcl816_ai_poll;
-		s->cancel	= pcl816_ai_cancel;
+		s->subdev_flags |= SDF_CMD_READ;
+		s->len_chanlist = board->ai_chanlist;
+		s->do_cmdtest = pcl816_ai_cmdtest;
+		s->do_cmd = pcl816_ai_cmd;
+		s->poll = pcl816_ai_poll;
+		s->cancel = pcl816_ai_cancel;
 	}
 
 	/* Piggyback Slot1 subdevice */
 	s = &dev->subdevices[1];
-	s->type		= COMEDI_SUBD_UNUSED;
+	s->type = COMEDI_SUBD_UNUSED;
 
 	/* Digital Input subdevice */
 	s = &dev->subdevices[2];
-	s->type		= COMEDI_SUBD_DI;
-	s->subdev_flags	= SDF_READABLE;
-	s->n_chan	= 16;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_bits	= pcl816_di_insn_bits;
+	s->type = COMEDI_SUBD_DI;
+	s->subdev_flags = SDF_READABLE;
+	s->n_chan = 16;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_bits = pcl816_di_insn_bits;
 
 	/* Digital Output subdevice */
 	s = &dev->subdevices[3];
-	s->type		= COMEDI_SUBD_DO;
-	s->subdev_flags	= SDF_WRITABLE;
-	s->n_chan	= 16;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_bits	= pcl816_do_insn_bits;
+	s->type = COMEDI_SUBD_DO;
+	s->subdev_flags = SDF_WRITABLE;
+	s->n_chan = 16;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_bits = pcl816_do_insn_bits;
 
 	pcl816_reset(dev);
 
@@ -681,14 +674,15 @@ static void pcl816_detach(struct comedi_device *dev)
 }
 
 static struct comedi_driver pcl816_driver = {
-	.driver_name	= "pcl816",
-	.module		= THIS_MODULE,
-	.attach		= pcl816_attach,
-	.detach		= pcl816_detach,
-	.board_name	= &boardtypes[0].name,
-	.num_names	= ARRAY_SIZE(boardtypes),
-	.offset		= sizeof(struct pcl816_board),
+	.driver_name = "pcl816",
+	.module = THIS_MODULE,
+	.attach = pcl816_attach,
+	.detach = pcl816_detach,
+	.board_name = &boardtypes[0].name,
+	.num_names = ARRAY_SIZE(boardtypes),
+	.offset = sizeof(struct pcl816_board),
 };
+
 module_comedi_driver(pcl816_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

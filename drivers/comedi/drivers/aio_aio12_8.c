@@ -69,10 +69,10 @@
 
 static const struct comedi_lrange aio_aio12_8_range = {
 	4, {
-		UNI_RANGE(5),
-		BIP_RANGE(5),
-		UNI_RANGE(10),
-		BIP_RANGE(10)
+	    UNI_RANGE(5),
+	    BIP_RANGE(5),
+	    UNI_RANGE(10),
+	    BIP_RANGE(10)
 	}
 };
 
@@ -84,22 +84,21 @@ struct aio12_8_boardtype {
 
 static const struct aio12_8_boardtype board_types[] = {
 	{
-		.name		= "aio_aio12_8",
-		.has_ai		= 1,
-		.has_ao		= 1,
-	}, {
-		.name		= "aio_ai12_8",
-		.has_ai		= 1,
-	}, {
-		.name		= "aio_ao12_4",
-		.has_ao		= 1,
-	},
+	 .name = "aio_aio12_8",
+	 .has_ai = 1,
+	 .has_ao = 1,
+	  }, {
+	      .name = "aio_ai12_8",
+	      .has_ai = 1,
+	       }, {
+		   .name = "aio_ao12_4",
+		   .has_ao = 1,
+		    },
 };
 
 static int aio_aio12_8_ai_eoc(struct comedi_device *dev,
 			      struct comedi_subdevice *s,
-			      struct comedi_insn *insn,
-			      unsigned long context)
+			      struct comedi_insn *insn, unsigned long context)
 {
 	unsigned int status;
 
@@ -111,8 +110,7 @@ static int aio_aio12_8_ai_eoc(struct comedi_device *dev,
 
 static int aio_aio12_8_ai_read(struct comedi_device *dev,
 			       struct comedi_subdevice *s,
-			       struct comedi_insn *insn,
-			       unsigned int *data)
+			       struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 	unsigned int range = CR_RANGE(insn->chanspec);
@@ -126,7 +124,7 @@ static int aio_aio12_8_ai_read(struct comedi_device *dev,
 	 * at the desired range of the requested channel.
 	 */
 	control = AIO12_8_ADC_MODE_NORMAL | AIO12_8_ADC_ACQ_3USEC |
-		  AIO12_8_ADC_RANGE(range) | AIO12_8_ADC_CHAN(chan);
+	    AIO12_8_ADC_RANGE(range) | AIO12_8_ADC_CHAN(chan);
 
 	/* Read status to clear EOC latch */
 	inb(dev->iobase + AIO12_8_STATUS_REG);
@@ -219,12 +217,12 @@ static int aio_aio12_8_attach(struct comedi_device *dev,
 	/* Analog Input subdevice */
 	s = &dev->subdevices[0];
 	if (board->has_ai) {
-		s->type		= COMEDI_SUBD_AI;
-		s->subdev_flags	= SDF_READABLE | SDF_GROUND | SDF_DIFF;
-		s->n_chan	= 8;
-		s->maxdata	= 0x0fff;
-		s->range_table	= &aio_aio12_8_range;
-		s->insn_read	= aio_aio12_8_ai_read;
+		s->type = COMEDI_SUBD_AI;
+		s->subdev_flags = SDF_READABLE | SDF_GROUND | SDF_DIFF;
+		s->n_chan = 8;
+		s->maxdata = 0x0fff;
+		s->range_table = &aio_aio12_8_range;
+		s->insn_read = aio_aio12_8_ai_read;
 	} else {
 		s->type = COMEDI_SUBD_UNUSED;
 	}
@@ -232,12 +230,12 @@ static int aio_aio12_8_attach(struct comedi_device *dev,
 	/* Analog Output subdevice */
 	s = &dev->subdevices[1];
 	if (board->has_ao) {
-		s->type		= COMEDI_SUBD_AO;
-		s->subdev_flags	= SDF_WRITABLE | SDF_GROUND;
-		s->n_chan	= 4;
-		s->maxdata	= 0x0fff;
-		s->range_table	= &aio_aio12_8_range;
-		s->insn_write	= aio_aio12_8_ao_insn_write;
+		s->type = COMEDI_SUBD_AO;
+		s->subdev_flags = SDF_WRITABLE | SDF_GROUND;
+		s->n_chan = 4;
+		s->maxdata = 0x0fff;
+		s->range_table = &aio_aio12_8_range;
+		s->insn_write = aio_aio12_8_ao_insn_write;
 
 		ret = comedi_alloc_subdev_readback(s);
 		if (ret)
@@ -262,14 +260,15 @@ static int aio_aio12_8_attach(struct comedi_device *dev,
 }
 
 static struct comedi_driver aio_aio12_8_driver = {
-	.driver_name	= "aio_aio12_8",
-	.module		= THIS_MODULE,
-	.attach		= aio_aio12_8_attach,
-	.detach		= comedi_legacy_detach,
-	.board_name	= &board_types[0].name,
-	.num_names	= ARRAY_SIZE(board_types),
-	.offset		= sizeof(struct aio12_8_boardtype),
+	.driver_name = "aio_aio12_8",
+	.module = THIS_MODULE,
+	.attach = aio_aio12_8_attach,
+	.detach = comedi_legacy_detach,
+	.board_name = &board_types[0].name,
+	.num_names = ARRAY_SIZE(board_types),
+	.offset = sizeof(struct aio12_8_boardtype),
 };
+
 module_comedi_driver(aio_aio12_8_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

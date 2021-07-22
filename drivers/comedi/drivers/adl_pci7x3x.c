@@ -83,38 +83,38 @@ struct adl_pci7x3x_boardinfo {
 
 static const struct adl_pci7x3x_boardinfo adl_pci7x3x_boards[] = {
 	[BOARD_PCI7230] = {
-		.name		= "adl_pci7230",
-		.nsubdevs	= 4,  /* IDI, IDO, IRQ_IDI0, IRQ_IDI1 */
-		.di_nchan	= 16,
-		.do_nchan	= 16,
-		.irq_nchan	= 2,
-	},
+			   .name = "adl_pci7230",
+			   .nsubdevs = 4,	/* IDI, IDO, IRQ_IDI0, IRQ_IDI1 */
+			   .di_nchan = 16,
+			   .do_nchan = 16,
+			   .irq_nchan = 2,
+			    },
 	[BOARD_PCI7233] = {
-		.name		= "adl_pci7233",
-		.nsubdevs	= 1,
-		.di_nchan	= 32,
-	},
+			   .name = "adl_pci7233",
+			   .nsubdevs = 1,
+			   .di_nchan = 32,
+			    },
 	[BOARD_PCI7234] = {
-		.name		= "adl_pci7234",
-		.nsubdevs	= 1,
-		.do_nchan	= 32,
-	},
+			   .name = "adl_pci7234",
+			   .nsubdevs = 1,
+			   .do_nchan = 32,
+			    },
 	[BOARD_PCI7432] = {
-		.name		= "adl_pci7432",
-		.nsubdevs	= 2,
-		.di_nchan	= 32,
-		.do_nchan	= 32,
-	},
+			   .name = "adl_pci7432",
+			   .nsubdevs = 2,
+			   .di_nchan = 32,
+			   .do_nchan = 32,
+			    },
 	[BOARD_PCI7433] = {
-		.name		= "adl_pci7433",
-		.nsubdevs	= 2,
-		.di_nchan	= 64,
-	},
+			   .name = "adl_pci7433",
+			   .nsubdevs = 2,
+			   .di_nchan = 64,
+			    },
 	[BOARD_PCI7434] = {
-		.name		= "adl_pci7434",
-		.nsubdevs	= 2,
-		.do_nchan	= 64,
-	}
+			   .name = "adl_pci7434",
+			   .nsubdevs = 2,
+			   .do_nchan = 64,
+			}
 };
 
 struct adl_pci7x3x_dev_private_data {
@@ -123,7 +123,7 @@ struct adl_pci7x3x_dev_private_data {
 };
 
 struct adl_pci7x3x_sd_private_data {
-	spinlock_t subd_slock;		/* spin-lock for cmd_running */
+	spinlock_t subd_slock;	/* spin-lock for cmd_running */
 	unsigned long port_offset;
 	short int cmd_running;
 };
@@ -173,12 +173,12 @@ static irqreturn_t adl_pci7x3x_interrupt(int irq, void *p_device)
 	}
 	spin_unlock_irqrestore(&dev->spinlock, cpu_flags);
 
-	/* SubDev 2, 3 = Isolated DigIn , on "SCSI2" jack!*/
+	/* SubDev 2, 3 = Isolated DigIn , on "SCSI2" jack! */
 
-	if (li1stat)	/* 0x0005 LINTi1 is Enabled && IDI0 is 1 */
+	if (li1stat)		/* 0x0005 LINTi1 is Enabled && IDI0 is 1 */
 		process_irq(dev, 2, intcsr);
 
-	if (li2stat)	/* 0x0028 LINTi2 is Enabled && IDI1 is 1 */
+	if (li2stat)		/* 0x0028 LINTi2 is Enabled && IDI1 is 1 */
 		process_irq(dev, 3, intcsr);
 
 	return IRQ_RETVAL(li1stat || li2stat);
@@ -333,7 +333,7 @@ static int adl_pci7x3x_reset(struct comedi_device *dev)
 	struct adl_pci7x3x_dev_private_data *dev_private = dev->private;
 
 	/* disable Interrupts */
-	dev_private->int_ctrl = 0x00;  /* Disable PCI + LINTi2 + LINTi1 */
+	dev_private->int_ctrl = 0x00;	/* Disable PCI + LINTi2 + LINTi1 */
 	outl(dev_private->int_ctrl, dev_private->lcr_io_base + PLX9052_INTCSR);
 
 	return 0;
@@ -398,14 +398,14 @@ static int adl_pci7x3x_auto_attach(struct comedi_device *dev,
 
 		s = &dev->subdevices[subdev];
 		/* Isolated digital inputs 0 to 15/31 */
-		s->type		= COMEDI_SUBD_DI;
-		s->subdev_flags	= SDF_READABLE;
-		s->n_chan	= nchan;
-		s->maxdata	= 1;
-		s->insn_bits	= adl_pci7x3x_di_insn_bits;
-		s->range_table	= &range_digital;
+		s->type = COMEDI_SUBD_DI;
+		s->subdev_flags = SDF_READABLE;
+		s->n_chan = nchan;
+		s->maxdata = 1;
+		s->insn_bits = adl_pci7x3x_di_insn_bits;
+		s->range_table = &range_digital;
 
-		s->private	= (void *)PCI7X3X_DIO_REG;
+		s->private = (void *)PCI7X3X_DIO_REG;
 
 		subdev++;
 
@@ -413,14 +413,14 @@ static int adl_pci7x3x_auto_attach(struct comedi_device *dev,
 		if (nchan) {
 			s = &dev->subdevices[subdev];
 			/* Isolated digital inputs 32 to 63 */
-			s->type		= COMEDI_SUBD_DI;
-			s->subdev_flags	= SDF_READABLE;
-			s->n_chan	= nchan;
-			s->maxdata	= 1;
-			s->insn_bits	= adl_pci7x3x_di_insn_bits;
-			s->range_table	= &range_digital;
+			s->type = COMEDI_SUBD_DI;
+			s->subdev_flags = SDF_READABLE;
+			s->n_chan = nchan;
+			s->maxdata = 1;
+			s->insn_bits = adl_pci7x3x_di_insn_bits;
+			s->range_table = &range_digital;
 
-			s->private	= (void *)PCI743X_DIO_REG;
+			s->private = (void *)PCI743X_DIO_REG;
 
 			subdev++;
 		}
@@ -431,14 +431,14 @@ static int adl_pci7x3x_auto_attach(struct comedi_device *dev,
 
 		s = &dev->subdevices[subdev];
 		/* Isolated digital outputs 0 to 15/31 */
-		s->type		= COMEDI_SUBD_DO;
-		s->subdev_flags	= SDF_WRITABLE;
-		s->n_chan	= nchan;
-		s->maxdata	= 1;
-		s->insn_bits	= adl_pci7x3x_do_insn_bits;
-		s->range_table	= &range_digital;
+		s->type = COMEDI_SUBD_DO;
+		s->subdev_flags = SDF_WRITABLE;
+		s->n_chan = nchan;
+		s->maxdata = 1;
+		s->insn_bits = adl_pci7x3x_do_insn_bits;
+		s->range_table = &range_digital;
 
-		s->private	= (void *)PCI7X3X_DIO_REG;
+		s->private = (void *)PCI7X3X_DIO_REG;
 
 		subdev++;
 
@@ -446,14 +446,14 @@ static int adl_pci7x3x_auto_attach(struct comedi_device *dev,
 		if (nchan) {
 			s = &dev->subdevices[subdev];
 			/* Isolated digital outputs 32 to 63 */
-			s->type		= COMEDI_SUBD_DO;
-			s->subdev_flags	= SDF_WRITABLE;
-			s->n_chan	= nchan;
-			s->maxdata	= 1;
-			s->insn_bits	= adl_pci7x3x_do_insn_bits;
-			s->range_table	= &range_digital;
+			s->type = COMEDI_SUBD_DO;
+			s->subdev_flags = SDF_WRITABLE;
+			s->n_chan = nchan;
+			s->maxdata = 1;
+			s->insn_bits = adl_pci7x3x_do_insn_bits;
+			s->range_table = &range_digital;
 
-			s->private	= (void *)PCI743X_DIO_REG;
+			s->private = (void *)PCI743X_DIO_REG;
 
 			subdev++;
 		}
@@ -466,12 +466,12 @@ static int adl_pci7x3x_auto_attach(struct comedi_device *dev,
 
 		s = &dev->subdevices[subdev];
 		/* Isolated digital inputs 0 or 1 */
-		s->type		= COMEDI_SUBD_DI;
-		s->subdev_flags	= SDF_READABLE;
-		s->n_chan	= nchan;
-		s->maxdata	= 1;
-		s->insn_bits	= adl_pci7x3x_dirq_insn_bits;
-		s->range_table	= &range_digital;
+		s->type = COMEDI_SUBD_DI;
+		s->subdev_flags = SDF_READABLE;
+		s->n_chan = nchan;
+		s->maxdata = 1;
+		s->insn_bits = adl_pci7x3x_dirq_insn_bits;
+		s->range_table = &range_digital;
 
 		sd_priv = comedi_alloc_spriv(s, sizeof(*sd_priv));
 		if (!sd_priv)
@@ -483,12 +483,12 @@ static int adl_pci7x3x_auto_attach(struct comedi_device *dev,
 
 		if (dev->irq) {
 			dev->read_subdev = s;
-			s->type		= COMEDI_SUBD_DI;
-			s->subdev_flags	= SDF_READABLE | SDF_CMD_READ;
-			s->len_chanlist	= 1;
-			s->do_cmdtest	= adl_pci7x3x_asy_cmdtest;
-			s->do_cmd	= adl_pci7x3x_asy_cmd;
-			s->cancel	= adl_pci7x3x_asy_cancel;
+			s->type = COMEDI_SUBD_DI;
+			s->subdev_flags = SDF_READABLE | SDF_CMD_READ;
+			s->len_chanlist = 1;
+			s->do_cmdtest = adl_pci7x3x_asy_cmdtest;
+			s->do_cmd = adl_pci7x3x_asy_cmd;
+			s->cancel = adl_pci7x3x_asy_cancel;
 		}
 
 		subdev++;
@@ -505,10 +505,10 @@ static void adl_pci7x3x_detach(struct comedi_device *dev)
 }
 
 static struct comedi_driver adl_pci7x3x_driver = {
-	.driver_name	= "adl_pci7x3x",
-	.module		= THIS_MODULE,
-	.auto_attach	= adl_pci7x3x_auto_attach,
-	.detach		= adl_pci7x3x_detach,
+	.driver_name = "adl_pci7x3x",
+	.module = THIS_MODULE,
+	.auto_attach = adl_pci7x3x_auto_attach,
+	.detach = adl_pci7x3x_detach,
 };
 
 static int adl_pci7x3x_pci_probe(struct pci_dev *dev,
@@ -527,14 +527,16 @@ static const struct pci_device_id adl_pci7x3x_pci_table[] = {
 	{ PCI_VDEVICE(ADLINK, 0x7434), BOARD_PCI7434 },
 	{ 0 }
 };
+
 MODULE_DEVICE_TABLE(pci, adl_pci7x3x_pci_table);
 
 static struct pci_driver adl_pci7x3x_pci_driver = {
-	.name		= "adl_pci7x3x",
-	.id_table	= adl_pci7x3x_pci_table,
-	.probe		= adl_pci7x3x_pci_probe,
-	.remove		= comedi_pci_auto_unconfig,
+	.name = "adl_pci7x3x",
+	.id_table = adl_pci7x3x_pci_table,
+	.probe = adl_pci7x3x_pci_probe,
+	.remove = comedi_pci_auto_unconfig,
 };
+
 module_comedi_pci_driver(adl_pci7x3x_driver, adl_pci7x3x_pci_driver);
 
 MODULE_DESCRIPTION("ADLINK PCI-723x/743x Isolated Digital I/O boards");

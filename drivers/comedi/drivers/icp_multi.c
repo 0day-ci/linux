@@ -76,10 +76,10 @@
 /* analog input and output have the same range options */
 static const struct comedi_lrange icp_multi_ranges = {
 	4, {
-		UNI_RANGE(5),
-		UNI_RANGE(10),
-		BIP_RANGE(5),
-		BIP_RANGE(10)
+	    UNI_RANGE(5),
+	    UNI_RANGE(10),
+	    BIP_RANGE(5),
+	    BIP_RANGE(10)
 	}
 };
 
@@ -87,8 +87,7 @@ static const char range_codes_analog[] = { 0x00, 0x20, 0x10, 0x30 };
 
 static int icp_multi_ai_eoc(struct comedi_device *dev,
 			    struct comedi_subdevice *s,
-			    struct comedi_insn *insn,
-			    unsigned long context)
+			    struct comedi_insn *insn, unsigned long context)
 {
 	unsigned int status;
 
@@ -100,8 +99,7 @@ static int icp_multi_ai_eoc(struct comedi_device *dev,
 
 static int icp_multi_ai_insn_read(struct comedi_device *dev,
 				  struct comedi_subdevice *s,
-				  struct comedi_insn *insn,
-				  unsigned int *data)
+				  struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 	unsigned int range = CR_RANGE(insn->chanspec);
@@ -113,7 +111,7 @@ static int icp_multi_ai_insn_read(struct comedi_device *dev,
 	/* Set mode and range data for specified channel */
 	if (aref == AREF_DIFF) {
 		adc_csr = ICP_MULTI_ADC_CSR_DI_CHAN(chan) |
-			  ICP_MULTI_ADC_CSR_DI;
+		    ICP_MULTI_ADC_CSR_DI;
 	} else {
 		adc_csr = ICP_MULTI_ADC_CSR_SE_CHAN(chan);
 	}
@@ -140,8 +138,7 @@ static int icp_multi_ai_insn_read(struct comedi_device *dev,
 
 static int icp_multi_ao_ready(struct comedi_device *dev,
 			      struct comedi_subdevice *s,
-			      struct comedi_insn *insn,
-			      unsigned long context)
+			      struct comedi_insn *insn, unsigned long context)
 {
 	unsigned int status;
 
@@ -153,8 +150,7 @@ static int icp_multi_ao_ready(struct comedi_device *dev,
 
 static int icp_multi_ao_insn_write(struct comedi_device *dev,
 				   struct comedi_subdevice *s,
-				   struct comedi_insn *insn,
-				   unsigned int *data)
+				   struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 	unsigned int range = CR_RANGE(insn->chanspec);
@@ -189,8 +185,7 @@ static int icp_multi_ao_insn_write(struct comedi_device *dev,
 
 static int icp_multi_di_insn_bits(struct comedi_device *dev,
 				  struct comedi_subdevice *s,
-				  struct comedi_insn *insn,
-				  unsigned int *data)
+				  struct comedi_insn *insn, unsigned int *data)
 {
 	data[1] = readw(dev->mmio + ICP_MULTI_DI);
 
@@ -199,8 +194,7 @@ static int icp_multi_di_insn_bits(struct comedi_device *dev,
 
 static int icp_multi_do_insn_bits(struct comedi_device *dev,
 				  struct comedi_subdevice *s,
-				  struct comedi_insn *insn,
-				  unsigned int *data)
+				  struct comedi_insn *insn, unsigned int *data)
 {
 	if (comedi_dio_update_state(s, data))
 		writew(s->state, dev->mmio + ICP_MULTI_DO);
@@ -263,21 +257,21 @@ static int icp_multi_auto_attach(struct comedi_device *dev,
 
 	/* Analog Input subdevice */
 	s = &dev->subdevices[0];
-	s->type		= COMEDI_SUBD_AI;
-	s->subdev_flags	= SDF_READABLE | SDF_COMMON | SDF_GROUND | SDF_DIFF;
-	s->n_chan	= 16;
-	s->maxdata	= 0x0fff;
-	s->range_table	= &icp_multi_ranges;
-	s->insn_read	= icp_multi_ai_insn_read;
+	s->type = COMEDI_SUBD_AI;
+	s->subdev_flags = SDF_READABLE | SDF_COMMON | SDF_GROUND | SDF_DIFF;
+	s->n_chan = 16;
+	s->maxdata = 0x0fff;
+	s->range_table = &icp_multi_ranges;
+	s->insn_read = icp_multi_ai_insn_read;
 
 	/* Analog Output subdevice */
 	s = &dev->subdevices[1];
-	s->type		= COMEDI_SUBD_AO;
-	s->subdev_flags	= SDF_WRITABLE | SDF_GROUND | SDF_COMMON;
-	s->n_chan	= 4;
-	s->maxdata	= 0x0fff;
-	s->range_table	= &icp_multi_ranges;
-	s->insn_write	= icp_multi_ao_insn_write;
+	s->type = COMEDI_SUBD_AO;
+	s->subdev_flags = SDF_WRITABLE | SDF_GROUND | SDF_COMMON;
+	s->n_chan = 4;
+	s->maxdata = 0x0fff;
+	s->range_table = &icp_multi_ranges;
+	s->insn_write = icp_multi_ao_insn_write;
 
 	ret = comedi_alloc_subdev_readback(s);
 	if (ret)
@@ -285,30 +279,30 @@ static int icp_multi_auto_attach(struct comedi_device *dev,
 
 	/* Digital Input subdevice */
 	s = &dev->subdevices[2];
-	s->type		= COMEDI_SUBD_DI;
-	s->subdev_flags	= SDF_READABLE;
-	s->n_chan	= 16;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_bits	= icp_multi_di_insn_bits;
+	s->type = COMEDI_SUBD_DI;
+	s->subdev_flags = SDF_READABLE;
+	s->n_chan = 16;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_bits = icp_multi_di_insn_bits;
 
 	/* Digital Output subdevice */
 	s = &dev->subdevices[3];
-	s->type		= COMEDI_SUBD_DO;
-	s->subdev_flags	= SDF_WRITABLE;
-	s->n_chan	= 8;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_bits	= icp_multi_do_insn_bits;
+	s->type = COMEDI_SUBD_DO;
+	s->subdev_flags = SDF_WRITABLE;
+	s->n_chan = 8;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_bits = icp_multi_do_insn_bits;
 
 	return 0;
 }
 
 static struct comedi_driver icp_multi_driver = {
-	.driver_name	= "icp_multi",
-	.module		= THIS_MODULE,
-	.auto_attach	= icp_multi_auto_attach,
-	.detach		= comedi_pci_detach,
+	.driver_name = "icp_multi",
+	.module = THIS_MODULE,
+	.auto_attach = icp_multi_auto_attach,
+	.detach = comedi_pci_detach,
 };
 
 static int icp_multi_pci_probe(struct pci_dev *dev,
@@ -321,14 +315,16 @@ static const struct pci_device_id icp_multi_pci_table[] = {
 	{ PCI_DEVICE(PCI_VENDOR_ID_ICP, 0x8000) },
 	{ 0 }
 };
+
 MODULE_DEVICE_TABLE(pci, icp_multi_pci_table);
 
 static struct pci_driver icp_multi_pci_driver = {
-	.name		= "icp_multi",
-	.id_table	= icp_multi_pci_table,
-	.probe		= icp_multi_pci_probe,
-	.remove		= comedi_pci_auto_unconfig,
+	.name = "icp_multi",
+	.id_table = icp_multi_pci_table,
+	.probe = icp_multi_pci_probe,
+	.remove = comedi_pci_auto_unconfig,
 };
+
 module_comedi_pci_driver(icp_multi_driver, icp_multi_pci_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

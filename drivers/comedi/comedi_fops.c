@@ -72,8 +72,7 @@ struct comedi_file {
 static unsigned short comedi_num_legacy_minors;
 module_param(comedi_num_legacy_minors, ushort, 0444);
 MODULE_PARM_DESC(comedi_num_legacy_minors,
-		 "number of comedi minor devices to reserve for non-auto-configured devices (default 0)"
-		);
+		 "number of comedi minor devices to reserve for non-auto-configured devices (default 0)");
 
 unsigned int comedi_default_buf_size_kb = CONFIG_COMEDI_DEFAULT_BUF_SIZE_KB;
 module_param(comedi_default_buf_size_kb, uint, 0644);
@@ -82,7 +81,7 @@ MODULE_PARM_DESC(comedi_default_buf_size_kb,
 		 __MODULE_STRING(CONFIG_COMEDI_DEFAULT_BUF_SIZE_KB) ")");
 
 unsigned int comedi_default_buf_maxsize_kb =
-	CONFIG_COMEDI_DEFAULT_BUF_MAXSIZE_KB;
+    CONFIG_COMEDI_DEFAULT_BUF_MAXSIZE_KB;
 module_param(comedi_default_buf_maxsize_kb, uint, 0644);
 MODULE_PARM_DESC(comedi_default_buf_maxsize_kb,
 		 "default maximum size of asynchronous buffer in KiB (default "
@@ -112,7 +111,7 @@ static void comedi_device_init(struct comedi_device *dev)
 static void comedi_dev_kref_release(struct kref *kref)
 {
 	struct comedi_device *dev =
-		container_of(kref, struct comedi_device, refcount);
+	    container_of(kref, struct comedi_device, refcount);
 
 	mutex_destroy(&dev->mutex);
 	put_device(dev->class_dev);
@@ -137,6 +136,7 @@ int comedi_dev_put(struct comedi_device *dev)
 		return kref_put(&dev->refcount, comedi_dev_kref_release);
 	return 1;
 }
+
 EXPORT_SYMBOL_GPL(comedi_dev_put);
 
 static struct comedi_device *comedi_dev_get(struct comedi_device *dev)
@@ -199,8 +199,9 @@ static void comedi_free_board_dev(struct comedi_device *dev)
 	}
 }
 
-static struct comedi_subdevice *
-comedi_subdevice_from_minor(const struct comedi_device *dev, unsigned int minor)
+static struct comedi_subdevice *comedi_subdevice_from_minor(const struct
+							    comedi_device * dev,
+							    unsigned int minor)
 {
 	struct comedi_subdevice *s;
 	unsigned int i = minor - COMEDI_NUM_BOARD_MINORS;
@@ -223,8 +224,8 @@ static struct comedi_device *comedi_dev_get_from_board_minor(unsigned int minor)
 	return dev;
 }
 
-static struct comedi_device *
-comedi_dev_get_from_subdevice_minor(unsigned int minor)
+static struct comedi_device *comedi_dev_get_from_subdevice_minor(unsigned int
+								 minor)
 {
 	struct comedi_device *dev;
 	struct comedi_subdevice *s;
@@ -256,10 +257,11 @@ struct comedi_device *comedi_dev_get_from_minor(unsigned int minor)
 
 	return comedi_dev_get_from_subdevice_minor(minor);
 }
+
 EXPORT_SYMBOL_GPL(comedi_dev_get_from_minor);
 
-static struct comedi_subdevice *
-comedi_read_subdevice(const struct comedi_device *dev, unsigned int minor)
+static struct comedi_subdevice *comedi_read_subdevice(const struct comedi_device
+						      *dev, unsigned int minor)
 {
 	struct comedi_subdevice *s;
 
@@ -272,8 +274,9 @@ comedi_read_subdevice(const struct comedi_device *dev, unsigned int minor)
 	return dev->read_subdev;
 }
 
-static struct comedi_subdevice *
-comedi_write_subdevice(const struct comedi_device *dev, unsigned int minor)
+static struct comedi_subdevice *comedi_write_subdevice(const struct
+						       comedi_device * dev,
+						       unsigned int minor)
 {
 	struct comedi_subdevice *s;
 
@@ -431,6 +434,7 @@ static ssize_t max_read_buffer_kb_store(struct device *csdev,
 	comedi_dev_put(dev);
 	return err ? err : count;
 }
+
 static DEVICE_ATTR_RW(max_read_buffer_kb);
 
 static ssize_t read_buffer_kb_show(struct device *csdev,
@@ -487,6 +491,7 @@ static ssize_t read_buffer_kb_store(struct device *csdev,
 	comedi_dev_put(dev);
 	return err ? err : count;
 }
+
 static DEVICE_ATTR_RW(read_buffer_kb);
 
 static ssize_t max_write_buffer_kb_show(struct device *csdev,
@@ -544,6 +549,7 @@ static ssize_t max_write_buffer_kb_store(struct device *csdev,
 	comedi_dev_put(dev);
 	return err ? err : count;
 }
+
 static DEVICE_ATTR_RW(max_write_buffer_kb);
 
 static ssize_t write_buffer_kb_show(struct device *csdev,
@@ -600,6 +606,7 @@ static ssize_t write_buffer_kb_store(struct device *csdev,
 	comedi_dev_put(dev);
 	return err ? err : count;
 }
+
 static DEVICE_ATTR_RW(write_buffer_kb);
 
 static struct attribute *comedi_dev_attrs[] = {
@@ -609,6 +616,7 @@ static struct attribute *comedi_dev_attrs[] = {
 	&dev_attr_write_buffer_kb.attr,
 	NULL,
 };
+
 ATTRIBUTE_GROUPS(comedi_dev);
 
 static void __comedi_clear_subdevice_runflags(struct comedi_subdevice *s,
@@ -674,6 +682,7 @@ bool comedi_is_subdevice_running(struct comedi_subdevice *s)
 
 	return comedi_is_runflags_running(runflags);
 }
+
 EXPORT_SYMBOL_GPL(comedi_is_subdevice_running);
 
 static bool __comedi_is_subdevice_running(struct comedi_subdevice *s)
@@ -702,6 +711,7 @@ void comedi_set_spriv_auto_free(struct comedi_subdevice *s)
 {
 	__comedi_set_subdevice_runflags(s, COMEDI_SRF_FREE_SPRIV);
 }
+
 EXPORT_SYMBOL_GPL(comedi_set_spriv_auto_free);
 
 /**
@@ -723,6 +733,7 @@ void *comedi_alloc_spriv(struct comedi_subdevice *s, size_t size)
 		comedi_set_spriv_auto_free(s);
 	return s->private;
 }
+
 EXPORT_SYMBOL_GPL(comedi_alloc_spriv);
 
 /*
@@ -1078,7 +1089,8 @@ static int do_chaninfo_ioctl(struct comedi_device *dev,
 		for (i = 0; i < s->n_chan; i++) {
 			int x;
 
-			x = (dev->minor << 28) | (it->subdev << 24) | (i << 16) |
+			x = (dev->minor << 28) | (it->
+						  subdev << 24) | (i << 16) |
 			    (s->range_table_list[i]->length);
 			if (put_user(x, it->rangelist + i))
 				return -EFAULT;
@@ -1240,8 +1252,9 @@ static int check_insn_config_length(struct comedi_insn *insn,
 		 * all possible cases yet
 		 */
 	default:
-		pr_warn("No check for data length of config insn id %i is implemented\n",
-			data[0]);
+		pr_warn
+		    ("No check for data length of config insn id %i is implemented\n",
+		     data[0]);
 		pr_warn("Add a check to %s in %s\n", __func__, __FILE__);
 		pr_warn("Assuming n=%i is correct\n", insn->n);
 		return 0;
@@ -1521,8 +1534,7 @@ out:
 #define MAX_SAMPLES 65536
 static int do_insnlist_ioctl(struct comedi_device *dev,
 			     struct comedi_insn *insns,
-			     unsigned int n_insns,
-			     void *file)
+			     unsigned int n_insns, void *file)
 {
 	unsigned int *data = NULL;
 	unsigned int max_n_data_required = MIN_SAMPLES;
@@ -1634,8 +1646,7 @@ static int do_insn_ioctl(struct comedi_device *dev,
 		goto error;
 	if (insn->insn & INSN_MASK_READ) {
 		if (copy_to_user(insn->data,
-				 data,
-				 insn->n * sizeof(unsigned int))) {
+				 data, insn->n * sizeof(unsigned int))) {
 			ret = -EFAULT;
 			goto error;
 		}
@@ -2131,8 +2142,7 @@ static long comedi_unlocked_ioctl(struct file *file, unsigned int cmd,
 		rc = do_devconfig_ioctl(dev,
 					(struct comedi_devconfig __user *)arg);
 		if (rc == 0) {
-			if (arg == 0 &&
-			    dev->minor >= comedi_num_legacy_minors) {
+			if (arg == 0 && dev->minor >= comedi_num_legacy_minors) {
 				/*
 				 * Successfully unconfigured a dynamically
 				 * allocated device.  Try and remove it.
@@ -2167,24 +2177,24 @@ static long comedi_unlocked_ioctl(struct file *file, unsigned int cmd,
 				       (struct comedi_subdinfo __user *)arg,
 				       file);
 		break;
-	case COMEDI_CHANINFO: {
-		struct comedi_chaninfo it;
+	case COMEDI_CHANINFO:{
+			struct comedi_chaninfo it;
 
-		if (copy_from_user(&it, (void __user *)arg, sizeof(it)))
-			rc = -EFAULT;
-		else
-			rc = do_chaninfo_ioctl(dev, &it);
-		break;
-	}
-	case COMEDI_RANGEINFO: {
-		struct comedi_rangeinfo it;
+			if (copy_from_user(&it, (void __user *)arg, sizeof(it)))
+				rc = -EFAULT;
+			else
+				rc = do_chaninfo_ioctl(dev, &it);
+			break;
+		}
+	case COMEDI_RANGEINFO:{
+			struct comedi_rangeinfo it;
 
-		if (copy_from_user(&it, (void __user *)arg, sizeof(it)))
-			rc = -EFAULT;
-		else
-			rc = do_rangeinfo_ioctl(dev, &it);
-		break;
-	}
+			if (copy_from_user(&it, (void __user *)arg, sizeof(it)))
+				rc = -EFAULT;
+			else
+				rc = do_rangeinfo_ioctl(dev, &it);
+			break;
+		}
 	case COMEDI_BUFINFO:
 		rc = do_bufinfo_ioctl(dev,
 				      (struct comedi_bufinfo __user *)arg,
@@ -2199,65 +2209,75 @@ static long comedi_unlocked_ioctl(struct file *file, unsigned int cmd,
 	case COMEDI_CANCEL:
 		rc = do_cancel_ioctl(dev, arg, file);
 		break;
-	case COMEDI_CMD: {
-		struct comedi_cmd cmd;
-		bool copy = false;
+	case COMEDI_CMD:{
+			struct comedi_cmd cmd;
+			bool copy = false;
 
-		if (copy_from_user(&cmd, (void __user *)arg, sizeof(cmd))) {
-			rc = -EFAULT;
+			if (copy_from_user
+			    (&cmd, (void __user *)arg, sizeof(cmd))) {
+				rc = -EFAULT;
+				break;
+			}
+			rc = do_cmd_ioctl(dev, &cmd, &copy, file);
+			if (copy
+			    && copy_to_user((void __user *)arg, &cmd,
+					    sizeof(cmd)))
+				rc = -EFAULT;
 			break;
 		}
-		rc = do_cmd_ioctl(dev, &cmd, &copy, file);
-		if (copy && copy_to_user((void __user *)arg, &cmd, sizeof(cmd)))
-			rc = -EFAULT;
-		break;
-	}
-	case COMEDI_CMDTEST: {
-		struct comedi_cmd cmd;
-		bool copy = false;
+	case COMEDI_CMDTEST:{
+			struct comedi_cmd cmd;
+			bool copy = false;
 
-		if (copy_from_user(&cmd, (void __user *)arg, sizeof(cmd))) {
-			rc = -EFAULT;
+			if (copy_from_user
+			    (&cmd, (void __user *)arg, sizeof(cmd))) {
+				rc = -EFAULT;
+				break;
+			}
+			rc = do_cmdtest_ioctl(dev, &cmd, &copy, file);
+			if (copy
+			    && copy_to_user((void __user *)arg, &cmd,
+					    sizeof(cmd)))
+				rc = -EFAULT;
 			break;
 		}
-		rc = do_cmdtest_ioctl(dev, &cmd, &copy, file);
-		if (copy && copy_to_user((void __user *)arg, &cmd, sizeof(cmd)))
-			rc = -EFAULT;
-		break;
-	}
-	case COMEDI_INSNLIST: {
-		struct comedi_insnlist insnlist;
-		struct comedi_insn *insns = NULL;
+	case COMEDI_INSNLIST:{
+			struct comedi_insnlist insnlist;
+			struct comedi_insn *insns = NULL;
 
-		if (copy_from_user(&insnlist, (void __user *)arg,
-				   sizeof(insnlist))) {
-			rc = -EFAULT;
-			break;
-		}
-		insns = kcalloc(insnlist.n_insns, sizeof(*insns), GFP_KERNEL);
-		if (!insns) {
-			rc = -ENOMEM;
-			break;
-		}
-		if (copy_from_user(insns, insnlist.insns,
-				   sizeof(*insns) * insnlist.n_insns)) {
-			rc = -EFAULT;
+			if (copy_from_user(&insnlist, (void __user *)arg,
+					   sizeof(insnlist))) {
+				rc = -EFAULT;
+				break;
+			}
+			insns =
+			    kcalloc(insnlist.n_insns, sizeof(*insns),
+				    GFP_KERNEL);
+			if (!insns) {
+				rc = -ENOMEM;
+				break;
+			}
+			if (copy_from_user(insns, insnlist.insns,
+					   sizeof(*insns) * insnlist.n_insns)) {
+				rc = -EFAULT;
+				kfree(insns);
+				break;
+			}
+			rc = do_insnlist_ioctl(dev, insns, insnlist.n_insns,
+					       file);
 			kfree(insns);
 			break;
 		}
-		rc = do_insnlist_ioctl(dev, insns, insnlist.n_insns, file);
-		kfree(insns);
-		break;
-	}
-	case COMEDI_INSN: {
-		struct comedi_insn insn;
+	case COMEDI_INSN:{
+			struct comedi_insn insn;
 
-		if (copy_from_user(&insn, (void __user *)arg, sizeof(insn)))
-			rc = -EFAULT;
-		else
-			rc = do_insn_ioctl(dev, &insn, file);
-		break;
-	}
+			if (copy_from_user
+			    (&insn, (void __user *)arg, sizeof(insn)))
+				rc = -EFAULT;
+			else
+				rc = do_insn_ioctl(dev, &insn, file);
+			break;
+		}
 	case COMEDI_POLL:
 		rc = do_poll_ioctl(dev, arg, file);
 		break;
@@ -2529,8 +2549,7 @@ static ssize_t comedi_write(struct file *file, const char __user *buf,
 				retval = -ERESTARTSYS;
 				break;
 			}
-			if (s->busy != file ||
-			    !(async->cmd.flags & CMDF_WRITE)) {
+			if (s->busy != file || !(async->cmd.flags & CMDF_WRITE)) {
 				retval = -EINVAL;
 				break;
 			}
@@ -2643,7 +2662,7 @@ static ssize_t comedi_read(struct file *file, char __user *buf, size_t nbytes,
 
 		if (n == 0) {
 			unsigned int runflags =
-				     comedi_get_subdevice_runflags(s);
+			    comedi_get_subdevice_runflags(s);
 
 			if (!comedi_is_runflags_running(runflags)) {
 				if (comedi_is_runflags_in_error(runflags))
@@ -2663,8 +2682,7 @@ static ssize_t comedi_read(struct file *file, char __user *buf, size_t nbytes,
 				retval = -ERESTARTSYS;
 				break;
 			}
-			if (s->busy != file ||
-			    (async->cmd.flags & CMDF_WRITE)) {
+			if (s->busy != file || (async->cmd.flags & CMDF_WRITE)) {
 				retval = -EINVAL;
 				break;
 			}
@@ -3116,7 +3134,8 @@ static int compat_insn(struct file *file, unsigned long arg)
  *
  * Returns -ENOIOCTLCMD for unrecognised ioctl codes.
  */
-static long comedi_compat_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+static long comedi_compat_ioctl(struct file *file, unsigned int cmd,
+				unsigned long arg)
 {
 	int rc;
 
@@ -3228,6 +3247,7 @@ void comedi_event(struct comedi_device *dev, struct comedi_subdevice *s)
 	if (si_code)
 		kill_fasync(&dev->async_queue, SIGIO, si_code);
 }
+
 EXPORT_SYMBOL_GPL(comedi_event);
 
 /* Note: the ->mutex is pre-locked on successful return */
@@ -3325,8 +3345,7 @@ void comedi_free_subdevice_minor(struct comedi_subdevice *s)
 
 	if (!s)
 		return;
-	if (s->minor < COMEDI_NUM_BOARD_MINORS ||
-	    s->minor >= COMEDI_NUM_MINORS)
+	if (s->minor < COMEDI_NUM_BOARD_MINORS || s->minor >= COMEDI_NUM_MINORS)
 		return;
 
 	i = s->minor - COMEDI_NUM_BOARD_MINORS;
@@ -3359,8 +3378,9 @@ static int __init comedi_init(void)
 	pr_info("version " COMEDI_RELEASE " - http://www.comedi.org\n");
 
 	if (comedi_num_legacy_minors > COMEDI_NUM_BOARD_MINORS) {
-		pr_err("invalid value for module parameter \"comedi_num_legacy_minors\".  Valid values are 0 through %i.\n",
-		       COMEDI_NUM_BOARD_MINORS);
+		pr_err
+		    ("invalid value for module parameter \"comedi_num_legacy_minors\".  Valid values are 0 through %i.\n",
+		     COMEDI_NUM_BOARD_MINORS);
 		return -EINVAL;
 	}
 
@@ -3418,6 +3438,7 @@ out_unregister_chrdev_region:
 	unregister_chrdev_region(MKDEV(COMEDI_MAJOR, 0), COMEDI_NUM_MINORS);
 	return retval;
 }
+
 module_init(comedi_init);
 
 static void __exit comedi_cleanup(void)
@@ -3429,6 +3450,7 @@ static void __exit comedi_cleanup(void)
 
 	comedi_proc_cleanup();
 }
+
 module_exit(comedi_cleanup);
 
 MODULE_AUTHOR("https://www.comedi.org");

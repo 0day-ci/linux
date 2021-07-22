@@ -177,21 +177,22 @@ struct comedi_subdevice {
 
 	unsigned int *chanlist;	/* driver-owned chanlist (not used) */
 
-	int (*insn_read)(struct comedi_device *dev, struct comedi_subdevice *s,
-			 struct comedi_insn *insn, unsigned int *data);
-	int (*insn_write)(struct comedi_device *dev, struct comedi_subdevice *s,
+	int (*insn_read)(struct comedi_device *dev,
+			 struct comedi_subdevice *s, struct comedi_insn *insn,
+			 unsigned int *data);
+	int (*insn_write)(struct comedi_device *dev,
+			  struct comedi_subdevice *s,
 			  struct comedi_insn *insn, unsigned int *data);
-	int (*insn_bits)(struct comedi_device *dev, struct comedi_subdevice *s,
-			 struct comedi_insn *insn, unsigned int *data);
+	int (*insn_bits)(struct comedi_device *dev,
+			 struct comedi_subdevice *s, struct comedi_insn *insn,
+			 unsigned int *data);
 	int (*insn_config)(struct comedi_device *dev,
 			   struct comedi_subdevice *s,
-			   struct comedi_insn *insn,
-			   unsigned int *data);
+			   struct comedi_insn *insn, unsigned int *data);
 
 	int (*do_cmd)(struct comedi_device *dev, struct comedi_subdevice *s);
 	int (*do_cmdtest)(struct comedi_device *dev,
-			  struct comedi_subdevice *s,
-			  struct comedi_cmd *cmd);
+			  struct comedi_subdevice *s, struct comedi_cmd *cmd);
 	int (*poll)(struct comedi_device *dev, struct comedi_subdevice *s);
 	int (*cancel)(struct comedi_device *dev, struct comedi_subdevice *s);
 
@@ -381,15 +382,15 @@ struct comedi_async {
  * @COMEDI_CB_CANCEL_MASK:	events that will cancel an async command
  */
 enum comedi_cb {
-	COMEDI_CB_EOS		= BIT(0),
-	COMEDI_CB_EOA		= BIT(1),
-	COMEDI_CB_BLOCK		= BIT(2),
-	COMEDI_CB_EOBUF		= BIT(3),
-	COMEDI_CB_ERROR		= BIT(4),
-	COMEDI_CB_OVERFLOW	= BIT(5),
+	COMEDI_CB_EOS = BIT(0),
+	COMEDI_CB_EOA = BIT(1),
+	COMEDI_CB_BLOCK = BIT(2),
+	COMEDI_CB_EOBUF = BIT(3),
+	COMEDI_CB_ERROR = BIT(4),
+	COMEDI_CB_OVERFLOW = BIT(5),
 	/* masks */
-	COMEDI_CB_ERROR_MASK	= (COMEDI_CB_ERROR | COMEDI_CB_OVERFLOW),
-	COMEDI_CB_CANCEL_MASK	= (COMEDI_CB_EOA | COMEDI_CB_ERROR_MASK)
+	COMEDI_CB_ERROR_MASK = (COMEDI_CB_ERROR | COMEDI_CB_OVERFLOW),
+	COMEDI_CB_CANCEL_MASK = (COMEDI_CB_EOA | COMEDI_CB_ERROR_MASK)
 };
 
 /**
@@ -575,7 +576,8 @@ struct comedi_device {
 	int (*open)(struct comedi_device *dev);
 	void (*close)(struct comedi_device *dev);
 	int (*insn_device_config)(struct comedi_device *dev,
-				  struct comedi_insn *insn, unsigned int *data);
+				  struct comedi_insn *insn,
+				  unsigned int *data);
 	unsigned int (*get_valid_routes)(struct comedi_device *dev,
 					 unsigned int n_pairs,
 					 unsigned int *pair_data);
@@ -596,8 +598,7 @@ void *comedi_alloc_spriv(struct comedi_subdevice *s, size_t size);
 void comedi_set_spriv_auto_free(struct comedi_subdevice *s);
 
 int comedi_check_chanlist(struct comedi_subdevice *s,
-			  int n,
-			  unsigned int *chanlist);
+			  int n, unsigned int *chanlist);
 
 /* range stuff */
 

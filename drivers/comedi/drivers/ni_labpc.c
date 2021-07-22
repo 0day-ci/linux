@@ -56,21 +56,21 @@
 
 static const struct labpc_boardinfo labpc_boards[] = {
 	{
-		.name			= "lab-pc-1200",
-		.ai_speed		= 10000,
-		.ai_scan_up		= 1,
-		.has_ao			= 1,
-		.is_labpc1200		= 1,
-	}, {
-		.name			= "lab-pc-1200ai",
-		.ai_speed		= 10000,
-		.ai_scan_up		= 1,
-		.is_labpc1200		= 1,
-	}, {
-		.name			= "lab-pc+",
-		.ai_speed		= 12000,
-		.has_ao			= 1,
-	},
+	 .name = "lab-pc-1200",
+	 .ai_speed = 10000,
+	 .ai_scan_up = 1,
+	 .has_ao = 1,
+	 .is_labpc1200 = 1,
+	  }, {
+	      .name = "lab-pc-1200ai",
+	      .ai_speed = 10000,
+	      .ai_scan_up = 1,
+	      .is_labpc1200 = 1,
+	       }, {
+		   .name = "lab-pc+",
+		   .ai_speed = 12000,
+		   .has_ao = 1,
+		    },
 };
 
 static int labpc_attach(struct comedi_device *dev, struct comedi_devconfig *it)
@@ -101,14 +101,15 @@ static void labpc_detach(struct comedi_device *dev)
 }
 
 static struct comedi_driver labpc_driver = {
-	.driver_name	= "ni_labpc",
-	.module		= THIS_MODULE,
-	.attach		= labpc_attach,
-	.detach		= labpc_detach,
-	.num_names	= ARRAY_SIZE(labpc_boards),
-	.board_name	= &labpc_boards[0].name,
-	.offset		= sizeof(struct labpc_boardinfo),
+	.driver_name = "ni_labpc",
+	.module = THIS_MODULE,
+	.attach = labpc_attach,
+	.detach = labpc_detach,
+	.num_names = ARRAY_SIZE(labpc_boards),
+	.board_name = &labpc_boards[0].name,
+	.offset = sizeof(struct labpc_boardinfo),
 };
+
 module_comedi_driver(labpc_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

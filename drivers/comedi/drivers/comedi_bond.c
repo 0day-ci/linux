@@ -93,7 +93,7 @@ static int bonding_dio_insn_bits(struct comedi_device *dev,
 			if (b_chans > n_left)
 				b_chans = n_left;
 			b_mask = (b_chans < 32) ? ((1 << b_chans) - 1)
-						: 0xffffffff;
+			    : 0xffffffff;
 			b_write_mask = (write_mask >> n_done) & b_mask;
 			b_data_bits = (data_bits >> n_done) & b_mask;
 			/* Read/Write the new digital lines. */
@@ -335,13 +335,15 @@ static void bonding_detach(struct comedi_device *dev)
 }
 
 static struct comedi_driver bonding_driver = {
-	.driver_name	= "comedi_bond",
-	.module		= THIS_MODULE,
-	.attach		= bonding_attach,
-	.detach		= bonding_detach,
+	.driver_name = "comedi_bond",
+	.module = THIS_MODULE,
+	.attach = bonding_attach,
+	.detach = bonding_detach,
 };
+
 module_comedi_driver(bonding_driver);
 
 MODULE_AUTHOR("Calin A. Culianu");
-MODULE_DESCRIPTION("comedi_bond: A driver for COMEDI to bond multiple COMEDI devices together as one.");
+MODULE_DESCRIPTION
+    ("comedi_bond: A driver for COMEDI to bond multiple COMEDI devices together as one.");
 MODULE_LICENSE("GPL");

@@ -40,8 +40,7 @@
 
 static int dnp_dio_insn_bits(struct comedi_device *dev,
 			     struct comedi_subdevice *s,
-			     struct comedi_insn *insn,
-			     unsigned int *data)
+			     struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int mask;
 	unsigned int val;
@@ -79,8 +78,7 @@ static int dnp_dio_insn_bits(struct comedi_device *dev,
 
 static int dnp_dio_insn_config(struct comedi_device *dev,
 			       struct comedi_subdevice *s,
-			       struct comedi_insn *insn,
-			       unsigned int *data)
+			       struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 	unsigned int mask;
@@ -91,13 +89,13 @@ static int dnp_dio_insn_config(struct comedi_device *dev,
 	if (ret)
 		return ret;
 
-	if (chan < 8) {			/* Port A */
+	if (chan < 8) {		/* Port A */
 		mask = 1 << chan;
 		outb(PAMR, CSCIR);
-	} else if (chan < 16) {		/* Port B */
+	} else if (chan < 16) {	/* Port B */
 		mask = 1 << (chan - 8);
 		outb(PBMR, CSCIR);
-	} else {			/* Port C */
+	} else {		/* Port C */
 		/*
 		 * We have to pay attention with port C.
 		 * This is the meaning of PCMR:
@@ -168,11 +166,12 @@ static void dnp_detach(struct comedi_device *dev)
 }
 
 static struct comedi_driver dnp_driver = {
-	.driver_name	= "dnp-1486",
-	.module		= THIS_MODULE,
-	.attach		= dnp_attach,
-	.detach		= dnp_detach,
+	.driver_name = "dnp-1486",
+	.module = THIS_MODULE,
+	.attach = dnp_attach,
+	.detach = dnp_detach,
 };
+
 module_comedi_driver(dnp_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

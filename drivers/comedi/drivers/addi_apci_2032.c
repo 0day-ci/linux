@@ -35,15 +35,14 @@
 #define APCI2032_WDOG_REG		0x10
 
 struct apci2032_int_private {
-	spinlock_t spinlock;		/* protects the following members */
-	bool active;			/* an async command is running */
+	spinlock_t spinlock;	/* protects the following members */
+	bool active;		/* an async command is running */
 	unsigned char enabled_isns;	/* mask of enabled interrupt channels */
 };
 
 static int apci2032_do_insn_bits(struct comedi_device *dev,
 				 struct comedi_subdevice *s,
-				 struct comedi_insn *insn,
-				 unsigned int *data)
+				 struct comedi_insn *insn, unsigned int *data)
 {
 	s->state = inl(dev->iobase + APCI2032_DO_REG);
 
@@ -57,8 +56,7 @@ static int apci2032_do_insn_bits(struct comedi_device *dev,
 
 static int apci2032_int_insn_bits(struct comedi_device *dev,
 				  struct comedi_subdevice *s,
-				  struct comedi_insn *insn,
-				  unsigned int *data)
+				  struct comedi_insn *insn, unsigned int *data)
 {
 	data[1] = inl(dev->iobase + APCI2032_INT_STATUS_REG) & 3;
 	return insn->n;
@@ -108,7 +106,7 @@ static int apci2032_int_cmdtest(struct comedi_device *dev,
 					   cmd->chanlist_len);
 	if (cmd->stop_src == TRIG_COUNT)
 		err |= comedi_check_trigger_arg_min(&cmd->stop_arg, 1);
-	else	/* TRIG_NONE */
+	else			/* TRIG_NONE */
 		err |= comedi_check_trigger_arg_is(&cmd->stop_arg, 0);
 
 	if (err)
@@ -249,12 +247,12 @@ static int apci2032_auto_attach(struct comedi_device *dev,
 
 	/* Initialize the digital output subdevice */
 	s = &dev->subdevices[0];
-	s->type		= COMEDI_SUBD_DO;
-	s->subdev_flags	= SDF_WRITABLE;
-	s->n_chan	= 32;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_bits	= apci2032_do_insn_bits;
+	s->type = COMEDI_SUBD_DO;
+	s->subdev_flags = SDF_WRITABLE;
+	s->n_chan = 32;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_bits = apci2032_do_insn_bits;
 
 	/* Initialize the watchdog subdevice */
 	s = &dev->subdevices[1];
@@ -264,12 +262,12 @@ static int apci2032_auto_attach(struct comedi_device *dev,
 
 	/* Initialize the interrupt subdevice */
 	s = &dev->subdevices[2];
-	s->type		= COMEDI_SUBD_DI;
-	s->subdev_flags	= SDF_READABLE;
-	s->n_chan	= 2;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_bits	= apci2032_int_insn_bits;
+	s->type = COMEDI_SUBD_DI;
+	s->subdev_flags = SDF_READABLE;
+	s->n_chan = 2;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_bits = apci2032_int_insn_bits;
 	if (dev->irq) {
 		struct apci2032_int_private *subpriv;
 
@@ -278,12 +276,12 @@ static int apci2032_auto_attach(struct comedi_device *dev,
 		if (!subpriv)
 			return -ENOMEM;
 		spin_lock_init(&subpriv->spinlock);
-		s->private	= subpriv;
-		s->subdev_flags	= SDF_READABLE | SDF_CMD_READ | SDF_PACKED;
+		s->private = subpriv;
+		s->subdev_flags = SDF_READABLE | SDF_CMD_READ | SDF_PACKED;
 		s->len_chanlist = 2;
-		s->do_cmdtest	= apci2032_int_cmdtest;
-		s->do_cmd	= apci2032_int_cmd;
-		s->cancel	= apci2032_int_cancel;
+		s->do_cmdtest = apci2032_int_cmdtest;
+		s->do_cmd = apci2032_int_cmd;
+		s->cancel = apci2032_int_cancel;
 	}
 
 	return 0;
@@ -299,10 +297,10 @@ static void apci2032_detach(struct comedi_device *dev)
 }
 
 static struct comedi_driver apci2032_driver = {
-	.driver_name	= "addi_apci_2032",
-	.module		= THIS_MODULE,
-	.auto_attach	= apci2032_auto_attach,
-	.detach		= apci2032_detach,
+	.driver_name = "addi_apci_2032",
+	.module = THIS_MODULE,
+	.auto_attach = apci2032_auto_attach,
+	.detach = apci2032_detach,
 };
 
 static int apci2032_pci_probe(struct pci_dev *dev,
@@ -315,14 +313,16 @@ static const struct pci_device_id apci2032_pci_table[] = {
 	{ PCI_DEVICE(PCI_VENDOR_ID_ADDIDATA, 0x1004) },
 	{ 0 }
 };
+
 MODULE_DEVICE_TABLE(pci, apci2032_pci_table);
 
 static struct pci_driver apci2032_pci_driver = {
-	.name		= "addi_apci_2032",
-	.id_table	= apci2032_pci_table,
-	.probe		= apci2032_pci_probe,
-	.remove		= comedi_pci_auto_unconfig,
+	.name = "addi_apci_2032",
+	.id_table = apci2032_pci_table,
+	.probe = apci2032_pci_probe,
+	.remove = comedi_pci_auto_unconfig,
 };
+
 module_comedi_pci_driver(apci2032_driver, apci2032_pci_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

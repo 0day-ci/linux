@@ -267,18 +267,18 @@ struct nidio_board {
 
 static const struct nidio_board nidio_boards[] = {
 	[BOARD_PCIDIO_32HS] = {
-		.name		= "pci-dio-32hs",
-		.dio_speed	= 50,
-	},
+			       .name = "pci-dio-32hs",
+			       .dio_speed = 50,
+				},
 	[BOARD_PXI6533] = {
-		.name		= "pxi-6533",
-		.dio_speed	= 50,
-	},
+			   .name = "pxi-6533",
+			   .dio_speed = 50,
+			    },
 	[BOARD_PCI6534] = {
-		.name		= "pci-6534",
-		.uses_firmware	= 1,
-		.dio_speed	= 50,
-	},
+			   .name = "pci-6534",
+			   .uses_firmware = 1,
+			   .dio_speed = 50,
+			    },
 };
 
 struct nidio96_private {
@@ -419,8 +419,7 @@ static irqreturn_t nidio_interrupt(int irq, void *d)
 					dev_dbg(dev->class_dev,
 						"too much work in interrupt\n");
 					writeb(0x00, dev->mmio +
-					       MASTER_DMA_AND_INTERRUPT_CONTROL
-					      );
+					       MASTER_DMA_AND_INTERRUPT_CONTROL);
 					goto out;
 				}
 				auxdata = readl(dev->mmio + GROUP_1_FIFO);
@@ -466,8 +465,7 @@ out:
 
 static int ni_pcidio_insn_config(struct comedi_device *dev,
 				 struct comedi_subdevice *s,
-				 struct comedi_insn *insn,
-				 unsigned int *data)
+				 struct comedi_insn *insn, unsigned int *data)
 {
 	int ret;
 
@@ -491,8 +489,7 @@ static int ni_pcidio_insn_config(struct comedi_device *dev,
 
 static int ni_pcidio_insn_bits(struct comedi_device *dev,
 			       struct comedi_subdevice *s,
-			       struct comedi_insn *insn,
-			       unsigned int *data)
+			       struct comedi_insn *insn, unsigned int *data)
 {
 	if (comedi_dio_update_state(s, data))
 		writel(s->state, dev->mmio + PORT_IO(0));
@@ -579,7 +576,7 @@ static int ni_pcidio_cmdtest(struct comedi_device *dev,
 
 	if (cmd->stop_src == TRIG_COUNT)
 		err |= comedi_check_trigger_arg_min(&cmd->stop_arg, 1);
-	else	/* TRIG_NONE */
+	else			/* TRIG_NONE */
 		err |= comedi_check_trigger_arg_is(&cmd->stop_arg, 0);
 
 	if (err)
@@ -600,8 +597,7 @@ static int ni_pcidio_cmdtest(struct comedi_device *dev,
 }
 
 static int ni_pcidio_inttrig(struct comedi_device *dev,
-			     struct comedi_subdevice *s,
-			     unsigned int trig_num)
+			     struct comedi_subdevice *s, unsigned int trig_num)
 {
 	struct nidio96_private *devpriv = dev->private;
 	struct comedi_cmd *cmd = &s->async->cmd;
@@ -670,7 +666,7 @@ static int ni_pcidio_cmd(struct comedi_device *dev, struct comedi_subdevice *s)
 		writeb(4, dev->mmio + BLOCK_MODE);
 		if (!(cmd->scan_begin_arg & CR_INVERT))	/* Leading Edge */
 			writeb(0, dev->mmio + LINE_POLARITIES);
-		else					/* Trailing Edge */
+		else		/* Trailing Edge */
 			writeb(2, dev->mmio + LINE_POLARITIES);
 		writeb(0x00, dev->mmio + ACK_SER);
 		writel(1, dev->mmio + START_DELAY);
@@ -684,8 +680,7 @@ static int ni_pcidio_cmd(struct comedi_device *dev, struct comedi_subdevice *s)
 	}
 
 	if (cmd->stop_src == TRIG_COUNT) {
-		writel(cmd->stop_arg,
-		       dev->mmio + TRANSFER_COUNT);
+		writel(cmd->stop_arg, dev->mmio + TRANSFER_COUNT);
 	} else {
 		/* XXX */
 	}
@@ -857,8 +852,7 @@ static int pci_6534_upload_firmware(struct comedi_device *dev)
 	/* load main FPGA first, then the two scarabs */
 	for (n = 2; n >= 0; n--) {
 		ret = comedi_load_firmware(dev, &devpriv->mite->pcidev->dev,
-					   fw_file[n],
-					   pci_6534_load_fpga, n);
+					   fw_file[n], pci_6534_load_fpga, n);
 		if (ret == 0 && n == 2)
 			pci_6534_init_main_fpga(dev);
 		if (ret < 0)
@@ -877,8 +871,7 @@ static void nidio_reset_board(struct comedi_device *dev)
 	writeb(0, dev->mmio + MASTER_DMA_AND_INTERRUPT_CONTROL);
 }
 
-static int nidio_auto_attach(struct comedi_device *dev,
-			     unsigned long context)
+static int nidio_auto_attach(struct comedi_device *dev, unsigned long context)
 {
 	struct pci_dev *pcidev = comedi_to_pci_dev(dev);
 	const struct nidio_board *board = NULL;
@@ -932,8 +925,8 @@ static int nidio_auto_attach(struct comedi_device *dev,
 	dev->read_subdev = s;
 	s->type = COMEDI_SUBD_DIO;
 	s->subdev_flags =
-		SDF_READABLE | SDF_WRITABLE | SDF_LSAMPL | SDF_PACKED |
-		SDF_CMD_READ;
+	    SDF_READABLE | SDF_WRITABLE | SDF_LSAMPL | SDF_PACKED |
+	    SDF_CMD_READ;
 	s->n_chan = 32;
 	s->range_table = &range_digital;
 	s->maxdata = 1;
@@ -977,10 +970,10 @@ static void nidio_detach(struct comedi_device *dev)
 }
 
 static struct comedi_driver ni_pcidio_driver = {
-	.driver_name	= "ni_pcidio",
-	.module		= THIS_MODULE,
-	.auto_attach	= nidio_auto_attach,
-	.detach		= nidio_detach,
+	.driver_name = "ni_pcidio",
+	.module = THIS_MODULE,
+	.auto_attach = nidio_auto_attach,
+	.detach = nidio_detach,
 };
 
 static int ni_pcidio_pci_probe(struct pci_dev *dev,
@@ -995,14 +988,16 @@ static const struct pci_device_id ni_pcidio_pci_table[] = {
 	{ PCI_VDEVICE(NI, 0x1320), BOARD_PXI6533 },
 	{ 0 }
 };
+
 MODULE_DEVICE_TABLE(pci, ni_pcidio_pci_table);
 
 static struct pci_driver ni_pcidio_pci_driver = {
-	.name		= "ni_pcidio",
-	.id_table	= ni_pcidio_pci_table,
-	.probe		= ni_pcidio_pci_probe,
-	.remove		= comedi_pci_auto_unconfig,
+	.name = "ni_pcidio",
+	.id_table = ni_pcidio_pci_table,
+	.probe = ni_pcidio_pci_probe,
+	.remove = comedi_pci_auto_unconfig,
 };
+
 module_comedi_pci_driver(ni_pcidio_driver, ni_pcidio_pci_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

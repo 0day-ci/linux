@@ -14,9 +14,9 @@ enum transfer_type { fifo_not_empty_transfer, fifo_half_full_transfer,
 
 struct labpc_boardinfo {
 	const char *name;
-	int ai_speed;			/* maximum input speed in ns */
-	unsigned ai_scan_up:1;		/* can auto scan up in ai channels */
-	unsigned has_ao:1;		/* has analog outputs */
+	int ai_speed;		/* maximum input speed in ns */
+	unsigned ai_scan_up:1;	/* can auto scan up in ai channels */
+	unsigned has_ao:1;	/* has analog outputs */
 	unsigned is_labpc1200:1;	/* has extra regs compared to pc+ */
 };
 
@@ -43,9 +43,10 @@ struct labpc_private {
 	 * function pointers so we can use inb/outb or readb/writeb as
 	 * appropriate
 	 */
-	unsigned int (*read_byte)(struct comedi_device *dev, unsigned long reg);
-	void (*write_byte)(struct comedi_device *dev,
-			   unsigned int byte, unsigned long reg);
+	unsigned int (*read_byte)(struct comedi_device *dev,
+				  unsigned long reg);
+	void (*write_byte)(struct comedi_device *dev, unsigned int byte,
+			   unsigned long reg);
 };
 
 int labpc_common_attach(struct comedi_device *dev,

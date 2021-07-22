@@ -26,6 +26,7 @@ struct pci_dev *comedi_to_pci_dev(struct comedi_device *dev)
 {
 	return dev->hw_dev ? to_pci_dev(dev->hw_dev) : NULL;
 }
+
 EXPORT_SYMBOL_GPL(comedi_to_pci_dev);
 
 /**
@@ -66,6 +67,7 @@ int comedi_pci_enable(struct comedi_device *dev)
 
 	return rc;
 }
+
 EXPORT_SYMBOL_GPL(comedi_pci_enable);
 
 /**
@@ -87,6 +89,7 @@ void comedi_pci_disable(struct comedi_device *dev)
 	}
 	dev->ioenabled = false;
 }
+
 EXPORT_SYMBOL_GPL(comedi_pci_disable);
 
 /**
@@ -120,6 +123,7 @@ void comedi_pci_detach(struct comedi_device *dev)
 	}
 	comedi_pci_disable(dev);
 }
+
 EXPORT_SYMBOL_GPL(comedi_pci_detach);
 
 /**
@@ -138,11 +142,11 @@ EXPORT_SYMBOL_GPL(comedi_pci_detach);
  * a negative error number on failure).
  */
 int comedi_pci_auto_config(struct pci_dev *pcidev,
-			   struct comedi_driver *driver,
-			   unsigned long context)
+			   struct comedi_driver *driver, unsigned long context)
 {
 	return comedi_auto_config(&pcidev->dev, driver, context);
 }
+
 EXPORT_SYMBOL_GPL(comedi_pci_auto_config);
 
 /**
@@ -163,6 +167,7 @@ void comedi_pci_auto_unconfig(struct pci_dev *pcidev)
 {
 	comedi_auto_unconfig(&pcidev->dev);
 }
+
 EXPORT_SYMBOL_GPL(comedi_pci_auto_unconfig);
 
 /**
@@ -193,6 +198,7 @@ int comedi_pci_driver_register(struct comedi_driver *comedi_driver,
 
 	return 0;
 }
+
 EXPORT_SYMBOL_GPL(comedi_pci_driver_register);
 
 /**
@@ -210,17 +216,20 @@ void comedi_pci_driver_unregister(struct comedi_driver *comedi_driver,
 	pci_unregister_driver(pci_driver);
 	comedi_driver_unregister(comedi_driver);
 }
+
 EXPORT_SYMBOL_GPL(comedi_pci_driver_unregister);
 
 static int __init comedi_pci_init(void)
 {
 	return 0;
 }
+
 module_init(comedi_pci_init);
 
 static void __exit comedi_pci_exit(void)
 {
 }
+
 module_exit(comedi_pci_exit);
 
 MODULE_AUTHOR("https://www.comedi.org");

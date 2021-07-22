@@ -134,7 +134,7 @@ static int apci1032_cos_insn_config(struct comedi_device *dev,
 					      APCI1032_CTRL_INT_OR)) {
 				/* switching to 'OR' mode */
 				devpriv->ctrl = APCI1032_CTRL_INT_ENA |
-						APCI1032_CTRL_INT_OR;
+				    APCI1032_CTRL_INT_OR;
 				/* wipe old channels */
 				devpriv->mode1 = 0;
 				devpriv->mode2 = 0;
@@ -152,7 +152,7 @@ static int apci1032_cos_insn_config(struct comedi_device *dev,
 					      APCI1032_CTRL_INT_AND)) {
 				/* switching to 'AND' mode */
 				devpriv->ctrl = APCI1032_CTRL_INT_ENA |
-						APCI1032_CTRL_INT_AND;
+				    APCI1032_CTRL_INT_AND;
 				/* wipe old channels */
 				devpriv->mode1 = 0;
 				devpriv->mode2 = 0;
@@ -178,8 +178,7 @@ static int apci1032_cos_insn_config(struct comedi_device *dev,
 
 static int apci1032_cos_insn_bits(struct comedi_device *dev,
 				  struct comedi_subdevice *s,
-				  struct comedi_insn *insn,
-				  unsigned int *data)
+				  struct comedi_insn *insn, unsigned int *data)
 {
 	data[1] = s->state;
 
@@ -288,8 +287,7 @@ static irqreturn_t apci1032_interrupt(int irq, void *d)
 
 static int apci1032_di_insn_bits(struct comedi_device *dev,
 				 struct comedi_subdevice *s,
-				 struct comedi_insn *insn,
-				 unsigned int *data)
+				 struct comedi_insn *insn, unsigned int *data)
 {
 	data[1] = inl(dev->iobase + APCI1032_DI_REG);
 
@@ -328,30 +326,30 @@ static int apci1032_auto_attach(struct comedi_device *dev,
 
 	/*  Allocate and Initialise DI Subdevice Structures */
 	s = &dev->subdevices[0];
-	s->type		= COMEDI_SUBD_DI;
-	s->subdev_flags	= SDF_READABLE;
-	s->n_chan	= 32;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_bits	= apci1032_di_insn_bits;
+	s->type = COMEDI_SUBD_DI;
+	s->subdev_flags = SDF_READABLE;
+	s->n_chan = 32;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_bits = apci1032_di_insn_bits;
 
 	/* Change-Of-State (COS) interrupt subdevice */
 	s = &dev->subdevices[1];
 	if (dev->irq) {
 		dev->read_subdev = s;
-		s->type		= COMEDI_SUBD_DI;
-		s->subdev_flags	= SDF_READABLE | SDF_CMD_READ;
-		s->n_chan	= 1;
-		s->maxdata	= 1;
-		s->range_table	= &range_digital;
-		s->insn_config	= apci1032_cos_insn_config;
-		s->insn_bits	= apci1032_cos_insn_bits;
-		s->len_chanlist	= 1;
-		s->do_cmdtest	= apci1032_cos_cmdtest;
-		s->do_cmd	= apci1032_cos_cmd;
-		s->cancel	= apci1032_cos_cancel;
+		s->type = COMEDI_SUBD_DI;
+		s->subdev_flags = SDF_READABLE | SDF_CMD_READ;
+		s->n_chan = 1;
+		s->maxdata = 1;
+		s->range_table = &range_digital;
+		s->insn_config = apci1032_cos_insn_config;
+		s->insn_bits = apci1032_cos_insn_bits;
+		s->len_chanlist = 1;
+		s->do_cmdtest = apci1032_cos_cmdtest;
+		s->do_cmd = apci1032_cos_cmd;
+		s->cancel = apci1032_cos_cancel;
 	} else {
-		s->type		= COMEDI_SUBD_UNUSED;
+		s->type = COMEDI_SUBD_UNUSED;
 	}
 
 	return 0;
@@ -365,10 +363,10 @@ static void apci1032_detach(struct comedi_device *dev)
 }
 
 static struct comedi_driver apci1032_driver = {
-	.driver_name	= "addi_apci_1032",
-	.module		= THIS_MODULE,
-	.auto_attach	= apci1032_auto_attach,
-	.detach		= apci1032_detach,
+	.driver_name = "addi_apci_1032",
+	.module = THIS_MODULE,
+	.auto_attach = apci1032_auto_attach,
+	.detach = apci1032_detach,
 };
 
 static int apci1032_pci_probe(struct pci_dev *dev,
@@ -381,14 +379,16 @@ static const struct pci_device_id apci1032_pci_table[] = {
 	{ PCI_DEVICE(PCI_VENDOR_ID_ADDIDATA, 0x1003) },
 	{ 0 }
 };
+
 MODULE_DEVICE_TABLE(pci, apci1032_pci_table);
 
 static struct pci_driver apci1032_pci_driver = {
-	.name		= "addi_apci_1032",
-	.id_table	= apci1032_pci_table,
-	.probe		= apci1032_pci_probe,
-	.remove		= comedi_pci_auto_unconfig,
+	.name = "addi_apci_1032",
+	.id_table = apci1032_pci_table,
+	.probe = apci1032_pci_probe,
+	.remove = comedi_pci_auto_unconfig,
 };
+
 module_comedi_pci_driver(apci1032_driver, apci1032_pci_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

@@ -51,17 +51,17 @@ struct ni_670x_board {
 
 static const struct ni_670x_board ni_670x_boards[] = {
 	[BOARD_PCI6703] = {
-		.name		= "PCI-6703",
-		.ao_chans	= 16,
-	},
+			   .name = "PCI-6703",
+			   .ao_chans = 16,
+			    },
 	[BOARD_PXI6704] = {
-		.name		= "PXI-6704",
-		.ao_chans	= 32,
-	},
+			   .name = "PXI-6704",
+			   .ao_chans = 32,
+			    },
 	[BOARD_PCI6704] = {
-		.name		= "PCI-6704",
-		.ao_chans	= 32,
-	},
+			   .name = "PCI-6704",
+			   .ao_chans = 32,
+			    },
 };
 
 struct ni_670x_private {
@@ -71,8 +71,7 @@ struct ni_670x_private {
 
 static int ni_670x_ao_insn_write(struct comedi_device *dev,
 				 struct comedi_subdevice *s,
-				 struct comedi_insn *insn,
-				 unsigned int *data)
+				 struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 	unsigned int val = s->readback[chan];
@@ -103,8 +102,7 @@ static int ni_670x_ao_insn_write(struct comedi_device *dev,
 
 static int ni_670x_dio_insn_bits(struct comedi_device *dev,
 				 struct comedi_subdevice *s,
-				 struct comedi_insn *insn,
-				 unsigned int *data)
+				 struct comedi_insn *insn, unsigned int *data)
 {
 	if (comedi_dio_update_state(s, data))
 		writel(s->state, dev->mmio + DIO_PORT0_DATA_OFFSET);
@@ -116,8 +114,7 @@ static int ni_670x_dio_insn_bits(struct comedi_device *dev,
 
 static int ni_670x_dio_insn_config(struct comedi_device *dev,
 				   struct comedi_subdevice *s,
-				   struct comedi_insn *insn,
-				   unsigned int *data)
+				   struct comedi_insn *insn, unsigned int *data)
 {
 	int ret;
 
@@ -131,8 +128,8 @@ static int ni_670x_dio_insn_config(struct comedi_device *dev,
 }
 
 /* ripped from mite.h and mite_setup2() to avoid mite dependency */
-#define MITE_IODWBSR	0xc0	 /* IO Device Window Base Size Register */
-#define WENAB		BIT(7) /* window enable */
+#define MITE_IODWBSR	0xc0	/* IO Device Window Base Size Register */
+#define WENAB		BIT(7)	/* window enable */
 
 static int ni_670x_mite_init(struct pci_dev *pcidev)
 {
@@ -153,8 +150,7 @@ static int ni_670x_mite_init(struct pci_dev *pcidev)
 	return 0;
 }
 
-static int ni_670x_auto_attach(struct comedi_device *dev,
-			       unsigned long context)
+static int ni_670x_auto_attach(struct comedi_device *dev, unsigned long context)
 {
 	struct pci_dev *pcidev = comedi_to_pci_dev(dev);
 	const struct ni_670x_board *board = NULL;
@@ -249,10 +245,10 @@ static void ni_670x_detach(struct comedi_device *dev)
 }
 
 static struct comedi_driver ni_670x_driver = {
-	.driver_name	= "ni_670x",
-	.module		= THIS_MODULE,
-	.auto_attach	= ni_670x_auto_attach,
-	.detach		= ni_670x_detach,
+	.driver_name = "ni_670x",
+	.module = THIS_MODULE,
+	.auto_attach = ni_670x_auto_attach,
+	.detach = ni_670x_detach,
 };
 
 static int ni_670x_pci_probe(struct pci_dev *dev,
@@ -267,14 +263,16 @@ static const struct pci_device_id ni_670x_pci_table[] = {
 	{ PCI_VDEVICE(NI, 0x2c90), BOARD_PCI6703 },
 	{ 0 }
 };
+
 MODULE_DEVICE_TABLE(pci, ni_670x_pci_table);
 
 static struct pci_driver ni_670x_pci_driver = {
-	.name		= "ni_670x",
-	.id_table	= ni_670x_pci_table,
-	.probe		= ni_670x_pci_probe,
-	.remove		= comedi_pci_auto_unconfig,
+	.name = "ni_670x",
+	.id_table = ni_670x_pci_table,
+	.probe = ni_670x_pci_probe,
+	.remove = comedi_pci_auto_unconfig,
 };
+
 module_comedi_pci_driver(ni_670x_driver, ni_670x_pci_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

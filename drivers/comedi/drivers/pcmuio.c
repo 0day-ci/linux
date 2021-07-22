@@ -106,12 +106,12 @@ struct pcmuio_board {
 
 static const struct pcmuio_board pcmuio_boards[] = {
 	{
-		.name		= "pcmuio48",
-		.num_asics	= 1,
-	}, {
-		.name		= "pcmuio96",
-		.num_asics	= 2,
-	},
+	 .name = "pcmuio48",
+	 .num_asics = 1,
+	  }, {
+	      .name = "pcmuio96",
+	      .num_asics = 2,
+	       },
 };
 
 struct pcmuio_asic {
@@ -211,8 +211,7 @@ static unsigned int pcmuio_read(struct comedi_device *dev,
  */
 static int pcmuio_dio_insn_bits(struct comedi_device *dev,
 				struct comedi_subdevice *s,
-				struct comedi_insn *insn,
-				unsigned int *data)
+				struct comedi_insn *insn, unsigned int *data)
 {
 	int asic = pcmuio_subdevice_to_asic(s);
 	int port = pcmuio_subdevice_to_port(s);
@@ -246,8 +245,7 @@ static int pcmuio_dio_insn_bits(struct comedi_device *dev,
 
 static int pcmuio_dio_insn_config(struct comedi_device *dev,
 				  struct comedi_subdevice *s,
-				  struct comedi_insn *insn,
-				  unsigned int *data)
+				  struct comedi_insn *insn, unsigned int *data)
 {
 	int asic = pcmuio_subdevice_to_asic(s);
 	int port = pcmuio_subdevice_to_port(s);
@@ -459,7 +457,7 @@ static int pcmuio_cmd(struct comedi_device *dev, struct comedi_subdevice *s)
 	/* Set up start of acquisition. */
 	if (cmd->start_src == TRIG_INT)
 		s->async->inttrig = pcmuio_inttrig_start_intr;
-	else	/* TRIG_NOW */
+	else			/* TRIG_NOW */
 		pcmuio_start_intr(dev, s);
 
 	spin_unlock_irqrestore(&chip->spinlock, flags);
@@ -468,8 +466,7 @@ static int pcmuio_cmd(struct comedi_device *dev, struct comedi_subdevice *s)
 }
 
 static int pcmuio_cmdtest(struct comedi_device *dev,
-			  struct comedi_subdevice *s,
-			  struct comedi_cmd *cmd)
+			  struct comedi_subdevice *s, struct comedi_cmd *cmd)
 {
 	int err = 0;
 
@@ -504,7 +501,7 @@ static int pcmuio_cmdtest(struct comedi_device *dev,
 
 	if (cmd->stop_src == TRIG_COUNT)
 		err |= comedi_check_trigger_arg_min(&cmd->stop_arg, 1);
-	else	/* TRIG_NONE */
+	else			/* TRIG_NONE */
 		err |= comedi_check_trigger_arg_is(&cmd->stop_arg, 0);
 
 	if (err)
@@ -570,24 +567,24 @@ static int pcmuio_attach(struct comedi_device *dev, struct comedi_devconfig *it)
 
 	for (i = 0; i < dev->n_subdevices; ++i) {
 		s = &dev->subdevices[i];
-		s->type		= COMEDI_SUBD_DIO;
-		s->subdev_flags	= SDF_READABLE | SDF_WRITABLE;
-		s->n_chan	= 24;
-		s->maxdata	= 1;
-		s->range_table	= &range_digital;
-		s->insn_bits	= pcmuio_dio_insn_bits;
-		s->insn_config	= pcmuio_dio_insn_config;
+		s->type = COMEDI_SUBD_DIO;
+		s->subdev_flags = SDF_READABLE | SDF_WRITABLE;
+		s->n_chan = 24;
+		s->maxdata = 1;
+		s->range_table = &range_digital;
+		s->insn_bits = pcmuio_dio_insn_bits;
+		s->insn_config = pcmuio_dio_insn_config;
 
 		/* subdevices 0 and 2 can support interrupts */
 		if ((i == 0 && dev->irq) || (i == 2 && devpriv->irq2)) {
 			/* setup the interrupt subdevice */
 			dev->read_subdev = s;
-			s->subdev_flags	|= SDF_CMD_READ | SDF_LSAMPL |
-					   SDF_PACKED;
-			s->len_chanlist	= s->n_chan;
-			s->cancel	= pcmuio_cancel;
-			s->do_cmd	= pcmuio_cmd;
-			s->do_cmdtest	= pcmuio_cmdtest;
+			s->subdev_flags |= SDF_CMD_READ | SDF_LSAMPL |
+			    SDF_PACKED;
+			s->len_chanlist = s->n_chan;
+			s->cancel = pcmuio_cancel;
+			s->do_cmd = pcmuio_cmd;
+			s->do_cmdtest = pcmuio_cmdtest;
 		}
 	}
 
@@ -609,14 +606,15 @@ static void pcmuio_detach(struct comedi_device *dev)
 }
 
 static struct comedi_driver pcmuio_driver = {
-	.driver_name	= "pcmuio",
-	.module		= THIS_MODULE,
-	.attach		= pcmuio_attach,
-	.detach		= pcmuio_detach,
-	.board_name	= &pcmuio_boards[0].name,
-	.offset		= sizeof(struct pcmuio_board),
-	.num_names	= ARRAY_SIZE(pcmuio_boards),
+	.driver_name = "pcmuio",
+	.module = THIS_MODULE,
+	.attach = pcmuio_attach,
+	.detach = pcmuio_detach,
+	.board_name = &pcmuio_boards[0].name,
+	.offset = sizeof(struct pcmuio_board),
+	.num_names = ARRAY_SIZE(pcmuio_boards),
 };
+
 module_comedi_driver(pcmuio_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

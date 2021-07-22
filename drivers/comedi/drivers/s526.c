@@ -132,7 +132,7 @@
 #define S526_GPCT_MODE_PR_SELECT_PR1	S526_GPCT_MODE_PR_SELECT(1)
 /* Control/Status - R = readable, W = writeable, C = write 1 to clear */
 #define S526_GPCT_CTRL_REG(x)	(0x18 + ((x) * 8))
-#define S526_GPCT_CTRL_EV_STATUS(x)	((x) << 0)		/* RC */
+#define S526_GPCT_CTRL_EV_STATUS(x)	((x) << 0)	/* RC */
 #define S526_GPCT_CTRL_EV_STATUS_MASK	S526_GPCT_EV_STATUS(0xf)
 #define S526_GPCT_CTRL_EV_STATUS_NONE	S526_GPCT_EV_STATUS(0)
 /* these 4 bits can be OR'ed */
@@ -140,9 +140,9 @@
 #define S526_GPCT_CTRL_EV_STATUS_ICAPN	S526_GPCT_EV_STATUS(0x2)
 #define S526_GPCT_CTRL_EV_STATUS_ICAPP	S526_GPCT_EV_STATUS(0x4)
 #define S526_GPCT_CTRL_EV_STATUS_RCAP	S526_GPCT_EV_STATUS(0x8)
-#define S526_GPCT_CTRL_COUT_STATUS	BIT(4)			/* R */
-#define S526_GPCT_CTRL_INDEX_STATUS	BIT(5)			/* R */
-#define S525_GPCT_CTRL_INTEN(x)		((x) << 6)		/* W */
+#define S526_GPCT_CTRL_COUT_STATUS	BIT(4)	/* R */
+#define S526_GPCT_CTRL_INDEX_STATUS	BIT(5)	/* R */
+#define S525_GPCT_CTRL_INTEN(x)		((x) << 6)	/* W */
 #define S525_GPCT_CTRL_INTEN_MASK	S526_GPCT_CTRL_INTEN(0xf)
 #define S525_GPCT_CTRL_INTEN_NONE	S526_GPCT_CTRL_INTEN(0)
 /* these 4 bits can be OR'ed */
@@ -150,16 +150,16 @@
 #define S525_GPCT_CTRL_INTEN_IXFALL	S526_GPCT_CTRL_INTEN(0x2)
 #define S525_GPCT_CTRL_INTEN_IXRISE	S526_GPCT_CTRL_INTEN(0x4)
 #define S525_GPCT_CTRL_INTEN_RO		S526_GPCT_CTRL_INTEN(0x8)
-#define S525_GPCT_CTRL_LATCH_SEL(x)	((x) << 10)		/* W */
+#define S525_GPCT_CTRL_LATCH_SEL(x)	((x) << 10)	/* W */
 #define S525_GPCT_CTRL_LATCH_SEL_MASK	S526_GPCT_CTRL_LATCH_SEL(0x7)
 #define S525_GPCT_CTRL_LATCH_SEL_NONE	S526_GPCT_CTRL_LATCH_SEL(0)
 /* these 3 bits can be OR'ed */
 #define S525_GPCT_CTRL_LATCH_SEL_IXFALL	S526_GPCT_CTRL_LATCH_SEL(0x1)
 #define S525_GPCT_CTRL_LATCH_SEL_IXRISE	S526_GPCT_CTRL_LATCH_SEL(0x2)
 #define S525_GPCT_CTRL_LATCH_SEL_ITIMER	S526_GPCT_CTRL_LATCH_SEL(0x4)
-#define S525_GPCT_CTRL_CT_ARM		BIT(13)			/* W */
-#define S525_GPCT_CTRL_CT_LOAD		BIT(14)			/* W */
-#define S526_GPCT_CTRL_CT_RESET		BIT(15)			/* W */
+#define S525_GPCT_CTRL_CT_ARM		BIT(13)	/* W */
+#define S525_GPCT_CTRL_CT_LOAD		BIT(14)	/* W */
+#define S526_GPCT_CTRL_CT_RESET		BIT(15)	/* W */
 #define S526_EEPROM_DATA_REG	0x32
 #define S526_EEPROM_CTRL_REG	0x34
 #define S526_EEPROM_CTRL_ADDR(x) (((x) & 0x3f) << 3)
@@ -180,8 +180,7 @@ static void s526_gpct_write(struct comedi_device *dev,
 	outw(val & 0xffff, dev->iobase + S526_GPCT_LSB_REG(chan));
 }
 
-static unsigned int s526_gpct_read(struct comedi_device *dev,
-				   unsigned int chan)
+static unsigned int s526_gpct_read(struct comedi_device *dev, unsigned int chan)
 {
 	unsigned int val;
 
@@ -194,8 +193,7 @@ static unsigned int s526_gpct_read(struct comedi_device *dev,
 
 static int s526_gpct_rinsn(struct comedi_device *dev,
 			   struct comedi_subdevice *s,
-			   struct comedi_insn *insn,
-			   unsigned int *data)
+			   struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 	int i;
@@ -208,8 +206,7 @@ static int s526_gpct_rinsn(struct comedi_device *dev,
 
 static int s526_gpct_insn_config(struct comedi_device *dev,
 				 struct comedi_subdevice *s,
-				 struct comedi_insn *insn,
-				 unsigned int *data)
+				 struct comedi_insn *insn, unsigned int *data)
 {
 	struct s526_private *devpriv = dev->private;
 	unsigned int chan = CR_CHAN(insn->chanspec);
@@ -379,8 +376,7 @@ static int s526_gpct_insn_config(struct comedi_device *dev,
 
 static int s526_gpct_winsn(struct comedi_device *dev,
 			   struct comedi_subdevice *s,
-			   struct comedi_insn *insn,
-			   unsigned int *data)
+			   struct comedi_insn *insn, unsigned int *data)
 {
 	struct s526_private *devpriv = dev->private;
 	unsigned int chan = CR_CHAN(insn->chanspec);
@@ -415,8 +411,7 @@ static int s526_gpct_winsn(struct comedi_device *dev,
 
 static int s526_eoc(struct comedi_device *dev,
 		    struct comedi_subdevice *s,
-		    struct comedi_insn *insn,
-		    unsigned long context)
+		    struct comedi_insn *insn, unsigned long context)
 {
 	unsigned int status;
 
@@ -431,8 +426,7 @@ static int s526_eoc(struct comedi_device *dev,
 
 static int s526_ai_insn_read(struct comedi_device *dev,
 			     struct comedi_subdevice *s,
-			     struct comedi_insn *insn,
-			     unsigned int *data)
+			     struct comedi_insn *insn, unsigned int *data)
 {
 	struct s526_private *devpriv = dev->private;
 	unsigned int chan = CR_CHAN(insn->chanspec);
@@ -442,7 +436,7 @@ static int s526_ai_insn_read(struct comedi_device *dev,
 	int i;
 
 	ctrl = S526_AI_CTRL_CONV(chan) | S526_AI_CTRL_READ(chan) |
-	       S526_AI_CTRL_START;
+	    S526_AI_CTRL_START;
 	if (ctrl != devpriv->ai_ctrl) {
 		/*
 		 * The multiplexor needs to change, enable the 15us
@@ -471,8 +465,7 @@ static int s526_ai_insn_read(struct comedi_device *dev,
 
 static int s526_ao_insn_write(struct comedi_device *dev,
 			      struct comedi_subdevice *s,
-			      struct comedi_insn *insn,
-			      unsigned int *data)
+			      struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 	unsigned int ctrl = S526_AO_CTRL_CHAN(chan);
@@ -500,8 +493,7 @@ static int s526_ao_insn_write(struct comedi_device *dev,
 
 static int s526_dio_insn_bits(struct comedi_device *dev,
 			      struct comedi_subdevice *s,
-			      struct comedi_insn *insn,
-			      unsigned int *data)
+			      struct comedi_insn *insn, unsigned int *data)
 {
 	if (comedi_dio_update_state(s, data))
 		outw(s->state, dev->iobase + S526_DIO_CTRL_REG);
@@ -513,8 +505,7 @@ static int s526_dio_insn_bits(struct comedi_device *dev,
 
 static int s526_dio_insn_config(struct comedi_device *dev,
 				struct comedi_subdevice *s,
-				struct comedi_insn *insn,
-				unsigned int *data)
+				struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 	unsigned int mask;
@@ -567,13 +558,13 @@ static int s526_attach(struct comedi_device *dev, struct comedi_devconfig *it)
 
 	/* General-Purpose Counter/Timer (GPCT) */
 	s = &dev->subdevices[0];
-	s->type		= COMEDI_SUBD_COUNTER;
-	s->subdev_flags	= SDF_READABLE | SDF_WRITABLE | SDF_LSAMPL;
-	s->n_chan	= 4;
-	s->maxdata	= 0x00ffffff;
-	s->insn_read	= s526_gpct_rinsn;
-	s->insn_config	= s526_gpct_insn_config;
-	s->insn_write	= s526_gpct_winsn;
+	s->type = COMEDI_SUBD_COUNTER;
+	s->subdev_flags = SDF_READABLE | SDF_WRITABLE | SDF_LSAMPL;
+	s->n_chan = 4;
+	s->maxdata = 0x00ffffff;
+	s->insn_read = s526_gpct_rinsn;
+	s->insn_config = s526_gpct_insn_config;
+	s->insn_write = s526_gpct_winsn;
 
 	/*
 	 * Analog Input subdevice
@@ -582,22 +573,22 @@ static int s526_attach(struct comedi_device *dev, struct comedi_devconfig *it)
 	 * channel 9 is "reference 1" (0V)
 	 */
 	s = &dev->subdevices[1];
-	s->type		= COMEDI_SUBD_AI;
-	s->subdev_flags	= SDF_READABLE | SDF_DIFF;
-	s->n_chan	= 10;
-	s->maxdata	= 0xffff;
-	s->range_table	= &range_bipolar10;
-	s->len_chanlist	= 16;
-	s->insn_read	= s526_ai_insn_read;
+	s->type = COMEDI_SUBD_AI;
+	s->subdev_flags = SDF_READABLE | SDF_DIFF;
+	s->n_chan = 10;
+	s->maxdata = 0xffff;
+	s->range_table = &range_bipolar10;
+	s->len_chanlist = 16;
+	s->insn_read = s526_ai_insn_read;
 
 	/* Analog Output subdevice */
 	s = &dev->subdevices[2];
-	s->type		= COMEDI_SUBD_AO;
-	s->subdev_flags	= SDF_WRITABLE;
-	s->n_chan	= 4;
-	s->maxdata	= 0xffff;
-	s->range_table	= &range_bipolar10;
-	s->insn_write	= s526_ao_insn_write;
+	s->type = COMEDI_SUBD_AO;
+	s->subdev_flags = SDF_WRITABLE;
+	s->n_chan = 4;
+	s->maxdata = 0xffff;
+	s->range_table = &range_bipolar10;
+	s->insn_write = s526_ao_insn_write;
 
 	ret = comedi_alloc_subdev_readback(s);
 	if (ret)
@@ -605,23 +596,24 @@ static int s526_attach(struct comedi_device *dev, struct comedi_devconfig *it)
 
 	/* Digital I/O subdevice */
 	s = &dev->subdevices[3];
-	s->type		= COMEDI_SUBD_DIO;
-	s->subdev_flags	= SDF_READABLE | SDF_WRITABLE;
-	s->n_chan	= 8;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_bits	= s526_dio_insn_bits;
-	s->insn_config	= s526_dio_insn_config;
+	s->type = COMEDI_SUBD_DIO;
+	s->subdev_flags = SDF_READABLE | SDF_WRITABLE;
+	s->n_chan = 8;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_bits = s526_dio_insn_bits;
+	s->insn_config = s526_dio_insn_config;
 
 	return 0;
 }
 
 static struct comedi_driver s526_driver = {
-	.driver_name	= "s526",
-	.module		= THIS_MODULE,
-	.attach		= s526_attach,
-	.detach		= comedi_legacy_detach,
+	.driver_name = "s526",
+	.module = THIS_MODULE,
+	.attach = s526_attach,
+	.detach = comedi_legacy_detach,
 };
+
 module_comedi_driver(s526_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

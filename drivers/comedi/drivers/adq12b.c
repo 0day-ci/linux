@@ -70,19 +70,19 @@
 /* available ranges through the PGA gains */
 static const struct comedi_lrange range_adq12b_ai_bipolar = {
 	4, {
-		BIP_RANGE(5),
-		BIP_RANGE(2),
-		BIP_RANGE(1),
-		BIP_RANGE(0.5)
+	    BIP_RANGE(5),
+	    BIP_RANGE(2),
+	    BIP_RANGE(1),
+	    BIP_RANGE(0.5)
 	}
 };
 
 static const struct comedi_lrange range_adq12b_ai_unipolar = {
 	4, {
-		UNI_RANGE(5),
-		UNI_RANGE(2),
-		UNI_RANGE(1),
-		UNI_RANGE(0.5)
+	    UNI_RANGE(5),
+	    UNI_RANGE(2),
+	    UNI_RANGE(1),
+	    UNI_RANGE(0.5)
 	}
 };
 
@@ -92,8 +92,7 @@ struct adq12b_private {
 
 static int adq12b_ai_eoc(struct comedi_device *dev,
 			 struct comedi_subdevice *s,
-			 struct comedi_insn *insn,
-			 unsigned long context)
+			 struct comedi_insn *insn, unsigned long context)
 {
 	unsigned char status;
 
@@ -105,8 +104,7 @@ static int adq12b_ai_eoc(struct comedi_device *dev,
 
 static int adq12b_ai_insn_read(struct comedi_device *dev,
 			       struct comedi_subdevice *s,
-			       struct comedi_insn *insn,
-			       unsigned int *data)
+			       struct comedi_insn *insn, unsigned int *data)
 {
 	struct adq12b_private *devpriv = dev->private;
 	unsigned int chan = CR_CHAN(insn->chanspec);
@@ -151,8 +149,7 @@ static int adq12b_di_insn_bits(struct comedi_device *dev,
 
 static int adq12b_do_insn_bits(struct comedi_device *dev,
 			       struct comedi_subdevice *s,
-			       struct comedi_insn *insn,
-			       unsigned int *data)
+			       struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int mask;
 	unsigned int chan;
@@ -196,46 +193,47 @@ static int adq12b_attach(struct comedi_device *dev, struct comedi_devconfig *it)
 
 	/* Analog Input subdevice */
 	s = &dev->subdevices[0];
-	s->type		= COMEDI_SUBD_AI;
+	s->type = COMEDI_SUBD_AI;
 	if (it->options[2]) {
-		s->subdev_flags	= SDF_READABLE | SDF_DIFF;
-		s->n_chan	= 8;
+		s->subdev_flags = SDF_READABLE | SDF_DIFF;
+		s->n_chan = 8;
 	} else {
-		s->subdev_flags	= SDF_READABLE | SDF_GROUND;
-		s->n_chan	= 16;
+		s->subdev_flags = SDF_READABLE | SDF_GROUND;
+		s->n_chan = 16;
 	}
-	s->maxdata	= 0xfff;
-	s->range_table	= it->options[1] ? &range_adq12b_ai_unipolar
-					 : &range_adq12b_ai_bipolar;
-	s->insn_read	= adq12b_ai_insn_read;
+	s->maxdata = 0xfff;
+	s->range_table = it->options[1] ? &range_adq12b_ai_unipolar
+	    : &range_adq12b_ai_bipolar;
+	s->insn_read = adq12b_ai_insn_read;
 
 	/* Digital Input subdevice */
 	s = &dev->subdevices[1];
-	s->type		= COMEDI_SUBD_DI;
-	s->subdev_flags	= SDF_READABLE;
-	s->n_chan	= 5;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_bits	= adq12b_di_insn_bits;
+	s->type = COMEDI_SUBD_DI;
+	s->subdev_flags = SDF_READABLE;
+	s->n_chan = 5;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_bits = adq12b_di_insn_bits;
 
 	/* Digital Output subdevice */
 	s = &dev->subdevices[2];
-	s->type		= COMEDI_SUBD_DO;
-	s->subdev_flags	= SDF_WRITABLE;
-	s->n_chan	= 8;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_bits	= adq12b_do_insn_bits;
+	s->type = COMEDI_SUBD_DO;
+	s->subdev_flags = SDF_WRITABLE;
+	s->n_chan = 8;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_bits = adq12b_do_insn_bits;
 
 	return 0;
 }
 
 static struct comedi_driver adq12b_driver = {
-	.driver_name	= "adq12b",
-	.module		= THIS_MODULE,
-	.attach		= adq12b_attach,
-	.detach		= comedi_legacy_detach,
+	.driver_name = "adq12b",
+	.module = THIS_MODULE,
+	.attach = adq12b_attach,
+	.detach = comedi_legacy_detach,
 };
+
 module_comedi_driver(adq12b_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

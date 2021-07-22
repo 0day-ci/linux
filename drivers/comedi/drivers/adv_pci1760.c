@@ -62,9 +62,9 @@
 #define PCI1760_CMD_GET_STATUS		0x03	/* Read current status */
 #define PCI1760_CMD_GET_FW_VER		0x0e	/* Read firmware version */
 #define PCI1760_CMD_GET_HW_VER		0x0f	/* Read hardware version */
-#define PCI1760_CMD_SET_PWM_HI(x)	(0x10 + (x) * 2) /* Set "hi" period */
-#define PCI1760_CMD_SET_PWM_LO(x)	(0x11 + (x) * 2) /* Set "lo" period */
-#define PCI1760_CMD_SET_PWM_CNT(x)	(0x14 + (x)) /* Set burst count */
+#define PCI1760_CMD_SET_PWM_HI(x)	(0x10 + (x) * 2)	/* Set "hi" period */
+#define PCI1760_CMD_SET_PWM_LO(x)	(0x11 + (x) * 2)	/* Set "lo" period */
+#define PCI1760_CMD_SET_PWM_CNT(x)	(0x14 + (x))	/* Set burst count */
 #define PCI1760_CMD_ENA_PWM		0x1f	/* Enable PWM outputs */
 #define PCI1760_CMD_ENA_FILT		0x20	/* Enable input filter */
 #define PCI1760_CMD_ENA_PAT_MATCH	0x21	/* Enable input pattern match */
@@ -77,10 +77,10 @@
 #define PCI1760_CMD_ENA_CNT_MATCH	0x2b	/* Enable counter match */
 #define PCI1760_CMD_SET_CNT_EDGE	0x2c	/* Set counter edge */
 #define PCI1760_CMD_GET_CNT		0x2f	/* Reads counter value */
-#define PCI1760_CMD_SET_HI_SAMP(x)	(0x30 + (x)) /* Set "hi" sample time */
-#define PCI1760_CMD_SET_LO_SAMP(x)	(0x38 + (x)) /* Set "lo" sample time */
-#define PCI1760_CMD_SET_CNT(x)		(0x40 + (x)) /* Set counter reset val */
-#define PCI1760_CMD_SET_CNT_MATCH(x)	(0x48 + (x)) /* Set counter match val */
+#define PCI1760_CMD_SET_HI_SAMP(x)	(0x30 + (x))	/* Set "hi" sample time */
+#define PCI1760_CMD_SET_LO_SAMP(x)	(0x38 + (x))	/* Set "lo" sample time */
+#define PCI1760_CMD_SET_CNT(x)		(0x40 + (x))	/* Set counter reset val */
+#define PCI1760_CMD_SET_CNT_MATCH(x)	(0x48 + (x))	/* Set counter match val */
 #define PCI1760_CMD_GET_INT_FLAGS	0x60	/* Read interrupt flags */
 #define PCI1760_CMD_GET_INT_FLAGS_MATCH	BIT(0)
 #define PCI1760_CMD_GET_INT_FLAGS_COS	BIT(1)
@@ -110,7 +110,7 @@ static int pci1760_send_cmd(struct comedi_device *dev,
 		if (inb(dev->iobase + PCI1760_IMB_REG(2)) == cmd) {
 			/* command success; return the feedback data */
 			return inb(dev->iobase + PCI1760_IMB_REG(0)) |
-			       (inb(dev->iobase + PCI1760_IMB_REG(1)) << 8);
+			    (inb(dev->iobase + PCI1760_IMB_REG(1)) << 8);
 		}
 		cpu_relax();
 	} while (time_before(jiffies, timeout));
@@ -148,8 +148,7 @@ static int pci1760_cmd(struct comedi_device *dev,
 
 static int pci1760_di_insn_bits(struct comedi_device *dev,
 				struct comedi_subdevice *s,
-				struct comedi_insn *insn,
-				unsigned int *data)
+				struct comedi_insn *insn, unsigned int *data)
 {
 	data[1] = inb(dev->iobase + PCI1760_IMB_REG(3));
 
@@ -158,8 +157,7 @@ static int pci1760_di_insn_bits(struct comedi_device *dev,
 
 static int pci1760_do_insn_bits(struct comedi_device *dev,
 				struct comedi_subdevice *s,
-				struct comedi_insn *insn,
-				unsigned int *data)
+				struct comedi_insn *insn, unsigned int *data)
 {
 	int ret;
 
@@ -219,8 +217,7 @@ static int pci1760_pwm_enable(struct comedi_device *dev,
 
 static int pci1760_pwm_insn_config(struct comedi_device *dev,
 				   struct comedi_subdevice *s,
-				   struct comedi_insn *insn,
-				   unsigned int *data)
+				   struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 	int hi_div;
@@ -336,8 +333,7 @@ static void pci1760_reset(struct comedi_device *dev)
 	pci1760_cmd(dev, PCI1760_CMD_SET_PAT_MATCH, 0);
 }
 
-static int pci1760_auto_attach(struct comedi_device *dev,
-			       unsigned long context)
+static int pci1760_auto_attach(struct comedi_device *dev, unsigned long context)
 {
 	struct pci_dev *pcidev = comedi_to_pci_dev(dev);
 	struct comedi_subdevice *s;
@@ -356,47 +352,47 @@ static int pci1760_auto_attach(struct comedi_device *dev,
 
 	/* Digital Input subdevice */
 	s = &dev->subdevices[0];
-	s->type		= COMEDI_SUBD_DI;
-	s->subdev_flags	= SDF_READABLE;
-	s->n_chan	= 8;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_bits	= pci1760_di_insn_bits;
+	s->type = COMEDI_SUBD_DI;
+	s->subdev_flags = SDF_READABLE;
+	s->n_chan = 8;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_bits = pci1760_di_insn_bits;
 
 	/* Digital Output subdevice */
 	s = &dev->subdevices[1];
-	s->type		= COMEDI_SUBD_DO;
-	s->subdev_flags	= SDF_WRITABLE;
-	s->n_chan	= 8;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_bits	= pci1760_do_insn_bits;
+	s->type = COMEDI_SUBD_DO;
+	s->subdev_flags = SDF_WRITABLE;
+	s->n_chan = 8;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_bits = pci1760_do_insn_bits;
 
 	/* get the current state of the outputs */
 	ret = pci1760_cmd(dev, PCI1760_CMD_GET_DO, 0);
 	if (ret < 0)
 		return ret;
-	s->state	= ret;
+	s->state = ret;
 
 	/* PWM subdevice */
 	s = &dev->subdevices[2];
-	s->type		= COMEDI_SUBD_PWM;
-	s->subdev_flags	= SDF_PWM_COUNTER;
-	s->n_chan	= 2;
-	s->insn_config	= pci1760_pwm_insn_config;
+	s->type = COMEDI_SUBD_PWM;
+	s->subdev_flags = SDF_PWM_COUNTER;
+	s->n_chan = 2;
+	s->insn_config = pci1760_pwm_insn_config;
 
 	/* Counter subdevice */
 	s = &dev->subdevices[3];
-	s->type		= COMEDI_SUBD_UNUSED;
+	s->type = COMEDI_SUBD_UNUSED;
 
 	return 0;
 }
 
 static struct comedi_driver pci1760_driver = {
-	.driver_name	= "adv_pci1760",
-	.module		= THIS_MODULE,
-	.auto_attach	= pci1760_auto_attach,
-	.detach		= comedi_pci_detach,
+	.driver_name = "adv_pci1760",
+	.module = THIS_MODULE,
+	.auto_attach = pci1760_auto_attach,
+	.detach = comedi_pci_detach,
 };
 
 static int pci1760_pci_probe(struct pci_dev *dev,
@@ -409,14 +405,16 @@ static const struct pci_device_id pci1760_pci_table[] = {
 	{ PCI_DEVICE(PCI_VENDOR_ID_ADVANTECH, 0x1760) },
 	{ 0 }
 };
+
 MODULE_DEVICE_TABLE(pci, pci1760_pci_table);
 
 static struct pci_driver pci1760_pci_driver = {
-	.name		= "adv_pci1760",
-	.id_table	= pci1760_pci_table,
-	.probe		= pci1760_pci_probe,
-	.remove		= comedi_pci_auto_unconfig,
+	.name = "adv_pci1760",
+	.id_table = pci1760_pci_table,
+	.probe = pci1760_pci_probe,
+	.remove = comedi_pci_auto_unconfig,
 };
+
 module_comedi_pci_driver(pci1760_driver, pci1760_pci_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

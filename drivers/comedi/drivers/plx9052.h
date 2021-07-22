@@ -55,9 +55,9 @@
 #define PLX9052_CNTRL_PCI_R_NO_FLUSH	BIT(16)	/* read no flush mode */
 #define PLX9052_CNTRL_PCI_R_NO_WRITE	BIT(17)	/* read no write mode */
 #define PLX9052_CNTRL_PCI_W_RELEASE	BIT(18)	/* write release bus mode */
-#define PLX9052_CNTRL_RETRY_CLKS(x)	(((x) & 0xf) << 19) /* retry clks */
+#define PLX9052_CNTRL_RETRY_CLKS(x)	(((x) & 0xf) << 19)	/* retry clks */
 #define PLX9052_CNTRL_LOCK_ENAB		BIT(23)	/* slave LOCK# enable */
-#define PLX9052_CNTRL_EEPROM_MASK	(0x1f << 24) /* EEPROM bits */
+#define PLX9052_CNTRL_EEPROM_MASK	(0x1f << 24)	/* EEPROM bits */
 #define PLX9052_CNTRL_EEPROM_CLK	BIT(24)	/* EEPROM clock */
 #define PLX9052_CNTRL_EEPROM_CS		BIT(25)	/* EEPROM chip select */
 #define PLX9052_CNTRL_EEPROM_DOUT	BIT(26)	/* EEPROM write bit */

@@ -151,10 +151,10 @@ struct daqp_private {
 
 static const struct comedi_lrange range_daqp_ai = {
 	4, {
-		BIP_RANGE(10),
-		BIP_RANGE(5),
-		BIP_RANGE(2.5),
-		BIP_RANGE(1.25)
+	    BIP_RANGE(10),
+	    BIP_RANGE(5),
+	    BIP_RANGE(2.5),
+	    BIP_RANGE(1.25)
 	}
 };
 
@@ -175,8 +175,7 @@ static int daqp_clear_events(struct comedi_device *dev, int loops)
 	return -EBUSY;
 }
 
-static int daqp_ai_cancel(struct comedi_device *dev,
-			  struct comedi_subdevice *s)
+static int daqp_ai_cancel(struct comedi_device *dev, struct comedi_subdevice *s)
 {
 	struct daqp_private *devpriv = dev->private;
 
@@ -259,8 +258,7 @@ static irqreturn_t daqp_interrupt(int irq, void *dev_id)
 }
 
 static void daqp_ai_set_one_scanlist_entry(struct comedi_device *dev,
-					   unsigned int chanspec,
-					   int start)
+					   unsigned int chanspec, int start)
 {
 	unsigned int chan = CR_CHAN(chanspec);
 	unsigned int range = CR_RANGE(chanspec);
@@ -281,8 +279,7 @@ static void daqp_ai_set_one_scanlist_entry(struct comedi_device *dev,
 
 static int daqp_ai_eos(struct comedi_device *dev,
 		       struct comedi_subdevice *s,
-		       struct comedi_insn *insn,
-		       unsigned long context)
+		       struct comedi_insn *insn, unsigned long context)
 {
 	unsigned int status;
 
@@ -294,8 +291,7 @@ static int daqp_ai_eos(struct comedi_device *dev,
 
 static int daqp_ai_insn_read(struct comedi_device *dev,
 			     struct comedi_subdevice *s,
-			     struct comedi_insn *insn,
-			     unsigned int *data)
+			     struct comedi_insn *insn, unsigned int *data)
 {
 	struct daqp_private *devpriv = dev->private;
 	int ret = 0;
@@ -369,8 +365,7 @@ static void daqp_set_pacer(struct comedi_device *dev, unsigned int val)
 }
 
 static int daqp_ai_cmdtest(struct comedi_device *dev,
-			   struct comedi_subdevice *s,
-			   struct comedi_cmd *cmd)
+			   struct comedi_subdevice *s, struct comedi_cmd *cmd)
 {
 	struct daqp_private *devpriv = dev->private;
 	int err = 0;
@@ -435,7 +430,7 @@ static int daqp_ai_cmdtest(struct comedi_device *dev,
 
 	if (cmd->stop_src == TRIG_COUNT)
 		err |= comedi_check_trigger_arg_max(&cmd->stop_arg, 0x00ffffff);
-	else	/* TRIG_NONE */
+	else			/* TRIG_NONE */
 		err |= comedi_check_trigger_arg_is(&cmd->stop_arg, 0);
 
 	if (err)
@@ -573,7 +568,7 @@ static int daqp_ai_cmd(struct comedi_device *dev, struct comedi_subdevice *s)
 		unsigned long long nbytes;
 
 		nsamples = (unsigned long long)cmd->stop_arg *
-			   cmd->scan_end_arg;
+		    cmd->scan_end_arg;
 		nbytes = nsamples * comedi_bytes_per_sample(s);
 		while (nbytes > DAQP_FIFO_SIZE * 3 / 4)
 			nbytes /= 2;
@@ -617,8 +612,7 @@ static int daqp_ai_cmd(struct comedi_device *dev, struct comedi_subdevice *s)
 
 static int daqp_ao_empty(struct comedi_device *dev,
 			 struct comedi_subdevice *s,
-			 struct comedi_insn *insn,
-			 unsigned long context)
+			 struct comedi_insn *insn, unsigned long context)
 {
 	unsigned int status;
 
@@ -630,8 +624,7 @@ static int daqp_ao_empty(struct comedi_device *dev,
 
 static int daqp_ao_insn_write(struct comedi_device *dev,
 			      struct comedi_subdevice *s,
-			      struct comedi_insn *insn,
-			      unsigned int *data)
+			      struct comedi_insn *insn, unsigned int *data)
 {
 	struct daqp_private *devpriv = dev->private;
 	unsigned int chan = CR_CHAN(insn->chanspec);
@@ -664,8 +657,7 @@ static int daqp_ao_insn_write(struct comedi_device *dev,
 
 static int daqp_di_insn_bits(struct comedi_device *dev,
 			     struct comedi_subdevice *s,
-			     struct comedi_insn *insn,
-			     unsigned int *data)
+			     struct comedi_insn *insn, unsigned int *data)
 {
 	struct daqp_private *devpriv = dev->private;
 
@@ -679,8 +671,7 @@ static int daqp_di_insn_bits(struct comedi_device *dev,
 
 static int daqp_do_insn_bits(struct comedi_device *dev,
 			     struct comedi_subdevice *s,
-			     struct comedi_insn *insn,
-			     unsigned int *data)
+			     struct comedi_insn *insn, unsigned int *data)
 {
 	struct daqp_private *devpriv = dev->private;
 
@@ -695,8 +686,7 @@ static int daqp_do_insn_bits(struct comedi_device *dev,
 	return insn->n;
 }
 
-static int daqp_auto_attach(struct comedi_device *dev,
-			    unsigned long context)
+static int daqp_auto_attach(struct comedi_device *dev, unsigned long context)
 {
 	struct pcmcia_device *link = comedi_to_pcmcia_dev(dev);
 	struct daqp_private *devpriv;
@@ -723,28 +713,28 @@ static int daqp_auto_attach(struct comedi_device *dev,
 		return ret;
 
 	s = &dev->subdevices[0];
-	s->type		= COMEDI_SUBD_AI;
-	s->subdev_flags	= SDF_READABLE | SDF_GROUND | SDF_DIFF;
-	s->n_chan	= 8;
-	s->maxdata	= 0xffff;
-	s->range_table	= &range_daqp_ai;
-	s->insn_read	= daqp_ai_insn_read;
+	s->type = COMEDI_SUBD_AI;
+	s->subdev_flags = SDF_READABLE | SDF_GROUND | SDF_DIFF;
+	s->n_chan = 8;
+	s->maxdata = 0xffff;
+	s->range_table = &range_daqp_ai;
+	s->insn_read = daqp_ai_insn_read;
 	if (dev->irq) {
 		dev->read_subdev = s;
-		s->subdev_flags	|= SDF_CMD_READ;
-		s->len_chanlist	= 2048;
-		s->do_cmdtest	= daqp_ai_cmdtest;
-		s->do_cmd	= daqp_ai_cmd;
-		s->cancel	= daqp_ai_cancel;
+		s->subdev_flags |= SDF_CMD_READ;
+		s->len_chanlist = 2048;
+		s->do_cmdtest = daqp_ai_cmdtest;
+		s->do_cmd = daqp_ai_cmd;
+		s->cancel = daqp_ai_cancel;
 	}
 
 	s = &dev->subdevices[1];
-	s->type		= COMEDI_SUBD_AO;
-	s->subdev_flags	= SDF_WRITABLE;
-	s->n_chan	= 2;
-	s->maxdata	= 0x0fff;
-	s->range_table	= &range_bipolar5;
-	s->insn_write	= daqp_ao_insn_write;
+	s->type = COMEDI_SUBD_AO;
+	s->subdev_flags = SDF_WRITABLE;
+	s->n_chan = 2;
+	s->maxdata = 0x0fff;
+	s->range_table = &range_bipolar5;
+	s->insn_write = daqp_ao_insn_write;
 
 	ret = comedi_alloc_subdev_readback(s);
 	if (ret)
@@ -762,11 +752,11 @@ static int daqp_auto_attach(struct comedi_device *dev,
 	 *  3    DI3                External gain select, hi bit
 	 */
 	s = &dev->subdevices[2];
-	s->type		= COMEDI_SUBD_DI;
-	s->subdev_flags	= SDF_READABLE;
-	s->n_chan	= 4;
-	s->maxdata	= 1;
-	s->insn_bits	= daqp_di_insn_bits;
+	s->type = COMEDI_SUBD_DI;
+	s->subdev_flags = SDF_READABLE;
+	s->n_chan = 4;
+	s->maxdata = 1;
+	s->insn_bits = daqp_di_insn_bits;
 
 	/*
 	 * Digital Output subdevice
@@ -776,20 +766,20 @@ static int daqp_auto_attach(struct comedi_device *dev,
 	 * work.
 	 */
 	s = &dev->subdevices[3];
-	s->type		= COMEDI_SUBD_DO;
-	s->subdev_flags	= SDF_WRITABLE;
-	s->n_chan	= 4;
-	s->maxdata	= 1;
-	s->insn_bits	= daqp_do_insn_bits;
+	s->type = COMEDI_SUBD_DO;
+	s->subdev_flags = SDF_WRITABLE;
+	s->n_chan = 4;
+	s->maxdata = 1;
+	s->insn_bits = daqp_do_insn_bits;
 
 	return 0;
 }
 
 static struct comedi_driver driver_daqp = {
-	.driver_name	= "quatech_daqp_cs",
-	.module		= THIS_MODULE,
-	.auto_attach	= daqp_auto_attach,
-	.detach		= comedi_pcmcia_disable,
+	.driver_name = "quatech_daqp_cs",
+	.module = THIS_MODULE,
+	.auto_attach = daqp_auto_attach,
+	.detach = comedi_pcmcia_disable,
 };
 
 static int daqp_cs_suspend(struct pcmcia_device *link)
@@ -824,17 +814,19 @@ static const struct pcmcia_device_id daqp_cs_id_table[] = {
 	PCMCIA_DEVICE_MANF_CARD(0x0137, 0x0027),
 	PCMCIA_DEVICE_NULL
 };
+
 MODULE_DEVICE_TABLE(pcmcia, daqp_cs_id_table);
 
 static struct pcmcia_driver daqp_cs_driver = {
-	.name		= "quatech_daqp_cs",
-	.owner		= THIS_MODULE,
-	.id_table	= daqp_cs_id_table,
-	.probe		= daqp_cs_attach,
-	.remove		= comedi_pcmcia_auto_unconfig,
-	.suspend	= daqp_cs_suspend,
-	.resume		= daqp_cs_resume,
+	.name = "quatech_daqp_cs",
+	.owner = THIS_MODULE,
+	.id_table = daqp_cs_id_table,
+	.probe = daqp_cs_attach,
+	.remove = comedi_pcmcia_auto_unconfig,
+	.suspend = daqp_cs_suspend,
+	.resume = daqp_cs_resume,
 };
+
 module_comedi_pcmcia_driver(driver_daqp, daqp_cs_driver);
 
 MODULE_DESCRIPTION("Comedi driver for Quatech DAQP PCMCIA data capture cards");

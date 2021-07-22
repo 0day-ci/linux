@@ -54,13 +54,13 @@ struct mf6x4_board {
 
 static const struct mf6x4_board mf6x4_boards[] = {
 	[BOARD_MF634] = {
-		.name           = "mf634",
-		.bar_nums	= {0, 2, 3},
-	},
+			 .name = "mf634",
+			 .bar_nums = { 0, 2, 3},
+			  },
 	[BOARD_MF624] = {
-		.name           = "mf624",
-		.bar_nums	= {0, 2, 4},
-	},
+			 .name = "mf624",
+			 .bar_nums = { 0, 2, 4},
+			  },
 };
 
 struct mf6x4_private {
@@ -83,8 +83,7 @@ struct mf6x4_private {
 
 static int mf6x4_di_insn_bits(struct comedi_device *dev,
 			      struct comedi_subdevice *s,
-			      struct comedi_insn *insn,
-			      unsigned int *data)
+			      struct comedi_insn *insn, unsigned int *data)
 {
 	data[1] = ioread16(dev->mmio + MF6X4_DIN_REG) & MF6X4_DIN_MASK;
 
@@ -93,8 +92,7 @@ static int mf6x4_di_insn_bits(struct comedi_device *dev,
 
 static int mf6x4_do_insn_bits(struct comedi_device *dev,
 			      struct comedi_subdevice *s,
-			      struct comedi_insn *insn,
-			      unsigned int *data)
+			      struct comedi_insn *insn, unsigned int *data)
 {
 	if (comedi_dio_update_state(s, data))
 		iowrite16(s->state, dev->mmio + MF6X4_DOUT_REG);
@@ -106,8 +104,7 @@ static int mf6x4_do_insn_bits(struct comedi_device *dev,
 
 static int mf6x4_ai_eoc(struct comedi_device *dev,
 			struct comedi_subdevice *s,
-			struct comedi_insn *insn,
-			unsigned long context)
+			struct comedi_insn *insn, unsigned long context)
 {
 	struct mf6x4_private *devpriv = dev->private;
 	unsigned int status;
@@ -121,8 +118,7 @@ static int mf6x4_ai_eoc(struct comedi_device *dev,
 
 static int mf6x4_ai_insn_read(struct comedi_device *dev,
 			      struct comedi_subdevice *s,
-			      struct comedi_insn *insn,
-			      unsigned int *data)
+			      struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 	unsigned int d;
@@ -154,8 +150,7 @@ static int mf6x4_ai_insn_read(struct comedi_device *dev,
 
 static int mf6x4_ao_insn_write(struct comedi_device *dev,
 			       struct comedi_subdevice *s,
-			       struct comedi_insn *insn,
-			       unsigned int *data)
+			       struct comedi_insn *insn, unsigned int *data)
 {
 	struct mf6x4_private *devpriv = dev->private;
 	unsigned int chan = CR_CHAN(insn->chanspec);
@@ -224,21 +219,21 @@ static int mf6x4_auto_attach(struct comedi_device *dev, unsigned long context)
 
 	/* Analog Input subdevice */
 	s = &dev->subdevices[0];
-	s->type		= COMEDI_SUBD_AI;
-	s->subdev_flags	= SDF_READABLE | SDF_GROUND;
-	s->n_chan	= 8;
-	s->maxdata	= 0x3fff;
-	s->range_table	= &range_bipolar10;
-	s->insn_read	= mf6x4_ai_insn_read;
+	s->type = COMEDI_SUBD_AI;
+	s->subdev_flags = SDF_READABLE | SDF_GROUND;
+	s->n_chan = 8;
+	s->maxdata = 0x3fff;
+	s->range_table = &range_bipolar10;
+	s->insn_read = mf6x4_ai_insn_read;
 
 	/* Analog Output subdevice */
 	s = &dev->subdevices[1];
-	s->type		= COMEDI_SUBD_AO;
-	s->subdev_flags	= SDF_WRITABLE;
-	s->n_chan	= 8;
-	s->maxdata	= 0x3fff;
-	s->range_table	= &range_bipolar10;
-	s->insn_write	= mf6x4_ao_insn_write;
+	s->type = COMEDI_SUBD_AO;
+	s->subdev_flags = SDF_WRITABLE;
+	s->n_chan = 8;
+	s->maxdata = 0x3fff;
+	s->range_table = &range_bipolar10;
+	s->insn_write = mf6x4_ao_insn_write;
 
 	ret = comedi_alloc_subdev_readback(s);
 	if (ret)
@@ -246,21 +241,21 @@ static int mf6x4_auto_attach(struct comedi_device *dev, unsigned long context)
 
 	/* Digital Input subdevice */
 	s = &dev->subdevices[2];
-	s->type		= COMEDI_SUBD_DI;
-	s->subdev_flags	= SDF_READABLE;
-	s->n_chan	= 8;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_bits	= mf6x4_di_insn_bits;
+	s->type = COMEDI_SUBD_DI;
+	s->subdev_flags = SDF_READABLE;
+	s->n_chan = 8;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_bits = mf6x4_di_insn_bits;
 
 	/* Digital Output subdevice */
 	s = &dev->subdevices[3];
-	s->type		= COMEDI_SUBD_DO;
-	s->subdev_flags	= SDF_WRITABLE;
-	s->n_chan	= 8;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_bits	= mf6x4_do_insn_bits;
+	s->type = COMEDI_SUBD_DO;
+	s->subdev_flags = SDF_WRITABLE;
+	s->n_chan = 8;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_bits = mf6x4_do_insn_bits;
 
 	return 0;
 }
@@ -279,10 +274,10 @@ static void mf6x4_detach(struct comedi_device *dev)
 }
 
 static struct comedi_driver mf6x4_driver = {
-	.driver_name    = "mf6x4",
-	.module         = THIS_MODULE,
-	.auto_attach    = mf6x4_auto_attach,
-	.detach         = mf6x4_detach,
+	.driver_name = "mf6x4",
+	.module = THIS_MODULE,
+	.auto_attach = mf6x4_auto_attach,
+	.detach = mf6x4_detach,
 };
 
 static int mf6x4_pci_probe(struct pci_dev *dev, const struct pci_device_id *id)
@@ -295,13 +290,14 @@ static const struct pci_device_id mf6x4_pci_table[] = {
 	{ PCI_VDEVICE(HUMUSOFT, 0x0624), BOARD_MF624 },
 	{ 0 }
 };
+
 MODULE_DEVICE_TABLE(pci, mf6x4_pci_table);
 
 static struct pci_driver mf6x4_pci_driver = {
-	.name           = "mf6x4",
-	.id_table       = mf6x4_pci_table,
-	.probe          = mf6x4_pci_probe,
-	.remove         = comedi_pci_auto_unconfig,
+	.name = "mf6x4",
+	.id_table = mf6x4_pci_table,
+	.probe = mf6x4_pci_probe,
+	.remove = comedi_pci_auto_unconfig,
 };
 
 module_comedi_pci_driver(mf6x4_driver, mf6x4_pci_driver);

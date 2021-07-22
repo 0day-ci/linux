@@ -113,11 +113,12 @@ static void dev_8255_detach(struct comedi_device *dev)
 }
 
 static struct comedi_driver dev_8255_driver = {
-	.driver_name	= "8255",
-	.module		= THIS_MODULE,
-	.attach		= dev_8255_attach,
-	.detach		= dev_8255_detach,
+	.driver_name = "8255",
+	.module = THIS_MODULE,
+	.attach = dev_8255_attach,
+	.detach = dev_8255_detach,
 };
+
 module_comedi_driver(dev_8255_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

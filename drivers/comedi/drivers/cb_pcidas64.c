@@ -95,8 +95,8 @@ static const int max_counter_value = 0xffffff;
 
 /* devpriv->main_iobase registers */
 enum write_only_registers {
-	INTR_ENABLE_REG = 0x0,		/* interrupt enable register */
-	HW_CONFIG_REG = 0x2,		/* hardware config register */
+	INTR_ENABLE_REG = 0x0,	/* interrupt enable register */
+	HW_CONFIG_REG = 0x2,	/* hardware config register */
 	DAQ_SYNC_REG = 0xc,
 	DAQ_ATRIG_LOW_4020_REG = 0xc,
 	ADC_CONTROL0_REG = 0x10,	/* adc control register 0 */
@@ -205,7 +205,7 @@ enum hw_config_contents {
 	INTERNAL_CLOCK_4020_BITS = 0x1,	/* use 40 MHz internal master clock */
 	BNC_CLOCK_4020_BITS = 0x2,	/* use BNC input for master clock */
 	EXT_CLOCK_4020_BITS = 0x3,	/* use dio input for master clock */
-	EXT_QUEUE_BIT = 0x200,		/* use external channel/gain queue */
+	EXT_QUEUE_BIT = 0x200,	/* use external channel/gain queue */
 	/* use 225 nanosec strobe when loading dac instead of 50 nanosec */
 	SLOW_DAC_BIT = 0x400,
 	/*
@@ -215,9 +215,9 @@ enum hw_config_contents {
 	HW_CONFIG_DUMMY_BITS = 0x2000,
 	/* bit selects channels 1/0 for analog input/output, otherwise 0/1 */
 	DMA_CH_SELECT_BIT = 0x8000,
-	FIFO_SIZE_REG = 0x4,		/* allows adjustment of fifo sizes */
+	FIFO_SIZE_REG = 0x4,	/* allows adjustment of fifo sizes */
 	DAC_FIFO_SIZE_MASK = 0xff00,	/* bits that set dac fifo size */
-	DAC_FIFO_BITS = 0xf800,		/* 8k sample ao fifo */
+	DAC_FIFO_BITS = 0xf800,	/* 8k sample ao fifo */
 };
 
 enum daq_atrig_low_4020_contents {
@@ -255,12 +255,12 @@ enum adc_control1_contents {
 	ADC_QUEUE_CONFIG_BIT = 0x1,
 	CONVERT_POLARITY_BIT = 0x10,
 	EOC_POLARITY_BIT = 0x20,
-	ADC_SW_GATE_BIT = 0x40,		/* software gate of adc */
-	ADC_DITHER_BIT = 0x200,		/* turn on extra noise for dithering */
+	ADC_SW_GATE_BIT = 0x40,	/* software gate of adc */
+	ADC_DITHER_BIT = 0x200,	/* turn on extra noise for dithering */
 	RETRIGGER_BIT = 0x800,
 	ADC_LO_CHANNEL_4020_MASK = 0x300,
 	ADC_HI_CHANNEL_4020_MASK = 0xc00,
-	TWO_CHANNEL_4020_BITS = 0x1000,		/* two channel mode for 4020 */
+	TWO_CHANNEL_4020_BITS = 0x1000,	/* two channel mode for 4020 */
 	FOUR_CHANNEL_4020_BITS = 0x2000,	/* four channel mode for 4020 */
 	CHANNEL_MODE_4020_MASK = 0x3000,
 	ADC_MODE_MASK = 0xf000,
@@ -285,7 +285,7 @@ enum calibration_contents {
 	SELECT_8800_BIT = 0x1,
 	SELECT_8402_64XX_BIT = 0x2,
 	SELECT_1590_60XX_BIT = 0x2,
-	CAL_EN_64XX_BIT = 0x40,		/* calibration enable for 64xx series */
+	CAL_EN_64XX_BIT = 0x40,	/* calibration enable for 64xx series */
 	SERIAL_DATA_IN_BIT = 0x80,
 	SERIAL_CLOCK_BIT = 0x100,
 	CAL_EN_60XX_BIT = 0x200,	/* calibration enable for 60xx series */
@@ -315,7 +315,7 @@ static inline u16 adc_convert_chan_4020_bits(unsigned int channel)
 };
 
 enum adc_queue_load_contents {
-	UNIP_BIT = 0x800,		/* unipolar/bipolar bit */
+	UNIP_BIT = 0x800,	/* unipolar/bipolar bit */
 	ADC_SE_DIFF_BIT = 0x1000,	/* single-ended/ differential bit */
 	/* non-referenced single-ended (common-mode input) */
 	ADC_COMMON_BIT = 0x2000,
@@ -418,14 +418,14 @@ static inline u8 attenuate_bit(unsigned int channel)
 /* analog input ranges for 64xx boards */
 static const struct comedi_lrange ai_ranges_64xx = {
 	8, {
-		BIP_RANGE(10),
-		BIP_RANGE(5),
-		BIP_RANGE(2.5),
-		BIP_RANGE(1.25),
-		UNI_RANGE(10),
-		UNI_RANGE(5),
-		UNI_RANGE(2.5),
-		UNI_RANGE(1.25)
+	    BIP_RANGE(10),
+	    BIP_RANGE(5),
+	    BIP_RANGE(2.5),
+	    BIP_RANGE(1.25),
+	    UNI_RANGE(10),
+	    UNI_RANGE(5),
+	    UNI_RANGE(2.5),
+	    UNI_RANGE(1.25)
 	}
 };
 
@@ -437,13 +437,13 @@ static const u8 ai_range_code_64xx[8] = {
 /* analog input ranges for 64-Mx boards */
 static const struct comedi_lrange ai_ranges_64_mx = {
 	7, {
-		BIP_RANGE(5),
-		BIP_RANGE(2.5),
-		BIP_RANGE(1.25),
-		BIP_RANGE(0.625),
-		UNI_RANGE(5),
-		UNI_RANGE(2.5),
-		UNI_RANGE(1.25)
+	    BIP_RANGE(5),
+	    BIP_RANGE(2.5),
+	    BIP_RANGE(1.25),
+	    BIP_RANGE(0.625),
+	    UNI_RANGE(5),
+	    UNI_RANGE(2.5),
+	    UNI_RANGE(1.25)
 	}
 };
 
@@ -455,10 +455,10 @@ static const u8 ai_range_code_64_mx[7] = {
 /* analog input ranges for 60xx boards */
 static const struct comedi_lrange ai_ranges_60xx = {
 	4, {
-		BIP_RANGE(10),
-		BIP_RANGE(5),
-		BIP_RANGE(0.5),
-		BIP_RANGE(0.05)
+	    BIP_RANGE(10),
+	    BIP_RANGE(5),
+	    BIP_RANGE(0.5),
+	    BIP_RANGE(0.05)
 	}
 };
 
@@ -469,46 +469,46 @@ static const u8 ai_range_code_60xx[4] = {
 /* analog input ranges for 6030, etc boards */
 static const struct comedi_lrange ai_ranges_6030 = {
 	14, {
-		BIP_RANGE(10),
-		BIP_RANGE(5),
-		BIP_RANGE(2),
-		BIP_RANGE(1),
-		BIP_RANGE(0.5),
-		BIP_RANGE(0.2),
-		BIP_RANGE(0.1),
-		UNI_RANGE(10),
-		UNI_RANGE(5),
-		UNI_RANGE(2),
-		UNI_RANGE(1),
-		UNI_RANGE(0.5),
-		UNI_RANGE(0.2),
-		UNI_RANGE(0.1)
+	     BIP_RANGE(10),
+	     BIP_RANGE(5),
+	     BIP_RANGE(2),
+	     BIP_RANGE(1),
+	     BIP_RANGE(0.5),
+	     BIP_RANGE(0.2),
+	     BIP_RANGE(0.1),
+	     UNI_RANGE(10),
+	     UNI_RANGE(5),
+	     UNI_RANGE(2),
+	     UNI_RANGE(1),
+	     UNI_RANGE(0.5),
+	     UNI_RANGE(0.2),
+	     UNI_RANGE(0.1)
 	}
 };
 
 static const u8 ai_range_code_6030[14] = {
-	0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, /* bip 10, 5, 2, 1, 0.5, 0.2, 0.1 */
-	0x9, 0xa, 0xb, 0xc, 0xd, 0xe, 0xf  /* uni 10, 5, 2, 1, 0.5, 0.2, 0.1 */
+	0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6,	/* bip 10, 5, 2, 1, 0.5, 0.2, 0.1 */
+	0x9, 0xa, 0xb, 0xc, 0xd, 0xe, 0xf	/* uni 10, 5, 2, 1, 0.5, 0.2, 0.1 */
 };
 
 /* analog input ranges for 6052, etc boards */
 static const struct comedi_lrange ai_ranges_6052 = {
 	15, {
-		BIP_RANGE(10),
-		BIP_RANGE(5),
-		BIP_RANGE(2.5),
-		BIP_RANGE(1),
-		BIP_RANGE(0.5),
-		BIP_RANGE(0.25),
-		BIP_RANGE(0.1),
-		BIP_RANGE(0.05),
-		UNI_RANGE(10),
-		UNI_RANGE(5),
-		UNI_RANGE(2),
-		UNI_RANGE(1),
-		UNI_RANGE(0.5),
-		UNI_RANGE(0.2),
-		UNI_RANGE(0.1)
+	     BIP_RANGE(10),
+	     BIP_RANGE(5),
+	     BIP_RANGE(2.5),
+	     BIP_RANGE(1),
+	     BIP_RANGE(0.5),
+	     BIP_RANGE(0.25),
+	     BIP_RANGE(0.1),
+	     BIP_RANGE(0.05),
+	     UNI_RANGE(10),
+	     UNI_RANGE(5),
+	     UNI_RANGE(2),
+	     UNI_RANGE(1),
+	     UNI_RANGE(0.5),
+	     UNI_RANGE(0.2),
+	     UNI_RANGE(0.1)
 	}
 };
 
@@ -520,18 +520,18 @@ static const u8 ai_range_code_6052[15] = {
 /* analog input ranges for 4020 board */
 static const struct comedi_lrange ai_ranges_4020 = {
 	2, {
-		BIP_RANGE(5),
-		BIP_RANGE(1)
+	    BIP_RANGE(5),
+	    BIP_RANGE(1)
 	}
 };
 
 /* analog output ranges */
 static const struct comedi_lrange ao_ranges_64xx = {
 	4, {
-		BIP_RANGE(5),
-		BIP_RANGE(10),
-		UNI_RANGE(5),
-		UNI_RANGE(10)
+	    BIP_RANGE(5),
+	    BIP_RANGE(10),
+	    UNI_RANGE(5),
+	    UNI_RANGE(10)
 	}
 };
 
@@ -548,8 +548,8 @@ static const int ao_range_code_60xx[] = {
 
 static const struct comedi_lrange ao_ranges_6030 = {
 	2, {
-		BIP_RANGE(10),
-		UNI_RANGE(10)
+	    BIP_RANGE(10),
+	    UNI_RANGE(10)
 	}
 };
 
@@ -560,8 +560,8 @@ static const int ao_range_code_6030[] = {
 
 static const struct comedi_lrange ao_ranges_4020 = {
 	2, {
-		BIP_RANGE(5),
-		BIP_RANGE(10)
+	    BIP_RANGE(5),
+	    BIP_RANGE(10)
 	}
 };
 
@@ -672,421 +672,421 @@ static const int bytes_in_sample = 2;
 
 static const struct pcidas64_board pcidas64_boards[] = {
 	[BOARD_PCIDAS6402_16] = {
-		.name		= "pci-das6402/16",
-		.ai_se_chans	= 64,
-		.ai_bits	= 16,
-		.ai_speed	= 5000,
-		.ao_nchan	= 2,
-		.ao_bits	= 16,
-		.ao_scan_speed	= 10000,
-		.layout		= LAYOUT_64XX,
-		.ai_range_table	= &ai_ranges_64xx,
-		.ai_range_code	= ai_range_code_64xx,
-		.ao_range_table	= &ao_ranges_64xx,
-		.ao_range_code	= ao_range_code_64xx,
-		.ai_fifo	= &ai_fifo_64xx,
-		.has_8255	= 1,
-	},
+				 .name = "pci-das6402/16",
+				 .ai_se_chans = 64,
+				 .ai_bits = 16,
+				 .ai_speed = 5000,
+				 .ao_nchan = 2,
+				 .ao_bits = 16,
+				 .ao_scan_speed = 10000,
+				 .layout = LAYOUT_64XX,
+				 .ai_range_table = &ai_ranges_64xx,
+				 .ai_range_code = ai_range_code_64xx,
+				 .ao_range_table = &ao_ranges_64xx,
+				 .ao_range_code = ao_range_code_64xx,
+				 .ai_fifo = &ai_fifo_64xx,
+				 .has_8255 = 1,
+				  },
 	[BOARD_PCIDAS6402_12] = {
-		.name		= "pci-das6402/12",	/* XXX check */
-		.ai_se_chans	= 64,
-		.ai_bits	= 12,
-		.ai_speed	= 5000,
-		.ao_nchan	= 2,
-		.ao_bits	= 12,
-		.ao_scan_speed	= 10000,
-		.layout		= LAYOUT_64XX,
-		.ai_range_table	= &ai_ranges_64xx,
-		.ai_range_code	= ai_range_code_64xx,
-		.ao_range_table	= &ao_ranges_64xx,
-		.ao_range_code	= ao_range_code_64xx,
-		.ai_fifo	= &ai_fifo_64xx,
-		.has_8255	= 1,
-	},
+				 .name = "pci-das6402/12",	/* XXX check */
+				 .ai_se_chans = 64,
+				 .ai_bits = 12,
+				 .ai_speed = 5000,
+				 .ao_nchan = 2,
+				 .ao_bits = 12,
+				 .ao_scan_speed = 10000,
+				 .layout = LAYOUT_64XX,
+				 .ai_range_table = &ai_ranges_64xx,
+				 .ai_range_code = ai_range_code_64xx,
+				 .ao_range_table = &ao_ranges_64xx,
+				 .ao_range_code = ao_range_code_64xx,
+				 .ai_fifo = &ai_fifo_64xx,
+				 .has_8255 = 1,
+				  },
 	[BOARD_PCIDAS64_M1_16] = {
-		.name		= "pci-das64/m1/16",
-		.ai_se_chans	= 64,
-		.ai_bits	= 16,
-		.ai_speed	= 1000,
-		.ao_nchan	= 2,
-		.ao_bits	= 16,
-		.ao_scan_speed	= 10000,
-		.layout		= LAYOUT_64XX,
-		.ai_range_table	= &ai_ranges_64_mx,
-		.ai_range_code	= ai_range_code_64_mx,
-		.ao_range_table	= &ao_ranges_64xx,
-		.ao_range_code	= ao_range_code_64xx,
-		.ai_fifo	= &ai_fifo_64xx,
-		.has_8255	= 1,
-	},
+				  .name = "pci-das64/m1/16",
+				  .ai_se_chans = 64,
+				  .ai_bits = 16,
+				  .ai_speed = 1000,
+				  .ao_nchan = 2,
+				  .ao_bits = 16,
+				  .ao_scan_speed = 10000,
+				  .layout = LAYOUT_64XX,
+				  .ai_range_table = &ai_ranges_64_mx,
+				  .ai_range_code = ai_range_code_64_mx,
+				  .ao_range_table = &ao_ranges_64xx,
+				  .ao_range_code = ao_range_code_64xx,
+				  .ai_fifo = &ai_fifo_64xx,
+				  .has_8255 = 1,
+				   },
 	[BOARD_PCIDAS64_M2_16] = {
-		.name = "pci-das64/m2/16",
-		.ai_se_chans	= 64,
-		.ai_bits	= 16,
-		.ai_speed	= 500,
-		.ao_nchan	= 2,
-		.ao_bits	= 16,
-		.ao_scan_speed	= 10000,
-		.layout		= LAYOUT_64XX,
-		.ai_range_table	= &ai_ranges_64_mx,
-		.ai_range_code	= ai_range_code_64_mx,
-		.ao_range_table	= &ao_ranges_64xx,
-		.ao_range_code	= ao_range_code_64xx,
-		.ai_fifo	= &ai_fifo_64xx,
-		.has_8255	= 1,
-	},
+				  .name = "pci-das64/m2/16",
+				  .ai_se_chans = 64,
+				  .ai_bits = 16,
+				  .ai_speed = 500,
+				  .ao_nchan = 2,
+				  .ao_bits = 16,
+				  .ao_scan_speed = 10000,
+				  .layout = LAYOUT_64XX,
+				  .ai_range_table = &ai_ranges_64_mx,
+				  .ai_range_code = ai_range_code_64_mx,
+				  .ao_range_table = &ao_ranges_64xx,
+				  .ao_range_code = ao_range_code_64xx,
+				  .ai_fifo = &ai_fifo_64xx,
+				  .has_8255 = 1,
+				   },
 	[BOARD_PCIDAS64_M3_16] = {
-		.name		= "pci-das64/m3/16",
-		.ai_se_chans	= 64,
-		.ai_bits	= 16,
-		.ai_speed	= 333,
-		.ao_nchan	= 2,
-		.ao_bits	= 16,
-		.ao_scan_speed	= 10000,
-		.layout		= LAYOUT_64XX,
-		.ai_range_table	= &ai_ranges_64_mx,
-		.ai_range_code	= ai_range_code_64_mx,
-		.ao_range_table	= &ao_ranges_64xx,
-		.ao_range_code	= ao_range_code_64xx,
-		.ai_fifo	= &ai_fifo_64xx,
-		.has_8255	= 1,
-	},
+				  .name = "pci-das64/m3/16",
+				  .ai_se_chans = 64,
+				  .ai_bits = 16,
+				  .ai_speed = 333,
+				  .ao_nchan = 2,
+				  .ao_bits = 16,
+				  .ao_scan_speed = 10000,
+				  .layout = LAYOUT_64XX,
+				  .ai_range_table = &ai_ranges_64_mx,
+				  .ai_range_code = ai_range_code_64_mx,
+				  .ao_range_table = &ao_ranges_64xx,
+				  .ao_range_code = ao_range_code_64xx,
+				  .ai_fifo = &ai_fifo_64xx,
+				  .has_8255 = 1,
+				   },
 	[BOARD_PCIDAS6013] = {
-		.name		= "pci-das6013",
-		.ai_se_chans	= 16,
-		.ai_bits	= 16,
-		.ai_speed	= 5000,
-		.ao_nchan	= 0,
-		.ao_bits	= 16,
-		.layout		= LAYOUT_60XX,
-		.ai_range_table	= &ai_ranges_60xx,
-		.ai_range_code	= ai_range_code_60xx,
-		.ao_range_table	= &range_bipolar10,
-		.ao_range_code	= ao_range_code_60xx,
-		.ai_fifo	= &ai_fifo_60xx,
-		.has_8255	= 0,
-	},
+			      .name = "pci-das6013",
+			      .ai_se_chans = 16,
+			      .ai_bits = 16,
+			      .ai_speed = 5000,
+			      .ao_nchan = 0,
+			      .ao_bits = 16,
+			      .layout = LAYOUT_60XX,
+			      .ai_range_table = &ai_ranges_60xx,
+			      .ai_range_code = ai_range_code_60xx,
+			      .ao_range_table = &range_bipolar10,
+			      .ao_range_code = ao_range_code_60xx,
+			      .ai_fifo = &ai_fifo_60xx,
+			      .has_8255 = 0,
+			       },
 	[BOARD_PCIDAS6014] = {
-		.name		= "pci-das6014",
-		.ai_se_chans	= 16,
-		.ai_bits	= 16,
-		.ai_speed	= 5000,
-		.ao_nchan	= 2,
-		.ao_bits	= 16,
-		.ao_scan_speed	= 100000,
-		.layout		= LAYOUT_60XX,
-		.ai_range_table	= &ai_ranges_60xx,
-		.ai_range_code	= ai_range_code_60xx,
-		.ao_range_table	= &range_bipolar10,
-		.ao_range_code	= ao_range_code_60xx,
-		.ai_fifo	= &ai_fifo_60xx,
-		.has_8255	= 0,
-	},
+			      .name = "pci-das6014",
+			      .ai_se_chans = 16,
+			      .ai_bits = 16,
+			      .ai_speed = 5000,
+			      .ao_nchan = 2,
+			      .ao_bits = 16,
+			      .ao_scan_speed = 100000,
+			      .layout = LAYOUT_60XX,
+			      .ai_range_table = &ai_ranges_60xx,
+			      .ai_range_code = ai_range_code_60xx,
+			      .ao_range_table = &range_bipolar10,
+			      .ao_range_code = ao_range_code_60xx,
+			      .ai_fifo = &ai_fifo_60xx,
+			      .has_8255 = 0,
+			       },
 	[BOARD_PCIDAS6023] = {
-		.name		= "pci-das6023",
-		.ai_se_chans	= 16,
-		.ai_bits	= 12,
-		.ai_speed	= 5000,
-		.ao_nchan	= 0,
-		.ao_scan_speed	= 100000,
-		.layout		= LAYOUT_60XX,
-		.ai_range_table	= &ai_ranges_60xx,
-		.ai_range_code	= ai_range_code_60xx,
-		.ao_range_table	= &range_bipolar10,
-		.ao_range_code	= ao_range_code_60xx,
-		.ai_fifo	= &ai_fifo_60xx,
-		.has_8255	= 1,
-	},
+			      .name = "pci-das6023",
+			      .ai_se_chans = 16,
+			      .ai_bits = 12,
+			      .ai_speed = 5000,
+			      .ao_nchan = 0,
+			      .ao_scan_speed = 100000,
+			      .layout = LAYOUT_60XX,
+			      .ai_range_table = &ai_ranges_60xx,
+			      .ai_range_code = ai_range_code_60xx,
+			      .ao_range_table = &range_bipolar10,
+			      .ao_range_code = ao_range_code_60xx,
+			      .ai_fifo = &ai_fifo_60xx,
+			      .has_8255 = 1,
+			       },
 	[BOARD_PCIDAS6025] = {
-		.name		= "pci-das6025",
-		.ai_se_chans	= 16,
-		.ai_bits	= 12,
-		.ai_speed	= 5000,
-		.ao_nchan	= 2,
-		.ao_bits	= 12,
-		.ao_scan_speed	= 100000,
-		.layout		= LAYOUT_60XX,
-		.ai_range_table	= &ai_ranges_60xx,
-		.ai_range_code	= ai_range_code_60xx,
-		.ao_range_table	= &range_bipolar10,
-		.ao_range_code	= ao_range_code_60xx,
-		.ai_fifo	= &ai_fifo_60xx,
-		.has_8255	= 1,
-	},
+			      .name = "pci-das6025",
+			      .ai_se_chans = 16,
+			      .ai_bits = 12,
+			      .ai_speed = 5000,
+			      .ao_nchan = 2,
+			      .ao_bits = 12,
+			      .ao_scan_speed = 100000,
+			      .layout = LAYOUT_60XX,
+			      .ai_range_table = &ai_ranges_60xx,
+			      .ai_range_code = ai_range_code_60xx,
+			      .ao_range_table = &range_bipolar10,
+			      .ao_range_code = ao_range_code_60xx,
+			      .ai_fifo = &ai_fifo_60xx,
+			      .has_8255 = 1,
+			       },
 	[BOARD_PCIDAS6030] = {
-		.name		= "pci-das6030",
-		.ai_se_chans	= 16,
-		.ai_bits	= 16,
-		.ai_speed	= 10000,
-		.ao_nchan	= 2,
-		.ao_bits	= 16,
-		.ao_scan_speed	= 10000,
-		.layout		= LAYOUT_60XX,
-		.ai_range_table	= &ai_ranges_6030,
-		.ai_range_code	= ai_range_code_6030,
-		.ao_range_table	= &ao_ranges_6030,
-		.ao_range_code	= ao_range_code_6030,
-		.ai_fifo	= &ai_fifo_60xx,
-		.has_8255	= 0,
-	},
+			      .name = "pci-das6030",
+			      .ai_se_chans = 16,
+			      .ai_bits = 16,
+			      .ai_speed = 10000,
+			      .ao_nchan = 2,
+			      .ao_bits = 16,
+			      .ao_scan_speed = 10000,
+			      .layout = LAYOUT_60XX,
+			      .ai_range_table = &ai_ranges_6030,
+			      .ai_range_code = ai_range_code_6030,
+			      .ao_range_table = &ao_ranges_6030,
+			      .ao_range_code = ao_range_code_6030,
+			      .ai_fifo = &ai_fifo_60xx,
+			      .has_8255 = 0,
+			       },
 	[BOARD_PCIDAS6031] = {
-		.name		= "pci-das6031",
-		.ai_se_chans	= 64,
-		.ai_bits	= 16,
-		.ai_speed	= 10000,
-		.ao_nchan	= 2,
-		.ao_bits	= 16,
-		.ao_scan_speed	= 10000,
-		.layout		= LAYOUT_60XX,
-		.ai_range_table	= &ai_ranges_6030,
-		.ai_range_code	= ai_range_code_6030,
-		.ao_range_table	= &ao_ranges_6030,
-		.ao_range_code	= ao_range_code_6030,
-		.ai_fifo	= &ai_fifo_60xx,
-		.has_8255	= 0,
-	},
+			      .name = "pci-das6031",
+			      .ai_se_chans = 64,
+			      .ai_bits = 16,
+			      .ai_speed = 10000,
+			      .ao_nchan = 2,
+			      .ao_bits = 16,
+			      .ao_scan_speed = 10000,
+			      .layout = LAYOUT_60XX,
+			      .ai_range_table = &ai_ranges_6030,
+			      .ai_range_code = ai_range_code_6030,
+			      .ao_range_table = &ao_ranges_6030,
+			      .ao_range_code = ao_range_code_6030,
+			      .ai_fifo = &ai_fifo_60xx,
+			      .has_8255 = 0,
+			       },
 	[BOARD_PCIDAS6032] = {
-		.name		= "pci-das6032",
-		.ai_se_chans	= 16,
-		.ai_bits	= 16,
-		.ai_speed	= 10000,
-		.ao_nchan	= 0,
-		.layout		= LAYOUT_60XX,
-		.ai_range_table	= &ai_ranges_6030,
-		.ai_range_code	= ai_range_code_6030,
-		.ai_fifo	= &ai_fifo_60xx,
-		.has_8255	= 0,
-	},
+			      .name = "pci-das6032",
+			      .ai_se_chans = 16,
+			      .ai_bits = 16,
+			      .ai_speed = 10000,
+			      .ao_nchan = 0,
+			      .layout = LAYOUT_60XX,
+			      .ai_range_table = &ai_ranges_6030,
+			      .ai_range_code = ai_range_code_6030,
+			      .ai_fifo = &ai_fifo_60xx,
+			      .has_8255 = 0,
+			       },
 	[BOARD_PCIDAS6033] = {
-		.name		= "pci-das6033",
-		.ai_se_chans	= 64,
-		.ai_bits	= 16,
-		.ai_speed	= 10000,
-		.ao_nchan	= 0,
-		.layout		= LAYOUT_60XX,
-		.ai_range_table	= &ai_ranges_6030,
-		.ai_range_code	= ai_range_code_6030,
-		.ai_fifo	= &ai_fifo_60xx,
-		.has_8255	= 0,
-	},
+			      .name = "pci-das6033",
+			      .ai_se_chans = 64,
+			      .ai_bits = 16,
+			      .ai_speed = 10000,
+			      .ao_nchan = 0,
+			      .layout = LAYOUT_60XX,
+			      .ai_range_table = &ai_ranges_6030,
+			      .ai_range_code = ai_range_code_6030,
+			      .ai_fifo = &ai_fifo_60xx,
+			      .has_8255 = 0,
+			       },
 	[BOARD_PCIDAS6034] = {
-		.name		= "pci-das6034",
-		.ai_se_chans	= 16,
-		.ai_bits	= 16,
-		.ai_speed	= 5000,
-		.ao_nchan	= 0,
-		.ao_scan_speed	= 0,
-		.layout		= LAYOUT_60XX,
-		.ai_range_table	= &ai_ranges_60xx,
-		.ai_range_code	= ai_range_code_60xx,
-		.ai_fifo	= &ai_fifo_60xx,
-		.has_8255	= 0,
-	},
+			      .name = "pci-das6034",
+			      .ai_se_chans = 16,
+			      .ai_bits = 16,
+			      .ai_speed = 5000,
+			      .ao_nchan = 0,
+			      .ao_scan_speed = 0,
+			      .layout = LAYOUT_60XX,
+			      .ai_range_table = &ai_ranges_60xx,
+			      .ai_range_code = ai_range_code_60xx,
+			      .ai_fifo = &ai_fifo_60xx,
+			      .has_8255 = 0,
+			       },
 	[BOARD_PCIDAS6035] = {
-		.name		= "pci-das6035",
-		.ai_se_chans	= 16,
-		.ai_bits	= 16,
-		.ai_speed	= 5000,
-		.ao_nchan	= 2,
-		.ao_bits	= 12,
-		.ao_scan_speed	= 100000,
-		.layout		= LAYOUT_60XX,
-		.ai_range_table	= &ai_ranges_60xx,
-		.ai_range_code	= ai_range_code_60xx,
-		.ao_range_table	= &range_bipolar10,
-		.ao_range_code	= ao_range_code_60xx,
-		.ai_fifo	= &ai_fifo_60xx,
-		.has_8255	= 0,
-	},
+			      .name = "pci-das6035",
+			      .ai_se_chans = 16,
+			      .ai_bits = 16,
+			      .ai_speed = 5000,
+			      .ao_nchan = 2,
+			      .ao_bits = 12,
+			      .ao_scan_speed = 100000,
+			      .layout = LAYOUT_60XX,
+			      .ai_range_table = &ai_ranges_60xx,
+			      .ai_range_code = ai_range_code_60xx,
+			      .ao_range_table = &range_bipolar10,
+			      .ao_range_code = ao_range_code_60xx,
+			      .ai_fifo = &ai_fifo_60xx,
+			      .has_8255 = 0,
+			       },
 	[BOARD_PCIDAS6036] = {
-		.name		= "pci-das6036",
-		.ai_se_chans	= 16,
-		.ai_bits	= 16,
-		.ai_speed	= 5000,
-		.ao_nchan	= 2,
-		.ao_bits	= 16,
-		.ao_scan_speed	= 100000,
-		.layout		= LAYOUT_60XX,
-		.ai_range_table	= &ai_ranges_60xx,
-		.ai_range_code	= ai_range_code_60xx,
-		.ao_range_table	= &range_bipolar10,
-		.ao_range_code	= ao_range_code_60xx,
-		.ai_fifo	= &ai_fifo_60xx,
-		.has_8255	= 0,
-	},
+			      .name = "pci-das6036",
+			      .ai_se_chans = 16,
+			      .ai_bits = 16,
+			      .ai_speed = 5000,
+			      .ao_nchan = 2,
+			      .ao_bits = 16,
+			      .ao_scan_speed = 100000,
+			      .layout = LAYOUT_60XX,
+			      .ai_range_table = &ai_ranges_60xx,
+			      .ai_range_code = ai_range_code_60xx,
+			      .ao_range_table = &range_bipolar10,
+			      .ao_range_code = ao_range_code_60xx,
+			      .ai_fifo = &ai_fifo_60xx,
+			      .has_8255 = 0,
+			       },
 	[BOARD_PCIDAS6040] = {
-		.name		= "pci-das6040",
-		.ai_se_chans	= 16,
-		.ai_bits	= 12,
-		.ai_speed	= 2000,
-		.ao_nchan	= 2,
-		.ao_bits	= 12,
-		.ao_scan_speed	= 1000,
-		.layout		= LAYOUT_60XX,
-		.ai_range_table	= &ai_ranges_6052,
-		.ai_range_code	= ai_range_code_6052,
-		.ao_range_table	= &ao_ranges_6030,
-		.ao_range_code	= ao_range_code_6030,
-		.ai_fifo	= &ai_fifo_60xx,
-		.has_8255	= 0,
-	},
+			      .name = "pci-das6040",
+			      .ai_se_chans = 16,
+			      .ai_bits = 12,
+			      .ai_speed = 2000,
+			      .ao_nchan = 2,
+			      .ao_bits = 12,
+			      .ao_scan_speed = 1000,
+			      .layout = LAYOUT_60XX,
+			      .ai_range_table = &ai_ranges_6052,
+			      .ai_range_code = ai_range_code_6052,
+			      .ao_range_table = &ao_ranges_6030,
+			      .ao_range_code = ao_range_code_6030,
+			      .ai_fifo = &ai_fifo_60xx,
+			      .has_8255 = 0,
+			       },
 	[BOARD_PCIDAS6052] = {
-		.name		= "pci-das6052",
-		.ai_se_chans	= 16,
-		.ai_bits	= 16,
-		.ai_speed	= 3333,
-		.ao_nchan	= 2,
-		.ao_bits	= 16,
-		.ao_scan_speed	= 3333,
-		.layout		= LAYOUT_60XX,
-		.ai_range_table	= &ai_ranges_6052,
-		.ai_range_code	= ai_range_code_6052,
-		.ao_range_table	= &ao_ranges_6030,
-		.ao_range_code	= ao_range_code_6030,
-		.ai_fifo	= &ai_fifo_60xx,
-		.has_8255	= 0,
-	},
+			      .name = "pci-das6052",
+			      .ai_se_chans = 16,
+			      .ai_bits = 16,
+			      .ai_speed = 3333,
+			      .ao_nchan = 2,
+			      .ao_bits = 16,
+			      .ao_scan_speed = 3333,
+			      .layout = LAYOUT_60XX,
+			      .ai_range_table = &ai_ranges_6052,
+			      .ai_range_code = ai_range_code_6052,
+			      .ao_range_table = &ao_ranges_6030,
+			      .ao_range_code = ao_range_code_6030,
+			      .ai_fifo = &ai_fifo_60xx,
+			      .has_8255 = 0,
+			       },
 	[BOARD_PCIDAS6070] = {
-		.name		= "pci-das6070",
-		.ai_se_chans	= 16,
-		.ai_bits	= 12,
-		.ai_speed	= 800,
-		.ao_nchan	= 2,
-		.ao_bits	= 12,
-		.ao_scan_speed	= 1000,
-		.layout		= LAYOUT_60XX,
-		.ai_range_table	= &ai_ranges_6052,
-		.ai_range_code	= ai_range_code_6052,
-		.ao_range_table	= &ao_ranges_6030,
-		.ao_range_code	= ao_range_code_6030,
-		.ai_fifo	= &ai_fifo_60xx,
-		.has_8255	= 0,
-	},
+			      .name = "pci-das6070",
+			      .ai_se_chans = 16,
+			      .ai_bits = 12,
+			      .ai_speed = 800,
+			      .ao_nchan = 2,
+			      .ao_bits = 12,
+			      .ao_scan_speed = 1000,
+			      .layout = LAYOUT_60XX,
+			      .ai_range_table = &ai_ranges_6052,
+			      .ai_range_code = ai_range_code_6052,
+			      .ao_range_table = &ao_ranges_6030,
+			      .ao_range_code = ao_range_code_6030,
+			      .ai_fifo = &ai_fifo_60xx,
+			      .has_8255 = 0,
+			       },
 	[BOARD_PCIDAS6071] = {
-		.name		= "pci-das6071",
-		.ai_se_chans	= 64,
-		.ai_bits	= 12,
-		.ai_speed	= 800,
-		.ao_nchan	= 2,
-		.ao_bits	= 12,
-		.ao_scan_speed	= 1000,
-		.layout		= LAYOUT_60XX,
-		.ai_range_table	= &ai_ranges_6052,
-		.ai_range_code	= ai_range_code_6052,
-		.ao_range_table	= &ao_ranges_6030,
-		.ao_range_code	= ao_range_code_6030,
-		.ai_fifo	= &ai_fifo_60xx,
-		.has_8255	= 0,
-	},
+			      .name = "pci-das6071",
+			      .ai_se_chans = 64,
+			      .ai_bits = 12,
+			      .ai_speed = 800,
+			      .ao_nchan = 2,
+			      .ao_bits = 12,
+			      .ao_scan_speed = 1000,
+			      .layout = LAYOUT_60XX,
+			      .ai_range_table = &ai_ranges_6052,
+			      .ai_range_code = ai_range_code_6052,
+			      .ao_range_table = &ao_ranges_6030,
+			      .ao_range_code = ao_range_code_6030,
+			      .ai_fifo = &ai_fifo_60xx,
+			      .has_8255 = 0,
+			       },
 	[BOARD_PCIDAS4020_12] = {
-		.name		= "pci-das4020/12",
-		.ai_se_chans	= 4,
-		.ai_bits	= 12,
-		.ai_speed	= 50,
-		.ao_bits	= 12,
-		.ao_nchan	= 2,
-		.ao_scan_speed	= 0,	/* no hardware pacing on ao */
-		.layout		= LAYOUT_4020,
-		.ai_range_table	= &ai_ranges_4020,
-		.ao_range_table	= &ao_ranges_4020,
-		.ao_range_code	= ao_range_code_4020,
-		.ai_fifo	= &ai_fifo_4020,
-		.has_8255	= 1,
-	},
+				 .name = "pci-das4020/12",
+				 .ai_se_chans = 4,
+				 .ai_bits = 12,
+				 .ai_speed = 50,
+				 .ao_bits = 12,
+				 .ao_nchan = 2,
+				 .ao_scan_speed = 0,	/* no hardware pacing on ao */
+				 .layout = LAYOUT_4020,
+				 .ai_range_table = &ai_ranges_4020,
+				 .ao_range_table = &ao_ranges_4020,
+				 .ao_range_code = ao_range_code_4020,
+				 .ai_fifo = &ai_fifo_4020,
+				 .has_8255 = 1,
+				  },
 #if 0
 	/* The device id for these boards is unknown */
 
 	[BOARD_PCIDAS6402_16_JR] = {
-		.name		= "pci-das6402/16/jr",
-		.ai_se_chans	= 64,
-		.ai_bits	= 16,
-		.ai_speed	= 5000,
-		.ao_nchan	= 0,
-		.ao_scan_speed	= 10000,
-		.layout		= LAYOUT_64XX,
-		.ai_range_table	= &ai_ranges_64xx,
-		.ai_range_code	= ai_range_code_64xx,
-		.ai_fifo	= ai_fifo_64xx,
-		.has_8255	= 1,
-	},
+				    .name = "pci-das6402/16/jr",
+				    .ai_se_chans = 64,
+				    .ai_bits = 16,
+				    .ai_speed = 5000,
+				    .ao_nchan = 0,
+				    .ao_scan_speed = 10000,
+				    .layout = LAYOUT_64XX,
+				    .ai_range_table = &ai_ranges_64xx,
+				    .ai_range_code = ai_range_code_64xx,
+				    .ai_fifo = ai_fifo_64xx,
+				    .has_8255 = 1,
+				     },
 	[BOARD_PCIDAS64_M1_16_JR] = {
-		.name		= "pci-das64/m1/16/jr",
-		.ai_se_chans	= 64,
-		.ai_bits	= 16,
-		.ai_speed	= 1000,
-		.ao_nchan	= 0,
-		.ao_scan_speed	= 10000,
-		.layout		= LAYOUT_64XX,
-		.ai_range_table	= &ai_ranges_64_mx,
-		.ai_range_code	= ai_range_code_64_mx,
-		.ai_fifo	= ai_fifo_64xx,
-		.has_8255	= 1,
-	},
+				     .name = "pci-das64/m1/16/jr",
+				     .ai_se_chans = 64,
+				     .ai_bits = 16,
+				     .ai_speed = 1000,
+				     .ao_nchan = 0,
+				     .ao_scan_speed = 10000,
+				     .layout = LAYOUT_64XX,
+				     .ai_range_table = &ai_ranges_64_mx,
+				     .ai_range_code = ai_range_code_64_mx,
+				     .ai_fifo = ai_fifo_64xx,
+				     .has_8255 = 1,
+				      },
 	[BOARD_PCIDAS64_M2_16_JR] = {
-		.name = "pci-das64/m2/16/jr",
-		.ai_se_chans	= 64,
-		.ai_bits	= 16,
-		.ai_speed	= 500,
-		.ao_nchan	= 0,
-		.ao_scan_speed	= 10000,
-		.layout		= LAYOUT_64XX,
-		.ai_range_table	= &ai_ranges_64_mx,
-		.ai_range_code	= ai_range_code_64_mx,
-		.ai_fifo	= ai_fifo_64xx,
-		.has_8255	= 1,
-	},
+				     .name = "pci-das64/m2/16/jr",
+				     .ai_se_chans = 64,
+				     .ai_bits = 16,
+				     .ai_speed = 500,
+				     .ao_nchan = 0,
+				     .ao_scan_speed = 10000,
+				     .layout = LAYOUT_64XX,
+				     .ai_range_table = &ai_ranges_64_mx,
+				     .ai_range_code = ai_range_code_64_mx,
+				     .ai_fifo = ai_fifo_64xx,
+				     .has_8255 = 1,
+				      },
 	[BOARD_PCIDAS64_M3_16_JR] = {
-		.name		= "pci-das64/m3/16/jr",
-		.ai_se_chans	= 64,
-		.ai_bits	= 16,
-		.ai_speed	= 333,
-		.ao_nchan	= 0,
-		.ao_scan_speed	= 10000,
-		.layout		= LAYOUT_64XX,
-		.ai_range_table	= &ai_ranges_64_mx,
-		.ai_range_code	= ai_range_code_64_mx,
-		.ai_fifo	= ai_fifo_64xx,
-		.has_8255	= 1,
-	},
+				     .name = "pci-das64/m3/16/jr",
+				     .ai_se_chans = 64,
+				     .ai_bits = 16,
+				     .ai_speed = 333,
+				     .ao_nchan = 0,
+				     .ao_scan_speed = 10000,
+				     .layout = LAYOUT_64XX,
+				     .ai_range_table = &ai_ranges_64_mx,
+				     .ai_range_code = ai_range_code_64_mx,
+				     .ai_fifo = ai_fifo_64xx,
+				     .has_8255 = 1,
+				      },
 	[BOARD_PCIDAS64_M1_14] = {
-		.name		= "pci-das64/m1/14",
-		.ai_se_chans	= 64,
-		.ai_bits	= 14,
-		.ai_speed	= 1000,
-		.ao_nchan	= 2,
-		.ao_scan_speed	= 10000,
-		.layout		= LAYOUT_64XX,
-		.ai_range_table	= &ai_ranges_64_mx,
-		.ai_range_code	= ai_range_code_64_mx,
-		.ai_fifo	= ai_fifo_64xx,
-		.has_8255	= 1,
-	},
+				  .name = "pci-das64/m1/14",
+				  .ai_se_chans = 64,
+				  .ai_bits = 14,
+				  .ai_speed = 1000,
+				  .ao_nchan = 2,
+				  .ao_scan_speed = 10000,
+				  .layout = LAYOUT_64XX,
+				  .ai_range_table = &ai_ranges_64_mx,
+				  .ai_range_code = ai_range_code_64_mx,
+				  .ai_fifo = ai_fifo_64xx,
+				  .has_8255 = 1,
+				   },
 	[BOARD_PCIDAS64_M2_14] = {
-		.name		= "pci-das64/m2/14",
-		.ai_se_chans	= 64,
-		.ai_bits	= 14,
-		.ai_speed	= 500,
-		.ao_nchan	= 2,
-		.ao_scan_speed	= 10000,
-		.layout		= LAYOUT_64XX,
-		.ai_range_table	= &ai_ranges_64_mx,
-		.ai_range_code	= ai_range_code_64_mx,
-		.ai_fifo	= ai_fifo_64xx,
-		.has_8255	= 1,
-	},
+				  .name = "pci-das64/m2/14",
+				  .ai_se_chans = 64,
+				  .ai_bits = 14,
+				  .ai_speed = 500,
+				  .ao_nchan = 2,
+				  .ao_scan_speed = 10000,
+				  .layout = LAYOUT_64XX,
+				  .ai_range_table = &ai_ranges_64_mx,
+				  .ai_range_code = ai_range_code_64_mx,
+				  .ai_fifo = ai_fifo_64xx,
+				  .has_8255 = 1,
+				   },
 	[BOARD_PCIDAS64_M3_14] = {
-		.name		= "pci-das64/m3/14",
-		.ai_se_chans	= 64,
-		.ai_bits	= 14,
-		.ai_speed	= 333,
-		.ao_nchan	= 2,
-		.ao_scan_speed	= 10000,
-		.layout		= LAYOUT_64XX,
-		.ai_range_table	= &ai_ranges_64_mx,
-		.ai_range_code	= ai_range_code_64_mx,
-		.ai_fifo	= ai_fifo_64xx,
-		.has_8255	= 1,
-	},
+				  .name = "pci-das64/m3/14",
+				  .ai_se_chans = 64,
+				  .ai_bits = 14,
+				  .ai_speed = 333,
+				  .ao_nchan = 2,
+				  .ao_scan_speed = 10000,
+				  .layout = LAYOUT_64XX,
+				  .ai_range_table = &ai_ranges_64_mx,
+				  .ai_range_code = ai_range_code_64_mx,
+				  .ai_fifo = ai_fifo_64xx,
+				  .has_8255 = 1,
+				   },
 #endif
 };
 
@@ -1239,9 +1239,9 @@ static void disable_ai_interrupts(struct comedi_device *dev)
 
 	spin_lock_irqsave(&dev->spinlock, flags);
 	devpriv->intr_enable_bits &=
-		~EN_ADC_INTR_SRC_BIT & ~EN_ADC_DONE_INTR_BIT &
-		~EN_ADC_ACTIVE_INTR_BIT & ~EN_ADC_STOP_INTR_BIT &
-		~EN_ADC_OVERRUN_BIT & ~ADC_INTR_SRC_MASK;
+	    ~EN_ADC_INTR_SRC_BIT & ~EN_ADC_DONE_INTR_BIT &
+	    ~EN_ADC_ACTIVE_INTR_BIT & ~EN_ADC_STOP_INTR_BIT &
+	    ~EN_ADC_OVERRUN_BIT & ~ADC_INTR_SRC_MASK;
 	writew(devpriv->intr_enable_bits,
 	       devpriv->main_iobase + INTR_ENABLE_REG);
 	spin_unlock_irqrestore(&dev->spinlock, flags);
@@ -1256,7 +1256,7 @@ static void enable_ai_interrupts(struct comedi_device *dev,
 	unsigned long flags;
 
 	bits = EN_ADC_OVERRUN_BIT | EN_ADC_DONE_INTR_BIT |
-	       EN_ADC_ACTIVE_INTR_BIT | EN_ADC_STOP_INTR_BIT;
+	    EN_ADC_ACTIVE_INTR_BIT | EN_ADC_STOP_INTR_BIT;
 	/*
 	 * Use pio transfer and interrupt on end of conversion
 	 * if CMDF_WAKE_EOS flag is set.
@@ -1282,7 +1282,7 @@ static void init_plx9080(struct comedi_device *dev)
 	void __iomem *plx_iobase = devpriv->plx9080_iobase;
 
 	devpriv->plx_control_bits =
-		readl(devpriv->plx9080_iobase + PLX_REG_CNTRL);
+	    readl(devpriv->plx9080_iobase + PLX_REG_CNTRL);
 
 #ifdef __BIG_ENDIAN
 	bits = PLX_BIGEND_DMA0 | PLX_BIGEND_DMA1;
@@ -1323,7 +1323,7 @@ static void init_plx9080(struct comedi_device *dev)
 	/* 4020 uses 32 bit dma */
 	if (board->layout == LAYOUT_4020)
 		bits |= PLX_DMAMODE_WIDTH_32;
-	else				/* localspace0 bus is 16 bits wide */
+	else			/* localspace0 bus is 16 bits wide */
 		bits |= PLX_DMAMODE_WIDTH_16;
 	writel(bits, plx_iobase + PLX_REG_DMAMODE1);
 	if (ao_cmd_is_supported(board))
@@ -1377,8 +1377,7 @@ static int set_ai_fifo_segment_length(struct comedi_device *dev,
 	bits = (~(num_increments - 1)) & fifo->fifo_size_reg_mask;
 	devpriv->fifo_size_bits &= ~fifo->fifo_size_reg_mask;
 	devpriv->fifo_size_bits |= bits;
-	writew(devpriv->fifo_size_bits,
-	       devpriv->main_iobase + FIFO_SIZE_REG);
+	writew(devpriv->fifo_size_bits, devpriv->main_iobase + FIFO_SIZE_REG);
 
 	devpriv->ai_fifo_segment_length = num_increments * increment_size;
 
@@ -1413,8 +1412,7 @@ static unsigned int ai_fifo_size(struct comedi_device *dev)
 	struct pcidas64_private *devpriv = dev->private;
 
 	return devpriv->ai_fifo_segment_length *
-	       board->ai_fifo->num_segments *
-	       board->ai_fifo->sample_packing_ratio;
+	    board->ai_fifo->num_segments * board->ai_fifo->sample_packing_ratio;
 }
 
 static void init_stc_registers(struct comedi_device *dev)
@@ -1442,8 +1440,7 @@ static void init_stc_registers(struct comedi_device *dev)
 	if (board->layout == LAYOUT_4020)
 		bits |= INTERNAL_CLOCK_4020_BITS;
 	devpriv->hw_config_bits |= bits;
-	writew(devpriv->hw_config_bits,
-	       devpriv->main_iobase + HW_CONFIG_REG);
+	writew(devpriv->hw_config_bits, devpriv->main_iobase + HW_CONFIG_REG);
 
 	writew(0, devpriv->main_iobase + DAQ_SYNC_REG);
 	writew(0, devpriv->main_iobase + CALIBRATION_REG);
@@ -1456,8 +1453,8 @@ static void init_stc_registers(struct comedi_device *dev)
 
 	devpriv->dac_control1_bits = DAC_OUTPUT_ENABLE_BIT;
 	devpriv->intr_enable_bits =
-		/* EN_DAC_INTR_SRC_BIT | DAC_INTR_QEMPTY_BITS | */
-		EN_DAC_DONE_INTR_BIT | EN_DAC_UNDERRUN_BIT;
+	    /* EN_DAC_INTR_SRC_BIT | DAC_INTR_QEMPTY_BITS | */
+	    EN_DAC_DONE_INTR_BIT | EN_DAC_UNDERRUN_BIT;
 	writew(devpriv->intr_enable_bits,
 	       devpriv->main_iobase + INTR_ENABLE_REG);
 
@@ -1474,9 +1471,9 @@ static int alloc_and_init_dma_members(struct comedi_device *dev)
 	/* allocate pci dma buffers */
 	for (i = 0; i < ai_dma_ring_count(board); i++) {
 		devpriv->ai_buffer[i] =
-			dma_alloc_coherent(&pcidev->dev, DMA_BUFFER_SIZE,
-					   &devpriv->ai_buffer_bus_addr[i],
-					   GFP_KERNEL);
+		    dma_alloc_coherent(&pcidev->dev, DMA_BUFFER_SIZE,
+				       &devpriv->ai_buffer_bus_addr[i],
+				       GFP_KERNEL);
 		if (!devpriv->ai_buffer[i])
 			return -ENOMEM;
 	}
@@ -1493,56 +1490,52 @@ static int alloc_and_init_dma_members(struct comedi_device *dev)
 	}
 	/* allocate dma descriptors */
 	devpriv->ai_dma_desc =
-		dma_alloc_coherent(&pcidev->dev, sizeof(struct plx_dma_desc) *
-				   ai_dma_ring_count(board),
-				   &devpriv->ai_dma_desc_bus_addr, GFP_KERNEL);
+	    dma_alloc_coherent(&pcidev->dev, sizeof(struct plx_dma_desc) *
+			       ai_dma_ring_count(board),
+			       &devpriv->ai_dma_desc_bus_addr, GFP_KERNEL);
 	if (!devpriv->ai_dma_desc)
 		return -ENOMEM;
 
 	if (ao_cmd_is_supported(board)) {
 		devpriv->ao_dma_desc =
-			dma_alloc_coherent(&pcidev->dev,
-					   sizeof(struct plx_dma_desc) *
-					   AO_DMA_RING_COUNT,
-					   &devpriv->ao_dma_desc_bus_addr,
-					   GFP_KERNEL);
+		    dma_alloc_coherent(&pcidev->dev,
+				       sizeof(struct plx_dma_desc) *
+				       AO_DMA_RING_COUNT,
+				       &devpriv->ao_dma_desc_bus_addr,
+				       GFP_KERNEL);
 		if (!devpriv->ao_dma_desc)
 			return -ENOMEM;
 	}
 	/* initialize dma descriptors */
 	for (i = 0; i < ai_dma_ring_count(board); i++) {
 		devpriv->ai_dma_desc[i].pci_start_addr =
-			cpu_to_le32(devpriv->ai_buffer_bus_addr[i]);
+		    cpu_to_le32(devpriv->ai_buffer_bus_addr[i]);
 		if (board->layout == LAYOUT_4020)
 			devpriv->ai_dma_desc[i].local_start_addr =
-				cpu_to_le32(devpriv->local1_iobase +
-					    ADC_FIFO_REG);
+			    cpu_to_le32(devpriv->local1_iobase + ADC_FIFO_REG);
 		else
 			devpriv->ai_dma_desc[i].local_start_addr =
-				cpu_to_le32(devpriv->local0_iobase +
-					    ADC_FIFO_REG);
+			    cpu_to_le32(devpriv->local0_iobase + ADC_FIFO_REG);
 		devpriv->ai_dma_desc[i].transfer_size = cpu_to_le32(0);
 		devpriv->ai_dma_desc[i].next =
-			cpu_to_le32((devpriv->ai_dma_desc_bus_addr +
-				     ((i + 1) % ai_dma_ring_count(board)) *
-				     sizeof(devpriv->ai_dma_desc[0])) |
-				    PLX_DMADPR_DESCPCI | PLX_DMADPR_TCINTR |
-				    PLX_DMADPR_XFERL2P);
+		    cpu_to_le32((devpriv->ai_dma_desc_bus_addr +
+				 ((i + 1) % ai_dma_ring_count(board)) *
+				 sizeof(devpriv->ai_dma_desc[0])) |
+				PLX_DMADPR_DESCPCI | PLX_DMADPR_TCINTR |
+				PLX_DMADPR_XFERL2P);
 	}
 	if (ao_cmd_is_supported(board)) {
 		for (i = 0; i < AO_DMA_RING_COUNT; i++) {
 			devpriv->ao_dma_desc[i].pci_start_addr =
-				cpu_to_le32(devpriv->ao_buffer_bus_addr[i]);
+			    cpu_to_le32(devpriv->ao_buffer_bus_addr[i]);
 			devpriv->ao_dma_desc[i].local_start_addr =
-				cpu_to_le32(devpriv->local0_iobase +
-					    DAC_FIFO_REG);
+			    cpu_to_le32(devpriv->local0_iobase + DAC_FIFO_REG);
 			devpriv->ao_dma_desc[i].transfer_size = cpu_to_le32(0);
 			devpriv->ao_dma_desc[i].next =
-				cpu_to_le32((devpriv->ao_dma_desc_bus_addr +
-					     ((i + 1) % (AO_DMA_RING_COUNT)) *
-					     sizeof(devpriv->ao_dma_desc[0])) |
-					    PLX_DMADPR_DESCPCI |
-					    PLX_DMADPR_TCINTR);
+			    cpu_to_le32((devpriv->ao_dma_desc_bus_addr +
+					 ((i + 1) % (AO_DMA_RING_COUNT)) *
+					 sizeof(devpriv->ao_dma_desc[0])) |
+					PLX_DMADPR_DESCPCI | PLX_DMADPR_TCINTR);
 		}
 	}
 	return 0;
@@ -1608,13 +1601,13 @@ static void i2c_set_sda(struct comedi_device *dev, int state)
 	struct pcidas64_private *devpriv = dev->private;
 	static const int data_bit = PLX_CNTRL_EEWB;
 	void __iomem *plx_control_addr = devpriv->plx9080_iobase +
-					 PLX_REG_CNTRL;
+	    PLX_REG_CNTRL;
 
-	if (state) {				/* set data line high */
+	if (state) {		/* set data line high */
 		devpriv->plx_control_bits &= ~data_bit;
 		writel(devpriv->plx_control_bits, plx_control_addr);
 		udelay(i2c_high_udelay);
-	} else {				/* set data line low */
+	} else {		/* set data line low */
 		devpriv->plx_control_bits |= data_bit;
 		writel(devpriv->plx_control_bits, plx_control_addr);
 		udelay(i2c_low_udelay);
@@ -1627,13 +1620,13 @@ static void i2c_set_scl(struct comedi_device *dev, int state)
 	struct pcidas64_private *devpriv = dev->private;
 	static const int clock_bit = PLX_CNTRL_USERO;
 	void __iomem *plx_control_addr = devpriv->plx9080_iobase +
-					 PLX_REG_CNTRL;
+	    PLX_REG_CNTRL;
 
-	if (state) {				/* set clock line high */
+	if (state) {		/* set clock line high */
 		devpriv->plx_control_bits &= ~clock_bit;
 		writel(devpriv->plx_control_bits, plx_control_addr);
 		udelay(i2c_high_udelay);
-	} else {				/* set clock line low */
+	} else {		/* set clock line low */
 		devpriv->plx_control_bits |= clock_bit;
 		writel(devpriv->plx_control_bits, plx_control_addr);
 		udelay(i2c_low_udelay);
@@ -1725,8 +1718,7 @@ static void i2c_write(struct comedi_device *dev, unsigned int address,
 
 static int cb_pcidas64_ai_eoc(struct comedi_device *dev,
 			      struct comedi_subdevice *s,
-			      struct comedi_insn *insn,
-			      unsigned long context)
+			      struct comedi_insn *insn, unsigned long context)
 {
 	const struct pcidas64_board *board = dev->board_ptr;
 	struct pcidas64_private *devpriv = dev->private;
@@ -1819,7 +1811,7 @@ static int ai_rinsn(struct comedi_device *dev, struct comedi_subdevice *s,
 		devpriv->i2c_cal_range_bits &= ~ADC_SRC_4020_MASK;
 		if (insn->chanspec & CR_ALT_SOURCE) {
 			devpriv->i2c_cal_range_bits |=
-				adc_src_4020_bits(devpriv->calibration_source);
+			    adc_src_4020_bits(devpriv->calibration_source);
 		} else {	/* select BNC inputs */
 			devpriv->i2c_cal_range_bits |= adc_src_4020_bits(4);
 		}
@@ -1906,7 +1898,7 @@ static int ai_config_block_size(struct comedi_device *dev, unsigned int *data)
 
 	if (requested_block_size) {
 		fifo_size = requested_block_size * fifo->num_segments /
-			    bytes_in_sample;
+		    bytes_in_sample;
 
 		retval = set_ai_fifo_size(dev, fifo_size);
 		if (retval < 0)
@@ -2016,7 +2008,7 @@ static void check_adc_timing(struct comedi_device *dev, struct comedi_cmd *cmd)
 	unsigned int scan_divisor;
 	static const int min_convert_divisor = 3;
 	static const int max_convert_divisor =
-		max_counter_value + min_convert_divisor;
+	    max_counter_value + min_convert_divisor;
 	static const int min_scan_divisor_4020 = 2;
 	unsigned long long max_scan_divisor, min_scan_divisor;
 
@@ -2041,8 +2033,8 @@ static void check_adc_timing(struct comedi_device *dev, struct comedi_cmd *cmd)
 		if (cmd->convert_src == TRIG_TIMER) {
 			min_scan_divisor = convert_divisor * cmd->chanlist_len;
 			max_scan_divisor =
-				(convert_divisor * cmd->chanlist_len - 1) +
-				max_counter_value;
+			    (convert_divisor * cmd->chanlist_len - 1) +
+			    max_counter_value;
 		} else {
 			min_scan_divisor = min_scan_divisor_4020;
 			max_scan_divisor = max_counter_value + min_scan_divisor;
@@ -2168,10 +2160,10 @@ static int ai_cmdtest(struct comedi_device *dev, struct comedi_subdevice *s,
 			 * allows
 			 */
 			if (cmd->scan_begin_src == TRIG_TIMER) {
-				err |= comedi_check_trigger_arg_min(
-						&cmd->scan_begin_arg,
-						cmd->convert_arg *
-						cmd->chanlist_len);
+				err |=
+				    comedi_check_trigger_arg_min
+				    (&cmd->scan_begin_arg,
+				     cmd->convert_arg * cmd->chanlist_len);
 			}
 		}
 	}
@@ -2255,7 +2247,7 @@ static inline unsigned int dma_transfer_size(struct comedi_device *dev)
 	unsigned int num_samples;
 
 	num_samples = devpriv->ai_fifo_segment_length *
-		      board->ai_fifo->sample_packing_ratio;
+	    board->ai_fifo->sample_packing_ratio;
 	if (num_samples > DMA_BUFFER_SIZE / sizeof(u16))
 		num_samples = DMA_BUFFER_SIZE / sizeof(u16);
 
@@ -2279,7 +2271,7 @@ static u32 ai_scan_counter_6xxx(struct comedi_device *dev,
 	case TRIG_TIMER:
 		count = (cmd->scan_begin_arg -
 			 (cmd->convert_arg * (cmd->chanlist_len - 1))) /
-			TIMER_BASE;
+		    TIMER_BASE;
 		break;
 	case TRIG_FOLLOW:
 		count = cmd->convert_arg / TIMER_BASE;
@@ -2330,8 +2322,7 @@ static void select_master_clock_4020(struct comedi_device *dev,
 	} else {
 		devpriv->hw_config_bits |= INTERNAL_CLOCK_4020_BITS;
 	}
-	writew(devpriv->hw_config_bits,
-	       devpriv->main_iobase + HW_CONFIG_REG);
+	writew(devpriv->hw_config_bits, devpriv->main_iobase + HW_CONFIG_REG);
 }
 
 static void select_master_clock(struct comedi_device *dev,
@@ -2439,8 +2430,7 @@ static int setup_channel_queue(struct comedi_device *dev,
 			       (CR_CHAN(cmd->chanlist[cmd->chanlist_len - 1])),
 			       devpriv->main_iobase + ADC_QUEUE_HIGH_REG);
 			/* set start channel, and rest of settings */
-			writew(bits,
-			       devpriv->main_iobase + ADC_QUEUE_LOAD_REG);
+			writew(bits, devpriv->main_iobase + ADC_QUEUE_LOAD_REG);
 		} else {
 			/* use external queue */
 			if (dev->write_subdev && dev->write_subdev->busy) {
@@ -2451,8 +2441,7 @@ static int setup_channel_queue(struct comedi_device *dev,
 			writew(devpriv->hw_config_bits,
 			       devpriv->main_iobase + HW_CONFIG_REG);
 			/* clear DAC buffer to prevent weird interactions */
-			writew(0,
-			       devpriv->main_iobase + DAC_BUFFER_CLEAR_REG);
+			writew(0, devpriv->main_iobase + DAC_BUFFER_CLEAR_REG);
 			/* clear queue pointer */
 			writew(0, devpriv->main_iobase + ADC_QUEUE_CLEAR_REG);
 			/* load external queue */
@@ -2477,7 +2466,7 @@ static int setup_channel_queue(struct comedi_device *dev,
 				/* mark end of queue */
 				if (i == cmd->chanlist_len - 1)
 					bits |= QUEUE_EOSCAN_BIT |
-						QUEUE_EOSEQ_BIT;
+					    QUEUE_EOSEQ_BIT;
 				writew(bits,
 				       devpriv->main_iobase +
 				       ADC_QUEUE_FIFO_REG);
@@ -2503,10 +2492,10 @@ static int setup_channel_queue(struct comedi_device *dev,
 
 			if (range == 0)
 				devpriv->i2c_cal_range_bits |=
-					attenuate_bit(channel);
+				    attenuate_bit(channel);
 			else
 				devpriv->i2c_cal_range_bits &=
-					~attenuate_bit(channel);
+				    ~attenuate_bit(channel);
 		}
 		/*
 		 * update calibration/range i2c register only if necessary,
@@ -2597,11 +2586,11 @@ static int ai_cmd(struct comedi_device *dev, struct comedi_subdevice *s)
 			devpriv->adc_control1_bits |= TWO_CHANNEL_4020_BITS;
 		devpriv->adc_control1_bits &= ~ADC_LO_CHANNEL_4020_MASK;
 		devpriv->adc_control1_bits |=
-			adc_lo_chan_4020_bits(CR_CHAN(cmd->chanlist[0]));
+		    adc_lo_chan_4020_bits(CR_CHAN(cmd->chanlist[0]));
 		devpriv->adc_control1_bits &= ~ADC_HI_CHANNEL_4020_MASK;
 		devpriv->adc_control1_bits |=
-			adc_hi_chan_4020_bits(CR_CHAN(cmd->chanlist
-						      [cmd->chanlist_len - 1]));
+		    adc_hi_chan_4020_bits(CR_CHAN(cmd->chanlist
+						  [cmd->chanlist_len - 1]));
 	}
 	writew(devpriv->adc_control1_bits,
 	       devpriv->main_iobase + ADC_CONTROL1_REG);
@@ -2610,15 +2599,13 @@ static int ai_cmd(struct comedi_device *dev, struct comedi_subdevice *s)
 	/* clear adc buffer */
 	writew(0, devpriv->main_iobase + ADC_BUFFER_CLEAR_REG);
 
-	if ((cmd->flags & CMDF_WAKE_EOS) == 0 ||
-	    board->layout == LAYOUT_4020) {
+	if ((cmd->flags & CMDF_WAKE_EOS) == 0 || board->layout == LAYOUT_4020) {
 		devpriv->ai_dma_index = 0;
 
 		/* set dma transfer size */
 		for (i = 0; i < ai_dma_ring_count(board); i++)
 			devpriv->ai_dma_desc[i].transfer_size =
-				cpu_to_le32(dma_transfer_size(dev) *
-					    sizeof(u16));
+			    cpu_to_le32(dma_transfer_size(dev) * sizeof(u16));
 
 		/* give location of first dma descriptor */
 		load_first_dma_descriptor(dev, 1,
@@ -2682,9 +2669,9 @@ static void pio_drain_ai_fifo_16(struct comedi_device *dev)
 	do {
 		/* get least significant 15 bits */
 		read_index = readw(devpriv->main_iobase + ADC_READ_PNTR_REG) &
-			     0x7fff;
+		    0x7fff;
 		write_index = readw(devpriv->main_iobase + ADC_WRITE_PNTR_REG) &
-			      0x7fff;
+		    0x7fff;
 		/*
 		 * Get most significant bits (grey code).
 		 * Different boards use different code so use a scheme
@@ -2703,7 +2690,7 @@ static void pio_drain_ai_fifo_16(struct comedi_device *dev)
 
 		if (read_segment != write_segment)
 			num_samples =
-				devpriv->ai_fifo_segment_length - read_index;
+			    devpriv->ai_fifo_segment_length - read_index;
 		else
 			num_samples = write_index - read_index;
 		if (num_samples < 0) {
@@ -2740,9 +2727,9 @@ static void pio_drain_ai_fifo_32(struct comedi_device *dev)
 	unsigned int i;
 	u32 fifo_data;
 	int write_code =
-		readw(devpriv->main_iobase + ADC_WRITE_PNTR_REG) & 0x7fff;
+	    readw(devpriv->main_iobase + ADC_WRITE_PNTR_REG) & 0x7fff;
 	int read_code =
-		readw(devpriv->main_iobase + ADC_READ_PNTR_REG) & 0x7fff;
+	    readw(devpriv->main_iobase + ADC_READ_PNTR_REG) & 0x7fff;
 
 	nsamples = comedi_nsamples_left(s, 100000);
 	for (i = 0; read_code != write_code && i < nsamples;) {
@@ -2758,7 +2745,7 @@ static void pio_drain_ai_fifo_32(struct comedi_device *dev)
 			i++;
 		}
 		read_code = readw(devpriv->main_iobase + ADC_READ_PNTR_REG) &
-			    0x7fff;
+		    0x7fff;
 	}
 }
 
@@ -2795,10 +2782,11 @@ static void drain_dma_buffers(struct comedi_device *dev, unsigned int channel)
 		/* transfer data from dma buffer to comedi buffer */
 		num_samples = comedi_nsamples_left(s, dma_transfer_size(dev));
 		comedi_buf_write_samples(s,
-				devpriv->ai_buffer[devpriv->ai_dma_index],
-				num_samples);
-		devpriv->ai_dma_index = (devpriv->ai_dma_index + 1) %
-					ai_dma_ring_count(board);
+					 devpriv->ai_buffer[devpriv->
+							    ai_dma_index],
+					 num_samples);
+		devpriv->ai_dma_index =
+		    (devpriv->ai_dma_index + 1) % ai_dma_ring_count(board);
 	}
 	/*
 	 * XXX check for dma ring buffer overrun
@@ -2807,8 +2795,7 @@ static void drain_dma_buffers(struct comedi_device *dev, unsigned int channel)
 }
 
 static void handle_ai_interrupt(struct comedi_device *dev,
-				unsigned short status,
-				unsigned int plx_status)
+				unsigned short status, unsigned int plx_status)
 {
 	const struct pcidas64_board *board = dev->board_ptr;
 	struct pcidas64_private *devpriv = dev->private;
@@ -2881,8 +2868,7 @@ static int last_ao_dma_load_completed(struct comedi_device *dev)
 	if ((dma_status & PLX_DMACSR_DONE) == 0)
 		return 0;
 
-	transfer_address =
-		readl(devpriv->plx9080_iobase + PLX_REG_DMAPADR0);
+	transfer_address = readl(devpriv->plx9080_iobase + PLX_REG_DMAPADR0);
 	if (transfer_address != devpriv->ao_buffer_bus_addr[buffer_index])
 		return 0;
 
@@ -2978,8 +2964,7 @@ static void load_ao_dma(struct comedi_device *dev, const struct comedi_cmd *cmd)
 		if (next_transfer_addr >=
 		    devpriv->ao_buffer_bus_addr[buffer_index] &&
 		    next_transfer_addr <
-		    devpriv->ao_buffer_bus_addr[buffer_index] +
-		    DMA_BUFFER_SIZE)
+		    devpriv->ao_buffer_bus_addr[buffer_index] + DMA_BUFFER_SIZE)
 			return;
 		num_bytes = load_ao_dma_buffer(dev, cmd);
 	} while (num_bytes >= DMA_BUFFER_SIZE);
@@ -3130,7 +3115,7 @@ static void set_dac_control0_reg(struct comedi_device *dev,
 {
 	struct pcidas64_private *devpriv = dev->private;
 	unsigned int bits = DAC_ENABLE_BIT | WAVEFORM_GATE_LEVEL_BIT |
-			    WAVEFORM_GATE_ENABLE_BIT | WAVEFORM_GATE_SELECT_BIT;
+	    WAVEFORM_GATE_ENABLE_BIT | WAVEFORM_GATE_SELECT_BIT;
 
 	if (cmd->start_src == TRIG_EXT) {
 		bits |= WAVEFORM_TRIG_EXT_BITS;
@@ -3376,7 +3361,7 @@ static int ao_cmdtest(struct comedi_device *dev, struct comedi_subdevice *s,
 		if (get_ao_divisor(cmd->scan_begin_arg, cmd->flags) >
 		    max_counter_value) {
 			cmd->scan_begin_arg = (max_counter_value + 2) *
-					      TIMER_BASE;
+			    TIMER_BASE;
 			err |= -EINVAL;
 		}
 	}
@@ -3447,8 +3432,7 @@ static int di_rbits(struct comedi_device *dev, struct comedi_subdevice *s,
 
 static int do_wbits(struct comedi_device *dev,
 		    struct comedi_subdevice *s,
-		    struct comedi_insn *insn,
-		    unsigned int *data)
+		    struct comedi_insn *insn, unsigned int *data)
 {
 	if (comedi_dio_update_state(s, data))
 		writeb(s->state, dev->mmio + DO_REG);
@@ -3460,8 +3444,7 @@ static int do_wbits(struct comedi_device *dev,
 
 static int dio_60xx_config_insn(struct comedi_device *dev,
 				struct comedi_subdevice *s,
-				struct comedi_insn *insn,
-				unsigned int *data)
+				struct comedi_insn *insn, unsigned int *data)
 {
 	int ret;
 
@@ -3476,8 +3459,7 @@ static int dio_60xx_config_insn(struct comedi_device *dev,
 
 static int dio_60xx_wbits(struct comedi_device *dev,
 			  struct comedi_subdevice *s,
-			  struct comedi_insn *insn,
-			  unsigned int *data)
+			  struct comedi_insn *insn, unsigned int *data)
 {
 	if (comedi_dio_update_state(s, data))
 		writeb(s->state, dev->mmio + DIO_DATA_60XX_REG);
@@ -3560,35 +3542,35 @@ static int caldac_i2c_write(struct comedi_device *dev,
 	};
 
 	switch (caldac_channel) {
-	case 0:					/* chan 0 offset */
+	case 0:		/* chan 0 offset */
 		i2c_addr = CALDAC0_I2C_ADDR;
 		serial_bytes[0] = OFFSET_0_2;
 		break;
-	case 1:					/* chan 1 offset */
+	case 1:		/* chan 1 offset */
 		i2c_addr = CALDAC0_I2C_ADDR;
 		serial_bytes[0] = OFFSET_1_3;
 		break;
-	case 2:					/* chan 2 offset */
+	case 2:		/* chan 2 offset */
 		i2c_addr = CALDAC1_I2C_ADDR;
 		serial_bytes[0] = OFFSET_0_2;
 		break;
-	case 3:					/* chan 3 offset */
+	case 3:		/* chan 3 offset */
 		i2c_addr = CALDAC1_I2C_ADDR;
 		serial_bytes[0] = OFFSET_1_3;
 		break;
-	case 4:					/* chan 0 gain */
+	case 4:		/* chan 0 gain */
 		i2c_addr = CALDAC0_I2C_ADDR;
 		serial_bytes[0] = GAIN_0_2;
 		break;
-	case 5:					/* chan 1 gain */
+	case 5:		/* chan 1 gain */
 		i2c_addr = CALDAC0_I2C_ADDR;
 		serial_bytes[0] = GAIN_1_3;
 		break;
-	case 6:					/* chan 2 gain */
+	case 6:		/* chan 2 gain */
 		i2c_addr = CALDAC1_I2C_ADDR;
 		serial_bytes[0] = GAIN_0_2;
 		break;
-	case 7:					/* chan 3 gain */
+	case 7:		/* chan 3 gain */
 		i2c_addr = CALDAC1_I2C_ADDR;
 		serial_bytes[0] = GAIN_1_3;
 		break;
@@ -3703,8 +3685,8 @@ static u16 read_eeprom(struct comedi_device *dev, u8 address)
 	static const int read_command = 0x6;
 	unsigned int bitstream = (read_command << 8) | address;
 	unsigned int bit;
-	void __iomem * const plx_control_addr =
-		devpriv->plx9080_iobase + PLX_REG_CNTRL;
+	void __iomem *const plx_control_addr =
+	    devpriv->plx9080_iobase + PLX_REG_CNTRL;
 	u16 value;
 	static const int value_length = 16;
 	static const int eeprom_udelay = 1;
@@ -3827,7 +3809,7 @@ static int setup_subdevices(struct comedi_device *dev)
 	if (board->ao_nchan) {
 		s->type = COMEDI_SUBD_AO;
 		s->subdev_flags = SDF_READABLE | SDF_WRITABLE |
-				  SDF_GROUND | SDF_CMD_WRITE;
+		    SDF_GROUND | SDF_CMD_WRITE;
 		s->n_chan = board->ao_nchan;
 		s->maxdata = (1 << board->ao_bits) - 1;
 		s->range_table = board->ao_range_table;
@@ -3965,8 +3947,7 @@ static int setup_subdevices(struct comedi_device *dev)
 	return 0;
 }
 
-static int auto_attach(struct comedi_device *dev,
-		       unsigned long context)
+static int auto_attach(struct comedi_device *dev, unsigned long context)
 {
 	struct pci_dev *pcidev = comedi_to_pci_dev(dev);
 	const struct pcidas64_board *board = NULL;
@@ -4006,16 +3987,16 @@ static int auto_attach(struct comedi_device *dev,
 
 	/* figure out what local addresses are */
 	local_range = readl(devpriv->plx9080_iobase + PLX_REG_LAS0RR) &
-		      PLX_LASRR_MEM_MASK;
+	    PLX_LASRR_MEM_MASK;
 	local_decode = readl(devpriv->plx9080_iobase + PLX_REG_LAS0BA) &
-		       local_range & PLX_LASBA_MEM_MASK;
-	devpriv->local0_iobase = ((u32)devpriv->main_phys_iobase &
+	    local_range & PLX_LASBA_MEM_MASK;
+	devpriv->local0_iobase = ((u32) devpriv->main_phys_iobase &
 				  ~local_range) | local_decode;
 	local_range = readl(devpriv->plx9080_iobase + PLX_REG_LAS1RR) &
-		      PLX_LASRR_MEM_MASK;
+	    PLX_LASRR_MEM_MASK;
 	local_decode = readl(devpriv->plx9080_iobase + PLX_REG_LAS1BA) &
-		       local_range & PLX_LASBA_MEM_MASK;
-	devpriv->local1_iobase = ((u32)devpriv->dio_counter_phys_iobase &
+	    local_range & PLX_LASBA_MEM_MASK;
+	devpriv->local1_iobase = ((u32) devpriv->dio_counter_phys_iobase &
 				  ~local_range) | local_decode;
 
 	retval = alloc_and_init_dma_members(dev);
@@ -4023,7 +4004,7 @@ static int auto_attach(struct comedi_device *dev,
 		return retval;
 
 	devpriv->hw_revision =
-		hw_revision(dev, readw(devpriv->main_iobase + HW_STATUS_REG));
+	    hw_revision(dev, readw(devpriv->main_iobase + HW_STATUS_REG));
 	dev_dbg(dev->class_dev, "stc hardware revision %i\n",
 		devpriv->hw_revision);
 	init_plx9080(dev);
@@ -4067,10 +4048,10 @@ static void detach(struct comedi_device *dev)
 }
 
 static struct comedi_driver cb_pcidas64_driver = {
-	.driver_name	= "cb_pcidas64",
-	.module		= THIS_MODULE,
-	.auto_attach	= auto_attach,
-	.detach		= detach,
+	.driver_name = "cb_pcidas64",
+	.module = THIS_MODULE,
+	.auto_attach = auto_attach,
+	.detach = detach,
 };
 
 static int cb_pcidas64_pci_probe(struct pci_dev *dev,
@@ -4104,14 +4085,16 @@ static const struct pci_device_id cb_pcidas64_pci_table[] = {
 	{ PCI_VDEVICE(CB, 0x0079), BOARD_PCIDAS6014 },
 	{ 0 }
 };
+
 MODULE_DEVICE_TABLE(pci, cb_pcidas64_pci_table);
 
 static struct pci_driver cb_pcidas64_pci_driver = {
-	.name		= "cb_pcidas64",
-	.id_table	= cb_pcidas64_pci_table,
-	.probe		= cb_pcidas64_pci_probe,
-	.remove		= comedi_pci_auto_unconfig,
+	.name = "cb_pcidas64",
+	.id_table = cb_pcidas64_pci_table,
+	.probe = cb_pcidas64_pci_probe,
+	.remove = comedi_pci_auto_unconfig,
 };
+
 module_comedi_pci_driver(cb_pcidas64_driver, cb_pcidas64_pci_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

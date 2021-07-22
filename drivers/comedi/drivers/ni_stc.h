@@ -291,8 +291,8 @@
 #define NISTC_ATRIG_ETC_DRV		BIT(4)
 #define NISTC_ATRIG_ETC_ENA		BIT(3)
 #define NISTC_ATRIG_ETC_MODE(x)		(((x) & 0x7) << 0)
-#define NISTC_GPFO_0_G_OUT		0 /* input to GPFO_0_SEL for Ctr0Out */
-#define NISTC_GPFO_1_G_OUT		0 /* input to GPFO_1_SEL for Ctr1Out */
+#define NISTC_GPFO_0_G_OUT		0	/* input to GPFO_0_SEL for Ctr0Out */
+#define NISTC_GPFO_1_G_OUT		0	/* input to GPFO_1_SEL for Ctr1Out */
 
 #define NISTC_AI_START_STOP_REG		62
 #define NISTC_AI_START_POLARITY		BIT(15)
@@ -593,7 +593,7 @@
 #define NI_E_AO_DEGLITCH		BIT(1)
 #define NI_E_AO_CFG_BIP			BIT(0)
 
-#define NI_E_DAC_DIRECT_DATA_REG(x)	(0x18 + ((x) * 2)) /* w16 */
+#define NI_E_DAC_DIRECT_DATA_REG(x)	(0x18 + ((x) * 2))	/* w16 */
 
 #define NI_E_8255_BASE			0x19	/* rw8 */
 
@@ -633,12 +633,12 @@
 #define NI6143_CALIB_CHAN_RELAY_ON	BIT(15)
 #define NI6143_CALIB_CHAN_RELAY_OFF	BIT(14)
 #define NI6143_CALIB_CHAN(x)		(((x) & 0xf) << 0)
-#define NI6143_CALIB_CHAN_GND_GND	NI6143_CALIB_CHAN(0) /* Offset Cal */
-#define NI6143_CALIB_CHAN_2V5_GND	NI6143_CALIB_CHAN(2) /* 2.5V ref */
-#define NI6143_CALIB_CHAN_PWM_GND	NI6143_CALIB_CHAN(5) /* +-5V Self Cal */
-#define NI6143_CALIB_CHAN_2V5_PWM	NI6143_CALIB_CHAN(10) /* PWM Cal */
-#define NI6143_CALIB_CHAN_PWM_PWM	NI6143_CALIB_CHAN(13) /* CMRR */
-#define NI6143_CALIB_CHAN_GND_PWM	NI6143_CALIB_CHAN(14) /* PWM Cal */
+#define NI6143_CALIB_CHAN_GND_GND	NI6143_CALIB_CHAN(0)	/* Offset Cal */
+#define NI6143_CALIB_CHAN_2V5_GND	NI6143_CALIB_CHAN(2)	/* 2.5V ref */
+#define NI6143_CALIB_CHAN_PWM_GND	NI6143_CALIB_CHAN(5)	/* +-5V Self Cal */
+#define NI6143_CALIB_CHAN_2V5_PWM	NI6143_CALIB_CHAN(10)	/* PWM Cal */
+#define NI6143_CALIB_CHAN_PWM_PWM	NI6143_CALIB_CHAN(13)	/* CMRR */
+#define NI6143_CALIB_CHAN_GND_PWM	NI6143_CALIB_CHAN(14)	/* PWM Cal */
 #define NI6143_CALIB_LO_TIME_REG	0x20	/* w16 */
 #define NI6143_CALIB_HI_TIME_REG	0x22	/* w16 */
 #define NI6143_RELAY_COUNTER_LOAD_REG	0x4c	/* w32 */
@@ -962,7 +962,7 @@ struct ni_board_struct {
 	int reg_type;
 	unsigned int has_8255:1;
 	unsigned int has_32dio_chan:1;
-	unsigned int dio_speed; /* not for e-series */
+	unsigned int dio_speed;	/* not for e-series */
 
 	enum caldac_enum caldac[3];
 };

@@ -50,12 +50,12 @@
  */
 static const struct comedi_lrange das02_ao_ranges = {
 	6, {
-		UNI_RANGE(5),
-		UNI_RANGE(10),
-		BIP_RANGE(5),
-		BIP_RANGE(10),
-		RANGE_mA(4, 20),
-		RANGE_ext(0, 1)
+	    UNI_RANGE(5),
+	    UNI_RANGE(10),
+	    BIP_RANGE(5),
+	    BIP_RANGE(10),
+	    RANGE_mA(4, 20),
+	    RANGE_ext(0, 1)
 	}
 };
 
@@ -67,8 +67,7 @@ static const struct comedi_lrange das02_ao_ranges = {
 
 static int dac02_ao_insn_write(struct comedi_device *dev,
 			       struct comedi_subdevice *s,
-			       struct comedi_insn *insn,
-			       unsigned int *data)
+			       struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 	unsigned int range = CR_RANGE(insn->chanspec);
@@ -114,22 +113,23 @@ static int dac02_attach(struct comedi_device *dev, struct comedi_devconfig *it)
 
 	/* Analog Output subdevice */
 	s = &dev->subdevices[0];
-	s->type		= COMEDI_SUBD_AO;
-	s->subdev_flags	= SDF_WRITABLE;
-	s->n_chan	= 2;
-	s->maxdata	= 0x0fff;
-	s->range_table	= &das02_ao_ranges;
-	s->insn_write	= dac02_ao_insn_write;
+	s->type = COMEDI_SUBD_AO;
+	s->subdev_flags = SDF_WRITABLE;
+	s->n_chan = 2;
+	s->maxdata = 0x0fff;
+	s->range_table = &das02_ao_ranges;
+	s->insn_write = dac02_ao_insn_write;
 
 	return comedi_alloc_subdev_readback(s);
 }
 
 static struct comedi_driver dac02_driver = {
-	.driver_name	= "dac02",
-	.module		= THIS_MODULE,
-	.attach		= dac02_attach,
-	.detach		= comedi_legacy_detach,
+	.driver_name = "dac02",
+	.module = THIS_MODULE,
+	.attach = dac02_attach,
+	.detach = comedi_legacy_detach,
 };
+
 module_comedi_driver(dac02_driver);
 
 MODULE_AUTHOR("H Hartley Sweeten <hsweeten@visionengravers.com>");

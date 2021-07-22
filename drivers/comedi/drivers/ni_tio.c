@@ -152,6 +152,7 @@ void ni_tio_write(struct ni_gpct *counter, unsigned int value,
 	if (reg < NITIO_NUM_REGS)
 		counter->counter_dev->write(counter, value, reg);
 }
+
 EXPORT_SYMBOL_GPL(ni_tio_write);
 
 /**
@@ -165,6 +166,7 @@ unsigned int ni_tio_read(struct ni_gpct *counter, enum ni_gpct_register reg)
 		return counter->counter_dev->read(counter, reg);
 	return 0;
 }
+
 EXPORT_SYMBOL_GPL(ni_tio_read);
 
 static void ni_tio_reset_count_and_disarm(struct ni_gpct *counter)
@@ -254,6 +256,7 @@ void ni_tio_set_bits(struct ni_gpct *counter, enum ni_gpct_register reg,
 {
 	ni_tio_set_bits_transient(counter, reg, mask, value, 0x0);
 }
+
 EXPORT_SYMBOL_GPL(ni_tio_set_bits);
 
 /**
@@ -280,6 +283,7 @@ unsigned int ni_tio_get_soft_copy(const struct ni_gpct *counter,
 	}
 	return value;
 }
+
 EXPORT_SYMBOL_GPL(ni_tio_get_soft_copy);
 
 static unsigned int ni_tio_clock_src_modifiers(const struct ni_gpct *counter)
@@ -287,7 +291,7 @@ static unsigned int ni_tio_clock_src_modifiers(const struct ni_gpct *counter)
 	struct ni_gpct_device *counter_dev = counter->counter_dev;
 	unsigned int cidx = counter->counter_index;
 	unsigned int counting_mode_bits =
-		ni_tio_get_soft_copy(counter, NITIO_CNT_MODE_REG(cidx));
+	    ni_tio_get_soft_copy(counter, NITIO_CNT_MODE_REG(cidx));
 	unsigned int bits = 0;
 
 	if (ni_tio_get_soft_copy(counter, NITIO_INPUT_SEL_REG(cidx)) &
@@ -593,7 +597,7 @@ int ni_tio_arm(struct ni_gpct *counter, bool arm, unsigned int start_trigger)
 			 */
 			if (mask && (start_trigger & NI_GPCT_ARM_UNKNOWN)) {
 				bits |= GI_HW_ARM_ENA |
-					(GI_HW_ARM_SEL(start_trigger) & mask);
+				    (GI_HW_ARM_SEL(start_trigger) & mask);
 			} else {
 				return -EINVAL;
 			}
@@ -610,6 +614,7 @@ int ni_tio_arm(struct ni_gpct *counter, bool arm, unsigned int start_trigger)
 				  0, 0, transient_bits);
 	return 0;
 }
+
 EXPORT_SYMBOL_GPL(ni_tio_arm);
 
 static int ni_660x_clk_src(unsigned int clock_source, unsigned int *bits)
@@ -858,8 +863,7 @@ static inline void ni_tio_set_gate_mode(struct ni_gpct *counter,
 			mode_bits |= GI_LEVEL_GATING;
 	}
 	ni_tio_set_bits(counter, NITIO_MODE_REG(counter->counter_index),
-			GI_GATE_POL_INVERT | GI_GATING_MODE_MASK,
-			mode_bits);
+			GI_GATE_POL_INVERT | GI_GATING_MODE_MASK, mode_bits);
 }
 
 /*
@@ -1052,6 +1056,7 @@ int ni_tio_set_gate_src_raw(struct ni_gpct *counter,
 	}
 	return 0;
 }
+
 EXPORT_SYMBOL_GPL(ni_tio_set_gate_src_raw);
 
 int ni_tio_set_gate_src(struct ni_gpct *counter,
@@ -1114,6 +1119,7 @@ int ni_tio_set_gate_src(struct ni_gpct *counter,
 	}
 	return 0;
 }
+
 EXPORT_SYMBOL_GPL(ni_tio_set_gate_src);
 
 static int ni_tio_set_other_src(struct ni_gpct *counter, unsigned int index,
@@ -1134,10 +1140,10 @@ static int ni_tio_set_other_src(struct ni_gpct *counter, unsigned int index,
 	    (index >= NI_CtrA(0) && index <= NI_CtrA(-1))) {
 		shift = 10;
 	} else if (index == NI_GPCT_SOURCE_ENCODER_B ||
-	    (index >= NI_CtrB(0) && index <= NI_CtrB(-1))) {
+		   (index >= NI_CtrB(0) && index <= NI_CtrB(-1))) {
 		shift = 5;
 	} else if (index == NI_GPCT_SOURCE_ENCODER_Z ||
-	    (index >= NI_CtrZ(0) && index <= NI_CtrZ(-1))) {
+		   (index >= NI_CtrZ(0) && index <= NI_CtrZ(-1))) {
 		shift = 0;
 	} else {
 		return -EINVAL;
@@ -1171,10 +1177,10 @@ static int ni_tio_get_other_src(struct ni_gpct *counter, unsigned int index,
 	    (index >= NI_CtrA(0) && index <= NI_CtrA(-1))) {
 		shift = 10;
 	} else if (index == NI_GPCT_SOURCE_ENCODER_B ||
-	    (index >= NI_CtrB(0) && index <= NI_CtrB(-1))) {
+		   (index >= NI_CtrB(0) && index <= NI_CtrB(-1))) {
 		shift = 5;
 	} else if (index == NI_GPCT_SOURCE_ENCODER_Z ||
-	    (index >= NI_CtrZ(0) && index <= NI_CtrZ(-1))) {
+		   (index >= NI_CtrZ(0) && index <= NI_CtrZ(-1))) {
 		shift = 0;
 	} else {
 		return -EINVAL;
@@ -1343,7 +1349,8 @@ static int ni_m_gate2_to_generic_gate(unsigned int gate, unsigned int *src)
 static inline unsigned int ni_tio_get_gate_mode(struct ni_gpct *counter)
 {
 	unsigned int mode = ni_tio_get_soft_copy(counter,
-				NITIO_MODE_REG(counter->counter_index));
+						 NITIO_MODE_REG
+						 (counter->counter_index));
 	unsigned int ret = 0;
 
 	if ((mode & GI_GATING_MODE_MASK) == GI_GATING_DISABLED)
@@ -1359,7 +1366,8 @@ static inline unsigned int ni_tio_get_gate_mode(struct ni_gpct *counter)
 static inline unsigned int ni_tio_get_gate2_mode(struct ni_gpct *counter)
 {
 	unsigned int mode = ni_tio_get_soft_copy(counter,
-				NITIO_GATE2_REG(counter->counter_index));
+						 NITIO_GATE2_REG
+						 (counter->counter_index));
 	unsigned int ret = 0;
 
 	if (!(mode & GI_GATE2_MODE))
@@ -1373,13 +1381,15 @@ static inline unsigned int ni_tio_get_gate2_mode(struct ni_gpct *counter)
 static inline unsigned int ni_tio_get_gate_val(struct ni_gpct *counter)
 {
 	return GI_BITS_TO_GATE(ni_tio_get_soft_copy(counter,
-		NITIO_INPUT_SEL_REG(counter->counter_index)));
+						    NITIO_INPUT_SEL_REG
+						    (counter->counter_index)));
 }
 
 static inline unsigned int ni_tio_get_gate2_val(struct ni_gpct *counter)
 {
 	return GI_BITS_TO_GATE2(ni_tio_get_soft_copy(counter,
-		NITIO_GATE2_REG(counter->counter_index)));
+						     NITIO_GATE2_REG
+						     (counter->counter_index)));
 }
 
 static int ni_tio_get_gate_src(struct ni_gpct *counter, unsigned int gate_index,
@@ -1434,11 +1444,11 @@ static int ni_tio_get_gate_src_raw(struct ni_gpct *counter,
 	switch (gate_index) {
 	case 0:
 		*gate_source = ni_tio_get_gate_mode(counter)
-			     | ni_tio_get_gate_val(counter);
+		    | ni_tio_get_gate_val(counter);
 		break;
 	case 1:
 		*gate_source = ni_tio_get_gate2_mode(counter)
-			     | ni_tio_get_gate2_val(counter);
+		    | ni_tio_get_gate2_val(counter);
 		break;
 	default:
 		return -EINVAL;
@@ -1448,8 +1458,7 @@ static int ni_tio_get_gate_src_raw(struct ni_gpct *counter,
 
 int ni_tio_insn_config(struct comedi_device *dev,
 		       struct comedi_subdevice *s,
-		       struct comedi_insn *insn,
-		       unsigned int *data)
+		       struct comedi_insn *insn, unsigned int *data)
 {
 	struct ni_gpct *counter = s->private;
 	unsigned int cidx = counter->counter_index;
@@ -1499,6 +1508,7 @@ int ni_tio_insn_config(struct comedi_device *dev,
 	}
 	return ret ? ret : insn->n;
 }
+
 EXPORT_SYMBOL_GPL(ni_tio_insn_config);
 
 /*
@@ -1525,12 +1535,12 @@ int ni_tio_get_routing(struct ni_gpct_device *counter_dev, unsigned int dest)
 		ret = ni_tio_get_gate_src_raw(counter, 0, &reg);
 	} else if (dest >= NI_CtrAux(0) && dest <= NI_CtrAux(-1)) {
 		ret = ni_tio_get_gate_src_raw(counter, 1, &reg);
-	/*
-	 * This case is not possible through this interface.  A user must use
-	 * INSN_CONFIG_SET_CLOCK_SRC instead.
-	 * } else if (dest >= NI_CtrSource(0) && dest <= NI_CtrSource(-1)) {
-	 *	ret = ni_tio_set_clock_src(counter, &reg, &period_ns);
-	 */
+		/*
+		 * This case is not possible through this interface.  A user must use
+		 * INSN_CONFIG_SET_CLOCK_SRC instead.
+		 * } else if (dest >= NI_CtrSource(0) && dest <= NI_CtrSource(-1)) {
+		 *      ret = ni_tio_set_clock_src(counter, &reg, &period_ns);
+		 */
 	}
 
 	if (ret)
@@ -1538,6 +1548,7 @@ int ni_tio_get_routing(struct ni_gpct_device *counter_dev, unsigned int dest)
 
 	return reg;
 }
+
 EXPORT_SYMBOL_GPL(ni_tio_get_routing);
 
 /**
@@ -1566,18 +1577,19 @@ int ni_tio_set_routing(struct ni_gpct_device *counter_dev, unsigned int dest,
 		ret = ni_tio_set_gate_src_raw(counter, 0, reg);
 	} else if (dest >= NI_CtrAux(0) && dest <= NI_CtrAux(-1)) {
 		ret = ni_tio_set_gate_src_raw(counter, 1, reg);
-	/*
-	 * This case is not possible through this interface.  A user must use
-	 * INSN_CONFIG_SET_CLOCK_SRC instead.
-	 * } else if (dest >= NI_CtrSource(0) && dest <= NI_CtrSource(-1)) {
-	 *	ret = ni_tio_set_clock_src(counter, reg, period_ns);
-	 */
+		/*
+		 * This case is not possible through this interface.  A user must use
+		 * INSN_CONFIG_SET_CLOCK_SRC instead.
+		 * } else if (dest >= NI_CtrSource(0) && dest <= NI_CtrSource(-1)) {
+		 *      ret = ni_tio_set_clock_src(counter, reg, period_ns);
+		 */
 	} else {
 		return -EINVAL;
 	}
 
 	return ret;
 }
+
 EXPORT_SYMBOL_GPL(ni_tio_set_routing);
 
 /*
@@ -1595,11 +1607,12 @@ int ni_tio_unset_routing(struct ni_gpct_device *counter_dev, unsigned int dest)
 	 * This case is not possible through this interface.  A user must use
 	 * INSN_CONFIG_SET_CLOCK_SRC instead.
 	 * if (dest >= NI_CtrSource(0) && dest <= NI_CtrSource(-1))
-	 *	return ni_tio_set_clock_src(counter, reg, period_ns);
+	 *      return ni_tio_set_clock_src(counter, reg, period_ns);
 	 */
 
 	return -EINVAL;
 }
+
 EXPORT_SYMBOL_GPL(ni_tio_unset_routing);
 
 static unsigned int ni_tio_read_sw_save_reg(struct comedi_device *dev,
@@ -1631,8 +1644,7 @@ static unsigned int ni_tio_read_sw_save_reg(struct comedi_device *dev,
 
 int ni_tio_insn_read(struct comedi_device *dev,
 		     struct comedi_subdevice *s,
-		     struct comedi_insn *insn,
-		     unsigned int *data)
+		     struct comedi_insn *insn, unsigned int *data)
 {
 	struct ni_gpct *counter = s->private;
 	struct ni_gpct_device *counter_dev = counter->counter_dev;
@@ -1658,6 +1670,7 @@ int ni_tio_insn_read(struct comedi_device *dev,
 	}
 	return insn->n;
 }
+
 EXPORT_SYMBOL_GPL(ni_tio_insn_read);
 
 static unsigned int ni_tio_next_load_register(struct ni_gpct *counter)
@@ -1666,14 +1679,13 @@ static unsigned int ni_tio_next_load_register(struct ni_gpct *counter)
 	unsigned int bits = ni_tio_read(counter, NITIO_SHARED_STATUS_REG(cidx));
 
 	return (bits & GI_NEXT_LOAD_SRC(cidx))
-			? NITIO_LOADB_REG(cidx)
-			: NITIO_LOADA_REG(cidx);
+	    ? NITIO_LOADB_REG(cidx)
+	    : NITIO_LOADA_REG(cidx);
 }
 
 int ni_tio_insn_write(struct comedi_device *dev,
 		      struct comedi_subdevice *s,
-		      struct comedi_insn *insn,
-		      unsigned int *data)
+		      struct comedi_insn *insn, unsigned int *data)
 {
 	struct ni_gpct *counter = s->private;
 	struct ni_gpct_device *counter_dev = counter->counter_dev;
@@ -1718,6 +1730,7 @@ int ni_tio_insn_write(struct comedi_device *dev,
 	}
 	return insn->n;
 }
+
 EXPORT_SYMBOL_GPL(ni_tio_insn_write);
 
 void ni_tio_init_counter(struct ni_gpct *counter)
@@ -1732,8 +1745,7 @@ void ni_tio_init_counter(struct ni_gpct *counter)
 	counter_dev->regs[chip][NITIO_AUTO_INC_REG(cidx)] = 0x0;
 	ni_tio_write(counter, 0x0, NITIO_AUTO_INC_REG(cidx));
 
-	ni_tio_set_bits(counter, NITIO_CMD_REG(cidx),
-			~0, GI_SYNC_GATE);
+	ni_tio_set_bits(counter, NITIO_CMD_REG(cidx), ~0, GI_SYNC_GATE);
 
 	ni_tio_set_bits(counter, NITIO_MODE_REG(cidx), ~0, 0);
 
@@ -1757,19 +1769,28 @@ void ni_tio_init_counter(struct ni_gpct *counter)
 
 	ni_tio_set_bits(counter, NITIO_INT_ENA_REG(cidx), ~0, 0x0);
 }
+
 EXPORT_SYMBOL_GPL(ni_tio_init_counter);
 
-struct ni_gpct_device *
-ni_gpct_device_construct(struct comedi_device *dev,
-			 void (*write)(struct ni_gpct *counter,
-				       unsigned int value,
-				       enum ni_gpct_register reg),
-			 unsigned int (*read)(struct ni_gpct *counter,
-					      enum ni_gpct_register reg),
-			 enum ni_gpct_variant variant,
-			 unsigned int num_counters,
-			 unsigned int counters_per_chip,
-			 const struct ni_route_tables *routing_tables)
+struct ni_gpct_device *ni_gpct_device_construct(struct comedi_device *dev,
+						void (*write)(struct ni_gpct *
+							      counter,
+							      unsigned int
+							      value,
+							      enum
+							      ni_gpct_register
+							      reg),
+						unsigned int (*read)(struct
+								    ni_gpct *
+								    counter,
+								    enum
+								    ni_gpct_register
+								    reg),
+						enum ni_gpct_variant variant,
+						unsigned int num_counters,
+						unsigned int counters_per_chip,
+						const struct ni_route_tables
+						*routing_tables)
 {
 	struct ni_gpct_device *counter_dev;
 	struct ni_gpct *counter;
@@ -1814,6 +1835,7 @@ ni_gpct_device_construct(struct comedi_device *dev,
 
 	return counter_dev;
 }
+
 EXPORT_SYMBOL_GPL(ni_gpct_device_construct);
 
 void ni_gpct_device_destroy(struct ni_gpct_device *counter_dev)
@@ -1824,17 +1846,20 @@ void ni_gpct_device_destroy(struct ni_gpct_device *counter_dev)
 	kfree(counter_dev->counters);
 	kfree(counter_dev);
 }
+
 EXPORT_SYMBOL_GPL(ni_gpct_device_destroy);
 
 static int __init ni_tio_init_module(void)
 {
 	return 0;
 }
+
 module_init(ni_tio_init_module);
 
 static void __exit ni_tio_cleanup_module(void)
 {
 }
+
 module_exit(ni_tio_cleanup_module);
 
 MODULE_AUTHOR("Comedi <comedi@comedi.org>");

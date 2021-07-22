@@ -37,20 +37,19 @@
 
 static const struct comedi_lrange range_fl512 = {
 	4, {
-		BIP_RANGE(0.5),
-		BIP_RANGE(1),
-		BIP_RANGE(5),
-		BIP_RANGE(10),
-		UNI_RANGE(1),
-		UNI_RANGE(5),
-		UNI_RANGE(10)
+	    BIP_RANGE(0.5),
+	    BIP_RANGE(1),
+	    BIP_RANGE(5),
+	    BIP_RANGE(10),
+	    UNI_RANGE(1),
+	    UNI_RANGE(5),
+	    UNI_RANGE(10)
 	}
 };
 
 static int fl512_ai_insn_read(struct comedi_device *dev,
 			      struct comedi_subdevice *s,
-			      struct comedi_insn *insn,
-			      unsigned int *data)
+			      struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 	unsigned int val;
@@ -76,8 +75,7 @@ static int fl512_ai_insn_read(struct comedi_device *dev,
 
 static int fl512_ao_insn_write(struct comedi_device *dev,
 			       struct comedi_subdevice *s,
-			       struct comedi_insn *insn,
-			       unsigned int *data)
+			       struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 	unsigned int val = s->readback[chan];
@@ -111,31 +109,32 @@ static int fl512_attach(struct comedi_device *dev, struct comedi_devconfig *it)
 
 	/* Analog Input subdevice */
 	s = &dev->subdevices[0];
-	s->type		= COMEDI_SUBD_AI;
-	s->subdev_flags	= SDF_READABLE | SDF_GROUND;
-	s->n_chan	= 16;
-	s->maxdata	= 0x0fff;
-	s->range_table	= &range_fl512;
-	s->insn_read	= fl512_ai_insn_read;
+	s->type = COMEDI_SUBD_AI;
+	s->subdev_flags = SDF_READABLE | SDF_GROUND;
+	s->n_chan = 16;
+	s->maxdata = 0x0fff;
+	s->range_table = &range_fl512;
+	s->insn_read = fl512_ai_insn_read;
 
 	/* Analog Output subdevice */
 	s = &dev->subdevices[1];
-	s->type		= COMEDI_SUBD_AO;
-	s->subdev_flags	= SDF_WRITABLE;
-	s->n_chan	= 2;
-	s->maxdata	= 0x0fff;
-	s->range_table	= &range_fl512;
-	s->insn_write	= fl512_ao_insn_write;
+	s->type = COMEDI_SUBD_AO;
+	s->subdev_flags = SDF_WRITABLE;
+	s->n_chan = 2;
+	s->maxdata = 0x0fff;
+	s->range_table = &range_fl512;
+	s->insn_write = fl512_ao_insn_write;
 
 	return comedi_alloc_subdev_readback(s);
 }
 
 static struct comedi_driver fl512_driver = {
-	.driver_name	= "fl512",
-	.module		= THIS_MODULE,
-	.attach		= fl512_attach,
-	.detach		= comedi_legacy_detach,
+	.driver_name = "fl512",
+	.module = THIS_MODULE,
+	.attach = fl512_attach,
+	.detach = comedi_legacy_detach,
 };
+
 module_comedi_driver(fl512_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

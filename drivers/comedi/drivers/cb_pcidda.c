@@ -41,14 +41,14 @@
 #define CB_DDA_DIO1_8255_BASE		0x04
 
 /* DAC registers */
-#define CB_DDA_DA_CTRL_REG		0x00	   /* D/A Control Register  */
-#define CB_DDA_DA_CTRL_SU		BIT(0)   /*  Simultaneous update  */
-#define CB_DDA_DA_CTRL_EN		BIT(1)   /*  Enable specified DAC */
-#define CB_DDA_DA_CTRL_DAC(x)		((x) << 2) /*  Specify DAC channel  */
-#define CB_DDA_DA_CTRL_RANGE2V5		(0 << 6)   /*  2.5V range           */
-#define CB_DDA_DA_CTRL_RANGE5V		(2 << 6)   /*  5V range             */
-#define CB_DDA_DA_CTRL_RANGE10V		(3 << 6)   /*  10V range            */
-#define CB_DDA_DA_CTRL_UNIP		BIT(8)   /*  Unipolar range       */
+#define CB_DDA_DA_CTRL_REG		0x00	/* D/A Control Register  */
+#define CB_DDA_DA_CTRL_SU		BIT(0)	/*  Simultaneous update  */
+#define CB_DDA_DA_CTRL_EN		BIT(1)	/*  Enable specified DAC */
+#define CB_DDA_DA_CTRL_DAC(x)		((x) << 2)	/*  Specify DAC channel  */
+#define CB_DDA_DA_CTRL_RANGE2V5		(0 << 6)	/*  2.5V range           */
+#define CB_DDA_DA_CTRL_RANGE5V		(2 << 6)	/*  5V range             */
+#define CB_DDA_DA_CTRL_RANGE10V		(3 << 6)	/*  10V range            */
+#define CB_DDA_DA_CTRL_UNIP		BIT(8)	/*  Unipolar range       */
 
 #define DACALIBRATION1	4	/*  D/A CALIBRATION REGISTER 1 */
 /* write bits */
@@ -83,12 +83,12 @@
 
 static const struct comedi_lrange cb_pcidda_ranges = {
 	6, {
-		BIP_RANGE(10),
-		BIP_RANGE(5),
-		BIP_RANGE(2.5),
-		UNI_RANGE(10),
-		UNI_RANGE(5),
-		UNI_RANGE(2.5)
+	    BIP_RANGE(10),
+	    BIP_RANGE(5),
+	    BIP_RANGE(2.5),
+	    UNI_RANGE(10),
+	    UNI_RANGE(5),
+	    UNI_RANGE(2.5)
 	}
 };
 
@@ -109,35 +109,35 @@ struct cb_pcidda_board {
 
 static const struct cb_pcidda_board cb_pcidda_boards[] = {
 	[BOARD_DDA02_12] = {
-		.name		= "pci-dda02/12",
-		.ao_chans	= 2,
-		.ao_bits	= 12,
-	},
+			    .name = "pci-dda02/12",
+			    .ao_chans = 2,
+			    .ao_bits = 12,
+			     },
 	[BOARD_DDA04_12] = {
-		.name		= "pci-dda04/12",
-		.ao_chans	= 4,
-		.ao_bits	= 12,
-	},
+			    .name = "pci-dda04/12",
+			    .ao_chans = 4,
+			    .ao_bits = 12,
+			     },
 	[BOARD_DDA08_12] = {
-		.name		= "pci-dda08/12",
-		.ao_chans	= 8,
-		.ao_bits	= 12,
-	},
+			    .name = "pci-dda08/12",
+			    .ao_chans = 8,
+			    .ao_bits = 12,
+			     },
 	[BOARD_DDA02_16] = {
-		.name		= "pci-dda02/16",
-		.ao_chans	= 2,
-		.ao_bits	= 16,
-	},
+			    .name = "pci-dda02/16",
+			    .ao_chans = 2,
+			    .ao_bits = 16,
+			     },
 	[BOARD_DDA04_16] = {
-		.name		= "pci-dda04/16",
-		.ao_chans	= 4,
-		.ao_bits	= 16,
-	},
+			    .name = "pci-dda04/16",
+			    .ao_chans = 4,
+			    .ao_bits = 16,
+			     },
 	[BOARD_DDA08_16] = {
-		.name		= "pci-dda08/16",
-		.ao_chans	= 8,
-		.ao_bits	= 16,
-	},
+			    .name = "pci-dda08/16",
+			    .ao_chans = 8,
+			    .ao_bits = 16,
+			     },
 };
 
 struct cb_pcidda_private {
@@ -284,8 +284,7 @@ static void cb_pcidda_calibrate(struct comedi_device *dev, unsigned int channel,
 
 static int cb_pcidda_ao_insn_write(struct comedi_device *dev,
 				   struct comedi_subdevice *s,
-				   struct comedi_insn *insn,
-				   unsigned int *data)
+				   struct comedi_insn *insn, unsigned int *data)
 {
 	struct cb_pcidda_private *devpriv = dev->private;
 	unsigned int channel = CR_CHAN(insn->chanspec);
@@ -384,17 +383,16 @@ static int cb_pcidda_auto_attach(struct comedi_device *dev,
 }
 
 static struct comedi_driver cb_pcidda_driver = {
-	.driver_name	= "cb_pcidda",
-	.module		= THIS_MODULE,
-	.auto_attach	= cb_pcidda_auto_attach,
-	.detach		= comedi_pci_detach,
+	.driver_name = "cb_pcidda",
+	.module = THIS_MODULE,
+	.auto_attach = cb_pcidda_auto_attach,
+	.detach = comedi_pci_detach,
 };
 
 static int cb_pcidda_pci_probe(struct pci_dev *dev,
 			       const struct pci_device_id *id)
 {
-	return comedi_pci_auto_config(dev, &cb_pcidda_driver,
-				      id->driver_data);
+	return comedi_pci_auto_config(dev, &cb_pcidda_driver, id->driver_data);
 }
 
 static const struct pci_device_id cb_pcidda_pci_table[] = {
@@ -406,14 +404,16 @@ static const struct pci_device_id cb_pcidda_pci_table[] = {
 	{ PCI_VDEVICE(CB, 0x0025), BOARD_DDA08_16 },
 	{ 0 }
 };
+
 MODULE_DEVICE_TABLE(pci, cb_pcidda_pci_table);
 
 static struct pci_driver cb_pcidda_pci_driver = {
-	.name		= "cb_pcidda",
-	.id_table	= cb_pcidda_pci_table,
-	.probe		= cb_pcidda_pci_probe,
-	.remove		= comedi_pci_auto_unconfig,
+	.name = "cb_pcidda",
+	.id_table = cb_pcidda_pci_table,
+	.probe = cb_pcidda_pci_probe,
+	.remove = comedi_pci_auto_unconfig,
 };
+
 module_comedi_pci_driver(cb_pcidda_driver, cb_pcidda_pci_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

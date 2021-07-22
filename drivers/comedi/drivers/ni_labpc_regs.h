@@ -37,8 +37,8 @@
 #define CMD3_ERRINTEN		BIT(4)
 #define CMD3_FIFOINTEN		BIT(5)
 #define ADC_START_CONVERT_REG	0x03	/* W: Start Convert reg */
-#define DAC_LSB_REG(x)		(0x04 + 2 * (x)) /* W: DAC0/1 LSB reg */
-#define DAC_MSB_REG(x)		(0x05 + 2 * (x)) /* W: DAC0/1 MSB reg */
+#define DAC_LSB_REG(x)		(0x04 + 2 * (x))	/* W: DAC0/1 LSB reg */
+#define DAC_MSB_REG(x)		(0x05 + 2 * (x))	/* W: DAC0/1 MSB reg */
 #define ADC_FIFO_CLEAR_REG	0x08	/* W: A/D FIFO Clear reg */
 #define ADC_FIFO_REG		0x0a	/* R: A/D FIFO reg */
 #define DMATC_CLEAR_REG		0x0a	/* W: DMA Interrupt Clear reg */

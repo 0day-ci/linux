@@ -102,7 +102,7 @@ static int ni_tio_input_cmd(struct comedi_subdevice *s)
 	struct ni_gpct *counter = s->private;
 	struct ni_gpct_device *counter_dev = counter->counter_dev;
 	const struct ni_route_tables *routing_tables =
-		counter_dev->routing_tables;
+	    counter_dev->routing_tables;
 	unsigned int cidx = counter->counter_index;
 	struct comedi_async *async = s->async;
 	struct comedi_cmd *cmd = &async->cmd;
@@ -125,7 +125,7 @@ static int ni_tio_input_cmd(struct comedi_subdevice *s)
 
 	if (cmd->start_src == TRIG_INT) {
 		async->inttrig = &ni_tio_input_inttrig;
-	} else {	/* TRIG_NOW || TRIG_EXT || TRIG_OTHER */
+	} else {		/* TRIG_NOW || TRIG_EXT || TRIG_OTHER */
 		async->inttrig = NULL;
 		mite_dma_arm(counter->mite_chan);
 
@@ -137,8 +137,8 @@ static int ni_tio_input_cmd(struct comedi_subdevice *s)
 			if (reg >= NI_NAMES_BASE) {
 				/* using a device-global name. lookup reg */
 				reg = ni_get_reg_value(reg,
-						       NI_CtrArmStartTrigger(cidx),
-						       routing_tables);
+						       NI_CtrArmStartTrigger
+						       (cidx), routing_tables);
 				/* mark this as a raw register value */
 				reg |= NI_GPCT_HW_ARM;
 			}
@@ -163,7 +163,7 @@ static int ni_tio_cmd_setup(struct comedi_subdevice *s)
 	struct ni_gpct *counter = s->private;
 	unsigned int cidx = counter->counter_index;
 	const struct ni_route_tables *routing_tables =
-		counter->counter_dev->routing_tables;
+	    counter->counter_dev->routing_tables;
 	int set_gate_source = 0;
 	unsigned int gate_source;
 	int retval = 0;
@@ -228,16 +228,16 @@ int ni_tio_cmd(struct comedi_device *dev, struct comedi_subdevice *s)
 	spin_unlock_irqrestore(&counter->lock, flags);
 	return retval;
 }
+
 EXPORT_SYMBOL_GPL(ni_tio_cmd);
 
 int ni_tio_cmdtest(struct comedi_device *dev,
-		   struct comedi_subdevice *s,
-		   struct comedi_cmd *cmd)
+		   struct comedi_subdevice *s, struct comedi_cmd *cmd)
 {
 	struct ni_gpct *counter = s->private;
 	unsigned int cidx = counter->counter_index;
 	const struct ni_route_tables *routing_tables =
-		counter->counter_dev->routing_tables;
+	    counter->counter_dev->routing_tables;
 	int err = 0;
 	unsigned int sources;
 
@@ -291,8 +291,8 @@ int ni_tio_cmdtest(struct comedi_device *dev,
 		 * should be uncommented:
 		 *
 		 * err |= ni_check_trigger_arg(CR_CHAN(cmd->start_arg),
-		 *			    NI_CtrArmStartTrigger(cidx),
-		 *			    routing_tables);
+		 *                          NI_CtrArmStartTrigger(cidx),
+		 *                          routing_tables);
 		 */
 		break;
 	}
@@ -327,6 +327,7 @@ int ni_tio_cmdtest(struct comedi_device *dev,
 
 	return 0;
 }
+
 EXPORT_SYMBOL_GPL(ni_tio_cmdtest);
 
 int ni_tio_cancel(struct ni_gpct *counter)
@@ -345,6 +346,7 @@ int ni_tio_cancel(struct ni_gpct *counter)
 			GI_GATE_INTERRUPT_ENABLE(cidx), 0x0);
 	return 0;
 }
+
 EXPORT_SYMBOL_GPL(ni_tio_cancel);
 
 static int should_ack_gate(struct ni_gpct *counter)
@@ -383,14 +385,14 @@ static int should_ack_gate(struct ni_gpct *counter)
 
 static void ni_tio_acknowledge_and_confirm(struct ni_gpct *counter,
 					   int *gate_error,
-					   int *tc_error,
-					   int *perm_stale_data)
+					   int *tc_error, int *perm_stale_data)
 {
 	unsigned int cidx = counter->counter_index;
 	const unsigned short gxx_status = ni_tio_read(counter,
-						NITIO_SHARED_STATUS_REG(cidx));
+						      NITIO_SHARED_STATUS_REG
+						      (cidx));
 	const unsigned short gi_status = ni_tio_read(counter,
-						NITIO_STATUS_REG(cidx));
+						     NITIO_STATUS_REG(cidx));
 	unsigned int ack = 0;
 
 	if (gate_error)
@@ -443,6 +445,7 @@ void ni_tio_acknowledge(struct ni_gpct *counter)
 {
 	ni_tio_acknowledge_and_confirm(counter, NULL, NULL, NULL);
 }
+
 EXPORT_SYMBOL_GPL(ni_tio_acknowledge);
 
 void ni_tio_handle_interrupt(struct ni_gpct *counter,
@@ -481,6 +484,7 @@ void ni_tio_handle_interrupt(struct ni_gpct *counter,
 		mite_ack_linkc(counter->mite_chan, s, true);
 	spin_unlock_irqrestore(&counter->lock, flags);
 }
+
 EXPORT_SYMBOL_GPL(ni_tio_handle_interrupt);
 
 void ni_tio_set_mite_channel(struct ni_gpct *counter,
@@ -492,17 +496,20 @@ void ni_tio_set_mite_channel(struct ni_gpct *counter,
 	counter->mite_chan = mite_chan;
 	spin_unlock_irqrestore(&counter->lock, flags);
 }
+
 EXPORT_SYMBOL_GPL(ni_tio_set_mite_channel);
 
 static int __init ni_tiocmd_init_module(void)
 {
 	return 0;
 }
+
 module_init(ni_tiocmd_init_module);
 
 static void __exit ni_tiocmd_cleanup_module(void)
 {
 }
+
 module_exit(ni_tiocmd_cleanup_module);
 
 MODULE_AUTHOR("Comedi <comedi@comedi.org>");

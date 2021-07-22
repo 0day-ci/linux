@@ -50,7 +50,7 @@
 #define UNKNOWN_DMA_BURST_ENABLE_BITS	0x600
 
 #define MITE_PCI_CONFIG_OFFSET	0x300
-#define MITE_CSIGR		0x460			/* chip signature */
+#define MITE_CSIGR		0x460	/* chip signature */
 #define CSIGR_TO_IOWINS(x)	(((x) >> 29) & 0x7)
 #define CSIGR_TO_WINS(x)	(((x) >> 24) & 0x1f)
 #define CSIGR_TO_WPDEP(x)	(((x) >> 20) & 0x7)
@@ -230,6 +230,7 @@ u32 mite_bytes_in_transit(struct mite_channel *mite_chan)
 
 	return readl(mite->mmio + MITE_FCR(mite_chan->channel)) & 0xff;
 }
+
 EXPORT_SYMBOL_GPL(mite_bytes_in_transit);
 
 /* returns lower bound for number of bytes transferred from device to memory */
@@ -356,6 +357,7 @@ void mite_sync_dma(struct mite_channel *mite_chan, struct comedi_subdevice *s)
 	else
 		mite_sync_output_dma(mite_chan, s);
 }
+
 EXPORT_SYMBOL_GPL(mite_sync_dma);
 
 static unsigned int mite_get_status(struct mite_channel *mite_chan)
@@ -384,8 +386,7 @@ static unsigned int mite_get_status(struct mite_channel *mite_chan)
  * This will also ack the DONE interrupt if active.
  */
 void mite_ack_linkc(struct mite_channel *mite_chan,
-		    struct comedi_subdevice *s,
-		    bool sync)
+		    struct comedi_subdevice *s, bool sync)
 {
 	struct mite *mite = mite_chan->mite;
 	unsigned int status;
@@ -404,6 +405,7 @@ void mite_ack_linkc(struct mite_channel *mite_chan,
 		s->async->events |= COMEDI_CB_ERROR;
 	}
 }
+
 EXPORT_SYMBOL_GPL(mite_ack_linkc);
 
 /**
@@ -424,6 +426,7 @@ int mite_done(struct mite_channel *mite_chan)
 	spin_unlock_irqrestore(&mite->lock, flags);
 	return done;
 }
+
 EXPORT_SYMBOL_GPL(mite_done);
 
 static void mite_dma_reset(struct mite_channel *mite_chan)
@@ -452,6 +455,7 @@ void mite_dma_arm(struct mite_channel *mite_chan)
 	writel(CHOR_START, mite->mmio + MITE_CHOR(mite_chan->channel));
 	spin_unlock_irqrestore(&mite->lock, flags);
 }
+
 EXPORT_SYMBOL_GPL(mite_dma_arm);
 
 /**
@@ -465,6 +469,7 @@ void mite_dma_disarm(struct mite_channel *mite_chan)
 	/* disarm */
 	writel(CHOR_ABORT, mite->mmio + MITE_CHOR(mite_chan->channel));
 }
+
 EXPORT_SYMBOL_GPL(mite_dma_disarm);
 
 /**
@@ -556,6 +561,7 @@ void mite_prep_dma(struct mite_channel *mite_chan,
 	writel(mite_chan->ring->dma_addr,
 	       mite->mmio + MITE_LKAR(mite_chan->channel));
 }
+
 EXPORT_SYMBOL_GPL(mite_prep_dma);
 
 /**
@@ -590,6 +596,7 @@ struct mite_channel *mite_request_channel_in_range(struct mite *mite,
 	spin_unlock_irqrestore(&mite->lock, flags);
 	return mite_chan;
 }
+
 EXPORT_SYMBOL_GPL(mite_request_channel_in_range);
 
 /**
@@ -603,6 +610,7 @@ struct mite_channel *mite_request_channel(struct mite *mite,
 	return mite_request_channel_in_range(mite, ring, 0,
 					     mite->num_channels - 1);
 }
+
 EXPORT_SYMBOL_GPL(mite_request_channel);
 
 /**
@@ -632,6 +640,7 @@ void mite_release_channel(struct mite_channel *mite_chan)
 	}
 	spin_unlock_irqrestore(&mite->lock, flags);
 }
+
 EXPORT_SYMBOL_GPL(mite_release_channel);
 
 /**
@@ -648,8 +657,7 @@ EXPORT_SYMBOL_GPL(mite_release_channel);
  * transferred.
  */
 int mite_init_ring_descriptors(struct mite_ring *ring,
-			       struct comedi_subdevice *s,
-			       unsigned int nbytes)
+			       struct comedi_subdevice *s, unsigned int nbytes)
 {
 	struct comedi_async *async = s->async;
 	struct mite_dma_desc *desc = NULL;
@@ -693,6 +701,7 @@ int mite_init_ring_descriptors(struct mite_ring *ring,
 	smp_wmb();
 	return 0;
 }
+
 EXPORT_SYMBOL_GPL(mite_init_ring_descriptors);
 
 static void mite_free_dma_descs(struct mite_ring *ring)
@@ -740,6 +749,7 @@ int mite_buf_change(struct mite_ring *ring, struct comedi_subdevice *s)
 
 	return mite_init_ring_descriptors(ring, s, n_links << PAGE_SHIFT);
 }
+
 EXPORT_SYMBOL_GPL(mite_buf_change);
 
 /**
@@ -763,6 +773,7 @@ struct mite_ring *mite_alloc_ring(struct mite *mite)
 	ring->dma_addr = 0;
 	return ring;
 }
+
 EXPORT_SYMBOL_GPL(mite_alloc_ring);
 
 /**
@@ -777,6 +788,7 @@ void mite_free_ring(struct mite_ring *ring)
 		kfree(ring);
 	}
 }
+
 EXPORT_SYMBOL_GPL(mite_free_ring);
 
 static int mite_setup(struct comedi_device *dev, struct mite *mite,
@@ -902,6 +914,7 @@ struct mite *mite_attach(struct comedi_device *dev, bool use_win1)
 
 	return mite;
 }
+
 EXPORT_SYMBOL_GPL(mite_attach);
 
 /**
@@ -920,17 +933,20 @@ void mite_detach(struct mite *mite)
 
 	kfree(mite);
 }
+
 EXPORT_SYMBOL_GPL(mite_detach);
 
 static int __init mite_module_init(void)
 {
 	return 0;
 }
+
 module_init(mite_module_init);
 
 static void __exit mite_module_exit(void)
 {
 }
+
 module_exit(mite_module_exit);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

@@ -74,8 +74,8 @@
 #define F020_MASK_DACXCN_DACXEN		0x80
 
 enum {
-					/* A/D  D/A  DI  DO  CT */
-	DT9812_DEVID_DT9812_10,		/*  8    2   8   8   1  +/- 10V */
+	/* A/D  D/A  DI  DO  CT */
+	DT9812_DEVID_DT9812_10,	/*  8    2   8   8   1  +/- 10V */
 	DT9812_DEVID_DT9812_2PT5,	/*  8    2   8   8   1  0-2.44V */
 };
 
@@ -385,8 +385,7 @@ static void dt9812_configure_gain(struct comedi_device *dev,
 
 	rmw->address = F020_SFR_ADC0CF;
 	rmw->and_mask = F020_MASK_ADC0CF_AMP0GN2 |
-			F020_MASK_ADC0CF_AMP0GN1 |
-			F020_MASK_ADC0CF_AMP0GN0;
+	    F020_MASK_ADC0CF_AMP0GN1 | F020_MASK_ADC0CF_AMP0GN0;
 
 	switch (gain) {
 		/*
@@ -399,7 +398,7 @@ static void dt9812_configure_gain(struct comedi_device *dev,
 		 */
 	case DT9812_GAIN_0PT5:
 		rmw->or_value = F020_MASK_ADC0CF_AMP0GN2 |
-				F020_MASK_ADC0CF_AMP0GN1;
+		    F020_MASK_ADC0CF_AMP0GN1;
 		break;
 	default:
 		/* this should never happen, just use a gain of 1 */
@@ -414,7 +413,7 @@ static void dt9812_configure_gain(struct comedi_device *dev,
 		break;
 	case DT9812_GAIN_8:
 		rmw->or_value = F020_MASK_ADC0CF_AMP0GN1 |
-				F020_MASK_ADC0CF_AMP0GN0;
+		    F020_MASK_ADC0CF_AMP0GN0;
 		break;
 	case DT9812_GAIN_16:
 		rmw->or_value = F020_MASK_ADC0CF_AMP0GN2;
@@ -541,8 +540,7 @@ static int dt9812_analog_out(struct comedi_device *dev, int channel, u16 value)
 
 static int dt9812_di_insn_bits(struct comedi_device *dev,
 			       struct comedi_subdevice *s,
-			       struct comedi_insn *insn,
-			       unsigned int *data)
+			       struct comedi_insn *insn, unsigned int *data)
 {
 	u8 bits = 0;
 	int ret;
@@ -558,8 +556,7 @@ static int dt9812_di_insn_bits(struct comedi_device *dev,
 
 static int dt9812_do_insn_bits(struct comedi_device *dev,
 			       struct comedi_subdevice *s,
-			       struct comedi_insn *insn,
-			       unsigned int *data)
+			       struct comedi_insn *insn, unsigned int *data)
 {
 	if (comedi_dio_update_state(s, data))
 		dt9812_digital_out(dev, s->state);
@@ -571,8 +568,7 @@ static int dt9812_do_insn_bits(struct comedi_device *dev,
 
 static int dt9812_ai_insn_read(struct comedi_device *dev,
 			       struct comedi_subdevice *s,
-			       struct comedi_insn *insn,
-			       unsigned int *data)
+			       struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 	u16 val = 0;
@@ -591,8 +587,7 @@ static int dt9812_ai_insn_read(struct comedi_device *dev,
 
 static int dt9812_ao_insn_read(struct comedi_device *dev,
 			       struct comedi_subdevice *s,
-			       struct comedi_insn *insn,
-			       unsigned int *data)
+			       struct comedi_insn *insn, unsigned int *data)
 {
 	struct dt9812_private *devpriv = dev->private;
 	int ret;
@@ -606,8 +601,7 @@ static int dt9812_ao_insn_read(struct comedi_device *dev,
 
 static int dt9812_ao_insn_write(struct comedi_device *dev,
 				struct comedi_subdevice *s,
-				struct comedi_insn *insn,
-				unsigned int *data)
+				struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 	int i;
@@ -749,8 +743,7 @@ static int dt9812_reset_device(struct comedi_device *dev)
 	return 0;
 }
 
-static int dt9812_auto_attach(struct comedi_device *dev,
-			      unsigned long context)
+static int dt9812_auto_attach(struct comedi_device *dev, unsigned long context)
 {
 	struct usb_interface *intf = comedi_to_usb_interface(dev);
 	struct dt9812_private *devpriv;
@@ -782,40 +775,40 @@ static int dt9812_auto_attach(struct comedi_device *dev,
 
 	/* Digital Input subdevice */
 	s = &dev->subdevices[0];
-	s->type		= COMEDI_SUBD_DI;
-	s->subdev_flags	= SDF_READABLE;
-	s->n_chan	= 8;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_bits	= dt9812_di_insn_bits;
+	s->type = COMEDI_SUBD_DI;
+	s->subdev_flags = SDF_READABLE;
+	s->n_chan = 8;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_bits = dt9812_di_insn_bits;
 
 	/* Digital Output subdevice */
 	s = &dev->subdevices[1];
-	s->type		= COMEDI_SUBD_DO;
-	s->subdev_flags	= SDF_WRITABLE;
-	s->n_chan	= 8;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_bits	= dt9812_do_insn_bits;
+	s->type = COMEDI_SUBD_DO;
+	s->subdev_flags = SDF_WRITABLE;
+	s->n_chan = 8;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_bits = dt9812_do_insn_bits;
 
 	/* Analog Input subdevice */
 	s = &dev->subdevices[2];
-	s->type		= COMEDI_SUBD_AI;
-	s->subdev_flags	= SDF_READABLE | SDF_GROUND;
-	s->n_chan	= 8;
-	s->maxdata	= 0x0fff;
-	s->range_table	= is_unipolar ? &range_unipolar2_5 : &range_bipolar10;
-	s->insn_read	= dt9812_ai_insn_read;
+	s->type = COMEDI_SUBD_AI;
+	s->subdev_flags = SDF_READABLE | SDF_GROUND;
+	s->n_chan = 8;
+	s->maxdata = 0x0fff;
+	s->range_table = is_unipolar ? &range_unipolar2_5 : &range_bipolar10;
+	s->insn_read = dt9812_ai_insn_read;
 
 	/* Analog Output subdevice */
 	s = &dev->subdevices[3];
-	s->type		= COMEDI_SUBD_AO;
-	s->subdev_flags	= SDF_WRITABLE;
-	s->n_chan	= 2;
-	s->maxdata	= 0x0fff;
-	s->range_table	= is_unipolar ? &range_unipolar2_5 : &range_bipolar10;
-	s->insn_write	= dt9812_ao_insn_write;
-	s->insn_read	= dt9812_ao_insn_read;
+	s->type = COMEDI_SUBD_AO;
+	s->subdev_flags = SDF_WRITABLE;
+	s->n_chan = 2;
+	s->maxdata = 0x0fff;
+	s->range_table = is_unipolar ? &range_unipolar2_5 : &range_bipolar10;
+	s->insn_write = dt9812_ao_insn_write;
+	s->insn_read = dt9812_ao_insn_read;
 
 	ret = comedi_alloc_subdev_readback(s);
 	if (ret)
@@ -840,10 +833,10 @@ static void dt9812_detach(struct comedi_device *dev)
 }
 
 static struct comedi_driver dt9812_driver = {
-	.driver_name	= "dt9812",
-	.module		= THIS_MODULE,
-	.auto_attach	= dt9812_auto_attach,
-	.detach		= dt9812_detach,
+	.driver_name = "dt9812",
+	.module = THIS_MODULE,
+	.auto_attach = dt9812_auto_attach,
+	.detach = dt9812_detach,
 };
 
 static int dt9812_usb_probe(struct usb_interface *intf,
@@ -856,14 +849,16 @@ static const struct usb_device_id dt9812_usb_table[] = {
 	{ USB_DEVICE(0x0867, 0x9812) },
 	{ }
 };
+
 MODULE_DEVICE_TABLE(usb, dt9812_usb_table);
 
 static struct usb_driver dt9812_usb_driver = {
-	.name		= "dt9812",
-	.id_table	= dt9812_usb_table,
-	.probe		= dt9812_usb_probe,
-	.disconnect	= comedi_usb_auto_unconfig,
+	.name = "dt9812",
+	.id_table = dt9812_usb_table,
+	.probe = dt9812_usb_probe,
+	.disconnect = comedi_usb_auto_unconfig,
 };
+
 module_comedi_usb_driver(dt9812_driver, dt9812_usb_driver);
 
 MODULE_AUTHOR("Anders Blomdell <anders.blomdell@control.lth.se>");

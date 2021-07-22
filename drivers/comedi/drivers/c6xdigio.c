@@ -55,7 +55,7 @@ static int c6xdigio_chk_status(struct comedi_device *dev, unsigned long context)
 		if ((status & 0x80) != context)
 			return 0;
 		timeout++;
-	} while  (timeout < C6XDIGIO_TIME_OUT);
+	} while (timeout < C6XDIGIO_TIME_OUT);
 
 	return -EBUSY;
 }
@@ -69,8 +69,7 @@ static int c6xdigio_write_data(struct comedi_device *dev,
 
 static int c6xdigio_get_encoder_bits(struct comedi_device *dev,
 				     unsigned int *bits,
-				     unsigned int cmd,
-				     unsigned int status)
+				     unsigned int cmd, unsigned int status)
 {
 	unsigned int val;
 
@@ -108,8 +107,7 @@ static void c6xdigio_pwm_write(struct comedi_device *dev,
 	c6xdigio_write_data(dev, 0x00, 0x80);
 }
 
-static int c6xdigio_encoder_read(struct comedi_device *dev,
-				 unsigned int chan)
+static int c6xdigio_encoder_read(struct comedi_device *dev, unsigned int chan)
 {
 	unsigned int cmd = C6XDIGIO_DATA_ENCODER | C6XDIGIO_DATA_CHAN(chan);
 	unsigned int val = 0;
@@ -148,8 +146,7 @@ static int c6xdigio_encoder_read(struct comedi_device *dev,
 
 static int c6xdigio_pwm_insn_write(struct comedi_device *dev,
 				   struct comedi_subdevice *s,
-				   struct comedi_insn *insn,
-				   unsigned int *data)
+				   struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 	unsigned int val = (s->state >> (16 * chan)) & 0xffff;
@@ -174,8 +171,7 @@ static int c6xdigio_pwm_insn_write(struct comedi_device *dev,
 
 static int c6xdigio_pwm_insn_read(struct comedi_device *dev,
 				  struct comedi_subdevice *s,
-				  struct comedi_insn *insn,
-				  unsigned int *data)
+				  struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 	unsigned int val;
@@ -225,10 +221,10 @@ static void c6xdigio_init(struct comedi_device *dev)
 
 static const struct pnp_device_id c6xdigio_pnp_tbl[] = {
 	/* Standard LPT Printer Port */
-	{.id = "PNP0400", .driver_data = 0},
+	{.id = "PNP0400", .driver_data = 0 },
 	/* ECP Printer Port */
-	{.id = "PNP0401", .driver_data = 0},
-	{}
+	{.id = "PNP0401", .driver_data = 0 },
+	{ }
 };
 
 static struct pnp_driver c6xdigio_pnp_driver = {
@@ -255,22 +251,22 @@ static int c6xdigio_attach(struct comedi_device *dev,
 
 	s = &dev->subdevices[0];
 	/* pwm output subdevice */
-	s->type		= COMEDI_SUBD_PWM;
-	s->subdev_flags	= SDF_WRITABLE;
-	s->n_chan	= 2;
-	s->maxdata	= 500;
-	s->range_table	= &range_unknown;
-	s->insn_write	= c6xdigio_pwm_insn_write;
-	s->insn_read	= c6xdigio_pwm_insn_read;
+	s->type = COMEDI_SUBD_PWM;
+	s->subdev_flags = SDF_WRITABLE;
+	s->n_chan = 2;
+	s->maxdata = 500;
+	s->range_table = &range_unknown;
+	s->insn_write = c6xdigio_pwm_insn_write;
+	s->insn_read = c6xdigio_pwm_insn_read;
 
 	s = &dev->subdevices[1];
 	/* encoder (counter) subdevice */
-	s->type		= COMEDI_SUBD_COUNTER;
-	s->subdev_flags	= SDF_READABLE | SDF_LSAMPL;
-	s->n_chan	= 2;
-	s->maxdata	= 0xffffff;
-	s->range_table	= &range_unknown;
-	s->insn_read	= c6xdigio_encoder_insn_read;
+	s->type = COMEDI_SUBD_COUNTER;
+	s->subdev_flags = SDF_READABLE | SDF_LSAMPL;
+	s->n_chan = 2;
+	s->maxdata = 0xffffff;
+	s->range_table = &range_unknown;
+	s->insn_read = c6xdigio_encoder_insn_read;
 
 	/*  I will call this init anyway but more than likely the DSP board */
 	/*  will not be connected when device driver is loaded. */
@@ -286,11 +282,12 @@ static void c6xdigio_detach(struct comedi_device *dev)
 }
 
 static struct comedi_driver c6xdigio_driver = {
-	.driver_name	= "c6xdigio",
-	.module		= THIS_MODULE,
-	.attach		= c6xdigio_attach,
-	.detach		= c6xdigio_detach,
+	.driver_name = "c6xdigio",
+	.module = THIS_MODULE,
+	.attach = c6xdigio_attach,
+	.detach = c6xdigio_detach,
 };
+
 module_comedi_driver(c6xdigio_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

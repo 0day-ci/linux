@@ -41,8 +41,7 @@
 
 static int pci6208_ao_eoc(struct comedi_device *dev,
 			  struct comedi_subdevice *s,
-			  struct comedi_insn *insn,
-			  unsigned long context)
+			  struct comedi_insn *insn, unsigned long context)
 {
 	unsigned int status;
 
@@ -54,8 +53,7 @@ static int pci6208_ao_eoc(struct comedi_device *dev,
 
 static int pci6208_ao_insn_write(struct comedi_device *dev,
 				 struct comedi_subdevice *s,
-				 struct comedi_insn *insn,
-				 unsigned int *data)
+				 struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 	int ret;
@@ -81,8 +79,7 @@ static int pci6208_ao_insn_write(struct comedi_device *dev,
 
 static int pci6208_di_insn_bits(struct comedi_device *dev,
 				struct comedi_subdevice *s,
-				struct comedi_insn *insn,
-				unsigned int *data)
+				struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int val;
 
@@ -96,8 +93,7 @@ static int pci6208_di_insn_bits(struct comedi_device *dev,
 
 static int pci6208_do_insn_bits(struct comedi_device *dev,
 				struct comedi_subdevice *s,
-				struct comedi_insn *insn,
-				unsigned int *data)
+				struct comedi_insn *insn, unsigned int *data)
 {
 	if (comedi_dio_update_state(s, data))
 		outw(s->state, dev->iobase + PCI6208_DIO);
@@ -126,12 +122,12 @@ static int pci6208_auto_attach(struct comedi_device *dev,
 
 	s = &dev->subdevices[0];
 	/* analog output subdevice */
-	s->type		= COMEDI_SUBD_AO;
-	s->subdev_flags	= SDF_WRITABLE;
-	s->n_chan	= 16;	/* Only 8 usable on PCI-6208 */
-	s->maxdata	= 0xffff;
-	s->range_table	= &range_bipolar10;
-	s->insn_write	= pci6208_ao_insn_write;
+	s->type = COMEDI_SUBD_AO;
+	s->subdev_flags = SDF_WRITABLE;
+	s->n_chan = 16;		/* Only 8 usable on PCI-6208 */
+	s->maxdata = 0xffff;
+	s->range_table = &range_bipolar10;
+	s->insn_write = pci6208_ao_insn_write;
 
 	ret = comedi_alloc_subdev_readback(s);
 	if (ret)
@@ -139,21 +135,21 @@ static int pci6208_auto_attach(struct comedi_device *dev,
 
 	s = &dev->subdevices[1];
 	/* digital input subdevice */
-	s->type		= COMEDI_SUBD_DI;
-	s->subdev_flags	= SDF_READABLE;
-	s->n_chan	= 4;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_bits	= pci6208_di_insn_bits;
+	s->type = COMEDI_SUBD_DI;
+	s->subdev_flags = SDF_READABLE;
+	s->n_chan = 4;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_bits = pci6208_di_insn_bits;
 
 	s = &dev->subdevices[2];
 	/* digital output subdevice */
-	s->type		= COMEDI_SUBD_DO;
-	s->subdev_flags	= SDF_WRITABLE;
-	s->n_chan	= 4;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_bits	= pci6208_do_insn_bits;
+	s->type = COMEDI_SUBD_DO;
+	s->subdev_flags = SDF_WRITABLE;
+	s->n_chan = 4;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_bits = pci6208_do_insn_bits;
 
 	/*
 	 * Get the read back signals from the digital outputs
@@ -161,16 +157,16 @@ static int pci6208_auto_attach(struct comedi_device *dev,
 	 */
 	val = inw(dev->iobase + PCI6208_DIO);
 	val = (val & PCI6208_DIO_DO_MASK) >> PCI6208_DIO_DO_SHIFT;
-	s->state	= val;
+	s->state = val;
 
 	return 0;
 }
 
 static struct comedi_driver adl_pci6208_driver = {
-	.driver_name	= "adl_pci6208",
-	.module		= THIS_MODULE,
-	.auto_attach	= pci6208_auto_attach,
-	.detach		= comedi_pci_detach,
+	.driver_name = "adl_pci6208",
+	.module = THIS_MODULE,
+	.auto_attach = pci6208_auto_attach,
+	.detach = comedi_pci_detach,
 };
 
 static int adl_pci6208_pci_probe(struct pci_dev *dev,
@@ -186,14 +182,16 @@ static const struct pci_device_id adl_pci6208_pci_table[] = {
 			 0x9999, 0x6208) },
 	{ 0 }
 };
+
 MODULE_DEVICE_TABLE(pci, adl_pci6208_pci_table);
 
 static struct pci_driver adl_pci6208_pci_driver = {
-	.name		= "adl_pci6208",
-	.id_table	= adl_pci6208_pci_table,
-	.probe		= adl_pci6208_pci_probe,
-	.remove		= comedi_pci_auto_unconfig,
+	.name = "adl_pci6208",
+	.id_table = adl_pci6208_pci_table,
+	.probe = adl_pci6208_pci_probe,
+	.remove = comedi_pci_auto_unconfig,
 };
+
 module_comedi_pci_driver(adl_pci6208_driver, adl_pci6208_pci_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

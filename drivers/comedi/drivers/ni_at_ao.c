@@ -96,12 +96,12 @@ struct atao_board {
 
 static const struct atao_board atao_boards[] = {
 	{
-		.name		= "at-ao-6",
-		.n_ao_chans	= 6,
-	}, {
-		.name		= "at-ao-10",
-		.n_ao_chans	= 10,
-	},
+	 .name = "at-ao-6",
+	 .n_ao_chans = 6,
+	  }, {
+	      .name = "at-ao-10",
+	      .n_ao_chans = 10,
+	       },
 };
 
 struct atao_private {
@@ -125,8 +125,7 @@ static void atao_select_reg_group(struct comedi_device *dev, int group)
 
 static int atao_ao_insn_write(struct comedi_device *dev,
 			      struct comedi_subdevice *s,
-			      struct comedi_insn *insn,
-			      unsigned int *data)
+			      struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 	unsigned int val = s->readback[chan];
@@ -152,8 +151,7 @@ static int atao_ao_insn_write(struct comedi_device *dev,
 
 static int atao_dio_insn_bits(struct comedi_device *dev,
 			      struct comedi_subdevice *s,
-			      struct comedi_insn *insn,
-			      unsigned int *data)
+			      struct comedi_insn *insn, unsigned int *data)
 {
 	if (comedi_dio_update_state(s, data))
 		outw(s->state, dev->iobase + ATAO_DIO_REG);
@@ -165,8 +163,7 @@ static int atao_dio_insn_bits(struct comedi_device *dev,
 
 static int atao_dio_insn_config(struct comedi_device *dev,
 				struct comedi_subdevice *s,
-				struct comedi_insn *insn,
-				unsigned int *data)
+				struct comedi_insn *insn, unsigned int *data)
 {
 	struct atao_private *devpriv = dev->private;
 	unsigned int chan = CR_CHAN(insn->chanspec);
@@ -231,8 +228,7 @@ static int atao_dio_insn_config(struct comedi_device *dev,
  */
 static int atao_calib_insn_write(struct comedi_device *dev,
 				 struct comedi_subdevice *s,
-				 struct comedi_insn *insn,
-				 unsigned int *data)
+				 struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 
@@ -316,12 +312,12 @@ static int atao_attach(struct comedi_device *dev, struct comedi_devconfig *it)
 
 	/* Analog Output subdevice */
 	s = &dev->subdevices[0];
-	s->type		= COMEDI_SUBD_AO;
-	s->subdev_flags	= SDF_WRITABLE;
-	s->n_chan	= board->n_ao_chans;
-	s->maxdata	= 0x0fff;
-	s->range_table	= it->options[3] ? &range_unipolar10 : &range_bipolar10;
-	s->insn_write	= atao_ao_insn_write;
+	s->type = COMEDI_SUBD_AO;
+	s->subdev_flags = SDF_WRITABLE;
+	s->n_chan = board->n_ao_chans;
+	s->maxdata = 0x0fff;
+	s->range_table = it->options[3] ? &range_unipolar10 : &range_bipolar10;
+	s->insn_write = atao_ao_insn_write;
 
 	ret = comedi_alloc_subdev_readback(s);
 	if (ret)
@@ -329,21 +325,21 @@ static int atao_attach(struct comedi_device *dev, struct comedi_devconfig *it)
 
 	/* Digital I/O subdevice */
 	s = &dev->subdevices[1];
-	s->type		= COMEDI_SUBD_DIO;
-	s->subdev_flags	= SDF_READABLE | SDF_WRITABLE;
-	s->n_chan	= 8;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_bits	= atao_dio_insn_bits;
-	s->insn_config	= atao_dio_insn_config;
+	s->type = COMEDI_SUBD_DIO;
+	s->subdev_flags = SDF_READABLE | SDF_WRITABLE;
+	s->n_chan = 8;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_bits = atao_dio_insn_bits;
+	s->insn_config = atao_dio_insn_config;
 
 	/* caldac subdevice */
 	s = &dev->subdevices[2];
-	s->type		= COMEDI_SUBD_CALIB;
-	s->subdev_flags	= SDF_WRITABLE | SDF_INTERNAL;
-	s->n_chan	= (board->n_ao_chans * 2) + 1;
-	s->maxdata	= 0xff;
-	s->insn_write	= atao_calib_insn_write;
+	s->type = COMEDI_SUBD_CALIB;
+	s->subdev_flags = SDF_WRITABLE | SDF_INTERNAL;
+	s->n_chan = (board->n_ao_chans * 2) + 1;
+	s->maxdata = 0xff;
+	s->insn_write = atao_calib_insn_write;
 
 	ret = comedi_alloc_subdev_readback(s);
 	if (ret)
@@ -351,7 +347,7 @@ static int atao_attach(struct comedi_device *dev, struct comedi_devconfig *it)
 
 	/* EEPROM subdevice */
 	s = &dev->subdevices[3];
-	s->type		= COMEDI_SUBD_UNUSED;
+	s->type = COMEDI_SUBD_UNUSED;
 
 	atao_reset(dev);
 
@@ -359,14 +355,15 @@ static int atao_attach(struct comedi_device *dev, struct comedi_devconfig *it)
 }
 
 static struct comedi_driver ni_at_ao_driver = {
-	.driver_name	= "ni_at_ao",
-	.module		= THIS_MODULE,
-	.attach		= atao_attach,
-	.detach		= comedi_legacy_detach,
-	.board_name	= &atao_boards[0].name,
-	.offset		= sizeof(struct atao_board),
-	.num_names	= ARRAY_SIZE(atao_boards),
+	.driver_name = "ni_at_ao",
+	.module = THIS_MODULE,
+	.attach = atao_attach,
+	.detach = comedi_legacy_detach,
+	.board_name = &atao_boards[0].name,
+	.offset = sizeof(struct atao_board),
+	.num_names = ARRAY_SIZE(atao_boards),
 };
+
 module_comedi_driver(ni_at_ao_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

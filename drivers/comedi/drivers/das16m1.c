@@ -82,15 +82,15 @@
 
 static const struct comedi_lrange range_das16m1 = {
 	9, {
-		BIP_RANGE(5),
-		BIP_RANGE(2.5),
-		BIP_RANGE(1.25),
-		BIP_RANGE(0.625),
-		UNI_RANGE(10),
-		UNI_RANGE(5),
-		UNI_RANGE(2.5),
-		UNI_RANGE(1.25),
-		BIP_RANGE(10)
+	    BIP_RANGE(5),
+	    BIP_RANGE(2.5),
+	    BIP_RANGE(1.25),
+	    BIP_RANGE(0.625),
+	    UNI_RANGE(10),
+	    UNI_RANGE(5),
+	    UNI_RANGE(2.5),
+	    UNI_RANGE(1.25),
+	    BIP_RANGE(10)
 	}
 };
 
@@ -208,7 +208,7 @@ static int das16m1_ai_cmdtest(struct comedi_device *dev,
 
 	if (cmd->stop_src == TRIG_COUNT)
 		err |= comedi_check_trigger_arg_min(&cmd->stop_arg, 1);
-	else	/* TRIG_NONE */
+	else			/* TRIG_NONE */
 		err |= comedi_check_trigger_arg_is(&cmd->stop_arg, 0);
 
 	if (err)
@@ -236,8 +236,7 @@ static int das16m1_ai_cmdtest(struct comedi_device *dev,
 	return 0;
 }
 
-static int das16m1_ai_cmd(struct comedi_device *dev,
-			  struct comedi_subdevice *s)
+static int das16m1_ai_cmd(struct comedi_device *dev, struct comedi_subdevice *s)
 {
 	struct das16m1_private *devpriv = dev->private;
 	struct comedi_async *async = s->async;
@@ -269,7 +268,7 @@ static int das16m1_ai_cmd(struct comedi_device *dev,
 		comedi_8254_update_divisors(dev->pacer);
 		comedi_8254_pacer_enable(dev->pacer, 1, 2, true);
 		devpriv->intr_ctrl |= DAS16M1_INTR_CTRL_PACER_INT;
-	} else {	/* TRIG_EXT */
+	} else {		/* TRIG_EXT */
 		devpriv->intr_ctrl |= DAS16M1_INTR_CTRL_PACER_EXT;
 	}
 
@@ -308,8 +307,7 @@ static int das16m1_ai_cancel(struct comedi_device *dev,
 
 static int das16m1_ai_eoc(struct comedi_device *dev,
 			  struct comedi_subdevice *s,
-			  struct comedi_insn *insn,
-			  unsigned long context)
+			  struct comedi_insn *insn, unsigned long context)
 {
 	unsigned int status;
 
@@ -321,8 +319,7 @@ static int das16m1_ai_eoc(struct comedi_device *dev,
 
 static int das16m1_ai_insn_read(struct comedi_device *dev,
 				struct comedi_subdevice *s,
-				struct comedi_insn *insn,
-				unsigned int *data)
+				struct comedi_insn *insn, unsigned int *data)
 {
 	int ret;
 	int i;
@@ -350,8 +347,7 @@ static int das16m1_ai_insn_read(struct comedi_device *dev,
 
 static int das16m1_di_insn_bits(struct comedi_device *dev,
 				struct comedi_subdevice *s,
-				struct comedi_insn *insn,
-				unsigned int *data)
+				struct comedi_insn *insn, unsigned int *data)
 {
 	data[1] = inb(dev->iobase + DAS16M1_DI_REG) & 0xf;
 
@@ -360,8 +356,7 @@ static int das16m1_di_insn_bits(struct comedi_device *dev,
 
 static int das16m1_do_insn_bits(struct comedi_device *dev,
 				struct comedi_subdevice *s,
-				struct comedi_insn *insn,
-				unsigned int *data)
+				struct comedi_insn *insn, unsigned int *data)
 {
 	if (comedi_dio_update_state(s, data))
 		outb(s->state, dev->iobase + DAS16M1_DO_REG);
@@ -386,8 +381,7 @@ static void das16m1_handler(struct comedi_device *dev, unsigned int status)
 	 * Make sure hardware counter reading is not bogus due to initial
 	 * value not having been loaded yet.
 	 */
-	if (devpriv->adc_count == 0 &&
-	    hw_counter == devpriv->initial_hw_count) {
+	if (devpriv->adc_count == 0 && hw_counter == devpriv->initial_hw_count) {
 		num_samples = 0;
 	} else {
 		/*
@@ -546,40 +540,40 @@ static int das16m1_attach(struct comedi_device *dev,
 
 	/* Analog Input subdevice */
 	s = &dev->subdevices[0];
-	s->type		= COMEDI_SUBD_AI;
-	s->subdev_flags	= SDF_READABLE | SDF_DIFF;
-	s->n_chan	= 8;
-	s->maxdata	= 0x0fff;
-	s->range_table	= &range_das16m1;
-	s->insn_read	= das16m1_ai_insn_read;
+	s->type = COMEDI_SUBD_AI;
+	s->subdev_flags = SDF_READABLE | SDF_DIFF;
+	s->n_chan = 8;
+	s->maxdata = 0x0fff;
+	s->range_table = &range_das16m1;
+	s->insn_read = das16m1_ai_insn_read;
 	if (dev->irq) {
 		dev->read_subdev = s;
-		s->subdev_flags	|= SDF_CMD_READ;
-		s->len_chanlist	= 256;
-		s->do_cmdtest	= das16m1_ai_cmdtest;
-		s->do_cmd	= das16m1_ai_cmd;
-		s->cancel	= das16m1_ai_cancel;
-		s->poll		= das16m1_ai_poll;
-		s->munge	= das16m1_ai_munge;
+		s->subdev_flags |= SDF_CMD_READ;
+		s->len_chanlist = 256;
+		s->do_cmdtest = das16m1_ai_cmdtest;
+		s->do_cmd = das16m1_ai_cmd;
+		s->cancel = das16m1_ai_cancel;
+		s->poll = das16m1_ai_poll;
+		s->munge = das16m1_ai_munge;
 	}
 
 	/* Digital Input subdevice */
 	s = &dev->subdevices[1];
-	s->type		= COMEDI_SUBD_DI;
-	s->subdev_flags	= SDF_READABLE;
-	s->n_chan	= 4;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_bits	= das16m1_di_insn_bits;
+	s->type = COMEDI_SUBD_DI;
+	s->subdev_flags = SDF_READABLE;
+	s->n_chan = 4;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_bits = das16m1_di_insn_bits;
 
 	/* Digital Output subdevice */
 	s = &dev->subdevices[2];
-	s->type		= COMEDI_SUBD_DO;
-	s->subdev_flags	= SDF_WRITABLE;
-	s->n_chan	= 4;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_bits	= das16m1_do_insn_bits;
+	s->type = COMEDI_SUBD_DO;
+	s->subdev_flags = SDF_WRITABLE;
+	s->n_chan = 4;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_bits = das16m1_do_insn_bits;
 
 	/* Digital I/O subdevice (8255) */
 	s = &dev->subdevices[3];
@@ -610,11 +604,12 @@ static void das16m1_detach(struct comedi_device *dev)
 }
 
 static struct comedi_driver das16m1_driver = {
-	.driver_name	= "das16m1",
-	.module		= THIS_MODULE,
-	.attach		= das16m1_attach,
-	.detach		= das16m1_detach,
+	.driver_name = "das16m1",
+	.module = THIS_MODULE,
+	.attach = das16m1_attach,
+	.detach = das16m1_detach,
 };
+
 module_comedi_driver(das16m1_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

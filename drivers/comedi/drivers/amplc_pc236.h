@@ -23,7 +23,7 @@ struct pc236_board {
 };
 
 struct pc236_private {
-	unsigned long lcr_iobase; /* PLX PCI9052 config registers in PCIBAR1 */
+	unsigned long lcr_iobase;	/* PLX PCI9052 config registers in PCIBAR1 */
 	bool enable_irq;
 };
 

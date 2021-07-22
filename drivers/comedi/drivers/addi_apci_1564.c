@@ -121,7 +121,7 @@
 #define APCI1564_DI_REG				0x00
 #define APCI1564_DI_INT_MODE1_REG		0x04
 #define APCI1564_DI_INT_MODE2_REG		0x08
-#define APCI1564_DI_INT_MODE_MASK		0x000ffff0 /* chans [19:4] */
+#define APCI1564_DI_INT_MODE_MASK		0x000ffff0	/* chans [19:4] */
 #define APCI1564_DI_INT_STATUS_REG		0x0c
 #define APCI1564_DI_IRQ_REG			0x10
 #define APCI1564_DI_IRQ_ENA			BIT(2)
@@ -155,8 +155,8 @@
  */
 #define APCI1564_EVENT_COS			BIT(31)
 #define APCI1564_EVENT_TIMER			BIT(30)
-#define APCI1564_EVENT_COUNTER(x)		BIT(27 + (x)) /* counter 0-2 */
-#define APCI1564_EVENT_MASK			0xfff0000f /* all but [19:4] */
+#define APCI1564_EVENT_COUNTER(x)		BIT(27 + (x))	/* counter 0-2 */
+#define APCI1564_EVENT_MASK			0xfff0000f	/* all but [19:4] */
 
 struct apci1564_private {
 	unsigned long eeprom;	/* base address of EEPROM register */
@@ -262,8 +262,7 @@ static irqreturn_t apci1564_interrupt(int irq, void *d)
 
 static int apci1564_di_insn_bits(struct comedi_device *dev,
 				 struct comedi_subdevice *s,
-				 struct comedi_insn *insn,
-				 unsigned int *data)
+				 struct comedi_insn *insn, unsigned int *data)
 {
 	data[1] = inl(dev->iobase + APCI1564_DI_REG);
 
@@ -272,8 +271,7 @@ static int apci1564_di_insn_bits(struct comedi_device *dev,
 
 static int apci1564_do_insn_bits(struct comedi_device *dev,
 				 struct comedi_subdevice *s,
-				 struct comedi_insn *insn,
-				 unsigned int *data)
+				 struct comedi_insn *insn, unsigned int *data)
 {
 	s->state = inl(dev->iobase + APCI1564_DO_REG);
 
@@ -287,8 +285,7 @@ static int apci1564_do_insn_bits(struct comedi_device *dev,
 
 static int apci1564_diag_insn_bits(struct comedi_device *dev,
 				   struct comedi_subdevice *s,
-				   struct comedi_insn *insn,
-				   unsigned int *data)
+				   struct comedi_insn *insn, unsigned int *data)
 {
 	data[1] = inl(dev->iobase + APCI1564_DO_INT_STATUS_REG) & 3;
 
@@ -378,7 +375,7 @@ static int apci1564_cos_insn_config(struct comedi_device *dev,
 					      APCI1564_DI_IRQ_MODE)) {
 				/* switching to 'AND' mode */
 				devpriv->ctrl = APCI1564_DI_IRQ_ENA |
-						APCI1564_DI_IRQ_MODE;
+				    APCI1564_DI_IRQ_MODE;
 				/* wipe old channels */
 				devpriv->mode1 = 0;
 				devpriv->mode2 = 0;
@@ -407,8 +404,7 @@ static int apci1564_cos_insn_config(struct comedi_device *dev,
 
 static int apci1564_cos_insn_bits(struct comedi_device *dev,
 				  struct comedi_subdevice *s,
-				  struct comedi_insn *insn,
-				  unsigned int *data)
+				  struct comedi_insn *insn, unsigned int *data)
 {
 	data[1] = s->state;
 
@@ -518,7 +514,7 @@ static int apci1564_timer_insn_config(struct comedi_device *dev,
 		if (val & ADDI_TCW_STATUS_OVERFLOW)
 			data[1] |= COMEDI_COUNTER_TERMINAL_COUNT;
 		data[2] = COMEDI_COUNTER_ARMED | COMEDI_COUNTER_COUNTING |
-			  COMEDI_COUNTER_TERMINAL_COUNT;
+		    COMEDI_COUNTER_TERMINAL_COUNT;
 		break;
 	case INSN_CONFIG_SET_CLOCK_SRC:
 		if (data[2] > s->maxdata)
@@ -610,7 +606,7 @@ static int apci1564_counter_insn_config(struct comedi_device *dev,
 		if (val & ADDI_TCW_STATUS_OVERFLOW)
 			data[1] |= COMEDI_COUNTER_TERMINAL_COUNT;
 		data[2] = COMEDI_COUNTER_ARMED | COMEDI_COUNTER_COUNTING |
-			  COMEDI_COUNTER_TERMINAL_COUNT;
+		    COMEDI_COUNTER_TERMINAL_COUNT;
 		break;
 	default:
 		return -EINVAL;
@@ -678,7 +674,7 @@ static int apci1564_auto_attach(struct comedi_device *dev,
 	if (APCI1564_EEPROM_TO_REV(val) == 0) {
 		/* PLD Revision 1.0 I/O Mapping */
 		dev->iobase = pci_resource_start(pcidev, 1) +
-			      APCI1564_REV1_MAIN_IOBASE;
+		    APCI1564_REV1_MAIN_IOBASE;
 		devpriv->timer = devpriv->eeprom + APCI1564_REV1_TIMER_IOBASE;
 	} else {
 		/* PLD Revision 2.x I/O Mapping */
@@ -702,65 +698,65 @@ static int apci1564_auto_attach(struct comedi_device *dev,
 
 	/*  Allocate and Initialise DI Subdevice Structures */
 	s = &dev->subdevices[0];
-	s->type		= COMEDI_SUBD_DI;
-	s->subdev_flags	= SDF_READABLE;
-	s->n_chan	= 32;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_bits	= apci1564_di_insn_bits;
+	s->type = COMEDI_SUBD_DI;
+	s->subdev_flags = SDF_READABLE;
+	s->n_chan = 32;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_bits = apci1564_di_insn_bits;
 
 	/*  Allocate and Initialise DO Subdevice Structures */
 	s = &dev->subdevices[1];
-	s->type		= COMEDI_SUBD_DO;
-	s->subdev_flags	= SDF_WRITABLE;
-	s->n_chan	= 32;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_bits	= apci1564_do_insn_bits;
+	s->type = COMEDI_SUBD_DO;
+	s->subdev_flags = SDF_WRITABLE;
+	s->n_chan = 32;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_bits = apci1564_do_insn_bits;
 
 	/* Change-Of-State (COS) interrupt subdevice */
 	s = &dev->subdevices[2];
 	if (dev->irq) {
 		dev->read_subdev = s;
-		s->type		= COMEDI_SUBD_DI;
-		s->subdev_flags	= SDF_READABLE | SDF_CMD_READ | SDF_LSAMPL;
-		s->n_chan	= 1;
-		s->maxdata	= 1;
-		s->range_table	= &range_digital;
-		s->len_chanlist	= 1;
-		s->insn_config	= apci1564_cos_insn_config;
-		s->insn_bits	= apci1564_cos_insn_bits;
-		s->do_cmdtest	= apci1564_cos_cmdtest;
-		s->do_cmd	= apci1564_cos_cmd;
-		s->cancel	= apci1564_cos_cancel;
+		s->type = COMEDI_SUBD_DI;
+		s->subdev_flags = SDF_READABLE | SDF_CMD_READ | SDF_LSAMPL;
+		s->n_chan = 1;
+		s->maxdata = 1;
+		s->range_table = &range_digital;
+		s->len_chanlist = 1;
+		s->insn_config = apci1564_cos_insn_config;
+		s->insn_bits = apci1564_cos_insn_bits;
+		s->do_cmdtest = apci1564_cos_cmdtest;
+		s->do_cmd = apci1564_cos_cmd;
+		s->cancel = apci1564_cos_cancel;
 	} else {
-		s->type		= COMEDI_SUBD_UNUSED;
+		s->type = COMEDI_SUBD_UNUSED;
 	}
 
 	/* Timer subdevice */
 	s = &dev->subdevices[3];
-	s->type		= COMEDI_SUBD_TIMER;
-	s->subdev_flags	= SDF_WRITABLE | SDF_READABLE;
-	s->n_chan	= 1;
-	s->maxdata	= 0x0fff;
-	s->range_table	= &range_digital;
-	s->insn_config	= apci1564_timer_insn_config;
-	s->insn_write	= apci1564_timer_insn_write;
-	s->insn_read	= apci1564_timer_insn_read;
+	s->type = COMEDI_SUBD_TIMER;
+	s->subdev_flags = SDF_WRITABLE | SDF_READABLE;
+	s->n_chan = 1;
+	s->maxdata = 0x0fff;
+	s->range_table = &range_digital;
+	s->insn_config = apci1564_timer_insn_config;
+	s->insn_write = apci1564_timer_insn_write;
+	s->insn_read = apci1564_timer_insn_read;
 
 	/* Counter subdevice */
 	s = &dev->subdevices[4];
 	if (devpriv->counters) {
-		s->type		= COMEDI_SUBD_COUNTER;
-		s->subdev_flags	= SDF_WRITABLE | SDF_READABLE | SDF_LSAMPL;
-		s->n_chan	= 3;
-		s->maxdata	= 0xffffffff;
-		s->range_table	= &range_digital;
-		s->insn_config	= apci1564_counter_insn_config;
-		s->insn_write	= apci1564_counter_insn_write;
-		s->insn_read	= apci1564_counter_insn_read;
+		s->type = COMEDI_SUBD_COUNTER;
+		s->subdev_flags = SDF_WRITABLE | SDF_READABLE | SDF_LSAMPL;
+		s->n_chan = 3;
+		s->maxdata = 0xffffffff;
+		s->range_table = &range_digital;
+		s->insn_config = apci1564_counter_insn_config;
+		s->insn_write = apci1564_counter_insn_write;
+		s->insn_read = apci1564_counter_insn_read;
 	} else {
-		s->type		= COMEDI_SUBD_UNUSED;
+		s->type = COMEDI_SUBD_UNUSED;
 	}
 
 	/* Initialize the watchdog subdevice */
@@ -771,12 +767,12 @@ static int apci1564_auto_attach(struct comedi_device *dev,
 
 	/* Initialize the diagnostic status subdevice */
 	s = &dev->subdevices[6];
-	s->type		= COMEDI_SUBD_DI;
-	s->subdev_flags	= SDF_READABLE;
-	s->n_chan	= 2;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_bits	= apci1564_diag_insn_bits;
+	s->type = COMEDI_SUBD_DI;
+	s->subdev_flags = SDF_READABLE;
+	s->n_chan = 2;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_bits = apci1564_diag_insn_bits;
 
 	return 0;
 }
@@ -789,10 +785,10 @@ static void apci1564_detach(struct comedi_device *dev)
 }
 
 static struct comedi_driver apci1564_driver = {
-	.driver_name	= "addi_apci_1564",
-	.module		= THIS_MODULE,
-	.auto_attach	= apci1564_auto_attach,
-	.detach		= apci1564_detach,
+	.driver_name = "addi_apci_1564",
+	.module = THIS_MODULE,
+	.auto_attach = apci1564_auto_attach,
+	.detach = apci1564_detach,
 };
 
 static int apci1564_pci_probe(struct pci_dev *dev,
@@ -805,14 +801,16 @@ static const struct pci_device_id apci1564_pci_table[] = {
 	{ PCI_DEVICE(PCI_VENDOR_ID_ADDIDATA, 0x1006) },
 	{ 0 }
 };
+
 MODULE_DEVICE_TABLE(pci, apci1564_pci_table);
 
 static struct pci_driver apci1564_pci_driver = {
-	.name		= "addi_apci_1564",
-	.id_table	= apci1564_pci_table,
-	.probe		= apci1564_pci_probe,
-	.remove		= comedi_pci_auto_unconfig,
+	.name = "addi_apci_1564",
+	.id_table = apci1564_pci_table,
+	.probe = apci1564_pci_probe,
+	.remove = comedi_pci_auto_unconfig,
 };
+
 module_comedi_pci_driver(apci1564_driver, apci1564_pci_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

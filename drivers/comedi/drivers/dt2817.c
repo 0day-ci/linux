@@ -32,8 +32,7 @@
 
 static int dt2817_dio_insn_config(struct comedi_device *dev,
 				  struct comedi_subdevice *s,
-				  struct comedi_insn *insn,
-				  unsigned int *data)
+				  struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 	unsigned int oe = 0;
@@ -69,8 +68,7 @@ static int dt2817_dio_insn_config(struct comedi_device *dev,
 
 static int dt2817_dio_insn_bits(struct comedi_device *dev,
 				struct comedi_subdevice *s,
-				struct comedi_insn *insn,
-				unsigned int *data)
+				struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned long iobase = dev->iobase + DT2817_DATA;
 	unsigned int mask;
@@ -128,11 +126,12 @@ static int dt2817_attach(struct comedi_device *dev, struct comedi_devconfig *it)
 }
 
 static struct comedi_driver dt2817_driver = {
-	.driver_name	= "dt2817",
-	.module		= THIS_MODULE,
-	.attach		= dt2817_attach,
-	.detach		= comedi_legacy_detach,
+	.driver_name = "dt2817",
+	.module = THIS_MODULE,
+	.attach = dt2817_attach,
+	.detach = comedi_legacy_detach,
 };
+
 module_comedi_driver(dt2817_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

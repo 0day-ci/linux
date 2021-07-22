@@ -131,4 +131,4 @@ struct comedi_8254 *comedi_8254_mm_init(void __iomem *mmio,
 					unsigned int iosize,
 					unsigned int regshift);
 
-#endif	/* _COMEDI_8254_H */
+#endif /* _COMEDI_8254_H */

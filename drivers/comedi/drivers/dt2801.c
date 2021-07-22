@@ -91,19 +91,19 @@
 /* ignore 'defined but not used' warning */
 static const struct comedi_lrange range_dt2801_ai_pgh_bipolar = {
 	4, {
-		BIP_RANGE(10),
-		BIP_RANGE(5),
-		BIP_RANGE(2.5),
-		BIP_RANGE(1.25)
+	    BIP_RANGE(10),
+	    BIP_RANGE(5),
+	    BIP_RANGE(2.5),
+	    BIP_RANGE(1.25)
 	}
 };
 #endif
 static const struct comedi_lrange range_dt2801_ai_pgl_bipolar = {
 	4, {
-		BIP_RANGE(10),
-		BIP_RANGE(1),
-		BIP_RANGE(0.1),
-		BIP_RANGE(0.02)
+	    BIP_RANGE(10),
+	    BIP_RANGE(1),
+	    BIP_RANGE(0.1),
+	    BIP_RANGE(0.02)
 	}
 };
 
@@ -111,19 +111,19 @@ static const struct comedi_lrange range_dt2801_ai_pgl_bipolar = {
 /* ignore 'defined but not used' warning */
 static const struct comedi_lrange range_dt2801_ai_pgh_unipolar = {
 	4, {
-		UNI_RANGE(10),
-		UNI_RANGE(5),
-		UNI_RANGE(2.5),
-		UNI_RANGE(1.25)
+	    UNI_RANGE(10),
+	    UNI_RANGE(5),
+	    UNI_RANGE(2.5),
+	    UNI_RANGE(1.25)
 	}
 };
 #endif
 static const struct comedi_lrange range_dt2801_ai_pgl_unipolar = {
 	4, {
-		UNI_RANGE(10),
-		UNI_RANGE(1),
-		UNI_RANGE(0.1),
-		UNI_RANGE(0.02)
+	    UNI_RANGE(10),
+	    UNI_RANGE(1),
+	    UNI_RANGE(0.1),
+	    UNI_RANGE(0.02)
 	}
 };
 
@@ -149,7 +149,7 @@ static const struct dt2801_board boardtypes[] = {
 	 .ad_chan = 16,
 	 .adbits = 12,
 	 .adrangetype = 0,
-	 .dabits = 12},
+	 .dabits = 12 },
 	{
 	 .name = "dt2801-a",
 	 .boardcode = 0x52,
@@ -157,7 +157,7 @@ static const struct dt2801_board boardtypes[] = {
 	 .ad_chan = 16,
 	 .adbits = 12,
 	 .adrangetype = 0,
-	 .dabits = 12},
+	 .dabits = 12 },
 	{
 	 .name = "dt2801/5716a",
 	 .boardcode = 0x82,
@@ -165,7 +165,7 @@ static const struct dt2801_board boardtypes[] = {
 	 .ad_chan = 16,
 	 .adbits = 16,
 	 .adrangetype = 1,
-	 .dabits = 12},
+	 .dabits = 12 },
 	{
 	 .name = "dt2805",
 	 .boardcode = 0x12,
@@ -173,7 +173,7 @@ static const struct dt2801_board boardtypes[] = {
 	 .ad_chan = 16,
 	 .adbits = 12,
 	 .adrangetype = 0,
-	 .dabits = 12},
+	 .dabits = 12 },
 	{
 	 .name = "dt2805/5716a",
 	 .boardcode = 0x92,
@@ -181,7 +181,7 @@ static const struct dt2801_board boardtypes[] = {
 	 .ad_chan = 16,
 	 .adbits = 16,
 	 .adrangetype = 1,
-	 .dabits = 12},
+	 .dabits = 12 },
 	{
 	 .name = "dt2808",
 	 .boardcode = 0x20,
@@ -189,7 +189,7 @@ static const struct dt2801_board boardtypes[] = {
 	 .ad_chan = 16,
 	 .adbits = 12,
 	 .adrangetype = 2,
-	 .dabits = 8},
+	 .dabits = 8 },
 	{
 	 .name = "dt2818",
 	 .boardcode = 0xa2,
@@ -197,7 +197,7 @@ static const struct dt2801_board boardtypes[] = {
 	 .ad_chan = 4,
 	 .adbits = 12,
 	 .adrangetype = 0,
-	 .dabits = 12},
+	 .dabits = 12 },
 	{
 	 .name = "dt2809",
 	 .boardcode = 0xb0,
@@ -205,7 +205,7 @@ static const struct dt2801_board boardtypes[] = {
 	 .ad_chan = 8,
 	 .adbits = 12,
 	 .adrangetype = 1,
-	 .dabits = 12},
+	 .dabits = 12 },
 };
 
 struct dt2801_private {
@@ -468,8 +468,7 @@ static int dt2801_ai_insn_read(struct comedi_device *dev,
 
 static int dt2801_ao_insn_write(struct comedi_device *dev,
 				struct comedi_subdevice *s,
-				struct comedi_insn *insn,
-				unsigned int *data)
+				struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 
@@ -484,8 +483,7 @@ static int dt2801_ao_insn_write(struct comedi_device *dev,
 
 static int dt2801_dio_insn_bits(struct comedi_device *dev,
 				struct comedi_subdevice *s,
-				struct comedi_insn *insn,
-				unsigned int *data)
+				struct comedi_insn *insn, unsigned int *data)
 {
 	int which = (s == &dev->subdevices[3]) ? 1 : 0;
 	unsigned int val = 0;
@@ -507,8 +505,7 @@ static int dt2801_dio_insn_bits(struct comedi_device *dev,
 
 static int dt2801_dio_insn_config(struct comedi_device *dev,
 				  struct comedi_subdevice *s,
-				  struct comedi_insn *insn,
-				  unsigned int *data)
+				  struct comedi_insn *insn, unsigned int *data)
 {
 	int ret;
 
@@ -633,11 +630,12 @@ out:
 }
 
 static struct comedi_driver dt2801_driver = {
-	.driver_name	= "dt2801",
-	.module		= THIS_MODULE,
-	.attach		= dt2801_attach,
-	.detach		= comedi_legacy_detach,
+	.driver_name = "dt2801",
+	.module = THIS_MODULE,
+	.attach = dt2801_attach,
+	.detach = comedi_legacy_detach,
 };
+
 module_comedi_driver(dt2801_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

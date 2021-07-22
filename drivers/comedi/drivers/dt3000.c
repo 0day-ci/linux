@@ -130,19 +130,19 @@
 
 static const struct comedi_lrange range_dt3000_ai = {
 	4, {
-		BIP_RANGE(10),
-		BIP_RANGE(5),
-		BIP_RANGE(2.5),
-		BIP_RANGE(1.25)
+	    BIP_RANGE(10),
+	    BIP_RANGE(5),
+	    BIP_RANGE(2.5),
+	    BIP_RANGE(1.25)
 	}
 };
 
 static const struct comedi_lrange range_dt3000_ai_pgl = {
 	4, {
-		BIP_RANGE(10),
-		BIP_RANGE(1),
-		BIP_RANGE(0.1),
-		BIP_RANGE(0.02)
+	    BIP_RANGE(10),
+	    BIP_RANGE(1),
+	    BIP_RANGE(0.1),
+	    BIP_RANGE(0.02)
 	}
 };
 
@@ -167,55 +167,55 @@ struct dt3k_boardtype {
 
 static const struct dt3k_boardtype dt3k_boardtypes[] = {
 	[BOARD_DT3001] = {
-		.name		= "dt3001",
-		.adchan		= 16,
-		.adrange	= &range_dt3000_ai,
-		.ai_speed	= 3000,
-		.has_ao		= 1,
-	},
+			  .name = "dt3001",
+			  .adchan = 16,
+			  .adrange = &range_dt3000_ai,
+			  .ai_speed = 3000,
+			  .has_ao = 1,
+			   },
 	[BOARD_DT3001_PGL] = {
-		.name		= "dt3001-pgl",
-		.adchan		= 16,
-		.adrange	= &range_dt3000_ai_pgl,
-		.ai_speed	= 3000,
-		.has_ao		= 1,
-	},
+			      .name = "dt3001-pgl",
+			      .adchan = 16,
+			      .adrange = &range_dt3000_ai_pgl,
+			      .ai_speed = 3000,
+			      .has_ao = 1,
+			       },
 	[BOARD_DT3002] = {
-		.name		= "dt3002",
-		.adchan		= 32,
-		.adrange	= &range_dt3000_ai,
-		.ai_speed	= 3000,
-	},
+			  .name = "dt3002",
+			  .adchan = 32,
+			  .adrange = &range_dt3000_ai,
+			  .ai_speed = 3000,
+			   },
 	[BOARD_DT3003] = {
-		.name		= "dt3003",
-		.adchan		= 64,
-		.adrange	= &range_dt3000_ai,
-		.ai_speed	= 3000,
-		.has_ao		= 1,
-	},
+			  .name = "dt3003",
+			  .adchan = 64,
+			  .adrange = &range_dt3000_ai,
+			  .ai_speed = 3000,
+			  .has_ao = 1,
+			   },
 	[BOARD_DT3003_PGL] = {
-		.name		= "dt3003-pgl",
-		.adchan		= 64,
-		.adrange	= &range_dt3000_ai_pgl,
-		.ai_speed	= 3000,
-		.has_ao		= 1,
-	},
+			      .name = "dt3003-pgl",
+			      .adchan = 64,
+			      .adrange = &range_dt3000_ai_pgl,
+			      .ai_speed = 3000,
+			      .has_ao = 1,
+			       },
 	[BOARD_DT3004] = {
-		.name		= "dt3004",
-		.adchan		= 16,
-		.adrange	= &range_dt3000_ai,
-		.ai_speed	= 10000,
-		.ai_is_16bit	= 1,
-		.has_ao		= 1,
-	},
+			  .name = "dt3004",
+			  .adchan = 16,
+			  .adrange = &range_dt3000_ai,
+			  .ai_speed = 10000,
+			  .ai_is_16bit = 1,
+			  .has_ao = 1,
+			   },
 	[BOARD_DT3005] = {
-		.name		= "dt3005",	/* a.k.a. 3004-200 */
-		.adchan		= 16,
-		.adrange	= &range_dt3000_ai,
-		.ai_speed	= 5000,
-		.ai_is_16bit	= 1,
-		.has_ao		= 1,
-	},
+			  .name = "dt3005",	/* a.k.a. 3004-200 */
+			  .adchan = 16,
+			  .adrange = &range_dt3000_ai,
+			  .ai_speed = 5000,
+			  .ai_is_16bit = 1,
+			  .has_ao = 1,
+			   },
 };
 
 struct dt3k_private {
@@ -299,8 +299,7 @@ static void dt3k_ai_empty_fifo(struct comedi_device *dev,
 	writew(rear, dev->mmio + DPR_AD_BUF_REAR);
 }
 
-static int dt3k_ai_cancel(struct comedi_device *dev,
-			  struct comedi_subdevice *s)
+static int dt3k_ai_cancel(struct comedi_device *dev, struct comedi_subdevice *s)
 {
 	writew(DPR_SUBSYS_AI, dev->mmio + DPR_SUBSYS);
 	dt3k_send_cmd(dev, DPR_CMD_STOP);
@@ -418,7 +417,7 @@ static int dt3k_ai_cmdtest(struct comedi_device *dev,
 
 	if (cmd->stop_src == TRIG_COUNT)
 		err |= comedi_check_trigger_arg_max(&cmd->stop_arg, 0x00ffffff);
-	else	/* TRIG_NONE */
+	else			/* TRIG_NONE */
 		err |= comedi_check_trigger_arg_is(&cmd->stop_arg, 0);
 
 	if (err)
@@ -439,8 +438,9 @@ static int dt3k_ai_cmdtest(struct comedi_device *dev,
 
 		if (cmd->scan_begin_src == TRIG_TIMER) {
 			arg = cmd->convert_arg * cmd->scan_end_arg;
-			err |= comedi_check_trigger_arg_min(
-				&cmd->scan_begin_arg, arg);
+			err |=
+			    comedi_check_trigger_arg_min(&cmd->scan_begin_arg,
+							 arg);
 		}
 	}
 
@@ -503,8 +503,7 @@ static int dt3k_ai_cmd(struct comedi_device *dev, struct comedi_subdevice *s)
 
 static int dt3k_ai_insn_read(struct comedi_device *dev,
 			     struct comedi_subdevice *s,
-			     struct comedi_insn *insn,
-			     unsigned int *data)
+			     struct comedi_insn *insn, unsigned int *data)
 {
 	int i;
 	unsigned int chan, gain;
@@ -521,8 +520,7 @@ static int dt3k_ai_insn_read(struct comedi_device *dev,
 
 static int dt3k_ao_insn_write(struct comedi_device *dev,
 			      struct comedi_subdevice *s,
-			      struct comedi_insn *insn,
-			      unsigned int *data)
+			      struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 	unsigned int val = s->readback[chan];
@@ -551,8 +549,7 @@ static void dt3k_dio_config(struct comedi_device *dev, int bits)
 
 static int dt3k_dio_insn_config(struct comedi_device *dev,
 				struct comedi_subdevice *s,
-				struct comedi_insn *insn,
-				unsigned int *data)
+				struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 	unsigned int mask;
@@ -574,8 +571,7 @@ static int dt3k_dio_insn_config(struct comedi_device *dev,
 
 static int dt3k_dio_insn_bits(struct comedi_device *dev,
 			      struct comedi_subdevice *s,
-			      struct comedi_insn *insn,
-			      unsigned int *data)
+			      struct comedi_insn *insn, unsigned int *data)
 {
 	if (comedi_dio_update_state(s, data))
 		dt3k_writesingle(dev, DPR_SUBSYS_DOUT, 0, s->state);
@@ -587,8 +583,7 @@ static int dt3k_dio_insn_bits(struct comedi_device *dev,
 
 static int dt3k_mem_insn_read(struct comedi_device *dev,
 			      struct comedi_subdevice *s,
-			      struct comedi_insn *insn,
-			      unsigned int *data)
+			      struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int addr = CR_CHAN(insn->chanspec);
 	int i;
@@ -606,8 +601,7 @@ static int dt3k_mem_insn_read(struct comedi_device *dev,
 	return i;
 }
 
-static int dt3000_auto_attach(struct comedi_device *dev,
-			      unsigned long context)
+static int dt3000_auto_attach(struct comedi_device *dev, unsigned long context)
 {
 	struct pci_dev *pcidev = comedi_to_pci_dev(dev);
 	const struct dt3k_boardtype *board = NULL;
@@ -647,70 +641,69 @@ static int dt3000_auto_attach(struct comedi_device *dev,
 
 	/* Analog Input subdevice */
 	s = &dev->subdevices[0];
-	s->type		= COMEDI_SUBD_AI;
-	s->subdev_flags	= SDF_READABLE | SDF_GROUND | SDF_DIFF;
-	s->n_chan	= board->adchan;
-	s->maxdata	= board->ai_is_16bit ? 0xffff : 0x0fff;
-	s->range_table	= &range_dt3000_ai;	/* XXX */
-	s->insn_read	= dt3k_ai_insn_read;
+	s->type = COMEDI_SUBD_AI;
+	s->subdev_flags = SDF_READABLE | SDF_GROUND | SDF_DIFF;
+	s->n_chan = board->adchan;
+	s->maxdata = board->ai_is_16bit ? 0xffff : 0x0fff;
+	s->range_table = &range_dt3000_ai;	/* XXX */
+	s->insn_read = dt3k_ai_insn_read;
 	if (dev->irq) {
 		dev->read_subdev = s;
-		s->subdev_flags	|= SDF_CMD_READ;
-		s->len_chanlist	= 512;
-		s->do_cmd	= dt3k_ai_cmd;
-		s->do_cmdtest	= dt3k_ai_cmdtest;
-		s->cancel	= dt3k_ai_cancel;
+		s->subdev_flags |= SDF_CMD_READ;
+		s->len_chanlist = 512;
+		s->do_cmd = dt3k_ai_cmd;
+		s->do_cmdtest = dt3k_ai_cmdtest;
+		s->cancel = dt3k_ai_cancel;
 	}
 
 	/* Analog Output subdevice */
 	s = &dev->subdevices[1];
 	if (board->has_ao) {
-		s->type		= COMEDI_SUBD_AO;
-		s->subdev_flags	= SDF_WRITABLE;
-		s->n_chan	= 2;
-		s->maxdata	= 0x0fff;
-		s->range_table	= &range_bipolar10;
-		s->insn_write	= dt3k_ao_insn_write;
+		s->type = COMEDI_SUBD_AO;
+		s->subdev_flags = SDF_WRITABLE;
+		s->n_chan = 2;
+		s->maxdata = 0x0fff;
+		s->range_table = &range_bipolar10;
+		s->insn_write = dt3k_ao_insn_write;
 
 		ret = comedi_alloc_subdev_readback(s);
 		if (ret)
 			return ret;
 
 	} else {
-		s->type		= COMEDI_SUBD_UNUSED;
+		s->type = COMEDI_SUBD_UNUSED;
 	}
 
 	/* Digital I/O subdevice */
 	s = &dev->subdevices[2];
-	s->type		= COMEDI_SUBD_DIO;
-	s->subdev_flags	= SDF_READABLE | SDF_WRITABLE;
-	s->n_chan	= 8;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_config	= dt3k_dio_insn_config;
-	s->insn_bits	= dt3k_dio_insn_bits;
+	s->type = COMEDI_SUBD_DIO;
+	s->subdev_flags = SDF_READABLE | SDF_WRITABLE;
+	s->n_chan = 8;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_config = dt3k_dio_insn_config;
+	s->insn_bits = dt3k_dio_insn_bits;
 
 	/* Memory subdevice */
 	s = &dev->subdevices[3];
-	s->type		= COMEDI_SUBD_MEMORY;
-	s->subdev_flags	= SDF_READABLE;
-	s->n_chan	= 0x1000;
-	s->maxdata	= 0xff;
-	s->range_table	= &range_unknown;
-	s->insn_read	= dt3k_mem_insn_read;
+	s->type = COMEDI_SUBD_MEMORY;
+	s->subdev_flags = SDF_READABLE;
+	s->n_chan = 0x1000;
+	s->maxdata = 0xff;
+	s->range_table = &range_unknown;
+	s->insn_read = dt3k_mem_insn_read;
 
 	return 0;
 }
 
 static struct comedi_driver dt3000_driver = {
-	.driver_name	= "dt3000",
-	.module		= THIS_MODULE,
-	.auto_attach	= dt3000_auto_attach,
-	.detach		= comedi_pci_detach,
+	.driver_name = "dt3000",
+	.module = THIS_MODULE,
+	.auto_attach = dt3000_auto_attach,
+	.detach = comedi_pci_detach,
 };
 
-static int dt3000_pci_probe(struct pci_dev *dev,
-			    const struct pci_device_id *id)
+static int dt3000_pci_probe(struct pci_dev *dev, const struct pci_device_id *id)
 {
 	return comedi_pci_auto_config(dev, &dt3000_driver, id->driver_data);
 }
@@ -725,14 +718,16 @@ static const struct pci_device_id dt3000_pci_table[] = {
 	{ PCI_VDEVICE(DT, 0x0028), BOARD_DT3003_PGL },
 	{ 0 }
 };
+
 MODULE_DEVICE_TABLE(pci, dt3000_pci_table);
 
 static struct pci_driver dt3000_pci_driver = {
-	.name		= "dt3000",
-	.id_table	= dt3000_pci_table,
-	.probe		= dt3000_pci_probe,
-	.remove		= comedi_pci_auto_unconfig,
+	.name = "dt3000",
+	.id_table = dt3000_pci_table,
+	.probe = dt3000_pci_probe,
+	.remove = comedi_pci_auto_unconfig,
 };
+
 module_comedi_pci_driver(dt3000_driver, dt3000_pci_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

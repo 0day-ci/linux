@@ -151,12 +151,12 @@
 /* (r/w) FIFO interrupt trigger level (most values are not very useful). */
 #define PCI224_DACCON_FIFOINTR(x)	(((x) & 0x7) << 9)
 #define PCI224_DACCON_FIFOINTR_MASK	PCI224_DACCON_FIFOINTR(7)
-#define PCI224_DACCON_FIFOINTR_EMPTY	PCI224_DACCON_FIFOINTR(0) /* empty */
-#define PCI224_DACCON_FIFOINTR_NEMPTY	PCI224_DACCON_FIFOINTR(1) /* !empty */
-#define PCI224_DACCON_FIFOINTR_NHALF	PCI224_DACCON_FIFOINTR(2) /* !half */
-#define PCI224_DACCON_FIFOINTR_HALF	PCI224_DACCON_FIFOINTR(3) /* half */
-#define PCI224_DACCON_FIFOINTR_NFULL	PCI224_DACCON_FIFOINTR(4) /* !full */
-#define PCI224_DACCON_FIFOINTR_FULL	PCI224_DACCON_FIFOINTR(5) /* full */
+#define PCI224_DACCON_FIFOINTR_EMPTY	PCI224_DACCON_FIFOINTR(0)	/* empty */
+#define PCI224_DACCON_FIFOINTR_NEMPTY	PCI224_DACCON_FIFOINTR(1)	/* !empty */
+#define PCI224_DACCON_FIFOINTR_NHALF	PCI224_DACCON_FIFOINTR(2)	/* !half */
+#define PCI224_DACCON_FIFOINTR_HALF	PCI224_DACCON_FIFOINTR(3)	/* half */
+#define PCI224_DACCON_FIFOINTR_NFULL	PCI224_DACCON_FIFOINTR(4)	/* !full */
+#define PCI224_DACCON_FIFOINTR_FULL	PCI224_DACCON_FIFOINTR(5)	/* full */
 /* (r-o) FIFO fill level. */
 #define PCI224_DACCON_FIFOFL(x)		(((x) & 0x7) << 12)
 #define PCI224_DACCON_FIFOFL_MASK	PCI224_DACCON_FIFOFL(7)
@@ -265,18 +265,18 @@ static unsigned int pci224_gat_config(unsigned int chan, unsigned int src)
  */
 static const struct comedi_lrange range_pci224 = {
 	10, {
-		/* jumper LK1 in position 1-2 (factory default) */
-		BIP_RANGE(10),
-		BIP_RANGE(5),
-		BIP_RANGE(2.5),
-		BIP_RANGE(1.25),
-		UNI_RANGE(10),
-		UNI_RANGE(5),
-		UNI_RANGE(2.5),
-		UNI_RANGE(1.25),
-		/* jumper LK1 in position 2-3 */
-		RANGE_ext(-1, 1),	/* bipolar [-Vext,+Vext] */
-		RANGE_ext(0, 1),	/* unipolar [0,+Vext] */
+	     /* jumper LK1 in position 1-2 (factory default) */
+	     BIP_RANGE(10),
+	     BIP_RANGE(5),
+	     BIP_RANGE(2.5),
+	     BIP_RANGE(1.25),
+	     UNI_RANGE(10),
+	     UNI_RANGE(5),
+	     UNI_RANGE(2.5),
+	     UNI_RANGE(1.25),
+	     /* jumper LK1 in position 2-3 */
+	     RANGE_ext(-1, 1),	/* bipolar [-Vext,+Vext] */
+	     RANGE_ext(0, 1),	/* unipolar [0,+Vext] */
 	}
 };
 
@@ -309,14 +309,14 @@ static const unsigned char range_check_pci224[10] = {
  */
 static const struct comedi_lrange range_pci234 = {
 	4, {
-		/* LK1: 1-2 (fact def), LK2/3/4/5: 2-3 (fac def) */
-		BIP_RANGE(10),
-		/* LK1: 1-2 (fact def), LK2/3/4/5: 1-2 */
-		BIP_RANGE(5),
-		/* LK1: 2-3, LK2/3/4/5: 2-3 (fac def) */
-		RANGE_ext(-2, 2),	/* bipolar [-2*Vext,+2*Vext] */
-		/* LK1: 2-3, LK2/3/4/5: 1-2 */
-		RANGE_ext(-1, 1),	/* bipolar [-Vext,+Vext] */
+	    /* LK1: 1-2 (fact def), LK2/3/4/5: 2-3 (fac def) */
+	    BIP_RANGE(10),
+	    /* LK1: 1-2 (fact def), LK2/3/4/5: 1-2 */
+	    BIP_RANGE(5),
+	    /* LK1: 2-3, LK2/3/4/5: 2-3 (fac def) */
+	    RANGE_ext(-2, 2),	/* bipolar [-2*Vext,+2*Vext] */
+	    /* LK1: 2-3, LK2/3/4/5: 1-2 */
+	    RANGE_ext(-1, 1),	/* bipolar [-Vext,+Vext] */
 	}
 };
 
@@ -350,21 +350,21 @@ struct pci224_board {
 
 static const struct pci224_board pci224_boards[] = {
 	[pci224_model] = {
-		.name		= "pci224",
-		.ao_chans	= 16,
-		.ao_bits	= 12,
-		.ao_range	= &range_pci224,
-		.ao_hwrange	= &hwrange_pci224[0],
-		.ao_range_check	= &range_check_pci224[0],
-	},
+			  .name = "pci224",
+			  .ao_chans = 16,
+			  .ao_bits = 12,
+			  .ao_range = &range_pci224,
+			  .ao_hwrange = &hwrange_pci224[0],
+			  .ao_range_check = &range_check_pci224[0],
+			   },
 	[pci234_model] = {
-		.name		= "pci234",
-		.ao_chans	= 4,
-		.ao_bits	= 16,
-		.ao_range	= &range_pci234,
-		.ao_hwrange	= &hwrange_pci234[0],
-		.ao_range_check	= &range_check_pci234[0],
-	},
+			  .name = "pci234",
+			  .ao_chans = 4,
+			  .ao_bits = 16,
+			  .ao_range = &range_pci234,
+			  .ao_hwrange = &hwrange_pci234[0],
+			  .ao_range_check = &range_check_pci234[0],
+			   },
 };
 
 struct pci224_private {
@@ -417,8 +417,7 @@ pci224_ao_set_data(struct comedi_device *dev, int chan, int range,
 
 static int pci224_ao_insn_write(struct comedi_device *dev,
 				struct comedi_subdevice *s,
-				struct comedi_insn *insn,
-				unsigned int *data)
+				struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 	unsigned int range = CR_RANGE(insn->chanspec);
@@ -469,9 +468,9 @@ static void pci224_ao_stop(struct comedi_device *dev,
 	/* Reconfigure DAC for insn_write usage. */
 	outw(0, dev->iobase + PCI224_DACCEN);	/* Disable channels. */
 	devpriv->daccon =
-	     COMBINE(devpriv->daccon,
-		     PCI224_DACCON_TRIG_SW | PCI224_DACCON_FIFOINTR_EMPTY,
-		     PCI224_DACCON_TRIG_MASK | PCI224_DACCON_FIFOINTR_MASK);
+	    COMBINE(devpriv->daccon,
+		    PCI224_DACCON_TRIG_SW | PCI224_DACCON_FIFOINTR_EMPTY,
+		    PCI224_DACCON_TRIG_MASK | PCI224_DACCON_FIFOINTR_MASK);
 	outw(devpriv->daccon | PCI224_DACCON_FIFORESET,
 	     dev->iobase + PCI224_DACCON);
 }
@@ -888,7 +887,7 @@ static int pci224_ao_cmd(struct comedi_device *dev, struct comedi_subdevice *s)
 	spin_lock_irqsave(&devpriv->ao_spinlock, flags);
 	if (cmd->start_src == TRIG_INT) {
 		s->async->inttrig = pci224_ao_inttrig_start;
-	} else {	/* TRIG_EXT */
+	} else {		/* TRIG_EXT */
 		/* Enable external interrupt trigger to start acquisition. */
 		devpriv->intsce |= PCI224_INTR_EXT;
 		outb(devpriv->intsce, devpriv->iobase1 + PCI224_INT_SCE);
@@ -1034,9 +1033,8 @@ pci224_auto_attach(struct comedi_device *dev, unsigned long context_model)
 
 	/* Allocate buffer to hold AO channel scan order. */
 	devpriv->ao_scan_order =
-				kmalloc_array(board->ao_chans,
-					      sizeof(devpriv->ao_scan_order[0]),
-					      GFP_KERNEL);
+	    kmalloc_array(board->ao_chans,
+			  sizeof(devpriv->ao_scan_order[0]), GFP_KERNEL);
 	if (!devpriv->ao_scan_order)
 		return -ENOMEM;
 
@@ -1049,7 +1047,7 @@ pci224_auto_attach(struct comedi_device *dev, unsigned long context_model)
 	outw(0, dev->iobase + PCI224_DACCEN);
 	outw(0, dev->iobase + PCI224_FIFOSIZ);
 	devpriv->daccon = PCI224_DACCON_TRIG_SW | PCI224_DACCON_POLAR_BI |
-			  PCI224_DACCON_FIFOENAB | PCI224_DACCON_FIFOINTR_EMPTY;
+	    PCI224_DACCON_FIFOENAB | PCI224_DACCON_FIFOINTR_EMPTY;
 	outw(devpriv->daccon | PCI224_DACCON_FIFORESET,
 	     dev->iobase + PCI224_DACCON);
 
@@ -1107,13 +1105,13 @@ static void pci224_detach(struct comedi_device *dev)
 }
 
 static struct comedi_driver amplc_pci224_driver = {
-	.driver_name	= "amplc_pci224",
-	.module		= THIS_MODULE,
-	.detach		= pci224_detach,
-	.auto_attach	= pci224_auto_attach,
-	.board_name	= &pci224_boards[0].name,
-	.offset		= sizeof(struct pci224_board),
-	.num_names	= ARRAY_SIZE(pci224_boards),
+	.driver_name = "amplc_pci224",
+	.module = THIS_MODULE,
+	.detach = pci224_detach,
+	.auto_attach = pci224_auto_attach,
+	.board_name = &pci224_boards[0].name,
+	.offset = sizeof(struct pci224_board),
+	.num_names = ARRAY_SIZE(pci224_boards),
 };
 
 static int amplc_pci224_pci_probe(struct pci_dev *dev,
@@ -1128,14 +1126,16 @@ static const struct pci_device_id amplc_pci224_pci_table[] = {
 	{ PCI_VDEVICE(AMPLICON, 0x0008), pci234_model },
 	{ 0 }
 };
+
 MODULE_DEVICE_TABLE(pci, amplc_pci224_pci_table);
 
 static struct pci_driver amplc_pci224_pci_driver = {
-	.name		= "amplc_pci224",
-	.id_table	= amplc_pci224_pci_table,
-	.probe		= amplc_pci224_pci_probe,
-	.remove		= comedi_pci_auto_unconfig,
+	.name = "amplc_pci224",
+	.id_table = amplc_pci224_pci_table,
+	.probe = amplc_pci224_pci_probe,
+	.remove = comedi_pci_auto_unconfig,
 };
+
 module_comedi_pci_driver(amplc_pci224_driver, amplc_pci224_pci_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

@@ -78,13 +78,13 @@
 #define NI_65XX_CTRL_INT_ENA		BIT(2)
 #define NI_65XX_CTRL_OVERFLOW_ENA	BIT(1)
 #define NI_65XX_CTRL_EDGE_ENA		BIT(0)
-#define NI_65XX_REV_REG			0x04 /* 32-bit */
-#define NI_65XX_FILTER_REG		0x08 /* 32-bit */
-#define NI_65XX_RTSI_ROUTE_REG		0x0c /* 16-bit */
-#define NI_65XX_RTSI_EDGE_REG		0x0e /* 16-bit */
-#define NI_65XX_RTSI_WDOG_REG		0x10 /* 16-bit */
-#define NI_65XX_RTSI_TRIG_REG		0x12 /* 16-bit */
-#define NI_65XX_AUTO_CLK_SEL_REG	0x14 /* PXI-6528 only */
+#define NI_65XX_REV_REG			0x04	/* 32-bit */
+#define NI_65XX_FILTER_REG		0x08	/* 32-bit */
+#define NI_65XX_RTSI_ROUTE_REG		0x0c	/* 16-bit */
+#define NI_65XX_RTSI_EDGE_REG		0x0e	/* 16-bit */
+#define NI_65XX_RTSI_WDOG_REG		0x10	/* 16-bit */
+#define NI_65XX_RTSI_TRIG_REG		0x12	/* 16-bit */
+#define NI_65XX_AUTO_CLK_SEL_REG	0x14	/* PXI-6528 only */
 #define NI_65XX_AUTO_CLK_SEL_STATUS	BIT(1)
 #define NI_65XX_AUTO_CLK_SEL_DISABLE	BIT(0)
 #define NI_65XX_WDOG_CTRL_REG		0x15
@@ -95,7 +95,7 @@
 #define NI_65XX_RTSI_CFG_SYNC_DETECT	BIT(0)
 #define NI_65XX_WDOG_STATUS_REG		0x17
 #define NI_65XX_WDOG_STATUS_EXP		BIT(0)
-#define NI_65XX_WDOG_INTERVAL_REG	0x18 /* 32-bit */
+#define NI_65XX_WDOG_INTERVAL_REG	0x18	/* 32-bit */
 
 /* Recurring port registers (8-bit) */
 #define NI_65XX_PORT(x)			((x) * 0x10)
@@ -150,114 +150,114 @@ struct ni_65xx_board {
 
 static const struct ni_65xx_board ni_65xx_boards[] = {
 	[BOARD_PCI6509] = {
-		.name		= "pci-6509",
-		.num_dio_ports	= 12,
-	},
+			   .name = "pci-6509",
+			   .num_dio_ports = 12,
+			    },
 	[BOARD_PXI6509] = {
-		.name		= "pxi-6509",
-		.num_dio_ports	= 12,
-	},
+			   .name = "pxi-6509",
+			   .num_dio_ports = 12,
+			    },
 	[BOARD_PCI6510] = {
-		.name		= "pci-6510",
-		.num_di_ports	= 4,
-	},
+			   .name = "pci-6510",
+			   .num_di_ports = 4,
+			    },
 	[BOARD_PCI6511] = {
-		.name		= "pci-6511",
-		.num_di_ports	= 8,
-	},
+			   .name = "pci-6511",
+			   .num_di_ports = 8,
+			    },
 	[BOARD_PXI6511] = {
-		.name		= "pxi-6511",
-		.num_di_ports	= 8,
-	},
+			   .name = "pxi-6511",
+			   .num_di_ports = 8,
+			    },
 	[BOARD_PCI6512] = {
-		.name		= "pci-6512",
-		.num_do_ports	= 8,
-	},
+			   .name = "pci-6512",
+			   .num_do_ports = 8,
+			    },
 	[BOARD_PXI6512] = {
-		.name		= "pxi-6512",
-		.num_do_ports	= 8,
-	},
+			   .name = "pxi-6512",
+			   .num_do_ports = 8,
+			    },
 	[BOARD_PCI6513] = {
-		.name		= "pci-6513",
-		.num_do_ports	= 8,
-		.legacy_invert	= 1,
-	},
+			   .name = "pci-6513",
+			   .num_do_ports = 8,
+			   .legacy_invert = 1,
+			    },
 	[BOARD_PXI6513] = {
-		.name		= "pxi-6513",
-		.num_do_ports	= 8,
-		.legacy_invert	= 1,
-	},
+			   .name = "pxi-6513",
+			   .num_do_ports = 8,
+			   .legacy_invert = 1,
+			    },
 	[BOARD_PCI6514] = {
-		.name		= "pci-6514",
-		.num_di_ports	= 4,
-		.num_do_ports	= 4,
-		.legacy_invert	= 1,
-	},
+			   .name = "pci-6514",
+			   .num_di_ports = 4,
+			   .num_do_ports = 4,
+			   .legacy_invert = 1,
+			    },
 	[BOARD_PXI6514] = {
-		.name		= "pxi-6514",
-		.num_di_ports	= 4,
-		.num_do_ports	= 4,
-		.legacy_invert	= 1,
-	},
+			   .name = "pxi-6514",
+			   .num_di_ports = 4,
+			   .num_do_ports = 4,
+			   .legacy_invert = 1,
+			    },
 	[BOARD_PCI6515] = {
-		.name		= "pci-6515",
-		.num_di_ports	= 4,
-		.num_do_ports	= 4,
-		.legacy_invert	= 1,
-	},
+			   .name = "pci-6515",
+			   .num_di_ports = 4,
+			   .num_do_ports = 4,
+			   .legacy_invert = 1,
+			    },
 	[BOARD_PXI6515] = {
-		.name		= "pxi-6515",
-		.num_di_ports	= 4,
-		.num_do_ports	= 4,
-		.legacy_invert	= 1,
-	},
+			   .name = "pxi-6515",
+			   .num_di_ports = 4,
+			   .num_do_ports = 4,
+			   .legacy_invert = 1,
+			    },
 	[BOARD_PCI6516] = {
-		.name		= "pci-6516",
-		.num_do_ports	= 4,
-		.legacy_invert	= 1,
-	},
+			   .name = "pci-6516",
+			   .num_do_ports = 4,
+			   .legacy_invert = 1,
+			    },
 	[BOARD_PCI6517] = {
-		.name		= "pci-6517",
-		.num_do_ports	= 4,
-		.legacy_invert	= 1,
-	},
+			   .name = "pci-6517",
+			   .num_do_ports = 4,
+			   .legacy_invert = 1,
+			    },
 	[BOARD_PCI6518] = {
-		.name		= "pci-6518",
-		.num_di_ports	= 2,
-		.num_do_ports	= 2,
-		.legacy_invert	= 1,
-	},
+			   .name = "pci-6518",
+			   .num_di_ports = 2,
+			   .num_do_ports = 2,
+			   .legacy_invert = 1,
+			    },
 	[BOARD_PCI6519] = {
-		.name		= "pci-6519",
-		.num_di_ports	= 2,
-		.num_do_ports	= 2,
-		.legacy_invert	= 1,
-	},
+			   .name = "pci-6519",
+			   .num_di_ports = 2,
+			   .num_do_ports = 2,
+			   .legacy_invert = 1,
+			    },
 	[BOARD_PCI6520] = {
-		.name		= "pci-6520",
-		.num_di_ports	= 1,
-		.num_do_ports	= 1,
-	},
+			   .name = "pci-6520",
+			   .num_di_ports = 1,
+			   .num_do_ports = 1,
+			    },
 	[BOARD_PCI6521] = {
-		.name		= "pci-6521",
-		.num_di_ports	= 1,
-		.num_do_ports	= 1,
-	},
+			   .name = "pci-6521",
+			   .num_di_ports = 1,
+			   .num_do_ports = 1,
+			    },
 	[BOARD_PXI6521] = {
-		.name		= "pxi-6521",
-		.num_di_ports	= 1,
-		.num_do_ports	= 1,
-	},
+			   .name = "pxi-6521",
+			   .num_di_ports = 1,
+			   .num_do_ports = 1,
+			    },
 	[BOARD_PCI6528] = {
-		.name		= "pci-6528",
-		.num_di_ports	= 3,
-		.num_do_ports	= 3,
-	},
+			   .name = "pci-6528",
+			   .num_di_ports = 3,
+			   .num_do_ports = 3,
+			    },
 	[BOARD_PXI6528] = {
-		.name		= "pxi-6528",
-		.num_di_ports	= 3,
-		.num_do_ports	= 3,
-	},
+			   .name = "pxi-6528",
+			   .num_di_ports = 3,
+			   .num_do_ports = 3,
+			    },
 };
 
 static bool ni_65xx_legacy_invert_outputs;
@@ -345,8 +345,7 @@ static void ni_65xx_disable_edge_detection(struct comedi_device *dev)
 
 static int ni_65xx_dio_insn_config(struct comedi_device *dev,
 				   struct comedi_subdevice *s,
-				   struct comedi_insn *insn,
-				   unsigned int *data)
+				   struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned long base_port = (unsigned long)s->private;
 	unsigned int chan = CR_CHAN(insn->chanspec);
@@ -401,7 +400,7 @@ static int ni_65xx_dio_insn_config(struct comedi_device *dev,
 			return -EINVAL;
 		val = readb(dev->mmio + NI_65XX_IO_SEL_REG(port));
 		data[1] = (val == NI_65XX_IO_SEL_INPUT) ? COMEDI_INPUT
-							: COMEDI_OUTPUT;
+		    : COMEDI_OUTPUT;
 		break;
 
 	default:
@@ -413,8 +412,7 @@ static int ni_65xx_dio_insn_config(struct comedi_device *dev,
 
 static int ni_65xx_dio_insn_bits(struct comedi_device *dev,
 				 struct comedi_subdevice *s,
-				 struct comedi_insn *insn,
-				 unsigned int *data)
+				 struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned long base_port = (unsigned long)s->private;
 	unsigned int base_chan = CR_CHAN(insn->chanspec);
@@ -550,8 +548,7 @@ static int ni_65xx_intr_cancel(struct comedi_device *dev,
 
 static int ni_65xx_intr_insn_bits(struct comedi_device *dev,
 				  struct comedi_subdevice *s,
-				  struct comedi_insn *insn,
-				  unsigned int *data)
+				  struct comedi_insn *insn, unsigned int *data)
 {
 	data[1] = 0;
 	return insn->n;
@@ -604,8 +601,8 @@ static int ni_65xx_intr_insn_config(struct comedi_device *dev,
 }
 
 /* ripped from mite.h and mite_setup2() to avoid mite dependency */
-#define MITE_IODWBSR	0xc0	 /* IO Device Window Base Size Register */
-#define WENAB			BIT(7) /* window enable */
+#define MITE_IODWBSR	0xc0	/* IO Device Window Base Size Register */
+#define WENAB			BIT(7)	/* window enable */
 
 static int ni_65xx_mite_init(struct pci_dev *pcidev)
 {
@@ -626,8 +623,7 @@ static int ni_65xx_mite_init(struct pci_dev *pcidev)
 	return 0;
 }
 
-static int ni_65xx_auto_attach(struct comedi_device *dev,
-			       unsigned long context)
+static int ni_65xx_auto_attach(struct comedi_device *dev, unsigned long context)
 {
 	struct pci_dev *pcidev = comedi_to_pci_dev(dev);
 	const struct ni_65xx_board *board = NULL;
@@ -674,28 +670,28 @@ static int ni_65xx_auto_attach(struct comedi_device *dev,
 
 	s = &dev->subdevices[0];
 	if (board->num_di_ports) {
-		s->type		= COMEDI_SUBD_DI;
-		s->subdev_flags	= SDF_READABLE;
-		s->n_chan	= NI_65XX_PORT_TO_CHAN(board->num_di_ports);
-		s->maxdata	= 1;
-		s->range_table	= &range_digital;
-		s->insn_bits	= ni_65xx_dio_insn_bits;
-		s->insn_config	= ni_65xx_dio_insn_config;
+		s->type = COMEDI_SUBD_DI;
+		s->subdev_flags = SDF_READABLE;
+		s->n_chan = NI_65XX_PORT_TO_CHAN(board->num_di_ports);
+		s->maxdata = 1;
+		s->range_table = &range_digital;
+		s->insn_bits = ni_65xx_dio_insn_bits;
+		s->insn_config = ni_65xx_dio_insn_config;
 
 		/* the input ports always start at port 0 */
 		s->private = (void *)0;
 	} else {
-		s->type		= COMEDI_SUBD_UNUSED;
+		s->type = COMEDI_SUBD_UNUSED;
 	}
 
 	s = &dev->subdevices[1];
 	if (board->num_do_ports) {
-		s->type		= COMEDI_SUBD_DO;
-		s->subdev_flags	= SDF_WRITABLE;
-		s->n_chan	= NI_65XX_PORT_TO_CHAN(board->num_do_ports);
-		s->maxdata	= 1;
-		s->range_table	= &range_digital;
-		s->insn_bits	= ni_65xx_dio_insn_bits;
+		s->type = COMEDI_SUBD_DO;
+		s->subdev_flags = SDF_WRITABLE;
+		s->n_chan = NI_65XX_PORT_TO_CHAN(board->num_do_ports);
+		s->maxdata = 1;
+		s->range_table = &range_digital;
+		s->insn_bits = ni_65xx_dio_insn_bits;
 
 		/* the output ports always start after the input ports */
 		s->private = (void *)(unsigned long)board->num_di_ports;
@@ -715,18 +711,18 @@ static int ni_65xx_auto_attach(struct comedi_device *dev,
 			       NI_65XX_IO_DATA_REG(board->num_di_ports + i));
 		}
 	} else {
-		s->type		= COMEDI_SUBD_UNUSED;
+		s->type = COMEDI_SUBD_UNUSED;
 	}
 
 	s = &dev->subdevices[2];
 	if (board->num_dio_ports) {
-		s->type		= COMEDI_SUBD_DIO;
-		s->subdev_flags	= SDF_READABLE | SDF_WRITABLE;
-		s->n_chan	= NI_65XX_PORT_TO_CHAN(board->num_dio_ports);
-		s->maxdata	= 1;
-		s->range_table	= &range_digital;
-		s->insn_bits	= ni_65xx_dio_insn_bits;
-		s->insn_config	= ni_65xx_dio_insn_config;
+		s->type = COMEDI_SUBD_DIO;
+		s->subdev_flags = SDF_READABLE | SDF_WRITABLE;
+		s->n_chan = NI_65XX_PORT_TO_CHAN(board->num_dio_ports);
+		s->maxdata = 1;
+		s->range_table = &range_digital;
+		s->insn_bits = ni_65xx_dio_insn_bits;
+		s->insn_config = ni_65xx_dio_insn_config;
 
 		/* the input/output ports always start at port 0 */
 		s->private = (void *)0;
@@ -737,24 +733,24 @@ static int ni_65xx_auto_attach(struct comedi_device *dev,
 			       dev->mmio + NI_65XX_IO_SEL_REG(i));
 		}
 	} else {
-		s->type		= COMEDI_SUBD_UNUSED;
+		s->type = COMEDI_SUBD_UNUSED;
 	}
 
 	s = &dev->subdevices[3];
-	s->type		= COMEDI_SUBD_DI;
-	s->subdev_flags	= SDF_READABLE;
-	s->n_chan	= 1;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_bits	= ni_65xx_intr_insn_bits;
+	s->type = COMEDI_SUBD_DI;
+	s->subdev_flags = SDF_READABLE;
+	s->n_chan = 1;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_bits = ni_65xx_intr_insn_bits;
 	if (dev->irq) {
 		dev->read_subdev = s;
-		s->subdev_flags	|= SDF_CMD_READ;
-		s->len_chanlist	= 1;
-		s->insn_config	= ni_65xx_intr_insn_config;
-		s->do_cmdtest	= ni_65xx_intr_cmdtest;
-		s->do_cmd	= ni_65xx_intr_cmd;
-		s->cancel	= ni_65xx_intr_cancel;
+		s->subdev_flags |= SDF_CMD_READ;
+		s->len_chanlist = 1;
+		s->insn_config = ni_65xx_intr_insn_config;
+		s->do_cmdtest = ni_65xx_intr_cmdtest;
+		s->do_cmd = ni_65xx_intr_cmd;
+		s->cancel = ni_65xx_intr_cancel;
 	}
 
 	ni_65xx_disable_input_filters(dev);
@@ -771,10 +767,10 @@ static void ni_65xx_detach(struct comedi_device *dev)
 }
 
 static struct comedi_driver ni_65xx_driver = {
-	.driver_name	= "ni_65xx",
-	.module		= THIS_MODULE,
-	.auto_attach	= ni_65xx_auto_attach,
-	.detach		= ni_65xx_detach,
+	.driver_name = "ni_65xx",
+	.module = THIS_MODULE,
+	.auto_attach = ni_65xx_auto_attach,
+	.detach = ni_65xx_detach,
 };
 
 static int ni_65xx_pci_probe(struct pci_dev *dev,
@@ -808,14 +804,16 @@ static const struct pci_device_id ni_65xx_pci_table[] = {
 	{ PCI_VDEVICE(NI, 0x71c5), BOARD_PCI6520 },
 	{ 0 }
 };
+
 MODULE_DEVICE_TABLE(pci, ni_65xx_pci_table);
 
 static struct pci_driver ni_65xx_pci_driver = {
-	.name		= "ni_65xx",
-	.id_table	= ni_65xx_pci_table,
-	.probe		= ni_65xx_pci_probe,
-	.remove		= comedi_pci_auto_unconfig,
+	.name = "ni_65xx",
+	.id_table = ni_65xx_pci_table,
+	.probe = ni_65xx_pci_probe,
+	.remove = comedi_pci_auto_unconfig,
 };
+
 module_comedi_pci_driver(ni_65xx_driver, ni_65xx_pci_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

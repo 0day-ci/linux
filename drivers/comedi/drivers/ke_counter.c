@@ -40,8 +40,7 @@
 
 static int ke_counter_insn_write(struct comedi_device *dev,
 				 struct comedi_subdevice *s,
-				 struct comedi_insn *insn,
-				 unsigned int *data)
+				 struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 	unsigned int val;
@@ -62,8 +61,7 @@ static int ke_counter_insn_write(struct comedi_device *dev,
 
 static int ke_counter_insn_read(struct comedi_device *dev,
 				struct comedi_subdevice *s,
-				struct comedi_insn *insn,
-				unsigned int *data)
+				struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 	unsigned int val;
@@ -94,8 +92,7 @@ static void ke_counter_reset(struct comedi_device *dev)
 
 static int ke_counter_insn_config(struct comedi_device *dev,
 				  struct comedi_subdevice *s,
-				  struct comedi_insn *insn,
-				  unsigned int *data)
+				  struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned char src;
 
@@ -147,8 +144,7 @@ static int ke_counter_insn_config(struct comedi_device *dev,
 
 static int ke_counter_do_insn_bits(struct comedi_device *dev,
 				   struct comedi_subdevice *s,
-				   struct comedi_insn *insn,
-				   unsigned int *data)
+				   struct comedi_insn *insn, unsigned int *data)
 {
 	if (comedi_dio_update_state(s, data))
 		outb(s->state, dev->iobase + KE_DO_REG);
@@ -175,22 +171,22 @@ static int ke_counter_auto_attach(struct comedi_device *dev,
 		return ret;
 
 	s = &dev->subdevices[0];
-	s->type		= COMEDI_SUBD_COUNTER;
-	s->subdev_flags	= SDF_READABLE;
-	s->n_chan	= 3;
-	s->maxdata	= 0x01ffffff;
-	s->range_table	= &range_unknown;
-	s->insn_read	= ke_counter_insn_read;
-	s->insn_write	= ke_counter_insn_write;
-	s->insn_config	= ke_counter_insn_config;
+	s->type = COMEDI_SUBD_COUNTER;
+	s->subdev_flags = SDF_READABLE;
+	s->n_chan = 3;
+	s->maxdata = 0x01ffffff;
+	s->range_table = &range_unknown;
+	s->insn_read = ke_counter_insn_read;
+	s->insn_write = ke_counter_insn_write;
+	s->insn_config = ke_counter_insn_config;
 
 	s = &dev->subdevices[1];
-	s->type		= COMEDI_SUBD_DO;
-	s->subdev_flags	= SDF_WRITABLE;
-	s->n_chan	= 3;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_bits	= ke_counter_do_insn_bits;
+	s->type = COMEDI_SUBD_DO;
+	s->subdev_flags = SDF_WRITABLE;
+	s->n_chan = 3;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_bits = ke_counter_do_insn_bits;
 
 	outb(KE_OSC_SEL_20MHZ, dev->iobase + KE_OSC_SEL_REG);
 
@@ -200,31 +196,32 @@ static int ke_counter_auto_attach(struct comedi_device *dev,
 }
 
 static struct comedi_driver ke_counter_driver = {
-	.driver_name	= "ke_counter",
-	.module		= THIS_MODULE,
-	.auto_attach	= ke_counter_auto_attach,
-	.detach		= comedi_pci_detach,
+	.driver_name = "ke_counter",
+	.module = THIS_MODULE,
+	.auto_attach = ke_counter_auto_attach,
+	.detach = comedi_pci_detach,
 };
 
 static int ke_counter_pci_probe(struct pci_dev *dev,
 				const struct pci_device_id *id)
 {
-	return comedi_pci_auto_config(dev, &ke_counter_driver,
-				      id->driver_data);
+	return comedi_pci_auto_config(dev, &ke_counter_driver, id->driver_data);
 }
 
 static const struct pci_device_id ke_counter_pci_table[] = {
 	{ PCI_DEVICE(PCI_VENDOR_ID_KOLTER, 0x0014) },
 	{ 0 }
 };
+
 MODULE_DEVICE_TABLE(pci, ke_counter_pci_table);
 
 static struct pci_driver ke_counter_pci_driver = {
-	.name		= "ke_counter",
-	.id_table	= ke_counter_pci_table,
-	.probe		= ke_counter_pci_probe,
-	.remove		= comedi_pci_auto_unconfig,
+	.name = "ke_counter",
+	.id_table = ke_counter_pci_table,
+	.probe = ke_counter_pci_probe,
+	.remove = comedi_pci_auto_unconfig,
 };
+
 module_comedi_pci_driver(ke_counter_driver, ke_counter_pci_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

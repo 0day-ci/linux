@@ -61,8 +61,7 @@ static int addi_watchdog_insn_config(struct comedi_device *dev,
 
 static int addi_watchdog_insn_read(struct comedi_device *dev,
 				   struct comedi_subdevice *s,
-				   struct comedi_insn *insn,
-				   unsigned int *data)
+				   struct comedi_insn *insn, unsigned int *data)
 {
 	struct addi_watchdog_private *spriv = s->private;
 	int i;
@@ -100,6 +99,7 @@ void addi_watchdog_reset(unsigned long iobase)
 	outl(0x0, iobase + ADDI_TCW_CTRL_REG);
 	outl(0x0, iobase + ADDI_TCW_RELOAD_REG);
 }
+
 EXPORT_SYMBOL_GPL(addi_watchdog_reset);
 
 int addi_watchdog_init(struct comedi_subdevice *s, unsigned long iobase)
@@ -112,27 +112,30 @@ int addi_watchdog_init(struct comedi_subdevice *s, unsigned long iobase)
 
 	spriv->iobase = iobase;
 
-	s->type		= COMEDI_SUBD_TIMER;
-	s->subdev_flags	= SDF_WRITABLE;
-	s->n_chan	= 1;
-	s->maxdata	= 0xff;
-	s->insn_config	= addi_watchdog_insn_config;
-	s->insn_read	= addi_watchdog_insn_read;
-	s->insn_write	= addi_watchdog_insn_write;
+	s->type = COMEDI_SUBD_TIMER;
+	s->subdev_flags = SDF_WRITABLE;
+	s->n_chan = 1;
+	s->maxdata = 0xff;
+	s->insn_config = addi_watchdog_insn_config;
+	s->insn_read = addi_watchdog_insn_read;
+	s->insn_write = addi_watchdog_insn_write;
 
 	return 0;
 }
+
 EXPORT_SYMBOL_GPL(addi_watchdog_init);
 
 static int __init addi_watchdog_module_init(void)
 {
 	return 0;
 }
+
 module_init(addi_watchdog_module_init);
 
 static void __exit addi_watchdog_module_exit(void)
 {
 }
+
 module_exit(addi_watchdog_module_exit);
 
 MODULE_DESCRIPTION("ADDI-DATA Watchdog subdevice");

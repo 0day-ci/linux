@@ -83,31 +83,43 @@ static const int no_val_dest = O(7), no_val_index = 4;
 
 static struct ni_device_routes DR = {
 	.device = "testdev",
-	.routes = (struct ni_route_set[]){
-		{.dest = O(0), .src = O9(/**/1, 2, 3, 4, 5, 6, 7, 8, 9)},
-		{.dest = O(1), .src = O9(0, /**/2, 3, 4, 5, 6, 7, 8, 9)},
-		/* ith route_set */
-		{.dest = O(5), .src = O9(0, 1, 2, 3, 4,/**/ 6, 7, 8, 9)},
-		{.dest = O(6), .src = O9(0, 1, 2, 3, 4, 5,/**/ 7, 8, 9)},
-		/* next one will not have valid reg values */
-		{.dest = O(7), .src = O9(0, 1, 2, 3, 4, 5, 6,/**/ 8, 9)},
-		{.dest = O(9), .src = O9(0, 1, 2, 3, 4, 5, 6, 7, 8/**/)},
+	.routes = (struct ni_route_set[]) {
+					   {.dest = O(0), .src =
+					    O9(/**/ 1, 2, 3, 4, 5, 6, 7, 8,
+					       9)},
+					   {.dest = O(1), .src =
+					    O9(0, /**/ 2, 3, 4, 5, 6, 7, 8, 9)},
+					   /* ith route_set */
+					   {.dest = O(5), .src =
+					    O9(0, 1, 2, 3, 4, /**/ 6, 7, 8, 9)},
+					   {.dest = O(6), .src =
+					    O9(0, 1, 2, 3, 4, 5, /**/ 7, 8, 9)},
+					   /* next one will not have valid reg values */
+					   {.dest = O(7), .src =
+					    O9(0, 1, 2, 3, 4, 5, 6, /**/ 8, 9)},
+					   {.dest = O(9), .src =
+					    O9(0, 1, 2, 3, 4, 5, 6, 7, 8 /**/)},
 
-		/* indirect routes done through muxes */
-		{.dest = TRIGGER_LINE(0), .src = I1(rgout0_src0)},
-		{.dest = TRIGGER_LINE(1), .src = I3(rgout0_src0,
-						    brd3_src0,
-						    brd3_src1)},
-		{.dest = TRIGGER_LINE(2), .src = I3(rgout0_src1,
-						    brd2_src0,
-						    brd2_src1)},
-		{.dest = TRIGGER_LINE(3), .src = I3(rgout0_src1,
-						    brd1_src0,
-						    brd1_src1)},
-		{.dest = TRIGGER_LINE(4), .src = I2(brd0_src0,
-						    brd0_src1)},
-		{.dest = 0},
-	},
+					   /* indirect routes done through muxes */
+					   {.dest = TRIGGER_LINE(0), .src =
+					    I1(rgout0_src0)},
+					   {.dest = TRIGGER_LINE(1), .src =
+					    I3(rgout0_src0,
+					       brd3_src0,
+					       brd3_src1)},
+					   {.dest = TRIGGER_LINE(2), .src =
+					    I3(rgout0_src1,
+					       brd2_src0,
+					       brd2_src1)},
+					   {.dest = TRIGGER_LINE(3), .src =
+					    I3(rgout0_src1,
+					       brd1_src0,
+					       brd1_src1)},
+					   {.dest = TRIGGER_LINE(4), .src =
+					    I2(brd0_src0,
+					       brd0_src1)},
+					   {.dest = 0},
+					    },
 };
 
 #undef I1
@@ -121,27 +133,27 @@ static struct ni_device_routes DR = {
 
 /* This table is indexed as RV[destination][source] */
 static const u8 RV[NI_NUM_NAMES][NI_NUM_NAMES] = {
-	[0] = {RV9(/**/1, 2, 3, 4, 5, 6, 7, 8, 9)},
-	[1] = {RV9(0,/**/ 2, 3, 4, 5, 6, 7, 8, 9)},
-	[2] = {RV9(0,  1,/**/3, 4, 5, 6, 7, 8, 9)},
-	[3] = {RV9(0,  1, 2,/**/4, 5, 6, 7, 8, 9)},
-	[4] = {RV9(0,  1, 2, 3,/**/5, 6, 7, 8, 9)},
-	[5] = {RV9(0,  1, 2, 3, 4,/**/6, 7, 8, 9)},
-	[6] = {RV9(0,  1, 2, 3, 4, 5,/**/7, 8, 9)},
+	[0] = { RV9(/**/ 1, 2, 3, 4, 5, 6, 7, 8, 9) },
+	[1] = { RV9(0, /**/ 2, 3, 4, 5, 6, 7, 8, 9) },
+	[2] = { RV9(0, 1, /**/ 3, 4, 5, 6, 7, 8, 9) },
+	[3] = { RV9(0, 1, 2, /**/ 4, 5, 6, 7, 8, 9) },
+	[4] = { RV9(0, 1, 2, 3, /**/ 5, 6, 7, 8, 9) },
+	[5] = { RV9(0, 1, 2, 3, 4, /**/ 6, 7, 8, 9) },
+	[6] = { RV9(0, 1, 2, 3, 4, 5, /**/ 7, 8, 9) },
 	/* [7] is intentionaly left absent to test invalid routes */
-	[8] = {RV9(0,  1, 2, 3, 4, 5, 6, 7,/**/9)},
-	[9] = {RV9(0,  1, 2, 3, 4, 5, 6, 7, 8/**/)},
+	[8] = { RV9(0, 1, 2, 3, 4, 5, 6, 7, /**/ 9) },
+	[9] = { RV9(0, 1, 2, 3, 4, 5, 6, 7, 8 /**/) },
 	/* some tests for needing extra muxes */
-	[B(NI_RGOUT0)]	= {[B(rgout0_src0)]   = V(0),
-			   [B(rgout0_src1)]   = V(1)},
+	[B(NI_RGOUT0)] = {[B(rgout0_src0)] = V(0),
+			  [B(rgout0_src1)] = V(1) },
 	[B(NI_RTSI_BRD(0))] = {[B(brd0_src0)] = V(0),
-			       [B(brd0_src1)] = V(1)},
+			       [B(brd0_src1)] = V(1) },
 	[B(NI_RTSI_BRD(1))] = {[B(brd1_src0)] = V(0),
-			       [B(brd1_src1)] = V(1)},
+			       [B(brd1_src1)] = V(1) },
 	[B(NI_RTSI_BRD(2))] = {[B(brd2_src0)] = V(0),
-			       [B(brd2_src1)] = V(1)},
+			       [B(brd2_src1)] = V(1) },
 	[B(NI_RTSI_BRD(3))] = {[B(brd3_src0)] = V(0),
-			       [B(brd3_src1)] = V(1)},
+			       [B(brd3_src1)] = V(1) },
 };
 
 #undef RV9
@@ -245,7 +257,8 @@ static void test_ni_assign_device_routes(void)
 	unittest(RVI(table, B(PXI_Star), B(NI_AI_SampleClock)) == V(17) &&
 		 RVI(table, B(NI_10MHzRefClock), B(TRIGGER_LINE(0))) == 0 &&
 		 RVI(table, B(NI_AI_ConvertClock), B(NI_PFI(0))) == 0 &&
-		 RVI(table, B(NI_AI_ConvertClock), B(NI_PFI(2))) == V(NI_PFI_OUTPUT_AI_CONVERT),
+		 RVI(table, B(NI_AI_ConvertClock),
+		     B(NI_PFI(2))) == V(NI_PFI_OUTPUT_AI_CONVERT),
 		 "pci-6070e finds e-series route_values table\n");
 
 	oldtable = table;
@@ -289,8 +302,7 @@ static void test_ni_find_route_set(void)
 		 &DR.routes[no_val_index],
 		 "find no_val route_set in spite of missing values\n");
 	unittest(ni_find_route_set(DR.routes[DR.n_route_sets - 1].dest, &DR) ==
-		 &DR.routes[DR.n_route_sets - 1],
-		 "find last route_set\n");
+		 &DR.routes[DR.n_route_sets - 1], "find last route_set\n");
 }
 
 static void test_ni_route_set_has_source(void)
@@ -372,24 +384,20 @@ static void test_ni_lookup_route_register(void)
 		 "lookup invalid destination\n");
 
 	unittest(ni_lookup_route_register(rgout0_src0, TRIGGER_LINE(0), T) ==
-		 -EINVAL,
-		 "rgout0_src0: no direct lookup of indirect route\n");
+		 -EINVAL, "rgout0_src0: no direct lookup of indirect route\n");
 	unittest(ni_lookup_route_register(rgout0_src0, NI_RGOUT0, T) == 0,
 		 "rgout0_src0: lookup indirect route register\n");
 	unittest(ni_lookup_route_register(rgout0_src1, TRIGGER_LINE(2), T) ==
-		 -EINVAL,
-		 "rgout0_src1: no direct lookup of indirect route\n");
+		 -EINVAL, "rgout0_src1: no direct lookup of indirect route\n");
 	unittest(ni_lookup_route_register(rgout0_src1, NI_RGOUT0, T) == 1,
 		 "rgout0_src1: lookup indirect route register\n");
 
 	unittest(ni_lookup_route_register(brd0_src0, TRIGGER_LINE(4), T) ==
-		 -EINVAL,
-		 "brd0_src0: no direct lookup of indirect route\n");
+		 -EINVAL, "brd0_src0: no direct lookup of indirect route\n");
 	unittest(ni_lookup_route_register(brd0_src0, NI_RTSI_BRD(0), T) == 0,
 		 "brd0_src0: lookup indirect route register\n");
 	unittest(ni_lookup_route_register(brd0_src1, TRIGGER_LINE(4), T) ==
-		 -EINVAL,
-		 "brd0_src1: no direct lookup of indirect route\n");
+		 -EINVAL, "brd0_src1: no direct lookup of indirect route\n");
 	unittest(ni_lookup_route_register(brd0_src1, NI_RTSI_BRD(0), T) == 1,
 		 "brd0_src1: lookup indirect route register\n");
 }
@@ -399,14 +407,11 @@ static void test_route_is_valid(void)
 	const struct ni_route_tables *T = &private.routing_tables;
 
 	init_pci_fake();
-	unittest(!route_is_valid(O(0), O(0), T),
-		 "check for bad route 0-->0\n");
-	unittest(route_is_valid(O(0), O(1), T),
-		 "validate first destination\n");
+	unittest(!route_is_valid(O(0), O(0), T), "check for bad route 0-->0\n");
+	unittest(route_is_valid(O(0), O(1), T), "validate first destination\n");
 	unittest(route_is_valid(O(5), O(6), T),
 		 "validate middle destination\n");
-	unittest(route_is_valid(O(8), O(9), T),
-		 "validate last destination\n");
+	unittest(route_is_valid(O(8), O(9), T), "validate last destination\n");
 }
 
 static void test_ni_is_cmd_dest(void)
@@ -441,8 +446,7 @@ static void test_channel_is_rtsi(void)
 	init_pci_fake();
 	unittest(channel_is_rtsi(TRIGGER_LINE(0)),
 		 "check First rtsi channel\n");
-	unittest(channel_is_rtsi(TRIGGER_LINE(3)),
-		 "check 3rd rtsi channel\n");
+	unittest(channel_is_rtsi(TRIGGER_LINE(3)), "check 3rd rtsi channel\n");
 	unittest(channel_is_rtsi(TRIGGER_LINE(-1)),
 		 "check last rtsi channel\n");
 	unittest(!channel_is_rtsi(TRIGGER_LINE(-1) + 1),
@@ -485,8 +489,7 @@ static void test_ni_find_route_source(void)
 		 "find first source\n");
 	unittest(ni_find_route_source(4, O(6), T) == O(4),
 		 "find middle source\n");
-	unittest(ni_find_route_source(9, O(8), T) == O(9),
-		 "find last source");
+	unittest(ni_find_route_source(9, O(8), T) == O(9), "find last source");
 	unittest(ni_find_route_source(8, O(9), T) == O(8),
 		 "find invalid source (without checking device routes)\n");
 }
@@ -498,12 +501,9 @@ static void test_route_register_is_valid(void)
 	init_pci_fake();
 	unittest(!route_register_is_valid(4, O(4), T),
 		 "check for bad source 4-->4\n");
-	unittest(route_register_is_valid(0, O(1), T),
-		 "find first source\n");
-	unittest(route_register_is_valid(4, O(6), T),
-		 "find middle source\n");
-	unittest(route_register_is_valid(9, O(8), T),
-		 "find last source");
+	unittest(route_register_is_valid(0, O(1), T), "find first source\n");
+	unittest(route_register_is_valid(4, O(6), T), "find middle source\n");
+	unittest(route_register_is_valid(9, O(8), T), "find last source");
 }
 
 static void test_ni_check_trigger_arg(void)
@@ -599,7 +599,9 @@ static int __init ni_routes_unittest(void)
 	return 0;
 }
 
-static void __exit ni_routes_unittest_exit(void) { }
+static void __exit ni_routes_unittest_exit(void)
+{
+}
 
 module_init(ni_routes_unittest);
 module_exit(ni_routes_unittest_exit);

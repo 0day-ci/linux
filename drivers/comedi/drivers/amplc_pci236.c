@@ -131,10 +131,10 @@ static int amplc_pci236_pci_probe(struct pci_dev *dev,
 }
 
 static struct pci_driver amplc_pci236_pci_driver = {
-	.name		= "amplc_pci236",
-	.id_table	= pci236_pci_table,
-	.probe		= &amplc_pci236_pci_probe,
-	.remove		= comedi_pci_auto_unconfig,
+	.name = "amplc_pci236",
+	.id_table = pci236_pci_table,
+	.probe = &amplc_pci236_pci_probe,
+	.remove = comedi_pci_auto_unconfig,
 };
 
 module_comedi_pci_driver(amplc_pci236_driver, amplc_pci236_pci_driver);

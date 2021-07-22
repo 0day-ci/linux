@@ -62,8 +62,8 @@
 #define DT2811_ADDATA_LO_REG		0x02	/* r   A/D Data low byte */
 #define DT2811_ADDATA_HI_REG		0x03	/* r   A/D Data high byte */
 
-#define DT2811_DADATA_LO_REG(x)		(0x02 + ((x) * 2)) /* w D/A Data low */
-#define DT2811_DADATA_HI_REG(x)		(0x03 + ((x) * 2)) /* w D/A Data high */
+#define DT2811_DADATA_LO_REG(x)		(0x02 + ((x) * 2))	/* w D/A Data low */
+#define DT2811_DADATA_HI_REG(x)		(0x03 + ((x) * 2))	/* w D/A Data high */
 
 #define DT2811_DI_REG			0x06	/* r   Digital Input Port 0 */
 #define DT2811_DO_REG			0x06	/* w   Digital Output Port 1 */
@@ -108,39 +108,39 @@ static const unsigned int dt2811_clk_multipliers[] = {
  */
 static const struct comedi_lrange dt2811_pgh_ai_ranges = {
 	12, {
-		BIP_RANGE(5),		/* range 0: gain=1 */
-		BIP_RANGE(2.5),		/* range 1: gain=2 */
-		BIP_RANGE(1.25),	/* range 2: gain=4 */
-		BIP_RANGE(0.625),	/* range 3: gain=8 */
+	     BIP_RANGE(5),	/* range 0: gain=1 */
+	     BIP_RANGE(2.5),	/* range 1: gain=2 */
+	     BIP_RANGE(1.25),	/* range 2: gain=4 */
+	     BIP_RANGE(0.625),	/* range 3: gain=8 */
 
-		BIP_RANGE(2.5),		/* range 0+4: gain=1 */
-		BIP_RANGE(1.25),	/* range 1+4: gain=2 */
-		BIP_RANGE(0.625),	/* range 2+4: gain=4 */
-		BIP_RANGE(0.3125),	/* range 3+4: gain=8 */
+	     BIP_RANGE(2.5),	/* range 0+4: gain=1 */
+	     BIP_RANGE(1.25),	/* range 1+4: gain=2 */
+	     BIP_RANGE(0.625),	/* range 2+4: gain=4 */
+	     BIP_RANGE(0.3125),	/* range 3+4: gain=8 */
 
-		UNI_RANGE(5),		/* range 0+8: gain=1 */
-		UNI_RANGE(2.5),		/* range 1+8: gain=2 */
-		UNI_RANGE(1.25),	/* range 2+8: gain=4 */
-		UNI_RANGE(0.625)	/* range 3+8: gain=8 */
+	     UNI_RANGE(5),	/* range 0+8: gain=1 */
+	     UNI_RANGE(2.5),	/* range 1+8: gain=2 */
+	     UNI_RANGE(1.25),	/* range 2+8: gain=4 */
+	     UNI_RANGE(0.625)	/* range 3+8: gain=8 */
 	}
 };
 
 static const struct comedi_lrange dt2811_pgl_ai_ranges = {
 	12, {
-		BIP_RANGE(5),		/* range 0: gain=1 */
-		BIP_RANGE(0.5),		/* range 1: gain=10 */
-		BIP_RANGE(0.05),	/* range 2: gain=100 */
-		BIP_RANGE(0.01),	/* range 3: gain=500 */
+	     BIP_RANGE(5),	/* range 0: gain=1 */
+	     BIP_RANGE(0.5),	/* range 1: gain=10 */
+	     BIP_RANGE(0.05),	/* range 2: gain=100 */
+	     BIP_RANGE(0.01),	/* range 3: gain=500 */
 
-		BIP_RANGE(2.5),		/* range 0+4: gain=1 */
-		BIP_RANGE(0.25),	/* range 1+4: gain=10 */
-		BIP_RANGE(0.025),	/* range 2+4: gain=100 */
-		BIP_RANGE(0.005),	/* range 3+4: gain=500 */
+	     BIP_RANGE(2.5),	/* range 0+4: gain=1 */
+	     BIP_RANGE(0.25),	/* range 1+4: gain=10 */
+	     BIP_RANGE(0.025),	/* range 2+4: gain=100 */
+	     BIP_RANGE(0.005),	/* range 3+4: gain=500 */
 
-		UNI_RANGE(5),		/* range 0+8: gain=1 */
-		UNI_RANGE(0.5),		/* range 1+8: gain=10 */
-		UNI_RANGE(0.05),	/* range 2+8: gain=100 */
-		UNI_RANGE(0.01)		/* range 3+8: gain=500 */
+	     UNI_RANGE(5),	/* range 0+8: gain=1 */
+	     UNI_RANGE(0.5),	/* range 1+8: gain=10 */
+	     UNI_RANGE(0.05),	/* range 2+8: gain=100 */
+	     UNI_RANGE(0.01)	/* range 3+8: gain=500 */
 	}
 };
 
@@ -155,9 +155,9 @@ static const struct comedi_lrange dt2811_pgl_ai_ranges = {
  */
 static const struct comedi_lrange dt2811_ao_ranges = {
 	3, {
-		BIP_RANGE(5),	/* default setting from factory */
-		BIP_RANGE(2.5),
-		UNI_RANGE(5)
+	    BIP_RANGE(5),	/* default setting from factory */
+	    BIP_RANGE(2.5),
+	    UNI_RANGE(5)
 	}
 };
 
@@ -168,11 +168,11 @@ struct dt2811_board {
 
 static const struct dt2811_board dt2811_boards[] = {
 	{
-		.name		= "dt2811-pgh",
-		.is_pgh		= 1,
-	}, {
-		.name		= "dt2811-pgl",
-	},
+	 .name = "dt2811-pgh",
+	 .is_pgh = 1,
+	  }, {
+	      .name = "dt2811-pgl",
+	       },
 };
 
 struct dt2811_private {
@@ -185,7 +185,7 @@ static unsigned int dt2811_ai_read_sample(struct comedi_device *dev,
 	unsigned int val;
 
 	val = inb(dev->iobase + DT2811_ADDATA_LO_REG) |
-	      (inb(dev->iobase + DT2811_ADDATA_HI_REG) << 8);
+	    (inb(dev->iobase + DT2811_ADDATA_HI_REG) << 8);
 
 	return val & s->maxdata;
 }
@@ -249,8 +249,7 @@ static void dt2811_ai_set_chanspec(struct comedi_device *dev,
 	     dev->iobase + DT2811_ADGCR_REG);
 }
 
-static int dt2811_ai_cmd(struct comedi_device *dev,
-			 struct comedi_subdevice *s)
+static int dt2811_ai_cmd(struct comedi_device *dev, struct comedi_subdevice *s)
 {
 	struct dt2811_private *devpriv = dev->private;
 	struct comedi_cmd *cmd = &s->async->cmd;
@@ -270,7 +269,7 @@ static int dt2811_ai_cmd(struct comedi_device *dev,
 		 * at the rate set by the internal clock/divider.
 		 */
 		mode = DT2811_ADCSR_ADMODE(1);
-	} else { /* TRIG_EXT */
+	} else {		/* TRIG_EXT */
 		if (cmd->convert_src == TRIG_TIMER) {
 			/*
 			 * Mode 2
@@ -281,7 +280,7 @@ static int dt2811_ai_cmd(struct comedi_device *dev,
 			 * on the external trigger input.
 			 */
 			mode = DT2811_ADCSR_ADMODE(2);
-		} else { /* TRIG_EXT */
+		} else {	/* TRIG_EXT */
 			/*
 			 * Mode 3
 			 * Continuous conversion, external trigger, clock
@@ -325,7 +324,7 @@ static unsigned int dt2811_ns_to_timer(unsigned int *nanosec,
 			unsigned int mult = dt2811_clk_multipliers[_mult];
 			unsigned long long divider = div * mult;
 			unsigned int divisor = DT2811_TMRCTR_MANTISSA(_div) |
-					       DT2811_TMRCTR_EXPONENT(_mult);
+			    DT2811_TMRCTR_EXPONENT(_mult);
 
 			/*
 			 * The timer can be configured to run at a slowest
@@ -388,8 +387,7 @@ static unsigned int dt2811_ns_to_timer(unsigned int *nanosec,
 }
 
 static int dt2811_ai_cmdtest(struct comedi_device *dev,
-			     struct comedi_subdevice *s,
-			     struct comedi_cmd *cmd)
+			     struct comedi_subdevice *s, struct comedi_cmd *cmd)
 {
 	struct dt2811_private *devpriv = dev->private;
 	unsigned int arg;
@@ -431,7 +429,7 @@ static int dt2811_ai_cmdtest(struct comedi_device *dev,
 					   cmd->chanlist_len);
 	if (cmd->stop_src == TRIG_COUNT)
 		err |= comedi_check_trigger_arg_min(&cmd->stop_arg, 1);
-	else	/* TRIG_NONE */
+	else			/* TRIG_NONE */
 		err |= comedi_check_trigger_arg_is(&cmd->stop_arg, 0);
 
 	if (err)
@@ -443,7 +441,7 @@ static int dt2811_ai_cmdtest(struct comedi_device *dev,
 		arg = cmd->convert_arg;
 		devpriv->ai_divisor = dt2811_ns_to_timer(&arg, cmd->flags);
 		err |= comedi_check_trigger_arg_is(&cmd->convert_arg, arg);
-	} else { /* TRIG_EXT */
+	} else {		/* TRIG_EXT */
 		/* The convert_arg is used to set the divisor. */
 		devpriv->ai_divisor = cmd->convert_arg;
 	}
@@ -458,8 +456,7 @@ static int dt2811_ai_cmdtest(struct comedi_device *dev,
 
 static int dt2811_ai_eoc(struct comedi_device *dev,
 			 struct comedi_subdevice *s,
-			 struct comedi_insn *insn,
-			 unsigned long context)
+			 struct comedi_insn *insn, unsigned long context)
 {
 	unsigned int status;
 
@@ -471,8 +468,7 @@ static int dt2811_ai_eoc(struct comedi_device *dev,
 
 static int dt2811_ai_insn_read(struct comedi_device *dev,
 			       struct comedi_subdevice *s,
-			       struct comedi_insn *insn,
-			       unsigned int *data)
+			       struct comedi_insn *insn, unsigned int *data)
 {
 	int ret;
 	int i;
@@ -494,8 +490,7 @@ static int dt2811_ai_insn_read(struct comedi_device *dev,
 
 static int dt2811_ao_insn_write(struct comedi_device *dev,
 				struct comedi_subdevice *s,
-				struct comedi_insn *insn,
-				unsigned int *data)
+				struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 	unsigned int val = s->readback[chan];
@@ -514,8 +509,7 @@ static int dt2811_ao_insn_write(struct comedi_device *dev,
 
 static int dt2811_di_insn_bits(struct comedi_device *dev,
 			       struct comedi_subdevice *s,
-			       struct comedi_insn *insn,
-			       unsigned int *data)
+			       struct comedi_insn *insn, unsigned int *data)
 {
 	data[1] = inb(dev->iobase + DT2811_DI_REG);
 
@@ -524,8 +518,7 @@ static int dt2811_di_insn_bits(struct comedi_device *dev,
 
 static int dt2811_do_insn_bits(struct comedi_device *dev,
 			       struct comedi_subdevice *s,
-			       struct comedi_insn *insn,
-			       unsigned int *data)
+			       struct comedi_insn *insn, unsigned int *data)
 {
 	if (comedi_dio_update_state(s, data))
 		outb(s->state, dev->iobase + DT2811_DO_REG);
@@ -564,7 +557,7 @@ static int dt2811_attach(struct comedi_device *dev, struct comedi_devconfig *it)
 	dt2811_reset(dev);
 
 	/* IRQ's 2,3,5,7 are valid for async command support */
-	if (it->options[1] <= 7  && (BIT(it->options[1]) & 0xac)) {
+	if (it->options[1] <= 7 && (BIT(it->options[1]) & 0xac)) {
 		ret = request_irq(it->options[1], dt2811_interrupt, 0,
 				  dev->board_name, dev);
 		if (ret == 0)
@@ -577,32 +570,32 @@ static int dt2811_attach(struct comedi_device *dev, struct comedi_devconfig *it)
 
 	/* Analog Input subdevice */
 	s = &dev->subdevices[0];
-	s->type		= COMEDI_SUBD_AI;
-	s->subdev_flags	= SDF_READABLE |
-			  ((it->options[2] == 1) ? SDF_DIFF :
-			   (it->options[2] == 2) ? SDF_COMMON : SDF_GROUND);
-	s->n_chan	= (it->options[2] == 1) ? 8 : 16;
-	s->maxdata	= 0x0fff;
-	s->range_table	= board->is_pgh ? &dt2811_pgh_ai_ranges
-					: &dt2811_pgl_ai_ranges;
-	s->insn_read	= dt2811_ai_insn_read;
+	s->type = COMEDI_SUBD_AI;
+	s->subdev_flags = SDF_READABLE |
+	    ((it->options[2] == 1) ? SDF_DIFF :
+	     (it->options[2] == 2) ? SDF_COMMON : SDF_GROUND);
+	s->n_chan = (it->options[2] == 1) ? 8 : 16;
+	s->maxdata = 0x0fff;
+	s->range_table = board->is_pgh ? &dt2811_pgh_ai_ranges
+	    : &dt2811_pgl_ai_ranges;
+	s->insn_read = dt2811_ai_insn_read;
 	if (dev->irq) {
 		dev->read_subdev = s;
-		s->subdev_flags	|= SDF_CMD_READ;
-		s->len_chanlist	= 1;
-		s->do_cmdtest	= dt2811_ai_cmdtest;
-		s->do_cmd	= dt2811_ai_cmd;
-		s->cancel	= dt2811_ai_cancel;
+		s->subdev_flags |= SDF_CMD_READ;
+		s->len_chanlist = 1;
+		s->do_cmdtest = dt2811_ai_cmdtest;
+		s->do_cmd = dt2811_ai_cmd;
+		s->cancel = dt2811_ai_cancel;
 	}
 
 	/* Analog Output subdevice */
 	s = &dev->subdevices[1];
-	s->type		= COMEDI_SUBD_AO;
-	s->subdev_flags	= SDF_WRITABLE;
-	s->n_chan	= 2;
-	s->maxdata	= 0x0fff;
-	s->range_table	= &dt2811_ao_ranges;
-	s->insn_write	= dt2811_ao_insn_write;
+	s->type = COMEDI_SUBD_AO;
+	s->subdev_flags = SDF_WRITABLE;
+	s->n_chan = 2;
+	s->maxdata = 0x0fff;
+	s->range_table = &dt2811_ao_ranges;
+	s->insn_write = dt2811_ao_insn_write;
 
 	ret = comedi_alloc_subdev_readback(s);
 	if (ret)
@@ -610,34 +603,35 @@ static int dt2811_attach(struct comedi_device *dev, struct comedi_devconfig *it)
 
 	/* Digital Input subdevice */
 	s = &dev->subdevices[2];
-	s->type		= COMEDI_SUBD_DI;
-	s->subdev_flags	= SDF_READABLE;
-	s->n_chan	= 8;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_bits	= dt2811_di_insn_bits;
+	s->type = COMEDI_SUBD_DI;
+	s->subdev_flags = SDF_READABLE;
+	s->n_chan = 8;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_bits = dt2811_di_insn_bits;
 
 	/* Digital Output subdevice */
 	s = &dev->subdevices[3];
-	s->type		= COMEDI_SUBD_DO;
-	s->subdev_flags	= SDF_WRITABLE;
-	s->n_chan	= 8;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_bits	= dt2811_do_insn_bits;
+	s->type = COMEDI_SUBD_DO;
+	s->subdev_flags = SDF_WRITABLE;
+	s->n_chan = 8;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_bits = dt2811_do_insn_bits;
 
 	return 0;
 }
 
 static struct comedi_driver dt2811_driver = {
-	.driver_name	= "dt2811",
-	.module		= THIS_MODULE,
-	.attach		= dt2811_attach,
-	.detach		= comedi_legacy_detach,
-	.board_name	= &dt2811_boards[0].name,
-	.num_names	= ARRAY_SIZE(dt2811_boards),
-	.offset		= sizeof(struct dt2811_board),
+	.driver_name = "dt2811",
+	.module = THIS_MODULE,
+	.attach = dt2811_attach,
+	.detach = comedi_legacy_detach,
+	.board_name = &dt2811_boards[0].name,
+	.num_names = ARRAY_SIZE(dt2811_boards),
+	.offset = sizeof(struct dt2811_board),
 };
+
 module_comedi_driver(dt2811_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

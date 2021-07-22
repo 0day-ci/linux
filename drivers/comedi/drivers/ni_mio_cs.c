@@ -39,76 +39,76 @@
 
 static const struct ni_board_struct ni_boards[] = {
 	{
-		.name		= "DAQCard-ai-16xe-50",
-		.device_id	= 0x010d,
-		.n_adchan	= 16,
-		.ai_maxdata	= 0xffff,
-		.ai_fifo_depth	= 1024,
-		.gainlkup	= ai_gain_8,
-		.ai_speed	= 5000,
-		.caldac		= { dac8800, dac8043 },
-	}, {
-		.name		= "DAQCard-ai-16e-4",
-		.device_id	= 0x010c,
-		.n_adchan	= 16,
-		.ai_maxdata	= 0x0fff,
-		.ai_fifo_depth	= 1024,
-		.gainlkup	= ai_gain_16,
-		.ai_speed	= 4000,
-		.caldac		= { mb88341 },		/* verified */
-	}, {
-		.name		= "DAQCard-6062E",
-		.device_id	= 0x02c4,
-		.n_adchan	= 16,
-		.ai_maxdata	= 0x0fff,
-		.ai_fifo_depth	= 8192,
-		.gainlkup	= ai_gain_16,
-		.ai_speed	= 2000,
-		.n_aochan	= 2,
-		.ao_maxdata	= 0x0fff,
-		.ao_fifo_depth	= 2048,
-		.ao_range_table	= &range_bipolar10,
-		.ao_speed	= 1176,
-		.caldac		= { ad8804_debug },	/* verified */
-	 }, {
-		/* specs incorrect! */
-		.name		= "DAQCard-6024E",
-		.device_id	= 0x075e,
-		.n_adchan	= 16,
-		.ai_maxdata	= 0x0fff,
-		.ai_fifo_depth	= 1024,
-		.gainlkup	= ai_gain_4,
-		.ai_speed	= 5000,
-		.n_aochan	= 2,
-		.ao_maxdata	= 0x0fff,
-		.ao_range_table	= &range_bipolar10,
-		.ao_speed	= 1000000,
-		.caldac		= { ad8804_debug },
-	}, {
-		/* specs incorrect! */
-		.name		= "DAQCard-6036E",
-		.device_id	= 0x0245,
-		.n_adchan	= 16,
-		.ai_maxdata	= 0xffff,
-		.ai_fifo_depth	= 1024,
-		.alwaysdither	= 1,
-		.gainlkup	= ai_gain_4,
-		.ai_speed	= 5000,
-		.n_aochan	= 2,
-		.ao_maxdata	= 0xffff,
-		.ao_range_table	= &range_bipolar10,
-		.ao_speed	= 1000000,
-		.caldac		= { ad8804_debug },
-	 },
+	 .name = "DAQCard-ai-16xe-50",
+	 .device_id = 0x010d,
+	 .n_adchan = 16,
+	 .ai_maxdata = 0xffff,
+	 .ai_fifo_depth = 1024,
+	 .gainlkup = ai_gain_8,
+	 .ai_speed = 5000,
+	 .caldac = { dac8800, dac8043},
+	  }, {
+	      .name = "DAQCard-ai-16e-4",
+	      .device_id = 0x010c,
+	      .n_adchan = 16,
+	      .ai_maxdata = 0x0fff,
+	      .ai_fifo_depth = 1024,
+	      .gainlkup = ai_gain_16,
+	      .ai_speed = 4000,
+	      .caldac = { mb88341},	/* verified */
+	       }, {
+		   .name = "DAQCard-6062E",
+		   .device_id = 0x02c4,
+		   .n_adchan = 16,
+		   .ai_maxdata = 0x0fff,
+		   .ai_fifo_depth = 8192,
+		   .gainlkup = ai_gain_16,
+		   .ai_speed = 2000,
+		   .n_aochan = 2,
+		   .ao_maxdata = 0x0fff,
+		   .ao_fifo_depth = 2048,
+		   .ao_range_table = &range_bipolar10,
+		   .ao_speed = 1176,
+		   .caldac = { ad8804_debug},	/* verified */
+		    }, {
+			/* specs incorrect! */
+			.name = "DAQCard-6024E",
+			.device_id = 0x075e,
+			.n_adchan = 16,
+			.ai_maxdata = 0x0fff,
+			.ai_fifo_depth = 1024,
+			.gainlkup = ai_gain_4,
+			.ai_speed = 5000,
+			.n_aochan = 2,
+			.ao_maxdata = 0x0fff,
+			.ao_range_table = &range_bipolar10,
+			.ao_speed = 1000000,
+			.caldac = { ad8804_debug},
+			 }, {
+			     /* specs incorrect! */
+			     .name = "DAQCard-6036E",
+			     .device_id = 0x0245,
+			     .n_adchan = 16,
+			     .ai_maxdata = 0xffff,
+			     .ai_fifo_depth = 1024,
+			     .alwaysdither = 1,
+			     .gainlkup = ai_gain_4,
+			     .ai_speed = 5000,
+			     .n_aochan = 2,
+			     .ao_maxdata = 0xffff,
+			     .ao_range_table = &range_bipolar10,
+			     .ao_speed = 1000000,
+			     .caldac = { ad8804_debug},
+			      },
 #if 0
 	{
-		.name		= "DAQCard-6715",
-		.device_id	= 0x0000,	/* unknown */
-		.n_aochan	= 8,
-		.ao_maxdata	= 0x0fff,
-		.ao_671x	= 8192,
-		.caldac		= { mb88341, mb88341 },
-	},
+	 .name = "DAQCard-6715",
+	 .device_id = 0x0000,	/* unknown */
+	 .n_aochan = 8,
+	 .ao_maxdata = 0x0fff,
+	 .ao_671x = 8192,
+	 .caldac = { mb88341, mb88341},
+	  },
 #endif
 };
 
@@ -144,8 +144,7 @@ static int mio_pcmcia_config_loop(struct pcmcia_device *p_dev, void *priv_data)
 	return -ENODEV;
 }
 
-static int mio_cs_auto_attach(struct comedi_device *dev,
-			      unsigned long context)
+static int mio_cs_auto_attach(struct comedi_device *dev, unsigned long context)
 {
 	struct pcmcia_device *link = comedi_to_pcmcia_dev(dev);
 	static const struct ni_board_struct *board;
@@ -183,10 +182,10 @@ static void mio_cs_detach(struct comedi_device *dev)
 }
 
 static struct comedi_driver driver_ni_mio_cs = {
-	.driver_name	= "ni_mio_cs",
-	.module		= THIS_MODULE,
-	.auto_attach	= mio_cs_auto_attach,
-	.detach		= mio_cs_detach,
+	.driver_name = "ni_mio_cs",
+	.module = THIS_MODULE,
+	.auto_attach = mio_cs_auto_attach,
+	.detach = mio_cs_detach,
 };
 
 static int cs_attach(struct pcmcia_device *link)
@@ -202,15 +201,17 @@ static const struct pcmcia_device_id ni_mio_cs_ids[] = {
 	PCMCIA_DEVICE_MANF_CARD(0x010b, 0x0245),	/* DAQCard-6036E */
 	PCMCIA_DEVICE_NULL
 };
+
 MODULE_DEVICE_TABLE(pcmcia, ni_mio_cs_ids);
 
 static struct pcmcia_driver ni_mio_cs_driver = {
-	.name		= "ni_mio_cs",
-	.owner		= THIS_MODULE,
-	.id_table	= ni_mio_cs_ids,
-	.probe		= cs_attach,
-	.remove		= comedi_pcmcia_auto_unconfig,
+	.name = "ni_mio_cs",
+	.owner = THIS_MODULE,
+	.id_table = ni_mio_cs_ids,
+	.probe = cs_attach,
+	.remove = comedi_pcmcia_auto_unconfig,
 };
+
 module_comedi_pcmcia_driver(driver_ni_mio_cs, ni_mio_cs_driver);
 
 MODULE_DESCRIPTION("Comedi driver for National Instruments DAQCard E series");

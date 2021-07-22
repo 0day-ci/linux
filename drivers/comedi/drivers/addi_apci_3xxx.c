@@ -24,21 +24,21 @@
 
 static const struct comedi_lrange apci3xxx_ai_range = {
 	8, {
-		BIP_RANGE(10),
-		BIP_RANGE(5),
-		BIP_RANGE(2),
-		BIP_RANGE(1),
-		UNI_RANGE(10),
-		UNI_RANGE(5),
-		UNI_RANGE(2),
-		UNI_RANGE(1)
+	    BIP_RANGE(10),
+	    BIP_RANGE(5),
+	    BIP_RANGE(2),
+	    BIP_RANGE(1),
+	    UNI_RANGE(10),
+	    UNI_RANGE(5),
+	    UNI_RANGE(2),
+	    UNI_RANGE(1)
 	}
 };
 
 static const struct comedi_lrange apci3xxx_ao_range = {
 	2, {
-		BIP_RANGE(10),
-		UNI_RANGE(10)
+	    BIP_RANGE(10),
+	    UNI_RANGE(10)
 	}
 };
 
@@ -85,259 +85,279 @@ struct apci3xxx_boardinfo {
 
 static const struct apci3xxx_boardinfo apci3xxx_boardtypes[] = {
 	[BOARD_APCI3000_16] = {
-		.name			= "apci3000-16",
-		.ai_subdev_flags	= SDF_COMMON | SDF_GROUND | SDF_DIFF,
-		.ai_n_chan		= 16,
-		.ai_maxdata		= 0x0fff,
-		.ai_conv_units		= CONV_UNIT_MS | CONV_UNIT_US,
-		.ai_min_acq_ns		= 10000,
-		.has_ttl_io		= 1,
-	},
+			       .name = "apci3000-16",
+			       .ai_subdev_flags =
+			       SDF_COMMON | SDF_GROUND | SDF_DIFF,
+			       .ai_n_chan = 16,
+			       .ai_maxdata = 0x0fff,
+			       .ai_conv_units = CONV_UNIT_MS | CONV_UNIT_US,
+			       .ai_min_acq_ns = 10000,
+			       .has_ttl_io = 1,
+				},
 	[BOARD_APCI3000_8] = {
-		.name			= "apci3000-8",
-		.ai_subdev_flags	= SDF_COMMON | SDF_GROUND | SDF_DIFF,
-		.ai_n_chan		= 8,
-		.ai_maxdata		= 0x0fff,
-		.ai_conv_units		= CONV_UNIT_MS | CONV_UNIT_US,
-		.ai_min_acq_ns		= 10000,
-		.has_ttl_io		= 1,
-	},
+			      .name = "apci3000-8",
+			      .ai_subdev_flags =
+			      SDF_COMMON | SDF_GROUND | SDF_DIFF,
+			      .ai_n_chan = 8,
+			      .ai_maxdata = 0x0fff,
+			      .ai_conv_units = CONV_UNIT_MS | CONV_UNIT_US,
+			      .ai_min_acq_ns = 10000,
+			      .has_ttl_io = 1,
+			       },
 	[BOARD_APCI3000_4] = {
-		.name			= "apci3000-4",
-		.ai_subdev_flags	= SDF_COMMON | SDF_GROUND | SDF_DIFF,
-		.ai_n_chan		= 4,
-		.ai_maxdata		= 0x0fff,
-		.ai_conv_units		= CONV_UNIT_MS | CONV_UNIT_US,
-		.ai_min_acq_ns		= 10000,
-		.has_ttl_io		= 1,
-	},
+			      .name = "apci3000-4",
+			      .ai_subdev_flags =
+			      SDF_COMMON | SDF_GROUND | SDF_DIFF,
+			      .ai_n_chan = 4,
+			      .ai_maxdata = 0x0fff,
+			      .ai_conv_units = CONV_UNIT_MS | CONV_UNIT_US,
+			      .ai_min_acq_ns = 10000,
+			      .has_ttl_io = 1,
+			       },
 	[BOARD_APCI3006_16] = {
-		.name			= "apci3006-16",
-		.ai_subdev_flags	= SDF_COMMON | SDF_GROUND | SDF_DIFF,
-		.ai_n_chan		= 16,
-		.ai_maxdata		= 0xffff,
-		.ai_conv_units		= CONV_UNIT_MS | CONV_UNIT_US,
-		.ai_min_acq_ns		= 10000,
-		.has_ttl_io		= 1,
-	},
+			       .name = "apci3006-16",
+			       .ai_subdev_flags =
+			       SDF_COMMON | SDF_GROUND | SDF_DIFF,
+			       .ai_n_chan = 16,
+			       .ai_maxdata = 0xffff,
+			       .ai_conv_units = CONV_UNIT_MS | CONV_UNIT_US,
+			       .ai_min_acq_ns = 10000,
+			       .has_ttl_io = 1,
+				},
 	[BOARD_APCI3006_8] = {
-		.name			= "apci3006-8",
-		.ai_subdev_flags	= SDF_COMMON | SDF_GROUND | SDF_DIFF,
-		.ai_n_chan		= 8,
-		.ai_maxdata		= 0xffff,
-		.ai_conv_units		= CONV_UNIT_MS | CONV_UNIT_US,
-		.ai_min_acq_ns		= 10000,
-		.has_ttl_io		= 1,
-	},
+			      .name = "apci3006-8",
+			      .ai_subdev_flags =
+			      SDF_COMMON | SDF_GROUND | SDF_DIFF,
+			      .ai_n_chan = 8,
+			      .ai_maxdata = 0xffff,
+			      .ai_conv_units = CONV_UNIT_MS | CONV_UNIT_US,
+			      .ai_min_acq_ns = 10000,
+			      .has_ttl_io = 1,
+			       },
 	[BOARD_APCI3006_4] = {
-		.name			= "apci3006-4",
-		.ai_subdev_flags	= SDF_COMMON | SDF_GROUND | SDF_DIFF,
-		.ai_n_chan		= 4,
-		.ai_maxdata		= 0xffff,
-		.ai_conv_units		= CONV_UNIT_MS | CONV_UNIT_US,
-		.ai_min_acq_ns		= 10000,
-		.has_ttl_io		= 1,
-	},
+			      .name = "apci3006-4",
+			      .ai_subdev_flags =
+			      SDF_COMMON | SDF_GROUND | SDF_DIFF,
+			      .ai_n_chan = 4,
+			      .ai_maxdata = 0xffff,
+			      .ai_conv_units = CONV_UNIT_MS | CONV_UNIT_US,
+			      .ai_min_acq_ns = 10000,
+			      .has_ttl_io = 1,
+			       },
 	[BOARD_APCI3010_16] = {
-		.name			= "apci3010-16",
-		.ai_subdev_flags	= SDF_COMMON | SDF_GROUND | SDF_DIFF,
-		.ai_n_chan		= 16,
-		.ai_maxdata		= 0x0fff,
-		.ai_conv_units		= CONV_UNIT_MS | CONV_UNIT_US,
-		.ai_min_acq_ns		= 5000,
-		.has_dig_in		= 1,
-		.has_dig_out		= 1,
-		.has_ttl_io		= 1,
-	},
+			       .name = "apci3010-16",
+			       .ai_subdev_flags =
+			       SDF_COMMON | SDF_GROUND | SDF_DIFF,
+			       .ai_n_chan = 16,
+			       .ai_maxdata = 0x0fff,
+			       .ai_conv_units = CONV_UNIT_MS | CONV_UNIT_US,
+			       .ai_min_acq_ns = 5000,
+			       .has_dig_in = 1,
+			       .has_dig_out = 1,
+			       .has_ttl_io = 1,
+				},
 	[BOARD_APCI3010_8] = {
-		.name			= "apci3010-8",
-		.ai_subdev_flags	= SDF_COMMON | SDF_GROUND | SDF_DIFF,
-		.ai_n_chan		= 8,
-		.ai_maxdata		= 0x0fff,
-		.ai_conv_units		= CONV_UNIT_MS | CONV_UNIT_US,
-		.ai_min_acq_ns		= 5000,
-		.has_dig_in		= 1,
-		.has_dig_out		= 1,
-		.has_ttl_io		= 1,
-	},
+			      .name = "apci3010-8",
+			      .ai_subdev_flags =
+			      SDF_COMMON | SDF_GROUND | SDF_DIFF,
+			      .ai_n_chan = 8,
+			      .ai_maxdata = 0x0fff,
+			      .ai_conv_units = CONV_UNIT_MS | CONV_UNIT_US,
+			      .ai_min_acq_ns = 5000,
+			      .has_dig_in = 1,
+			      .has_dig_out = 1,
+			      .has_ttl_io = 1,
+			       },
 	[BOARD_APCI3010_4] = {
-		.name			= "apci3010-4",
-		.ai_subdev_flags	= SDF_COMMON | SDF_GROUND | SDF_DIFF,
-		.ai_n_chan		= 4,
-		.ai_maxdata		= 0x0fff,
-		.ai_conv_units		= CONV_UNIT_MS | CONV_UNIT_US,
-		.ai_min_acq_ns		= 5000,
-		.has_dig_in		= 1,
-		.has_dig_out		= 1,
-		.has_ttl_io		= 1,
-	},
+			      .name = "apci3010-4",
+			      .ai_subdev_flags =
+			      SDF_COMMON | SDF_GROUND | SDF_DIFF,
+			      .ai_n_chan = 4,
+			      .ai_maxdata = 0x0fff,
+			      .ai_conv_units = CONV_UNIT_MS | CONV_UNIT_US,
+			      .ai_min_acq_ns = 5000,
+			      .has_dig_in = 1,
+			      .has_dig_out = 1,
+			      .has_ttl_io = 1,
+			       },
 	[BOARD_APCI3016_16] = {
-		.name			= "apci3016-16",
-		.ai_subdev_flags	= SDF_COMMON | SDF_GROUND | SDF_DIFF,
-		.ai_n_chan		= 16,
-		.ai_maxdata		= 0xffff,
-		.ai_conv_units		= CONV_UNIT_MS | CONV_UNIT_US,
-		.ai_min_acq_ns		= 5000,
-		.has_dig_in		= 1,
-		.has_dig_out		= 1,
-		.has_ttl_io		= 1,
-	},
+			       .name = "apci3016-16",
+			       .ai_subdev_flags =
+			       SDF_COMMON | SDF_GROUND | SDF_DIFF,
+			       .ai_n_chan = 16,
+			       .ai_maxdata = 0xffff,
+			       .ai_conv_units = CONV_UNIT_MS | CONV_UNIT_US,
+			       .ai_min_acq_ns = 5000,
+			       .has_dig_in = 1,
+			       .has_dig_out = 1,
+			       .has_ttl_io = 1,
+				},
 	[BOARD_APCI3016_8] = {
-		.name			= "apci3016-8",
-		.ai_subdev_flags	= SDF_COMMON | SDF_GROUND | SDF_DIFF,
-		.ai_n_chan		= 8,
-		.ai_maxdata		= 0xffff,
-		.ai_conv_units		= CONV_UNIT_MS | CONV_UNIT_US,
-		.ai_min_acq_ns		= 5000,
-		.has_dig_in		= 1,
-		.has_dig_out		= 1,
-		.has_ttl_io		= 1,
-	},
+			      .name = "apci3016-8",
+			      .ai_subdev_flags =
+			      SDF_COMMON | SDF_GROUND | SDF_DIFF,
+			      .ai_n_chan = 8,
+			      .ai_maxdata = 0xffff,
+			      .ai_conv_units = CONV_UNIT_MS | CONV_UNIT_US,
+			      .ai_min_acq_ns = 5000,
+			      .has_dig_in = 1,
+			      .has_dig_out = 1,
+			      .has_ttl_io = 1,
+			       },
 	[BOARD_APCI3016_4] = {
-		.name			= "apci3016-4",
-		.ai_subdev_flags	= SDF_COMMON | SDF_GROUND | SDF_DIFF,
-		.ai_n_chan		= 4,
-		.ai_maxdata		= 0xffff,
-		.ai_conv_units		= CONV_UNIT_MS | CONV_UNIT_US,
-		.ai_min_acq_ns		= 5000,
-		.has_dig_in		= 1,
-		.has_dig_out		= 1,
-		.has_ttl_io		= 1,
-	},
+			      .name = "apci3016-4",
+			      .ai_subdev_flags =
+			      SDF_COMMON | SDF_GROUND | SDF_DIFF,
+			      .ai_n_chan = 4,
+			      .ai_maxdata = 0xffff,
+			      .ai_conv_units = CONV_UNIT_MS | CONV_UNIT_US,
+			      .ai_min_acq_ns = 5000,
+			      .has_dig_in = 1,
+			      .has_dig_out = 1,
+			      .has_ttl_io = 1,
+			       },
 	[BOARD_APCI3100_16_4] = {
-		.name			= "apci3100-16-4",
-		.ai_subdev_flags	= SDF_COMMON | SDF_GROUND | SDF_DIFF,
-		.ai_n_chan		= 16,
-		.ai_maxdata		= 0x0fff,
-		.ai_conv_units		= CONV_UNIT_MS | CONV_UNIT_US,
-		.ai_min_acq_ns		= 10000,
-		.has_ao			= 1,
-		.has_ttl_io		= 1,
-	},
+				 .name = "apci3100-16-4",
+				 .ai_subdev_flags =
+				 SDF_COMMON | SDF_GROUND | SDF_DIFF,
+				 .ai_n_chan = 16,
+				 .ai_maxdata = 0x0fff,
+				 .ai_conv_units = CONV_UNIT_MS | CONV_UNIT_US,
+				 .ai_min_acq_ns = 10000,
+				 .has_ao = 1,
+				 .has_ttl_io = 1,
+				  },
 	[BOARD_APCI3100_8_4] = {
-		.name			= "apci3100-8-4",
-		.ai_subdev_flags	= SDF_COMMON | SDF_GROUND | SDF_DIFF,
-		.ai_n_chan		= 8,
-		.ai_maxdata		= 0x0fff,
-		.ai_conv_units		= CONV_UNIT_MS | CONV_UNIT_US,
-		.ai_min_acq_ns		= 10000,
-		.has_ao			= 1,
-		.has_ttl_io		= 1,
-	},
+				.name = "apci3100-8-4",
+				.ai_subdev_flags =
+				SDF_COMMON | SDF_GROUND | SDF_DIFF,
+				.ai_n_chan = 8,
+				.ai_maxdata = 0x0fff,
+				.ai_conv_units = CONV_UNIT_MS | CONV_UNIT_US,
+				.ai_min_acq_ns = 10000,
+				.has_ao = 1,
+				.has_ttl_io = 1,
+				 },
 	[BOARD_APCI3106_16_4] = {
-		.name			= "apci3106-16-4",
-		.ai_subdev_flags	= SDF_COMMON | SDF_GROUND | SDF_DIFF,
-		.ai_n_chan		= 16,
-		.ai_maxdata		= 0xffff,
-		.ai_conv_units		= CONV_UNIT_MS | CONV_UNIT_US,
-		.ai_min_acq_ns		= 10000,
-		.has_ao			= 1,
-		.has_ttl_io		= 1,
-	},
+				 .name = "apci3106-16-4",
+				 .ai_subdev_flags =
+				 SDF_COMMON | SDF_GROUND | SDF_DIFF,
+				 .ai_n_chan = 16,
+				 .ai_maxdata = 0xffff,
+				 .ai_conv_units = CONV_UNIT_MS | CONV_UNIT_US,
+				 .ai_min_acq_ns = 10000,
+				 .has_ao = 1,
+				 .has_ttl_io = 1,
+				  },
 	[BOARD_APCI3106_8_4] = {
-		.name			= "apci3106-8-4",
-		.ai_subdev_flags	= SDF_COMMON | SDF_GROUND | SDF_DIFF,
-		.ai_n_chan		= 8,
-		.ai_maxdata		= 0xffff,
-		.ai_conv_units		= CONV_UNIT_MS | CONV_UNIT_US,
-		.ai_min_acq_ns		= 10000,
-		.has_ao			= 1,
-		.has_ttl_io		= 1,
-	},
+				.name = "apci3106-8-4",
+				.ai_subdev_flags =
+				SDF_COMMON | SDF_GROUND | SDF_DIFF,
+				.ai_n_chan = 8,
+				.ai_maxdata = 0xffff,
+				.ai_conv_units = CONV_UNIT_MS | CONV_UNIT_US,
+				.ai_min_acq_ns = 10000,
+				.has_ao = 1,
+				.has_ttl_io = 1,
+				 },
 	[BOARD_APCI3110_16_4] = {
-		.name			= "apci3110-16-4",
-		.ai_subdev_flags	= SDF_COMMON | SDF_GROUND | SDF_DIFF,
-		.ai_n_chan		= 16,
-		.ai_maxdata		= 0x0fff,
-		.ai_conv_units		= CONV_UNIT_MS | CONV_UNIT_US,
-		.ai_min_acq_ns		= 5000,
-		.has_ao			= 1,
-		.has_dig_in		= 1,
-		.has_dig_out		= 1,
-		.has_ttl_io		= 1,
-	},
+				 .name = "apci3110-16-4",
+				 .ai_subdev_flags =
+				 SDF_COMMON | SDF_GROUND | SDF_DIFF,
+				 .ai_n_chan = 16,
+				 .ai_maxdata = 0x0fff,
+				 .ai_conv_units = CONV_UNIT_MS | CONV_UNIT_US,
+				 .ai_min_acq_ns = 5000,
+				 .has_ao = 1,
+				 .has_dig_in = 1,
+				 .has_dig_out = 1,
+				 .has_ttl_io = 1,
+				  },
 	[BOARD_APCI3110_8_4] = {
-		.name			= "apci3110-8-4",
-		.ai_subdev_flags	= SDF_COMMON | SDF_GROUND | SDF_DIFF,
-		.ai_n_chan		= 8,
-		.ai_maxdata		= 0x0fff,
-		.ai_conv_units		= CONV_UNIT_MS | CONV_UNIT_US,
-		.ai_min_acq_ns		= 5000,
-		.has_ao			= 1,
-		.has_dig_in		= 1,
-		.has_dig_out		= 1,
-		.has_ttl_io		= 1,
-	},
+				.name = "apci3110-8-4",
+				.ai_subdev_flags =
+				SDF_COMMON | SDF_GROUND | SDF_DIFF,
+				.ai_n_chan = 8,
+				.ai_maxdata = 0x0fff,
+				.ai_conv_units = CONV_UNIT_MS | CONV_UNIT_US,
+				.ai_min_acq_ns = 5000,
+				.has_ao = 1,
+				.has_dig_in = 1,
+				.has_dig_out = 1,
+				.has_ttl_io = 1,
+				 },
 	[BOARD_APCI3116_16_4] = {
-		.name			= "apci3116-16-4",
-		.ai_subdev_flags	= SDF_COMMON | SDF_GROUND | SDF_DIFF,
-		.ai_n_chan		= 16,
-		.ai_maxdata		= 0xffff,
-		.ai_conv_units		= CONV_UNIT_MS | CONV_UNIT_US,
-		.ai_min_acq_ns		= 5000,
-		.has_ao			= 1,
-		.has_dig_in		= 1,
-		.has_dig_out		= 1,
-		.has_ttl_io		= 1,
-	},
+				 .name = "apci3116-16-4",
+				 .ai_subdev_flags =
+				 SDF_COMMON | SDF_GROUND | SDF_DIFF,
+				 .ai_n_chan = 16,
+				 .ai_maxdata = 0xffff,
+				 .ai_conv_units = CONV_UNIT_MS | CONV_UNIT_US,
+				 .ai_min_acq_ns = 5000,
+				 .has_ao = 1,
+				 .has_dig_in = 1,
+				 .has_dig_out = 1,
+				 .has_ttl_io = 1,
+				  },
 	[BOARD_APCI3116_8_4] = {
-		.name			= "apci3116-8-4",
-		.ai_subdev_flags	= SDF_COMMON | SDF_GROUND | SDF_DIFF,
-		.ai_n_chan		= 8,
-		.ai_maxdata		= 0xffff,
-		.ai_conv_units		= CONV_UNIT_MS | CONV_UNIT_US,
-		.ai_min_acq_ns		= 5000,
-		.has_ao			= 1,
-		.has_dig_in		= 1,
-		.has_dig_out		= 1,
-		.has_ttl_io		= 1,
-	},
+				.name = "apci3116-8-4",
+				.ai_subdev_flags =
+				SDF_COMMON | SDF_GROUND | SDF_DIFF,
+				.ai_n_chan = 8,
+				.ai_maxdata = 0xffff,
+				.ai_conv_units = CONV_UNIT_MS | CONV_UNIT_US,
+				.ai_min_acq_ns = 5000,
+				.has_ao = 1,
+				.has_dig_in = 1,
+				.has_dig_out = 1,
+				.has_ttl_io = 1,
+				 },
 	[BOARD_APCI3003] = {
-		.name			= "apci3003",
-		.ai_subdev_flags	= SDF_DIFF,
-		.ai_n_chan		= 4,
-		.ai_maxdata		= 0xffff,
-		.ai_conv_units		= CONV_UNIT_MS | CONV_UNIT_US |
-					  CONV_UNIT_NS,
-		.ai_min_acq_ns		= 2500,
-		.has_dig_in		= 1,
-		.has_dig_out		= 1,
-	},
+			    .name = "apci3003",
+			    .ai_subdev_flags = SDF_DIFF,
+			    .ai_n_chan = 4,
+			    .ai_maxdata = 0xffff,
+			    .ai_conv_units = CONV_UNIT_MS | CONV_UNIT_US |
+			    CONV_UNIT_NS,
+			    .ai_min_acq_ns = 2500,
+			    .has_dig_in = 1,
+			    .has_dig_out = 1,
+			     },
 	[BOARD_APCI3002_16] = {
-		.name			= "apci3002-16",
-		.ai_subdev_flags	= SDF_DIFF,
-		.ai_n_chan		= 16,
-		.ai_maxdata		= 0xffff,
-		.ai_conv_units		= CONV_UNIT_MS | CONV_UNIT_US,
-		.ai_min_acq_ns		= 5000,
-		.has_dig_in		= 1,
-		.has_dig_out		= 1,
-	},
+			       .name = "apci3002-16",
+			       .ai_subdev_flags = SDF_DIFF,
+			       .ai_n_chan = 16,
+			       .ai_maxdata = 0xffff,
+			       .ai_conv_units = CONV_UNIT_MS | CONV_UNIT_US,
+			       .ai_min_acq_ns = 5000,
+			       .has_dig_in = 1,
+			       .has_dig_out = 1,
+				},
 	[BOARD_APCI3002_8] = {
-		.name			= "apci3002-8",
-		.ai_subdev_flags	= SDF_DIFF,
-		.ai_n_chan		= 8,
-		.ai_maxdata		= 0xffff,
-		.ai_conv_units		= CONV_UNIT_MS | CONV_UNIT_US,
-		.ai_min_acq_ns		= 5000,
-		.has_dig_in		= 1,
-		.has_dig_out		= 1,
-	},
+			      .name = "apci3002-8",
+			      .ai_subdev_flags = SDF_DIFF,
+			      .ai_n_chan = 8,
+			      .ai_maxdata = 0xffff,
+			      .ai_conv_units = CONV_UNIT_MS | CONV_UNIT_US,
+			      .ai_min_acq_ns = 5000,
+			      .has_dig_in = 1,
+			      .has_dig_out = 1,
+			       },
 	[BOARD_APCI3002_4] = {
-		.name			= "apci3002-4",
-		.ai_subdev_flags	= SDF_DIFF,
-		.ai_n_chan		= 4,
-		.ai_maxdata		= 0xffff,
-		.ai_conv_units		= CONV_UNIT_MS | CONV_UNIT_US,
-		.ai_min_acq_ns		= 5000,
-		.has_dig_in		= 1,
-		.has_dig_out		= 1,
-	},
+			      .name = "apci3002-4",
+			      .ai_subdev_flags = SDF_DIFF,
+			      .ai_n_chan = 4,
+			      .ai_maxdata = 0xffff,
+			      .ai_conv_units = CONV_UNIT_MS | CONV_UNIT_US,
+			      .ai_min_acq_ns = 5000,
+			      .has_dig_in = 1,
+			      .has_dig_out = 1,
+			       },
 	[BOARD_APCI3500] = {
-		.name			= "apci3500",
-		.has_ao			= 1,
-		.has_ttl_io		= 1,
-	},
+			    .name = "apci3500",
+			    .has_ao = 1,
+			    .has_ttl_io = 1,
+			     },
 };
 
 struct apci3xxx_private {
@@ -399,8 +419,7 @@ static int apci3xxx_ai_setup(struct comedi_device *dev, unsigned int chanspec)
 	writel(delay_mode, dev->mmio + 4);
 
 	/* Make the configuration */
-	val = (range & 3) | ((range >> 2) << 6) |
-	      ((aref == AREF_DIFF) << 7);
+	val = (range & 3) | ((range >> 2) << 6) | ((aref == AREF_DIFF) << 7);
 	writel(val, dev->mmio + 0);
 
 	/* Channel selection */
@@ -418,8 +437,7 @@ static int apci3xxx_ai_setup(struct comedi_device *dev, unsigned int chanspec)
 
 static int apci3xxx_ai_eoc(struct comedi_device *dev,
 			   struct comedi_subdevice *s,
-			   struct comedi_insn *insn,
-			   unsigned long context)
+			   struct comedi_insn *insn, unsigned long context)
 {
 	unsigned int status;
 
@@ -431,8 +449,7 @@ static int apci3xxx_ai_eoc(struct comedi_device *dev,
 
 static int apci3xxx_ai_insn_read(struct comedi_device *dev,
 				 struct comedi_subdevice *s,
-				 struct comedi_insn *insn,
-				 unsigned int *data)
+				 struct comedi_insn *insn, unsigned int *data)
 {
 	int ret;
 	int i;
@@ -546,7 +563,7 @@ static int apci3xxx_ai_cmdtest(struct comedi_device *dev,
 
 	if (cmd->stop_src == TRIG_COUNT)
 		err |= comedi_check_trigger_arg_min(&cmd->stop_arg, 1);
-	else	/* TRIG_NONE */
+	else			/* TRIG_NONE */
 		err |= comedi_check_trigger_arg_is(&cmd->stop_arg, 0);
 
 	if (err)
@@ -595,8 +612,7 @@ static int apci3xxx_ai_cancel(struct comedi_device *dev,
 
 static int apci3xxx_ao_eoc(struct comedi_device *dev,
 			   struct comedi_subdevice *s,
-			   struct comedi_insn *insn,
-			   unsigned long context)
+			   struct comedi_insn *insn, unsigned long context)
 {
 	unsigned int status;
 
@@ -608,8 +624,7 @@ static int apci3xxx_ao_eoc(struct comedi_device *dev,
 
 static int apci3xxx_ao_insn_write(struct comedi_device *dev,
 				  struct comedi_subdevice *s,
-				  struct comedi_insn *insn,
-				  unsigned int *data)
+				  struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 	unsigned int range = CR_RANGE(insn->chanspec);
@@ -638,8 +653,7 @@ static int apci3xxx_ao_insn_write(struct comedi_device *dev,
 
 static int apci3xxx_di_insn_bits(struct comedi_device *dev,
 				 struct comedi_subdevice *s,
-				 struct comedi_insn *insn,
-				 unsigned int *data)
+				 struct comedi_insn *insn, unsigned int *data)
 {
 	data[1] = inl(dev->iobase + 32) & 0xf;
 
@@ -648,8 +662,7 @@ static int apci3xxx_di_insn_bits(struct comedi_device *dev,
 
 static int apci3xxx_do_insn_bits(struct comedi_device *dev,
 				 struct comedi_subdevice *s,
-				 struct comedi_insn *insn,
-				 unsigned int *data)
+				 struct comedi_insn *insn, unsigned int *data)
 {
 	s->state = inl(dev->iobase + 48) & 0xf;
 
@@ -696,8 +709,7 @@ static int apci3xxx_dio_insn_config(struct comedi_device *dev,
 
 static int apci3xxx_dio_insn_bits(struct comedi_device *dev,
 				  struct comedi_subdevice *s,
-				  struct comedi_insn *insn,
-				  unsigned int *data)
+				  struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int mask;
 	unsigned int val;
@@ -789,8 +801,7 @@ static int apci3xxx_auto_attach(struct comedi_device *dev,
 	}
 
 	n_subdevices = (board->ai_n_chan ? 0 : 1) + board->has_ao +
-		       board->has_dig_in + board->has_dig_out +
-		       board->has_ttl_io;
+	    board->has_dig_in + board->has_dig_out + board->has_ttl_io;
 	ret = comedi_alloc_subdevices(dev, n_subdevices);
 	if (ret)
 		return ret;
@@ -800,12 +811,12 @@ static int apci3xxx_auto_attach(struct comedi_device *dev,
 	/* Analog Input subdevice */
 	if (board->ai_n_chan) {
 		s = &dev->subdevices[subdev];
-		s->type		= COMEDI_SUBD_AI;
-		s->subdev_flags	= SDF_READABLE | board->ai_subdev_flags;
-		s->n_chan	= board->ai_n_chan;
-		s->maxdata	= board->ai_maxdata;
-		s->range_table	= &apci3xxx_ai_range;
-		s->insn_read	= apci3xxx_ai_insn_read;
+		s->type = COMEDI_SUBD_AI;
+		s->subdev_flags = SDF_READABLE | board->ai_subdev_flags;
+		s->n_chan = board->ai_n_chan;
+		s->maxdata = board->ai_maxdata;
+		s->range_table = &apci3xxx_ai_range;
+		s->insn_read = apci3xxx_ai_insn_read;
 		if (dev->irq) {
 			/*
 			 * FIXME: The hardware supports multiple scan modes
@@ -826,11 +837,11 @@ static int apci3xxx_auto_attach(struct comedi_device *dev,
 			 * For now, limit the chanlist to a single channel.
 			 */
 			dev->read_subdev = s;
-			s->subdev_flags	|= SDF_CMD_READ;
-			s->len_chanlist	= 1;
-			s->do_cmdtest	= apci3xxx_ai_cmdtest;
-			s->do_cmd	= apci3xxx_ai_cmd;
-			s->cancel	= apci3xxx_ai_cancel;
+			s->subdev_flags |= SDF_CMD_READ;
+			s->len_chanlist = 1;
+			s->do_cmdtest = apci3xxx_ai_cmdtest;
+			s->do_cmd = apci3xxx_ai_cmd;
+			s->cancel = apci3xxx_ai_cancel;
 		}
 
 		subdev++;
@@ -839,12 +850,12 @@ static int apci3xxx_auto_attach(struct comedi_device *dev,
 	/* Analog Output subdevice */
 	if (board->has_ao) {
 		s = &dev->subdevices[subdev];
-		s->type		= COMEDI_SUBD_AO;
-		s->subdev_flags	= SDF_WRITABLE | SDF_GROUND | SDF_COMMON;
-		s->n_chan	= 4;
-		s->maxdata	= 0x0fff;
-		s->range_table	= &apci3xxx_ao_range;
-		s->insn_write	= apci3xxx_ao_insn_write;
+		s->type = COMEDI_SUBD_AO;
+		s->subdev_flags = SDF_WRITABLE | SDF_GROUND | SDF_COMMON;
+		s->n_chan = 4;
+		s->maxdata = 0x0fff;
+		s->range_table = &apci3xxx_ao_range;
+		s->insn_write = apci3xxx_ao_insn_write;
 
 		ret = comedi_alloc_subdev_readback(s);
 		if (ret)
@@ -856,12 +867,12 @@ static int apci3xxx_auto_attach(struct comedi_device *dev,
 	/* Digital Input subdevice */
 	if (board->has_dig_in) {
 		s = &dev->subdevices[subdev];
-		s->type		= COMEDI_SUBD_DI;
-		s->subdev_flags	= SDF_READABLE;
-		s->n_chan	= 4;
-		s->maxdata	= 1;
-		s->range_table	= &range_digital;
-		s->insn_bits	= apci3xxx_di_insn_bits;
+		s->type = COMEDI_SUBD_DI;
+		s->subdev_flags = SDF_READABLE;
+		s->n_chan = 4;
+		s->maxdata = 1;
+		s->range_table = &range_digital;
+		s->insn_bits = apci3xxx_di_insn_bits;
 
 		subdev++;
 	}
@@ -869,12 +880,12 @@ static int apci3xxx_auto_attach(struct comedi_device *dev,
 	/* Digital Output subdevice */
 	if (board->has_dig_out) {
 		s = &dev->subdevices[subdev];
-		s->type		= COMEDI_SUBD_DO;
-		s->subdev_flags	= SDF_WRITABLE;
-		s->n_chan	= 4;
-		s->maxdata	= 1;
-		s->range_table	= &range_digital;
-		s->insn_bits	= apci3xxx_do_insn_bits;
+		s->type = COMEDI_SUBD_DO;
+		s->subdev_flags = SDF_WRITABLE;
+		s->n_chan = 4;
+		s->maxdata = 1;
+		s->range_table = &range_digital;
+		s->insn_bits = apci3xxx_do_insn_bits;
 
 		subdev++;
 	}
@@ -882,14 +893,14 @@ static int apci3xxx_auto_attach(struct comedi_device *dev,
 	/* TTL Digital I/O subdevice */
 	if (board->has_ttl_io) {
 		s = &dev->subdevices[subdev];
-		s->type		= COMEDI_SUBD_DIO;
-		s->subdev_flags	= SDF_READABLE | SDF_WRITABLE;
-		s->n_chan	= 24;
-		s->maxdata	= 1;
-		s->io_bits	= 0xff;	/* channels 0-7 are always outputs */
-		s->range_table	= &range_digital;
-		s->insn_config	= apci3xxx_dio_insn_config;
-		s->insn_bits	= apci3xxx_dio_insn_bits;
+		s->type = COMEDI_SUBD_DIO;
+		s->subdev_flags = SDF_READABLE | SDF_WRITABLE;
+		s->n_chan = 24;
+		s->maxdata = 1;
+		s->io_bits = 0xff;	/* channels 0-7 are always outputs */
+		s->range_table = &range_digital;
+		s->insn_config = apci3xxx_dio_insn_config;
+		s->insn_bits = apci3xxx_dio_insn_bits;
 
 		subdev++;
 	}
@@ -906,10 +917,10 @@ static void apci3xxx_detach(struct comedi_device *dev)
 }
 
 static struct comedi_driver apci3xxx_driver = {
-	.driver_name	= "addi_apci_3xxx",
-	.module		= THIS_MODULE,
-	.auto_attach	= apci3xxx_auto_attach,
-	.detach		= apci3xxx_detach,
+	.driver_name = "addi_apci_3xxx",
+	.module = THIS_MODULE,
+	.auto_attach = apci3xxx_auto_attach,
+	.detach = apci3xxx_detach,
 };
 
 static int apci3xxx_pci_probe(struct pci_dev *dev,
@@ -946,14 +957,16 @@ static const struct pci_device_id apci3xxx_pci_table[] = {
 	{ PCI_VDEVICE(ADDIDATA, 0x3024), BOARD_APCI3500 },
 	{ 0 }
 };
+
 MODULE_DEVICE_TABLE(pci, apci3xxx_pci_table);
 
 static struct pci_driver apci3xxx_pci_driver = {
-	.name		= "addi_apci_3xxx",
-	.id_table	= apci3xxx_pci_table,
-	.probe		= apci3xxx_pci_probe,
-	.remove		= comedi_pci_auto_unconfig,
+	.name = "addi_apci_3xxx",
+	.id_table = apci3xxx_pci_table,
+	.probe = apci3xxx_pci_probe,
+	.remove = comedi_pci_auto_unconfig,
 };
+
 module_comedi_pci_driver(apci3xxx_driver, apci3xxx_pci_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

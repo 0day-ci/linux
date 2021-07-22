@@ -187,107 +187,107 @@ struct me4000_board {
 
 static const struct me4000_board me4000_boards[] = {
 	[BOARD_ME4650] = {
-		.name		= "ME-4650",
-		.ai_nchan	= 16,
-	},
+			  .name = "ME-4650",
+			  .ai_nchan = 16,
+			   },
 	[BOARD_ME4660] = {
-		.name		= "ME-4660",
-		.ai_nchan	= 32,
-		.can_do_diff_ai	= 1,
-		.has_counter	= 1,
-	},
+			  .name = "ME-4660",
+			  .ai_nchan = 32,
+			  .can_do_diff_ai = 1,
+			  .has_counter = 1,
+			   },
 	[BOARD_ME4660I] = {
-		.name		= "ME-4660i",
-		.ai_nchan	= 32,
-		.can_do_diff_ai	= 1,
-		.has_counter	= 1,
-	},
+			   .name = "ME-4660i",
+			   .ai_nchan = 32,
+			   .can_do_diff_ai = 1,
+			   .has_counter = 1,
+			    },
 	[BOARD_ME4660S] = {
-		.name		= "ME-4660s",
-		.ai_nchan	= 32,
-		.can_do_diff_ai	= 1,
-		.can_do_sh_ai	= 1,
-		.has_counter	= 1,
-	},
+			   .name = "ME-4660s",
+			   .ai_nchan = 32,
+			   .can_do_diff_ai = 1,
+			   .can_do_sh_ai = 1,
+			   .has_counter = 1,
+			    },
 	[BOARD_ME4660IS] = {
-		.name		= "ME-4660is",
-		.ai_nchan	= 32,
-		.can_do_diff_ai	= 1,
-		.can_do_sh_ai	= 1,
-		.has_counter	= 1,
-	},
+			    .name = "ME-4660is",
+			    .ai_nchan = 32,
+			    .can_do_diff_ai = 1,
+			    .can_do_sh_ai = 1,
+			    .has_counter = 1,
+			     },
 	[BOARD_ME4670] = {
-		.name		= "ME-4670",
-		.ai_nchan	= 32,
-		.can_do_diff_ai	= 1,
-		.ex_trig_analog	= 1,
-		.has_ao		= 1,
-		.has_counter	= 1,
-	},
+			  .name = "ME-4670",
+			  .ai_nchan = 32,
+			  .can_do_diff_ai = 1,
+			  .ex_trig_analog = 1,
+			  .has_ao = 1,
+			  .has_counter = 1,
+			   },
 	[BOARD_ME4670I] = {
-		.name		= "ME-4670i",
-		.ai_nchan	= 32,
-		.can_do_diff_ai	= 1,
-		.ex_trig_analog	= 1,
-		.has_ao		= 1,
-		.has_counter	= 1,
-	},
+			   .name = "ME-4670i",
+			   .ai_nchan = 32,
+			   .can_do_diff_ai = 1,
+			   .ex_trig_analog = 1,
+			   .has_ao = 1,
+			   .has_counter = 1,
+			    },
 	[BOARD_ME4670S] = {
-		.name		= "ME-4670s",
-		.ai_nchan	= 32,
-		.can_do_diff_ai	= 1,
-		.can_do_sh_ai	= 1,
-		.ex_trig_analog	= 1,
-		.has_ao		= 1,
-		.has_counter	= 1,
-	},
+			   .name = "ME-4670s",
+			   .ai_nchan = 32,
+			   .can_do_diff_ai = 1,
+			   .can_do_sh_ai = 1,
+			   .ex_trig_analog = 1,
+			   .has_ao = 1,
+			   .has_counter = 1,
+			    },
 	[BOARD_ME4670IS] = {
-		.name		= "ME-4670is",
-		.ai_nchan	= 32,
-		.can_do_diff_ai	= 1,
-		.can_do_sh_ai	= 1,
-		.ex_trig_analog	= 1,
-		.has_ao		= 1,
-		.has_counter	= 1,
-	},
+			    .name = "ME-4670is",
+			    .ai_nchan = 32,
+			    .can_do_diff_ai = 1,
+			    .can_do_sh_ai = 1,
+			    .ex_trig_analog = 1,
+			    .has_ao = 1,
+			    .has_counter = 1,
+			     },
 	[BOARD_ME4680] = {
-		.name		= "ME-4680",
-		.ai_nchan	= 32,
-		.can_do_diff_ai	= 1,
-		.ex_trig_analog	= 1,
-		.has_ao		= 1,
-		.has_ao_fifo	= 1,
-		.has_counter	= 1,
-	},
+			  .name = "ME-4680",
+			  .ai_nchan = 32,
+			  .can_do_diff_ai = 1,
+			  .ex_trig_analog = 1,
+			  .has_ao = 1,
+			  .has_ao_fifo = 1,
+			  .has_counter = 1,
+			   },
 	[BOARD_ME4680I] = {
-		.name		= "ME-4680i",
-		.ai_nchan	= 32,
-		.can_do_diff_ai	= 1,
-		.ex_trig_analog	= 1,
-		.has_ao		= 1,
-		.has_ao_fifo	= 1,
-		.has_counter	= 1,
-	},
+			   .name = "ME-4680i",
+			   .ai_nchan = 32,
+			   .can_do_diff_ai = 1,
+			   .ex_trig_analog = 1,
+			   .has_ao = 1,
+			   .has_ao_fifo = 1,
+			   .has_counter = 1,
+			    },
 	[BOARD_ME4680S] = {
-		.name		= "ME-4680s",
-		.ai_nchan	= 32,
-		.can_do_diff_ai	= 1,
-		.can_do_sh_ai	= 1,
-		.ex_trig_analog	= 1,
-		.has_ao		= 1,
-		.has_ao_fifo	= 1,
-		.has_counter	= 1,
-	},
+			   .name = "ME-4680s",
+			   .ai_nchan = 32,
+			   .can_do_diff_ai = 1,
+			   .can_do_sh_ai = 1,
+			   .ex_trig_analog = 1,
+			   .has_ao = 1,
+			   .has_ao_fifo = 1,
+			   .has_counter = 1,
+			    },
 	[BOARD_ME4680IS] = {
-		.name		= "ME-4680is",
-		.ai_nchan	= 32,
-		.can_do_diff_ai	= 1,
-		.can_do_sh_ai	= 1,
-		.ex_trig_analog	= 1,
-		.has_ao		= 1,
-		.has_ao_fifo	= 1,
-		.has_counter	= 1,
-	},
+			    .name = "ME-4680is",
+			    .ai_nchan = 32,
+			    .can_do_diff_ai = 1,
+			    .can_do_sh_ai = 1,
+			    .ex_trig_analog = 1,
+			    .has_ao = 1,
+			    .has_ao_fifo = 1,
+			    .has_counter = 1,
+			     },
 };
 
 /*
@@ -298,10 +298,10 @@ static const struct me4000_board me4000_boards[] = {
  */
 static const struct comedi_lrange me4000_ai_range = {
 	4, {
-		UNI_RANGE(2.5),
-		UNI_RANGE(10),
-		BIP_RANGE(2.5),
-		BIP_RANGE(10)
+	    UNI_RANGE(2.5),
+	    UNI_RANGE(10),
+	    BIP_RANGE(2.5),
+	    BIP_RANGE(10)
 	}
 };
 
@@ -348,9 +348,9 @@ static int me4000_xilinx_download(struct comedi_device *dev,
 
 	/* Download Xilinx firmware */
 	file_length = (((unsigned int)data[0] & 0xff) << 24) +
-		      (((unsigned int)data[1] & 0xff) << 16) +
-		      (((unsigned int)data[2] & 0xff) << 8) +
-		      ((unsigned int)data[3] & 0xff);
+	    (((unsigned int)data[1] & 0xff) << 16) +
+	    (((unsigned int)data[2] & 0xff) << 8) +
+	    ((unsigned int)data[3] & 0xff);
 	usleep_range(10, 1000);
 
 	for (i = 0; i < file_length; i++) {
@@ -446,8 +446,7 @@ static unsigned int me4000_ai_get_sample(struct comedi_device *dev,
 
 static int me4000_ai_eoc(struct comedi_device *dev,
 			 struct comedi_subdevice *s,
-			 struct comedi_insn *insn,
-			 unsigned long context)
+			 struct comedi_insn *insn, unsigned long context)
 {
 	unsigned int status;
 
@@ -459,8 +458,7 @@ static int me4000_ai_eoc(struct comedi_device *dev,
 
 static int me4000_ai_insn_read(struct comedi_device *dev,
 			       struct comedi_subdevice *s,
-			       struct comedi_insn *insn,
-			       unsigned int *data)
+			       struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 	unsigned int range = CR_RANGE(insn->chanspec);
@@ -673,8 +671,7 @@ static int me4000_ai_do_cmd(struct comedi_device *dev,
 
 	/* Start sources */
 	ctrl = devpriv->ai_ctrl_mode |
-	       ME4000_AI_CTRL_CHANNEL_FIFO |
-	       ME4000_AI_CTRL_DATA_FIFO;
+	    ME4000_AI_CTRL_CHANNEL_FIFO | ME4000_AI_CTRL_DATA_FIFO;
 
 	/* Stop triggers */
 	if (cmd->stop_src == TRIG_COUNT) {
@@ -756,7 +753,7 @@ static int me4000_ai_do_cmd_test(struct comedi_device *dev,
 		   cmd->scan_begin_src == TRIG_EXT &&
 		   cmd->convert_src == TRIG_EXT) {
 		devpriv->ai_ctrl_mode = ME4000_AI_CTRL_MODE_0 |
-					ME4000_AI_CTRL_MODE_1;
+		    ME4000_AI_CTRL_MODE_1;
 	} else {
 		err |= -EINVAL;
 	}
@@ -791,7 +788,7 @@ static int me4000_ai_do_cmd_test(struct comedi_device *dev,
 
 	if (cmd->stop_src == TRIG_COUNT)
 		err |= comedi_check_trigger_arg_min(&cmd->stop_arg, 1);
-	else	/* TRIG_NONE */
+	else			/* TRIG_NONE */
 		err |= comedi_check_trigger_arg_is(&cmd->stop_arg, 0);
 
 	if (err)
@@ -929,8 +926,7 @@ static irqreturn_t me4000_ai_isr(int irq, void *dev_id)
 	if (!dev->attached)
 		return IRQ_NONE;
 
-	if (inl(dev->iobase + ME4000_IRQ_STATUS_REG) &
-	    ME4000_IRQ_STATUS_AI_HF) {
+	if (inl(dev->iobase + ME4000_IRQ_STATUS_REG) & ME4000_IRQ_STATUS_AI_HF) {
 		/* Read status register to find out what happened */
 		tmp = inl(dev->iobase + ME4000_AI_STATUS_REG);
 
@@ -963,8 +959,7 @@ static irqreturn_t me4000_ai_isr(int irq, void *dev_id)
 		outl(tmp, dev->iobase + ME4000_AI_CTRL_REG);
 	}
 
-	if (inl(dev->iobase + ME4000_IRQ_STATUS_REG) &
-	    ME4000_IRQ_STATUS_SC) {
+	if (inl(dev->iobase + ME4000_IRQ_STATUS_REG) & ME4000_IRQ_STATUS_SC) {
 		/* Acquisition is complete */
 		s->async->events |= COMEDI_CB_EOA;
 
@@ -991,8 +986,7 @@ static irqreturn_t me4000_ai_isr(int irq, void *dev_id)
 
 static int me4000_ao_insn_write(struct comedi_device *dev,
 				struct comedi_subdevice *s,
-				struct comedi_insn *insn,
-				unsigned int *data)
+				struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 	unsigned int tmp;
@@ -1016,8 +1010,7 @@ static int me4000_ao_insn_write(struct comedi_device *dev,
 
 static int me4000_dio_insn_bits(struct comedi_device *dev,
 				struct comedi_subdevice *s,
-				struct comedi_insn *insn,
-				unsigned int *data)
+				struct comedi_insn *insn, unsigned int *data)
 {
 	if (comedi_dio_update_state(s, data)) {
 		outl((s->state >> 0) & 0xFF,
@@ -1031,17 +1024,16 @@ static int me4000_dio_insn_bits(struct comedi_device *dev,
 	}
 
 	data[1] = ((inl(dev->iobase + ME4000_DIO_PORT_0_REG) & 0xFF) << 0) |
-		  ((inl(dev->iobase + ME4000_DIO_PORT_1_REG) & 0xFF) << 8) |
-		  ((inl(dev->iobase + ME4000_DIO_PORT_2_REG) & 0xFF) << 16) |
-		  ((inl(dev->iobase + ME4000_DIO_PORT_3_REG) & 0xFF) << 24);
+	    ((inl(dev->iobase + ME4000_DIO_PORT_1_REG) & 0xFF) << 8) |
+	    ((inl(dev->iobase + ME4000_DIO_PORT_2_REG) & 0xFF) << 16) |
+	    ((inl(dev->iobase + ME4000_DIO_PORT_3_REG) & 0xFF) << 24);
 
 	return insn->n;
 }
 
 static int me4000_dio_insn_config(struct comedi_device *dev,
 				  struct comedi_subdevice *s,
-				  struct comedi_insn *insn,
-				  unsigned int *data)
+				  struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 	unsigned int mask;
@@ -1092,8 +1084,7 @@ static int me4000_dio_insn_config(struct comedi_device *dev,
 	return insn->n;
 }
 
-static int me4000_auto_attach(struct comedi_device *dev,
-			      unsigned long context)
+static int me4000_auto_attach(struct comedi_device *dev, unsigned long context)
 {
 	struct pci_dev *pcidev = comedi_to_pci_dev(dev);
 	const struct me4000_board *board = NULL;
@@ -1147,50 +1138,50 @@ static int me4000_auto_attach(struct comedi_device *dev,
 
 	/* Analog Input subdevice */
 	s = &dev->subdevices[0];
-	s->type		= COMEDI_SUBD_AI;
-	s->subdev_flags	= SDF_READABLE | SDF_COMMON | SDF_GROUND;
+	s->type = COMEDI_SUBD_AI;
+	s->subdev_flags = SDF_READABLE | SDF_COMMON | SDF_GROUND;
 	if (board->can_do_diff_ai)
-		s->subdev_flags	|= SDF_DIFF;
-	s->n_chan	= board->ai_nchan;
-	s->maxdata	= 0xffff;
-	s->len_chanlist	= ME4000_AI_CHANNEL_LIST_COUNT;
-	s->range_table	= &me4000_ai_range;
-	s->insn_read	= me4000_ai_insn_read;
+		s->subdev_flags |= SDF_DIFF;
+	s->n_chan = board->ai_nchan;
+	s->maxdata = 0xffff;
+	s->len_chanlist = ME4000_AI_CHANNEL_LIST_COUNT;
+	s->range_table = &me4000_ai_range;
+	s->insn_read = me4000_ai_insn_read;
 
 	if (dev->irq) {
 		dev->read_subdev = s;
-		s->subdev_flags	|= SDF_CMD_READ;
-		s->cancel	= me4000_ai_cancel;
-		s->do_cmdtest	= me4000_ai_do_cmd_test;
-		s->do_cmd	= me4000_ai_do_cmd;
+		s->subdev_flags |= SDF_CMD_READ;
+		s->cancel = me4000_ai_cancel;
+		s->do_cmdtest = me4000_ai_do_cmd_test;
+		s->do_cmd = me4000_ai_do_cmd;
 	}
 
 	/* Analog Output subdevice */
 	s = &dev->subdevices[1];
 	if (board->has_ao) {
-		s->type		= COMEDI_SUBD_AO;
-		s->subdev_flags	= SDF_WRITABLE | SDF_COMMON | SDF_GROUND;
-		s->n_chan	= 4;
-		s->maxdata	= 0xffff;
-		s->range_table	= &range_bipolar10;
-		s->insn_write	= me4000_ao_insn_write;
+		s->type = COMEDI_SUBD_AO;
+		s->subdev_flags = SDF_WRITABLE | SDF_COMMON | SDF_GROUND;
+		s->n_chan = 4;
+		s->maxdata = 0xffff;
+		s->range_table = &range_bipolar10;
+		s->insn_write = me4000_ao_insn_write;
 
 		result = comedi_alloc_subdev_readback(s);
 		if (result)
 			return result;
 	} else {
-		s->type		= COMEDI_SUBD_UNUSED;
+		s->type = COMEDI_SUBD_UNUSED;
 	}
 
 	/* Digital I/O subdevice */
 	s = &dev->subdevices[2];
-	s->type		= COMEDI_SUBD_DIO;
-	s->subdev_flags	= SDF_READABLE | SDF_WRITABLE;
-	s->n_chan	= 32;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_bits	= me4000_dio_insn_bits;
-	s->insn_config	= me4000_dio_insn_config;
+	s->type = COMEDI_SUBD_DIO;
+	s->subdev_flags = SDF_READABLE | SDF_WRITABLE;
+	s->n_chan = 32;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_bits = me4000_dio_insn_bits;
+	s->insn_config = me4000_dio_insn_config;
 
 	/*
 	 * Check for optoisolated ME-4000 version. If one the first
@@ -1198,8 +1189,7 @@ static int me4000_auto_attach(struct comedi_device *dev,
 	 */
 	if (!inl(dev->iobase + ME4000_DIO_DIR_REG)) {
 		s->io_bits |= 0xFF;
-		outl(ME4000_DIO_CTRL_MODE_0,
-		     dev->iobase + ME4000_DIO_DIR_REG);
+		outl(ME4000_DIO_CTRL_MODE_0, dev->iobase + ME4000_DIO_DIR_REG);
 	}
 
 	/* Counter subdevice (8254) */
@@ -1234,14 +1224,13 @@ static void me4000_detach(struct comedi_device *dev)
 }
 
 static struct comedi_driver me4000_driver = {
-	.driver_name	= "me4000",
-	.module		= THIS_MODULE,
-	.auto_attach	= me4000_auto_attach,
-	.detach		= me4000_detach,
+	.driver_name = "me4000",
+	.module = THIS_MODULE,
+	.auto_attach = me4000_auto_attach,
+	.detach = me4000_detach,
 };
 
-static int me4000_pci_probe(struct pci_dev *dev,
-			    const struct pci_device_id *id)
+static int me4000_pci_probe(struct pci_dev *dev, const struct pci_device_id *id)
 {
 	return comedi_pci_auto_config(dev, &me4000_driver, id->driver_data);
 }
@@ -1262,14 +1251,16 @@ static const struct pci_device_id me4000_pci_table[] = {
 	{ PCI_VDEVICE(MEILHAUS, 0x4683), BOARD_ME4680IS },
 	{ 0 }
 };
+
 MODULE_DEVICE_TABLE(pci, me4000_pci_table);
 
 static struct pci_driver me4000_pci_driver = {
-	.name		= "me4000",
-	.id_table	= me4000_pci_table,
-	.probe		= me4000_pci_probe,
-	.remove		= comedi_pci_auto_unconfig,
+	.name = "me4000",
+	.id_table = me4000_pci_table,
+	.probe = me4000_pci_probe,
+	.remove = comedi_pci_auto_unconfig,
 };
+
 module_comedi_pci_driver(me4000_driver, me4000_pci_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

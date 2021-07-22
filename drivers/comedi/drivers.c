@@ -56,6 +56,7 @@ int comedi_set_hw_dev(struct comedi_device *dev, struct device *hw_dev)
 	dev->hw_dev = get_device(hw_dev);
 	return 0;
 }
+
 EXPORT_SYMBOL_GPL(comedi_set_hw_dev);
 
 static void comedi_clear_hw_dev(struct comedi_device *dev)
@@ -80,6 +81,7 @@ void *comedi_alloc_devpriv(struct comedi_device *dev, size_t size)
 	dev->private = kzalloc(size, GFP_KERNEL);
 	return dev->private;
 }
+
 EXPORT_SYMBOL_GPL(comedi_alloc_devpriv);
 
 /**
@@ -118,6 +120,7 @@ int comedi_alloc_subdevices(struct comedi_device *dev, int num_subdevices)
 	}
 	return 0;
 }
+
 EXPORT_SYMBOL_GPL(comedi_alloc_subdevices);
 
 /**
@@ -152,6 +155,7 @@ int comedi_alloc_subdev_readback(struct comedi_subdevice *s)
 
 	return 0;
 }
+
 EXPORT_SYMBOL_GPL(comedi_alloc_subdev_readback);
 
 static void comedi_device_detach_cleanup(struct comedi_device *dev)
@@ -252,8 +256,7 @@ int insn_inval(struct comedi_device *dev, struct comedi_subdevice *s,
  */
 int comedi_readback_insn_read(struct comedi_device *dev,
 			      struct comedi_subdevice *s,
-			      struct comedi_insn *insn,
-			      unsigned int *data)
+			      struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 	int i;
@@ -266,6 +269,7 @@ int comedi_readback_insn_read(struct comedi_device *dev,
 
 	return insn->n;
 }
+
 EXPORT_SYMBOL_GPL(comedi_readback_insn_read);
 
 /**
@@ -291,8 +295,7 @@ int comedi_timeout(struct comedi_device *dev,
 		   int (*cb)(struct comedi_device *dev,
 			     struct comedi_subdevice *s,
 			     struct comedi_insn *insn,
-			     unsigned long context),
-		   unsigned long context)
+			     unsigned long context), unsigned long context)
 {
 	unsigned long timeout = jiffies + msecs_to_jiffies(COMEDI_TIMEOUT_MS);
 	int ret;
@@ -305,6 +308,7 @@ int comedi_timeout(struct comedi_device *dev,
 	}
 	return -ETIMEDOUT;
 }
+
 EXPORT_SYMBOL_GPL(comedi_timeout);
 
 /**
@@ -336,8 +340,7 @@ EXPORT_SYMBOL_GPL(comedi_timeout);
 int comedi_dio_insn_config(struct comedi_device *dev,
 			   struct comedi_subdevice *s,
 			   struct comedi_insn *insn,
-			   unsigned int *data,
-			   unsigned int mask)
+			   unsigned int *data, unsigned int mask)
 {
 	unsigned int chan_mask = 1 << CR_CHAN(insn->chanspec);
 
@@ -363,6 +366,7 @@ int comedi_dio_insn_config(struct comedi_device *dev,
 
 	return 0;
 }
+
 EXPORT_SYMBOL_GPL(comedi_dio_insn_config);
 
 /**
@@ -383,7 +387,7 @@ unsigned int comedi_dio_update_state(struct comedi_subdevice *s,
 				     unsigned int *data)
 {
 	unsigned int chanmask = (s->n_chan < 32) ? ((1 << s->n_chan) - 1)
-						 : 0xffffffff;
+	    : 0xffffffff;
 	unsigned int mask = data[0] & chanmask;
 	unsigned int bits = data[1];
 
@@ -394,6 +398,7 @@ unsigned int comedi_dio_update_state(struct comedi_subdevice *s,
 
 	return mask;
 }
+
 EXPORT_SYMBOL_GPL(comedi_dio_update_state);
 
 /**
@@ -432,6 +437,7 @@ unsigned int comedi_bytes_per_scan_cmd(struct comedi_subdevice *s,
 	}
 	return comedi_samples_to_bytes(s, num_samples);
 }
+
 EXPORT_SYMBOL_GPL(comedi_bytes_per_scan_cmd);
 
 /**
@@ -455,6 +461,7 @@ unsigned int comedi_bytes_per_scan(struct comedi_subdevice *s)
 
 	return comedi_bytes_per_scan_cmd(s, cmd);
 }
+
 EXPORT_SYMBOL_GPL(comedi_bytes_per_scan);
 
 static unsigned int __comedi_nscans_left(struct comedi_subdevice *s,
@@ -489,8 +496,7 @@ static unsigned int __comedi_nscans_left(struct comedi_subdevice *s,
  * The return value will then be either the expected number of scans or the
  * number of scans remaining to complete the command, whichever is fewer.
  */
-unsigned int comedi_nscans_left(struct comedi_subdevice *s,
-				unsigned int nscans)
+unsigned int comedi_nscans_left(struct comedi_subdevice *s, unsigned int nscans)
 {
 	if (nscans == 0) {
 		unsigned int nbytes = comedi_buf_read_n_available(s);
@@ -499,6 +505,7 @@ unsigned int comedi_nscans_left(struct comedi_subdevice *s,
 	}
 	return __comedi_nscans_left(s, nscans);
 }
+
 EXPORT_SYMBOL_GPL(comedi_nscans_left);
 
 /**
@@ -525,12 +532,13 @@ unsigned int comedi_nsamples_left(struct comedi_subdevice *s,
 		return 0;
 
 	samples_left = scans_left * cmd->scan_end_arg -
-		comedi_bytes_to_samples(s, async->scan_progress);
+	    comedi_bytes_to_samples(s, async->scan_progress);
 
 	if (samples_left < nsamples)
 		return samples_left;
 	return nsamples;
 }
+
 EXPORT_SYMBOL_GPL(comedi_nsamples_left);
 
 /**
@@ -569,6 +577,7 @@ void comedi_inc_scan_progress(struct comedi_subdevice *s,
 		async->events |= COMEDI_CB_EOS;
 	}
 }
+
 EXPORT_SYMBOL_GPL(comedi_inc_scan_progress);
 
 /**
@@ -602,12 +611,12 @@ unsigned int comedi_handle_events(struct comedi_device *dev,
 
 	return events;
 }
+
 EXPORT_SYMBOL_GPL(comedi_handle_events);
 
 static int insn_rw_emulate_bits(struct comedi_device *dev,
 				struct comedi_subdevice *s,
-				struct comedi_insn *insn,
-				unsigned int *data)
+				struct comedi_insn *insn, unsigned int *data)
 {
 	struct comedi_insn _insn;
 	unsigned int chan = CR_CHAN(insn->chanspec);
@@ -625,8 +634,8 @@ static int insn_rw_emulate_bits(struct comedi_device *dev,
 	if (insn->insn == INSN_WRITE) {
 		if (!(s->subdev_flags & SDF_WRITABLE))
 			return -EINVAL;
-		_data[0] = 1 << (chan - base_chan);		    /* mask */
-		_data[1] = data[0] ? (1 << (chan - base_chan)) : 0; /* bits */
+		_data[0] = 1 << (chan - base_chan);	/* mask */
+		_data[1] = data[0] ? (1 << (chan - base_chan)) : 0;	/* bits */
 	}
 
 	ret = s->insn_bits(dev, s, &_insn, _data);
@@ -857,6 +866,7 @@ int comedi_load_firmware(struct comedi_device *dev,
 
 	return ret < 0 ? ret : 0;
 }
+
 EXPORT_SYMBOL_GPL(comedi_load_firmware);
 
 /**
@@ -889,6 +899,7 @@ int __comedi_request_region(struct comedi_device *dev,
 
 	return 0;
 }
+
 EXPORT_SYMBOL_GPL(__comedi_request_region);
 
 /**
@@ -919,6 +930,7 @@ int comedi_request_region(struct comedi_device *dev,
 
 	return ret;
 }
+
 EXPORT_SYMBOL_GPL(comedi_request_region);
 
 /**
@@ -945,6 +957,7 @@ void comedi_legacy_detach(struct comedi_device *dev)
 		dev->iolen = 0;
 	}
 }
+
 EXPORT_SYMBOL_GPL(comedi_legacy_detach);
 
 int comedi_device_attach(struct comedi_device *dev, struct comedi_devconfig *it)
@@ -992,7 +1005,7 @@ int comedi_device_attach(struct comedi_device *dev, struct comedi_devconfig *it)
 	}
 	dev->driver = driv;
 	dev->board_name = dev->board_ptr ? *(const char **)dev->board_ptr
-					 : dev->driver->driver_name;
+	    : dev->driver->driver_name;
 	ret = driv->attach(dev, it);
 	if (ret >= 0)
 		ret = comedi_device_postconfig(dev);
@@ -1086,6 +1099,7 @@ int comedi_auto_config(struct device *hardware_device,
 	}
 	return ret;
 }
+
 EXPORT_SYMBOL_GPL(comedi_auto_config);
 
 /**
@@ -1110,6 +1124,7 @@ void comedi_auto_unconfig(struct device *hardware_device)
 		return;
 	comedi_release_hardware_device(hardware_device);
 }
+
 EXPORT_SYMBOL_GPL(comedi_auto_unconfig);
 
 /**
@@ -1132,6 +1147,7 @@ int comedi_driver_register(struct comedi_driver *driver)
 
 	return 0;
 }
+
 EXPORT_SYMBOL_GPL(comedi_driver_register);
 
 /**
@@ -1181,4 +1197,5 @@ void comedi_driver_unregister(struct comedi_driver *driver)
 		comedi_dev_put(dev);
 	}
 }
+
 EXPORT_SYMBOL_GPL(comedi_driver_unregister);

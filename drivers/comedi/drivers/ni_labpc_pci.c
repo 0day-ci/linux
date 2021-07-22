@@ -33,12 +33,12 @@ enum labpc_pci_boardid {
 
 static const struct labpc_boardinfo labpc_pci_boards[] = {
 	[BOARD_NI_PCI1200] = {
-		.name			= "ni_pci-1200",
-		.ai_speed		= 10000,
-		.ai_scan_up		= 1,
-		.has_ao			= 1,
-		.is_labpc1200		= 1,
-	},
+			      .name = "ni_pci-1200",
+			      .ai_speed = 10000,
+			      .ai_scan_up = 1,
+			      .has_ao = 1,
+			      .is_labpc1200 = 1,
+			       },
 };
 
 /* ripped from mite.h and mite_setup2() to avoid mite dependency */
@@ -100,31 +100,32 @@ static void labpc_pci_detach(struct comedi_device *dev)
 }
 
 static struct comedi_driver labpc_pci_comedi_driver = {
-	.driver_name	= "labpc_pci",
-	.module		= THIS_MODULE,
-	.auto_attach	= labpc_pci_auto_attach,
-	.detach		= labpc_pci_detach,
+	.driver_name = "labpc_pci",
+	.module = THIS_MODULE,
+	.auto_attach = labpc_pci_auto_attach,
+	.detach = labpc_pci_detach,
 };
 
 static const struct pci_device_id labpc_pci_table[] = {
 	{ PCI_VDEVICE(NI, 0x161), BOARD_NI_PCI1200 },
 	{ 0 }
 };
+
 MODULE_DEVICE_TABLE(pci, labpc_pci_table);
 
-static int labpc_pci_probe(struct pci_dev *dev,
-			   const struct pci_device_id *id)
+static int labpc_pci_probe(struct pci_dev *dev, const struct pci_device_id *id)
 {
 	return comedi_pci_auto_config(dev, &labpc_pci_comedi_driver,
 				      id->driver_data);
 }
 
 static struct pci_driver labpc_pci_driver = {
-	.name		= "labpc_pci",
-	.id_table	= labpc_pci_table,
-	.probe		= labpc_pci_probe,
-	.remove		= comedi_pci_auto_unconfig,
+	.name = "labpc_pci",
+	.id_table = labpc_pci_table,
+	.probe = labpc_pci_probe,
+	.remove = comedi_pci_auto_unconfig,
 };
+
 module_comedi_pci_driver(labpc_pci_comedi_driver, labpc_pci_driver);
 
 MODULE_DESCRIPTION("Comedi: National Instruments Lab-PC PCI-1200 driver");

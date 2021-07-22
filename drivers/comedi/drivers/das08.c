@@ -48,7 +48,7 @@
  * the same mask.
  */
 #define DAS08_CONTROL_MUX_MASK	0x7	/* multiplexor channel mask */
-#define DAS08_CONTROL_MUX(x)	((x) & DAS08_CONTROL_MUX_MASK) /* mux channel */
+#define DAS08_CONTROL_MUX(x)	((x) & DAS08_CONTROL_MUX_MASK)	/* mux channel */
 #define DAS08_CONTROL_INTE	BIT(3)	/* interrupt enable (not "JR" boards) */
 #define DAS08_CONTROL_DO_MASK	0xf0	/* digital outputs mask (not "JR") */
 /* digital outputs (not "JR" boards) */
@@ -87,55 +87,55 @@
 
 static const struct comedi_lrange das08_pgl_ai_range = {
 	9, {
-		BIP_RANGE(10),
-		BIP_RANGE(5),
-		BIP_RANGE(2.5),
-		BIP_RANGE(1.25),
-		BIP_RANGE(0.625),
-		UNI_RANGE(10),
-		UNI_RANGE(5),
-		UNI_RANGE(2.5),
-		UNI_RANGE(1.25)
+	    BIP_RANGE(10),
+	    BIP_RANGE(5),
+	    BIP_RANGE(2.5),
+	    BIP_RANGE(1.25),
+	    BIP_RANGE(0.625),
+	    UNI_RANGE(10),
+	    UNI_RANGE(5),
+	    UNI_RANGE(2.5),
+	    UNI_RANGE(1.25)
 	}
 };
 
 static const struct comedi_lrange das08_pgh_ai_range = {
 	12, {
-		BIP_RANGE(10),
-		BIP_RANGE(5),
-		BIP_RANGE(1),
-		BIP_RANGE(0.5),
-		BIP_RANGE(0.1),
-		BIP_RANGE(0.05),
-		BIP_RANGE(0.01),
-		BIP_RANGE(0.005),
-		UNI_RANGE(10),
-		UNI_RANGE(1),
-		UNI_RANGE(0.1),
-		UNI_RANGE(0.01)
+	     BIP_RANGE(10),
+	     BIP_RANGE(5),
+	     BIP_RANGE(1),
+	     BIP_RANGE(0.5),
+	     BIP_RANGE(0.1),
+	     BIP_RANGE(0.05),
+	     BIP_RANGE(0.01),
+	     BIP_RANGE(0.005),
+	     UNI_RANGE(10),
+	     UNI_RANGE(1),
+	     UNI_RANGE(0.1),
+	     UNI_RANGE(0.01)
 	}
 };
 
 static const struct comedi_lrange das08_pgm_ai_range = {
 	9, {
-		BIP_RANGE(10),
-		BIP_RANGE(5),
-		BIP_RANGE(0.5),
-		BIP_RANGE(0.05),
-		BIP_RANGE(0.01),
-		UNI_RANGE(10),
-		UNI_RANGE(1),
-		UNI_RANGE(0.1),
-		UNI_RANGE(0.01)
+	    BIP_RANGE(10),
+	    BIP_RANGE(5),
+	    BIP_RANGE(0.5),
+	    BIP_RANGE(0.05),
+	    BIP_RANGE(0.01),
+	    UNI_RANGE(10),
+	    UNI_RANGE(1),
+	    UNI_RANGE(0.1),
+	    UNI_RANGE(0.01)
 	}
 };
 
 static const struct comedi_lrange *const das08_ai_lranges[] = {
-	[das08_pg_none]		= &range_unknown,
-	[das08_bipolar5]	= &range_bipolar5,
-	[das08_pgh]		= &das08_pgh_ai_range,
-	[das08_pgl]		= &das08_pgl_ai_range,
-	[das08_pgm]		= &das08_pgm_ai_range,
+	[das08_pg_none] = &range_unknown,
+	[das08_bipolar5] = &range_bipolar5,
+	[das08_pgh] = &das08_pgh_ai_range,
+	[das08_pgl] = &das08_pgl_ai_range,
+	[das08_pgm] = &das08_pgm_ai_range,
 };
 
 static const int das08_pgh_ai_gainlist[] = {
@@ -145,17 +145,16 @@ static const int das08_pgl_ai_gainlist[] = { 8, 0, 2, 4, 6, 1, 3, 5, 7 };
 static const int das08_pgm_ai_gainlist[] = { 8, 0, 10, 12, 14, 9, 11, 13, 15 };
 
 static const int *const das08_ai_gainlists[] = {
-	[das08_pg_none]		= NULL,
-	[das08_bipolar5]	= NULL,
-	[das08_pgh]		= das08_pgh_ai_gainlist,
-	[das08_pgl]		= das08_pgl_ai_gainlist,
-	[das08_pgm]		= das08_pgm_ai_gainlist,
+	[das08_pg_none] = NULL,
+	[das08_bipolar5] = NULL,
+	[das08_pgh] = das08_pgh_ai_gainlist,
+	[das08_pgl] = das08_pgl_ai_gainlist,
+	[das08_pgm] = das08_pgm_ai_gainlist,
 };
 
 static int das08_ai_eoc(struct comedi_device *dev,
 			struct comedi_subdevice *s,
-			struct comedi_insn *insn,
-			unsigned long context)
+			struct comedi_insn *insn, unsigned long context)
 {
 	unsigned int status;
 
@@ -195,8 +194,7 @@ static int das08_ai_insn_read(struct comedi_device *dev,
 	if (devpriv->pg_gainlist) {
 		/* set gain/range */
 		range = CR_RANGE(insn->chanspec);
-		outb(devpriv->pg_gainlist[range],
-		     dev->iobase + DAS08_GAIN_REG);
+		outb(devpriv->pg_gainlist[range], dev->iobase + DAS08_GAIN_REG);
 	}
 
 	for (n = 0; n < insn->n; n++) {
@@ -324,8 +322,7 @@ static void das08_ao_set_data(struct comedi_device *dev,
 
 static int das08_ao_insn_write(struct comedi_device *dev,
 			       struct comedi_subdevice *s,
-			       struct comedi_insn *insn,
-			       unsigned int *data)
+			       struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 	unsigned int val = s->readback[chan];
@@ -408,7 +405,7 @@ int das08_common_attach(struct comedi_device *dev, unsigned long iobase)
 		s->maxdata = 1;
 		s->range_table = &range_digital;
 		s->insn_bits = board->is_jr ? das08jr_di_insn_bits :
-			       das08_di_insn_bits;
+		    das08_di_insn_bits;
 	} else {
 		s->type = COMEDI_SUBD_UNUSED;
 	}
@@ -422,7 +419,7 @@ int das08_common_attach(struct comedi_device *dev, unsigned long iobase)
 		s->maxdata = 1;
 		s->range_table = &range_digital;
 		s->insn_bits = board->is_jr ? das08jr_do_insn_bits :
-			       das08_do_insn_bits;
+		    das08_do_insn_bits;
 	} else {
 		s->type = COMEDI_SUBD_UNUSED;
 	}
@@ -452,17 +449,20 @@ int das08_common_attach(struct comedi_device *dev, unsigned long iobase)
 
 	return 0;
 }
+
 EXPORT_SYMBOL_GPL(das08_common_attach);
 
 static int __init das08_init(void)
 {
 	return 0;
 }
+
 module_init(das08_init);
 
 static void __exit das08_exit(void)
 {
 }
+
 module_exit(das08_exit);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

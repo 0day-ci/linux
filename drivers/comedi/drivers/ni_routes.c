@@ -69,8 +69,8 @@ static const u8 *ni_find_route_values(const char *device_family)
 /*
  * Find the valid routes for a board.
  */
-static const struct ni_device_routes *
-ni_find_valid_routes(const char *board_name)
+static const struct ni_device_routes *ni_find_valid_routes(const char
+							   *board_name)
 {
 	const struct ni_device_routes *dr = NULL;
 	int i;
@@ -143,6 +143,7 @@ int ni_assign_device_routes(const char *device_family,
 	return ni_find_device_routes(device_family, board_name, alt_board_name,
 				     tables);
 }
+
 EXPORT_SYMBOL_GPL(ni_assign_device_routes);
 
 /**
@@ -159,7 +160,7 @@ unsigned int ni_count_valid_routes(const struct ni_route_tables *tables)
 		int j;
 
 		for (j = 0; j < R->n_src; ++j) {
-			const int src  = R->src[j];
+			const int src = R->src[j];
 			const int dest = R->dest;
 			const u8 *rv = tables->route_values;
 
@@ -178,6 +179,7 @@ unsigned int ni_count_valid_routes(const struct ni_route_tables *tables)
 	}
 	return total;
 }
+
 EXPORT_SYMBOL_GPL(ni_count_valid_routes);
 
 /**
@@ -194,8 +196,7 @@ EXPORT_SYMBOL_GPL(ni_count_valid_routes);
  *	valid routes copied.
  */
 unsigned int ni_get_valid_routes(const struct ni_route_tables *tables,
-				 unsigned int n_pairs,
-				 unsigned int *pair_data)
+				 unsigned int n_pairs, unsigned int *pair_data)
 {
 	unsigned int n_valid = ni_count_valid_routes(tables);
 	int i;
@@ -213,7 +214,7 @@ unsigned int ni_get_valid_routes(const struct ni_route_tables *tables,
 		int j;
 
 		for (j = 0; j < R->n_src; ++j) {
-			const int src  = R->src[j];
+			const int src = R->src[j];
 			const int dest = R->dest;
 			bool valid = false;
 			const u8 *rv = tables->route_values;
@@ -243,6 +244,7 @@ unsigned int ni_get_valid_routes(const struct ni_route_tables *tables,
 	}
 	return n_valid;
 }
+
 EXPORT_SYMBOL_GPL(ni_get_valid_routes);
 
 /*
@@ -273,6 +275,7 @@ bool ni_is_cmd_dest(int dest)
 			return true;
 	return false;
 }
+
 EXPORT_SYMBOL_GPL(ni_is_cmd_dest);
 
 /* **** BEGIN Routes sort routines **** */
@@ -332,6 +335,7 @@ void ni_sort_device_routes(struct ni_device_routes *valid_routes)
 		     sizeof(int), _ni_sort_srccmp, NULL);
 	}
 }
+
 EXPORT_SYMBOL_GPL(ni_sort_device_routes);
 
 /* sort all valid device signal routes in prep for use */
@@ -377,14 +381,14 @@ static int _ni_bsearch_srccmp(const void *vkey, const void *velt)
  * Return: NULL if no route_set is found with the specified @destination;
  *	otherwise, a pointer to the route_set if found.
  */
-const struct ni_route_set *
-ni_find_route_set(const int destination,
-		  const struct ni_device_routes *valid_routes)
+const struct ni_route_set *ni_find_route_set(const int destination, const struct ni_device_routes
+					     *valid_routes)
 {
 	return bsearch(&destination, valid_routes->routes,
 		       valid_routes->n_route_sets, sizeof(struct ni_route_set),
 		       _ni_bsearch_destcmp);
 }
+
 EXPORT_SYMBOL_GPL(ni_find_route_set);
 
 /*
@@ -401,6 +405,7 @@ bool ni_route_set_has_source(const struct ni_route_set *routes,
 		return false;
 	return true;
 }
+
 EXPORT_SYMBOL_GPL(ni_route_set_has_source);
 
 /**
@@ -432,6 +437,7 @@ s8 ni_lookup_route_register(int src, int dest,
 	/* mask out the valid-value marking bit */
 	return UNMARK(regval);
 }
+
 EXPORT_SYMBOL_GPL(ni_lookup_route_register);
 
 /**
@@ -468,7 +474,7 @@ s8 ni_route_to_register(const int src, const int dest,
 			const struct ni_route_tables *tables)
 {
 	const struct ni_route_set *routes =
-		ni_find_route_set(dest, tables->valid_routes);
+	    ni_find_route_set(dest, tables->valid_routes);
 	const u8 *rv;
 	s8 regval;
 
@@ -504,6 +510,7 @@ s8 ni_route_to_register(const int src, const int dest,
 	/* mask out the valid-value marking bit */
 	return UNMARK(regval);
 }
+
 EXPORT_SYMBOL_GPL(ni_route_to_register);
 
 /*
@@ -527,7 +534,7 @@ int ni_find_route_source(const u8 src_sel_reg_value, int dest,
 	if (!tables->route_values)
 		return -EINVAL;
 
-	dest = B(dest); /* subtract NI names offset */
+	dest = B(dest);		/* subtract NI names offset */
 	/* ensure we are not going to under/over run the route value table */
 	if (dest < 0 || dest >= NI_NUM_NAMES)
 		return -EINVAL;
@@ -537,6 +544,7 @@ int ni_find_route_source(const u8 src_sel_reg_value, int dest,
 			return src + NI_NAMES_BASE;
 	return -EINVAL;
 }
+
 EXPORT_SYMBOL_GPL(ni_find_route_source);
 
 /* **** END Routes search routines **** */

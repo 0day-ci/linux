@@ -87,9 +87,8 @@ int ni_assign_device_routes(const char *device_family,
  * Return: NULL if no route_set is found with the specified @destination;
  *	otherwise, a pointer to the route_set if found.
  */
-const struct ni_route_set *
-ni_find_route_set(const int destination,
-		  const struct ni_device_routes *valid_routes);
+const struct ni_route_set *ni_find_route_set(const int destination, const struct ni_device_routes
+					     *valid_routes);
 
 /*
  * ni_route_set_has_source() - Determines whether the given source is in
@@ -185,7 +184,7 @@ static inline bool channel_is_rtsi(int channel)
 static inline bool channel_is_ctr(int channel)
 {
 	return channel >= NI_COUNTER_NAMES_BASE &&
-	       channel <= NI_COUNTER_NAMES_MAX;
+	    channel <= NI_COUNTER_NAMES_MAX;
 }
 
 /*
@@ -208,8 +207,7 @@ unsigned int ni_count_valid_routes(const struct ni_route_tables *tables);
  *	valid routes copied.
  */
 unsigned int ni_get_valid_routes(const struct ni_route_tables *tables,
-				 unsigned int n_pairs,
-				 unsigned int *pair_data);
+				 unsigned int n_pairs, unsigned int *pair_data);
 
 /*
  * ni_sort_device_routes() - Sort the list of valid device signal routes in
@@ -311,9 +309,9 @@ static inline int ni_get_reg_value(const int src, const int dest,
  *	valid for the destination; -EINVAL otherwise.
  */
 static inline
-int ni_check_trigger_arg_roffs(int src, const int dest,
-			       const struct ni_route_tables *tables,
-			       const int direct_reg_offset)
+    int ni_check_trigger_arg_roffs(int src, const int dest,
+				   const struct ni_route_tables *tables,
+				   const int direct_reg_offset)
 {
 	if (ni_get_reg_value_roffs(src, dest, tables, direct_reg_offset) < 0)
 		return -EINVAL;

@@ -144,27 +144,27 @@
 
 static const struct comedi_lrange das1801_ai_range = {
 	8, {
-		BIP_RANGE(5),		/* bipolar gain = 1 */
-		BIP_RANGE(1),		/* bipolar gain = 10 */
-		BIP_RANGE(0.1),		/* bipolar gain = 50 */
-		BIP_RANGE(0.02),	/* bipolar gain = 250 */
-		UNI_RANGE(5),		/* unipolar gain = 1 */
-		UNI_RANGE(1),		/* unipolar gain = 10 */
-		UNI_RANGE(0.1),		/* unipolar gain = 50 */
-		UNI_RANGE(0.02)		/* unipolar gain = 250 */
+	    BIP_RANGE(5),	/* bipolar gain = 1 */
+	    BIP_RANGE(1),	/* bipolar gain = 10 */
+	    BIP_RANGE(0.1),	/* bipolar gain = 50 */
+	    BIP_RANGE(0.02),	/* bipolar gain = 250 */
+	    UNI_RANGE(5),	/* unipolar gain = 1 */
+	    UNI_RANGE(1),	/* unipolar gain = 10 */
+	    UNI_RANGE(0.1),	/* unipolar gain = 50 */
+	    UNI_RANGE(0.02)	/* unipolar gain = 250 */
 	}
 };
 
 static const struct comedi_lrange das1802_ai_range = {
 	8, {
-		BIP_RANGE(10),		/* bipolar gain = 1 */
-		BIP_RANGE(5),		/* bipolar gain = 2 */
-		BIP_RANGE(2.5),		/* bipolar gain = 4 */
-		BIP_RANGE(1.25),	/* bipolar gain = 8 */
-		UNI_RANGE(10),		/* unipolar gain = 1 */
-		UNI_RANGE(5),		/* unipolar gain = 2 */
-		UNI_RANGE(2.5),		/* unipolar gain = 4 */
-		UNI_RANGE(1.25)		/* unipolar gain = 8 */
+	    BIP_RANGE(10),	/* bipolar gain = 1 */
+	    BIP_RANGE(5),	/* bipolar gain = 2 */
+	    BIP_RANGE(2.5),	/* bipolar gain = 4 */
+	    BIP_RANGE(1.25),	/* bipolar gain = 8 */
+	    UNI_RANGE(10),	/* unipolar gain = 1 */
+	    UNI_RANGE(5),	/* unipolar gain = 2 */
+	    UNI_RANGE(2.5),	/* unipolar gain = 4 */
+	    UNI_RANGE(1.25)	/* unipolar gain = 8 */
 	}
 };
 
@@ -212,102 +212,102 @@ struct das1800_board {
 
 static const struct das1800_board das1800_boards[] = {
 	[BOARD_DAS1701ST] = {
-		.name		= "das-1701st",
-		.id		= DAS1800_ID_ST,
-		.ai_speed	= 6250,
-		.is_01_series	= 1,
-	},
+			     .name = "das-1701st",
+			     .id = DAS1800_ID_ST,
+			     .ai_speed = 6250,
+			     .is_01_series = 1,
+			      },
 	[BOARD_DAS1701ST_DA] = {
-		.name		= "das-1701st-da",
-		.id		= DAS1800_ID_ST_DA,
-		.ai_speed	= 6250,
-		.is_01_series	= 1,
-	},
+				.name = "das-1701st-da",
+				.id = DAS1800_ID_ST_DA,
+				.ai_speed = 6250,
+				.is_01_series = 1,
+				 },
 	[BOARD_DAS1702ST] = {
-		.name		= "das-1702st",
-		.id		= DAS1800_ID_ST,
-		.ai_speed	= 6250,
-	},
+			     .name = "das-1702st",
+			     .id = DAS1800_ID_ST,
+			     .ai_speed = 6250,
+			      },
 	[BOARD_DAS1702ST_DA] = {
-		.name		= "das-1702st-da",
-		.id		= DAS1800_ID_ST_DA,
-		.ai_speed	= 6250,
-	},
+				.name = "das-1702st-da",
+				.id = DAS1800_ID_ST_DA,
+				.ai_speed = 6250,
+				 },
 	[BOARD_DAS1702HR] = {
-		.name		= "das-1702hr",
-		.id		= DAS1800_ID_HR,
-		.ai_speed	= 20000,
-	},
+			     .name = "das-1702hr",
+			     .id = DAS1800_ID_HR,
+			     .ai_speed = 20000,
+			      },
 	[BOARD_DAS1702HR_DA] = {
-		.name		= "das-1702hr-da",
-		.id		= DAS1800_ID_HR_DA,
-		.ai_speed	= 20000,
-	},
+				.name = "das-1702hr-da",
+				.id = DAS1800_ID_HR_DA,
+				.ai_speed = 20000,
+				 },
 	[BOARD_DAS1701AO] = {
-		.name		= "das-1701ao",
-		.id		= DAS1800_ID_AO,
-		.ai_speed	= 6250,
-		.is_01_series	= 1,
-	},
+			     .name = "das-1701ao",
+			     .id = DAS1800_ID_AO,
+			     .ai_speed = 6250,
+			     .is_01_series = 1,
+			      },
 	[BOARD_DAS1702AO] = {
-		.name		= "das-1702ao",
-		.id		= DAS1800_ID_AO,
-		.ai_speed	= 6250,
-	},
+			     .name = "das-1702ao",
+			     .id = DAS1800_ID_AO,
+			     .ai_speed = 6250,
+			      },
 	[BOARD_DAS1801ST] = {
-		.name		= "das-1801st",
-		.id		= DAS1800_ID_ST,
-		.ai_speed	= 3000,
-		.is_01_series	= 1,
-	},
+			     .name = "das-1801st",
+			     .id = DAS1800_ID_ST,
+			     .ai_speed = 3000,
+			     .is_01_series = 1,
+			      },
 	[BOARD_DAS1801ST_DA] = {
-		.name		= "das-1801st-da",
-		.id		= DAS1800_ID_ST_DA,
-		.ai_speed	= 3000,
-		.is_01_series	= 1,
-	},
+				.name = "das-1801st-da",
+				.id = DAS1800_ID_ST_DA,
+				.ai_speed = 3000,
+				.is_01_series = 1,
+				 },
 	[BOARD_DAS1802ST] = {
-		.name		= "das-1802st",
-		.id		= DAS1800_ID_ST,
-		.ai_speed	= 3000,
-	},
+			     .name = "das-1802st",
+			     .id = DAS1800_ID_ST,
+			     .ai_speed = 3000,
+			      },
 	[BOARD_DAS1802ST_DA] = {
-		.name		= "das-1802st-da",
-		.id		= DAS1800_ID_ST_DA,
-		.ai_speed	= 3000,
-	},
+				.name = "das-1802st-da",
+				.id = DAS1800_ID_ST_DA,
+				.ai_speed = 3000,
+				 },
 	[BOARD_DAS1802HR] = {
-		.name		= "das-1802hr",
-		.id		= DAS1800_ID_HR,
-		.ai_speed	= 10000,
-	},
+			     .name = "das-1802hr",
+			     .id = DAS1800_ID_HR,
+			     .ai_speed = 10000,
+			      },
 	[BOARD_DAS1802HR_DA] = {
-		.name		= "das-1802hr-da",
-		.id		= DAS1800_ID_HR_DA,
-		.ai_speed	= 10000,
-	},
+				.name = "das-1802hr-da",
+				.id = DAS1800_ID_HR_DA,
+				.ai_speed = 10000,
+				 },
 	[BOARD_DAS1801HC] = {
-		.name		= "das-1801hc",
-		.id		= DAS1800_ID_HC,
-		.ai_speed	= 3000,
-		.is_01_series	= 1,
-	},
+			     .name = "das-1801hc",
+			     .id = DAS1800_ID_HC,
+			     .ai_speed = 3000,
+			     .is_01_series = 1,
+			      },
 	[BOARD_DAS1802HC] = {
-		.name		= "das-1802hc",
-		.id		= DAS1800_ID_HC,
-		.ai_speed	= 3000,
-	},
+			     .name = "das-1802hc",
+			     .id = DAS1800_ID_HC,
+			     .ai_speed = 3000,
+			      },
 	[BOARD_DAS1801AO] = {
-		.name		= "das-1801ao",
-		.id		= DAS1800_ID_AO,
-		.ai_speed	= 3000,
-		.is_01_series	= 1,
-	},
+			     .name = "das-1801ao",
+			     .id = DAS1800_ID_AO,
+			     .ai_speed = 3000,
+			     .is_01_series = 1,
+			      },
 	[BOARD_DAS1802AO] = {
-		.name		= "das-1802ao",
-		.id		= DAS1800_ID_AO,
-		.ai_speed	= 3000,
-	},
+			     .name = "das-1802ao",
+			     .id = DAS1800_ID_AO,
+			     .ai_speed = 3000,
+			      },
 };
 
 struct das1800_private {
@@ -548,8 +548,8 @@ static int das1800_ai_fixup_paced_timing(struct comedi_device *dev,
 
 	/*
 	 * Paced mode:
-	 *	scan_begin_src is TRIG_FOLLOW
-	 *	convert_src is TRIG_TIMER
+	 *      scan_begin_src is TRIG_FOLLOW
+	 *      convert_src is TRIG_TIMER
 	 *
 	 * The convert_arg sets the pacer sample acquisition time.
 	 * The max acquisition speed is limited to the boards
@@ -568,8 +568,8 @@ static int das1800_ai_fixup_burst_timing(struct comedi_device *dev,
 
 	/*
 	 * Burst mode:
-	 *	scan_begin_src is TRIG_TIMER or TRIG_EXT
-	 *	convert_src is TRIG_TIMER
+	 *      scan_begin_src is TRIG_TIMER or TRIG_EXT
+	 *      convert_src is TRIG_TIMER
 	 *
 	 * The convert_arg sets burst sample acquisition time.
 	 * The max acquisition speed is limited to the boards
@@ -707,7 +707,7 @@ static int das1800_ai_cmdtest(struct comedi_device *dev,
 	if (cmd->convert_src == TRIG_TIMER) {
 		if (cmd->scan_begin_src == TRIG_FOLLOW)
 			err |= das1800_ai_fixup_paced_timing(dev, cmd);
-		else /* TRIG_TIMER or TRIG_EXT */
+		else		/* TRIG_TIMER or TRIG_EXT */
 			err |= das1800_ai_fixup_burst_timing(dev, cmd);
 	}
 
@@ -832,8 +832,7 @@ static void das1800_ai_set_chanlist(struct comedi_device *dev,
 	spin_unlock_irqrestore(&dev->spinlock, flags);
 }
 
-static int das1800_ai_cmd(struct comedi_device *dev,
-			  struct comedi_subdevice *s)
+static int das1800_ai_cmd(struct comedi_device *dev, struct comedi_subdevice *s)
 {
 	struct das1800_private *devpriv = dev->private;
 	int control_a, control_c;
@@ -867,7 +866,7 @@ static int das1800_ai_cmd(struct comedi_device *dev,
 		control_a |= ATEN;
 	if (cmd->start_src == TRIG_EXT)
 		control_a |= TGEN | CGSL;
-	else /* TRIG_NOW */
+	else			/* TRIG_NOW */
 		control_a |= CGEN;
 	if (control_a & (ATEN | TGEN)) {
 		if ((cmd->start_arg & CR_INVERT) || (cmd->stop_arg & CR_INVERT))
@@ -881,14 +880,14 @@ static int das1800_ai_cmd(struct comedi_device *dev,
 		if (cmd->convert_src == TRIG_TIMER) {
 			/* trig on cascaded counters */
 			control_c |= IPCLK;
-		} else { /* TRIG_EXT */
+		} else {	/* TRIG_EXT */
 			/* trig on falling edge of external trigger */
 			control_c |= XPCLK;
 		}
 	} else if (cmd->scan_begin_src == TRIG_TIMER) {
 		/* burst mode with internal pacer clock */
 		control_c |= BMDE | IPCLK;
-	} else { /* TRIG_EXT */
+	} else {		/* TRIG_EXT */
 		/* burst mode with external trigger */
 		control_c |= BMDE | XPCLK;
 	}
@@ -926,8 +925,7 @@ static int das1800_ai_cmd(struct comedi_device *dev,
 
 static int das1800_ai_eoc(struct comedi_device *dev,
 			  struct comedi_subdevice *s,
-			  struct comedi_insn *insn,
-			  unsigned long context)
+			  struct comedi_insn *insn, unsigned long context)
 {
 	unsigned char status;
 
@@ -939,8 +937,7 @@ static int das1800_ai_eoc(struct comedi_device *dev,
 
 static int das1800_ai_insn_read(struct comedi_device *dev,
 				struct comedi_subdevice *s,
-				struct comedi_insn *insn,
-				unsigned int *data)
+				struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int range = CR_RANGE(insn->chanspec);
 	bool is_unipolar = comedi_range_is_unipolar(s, range);
@@ -949,8 +946,7 @@ static int das1800_ai_insn_read(struct comedi_device *dev,
 	unsigned short dpnt;
 	unsigned long flags;
 
-	outb(das1800_ai_chanspec_bits(s, insn->chanspec),
-	     dev->iobase + DAS1800_CONTROL_C);		/* software pacer */
+	outb(das1800_ai_chanspec_bits(s, insn->chanspec), dev->iobase + DAS1800_CONTROL_C);	/* software pacer */
 	outb(CVEN, dev->iobase + DAS1800_STATUS);	/* enable conversions */
 	outb(0x0, dev->iobase + DAS1800_CONTROL_A);	/* reset fifo */
 	outb(FFEN, dev->iobase + DAS1800_CONTROL_A);
@@ -983,8 +979,7 @@ static int das1800_ai_insn_read(struct comedi_device *dev,
 
 static int das1800_ao_insn_write(struct comedi_device *dev,
 				 struct comedi_subdevice *s,
-				 struct comedi_insn *insn,
-				 unsigned int *data)
+				 struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 	unsigned int update_chan = s->n_chan - 1;
@@ -1020,8 +1015,7 @@ static int das1800_ao_insn_write(struct comedi_device *dev,
 
 static int das1800_di_insn_bits(struct comedi_device *dev,
 				struct comedi_subdevice *s,
-				struct comedi_insn *insn,
-				unsigned int *data)
+				struct comedi_insn *insn, unsigned int *data)
 {
 	data[1] = inb(dev->iobase + DAS1800_DIGITAL) & 0xf;
 	data[0] = 0;
@@ -1031,8 +1025,7 @@ static int das1800_di_insn_bits(struct comedi_device *dev,
 
 static int das1800_do_insn_bits(struct comedi_device *dev,
 				struct comedi_subdevice *s,
-				struct comedi_insn *insn,
-				unsigned int *data)
+				struct comedi_insn *insn, unsigned int *data)
 {
 	if (comedi_dio_update_state(s, data))
 		outb(s->state, dev->iobase + DAS1800_DIGITAL);
@@ -1057,22 +1050,22 @@ static void das1800_init_dma(struct comedi_device *dev,
 	dma_chan = &it->options[2];
 
 	switch ((dma_chan[0] & 0x7) | (dma_chan[1] << 4)) {
-	case 0x5:	/*  dma0 == 5 */
+	case 0x5:		/*  dma0 == 5 */
 		devpriv->dma_bits = DMA_CH5;
 		break;
-	case 0x6:	/*  dma0 == 6 */
+	case 0x6:		/*  dma0 == 6 */
 		devpriv->dma_bits = DMA_CH6;
 		break;
-	case 0x7:	/*  dma0 == 7 */
+	case 0x7:		/*  dma0 == 7 */
 		devpriv->dma_bits = DMA_CH7;
 		break;
-	case 0x65:	/*  dma0 == 5, dma1 == 6 */
+	case 0x65:		/*  dma0 == 5, dma1 == 6 */
 		devpriv->dma_bits = DMA_CH5_CH6;
 		break;
-	case 0x76:	/*  dma0 == 6, dma1 == 7 */
+	case 0x76:		/*  dma0 == 6, dma1 == 7 */
 		devpriv->dma_bits = DMA_CH6_CH7;
 		break;
-	case 0x57:	/*  dma0 == 7, dma1 == 5 */
+	case 0x57:		/*  dma0 == 7, dma1 == 5 */
 		devpriv->dma_bits = DMA_CH7_CH5;
 		break;
 	default:
@@ -1117,11 +1110,11 @@ static int das1800_probe(struct comedi_device *dev)
 		return -ENODEV;
 	}
 
-	 /*
-	  * If the dev->board_ptr is not set, the user is trying to attach
-	  * an unspecified board to this driver. In this case the id is used
-	  * to 'probe' for the dev->board_ptr.
-	  */
+	/*
+	 * If the dev->board_ptr is not set, the user is trying to attach
+	 * an unspecified board to this driver. In this case the id is used
+	 * to 'probe' for the dev->board_ptr.
+	 */
 	switch (id) {
 	case DAS1800_ID_ST_DA:
 		/* das-1701st-da, das-1702st-da, das-1801st-da, das-1802st-da */
@@ -1259,35 +1252,35 @@ static int das1800_attach(struct comedi_device *dev,
 	 * actual physical channel mapping is when EXP-1800 boards are used.
 	 */
 	s = &dev->subdevices[0];
-	s->type		= COMEDI_SUBD_AI;
-	s->subdev_flags	= SDF_READABLE | SDF_DIFF | SDF_GROUND;
+	s->type = COMEDI_SUBD_AI;
+	s->subdev_flags = SDF_READABLE | SDF_DIFF | SDF_GROUND;
 	if (board->id != DAS1800_ID_HC)
-		s->subdev_flags	|= SDF_COMMON;
-	s->n_chan	= (board->id == DAS1800_ID_HC) ? 64 : 256;
-	s->maxdata	= is_16bit ? 0xffff : 0x0fff;
-	s->range_table	= board->is_01_series ? &das1801_ai_range
-					      : &das1802_ai_range;
-	s->insn_read	= das1800_ai_insn_read;
+		s->subdev_flags |= SDF_COMMON;
+	s->n_chan = (board->id == DAS1800_ID_HC) ? 64 : 256;
+	s->maxdata = is_16bit ? 0xffff : 0x0fff;
+	s->range_table = board->is_01_series ? &das1801_ai_range
+	    : &das1802_ai_range;
+	s->insn_read = das1800_ai_insn_read;
 	if (dev->irq) {
 		dev->read_subdev = s;
-		s->subdev_flags	|= SDF_CMD_READ;
-		s->len_chanlist	= s->n_chan;
-		s->do_cmd	= das1800_ai_cmd;
-		s->do_cmdtest	= das1800_ai_cmdtest;
-		s->poll		= das1800_ai_poll;
-		s->cancel	= das1800_ai_cancel;
-		s->munge	= das1800_ai_munge;
+		s->subdev_flags |= SDF_CMD_READ;
+		s->len_chanlist = s->n_chan;
+		s->do_cmd = das1800_ai_cmd;
+		s->do_cmdtest = das1800_ai_cmdtest;
+		s->poll = das1800_ai_poll;
+		s->cancel = das1800_ai_cancel;
+		s->munge = das1800_ai_munge;
 	}
 
 	/* Analog Output subdevice */
 	s = &dev->subdevices[1];
 	if (board->id == DAS1800_ID_ST_DA || board->id == DAS1800_ID_HR_DA) {
-		s->type		= COMEDI_SUBD_AO;
-		s->subdev_flags	= SDF_WRITABLE;
-		s->n_chan	= (board->id == DAS1800_ID_ST_DA) ? 4 : 2;
-		s->maxdata	= is_16bit ? 0xffff : 0x0fff;
-		s->range_table	= &range_bipolar10;
-		s->insn_write	= das1800_ao_insn_write;
+		s->type = COMEDI_SUBD_AO;
+		s->subdev_flags = SDF_WRITABLE;
+		s->n_chan = (board->id == DAS1800_ID_ST_DA) ? 4 : 2;
+		s->maxdata = is_16bit ? 0xffff : 0x0fff;
+		s->range_table = &range_bipolar10;
+		s->insn_write = das1800_ao_insn_write;
 
 		ret = comedi_alloc_subdev_readback(s);
 		if (ret)
@@ -1304,28 +1297,28 @@ static int das1800_attach(struct comedi_device *dev,
 		 * 'ao' boards have waveform analog outputs that are not
 		 * currently supported.
 		 */
-		s->type		= COMEDI_SUBD_UNUSED;
+		s->type = COMEDI_SUBD_UNUSED;
 	} else {
-		s->type		= COMEDI_SUBD_UNUSED;
+		s->type = COMEDI_SUBD_UNUSED;
 	}
 
 	/* Digital Input subdevice */
 	s = &dev->subdevices[2];
-	s->type		= COMEDI_SUBD_DI;
-	s->subdev_flags	= SDF_READABLE;
-	s->n_chan	= 4;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_bits	= das1800_di_insn_bits;
+	s->type = COMEDI_SUBD_DI;
+	s->subdev_flags = SDF_READABLE;
+	s->n_chan = 4;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_bits = das1800_di_insn_bits;
 
 	/* Digital Output subdevice */
 	s = &dev->subdevices[3];
-	s->type		= COMEDI_SUBD_DO;
-	s->subdev_flags	= SDF_WRITABLE;
-	s->n_chan	= (board->id == DAS1800_ID_HC) ? 8 : 4;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_bits	= das1800_do_insn_bits;
+	s->type = COMEDI_SUBD_DO;
+	s->subdev_flags = SDF_WRITABLE;
+	s->n_chan = (board->id == DAS1800_ID_HC) ? 8 : 4;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_bits = das1800_do_insn_bits;
 
 	das1800_ai_cancel(dev, dev->read_subdev);
 
@@ -1349,14 +1342,15 @@ static void das1800_detach(struct comedi_device *dev)
 }
 
 static struct comedi_driver das1800_driver = {
-	.driver_name	= "das1800",
-	.module		= THIS_MODULE,
-	.attach		= das1800_attach,
-	.detach		= das1800_detach,
-	.num_names	= ARRAY_SIZE(das1800_boards),
-	.board_name	= &das1800_boards[0].name,
-	.offset		= sizeof(struct das1800_board),
+	.driver_name = "das1800",
+	.module = THIS_MODULE,
+	.attach = das1800_attach,
+	.detach = das1800_detach,
+	.num_names = ARRAY_SIZE(das1800_boards),
+	.board_name = &das1800_boards[0].name,
+	.offset = sizeof(struct das1800_board),
 };
+
 module_comedi_driver(das1800_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

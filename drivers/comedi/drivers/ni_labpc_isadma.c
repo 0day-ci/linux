@@ -67,6 +67,7 @@ void labpc_setup_dma(struct comedi_device *dev, struct comedi_subdevice *s)
 	/* set CMD3 bits for caller to enable DMA and interrupt */
 	devpriv->cmd3 |= (CMD3_DMAEN | CMD3_DMATCINTEN);
 }
+
 EXPORT_SYMBOL_GPL(labpc_setup_dma);
 
 void labpc_drain_dma(struct comedi_device *dev)
@@ -110,6 +111,7 @@ void labpc_drain_dma(struct comedi_device *dev)
 
 	comedi_buf_write_samples(s, desc->virt_addr, nsamples);
 }
+
 EXPORT_SYMBOL_GPL(labpc_drain_dma);
 
 static void handle_isa_dma(struct comedi_device *dev)
@@ -139,6 +141,7 @@ void labpc_handle_dma_status(struct comedi_device *dev)
 	    (board->is_labpc1200 && devpriv->stat2 & STAT2_OUTA1))
 		handle_isa_dma(dev);
 }
+
 EXPORT_SYMBOL_GPL(labpc_handle_dma_status);
 
 void labpc_init_dma_chan(struct comedi_device *dev, unsigned int dma_chan)
@@ -154,6 +157,7 @@ void labpc_init_dma_chan(struct comedi_device *dev, unsigned int dma_chan)
 					   LABPC_ISADMA_BUFFER_SIZE,
 					   COMEDI_ISADMA_READ);
 }
+
 EXPORT_SYMBOL_GPL(labpc_init_dma_chan);
 
 void labpc_free_dma_chan(struct comedi_device *dev)
@@ -163,17 +167,20 @@ void labpc_free_dma_chan(struct comedi_device *dev)
 	if (devpriv)
 		comedi_isadma_free(devpriv->dma);
 }
+
 EXPORT_SYMBOL_GPL(labpc_free_dma_chan);
 
 static int __init ni_labpc_isadma_init_module(void)
 {
 	return 0;
 }
+
 module_init(ni_labpc_isadma_init_module);
 
 static void __exit ni_labpc_isadma_cleanup_module(void)
 {
 }
+
 module_exit(ni_labpc_isadma_cleanup_module);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

@@ -44,20 +44,20 @@ struct apci1516_boardinfo {
 
 static const struct apci1516_boardinfo apci1516_boardtypes[] = {
 	[BOARD_APCI1016] = {
-		.name		= "apci1016",
-		.di_nchan	= 16,
-	},
+			    .name = "apci1016",
+			    .di_nchan = 16,
+			     },
 	[BOARD_APCI1516] = {
-		.name		= "apci1516",
-		.di_nchan	= 8,
-		.do_nchan	= 8,
-		.has_wdog	= 1,
-	},
+			    .name = "apci1516",
+			    .di_nchan = 8,
+			    .do_nchan = 8,
+			    .has_wdog = 1,
+			     },
 	[BOARD_APCI2016] = {
-		.name		= "apci2016",
-		.do_nchan	= 16,
-		.has_wdog	= 1,
-	},
+			    .name = "apci2016",
+			    .do_nchan = 16,
+			    .has_wdog = 1,
+			     },
 };
 
 struct apci1516_private {
@@ -66,8 +66,7 @@ struct apci1516_private {
 
 static int apci1516_di_insn_bits(struct comedi_device *dev,
 				 struct comedi_subdevice *s,
-				 struct comedi_insn *insn,
-				 unsigned int *data)
+				 struct comedi_insn *insn, unsigned int *data)
 {
 	data[1] = inw(dev->iobase + APCI1516_DI_REG);
 
@@ -76,8 +75,7 @@ static int apci1516_di_insn_bits(struct comedi_device *dev,
 
 static int apci1516_do_insn_bits(struct comedi_device *dev,
 				 struct comedi_subdevice *s,
-				 struct comedi_insn *insn,
-				 unsigned int *data)
+				 struct comedi_insn *insn, unsigned int *data)
 {
 	s->state = inw(dev->iobase + APCI1516_DO_REG);
 
@@ -138,27 +136,27 @@ static int apci1516_auto_attach(struct comedi_device *dev,
 	/* Initialize the digital input subdevice */
 	s = &dev->subdevices[0];
 	if (board->di_nchan) {
-		s->type		= COMEDI_SUBD_DI;
-		s->subdev_flags	= SDF_READABLE;
-		s->n_chan	= board->di_nchan;
-		s->maxdata	= 1;
-		s->range_table	= &range_digital;
-		s->insn_bits	= apci1516_di_insn_bits;
+		s->type = COMEDI_SUBD_DI;
+		s->subdev_flags = SDF_READABLE;
+		s->n_chan = board->di_nchan;
+		s->maxdata = 1;
+		s->range_table = &range_digital;
+		s->insn_bits = apci1516_di_insn_bits;
 	} else {
-		s->type		= COMEDI_SUBD_UNUSED;
+		s->type = COMEDI_SUBD_UNUSED;
 	}
 
 	/* Initialize the digital output subdevice */
 	s = &dev->subdevices[1];
 	if (board->do_nchan) {
-		s->type		= COMEDI_SUBD_DO;
-		s->subdev_flags	= SDF_WRITABLE;
-		s->n_chan	= board->do_nchan;
-		s->maxdata	= 1;
-		s->range_table	= &range_digital;
-		s->insn_bits	= apci1516_do_insn_bits;
+		s->type = COMEDI_SUBD_DO;
+		s->subdev_flags = SDF_WRITABLE;
+		s->n_chan = board->do_nchan;
+		s->maxdata = 1;
+		s->range_table = &range_digital;
+		s->insn_bits = apci1516_do_insn_bits;
 	} else {
-		s->type		= COMEDI_SUBD_UNUSED;
+		s->type = COMEDI_SUBD_UNUSED;
 	}
 
 	/* Initialize the watchdog subdevice */
@@ -168,7 +166,7 @@ static int apci1516_auto_attach(struct comedi_device *dev,
 		if (ret)
 			return ret;
 	} else {
-		s->type		= COMEDI_SUBD_UNUSED;
+		s->type = COMEDI_SUBD_UNUSED;
 	}
 
 	apci1516_reset(dev);
@@ -183,10 +181,10 @@ static void apci1516_detach(struct comedi_device *dev)
 }
 
 static struct comedi_driver apci1516_driver = {
-	.driver_name	= "addi_apci_1516",
-	.module		= THIS_MODULE,
-	.auto_attach	= apci1516_auto_attach,
-	.detach		= apci1516_detach,
+	.driver_name = "addi_apci_1516",
+	.module = THIS_MODULE,
+	.auto_attach = apci1516_auto_attach,
+	.detach = apci1516_detach,
 };
 
 static int apci1516_pci_probe(struct pci_dev *dev,
@@ -201,14 +199,16 @@ static const struct pci_device_id apci1516_pci_table[] = {
 	{ PCI_VDEVICE(ADDIDATA, 0x1002), BOARD_APCI2016 },
 	{ 0 }
 };
+
 MODULE_DEVICE_TABLE(pci, apci1516_pci_table);
 
 static struct pci_driver apci1516_pci_driver = {
-	.name		= "addi_apci_1516",
-	.id_table	= apci1516_pci_table,
-	.probe		= apci1516_pci_probe,
-	.remove		= comedi_pci_auto_unconfig,
+	.name = "addi_apci_1516",
+	.id_table = apci1516_pci_table,
+	.probe = apci1516_pci_probe,
+	.remove = comedi_pci_auto_unconfig,
 };
+
 module_comedi_pci_driver(apci1516_driver, apci1516_pci_driver);
 
 MODULE_DESCRIPTION("ADDI-DATA APCI-1016/1516/2016, 16 channel DIO boards");

@@ -26,10 +26,10 @@ struct pcmcia_device *comedi_to_pcmcia_dev(struct comedi_device *dev)
 {
 	return dev->hw_dev ? to_pcmcia_dev(dev->hw_dev) : NULL;
 }
+
 EXPORT_SYMBOL_GPL(comedi_to_pcmcia_dev);
 
-static int comedi_pcmcia_conf_check(struct pcmcia_device *link,
-				    void *priv_data)
+static int comedi_pcmcia_conf_check(struct pcmcia_device *link, void *priv_data)
 {
 	if (link->config_index == 0)
 		return -EINVAL;
@@ -87,6 +87,7 @@ int comedi_pcmcia_enable(struct comedi_device *dev,
 
 	return pcmcia_enable_device(link);
 }
+
 EXPORT_SYMBOL_GPL(comedi_pcmcia_enable);
 
 /**
@@ -104,6 +105,7 @@ void comedi_pcmcia_disable(struct comedi_device *dev)
 	if (link)
 		pcmcia_disable_device(link);
 }
+
 EXPORT_SYMBOL_GPL(comedi_pcmcia_disable);
 
 /**
@@ -124,6 +126,7 @@ int comedi_pcmcia_auto_config(struct pcmcia_device *link,
 {
 	return comedi_auto_config(&link->dev, driver, 0);
 }
+
 EXPORT_SYMBOL_GPL(comedi_pcmcia_auto_config);
 
 /**
@@ -144,6 +147,7 @@ void comedi_pcmcia_auto_unconfig(struct pcmcia_device *link)
 {
 	comedi_auto_unconfig(&link->dev);
 }
+
 EXPORT_SYMBOL_GPL(comedi_pcmcia_auto_unconfig);
 
 /**
@@ -174,6 +178,7 @@ int comedi_pcmcia_driver_register(struct comedi_driver *comedi_driver,
 
 	return 0;
 }
+
 EXPORT_SYMBOL_GPL(comedi_pcmcia_driver_register);
 
 /**
@@ -191,17 +196,20 @@ void comedi_pcmcia_driver_unregister(struct comedi_driver *comedi_driver,
 	pcmcia_unregister_driver(pcmcia_driver);
 	comedi_driver_unregister(comedi_driver);
 }
+
 EXPORT_SYMBOL_GPL(comedi_pcmcia_driver_unregister);
 
 static int __init comedi_pcmcia_init(void)
 {
 	return 0;
 }
+
 module_init(comedi_pcmcia_init);
 
 static void __exit comedi_pcmcia_exit(void)
 {
 }
+
 module_exit(comedi_pcmcia_exit);
 
 MODULE_AUTHOR("https://www.comedi.org");

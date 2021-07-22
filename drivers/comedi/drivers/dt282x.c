@@ -118,55 +118,55 @@
 
 static const struct comedi_lrange range_dt282x_ai_lo_bipolar = {
 	4, {
-		BIP_RANGE(10),
-		BIP_RANGE(5),
-		BIP_RANGE(2.5),
-		BIP_RANGE(1.25)
+	    BIP_RANGE(10),
+	    BIP_RANGE(5),
+	    BIP_RANGE(2.5),
+	    BIP_RANGE(1.25)
 	}
 };
 
 static const struct comedi_lrange range_dt282x_ai_lo_unipolar = {
 	4, {
-		UNI_RANGE(10),
-		UNI_RANGE(5),
-		UNI_RANGE(2.5),
-		UNI_RANGE(1.25)
+	    UNI_RANGE(10),
+	    UNI_RANGE(5),
+	    UNI_RANGE(2.5),
+	    UNI_RANGE(1.25)
 	}
 };
 
 static const struct comedi_lrange range_dt282x_ai_5_bipolar = {
 	4, {
-		BIP_RANGE(5),
-		BIP_RANGE(2.5),
-		BIP_RANGE(1.25),
-		BIP_RANGE(0.625)
+	    BIP_RANGE(5),
+	    BIP_RANGE(2.5),
+	    BIP_RANGE(1.25),
+	    BIP_RANGE(0.625)
 	}
 };
 
 static const struct comedi_lrange range_dt282x_ai_5_unipolar = {
 	4, {
-		UNI_RANGE(5),
-		UNI_RANGE(2.5),
-		UNI_RANGE(1.25),
-		UNI_RANGE(0.625)
+	    UNI_RANGE(5),
+	    UNI_RANGE(2.5),
+	    UNI_RANGE(1.25),
+	    UNI_RANGE(0.625)
 	}
 };
 
 static const struct comedi_lrange range_dt282x_ai_hi_bipolar = {
 	4, {
-		BIP_RANGE(10),
-		BIP_RANGE(1),
-		BIP_RANGE(0.1),
-		BIP_RANGE(0.02)
+	    BIP_RANGE(10),
+	    BIP_RANGE(1),
+	    BIP_RANGE(0.1),
+	    BIP_RANGE(0.02)
 	}
 };
 
 static const struct comedi_lrange range_dt282x_ai_hi_unipolar = {
 	4, {
-		UNI_RANGE(10),
-		UNI_RANGE(1),
-		UNI_RANGE(0.1),
-		UNI_RANGE(0.02)
+	    UNI_RANGE(10),
+	    UNI_RANGE(1),
+	    UNI_RANGE(0.1),
+	    UNI_RANGE(0.02)
 	}
 };
 
@@ -177,11 +177,11 @@ static const struct comedi_lrange range_dt282x_ai_hi_unipolar = {
  */
 static const struct comedi_lrange dt282x_ao_range = {
 	5, {
-		BIP_RANGE(10),
-		BIP_RANGE(5),
-		BIP_RANGE(2.5),
-		UNI_RANGE(10),
-		UNI_RANGE(5),
+	    BIP_RANGE(10),
+	    BIP_RANGE(5),
+	    BIP_RANGE(2.5),
+	    UNI_RANGE(10),
+	    UNI_RANGE(5),
 	}
 };
 
@@ -198,114 +198,136 @@ struct dt282x_board {
 
 static const struct dt282x_board boardtypes[] = {
 	{
-		.name		= "dt2821",
-		.ai_maxdata	= 0x0fff,
-		.adchan_se	= 16,
-		.adchan_di	= 8,
-		.ai_speed	= 20000,
-		.dachan		= 2,
-		.ao_maxdata	= 0x0fff,
-	}, {
-		.name		= "dt2821-f",
-		.ai_maxdata	= 0x0fff,
-		.adchan_se	= 16,
-		.adchan_di	= 8,
-		.ai_speed	= 6500,
-		.dachan		= 2,
-		.ao_maxdata	= 0x0fff,
-	}, {
-		.name		= "dt2821-g",
-		.ai_maxdata	= 0x0fff,
-		.adchan_se	= 16,
-		.adchan_di	= 8,
-		.ai_speed	= 4000,
-		.dachan		= 2,
-		.ao_maxdata	= 0x0fff,
-	}, {
-		.name		= "dt2823",
-		.ai_maxdata	= 0xffff,
-		.adchan_di	= 4,
-		.ai_speed	= 10000,
-		.dachan		= 2,
-		.ao_maxdata	= 0xffff,
-	}, {
-		.name		= "dt2824-pgh",
-		.ai_maxdata	= 0x0fff,
-		.adchan_se	= 16,
-		.adchan_di	= 8,
-		.ai_speed	= 20000,
-	}, {
-		.name		= "dt2824-pgl",
-		.ai_maxdata	= 0x0fff,
-		.adchan_se	= 16,
-		.adchan_di	= 8,
-		.ai_speed	= 20000,
-		.ispgl		= 1,
-	}, {
-		.name		= "dt2825",
-		.ai_maxdata	= 0x0fff,
-		.adchan_se	= 16,
-		.adchan_di	= 8,
-		.ai_speed	= 20000,
-		.ispgl		= 1,
-		.dachan		= 2,
-		.ao_maxdata	= 0x0fff,
-	}, {
-		.name		= "dt2827",
-		.ai_maxdata	= 0xffff,
-		.adchan_di	= 4,
-		.ai_speed	= 10000,
-		.dachan		= 2,
-		.ao_maxdata	= 0x0fff,
-	}, {
-		.name		= "dt2828",
-		.ai_maxdata	= 0x0fff,
-		.adchan_se	= 4,
-		.ai_speed	= 10000,
-		.dachan		= 2,
-		.ao_maxdata	= 0x0fff,
-	}, {
-		.name		= "dt2829",
-		.ai_maxdata	= 0xffff,
-		.adchan_se	= 8,
-		.ai_speed	= 33250,
-		.dachan		= 2,
-		.ao_maxdata	= 0xffff,
-	}, {
-		.name		= "dt21-ez",
-		.ai_maxdata	= 0x0fff,
-		.adchan_se	= 16,
-		.adchan_di	= 8,
-		.ai_speed	= 10000,
-		.dachan		= 2,
-		.ao_maxdata	= 0x0fff,
-	}, {
-		.name		= "dt23-ez",
-		.ai_maxdata	= 0xffff,
-		.adchan_se	= 16,
-		.adchan_di	= 8,
-		.ai_speed	= 10000,
-	}, {
-		.name		= "dt24-ez",
-		.ai_maxdata	= 0x0fff,
-		.adchan_se	= 16,
-		.adchan_di	= 8,
-		.ai_speed	= 10000,
-	}, {
-		.name		= "dt24-ez-pgl",
-		.ai_maxdata	= 0x0fff,
-		.adchan_se	= 16,
-		.adchan_di	= 8,
-		.ai_speed	= 10000,
-		.ispgl		= 1,
-	},
+	 .name = "dt2821",
+	 .ai_maxdata = 0x0fff,
+	 .adchan_se = 16,
+	 .adchan_di = 8,
+	 .ai_speed = 20000,
+	 .dachan = 2,
+	 .ao_maxdata = 0x0fff,
+	  }, {
+	      .name = "dt2821-f",
+	      .ai_maxdata = 0x0fff,
+	      .adchan_se = 16,
+	      .adchan_di = 8,
+	      .ai_speed = 6500,
+	      .dachan = 2,
+	      .ao_maxdata = 0x0fff,
+	       }, {
+		   .name = "dt2821-g",
+		   .ai_maxdata = 0x0fff,
+		   .adchan_se = 16,
+		   .adchan_di = 8,
+		   .ai_speed = 4000,
+		   .dachan = 2,
+		   .ao_maxdata = 0x0fff,
+		    }, {
+			.name = "dt2823",
+			.ai_maxdata = 0xffff,
+			.adchan_di = 4,
+			.ai_speed = 10000,
+			.dachan = 2,
+			.ao_maxdata = 0xffff,
+			 }, {
+			     .name = "dt2824-pgh",
+			     .ai_maxdata = 0x0fff,
+			     .adchan_se = 16,
+			     .adchan_di = 8,
+			     .ai_speed = 20000,
+			      }, {
+				  .name = "dt2824-pgl",
+				  .ai_maxdata = 0x0fff,
+				  .adchan_se = 16,
+				  .adchan_di = 8,
+				  .ai_speed = 20000,
+				  .ispgl = 1,
+				   }, {
+				       .name = "dt2825",
+				       .ai_maxdata = 0x0fff,
+				       .adchan_se = 16,
+				       .adchan_di = 8,
+				       .ai_speed = 20000,
+				       .ispgl = 1,
+				       .dachan = 2,
+				       .ao_maxdata = 0x0fff,
+					}, {
+					    .name = "dt2827",
+					    .ai_maxdata = 0xffff,
+					    .adchan_di = 4,
+					    .ai_speed = 10000,
+					    .dachan = 2,
+					    .ao_maxdata = 0x0fff,
+					     }, {
+						 .name = "dt2828",
+						 .ai_maxdata = 0x0fff,
+						 .adchan_se = 4,
+						 .ai_speed = 10000,
+						 .dachan = 2,
+						 .ao_maxdata = 0x0fff,
+						  }, {
+						      .name = "dt2829",
+						      .ai_maxdata = 0xffff,
+						      .adchan_se = 8,
+						      .ai_speed = 33250,
+						      .dachan = 2,
+						      .ao_maxdata = 0xffff,
+						       }, {
+							   .name = "dt21-ez",
+							   .ai_maxdata = 0x0fff,
+							   .adchan_se = 16,
+							   .adchan_di = 8,
+							   .ai_speed = 10000,
+							   .dachan = 2,
+							   .ao_maxdata = 0x0fff,
+							    }, {
+								.name =
+								"dt23-ez",
+								.ai_maxdata =
+								0xffff,
+								.adchan_se = 16,
+								.adchan_di = 8,
+								.ai_speed =
+								10000,
+								 }, {
+								     .name =
+								     "dt24-ez",
+								     .ai_maxdata
+								     = 0x0fff,
+								     .adchan_se
+								     = 16,
+								     .adchan_di
+								     = 8,
+								     .ai_speed =
+								     10000,
+								      }, {
+									  .name
+									  =
+									  "dt24-ez-pgl",
+									  .
+									  ai_maxdata
+									  =
+									  0x0fff,
+									  .
+									  adchan_se
+									  = 16,
+									  .
+									  adchan_di
+									  = 8,
+									  .
+									  ai_speed
+									  =
+									  10000,
+									  .
+									  ispgl
+									  = 1,
+									   },
 };
 
 struct dt282x_private {
 	struct comedi_isadma *dma;
 	unsigned int ad_2scomp:1;
 	unsigned int divisor;
-	int dacsr;	/* software copies of registers */
+	int dacsr;		/* software copies of registers */
 	int adcsr;
 	int supcsr;
 	int ntrig;
@@ -393,13 +415,12 @@ static unsigned int dt282x_ns_to_timer(unsigned int *ns, unsigned int flags)
 	}
 	*ns = divider * base;
 	return DT2821_TMRCTR_PRESCALE(prescale) |
-	       DT2821_TMRCTR_DIVIDER(divider);
+	    DT2821_TMRCTR_DIVIDER(divider);
 }
 
 static void dt282x_munge(struct comedi_device *dev,
 			 struct comedi_subdevice *s,
-			 unsigned short *buf,
-			 unsigned int nbytes)
+			 unsigned short *buf, unsigned int nbytes)
 {
 	struct dt282x_private *devpriv = dev->private;
 	unsigned int val;
@@ -420,8 +441,7 @@ static void dt282x_munge(struct comedi_device *dev,
 }
 
 static unsigned int dt282x_ao_setup_dma(struct comedi_device *dev,
-					struct comedi_subdevice *s,
-					int cur_dma)
+					struct comedi_subdevice *s, int cur_dma)
 {
 	struct dt282x_private *devpriv = dev->private;
 	struct comedi_isadma *dma = devpriv->dma;
@@ -549,16 +569,14 @@ static void dt282x_load_changain(struct comedi_device *dev, int n,
 
 		outw(devpriv->adcsr |
 		     DT2821_ADCSR_GS(range) |
-		     DT2821_ADCSR_CHAN(chan),
-		     dev->iobase + DT2821_ADCSR_REG);
+		     DT2821_ADCSR_CHAN(chan), dev->iobase + DT2821_ADCSR_REG);
 	}
 	outw(DT2821_CHANCSR_NUMB(n), dev->iobase + DT2821_CHANCSR_REG);
 }
 
 static int dt282x_ai_timeout(struct comedi_device *dev,
 			     struct comedi_subdevice *s,
-			     struct comedi_insn *insn,
-			     unsigned long context)
+			     struct comedi_insn *insn, unsigned long context)
 {
 	unsigned int status;
 
@@ -586,8 +604,7 @@ static int dt282x_ai_timeout(struct comedi_device *dev,
  */
 static int dt282x_ai_insn_read(struct comedi_device *dev,
 			       struct comedi_subdevice *s,
-			       struct comedi_insn *insn,
-			       unsigned int *data)
+			       struct comedi_insn *insn, unsigned int *data)
 {
 	struct dt282x_private *devpriv = dev->private;
 	unsigned int val;
@@ -628,8 +645,7 @@ static int dt282x_ai_insn_read(struct comedi_device *dev,
 }
 
 static int dt282x_ai_cmdtest(struct comedi_device *dev,
-			     struct comedi_subdevice *s,
-			     struct comedi_cmd *cmd)
+			     struct comedi_subdevice *s, struct comedi_cmd *cmd)
 {
 	const struct dt282x_board *board = dev->board_ptr;
 	struct dt282x_private *devpriv = dev->private;
@@ -669,7 +685,7 @@ static int dt282x_ai_cmdtest(struct comedi_device *dev,
 
 	if (cmd->stop_src == TRIG_COUNT)
 		err |= comedi_check_trigger_arg_min(&cmd->stop_arg, 1);
-	else	/* TRIG_EXT | TRIG_NONE */
+	else			/* TRIG_EXT | TRIG_NONE */
 		err |= comedi_check_trigger_arg_is(&cmd->stop_arg, 0);
 
 	if (err)
@@ -706,8 +722,7 @@ static int dt282x_ai_cmd(struct comedi_device *dev, struct comedi_subdevice *s)
 	outw(devpriv->supcsr |
 	     DT2821_SUPCSR_CLRDMADNE |
 	     DT2821_SUPCSR_BUFFB |
-	     DT2821_SUPCSR_ADCINIT,
-	     dev->iobase + DT2821_SUPCSR_REG);
+	     DT2821_SUPCSR_ADCINIT, dev->iobase + DT2821_SUPCSR_REG);
 
 	devpriv->ntrig = cmd->stop_arg * cmd->scan_end_arg;
 	devpriv->nread = devpriv->ntrig;
@@ -765,8 +780,7 @@ static int dt282x_ai_cancel(struct comedi_device *dev,
 
 static int dt282x_ao_insn_write(struct comedi_device *dev,
 				struct comedi_subdevice *s,
-				struct comedi_insn *insn,
-				unsigned int *data)
+				struct comedi_insn *insn, unsigned int *data)
 {
 	struct dt282x_private *devpriv = dev->private;
 	unsigned int chan = CR_CHAN(insn->chanspec);
@@ -795,8 +809,7 @@ static int dt282x_ao_insn_write(struct comedi_device *dev,
 }
 
 static int dt282x_ao_cmdtest(struct comedi_device *dev,
-			     struct comedi_subdevice *s,
-			     struct comedi_cmd *cmd)
+			     struct comedi_subdevice *s, struct comedi_cmd *cmd)
 {
 	struct dt282x_private *devpriv = dev->private;
 	int err = 0;
@@ -832,7 +845,7 @@ static int dt282x_ao_cmdtest(struct comedi_device *dev,
 
 	if (cmd->stop_src == TRIG_COUNT)
 		err |= comedi_check_trigger_arg_min(&cmd->stop_arg, 1);
-	else	/* TRIG_EXT | TRIG_NONE */
+	else			/* TRIG_EXT | TRIG_NONE */
 		err |= comedi_check_trigger_arg_is(&cmd->stop_arg, 0);
 
 	if (err)
@@ -851,8 +864,7 @@ static int dt282x_ao_cmdtest(struct comedi_device *dev,
 }
 
 static int dt282x_ao_inttrig(struct comedi_device *dev,
-			     struct comedi_subdevice *s,
-			     unsigned int trig_num)
+			     struct comedi_subdevice *s, unsigned int trig_num)
 {
 	struct dt282x_private *devpriv = dev->private;
 	struct comedi_cmd *cmd = &s->async->cmd;
@@ -882,13 +894,11 @@ static int dt282x_ao_cmd(struct comedi_device *dev, struct comedi_subdevice *s)
 	dt282x_disable_dma(dev);
 
 	devpriv->supcsr = DT2821_SUPCSR_ERRINTEN |
-			  DT2821_SUPCSR_DS_DA_CLK |
-			  DT2821_SUPCSR_DDMA;
+	    DT2821_SUPCSR_DS_DA_CLK | DT2821_SUPCSR_DDMA;
 	outw(devpriv->supcsr |
 	     DT2821_SUPCSR_CLRDMADNE |
 	     DT2821_SUPCSR_BUFFB |
-	     DT2821_SUPCSR_DACINIT,
-	     dev->iobase + DT2821_SUPCSR_REG);
+	     DT2821_SUPCSR_DACINIT, dev->iobase + DT2821_SUPCSR_REG);
 
 	devpriv->ntrig = cmd->stop_arg * cmd->chanlist_len;
 	devpriv->nread = devpriv->ntrig;
@@ -902,8 +912,7 @@ static int dt282x_ao_cmd(struct comedi_device *dev, struct comedi_subdevice *s)
 	devpriv->dacsr &= (DT2821_DACSR_LBOE | DT2821_DACSR_HBOE);
 
 	devpriv->dacsr |= (DT2821_DACSR_SSEL |
-			   DT2821_DACSR_DACLK |
-			   DT2821_DACSR_IDARDY);
+			   DT2821_DACSR_DACLK | DT2821_DACSR_IDARDY);
 	outw(devpriv->dacsr, dev->iobase + DT2821_DACSR_REG);
 
 	s->async->inttrig = dt282x_ao_inttrig;
@@ -932,8 +941,7 @@ static int dt282x_ao_cancel(struct comedi_device *dev,
 
 static int dt282x_dio_insn_bits(struct comedi_device *dev,
 				struct comedi_subdevice *s,
-				struct comedi_insn *insn,
-				unsigned int *data)
+				struct comedi_insn *insn, unsigned int *data)
 {
 	if (comedi_dio_update_state(s, data))
 		outw(s->state, dev->iobase + DT2821_DIODAT_REG);
@@ -945,8 +953,7 @@ static int dt282x_dio_insn_bits(struct comedi_device *dev,
 
 static int dt282x_dio_insn_config(struct comedi_device *dev,
 				  struct comedi_subdevice *s,
-				  struct comedi_insn *insn,
-				  unsigned int *data)
+				  struct comedi_insn *insn, unsigned int *data)
 {
 	struct dt282x_private *devpriv = dev->private;
 	unsigned int chan = CR_CHAN(insn->chanspec);
@@ -1087,65 +1094,65 @@ static int dt282x_attach(struct comedi_device *dev, struct comedi_devconfig *it)
 
 	/* Analog Input subdevice */
 	s = &dev->subdevices[0];
-	s->type		= COMEDI_SUBD_AI;
-	s->subdev_flags	= SDF_READABLE;
+	s->type = COMEDI_SUBD_AI;
+	s->subdev_flags = SDF_READABLE;
 	if ((it->options[4] && board->adchan_di) || board->adchan_se == 0) {
-		s->subdev_flags	|= SDF_DIFF;
-		s->n_chan	= board->adchan_di;
+		s->subdev_flags |= SDF_DIFF;
+		s->n_chan = board->adchan_di;
 	} else {
-		s->subdev_flags	|= SDF_COMMON;
-		s->n_chan	= board->adchan_se;
+		s->subdev_flags |= SDF_COMMON;
+		s->n_chan = board->adchan_se;
 	}
-	s->maxdata	= board->ai_maxdata;
+	s->maxdata = board->ai_maxdata;
 
 	s->range_table = opt_ai_range_lkup(board->ispgl, it->options[8]);
 	devpriv->ad_2scomp = it->options[5] ? 1 : 0;
 
-	s->insn_read	= dt282x_ai_insn_read;
+	s->insn_read = dt282x_ai_insn_read;
 	if (dev->irq) {
 		dev->read_subdev = s;
-		s->subdev_flags	|= SDF_CMD_READ;
-		s->len_chanlist	= s->n_chan;
-		s->do_cmdtest	= dt282x_ai_cmdtest;
-		s->do_cmd	= dt282x_ai_cmd;
-		s->cancel	= dt282x_ai_cancel;
+		s->subdev_flags |= SDF_CMD_READ;
+		s->len_chanlist = s->n_chan;
+		s->do_cmdtest = dt282x_ai_cmdtest;
+		s->do_cmd = dt282x_ai_cmd;
+		s->cancel = dt282x_ai_cancel;
 	}
 
 	/* Analog Output subdevice */
 	s = &dev->subdevices[1];
 	if (board->dachan) {
-		s->type		= COMEDI_SUBD_AO;
-		s->subdev_flags	= SDF_WRITABLE;
-		s->n_chan	= board->dachan;
-		s->maxdata	= board->ao_maxdata;
+		s->type = COMEDI_SUBD_AO;
+		s->subdev_flags = SDF_WRITABLE;
+		s->n_chan = board->dachan;
+		s->maxdata = board->ao_maxdata;
 		/* ranges are per-channel, set by jumpers on the board */
-		s->range_table	= &dt282x_ao_range;
-		s->insn_write	= dt282x_ao_insn_write;
+		s->range_table = &dt282x_ao_range;
+		s->insn_write = dt282x_ao_insn_write;
 		if (dev->irq) {
 			dev->write_subdev = s;
-			s->subdev_flags	|= SDF_CMD_WRITE;
-			s->len_chanlist	= s->n_chan;
-			s->do_cmdtest	= dt282x_ao_cmdtest;
-			s->do_cmd	= dt282x_ao_cmd;
-			s->cancel	= dt282x_ao_cancel;
+			s->subdev_flags |= SDF_CMD_WRITE;
+			s->len_chanlist = s->n_chan;
+			s->do_cmdtest = dt282x_ao_cmdtest;
+			s->do_cmd = dt282x_ao_cmd;
+			s->cancel = dt282x_ao_cancel;
 		}
 
 		ret = comedi_alloc_subdev_readback(s);
 		if (ret)
 			return ret;
 	} else {
-		s->type		= COMEDI_SUBD_UNUSED;
+		s->type = COMEDI_SUBD_UNUSED;
 	}
 
 	/* Digital I/O subdevice */
 	s = &dev->subdevices[2];
-	s->type		= COMEDI_SUBD_DIO;
-	s->subdev_flags	= SDF_READABLE | SDF_WRITABLE;
-	s->n_chan	= 16;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_bits	= dt282x_dio_insn_bits;
-	s->insn_config	= dt282x_dio_insn_config;
+	s->type = COMEDI_SUBD_DIO;
+	s->subdev_flags = SDF_READABLE | SDF_WRITABLE;
+	s->n_chan = 16;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_bits = dt282x_dio_insn_bits;
+	s->insn_config = dt282x_dio_insn_config;
 
 	return 0;
 }
@@ -1157,14 +1164,15 @@ static void dt282x_detach(struct comedi_device *dev)
 }
 
 static struct comedi_driver dt282x_driver = {
-	.driver_name	= "dt282x",
-	.module		= THIS_MODULE,
-	.attach		= dt282x_attach,
-	.detach		= dt282x_detach,
-	.board_name	= &boardtypes[0].name,
-	.num_names	= ARRAY_SIZE(boardtypes),
-	.offset		= sizeof(struct dt282x_board),
+	.driver_name = "dt282x",
+	.module = THIS_MODULE,
+	.attach = dt282x_attach,
+	.detach = dt282x_detach,
+	.board_name = &boardtypes[0].name,
+	.num_names = ARRAY_SIZE(boardtypes),
+	.offset = sizeof(struct dt282x_board),
 };
+
 module_comedi_driver(dt282x_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

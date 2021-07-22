@@ -151,74 +151,74 @@
 
 static const struct comedi_lrange range_pcl818h_ai = {
 	9, {
-		BIP_RANGE(5),
-		BIP_RANGE(2.5),
-		BIP_RANGE(1.25),
-		BIP_RANGE(0.625),
-		UNI_RANGE(10),
-		UNI_RANGE(5),
-		UNI_RANGE(2.5),
-		UNI_RANGE(1.25),
-		BIP_RANGE(10)
+	    BIP_RANGE(5),
+	    BIP_RANGE(2.5),
+	    BIP_RANGE(1.25),
+	    BIP_RANGE(0.625),
+	    UNI_RANGE(10),
+	    UNI_RANGE(5),
+	    UNI_RANGE(2.5),
+	    UNI_RANGE(1.25),
+	    BIP_RANGE(10)
 	}
 };
 
 static const struct comedi_lrange range_pcl818hg_ai = {
 	10, {
-		BIP_RANGE(5),
-		BIP_RANGE(0.5),
-		BIP_RANGE(0.05),
-		BIP_RANGE(0.005),
-		UNI_RANGE(10),
-		UNI_RANGE(1),
-		UNI_RANGE(0.1),
-		UNI_RANGE(0.01),
-		BIP_RANGE(10),
-		BIP_RANGE(1),
-		BIP_RANGE(0.1),
-		BIP_RANGE(0.01)
+	     BIP_RANGE(5),
+	     BIP_RANGE(0.5),
+	     BIP_RANGE(0.05),
+	     BIP_RANGE(0.005),
+	     UNI_RANGE(10),
+	     UNI_RANGE(1),
+	     UNI_RANGE(0.1),
+	     UNI_RANGE(0.01),
+	     BIP_RANGE(10),
+	     BIP_RANGE(1),
+	     BIP_RANGE(0.1),
+	     BIP_RANGE(0.01)
 	}
 };
 
 static const struct comedi_lrange range_pcl818l_l_ai = {
 	4, {
-		BIP_RANGE(5),
-		BIP_RANGE(2.5),
-		BIP_RANGE(1.25),
-		BIP_RANGE(0.625)
+	    BIP_RANGE(5),
+	    BIP_RANGE(2.5),
+	    BIP_RANGE(1.25),
+	    BIP_RANGE(0.625)
 	}
 };
 
 static const struct comedi_lrange range_pcl818l_h_ai = {
 	4, {
-		BIP_RANGE(10),
-		BIP_RANGE(5),
-		BIP_RANGE(2.5),
-		BIP_RANGE(1.25)
+	    BIP_RANGE(10),
+	    BIP_RANGE(5),
+	    BIP_RANGE(2.5),
+	    BIP_RANGE(1.25)
 	}
 };
 
 static const struct comedi_lrange range718_bipolar1 = {
 	1, {
-		BIP_RANGE(1)
+	    BIP_RANGE(1)
 	}
 };
 
 static const struct comedi_lrange range718_bipolar0_5 = {
 	1, {
-		BIP_RANGE(0.5)
+	    BIP_RANGE(0.5)
 	}
 };
 
 static const struct comedi_lrange range718_unipolar2 = {
 	1, {
-		UNI_RANGE(2)
+	    UNI_RANGE(2)
 	}
 };
 
 static const struct comedi_lrange range718_unipolar1 = {
 	1, {
-		BIP_RANGE(1)
+	    BIP_RANGE(1)
 	}
 };
 
@@ -234,55 +234,55 @@ struct pcl818_board {
 
 static const struct pcl818_board boardtypes[] = {
 	{
-		.name		= "pcl818l",
-		.ns_min		= 25000,
-		.n_aochan	= 1,
-		.ai_range_type	= &range_pcl818l_l_ai,
-		.has_dma	= 1,
-		.is_818		= 1,
-	}, {
-		.name		= "pcl818h",
-		.ns_min		= 10000,
-		.n_aochan	= 1,
-		.ai_range_type	= &range_pcl818h_ai,
-		.has_dma	= 1,
-		.is_818		= 1,
-	}, {
-		.name		= "pcl818hd",
-		.ns_min		= 10000,
-		.n_aochan	= 1,
-		.ai_range_type	= &range_pcl818h_ai,
-		.has_dma	= 1,
-		.has_fifo	= 1,
-		.is_818		= 1,
-	}, {
-		.name		= "pcl818hg",
-		.ns_min		= 10000,
-		.n_aochan	= 1,
-		.ai_range_type	= &range_pcl818hg_ai,
-		.has_dma	= 1,
-		.has_fifo	= 1,
-		.is_818		= 1,
-	}, {
-		.name		= "pcl818",
-		.ns_min		= 10000,
-		.n_aochan	= 2,
-		.ai_range_type	= &range_pcl818h_ai,
-		.has_dma	= 1,
-		.is_818		= 1,
-	}, {
-		.name		= "pcl718",
-		.ns_min		= 16000,
-		.n_aochan	= 2,
-		.ai_range_type	= &range_unipolar5,
-		.has_dma	= 1,
-	}, {
-		.name		= "pcm3718",
-		.ns_min		= 10000,
-		.ai_range_type	= &range_pcl818h_ai,
-		.has_dma	= 1,
-		.is_818		= 1,
-	},
+	 .name = "pcl818l",
+	 .ns_min = 25000,
+	 .n_aochan = 1,
+	 .ai_range_type = &range_pcl818l_l_ai,
+	 .has_dma = 1,
+	 .is_818 = 1,
+	  }, {
+	      .name = "pcl818h",
+	      .ns_min = 10000,
+	      .n_aochan = 1,
+	      .ai_range_type = &range_pcl818h_ai,
+	      .has_dma = 1,
+	      .is_818 = 1,
+	       }, {
+		   .name = "pcl818hd",
+		   .ns_min = 10000,
+		   .n_aochan = 1,
+		   .ai_range_type = &range_pcl818h_ai,
+		   .has_dma = 1,
+		   .has_fifo = 1,
+		   .is_818 = 1,
+		    }, {
+			.name = "pcl818hg",
+			.ns_min = 10000,
+			.n_aochan = 1,
+			.ai_range_type = &range_pcl818hg_ai,
+			.has_dma = 1,
+			.has_fifo = 1,
+			.is_818 = 1,
+			 }, {
+			     .name = "pcl818",
+			     .ns_min = 10000,
+			     .n_aochan = 2,
+			     .ai_range_type = &range_pcl818h_ai,
+			     .has_dma = 1,
+			     .is_818 = 1,
+			      }, {
+				  .name = "pcl718",
+				  .ns_min = 16000,
+				  .n_aochan = 2,
+				  .ai_range_type = &range_unipolar5,
+				  .has_dma = 1,
+				   }, {
+				       .name = "pcm3718",
+				       .ns_min = 10000,
+				       .ai_range_type = &range_pcl818h_ai,
+				       .has_dma = 1,
+				       .is_818 = 1,
+					},
 };
 
 struct pcl818_private {
@@ -323,8 +323,7 @@ static void pcl818_ai_setup_dma(struct comedi_device *dev,
 }
 
 static void pcl818_ai_set_chan_range(struct comedi_device *dev,
-				     unsigned int chan,
-				     unsigned int range)
+				     unsigned int chan, unsigned int range)
 {
 	outb(chan, dev->iobase + PCL818_MUX_REG);
 	outb(range, dev->iobase + PCL818_RANGE_REG);
@@ -410,8 +409,7 @@ static unsigned int pcl818_ai_get_sample(struct comedi_device *dev,
 
 static int pcl818_ai_eoc(struct comedi_device *dev,
 			 struct comedi_subdevice *s,
-			 struct comedi_insn *insn,
-			 unsigned long context)
+			 struct comedi_insn *insn, unsigned long context)
 {
 	unsigned int status;
 
@@ -667,7 +665,7 @@ static int ai_cmdtest(struct comedi_device *dev, struct comedi_subdevice *s,
 	if (cmd->convert_src == TRIG_TIMER) {
 		err |= comedi_check_trigger_arg_min(&cmd->convert_arg,
 						    board->ns_min);
-	} else {	/* TRIG_EXT */
+	} else {		/* TRIG_EXT */
 		err |= comedi_check_trigger_arg_is(&cmd->convert_arg, 0);
 	}
 
@@ -676,7 +674,7 @@ static int ai_cmdtest(struct comedi_device *dev, struct comedi_subdevice *s,
 
 	if (cmd->stop_src == TRIG_COUNT)
 		err |= comedi_check_trigger_arg_min(&cmd->stop_arg, 1);
-	else	/* TRIG_NONE */
+	else			/* TRIG_NONE */
 		err |= comedi_check_trigger_arg_is(&cmd->stop_arg, 0);
 
 	if (err)
@@ -705,8 +703,7 @@ static int ai_cmdtest(struct comedi_device *dev, struct comedi_subdevice *s,
 	return 0;
 }
 
-static int pcl818_ai_cmd(struct comedi_device *dev,
-			 struct comedi_subdevice *s)
+static int pcl818_ai_cmd(struct comedi_device *dev, struct comedi_subdevice *s)
 {
 	struct pcl818_private *devpriv = dev->private;
 	struct comedi_isadma *dma = devpriv->dma;
@@ -739,7 +736,7 @@ static int pcl818_ai_cmd(struct comedi_device *dev,
 		pcl818_ai_setup_dma(dev, s, 0);
 
 		ctrl |= PCL818_CTRL_INTE | PCL818_CTRL_IRQ(dev->irq) |
-			PCL818_CTRL_DMAE;
+		    PCL818_CTRL_DMAE;
 	} else if (devpriv->usefifo) {
 		/* enable FIFO */
 		outb(1, dev->iobase + PCL818_FI_ENABLE);
@@ -799,8 +796,7 @@ static int pcl818_ai_cancel(struct comedi_device *dev,
 
 static int pcl818_ai_insn_read(struct comedi_device *dev,
 			       struct comedi_subdevice *s,
-			       struct comedi_insn *insn,
-			       unsigned int *data)
+			       struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 	unsigned int range = CR_RANGE(insn->chanspec);
@@ -829,8 +825,7 @@ static int pcl818_ai_insn_read(struct comedi_device *dev,
 
 static int pcl818_ao_insn_write(struct comedi_device *dev,
 				struct comedi_subdevice *s,
-				struct comedi_insn *insn,
-				unsigned int *data)
+				struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 	unsigned int val = s->readback[chan];
@@ -850,19 +845,17 @@ static int pcl818_ao_insn_write(struct comedi_device *dev,
 
 static int pcl818_di_insn_bits(struct comedi_device *dev,
 			       struct comedi_subdevice *s,
-			       struct comedi_insn *insn,
-			       unsigned int *data)
+			       struct comedi_insn *insn, unsigned int *data)
 {
 	data[1] = inb(dev->iobase + PCL818_DO_DI_LSB_REG) |
-		  (inb(dev->iobase + PCL818_DO_DI_MSB_REG) << 8);
+	    (inb(dev->iobase + PCL818_DO_DI_MSB_REG) << 8);
 
 	return insn->n;
 }
 
 static int pcl818_do_insn_bits(struct comedi_device *dev,
 			       struct comedi_subdevice *s,
-			       struct comedi_insn *insn,
-			       unsigned int *data)
+			       struct comedi_insn *insn, unsigned int *data)
 {
 	if (comedi_dio_update_state(s, data)) {
 		outb(s->state & 0xff, dev->iobase + PCL818_DO_DI_LSB_REG);
@@ -1035,37 +1028,37 @@ static int pcl818_attach(struct comedi_device *dev, struct comedi_devconfig *it)
 		return ret;
 
 	s = &dev->subdevices[0];
-	s->type		= COMEDI_SUBD_AI;
-	s->subdev_flags	= SDF_READABLE;
+	s->type = COMEDI_SUBD_AI;
+	s->subdev_flags = SDF_READABLE;
 	if (check_single_ended(dev->iobase)) {
-		s->n_chan	= 16;
-		s->subdev_flags	|= SDF_COMMON | SDF_GROUND;
+		s->n_chan = 16;
+		s->subdev_flags |= SDF_COMMON | SDF_GROUND;
 	} else {
-		s->n_chan	= 8;
-		s->subdev_flags	|= SDF_DIFF;
+		s->n_chan = 8;
+		s->subdev_flags |= SDF_DIFF;
 	}
-	s->maxdata	= 0x0fff;
+	s->maxdata = 0x0fff;
 
 	pcl818_set_ai_range_table(dev, s, it);
 
-	s->insn_read	= pcl818_ai_insn_read;
+	s->insn_read = pcl818_ai_insn_read;
 	if (dev->irq) {
 		dev->read_subdev = s;
-		s->subdev_flags	|= SDF_CMD_READ;
-		s->len_chanlist	= s->n_chan;
-		s->do_cmdtest	= ai_cmdtest;
-		s->do_cmd	= pcl818_ai_cmd;
-		s->cancel	= pcl818_ai_cancel;
+		s->subdev_flags |= SDF_CMD_READ;
+		s->len_chanlist = s->n_chan;
+		s->do_cmdtest = ai_cmdtest;
+		s->do_cmd = pcl818_ai_cmd;
+		s->cancel = pcl818_ai_cancel;
 	}
 
 	/* Analog Output subdevice */
 	s = &dev->subdevices[1];
 	if (board->n_aochan) {
-		s->type		= COMEDI_SUBD_AO;
-		s->subdev_flags	= SDF_WRITABLE | SDF_GROUND;
-		s->n_chan	= board->n_aochan;
-		s->maxdata	= 0x0fff;
-		s->range_table	= &range_unipolar5;
+		s->type = COMEDI_SUBD_AO;
+		s->subdev_flags = SDF_WRITABLE | SDF_GROUND;
+		s->n_chan = board->n_aochan;
+		s->maxdata = 0x0fff;
+		s->range_table = &range_unipolar5;
 		if (board->is_818) {
 			if ((it->options[4] == 1) || (it->options[4] == 10))
 				s->range_table = &range_unipolar10;
@@ -1077,32 +1070,32 @@ static int pcl818_attach(struct comedi_device *dev, struct comedi_devconfig *it)
 			if (it->options[5] == 2)
 				s->range_table = &range_unknown;
 		}
-		s->insn_write	= pcl818_ao_insn_write;
+		s->insn_write = pcl818_ao_insn_write;
 
 		ret = comedi_alloc_subdev_readback(s);
 		if (ret)
 			return ret;
 	} else {
-		s->type		= COMEDI_SUBD_UNUSED;
+		s->type = COMEDI_SUBD_UNUSED;
 	}
 
 	/* Digital Input subdevice */
 	s = &dev->subdevices[2];
-	s->type		= COMEDI_SUBD_DI;
-	s->subdev_flags	= SDF_READABLE;
-	s->n_chan	= 16;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_bits	= pcl818_di_insn_bits;
+	s->type = COMEDI_SUBD_DI;
+	s->subdev_flags = SDF_READABLE;
+	s->n_chan = 16;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_bits = pcl818_di_insn_bits;
 
 	/* Digital Output subdevice */
 	s = &dev->subdevices[3];
-	s->type		= COMEDI_SUBD_DO;
-	s->subdev_flags	= SDF_WRITABLE;
-	s->n_chan	= 16;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_bits	= pcl818_do_insn_bits;
+	s->type = COMEDI_SUBD_DO;
+	s->subdev_flags = SDF_WRITABLE;
+	s->n_chan = 16;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_bits = pcl818_do_insn_bits;
 
 	pcl818_reset(dev);
 
@@ -1122,14 +1115,15 @@ static void pcl818_detach(struct comedi_device *dev)
 }
 
 static struct comedi_driver pcl818_driver = {
-	.driver_name	= "pcl818",
-	.module		= THIS_MODULE,
-	.attach		= pcl818_attach,
-	.detach		= pcl818_detach,
-	.board_name	= &boardtypes[0].name,
-	.num_names	= ARRAY_SIZE(boardtypes),
-	.offset		= sizeof(struct pcl818_board),
+	.driver_name = "pcl818",
+	.module = THIS_MODULE,
+	.attach = pcl818_attach,
+	.detach = pcl818_detach,
+	.board_name = &boardtypes[0].name,
+	.num_names = ARRAY_SIZE(boardtypes),
+	.offset = sizeof(struct pcl818_board),
 };
+
 module_comedi_driver(pcl818_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

@@ -89,14 +89,14 @@
 
 static const struct comedi_lrange das6402_ai_ranges = {
 	8, {
-		BIP_RANGE(10),
-		BIP_RANGE(5),
-		BIP_RANGE(2.5),
-		BIP_RANGE(1.25),
-		UNI_RANGE(10),
-		UNI_RANGE(5),
-		UNI_RANGE(2.5),
-		UNI_RANGE(1.25)
+	    BIP_RANGE(10),
+	    BIP_RANGE(5),
+	    BIP_RANGE(2.5),
+	    BIP_RANGE(1.25),
+	    UNI_RANGE(10),
+	    UNI_RANGE(5),
+	    UNI_RANGE(2.5),
+	    UNI_RANGE(1.25)
 	}
 };
 
@@ -107,10 +107,10 @@ static const struct comedi_lrange das6402_ai_ranges = {
  */
 static const struct comedi_lrange das6402_ao_ranges = {
 	4, {
-		BIP_RANGE(5),
-		BIP_RANGE(10),
-		UNI_RANGE(5),
-		UNI_RANGE(10)
+	    BIP_RANGE(5),
+	    BIP_RANGE(10),
+	    UNI_RANGE(5),
+	    UNI_RANGE(10)
 	}
 };
 
@@ -121,12 +121,12 @@ struct das6402_boardinfo {
 
 static struct das6402_boardinfo das6402_boards[] = {
 	{
-		.name		= "das6402-12",
-		.maxdata	= 0x0fff,
-	}, {
-		.name		= "das6402-16",
-		.maxdata	= 0xffff,
-	},
+	 .name = "das6402-12",
+	 .maxdata = 0x0fff,
+	  }, {
+	      .name = "das6402-16",
+	      .maxdata = 0xffff,
+	       },
 };
 
 struct das6402_private {
@@ -134,14 +134,12 @@ struct das6402_private {
 	unsigned int ao_range;
 };
 
-static void das6402_set_mode(struct comedi_device *dev,
-			     unsigned int mode)
+static void das6402_set_mode(struct comedi_device *dev, unsigned int mode)
 {
 	outb(DAS6402_MODE_ENHANCED | mode, dev->iobase + DAS6402_MODE_REG);
 }
 
-static void das6402_set_extended(struct comedi_device *dev,
-				 unsigned int val)
+static void das6402_set_extended(struct comedi_device *dev, unsigned int val)
 {
 	outb(DAS6402_STATUS_W_EXTEND, dev->iobase + DAS6402_STATUS_REG);
 	outb(DAS6402_STATUS_W_EXTEND | val, dev->iobase + DAS6402_STATUS_REG);
@@ -205,8 +203,7 @@ static irqreturn_t das6402_interrupt(int irq, void *d)
 
 static void das6402_ai_set_mode(struct comedi_device *dev,
 				struct comedi_subdevice *s,
-				unsigned int chanspec,
-				unsigned int mode)
+				unsigned int chanspec, unsigned int mode)
 {
 	unsigned int range = CR_RANGE(chanspec);
 	unsigned int aref = CR_AREF(chanspec);
@@ -220,8 +217,7 @@ static void das6402_ai_set_mode(struct comedi_device *dev,
 	das6402_set_mode(dev, mode);
 }
 
-static int das6402_ai_cmd(struct comedi_device *dev,
-			  struct comedi_subdevice *s)
+static int das6402_ai_cmd(struct comedi_device *dev, struct comedi_subdevice *s)
 {
 	struct das6402_private *devpriv = dev->private;
 	struct comedi_cmd *cmd = &s->async->cmd;
@@ -324,7 +320,7 @@ static int das6402_ai_cmdtest(struct comedi_device *dev,
 
 	if (cmd->stop_src == TRIG_COUNT)
 		err |= comedi_check_trigger_arg_min(&cmd->stop_arg, 1);
-	else	/* TRIG_NONE */
+	else			/* TRIG_NONE */
 		err |= comedi_check_trigger_arg_is(&cmd->stop_arg, 0);
 
 	if (err)
@@ -364,8 +360,7 @@ static void das6402_ai_soft_trig(struct comedi_device *dev)
 
 static int das6402_ai_eoc(struct comedi_device *dev,
 			  struct comedi_subdevice *s,
-			  struct comedi_insn *insn,
-			  unsigned long context)
+			  struct comedi_insn *insn, unsigned long context)
 {
 	unsigned int status;
 
@@ -377,8 +372,7 @@ static int das6402_ai_eoc(struct comedi_device *dev,
 
 static int das6402_ai_insn_read(struct comedi_device *dev,
 				struct comedi_subdevice *s,
-				struct comedi_insn *insn,
-				unsigned int *data)
+				struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 	unsigned int aref = CR_AREF(insn->chanspec);
@@ -415,8 +409,7 @@ static int das6402_ai_insn_read(struct comedi_device *dev,
 
 static int das6402_ao_insn_write(struct comedi_device *dev,
 				 struct comedi_subdevice *s,
-				 struct comedi_insn *insn,
-				 unsigned int *data)
+				 struct comedi_insn *insn, unsigned int *data)
 {
 	struct das6402_private *devpriv = dev->private;
 	unsigned int chan = CR_CHAN(insn->chanspec);
@@ -475,8 +468,7 @@ static int das6402_ao_insn_write(struct comedi_device *dev,
 
 static int das6402_ao_insn_read(struct comedi_device *dev,
 				struct comedi_subdevice *s,
-				struct comedi_insn *insn,
-				unsigned int *data)
+				struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 
@@ -491,8 +483,7 @@ static int das6402_ao_insn_read(struct comedi_device *dev,
 
 static int das6402_di_insn_bits(struct comedi_device *dev,
 				struct comedi_subdevice *s,
-				struct comedi_insn *insn,
-				unsigned int *data)
+				struct comedi_insn *insn, unsigned int *data)
 {
 	data[1] = inb(dev->iobase + DAS6402_DI_DO_REG);
 
@@ -501,8 +492,7 @@ static int das6402_di_insn_bits(struct comedi_device *dev,
 
 static int das6402_do_insn_bits(struct comedi_device *dev,
 				struct comedi_subdevice *s,
-				struct comedi_insn *insn,
-				unsigned int *data)
+				struct comedi_insn *insn, unsigned int *data)
 {
 	if (comedi_dio_update_state(s, data))
 		outb(s->state, dev->iobase + DAS6402_DI_DO_REG);
@@ -527,9 +517,8 @@ static void das6402_reset(struct comedi_device *dev)
 
 	/* default ADC to single-ended unipolar 10V inputs */
 	das6402_set_mode(dev, DAS6402_MODE_RANGE(0) |
-			      DAS6402_MODE_POLLED |
-			      DAS6402_MODE_SE |
-			      DAS6402_MODE_UNI);
+			 DAS6402_MODE_POLLED |
+			 DAS6402_MODE_SE | DAS6402_MODE_UNI);
 
 	/* default mux for single channel conversion (channel 0) */
 	outw(DAS6402_AI_MUX_HI(0) | DAS6402_AI_MUX_LO(0),
@@ -603,30 +592,30 @@ static int das6402_attach(struct comedi_device *dev,
 
 	/* Analog Input subdevice */
 	s = &dev->subdevices[0];
-	s->type		= COMEDI_SUBD_AI;
-	s->subdev_flags	= SDF_READABLE | SDF_GROUND | SDF_DIFF;
-	s->n_chan	= 64;
-	s->maxdata	= board->maxdata;
-	s->range_table	= &das6402_ai_ranges;
-	s->insn_read	= das6402_ai_insn_read;
+	s->type = COMEDI_SUBD_AI;
+	s->subdev_flags = SDF_READABLE | SDF_GROUND | SDF_DIFF;
+	s->n_chan = 64;
+	s->maxdata = board->maxdata;
+	s->range_table = &das6402_ai_ranges;
+	s->insn_read = das6402_ai_insn_read;
 	if (dev->irq) {
 		dev->read_subdev = s;
-		s->subdev_flags	|= SDF_CMD_READ;
-		s->len_chanlist	= s->n_chan;
-		s->do_cmdtest	= das6402_ai_cmdtest;
-		s->do_cmd	= das6402_ai_cmd;
-		s->cancel	= das6402_ai_cancel;
+		s->subdev_flags |= SDF_CMD_READ;
+		s->len_chanlist = s->n_chan;
+		s->do_cmdtest = das6402_ai_cmdtest;
+		s->do_cmd = das6402_ai_cmd;
+		s->cancel = das6402_ai_cancel;
 	}
 
 	/* Analog Output subdevice */
 	s = &dev->subdevices[1];
-	s->type		= COMEDI_SUBD_AO;
-	s->subdev_flags	= SDF_WRITABLE;
-	s->n_chan	= 2;
-	s->maxdata	= board->maxdata;
-	s->range_table	= &das6402_ao_ranges;
-	s->insn_write	= das6402_ao_insn_write;
-	s->insn_read	= das6402_ao_insn_read;
+	s->type = COMEDI_SUBD_AO;
+	s->subdev_flags = SDF_WRITABLE;
+	s->n_chan = 2;
+	s->maxdata = board->maxdata;
+	s->range_table = &das6402_ao_ranges;
+	s->insn_write = das6402_ao_insn_write;
+	s->insn_read = das6402_ao_insn_read;
 
 	ret = comedi_alloc_subdev_readback(s);
 	if (ret)
@@ -634,36 +623,36 @@ static int das6402_attach(struct comedi_device *dev,
 
 	/* Digital Input subdevice */
 	s = &dev->subdevices[2];
-	s->type		= COMEDI_SUBD_DI;
-	s->subdev_flags	= SDF_READABLE;
-	s->n_chan	= 8;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_bits	= das6402_di_insn_bits;
+	s->type = COMEDI_SUBD_DI;
+	s->subdev_flags = SDF_READABLE;
+	s->n_chan = 8;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_bits = das6402_di_insn_bits;
 
 	/* Digital Input subdevice */
 	s = &dev->subdevices[3];
-	s->type		= COMEDI_SUBD_DO;
-	s->subdev_flags	= SDF_WRITABLE;
-	s->n_chan	= 8;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_bits	= das6402_do_insn_bits;
+	s->type = COMEDI_SUBD_DO;
+	s->subdev_flags = SDF_WRITABLE;
+	s->n_chan = 8;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_bits = das6402_do_insn_bits;
 
 	return 0;
 }
 
 static struct comedi_driver das6402_driver = {
-	.driver_name	= "das6402",
-	.module		= THIS_MODULE,
-	.attach		= das6402_attach,
-	.detach		= comedi_legacy_detach,
-	.board_name	= &das6402_boards[0].name,
-	.num_names	= ARRAY_SIZE(das6402_boards),
-	.offset		= sizeof(struct das6402_boardinfo),
+	.driver_name = "das6402",
+	.module = THIS_MODULE,
+	.attach = das6402_attach,
+	.detach = comedi_legacy_detach,
+	.board_name = &das6402_boards[0].name,
+	.num_names = ARRAY_SIZE(das6402_boards),
+	.offset = sizeof(struct das6402_boardinfo),
 };
-module_comedi_driver(das6402_driver)
 
-MODULE_AUTHOR("H Hartley Sweeten <hsweeten@visionengravers.com>");
+module_comedi_driver(das6402_driver)
+    MODULE_AUTHOR("H Hartley Sweeten <hsweeten@visionengravers.com>");
 MODULE_DESCRIPTION("Comedi driver for DAS6402 compatible boards");
 MODULE_LICENSE("GPL");

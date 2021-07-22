@@ -97,8 +97,8 @@ enum vmk80xx_model {
 
 static const struct comedi_lrange vmk8061_range = {
 	2, {
-		UNI_RANGE(5),
-		UNI_RANGE(10)
+	    UNI_RANGE(5),
+	    UNI_RANGE(10)
 	}
 };
 
@@ -117,27 +117,27 @@ struct vmk80xx_board {
 
 static const struct vmk80xx_board vmk80xx_boardinfo[] = {
 	[DEVICE_VMK8055] = {
-		.name		= "K8055 (VM110)",
-		.model		= VMK8055_MODEL,
-		.range		= &range_unipolar5,
-		.ai_nchans	= 2,
-		.ai_maxdata	= 0x00ff,
-		.ao_nchans	= 2,
-		.di_nchans	= 6,
-		.cnt_maxdata	= 0xffff,
-	},
+			    .name = "K8055 (VM110)",
+			    .model = VMK8055_MODEL,
+			    .range = &range_unipolar5,
+			    .ai_nchans = 2,
+			    .ai_maxdata = 0x00ff,
+			    .ao_nchans = 2,
+			    .di_nchans = 6,
+			    .cnt_maxdata = 0xffff,
+			     },
 	[DEVICE_VMK8061] = {
-		.name		= "K8061 (VM140)",
-		.model		= VMK8061_MODEL,
-		.range		= &vmk8061_range,
-		.ai_nchans	= 8,
-		.ai_maxdata	= 0x03ff,
-		.ao_nchans	= 8,
-		.di_nchans	= 8,
-		.cnt_maxdata	= 0,	/* unknown, device is not writeable */
-		.pwm_nchans	= 1,
-		.pwm_maxdata	= 0x03ff,
-	},
+			    .name = "K8061 (VM140)",
+			    .model = VMK8061_MODEL,
+			    .range = &vmk8061_range,
+			    .ai_nchans = 8,
+			    .ai_maxdata = 0x03ff,
+			    .ao_nchans = 8,
+			    .di_nchans = 8,
+			    .cnt_maxdata = 0,	/* unknown, device is not writeable */
+			    .pwm_nchans = 1,
+			    .pwm_maxdata = 0x03ff,
+			     },
 };
 
 struct vmk80xx_private {
@@ -190,8 +190,7 @@ static int vmk80xx_read_packet(struct comedi_device *dev)
 	ep = devpriv->ep_rx;
 	pipe = usb_rcvintpipe(usb, ep->bEndpointAddress);
 	return usb_interrupt_msg(usb, pipe, devpriv->usb_rx_buf,
-				 usb_endpoint_maxp(ep), NULL,
-				 HZ * 10);
+				 usb_endpoint_maxp(ep), NULL, HZ * 10);
 }
 
 static int vmk80xx_write_packet(struct comedi_device *dev, int cmd)
@@ -211,8 +210,7 @@ static int vmk80xx_write_packet(struct comedi_device *dev, int cmd)
 	ep = devpriv->ep_tx;
 	pipe = usb_sndintpipe(usb, ep->bEndpointAddress);
 	return usb_interrupt_msg(usb, pipe, devpriv->usb_tx_buf,
-				 usb_endpoint_maxp(ep), NULL,
-				 HZ * 10);
+				 usb_endpoint_maxp(ep), NULL, HZ * 10);
 }
 
 static int vmk80xx_reset_device(struct comedi_device *dev)
@@ -232,8 +230,7 @@ static int vmk80xx_reset_device(struct comedi_device *dev)
 
 static int vmk80xx_ai_insn_read(struct comedi_device *dev,
 				struct comedi_subdevice *s,
-				struct comedi_insn *insn,
-				unsigned int *data)
+				struct comedi_insn *insn, unsigned int *data)
 {
 	struct vmk80xx_private *devpriv = dev->private;
 	int chan;
@@ -280,8 +277,7 @@ static int vmk80xx_ai_insn_read(struct comedi_device *dev,
 
 static int vmk80xx_ao_insn_write(struct comedi_device *dev,
 				 struct comedi_subdevice *s,
-				 struct comedi_insn *insn,
-				 unsigned int *data)
+				 struct comedi_insn *insn, unsigned int *data)
 {
 	struct vmk80xx_private *devpriv = dev->private;
 	int chan;
@@ -321,8 +317,7 @@ static int vmk80xx_ao_insn_write(struct comedi_device *dev,
 
 static int vmk80xx_ao_insn_read(struct comedi_device *dev,
 				struct comedi_subdevice *s,
-				struct comedi_insn *insn,
-				unsigned int *data)
+				struct comedi_insn *insn, unsigned int *data)
 {
 	struct vmk80xx_private *devpriv = dev->private;
 	int chan;
@@ -350,8 +345,7 @@ static int vmk80xx_ao_insn_read(struct comedi_device *dev,
 
 static int vmk80xx_di_insn_bits(struct comedi_device *dev,
 				struct comedi_subdevice *s,
-				struct comedi_insn *insn,
-				unsigned int *data)
+				struct comedi_insn *insn, unsigned int *data)
 {
 	struct vmk80xx_private *devpriv = dev->private;
 	unsigned char *rx_buf;
@@ -374,8 +368,8 @@ static int vmk80xx_di_insn_bits(struct comedi_device *dev,
 	if (!retval) {
 		if (devpriv->model == VMK8055_MODEL)
 			data[1] = (((rx_buf[reg] >> 4) & 0x03) |
-				  ((rx_buf[reg] << 2) & 0x04) |
-				  ((rx_buf[reg] >> 3) & 0x18));
+				   ((rx_buf[reg] << 2) & 0x04) |
+				   ((rx_buf[reg] >> 3) & 0x18));
 		else
 			data[1] = rx_buf[reg];
 
@@ -389,8 +383,7 @@ static int vmk80xx_di_insn_bits(struct comedi_device *dev,
 
 static int vmk80xx_do_insn_bits(struct comedi_device *dev,
 				struct comedi_subdevice *s,
-				struct comedi_insn *insn,
-				unsigned int *data)
+				struct comedi_insn *insn, unsigned int *data)
 {
 	struct vmk80xx_private *devpriv = dev->private;
 	unsigned char *rx_buf = devpriv->usb_rx_buf;
@@ -401,7 +394,7 @@ static int vmk80xx_do_insn_bits(struct comedi_device *dev,
 	if (devpriv->model == VMK8061_MODEL) {
 		reg = VMK8061_DO_REG;
 		cmd = VMK8061_CMD_DO;
-	} else { /* VMK8055_MODEL */
+	} else {		/* VMK8055_MODEL */
 		reg = VMK8055_DO_REG;
 		cmd = VMK8055_CMD_WRT_AD;
 	}
@@ -433,8 +426,7 @@ out:
 
 static int vmk80xx_cnt_insn_read(struct comedi_device *dev,
 				 struct comedi_subdevice *s,
-				 struct comedi_insn *insn,
-				 unsigned int *data)
+				 struct comedi_insn *insn, unsigned int *data)
 {
 	struct vmk80xx_private *devpriv = dev->private;
 	int chan;
@@ -465,7 +457,7 @@ static int vmk80xx_cnt_insn_read(struct comedi_device *dev,
 
 		if (devpriv->model == VMK8055_MODEL)
 			data[n] = devpriv->usb_rx_buf[reg[0]];
-		else /* VMK8061_MODEL */
+		else		/* VMK8061_MODEL */
 			data[n] = devpriv->usb_rx_buf[reg[0] * (chan + 1) + 1]
 			    + 256 * devpriv->usb_rx_buf[reg[1] * 2 + 2];
 	}
@@ -477,8 +469,7 @@ static int vmk80xx_cnt_insn_read(struct comedi_device *dev,
 
 static int vmk80xx_cnt_insn_config(struct comedi_device *dev,
 				   struct comedi_subdevice *s,
-				   struct comedi_insn *insn,
-				   unsigned int *data)
+				   struct comedi_insn *insn, unsigned int *data)
 {
 	struct vmk80xx_private *devpriv = dev->private;
 	unsigned int chan = CR_CHAN(insn->chanspec);
@@ -514,8 +505,7 @@ static int vmk80xx_cnt_insn_config(struct comedi_device *dev,
 
 static int vmk80xx_cnt_insn_write(struct comedi_device *dev,
 				  struct comedi_subdevice *s,
-				  struct comedi_insn *insn,
-				  unsigned int *data)
+				  struct comedi_insn *insn, unsigned int *data)
 {
 	struct vmk80xx_private *devpriv = dev->private;
 	unsigned long debtime;
@@ -558,8 +548,7 @@ static int vmk80xx_cnt_insn_write(struct comedi_device *dev,
 
 static int vmk80xx_pwm_insn_read(struct comedi_device *dev,
 				 struct comedi_subdevice *s,
-				 struct comedi_insn *insn,
-				 unsigned int *data)
+				 struct comedi_insn *insn, unsigned int *data)
 {
 	struct vmk80xx_private *devpriv = dev->private;
 	unsigned char *tx_buf;
@@ -591,8 +580,7 @@ static int vmk80xx_pwm_insn_read(struct comedi_device *dev,
 
 static int vmk80xx_pwm_insn_write(struct comedi_device *dev,
 				  struct comedi_subdevice *s,
-				  struct comedi_insn *insn,
-				  unsigned int *data)
+				  struct comedi_insn *insn, unsigned int *data)
 {
 	struct vmk80xx_private *devpriv = dev->private;
 	unsigned char *tx_buf;
@@ -667,7 +655,8 @@ static int vmk80xx_find_usb_endpoints(struct comedi_device *dev)
 	if (!devpriv->ep_rx || !devpriv->ep_tx)
 		return -ENODEV;
 
-	if (!usb_endpoint_maxp(devpriv->ep_rx) || !usb_endpoint_maxp(devpriv->ep_tx))
+	if (!usb_endpoint_maxp(devpriv->ep_rx)
+	    || !usb_endpoint_maxp(devpriv->ep_tx))
 		return -EINVAL;
 
 	return 0;
@@ -713,66 +702,66 @@ static int vmk80xx_init_subdevices(struct comedi_device *dev)
 
 	/* Analog input subdevice */
 	s = &dev->subdevices[0];
-	s->type		= COMEDI_SUBD_AI;
-	s->subdev_flags	= SDF_READABLE | SDF_GROUND;
-	s->n_chan	= board->ai_nchans;
-	s->maxdata	= board->ai_maxdata;
-	s->range_table	= board->range;
-	s->insn_read	= vmk80xx_ai_insn_read;
+	s->type = COMEDI_SUBD_AI;
+	s->subdev_flags = SDF_READABLE | SDF_GROUND;
+	s->n_chan = board->ai_nchans;
+	s->maxdata = board->ai_maxdata;
+	s->range_table = board->range;
+	s->insn_read = vmk80xx_ai_insn_read;
 
 	/* Analog output subdevice */
 	s = &dev->subdevices[1];
-	s->type		= COMEDI_SUBD_AO;
-	s->subdev_flags	= SDF_WRITABLE | SDF_GROUND;
-	s->n_chan	= board->ao_nchans;
-	s->maxdata	= 0x00ff;
-	s->range_table	= board->range;
-	s->insn_write	= vmk80xx_ao_insn_write;
+	s->type = COMEDI_SUBD_AO;
+	s->subdev_flags = SDF_WRITABLE | SDF_GROUND;
+	s->n_chan = board->ao_nchans;
+	s->maxdata = 0x00ff;
+	s->range_table = board->range;
+	s->insn_write = vmk80xx_ao_insn_write;
 	if (devpriv->model == VMK8061_MODEL) {
-		s->subdev_flags	|= SDF_READABLE;
-		s->insn_read	= vmk80xx_ao_insn_read;
+		s->subdev_flags |= SDF_READABLE;
+		s->insn_read = vmk80xx_ao_insn_read;
 	}
 
 	/* Digital input subdevice */
 	s = &dev->subdevices[2];
-	s->type		= COMEDI_SUBD_DI;
-	s->subdev_flags	= SDF_READABLE;
-	s->n_chan	= board->di_nchans;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_bits	= vmk80xx_di_insn_bits;
+	s->type = COMEDI_SUBD_DI;
+	s->subdev_flags = SDF_READABLE;
+	s->n_chan = board->di_nchans;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_bits = vmk80xx_di_insn_bits;
 
 	/* Digital output subdevice */
 	s = &dev->subdevices[3];
-	s->type		= COMEDI_SUBD_DO;
-	s->subdev_flags	= SDF_WRITABLE;
-	s->n_chan	= 8;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_bits	= vmk80xx_do_insn_bits;
+	s->type = COMEDI_SUBD_DO;
+	s->subdev_flags = SDF_WRITABLE;
+	s->n_chan = 8;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_bits = vmk80xx_do_insn_bits;
 
 	/* Counter subdevice */
 	s = &dev->subdevices[4];
-	s->type		= COMEDI_SUBD_COUNTER;
-	s->subdev_flags	= SDF_READABLE;
-	s->n_chan	= 2;
-	s->maxdata	= board->cnt_maxdata;
-	s->insn_read	= vmk80xx_cnt_insn_read;
-	s->insn_config	= vmk80xx_cnt_insn_config;
+	s->type = COMEDI_SUBD_COUNTER;
+	s->subdev_flags = SDF_READABLE;
+	s->n_chan = 2;
+	s->maxdata = board->cnt_maxdata;
+	s->insn_read = vmk80xx_cnt_insn_read;
+	s->insn_config = vmk80xx_cnt_insn_config;
 	if (devpriv->model == VMK8055_MODEL) {
-		s->subdev_flags	|= SDF_WRITABLE;
-		s->insn_write	= vmk80xx_cnt_insn_write;
+		s->subdev_flags |= SDF_WRITABLE;
+		s->insn_write = vmk80xx_cnt_insn_write;
 	}
 
 	/* PWM subdevice */
 	if (devpriv->model == VMK8061_MODEL) {
 		s = &dev->subdevices[5];
-		s->type		= COMEDI_SUBD_PWM;
-		s->subdev_flags	= SDF_READABLE | SDF_WRITABLE;
-		s->n_chan	= board->pwm_nchans;
-		s->maxdata	= board->pwm_maxdata;
-		s->insn_read	= vmk80xx_pwm_insn_read;
-		s->insn_write	= vmk80xx_pwm_insn_write;
+		s->type = COMEDI_SUBD_PWM;
+		s->subdev_flags = SDF_READABLE | SDF_WRITABLE;
+		s->n_chan = board->pwm_nchans;
+		s->maxdata = board->pwm_maxdata;
+		s->insn_read = vmk80xx_pwm_insn_read;
+		s->insn_write = vmk80xx_pwm_insn_write;
 	}
 
 	up(&devpriv->limit_sem);
@@ -780,8 +769,7 @@ static int vmk80xx_init_subdevices(struct comedi_device *dev)
 	return 0;
 }
 
-static int vmk80xx_auto_attach(struct comedi_device *dev,
-			       unsigned long context)
+static int vmk80xx_auto_attach(struct comedi_device *dev, unsigned long context)
 {
 	struct usb_interface *intf = comedi_to_usb_interface(dev);
 	const struct vmk80xx_board *board = NULL;
@@ -838,10 +826,10 @@ static void vmk80xx_detach(struct comedi_device *dev)
 }
 
 static struct comedi_driver vmk80xx_driver = {
-	.module		= THIS_MODULE,
-	.driver_name	= "vmk80xx",
-	.auto_attach	= vmk80xx_auto_attach,
-	.detach		= vmk80xx_detach,
+	.module = THIS_MODULE,
+	.driver_name = "vmk80xx",
+	.auto_attach = vmk80xx_auto_attach,
+	.detach = vmk80xx_detach,
 };
 
 static int vmk80xx_usb_probe(struct usb_interface *intf,
@@ -865,14 +853,16 @@ static const struct usb_device_id vmk80xx_usb_id_table[] = {
 	{ USB_DEVICE(0x10cf, 0x8068), .driver_info = DEVICE_VMK8061 },
 	{ }
 };
+
 MODULE_DEVICE_TABLE(usb, vmk80xx_usb_id_table);
 
 static struct usb_driver vmk80xx_usb_driver = {
-	.name		= "vmk80xx",
-	.id_table	= vmk80xx_usb_id_table,
-	.probe		= vmk80xx_usb_probe,
-	.disconnect	= comedi_usb_auto_unconfig,
+	.name = "vmk80xx",
+	.id_table = vmk80xx_usb_id_table,
+	.probe = vmk80xx_usb_probe,
+	.disconnect = comedi_usb_auto_unconfig,
 };
+
 module_comedi_usb_driver(vmk80xx_driver, vmk80xx_usb_driver);
 
 MODULE_AUTHOR("Manuel Gebele <forensixs@gmx.de>");

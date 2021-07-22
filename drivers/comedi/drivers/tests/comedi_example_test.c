@@ -60,7 +60,9 @@ static int __init unittest_enter(void)
 	return 0;
 }
 
-static void __exit unittest_exit(void) { }
+static void __exit unittest_exit(void)
+{
+}
 
 module_init(unittest_enter);
 module_exit(unittest_exit);

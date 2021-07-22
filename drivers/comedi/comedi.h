@@ -156,15 +156,15 @@
 #define TRIG_ANY	0xffffffff
 #define TRIG_INVALID	0x00000000
 
-#define TRIG_NONE	0x00000001 /* never trigger */
-#define TRIG_NOW	0x00000002 /* trigger now + N ns */
-#define TRIG_FOLLOW	0x00000004 /* trigger on next lower level trig */
-#define TRIG_TIME	0x00000008 /* trigger at time N ns */
-#define TRIG_TIMER	0x00000010 /* trigger at rate N ns */
-#define TRIG_COUNT	0x00000020 /* trigger when count reaches N */
-#define TRIG_EXT	0x00000040 /* trigger on external signal N */
-#define TRIG_INT	0x00000080 /* trigger on comedi-internal signal N */
-#define TRIG_OTHER	0x00000100 /* driver defined */
+#define TRIG_NONE	0x00000001	/* never trigger */
+#define TRIG_NOW	0x00000002	/* trigger now + N ns */
+#define TRIG_FOLLOW	0x00000004	/* trigger on next lower level trig */
+#define TRIG_TIME	0x00000008	/* trigger at time N ns */
+#define TRIG_TIMER	0x00000010	/* trigger at rate N ns */
+#define TRIG_COUNT	0x00000020	/* trigger when count reaches N */
+#define TRIG_EXT	0x00000040	/* trigger on external signal N */
+#define TRIG_INT	0x00000080	/* trigger on comedi-internal signal N */
+#define TRIG_OTHER	0x00000100	/* driver defined */
 
 /* subdevice flags */
 
@@ -178,9 +178,9 @@
 #define SDF_PWM_COUNTER 0x0080	/* PWM can automatically switch off */
 #define SDF_PWM_HBRIDGE 0x0100	/* PWM is signed (H-bridge) */
 #define SDF_CMD		0x1000	/* can do commands (deprecated) */
-#define SDF_SOFT_CALIBRATED	0x2000 /* subdevice uses software calibration */
-#define SDF_CMD_WRITE		0x4000 /* can do output commands */
-#define SDF_CMD_READ		0x8000 /* can do input commands */
+#define SDF_SOFT_CALIBRATED	0x2000	/* subdevice uses software calibration */
+#define SDF_CMD_WRITE		0x4000	/* can do output commands */
+#define SDF_CMD_READ		0x8000	/* can do input commands */
 
 /* subdevice can be read (e.g. analog input) */
 #define SDF_READABLE	0x00010000
@@ -320,8 +320,8 @@ enum configuration_ids {
 	INSN_CONFIG_FILTER = 24,
 	INSN_CONFIG_CHANGE_NOTIFY = 25,
 
-	INSN_CONFIG_SERIAL_CLOCK = 26,	/*ALPHA*/
-	INSN_CONFIG_BIDIRECTIONAL_DATA = 27,
+	INSN_CONFIG_SERIAL_CLOCK = 26, /*ALPHA*/
+	    INSN_CONFIG_BIDIRECTIONAL_DATA = 27,
 	INSN_CONFIG_DIO_QUERY = 28,
 	INSN_CONFIG_PWM_OUTPUT = 29,
 	INSN_CONFIG_GET_PWM_OUTPUT = 30,
@@ -1053,7 +1053,7 @@ enum ni_common_signal_names {
 	NI_AI_HoldCompleteEvent,
 	NI_AI_HoldComplete,
 	NI_AI_ExternalMUXClock,
-	NI_AI_STOP, /* pulse signal that occurs when a update is finished(?) */
+	NI_AI_STOP,		/* pulse signal that occurs when a update is finished(?) */
 	NI_AO_SampleClock,
 	NI_AO_SampleClockTimebase,
 	NI_AO_StartTrigger,
@@ -1137,38 +1137,37 @@ enum ni_gpct_mode_bits {
 	NI_GPCT_LOADING_ON_TC_BIT = 0x1000,
 	NI_GPCT_LOADING_ON_GATE_BIT = 0x4000,
 	NI_GPCT_COUNTING_MODE_MASK = 0x7 << NI_GPCT_COUNTING_MODE_SHIFT,
-	NI_GPCT_COUNTING_MODE_NORMAL_BITS =
-		0x0 << NI_GPCT_COUNTING_MODE_SHIFT,
+	NI_GPCT_COUNTING_MODE_NORMAL_BITS = 0x0 << NI_GPCT_COUNTING_MODE_SHIFT,
 	NI_GPCT_COUNTING_MODE_QUADRATURE_X1_BITS =
-		0x1 << NI_GPCT_COUNTING_MODE_SHIFT,
+	    0x1 << NI_GPCT_COUNTING_MODE_SHIFT,
 	NI_GPCT_COUNTING_MODE_QUADRATURE_X2_BITS =
-		0x2 << NI_GPCT_COUNTING_MODE_SHIFT,
+	    0x2 << NI_GPCT_COUNTING_MODE_SHIFT,
 	NI_GPCT_COUNTING_MODE_QUADRATURE_X4_BITS =
-		0x3 << NI_GPCT_COUNTING_MODE_SHIFT,
+	    0x3 << NI_GPCT_COUNTING_MODE_SHIFT,
 	NI_GPCT_COUNTING_MODE_TWO_PULSE_BITS =
-		0x4 << NI_GPCT_COUNTING_MODE_SHIFT,
+	    0x4 << NI_GPCT_COUNTING_MODE_SHIFT,
 	NI_GPCT_COUNTING_MODE_SYNC_SOURCE_BITS =
-		0x6 << NI_GPCT_COUNTING_MODE_SHIFT,
+	    0x6 << NI_GPCT_COUNTING_MODE_SHIFT,
 	NI_GPCT_INDEX_PHASE_MASK = 0x3 << NI_GPCT_INDEX_PHASE_BITSHIFT,
 	NI_GPCT_INDEX_PHASE_LOW_A_LOW_B_BITS =
-		0x0 << NI_GPCT_INDEX_PHASE_BITSHIFT,
+	    0x0 << NI_GPCT_INDEX_PHASE_BITSHIFT,
 	NI_GPCT_INDEX_PHASE_LOW_A_HIGH_B_BITS =
-		0x1 << NI_GPCT_INDEX_PHASE_BITSHIFT,
+	    0x1 << NI_GPCT_INDEX_PHASE_BITSHIFT,
 	NI_GPCT_INDEX_PHASE_HIGH_A_LOW_B_BITS =
-		0x2 << NI_GPCT_INDEX_PHASE_BITSHIFT,
+	    0x2 << NI_GPCT_INDEX_PHASE_BITSHIFT,
 	NI_GPCT_INDEX_PHASE_HIGH_A_HIGH_B_BITS =
-		0x3 << NI_GPCT_INDEX_PHASE_BITSHIFT,
+	    0x3 << NI_GPCT_INDEX_PHASE_BITSHIFT,
 	NI_GPCT_INDEX_ENABLE_BIT = 0x400000,
 	NI_GPCT_COUNTING_DIRECTION_MASK =
-		0x3 << NI_GPCT_COUNTING_DIRECTION_SHIFT,
+	    0x3 << NI_GPCT_COUNTING_DIRECTION_SHIFT,
 	NI_GPCT_COUNTING_DIRECTION_DOWN_BITS =
-		0x00 << NI_GPCT_COUNTING_DIRECTION_SHIFT,
+	    0x00 << NI_GPCT_COUNTING_DIRECTION_SHIFT,
 	NI_GPCT_COUNTING_DIRECTION_UP_BITS =
-		0x1 << NI_GPCT_COUNTING_DIRECTION_SHIFT,
+	    0x1 << NI_GPCT_COUNTING_DIRECTION_SHIFT,
 	NI_GPCT_COUNTING_DIRECTION_HW_UP_DOWN_BITS =
-		0x2 << NI_GPCT_COUNTING_DIRECTION_SHIFT,
+	    0x2 << NI_GPCT_COUNTING_DIRECTION_SHIFT,
 	NI_GPCT_COUNTING_DIRECTION_HW_GATE_BITS =
-		0x3 << NI_GPCT_COUNTING_DIRECTION_SHIFT,
+	    0x3 << NI_GPCT_COUNTING_DIRECTION_SHIFT,
 	NI_GPCT_RELOAD_SOURCE_MASK = 0xc000000,
 	NI_GPCT_RELOAD_SOURCE_FIXED_BITS = 0x0,
 	NI_GPCT_RELOAD_SOURCE_SWITCHING_BITS = 0x4000000,
@@ -1469,7 +1468,7 @@ enum amplc_dio_clock_source {
 	/* the following are "enhanced" clock sources for PCIe models */
 	AMPLC_DIO_CLK_VCC,	/* clock input HIGH */
 	AMPLC_DIO_CLK_GND,	/* clock input LOW */
-	AMPLC_DIO_CLK_PAT_PRESENT, /* "pattern present" signal */
+	AMPLC_DIO_CLK_PAT_PRESENT,	/* "pattern present" signal */
 	AMPLC_DIO_CLK_20MHZ	/* 20 MHz internal clock */
 };
 
@@ -1503,14 +1502,14 @@ enum amplc_dio_gate_source {
 	AMPLC_DIO_GAT_RESERVED6,
 	AMPLC_DIO_GAT_RESERVED7,
 	/* the following are "enhanced" gate sources for PCIe models */
-	AMPLC_DIO_GAT_NGATN = 6, /* negated per channel gate input */
+	AMPLC_DIO_GAT_NGATN = 6,	/* negated per channel gate input */
 	/* non-negated output of counter channel minus 2 */
 	AMPLC_DIO_GAT_OUTNM2,
-	AMPLC_DIO_GAT_PAT_PRESENT, /* "pattern present" signal */
-	AMPLC_DIO_GAT_PAT_OCCURRED, /* "pattern occurred" latched */
+	AMPLC_DIO_GAT_PAT_PRESENT,	/* "pattern present" signal */
+	AMPLC_DIO_GAT_PAT_OCCURRED,	/* "pattern occurred" latched */
 	AMPLC_DIO_GAT_PAT_GONE,	/* "pattern gone away" latched */
-	AMPLC_DIO_GAT_NPAT_PRESENT, /* negated "pattern present" */
-	AMPLC_DIO_GAT_NPAT_OCCURRED, /* negated "pattern occurred" */
+	AMPLC_DIO_GAT_NPAT_PRESENT,	/* negated "pattern present" */
+	AMPLC_DIO_GAT_NPAT_OCCURRED,	/* negated "pattern occurred" */
 	AMPLC_DIO_GAT_NPAT_GONE	/* negated "pattern gone away" */
 };
 
@@ -1520,9 +1519,9 @@ enum amplc_dio_gate_source {
  * (ke_counter driver).
  */
 enum ke_counter_clock_source {
-	KE_CLK_20MHZ,	/* internal 20MHz (default) */
-	KE_CLK_4MHZ,	/* internal 4MHz (option) */
-	KE_CLK_EXT	/* external clock on pin 21 of D-Sub */
+	KE_CLK_20MHZ,		/* internal 20MHz (default) */
+	KE_CLK_4MHZ,		/* internal 4MHz (option) */
+	KE_CLK_EXT		/* external clock on pin 21 of D-Sub */
 };
 
 #endif /* _COMEDI_H */

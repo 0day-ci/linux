@@ -111,19 +111,19 @@
 
 static const struct comedi_lrange cb_pcimdas_ai_bip_range = {
 	4, {
-		BIP_RANGE(10),
-		BIP_RANGE(5),
-		BIP_RANGE(2.5),
-		BIP_RANGE(1.25)
+	    BIP_RANGE(10),
+	    BIP_RANGE(5),
+	    BIP_RANGE(2.5),
+	    BIP_RANGE(1.25)
 	}
 };
 
 static const struct comedi_lrange cb_pcimdas_ai_uni_range = {
 	4, {
-		UNI_RANGE(10),
-		UNI_RANGE(5),
-		UNI_RANGE(2.5),
-		UNI_RANGE(1.25)
+	    UNI_RANGE(10),
+	    UNI_RANGE(5),
+	    UNI_RANGE(2.5),
+	    UNI_RANGE(1.25)
 	}
 };
 
@@ -133,12 +133,12 @@ static const struct comedi_lrange cb_pcimdas_ai_uni_range = {
  */
 static const struct comedi_lrange cb_pcimdas_ao_range = {
 	6, {
-		BIP_RANGE(10),
-		BIP_RANGE(5),
-		UNI_RANGE(10),
-		UNI_RANGE(5),
-		RANGE_ext(-1, 1),
-		RANGE_ext(0, 1)
+	    BIP_RANGE(10),
+	    BIP_RANGE(5),
+	    UNI_RANGE(10),
+	    UNI_RANGE(5),
+	    RANGE_ext(-1, 1),
+	    RANGE_ext(0, 1)
 	}
 };
 
@@ -156,8 +156,7 @@ struct cb_pcimdas_private {
 
 static int cb_pcimdas_ai_eoc(struct comedi_device *dev,
 			     struct comedi_subdevice *s,
-			     struct comedi_insn *insn,
-			     unsigned long context)
+			     struct comedi_insn *insn, unsigned long context)
 {
 	struct cb_pcimdas_private *devpriv = dev->private;
 	unsigned int status;
@@ -170,8 +169,7 @@ static int cb_pcimdas_ai_eoc(struct comedi_device *dev,
 
 static int cb_pcimdas_ai_insn_read(struct comedi_device *dev,
 				   struct comedi_subdevice *s,
-				   struct comedi_insn *insn,
-				   unsigned int *data)
+				   struct comedi_insn *insn, unsigned int *data)
 {
 	struct cb_pcimdas_private *devpriv = dev->private;
 	unsigned int chan = CR_CHAN(insn->chanspec);
@@ -238,8 +236,7 @@ static int cb_pcimdas_ao_insn_write(struct comedi_device *dev,
 
 static int cb_pcimdas_di_insn_bits(struct comedi_device *dev,
 				   struct comedi_subdevice *s,
-				   struct comedi_insn *insn,
-				   unsigned int *data)
+				   struct comedi_insn *insn, unsigned int *data)
 {
 	struct cb_pcimdas_private *devpriv = dev->private;
 	unsigned int val;
@@ -253,8 +250,7 @@ static int cb_pcimdas_di_insn_bits(struct comedi_device *dev,
 
 static int cb_pcimdas_do_insn_bits(struct comedi_device *dev,
 				   struct comedi_subdevice *s,
-				   struct comedi_insn *insn,
-				   unsigned int *data)
+				   struct comedi_insn *insn, unsigned int *data)
 {
 	struct cb_pcimdas_private *devpriv = dev->private;
 
@@ -366,8 +362,7 @@ static int cb_pcimdas_auto_attach(struct comedi_device *dev,
 	dev->iobase = pci_resource_start(pcidev, 4);
 
 	dev->pacer = comedi_8254_init(devpriv->BADR3 + PCIMDAS_8254_BASE,
-				      cb_pcimdas_pacer_clk(dev),
-				      I8254_IO8, 0);
+				      cb_pcimdas_pacer_clk(dev), I8254_IO8, 0);
 	if (!dev->pacer)
 		return -ENOMEM;
 
@@ -377,28 +372,28 @@ static int cb_pcimdas_auto_attach(struct comedi_device *dev,
 
 	/* Analog Input subdevice */
 	s = &dev->subdevices[0];
-	s->type		= COMEDI_SUBD_AI;
-	s->subdev_flags	= SDF_READABLE;
+	s->type = COMEDI_SUBD_AI;
+	s->subdev_flags = SDF_READABLE;
 	if (cb_pcimdas_is_ai_se(dev)) {
-		s->subdev_flags	|= SDF_GROUND;
-		s->n_chan	= 16;
+		s->subdev_flags |= SDF_GROUND;
+		s->n_chan = 16;
 	} else {
-		s->subdev_flags	|= SDF_DIFF;
-		s->n_chan	= 8;
+		s->subdev_flags |= SDF_DIFF;
+		s->n_chan = 8;
 	}
-	s->maxdata	= 0xffff;
-	s->range_table	= cb_pcimdas_is_ai_uni(dev) ? &cb_pcimdas_ai_uni_range
-						    : &cb_pcimdas_ai_bip_range;
-	s->insn_read	= cb_pcimdas_ai_insn_read;
+	s->maxdata = 0xffff;
+	s->range_table = cb_pcimdas_is_ai_uni(dev) ? &cb_pcimdas_ai_uni_range
+	    : &cb_pcimdas_ai_bip_range;
+	s->insn_read = cb_pcimdas_ai_insn_read;
 
 	/* Analog Output subdevice */
 	s = &dev->subdevices[1];
-	s->type		= COMEDI_SUBD_AO;
-	s->subdev_flags	= SDF_WRITABLE;
-	s->n_chan	= 2;
-	s->maxdata	= 0xfff;
-	s->range_table	= &cb_pcimdas_ao_range;
-	s->insn_write	= cb_pcimdas_ao_insn_write;
+	s->type = COMEDI_SUBD_AO;
+	s->subdev_flags = SDF_WRITABLE;
+	s->n_chan = 2;
+	s->maxdata = 0xfff;
+	s->range_table = &cb_pcimdas_ao_range;
+	s->insn_write = cb_pcimdas_ao_insn_write;
 
 	ret = comedi_alloc_subdev_readback(s);
 	if (ret)
@@ -412,21 +407,21 @@ static int cb_pcimdas_auto_attach(struct comedi_device *dev,
 
 	/* Digital Input subdevice (main connector) */
 	s = &dev->subdevices[3];
-	s->type		= COMEDI_SUBD_DI;
-	s->subdev_flags	= SDF_READABLE;
-	s->n_chan	= 4;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_bits	= cb_pcimdas_di_insn_bits;
+	s->type = COMEDI_SUBD_DI;
+	s->subdev_flags = SDF_READABLE;
+	s->n_chan = 4;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_bits = cb_pcimdas_di_insn_bits;
 
 	/* Digital Output subdevice (main connector) */
 	s = &dev->subdevices[4];
-	s->type		= COMEDI_SUBD_DO;
-	s->subdev_flags	= SDF_WRITABLE;
-	s->n_chan	= 4;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_bits	= cb_pcimdas_do_insn_bits;
+	s->type = COMEDI_SUBD_DO;
+	s->subdev_flags = SDF_WRITABLE;
+	s->n_chan = 4;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_bits = cb_pcimdas_do_insn_bits;
 
 	/* Counter subdevice (8254) */
 	s = &dev->subdevices[5];
@@ -442,17 +437,16 @@ static int cb_pcimdas_auto_attach(struct comedi_device *dev,
 }
 
 static struct comedi_driver cb_pcimdas_driver = {
-	.driver_name	= "cb_pcimdas",
-	.module		= THIS_MODULE,
-	.auto_attach	= cb_pcimdas_auto_attach,
-	.detach		= comedi_pci_detach,
+	.driver_name = "cb_pcimdas",
+	.module = THIS_MODULE,
+	.auto_attach = cb_pcimdas_auto_attach,
+	.detach = comedi_pci_detach,
 };
 
 static int cb_pcimdas_pci_probe(struct pci_dev *dev,
 				const struct pci_device_id *id)
 {
-	return comedi_pci_auto_config(dev, &cb_pcimdas_driver,
-				      id->driver_data);
+	return comedi_pci_auto_config(dev, &cb_pcimdas_driver, id->driver_data);
 }
 
 static const struct pci_device_id cb_pcimdas_pci_table[] = {
@@ -460,14 +454,16 @@ static const struct pci_device_id cb_pcimdas_pci_table[] = {
 	{ PCI_DEVICE(PCI_VENDOR_ID_CB, 0x0115) },	/* PCIe-DAS1602/16 */
 	{ 0 }
 };
+
 MODULE_DEVICE_TABLE(pci, cb_pcimdas_pci_table);
 
 static struct pci_driver cb_pcimdas_pci_driver = {
-	.name		= "cb_pcimdas",
-	.id_table	= cb_pcimdas_pci_table,
-	.probe		= cb_pcimdas_pci_probe,
-	.remove		= comedi_pci_auto_unconfig,
+	.name = "cb_pcimdas",
+	.id_table = cb_pcimdas_pci_table,
+	.probe = cb_pcimdas_pci_probe,
+	.remove = comedi_pci_auto_unconfig,
 };
+
 module_comedi_pci_driver(cb_pcimdas_driver, cb_pcimdas_pci_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");

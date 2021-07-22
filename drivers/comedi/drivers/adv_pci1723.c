@@ -77,8 +77,7 @@
 
 static int pci1723_ao_insn_write(struct comedi_device *dev,
 				 struct comedi_subdevice *s,
-				 struct comedi_insn *insn,
-				 unsigned int *data)
+				 struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 	int i;
@@ -95,12 +94,11 @@ static int pci1723_ao_insn_write(struct comedi_device *dev,
 
 static int pci1723_dio_insn_config(struct comedi_device *dev,
 				   struct comedi_subdevice *s,
-				   struct comedi_insn *insn,
-				   unsigned int *data)
+				   struct comedi_insn *insn, unsigned int *data)
 {
 	unsigned int chan = CR_CHAN(insn->chanspec);
 	unsigned int mask = (chan < 8) ? 0x00ff : 0xff00;
-	unsigned short mode = 0x0000;		/* assume output */
+	unsigned short mode = 0x0000;	/* assume output */
 	int ret;
 
 	ret = comedi_dio_insn_config(dev, s, insn, data, mask);
@@ -118,8 +116,7 @@ static int pci1723_dio_insn_config(struct comedi_device *dev,
 
 static int pci1723_dio_insn_bits(struct comedi_device *dev,
 				 struct comedi_subdevice *s,
-				 struct comedi_insn *insn,
-				 unsigned int *data)
+				 struct comedi_insn *insn, unsigned int *data)
 {
 	if (comedi_dio_update_state(s, data))
 		outw(s->state, dev->iobase + PCI1723_DIO_DATA_REG);
@@ -148,12 +145,12 @@ static int pci1723_auto_attach(struct comedi_device *dev,
 		return ret;
 
 	s = &dev->subdevices[0];
-	s->type		= COMEDI_SUBD_AO;
-	s->subdev_flags	= SDF_WRITABLE | SDF_GROUND | SDF_COMMON;
-	s->n_chan	= 8;
-	s->maxdata	= 0xffff;
-	s->range_table	= &range_bipolar10;
-	s->insn_write	= pci1723_ao_insn_write;
+	s->type = COMEDI_SUBD_AO;
+	s->subdev_flags = SDF_WRITABLE | SDF_GROUND | SDF_COMMON;
+	s->n_chan = 8;
+	s->maxdata = 0xffff;
+	s->range_table = &range_bipolar10;
+	s->insn_write = pci1723_ao_insn_write;
 
 	ret = comedi_alloc_subdev_readback(s);
 	if (ret)
@@ -175,13 +172,13 @@ static int pci1723_auto_attach(struct comedi_device *dev,
 	outw(PCI1723_SYNC_CTRL_ASYNC, dev->iobase + PCI1723_SYNC_CTRL_REG);
 
 	s = &dev->subdevices[1];
-	s->type		= COMEDI_SUBD_DIO;
-	s->subdev_flags	= SDF_READABLE | SDF_WRITABLE;
-	s->n_chan	= 16;
-	s->maxdata	= 1;
-	s->range_table	= &range_digital;
-	s->insn_config	= pci1723_dio_insn_config;
-	s->insn_bits	= pci1723_dio_insn_bits;
+	s->type = COMEDI_SUBD_DIO;
+	s->subdev_flags = SDF_READABLE | SDF_WRITABLE;
+	s->n_chan = 16;
+	s->maxdata = 1;
+	s->range_table = &range_digital;
+	s->insn_config = pci1723_dio_insn_config;
+	s->insn_bits = pci1723_dio_insn_bits;
 
 	/* get initial DIO direction and state */
 	val = inw(dev->iobase + PCI1723_DIO_CTRL_REG);
@@ -195,10 +192,10 @@ static int pci1723_auto_attach(struct comedi_device *dev,
 }
 
 static struct comedi_driver adv_pci1723_driver = {
-	.driver_name	= "adv_pci1723",
-	.module		= THIS_MODULE,
-	.auto_attach	= pci1723_auto_attach,
-	.detach		= comedi_pci_detach,
+	.driver_name = "adv_pci1723",
+	.module = THIS_MODULE,
+	.auto_attach = pci1723_auto_attach,
+	.detach = comedi_pci_detach,
 };
 
 static int adv_pci1723_pci_probe(struct pci_dev *dev,
@@ -212,14 +209,16 @@ static const struct pci_device_id adv_pci1723_pci_table[] = {
 	{ PCI_DEVICE(PCI_VENDOR_ID_ADVANTECH, 0x1723) },
 	{ 0 }
 };
+
 MODULE_DEVICE_TABLE(pci, adv_pci1723_pci_table);
 
 static struct pci_driver adv_pci1723_pci_driver = {
-	.name		= "adv_pci1723",
-	.id_table	= adv_pci1723_pci_table,
-	.probe		= adv_pci1723_pci_probe,
-	.remove		= comedi_pci_auto_unconfig,
+	.name = "adv_pci1723",
+	.id_table = adv_pci1723_pci_table,
+	.probe = adv_pci1723_pci_probe,
+	.remove = comedi_pci_auto_unconfig,
 };
+
 module_comedi_pci_driver(adv_pci1723_driver, adv_pci1723_pci_driver);
 
 MODULE_AUTHOR("Comedi https://www.comedi.org");
