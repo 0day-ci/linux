@@ -786,45 +786,45 @@ parse_power_conservation_features(struct drm_i915_private *i915,
 		info->drrs_type = DRRS_NOT_SUPPORTED;
 
 	if (bdb->version >= 232)
-		i915->vbt.edp.hobl = power->hobl & BIT(panel_index);
+		info->edp.hobl = power->hobl & BIT(panel_index);
 }
 
 static void
-parse_edp(struct drm_i915_private *i915, const struct bdb_header *bdb)
+parse_edp(struct drm_i915_private *i915, const struct bdb_header *bdb,
+	  struct ddi_vbt_port_info *info, int panel_index)
 {
 	const struct bdb_edp *edp;
 	const struct edp_power_seq *edp_pps;
 	const struct edp_fast_link_params *edp_link_params;
-	int panel_type = i915->vbt.panel_type;
 
 	edp = find_section(bdb, BDB_EDP);
 	if (!edp)
 		return;
 
-	switch ((edp->color_depth >> (panel_type * 2)) & 3) {
+	switch ((edp->color_depth >> (panel_index * 2)) & 3) {
 	case EDP_18BPP:
-		i915->vbt.edp.bpp = 18;
+		info->edp.bpp = 18;
 		break;
 	case EDP_24BPP:
-		i915->vbt.edp.bpp = 24;
+		info->edp.bpp = 24;
 		break;
 	case EDP_30BPP:
-		i915->vbt.edp.bpp = 30;
+		info->edp.bpp = 30;
 		break;
 	}
 
 	/* Get the eDP sequencing and link info */
-	edp_pps = &edp->power_seqs[panel_type];
-	edp_link_params = &edp->fast_link_params[panel_type];
+	edp_pps = &edp->power_seqs[panel_index];
+	edp_link_params = &edp->fast_link_params[panel_index];
 
-	i915->vbt.edp.pps = *edp_pps;
+	info->edp.pps = *edp_pps;
 
 	switch (edp_link_params->rate) {
 	case EDP_RATE_1_62:
-		i915->vbt.edp.rate = DP_LINK_BW_1_62;
+		info->edp.rate = DP_LINK_BW_1_62;
 		break;
 	case EDP_RATE_2_7:
-		i915->vbt.edp.rate = DP_LINK_BW_2_7;
+		info->edp.rate = DP_LINK_BW_2_7;
 		break;
 	default:
 		drm_dbg_kms(&i915->drm,
@@ -835,13 +835,13 @@ parse_edp(struct drm_i915_private *i915, const struct bdb_header *bdb)
 
 	switch (edp_link_params->lanes) {
 	case EDP_LANE_1:
-		i915->vbt.edp.lanes = 1;
+		info->edp.lanes = 1;
 		break;
 	case EDP_LANE_2:
-		i915->vbt.edp.lanes = 2;
+		info->edp.lanes = 2;
 		break;
 	case EDP_LANE_4:
-		i915->vbt.edp.lanes = 4;
+		info->edp.lanes = 4;
 		break;
 	default:
 		drm_dbg_kms(&i915->drm,
@@ -852,16 +852,16 @@ parse_edp(struct drm_i915_private *i915, const struct bdb_header *bdb)
 
 	switch (edp_link_params->preemphasis) {
 	case EDP_PREEMPHASIS_NONE:
-		i915->vbt.edp.preemphasis = DP_TRAIN_PRE_EMPH_LEVEL_0;
+		info->edp.preemphasis = DP_TRAIN_PRE_EMPH_LEVEL_0;
 		break;
 	case EDP_PREEMPHASIS_3_5dB:
-		i915->vbt.edp.preemphasis = DP_TRAIN_PRE_EMPH_LEVEL_1;
+		info->edp.preemphasis = DP_TRAIN_PRE_EMPH_LEVEL_1;
 		break;
 	case EDP_PREEMPHASIS_6dB:
-		i915->vbt.edp.preemphasis = DP_TRAIN_PRE_EMPH_LEVEL_2;
+		info->edp.preemphasis = DP_TRAIN_PRE_EMPH_LEVEL_2;
 		break;
 	case EDP_PREEMPHASIS_9_5dB:
-		i915->vbt.edp.preemphasis = DP_TRAIN_PRE_EMPH_LEVEL_3;
+		info->edp.preemphasis = DP_TRAIN_PRE_EMPH_LEVEL_3;
 		break;
 	default:
 		drm_dbg_kms(&i915->drm,
@@ -872,16 +872,16 @@ parse_edp(struct drm_i915_private *i915, const struct bdb_header *bdb)
 
 	switch (edp_link_params->vswing) {
 	case EDP_VSWING_0_4V:
-		i915->vbt.edp.vswing = DP_TRAIN_VOLTAGE_SWING_LEVEL_0;
+		info->edp.vswing = DP_TRAIN_VOLTAGE_SWING_LEVEL_0;
 		break;
 	case EDP_VSWING_0_6V:
-		i915->vbt.edp.vswing = DP_TRAIN_VOLTAGE_SWING_LEVEL_1;
+		info->edp.vswing = DP_TRAIN_VOLTAGE_SWING_LEVEL_1;
 		break;
 	case EDP_VSWING_0_8V:
-		i915->vbt.edp.vswing = DP_TRAIN_VOLTAGE_SWING_LEVEL_2;
+		info->edp.vswing = DP_TRAIN_VOLTAGE_SWING_LEVEL_2;
 		break;
 	case EDP_VSWING_1_2V:
-		i915->vbt.edp.vswing = DP_TRAIN_VOLTAGE_SWING_LEVEL_3;
+		info->edp.vswing = DP_TRAIN_VOLTAGE_SWING_LEVEL_3;
 		break;
 	default:
 		drm_dbg_kms(&i915->drm,
@@ -895,11 +895,11 @@ parse_edp(struct drm_i915_private *i915, const struct bdb_header *bdb)
 
 		/* Don't read from VBT if module parameter has valid value*/
 		if (i915->params.edp_vswing) {
-			i915->vbt.edp.low_vswing =
+			info->edp.low_vswing =
 				i915->params.edp_vswing == 1;
 		} else {
-			vswing = (edp->edp_vswing_preemph >> (panel_type * 4)) & 0xF;
-			i915->vbt.edp.low_vswing = vswing == 0;
+			vswing = (edp->edp_vswing_preemph >> (panel_index * 4)) & 0xF;
+			info->edp.low_vswing = vswing == 0;
 		}
 	}
 }
@@ -1989,6 +1989,7 @@ static void parse_integrated_panel(struct drm_i915_private *i915,
 	parse_driver_features_drrs_only(i915, bdb, info);
 	parse_panel_dtd(i915, bdb, info, panel_index);
 	parse_lfp_backlight(i915, bdb, info, panel_index);
+	parse_edp(i915, bdb, info, panel_index);
 }
 
 static void parse_ddi_port(struct drm_i915_private *i915,
@@ -2485,7 +2486,6 @@ void intel_bios_init(struct drm_i915_private *i915)
 	parse_panel_type(i915, bdb);
 	parse_sdvo_panel_data(i915, bdb);
 	parse_driver_features(i915, bdb);
-	parse_edp(i915, bdb);
 	parse_psr(i915, bdb);
 	parse_mipi_config(i915, bdb);
 	parse_mipi_sequence(i915, bdb);
@@ -3131,4 +3131,12 @@ intel_bios_backlight_info(struct intel_encoder *encoder)
 	struct drm_i915_private *i915 = to_i915(encoder->base.dev);
 
 	return &i915->vbt.ddi_port_info[encoder->port].backlight;
+}
+
+struct vbt_edp_info *
+intel_bios_edp_info(struct intel_encoder *encoder)
+{
+	struct drm_i915_private *i915 = to_i915(encoder->base.dev);
+
+	return &i915->vbt.ddi_port_info[encoder->port].edp;
 }

@@ -1009,6 +1009,7 @@ static int intel_dp_max_bpp(struct intel_dp *intel_dp,
 {
 	struct drm_i915_private *dev_priv = dp_to_i915(intel_dp);
 	struct intel_connector *intel_connector = intel_dp->attached_connector;
+	struct vbt_edp_info *vbt_edp_info = intel_bios_edp_info(intel_connector->encoder);
 	int bpp, bpc;
 
 	bpc = crtc_state->pipe_bpp / 3;
@@ -1027,11 +1028,11 @@ static int intel_dp_max_bpp(struct intel_dp *intel_dp,
 	if (intel_dp_is_edp(intel_dp)) {
 		/* Get bpp from vbt only for panels that dont have bpp in edid */
 		if (intel_connector->base.display_info.bpc == 0 &&
-		    dev_priv->vbt.edp.bpp && dev_priv->vbt.edp.bpp < bpp) {
+		    vbt_edp_info->bpp && vbt_edp_info->bpp < bpp) {
 			drm_dbg_kms(&dev_priv->drm,
 				    "clamping bpp for eDP panel to BIOS-provided %i\n",
-				    dev_priv->vbt.edp.bpp);
-			bpp = dev_priv->vbt.edp.bpp;
+				    vbt_edp_info->bpp);
+			bpp = vbt_edp_info->bpp;
 		}
 	}
 

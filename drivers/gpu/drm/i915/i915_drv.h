@@ -669,6 +669,18 @@ struct ddi_vbt_port_info {
 		u8 controller;		/* brightness controller number */
 		enum intel_backlight_type type;
 	} backlight;
+
+	struct vbt_edp_info {
+		int rate;
+		int lanes;
+		int preemphasis;
+		int vswing;
+		bool low_vswing;
+		bool initialized;
+		int bpp;
+		struct edp_power_seq pps;
+		bool hobl;
+	} edp;
 };
 
 enum psr_lines_to_wait {
@@ -695,18 +707,6 @@ struct intel_vbt_data {
 	int lvds_ssc_freq;
 	unsigned int bios_lvds_val; /* initial [PCH_]LVDS reg val in VBIOS */
 	enum drm_panel_orientation orientation;
-
-	struct {
-		int rate;
-		int lanes;
-		int preemphasis;
-		int vswing;
-		bool low_vswing;
-		bool initialized;
-		int bpp;
-		struct edp_power_seq pps;
-		bool hobl;
-	} edp;
 
 	struct {
 		bool enable;

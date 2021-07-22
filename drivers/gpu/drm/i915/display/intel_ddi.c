@@ -3645,6 +3645,7 @@ static void intel_ddi_get_config(struct intel_encoder *encoder,
 				 struct intel_crtc_state *pipe_config)
 {
 	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
+	struct vbt_edp_info *vbt_edp_info = intel_bios_edp_info(encoder);
 	enum transcoder cpu_transcoder = pipe_config->cpu_transcoder;
 
 	/* XXX: DSI transcoder paranoia */
@@ -3669,8 +3670,8 @@ static void intel_ddi_get_config(struct intel_encoder *encoder,
 	pipe_config->has_audio =
 		intel_ddi_is_audio_enabled(dev_priv, cpu_transcoder);
 
-	if (encoder->type == INTEL_OUTPUT_EDP && dev_priv->vbt.edp.bpp &&
-	    pipe_config->pipe_bpp > dev_priv->vbt.edp.bpp) {
+	if (encoder->type == INTEL_OUTPUT_EDP && vbt_edp_info->bpp &&
+	    pipe_config->pipe_bpp > vbt_edp_info->bpp) {
 		/*
 		 * This is a big fat ugly hack.
 		 *
@@ -3686,8 +3687,8 @@ static void intel_ddi_get_config(struct intel_encoder *encoder,
 		 */
 		drm_dbg_kms(&dev_priv->drm,
 			    "pipe has %d bpp for eDP panel, overriding BIOS-provided max %d bpp\n",
-			    pipe_config->pipe_bpp, dev_priv->vbt.edp.bpp);
-		dev_priv->vbt.edp.bpp = pipe_config->pipe_bpp;
+			    pipe_config->pipe_bpp, vbt_edp_info->bpp);
+		vbt_edp_info->bpp = pipe_config->pipe_bpp;
 	}
 
 	if (!pipe_config->bigjoiner_slave)

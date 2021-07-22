@@ -340,6 +340,7 @@ static void intel_dp_get_config(struct intel_encoder *encoder,
 	u32 tmp, flags = 0;
 	enum port port = encoder->port;
 	struct intel_crtc *crtc = to_intel_crtc(pipe_config->uapi.crtc);
+	struct vbt_edp_info *vbt_edp_info = intel_bios_edp_info(encoder);
 
 	if (encoder->type == INTEL_OUTPUT_EDP)
 		pipe_config->output_types |= BIT(INTEL_OUTPUT_EDP);
@@ -396,8 +397,8 @@ static void intel_dp_get_config(struct intel_encoder *encoder,
 		intel_dotclock_calculate(pipe_config->port_clock,
 					 &pipe_config->dp_m_n);
 
-	if (intel_dp_is_edp(intel_dp) && dev_priv->vbt.edp.bpp &&
-	    pipe_config->pipe_bpp > dev_priv->vbt.edp.bpp) {
+	if (intel_dp_is_edp(intel_dp) && vbt_edp_info->bpp &&
+	    pipe_config->pipe_bpp > vbt_edp_info->bpp) {
 		/*
 		 * This is a big fat ugly hack.
 		 *
@@ -413,8 +414,8 @@ static void intel_dp_get_config(struct intel_encoder *encoder,
 		 */
 		drm_dbg_kms(&dev_priv->drm,
 			    "pipe has %d bpp for eDP panel, overriding BIOS-provided max %d bpp\n",
-			    pipe_config->pipe_bpp, dev_priv->vbt.edp.bpp);
-		dev_priv->vbt.edp.bpp = pipe_config->pipe_bpp;
+			    pipe_config->pipe_bpp, vbt_edp_info->bpp);
+		vbt_edp_info->bpp = pipe_config->pipe_bpp;
 	}
 }
 
