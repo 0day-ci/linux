@@ -172,6 +172,7 @@ static const u16 mgmt_events[] = {
 	MGMT_EV_ADV_MONITOR_REMOVED,
 	MGMT_EV_CONTROLLER_SUSPEND,
 	MGMT_EV_CONTROLLER_RESUME,
+	MGMT_EV_LE_PHY_UPDATE_COMPLETE,
 };
 
 static const u16 mgmt_untrusted_commands[] = {
@@ -3609,6 +3610,39 @@ unlock:
 	hci_dev_unlock(hdev);
 
 	return err;
+}
+
+void mgmt_le_phy_update(struct hci_dev *hdev, struct hci_conn *conn,
+			u8 status)
+{
+	struct mgmt_ev_le_phy_update_complete ev;
+	u32 phys = 0;
+
+	memset(&ev, 0, sizeof(ev));
+
+	bacpy(&ev.addr.bdaddr, &conn->dst);
+	ev.addr.type = link_to_bdaddr(conn->type, conn->dst_type);
+
+	ev.status = status;
+
+	if (conn->le_tx_phy == HCI_LE_READ_PHY_1M)
+		phys |= MGMT_PHY_LE_1M_TX;
+	else if (conn->le_tx_phy == HCI_LE_READ_PHY_2M)
+		phys |= MGMT_PHY_LE_2M_TX;
+	else if (conn->le_tx_phy == HCI_LE_READ_PHY_CODED)
+		phys |= MGMT_PHY_LE_CODED_TX;
+
+	if (conn->le_rx_phy == HCI_LE_READ_PHY_1M)
+		phys |= MGMT_PHY_LE_1M_RX;
+	else if (conn->le_rx_phy == HCI_LE_READ_PHY_2M)
+		phys |= MGMT_PHY_LE_2M_RX;
+	else if (conn->le_rx_phy == HCI_LE_READ_PHY_CODED)
+		phys |= MGMT_PHY_LE_CODED_RX;
+
+	ev.phys = cpu_to_le32(phys);
+
+	mgmt_event(MGMT_EV_LE_PHY_UPDATE_COMPLETE, hdev, &ev, sizeof(ev),
+		   NULL);
 }
 
 static int set_blocked_keys(struct sock *sk, struct hci_dev *hdev, void *data,

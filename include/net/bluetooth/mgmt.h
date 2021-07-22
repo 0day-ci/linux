@@ -1100,6 +1100,13 @@ struct mgmt_ev_controller_resume {
 	struct mgmt_addr_info addr;
 } __packed;
 
+#define MGMT_EV_LE_PHY_UPDATE_COMPLETE	0x002f
+struct mgmt_ev_le_phy_update_complete {
+	struct mgmt_addr_info addr;
+	__u8	status;
+	__le32	phys;
+} __packed;
+
 #define MGMT_WAKE_REASON_NON_BT_WAKE		0x0
 #define MGMT_WAKE_REASON_UNEXPECTED		0x1
 #define MGMT_WAKE_REASON_REMOTE_WAKE		0x2
