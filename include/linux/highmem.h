@@ -37,8 +37,8 @@
 static inline void *kmap(struct page *page);
 
 /**
- * kunmap - Unmap the virtual address mapped by kmap()
- * @addr:	Virtual address to be unmapped
+ * kunmap - Unmap the page mapped by kmap()
+ * @page: Page to be unmapped
  *
  * Counterpart to kmap(). A NOOP for CONFIG_HIGHMEM=n and for mappings of
  * pages in the low memory area.
@@ -69,13 +69,13 @@ static inline void kmap_flush_unused(void);
  *
  * Requires careful handling when nesting multiple mappings because the map
  * management is stack based. The unmap has to be in the reverse order of
- * the map operation:
+ * the map operation::
  *
- * addr1 = kmap_local_page(page1);
- * addr2 = kmap_local_page(page2);
- * ...
- * kunmap_local(addr2);
- * kunmap_local(addr1);
+ *   addr1 = kmap_local_page(page1);
+ *   addr2 = kmap_local_page(page2);
+ *   ...
+ *   kunmap_local(addr2);
+ *   kunmap_local(addr1);
  *
  * Unmapping addr1 before addr2 is invalid and causes malfunction.
  *
@@ -119,6 +119,7 @@ static inline void *kmap_atomic(struct page *page);
  * the side effects of kmap_atomic(), i.e. reenabling pagefaults and
  * preemption.
  */
+static inline void kunmap_atomic(void *addr);
 
 /* Highmem related interfaces for management code */
 static inline unsigned int nr_free_highpages(void);

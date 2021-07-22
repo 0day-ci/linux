@@ -54,6 +54,7 @@ Virtually Contiguous Mappings
 
 .. kernel-doc:: mm/vmalloc.c
    :export:
+.. kernel-doc:: include/linux/highmem.h
 
 File Mapping and Page Cache
 ===========================
