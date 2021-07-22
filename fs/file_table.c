@@ -29,6 +29,7 @@
 #include <linux/swap.h>
 
 #include <linux/atomic.h>
+#include <linux/misc_cgroup.h>
 
 #include "internal.h"
 
@@ -53,8 +54,16 @@ static void file_free_rcu(struct rcu_head *head)
 static inline void file_free(struct file *f)
 {
 	security_file_free(f);
-	if (!(f->f_mode & FMODE_NOACCOUNT))
+	if (!(f->f_mode & FMODE_NOACCOUNT)) {
+#ifdef CONFIG_CGROUP_MISC
+		struct misc_cg *misc_cg = css_misc(f->f_css);
+
+		misc_cg_uncharge(MISC_CG_RES_NOFILE, misc_cg, 1);
+		put_misc_cg(misc_cg);
+#endif
+
 		percpu_counter_dec(&nr_files);
+	}
 	call_rcu(&f->f_u.fu_rcuhead, file_free_rcu);
 }
 
@@ -148,8 +157,22 @@ struct file *alloc_empty_file(int flags, const struct cred *cred)
 	}
 
 	f = __alloc_file(flags, cred);
-	if (!IS_ERR(f))
+	if (!IS_ERR(f)) {
+#ifdef CONFIG_CGROUP_MISC
+		struct misc_cg *misc_cg = get_current_misc_cg();
+		int ret;
+
+		ret = misc_cg_try_charge(MISC_CG_RES_NOFILE, misc_cg, 1);
+		if (ret < 0) {
+			file_free(f);
+			put_misc_cg(misc_cg);
+			return ERR_PTR(-ENFILE);
+		}
+		f->f_css = &misc_cg->css;
+#endif
+
 		percpu_counter_inc(&nr_files);
+	}
 
 	return f;
 
@@ -397,4 +420,5 @@ void __init files_maxfiles_init(void)
 	n = ((nr_pages - memreserve) * (PAGE_SIZE / 1024)) / 10;
 
 	files_stat.max_files = max_t(unsigned long, n, NR_FILE);
+	misc_cg_set_capacity(MISC_CG_RES_NOFILE, files_stat.max_files);
 }

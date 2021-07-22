@@ -18,6 +18,7 @@ enum misc_res_type {
 	/* AMD SEV-ES ASIDs resource */
 	MISC_CG_RES_SEV_ES,
 #endif
+	MISC_CG_RES_NOFILE,
 	MISC_CG_RES_TYPES
 };
 

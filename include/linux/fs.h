@@ -947,7 +947,9 @@ struct file {
 #endif
 	/* needed for tty driver, and maybe others */
 	void			*private_data;
-
+#ifdef CONFIG_CGROUP_MISC
+	struct cgroup_subsys_state *f_css;
+#endif
 #ifdef CONFIG_EPOLL
 	/* Used by fs/eventpoll.c to link all the hooks to this file */
 	struct hlist_head	*f_ep;
