@@ -282,6 +282,10 @@ tcf_exts_stats_update(const struct tcf_exts *exts,
 	for (i = 0; i < exts->nr_actions; i++) {
 		struct tc_action *a = exts->actions[i];
 
+		/* if stats from hw, just skip */
+		if (!tcf_action_update_hw_stats(a))
+			continue;
+
 		tcf_action_stats_update(a, bytes, packets, drops,
 					lastuse, true);
 		a->used_hw_stats = used_hw_stats;

@@ -560,7 +560,7 @@ enum flow_act_command {
 };
 
 struct flow_offload_action {
-	struct netlink_ext_ack *extack;
+	struct netlink_ext_ack *extack; /* NULL in FLOW_ACT_STATS process*/
 	enum flow_act_command command;
 	struct flow_stats stats;
 	struct flow_action action;

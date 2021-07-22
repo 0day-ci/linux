@@ -1089,15 +1089,18 @@ err_out:
 EXPORT_SYMBOL(tcf_action_offload_cmd_pre);
 
 int tcf_action_offload_cmd_post(struct flow_offload_action *fl_act,
-				struct netlink_ext_ack *extack)
+				struct netlink_ext_ack *extack,
+				bool keep_fl_act)
 {
 	if (IS_ERR(fl_act))
 		return PTR_ERR(fl_act);
 
 	flow_indr_dev_setup_offload(NULL, NULL, TC_SETUP_ACT, fl_act, NULL, NULL);
 
-	tc_cleanup_flow_action(&fl_act->action);
-	kfree(fl_act);
+	if (!keep_fl_act) {
+		tc_cleanup_flow_action(&fl_act->action);
+		kfree(fl_act);
+	}
 	return 0;
 }
 
@@ -1115,9 +1118,44 @@ int tcf_action_offload_cmd(struct tc_action *actions[],
 	if (err)
 		return err;
 
-	return tcf_action_offload_cmd_post(fl_act, extack);
+	return tcf_action_offload_cmd_post(fl_act, extack, false);
 }
 EXPORT_SYMBOL(tcf_action_offload_cmd);
+
+int tcf_action_update_hw_stats(struct tc_action *action)
+{
+	struct tc_action *actions[TCA_ACT_MAX_PRIO] = {
+		[0] = action,
+	};
+	struct flow_offload_action *fl_act;
+	int err = 0;
+
+	err = tcf_action_offload_cmd_pre(actions,
+					 FLOW_ACT_STATS,
+					 NULL,
+					 &fl_act);
+	if (err)
+		goto err_out;
+
+	err = tcf_action_offload_cmd_post(fl_act, NULL, true);
+
+	if (fl_act->stats.lastused) {
+		tcf_action_stats_update(action, fl_act->stats.bytes,
+					fl_act->stats.pkts,
+					fl_act->stats.drops,
+					fl_act->stats.lastused,
+					true);
+		err = 0;
+	} else {
+		err = -EOPNOTSUPP;
+	}
+	tc_cleanup_flow_action(&fl_act->action);
+	kfree(fl_act);
+
+err_out:
+	return err;
+}
+EXPORT_SYMBOL(tcf_action_update_hw_stats);
 
 /* offload the tc command after deleted */
 int tcf_action_offload_del_post(struct flow_offload_action *fl_act,
@@ -1254,6 +1292,9 @@ int tcf_action_copy_stats(struct sk_buff *skb, struct tc_action *p,
 
 	if (p == NULL)
 		goto errout;
+
+	/* update hw stats for this action */
+	tcf_action_update_hw_stats(p);
 
 	/* compat_mode being true specifies a call that is supposed
 	 * to add additional backward compatibility statistic TLVs.
