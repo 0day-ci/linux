@@ -3755,6 +3755,15 @@ unsigned int tcf_exts_num_actions(struct tcf_exts *exts)
 }
 EXPORT_SYMBOL(tcf_exts_num_actions);
 
+unsigned int tcf_act_num_actions_single(struct tc_action *act)
+{
+	if (is_tcf_pedit(act))
+		return tcf_pedit_nkeys(act);
+	else
+		return 1;
+}
+EXPORT_SYMBOL(tcf_act_num_actions_single);
+
 unsigned int tcf_act_num_actions(struct tc_action *actions[])
 {
 	unsigned int num_acts = 0;
@@ -3762,10 +3771,7 @@ unsigned int tcf_act_num_actions(struct tc_action *actions[])
 	int i;
 
 	tcf_act_for_each_action(i, act, actions) {
-		if (is_tcf_pedit(act))
-			num_acts += tcf_pedit_nkeys(act);
-		else
-			num_acts++;
+		num_acts += tcf_act_num_actions_single(act);
 	}
 	return num_acts;
 }

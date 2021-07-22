@@ -1060,6 +1060,47 @@ err_out:
 	return ERR_PTR(err);
 }
 
+int tcf_action_offload_cmd_pre(struct tc_action *actions[],
+			       enum flow_act_command cmd,
+			       struct netlink_ext_ack *extack,
+			       struct flow_offload_action **fl_act)
+{
+	struct flow_offload_action *fl_act_p;
+	int err = 0;
+
+	fl_act_p = flow_action_alloc(tcf_act_num_actions(actions));
+	if (!fl_act_p)
+		return -ENOMEM;
+
+	fl_act_p->extack = extack;
+	fl_act_p->command = cmd;
+	err = tc_setup_action(&fl_act_p->action, actions);
+	if (err) {
+		NL_SET_ERR_MSG_MOD(extack,
+				   "Failed to setup tc actions for offload\n");
+		goto err_out;
+	}
+	*fl_act = fl_act_p;
+	return 0;
+err_out:
+	kfree(fl_act_p);
+	return err;
+}
+EXPORT_SYMBOL(tcf_action_offload_cmd_pre);
+
+int tcf_action_offload_cmd_post(struct flow_offload_action *fl_act,
+				struct netlink_ext_ack *extack)
+{
+	if (IS_ERR(fl_act))
+		return PTR_ERR(fl_act);
+
+	flow_indr_dev_setup_offload(NULL, NULL, TC_SETUP_ACT, fl_act, NULL, NULL);
+
+	tc_cleanup_flow_action(&fl_act->action);
+	kfree(fl_act);
+	return 0;
+}
+
 /* offload the tc command after inserted */
 int tcf_action_offload_cmd(struct tc_action *actions[],
 			   struct netlink_ext_ack *extack)
@@ -1067,28 +1108,60 @@ int tcf_action_offload_cmd(struct tc_action *actions[],
 	struct flow_offload_action *fl_act;
 	int err = 0;
 
-	fl_act = flow_action_alloc(tcf_act_num_actions(actions));
+	err = tcf_action_offload_cmd_pre(actions,
+					 FLOW_ACT_REPLACE,
+					 extack,
+					 &fl_act);
+	if (err)
+		return err;
+
+	return tcf_action_offload_cmd_post(fl_act, extack);
+}
+EXPORT_SYMBOL(tcf_action_offload_cmd);
+
+/* offload the tc command after deleted */
+int tcf_action_offload_del_post(struct flow_offload_action *fl_act,
+				struct tc_action *actions[],
+				struct netlink_ext_ack *extack,
+				int fallback_num)
+{
+	int fallback_entries = 0;
+	struct tc_action *act;
+	int total_entries = 0;
+	int i;
+
 	if (!fl_act)
-		return -ENOMEM;
+		return -EINVAL;
 
-	fl_act->extack = extack;
-	err = tc_setup_action(&fl_act->action, actions);
-	if (err) {
-		NL_SET_ERR_MSG_MOD(extack,
-				   "Failed to setup tc actions for offload\n");
-		goto err_out;
+	if (fallback_num) {
+		/* for each the actions to fallback the action entries remain in the actions */
+		for (i = 0; i < TCA_ACT_MAX_PRIO; i++) {
+			act = actions[i];
+			if (!act)
+				continue;
+
+			fallback_entries += tcf_act_num_actions_single(act);
+		}
+		fallback_entries += fallback_num;
 	}
-	fl_act->command = FLOW_ACT_REPLACE;
+	total_entries = fl_act->action.num_entries;
+	if (total_entries > fallback_entries) {
+		/* just offload the actions that is not fallback and start with the actions */
+		fl_act->action.num_entries -= fallback_entries;
+		flow_indr_dev_setup_offload(NULL, NULL, TC_SETUP_ACT, fl_act, NULL, NULL);
 
-	flow_indr_dev_setup_offload(NULL, NULL, TC_SETUP_ACT, fl_act, NULL, NULL);
+		/* recovery num_entries for cleanup */
+		fl_act->action.num_entries = total_entries;
+	} else {
+		NL_SET_ERR_MSG(extack, "no entries to offload when deleting the tc actions");
+	}
 
 	tc_cleanup_flow_action(&fl_act->action);
 
-err_out:
 	kfree(fl_act);
-	return err;
+	return 0;
 }
-EXPORT_SYMBOL(tcf_action_offload_cmd);
+EXPORT_SYMBOL(tcf_action_offload_del_post);
 
 /* Returns numbers of initialized actions or negative error. */
 
@@ -1393,7 +1466,7 @@ err_out:
 	return err;
 }
 
-static int tcf_action_delete(struct net *net, struct tc_action *actions[])
+static int tcf_action_delete(struct net *net, struct tc_action *actions[], int *fallbacknum)
 {
 	int i;
 
@@ -1407,6 +1480,7 @@ static int tcf_action_delete(struct net *net, struct tc_action *actions[])
 		u32 act_index = a->tcfa_index;
 
 		actions[i] = NULL;
+		*fallbacknum = tcf_act_num_actions_single(a);
 		if (tcf_action_put(a)) {
 			/* last reference, action was deleted concurrently */
 			module_put(ops->owner);
@@ -1419,12 +1493,13 @@ static int tcf_action_delete(struct net *net, struct tc_action *actions[])
 				return ret;
 		}
 	}
+	*fallbacknum = 0;
 	return 0;
 }
 
 static int
 tcf_del_notify(struct net *net, struct nlmsghdr *n, struct tc_action *actions[],
-	       u32 portid, size_t attr_size, struct netlink_ext_ack *extack)
+	       u32 portid, size_t attr_size, struct netlink_ext_ack *extack, int *fallbacknum)
 {
 	int ret;
 	struct sk_buff *skb;
@@ -1442,7 +1517,7 @@ tcf_del_notify(struct net *net, struct nlmsghdr *n, struct tc_action *actions[],
 	}
 
 	/* now do the delete */
-	ret = tcf_action_delete(net, actions);
+	ret = tcf_action_delete(net, actions, fallbacknum);
 	if (ret < 0) {
 		NL_SET_ERR_MSG(extack, "Failed to delete TC action");
 		kfree_skb(skb);
@@ -1458,11 +1533,12 @@ static int
 tca_action_gd(struct net *net, struct nlattr *nla, struct nlmsghdr *n,
 	      u32 portid, int event, struct netlink_ext_ack *extack)
 {
-	int i, ret;
 	struct nlattr *tb[TCA_ACT_MAX_PRIO + 1];
 	struct tc_action *act;
 	size_t attr_size = 0;
 	struct tc_action *actions[TCA_ACT_MAX_PRIO] = {};
+	struct flow_offload_action *fl_act;
+	int i, ret, fallback_num;
 
 	ret = nla_parse_nested_deprecated(tb, TCA_ACT_MAX_PRIO, nla, NULL,
 					  extack);
@@ -1492,7 +1568,9 @@ tca_action_gd(struct net *net, struct nlattr *nla, struct nlmsghdr *n,
 	if (event == RTM_GETACTION)
 		ret = tcf_get_notify(net, portid, n, actions, event, extack);
 	else { /* delete */
-		ret = tcf_del_notify(net, n, actions, portid, attr_size, extack);
+		tcf_action_offload_cmd_pre(actions, FLOW_ACT_DESTROY, extack, &fl_act);
+		ret = tcf_del_notify(net, n, actions, portid, attr_size, extack, &fallback_num);
+		tcf_action_offload_del_post(fl_act, actions, extack, fallback_num);
 		if (ret)
 			goto err;
 		return 0;
