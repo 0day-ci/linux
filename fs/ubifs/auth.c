@@ -14,6 +14,8 @@
 #include <crypto/hash.h>
 #include <crypto/algapi.h>
 #include <keys/user-type.h>
+#include <keys/trusted-type.h>
+#include <keys/encrypted-type.h>
 #include <keys/asymmetric-type.h>
 
 #include "ubifs.h"
@@ -256,9 +258,10 @@ out_destroy:
 int ubifs_init_authentication(struct ubifs_info *c)
 {
 	struct key *keyring_key;
-	const struct user_key_payload *ukp;
 	int err;
+	unsigned int len;
 	char hmac_name[CRYPTO_MAX_ALG_NAME];
+	const void *key_material;
 
 	if (!c->auth_hash_name) {
 		ubifs_err(c, "authentication hash name needed with authentication");
@@ -277,6 +280,10 @@ int ubifs_init_authentication(struct ubifs_info *c)
 		 c->auth_hash_name);
 
 	keyring_key = request_key(&key_type_logon, c->auth_key_name, NULL);
+	if (IS_ERR(keyring_key) && IS_REACHABLE(CONFIG_ENCRYPTED_KEYS))
+		keyring_key = request_key(&key_type_encrypted, c->auth_key_name, NULL);
+	if (IS_ERR(keyring_key) && IS_REACHABLE(CONFIG_TRUSTED_KEYS))
+		keyring_key = request_key(&key_type_trusted, c->auth_key_name, NULL);
 
 	if (IS_ERR(keyring_key)) {
 		ubifs_err(c, "Failed to request key: %ld",
@@ -286,12 +293,10 @@ int ubifs_init_authentication(struct ubifs_info *c)
 
 	down_read(&keyring_key->sem);
 
-	ukp = user_key_payload_locked(keyring_key);
-	if (!ukp) {
-		/* key was revoked before we acquired its semaphore */
-		err = -EKEYREVOKED;
+	key_material = key_extract_material(keyring_key, &len);
+	err = PTR_ERR_OR_ZERO(key_material);
+	if (err < 0)
 		goto out;
-	}
 
 	c->hash_tfm = crypto_alloc_shash(c->auth_hash_name, 0, 0);
 	if (IS_ERR(c->hash_tfm)) {
@@ -324,7 +329,7 @@ int ubifs_init_authentication(struct ubifs_info *c)
 		goto out_free_hmac;
 	}
 
-	err = crypto_shash_setkey(c->hmac_tfm, ukp->data, ukp->datalen);
+	err = crypto_shash_setkey(c->hmac_tfm, key_material, len);
 	if (err)
 		goto out_free_hmac;
 

@@ -101,7 +101,7 @@ compr=zlib              override default compressor and set it to "zlib"
 auth_key=		specify the key used for authenticating the filesystem.
 			Passing this option makes authentication mandatory.
 			The passed key must be present in the kernel keyring
-			and must be of type 'logon'
+			and must be of type 'logon', 'encrypted' or 'trusted'.
 auth_hash_name=		The hash algorithm used for authentication. Used for
 			both hashing and for creating HMACs. Typical values
 			include "sha256" or "sha512"
