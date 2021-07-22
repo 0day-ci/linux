@@ -70,12 +70,36 @@ Optional RK817 properties:
 
 - vcc8-supply:  The input supply for BOOST
 - vcc9-supply:  The input supply for OTG_SWITCH
+
 - codec:	The child node for the codec to hold additional properties.
 		If no additional properties are required for the codec, this
 		node can be omitted.
-
-- rockchip,mic-in-differential: Telling if the microphone uses differential
+- rockchip,mic-in-differential:	Telling if the microphone uses differential
 				mode. Should be under the codec child node.
+
+- battery:	The child node for the charger to hold additional properties.
+		If a battery is not in use, this node can be omitted. If a
+		battery node is used, the following values are required:
+		rockchip,resistor-sense, rockchip,sleep-enter-current,
+		rockchip,sleep-filter-current, and a phandle to a
+		monitored-battery node that contains a valid value for
+		charge-full-design-microamp-hours,
+		charge-term-current-microamp,
+		constant-charge-current-max-microamp,
+		constant-charge-voltage-max-microvolt,
+		voltage-max-design-microvolt, voltage-min-design-microvolt,
+		and a valid ocv-capacity table.
+- rockchip,resistor-sense: Value in microohms of the battery sense resistor.
+			   The PMIC only supports values of either 10000 or
+			   20000. This value is used by the driver to set
+			   the correct divisor value to translate ADC readings
+			   into the proper units of measure.
+- rockchip,sleep-enter-current: Value in microamps of the sleep enter current
+				for the charger. Value is used by the driver
+				to calibrate the relax threshold.
+- rockchip,sleep-filter-current: Value in microamps of the sleep filter current
+				 for the charger. Value is used by the driver
+				 to derive the sleep sample current.
 
 Optional RK818 properties:
 - vcc1-supply:  The input supply for DCDC_REG1
@@ -457,6 +481,13 @@ Example:
 					regulator-suspend-microvolt = <3000000>;
 				};
 			};
+		};
+
+		rk817_battery: battery {
+			monitored-battery = <&battery_cell>;
+			rockchip,resistor-sense = <10000>;
+			rockchip,sleep-enter-current = <300000>;
+			rockchip,sleep-filter-current = <100000>;
 		};
 
 		rk817_codec: codec {
