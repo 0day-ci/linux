@@ -291,6 +291,7 @@ extern int  audit_alloc(struct task_struct *task);
 extern void __audit_free(struct task_struct *task);
 extern struct audit_context *audit_alloc_local(gfp_t gfpflags);
 extern void audit_free_context(struct audit_context *context);
+extern void audit_free_local(struct audit_context *context);
 extern void __audit_syscall_entry(int major, unsigned long a0, unsigned long a1,
 				  unsigned long a2, unsigned long a3);
 extern void __audit_syscall_exit(int ret_success, long ret_value);
@@ -384,6 +385,19 @@ static inline void audit_ptrace(struct task_struct *t)
 {
 	if (unlikely(!audit_dummy_context()))
 		__audit_ptrace(t);
+}
+
+static inline struct audit_context *audit_alloc_for_lsm(gfp_t gfp)
+{
+	struct audit_context *context = audit_context();
+
+	if (context)
+		return context;
+
+	if (lsm_multiple_contexts())
+		return audit_alloc_local(gfp);
+
+	return NULL;
 }
 
 				/* Private API (for audit.c only) */
@@ -559,6 +573,8 @@ extern int audit_signals;
 	return NULL;
 }
 static inline void audit_free_context(struct audit_context *context)
+{ }
+static inline void audit_free_local(struct audit_context *context)
 { }
 static inline int audit_alloc(struct task_struct *task)
 {
