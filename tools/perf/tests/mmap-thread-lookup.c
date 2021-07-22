@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 #include <inttypes.h>
 #include <unistd.h>
-#include <sys/syscall.h>
+#include <tools/libc_compat.h> // gettid
 #include <sys/types.h>
 #include <sys/mman.h>
 #include <pthread.h>
@@ -45,7 +45,7 @@ static int thread_init(struct thread_data *td)
 	}
 
 	td->map = map;
-	td->tid = syscall(SYS_gettid);
+	td->tid = gettid();
 
 	pr_debug("tid = %d, map = %p\n", td->tid, map);
 	return 0;
