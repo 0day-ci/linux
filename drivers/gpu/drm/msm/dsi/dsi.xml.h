@@ -8,25 +8,8 @@ http://github.com/freedreno/envytools/
 git clone https://github.com/freedreno/envytools.git
 
 The rules-ng-ng source files this header was generated from are:
-- /home/robclark/src/mesa/mesa/src/freedreno/registers/msm.xml                   (    981 bytes, from 2021-06-05 21:37:42)
-- /home/robclark/src/mesa/mesa/src/freedreno/registers/freedreno_copyright.xml   (   1572 bytes, from 2021-02-18 16:45:44)
-- /home/robclark/src/mesa/mesa/src/freedreno/registers/mdp/mdp4.xml              (  20912 bytes, from 2021-02-18 16:45:44)
-- /home/robclark/src/mesa/mesa/src/freedreno/registers/mdp/mdp_common.xml        (   2849 bytes, from 2021-02-18 16:45:44)
-- /home/robclark/src/mesa/mesa/src/freedreno/registers/mdp/mdp5.xml              (  37461 bytes, from 2021-02-18 16:45:44)
-- /home/robclark/src/mesa/mesa/src/freedreno/registers/dsi/dsi.xml               (  15291 bytes, from 2021-06-15 22:36:13)
-- /home/robclark/src/mesa/mesa/src/freedreno/registers/dsi/dsi_phy_v2.xml        (   3236 bytes, from 2021-06-05 21:37:42)
-- /home/robclark/src/mesa/mesa/src/freedreno/registers/dsi/dsi_phy_28nm_8960.xml (   4935 bytes, from 2021-05-21 19:18:08)
-- /home/robclark/src/mesa/mesa/src/freedreno/registers/dsi/dsi_phy_28nm.xml      (   7004 bytes, from 2021-05-21 19:18:08)
-- /home/robclark/src/mesa/mesa/src/freedreno/registers/dsi/dsi_phy_20nm.xml      (   3712 bytes, from 2021-05-21 19:18:08)
-- /home/robclark/src/mesa/mesa/src/freedreno/registers/dsi/dsi_phy_14nm.xml      (   5381 bytes, from 2021-05-21 19:18:08)
-- /home/robclark/src/mesa/mesa/src/freedreno/registers/dsi/dsi_phy_10nm.xml      (   4499 bytes, from 2021-05-21 19:18:08)
-- /home/robclark/src/mesa/mesa/src/freedreno/registers/dsi/dsi_phy_7nm.xml       (  10953 bytes, from 2021-05-21 19:18:08)
-- /home/robclark/src/mesa/mesa/src/freedreno/registers/dsi/dsi_phy_5nm.xml       (  10900 bytes, from 2021-05-21 19:18:08)
-- /home/robclark/src/mesa/mesa/src/freedreno/registers/dsi/sfpb.xml              (    602 bytes, from 2021-02-18 16:45:44)
-- /home/robclark/src/mesa/mesa/src/freedreno/registers/dsi/mmss_cc.xml           (   1686 bytes, from 2021-02-18 16:45:44)
-- /home/robclark/src/mesa/mesa/src/freedreno/registers/hdmi/qfprom.xml           (    600 bytes, from 2021-02-18 16:45:44)
-- /home/robclark/src/mesa/mesa/src/freedreno/registers/hdmi/hdmi.xml             (  41874 bytes, from 2021-02-18 16:45:44)
-- /home/robclark/src/mesa/mesa/src/freedreno/registers/edp/edp.xml               (  10416 bytes, from 2021-02-18 16:45:44)
+- /local/mnt2/workspace2/abhinav/mesa_tool/mesa/src/freedreno/registers/dsi/dsi.xml             (  17500 bytes, from 2021-07-22 02:35:56)
+- /local/mnt2/workspace2/abhinav/mesa_tool/mesa/src/freedreno/registers/freedreno_copyright.xml (   1572 bytes, from 2021-07-13 18:03:11)
 
 Copyright (C) 2013-2021 by the following authors:
 - Rob Clark <robdclark@gmail.com> (robclark)
@@ -103,6 +86,32 @@ enum dsi_lane_swap {
 	LANE_SWAP_1032 = 5,
 	LANE_SWAP_2103 = 6,
 	LANE_SWAP_3210 = 7,
+};
+
+enum video_config_bpp {
+	VIDEO_CONFIG_18BPP = 0,
+	VIDEO_CONFIG_24BPP = 1,
+};
+
+enum video_pattern_sel {
+	VID_PRBS = 0,
+	VID_INCREMENTAL = 1,
+	VID_FIXED = 2,
+	VID_MDSS_GENERAL_PATTERN = 3,
+};
+
+enum cmd_mdp_stream0_pattern_sel {
+	CMD_MDP_PRBS = 0,
+	CMD_MDP_INCREMENTAL = 1,
+	CMD_MDP_FIXED = 2,
+	CMD_MDP_MDSS_GENERAL_PATTERN = 3,
+};
+
+enum cmd_dma_pattern_sel {
+	CMD_DMA_PRBS = 0,
+	CMD_DMA_INCREMENTAL = 1,
+	CMD_DMA_FIXED = 2,
+	CMD_DMA_CUSTOM_PATTERN_DMA_FIFO = 3,
 };
 
 #define DSI_IRQ_CMD_DMA_DONE					0x00000001
@@ -563,6 +572,53 @@ static inline uint32_t DSI_LANE_SWAP_CTRL_DLN_SWAP_SEL(enum dsi_lane_swap val)
 
 #define REG_DSI_PHY_RESET					0x00000128
 #define DSI_PHY_RESET_RESET					0x00000001
+
+#define REG_DSI_TEST_PATTERN_GEN_VIDEO_INIT_VAL			0x00000160
+
+#define REG_DSI_TPG_MAIN_CONTROL				0x00000198
+#define DSI_TPG_MAIN_CONTROL_CHECKERED_RECTANGLE_PATTERN	0x00000100
+
+#define REG_DSI_TPG_VIDEO_CONFIG				0x000001a0
+#define DSI_TPG_VIDEO_CONFIG_BPP__MASK				0x00000003
+#define DSI_TPG_VIDEO_CONFIG_BPP__SHIFT				0
+static inline uint32_t DSI_TPG_VIDEO_CONFIG_BPP(enum video_config_bpp val)
+{
+	return ((val) << DSI_TPG_VIDEO_CONFIG_BPP__SHIFT) & DSI_TPG_VIDEO_CONFIG_BPP__MASK;
+}
+#define DSI_TPG_VIDEO_CONFIG_RGB				0x00000004
+
+#define REG_DSI_TEST_PATTERN_GEN_CTRL				0x00000158
+#define DSI_TEST_PATTERN_GEN_CTRL_CMD_DMA_PATTERN_SEL__MASK	0x00030000
+#define DSI_TEST_PATTERN_GEN_CTRL_CMD_DMA_PATTERN_SEL__SHIFT	16
+static inline uint32_t DSI_TEST_PATTERN_GEN_CTRL_CMD_DMA_PATTERN_SEL(enum cmd_dma_pattern_sel val)
+{
+	return ((val) << DSI_TEST_PATTERN_GEN_CTRL_CMD_DMA_PATTERN_SEL__SHIFT) & DSI_TEST_PATTERN_GEN_CTRL_CMD_DMA_PATTERN_SEL__MASK;
+}
+#define DSI_TEST_PATTERN_GEN_CTRL_CMD_MDP_STREAM0_PATTERN_SEL__MASK	0x00000300
+#define DSI_TEST_PATTERN_GEN_CTRL_CMD_MDP_STREAM0_PATTERN_SEL__SHIFT	8
+static inline uint32_t DSI_TEST_PATTERN_GEN_CTRL_CMD_MDP_STREAM0_PATTERN_SEL(enum cmd_mdp_stream0_pattern_sel val)
+{
+	return ((val) << DSI_TEST_PATTERN_GEN_CTRL_CMD_MDP_STREAM0_PATTERN_SEL__SHIFT) & DSI_TEST_PATTERN_GEN_CTRL_CMD_MDP_STREAM0_PATTERN_SEL__MASK;
+}
+#define DSI_TEST_PATTERN_GEN_CTRL_VIDEO_PATTERN_SEL__MASK	0x00000030
+#define DSI_TEST_PATTERN_GEN_CTRL_VIDEO_PATTERN_SEL__SHIFT	4
+static inline uint32_t DSI_TEST_PATTERN_GEN_CTRL_VIDEO_PATTERN_SEL(enum video_pattern_sel val)
+{
+	return ((val) << DSI_TEST_PATTERN_GEN_CTRL_VIDEO_PATTERN_SEL__SHIFT) & DSI_TEST_PATTERN_GEN_CTRL_VIDEO_PATTERN_SEL__MASK;
+}
+#define DSI_TEST_PATTERN_GEN_CTRL_TPG_DMA_FIFO_MODE		0x00000004
+#define DSI_TEST_PATTERN_GEN_CTRL_CMD_DMA_TPG_EN		0x00000002
+#define DSI_TEST_PATTERN_GEN_CTRL_EN				0x00000001
+
+#define REG_DSI_TEST_PATTERN_GEN_CMD_MDP_INIT_VAL0		0x00000168
+
+#define REG_DSI_TEST_PATTERN_GEN_CMD_STREAM0_TRIGGER		0x00000180
+#define DSI_TEST_PATTERN_GEN_CMD_STREAM0_TRIGGER_SW_TRIGGER	0x00000001
+
+#define REG_DSI_TPG_MAIN_CONTROL2				0x0000019c
+#define DSI_TPG_MAIN_CONTROL2_CMD_MDP0_CHECKERED_RECTANGLE_PATTERN	0x00000080
+#define DSI_TPG_MAIN_CONTROL2_CMD_MDP1_CHECKERED_RECTANGLE_PATTERN	0x00010000
+#define DSI_TPG_MAIN_CONTROL2_CMD_MDP2_CHECKERED_RECTANGLE_PATTERN	0x02000000
 
 #define REG_DSI_T_CLK_PRE_EXTEND				0x0000017c
 #define DSI_T_CLK_PRE_EXTEND_INC_BY_2_BYTECLK			0x00000001
