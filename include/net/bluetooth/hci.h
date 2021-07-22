@@ -1670,6 +1670,18 @@ struct hci_rp_le_read_max_data_len {
 	__le16	rx_time;
 } __packed;
 
+#define HCI_OP_LE_READ_PHY	0x2030
+struct hci_cp_le_read_phy {
+	__le16 handle;
+} __packed;
+
+struct hci_rp_le_read_phy {
+	__u8	status;
+	__le16	handle;
+	__u8	tx_phy;
+	__u8	rx_phy;
+} __packed;
+
 #define HCI_OP_LE_SET_DEFAULT_PHY	0x2031
 struct hci_cp_le_set_default_phy {
 	__u8    all_phys;

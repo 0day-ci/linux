@@ -1196,6 +1196,31 @@ static void hci_cc_le_set_default_phy(struct hci_dev *hdev, struct sk_buff *skb)
 	hci_dev_unlock(hdev);
 }
 
+static void hci_cc_le_read_phy(struct hci_dev *hdev, struct sk_buff *skb)
+{
+	struct hci_rp_le_read_phy *rp = (void *)skb->data;
+	struct hci_conn *conn;
+
+	BT_DBG("%s status 0x%2.2x", hdev->name, rp->status);
+
+	if (rp->status)
+		return;
+
+	hci_dev_lock(hdev);
+
+	conn = hci_conn_hash_lookup_handle(hdev, __le16_to_cpu(rp->handle));
+	if (!conn)
+		goto unlock;
+
+	conn->le_tx_phy = rp->tx_phy;
+	conn->le_rx_phy = rp->rx_phy;
+
+	mgmt_le_phy_update(hdev, conn, 0);
+
+unlock:
+	hci_dev_unlock(hdev);
+}
+
 static void hci_cc_le_set_adv_set_random_addr(struct hci_dev *hdev,
                                               struct sk_buff *skb)
 {
@@ -3642,6 +3667,10 @@ static void hci_cmd_complete_evt(struct hci_dev *hdev, struct sk_buff *skb,
 		hci_cc_le_read_transmit_power(hdev, skb);
 		break;
 
+	case HCI_OP_LE_READ_PHY:
+		hci_cc_le_read_phy(hdev, skb);
+		break;
+
 	default:
 		BT_DBG("%s opcode 0x%4.4x", hdev->name, *opcode);
 		break;
@@ -5229,6 +5258,17 @@ static void le_conn_complete_evt(struct hci_dev *hdev, u8 status,
 		goto unlock;
 	}
 
+	/* If this LE connection is not an extended connection, then LE
+	 * PHYs will always be 1M at the time of connection establishment.
+	 * So, set 1M as initial LE PHY values.
+	 * But if this is LE Extended connection, then the PHY values
+	 * can be 1M, 2M or CODED. So, In this case, read and update
+	 * the values after the conn->state becomes connected and
+	 * then, send the LE_PHY_UPDATE_COMPLETE event.
+	 */
+	conn->le_tx_phy = HCI_LE_SET_PHY_1M;
+	conn->le_rx_phy = HCI_LE_SET_PHY_1M;
+
 	if (!test_and_set_bit(HCI_CONN_MGMT_CONNECTED, &conn->flags))
 		mgmt_device_connected(hdev, conn, NULL, 0);
 
@@ -5265,6 +5305,17 @@ static void le_conn_complete_evt(struct hci_dev *hdev, u8 status,
 	} else {
 		conn->state = BT_CONNECTED;
 		hci_connect_cfm(conn, status);
+	}
+
+	/* If this is LE Extended connection and HCI_LE_READ_PHY
+	 * command is supported, then update the LE PHYs.
+	 */
+	if (use_ext_conn(hdev) && hdev->commands[35] & 0x10) {
+		struct hci_cp_le_read_phy cp;
+
+		cp.handle = __cpu_to_le16(conn->handle);
+
+		hci_send_cmd(hdev, HCI_OP_LE_READ_PHY, sizeof(cp), &cp);
 	}
 
 	params = hci_pend_le_action_lookup(&hdev->pend_le_conns, &conn->dst,
