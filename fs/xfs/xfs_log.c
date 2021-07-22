@@ -783,6 +783,21 @@ xfs_log_mount_cancel(
 }
 
 /*
+ * Flush out the iclog to disk ensuring that device caches are flushed and
+ * the iclog hits stable storage before any completion waiters are woken.
+ */
+static inline int
+xlog_force_iclog(
+	struct xlog_in_core	*iclog)
+{
+	atomic_inc(&iclog->ic_refcnt);
+	iclog->ic_flags |= XLOG_ICL_NEED_FLUSH | XLOG_ICL_NEED_FUA;
+	if (iclog->ic_state == XLOG_STATE_ACTIVE)
+		xlog_state_switch_iclogs(iclog->ic_log, iclog, 0);
+	return xlog_state_release_iclog(iclog->ic_log, iclog, 0);
+}
+
+/*
  * Wait for the iclog and all prior iclogs to be written disk as required by the
  * log force state machine. Waiting on ic_force_wait ensures iclog completions
  * have been ordered and callbacks run before we are woken here, hence
@@ -862,29 +877,18 @@ xlog_unmount_write(
 	 * transitioning log state to IOERROR. Just continue...
 	 */
 out_err:
-	if (error)
-		xfs_alert(mp, "%s: unmount record failed", __func__);
-
 	spin_lock(&log->l_icloglock);
 	iclog = log->l_iclog;
-	atomic_inc(&iclog->ic_refcnt);
-	if (iclog->ic_state == XLOG_STATE_ACTIVE)
-		xlog_state_switch_iclogs(log, iclog, 0);
-	else
-		ASSERT(iclog->ic_state == XLOG_STATE_WANT_SYNC ||
-		       iclog->ic_state == XLOG_STATE_IOERROR);
-	/*
-	 * Ensure the journal is fully flushed and on stable storage once the
-	 * iclog containing the unmount record is written.
-	 */
-	iclog->ic_flags |= (XLOG_ICL_NEED_FLUSH | XLOG_ICL_NEED_FUA);
-	error = xlog_state_release_iclog(log, iclog, 0);
+	error = xlog_force_iclog(iclog);
 	xlog_wait_on_iclog(iclog);
 
 	if (tic) {
 		trace_xfs_log_umount_write(log, tic);
 		xfs_log_ticket_ungrant(log, tic);
 	}
+	if (error)
+		xfs_alert(mp, "%s: unmount record failed", __func__);
+
 }
 
 static void
@@ -3205,38 +3209,35 @@ xfs_log_force(
 		iclog = iclog->ic_prev;
 	} else if (iclog->ic_state == XLOG_STATE_ACTIVE) {
 		if (atomic_read(&iclog->ic_refcnt) == 0) {
-			/*
-			 * We are the only one with access to this iclog.
-			 *
-			 * Flush it out now.  There should be a roundoff of zero
-			 * to show that someone has already taken care of the
-			 * roundoff from the previous sync.
-			 */
-			atomic_inc(&iclog->ic_refcnt);
+			/* We have exclusive access to this iclog. */
 			lsn = be64_to_cpu(iclog->ic_header.h_lsn);
-			xlog_state_switch_iclogs(log, iclog, 0);
-			if (xlog_state_release_iclog(log, iclog, 0))
+			if (xlog_force_iclog(iclog))
 				goto out_error;
-
+			/*
+			 * If the iclog has already been completed and reused
+			 * the header LSN will have been rewritten. Don't wait
+			 * on these iclogs that contain future modifications.
+			 */
 			if (be64_to_cpu(iclog->ic_header.h_lsn) != lsn)
 				goto out_unlock;
 		} else {
 			/*
-			 * Someone else is writing to this iclog.
-			 *
-			 * Use its call to flush out the data.  However, the
-			 * other thread may not force out this LR, so we mark
-			 * it WANT_SYNC.
+			 * Someone else is still writing to this iclog, so we
+			 * need to ensure that when they release the iclog it
+			 * gets synced immediately as we may be waiting on it.
 			 */
 			xlog_state_switch_iclogs(log, iclog, 0);
 		}
-	} else {
-		/*
-		 * If the head iclog is not active nor dirty, we just attach
-		 * ourselves to the head and go to sleep if necessary.
-		 */
-		;
 	}
+
+	/*
+	 * The iclog we are about to wait on may contain the checkpoint pushed
+	 * by the above xlog_cil_force() call, but it may not have been pushed
+	 * to disk yet. Like the ACTIVE case above, we need to make sure caches
+	 * are flushed when this iclog is written.
+	 */
+	if (iclog->ic_state == XLOG_STATE_WANT_SYNC)
+		iclog->ic_flags |= XLOG_ICL_NEED_FLUSH | XLOG_ICL_NEED_FUA;
 
 	if (flags & XFS_LOG_SYNC)
 		return xlog_wait_on_iclog(iclog);
@@ -3270,7 +3271,8 @@ xlog_force_lsn(
 			goto out_unlock;
 	}
 
-	if (iclog->ic_state == XLOG_STATE_ACTIVE) {
+	switch (iclog->ic_state) {
+	case XLOG_STATE_ACTIVE:
 		/*
 		 * We sleep here if we haven't already slept (e.g. this is the
 		 * first time we've looked at the correct iclog buf) and the
@@ -3293,12 +3295,31 @@ xlog_force_lsn(
 					&log->l_icloglock);
 			return -EAGAIN;
 		}
-		atomic_inc(&iclog->ic_refcnt);
-		xlog_state_switch_iclogs(log, iclog, 0);
-		if (xlog_state_release_iclog(log, iclog, 0))
+		if (xlog_force_iclog(iclog))
 			goto out_error;
 		if (log_flushed)
 			*log_flushed = 1;
+		break;
+	case XLOG_STATE_WANT_SYNC:
+		/*
+		 * This iclog may contain the checkpoint pushed by the 
+		 * xlog_cil_force_seq() call, but there are other writers still
+		 * accessing it so it hasn't been pushed to disk yet. Like the
+		 * ACTIVE case above, we need to make sure caches are flushed
+		 * when this iclog is written.
+		 */
+		iclog->ic_flags |= XLOG_ICL_NEED_FLUSH | XLOG_ICL_NEED_FUA;
+		if (log_flushed)
+			*log_flushed = 1;
+		break;
+	default:
+		/*
+		 * The entire checkpoint was written by the CIL force and is on
+		 * it's way to disk already. It will be stable when it
+		 * completes, so we don't need to manipulate caches here at all.
+		 * We just need to wait for completion if necessary.
+		 */
+		break;
 	}
 
 	if (flags & XFS_LOG_SYNC)
