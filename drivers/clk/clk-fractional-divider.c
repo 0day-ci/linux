@@ -153,7 +153,6 @@ const struct clk_ops clk_fractional_divider_ops = {
 	.round_rate = clk_fd_round_rate,
 	.set_rate = clk_fd_set_rate,
 };
-EXPORT_SYMBOL_GPL(clk_fractional_divider_ops);
 
 struct clk_hw *clk_hw_register_fractional_divider(struct device *dev,
 		const char *name, const char *parent_name, unsigned long flags,
