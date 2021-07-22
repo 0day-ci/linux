@@ -2342,16 +2342,15 @@ static bool setup_vmgexit_scratch(struct vcpu_svm *svm, bool sync, u64 len)
 	return true;
 }
 
-static void set_ghcb_msr_bits(struct vcpu_svm *svm, u64 value, u64 mask,
-			      unsigned int pos)
+static void set_ghcb_msr_cpuid_resp(struct vcpu_svm *svm, u64 reg, u64 value)
 {
-	svm->vmcb->control.ghcb_gpa &= ~(mask << pos);
-	svm->vmcb->control.ghcb_gpa |= (value & mask) << pos;
-}
+	u64 msr;
 
-static u64 get_ghcb_msr_bits(struct vcpu_svm *svm, u64 mask, unsigned int pos)
-{
-	return (svm->vmcb->control.ghcb_gpa >> pos) & mask;
+	msr  = GHCB_MSR_CPUID_RESP;
+	msr |= (reg & GHCB_MSR_CPUID_REG_MASK) << GHCB_MSR_CPUID_REG_POS;
+	msr |= (value & GHCB_MSR_CPUID_VALUE_MASK) << GHCB_MSR_CPUID_VALUE_POS;
+
+	svm->vmcb->control.ghcb_gpa = msr;
 }
 
 static void set_ghcb_msr(struct vcpu_svm *svm, u64 value)
@@ -2380,9 +2379,7 @@ static int sev_handle_vmgexit_msr_protocol(struct vcpu_svm *svm)
 	case GHCB_MSR_CPUID_REQ: {
 		u64 cpuid_fn, cpuid_reg, cpuid_value;
 
-		cpuid_fn = get_ghcb_msr_bits(svm,
-					     GHCB_MSR_CPUID_FUNC_MASK,
-					     GHCB_MSR_CPUID_FUNC_POS);
+		cpuid_fn = GHCB_MSR_CPUID_FN(control->ghcb_gpa);
 
 		/* Initialize the registers needed by the CPUID intercept */
 		vcpu->arch.regs[VCPU_REGS_RAX] = cpuid_fn;
@@ -2394,9 +2391,8 @@ static int sev_handle_vmgexit_msr_protocol(struct vcpu_svm *svm)
 			break;
 		}
 
-		cpuid_reg = get_ghcb_msr_bits(svm,
-					      GHCB_MSR_CPUID_REG_MASK,
-					      GHCB_MSR_CPUID_REG_POS);
+		cpuid_reg = GHCB_MSR_CPUID_REG(control->ghcb_gpa);
+
 		if (cpuid_reg == 0)
 			cpuid_value = vcpu->arch.regs[VCPU_REGS_RAX];
 		else if (cpuid_reg == 1)
@@ -2406,26 +2402,19 @@ static int sev_handle_vmgexit_msr_protocol(struct vcpu_svm *svm)
 		else
 			cpuid_value = vcpu->arch.regs[VCPU_REGS_RDX];
 
-		set_ghcb_msr_bits(svm, cpuid_value,
-				  GHCB_MSR_CPUID_VALUE_MASK,
-				  GHCB_MSR_CPUID_VALUE_POS);
+		set_ghcb_msr_cpuid_resp(svm, cpuid_reg, cpuid_value);
 
-		set_ghcb_msr_bits(svm, GHCB_MSR_CPUID_RESP,
-				  GHCB_MSR_INFO_MASK,
-				  GHCB_MSR_INFO_POS);
 		break;
 	}
 	case GHCB_MSR_TERM_REQ: {
 		u64 reason_set, reason_code;
 
-		reason_set = get_ghcb_msr_bits(svm,
-					       GHCB_MSR_TERM_REASON_SET_MASK,
-					       GHCB_MSR_TERM_REASON_SET_POS);
-		reason_code = get_ghcb_msr_bits(svm,
-						GHCB_MSR_TERM_REASON_MASK,
-						GHCB_MSR_TERM_REASON_POS);
+		reason_set  = GHCB_MSR_TERM_REASON_SET(control->ghcb_gpa);
+		reason_code = GHCB_MSR_TERM_REASON(control->ghcb_gpa);
+
 		pr_info("SEV-ES guest requested termination: %#llx:%#llx\n",
 			reason_set, reason_code);
+
 		fallthrough;
 	}
 	default:
