@@ -253,13 +253,9 @@ static unsigned long __trbe_normal_offset(struct perf_output_handle *handle)
 	 * trbe_base				trbe_base + nr_pages
 	 *
 	 * Perf aux buffer does not have any space for the driver to write into.
-	 * Just communicate trace truncation event to the user space by marking
-	 * it with PERF_AUX_FLAG_TRUNCATED.
 	 */
-	if (!handle->size) {
-		perf_aux_output_flag(handle, PERF_AUX_FLAG_TRUNCATED);
+	if (!handle->size)
 		return 0;
-	}
 
 	/* Compute the tail and wakeup indices now that we've aligned head */
 	tail = PERF_IDX2OFF(handle->head + handle->size, buf);
@@ -361,7 +357,6 @@ static unsigned long __trbe_normal_offset(struct perf_output_handle *handle)
 		return limit;
 
 	trbe_pad_buf(handle, handle->size);
-	perf_aux_output_flag(handle, PERF_AUX_FLAG_TRUNCATED);
 	return 0;
 }
 
