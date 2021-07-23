@@ -366,7 +366,7 @@ static int tpm2_load_cmd(struct tpm_chip *chip,
 	unsigned int private_len;
 	unsigned int public_len;
 	unsigned int blob_len;
-	u8 *blob, *pub;
+	u8 *blob = NULL, *pub;
 	int rc;
 	u32 attrs;
 
@@ -378,22 +378,30 @@ static int tpm2_load_cmd(struct tpm_chip *chip,
 	}
 
 	/* new format carries keyhandle but old format doesn't */
-	if (!options->keyhandle)
-		return -EINVAL;
+	if (!options->keyhandle) {
+		rc = -EINVAL;
+		goto err;
+	}
 
 	/* must be big enough for at least the two be16 size counts */
-	if (payload->blob_len < 4)
-		return -EINVAL;
+	if (payload->blob_len < 4) {
+		rc = -EINVAL;
+		goto err;
+	}
 
 	private_len = get_unaligned_be16(blob);
 
 	/* must be big enough for following public_len */
-	if (private_len + 2 + 2 > (payload->blob_len))
-		return -E2BIG;
+	if (private_len + 2 + 2 > (payload->blob_len)) {
+		rc = -E2BIG;
+		goto err;
+	}
 
 	public_len = get_unaligned_be16(blob + 2 + private_len);
-	if (private_len + 2 + public_len + 2 > payload->blob_len)
-		return -E2BIG;
+	if (private_len + 2 + public_len + 2 > payload->blob_len) {
+		rc = -E2BIG;
+		goto err;
+	}
 
 	pub = blob + 2 + private_len + 2;
 	/* key attributes are always at offset 4 */
@@ -440,6 +448,10 @@ out:
 	if (rc > 0)
 		rc = -EPERM;
 
+	return rc;
+
+err:
+	kfree(blob);
 	return rc;
 }
 
