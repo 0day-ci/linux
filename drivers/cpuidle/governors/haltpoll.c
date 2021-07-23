@@ -90,7 +90,6 @@ static void adjust_poll_limit(struct cpuidle_device *dev, u64 block_ns)
 		if (val > guest_halt_poll_ns)
 			val = guest_halt_poll_ns;
 
-		dev->poll_limit_ns = val;
 	} else if (block_ns > guest_halt_poll_ns &&
 		   guest_halt_poll_allow_shrink) {
 		unsigned int shrink = guest_halt_poll_shrink;
@@ -100,8 +99,9 @@ static void adjust_poll_limit(struct cpuidle_device *dev, u64 block_ns)
 			val = 0;
 		else
 			val /= shrink;
-		dev->poll_limit_ns = val;
 	}
+
+	dev->poll_limit_ns = val;
 }
 
 /**
