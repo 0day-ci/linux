@@ -123,10 +123,27 @@ exit:
 
 	if (allocated != count)
 		netdev_info(pfvf->netdev,
-			    "Unable to allocate %d MCAM entries for ntuple, got %d\n",
-			    count, allocated);
+			    "Unable to allocate %d MCAM entries above default rules' "
+			    "start index %d, got only %d\n",
+			    count, flow_cfg->def_ent[0], allocated);
 
 	return allocated;
+}
+
+int otx2_set_flow_rule_count(struct otx2_nic *pfvf, int count)
+{
+	struct otx2_flow_config *flow_cfg = pfvf->flow_cfg;
+
+	if (!flow_cfg)
+		return 0;
+
+	if (flow_cfg->nr_flows) {
+		netdev_err(pfvf->netdev,
+			   "Cannot change count when there are active rules\n");
+		return 0;
+	}
+
+	return otx2_alloc_ntuple_mcam_entries(pfvf, count);
 }
 
 int otx2_alloc_mcam_entries(struct otx2_nic *pfvf)
@@ -922,6 +939,12 @@ int otx2_add_flow(struct otx2_nic *pfvf, struct ethtool_rxnfc *nfc)
 	bool new = false;
 	int err = 0;
 	u32 ring;
+
+	if (!flow_cfg->ntuple_max_flows) {
+		netdev_err(pfvf->netdev,
+			   "Ntuple rule count is 0, allocate and retry\n");
+		return -EINVAL;
+	}
 
 	ring = ethtool_get_flow_spec_ring(fsp->ring_cookie);
 	if (!(pfvf->flags & OTX2_FLAG_NTUPLE_SUPPORT))

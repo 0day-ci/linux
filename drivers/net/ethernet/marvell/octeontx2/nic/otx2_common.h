@@ -825,6 +825,7 @@ int otx2_get_all_flows(struct otx2_nic *pfvf,
 int otx2_add_flow(struct otx2_nic *pfvf,
 		  struct ethtool_rxnfc *nfc);
 int otx2_remove_flow(struct otx2_nic *pfvf, u32 location);
+int otx2_set_flow_rule_count(struct otx2_nic *pfvf, int count);
 int otx2_prepare_flow_request(struct ethtool_rx_flow_spec *fsp,
 			      struct npc_install_flow_req *req);
 void otx2_rss_ctx_flow_del(struct otx2_nic *pfvf, int ctx_id);
