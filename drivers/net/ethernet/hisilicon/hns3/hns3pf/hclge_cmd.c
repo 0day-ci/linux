@@ -395,6 +395,8 @@ static void hclge_parse_capability(struct hclge_dev *hdev,
 		set_bit(HNAE3_DEV_SUPPORT_PORT_VLAN_BYPASS_B, ae_dev->caps);
 		set_bit(HNAE3_DEV_SUPPORT_VLAN_FLTR_MDF_B, ae_dev->caps);
 	}
+	if (hnae3_get_bit(caps, HCLGE_CAP_TX_PUSH_B))
+		set_bit(HNAE3_DEV_SUPPORT_TX_PUSH_B, ae_dev->caps);
 }
 
 static __le32 hclge_build_api_caps(void)
