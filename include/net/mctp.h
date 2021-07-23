@@ -37,6 +37,8 @@ struct mctp_hdr {
 
 #define MCTP_HEADER_MAXLEN	4
 
+#define MCTP_INITIAL_DEFAULT_NET	1
+
 static inline bool mctp_address_ok(mctp_eid_t eid)
 {
 	return eid >= 8 && eid < 255;
@@ -189,6 +191,8 @@ int mctp_local_output(struct sock *sk, struct mctp_route *rt,
 		      struct sk_buff *skb, mctp_eid_t daddr, u8 req_tag);
 
 /* routing <--> device interface */
+unsigned int mctp_default_net(struct net *net);
+int mctp_default_net_set(struct net *net, unsigned int index);
 int mctp_route_add(struct mctp_dev *mdev, mctp_eid_t daddr_start,
 		   unsigned int daddr_extent, unsigned int mtu, bool is_local);
 int mctp_route_remove(struct mctp_dev *mdev, mctp_eid_t daddr_start,
