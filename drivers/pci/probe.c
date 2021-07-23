@@ -1498,8 +1498,8 @@ void set_pcie_port_type(struct pci_dev *pdev)
 	pdev->pcie_cap = pos;
 	pci_read_config_word(pdev, pos + PCI_EXP_FLAGS, &reg16);
 	pdev->pcie_flags_reg = reg16;
-	pci_read_config_word(pdev, pos + PCI_EXP_DEVCAP, &reg16);
-	pdev->pcie_mpss = reg16 & PCI_EXP_DEVCAP_PAYLOAD;
+	pci_read_config_dword(pdev, pos + PCI_EXP_DEVCAP, &pdev->pcie_devcap);
+	pdev->pcie_mpss = pdev->pcie_devcap & PCI_EXP_DEVCAP_PAYLOAD;
 
 	parent = pci_upstream_bridge(pdev);
 	if (!parent)
@@ -2031,18 +2031,13 @@ static void pci_configure_mps(struct pci_dev *dev)
 int pci_configure_extended_tags(struct pci_dev *dev, void *ign)
 {
 	struct pci_host_bridge *host;
-	u32 cap;
 	u16 ctl;
 	int ret;
 
 	if (!pci_is_pcie(dev))
 		return 0;
 
-	ret = pcie_capability_read_dword(dev, PCI_EXP_DEVCAP, &cap);
-	if (ret)
-		return 0;
-
-	if (!(cap & PCI_EXP_DEVCAP_EXT_TAG))
+	if (!(dev->pcie_devcap & PCI_EXP_DEVCAP_EXT_TAG))
 		return 0;
 
 	ret = pcie_capability_read_word(dev, PCI_EXP_DEVCTL, &ctl);
