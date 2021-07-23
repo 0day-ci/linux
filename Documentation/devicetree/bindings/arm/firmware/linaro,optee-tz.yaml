@@ -24,6 +24,9 @@ properties:
   compatible:
     const: linaro,optee-tz
 
+  interrupts:
+    maxItems: 1
+
   method:
     enum: [smc, hvc]
     description: |
@@ -46,6 +49,7 @@ examples:
         optee  {
             compatible = "linaro,optee-tz";
             method = "smc";
+            interrupts = <0 187 4>;
         };
     };
 
