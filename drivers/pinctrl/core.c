@@ -1994,7 +1994,8 @@ static int pinctrl_check_ops(struct pinctrl_dev *pctldev)
 
 	if (!ops ||
 	    !ops->get_groups_count ||
-	    !ops->get_group_name)
+	    !ops->get_group_name ||
+	    !ops->get_group_pins)
 		return -EINVAL;
 
 	return 0;
