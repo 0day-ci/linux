@@ -1063,7 +1063,11 @@ static struct pinctrl *create_pinctrl(struct device *dev,
 	INIT_LIST_HEAD(&p->states);
 	INIT_LIST_HEAD(&p->dt_maps);
 
-	ret = pinctrl_dt_to_map(p, pctldev);
+	if (pctldev && pctldev->desc->pctlops->dt_dev_to_map) {
+		ret = pctldev->desc->pctlops->dt_dev_to_map(pctldev, dev);
+	} else {
+		ret = pinctrl_dt_to_map(p, pctldev);
+	}
 	if (ret < 0) {
 		kfree(p);
 		return ERR_PTR(ret);
