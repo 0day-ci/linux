@@ -132,7 +132,8 @@ static void trbe_stop_and_truncate_event(struct perf_output_handle *handle)
 	 * the update_buffer() to return a 0 size.
 	 */
 	trbe_drain_and_disable_local();
-	perf_aux_output_flag(handle, PERF_AUX_FLAG_TRUNCATED);
+	perf_aux_output_flag(handle, PERF_AUX_FLAG_TRUNCATED |
+				     PERF_AUX_FLAG_CORESIGHT_FORMAT_RAW);
 	*this_cpu_ptr(buf->cpudata->drvdata->handle) = NULL;
 }
 
