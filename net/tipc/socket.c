@@ -1886,6 +1886,7 @@ static int tipc_recvmsg(struct socket *sock, struct msghdr *m,
 	struct sk_buff *skb;
 	bool grp_evt;
 	long timeout;
+	unsigned int bytes_read;
 
 	/* Catch invalid receive requests */
 	if (unlikely(!buflen))
@@ -1973,10 +1974,13 @@ static int tipc_recvmsg(struct socket *sock, struct msghdr *m,
 		tipc_node_distr_xmit(sock_net(sk), &xmitq);
 	}
 
-	if (!skb_cb->bytes_read)
+	/* To avoid accesing skb_cb after tsk_advance_rx_queue */
+	bytes_read = skb_cb->bytes_read;
+
+	if (!bytes_read)
 		tsk_advance_rx_queue(sk);
 
-	if (likely(!connected) || skb_cb->bytes_read)
+	if (likely(!connected) || bytes_read)
 		goto exit;
 
 	/* Send connection flow control advertisement when applicable */
