@@ -45,7 +45,6 @@
 struct nvkm_i2c_port;
 struct dcb_output;
 
-#ifdef CONFIG_DRM_NOUVEAU_BACKLIGHT
 struct nouveau_backlight {
 	struct backlight_device *dev;
 
@@ -54,7 +53,6 @@ struct nouveau_backlight {
 
 	int id;
 };
-#endif
 
 #define nouveau_conn_atom(p)                                                   \
 	container_of((p), struct nouveau_conn_atom, state)
@@ -133,9 +131,7 @@ struct nouveau_connector {
 	struct nouveau_encoder *detected_encoder;
 	struct edid *edid;
 	struct drm_display_mode *native_mode;
-#ifdef CONFIG_DRM_NOUVEAU_BACKLIGHT
 	struct nouveau_backlight *backlight;
-#endif
 	/*
 	 * Our connector property code expects a nouveau_conn_atom struct
 	 * even on pre-nv50 where we do not support atomic. This embedded
@@ -220,29 +216,9 @@ nouveau_conn_mode_clock_valid(const struct drm_display_mode *,
 			      const unsigned max_clock,
 			      unsigned *clock);
 
-#ifdef CONFIG_DRM_NOUVEAU_BACKLIGHT
 extern int nouveau_backlight_init(struct drm_connector *);
 extern void nouveau_backlight_fini(struct drm_connector *);
 extern void nouveau_backlight_ctor(void);
 extern void nouveau_backlight_dtor(void);
-#else
-static inline int
-nouveau_backlight_init(struct drm_connector *connector)
-{
-	return 0;
-}
-
-static inline void
-nouveau_backlight_fini(struct drm_connector *connector) {
-}
-
-static inline void
-nouveau_backlight_ctor(void) {
-}
-
-static inline void
-nouveau_backlight_dtor(void) {
-}
-#endif
 
 #endif /* __NOUVEAU_CONNECTOR_H__ */
