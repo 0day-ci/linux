@@ -34,34 +34,35 @@ int bpf_nextcnt(struct __sk_buff *skb)
 	cnt = bpf_get_local_storage(&netcnt, 0);
 	percpu_cnt = bpf_get_local_storage(&percpu_netcnt, 0);
 
-	percpu_cnt->packets++;
-	percpu_cnt->bytes += skb->len;
+	percpu_cnt->val.packets++;
+	percpu_cnt->val.bytes += skb->len;
 
-	if (percpu_cnt->packets > MAX_PERCPU_PACKETS) {
-		__sync_fetch_and_add(&cnt->packets,
-				     percpu_cnt->packets);
-		percpu_cnt->packets = 0;
+	if (percpu_cnt->val.packets > MAX_PERCPU_PACKETS) {
+		__sync_fetch_and_add(&cnt->val.packets,
+				     percpu_cnt->val.packets);
+		percpu_cnt->val.packets = 0;
 
-		__sync_fetch_and_add(&cnt->bytes,
-				     percpu_cnt->bytes);
-		percpu_cnt->bytes = 0;
+		__sync_fetch_and_add(&cnt->val.bytes,
+				     percpu_cnt->val.bytes);
+		percpu_cnt->val.bytes = 0;
 	}
 
 	ts = bpf_ktime_get_ns();
-	dt = ts - percpu_cnt->prev_ts;
+	dt = ts - percpu_cnt->val.prev_ts;
 
 	dt *= MAX_BPS;
 	dt /= NS_PER_SEC;
 
-	if (cnt->bytes + percpu_cnt->bytes - percpu_cnt->prev_bytes < dt)
+	if (cnt->val.bytes + percpu_cnt->val.bytes -
+	    percpu_cnt->val.prev_bytes < dt)
 		ret = 1;
 	else
 		ret = 0;
 
 	if (dt > REFRESH_TIME_NS) {
-		percpu_cnt->prev_ts = ts;
-		percpu_cnt->prev_packets = cnt->packets;
-		percpu_cnt->prev_bytes = cnt->bytes;
+		percpu_cnt->val.prev_ts = ts;
+		percpu_cnt->val.prev_packets = cnt->val.packets;
+		percpu_cnt->val.prev_bytes = cnt->val.bytes;
 	}
 
 	return !!ret;
