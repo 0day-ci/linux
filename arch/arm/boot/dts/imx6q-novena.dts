@@ -227,9 +227,6 @@
 	status = "okay";
 
 	mdio {
-		#address-cells = <1>;
-		#size-cells = <0>;
-
 		ethphy: ethernet-phy {
 			compatible = "ethernet-phy-ieee802.3-c22";
 			rxc-skew-ps = <3000>;

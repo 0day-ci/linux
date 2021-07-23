@@ -340,9 +340,6 @@
 	status = "okay";
 
 	mdio {
-		#address-cells = <1>;
-		#size-cells = <0>;
-
 		ethphy: ethernet-phy {
 			compatible = "ethernet-phy-ieee802.3-c22";
 			txen-skew-ps = <0>;
