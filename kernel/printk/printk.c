@@ -2190,7 +2190,8 @@ EXPORT_SYMBOL_GPL(vprintk_default);
  * _printk - print a kernel message
  * @fmt: format string
  *
- * This is _printk(). It can be called from any context. We want it to work.
+ * This is printk() implementation. It can be called from any context.
+ * We want it to work.
  *
  * If printk indexing is enabled, _printk() is called from printk_index_wrap.
  * Otherwise, printk is simply #defined to _printk.

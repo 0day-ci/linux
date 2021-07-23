@@ -431,6 +431,18 @@ struct pi_entry {
 	})
 
 
+/**
+ * printk - Print a message
+ * @fmt: format string
+ * @...: arguments for the format string
+ *
+ * This macro generates metadata for printk indexing and prints the message
+ * using _printk(). It uses pr_fmt() to generate the format string.
+ *
+ * The default log level is used when a particular one is not part of
+ * the message prefix. pr_<level>() macros are preferred because each
+ * caller should know the exact purpose of the message.
+ */
 #define printk(fmt, ...) printk_index_wrap(_printk, fmt, ##__VA_ARGS__)
 #define printk_deferred(fmt, ...)					\
 	printk_index_wrap(_printk_deferred, fmt, ##__VA_ARGS__)
