@@ -329,7 +329,9 @@ SYM_FUNC_START_LOCAL(__create_page_tables)
 
 #if (VA_BITS < 48)
 #define EXTRA_SHIFT	(PGDIR_SHIFT + PAGE_SHIFT - 3)
+#define EXTRA_SHIFT_1	(EXTRA_SHIFT + PAGE_SHIFT - 3)
 #define EXTRA_PTRS	(1 << (PHYS_MASK_SHIFT - EXTRA_SHIFT))
+#define EXTRA_PTRS_1	(1 << (PHYS_MASK_SHIFT - EXTRA_SHIFT_1))
 
 	/*
 	 * If VA_BITS < 48, we have to configure an additional table level.
@@ -342,8 +344,30 @@ SYM_FUNC_START_LOCAL(__create_page_tables)
 #error "Mismatch between VA_BITS and page size/number of translation levels"
 #endif
 
+/*
+ * In this particular CONFIG_ARM64_16K_PAGES config, there might be a
+ * scenario where 'idmap_text_end' ends up high enough in the PA range
+ * requiring two additional idmap page table levels. Reduce idmap_t0sz
+ * to cover the entire PA range. This prevents table misconfiguration
+ * when a given idmap_t0sz value just requires single additional level
+ * where as two levels have been built.
+ */
+#if defined(CONFIG_ARM64_VA_BITS_36) && defined(CONFIG_ARM64_PA_BITS_48)
+	mov	x4, EXTRA_PTRS_1
+	create_table_entry x0, x3, EXTRA_SHIFT_1, x4, x5, x6
+
+	mov	x4, PTRS_PER_PTE
+	create_table_entry x0, x3, EXTRA_SHIFT, x4, x5, x6
+
+	mov	x5, #64 - PHYS_MASK_SHIFT
+	adr_l	x6, idmap_t0sz
+	str	x5, [x6]
+	dmb	sy
+	dc	ivac, x6
+#else
 	mov	x4, EXTRA_PTRS
 	create_table_entry x0, x3, EXTRA_SHIFT, x4, x5, x6
+#endif
 #else
 	/*
 	 * If VA_BITS == 48, we don't have to configure an additional
