@@ -738,6 +738,25 @@ int pinctrl_get_group_selector(struct pinctrl_dev *pctldev,
 	return -EINVAL;
 }
 
+int pinctrl_gpio_as_pin(struct pinctrl_dev *pctldev, unsigned int gpio)
+{
+	struct pinctrl_gpio_range *range;
+	int pin;
+
+	range = pinctrl_match_gpio_range(pctldev, gpio);
+	if (!range)
+		return -ENODEV;
+
+	mutex_lock(&pctldev->mutex);
+
+	pin = gpio_to_pin(range, gpio);
+
+	mutex_unlock(&pctldev->mutex);
+
+	return pin;
+}
+EXPORT_SYMBOL_GPL(pinctrl_find_gpio_range_from_pin);
+
 bool pinctrl_gpio_can_use_line(unsigned gpio)
 {
 	struct pinctrl_dev *pctldev;
