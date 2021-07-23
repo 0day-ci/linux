@@ -381,7 +381,7 @@ static const u8 *mipi_exec_gpio(struct intel_dsi *intel_dsi, const u8 *data)
 	value = *data++ & 1;
 
 	if (DISPLAY_VER(dev_priv) >= 11)
-		icl_exec_gpio(dev_priv, gpio_source, gpio_index, value);
+		icl_exec_gpio(dev_priv, gpio_source, gpio_number, value);
 	else if (IS_VALLEYVIEW(dev_priv))
 		vlv_exec_gpio(dev_priv, gpio_source, gpio_number, value);
 	else if (IS_CHERRYVIEW(dev_priv))
