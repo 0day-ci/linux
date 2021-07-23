@@ -1357,18 +1357,9 @@ static void __exit unload_cpqphpd(void)
 }
 
 static const struct pci_device_id hpcd_pci_tbl[] = {
-	{
 	/* handle any PCI Hotplug controller */
-	.class =        ((PCI_CLASS_SYSTEM_PCI_HOTPLUG << 8) | 0x00),
-	.class_mask =   ~0,
-
-	/* no matter who makes it */
-	.vendor =       PCI_ANY_ID,
-	.device =       PCI_ANY_ID,
-	.subvendor =    PCI_ANY_ID,
-	.subdevice =    PCI_ANY_ID,
-
-	}, { /* end: all zeroes */ }
+	{ PCI_DEVICE_CLASS(((PCI_CLASS_SYSTEM_PCI_HOTPLUG << 8) | 0x00), ~0) },
+	{ /* end: all zeroes */ },
 };
 
 MODULE_DEVICE_TABLE(pci, hpcd_pci_tbl);

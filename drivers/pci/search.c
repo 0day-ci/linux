@@ -303,11 +303,7 @@ struct pci_dev *pci_get_subsys(unsigned int vendor, unsigned int device,
 			       struct pci_dev *from)
 {
 	struct pci_device_id id = {
-		.vendor = vendor,
-		.device = device,
-		.subvendor = ss_vendor,
-		.subdevice = ss_device,
-	};
+		PCI_DEVICE_SUB(vendor, device, ss_vendor, ss_device) };
 
 	return pci_get_dev_by_id(&id, from);
 }
@@ -351,13 +347,7 @@ EXPORT_SYMBOL(pci_get_device);
 struct pci_dev *pci_get_class(unsigned int class, struct pci_dev *from)
 {
 	struct pci_device_id id = {
-		.vendor = PCI_ANY_ID,
-		.device = PCI_ANY_ID,
-		.subvendor = PCI_ANY_ID,
-		.subdevice = PCI_ANY_ID,
-		.class_mask = PCI_ANY_ID,
-		.class = class,
-	};
+		PCI_DEVICE_CLASS(PCI_ANY_ID, class) };
 
 	return pci_get_dev_by_id(&id, from);
 }
