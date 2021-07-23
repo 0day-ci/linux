@@ -181,8 +181,7 @@ out:
 static int fill_write_buffer(struct configfs_buffer *buffer, loff_t pos,
 			     struct iov_iter *from)
 {
-	loff_t to_copy;
-	int copied;
+	int to_copy, copied;
 	u8 *to;
 
 	if (!buffer->page)
@@ -190,9 +189,9 @@ static int fill_write_buffer(struct configfs_buffer *buffer, loff_t pos,
 	if (!buffer->page)
 		return -ENOMEM;
 
-	to_copy = SIMPLE_ATTR_SIZE - 1 - pos;
-	if (to_copy <= 0)
+	if (pos >= SIMPLE_ATTR_SIZE - 1)
 		return 0;
+	to_copy = SIMPLE_ATTR_SIZE - 1 - pos;
 	to = buffer->page + pos;
 	copied = copy_from_iter(to, to_copy, from);
 	buffer->needs_read_fill = 1;
