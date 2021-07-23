@@ -1343,6 +1343,7 @@ int irdma_modify_qp_roce(struct ib_qp *ibqp, struct ib_qp_attr *attr,
 			break;
 		case IB_QPS_SQD:
 			if (iwqp->iwarp_state == IRDMA_QP_STATE_SQD)
+				ret = -EINVAL;
 				goto exit;
 
 			if (iwqp->iwarp_state != IRDMA_QP_STATE_RTS) {
