@@ -2572,7 +2572,7 @@ static inline bool i915_mmio_reg_valid(i915_reg_t reg)
 #define   ARB_MODE_BWGTLB_DISABLE (1 << 9)
 #define   ARB_MODE_SWIZZLE_BDW	(1 << 1)
 #define RENDER_HWS_PGA_GEN7	_MMIO(0x04080)
-#define RING_FAULT_REG(engine)	_MMIO(0x4094 + 0x100 * (engine)->hw_id)
+#define RING_FAULT_REG(engine)	_MMIO(0x4094 + 0x100 * (engine)->gen6_hw_id)
 #define GEN8_RING_FAULT_REG	_MMIO(0x4094)
 #define GEN12_RING_FAULT_REG	_MMIO(0xcec4)
 #define   GEN8_RING_FAULT_ENGINE_ID(x)	(((x) >> 12) & 0x7)
@@ -4142,6 +4142,7 @@ enum {
 	FAULT_AND_CONTINUE /* Unsupported */
 };
 
+#define CTX_GTT_ADDRESS_MASK GENMASK(31, 12)
 #define GEN8_CTX_VALID (1 << 0)
 #define GEN8_CTX_FORCE_PD_RESTORE (1 << 1)
 #define GEN8_CTX_FORCE_RESTORE (1 << 2)
@@ -4157,6 +4158,11 @@ enum {
 #define GEN11_ENGINE_CLASS_WIDTH 3
 #define GEN11_ENGINE_INSTANCE_SHIFT 48
 #define GEN11_ENGINE_INSTANCE_WIDTH 6
+
+#define XEHP_SW_CTX_ID_SHIFT 39
+#define XEHP_SW_CTX_ID_WIDTH 16
+#define XEHP_SW_COUNTER_SHIFT 58
+#define XEHP_SW_COUNTER_WIDTH 6
 
 #define CHV_CLK_CTL1			_MMIO(0x101100)
 #define VLV_CLK_CTL2			_MMIO(0x101104)
