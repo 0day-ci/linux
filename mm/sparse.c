@@ -321,10 +321,11 @@ size_t mem_section_usage_size(void)
 static inline phys_addr_t pgdat_to_phys(struct pglist_data *pgdat)
 {
 #ifndef CONFIG_NUMA
-	return __pa_symbol(pgdat);
-#else
+	if (pgdat == &contig_page_data)
+		return __pa_symbol(&contig_page_data);
+	pr_warn("Unexpected pglist_data pointer!\n");
+#endif /* !CONFIG_NUMA */
 	return __pa(pgdat);
-#endif
 }
 
 #ifdef CONFIG_MEMORY_HOTREMOVE
