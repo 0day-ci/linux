@@ -5128,8 +5128,11 @@ static int hns3_client_init(struct hnae3_handle *handle)
 	if (hnae3_ae_dev_rxd_adv_layout_supported(ae_dev))
 		set_bit(HNS3_NIC_STATE_RXD_ADV_LAYOUT_ENABLE, &priv->state);
 
-	if (test_bit(HNAE3_DEV_SUPPORT_TX_PUSH_B, ae_dev->caps))
+	if (test_bit(HNAE3_DEV_SUPPORT_TX_PUSH_B, ae_dev->caps)) {
 		set_bit(HNS3_NIC_STATE_TX_PUSH_ENABLE, &priv->state);
+		handle->priv_flags |= BIT(HNAE3_PFLAG_PUSH_ENABLE);
+		set_bit(HNAE3_PFLAG_PUSH_ENABLE, &handle->supported_pflags);
+	}
 
 	set_bit(HNS3_NIC_STATE_INITED, &priv->state);
 
