@@ -19,6 +19,7 @@
 #include <linux/random.h>
 #include <linux/seq_buf.h>
 #include <linux/xarray.h>
+#include "pci.h"
 
 enum pci_p2pdma_map_type {
 	PCI_P2PDMA_MAP_UNKNOWN = 0,
@@ -541,6 +542,39 @@ done:
 	return map_type;
 }
 
+
+static bool check_10bit_tags_vaild(struct pci_dev *a, struct pci_dev *b,
+				   bool verbose)
+{
+	bool req;
+	bool comp;
+	u16 ctl2;
+
+	if (a->is_virtfn) {
+#ifdef CONFIG_PCI_IOV
+		req = !!(a->physfn->sriov->ctrl &
+			 PCI_SRIOV_CTRL_VF_10BIT_TAG_REQ_EN);
+#endif
+	} else {
+		pcie_capability_read_word(a, PCI_EXP_DEVCTL2, &ctl2);
+		req = !!(ctl2 & PCI_EXP_DEVCTL2_10BIT_TAG_REQ_EN);
+	}
+
+	comp = !!(b->pcie_devcap2 & PCI_EXP_DEVCAP2_10BIT_TAG_COMP);
+	if (req && (!comp)) {
+		if (verbose) {
+			pci_warn(a, "cannot be used for peer-to-peer DMA as 10-Bit Tag Requester enable is set in device (%s), but peer device (%s) does not support the 10-Bit Tag Completer\n",
+				 pci_name(a), pci_name(b));
+
+			pci_warn(a, "to disable 10-Bit Tag Requester for this device, add the kernel parameter: pci=disable_10bit_tag=%s\n",
+				 pci_name(a));
+		}
+		return false;
+	}
+
+	return true;
+}
+
 /**
  * pci_p2pdma_distance_many - Determine the cumulative distance between
  *	a p2pdma provider and the clients in use.
@@ -578,6 +612,10 @@ int pci_p2pdma_distance_many(struct pci_dev *provider, struct device **clients,
 					 "cannot be used for peer-to-peer DMA as it is not a PCI device\n");
 			return -1;
 		}
+
+		if (!check_10bit_tags_vaild(pci_client, provider, verbose) ||
+		    !check_10bit_tags_vaild(provider, pci_client, verbose))
+			not_supported = true;
 
 		map = calc_map_type_and_dist(provider, pci_client, &distance,
 					     verbose);
