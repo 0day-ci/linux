@@ -199,12 +199,13 @@ static unsigned int tcp_model_timeout(struct sock *sk,
  *  @boundary: max number of retransmissions
  *  @timeout:  A custom timeout value.
  *             If set to 0 the default timeout is calculated and used.
- *             Using TCP_RTO_MIN and the number of unsuccessful retransmits.
+ *             Using icsk_rto_min value from socket or RTAX_RTO_MIN from route
+ *             and the number of unsuccessful retransmits.
  *
  * The default "timeout" value this function can calculate and use
  * is equivalent to the timeout of a TCP Connection
  * after "boundary" unsuccessful, exponentially backed-off
- * retransmissions with an initial RTO of TCP_RTO_MIN.
+ * retransmissions with an initial RTO of icsk_rto_min or RTAX_RTO_MIN.
  */
 static bool retransmits_timed_out(struct sock *sk,
 				  unsigned int boundary,
@@ -217,7 +218,7 @@ static bool retransmits_timed_out(struct sock *sk,
 
 	start_ts = tcp_sk(sk)->retrans_stamp;
 	if (likely(timeout == 0)) {
-		unsigned int rto_base = TCP_RTO_MIN;
+		unsigned int rto_base = tcp_rto_min(sk);
 
 		if ((1 << sk->sk_state) & (TCPF_SYN_SENT | TCPF_SYN_RECV))
 			rto_base = tcp_timeout_init(sk);
