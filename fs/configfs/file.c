@@ -226,14 +226,16 @@ static ssize_t configfs_write_iter(struct kiocb *iocb, struct iov_iter *from)
 {
 	struct file *file = iocb->ki_filp;
 	struct configfs_buffer *buffer = file->private_data;
-	ssize_t len;
+	int len, written = 0;
 
 	mutex_lock(&buffer->mutex);
 	len = fill_write_buffer(buffer, iocb->ki_pos, from);
 	if (len > 0)
-		len = flush_write_buffer(file, buffer, len);
-	if (len > 0)
-		iocb->ki_pos += len;
+		written = flush_write_buffer(file, buffer, iocb->ki_pos + len);
+	if (written > 0) {
+		len = max_t(int, 0, written - iocb->ki_pos);
+		iocb->ki_pos = written;
+	}
 	mutex_unlock(&buffer->mutex);
 	return len;
 }
