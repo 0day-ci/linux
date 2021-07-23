@@ -10,14 +10,26 @@ maintainers:
   - Joel Stanley <joel@jms.id.au>
 
 description:
-  This device is a 10-bit converter for 16 voltage channels.  All inputs are
-  single ended.
+  • 10-bits resolution for 16 voltage channels.
+  At ast2400/ast2500 the device has only one engine with 16 voltage channels.
+  At ast2600 the device split into two individual engine and each contains 8 voltage channels.
+  • Channel scanning can be non-continuous.
+  • Programmable ADC clock frequency.
+  • Programmable upper and lower bound for each channels.
+  • Interrupt when larger or less than bounds for each channels.
+  • Support hysteresis for each channels.
+  • Buildin a compensating method.
+  Additional feature at ast2600
+  • Internal or External reference voltage.
+  • Support 2 Internal reference voltage 1.2v or 2.5v.
+  • Integrate dividing circuit for battery sensing.
 
 properties:
   compatible:
     enum:
       - aspeed,ast2400-adc
       - aspeed,ast2500-adc
+      - aspeed,ast2600-adc
 
   reg:
     maxItems: 1
@@ -33,6 +45,18 @@ properties:
 
   "#io-channel-cells":
     const: 1
+
+  vref:
+    minItems: 900
+    maxItems: 2700
+    default: 2500
+    description:
+      ADC Reference voltage in millivolts.
+
+  battery-sensing:
+    type: boolean
+    description:
+      Inform the driver that last channel will be used to sensor battery.
 
 required:
   - compatible
