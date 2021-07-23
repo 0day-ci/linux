@@ -41,7 +41,7 @@
 #define POWER_SAVE_HIGH			(3 << 0)
 #define POWER_SAVE_OUTDOOR_MODE		(4 << 0)
 
-#define PANEL_PWM_MAX_VALUE		0xFF
+#define PANEL_PWM_MAX_VALUE		0xFFFF
 
 static u32 dcs_get_backlight(struct intel_connector *connector, enum pipe unused)
 {
@@ -147,10 +147,16 @@ static void dcs_enable_backlight(const struct intel_crtc_state *crtc_state,
 static int dcs_setup_backlight(struct intel_connector *connector,
 			       enum pipe unused)
 {
+	struct drm_device *dev = connector->base.dev;
+	struct drm_i915_private *dev_priv = to_i915(dev);
 	struct intel_panel *panel = &connector->panel;
 
-	panel->backlight.max = PANEL_PWM_MAX_VALUE;
-	panel->backlight.level = PANEL_PWM_MAX_VALUE;
+	panel->backlight.max = dev_priv->vbt.backlight.max_brightness_level \
+			       ? dev_priv->vbt.backlight.max_brightness_level \
+			       : PANEL_PWM_MAX_VALUE;
+	panel->backlight.level = dev_priv->vbt.backlight.max_brightness_level \
+				 ? dev_priv->vbt.backlight.max_brightness_level \
+				 : PANEL_PWM_MAX_VALUE;
 
 	return 0;
 }
