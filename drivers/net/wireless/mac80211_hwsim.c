@@ -3404,6 +3404,8 @@ failed_final_insert:
 	debugfs_remove_recursive(data->debugfs);
 	ieee80211_unregister_hw(data->hw);
 failed_hw:
+	if (param->regd)
+		kfree_rcu(get_wiphy_regdom(data->hw->wiphy));
 	device_release_driver(data->dev);
 failed_bind:
 	device_unregister(data->dev);
@@ -3454,6 +3456,8 @@ static void mac80211_hwsim_del_radio(struct mac80211_hwsim_data *data,
 {
 	hwsim_mcast_del_radio(data->idx, hwname, info);
 	debugfs_remove_recursive(data->debugfs);
+	if (data->regd)
+		kfree_rcu(get_wiphy_regdom(data->hw->wiphy));
 	ieee80211_unregister_hw(data->hw);
 	device_release_driver(data->dev);
 	device_unregister(data->dev);
