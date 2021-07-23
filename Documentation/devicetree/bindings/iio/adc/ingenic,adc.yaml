@@ -23,6 +23,8 @@ properties:
     enum:
       - ingenic,jz4725b-adc
       - ingenic,jz4740-adc
+      - ingenic,jz4760-adc
+      - ingenic,jz4760b-adc
       - ingenic,jz4770-adc
 
   '#io-channel-cells':
@@ -42,6 +44,13 @@ properties:
 
   interrupts:
     maxItems: 1
+
+  ingenic,use-internal-divider:
+    description:
+      This property can be used to set VBAT_SEL in the JZ4760B CFG register
+      to sample the battery voltage from the internal divider. If absent, it
+      will sample the external divider.
+    type: boolean
 
 required:
   - compatible
