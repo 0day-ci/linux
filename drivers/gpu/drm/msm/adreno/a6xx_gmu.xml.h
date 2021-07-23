@@ -479,5 +479,7 @@ static inline uint32_t A6XX_GMU_GPU_NAP_CTRL_SID(uint32_t val)
 
 #define REG_A6XX_RSCC_TCS3_DRV0_STATUS				0x0000053e
 
+#define REG_A6XX_GPU_CPR_FSM_CTL				0x0000c001
+
 
 #endif /* A6XX_GMU_XML */

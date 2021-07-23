@@ -933,6 +933,7 @@ int a6xx_gmu_resume(struct a6xx_gpu *a6xx_gpu)
 
 	/* Use a known rate to bring up the GMU */
 	clk_set_rate(gmu->core_clk, 200000000);
+	clk_set_rate(gmu->hub_clk, 150000000);
 	ret = clk_bulk_prepare_enable(gmu->nr_clocks, gmu->clocks);
 	if (ret) {
 		pm_runtime_put(gmu->gxpd);
@@ -1094,6 +1095,7 @@ static void a6xx_gmu_shutdown(struct a6xx_gmu *gmu)
 
 int a6xx_gmu_stop(struct a6xx_gpu *a6xx_gpu)
 {
+	struct adreno_gpu *adreno_gpu = &a6xx_gpu->base;
 	struct a6xx_gmu *gmu = &a6xx_gpu->gmu;
 	struct msm_gpu *gpu = &a6xx_gpu->base.base;
 
@@ -1117,8 +1119,21 @@ int a6xx_gmu_stop(struct a6xx_gpu *a6xx_gpu)
 	 * domain. Usually the GMU does this but only if the shutdown sequence
 	 * was successful
 	 */
-	if (!IS_ERR_OR_NULL(gmu->gxpd))
+	if (!IS_ERR_OR_NULL(gmu->gxpd)) {
+		/*
+		 * Toggle the loop_en bit, across disabling the gx gdsc,
+		 * with a delay of 10 XO cycles before disabling gx
+		 * gdsc. This is to prevent CPR measurements from
+		 * failing.
+		 */
+		if (adreno_is_a660(adreno_gpu))
+			gmu_rmw(gmu, REG_A6XX_GPU_CPR_FSM_CTL, 1, 0);
+
 		pm_runtime_put_sync(gmu->gxpd);
+
+		if (adreno_is_a660(adreno_gpu))
+			gmu_rmw(gmu, REG_A6XX_GPU_CPR_FSM_CTL, 1, 1);
+	}
 
 	clk_bulk_disable_unprepare(gmu->nr_clocks, gmu->clocks);
 
@@ -1392,6 +1407,9 @@ static int a6xx_gmu_clocks_probe(struct a6xx_gmu *gmu)
 
 	gmu->core_clk = msm_clk_bulk_get_clock(gmu->clocks,
 		gmu->nr_clocks, "gmu");
+
+	gmu->hub_clk = msm_clk_bulk_get_clock(gmu->clocks,
+		gmu->nr_clocks, "hub");
 
 	return 0;
 }
