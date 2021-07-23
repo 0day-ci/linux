@@ -175,8 +175,6 @@ static void handle_signal(struct ksignal *ksig, struct pt_regs *regs)
 	sigset_t *oldset = sigmask_to_save();
 	int ret;
 
-	rseq_signal_deliver(ksig, regs);
-
 	/* Are we from a system call? */
 	if (in_syscall(regs)) {
 		/* Avoid additional syscall restarting via ret_from_exception */
@@ -262,6 +260,5 @@ asmlinkage void do_notify_resume(struct pt_regs *regs,
 
 	if (thread_info_flags & _TIF_NOTIFY_RESUME) {
 		tracehook_notify_resume(regs);
-		rseq_handle_notify_resume(NULL, regs);
 	}
 }
