@@ -87,6 +87,9 @@ static void gve_tx_clean_pending_packets(struct gve_tx_ring *tx)
 		for (j = 0; j < cur_state->num_bufs; j++) {
 			struct gve_tx_dma_buf *buf = &cur_state->bufs[j];
 
+#ifndef CONFIG_NEED_DMA_MAP_STATE
+			(void)buf;  // Suppress unused variable.
+#endif
 			if (j == 0) {
 				dma_unmap_single(tx->dev,
 						 dma_unmap_addr(buf, dma),
@@ -459,8 +462,13 @@ static int gve_tx_add_skb_no_copy_dqo(struct gve_tx_ring *tx,
 
 	struct gve_tx_pending_packet_dqo *pending_packet;
 	struct gve_tx_metadata_dqo metadata;
+	struct gve_tx_dma_buf *buf;
 	s16 completion_tag;
 	int i;
+
+#ifndef CONFIG_NEED_DMA_MAP_STATE
+	(void)buf;  // Suppress unused variable.
+#endif
 
 	pending_packet = gve_alloc_pending_packet(tx);
 	pending_packet->skb = skb;
@@ -493,8 +501,6 @@ static int gve_tx_add_skb_no_copy_dqo(struct gve_tx_ring *tx,
 
 	/* Map the linear portion of skb */
 	{
-		struct gve_tx_dma_buf *buf =
-			&pending_packet->bufs[pending_packet->num_bufs];
 		u32 len = skb_headlen(skb);
 		dma_addr_t addr;
 
@@ -502,6 +508,7 @@ static int gve_tx_add_skb_no_copy_dqo(struct gve_tx_ring *tx,
 		if (unlikely(dma_mapping_error(tx->dev, addr)))
 			goto err;
 
+		buf = &pending_packet->bufs[pending_packet->num_bufs];
 		dma_unmap_len_set(buf, len, len);
 		dma_unmap_addr_set(buf, dma, addr);
 		++pending_packet->num_bufs;
@@ -512,8 +519,6 @@ static int gve_tx_add_skb_no_copy_dqo(struct gve_tx_ring *tx,
 	}
 
 	for (i = 0; i < shinfo->nr_frags; i++) {
-		struct gve_tx_dma_buf *buf =
-			&pending_packet->bufs[pending_packet->num_bufs];
 		const skb_frag_t *frag = &shinfo->frags[i];
 		bool is_eop = i == (shinfo->nr_frags - 1);
 		u32 len = skb_frag_size(frag);
@@ -523,6 +528,7 @@ static int gve_tx_add_skb_no_copy_dqo(struct gve_tx_ring *tx,
 		if (unlikely(dma_mapping_error(tx->dev, addr)))
 			goto err;
 
+		buf = &pending_packet->bufs[pending_packet->num_bufs];
 		dma_unmap_len_set(buf, len, len);
 		dma_unmap_addr_set(buf, dma, addr);
 		++pending_packet->num_bufs;
@@ -555,6 +561,9 @@ err:
 	for (i = 0; i < pending_packet->num_bufs; i++) {
 		struct gve_tx_dma_buf *buf = &pending_packet->bufs[i];
 
+#ifndef CONFIG_NEED_DMA_MAP_STATE
+		(void)buf;  // Suppress unused variable.
+#endif
 		if (i == 0) {
 			dma_unmap_single(tx->dev, dma_unmap_addr(buf, dma),
 					 dma_unmap_len(buf, len),
