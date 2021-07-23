@@ -404,6 +404,7 @@ static void drm_mode_rmfb_work_fn(struct work_struct *w)
 		struct drm_framebuffer *fb =
 			list_first_entry(&arg->fbs, typeof(*fb), filp_head);
 
+		drm_dbg_kms(fb->dev, "Removing [FB:%d]\n", fb->base.id);
 		list_del_init(&fb->filp_head);
 		drm_framebuffer_remove(fb);
 	}
