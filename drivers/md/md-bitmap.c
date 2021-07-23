@@ -1396,8 +1396,8 @@ int md_bitmap_startwrite(struct bitmap *bitmap, sector_t offset, unsigned long s
 
 	if (behind) {
 		int bw;
-		atomic_inc(&bitmap->behind_writes);
-		bw = atomic_read(&bitmap->behind_writes);
+
+		bw = atomic_inc_return(&bitmap->behind_writes);
 		if (bw > bitmap->behind_writes_used)
 			bitmap->behind_writes_used = bw;
 
