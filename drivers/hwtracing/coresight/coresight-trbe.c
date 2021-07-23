@@ -615,7 +615,7 @@ static unsigned long arm_trbe_update_buffer(struct coresight_device *csdev,
 		 * for correct size. Also, mark the buffer truncated.
 		 */
 		write = get_trbe_limit_pointer();
-		perf_aux_output_flag(handle, PERF_AUX_FLAG_TRUNCATED);
+		perf_aux_output_flag(handle, PERF_AUX_FLAG_COLLISION);
 	}
 
 	offset = write - base;
@@ -708,7 +708,7 @@ static void trbe_handle_overflow(struct perf_output_handle *handle)
 	 * collection upon the WRAP event, without stopping the source.
 	 */
 	perf_aux_output_flag(handle, PERF_AUX_FLAG_CORESIGHT_FORMAT_RAW |
-				     PERF_AUX_FLAG_TRUNCATED);
+				     PERF_AUX_FLAG_COLLISION);
 	perf_aux_output_end(handle, size);
 	event_data = perf_aux_output_begin(handle, event);
 	if (!event_data) {
