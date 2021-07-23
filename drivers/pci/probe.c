@@ -2034,11 +2034,11 @@ static void pci_configure_10bit_tags(struct pci_dev *dev)
 	struct pci_dev *bridge;
 
 	if (!(dev->pcie_devcap2 & PCI_EXP_DEVCAP2_10BIT_TAG_COMP))
-		return;
+		goto disable_10bit_tag_req;
 
 	if (pci_pcie_type(dev) == PCI_EXP_TYPE_ROOT_PORT) {
 		dev->ext_10bit_tag = 1;
-		return;
+		goto disable_10bit_tag_req;
 	}
 
 	bridge = pci_upstream_bridge(dev);
@@ -2050,7 +2050,7 @@ static void pci_configure_10bit_tags(struct pci_dev *dev)
 	 * for VF.
 	 */
 	if (dev->is_virtfn)
-		return;
+		goto disable_10bit_tag_req;
 
 	if (pci_pcie_type(dev) == PCI_EXP_TYPE_ENDPOINT &&
 	    dev->ext_10bit_tag == 1 &&
@@ -2059,6 +2059,9 @@ static void pci_configure_10bit_tags(struct pci_dev *dev)
 		pcie_capability_set_word(dev, PCI_EXP_DEVCTL2,
 					PCI_EXP_DEVCTL2_10BIT_TAG_REQ_EN);
 	}
+
+disable_10bit_tag_req:
+	 pci_disable_10bit_tag(dev);
 }
 
 int pci_configure_extended_tags(struct pci_dev *dev, void *ign)

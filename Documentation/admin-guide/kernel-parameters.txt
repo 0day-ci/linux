@@ -4019,6 +4019,13 @@
 				bridges without forcing it upstream. Note:
 				this removes isolation between devices and
 				may put more devices in an IOMMU group.
+		disable_10bit_tag=<pci_dev>[; ...]
+				  Specify one or more PCI devices (in the format
+				  specified above) separated by semicolons.
+				  Disable 10-Bit Tag Requester if the peer
+				  device does not support the 10-Bit Tag
+				  Completer.This will make P2P traffic safe.
+
 		force_floating	[S390] Force usage of floating interrupts.
 		nomio		[S390] Do not use MIO instructions.
 		norid		[S390] ignore the RID field and force use of

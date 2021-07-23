@@ -125,15 +125,15 @@ static void pci_configure_rp_10bit_tag(struct pci_dev *dev)
 	bool support = true;
 
 	if (dev->subordinate == NULL)
-		return;
+		goto disable_10bit_tag_req;
 
 	/* If no devices under the root port, no need to enable 10-Bit Tag. */
 	if (list_empty(&dev->subordinate->devices))
-		return;
+		goto disable_10bit_tag_req;
 
 	pci_10bit_tag_comp_support(dev, &support);
 	if (!support)
-		return;
+		goto disable_10bit_tag_req;
 
 	/*
 	 * PCIe spec 5.0r1.0 section 2.2.6.2 implementation note.
@@ -146,14 +146,17 @@ static void pci_configure_rp_10bit_tag(struct pci_dev *dev)
 	 */
 	pci_walk_bus(dev->subordinate, pci_10bit_tag_comp_support, &support);
 	if (!support)
-		return;
+		goto disable_10bit_tag_req;
 
 	if (!(dev->pcie_devcap2 & PCI_EXP_DEVCAP2_10BIT_TAG_REQ))
-		return;
+		goto disable_10bit_tag_req;
 
 	pci_dbg(dev, "enabling 10-Bit Tag Requester\n");
 	pcie_capability_set_word(dev, PCI_EXP_DEVCTL2,
 				 PCI_EXP_DEVCTL2_10BIT_TAG_REQ_EN);
+
+disable_10bit_tag_req:
+	pci_disable_10bit_tag(dev);
 }
 
 /*

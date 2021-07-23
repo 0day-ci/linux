@@ -6568,6 +6568,59 @@ int pci_bus_find_domain_nr(struct pci_bus *bus, struct device *parent)
 }
 #endif
 
+static const char *disable_10bit_tag_param;
+
+void pci_disable_10bit_tag(struct pci_dev *dev)
+{
+	int ret = 0;
+	const char *p;
+#ifdef CONFIG_PCI_IOV
+	struct pci_sriov *iov;
+#endif
+
+	if (!disable_10bit_tag_param)
+		return;
+
+	p = disable_10bit_tag_param;
+	while (*p) {
+		ret = pci_dev_str_match(dev, p, &p);
+		if (ret < 0) {
+			pr_info_once("PCI: Can't parse disable_10bit_tag parameter: %s\n",
+				     disable_10bit_tag_param);
+
+			break;
+		} else if (ret == 1) {
+			/* Found a match */
+			break;
+		}
+
+		if (*p != ';' && *p != ',') {
+			/* End of param or invalid format */
+			break;
+		}
+		p++;
+	}
+
+	if (ret != 1)
+		return;
+
+#ifdef CONFIG_PCI_IOV
+	if (dev->is_virtfn) {
+		iov = dev->physfn->sriov;
+		iov->ctrl &= ~PCI_SRIOV_CTRL_VF_10BIT_TAG_REQ_EN;
+		pci_write_config_word(dev, iov->pos + PCI_SRIOV_CTRL,
+				      iov->ctrl);
+		pci_info(dev, "disabled PF SRIOV 10-Bit Tag Requester\n");
+		return;
+#endif
+	}
+
+	pcie_capability_clear_word(dev, PCI_EXP_DEVCTL2,
+				   PCI_EXP_DEVCTL2_10BIT_TAG_REQ_EN);
+
+	pci_info(dev, "disabled 10-Bit Tag Requester\n");
+}
+
 /**
  * pci_ext_cfg_avail - can we access extended PCI config space?
  *
@@ -6643,6 +6696,8 @@ static int __init pci_setup(char *str)
 				pci_add_flags(PCI_SCAN_ALL_PCIE_DEVS);
 			} else if (!strncmp(str, "disable_acs_redir=", 18)) {
 				disable_acs_redir_param = str + 18;
+			} else if (!strncmp(str, "disable_10bit_tag=", 18)) {
+				disable_10bit_tag_param = str + 18;
 			} else {
 				pr_err("PCI: Unknown option `%s'\n", str);
 			}
@@ -6667,6 +6722,7 @@ static int __init pci_realloc_setup_params(void)
 	resource_alignment_param = kstrdup(resource_alignment_param,
 					   GFP_KERNEL);
 	disable_acs_redir_param = kstrdup(disable_acs_redir_param, GFP_KERNEL);
+	disable_10bit_tag_param = kstrdup(disable_10bit_tag_param, GFP_KERNEL);
 
 	return 0;
 }
