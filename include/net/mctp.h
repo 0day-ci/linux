@@ -111,6 +111,10 @@ int mctp_local_output(struct sock *sk, struct mctp_route *rt,
 		      struct sk_buff *skb, mctp_eid_t daddr, u8 req_tag);
 
 /* routing <--> device interface */
+int mctp_route_add(struct mctp_dev *mdev, mctp_eid_t daddr_start,
+		   unsigned int daddr_extent, unsigned int mtu, bool is_local);
+int mctp_route_remove(struct mctp_dev *mdev, mctp_eid_t daddr_start,
+		      unsigned int daddr_extent);
 int mctp_route_add_local(struct mctp_dev *mdev, mctp_eid_t addr);
 int mctp_route_remove_local(struct mctp_dev *mdev, mctp_eid_t addr);
 void mctp_route_remove_dev(struct mctp_dev *mdev);
