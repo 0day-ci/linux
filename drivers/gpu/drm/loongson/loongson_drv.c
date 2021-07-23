@@ -172,6 +172,12 @@ static int loongson_drm_load(struct drm_device *dev)
 		goto err;
 	}
 
+	ret = loongson_irq_init(ldev);
+	if (ret) {
+		dev_err(dev->dev, "Fatal error during irq init: %d\n", ret);
+		goto err;
+	}
+
 	drm_kms_helper_poll_init(dev);
 	drm_mode_config_reset(dev);
 
@@ -197,6 +203,10 @@ static struct drm_driver loongson_drm_driver = {
 	.driver_features = DRIVER_MODESET | DRIVER_GEM | DRIVER_ATOMIC,
 	.fops = &fops,
 	DRM_GEM_VRAM_DRIVER,
+
+	.irq_handler = loongson_irq_handler,
+	.irq_preinstall = loongson_irq_preinstall,
+	.irq_uninstall = loongson_irq_uninstall,
 
 	.name = DRIVER_NAME,
 	.desc = DRIVER_DESC,
