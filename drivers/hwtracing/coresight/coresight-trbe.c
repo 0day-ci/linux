@@ -632,6 +632,20 @@ done:
 	return size;
 }
 
+static int __arm_trbe_enable(struct trbe_buf *buf,
+			     struct perf_output_handle *handle)
+{
+	buf->trbe_limit = compute_trbe_buffer_limit(handle);
+	buf->trbe_write = buf->trbe_base + PERF_IDX2OFF(handle->head, buf);
+	if (buf->trbe_limit == buf->trbe_base) {
+		trbe_stop_and_truncate_event(handle);
+		return -ENOSPC;
+	}
+	*this_cpu_ptr(buf->cpudata->drvdata->handle) = handle;
+	trbe_enable_hw(buf);
+	return 0;
+}
+
 static int arm_trbe_enable(struct coresight_device *csdev, u32 mode, void *data)
 {
 	struct trbe_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
@@ -648,14 +662,8 @@ static int arm_trbe_enable(struct coresight_device *csdev, u32 mode, void *data)
 	cpudata->buf = buf;
 	cpudata->mode = mode;
 	buf->cpudata = cpudata;
-	buf->trbe_limit = compute_trbe_buffer_limit(handle);
-	buf->trbe_write = buf->trbe_base + PERF_IDX2OFF(handle->head, buf);
-	if (buf->trbe_limit == buf->trbe_base) {
-		trbe_stop_and_truncate_event(handle);
-		return 0;
-	}
-	trbe_enable_hw(buf);
-	return 0;
+
+	return __arm_trbe_enable(buf, handle);
 }
 
 static int arm_trbe_disable(struct coresight_device *csdev)
@@ -722,14 +730,8 @@ static void trbe_handle_overflow(struct perf_output_handle *handle)
 		*this_cpu_ptr(buf->cpudata->drvdata->handle) = NULL;
 		return;
 	}
-	buf->trbe_limit = compute_trbe_buffer_limit(handle);
-	buf->trbe_write = buf->trbe_base + PERF_IDX2OFF(handle->head, buf);
-	if (buf->trbe_limit == buf->trbe_base) {
-		trbe_stop_and_truncate_event(handle);
-		return;
-	}
-	*this_cpu_ptr(buf->cpudata->drvdata->handle) = handle;
-	trbe_enable_hw(buf);
+
+	__arm_trbe_enable(buf, handle);
 }
 
 static bool is_perf_trbe(struct perf_output_handle *handle)
