@@ -581,6 +581,8 @@ void del_gendisk(struct gendisk *disk)
 	if (WARN_ON_ONCE(!disk->queue))
 		return;
 
+	remove_inode_hash(disk->part0->bd_inode);
+
 	blk_integrity_del(disk);
 	disk_del_events(disk);
 
@@ -591,12 +593,6 @@ void del_gendisk(struct gendisk *disk)
 
 	fsync_bdev(disk->part0);
 	__invalidate_device(disk->part0, true);
-
-	/*
-	 * Unhash the bdev inode for this device so that it can't be looked
-	 * up any more even if openers still hold references to it.
-	 */
-	remove_inode_hash(disk->part0->bd_inode);
 
 	set_capacity(disk, 0);
 
