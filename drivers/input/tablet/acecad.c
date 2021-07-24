@@ -151,7 +151,7 @@ static int usb_acecad_probe(struct usb_interface *intf, const struct usb_device_
 		goto fail2;
 	}
 
-	acecad->intf = intf;
+	acecad->intf = usb_get_intf(intf);
 	acecad->input = input_dev;
 
 	if (dev->manufacturer)
@@ -236,6 +236,9 @@ static void usb_acecad_disconnect(struct usb_interface *intf)
 	input_unregister_device(acecad->input);
 	usb_free_urb(acecad->irq);
 	usb_free_coherent(udev, 8, acecad->data, acecad->data_dma);
+
+	usb_put_intf(acecad->intf);
+
 	kfree(acecad);
 }
 
