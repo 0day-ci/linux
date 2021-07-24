@@ -76,6 +76,85 @@ ingenic_cgu_gate_set(struct ingenic_cgu *cgu,
  * PLL operations
  */
 
+static u8 ingenic_pll_get_parent(struct clk_hw *hw)
+{
+	struct ingenic_clk *ingenic_clk = to_ingenic_clk(hw);
+	const struct ingenic_cgu_clk_info *clk_info = to_clk_info(ingenic_clk);
+	struct ingenic_cgu *cgu = ingenic_clk->cgu;
+	const struct ingenic_cgu_pll_info *pll_info;
+	u32 reg;
+	u8 i, hw_idx, idx = 0;
+
+	BUG_ON(clk_info->type != CGU_CLK_PLL);
+	pll_info = &clk_info->pll;
+
+	if (pll_info->mux_bits <= 0)
+		return 1;
+
+	reg = readl(cgu->base + pll_info->reg);
+	hw_idx = (reg >> pll_info->mux_shift) &
+		 GENMASK(pll_info->mux_bits - 1, 0);
+
+	/*
+	 * Convert the hardware index to the parent index by skipping
+	 * over any -1's in the parents array.
+	 */
+	for (i = 0; i < hw_idx; i++) {
+		if (clk_info->parents[i] != -1)
+			idx++;
+	}
+
+	return idx;
+}
+
+static int ingenic_pll_set_parent(struct clk_hw *hw, u8 idx)
+{
+	struct ingenic_clk *ingenic_clk = to_ingenic_clk(hw);
+	const struct ingenic_cgu_clk_info *clk_info = to_clk_info(ingenic_clk);
+	struct ingenic_cgu *cgu = ingenic_clk->cgu;
+	const struct ingenic_cgu_pll_info *pll_info;
+	unsigned long flags;
+	u32 reg;
+	u8 curr_idx, hw_idx, num_poss;
+
+	BUG_ON(clk_info->type != CGU_CLK_PLL);
+	pll_info = &clk_info->pll;
+
+	if (pll_info->mux_bits <= 0)
+		return 0;
+
+	/*
+	 * Convert the parent index to the hardware index by adding
+	 * 1 for any -1 in the parents array preceding the given
+	 * index. That is, we want the index of idx'th entry in
+	 * clk_info->parents which does not equal -1.
+	 */
+	hw_idx = curr_idx = 0;
+	num_poss = 1 << pll_info->mux_bits;
+	for (; hw_idx < num_poss; hw_idx++) {
+		if (clk_info->parents[hw_idx] == -1)
+			continue;
+		if (curr_idx == idx)
+			break;
+		curr_idx++;
+	}
+
+	/* idx should always be a valid parent */
+	BUG_ON(curr_idx != idx);
+
+	spin_lock_irqsave(&cgu->lock, flags);
+
+	/* write the register */
+	reg = readl(cgu->base + pll_info->reg);
+	reg &= ~(GENMASK(pll_info->mux_bits - 1, 0) << pll_info->mux_shift);
+	reg |= hw_idx << pll_info->mux_shift;
+	writel(reg, cgu->base + pll_info->reg);
+
+	spin_unlock_irqrestore(&cgu->lock, flags);
+
+	return 0;
+}
+
 static unsigned long
 ingenic_pll_recalc_rate(struct clk_hw *hw, unsigned long parent_rate)
 {
@@ -96,8 +175,20 @@ ingenic_pll_recalc_rate(struct clk_hw *hw, unsigned long parent_rate)
 	m += pll_info->m_offset;
 	n = (ctl >> pll_info->n_shift) & GENMASK(pll_info->n_bits - 1, 0);
 	n += pll_info->n_offset;
-	od_enc = ctl >> pll_info->od_shift;
-	od_enc &= GENMASK(pll_info->od_bits - 1, 0);
+
+	if (pll_info->od_encoding) {
+		od_enc = ctl >> pll_info->od_shift;
+		od_enc &= GENMASK(pll_info->od_bits - 1, 0);
+
+		for (od = 0; od < pll_info->od_max; od++) {
+			if (pll_info->od_encoding[od] == od_enc)
+				break;
+		}
+		BUG_ON(od == pll_info->od_max);
+		od++;
+	} else {
+		od = 1;
+	}
 
 	if (pll_info->bypass_bit >= 0) {
 		ctl = readl(cgu->base + pll_info->bypass_reg);
@@ -108,15 +199,7 @@ ingenic_pll_recalc_rate(struct clk_hw *hw, unsigned long parent_rate)
 			return parent_rate;
 	}
 
-	for (od = 0; od < pll_info->od_max; od++) {
-		if (pll_info->od_encoding[od] == od_enc)
-			break;
-	}
-	BUG_ON(od == pll_info->od_max);
-	od++;
-
-	return div_u64((u64)parent_rate * m * pll_info->rate_multiplier,
-		n * od);
+	return div_u64((u64)parent_rate * m * pll_info->rate_multiplier, n * od);
 }
 
 static void
@@ -215,13 +298,15 @@ ingenic_pll_set_rate(struct clk_hw *hw, unsigned long req_rate,
 	ctl &= ~(GENMASK(pll_info->n_bits - 1, 0) << pll_info->n_shift);
 	ctl |= (n - pll_info->n_offset) << pll_info->n_shift;
 
-	ctl &= ~(GENMASK(pll_info->od_bits - 1, 0) << pll_info->od_shift);
-	ctl |= pll_info->od_encoding[od - 1] << pll_info->od_shift;
+	if (pll_info->od_encoding) {
+		ctl &= ~(GENMASK(pll_info->od_bits - 1, 0) << pll_info->od_shift);
+		ctl |= pll_info->od_encoding[od - 1] << pll_info->od_shift;
+	}
 
 	writel(ctl, cgu->base + pll_info->reg);
 
 	/* If the PLL is enabled, verify that it's stable */
-	if (ctl & BIT(pll_info->enable_bit))
+	if ((pll_info->stable_bit >= 0) && (ctl & BIT(pll_info->enable_bit)))
 		ret = ingenic_pll_check_stable(cgu, pll_info);
 
 	spin_unlock_irqrestore(&cgu->lock, flags);
@@ -292,6 +377,9 @@ static int ingenic_pll_is_enabled(struct clk_hw *hw)
 }
 
 static const struct clk_ops ingenic_pll_ops = {
+	.get_parent = ingenic_pll_get_parent,
+	.set_parent = ingenic_pll_set_parent,
+
 	.recalc_rate = ingenic_pll_recalc_rate,
 	.round_rate = ingenic_pll_round_rate,
 	.set_rate = ingenic_pll_set_rate,
@@ -672,7 +760,7 @@ static int ingenic_register_clock(struct ingenic_cgu *cgu, unsigned idx)
 		clk_init.flags |= CLK_SET_RATE_PARENT;
 	}
 
-	if (caps & (CGU_CLK_MUX | CGU_CLK_CUSTOM)) {
+	if (caps & (CGU_CLK_PLL | CGU_CLK_MUX | CGU_CLK_CUSTOM)) {
 		clk_init.num_parents = 0;
 
 		if (caps & CGU_CLK_MUX)
