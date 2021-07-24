@@ -1455,9 +1455,7 @@ static int rtl8187_probe(struct usb_interface *intf,
 
 	SET_IEEE80211_DEV(dev, &intf->dev);
 	usb_set_intfdata(intf, dev);
-	priv->udev = udev;
-
-	usb_get_dev(udev);
+	priv->udev = usb_get_dev(udev);
 
 	skb_queue_head_init(&priv->rx_queue);
 
