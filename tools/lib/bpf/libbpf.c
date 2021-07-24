@@ -2685,7 +2685,7 @@ static int bpf_object__load_vmlinux_btf(struct bpf_object *obj, bool force)
 	if (!force && !obj_needs_vmlinux_btf(obj))
 		return 0;
 
-	obj->btf_vmlinux = libbpf_find_kernel_btf();
+	obj->btf_vmlinux = libbpf_load_vmlinux_btf();
 	err = libbpf_get_error(obj->btf_vmlinux);
 	if (err) {
 		pr_warn("Error loading vmlinux BTF: %d\n", err);
@@ -7236,7 +7236,7 @@ static int bpf_object__collect_relos(struct bpf_object *obj)
 
 	for (i = 0; i < obj->nr_programs; i++) {
 		struct bpf_program *p = &obj->programs[i];
-		
+
 		if (!p->nr_reloc)
 			continue;
 
@@ -9562,7 +9562,7 @@ int libbpf_find_vmlinux_btf_id(const char *name,
 	struct btf *btf;
 	int err;
 
-	btf = libbpf_find_kernel_btf();
+	btf = libbpf_load_vmlinux_btf();
 	err = libbpf_get_error(btf);
 	if (err) {
 		pr_warn("vmlinux BTF is not found\n");
@@ -10080,7 +10080,7 @@ struct bpf_link {
 int bpf_link__update_program(struct bpf_link *link, struct bpf_program *prog)
 {
 	int ret;
-	
+
 	ret = bpf_link_update(bpf_link__fd(link), bpf_program__fd(prog), NULL);
 	return libbpf_err_errno(ret);
 }
