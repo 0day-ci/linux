@@ -143,7 +143,7 @@ static int pxrc_probe(struct usb_interface *intf,
 		return -ENOMEM;
 
 	mutex_init(&pxrc->pm_mutex);
-	pxrc->intf = intf;
+	pxrc->intf = usb_get_intf(intf);
 
 	usb_set_intfdata(pxrc->intf, pxrc);
 
