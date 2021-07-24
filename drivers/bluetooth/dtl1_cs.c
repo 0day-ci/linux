@@ -449,7 +449,7 @@ static int dtl1_open(struct dtl1_info *info)
 	set_bit(XMIT_WAITING, &(info->tx_state));
 
 	/* Initialize HCI device */
-	hdev = hci_alloc_dev();
+	hdev = hci_alloc_dev(0);
 	if (!hdev) {
 		BT_ERR("Can't allocate HCI device");
 		return -ENOMEM;

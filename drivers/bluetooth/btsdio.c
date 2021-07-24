@@ -310,7 +310,7 @@ static int btsdio_probe(struct sdio_func *func,
 
 	skb_queue_head_init(&data->txq);
 
-	hdev = hci_alloc_dev();
+	hdev = hci_alloc_dev(0);
 	if (!hdev)
 		return -ENOMEM;
 
