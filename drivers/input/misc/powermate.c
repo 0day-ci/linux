@@ -337,7 +337,7 @@ static int powermate_probe(struct usb_interface *intf, const struct usb_device_i
 		goto fail3;
 
 	pm->udev = udev;
-	pm->intf = intf;
+	pm->intf = usb_get_intf(intf);
 	pm->input = input_dev;
 
 	usb_make_path(udev, pm->phys, sizeof(pm->phys));
@@ -428,6 +428,7 @@ static void powermate_disconnect(struct usb_interface *intf)
 		usb_free_urb(pm->irq);
 		usb_free_urb(pm->config);
 		powermate_free_buffers(interface_to_usbdev(intf), pm);
+		usb_put_intf(pm->intf);
 
 		kfree(pm);
 	}
