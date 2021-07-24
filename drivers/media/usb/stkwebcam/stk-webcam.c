@@ -1309,7 +1309,7 @@ static int stk_camera_probe(struct usb_interface *interface,
 	init_waitqueue_head(&dev->wait_frame);
 	dev->first_init = 1; /* webcam LED management */
 
-	dev->udev = udev;
+	dev->udev = usb_get_dev(udev);
 	dev->interface = interface;
 	usb_get_intf(interface);
 
@@ -1376,6 +1376,7 @@ static void stk_camera_disconnect(struct usb_interface *interface)
 
 	usb_set_intfdata(interface, NULL);
 	unset_present(dev);
+	usb_put_dev(interface_to_usbdev(interface));
 
 	wake_up_interruptible(&dev->wait_frame);
 
