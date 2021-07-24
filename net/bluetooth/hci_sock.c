@@ -295,6 +295,11 @@ void hci_send_to_channel(unsigned short channel, struct sk_buff *skb,
 	read_unlock(&hci_sk_list.lock);
 }
 
+static void __hci_send_to_monitor(struct sk_buff *skb)
+{
+	hci_send_to_channel(HCI_CHANNEL_MONITOR, skb, HCI_SOCK_TRUSTED, NULL);
+}
+
 /* Send frame to monitor socket */
 void hci_send_to_monitor(struct hci_dev *hdev, struct sk_buff *skb)
 {
@@ -350,8 +355,7 @@ void hci_send_to_monitor(struct hci_dev *hdev, struct sk_buff *skb)
 	hdr->index = cpu_to_le16(hdev->id);
 	hdr->len = cpu_to_le16(skb->len);
 
-	hci_send_to_channel(HCI_CHANNEL_MONITOR, skb_copy,
-			    HCI_SOCK_TRUSTED, NULL);
+	__hci_send_to_monitor(skb_copy);
 	kfree_skb(skb_copy);
 }
 
@@ -545,6 +549,16 @@ static struct sk_buff *create_monitor_ctrl_open(struct sock *sk)
 	return skb;
 }
 
+static void hci_monitor_ctrl_open(struct sock *sk)
+{
+	struct sk_buff *skb = create_monitor_ctrl_open(sk);
+
+	if (skb) {
+		__hci_send_to_monitor(skb);
+		kfree_skb(skb);
+	}
+}
+
 static struct sk_buff *create_monitor_ctrl_close(struct sock *sk)
 {
 	struct hci_mon_hdr *hdr;
@@ -581,6 +595,16 @@ static struct sk_buff *create_monitor_ctrl_close(struct sock *sk)
 	hdr->len = cpu_to_le16(skb->len - HCI_MON_HDR_SIZE);
 
 	return skb;
+}
+
+static void hci_monitor_ctrl_close(struct sock *sk)
+{
+	struct sk_buff *skb = create_monitor_ctrl_close(sk);
+
+	if (skb) {
+		__hci_send_to_monitor(skb);
+		kfree_skb(skb);
+	}
 }
 
 static struct sk_buff *create_monitor_ctrl_command(struct sock *sk, u16 index,
@@ -741,8 +765,7 @@ void hci_sock_dev_event(struct hci_dev *hdev, int event)
 		/* Send event to monitor */
 		skb = create_monitor_event(hdev, event);
 		if (skb) {
-			hci_send_to_channel(HCI_CHANNEL_MONITOR, skb,
-					    HCI_SOCK_TRUSTED, NULL);
+			__hci_send_to_monitor(skb);
 			kfree_skb(skb);
 		}
 	}
@@ -831,7 +854,6 @@ static int hci_sock_release(struct socket *sock)
 {
 	struct sock *sk = sock->sk;
 	struct hci_dev *hdev;
-	struct sk_buff *skb;
 
 	BT_DBG("sock %p sk %p", sock, sk);
 
@@ -848,12 +870,7 @@ static int hci_sock_release(struct socket *sock)
 	case HCI_CHANNEL_USER:
 	case HCI_CHANNEL_CONTROL:
 		/* Send event to monitor */
-		skb = create_monitor_ctrl_close(sk);
-		if (skb) {
-			hci_send_to_channel(HCI_CHANNEL_MONITOR, skb,
-					    HCI_SOCK_TRUSTED, NULL);
-			kfree_skb(skb);
-		}
+		hci_monitor_ctrl_close(sk);
 
 		hci_sock_free_cookie(sk);
 		break;
@@ -993,18 +1010,11 @@ static int hci_sock_ioctl(struct socket *sock, unsigned int cmd,
 	 * of a given socket.
 	 */
 	if (hci_sock_gen_cookie(sk)) {
-		struct sk_buff *skb;
-
 		if (capable(CAP_NET_ADMIN))
 			hci_sock_set_flag(sk, HCI_SOCK_TRUSTED);
 
 		/* Send event to monitor */
-		skb = create_monitor_ctrl_open(sk);
-		if (skb) {
-			hci_send_to_channel(HCI_CHANNEL_MONITOR, skb,
-					    HCI_SOCK_TRUSTED, NULL);
-			kfree_skb(skb);
-		}
+		hci_monitor_ctrl_open(sk);
 	}
 
 	release_sock(sk);
@@ -1086,7 +1096,6 @@ static int hci_sock_bind(struct socket *sock, struct sockaddr *addr,
 	struct sockaddr_hci haddr;
 	struct sock *sk = sock->sk;
 	struct hci_dev *hdev = NULL;
-	struct sk_buff *skb;
 	int len, err = 0;
 
 	BT_DBG("sock %p sk %p", sock, sk);
@@ -1134,12 +1143,7 @@ static int hci_sock_bind(struct socket *sock, struct sockaddr *addr,
 			 * notification. Send a close notification first to
 			 * allow the state transition to bounded.
 			 */
-			skb = create_monitor_ctrl_close(sk);
-			if (skb) {
-				hci_send_to_channel(HCI_CHANNEL_MONITOR, skb,
-						    HCI_SOCK_TRUSTED, NULL);
-				kfree_skb(skb);
-			}
+			hci_monitor_ctrl_close(sk);
 		}
 
 		if (capable(CAP_NET_ADMIN))
@@ -1148,12 +1152,7 @@ static int hci_sock_bind(struct socket *sock, struct sockaddr *addr,
 		hci_pi(sk)->hdev = hdev;
 
 		/* Send event to monitor */
-		skb = create_monitor_ctrl_open(sk);
-		if (skb) {
-			hci_send_to_channel(HCI_CHANNEL_MONITOR, skb,
-					    HCI_SOCK_TRUSTED, NULL);
-			kfree_skb(skb);
-		}
+		hci_monitor_ctrl_open(sk);
 		break;
 
 	case HCI_CHANNEL_USER:
@@ -1223,12 +1222,7 @@ static int hci_sock_bind(struct socket *sock, struct sockaddr *addr,
 			 * a user channel socket. For a clean transition, send
 			 * the close notification first.
 			 */
-			skb = create_monitor_ctrl_close(sk);
-			if (skb) {
-				hci_send_to_channel(HCI_CHANNEL_MONITOR, skb,
-						    HCI_SOCK_TRUSTED, NULL);
-				kfree_skb(skb);
-			}
+			hci_monitor_ctrl_close(sk);
 		}
 
 		/* The user channel is restricted to CAP_NET_ADMIN
@@ -1239,12 +1233,7 @@ static int hci_sock_bind(struct socket *sock, struct sockaddr *addr,
 		hci_pi(sk)->hdev = hdev;
 
 		/* Send event to monitor */
-		skb = create_monitor_ctrl_open(sk);
-		if (skb) {
-			hci_send_to_channel(HCI_CHANNEL_MONITOR, skb,
-					    HCI_SOCK_TRUSTED, NULL);
-			kfree_skb(skb);
-		}
+		hci_monitor_ctrl_open(sk);
 
 		atomic_inc(&hdev->promisc);
 		break;
@@ -1331,21 +1320,11 @@ static int hci_sock_bind(struct socket *sock, struct sockaddr *addr,
 				 * allow for a clean transition, send the
 				 * close notification first.
 				 */
-				skb = create_monitor_ctrl_close(sk);
-				if (skb) {
-					hci_send_to_channel(HCI_CHANNEL_MONITOR, skb,
-							    HCI_SOCK_TRUSTED, NULL);
-					kfree_skb(skb);
-				}
+				hci_monitor_ctrl_close(sk);
 			}
 
 			/* Send event to monitor */
-			skb = create_monitor_ctrl_open(sk);
-			if (skb) {
-				hci_send_to_channel(HCI_CHANNEL_MONITOR, skb,
-						    HCI_SOCK_TRUSTED, NULL);
-				kfree_skb(skb);
-			}
+			hci_monitor_ctrl_open(sk);
 
 			hci_sock_set_flag(sk, HCI_MGMT_INDEX_EVENTS);
 			hci_sock_set_flag(sk, HCI_MGMT_UNCONF_INDEX_EVENTS);
@@ -1531,8 +1510,7 @@ static int hci_mgmt_cmd(struct hci_mgmt_chan *chan, struct sock *sk,
 		skb = create_monitor_ctrl_command(sk, index, opcode, len,
 						  buf + sizeof(*hdr));
 		if (skb) {
-			hci_send_to_channel(HCI_CHANNEL_MONITOR, skb,
-					    HCI_SOCK_TRUSTED, NULL);
+			__hci_send_to_monitor(skb);
 			kfree_skb(skb);
 		}
 	}
@@ -1687,7 +1665,7 @@ static int hci_logging_frame(struct sock *sk, struct msghdr *msg, int len)
 
 	hdr->opcode = cpu_to_le16(HCI_MON_USER_LOGGING);
 
-	hci_send_to_channel(HCI_CHANNEL_MONITOR, skb, HCI_SOCK_TRUSTED, NULL);
+	__hci_send_to_monitor(skb);
 	err = len;
 
 	if (hdev)
