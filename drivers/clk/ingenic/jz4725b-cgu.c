@@ -17,7 +17,7 @@
 
 /* CGU register offsets */
 #define CGU_REG_CPCCR		0x00
-#define CGU_REG_LCR		0x04
+#define CGU_REG_LCR			0x04
 #define CGU_REG_CPPCR		0x10
 #define CGU_REG_CLKGR		0x20
 #define CGU_REG_OPCR		0x24
@@ -28,7 +28,7 @@
 #define CGU_REG_CIMCDR		0x78
 
 /* bits within the LCR register */
-#define LCR_SLEEP		BIT(0)
+#define LCR_SLEEP			BIT(0)
 
 static struct ingenic_cgu *cgu;
 
@@ -78,7 +78,7 @@ static const struct ingenic_cgu_clk_info jz4725b_cgu_clocks[] = {
 
 	[JZ4725B_CLK_PLL_HALF] = {
 		"pll half", CGU_CLK_DIV,
-		.parents = { JZ4725B_CLK_PLL, -1, -1, -1 },
+		.parents = { JZ4725B_CLK_PLL },
 		.div = {
 			CGU_REG_CPCCR, 21, 1, 1, -1, -1, -1, 0,
 			jz4725b_cgu_pll_half_div_table,
@@ -87,7 +87,7 @@ static const struct ingenic_cgu_clk_info jz4725b_cgu_clocks[] = {
 
 	[JZ4725B_CLK_CCLK] = {
 		"cclk", CGU_CLK_DIV,
-		.parents = { JZ4725B_CLK_PLL, -1, -1, -1 },
+		.parents = { JZ4725B_CLK_PLL },
 		.div = {
 			CGU_REG_CPCCR, 0, 1, 4, 22, -1, -1, 0,
 			jz4725b_cgu_cpccr_div_table,
@@ -96,7 +96,7 @@ static const struct ingenic_cgu_clk_info jz4725b_cgu_clocks[] = {
 
 	[JZ4725B_CLK_HCLK] = {
 		"hclk", CGU_CLK_DIV,
-		.parents = { JZ4725B_CLK_PLL, -1, -1, -1 },
+		.parents = { JZ4725B_CLK_PLL },
 		.div = {
 			CGU_REG_CPCCR, 4, 1, 4, 22, -1, -1, 0,
 			jz4725b_cgu_cpccr_div_table,
@@ -105,7 +105,7 @@ static const struct ingenic_cgu_clk_info jz4725b_cgu_clocks[] = {
 
 	[JZ4725B_CLK_PCLK] = {
 		"pclk", CGU_CLK_DIV,
-		.parents = { JZ4725B_CLK_PLL, -1, -1, -1 },
+		.parents = { JZ4725B_CLK_PLL },
 		.div = {
 			CGU_REG_CPCCR, 8, 1, 4, 22, -1, -1, 0,
 			jz4725b_cgu_cpccr_div_table,
@@ -114,7 +114,7 @@ static const struct ingenic_cgu_clk_info jz4725b_cgu_clocks[] = {
 
 	[JZ4725B_CLK_MCLK] = {
 		"mclk", CGU_CLK_DIV,
-		.parents = { JZ4725B_CLK_PLL, -1, -1, -1 },
+		.parents = { JZ4725B_CLK_PLL },
 		.div = {
 			CGU_REG_CPCCR, 12, 1, 4, 22, -1, -1, 0,
 			jz4725b_cgu_cpccr_div_table,
@@ -123,7 +123,7 @@ static const struct ingenic_cgu_clk_info jz4725b_cgu_clocks[] = {
 
 	[JZ4725B_CLK_IPU] = {
 		"ipu", CGU_CLK_DIV | CGU_CLK_GATE,
-		.parents = { JZ4725B_CLK_PLL, -1, -1, -1 },
+		.parents = { JZ4725B_CLK_PLL },
 		.div = {
 			CGU_REG_CPCCR, 16, 1, 4, 22, -1, -1, 0,
 			jz4725b_cgu_cpccr_div_table,
@@ -133,14 +133,14 @@ static const struct ingenic_cgu_clk_info jz4725b_cgu_clocks[] = {
 
 	[JZ4725B_CLK_LCD] = {
 		"lcd", CGU_CLK_DIV | CGU_CLK_GATE,
-		.parents = { JZ4725B_CLK_PLL_HALF, -1, -1, -1 },
+		.parents = { JZ4725B_CLK_PLL_HALF },
 		.div = { CGU_REG_LPCDR, 0, 1, 11, -1, -1, -1 },
 		.gate = { CGU_REG_CLKGR, 9 },
 	},
 
 	[JZ4725B_CLK_I2S] = {
 		"i2s", CGU_CLK_MUX | CGU_CLK_DIV | CGU_CLK_GATE,
-		.parents = { JZ4725B_CLK_EXT, JZ4725B_CLK_PLL_HALF, -1, -1 },
+		.parents = { JZ4725B_CLK_EXT, JZ4725B_CLK_PLL_HALF },
 		.mux = { CGU_REG_CPCCR, 31, 1 },
 		.div = { CGU_REG_I2SCDR, 0, 1, 9, -1, -1, -1 },
 		.gate = { CGU_REG_CLKGR, 6 },
@@ -148,7 +148,7 @@ static const struct ingenic_cgu_clk_info jz4725b_cgu_clocks[] = {
 
 	[JZ4725B_CLK_SPI] = {
 		"spi", CGU_CLK_MUX | CGU_CLK_DIV | CGU_CLK_GATE,
-		.parents = { JZ4725B_CLK_EXT, JZ4725B_CLK_PLL, -1, -1 },
+		.parents = { JZ4725B_CLK_EXT, JZ4725B_CLK_PLL },
 		.mux = { CGU_REG_SSICDR, 31, 1 },
 		.div = { CGU_REG_SSICDR, 0, 1, 4, -1, -1, -1 },
 		.gate = { CGU_REG_CLKGR, 4 },
@@ -156,13 +156,13 @@ static const struct ingenic_cgu_clk_info jz4725b_cgu_clocks[] = {
 
 	[JZ4725B_CLK_MMC_MUX] = {
 		"mmc_mux", CGU_CLK_DIV,
-		.parents = { JZ4725B_CLK_PLL_HALF, -1, -1, -1 },
+		.parents = { JZ4725B_CLK_PLL_HALF },
 		.div = { CGU_REG_MSCCDR, 0, 1, 5, -1, -1, -1 },
 	},
 
 	[JZ4725B_CLK_UDC] = {
 		"udc", CGU_CLK_MUX | CGU_CLK_DIV,
-		.parents = { JZ4725B_CLK_EXT, JZ4725B_CLK_PLL_HALF, -1, -1 },
+		.parents = { JZ4725B_CLK_EXT, JZ4725B_CLK_PLL_HALF },
 		.mux = { CGU_REG_CPCCR, 29, 1 },
 		.div = { CGU_REG_CPCCR, 23, 1, 6, -1, -1, -1 },
 	},
@@ -171,55 +171,55 @@ static const struct ingenic_cgu_clk_info jz4725b_cgu_clocks[] = {
 
 	[JZ4725B_CLK_UART] = {
 		"uart", CGU_CLK_GATE,
-		.parents = { JZ4725B_CLK_EXT, -1, -1, -1 },
+		.parents = { JZ4725B_CLK_EXT },
 		.gate = { CGU_REG_CLKGR, 0 },
 	},
 
 	[JZ4725B_CLK_DMA] = {
 		"dma", CGU_CLK_GATE,
-		.parents = { JZ4725B_CLK_PCLK, -1, -1, -1 },
+		.parents = { JZ4725B_CLK_PCLK },
 		.gate = { CGU_REG_CLKGR, 12 },
 	},
 
 	[JZ4725B_CLK_ADC] = {
 		"adc", CGU_CLK_GATE,
-		.parents = { JZ4725B_CLK_EXT, -1, -1, -1 },
+		.parents = { JZ4725B_CLK_EXT },
 		.gate = { CGU_REG_CLKGR, 7 },
 	},
 
 	[JZ4725B_CLK_I2C] = {
 		"i2c", CGU_CLK_GATE,
-		.parents = { JZ4725B_CLK_EXT, -1, -1, -1 },
+		.parents = { JZ4725B_CLK_EXT },
 		.gate = { CGU_REG_CLKGR, 3 },
 	},
 
 	[JZ4725B_CLK_AIC] = {
 		"aic", CGU_CLK_GATE,
-		.parents = { JZ4725B_CLK_EXT, -1, -1, -1 },
+		.parents = { JZ4725B_CLK_EXT },
 		.gate = { CGU_REG_CLKGR, 5 },
 	},
 
 	[JZ4725B_CLK_MMC0] = {
 		"mmc0", CGU_CLK_GATE,
-		.parents = { JZ4725B_CLK_MMC_MUX, -1, -1, -1 },
+		.parents = { JZ4725B_CLK_MMC_MUX },
 		.gate = { CGU_REG_CLKGR, 6 },
 	},
 
 	[JZ4725B_CLK_MMC1] = {
 		"mmc1", CGU_CLK_GATE,
-		.parents = { JZ4725B_CLK_MMC_MUX, -1, -1, -1 },
+		.parents = { JZ4725B_CLK_MMC_MUX },
 		.gate = { CGU_REG_CLKGR, 16 },
 	},
 
 	[JZ4725B_CLK_BCH] = {
 		"bch", CGU_CLK_GATE,
-		.parents = { JZ4725B_CLK_MCLK/* not sure */, -1, -1, -1 },
+		.parents = { JZ4725B_CLK_MCLK/* not sure */ },
 		.gate = { CGU_REG_CLKGR, 11 },
 	},
 
 	[JZ4725B_CLK_TCU] = {
 		"tcu", CGU_CLK_GATE,
-		.parents = { JZ4725B_CLK_EXT/* not sure */, -1, -1, -1 },
+		.parents = { JZ4725B_CLK_EXT/* not sure */ },
 		.gate = { CGU_REG_CLKGR, 1 },
 	},
 
@@ -233,13 +233,13 @@ static const struct ingenic_cgu_clk_info jz4725b_cgu_clocks[] = {
 
 	[JZ4725B_CLK_RTC] = {
 		"rtc", CGU_CLK_MUX,
-		.parents = { JZ4725B_CLK_EXT512, JZ4725B_CLK_OSC32K, -1, -1 },
+		.parents = { JZ4725B_CLK_EXT512, JZ4725B_CLK_OSC32K },
 		.mux = { CGU_REG_OPCR, 2, 1},
 	},
 
 	[JZ4725B_CLK_UDC_PHY] = {
 		"udc_phy", CGU_CLK_GATE,
-		.parents = { JZ4725B_CLK_EXT, -1, -1, -1 },
+		.parents = { JZ4725B_CLK_EXT },
 		.gate = { CGU_REG_OPCR, 6, true },
 	},
 };
@@ -261,4 +261,5 @@ static void __init jz4725b_cgu_init(struct device_node *np)
 
 	ingenic_cgu_register_syscore_ops(cgu);
 }
+
 CLK_OF_DECLARE_DRIVER(jz4725b_cgu, "ingenic,jz4725b-cgu", jz4725b_cgu_init);
