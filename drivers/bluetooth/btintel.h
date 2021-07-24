@@ -138,6 +138,16 @@ struct intel_debug_features {
 #define INTEL_CNVX_TOP_STEP(cnvx_top)	(((cnvx_top) & 0x0f000000) >> 24)
 #define INTEL_CNVX_TOP_PACK_SWAB(t, s)	__swab16(((__u16)(((t) << 4) | (s))))
 
+#define INTEL_BOOTLOADER		0
+#define INTEL_DOWNLOADING		1
+#define INTEL_FIRMWARE_LOADED		2
+#define INTEL_FIRMWARE_FAILED		3
+#define INTEL_BOOTING			4
+
+struct btintel_data {
+	unsigned long flags;
+};
+
 #if IS_ENABLED(CONFIG_BT_INTEL)
 
 int btintel_check_bdaddr(struct hci_dev *hdev);
@@ -167,6 +177,7 @@ int btintel_download_firmware(struct hci_dev *dev, struct intel_version *ver,
 			      const struct firmware *fw, u32 *boot_param);
 int btintel_setup_combined(struct hci_dev *hdev);
 int btintel_shutdown_combined(struct hci_dev *hdev);
+void btintel_set_flags(struct hci_dev *hdev, unsigned int flag);
 int btintel_download_firmware_newgen(struct hci_dev *hdev,
 				     struct intel_version_tlv *ver,
 				     const struct firmware *fw,
@@ -293,6 +304,10 @@ static inline int btintel_setup_combined(struct hci_dev *hdev)
 static inline int btintel_shutdown_combined(struct hci_dev *hdev)
 {
 	return -EOPNOTSUPP;
+}
+
+static inline void btintel_set_flags(struct hci_dev *hdev, unsigned int flag)
+{
 }
 
 static inline int btintel_download_firmware_newgen(struct hci_dev *hdev,

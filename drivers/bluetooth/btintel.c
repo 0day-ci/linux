@@ -1767,6 +1767,14 @@ int btintel_shutdown_combined(struct hci_dev *hdev)
 }
 EXPORT_SYMBOL_GPL(btintel_shutdown_combined);
 
+void btintel_set_flags(struct hci_dev *hdev, unsigned int flag)
+{
+	struct btintel_data *intel = hci_get_priv(hdev);
+
+	set_bit(flag, &intel->flags);
+}
+EXPORT_SYMBOL_GPL(btintel_set_flags);
+
 MODULE_AUTHOR("Marcel Holtmann <marcel@holtmann.org>");
 MODULE_DESCRIPTION("Bluetooth support for Intel devices ver " VERSION);
 MODULE_VERSION(VERSION);
