@@ -164,7 +164,7 @@ done:
 }
 EXPORT_SYMBOL_GPL(btintel_set_diag);
 
-int btintel_set_diag_mfg(struct hci_dev *hdev, bool enable)
+static int btintel_set_diag_mfg(struct hci_dev *hdev, bool enable)
 {
 	int err, ret;
 
@@ -180,7 +180,25 @@ int btintel_set_diag_mfg(struct hci_dev *hdev, bool enable)
 
 	return ret;
 }
-EXPORT_SYMBOL_GPL(btintel_set_diag_mfg);
+
+int btintel_set_diag_combined(struct hci_dev *hdev, bool enable)
+{
+	struct btintel_data *intel = hci_get_priv(hdev);
+	int ret;
+
+	/* Legacy ROM device needs to be in the manufacturer mode to apply
+	 * diagnostic setting
+	 *
+	 * This flag is set after reading the Intel version.
+	 */
+	if (test_bit(INTEL_ROM_LEGACY, &intel->flags))
+		ret = btintel_set_diag_mfg(hdev, enable);
+	else
+		ret = btintel_set_diag(hdev, enable);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(btintel_set_diag_combined);
 
 void btintel_hw_error(struct hci_dev *hdev, u8 code)
 {
@@ -1723,6 +1741,7 @@ int btintel_setup_combined(struct hci_dev *hdev)
 		case 0x07:	/* WP */
 		case 0x08:	/* StP */
 			/* Legacy ROM product */
+			set_bit(INTEL_ROM_LEGACY, &intel->flags);
 			err = btintel_legacy_rom_setup(hdev, &ver);
 			break;
 		case 0x0b:      /* SfP */
