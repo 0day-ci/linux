@@ -209,25 +209,23 @@ static int iomap_read_inline_data(struct inode *inode, struct page *page,
 		struct iomap *iomap, loff_t pos)
 {
 	size_t size = iomap->length + iomap->offset - pos;
+	size_t poff = offset_in_page(pos);
 	void *addr;
 
 	if (PageUptodate(page))
-		return PAGE_SIZE;
+		return PAGE_SIZE - poff;
 
-	/* inline data must start page aligned in the file */
-	if (WARN_ON_ONCE(offset_in_page(pos)))
-		return -EIO;
 	if (WARN_ON_ONCE(!iomap_inline_data_size_valid(iomap)))
 		return -EIO;
-	if (WARN_ON_ONCE(page_has_private(page)))
-		return -EIO;
+	if (poff > 0)
+		iomap_page_create(inode, page);
 
-	addr = kmap_atomic(page);
+	addr = kmap_atomic(page) + poff;
 	memcpy(addr, iomap_inline_buf(iomap, pos), size);
-	memset(addr + size, 0, PAGE_SIZE - size);
+	memset(addr + size, 0, PAGE_SIZE - poff - size);
 	kunmap_atomic(addr);
-	SetPageUptodate(page);
-	return PAGE_SIZE;
+	iomap_set_range_uptodate(page, poff, PAGE_SIZE - poff);
+	return PAGE_SIZE - poff;
 }
 
 static inline bool iomap_block_needs_zeroing(struct inode *inode,
