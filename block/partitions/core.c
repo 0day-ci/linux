@@ -261,6 +261,7 @@ static void part_release(struct device *dev)
 {
 	if (MAJOR(dev->devt) == BLOCK_EXT_MAJOR)
 		blk_free_ext_minor(MINOR(dev->devt));
+	put_disk(dev_to_bdev(dev)->bd_disk);
 	bdput(dev_to_bdev(dev));
 }
 
@@ -363,6 +364,9 @@ static struct block_device *add_partition(struct gendisk *disk, int partno,
 	pdev->class = &block_class;
 	pdev->type = &part_type;
 	pdev->parent = ddev;
+
+	/* ensure we always have a reference to the whole disk */
+	get_device(disk_to_dev(disk));
 
 	/* in consecutive minor range? */
 	if (bdev->bd_partno < disk->minors) {
