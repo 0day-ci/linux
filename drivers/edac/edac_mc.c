@@ -1028,6 +1028,7 @@ void edac_mc_handle_error(const enum hw_event_mc_err_type type,
 {
 	struct dimm_info *dimm;
 	char *p;
+	size_t p_size = 0;
 	int row = -1, chan = -1;
 	int pos[EDAC_MAX_LAYERS] = { top_layer, mid_layer, low_layer };
 	int i, n_labels = 0;
@@ -1114,12 +1115,11 @@ void edac_mc_handle_error(const enum hw_event_mc_err_type type,
 			p = e->label;
 			*p = '\0';
 		} else {
-			if (p != e->label) {
-				strcpy(p, OTHER_LABEL);
-				p += strlen(OTHER_LABEL);
-			}
-			strcpy(p, dimm->label);
-			p += strlen(p);
+			const char *or = (p != e->label) ? OTHER_LABEL : "";
+
+			p_size += scnprintf(p + p_size,
+					    sizeof(e->label) - p_size,
+					    "%s%s", or, dimm->label);
 		}
 
 		/*
@@ -1141,9 +1141,9 @@ void edac_mc_handle_error(const enum hw_event_mc_err_type type,
 	}
 
 	if (any_memory)
-		strcpy(e->label, "any memory");
+		strscpy(e->label, "any memory", sizeof(e->label));
 	else if (!*e->label)
-		strcpy(e->label, "unknown memory");
+		strscpy(e->label, "unknown memory", sizeof(e->label));
 
 	edac_inc_csrow(e, row, chan);
 
