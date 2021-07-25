@@ -283,14 +283,14 @@ static const struct sdhci_pltfm_data sdhci_dwcmshc_rk3568_pdata = {
 	.ops = &sdhci_dwcmshc_rk3568_ops,
 	.quirks = SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN |
 		  SDHCI_QUIRK_BROKEN_TIMEOUT_VAL,
-	.quirks2 = SDHCI_QUIRK2_PRESET_VALUE_BROKEN |
-		   SDHCI_QUIRK2_CLOCK_DIV_ZERO_BROKEN,
+	.quirks2 = SDHCI_QUIRK2_PRESET_VALUE_BROKEN;
 };
 
 static int dwcmshc_rk3568_init(struct sdhci_host *host, struct dwcmshc_priv *dwc_priv)
 {
-	int err;
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
 	struct rk3568_priv *priv = dwc_priv->priv;
+	int err;
 
 	priv->rockchip_clks[0].id = "axi";
 	priv->rockchip_clks[1].id = "block";
@@ -317,6 +317,9 @@ static int dwcmshc_rk3568_init(struct sdhci_host *host, struct dwcmshc_priv *dwc
 	/* Reset previous settings */
 	sdhci_writel(host, 0, DWCMSHC_EMMC_DLL_TXCLK);
 	sdhci_writel(host, 0, DWCMSHC_EMMC_DLL_STRBIN);
+
+	if (sdhci_pltfm_clk_get_max_clock(pltfm_host) <= 25000000)
+		host->quirks2 |= SDHCI_QUIRK2_CLOCK_DIV_ZERO_BROKEN;
 
 	return 0;
 }
