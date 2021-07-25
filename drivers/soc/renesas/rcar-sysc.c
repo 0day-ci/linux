@@ -396,19 +396,21 @@ static int __init rcar_sysc_pd_init(void)
 	for (i = 0; i < info->num_areas; i++) {
 		const struct rcar_sysc_area *area = &info->areas[i];
 		struct rcar_sysc_pd *pd;
+		size_t area_name_size;
 
 		if (!area->name) {
 			/* Skip NULLified area */
 			continue;
 		}
 
-		pd = kzalloc(sizeof(*pd) + strlen(area->name) + 1, GFP_KERNEL);
+		area_name_size = strlen(area->name) + 1;
+		pd = kzalloc(sizeof(*pd) + area_name_size, GFP_KERNEL);
 		if (!pd) {
 			error = -ENOMEM;
 			goto out_put;
 		}
 
-		strcpy(pd->name, area->name);
+		strscpy(pd->name, area->name, area_name_size);
 		pd->genpd.name = pd->name;
 		pd->ch.chan_offs = area->chan_offs;
 		pd->ch.chan_bit = area->chan_bit;
