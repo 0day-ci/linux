@@ -541,7 +541,11 @@ static __always_inline void __do_page_fault(struct pt_regs *regs)
 {
 	long err;
 
-	err = ___do_page_fault(regs, regs->dar, regs->dsisr);
+	if (IS_ENABLED(CONFIG_4xx) || IS_ENABLED(CONFIG_BOOKE))
+		err = ___do_page_fault(regs, regs->dar, regs->esr);
+	else
+		err = ___do_page_fault(regs, regs->dar, regs->dsisr);
+
 	if (unlikely(err))
 		bad_page_fault(regs, err);
 }
@@ -567,7 +571,15 @@ NOKPROBE_SYMBOL(hash__do_page_fault);
  */
 static void __bad_page_fault(struct pt_regs *regs, int sig)
 {
-	int is_write = page_fault_is_write(regs->dsisr);
+	unsigned long err_reg;
+	int is_write;
+
+	if (IS_ENABLED(CONFIG_4xx) || IS_ENABLED(CONFIG_BOOKE))
+		err_reg = regs->esr;
+	else
+		err_reg = regs->dsisr;
+
+	is_write = page_fault_is_write(err_reg);
 
 	/* kernel has accessed a bad area */
 

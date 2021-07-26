@@ -53,7 +53,10 @@ struct pt_regs
 	/* N.B. for critical exceptions on 4xx, the dar and dsisr
 	   fields are overloaded to hold srr0 and srr1. */
 	unsigned long dar;		/* Fault registers */
-	unsigned long dsisr;		/* on 4xx/Book-E used for ESR */
+	union {
+		unsigned long dsisr;		/* on Book-S used for DSISR */
+		unsigned long esr;		/* on 4xx/Book-E used for ESR */
+	};
 	unsigned long result;		/* Result of a system call */
 };
 
