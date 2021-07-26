@@ -506,6 +506,12 @@ static int __uc_init_hw(struct intel_uc *uc)
 		 "submission",
 		 enableddisabled(intel_uc_uses_guc_submission(uc)));
 
+	if (intel_uc_uses_guc_slpc(uc)) {
+		ret = intel_guc_slpc_enable(&guc->slpc);
+		if (ret)
+			goto err_submission;
+	}
+
 	if (intel_uc_uses_huc(uc)) {
 		drm_info(&i915->drm, "%s firmware %s version %u.%u %s:%s\n",
 			 intel_uc_fw_type_repr(INTEL_UC_FW_TYPE_HUC),
@@ -520,6 +526,8 @@ static int __uc_init_hw(struct intel_uc *uc)
 	/*
 	 * We've failed to load the firmware :(
 	 */
+err_submission:
+	intel_guc_submission_disable(guc);
 err_log_capture:
 	__uc_capture_load_err_log(uc);
 err_out:
