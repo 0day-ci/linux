@@ -13,21 +13,7 @@
 
 #include <linux/tracepoint.h>
 
-/*
- * The gpu_memory_total event indicates that there's an update to either the
- * global or process total gpu memory counters.
- *
- * This event should be emitted whenever the kernel device driver allocates,
- * frees, imports, unimports memory in the GPU addressable space.
- *
- * @gpu_id: This is the gpu id.
- *
- * @pid: Put 0 for global total, while positive pid for process total.
- *
- * @size: Size of the allocation in bytes.
- *
- */
-TRACE_EVENT(gpu_mem_total,
+DECLARE_EVENT_CLASS(gpu_mem_template,
 
 	TP_PROTO(uint32_t gpu_id, uint32_t pid, uint64_t size),
 
@@ -50,6 +36,41 @@ TRACE_EVENT(gpu_mem_total,
 		__entry->pid,
 		__entry->size)
 );
+
+/*
+ * The gpu_memory_total event indicates that there's an update to either the
+ * global or process total gpu memory counters.
+ *
+ * This event should be emitted whenever the kernel device driver allocates,
+ * frees, imports, unimports memory in the GPU addressable space.
+ *
+ * @gpu_id: This is the gpu id.
+ *
+ * @pid: Put 0 for global total, while positive pid for process total.
+ *
+ * @size: Size of the allocation in bytes.
+ *
+ */
+DEFINE_EVENT(gpu_mem_template, gpu_mem_total,
+	TP_PROTO(uint32_t gpu_id, uint32_t pid, uint64_t size),
+	TP_ARGS(gpu_id, pid, size));
+
+/*
+ * The gpu_mem_imported event indicates that there's an update to the
+ * global or process imported gpu memory counters.
+ *
+ * This event should be emitted whenever the kernel device driver imports
+ * or unimports memory (allocated externally) in the GPU addressable space.
+ *
+ * @gpu_id: This is the gpu id.
+ *
+ * @pid: Put 0 for global total, while positive pid for process total.
+ *
+ * @size: Size of the imported memory in bytes.
+ */
+DEFINE_EVENT(gpu_mem_template, gpu_mem_imported,
+	TP_PROTO(uint32_t gpu_id, uint32_t pid, uint64_t size),
+	TP_ARGS(gpu_id, pid, size));
 
 #endif /* _TRACE_GPU_MEM_H */
 
