@@ -438,6 +438,7 @@ int bt_procfs_init(struct net *net, const char *name,
 		   struct bt_sock_list *sk_list,
 		   int (*seq_show)(struct seq_file *, void *));
 void bt_procfs_cleanup(struct net *net, const char *name);
+void bt_host_release(struct device *dev);
 
 extern struct dentry *bt_debugfs;
 

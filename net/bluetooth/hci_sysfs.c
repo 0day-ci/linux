@@ -80,13 +80,6 @@ void hci_conn_del_sysfs(struct hci_conn *conn)
 	hci_dev_put(hdev);
 }
 
-static void bt_host_release(struct device *dev)
-{
-	struct hci_dev *hdev = to_hci_dev(dev);
-	kfree(hdev);
-	module_put(THIS_MODULE);
-}
-
 static const struct device_type bt_host = {
 	.name    = "host",
 	.release = bt_host_release,
