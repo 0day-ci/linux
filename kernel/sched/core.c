@@ -3330,9 +3330,6 @@ static void ttwu_do_wakeup(struct rq *rq, struct task_struct *p, int wake_flags,
 		if (rq->avg_idle > max)
 			rq->avg_idle = max;
 
-		rq->wake_stamp = jiffies;
-		rq->wake_avg_idle = rq->avg_idle / 2;
-
 		rq->idle_stamp = 0;
 	}
 #endif
@@ -8645,18 +8642,11 @@ int sched_cpu_activate(unsigned int cpu)
 	balance_push_set(cpu, false);
 
 #ifdef CONFIG_SCHED_SMT
-	do {
-		int weight = cpumask_weight(cpu_smt_mask(cpu));
-
-		if (weight > sched_smt_weight)
-			sched_smt_weight = weight;
-
-		/*
-		 * When going up, increment the number of cores with SMT present.
-		 */
-		if (cpumask_weight(cpu_smt_mask(cpu)) == 2)
-			static_branch_inc_cpuslocked(&sched_smt_present);
-	} while (0);
+	/*
+	 * When going up, increment the number of cores with SMT present.
+	 */
+	if (cpumask_weight(cpu_smt_mask(cpu)) == 2)
+		static_branch_inc_cpuslocked(&sched_smt_present);
 #endif
 	set_cpu_active(cpu, true);
 
@@ -9026,8 +9016,6 @@ void __init sched_init(void)
 		rq->online = 0;
 		rq->idle_stamp = 0;
 		rq->avg_idle = 2*sysctl_sched_migration_cost;
-		rq->wake_stamp = jiffies;
-		rq->wake_avg_idle = rq->avg_idle;
 		rq->max_idle_balance_cost = sysctl_sched_migration_cost;
 		rq->last_idle_state = 1;
 
