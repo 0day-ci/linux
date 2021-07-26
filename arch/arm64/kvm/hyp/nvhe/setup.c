@@ -58,6 +58,7 @@ static int recreate_hyp_mappings(phys_addr_t phys, unsigned long size,
 {
 	void *start, *end, *virt = hyp_phys_to_virt(phys);
 	unsigned long pgt_size = hyp_s1_pgtable_pages() << PAGE_SHIFT;
+	enum kvm_pgtable_prot prot;
 	int ret, i;
 
 	/* Recreate the hyp page-table using the early page allocator */
@@ -83,19 +84,11 @@ static int recreate_hyp_mappings(phys_addr_t phys, unsigned long size,
 	if (ret)
 		return ret;
 
-	ret = pkvm_create_mappings(__start_rodata, __end_rodata, PAGE_HYP_RO);
-	if (ret)
-		return ret;
-
 	ret = pkvm_create_mappings(__hyp_rodata_start, __hyp_rodata_end, PAGE_HYP_RO);
 	if (ret)
 		return ret;
 
 	ret = pkvm_create_mappings(__hyp_bss_start, __hyp_bss_end, PAGE_HYP);
-	if (ret)
-		return ret;
-
-	ret = pkvm_create_mappings(__hyp_bss_end, __bss_stop, PAGE_HYP_RO);
 	if (ret)
 		return ret;
 
@@ -116,6 +109,24 @@ static int recreate_hyp_mappings(phys_addr_t phys, unsigned long size,
 		if (ret)
 			return ret;
 	}
+
+	/*
+	 * Map the host's .bss and .rodata sections RO in the hypervisor, but
+	 * transfer the ownerhsip from the host to the hypervisor itself to
+	 * make sure it can't be donated or shared with another entity.
+	 *
+	 * The ownership transtion requires matching changes in the host
+	 * stage-2. This will done later (see finalize_mappings()) once the
+	 * hyp_vmemmap is addressable.
+	 */
+	prot = pkvm_mkstate(PAGE_HYP_RO, PKVM_PAGE_SHARED_OWNED);
+	ret = pkvm_create_mappings(__start_rodata, __end_rodata, prot);
+	if (ret)
+		return ret;
+
+	ret = pkvm_create_mappings(__hyp_bss_end, __bss_stop, prot);
+	if (ret)
+		return ret;
 
 	return 0;
 }
@@ -148,6 +159,27 @@ static void hpool_put_page(void *addr)
 	hyp_put_page(&hpool, addr);
 }
 
+static int finalize_mappings(void)
+{
+	enum kvm_pgtable_prot prot;
+	int ret;
+
+	/*
+	 * The host's .bss and .rodata sections are now conceptually owned by
+	 * the hypervisor, so mark them as 'borrowed' in the host stage-2. We
+	 * can safely use host_stage2_idmap_locked() at this point since the
+	 * host stage-2 has not been enabled yet.
+	 */
+	prot = pkvm_mkstate(KVM_PGTABLE_PROT_RWX, PKVM_PAGE_SHARED_BORROWED);
+	ret = host_stage2_idmap_locked(__hyp_pa(__start_rodata),
+				       __hyp_pa(__end_rodata), prot);
+	if (ret)
+		return ret;
+
+	return host_stage2_idmap_locked(__hyp_pa(__hyp_bss_end),
+					__hyp_pa(__bss_stop), prot);
+}
+
 void __noreturn __pkvm_init_finalise(void)
 {
 	struct kvm_host_data *host_data = this_cpu_ptr(&kvm_host_data);
@@ -164,6 +196,10 @@ void __noreturn __pkvm_init_finalise(void)
 		goto out;
 
 	ret = kvm_host_prepare_stage2(host_s2_pgt_base);
+	if (ret)
+		goto out;
+
+	ret = finalize_mappings();
 	if (ret)
 		goto out;
 
