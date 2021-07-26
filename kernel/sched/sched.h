@@ -1351,6 +1351,8 @@ do {						\
 #ifdef CONFIG_SCHED_SMT
 extern void __update_idle_core(struct rq *rq);
 
+extern int sched_smt_weight;
+
 static inline void update_idle_core(struct rq *rq)
 {
 	if (static_branch_unlikely(&sched_smt_present))
