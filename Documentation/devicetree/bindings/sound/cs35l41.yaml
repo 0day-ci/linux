@@ -1,0 +1,398 @@
+# SPDX-License-Identifier: GPL-2.0-only OR BSD-2-Clause
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/sound/cs35l41.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Cirrus Logic CS35L41 Speaker Amplifier
+
+maintainers:
+  - david.rhodes@cirrus.com
+
+description: |
+  CS35L41 is a boosted mono Class D amplifier with DSP
+  speaker protection and equalization
+
+properties:
+  compatible:
+    enum:
+      - cirrus,cs35l40
+      - cirrus,cs35l41
+
+  reg:
+    maxItems: 1
+
+  '#sound-dai-cells':
+    description:
+      The first cell indicating the audio interface.
+    const: 1
+
+  cirrus,boost-peak-milliamp:
+    description:
+      Boost-converter peak current limit in mA.
+      Configures the peak current by monitoring the current through the boost FET.
+      Range starts at 1600 mA and goes to a maximum of 4500 mA with increments
+      of 50 mA. See section 4.3.6 of the datasheet for details.
+    $ref: "/schemas/types.yaml#/definitions/uint32"
+    minimum: 1600
+    maximum: 4500
+    default: 4500
+
+  cirrus,boost-ind-nanohenry:
+    description:
+      Boost inductor value, expressed in nH. Valid
+      values include 1000, 1200, 1500 and 2200.
+    $ref: "/schemas/types.yaml#/definitions/uint32"
+    minimum: 1000
+    maximum: 2200
+
+  cirrus,boost-cap-microfarad:
+    description:
+      Total equivalent boost capacitance on the VBST
+      and VAMP pins, derated at 11 volts DC. The value must be rounded to the
+      nearest integer and expressed in uF.
+    $ref: "/schemas/types.yaml#/definitions/uint32"
+
+
+  cirrus,sclk-force-output:
+    description:
+      Audio serial port SCLK force
+      output control. Forces the SCLK to continue to drive even
+      if no ASP_TXn channels are enabled.
+    type: boolean
+
+  cirrus,lrclk-force-output:
+    description:
+      Audio serial port LRCLK force
+      output control. Forces the LRCLK to continue to drive even
+      if no ASP_TXn channels are enabled.
+    type: boolean
+
+  cirrus,right-channel-amp:
+    description:
+      Boolean to determine which channel
+      the amplifier is to receive the audio data on. If present the
+      amplifier receives data on the right channel of I2S data.
+      If not present the amplifier receives data on the left
+      channel of I2S data
+    type: boolean
+
+  cirrus,boost-ctl-millivolt:
+    description:
+      Boost Voltage Value. Configures the
+      boost converter's output voltage in mV. The range is from 2550 mV to
+      11000 mV with increments of 50 mV.  This will be the maximum voltage
+      in Class-H mode if 'classh-bst-max-limit' is set to 1, or the fixed
+      boost voltage if 'classh-bst-overide' is set to true.
+    $ref: "/schemas/types.yaml#/definitions/uint32"
+    minimum: 2550
+    maximum: 11000
+
+  cirrus,amp-gain-zc:
+    description:
+      Boolean to determine whether to use the amplifier
+      gain-change zero-crossing feature. If the feature is enabled, any
+      user-controlled amplifier gain change will occur on a zero-crossing point.
+      (Default) Disabled
+    type: boolean
+
+  cirrus,asp-sdout-hiz:
+    description:
+      Audio serial port SDOUT Hi-Z control. Sets the Hi-Z
+      configuration for SDOUT pin of amplifier.
+      0 = Logic 0 during unused slots, and while all transmit channels disabled
+      1 = Hi-Z during unused slots but logic 0 while all transmit channels disabled
+      2 = (Default) Logic 0 during unused slots, but Hi-Z while all transmit channels disabled
+      3 = Hi-Z during unused slots and while all transmit channels disabled
+    $ref: "/schemas/types.yaml#/definitions/uint32"
+    minimum: 0
+    maximum: 3
+    default: 2
+
+  cirrus,temp-warn-threshold:
+    description:
+      Amplifier overtemperature warning threshold.
+      Configures the threshold at which the overtemperature warning condition occurs.
+      When the threshold is met, the ovetemperature warning attenuation is applied
+      and the TEMP_WARN_EINT interrupt status bit is set.
+      If TEMP_WARN_MASK = 0, INTb is asserted.
+      0 = 105C
+      1 = 115C
+      2 = 125C (Default)
+      3 = 135C
+    $ref: "/schemas/types.yaml#/definitions/uint32"
+    minimum: 0
+    maximum: 3
+    default: 2
+
+  cirrus,hw-noise-gate-select:
+    description: Hardware Noise Gate feature. Each bit selects
+      a different block for detection.
+      000000 - All noise gating functionality disabled
+      xxxxx1 - Amplifier noise gating detection enabled
+      xxxx1x - Boost converter DCM detection enabled
+      xxx1xx - VMON low power mode detection enabled
+      xx1xxx - IMON low power mode detection enabled
+      x1xxxx - VP brownout prevention detection enabled
+      1xxxxx - VBST brownout prevention detection enabled
+    $ref: "/schemas/types.yaml#/definitions/uint32"
+    minimum: 0
+    maximum: 63
+    default: 0
+
+  cirrus,hw-noise-gate-delay:
+    description: Time that the incoming audio signal must be
+      below the noise gate threshold prior to entering a noise gated state
+      0 = 5 ms
+      1 = 10 ms
+      2 = 25 ms
+      3 = 50 ms (default)
+      4 = 100 ms
+      5 = 250 ms
+      6 = 500 ms
+      7 = 1 s
+    $ref: "/schemas/types.yaml#/definitions/uint32"
+    minimum: 0
+    maximum: 7
+    default: 3
+
+  cirrus,hw-noise-gate-threshold:
+    description: Threshold of audio signal input which the
+      noise gate considers the input audio to be at a low enough level to be
+      valid to enter a noise gating state of operation.
+      0 = 0.654 mVpk
+      1 = 0.328 mVpk
+      2 = 0.164 mVpk
+      3 = 0.082 mVpk (default)
+      4 = 0.041 mVpk
+      5 = 0.021 mVpk
+      6 = 0.010 mVpk
+      7 = True zero data (no LSB dither)
+    $ref: "/schemas/types.yaml#/definitions/uint32"
+    minimum: 0
+    maximum: 7
+    default: 3
+
+  cirrus,dsp-noise-gate-enable:
+    description:
+      DSP Noise Gate feature. If present, noise gate feature will be enabled.
+    type: boolean
+
+  cirrus,dsp-noise-gate-threshold:
+    description:
+      Threshold of audio signal input which the
+      noise gate considers the input audio to be at a low enough level to be
+      valid to enter a noise gating state of operation.
+      0 = -66 dBFS
+      1 = -72 dBFS
+      2 = -78 dBFS
+      3 = -84 dBFS (default)
+      4 = -90 dBFS
+      5 = -96 dBFS
+      6 = -102 dBFS
+      7 = -108 dBFS
+    $ref: "/schemas/types.yaml#/definitions/uint32"
+    minimum: 0
+    maximum: 7
+    default: 3
+
+  cirrus,dsp-noise-gate-delay:
+    description:
+      Time that the incoming audio signal must be
+      below the noise gate threshold prior to entering a noise gated state
+      0 = 5 ms
+      1 = 10 ms
+      2 = 25 ms
+      3 = 50 ms (default)
+      4 = 100 ms
+      5 = 250 ms
+      6 = 500 ms
+      7 = 1 s
+      8 = 5 s
+      9 = 10 s
+      10 = 20 s
+      11 = 30 s
+      12 = 40 s
+      13 = 50 s
+      14 = 60 s
+      15 = 120 s
+    $ref: "/schemas/types.yaml#/definitions/uint32"
+    minimum: 0
+    maximum: 15
+    default: 3
+
+  cirrus,invert-class-d:
+    description:
+      Inverts the polarity of the audio signal output from
+      the Class-D amplifier.
+    type: boolean
+
+  classh-internal-algo:
+    description:
+      Sub-node for the Internal Class H Algorithm
+      See Section 4.4 Internal Class H Algorithm in the Datasheet.
+      If not used, the device manages the ClassH Algorithm internally.
+      It is strongly recommended that the Datasheet be referenced when adjusting
+      or using these Class H Algorithm controls over the internal Algorithm.
+      Serious damage can occur to the Device and surrounding components.
+      Unavailable for cs35l41l.
+    type:
+      boolean
+  cirrus,classh-bst-overide:
+    description:
+      Boolean which will disable Class H tracking and
+      set Boost voltage to the value in the 'boost-ctl-millivolt' property
+    type: boolean
+  cirrus,classh-bst-max-limit:
+    description:
+      Value set to the BST_CTL_LIM_EN field.
+      A value of 1 will limit the Class-H voltage to the value in the
+      'boost-ctl-millivolt' property.
+      0 = No Class-H limit (default)
+      1 = Class-H limited to 'boost-ctl-millivolt' value
+    $ref: "/schemas/types.yaml#/definitions/uint32"
+    minimum: 0
+    maximum: 1
+  cirrus,classh-headroom:
+    description:
+      Class H algorithm headroom. Controls VBST headroom
+      in the max detection path of the Class H algorithm. Step size is 0.1 V.
+      Range is from -6.4V to +6.3V with 7-bit 2's complement representation.
+      0 = 0V
+      1 = 0.1V
+      2 = 0.2V
+      ===
+      11 = 1.1V (Default)
+      ===
+      62 = 6.2V
+      63 = 6.3V
+      64 = -6.4V
+      65 = -6.3V
+      ===
+      126 = -0.2V
+      127 = -0.1V
+    $ref: "/schemas/types.yaml#/definitions/uint32"
+    minimum: 0
+    maximum: 127
+  cirrus,classh-release-rate:
+    description:
+      Class H release rate. Controls the amount of
+      time required before allowing consecutive release condition VBST supply
+      tracking updates. Step size is 5us with range from 20us to 1275us.
+      4 = 20us (Default)
+      5 = 25us
+      ===
+      254 = 1270us
+      255 = 1275us
+    $ref: "/schemas/types.yaml#/definitions/uint32"
+    minimum: 4
+    maximum: 255
+  cirrus,classh-mem-depth:
+    description:
+      Class H memory depth. Controls the memory depth
+      used in the Class H algorithm for audio data buffering and analysis.
+      0 = 20.83 - 23.4 us
+      1 = 41.67 - 46.88 us
+      2 = 83.33 - 85.94 us
+      3 = 166.67 - 171.88 us
+      4 = 250.00 - 255.10 us
+      5 = 333.33 - 335.93 us (Default)
+    $ref: "/schemas/types.yaml#/definitions/uint32"
+    minimum: 0
+    maximum: 5
+  cirrus,classh-wk-fet-thld:
+    description:
+      Weak-FET amplifier driver threshold.
+      Configures the signal threshold at which the PWM output stage enters weak-FET
+      operation. Step size is 0.05V. Range is from 0.05V to 0.7V.
+      1 = 0.05V
+      2 = 0.1V
+      3 = 0.15V
+      ===
+      13 = 0.65V
+      14 = 0.7V
+    $ref: "/schemas/types.yaml#/definitions/uint32"
+    minimum: 1
+    maximum: 14
+  cirrus,classh-wk-fet-delay:
+    description:
+      Weak-Fet entry . Controls the delay in ms
+      before the Class H algorithm switches to the weak-FET voltage after the audio
+      falls and remains below the value specified in 'classh-wk-fet-thld'.
+      0 = 0ms
+      1 = 5ms
+      2 = 10ms
+      3 = 50ms
+      4 = 100ms (Default)
+      5 = 200ms
+      6 = 500ms
+      7 = 1000ms
+    $ref: "/schemas/types.yaml#/definitions/uint32"
+    minimum: 0
+    maximum: 7
+  cirrus,gpio1-polarity-invert:
+    description:
+      Boolean which specifies whether the GPIO1
+      level is inverted. If this property is not present the level is not inverted.
+    type: boolean
+  cirrus,gpio1-output-enable:
+    description:
+      Boolean which specifies whether the GPIO1 pin
+      is configured as an output. If this property is not present the
+      pin will be configured as an input.
+    type: boolean
+  cirrus,gpio1-src-select:
+    description:
+      Configures the function of the GPIO1 pin.
+      Note that the options are different from the GPIO2 pin
+      0 = High Impedance (Default)
+      1 = GPIO
+      2 = Sync
+      3 = MCLK input
+    $ref: "/schemas/types.yaml#/definitions/uint32"
+    minimum: 0
+    maximum: 3
+  cirrus,gpio2-polarity-invert:
+    description:
+      Boolean which specifies whether the GPIO2
+      level is inverted. If this property is not present the level is not inverted.
+    type: boolean
+  cirrus,gpio2-output-enable:
+    description:
+      Boolean which specifies whether the GPIO2 pin
+      is configured as an output. If this property is not present the
+      pin will be configured as an input.
+    type: boolean
+  cirrus,gpio2-src-select:
+    description:
+      Configures the function of the GPIO2 pin.
+      Note that the options are different from the GPIO1 pin.
+      0 = High Impedance (Default)
+      1 = GPIO
+      2 = Open Drain INTB
+      3 = MCLK input
+      4 = Push-pull INTB (active low)
+      5 = Push-pull INT (active high)
+    $ref: "/schemas/types.yaml#/definitions/uint32"
+    minimum: 0
+    maximum: 5
+
+required:
+  - compatible
+  - cirrus,boost-peak-milliamp
+  - cirrus,boost-ind-nanohenry
+  - cirrus,boost-cap-microfarad
+
+unevaluatedProperties: false
+
+examples:
+  - |
+      cs35l41: cs35l41@2 {
+        compatible = "cirrus,cs35l41";
+        reg = <2>;
+        VA-supply = <&dummy_vreg>;
+        VP-supply = <&dummy_vreg>;
+        cirrus,boost-peak-milliamp = <4500>;
+        cirrus,boost-ind-nanohenry = <1000>;
+        cirrus,boost-cap-microfarad = <15>;
+      };
