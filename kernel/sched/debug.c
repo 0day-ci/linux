@@ -745,6 +745,10 @@ do {									\
 		P(sched_goidle);
 		P(ttwu_count);
 		P(ttwu_local);
+		P(sis_search);
+		P(sis_domain_search);
+		P(sis_scanned);
+		P(sis_failed);
 	}
 #undef P
 

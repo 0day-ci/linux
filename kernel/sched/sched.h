@@ -1072,6 +1072,12 @@ struct rq {
 	/* try_to_wake_up() stats */
 	unsigned int		ttwu_count;
 	unsigned int		ttwu_local;
+
+	/* select_idle_sibling stats */
+	unsigned int		sis_search;
+	unsigned int		sis_domain_search;
+	unsigned int		sis_scanned;
+	unsigned int		sis_failed;
 #endif
 
 #ifdef CONFIG_CPU_IDLE
