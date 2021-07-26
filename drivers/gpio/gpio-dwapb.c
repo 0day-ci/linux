@@ -581,7 +581,8 @@ static struct dwapb_platform_data *dwapb_gpio_get_pdata(struct device *dev)
 			pp->ngpio = DWAPB_MAX_GPIOS;
 		}
 
-		pp->gpio_base	= -1;
+		if (fwnode_property_read_u32(fwnode, "gpio-base", &pp->gpio_base))
+			pp->gpio_base = -1;
 
 		/*
 		 * Only port A can provide interrupts in all configurations of
