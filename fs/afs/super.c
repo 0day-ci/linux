@@ -434,11 +434,6 @@ static int afs_dynroot_test_super(struct super_block *sb, struct fs_context *fc)
 		as->dyn_root);
 }
 
-static int afs_set_super(struct super_block *sb, struct fs_context *fc)
-{
-	return set_anon_super(sb, NULL);
-}
-
 /*
  * fill in the superblock
  */
@@ -575,7 +570,7 @@ static int afs_get_tree(struct fs_context *fc)
 	/* allocate a deviceless superblock */
 	sb = sget_fc(fc,
 		     as->dyn_root ? afs_dynroot_test_super : afs_test_super,
-		     afs_set_super);
+		     set_anon_super_fc);
 	if (IS_ERR(sb)) {
 		ret = PTR_ERR(sb);
 		goto error;
