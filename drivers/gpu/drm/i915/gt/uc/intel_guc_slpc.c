@@ -448,6 +448,35 @@ int intel_guc_slpc_enable(struct intel_guc_slpc *slpc)
 	return 0;
 }
 
+int intel_guc_slpc_info(struct intel_guc_slpc *slpc, struct drm_printer *p)
+{
+	struct drm_i915_private *i915 = guc_to_gt(slpc_to_guc(slpc))->i915;
+	struct slpc_shared_data *data = slpc->vaddr;
+	struct slpc_task_state_data *slpc_tasks;
+	intel_wakeref_t wakeref;
+	int ret = 0;
+
+	GEM_BUG_ON(!slpc->vma);
+
+	with_intel_runtime_pm(&i915->runtime_pm, wakeref) {
+		ret = slpc_query_task_state(slpc);
+
+		if (!ret) {
+			slpc_tasks = &data->task_state_data;
+
+			drm_printf(p, "\tSLPC state: %s\n", slpc_get_state_string(slpc));
+			drm_printf(p, "\tGTPERF task active: %s\n",
+				yesno(slpc_tasks->status & SLPC_GTPERF_TASK_ENABLED));
+			drm_printf(p, "\tMax freq: %u MHz\n",
+					slpc_decode_max_freq(slpc));
+			drm_printf(p, "\tMin freq: %u MHz\n",
+					slpc_decode_min_freq(slpc));
+		}
+	}
+
+	return ret;
+}
+
 void intel_guc_slpc_fini(struct intel_guc_slpc *slpc)
 {
 	if (!slpc->vma)
