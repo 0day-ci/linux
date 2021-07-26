@@ -650,7 +650,7 @@ static unsigned long power9_idle_stop(unsigned long psscr)
 	}
 #endif
 
-	if (!cpu_has_feature(CPU_FTR_POWER9_DD2_1)) {
+	if (!cpu_has_feature(CPU_FTR_P9_STOP_FIXED)) {
 		 /*
 		  * POWER9 DD2 can incorrectly set PMAO when waking up
 		  * after a state-loss idle. Saving and restoring MMCR0
@@ -717,7 +717,7 @@ static unsigned long power9_idle_stop(unsigned long psscr)
 		 * might have been corrupted and needs flushing. We also need
 		 * to reload MMCR0 (see mmcr0 comment above).
 		 */
-		if (!cpu_has_feature(CPU_FTR_POWER9_DD2_1)) {
+		if (!cpu_has_feature(CPU_FTR_P9_STOP_FIXED)) {
 			asm volatile(PPC_ISA_3_0_INVALIDATE_ERAT);
 			mtspr(SPRN_MMCR0, mmcr0);
 		}
