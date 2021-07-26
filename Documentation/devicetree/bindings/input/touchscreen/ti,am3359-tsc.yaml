@@ -1,0 +1,79 @@
+# SPDX-License-Identifier: (GPL-2.0 OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/input/touchscreen/ti,am3359-tsc.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Bindings for TSC part of TSCADC MFDs on TI SoCs
+
+maintainers:
+  - Vignesh Raghavendra <vigneshr@ti.com>
+
+properties:
+  compatible:
+    const: ti,am3359-tsc
+
+  ti,wires:
+    $ref: /schemas/types.yaml#/definitions/uint32
+    enum: [4, 5, 8]
+    description:
+      Number of wires used by touchscreen
+
+  ti,x-plate-resistance:
+    $ref: /schemas/types.yaml#/definitions/uint32
+    description:
+      X plate resistance
+
+  ti,coordinate-readouts:
+    $ref: /schemas/types.yaml#/definitions/uint32
+    minimum: 1
+    maximum: 5
+    description:
+      The sequencer supports a total of 16 programmable steps
+      each step is used to read a single coordinate. A single
+      readout is enough but multiple reads can increase the quality.
+      A value of 5 means, 5 reads for X, 5 for Y and 2 for Z (always).
+      This utilises 12 of the 16 software steps available.
+      The remaining 4 can be used by the ADC.
+
+  ti,wire-config:
+    $ref: /schemas/types.yaml#/definitions/uint32-array
+    description: |
+      Different boards could have a different order for
+      connecting wires on touchscreen. We need to provide an
+      8 bit number where in the 1st four bits represent the
+      analog lines and the next 4 bits represent positive/
+      negative terminal on that input line. Notations to
+      represent the input lines and terminals respectively
+      is as follows:
+      AIN0 = 0, AIN1 = 1 and so on till AIN7 = 7.
+      XP  = 0, XN = 1, YP = 2, YN = 3.
+      minItems: 4
+    items:
+      maximum: 0x73
+
+  ti,charge-delay:
+    $ref: /schemas/types.yaml#/definitions/uint32
+    description:
+      Length of touch screen charge delay step in terms of
+      List of analog inputs available for ADC.
+      ADC clock cycles. Charge delay value should be large
+      in order to avoid false pen-up events. This value
+      effects the overall sampling speed, hence need to be
+      kept as low as possible, while avoiding false pen-up
+      event. Start from a lower value, say 0x400, and
+      increase value until false pen-up events are avoided.
+      The pen-up detection happens immediately after the
+      charge step, so this does in fact function as a
+      hardware knob for adjusting the amount of "settling time".
+    minimum: 0x1
+    maximum: 0xFFFF
+
+required:
+  - compatible
+  - ti,wires
+  - ti,coordinate-readouts
+  - ti,wire-config
+  - ti,x-plate-resistance
+
+additionalProperties: false

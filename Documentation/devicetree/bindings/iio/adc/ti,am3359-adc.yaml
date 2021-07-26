@@ -1,0 +1,74 @@
+# SPDX-License-Identifier: (GPL-2.0 OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/iio/adc/ti,am3359-adc.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Bindings for ADC part of TSCADC MFDs on TI SoCs
+
+maintainers:
+  - Vignesh Raghavendra <vigneshr@ti.com>
+
+properties:
+  compatible:
+    oneOf:
+      - items:
+          - enum:
+              - ti,am654-adc
+          - const: ti,am3359-adc
+      - const: ti,am3359-adc
+
+  ti,adc-channels:
+    $ref: /schemas/types.yaml#/definitions/uint32-array
+    description:
+      List of analog inputs available for ADC.
+      AIN0 = 0, AIN1 = 1 and so on till AIN7 = 7.
+    minItems: 1
+    maxItems: 8
+    items:
+      maximum: 7
+
+  ti,chan-step-opendelay:
+    $ref: /schemas/types.yaml#/definitions/uint32-array
+    description:
+      List of open delays for each channel of list of analog inputs
+      available for ADC. ADC in the order of ti,adc-channels. The
+      value corresponds to the number of ADC clock cycles to wait
+      after applying the step configuration registers and before
+      sending the start of ADC conversion.
+    minItems: 1
+    maxItems: 8
+    items:
+      maximum: 0x3FFFF
+
+  ti,chan-step-sampledelay:
+    $ref: /schemas/types.yaml#/definitions/uint32-array
+    description:
+      List of sample delays for each channel of ADC in the order of
+      ti,adc-channels. The value corresponds to the number of
+      ADC clock cycles to sample (to hold start of conversion high).
+    minItems: 1
+    maxItems: 8
+    items:
+      maximum: 0xFF
+
+  ti,chan-step-avg:
+    $ref: /schemas/types.yaml#/definitions/uint32-array
+    description:
+      Number of averages to be performed for each channel of ADC. If
+      average is 16 then input is sampled 16 times and averaged to
+      get more accurate value. This increases the time taken by ADC
+      to generate a sample.
+    minItems: 1
+    maxItems: 8
+    items:
+      maximum: 16
+
+  "#io-channel-cells":
+    const: 1
+
+required:
+  - compatible
+  - "#io-channel-cells"
+
+additionalProperties: false
