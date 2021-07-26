@@ -391,6 +391,50 @@ static void test_seqpacket_msg_trunc_server(const struct test_opts *opts)
 	close(fd);
 }
 
+static void test_seqpacket_timeout_client(const struct test_opts *opts)
+{
+	int fd;
+	struct timeval tv;
+	char dummy;
+
+	fd = vsock_seqpacket_connect(opts->peer_cid, 1234);
+	if (fd < 0) {
+		perror("connect");
+		exit(EXIT_FAILURE);
+	}
+
+	tv.tv_sec = 1;
+	tv.tv_usec = 0;
+
+	if (setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (void *)&tv, sizeof(tv)) == -1) {
+		perror("setsockopt 'SO_RCVTIMEO'");
+		exit(EXIT_FAILURE);
+	}
+
+	if ((read(fd, &dummy, sizeof(dummy)) != -1) ||
+	    (errno != EAGAIN)) {
+		perror("EAGAIN expected");
+		exit(EXIT_FAILURE);
+	}
+
+	control_writeln("WAITDONE");
+	close(fd);
+}
+
+static void test_seqpacket_timeout_server(const struct test_opts *opts)
+{
+	int fd;
+
+	fd = vsock_seqpacket_accept(VMADDR_CID_ANY, 1234, NULL);
+	if (fd < 0) {
+		perror("accept");
+		exit(EXIT_FAILURE);
+	}
+
+	control_expectln("WAITDONE");
+	close(fd);
+}
+
 static struct test_case test_cases[] = {
 	{
 		.name = "SOCK_STREAM connection reset",
@@ -430,6 +474,11 @@ static struct test_case test_cases[] = {
 		.name = "SOCK_SEQPACKET MSG_TRUNC flag",
 		.run_client = test_seqpacket_msg_trunc_client,
 		.run_server = test_seqpacket_msg_trunc_server,
+	},
+	{
+		.name = "SOCK_SEQPACKET timeout",
+		.run_client = test_seqpacket_timeout_client,
+		.run_server = test_seqpacket_timeout_server,
 	},
 	{},
 };
