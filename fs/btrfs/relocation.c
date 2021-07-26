@@ -2912,7 +2912,7 @@ static int relocate_file_extent_cluster(struct inode *inode,
 	if (ret)
 		goto out;
 
-	file_ra_state_init(ra, inode->i_mapping);
+	file_ra_state_init(ra, inode);
 
 	ret = setup_extent_mapping(inode, cluster->start - offset,
 				   cluster->end - offset, cluster->start);

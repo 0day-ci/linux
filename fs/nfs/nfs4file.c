@@ -385,7 +385,7 @@ static struct file *__nfs42_ssc_open(struct vfsmount *ss_mnt,
 	nfs_file_set_open_context(filep, ctx);
 	put_nfs_open_context(ctx);
 
-	file_ra_state_init(&filep->f_ra, filep->f_mapping->host->i_mapping);
+	file_ra_state_init(&filep->f_ra, file_inode(filep));
 	res = filep;
 out_free_name:
 	kfree(read_name);

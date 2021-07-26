@@ -31,9 +31,9 @@
  * memset *ra to zero.
  */
 void
-file_ra_state_init(struct file_ra_state *ra, struct address_space *mapping)
+file_ra_state_init(struct file_ra_state *ra, struct inode *inode)
 {
-	ra->ra_pages = inode_to_bdi(mapping->host)->ra_pages;
+	ra->ra_pages = inode_to_bdi(inode)->ra_pages;
 	ra->prev_pos = -1;
 }
 EXPORT_SYMBOL_GPL(file_ra_state_init);

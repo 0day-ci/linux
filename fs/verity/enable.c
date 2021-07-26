@@ -66,7 +66,7 @@ static int build_merkle_tree_level(struct file *filp, unsigned int level,
 		dst_block_num = 0; /* unused */
 	}
 
-	file_ra_state_init(&ra, filp->f_mapping);
+	file_ra_state_init(&ra, inode);
 
 	for (i = 0; i < num_blocks_to_hash; i++) {
 		struct page *src_page;

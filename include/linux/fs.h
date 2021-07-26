@@ -3260,7 +3260,7 @@ extern long do_splice_direct(struct file *in, loff_t *ppos, struct file *out,
 
 
 extern void
-file_ra_state_init(struct file_ra_state *ra, struct address_space *mapping);
+file_ra_state_init(struct file_ra_state *ra, struct inode *inode);
 extern loff_t noop_llseek(struct file *file, loff_t offset, int whence);
 extern loff_t no_llseek(struct file *file, loff_t offset, int whence);
 extern loff_t vfs_setpos(struct file *file, loff_t offset, loff_t maxsize);

@@ -1439,7 +1439,7 @@ int btrfs_defrag_file(struct inode *inode, struct file *file,
 	if (!file) {
 		ra = kzalloc(sizeof(*ra), GFP_KERNEL);
 		if (ra)
-			file_ra_state_init(ra, inode->i_mapping);
+			file_ra_state_init(ra, inode);
 	} else {
 		ra = &file->f_ra;
 	}

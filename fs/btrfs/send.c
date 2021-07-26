@@ -4956,7 +4956,7 @@ static int put_file_data(struct send_ctx *sctx, u64 offset, u32 len)
 
 	/* initial readahead */
 	memset(&sctx->ra, 0, sizeof(struct file_ra_state));
-	file_ra_state_init(&sctx->ra, inode->i_mapping);
+	file_ra_state_init(&sctx->ra, inode);
 
 	while (index <= last_index) {
 		unsigned cur_len = min_t(unsigned, len,

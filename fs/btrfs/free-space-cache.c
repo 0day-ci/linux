@@ -351,7 +351,7 @@ static void readahead_cache(struct inode *inode)
 	if (!ra)
 		return;
 
-	file_ra_state_init(ra, inode->i_mapping);
+	file_ra_state_init(ra, inode);
 	last_index = (i_size_read(inode) - 1) >> PAGE_SHIFT;
 
 	page_cache_sync_readahead(inode->i_mapping, ra, NULL, 0, last_index);
