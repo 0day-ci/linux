@@ -482,7 +482,7 @@ static enum resp_states check_rkey(struct rxe_qp *qp,
 		rxe_drop_ref(mw);
 		rxe_add_ref(mr);
 	} else {
-		mr = lookup_mr(qp->pd, access, rkey, RXE_LOOKUP_REMOTE);
+		mr = lookup_mr(rxe_qp_pd(qp), access, rkey, RXE_LOOKUP_REMOTE);
 		if (!mr) {
 			pr_err("%s: no MR matches rkey %#x\n", __func__, rkey);
 			state = RESPST_ERR_RKEY_VIOLATION;
@@ -535,7 +535,7 @@ static enum resp_states send_data_in(struct rxe_qp *qp, void *data_addr,
 {
 	int err;
 
-	err = copy_data(qp->pd, IB_ACCESS_LOCAL_WRITE, &qp->resp.wqe->dma,
+	err = copy_data(rxe_qp_pd(qp), IB_ACCESS_LOCAL_WRITE, &qp->resp.wqe->dma,
 			data_addr, data_len, RXE_TO_MR_OBJ);
 	if (unlikely(err))
 		return (err == -ENOSPC) ? RESPST_ERR_LENGTH

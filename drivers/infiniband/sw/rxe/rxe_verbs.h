@@ -46,7 +46,6 @@ struct rxe_pd {
 struct rxe_ah {
 	struct ib_ah		ibah;
 	struct rxe_pool_entry	pelem;
-	struct rxe_pd		*pd;
 	struct rxe_av		av;
 };
 
@@ -97,7 +96,6 @@ struct rxe_rq {
 struct rxe_srq {
 	struct ib_srq		ibsrq;
 	struct rxe_pool_entry	pelem;
-	struct rxe_pd		*pd;
 	struct rxe_rq		rq;
 	u32			srq_num;
 	bool			is_user;
@@ -217,7 +215,6 @@ struct rxe_qp {
 	unsigned int		mtu;
 	bool			is_user;
 
-	struct rxe_pd		*pd;
 	struct rxe_srq		*srq;
 	struct rxe_cq		*scq;
 	struct rxe_cq		*rcq;
@@ -469,17 +466,22 @@ static inline struct rxe_mw *to_rmw(struct ib_mw *mw)
 	return mw ? container_of(mw, struct rxe_mw, ibmw) : NULL;
 }
 
-static inline struct rxe_pd *mr_pd(struct rxe_mr *mr)
+static inline struct rxe_pd *rxe_ah_pd(struct rxe_ah *ah)
+{
+	return to_rpd(ah->ibah.pd);
+}
+
+static inline struct rxe_pd *rxe_mr_pd(struct rxe_mr *mr)
 {
 	return to_rpd(mr->ibmr.pd);
 }
 
-static inline u32 mr_lkey(struct rxe_mr *mr)
+static inline u32 rxe_mr_lkey(struct rxe_mr *mr)
 {
 	return mr->ibmr.lkey;
 }
 
-static inline u32 mr_rkey(struct rxe_mr *mr)
+static inline u32 rxe_mr_rkey(struct rxe_mr *mr)
 {
 	return mr->ibmr.rkey;
 }
@@ -492,6 +494,16 @@ static inline struct rxe_pd *rxe_mw_pd(struct rxe_mw *mw)
 static inline u32 rxe_mw_rkey(struct rxe_mw *mw)
 {
 	return mw->ibmw.rkey;
+}
+
+static inline struct rxe_pd *rxe_qp_pd(struct rxe_qp *qp)
+{
+	return to_rpd(qp->ibqp.pd);
+}
+
+static inline struct rxe_pd *rxe_srq_pd(struct rxe_srq *srq)
+{
+	return to_rpd(srq->ibsrq.pd);
 }
 
 int rxe_register_device(struct rxe_dev *rxe, const char *ibdev_name);

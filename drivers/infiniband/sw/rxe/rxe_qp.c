@@ -328,10 +328,9 @@ static int rxe_qp_init_resp(struct rxe_dev *rxe, struct rxe_qp *qp,
 }
 
 /* called by the create qp verb */
-int rxe_qp_from_init(struct rxe_dev *rxe, struct rxe_qp *qp, struct rxe_pd *pd,
+int rxe_qp_from_init(struct rxe_dev *rxe, struct rxe_qp *qp,
 		     struct ib_qp_init_attr *init,
 		     struct rxe_create_qp_resp __user *uresp,
-		     struct ib_pd *ibpd,
 		     struct ib_udata *udata)
 {
 	int err;
@@ -339,13 +338,11 @@ int rxe_qp_from_init(struct rxe_dev *rxe, struct rxe_qp *qp, struct rxe_pd *pd,
 	struct rxe_cq *scq = to_rcq(init->send_cq);
 	struct rxe_srq *srq = init->srq ? to_rsrq(init->srq) : NULL;
 
-	rxe_add_ref(pd);
 	rxe_add_ref(rcq);
 	rxe_add_ref(scq);
 	if (srq)
 		rxe_add_ref(srq);
 
-	qp->pd			= pd;
 	qp->rcq			= rcq;
 	qp->scq			= scq;
 	qp->srq			= srq;
@@ -368,7 +365,6 @@ int rxe_qp_from_init(struct rxe_dev *rxe, struct rxe_qp *qp, struct rxe_pd *pd,
 err2:
 	rxe_queue_cleanup(qp->sq.queue);
 err1:
-	qp->pd = NULL;
 	qp->rcq = NULL;
 	qp->scq = NULL;
 	qp->srq = NULL;
@@ -377,7 +373,6 @@ err1:
 		rxe_drop_ref(srq);
 	rxe_drop_ref(scq);
 	rxe_drop_ref(rcq);
-	rxe_drop_ref(pd);
 
 	return err;
 }
@@ -821,8 +816,6 @@ static void rxe_qp_do_cleanup(struct work_struct *work)
 		rxe_drop_ref(qp->scq);
 	if (qp->rcq)
 		rxe_drop_ref(qp->rcq);
-	if (qp->pd)
-		rxe_drop_ref(qp->pd);
 
 	if (qp->resp.mr) {
 		rxe_drop_ref(qp->resp.mr);

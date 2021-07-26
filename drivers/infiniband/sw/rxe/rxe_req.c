@@ -481,7 +481,7 @@ static int finish_packet(struct rxe_qp *qp, struct rxe_send_wqe *wqe,
 			wqe->dma.resid -= paylen;
 			wqe->dma.sge_offset += paylen;
 		} else {
-			err = copy_data(qp->pd, 0, &wqe->dma,
+			err = copy_data(rxe_qp_pd(qp), 0, &wqe->dma,
 					payload_addr(pkt), paylen,
 					RXE_FROM_MR_OBJ);
 			if (err)

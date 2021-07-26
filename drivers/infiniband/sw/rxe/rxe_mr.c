@@ -500,9 +500,9 @@ struct rxe_mr *lookup_mr(struct rxe_pd *pd, int access, u32 key,
 	if (!mr)
 		return NULL;
 
-	if (unlikely((type == RXE_LOOKUP_LOCAL && mr_lkey(mr) != key) ||
-		     (type == RXE_LOOKUP_REMOTE && mr_rkey(mr) != key) ||
-		     mr_pd(mr) != pd || (access && !(access & mr->access)) ||
+	if (unlikely((type == RXE_LOOKUP_LOCAL && rxe_mr_lkey(mr) != key) ||
+		     (type == RXE_LOOKUP_REMOTE && rxe_mr_rkey(mr) != key) ||
+		     rxe_mr_pd(mr) != pd || (access && !(access & mr->access)) ||
 		     mr->state != RXE_MR_STATE_VALID)) {
 		rxe_drop_ref(mr);
 		mr = NULL;
@@ -558,7 +558,7 @@ int rxe_dereg_mr(struct ib_mr *ibmr, struct ib_udata *udata)
 	}
 
 	mr->state = RXE_MR_STATE_ZOMBIE;
-	rxe_drop_ref(mr_pd(mr));
+	rxe_drop_ref(rxe_mr_pd(mr));
 	rxe_drop_index(mr);
 	rxe_drop_ref(mr);
 

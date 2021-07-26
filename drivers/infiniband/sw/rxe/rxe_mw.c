@@ -8,17 +8,12 @@
 int rxe_alloc_mw(struct ib_mw *ibmw, struct ib_udata *udata)
 {
 	struct rxe_mw *mw = to_rmw(ibmw);
-	struct rxe_pd *pd = to_rpd(ibmw->pd);
 	struct rxe_dev *rxe = to_rdev(ibmw->device);
 	int ret;
 
-	rxe_add_ref(pd);
-
 	ret = rxe_add_to_pool(&rxe->mw_pool, mw);
-	if (ret) {
-		rxe_drop_ref(pd);
+	if (ret)
 		return ret;
-	}
 
 	rxe_add_index(mw);
 	ibmw->rkey = (mw->pelem.index << 8) | rxe_get_next_key(-1);
@@ -55,7 +50,6 @@ static void rxe_do_dealloc_mw(struct rxe_mw *mw)
 int rxe_dealloc_mw(struct ib_mw *ibmw)
 {
 	struct rxe_mw *mw = to_rmw(ibmw);
-	struct rxe_pd *pd = to_rpd(ibmw->pd);
 	unsigned long flags;
 
 	spin_lock_irqsave(&mw->lock, flags);
@@ -63,7 +57,6 @@ int rxe_dealloc_mw(struct ib_mw *ibmw)
 	spin_unlock_irqrestore(&mw->lock, flags);
 
 	rxe_drop_ref(mw);
-	rxe_drop_ref(pd);
 
 	return 0;
 }
@@ -94,7 +87,7 @@ static int rxe_check_bind_mw(struct rxe_qp *qp, struct rxe_send_wqe *wqe,
 		}
 
 		/* C10-72 */
-		if (unlikely(qp->pd != to_rpd(mw->ibmw.pd))) {
+		if (unlikely(rxe_qp_pd(qp) != rxe_mw_pd(mw))) {
 			pr_err_once(
 				"attempt to bind type 2 MW with qp with different PD\n");
 			return -EINVAL;
@@ -108,7 +101,7 @@ static int rxe_check_bind_mw(struct rxe_qp *qp, struct rxe_send_wqe *wqe,
 		}
 	}
 
-	if (unlikely((wqe->wr.wr.mw.rkey & 0xff) == (mw->ibmw.rkey & 0xff))) {
+	if (unlikely((wqe->wr.wr.mw.rkey & 0xff) == (rxe_mw_rkey(mw) & 0xff))) {
 		pr_err_once("attempt to bind MW with same key\n");
 		return -EINVAL;
 	}
@@ -164,7 +157,7 @@ static void rxe_do_bind_mw(struct rxe_qp *qp, struct rxe_send_wqe *wqe,
 	u32 rkey;
 	u32 new_rkey;
 
-	rkey = mw->ibmw.rkey;
+	rkey = rxe_mw_rkey(mw);
 	new_rkey = (rkey & 0xffffff00) | (wqe->wr.wr.mw.rkey & 0x000000ff);
 
 	mw->ibmw.rkey = new_rkey;
@@ -206,7 +199,7 @@ int rxe_bind_mw(struct rxe_qp *qp, struct rxe_send_wqe *wqe)
 		goto err;
 	}
 
-	if (unlikely(mw->ibmw.rkey != wqe->wr.wr.mw.mw_rkey)) {
+	if (unlikely(rxe_mw_rkey(mw) != wqe->wr.wr.mw.mw_rkey)) {
 		ret = -EINVAL;
 		goto err_drop_mw;
 	}
@@ -219,7 +212,7 @@ int rxe_bind_mw(struct rxe_qp *qp, struct rxe_send_wqe *wqe)
 			goto err_drop_mw;
 		}
 
-		if (unlikely(mr->ibmr.lkey != wqe->wr.wr.mw.mr_lkey)) {
+		if (unlikely(rxe_mr_lkey(mr) != wqe->wr.wr.mw.mr_lkey)) {
 			ret = -EINVAL;
 			goto err_drop_mr;
 		}
@@ -289,12 +282,12 @@ int rxe_invalidate_mw(struct rxe_qp *qp, u32 rkey)
 	mw = rxe_pool_get_index(&rxe->mw_pool, rkey >> 8);
 	if (!mw) {
 		ret = -EINVAL;
-		goto err;
+		goto err_out;
 	}
 
-	if (rkey != mw->ibmw.rkey) {
+	if (rkey != rxe_mw_rkey(mw)) {
 		ret = -EINVAL;
-		goto err_drop_ref;
+		goto err_drop_mw_ref;
 	}
 
 	spin_lock_irqsave(&mw->lock, flags);
@@ -306,16 +299,16 @@ int rxe_invalidate_mw(struct rxe_qp *qp, u32 rkey)
 	rxe_do_invalidate_mw(mw);
 err_unlock:
 	spin_unlock_irqrestore(&mw->lock, flags);
-err_drop_ref:
+err_drop_mw_ref:
 	rxe_drop_ref(mw);
-err:
+err_out:
 	return ret;
 }
 
 struct rxe_mw *rxe_lookup_mw(struct rxe_qp *qp, int access, u32 rkey)
 {
 	struct rxe_dev *rxe = to_rdev(qp->ibqp.device);
-	struct rxe_pd *pd = to_rpd(qp->ibqp.pd);
+	struct rxe_pd *pd = rxe_qp_pd(qp);
 	struct rxe_mw *mw;
 	int index = rkey >> 8;
 
