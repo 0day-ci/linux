@@ -83,12 +83,16 @@ static int nf_br_ip_fragment(struct net *net, struct sock *sk,
 
 			skb->tstamp = tstamp;
 			err = output(net, sk, data, skb);
-			if (err || !iter.frag)
-				break;
+			if (err) {
+				kfree_skb_list(iter.frag);
+				return err;
+			}
+
+			if (!iter.frag)
+				return 0;
 
 			skb = ip_fraglist_next(&iter);
 		}
-		return err;
 	}
 slow_path:
 	/* This is a linearized skbuff, the original geometry is lost for us.
