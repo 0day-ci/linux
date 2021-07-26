@@ -240,4 +240,6 @@ static inline bool kvm_memslots_have_rmaps(struct kvm *kvm)
 	return smp_load_acquire(&kvm->arch.memslots_have_rmaps);
 }
 
+void kvm_update_page_stats(struct kvm *kvm, int level, int count);
+
 #endif
