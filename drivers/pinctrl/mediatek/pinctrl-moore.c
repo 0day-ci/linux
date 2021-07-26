@@ -35,6 +35,19 @@ static const struct pin_config_item mtk_conf_items[] = {
 };
 #endif
 
+static int mtk_pin_desc_lookup(struct mtk_pinctrl *hw, int pin)
+{
+	int idx;
+
+	for (idx = 0 ; idx < hw->soc->npins ; idx++)
+		if (hw->soc->pins[idx].number == pin)
+			break;
+	if (idx < hw->soc->npins)
+		return idx;
+
+	return -EINVAL;
+}
+
 static int mtk_pinmux_set_mux(struct pinctrl_dev *pctldev,
 			      unsigned int selector, unsigned int group)
 {
@@ -74,6 +87,13 @@ static int mtk_pinmux_gpio_request_enable(struct pinctrl_dev *pctldev,
 {
 	struct mtk_pinctrl *hw = pinctrl_dev_get_drvdata(pctldev);
 	const struct mtk_pin_desc *desc;
+	int err;
+
+	err = mtk_pin_desc_lookup(hw, pin);
+	if (err >= 0)
+		pin = err;
+	else
+		return err;
 
 	desc = (const struct mtk_pin_desc *)&hw->soc->pins[pin];
 
@@ -87,6 +107,13 @@ static int mtk_pinmux_gpio_set_direction(struct pinctrl_dev *pctldev,
 {
 	struct mtk_pinctrl *hw = pinctrl_dev_get_drvdata(pctldev);
 	const struct mtk_pin_desc *desc;
+	int err;
+
+	err = mtk_pin_desc_lookup(hw, pin);
+	if (err >= 0)
+		pin = err;
+	else
+		return err;
 
 	desc = (const struct mtk_pin_desc *)&hw->soc->pins[pin];
 
@@ -101,6 +128,12 @@ static int mtk_pinconf_get(struct pinctrl_dev *pctldev,
 	u32 param = pinconf_to_config_param(*config);
 	int val, val2, err, reg, ret = 1;
 	const struct mtk_pin_desc *desc;
+
+	err = mtk_pin_desc_lookup(hw, pin);
+	if (err >= 0)
+		pin = err;
+	else
+		return err;
 
 	desc = (const struct mtk_pin_desc *)&hw->soc->pins[pin];
 
@@ -216,6 +249,12 @@ static int mtk_pinconf_set(struct pinctrl_dev *pctldev, unsigned int pin,
 	const struct mtk_pin_desc *desc;
 	u32 reg, param, arg;
 	int cfg, err = 0;
+
+	err = mtk_pin_desc_lookup(hw, pin);
+	if (err >= 0)
+		pin = err;
+	else
+		return err;
 
 	desc = (const struct mtk_pin_desc *)&hw->soc->pins[pin];
 
@@ -434,6 +473,12 @@ static int mtk_gpio_get(struct gpio_chip *chip, unsigned int gpio)
 	const struct mtk_pin_desc *desc;
 	int value, err;
 
+	err = mtk_pin_desc_lookup(hw, gpio);
+	if (err >= 0)
+		gpio = err;
+	else
+		return err;
+
 	desc = (const struct mtk_pin_desc *)&hw->soc->pins[gpio];
 
 	err = mtk_hw_get_value(hw, desc, PINCTRL_PIN_REG_DI, &value);
@@ -447,6 +492,15 @@ static void mtk_gpio_set(struct gpio_chip *chip, unsigned int gpio, int value)
 {
 	struct mtk_pinctrl *hw = gpiochip_get_data(chip);
 	const struct mtk_pin_desc *desc;
+	int err;
+
+	err = mtk_pin_desc_lookup(hw, gpio);
+	if (err >= 0) {
+		gpio = err;
+	} else {
+		dev_err(hw->dev, "Failed to set gpio %d\n", gpio);
+		return;
+	}
 
 	desc = (const struct mtk_pin_desc *)&hw->soc->pins[gpio];
 
@@ -488,6 +542,13 @@ static int mtk_gpio_set_config(struct gpio_chip *chip, unsigned int offset,
 	struct mtk_pinctrl *hw = gpiochip_get_data(chip);
 	const struct mtk_pin_desc *desc;
 	u32 debounce;
+	int err;
+
+	err = mtk_pin_desc_lookup(hw, offset);
+	if (err >= 0)
+		offset = err;
+	else
+		return err;
 
 	desc = (const struct mtk_pin_desc *)&hw->soc->pins[offset];
 
