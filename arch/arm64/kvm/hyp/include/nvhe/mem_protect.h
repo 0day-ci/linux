@@ -49,6 +49,7 @@ extern struct host_kvm host_kvm;
 
 int __pkvm_prot_finalize(void);
 int __pkvm_mark_hyp(phys_addr_t start, phys_addr_t end);
+int __pkvm_host_share_hyp(u64 pfn);
 
 int host_stage2_idmap_locked(u64 start, u64 end, enum kvm_pgtable_prot prot);
 int kvm_host_prepare_stage2(void *pgt_pool_base);
