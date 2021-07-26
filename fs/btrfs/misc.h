@@ -10,6 +10,10 @@
 
 #define in_range(b, first, len) ((b) >= (first) && (b) < (first) + (len))
 
+#define page_to_fs_info(page)	(BTRFS_I((page)->mapping->host)->root->fs_info)
+#define page_to_inode(page)	(BTRFS_I((page)->mapping->host))
+#define bio_to_fs_info(bio)	(page_to_fs_info(bio_first_page_all(bio)))
+
 static inline void cond_wake_up(struct wait_queue_head *wq)
 {
 	/*
