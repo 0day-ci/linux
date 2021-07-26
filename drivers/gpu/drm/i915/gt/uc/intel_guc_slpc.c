@@ -392,6 +392,20 @@ int intel_guc_slpc_get_min_freq(struct intel_guc_slpc *slpc, u32 *val)
 	return ret;
 }
 
+void intel_guc_pm_intrmsk_enable(struct intel_gt *gt)
+{
+	u32 pm_intrmsk_mbz = 0;
+
+	/* Allow GuC to receive ARAT timer expiry event.
+	 * This interrupt register is setup by RPS code
+	 * when host based Turbo is enabled.
+	 */
+	pm_intrmsk_mbz |= ARAT_EXPIRED_INTRMSK;
+
+	intel_uncore_rmw(gt->uncore,
+			   GEN6_PMINTRMSK, pm_intrmsk_mbz, 0);
+}
+
 /*
  * intel_guc_slpc_enable() - Start SLPC
  * @slpc: pointer to intel_guc_slpc.
@@ -438,6 +452,8 @@ int intel_guc_slpc_enable(struct intel_guc_slpc *slpc)
 	drm_info(&i915->drm, "GuC SLPC: enabled\n");
 
 	slpc_query_task_state(slpc);
+
+	intel_guc_pm_intrmsk_enable(&i915->gt);
 
 	/* min and max frequency limits being used by SLPC */
 	drm_info(&i915->drm, "SLPC min freq: %u Mhz, max is %u Mhz\n",
