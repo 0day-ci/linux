@@ -33,11 +33,11 @@ static int bpf_find_map(const char *test, struct bpf_object *obj,
 
 int main(int argc, char **argv)
 {
-	struct percpu_net_cnt *percpu_netcnt;
+	struct percpu_net_cnt *percpu_netcnt = NULL;
 	struct bpf_cgroup_storage_key key;
+	struct net_cnt *netcnt = NULL;
 	int map_fd, percpu_map_fd;
 	int error = EXIT_FAILURE;
-	struct net_cnt netcnt;
 	struct bpf_object *obj;
 	int prog_fd, cgroup_fd;
 	unsigned long packets;
@@ -49,6 +49,12 @@ int main(int argc, char **argv)
 	percpu_netcnt = malloc(sizeof(*percpu_netcnt) * nproc);
 	if (!percpu_netcnt) {
 		printf("Not enough memory for per-cpu area (%d cpus)\n", nproc);
+		goto err;
+	}
+
+	netcnt = malloc(sizeof(*netcnt));
+	if (!netcnt) {
+		printf("Not enough memory for non-per-cpu area\n");
 		goto err;
 	}
 
@@ -96,7 +102,7 @@ int main(int argc, char **argv)
 		goto err;
 	}
 
-	if (bpf_map_lookup_elem(map_fd, &key, &netcnt)) {
+	if (bpf_map_lookup_elem(map_fd, &key, netcnt)) {
 		printf("Failed to lookup cgroup storage\n");
 		goto err;
 	}
@@ -109,8 +115,8 @@ int main(int argc, char **argv)
 	/* Some packets can be still in per-cpu cache, but not more than
 	 * MAX_PERCPU_PACKETS.
 	 */
-	packets = netcnt.packets;
-	bytes = netcnt.bytes;
+	packets = netcnt->packets;
+	bytes = netcnt->bytes;
 	for (cpu = 0; cpu < nproc; cpu++) {
 		if (percpu_netcnt[cpu].packets > MAX_PERCPU_PACKETS) {
 			printf("Unexpected percpu value: %llu\n",
@@ -141,6 +147,7 @@ int main(int argc, char **argv)
 
 err:
 	cleanup_cgroup_environment();
+	free(netcnt);
 	free(percpu_netcnt);
 
 out:
