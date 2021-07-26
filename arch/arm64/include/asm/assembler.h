@@ -614,6 +614,10 @@ alternative_endif
 	 */
 	orr	\pte, \phys, \phys, lsr #36
 	and	\pte, \pte, #PTE_ADDR_MASK
+#elif defined(CONFIG_ARM64_PA_BITS_52_LPA2)
+	orr	\pte, \phys, \phys, lsr #42
+	and	\pte, \pte, #PTE_ADDR_MASK | GENMASK(PAGE_SHIFT - 1, 10)
+	and	\pte, \pte, #~GENMASK(PAGE_SHIFT - 1, 10)
 #else  /* !CONFIG_ARM64_PA_BITS_52_LPA */
 	mov	\pte, \phys
 #endif /* CONFIG_ARM64_PA_BITS_52_LPA */
@@ -621,9 +625,13 @@ alternative_endif
 
 	.macro	pte_to_phys, phys, pte
 #ifdef CONFIG_ARM64_PA_BITS_52_LPA
-	ubfiz	\phys, \pte, #(48 - 16 - 12), #16
-	bfxil	\phys, \pte, #16, #32
-	lsl	\phys, \phys, #16
+	ubfiz	\phys, \pte, #(48 - PAGE_SHIFT - 12), #16
+	bfxil	\phys, \pte, #PAGE_SHIFT, #(48 - PAGE_SHIFT)
+	lsl	\phys, \phys, #PAGE_SHIFT
+#elif defined(CONFIG_ARM64_PA_BITS_52_LPA2)
+	ubfiz	\phys, \pte, #(52 - PAGE_SHIFT - 10), #10
+	bfxil	\phys, \pte, #PAGE_SHIFT, #(50 - PAGE_SHIFT)
+	lsl	\phys, \phys, #PAGE_SHIFT
 #else  /* !CONFIG_ARM64_PA_BITS_52_LPA */
 	and	\phys, \pte, #PTE_ADDR_MASK
 #endif /* CONFIG_ARM64_PA_BITS_52_LPA */
