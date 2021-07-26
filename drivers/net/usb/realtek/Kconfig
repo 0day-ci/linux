@@ -1,0 +1,33 @@
+# SPDX-License-Identifier: GPL-2.0-only
+#
+# Reatlek USB Network devices configuration
+#
+config USB_RTL8150
+	tristate "USB RTL8150 based ethernet device support"
+	select MII
+	help
+	  Say Y here if you have RTL8150 based usb-ethernet adapter.
+	  Send me <petkan@users.sourceforge.net> any comments you may have.
+	  You can also check for updates at <http://pegasus2.sourceforge.net/>.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called rtl8150.
+
+config USB_RTL8152
+	tristate "Realtek RTL8152/RTL8153 Based USB Ethernet Adapters"
+	select MII
+	help
+	  This option adds support for Realtek RTL8152 based USB 2.0
+	  10/100 Ethernet adapters and RTL8153 based USB 3.0 10/100/1000
+	  Ethernet adapters.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called r8152.
+
+config USB_RTL8153_ECM
+	tristate "RTL8153 ECM support"
+	depends on USB_NET_CDCETHER && (USB_RTL8152 || USB_RTL8152=n)
+	help
+	  This option supports ECM mode for RTL8153 ethernet adapter, when
+	  CONFIG_USB_RTL8152 is not set, or the RTL8153 device is not
+	  supported by r8152 driver.
