@@ -3,6 +3,7 @@
 #include <linux/kvm_host.h>
 #include <asm/asm-prototypes.h>
 #include <asm/dbell.h>
+#include <asm/interrupt.h>
 #include <asm/kvm_ppc.h>
 #include <asm/pmc.h>
 #include <asm/ppc-opcode.h>
@@ -927,7 +928,36 @@ tm_return_to_guest:
 		kvmppc_realmode_machine_check(vcpu);
 
 	} else if (unlikely(trap == BOOK3S_INTERRUPT_HMI)) {
-		kvmppc_realmode_hmi_handler();
+		/*
+		 * Unapply and clear the offset first. That way, if the TB
+		 * was fine then no harm done, if it is corrupted then the
+		 * HMI resync will bring it back to host mode. This way, we
+		 * don't need to actualy know whether not OPAL resynced the
+		 * timebase. Although it would be cleaner if we could rely
+		 * on that, early POWER9 OPAL did not support the
+		 * OPAL_HANDLE_HMI2 call.
+		 */
+		if (vc->tb_offset_applied) {
+			u64 new_tb = mftb() - vc->tb_offset_applied;
+			mtspr(SPRN_TBU40, new_tb);
+			if ((mftb() & 0xffffff) < (new_tb & 0xffffff)) {
+				new_tb += 0x1000000;
+				mtspr(SPRN_TBU40, new_tb);
+			}
+			vc->tb_offset_applied = 0;
+		}
+
+		hmi_exception_realmode(NULL);
+
+		if (vc->tb_offset) {
+			u64 new_tb = mftb() + vc->tb_offset;
+			mtspr(SPRN_TBU40, new_tb);
+			if ((mftb() & 0xffffff) < (new_tb & 0xffffff)) {
+				new_tb += 0x1000000;
+				mtspr(SPRN_TBU40, new_tb);
+			}
+			vc->tb_offset_applied = vc->tb_offset;
+		}
 
 	} else if (trap == BOOK3S_INTERRUPT_H_EMUL_ASSIST) {
 		vcpu->arch.emul_inst = mfspr(SPRN_HEIR);
