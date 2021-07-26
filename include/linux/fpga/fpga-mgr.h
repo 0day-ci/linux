@@ -10,6 +10,7 @@
 
 #include <linux/mutex.h>
 #include <linux/platform_device.h>
+#include <linux/uuid.h>
 
 struct fpga_manager;
 struct sg_table;
@@ -144,14 +145,19 @@ struct fpga_manager_ops {
 #define FPGA_MGR_STATUS_FIFO_OVERFLOW_ERR	BIT(4)
 
 /**
- * struct fpga_compat_id - id for compatibility check
- *
+ * union fpga_compat_id - id for compatibility check
+ * Can be accessed as either:
+ * @uuid: the base uuid_t type
+ * or
  * @id_h: high 64bit of the compat_id
  * @id_l: low 64bit of the compat_id
  */
-struct fpga_compat_id {
-	u64 id_h;
-	u64 id_l;
+union fpga_compat_id {
+	uuid_t uuid;
+	struct {
+		u64 id_h;
+		u64 id_l;
+	};
 };
 
 /**
@@ -169,7 +175,7 @@ struct fpga_manager {
 	struct device dev;
 	struct mutex ref_mutex;
 	enum fpga_mgr_states state;
-	struct fpga_compat_id *compat_id;
+	union fpga_compat_id *compat_id;
 	const struct fpga_manager_ops *mops;
 	void *priv;
 };

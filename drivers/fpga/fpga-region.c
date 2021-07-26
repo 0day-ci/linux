@@ -166,9 +166,7 @@ static ssize_t compat_id_show(struct device *dev,
 	if (!region->compat_id)
 		return -ENOENT;
 
-	return sprintf(buf, "%016llx%016llx\n",
-		       (unsigned long long)region->compat_id->id_h,
-		       (unsigned long long)region->compat_id->id_l);
+	return sprintf(buf, "%pU\n", &region->compat_id->uuid);
 }
 
 static DEVICE_ATTR_RO(compat_id);

@@ -273,16 +273,16 @@ static const struct fpga_manager_ops fme_mgr_ops = {
 };
 
 static void fme_mgr_get_compat_id(void __iomem *fme_pr,
-				  struct fpga_compat_id *id)
+				  union fpga_compat_id *id)
 {
-	id->id_l = readq(fme_pr + FME_PR_INTFC_ID_L);
-	id->id_h = readq(fme_pr + FME_PR_INTFC_ID_H);
+	id->id_l = cpu_to_be64(readq(fme_pr + FME_PR_INTFC_ID_L));
+	id->id_h = cpu_to_be64(readq(fme_pr + FME_PR_INTFC_ID_H));
 }
 
 static int fme_mgr_probe(struct platform_device *pdev)
 {
 	struct dfl_fme_mgr_pdata *pdata = dev_get_platdata(&pdev->dev);
-	struct fpga_compat_id *compat_id;
+	union fpga_compat_id *compat_id;
 	struct device *dev = &pdev->dev;
 	struct fme_mgr_priv *priv;
 	struct fpga_manager *mgr;
