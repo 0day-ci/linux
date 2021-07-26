@@ -6203,7 +6203,7 @@ static int select_idle_cpu(struct task_struct *p, struct sched_domain *sd, bool 
 
 	cpumask_and(cpus, sched_domain_span(sd), p->cpus_ptr);
 
-	if (sched_feat(SIS_PROP) && !has_idle_core) {
+	if (sched_feat(SIS_PROP)) {
 		u64 avg_cost, avg_idle, span_avg;
 		unsigned long now = jiffies;
 
@@ -6236,30 +6236,35 @@ static int select_idle_cpu(struct task_struct *p, struct sched_domain *sd, bool 
 		if (has_idle_core) {
 			i = select_idle_core(p, cpu, cpus, &idle_cpu);
 			if ((unsigned int)i < nr_cpumask_bits)
-				return i;
+				break;
 
+			nr -= sched_smt_weight;
 		} else {
-			if (!--nr)
-				return -1;
 			idle_cpu = __select_idle_cpu(cpu, p);
 			if ((unsigned int)idle_cpu < nr_cpumask_bits)
 				break;
+			nr--;
 		}
+
+		if (nr < 0)
+			break;
 	}
 
-	if (has_idle_core)
-		set_idle_cores(target, false);
+	if ((unsigned int)idle_cpu < nr_cpumask_bits) {
+		if (has_idle_core)
+			set_idle_cores(target, false);
 
-	if (sched_feat(SIS_PROP) && !has_idle_core) {
-		time = cpu_clock(this) - time;
+		if (sched_feat(SIS_PROP)) {
+			time = cpu_clock(this) - time;
 
-		/*
-		 * Account for the scan cost of wakeups against the average
-		 * idle time.
-		 */
-		this_rq->wake_avg_idle -= min(this_rq->wake_avg_idle, time);
+			/*
+			 * Account for the scan cost of wakeups against the average
+			 * idle time.
+			 */
+			this_rq->wake_avg_idle -= min(this_rq->wake_avg_idle, time);
 
-		update_avg(&this_sd->avg_scan_cost, time);
+			update_avg(&this_sd->avg_scan_cost, time);
+		}
 	}
 
 	return idle_cpu;
