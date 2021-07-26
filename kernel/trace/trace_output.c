@@ -1457,9 +1457,8 @@ __init static int init_events(void)
 
 		ret = register_trace_event(event);
 		if (!ret) {
-			printk(KERN_WARNING "event %d failed to register\n",
-			       event->type);
-			WARN_ON_ONCE(1);
+			WARN_ONCE(1, "event %d failed to register\n",
+				  event->type);
 		}
 	}
 
