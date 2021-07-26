@@ -155,13 +155,14 @@
 #define PTE_PXN			(_AT(pteval_t, 1) << 53)	/* Privileged XN */
 #define PTE_UXN			(_AT(pteval_t, 1) << 54)	/* User XN */
 
+#ifdef CONFIG_ARM64_PA_BITS_52_LPA
 #define PTE_ADDR_LOW		(((_AT(pteval_t, 1) << (48 - PAGE_SHIFT)) - 1) << PAGE_SHIFT)
-#ifdef CONFIG_ARM64_PA_BITS_52
 #define PTE_ADDR_HIGH		(_AT(pteval_t, 0xf) << 12)
 #define PTE_ADDR_MASK		(PTE_ADDR_LOW | PTE_ADDR_HIGH)
-#else
+#else  /* !CONFIG_ARM64_PA_BITS_52_LPA */
+#define PTE_ADDR_LOW		(((_AT(pteval_t, 1) << (48 - PAGE_SHIFT)) - 1) << PAGE_SHIFT)
 #define PTE_ADDR_MASK		PTE_ADDR_LOW
-#endif
+#endif /* CONFIG_ARM64_PA_BITS_52_LPA */
 
 /*
  * AttrIndx[2:0] encoding (mapping attributes defined in the MAIR* registers).

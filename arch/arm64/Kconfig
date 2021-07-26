@@ -941,6 +941,12 @@ config ARM64_VA_BITS
 	default 48 if ARM64_VA_BITS_48
 	default 52 if ARM64_VA_BITS_52
 
+config ARM64_PA_BITS_52_LPA
+	bool
+
+config ARM64_PA_BITS_52_LPA2
+	bool
+
 choice
 	prompt "Physical address space size"
 	default ARM64_PA_BITS_48
@@ -955,6 +961,7 @@ config ARM64_PA_BITS_52
 	bool "52-bit (ARMv8.2)"
 	depends on ARM64_64K_PAGES
 	depends on ARM64_PAN || !ARM64_SW_TTBR0_PAN
+	select ARM64_PA_BITS_52_LPA if ARM64_64K_PAGES
 	help
 	  Enable support for a 52-bit physical address space, introduced as
 	  part of the ARMv8.2-LPA extension.
