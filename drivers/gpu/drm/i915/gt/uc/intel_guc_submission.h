@@ -25,11 +25,20 @@ void intel_guc_submission_print_info(struct intel_guc *guc,
 				     struct drm_printer *p);
 void intel_guc_submission_print_context_info(struct intel_guc *guc,
 					     struct drm_printer *p);
+void intel_guc_dump_active_requests(struct intel_engine_cs *engine,
+				    struct i915_request *hung_rq,
+				    struct drm_printer *m);
+
+bool intel_guc_virtual_engine_has_heartbeat(const struct intel_engine_cs *ve);
+
+int intel_guc_wait_for_pending_msg(struct intel_guc *guc,
+				   atomic_t *wait_var,
+				   bool interruptible,
+				   long timeout);
 
 static inline bool intel_guc_submission_is_supported(struct intel_guc *guc)
 {
-	/* XXX: GuC submission is unavailable for now */
-	return false;
+	return guc->submission_supported;
 }
 
 static inline bool intel_guc_submission_is_wanted(struct intel_guc *guc)

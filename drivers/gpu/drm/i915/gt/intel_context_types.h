@@ -13,12 +13,14 @@
 #include <linux/types.h>
 
 #include "i915_active_types.h"
+#include "i915_sw_fence.h"
 #include "i915_utils.h"
 #include "intel_engine_types.h"
 #include "intel_sseu.h"
 
-#define CONTEXT_REDZONE POISON_INUSE
+#include "uc/intel_guc_fwif.h"
 
+#define CONTEXT_REDZONE POISON_INUSE
 DECLARE_EWMA(runtime, 3, 8);
 
 struct i915_gem_context;
@@ -35,10 +37,15 @@ struct intel_context_ops {
 
 	int (*alloc)(struct intel_context *ce);
 
+	void (*ban)(struct intel_context *ce, struct i915_request *rq);
+
 	int (*pre_pin)(struct intel_context *ce, struct i915_gem_ww_ctx *ww, void **vaddr);
 	int (*pin)(struct intel_context *ce, void *vaddr);
 	void (*unpin)(struct intel_context *ce);
 	void (*post_unpin)(struct intel_context *ce);
+
+	void (*cancel_request)(struct intel_context *ce,
+			       struct i915_request *rq);
 
 	void (*enter)(struct intel_context *ce);
 	void (*exit)(struct intel_context *ce);
@@ -47,6 +54,12 @@ struct intel_context_ops {
 
 	void (*reset)(struct intel_context *ce);
 	void (*destroy)(struct kref *kref);
+
+	/* virtual engine/context interface */
+	struct intel_context *(*create_virtual)(struct intel_engine_cs **engine,
+						unsigned int count);
+	struct intel_engine_cs *(*get_sibling)(struct intel_engine_cs *engine,
+					       unsigned int sibling);
 };
 
 struct intel_context {
@@ -156,6 +169,13 @@ struct intel_context {
 		struct list_head fences;
 	} guc_state;
 
+	struct {
+		/** lock: protects everything in guc_active */
+		spinlock_t lock;
+		/** requests: active requests on this context */
+		struct list_head requests;
+	} guc_active;
+
 	/* GuC scheduling state flags that do not require a lock. */
 	atomic_t guc_sched_state_no_lock;
 
@@ -169,6 +189,15 @@ struct intel_context {
 	 * GuC ID link - in list when unpinned but guc_id still valid in GuC
 	 */
 	struct list_head guc_id_link;
+
+	/* GuC context blocked fence */
+	struct i915_sw_fence guc_blocked;
+
+	/*
+	 * GuC priority management
+	 */
+	u8 guc_prio;
+	u32 guc_prio_count[GUC_CLIENT_PRIORITY_NUM];
 };
 
 #endif /* __INTEL_CONTEXT_TYPES__ */

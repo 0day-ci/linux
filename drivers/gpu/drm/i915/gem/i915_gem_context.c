@@ -74,7 +74,6 @@
 #include "gt/intel_context_param.h"
 #include "gt/intel_engine_heartbeat.h"
 #include "gt/intel_engine_user.h"
-#include "gt/intel_execlists_submission.h" /* virtual_engine */
 #include "gt/intel_gpu_commands.h"
 #include "gt/intel_ring.h"
 
@@ -363,9 +362,6 @@ set_proto_ctx_engines_balance(struct i915_user_extension __user *base,
 	if (!HAS_EXECLISTS(i915))
 		return -ENODEV;
 
-	if (intel_uc_uses_guc_submission(&i915->gt.uc))
-		return -ENODEV; /* not implement yet */
-
 	if (get_user(idx, &ext->engine_index))
 		return -EFAULT;
 
@@ -493,6 +489,11 @@ set_proto_ctx_engines_bond(struct i915_user_extension __user *base, void *data)
 			"Unrecognised master engine: { class:%u, instance:%u }\n",
 			ci.engine_class, ci.engine_instance);
 		return -EINVAL;
+	}
+
+	if (intel_engine_uses_guc(master)) {
+		DRM_DEBUG("bonding extension not supported with GuC submission");
+		return -ENODEV;
 	}
 
 	if (get_user(num_bonds, &ext->num_bonds))
@@ -950,8 +951,8 @@ static struct i915_gem_engines *user_engines(struct i915_gem_context *ctx,
 			break;
 
 		case I915_GEM_ENGINE_TYPE_BALANCED:
-			ce = intel_execlists_create_virtual(pe[n].siblings,
-							    pe[n].num_siblings);
+			ce = intel_engine_create_virtual(pe[n].siblings,
+							 pe[n].num_siblings);
 			break;
 
 		case I915_GEM_ENGINE_TYPE_INVALID:
@@ -1083,7 +1084,7 @@ static void kill_engines(struct i915_gem_engines *engines, bool ban)
 	for_each_gem_engine(ce, engines, it) {
 		struct intel_engine_cs *engine;
 
-		if (ban && intel_context_set_banned(ce))
+		if (ban && intel_context_ban(ce, NULL))
 			continue;
 
 		/*
