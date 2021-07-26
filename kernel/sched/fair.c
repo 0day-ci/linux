@@ -6201,7 +6201,12 @@ static int select_idle_cpu(struct task_struct *p, struct sched_domain *sd, bool 
 	if (!this_sd)
 		return -1;
 
-	cpumask_and(cpus, sched_domain_span(sd), p->cpus_ptr);
+	/*
+	 * sched_domain_shared is set only at shared cache level,
+	 * this works only because select_idle_cpu is called with
+	 * sd_llc.
+	 */
+	cpumask_and(cpus, sds_idle_cpus(sd->shared), p->cpus_ptr);
 
 	if (sched_feat(SIS_PROP)) {
 		u64 avg_cost, avg_idle, span_avg;
@@ -6988,6 +6993,45 @@ balance_fair(struct rq *rq, struct task_struct *prev, struct rq_flags *rf)
 		return 1;
 
 	return newidle_balance(rq, rf) != 0;
+}
+
+/*
+ * Update cpu idle state and record this information
+ * in sd_llc_shared->idle_cpus_span.
+ *
+ * This function is called with interrupts disabled.
+ */
+void update_idle_cpumask(int cpu, bool idle)
+{
+	struct sched_domain *sd;
+	struct rq *rq = cpu_rq(cpu);
+	int idle_state;
+
+	/*
+	 * Also set SCHED_IDLE cpu in idle cpumask to
+	 * allow SCHED_IDLE cpu as a wakeup target.
+	 */
+	idle_state = idle || sched_idle_cpu(cpu);
+	/*
+	 * No need to update idle cpumask if the state
+	 * does not change.
+	 */
+	if (rq->last_idle_state == idle_state)
+		return;
+
+	rcu_read_lock();
+	sd = per_cpu(sd_llc, cpu);
+	if (unlikely(!sd))
+		goto unlock;
+
+	if (idle_state)
+		cpumask_set_cpu(cpu, sds_idle_cpus(sd->shared));
+	else
+		cpumask_clear_cpu(cpu, sds_idle_cpus(sd->shared));
+
+	rq->last_idle_state = idle_state;
+unlock:
+	rcu_read_unlock();
 }
 #endif /* CONFIG_SMP */
 
