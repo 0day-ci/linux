@@ -196,12 +196,16 @@ out:
 	return regd->dfs_region;
 }
 
-static void rcu_free_regdom(const struct ieee80211_regdomain *r)
+/*
+ * Free the regulatory domain associated with the wiphy
+ */
+void rcu_free_regdom(const struct ieee80211_regdomain *r)
 {
 	if (!r)
 		return;
 	kfree_rcu((struct ieee80211_regdomain *)r, rcu_head);
 }
+EXPORT_SYMBOL(rcu_free_regdom);
 
 static struct regulatory_request *get_last_request(void)
 {
@@ -4063,9 +4067,6 @@ void wiphy_regulatory_deregister(struct wiphy *wiphy)
 
 	if (!reg_dev_ignore_cell_hint(wiphy))
 		reg_num_devs_support_basehint--;
-
-	rcu_free_regdom(get_wiphy_regdom(wiphy));
-	RCU_INIT_POINTER(wiphy->regd, NULL);
 
 	if (lr)
 		request_wiphy = wiphy_idx_to_wiphy(lr->wiphy_idx);

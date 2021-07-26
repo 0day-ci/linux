@@ -1085,6 +1085,9 @@ void cfg80211_dev_free(struct cfg80211_registered_device *rdev)
 
 void wiphy_free(struct wiphy *wiphy)
 {
+	rcu_free_regdom(get_wiphy_regdom(wiphy));
+	RCU_INIT_POINTER(wiphy->regd, NULL);
+
 	put_device(&wiphy->dev);
 }
 EXPORT_SYMBOL(wiphy_free);
