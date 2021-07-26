@@ -6359,18 +6359,22 @@ static int select_idle_sibling(struct task_struct *p, int prev, int target)
 
 	/* Check a recently used CPU as a potential idle candidate: */
 	recent_used_cpu = p->recent_used_cpu;
-	if (recent_used_cpu != prev &&
-	    recent_used_cpu != target &&
-	    cpus_share_cache(recent_used_cpu, target) &&
-	    (available_idle_cpu(recent_used_cpu) || sched_idle_cpu(recent_used_cpu)) &&
-	    cpumask_test_cpu(p->recent_used_cpu, p->cpus_ptr) &&
-	    asym_fits_capacity(task_util, recent_used_cpu)) {
-		/*
-		 * Replace recent_used_cpu with prev as it is a potential
-		 * candidate for the next wake:
-		 */
-		p->recent_used_cpu = prev;
-		return recent_used_cpu;
+	if (recent_used_cpu != prev && recent_used_cpu != target) {
+
+		if (cpus_share_cache(recent_used_cpu, target) &&
+		    (available_idle_cpu(recent_used_cpu) || sched_idle_cpu(recent_used_cpu)) &&
+		    cpumask_test_cpu(p->recent_used_cpu, p->cpus_ptr) &&
+		    asym_fits_capacity(task_util, recent_used_cpu)) {
+			/*
+			 * Replace recent_used_cpu with prev as it is a potential
+			 * candidate for the next wake:
+			 */
+			schedstat_inc(this_rq()->sis_recent_hit);
+			p->recent_used_cpu = prev;
+			return recent_used_cpu;
+		}
+
+		schedstat_inc(this_rq()->sis_recent_miss);
 	}
 
 	/*
