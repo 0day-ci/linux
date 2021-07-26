@@ -804,6 +804,7 @@ struct kvm_vcpu_arch {
 	struct kvmppc_vpa slb_shadow;
 
 	spinlock_t tbacct_lock;
+	u64 hfscr_permitted;	/* A mask of permitted HFSCR facilities */
 	u64 busy_stolen;
 	u64 busy_preempt;
 

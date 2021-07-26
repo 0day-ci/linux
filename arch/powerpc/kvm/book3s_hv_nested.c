@@ -104,16 +104,6 @@ static void save_hv_return_state(struct kvm_vcpu *vcpu,
 {
 	struct kvmppc_vcore *vc = vcpu->arch.vcore;
 
-	/*
-	 * When loading the hypervisor-privileged registers to run L2,
-	 * we might have used bits from L1 state to restrict what the
-	 * L2 state is allowed to be. Since L1 is not allowed to read
-	 * the HV registers, do not include these modifications in the
-	 * return state.
-	 */
-	hr->hfscr = ((~HFSCR_INTR_CAUSE & hr->hfscr) |
-		     (HFSCR_INTR_CAUSE & vcpu->arch.hfscr));
-
 	hr->dpdes = vc->dpdes;
 	hr->purr = vcpu->arch.purr;
 	hr->spurr = vcpu->arch.spurr;
@@ -137,14 +127,23 @@ static void save_hv_return_state(struct kvm_vcpu *vcpu,
 	case BOOK3S_INTERRUPT_H_INST_STORAGE:
 		hr->asdr = vcpu->arch.fault_gpa;
 		break;
-	case BOOK3S_INTERRUPT_H_FAC_UNAVAIL:
-	{
-		u8 cause = vcpu->arch.hfscr >> 56;
+	case BOOK3S_INTERRUPT_H_FAC_UNAVAIL: {
+		u64 cause = vcpu->arch.hfscr >> 56;
 
 		WARN_ON_ONCE(cause >= BITS_PER_LONG);
 
-		if (!(hr->hfscr & (1UL << cause)))
+		/*
+		 * When loading the hypervisor-privileged registers to run L2,
+		 * we might have used bits from L1 state to restrict what the
+		 * L2 state is allowed to be. Since L1 is not allowed to read
+		 * the HV registers, do not include these modifications in the
+		 * return state.
+		 */
+		hr->hfscr &= ~HFSCR_INTR_CAUSE;
+		if (!(hr->hfscr & (1UL << cause))) {
+			hr->hfscr |= vcpu->arch.hfscr & HFSCR_INTR_CAUSE;
 			break;
+		}
 
 		/*
 		 * We have disabled this facility, so it does not
@@ -152,10 +151,6 @@ static void save_hv_return_state(struct kvm_vcpu *vcpu,
 		 */
 		vcpu->arch.trap = BOOK3S_INTERRUPT_H_EMUL_ASSIST;
 		kvmppc_load_last_inst(vcpu, INST_GENERIC, &vcpu->arch.emul_inst);
-
-		/* Don't leak the cause field */
-		hr->hfscr &= ~HFSCR_INTR_CAUSE;
-
 		fallthrough;
 	}
 	case BOOK3S_INTERRUPT_H_EMUL_ASSIST:
@@ -299,10 +294,10 @@ static void load_l2_hv_regs(struct kvm_vcpu *vcpu,
 				      (vc->lpcr & ~mask) | (*lpcr & mask));
 
 	/*
-	 * Don't let L1 enable features for L2 which we've disabled for L1,
-	 * but preserve the interrupt cause field.
+	 * Don't let L1 enable features for L2 which we disallow for L1.
+	 * Preserve the interrupt cause field.
 	 */
-	vcpu->arch.hfscr = l2_hv->hfscr & (HFSCR_INTR_CAUSE | l1_hv->hfscr);
+	vcpu->arch.hfscr = l2_hv->hfscr & (HFSCR_INTR_CAUSE | vcpu->arch.hfscr_permitted);
 
 	/* Don't let data address watchpoint match in hypervisor state */
 	vcpu->arch.dawrx0 = l2_hv->dawrx0 & ~DAWRX_HYP;
@@ -389,6 +384,7 @@ long kvmhv_enter_nested_guest(struct kvm_vcpu *vcpu)
 	/* set L1 state to L2 state */
 	vcpu->arch.nested = l2;
 	vcpu->arch.nested_vcpu_id = l2_hv.vcpu_token;
+	l2->hfscr = l2_hv.hfscr;
 	vcpu->arch.regs = l2_regs;
 
 	/* Guest must always run with ME enabled, HV disabled. */
