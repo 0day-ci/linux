@@ -423,6 +423,15 @@ SYM_FUNC_START(__cpu_setup)
 			TCR_TG_FLAGS | TCR_KASLR_FLAGS | TCR_ASID16 | \
 			TCR_TBI0 | TCR_A1 | TCR_KASAN_SW_FLAGS
 
+#ifdef CONFIG_ARM64_PA_BITS_52_LPA2
+	ldr_l   x10, arm64_lpa2_enabled
+	cmp	x10, #1
+	b.ne	1f
+	mov_q	x10, TCR_DS
+	orr	tcr, tcr, x10
+1:
+#endif /* CONFIG_ARM64_PA_BITS_52_LPA2 */
+
 #ifdef CONFIG_ARM64_MTE
 	/*
 	 * Update MAIR_EL1, GCR_EL1 and TFSR*_EL1 if MTE is supported
