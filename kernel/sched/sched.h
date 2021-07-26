@@ -1080,6 +1080,8 @@ struct rq {
 	unsigned int		sis_failed;
 	unsigned int		sis_recent_hit;
 	unsigned int		sis_recent_miss;
+	unsigned int		sis_core_search;
+	unsigned int		sis_core_failed;
 #endif
 
 #ifdef CONFIG_CPU_IDLE

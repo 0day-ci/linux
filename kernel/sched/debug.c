@@ -751,6 +751,8 @@ do {									\
 		P(sis_failed);
 		P(sis_recent_hit);
 		P(sis_recent_miss);
+		P(sis_core_search);
+		P(sis_core_failed);
 	}
 #undef P
 

@@ -6109,6 +6109,7 @@ static int select_idle_core(struct task_struct *p, int core, struct cpumask *cpu
 	if (!static_branch_likely(&sched_smt_present))
 		return __select_idle_cpu(core, p);
 
+	schedstat_inc(this_rq()->sis_core_search);
 	for_each_cpu(cpu, cpu_smt_mask(core)) {
 		schedstat_inc(this_rq()->sis_scanned);
 		if (!available_idle_cpu(cpu)) {
@@ -6129,6 +6130,7 @@ static int select_idle_core(struct task_struct *p, int core, struct cpumask *cpu
 	if (idle)
 		return core;
 
+	schedstat_inc(this_rq()->sis_core_failed);
 	cpumask_andnot(cpus, cpus, cpu_smt_mask(core));
 	return -1;
 }
