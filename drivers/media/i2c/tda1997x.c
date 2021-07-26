@@ -2770,6 +2770,7 @@ static int tda1997x_probe(struct i2c_client *client,
 		goto err_free_media;
 	}
 
+	i2c_set_clientdata(client, sd);
 	return 0;
 
 err_free_media:
