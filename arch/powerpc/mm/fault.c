@@ -542,7 +542,7 @@ static __always_inline void __do_page_fault(struct pt_regs *regs)
 	long err;
 
 	if (IS_ENABLED(CONFIG_4xx) || IS_ENABLED(CONFIG_BOOKE))
-		err = ___do_page_fault(regs, regs->dar, regs->esr);
+		err = ___do_page_fault(regs, regs->dear, regs->esr);
 	else
 		err = ___do_page_fault(regs, regs->dar, regs->dsisr);
 

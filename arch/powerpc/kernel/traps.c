@@ -1609,7 +1609,10 @@ DEFINE_INTERRUPT_HANDLER(alignment_exception)
 	}
 bad:
 	if (user_mode(regs))
-		_exception(sig, regs, code, regs->dar);
+		if (IS_ENABLED(CONFIG_4xx) || IS_ENABLED(CONFIG_BOOKE))
+			_exception(sig, regs, code, regs->dear);
+		else
+			_exception(sig, regs, code, regs->dar);
 	else
 		bad_page_fault(regs, sig);
 }
