@@ -615,9 +615,17 @@ alternative_endif
 	orr	\pte, \phys, \phys, lsr #36
 	and	\pte, \pte, #PTE_ADDR_MASK
 #elif defined(CONFIG_ARM64_PA_BITS_52_LPA2)
+	ldr_l   \pte, arm64_lpa2_enabled
+	cmp     \pte, #1
+	b.ne    .Lskip_lpa2\@
+
 	orr	\pte, \phys, \phys, lsr #42
 	and	\pte, \pte, #PTE_ADDR_MASK | GENMASK(PAGE_SHIFT - 1, 10)
 	and	\pte, \pte, #~GENMASK(PAGE_SHIFT - 1, 10)
+	b	.Ldone_lpa2\@
+.Lskip_lpa2\@:
+	mov	\pte, \phys
+.Ldone_lpa2\@:
 #else  /* !CONFIG_ARM64_PA_BITS_52_LPA */
 	mov	\pte, \phys
 #endif /* CONFIG_ARM64_PA_BITS_52_LPA */
@@ -629,9 +637,17 @@ alternative_endif
 	bfxil	\phys, \pte, #PAGE_SHIFT, #(48 - PAGE_SHIFT)
 	lsl	\phys, \phys, #PAGE_SHIFT
 #elif defined(CONFIG_ARM64_PA_BITS_52_LPA2)
+	ldr_l   \phys, arm64_lpa2_enabled
+	cmp     \phys, #1
+	b.ne    .Lskip_lpa2\@
+
 	ubfiz	\phys, \pte, #(52 - PAGE_SHIFT - 10), #10
 	bfxil	\phys, \pte, #PAGE_SHIFT, #(50 - PAGE_SHIFT)
 	lsl	\phys, \phys, #PAGE_SHIFT
+	b	.Ldone_lpa2\@
+.Lskip_lpa2\@:
+	and	\phys, \pte, #PTE_ADDR_MASK_48
+.Ldone_lpa2\@:
 #else  /* !CONFIG_ARM64_PA_BITS_52_LPA */
 	and	\phys, \pte, #PTE_ADDR_MASK
 #endif /* CONFIG_ARM64_PA_BITS_52_LPA */

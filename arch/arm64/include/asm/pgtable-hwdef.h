@@ -176,6 +176,8 @@
 #define PTE_ADDR_MASK		PTE_ADDR_LOW
 #endif /* CONFIG_ARM64_PA_BITS_52_LPA */
 
+#define PTE_ADDR_MASK_48	(((_AT(pteval_t, 1) << (48 - PAGE_SHIFT)) - 1) << PAGE_SHIFT)
+
 /*
  * AttrIndx[2:0] encoding (mapping attributes defined in the MAIR* registers).
  */
