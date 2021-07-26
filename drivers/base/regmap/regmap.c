@@ -630,8 +630,6 @@ int regmap_attach_dev(struct device *dev, struct regmap *map,
 	if (ret)
 		return ret;
 
-	regmap_debugfs_init(map);
-
 	/* Add a devres resource for dev_get_regmap() */
 	m = devres_alloc(dev_get_regmap_release, sizeof(*m), GFP_KERNEL);
 	if (!m) {
@@ -1192,9 +1190,9 @@ skip_format_initialization:
 		ret = regmap_attach_dev(dev, map, config);
 		if (ret != 0)
 			goto err_regcache;
-	} else {
-		regmap_debugfs_init(map);
 	}
+
+	regmap_debugfs_init(map);
 
 	return map;
 
