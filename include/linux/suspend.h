@@ -210,9 +210,10 @@ extern int suspend_valid_only_mem(suspend_state_t state);
 
 extern unsigned int pm_suspend_global_flags;
 
-#define PM_SUSPEND_FLAG_FW_SUSPEND	BIT(0)
-#define PM_SUSPEND_FLAG_FW_RESUME	BIT(1)
-#define PM_SUSPEND_FLAG_NO_PLATFORM	BIT(2)
+#define PM_SUSPEND_FLAG_FW_SUSPEND		BIT(0)
+#define PM_SUSPEND_FLAG_FW_RESUME		BIT(1)
+#define PM_SUSPEND_FLAG_NO_PLATFORM		BIT(2)
+#define PM_SUSPEND_FLAG_POWER_LOSS_IMMINENT	BIT(3)
 
 static inline void pm_suspend_clear_flags(void)
 {
@@ -232,6 +233,11 @@ static inline void pm_set_resume_via_firmware(void)
 static inline void pm_set_suspend_no_platform(void)
 {
 	pm_suspend_global_flags |= PM_SUSPEND_FLAG_NO_PLATFORM;
+}
+
+static inline void pm_set_power_loss_imminent(void)
+{
+	pm_suspend_global_flags |= PM_SUSPEND_FLAG_POWER_LOSS_IMMINENT;
 }
 
 /**
@@ -289,6 +295,22 @@ static inline bool pm_resume_via_firmware(void)
 static inline bool pm_suspend_no_platform(void)
 {
 	return !!(pm_suspend_global_flags & PM_SUSPEND_FLAG_NO_PLATFORM);
+}
+
+/**
+ * pm_power_loss_imminent - Check if platform is running on limited backup power
+ * source
+ *
+ * To be called during system-wide power management transitions to sleep states.
+ *
+ * Return 'true' if power loss may be imminent due to platform running on
+ * limited backup supply. If set during a shutdown, drivers should use any
+ * available shortcuts to prepare their device for abrupt power loss.
+ */
+static inline bool pm_power_loss_imminent(void)
+{
+	return !!(pm_suspend_global_flags &
+		  PM_SUSPEND_FLAG_POWER_LOSS_IMMINENT);
 }
 
 /* Suspend-to-idle state machnine. */
