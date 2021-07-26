@@ -4089,6 +4089,13 @@
 			Override pmtimer IOPort with a hex value.
 			e.g. pmtmr=0x508
 
+	pmu=		[PPC] Manually enable the PMU.
+			Enable the PMU by setting MMCR0 to 0 (clear FC bit).
+			This option is implemented for Book3S processors.
+			If a number is given, then MMCR1 is set to that number,
+			otherwise (e.g., 'pmu=on'), it is left 0. The perf
+			subsystem is disabled if this option is used.
+
 	pm_debug_messages	[SUSPEND,KNL]
 			Enable suspend/resume debug messages during boot up.
 
