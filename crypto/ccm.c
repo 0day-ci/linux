@@ -66,7 +66,7 @@ static inline struct crypto_ccm_req_priv_ctx *crypto_ccm_reqctx(
 	return (void *)PTR_ALIGN((u8 *)aead_request_ctx(req), align + 1);
 }
 
-static int set_msg_len(u8 *block, unsigned int msglen, int csize)
+static int set_msg_len(u8 *block, unsigned int msglen, unsigned int csize)
 {
 	__be32 data;
 
