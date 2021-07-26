@@ -316,6 +316,11 @@ int intel_guc_slpc_set_max_freq(struct intel_guc_slpc *slpc, u32 val)
 	intel_wakeref_t wakeref;
 	int ret;
 
+	if ((val < slpc->min_freq) ||
+	    (val > slpc->rp0_freq) ||
+	    (val < slpc->min_freq_softlimit))
+		return -EINVAL;
+
 	with_intel_runtime_pm(&i915->runtime_pm, wakeref) {
 		ret = slpc_set_param(slpc,
 			       SLPC_PARAM_GLOBAL_MAX_GT_UNSLICE_FREQ_MHZ,
@@ -327,6 +332,8 @@ int intel_guc_slpc_set_max_freq(struct intel_guc_slpc *slpc, u32 val)
 			ret = -EIO;
 		}
 	}
+
+	slpc->max_freq_softlimit = val;
 
 	return ret;
 }
@@ -375,6 +382,11 @@ int intel_guc_slpc_set_min_freq(struct intel_guc_slpc *slpc, u32 val)
 	struct drm_i915_private *i915 = guc_to_gt(guc)->i915;
 	intel_wakeref_t wakeref;
 
+	if ((val < slpc->min_freq) ||
+	    (val > slpc->rp0_freq) ||
+	    (val > slpc->max_freq_softlimit))
+		return -EINVAL;
+
 	with_intel_runtime_pm(&i915->runtime_pm, wakeref) {
 		ret = slpc_set_param(slpc,
 			       SLPC_PARAM_GLOBAL_MIN_GT_UNSLICE_FREQ_MHZ,
@@ -386,6 +398,8 @@ int intel_guc_slpc_set_min_freq(struct intel_guc_slpc *slpc, u32 val)
 			ret = -EIO;
 		}
 	}
+
+	slpc->min_freq_softlimit = val;
 
 	return ret;
 }
