@@ -43,6 +43,8 @@ struct intel_context_ops {
 	void (*enter)(struct intel_context *ce);
 	void (*exit)(struct intel_context *ce);
 
+	void (*sched_disable)(struct intel_context *ce);
+
 	void (*reset)(struct intel_context *ce);
 	void (*destroy)(struct kref *kref);
 };
@@ -82,6 +84,7 @@ struct intel_context {
 	spinlock_t signal_lock; /* protects signals, the list of requests */
 
 	struct i915_vma *state;
+	u32 ring_size;
 	struct intel_ring *ring;
 	struct intel_timeline *timeline;
 
@@ -95,6 +98,7 @@ struct intel_context {
 #define CONTEXT_BANNED			6
 #define CONTEXT_FORCE_SINGLE_SUBMISSION	7
 #define CONTEXT_NOPREEMPT		8
+#define CONTEXT_LRCA_DIRTY		9
 
 	struct {
 		u64 timeout_us;
@@ -136,6 +140,35 @@ struct intel_context {
 	struct intel_sseu sseu;
 
 	u8 wa_bb_page; /* if set, page num reserved for context workarounds */
+
+	struct {
+		/** lock: protects everything in guc_state */
+		spinlock_t lock;
+		/**
+		 * sched_state: scheduling state of this context using GuC
+		 * submission
+		 */
+		u8 sched_state;
+		/*
+		 * fences: maintains of list of requests that have a submit
+		 * fence related to GuC submission
+		 */
+		struct list_head fences;
+	} guc_state;
+
+	/* GuC scheduling state flags that do not require a lock. */
+	atomic_t guc_sched_state_no_lock;
+
+	/* GuC LRC descriptor ID */
+	u16 guc_id;
+
+	/* GuC LRC descriptor reference count */
+	atomic_t guc_id_ref;
+
+	/*
+	 * GuC ID link - in list when unpinned but guc_id still valid in GuC
+	 */
+	struct list_head guc_id_link;
 };
 
 #endif /* __INTEL_CONTEXT_TYPES__ */
