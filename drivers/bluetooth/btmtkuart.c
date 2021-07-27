@@ -987,7 +987,7 @@ static int btmtkuart_probe(struct serdev_device *serdev)
 	skb_queue_head_init(&bdev->txq);
 
 	/* Initialize and register HCI device */
-	hdev = hci_alloc_dev();
+	hdev = hci_alloc_dev(0);
 	if (!hdev) {
 		dev_err(&serdev->dev, "Can't allocate HCI device\n");
 		return -ENOMEM;

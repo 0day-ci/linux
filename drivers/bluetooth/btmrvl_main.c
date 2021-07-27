@@ -680,7 +680,7 @@ int btmrvl_register_hdev(struct btmrvl_private *priv)
 	struct btmrvl_sdio_card *card = priv->btmrvl_dev.card;
 	int ret;
 
-	hdev = hci_alloc_dev();
+	hdev = hci_alloc_dev(0);
 	if (!hdev) {
 		BT_ERR("Can not allocate HCI device");
 		goto err_hdev;

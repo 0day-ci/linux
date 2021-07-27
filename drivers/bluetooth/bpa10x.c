@@ -380,7 +380,7 @@ static int bpa10x_probe(struct usb_interface *intf,
 	init_usb_anchor(&data->tx_anchor);
 	init_usb_anchor(&data->rx_anchor);
 
-	hdev = hci_alloc_dev();
+	hdev = hci_alloc_dev(0);
 	if (!hdev)
 		return -ENOMEM;
 

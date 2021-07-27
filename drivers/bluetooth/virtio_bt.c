@@ -283,7 +283,7 @@ static int virtbt_probe(struct virtio_device *vdev)
 	if (err)
 		return err;
 
-	hdev = hci_alloc_dev();
+	hdev = hci_alloc_dev(0);
 	if (!hdev) {
 		err = -ENOMEM;
 		goto failed;

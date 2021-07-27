@@ -694,7 +694,7 @@ static int bluecard_open(struct bluecard_info *info)
 	info->rx_skb = NULL;
 
 	/* Initialize HCI device */
-	hdev = hci_alloc_dev();
+	hdev = hci_alloc_dev(0);
 	if (!hdev) {
 		BT_ERR("Can't allocate HCI device");
 		return -ENOMEM;

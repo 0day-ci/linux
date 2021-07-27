@@ -627,7 +627,7 @@ static int hci_uart_register_dev(struct hci_uart *hu)
 	BT_DBG("");
 
 	/* Initialize and register HCI device */
-	hdev = hci_alloc_dev();
+	hdev = hci_alloc_dev(0);
 	if (!hdev) {
 		BT_ERR("Can't allocate HCI device");
 		return -ENOMEM;

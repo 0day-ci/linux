@@ -96,7 +96,7 @@ static int __vhci_create_device(struct vhci_data *data, __u8 opcode)
 	if (!skb)
 		return -ENOMEM;
 
-	hdev = hci_alloc_dev();
+	hdev = hci_alloc_dev(0);
 	if (!hdev) {
 		kfree_skb(skb);
 		return -ENOMEM;

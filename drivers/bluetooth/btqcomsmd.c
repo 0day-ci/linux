@@ -147,7 +147,7 @@ static int btqcomsmd_probe(struct platform_device *pdev)
 		goto destroy_acl_channel;
 	}
 
-	hdev = hci_alloc_dev();
+	hdev = hci_alloc_dev(0);
 	if (!hdev) {
 		ret = -ENOMEM;
 		goto destroy_cmd_channel;

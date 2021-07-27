@@ -121,7 +121,7 @@ static int rsi_hci_attach(void *priv, struct rsi_proto_ops *ops)
 	ops->set_bt_context(priv, h_adapter);
 	h_adapter->proto_ops = ops;
 
-	hdev = hci_alloc_dev();
+	hdev = hci_alloc_dev(0);
 	if (!hdev) {
 		BT_ERR("Failed to alloc HCI device");
 		goto err;
