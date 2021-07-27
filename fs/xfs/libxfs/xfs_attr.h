@@ -30,7 +30,7 @@ struct xfs_attr_list_context;
 
 static inline bool xfs_hasdelattr(struct xfs_mount *mp)
 {
-	return false;
+	return mp->m_flags & XFS_MOUNT_DELATTR;
 }
 
 /*
