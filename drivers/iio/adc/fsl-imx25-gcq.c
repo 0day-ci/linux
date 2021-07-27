@@ -331,6 +331,10 @@ static int mx25_gcq_probe(struct platform_device *pdev)
 	if (ret)
 		return ret;
 
+	priv->irq = platform_get_irq(pdev, 0);
+	if (priv->irq < 0)
+		return priv->irq;
+
 	for (i = 0; i != 4; ++i) {
 		if (!priv->vref[i])
 			continue;
@@ -345,14 +349,6 @@ static int mx25_gcq_probe(struct platform_device *pdev)
 	if (ret) {
 		dev_err(dev, "Failed to enable clock\n");
 		goto err_vref_disable;
-	}
-
-	priv->irq = platform_get_irq(pdev, 0);
-	if (priv->irq <= 0) {
-		ret = priv->irq;
-		if (!ret)
-			ret = -ENXIO;
-		goto err_clk_unprepare;
 	}
 
 	ret = request_irq(priv->irq, mx25_gcq_irq, 0, pdev->name, priv);
