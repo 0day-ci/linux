@@ -614,12 +614,19 @@ void folio_migrate_flags(struct folio *newfolio, struct folio *folio)
 }
 EXPORT_SYMBOL(folio_migrate_flags);
 
-void folio_migrate_copy(struct folio *newfolio, struct folio *folio)
+void migrate_page_copy(struct page *newpage, struct page *page)
 {
-	folio_copy(newfolio, folio);
+	struct folio *newfolio = page_folio(newpage);
+	struct folio *folio = page_folio(page);
+
+	if (PageHuge(page) || PageTransHuge(page))
+		folio_copy(newfolio, folio);
+	else
+		copy_highpage(newpage, page);
+
 	folio_migrate_flags(newfolio, folio);
 }
-EXPORT_SYMBOL(folio_migrate_copy);
+EXPORT_SYMBOL(migrate_page_copy);
 
 /************************************************************
  *                    Migration functions
@@ -647,7 +654,7 @@ int migrate_page(struct address_space *mapping,
 		return rc;
 
 	if (mode != MIGRATE_SYNC_NO_COPY)
-		folio_migrate_copy(newfolio, folio);
+		migrate_page_copy(newpage, page);
 	else
 		folio_migrate_flags(newfolio, folio);
 	return MIGRATEPAGE_SUCCESS;
