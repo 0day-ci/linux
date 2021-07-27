@@ -165,6 +165,8 @@ int btintel_read_boot_params(struct hci_dev *hdev,
 			     struct intel_boot_params *params);
 int btintel_download_firmware(struct hci_dev *dev, struct intel_version *ver,
 			      const struct firmware *fw, u32 *boot_param);
+int btintel_setup_combined(struct hci_dev *hdev);
+int btintel_shutdown_combined(struct hci_dev *hdev);
 int btintel_download_firmware_newgen(struct hci_dev *hdev,
 				     struct intel_version_tlv *ver,
 				     const struct firmware *fw,
@@ -279,6 +281,16 @@ static inline int btintel_read_boot_params(struct hci_dev *hdev,
 static inline int btintel_download_firmware(struct hci_dev *dev,
 					    const struct firmware *fw,
 					    u32 *boot_param)
+{
+	return -EOPNOTSUPP;
+}
+
+static inline int btintel_setup_combined(struct hci_dev *hdev)
+{
+	return -EOPNOTSUPP;
+}
+
+static inline int btintel_shutdown_combined(struct hci_dev *hdev)
 {
 	return -EOPNOTSUPP;
 }
