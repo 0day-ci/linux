@@ -681,11 +681,15 @@ It can be executed on any file or directory on the target filesystem,
 but using the filesystem's root directory is recommended.  It takes in
 a pointer to struct fscrypt_add_key_arg, defined as follows::
 
+    #define FSCRYPT_KEY_ADD_RAW_ASIS		0
+    #define FSCRYPT_KEY_ADD_RAW_DESC		1
+
     struct fscrypt_add_key_arg {
             struct fscrypt_key_specifier key_spec;
             __u32 raw_size;
             __u32 key_id;
-            __u32 __reserved[8];
+            __u32 raw_flags;     /* one of FSCRYPT_KEY_ADD_RAW_* */
+            __u32 __reserved[7];
             __u8 raw[];
     };
 
@@ -732,8 +736,11 @@ as follows:
   Alternatively, if ``key_id`` is nonzero, this field must be 0, since
   in that case the size is implied by the specified Linux keyring key.
 
-- ``key_id`` is 0 if the raw key is given directly in the ``raw``
-  field.  Otherwise ``key_id`` is the ID of a Linux keyring key of
+- If ``key_id`` is 0, the raw key is given directly in the ``raw``
+  field if ``raw_flags == FSCRYPT_KEY_ADD_RAW_ASIS``. With
+  ``raw_flags == FSCRYPT_KEY_ADD_RAW_DESC``, ``raw`` is instead
+  interpreted as the description of an encrypted or trusted key.
+  Otherwise ``key_id`` is the ID of a Linux keyring key of
   type "fscrypt-provisioning" whose payload is
   struct fscrypt_provisioning_key_payload whose ``raw`` field contains
   the raw key and whose ``type`` field matches ``key_spec.type``.
@@ -748,8 +755,15 @@ as follows:
   without having to store the raw keys in userspace memory.
 
 - ``raw`` is a variable-length field which must contain the actual
-  key, ``raw_size`` bytes long.  Alternatively, if ``key_id`` is
-  nonzero, then this field is unused.
+  key when ``raw_flags == FSCRYPT_KEY_ADD_RAW_ASIS``,
+  ``raw_size`` bytes long.  Alternatively, if
+  ``raw_flags == FSCRYPT_KEY_ADD_RAW_DESC``, ``raw`` is interpreted
+  as the key description of an encrypted or trusted key, in that order.
+  The material of this key will be used as if it were a raw key
+  supplied by userspace.
+
+  In both cases, the buffer is ``raw_size`` bytes long. If ````key_id``
+  is nonzero, then this field is unused.
 
 For v2 policy keys, the kernel keeps track of which user (identified
 by effective user ID) added the key, and only allows the key to be

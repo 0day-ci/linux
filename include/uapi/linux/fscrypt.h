@@ -119,12 +119,26 @@ struct fscrypt_provisioning_key_payload {
 	__u8 raw[];
 };
 
+/*
+ * fscrypt_add_key_arg::raw contains the raw key material directly
+ * if key_id == 0
+ */
+#define FSCRYPT_KEY_ADD_RAW_ASIS		0
+
+/*
+ * fscrypt_add_key_arg::raw is a key descriptor for an already
+ * existing kernel encrypted or trusted key if key_id == 0.
+ * The kernel key's material will be used as input for fscrypt.
+ */
+#define FSCRYPT_KEY_ADD_RAW_DESC		1
+
 /* Struct passed to FS_IOC_ADD_ENCRYPTION_KEY */
 struct fscrypt_add_key_arg {
 	struct fscrypt_key_specifier key_spec;
 	__u32 raw_size;
 	__u32 key_id;
-	__u32 __reserved[8];
+	__u32 raw_flags;	/* one of FSCRYPT_KEY_ADD_RAW_* */
+	__u32 __reserved[7];
 	__u8 raw[];
 };
 

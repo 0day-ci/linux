@@ -20,6 +20,9 @@
 
 #include <crypto/skcipher.h>
 #include <linux/key-type.h>
+#include <linux/key-type.h>
+#include <keys/encrypted-type.h>
+#include <keys/trusted-type.h>
 #include <linux/random.h>
 #include <linux/seq_file.h>
 
@@ -662,13 +665,57 @@ int fscrypt_ioctl_add_key(struct file *filp, void __user *_uarg)
 		if (err)
 			goto out_wipe_secret;
 	} else {
-		if (arg.raw_size < FSCRYPT_MIN_KEY_SIZE ||
-		    arg.raw_size > FSCRYPT_MAX_KEY_SIZE)
+		struct key *keyring_key = ERR_PTR(-EINVAL);
+		const void *key_material;
+		const char *desc;
+
+		switch (arg.raw_flags) {
+		case FSCRYPT_KEY_ADD_RAW_ASIS:
+			if (arg.raw_size < FSCRYPT_MIN_KEY_SIZE ||
+			    arg.raw_size > FSCRYPT_MAX_KEY_SIZE)
+				return -EINVAL;
+			secret.size = arg.raw_size;
+			err = -EFAULT;
+			if (copy_from_user(secret.raw, uarg->raw, secret.size))
+				goto out_wipe_secret;
+			break;
+		case FSCRYPT_KEY_ADD_RAW_DESC:
+			if (arg.raw_size > 4096)
+				return -EINVAL;
+			desc = memdup_user_nul(uarg->raw, arg.raw_size);
+			if (IS_ERR(desc))
+				return PTR_ERR(desc);
+
+			if (IS_REACHABLE(CONFIG_ENCRYPTED_KEYS))
+				keyring_key = request_key(&key_type_encrypted, desc, NULL);
+			if (IS_REACHABLE(CONFIG_TRUSTED_KEYS) && IS_ERR(keyring_key))
+				keyring_key = request_key(&key_type_trusted, desc, NULL);
+
+			kfree(desc);
+
+			if (IS_ERR(keyring_key))
+				return PTR_ERR(keyring_key);
+
+			down_read(&keyring_key->sem);
+
+			key_material = key_extract_material(keyring_key, &secret.size);
+			if (!IS_ERR(key_material) && (secret.size < FSCRYPT_MIN_KEY_SIZE ||
+			    secret.size > FSCRYPT_MAX_KEY_SIZE))
+				key_material = ERR_PTR(-EINVAL);
+			if (IS_ERR(key_material)) {
+				up_read(&keyring_key->sem);
+				key_put(keyring_key);
+				return PTR_ERR(key_material);
+			}
+
+			memcpy(secret.raw, key_material, secret.size);
+
+			up_read(&keyring_key->sem);
+			key_put(keyring_key);
+			break;
+		default:
 			return -EINVAL;
-		secret.size = arg.raw_size;
-		err = -EFAULT;
-		if (copy_from_user(secret.raw, uarg->raw, secret.size))
-			goto out_wipe_secret;
+		}
 	}
 
 	err = add_master_key(sb, &secret, &arg.key_spec);
