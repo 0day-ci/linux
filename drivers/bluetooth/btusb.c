@@ -63,6 +63,7 @@ static struct usb_driver btusb_driver;
 #define BTUSB_INTEL_NEWGEN	0x2000000
 #define BTUSB_INTEL_COMBINED	0x4000000
 #define BTUSB_INTEL_BROKEN_READ_VERSION 0x8000000
+#define BTUSB_INTEL_BROKEN_LED	0x10000000
 
 static const struct usb_device_id btusb_table[] = {
 	/* Generic Bluetooth USB device */
@@ -378,13 +379,16 @@ static const struct usb_device_id blacklist_table[] = {
 						     BTUSB_VALID_LE_STATES },
 	{ USB_DEVICE(0x8087, 0x07da), .driver_info = BTUSB_CSR },
 	{ USB_DEVICE(0x8087, 0x07dc), .driver_info = BTUSB_INTEL_COMBINED |
-						     BTUSB_INTEL_BROKEN_READ_VERSION },
+						     BTUSB_INTEL_BROKEN_READ_VERSION |
+						     BTUSB_INTEL_BROKEN_LED },
 	{ USB_DEVICE(0x8087, 0x0a2a), .driver_info = BTUSB_INTEL_COMBINED |
-						     BTUSB_INTEL_BROKEN_READ_VERSION },
+						     BTUSB_INTEL_BROKEN_READ_VERSION |
+						     BTUSB_INTEL_BROKEN_LED },
 	{ USB_DEVICE(0x8087, 0x0a2b), .driver_info = BTUSB_INTEL_NEW |
 						     BTUSB_WIDEBAND_SPEECH },
 	{ USB_DEVICE(0x8087, 0x0aa7), .driver_info = BTUSB_INTEL_COMBINED |
 						     BTUSB_INTEL_BROKEN_READ_VERSION |
+						     BTUSB_INTEL_BROKEN_LED |
 						     BTUSB_WIDEBAND_SPEECH },
 	{ USB_DEVICE(0x8087, 0x0aaa), .driver_info = BTUSB_INTEL_NEW |
 						     BTUSB_WIDEBAND_SPEECH |
@@ -4327,6 +4331,9 @@ static int btusb_probe(struct usb_interface *intf,
 
 		if (id->driver_info & BTUSB_INTEL_BROKEN_READ_VERSION)
 			btintel_set_flags(hdev, INTEL_BROKEN_READ_VERSION);
+
+		if (id->driver_info & BTUSB_INTEL_BROKEN_LED)
+			btintel_set_flags(hdev, INTEL_BROKEN_LED);
 	}
 
 	if (id->driver_info & BTUSB_INTEL_NEW) {

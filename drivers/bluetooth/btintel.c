@@ -1757,7 +1757,9 @@ EXPORT_SYMBOL_GPL(btintel_setup_combined);
 
 int btintel_shutdown_combined(struct hci_dev *hdev)
 {
+	struct btintel_data *intel = hci_get_priv(hdev);
 	struct sk_buff *skb;
+	int ret;
 
 	/* Send HCI Reset to the controller to stop any BT activity which
 	 * were triggered. This will help to save power and maintain the
@@ -1769,6 +1771,21 @@ int btintel_shutdown_combined(struct hci_dev *hdev)
 		return PTR_ERR(skb);
 	}
 	kfree_skb(skb);
+
+
+	/* Some platforms have an issue with BT LED when the interface is
+	 * down or BT radio is turned off, which takes 5 seconds to BT LED
+	 * goes off. This command turns off the BT LED immediately.
+	 */
+	if (test_bit(INTEL_BROKEN_LED, &intel->flags)) {
+		skb = __hci_cmd_sync(hdev, 0xfc3f, 0, NULL, HCI_INIT_TIMEOUT);
+		if (IS_ERR(skb)) {
+			ret = PTR_ERR(skb);
+			bt_dev_err(hdev, "turning off Intel device LED failed");
+			return ret;
+		}
+		kfree_skb(skb);
+	}
 
 	return 0;
 }
