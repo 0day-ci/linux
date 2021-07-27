@@ -261,8 +261,9 @@ static inline const char *kbasename(const char *path)
  * @count: The number of bytes to copy
  * @pad: Character to use for padding if space is left in destination.
  */
-static inline void memcpy_and_pad(void *dest, size_t dest_len,
-				  const void *src, size_t count, int pad)
+static __always_inline void memcpy_and_pad(void *dest, size_t dest_len,
+					   const void *src, size_t count,
+					   int pad)
 {
 	if (dest_len > count) {
 		memcpy(dest, src, count);
