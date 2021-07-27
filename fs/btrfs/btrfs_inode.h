@@ -387,4 +387,6 @@ static inline void btrfs_print_data_csum_error(struct btrfs_inode *inode,
 			mirror_num);
 }
 
+void btrfs_release_automount_timer(void);
+
 #endif

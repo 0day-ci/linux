@@ -349,6 +349,7 @@ void __btrfs_panic(struct btrfs_fs_info *fs_info, const char *function,
 static void btrfs_put_super(struct super_block *sb)
 {
 	close_ctree(btrfs_sb(sb));
+	btrfs_release_automount_timer();
 }
 
 enum {

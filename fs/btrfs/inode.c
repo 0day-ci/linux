@@ -31,6 +31,7 @@
 #include <linux/migrate.h>
 #include <linux/sched/mm.h>
 #include <linux/iomap.h>
+#include <linux/fs_context.h>
 #include <asm/unaligned.h>
 #include "misc.h"
 #include "ctree.h"
@@ -5656,6 +5657,8 @@ static int btrfs_init_locked_inode(struct inode *inode, void *p)
 	struct btrfs_iget_args *args = p;
 
 	inode->i_ino = args->ino;
+	if (args->ino == BTRFS_FIRST_FREE_OBJECTID)
+		inode->i_flags |= S_AUTOMOUNT;
 	BTRFS_I(inode)->location.objectid = args->ino;
 	BTRFS_I(inode)->location.type = BTRFS_INODE_ITEM_KEY;
 	BTRFS_I(inode)->location.offset = 0;
@@ -5858,6 +5861,101 @@ static int btrfs_dentry_delete(const struct dentry *dentry)
 	}
 	return 0;
 }
+
+static void btrfs_expire_automounts(struct work_struct *work);
+static LIST_HEAD(btrfs_automount_list);
+static DECLARE_DELAYED_WORK(btrfs_automount_task, btrfs_expire_automounts);
+int btrfs_mountpoint_expiry_timeout = 500 * HZ;
+static void btrfs_expire_automounts(struct work_struct *work)
+{
+	struct list_head *list = &btrfs_automount_list;
+	int timeout = READ_ONCE(btrfs_mountpoint_expiry_timeout);
+
+	mark_mounts_for_expiry(list);
+	if (!list_empty(list) && timeout > 0)
+		schedule_delayed_work(&btrfs_automount_task, timeout);
+}
+
+void btrfs_release_automount_timer(void)
+{
+	if (list_empty(&btrfs_automount_list))
+		cancel_delayed_work(&btrfs_automount_task);
+}
+
+static struct vfsmount *btrfs_automount(struct path *path)
+{
+	struct fs_context fc;
+	struct vfsmount *mnt;
+	int timeout = READ_ONCE(btrfs_mountpoint_expiry_timeout);
+
+	if (path->dentry == path->mnt->mnt_root)
+		/* dentry is root of the vfsmount,
+		 * so skip automount processing
+		 */
+		return ERR_PTR(-EISDIR);
+	/* Create a bind-mount to expose the subvol in the mount table */
+	fc.root = path->dentry;
+	fc.sb_flags = 0;
+	fc.source = "btrfs-automount";
+	mnt = vfs_create_mount(&fc);
+	if (IS_ERR(mnt))
+		return mnt;
+	mntget(mnt);
+	mnt_set_expiry(mnt, &btrfs_automount_list);
+	if (timeout > 0)
+		schedule_delayed_work(&btrfs_automount_task, timeout);
+	return mnt;
+}
+
+static int param_set_btrfs_timeout(const char *val, const struct kernel_param *kp)
+{
+	long num;
+	int ret;
+
+	if (!val)
+		return -EINVAL;
+	ret = kstrtol(val, 0, &num);
+	if (ret)
+		return -EINVAL;
+	if (num > 0) {
+		if (num >= INT_MAX / HZ)
+			num = INT_MAX;
+		else
+			num *= HZ;
+		*((int *)kp->arg) = num;
+		if (!list_empty(&btrfs_automount_list))
+			mod_delayed_work(system_wq, &btrfs_automount_task, num);
+	} else {
+		*((int *)kp->arg) = -1*HZ;
+		cancel_delayed_work(&btrfs_automount_task);
+	}
+	return 0;
+}
+
+static int param_get_btrfs_timeout(char *buffer, const struct kernel_param *kp)
+{
+	long num = *((int *)kp->arg);
+
+	if (num > 0) {
+		if (num >= INT_MAX - (HZ - 1))
+			num = INT_MAX / HZ;
+		else
+			num = (num + (HZ - 1)) / HZ;
+	} else
+		num = -1;
+	return scnprintf(buffer, PAGE_SIZE, "%li\n", num);
+}
+
+static const struct kernel_param_ops param_ops_btrfs_timeout = {
+	.set = param_set_btrfs_timeout,
+	.get = param_get_btrfs_timeout,
+};
+#define param_check_btrfs_timeout(name, p) __param_check(name, p, int)
+
+module_param(btrfs_mountpoint_expiry_timeout, btrfs_timeout, 0644);
+MODULE_PARM_DESC(btrfs_mountpoint_expiry_timeout,
+		"Set the btrfs automounted mountpoint timeout value (seconds). "
+		"Values <= 0 turn expiration off.");
 
 static struct dentry *btrfs_lookup(struct inode *dir, struct dentry *dentry,
 				   unsigned int flags)
@@ -9046,6 +9144,15 @@ static int btrfs_getattr(struct user_namespace *mnt_userns,
 
 	generic_fillattr(&init_user_ns, inode, stat);
 	stat->dev = BTRFS_I(inode)->root->anon_dev;
+	if ((inode->i_flags & S_AUTOMOUNT) &&
+	    path->dentry != path->mnt->mnt_root) {
+		/* This is the mounted-on side of the automount,
+		 * so we show the inode number from the ROOT_ITEM key
+		 * and the dev of the mountpoint.
+		 */
+		stat->ino = btrfs_location_to_ino(&BTRFS_I(inode)->root->root_key);
+		stat->dev = BTRFS_I(d_inode(path->mnt->mnt_root))->root->anon_dev;
+	}
 
 	spin_lock(&BTRFS_I(inode)->lock);
 	delalloc_bytes = BTRFS_I(inode)->new_delalloc_bytes;
@@ -10686,4 +10793,5 @@ static const struct inode_operations btrfs_symlink_inode_operations = {
 
 const struct dentry_operations btrfs_dentry_operations = {
 	.d_delete	= btrfs_dentry_delete,
+	.d_automount	= btrfs_automount,
 };
