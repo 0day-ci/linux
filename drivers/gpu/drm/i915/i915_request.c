@@ -42,7 +42,6 @@
 
 #include "i915_active.h"
 #include "i915_drv.h"
-#include "i915_globals.h"
 #include "i915_trace.h"
 #include "intel_pm.h"
 
@@ -52,11 +51,8 @@ struct execute_cb {
 	struct i915_request *signal;
 };
 
-static struct i915_global_request {
-	struct i915_global base;
-	struct kmem_cache *slab_requests;
-	struct kmem_cache *slab_execute_cbs;
-} global;
+static struct kmem_cache *slab_requests;
+static struct kmem_cache *slab_execute_cbs;
 
 static const char *i915_fence_get_driver_name(struct dma_fence *fence)
 {
@@ -107,7 +103,7 @@ static signed long i915_fence_wait(struct dma_fence *fence,
 
 struct kmem_cache *i915_request_slab_cache(void)
 {
-	return global.slab_requests;
+	return slab_requests;
 }
 
 static void i915_fence_release(struct dma_fence *fence)
@@ -159,7 +155,7 @@ static void i915_fence_release(struct dma_fence *fence)
 	    !cmpxchg(&rq->engine->request_pool, NULL, rq))
 		return;
 
-	kmem_cache_free(global.slab_requests, rq);
+	kmem_cache_free(slab_requests, rq);
 }
 
 const struct dma_fence_ops i915_fence_ops = {
@@ -176,7 +172,7 @@ static void irq_execute_cb(struct irq_work *wrk)
 	struct execute_cb *cb = container_of(wrk, typeof(*cb), work);
 
 	i915_sw_fence_complete(cb->fence);
-	kmem_cache_free(global.slab_execute_cbs, cb);
+	kmem_cache_free(slab_execute_cbs, cb);
 }
 
 static __always_inline void
@@ -514,7 +510,7 @@ __await_execution(struct i915_request *rq,
 	if (i915_request_is_active(signal))
 		return 0;
 
-	cb = kmem_cache_alloc(global.slab_execute_cbs, gfp);
+	cb = kmem_cache_alloc(slab_execute_cbs, gfp);
 	if (!cb)
 		return -ENOMEM;
 
@@ -868,7 +864,7 @@ request_alloc_slow(struct intel_timeline *tl,
 	rq = list_first_entry(&tl->requests, typeof(*rq), link);
 	i915_request_retire(rq);
 
-	rq = kmem_cache_alloc(global.slab_requests,
+	rq = kmem_cache_alloc(slab_requests,
 			      gfp | __GFP_RETRY_MAYFAIL | __GFP_NOWARN);
 	if (rq)
 		return rq;
@@ -881,7 +877,7 @@ request_alloc_slow(struct intel_timeline *tl,
 	retire_requests(tl);
 
 out:
-	return kmem_cache_alloc(global.slab_requests, gfp);
+	return kmem_cache_alloc(slab_requests, gfp);
 }
 
 static void __i915_request_ctor(void *arg)
@@ -942,7 +938,7 @@ __i915_request_create(struct intel_context *ce, gfp_t gfp)
 	 *
 	 * Do not use kmem_cache_zalloc() here!
 	 */
-	rq = kmem_cache_alloc(global.slab_requests,
+	rq = kmem_cache_alloc(slab_requests,
 			      gfp | __GFP_RETRY_MAYFAIL | __GFP_NOWARN);
 	if (unlikely(!rq)) {
 		rq = request_alloc_slow(tl, &ce->engine->request_pool, gfp);
@@ -1029,7 +1025,7 @@ err_unwind:
 	GEM_BUG_ON(!list_empty(&rq->sched.waiters_list));
 
 err_free:
-	kmem_cache_free(global.slab_requests, rq);
+	kmem_cache_free(slab_requests, rq);
 err_unreserve:
 	intel_context_unpin(ce);
 	return ERR_PTR(ret);
@@ -2084,19 +2080,15 @@ void i915_request_show(struct drm_printer *m,
 #include "selftests/i915_request.c"
 #endif
 
-static void i915_global_request_exit(void)
+void i915_request_module_exit(void)
 {
-	kmem_cache_destroy(global.slab_execute_cbs);
-	kmem_cache_destroy(global.slab_requests);
+	kmem_cache_destroy(slab_execute_cbs);
+	kmem_cache_destroy(slab_requests);
 }
 
-static struct i915_global_request global = { {
-	.exit = i915_global_request_exit,
-} };
-
-int __init i915_global_request_init(void)
+int __init i915_request_module_init(void)
 {
-	global.slab_requests =
+	slab_requests =
 		kmem_cache_create("i915_request",
 				  sizeof(struct i915_request),
 				  __alignof__(struct i915_request),
@@ -2104,20 +2096,19 @@ int __init i915_global_request_init(void)
 				  SLAB_RECLAIM_ACCOUNT |
 				  SLAB_TYPESAFE_BY_RCU,
 				  __i915_request_ctor);
-	if (!global.slab_requests)
+	if (!slab_requests)
 		return -ENOMEM;
 
-	global.slab_execute_cbs = KMEM_CACHE(execute_cb,
+	slab_execute_cbs = KMEM_CACHE(execute_cb,
 					     SLAB_HWCACHE_ALIGN |
 					     SLAB_RECLAIM_ACCOUNT |
 					     SLAB_TYPESAFE_BY_RCU);
-	if (!global.slab_execute_cbs)
+	if (!slab_execute_cbs)
 		goto err_requests;
 
-	i915_global_register(&global.base);
 	return 0;
 
 err_requests:
-	kmem_cache_destroy(global.slab_requests);
+	kmem_cache_destroy(slab_requests);
 	return -ENOMEM;
 }
