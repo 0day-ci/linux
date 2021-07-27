@@ -66,6 +66,7 @@ struct sighand_struct;
 struct signal_struct;
 struct task_delay_info;
 struct task_group;
+struct isol_info;
 
 /*
  * Task state bitmask. NOTE! These bits are also
@@ -1398,6 +1399,10 @@ struct task_struct {
 
 #ifdef CONFIG_KRETPROBES
 	struct llist_head               kretprobe_instances;
+#endif
+
+#ifdef CONFIG_CPU_ISOLATION
+	struct isol_info		*isol_info;
 #endif
 
 	/*

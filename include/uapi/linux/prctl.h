@@ -267,4 +267,13 @@ struct prctl_mm_map {
 # define PR_SCHED_CORE_SHARE_FROM	3 /* pull core_sched cookie to pid */
 # define PR_SCHED_CORE_MAX		4
 
+/* Task isolation control */
+#define PR_ISOL_SET			62
+#define PR_ISOL_GET			63
+#define PR_ISOL_ENTER			64
+#define PR_ISOL_EXIT			65
+# define PR_ISOL_MODE			1
+
+# define PR_ISOL_MODE_NONE		0
+# define PR_ISOL_MODE_NORMAL		1
 #endif /* _LINUX_PRCTL_H */
