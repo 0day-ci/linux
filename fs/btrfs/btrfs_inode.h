@@ -328,6 +328,16 @@ static inline bool btrfs_inode_in_log(struct btrfs_inode *inode, u64 generation)
 	return ret;
 }
 
+static inline unsigned long btrfs_location_to_ino(struct btrfs_key *location)
+{
+	if (location->type == BTRFS_INODE_ITEM_KEY)
+		return location->objectid;
+	/* Probably BTRFS_ROOT_ITEM_KEY, try to keep the inode
+	 * numbers separate.
+	 */
+	return ULONG_MAX - location->objectid;
+}
+
 struct btrfs_dio_private {
 	struct inode *inode;
 	u64 logical_offset;

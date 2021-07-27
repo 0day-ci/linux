@@ -6010,7 +6010,8 @@ again:
 		put_unaligned(fs_ftype_to_dtype(btrfs_dir_type(leaf, di)),
 				&entry->type);
 		btrfs_dir_item_key_to_cpu(leaf, di, &location);
-		put_unaligned(location.objectid, &entry->ino);
+		put_unaligned(btrfs_location_to_ino(&location),
+			      &entry->ino);
 		put_unaligned(found_key.offset, &entry->offset);
 		entries++;
 		addr += sizeof(struct dir_entry) + name_len;
