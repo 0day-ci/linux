@@ -1122,6 +1122,31 @@ int ufshcd_wb_toggle(struct ufs_hba *hba, bool enable);
 int ufshcd_suspend_prepare(struct device *dev);
 void ufshcd_resume_complete(struct device *dev);
 
+/**
+ * ufs_is_valid_unit_desc_lun - checks if the given LUN has a unit descriptor
+ * @dev_info: pointer of instance of struct ufs_dev_info
+ * @lun: LU number to check
+ * @return: true if the lun has a matching unit descriptor, false otherwise
+ */
+static inline bool ufs_is_valid_unit_desc_lun(struct ufs_hba *hba, u8 lun,
+					      u8 param_offset)
+{
+	struct ufs_dev_info *dev_info = &hba->dev_info;
+	u8 desc_size = lun == UFS_UPIU_RPMB_WLUN ?
+			hba->desc_size[QUERY_DESC_IDN_UNIT_RPMB] :
+			hba->desc_size[QUERY_DESC_IDN_UNIT];
+
+	if (!dev_info || !dev_info->max_lu_supported) {
+		pr_err("Max General LU supported by UFS isn't initialized\n");
+		return false;
+	}
+
+	if (param_offset >= desc_size)
+		return false;
+
+	return lun == UFS_UPIU_RPMB_WLUN || (lun < dev_info->max_lu_supported);
+}
+
 /* Wrapper functions for safely calling variant operations */
 static inline const char *ufshcd_get_var_name(struct ufs_hba *hba)
 {
