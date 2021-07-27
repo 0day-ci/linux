@@ -333,12 +333,16 @@ fail:
  * @hw: handle between common and hardware-specific interfaces
  * @off: register offset
  * @bit: ON/MON bit
+ * @is_coupled: flag to indicate coupled clock
+ * @on_cnt: ON count for coupled clocks
  * @priv: CPG/MSTP private data
  */
 struct mstp_clock {
 	struct clk_hw hw;
 	u16 off;
 	u8 bit;
+	bool is_coupled;
+	u8 on_cnt;
 	struct rzg2l_cpg_priv *priv;
 };
 
@@ -392,11 +396,37 @@ static int rzg2l_mod_clock_endisable(struct clk_hw *hw, bool enable)
 
 static int rzg2l_mod_clock_enable(struct clk_hw *hw)
 {
+	struct mstp_clock *clock = to_mod_clock(hw);
+	struct rzg2l_cpg_priv *priv = clock->priv;
+	unsigned long flags;
+
+	spin_lock_irqsave(&priv->rmw_lock, flags);
+	clock->on_cnt++;
+	if (clock->is_coupled && clock->on_cnt > 1) {
+		spin_unlock_irqrestore(&priv->rmw_lock, flags);
+		return 1;
+	}
+
+	spin_unlock_irqrestore(&priv->rmw_lock, flags);
+
 	return rzg2l_mod_clock_endisable(hw, true);
 }
 
 static void rzg2l_mod_clock_disable(struct clk_hw *hw)
 {
+	struct mstp_clock *clock = to_mod_clock(hw);
+	struct rzg2l_cpg_priv *priv = clock->priv;
+	unsigned long flags;
+
+	spin_lock_irqsave(&priv->rmw_lock, flags);
+	clock->on_cnt--;
+	if (clock->is_coupled && clock->on_cnt) {
+		spin_unlock_irqrestore(&priv->rmw_lock, flags);
+		return;
+	}
+
+	spin_unlock_irqrestore(&priv->rmw_lock, flags);
+
 	rzg2l_mod_clock_endisable(hw, false);
 }
 
@@ -475,6 +505,7 @@ rzg2l_cpg_register_mod_clk(const struct rzg2l_mod_clk *mod,
 
 	clock->off = mod->off;
 	clock->bit = mod->bit;
+	clock->is_coupled = mod->is_coupled;
 	clock->priv = priv;
 	clock->hw.init = &init;
 
