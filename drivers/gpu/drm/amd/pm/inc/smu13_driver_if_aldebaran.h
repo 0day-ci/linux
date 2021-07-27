@@ -390,6 +390,7 @@ typedef struct {
   uint32_t spare3[14];
 
   // SECTION: BOARD PARAMETERS
+  struct_group(v4_10,
   // Telemetry Settings
   uint16_t GfxMaxCurrent; // in Amps
   int8_t   GfxOffset;     // in Amps
@@ -444,7 +445,7 @@ typedef struct {
 
   //reserved
   uint32_t reserved[14];
-
+  );
 } PPTable_t;
 
 typedef struct {

@@ -725,6 +725,7 @@ typedef struct {
   uint32_t     Reserved[8];
 
   // SECTION: BOARD PARAMETERS
+  struct_group(v4,
   // I2C Control
   I2cControllerConfig_t  I2cControllers[NUM_I2C_CONTROLLERS];     
 
@@ -809,10 +810,10 @@ typedef struct {
   uint8_t      Padding8_Loadline;
 
   uint32_t     BoardReserved[8];
+  );
 
   // Padding for MMHUB - do not modify this
   uint32_t     MmHubPadding[8]; // SMU internal use
-
 } PPTable_t;
 
 typedef struct {
