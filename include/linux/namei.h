@@ -73,7 +73,7 @@ extern struct dentry *lookup_one_len_unlocked(const char *, struct dentry *, int
 extern struct dentry *lookup_positive_unlocked(const char *, struct dentry *, int);
 
 extern int follow_down_one(struct path *);
-extern int follow_down(struct path *);
+extern int follow_down(struct path *, unsigned int);
 extern int follow_up(struct path *);
 
 extern struct dentry *lock_rename(struct dentry *, struct dentry *);
