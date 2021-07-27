@@ -172,6 +172,11 @@ void bpf_jit_build_prologue(u32 *image, struct codegen_context *ctx);
 void bpf_jit_build_epilogue(u32 *image, struct codegen_context *ctx);
 void bpf_jit_realloc_regs(struct codegen_context *ctx);
 
+static inline int bpf_to_ppc(struct codegen_context *ctx, int reg)
+{
+	return ctx->b2p[reg];
+}
+
 #endif
 
 #endif

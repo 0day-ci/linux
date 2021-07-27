@@ -58,11 +58,6 @@ const int b2p[MAX_BPF_JIT_REG + 1] = {
 	[TMP_REG] = 31,		/* 32 bits */
 };
 
-static int bpf_to_ppc(struct codegen_context *ctx, int reg)
-{
-	return ctx->b2p[reg];
-}
-
 /* PPC NVR range -- update this if we ever use NVRs below r17 */
 #define BPF_PPC_NVR_MIN		17
 #define BPF_PPC_TC		16
