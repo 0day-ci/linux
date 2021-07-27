@@ -138,10 +138,16 @@ static int show_mountinfo(struct seq_file *m, struct vfsmount *mnt)
 	struct mount *r = real_mount(mnt);
 	struct super_block *sb = mnt->mnt_sb;
 	struct path mnt_path = { .dentry = mnt->mnt_root, .mnt = mnt };
+	struct kstat stat;
 	int err;
 
+	/* We only want ->dev, and there is no STATX flag for that,
+	 * so ask for nothing and assume we get ->dev
+	 */
+	vfs_getattr_nosec(&mnt_path, &stat, 0, AT_STATX_DONT_SYNC);
+
 	seq_printf(m, "%i %i %u:%u ", r->mnt_id, r->mnt_parent->mnt_id,
-		   MAJOR(sb->s_dev), MINOR(sb->s_dev));
+		   MAJOR(stat.dev), MINOR(stat.dev));
 	if (sb->s_op->show_path) {
 		err = sb->s_op->show_path(m, mnt->mnt_root);
 		if (err)
