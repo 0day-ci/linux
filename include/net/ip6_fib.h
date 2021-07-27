@@ -205,20 +205,22 @@ struct fib6_info {
 
 struct rt6_info {
 	struct dst_entry		dst;
-	struct fib6_info __rcu		*from;
-	int				sernum;
+	struct_group(init,
+		struct fib6_info __rcu		*from;
+		int				sernum;
 
-	struct rt6key			rt6i_dst;
-	struct rt6key			rt6i_src;
-	struct in6_addr			rt6i_gateway;
-	struct inet6_dev		*rt6i_idev;
-	u32				rt6i_flags;
+		struct rt6key			rt6i_dst;
+		struct rt6key			rt6i_src;
+		struct in6_addr			rt6i_gateway;
+		struct inet6_dev		*rt6i_idev;
+		u32				rt6i_flags;
 
-	struct list_head		rt6i_uncached;
-	struct uncached_list		*rt6i_uncached_list;
+		struct list_head		rt6i_uncached;
+		struct uncached_list		*rt6i_uncached_list;
 
-	/* more non-fragment space at head required */
-	unsigned short			rt6i_nfheader_len;
+		/* more non-fragment space at head required */
+		unsigned short			rt6i_nfheader_len;
+	);
 };
 
 struct fib6_result {
