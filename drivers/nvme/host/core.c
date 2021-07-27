@@ -833,7 +833,7 @@ static blk_status_t nvme_setup_discard(struct nvme_ns *ns, struct request *req,
 {
 	unsigned short segments = blk_rq_nr_discard_segments(req), n = 0;
 	struct nvme_dsm_range *range;
-	struct bio *bio;
+	struct req_discard_range r;
 
 	/*
 	 * Some devices do not consider the DSM 'Number of Ranges' field when
@@ -855,9 +855,9 @@ static blk_status_t nvme_setup_discard(struct nvme_ns *ns, struct request *req,
 		range = page_address(ns->ctrl->discard_page);
 	}
 
-	__rq_for_each_bio(bio, req) {
-		u64 slba = nvme_sect_to_lba(ns, bio->bi_iter.bi_sector);
-		u32 nlb = bio->bi_iter.bi_size >> ns->lba_shift;
+	rq_for_each_discard_range(r, req) {
+		u64 slba = nvme_sect_to_lba(ns, r.sector);
+		u32 nlb = r.size >> ns->lba_shift;
 
 		if (n < segments) {
 			range[n].cattr = cpu_to_le32(0);

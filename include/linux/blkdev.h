@@ -982,6 +982,57 @@ static inline unsigned int blk_rq_stats_sectors(const struct request *rq)
 	return rq->stats_sectors;
 }
 
+struct req_discard_range {
+	sector_t	sector;
+	unsigned int	size;
+
+	/*
+	 * internal field: driver don't use it, and it always points to
+	 * next bio to be processed
+	 */
+	struct bio *__bio;
+};
+
+static inline void req_init_discard_range_iter(const struct request *rq,
+		struct req_discard_range *range)
+{
+	range->__bio = rq->bio;
+}
+
+/* return true if @range stores one valid discard range */
+static inline bool req_get_discard_range(struct req_discard_range *range)
+{
+	struct bio *bio;
+
+	if (!range->__bio)
+		return false;
+
+	bio = range->__bio;
+	range->sector = bio->bi_iter.bi_sector;
+	range->size = bio->bi_iter.bi_size;
+	range->__bio = bio->bi_next;
+
+	while (range->__bio) {
+		struct bio *bio = range->__bio;
+
+		if (range->sector + (range->size >> SECTOR_SHIFT) !=
+				bio->bi_iter.bi_sector)
+			break;
+
+		/*
+		 * ->size won't overflow because req->__data_len is defined
+		 *  as 'unsigned int'
+		 */
+		range->size += bio->bi_iter.bi_size;
+		range->__bio = bio->bi_next;
+	}
+	return true;
+}
+
+#define rq_for_each_discard_range(range, rq) \
+	for (req_init_discard_range_iter((rq), &range); \
+			req_get_discard_range(&range);)
+
 #ifdef CONFIG_BLK_DEV_ZONED
 
 /* Helper to convert BLK_ZONE_ZONE_XXX to its string format XXX */

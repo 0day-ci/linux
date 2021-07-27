@@ -119,7 +119,6 @@ static int virtblk_setup_discard_write_zeroes(struct request *req, bool unmap)
 	unsigned short segments = blk_rq_nr_discard_segments(req);
 	unsigned short n = 0;
 	struct virtio_blk_discard_write_zeroes *range;
-	struct bio *bio;
 	u32 flags = 0;
 
 	if (unmap)
@@ -141,9 +140,11 @@ static int virtblk_setup_discard_write_zeroes(struct request *req, bool unmap)
 		range[0].sector = cpu_to_le64(blk_rq_pos(req));
 		n = 1;
 	} else {
-		__rq_for_each_bio(bio, req) {
-			u64 sector = bio->bi_iter.bi_sector;
-			u32 num_sectors = bio->bi_iter.bi_size >> SECTOR_SHIFT;
+		struct req_discard_range r;
+
+		rq_for_each_discard_range(r, req) {
+			u64 sector = r.sector;
+			u32 num_sectors = r.size >> SECTOR_SHIFT;
 
 			range[n].flags = cpu_to_le32(flags);
 			range[n].num_sectors = cpu_to_le32(num_sectors);
