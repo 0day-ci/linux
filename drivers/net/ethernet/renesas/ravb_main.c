@@ -172,6 +172,14 @@ static const struct mdiobb_ops bb_ops = {
 	.get_mdio_data = ravb_get_mdio_data,
 };
 
+static u32 get_num_desc(u32 from, u32 subtract)
+{
+	if (from >= subtract)
+		return from - subtract;
+
+	return U32_MAX - subtract + 1 + from;
+}
+
 /* Free TX skb function for AVB-IP */
 static int ravb_tx_free(struct net_device *ndev, int q, bool free_txed_only)
 {
@@ -183,7 +191,7 @@ static int ravb_tx_free(struct net_device *ndev, int q, bool free_txed_only)
 	int entry;
 	u32 size;
 
-	for (; priv->cur_tx[q] - priv->dirty_tx[q] > 0; priv->dirty_tx[q]++) {
+	for (; get_num_desc(priv->cur_tx[q], priv->dirty_tx[q]) > 0; priv->dirty_tx[q]++) {
 		bool txed;
 
 		entry = priv->dirty_tx[q] % (priv->num_tx_ring[q] *
@@ -536,8 +544,8 @@ static bool ravb_rx(struct net_device *ndev, int *quota, int q)
 {
 	struct ravb_private *priv = netdev_priv(ndev);
 	int entry = priv->cur_rx[q] % priv->num_rx_ring[q];
-	int boguscnt = (priv->dirty_rx[q] + priv->num_rx_ring[q]) -
-			priv->cur_rx[q];
+	int boguscnt = get_num_desc(priv->dirty_rx[q], priv->cur_rx[q]) +
+		       priv->num_rx_ring[q];
 	struct net_device_stats *stats = &priv->stats[q];
 	struct ravb_ex_rx_desc *desc;
 	struct sk_buff *skb;
@@ -613,7 +621,7 @@ static bool ravb_rx(struct net_device *ndev, int *quota, int q)
 	}
 
 	/* Refill the RX ring buffers. */
-	for (; priv->cur_rx[q] - priv->dirty_rx[q] > 0; priv->dirty_rx[q]++) {
+	for (; get_num_desc(priv->cur_rx[q], priv->dirty_rx[q]) > 0; priv->dirty_rx[q]++) {
 		entry = priv->dirty_rx[q] % priv->num_rx_ring[q];
 		desc = &priv->rx_ring[q][entry];
 		desc->ds_cc = cpu_to_le16(RX_BUF_SZ);
@@ -1499,8 +1507,8 @@ static netdev_tx_t ravb_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 	u32 len;
 
 	spin_lock_irqsave(&priv->lock, flags);
-	if (priv->cur_tx[q] - priv->dirty_tx[q] > (priv->num_tx_ring[q] - 1) *
-	    num_tx_desc) {
+	if (get_num_desc(priv->cur_tx[q], priv->dirty_tx[q]) >
+	    (priv->num_tx_ring[q] - 1) * num_tx_desc) {
 		netif_err(priv, tx_queued, ndev,
 			  "still transmitting with the full ring!\n");
 		netif_stop_subqueue(ndev, q);
@@ -1598,7 +1606,7 @@ static netdev_tx_t ravb_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 	ravb_modify(ndev, TCCR, TCCR_TSRQ0 << q, TCCR_TSRQ0 << q);
 
 	priv->cur_tx[q] += num_tx_desc;
-	if (priv->cur_tx[q] - priv->dirty_tx[q] >
+	if (get_num_desc(priv->cur_tx[q], priv->dirty_tx[q]) >
 	    (priv->num_tx_ring[q] - 1) * num_tx_desc &&
 	    !ravb_tx_free(ndev, q, true))
 		netif_stop_subqueue(ndev, q);
