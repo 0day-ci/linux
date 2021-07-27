@@ -228,7 +228,13 @@ static void f2fs_handle_step_decompress(struct bio_post_read_ctx *ctx)
 	struct bio_vec *bv;
 	struct bvec_iter_all iter_all;
 	bool all_compressed = true;
-	block_t blkaddr = SECTOR_TO_BLOCK(ctx->bio->bi_iter.bi_sector);
+	sector_t sector = ctx->bio->bi_iter.bi_sector;
+	block_t blkaddr;
+
+	if (bio_flagged(ctx->bio, BIO_REMAPPED))
+		sector -= ctx->bio->bi_bdev->bd_start_sect;
+
+	blkaddr = SECTOR_TO_BLOCK(sector);
 
 	bio_for_each_segment_all(bv, ctx->bio, iter_all) {
 		struct page *page = bv->bv_page;
