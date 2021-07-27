@@ -98,4 +98,7 @@ void i915_request_show_with_schedule(struct drm_printer *m,
 				     const char *prefix,
 				     int indent);
 
+void i915_scheduler_module_exit(void);
+int i915_scheduler_module_init(void);
+
 #endif /* _I915_SCHEDULER_H_ */
