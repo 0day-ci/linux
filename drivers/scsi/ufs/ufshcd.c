@@ -3334,7 +3334,8 @@ static void ufshcd_update_desc_length(struct ufs_hba *hba,
 				      unsigned char desc_len)
 {
 	if (hba->desc_size[desc_id] == QUERY_DESC_MAX_SIZE &&
-	    desc_id != QUERY_DESC_IDN_STRING && desc_index != UFS_RPMB_UNIT)
+	    desc_id != QUERY_DESC_IDN_STRING &&
+	    desc_index != UFS_UPIU_RPMB_WLUN)
 		/* For UFS 3.1, the normal unit descriptor is 10 bytes larger
 		 * than the RPMB unit, however, both descriptors share the same
 		 * desc_idn, to cover both unit descriptors with one length, we
