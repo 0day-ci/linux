@@ -1998,7 +1998,7 @@
 				 <&mmcc SMMU_MDP_AXI_CLK>;
 			clock-names = "iface", "bus";
 
-			power-domains = <&mmcc MDSS_GDSC>;
+			power-domains = <&mmcc MMAGIC_MDSS_GDSC>;
 		};
 
 		venus_smmu: iommu@d40000 {
