@@ -5484,7 +5484,7 @@ int btrfs_drop_snapshot(struct btrfs_root *root, int update_ref, int for_reloc)
 	struct btrfs_trans_handle *trans;
 	struct btrfs_root *tree_root = fs_info->tree_root;
 	struct btrfs_root_item *root_item = &root->root_item;
-	struct walk_control *wc;
+	struct walk_control wc = {0};
 	struct btrfs_key key;
 	int err = 0;
 	int ret;
@@ -5495,13 +5495,6 @@ int btrfs_drop_snapshot(struct btrfs_root *root, int update_ref, int for_reloc)
 
 	path = btrfs_alloc_path();
 	if (!path) {
-		err = -ENOMEM;
-		goto out;
-	}
-
-	wc = kzalloc(sizeof(*wc), GFP_NOFS);
-	if (!wc) {
-		btrfs_free_path(path);
 		err = -ENOMEM;
 		goto out;
 	}
@@ -5537,12 +5530,10 @@ int btrfs_drop_snapshot(struct btrfs_root *root, int update_ref, int for_reloc)
 		path->nodes[level] = btrfs_lock_root_node(root);
 		path->slots[level] = 0;
 		path->locks[level] = BTRFS_WRITE_LOCK;
-		memset(&wc->update_progress, 0,
-		       sizeof(wc->update_progress));
 	} else {
 		btrfs_disk_key_to_cpu(&key, &root_item->drop_progress);
-		memcpy(&wc->update_progress, &key,
-		       sizeof(wc->update_progress));
+		memcpy(&wc.update_progress, &key,
+		       sizeof(wc.update_progress));
 
 		level = btrfs_root_drop_level(root_item);
 		BUG_ON(level == 0);
@@ -5568,62 +5559,62 @@ int btrfs_drop_snapshot(struct btrfs_root *root, int update_ref, int for_reloc)
 
 			ret = btrfs_lookup_extent_info(trans, fs_info,
 						path->nodes[level]->start,
-						level, 1, &wc->refs[level],
-						&wc->flags[level]);
+						level, 1, &wc.refs[level],
+						&wc.flags[level]);
 			if (ret < 0) {
 				err = ret;
 				goto out_end_trans;
 			}
-			BUG_ON(wc->refs[level] == 0);
+			BUG_ON(wc.refs[level] == 0);
 
 			if (level == btrfs_root_drop_level(root_item))
 				break;
 
 			btrfs_tree_unlock(path->nodes[level]);
 			path->locks[level] = 0;
-			WARN_ON(wc->refs[level] != 1);
+			WARN_ON(wc.refs[level] != 1);
 			level--;
 		}
 	}
 
-	wc->restarted = test_bit(BTRFS_ROOT_DEAD_TREE, &root->state);
-	wc->level = level;
-	wc->shared_level = -1;
-	wc->stage = DROP_REFERENCE;
-	wc->update_ref = update_ref;
-	wc->keep_locks = 0;
-	wc->reada_count = BTRFS_NODEPTRS_PER_BLOCK(fs_info);
+	wc.restarted = test_bit(BTRFS_ROOT_DEAD_TREE, &root->state);
+	wc.level = level;
+	wc.shared_level = -1;
+	wc.stage = DROP_REFERENCE;
+	wc.update_ref = update_ref;
+	wc.keep_locks = 0;
+	wc.reada_count = BTRFS_NODEPTRS_PER_BLOCK(fs_info);
 
 	while (1) {
 
-		ret = walk_down_tree(trans, root, path, wc);
+		ret = walk_down_tree(trans, root, path, &wc);
 		if (ret < 0) {
 			err = ret;
 			break;
 		}
 
-		ret = walk_up_tree(trans, root, path, wc, BTRFS_MAX_LEVEL);
+		ret = walk_up_tree(trans, root, path, &wc, BTRFS_MAX_LEVEL);
 		if (ret < 0) {
 			err = ret;
 			break;
 		}
 
 		if (ret > 0) {
-			BUG_ON(wc->stage != DROP_REFERENCE);
+			BUG_ON(wc.stage != DROP_REFERENCE);
 			break;
 		}
 
-		if (wc->stage == DROP_REFERENCE) {
-			wc->drop_level = wc->level;
-			btrfs_node_key_to_cpu(path->nodes[wc->drop_level],
-					      &wc->drop_progress,
-					      path->slots[wc->drop_level]);
+		if (wc.stage == DROP_REFERENCE) {
+			wc.drop_level = wc.level;
+			btrfs_node_key_to_cpu(path->nodes[wc.drop_level],
+					      &wc.drop_progress,
+					      path->slots[wc.drop_level]);
 		}
 		btrfs_cpu_key_to_disk(&root_item->drop_progress,
-				      &wc->drop_progress);
-		btrfs_set_root_drop_level(root_item, wc->drop_level);
+				      &wc.drop_progress);
+		btrfs_set_root_drop_level(root_item, wc.drop_level);
 
-		BUG_ON(wc->level == 0);
+		BUG_ON(wc.level == 0);
 		if (btrfs_should_end_transaction(trans) ||
 		    (!for_reloc && btrfs_need_cleaner_sleep(fs_info))) {
 			ret = btrfs_update_root(trans, tree_root,
@@ -5703,7 +5694,6 @@ int btrfs_drop_snapshot(struct btrfs_root *root, int update_ref, int for_reloc)
 out_end_trans:
 	btrfs_end_transaction_throttle(trans);
 out_free:
-	kfree(wc);
 	btrfs_free_path(path);
 out:
 	/*
@@ -5731,7 +5721,7 @@ int btrfs_drop_subtree(struct btrfs_trans_handle *trans,
 {
 	struct btrfs_fs_info *fs_info = root->fs_info;
 	struct btrfs_path *path;
-	struct walk_control *wc;
+	struct walk_control wc = {0};
 	int level;
 	int parent_level;
 	int ret = 0;
@@ -5742,12 +5732,6 @@ int btrfs_drop_subtree(struct btrfs_trans_handle *trans,
 	path = btrfs_alloc_path();
 	if (!path)
 		return -ENOMEM;
-
-	wc = kzalloc(sizeof(*wc), GFP_NOFS);
-	if (!wc) {
-		btrfs_free_path(path);
-		return -ENOMEM;
-	}
 
 	btrfs_assert_tree_locked(parent);
 	parent_level = btrfs_header_level(parent);
@@ -5761,30 +5745,29 @@ int btrfs_drop_subtree(struct btrfs_trans_handle *trans,
 	path->slots[level] = 0;
 	path->locks[level] = BTRFS_WRITE_LOCK;
 
-	wc->refs[parent_level] = 1;
-	wc->flags[parent_level] = BTRFS_BLOCK_FLAG_FULL_BACKREF;
-	wc->level = level;
-	wc->shared_level = -1;
-	wc->stage = DROP_REFERENCE;
-	wc->update_ref = 0;
-	wc->keep_locks = 1;
-	wc->reada_count = BTRFS_NODEPTRS_PER_BLOCK(fs_info);
+	wc.refs[parent_level] = 1;
+	wc.flags[parent_level] = BTRFS_BLOCK_FLAG_FULL_BACKREF;
+	wc.level = level;
+	wc.shared_level = -1;
+	wc.stage = DROP_REFERENCE;
+	wc.update_ref = 0;
+	wc.keep_locks = 1;
+	wc.reada_count = BTRFS_NODEPTRS_PER_BLOCK(fs_info);
 
 	while (1) {
-		wret = walk_down_tree(trans, root, path, wc);
+		wret = walk_down_tree(trans, root, path, &wc);
 		if (wret < 0) {
 			ret = wret;
 			break;
 		}
 
-		wret = walk_up_tree(trans, root, path, wc, parent_level);
+		wret = walk_up_tree(trans, root, path, &wc, parent_level);
 		if (wret < 0)
 			ret = wret;
 		if (wret != 0)
 			break;
 	}
 
-	kfree(wc);
 	btrfs_free_path(path);
 	return ret;
 }
