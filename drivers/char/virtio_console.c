@@ -1119,6 +1119,7 @@ static int put_chars(u32 vtermno, const char *buf, int count)
 	struct scatterlist sg[1];
 	void *data;
 	int ret;
+	bool vmalloc_addr = false;
 
 	if (unlikely(early_put_chars))
 		return early_put_chars(vtermno, buf, count);
@@ -1127,13 +1128,18 @@ static int put_chars(u32 vtermno, const char *buf, int count)
 	if (!port)
 		return -EPIPE;
 
-	data = kmemdup(buf, count, GFP_ATOMIC);
-	if (!data)
-		return -ENOMEM;
+	if (is_vmalloc_addr(buf)) {
+		data = kmemdup(buf, count, GFP_ATOMIC);
+		if (!data)
+			return -ENOMEM;
+		vmalloc_addr = true;
+	} else
+		data = (void *)buf;
 
 	sg_init_one(sg, data, count);
 	ret = __send_to_port(port, sg, 1, count, data, false);
-	kfree(data);
+	if (vmalloc_addr)
+		kfree(data);
 	return ret;
 }
 
