@@ -207,11 +207,18 @@ out_reconnected:
  * that case reconnect_path may still succeed with target_dir fully
  * connected, but further operations using the filehandle will fail when
  * necessary (due to S_DEAD being set on the directory).
+ *
+ * If the filesystem supports multiple subvols, then *mntp may be updated
+ * to a subordinate mount point on the same filesystem.
  */
 static int
-reconnect_path(struct vfsmount *mnt, struct dentry *target_dir, char *nbuf)
+reconnect_path(struct vfsmount **mntp, struct dentry *target_dir, char *nbuf)
 {
+	struct vfsmount *mnt = *mntp;
+	struct path path;
 	struct dentry *dentry, *parent;
+	struct kstat stat;
+	dev_t target_dev;
 
 	dentry = dget(target_dir);
 
@@ -232,6 +239,68 @@ reconnect_path(struct vfsmount *mnt, struct dentry *target_dir, char *nbuf)
 	}
 	dput(dentry);
 	clear_disconnected(target_dir);
+
+	/* Need to find appropriate vfsmount, which might not exist yet.
+	 * We may need to trigger automount points.
+	 */
+	path.mnt = mnt;
+	path.dentry = target_dir;
+	vfs_getattr_nosec(&path, &stat, 0, AT_STATX_DONT_SYNC);
+	target_dev = stat.dev;
+
+	path.dentry = mnt->mnt_root;
+	vfs_getattr_nosec(&path, &stat, 0, AT_STATX_DONT_SYNC);
+
+	while (stat.dev != target_dev) {
+		/* walk up the dcache tree from target_dir, recording the
+		 * location of the most recent change in dev number,
+		 * until we find a mountpoint.
+		 * If there was no change in show_dev result before the
+		 * mountpount, the vfsmount at the mountpoint is what we want.
+		 * If there was, we need to trigger an automount where the
+		 * show_dev() result changed.
+		 */
+		struct dentry *last_change = NULL;
+		dev_t last_dev = target_dev;
+
+		dentry = dget(target_dir);
+		while ((parent = dget_parent(dentry)) != dentry) {
+			path.dentry = parent;
+			vfs_getattr_nosec(&path, &stat, 0, AT_STATX_DONT_SYNC);
+			if (stat.dev != last_dev) {
+				path.dentry = dentry;
+				mnt = lookup_mnt(&path);
+				if (mnt) {
+					mntput(path.mnt);
+					path.mnt = mnt;
+					break;
+				}
+				dput(last_change);
+				last_change = dget(dentry);
+				last_dev = stat.dev;
+			}
+			dput(dentry);
+			dentry = parent;
+		}
+		dput(dentry); dput(parent);
+
+		if (!last_change)
+			break;
+
+		mnt = path.mnt;
+		path.dentry = last_change;
+		follow_down(&path, LOOKUP_AUTOMOUNT);
+		dput(path.dentry);
+		if (path.mnt == mnt)
+			/* There should have been a mount-trap there,
+			 * but there wasn't.  Just give up.
+			 */
+			break;
+
+		path.dentry = mnt->mnt_root;
+		vfs_getattr_nosec(&path, &stat, 0, AT_STATX_DONT_SYNC);
+	}
+	*mntp = path.mnt;
 	return 0;
 }
 
@@ -418,12 +487,13 @@ int exportfs_encode_fh(struct dentry *dentry, struct fid *fid, int *max_len,
 EXPORT_SYMBOL_GPL(exportfs_encode_fh);
 
 struct dentry *
-exportfs_decode_fh_raw(struct vfsmount *mnt, struct fid *fid, int fh_len,
+exportfs_decode_fh_raw(struct vfsmount **mntp, struct fid *fid, int fh_len,
 		       int fileid_type,
 		       int (*acceptable)(void *, struct dentry *),
 		       void *context)
 {
-	const struct export_operations *nop = mnt->mnt_sb->s_export_op;
+	struct super_block *sb = (*mntp)->mnt_sb;
+	const struct export_operations *nop = sb->s_export_op;
 	struct dentry *result, *alias;
 	char nbuf[NAME_MAX+1];
 	int err;
@@ -433,7 +503,7 @@ exportfs_decode_fh_raw(struct vfsmount *mnt, struct fid *fid, int fh_len,
 	 */
 	if (!nop || !nop->fh_to_dentry)
 		return ERR_PTR(-ESTALE);
-	result = nop->fh_to_dentry(mnt->mnt_sb, fid, fh_len, fileid_type);
+	result = nop->fh_to_dentry(sb, fid, fh_len, fileid_type);
 	if (IS_ERR_OR_NULL(result))
 		return result;
 
@@ -452,14 +522,12 @@ exportfs_decode_fh_raw(struct vfsmount *mnt, struct fid *fid, int fh_len,
 		 *
 		 * On the positive side there is only one dentry for each
 		 * directory inode.  On the negative side this implies that we
-		 * to ensure our dentry is connected all the way up to the
+		 * need to ensure our dentry is connected all the way up to the
 		 * filesystem root.
 		 */
-		if (result->d_flags & DCACHE_DISCONNECTED) {
-			err = reconnect_path(mnt, result, nbuf);
-			if (err)
-				goto err_result;
-		}
+		err = reconnect_path(mntp, result, nbuf);
+		if (err)
+			goto err_result;
 
 		if (!acceptable(context, result)) {
 			err = -EACCES;
@@ -494,7 +562,7 @@ exportfs_decode_fh_raw(struct vfsmount *mnt, struct fid *fid, int fh_len,
 		if (!nop->fh_to_parent)
 			goto err_result;
 
-		target_dir = nop->fh_to_parent(mnt->mnt_sb, fid,
+		target_dir = nop->fh_to_parent(sb, fid,
 				fh_len, fileid_type);
 		if (!target_dir)
 			goto err_result;
@@ -507,7 +575,7 @@ exportfs_decode_fh_raw(struct vfsmount *mnt, struct fid *fid, int fh_len,
 		 * connected to the filesystem root.  The VFS really doesn't
 		 * like disconnected directories..
 		 */
-		err = reconnect_path(mnt, target_dir, nbuf);
+		err = reconnect_path(mntp, target_dir, nbuf);
 		if (err) {
 			dput(target_dir);
 			goto err_result;
@@ -518,7 +586,7 @@ exportfs_decode_fh_raw(struct vfsmount *mnt, struct fid *fid, int fh_len,
 		 * dentry for the inode we're after, make sure that our
 		 * inode is actually connected to the parent.
 		 */
-		err = exportfs_get_name(mnt, target_dir, nbuf, result);
+		err = exportfs_get_name(*mntp, target_dir, nbuf, result);
 		if (err) {
 			dput(target_dir);
 			goto err_result;
@@ -556,7 +624,7 @@ exportfs_decode_fh_raw(struct vfsmount *mnt, struct fid *fid, int fh_len,
 			goto err_result;
 		}
 
-		return alias;
+		return result;
 	}
 
  err_result:
@@ -565,14 +633,14 @@ exportfs_decode_fh_raw(struct vfsmount *mnt, struct fid *fid, int fh_len,
 }
 EXPORT_SYMBOL_GPL(exportfs_decode_fh_raw);
 
-struct dentry *exportfs_decode_fh(struct vfsmount *mnt, struct fid *fid,
+struct dentry *exportfs_decode_fh(struct vfsmount **mntp, struct fid *fid,
 				  int fh_len, int fileid_type,
 				  int (*acceptable)(void *, struct dentry *),
 				  void *context)
 {
 	struct dentry *ret;
 
-	ret = exportfs_decode_fh_raw(mnt, fid, fh_len, fileid_type,
+	ret = exportfs_decode_fh_raw(mntp, fid, fh_len, fileid_type,
 				     acceptable, context);
 	if (IS_ERR_OR_NULL(ret)) {
 		if (ret == ERR_PTR(-ENOMEM))

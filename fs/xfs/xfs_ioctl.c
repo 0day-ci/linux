@@ -149,6 +149,8 @@ xfs_handle_to_dentry(
 {
 	xfs_handle_t		handle;
 	struct xfs_fid64	fid;
+	struct dentry		*ret;
+	struct vfsmount		*mnt;
 
 	/*
 	 * Only allow handle opens under a directory.
@@ -168,9 +170,13 @@ xfs_handle_to_dentry(
 	fid.ino = handle.ha_fid.fid_ino;
 	fid.gen = handle.ha_fid.fid_gen;
 
-	return exportfs_decode_fh(parfilp->f_path.mnt, (struct fid *)&fid, 3,
-			FILEID_INO32_GEN | XFS_FILEID_TYPE_64FLAG,
-			xfs_handle_acceptable, NULL);
+	mnt = mntget(parfilp->f_path.mnt);
+	ret = exportfs_decode_fh(&mnt, (struct fid *)&fid, 3,
+				 FILEID_INO32_GEN | XFS_FILEID_TYPE_64FLAG,
+				 xfs_handle_acceptable, NULL);
+	WARN_ON(mnt != parfilp->f_path.mnt);
+	mntput(mnt);
+	return ret;
 }
 
 STATIC struct dentry *

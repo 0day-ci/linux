@@ -155,6 +155,7 @@ struct dentry *ovl_decode_real_fh(struct ovl_fs *ofs, struct ovl_fh *fh,
 {
 	struct dentry *real;
 	int bytes;
+	struct vfsmount *mnt2;
 
 	if (!capable(CAP_DAC_READ_SEARCH))
 		return NULL;
@@ -169,9 +170,11 @@ struct dentry *ovl_decode_real_fh(struct ovl_fs *ofs, struct ovl_fh *fh,
 		return NULL;
 
 	bytes = (fh->fb.len - offsetof(struct ovl_fb, fid));
-	real = exportfs_decode_fh(mnt, (struct fid *)fh->fb.fid,
+	mnt2 = mntget(mnt);
+	real = exportfs_decode_fh(&mnt2, (struct fid *)fh->fb.fid,
 				  bytes >> 2, (int)fh->fb.type,
 				  connected ? ovl_acceptable : NULL, mnt);
+	mntput(mnt2);
 	if (IS_ERR(real)) {
 		/*
 		 * Treat stale file handle to lower file as "origin unknown".

@@ -228,12 +228,12 @@ extern int exportfs_encode_inode_fh(struct inode *inode, struct fid *fid,
 				    int *max_len, struct inode *parent);
 extern int exportfs_encode_fh(struct dentry *dentry, struct fid *fid,
 	int *max_len, int connectable);
-extern struct dentry *exportfs_decode_fh_raw(struct vfsmount *mnt,
+extern struct dentry *exportfs_decode_fh_raw(struct vfsmount **mntp,
 					     struct fid *fid, int fh_len,
 					     int fileid_type,
 					     int (*acceptable)(void *, struct dentry *),
 					     void *context);
-extern struct dentry *exportfs_decode_fh(struct vfsmount *mnt, struct fid *fid,
+extern struct dentry *exportfs_decode_fh(struct vfsmount **mnt, struct fid *fid,
 	int fh_len, int fileid_type, int (*acceptable)(void *, struct dentry *),
 	void *context);
 

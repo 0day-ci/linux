@@ -157,6 +157,7 @@ static __be32 nfsd_set_fh_dentry(struct svc_rqst *rqstp, struct svc_fh *fhp)
 	struct fid *fid = NULL, sfid;
 	struct svc_export *exp;
 	struct dentry *dentry;
+	struct vfsmount *mnt = NULL;
 	int fileid_type;
 	int data_left = fh->fh_size/4;
 	__be32 error;
@@ -253,6 +254,8 @@ static __be32 nfsd_set_fh_dentry(struct svc_rqst *rqstp, struct svc_fh *fhp)
 	if (rqstp->rq_vers > 2)
 		error = nfserr_badhandle;
 
+	mnt = mntget(exp->ex_path.mnt);
+
 	if (fh->fh_version != 1) {
 		sfid.i32.ino = fh->ofh_ino;
 		sfid.i32.gen = fh->ofh_generation;
@@ -269,7 +272,7 @@ static __be32 nfsd_set_fh_dentry(struct svc_rqst *rqstp, struct svc_fh *fhp)
 	if (fileid_type == FILEID_ROOT)
 		dentry = dget(exp->ex_path.dentry);
 	else {
-		dentry = exportfs_decode_fh_raw(exp->ex_path.mnt, fid,
+		dentry = exportfs_decode_fh_raw(&mnt, fid,
 						data_left, fileid_type,
 						nfsd_acceptable, exp);
 		if (IS_ERR_OR_NULL(dentry)) {
@@ -299,7 +302,7 @@ static __be32 nfsd_set_fh_dentry(struct svc_rqst *rqstp, struct svc_fh *fhp)
 	}
 
 	fhp->fh_dentry = dentry;
-	fhp->fh_mnt = mntget(exp->ex_path.mnt);
+	fhp->fh_mnt = mnt;
 	fhp->fh_export = exp;
 
 	switch (rqstp->rq_vers) {
@@ -317,6 +320,7 @@ static __be32 nfsd_set_fh_dentry(struct svc_rqst *rqstp, struct svc_fh *fhp)
 
 	return 0;
 out:
+	mntput(mnt);
 	exp_put(exp);
 	return error;
 }
@@ -427,7 +431,6 @@ out:
 		nfsd_stats_fh_stale_inc(exp);
 	return error;
 }
-
 
 /*
  * Compose a file handle for an NFS reply.

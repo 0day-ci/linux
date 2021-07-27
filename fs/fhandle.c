@@ -149,7 +149,7 @@ static int do_handle_to_path(int mountdirfd, struct file_handle *handle,
 	}
 	/* change the handle size to multiple of sizeof(u32) */
 	handle_dwords = handle->handle_bytes >> 2;
-	path->dentry = exportfs_decode_fh(path->mnt,
+	path->dentry = exportfs_decode_fh(&path->mnt,
 					  (struct fid *)handle->f_handle,
 					  handle_dwords, handle->handle_type,
 					  vfs_dentry_acceptable, NULL);
