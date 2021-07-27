@@ -2928,7 +2928,7 @@ int finish_automount(struct vfsmount *m, struct path *path)
 	 */
 	BUG_ON(mnt_get_count(mnt) < 2);
 
-	if (m->mnt_sb == path->mnt->mnt_sb &&
+	if (m->mnt_root == path->mnt->mnt_root &&
 	    m->mnt_root == dentry) {
 		err = -ELOOP;
 		goto discard;
