@@ -49,6 +49,7 @@ void reset_scoop(struct device *dev)
 	iowrite16(0x0000, sdev->base + SCOOP_ISR);  /* 1C */
 	iowrite16(0x0000, sdev->base + SCOOP_IRM);
 }
+EXPORT_SYMBOL(reset_scoop);
 
 static void __scoop_gpio_set(struct scoop_dev *sdev,
 			unsigned offset, int value)
@@ -126,15 +127,13 @@ unsigned short read_scoop_reg(struct device *dev, unsigned short reg)
 	struct scoop_dev *sdev = dev_get_drvdata(dev);
 	return ioread16(sdev->base + reg);
 }
+EXPORT_SYMBOL(read_scoop_reg);
 
 void write_scoop_reg(struct device *dev, unsigned short reg, unsigned short data)
 {
 	struct scoop_dev *sdev = dev_get_drvdata(dev);
 	iowrite16(data, sdev->base + reg);
 }
-
-EXPORT_SYMBOL(reset_scoop);
-EXPORT_SYMBOL(read_scoop_reg);
 EXPORT_SYMBOL(write_scoop_reg);
 
 #ifdef CONFIG_PM
