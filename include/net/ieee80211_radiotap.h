@@ -39,10 +39,26 @@ struct ieee80211_radiotap_header {
 	 */
 	__le16 it_len;
 
-	/**
-	 * @it_present: (first) present word
-	 */
-	__le32 it_present;
+	union {
+		/**
+		 * @it_present: (first) present word
+		 */
+		__le32 it_present;
+
+		struct {
+			/* The compiler makes it difficult to overlap
+			 * a flex-array with an existing singleton,
+			 * so we're forced to add an empty named
+			 * variable here.
+			 */
+			struct { } __unused;
+
+			/**
+			 * @bitmap: all presence bitmaps
+			 */
+			__le32 bitmap[];
+		};
+	};
 } __packed;
 
 /* version is always 0 */
