@@ -458,7 +458,7 @@ static inline void bitmap_replace(unsigned long *dst,
 		__bitmap_replace(dst, old, new, mask, nbits);
 }
 
-static inline void bitmap_next_clear_region(unsigned long *bitmap,
+static inline void bitmap_next_clear_region(const unsigned long *bitmap,
 					    unsigned int *rs, unsigned int *re,
 					    unsigned int end)
 {
@@ -466,7 +466,7 @@ static inline void bitmap_next_clear_region(unsigned long *bitmap,
 	*re = find_next_bit(bitmap, end, *rs + 1);
 }
 
-static inline void bitmap_next_set_region(unsigned long *bitmap,
+static inline void bitmap_next_set_region(const unsigned long *bitmap,
 					  unsigned int *rs, unsigned int *re,
 					  unsigned int end)
 {
