@@ -1559,6 +1559,7 @@ static int __vfio_pci_add_vma(struct vfio_pci_device *vdev,
  * Zap mmaps on open so that we can fault them in on access and therefore
  * our vma_list only tracks mappings accessed since last zap.
  */
+#ifdef CONFIG_MMU
 static void vfio_pci_mmap_open(struct vm_area_struct *vma)
 {
 	zap_vma_ptes(vma, vma->vm_start, vma->vm_end - vma->vm_start);
@@ -1701,6 +1702,7 @@ static int vfio_pci_mmap(struct vfio_device *core_vdev, struct vm_area_struct *v
 
 	return 0;
 }
+#endif /* CONFIG_MMU */
 
 static void vfio_pci_request(struct vfio_device *core_vdev, unsigned int count)
 {
@@ -1875,7 +1877,9 @@ static const struct vfio_device_ops vfio_pci_ops = {
 	.ioctl		= vfio_pci_ioctl,
 	.read		= vfio_pci_read,
 	.write		= vfio_pci_write,
+#ifdef CONFIG_MMU
 	.mmap		= vfio_pci_mmap,
+#endif /* CONFIG_MMU */
 	.request	= vfio_pci_request,
 	.match		= vfio_pci_match,
 };

@@ -1182,6 +1182,7 @@ static ssize_t vfio_fops_write(struct file *filep, const char __user *buf,
 	return ret;
 }
 
+#ifdef CONFIG_MMU
 static int vfio_fops_mmap(struct file *filep, struct vm_area_struct *vma)
 {
 	struct vfio_container *container = filep->private_data;
@@ -1194,6 +1195,7 @@ static int vfio_fops_mmap(struct file *filep, struct vm_area_struct *vma)
 
 	return ret;
 }
+#endif /* CONFIG_MMU */
 
 static const struct file_operations vfio_fops = {
 	.owner		= THIS_MODULE,
@@ -1203,7 +1205,9 @@ static const struct file_operations vfio_fops = {
 	.write		= vfio_fops_write,
 	.unlocked_ioctl	= vfio_fops_unl_ioctl,
 	.compat_ioctl	= compat_ptr_ioctl,
+#ifdef CONFIG_MMU
 	.mmap		= vfio_fops_mmap,
+#endif /* CONFIG_MMU */
 };
 
 /**
@@ -1601,6 +1605,7 @@ static ssize_t vfio_device_fops_write(struct file *filep,
 	return device->ops->write(device, buf, count, ppos);
 }
 
+#ifdef CONFIG_MMU
 static int vfio_device_fops_mmap(struct file *filep, struct vm_area_struct *vma)
 {
 	struct vfio_device *device = filep->private_data;
@@ -1610,6 +1615,7 @@ static int vfio_device_fops_mmap(struct file *filep, struct vm_area_struct *vma)
 
 	return device->ops->mmap(device, vma);
 }
+#endif /* CONFIG_MMU */
 
 static const struct file_operations vfio_device_fops = {
 	.owner		= THIS_MODULE,
@@ -1618,7 +1624,9 @@ static const struct file_operations vfio_device_fops = {
 	.write		= vfio_device_fops_write,
 	.unlocked_ioctl	= vfio_device_fops_unl_ioctl,
 	.compat_ioctl	= compat_ptr_ioctl,
+#ifdef CONFIG_MMU
 	.mmap		= vfio_device_fops_mmap,
+#endif /* CONFIG_MMU */
 };
 
 /**
