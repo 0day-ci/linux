@@ -3319,11 +3319,13 @@ int ufshcd_query_descriptor_retry(struct ufs_hba *hba,
  * @desc_len: mapped desc length (out)
  */
 void ufshcd_map_desc_id_to_length(struct ufs_hba *hba, enum desc_idn desc_id,
-				  int *desc_len)
+				  int desc_index, int *desc_len)
 {
 	if (desc_id >= QUERY_DESC_IDN_MAX || desc_id == QUERY_DESC_IDN_RFU_0 ||
 	    desc_id == QUERY_DESC_IDN_RFU_1)
 		*desc_len = 0;
+	else if (desc_index == UFS_UPIU_RPMB_WLUN)
+		*desc_len = hba->desc_size[QUERY_DESC_IDN_UNIT_RPMB];
 	else
 		*desc_len = hba->desc_size[desc_id];
 }
@@ -3334,14 +3336,16 @@ static void ufshcd_update_desc_length(struct ufs_hba *hba,
 				      unsigned char desc_len)
 {
 	if (hba->desc_size[desc_id] == QUERY_DESC_MAX_SIZE &&
-	    desc_id != QUERY_DESC_IDN_STRING &&
-	    desc_index != UFS_UPIU_RPMB_WLUN)
+	    desc_id != QUERY_DESC_IDN_STRING) {
+		if (desc_index == UFS_UPIU_RPMB_WLUN)
 		/* For UFS 3.1, the normal unit descriptor is 10 bytes larger
 		 * than the RPMB unit, however, both descriptors share the same
-		 * desc_idn, to cover both unit descriptors with one length, we
-		 * choose the normal unit descriptor length by desc_index.
+		 * desc_idn, but differ by the descriptor index
 		 */
-		hba->desc_size[desc_id] = desc_len;
+			hba->desc_size[QUERY_DESC_IDN_UNIT_RPMB] = desc_len;
+		else
+			hba->desc_size[desc_id] = desc_len;
+	}
 }
 
 /**
@@ -3372,7 +3376,7 @@ int ufshcd_read_desc_param(struct ufs_hba *hba,
 		return -EINVAL;
 
 	/* Get the length of descriptor */
-	ufshcd_map_desc_id_to_length(hba, desc_id, &buff_len);
+	ufshcd_map_desc_id_to_length(hba, desc_id, desc_index, &buff_len);
 	if (!buff_len) {
 		dev_err(hba->dev, "%s: Failed to get desc length\n", __func__);
 		return -EINVAL;
