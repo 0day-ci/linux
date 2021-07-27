@@ -241,10 +241,11 @@ static int kobject_add_internal(struct kobject *kobj)
 
 	/* join kset if set, use it as parent if we do not already have one */
 	if (kobj->kset) {
-		if (!parent)
+		if (!parent) {
 			parent = kobject_get(&kobj->kset->kobj);
+			kobj->parent = parent;
+		}
 		kobj_kset_join(kobj);
-		kobj->parent = parent;
 	}
 
 	pr_debug("kobject: '%s' (%p): %s: parent: '%s', set: '%s'\n",
