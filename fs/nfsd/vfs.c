@@ -2445,3 +2445,21 @@ nfsd_permission(struct svc_rqst *rqstp, struct svc_export *exp,
 
 	return err? nfserrno(err) : 0;
 }
+
+unsigned long nfsd_get_mounted_on(struct vfsmount *mnt)
+{
+	struct kstat stat;
+	struct path path = { .mnt = mnt, .dentry = mnt->mnt_root };
+	int err;
+
+	path_get(&path);
+	while (follow_up(&path)) {
+		if (path.dentry != path.mnt->mnt_root)
+			break;
+	}
+	err = vfs_getattr(&path, &stat, STATX_INO, AT_STATX_DONT_SYNC);
+	path_put(&path);
+	if (err)
+		return 0;
+	return stat.ino;
+}

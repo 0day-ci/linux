@@ -132,6 +132,8 @@ __be32		nfsd_statfs(struct svc_rqst *, struct svc_fh *,
 __be32		nfsd_permission(struct svc_rqst *, struct svc_export *,
 				struct dentry *, int);
 
+unsigned long	nfsd_get_mounted_on(struct vfsmount *mnt);
+
 static inline int fh_want_write(struct svc_fh *fh)
 {
 	int ret;

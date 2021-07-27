@@ -2768,22 +2768,6 @@ static __be32 fattr_handle_absent_fs(u32 *bmval0, u32 *bmval1, u32 *bmval2, u32 
 	return 0;
 }
 
-
-static int get_parent_attributes(struct svc_export *exp, struct kstat *stat)
-{
-	struct path path = exp->ex_path;
-	int err;
-
-	path_get(&path);
-	while (follow_up(&path)) {
-		if (path.dentry != path.mnt->mnt_root)
-			break;
-	}
-	err = vfs_getattr(&path, stat, STATX_BASIC_STATS, AT_STATX_SYNC_AS_STAT);
-	path_put(&path);
-	return err;
-}
-
 static __be32
 nfsd4_encode_bitmap(struct xdr_stream *xdr, u32 bmval0, u32 bmval1, u32 bmval2)
 {
@@ -3269,8 +3253,7 @@ out_acl:
 		*p++ = cpu_to_be32(stat.mtime.tv_nsec);
 	}
 	if (bmval1 & FATTR4_WORD1_MOUNTED_ON_FILEID) {
-		struct kstat parent_stat;
-		u64 ino = stat.ino;
+		u64 ino;
 
 		p = xdr_reserve_space(xdr, 8);
 		if (!p)
@@ -3279,12 +3262,10 @@ out_acl:
 		 * Get parent's attributes if not ignoring crossmount
 		 * and this is the root of a cross-mounted filesystem.
 		 */
-		if (ignore_crossmnt == 0 && dentry == mnt->mnt_root) {
-			err = get_parent_attributes(exp, &parent_stat);
-			if (err)
-				goto out_nfserr;
-			ino = parent_stat.ino;
-		}
+		if (ignore_crossmnt == 0 && dentry == mnt->mnt_root)
+			ino = nfsd_get_mounted_on(mnt);
+		if (!ino)
+			ino = stat.ino;
 		p = xdr_encode_hyper(p, ino);
 	}
 #ifdef CONFIG_NFSD_PNFS
