@@ -196,10 +196,10 @@ struct vfsmount *nfs_d_automount(struct path *path)
 		goto out_fc;
 
 	mntget(mnt); /* prevent immediate expiration */
+	mnt_set_expiry(mnt, &nfs_automount_list);
 	if (timeout <= 0)
 		goto out_fc;
 
-	mnt_set_expiry(mnt, &nfs_automount_list);
 	schedule_delayed_work(&nfs_automount_task, timeout);
 
 out_fc:
@@ -366,5 +366,4 @@ static const struct kernel_param_ops param_ops_nfs_timeout = {
 
 module_param(nfs_mountpoint_expiry_timeout, nfs_timeout, 0644);
 MODULE_PARM_DESC(nfs_mountpoint_expiry_timeout,
-		"Set the NFS automounted mountpoint timeout value (seconds)."
-		"Values <= 0 turn expiration off.");
+		"Set the NFS automounted mountpoint timeout value (seconds). Values <= 0 turn expiration off.");
