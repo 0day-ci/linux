@@ -10,7 +10,7 @@
 
 struct prepend_buffer {
 	char *buf;
-	int len;
+	unsigned int len;
 };
 #define DECLARE_BUFFER(__name, __buf, __len) \
 	struct prepend_buffer __name = {.buf = __buf + __len, .len = __len}
@@ -182,7 +182,7 @@ restart:
  */
 char *__d_path(const struct path *path,
 	       const struct path *root,
-	       char *buf, int buflen)
+	       char *buf, unsigned int buflen)
 {
 	DECLARE_BUFFER(b, buf, buflen);
 
@@ -193,7 +193,7 @@ char *__d_path(const struct path *path,
 }
 
 char *d_absolute_path(const struct path *path,
-	       char *buf, int buflen)
+	       char *buf, unsigned int buflen)
 {
 	struct path root = {};
 	DECLARE_BUFFER(b, buf, buflen);
@@ -230,7 +230,7 @@ static void get_fs_root_rcu(struct fs_struct *fs, struct path *root)
  *
  * "buflen" should be positive.
  */
-char *d_path(const struct path *path, char *buf, int buflen)
+char *d_path(const struct path *path, char *buf, unsigned int buflen)
 {
 	DECLARE_BUFFER(b, buf, buflen);
 	struct path root;
@@ -266,7 +266,7 @@ EXPORT_SYMBOL(d_path);
 /*
  * Helper function for dentry_operations.d_dname() members
  */
-char *dynamic_dname(struct dentry *dentry, char *buffer, int buflen,
+char *dynamic_dname(struct dentry *dentry, char *buffer, unsigned int buflen,
 			const char *fmt, ...)
 {
 	va_list args;
@@ -284,7 +284,7 @@ char *dynamic_dname(struct dentry *dentry, char *buffer, int buflen,
 	return memcpy(buffer, temp, sz);
 }
 
-char *simple_dname(struct dentry *dentry, char *buffer, int buflen)
+char *simple_dname(struct dentry *dentry, char *buffer, unsigned int buflen)
 {
 	DECLARE_BUFFER(b, buffer, buflen);
 	/* these dentries are never renamed, so d_lock is not needed */
@@ -328,7 +328,7 @@ restart:
 	return extract_string(&b);
 }
 
-char *dentry_path_raw(const struct dentry *dentry, char *buf, int buflen)
+char *dentry_path_raw(const struct dentry *dentry, char *buf, unsigned int buflen)
 {
 	DECLARE_BUFFER(b, buf, buflen);
 
@@ -337,7 +337,7 @@ char *dentry_path_raw(const struct dentry *dentry, char *buf, int buflen)
 }
 EXPORT_SYMBOL(dentry_path_raw);
 
-char *dentry_path(const struct dentry *dentry, char *buf, int buflen)
+char *dentry_path(const struct dentry *dentry, char *buf, unsigned int buflen)
 {
 	DECLARE_BUFFER(b, buf, buflen);
 
