@@ -434,15 +434,43 @@ static int pca954x_probe(struct i2c_client *client,
 	i2c_set_clientdata(client, muxc);
 	data->client = client;
 
-	/* Reset the mux if a reset GPIO is specified. */
-	gpio = devm_gpiod_get_optional(dev, "reset", GPIOD_OUT_HIGH);
-	if (IS_ERR(gpio))
-		return PTR_ERR(gpio);
-	if (gpio) {
-		udelay(1);
-		gpiod_set_value_cansleep(gpio, 0);
-		/* Give the chip some time to recover. */
-		udelay(1);
+	/*
+	 * Grab the shared, hogged gpio that controls the mux reset. We expect
+	 * this to fail with either EPROBE_DEFER or EBUSY. The only purpose of
+	 * trying to get it is to make sure the gpio controller has probed up
+	 * and hogged the line to take the mux out of reset, meaning that the
+	 * mux is ready to be probed up. Don't try and set the line any way; in
+	 * the event we actually successfully get the line (if it wasn't
+	 * hogged) then we immediately release it, since there is no way to
+	 * sync up the line between muxes.
+	 */
+	gpio = gpiod_get_optional(dev, "reset-shared-hogged", 0);
+	if (IS_ERR(gpio)) {
+		ret = PTR_ERR(gpio);
+		if (ret != -EBUSY)
+			return ret;
+	} else {
+		if (gpio) {
+			/* This is really a problem since now we don't know the
+			 * state of the gpio. Log a warning and keep trying to
+			 * probe the mux just in case it works.
+			 */
+			dev_warn(dev, "got hogged reset line, expect error\n");
+			gpiod_put(gpio);
+		} else {
+			/* Reset the mux if a reset GPIO is specified. */
+			gpio = devm_gpiod_get_optional(dev, "reset",
+						       GPIOD_OUT_HIGH);
+			if (IS_ERR(gpio))
+				return PTR_ERR(gpio);
+
+			if (gpio) {
+				udelay(1);
+				gpiod_set_value_cansleep(gpio, 0);
+				/* Give the chip some time to recover. */
+				udelay(1);
+			}
+		}
 	}
 
 	data->chip = device_get_match_data(dev);
