@@ -49,6 +49,11 @@ properties:
   reset-gpios:
     maxItems: 1
 
+  reset-shared-hogged-gpios:
+    maxItems: 1
+    description: Reference to a shared, hogged GPIO connected to the reset
+      input of several PCA954x muxes.
+
   i2c-mux-idle-disconnect:
     type: boolean
     description: Forces mux to disconnect all children in idle state. This is
