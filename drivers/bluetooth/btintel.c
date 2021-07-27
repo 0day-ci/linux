@@ -2254,10 +2254,33 @@ int btintel_setup_combined(struct hci_dev *hdev)
 	/* For TLV type device, parse the tlv data */
 	btintel_parse_version_tlv(hdev, &ver_tlv, skb);
 
+	/* Some legacy bootloader devices from JfP supports both old and TLV
+	 * based HCI_Intel_Read_Version command. But we don't want to use the
+	 * TLV based setup routines for those old bootloader device.
+	 * Also, it is not easy to convert TLV based version to the legacy
+	 * version format.
+	 *
+	 * So, as a workaround for those devices, use the legacy
+	 * HCI_Intel_Read_Version to get the version information and run the
+	 * legacy bootloader setup.
+	 */
+	switch(INTEL_HW_VARIANT(ver_tlv.cnvi_bt)) {
+	case 0x11:      /* JfP */
+	case 0x12:      /* ThP */
+	case 0x13:      /* HrP */
+	case 0x14:      /* CcP */
+		err = btintel_read_version(hdev, &ver);
+		if (err)
+			return err;
+		return btintel_bootloader_setup(hdev, &ver);
+	default:
+		/* Nothing to do here */
+		break;
+	}
+
 	/* Display version information of TLV type */
 	btintel_version_info_tlv(hdev, &ver_tlv);
 
-	/* TODO: Need to filter the device for new generation */
 	err = btintel_bootloader_setup_tlv(hdev, &ver_tlv);
 
 	return err;
