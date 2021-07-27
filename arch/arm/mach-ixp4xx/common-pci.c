@@ -203,18 +203,18 @@ static u32 local_byte_lane_enable_bits(u32 n, int size)
 static int local_read_config(int where, int size, u32 *value)
 { 
 	u32 n, data;
-	pr_debug("local_read_config from %d size %d\n", where, size);
+	pr_debug("%s from %d size %d\n", __func__, where, size);
 	n = where % 4;
 	crp_read(where & ~3, &data);
 	*value = (data >> (8*n)) & bytemask[size];
-	pr_debug("local_read_config read %#x\n", *value);
+	pr_debug("%s read %#x\n", __func__, *value);
 	return PCIBIOS_SUCCESSFUL;
 }
 
 static int local_write_config(int where, int size, u32 value)
 {
 	u32 n, byte_enables, data;
-	pr_debug("local_write_config %#x to %d size %d\n", value, where, size);
+	pr_debug("%s %#x to %d size %d\n", __func__, value, where, size);
 	n = where % 4;
 	byte_enables = local_byte_lane_enable_bits(n, size);
 	if (byte_enables == 0xffffffff)
@@ -293,8 +293,8 @@ static int abort_handler(unsigned long addr, unsigned int fsr, struct pt_regs *r
 
 	isr = *PCI_ISR;
 	local_read_config(PCI_STATUS, 2, &status);
-	pr_debug("PCI: abort_handler addr = %#lx, isr = %#x, "
-		"status = %#x\n", addr, isr, status);
+	pr_debug("PCI: %s addr = %#lx, isr = %#x, status = %#x\n",
+			__func__, addr, isr, status);
 
 	/* make sure the Master Abort bit is reset */    
 	*PCI_ISR = PCI_ISR_PFE;
