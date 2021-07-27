@@ -74,10 +74,20 @@ static void spaceball_process_packet(struct spaceball* spaceball)
 	switch (spaceball->data[0]) {
 
 		case 'D':					/* Ball data */
+			/*
+			 * Skip first three bytes; read six axes worth of data.
+			 * Axis values are signed 16-bit big-endian.
+			 */
 			if (spaceball->idx != 15) return;
-			for (i = 0; i < 6; i++)
-				input_report_abs(dev, spaceball_axes[i],
-					(__s16)((data[2 * i + 3] << 8) | data[2 * i + 2]));
+			data += 3;
+			for (i = 0;
+			     i < ARRAY_SIZE(spaceball_axes);
+			     ++i, data += sizeof(__s16)) {
+				input_report_abs(
+					dev,
+					spaceball_axes[i],
+					(__s16)((data[0] << 8) | data[1]));
+			}
 			break;
 
 		case 'K':					/* Button data */
