@@ -3023,6 +3023,9 @@ static int btusb_setup_intel_newgen(struct hci_dev *hdev)
 		btintel_set_debug_features(hdev, &features);
 	}
 
+	/* Read supported usecases and set callbacks to fetch datapath id */
+	btintel_configure_offload_usecases(hdev);
+
 	/* Read the Intel version information after loading the FW  */
 	err = btintel_read_version_tlv(hdev, &version);
 	if (err)
