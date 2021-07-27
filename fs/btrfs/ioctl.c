@@ -4154,7 +4154,7 @@ static long btrfs_ioctl_balance_ctl(struct btrfs_fs_info *fs_info, int cmd)
 static long btrfs_ioctl_balance_progress(struct btrfs_fs_info *fs_info,
 					 void __user *arg)
 {
-	struct btrfs_ioctl_balance_args *bargs;
+	struct btrfs_ioctl_balance_args bargs = {0};
 	int ret = 0;
 
 	if (!capable(CAP_SYS_ADMIN))
@@ -4166,18 +4166,11 @@ static long btrfs_ioctl_balance_progress(struct btrfs_fs_info *fs_info,
 		goto out;
 	}
 
-	bargs = kzalloc(sizeof(*bargs), GFP_KERNEL);
-	if (!bargs) {
-		ret = -ENOMEM;
-		goto out;
-	}
+	btrfs_update_ioctl_balance_args(fs_info, &bargs);
 
-	btrfs_update_ioctl_balance_args(fs_info, bargs);
-
-	if (copy_to_user(arg, bargs, sizeof(*bargs)))
+	if (copy_to_user(arg, &bargs, sizeof(bargs)))
 		ret = -EFAULT;
 
-	kfree(bargs);
 out:
 	mutex_unlock(&fs_info->balance_mutex);
 	return ret;
