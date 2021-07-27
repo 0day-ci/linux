@@ -1227,6 +1227,14 @@ static const struct mdiobb_ops bb_ops = {
 	.get_mdio_data = sh_get_mdio,
 };
 
+static u32 get_num_desc(u32 from, u32 subtract)
+{
+	if (from >= subtract)
+		return from - subtract;
+
+	return U32_MAX - subtract + 1 + from;
+}
+
 /* free Tx skb function */
 static int sh_eth_tx_free(struct net_device *ndev, bool sent_only)
 {
@@ -1236,7 +1244,7 @@ static int sh_eth_tx_free(struct net_device *ndev, bool sent_only)
 	int entry;
 	bool sent;
 
-	for (; mdp->cur_tx - mdp->dirty_tx > 0; mdp->dirty_tx++) {
+	for (; get_num_desc(mdp->cur_tx, mdp->dirty_tx) > 0; mdp->dirty_tx++) {
 		entry = mdp->dirty_tx % mdp->num_tx_ring;
 		txdesc = &mdp->tx_ring[entry];
 		sent = !(txdesc->status & cpu_to_le32(TD_TACT));
@@ -1587,7 +1595,7 @@ static int sh_eth_rx(struct net_device *ndev, u32 intr_status, int *quota)
 	struct sh_eth_rxdesc *rxdesc;
 
 	int entry = mdp->cur_rx % mdp->num_rx_ring;
-	int boguscnt = (mdp->dirty_rx + mdp->num_rx_ring) - mdp->cur_rx;
+	int boguscnt = get_num_desc(mdp->dirty_rx, mdp->cur_rx) + mdp->num_rx_ring;
 	int limit;
 	struct sk_buff *skb;
 	u32 desc_status;
@@ -1667,7 +1675,7 @@ static int sh_eth_rx(struct net_device *ndev, u32 intr_status, int *quota)
 	}
 
 	/* Refill the Rx ring buffers. */
-	for (; mdp->cur_rx - mdp->dirty_rx > 0; mdp->dirty_rx++) {
+	for (; get_num_desc(mdp->cur_rx, mdp->dirty_rx) > 0; mdp->dirty_rx++) {
 		entry = mdp->dirty_rx % mdp->num_rx_ring;
 		rxdesc = &mdp->rx_ring[entry];
 		/* The size of the buffer is 32 byte boundary. */
@@ -2499,7 +2507,7 @@ static netdev_tx_t sh_eth_start_xmit(struct sk_buff *skb,
 	unsigned long flags;
 
 	spin_lock_irqsave(&mdp->lock, flags);
-	if ((mdp->cur_tx - mdp->dirty_tx) >= (mdp->num_tx_ring - 4)) {
+	if (get_num_desc(mdp->cur_tx, mdp->dirty_tx) >= (mdp->num_tx_ring - 4)) {
 		if (!sh_eth_tx_free(ndev, true)) {
 			netif_warn(mdp, tx_queued, ndev, "TxFD exhausted.\n");
 			netif_stop_queue(ndev);
