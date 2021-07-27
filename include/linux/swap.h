@@ -28,10 +28,17 @@ struct pagevec;
 #define SWAP_FLAG_DISCARD	0x10000 /* enable discard for swap */
 #define SWAP_FLAG_DISCARD_ONCE	0x20000 /* discard swap area at swapon-time */
 #define SWAP_FLAG_DISCARD_PAGES 0x40000 /* discard page-clusters after use */
+#define SWAP_FLAG_HIBERNATE_ONLY 0x80000 /* use only for hibernate, not swap */
 
 #define SWAP_FLAGS_VALID	(SWAP_FLAG_PRIO_MASK | SWAP_FLAG_PREFER | \
 				 SWAP_FLAG_DISCARD | SWAP_FLAG_DISCARD_ONCE | \
-				 SWAP_FLAG_DISCARD_PAGES)
+				 SWAP_FLAG_DISCARD_PAGES | \
+				 SWAP_FLAG_HIBERNATE_ONLY)
+
+/* Valid flags when SWAP_FLAG_HIBERNATE_ONLY is set */
+#define SWAP_HIBERNATE_ONLY_VALID_FLAGS \
+	(SWAP_FLAG_HIBERNATE_ONLY | SWAP_FLAG_DISCARD | SWAP_FLAG_DISCARD_ONCE)
+
 #define SWAP_BATCH 64
 
 static inline int current_is_kswapd(void)
@@ -182,6 +189,7 @@ enum {
 	SWP_PAGE_DISCARD = (1 << 10),	/* freed swap page-cluster discards */
 	SWP_STABLE_WRITES = (1 << 11),	/* no overwrite PG_writeback pages */
 	SWP_SYNCHRONOUS_IO = (1 << 12),	/* synchronous IO is efficient */
+	SWP_HIBERNATE_ONLY = (1 << 13),	/* use only for hibernate, not swap */
 					/* add others here before... */
 	SWP_SCANNING	= (1 << 14),	/* refcount in scan_swap_map */
 };
