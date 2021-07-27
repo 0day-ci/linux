@@ -265,6 +265,16 @@ typedef struct _drm_mga_sarea {
 #define DRM_IOCTL_MGA_WAIT_FENCE    DRM_IOWR(DRM_COMMAND_BASE + DRM_MGA_WAIT_FENCE, __u32)
 #define DRM_IOCTL_MGA_DMA_BOOTSTRAP DRM_IOWR(DRM_COMMAND_BASE + DRM_MGA_DMA_BOOTSTRAP, drm_mga_dma_bootstrap_t)
 
+#define __struct_group(name, fields) \
+	union { \
+		struct { \
+			fields \
+		}; \
+		struct { \
+			fields \
+		} name; \
+	}
+
 typedef struct _drm_mga_warp_index {
 	int installed;
 	unsigned long phys_addr;
@@ -279,20 +289,25 @@ typedef struct drm_mga_init {
 
 	unsigned long sarea_priv_offset;
 
-	int chipset;
-	int sgram;
+	__struct_group(always32bit,
+		int chipset;
+		int sgram;
 
-	unsigned int maccess;
+		unsigned int maccess;
 
-	unsigned int fb_cpp;
-	unsigned int front_offset, front_pitch;
-	unsigned int back_offset, back_pitch;
+		unsigned int fb_cpp;
+		unsigned int front_offset;
+		unsigned int front_pitch;
+		unsigned int back_offset;
+		unsigned int back_pitch;
 
-	unsigned int depth_cpp;
-	unsigned int depth_offset, depth_pitch;
+		unsigned int depth_cpp;
+		unsigned int depth_offset;
+		unsigned int depth_pitch;
 
-	unsigned int texture_offset[MGA_NR_TEX_HEAPS];
-	unsigned int texture_size[MGA_NR_TEX_HEAPS];
+		unsigned int texture_offset[MGA_NR_TEX_HEAPS];
+		unsigned int texture_size[MGA_NR_TEX_HEAPS];
+	);
 
 	unsigned long fb_offset;
 	unsigned long mmio_offset;
@@ -301,6 +316,8 @@ typedef struct drm_mga_init {
 	unsigned long primary_offset;
 	unsigned long buffers_offset;
 } drm_mga_init_t;
+
+#undef __struct_group
 
 typedef struct drm_mga_dma_bootstrap {
 	/**
