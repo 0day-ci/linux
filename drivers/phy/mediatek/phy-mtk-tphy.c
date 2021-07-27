@@ -68,6 +68,7 @@
 #define PA6_RG_U2_SQTH_VAL(x)	(0xf & (x))
 
 #define U3P_U2PHYACR4		0x020
+#define P2C_RG_USB20_DM_100K_EN		BIT(17)
 #define P2C_RG_USB20_GPIO_CTL		BIT(9)
 #define P2C_USB20_GPIO_MODE		BIT(8)
 #define P2C_U2_GPIO_CTR_MSK	(P2C_RG_USB20_GPIO_CTL | P2C_USB20_GPIO_MODE)
@@ -76,6 +77,12 @@
 #define P2C_RG_SIF_U2PLL_FORCE_ON	BIT(24)
 
 #define U3P_U2PHYDTM0		0x068
+#define P2C_RG_UART_MODE		GENMASK(31, 30)
+#define P2C_RG_UART_MODE_VAL(x)		((0x3 & (x)) << 30)
+#define P2C_RG_UART_MODE_OFET		(30)
+#define P2C_FORCE_UART_I		BIT(29)
+#define P2C_FORCE_UART_BIAS_EN		BIT(28)
+#define P2C_FORCE_UART_TX_OE		BIT(27)
 #define P2C_FORCE_UART_EN		BIT(26)
 #define P2C_FORCE_DATAIN		BIT(23)
 #define P2C_FORCE_DM_PULLDOWN		BIT(21)
@@ -98,6 +105,8 @@
 		P2C_RG_DPPULLDOWN | P2C_RG_TERMSEL)
 
 #define U3P_U2PHYDTM1		0x06C
+#define P2C_RG_UART_BIAS_EN		BIT(18)
+#define P2C_RG_UART_TX_OE		BIT(17)
 #define P2C_RG_UART_EN			BIT(16)
 #define P2C_FORCE_IDDIG		BIT(9)
 #define P2C_RG_VBUSVALID		BIT(5)
@@ -600,6 +609,90 @@ static void u2_phy_instance_exit(struct mtk_tphy *tphy,
 	}
 }
 
+static void u2_phy_instance_set_mode_2uart(struct u2phy_banks *u2_banks)
+{
+	u32 tmp;
+
+	/* Clear PA6_RG_U2_BC11_SW_EN */
+	tmp = readl(u2_banks->com + U3P_USBPHYACR6);
+	tmp &= ~(PA6_RG_U2_BC11_SW_EN);
+	writel(tmp, u2_banks->com + U3P_USBPHYACR6);
+
+	/* Set P2C_RG_SUSPENDM */
+	tmp = readl(u2_banks->com + U3P_U2PHYDTM0);
+	tmp |= P2C_RG_SUSPENDM;
+	writel(tmp, u2_banks->com + U3P_U2PHYDTM0);
+
+	/* Set P2C_FORCE_SUSPENDM */
+	tmp = readl(u2_banks->com + U3P_U2PHYDTM0);
+	tmp |= P2C_FORCE_SUSPENDM;
+	writel(tmp, u2_banks->com + U3P_U2PHYDTM0);
+
+	/* Clear and Set P2C_RG_UART_MODE to 2'b01 */
+	tmp = readl(u2_banks->com + U3P_U2PHYDTM0);
+	tmp &= ~(P2C_RG_UART_MODE);
+	tmp |= P2C_RG_UART_MODE_VAL(0x1);
+	writel(tmp, u2_banks->com + U3P_U2PHYDTM0);
+
+	/* Clear P2C_FORCE_UART_I */
+	tmp = readl(u2_banks->com + U3P_U2PHYDTM0);
+	tmp &= ~(P2C_FORCE_UART_I);
+	writel(tmp, u2_banks->com + U3P_U2PHYDTM0);
+
+	/* Set P2C_FORCE_UART_BIAS_EN */
+	tmp = readl(u2_banks->com + U3P_U2PHYDTM0);
+	tmp |= P2C_FORCE_UART_BIAS_EN;
+	writel(tmp, u2_banks->com + U3P_U2PHYDTM0);
+
+	/* Set P2C_FORCE_UART_TX_OE */
+	tmp = readl(u2_banks->com + U3P_U2PHYDTM0);
+	tmp |= P2C_FORCE_UART_TX_OE;
+	writel(tmp, u2_banks->com + U3P_U2PHYDTM0);
+
+	/* Set P2C_FORCE_UART_EN */
+	tmp = readl(u2_banks->com + U3P_U2PHYDTM0);
+	tmp |= P2C_FORCE_UART_EN;
+	writel(tmp, u2_banks->com + U3P_U2PHYDTM0);
+
+	/* Set P2C_RG_UART_BIAS_EN */
+	tmp = readl(u2_banks->com + U3P_U2PHYDTM0);
+	tmp |= P2C_RG_UART_BIAS_EN;
+	writel(tmp, u2_banks->com + U3P_U2PHYDTM0);
+
+	/* Set P2C_RG_UART_TX_OE */
+	tmp = readl(u2_banks->com + U3P_U2PHYDTM0);
+	tmp |= P2C_RG_UART_TX_OE;
+	writel(tmp, u2_banks->com + U3P_U2PHYDTM0);
+
+	/* Set P2C_RG_UART_EN */
+	tmp = readl(u2_banks->com + U3P_U2PHYDTM0);
+	tmp |= P2C_RG_UART_EN;
+	writel(tmp, u2_banks->com + U3P_U2PHYDTM0);
+
+	/* Set P2C_RG_USB20_DM_100K_EN */
+	tmp = readl(u2_banks->com + U3P_U2PHYACR4);
+	tmp |= P2C_RG_USB20_DM_100K_EN;
+	writel(tmp, u2_banks->com + U3P_U2PHYACR4);
+
+	/* Clear P2C_RG_DMPULLDOWN, P2C_RG_DPPULLDOWN */
+	tmp = readl(u2_banks->com + U3P_U2PHYDTM0);
+	tmp &= ~(P2C_RG_DPPULLDOWN | P2C_RG_DMPULLDOWN);
+	writel(tmp, u2_banks->com + U3P_U2PHYDTM0);
+}
+
+static int u2_phy_instance_get_mode_ext(struct mtk_tphy *tphy, struct mtk_phy_instance *instance)
+{
+	struct u2phy_banks *u2_banks = &instance->u2_banks;
+	u32 tmp;
+
+	tmp = readl(u2_banks->com + U3P_U2PHYDTM0);
+
+	if ((tmp & P2C_RG_UART_MODE) >> P2C_RG_UART_MODE_OFET)
+		return PHY_MODE_UART;
+	else
+		return PHY_MODE_USB_OTG;
+}
+
 static void u2_phy_instance_set_mode(struct mtk_tphy *tphy,
 				     struct mtk_phy_instance *instance,
 				     enum phy_mode mode)
@@ -609,6 +702,9 @@ static void u2_phy_instance_set_mode(struct mtk_tphy *tphy,
 
 	tmp = readl(u2_banks->com + U3P_U2PHYDTM1);
 	switch (mode) {
+	case PHY_MODE_UART:
+		u2_phy_instance_set_mode_2uart(u2_banks);
+		return;
 	case PHY_MODE_USB_DEVICE:
 		tmp |= P2C_FORCE_IDDIG | P2C_RG_IDDIG;
 		break;
@@ -933,6 +1029,10 @@ static int mtk_phy_init(struct phy *phy)
 		return ret;
 	}
 
+	ret = u2_phy_instance_get_mode_ext(tphy, instance);
+	if (ret == PHY_MODE_UART)
+		return 0;
+
 	switch (instance->type) {
 	case PHY_TYPE_USB2:
 		u2_phy_instance_init(tphy, instance);
@@ -996,6 +1096,19 @@ static int mtk_phy_exit(struct phy *phy)
 	clk_disable_unprepare(instance->ref_clk);
 	clk_disable_unprepare(instance->da_ref_clk);
 	return 0;
+}
+
+static int mtk_phy_get_mode_ext(struct phy *phy)
+{
+	struct mtk_phy_instance *instance = phy_get_drvdata(phy);
+	struct mtk_tphy *tphy = dev_get_drvdata(phy->dev.parent);
+	int ret;
+
+	ret = 0;
+	if (instance->type == PHY_TYPE_USB2)
+		ret = u2_phy_instance_get_mode_ext(tphy, instance);
+
+	return ret;
 }
 
 static int mtk_phy_set_mode(struct phy *phy, enum phy_mode mode, int submode)
@@ -1062,6 +1175,7 @@ static const struct phy_ops mtk_tphy_ops = {
 	.power_on	= mtk_phy_power_on,
 	.power_off	= mtk_phy_power_off,
 	.set_mode	= mtk_phy_set_mode,
+	.get_mode_ext	= mtk_phy_get_mode_ext,
 	.owner		= THIS_MODULE,
 };
 
