@@ -118,6 +118,8 @@ extern unsigned int sysctl_mount_max;
 
 extern bool path_is_mountpoint(const struct path *path);
 
+extern bool mount_is_internal(struct vfsmount *mnt);
+
 extern struct vfsmount *lookup_mnt(const struct path *);
 
 extern void kern_unmount_array(struct vfsmount *mnt[], unsigned int num);

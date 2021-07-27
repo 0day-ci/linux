@@ -1273,6 +1273,35 @@ bool path_is_mountpoint(const struct path *path)
 }
 EXPORT_SYMBOL(path_is_mountpoint);
 
+/**
+ * mount_is_internal() - Check if path is a mount internal to a single filesystem
+ * @mnt: vfsmount to check
+ *
+ * Some filesystems present multiple file-sets using a single
+ * superblock, such as btrfs with multiple subvolumes.  Names within a
+ * parent filesystem which lead to a subordinate filesystem are
+ * implemented as automounts so that the structure is visible in the
+ * mount table.  nfsd needs visibility into this arrangement so that it
+ * can determine if a mountpoint requires a new export, or is completely
+ * covered by an existing mount.
+ *
+ * An "internal" mount is one where the parent and child have the same
+ * superblock, and the mounted-on dentry is "managed" as an automount.  A
+ * filehandle found for an inode in the child can be looked-up using either
+ * vfsmount.
+ */
+bool mount_is_internal(struct vfsmount *mnt)
+{
+	struct mount *m = real_mount(mnt);
+
+	if (!mnt_has_parent(m))
+		return false;
+	if (m->mnt_parent->mnt.mnt_sb != m->mnt.mnt_sb)
+		return false;
+	return m->mnt_mountpoint->d_flags & DCACHE_NEED_AUTOMOUNT;
+}
+EXPORT_SYMBOL(mount_is_internal);
+
 struct vfsmount *mnt_clone_internal(const struct path *path)
 {
 	struct mount *p;
