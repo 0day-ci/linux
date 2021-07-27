@@ -81,8 +81,10 @@ struct flowi4 {
 #define flowi4_multipath_hash	__fl_common.flowic_multipath_hash
 
 	/* (saddr,daddr) must be grouped, same order as in IP header */
-	__be32			saddr;
-	__be32			daddr;
+	struct_group(addrs,
+		__be32			saddr;
+		__be32			daddr;
+	);
 
 	union flowi_uli		uli;
 #define fl4_sport		uli.ports.sport

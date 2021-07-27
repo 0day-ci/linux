@@ -130,8 +130,16 @@ struct ipv6hdr {
 	__u8			nexthdr;
 	__u8			hop_limit;
 
-	struct	in6_addr	saddr;
-	struct	in6_addr	daddr;
+	union {
+		struct {
+			struct	in6_addr	saddr;
+			struct	in6_addr	daddr;
+		} addrs;
+		struct {
+			struct	in6_addr	saddr;
+			struct	in6_addr	daddr;
+		};
+	};
 };
 
 
