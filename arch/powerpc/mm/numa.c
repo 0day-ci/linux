@@ -171,25 +171,36 @@ static void unmap_cpu_from_node(unsigned long cpu)
 }
 #endif /* CONFIG_HOTPLUG_CPU || CONFIG_PPC_SPLPAR */
 
-/*
- * Returns nid in the range [0..nr_node_ids], or -1 if no useful NUMA
- * info is found.
- */
-static int associativity_to_nid(const __be32 *associativity)
+static int __associativity_to_nid(const __be32 *associativity,
+				  int max_array_sz)
 {
 	int nid = NUMA_NO_NODE;
+	/*
+	 * primary_domain_index is 1 based array index.
+	 */
+	int index = primary_domain_index  - 1;
 
-	if (!numa_enabled)
+	if (!numa_enabled || index >= max_array_sz)
 		goto out;
 
-	if (of_read_number(associativity, 1) >= primary_domain_index)
-		nid = of_read_number(&associativity[primary_domain_index], 1);
+	nid = of_read_number(&associativity[index], 1);
 
 	/* POWER4 LPAR uses 0xffff as invalid node */
 	if (nid == 0xffff || nid >= nr_node_ids)
 		nid = NUMA_NO_NODE;
 out:
 	return nid;
+}
+/*
+ * Returns nid in the range [0..nr_node_ids], or -1 if no useful NUMA
+ * info is found.
+ */
+static int associativity_to_nid(const __be32 *associativity)
+{
+	int array_sz = of_read_number(associativity, 1);
+
+	/* Skip the first element in the associativity array */
+	return __associativity_to_nid((associativity + 1), array_sz);
 }
 
 static int __cpu_form2_relative_distance(__be32 *cpu1_assoc, __be32 *cpu2_assoc)
@@ -295,22 +306,39 @@ int of_node_to_nid(struct device_node *device)
 }
 EXPORT_SYMBOL(of_node_to_nid);
 
-static void __initialize_form1_numa_distance(const __be32 *associativity)
+static void ___initialize_form1_numa_distance(const __be32 *associativity,
+					     int max_array_sz)
 {
 	int i, nid;
 
 	if (affinity_form != FORM1_AFFINITY)
 		return;
 
-	nid = associativity_to_nid(associativity);
+	nid = __associativity_to_nid(associativity, max_array_sz);
 	if (nid != NUMA_NO_NODE) {
 		for (i = 0; i < distance_ref_points_depth; i++) {
 			const __be32 *entry;
+			int index = be32_to_cpu(distance_ref_points[i]) - 1;
 
-			entry = &associativity[be32_to_cpu(distance_ref_points[i])];
+			/*
+			 * broken hierarchy, return with broken distance table
+			 */
+			if (index >= max_array_sz)
+				return;
+
+			entry = &associativity[index];
 			distance_lookup_table[nid][i] = of_read_number(entry, 1);
 		}
 	}
+}
+
+static void __initialize_form1_numa_distance(const __be32 *associativity)
+{
+	int array_sz;
+
+	array_sz = of_read_number(associativity, 1);
+	/* Skip the first element in the associativity array */
+	___initialize_form1_numa_distance(associativity + 1, array_sz);
 }
 
 static void initialize_form1_numa_distance(struct device_node *node)
@@ -586,27 +614,18 @@ static int get_nid_and_numa_distance(struct drmem_lmb *lmb)
 
 	if (primary_domain_index <= aa.array_sz &&
 	    !(lmb->flags & DRCONF_MEM_AI_INVALID) && lmb->aa_index < aa.n_arrays) {
-		index = lmb->aa_index * aa.array_sz + primary_domain_index - 1;
-		nid = of_read_number(&aa.arrays[index], 1);
+		const __be32 *associativity;
 
-		if (nid == 0xffff || nid >= nr_node_ids)
-			nid = default_nid;
+		index = lmb->aa_index * aa.array_sz;
+		associativity = &aa.arrays[index];
+		nid = __associativity_to_nid(associativity, aa.array_sz);
 		if (nid > 0 && affinity_form == FORM1_AFFINITY) {
-			int i;
-			const __be32 *associativity;
-
-			index = lmb->aa_index * aa.array_sz;
-			associativity = &aa.arrays[index];
 			/*
-			 * lookup array associativity entries have different format
-			 * There is no length of the array as the first element.
+			 * lookup array associativity entries have
+			 * no length of the array as the first element.
 			 */
-			for (i = 0; i < distance_ref_points_depth; i++) {
-				const __be32 *entry;
-
-				entry = &associativity[be32_to_cpu(distance_ref_points[i]) - 1];
-				distance_lookup_table[nid][i] = of_read_number(entry, 1);
-			}
+			___initialize_form1_numa_distance(associativity,
+							  aa.array_sz);
 		}
 	}
 	return nid;
@@ -632,11 +651,11 @@ int of_drconf_to_nid_single(struct drmem_lmb *lmb)
 
 	if (primary_domain_index <= aa.array_sz &&
 	    !(lmb->flags & DRCONF_MEM_AI_INVALID) && lmb->aa_index < aa.n_arrays) {
-		index = lmb->aa_index * aa.array_sz + primary_domain_index - 1;
-		nid = of_read_number(&aa.arrays[index], 1);
+		const __be32 *associativity;
 
-		if (nid == 0xffff || nid >= nr_node_ids)
-			nid = default_nid;
+		index = lmb->aa_index * aa.array_sz;
+		associativity = &aa.arrays[index];
+		nid = __associativity_to_nid(associativity, aa.array_sz);
 	}
 	return nid;
 }
