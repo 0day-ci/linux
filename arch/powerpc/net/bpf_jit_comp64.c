@@ -66,6 +66,24 @@ static int bpf_jit_stack_offsetof(struct codegen_context *ctx, int reg)
 
 void bpf_jit_realloc_regs(struct codegen_context *ctx)
 {
+	if (ctx->seen & SEEN_FUNC)
+		return;
+
+	while (ctx->seen & SEEN_NVREG_MASK &&
+	       (ctx->seen & SEEN_VREG_MASK) != SEEN_VREG_MASK) {
+		int old = 32 - fls(ctx->seen & SEEN_NVREG_MASK);
+		int new = 32 - fls(~ctx->seen & SEEN_VREG_MASK);
+		int i;
+
+		for (i = BPF_REG_0; i <= TMP_REG_2; i++) {
+			if (ctx->b2p[i] != old)
+				continue;
+			ctx->b2p[i] = new;
+			bpf_set_seen_register(ctx, new);
+			bpf_clear_seen_register(ctx, old);
+			break;
+		}
+	}
 }
 
 void bpf_jit_build_prologue(u32 *image, struct codegen_context *ctx)
@@ -106,10 +124,9 @@ void bpf_jit_build_prologue(u32 *image, struct codegen_context *ctx)
 	 * If we haven't created our own stack frame, we save these
 	 * in the protected zone below the previous stack frame
 	 */
-	for (i = BPF_REG_6; i <= BPF_REG_10; i++)
-		if (bpf_is_seen_register(ctx, bpf_to_ppc(ctx, i)))
-			PPC_BPF_STL(ctx, bpf_to_ppc(ctx, i), 1,
-				    bpf_jit_stack_offsetof(ctx, bpf_to_ppc(ctx, i)));
+	for (i = BPF_PPC_NVR_MIN; i <= 31; i++)
+		if (bpf_is_seen_register(ctx, i))
+			PPC_BPF_STL(ctx, i, 1, bpf_jit_stack_offsetof(ctx, i));
 
 	/* Setup frame pointer to point to the bpf stack area */
 	if (bpf_is_seen_register(ctx, bpf_to_ppc(ctx, BPF_REG_FP)))
@@ -122,10 +139,9 @@ static void bpf_jit_emit_common_epilogue(u32 *image, struct codegen_context *ctx
 	int i;
 
 	/* Restore NVRs */
-	for (i = BPF_REG_6; i <= BPF_REG_10; i++)
-		if (bpf_is_seen_register(ctx, bpf_to_ppc(ctx, i)))
-			PPC_BPF_LL(ctx, bpf_to_ppc(ctx, i), 1,
-				   bpf_jit_stack_offsetof(ctx, bpf_to_ppc(ctx, i)));
+	for (i = BPF_PPC_NVR_MIN; i <= 31; i++)
+		if (bpf_is_seen_register(ctx, i))
+			PPC_BPF_LL(ctx, i, 1, bpf_jit_stack_offsetof(ctx, i));
 
 	/* Tear down our stack frame */
 	if (bpf_has_stack_frame(ctx)) {
@@ -223,6 +239,7 @@ static void bpf_jit_emit_tail_call(u32 *image, struct codegen_context *ctx, u32 
 	 * if (index >= array->map.max_entries)
 	 *   goto out;
 	 */
+	bpf_set_seen_register(ctx, bpf_to_ppc(ctx, TMP_REG_1));
 	EMIT(PPC_RAW_LWZ(bpf_to_ppc(ctx, TMP_REG_1), b2p_bpf_array,
 			 offsetof(struct bpf_array, map.max_entries)));
 	EMIT(PPC_RAW_RLWINM(b2p_index, b2p_index, 0, 0, 31));
@@ -318,9 +335,9 @@ int bpf_jit_build_body(struct bpf_prog *fp, u32 *image, struct codegen_context *
 		 * optimization but everything else should work without
 		 * any issues.
 		 */
-		if (dst_reg >= BPF_PPC_NVR_MIN && dst_reg < 32)
+		if (dst_reg >= 3 && dst_reg < 32)
 			bpf_set_seen_register(ctx, dst_reg);
-		if (src_reg >= BPF_PPC_NVR_MIN && src_reg < 32)
+		if (src_reg >= 3 && src_reg < 32)
 			bpf_set_seen_register(ctx, src_reg);
 
 		switch (code) {
@@ -345,6 +362,7 @@ int bpf_jit_build_body(struct bpf_prog *fp, u32 *image, struct codegen_context *
 				if (imm >= -32768 && imm < 32768)
 					EMIT(PPC_RAW_ADDI(dst_reg, dst_reg, IMM_L(imm)));
 				else {
+					bpf_set_seen_register(ctx, tmp1_reg);
 					PPC_LI32(tmp1_reg, imm);
 					EMIT(PPC_RAW_ADD(dst_reg, dst_reg, tmp1_reg));
 				}
@@ -362,6 +380,7 @@ int bpf_jit_build_body(struct bpf_prog *fp, u32 *image, struct codegen_context *
 			if (imm >= -32768 && imm < 32768)
 				EMIT(PPC_RAW_MULI(dst_reg, dst_reg, IMM_L(imm)));
 			else {
+				bpf_set_seen_register(ctx, tmp1_reg);
 				PPC_LI32(tmp1_reg, imm);
 				if (BPF_CLASS(code) == BPF_ALU)
 					EMIT(PPC_RAW_MULW(dst_reg, dst_reg, tmp1_reg));
@@ -372,6 +391,7 @@ int bpf_jit_build_body(struct bpf_prog *fp, u32 *image, struct codegen_context *
 		case BPF_ALU | BPF_DIV | BPF_X: /* (u32) dst /= (u32) src */
 		case BPF_ALU | BPF_MOD | BPF_X: /* (u32) dst %= (u32) src */
 			if (BPF_OP(code) == BPF_MOD) {
+				bpf_set_seen_register(ctx, tmp1_reg);
 				EMIT(PPC_RAW_DIVWU(tmp1_reg, dst_reg, src_reg));
 				EMIT(PPC_RAW_MULW(tmp1_reg, src_reg, tmp1_reg));
 				EMIT(PPC_RAW_SUB(dst_reg, dst_reg, tmp1_reg));
@@ -381,6 +401,7 @@ int bpf_jit_build_body(struct bpf_prog *fp, u32 *image, struct codegen_context *
 		case BPF_ALU64 | BPF_DIV | BPF_X: /* dst /= src */
 		case BPF_ALU64 | BPF_MOD | BPF_X: /* dst %= src */
 			if (BPF_OP(code) == BPF_MOD) {
+				bpf_set_seen_register(ctx, tmp1_reg);
 				EMIT(PPC_RAW_DIVDU(tmp1_reg, dst_reg, src_reg));
 				EMIT(PPC_RAW_MULD(tmp1_reg, src_reg, tmp1_reg));
 				EMIT(PPC_RAW_SUB(dst_reg, dst_reg, tmp1_reg));
@@ -396,10 +417,12 @@ int bpf_jit_build_body(struct bpf_prog *fp, u32 *image, struct codegen_context *
 			else if (imm == 1)
 				goto bpf_alu32_trunc;
 
+			bpf_set_seen_register(ctx, tmp1_reg);
 			PPC_LI32(tmp1_reg, imm);
 			switch (BPF_CLASS(code)) {
 			case BPF_ALU:
 				if (BPF_OP(code) == BPF_MOD) {
+					bpf_set_seen_register(ctx, tmp2_reg);
 					EMIT(PPC_RAW_DIVWU(tmp2_reg, dst_reg, tmp1_reg));
 					EMIT(PPC_RAW_MULW(tmp1_reg, tmp1_reg, tmp2_reg));
 					EMIT(PPC_RAW_SUB(dst_reg, dst_reg, tmp1_reg));
@@ -408,6 +431,7 @@ int bpf_jit_build_body(struct bpf_prog *fp, u32 *image, struct codegen_context *
 				break;
 			case BPF_ALU64:
 				if (BPF_OP(code) == BPF_MOD) {
+					bpf_set_seen_register(ctx, tmp2_reg);
 					EMIT(PPC_RAW_DIVDU(tmp2_reg, dst_reg, tmp1_reg));
 					EMIT(PPC_RAW_MULD(tmp1_reg, tmp1_reg, tmp2_reg));
 					EMIT(PPC_RAW_SUB(dst_reg, dst_reg, tmp1_reg));
@@ -434,6 +458,7 @@ int bpf_jit_build_body(struct bpf_prog *fp, u32 *image, struct codegen_context *
 				EMIT(PPC_RAW_ANDI(dst_reg, dst_reg, IMM_L(imm)));
 			else {
 				/* Sign-extended */
+				bpf_set_seen_register(ctx, tmp1_reg);
 				PPC_LI32(tmp1_reg, imm);
 				EMIT(PPC_RAW_AND(dst_reg, dst_reg, tmp1_reg));
 			}
@@ -446,6 +471,7 @@ int bpf_jit_build_body(struct bpf_prog *fp, u32 *image, struct codegen_context *
 		case BPF_ALU64 | BPF_OR | BPF_K:/* dst = dst | imm */
 			if (imm < 0 && BPF_CLASS(code) == BPF_ALU64) {
 				/* Sign-extended */
+				bpf_set_seen_register(ctx, tmp1_reg);
 				PPC_LI32(tmp1_reg, imm);
 				EMIT(PPC_RAW_OR(dst_reg, dst_reg, tmp1_reg));
 			} else {
@@ -463,6 +489,7 @@ int bpf_jit_build_body(struct bpf_prog *fp, u32 *image, struct codegen_context *
 		case BPF_ALU64 | BPF_XOR | BPF_K: /* dst ^= imm */
 			if (imm < 0 && BPF_CLASS(code) == BPF_ALU64) {
 				/* Sign-extended */
+				bpf_set_seen_register(ctx, tmp1_reg);
 				PPC_LI32(tmp1_reg, imm);
 				EMIT(PPC_RAW_XOR(dst_reg, dst_reg, tmp1_reg));
 			} else {
@@ -562,6 +589,7 @@ bpf_alu32_trunc:
 			if (BPF_SRC(code) == BPF_FROM_LE)
 				goto emit_clear;
 #endif
+			bpf_set_seen_register(ctx, tmp1_reg);
 			switch (imm) {
 			case 16:
 				/* Rotate 8 bits left & mask with 0x0000ff00 */
@@ -625,6 +653,7 @@ emit_clear:
 		case BPF_STX | BPF_MEM | BPF_B: /* *(u8 *)(dst + off) = src */
 		case BPF_ST | BPF_MEM | BPF_B: /* *(u8 *)(dst + off) = imm */
 			if (BPF_CLASS(code) == BPF_ST) {
+				bpf_set_seen_register(ctx, tmp1_reg);
 				EMIT(PPC_RAW_LI(tmp1_reg, imm));
 				src_reg = tmp1_reg;
 			}
@@ -633,6 +662,7 @@ emit_clear:
 		case BPF_STX | BPF_MEM | BPF_H: /* (u16 *)(dst + off) = src */
 		case BPF_ST | BPF_MEM | BPF_H: /* (u16 *)(dst + off) = imm */
 			if (BPF_CLASS(code) == BPF_ST) {
+				bpf_set_seen_register(ctx, tmp1_reg);
 				EMIT(PPC_RAW_LI(tmp1_reg, imm));
 				src_reg = tmp1_reg;
 			}
@@ -641,6 +671,7 @@ emit_clear:
 		case BPF_STX | BPF_MEM | BPF_W: /* *(u32 *)(dst + off) = src */
 		case BPF_ST | BPF_MEM | BPF_W: /* *(u32 *)(dst + off) = imm */
 			if (BPF_CLASS(code) == BPF_ST) {
+				bpf_set_seen_register(ctx, tmp1_reg);
 				PPC_LI32(tmp1_reg, imm);
 				src_reg = tmp1_reg;
 			}
@@ -649,6 +680,7 @@ emit_clear:
 		case BPF_STX | BPF_MEM | BPF_DW: /* (u64 *)(dst + off) = src */
 		case BPF_ST | BPF_MEM | BPF_DW: /* *(u64 *)(dst + off) = imm */
 			if (BPF_CLASS(code) == BPF_ST) {
+				bpf_set_seen_register(ctx, tmp1_reg);
 				PPC_LI32(tmp1_reg, imm);
 				src_reg = tmp1_reg;
 			}
@@ -669,6 +701,8 @@ emit_clear:
 			/* *(u32 *)(dst + off) += src */
 
 			/* Get EA into TMP_REG_1 */
+			bpf_set_seen_register(ctx, tmp1_reg);
+			bpf_set_seen_register(ctx, tmp2_reg);
 			EMIT(PPC_RAW_ADDI(tmp1_reg, dst_reg, off));
 			tmp_idx = ctx->idx * 4;
 			/* load value from memory into TMP_REG_2 */
@@ -689,6 +723,8 @@ emit_clear:
 			}
 			/* *(u64 *)(dst + off) += src */
 
+			bpf_set_seen_register(ctx, tmp1_reg);
+			bpf_set_seen_register(ctx, tmp2_reg);
 			EMIT(PPC_RAW_ADDI(tmp1_reg, dst_reg, off));
 			tmp_idx = ctx->idx * 4;
 			EMIT(PPC_RAW_LDARX(tmp2_reg, 0, tmp1_reg, 0));
@@ -870,6 +906,7 @@ cond_branch:
 				break;
 			case BPF_JMP | BPF_JSET | BPF_X:
 			case BPF_JMP32 | BPF_JSET | BPF_X:
+				bpf_set_seen_register(ctx, tmp1_reg);
 				if (BPF_CLASS(code) == BPF_JMP) {
 					EMIT(PPC_RAW_AND_DOT(tmp1_reg, dst_reg, src_reg));
 				} else {
@@ -903,6 +940,7 @@ cond_branch:
 						EMIT(PPC_RAW_CMPLDI(dst_reg, imm));
 				} else {
 					/* sign-extending load */
+					bpf_set_seen_register(ctx, tmp1_reg);
 					PPC_LI32(tmp1_reg, imm);
 					/* ... but unsigned comparison */
 					if (is_jmp32)
@@ -933,6 +971,7 @@ cond_branch:
 					else
 						EMIT(PPC_RAW_CMPDI(dst_reg, imm));
 				} else {
+					bpf_set_seen_register(ctx, tmp1_reg);
 					PPC_LI32(tmp1_reg, imm);
 					if (is_jmp32)
 						EMIT(PPC_RAW_CMPW(dst_reg, tmp1_reg));
@@ -944,6 +983,7 @@ cond_branch:
 			case BPF_JMP | BPF_JSET | BPF_K:
 			case BPF_JMP32 | BPF_JSET | BPF_K:
 				/* andi does not sign-extend the immediate */
+				bpf_set_seen_register(ctx, tmp1_reg);
 				if (imm >= 0 && imm < 32768)
 					/* PPC_ANDI is _only/always_ dot-form */
 					EMIT(PPC_RAW_ANDI(tmp1_reg, dst_reg, imm));

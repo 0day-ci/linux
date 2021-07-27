@@ -70,6 +70,7 @@ const int b2p[MAX_BPF_JIT_REG + 2] = {
  */
 #define PPC_BPF_LL(ctx, r, base, i) do {						  \
 				if ((i) % 4) {						  \
+					bpf_set_seen_register(ctx, bpf_to_ppc(ctx, TMP_REG_2));\
 					EMIT(PPC_RAW_LI(bpf_to_ppc(ctx, TMP_REG_2), (i)));\
 					EMIT(PPC_RAW_LDX(r, base,			  \
 							bpf_to_ppc(ctx, TMP_REG_2)));	  \
@@ -78,6 +79,7 @@ const int b2p[MAX_BPF_JIT_REG + 2] = {
 				} while(0)
 #define PPC_BPF_STL(ctx, r, base, i) do {						  \
 				if ((i) % 4) {						  \
+					bpf_set_seen_register(ctx, bpf_to_ppc(ctx, TMP_REG_2));\
 					EMIT(PPC_RAW_LI(bpf_to_ppc(ctx, TMP_REG_2), (i)));\
 					EMIT(PPC_RAW_STDX(r, base,			  \
 							bpf_to_ppc(ctx, TMP_REG_2)));	  \
