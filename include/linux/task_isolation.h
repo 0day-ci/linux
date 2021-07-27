@@ -30,8 +30,19 @@ int prctl_task_isolation_enter(unsigned long arg2, unsigned long arg3,
 int prctl_task_isolation_exit(unsigned long arg2, unsigned long arg3,
 			      unsigned long arg4, unsigned long arg5);
 
+void __isolation_exit_to_user_mode_prepare(void);
+
+static inline void isolation_exit_to_user_mode_prepare(void)
+{
+	if (current->isol_info != NULL)
+		__isolation_exit_to_user_mode_prepare();
+}
 
 #else
+
+static void isolation_exit_to_user_mode_prepare(void)
+{
+}
 
 static inline void tsk_isol_exit(struct task_struct *tsk)
 {

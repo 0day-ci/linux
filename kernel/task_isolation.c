@@ -13,6 +13,8 @@
 #include <linux/task_isolation.h>
 #include <linux/prctl.h>
 #include <linux/slab.h>
+#include <linux/mm.h>
+#include <linux/vmstat.h>
 
 static int tsk_isol_alloc_context(struct task_struct *task)
 {
@@ -93,4 +95,14 @@ int prctl_task_isolation_exit(unsigned long arg2, unsigned long arg3,
 	return 0;
 }
 
+void __isolation_exit_to_user_mode_prepare(void)
+{
+	if (current->isol_info->mode != PR_ISOL_MODE_NORMAL)
+		return;
+
+	if (current->isol_info->active != 1)
+		return;
+
+	sync_vmstat();
+}
 
