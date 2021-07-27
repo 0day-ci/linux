@@ -64,13 +64,20 @@ nfsd_cross_mnt(struct svc_rqst *rqstp, struct path *path_parent,
 			    .dentry = dget(path_parent->dentry)};
 	int err = 0;
 
-	err = follow_down(&path, 0);
+	err = follow_down(&path, LOOKUP_AUTOMOUNT);
 	if (err < 0)
 		goto out;
 	if (path.mnt == path_parent->mnt && path.dentry == path_parent->dentry &&
 	    nfsd_mountpoint(path.dentry, exp) == 2) {
 		/* This is only a mountpoint in some other namespace */
 		path_put(&path);
+		goto out;
+	}
+	if (mount_is_internal(path.mnt)) {
+		/* Use the new path, but don't look for a new export */
+		/* FIXME should I check NOHIDE in this case?? */
+		path_put(path_parent);
+		*path_parent = path;
 		goto out;
 	}
 
@@ -157,7 +164,7 @@ int nfsd_mountpoint(struct dentry *dentry, struct svc_export *exp)
 		return 1;
 	if (nfsd4_is_junction(dentry))
 		return 1;
-	if (d_mountpoint(dentry))
+	if (d_managed(dentry))
 		/*
 		 * Might only be a mountpoint in a different namespace,
 		 * but we need to check.

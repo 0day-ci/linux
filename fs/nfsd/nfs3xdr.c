@@ -370,6 +370,8 @@ svcxdr_encode_fattr3(struct svc_rqst *rqstp, struct xdr_stream *xdr,
 	case FSIDSOURCE_UUID:
 		fsid = ((u64 *)fhp->fh_export->ex_uuid)[0];
 		fsid ^= ((u64 *)fhp->fh_export->ex_uuid)[1];
+		if (fhp->fh_mnt != fhp->fh_export->ex_path.mnt)
+			fsid ^= nfsd_get_mounted_on(fhp->fh_mnt);
 		break;
 	default:
 		fsid = (u64)huge_encode_dev(fhp->fh_dentry->d_sb->s_dev);
@@ -1094,8 +1096,8 @@ compose_entry_fh(struct nfsd3_readdirres *cd, struct svc_fh *fhp,
 	__be32 rv = nfserr_noent;
 
 	dparent = cd->fh.fh_dentry;
-	exp  = cd->fh.fh_export;
-	child.mnt = cd->fh.fh_mnt;
+	exp  = exp_get(cd->fh.fh_export);
+	child.mnt = mntget(cd->fh.fh_mnt);
 
 	if (isdotent(name, namlen)) {
 		if (namlen == 2) {
@@ -1112,15 +1114,27 @@ compose_entry_fh(struct nfsd3_readdirres *cd, struct svc_fh *fhp,
 			child.dentry = dget(dparent);
 	} else
 		child.dentry = lookup_positive_unlocked(name, dparent, namlen);
-	if (IS_ERR(child.dentry))
+	if (IS_ERR(child.dentry)) {
+		mntput(child.mnt);
+		exp_put(exp);
 		return rv;
-	if (d_mountpoint(child.dentry))
-		goto out;
-	if (child.dentry->d_inode->i_ino != ino)
+	}
+	/* If child is a mountpoint, then we want to expose the fact
+	 * so client can create a mountpoint.  If not, then a different
+	 * ino number probably means a race with rename, so avoid providing
+	 * too much detail.
+	 */
+	if (nfsd_mountpoint(child.dentry, exp)) {
+		int err;
+		err = nfsd_cross_mnt(cd->rqstp, &child, &exp);
+		if (err)
+			goto out;
+	} else if (child.dentry->d_inode->i_ino != ino)
 		goto out;
 	rv = fh_compose(fhp, exp, &child, &cd->fh);
 out:
-	dput(child.dentry);
+	path_put(&child);
+	exp_put(exp);
 	return rv;
 }
 

@@ -2817,6 +2817,8 @@ nfsd4_encode_fattr(struct xdr_stream *xdr, struct svc_fh *fhp,
 	struct kstat stat;
 	struct svc_fh *tempfh = NULL;
 	struct kstatfs statfs;
+	u64 mounted_on_ino;
+	u64 sub_fsid;
 	__be32 *p;
 	int starting_len = xdr->buf->len;
 	int attrlen_offset;
@@ -2870,6 +2872,24 @@ nfsd4_encode_fattr(struct xdr_stream *xdr, struct svc_fh *fhp,
 		if (status)
 			goto out;
 		fhp = tempfh;
+	}
+	if ((bmval0 & FATTR4_WORD0_FSID) ||
+	    (bmval1 & FATTR4_WORD1_MOUNTED_ON_FILEID)) {
+		mounted_on_ino = stat.ino;
+		sub_fsid = 0;
+		/*
+		 * The inode number that the current mnt is mounted on is
+		 * used for MOUNTED_ON_FILED if we are at the root,
+		 * and for sub_fsid if mnt is not the export mnt.
+		 */
+		if (ignore_crossmnt == 0) {
+			u64 moi = nfsd_get_mounted_on(mnt);
+
+			if (dentry == mnt->mnt_root && moi)
+				mounted_on_ino = moi;
+			if (mnt != exp->ex_path.mnt)
+				sub_fsid = moi;
+		}
 	}
 	if (bmval0 & FATTR4_WORD0_ACL) {
 		err = nfsd4_get_nfs4_acl(rqstp, dentry, &acl);
@@ -3008,6 +3028,8 @@ nfsd4_encode_fattr(struct xdr_stream *xdr, struct svc_fh *fhp,
 		case FSIDSOURCE_UUID:
 			p = xdr_encode_opaque_fixed(p, exp->ex_uuid,
 								EX_UUID_LEN);
+			if (mnt != exp->ex_path.mnt)
+				*(u64*)(p-2) ^= sub_fsid;
 			break;
 		}
 	}
@@ -3253,20 +3275,10 @@ out_acl:
 		*p++ = cpu_to_be32(stat.mtime.tv_nsec);
 	}
 	if (bmval1 & FATTR4_WORD1_MOUNTED_ON_FILEID) {
-		u64 ino;
-
 		p = xdr_reserve_space(xdr, 8);
 		if (!p)
 			goto out_resource;
-		/*
-		 * Get parent's attributes if not ignoring crossmount
-		 * and this is the root of a cross-mounted filesystem.
-		 */
-		if (ignore_crossmnt == 0 && dentry == mnt->mnt_root)
-			ino = nfsd_get_mounted_on(mnt);
-		if (!ino)
-			ino = stat.ino;
-		p = xdr_encode_hyper(p, ino);
+		p = xdr_encode_hyper(p, mounted_on_ino);
 	}
 #ifdef CONFIG_NFSD_PNFS
 	if (bmval1 & FATTR4_WORD1_FS_LAYOUT_TYPES) {

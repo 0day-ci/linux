@@ -9,7 +9,7 @@
  */
 
 #include <linux/exportfs.h>
-
+#include <linux/namei.h>
 #include <linux/sunrpc/svcauth_gss.h>
 #include "nfsd.h"
 #include "vfs.h"
@@ -285,6 +285,11 @@ static __be32 nfsd_set_fh_dentry(struct svc_rqst *rqstp, struct svc_fh *fhp)
 			default:
 				dentry = ERR_PTR(-ESTALE);
 			}
+		} else if (nfsd_mountpoint(dentry, exp)) {
+			struct path path = { .mnt = mnt, .dentry = dentry };
+			follow_down(&path, LOOKUP_AUTOMOUNT);
+			mnt = path.mnt;
+			dentry = path.dentry;
 		}
 	}
 	if (dentry == NULL)
