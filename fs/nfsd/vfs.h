@@ -42,13 +42,13 @@ struct nfsd_file;
 typedef int (*nfsd_filldir_t)(void *, const char *, int, loff_t, u64, unsigned);
 
 /* nfsd/vfs.c */
-int		nfsd_cross_mnt(struct svc_rqst *rqstp, struct dentry **dpp,
+int		nfsd_cross_mnt(struct svc_rqst *rqstp, struct path *,
 		                struct svc_export **expp);
 __be32		nfsd_lookup(struct svc_rqst *, struct svc_fh *,
 				const char *, unsigned int, struct svc_fh *);
 __be32		 nfsd_lookup_dentry(struct svc_rqst *, struct svc_fh *,
 				const char *, unsigned int,
-				struct svc_export **, struct dentry **);
+				struct svc_export **, struct path *);
 __be32		nfsd_setattr(struct svc_rqst *, struct svc_fh *,
 				struct iattr *, int, time64_t);
 int nfsd_mountpoint(struct dentry *, struct svc_export *);
@@ -138,7 +138,7 @@ static inline int fh_want_write(struct svc_fh *fh)
 
 	if (fh->fh_want_write)
 		return 0;
-	ret = mnt_want_write(fh->fh_export->ex_path.mnt);
+	ret = mnt_want_write(fh->fh_mnt);
 	if (!ret)
 		fh->fh_want_write = true;
 	return ret;
@@ -148,13 +148,13 @@ static inline void fh_drop_write(struct svc_fh *fh)
 {
 	if (fh->fh_want_write) {
 		fh->fh_want_write = false;
-		mnt_drop_write(fh->fh_export->ex_path.mnt);
+		mnt_drop_write(fh->fh_mnt);
 	}
 }
 
 static inline __be32 fh_getattr(const struct svc_fh *fh, struct kstat *stat)
 {
-	struct path p = {.mnt = fh->fh_export->ex_path.mnt,
+	struct path p = {.mnt = fh->fh_mnt,
 			 .dentry = fh->fh_dentry};
 	return nfserrno(vfs_getattr(&p, stat, STATX_BASIC_STATS,
 				    AT_STATX_SYNC_AS_STAT));

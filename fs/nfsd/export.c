@@ -1003,7 +1003,7 @@ exp_rootfh(struct net *net, struct auth_domain *clp, char *name,
 	 * fh must be initialized before calling fh_compose
 	 */
 	fh_init(&fh, maxsize);
-	if (fh_compose(&fh, exp, path.dentry, NULL))
+	if (fh_compose(&fh, exp, &path, NULL))
 		err = -EINVAL;
 	else
 		err = 0;
@@ -1178,7 +1178,7 @@ exp_pseudoroot(struct svc_rqst *rqstp, struct svc_fh *fhp)
 	exp = rqst_find_fsidzero_export(rqstp);
 	if (IS_ERR(exp))
 		return nfserrno(PTR_ERR(exp));
-	rv = fh_compose(fhp, exp, exp->ex_path.dentry, NULL);
+	rv = fh_compose(fhp, exp, &exp->ex_path, NULL);
 	exp_put(exp);
 	return rv;
 }

@@ -902,7 +902,7 @@ nfsd4_secinfo(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 {
 	struct nfsd4_secinfo *secinfo = &u->secinfo;
 	struct svc_export *exp;
-	struct dentry *dentry;
+	struct path path;
 	__be32 err;
 
 	err = fh_verify(rqstp, &cstate->current_fh, S_IFDIR, NFSD_MAY_EXEC);
@@ -910,16 +910,16 @@ nfsd4_secinfo(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 		return err;
 	err = nfsd_lookup_dentry(rqstp, &cstate->current_fh,
 				    secinfo->si_name, secinfo->si_namelen,
-				    &exp, &dentry);
+				    &exp, &path);
 	if (err)
 		return err;
 	fh_unlock(&cstate->current_fh);
-	if (d_really_is_negative(dentry)) {
+	if (d_really_is_negative(path.dentry)) {
 		exp_put(exp);
 		err = nfserr_noent;
 	} else
 		secinfo->si_exp = exp;
-	dput(dentry);
+	path_put(&path);
 	if (cstate->minorversion)
 		/* See rfc 5661 section 2.6.3.1.1.8 */
 		fh_put(&cstate->current_fh);
@@ -1930,6 +1930,7 @@ _nfsd4_verify(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 	p = buf;
 	status = nfsd4_encode_fattr_to_buf(&p, count, &cstate->current_fh,
 				    cstate->current_fh.fh_export,
+				    cstate->current_fh.fh_mnt,
 				    cstate->current_fh.fh_dentry,
 				    verify->ve_bmval,
 				    rqstp, 0);

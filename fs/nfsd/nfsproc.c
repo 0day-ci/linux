@@ -268,6 +268,7 @@ nfsd_proc_create(struct svc_rqst *rqstp)
 	struct iattr	*attr = &argp->attrs;
 	struct inode	*inode;
 	struct dentry	*dchild;
+	struct path	path;
 	int		type, mode;
 	int		hosterr;
 	dev_t		rdev = 0, wanted = new_decode_dev(attr->ia_size);
@@ -298,7 +299,9 @@ nfsd_proc_create(struct svc_rqst *rqstp)
 		goto out_unlock;
 	}
 	fh_init(newfhp, NFS_FHSIZE);
-	resp->status = fh_compose(newfhp, dirfhp->fh_export, dchild, dirfhp);
+	path.mnt = dirfhp->fh_mnt;
+	path.dentry = dchild;
+	resp->status = fh_compose(newfhp, dirfhp->fh_export, &path, dirfhp);
 	if (!resp->status && d_really_is_negative(dchild))
 		resp->status = nfserr_noent;
 	dput(dchild);

@@ -299,6 +299,7 @@ static __be32 nfsd_set_fh_dentry(struct svc_rqst *rqstp, struct svc_fh *fhp)
 	}
 
 	fhp->fh_dentry = dentry;
+	fhp->fh_mnt = mntget(exp->ex_path.mnt);
 	fhp->fh_export = exp;
 
 	switch (rqstp->rq_vers) {
@@ -556,7 +557,7 @@ retry:
 }
 
 __be32
-fh_compose(struct svc_fh *fhp, struct svc_export *exp, struct dentry *dentry,
+fh_compose(struct svc_fh *fhp, struct svc_export *exp, struct path *path,
 	   struct svc_fh *ref_fh)
 {
 	/* ref_fh is a reference file handle.
@@ -567,13 +568,13 @@ fh_compose(struct svc_fh *fhp, struct svc_export *exp, struct dentry *dentry,
 	 *
 	 */
 
-	struct inode * inode = d_inode(dentry);
+	struct inode * inode = d_inode(path->dentry);
 	dev_t ex_dev = exp_sb(exp)->s_dev;
 
 	dprintk("nfsd: fh_compose(exp %02x:%02x/%ld %pd2, ino=%ld)\n",
 		MAJOR(ex_dev), MINOR(ex_dev),
 		(long) d_inode(exp->ex_path.dentry)->i_ino,
-		dentry,
+		path->dentry,
 		(inode ? inode->i_ino : 0));
 
 	/* Choose filehandle version and fsid type based on
@@ -590,14 +591,15 @@ fh_compose(struct svc_fh *fhp, struct svc_export *exp, struct dentry *dentry,
 
 	if (fhp->fh_locked || fhp->fh_dentry) {
 		printk(KERN_ERR "fh_compose: fh %pd2 not initialized!\n",
-		       dentry);
+		       path->dentry);
 	}
 	if (fhp->fh_maxsize < NFS_FHSIZE)
 		printk(KERN_ERR "fh_compose: called with maxsize %d! %pd2\n",
 		       fhp->fh_maxsize,
-		       dentry);
+		       path->dentry);
 
-	fhp->fh_dentry = dget(dentry); /* our internal copy */
+	fhp->fh_dentry = dget(path->dentry); /* our internal copy */
+	fhp->fh_mnt = mntget(path->mnt);
 	fhp->fh_export = exp_get(exp);
 
 	if (fhp->fh_handle.fh_version == 0xca) {
@@ -609,9 +611,9 @@ fh_compose(struct svc_fh *fhp, struct svc_export *exp, struct dentry *dentry,
 		fhp->fh_handle.ofh_xdev = fhp->fh_handle.ofh_dev;
 		fhp->fh_handle.ofh_xino =
 			ino_t_to_u32(d_inode(exp->ex_path.dentry)->i_ino);
-		fhp->fh_handle.ofh_dirino = ino_t_to_u32(parent_ino(dentry));
+		fhp->fh_handle.ofh_dirino = ino_t_to_u32(parent_ino(path->dentry));
 		if (inode)
-			_fh_update_old(dentry, exp, &fhp->fh_handle);
+			_fh_update_old(path->dentry, exp, &fhp->fh_handle);
 	} else {
 		fhp->fh_handle.fh_size =
 			key_len(fhp->fh_handle.fh_fsid_type) + 4;
@@ -624,7 +626,7 @@ fh_compose(struct svc_fh *fhp, struct svc_export *exp, struct dentry *dentry,
 			exp->ex_fsid, exp->ex_uuid);
 
 		if (inode)
-			_fh_update(fhp, exp, dentry);
+			_fh_update(fhp, exp, path->dentry);
 		if (fhp->fh_handle.fh_fileid_type == FILEID_INVALID) {
 			fh_put(fhp);
 			return nfserr_opnotsupp;
@@ -675,8 +677,10 @@ out_negative:
 void
 fh_put(struct svc_fh *fhp)
 {
-	struct dentry * dentry = fhp->fh_dentry;
-	struct svc_export * exp = fhp->fh_export;
+	struct dentry *dentry = fhp->fh_dentry;
+	struct svc_export *exp = fhp->fh_export;
+	struct vfsmount *mnt = fhp->fh_mnt;
+
 	if (dentry) {
 		fh_unlock(fhp);
 		fhp->fh_dentry = NULL;
@@ -684,6 +688,10 @@ fh_put(struct svc_fh *fhp)
 		fh_clear_wcc(fhp);
 	}
 	fh_drop_write(fhp);
+	if (mnt) {
+		mntput(mnt);
+		fhp->fh_mnt = NULL;
+	}
 	if (exp) {
 		exp_put(exp);
 		fhp->fh_export = NULL;

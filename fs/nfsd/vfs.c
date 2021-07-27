@@ -49,27 +49,26 @@
 
 #define NFSDDBG_FACILITY		NFSDDBG_FILEOP
 
-/* 
- * Called from nfsd_lookup and encode_dirent. Check if we have crossed 
+/*
+ * Called from nfsd_lookup and encode_dirent. Check if we have crossed
  * a mount point.
- * Returns -EAGAIN or -ETIMEDOUT leaving *dpp and *expp unchanged,
- *  or nfs_ok having possibly changed *dpp and *expp
+ * Returns -EAGAIN or -ETIMEDOUT leaving *path and *expp unchanged,
+ *  or nfs_ok having possibly changed *path and *expp
  */
 int
-nfsd_cross_mnt(struct svc_rqst *rqstp, struct dentry **dpp, 
-		        struct svc_export **expp)
+nfsd_cross_mnt(struct svc_rqst *rqstp, struct path *path_parent,
+	       struct svc_export **expp)
 {
 	struct svc_export *exp = *expp, *exp2 = NULL;
-	struct dentry *dentry = *dpp;
-	struct path path = {.mnt = mntget(exp->ex_path.mnt),
-			    .dentry = dget(dentry)};
+	struct path path = {.mnt = mntget(path_parent->mnt),
+			    .dentry = dget(path_parent->dentry)};
 	int err = 0;
 
 	err = follow_down(&path, 0);
 	if (err < 0)
 		goto out;
-	if (path.mnt == exp->ex_path.mnt && path.dentry == dentry &&
-	    nfsd_mountpoint(dentry, exp) == 2) {
+	if (path.mnt == path_parent->mnt && path.dentry == path_parent->dentry &&
+	    nfsd_mountpoint(path.dentry, exp) == 2) {
 		/* This is only a mountpoint in some other namespace */
 		path_put(&path);
 		goto out;
@@ -93,19 +92,14 @@ nfsd_cross_mnt(struct svc_rqst *rqstp, struct dentry **dpp,
 	if (nfsd_v4client(rqstp) ||
 		(exp->ex_flags & NFSEXP_CROSSMOUNT) || EX_NOHIDE(exp2)) {
 		/* successfully crossed mount point */
-		/*
-		 * This is subtle: path.dentry is *not* on path.mnt
-		 * at this point.  The only reason we are safe is that
-		 * original mnt is pinned down by exp, so we should
-		 * put path *before* putting exp
-		 */
-		*dpp = path.dentry;
-		path.dentry = dentry;
+		path_put(path_parent);
+		*path_parent = path;
+		exp_put(exp);
 		*expp = exp2;
-		exp2 = exp;
+	} else {
+		path_put(&path);
+		exp_put(exp2);
 	}
-	path_put(&path);
-	exp_put(exp2);
 out:
 	return err;
 }
@@ -121,27 +115,30 @@ static void follow_to_parent(struct path *path)
 	path->dentry = dp;
 }
 
-static int nfsd_lookup_parent(struct svc_rqst *rqstp, struct dentry *dparent, struct svc_export **exp, struct dentry **dentryp)
+static int nfsd_lookup_parent(struct svc_rqst *rqstp, struct svc_export **exp,
+			      struct path *path)
 {
+	struct path path2;
 	struct svc_export *exp2;
-	struct path path = {.mnt = mntget((*exp)->ex_path.mnt),
-			    .dentry = dget(dparent)};
 
-	follow_to_parent(&path);
-
-	exp2 = rqst_exp_parent(rqstp, &path);
+	path2 = *path;
+	path_get(&path2);
+	follow_to_parent(&path2);
+	exp2 = rqst_exp_parent(rqstp, path);
 	if (PTR_ERR(exp2) == -ENOENT) {
-		*dentryp = dget(dparent);
+		/* leave path unchanged */
+		path_put(&path2);
+		return 0;
 	} else if (IS_ERR(exp2)) {
-		path_put(&path);
+		path_put(&path2);
 		return PTR_ERR(exp2);
 	} else {
-		*dentryp = dget(path.dentry);
+		path_put(path);
+		*path = path2;
 		exp_put(*exp);
 		*exp = exp2;
+		return 0;
 	}
-	path_put(&path);
-	return 0;
 }
 
 /*
@@ -172,29 +169,32 @@ int nfsd_mountpoint(struct dentry *dentry, struct svc_export *exp)
 __be32
 nfsd_lookup_dentry(struct svc_rqst *rqstp, struct svc_fh *fhp,
 		   const char *name, unsigned int len,
-		   struct svc_export **exp_ret, struct dentry **dentry_ret)
+		   struct svc_export **exp_ret, struct path *ret)
 {
 	struct svc_export	*exp;
 	struct dentry		*dparent;
-	struct dentry		*dentry;
 	int			host_err;
 
 	dprintk("nfsd: nfsd_lookup(fh %s, %.*s)\n", SVCFH_fmt(fhp), len,name);
 
 	dparent = fhp->fh_dentry;
+	ret->mnt = mntget(fhp->fh_mnt);
 	exp = exp_get(fhp->fh_export);
 
 	/* Lookup the name, but don't follow links */
 	if (isdotent(name, len)) {
 		if (len==1)
-			dentry = dget(dparent);
+			ret->dentry = dget(dparent);
 		else if (dparent != exp->ex_path.dentry)
-			dentry = dget_parent(dparent);
+			ret->dentry = dget_parent(dparent);
 		else if (!EX_NOHIDE(exp) && !nfsd_v4client(rqstp))
-			dentry = dget(dparent); /* .. == . just like at / */
+			ret->dentry = dget(dparent); /* .. == . just like at / */
 		else {
-			/* checking mountpoint crossing is very different when stepping up */
-			host_err = nfsd_lookup_parent(rqstp, dparent, &exp, &dentry);
+			/* checking mountpoint crossing is very different when
+			 * stepping up
+			 */
+			ret->dentry = dget(dparent);
+			host_err = nfsd_lookup_parent(rqstp, &exp, ret);
 			if (host_err)
 				goto out_nfserr;
 		}
@@ -205,11 +205,13 @@ nfsd_lookup_dentry(struct svc_rqst *rqstp, struct svc_fh *fhp,
 		 * need to take the child's i_mutex:
 		 */
 		fh_lock_nested(fhp, I_MUTEX_PARENT);
-		dentry = lookup_one_len(name, dparent, len);
-		host_err = PTR_ERR(dentry);
-		if (IS_ERR(dentry))
+		ret->dentry = lookup_one_len(name, dparent, len);
+		host_err = PTR_ERR(ret->dentry);
+		if (IS_ERR(ret->dentry)) {
+			ret->dentry = NULL;
 			goto out_nfserr;
-		if (nfsd_mountpoint(dentry, exp)) {
+		}
+		if (nfsd_mountpoint(ret->dentry, exp)) {
 			/*
 			 * We don't need the i_mutex after all.  It's
 			 * still possible we could open this (regular
@@ -219,18 +221,16 @@ nfsd_lookup_dentry(struct svc_rqst *rqstp, struct svc_fh *fhp,
 			 * and a mountpoint won't be renamed:
 			 */
 			fh_unlock(fhp);
-			if ((host_err = nfsd_cross_mnt(rqstp, &dentry, &exp))) {
-				dput(dentry);
+			if ((host_err = nfsd_cross_mnt(rqstp, ret, &exp)))
 				goto out_nfserr;
-			}
 		}
 	}
-	*dentry_ret = dentry;
 	*exp_ret = exp;
 	return 0;
 
 out_nfserr:
 	exp_put(exp);
+	path_put(ret);
 	return nfserrno(host_err);
 }
 
@@ -251,13 +251,13 @@ nfsd_lookup(struct svc_rqst *rqstp, struct svc_fh *fhp, const char *name,
 				unsigned int len, struct svc_fh *resfh)
 {
 	struct svc_export	*exp;
-	struct dentry		*dentry;
+	struct path		path;
 	__be32 err;
 
 	err = fh_verify(rqstp, fhp, S_IFDIR, NFSD_MAY_EXEC);
 	if (err)
 		return err;
-	err = nfsd_lookup_dentry(rqstp, fhp, name, len, &exp, &dentry);
+	err = nfsd_lookup_dentry(rqstp, fhp, name, len, &exp, &path);
 	if (err)
 		return err;
 	err = check_nfsd_access(exp, rqstp);
@@ -267,11 +267,11 @@ nfsd_lookup(struct svc_rqst *rqstp, struct svc_fh *fhp, const char *name,
 	 * Note: we compose the file handle now, but as the
 	 * dentry may be negative, it may need to be updated.
 	 */
-	err = fh_compose(resfh, exp, dentry, fhp);
-	if (!err && d_really_is_negative(dentry))
+	err = fh_compose(resfh, exp, &path, fhp);
+	if (!err && d_really_is_negative(path.dentry))
 		err = nfserr_noent;
 out:
-	dput(dentry);
+	path_put(&path);
 	exp_put(exp);
 	return err;
 }
@@ -740,7 +740,7 @@ __nfsd_open(struct svc_rqst *rqstp, struct svc_fh *fhp, umode_t type,
 	__be32		err;
 	int		host_err = 0;
 
-	path.mnt = fhp->fh_export->ex_path.mnt;
+	path.mnt = fhp->fh_mnt;
 	path.dentry = fhp->fh_dentry;
 	inode = d_inode(path.dentry);
 
@@ -1350,6 +1350,7 @@ nfsd_create(struct svc_rqst *rqstp, struct svc_fh *fhp,
 		int type, dev_t rdev, struct svc_fh *resfhp)
 {
 	struct dentry	*dentry, *dchild = NULL;
+	struct path	path;
 	__be32		err;
 	int		host_err;
 
@@ -1371,7 +1372,9 @@ nfsd_create(struct svc_rqst *rqstp, struct svc_fh *fhp,
 	host_err = PTR_ERR(dchild);
 	if (IS_ERR(dchild))
 		return nfserrno(host_err);
-	err = fh_compose(resfhp, fhp->fh_export, dchild, fhp);
+	path.mnt = fhp->fh_mnt;
+	path.dentry = dchild;
+	err = fh_compose(resfhp, fhp->fh_export, &path, fhp);
 	/*
 	 * We unconditionally drop our ref to dchild as fh_compose will have
 	 * already grabbed its own ref for it.
@@ -1390,11 +1393,12 @@ nfsd_create(struct svc_rqst *rqstp, struct svc_fh *fhp,
  */
 __be32
 do_nfsd_create(struct svc_rqst *rqstp, struct svc_fh *fhp,
-		char *fname, int flen, struct iattr *iap,
-		struct svc_fh *resfhp, int createmode, u32 *verifier,
-	        bool *truncp, bool *created)
+	       char *fname, int flen, struct iattr *iap,
+	       struct svc_fh *resfhp, int createmode, u32 *verifier,
+	       bool *truncp, bool *created)
 {
 	struct dentry	*dentry, *dchild = NULL;
+	struct path	path;
 	struct inode	*dirp;
 	__be32		err;
 	int		host_err;
@@ -1436,7 +1440,9 @@ do_nfsd_create(struct svc_rqst *rqstp, struct svc_fh *fhp,
 			goto out;
 	}
 
-	err = fh_compose(resfhp, fhp->fh_export, dchild, fhp);
+	path.mnt = fhp->fh_mnt;
+	path.dentry = dchild;
+	err = fh_compose(resfhp, fhp->fh_export, &path, fhp);
 	if (err)
 		goto out;
 
@@ -1569,7 +1575,7 @@ nfsd_readlink(struct svc_rqst *rqstp, struct svc_fh *fhp, char *buf, int *lenp)
 	if (unlikely(err))
 		return err;
 
-	path.mnt = fhp->fh_export->ex_path.mnt;
+	path.mnt = fhp->fh_mnt;
 	path.dentry = fhp->fh_dentry;
 
 	if (unlikely(!d_is_symlink(path.dentry)))
@@ -1600,6 +1606,7 @@ nfsd_symlink(struct svc_rqst *rqstp, struct svc_fh *fhp,
 				struct svc_fh *resfhp)
 {
 	struct dentry	*dentry, *dnew;
+	struct path	pathnew;
 	__be32		err, cerr;
 	int		host_err;
 
@@ -1633,7 +1640,9 @@ nfsd_symlink(struct svc_rqst *rqstp, struct svc_fh *fhp,
 
 	fh_drop_write(fhp);
 
-	cerr = fh_compose(resfhp, fhp->fh_export, dnew, fhp);
+	pathnew.mnt = fhp->fh_mnt;
+	pathnew.dentry = dnew;
+	cerr = fh_compose(resfhp, fhp->fh_export, &pathnew, fhp);
 	dput(dnew);
 	if (err==0) err = cerr;
 out:
@@ -2107,7 +2116,7 @@ nfsd_statfs(struct svc_rqst *rqstp, struct svc_fh *fhp, struct kstatfs *stat, in
 	err = fh_verify(rqstp, fhp, 0, NFSD_MAY_NOP | access);
 	if (!err) {
 		struct path path = {
-			.mnt	= fhp->fh_export->ex_path.mnt,
+			.mnt	= fhp->fh_mnt,
 			.dentry	= fhp->fh_dentry,
 		};
 		if (vfs_statfs(&path, stat))

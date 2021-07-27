@@ -2823,9 +2823,9 @@ out_resource:
  */
 static __be32
 nfsd4_encode_fattr(struct xdr_stream *xdr, struct svc_fh *fhp,
-		struct svc_export *exp,
-		struct dentry *dentry, u32 *bmval,
-		struct svc_rqst *rqstp, int ignore_crossmnt)
+		   struct svc_export *exp,
+		   struct vfsmount *mnt, struct dentry *dentry,
+		   u32 *bmval, struct svc_rqst *rqstp, int ignore_crossmnt)
 {
 	u32 bmval0 = bmval[0];
 	u32 bmval1 = bmval[1];
@@ -2851,7 +2851,7 @@ nfsd4_encode_fattr(struct xdr_stream *xdr, struct svc_fh *fhp,
 	struct nfsd4_compoundres *resp = rqstp->rq_resp;
 	u32 minorversion = resp->cstate.minorversion;
 	struct path path = {
-		.mnt	= exp->ex_path.mnt,
+		.mnt	= mnt,
 		.dentry	= dentry,
 	};
 	struct nfsd_net *nn = net_generic(SVC_NET(rqstp), nfsd_net_id);
@@ -2882,7 +2882,7 @@ nfsd4_encode_fattr(struct xdr_stream *xdr, struct svc_fh *fhp,
 		if (!tempfh)
 			goto out;
 		fh_init(tempfh, NFS4_FHSIZE);
-		status = fh_compose(tempfh, exp, dentry, NULL);
+		status = fh_compose(tempfh, exp, &path, NULL);
 		if (status)
 			goto out;
 		fhp = tempfh;
@@ -3274,13 +3274,12 @@ out_acl:
 
 		p = xdr_reserve_space(xdr, 8);
 		if (!p)
-                	goto out_resource;
+			goto out_resource;
 		/*
 		 * Get parent's attributes if not ignoring crossmount
 		 * and this is the root of a cross-mounted filesystem.
 		 */
-		if (ignore_crossmnt == 0 &&
-		    dentry == exp->ex_path.mnt->mnt_root) {
+		if (ignore_crossmnt == 0 && dentry == mnt->mnt_root) {
 			err = get_parent_attributes(exp, &parent_stat);
 			if (err)
 				goto out_nfserr;
@@ -3380,17 +3379,18 @@ static void svcxdr_init_encode_from_buffer(struct xdr_stream *xdr,
 }
 
 __be32 nfsd4_encode_fattr_to_buf(__be32 **p, int words,
-			struct svc_fh *fhp, struct svc_export *exp,
-			struct dentry *dentry, u32 *bmval,
-			struct svc_rqst *rqstp, int ignore_crossmnt)
+				 struct svc_fh *fhp, struct svc_export *exp,
+				 struct vfsmount *mnt, struct dentry *dentry,
+				 u32 *bmval, struct svc_rqst *rqstp,
+				 int ignore_crossmnt)
 {
 	struct xdr_buf dummy;
 	struct xdr_stream xdr;
 	__be32 ret;
 
 	svcxdr_init_encode_from_buffer(&xdr, &dummy, *p, words << 2);
-	ret = nfsd4_encode_fattr(&xdr, fhp, exp, dentry, bmval, rqstp,
-							ignore_crossmnt);
+	ret = nfsd4_encode_fattr(&xdr, fhp, exp, mnt, dentry, bmval, rqstp,
+				 ignore_crossmnt);
 	*p = xdr.p;
 	return ret;
 }
@@ -3409,14 +3409,16 @@ nfsd4_encode_dirent_fattr(struct xdr_stream *xdr, struct nfsd4_readdir *cd,
 			const char *name, int namlen)
 {
 	struct svc_export *exp = cd->rd_fhp->fh_export;
-	struct dentry *dentry;
+	struct path path;
 	__be32 nfserr;
 	int ignore_crossmnt = 0;
 
-	dentry = lookup_positive_unlocked(name, cd->rd_fhp->fh_dentry, namlen);
-	if (IS_ERR(dentry))
-		return nfserrno(PTR_ERR(dentry));
+	path.dentry = lookup_positive_unlocked(name, cd->rd_fhp->fh_dentry,
+					      namlen);
+	if (IS_ERR(path.dentry))
+		return nfserrno(PTR_ERR(path.dentry));
 
+	path.mnt = mntget(cd->rd_fhp->fh_mnt);
 	exp_get(exp);
 	/*
 	 * In the case of a mountpoint, the client may be asking for
@@ -3425,7 +3427,7 @@ nfsd4_encode_dirent_fattr(struct xdr_stream *xdr, struct nfsd4_readdir *cd,
 	 * we will not follow the cross mount and will fill the attribtutes
 	 * directly from the mountpoint dentry.
 	 */
-	if (nfsd_mountpoint(dentry, exp)) {
+	if (nfsd_mountpoint(path.dentry, exp)) {
 		int err;
 
 		if (!(exp->ex_flags & NFSEXP_V4ROOT)
@@ -3434,11 +3436,11 @@ nfsd4_encode_dirent_fattr(struct xdr_stream *xdr, struct nfsd4_readdir *cd,
 			goto out_encode;
 		}
 		/*
-		 * Why the heck aren't we just using nfsd_lookup??
+		 * Why the heck aren't we just using nfsd_lookup_dentry??
 		 * Different "."/".." handling?  Something else?
 		 * At least, add a comment here to explain....
 		 */
-		err = nfsd_cross_mnt(cd->rd_rqstp, &dentry, &exp);
+		err = nfsd_cross_mnt(cd->rd_rqstp, &path, &exp);
 		if (err) {
 			nfserr = nfserrno(err);
 			goto out_put;
@@ -3446,13 +3448,13 @@ nfsd4_encode_dirent_fattr(struct xdr_stream *xdr, struct nfsd4_readdir *cd,
 		nfserr = check_nfsd_access(exp, cd->rd_rqstp);
 		if (nfserr)
 			goto out_put;
-
 	}
 out_encode:
-	nfserr = nfsd4_encode_fattr(xdr, NULL, exp, dentry, cd->rd_bmval,
-					cd->rd_rqstp, ignore_crossmnt);
+	nfserr = nfsd4_encode_fattr(xdr, NULL, exp, path.mnt, path.dentry,
+				    cd->rd_bmval, cd->rd_rqstp,
+				    ignore_crossmnt);
 out_put:
-	dput(dentry);
+	path_put(&path);
 	exp_put(exp);
 	return nfserr;
 }
@@ -3651,8 +3653,9 @@ nfsd4_encode_getattr(struct nfsd4_compoundres *resp, __be32 nfserr, struct nfsd4
 	struct svc_fh *fhp = getattr->ga_fhp;
 	struct xdr_stream *xdr = resp->xdr;
 
-	return nfsd4_encode_fattr(xdr, fhp, fhp->fh_export, fhp->fh_dentry,
-				    getattr->ga_bmval, resp->rqstp, 0);
+	return nfsd4_encode_fattr(xdr, fhp, fhp->fh_export,
+				  fhp->fh_mnt, fhp->fh_dentry,
+				  getattr->ga_bmval, resp->rqstp, 0);
 }
 
 static __be32

@@ -1089,36 +1089,38 @@ compose_entry_fh(struct nfsd3_readdirres *cd, struct svc_fh *fhp,
 		 const char *name, int namlen, u64 ino)
 {
 	struct svc_export	*exp;
-	struct dentry		*dparent, *dchild;
+	struct dentry		*dparent;
+	struct path		child;
 	__be32 rv = nfserr_noent;
 
 	dparent = cd->fh.fh_dentry;
 	exp  = cd->fh.fh_export;
+	child.mnt = cd->fh.fh_mnt;
 
 	if (isdotent(name, namlen)) {
 		if (namlen == 2) {
-			dchild = dget_parent(dparent);
+			child.dentry = dget_parent(dparent);
 			/*
 			 * Don't return filehandle for ".." if we're at
 			 * the filesystem or export root:
 			 */
-			if (dchild == dparent)
+			if (child.dentry == dparent)
 				goto out;
 			if (dparent == exp->ex_path.dentry)
 				goto out;
 		} else
-			dchild = dget(dparent);
+			child.dentry = dget(dparent);
 	} else
-		dchild = lookup_positive_unlocked(name, dparent, namlen);
-	if (IS_ERR(dchild))
+		child.dentry = lookup_positive_unlocked(name, dparent, namlen);
+	if (IS_ERR(child.dentry))
 		return rv;
-	if (d_mountpoint(dchild))
+	if (d_mountpoint(child.dentry))
 		goto out;
-	if (dchild->d_inode->i_ino != ino)
+	if (child.dentry->d_inode->i_ino != ino)
 		goto out;
-	rv = fh_compose(fhp, exp, dchild, &cd->fh);
+	rv = fh_compose(fhp, exp, &child, &cd->fh);
 out:
-	dput(dchild);
+	dput(child.dentry);
 	return rv;
 }
 
