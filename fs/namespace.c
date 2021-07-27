@@ -662,6 +662,7 @@ struct vfsmount *lookup_mnt(const struct path *path)
 	rcu_read_unlock();
 	return m;
 }
+EXPORT_SYMBOL(lookup_mnt);
 
 static inline void lock_ns_list(struct mnt_namespace *ns)
 {

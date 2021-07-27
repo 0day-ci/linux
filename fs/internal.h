@@ -81,7 +81,6 @@ int do_renameat2(int olddfd, struct filename *oldname, int newdfd,
 /*
  * namespace.c
  */
-extern struct vfsmount *lookup_mnt(const struct path *);
 extern int finish_automount(struct vfsmount *, struct path *);
 
 extern int sb_prepare_remount_readonly(struct super_block *);
