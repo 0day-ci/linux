@@ -119,3 +119,49 @@ config DRM_I915_TIMESLICE_DURATION
 	  /sys/class/drm/card?/engine/*/timeslice_duration_ms
 
 	  May be 0 to disable timeslicing.
+
+choice
+	prompt "Transparent Hugepage Support (native)"
+	default DRM_I915_THP_NATIVE_NEVER
+	help
+	  Select the preferred method for allocating from Transparent Hugepages
+	  when IOMMU is not enabled.
+
+	config DRM_I915_THP_NATIVE_NEVER
+	bool "Never"
+
+	config DRM_I915_THP_NATIVE_WITHIN
+	bool "Within"
+
+	config DRM_I915_THP_NATIVE_ALWAYS
+	bool "Always"
+endchoice
+
+config DRM_I915_THP_NATIVE
+	string
+	default "always" if DRM_I915_THP_NATIVE_ALWAYS
+	default "within_size" if DRM_I915_THP_NATIVE_WITHIN
+	default "never" if DRM_I915_THP_NATIVE_NEVER
+
+choice
+	prompt "Transparent Hugepage Support (IOMMU)"
+	default DRM_I915_THP_IOMMU_WITHIN
+	help
+	  Select the preferred method for allocating from Transparent Hugepages
+	  with IOMMU active.
+
+	config DRM_I915_THP_IOMMU_NEVER
+	bool "Never"
+
+	config DRM_I915_THP_IOMMU_WITHIN
+	bool "Within"
+
+	config DRM_I915_THP_IOMMU_ALWAYS
+	bool "Always"
+endchoice
+
+config DRM_I915_THP_IOMMU
+	string
+	default "always" if DRM_I915_THP_IOMMU_ALWAYS
+	default "within_size" if DRM_I915_THP_IOMMU_WITHIN
+	default "never" if DRM_I915_THP_IOMMU_NEVER
