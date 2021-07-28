@@ -155,6 +155,55 @@ out_err:
 	return -ENOMEM;
 }
 
+/*
+ * Remove the topmost level of page tables from the list of page tables of
+ * the gmap.
+ * This means that it will not be freed when the VM is torn down, and needs
+ * to be handled separately by the caller, unless an intentional leak is
+ * intended.
+ */
+static void kvm_s390_pv_remove_old_asce(struct kvm *kvm)
+{
+	struct page *old;
+
+	old = virt_to_page(kvm->arch.gmap->table);
+	list_del(&old->lru);
+	/* in case the ASCE needs to be "removed" multiple times */
+	INIT_LIST_HEAD(&old->lru);
+}
+
+/*
+ * Try to replace the current ASCE with another equivalent one.
+ * If the allocation of the new top level page table fails, the ASCE is not
+ * replaced.
+ * In any case, the old ASCE is removed from the list, therefore the caller
+ * has to make sure to save a pointer to it beforehands, unless an
+ * intentional leak is intended.
+ */
+static int kvm_s390_pv_replace_asce(struct kvm *kvm)
+{
+	unsigned long asce;
+	struct page *page;
+	void *table;
+
+	kvm_s390_pv_remove_old_asce(kvm);
+
+	page = alloc_pages(GFP_KERNEL_ACCOUNT, CRST_ALLOC_ORDER);
+	if (!page)
+		return -ENOMEM;
+	list_add(&page->lru, &kvm->arch.gmap->crst_list);
+
+	table = page_to_virt(page);
+	memcpy(table, kvm->arch.gmap->table, 1UL << (CRST_ALLOC_ORDER + PAGE_SHIFT));
+
+	asce = (kvm->arch.gmap->asce & ~PAGE_MASK) | __pa(table);
+	WRITE_ONCE(kvm->arch.gmap->asce, asce);
+	WRITE_ONCE(kvm->mm->context.gmap_asce, asce);
+	WRITE_ONCE(kvm->arch.gmap->table, table);
+
+	return 0;
+}
+
 /* this should not fail, but if it does, we must not free the donated memory */
 int kvm_s390_pv_deinit_vm(struct kvm *kvm, u16 *rc, u16 *rrc)
 {
@@ -169,9 +218,11 @@ int kvm_s390_pv_deinit_vm(struct kvm *kvm, u16 *rc, u16 *rrc)
 	atomic_set(&kvm->mm->context.is_protected, 0);
 	KVM_UV_EVENT(kvm, 3, "PROTVIRT DESTROY VM: rc %x rrc %x", *rc, *rrc);
 	WARN_ONCE(cc, "protvirt destroy vm failed rc %x rrc %x", *rc, *rrc);
-	/* Inteded memory leak on "impossible" error */
+	/* Intended memory leak on "impossible" error */
 	if (!cc)
 		kvm_s390_pv_dealloc_vm(kvm);
+	else
+		kvm_s390_pv_replace_asce(kvm);
 	return cc ? -EIO : 0;
 }
 
