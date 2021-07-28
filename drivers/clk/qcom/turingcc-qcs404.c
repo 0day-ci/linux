@@ -9,7 +9,6 @@
 #include <linux/module.h>
 #include <linux/of_address.h>
 #include <linux/pm_clock.h>
-#include <linux/pm_runtime.h>
 #include <linux/regmap.h>
 
 #include <dt-bindings/clock/qcom,turingcc-qcs404.h>
@@ -100,35 +99,23 @@ static const struct regmap_config turingcc_regmap_config = {
 	.fast_io	= true,
 };
 
+static const char * const turingcc_pm_clks[] = { NULL };
+
+static const struct qcom_cc_pm turingcc_pm = {
+	.pm_clks = turingcc_pm_clks,
+	.num_pm_clks = ARRAY_SIZE(turingcc_pm_clks),
+};
+
 static const struct qcom_cc_desc turingcc_desc = {
 	.config = &turingcc_regmap_config,
+	.pm = &turingcc_pm,
 	.clks = turingcc_clocks,
 	.num_clks = ARRAY_SIZE(turingcc_clocks),
 };
 
 static int turingcc_probe(struct platform_device *pdev)
 {
-	int ret;
-
-	ret = devm_pm_runtime_enable(&pdev->dev);
-	if (ret)
-		return ret;
-
-	ret = devm_pm_clk_create(&pdev->dev);
-	if (ret)
-		return ret;
-
-	ret = pm_clk_add(&pdev->dev, NULL);
-	if (ret < 0) {
-		dev_err(&pdev->dev, "failed to acquire iface clock\n");
-		return ret;
-	}
-
-	ret = qcom_cc_probe(pdev, &turingcc_desc);
-	if (ret < 0)
-		return ret;
-
-	return 0;
+	return qcom_cc_probe(pdev, &turingcc_desc);
 }
 
 static const struct dev_pm_ops turingcc_pm_ops = {

@@ -7,6 +7,8 @@
 #include <linux/module.h>
 #include <linux/regmap.h>
 #include <linux/platform_device.h>
+#include <linux/pm_clock.h>
+#include <linux/pm_runtime.h>
 #include <linux/clk-provider.h>
 #include <linux/reset-controller.h>
 #include <linux/of.h>
@@ -307,6 +309,8 @@ int qcom_cc_probe(struct platform_device *pdev, const struct qcom_cc_desc *desc)
 {
 	struct regmap *regmap;
 
+	qcom_cc_setup_pm(pdev, desc);
+
 	regmap = qcom_cc_map(pdev, desc);
 	if (IS_ERR(regmap))
 		return PTR_ERR(regmap);
@@ -320,6 +324,8 @@ int qcom_cc_probe_by_index(struct platform_device *pdev, int index,
 {
 	struct regmap *regmap;
 
+	qcom_cc_setup_pm(pdev, desc);
+
 	regmap = qcom_cc_map_by_index(pdev, desc, index);
 	if (IS_ERR(regmap))
 		return PTR_ERR(regmap);
@@ -327,5 +333,35 @@ int qcom_cc_probe_by_index(struct platform_device *pdev, int index,
 	return qcom_cc_really_probe(pdev, desc, regmap);
 }
 EXPORT_SYMBOL_GPL(qcom_cc_probe_by_index);
+
+int qcom_cc_really_setup_pm(struct platform_device *pdev, const struct qcom_cc_pm *pm)
+{
+	int ret;
+	int i;
+
+	if (!pm)
+		return -EINVAL;
+
+	ret = devm_pm_runtime_enable(&pdev->dev);
+	if (ret)
+		return ret;
+
+	if (pm->num_pm_clks) {
+		ret = devm_pm_clk_create(&pdev->dev);
+		if (ret)
+			return ret;
+	}
+
+	for (i = 0; i < pm->num_pm_clks; i++) {
+		ret = pm_clk_add(&pdev->dev, pm->pm_clks[i]);
+		if (ret < 0) {
+			dev_err(&pdev->dev, "Failed to acquire %s pm clk\n", pm->pm_clks[i]);
+			return ret;
+		}
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(qcom_cc_really_setup_pm);
 
 MODULE_LICENSE("GPL v2");

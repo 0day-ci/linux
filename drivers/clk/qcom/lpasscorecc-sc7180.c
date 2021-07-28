@@ -338,8 +338,16 @@ static struct regmap_config lpass_core_cc_sc7180_regmap_config = {
 	.fast_io = true,
 };
 
+static const char * const lpass_core_sc7180_pm_clks[] = { "iface" };
+
+static const struct qcom_cc_pm lpass_core_sc7180_pm = {
+	.pm_clks = lpass_core_sc7180_pm_clks,
+	.num_pm_clks = ARRAY_SIZE(lpass_core_sc7180_pm_clks),
+};
+
 static const struct qcom_cc_desc lpass_core_hm_sc7180_desc = {
 	.config = &lpass_core_cc_sc7180_regmap_config,
+	.pm = &lpass_core_sc7180_pm,
 	.gdscs = lpass_core_hm_sc7180_gdscs,
 	.num_gdscs = ARRAY_SIZE(lpass_core_hm_sc7180_gdscs),
 };
@@ -356,35 +364,16 @@ static const struct qcom_cc_desc lpass_audio_hm_sc7180_desc = {
 	.num_gdscs = ARRAY_SIZE(lpass_audio_hm_sc7180_gdscs),
 };
 
-static int lpass_create_pm_clks(struct platform_device *pdev)
-{
-	int ret;
-
-	pm_runtime_use_autosuspend(&pdev->dev);
-	pm_runtime_set_autosuspend_delay(&pdev->dev, 500);
-
-	ret = devm_pm_runtime_enable(&pdev->dev);
-	if (ret)
-		return ret;
-
-	ret = devm_pm_clk_create(&pdev->dev);
-	if (ret)
-		return ret;
-
-	ret = pm_clk_add(&pdev->dev, "iface");
-	if (ret < 0)
-		dev_err(&pdev->dev, "failed to acquire iface clock\n");
-
-	return ret;
-}
-
 static int lpass_core_cc_sc7180_probe(struct platform_device *pdev)
 {
 	const struct qcom_cc_desc *desc;
 	struct regmap *regmap;
 	int ret;
 
-	ret = lpass_create_pm_clks(pdev);
+	pm_runtime_use_autosuspend(&pdev->dev);
+	pm_runtime_set_autosuspend_delay(&pdev->dev, 500);
+
+	ret = qcom_cc_really_setup_pm(pdev, &lpass_core_sc7180_pm);
 	if (ret)
 		return ret;
 
@@ -423,11 +412,9 @@ static int lpass_core_cc_sc7180_probe(struct platform_device *pdev)
 static int lpass_hm_core_probe(struct platform_device *pdev)
 {
 	const struct qcom_cc_desc *desc;
-	int ret;
 
-	ret = lpass_create_pm_clks(pdev);
-	if (ret)
-		return ret;
+	pm_runtime_use_autosuspend(&pdev->dev);
+	pm_runtime_set_autosuspend_delay(&pdev->dev, 500);
 
 	lpass_core_cc_sc7180_regmap_config.name = "lpass_hm_core";
 	desc = &lpass_core_hm_sc7180_desc;

@@ -7,7 +7,6 @@
 #include <linux/platform_device.h>
 #include <linux/module.h>
 #include <linux/pm_clock.h>
-#include <linux/pm_runtime.h>
 #include <linux/regmap.h>
 
 #include <dt-bindings/clock/qcom,mss-sc7180.h>
@@ -63,35 +62,23 @@ static struct clk_regmap *mss_sc7180_clocks[] = {
 	[MSS_AXI_NAV_CLK] = &mss_axi_nav_clk.clkr,
 };
 
+static const char * const mss_sc7180_pm_clks[] = { "cfg_ahb" };
+
+static const struct qcom_cc_pm mss_sc7180_pm = {
+	.pm_clks = mss_sc7180_pm_clks,
+	.num_pm_clks = ARRAY_SIZE(mss_sc7180_pm_clks),
+};
+
 static const struct qcom_cc_desc mss_sc7180_desc = {
 	.config = &mss_regmap_config,
+	.pm = &mss_sc7180_pm,
 	.clks = mss_sc7180_clocks,
 	.num_clks = ARRAY_SIZE(mss_sc7180_clocks),
 };
 
 static int mss_sc7180_probe(struct platform_device *pdev)
 {
-	int ret;
-
-	ret = devm_pm_runtime_enable(&pdev->dev);
-	if (ret)
-		return ret;
-
-	ret = devm_pm_clk_create(&pdev->dev);
-	if (ret)
-		return ret;
-
-	ret = pm_clk_add(&pdev->dev, "cfg_ahb");
-	if (ret < 0) {
-		dev_err(&pdev->dev, "failed to acquire iface clock\n");
-		return ret;
-	}
-
-	ret = qcom_cc_probe(pdev, &mss_sc7180_desc);
-	if (ret < 0)
-		return ret;
-
-	return 0;
+	return qcom_cc_probe(pdev, &mss_sc7180_desc);
 }
 
 static const struct dev_pm_ops mss_sc7180_pm_ops = {

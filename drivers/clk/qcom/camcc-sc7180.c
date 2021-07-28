@@ -1631,8 +1631,16 @@ static const struct regmap_config cam_cc_sc7180_regmap_config = {
 	.fast_io = true,
 };
 
+static const char * const cam_cc_sc7180_pm_clks[] = { "xo", "iface" };
+
+static const struct qcom_cc_pm cam_cc_sc7180_pm = {
+	.pm_clks = cam_cc_sc7180_pm_clks,
+	.num_pm_clks = ARRAY_SIZE(cam_cc_sc7180_pm_clks),
+};
+
 static const struct qcom_cc_desc cam_cc_sc7180_desc = {
 	.config = &cam_cc_sc7180_regmap_config,
+	.pm = &cam_cc_sc7180_pm,
 	.clk_hws = cam_cc_sc7180_hws,
 	.num_clk_hws = ARRAY_SIZE(cam_cc_sc7180_hws),
 	.clks = cam_cc_sc7180_clocks,
@@ -1652,25 +1660,9 @@ static int cam_cc_sc7180_probe(struct platform_device *pdev)
 	struct regmap *regmap;
 	int ret;
 
-	ret = devm_pm_runtime_enable(&pdev->dev);
-	if (ret < 0)
+	ret = qcom_cc_setup_pm(pdev, &cam_cc_sc7180_desc);
+	if (ret)
 		return ret;
-
-	ret = devm_pm_clk_create(&pdev->dev);
-	if (ret < 0)
-		return ret;
-
-	ret = pm_clk_add(&pdev->dev, "xo");
-	if (ret < 0) {
-		dev_err(&pdev->dev, "Failed to acquire XO clock\n");
-		return ret;
-	}
-
-	ret = pm_clk_add(&pdev->dev, "iface");
-	if (ret < 0) {
-		dev_err(&pdev->dev, "Failed to acquire iface clock\n");
-		return ret;
-	}
 
 	ret = pm_runtime_get(&pdev->dev);
 	if (ret)

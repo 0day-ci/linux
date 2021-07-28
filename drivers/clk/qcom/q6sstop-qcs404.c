@@ -8,7 +8,6 @@
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/pm_clock.h>
-#include <linux/pm_runtime.h>
 #include <linux/regmap.h>
 
 #include <dt-bindings/clock/qcom,q6sstopcc-qcs404.h>
@@ -117,6 +116,13 @@ static struct regmap_config q6sstop_regmap_config = {
 	.fast_io	= true,
 };
 
+static const char * const q6sstop_qcs404_pm_clks[] = { NULL };
+
+static const struct qcom_cc_pm q6sstop_qcs404_pm = {
+	.pm_clks = q6sstop_qcs404_pm_clks,
+	.num_pm_clks = ARRAY_SIZE(q6sstop_qcs404_pm_clks),
+};
+
 static struct clk_regmap *q6sstop_qcs404_clocks[] = {
 	[LCC_AHBFABRIC_CBC_CLK] = &lcc_ahbfabric_cbc_clk.clkr,
 	[LCC_Q6SS_AHBS_CBC_CLK] = &lcc_q6ss_ahbs_cbc_clk.clkr,
@@ -159,19 +165,7 @@ static int q6sstopcc_qcs404_probe(struct platform_device *pdev)
 	const struct qcom_cc_desc *desc;
 	int ret;
 
-	ret = devm_pm_runtime_enable(&pdev->dev);
-	if (ret)
-		return ret;
-
-	ret = devm_pm_clk_create(&pdev->dev);
-	if (ret)
-		return ret;
-
-	ret = pm_clk_add(&pdev->dev, NULL);
-	if (ret < 0) {
-		dev_err(&pdev->dev, "failed to acquire iface clock\n");
-		return ret;
-	}
+	ret = qcom_cc_really_setup_pm(pdev, &q6sstop_qcs404_pm);
 
 	q6sstop_regmap_config.name = "q6sstop_tcsr";
 	desc = &tcsr_qcs404_desc;

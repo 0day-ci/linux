@@ -19,8 +19,15 @@ struct clk_hw;
 #define PLL_VOTE_FSM_ENA	BIT(20)
 #define PLL_VOTE_FSM_RESET	BIT(21)
 
+/* This can be used from within the qcom_cc_desc or separately */
+struct qcom_cc_pm {
+	const char *const *pm_clks;
+	size_t num_pm_clks;
+};
+
 struct qcom_cc_desc {
 	const struct regmap_config *config;
+	const struct qcom_cc_pm *pm;
 	struct clk_regmap **clks;
 	size_t num_clks;
 	const struct qcom_reset_map *resets;
@@ -53,6 +60,16 @@ extern int qcom_find_src_index(struct clk_hw *hw, const struct parent_map *map,
 extern int qcom_cc_register_board_clk(struct device *dev, const char *path,
 				      const char *name, unsigned long rate);
 extern int qcom_cc_register_sleep_clk(struct device *dev);
+
+extern int qcom_cc_really_setup_pm(struct platform_device *pdev, const struct qcom_cc_pm *pm);
+
+static inline int qcom_cc_setup_pm(struct platform_device *pdev, const struct qcom_cc_desc *desc)
+{
+	if (!desc->pm)
+		return 0;
+
+	return qcom_cc_really_setup_pm(pdev, desc->pm);
+}
 
 extern struct regmap *qcom_cc_map(struct platform_device *pdev,
 				  const struct qcom_cc_desc *desc);
