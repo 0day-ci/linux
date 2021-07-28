@@ -15,8 +15,7 @@
 #define MTK_HDR_XMIT_TAGGED_TPID_8100	1
 #define MTK_HDR_XMIT_TAGGED_TPID_88A8	2
 #define MTK_HDR_RECV_SOURCE_PORT_MASK	GENMASK(2, 0)
-#define MTK_HDR_XMIT_DP_BIT_MASK	GENMASK(5, 0)
-#define MTK_HDR_XMIT_SA_DIS		BIT(6)
+#define MTK_HDR_XMIT_SA_DIS_SHIFT	6
 
 static struct sk_buff *mtk_tag_xmit(struct sk_buff *skb,
 				    struct net_device *dev)
@@ -50,7 +49,8 @@ static struct sk_buff *mtk_tag_xmit(struct sk_buff *skb,
 	 * whether that's a combined special tag with 802.1Q header.
 	 */
 	mtk_tag[0] = xmit_tpid;
-	mtk_tag[1] = (1 << dp->index) & MTK_HDR_XMIT_DP_BIT_MASK;
+	mtk_tag[1] = BIT(dp->index) |
+		     (!dp->bridge_dev << MTK_HDR_XMIT_SA_DIS_SHIFT);
 
 	/* Tag control information is kept for 802.1Q */
 	if (xmit_tpid == MTK_HDR_XMIT_UNTAGGED) {
