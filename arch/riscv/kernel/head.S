@@ -89,29 +89,52 @@ relocate:
 	add ra, ra, a1
 
 	/* Point stvec to virtual address of intruction after satp write */
-	la a2, 1f
+#ifdef CONFIG_64BIT
+	la a2, load_done
+#else
+	la a2, load_kernel_pgd
+#endif
 	add a2, a2, a1
 	csrw CSR_TVEC, a2
 
-	/* Compute satp for kernel page tables, but don't load it yet */
+	/* Compute satp for kernel page tables.
+	 * For 64bit systems, load it and trap to stvec.
+	 * For 32bit systems, don't load it yet.
+	 */
 	srl a2, a0, PAGE_SHIFT
 	li a1, SATP_MODE
 	or a2, a2, a1
 
 	/*
+	 * Before writing satp, we need a full fence here because setup_vm() just
+	 * wrote these PTEs and we need to ensure the new translations are in use.
+	 */
+	sfence.vma
+#ifndef CONFIG_64BIT
+	/*
+	 * 32bit systems need firstly loading a trampoline to handle a corner
+	 * case where load address range overlaps kernel virtual address range.
 	 * Load trampoline page directory, which will cause us to trap to
-	 * stvec if VA != PA, or simply fall through if VA == PA.  We need a
-	 * full fence here because setup_vm() just wrote these PTEs and we need
-	 * to ensure the new translations are in use.
+	 * stvec if VA != PA, or simply fall through if VA == PA.
 	 */
 	la a0, trampoline_pg_dir
 	XIP_FIXUP_OFFSET a0
 	srl a0, a0, PAGE_SHIFT
 	or a0, a0, a1
-	sfence.vma
 	csrw CSR_SATP, a0
+#endif
 .align 2
-1:
+load_kernel_pgd:
+        /*
+         * Switch to kernel page tables.  A full fence is necessary in order to
+         * avoid using the trampoline translations, which are only correct for
+         * the first superpage.  Fetching the fence is guarnteed to work
+         * because that first superpage is translated the same way.
+         */
+        csrw CSR_SATP, a2
+        sfence.vma
+
+load_done:
 	/* Set trap vector to spin forever to help debug */
 	la a0, .Lsecondary_park
 	csrw CSR_TVEC, a0
@@ -121,15 +144,6 @@ relocate:
 .option norelax
 	la gp, __global_pointer$
 .option pop
-
-	/*
-	 * Switch to kernel page tables.  A full fence is necessary in order to
-	 * avoid using the trampoline translations, which are only correct for
-	 * the first superpage.  Fetching the fence is guarnteed to work
-	 * because that first superpage is translated the same way.
-	 */
-	csrw CSR_SATP, a2
-	sfence.vma
 
 	ret
 #endif /* CONFIG_MMU */
