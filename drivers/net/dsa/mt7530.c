@@ -1228,6 +1228,8 @@ mt7530_port_bridge_join(struct dsa_switch *ds, int port,
 		mt7530_rmw(priv, MT7530_PCR_P(port),
 			   PCR_MATRIX_MASK, PCR_MATRIX(port_bitmap));
 	priv->ports[port].pm |= PCR_MATRIX(port_bitmap);
+	/* Don't trap frames to the CPU port */
+	mt7530_clear(priv, MT7530_PCR_P(port), PORT_ACL_EN);
 
 	mutex_unlock(&priv->reg_mutex);
 
@@ -1328,6 +1330,8 @@ mt7530_port_bridge_leave(struct dsa_switch *ds, int port,
 		mt7530_rmw(priv, MT7530_PCR_P(port), PCR_MATRIX_MASK,
 			   PCR_MATRIX(BIT(MT7530_CPU_PORT)));
 	priv->ports[port].pm = PCR_MATRIX(BIT(MT7530_CPU_PORT));
+	/* Trap all frames to the CPU port */
+	mt7530_set(priv, MT7530_PCR_P(port), PORT_ACL_EN);
 
 	mutex_unlock(&priv->reg_mutex);
 }
@@ -2037,6 +2041,24 @@ mt7530_setup_mdio(struct mt7530_priv *priv)
 	return ret;
 }
 
+static void
+mt7530_setup_acl(struct mt7530_priv *priv)
+{
+	u32 action;
+
+	/* Set ACL pattern mask to 0 to match unconditionally */
+	mt7530_write(priv, MT7530_VAWD1, 0);
+	mt7530_write(priv, MT7530_VAWD2, 0);
+	mt7530_vlan_cmd(priv, MT7530_VTCR_WR_ACL_MASK, 0);
+
+	/* Set ACL action to forward frames to the CPU port */
+	action = ACL_PORT_EN | ACL_PORT(BIT(MT7530_CPU_PORT)) |
+		 ACL_EG_TAG(MT7530_VLAN_EG_CONSISTENT);
+	mt7530_write(priv, MT7530_VAWD1, action);
+	mt7530_write(priv, MT7530_VAWD2, 0);
+	mt7530_vlan_cmd(priv, MT7530_VTCR_WR_ACL_ACTION, 0);
+}
+
 static int
 mt7530_setup(struct dsa_switch *ds)
 {
@@ -2133,6 +2155,8 @@ mt7530_setup(struct dsa_switch *ds)
 
 			/* Disable learning by default on all user ports */
 			mt7530_set(priv, MT7530_PSC_P(i), SA_DIS);
+			/* Trap all frames to the CPU port */
+			mt7530_set(priv, MT7530_PCR_P(i), PORT_ACL_EN);
 		}
 		/* Enable consistent egress tag */
 		mt7530_rmw(priv, MT7530_PVC_P(i), PVC_EG_TAG_MASK,
@@ -2300,6 +2324,8 @@ mt7531_setup(struct dsa_switch *ds)
 
 			/* Disable learning by default on all user ports */
 			mt7530_set(priv, MT7530_PSC_P(i), SA_DIS);
+			/* Trap all frames to the CPU port */
+			mt7530_set(priv, MT7530_PCR_P(i), PORT_ACL_EN);
 		}
 
 		/* Enable consistent egress tag */
@@ -3004,6 +3030,8 @@ mt753x_setup(struct dsa_switch *ds)
 
 	if (ret)
 		return ret;
+
+	mt7530_setup_acl(priv);
 
 	ret = mt7530_setup_irq(priv);
 	if (ret)

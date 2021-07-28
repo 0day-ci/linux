@@ -137,6 +137,15 @@ enum mt7530_vlan_cmd {
 	 */
 	MT7530_VTCR_RD_VID = 0,
 	MT7530_VTCR_WR_VID = 1,
+	/* Read/Write the specified ACL rule pattern */
+	MT7530_VTCR_RD_ACL_PATTERN = 4,
+	MT7530_VTCR_WR_ACL_PATTERN = 5,
+	/* Read/Write the specified ACL rule mask */
+	MT7530_VTCR_RD_ACL_MASK = 8,
+	MT7530_VTCR_WR_ACL_MASK = 9,
+	/* Read/Write the specified ACL rule action */
+	MT7530_VTCR_RD_ACL_ACTION = 10,
+	MT7530_VTCR_WR_ACL_ACTION = 11,
 };
 
 /* Register for setup vlan and acl write data */
@@ -153,6 +162,35 @@ enum mt7530_vlan_cmd {
 #define  PORT_MEM_SHFT			16
 #define  PORT_MEM_MASK			0xff
 
+/* ACL rule pattern */
+#define  BIT_CMP(x)			(((x) & 0xffff) << 16)
+#define  CMP_PAT(x)			((x) & 0xffff)
+
+/* ACL rule action */
+#define  ACL_MANG			BIT(29)
+#define  ACL_INT_EN			BIT(28)
+#define  ACL_CNT_EN			BIT(27)
+#define  ACL_CNT_IDX(x)			(((x) & 0x7) << 24)
+#define  VLAN_PORT_EN			BIT(23)
+#define  DA_SWAP			BIT(22)
+#define  SA_SWAP			BIT(21)
+#define  PPP_RM				BIT(20)
+#define  LKY_VLAN			BIT(19)
+#define  ACL_EG_TAG(x)			(((x) & 0x7) << 16)
+#define  ACL_PORT(x)			(((x) & 0xff) << 8)
+#define  ACL_PORT_EN			BIT(7)
+#define  PRI_USER(x)			(((x) & 0x7) << 4)
+#define  ACL_MIR_EN			BIT(3)
+#define  ACL_PORT_FW(x)			((x) & 0x7)
+
+enum mt7530_to_cpu_port_fw {
+	PORT_FW_DEFAULT,
+	PORT_FW_EXCLUDE_CPU = 4,
+	PORT_FW_INCLUDE_CPU,
+	PORT_FW_CPU_ONLY,
+	PORT_FW_DROP,
+};
+
 #define MT7530_VAWD2			0x98
 /* Egress Tag Control */
 #define  ETAG_CTRL_P(p, x)		(((x) & 0x3) << ((p) << 1))
@@ -162,6 +200,23 @@ enum mt7530_vlan_egress_attr {
 	MT7530_VLAN_EGRESS_UNTAG = 0,
 	MT7530_VLAN_EGRESS_TAG = 2,
 	MT7530_VLAN_EGRESS_STACK = 3,
+};
+
+/* ACL rule pattern */
+#define  ACL_TABLE_EN			BIT(19)
+#define  OFST_TP(x)			(((x) & 0x7) << 16)
+#define  ACL_SP(x)			(((x) & 0xff) << 8)
+#define  WORD_OFST(x)			(((x) & 0x7f) << 1)
+#define  CMP_SEL			BIT(0)
+
+enum mt7530_acl_offset_type {
+	MT7530_ACL_MAC_HEADER,
+	MT7530_ACL_L2_PAYLOAD,
+	MT7530_ACL_IP_HEADER,
+	MT7530_ACL_IP_DATAGRAM,
+	MT7530_ACL_TCP_UDP_HEADER,
+	MT7530_ACL_TCP_UDP_DATAGRAM,
+	MT7530_ACL_IPV6_HEADER,
 };
 
 /* Register for address age control */
@@ -192,6 +247,7 @@ enum mt7530_stp_state {
 
 /* Register for port control */
 #define MT7530_PCR_P(x)			(0x2004 + ((x) * 0x100))
+#define  PORT_ACL_EN			BIT(10)
 #define  PORT_TX_MIR			BIT(9)
 #define  PORT_RX_MIR			BIT(8)
 #define  PORT_VLAN(x)			((x) & 0x3)
