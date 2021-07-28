@@ -178,6 +178,9 @@ struct throtl_grp {
 	unsigned int bad_bio_cnt; /* bios exceeding latency threshold */
 	unsigned long bio_cnt_reset_time;
 
+	atomic_t io_split_cnt[2];
+	atomic_t last_io_split_cnt[2];
+
 	struct blkg_rwstat stat_bytes;
 	struct blkg_rwstat stat_ios;
 };
@@ -291,6 +294,16 @@ static uint64_t throtl_adjusted_limit(uint64_t low, struct throtl_data *td)
 		td->scale = (jiffies - td->low_upgrade_time) / td->throtl_slice;
 
 	return low + (low >> 1) * td->scale;
+}
+
+static inline unsigned int tg_io_disp(struct throtl_grp *tg, int rw)
+{
+	return tg->io_disp[rw] + atomic_read(&tg->io_split_cnt[rw]);
+}
+
+static inline unsigned int tg_last_io_disp(struct throtl_grp *tg, int rw)
+{
+	return tg->last_io_disp[rw] + atomic_read(&tg->last_io_split_cnt[rw]);
 }
 
 static uint64_t tg_bps_limit(struct throtl_grp *tg, int rw)
@@ -523,6 +536,11 @@ static struct blkg_policy_data *throtl_pd_alloc(gfp_t gfp,
 	tg->latency_target_conf = DFL_LATENCY_TARGET;
 	tg->idletime_threshold = DFL_IDLE_THRESHOLD;
 	tg->idletime_threshold_conf = DFL_IDLE_THRESHOLD;
+
+	atomic_set(&tg->io_split_cnt[0], 0);
+	atomic_set(&tg->io_split_cnt[1], 0);
+	atomic_set(&tg->last_io_split_cnt[0], 0);
+	atomic_set(&tg->last_io_split_cnt[1], 0);
 
 	return &tg->pd;
 
@@ -777,6 +795,8 @@ static inline void throtl_start_new_slice_with_credit(struct throtl_grp *tg,
 	tg->bytes_disp[rw] = 0;
 	tg->io_disp[rw] = 0;
 
+	atomic_set(&tg->io_split_cnt[rw], 0);
+
 	/*
 	 * Previous slice has expired. We must have trimmed it after last
 	 * bio dispatch. That means since start of last slice, we never used
@@ -799,6 +819,9 @@ static inline void throtl_start_new_slice(struct throtl_grp *tg, bool rw)
 	tg->io_disp[rw] = 0;
 	tg->slice_start[rw] = jiffies;
 	tg->slice_end[rw] = jiffies + tg->td->throtl_slice;
+
+	atomic_set(&tg->io_split_cnt[rw], 0);
+
 	throtl_log(&tg->service_queue,
 		   "[%c] new slice start=%lu end=%lu jiffies=%lu",
 		   rw == READ ? 'R' : 'W', tg->slice_start[rw],
@@ -877,10 +900,19 @@ static inline void throtl_trim_slice(struct throtl_grp *tg, bool rw)
 	else
 		tg->bytes_disp[rw] = 0;
 
-	if (tg->io_disp[rw] >= io_trim)
+	if (tg_io_disp(tg, rw) >= io_trim) {
+		int cnt = atomic_read(&tg->io_split_cnt[rw]);
+
+		if (cnt) {
+			atomic_set(&tg->io_split_cnt[rw], 0);
+			tg->io_disp[rw] += cnt;
+		}
+
 		tg->io_disp[rw] -= io_trim;
-	else
+	} else {
+		atomic_set(&tg->io_split_cnt[rw], 0);
 		tg->io_disp[rw] = 0;
+	}
 
 	tg->slice_start[rw] += nr_slices * tg->td->throtl_slice;
 
@@ -924,7 +956,7 @@ static bool tg_with_in_iops_limit(struct throtl_grp *tg, struct bio *bio,
 	else
 		io_allowed = tmp;
 
-	if (tg->io_disp[rw] + 1 <= io_allowed) {
+	if (tg_io_disp(tg, rw) + 1 <= io_allowed) {
 		if (wait)
 			*wait = 0;
 		return true;
@@ -2052,13 +2084,13 @@ static void throtl_downgrade_check(struct throtl_grp *tg)
 	}
 
 	if (tg->iops[READ][LIMIT_LOW]) {
-		iops = tg->last_io_disp[READ] * HZ / elapsed_time;
+		iops = tg_last_io_disp(tg, READ) * HZ / elapsed_time;
 		if (iops >= tg->iops[READ][LIMIT_LOW])
 			tg->last_low_overflow_time[READ] = now;
 	}
 
 	if (tg->iops[WRITE][LIMIT_LOW]) {
-		iops = tg->last_io_disp[WRITE] * HZ / elapsed_time;
+		iops = tg_last_io_disp(tg, WRITE) * HZ / elapsed_time;
 		if (iops >= tg->iops[WRITE][LIMIT_LOW])
 			tg->last_low_overflow_time[WRITE] = now;
 	}
@@ -2074,6 +2106,9 @@ static void throtl_downgrade_check(struct throtl_grp *tg)
 	tg->last_bytes_disp[WRITE] = 0;
 	tg->last_io_disp[READ] = 0;
 	tg->last_io_disp[WRITE] = 0;
+
+	atomic_set(&tg->last_io_split_cnt[READ], 0);
+	atomic_set(&tg->last_io_split_cnt[WRITE], 0);
 }
 
 static void blk_throtl_update_idletime(struct throtl_grp *tg)
@@ -2176,6 +2211,25 @@ static inline void throtl_update_latency_buckets(struct throtl_data *td)
 }
 #endif
 
+void blk_throtl_recharge_bio(struct bio *bio)
+{
+	struct blkcg_gq *blkg = bio->bi_blkg;
+	struct throtl_grp *parent = blkg_to_tg(blkg);
+	struct throtl_service_queue *parent_sq;
+	bool rw = bio_data_dir(bio);
+
+	if (!parent->has_rules[rw])
+		return;
+
+	do {
+		atomic_inc(&parent->io_split_cnt[rw]);
+		atomic_inc(&parent->last_io_split_cnt[rw]);
+
+		parent_sq = parent->service_queue.parent_sq;
+		parent = sq_to_tg(parent_sq);
+	} while (parent);
+}
+
 bool blk_throtl_bio(struct bio *bio)
 {
 	struct request_queue *q = bio->bi_bdev->bd_disk->queue;
@@ -2263,7 +2317,7 @@ again:
 		   rw == READ ? 'R' : 'W',
 		   tg->bytes_disp[rw], bio->bi_iter.bi_size,
 		   tg_bps_limit(tg, rw),
-		   tg->io_disp[rw], tg_iops_limit(tg, rw),
+		   tg_io_disp(tg, rw), tg_iops_limit(tg, rw),
 		   sq->nr_queued[READ], sq->nr_queued[WRITE]);
 
 	tg->last_low_overflow_time[rw] = jiffies;
