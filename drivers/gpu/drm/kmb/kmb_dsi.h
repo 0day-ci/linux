@@ -378,7 +378,8 @@ static inline void kmb_clr_bit_mipi(struct kmb_dsi *kmb_dsi,
 
 int kmb_dsi_host_bridge_init(struct device *dev);
 struct kmb_dsi *kmb_dsi_init(struct platform_device *pdev);
-void kmb_dsi_host_unregister(struct kmb_dsi *kmb_dsi);
+void kmb_dsi_host_unregister(void);
+void kmb_dsi_clk_disable(struct kmb_dsi *kmb_dsi);
 int kmb_dsi_mode_set(struct kmb_dsi *kmb_dsi, struct drm_display_mode *mode,
 		     int sys_clk_mhz);
 int kmb_dsi_map_mmio(struct kmb_dsi *kmb_dsi);

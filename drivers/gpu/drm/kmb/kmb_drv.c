@@ -454,8 +454,9 @@ static int kmb_remove(struct platform_device *pdev)
 	dev_set_drvdata(dev, NULL);
 
 	/* Unregister DSI host */
-	kmb_dsi_host_unregister(kmb->kmb_dsi);
+	kmb_dsi_host_unregister();
 	drm_atomic_helper_shutdown(drm);
+	drm_dev_put(drm);
 	return 0;
 }
 
@@ -519,7 +520,7 @@ static int kmb_probe(struct platform_device *pdev)
 	if (IS_ERR(kmb->kmb_dsi)) {
 		drm_err(&kmb->drm, "failed to initialize DSI\n");
 		ret = PTR_ERR(kmb->kmb_dsi);
-		goto err_free1;
+		goto err_free2;
 	}
 
 	kmb->kmb_dsi->dev = &dsi_pdev->dev;
@@ -555,8 +556,10 @@ static int kmb_probe(struct platform_device *pdev)
 	drm_crtc_cleanup(&kmb->crtc);
 	drm_mode_config_cleanup(&kmb->drm);
  err_free1:
+	kmb_dsi_clk_disable(kmb->kmb_dsi);
+ err_free2:
 	dev_set_drvdata(dev, NULL);
-	kmb_dsi_host_unregister(kmb->kmb_dsi);
+	kmb_dsi_host_unregister();
 
 	return ret;
 }

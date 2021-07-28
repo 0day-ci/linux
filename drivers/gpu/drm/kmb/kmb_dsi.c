@@ -172,17 +172,17 @@ mipi_hs_freq_range[MIPI_DPHY_DEFAULT_BIT_RATES] = {
 	{.default_bit_rate_mbps = 2500, .hsfreqrange_code = 0x49}
 };
 
-static void kmb_dsi_clk_disable(struct kmb_dsi *kmb_dsi)
+void kmb_dsi_clk_disable(struct kmb_dsi *kmb_dsi)
 {
 	clk_disable_unprepare(kmb_dsi->clk_mipi);
 	clk_disable_unprepare(kmb_dsi->clk_mipi_ecfg);
 	clk_disable_unprepare(kmb_dsi->clk_mipi_cfg);
 }
 
-void kmb_dsi_host_unregister(struct kmb_dsi *kmb_dsi)
+void kmb_dsi_host_unregister(void)
 {
-	kmb_dsi_clk_disable(kmb_dsi);
-	mipi_dsi_host_unregister(kmb_dsi->host);
+	if (dsi_host)
+		mipi_dsi_host_unregister(dsi_host);
 }
 
 /*
@@ -229,6 +229,7 @@ int kmb_dsi_host_bridge_init(struct device *dev)
 			dsi_device = kzalloc(sizeof(*dsi_device), GFP_KERNEL);
 			if (!dsi_device) {
 				kfree(dsi_host);
+				dsi_host = NULL;
 				return -ENOMEM;
 			}
 		}
