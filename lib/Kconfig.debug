@@ -2231,12 +2231,15 @@ config TEST_HASH
 config TEST_IDA
 	tristate "Perform selftest on IDA functions"
 
-config TEST_PARMAN
-	tristate "Perform selftest on priority array manager"
-	depends on PARMAN
+config PARMAN_KUNIT_TEST
+	tristate "Kunit test for priority array manager" if !KUNIT_ALL_TESTS
+	select PARMAN
+	depends on KUNIT
+	default KUNIT_ALL_TESTS
 	help
-	  Enable this option to test priority array manager on boot
-	  (or module load).
+	  Enable this option to test priority array manager on boot.
+	  For more information on KUnit and unit tests in general please refer
+	  to the KUnit documentation in Documentation/dev-tools/kunit/.
 
 	  If unsure, say N.
 
