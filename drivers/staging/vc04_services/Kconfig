@@ -23,6 +23,7 @@ if BCM2835_VCHIQ
 
 config VCHIQ_CDEV
 	bool "VCHIQ Character Driver"
+	default y
 	help
 		Enable the creation of VCHIQ character driver to help
 		communicate with the Videocore platform.
