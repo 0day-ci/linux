@@ -765,21 +765,6 @@ struct v4l2_event32 {
 	__u32				reserved[8];
 };
 
-#ifdef CONFIG_COMPAT_32BIT_TIME
-struct v4l2_event32_time32 {
-	__u32				type;
-	union {
-		compat_s64		value64;
-		__u8			data[64];
-	} u;
-	__u32				pending;
-	__u32				sequence;
-	struct old_timespec32		timestamp;
-	__u32				id;
-	__u32				reserved[8];
-};
-#endif
-
 static int put_v4l2_event32(struct v4l2_event *p64,
 			    struct v4l2_event32 __user *p32)
 {
@@ -796,6 +781,19 @@ static int put_v4l2_event32(struct v4l2_event *p64,
 }
 
 #ifdef CONFIG_COMPAT_32BIT_TIME
+struct v4l2_event32_time32 {
+	__u32				type;
+	union {
+		compat_s64		value64;
+		__u8			data[64];
+	} u;
+	__u32				pending;
+	__u32				sequence;
+	struct old_timespec32		timestamp;
+	__u32				id;
+	__u32				reserved[8];
+};
+
 static int put_v4l2_event32_time32(struct v4l2_event *p64,
 				   struct v4l2_event32_time32 __user *p32)
 {
@@ -811,7 +809,7 @@ static int put_v4l2_event32_time32(struct v4l2_event *p64,
 	return 0;
 }
 #endif
-#endif
+#endif /* CONFIG_X86_64 */
 
 struct v4l2_edid32 {
 	__u32 pad;
