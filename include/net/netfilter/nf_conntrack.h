@@ -24,6 +24,8 @@
 
 #include <net/netfilter/nf_conntrack_tuple.h>
 
+#include <uapi/linux/netfilter/nf_nat.h>
+
 struct nf_ct_udp {
 	unsigned long	stream_ts;
 };
@@ -99,6 +101,7 @@ struct nf_conn {
 
 #if IS_ENABLED(CONFIG_NF_NAT)
 	struct hlist_node	nat_bysource;
+	struct nf_nat_range2 range;
 #endif
 	/* all members below initialized via memset */
 	struct { } __nfct_init_offset;

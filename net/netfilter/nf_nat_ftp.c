@@ -17,6 +17,10 @@
 #include <net/netfilter/nf_conntrack_helper.h>
 #include <net/netfilter/nf_conntrack_expect.h>
 #include <linux/netfilter/nf_conntrack_ftp.h>
+void nf_nat_l4proto_unique_tuple(struct nf_conntrack_tuple *tuple,
+				 const struct nf_nat_range2 *range,
+				 enum nf_nat_manip_type maniptype,
+				 const struct nf_conn *ct);
 
 #define NAT_HELPER_NAME "ftp"
 
@@ -74,6 +78,7 @@ static unsigned int nf_nat_ftp(struct sk_buff *skb,
 	struct nf_conn *ct = exp->master;
 	char buffer[sizeof("|1||65535|") + INET6_ADDRSTRLEN];
 	unsigned int buflen;
+	int ret;
 
 	pr_debug("type %i, off %u len %u\n", type, matchoff, matchlen);
 
@@ -86,21 +91,14 @@ static unsigned int nf_nat_ftp(struct sk_buff *skb,
 	 * this one. */
 	exp->expectfn = nf_nat_follow_master;
 
-	/* Try to get same port: if not, try to change it. */
-	for (port = ntohs(exp->saved_proto.tcp.port); port != 0; port++) {
-		int ret;
+	/* Find a port that matches the NAT rule */
+	nf_nat_l4proto_unique_tuple(&exp->tuple, &ct->range,
+				    dir ? NF_NAT_MANIP_SRC : NF_NAT_MANIP_DST,
+				    ct);
+	port = ntohs(exp->tuple.dst.u.tcp.port);
+	ret = nf_ct_expect_related(exp, 0);
 
-		exp->tuple.dst.u.tcp.port = htons(port);
-		ret = nf_ct_expect_related(exp, 0);
-		if (ret == 0)
-			break;
-		else if (ret != -EBUSY) {
-			port = 0;
-			break;
-		}
-	}
-
-	if (port == 0) {
+	if ((ret != 0 && ret != -EBUSY) || port == 0) {
 		nf_ct_helper_log(skb, ct, "all ports in use");
 		return NF_DROP;
 	}
