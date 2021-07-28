@@ -16,6 +16,7 @@
 #include <linux/huge_mm.h>
 #include <linux/iommu.h>
 #include <linux/iova.h>
+#include <linux/io-pgtable.h>
 #include <linux/irq.h>
 #include <linux/mm.h>
 #include <linux/mutex.h>
@@ -326,6 +327,8 @@ int iommu_dma_init_fq(struct iommu_domain *domain)
 		return -ENODEV;
 	}
 	cookie->fq_domain = domain;
+	if (domain->ops->set_pgtable_quirks)
+		domain->ops->set_pgtable_quirks(domain, IO_PGTABLE_QUIRK_NON_STRICT);
 	return 0;
 }
 

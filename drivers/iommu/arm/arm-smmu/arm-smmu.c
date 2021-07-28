@@ -1518,6 +1518,17 @@ static int arm_smmu_set_pgtable_quirks(struct iommu_domain *domain,
 	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
 	int ret = 0;
 
+	if (quirks == IO_PGTABLE_QUIRK_NON_STRICT) {
+		struct io_pgtable *iop;
+
+		if (!smmu_domain->pgtbl_ops)
+			return -EINVAL;
+
+		iop = io_pgtable_ops_to_pgtable(smmu_domain->pgtbl_ops);
+		iop->cfg.quirks |= IO_PGTABLE_QUIRK_NON_STRICT;
+		return 0;
+	}
+
 	mutex_lock(&smmu_domain->init_mutex);
 	if (smmu_domain->smmu)
 		ret = -EPERM;
