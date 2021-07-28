@@ -22,7 +22,7 @@ properties:
     maxItems: 1
 
   clocks:
-    maxItems: 1
+    maxItems: 2
 
   gpio-controller: true
 
