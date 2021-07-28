@@ -25,8 +25,12 @@ config VCHIQ_CDEV
 	bool "VCHIQ Character Driver"
 	default y
 	help
-		Enable the creation of VCHIQ character driver to help
-		communicate with the Videocore platform.
+		Enable the creation of VCHIQ character driver to help communicate
+		with the VideoCore platform. The cdev exposes ioctls used by
+		userspace libraries and testing tools to interact with VideoCore.
+		This can be set to 'N' if the VideoCore communication is not needed
+		by userspace but only by other kernel modules (like bcm2835-audio).
+		If not sure, set this to 'Y'.
 
 endif
 
