@@ -786,7 +786,10 @@ struct v4l2_buffer_time32 {
 };
 
 /*
+ * For architectures other than x86_64, the struct v4l2_event32_time32
+ * is the same as v4l2_event_time32.
  * This function is used to copy the struct v4l2_event_time32 to userspace
+ * if either the kernel is not 64-bit or if the architecture is other than x86_64.
  */
 int put_v4l2_event_time32(void *parg, void __user *arg);
 

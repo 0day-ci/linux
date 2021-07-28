@@ -871,9 +871,13 @@ static int put_v4l2_edid32(struct v4l2_edid *p64,
 #define VIDIOC_QUERYBUF32_TIME32	_IOWR('V',  9, struct v4l2_buffer32_time32)
 #define VIDIOC_QBUF32_TIME32		_IOWR('V', 15, struct v4l2_buffer32_time32)
 #define VIDIOC_DQBUF32_TIME32		_IOWR('V', 17, struct v4l2_buffer32_time32)
+
 #ifdef CONFIG_X86_64
 #define	VIDIOC_DQEVENT32_TIME32		_IOR ('V', 89, struct v4l2_event32_time32)
+#else
+#define	VIDIOC_DQEVENT32_TIME32		VIDIOC_DQEVENT_TIME32
 #endif
+
 #define VIDIOC_PREPARE_BUF32_TIME32	_IOWR('V', 93, struct v4l2_buffer32_time32)
 #endif
 
@@ -899,6 +903,8 @@ unsigned int v4l2_compat_translate_cmd(unsigned int cmd)
 		return VIDIOC_DQBUF;
 	case VIDIOC_PREPARE_BUF32_TIME32:
 		return VIDIOC_PREPARE_BUF;
+	case VIDIOC_DQEVENT32_TIME32:
+		return VIDIOC_DQEVENT;
 #endif
 	case VIDIOC_QUERYBUF32:
 		return VIDIOC_QUERYBUF;
@@ -927,10 +933,6 @@ unsigned int v4l2_compat_translate_cmd(unsigned int cmd)
 #ifdef CONFIG_X86_64
 	case VIDIOC_DQEVENT32:
 		return VIDIOC_DQEVENT;
-#ifdef CONFIG_COMPAT_32BIT_TIME
-	case VIDIOC_DQEVENT32_TIME32:
-		return VIDIOC_DQEVENT;
-#endif
 #endif
 	}
 	return cmd;
@@ -996,6 +998,13 @@ int v4l2_compat_put_user(void __user *arg, void *parg, unsigned int cmd)
 	case VIDIOC_DQBUF32_TIME32:
 	case VIDIOC_PREPARE_BUF32_TIME32:
 		return put_v4l2_buffer32_time32(parg, arg);
+	case VIDIOC_DQEVENT32_TIME32:
+#ifdef CONFIG_X86_64
+		return put_v4l2_event32_time32(parg, arg);
+#else
+		return put_v4l2_event_time32(parg, arg);
+#endif
+
 #endif
 	case VIDIOC_QUERYBUF32:
 	case VIDIOC_QBUF32:
@@ -1023,10 +1032,6 @@ int v4l2_compat_put_user(void __user *arg, void *parg, unsigned int cmd)
 #ifdef CONFIG_X86_64
 	case VIDIOC_DQEVENT32:
 		return put_v4l2_event32(parg, arg);
-#ifdef CONFIG_COMPAT_32BIT_TIME
-	case VIDIOC_DQEVENT32_TIME32:
-		return put_v4l2_event32_time32(parg, arg);
-#endif
 #endif
 	}
 	return 0;
