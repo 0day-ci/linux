@@ -101,6 +101,7 @@ struct wmi *ath9k_init_wmi(struct ath9k_htc_priv *priv)
 	skb_queue_head_init(&wmi->wmi_event_queue);
 	spin_lock_init(&wmi->wmi_lock);
 	spin_lock_init(&wmi->event_lock);
+	spin_lock_init(&wmi->drv_priv->tx.tx_lock);
 	mutex_init(&wmi->op_mutex);
 	mutex_init(&wmi->multi_write_mutex);
 	mutex_init(&wmi->multi_rmw_mutex);
