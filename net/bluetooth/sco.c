@@ -48,6 +48,8 @@ struct sco_conn {
 	spinlock_t	lock;
 	struct sock	*sk;
 
+	struct delayed_work	sk_timer;
+
 	unsigned int    mtu;
 };
 
@@ -74,9 +76,11 @@ struct sco_pinfo {
 #define SCO_CONN_TIMEOUT	(HZ * 40)
 #define SCO_DISCONN_TIMEOUT	(HZ * 2)
 
-static void sco_sock_timeout(struct timer_list *t)
+static void sco_sock_timeout(struct work_struct *work)
 {
-	struct sock *sk = from_timer(sk, t, sk_timer);
+	struct sco_conn *conn = container_of(work, struct sco_conn,
+					     sk_timer.work);
+	struct sock *sk = conn->sk;
 
 	BT_DBG("sock %p state %d", sk, sk->sk_state);
 
@@ -89,16 +93,18 @@ static void sco_sock_timeout(struct timer_list *t)
 	sock_put(sk);
 }
 
-static void sco_sock_set_timer(struct sock *sk, long timeout)
+static void sco_sock_set_timer(struct sock *sk, struct delayed_work *work,
+			       long timeout)
 {
 	BT_DBG("sock %p state %d timeout %ld", sk, sk->sk_state, timeout);
-	sk_reset_timer(sk, &sk->sk_timer, jiffies + timeout);
+	cancel_delayed_work(work);
+	schedule_delayed_work(work, timeout);
 }
 
-static void sco_sock_clear_timer(struct sock *sk)
+static void sco_sock_clear_timer(struct sock *sk, struct delayed_work *work)
 {
 	BT_DBG("sock %p state %d", sk, sk->sk_state);
-	sk_stop_timer(sk, &sk->sk_timer);
+	cancel_delayed_work(work);
 }
 
 /* ---- SCO connections ---- */
@@ -174,7 +180,7 @@ static void sco_conn_del(struct hci_conn *hcon, int err)
 	if (sk) {
 		sock_hold(sk);
 		bh_lock_sock(sk);
-		sco_sock_clear_timer(sk);
+		sco_sock_clear_timer(sk, &conn->sk_timer);
 		sco_chan_del(sk, err);
 		bh_unlock_sock(sk);
 		sco_sock_kill(sk);
@@ -192,6 +198,8 @@ static void __sco_chan_add(struct sco_conn *conn, struct sock *sk,
 
 	sco_pi(sk)->conn = conn;
 	conn->sk = sk;
+
+	INIT_DELAYED_WORK(&conn->sk_timer, sco_sock_timeout);
 
 	if (parent)
 		bt_accept_enqueue(parent, sk, true);
@@ -260,11 +268,11 @@ static int sco_connect(struct sock *sk)
 		goto done;
 
 	if (hcon->state == BT_CONNECTED) {
-		sco_sock_clear_timer(sk);
+		sco_sock_clear_timer(sk, &conn->sk_timer);
 		sk->sk_state = BT_CONNECTED;
 	} else {
 		sk->sk_state = BT_CONNECT;
-		sco_sock_set_timer(sk, sk->sk_sndtimeo);
+		sco_sock_set_timer(sk, &conn->sk_timer, sk->sk_sndtimeo);
 	}
 
 done:
@@ -419,7 +427,8 @@ static void __sco_sock_close(struct sock *sk)
 	case BT_CONFIG:
 		if (sco_pi(sk)->conn->hcon) {
 			sk->sk_state = BT_DISCONN;
-			sco_sock_set_timer(sk, SCO_DISCONN_TIMEOUT);
+			sco_sock_set_timer(sk, &sco_pi(sk)->conn->sk_timer,
+					   SCO_DISCONN_TIMEOUT);
 			sco_conn_lock(sco_pi(sk)->conn);
 			hci_conn_drop(sco_pi(sk)->conn->hcon);
 			sco_pi(sk)->conn->hcon = NULL;
@@ -443,7 +452,8 @@ static void __sco_sock_close(struct sock *sk)
 /* Must be called on unlocked socket. */
 static void sco_sock_close(struct sock *sk)
 {
-	sco_sock_clear_timer(sk);
+	if (sco_pi(sk)->conn)
+		sco_sock_clear_timer(sk, &sco_pi(sk)->conn->sk_timer);
 	lock_sock(sk);
 	__sco_sock_close(sk);
 	release_sock(sk);
@@ -499,8 +509,6 @@ static struct sock *sco_sock_alloc(struct net *net, struct socket *sock,
 	sk->sk_state    = BT_OPEN;
 
 	sco_pi(sk)->setting = BT_VOICE_CVSD_16BIT;
-
-	timer_setup(&sk->sk_timer, sco_sock_timeout, 0);
 
 	bt_sock_link(&sco_sk_list, sk);
 	return sk;
@@ -1036,7 +1044,8 @@ static int sco_sock_shutdown(struct socket *sock, int how)
 
 	if (!sk->sk_shutdown) {
 		sk->sk_shutdown = SHUTDOWN_MASK;
-		sco_sock_clear_timer(sk);
+		if (sco_pi(sk)->conn)
+			sco_sock_clear_timer(sk, &sco_pi(sk)->conn->sk_timer);
 		__sco_sock_close(sk);
 
 		if (sock_flag(sk, SOCK_LINGER) && sk->sk_lingertime &&
@@ -1083,7 +1092,7 @@ static void sco_conn_ready(struct sco_conn *conn)
 	BT_DBG("conn %p", conn);
 
 	if (sk) {
-		sco_sock_clear_timer(sk);
+		sco_sock_clear_timer(sk, &conn->sk_timer);
 		bh_lock_sock(sk);
 		sk->sk_state = BT_CONNECTED;
 		sk->sk_state_change(sk);
