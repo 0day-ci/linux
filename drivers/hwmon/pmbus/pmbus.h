@@ -135,6 +135,8 @@ enum pmbus_regs {
 	PMBUS_MFR_MAX_TEMP_2		= 0xC1,
 	PMBUS_MFR_MAX_TEMP_3		= 0xC2,
 
+	PMBUS_READ_TEMPERATURE_4	= 0xDF,
+
 /*
  * Virtual registers.
  * Useful to support attributes which are not supported by standard PMBus
@@ -401,6 +403,7 @@ enum pmbus_sensor_classes {
 #define PMBUS_HAVE_PWM12	BIT(20)
 #define PMBUS_HAVE_PWM34	BIT(21)
 #define PMBUS_HAVE_SAMPLES	BIT(22)
+#define PMBUS_HAVE_TEMP4	BIT(23)
 
 #define PMBUS_PHASE_VIRTUAL	BIT(30)	/* Phases on this page are virtual */
 #define PMBUS_PAGE_VIRTUAL	BIT(31)	/* Page is virtual */

@@ -1810,6 +1810,32 @@ static const struct pmbus_limit_attr temp_limit_attrs3[] = {
 	},
 };
 
+static const struct pmbus_limit_attr temp_limit_attrs4[] = {
+	{
+		.reg = PMBUS_UT_WARN_LIMIT,
+		.low = true,
+		.attr = "min",
+		.alarm = "min_alarm",
+		.sbit = PB_TEMP_UT_WARNING,
+	}, {
+		.reg = PMBUS_UT_FAULT_LIMIT,
+		.low = true,
+		.attr = "lcrit",
+		.alarm = "lcrit_alarm",
+		.sbit = PB_TEMP_UT_FAULT,
+	}, {
+		.reg = PMBUS_OT_WARN_LIMIT,
+		.attr = "max",
+		.alarm = "max_alarm",
+		.sbit = PB_TEMP_OT_WARNING,
+	}, {
+		.reg = PMBUS_OT_FAULT_LIMIT,
+		.attr = "crit",
+		.alarm = "crit_alarm",
+		.sbit = PB_TEMP_OT_FAULT,
+	}
+};
+
 static const struct pmbus_sensor_attr temp_attributes[] = {
 	{
 		.reg = PMBUS_READ_TEMPERATURE_1,
@@ -1847,6 +1873,18 @@ static const struct pmbus_sensor_attr temp_attributes[] = {
 		.gbit = PB_STATUS_TEMPERATURE,
 		.limit = temp_limit_attrs3,
 		.nlimit = ARRAY_SIZE(temp_limit_attrs3),
+	}, {
+		.reg = PMBUS_READ_TEMPERATURE_4,
+		.class = PSC_TEMPERATURE,
+		.paged = true,
+		.update = true,
+		.compare = true,
+		.func = PMBUS_HAVE_TEMP4,
+		.sfunc = PMBUS_HAVE_STATUS_TEMP,
+		.sbase = PB_STATUS_TEMP_BASE,
+		.gbit = PB_STATUS_TEMPERATURE,
+		.limit = temp_limit_attrs4,
+		.nlimit = ARRAY_SIZE(temp_limit_attrs4),
 	}
 };
 

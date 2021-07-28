@@ -60,8 +60,10 @@ static void pmbus_find_sensor_groups(struct i2c_client *client,
 		info->func[0] |= PMBUS_HAVE_TEMP2;
 	if (pmbus_check_word_register(client, 0, PMBUS_READ_TEMPERATURE_3))
 		info->func[0] |= PMBUS_HAVE_TEMP3;
+	if (pmbus_check_word_register(client, 0, PMBUS_READ_TEMPERATURE_4))
+		info->func[0] |= PMBUS_HAVE_TEMP4;
 	if (info->func[0] & (PMBUS_HAVE_TEMP | PMBUS_HAVE_TEMP2
-			     | PMBUS_HAVE_TEMP3)
+			     | PMBUS_HAVE_TEMP3 | PMBUS_HAVE_TEMP4)
 	    && pmbus_check_byte_register(client, 0,
 					 PMBUS_STATUS_TEMPERATURE))
 			info->func[0] |= PMBUS_HAVE_STATUS_TEMP;
