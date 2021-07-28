@@ -15,11 +15,13 @@
  * BOND_OPTFLAG_NOSLAVES - check if the bond device is empty before setting
  * BOND_OPTFLAG_IFDOWN - check if the bond device is down before setting
  * BOND_OPTFLAG_RAWVAL - the option parses the value itself
+ * BOND_OPTFLAG_IFUP - check if the bond device is up before setting
  */
 enum {
 	BOND_OPTFLAG_NOSLAVES	= BIT(0),
 	BOND_OPTFLAG_IFDOWN	= BIT(1),
-	BOND_OPTFLAG_RAWVAL	= BIT(2)
+	BOND_OPTFLAG_RAWVAL	= BIT(2),
+	BOND_OPTFLAG_IFUP	= BIT(3)
 };
 
 /* Value type flags:

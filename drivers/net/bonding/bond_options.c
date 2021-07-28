@@ -387,7 +387,7 @@ static const struct bond_option bond_opts[BOND_OPT_LAST] = {
 		.id = BOND_OPT_SLAVES,
 		.name = "slaves",
 		.desc = "Slave membership management",
-		.flags = BOND_OPTFLAG_RAWVAL,
+		.flags = BOND_OPTFLAG_RAWVAL | BOND_OPTFLAG_IFUP,
 		.set = bond_option_slaves_set
 	},
 	[BOND_OPT_TLB_DYNAMIC_LB] = {
@@ -583,6 +583,8 @@ static int bond_opt_check_deps(struct bonding *bond,
 		return -ENOTEMPTY;
 	if ((opt->flags & BOND_OPTFLAG_IFDOWN) && (bond->dev->flags & IFF_UP))
 		return -EBUSY;
+	if ((opt->flags & BOND_OPTFLAG_IFUP) && !(bond->dev->flags & IFF_UP))
+		return -EPERM;
 
 	return 0;
 }
