@@ -335,7 +335,7 @@ static umode_t atkbd_attr_is_visible(struct kobject *kobj,
 	return attr->mode;
 }
 
-static struct attribute_group atkbd_attribute_group = {
+static const struct attribute_group atkbd_attribute_group = {
 	.attrs	= atkbd_attributes,
 	.is_visible = atkbd_attr_is_visible,
 };
