@@ -2309,7 +2309,21 @@ bool pci_pme_capable(struct pci_dev *dev, pci_power_t state)
 	if (!dev->pm_cap)
 		return false;
 
-	return !!(dev->pme_support & (1 << state));
+	if (dev->pme_support & (1 << state))
+		return true;
+
+	/*
+	 * Special case: The target state is D3hot and the device (which is a
+	 * PCIe one) only supports signaling PME from D3cold.  In that case, if
+	 * the device is allowed to go into D3hot, its ancestor PCIe port may go
+	 * into D3cold which will cause the device to end up in D3cold too
+	 * (along the lines of the PCI PM spec v1.2, Table 6-1), so it will be
+	 * able to signal PME from the final state.  It will not be able to
+	 * signal PME if left in D0, however.
+	 */
+	return state == PCI_D3hot && pci_is_pcie(dev) &&
+		(dev->pme_support & (1 << PCI_D3cold)) &&
+		!(dev->pme_support ^ (1 << PCI_D3cold));
 }
 EXPORT_SYMBOL(pci_pme_capable);
 
@@ -2603,17 +2617,12 @@ static pci_power_t pci_target_state(struct pci_dev *dev, bool wakeup)
 	if (dev->current_state == PCI_D3cold)
 		target_state = PCI_D3cold;
 
-	if (wakeup) {
-		/*
-		 * Find the deepest state from which the device can generate
-		 * PME#.
-		 */
-		if (dev->pme_support) {
-			while (target_state
-			      && !(dev->pme_support & (1 << target_state)))
-				target_state--;
-		}
-	}
+	if (!wakeup || !dev->pme_support || pci_pme_capable(dev, target_state))
+		return target_state;
+
+	/* Find the deepest state from which the device can generate PME#. */
+	while (target_state && !(dev->pme_support & (1 << target_state)))
+		target_state--;
 
 	return target_state;
 }
