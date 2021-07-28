@@ -300,6 +300,100 @@ static void __init xen_acpi_guest_init(void)
 #endif
 }
 
+#ifdef CONFIG_XEN_UNPOPULATED_ALLOC
+int arch_xen_unpopulated_init_resource(struct resource *res)
+{
+	struct xen_get_unallocated_space xgus;
+	struct xen_unallocated_region *regions;
+	xen_pfn_t min_gpfn = -1, max_gpfn = 0;
+	unsigned int i, nr_regions;
+	struct resource *tmp_res;
+	int rc;
+
+	if (!xen_domain())
+		return -ENODEV;
+
+	/* Query hypervisor to find as many unused memory regions as possible */
+	nr_regions = XEN_MAX_UNALLOCATED_REGIONS;
+	regions = kcalloc(nr_regions, sizeof(regions[0]), GFP_KERNEL);
+	if (!regions)
+		return -ENOMEM;
+
+	xgus.domid = DOMID_SELF;
+	xgus.nr_regions = nr_regions;
+	set_xen_guest_handle(xgus.buffer, regions);
+
+	rc = HYPERVISOR_memory_op(XENMEM_get_unallocated_space, &xgus);
+	if (rc) {
+		pr_warn("XENMEM_get_unallocated_space failed, err=%d\n", rc);
+		goto err;
+	}
+
+	if (WARN_ON(xgus.nr_regions == 0)) {
+		rc = -EINVAL;
+		goto err;
+	}
+	nr_regions = xgus.nr_regions;
+
+	/*
+	 * Create resource from memory regions provided by the hypervisor to be
+	 * used as unallocated address space for Xen scratch pages.
+	 */
+	for (i = 0; i < nr_regions; i++) {
+		if (max_gpfn < regions[i].start_gpfn + regions[i].nr_gpfns)
+			max_gpfn = regions[i].start_gpfn + regions[i].nr_gpfns;
+		if (min_gpfn > regions[i].start_gpfn)
+			min_gpfn = regions[i].start_gpfn;
+	}
+	res->start = min_gpfn << PAGE_SHIFT;
+	res->end = (max_gpfn << PAGE_SHIFT) - 1;
+
+	/*
+	 * As memory regions are not necessarily completely sequential calculate
+	 * and reserve the possible holes. The rest of that address space will be
+	 * available for the allocation.
+	 */
+	for (i = 1; i < nr_regions; i++) {
+		resource_size_t start, end;
+
+		start = (regions[i - 1].start_gpfn << PAGE_SHIFT) +
+				regions[i - 1].nr_gpfns * PAGE_SIZE;
+		end = regions[i].start_gpfn << PAGE_SHIFT;
+
+		if (WARN_ON(start > end)) {
+			rc = -EINVAL;
+			goto err;
+		}
+
+		if (start == end)
+			continue;
+
+		tmp_res = kzalloc(sizeof(*tmp_res), GFP_KERNEL);
+		if (!tmp_res) {
+			rc = -ENOMEM;
+			goto err;
+		}
+
+		tmp_res->name = "Unavailable space";
+		tmp_res->start = start;
+		tmp_res->end = end - 1;
+
+		rc = request_resource(res, tmp_res);
+		if (rc) {
+			pr_err("Cannot insert IOMEM resource [%llx - %llx]\n",
+			       tmp_res->start, tmp_res->end);
+			kfree(tmp_res);
+			goto err;
+		}
+	}
+
+err:
+	kfree(regions);
+
+	return rc;
+}
+#endif
+
 static void __init xen_dt_guest_init(void)
 {
 	struct device_node *xen_node;

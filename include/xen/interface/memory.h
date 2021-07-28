@@ -325,4 +325,37 @@ struct xen_mem_acquire_resource {
 };
 DEFINE_GUEST_HANDLE_STRUCT(xen_mem_acquire_resource);
 
+/*
+ * Get the unallocated space (regions of guest physical address space which
+ * are unused) and can be used to create grant/foreign mappings.
+ */
+#define XENMEM_get_unallocated_space 29
+struct xen_unallocated_region {
+    xen_pfn_t start_gpfn;
+    xen_ulong_t nr_gpfns;
+};
+DEFINE_GUEST_HANDLE_STRUCT(xen_unallocated_region);
+
+#define XEN_MAX_UNALLOCATED_REGIONS 32
+
+struct xen_get_unallocated_space {
+    /* IN - Which domain to provide unallocated space for */
+    domid_t domid;
+
+    /*
+     * IN/OUT - As an IN parameter number of memory regions which
+     *          can be written to the buffer (maximum size of the array)
+     *          As OUT parameter number of memory regions which
+     *          have been written to the buffer
+     */
+    unsigned int nr_regions;
+
+    /*
+     * OUT - An array of memory regions, the regions must be placed in
+     *       ascending order, there must be no overlap between them.
+     */
+    GUEST_HANDLE(xen_unallocated_region) buffer;
+};
+DEFINE_GUEST_HANDLE_STRUCT(xen_get_unallocated_space);
+
 #endif /* __XEN_PUBLIC_MEMORY_H__ */
