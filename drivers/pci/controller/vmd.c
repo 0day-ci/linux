@@ -15,6 +15,9 @@
 #include <linux/srcu.h>
 #include <linux/rculist.h>
 #include <linux/rcupdate.h>
+#include <linux/delay.h>
+#include <linux/pci_regs.h>
+#include <linux/pci_ids.h>
 
 #include <asm/irqdomain.h>
 #include <asm/device.h>
@@ -447,6 +450,64 @@ static struct pci_ops vmd_ops = {
 	.write		= vmd_pci_write,
 };
 
+static void vmd_domain_reset(struct vmd_dev *vmd)
+{
+	char __iomem *base;
+	char __iomem *addr;
+	u16 ctl;
+	int dev_seq;
+	int max_devs = 32;
+	int max_buses = resource_size(&vmd->resources[0]);
+	int bus_seq;
+	u8 functions;
+	u8 fn_seq;
+	u8 hdr_type;
+
+	for(bus_seq = 0; bus_seq < max_buses; bus_seq++) {
+		for (dev_seq = 0; dev_seq < max_devs; dev_seq++) {
+			base = vmd->cfgbar
+					+ PCIE_ECAM_OFFSET(bus_seq,
+					   PCI_DEVFN(dev_seq, 0), PCI_VENDOR_ID);
+
+			if (readw(base) != PCI_VENDOR_ID_INTEL)
+				continue;
+
+			hdr_type = readb(base + PCI_HEADER_TYPE) & PCI_HEADER_TYPE_MASK;
+			if (hdr_type != PCI_HEADER_TYPE_BRIDGE)
+				continue;
+
+			functions = !!(hdr_type & 0x80) ? 8 : 1;
+			for (fn_seq = 0; fn_seq < functions; fn_seq++)
+			{
+				addr = vmd->cfgbar
+						+ PCIE_ECAM_OFFSET(0x0,
+						   PCI_DEVFN(dev_seq, fn_seq), PCI_VENDOR_ID);
+				if (readw(addr) != PCI_VENDOR_ID_INTEL)
+					continue;
+
+				memset_io((vmd->cfgbar +
+				 PCIE_ECAM_OFFSET(0x0,PCI_DEVFN(dev_seq, fn_seq),PCI_IO_BASE)),
+				 0, PCI_ROM_ADDRESS1 - PCI_IO_BASE);
+			}
+
+			if (readw(base + PCI_CLASS_DEVICE) != PCI_CLASS_BRIDGE_PCI)
+				continue;
+
+			/* pci_reset_secondary_bus() */
+			ctl = readw(base + PCI_BRIDGE_CONTROL);
+			ctl |= PCI_BRIDGE_CTL_BUS_RESET;
+			writew(ctl, base + PCI_BRIDGE_CONTROL);
+			readw(base + PCI_BRIDGE_CONTROL);
+			msleep(2);
+
+			ctl &= ~PCI_BRIDGE_CTL_BUS_RESET;
+			writew(ctl, base + PCI_BRIDGE_CONTROL);
+			readw(base + PCI_BRIDGE_CONTROL);
+		}
+	}
+	ssleep(1);
+}
+
 static void vmd_attach_resources(struct vmd_dev *vmd)
 {
 	vmd->dev->resource[VMD_MEMBAR1].child = &vmd->resources[1];
@@ -746,6 +807,8 @@ static int vmd_enable_domain(struct vmd_dev *vmd, unsigned long features)
 	vmd_attach_resources(vmd);
 	if (vmd->irq_domain)
 		dev_set_msi_domain(&vmd->bus->dev, vmd->irq_domain);
+
+	vmd_domain_reset(vmd);
 
 	pci_scan_child_bus(vmd->bus);
 	pci_assign_unassigned_bus_resources(vmd->bus);
