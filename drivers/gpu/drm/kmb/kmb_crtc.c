@@ -191,6 +191,7 @@ static enum drm_mode_status
 {
 	int refresh;
 	struct drm_device *dev = crtc->dev;
+	int vfp = mode->vsync_start - mode->vdisplay;
 
 	if (mode->vdisplay < KMB_CRTC_MAX_HEIGHT) {
 		drm_dbg(dev, "height = %d less than %d",
@@ -206,6 +207,11 @@ static enum drm_mode_status
 	if (refresh < KMB_MIN_VREFRESH || refresh > KMB_MAX_VREFRESH) {
 		drm_dbg(dev, "refresh = %d less than %d or greater than %d",
 			refresh, KMB_MIN_VREFRESH, KMB_MAX_VREFRESH);
+		return MODE_BAD;
+	}
+
+	if (vfp < KMB_CRTC_MIN_VFP) {
+		drm_dbg(dev, "vfp = %d less than %d", vfp, KMB_CRTC_MIN_VFP);
 		return MODE_BAD;
 	}
 
