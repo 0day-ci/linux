@@ -346,14 +346,19 @@ static inline void memcg_slab_free_hook(struct kmem_cache *s_orig,
 			continue;
 
 		page = virt_to_head_page(p[i]);
+		if (!s_orig) {
+			if (unlikely(!PageSlab(page))) {
+				BUG_ON(!PageCompound(page));
+				continue;
+			}
+			s = page->slab_cache;
+		} else {
+			s = s_orig;
+		}
+
 		objcgs = page_objcgs(page);
 		if (!objcgs)
 			continue;
-
-		if (!s_orig)
-			s = page->slab_cache;
-		else
-			s = s_orig;
 
 		off = obj_to_index(s, page, p[i]);
 		objcg = objcgs[off];
