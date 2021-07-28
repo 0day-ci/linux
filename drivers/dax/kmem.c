@@ -46,20 +46,7 @@ static int dev_dax_kmem_probe(struct dev_dax *dev_dax)
 	struct dax_kmem_data *data;
 	int rc = -ENOMEM;
 	int i, mapped = 0;
-	int numa_node;
-
-	/*
-	 * Ensure good NUMA information for the persistent memory.
-	 * Without this check, there is a risk that slow memory
-	 * could be mixed in a node with faster memory, causing
-	 * unavoidable performance issues.
-	 */
-	numa_node = dev_dax->target_node;
-	if (numa_node < 0) {
-		dev_warn(dev, "rejecting DAX region with invalid node: %d\n",
-				numa_node);
-		return -EINVAL;
-	}
+	int numa_node = dev_dax->target_node, new_node;
 
 	data = kzalloc(struct_size(data, res, dev_dax->nr_range), GFP_KERNEL);
 	if (!data)
@@ -105,6 +92,20 @@ static int dev_dax_kmem_probe(struct dev_dax *dev_dax)
 		res->flags = IORESOURCE_SYSTEM_RAM;
 
 		/*
+		 * Ensure good NUMA information for the persistent memory.
+		 * Without this check, there is a risk but not fatal that slow
+		 * memory could be mixed in a node with faster memory, causing
+		 * unavoidable performance issues. Furthermore, fallback node
+		 * id can be used when numa_node is invalid.
+		 */
+		if (numa_node < 0) {
+			new_node = memory_add_physaddr_to_nid(range.start);
+			dev_info(dev, "changing nid from %d to %d for DAX region %pR\n",
+				numa_node, new_node, res);
+			numa_node = new_node;
+		}
+
+		/*
 		 * Ensure that future kexec'd kernels will not treat
 		 * this as RAM automatically.
 		 */
@@ -141,6 +142,7 @@ static void dev_dax_kmem_remove(struct dev_dax *dev_dax)
 	int i, success = 0;
 	struct device *dev = &dev_dax->dev;
 	struct dax_kmem_data *data = dev_get_drvdata(dev);
+	int numa_node = dev_dax->target_node;
 
 	/*
 	 * We have one shot for removing memory, if some memory blocks were not
@@ -156,8 +158,10 @@ static void dev_dax_kmem_remove(struct dev_dax *dev_dax)
 		if (rc)
 			continue;
 
-		rc = remove_memory(dev_dax->target_node, range.start,
-				range_len(&range));
+		if (numa_node < 0)
+			numa_node = memory_add_physaddr_to_nid(range.start);
+
+		rc = remove_memory(numa_node, range.start, range_len(&range));
 		if (rc == 0) {
 			release_resource(data->res[i]);
 			kfree(data->res[i]);
