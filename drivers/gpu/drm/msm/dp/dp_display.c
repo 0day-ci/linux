@@ -1280,6 +1280,17 @@ static int dp_display_remove(struct platform_device *pdev)
 	return 0;
 }
 
+static int dp_get_sink_count(struct dp_display_private *dp)
+{
+	u8 sink_count;
+
+	sink_count = drm_dp_read_sink_count(dp->aux);
+	if (sink_count < 0)
+		return 0;
+
+	return sink_count;
+}
+
 static int dp_pm_resume(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
@@ -1299,14 +1310,22 @@ static int dp_pm_resume(struct device *dev)
 
 	dp_catalog_ctrl_hpd_config(dp->catalog);
 
-	status = dp_catalog_link_is_connected(dp->catalog);
+	/*
+	 * set sink to normal operation mode -- D0
+	 * before dpcd read
+	 */
+	dp_link_psm_config(dp->link, &dp->panel->link_info, false);
 
+	if ((status = dp_catalog_link_is_connected(dp->catalog)))
+		dp->link->sink_count = dp_get_sink_count(dp);
+	else
+		dp->link->sink_count = 0;
 	/*
 	 * can not declared display is connected unless
 	 * HDMI cable is plugged in and sink_count of
 	 * dongle become 1
 	 */
-	if (status && dp->link->sink_count)
+	if (dp->link->sink_count)
 		dp->dp_display.is_connected = true;
 	else
 		dp->dp_display.is_connected = false;
