@@ -189,13 +189,18 @@ static bool find_mem_range(phys_addr_t addr, struct kvm_mem_range *range)
 	return false;
 }
 
+static bool is_in_mem_range(phys_addr_t addr, struct kvm_mem_range *range)
+{
+	return range->start <= addr && addr < range->end;
+}
+
 static bool range_is_memory(u64 start, u64 end)
 {
-	struct kvm_mem_range r1, r2;
+	struct kvm_mem_range r;
 
-	if (!find_mem_range(start, &r1) || !find_mem_range(end - 1, &r2))
+	if (!find_mem_range(start, &r))
 		return false;
-	if (r1.start != r2.start)
+	if (!is_in_mem_range(end - 1, &r))
 		return false;
 
 	return true;
