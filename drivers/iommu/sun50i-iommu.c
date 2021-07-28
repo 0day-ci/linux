@@ -610,14 +610,10 @@ static struct iommu_domain *sun50i_iommu_domain_alloc(unsigned type)
 	if (!sun50i_domain)
 		return NULL;
 
-	if (type == IOMMU_DOMAIN_DMA &&
-	    iommu_get_dma_cookie(&sun50i_domain->domain))
-		goto err_free_domain;
-
 	sun50i_domain->dt = (u32 *)__get_free_pages(GFP_KERNEL | __GFP_ZERO,
 						    get_order(DT_SIZE));
 	if (!sun50i_domain->dt)
-		goto err_put_cookie;
+		goto err_free_domain;
 
 	refcount_set(&sun50i_domain->refcnt, 1);
 
@@ -626,10 +622,6 @@ static struct iommu_domain *sun50i_iommu_domain_alloc(unsigned type)
 	sun50i_domain->domain.geometry.force_aperture = true;
 
 	return &sun50i_domain->domain;
-
-err_put_cookie:
-	if (type == IOMMU_DOMAIN_DMA)
-		iommu_put_dma_cookie(&sun50i_domain->domain);
 
 err_free_domain:
 	kfree(sun50i_domain);
@@ -643,8 +635,6 @@ static void sun50i_iommu_domain_free(struct iommu_domain *domain)
 
 	free_pages((unsigned long)sun50i_domain->dt, get_order(DT_SIZE));
 	sun50i_domain->dt = NULL;
-
-	iommu_put_dma_cookie(domain);
 
 	kfree(sun50i_domain);
 }
