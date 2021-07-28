@@ -3167,6 +3167,28 @@ static int video_get_user(void __user *arg, void *parg,
 	return err;
 }
 
+int put_v4l2_event_time32(void *parg, void __user *arg)
+{
+	struct v4l2_event *ev = parg;
+	struct v4l2_event_time32 ev32;
+
+	memset(&ev32, 0, sizeof(ev32));
+
+	ev32.type	= ev->type;
+	ev32.pending	= ev->pending;
+	ev32.sequence	= ev->sequence;
+	ev32.timestamp.tv_sec	= ev->timestamp.tv_sec;
+	ev32.timestamp.tv_nsec	= ev->timestamp.tv_nsec;
+	ev32.id		= ev->id;
+
+	memcpy(&ev32.u, &ev->u, sizeof(ev->u));
+	memcpy(&ev32.reserved, &ev->reserved, sizeof(ev->reserved));
+
+	if (copy_to_user(arg, &ev32, sizeof(ev32)))
+		return -EFAULT;
+	return 0;
+}
+
 static int video_put_user(void __user *arg, void *parg,
 			  unsigned int real_cmd, unsigned int cmd)
 {
@@ -3186,23 +3208,10 @@ static int video_put_user(void __user *arg, void *parg,
 #if !defined(CONFIG_64BIT) && defined(CONFIG_COMPAT_32BIT_TIME)
 	switch (cmd) {
 	case VIDIOC_DQEVENT_TIME32: {
-		struct v4l2_event *ev = parg;
-		struct v4l2_event_time32 ev32;
+		int ret = put_v4l2_event_time32(parg, arg);
 
-		memset(&ev32, 0, sizeof(ev32));
-
-		ev32.type	= ev->type;
-		ev32.pending	= ev->pending;
-		ev32.sequence	= ev->sequence;
-		ev32.timestamp.tv_sec	= ev->timestamp.tv_sec;
-		ev32.timestamp.tv_nsec	= ev->timestamp.tv_nsec;
-		ev32.id		= ev->id;
-
-		memcpy(&ev32.u, &ev->u, sizeof(ev->u));
-		memcpy(&ev32.reserved, &ev->reserved, sizeof(ev->reserved));
-
-		if (copy_to_user(arg, &ev32, sizeof(ev32)))
-			return -EFAULT;
+		if (ret)
+			return ret;
 		break;
 	}
 	case VIDIOC_QUERYBUF_TIME32:

@@ -784,6 +784,12 @@ struct v4l2_buffer_time32 {
 		__u32		reserved;
 	};
 };
+
+/*
+ * This function is used to copy the struct v4l2_event_time32 to userspace
+ */
+int put_v4l2_event_time32(void *parg, void __user *arg);
+
 #define VIDIOC_QUERYBUF_TIME32	_IOWR('V',  9, struct v4l2_buffer_time32)
 #define VIDIOC_QBUF_TIME32	_IOWR('V', 15, struct v4l2_buffer_time32)
 #define VIDIOC_DQBUF_TIME32	_IOWR('V', 17, struct v4l2_buffer_time32)
