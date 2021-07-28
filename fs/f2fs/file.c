@@ -4287,14 +4287,9 @@ static ssize_t f2fs_file_write_iter(struct kiocb *iocb, struct iov_iter *from)
 			err = f2fs_convert_inline_inode(inode);
 			if (err)
 				goto out_err;
-			/*
-			 * If force_buffere_io() is true, we have to allocate
-			 * blocks all the time, since f2fs_direct_IO will fall
-			 * back to buffered IO.
-			 */
-			if (!f2fs_force_buffered_io(inode, iocb, from) &&
-					f2fs_lfs_mode(F2FS_I_SB(inode)))
-				goto write;
+
+			set_inode_flag(inode, FI_NO_PREALLOC);
+			goto write;
 		}
 		preallocated = true;
 		target_size = iocb->ki_pos + iov_iter_count(from);

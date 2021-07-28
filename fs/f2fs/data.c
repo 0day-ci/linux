@@ -1374,9 +1374,7 @@ int f2fs_preallocate_blocks(struct kiocb *iocb, struct iov_iter *from)
 {
 	struct inode *inode = file_inode(iocb->ki_filp);
 	struct f2fs_map_blocks map;
-	int flag;
 	int err = 0;
-	bool direct_io = iocb->ki_flags & IOCB_DIRECT;
 
 	map.m_lblk = F2FS_BLK_ALIGN(iocb->ki_pos);
 	map.m_len = F2FS_BYTES_TO_BLK(iocb->ki_pos + iov_iter_count(from));
@@ -1390,13 +1388,6 @@ int f2fs_preallocate_blocks(struct kiocb *iocb, struct iov_iter *from)
 	map.m_seg_type = NO_CHECK_TYPE;
 	map.m_may_create = true;
 
-	if (direct_io) {
-		map.m_seg_type = f2fs_rw_hint_to_seg_type(iocb->ki_hint);
-		flag = f2fs_force_buffered_io(inode, iocb, from) ?
-					F2FS_GET_BLOCK_PRE_AIO :
-					F2FS_GET_BLOCK_PRE_DIO;
-		goto map_blocks;
-	}
 	if (iocb->ki_pos + iov_iter_count(from) > MAX_INLINE_DATA(inode)) {
 		err = f2fs_convert_inline_inode(inode);
 		if (err)
@@ -1405,13 +1396,9 @@ int f2fs_preallocate_blocks(struct kiocb *iocb, struct iov_iter *from)
 	if (f2fs_has_inline_data(inode))
 		return err;
 
-	flag = F2FS_GET_BLOCK_PRE_AIO;
-
-map_blocks:
-	err = f2fs_map_blocks(inode, &map, 1, flag);
+	err = f2fs_map_blocks(inode, &map, 1, F2FS_GET_BLOCK_PRE_AIO);
 	if (map.m_len > 0 && err == -ENOSPC) {
-		if (!direct_io)
-			set_inode_flag(inode, FI_NO_PREALLOC);
+		set_inode_flag(inode, FI_NO_PREALLOC);
 		err = 0;
 	}
 	return err;
@@ -1701,45 +1688,28 @@ static inline u64 blks_to_bytes(struct inode *inode, u64 blks)
 	return (blks << inode->i_blkbits);
 }
 
-static int __get_data_block(struct inode *inode, sector_t iblock,
-			struct buffer_head *bh, int create, int flag,
-			pgoff_t *next_pgofs, int seg_type, bool may_write)
+static int get_data_block_dio(struct inode *inode, sector_t iblock,
+			      struct buffer_head *bh, int create)
 {
-	struct f2fs_map_blocks map;
+	struct f2fs_map_blocks map = {
+		.m_lblk = iblock,
+		.m_len = bytes_to_blks(inode, bh->b_size),
+	};
 	int err;
 
-	map.m_lblk = iblock;
-	map.m_len = bytes_to_blks(inode, bh->b_size);
-	map.m_next_pgofs = next_pgofs;
-	map.m_next_extent = NULL;
-	map.m_seg_type = seg_type;
-	map.m_may_create = may_write;
-
-	err = f2fs_map_blocks(inode, &map, create, flag);
+	/*
+	 * We don't allocate blocks here, as that would expose uninitialized
+	 * blocks if the DIO write doesn't fully complete.  DIO writes that need
+	 * to allocate blocks will fall back to buffered writes.
+	 */
+	err = f2fs_map_blocks(inode, &map, 0, F2FS_GET_BLOCK_DEFAULT);
 	if (!err) {
-		map_bh(bh, inode->i_sb, map.m_pblk);
+		if (map.m_flags & F2FS_MAP_MAPPED)
+			map_bh(bh, inode->i_sb, map.m_pblk);
 		bh->b_state = (bh->b_state & ~F2FS_MAP_FLAGS) | map.m_flags;
 		bh->b_size = blks_to_bytes(inode, map.m_len);
 	}
 	return err;
-}
-
-static int get_data_block_dio_write(struct inode *inode, sector_t iblock,
-			struct buffer_head *bh_result, int create)
-{
-	return __get_data_block(inode, iblock, bh_result, create,
-				F2FS_GET_BLOCK_DIO, NULL,
-				f2fs_rw_hint_to_seg_type(inode->i_write_hint),
-				true);
-}
-
-static int get_data_block_dio(struct inode *inode, sector_t iblock,
-			struct buffer_head *bh_result, int create)
-{
-	return __get_data_block(inode, iblock, bh_result, create,
-				F2FS_GET_BLOCK_DIO, NULL,
-				f2fs_rw_hint_to_seg_type(inode->i_write_hint),
-				false);
 }
 
 static int f2fs_xattr_fiemap(struct inode *inode,
@@ -3556,7 +3526,6 @@ static ssize_t f2fs_direct_IO(struct kiocb *iocb, struct iov_iter *iter)
 	int err;
 	enum rw_hint hint = iocb->ki_hint;
 	int whint_mode = F2FS_OPTION(sbi).whint_mode;
-	bool do_opu;
 
 	err = check_direct_IO(inode, iter, offset);
 	if (err)
@@ -3564,8 +3533,6 @@ static ssize_t f2fs_direct_IO(struct kiocb *iocb, struct iov_iter *iter)
 
 	if (f2fs_force_buffered_io(inode, iocb, iter))
 		return 0;
-
-	do_opu = rw == WRITE && f2fs_lfs_mode(sbi);
 
 	trace_f2fs_direct_IO_enter(inode, offset, count, rw);
 
@@ -3578,26 +3545,14 @@ static ssize_t f2fs_direct_IO(struct kiocb *iocb, struct iov_iter *iter)
 			err = -EAGAIN;
 			goto out;
 		}
-		if (do_opu && !down_read_trylock(&fi->i_gc_rwsem[READ])) {
-			up_read(&fi->i_gc_rwsem[rw]);
-			iocb->ki_hint = hint;
-			err = -EAGAIN;
-			goto out;
-		}
 	} else {
 		down_read(&fi->i_gc_rwsem[rw]);
-		if (do_opu)
-			down_read(&fi->i_gc_rwsem[READ]);
 	}
 
 	err = __blockdev_direct_IO(iocb, inode, inode->i_sb->s_bdev,
-			iter, rw == WRITE ? get_data_block_dio_write :
-			get_data_block_dio, NULL, f2fs_dio_submit_bio,
+			iter, get_data_block_dio, NULL, f2fs_dio_submit_bio,
 			rw == WRITE ? DIO_LOCKING | DIO_SKIP_HOLES :
 			DIO_SKIP_HOLES);
-
-	if (do_opu)
-		up_read(&fi->i_gc_rwsem[READ]);
 
 	up_read(&fi->i_gc_rwsem[rw]);
 
@@ -3607,8 +3562,7 @@ static ssize_t f2fs_direct_IO(struct kiocb *iocb, struct iov_iter *iter)
 		if (err > 0) {
 			f2fs_update_iostat(F2FS_I_SB(inode), APP_DIRECT_IO,
 									err);
-			if (!do_opu)
-				set_inode_flag(inode, FI_UPDATE_WRITE);
+			set_inode_flag(inode, FI_UPDATE_WRITE);
 		} else if (err == -EIOCBQUEUED) {
 			f2fs_update_iostat(F2FS_I_SB(inode), APP_DIRECT_IO,
 						count - iov_iter_count(iter));
