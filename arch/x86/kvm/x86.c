@@ -9752,10 +9752,14 @@ static inline int vcpu_block(struct kvm *kvm, struct kvm_vcpu *vcpu)
 	return 1;
 }
 
-static inline bool kvm_vcpu_running(struct kvm_vcpu *vcpu)
+static inline int kvm_vcpu_running(struct kvm_vcpu *vcpu)
 {
-	if (is_guest_mode(vcpu))
-		kvm_check_nested_events(vcpu);
+	int r;
+	if (is_guest_mode(vcpu)) {
+		r = kvm_check_nested_events(vcpu);
+		if (r < 0 && r != -EBUSY)
+			return r;
+	}
 
 	return (vcpu->arch.mp_state == KVM_MP_STATE_RUNNABLE &&
 		!vcpu->arch.apf.halted);
@@ -9770,12 +9774,16 @@ static int vcpu_run(struct kvm_vcpu *vcpu)
 	vcpu->arch.l1tf_flush_l1d = true;
 
 	for (;;) {
-		if (kvm_vcpu_running(vcpu)) {
-			r = vcpu_enter_guest(vcpu);
-		} else {
-			r = vcpu_block(kvm, vcpu);
+		r = kvm_vcpu_running(vcpu);
+		if (r < 0) {
+			r = 0;
+			break;
 		}
 
+		if (r)
+			r = vcpu_enter_guest(vcpu);
+		else
+			r = vcpu_block(kvm, vcpu);
 		if (r <= 0)
 			break;
 
