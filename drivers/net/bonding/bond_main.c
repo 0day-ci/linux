@@ -103,6 +103,7 @@ static int use_carrier	= 1;
 static char *mode;
 static char *primary;
 static char *primary_reselect;
+static int lacp_active = 1;
 static char *lacp_rate;
 static int min_links;
 static char *ad_select;
@@ -153,6 +154,9 @@ MODULE_PARM_DESC(primary_reselect, "Reselect primary slave "
 				   "better, "
 				   "2 for only on active slave "
 				   "failure");
+module_param(lacp_active, int, 0);
+MODULE_PARM_DESC(lacp_active, "Send LACPDU frames as the configured lacp_rate or acts as speak when spoken to; "
+			      "0 for off, 1 for on (default)");
 module_param(lacp_rate, charp, 0);
 MODULE_PARM_DESC(lacp_rate, "LACPDU tx rate to request from 802.3ad partner; "
 			    "0 for slow, 1 for fast");
@@ -5171,6 +5175,16 @@ static int bond_check_params(struct bond_params *params)
 		}
 	}
 
+	if (lacp_active == 0 || lacp_active == 1) {
+		if (bond_mode != BOND_MODE_8023AD)
+			pr_info("lacp_active param is irrelevant in mode %s\n",
+				bond_mode_name(bond_mode));
+	} else {
+		pr_warn("Warning: lacp_active module parameter (%d), not of valid value (0/1), so it was set to 1\n",
+			lacp_active);
+		lacp_active = 1;
+	}
+
 	if (lacp_rate) {
 		if (bond_mode != BOND_MODE_8023AD) {
 			pr_info("lacp_rate param is irrelevant in mode %s\n",
@@ -5477,6 +5491,7 @@ static int bond_check_params(struct bond_params *params)
 	params->downdelay = downdelay;
 	params->peer_notif_delay = 0;
 	params->use_carrier = use_carrier;
+	params->lacp_active = lacp_active;
 	params->lacp_fast = lacp_fast;
 	params->primary[0] = 0;
 	params->primary_reselect = primary_reselect_value;
