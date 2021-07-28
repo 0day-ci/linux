@@ -2099,15 +2099,13 @@ void bond_3ad_unbind_slave(struct slave *slave)
 	struct list_head *iter;
 	bool dummy_slave_update; /* Ignore this value as caller updates array */
 
-	/* Sync against bond_3ad_state_machine_handler() */
-	spin_lock_bh(&bond->mode_lock);
 	aggregator = &(SLAVE_AD_INFO(slave)->aggregator);
 	port = &(SLAVE_AD_INFO(slave)->port);
 
 	/* if slave is null, the whole port is not initialized */
 	if (!port->slave) {
 		slave_warn(bond->dev, slave->dev, "Trying to unbind an uninitialized port\n");
-		goto out;
+		return;
 	}
 
 	slave_dbg(bond->dev, slave->dev, "Unbinding Link Aggregation Group %d\n",
@@ -2239,9 +2237,6 @@ void bond_3ad_unbind_slave(struct slave *slave)
 		}
 	}
 	port->slave = NULL;
-
-out:
-	spin_unlock_bh(&bond->mode_lock);
 }
 
 /**
