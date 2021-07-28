@@ -18,6 +18,7 @@ typedef struct {
 	unsigned long vdso_base;
 	/* The mmu context belongs to a secure guest. */
 	atomic_t is_protected;
+	struct list_head deferred_list;
 	/*
 	 * The following bitfields need a down_write on the mm
 	 * semaphore when they are written to. As they are only
@@ -34,6 +35,8 @@ typedef struct {
 	unsigned int uses_cmm:1;
 	/* The gmaps associated with this context are allowed to use huge pages. */
 	unsigned int allow_gmap_hpage_1m:1;
+	/* The mmu context should be destroyed synchronously */
+	unsigned int pv_sync_destroy:1;
 } mm_context_t;
 
 #define INIT_MM_CONTEXT(name)						   \

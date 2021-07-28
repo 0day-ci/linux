@@ -27,8 +27,10 @@ static inline int init_new_context(struct task_struct *tsk,
 	cpumask_clear(&mm->context.cpu_attach_mask);
 	atomic_set(&mm->context.flush_count, 0);
 	atomic_set(&mm->context.is_protected, 0);
+	mm->context.pv_sync_destroy = 0;
 	mm->context.gmap_asce = 0;
 	mm->context.flush_mm = 0;
+	INIT_LIST_HEAD(&mm->context.deferred_list);
 #ifdef CONFIG_PGSTE
 	mm->context.alloc_pgste = page_table_allocate_pgste ||
 		test_thread_flag(TIF_PGSTE) ||
