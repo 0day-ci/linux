@@ -884,6 +884,7 @@ int policydb_load_isids(struct policydb *p, struct sidtab *s)
 
 		if (sid == SECSID_NULL) {
 			pr_err("SELinux:  SID 0 was assigned a context.\n");
+			rc = -EINVAL;
 			sidtab_destroy(s);
 			goto out;
 		}
