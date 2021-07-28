@@ -9353,7 +9353,7 @@ static struct bpf_prog *dev_xdp_prog(struct net_device *dev,
 	return dev->xdp_state[mode].prog;
 }
 
-static u8 dev_xdp_prog_count(struct net_device *dev)
+u8 dev_xdp_prog_count(struct net_device *dev)
 {
 	u8 count = 0;
 	int i;
@@ -9363,6 +9363,7 @@ static u8 dev_xdp_prog_count(struct net_device *dev)
 			count++;
 	return count;
 }
+EXPORT_SYMBOL_GPL(dev_xdp_prog_count);
 
 u32 dev_xdp_prog_id(struct net_device *dev, enum bpf_xdp_mode mode)
 {
@@ -9484,6 +9485,11 @@ static int dev_xdp_attach(struct net_device *dev, struct netlink_ext_ack *extack
 	/* old_prog != NULL implies XDP_FLAGS_REPLACE is set */
 	if (old_prog && !(flags & XDP_FLAGS_REPLACE)) {
 		NL_SET_ERR_MSG(extack, "XDP_FLAGS_REPLACE is not specified");
+		return -EINVAL;
+	}
+	/* don't allow loading XDP programs to a bonded device */
+	if (netif_is_bond_slave(dev)) {
+		NL_SET_ERR_MSG(extack, "XDP program can not be attached to a bond slave");
 		return -EINVAL;
 	}
 
