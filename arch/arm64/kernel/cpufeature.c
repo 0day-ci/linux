@@ -1840,9 +1840,22 @@ static void bti_enable(const struct arm64_cpu_capabilities *__unused)
 }
 #endif /* CONFIG_ARM64_BTI */
 
+DEFINE_STATIC_KEY_TRUE(arm64_mte_support);
+EXPORT_SYMBOL(arm64_mte_support);
 #ifdef CONFIG_ARM64_MTE
+static int __init disable_arm64_mte_support(char *str)
+{
+	static_branch_disable(&arm64_mte_support);
+	return 0;
+}
+early_param("arm64_mte_not_support", disable_arm64_mte_support);
+
 static void cpu_enable_mte(struct arm64_cpu_capabilities const *cap)
 {
+	if(!system_supports_mte()){
+		pr_info("MTE is disabled since system does not support.\n");
+		return ;
+	}
 	/*
 	 * Clear the tags in the zero page. This needs to be done via the
 	 * linear map which has the Tagged attribute.

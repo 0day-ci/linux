@@ -420,6 +420,7 @@ static __always_inline bool is_hyp_code(void)
 extern DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
 extern struct static_key_false cpu_hwcap_keys[ARM64_NCAPS];
 extern struct static_key_false arm64_const_caps_ready;
+extern struct static_key_true arm64_mte_support;
 
 /* ARM64 CAPS + alternative_cb */
 #define ARM64_NPATCHABLE (ARM64_NCAPS + 1)
@@ -756,7 +757,8 @@ static __always_inline bool system_uses_irq_prio_masking(void)
 static inline bool system_supports_mte(void)
 {
 	return IS_ENABLED(CONFIG_ARM64_MTE) &&
-		cpus_have_const_cap(ARM64_MTE);
+		cpus_have_const_cap(ARM64_MTE) &&
+		static_branch_likely(&arm64_mte_support);
 }
 
 static inline bool system_has_prio_mask_debugging(void)
