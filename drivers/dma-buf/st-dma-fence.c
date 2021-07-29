@@ -122,21 +122,13 @@ static int test_signaling(void *arg)
 		goto err_free;
 	}
 
-	if (dma_fence_signal(f)) {
-		pr_err("Fence reported being already signaled\n");
-		goto err_free;
-	}
-
+	dma_fence_signal(f);
 	if (!dma_fence_is_signaled(f)) {
 		pr_err("Fence not reporting signaled\n");
 		goto err_free;
 	}
 
-	if (!dma_fence_signal(f)) {
-		pr_err("Fence reported not being already signaled\n");
-		goto err_free;
-	}
-
+	dma_fence_signal(f);
 	err = 0;
 err_free:
 	dma_fence_put(f);
