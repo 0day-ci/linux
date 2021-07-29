@@ -45,7 +45,7 @@ static int parse_record_events(const struct option *opt,
 
 	if (!strcmp(str, "list")) {
 		perf_mem_events__list();
-		exit(0);
+		exit(EXIT_SUCCESS);
 	}
 	if (perf_mem_events__parse(str))
 		exit(-1);

@@ -1551,7 +1551,7 @@ static int __bench_numa(const char *name)
 			/* Child process: */
 			worker_process(i);
 
-			exit(0);
+			exit(EXIT_SUCCESS);
 		}
 		pids[i] = pid;
 

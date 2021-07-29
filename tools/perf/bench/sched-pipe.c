@@ -135,7 +135,7 @@ int bench_sched_pipe(int argc, const char **argv)
 
 		if (!pid) {
 			worker_thread(threads + 0);
-			exit(0);
+			exit(EXIT_SUCCESS);
 		} else {
 			worker_thread(threads + 1);
 		}
@@ -175,7 +175,7 @@ int bench_sched_pipe(int argc, const char **argv)
 	default:
 		/* reaching here is something disaster */
 		fprintf(stderr, "Unknown format:%d\n", bench_format);
-		exit(1);
+		exit(EXIT_FAILURE);
 		break;
 	}
 

@@ -214,11 +214,11 @@ static int handle_options(const char ***argv, int *argc, int *envchanged)
 				set_argv_exec_path(cmd + 1);
 			else {
 				puts(get_argv_exec_path());
-				exit(0);
+				exit(EXIT_SUCCESS);
 			}
 		} else if (!strcmp(cmd, "--html-path")) {
 			puts(system_path(PERF_HTML_PATH));
-			exit(0);
+			exit(EXIT_SUCCESS);
 		} else if (!strcmp(cmd, "-p") || !strcmp(cmd, "--paginate")) {
 			use_pager = 1;
 		} else if (!strcmp(cmd, "--no-pager")) {
@@ -258,7 +258,7 @@ static int handle_options(const char ***argv, int *argc, int *envchanged)
 				printf("%s ", p->cmd);
 			}
 			putchar('\n');
-			exit(0);
+			exit(EXIT_SUCCESS);
 		} else if (!strcmp(cmd, "--list-opts")) {
 			unsigned int i;
 
@@ -267,7 +267,7 @@ static int handle_options(const char ***argv, int *argc, int *envchanged)
 				printf("--%s ", p->long_name);
 			}
 			putchar('\n');
-			exit(0);
+			exit(EXIT_SUCCESS);
 		} else if (!strcmp(cmd, "--debug")) {
 			if (*argc < 2) {
 				fprintf(stderr, "No variable specified for --debug.\n");

@@ -41,12 +41,12 @@ static int spawn_child(void)
 
 		if (err) {
 			pr_debug("failed to PTRACE_TRACEME\n");
-			exit(1);
+			exit(EXIT_FAILURE);
 		}
 
 		raise(SIGCONT);
 		bp_1();
-		exit(0);
+		exit(EXIT_SUCCESS);
 	}
 
 	return child;

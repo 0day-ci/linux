@@ -750,7 +750,7 @@ static int opt_list_avail_functions(const struct option *opt __maybe_unused,
 	if (ret < 0)
 		return ret;
 
-	exit(0);
+	exit(EXIT_SUCCESS);
 }
 
 static int parse_filter_func(const struct option *opt, const char *str,

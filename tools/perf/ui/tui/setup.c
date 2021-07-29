@@ -109,7 +109,7 @@ static void ui__signal_backtrace(int sig)
 	size = backtrace(stackdump, ARRAY_SIZE(stackdump));
 	backtrace_symbols_fd(stackdump, size, STDOUT_FILENO);
 
-	exit(0);
+	exit(EXIT_SUCCESS);
 }
 #else
 # define ui__signal_backtrace  ui__signal
@@ -119,7 +119,7 @@ static void ui__signal(int sig)
 {
 	ui__exit(false);
 	psignal(sig, "perf");
-	exit(0);
+	exit(EXIT_SUCCESS);
 }
 
 int ui__init(void)

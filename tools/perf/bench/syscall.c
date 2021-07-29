@@ -73,7 +73,7 @@ int bench_syscall_basic(int argc, const char **argv)
 	default:
 		/* reaching here is something disaster */
 		fprintf(stderr, "Unknown format:%d\n", bench_format);
-		exit(1);
+		exit(EXIT_FAILURE);
 		break;
 	}
 

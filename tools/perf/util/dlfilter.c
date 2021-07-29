@@ -611,5 +611,5 @@ int list_available_dlfilters(const struct option *opt __maybe_unused,
 
 	free(exec_path);
 out:
-	exit(0);
+	exit(EXIT_SUCCESS);
 }

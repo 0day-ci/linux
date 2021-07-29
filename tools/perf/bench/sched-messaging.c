@@ -149,7 +149,7 @@ static pthread_t create_worker(void *ctx, void *(*func)(void *))
 			break;
 		case 0:
 			(*func) (ctx);
-			exit(0);
+			exit(EXIT_SUCCESS);
 			break;
 		default:
 			break;
@@ -182,7 +182,7 @@ static void reap_worker(pthread_t id)
 		/* process mode */
 		wait(&proc_status);
 		if (!WIFEXITED(proc_status))
-			exit(1);
+			exit(EXIT_FAILURE);
 	} else {
 		pthread_join(id, &thread_status);
 	}
@@ -319,7 +319,7 @@ int bench_sched_messaging(int argc, const char **argv)
 	default:
 		/* reaching here is something disaster */
 		fprintf(stderr, "Unknown format:%d\n", bench_format);
-		exit(1);
+		exit(EXIT_FAILURE);
 		break;
 	}
 

@@ -2774,7 +2774,7 @@ static int parse_scriptname(const struct option *opt __maybe_unused,
 
 	if (strcmp(str, "lang") == 0) {
 		list_available_languages();
-		exit(0);
+		exit(EXIT_SUCCESS);
 	}
 
 	script = strchr(str, ':');
@@ -3175,7 +3175,7 @@ static int list_available_scripts(const struct option *opt __maybe_unused,
 			desc->half_liner ? desc->half_liner : "");
 	}
 
-	exit(0);
+	exit(EXIT_SUCCESS);
 }
 
 static int add_dlarg(const struct option *opt __maybe_unused,

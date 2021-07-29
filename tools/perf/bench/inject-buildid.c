@@ -106,7 +106,7 @@ static void collect_dso(void)
 	dsos = calloc(nr_mmaps * DSO_MMAP_RATIO, sizeof(*dsos));
 	if (dsos == NULL) {
 		printf("  Memory allocation failed\n");
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 
 	if (nftw("/usr/lib/", add_dso, 10, FTW_PHYS) < 0)
@@ -305,7 +305,7 @@ static int setup_injection(struct bench_data *data, bool build_id_all)
 
 		dev_null_fd = open("/dev/null", O_WRONLY);
 		if (dev_null_fd < 0)
-			exit(1);
+			exit(EXIT_FAILURE);
 
 		dup2(dev_null_fd, STDERR_FILENO);
 
@@ -314,7 +314,7 @@ static int setup_injection(struct bench_data *data, bool build_id_all)
 
 		inject_argv = calloc(inject_argc + 1, sizeof(*inject_argv));
 		if (inject_argv == NULL)
-			exit(1);
+			exit(EXIT_FAILURE);
 
 		inject_argv[0] = strdup("inject");
 		inject_argv[1] = strdup("-b");
@@ -326,7 +326,7 @@ static int setup_injection(struct bench_data *data, bool build_id_all)
 
 		cmd_inject(inject_argc, inject_argv);
 
-		exit(0);
+		exit(EXIT_SUCCESS);
 	}
 
 	pthread_create(&data->th, NULL, data_reader, data);
