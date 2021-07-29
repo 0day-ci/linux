@@ -697,8 +697,8 @@ void __mod_lruvec_page_state(struct page *page, enum node_stat_item idx,
 	memcg = page_memcg(head);
 	/* Untracked pages have no memcg, no lruvec. Update only the node */
 	if (!memcg) {
-		rcu_read_unlock();
 		__mod_node_page_state(pgdat, idx, val);
+		rcu_read_unlock();
 		return;
 	}
 
