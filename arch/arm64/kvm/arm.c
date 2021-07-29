@@ -15,6 +15,7 @@
 #include <linux/fs.h>
 #include <linux/mman.h>
 #include <linux/sched.h>
+#include <linux/kmemleak.h>
 #include <linux/kvm.h>
 #include <linux/kvm_irqfd.h>
 #include <linux/irqbypass.h>
@@ -1951,8 +1952,12 @@ static inline int pkvm_mark_hyp(phys_addr_t start, phys_addr_t end)
 }
 
 #define pkvm_mark_hyp_section(__section)		\
+({							\
+	u64 sz = __section##_end - __section##_start;	\
+	kmemleak_free_part(__section##_start, sz);	\
 	pkvm_mark_hyp(__pa_symbol(__section##_start),	\
-			__pa_symbol(__section##_end))
+		      __pa_symbol(__section##_end));	\
+})
 
 static int finalize_hyp_mode(void)
 {
