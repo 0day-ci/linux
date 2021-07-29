@@ -7109,6 +7109,8 @@ static int __init mem_cgroup_init(void)
 		rtpn = kzalloc_node(sizeof(*rtpn), GFP_KERNEL,
 				    node_online(node) ? node : NUMA_NO_NODE);
 
+		if (WARN_ON_ONCE(!rtpn))
+			continue;
 		rtpn->rb_root = RB_ROOT;
 		rtpn->rb_rightmost = NULL;
 		spin_lock_init(&rtpn->lock);
