@@ -511,7 +511,7 @@
 	tx-fifo-depth = <2048>;
 
 	resets = <&reset RESET_ETHERNET>;
-	reset-names = "stmmaceth";
+	reset-names = "ethreset";
 
 	power-domains = <&pwrc PWRC_MESON8_ETHERNET_MEM_ID>;
 };
