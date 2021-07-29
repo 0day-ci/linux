@@ -24,6 +24,7 @@
 #include <linux/log2.h>
 #include <linux/pm_runtime.h>
 #include <linux/badblocks.h>
+#include <linux/blk-ledtrig.h>
 
 #include "blk.h"
 #include "blk-ledtrig.h"
@@ -601,6 +602,7 @@ void del_gendisk(struct gendisk *disk)
 	if (WARN_ON_ONCE(!disk->queue))
 		return;
 
+	blk_ledtrig_clear(disk);
 	blk_integrity_del(disk);
 	disk_del_events(disk);
 

@@ -348,3 +348,134 @@ init_error_del:
 init_error_new:
 	pr_err("failed to initialize blkdev LED triggers (%d)\n", ret);
 }
+
+
+/*
+ *
+ *	Set a device trigger
+ *
+ */
+
+static int __blk_ledtrig_set(struct gendisk *const gd, const char *const name,
+			     const size_t name_len)
+{
+	struct blk_ledtrig *t;
+	bool already_set;
+	int ret;
+
+	ret = mutex_lock_interruptible(&blk_ledtrig_list_mutex);
+	if (unlikely(ret != 0))
+		goto set_exit_return;
+
+	t = blk_ledtrig_find(name, name_len);
+	if (t == NULL) {
+		pr_warn("blockdev LED trigger named %.*s doesn't exist\n",
+			(int)name_len, name);
+		ret = -ENODEV;
+		goto set_exit_unlock_list;
+	}
+
+	ret = mutex_lock_interruptible(&t->refcount_mutex);
+	if (unlikely(ret != 0))
+		goto set_exit_unlock_list;
+
+	// Holding the refcount mutex blocks __blk_ledtrig_delete, so we don't
+	// actually need to hold the list mutex anymore, but it makes the flow
+	// much simpler to do so
+
+	if (WARN_ON_ONCE(t->refcount == INT_MAX)) {
+		ret = -ERANGE;
+		goto set_exit_unlock_refcount;
+	}
+
+	ret = mutex_lock_interruptible(&gd->ledtrig_mutex);
+	if (unlikely(ret != 0))
+		goto set_exit_unlock_refcount;
+
+	if (gd->ledtrig == NULL) {
+		already_set = false;
+		gd->ledtrig = t;
+	} else {
+		already_set = true;
+	}
+
+	mutex_unlock(&gd->ledtrig_mutex);
+
+	if (already_set) {
+		pr_warn("blockdev trigger for %s already set\n",
+			gd->disk_name);
+		ret = -EBUSY;
+		goto set_exit_unlock_refcount;
+	}
+
+	++(t->refcount);
+	ret = 0;
+
+set_exit_unlock_refcount:
+	mutex_unlock(&t->refcount_mutex);
+set_exit_unlock_list:
+	mutex_unlock(&blk_ledtrig_list_mutex);
+set_exit_return:
+	return ret;
+}
+
+/**
+ * blk_ledtrig_set() - set the LED trigger for a block device
+ * @gd: the block device
+ * @name: the name of the LED trigger
+ *
+ * Context: Process context (can sleep).  Takes and releases
+ *	    @blk_ledtrig_list_mutex, trigger's @refcount_mutex,
+ *	    and @gd->ledtrig_mutex.
+ *
+ * Return: 0 on success; -@errno on error
+ */
+int blk_ledtrig_set(struct gendisk *const gd, const char *const name)
+{
+	return __blk_ledtrig_set(gd, name, strlen(name));
+}
+EXPORT_SYMBOL_GPL(blk_ledtrig_set);
+
+
+/*
+ *
+ *	Clear a device trigger
+ *
+ */
+
+/**
+ * blk_ledtrig_clear() - clear the LED trigger of a block device
+ * @gd: the block device
+ *
+ * Context: Process context (can sleep).  Takes and releases
+ *	    @gd->ledtrig_mutex and @gd->ledtrig->refcount_mutex.
+ *
+ * Return: @true if the trigger was actually cleared; @false if it wasn't set
+ */
+bool blk_ledtrig_clear(struct gendisk *const gd)
+{
+	struct blk_ledtrig *t;
+	bool changed;
+	int new_refcount;
+
+	mutex_lock(&gd->ledtrig_mutex);
+
+	t = gd->ledtrig;
+	if (t == NULL) {
+		changed = false;
+		goto clear_exit_unlock_ledtrig;
+	}
+
+	mutex_lock(&t->refcount_mutex);
+	new_refcount = --(t->refcount);
+	mutex_unlock(&t->refcount_mutex);
+
+	gd->ledtrig = NULL;
+	changed = true;
+
+clear_exit_unlock_ledtrig:
+	mutex_unlock(&gd->ledtrig_mutex);
+	WARN_ON(changed && (new_refcount < 0));
+	return changed;
+}
+EXPORT_SYMBOL_GPL(blk_ledtrig_clear);

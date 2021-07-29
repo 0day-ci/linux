@@ -11,8 +11,13 @@
 
 #ifdef CONFIG_BLK_LED_TRIGGERS
 
+#include <linux/genhd.h>
+#include <linux/types.h>
+
 int blk_ledtrig_create(const char *name);
 int blk_ledtrig_delete(const char *name);
+int blk_ledtrig_set(struct gendisk *const gd, const char *const name);
+bool blk_ledtrig_clear(struct gendisk *const gd);
 
 #endif	// CONFIG_BLK_LED_TRIGGERS
 
