@@ -360,4 +360,8 @@ static inline struct nf_conntrack_net *nf_ct_pernet(const struct net *net)
 #define MODULE_ALIAS_NFCT_HELPER(helper) \
         MODULE_ALIAS("nfct-helper-" helper)
 
+int nf_conntrack_lwtunnel_sysctl_handler(struct ctl_table *table, int write,
+					 void *buffer, size_t *lenp,
+					 loff_t *ppos);
+
 #endif /* _NF_CONNTRACK_H */
