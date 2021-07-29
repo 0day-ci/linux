@@ -404,6 +404,9 @@ static void vfio_pci_disable(struct vfio_pci_device *vdev)
 	struct vfio_pci_ioeventfd *ioeventfd, *ioeventfd_tmp;
 	int i, bar;
 
+	/* For needs_reset */
+	lockdep_assert_held(&vdev->vdev.dev_set->lock);
+
 	/* Stop the device from further DMA */
 	pci_clear_master(pdev);
 
@@ -2145,36 +2148,6 @@ static struct pci_driver vfio_pci_driver = {
 	.err_handler		= &vfio_err_handlers,
 };
 
-static int vfio_pci_get_unused_devs(struct pci_dev *pdev, void *data)
-{
-	struct vfio_devices *devs = data;
-	struct vfio_device *device;
-	struct vfio_pci_device *vdev;
-
-	if (devs->cur_index == devs->max_index)
-		return -ENOSPC;
-
-	device = vfio_device_get_from_dev(&pdev->dev);
-	if (!device)
-		return -EINVAL;
-
-	if (pci_dev_driver(pdev) != &vfio_pci_driver) {
-		vfio_device_put(device);
-		return -EBUSY;
-	}
-
-	vdev = container_of(device, struct vfio_pci_device, vdev);
-
-	/* Fault if the device is not unused */
-	if (device->open_count) {
-		vfio_device_put(device);
-		return -EBUSY;
-	}
-
-	devs->devices[devs->cur_index++] = vdev;
-	return 0;
-}
-
 static int vfio_pci_try_zap_and_vma_lock_cb(struct pci_dev *pdev, void *data)
 {
 	struct vfio_devices *devs = data;
@@ -2208,79 +2181,82 @@ static int vfio_pci_try_zap_and_vma_lock_cb(struct pci_dev *pdev, void *data)
 	return 0;
 }
 
+static int vfio_pci_is_device_in_set(struct pci_dev *pdev, void *data)
+{
+	struct vfio_device_set *dev_set = data;
+	struct vfio_device *cur;
+
+	lockdep_assert_held(&dev_set->lock);
+
+	list_for_each_entry(cur, &dev_set->device_list, dev_set_list)
+		if (cur->dev == &pdev->dev)
+			return 0;
+	return -EBUSY;
+}
+
+/*
+ * vfio-core considers a group to be viable and will create a vfio_device even
+ * if some devices are bound to drivers like pci-stub or pcieport.  Here we
+ * require all PCI devices to be inside our dev_set since that ensures they stay
+ * put and that every driver controlling the device can co-ordinate with the
+ * device reset.
+ */
+static struct pci_dev *vfio_pci_find_reset_target(struct vfio_pci_device *vdev)
+{
+	struct vfio_device_set *dev_set = vdev->vdev.dev_set;
+	struct vfio_pci_device *cur;
+	bool needs_reset = false;
+
+	/* No VFIO device has an open device FD */
+	list_for_each_entry(cur, &dev_set->device_list, vdev.dev_set_list) {
+		if (cur->vdev.open_count)
+			return NULL;
+		needs_reset |= cur->needs_reset;
+	}
+	if (!needs_reset)
+		return NULL;
+
+	/* All PCI devices in the group to be reset need to be in our dev_set */
+	if (vfio_pci_for_each_slot_or_bus(
+		    vdev->pdev, vfio_pci_is_device_in_set, dev_set,
+		    !pci_probe_reset_slot(vdev->pdev->slot)))
+		return NULL;
+	return cur->pdev;
+}
+
 /*
  * If a bus or slot reset is available for the provided device and:
  *  - All of the devices affected by that bus or slot reset are unused
- *    (!refcnt)
  *  - At least one of the affected devices is marked dirty via
  *    needs_reset (such as by lack of FLR support)
- * Then attempt to perform that bus or slot reset.  Callers are required
- * to hold vdev->dev_set->lock, protecting the bus/slot reset group from
- * concurrent opens.  A vfio_device reference is acquired for each device
- * to prevent unbinds during the reset operation.
- *
- * NB: vfio-core considers a group to be viable even if some devices are
- * bound to drivers like pci-stub or pcieport.  Here we require all devices
- * to be bound to vfio_pci since that's the only way we can be sure they
- * stay put.
+ * Then attempt to perform that bus or slot reset.
  */
 static void vfio_pci_try_bus_reset(struct vfio_pci_device *vdev)
 {
-	struct vfio_devices devs = { .cur_index = 0 };
-	int i = 0, ret = -EINVAL;
-	bool slot = false;
-	struct vfio_pci_device *tmp;
+	struct vfio_device_set *dev_set = vdev->vdev.dev_set;
+	struct pci_dev *to_reset;
+	struct vfio_pci_device *cur;
+	int ret;
 
-	if (!pci_probe_reset_slot(vdev->pdev->slot))
-		slot = true;
-	else if (pci_probe_reset_bus(vdev->pdev->bus))
+	lockdep_assert_held(&vdev->vdev.dev_set->lock);
+
+	if (pci_probe_reset_slot(vdev->pdev->slot) &&
+	    pci_probe_reset_bus(vdev->pdev->bus))
 		return;
 
-	if (vfio_pci_for_each_slot_or_bus(vdev->pdev, vfio_pci_count_devs,
-					  &i, slot) || !i)
+	to_reset = vfio_pci_find_reset_target(vdev);
+	if (!to_reset)
 		return;
 
-	devs.max_index = i;
-	devs.devices = kcalloc(i, sizeof(struct vfio_device *), GFP_KERNEL);
-	if (!devs.devices)
+	ret = pci_reset_bus(to_reset);
+	if (ret)
 		return;
 
-	if (vfio_pci_for_each_slot_or_bus(vdev->pdev,
-					  vfio_pci_get_unused_devs,
-					  &devs, slot))
-		goto put_devs;
-
-	/* Does at least one need a reset? */
-	for (i = 0; i < devs.cur_index; i++) {
-		tmp = devs.devices[i];
-		if (tmp->needs_reset) {
-			ret = pci_reset_bus(vdev->pdev);
-			break;
-		}
+	list_for_each_entry(cur, &dev_set->device_list, vdev.dev_set_list) {
+		cur->needs_reset = false;
+		if (cur->pdev != to_reset && !disable_idle_d3)
+			vfio_pci_set_power_state(cur, PCI_D3hot);
 	}
-
-put_devs:
-	for (i = 0; i < devs.cur_index; i++) {
-		tmp = devs.devices[i];
-
-		/*
-		 * If reset was successful, affected devices no longer need
-		 * a reset and we should return all the collateral devices
-		 * to low power.  If not successful, we either didn't reset
-		 * the bus or timed out waiting for it, so let's not touch
-		 * the power state.
-		 */
-		if (!ret) {
-			tmp->needs_reset = false;
-
-			if (tmp != vdev && !disable_idle_d3)
-				vfio_pci_set_power_state(tmp, PCI_D3hot);
-		}
-
-		vfio_device_put(&tmp->vdev);
-	}
-
-	kfree(devs.devices);
 }
 
 static void __exit vfio_pci_cleanup(void)
