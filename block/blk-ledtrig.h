@@ -13,9 +13,16 @@
 
 void blk_ledtrig_init(void);
 
+static inline void blk_ledtrig_disk_init(struct gendisk *const gd)
+{
+	gd->ledtrig = NULL;
+	mutex_init(&gd->ledtrig_mutex);
+}
+
 #else	// CONFIG_BLK_LED_TRIGGERS
 
 static inline void blk_ledtrig_init(void) {}
+static inline void blk_ledtrig_disk_init(const struct gendisk *gd) {}
 
 #endif	// CONFIG_BLK_LED_TRIGGERS
 

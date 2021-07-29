@@ -558,6 +558,7 @@ static void __device_add_disk(struct device *parent, struct gendisk *disk,
 
 	disk_add_events(disk);
 	blk_integrity_add(disk);
+	blk_ledtrig_disk_init(disk);
 }
 
 void device_add_disk(struct device *parent, struct gendisk *disk,
