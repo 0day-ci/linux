@@ -117,6 +117,11 @@ enum {
 	HNS_ROCE_MMAP_DCA_PAGE,
 };
 
+struct hns_roce_ib_modify_qp_resp {
+	__u32	dcan;
+	__u32	reserved;
+};
+
 #define UVERBS_ID_NS_MASK 0xF000
 #define UVERBS_ID_NS_SHIFT 12
 

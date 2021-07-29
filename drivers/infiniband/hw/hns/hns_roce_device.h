@@ -234,6 +234,7 @@ struct hns_roce_dca_ctx {
 
 	unsigned int max_qps;
 	unsigned int status_npage;
+	struct ida ida;
 
 #define HNS_DCA_BITS_PER_STATUS 1
 	unsigned long *buf_status;
@@ -348,10 +349,11 @@ struct hns_roce_dca_cfg {
 	spinlock_t lock;
 	u32 buf_id;
 	u16 attach_count;
+	u32 dcan;
 	u32 npages;
 	u32 sq_idx;
-	bool			aging_enable;
-	struct list_head	aging_node;
+	bool aging_enable;
+	struct list_head aging_node;
 };
 
 struct hns_roce_mw {

@@ -298,6 +298,39 @@ static int shrink_dca_mem(struct hns_roce_dev *hr_dev,
 	return 0;
 }
 
+#define DCAN_TO_SYNC_BIT(n) ((n) * HNS_DCA_BITS_PER_STATUS)
+#define DCAN_TO_STAT_BIT(n) DCAN_TO_SYNC_BIT(n)
+static bool start_free_dca_buf(struct hns_roce_dca_ctx *ctx, u32 dcan)
+{
+	unsigned long *st = ctx->sync_status;
+
+	if (st && dcan < ctx->max_qps)
+		return !test_and_set_bit_lock(DCAN_TO_SYNC_BIT(dcan), st);
+
+	return true;
+}
+
+static void stop_free_dca_buf(struct hns_roce_dca_ctx *ctx, u32 dcan)
+{
+	unsigned long *st = ctx->sync_status;
+
+	if (st && dcan < ctx->max_qps)
+		clear_bit_unlock(DCAN_TO_SYNC_BIT(dcan), st);
+}
+
+static void update_dca_buf_status(struct hns_roce_dca_ctx *ctx, u32 dcan,
+				  bool en)
+{
+	unsigned long *st = ctx->buf_status;
+
+	if (st && dcan < ctx->max_qps) {
+		if (en)
+			set_bit(DCAN_TO_STAT_BIT(dcan), st);
+		else
+			clear_bit(DCAN_TO_STAT_BIT(dcan), st);
+	}
+}
+
 static void restart_aging_dca_mem(struct hns_roce_dev *hr_dev,
 				  struct hns_roce_dca_ctx *ctx)
 {
@@ -347,8 +380,12 @@ static void process_aging_dca_mem(struct hns_roce_dev *hr_dev,
 		hr_qp = container_of(cfg, struct hns_roce_qp, dca_cfg);
 		spin_unlock(&ctx->aging_lock);
 
-		if (hr_dev->hw->chk_dca_buf_inactive(hr_dev, hr_qp))
-			free_buf_from_dca_mem(ctx, cfg);
+		if (start_free_dca_buf(ctx, cfg->dcan)) {
+			if (hr_dev->hw->chk_dca_buf_inactive(hr_dev, hr_qp))
+				free_buf_from_dca_mem(ctx, cfg);
+
+			stop_free_dca_buf(ctx, cfg->dcan);
+		}
 
 		spin_lock(&ctx->aging_lock);
 
@@ -381,6 +418,8 @@ static void init_dca_context(struct hns_roce_dca_ctx *ctx)
 	INIT_LIST_HEAD(&ctx->pool);
 	spin_lock_init(&ctx->pool_lock);
 	ctx->total_size = 0;
+
+	ida_init(&ctx->ida);
 	INIT_LIST_HEAD(&ctx->aging_new_list);
 	INIT_LIST_HEAD(&ctx->aging_proc_list);
 	spin_lock_init(&ctx->aging_lock);
@@ -458,6 +497,8 @@ void hns_roce_unregister_udca(struct hns_roce_dev *hr_dev,
 				 ctx->status_npage * PAGE_SIZE);
 		ctx->buf_status = NULL;
 	}
+
+	ida_destroy(&ctx->ida);
 }
 
 static struct dca_mem *alloc_dca_mem(struct hns_roce_dca_ctx *ctx)
@@ -904,6 +945,7 @@ static int attach_dca_mem(struct hns_roce_dev *hr_dev,
 
 	resp->alloc_flags |= HNS_IB_ATTACH_FLAGS_NEW_BUFFER;
 	resp->alloc_pages = cfg->npages;
+	update_dca_buf_status(ctx, cfg->dcan, true);
 
 	return 0;
 }
@@ -1014,6 +1056,7 @@ static void free_buf_from_dca_mem(struct hns_roce_dca_ctx *ctx,
 	unsigned long flags;
 	u32 buf_id;
 
+	update_dca_buf_status(ctx, cfg->dcan, false);
 	spin_lock(&cfg->lock);
 	buf_id = cfg->buf_id;
 	cfg->buf_id = HNS_DCA_INVALID_BUF_ID;
@@ -1060,6 +1103,27 @@ static void kick_dca_buf(struct hns_roce_dev *hr_dev,
 	restart_aging_dca_mem(hr_dev, ctx);
 }
 
+static u32 alloc_dca_num(struct hns_roce_dca_ctx *ctx)
+{
+	int ret;
+
+	ret = ida_alloc_max(&ctx->ida, ctx->max_qps - 1, GFP_KERNEL);
+	if (ret < 0)
+		return HNS_DCA_INVALID_DCA_NUM;
+
+	stop_free_dca_buf(ctx, ret);
+	update_dca_buf_status(ctx, ret, false);
+	return ret;
+}
+
+static void free_dca_num(u32 dcan, struct hns_roce_dca_ctx *ctx)
+{
+	if (dcan == HNS_DCA_INVALID_DCA_NUM)
+		return;
+
+	ida_free(&ctx->ida, dcan);
+}
+
 void hns_roce_enable_dca(struct hns_roce_dev *hr_dev, struct hns_roce_qp *hr_qp)
 {
 	struct hns_roce_dca_cfg *cfg = &hr_qp->dca_cfg;
@@ -1068,6 +1132,7 @@ void hns_roce_enable_dca(struct hns_roce_dev *hr_dev, struct hns_roce_qp *hr_qp)
 	INIT_LIST_HEAD(&cfg->aging_node);
 	cfg->buf_id = HNS_DCA_INVALID_BUF_ID;
 	cfg->npages = hr_qp->buff_size >> HNS_HW_PAGE_SHIFT;
+	cfg->dcan = HNS_DCA_INVALID_DCA_NUM;
 	/* Support dynamic detach when rq is empty */
 	if (!hr_qp->rq.wqe_cnt)
 		hr_qp->en_flags |= HNS_ROCE_QP_CAP_DYNAMIC_CTX_DETACH;
@@ -1083,6 +1148,9 @@ void hns_roce_disable_dca(struct hns_roce_dev *hr_dev,
 
 	kick_dca_buf(hr_dev, cfg, ctx);
 	cfg->buf_id = HNS_DCA_INVALID_BUF_ID;
+
+	free_dca_num(cfg->dcan, ctx);
+	cfg->dcan = HNS_DCA_INVALID_DCA_NUM;
 }
 
 void hns_roce_modify_dca(struct hns_roce_dev *hr_dev, struct hns_roce_qp *hr_qp,
@@ -1093,9 +1161,14 @@ void hns_roce_modify_dca(struct hns_roce_dev *hr_dev, struct hns_roce_qp *hr_qp,
 	struct hns_roce_dca_ctx *ctx = to_hr_dca_ctx(uctx);
 	struct hns_roce_dca_cfg *cfg = &hr_qp->dca_cfg;
 
-	if (hr_qp->state == IB_QPS_RESET || hr_qp->state == IB_QPS_ERR)
+	if (hr_qp->state == IB_QPS_RESET || hr_qp->state == IB_QPS_ERR) {
 		kick_dca_buf(hr_dev, cfg, ctx);
-
+		free_dca_num(cfg->dcan, ctx);
+		cfg->dcan = HNS_DCA_INVALID_DCA_NUM;
+	} else if (hr_qp->state == IB_QPS_RTR) {
+		free_dca_num(cfg->dcan, ctx);
+		cfg->dcan = alloc_dca_num(ctx);
+	}
 }
 
 static struct hns_roce_ucontext *

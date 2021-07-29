@@ -15,6 +15,8 @@ struct hns_dca_page_state {
 };
 
 #define HNS_DCA_INVALID_BUF_ID 0UL
+#define HNS_DCA_INVALID_DCA_NUM ~0U
+
 struct hns_dca_shrink_resp {
 	u64 free_key; /* free buffer's key which registered by the user */
 	u32 free_mems; /* free buffer count which no any QP be using */
