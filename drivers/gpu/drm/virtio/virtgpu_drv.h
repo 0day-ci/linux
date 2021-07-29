@@ -139,6 +139,7 @@ struct virtio_gpu_fence {
 	uint64_t fence_id;
 	struct virtio_gpu_fence_driver *drv;
 	struct list_head node;
+	struct dma_fence *out_fence;
 };
 
 struct virtio_gpu_vbuffer {
@@ -233,6 +234,7 @@ struct virtio_gpu_device {
 	bool has_resource_assign_uuid;
 	bool has_resource_blob;
 	bool has_host_visible;
+	bool has_out_fence;
 	struct virtio_shm_region host_visible_region;
 	struct drm_mm host_visible_mm;
 

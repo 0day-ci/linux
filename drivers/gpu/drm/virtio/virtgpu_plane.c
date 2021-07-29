@@ -27,6 +27,7 @@
 #include <drm/drm_damage_helper.h>
 #include <drm/drm_fourcc.h>
 #include <drm/drm_plane_helper.h>
+#include <drm/drm_vblank.h>
 
 #include "virtgpu_drv.h"
 
@@ -129,6 +130,45 @@ static void virtio_gpu_update_dumb_bo(struct virtio_gpu_device *vgdev,
 					   objs, NULL);
 }
 
+static void virtio_gpu_resource_add_out_fence(struct drm_plane *plane,
+					      struct virtio_gpu_output *output)
+{
+	struct drm_device *dev = plane->dev;
+	struct drm_crtc_state *crtc_state;
+	struct drm_pending_event *e;
+	struct virtio_gpu_device *vgdev = dev->dev_private;
+	struct virtio_gpu_framebuffer *vgfb;
+	struct virtio_gpu_object_array *objs;
+	struct virtio_gpu_fence *fence;
+
+	crtc_state = output->crtc.state;
+	if (!crtc_state || !crtc_state->event)
+		return;
+
+	e = &crtc_state->event->base;
+	if (!e->fence)
+		return;
+
+	vgfb = to_virtio_gpu_framebuffer(plane->state->fb);
+	if (!vgfb->fence) {
+		dma_fence_signal(e->fence);
+		return;
+	}
+
+	fence = virtio_gpu_fence_alloc(vgdev);
+	if (!fence)
+		return;
+
+	objs = virtio_gpu_array_alloc(1);
+	if (!objs)
+		return;
+
+	fence->out_fence = dma_fence_get(e->fence);
+	virtio_gpu_array_add_obj(objs, vgfb->base.obj[0]);
+	virtio_gpu_array_lock_resv(objs);
+	virtio_gpu_cmd_resource_out_fence(vgdev, objs, fence);
+}
+
 static void virtio_gpu_resource_flush(struct drm_plane *plane,
 				      uint32_t x, uint32_t y,
 				      uint32_t width, uint32_t height)
@@ -151,7 +191,6 @@ static void virtio_gpu_resource_flush(struct drm_plane *plane,
 		virtio_gpu_cmd_resource_flush(vgdev, bo->hw_res_handle, x, y,
 					      width, height, objs, vgfb->fence);
 		virtio_gpu_notify(vgdev);
-
 		dma_fence_wait_timeout(&vgfb->fence->f, true,
 				       msecs_to_jiffies(50));
 		dma_fence_put(&vgfb->fence->f);
@@ -231,6 +270,9 @@ static void virtio_gpu_primary_plane_update(struct drm_plane *plane,
 						   plane->state->src_y >> 16);
 		}
 	}
+
+	if (vgdev->has_out_fence && bo->guest_blob)
+		virtio_gpu_resource_add_out_fence(plane, output);
 
 	virtio_gpu_resource_flush(plane,
 				  rect.x1,

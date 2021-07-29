@@ -134,12 +134,21 @@ void virtio_gpu_fence_event_process(struct virtio_gpu_device *vgdev,
 			if (signaled->f.context != curr->f.context)
 				continue;
 
+			if (curr->out_fence)
+				continue;
+
 			if (!dma_fence_is_later(&signaled->f, &curr->f))
 				continue;
 
 			dma_fence_signal_locked(&curr->f);
 			list_del(&curr->node);
 			dma_fence_put(&curr->f);
+		}
+
+		if (signaled->out_fence) {
+			dma_fence_signal(signaled->out_fence);
+			dma_fence_put(signaled->out_fence);
+			signaled->out_fence = NULL;
 		}
 
 		dma_fence_signal_locked(&signaled->f);
