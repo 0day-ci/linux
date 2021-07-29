@@ -11,6 +11,9 @@
 #include <linux/of_mdio.h>
 #include <linux/phy.h>
 #include <linux/platform_device.h>
+#include <linux/gpio/consumer.h>
+#include <linux/reset.h>
+#include <linux/clk.h>
 
 #define MDIO_MODE_REG				0x40
 #define MDIO_ADDR_REG				0x44
@@ -31,8 +34,16 @@
 #define IPQ4019_MDIO_TIMEOUT	10000
 #define IPQ4019_MDIO_SLEEP		10
 
+/* MDIO clock source frequency is fixed to 100M */
+#define QCA_MDIO_CLK_RATE	100000000
+
+#define QCA_PHY_SET_DELAY_US	100000
+
 struct ipq4019_mdio_data {
 	void __iomem	*membase;
+	void __iomem *eth_ldo_rdy;
+	struct reset_control *reset_ctrl;
+	struct clk *mdio_clk;
 };
 
 static int ipq4019_mdio_wait_busy(struct mii_bus *bus)
@@ -171,10 +182,61 @@ static int ipq4019_mdio_write(struct mii_bus *bus, int mii_id, int regnum,
 	return 0;
 }
 
+static int ipq_mdio_reset(struct mii_bus *bus)
+{
+	struct ipq4019_mdio_data *priv = bus->priv;
+	struct device *dev = bus->parent;
+	struct gpio_desc *reset_gpio;
+	u32 val;
+	int i, ret;
+
+	/* To indicate CMN_PLL that ethernet_ldo has been ready if needed */
+	if (!IS_ERR(priv->eth_ldo_rdy)) {
+		val = readl(priv->eth_ldo_rdy);
+		val |= BIT(0);
+		writel(val, priv->eth_ldo_rdy);
+		fsleep(QCA_PHY_SET_DELAY_US);
+	}
+
+	/* Reset GEPHY if need */
+	if (!IS_ERR(priv->reset_ctrl)) {
+		reset_control_assert(priv->reset_ctrl);
+		fsleep(QCA_PHY_SET_DELAY_US);
+		reset_control_deassert(priv->reset_ctrl);
+		fsleep(QCA_PHY_SET_DELAY_US);
+	}
+
+	/* Configure MDIO clock frequency */
+	if (!IS_ERR(priv->mdio_clk)) {
+		ret = clk_set_rate(priv->mdio_clk, QCA_MDIO_CLK_RATE);
+		if (ret)
+			return ret;
+
+		ret = clk_prepare_enable(priv->mdio_clk);
+		if (ret)
+			return ret;
+	}
+
+	/* Reset PHYs by gpio pins */
+	for (i = 0; i < gpiod_count(dev, "phy-reset"); i++) {
+		reset_gpio = gpiod_get_index_optional(dev, "phy-reset", i, GPIOD_OUT_HIGH);
+		if (IS_ERR(reset_gpio))
+			continue;
+		gpiod_set_value_cansleep(reset_gpio, 0);
+		fsleep(QCA_PHY_SET_DELAY_US);
+		gpiod_set_value_cansleep(reset_gpio, 1);
+		fsleep(QCA_PHY_SET_DELAY_US);
+		gpiod_put(reset_gpio);
+	}
+
+	return 0;
+}
+
 static int ipq4019_mdio_probe(struct platform_device *pdev)
 {
 	struct ipq4019_mdio_data *priv;
 	struct mii_bus *bus;
+	struct resource *res;
 	int ret;
 
 	bus = devm_mdiobus_alloc_size(&pdev->dev, sizeof(*priv));
@@ -182,14 +244,23 @@ static int ipq4019_mdio_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	priv = bus->priv;
+	priv->eth_ldo_rdy = IOMEM_ERR_PTR(-EINVAL);
 
 	priv->membase = devm_platform_ioremap_resource(pdev, 0);
 	if (IS_ERR(priv->membase))
 		return PTR_ERR(priv->membase);
 
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+	if (res)
+		priv->eth_ldo_rdy = devm_ioremap_resource(&pdev->dev, res);
+
+	priv->reset_ctrl = devm_reset_control_get_exclusive(&pdev->dev, "gephy_mdc_rst");
+	priv->mdio_clk = devm_clk_get(&pdev->dev, "gcc_mdio_ahb_clk");
+
 	bus->name = "ipq4019_mdio";
 	bus->read = ipq4019_mdio_read;
 	bus->write = ipq4019_mdio_write;
+	bus->reset = ipq_mdio_reset;
 	bus->parent = &pdev->dev;
 	snprintf(bus->id, MII_BUS_ID_SIZE, "%s%d", pdev->name, pdev->id);
 
