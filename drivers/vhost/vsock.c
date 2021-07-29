@@ -178,10 +178,10 @@ vhost_transport_do_send_pkt(struct vhost_vsock *vsock,
 			 * small rx buffers, headers of packets in rx queue are
 			 * created dynamically and are initialized with header
 			 * of current packet(except length). But in case of
-			 * SOCK_SEQPACKET, we also must clear record delimeter
+			 * SOCK_SEQPACKET, we also must clear record delimiter
 			 * bit(VIRTIO_VSOCK_SEQ_EOR). Otherwise, instead of one
-			 * packet with delimeter(which marks end of record),
-			 * there will be sequence of packets with delimeter
+			 * packet with delimiter(which marks end of record),
+			 * there will be sequence of packets with delimiter
 			 * bit set. After initialized header will be copied to
 			 * rx buffer, this bit will be restored.
 			 */
