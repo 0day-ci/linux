@@ -897,21 +897,21 @@ static int hns_roce_v1_rsv_lp_qp(struct hns_roce_dev *hr_dev)
 		rdma_ah_set_dgid_raw(&attr.ah_attr, dgid.raw);
 
 		ret = hr_dev->hw->modify_qp(&hr_qp->ibqp, &attr, attr_mask,
-					    IB_QPS_RESET, IB_QPS_INIT);
+					    IB_QPS_RESET, IB_QPS_INIT, NULL);
 		if (ret) {
 			dev_err(dev, "modify qp failed(%d)!\n", ret);
 			goto create_lp_qp_failed;
 		}
 
 		ret = hr_dev->hw->modify_qp(&hr_qp->ibqp, &attr, IB_QP_DEST_QPN,
-					    IB_QPS_INIT, IB_QPS_RTR);
+					    IB_QPS_INIT, IB_QPS_RTR, NULL);
 		if (ret) {
 			dev_err(dev, "modify qp failed(%d)!\n", ret);
 			goto create_lp_qp_failed;
 		}
 
 		ret = hr_dev->hw->modify_qp(&hr_qp->ibqp, &attr, attr_mask,
-					    IB_QPS_RTR, IB_QPS_RTS);
+					    IB_QPS_RTR, IB_QPS_RTS, NULL);
 		if (ret) {
 			dev_err(dev, "modify qp failed(%d)!\n", ret);
 			goto create_lp_qp_failed;
@@ -3326,7 +3326,8 @@ out:
 static int hns_roce_v1_modify_qp(struct ib_qp *ibqp,
 				 const struct ib_qp_attr *attr, int attr_mask,
 				 enum ib_qp_state cur_state,
-				 enum ib_qp_state new_state)
+				 enum ib_qp_state new_state,
+				 struct ib_udata *udata)
 {
 	if (attr_mask & ~IB_QP_ATTR_STANDARD_BITS)
 		return -EOPNOTSUPP;
@@ -3612,7 +3613,8 @@ int hns_roce_v1_destroy_qp(struct ib_qp *ibqp, struct ib_udata *udata)
 	struct hns_roce_cq *send_cq, *recv_cq;
 	int ret;
 
-	ret = hns_roce_v1_modify_qp(ibqp, NULL, 0, hr_qp->state, IB_QPS_RESET);
+	ret = hns_roce_v1_modify_qp(ibqp, NULL, 0, hr_qp->state, IB_QPS_RESET,
+				    NULL);
 	if (ret)
 		return ret;
 

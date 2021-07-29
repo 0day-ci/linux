@@ -794,7 +794,7 @@ static int alloc_wqe_buf(struct hns_roce_dev *hr_dev, struct hns_roce_qp *hr_qp,
 	if (ret) {
 		ibdev_err(ibdev, "failed to create WQE mtr, ret = %d.\n", ret);
 		if (dca_en)
-			hns_roce_disable_dca(hr_dev, hr_qp);
+			hns_roce_disable_dca(hr_dev, hr_qp, udata);
 	}
 
 	return ret;
@@ -806,7 +806,7 @@ static void free_wqe_buf(struct hns_roce_dev *hr_dev, struct hns_roce_qp *hr_qp,
 	hns_roce_mtr_destroy(hr_dev, &hr_qp->mtr);
 
 	if (hr_qp->en_flags & HNS_ROCE_QP_CAP_DYNAMIC_CTX_ATTACH)
-		hns_roce_disable_dca(hr_dev, hr_qp);
+		hns_roce_disable_dca(hr_dev, hr_qp, udata);
 }
 
 static int alloc_qp_wqe(struct hns_roce_dev *hr_dev, struct hns_roce_qp *hr_qp,
@@ -1396,7 +1396,7 @@ int hns_roce_modify_qp(struct ib_qp *ibqp, struct ib_qp_attr *attr,
 	}
 
 	ret = hr_dev->hw->modify_qp(ibqp, attr, attr_mask, cur_state,
-				    new_state);
+				    new_state, udata);
 
 out:
 	mutex_unlock(&hr_qp->mutex);

@@ -46,6 +46,7 @@
 #include "hns_roce_device.h"
 #include "hns_roce_cmd.h"
 #include "hns_roce_hem.h"
+#include "hns_roce_dca.h"
 #include "hns_roce_hw_v2.h"
 
 enum {
@@ -5026,7 +5027,8 @@ static void v2_set_flushed_fields(struct ib_qp *ibqp,
 static int hns_roce_v2_modify_qp(struct ib_qp *ibqp,
 				 const struct ib_qp_attr *attr,
 				 int attr_mask, enum ib_qp_state cur_state,
-				 enum ib_qp_state new_state)
+				 enum ib_qp_state new_state,
+				 struct ib_udata *udata)
 {
 	struct hns_roce_dev *hr_dev = to_hr_dev(ibqp->device);
 	struct hns_roce_qp *hr_qp = to_hr_qp(ibqp);
@@ -5085,6 +5087,9 @@ static int hns_roce_v2_modify_qp(struct ib_qp *ibqp,
 
 	if (new_state == IB_QPS_RESET && !ibqp->uobject)
 		clear_qp(hr_qp);
+
+	if (check_dca_attach_enable(hr_qp))
+		hns_roce_modify_dca(hr_dev, hr_qp, udata);
 
 out:
 	return ret;
@@ -5272,6 +5277,39 @@ out:
 	return ret;
 }
 
+static bool hns_roce_v2_chk_dca_buf_inactive(struct hns_roce_dev *hr_dev,
+					     struct hns_roce_qp *hr_qp)
+{
+	struct hns_roce_dca_cfg *cfg = &hr_qp->dca_cfg;
+	struct hns_roce_v2_qp_context context = {};
+	struct ib_device *ibdev = &hr_dev->ib_dev;
+	u32 tmp, sq_idx;
+	int state;
+	int ret;
+
+	ret = hns_roce_v2_query_qpc(hr_dev, hr_qp, &context);
+	if (ret) {
+		ibdev_err(ibdev, "failed to query DCA QPC, ret = %d.\n", ret);
+		return false;
+	}
+
+	state = hr_reg_read(&context, QPC_QP_ST);
+	if (state == HNS_ROCE_QP_ST_ERR || state == HNS_ROCE_QP_ST_RST)
+		return true;
+
+	if (hr_qp->sq.wqe_cnt > 0) {
+		tmp = (u32)hr_reg_read(&context, QPC_RETRY_MSG_MSN);
+		sq_idx = tmp & (hr_qp->sq.wqe_cnt - 1);
+		/* If SQ-PI equals to retry_msg_msn in QPC, the QP is
+		 * inactive.
+		 */
+		if (sq_idx != cfg->sq_idx)
+			return false;
+	}
+
+	return true;
+}
+
 static inline int modify_qp_is_ok(struct hns_roce_qp *hr_qp)
 {
 	return ((hr_qp->ibqp.qp_type == IB_QPT_RC ||
@@ -5293,7 +5331,7 @@ static int hns_roce_v2_destroy_qp_common(struct hns_roce_dev *hr_dev,
 	if (modify_qp_is_ok(hr_qp)) {
 		/* Modify qp to reset before destroying qp */
 		ret = hns_roce_v2_modify_qp(&hr_qp->ibqp, NULL, 0,
-					    hr_qp->state, IB_QPS_RESET);
+					    hr_qp->state, IB_QPS_RESET, udata);
 		if (ret)
 			ibdev_err(ibdev,
 				  "failed to modify QP to RST, ret = %d.\n",
@@ -6309,6 +6347,7 @@ static const struct hns_roce_hw hns_roce_hw_v2 = {
 	.set_hem = hns_roce_v2_set_hem,
 	.clear_hem = hns_roce_v2_clear_hem,
 	.set_dca_buf = hns_roce_v2_set_dca_buf,
+	.chk_dca_buf_inactive = hns_roce_v2_chk_dca_buf_inactive,
 	.modify_qp = hns_roce_v2_modify_qp,
 	.qp_flow_control_init = hns_roce_v2_qp_flow_control_init,
 	.init_eq = hns_roce_v2_init_eq_table,

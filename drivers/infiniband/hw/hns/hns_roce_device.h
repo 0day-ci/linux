@@ -231,6 +231,12 @@ struct hns_roce_dca_ctx {
 	unsigned int free_mems; /* free mem num in pool */
 	size_t free_size; /* free mem size in pool */
 	size_t total_size; /* total size in pool */
+
+	bool exit_aging;
+	struct list_head aging_proc_list;
+	struct list_head aging_new_list;
+	spinlock_t aging_lock;
+	struct delayed_work aging_dwork;
 };
 
 struct hns_roce_ucontext {
@@ -336,8 +342,10 @@ struct hns_roce_dca_cfg {
 	u32 buf_id;
 	u16 attach_count;
 	u32 npages;
+	u32 sq_idx;
+	bool			aging_enable;
+	struct list_head	aging_node;
 };
-
 
 struct hns_roce_mw {
 	struct ib_mw		ibmw;
@@ -932,11 +940,13 @@ struct hns_roce_hw {
 			 int step_idx);
 	int (*set_dca_buf)(struct hns_roce_dev *hr_dev,
 			   struct hns_roce_qp *hr_qp);
+	bool (*chk_dca_buf_inactive)(struct hns_roce_dev *hr_dev,
+				     struct hns_roce_qp *hr_qp);
 	int (*query_qp)(struct ib_qp *ibqp, struct ib_qp_attr *qp_attr,
 			int qp_attr_mask, struct ib_qp_init_attr *qp_init_attr);
 	int (*modify_qp)(struct ib_qp *ibqp, const struct ib_qp_attr *attr,
 			 int attr_mask, enum ib_qp_state cur_state,
-			 enum ib_qp_state new_state);
+			 enum ib_qp_state new_state, struct ib_udata *udata);
 	int (*qp_flow_control_init)(struct hns_roce_dev *hr_dev,
 			 struct hns_roce_qp *hr_qp);
 	int (*dereg_mr)(struct hns_roce_dev *hr_dev, struct hns_roce_mr *mr,

@@ -15,6 +15,9 @@
 #define UVERBS_MODULE_NAME hns_ib
 #include <rdma/uverbs_named_ioctl.h>
 
+/* DCA mem ageing interval time */
+#define DCA_MEM_AGEING_MSES 1000
+
 /* DCA memory */
 struct dca_mem {
 #define DCA_MEM_FLAGS_ALLOCED BIT(0)
@@ -38,6 +41,12 @@ struct dca_mem_attr {
 static inline void set_dca_page_to_free(struct hns_dca_page_state *state)
 {
 	state->buf_id = HNS_DCA_INVALID_BUF_ID;
+	state->active = 0;
+	state->lock = 0;
+}
+
+static inline void set_dca_page_to_inactive(struct hns_dca_page_state *state)
+{
 	state->active = 0;
 	state->lock = 0;
 }
@@ -285,11 +294,94 @@ static int shrink_dca_mem(struct hns_roce_dev *hr_dev,
 	return 0;
 }
 
+static void restart_aging_dca_mem(struct hns_roce_dev *hr_dev,
+				  struct hns_roce_dca_ctx *ctx)
+{
+	spin_lock(&ctx->aging_lock);
+	ctx->exit_aging = false;
+	if (!list_empty(&ctx->aging_new_list))
+		queue_delayed_work(hr_dev->irq_workq, &ctx->aging_dwork,
+				   msecs_to_jiffies(DCA_MEM_AGEING_MSES));
+
+	spin_unlock(&ctx->aging_lock);
+}
+
+static void stop_aging_dca_mem(struct hns_roce_dca_ctx *ctx,
+			       struct hns_roce_dca_cfg *cfg, bool stop_worker)
+{
+	spin_lock(&ctx->aging_lock);
+	if (stop_worker) {
+		ctx->exit_aging = true;
+		cancel_delayed_work(&ctx->aging_dwork);
+	}
+
+	spin_lock(&cfg->lock);
+
+	if (!list_empty(&cfg->aging_node))
+		list_del_init(&cfg->aging_node);
+
+	spin_unlock(&cfg->lock);
+	spin_unlock(&ctx->aging_lock);
+}
+
+static void free_buf_from_dca_mem(struct hns_roce_dca_ctx *ctx,
+				  struct hns_roce_dca_cfg *cfg);
+static void process_aging_dca_mem(struct hns_roce_dev *hr_dev,
+				  struct hns_roce_dca_ctx *ctx)
+{
+	struct hns_roce_dca_cfg *cfg, *tmp_cfg;
+	struct hns_roce_qp *hr_qp;
+
+	spin_lock(&ctx->aging_lock);
+	list_for_each_entry_safe(cfg, tmp_cfg, &ctx->aging_new_list, aging_node)
+		list_move(&cfg->aging_node, &ctx->aging_proc_list);
+
+	while (!ctx->exit_aging && !list_empty(&ctx->aging_proc_list)) {
+		cfg = list_first_entry(&ctx->aging_proc_list,
+				       struct hns_roce_dca_cfg, aging_node);
+		list_del_init_careful(&cfg->aging_node);
+		hr_qp = container_of(cfg, struct hns_roce_qp, dca_cfg);
+		spin_unlock(&ctx->aging_lock);
+
+		if (hr_dev->hw->chk_dca_buf_inactive(hr_dev, hr_qp))
+			free_buf_from_dca_mem(ctx, cfg);
+
+		spin_lock(&ctx->aging_lock);
+
+		spin_lock(&cfg->lock);
+		/* If buf not free then add the buf to next aging list */
+		if (cfg->buf_id != HNS_DCA_INVALID_BUF_ID)
+			list_move(&cfg->aging_node, &ctx->aging_new_list);
+
+		spin_unlock(&cfg->lock);
+	}
+	spin_unlock(&ctx->aging_lock);
+}
+
+static void udca_mem_aging_work(struct work_struct *work)
+{
+	struct hns_roce_dca_ctx *ctx = container_of(work,
+			struct hns_roce_dca_ctx, aging_dwork.work);
+	struct hns_roce_ucontext *uctx = container_of(ctx,
+					 struct hns_roce_ucontext, dca_ctx);
+	struct hns_roce_dev *hr_dev = to_hr_dev(uctx->ibucontext.device);
+
+	cancel_delayed_work(&ctx->aging_dwork);
+	process_aging_dca_mem(hr_dev, ctx);
+	if (!ctx->exit_aging)
+		restart_aging_dca_mem(hr_dev, ctx);
+}
+
 static void init_dca_context(struct hns_roce_dca_ctx *ctx)
 {
 	INIT_LIST_HEAD(&ctx->pool);
 	spin_lock_init(&ctx->pool_lock);
 	ctx->total_size = 0;
+	INIT_LIST_HEAD(&ctx->aging_new_list);
+	INIT_LIST_HEAD(&ctx->aging_proc_list);
+	spin_lock_init(&ctx->aging_lock);
+	ctx->exit_aging = false;
+	INIT_DELAYED_WORK(&ctx->aging_dwork, udca_mem_aging_work);
 }
 
 static void cleanup_dca_context(struct hns_roce_dev *hr_dev,
@@ -297,6 +389,10 @@ static void cleanup_dca_context(struct hns_roce_dev *hr_dev,
 {
 	struct dca_mem *mem, *tmp;
 	unsigned long flags;
+
+	spin_lock(&ctx->aging_lock);
+	cancel_delayed_work_sync(&ctx->aging_dwork);
+	spin_unlock(&ctx->aging_lock);
 
 	spin_lock_irqsave(&ctx->pool_lock, flags);
 	list_for_each_entry_safe(mem, tmp, &ctx->pool, list) {
@@ -731,7 +827,11 @@ static int attach_dca_mem(struct hns_roce_dev *hr_dev,
 	u32 buf_id;
 	int ret;
 
+	if (hr_qp->en_flags & HNS_ROCE_QP_CAP_DYNAMIC_CTX_DETACH)
+		stop_aging_dca_mem(ctx, cfg, false);
+
 	resp->alloc_flags = 0;
+
 	spin_lock(&cfg->lock);
 	buf_id = cfg->buf_id;
 	/* Already attached */
@@ -770,21 +870,136 @@ static int attach_dca_mem(struct hns_roce_dev *hr_dev,
 	return 0;
 }
 
+struct dca_page_free_buf_attr {
+	u32 buf_id;
+	u32 max_pages;
+	u32 free_pages;
+	u32 clean_mems;
+};
+
+static int free_buffer_pages_proc(struct dca_mem *mem, int index, void *param)
+{
+	struct dca_page_free_buf_attr *attr = param;
+	struct hns_dca_page_state *state;
+	bool changed = false;
+	bool stop = false;
+	int i, free_pages;
+
+	free_pages = 0;
+	for (i = 0; !stop && i < mem->page_count; i++) {
+		state = &mem->states[i];
+		/* Change matched pages state */
+		if (dca_page_is_attached(state, attr->buf_id)) {
+			set_dca_page_to_free(state);
+			changed = true;
+			attr->free_pages++;
+			if (attr->free_pages == attr->max_pages)
+				stop = true;
+		}
+
+		if (dca_page_is_free(state))
+			free_pages++;
+	}
+
+	for (; changed && i < mem->page_count; i++)
+		if (dca_page_is_free(state))
+			free_pages++;
+
+	if (changed && free_pages == mem->page_count)
+		attr->clean_mems++;
+
+	return stop ? DCA_MEM_STOP_ITERATE : DCA_MEM_NEXT_ITERATE;
+}
+
+static void free_buf_from_dca_mem(struct hns_roce_dca_ctx *ctx,
+				  struct hns_roce_dca_cfg *cfg)
+{
+	struct dca_page_free_buf_attr attr = {};
+	unsigned long flags;
+	u32 buf_id;
+
+	spin_lock(&cfg->lock);
+	buf_id = cfg->buf_id;
+	cfg->buf_id = HNS_DCA_INVALID_BUF_ID;
+	spin_unlock(&cfg->lock);
+	if (buf_id == HNS_DCA_INVALID_BUF_ID)
+		return;
+
+	attr.buf_id = buf_id;
+	attr.max_pages = cfg->npages;
+	travel_dca_pages(ctx, &attr, free_buffer_pages_proc);
+
+	/* Update free size */
+	spin_lock_irqsave(&ctx->pool_lock, flags);
+	ctx->free_mems += attr.clean_mems;
+	ctx->free_size += attr.free_pages << HNS_HW_PAGE_SHIFT;
+	spin_unlock_irqrestore(&ctx->pool_lock, flags);
+}
+
+static void detach_dca_mem(struct hns_roce_dev *hr_dev,
+			   struct hns_roce_qp *hr_qp,
+			   struct hns_dca_detach_attr *attr)
+{
+	struct hns_roce_dca_ctx *ctx = hr_qp_to_dca_ctx(hr_qp);
+	struct hns_roce_dca_cfg *cfg = &hr_qp->dca_cfg;
+
+	stop_aging_dca_mem(ctx, cfg, true);
+
+	spin_lock(&ctx->aging_lock);
+	spin_lock(&cfg->lock);
+	cfg->sq_idx = attr->sq_idx;
+	list_add_tail(&cfg->aging_node, &ctx->aging_new_list);
+	spin_unlock(&cfg->lock);
+	spin_unlock(&ctx->aging_lock);
+
+	restart_aging_dca_mem(hr_dev, ctx);
+}
+
+static void kick_dca_buf(struct hns_roce_dev *hr_dev,
+			 struct hns_roce_dca_cfg *cfg,
+			 struct hns_roce_dca_ctx *ctx)
+{
+	stop_aging_dca_mem(ctx, cfg, true);
+	free_buf_from_dca_mem(ctx, cfg);
+	restart_aging_dca_mem(hr_dev, ctx);
+}
+
 void hns_roce_enable_dca(struct hns_roce_dev *hr_dev, struct hns_roce_qp *hr_qp)
 {
 	struct hns_roce_dca_cfg *cfg = &hr_qp->dca_cfg;
 
 	spin_lock_init(&cfg->lock);
+	INIT_LIST_HEAD(&cfg->aging_node);
 	cfg->buf_id = HNS_DCA_INVALID_BUF_ID;
 	cfg->npages = hr_qp->buff_size >> HNS_HW_PAGE_SHIFT;
+	/* Support dynamic detach when rq is empty */
+	if (!hr_qp->rq.wqe_cnt)
+		hr_qp->en_flags |= HNS_ROCE_QP_CAP_DYNAMIC_CTX_DETACH;
 }
 
 void hns_roce_disable_dca(struct hns_roce_dev *hr_dev,
-			  struct hns_roce_qp *hr_qp)
+			  struct hns_roce_qp *hr_qp, struct ib_udata *udata)
 {
+	struct hns_roce_ucontext *uctx = rdma_udata_to_drv_context(udata,
+					 struct hns_roce_ucontext, ibucontext);
+	struct hns_roce_dca_ctx *ctx = to_hr_dca_ctx(uctx);
 	struct hns_roce_dca_cfg *cfg = &hr_qp->dca_cfg;
 
+	kick_dca_buf(hr_dev, cfg, ctx);
 	cfg->buf_id = HNS_DCA_INVALID_BUF_ID;
+}
+
+void hns_roce_modify_dca(struct hns_roce_dev *hr_dev, struct hns_roce_qp *hr_qp,
+			 struct ib_udata *udata)
+{
+	struct hns_roce_ucontext *uctx = rdma_udata_to_drv_context(udata,
+					 struct hns_roce_ucontext, ibucontext);
+	struct hns_roce_dca_ctx *ctx = to_hr_dca_ctx(uctx);
+	struct hns_roce_dca_cfg *cfg = &hr_qp->dca_cfg;
+
+	if (hr_qp->state == IB_QPS_RESET || hr_qp->state == IB_QPS_ERR)
+		kick_dca_buf(hr_dev, cfg, ctx);
+
 }
 
 static struct hns_roce_ucontext *
@@ -962,12 +1177,38 @@ DECLARE_UVERBS_NAMED_METHOD(
 	UVERBS_ATTR_PTR_OUT(HNS_IB_ATTR_DCA_MEM_ATTACH_OUT_ALLOC_PAGES,
 			    UVERBS_ATTR_TYPE(u32), UA_MANDATORY));
 
+static int UVERBS_HANDLER(HNS_IB_METHOD_DCA_MEM_DETACH)(
+	struct uverbs_attr_bundle *attrs)
+{
+	struct hns_roce_qp *hr_qp = uverbs_attr_to_hr_qp(attrs);
+	struct hns_dca_detach_attr attr = {};
+
+	if (!hr_qp)
+		return -EINVAL;
+
+	if (uverbs_copy_from(&attr.sq_idx, attrs,
+			     HNS_IB_ATTR_DCA_MEM_DETACH_SQ_INDEX))
+		return -EFAULT;
+
+	detach_dca_mem(to_hr_dev(hr_qp->ibqp.device), hr_qp, &attr);
+
+	return 0;
+}
+
+DECLARE_UVERBS_NAMED_METHOD(
+	HNS_IB_METHOD_DCA_MEM_DETACH,
+	UVERBS_ATTR_IDR(HNS_IB_ATTR_DCA_MEM_DETACH_HANDLE, UVERBS_OBJECT_QP,
+			UVERBS_ACCESS_WRITE, UA_MANDATORY),
+	UVERBS_ATTR_PTR_IN(HNS_IB_ATTR_DCA_MEM_DETACH_SQ_INDEX,
+			   UVERBS_ATTR_TYPE(u32), UA_MANDATORY));
+
 DECLARE_UVERBS_NAMED_OBJECT(HNS_IB_OBJECT_DCA_MEM,
 			    UVERBS_TYPE_ALLOC_IDR(dca_cleanup),
 			    &UVERBS_METHOD(HNS_IB_METHOD_DCA_MEM_REG),
 			    &UVERBS_METHOD(HNS_IB_METHOD_DCA_MEM_DEREG),
 			    &UVERBS_METHOD(HNS_IB_METHOD_DCA_MEM_SHRINK),
-			    &UVERBS_METHOD(HNS_IB_METHOD_DCA_MEM_ATTACH));
+			    &UVERBS_METHOD(HNS_IB_METHOD_DCA_MEM_ATTACH),
+			    &UVERBS_METHOD(HNS_IB_METHOD_DCA_MEM_DETACH));
 
 static bool dca_is_supported(struct ib_device *device)
 {
