@@ -1596,9 +1596,14 @@ static u32 vlv_hz_to_pwm(struct intel_connector *connector, u32 pwm_freq_hz)
 	return DIV_ROUND_CLOSEST(clock, pwm_freq_hz * mul);
 }
 
-static u16 get_vbt_pwm_freq(struct drm_i915_private *dev_priv)
+static u16 get_vbt_pwm_freq(struct intel_connector *connector)
 {
-	u16 pwm_freq_hz = dev_priv->vbt.backlight.pwm_freq_hz;
+	struct drm_i915_private *dev_priv = to_i915(connector->base.dev);
+	const struct vbt_backlight_info *backlight_info;
+	u16 pwm_freq_hz;
+
+	backlight_info = intel_bios_backlight_info(connector->encoder);
+	pwm_freq_hz = backlight_info->pwm_freq_hz;
 
 	if (pwm_freq_hz) {
 		drm_dbg_kms(&dev_priv->drm,
@@ -1618,7 +1623,7 @@ static u32 get_backlight_max_vbt(struct intel_connector *connector)
 {
 	struct drm_i915_private *dev_priv = to_i915(connector->base.dev);
 	struct intel_panel *panel = &connector->panel;
-	u16 pwm_freq_hz = get_vbt_pwm_freq(dev_priv);
+	u16 pwm_freq_hz = get_vbt_pwm_freq(connector);
 	u32 pwm;
 
 	if (!panel->backlight.pwm_funcs->hz_to_pwm) {
@@ -1643,10 +1648,13 @@ static u32 get_backlight_max_vbt(struct intel_connector *connector)
 static u32 get_backlight_min_vbt(struct intel_connector *connector)
 {
 	struct drm_i915_private *dev_priv = to_i915(connector->base.dev);
+	const struct vbt_backlight_info *backlight_info;
 	struct intel_panel *panel = &connector->panel;
 	int min;
 
 	drm_WARN_ON(&dev_priv->drm, panel->backlight.pwm_level_max == 0);
+
+	backlight_info = intel_bios_backlight_info(connector->encoder);
 
 	/*
 	 * XXX: If the vbt value is 255, it makes min equal to max, which leads
@@ -1655,11 +1663,11 @@ static u32 get_backlight_min_vbt(struct intel_connector *connector)
 	 * against this by letting the minimum be at most (arbitrarily chosen)
 	 * 25% of the max.
 	 */
-	min = clamp_t(int, dev_priv->vbt.backlight.min_brightness, 0, 64);
-	if (min != dev_priv->vbt.backlight.min_brightness) {
+	min = clamp_t(int, backlight_info->min_brightness, 0, 64);
+	if (min != backlight_info->min_brightness) {
 		drm_dbg_kms(&dev_priv->drm,
 			    "clamping VBT min backlight %d/255 to %d/255\n",
-			    dev_priv->vbt.backlight.min_brightness, min);
+			    backlight_info->min_brightness, min);
 	}
 
 	/* vbt value is a coefficient in range [0..255] */
@@ -1845,10 +1853,12 @@ static int
 bxt_setup_backlight(struct intel_connector *connector, enum pipe unused)
 {
 	struct drm_i915_private *dev_priv = to_i915(connector->base.dev);
+	const struct vbt_backlight_info *backlight_info;
 	struct intel_panel *panel = &connector->panel;
 	u32 pwm_ctl, val;
 
-	panel->backlight.controller = dev_priv->vbt.backlight.controller;
+	backlight_info = intel_bios_backlight_info(connector->encoder);
+	panel->backlight.controller = backlight_info->controller;
 
 	pwm_ctl = intel_de_read(dev_priv,
 				BXT_BLC_PWM_CTL(panel->backlight.controller));
@@ -1950,11 +1960,11 @@ static int ext_pwm_setup_backlight(struct intel_connector *connector,
 
 		drm_dbg_kms(&dev_priv->drm, "PWM already enabled at freq %ld, VBT freq %d, level %d\n",
 			    NSEC_PER_SEC / (unsigned long)panel->backlight.pwm_state.period,
-			    get_vbt_pwm_freq(dev_priv), level);
+			    get_vbt_pwm_freq(connector), level);
 	} else {
 		/* Set period from VBT frequency, leave other settings at 0. */
 		panel->backlight.pwm_state.period =
-			NSEC_PER_SEC / get_vbt_pwm_freq(dev_priv);
+			NSEC_PER_SEC / get_vbt_pwm_freq(connector);
 	}
 
 	drm_info(&dev_priv->drm, "Using %s PWM for LCD backlight control\n",
@@ -2037,10 +2047,12 @@ int intel_panel_setup_backlight(struct drm_connector *connector, enum pipe pipe)
 {
 	struct drm_i915_private *dev_priv = to_i915(connector->dev);
 	struct intel_connector *intel_connector = to_intel_connector(connector);
+	const struct vbt_backlight_info *backlight_info;
 	struct intel_panel *panel = &intel_connector->panel;
 	int ret;
 
-	if (!dev_priv->vbt.backlight.present) {
+	backlight_info = intel_bios_backlight_info(intel_connector->encoder);
+	if (!backlight_info->present) {
 		if (dev_priv->quirks & QUIRK_BACKLIGHT_PRESENT) {
 			drm_dbg_kms(&dev_priv->drm,
 				    "no backlight present per VBT, but present per quirk\n");
