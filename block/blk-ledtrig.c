@@ -7,10 +7,14 @@
  */
 
 #include <linux/blk-ledtrig.h>
+#include <linux/ctype.h>
+#include <linux/genhd.h>
 #include <linux/leds.h>
 #include <linux/list.h>
 #include <linux/mutex.h>
 #include <linux/slab.h>
+
+#include "blk-ledtrig.h"
 
 
 /*
@@ -201,3 +205,146 @@ int blk_ledtrig_delete(const char *const name)
 	return __blk_ledtrig_delete(name, strlen(name));
 }
 EXPORT_SYMBOL_GPL(blk_ledtrig_delete);
+
+
+/*
+ *
+ *	Class attributes to manage the trigger list
+ *
+ */
+
+static ssize_t blk_ledtrig_attr_store(struct class *, struct class_attribute *,
+				      const char *, const size_t);
+static ssize_t blk_ledtrig_list_show(struct class *, struct class_attribute *,
+				     char *);
+
+static struct class_attribute blk_ledtrig_attr_new =
+	__ATTR(led_trigger_new, 0200, 0, blk_ledtrig_attr_store);
+
+static struct class_attribute blk_ledtrig_attr_del =
+	__ATTR(led_trigger_del, 0200, 0, blk_ledtrig_attr_store);
+
+static struct class_attribute blk_ledtrig_attr_list =
+	__ATTR(led_trigger_list, 0444, blk_ledtrig_list_show, 0);
+
+// Returns a pointer to the first non-whitespace character in s (or a pointer
+// to the terminating nul).
+static const char *blk_ledtrig_skip_whitespace(const char *s)
+{
+	while (*s != 0 && isspace(*s))
+		++s;
+
+	return s;
+}
+
+// Returns a pointer to the first whitespace character in s (or a pointer to
+// the terminating nul), which is effectively a pointer to the position *after*
+// the last character in the non-whitespace token at the beginning of s.  (s is
+// expected to be the result of a previous call to blk_ledtrig_skip_whitespace.)
+static const char *blk_ledtrig_find_whitespace(const char *s)
+{
+	while (*s != 0 && !isspace(*s))
+		++s;
+
+	return s;
+}
+
+static ssize_t blk_ledtrig_attr_store(struct class *const class,
+				      struct class_attribute *const attr,
+				      const char *const buf,
+				      const size_t count)
+{
+	const char *const name = blk_ledtrig_skip_whitespace(buf);
+	const char *const endp = blk_ledtrig_find_whitespace(name);
+	const ptrdiff_t name_len = endp - name;		// always >= 0
+	int ret;
+
+	if (attr == &blk_ledtrig_attr_new)
+		ret = __blk_ledtrig_create(name, name_len);
+	else	// attr == &blk_ledtrig_attr_del
+		ret = __blk_ledtrig_delete(name, name_len);
+
+	if (ret < 0)
+		return ret;
+
+	// Avoid potential "empty name" error by skipping whitespace
+	// to next token or terminating nul
+	return blk_ledtrig_skip_whitespace(endp) - buf;
+}
+
+static ssize_t blk_ledtrig_list_show(struct class *const class,
+				     struct class_attribute *const attr,
+				     char *const buf)
+{
+	struct list_head *n;
+	int ret, c = 0;
+
+	ret = mutex_lock_interruptible(&blk_ledtrig_list_mutex);
+	if (unlikely(ret != 0))
+		goto list_exit_return;
+
+	list_for_each(n, &blk_ledtrig_list) {
+
+		struct blk_ledtrig *const t = blk_ledtrig_from_node(n);
+		int refcount;
+
+		ret = mutex_lock_interruptible(&t->refcount_mutex);
+		if (unlikely(ret != 0))
+			goto list_exit_unlock_list;
+
+		refcount = t->refcount;
+
+		mutex_unlock(&t->refcount_mutex);
+
+		ret = snprintf(buf + c, PAGE_SIZE - c, "%s: %d\n",
+			       t->name, refcount);
+		if (unlikely(ret < 0))
+			goto list_exit_unlock_list;
+
+		c += ret;
+		if (unlikely(c >= PAGE_SIZE)) {
+			ret = -EOVERFLOW;
+			goto list_exit_unlock_list;
+		}
+	}
+
+	ret = c;
+
+list_exit_unlock_list:
+	mutex_unlock(&blk_ledtrig_list_mutex);
+list_exit_return:
+	return ret;
+}
+
+
+/*
+ *
+ *	Initialization - create the class attributes
+ *
+ */
+
+void __init blk_ledtrig_init(void)
+{
+	int ret;
+
+	ret = class_create_file(&block_class, &blk_ledtrig_attr_new);
+	if (unlikely(ret != 0))
+		goto init_error_new;
+
+	ret = class_create_file(&block_class, &blk_ledtrig_attr_del);
+	if (unlikely(ret != 0))
+		goto init_error_del;
+
+	ret = class_create_file(&block_class, &blk_ledtrig_attr_list);
+	if (unlikely(ret != 0))
+		goto init_error_list;
+
+	return;
+
+init_error_list:
+	class_remove_file(&block_class, &blk_ledtrig_attr_del);
+init_error_del:
+	class_remove_file(&block_class, &blk_ledtrig_attr_new);
+init_error_new:
+	pr_err("failed to initialize blkdev LED triggers (%d)\n", ret);
+}

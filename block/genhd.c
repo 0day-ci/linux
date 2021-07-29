@@ -26,6 +26,7 @@
 #include <linux/badblocks.h>
 
 #include "blk.h"
+#include "blk-ledtrig.h"
 
 static struct kobject *block_depr;
 
@@ -833,6 +834,7 @@ static int __init genhd_device_init(void)
 	if (unlikely(error))
 		return error;
 	blk_dev_init();
+	blk_ledtrig_init();
 
 	register_blkdev(BLOCK_EXT_MAJOR, "blkext");
 
