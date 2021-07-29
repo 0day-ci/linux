@@ -787,10 +787,13 @@ static void drm_send_event_helper(struct drm_device *dev,
 	}
 
 	if (e->fence) {
-		if (timestamp)
-			dma_fence_signal_timestamp(e->fence, timestamp);
-		else
-			dma_fence_signal(e->fence);
+		if (!dev->mode_config.deferred_out_fence) {
+			if (timestamp)
+				dma_fence_signal_timestamp(e->fence, timestamp);
+			else
+				dma_fence_signal(e->fence);
+		}
+
 		dma_fence_put(e->fence);
 	}
 

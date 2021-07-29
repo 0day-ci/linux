@@ -930,6 +930,15 @@ struct drm_mode_config {
 	bool normalize_zpos;
 
 	/**
+	 * @deferred_out_fence:
+	 *
+	 * If this option is set, the drm core would no longer signal the
+	 * out_fence at pageflip completion time. Instead, the driver would
+	 * signal the out_fence at a time when it deems appropriate.
+	 */
+	bool deferred_out_fence;
+
+	/**
 	 * @modifiers_property: Plane property to list support modifier/format
 	 * combination.
 	 */
