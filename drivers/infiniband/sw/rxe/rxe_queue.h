@@ -35,9 +35,8 @@
 
 /* type of queue */
 enum queue_type {
-	QUEUE_TYPE_KERNEL,
-	QUEUE_TYPE_TO_USER,
-	QUEUE_TYPE_FROM_USER,
+	QUEUE_TYPE_TO_CLIENT,
+	QUEUE_TYPE_FROM_CLIENT,
 };
 
 struct rxe_queue {
@@ -87,19 +86,15 @@ static inline int queue_empty(struct rxe_queue *q, enum queue_type type)
 	u32 cons;
 
 	switch (type) {
-	case QUEUE_TYPE_FROM_USER:
+	case QUEUE_TYPE_FROM_CLIENT:
 		/* protect user space index */
 		prod = smp_load_acquire(&q->buf->producer_index);
 		cons = q->index;
 		break;
-	case QUEUE_TYPE_TO_USER:
+	case QUEUE_TYPE_TO_CLIENT:
 		prod = q->index;
 		/* protect user space index */
 		cons = smp_load_acquire(&q->buf->consumer_index);
-		break;
-	case QUEUE_TYPE_KERNEL:
-		prod = q->buf->producer_index;
-		cons = q->buf->consumer_index;
 		break;
 	}
 
@@ -112,19 +107,15 @@ static inline int queue_full(struct rxe_queue *q, enum queue_type type)
 	u32 cons;
 
 	switch (type) {
-	case QUEUE_TYPE_FROM_USER:
+	case QUEUE_TYPE_FROM_CLIENT:
 		/* protect user space index */
 		prod = smp_load_acquire(&q->buf->producer_index);
 		cons = q->index;
 		break;
-	case QUEUE_TYPE_TO_USER:
+	case QUEUE_TYPE_TO_CLIENT:
 		prod = q->index;
 		/* protect user space index */
 		cons = smp_load_acquire(&q->buf->consumer_index);
-		break;
-	case QUEUE_TYPE_KERNEL:
-		prod = q->buf->producer_index;
-		cons = q->buf->consumer_index;
 		break;
 	}
 
@@ -138,19 +129,15 @@ static inline unsigned int queue_count(const struct rxe_queue *q,
 	u32 cons;
 
 	switch (type) {
-	case QUEUE_TYPE_FROM_USER:
+	case QUEUE_TYPE_FROM_CLIENT:
 		/* protect user space index */
 		prod = smp_load_acquire(&q->buf->producer_index);
 		cons = q->index;
 		break;
-	case QUEUE_TYPE_TO_USER:
+	case QUEUE_TYPE_TO_CLIENT:
 		prod = q->index;
 		/* protect user space index */
 		cons = smp_load_acquire(&q->buf->consumer_index);
-		break;
-	case QUEUE_TYPE_KERNEL:
-		prod = q->buf->producer_index;
-		cons = q->buf->consumer_index;
 		break;
 	}
 
@@ -162,7 +149,7 @@ static inline void advance_producer(struct rxe_queue *q, enum queue_type type)
 	u32 prod;
 
 	switch (type) {
-	case QUEUE_TYPE_FROM_USER:
+	case QUEUE_TYPE_FROM_CLIENT:
 		pr_warn_once("Normally kernel should not write user space index\n");
 		/* protect user space index */
 		prod = smp_load_acquire(&q->buf->producer_index);
@@ -170,14 +157,10 @@ static inline void advance_producer(struct rxe_queue *q, enum queue_type type)
 		/* same */
 		smp_store_release(&q->buf->producer_index, prod);
 		break;
-	case QUEUE_TYPE_TO_USER:
+	case QUEUE_TYPE_TO_CLIENT:
 		prod = q->index;
 		q->index = (prod + 1) & q->index_mask;
 		q->buf->producer_index = q->index;
-		break;
-	case QUEUE_TYPE_KERNEL:
-		prod = q->buf->producer_index;
-		q->buf->producer_index = (prod + 1) & q->index_mask;
 		break;
 	}
 }
@@ -187,22 +170,18 @@ static inline void advance_consumer(struct rxe_queue *q, enum queue_type type)
 	u32 cons;
 
 	switch (type) {
-	case QUEUE_TYPE_FROM_USER:
+	case QUEUE_TYPE_FROM_CLIENT:
 		cons = q->index;
 		q->index = (cons + 1) & q->index_mask;
 		q->buf->consumer_index = q->index;
 		break;
-	case QUEUE_TYPE_TO_USER:
+	case QUEUE_TYPE_TO_CLIENT:
 		pr_warn_once("Normally kernel should not write user space index\n");
 		/* protect user space index */
 		cons = smp_load_acquire(&q->buf->consumer_index);
 		cons = (cons + 1) & q->index_mask;
 		/* same */
 		smp_store_release(&q->buf->consumer_index, cons);
-		break;
-	case QUEUE_TYPE_KERNEL:
-		cons = q->buf->consumer_index;
-		q->buf->consumer_index = (cons + 1) & q->index_mask;
 		break;
 	}
 }
@@ -212,16 +191,13 @@ static inline void *producer_addr(struct rxe_queue *q, enum queue_type type)
 	u32 prod;
 
 	switch (type) {
-	case QUEUE_TYPE_FROM_USER:
+	case QUEUE_TYPE_FROM_CLIENT:
 		/* protect user space index */
 		prod = smp_load_acquire(&q->buf->producer_index);
 		prod &= q->index_mask;
 		break;
-	case QUEUE_TYPE_TO_USER:
+	case QUEUE_TYPE_TO_CLIENT:
 		prod = q->index;
-		break;
-	case QUEUE_TYPE_KERNEL:
-		prod = q->buf->producer_index;
 		break;
 	}
 
@@ -233,16 +209,13 @@ static inline void *consumer_addr(struct rxe_queue *q, enum queue_type type)
 	u32 cons;
 
 	switch (type) {
-	case QUEUE_TYPE_FROM_USER:
+	case QUEUE_TYPE_FROM_CLIENT:
 		cons = q->index;
 		break;
-	case QUEUE_TYPE_TO_USER:
+	case QUEUE_TYPE_TO_CLIENT:
 		/* protect user space index */
 		cons = smp_load_acquire(&q->buf->consumer_index);
 		cons &= q->index_mask;
-		break;
-	case QUEUE_TYPE_KERNEL:
-		cons = q->buf->consumer_index;
 		break;
 	}
 
@@ -255,16 +228,13 @@ static inline unsigned int producer_index(struct rxe_queue *q,
 	u32 prod;
 
 	switch (type) {
-	case QUEUE_TYPE_FROM_USER:
+	case QUEUE_TYPE_FROM_CLIENT:
 		/* protect user space index */
 		prod = smp_load_acquire(&q->buf->producer_index);
 		prod &= q->index_mask;
 		break;
-	case QUEUE_TYPE_TO_USER:
+	case QUEUE_TYPE_TO_CLIENT:
 		prod = q->index;
-		break;
-	case QUEUE_TYPE_KERNEL:
-		prod = q->buf->producer_index;
 		break;
 	}
 
@@ -277,16 +247,13 @@ static inline unsigned int consumer_index(struct rxe_queue *q,
 	u32 cons;
 
 	switch (type) {
-	case QUEUE_TYPE_FROM_USER:
+	case QUEUE_TYPE_FROM_CLIENT:
 		cons = q->index;
 		break;
-	case QUEUE_TYPE_TO_USER:
+	case QUEUE_TYPE_TO_CLIENT:
 		/* protect user space index */
 		cons = smp_load_acquire(&q->buf->consumer_index);
 		cons &= q->index_mask;
-		break;
-	case QUEUE_TYPE_KERNEL:
-		cons = q->buf->consumer_index;
 		break;
 	}
 
