@@ -1309,6 +1309,16 @@ scripts_unifdef: scripts_basic
 	$(Q)$(MAKE) $(build)=scripts scripts/unifdef
 
 # ---------------------------------------------------------------------------
+# Install
+
+# Many distros have the custom install script, /sbin/kernelinstall.
+# If DKMS is installed, 'make install' will eventually recuses back
+# to the this Makefile to build and install external modules.
+# Cancel sub_make_done so that options such as M=, V=, etc. are parsed.
+
+install: sub_make_done=
+
+# ---------------------------------------------------------------------------
 # Tools
 
 ifdef CONFIG_STACK_VALIDATION
