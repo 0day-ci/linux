@@ -85,6 +85,11 @@ static size_t pci_vpd_size(struct pci_dev *dev, size_t old_size)
 		if (header[0] & PCI_VPD_LRDT) {
 			/* Large Resource Data Type Tag */
 			tag = pci_vpd_lrdt_tag(header);
+			if (pci_read_vpd(dev, off + 1, 2, &header[1]) != 2) {
+				pci_warn(dev, "failed VPD read at offset %zu",
+					 off + 1);
+				return off;
+			}
 			size = pci_vpd_lrdt_size(header);
 			if (off + size > PCI_VPD_MAX_SIZE)
 				goto error;
@@ -102,13 +107,13 @@ static size_t pci_vpd_size(struct pci_dev *dev, size_t old_size)
 				return off;
 		}
 	}
-	return 0;
+	return off;
 
 error:
 	pci_info(dev, "invalid VPD tag %#04x at offset %zu%s\n",
 		 header[0], off, off == 0 ?
 		 "; assume missing optional EEPROM" : "");
-	return 0;
+	return off;
 }
 
 /*
