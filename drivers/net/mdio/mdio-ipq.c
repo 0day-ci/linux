@@ -31,38 +31,38 @@
 /* 0 = Clause 22, 1 = Clause 45 */
 #define MDIO_MODE_C45				BIT(8)
 
-#define IPQ4019_MDIO_TIMEOUT	10000
-#define IPQ4019_MDIO_SLEEP		10
+#define IPQ_MDIO_TIMEOUT	10000
+#define IPQ_MDIO_SLEEP		10
 
 /* MDIO clock source frequency is fixed to 100M */
 #define QCA_MDIO_CLK_RATE	100000000
 
 #define QCA_PHY_SET_DELAY_US	100000
 
-struct ipq4019_mdio_data {
+struct ipq_mdio_data {
 	void __iomem	*membase;
 	void __iomem *eth_ldo_rdy;
 	struct reset_control *reset_ctrl;
 	struct clk *mdio_clk;
 };
 
-static int ipq4019_mdio_wait_busy(struct mii_bus *bus)
+static int ipq_mdio_wait_busy(struct mii_bus *bus)
 {
-	struct ipq4019_mdio_data *priv = bus->priv;
+	struct ipq_mdio_data *priv = bus->priv;
 	unsigned int busy;
 
 	return readl_poll_timeout(priv->membase + MDIO_CMD_REG, busy,
 				  (busy & MDIO_CMD_ACCESS_BUSY) == 0,
-				  IPQ4019_MDIO_SLEEP, IPQ4019_MDIO_TIMEOUT);
+				  IPQ_MDIO_SLEEP, IPQ_MDIO_TIMEOUT);
 }
 
-static int ipq4019_mdio_read(struct mii_bus *bus, int mii_id, int regnum)
+static int ipq_mdio_read(struct mii_bus *bus, int mii_id, int regnum)
 {
-	struct ipq4019_mdio_data *priv = bus->priv;
+	struct ipq_mdio_data *priv = bus->priv;
 	unsigned int data;
 	unsigned int cmd;
 
-	if (ipq4019_mdio_wait_busy(bus))
+	if (ipq_mdio_wait_busy(bus))
 		return -ETIMEDOUT;
 
 	/* Clause 45 support */
@@ -102,7 +102,7 @@ static int ipq4019_mdio_read(struct mii_bus *bus, int mii_id, int regnum)
 	writel(cmd, priv->membase + MDIO_CMD_REG);
 
 	/* Wait read complete */
-	if (ipq4019_mdio_wait_busy(bus))
+	if (ipq_mdio_wait_busy(bus))
 		return -ETIMEDOUT;
 
 	if (regnum & MII_ADDR_C45) {
@@ -110,7 +110,7 @@ static int ipq4019_mdio_read(struct mii_bus *bus, int mii_id, int regnum)
 
 		writel(cmd, priv->membase + MDIO_CMD_REG);
 
-		if (ipq4019_mdio_wait_busy(bus))
+		if (ipq_mdio_wait_busy(bus))
 			return -ETIMEDOUT;
 	}
 
@@ -118,14 +118,13 @@ static int ipq4019_mdio_read(struct mii_bus *bus, int mii_id, int regnum)
 	return readl(priv->membase + MDIO_DATA_READ_REG);
 }
 
-static int ipq4019_mdio_write(struct mii_bus *bus, int mii_id, int regnum,
-							 u16 value)
+static int ipq_mdio_write(struct mii_bus *bus, int mii_id, int regnum, u16 value)
 {
-	struct ipq4019_mdio_data *priv = bus->priv;
+	struct ipq_mdio_data *priv = bus->priv;
 	unsigned int data;
 	unsigned int cmd;
 
-	if (ipq4019_mdio_wait_busy(bus))
+	if (ipq_mdio_wait_busy(bus))
 		return -ETIMEDOUT;
 
 	/* Clause 45 support */
@@ -150,7 +149,7 @@ static int ipq4019_mdio_write(struct mii_bus *bus, int mii_id, int regnum,
 
 		writel(cmd, priv->membase + MDIO_CMD_REG);
 
-		if (ipq4019_mdio_wait_busy(bus))
+		if (ipq_mdio_wait_busy(bus))
 			return -ETIMEDOUT;
 	} else {
 		/* Enter Clause 22 mode */
@@ -176,7 +175,7 @@ static int ipq4019_mdio_write(struct mii_bus *bus, int mii_id, int regnum,
 	writel(cmd, priv->membase + MDIO_CMD_REG);
 
 	/* Wait write complete */
-	if (ipq4019_mdio_wait_busy(bus))
+	if (ipq_mdio_wait_busy(bus))
 		return -ETIMEDOUT;
 
 	return 0;
@@ -184,7 +183,7 @@ static int ipq4019_mdio_write(struct mii_bus *bus, int mii_id, int regnum,
 
 static int ipq_mdio_reset(struct mii_bus *bus)
 {
-	struct ipq4019_mdio_data *priv = bus->priv;
+	struct ipq_mdio_data *priv = bus->priv;
 	struct device *dev = bus->parent;
 	struct gpio_desc *reset_gpio;
 	u32 val;
@@ -232,9 +231,9 @@ static int ipq_mdio_reset(struct mii_bus *bus)
 	return 0;
 }
 
-static int ipq4019_mdio_probe(struct platform_device *pdev)
+static int ipq_mdio_probe(struct platform_device *pdev)
 {
-	struct ipq4019_mdio_data *priv;
+	struct ipq_mdio_data *priv;
 	struct mii_bus *bus;
 	struct resource *res;
 	int ret;
@@ -257,9 +256,9 @@ static int ipq4019_mdio_probe(struct platform_device *pdev)
 	priv->reset_ctrl = devm_reset_control_get_exclusive(&pdev->dev, "gephy_mdc_rst");
 	priv->mdio_clk = devm_clk_get(&pdev->dev, "gcc_mdio_ahb_clk");
 
-	bus->name = "ipq4019_mdio";
-	bus->read = ipq4019_mdio_read;
-	bus->write = ipq4019_mdio_write;
+	bus->name = "ipq_mdio";
+	bus->read = ipq_mdio_read;
+	bus->write = ipq_mdio_write;
 	bus->reset = ipq_mdio_reset;
 	bus->parent = &pdev->dev;
 	snprintf(bus->id, MII_BUS_ID_SIZE, "%s%d", pdev->name, pdev->id);
@@ -275,7 +274,7 @@ static int ipq4019_mdio_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int ipq4019_mdio_remove(struct platform_device *pdev)
+static int ipq_mdio_remove(struct platform_device *pdev)
 {
 	struct mii_bus *bus = platform_get_drvdata(pdev);
 
@@ -284,23 +283,24 @@ static int ipq4019_mdio_remove(struct platform_device *pdev)
 	return 0;
 }
 
-static const struct of_device_id ipq4019_mdio_dt_ids[] = {
+static const struct of_device_id ipq_mdio_dt_ids[] = {
 	{ .compatible = "qcom,ipq4019-mdio" },
+	{ .compatible = "qcom,ipq-mdio" },
 	{ }
 };
-MODULE_DEVICE_TABLE(of, ipq4019_mdio_dt_ids);
+MODULE_DEVICE_TABLE(of, ipq_mdio_dt_ids);
 
-static struct platform_driver ipq4019_mdio_driver = {
-	.probe = ipq4019_mdio_probe,
-	.remove = ipq4019_mdio_remove,
+static struct platform_driver ipq_mdio_driver = {
+	.probe = ipq_mdio_probe,
+	.remove = ipq_mdio_remove,
 	.driver = {
-		.name = "ipq4019-mdio",
-		.of_match_table = ipq4019_mdio_dt_ids,
+		.name = "ipq-mdio",
+		.of_match_table = ipq_mdio_dt_ids,
 	},
 };
 
-module_platform_driver(ipq4019_mdio_driver);
+module_platform_driver(ipq_mdio_driver);
 
-MODULE_DESCRIPTION("ipq4019 MDIO interface driver");
+MODULE_DESCRIPTION("ipq MDIO interface driver");
 MODULE_AUTHOR("Qualcomm Atheros");
 MODULE_LICENSE("Dual BSD/GPL");
