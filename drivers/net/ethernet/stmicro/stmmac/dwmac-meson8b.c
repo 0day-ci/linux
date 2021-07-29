@@ -17,6 +17,7 @@
 #include <linux/of_net.h>
 #include <linux/mfd/syscon.h>
 #include <linux/platform_device.h>
+#include <linux/reset.h>
 #include <linux/stmmac.h>
 
 #include "stmmac_platform.h"
@@ -95,6 +96,7 @@ struct meson8b_dwmac {
 	u32				tx_delay_ns;
 	u32				rx_delay_ps;
 	struct clk			*timing_adj_clk;
+	struct reset_control		*eth_reset;
 };
 
 struct meson8b_dwmac_clk_configs {
@@ -384,6 +386,17 @@ static int meson8b_init_prg_eth(struct meson8b_dwmac *dwmac)
 	meson8b_dwmac_mask_bits(dwmac, PRG_ETH0, PRG_ETH0_TX_AND_PHY_REF_CLK,
 				PRG_ETH0_TX_AND_PHY_REF_CLK);
 
+	/* Make sure the Ethernet PHY is properly reseted, as U-Boot may leave
+	 * it at deasserted state, and thus it may fail to reset EMAC.
+	 *
+	 * This assumes the driver has exclusive access to the EPHY reset.
+	 */
+	ret = reset_control_reset(dwmac->eth_reset);
+	if (ret) {
+		dev_err(dwmac->dev, "Cannot reset internal PHY\n");
+		return ret;
+	}
+
 	return 0;
 }
 
@@ -462,6 +475,13 @@ static int meson8b_dwmac_probe(struct platform_device *pdev)
 						      "timing-adjustment");
 	if (IS_ERR(dwmac->timing_adj_clk)) {
 		ret = PTR_ERR(dwmac->timing_adj_clk);
+		goto err_remove_config_dt;
+	}
+
+	dwmac->eth_reset = devm_reset_control_get_exclusive(dwmac->dev, "ethreset");
+	if (IS_ERR_OR_NULL(dwmac->eth_reset)) {
+		dev_err(dwmac->dev, "Failed to get Ethernet reset\n");
+		ret = PTR_ERR(dwmac->eth_reset);
 		goto err_remove_config_dt;
 	}
 
