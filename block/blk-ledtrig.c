@@ -479,3 +479,68 @@ clear_exit_unlock_ledtrig:
 	return changed;
 }
 EXPORT_SYMBOL_GPL(blk_ledtrig_clear);
+
+
+/*
+ *
+ *	Set, clear & show LED triggers via sysfs device attributes
+ *
+ *	(See dev_attr_led_trigger and disk_attrs in genhd.c)
+ *
+ */
+
+ssize_t blk_ledtrig_devattr_store(struct device *const dev,
+				  struct device_attribute *const attr,
+				  const char *const buf, const size_t count)
+{
+	struct gendisk *const gd = dev_to_disk(dev);
+	const char *const name = blk_ledtrig_skip_whitespace(buf);
+	const char *const endp = blk_ledtrig_find_whitespace(name);
+	const ptrdiff_t name_len = endp - name;		// always >= 0
+	int ret;
+
+	if (name_len == 0)
+		ret = blk_ledtrig_clear(gd);
+	else
+		ret = __blk_ledtrig_set(gd, name, name_len);
+
+	if (ret < 0)
+		return ret;
+
+	return blk_ledtrig_skip_whitespace(endp) - buf;
+}
+
+ssize_t blk_ledtrig_devattr_show(struct device *const dev,
+				 struct device_attribute *const attr,
+				 char *const buf)
+{
+	struct gendisk *const gd = dev_to_disk(dev);
+	const struct blk_ledtrig *t;
+	size_t name_len;
+	int ret;
+
+	ret = mutex_lock_interruptible(&gd->ledtrig_mutex);
+	if (unlikely(ret != 0))
+		return ret;
+
+	t = gd->ledtrig;
+
+	if (t != NULL) {
+		name_len = strlen(t->name);
+		if (likely(name_len < PAGE_SIZE - 1))
+			memcpy(buf, t->name, name_len);
+	}
+
+	mutex_unlock(&gd->ledtrig_mutex);
+
+	if (t == NULL)
+		return sprintf(buf, "(none)\n");
+
+	if (unlikely(name_len >= PAGE_SIZE - 1))
+		return -EOVERFLOW;
+
+	buf[name_len] = '\n';
+	buf[name_len + 1] = 0;
+
+	return (ssize_t)(name_len + 1);
+}

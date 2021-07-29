@@ -19,6 +19,14 @@ static inline void blk_ledtrig_disk_init(struct gendisk *const gd)
 	mutex_init(&gd->ledtrig_mutex);
 }
 
+ssize_t blk_ledtrig_devattr_store(struct device *const dev,
+				  struct device_attribute *const attr,
+				  const char *const buf, const size_t count);
+
+ssize_t blk_ledtrig_devattr_show(struct device *const dev,
+				 struct device_attribute *const attr,
+				 char *const buf);
+
 #else	// CONFIG_BLK_LED_TRIGGERS
 
 static inline void blk_ledtrig_init(void) {}
