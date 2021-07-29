@@ -30,6 +30,9 @@ void intel_pxp_fini(struct intel_pxp *pxp);
 
 void intel_pxp_init_hw(struct intel_pxp *pxp);
 void intel_pxp_fini_hw(struct intel_pxp *pxp);
+
+void intel_pxp_mark_termination_in_progress(struct intel_pxp *pxp);
+int intel_pxp_wait_for_arb_start(struct intel_pxp *pxp);
 #else
 static inline void intel_pxp_init(struct intel_pxp *pxp)
 {
@@ -37,6 +40,11 @@ static inline void intel_pxp_init(struct intel_pxp *pxp)
 
 static inline void intel_pxp_fini(struct intel_pxp *pxp)
 {
+}
+
+static inline int intel_pxp_wait_for_arb_start(struct intel_pxp *pxp)
+{
+	return 0;
 }
 #endif
 
