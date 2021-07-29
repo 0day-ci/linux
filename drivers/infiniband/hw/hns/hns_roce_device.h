@@ -232,6 +232,13 @@ struct hns_roce_dca_ctx {
 	size_t free_size; /* free mem size in pool */
 	size_t total_size; /* total size in pool */
 
+	unsigned int max_qps;
+	unsigned int status_npage;
+
+#define HNS_DCA_BITS_PER_STATUS 1
+	unsigned long *buf_status;
+	unsigned long *sync_status;
+
 	bool exit_aging;
 	struct list_head aging_proc_list;
 	struct list_head aging_new_list;

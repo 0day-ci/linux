@@ -86,6 +86,15 @@ struct hns_roce_ib_create_qp_resp {
 };
 
 enum {
+	HNS_ROCE_ALLOC_UCTX_COMP_DCA_MAX_QPS = 1 << 0,
+};
+
+struct hns_roce_ib_alloc_ucontext {
+	__u32 comp;
+	__u32 dca_max_qps;
+};
+
+enum {
 	HNS_ROCE_CAP_FLAG_DCA_MODE = 1 << 15,
 };
 
@@ -95,10 +104,17 @@ struct hns_roce_ib_alloc_ucontext_resp {
 	__u32	srq_tab_size;
 	__u32	reserved;
 	__aligned_u64 cap_flags;
+	__u32	dca_qps;
+	__u32	dca_mmap_size;
 };
 
 struct hns_roce_ib_alloc_pd_resp {
 	__u32 pdn;
+};
+
+enum {
+	HNS_ROCE_MMAP_REGULAR_PAGE,
+	HNS_ROCE_MMAP_DCA_PAGE,
 };
 
 #define UVERBS_ID_NS_MASK 0xF000

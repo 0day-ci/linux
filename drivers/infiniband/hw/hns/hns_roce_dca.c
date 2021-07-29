@@ -414,16 +414,50 @@ static void cleanup_dca_context(struct hns_roce_dev *hr_dev,
 	spin_unlock_irqrestore(&ctx->pool_lock, flags);
 }
 
-void hns_roce_register_udca(struct hns_roce_dev *hr_dev,
+static void init_udca_status(struct hns_roce_dca_ctx *ctx, int udca_max_qps,
+			     unsigned int dev_max_qps)
+{
+	const unsigned int bits_per_qp = 2 * HNS_DCA_BITS_PER_STATUS;
+	void *kaddr;
+	size_t size;
+
+	size = BITS_TO_BYTES(udca_max_qps * bits_per_qp);
+	ctx->status_npage = DIV_ROUND_UP(size, PAGE_SIZE);
+
+	size = ctx->status_npage * PAGE_SIZE;
+	ctx->max_qps = min_t(unsigned int, dev_max_qps,
+			     size * BITS_PER_BYTE / bits_per_qp);
+
+	kaddr = alloc_pages_exact(size, GFP_KERNEL | __GFP_ZERO);
+	if (!kaddr)
+		return;
+
+	ctx->buf_status = (unsigned long *)kaddr;
+	ctx->sync_status = (unsigned long *)(kaddr + size / 2);
+}
+
+void hns_roce_register_udca(struct hns_roce_dev *hr_dev, int max_qps,
 			    struct hns_roce_ucontext *uctx)
 {
-	init_dca_context(&uctx->dca_ctx);
+	struct hns_roce_dca_ctx *ctx = to_hr_dca_ctx(uctx);
+
+	init_dca_context(ctx);
+	if (max_qps > 0)
+		init_udca_status(ctx, max_qps, hr_dev->caps.num_qps);
 }
 
 void hns_roce_unregister_udca(struct hns_roce_dev *hr_dev,
 			      struct hns_roce_ucontext *uctx)
 {
-	cleanup_dca_context(hr_dev, &uctx->dca_ctx);
+	struct hns_roce_dca_ctx *ctx = to_hr_dca_ctx(uctx);
+
+	cleanup_dca_context(hr_dev, ctx);
+
+	if (ctx->buf_status) {
+		free_pages_exact(ctx->buf_status,
+				 ctx->status_npage * PAGE_SIZE);
+		ctx->buf_status = NULL;
+	}
 }
 
 static struct dca_mem *alloc_dca_mem(struct hns_roce_dca_ctx *ctx)

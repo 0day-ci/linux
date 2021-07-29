@@ -293,20 +293,54 @@ static int hns_roce_modify_device(struct ib_device *ib_dev, int mask,
 	return 0;
 }
 
+static void ucontext_set_resp(struct ib_ucontext *uctx,
+			      struct hns_roce_ib_alloc_ucontext_resp *resp)
+{
+	struct hns_roce_ucontext *context = to_hr_ucontext(uctx);
+	struct hns_roce_dev *hr_dev = to_hr_dev(uctx->device);
+
+	resp->qp_tab_size = hr_dev->caps.num_qps;
+	resp->cap_flags = hr_dev->caps.flags;
+	resp->cqe_size = hr_dev->caps.cqe_sz;
+	resp->srq_tab_size = hr_dev->caps.num_srqs;
+	resp->dca_qps = context->dca_ctx.max_qps;
+	resp->dca_mmap_size = PAGE_SIZE * context->dca_ctx.status_npage;
+}
+
+static u32 get_udca_max_qps(struct hns_roce_dev *hr_dev,
+			    struct hns_roce_ib_alloc_ucontext *ucmd)
+{
+	u32 qp_num;
+
+	if (ucmd->comp & HNS_ROCE_ALLOC_UCTX_COMP_DCA_MAX_QPS) {
+		qp_num = ucmd->dca_max_qps;
+		if (!qp_num)
+			qp_num = hr_dev->caps.num_qps;
+	} else {
+		qp_num = 0;
+	}
+
+	return qp_num;
+}
+
 static int hns_roce_alloc_ucontext(struct ib_ucontext *uctx,
 				   struct ib_udata *udata)
 {
 	struct hns_roce_ucontext *context = to_hr_ucontext(uctx);
 	struct hns_roce_dev *hr_dev = to_hr_dev(uctx->device);
 	struct hns_roce_ib_alloc_ucontext_resp resp = {};
+	struct hns_roce_ib_alloc_ucontext ucmd = {};
 	int ret;
 
 	if (!hr_dev->active)
 		return -EAGAIN;
 
-	resp.qp_tab_size = hr_dev->caps.num_qps;
-	resp.srq_tab_size = hr_dev->caps.num_srqs;
-	resp.cap_flags = hr_dev->caps.flags;
+	if (udata->inlen == sizeof(struct hns_roce_ib_alloc_ucontext)) {
+		ret = ib_copy_from_udata(&ucmd, udata,
+					 min(udata->inlen, sizeof(ucmd)));
+		if (ret)
+			return ret;
+	}
 
 	ret = hns_roce_uar_alloc(hr_dev, &context->uar);
 	if (ret)
@@ -319,9 +353,10 @@ static int hns_roce_alloc_ucontext(struct ib_ucontext *uctx,
 	}
 
 	if (hr_dev->caps.flags & HNS_ROCE_CAP_FLAG_DCA_MODE)
-		hns_roce_register_udca(hr_dev, context);
+		hns_roce_register_udca(hr_dev, get_udca_max_qps(hr_dev, &ucmd),
+				       context);
 
-	resp.cqe_size = hr_dev->caps.cqe_sz;
+	ucontext_set_resp(uctx, &resp);
 
 	ret = ib_copy_to_udata(udata, &resp,
 			       min(udata->outlen, sizeof(resp)));
@@ -340,6 +375,17 @@ error_fail_uar_alloc:
 	return ret;
 }
 
+/* command value is offset[15:8] */
+static int hns_roce_mmap_get_command(unsigned long offset)
+{
+	return (offset >> 8) & 0xff;
+}
+
+/* index value is offset[63:16] | offset[7:0] */
+static unsigned long hns_roce_mmap_get_index(unsigned long offset)
+{
+	return ((offset >> 16) << 8) | (offset & 0xff);
+}
 static void hns_roce_dealloc_ucontext(struct ib_ucontext *ibcontext)
 {
 	struct hns_roce_ucontext *context = to_hr_ucontext(ibcontext);
@@ -351,12 +397,11 @@ static void hns_roce_dealloc_ucontext(struct ib_ucontext *ibcontext)
 		hns_roce_unregister_udca(hr_dev, context);
 }
 
-static int hns_roce_mmap(struct ib_ucontext *context,
-			 struct vm_area_struct *vma)
+static int mmap_uar(struct ib_ucontext *context, struct vm_area_struct *vma)
 {
 	struct hns_roce_dev *hr_dev = to_hr_dev(context->device);
 
-	switch (vma->vm_pgoff) {
+	switch (hns_roce_mmap_get_index(vma->vm_pgoff)) {
 	case 0:
 		return rdma_user_mmap_io(context, vma,
 					 to_hr_ucontext(context)->uar.pfn,
@@ -378,6 +423,49 @@ static int hns_roce_mmap(struct ib_ucontext *context,
 					 vma->vm_page_prot,
 					 NULL);
 
+	default:
+		return -EINVAL;
+	}
+}
+
+static int mmap_dca(struct ib_ucontext *context, struct vm_area_struct *vma)
+{
+	struct hns_roce_ucontext *uctx = to_hr_ucontext(context);
+	struct hns_roce_dca_ctx *ctx = &uctx->dca_ctx;
+	struct page **pages;
+	unsigned long num;
+	int ret;
+
+	if ((vma->vm_end - vma->vm_start != (ctx->status_npage * PAGE_SIZE) ||
+	    !(vma->vm_flags & VM_SHARED)))
+		return -EINVAL;
+
+	if (!(vma->vm_flags & VM_WRITE) || (vma->vm_flags & VM_EXEC))
+		return -EPERM;
+
+	if (!ctx->buf_status)
+		return -EOPNOTSUPP;
+
+	pages = kcalloc(ctx->status_npage, sizeof(struct page *), GFP_KERNEL);
+	if (!pages)
+		return -ENOMEM;
+
+	for (num = 0; num < ctx->status_npage; num++)
+		pages[num] = virt_to_page(ctx->buf_status + num * PAGE_SIZE);
+
+	ret = vm_insert_pages(vma, vma->vm_start, pages, &num);
+	kfree(pages);
+
+	return ret;
+}
+
+static int hns_roce_mmap(struct ib_ucontext *uctx, struct vm_area_struct *vma)
+{
+	switch (hns_roce_mmap_get_command(vma->vm_pgoff)) {
+	case HNS_ROCE_MMAP_REGULAR_PAGE:
+		return mmap_uar(uctx, vma);
+	case HNS_ROCE_MMAP_DCA_PAGE:
+		return mmap_dca(uctx, vma);
 	default:
 		return -EINVAL;
 	}
