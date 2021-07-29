@@ -270,6 +270,18 @@ i915_gem_object_clear_tiling_quirk(struct drm_i915_gem_object *obj)
 }
 
 static inline bool
+i915_gem_object_is_protected(const struct drm_i915_gem_object *obj)
+{
+	return obj->flags & I915_BO_PROTECTED;
+}
+
+static inline bool
+i915_gem_object_has_valid_protection(const struct drm_i915_gem_object *obj)
+{
+	return i915_gem_object_is_protected(obj) && !list_empty(&obj->pxp_link);
+}
+
+static inline bool
 i915_gem_object_type_has(const struct drm_i915_gem_object *obj,
 			 unsigned long flags)
 {

@@ -298,6 +298,7 @@ struct drm_i915_gem_object {
 			     I915_BO_ALLOC_USER)
 #define I915_BO_READONLY         BIT(4)
 #define I915_TILING_QUIRK_BIT    5 /* unknown swizzling; do not release! */
+#define I915_BO_PROTECTED        BIT(6)
 
 	/**
 	 * @mem_flags - Mutable placement-related flags
@@ -536,6 +537,14 @@ struct drm_i915_gem_object {
 		struct i915_gem_object_page_iter get_io_page;
 		bool created:1;
 	} ttm;
+
+	/*
+	 * When the PXP session is invalidated, we need to mark all protected
+	 * objects as invalid. To easily do so we add them all to a list. The
+	 * presence on the list is used to check if the encryption is valid or
+	 * not.
+	 */
+	struct list_head pxp_link;
 
 	/** Record of address bit 17 of each page at last unbind. */
 	unsigned long *bit_17;
