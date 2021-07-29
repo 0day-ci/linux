@@ -332,8 +332,12 @@ struct hns_roce_mtr {
 };
 
 struct hns_roce_dca_cfg {
+	spinlock_t lock;
 	u32 buf_id;
+	u16 attach_count;
+	u32 npages;
 };
+
 
 struct hns_roce_mw {
 	struct ib_mw		ibmw;
@@ -375,6 +379,7 @@ struct hns_roce_wq {
 	u32		max_gs;
 	u32		rsv_sge;
 	int		offset;
+	int		wqe_offset;
 	int		wqe_shift;	/* WQE size */
 	u32		head;
 	u32		tail;
@@ -385,6 +390,7 @@ struct hns_roce_sge {
 	unsigned int	sge_cnt;	/* SGE num */
 	int		offset;
 	int		sge_shift;	/* SGE size */
+	int		wqe_offset;
 };
 
 struct hns_roce_buf_list {
@@ -924,6 +930,10 @@ struct hns_roce_hw {
 	int (*clear_hem)(struct hns_roce_dev *hr_dev,
 			 struct hns_roce_hem_table *table, int obj,
 			 int step_idx);
+	int (*set_dca_buf)(struct hns_roce_dev *hr_dev,
+			   struct hns_roce_qp *hr_qp);
+	int (*query_qp)(struct ib_qp *ibqp, struct ib_qp_attr *qp_attr,
+			int qp_attr_mask, struct ib_qp_init_attr *qp_init_attr);
 	int (*modify_qp)(struct ib_qp *ibqp, const struct ib_qp_attr *attr,
 			 int attr_mask, enum ib_qp_state cur_state,
 			 enum ib_qp_state new_state);
