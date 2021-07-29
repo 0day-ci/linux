@@ -8,6 +8,11 @@
 #include <linux/nsproxy.h>
 #include <linux/ipc_namespace.h>
 #include <linux/sysctl.h>
+#include <linux/slab.h>
+#include <linux/user_namespace.h>
+#include <linux/capability.h>
+#include <linux/cred.h>
+#include <linux/stat.h>
 
 #ifdef CONFIG_PROC_SYSCTL
 static void *get_mq(struct ctl_table *table)
@@ -96,25 +101,104 @@ static struct ctl_table mq_sysctls[] = {
 	{}
 };
 
-static struct ctl_table mq_sysctl_dir[] = {
-	{
-		.procname	= "mqueue",
-		.mode		= 0555,
-		.child		= mq_sysctls,
-	},
-	{}
+static int set_is_seen(struct ctl_table_set *set)
+{
+	return &current->nsproxy->ipc_ns->mq_set == set;
+}
+
+static struct ctl_table_set *
+set_lookup(struct ctl_table_root *root)
+{
+	return &current->nsproxy->ipc_ns->mq_set;
+}
+
+static int set_permissions(struct ctl_table_header *head,
+				struct ctl_table *table)
+{
+	struct ipc_namespace *ipc_ns =
+		container_of(head->set, struct ipc_namespace, mq_set);
+	struct user_namespace *user_ns = ipc_ns->user_ns;
+	int mode;
+
+	/* Allow users with CAP_SYS_RESOURCE unrestrained access */
+	if (ns_capable(user_ns, CAP_SYS_RESOURCE))
+		mode = (table->mode & S_IRWXU) >> 6;
+	else
+	/* Allow all others at most read-only access */
+		mode = table->mode & S_IROTH;
+	return (mode << 6) | (mode << 3) | mode;
+}
+
+static void set_ownership(struct ctl_table_header *head,
+				struct ctl_table *table,
+				kuid_t *uid, kgid_t *gid)
+{
+	struct ipc_namespace *ipc_ns =
+		container_of(head->set, struct ipc_namespace, mq_set);
+	struct user_namespace *user_ns = ipc_ns->user_ns;
+	kuid_t ns_root_uid;
+	kgid_t ns_root_gid;
+
+	ns_root_uid = make_kuid(user_ns, 0);
+	if (uid_valid(ns_root_uid))
+		*uid = ns_root_uid;
+
+	ns_root_gid = make_kgid(user_ns, 0);
+	if (gid_valid(ns_root_gid))
+		*gid = ns_root_gid;
+}
+
+static struct ctl_table_root mq_sysctl_root = {
+	.lookup = set_lookup,
+	.permissions = set_permissions,
+	.set_ownership = set_ownership,
 };
 
-static struct ctl_table mq_sysctl_root[] = {
-	{
-		.procname	= "fs",
-		.mode		= 0555,
-		.child		= mq_sysctl_dir,
-	},
-	{}
-};
+bool setup_mq_sysctls(struct ipc_namespace *ns)
+{
+	struct ctl_table *tbl;
+
+	if (!mq_sysctl_table)
+		return false;
+
+	setup_sysctl_set(&ns->mq_set, &mq_sysctl_root, set_is_seen);
+	tbl = kmemdup(mq_sysctls, sizeof(mq_sysctls), GFP_KERNEL);
+	if (!tbl)
+		goto out;
+
+	ns->sysctls = __register_sysctl_table(&ns->mq_set, "fs/mqueue", tbl);
+	if (!ns->sysctls)
+		goto out1;
+
+	return true;
+
+out1:
+	kfree(tbl);
+	retire_sysctl_set(&ns->mq_set);
+out:
+	return false;
+}
+
+void retire_mq_sysctls(struct ipc_namespace *ns)
+{
+	struct ctl_table *tbl;
+
+	if (!ns->sysctls)
+		return;
+
+	tbl = ns->sysctls->ctl_table_arg;
+	unregister_sysctl_table(ns->sysctls);
+	retire_sysctl_set(&ns->mq_set);
+	kfree(tbl);
+}
 
 struct ctl_table_header *mq_register_sysctl_table(void)
 {
-	return register_sysctl_table(mq_sysctl_root);
+	static struct ctl_table empty[1];
+
+	/*
+	 * Register the fs/mqueue directory in the default set so that
+	 * registrations in the child sets work properly.
+	 */
+	return register_sysctl("fs/mqueue", empty);
 }

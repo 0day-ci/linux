@@ -10,6 +10,7 @@
 #include <linux/ns_common.h>
 #include <linux/refcount.h>
 #include <linux/rhashtable-types.h>
+#include <linux/sysctl.h>
 
 struct user_namespace;
 
@@ -66,6 +67,11 @@ struct ipc_namespace {
 	/* user_ns which owns the ipc ns */
 	struct user_namespace *user_ns;
 	struct ucounts *ucounts;
+
+#ifdef CONFIG_POSIX_MQUEUE_SYSCTL
+	struct ctl_table_set	mq_set;
+	struct ctl_table_header	*sysctls;
+#endif
 
 	struct llist_node mnt_llist;
 
@@ -155,7 +161,10 @@ static inline void put_ipc_ns(struct ipc_namespace *ns)
 #ifdef CONFIG_POSIX_MQUEUE_SYSCTL
 
 struct ctl_table_header;
+extern struct ctl_table_header *mq_sysctl_table;
 extern struct ctl_table_header *mq_register_sysctl_table(void);
+bool setup_mq_sysctls(struct ipc_namespace *ns);
+void retire_mq_sysctls(struct ipc_namespace *ns);
 
 #else /* CONFIG_POSIX_MQUEUE_SYSCTL */
 
@@ -163,6 +172,11 @@ static inline struct ctl_table_header *mq_register_sysctl_table(void)
 {
 	return NULL;
 }
+static inline bool setup_mq_sysctls(struct ipc_namespace *ns)
+{
+	return true;
+}
+static inline void retire_mq_sysctls(struct ipc_namespace *ns) { }
 
 #endif /* CONFIG_POSIX_MQUEUE_SYSCTL */
 #endif

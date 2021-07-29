@@ -58,6 +58,7 @@ static struct ipc_namespace *create_ipc_ns(struct user_namespace *user_ns,
 	err = mq_init_ns(ns);
 	if (err)
 		goto fail_put;
+	setup_mq_sysctls(ns);
 
 	sem_init_ns(ns);
 	msg_init_ns(ns);
@@ -121,6 +122,7 @@ static void free_ipc_ns(struct ipc_namespace *ns)
 	 * uses synchronize_rcu().
 	 */
 	mq_put_mnt(ns);
+	retire_mq_sysctls(ns);
 	sem_exit_ns(ns);
 	msg_exit_ns(ns);
 	shm_exit_ns(ns);

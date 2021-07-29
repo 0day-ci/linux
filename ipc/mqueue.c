@@ -163,7 +163,7 @@ static void remove_notification(struct mqueue_inode_info *info);
 
 static struct kmem_cache *mqueue_inode_cachep;
 
-static struct ctl_table_header *mq_sysctl_table;
+struct ctl_table_header *mq_sysctl_table;
 
 static inline struct mqueue_inode_info *MQUEUE_I(struct inode *inode)
 {
@@ -1711,6 +1711,10 @@ static int __init init_mqueue_fs(void)
 
 	/* ignore failures - they are not fatal */
 	mq_sysctl_table = mq_register_sysctl_table();
+	if (mq_sysctl_table && !setup_mq_sysctls(&init_ipc_ns)) {
+		unregister_sysctl_table(mq_sysctl_table);
+		mq_sysctl_table = NULL;
+	}
 
 	error = register_filesystem(&mqueue_fs_type);
 	if (error)
@@ -1727,8 +1731,10 @@ static int __init init_mqueue_fs(void)
 out_filesystem:
 	unregister_filesystem(&mqueue_fs_type);
 out_sysctl:
-	if (mq_sysctl_table)
+	if (mq_sysctl_table) {
+		retire_mq_sysctls(&init_ipc_ns);
 		unregister_sysctl_table(mq_sysctl_table);
+	}
 	kmem_cache_destroy(mqueue_inode_cachep);
 	return error;
 }
