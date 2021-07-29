@@ -35,6 +35,7 @@
 struct drm_i915_private;
 struct intel_bios_encoder_data;
 struct intel_crtc_state;
+struct intel_dp;
 struct intel_encoder;
 enum port;
 
@@ -270,5 +271,6 @@ enum drrs_support_type intel_bios_drrs_type(struct intel_encoder *encoder);
 const struct drm_display_mode *intel_bios_lfp_lvds_info(struct intel_encoder *encoder);
 const struct vbt_backlight_info *intel_bios_backlight_info(struct intel_encoder *encoder);
 struct vbt_edp_info *intel_bios_edp_info(struct intel_encoder *encoder);
+const struct vbt_psr_info *intel_bios_psr_info(struct intel_dp *intel_dp);
 
 #endif /* _INTEL_BIOS_H_ */
