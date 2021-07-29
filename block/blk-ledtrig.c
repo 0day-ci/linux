@@ -544,3 +544,27 @@ ssize_t blk_ledtrig_devattr_show(struct device *const dev,
 
 	return (ssize_t)(name_len + 1);
 }
+
+
+/*
+ *
+ *	Try to blink an LED
+ *
+ */
+
+void __blk_ledtrig_try_blink(struct gendisk *const gd)
+{
+	if (mutex_trylock(&gd->ledtrig_mutex)) {
+
+		if (gd->ledtrig != NULL) {
+
+			unsigned long delay_on = 75;
+			unsigned long delay_off = 25;
+
+			led_trigger_blink_oneshot(&gd->ledtrig->trigger,
+						  &delay_on, &delay_off, 0);
+		}
+
+		mutex_unlock(&gd->ledtrig_mutex);
+	}
+}

@@ -27,10 +27,19 @@ ssize_t blk_ledtrig_devattr_show(struct device *const dev,
 				 struct device_attribute *const attr,
 				 char *const buf);
 
+void __blk_ledtrig_try_blink(struct gendisk *gd);
+
+static inline void blk_ledtrig_try_blink(struct gendisk *const gd)
+{
+	if (gd != NULL)
+		__blk_ledtrig_try_blink(gd);
+}
+
 #else	// CONFIG_BLK_LED_TRIGGERS
 
 static inline void blk_ledtrig_init(void) {}
 static inline void blk_ledtrig_disk_init(const struct gendisk *gd) {}
+static inline void blk_ledtrig_try_blink(const struct gendisk *gd) {}
 
 // Real function (declared in include/linux/blk-ledtrig.h) returns a bool.
 // This is only here for del_gendisk() (in genhd.c), which doesn't check
