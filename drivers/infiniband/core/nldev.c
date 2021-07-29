@@ -716,6 +716,7 @@ static int fill_res_ctx_entry(struct sk_buff *msg, bool has_cap_net_admin,
 			      struct rdma_restrack_entry *res, uint32_t port)
 {
 	struct ib_ucontext *ctx = container_of(res, struct ib_ucontext, res);
+	struct ib_device *dev = ctx->device;
 
 	if (rdma_is_kernel_res(res))
 		return 0;
@@ -723,7 +724,12 @@ static int fill_res_ctx_entry(struct sk_buff *msg, bool has_cap_net_admin,
 	if (nla_put_u32(msg, RDMA_NLDEV_ATTR_RES_CTXN, ctx->res.id))
 		return -EMSGSIZE;
 
-	return fill_res_name_pid(msg, res);
+	if (fill_res_name_pid(msg, res))
+		return -EMSGSIZE;
+
+	return (dev->ops.fill_res_ctx_entry) ?
+		       dev->ops.fill_res_ctx_entry(msg, ctx) :
+		       0;
 }
 
 static int fill_res_range_qp_entry(struct sk_buff *msg, uint32_t min_range,
