@@ -1310,3 +1310,20 @@ void virtio_gpu_cmd_set_scanout_blob(struct virtio_gpu_device *vgdev,
 
 	virtio_gpu_queue_ctrl_buffer(vgdev, vbuf);
 }
+
+void virtio_gpu_cmd_resource_out_fence(struct virtio_gpu_device *vgdev,
+				       struct virtio_gpu_object_array *objs,
+				       struct virtio_gpu_fence *fence)
+{
+	struct virtio_gpu_object *bo = gem_to_virtio_gpu_obj(objs->objs[0]);
+	struct virtio_gpu_resource_out_fence *cmd_p;
+	struct virtio_gpu_vbuffer *vbuf;
+
+	cmd_p = virtio_gpu_alloc_cmd(vgdev, &vbuf, sizeof(*cmd_p));
+	memset(cmd_p, 0, sizeof(*cmd_p));
+	vbuf->objs = objs;
+
+	cmd_p->hdr.type = cpu_to_le32(VIRTIO_GPU_CMD_RESOURCE_OUT_FENCE);
+	cmd_p->resource_id = cpu_to_le32(bo->hw_res_handle);
+	virtio_gpu_queue_fenced_ctrl_buffer(vgdev, vbuf, fence);
+}

@@ -405,6 +405,10 @@ virtio_gpu_cmd_set_scanout_blob(struct virtio_gpu_device *vgdev,
 				struct drm_framebuffer *fb,
 				uint32_t width, uint32_t height,
 				uint32_t x, uint32_t y);
+void virtio_gpu_cmd_resource_out_fence(struct virtio_gpu_device *vgdev,
+				       struct virtio_gpu_object_array *objs,
+				       struct virtio_gpu_fence *fence);
+
 
 /* virtgpu_display.c */
 int virtio_gpu_modeset_init(struct virtio_gpu_device *vgdev);
