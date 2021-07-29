@@ -1079,8 +1079,9 @@ static void kill_engines(struct i915_gem_engines *engines, bool ban)
 	 */
 	for_each_gem_engine(ce, engines, it) {
 		struct intel_engine_cs *engine;
+		bool local_ban = ban || !intel_engine_has_heartbeat(ce->engine);
 
-		if (ban && intel_context_ban(ce, NULL))
+		if (local_ban && intel_context_ban(ce, NULL))
 			continue;
 
 		/*
@@ -1093,7 +1094,7 @@ static void kill_engines(struct i915_gem_engines *engines, bool ban)
 		engine = active_engine(ce);
 
 		/* First attempt to gracefully cancel the context */
-		if (engine && !__cancel_engine(engine) && ban)
+		if (engine && !__cancel_engine(engine) && local_ban)
 			/*
 			 * If we are unable to send a preemptive pulse to bump
 			 * the context from the GPU, we have to resort to a full

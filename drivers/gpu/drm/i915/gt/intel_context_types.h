@@ -55,6 +55,8 @@ struct intel_context_ops {
 	void (*reset)(struct intel_context *ce);
 	void (*destroy)(struct kref *kref);
 
+	bool (*has_heartbeat)(const struct intel_engine_cs *engine);
+
 	/* virtual engine/context interface */
 	struct intel_context *(*create_virtual)(struct intel_engine_cs **engine,
 						unsigned int count);

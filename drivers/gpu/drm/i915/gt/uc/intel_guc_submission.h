@@ -29,8 +29,6 @@ void intel_guc_dump_active_requests(struct intel_engine_cs *engine,
 				    struct i915_request *hung_rq,
 				    struct drm_printer *m);
 
-bool intel_guc_virtual_engine_has_heartbeat(const struct intel_engine_cs *ve);
-
 int intel_guc_wait_for_pending_msg(struct intel_guc *guc,
 				   atomic_t *wait_var,
 				   bool interruptible,

@@ -2168,6 +2168,8 @@ static int guc_virtual_context_alloc(struct intel_context *ce)
 	return lrc_alloc(ce, engine);
 }
 
+static bool guc_virtual_engine_has_heartbeat(const struct intel_engine_cs *ve);
+
 static const struct intel_context_ops virtual_guc_context_ops = {
 	.alloc = guc_virtual_context_alloc,
 
@@ -2182,6 +2184,8 @@ static const struct intel_context_ops virtual_guc_context_ops = {
 
 	.enter = guc_virtual_context_enter,
 	.exit = guc_virtual_context_exit,
+
+	.has_heartbeat = guc_virtual_engine_has_heartbeat,
 
 	.sched_disable = guc_context_sched_disable,
 
@@ -3029,7 +3033,7 @@ err_put:
 	return ERR_PTR(err);
 }
 
-bool intel_guc_virtual_engine_has_heartbeat(const struct intel_engine_cs *ve)
+static bool guc_virtual_engine_has_heartbeat(const struct intel_engine_cs *ve)
 {
 	struct intel_engine_cs *engine;
 	intel_engine_mask_t tmp, mask = ve->mask;

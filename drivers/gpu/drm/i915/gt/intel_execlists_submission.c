@@ -3619,6 +3619,18 @@ virtual_get_sibling(struct intel_engine_cs *engine, unsigned int sibling)
 	return ve->siblings[sibling];
 }
 
+static bool virtual_engine_has_heartbeat(const struct intel_engine_cs *ve)
+{
+	struct intel_engine_cs *engine;
+	intel_engine_mask_t tmp, mask = ve->mask;
+
+	for_each_engine_masked(engine, ve->gt, mask, tmp)
+		if (READ_ONCE(engine->props.heartbeat_interval_ms))
+			return true;
+
+	return false;
+}
+
 static const struct intel_context_ops virtual_context_ops = {
 	.flags = COPS_HAS_INFLIGHT,
 
@@ -3633,6 +3645,8 @@ static const struct intel_context_ops virtual_context_ops = {
 
 	.enter = virtual_context_enter,
 	.exit = virtual_context_exit,
+
+	.has_heartbeat = virtual_engine_has_heartbeat,
 
 	.destroy = virtual_context_destroy,
 

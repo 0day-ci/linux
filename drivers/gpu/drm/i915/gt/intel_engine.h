@@ -284,27 +284,10 @@ intel_engine_create_virtual(struct intel_engine_cs **siblings,
 			    unsigned int count);
 
 static inline bool
-intel_virtual_engine_has_heartbeat(const struct intel_engine_cs *engine)
-{
-	/*
-	 * For non-GuC submission we expect the back-end to look at the
-	 * heartbeat status of the actual physical engine that the work
-	 * has been (or is being) scheduled on, so we should only reach
-	 * here with GuC submission enabled.
-	 */
-	GEM_BUG_ON(!intel_engine_uses_guc(engine));
-
-	return intel_guc_virtual_engine_has_heartbeat(engine);
-}
-
-static inline bool
 intel_engine_has_heartbeat(const struct intel_engine_cs *engine)
 {
-	if (!IS_ACTIVE(CONFIG_DRM_I915_HEARTBEAT_INTERVAL))
-		return false;
-
-	if (intel_engine_is_virtual(engine))
-		return intel_virtual_engine_has_heartbeat(engine);
+	if (engine->cops->has_heartbeat)
+		return engine->cops->has_heartbeat(engine);
 	else
 		return READ_ONCE(engine->props.heartbeat_interval_ms);
 }
