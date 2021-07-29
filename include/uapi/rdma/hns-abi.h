@@ -83,15 +83,42 @@ struct hns_roce_ib_create_qp_resp {
 	__aligned_u64 cap_flags;
 };
 
+enum {
+	HNS_ROCE_CAP_FLAG_DCA_MODE = 1 << 15,
+};
+
 struct hns_roce_ib_alloc_ucontext_resp {
 	__u32	qp_tab_size;
 	__u32	cqe_size;
 	__u32	srq_tab_size;
 	__u32	reserved;
+	__aligned_u64 cap_flags;
 };
 
 struct hns_roce_ib_alloc_pd_resp {
 	__u32 pdn;
 };
 
+#define UVERBS_ID_NS_MASK 0xF000
+#define UVERBS_ID_NS_SHIFT 12
+
+enum hns_ib_objects {
+	HNS_IB_OBJECT_DCA_MEM = (1U << UVERBS_ID_NS_SHIFT),
+};
+
+enum hns_ib_dca_mem_methods {
+	HNS_IB_METHOD_DCA_MEM_REG = (1U << UVERBS_ID_NS_SHIFT),
+	HNS_IB_METHOD_DCA_MEM_DEREG,
+};
+
+enum hns_ib_dca_mem_reg_attrs {
+	HNS_IB_ATTR_DCA_MEM_REG_HANDLE = (1U << UVERBS_ID_NS_SHIFT),
+	HNS_IB_ATTR_DCA_MEM_REG_LEN,
+	HNS_IB_ATTR_DCA_MEM_REG_ADDR,
+	HNS_IB_ATTR_DCA_MEM_REG_KEY,
+};
+
+enum hns_ib_dca_mem_dereg_attrs {
+	HNS_IB_ATTR_DCA_MEM_DEREG_HANDLE = (1U << UVERBS_ID_NS_SHIFT),
+};
 #endif /* HNS_ABI_USER_H */
