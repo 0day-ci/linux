@@ -60,6 +60,11 @@
  */
 #define VIRTIO_GPU_F_RESOURCE_BLOB       3
 
+/*
+ * VIRTIO_GPU_CMD_RESOURCE_OUT_FENCE
+ */
+#define VIRTIO_GPU_F_OUT_FENCE  4
+
 enum virtio_gpu_ctrl_type {
 	VIRTIO_GPU_UNDEFINED = 0,
 
@@ -78,6 +83,7 @@ enum virtio_gpu_ctrl_type {
 	VIRTIO_GPU_CMD_RESOURCE_ASSIGN_UUID,
 	VIRTIO_GPU_CMD_RESOURCE_CREATE_BLOB,
 	VIRTIO_GPU_CMD_SET_SCANOUT_BLOB,
+	VIRTIO_GPU_CMD_RESOURCE_OUT_FENCE,
 
 	/* 3d commands */
 	VIRTIO_GPU_CMD_CTX_CREATE = 0x0200,
@@ -439,6 +445,12 @@ struct virtio_gpu_resource_unmap_blob {
 	struct virtio_gpu_ctrl_hdr hdr;
 	__le32 resource_id;
 	__le32 padding;
+};
+
+/* VIRTIO_GPU_CMD_RESOURCE_OUT_FENCE */
+struct virtio_gpu_resource_out_fence {
+	struct virtio_gpu_ctrl_hdr hdr;
+	__le32 resource_id;
 };
 
 #endif
