@@ -1161,6 +1161,8 @@ intel_pps_verify_state(struct intel_dp *intel_dp)
 
 static void pps_init_delays(struct intel_dp *intel_dp)
 {
+	struct intel_encoder *encoder = &dp_to_dig_port(intel_dp)->base;
+	const struct vbt_edp_info *vbt_edp_info = intel_bios_edp_info(encoder);
 	struct drm_i915_private *dev_priv = dp_to_i915(intel_dp);
 	struct edp_power_seq cur, vbt, spec,
 		*final = &intel_dp->pps.pps_delays;
@@ -1175,7 +1177,7 @@ static void pps_init_delays(struct intel_dp *intel_dp)
 
 	intel_pps_dump_state("cur", &cur);
 
-	vbt = dev_priv->vbt.edp.pps;
+	vbt = vbt_edp_info->pps;
 	/* On Toshiba Satellite P50-C-18C system the VBT T12 delay
 	 * of 500ms appears to be too short. Ocassionally the panel
 	 * just fails to power back on. Increasing the delay to 800ms
