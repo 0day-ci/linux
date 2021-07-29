@@ -8,7 +8,11 @@ Properties:
 - compatible
 	Usage:		required
 	Value type:	<string>
-	Definition:	must be "qcom,cpufreq-hw" or "qcom,cpufreq-epss".
+	Definition:	must be one of:
+			"qcom,cpufreq-epss"
+			"qcom,cpufreq-hw"
+			"qcom,sm8250-cpufreq-epss"
+			"qcom,sm8350-cpufreq-epss"
 
 - clocks
 	Usage:		required
