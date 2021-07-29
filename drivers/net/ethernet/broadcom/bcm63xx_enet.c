@@ -920,13 +920,13 @@ static int bcm_enet_open(struct net_device *dev)
 	memcpy(addr.sa_data, dev->dev_addr, ETH_ALEN);
 	bcm_enet_set_mac_address(dev, &addr);
 
+	ret = -ENOMEM;
+
 	/* allocate rx dma ring */
 	size = priv->rx_ring_size * sizeof(struct bcm_enet_desc);
 	p = dma_alloc_coherent(kdev, size, &priv->rx_desc_dma, GFP_KERNEL);
-	if (!p) {
-		ret = -ENOMEM;
+	if (!p)
 		goto out_freeirq_tx;
-	}
 
 	priv->rx_desc_alloc_size = size;
 	priv->rx_desc_cpu = p;
@@ -934,20 +934,16 @@ static int bcm_enet_open(struct net_device *dev)
 	/* allocate tx dma ring */
 	size = priv->tx_ring_size * sizeof(struct bcm_enet_desc);
 	p = dma_alloc_coherent(kdev, size, &priv->tx_desc_dma, GFP_KERNEL);
-	if (!p) {
-		ret = -ENOMEM;
+	if (!p)
 		goto out_free_rx_ring;
-	}
 
 	priv->tx_desc_alloc_size = size;
 	priv->tx_desc_cpu = p;
 
 	priv->tx_skb = kcalloc(priv->tx_ring_size, sizeof(struct sk_buff *),
 			       GFP_KERNEL);
-	if (!priv->tx_skb) {
-		ret = -ENOMEM;
+	if (!priv->tx_skb)
 		goto out_free_tx_ring;
-	}
 
 	priv->tx_desc_count = priv->tx_ring_size;
 	priv->tx_dirty_desc = 0;
@@ -957,10 +953,8 @@ static int bcm_enet_open(struct net_device *dev)
 	/* init & fill rx ring with skbs */
 	priv->rx_skb = kcalloc(priv->rx_ring_size, sizeof(struct sk_buff *),
 			       GFP_KERNEL);
-	if (!priv->rx_skb) {
-		ret = -ENOMEM;
+	if (!priv->rx_skb)
 		goto out_free_tx_skb;
-	}
 
 	priv->rx_desc_count = 0;
 	priv->rx_dirty_desc = 0;
@@ -976,7 +970,6 @@ static int bcm_enet_open(struct net_device *dev)
 
 	if (bcm_enet_refill_rx(dev)) {
 		dev_err(kdev, "cannot allocate rx skb queue\n");
-		ret = -ENOMEM;
 		goto out;
 	}
 
