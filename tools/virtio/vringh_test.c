@@ -447,7 +447,7 @@ int main(int argc, char *argv[])
 	char buf[28];
 	u16 head;
 	int err;
-	unsigned i;
+	unsigned int i;
 	void *ret;
 	bool (*getrange)(struct vringh *vrh, u64 addr, struct vringh_range *r);
 	bool fast_vringh = false, parallel = false;
@@ -654,7 +654,7 @@ int main(int argc, char *argv[])
 
 	/* Free those buffers. */
 	for (i = 0; i < RINGSIZE; i++) {
-		unsigned len;
+		unsigned int len;
 		assert(virtqueue_get_buf(vq, &len) != NULL);
 	}
 
