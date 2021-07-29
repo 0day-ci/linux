@@ -28,6 +28,7 @@ struct qcom_cpufreq_soc_data {
 	u32 reg_volt_lut;
 	u32 reg_perf_state;
 	u8 lut_row_size;
+	bool skip_enable;
 };
 
 struct qcom_cpufreq_data {
@@ -257,19 +258,31 @@ static const struct qcom_cpufreq_soc_data qcom_soc_data = {
 	.reg_volt_lut = 0x114,
 	.reg_perf_state = 0x920,
 	.lut_row_size = 32,
+	.skip_enable = false,
 };
 
 static const struct qcom_cpufreq_soc_data epss_soc_data = {
+	.reg_freq_lut = 0x0,
+	.reg_volt_lut = 0x100,
+	.reg_perf_state = 0x220,
+	.lut_row_size = 4,
+	.skip_enable = true,
+};
+
+static const struct qcom_cpufreq_soc_data epss_sm8250_soc_data = {
 	.reg_enable = 0x0,
 	.reg_freq_lut = 0x100,
 	.reg_volt_lut = 0x200,
 	.reg_perf_state = 0x320,
 	.lut_row_size = 4,
+	.skip_enable = false,
 };
 
 static const struct of_device_id qcom_cpufreq_hw_match[] = {
 	{ .compatible = "qcom,cpufreq-hw", .data = &qcom_soc_data },
 	{ .compatible = "qcom,cpufreq-epss", .data = &epss_soc_data },
+	{ .compatible = "qcom,sm8250-cpufreq-epss", .data = &epss_sm8250_soc_data },
+	{ .compatible = "qcom,sm8350-cpufreq-epss", .data = &epss_sm8250_soc_data },
 	{}
 };
 MODULE_DEVICE_TABLE(of, qcom_cpufreq_hw_match);
@@ -334,10 +347,12 @@ static int qcom_cpufreq_hw_cpu_init(struct cpufreq_policy *policy)
 	data->res = res;
 
 	/* HW should be in enabled state to proceed */
-	if (!(readl_relaxed(base + data->soc_data->reg_enable) & 0x1)) {
-		dev_err(dev, "Domain-%d cpufreq hardware not enabled\n", index);
-		ret = -ENODEV;
-		goto error;
+	if (!data->soc_data->skip_enable) {
+		if (!(readl_relaxed(base + data->soc_data->reg_enable) & 0x1)) {
+			dev_err(dev, "Domain-%d cpufreq hardware not enabled\n", index);
+			ret = -ENODEV;
+			goto error;
+		}
 	}
 
 	qcom_get_related_cpus(index, policy->cpus);
