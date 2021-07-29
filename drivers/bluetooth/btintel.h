@@ -143,6 +143,7 @@ struct intel_debug_features {
 #define INTEL_FIRMWARE_LOADED		2
 #define INTEL_FIRMWARE_FAILED		3
 #define INTEL_BOOTING			4
+#define INTEL_BROKEN_READ_VERSION	5
 
 struct btintel_data {
 	unsigned long flags;
