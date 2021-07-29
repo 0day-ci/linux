@@ -272,6 +272,21 @@ static int host_stage2_adjust_range(u64 addr, struct kvm_mem_range *range)
 	return 0;
 }
 
+int host_stage2_idmap_locked(u64 start, u64 end, enum kvm_pgtable_prot prot)
+{
+	hyp_assert_lock_held(&host_kvm.lock);
+
+	return host_stage2_try(__host_stage2_idmap, start, end, prot);
+}
+
+int host_stage2_set_owner_locked(u64 start, u64 end, u8 owner_id)
+{
+	hyp_assert_lock_held(&host_kvm.lock);
+
+	return host_stage2_try(kvm_pgtable_stage2_set_owner, &host_kvm.pgt,
+			       start, end - start, &host_s2_pool, owner_id);
+}
+
 static bool host_stage2_force_pte_cb(u64 addr, u64 end, enum kvm_pgtable_prot prot)
 {
 	/*
@@ -309,7 +324,7 @@ static int host_stage2_idmap(u64 addr)
 	if (ret)
 		goto unlock;
 
-	ret = host_stage2_try(__host_stage2_idmap, range.start, range.end, prot);
+	ret = host_stage2_idmap_locked(range.start, range.end, prot);
 unlock:
 	hyp_spin_unlock(&host_kvm.lock);
 
