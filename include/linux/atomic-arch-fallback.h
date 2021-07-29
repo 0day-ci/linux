@@ -1250,6 +1250,136 @@ arch_atomic_dec_if_positive(atomic_t *v)
 #define arch_atomic_dec_if_positive arch_atomic_dec_if_positive
 #endif
 
+#ifndef arch_atomic_andnot_or
+static __always_inline void
+arch_atomic_andnot_or(int m, int o, atomic_t *v)
+{
+	({
+		int N, O = arch_atomic_read(v);
+		do {
+			N = O;
+			N &= ~m;
+			N |= o;
+		} while (!arch_atomic_try_cmpxchg_relaxed(v, &O, N));
+		O;
+	});
+}
+#define arch_atomic_andnot_or arch_atomic_andnot_or
+#endif
+
+#ifndef arch_atomic_fetch_andnot_or_relaxed
+#ifdef arch_atomic_fetch_andnot_or
+#define arch_atomic_fetch_andnot_or_acquire arch_atomic_fetch_andnot_or
+#define arch_atomic_fetch_andnot_or_release arch_atomic_fetch_andnot_or
+#define arch_atomic_fetch_andnot_or_relaxed arch_atomic_fetch_andnot_or
+#endif /* arch_atomic_fetch_andnot_or */
+
+#ifndef arch_atomic_fetch_andnot_or
+static __always_inline int
+arch_atomic_fetch_andnot_or(int m, int o, atomic_t *v)
+{
+	return ({
+		int N, O = arch_atomic_read(v);
+		do {
+			N = O;
+			N &= ~m;
+			N |= o;
+		} while (!arch_atomic_try_cmpxchg(v, &O, N));
+		O;
+	});
+}
+#define arch_atomic_fetch_andnot_or arch_atomic_fetch_andnot_or
+#endif
+
+#ifndef arch_atomic_fetch_andnot_or_acquire
+static __always_inline int
+arch_atomic_fetch_andnot_or_acquire(int m, int o, atomic_t *v)
+{
+	return ({
+		int N, O = arch_atomic_read(v);
+		do {
+			N = O;
+			N &= ~m;
+			N |= o;
+		} while (!arch_atomic_try_cmpxchg_acquire(v, &O, N));
+		O;
+	});
+}
+#define arch_atomic_fetch_andnot_or_acquire arch_atomic_fetch_andnot_or_acquire
+#endif
+
+#ifndef arch_atomic_fetch_andnot_or_release
+static __always_inline int
+arch_atomic_fetch_andnot_or_release(int m, int o, atomic_t *v)
+{
+	return ({
+		int N, O = arch_atomic_read(v);
+		do {
+			N = O;
+			N &= ~m;
+			N |= o;
+		} while (!arch_atomic_try_cmpxchg_release(v, &O, N));
+		O;
+	});
+}
+#define arch_atomic_fetch_andnot_or_release arch_atomic_fetch_andnot_or_release
+#endif
+
+#ifndef arch_atomic_fetch_andnot_or_relaxed
+static __always_inline int
+arch_atomic_fetch_andnot_or_relaxed(int m, int o, atomic_t *v)
+{
+	return ({
+		int N, O = arch_atomic_read(v);
+		do {
+			N = O;
+			N &= ~m;
+			N |= o;
+		} while (!arch_atomic_try_cmpxchg_relaxed(v, &O, N));
+		O;
+	});
+}
+#define arch_atomic_fetch_andnot_or_relaxed arch_atomic_fetch_andnot_or_relaxed
+#endif
+
+#else /* arch_atomic_fetch_andnot_or_relaxed */
+
+#ifndef arch_atomic_fetch_andnot_or_acquire
+static __always_inline int
+arch_atomic_fetch_andnot_or_acquire(int m, int o, atomic_t *v)
+{
+	int ret = arch_atomic_fetch_andnot_or_relaxed(m, o, v);
+	__atomic_acquire_fence();
+	return ret;
+}
+#define arch_atomic_fetch_andnot_or_acquire arch_atomic_fetch_andnot_or_acquire
+#endif
+
+#ifndef arch_atomic_fetch_andnot_or_release
+static __always_inline int
+arch_atomic_fetch_andnot_or_release(int m, int o, atomic_t *v)
+{
+	__atomic_release_fence();
+	return arch_atomic_fetch_andnot_or_relaxed(m, o, v);
+}
+#define arch_atomic_fetch_andnot_or_release arch_atomic_fetch_andnot_or_release
+#endif
+
+#ifndef arch_atomic_fetch_andnot_or
+static __always_inline int
+arch_atomic_fetch_andnot_or(int m, int o, atomic_t *v)
+{
+	int ret;
+	__atomic_pre_full_fence();
+	ret = arch_atomic_fetch_andnot_or_relaxed(m, o, v);
+	__atomic_post_full_fence();
+	return ret;
+}
+#define arch_atomic_fetch_andnot_or arch_atomic_fetch_andnot_or
+#endif
+
+#endif /* arch_atomic_fetch_andnot_or_relaxed */
+
 #ifdef CONFIG_GENERIC_ATOMIC64
 #include <asm-generic/atomic64.h>
 #endif
@@ -2357,5 +2487,135 @@ arch_atomic64_dec_if_positive(atomic64_t *v)
 #define arch_atomic64_dec_if_positive arch_atomic64_dec_if_positive
 #endif
 
+#ifndef arch_atomic64_andnot_or
+static __always_inline void
+arch_atomic64_andnot_or(s64 m, s64 o, atomic64_t *v)
+{
+	({
+		s64 N, O = arch_atomic64_read(v);
+		do {
+			N = O;
+			N &= ~m;
+			N |= o;
+		} while (!arch_atomic64_try_cmpxchg_relaxed(v, &O, N));
+		O;
+	});
+}
+#define arch_atomic64_andnot_or arch_atomic64_andnot_or
+#endif
+
+#ifndef arch_atomic64_fetch_andnot_or_relaxed
+#ifdef arch_atomic64_fetch_andnot_or
+#define arch_atomic64_fetch_andnot_or_acquire arch_atomic64_fetch_andnot_or
+#define arch_atomic64_fetch_andnot_or_release arch_atomic64_fetch_andnot_or
+#define arch_atomic64_fetch_andnot_or_relaxed arch_atomic64_fetch_andnot_or
+#endif /* arch_atomic64_fetch_andnot_or */
+
+#ifndef arch_atomic64_fetch_andnot_or
+static __always_inline s64
+arch_atomic64_fetch_andnot_or(s64 m, s64 o, atomic64_t *v)
+{
+	return ({
+		s64 N, O = arch_atomic64_read(v);
+		do {
+			N = O;
+			N &= ~m;
+			N |= o;
+		} while (!arch_atomic64_try_cmpxchg(v, &O, N));
+		O;
+	});
+}
+#define arch_atomic64_fetch_andnot_or arch_atomic64_fetch_andnot_or
+#endif
+
+#ifndef arch_atomic64_fetch_andnot_or_acquire
+static __always_inline s64
+arch_atomic64_fetch_andnot_or_acquire(s64 m, s64 o, atomic64_t *v)
+{
+	return ({
+		s64 N, O = arch_atomic64_read(v);
+		do {
+			N = O;
+			N &= ~m;
+			N |= o;
+		} while (!arch_atomic64_try_cmpxchg_acquire(v, &O, N));
+		O;
+	});
+}
+#define arch_atomic64_fetch_andnot_or_acquire arch_atomic64_fetch_andnot_or_acquire
+#endif
+
+#ifndef arch_atomic64_fetch_andnot_or_release
+static __always_inline s64
+arch_atomic64_fetch_andnot_or_release(s64 m, s64 o, atomic64_t *v)
+{
+	return ({
+		s64 N, O = arch_atomic64_read(v);
+		do {
+			N = O;
+			N &= ~m;
+			N |= o;
+		} while (!arch_atomic64_try_cmpxchg_release(v, &O, N));
+		O;
+	});
+}
+#define arch_atomic64_fetch_andnot_or_release arch_atomic64_fetch_andnot_or_release
+#endif
+
+#ifndef arch_atomic64_fetch_andnot_or_relaxed
+static __always_inline s64
+arch_atomic64_fetch_andnot_or_relaxed(s64 m, s64 o, atomic64_t *v)
+{
+	return ({
+		s64 N, O = arch_atomic64_read(v);
+		do {
+			N = O;
+			N &= ~m;
+			N |= o;
+		} while (!arch_atomic64_try_cmpxchg_relaxed(v, &O, N));
+		O;
+	});
+}
+#define arch_atomic64_fetch_andnot_or_relaxed arch_atomic64_fetch_andnot_or_relaxed
+#endif
+
+#else /* arch_atomic64_fetch_andnot_or_relaxed */
+
+#ifndef arch_atomic64_fetch_andnot_or_acquire
+static __always_inline s64
+arch_atomic64_fetch_andnot_or_acquire(s64 m, s64 o, atomic64_t *v)
+{
+	s64 ret = arch_atomic64_fetch_andnot_or_relaxed(m, o, v);
+	__atomic_acquire_fence();
+	return ret;
+}
+#define arch_atomic64_fetch_andnot_or_acquire arch_atomic64_fetch_andnot_or_acquire
+#endif
+
+#ifndef arch_atomic64_fetch_andnot_or_release
+static __always_inline s64
+arch_atomic64_fetch_andnot_or_release(s64 m, s64 o, atomic64_t *v)
+{
+	__atomic_release_fence();
+	return arch_atomic64_fetch_andnot_or_relaxed(m, o, v);
+}
+#define arch_atomic64_fetch_andnot_or_release arch_atomic64_fetch_andnot_or_release
+#endif
+
+#ifndef arch_atomic64_fetch_andnot_or
+static __always_inline s64
+arch_atomic64_fetch_andnot_or(s64 m, s64 o, atomic64_t *v)
+{
+	s64 ret;
+	__atomic_pre_full_fence();
+	ret = arch_atomic64_fetch_andnot_or_relaxed(m, o, v);
+	__atomic_post_full_fence();
+	return ret;
+}
+#define arch_atomic64_fetch_andnot_or arch_atomic64_fetch_andnot_or
+#endif
+
+#endif /* arch_atomic64_fetch_andnot_or_relaxed */
+
 #endif /* _LINUX_ATOMIC_FALLBACK_H */
-// cca554917d7ea73d5e3e7397dd70c484cad9b2c4
+// 709f9a3b37c43051cce565fa3c78002ee8b83766

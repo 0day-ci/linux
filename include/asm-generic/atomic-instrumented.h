@@ -599,6 +599,41 @@ atomic_dec_if_positive(atomic_t *v)
 	return arch_atomic_dec_if_positive(v);
 }
 
+static __always_inline void
+atomic_andnot_or(int m, int o, atomic_t *v)
+{
+	instrument_atomic_read_write(v, sizeof(*v));
+	arch_atomic_andnot_or(m, o, v);
+}
+
+static __always_inline int
+atomic_fetch_andnot_or(int m, int o, atomic_t *v)
+{
+	instrument_atomic_read_write(v, sizeof(*v));
+	return arch_atomic_fetch_andnot_or(m, o, v);
+}
+
+static __always_inline int
+atomic_fetch_andnot_or_acquire(int m, int o, atomic_t *v)
+{
+	instrument_atomic_read_write(v, sizeof(*v));
+	return arch_atomic_fetch_andnot_or_acquire(m, o, v);
+}
+
+static __always_inline int
+atomic_fetch_andnot_or_release(int m, int o, atomic_t *v)
+{
+	instrument_atomic_read_write(v, sizeof(*v));
+	return arch_atomic_fetch_andnot_or_release(m, o, v);
+}
+
+static __always_inline int
+atomic_fetch_andnot_or_relaxed(int m, int o, atomic_t *v)
+{
+	instrument_atomic_read_write(v, sizeof(*v));
+	return arch_atomic_fetch_andnot_or_relaxed(m, o, v);
+}
+
 static __always_inline s64
 atomic64_read(const atomic64_t *v)
 {
@@ -1177,6 +1212,41 @@ atomic64_dec_if_positive(atomic64_t *v)
 	return arch_atomic64_dec_if_positive(v);
 }
 
+static __always_inline void
+atomic64_andnot_or(s64 m, s64 o, atomic64_t *v)
+{
+	instrument_atomic_read_write(v, sizeof(*v));
+	arch_atomic64_andnot_or(m, o, v);
+}
+
+static __always_inline s64
+atomic64_fetch_andnot_or(s64 m, s64 o, atomic64_t *v)
+{
+	instrument_atomic_read_write(v, sizeof(*v));
+	return arch_atomic64_fetch_andnot_or(m, o, v);
+}
+
+static __always_inline s64
+atomic64_fetch_andnot_or_acquire(s64 m, s64 o, atomic64_t *v)
+{
+	instrument_atomic_read_write(v, sizeof(*v));
+	return arch_atomic64_fetch_andnot_or_acquire(m, o, v);
+}
+
+static __always_inline s64
+atomic64_fetch_andnot_or_release(s64 m, s64 o, atomic64_t *v)
+{
+	instrument_atomic_read_write(v, sizeof(*v));
+	return arch_atomic64_fetch_andnot_or_release(m, o, v);
+}
+
+static __always_inline s64
+atomic64_fetch_andnot_or_relaxed(s64 m, s64 o, atomic64_t *v)
+{
+	instrument_atomic_read_write(v, sizeof(*v));
+	return arch_atomic64_fetch_andnot_or_relaxed(m, o, v);
+}
+
 #define xchg(ptr, ...) \
 ({ \
 	typeof(ptr) __ai_ptr = (ptr); \
@@ -1334,4 +1404,4 @@ atomic64_dec_if_positive(atomic64_t *v)
 })
 
 #endif /* _ASM_GENERIC_ATOMIC_INSTRUMENTED_H */
-// 1d7c3a25aca5c7fb031c307be4c3d24c7b48fcd5
+// 9c9792d0dcd1fb3de8eeda1225ebbd0d811fb941

@@ -39,3 +39,4 @@ inc_not_zero		b	v
 inc_unless_negative	b	v
 dec_unless_positive	b	v
 dec_if_positive		i	v
+andnot_or		vF	i:m	i:o	v

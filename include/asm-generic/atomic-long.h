@@ -515,6 +515,36 @@ atomic_long_dec_if_positive(atomic_long_t *v)
 	return atomic64_dec_if_positive(v);
 }
 
+static __always_inline void
+atomic_long_andnot_or(long m, long o, atomic_long_t *v)
+{
+	atomic64_andnot_or(m, o, v);
+}
+
+static __always_inline long
+atomic_long_fetch_andnot_or(long m, long o, atomic_long_t *v)
+{
+	return atomic64_fetch_andnot_or(m, o, v);
+}
+
+static __always_inline long
+atomic_long_fetch_andnot_or_acquire(long m, long o, atomic_long_t *v)
+{
+	return atomic64_fetch_andnot_or_acquire(m, o, v);
+}
+
+static __always_inline long
+atomic_long_fetch_andnot_or_release(long m, long o, atomic_long_t *v)
+{
+	return atomic64_fetch_andnot_or_release(m, o, v);
+}
+
+static __always_inline long
+atomic_long_fetch_andnot_or_relaxed(long m, long o, atomic_long_t *v)
+{
+	return atomic64_fetch_andnot_or_relaxed(m, o, v);
+}
+
 #else /* CONFIG_64BIT */
 
 static __always_inline long
@@ -1009,6 +1039,36 @@ atomic_long_dec_if_positive(atomic_long_t *v)
 	return atomic_dec_if_positive(v);
 }
 
+static __always_inline void
+atomic_long_andnot_or(long m, long o, atomic_long_t *v)
+{
+	atomic_andnot_or(m, o, v);
+}
+
+static __always_inline long
+atomic_long_fetch_andnot_or(long m, long o, atomic_long_t *v)
+{
+	return atomic_fetch_andnot_or(m, o, v);
+}
+
+static __always_inline long
+atomic_long_fetch_andnot_or_acquire(long m, long o, atomic_long_t *v)
+{
+	return atomic_fetch_andnot_or_acquire(m, o, v);
+}
+
+static __always_inline long
+atomic_long_fetch_andnot_or_release(long m, long o, atomic_long_t *v)
+{
+	return atomic_fetch_andnot_or_release(m, o, v);
+}
+
+static __always_inline long
+atomic_long_fetch_andnot_or_relaxed(long m, long o, atomic_long_t *v)
+{
+	return atomic_fetch_andnot_or_relaxed(m, o, v);
+}
+
 #endif /* CONFIG_64BIT */
 #endif /* _ASM_GENERIC_ATOMIC_LONG_H */
-// a624200981f552b2c6be4f32fe44da8289f30d87
+// 3ab842342b36b655b902481be793ba7a04c5a88d

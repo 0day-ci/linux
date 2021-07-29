@@ -1,0 +1,24 @@
+local try_order=${order}
+
+#
+# non-value returning atomics are implicity relaxed
+#
+if [ -z "${retstmt}" ]; then
+	try_order="_relaxed"
+fi
+
+cat <<EOF
+static __always_inline ${ret}
+${arch}${atomic}_${pfx}andnot_or${sfx}${order}(${int} m, ${int} o, ${atomic}_t *v)
+{
+	${retstmt}({
+		${int} N, O = ${arch}${atomic}_read(v);
+		do {
+			N = O;
+			N &= ~m;
+			N |= o;
+		} while (!${arch}${atomic}_try_cmpxchg${try_order}(v, &O, N));
+		O;
+	});
+}
+EOF
