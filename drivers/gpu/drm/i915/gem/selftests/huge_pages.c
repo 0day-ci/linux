@@ -1572,12 +1572,15 @@ static int igt_shrink_thp(void *arg)
 		goto out_put;
 
 	/*
-	 * Now that the pages are *unpinned* shrink-all should invoke
+	 * Now that the pages are *unpinned* shrinking should invoke
 	 * shmem to truncate our pages.
 	 */
-	i915_gem_shrink_all(i915);
+	i915_gem_shrink(NULL, i915, -1UL, NULL,
+			I915_SHRINK_BOUND |
+			I915_SHRINK_UNBOUND |
+			I915_SHRINK_ACTIVE);
 	if (i915_gem_object_has_pages(obj)) {
-		pr_err("shrink-all didn't truncate the pages\n");
+		pr_err("shrinking didn't truncate the pages\n");
 		err = -EINVAL;
 		goto out_put;
 	}
