@@ -1924,7 +1924,7 @@ static void parse_integrated_panel(struct drm_i915_private *i915,
 {
 	const struct vbt_header *vbt = i915->opregion.vbt;
 	const struct bdb_header *bdb;
-	int lfp_inst = 0, panel_index, opregion_panel_index;
+	int lfp_inst = 0, panel_index;
 
 	if (devdata->child.handle == HANDLE_LFP_1)
 		lfp_inst = 1;
@@ -1937,17 +1937,12 @@ static void parse_integrated_panel(struct drm_i915_private *i915,
 	bdb = get_bdb_header(vbt);
 	panel_index = get_lfp_panel_index(i915, bdb, lfp_inst);
 
-	opregion_panel_index = intel_opregion_get_panel_type(i915);
-	/*
-	 * TODO: the current implementation always use the panel index from
-	 * opregion if available due to issues with old platforms.
-	 * But this do not supports two panels and in SKL or newer I never saw a
-	 * system were this call returns a valid value.
-	 * So will change this to only use opregion up to BDW in a separated
-	 * commit.
-	 */
-	if (opregion_panel_index >= 0)
-		panel_index = opregion_panel_index;
+	if (DISPLAY_VER(i915) < 9) {
+		int opregion_panel_index = intel_opregion_get_panel_type(i915);
+
+		if (opregion_panel_index >= 0)
+			opregion_panel_index = panel_index;
+	}
 
 	if (panel_index == -1)
 		return;
