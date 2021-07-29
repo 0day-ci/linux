@@ -973,6 +973,13 @@ void qed_dcbx_set_pf_update_params(struct qed_dcbx_results *p_src,
 	qed_dcbx_update_protocol_data(p_dcb_data, p_src, DCBX_PROTOCOL_ETH);
 }
 
+bool qed_dcbx_get_dscp_state(struct qed_hwfn *p_hwfn)
+{
+	struct qed_dcbx_get *p_dcbx_info = &p_hwfn->p_dcbx_info->get;
+
+	return p_dcbx_info->dscp.enabled;
+}
+
 u8 qed_dcbx_get_priority_tc(struct qed_hwfn *p_hwfn, u8 pri)
 {
 	struct qed_dcbx_get *dcbx_info = &p_hwfn->p_dcbx_info->get;

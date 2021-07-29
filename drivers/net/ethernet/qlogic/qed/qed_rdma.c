@@ -32,6 +32,7 @@
 #include "qed_rdma.h"
 #include "qed_roce.h"
 #include "qed_sp.h"
+#include "qed_dcbx.h"
 
 
 int qed_rdma_bmap_alloc(struct qed_hwfn *p_hwfn,
@@ -1965,6 +1966,29 @@ static void qed_rdma_remove_user(void *rdma_cxt, u16 dpi)
 	spin_unlock_bh(&p_hwfn->p_rdma_info->lock);
 }
 
+#ifdef CONFIG_DCB
+static int qed_rdma_get_dscp_priority(void *rdma_cxt, u8 dscp_index, u8 *pri)
+{
+	struct qed_hwfn *p_hwfn = (struct qed_hwfn *)rdma_cxt;
+	int rc = -EINVAL;
+
+	if (qed_dcbx_get_dscp_state(p_hwfn)) {
+		rc = qed_dcbx_get_dscp_priority(p_hwfn, dscp_index, pri);
+		if (rc)
+			DP_INFO(p_hwfn,
+				"Failed to get priority val for dscp idx %d\n",
+				dscp_index);
+	}
+
+	return rc;
+}
+#else
+static int qed_rdma_get_dscp_priority(void *rdma_cxt, u8 dscp_index, u8 *pri)
+{
+	return -EINVAL;
+}
+#endif
+
 static int qed_roce_ll2_set_mac_filter(struct qed_dev *cdev,
 				       u8 *old_mac_address,
 				       u8 *new_mac_address)
@@ -2045,6 +2069,7 @@ static const struct qed_rdma_ops qed_rdma_ops_pass = {
 	.rdma_create_srq = &qed_rdma_create_srq,
 	.rdma_modify_srq = &qed_rdma_modify_srq,
 	.rdma_destroy_srq = &qed_rdma_destroy_srq,
+	.rdma_get_dscp_priority = &qed_rdma_get_dscp_priority,
 	.ll2_acquire_connection = &qed_ll2_acquire_connection,
 	.ll2_establish_connection = &qed_ll2_establish_connection,
 	.ll2_terminate_connection = &qed_ll2_terminate_connection,
