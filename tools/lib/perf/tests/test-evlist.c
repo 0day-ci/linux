@@ -251,7 +251,7 @@ static int test_mmap_thread(void)
 		for (i = 0; i < 100; i++)
 			prctl(0, 0, 0, 0, 0);
 
-		exit(0);
+		exit(EXIT_SUCCESS);
 	}
 
 	threads = perf_thread_map__new_dummy();
