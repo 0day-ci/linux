@@ -2782,6 +2782,17 @@ static void hns_roce_v2_exit(struct hns_roce_dev *hr_dev)
 		free_dip_list(hr_dev);
 }
 
+static inline void mbox_desc_init(struct hns_roce_post_mbox *mb, u64 in_param,
+				  u64 out_param, u32 in_modifier,
+				  u8 op_modifier, u16 op)
+{
+	mb->in_param_l = cpu_to_le32(in_param);
+	mb->in_param_h = cpu_to_le32(in_param >> 32);
+	mb->out_param_l = cpu_to_le32(out_param);
+	mb->out_param_h = cpu_to_le32(out_param >> 32);
+	mb->cmd_tag = cpu_to_le32(in_modifier << 8 | op);
+}
+
 static int hns_roce_mbox_post(struct hns_roce_dev *hr_dev, u64 in_param,
 			      u64 out_param, u32 in_modifier, u8 op_modifier,
 			      u16 op, u16 token, int event)
@@ -2790,14 +2801,31 @@ static int hns_roce_mbox_post(struct hns_roce_dev *hr_dev, u64 in_param,
 	struct hns_roce_post_mbox *mb = (struct hns_roce_post_mbox *)desc.data;
 
 	hns_roce_cmq_setup_basic_desc(&desc, HNS_ROCE_OPC_POST_MB, false);
-
-	mb->in_param_l = cpu_to_le32(in_param);
-	mb->in_param_h = cpu_to_le32(in_param >> 32);
-	mb->out_param_l = cpu_to_le32(out_param);
-	mb->out_param_h = cpu_to_le32(out_param >> 32);
-	mb->cmd_tag = cpu_to_le32(in_modifier << 8 | op);
+	mbox_desc_init(mb, in_param, out_param, in_modifier, op_modifier, op);
 	mb->token_event_en = cpu_to_le32(event << 16 | token);
 
+	return hns_roce_cmq_send(hr_dev, &desc, 1);
+}
+
+static int hns_roce_mbox_send(struct hns_roce_dev *hr_dev, u64 in_param,
+			      u64 out_param, u32 in_modifier, u8 op_modifier,
+			      u16 op)
+{
+	struct hns_roce_cmq_desc desc;
+	struct hns_roce_post_mbox *mb = (struct hns_roce_post_mbox *)desc.data;
+
+	hns_roce_cmq_setup_basic_desc(&desc, HNS_ROCE_OPC_SYNC_MB, false);
+
+	mbox_desc_init(mb, in_param, out_param, in_modifier, op_modifier, op);
+
+	/* The hardware doesn't care about the token fields when working in
+	 * sync mode.
+	 */
+	mb->token_event_en = 0;
+
+	/* The cmdq send returns 0 indicates that the hardware has already
+	 * finished the operation defined in this mbox.
+	 */
 	return hns_roce_cmq_send(hr_dev, &desc, 1);
 }
 
@@ -5062,6 +5090,47 @@ out:
 	return ret;
 }
 
+static int hns_roce_v2_set_dca_buf(struct hns_roce_dev *hr_dev,
+				   struct hns_roce_qp *hr_qp)
+{
+	struct ib_device *ibdev = &hr_dev->ib_dev;
+	struct hns_roce_v2_qp_context *qpc, *msk;
+	dma_addr_t dma_handle;
+	int qpc_sz;
+	int ret;
+
+	qpc_sz = hr_dev->caps.qpc_sz;
+	WARN_ON(2 * qpc_sz > HNS_ROCE_MAILBOX_SIZE);
+	qpc = dma_pool_alloc(hr_dev->cmd.pool, GFP_NOWAIT, &dma_handle);
+	if (!qpc)
+		return -ENOMEM;
+
+	msk = (struct hns_roce_v2_qp_context *)((void *)qpc + qpc_sz);
+	memset(msk, 0xff, qpc_sz);
+
+	ret = config_qp_rq_buf(hr_dev, hr_qp, qpc, msk);
+	if (ret) {
+		ibdev_err(ibdev, "failed to config rq qpc, ret = %d.\n", ret);
+		goto done;
+	}
+
+	ret = config_qp_sq_buf(hr_dev, hr_qp, qpc, msk);
+	if (ret) {
+		ibdev_err(ibdev, "failed to config sq qpc, ret = %d.\n", ret);
+		goto done;
+	}
+
+	ret = hns_roce_mbox_send(hr_dev, dma_handle, 0, hr_qp->qpn, 0,
+				 HNS_ROCE_CMD_MODIFY_QPC);
+	if (ret)
+		ibdev_err(ibdev, "failed to modify DCA buf, ret = %d.\n", ret);
+
+done:
+	dma_pool_free(hr_dev->cmd.pool, qpc, dma_handle);
+
+	return ret;
+}
+
 static int to_ib_qp_st(enum hns_roce_v2_qp_state state)
 {
 	static const enum ib_qp_state map[] = {
@@ -6239,6 +6308,7 @@ static const struct hns_roce_hw hns_roce_hw_v2 = {
 	.write_cqc = hns_roce_v2_write_cqc,
 	.set_hem = hns_roce_v2_set_hem,
 	.clear_hem = hns_roce_v2_clear_hem,
+	.set_dca_buf = hns_roce_v2_set_dca_buf,
 	.modify_qp = hns_roce_v2_modify_qp,
 	.qp_flow_control_init = hns_roce_v2_qp_flow_control_init,
 	.init_eq = hns_roce_v2_init_eq_table,
