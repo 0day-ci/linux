@@ -7,8 +7,11 @@
 #define __INTEL_PXP_TYPES_H__
 
 struct intel_context;
+struct i915_pxp_component;
 
 struct intel_pxp {
+	struct i915_pxp_component *pxp_component;
+
 	struct intel_context *ce;
 };
 
