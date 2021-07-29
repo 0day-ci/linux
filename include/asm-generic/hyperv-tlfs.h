@@ -283,9 +283,9 @@ union hv_port_id {
 /* Define synthetic interrupt controller message header. */
 struct hv_message_header {
 	__u32 message_type;
-	__u8 payload_size;
-	union hv_message_flags message_flags;
 	__u8 reserved[2];
+	union hv_message_flags message_flags;
+	__u8 payload_size;
 	union {
 		__u64 sender;
 		union hv_port_id port;
