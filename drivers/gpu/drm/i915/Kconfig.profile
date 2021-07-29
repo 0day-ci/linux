@@ -119,3 +119,76 @@ config DRM_I915_TIMESLICE_DURATION
 	  /sys/class/drm/card?/engine/*/timeslice_duration_ms
 
 	  May be 0 to disable timeslicing.
+
+choice
+	prompt "Transparent Hugepage Support (native)"
+	default DRM_I915_THP_NATIVE_NEVER
+	depends on TRANSPARENT_HUGEPAGE
+	help
+	  Select the preferred method for allocating from Transparent Hugepages
+	  when IOMMU is not enabled.
+
+	config DRM_I915_THP_NATIVE_NEVER
+	bool "Never"
+	help
+	  Disable using THP for system memory allocations, individually
+	  allocating each 4K chunk as a separate page. It is unlikely that such
+	  individual allocations will return contiguous memory.
+
+	config DRM_I915_THP_NATIVE_WITHIN
+	bool "Within size"
+	help
+	  Allocate whole 2M superpages while those chunks do not exceed the
+	  object size. The remainder of the object will be allocated from 4K
+	  pages. No overallocation.
+
+	config DRM_I915_THP_NATIVE_ALWAYS
+	bool "Always"
+	help
+	  Allocate the whole object using 2M superpages, even if the object does
+	  not require an exact number of superpages.
+
+endchoice
+
+config DRM_I915_THP_NATIVE
+	string
+	default "always" if DRM_I915_THP_NATIVE_ALWAYS
+	default "within_size" if DRM_I915_THP_NATIVE_WITHIN
+	default "never" if DRM_I915_THP_NATIVE_NEVER
+
+choice
+	prompt "Transparent Hugepage Support (IOMMU)"
+	default DRM_I915_THP_IOMMU_WITHIN if TRANSPARENT_HUGEPAGE=y
+	default DRM_I915_THP_IOMMU_NEVER if TRANSPARENT_HUGEPAGE=n
+	depends on TRANSPARENT_HUGEPAGE
+	help
+	  Select the preferred method for allocating from Transparent Hugepages
+	  with IOMMU active.
+
+	config DRM_I915_THP_IOMMU_NEVER
+	bool "Never"
+	help
+	  Disable using THP for system memory allocations, individually
+	  allocating each 4K chunk as a separate page. It is unlikely that such
+	  individual allocations will return contiguous memory.
+
+	config DRM_I915_THP_IOMMU_WITHIN
+	bool "Within size"
+	help
+	  Allocate whole 2M superpages while those chunks do not exceed the
+	  object size. The remainder of the object will be allocated from 4K
+	  pages. No overallocation.
+
+	config DRM_I915_THP_IOMMU_ALWAYS
+	bool "Always"
+	help
+	  Allocate the whole object using 2M superpages, even if the object does
+	  not require an exact number of superpages.
+
+endchoice
+
+config DRM_I915_THP_IOMMU
+	string
+	default "always" if DRM_I915_THP_IOMMU_ALWAYS
+	default "within_size" if DRM_I915_THP_IOMMU_WITHIN
+	default "never" if DRM_I915_THP_IOMMU_NEVER
