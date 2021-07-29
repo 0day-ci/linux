@@ -1303,4 +1303,6 @@ int hns_roce_init(struct hns_roce_dev *hr_dev);
 void hns_roce_exit(struct hns_roce_dev *hr_dev);
 int hns_roce_fill_res_cq_entry(struct sk_buff *msg,
 			       struct ib_cq *ib_cq);
+int hns_roce_fill_res_ctx_entry(struct sk_buff *msg, struct ib_ucontext *ctx);
+
 #endif /* _HNS_ROCE_DEVICE_H */

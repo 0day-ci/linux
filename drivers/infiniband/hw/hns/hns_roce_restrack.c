@@ -118,3 +118,53 @@ err:
 	kfree(context);
 	return ret;
 }
+
+static int hns_roce_fill_dca_uctx(struct hns_roce_dca_ctx *ctx,
+				  struct sk_buff *msg)
+{
+	unsigned long flags;
+	u64 total, free;
+
+	spin_lock_irqsave(&ctx->pool_lock, flags);
+	total = ctx->total_size;
+	free = ctx->free_size;
+	spin_unlock_irqrestore(&ctx->pool_lock, flags);
+
+	if (rdma_nl_put_driver_u64(msg, "dca-total", total))
+		goto err;
+
+	if (rdma_nl_put_driver_u64(msg, "dca-free", free))
+		goto err;
+
+	return 0;
+
+err:
+	return -EMSGSIZE;
+}
+
+int hns_roce_fill_res_ctx_entry(struct sk_buff *msg, struct ib_ucontext *ctx)
+{
+	struct hns_roce_dev *hr_dev = to_hr_dev(ctx->device);
+	struct hns_roce_ucontext *uctx = to_hr_ucontext(ctx);
+	struct nlattr *table_attr;
+
+	table_attr = nla_nest_start(msg, RDMA_NLDEV_ATTR_DRIVER);
+	if (!table_attr)
+		goto err;
+
+	if (hr_dev->caps.flags & HNS_ROCE_CAP_FLAG_DCA_MODE) {
+		if (hns_roce_fill_dca_uctx(&uctx->dca_ctx, msg))
+			goto err_cancel_table;
+	}
+
+	nla_nest_end(msg, table_attr);
+
+	return 0;
+
+err_cancel_table:
+	nla_nest_cancel(msg, table_attr);
+err:
+	return -EMSGSIZE;
+
+	return 0;
+}
