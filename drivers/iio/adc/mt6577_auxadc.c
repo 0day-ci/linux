@@ -289,6 +289,7 @@ static int mt6577_auxadc_probe(struct platform_device *pdev)
 	ret = iio_device_register(indio_dev);
 	if (ret < 0) {
 		dev_err(&pdev->dev, "failed to register iio device\n");
+		mutex_destroy(&adc_dev->lock);
 		goto err_power_off;
 	}
 
@@ -313,6 +314,7 @@ static int mt6577_auxadc_remove(struct platform_device *pdev)
 			      0, MT6577_AUXADC_PDN_EN);
 
 	clk_disable_unprepare(adc_dev->adc_clk);
+	mutex_destroy(&adc_dev->lock);
 
 	return 0;
 }
