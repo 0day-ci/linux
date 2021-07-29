@@ -54,6 +54,7 @@ properties:
       - items:
           - enum:
               - mediatek,mt8192-disp-ovl
+              - mediatek,mt8195-disp-ovl
           - enum:
               - mediatek,mt8183-disp-ovl
 
@@ -73,6 +74,8 @@ properties:
           - const: mediatek,mt8173-disp-rdma
       - items:
           - const: mediatek,mt8183-disp-rdma
+      - items:
+          - const: mediatek,mt8195-disp-rdma
       - items:
           - enum:
               - mediatek,mt7623-disp-rdma
@@ -95,6 +98,7 @@ properties:
       - items:
           - enum:
               - mediatek,mt8192-disp-ccorr
+              - mediatek,mt8195-disp-ccorr
           - enum:
               - mediatek,mt8183-disp-ccorr
 
@@ -115,6 +119,7 @@ properties:
           - enum:
               - mediatek,mt8183-disp-color
               - mediatek,mt8192-disp-color
+              - mediatek,mt8195-disp-color
           - enum:
               - mediatek,mt8173-disp-color
 
@@ -124,6 +129,7 @@ properties:
       - items:
           - enum:
               - mediatek,mt8192-disp-dither
+              - mediatek,mt8195-disp-dither
           - enum:
               - mediatek,mt8183-disp-dither
 
@@ -135,6 +141,7 @@ properties:
               - mediatek,mt2712-disp-aal
               - mediatek,mt8183-disp-aal
               - mediatek,mt8192-disp-aal
+              - mediatek,mt8195-disp-aal
           - enum:
               - mediatek,mt8173-disp-aal
 
@@ -146,10 +153,17 @@ properties:
       - items:
           - enum:
               - mediatek,mt8192-disp-gamma
+              - mediatek,mt8195-disp-gamma
           - enum:
               - mediatek,mt8183-disp-gamma
 
+      # DSC: see Documentation/devicetree/bindings/display/mediatek/mediatek,dsc.yaml for details.
+      - items:
+          - const: mediatek,mt8195-disp-dsc
+
       # MERGE: merge streams from two RDMA sources
+      - items:
+          - const: mediatek,mt8195-disp-merge
 
       # POSTMASK: control round corner for display frame
       - items:
@@ -209,6 +223,8 @@ properties:
           - const: mediatek,mt8183-disp-mutex
       - items:
           - const: mediatek,mt8192-disp-mutex
+      - items:
+          - const: mediatek,mt8195-disp-mutex
 
       # OD: overdrive
       - items:
@@ -237,7 +253,7 @@ properties:
   mediatek,larb:
     description: The compatible property should be one of DMA function blocks,
       such as "mediatek,<chip>-disp-ovl", "mediatek,<chip>-disp-rdma" or
-      "mediatek,<chip>-disp-wdma". The supported chips are mt2701, mt8167 and mt8173.
+      "mediatek,<chip>-disp-wdma". The supported chips are mt2701, mt8167, mt8173 and mt8195.
       Should contain a phandle pointing to the local arbiter device as defined in
       Documentation/devicetree/bindings/memory-controllers/mediatek,smi-larb.yaml.
       It must sort according to the local arbiter index, like larb0, larb1, larb2...
@@ -248,7 +264,7 @@ properties:
   iommus:
     description: The compatible property should be one of DMA function blocks,
       such as "mediatek,<chip>-disp-ovl", "mediatek,<chip>-disp-rdma" or
-      "mediatek,<chip>-disp-wdma". The supported chips are mt2701, mt8167 and mt8173.
+      "mediatek,<chip>-disp-wdma". The supported chips are mt2701, mt8167, mt8173 and mt8195.
       Should point to the respective IOMMU block with master port as argument, see
       Documentation/devicetree/bindings/iommu/mediatek,iommu.yaml for details.
 
@@ -441,4 +457,8 @@ examples:
         reg = <0 0x14023000 0 0x1000>;
         power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
         clocks = <&mmsys CLK_MM_DISP_OD>;
+    };
+
+    dsc0: disp_dsc_wrap@1c009000 {
+        /* See mediatek,dsc.yaml for details */
     };
