@@ -293,14 +293,13 @@ static int mxcmci_setup_data(struct mxcmci_host *host, struct mmc_data *data)
 	mxcmci_writew(host, blksz, MMC_REG_BLK_LEN);
 	host->datasize = datasize;
 
-	if (!mxcmci_use_dma(host))
-		return 0;
+	if (host->dma == NULL)
+		return 0; /* Keep PIO */
 
+	/* Avoid the use of DMA on short transfers, e.g. non-sectors for example */
 	for_each_sg(data->sg, sg, data->sg_len, i) {
-		if (sg->offset & 3 || sg->length & 3 || sg->length < 512) {
-			host->do_dma = 0;
-			return 0;
-		}
+		if (sg->offset & 3 || sg->length & 3 || sg->length < 512)
+			return 0; /* Keep PIO */
 	}
 
 	if (data->flags & MMC_DATA_READ) {
@@ -325,9 +324,11 @@ static int mxcmci_setup_data(struct mxcmci_host *host, struct mmc_data *data)
 	if (!host->desc) {
 		dma_unmap_sg(host->dma->device->dev, data->sg, data->sg_len,
 				host->dma_dir);
-		host->do_dma = 0;
-		return 0; /* Fall back to PIO */
+		return 0; /* Keep PIO */
 	}
+
+	/* DMA is possible */
+	host->do_dma = 1;
 	wmb();
 
 	dmaengine_submit(host->desc);
@@ -747,8 +748,11 @@ static void mxcmci_request(struct mmc_host *mmc, struct mmc_request *req)
 	host->req = req;
 	host->cmdat &= ~CMD_DAT_CONT_INIT;
 
-	if (host->dma)
-		host->do_dma = 1;
+	/*
+	 * Default always to PIO. DMA will be enabled in
+	 * mxcmci_setup_data() if possible
+	 */
+	host->do_dma = 0;
 
 	if (req->data) {
 		error = mxcmci_setup_data(host, req->data);
