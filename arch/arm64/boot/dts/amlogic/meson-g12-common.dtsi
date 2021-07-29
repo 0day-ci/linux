@@ -230,6 +230,8 @@
 				      "timing-adjustment";
 			rx-fifo-depth = <4096>;
 			tx-fifo-depth = <2048>;
+			resets = <&reset RESET_ETHERNET>;
+			reset-names = "ethreset";
 			status = "disabled";
 
 			mdio0: mdio {
