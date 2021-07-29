@@ -1280,6 +1280,71 @@ int qed_dcbx_get_config_params(struct qed_hwfn *p_hwfn,
 	return 0;
 }
 
+int qed_dcbx_get_dscp_priority(struct qed_hwfn *p_hwfn, u8 dscp_index,
+			       u8 *p_dscp_pri)
+{
+	struct qed_dcbx_get *p_dcbx_info;
+	int rc;
+
+	if (IS_VF(p_hwfn->cdev)) {
+		DP_ERR(p_hwfn->cdev,
+		       "qed rdma get dscp priority not supported for VF.\n");
+		return -EINVAL;
+	}
+
+	if (dscp_index >= QED_DCBX_DSCP_SIZE) {
+		DP_ERR(p_hwfn, "Invalid dscp index %d\n", dscp_index);
+		return -EINVAL;
+	}
+
+	p_dcbx_info = kmalloc(sizeof(*p_dcbx_info), GFP_KERNEL);
+	if (!p_dcbx_info)
+		return -ENOMEM;
+
+	memset(p_dcbx_info, 0, sizeof(*p_dcbx_info));
+	rc = qed_dcbx_query_params(p_hwfn, p_dcbx_info,
+				   QED_DCBX_OPERATIONAL_MIB);
+	if (rc) {
+		kfree(p_dcbx_info);
+		return rc;
+	}
+
+	*p_dscp_pri = p_dcbx_info->dscp.dscp_pri_map[dscp_index];
+	kfree(p_dcbx_info);
+
+	return 0;
+}
+
+int qed_dcbx_set_dscp_priority(struct qed_hwfn *p_hwfn, struct qed_ptt *p_ptt,
+			       u8 dscp_index, u8 pri_val)
+{
+	struct qed_dcbx_set dcbx_set;
+	int rc;
+
+	if (IS_VF(p_hwfn->cdev)) {
+		DP_ERR(p_hwfn->cdev,
+		       "qed rdma set dscp priority not supported for VF.\n");
+		return -EINVAL;
+	}
+
+	if (dscp_index >= QED_DCBX_DSCP_SIZE ||
+	    pri_val >= QED_MAX_PFC_PRIORITIES) {
+		DP_ERR(p_hwfn, "Invalid dscp params: index = %d pri = %d\n",
+		       dscp_index, pri_val);
+		return -EINVAL;
+	}
+
+	memset(&dcbx_set, 0, sizeof(dcbx_set));
+	rc = qed_dcbx_get_config_params(p_hwfn, &dcbx_set);
+	if (rc)
+		return rc;
+
+	dcbx_set.override_flags = QED_DCBX_OVERRIDE_DSCP_CFG;
+	dcbx_set.dscp.dscp_pri_map[dscp_index] = pri_val;
+
+	return qed_dcbx_config_params(p_hwfn, p_ptt, &dcbx_set, 1);
+}
+
 static struct qed_dcbx_get *qed_dcbnl_get_dcbx(struct qed_hwfn *hwfn,
 					       enum qed_mib_read_type type)
 {

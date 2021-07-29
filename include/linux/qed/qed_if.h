@@ -124,12 +124,18 @@ struct qed_dcbx_operational_params {
 	u32 err;
 };
 
+struct qed_dcbx_dscp_params {
+	bool enabled;
+	u8 dscp_pri_map[QED_DCBX_DSCP_SIZE];
+};
+
 struct qed_dcbx_get {
 	struct qed_dcbx_operational_params operational;
 	struct qed_dcbx_lldp_remote lldp_remote;
 	struct qed_dcbx_lldp_local lldp_local;
 	struct qed_dcbx_remote_params remote;
 	struct qed_dcbx_admin_params local;
+	struct qed_dcbx_dscp_params dscp;
 };
 
 enum qed_nvm_images {

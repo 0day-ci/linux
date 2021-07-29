@@ -46,6 +46,7 @@ struct qed_dcbx_set {
 	bool enabled;
 	struct qed_dcbx_admin_params config;
 	u32 ver_num;
+	struct qed_dcbx_dscp_params dscp;
 };
 
 struct qed_dcbx_results {
@@ -99,6 +100,14 @@ int qed_dcbx_info_alloc(struct qed_hwfn *p_hwfn);
 void qed_dcbx_info_free(struct qed_hwfn *p_hwfn);
 void qed_dcbx_set_pf_update_params(struct qed_dcbx_results *p_src,
 				   struct pf_update_ramrod_data *p_dest);
+
+/* Returns priority value for a given dscp index */
+int qed_dcbx_get_dscp_priority(struct qed_hwfn *p_hwfn, u8 dscp_index,
+			       u8 *p_dscp_pri);
+
+/* Sets priority value for a given dscp index */
+int qed_dcbx_set_dscp_priority(struct qed_hwfn *p_hwfn, struct qed_ptt *p_ptt,
+			       u8 dscp_index, u8 pri_val);
 
 #define QED_DCBX_DEFAULT_TC	0
 
