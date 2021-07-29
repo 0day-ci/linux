@@ -116,6 +116,12 @@ set_vmid:
 	return idx2vmid(vmid) | generation;
 }
 
+/* Call with preemption disabled */
+void kvm_arm_vmid_clear_active(void)
+{
+	atomic64_set(this_cpu_ptr(&active_vmids), 0);
+}
+
 void kvm_arm_vmid_update(struct kvm_vmid *kvm_vmid)
 {
 	unsigned long flags;
