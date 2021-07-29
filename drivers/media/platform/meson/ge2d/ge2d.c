@@ -780,7 +780,7 @@ static int ge2d_s_ctrl(struct v4l2_ctrl *ctrl)
 		 * parameters, take them in account
 		 */
 		if (fmt.width != ctx->out.pix_fmt.width ||
-		    fmt.height != ctx->out.pix_fmt.width ||
+		    fmt.height != ctx->out.pix_fmt.height ||
 		    fmt.bytesperline > ctx->out.pix_fmt.bytesperline ||
 		    fmt.sizeimage > ctx->out.pix_fmt.sizeimage)
 			ctx->out.pix_fmt = fmt;
