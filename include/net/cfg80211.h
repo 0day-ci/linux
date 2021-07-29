@@ -694,6 +694,7 @@ struct cfg80211_bitrate_mask {
 		enum nl80211_txrate_gi gi;
 		enum nl80211_he_gi he_gi;
 		enum nl80211_he_ltf he_ltf;
+		u16 he_ul_mcs[NL80211_HE_NSS_MAX];
 	} control[NUM_NL80211_BANDS];
 };
 

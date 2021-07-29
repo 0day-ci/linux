@@ -384,6 +384,7 @@ static const struct nla_policy nl80211_txattr_policy[NL80211_TXRATE_MAX + 1] = {
 	[NL80211_TXRATE_HE_LTF] = NLA_POLICY_RANGE(NLA_U8,
 						   NL80211_RATE_INFO_HE_1XLTF,
 						   NL80211_RATE_INFO_HE_4XLTF),
+	[NL80211_TXRATE_HE_UL] = NLA_POLICY_EXACT_LEN(sizeof(struct nl80211_txrate_he)),
 };
 
 static const struct nla_policy
@@ -4869,6 +4870,14 @@ static int nl80211_parse_tx_bitrate_mask(struct genl_info *info,
 		if (tb[NL80211_TXRATE_HE_LTF])
 			mask->control[band].he_ltf =
 				nla_get_u8(tb[NL80211_TXRATE_HE_LTF]);
+		if (tb[NL80211_TXRATE_HE_UL] &&
+		    !he_set_mcs_mask(info, wdev, sband,
+				     nla_data(tb[NL80211_TXRATE_HE_UL]),
+				     mask->control[band].he_ul_mcs)) {
+			NL_SET_ERR_MSG(info->extack,
+					    "Unable to build HE mcs mask");
+			return -EINVAL;
+		}
 
 		if (mask->control[band].legacy == 0) {
 			/* don't allow empty legacy rates if HT, VHT or HE
