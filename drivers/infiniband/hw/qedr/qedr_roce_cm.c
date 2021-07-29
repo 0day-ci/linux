@@ -477,7 +477,7 @@ static inline int qedr_gsi_build_header(struct qedr_dev *dev,
 		u32 ipv4_addr;
 
 		udh->ip4.protocol = IPPROTO_UDP;
-		udh->ip4.tos = htonl(grh->flow_label);
+		udh->ip4.tos = grh->traffic_class;
 		udh->ip4.frag_off = htons(IP_DF);
 		udh->ip4.ttl = grh->hop_limit;
 
