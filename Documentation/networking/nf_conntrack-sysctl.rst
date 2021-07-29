@@ -30,6 +30,13 @@ nf_conntrack_checksum - BOOLEAN
 	in INVALID state. If this is enabled, such packets will not be
 	considered for connection tracking.
 
+nf_conntrack_lwtunnel - BOOLEAN
+	- 0 - disabled (default)
+	- not 0 - enabled
+
+	If this option is enabled, the lightweight tunnel netfilter hooks are
+	enabled. This option cannot be disabled once it is enabled.
+
 nf_conntrack_count - INTEGER (read-only)
 	Number of currently allocated flow entries.
 

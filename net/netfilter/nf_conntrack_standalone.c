@@ -552,6 +552,7 @@ enum nf_ct_sysctl_index {
 	NF_SYSCTL_CT_COUNT,
 	NF_SYSCTL_CT_BUCKETS,
 	NF_SYSCTL_CT_CHECKSUM,
+	NF_SYSCTL_CT_LWTUNNEL,
 	NF_SYSCTL_CT_LOG_INVALID,
 	NF_SYSCTL_CT_EXPECT_MAX,
 	NF_SYSCTL_CT_ACCT,
@@ -648,6 +649,13 @@ static struct ctl_table nf_ct_sysctl_table[] = {
 		.proc_handler	= proc_dou8vec_minmax,
 		.extra1 	= SYSCTL_ZERO,
 		.extra2 	= SYSCTL_ONE,
+	},
+	[NF_SYSCTL_CT_LWTUNNEL] = {
+		.procname	= "nf_conntrack_lwtunnel",
+		.data		= NULL,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= nf_conntrack_lwtunnel_sysctl_handler,
 	},
 	[NF_SYSCTL_CT_LOG_INVALID] = {
 		.procname	= "nf_conntrack_log_invalid",
