@@ -834,7 +834,8 @@ static void mxcmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 	else
 		burstlen = 4;
 
-	if (mxcmci_use_dma(host) && burstlen != host->burstlen) {
+	if (host->dma != NULL && burstlen != host->burstlen) {
+		/* reconfigure DMA on changes only */
 		host->burstlen = burstlen;
 		ret = mxcmci_setup_dma(mmc);
 		if (ret) {
