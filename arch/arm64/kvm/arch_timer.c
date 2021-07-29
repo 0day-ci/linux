@@ -89,7 +89,10 @@ static u64 timer_get_offset(struct arch_timer_context *ctxt)
 	switch(arch_timer_ctx_index(ctxt)) {
 	case TIMER_VTIMER:
 		return __vcpu_sys_reg(vcpu, CNTVOFF_EL2);
+	case TIMER_PTIMER:
+		return __vcpu_sys_reg(vcpu, CNTPOFF_EL2);
 	default:
+		WARN_ONCE(1, "unrecognized timer index %ld", arch_timer_ctx_index(ctxt));
 		return 0;
 	}
 }
@@ -134,6 +137,9 @@ static void timer_set_offset(struct arch_timer_context *ctxt, u64 offset)
 	case TIMER_VTIMER:
 		__vcpu_sys_reg(vcpu, CNTVOFF_EL2) = offset;
 		break;
+	case TIMER_PTIMER:
+		__vcpu_sys_reg(vcpu, CNTPOFF_EL2) = offset;
+		break;
 	default:
 		WARN(offset, "timer %ld\n", arch_timer_ctx_index(ctxt));
 	}
@@ -144,9 +150,24 @@ u64 kvm_phys_timer_read(void)
 	return timecounter->cc->read(timecounter->cc);
 }
 
+static bool timer_emulation_required(struct arch_timer_context *ctx)
+{
+	enum kvm_arch_timers timer = arch_timer_ctx_index(ctx);
+
+	switch (timer) {
+	case TIMER_VTIMER:
+		return false;
+	case TIMER_PTIMER:
+		return timer_get_offset(ctx);
+	default:
+		WARN_ONCE(1, "unrecognized timer index %ld\n", timer);
+		return false;
+	}
+}
+
 static void get_timer_map(struct kvm_vcpu *vcpu, struct timer_map *map)
 {
-	if (has_vhe()) {
+	if (has_vhe() && !timer_emulation_required(vcpu_ptimer(vcpu))) {
 		map->direct_vtimer = vcpu_vtimer(vcpu);
 		map->direct_ptimer = vcpu_ptimer(vcpu);
 		map->emul_ptimer = NULL;
@@ -747,8 +768,9 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu)
 	return 0;
 }
 
-/* Make the updates of cntvoff for all vtimer contexts atomic */
-static void update_vtimer_cntvoff(struct kvm_vcpu *vcpu, u64 cntvoff)
+/* Make the updates of offset for all timer contexts atomic */
+static void update_timer_offset(struct kvm_vcpu *vcpu,
+				enum kvm_arch_timers timer, u64 offset)
 {
 	int i;
 	struct kvm *kvm = vcpu->kvm;
@@ -756,14 +778,24 @@ static void update_vtimer_cntvoff(struct kvm_vcpu *vcpu, u64 cntvoff)
 
 	mutex_lock(&kvm->lock);
 	kvm_for_each_vcpu(i, tmp, kvm)
-		timer_set_offset(vcpu_vtimer(tmp), cntvoff);
+		timer_set_offset(vcpu_get_timer(tmp, timer), offset);
 
 	/*
 	 * When called from the vcpu create path, the CPU being created is not
 	 * included in the loop above, so we just set it here as well.
 	 */
-	timer_set_offset(vcpu_vtimer(vcpu), cntvoff);
+	timer_set_offset(vcpu_get_timer(vcpu, timer), offset);
 	mutex_unlock(&kvm->lock);
+}
+
+static void update_vtimer_cntvoff(struct kvm_vcpu *vcpu, u64 cntvoff)
+{
+	update_timer_offset(vcpu, TIMER_VTIMER, cntvoff);
+}
+
+static void update_ptimer_cntpoff(struct kvm_vcpu *vcpu, u64 cntpoff)
+{
+	update_timer_offset(vcpu, TIMER_PTIMER, cntpoff);
 }
 
 void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu)
@@ -1272,28 +1304,6 @@ no_vgic:
 	return 0;
 }
 
-/*
- * On VHE system, we only need to configure the EL2 timer trap register once,
- * not for every world switch.
- * The host kernel runs at EL2 with HCR_EL2.TGE == 1,
- * and this makes those bits have no effect for the host kernel execution.
- */
-void kvm_timer_init_vhe(void)
-{
-	/* When HCR_EL2.E2H ==1, EL1PCEN and EL1PCTEN are shifted by 10 */
-	u32 cnthctl_shift = 10;
-	u64 val;
-
-	/*
-	 * VHE systems allow the guest direct access to the EL1 physical
-	 * timer/counter.
-	 */
-	val = read_sysreg(cnthctl_el2);
-	val |= (CNTHCTL_EL1PCEN << cnthctl_shift);
-	val |= (CNTHCTL_EL1PCTEN << cnthctl_shift);
-	write_sysreg(val, cnthctl_el2);
-}
-
 static void set_timer_irqs(struct kvm *kvm, int vtimer_irq, int ptimer_irq)
 {
 	struct kvm_vcpu *vcpu;
@@ -1350,6 +1360,9 @@ int kvm_arm_timer_set_attr_offset(struct kvm_vcpu *vcpu, struct kvm_device_attr 
 	case KVM_ARM_VCPU_TIMER_OFFSET_VTIMER:
 		update_vtimer_cntvoff(vcpu, offset);
 		break;
+	case KVM_ARM_VCPU_TIMER_OFFSET_PTIMER:
+		update_ptimer_cntpoff(vcpu, offset);
+		break;
 	default:
 		return -ENXIO;
 	}
@@ -1364,6 +1377,7 @@ int kvm_arm_timer_set_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr)
 	case KVM_ARM_VCPU_TIMER_IRQ_PTIMER:
 		return kvm_arm_timer_set_attr_irq(vcpu, attr);
 	case KVM_ARM_VCPU_TIMER_OFFSET_VTIMER:
+	case KVM_ARM_VCPU_TIMER_OFFSET_PTIMER:
 		return kvm_arm_timer_set_attr_offset(vcpu, attr);
 	}
 
@@ -1400,6 +1414,8 @@ int kvm_arm_timer_get_attr_offset(struct kvm_vcpu *vcpu, struct kvm_device_attr 
 	switch (attr->attr) {
 	case KVM_ARM_VCPU_TIMER_OFFSET_VTIMER:
 		timer = vcpu_vtimer(vcpu);
+	case KVM_ARM_VCPU_TIMER_OFFSET_PTIMER:
+		timer = vcpu_ptimer(vcpu);
 		break;
 	default:
 		return -ENXIO;
@@ -1416,6 +1432,7 @@ int kvm_arm_timer_get_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr)
 	case KVM_ARM_VCPU_TIMER_IRQ_PTIMER:
 		return kvm_arm_timer_get_attr_irq(vcpu, attr);
 	case KVM_ARM_VCPU_TIMER_OFFSET_VTIMER:
+	case KVM_ARM_VCPU_TIMER_OFFSET_PTIMER:
 		return kvm_arm_timer_get_attr_offset(vcpu, attr);
 	}
 
@@ -1428,6 +1445,7 @@ int kvm_arm_timer_has_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr)
 	case KVM_ARM_VCPU_TIMER_IRQ_VTIMER:
 	case KVM_ARM_VCPU_TIMER_IRQ_PTIMER:
 	case KVM_ARM_VCPU_TIMER_OFFSET_VTIMER:
+	case KVM_ARM_VCPU_TIMER_OFFSET_PTIMER:
 		return 0;
 	}
 
