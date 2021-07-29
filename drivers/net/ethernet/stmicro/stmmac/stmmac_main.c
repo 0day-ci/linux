@@ -3212,6 +3212,7 @@ static int stmmac_hw_setup(struct net_device *dev, bool init_ptp)
 	bool sph_en;
 	u32 chan;
 	int ret;
+	int speed;
 
 	/* DMA initialization and SW reset */
 	ret = stmmac_init_dma_engine(priv);
@@ -3226,7 +3227,9 @@ static int stmmac_hw_setup(struct net_device *dev, bool init_ptp)
 
 	/* PS and related bits will be programmed according to the speed */
 	if (priv->hw->pcs) {
-		int speed = priv->plat->mac_port_sel_speed;
+		speed = priv->plat->mac_port_sel_speed;
+		if (priv->plat->phy_interface == PHY_INTERFACE_MODE_NA)
+			speed = SPEED_1000;
 
 		if ((speed == SPEED_10) || (speed == SPEED_100) ||
 		    (speed == SPEED_1000)) {
@@ -3255,6 +3258,17 @@ static int stmmac_hw_setup(struct net_device *dev, bool init_ptp)
 
 	/* Enable the MAC Rx/Tx */
 	stmmac_mac_set(priv, priv->ioaddr, true);
+
+	if (priv->plat->phy_interface == PHY_INTERFACE_MODE_NA) {
+		/*
+		 * Force MAC PORT SPEED to 1000Mbps and Full Duplex.
+		 */
+		u32 ctrl = readl(priv->ioaddr + MAC_CTRL_REG);
+		ctrl |= MAC_FULL_DUPLEX;
+		ctrl &= ~(MAC_PORT_SELECT);
+		writel(ctrl, priv->ioaddr + MAC_CTRL_REG);
+	}
+
 
 	/* Set the HW DMA mode and the COE */
 	stmmac_dma_operation_mode(priv);
@@ -3291,8 +3305,14 @@ static int stmmac_hw_setup(struct net_device *dev, bool init_ptp)
 		}
 	}
 
-	if (priv->hw->pcs)
-		stmmac_pcs_ctrl_ane(priv, priv->ioaddr, 1, priv->hw->ps, 0);
+	if (priv->hw->pcs) {
+		if (priv->plat->phy_interface != PHY_INTERFACE_MODE_NA) {
+			stmmac_pcs_ctrl_ane(priv, priv->ioaddr, 1, priv->hw->ps, 0);
+		} else {
+			/* Disable Autoneg */
+			writel(0x0, priv->ioaddr + GMAC_PCS_BASE);
+		}
+	}
 
 	/* set TX and RX rings length */
 	stmmac_set_rings_length(priv);
@@ -3644,12 +3664,14 @@ int stmmac_open(struct net_device *dev)
 	    priv->hw->pcs != STMMAC_PCS_RTBI &&
 	    (!priv->hw->xpcs ||
 	     xpcs_get_an_mode(priv->hw->xpcs, mode) != DW_AN_C73)) {
-		ret = stmmac_init_phy(dev);
-		if (ret) {
-			netdev_err(priv->dev,
-				   "%s: Cannot attach to PHY (error: %d)\n",
-				   __func__, ret);
-			goto init_phy_error;
+		if (priv->plat->phy_interface != PHY_INTERFACE_MODE_NA) {
+			ret = stmmac_init_phy(dev);
+			if (ret) {
+				netdev_err(priv->dev,
+					   "%s: Cannot attach to PHY (error: %d)\n",
+					   __func__, ret);
+				goto init_phy_error;
+			}
 		}
 	}
 
@@ -3705,7 +3727,8 @@ int stmmac_open(struct net_device *dev)
 
 	stmmac_init_coalesce(priv);
 
-	phylink_start(priv->phylink);
+	if (priv->plat->phy_interface != PHY_INTERFACE_MODE_NA)
+		phylink_start(priv->phylink);
 	/* We may have called phylink_speed_down before */
 	phylink_speed_up(priv->phylink);
 
@@ -3716,10 +3739,14 @@ int stmmac_open(struct net_device *dev)
 	stmmac_enable_all_queues(priv);
 	netif_tx_start_all_queues(priv->dev);
 
+	if (priv->plat->phy_interface == PHY_INTERFACE_MODE_NA)
+		netif_carrier_on(dev);
+
 	return 0;
 
 irq_error:
-	phylink_stop(priv->phylink);
+	if (priv->plat->phy_interface != PHY_INTERFACE_MODE_NA)
+		phylink_stop(priv->phylink);
 
 	for (chan = 0; chan < priv->plat->tx_queues_to_use; chan++)
 		hrtimer_cancel(&priv->tx_queue[chan].txtimer);
@@ -3728,7 +3755,8 @@ irq_error:
 init_error:
 	free_dma_desc_resources(priv);
 dma_desc_error:
-	phylink_disconnect_phy(priv->phylink);
+	if (priv->plat->phy_interface != PHY_INTERFACE_MODE_NA)
+		phylink_disconnect_phy(priv->phylink);
 init_phy_error:
 	pm_runtime_put(priv->device);
 	return ret;
@@ -3758,8 +3786,10 @@ int stmmac_release(struct net_device *dev)
 	if (device_may_wakeup(priv->device))
 		phylink_speed_down(priv->phylink, false);
 	/* Stop and disconnect the PHY */
-	phylink_stop(priv->phylink);
-	phylink_disconnect_phy(priv->phylink);
+	if (priv->plat->phy_interface != PHY_INTERFACE_MODE_NA) {
+		phylink_stop(priv->phylink);
+		phylink_disconnect_phy(priv->phylink);
+	}
 
 	stmmac_disable_all_queues(priv);
 
@@ -6986,12 +7016,15 @@ int stmmac_dvr_probe(struct device *device,
 	if (priv->hw->pcs != STMMAC_PCS_TBI &&
 	    priv->hw->pcs != STMMAC_PCS_RTBI) {
 		/* MDIO bus Registration */
-		ret = stmmac_mdio_register(ndev);
-		if (ret < 0) {
-			dev_err(priv->device,
-				"%s: MDIO bus (id: %d) registration failed",
-				__func__, priv->plat->bus_id);
-			goto error_mdio_register;
+
+		if (priv->plat->phy_interface != PHY_INTERFACE_MODE_NA) {
+			ret = stmmac_mdio_register(ndev);
+			if (ret < 0) {
+				dev_err(priv->device,
+					"%s: MDIO bus (id: %d) registration failed",
+					__func__, priv->plat->bus_id);
+				goto error_mdio_register;
+			}
 		}
 	}
 
@@ -7004,10 +7037,12 @@ int stmmac_dvr_probe(struct device *device,
 			goto error_xpcs_setup;
 	}
 
-	ret = stmmac_phy_setup(priv);
-	if (ret) {
-		netdev_err(ndev, "failed to setup phy (%d)\n", ret);
-		goto error_phy_setup;
+	if (priv->plat->phy_interface != PHY_INTERFACE_MODE_NA) {
+		ret = stmmac_phy_setup(priv);
+		if (ret) {
+			netdev_err(ndev, "failed to setup phy (%d)\n", ret);
+			goto error_phy_setup;
+		}
 	}
 
 	ret = register_netdev(ndev);
@@ -7039,11 +7074,13 @@ int stmmac_dvr_probe(struct device *device,
 error_serdes_powerup:
 	unregister_netdev(ndev);
 error_netdev_register:
-	phylink_destroy(priv->phylink);
+	if (priv->plat->phy_interface != PHY_INTERFACE_MODE_NA)
+		phylink_destroy(priv->phylink);
 error_xpcs_setup:
 error_phy_setup:
 	if (priv->hw->pcs != STMMAC_PCS_TBI &&
-	    priv->hw->pcs != STMMAC_PCS_RTBI)
+	    priv->hw->pcs != STMMAC_PCS_RTBI &&
+	    priv->plat->phy_interface != PHY_INTERFACE_MODE_NA)
 		stmmac_mdio_unregister(ndev);
 error_mdio_register:
 	stmmac_napi_del(ndev);
