@@ -222,7 +222,7 @@ static int test_ipc(void)
 
 	TEST_ASSERT_VAL("IPC failed, wrong ratio",
 			ratio == 1.5);
-	return 0;
+	return TEST_OK;
 }
 
 static int test_frontend(void)
@@ -241,7 +241,7 @@ static int test_frontend(void)
 
 	TEST_ASSERT_VAL("Frontend_Bound_SMT failed, wrong ratio",
 			ratio == 0.45);
-	return 0;
+	return TEST_OK;
 }
 
 static int test_cache_miss_cycles(void)
@@ -259,7 +259,7 @@ static int test_cache_miss_cycles(void)
 
 	TEST_ASSERT_VAL("cache_miss_cycles failed, wrong ratio",
 			ratio == 1.25);
-	return 0;
+	return TEST_OK;
 }
 
 
@@ -308,7 +308,7 @@ static int test_dcache_l2(void)
 
 	TEST_ASSERT_VAL("DCache_L2_Misses failed, wrong ratio",
 			ratio == 0.7);
-	return 0;
+	return TEST_OK;
 }
 
 static int test_recursion_fail(void)
@@ -325,7 +325,7 @@ static int test_recursion_fail(void)
 
 	TEST_ASSERT_VAL("failed to find recursion",
 			compute_metric("M3", vals, &ratio) == -1);
-	return 0;
+	return TEST_OK;
 }
 
 static int test_memory_bandwidth(void)
@@ -342,7 +342,7 @@ static int test_memory_bandwidth(void)
 	TEST_ASSERT_VAL("L1D_Cache_Fill_BW, wrong ratio",
 			1.28 == ratio);
 
-	return 0;
+	return TEST_OK;
 }
 
 static int test_metric_group(void)
@@ -366,7 +366,7 @@ static int test_metric_group(void)
 
 	TEST_ASSERT_VAL("group cache_miss_cycles failed, wrong ratio",
 			ratio2 == 1.25);
-	return 0;
+	return TEST_OK;
 }
 
 int test__parse_metric(struct test *test __maybe_unused, int subtest __maybe_unused)
@@ -381,5 +381,5 @@ int test__parse_metric(struct test *test __maybe_unused, int subtest __maybe_unu
 		TEST_ASSERT_VAL("cache_miss_cycles failed", test_cache_miss_cycles() == 0);
 		TEST_ASSERT_VAL("test metric group", test_metric_group() == 0);
 	}
-	return 0;
+	return TEST_OK;
 }

@@ -247,5 +247,5 @@ int test__time_utils(struct test *t __maybe_unused, int subtest __maybe_unused)
 
 	pr_debug("\n");
 
-	return pass ? 0 : TEST_FAIL;
+	return pass ? TEST_OK : TEST_FAIL;
 }

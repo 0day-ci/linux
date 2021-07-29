@@ -13,7 +13,7 @@ static int test(struct expr_parse_ctx *ctx, const char *e, double val2)
 	if (expr__parse(&val, ctx, e, 1))
 		TEST_ASSERT_VAL("parse test failed", 0);
 	TEST_ASSERT_VAL("unexpected value", val == val2);
-	return 0;
+	return TEST_OK;
 }
 
 int test__expr(struct test *t __maybe_unused, int subtest __maybe_unused)
@@ -84,5 +84,5 @@ int test__expr(struct test *t __maybe_unused, int subtest __maybe_unused)
 
 	expr__ctx_clear(&ctx);
 
-	return 0;
+	return TEST_OK;
 }

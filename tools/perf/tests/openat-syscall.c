@@ -15,7 +15,7 @@
 
 int test__openat_syscall_event(struct test *test __maybe_unused, int subtest __maybe_unused)
 {
-	int err = -1, fd;
+	int err = TEST_FAIL, fd;
 	struct evsel *evsel;
 	unsigned int nr_openat_calls = 111, i;
 	struct perf_thread_map *threads = thread_map__new(-1, getpid(), UINT_MAX);
@@ -24,7 +24,7 @@ int test__openat_syscall_event(struct test *test __maybe_unused, int subtest __m
 
 	if (threads == NULL) {
 		pr_debug("thread_map__new\n");
-		return -1;
+		return TEST_FAIL;
 	}
 
 	evsel = evsel__newtp("syscalls", "sys_enter_openat");
@@ -57,7 +57,7 @@ int test__openat_syscall_event(struct test *test __maybe_unused, int subtest __m
 		goto out_close_fd;
 	}
 
-	err = 0;
+	err = TEST_OK;
 out_close_fd:
 	perf_evsel__close_fd(&evsel->core);
 out_evsel_delete:

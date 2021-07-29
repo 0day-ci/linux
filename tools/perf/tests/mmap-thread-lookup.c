@@ -234,5 +234,5 @@ int test__mmap_thread_lookup(struct test *test __maybe_unused, int subtest __may
 	TEST_ASSERT_VAL("failed with sythesizing process",
 			!mmap_events(synth_process));
 
-	return 0;
+	return TEST_OK;
 }

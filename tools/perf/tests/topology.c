@@ -169,7 +169,7 @@ static int check_cpu_topology(char *path, struct perf_cpu_map *map)
 	}
 	perf_session__delete(session);
 
-	return 0;
+	return TEST_OK;
 }
 
 int test__session_topology(struct test *test __maybe_unused, int subtest __maybe_unused)

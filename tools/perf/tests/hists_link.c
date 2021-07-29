@@ -119,11 +119,11 @@ static int add_hist_entries(struct evlist *evlist, struct machine *machine)
 		i++;
 	}
 
-	return 0;
+	return TEST_OK;
 
 out:
 	pr_debug("Not enough memory for adding a hist entry\n");
-	return -1;
+	return TEST_FAIL;
 }
 
 static int find_sample(struct sample *samples, size_t nr_samples,
@@ -222,7 +222,7 @@ static int __validate_link(struct hists *hists, int idx)
 			count_pair++;
 		} else if (idx) {
 			pr_debug("A entry from the other hists should have pair\n");
-			return -1;
+			return TEST_FAIL;
 		}
 
 		count++;
@@ -236,27 +236,27 @@ static int __validate_link(struct hists *hists, int idx)
 		if (count_dummy != ARRAY_SIZE(fake_samples[1]) - 1) {
 			pr_debug("Invalid count of dummy entries: %zd of %zd\n",
 				 count_dummy, ARRAY_SIZE(fake_samples[1]) - 1);
-			return -1;
+			return TEST_FAIL;
 		}
 		if (count != count_pair + ARRAY_SIZE(fake_samples[0])) {
 			pr_debug("Invalid count of total leader entries: %zd of %zd\n",
 				 count, count_pair + ARRAY_SIZE(fake_samples[0]));
-			return -1;
+			return TEST_FAIL;
 		}
 	} else {
 		if (count != count_pair) {
 			pr_debug("Invalid count of total other entries: %zd of %zd\n",
 				 count, count_pair);
-			return -1;
+			return TEST_FAIL;
 		}
 		if (count_dummy > 0) {
 			pr_debug("Other hists should not have dummy entries: %zd\n",
 				 count_dummy);
-			return -1;
+			return TEST_FAIL;
 		}
 	}
 
-	return 0;
+	return TEST_OK;
 }
 
 static int validate_link(struct hists *leader, struct hists *other)
@@ -266,7 +266,7 @@ static int validate_link(struct hists *leader, struct hists *other)
 
 int test__hists_link(struct test *test __maybe_unused, int subtest __maybe_unused)
 {
-	int err = -1;
+	int err = TEST_FAIL;
 	struct hists *hists, *first_hists;
 	struct machines machines;
 	struct machine *machine = NULL;
@@ -274,15 +274,18 @@ int test__hists_link(struct test *test __maybe_unused, int subtest __maybe_unuse
 	struct evlist *evlist = evlist__new();
 
 	if (evlist == NULL)
-                return -ENOMEM;
+		return TEST_FAIL;
 
 	err = parse_events(evlist, "cpu-clock", NULL);
-	if (err)
+	if (err) {
+		err = TEST_FAIL;
 		goto out;
+	}
 	err = parse_events(evlist, "task-clock", NULL);
-	if (err)
+	if (err) {
+		err = TEST_FAIL;
 		goto out;
-
+	}
 	err = TEST_FAIL;
 	/* default sort order (comm,dso,sym) will be used */
 	if (setup_sorting(NULL) < 0)
@@ -300,7 +303,7 @@ int test__hists_link(struct test *test __maybe_unused, int subtest __maybe_unuse
 
 	/* process sample events */
 	err = add_hist_entries(evlist, machine);
-	if (err < 0)
+	if (err != TEST_OK)
 		goto out;
 
 	evlist__for_each_entry(evlist, evsel) {
@@ -329,7 +332,7 @@ int test__hists_link(struct test *test __maybe_unused, int subtest __maybe_unuse
 	if (err)
 		goto out;
 
-	err = 0;
+	err = TEST_OK;
 
 out:
 	/* tear down everything */

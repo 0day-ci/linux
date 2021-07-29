@@ -16,7 +16,7 @@
 
 int test__vmlinux_matches_kallsyms(struct test *test __maybe_unused, int subtest __maybe_unused)
 {
-	int err = -1;
+	int err = TEST_FAIL;
 	struct rb_node *nd;
 	struct symbol *sym;
 	struct map *kallsyms_map, *vmlinux_map, *map;
@@ -101,7 +101,7 @@ int test__vmlinux_matches_kallsyms(struct test *test __maybe_unused, int subtest
 		goto out;
 	}
 
-	err = 0;
+	err = TEST_OK;
 	/*
 	 * Step 7:
 	 *
@@ -174,7 +174,7 @@ next_pair:
 				 mem_start, sym->name);
 		}
 
-		err = -1;
+		err = TEST_FAIL;
 	}
 
 	if (verbose <= 0)

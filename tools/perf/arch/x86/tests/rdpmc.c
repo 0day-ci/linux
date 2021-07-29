@@ -89,7 +89,7 @@ static void segfault_handler(int sig __maybe_unused,
 			     siginfo_t *info __maybe_unused,
 			     void *uc __maybe_unused)
 {
-	exit(-1);
+	exit(TEST_FAIL);
 }
 
 static int __test__rdpmc(void)
@@ -119,7 +119,7 @@ static int __test__rdpmc(void)
 		pr_err("Error: sys_perf_event_open() syscall returned "
 		       "with %d (%s)\n", fd,
 		       str_error_r(errno, sbuf, sizeof(sbuf)));
-		return -1;
+		return TEST_FAIL;
 	}
 
 	addr = mmap(NULL, page_size, PROT_READ, MAP_SHARED, fd, 0);
@@ -152,9 +152,9 @@ out_close:
 	close(fd);
 
 	if (!delta_sum)
-		return -1;
+		return TEST_FAIL;
 
-	return 0;
+	return TEST_OK;
 }
 
 int test__rdpmc(struct test *test __maybe_unused, int subtest __maybe_unused)

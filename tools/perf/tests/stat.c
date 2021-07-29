@@ -44,7 +44,7 @@ static int process_stat_config_event(struct perf_tool *tool __maybe_unused,
 	TEST_ASSERT_VAL("wrong aggr_mode", stat_config.aggr_mode == AGGR_CORE);
 	TEST_ASSERT_VAL("wrong scale",     stat_config.scale == 1);
 	TEST_ASSERT_VAL("wrong interval",  stat_config.interval == 1);
-	return 0;
+	return TEST_OK;
 }
 
 int test__synthesize_stat_config(struct test *test __maybe_unused, int subtest __maybe_unused)
@@ -58,7 +58,7 @@ int test__synthesize_stat_config(struct test *test __maybe_unused, int subtest _
 	TEST_ASSERT_VAL("failed to synthesize stat_config",
 		!perf_event__synthesize_stat_config(NULL, &stat_config, process_stat_config_event, NULL));
 
-	return 0;
+	return TEST_OK;
 }
 
 static int process_stat_event(struct perf_tool *tool __maybe_unused,
@@ -74,7 +74,7 @@ static int process_stat_event(struct perf_tool *tool __maybe_unused,
 	TEST_ASSERT_VAL("wrong val",    st->val    == 100);
 	TEST_ASSERT_VAL("wrong run",    st->ena    == 200);
 	TEST_ASSERT_VAL("wrong ena",    st->run    == 300);
-	return 0;
+	return TEST_OK;
 }
 
 int test__synthesize_stat(struct test *test __maybe_unused, int subtest __maybe_unused)
@@ -88,7 +88,7 @@ int test__synthesize_stat(struct test *test __maybe_unused, int subtest __maybe_
 	TEST_ASSERT_VAL("failed to synthesize stat_config",
 		!perf_event__synthesize_stat(NULL, 1, 2, 3, &count, process_stat_event, NULL));
 
-	return 0;
+	return TEST_OK;
 }
 
 static int process_stat_round_event(struct perf_tool *tool __maybe_unused,
@@ -100,7 +100,7 @@ static int process_stat_round_event(struct perf_tool *tool __maybe_unused,
 
 	TEST_ASSERT_VAL("wrong time", stat_round->time == 0xdeadbeef);
 	TEST_ASSERT_VAL("wrong type", stat_round->type == PERF_STAT_ROUND_TYPE__INTERVAL);
-	return 0;
+	return TEST_OK;
 }
 
 int test__synthesize_stat_round(struct test *test __maybe_unused, int subtest __maybe_unused)
@@ -109,5 +109,5 @@ int test__synthesize_stat_round(struct test *test __maybe_unused, int subtest __
 		!perf_event__synthesize_stat_round(NULL, 0xdeadbeef, PERF_STAT_ROUND_TYPE__INTERVAL,
 						   process_stat_round_event, NULL));
 
-	return 0;
+	return TEST_OK;
 }

@@ -95,7 +95,7 @@ noinline int test_dwarf_unwind__thread(struct thread *thread)
 {
 	struct perf_sample sample;
 	unsigned long cnt = 0;
-	int err = -1;
+	int err = TEST_FAIL;
 
 	memset(&sample, 0, sizeof(sample));
 
@@ -108,10 +108,12 @@ noinline int test_dwarf_unwind__thread(struct thread *thread)
 				  &sample, MAX_STACK);
 	if (err)
 		pr_debug("unwind failed\n");
-	else if (cnt != MAX_STACK) {
+
+	err = err ? TEST_FAIL : TEST_OK;
+	if (cnt != MAX_STACK) {
 		pr_debug("got wrong number of stack entries %lu != %d\n",
 			 cnt, MAX_STACK);
-		err = -1;
+		err = TEST_FAIL;
 	}
 
  out:
@@ -174,17 +176,17 @@ int test__dwarf_unwind(struct test *test __maybe_unused, int subtest __maybe_unu
 {
 	struct machine *machine;
 	struct thread *thread;
-	int err = -1;
+	int err = TEST_FAIL;
 
 	machine = machine__new_host();
 	if (!machine) {
 		pr_err("Could not get machine\n");
-		return -1;
+		return TEST_FAIL;
 	}
 
 	if (machine__create_kernel_maps(machine)) {
 		pr_err("Failed to create kernel maps\n");
-		return -1;
+		return TEST_FAIL;
 	}
 
 	callchain_param.record_mode = CALLCHAIN_DWARF;

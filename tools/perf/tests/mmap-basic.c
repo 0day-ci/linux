@@ -31,7 +31,7 @@
  */
 int test__basic_mmap(struct test *test __maybe_unused, int subtest __maybe_unused)
 {
-	int err = -1;
+	int err = TEST_FAIL;
 	union perf_event *event;
 	struct perf_thread_map *threads;
 	struct perf_cpu_map *cpus;
@@ -49,7 +49,7 @@ int test__basic_mmap(struct test *test __maybe_unused, int subtest __maybe_unuse
 	threads = thread_map__new(-1, getpid(), UINT_MAX);
 	if (threads == NULL) {
 		pr_debug("thread_map__new\n");
-		return -1;
+		return TEST_FAIL;
 	}
 
 	cpus = perf_cpu_map__new(NULL);
@@ -132,7 +132,7 @@ int test__basic_mmap(struct test *test __maybe_unused, int subtest __maybe_unuse
 			goto out_delete_evlist;
 		}
 
-		err = -1;
+		err = TEST_FAIL;
 		evsel = evlist__id2evsel(evlist, sample.id);
 		if (evsel == NULL) {
 			pr_debug("event with id %" PRIu64
@@ -145,13 +145,13 @@ int test__basic_mmap(struct test *test __maybe_unused, int subtest __maybe_unuse
 	perf_mmap__read_done(&md->core);
 
 out_init:
-	err = 0;
+	err = TEST_OK;
 	evlist__for_each_entry(evlist, evsel) {
 		if (nr_events[evsel->core.idx] != expected_nr_events[evsel->core.idx]) {
 			pr_debug("expected %d %s events, got %d\n",
 				 expected_nr_events[evsel->core.idx],
 				 evsel__name(evsel), nr_events[evsel->core.idx]);
-			err = -1;
+			err = TEST_FAIL;
 			goto out_delete_evlist;
 		}
 	}

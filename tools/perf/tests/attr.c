@@ -194,7 +194,7 @@ int test__attr(struct test *test __maybe_unused, int subtest __maybe_unused)
 
 	exec_path = get_argv_exec_path();
 	if (exec_path == NULL)
-		return -1;
+		return TEST_FAIL;
 
 	/* Then installed path. */
 	snprintf(path_dir,  PATH_MAX, "%s/tests", exec_path);

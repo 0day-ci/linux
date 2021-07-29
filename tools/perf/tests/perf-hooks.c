@@ -12,7 +12,7 @@ static void sigsegv_handler(int sig __maybe_unused)
 	perf_hooks__recover();
 	signal(SIGSEGV, SIG_DFL);
 	raise(SIGSEGV);
-	exit(-1);
+	exit(TEST_FAIL);
 }
 
 

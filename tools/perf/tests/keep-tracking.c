@@ -75,7 +75,7 @@ int test__keep_tracking(struct test *test __maybe_unused, int subtest __maybe_un
 	struct perf_cpu_map *cpus = NULL;
 	struct evlist *evlist = NULL;
 	struct evsel *evsel = NULL;
-	int found, err = -1;
+	int found, err = TEST_FAIL;
 	const char *comm;
 
 	threads = thread_map__new(-1, getpid(), UINT_MAX);
@@ -148,7 +148,7 @@ int test__keep_tracking(struct test *test __maybe_unused, int subtest __maybe_un
 		goto out_err;
 	}
 
-	err = 0;
+	err = TEST_OK;
 
 out_err:
 	if (evlist) {

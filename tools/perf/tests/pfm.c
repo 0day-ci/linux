@@ -101,7 +101,7 @@ static int test__pfm_events(void)
 
 		evlist__delete(evlist);
 	}
-	return 0;
+	return TEST_OK;
 }
 
 static int test__pfm_group(void)
@@ -185,7 +185,7 @@ static int test__pfm_group(void)
 
 		evlist__delete(evlist);
 	}
-	return 0;
+	return TEST_OK;
 }
 #endif
 

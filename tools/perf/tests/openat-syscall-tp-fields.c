@@ -38,7 +38,7 @@ int test__syscall_openat_tp_fields(struct test *test __maybe_unused, int subtest
 	int flags = O_RDONLY | O_DIRECTORY;
 	struct evlist *evlist = evlist__new();
 	struct evsel *evsel;
-	int err = -1, i, nr_events = 0, nr_polls = 0;
+	int err = TEST_FAIL, i, nr_events = 0, nr_polls = 0;
 	char sbuf[STRERR_BUFSIZE];
 
 	if (evlist == NULL) {
@@ -136,7 +136,7 @@ int test__syscall_openat_tp_fields(struct test *test __maybe_unused, int subtest
 		}
 	}
 out_ok:
-	err = 0;
+	err = TEST_OK;
 out_delete_evlist:
 	evlist__delete(evlist);
 out:

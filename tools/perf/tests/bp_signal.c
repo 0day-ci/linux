@@ -125,7 +125,7 @@ static int __event(bool is_x, void *addr, int sig)
 				 perf_event_open_cloexec_flag());
 	if (fd < 0) {
 		pr_debug("failed opening event %llx\n", pe.config);
-		return TEST_FAIL;
+		return -1;
 	}
 
 	fcntl(fd, F_SETFL, O_RDWR|O_NONBLOCK|O_ASYNC);
@@ -165,6 +165,7 @@ int test__bp_signal(struct test *test __maybe_unused, int subtest __maybe_unused
 {
 	struct sigaction sa;
 	long long count1, count2, count3;
+	int ret;
 
 	/* setup SIGIO signal handler */
 	memset(&sa, 0, sizeof(struct sigaction));
@@ -234,8 +235,24 @@ int test__bp_signal(struct test *test __maybe_unused, int subtest __maybe_unused
 	 */
 
 	fd1 = bp_event(__test_function, SIGIO);
+	fd2 = -1;
+	fd3 = -1;
+	if (fd1 == -1)
+		return TEST_FAIL;
+
 	fd2 = bp_event(sig_handler, SIGUSR1);
+	if (fd2 == -1) {
+		ret = TEST_FAIL;
+		goto err_out;
+	}
+
 	fd3 = wp_event((void *)&the_var, SIGIO);
+	if (fd3 == -1) {
+		ret = TEST_FAIL;
+		goto err_out;
+	}
+
+	ret = TEST_OK;
 
 	ioctl(fd1, PERF_EVENT_IOC_ENABLE, 0);
 	ioctl(fd2, PERF_EVENT_IOC_ENABLE, 0);
@@ -255,34 +272,46 @@ int test__bp_signal(struct test *test __maybe_unused, int subtest __maybe_unused
 	count2 = bp_count(fd2);
 	count3 = bp_count(fd3);
 
-	close(fd1);
-	close(fd2);
-	close(fd3);
-
 	pr_debug("count1 %lld, count2 %lld, count3 %lld, overflow %d, overflows_2 %d\n",
 		 count1, count2, count3, overflows, overflows_2);
 
 	if (count1 != 1) {
+		ret = TEST_FAIL;
 		if (count1 == 11)
 			pr_debug("failed: RF EFLAG recursion issue detected\n");
 		else
 			pr_debug("failed: wrong count for bp1: %lld, expected 1\n", count1);
 	}
 
-	if (overflows != 3)
+	if (overflows != 3) {
+		ret = TEST_FAIL;
 		pr_debug("failed: wrong overflow (%d) hit, expected 3\n", overflows);
+	}
 
-	if (overflows_2 != 3)
+	if (overflows_2 != 3) {
+		ret = TEST_FAIL;
 		pr_debug("failed: wrong overflow_2 (%d) hit, expected 3\n", overflows_2);
+	}
 
-	if (count2 != 3)
+	if (count2 != 3) {
+		ret = TEST_FAIL;
 		pr_debug("failed: wrong count for bp2 (%lld), expected 3\n", count2);
+	}
 
-	if (count3 != 2)
+	if (count3 != 2) {
+		ret = TEST_FAIL;
 		pr_debug("failed: wrong count for bp3 (%lld), expected 2\n", count3);
+	}
 
-	return count1 == 1 && overflows == 3 && count2 == 3 && overflows_2 == 3 && count3 == 2 ?
-		TEST_OK : TEST_FAIL;
+err_out:
+	if (fd1 != -1)
+		close(fd1);
+	if (fd2 != -1)
+		close(fd2);
+	if (fd3 != -1)
+		close(fd3);
+
+	return ret;
 }
 
 bool test__bp_signal_is_supported(void)

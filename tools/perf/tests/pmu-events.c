@@ -173,7 +173,7 @@ static int test_pmu_event_table(void)
 			  ARRAY_SIZE(test_uncore_events) - 2;
 
 	if (!map)
-		return -1;
+		return TEST_FAIL;
 
 	for (table = map->table; table->name; table++) {
 		struct perf_pmu_test_event *test;
@@ -196,56 +196,56 @@ static int test_pmu_event_table(void)
 			if (!is_same(table->desc, te->desc)) {
 				pr_debug2("testing event table %s: mismatched desc, %s vs %s\n",
 					  table->name, table->desc, te->desc);
-				return -1;
+				return TEST_FAIL;
 			}
 
 			if (!is_same(table->topic, te->topic)) {
 				pr_debug2("testing event table %s: mismatched topic, %s vs %s\n",
 					  table->name, table->topic,
 					  te->topic);
-				return -1;
+				return TEST_FAIL;
 			}
 
 			if (!is_same(table->long_desc, te->long_desc)) {
 				pr_debug2("testing event table %s: mismatched long_desc, %s vs %s\n",
 					  table->name, table->long_desc,
 					  te->long_desc);
-				return -1;
+				return TEST_FAIL;
 			}
 
 			if (!is_same(table->unit, te->unit)) {
 				pr_debug2("testing event table %s: mismatched unit, %s vs %s\n",
 					  table->name, table->unit,
 					  te->unit);
-				return -1;
+				return TEST_FAIL;
 			}
 
 			if (!is_same(table->perpkg, te->perpkg)) {
 				pr_debug2("testing event table %s: mismatched perpkg, %s vs %s\n",
 					  table->name, table->perpkg,
 					  te->perpkg);
-				return -1;
+				return TEST_FAIL;
 			}
 
 			if (!is_same(table->metric_expr, te->metric_expr)) {
 				pr_debug2("testing event table %s: mismatched metric_expr, %s vs %s\n",
 					  table->name, table->metric_expr,
 					  te->metric_expr);
-				return -1;
+				return TEST_FAIL;
 			}
 
 			if (!is_same(table->metric_name, te->metric_name)) {
 				pr_debug2("testing event table %s: mismatched metric_name, %s vs %s\n",
 					  table->name,  table->metric_name,
 					  te->metric_name);
-				return -1;
+				return TEST_FAIL;
 			}
 
 			if (!is_same(table->deprecated, te->deprecated)) {
 				pr_debug2("testing event table %s: mismatched deprecated, %s vs %s\n",
 					  table->name, table->deprecated,
 					  te->deprecated);
-				return -1;
+				return TEST_FAIL;
 			}
 
 			pr_debug("testing event table %s: pass\n", table->name);
@@ -254,17 +254,17 @@ static int test_pmu_event_table(void)
 		if (!found) {
 			pr_err("testing event table: could not find event %s\n",
 			       table->name);
-			return -1;
+			return TEST_FAIL;
 		}
 	}
 
 	if (map_events != expected_events) {
 		pr_err("testing event table: found %d, but expected %d\n",
 		       map_events, expected_events);
-		return -1;
+		return TEST_FAIL;
 	}
 
-	return 0;
+	return TEST_OK;
 }
 
 static struct perf_pmu_alias *find_alias(const char *test_event, struct list_head *aliases)
@@ -386,7 +386,7 @@ static int test_aliases(void)
 
 		if (__test__pmu_event_aliases(pmu->name, &count)) {
 			pr_debug("testing PMU %s aliases: failed\n", pmu->name);
-			return -1;
+			return TEST_FAIL;
 		}
 
 		if (count == 0)
@@ -396,7 +396,7 @@ static int test_aliases(void)
 			pr_debug("testing PMU %s aliases: pass\n", pmu->name);
 	}
 
-	return 0;
+	return TEST_OK;
 }
 
 static bool is_number(const char *str)
@@ -628,7 +628,7 @@ static int metric_parse_fake(const char *str)
 	struct expr_parse_ctx ctx;
 	struct hashmap_entry *cur;
 	double result;
-	int ret = -1;
+	int ret = TEST_FAIL;
 	size_t bkt;
 	int i;
 
@@ -637,7 +637,7 @@ static int metric_parse_fake(const char *str)
 	expr__ctx_init(&ctx);
 	if (expr__find_other(str, NULL, &ctx, 0) < 0) {
 		pr_err("expr__find_other failed\n");
-		return -1;
+		return TEST_FAIL;
 	}
 
 	/*
@@ -659,7 +659,7 @@ static int metric_parse_fake(const char *str)
 	if (expr__parse(&result, &ctx, str, 0))
 		pr_err("expr__parse failed\n");
 	else
-		ret = 0;
+		ret = TEST_OK;
 
 out:
 	expr__ctx_clear(&ctx);
@@ -702,7 +702,7 @@ static int test_parsing_fake(void)
 		}
 	}
 
-	return 0;
+	return TEST_OK;
 }
 
 static const struct {

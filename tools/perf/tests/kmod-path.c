@@ -29,7 +29,7 @@ static int test(const char *path, bool alloc_name, bool kmod,
 		TEST_ASSERT_VAL("wrong name", !m.name);
 
 	free(m.name);
-	return 0;
+	return TEST_OK;
 }
 
 static int test_is_kernel_module(const char *path, int cpumode, bool expect)
@@ -38,7 +38,7 @@ static int test_is_kernel_module(const char *path, int cpumode, bool expect)
 			(!!is_kernel_module(path, cpumode)) == (!!expect));
 	pr_debug("%s (cpumode: %d) - is_kernel_module: %s\n",
 			path, cpumode, expect ? "true" : "false");
-	return 0;
+	return TEST_OK;
 }
 
 #define T(path, an, k, c, n) \
@@ -157,5 +157,5 @@ int test__kmod_path__parse(struct test *t __maybe_unused, int subtest __maybe_un
 	M("[kernel.kallsyms]", PERF_RECORD_MISC_KERNEL, false);
 	M("[kernel.kallsyms]", PERF_RECORD_MISC_USER, false);
 
-	return 0;
+	return TEST_OK;
 }

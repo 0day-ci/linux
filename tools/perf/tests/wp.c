@@ -78,7 +78,7 @@ static int wp_ro_test(void)
 	WP_TEST_ASSERT_VAL(fd, "RO watchpoint", 1);
 
 	close(fd);
-	return 0;
+	return TEST_OK;
 }
 
 static int wp_wo_test(void)
@@ -88,7 +88,7 @@ static int wp_wo_test(void)
 
 	fd = __event(HW_BREAKPOINT_W, (void *)&data1, sizeof(data1));
 	if (fd < 0)
-		return -1;
+		return TEST_FAIL;
 
 	tmp = data1;
 	WP_TEST_ASSERT_VAL(fd, "WO watchpoint", 0);
@@ -97,7 +97,7 @@ static int wp_wo_test(void)
 	WP_TEST_ASSERT_VAL(fd, "WO watchpoint", 1);
 
 	close(fd);
-	return 0;
+	return TEST_OK;
 }
 
 static int wp_rw_test(void)
@@ -117,7 +117,7 @@ static int wp_rw_test(void)
 	WP_TEST_ASSERT_VAL(fd, "RW watchpoint", 2);
 
 	close(fd);
-	return 0;
+	return TEST_OK;
 }
 
 static int wp_modify_test(void)
@@ -162,7 +162,7 @@ static int wp_modify_test(void)
 	WP_TEST_ASSERT_VAL(fd, "Modify watchpoint", 2);
 
 	close(fd);
-	return 0;
+	return TEST_OK;
 }
 
 static bool wp_ro_supported(void)

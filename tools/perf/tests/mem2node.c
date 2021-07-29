@@ -75,5 +75,5 @@ int test__mem2node(struct test *t __maybe_unused, int subtest __maybe_unused)
 		zfree(&nodes[i].set);
 
 	mem2node__exit(&map);
-	return 0;
+	return TEST_OK;
 }

@@ -94,5 +94,5 @@ int test__thread_maps_share(struct test *test __maybe_unused, int subtest __mayb
 	thread__put(other);
 
 	machines__exit(&machines);
-	return 0;
+	return TEST_OK;
 }

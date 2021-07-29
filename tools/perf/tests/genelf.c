@@ -44,7 +44,7 @@ int test__jit_write_elf(struct test *test __maybe_unused,
 
 	unlink(path);
 
-	return ret ? TEST_FAIL : 0;
+	return ret ? TEST_FAIL : TEST_OK;
 #else
 	return TEST_SKIP;
 #endif

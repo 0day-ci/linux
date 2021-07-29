@@ -725,20 +725,20 @@ int test__code_reading(struct test *test __maybe_unused, int subtest __maybe_unu
 
 	switch (ret) {
 	case TEST_CODE_READING_OK:
-		return 0;
+		return TEST_OK;
 	case TEST_CODE_READING_NO_VMLINUX:
 		pr_debug("no vmlinux\n");
-		return 0;
+		return TEST_SKIP;
 	case TEST_CODE_READING_NO_KCORE:
 		pr_debug("no kcore\n");
-		return 0;
+		return TEST_SKIP;
 	case TEST_CODE_READING_NO_ACCESS:
 		pr_debug("no access\n");
-		return 0;
+		return TEST_SKIP;
 	case TEST_CODE_READING_NO_KERNEL_OBJ:
 		pr_debug("no kernel obj\n");
-		return 0;
+		return TEST_SKIP;
 	default:
-		return -1;
+		return TEST_FAIL;
 	};
 }

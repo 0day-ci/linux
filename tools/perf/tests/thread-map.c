@@ -56,7 +56,7 @@ int test__thread_map(struct test *test __maybe_unused, int subtest __maybe_unuse
 	TEST_ASSERT_VAL("wrong refcnt",
 			refcount_read(&map->refcnt) == 1);
 	perf_thread_map__put(map);
-	return 0;
+	return TEST_OK;
 }
 
 static int process_event(struct perf_tool *tool __maybe_unused,
@@ -83,7 +83,7 @@ static int process_event(struct perf_tool *tool __maybe_unused,
 	TEST_ASSERT_VAL("wrong refcnt",
 			refcount_read(&threads->refcnt) == 1);
 	perf_thread_map__put(threads);
-	return 0;
+	return TEST_OK;
 }
 
 int test__thread_map_synthesize(struct test *test __maybe_unused, int subtest __maybe_unused)
@@ -103,7 +103,7 @@ int test__thread_map_synthesize(struct test *test __maybe_unused, int subtest __
 		!perf_event__synthesize_thread_map2(NULL, threads, process_event, NULL));
 
 	perf_thread_map__put(threads);
-	return 0;
+	return TEST_OK;
 }
 
 int test__thread_map_remove(struct test *test __maybe_unused, int subtest __maybe_unused)
@@ -143,5 +143,5 @@ int test__thread_map_remove(struct test *test __maybe_unused, int subtest __mayb
 			thread_map__remove(threads, 0));
 
 	perf_thread_map__put(threads);
-	return 0;
+	return TEST_OK;
 }

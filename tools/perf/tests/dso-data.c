@@ -171,7 +171,7 @@ int test__dso_data(struct test *test __maybe_unused, int subtest __maybe_unused)
 
 	dso__put(dso);
 	unlink(file);
-	return 0;
+	return TEST_OK;
 }
 
 static long open_files_cnt(void)
@@ -218,7 +218,7 @@ static int dsos__create(int cnt, int size)
 		TEST_ASSERT_VAL("failed to get dso", dsos[i]);
 	}
 
-	return 0;
+	return TEST_OK;
 }
 
 static void dsos__delete(int cnt)
@@ -305,7 +305,7 @@ int test__dso_data_cache(struct test *test __maybe_unused, int subtest __maybe_u
 	nr_end = open_files_cnt();
 	pr_debug("nr start %ld, nr stop %ld\n", nr, nr_end);
 	TEST_ASSERT_VAL("failed leaking files", nr == nr_end);
-	return 0;
+	return TEST_OK;
 }
 
 int test__dso_data_reopen(struct test *test __maybe_unused, int subtest __maybe_unused)
@@ -381,5 +381,5 @@ int test__dso_data_reopen(struct test *test __maybe_unused, int subtest __maybe_
 	nr_end = open_files_cnt();
 	pr_debug("nr start %ld, nr stop %ld\n", nr, nr_end);
 	TEST_ASSERT_VAL("failed leaking files", nr == nr_end);
-	return 0;
+	return TEST_OK;
 }

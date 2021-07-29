@@ -145,7 +145,7 @@ int test__pmu(struct test *test __maybe_unused, int subtest __maybe_unused)
 	int ret;
 
 	if (!format)
-		return -EINVAL;
+		return TEST_FAIL;
 
 	do {
 		struct perf_event_attr attr;
@@ -153,15 +153,17 @@ int test__pmu(struct test *test __maybe_unused, int subtest __maybe_unused)
 		memset(&attr, 0, sizeof(attr));
 
 		ret = perf_pmu__format_parse(format, &formats);
-		if (ret)
+		if (ret) {
+			ret = TEST_FAIL;
 			break;
-
+		}
 		ret = perf_pmu__config_terms("perf-pmu-test", &formats, &attr,
 					     terms, false, NULL);
-		if (ret)
+		if (ret) {
+			ret = TEST_FAIL;
 			break;
-
-		ret = -EINVAL;
+		}
+		ret = TEST_FAIL;
 
 		if (attr.config  != 0xc00000000002a823)
 			break;
@@ -170,7 +172,7 @@ int test__pmu(struct test *test __maybe_unused, int subtest __maybe_unused)
 		if (attr.config2 != 0x0400000020041d07)
 			break;
 
-		ret = 0;
+		ret = TEST_OK;
 	} while (0);
 
 	perf_pmu__del_formats(&formats);

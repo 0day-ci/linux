@@ -49,7 +49,7 @@ static int __event(bool is_x, void *addr, struct perf_event_attr *attr)
 				 perf_event_open_cloexec_flag());
 	if (fd < 0) {
 		pr_debug("failed opening event %llx\n", attr->config);
-		return TEST_FAIL;
+		return -1;
 	}
 
 	return fd;
@@ -94,7 +94,7 @@ static int bp_accounting(int wp_cnt, int share)
 	for (i = 0; i < wp_cnt; i++)
 		close(fd[i]);
 
-	return 0;
+	return TEST_OK;
 }
 
 static int detect_cnt(bool is_x)

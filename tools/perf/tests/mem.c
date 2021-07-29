@@ -20,12 +20,12 @@ static int check(union perf_mem_data_src data_src,
 	n += perf_mem__lvl_scnprintf(out + n, sizeof out - n, &mi);
 	scnprintf(failure, sizeof failure, "unexpected %s", out);
 	TEST_ASSERT_VAL(failure, !strcmp(string, out));
-	return 0;
+	return TEST_OK;
 }
 
 int test__mem(struct test *text __maybe_unused, int subtest __maybe_unused)
 {
-	int ret = 0;
+	int ret = TEST_OK;
 	union perf_mem_data_src src;
 
 	memset(&src, 0, sizeof(src));

@@ -11,12 +11,12 @@
 static int perf_evsel__roundtrip_cache_name_test(void)
 {
 	char name[128];
-	int type, op, err = 0, ret = 0, i, idx;
+	int type, op, err, ret = TEST_OK, i, idx;
 	struct evsel *evsel;
 	struct evlist *evlist = evlist__new();
 
         if (evlist == NULL)
-                return -ENOMEM;
+		return TEST_FAIL;
 
 	for (type = 0; type < PERF_COUNT_HW_CACHE_MAX; type++) {
 		for (op = 0; op < PERF_COUNT_HW_CACHE_OP_MAX; op++) {
@@ -28,7 +28,7 @@ static int perf_evsel__roundtrip_cache_name_test(void)
 				__evsel__hw_cache_type_op_res_name(type, op, i, name, sizeof(name));
 				err = parse_events(evlist, name, NULL);
 				if (err)
-					ret = err;
+					ret = TEST_FAIL;
 			}
 		}
 	}
@@ -51,7 +51,7 @@ static int perf_evsel__roundtrip_cache_name_test(void)
 
 				if (strcmp(evsel__name(evsel), name)) {
 					pr_debug("%s != %s\n", evsel__name(evsel), name);
-					ret = -1;
+					ret = TEST_FAIL;
 				}
 
 				evsel = evsel__next(evsel);
@@ -71,7 +71,7 @@ static int __perf_evsel__name_array_test(const char *names[], int nr_names,
 	struct evlist *evlist = evlist__new();
 
         if (evlist == NULL)
-                return -ENOMEM;
+		return TEST_FAIL;
 
 	for (i = 0; i < nr_names; ++i) {
 		err = parse_events(evlist, names[i], NULL);
@@ -82,7 +82,7 @@ static int __perf_evsel__name_array_test(const char *names[], int nr_names,
 		}
 	}
 
-	err = 0;
+	err = TEST_OK;
 	evlist__for_each_entry(evlist, evsel) {
 		if (strcmp(evsel__name(evsel), names[evsel->core.idx / distance])) {
 			--err;
@@ -100,7 +100,7 @@ out_delete_evlist:
 
 int test__perf_evsel__roundtrip_name_test(struct test *test __maybe_unused, int subtest __maybe_unused)
 {
-	int err = 0, ret = 0;
+	int err, ret = TEST_OK;
 
 	if (perf_pmu__has_hybrid())
 		return perf_evsel__name_array_test(evsel__hw_names, 2);

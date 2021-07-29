@@ -19,7 +19,7 @@ int test__python_use(struct test *test __maybe_unused, int subtest __maybe_unuse
 		return -1;
 
 	pr_debug("python usage test: \"%s\"\n", cmd);
-	ret = system(cmd) ? -1 : 0;
+	ret = system(cmd) ? TEST_FAIL : TEST_OK;
 	free(cmd);
 	return ret;
 }

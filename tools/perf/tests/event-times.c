@@ -218,7 +218,7 @@ out_err:
  */
 int test__event_times(struct test *test __maybe_unused, int subtest __maybe_unused)
 {
-	int err, ret = 0;
+	int err, ret = TEST_OK;
 
 #define _T(attach, detach)			\
 	err = test_times(attach, detach);	\

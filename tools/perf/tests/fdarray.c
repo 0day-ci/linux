@@ -82,7 +82,7 @@ int test__fdarray__filter(struct test *test __maybe_unused, int subtest __maybe_
 
 	pr_debug("\n");
 
-	err = 0;
+	err = TEST_OK;
 out_delete:
 	fdarray__delete(fda);
 out:
@@ -152,7 +152,7 @@ int test__fdarray__add(struct test *test __maybe_unused, int subtest __maybe_unu
 
 	pr_debug("\n");
 
-	err = 0;
+	err = TEST_OK;
 out_delete:
 	fdarray__delete(fda);
 out:

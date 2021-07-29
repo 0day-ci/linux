@@ -41,7 +41,7 @@ static void workload_exec_failed_signal(int signo __maybe_unused,
  */
 int test__task_exit(struct test *test __maybe_unused, int subtest __maybe_unused)
 {
-	int err = -1;
+	int err = TEST_FAIL;
 	union perf_event *event;
 	struct evsel *evsel;
 	struct evlist *evlist;
@@ -61,7 +61,7 @@ int test__task_exit(struct test *test __maybe_unused, int subtest __maybe_unused
 	evlist = evlist__new_default();
 	if (evlist == NULL) {
 		pr_debug("evlist__new_default\n");
-		return -1;
+		return TEST_FAIL;
 	}
 
 	/*
@@ -73,7 +73,7 @@ int test__task_exit(struct test *test __maybe_unused, int subtest __maybe_unused
 	cpus = perf_cpu_map__dummy_new();
 	threads = thread_map__new_by_tid(-1);
 	if (!cpus || !threads) {
-		err = -ENOMEM;
+		err = TEST_FAIL;
 		pr_debug("Not enough memory to create thread/cpu maps\n");
 		goto out_delete_evlist;
 	}
@@ -108,7 +108,7 @@ int test__task_exit(struct test *test __maybe_unused, int subtest __maybe_unused
 	if (evlist__mmap(evlist, 128) < 0) {
 		pr_debug("failed to mmap events: %d (%s)\n", errno,
 			 str_error_r(errno, sbuf, sizeof(sbuf)));
-		err = -1;
+		err = TEST_FAIL;
 		goto out_delete_evlist;
 	}
 
@@ -133,7 +133,7 @@ out_init:
 
 		if (retry_count++ > 1000) {
 			pr_debug("Failed after retrying 1000 times\n");
-			err = -1;
+			err = TEST_FAIL;
 			goto out_delete_evlist;
 		}
 
@@ -142,7 +142,7 @@ out_init:
 
 	if (nr_exit != 1) {
 		pr_debug("received %d EXIT records\n", nr_exit);
-		err = -1;
+		err = TEST_FAIL;
 	}
 
 out_delete_evlist:

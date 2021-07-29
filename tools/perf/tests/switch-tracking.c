@@ -340,7 +340,7 @@ int test__switch_tracking(struct test *test __maybe_unused, int subtest __maybe_
 	struct evsel *evsel, *cpu_clocks_evsel, *cycles_evsel;
 	struct evsel *switch_evsel, *tracking_evsel;
 	const char *comm;
-	int err = -1;
+	int err = TEST_FAIL;
 
 	threads = thread_map__new(-1, getpid(), UINT_MAX);
 	if (!threads) {
@@ -386,7 +386,7 @@ int test__switch_tracking(struct test *test __maybe_unused, int subtest __maybe_
 	/* Third event */
 	if (!evlist__can_select_event(evlist, sched_switch)) {
 		pr_debug("No sched_switch\n");
-		err = 0;
+		err = TEST_OK;
 		goto out;
 	}
 
@@ -462,7 +462,7 @@ int test__switch_tracking(struct test *test __maybe_unused, int subtest __maybe_
 
 	if (evlist__open(evlist) < 0) {
 		pr_debug("Not supported\n");
-		err = 0;
+		err = TEST_OK;
 		goto out;
 	}
 
@@ -553,6 +553,7 @@ int test__switch_tracking(struct test *test __maybe_unused, int subtest __maybe_
 	/* Check all 4 comm events were seen i.e. that evsel->tracking works */
 	if (!switch_tracking.comm_seen[0] || !switch_tracking.comm_seen[1] ||
 	    !switch_tracking.comm_seen[2] || !switch_tracking.comm_seen[3]) {
+		err = TEST_FAIL;
 		pr_debug("Missing comm events\n");
 		goto out_err;
 	}
@@ -585,6 +586,6 @@ out:
 	return err;
 
 out_err:
-	err = -1;
+	err = TEST_FAIL;
 	goto out;
 }

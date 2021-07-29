@@ -250,7 +250,7 @@ static int do_test(u64 sample_type, u64 sample_regs, u64 read_format)
 	struct sample_read_value values[] = {{1, 5}, {9, 3}, {2, 7}, {6, 4},};
 	struct perf_sample sample_out;
 	size_t i, sz, bufsz;
-	int err, ret = -1;
+	int err, ret = TEST_FAIL;
 
 	if (sample_type & PERF_SAMPLE_REGS_USER)
 		evsel.core.attr.sample_regs_user = sample_regs;
@@ -277,7 +277,7 @@ static int do_test(u64 sample_type, u64 sample_regs, u64 read_format)
 	event = malloc(bufsz);
 	if (!event) {
 		pr_debug("malloc failed\n");
-		return -1;
+		return TEST_FAIL;
 	}
 
 	memset(event, 0xff, bufsz);
@@ -319,7 +319,7 @@ static int do_test(u64 sample_type, u64 sample_regs, u64 read_format)
 		goto out_free;
 	}
 
-	ret = 0;
+	ret = TEST_OK;
 out_free:
 	free(event);
 	if (ret && read_format)
@@ -350,7 +350,7 @@ int test__sample_parsing(struct test *test __maybe_unused, int subtest __maybe_u
 	 */
 	if (PERF_SAMPLE_MAX > PERF_SAMPLE_WEIGHT_STRUCT << 1) {
 		pr_debug("sample format has changed, some new PERF_SAMPLE_ bit was introduced - test needs updating\n");
-		return -1;
+		return TEST_FAIL;
 	}
 
 	/* Test each sample format bit separately */
@@ -391,5 +391,5 @@ int test__sample_parsing(struct test *test __maybe_unused, int subtest __maybe_u
 			return err;
 	}
 
-	return 0;
+	return TEST_OK;
 }

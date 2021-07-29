@@ -26,7 +26,7 @@
  */
 static int __test__sw_clock_freq(enum perf_sw_ids clock_id)
 {
-	int i, err = -1;
+	int i, err = TEST_FAIL;
 	volatile int tmp = 0;
 	u64 total_periods = 0;
 	int nr_samples = 0;
@@ -51,7 +51,7 @@ static int __test__sw_clock_freq(enum perf_sw_ids clock_id)
 	evlist = evlist__new();
 	if (evlist == NULL) {
 		pr_debug("evlist__new\n");
-		return -1;
+		return TEST_FAIL;
 	}
 
 	evsel = evsel__new(&attr);
@@ -64,7 +64,6 @@ static int __test__sw_clock_freq(enum perf_sw_ids clock_id)
 	cpus = perf_cpu_map__dummy_new();
 	threads = thread_map__new_by_tid(getpid());
 	if (!cpus || !threads) {
-		err = -ENOMEM;
 		pr_debug("Not enough memory to create thread/cpu maps\n");
 		goto out_delete_evlist;
 	}
@@ -74,7 +73,6 @@ static int __test__sw_clock_freq(enum perf_sw_ids clock_id)
 	if (evlist__open(evlist)) {
 		const char *knob = "/proc/sys/kernel/perf_event_max_sample_rate";
 
-		err = -errno;
 		pr_debug("Couldn't open evlist: %s\nHint: check %s, using %" PRIu64 " in this test.\n",
 			 str_error_r(errno, sbuf, sizeof(sbuf)),
 			 knob, (u64)attr.sample_freq);
@@ -83,6 +81,7 @@ static int __test__sw_clock_freq(enum perf_sw_ids clock_id)
 
 	err = evlist__mmap(evlist, 128);
 	if (err < 0) {
+		err = TEST_FAIL;
 		pr_debug("failed to mmap event: %d (%s)\n", errno,
 			 str_error_r(errno, sbuf, sizeof(sbuf)));
 		goto out_delete_evlist;
@@ -108,6 +107,7 @@ static int __test__sw_clock_freq(enum perf_sw_ids clock_id)
 
 		err = evlist__parse_sample(evlist, event, &sample);
 		if (err < 0) {
+			err = TEST_FAIL;
 			pr_debug("Error during parse sample\n");
 			goto out_delete_evlist;
 		}

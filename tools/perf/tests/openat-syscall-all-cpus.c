@@ -21,7 +21,7 @@
 
 int test__openat_syscall_event_on_all_cpus(struct test *test __maybe_unused, int subtest __maybe_unused)
 {
-	int err = -1, fd, cpu;
+	int err = TEST_FAIL, fd, cpu;
 	struct perf_cpu_map *cpus;
 	struct evsel *evsel;
 	unsigned int nr_openat_calls = 111, i;
@@ -94,7 +94,7 @@ int test__openat_syscall_event_on_all_cpus(struct test *test __maybe_unused, int
 		goto out_close_fd;
 	}
 
-	err = 0;
+	err = TEST_OK;
 
 	for (cpu = 0; cpu < cpus->nr; ++cpu) {
 		unsigned int expected;

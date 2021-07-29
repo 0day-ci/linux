@@ -99,7 +99,7 @@ int test__parse_no_sample_id_all(struct test *test __maybe_unused, int subtest _
 
 	err = process_events(events, ARRAY_SIZE(events));
 	if (err)
-		return -1;
+		return TEST_FAIL;
 
-	return 0;
+	return TEST_OK;
 }

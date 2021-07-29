@@ -330,5 +330,5 @@ found_exit:
 out_delete_evlist:
 	evlist__delete(evlist);
 out:
-	return (err < 0 || errs > 0) ? -1 : 0;
+	return (err < 0 || errs > 0) ? TEST_FAIL : TEST_OK;
 }

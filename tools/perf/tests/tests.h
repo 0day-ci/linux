@@ -8,7 +8,7 @@
 do {									 \
 	if (!(cond)) {							 \
 		pr_debug("FAILED %s:%d %s\n", __FILE__, __LINE__, text); \
-		return -1;						 \
+		return TEST_FAIL;					 \
 	}								 \
 } while (0)
 
@@ -17,7 +17,7 @@ do {									 \
 	if (val != expected) {						 \
 		pr_debug("FAILED %s:%d %s (%d != %d)\n",		 \
 			 __FILE__, __LINE__, text, val, expected);	 \
-		return -1;						 \
+		return TEST_FAIL;					 \
 	}								 \
 } while (0)
 

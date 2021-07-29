@@ -243,7 +243,7 @@ static int do_test(struct hists *hists, struct result *expected, size_t nr_expec
 			i == nr_expected);
 	TEST_ASSERT_VAL("Incorrect number of callchain entry",
 			!symbol_conf.use_callchain || nr_expected == nr_callchain);
-	return 0;
+	return TEST_OK;
 }
 
 /* NO callchain + NO children */

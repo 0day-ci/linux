@@ -42,7 +42,7 @@ static int process_event_mask(struct perf_tool *tool __maybe_unused,
 	}
 
 	perf_cpu_map__put(map);
-	return 0;
+	return TEST_OK;
 }
 
 static int process_event_cpus(struct perf_tool *tool __maybe_unused,
@@ -71,7 +71,7 @@ static int process_event_cpus(struct perf_tool *tool __maybe_unused,
 	TEST_ASSERT_VAL("wrong cpu", map->map[1] == 256);
 	TEST_ASSERT_VAL("wrong refcnt", refcount_read(&map->refcnt) == 1);
 	perf_cpu_map__put(map);
-	return 0;
+	return TEST_OK;
 }
 
 
@@ -94,7 +94,7 @@ int test__cpu_map_synthesize(struct test *test __maybe_unused, int subtest __may
 		!perf_event__synthesize_cpu_map(NULL, cpus, process_event_cpus, NULL));
 
 	perf_cpu_map__put(cpus);
-	return 0;
+	return TEST_OK;
 }
 
 static int cpu_map_print(const char *str)
@@ -120,7 +120,7 @@ int test__cpu_map_print(struct test *test __maybe_unused, int subtest __maybe_un
 	TEST_ASSERT_VAL("failed to convert map", cpu_map_print("1,3-6,8-10,24,35-37"));
 	TEST_ASSERT_VAL("failed to convert map", cpu_map_print("1,3-6,8-10,24,35-37"));
 	TEST_ASSERT_VAL("failed to convert map", cpu_map_print("1-10,12-20,22-30,32-40"));
-	return 0;
+	return TEST_OK;
 }
 
 int test__cpu_map_merge(struct test *test __maybe_unused, int subtest __maybe_unused)
@@ -135,5 +135,5 @@ int test__cpu_map_merge(struct test *test __maybe_unused, int subtest __maybe_un
 	TEST_ASSERT_VAL("failed to merge map: bad result", !strcmp(buf, "1-2,4-5,7"));
 	perf_cpu_map__put(b);
 	perf_cpu_map__put(c);
-	return 0;
+	return TEST_OK;
 }

@@ -94,7 +94,7 @@ static int add_hist_entries(struct evlist *evlist,
 		}
 	}
 
-	return 0;
+	return TEST_OK;
 
 out:
 	pr_debug("Not enough memory for adding a hist entry\n");
@@ -103,7 +103,7 @@ out:
 
 int test__hists_filter(struct test *test __maybe_unused, int subtest __maybe_unused)
 {
-	int err = TEST_FAIL;
+	int err;
 	struct machines machines;
 	struct machine *machine;
 	struct evsel *evsel;
@@ -112,11 +112,15 @@ int test__hists_filter(struct test *test __maybe_unused, int subtest __maybe_unu
 	TEST_ASSERT_VAL("No memory", evlist);
 
 	err = parse_events(evlist, "cpu-clock", NULL);
-	if (err)
+	if (err) {
+		err = TEST_FAIL;
 		goto out;
+	}
 	err = parse_events(evlist, "task-clock", NULL);
-	if (err)
+	if (err) {
+		err = TEST_FAIL;
 		goto out;
+	}
 	err = TEST_FAIL;
 
 	/* default sort order (comm,dso,sym) will be used */
