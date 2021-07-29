@@ -45,6 +45,15 @@ config SND_SOC_RCAR
 	help
 	  This option enables R-Car SRU/SCU/SSIU/SSI sound support
 
+config SND_SOC_RZ
+	tristate "RZ/G2L series SSIF-2 support"
+	depends on ARCH_R9A07G044 || COMPILE_TEST
+	select SND_SIMPLE_CARD
+	help
+	  This option enables ASoC sound support for the RZ/G2L MPUs.
+	  The simple-audio-card driver and the RZ/G2L built-in serial
+	  sound interface (SSIF-2) driver are used.
+
 ##
 ## Boards
 ##
