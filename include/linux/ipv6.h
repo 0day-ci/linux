@@ -76,6 +76,7 @@ struct ipv6_devconf {
 	__s32		disable_policy;
 	__s32           ndisc_tclass;
 	__s32		rpl_seg_enabled;
+	__s32		ra_mtu;
 
 	struct ctl_table_header *sysctl_header;
 };
@@ -320,6 +321,8 @@ extern int inet6_sk_rebuild_header(struct sock *sk);
 struct tcp6_timewait_sock {
 	struct tcp_timewait_sock   tcp6tw_tcp;
 };
+
+u32 inet6_dev_ramtu(struct net_device *dev);
 
 #if IS_ENABLED(CONFIG_IPV6)
 bool ipv6_mod_enabled(void);
