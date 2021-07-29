@@ -780,6 +780,7 @@ static void intel_dsi_pre_enable(struct intel_atomic_state *state,
 				 const struct drm_connector_state *conn_state)
 {
 	struct intel_dsi *intel_dsi = enc_to_intel_dsi(encoder);
+	const struct vbt_dsi_info *vbt_dsi_info = intel_bios_dsi_info(&intel_dsi->base);
 	struct intel_crtc *crtc = to_intel_crtc(pipe_config->uapi.crtc);
 	struct drm_i915_private *dev_priv = to_i915(crtc->base.dev);
 	enum pipe pipe = crtc->pipe;
@@ -837,7 +838,7 @@ static void intel_dsi_pre_enable(struct intel_atomic_state *state,
 	 * the delay in that case. If there is no deassert-seq, then an
 	 * unconditional msleep is used to give the panel time to power-on.
 	 */
-	if (dev_priv->vbt.dsi.sequence[MIPI_SEQ_DEASSERT_RESET]) {
+	if (vbt_dsi_info->sequence[MIPI_SEQ_DEASSERT_RESET]) {
 		intel_dsi_msleep(intel_dsi, intel_dsi->panel_on_delay);
 		intel_dsi_vbt_exec_sequence(intel_dsi, MIPI_SEQ_DEASSERT_RESET);
 	} else {
@@ -1665,7 +1666,8 @@ static void vlv_dphy_param_init(struct intel_dsi *intel_dsi)
 {
 	struct drm_device *dev = intel_dsi->base.base.dev;
 	struct drm_i915_private *dev_priv = to_i915(dev);
-	struct mipi_config *mipi_config = dev_priv->vbt.dsi.config;
+	const struct vbt_dsi_info *vbt_dsi_info = intel_bios_dsi_info(&intel_dsi->base);
+	struct mipi_config *mipi_config = vbt_dsi_info->config;
 	u32 tlpx_ns, extra_byte_count, tlpx_ui;
 	u32 ui_num, ui_den;
 	u32 prepare_cnt, exit_zero_cnt, clk_zero_cnt, trail_cnt;
@@ -1835,6 +1837,7 @@ void vlv_dsi_init(struct drm_i915_private *dev_priv)
 	struct intel_connector *intel_connector;
 	struct drm_connector *connector;
 	struct drm_display_mode *current_mode, *fixed_mode;
+	const struct vbt_dsi_info *vbt_dsi_info;
 	enum port port;
 	enum pipe pipe;
 
@@ -1898,14 +1901,15 @@ void vlv_dsi_init(struct drm_i915_private *dev_priv)
 		intel_encoder->pipe_mask = BIT(PIPE_B);
 
 	intel_dsi->panel_power_off_time = ktime_get_boottime();
+	vbt_dsi_info = intel_bios_dsi_info(intel_encoder);
 
-	if (dev_priv->vbt.dsi.config->dual_link)
+	if (vbt_dsi_info->config->dual_link)
 		intel_dsi->ports = BIT(PORT_A) | BIT(PORT_C);
 	else
 		intel_dsi->ports = BIT(port);
 
-	intel_dsi->dcs_backlight_ports = dev_priv->vbt.dsi.bl_ports;
-	intel_dsi->dcs_cabc_ports = dev_priv->vbt.dsi.cabc_ports;
+	intel_dsi->dcs_backlight_ports = vbt_dsi_info->bl_ports;
+	intel_dsi->dcs_cabc_ports = vbt_dsi_info->cabc_ports;
 
 	/* Create a DSI host (and a device) for each port. */
 	for_each_dsi_port(port, intel_dsi->ports) {

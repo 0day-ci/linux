@@ -1924,6 +1924,7 @@ cnp_setup_backlight(struct intel_connector *connector, enum pipe unused)
 static int ext_pwm_setup_backlight(struct intel_connector *connector,
 				   enum pipe pipe)
 {
+	const struct vbt_dsi_info *vbt_dsi_info = intel_bios_dsi_info(connector->encoder);
 	struct drm_device *dev = connector->base.dev;
 	struct drm_i915_private *dev_priv = to_i915(dev);
 	struct intel_panel *panel = &connector->panel;
@@ -1931,7 +1932,7 @@ static int ext_pwm_setup_backlight(struct intel_connector *connector,
 	u32 level;
 
 	/* Get the right PWM chip for DSI backlight according to VBT */
-	if (dev_priv->vbt.dsi.config->pwm_blc == PPS_BLC_PMIC) {
+	if (vbt_dsi_info->config->pwm_blc == PPS_BLC_PMIC) {
 		panel->backlight.pwm = pwm_get(dev->dev, "pwm_pmic_backlight");
 		desc = "PMIC";
 	} else {
