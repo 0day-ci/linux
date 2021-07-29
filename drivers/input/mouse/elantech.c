@@ -517,6 +517,17 @@ static void elantech_report_trackpoint(struct psmouse *psmouse,
 	case 0x16008020U:
 	case 0x26800010U:
 	case 0x36808000U:
+	
+		/* This firmware misreport coordinates for trackpoint occasionally.
+		* So we discard these packets by pattern to prevent cursor jumps.
+		*/
+		if (packet[4] == 0x80 || packet[5] == 0x80 ||
+		    packet[1] >> 7 == packet[4] >> 7 ||
+		    packet[2] >> 7 == packet[5] >> 7) {
+		    	elantech_debug("discarding packet [%6ph]\n", packet);
+			break;
+
+		}
 		x = packet[4] - (int)((packet[1]^0x80) << 1);
 		y = (int)((packet[2]^0x80) << 1) - packet[5];
 
@@ -1678,7 +1689,7 @@ static int elantech_query_info(struct psmouse *psmouse,
 		return -EINVAL;
 	}
 	psmouse_info(psmouse,
-		     "assuming hardware version %d (with firmware version 0x%02x%02x%02x)\n",
+		     "(7/19) assuming hardware version %d (with firmware version 0x%02x%02x%02x)\n",
 		     info->hw_version, param[0], param[1], param[2]);
 
 	if (info->send_cmd(psmouse, ETP_CAPABILITIES_QUERY,
