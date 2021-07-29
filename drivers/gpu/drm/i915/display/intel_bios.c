@@ -1709,10 +1709,10 @@ static enum port dvo_port_to_port(struct drm_i915_private *i915,
 	 * so look for all the possible values for each port.
 	 */
 	static const int port_mapping[][3] = {
-		[PORT_A] = { DVO_PORT_HDMIA, DVO_PORT_DPA, -1 },
-		[PORT_B] = { DVO_PORT_HDMIB, DVO_PORT_DPB, -1 },
-		[PORT_C] = { DVO_PORT_HDMIC, DVO_PORT_DPC, -1 },
-		[PORT_D] = { DVO_PORT_HDMID, DVO_PORT_DPD, -1 },
+		[PORT_A] = { DVO_PORT_HDMIA, DVO_PORT_DPA, DVO_PORT_MIPIA },
+		[PORT_B] = { DVO_PORT_HDMIB, DVO_PORT_DPB, DVO_PORT_MIPIB },
+		[PORT_C] = { DVO_PORT_HDMIC, DVO_PORT_DPC, DVO_PORT_MIPIC },
+		[PORT_D] = { DVO_PORT_HDMID, DVO_PORT_DPD, DVO_PORT_MIPID },
 		[PORT_E] = { DVO_PORT_HDMIE, DVO_PORT_DPE, DVO_PORT_CRT },
 		[PORT_F] = { DVO_PORT_HDMIF, DVO_PORT_DPF, -1 },
 		[PORT_G] = { DVO_PORT_HDMIG, DVO_PORT_DPG, -1 },
@@ -1868,6 +1868,12 @@ intel_bios_encoder_supports_edp(const struct intel_bios_encoder_data *devdata)
 		devdata->child.device_type & DEVICE_TYPE_INTERNAL_CONNECTOR;
 }
 
+static bool
+intel_bios_encoder_supports_dsi(const struct intel_bios_encoder_data *devdata)
+{
+	return devdata->child.device_type & DEVICE_TYPE_MIPI_OUTPUT;
+}
+
 static bool is_port_valid(struct drm_i915_private *i915, enum port port)
 {
 	/*
@@ -1886,7 +1892,8 @@ static void parse_ddi_port(struct drm_i915_private *i915,
 {
 	const struct child_device_config *child = &devdata->child;
 	struct ddi_vbt_port_info *info;
-	bool is_dvi, is_hdmi, is_dp, is_edp, is_crt, supports_typec_usb, supports_tbt;
+	bool is_dvi, is_hdmi, is_dp, is_edp, is_crt, supports_typec_usb;
+	bool supports_tbt, is_dsi;
 	int dp_boost_level, hdmi_boost_level;
 	enum port port;
 
@@ -1917,16 +1924,17 @@ static void parse_ddi_port(struct drm_i915_private *i915,
 	is_crt = intel_bios_encoder_supports_crt(devdata);
 	is_hdmi = intel_bios_encoder_supports_hdmi(devdata);
 	is_edp = intel_bios_encoder_supports_edp(devdata);
+	is_dsi = intel_bios_encoder_supports_dsi(devdata);
 
 	supports_typec_usb = intel_bios_encoder_supports_typec_usb(devdata);
 	supports_tbt = intel_bios_encoder_supports_tbt(devdata);
 
 	drm_dbg_kms(&i915->drm,
-		    "Port %c VBT info: CRT:%d DVI:%d HDMI:%d DP:%d eDP:%d LSPCON:%d USB-Type-C:%d TBT:%d DSC:%d\n",
+		    "Port %c VBT info: CRT:%d DVI:%d HDMI:%d DP:%d eDP:%d LSPCON:%d USB-Type-C:%d TBT:%d DSC:%d DSI:%d\n",
 		    port_name(port), is_crt, is_dvi, is_hdmi, is_dp, is_edp,
 		    HAS_LSPCON(i915) && child->lspcon,
 		    supports_typec_usb, supports_tbt,
-		    devdata->dsc != NULL);
+		    devdata->dsc != NULL, is_dsi);
 
 	if (is_dvi) {
 		u8 ddc_pin;
