@@ -105,6 +105,8 @@ int powernv_get_random_long(unsigned long *v)
 	struct powernv_rng *rng;
 
 	rng = get_cpu_var(powernv_rng);
+	if (!rng || !rng->regs)
+		return 0;
 
 	*v = rng_whiten(rng, in_be64(rng->regs));
 
