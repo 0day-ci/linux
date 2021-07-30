@@ -1123,15 +1123,30 @@ static int shmem_setattr(struct user_namespace *mnt_userns,
 
 		/* protected by i_mutex */
 		if ((newsize < oldsize && (info->seals & F_SEAL_SHRINK)) ||
-		    (newsize > oldsize && (info->seals & F_SEAL_GROW)) ||
-		    (newsize != oldsize && info->mlock_ucounts))
+		    (newsize > oldsize && (info->seals & F_SEAL_GROW)))
 			return -EPERM;
 
 		if (newsize != oldsize) {
-			error = shmem_reacct_size(SHMEM_I(inode)->flags,
-					oldsize, newsize);
+			struct ucounts *ucounts = info->mlock_ucounts;
+
+			if (ucounts && ucounts != current_ucounts())
+				return -EPERM;
+			error = shmem_reacct_size(info->flags,
+						  oldsize, newsize);
 			if (error)
 				return error;
+			if (ucounts) {
+				loff_t mlock = round_up(newsize, PAGE_SIZE) -
+						round_up(oldsize, PAGE_SIZE);
+				if (mlock < 0) {
+					user_shm_unlock(-mlock, ucounts, false);
+				} else if (mlock > 0 &&
+					!user_shm_lock(mlock, ucounts, false)) {
+					shmem_reacct_size(info->flags,
+							  newsize, oldsize);
+					return -EPERM;
+				}
+			}
 			i_size_write(inode, newsize);
 			inode->i_ctime = inode->i_mtime = current_time(inode);
 		}
@@ -2784,6 +2799,7 @@ static long shmem_fallocate(struct file *file, int mode, loff_t offset,
 	struct shmem_inode_info *info = SHMEM_I(inode);
 	struct shmem_falloc shmem_falloc;
 	pgoff_t start, index, end, undo_fallocend;
+	loff_t mlock = 0;
 	int error;
 
 	if (mode & ~(FALLOC_FL_KEEP_SIZE | FALLOC_FL_PUNCH_HOLE))
@@ -2830,13 +2846,23 @@ static long shmem_fallocate(struct file *file, int mode, loff_t offset,
 	if (error)
 		goto out;
 
-	if ((info->seals & F_SEAL_GROW) && offset + len > inode->i_size) {
+	if (offset + len > inode->i_size) {
 		error = -EPERM;
-		goto out;
-	}
-	if (info->mlock_ucounts && offset + len > inode->i_size) {
-		error = -EPERM;
-		goto out;
+		if (info->seals & F_SEAL_GROW)
+			goto out;
+		if (info->mlock_ucounts) {
+			if (info->mlock_ucounts != current_ucounts() ||
+			    (mode & FALLOC_FL_KEEP_SIZE))
+				goto out;
+			mlock = round_up(offset + len, PAGE_SIZE) -
+				round_up(inode->i_size, PAGE_SIZE);
+			if (mlock > 0 &&
+			    !user_shm_lock(mlock, info->mlock_ucounts, false)) {
+				mlock = 0;
+				goto out;
+			}
+		}
+		error = 0;
 	}
 
 	start = offset >> PAGE_SHIFT;
@@ -2932,6 +2958,8 @@ undone:
 	inode->i_private = NULL;
 	spin_unlock(&inode->i_lock);
 out:
+	if (error && mlock > 0)
+		user_shm_unlock(mlock, info->mlock_ucounts, false);
 	inode_unlock(inode);
 	return error;
 }
