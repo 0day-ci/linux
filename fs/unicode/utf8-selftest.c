@@ -16,6 +16,7 @@
 
 unsigned int failed_tests;
 unsigned int total_tests;
+struct unicode_map *table;
 
 /* Tests will be based on this version. */
 #define latest_maj 12
@@ -232,16 +233,9 @@ static void check_utf8_nfdicf(void)
 	}
 }
 
-static void check_utf8_comparisons(void)
+static void check_utf8_comparisons(struct unicode_map *table)
 {
 	int i;
-	struct unicode_map *table = utf8_load("12.1.0");
-
-	if (IS_ERR(table)) {
-		pr_err("%s: Unable to load utf8 %d.%d.%d. Skipping.\n",
-		       __func__, latest_maj, latest_min, latest_rev);
-		return;
-	}
 
 	for (i = 0; i < ARRAY_SIZE(nfdi_test_data); i++) {
 		const struct qstr s1 = {.name = nfdi_test_data[i].str,
@@ -262,8 +256,6 @@ static void check_utf8_comparisons(void)
 		test_f(!utf8_strncasecmp(table, &s1, &s2),
 		       "%s %s comparison mismatch\n", s1.name, s2.name);
 	}
-
-	utf8_unload(table);
 }
 
 static void check_supported_versions(void)
@@ -273,9 +265,6 @@ static void check_supported_versions(void)
 
 	/* Unicode 9.0.0 should be supported. */
 	test(utf8version_is_supported(9, 0, 0));
-
-	/* Unicode 1x.0.0 (the latest version) should be supported. */
-	test(utf8version_is_supported(latest_maj, latest_min, latest_rev));
 
 	/* Next versions don't exist. */
 	test(!utf8version_is_supported(13, 0, 0));
@@ -288,10 +277,17 @@ static int __init init_test_ucd(void)
 	failed_tests = 0;
 	total_tests = 0;
 
+	table = utf8_load("12.1.0");
+	if (IS_ERR(table)) {
+		pr_err("%s: Unable to load utf8 %d.%d.%d. Could not run the tests\n",
+		       __func__, latest_maj, latest_min, latest_rev);
+		return -EINVAL;
+	}
+
 	check_supported_versions();
 	check_utf8_nfdi();
 	check_utf8_nfdicf();
-	check_utf8_comparisons();
+	check_utf8_comparisons(table);
 
 	if (!failed_tests)
 		pr_info("All %u tests passed\n", total_tests);
@@ -303,6 +299,7 @@ static int __init init_test_ucd(void)
 
 static void __exit exit_test_ucd(void)
 {
+	utf8_unload(table);
 }
 
 module_init(init_test_ucd);

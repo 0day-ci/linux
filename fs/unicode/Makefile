@@ -2,10 +2,11 @@
 
 obj-$(CONFIG_UNICODE) += unicode.o
 obj-$(CONFIG_UNICODE_NORMALIZATION_SELFTEST) += utf8-selftest.o
+obj-$(CONFIG_UNICODE_UTF8_DATA) += utf8-data.o
 
 unicode-y := utf8-norm.o utf8-core.o
 
-$(obj)/utf8-norm.o: $(obj)/utf8data.h
+$(obj)/utf8-data.o: $(obj)/utf8data.h
 
 # In the normal build, the checked-in utf8data.h is just shipped.
 #

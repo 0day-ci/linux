@@ -192,7 +192,7 @@ static int utf8_parse_version(const char *version, unsigned int *maj,
 	return 0;
 }
 
-struct unicode_map *utf8_load(const char *version)
+static struct unicode_map *utf8_load_core(const char *version)
 {
 	struct unicode_map *um = NULL;
 	int unicode_version;
@@ -225,11 +225,57 @@ struct unicode_map *utf8_load(const char *version)
 
 	return um;
 }
+
+static void utf8_unload_core(struct unicode_map *um)
+{
+	kfree(um);
+}
+
+static int utf8mod_get(void)
+{
+	int ret;
+
+	spin_lock(&utf8_lock);
+	ret = utf8data_loaded && try_module_get(utf8_ops->owner);
+	spin_unlock(&utf8_lock);
+	return ret;
+}
+
+struct unicode_map *utf8_load(const char *version)
+{
+	struct unicode_map *um;
+
+	/*
+	 * try_then_request_module() is used here instead of using
+	 * request_module() because of the following problems that
+	 * could occur with the usage of request_module().
+	 * 1) Multiple calls in parallel to utf8_load() would fail if
+	 * kmod_concurrent_max == 0
+	 * 2) There would be unnecessary memory allocation and userspace
+	 * invocation in call_modprobe() that would always happen even if
+	 * the module is already loaded.
+	 * Hence, using try_then_request_module() would first check if the
+	 * module is already loaded, if not then it calls the request_module()
+	 * and finally would aquire the reference of the loaded module.
+	 */
+	if (!try_then_request_module(utf8mod_get(), "utf8-data")) {
+		pr_err("Failed to load UTF-8 module\n");
+		return ERR_PTR(-ENODEV);
+	}
+	um = utf8_load_core(version);
+	if (IS_ERR(um))
+		module_put(utf8_ops->owner);
+
+	return um;
+}
 EXPORT_SYMBOL(utf8_load);
 
 void utf8_unload(struct unicode_map *um)
 {
-	kfree(um);
+	if (um) {
+		utf8_unload_core(um);
+		module_put(utf8_ops->owner);
+	}
 }
 EXPORT_SYMBOL(utf8_unload);
 

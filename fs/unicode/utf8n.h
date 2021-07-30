@@ -11,6 +11,7 @@
 #include <linux/export.h>
 #include <linux/string.h>
 #include <linux/module.h>
+#include <linux/spinlock.h>
 
 /* Encoding a unicode version number as a single unsigned int. */
 #define UNICODE_MAJ_SHIFT		(16)
@@ -20,6 +21,11 @@
 	(((unsigned int)(MAJ) << UNICODE_MAJ_SHIFT) |	\
 	 ((unsigned int)(MIN) << UNICODE_MIN_SHIFT) |	\
 	 ((unsigned int)(REV)))
+
+extern spinlock_t utf8_lock;
+
+extern struct utf8_data *utf8_ops;
+extern bool utf8data_loaded;
 
 /* Highest unicode version supported by the data tables. */
 extern int utf8version_is_supported(u8 maj, u8 min, u8 rev);
@@ -104,5 +110,31 @@ extern int utf8ncursor(struct utf8cursor *u8c, const struct utf8data *data,
  * Returns -1 if the string being normalized is not valid UTF-8.
  */
 extern int utf8byte(struct utf8cursor *u8c);
+
+struct utf8data {
+	unsigned int maxage;
+	unsigned int offset;
+};
+
+struct utf8_data {
+	struct module *owner;
+
+	const unsigned int utf8vers;
+
+	const unsigned int *utf8agetab;
+	int utf8agetab_size;
+
+	const struct utf8data *utf8nfdicfdata;
+	int utf8nfdicfdata_size;
+
+	const struct utf8data *utf8nfdidata;
+	int utf8nfdidata_size;
+
+	const unsigned char *utf8data;
+	int utf8data_size;
+};
+
+void unicode_register(struct utf8_data *ops);
+void unicode_unregister(void);
 
 #endif /* UTF8NORM_H */

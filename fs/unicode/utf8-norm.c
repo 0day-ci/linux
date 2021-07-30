@@ -6,22 +6,19 @@
 
 #include "utf8n.h"
 
-struct utf8data {
-	unsigned int maxage;
-	unsigned int offset;
-};
+/* Spinlock for protecting utf8data_loaded and utf8_ops */
+DEFINE_SPINLOCK(utf8_lock);
 
-#define __INCLUDED_FROM_UTF8NORM_C__
-#include "utf8data.h"
-#undef __INCLUDED_FROM_UTF8NORM_C__
+struct utf8_data *utf8_ops;
+bool utf8data_loaded;
 
 int utf8version_is_supported(u8 maj, u8 min, u8 rev)
 {
-	int i = ARRAY_SIZE(utf8agetab) - 1;
+	int i = utf8_ops->utf8agetab_size - 1;
 	unsigned int sb_utf8version = UNICODE_AGE(maj, min, rev);
 
-	while (i >= 0 && utf8agetab[i] != 0) {
-		if (sb_utf8version == utf8agetab[i])
+	while (i >= 0 && utf8_ops->utf8agetab[i] != 0) {
+		if (sb_utf8version == utf8_ops->utf8agetab[i])
 			return 1;
 		i--;
 	}
@@ -31,7 +28,7 @@ EXPORT_SYMBOL(utf8version_is_supported);
 
 int utf8version_latest(void)
 {
-	return utf8vers;
+	return utf8_ops->utf8vers;
 }
 EXPORT_SYMBOL(utf8version_latest);
 
@@ -168,7 +165,7 @@ typedef const unsigned char utf8trie_t;
  * underlying datatype: unsigned char.
  *
  * leaf[0]: The unicode version, stored as a generation number that is
- *          an index into utf8agetab[].  With this we can filter code
+ *          an index into utf8_ops->utf8agetab[].  With this we can filter code
  *          points based on the unicode version in which they were
  *          defined.  The CCC of a non-defined code point is 0.
  * leaf[1]: Canonical Combining Class. During normalization, we need
@@ -330,7 +327,7 @@ static utf8leaf_t *utf8nlookup(const struct utf8data *data,
 	if (len == 0)
 		return NULL;
 
-	trie = utf8data + data->offset;
+	trie = utf8_ops->utf8data + data->offset;
 	node = 1;
 	while (node) {
 		offlen = (*trie & OFFLEN) >> OFFLEN_SHIFT;
@@ -418,7 +415,7 @@ int utf8agemax(const struct utf8data *data, const char *s)
 		if (!leaf)
 			return -1;
 
-		leaf_age = utf8agetab[LEAF_GEN(leaf)];
+		leaf_age = utf8_ops->utf8agetab[LEAF_GEN(leaf)];
 		if (leaf_age <= data->maxage && leaf_age > age)
 			age = leaf_age;
 		s += utf8clen(s);
@@ -446,7 +443,7 @@ int utf8agemin(const struct utf8data *data, const char *s)
 		leaf = utf8lookup(data, hangul, s);
 		if (!leaf)
 			return -1;
-		leaf_age = utf8agetab[LEAF_GEN(leaf)];
+		leaf_age = utf8_ops->utf8agetab[LEAF_GEN(leaf)];
 		if (leaf_age <= data->maxage && leaf_age < age)
 			age = leaf_age;
 		s += utf8clen(s);
@@ -473,7 +470,7 @@ int utf8nagemax(const struct utf8data *data, const char *s, size_t len)
 		leaf = utf8nlookup(data, hangul, s, len);
 		if (!leaf)
 			return -1;
-		leaf_age = utf8agetab[LEAF_GEN(leaf)];
+		leaf_age = utf8_ops->utf8agetab[LEAF_GEN(leaf)];
 		if (leaf_age <= data->maxage && leaf_age > age)
 			age = leaf_age;
 		len -= utf8clen(s);
@@ -501,7 +498,7 @@ int utf8nagemin(const struct utf8data *data, const char *s, size_t len)
 		leaf = utf8nlookup(data, hangul, s, len);
 		if (!leaf)
 			return -1;
-		leaf_age = utf8agetab[LEAF_GEN(leaf)];
+		leaf_age = utf8_ops->utf8agetab[LEAF_GEN(leaf)];
 		if (leaf_age <= data->maxage && leaf_age < age)
 			age = leaf_age;
 		len -= utf8clen(s);
@@ -529,7 +526,7 @@ ssize_t utf8len(const struct utf8data *data, const char *s)
 		leaf = utf8lookup(data, hangul, s);
 		if (!leaf)
 			return -1;
-		if (utf8agetab[LEAF_GEN(leaf)] > data->maxage)
+		if (utf8_ops->utf8agetab[LEAF_GEN(leaf)] > data->maxage)
 			ret += utf8clen(s);
 		else if (LEAF_CCC(leaf) == DECOMPOSE)
 			ret += strlen(LEAF_STR(leaf));
@@ -557,7 +554,7 @@ ssize_t utf8nlen(const struct utf8data *data, const char *s, size_t len)
 		leaf = utf8nlookup(data, hangul, s, len);
 		if (!leaf)
 			return -1;
-		if (utf8agetab[LEAF_GEN(leaf)] > data->maxage)
+		if (utf8_ops->utf8agetab[LEAF_GEN(leaf)] > data->maxage)
 			ret += utf8clen(s);
 		else if (LEAF_CCC(leaf) == DECOMPOSE)
 			ret += strlen(LEAF_STR(leaf));
@@ -690,7 +687,7 @@ int utf8byte(struct utf8cursor *u8c)
 
 		ccc = LEAF_CCC(leaf);
 		/* Characters that are too new have CCC 0. */
-		if (utf8agetab[LEAF_GEN(leaf)] > u8c->data->maxage) {
+		if (utf8_ops->utf8agetab[LEAF_GEN(leaf)] > u8c->data->maxage) {
 			ccc = STOPPER;
 		} else if (ccc == DECOMPOSE) {
 			u8c->len -= utf8clen(u8c->s);
@@ -769,24 +766,42 @@ EXPORT_SYMBOL(utf8byte);
 
 const struct utf8data *utf8nfdi(unsigned int maxage)
 {
-	int i = ARRAY_SIZE(utf8nfdidata) - 1;
+	int i = utf8_ops->utf8nfdidata_size - 1;
 
-	while (maxage < utf8nfdidata[i].maxage)
+	while (maxage < utf8_ops->utf8nfdidata[i].maxage)
 		i--;
-	if (maxage > utf8nfdidata[i].maxage)
+	if (maxage > utf8_ops->utf8nfdidata[i].maxage)
 		return NULL;
-	return &utf8nfdidata[i];
+	return &utf8_ops->utf8nfdidata[i];
 }
 EXPORT_SYMBOL(utf8nfdi);
 
 const struct utf8data *utf8nfdicf(unsigned int maxage)
 {
-	int i = ARRAY_SIZE(utf8nfdicfdata) - 1;
+	int i = utf8_ops->utf8nfdicfdata_size - 1;
 
-	while (maxage < utf8nfdicfdata[i].maxage)
+	while (maxage < utf8_ops->utf8nfdicfdata[i].maxage)
 		i--;
-	if (maxage > utf8nfdicfdata[i].maxage)
+	if (maxage > utf8_ops->utf8nfdicfdata[i].maxage)
 		return NULL;
-	return &utf8nfdicfdata[i];
+	return &utf8_ops->utf8nfdicfdata[i];
 }
 EXPORT_SYMBOL(utf8nfdicf);
+
+void unicode_register(struct utf8_data *ops)
+{
+	spin_lock(&utf8_lock);
+	utf8_ops = ops;
+	utf8data_loaded = true;
+	spin_unlock(&utf8_lock);
+}
+EXPORT_SYMBOL(unicode_register);
+
+void unicode_unregister(void)
+{
+	spin_lock(&utf8_lock);
+	utf8_ops = NULL;
+	utf8data_loaded = false;
+	spin_unlock(&utf8_lock);
+}
+EXPORT_SYMBOL(unicode_unregister);
