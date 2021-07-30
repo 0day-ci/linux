@@ -2160,8 +2160,10 @@ skl_universal_plane_create(struct drm_i915_private *dev_priv,
 					  supported_csc,
 					  BIT(DRM_COLOR_YCBCR_LIMITED_RANGE) |
 					  BIT(DRM_COLOR_YCBCR_FULL_RANGE),
+					  BIT(DRM_TF_UNDEFINED),
 					  DRM_COLOR_YCBCR_BT709,
-					  DRM_COLOR_YCBCR_LIMITED_RANGE);
+					  DRM_COLOR_YCBCR_LIMITED_RANGE,
+					  DRM_TF_UNDEFINED);
 
 	drm_plane_create_alpha_property(&plane->base);
 	drm_plane_create_blend_mode_property(&plane->base,

@@ -302,8 +302,10 @@ static int komeda_plane_add(struct komeda_kms_dev *kms,
 			BIT(DRM_COLOR_YCBCR_BT2020),
 			BIT(DRM_COLOR_YCBCR_LIMITED_RANGE) |
 			BIT(DRM_COLOR_YCBCR_FULL_RANGE),
+			BIT(DRM_TF_UNDEFINED),
 			DRM_COLOR_YCBCR_BT601,
-			DRM_COLOR_YCBCR_LIMITED_RANGE);
+			DRM_COLOR_YCBCR_LIMITED_RANGE,
+			DRM_TF_UNDEFINED);
 	if (err)
 		goto cleanup;
 
