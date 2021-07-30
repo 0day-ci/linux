@@ -524,7 +524,7 @@ static inline void debug_work_deactivate(struct work_struct *work) { }
 #endif
 
 /**
- * worker_pool_assign_id - allocate ID and assing it to @pool
+ * worker_pool_assign_id - allocate ID and assign it to @pool
  * @pool: the pool pointer of interest
  *
  * Returns 0 if ID in [0, WORK_OFFQ_POOL_NONE) is allocated and assigned
@@ -1293,7 +1293,7 @@ static int try_to_grab_pending(struct work_struct *work, bool is_dwork,
 		list_del_init(&work->entry);
 		pwq_dec_nr_in_flight(pwq, get_work_color(work));
 
-		/* work->data points to pwq iff queued, point to pool */
+		/* work->data points to pwq if queued, point to pool */
 		set_work_pool_and_keep_pending(work, pool->id);
 
 		raw_spin_unlock(&pool->lock);
@@ -1357,7 +1357,7 @@ static bool is_chained_work(struct workqueue_struct *wq)
 
 	worker = current_wq_worker();
 	/*
-	 * Return %true iff I'm a worker executing a work item on @wq.  If
+	 * Return %true if I'm a worker executing a work item on @wq.  If
 	 * I'm @worker, it's safe to dereference it without locking.
 	 */
 	return worker && worker->current_pwq->wq == wq;
@@ -1792,7 +1792,7 @@ static void worker_enter_idle(struct worker *worker)
 	/*
 	 * Sanity check nr_running.  Because unbind_workers() releases
 	 * pool->lock between setting %WORKER_UNBOUND and zapping
-	 * nr_running, the warning may trigger spuriously.  Check iff
+	 * nr_running, the warning may trigger spuriously.  Check if
 	 * unbind is not in progress.
 	 */
 	WARN_ON_ONCE(!(pool->flags & POOL_DISASSOCIATED) &&
@@ -2540,7 +2540,7 @@ repeat:
 			if (pwq->nr_active && need_to_create_worker(pool)) {
 				raw_spin_lock(&wq_mayday_lock);
 				/*
-				 * Queue iff we aren't racing destruction
+				 * Queue if we aren't racing destruction
 				 * and somebody else hasn't queued it already.
 				 */
 				if (wq->rescuer && list_empty(&pwq->mayday_node)) {
@@ -3746,7 +3746,7 @@ static void pwq_adjust_max_active(struct pool_workqueue *pwq)
 		 * Need to kick a worker after thawed or an unbound wq's
 		 * max_active is bumped. In realtime scenarios, always kicking a
 		 * worker will cause interference on the isolated cpu cores, so
-		 * let's kick iff work items were activated.
+		 * let's kick if work items were activated.
 		 */
 		if (kick)
 			wake_up_worker(pwq->pool);
@@ -3757,7 +3757,7 @@ static void pwq_adjust_max_active(struct pool_workqueue *pwq)
 	raw_spin_unlock_irqrestore(&pwq->pool->lock, flags);
 }
 
-/* initialize newly alloced @pwq which is associated with @wq and @pool */
+/* initialize newly allocated @pwq which is associated with @wq and @pool */
 static void init_pwq(struct pool_workqueue *pwq, struct workqueue_struct *wq,
 		     struct worker_pool *pool)
 {
@@ -5325,7 +5325,7 @@ static int workqueue_apply_unbound_cpumask(void)
  *  the affinity of all unbound workqueues.  This function check the @cpumask
  *  and apply it to all unbound workqueues and updates all pwqs of them.
  *
- *  Retun:	0	- Success
+ *  Return:	0	- Success
  *  		-EINVAL	- Invalid @cpumask
  *  		-ENOMEM	- Failed to allocate memory for attrs or pwqs.
  */
@@ -5655,7 +5655,7 @@ static void wq_device_release(struct device *dev)
  * alloc_workqueue*() automatically calls this function if WQ_SYSFS is set
  * which is the preferred method.
  *
- * Workqueue user should use this function directly iff it wants to apply
+ * Workqueue user should use this function directly if it wants to apply
  * workqueue_attrs before making the workqueue visible in sysfs; otherwise,
  * apply_workqueue_attrs() may race against userland updating the
  * attributes.
@@ -5915,7 +5915,7 @@ static void __init wq_numa_init(void)
 		node = cpu_to_node(cpu);
 		if (WARN_ON(node == NUMA_NO_NODE)) {
 			pr_warn("workqueue: NUMA node mapping not available for cpu%d, disabling NUMA support\n", cpu);
-			/* happens iff arch is bonkers, let's just proceed */
+			/* happens if arch is bonkers, let's just proceed */
 			return;
 		}
 		cpumask_set_cpu(cpu, tbl[node]);
