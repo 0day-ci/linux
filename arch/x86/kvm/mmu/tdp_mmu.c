@@ -929,10 +929,19 @@ static int tdp_mmu_map_handle_target_level(struct kvm_vcpu *vcpu, int write,
 					 map_writable, !shadow_accessed_mask,
 					 &new_spte);
 
-	if (new_spte == iter->old_spte)
+	if (new_spte == iter->old_spte) {
 		ret = RET_PF_SPURIOUS;
-	else if (!tdp_mmu_set_spte_atomic(vcpu->kvm, iter, new_spte))
-		return RET_PF_RETRY;
+	} else {
+		if (!tdp_mmu_set_spte_atomic_no_dirty_log(vcpu->kvm, iter, new_spte))
+			return RET_PF_RETRY;
+
+		/*
+		 * Mark the gfn dirty here rather that through the vcpu-agnostic
+		 * handle_changed_spte_dirty_log to leverage vcpu->lru_slot_index.
+		 */
+		if (is_writable_pte(new_spte))
+			kvm_vcpu_mark_page_dirty(vcpu, iter->gfn);
+	}
 
 	/*
 	 * If the page fault was caused by a write but the page is write
