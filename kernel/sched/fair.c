@@ -674,6 +674,7 @@ static u64 __sched_period(unsigned long nr_running)
 static u64 sched_slice(struct cfs_rq *cfs_rq, struct sched_entity *se)
 {
 	unsigned int nr_running = cfs_rq->nr_running;
+	struct sched_entity *init_se = se;
 	u64 slice;
 
 	if (sched_feat(ALT_PERIOD))
@@ -684,12 +685,13 @@ static u64 sched_slice(struct cfs_rq *cfs_rq, struct sched_entity *se)
 	for_each_sched_entity(se) {
 		struct load_weight *load;
 		struct load_weight lw;
+		struct cfs_rq *qcfs_rq;
 
-		cfs_rq = cfs_rq_of(se);
-		load = &cfs_rq->load;
+		qcfs_rq = cfs_rq_of(se);
+		load = &qcfs_rq->load;
 
 		if (unlikely(!se->on_rq)) {
-			lw = cfs_rq->load;
+			lw = qcfs_rq->load;
 
 			update_load_add(&lw, se->load.weight);
 			load = &lw;
@@ -697,8 +699,18 @@ static u64 sched_slice(struct cfs_rq *cfs_rq, struct sched_entity *se)
 		slice = __calc_delta(slice, se->load.weight, load);
 	}
 
-	if (sched_feat(BASE_SLICE))
-		slice = max(slice, (u64)sysctl_sched_min_granularity);
+	if (sched_feat(BASE_SLICE)) {
+		/*
+		 * SCHED_IDLE entities are not subject to min_granularity if
+		 * they are competing with non SCHED_IDLE entities. As a result,
+		 * non SCHED_IDLE entities will have reduced latency to get back
+		 * on cpu, at the cost of increased context switch frequency of
+		 * SCHED_IDLE entities.
+		 */
+		if (!se_is_idle(init_se) ||
+		    cfs_rq->h_nr_running == cfs_rq->idle_h_nr_running)
+			slice = max(slice, (u64)sysctl_sched_min_granularity);
+	}
 
 	return slice;
 }
@@ -4187,7 +4199,15 @@ place_entity(struct cfs_rq *cfs_rq, struct sched_entity *se, int initial)
 		if (sched_feat(GENTLE_FAIR_SLEEPERS))
 			thresh >>= 1;
 
-		vruntime -= thresh;
+		/*
+		 * Don't give sleep credit to a SCHED_IDLE entity if we're
+		 * placing it onto a cfs_rq with non SCHED_IDLE entities.
+		 */
+		if (!se_is_idle(se) ||
+		    cfs_rq->h_nr_running == cfs_rq->idle_h_nr_running)
+			vruntime -= thresh;
+		else
+			vruntime += 1;
 	}
 
 	/* ensure we never gain time by being placed backwards. */
