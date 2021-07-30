@@ -437,6 +437,8 @@ static long do_fcntl(int fd, unsigned int cmd, unsigned long arg,
 		break;
 	case F_HUGEPAGE:
 	case F_NOHUGEPAGE:
+	case F_MEM_LOCK:
+	case F_MEM_UNLOCK:
 		err = shmem_fcntl(filp, cmd, arg);
 		break;
 	default:

@@ -24,6 +24,7 @@ struct shmem_inode_info {
 	struct shared_policy	policy;		/* NUMA memory alloc policy */
 	struct simple_xattrs	xattrs;		/* list of xattrs */
 	atomic_t		stop_eviction;	/* hold when working on inode */
+	struct ucounts		*mlock_ucounts;	/* user memlocked tmpfs file */
 	struct inode		vfs_inode;
 };
 

@@ -83,6 +83,13 @@
 #define F_NOHUGEPAGE		(F_LINUX_SPECIFIC_BASE + 16)
 
 /*
+ * Lock all pages of file into memory, as they are allocated; or unlock them.
+ * Currently supported only on tmpfs, and on its memfd_created files.
+ */
+#define F_MEM_LOCK		(F_LINUX_SPECIFIC_BASE + 17)
+#define F_MEM_UNLOCK		(F_LINUX_SPECIFIC_BASE + 18)
+
+/*
  * Types of directory notifications that may be requested.
  */
 #define DN_ACCESS	0x00000001	/* File accessed */

@@ -888,7 +888,7 @@ unsigned long shmem_swap_usage(struct vm_area_struct *vma)
 }
 
 /*
- * SysV IPC SHM_UNLOCK restore Unevictable pages to their evictable lists.
+ * SHM_UNLOCK or F_MEM_UNLOCK restore Unevictable pages to their evictable list.
  */
 void shmem_unlock_mapping(struct address_space *mapping)
 {
@@ -897,7 +897,7 @@ void shmem_unlock_mapping(struct address_space *mapping)
 
 	pagevec_init(&pvec);
 	/*
-	 * Minor point, but we might as well stop if someone else SHM_LOCKs it.
+	 * Minor point, but we might as well stop if someone else memlocks it.
 	 */
 	while (!mapping_unevictable(mapping)) {
 		if (!pagevec_lookup(&pvec, mapping, &index))
@@ -1123,7 +1123,8 @@ static int shmem_setattr(struct user_namespace *mnt_userns,
 
 		/* protected by i_mutex */
 		if ((newsize < oldsize && (info->seals & F_SEAL_SHRINK)) ||
-		    (newsize > oldsize && (info->seals & F_SEAL_GROW)))
+		    (newsize > oldsize && (info->seals & F_SEAL_GROW)) ||
+		    (newsize != oldsize && info->mlock_ucounts))
 			return -EPERM;
 
 		if (newsize != oldsize) {
@@ -1161,6 +1162,10 @@ static void shmem_evict_inode(struct inode *inode)
 	struct shmem_sb_info *sbinfo = SHMEM_SB(inode->i_sb);
 
 	if (shmem_mapping(inode->i_mapping)) {
+		if (info->mlock_ucounts) {
+			user_shm_unlock(inode->i_size, info->mlock_ucounts);
+			info->mlock_ucounts = NULL;
+		}
 		shmem_unacct_size(info->flags, inode->i_size);
 		inode->i_size = 0;
 		shmem_truncate_range(inode, 0, (loff_t)-1);
@@ -2266,6 +2271,7 @@ int shmem_lock(struct file *file, int lock, struct ucounts *ucounts)
 
 	/*
 	 * What serializes the accesses to info->flags?
+	 * inode_lock() when called from shmem_memlock_fcntl(),
 	 * ipc_lock_object() when called from shmctl_do_lock(),
 	 * no serialization needed when called from shm_destroy().
 	 */
@@ -2283,6 +2289,43 @@ int shmem_lock(struct file *file, int lock, struct ucounts *ucounts)
 	retval = 0;
 
 out_nomem:
+	return retval;
+}
+
+static int shmem_memlock_fcntl(struct file *file, unsigned int cmd)
+{
+	struct inode *inode = file_inode(file);
+	struct shmem_inode_info *info = SHMEM_I(inode);
+	bool cleanup_mapping = false;
+	int retval = 0;
+
+	inode_lock(inode);
+	if (cmd == F_MEM_LOCK) {
+		if (!info->mlock_ucounts) {
+			struct ucounts *ucounts = current_ucounts();
+			/* capability/rlimit check is down in user_shm_lock */
+			retval = shmem_lock(file, 1, ucounts);
+			if (!retval)
+				info->mlock_ucounts = ucounts;
+			else if (!rlimit(RLIMIT_MEMLOCK))
+				retval = -EPERM;
+			/* else retval == -ENOMEM */
+		}
+	} else { /* F_MEM_UNLOCK */
+		if (info->mlock_ucounts) {
+			if (info->mlock_ucounts == current_ucounts() ||
+			    capable(CAP_IPC_LOCK)) {
+				shmem_lock(file, 0, info->mlock_ucounts);
+				info->mlock_ucounts = NULL;
+				cleanup_mapping = true;
+			} else
+				retval = -EPERM;
+		}
+	}
+	inode_unlock(inode);
+
+	if (cleanup_mapping)
+		shmem_unlock_mapping(file->f_mapping);
 	return retval;
 }
 
@@ -2503,6 +2546,8 @@ shmem_write_begin(struct file *file, struct address_space *mapping,
 		if ((info->seals & F_SEAL_GROW) && pos + len > inode->i_size)
 			return -EPERM;
 	}
+	if (unlikely(info->mlock_ucounts) && pos + len > inode->i_size)
+		return -EPERM;
 
 	return shmem_getpage(inode, index, pagep, SGP_WRITE);
 }
@@ -2715,6 +2760,10 @@ long shmem_fcntl(struct file *file, unsigned int cmd, unsigned long arg)
 	case F_NOHUGEPAGE:
 		error = shmem_huge_fcntl(file, cmd);
 		break;
+	case F_MEM_LOCK:
+	case F_MEM_UNLOCK:
+		error = shmem_memlock_fcntl(file, cmd);
+		break;
 	}
 
 	return error;
@@ -2775,6 +2824,10 @@ static long shmem_fallocate(struct file *file, int mode, loff_t offset,
 		goto out;
 
 	if ((info->seals & F_SEAL_GROW) && offset + len > inode->i_size) {
+		error = -EPERM;
+		goto out;
+	}
+	if (info->mlock_ucounts && offset + len > inode->i_size) {
 		error = -EPERM;
 		goto out;
 	}
