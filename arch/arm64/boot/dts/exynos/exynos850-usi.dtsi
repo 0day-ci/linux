@@ -1,0 +1,30 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * Samsung's Exynos850 SoC USI device tree source
+ *
+ * Copyright (C) 2019 Samsung Electronics Co., Ltd.
+ * Copyright (C) 2021 Linaro Ltd.
+ *
+ * Samsung's Exynos850 SoC USI channels are listed in this file as device tree
+ * nodes.
+ */
+
+#include <dt-bindings/clock/exynos850.h>
+
+/ {
+	aliases {
+		uart0 = &serial_0;
+	};
+
+	/* USI_UART */
+	serial_0: uart@13820000 {
+		compatible = "samsung,exynos850-uart";
+		reg = <0x0 0x13820000 0x100>;
+		interrupts = <GIC_SPI INTREQ__UART IRQ_TYPE_LEVEL_HIGH>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&uart0_bus>;
+		clocks = <&clock GATE_UART_QCH>, <&clock DOUT_UART>;
+		clock-names = "gate_uart_clk0", "uart";
+		status = "disabled";
+	};
+};
