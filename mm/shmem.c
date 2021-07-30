@@ -2395,7 +2395,7 @@ static struct inode *shmem_get_inode(struct super_block *sb, const struct inode 
 		spin_lock_init(&info->lock);
 		atomic_set(&info->stop_eviction, 0);
 		info->seals = F_SEAL_SEAL;
-		info->flags = flags & VM_NORESERVE;
+		info->flags = flags & (VM_NORESERVE | VM_LOCKED);
 		if ((flags & VM_HUGEPAGE) &&
 		    transparent_hugepage_allowed(sbinfo) &&
 		    !test_bit(MMF_DISABLE_THP, &current->mm->flags))
@@ -4254,6 +4254,17 @@ static struct file *__shmem_file_setup(struct vfsmount *mnt, const char *name, l
 	inode->i_size = size;
 	clear_nlink(inode);	/* It is unlinked */
 	res = ERR_PTR(ramfs_nommu_expand_for_mapping(inode, size));
+	if (!IS_ERR(res) && (flags & VM_LOCKED)) {
+		struct ucounts *ucounts = current_ucounts();
+		/*
+		 * Only memfd_create() may pass VM_LOCKED, and it passes
+		 * size 0; but avoid that assumption in case it changes.
+		 */
+		if (user_shm_lock(size, ucounts, true))
+			SHMEM_I(inode)->mlock_ucounts = ucounts;
+		else
+			res = ERR_PTR(-EPERM);
+	}
 	if (!IS_ERR(res))
 		res = alloc_file_pseudo(inode, mnt, name, O_RDWR,
 				&shmem_file_operations);

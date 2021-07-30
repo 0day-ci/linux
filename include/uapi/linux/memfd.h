@@ -9,6 +9,7 @@
 #define MFD_ALLOW_SEALING	0x0002U
 #define MFD_HUGETLB		0x0004U		/* Use hugetlbfs */
 #define MFD_HUGEPAGE		0x0008U		/* Use huge tmpfs */
+#define MFD_MEM_LOCK		0x0010U		/* Memlock tmpfs */
 
 /*
  * Huge page size encoding when MFD_HUGETLB is specified, and a huge page

@@ -248,7 +248,8 @@ long memfd_fcntl(struct file *file, unsigned int cmd, unsigned long arg)
 #define MFD_ALL_FLAGS  (MFD_CLOEXEC | \
 			MFD_ALLOW_SEALING | \
 			MFD_HUGETLB | \
-			MFD_HUGEPAGE)
+			MFD_HUGEPAGE | \
+			MFD_MEM_LOCK)
 
 SYSCALL_DEFINE2(memfd_create,
 		const char __user *, uname,
@@ -262,7 +263,7 @@ SYSCALL_DEFINE2(memfd_create,
 
 	if (flags & MFD_HUGETLB) {
 		/* Disallow huge tmpfs when choosing hugetlbfs */
-		if (flags & MFD_HUGEPAGE)
+		if (flags & (MFD_HUGEPAGE | MFD_MEM_LOCK))
 			return -EINVAL;
 		/* Allow huge page size encoding in flags. */
 		if (flags & ~(unsigned int)(MFD_ALL_FLAGS |
@@ -314,6 +315,8 @@ SYSCALL_DEFINE2(memfd_create,
 
 		if (flags & MFD_HUGEPAGE)
 			vm_flags |= VM_HUGEPAGE;
+		if (flags & MFD_MEM_LOCK)
+			vm_flags |= VM_LOCKED;
 		file = shmem_file_setup(name, 0, vm_flags);
 	}
 
