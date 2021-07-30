@@ -214,6 +214,8 @@ enum dax_device_flags {
  * @cdev: optional character interface for "device dax"
  * @host: optional name for lookups where the device path is not available
  * @private: dax driver private data
+ * @holder_rwsem: prevent unregistration while holder_ops is in progress
+ * @holder_data: holder of a dax_device: could be filesystem or mapped device
  * @flags: state and boolean properties
  */
 struct dax_device {
@@ -222,8 +224,11 @@ struct dax_device {
 	struct cdev cdev;
 	const char *host;
 	void *private;
+	struct rw_semaphore holder_rwsem;
+	void *holder_data;
 	unsigned long flags;
 	const struct dax_operations *ops;
+	const struct dax_holder_operations *holder_ops;
 };
 
 static ssize_t write_cache_show(struct device *dev,
@@ -372,6 +377,25 @@ int dax_zero_page_range(struct dax_device *dax_dev, pgoff_t pgoff,
 	return dax_dev->ops->zero_page_range(dax_dev, pgoff, nr_pages);
 }
 EXPORT_SYMBOL_GPL(dax_zero_page_range);
+
+int dax_holder_notify_failure(struct dax_device *dax_dev, loff_t offset,
+			      size_t size, void *data)
+{
+	int rc;
+
+	if (!dax_dev)
+		return -ENXIO;
+
+	if (!dax_dev->holder_data)
+		return -EOPNOTSUPP;
+
+	down_read(&dax_dev->holder_rwsem);
+	rc = dax_dev->holder_ops->notify_failure(dax_dev, offset,
+							 size, data);
+	up_read(&dax_dev->holder_rwsem);
+	return rc;
+}
+EXPORT_SYMBOL_GPL(dax_holder_notify_failure);
 
 #ifdef CONFIG_ARCH_HAS_PMEM_API
 void arch_wb_cache_pmem(void *addr, size_t size);
@@ -603,6 +627,7 @@ struct dax_device *alloc_dax(void *private, const char *__host,
 	dax_add_host(dax_dev, host);
 	dax_dev->ops = ops;
 	dax_dev->private = private;
+	init_rwsem(&dax_dev->holder_rwsem);
 	if (flags & DAXDEV_F_SYNC)
 		set_dax_synchronous(dax_dev);
 
@@ -623,6 +648,27 @@ void put_dax(struct dax_device *dax_dev)
 	iput(&dax_dev->inode);
 }
 EXPORT_SYMBOL_GPL(put_dax);
+
+void dax_set_holder(struct dax_device *dax_dev, void *holder,
+		const struct dax_holder_operations *ops)
+{
+	if (!dax_dev)
+		return;
+	down_write(&dax_dev->holder_rwsem);
+	dax_dev->holder_data = holder;
+	dax_dev->holder_ops = ops;
+	up_write(&dax_dev->holder_rwsem);
+}
+EXPORT_SYMBOL_GPL(dax_set_holder);
+
+void *dax_get_holder(struct dax_device *dax_dev)
+{
+	if (!dax_dev)
+		return NULL;
+
+	return dax_dev->holder_data;
+}
+EXPORT_SYMBOL_GPL(dax_get_holder);
 
 /**
  * dax_get_by_host() - temporary lookup mechanism for filesystem-dax
