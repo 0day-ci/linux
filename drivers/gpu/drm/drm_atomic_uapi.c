@@ -598,6 +598,8 @@ static int drm_atomic_plane_set_property(struct drm_plane *plane,
 		state->color_range = val;
 	} else if (property == plane->transfer_function_property) {
 		state->transfer_function = val;
+	} else if (property == plane->sdr_white_level_property) {
+		state->sdr_white_level = val;
 	} else if (property == config->prop_fb_damage_clips) {
 		ret = drm_atomic_replace_property_blob_from_id(dev,
 					&state->fb_damage_clips,
@@ -666,6 +668,8 @@ drm_atomic_plane_get_property(struct drm_plane *plane,
 		*val = state->color_range;
 	} else if (property == plane->transfer_function_property) {
 		*val = state->transfer_function;
+	} else if (property == plane->sdr_white_level_property) {
+		*val = state->sdr_white_level;
 	} else if (property == config->prop_fb_damage_clips) {
 		*val = (state->fb_damage_clips) ?
 			state->fb_damage_clips->base.id : 0;
