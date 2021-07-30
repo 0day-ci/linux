@@ -88,6 +88,7 @@
  */
 #define F_MEM_LOCK		(F_LINUX_SPECIFIC_BASE + 17)
 #define F_MEM_UNLOCK		(F_LINUX_SPECIFIC_BASE + 18)
+#define F_MEM_LOCKED		(F_LINUX_SPECIFIC_BASE + 19)
 
 /*
  * Types of directory notifications that may be requested.

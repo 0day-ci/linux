@@ -439,6 +439,7 @@ static long do_fcntl(int fd, unsigned int cmd, unsigned long arg,
 	case F_NOHUGEPAGE:
 	case F_MEM_LOCK:
 	case F_MEM_UNLOCK:
+	case F_MEM_LOCKED:
 		err = shmem_fcntl(filp, cmd, arg);
 		break;
 	default:

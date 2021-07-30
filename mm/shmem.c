@@ -2299,6 +2299,9 @@ static int shmem_memlock_fcntl(struct file *file, unsigned int cmd)
 	bool cleanup_mapping = false;
 	int retval = 0;
 
+	if (cmd == F_MEM_LOCKED)
+		return !!info->mlock_ucounts;
+
 	inode_lock(inode);
 	if (cmd == F_MEM_LOCK) {
 		if (!info->mlock_ucounts) {
@@ -2762,6 +2765,7 @@ long shmem_fcntl(struct file *file, unsigned int cmd, unsigned long arg)
 		break;
 	case F_MEM_LOCK:
 	case F_MEM_UNLOCK:
+	case F_MEM_LOCKED:
 		error = shmem_memlock_fcntl(file, cmd);
 		break;
 	}
