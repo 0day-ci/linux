@@ -500,7 +500,7 @@ cond_move_thread_delta_start(struct osnoise_variables *osn_var, u64 duration)
 /*
  * get_int_safe_duration - Get the duration of a window
  *
- * The irq, softirq and thread varaibles need to have its duration without
+ * The irq, softirq and thread variables need to have its duration without
  * the interference from higher priority interrupts. Instead of keeping a
  * variable to discount the interrupt interference from these variables, the
  * starting time of these variables are pushed forward with the interrupt's
@@ -1083,7 +1083,7 @@ static int run_osnoise(void)
 	stop_in = osnoise_data.stop_tracing * NSEC_PER_USEC;
 
 	/*
-	 * Start timestemp
+	 * Start timestamp
 	 */
 	start = time_get();
 
@@ -1888,7 +1888,7 @@ static int __osnoise_tracer_start(struct trace_array *tr)
 	if (retval)
 		return retval;
 	/*
-	 * Make sure NMIs see reseted values.
+	 * Make sure NMIs see reset values.
 	 */
 	barrier();
 	trace_osnoise_callback_enabled = true;

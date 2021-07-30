@@ -5979,7 +5979,7 @@ static __init int test_ringbuffer(void)
 		pr_info("CPU %d:\n", cpu);
 		pr_info("              events:    %ld\n", total_events);
 		pr_info("       dropped bytes:    %ld\n", total_dropped);
-		pr_info("       alloced bytes:    %ld\n", total_alloc);
+		pr_info("     allocated bytes:    %ld\n", total_alloc);
 		pr_info("       written bytes:    %ld\n", total_written);
 		pr_info("       biggest event:    %d\n", big_event_size);
 		pr_info("      smallest event:    %d\n", small_event_size);
@@ -6016,7 +6016,7 @@ static __init int test_ringbuffer(void)
 		pr_info(" recorded size bytes:   %ld\n", total_size);
 		if (total_lost)
 			pr_info(" With dropped events, record len and size may not match\n"
-				" alloced and written from above\n");
+				" allocated and written from above\n");
 		if (!total_lost) {
 			if (RB_WARN_ON(buffer, total_len != total_alloc ||
 				       total_size != total_written))
