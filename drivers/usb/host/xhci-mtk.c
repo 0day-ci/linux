@@ -18,6 +18,7 @@
 #include <linux/pm_wakeirq.h>
 #include <linux/regmap.h>
 #include <linux/regulator/consumer.h>
+#include <linux/usb/of.h>
 
 #include "xhci.h"
 #include "xhci-mtk.h"
@@ -516,6 +517,9 @@ static int xhci_mtk_probe(struct platform_device *pdev)
 		ret = -ENOMEM;
 		goto disable_device_wakeup;
 	}
+
+	hcd->tpl_support = of_usb_host_tpl_support(node);
+	xhci->shared_hcd->tpl_support = hcd->tpl_support;
 
 	ret = usb_add_hcd(hcd, irq, IRQF_SHARED);
 	if (ret)
