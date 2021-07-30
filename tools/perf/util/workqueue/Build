@@ -1,1 +1,2 @@
 perf-y += threadpool.o
+perf-y += workqueue.o
