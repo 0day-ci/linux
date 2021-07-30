@@ -1163,7 +1163,7 @@ static void shmem_evict_inode(struct inode *inode)
 
 	if (shmem_mapping(inode->i_mapping)) {
 		if (info->mlock_ucounts) {
-			user_shm_unlock(inode->i_size, info->mlock_ucounts);
+			user_shm_unlock(inode->i_size, info->mlock_ucounts, true);
 			info->mlock_ucounts = NULL;
 		}
 		shmem_unacct_size(info->flags, inode->i_size);
@@ -2276,13 +2276,13 @@ int shmem_lock(struct file *file, int lock, struct ucounts *ucounts)
 	 * no serialization needed when called from shm_destroy().
 	 */
 	if (lock && !(info->flags & VM_LOCKED)) {
-		if (!user_shm_lock(inode->i_size, ucounts))
+		if (!user_shm_lock(inode->i_size, ucounts, true))
 			goto out_nomem;
 		info->flags |= VM_LOCKED;
 		mapping_set_unevictable(file->f_mapping);
 	}
 	if (!lock && (info->flags & VM_LOCKED) && ucounts) {
-		user_shm_unlock(inode->i_size, ucounts);
+		user_shm_unlock(inode->i_size, ucounts, true);
 		info->flags &= ~VM_LOCKED;
 		mapping_clear_unevictable(file->f_mapping);
 	}

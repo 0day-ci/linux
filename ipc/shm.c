@@ -289,7 +289,7 @@ static void shm_destroy(struct ipc_namespace *ns, struct shmid_kernel *shp)
 		shmem_lock(shm_file, 0, shp->mlock_ucounts);
 	else if (shp->mlock_ucounts)
 		user_shm_unlock(i_size_read(file_inode(shm_file)),
-				shp->mlock_ucounts);
+				shp->mlock_ucounts, true);
 	fput(shm_file);
 	ipc_update_pid(&shp->shm_cprid, NULL);
 	ipc_update_pid(&shp->shm_lprid, NULL);
@@ -699,7 +699,7 @@ no_id:
 	ipc_update_pid(&shp->shm_cprid, NULL);
 	ipc_update_pid(&shp->shm_lprid, NULL);
 	if (is_file_hugepages(file) && shp->mlock_ucounts)
-		user_shm_unlock(size, shp->mlock_ucounts);
+		user_shm_unlock(size, shp->mlock_ucounts, true);
 	fput(file);
 	ipc_rcu_putref(&shp->shm_perm, shm_rcu_free);
 	return error;

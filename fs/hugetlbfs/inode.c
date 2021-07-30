@@ -1465,7 +1465,7 @@ struct file *hugetlb_file_setup(const char *name, size_t size,
 
 	if (creat_flags == HUGETLB_SHMFS_INODE && !can_do_hugetlb_shm()) {
 		*ucounts = current_ucounts();
-		if (user_shm_lock(size, *ucounts)) {
+		if (user_shm_lock(size, *ucounts, true)) {
 			task_lock(current);
 			pr_warn_once("%s (%d): Using mlock ulimits for SHM_HUGETLB is deprecated\n",
 				current->comm, current->pid);
@@ -1499,7 +1499,7 @@ struct file *hugetlb_file_setup(const char *name, size_t size,
 	iput(inode);
 out:
 	if (*ucounts) {
-		user_shm_unlock(size, *ucounts);
+		user_shm_unlock(size, *ucounts, true);
 		*ucounts = NULL;
 	}
 	return file;

@@ -818,7 +818,7 @@ SYSCALL_DEFINE0(munlockall)
  */
 static DEFINE_SPINLOCK(shmlock_user_lock);
 
-bool user_shm_lock(loff_t size, struct ucounts *ucounts)
+bool user_shm_lock(loff_t size, struct ucounts *ucounts, bool getuc)
 {
 	unsigned long lock_limit, locked;
 	long memlock;
@@ -836,7 +836,7 @@ bool user_shm_lock(loff_t size, struct ucounts *ucounts)
 		dec_rlimit_ucounts(ucounts, UCOUNT_RLIMIT_MEMLOCK, locked);
 		goto out;
 	}
-	if (!get_ucounts(ucounts)) {
+	if (getuc && !get_ucounts(ucounts)) {
 		dec_rlimit_ucounts(ucounts, UCOUNT_RLIMIT_MEMLOCK, locked);
 		goto out;
 	}
@@ -846,10 +846,11 @@ out:
 	return allowed;
 }
 
-void user_shm_unlock(loff_t size, struct ucounts *ucounts)
+void user_shm_unlock(loff_t size, struct ucounts *ucounts, bool putuc)
 {
 	spin_lock(&shmlock_user_lock);
 	dec_rlimit_ucounts(ucounts, UCOUNT_RLIMIT_MEMLOCK, (size + PAGE_SIZE - 1) >> PAGE_SHIFT);
 	spin_unlock(&shmlock_user_lock);
-	put_ucounts(ucounts);
+	if (putuc)
+		put_ucounts(ucounts);
 }
