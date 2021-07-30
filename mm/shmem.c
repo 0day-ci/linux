@@ -476,6 +476,20 @@ static bool shmem_confirm_swap(struct address_space *mapping,
 
 static int shmem_huge __read_mostly = SHMEM_HUGE_NEVER;
 
+/*
+ * Does either /sys/kernel/mm/transparent_hugepage/shmem_enabled or
+ * /sys/kernel/mm/transparent_hugepage/enabled allow transparent hugepages?
+ * (Can only return true when the machine has_transparent_hugepage() too.)
+ */
+static bool transparent_hugepage_allowed(void)
+{
+	return	shmem_huge > SHMEM_HUGE_NEVER ||
+		test_bit(TRANSPARENT_HUGEPAGE_FLAG,
+			&transparent_hugepage_flags) ||
+		test_bit(TRANSPARENT_HUGEPAGE_REQ_MADV_FLAG,
+			&transparent_hugepage_flags);
+}
+
 bool shmem_is_huge(struct vm_area_struct *vma,
 		   struct inode *inode, pgoff_t index)
 {
@@ -486,6 +500,8 @@ bool shmem_is_huge(struct vm_area_struct *vma,
 	if (vma && ((vma->vm_flags & VM_NOHUGEPAGE) ||
 	    test_bit(MMF_DISABLE_THP, &vma->vm_mm->flags)))
 		return false;
+	if (SHMEM_I(inode)->flags & VM_HUGEPAGE)
+		return true;
 	if (shmem_huge == SHMEM_HUGE_FORCE)
 		return true;
 
@@ -675,6 +691,11 @@ static long shmem_unused_huge_count(struct super_block *sb,
 #else /* !CONFIG_TRANSPARENT_HUGEPAGE */
 
 #define shmem_huge SHMEM_HUGE_DENY
+
+bool transparent_hugepage_allowed(void)
+{
+	return false;
+}
 
 bool shmem_is_huge(struct vm_area_struct *vma,
 		   struct inode *inode, pgoff_t index)
@@ -2171,10 +2192,14 @@ unsigned long shmem_get_unmapped_area(struct file *file,
 
 	if (shmem_huge != SHMEM_HUGE_FORCE) {
 		struct super_block *sb;
+		struct inode *inode;
 
 		if (file) {
 			VM_BUG_ON(file->f_op != &shmem_file_operations);
-			sb = file_inode(file)->i_sb;
+			inode = file_inode(file);
+			if (SHMEM_I(inode)->flags & VM_HUGEPAGE)
+				goto huge;
+			sb = inode->i_sb;
 		} else {
 			/*
 			 * Called directly from mm/mmap.c, or drivers/char/mem.c
@@ -2187,7 +2212,7 @@ unsigned long shmem_get_unmapped_area(struct file *file,
 		if (SHMEM_SB(sb)->huge == SHMEM_HUGE_NEVER)
 			return addr;
 	}
-
+huge:
 	offset = (pgoff << PAGE_SHIFT) & (HPAGE_PMD_SIZE-1);
 	if (offset && offset + len < 2 * HPAGE_PMD_SIZE)
 		return addr;
@@ -2308,6 +2333,10 @@ static struct inode *shmem_get_inode(struct super_block *sb, const struct inode 
 		atomic_set(&info->stop_eviction, 0);
 		info->seals = F_SEAL_SEAL;
 		info->flags = flags & VM_NORESERVE;
+		if ((flags & VM_HUGEPAGE) &&
+		    transparent_hugepage_allowed() &&
+		    !test_bit(MMF_DISABLE_THP, &current->mm->flags))
+			info->flags |= VM_HUGEPAGE;
 		INIT_LIST_HEAD(&info->shrinklist);
 		INIT_LIST_HEAD(&info->swaplist);
 		simple_xattrs_init(&info->xattrs);

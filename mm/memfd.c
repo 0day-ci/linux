@@ -245,7 +245,10 @@ long memfd_fcntl(struct file *file, unsigned int cmd, unsigned long arg)
 #define MFD_NAME_PREFIX_LEN (sizeof(MFD_NAME_PREFIX) - 1)
 #define MFD_NAME_MAX_LEN (NAME_MAX - MFD_NAME_PREFIX_LEN)
 
-#define MFD_ALL_FLAGS (MFD_CLOEXEC | MFD_ALLOW_SEALING | MFD_HUGETLB)
+#define MFD_ALL_FLAGS  (MFD_CLOEXEC | \
+			MFD_ALLOW_SEALING | \
+			MFD_HUGETLB | \
+			MFD_HUGEPAGE)
 
 SYSCALL_DEFINE2(memfd_create,
 		const char __user *, uname,
@@ -257,13 +260,16 @@ SYSCALL_DEFINE2(memfd_create,
 	char *name;
 	long len;
 
-	if (!(flags & MFD_HUGETLB)) {
-		if (flags & ~(unsigned int)MFD_ALL_FLAGS)
+	if (flags & MFD_HUGETLB) {
+		/* Disallow huge tmpfs when choosing hugetlbfs */
+		if (flags & MFD_HUGEPAGE)
 			return -EINVAL;
-	} else {
 		/* Allow huge page size encoding in flags. */
 		if (flags & ~(unsigned int)(MFD_ALL_FLAGS |
 				(MFD_HUGE_MASK << MFD_HUGE_SHIFT)))
+			return -EINVAL;
+	} else {
+		if (flags & ~(unsigned int)MFD_ALL_FLAGS)
 			return -EINVAL;
 	}
 
@@ -303,8 +309,14 @@ SYSCALL_DEFINE2(memfd_create,
 					HUGETLB_ANONHUGE_INODE,
 					(flags >> MFD_HUGE_SHIFT) &
 					MFD_HUGE_MASK);
-	} else
-		file = shmem_file_setup(name, 0, VM_NORESERVE);
+	} else {
+		unsigned long vm_flags = VM_NORESERVE;
+
+		if (flags & MFD_HUGEPAGE)
+			vm_flags |= VM_HUGEPAGE;
+		file = shmem_file_setup(name, 0, vm_flags);
+	}
+
 	if (IS_ERR(file)) {
 		error = PTR_ERR(file);
 		goto err_fd;
