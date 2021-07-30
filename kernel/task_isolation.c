@@ -17,6 +17,8 @@
 #include <linux/string.h>
 #include <linux/sysfs.h>
 #include <linux/init.h>
+#include <linux/mm.h>
+#include <linux/vmstat.h>
 
 static unsigned long default_quiesce_mask;
 
@@ -143,6 +145,17 @@ int prctl_task_isolation_ctrl_get(unsigned long arg2, unsigned long arg3,
 		return 0;
 
 	return current->isol_info->active_mask;
+}
+
+void __isolation_exit_to_user_mode_prepare(void)
+{
+	struct isol_info *i = current->isol_info;
+
+	if (i->active_mask != ISOL_F_QUIESCE)
+		return;
+
+	if (i->quiesce_mask & ISOL_F_QUIESCE_VMSTATS)
+		sync_vmstat();
 }
 
 struct qoptions {
