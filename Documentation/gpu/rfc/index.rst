@@ -19,3 +19,4 @@ host such documentation:
 .. toctree::
 
     i915_gem_lmem.rst
+    hdr-wide-gamut.rst
