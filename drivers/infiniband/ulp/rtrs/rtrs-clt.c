@@ -1898,6 +1898,7 @@ static int rtrs_rdma_conn_rejected(struct rtrs_clt_con *con,
 				    struct rdma_cm_event *ev)
 {
 	struct rtrs_sess *s = con->c.sess;
+	struct rtrs_clt_sess *sess = to_clt_sess(s);
 	const struct rtrs_msg_conn_rsp *msg;
 	const char *rej_msg;
 	int status, errno;
@@ -1916,6 +1917,15 @@ static int rtrs_rdma_conn_rejected(struct rtrs_clt_con *con,
 			rtrs_err(s,
 				  "Connect rejected: status %d (%s), rtrs errno %d\n",
 				  status, rej_msg, errno);
+
+		if (errno == -ENETDOWN) {
+			/*
+			 * Stop reconnection attempts
+			 */
+			sess->reconnect_attempts = -1;
+			rtrs_err(s,
+				"Disabling auto-reconnect. Trigger a manual reconnect after issue is resolved\n");
+		}
 	} else {
 		rtrs_err(s,
 			  "Connect rejected but with malformed message: status %d (%s)\n",

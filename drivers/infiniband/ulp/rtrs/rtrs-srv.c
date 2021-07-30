@@ -32,7 +32,9 @@ MODULE_LICENSE("GPL");
 static struct rtrs_rdma_dev_pd dev_pd;
 static mempool_t *chunk_pool;
 struct class *rtrs_dev_class;
+static struct device *rtrs_dev;
 static struct rtrs_srv_ib_ctx ib_ctx;
+static char disabled_port[NAME_MAX];
 
 static int __read_mostly max_chunk_size = DEFAULT_MAX_CHUNK_SIZE;
 static int __read_mostly sess_queue_depth = DEFAULT_SESS_QUEUE_DEPTH;
@@ -1826,6 +1828,20 @@ static int rtrs_rdma_connect(struct rdma_cm_id *cm_id,
 	u16 recon_cnt;
 	int err = -ECONNRESET;
 
+	if (strnlen(disabled_port, NAME_MAX) > 0) {
+		char ib_device[NAME_MAX];
+
+		snprintf(ib_device, NAME_MAX, "%s %u", cm_id->device->name, cm_id->port_num);
+		if (strncmp(disabled_port, ib_device, NAME_MAX) == 0) {
+			/*
+			 * Reject connection attempt on disabled port
+			 */
+			pr_err("Error: Connection request on a disabled port");
+			err = -ENETDOWN;
+			goto reject_w_err;
+		}
+	}
+
 	if (len < sizeof(*msg)) {
 		pr_err("Invalid RTRS connection request\n");
 		goto reject_w_err;
@@ -2242,6 +2258,56 @@ static int check_module_params(void)
 	return 0;
 }
 
+static ssize_t disable_port_show(struct kobject *kobj,
+				 struct kobj_attribute *attr,
+				 char *page)
+{
+	return sysfs_emit(page, "%s\n", disabled_port);
+}
+
+static ssize_t disable_port_store(struct kobject *kobj,
+				  struct kobj_attribute *attr,
+				  const char *buf, size_t count)
+{
+	int ret, len;
+
+	if (count > 1 && strnlen(disabled_port, NAME_MAX) > 0) {
+		pr_err("A disabled port already exists.\n");
+		return -EINVAL;
+	}
+
+	ret = strscpy(disabled_port, buf, NAME_MAX);
+	if (ret == -E2BIG) {
+		pr_err("String too big.\n");
+		disabled_port[0] = '\0';
+		return ret;
+	}
+
+	len = strlen(disabled_port);
+	if (len > 0 && disabled_port[len-1] == '\n')
+		disabled_port[len-1] = '\0';
+
+	return ret;
+}
+
+static struct kobj_attribute rtrs_srv_disable_port_device_attr =
+	__ATTR(disable_port, 0644,
+	       disable_port_show, disable_port_store);
+
+static struct attribute *default_attrs[] = {
+	&rtrs_srv_disable_port_device_attr.attr,
+	NULL,
+};
+
+static struct attribute_group default_attr_group = {
+	.attrs = default_attrs,
+};
+
+static const struct attribute_group *default_attr_groups[] = {
+	&default_attr_group,
+	NULL,
+};
+
 static int __init rtrs_server_init(void)
 {
 	int err;
@@ -2268,15 +2334,26 @@ static int __init rtrs_server_init(void)
 		err = PTR_ERR(rtrs_dev_class);
 		goto out_chunk_pool;
 	}
+
+	rtrs_dev = device_create_with_groups(rtrs_dev_class, NULL,
+					      MKDEV(0, 0), NULL,
+					      default_attr_groups, "ctl");
+	if (IS_ERR(rtrs_dev)) {
+		err = PTR_ERR(rtrs_dev);
+		goto out_class;
+	}
+
 	rtrs_wq = alloc_workqueue("rtrs_server_wq", 0, 0);
 	if (!rtrs_wq) {
 		err = -ENOMEM;
-		goto out_dev_class;
+		goto out_dev;
 	}
 
 	return 0;
 
-out_dev_class:
+out_dev:
+	device_destroy(rtrs_dev_class, MKDEV(0, 0));
+out_class:
 	class_destroy(rtrs_dev_class);
 out_chunk_pool:
 	mempool_destroy(chunk_pool);
@@ -2287,6 +2364,7 @@ out_chunk_pool:
 static void __exit rtrs_server_exit(void)
 {
 	destroy_workqueue(rtrs_wq);
+	device_destroy(rtrs_dev_class, MKDEV(0, 0));
 	class_destroy(rtrs_dev_class);
 	mempool_destroy(chunk_pool);
 	rtrs_rdma_dev_pd_deinit(&dev_pd);
