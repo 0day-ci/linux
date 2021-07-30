@@ -1713,8 +1713,8 @@ extern bool can_do_mlock(void);
 #else
 static inline bool can_do_mlock(void) { return false; }
 #endif
-extern int user_shm_lock(size_t, struct ucounts *);
-extern void user_shm_unlock(size_t, struct ucounts *);
+extern bool user_shm_lock(loff_t size, struct ucounts *ucounts);
+extern void user_shm_unlock(loff_t size, struct ucounts *ucounts);
 
 /*
  * Parameter block passed down to zap_pte_range in exceptional cases.
