@@ -289,6 +289,15 @@ struct drm_crtc_state {
 	struct drm_property_blob *gamma_lut;
 
 	/**
+	 * @out_transfer_function:
+	 *
+	 * Transfer function for conversion from blending space to
+	 * display space. DRM_TF_1D_LUT can be specified to use the
+	 * gamma/degamma LUTs from mode_config instead.
+	 */
+	enum drm_transfer_function out_transfer_function;
+
+	/**
 	 * @target_vblank:
 	 *
 	 * Target vertical blank period when a page flip
@@ -1095,6 +1104,17 @@ struct drm_crtc {
 	 * scaling.
 	 */
 	struct drm_property *scaling_filter_property;
+
+	/**
+	 * @out_transfer_function_property:
+	 *
+	 * Optional "OUT TRANSFER FUNCTION" enum property for specifying
+	 * an output transfer function, i.e. a TF to convert from
+	 * blending space to luminance space. Use DRM_TF_1D_LUT to
+	 * indicate using the 1D gamma/degamma LUTs instead of a
+	 * named transfer function.
+	 */
+	struct drm_property *out_transfer_function_property;
 
 	/**
 	 * @state:

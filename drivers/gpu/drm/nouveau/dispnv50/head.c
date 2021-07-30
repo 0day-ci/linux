@@ -589,9 +589,16 @@ nv50_head_create(struct drm_device *dev, int index)
 	drm_crtc_helper_add(crtc, &nv50_head_help);
 	/* Keep the legacy gamma size at 256 to avoid compatibility issues */
 	drm_mode_crtc_set_gamma_size(crtc, 256);
-	drm_crtc_enable_color_mgmt(crtc, base->func->ilut_size,
-				   disp->disp->object.oclass >= GF110_DISP,
-				   head->func->olut_size);
+	ret = drm_crtc_enable_color_mgmt(crtc, base->func->ilut_size,
+					 disp->disp->object.oclass >= GF110_DISP,
+					 head->func->olut_size,
+					 BIT(DRM_TF_1D_LUT), DRM_TF_1D_LUT);
+	if (ret) {
+		drm_crtc_cleanup(crtc);
+		kfree(head);
+		return ERR_PTR(ret);
+	}
+
 
 	if (head->func->olut_set) {
 		ret = nv50_lut_init(disp, &drm->client.mmu, &head->olut);

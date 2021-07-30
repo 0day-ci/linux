@@ -1017,8 +1017,13 @@ static int ingenic_drm_bind(struct device *dev, bool has_components)
 		return ret;
 	}
 
-	drm_crtc_enable_color_mgmt(&priv->crtc, 0, false,
-				   ARRAY_SIZE(priv->dma_hwdescs->palette));
+	ret = drm_crtc_enable_color_mgmt(&priv->crtc, 0, false,
+					 ARRAY_SIZE(priv->dma_hwdescs->palette),
+					 BIT(DRM_TF_1D_LUT), DRM_TF_1D_LUT);
+	if (ret) {
+		dev_err(dev, "Failed to init color management: %i\n", ret);
+		return ret;
+	}
 
 	if (soc_info->has_osd) {
 		drm_plane_helper_add(&priv->f0,

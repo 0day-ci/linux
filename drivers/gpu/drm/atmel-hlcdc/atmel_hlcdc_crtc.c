@@ -531,8 +531,11 @@ int atmel_hlcdc_crtc_create(struct drm_device *dev)
 	drm_crtc_helper_add(&crtc->base, &lcdc_crtc_helper_funcs);
 
 	drm_mode_crtc_set_gamma_size(&crtc->base, ATMEL_HLCDC_CLUT_SIZE);
-	drm_crtc_enable_color_mgmt(&crtc->base, 0, false,
-				   ATMEL_HLCDC_CLUT_SIZE);
+	ret = drm_crtc_enable_color_mgmt(&crtc->base, 0, false,
+					 ATMEL_HLCDC_CLUT_SIZE,
+					 BIT(DRM_TF_1D_LUT), DRM_TF_1D_LUT);
+	if (ret)
+		goto fail;
 
 	dc->crtc = &crtc->base;
 

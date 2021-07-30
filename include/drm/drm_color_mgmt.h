@@ -54,10 +54,29 @@ static inline u32 drm_color_lut_extract(u32 user_input, int bit_precision)
 
 u64 drm_color_ctm_s31_32_to_qm_n(u64 user_input, u32 m, u32 n);
 
-void drm_crtc_enable_color_mgmt(struct drm_crtc *crtc,
+/**
+ * enum drm_transfer_function - common transfer function used for sdr/hdr formats
+ *
+ * DRM_TF_UNDEFINED - The legacy case where a TF in and out of the blending
+ *                    space is undefined
+ * DRM_TF_SRGB - Based on gamma curve and is used for printer/monitors/web
+ * DRM_TF_PQ2084 - Used for HDR and allows for up to 10,000 nit support.
+ * DRM_TF_1D_LUT - Use 1D gamma/degamma LUTs (currently only defined on crtc)
+*/
+enum drm_transfer_function {
+	DRM_TF_UNDEFINED,
+	DRM_TF_SRGB,
+	DRM_TF_PQ2084,
+	DRM_TF_1D_LUT,
+	DRM_TF_MAX,
+};
+
+bool drm_crtc_enable_color_mgmt(struct drm_crtc *crtc,
 				uint degamma_lut_size,
 				bool has_ctm,
-				uint gamma_lut_size);
+				uint gamma_lut_size,
+				u32 supported_tfs,
+				enum drm_transfer_function default_tf);
 
 int drm_mode_crtc_set_gamma_size(struct drm_crtc *crtc,
 				 int gamma_size);
@@ -87,20 +106,6 @@ enum drm_color_range {
 	DRM_COLOR_RANGE_MAX,
 };
 
-/**
- * enum drm_transfer_function - common transfer function used for sdr/hdr formats
- *
- * DRM_TF_UNDEFINED - The legacy case where a TF in and out of the blending
- *                    space is undefined
- * DRM_TF_SRGB - Based on gamma curve and is used for printer/monitors/web
- * DRM_TF_PQ2084 - Used for HDR and allows for up to 10,000 nit support.
-*/
-enum drm_transfer_function {
-	DRM_TF_UNDEFINED,
-	DRM_TF_SRGB,
-	DRM_TF_PQ2084,
-	DRM_TF_MAX,
-};
 int drm_plane_create_color_properties(struct drm_plane *plane,
 				      u32 supported_encodings,
 				      u32 supported_ranges,

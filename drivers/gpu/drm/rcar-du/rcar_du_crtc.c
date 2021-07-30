@@ -1263,7 +1263,12 @@ int rcar_du_crtc_create(struct rcar_du_group *rgrp, unsigned int swindex,
 		rgrp->cmms_mask |= BIT(hwindex % 2);
 
 		drm_mode_crtc_set_gamma_size(crtc, CM2_LUT_SIZE);
-		drm_crtc_enable_color_mgmt(crtc, 0, false, CM2_LUT_SIZE);
+		ret = drm_crtc_enable_color_mgmt(crtc, 0, false, CM2_LUT_SIZE,
+						 BIT(DRM_TF_1D_LUT), DRM_TF_1D_LUT);
+		if (ret) {
+			drm_crtc_cleanup(crtc);
+			return ret;
+		}
 	}
 
 	drm_crtc_helper_add(crtc, &crtc_helper_funcs);

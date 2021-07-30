@@ -439,7 +439,14 @@ struct tidss_crtc *tidss_crtc_create(struct tidss_device *tidss,
 	if (tidss->feat->vp_feat.color.gamma_size)
 		gamma_lut_size = 256;
 
-	drm_crtc_enable_color_mgmt(crtc, 0, has_ctm, gamma_lut_size);
+	ret = drm_crtc_enable_color_mgmt(crtc, 0, has_ctm, gamma_lut_size,
+					 BIT(DRM_TF_1D_LUT), DRM_TF_1D_LUT);
+	if (ret) {
+		drm_crtc_cleanup(crtc);
+		kfree(tcrtc);
+		return ERR_PTR(ret);
+	}
+
 	if (gamma_lut_size)
 		drm_mode_crtc_set_gamma_size(crtc, gamma_lut_size);
 

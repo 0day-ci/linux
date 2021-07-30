@@ -626,7 +626,12 @@ static int komeda_crtc_add(struct komeda_kms_dev *kms,
 
 	crtc->port = kcrtc->master->of_output_port;
 
-	drm_crtc_enable_color_mgmt(crtc, 0, true, KOMEDA_COLOR_LUT_SIZE);
+	err = drm_crtc_enable_color_mgmt(crtc, 0, true, KOMEDA_COLOR_LUT_SIZE,
+					 BIT(DRM_TF_1D_LUT), DRM_TF_1D_LUT);
+	if (err) {
+		drm_crtc_cleanup(crtc);
+		return err;
+	}
 
 	return err;
 }

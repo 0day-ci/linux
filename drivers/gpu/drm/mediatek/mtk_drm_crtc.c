@@ -827,7 +827,13 @@ int mtk_drm_crtc_create(struct drm_device *drm_dev,
 
 	if (gamma_lut_size)
 		drm_mode_crtc_set_gamma_size(&mtk_crtc->base, gamma_lut_size);
-	drm_crtc_enable_color_mgmt(&mtk_crtc->base, 0, has_ctm, gamma_lut_size);
+	ret = drm_crtc_enable_color_mgmt(&mtk_crtc->base, 0, has_ctm, gamma_lut_size,
+					BIT(DRM_TF_1D_LUT), DRM_TF_1D_LUT);
+	if (ret) {
+		drm_crtc_cleanup(mtk_crtc->base);
+		kfree(mtk_crtc);
+		return ret;
+
 	priv->num_pipes++;
 	mutex_init(&mtk_crtc->hw_lock);
 

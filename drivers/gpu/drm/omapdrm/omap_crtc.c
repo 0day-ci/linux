@@ -839,7 +839,15 @@ struct drm_crtc *omap_crtc_init(struct drm_device *dev,
 	if (dispc_mgr_gamma_size(priv->dispc, channel)) {
 		unsigned int gamma_lut_size = 256;
 
-		drm_crtc_enable_color_mgmt(crtc, gamma_lut_size, true, 0);
+		ret = drm_crtc_enable_color_mgmt(crtc, gamma_lut_size, true, 0,
+						 BIT(DRM_TF_1D_LUT), DRM_TF_1D_LUT);
+		if (ret) {
+			dev_err(dev->dev, "$s(): could not init color management for: %s\n",
+				__func__, pipe->output->name);
+			drm_crtc_cleanup(crtc);
+			kfree(omap_crtc);
+			return ERR_PTR(ret);
+		}
 		drm_mode_crtc_set_gamma_size(crtc, gamma_lut_size);
 	}
 

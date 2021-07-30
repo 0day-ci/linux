@@ -1118,12 +1118,24 @@ int vc4_crtc_init(struct drm_device *drm, struct vc4_crtc *vc4_crtc,
 	if (!vc4->hvs->hvs5) {
 		drm_mode_crtc_set_gamma_size(crtc, ARRAY_SIZE(vc4_crtc->lut_r));
 
-		drm_crtc_enable_color_mgmt(crtc, 0, false, crtc->gamma_size);
+		ret = drm_crtc_enable_color_mgmt(crtc, 0, false, crtc->gamma_size,
+						 BIT(DRM_TF_1D_LUT), DRM_TF_1D_LUT);
+		if (ret) {
+			dev_err(drm->dev, "failed to enable color management\n");
+			drm_crtc_cleanup(crtc);
+			return ret;
+		}
 
 		/* We support CTM, but only for one CRTC at a time. It's therefore
 		 * implemented as private driver state in vc4_kms, not here.
 		 */
-		drm_crtc_enable_color_mgmt(crtc, 0, true, crtc->gamma_size);
+		ret = drm_crtc_enable_color_mgmt(crtc, 0, true, crtc->gamma_size,
+						 BIT(DRM_TF_1D_LUT), DRM_TF_1D_LUT);
+		if (ret) {
+			dev_err(drm->dev, "failed to enable color management\n");
+			drm_crtc_cleanup(crtc);
+			return ret;
+		}
 	}
 
 	for (i = 0; i < crtc->gamma_size; i++) {

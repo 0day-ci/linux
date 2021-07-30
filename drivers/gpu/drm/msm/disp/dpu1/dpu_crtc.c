@@ -1337,6 +1337,7 @@ struct drm_crtc *dpu_crtc_init(struct drm_device *dev, struct drm_plane *plane,
 	struct drm_crtc *crtc = NULL;
 	struct dpu_crtc *dpu_crtc = NULL;
 	int i;
+	int ret = 0;
 
 	dpu_crtc = kzalloc(sizeof(*dpu_crtc), GFP_KERNEL);
 	if (!dpu_crtc)
@@ -1365,7 +1366,13 @@ struct drm_crtc *dpu_crtc_init(struct drm_device *dev, struct drm_plane *plane,
 
 	drm_crtc_helper_add(crtc, &dpu_crtc_helper_funcs);
 
-	drm_crtc_enable_color_mgmt(crtc, 0, true, 0);
+	ret = drm_crtc_enable_color_mgmt(crtc, 0, true, 0,
+					 BIT(DRM_TF_UNDEFINED), DRM_TF_UNDEFINED);
+	if (ret) {
+		drm_crtc_cleanup(crtc);
+		kfree(dpu_crtc);
+		return ERR_PTR(ret);
+	}
 
 	/* save user friendly CRTC name for later */
 	snprintf(dpu_crtc->name, DPU_CRTC_NAME_SIZE, "crtc%u", crtc->base.id);

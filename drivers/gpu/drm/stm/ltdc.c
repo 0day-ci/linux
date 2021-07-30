@@ -1035,7 +1035,13 @@ static int ltdc_crtc_init(struct drm_device *ddev, struct drm_crtc *crtc)
 	drm_crtc_helper_add(crtc, &ltdc_crtc_helper_funcs);
 
 	drm_mode_crtc_set_gamma_size(crtc, CLUT_SIZE);
-	drm_crtc_enable_color_mgmt(crtc, 0, false, CLUT_SIZE);
+	ret = drm_crtc_enable_color_mgmt(crtc, 0, false, CLUT_SIZE,
+					 BIT(DRM_TF_1D_LUT), DRM_TF_1D_LUT);
+	if (ret) {
+		DRM_ERROR("Can not initialize color management\n");
+		drm_crtc_cleanup(crtc);
+		goto cleanup;
+	}
 
 	DRM_DEBUG_DRIVER("CRTC:%d created\n", crtc->base.id);
 

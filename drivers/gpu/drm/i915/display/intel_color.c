@@ -2092,7 +2092,7 @@ static void icl_read_luts(struct intel_crtc_state *crtc_state)
 	}
 }
 
-void intel_color_init(struct intel_crtc *crtc)
+bool intel_color_init(struct intel_crtc *crtc)
 {
 	struct drm_i915_private *dev_priv = to_i915(crtc->base.dev);
 	bool has_ctm = INTEL_INFO(dev_priv)->color.degamma_lut_size != 0;
@@ -2149,8 +2149,9 @@ void intel_color_init(struct intel_crtc *crtc)
 		}
 	}
 
-	drm_crtc_enable_color_mgmt(&crtc->base,
-				   INTEL_INFO(dev_priv)->color.degamma_lut_size,
-				   has_ctm,
-				   INTEL_INFO(dev_priv)->color.gamma_lut_size);
+	return drm_crtc_enable_color_mgmt(&crtc->base,
+					  INTEL_INFO(dev_priv)->color.degamma_lut_size,
+					  has_ctm,
+					  INTEL_INFO(dev_priv)->color.gamma_lut_size,
+					  BIT(DRM_TF_1D_LUT), DRM_TF_1D_LUT);
 }

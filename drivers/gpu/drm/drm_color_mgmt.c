@@ -147,12 +147,21 @@ u64 drm_color_ctm_s31_32_to_qm_n(u64 user_input, u32 m, u32 n)
 }
 EXPORT_SYMBOL(drm_color_ctm_s31_32_to_qm_n);
 
+static const char * const tf_name[] = {
+	[DRM_TF_UNDEFINED] = "undefined",
+	[DRM_TF_SRGB] = "sRGB",
+	[DRM_TF_PQ2084] = "PQ2084",
+	[DRM_TF_1D_LUT] = "1D LUT",
+};
+
 /**
  * drm_crtc_enable_color_mgmt - enable color management properties
  * @crtc: DRM CRTC
  * @degamma_lut_size: the size of the degamma lut (before CSC)
  * @has_ctm: whether to attach ctm_property for CSC matrix
  * @gamma_lut_size: the size of the gamma lut (after CSC)
+ * @supported_tfs: bitfield indicating supported transfer functions
+ * @default_tf: default output transfer function
  *
  * This function lets the driver enable the color correction
  * properties on a CRTC. This includes 3 degamma, csc and gamma
@@ -162,13 +171,27 @@ EXPORT_SYMBOL(drm_color_ctm_s31_32_to_qm_n);
  * their size is not 0 and ctm_property is only attached if has_ctm is
  * true.
  */
-void drm_crtc_enable_color_mgmt(struct drm_crtc *crtc,
+bool drm_crtc_enable_color_mgmt(struct drm_crtc *crtc,
 				uint degamma_lut_size,
 				bool has_ctm,
-				uint gamma_lut_size)
+				uint gamma_lut_size,
+				u32 supported_tfs,
+				enum drm_transfer_function default_tf)
 {
 	struct drm_device *dev = crtc->dev;
 	struct drm_mode_config *config = &dev->mode_config;
+	struct drm_property *prop;
+	struct drm_prop_enum_list enum_list[DRM_TF_MAX];
+	int i, len;
+
+	if (WARN_ON(supported_tfs == 0 ||
+		    (supported_tfs & -BIT(DRM_TF_MAX)) != 0 ||
+		    (supported_tfs & BIT(default_tf)) == 0))
+		return -EINVAL;
+
+	if (!!(supported_tfs & BIT(DRM_TF_1D_LUT)) !=
+	    !!(degamma_lut_size || gamma_lut_size))
+		return -EINVAL;
 
 	if (degamma_lut_size) {
 		drm_object_attach_property(&crtc->base,
@@ -189,6 +212,28 @@ void drm_crtc_enable_color_mgmt(struct drm_crtc *crtc,
 					   config->gamma_lut_size_property,
 					   gamma_lut_size);
 	}
+
+	len = 0;
+	for (i = 0; i < DRM_TF_MAX; i++) {
+		if ((supported_tfs & BIT(i)) == 0)
+			continue;
+
+		enum_list[len].type = i;
+		enum_list[len].name = tf_name[i];
+		len++;
+	}
+
+	prop = drm_property_create_enum(dev, 0, "OUT TRANSFER_FUNCTION",
+					enum_list, len);
+	if (!prop)
+		return -ENOMEM;
+	crtc->out_transfer_function_property = prop;
+	drm_object_attach_property(&crtc->base, prop, default_tf);
+	if (crtc->state)
+		crtc->state->out_transfer_function = default_tf;
+	
+	return 0;
+
 }
 EXPORT_SYMBOL(drm_crtc_enable_color_mgmt);
 
@@ -481,11 +526,6 @@ static const char * const color_range_name[] = {
 	[DRM_COLOR_YCBCR_LIMITED_RANGE] = "YCbCr limited range",
 };
 
-static const char * const tf_name[] = {
-	[DRM_TF_UNDEFINED] = "undefined",
-	[DRM_TF_SRGB] = "sRGB",
-	[DRM_TF_PQ2084] = "PQ2084",
-};
 /**
  * drm_get_color_encoding_name - return a string for color encoding
  * @encoding: color encoding to compute name of

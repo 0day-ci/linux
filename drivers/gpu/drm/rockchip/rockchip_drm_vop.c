@@ -1817,7 +1817,10 @@ static int vop_create_crtc(struct vop *vop)
 	drm_crtc_helper_add(crtc, &vop_crtc_helper_funcs);
 	if (vop->lut_regs) {
 		drm_mode_crtc_set_gamma_size(crtc, vop_data->lut_size);
-		drm_crtc_enable_color_mgmt(crtc, 0, false, vop_data->lut_size);
+		ret = drm_crtc_enable_color_mgmt(crtc, 0, false, vop_data->lut_size,
+						 BIT(DRM_TF_1D_LUT), DRM_TF_1D_LUT);
+		if (ret)
+			goto err_cleanup_crtc;
 	}
 
 	/*

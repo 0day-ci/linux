@@ -12,7 +12,7 @@ struct intel_crtc_state;
 struct intel_crtc;
 struct drm_property_blob;
 
-void intel_color_init(struct intel_crtc *crtc);
+bool intel_color_init(struct intel_crtc *crtc);
 int intel_color_check(struct intel_crtc_state *crtc_state);
 void intel_color_commit(const struct intel_crtc_state *crtc_state);
 void intel_color_load_luts(const struct intel_crtc_state *crtc_state);

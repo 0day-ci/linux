@@ -992,7 +992,10 @@ static int armada_drm_crtc_create(struct drm_device *drm, struct device *dev,
 	if (ret)
 		return ret;
 
-	drm_crtc_enable_color_mgmt(&dcrtc->crtc, 0, false, 256);
+	ret = drm_crtc_enable_color_mgmt(&dcrtc->crtc, 0, false, ,
+					 BIT(DRM_TF_1D_LUT), DRM_TF_1D_LUT);
+	if (ret)
+		return ret;
 
 	return armada_overlay_plane_create(drm, 1 << dcrtc->num);
 

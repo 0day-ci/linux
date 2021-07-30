@@ -340,7 +340,9 @@ int intel_crtc_init(struct drm_i915_private *dev_priv, enum pipe pipe)
 						BIT(DRM_SCALING_FILTER_DEFAULT) |
 						BIT(DRM_SCALING_FILTER_NEAREST_NEIGHBOR));
 
-	intel_color_init(crtc);
+	ret = intel_color_init(crtc);
+	if (ret)
+		goto fail;
 
 	intel_crtc_crc_init(crtc);
 
