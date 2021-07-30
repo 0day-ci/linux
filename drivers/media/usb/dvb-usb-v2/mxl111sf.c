@@ -931,8 +931,6 @@ static int mxl111sf_init(struct dvb_usb_device *d)
 		  .len = sizeof(eeprom), .buf = eeprom },
 	};
 
-	mutex_init(&state->msg_lock);
-
 	ret = get_chip_info(state);
 	if (mxl_fail(ret))
 		pr_err("failed to get chip info during probe");
@@ -979,7 +977,11 @@ static int mxl111sf_frontend_attach_mh(struct dvb_usb_adapter *adap)
 static int mxl111sf_frontend_attach_atsc_mh(struct dvb_usb_adapter *adap)
 {
 	int ret;
+	struct mxl111sf_state *state = d_to_priv(adap_to_d(adap));
+
 	pr_debug("%s\n", __func__);
+
+	mutex_init(&state->msg_lock);
 
 	ret = mxl111sf_lgdt3305_frontend_attach(adap, 0);
 	if (ret < 0)
