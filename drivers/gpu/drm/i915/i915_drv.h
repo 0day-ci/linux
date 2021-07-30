@@ -335,7 +335,7 @@ struct drm_i915_display_funcs {
 enum i915_cache_level {
 	I915_CACHE_NONE = 0,
 	I915_CACHE_LLC, /* also used for snoopable memory on non-LLC */
-	I915_CACHE_L3_LLC, /* gen7+, L3 sits between the domain specifc
+	I915_CACHE_L3_LLC, /* gen7+, L3 sits between the domain specific
 			      caches, eg sampler/render caches, and the
 			      large Last-Level-Cache. LLC is coherent with
 			      the CPU, but L3 is only visible to the GPU. */
@@ -383,7 +383,7 @@ struct intel_fbc {
 			int src_h;
 			bool visible;
 			/*
-			 * Display surface base address adjustement for
+			 * Display surface base address adjustment for
 			 * pageflips. Note that on gen4+ this only adjusts up
 			 * to a tile, offsets within a tile are handled in
 			 * the hw itself (with the TILEOFF register).
@@ -795,7 +795,7 @@ struct drm_i915_private {
 	 */
 	struct resource dsm;
 	/**
-	 * Reseved portion of Data Stolen Memory
+	 * Reserved portion of Data Stolen Memory
 	 */
 	struct resource dsm_reserved;
 

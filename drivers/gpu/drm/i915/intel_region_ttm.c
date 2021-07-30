@@ -205,7 +205,7 @@ intel_region_ttm_node_alloc(struct intel_memory_region *mem,
 
 	/*
 	 * We ignore the flags for now since we're using the range
-	 * manager and contigous and min page size would be fulfilled
+	 * manager and contiguous and min page size would be fulfilled
 	 * by default if size is min page size aligned.
 	 */
 	mock_bo.base.size = size;

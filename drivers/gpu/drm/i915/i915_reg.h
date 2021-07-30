@@ -3017,7 +3017,7 @@ static inline bool i915_mmio_reg_valid(i915_reg_t reg)
 #define   HDPORT_DDI_USED(phy)		REG_BIT(2 * (phy) + 1)
 #define   HDPORT_ENABLED		REG_BIT(0)
 
-/* Make render/texture TLB fetches lower priorty than associated data
+/* Make render/texture TLB fetches lower priority than associated data
  *   fetches. This is not turned on by default
  */
 #define   MI_ARB_RENDER_TLB_LOW_PRIORITY	(1 << 15)

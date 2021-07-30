@@ -3457,7 +3457,7 @@ i915_perf_open_ioctl_locked(struct i915_perf *perf,
 	}
 
 	/*
-	 * Asking for SSEU configuration is a priviliged operation.
+	 * Asking for SSEU configuration is a privileged operation.
 	 */
 	if (props->has_sseu)
 		privileged_op = true;
@@ -3939,7 +3939,7 @@ static u32 mask_reg_value(u32 reg, u32 val)
 	if (REG_EQUAL(reg, HALF_SLICE_CHICKEN2))
 		val = val & ~_MASKED_BIT_ENABLE(GEN8_ST_PO_DISABLE);
 
-	/* WAIT_FOR_RC6_EXIT has only one bit fullfilling the function
+	/* WAIT_FOR_RC6_EXIT has only one bit fulfilling the function
 	 * indicated by its name and a bunch of selection fields used by OA
 	 * configs.
 	 */

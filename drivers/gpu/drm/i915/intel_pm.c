@@ -660,7 +660,7 @@ static const struct intel_watermark_params i845_wm_info = {
  * @latency: Memory wakeup latency in 0.1us units
  *
  * Compute the watermark using the method 1 or "small buffer"
- * formula. The caller may additonally add extra cachelines
+ * formula. The caller may additionally add extra cachelines
  * to account for TLB misses and clock crossings.
  *
  * This method is concerned with the short term drain rate
@@ -707,7 +707,7 @@ static unsigned int intel_wm_method1(unsigned int pixel_rate,
  * @latency: Memory wakeup latency in 0.1us units
  *
  * Compute the watermark using the method 2 or "large buffer"
- * formula. The caller may additonally add extra cachelines
+ * formula. The caller may additionally add extra cachelines
  * to account for TLB misses and clock crossings.
  *
  * This method is concerned with the long term drain rate
@@ -1719,7 +1719,7 @@ static int vlv_compute_fifo(struct intel_crtc_state *crtc_state)
 	/*
 	 * When enabling sprite0 after sprite1 has already been enabled
 	 * we tend to get an underrun unless sprite0 already has some
-	 * FIFO space allcoated. Hence we always allocate at least one
+	 * FIFO space allocated. Hence we always allocate at least one
 	 * cacheline for sprite0 whenever sprite1 is enabled.
 	 *
 	 * All other plane enable sequences appear immune to this problem.
@@ -2919,7 +2919,7 @@ static void intel_read_wm_latency(struct drm_i915_private *dev_priv,
 		 * WaWmMemoryReadLatency
 		 *
 		 * punit doesn't take into account the read latency so we need
-		 * to add proper adjustement to each valid level we retrieve
+		 * to add proper adjustment to each valid level we retrieve
 		 * from the punit when level 0 response data is 0us.
 		 */
 		if (wm[0] == 0) {
@@ -4091,7 +4091,7 @@ u32 skl_ddb_dbuf_slice_mask(struct drm_i915_private *dev_priv,
 
 	/*
 	 * Per plane DDB entry can in a really worst case be on multiple slices
-	 * but single entry is anyway contigious.
+	 * but single entry is anyway contiguous.
 	 */
 	while (start_slice <= end_slice) {
 		slice_mask |= BIT(start_slice);

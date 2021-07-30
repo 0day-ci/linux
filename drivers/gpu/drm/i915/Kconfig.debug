@@ -2,7 +2,7 @@
 config DRM_I915_WERROR
 	bool "Force GCC to throw an error instead of a warning when compiling"
 	# As this may inadvertently break the build, only allow the user
-	# to shoot oneself in the foot iff they aim really hard
+	# to shoot oneself in the foot if they aim really hard
 	depends on EXPERT
 	# We use the dependency on !COMPILE_TEST to not be enabled in
 	# allmodconfig or allyesconfig configurations

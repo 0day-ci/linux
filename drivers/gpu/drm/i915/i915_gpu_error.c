@@ -1498,7 +1498,7 @@ gt_record_uc(struct intel_gt_coredump *gt,
 	memcpy(&error_uc->huc_fw, &uc->huc.fw, sizeof(uc->huc.fw));
 
 	/* Non-default firmware paths will be specified by the modparam.
-	 * As modparams are generally accesible from the userspace make
+	 * As modparams are generally accessible from the userspace make
 	 * explicit copies of the firmware paths.
 	 */
 	error_uc->guc_fw.path = kstrdup(uc->guc.fw.path, ALLOW_FAIL);
