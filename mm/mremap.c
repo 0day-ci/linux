@@ -489,6 +489,9 @@ unsigned long move_page_tables(struct vm_area_struct *vma,
 	old_end = old_addr + len;
 	flush_cache_range(vma, old_addr, old_end);
 
+	if (is_vm_hugetlb_page(vma))
+		return move_hugetlb_page_tables(vma, old_addr, new_addr, len);
+
 	mmu_notifier_range_init(&range, MMU_NOTIFY_UNMAP, 0, vma, vma->vm_mm,
 				old_addr, old_end);
 	mmu_notifier_invalidate_range_start(&range);
@@ -646,6 +649,57 @@ static unsigned long move_vma(struct vm_area_struct *vma,
 		mremap_userfaultfd_prep(new_vma, uf);
 	}
 
+	if (is_vm_hugetlb_page(vma)) {
+		/*
+		 * Clear the old hugetlb private page reservation.
+		 * It has already been transferred to new_vma.
+		 *
+		 * The reservation tracking for hugetlb private mapping is
+		 * done in two places:
+		 * 1. implicit vma size, e.g. vma->vm_end - vma->vm_start
+		 * 2. tracking of hugepages that has been faulted in already,
+		 *    this is done via a linked list hanging off
+		 *    vma_resv_map(vma).
+		 *
+		 * Each hugepage vma also has hugepage specific vm_ops method
+		 * and there is an imbalance in the open() and close method.
+		 *
+		 * In the open method (hugetlb_vm_op_open), a ref count is
+		 * obtained on the structure that tracks faulted in pages.
+		 *
+		 * In the close method, it unconditionally returns pending
+		 * reservation on the vma as well as release a kref count and
+		 * calls release function upon last reference.
+		 *
+		 * Because of this unbalanced operation in the open/close
+		 * method, this code runs into trouble in the mremap() path:
+		 * copy_vma will copy the pointer to the reservation structure,
+		 * then calls vma->vm_ops->open() method, which only increments
+		 * ref count on the tracking structure and does not do actual
+		 * reservation.  In the same code sequence from move_vma(), the
+		 * close() method is called as a result of cleaning up original
+		 * vma segment from a call to do_munmap().  At this stage, the
+		 * tracking and reservation is out of balance, e.g. the
+		 * reservation is returned, however there is an active ref on
+		 * the tracking structure.
+		 *
+		 * When the remap'ed vma unmaps (either implicit at process
+		 * exit or explicit munmap), the reservation will be returned
+		 * again because hugetlb_vm_op_close calculate pending
+		 * reservation unconditionally based on size of vma.  This
+		 * cause h->resv_huge_pages. to underflow and no more hugepages
+		 * can be allocated to application in certain situation.
+		 *
+		 * We need to reset and clear the tracking reservation, such
+		 * that we don't prematurely returns hugepage reservation at
+		 * mremap time.  The reservation should only be returned at
+		 * munmap() time.  This is totally undesired, however, we
+		 * don't want to re-factor hugepage reservation code at this
+		 * stage for prod kernel. Resetting is the least risky method.
+		 */
+		clear_vma_resv_huge_pages(vma);
+	}
+
 	/* Conceal VM_ACCOUNT so old reservation is not undone */
 	if (vm_flags & VM_ACCOUNT && !(flags & MREMAP_DONTUNMAP)) {
 		vma->vm_flags &= ~VM_ACCOUNT;
@@ -737,9 +791,6 @@ static struct vm_area_struct *vma_to_resize(unsigned long addr,
 
 	if ((flags & MREMAP_DONTUNMAP) &&
 			(vma->vm_flags & (VM_DONTEXPAND | VM_PFNMAP)))
-		return ERR_PTR(-EINVAL);
-
-	if (is_vm_hugetlb_page(vma))
 		return ERR_PTR(-EINVAL);
 
 	/* We can't remap across vm area boundaries */
@@ -937,6 +988,24 @@ SYSCALL_DEFINE5(mremap, unsigned long, addr, unsigned long, old_len,
 
 	if (mmap_write_lock_killable(current->mm))
 		return -EINTR;
+	vma = find_vma(mm, addr);
+	if (!vma || vma->vm_start > addr)
+		goto out;
+
+	if (is_vm_hugetlb_page(vma)) {
+		struct hstate *h __maybe_unused = hstate_vma(vma);
+
+		if (old_len & ~huge_page_mask(h) ||
+		    new_len & ~huge_page_mask(h))
+			goto out;
+
+		/*
+		 * Don't allow remap expansion, because the underlying hugetlb
+		 * reservation is not yet capable to handle split reservation.
+		 */
+		if (new_len > old_len)
+			goto out;
+	}
 
 	if (flags & (MREMAP_FIXED | MREMAP_DONTUNMAP)) {
 		ret = mremap_to(addr, old_len, new_addr, new_len,

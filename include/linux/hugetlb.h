@@ -124,6 +124,7 @@ struct hugepage_subpool *hugepage_new_subpool(struct hstate *h, long max_hpages,
 void hugepage_put_subpool(struct hugepage_subpool *spool);
 
 void reset_vma_resv_huge_pages(struct vm_area_struct *vma);
+void clear_vma_resv_huge_pages(struct vm_area_struct *vma);
 int hugetlb_sysctl_handler(struct ctl_table *, int, void *, size_t *, loff_t *);
 int hugetlb_overcommit_handler(struct ctl_table *, int, void *, size_t *,
 		loff_t *);
@@ -132,6 +133,8 @@ int hugetlb_treat_movable_handler(struct ctl_table *, int, void *, size_t *,
 int hugetlb_mempolicy_sysctl_handler(struct ctl_table *, int, void *, size_t *,
 		loff_t *);
 
+int move_hugetlb_page_tables(struct vm_area_struct *vma, unsigned long old_addr,
+			     unsigned long new_addr, unsigned long len);
 int copy_hugetlb_page_range(struct mm_struct *, struct mm_struct *, struct vm_area_struct *);
 long follow_hugetlb_page(struct mm_struct *, struct vm_area_struct *,
 			 struct page **, struct vm_area_struct **,
@@ -218,6 +221,10 @@ static inline void reset_vma_resv_huge_pages(struct vm_area_struct *vma)
 {
 }
 
+static inline void clear_vma_resv_huge_pages(struct vm_area_struct *vma)
+{
+}
+
 static inline unsigned long hugetlb_total_pages(void)
 {
 	return 0;
@@ -264,6 +271,12 @@ static inline int copy_hugetlb_page_range(struct mm_struct *dst,
 	BUG();
 	return 0;
 }
+
+#define move_hugetlb_page_tables(vma, old_addr, new_addr, len)                 \
+	({                                                                     \
+		BUG();                                                         \
+		0;                                                             \
+	})
 
 static inline void hugetlb_report_meminfo(struct seq_file *m)
 {
