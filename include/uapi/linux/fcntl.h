@@ -74,6 +74,15 @@
 #define RWF_WRITE_LIFE_NOT_SET	RWH_WRITE_LIFE_NOT_SET
 
 /*
+ * Allocate hugepages when available: useful on a tmpfs which was not mounted
+ * with the "huge=always" option, as for memfds.  And, do not allocate hugepages
+ * even when available: useful to cancel the above request, or make an exception
+ * on a tmpfs mounted with "huge=always" (without splitting existing hugepages).
+ */
+#define F_HUGEPAGE		(F_LINUX_SPECIFIC_BASE + 15)
+#define F_NOHUGEPAGE		(F_LINUX_SPECIFIC_BASE + 16)
+
+/*
  * Types of directory notifications that may be requested.
  */
 #define DN_ACCESS	0x00000001	/* File accessed */

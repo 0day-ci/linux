@@ -448,9 +448,9 @@ static bool shmem_confirm_swap(struct address_space *mapping,
  *	enables huge pages for the mount;
  * SHMEM_HUGE_WITHIN_SIZE:
  *	only allocate huge pages if the page will be fully within i_size,
- *	also respect fadvise()/madvise() hints;
+ *	also respect fcntl()/madvise() hints;
  * SHMEM_HUGE_ADVISE:
- *	only allocate huge pages if requested with fadvise()/madvise();
+ *	only allocate huge pages if requested with fcntl()/madvise().
  */
 
 #define SHMEM_HUGE_NEVER	0
@@ -477,13 +477,13 @@ static bool shmem_confirm_swap(struct address_space *mapping,
 static int shmem_huge __read_mostly = SHMEM_HUGE_NEVER;
 
 /*
- * Does either /sys/kernel/mm/transparent_hugepage/shmem_enabled or
+ * Does either tmpfs mount option (or transparent_hugepage/shmem_enabled) or
  * /sys/kernel/mm/transparent_hugepage/enabled allow transparent hugepages?
  * (Can only return true when the machine has_transparent_hugepage() too.)
  */
-static bool transparent_hugepage_allowed(void)
+static bool transparent_hugepage_allowed(struct shmem_sb_info *sbinfo)
 {
-	return	shmem_huge > SHMEM_HUGE_NEVER ||
+	return	sbinfo->huge > SHMEM_HUGE_NEVER ||
 		test_bit(TRANSPARENT_HUGEPAGE_FLAG,
 			&transparent_hugepage_flags) ||
 		test_bit(TRANSPARENT_HUGEPAGE_REQ_MADV_FLAG,
@@ -499,6 +499,8 @@ bool shmem_is_huge(struct vm_area_struct *vma,
 		return false;
 	if (vma && ((vma->vm_flags & VM_NOHUGEPAGE) ||
 	    test_bit(MMF_DISABLE_THP, &vma->vm_mm->flags)))
+		return false;
+	if (SHMEM_I(inode)->flags & VM_NOHUGEPAGE)
 		return false;
 	if (SHMEM_I(inode)->flags & VM_HUGEPAGE)
 		return true;
@@ -692,7 +694,7 @@ static long shmem_unused_huge_count(struct super_block *sb,
 
 #define shmem_huge SHMEM_HUGE_DENY
 
-bool transparent_hugepage_allowed(void)
+bool transparent_hugepage_allowed(struct shmem_sb_info *sbinfo)
 {
 	return false;
 }
@@ -2197,6 +2199,8 @@ unsigned long shmem_get_unmapped_area(struct file *file,
 		if (file) {
 			VM_BUG_ON(file->f_op != &shmem_file_operations);
 			inode = file_inode(file);
+			if (SHMEM_I(inode)->flags & VM_NOHUGEPAGE)
+				return addr;
 			if (SHMEM_I(inode)->flags & VM_HUGEPAGE)
 				goto huge;
 			sb = inode->i_sb;
@@ -2211,6 +2215,11 @@ unsigned long shmem_get_unmapped_area(struct file *file,
 		}
 		if (SHMEM_SB(sb)->huge == SHMEM_HUGE_NEVER)
 			return addr;
+		/*
+		 * Note that SHMEM_HUGE_ADVISE has to give out huge-aligned
+		 * addresses to everyone, because madvise(,,MADV_HUGEPAGE)
+		 * needs the address-chicken on which to advise if huge-egg.
+		 */
 	}
 huge:
 	offset = (pgoff << PAGE_SHIFT) & (HPAGE_PMD_SIZE-1);
@@ -2334,7 +2343,7 @@ static struct inode *shmem_get_inode(struct super_block *sb, const struct inode 
 		info->seals = F_SEAL_SEAL;
 		info->flags = flags & VM_NORESERVE;
 		if ((flags & VM_HUGEPAGE) &&
-		    transparent_hugepage_allowed() &&
+		    transparent_hugepage_allowed(sbinfo) &&
 		    !test_bit(MMF_DISABLE_THP, &current->mm->flags))
 			info->flags |= VM_HUGEPAGE;
 		INIT_LIST_HEAD(&info->shrinklist);
@@ -2672,6 +2681,53 @@ static loff_t shmem_file_llseek(struct file *file, loff_t offset, int whence)
 		offset = vfs_setpos(file, offset, MAX_LFS_FILESIZE);
 	inode_unlock(inode);
 	return offset;
+}
+
+static int shmem_huge_fcntl(struct file *file, unsigned int cmd)
+{
+	struct inode *inode = file_inode(file);
+	struct shmem_inode_info *info = SHMEM_I(inode);
+
+	if (!(file->f_mode & FMODE_WRITE))
+		return -EBADF;
+	if (test_bit(MMF_DISABLE_THP, &current->mm->flags))
+		return -EPERM;
+	if (cmd == F_HUGEPAGE &&
+	    !transparent_hugepage_allowed(SHMEM_SB(inode->i_sb)))
+		return -EPERM;
+
+	inode_lock(inode);
+	if (cmd == F_HUGEPAGE) {
+		info->flags &= ~VM_NOHUGEPAGE;
+		info->flags |= VM_HUGEPAGE;
+	} else {
+		info->flags &= ~VM_HUGEPAGE;
+		info->flags |= VM_NOHUGEPAGE;
+	}
+	inode_unlock(inode);
+	return 0;
+}
+
+long shmem_fcntl(struct file *file, unsigned int cmd, unsigned long arg)
+{
+	long error = -EINVAL;
+
+	if (file->f_op != &shmem_file_operations)
+		return error;
+
+	switch (cmd) {
+	/*
+	 * case F_ADD_SEALS:
+	 * case F_GET_SEALS:
+	 *	are handled by memfd_fcntl().
+	 */
+	case F_HUGEPAGE:
+	case F_NOHUGEPAGE:
+		error = shmem_huge_fcntl(file, cmd);
+		break;
+	}
+
+	return error;
 }
 
 static long shmem_fallocate(struct file *file, int mode, loff_t offset,
