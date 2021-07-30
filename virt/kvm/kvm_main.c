@@ -924,6 +924,10 @@ static int kvm_create_vm_debugfs(struct kvm *kvm, int fd)
 
 	snprintf(dir_name, sizeof(dir_name), "%d-%d", task_pid_nr(current), fd);
 	kvm->debugfs_dentry = debugfs_create_dir(dir_name, kvm_debugfs_dir);
+	if (IS_ERR_OR_NULL(kvm->debugfs_dentry)) {
+		pr_err("Failed to create %s\n", dir_name);
+		return 0;
+	}
 
 	kvm->debugfs_stat_data = kcalloc(kvm_debugfs_num_entries,
 					 sizeof(*kvm->debugfs_stat_data),
