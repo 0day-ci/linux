@@ -57,7 +57,6 @@
 #include <linux/mqueue.h>
 #include <linux/audit.h>
 #include <linux/personality.h>
-#include <linux/time.h>
 #include <linux/netlink.h>
 #include <linux/compiler.h>
 #include <asm/unistd.h>
