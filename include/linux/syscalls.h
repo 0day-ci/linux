@@ -735,11 +735,14 @@ asmlinkage long sys_rt_sigtimedwait_time32(const sigset_t __user *uthese,
 				size_t sigsetsize);
 asmlinkage long sys_rt_sigqueueinfo(pid_t pid, int sig, siginfo_t __user *uinfo);
 
+/* kernel/reboot.c */
+asmlinkage long sys_reboot(int magic1, int magic2, unsigned int cmd,
+				void __user *arg);
+
 /* kernel/sys.c */
 asmlinkage long sys_setpriority(int which, int who, int niceval);
 asmlinkage long sys_getpriority(int which, int who);
-asmlinkage long sys_reboot(int magic1, int magic2, unsigned int cmd,
-				void __user *arg);
+
 asmlinkage long sys_setregid(gid_t rgid, gid_t egid);
 asmlinkage long sys_setgid(gid_t gid);
 asmlinkage long sys_setreuid(uid_t ruid, uid_t euid);
