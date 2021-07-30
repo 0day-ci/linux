@@ -1220,17 +1220,13 @@ static inline bool slot_contains_gfn(struct kvm_memslots *slots, int slot_index,
 static inline int __search_memslots(struct kvm_memslots *slots, gfn_t gfn)
 {
 	int start = 0, end = slots->used_slots;
-	int slot = atomic_read(&slots->lru_slot);
 	struct kvm_memory_slot *memslots = slots->memslots;
 
 	if (unlikely(!slots->used_slots))
 		return -1;
 
-	if (slot_contains_gfn(slots, slot, gfn))
-		return slot;
-
 	while (start < end) {
-		slot = start + (end - start) / 2;
+		int slot = start + (end - start) / 2;
 
 		if (gfn >= memslots[slot].base_gfn)
 			end = slot;
@@ -1238,10 +1234,8 @@ static inline int __search_memslots(struct kvm_memslots *slots, gfn_t gfn)
 			start = slot + 1;
 	}
 
-	if (slot_contains_gfn(slots, start, gfn)) {
-		atomic_set(&slots->lru_slot, start);
+	if (slot_contains_gfn(slots, start, gfn))
 		return start;
-	}
 
 	return -1;
 }
@@ -1255,8 +1249,16 @@ static inline int __search_memslots(struct kvm_memslots *slots, gfn_t gfn)
 static inline struct kvm_memory_slot *
 search_memslots(struct kvm_memslots *slots, gfn_t gfn)
 {
-	int slot_index = __search_memslots(slots, gfn);
+	int slot_index = atomic_read(&slots->lru_slot);
 
+	if (slot_contains_gfn(slots, slot_index, gfn))
+		return get_slot(slots, slot_index);
+
+	slot_index = __search_memslots(slots, gfn);
+	if (slot_index < 0)
+		return NULL;
+
+	atomic_set(&slots->lru_slot, slot_index);
 	return get_slot(slots, slot_index);
 }
 
