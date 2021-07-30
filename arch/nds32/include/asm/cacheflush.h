@@ -40,8 +40,8 @@ void flush_anon_page(struct vm_area_struct *vma,
 void flush_kernel_dcache_page(struct page *page);
 void flush_kernel_vmap_range(void *addr, int size);
 void invalidate_kernel_vmap_range(void *addr, int size);
-#define flush_dcache_mmap_lock(mapping)   xa_lock_irq(&(mapping)->i_pages)
-#define flush_dcache_mmap_unlock(mapping) xa_unlock_irq(&(mapping)->i_pages)
+#define flush_dcache_mmap_lock(mapping)   xa_lock_bh(&(mapping)->i_pages)
+#define flush_dcache_mmap_unlock(mapping) xa_unlock_bh(&(mapping)->i_pages)
 
 #else
 void flush_icache_user_page(struct vm_area_struct *vma, struct page *page,

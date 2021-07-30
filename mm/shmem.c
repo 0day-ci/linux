@@ -698,7 +698,7 @@ static int shmem_add_to_page_cache(struct page *page,
 
 	do {
 		void *entry;
-		xas_lock_irq(&xas);
+		xas_lock_bh(&xas);
 		entry = xas_find_conflict(&xas);
 		if (entry != expected)
 			xas_set_err(&xas, -EEXIST);
@@ -719,7 +719,7 @@ next:
 		__mod_lruvec_page_state(page, NR_FILE_PAGES, nr);
 		__mod_lruvec_page_state(page, NR_SHMEM, nr);
 unlock:
-		xas_unlock_irq(&xas);
+		xas_unlock_bh(&xas);
 	} while (xas_nomem(&xas, gfp));
 
 	if (xas_error(&xas)) {
@@ -744,13 +744,13 @@ static void shmem_delete_from_page_cache(struct page *page, void *radswap)
 
 	VM_BUG_ON_PAGE(PageCompound(page), page);
 
-	xa_lock_irq(&mapping->i_pages);
+	xa_lock_bh(&mapping->i_pages);
 	error = shmem_replace_entry(mapping, page->index, page, radswap);
 	page->mapping = NULL;
 	mapping->nrpages--;
 	__dec_lruvec_page_state(page, NR_FILE_PAGES);
 	__dec_lruvec_page_state(page, NR_SHMEM);
-	xa_unlock_irq(&mapping->i_pages);
+	xa_unlock_bh(&mapping->i_pages);
 	put_page(page);
 	BUG_ON(error);
 }
@@ -1652,14 +1652,14 @@ static int shmem_replace_page(struct page **pagep, gfp_t gfp,
 	 * Our caller will very soon move newpage out of swapcache, but it's
 	 * a nice clean interface for us to replace oldpage by newpage there.
 	 */
-	xa_lock_irq(&swap_mapping->i_pages);
+	xa_lock_bh(&swap_mapping->i_pages);
 	error = shmem_replace_entry(swap_mapping, swap_index, oldpage, newpage);
 	if (!error) {
 		mem_cgroup_migrate(oldpage, newpage);
 		__inc_lruvec_page_state(newpage, NR_FILE_PAGES);
 		__dec_lruvec_page_state(oldpage, NR_FILE_PAGES);
 	}
-	xa_unlock_irq(&swap_mapping->i_pages);
+	xa_unlock_bh(&swap_mapping->i_pages);
 
 	if (unlikely(error)) {
 		/*

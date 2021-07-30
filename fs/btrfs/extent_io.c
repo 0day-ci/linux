@@ -6321,11 +6321,11 @@ static void btree_clear_page_dirty(struct page *page)
 	ASSERT(PageDirty(page));
 	ASSERT(PageLocked(page));
 	clear_page_dirty_for_io(page);
-	xa_lock_irq(&page->mapping->i_pages);
+	xa_lock_bh(&page->mapping->i_pages);
 	if (!PageDirty(page))
 		__xa_clear_mark(&page->mapping->i_pages,
 				page_index(page), PAGECACHE_TAG_DIRTY);
-	xa_unlock_irq(&page->mapping->i_pages);
+	xa_unlock_bh(&page->mapping->i_pages);
 }
 
 static void clear_subpage_extent_buffer_dirty(const struct extent_buffer *eb)

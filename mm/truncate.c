@@ -45,9 +45,9 @@ static inline void __clear_shadow_entry(struct address_space *mapping,
 static void clear_shadow_entry(struct address_space *mapping, pgoff_t index,
 			       void *entry)
 {
-	xa_lock_irq(&mapping->i_pages);
+	xa_lock_bh(&mapping->i_pages);
 	__clear_shadow_entry(mapping, index, entry);
-	xa_unlock_irq(&mapping->i_pages);
+	xa_unlock_bh(&mapping->i_pages);
 }
 
 /*
@@ -74,7 +74,7 @@ static void truncate_exceptional_pvec_entries(struct address_space *mapping,
 
 	dax = dax_mapping(mapping);
 	if (!dax)
-		xa_lock_irq(&mapping->i_pages);
+		xa_lock_bh(&mapping->i_pages);
 
 	for (i = j; i < pagevec_count(pvec); i++) {
 		struct page *page = pvec->pages[i];
@@ -94,7 +94,7 @@ static void truncate_exceptional_pvec_entries(struct address_space *mapping,
 	}
 
 	if (!dax)
-		xa_unlock_irq(&mapping->i_pages);
+		xa_unlock_bh(&mapping->i_pages);
 	pvec->nr = j;
 }
 
@@ -452,8 +452,8 @@ void truncate_inode_pages_final(struct address_space *mapping)
 		 * modification that does not see AS_EXITING is
 		 * completed before starting the final truncate.
 		 */
-		xa_lock_irq(&mapping->i_pages);
-		xa_unlock_irq(&mapping->i_pages);
+		xa_lock_bh(&mapping->i_pages);
+		xa_unlock_bh(&mapping->i_pages);
 	}
 
 	/*
@@ -560,7 +560,6 @@ void invalidate_mapping_pagevec(struct address_space *mapping,
 static int
 invalidate_complete_page2(struct address_space *mapping, struct page *page)
 {
-	unsigned long flags;
 
 	if (page->mapping != mapping)
 		return 0;
@@ -568,13 +567,13 @@ invalidate_complete_page2(struct address_space *mapping, struct page *page)
 	if (page_has_private(page) && !try_to_release_page(page, GFP_KERNEL))
 		return 0;
 
-	xa_lock_irqsave(&mapping->i_pages, flags);
+	xa_lock_bh(&mapping->i_pages);
 	if (PageDirty(page))
 		goto failed;
 
 	BUG_ON(page_has_private(page));
 	__delete_from_page_cache(page, NULL);
-	xa_unlock_irqrestore(&mapping->i_pages, flags);
+	xa_unlock_bh(&mapping->i_pages);
 
 	if (mapping->a_ops->freepage)
 		mapping->a_ops->freepage(page);
@@ -582,7 +581,7 @@ invalidate_complete_page2(struct address_space *mapping, struct page *page)
 	put_page(page);	/* pagecache ref */
 	return 1;
 failed:
-	xa_unlock_irqrestore(&mapping->i_pages, flags);
+	xa_unlock_bh(&mapping->i_pages);
 	return 0;
 }
 

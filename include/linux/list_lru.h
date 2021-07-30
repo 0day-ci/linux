@@ -184,6 +184,15 @@ unsigned long list_lru_walk_one_irq(struct list_lru *lru,
 				    int nid, struct mem_cgroup *memcg,
 				    list_lru_walk_cb isolate, void *cb_arg,
 				    unsigned long *nr_to_walk);
+/**
+ * Same as @list_lru_walk_one except that the spinlock is acquired with
+ * spin_lock_bh().
+ */
+unsigned long list_lru_walk_one_bh(struct list_lru *lru,
+				    int nid, struct mem_cgroup *memcg,
+				    list_lru_walk_cb isolate, void *cb_arg,
+				    unsigned long *nr_to_walk);
+
 unsigned long list_lru_walk_node(struct list_lru *lru, int nid,
 				 list_lru_walk_cb isolate, void *cb_arg,
 				 unsigned long *nr_to_walk);
@@ -201,6 +210,14 @@ list_lru_shrink_walk_irq(struct list_lru *lru, struct shrink_control *sc,
 			 list_lru_walk_cb isolate, void *cb_arg)
 {
 	return list_lru_walk_one_irq(lru, sc->nid, sc->memcg, isolate, cb_arg,
+				     &sc->nr_to_scan);
+}
+
+static inline unsigned long
+list_lru_shrink_walk_bh(struct list_lru *lru, struct shrink_control *sc,
+			 list_lru_walk_cb isolate, void *cb_arg)
+{
+	return list_lru_walk_one_bh(lru, sc->nid, sc->memcg, isolate, cb_arg,
 				     &sc->nr_to_scan);
 }
 

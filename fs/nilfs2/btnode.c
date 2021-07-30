@@ -178,9 +178,9 @@ retry:
 				       (unsigned long long)oldkey,
 				       (unsigned long long)newkey);
 
-		xa_lock_irq(&btnc->i_pages);
+		xa_lock_bh(&btnc->i_pages);
 		err = __xa_insert(&btnc->i_pages, newkey, opage, GFP_NOFS);
-		xa_unlock_irq(&btnc->i_pages);
+		xa_unlock_bh(&btnc->i_pages);
 		/*
 		 * Note: page->index will not change to newkey until
 		 * nilfs_btnode_commit_change_key() will be called.
@@ -235,10 +235,10 @@ void nilfs_btnode_commit_change_key(struct address_space *btnc,
 				       (unsigned long long)newkey);
 		mark_buffer_dirty(obh);
 
-		xa_lock_irq(&btnc->i_pages);
+		xa_lock_bh(&btnc->i_pages);
 		__xa_erase(&btnc->i_pages, oldkey);
 		__xa_set_mark(&btnc->i_pages, newkey, PAGECACHE_TAG_DIRTY);
-		xa_unlock_irq(&btnc->i_pages);
+		xa_unlock_bh(&btnc->i_pages);
 
 		opage->index = obh->b_blocknr = newkey;
 		unlock_page(opage);

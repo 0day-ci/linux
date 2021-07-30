@@ -285,6 +285,21 @@ list_lru_walk_one_irq(struct list_lru *lru, int nid, struct mem_cgroup *memcg,
 	return ret;
 }
 
+unsigned long
+list_lru_walk_one_bh(struct list_lru *lru, int nid, struct mem_cgroup *memcg,
+		      list_lru_walk_cb isolate, void *cb_arg,
+		      unsigned long *nr_to_walk)
+{
+	struct list_lru_node *nlru = &lru->node[nid];
+	unsigned long ret;
+
+	spin_lock_bh(&nlru->lock);
+	ret = __list_lru_walk_one(nlru, memcg_cache_id(memcg), isolate, cb_arg,
+				  nr_to_walk);
+	spin_unlock_bh(&nlru->lock);
+	return ret;
+}
+
 unsigned long list_lru_walk_node(struct list_lru *lru, int nid,
 				 list_lru_walk_cb isolate, void *cb_arg,
 				 unsigned long *nr_to_walk)

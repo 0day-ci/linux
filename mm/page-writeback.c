@@ -2122,18 +2122,18 @@ void tag_pages_for_writeback(struct address_space *mapping,
 	unsigned int tagged = 0;
 	void *page;
 
-	xas_lock_irq(&xas);
+	xas_lock_bh(&xas);
 	xas_for_each_marked(&xas, page, end, PAGECACHE_TAG_DIRTY) {
 		xas_set_mark(&xas, PAGECACHE_TAG_TOWRITE);
 		if (++tagged % XA_CHECK_SCHED)
 			continue;
 
 		xas_pause(&xas);
-		xas_unlock_irq(&xas);
+		xas_unlock_bh(&xas);
 		cond_resched();
-		xas_lock_irq(&xas);
+		xas_lock_bh(&xas);
 	}
-	xas_unlock_irq(&xas);
+	xas_unlock_bh(&xas);
 }
 EXPORT_SYMBOL(tag_pages_for_writeback);
 
@@ -2475,16 +2475,15 @@ void account_page_cleaned(struct page *page, struct address_space *mapping,
 void __set_page_dirty(struct page *page, struct address_space *mapping,
 			     int warn)
 {
-	unsigned long flags;
 
-	xa_lock_irqsave(&mapping->i_pages, flags);
+	xa_lock_bh(&mapping->i_pages);
 	if (page->mapping) {	/* Race with truncate? */
 		WARN_ON_ONCE(warn && !PageUptodate(page));
 		account_page_dirtied(page, mapping);
 		__xa_set_mark(&mapping->i_pages, page_index(page),
 				PAGECACHE_TAG_DIRTY);
 	}
-	xa_unlock_irqrestore(&mapping->i_pages, flags);
+	xa_unlock_bh(&mapping->i_pages);
 }
 
 /*
@@ -2740,9 +2739,8 @@ int test_clear_page_writeback(struct page *page)
 	if (mapping && mapping_use_writeback_tags(mapping)) {
 		struct inode *inode = mapping->host;
 		struct backing_dev_info *bdi = inode_to_bdi(inode);
-		unsigned long flags;
 
-		xa_lock_irqsave(&mapping->i_pages, flags);
+		xa_lock_bh(&mapping->i_pages);
 		ret = TestClearPageWriteback(page);
 		if (ret) {
 			__xa_clear_mark(&mapping->i_pages, page_index(page),
@@ -2759,7 +2757,7 @@ int test_clear_page_writeback(struct page *page)
 						     PAGECACHE_TAG_WRITEBACK))
 			sb_clear_inode_writeback(mapping->host);
 
-		xa_unlock_irqrestore(&mapping->i_pages, flags);
+		xa_unlock_bh(&mapping->i_pages);
 	} else {
 		ret = TestClearPageWriteback(page);
 	}
@@ -2782,9 +2780,8 @@ int __test_set_page_writeback(struct page *page, bool keep_write)
 		XA_STATE(xas, &mapping->i_pages, page_index(page));
 		struct inode *inode = mapping->host;
 		struct backing_dev_info *bdi = inode_to_bdi(inode);
-		unsigned long flags;
 
-		xas_lock_irqsave(&xas, flags);
+		xas_lock_bh(&xas);
 		xas_load(&xas);
 		ret = TestSetPageWriteback(page);
 		if (!ret) {
@@ -2809,7 +2806,7 @@ int __test_set_page_writeback(struct page *page, bool keep_write)
 			xas_clear_mark(&xas, PAGECACHE_TAG_DIRTY);
 		if (!keep_write)
 			xas_clear_mark(&xas, PAGECACHE_TAG_TOWRITE);
-		xas_unlock_irqrestore(&xas, flags);
+		xas_unlock_bh(&xas);
 	} else {
 		ret = TestSetPageWriteback(page);
 	}

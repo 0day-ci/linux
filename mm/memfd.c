@@ -35,7 +35,7 @@ static void memfd_tag_pins(struct xa_state *xas)
 
 	lru_add_drain();
 
-	xas_lock_irq(xas);
+	xas_lock_bh(xas);
 	xas_for_each(xas, page, ULONG_MAX) {
 		if (xa_is_value(page))
 			continue;
@@ -47,11 +47,11 @@ static void memfd_tag_pins(struct xa_state *xas)
 			continue;
 
 		xas_pause(xas);
-		xas_unlock_irq(xas);
+		xas_unlock_bh(xas);
 		cond_resched();
-		xas_lock_irq(xas);
+		xas_lock_bh(xas);
 	}
-	xas_unlock_irq(xas);
+	xas_unlock_bh(xas);
 }
 
 /*
@@ -84,7 +84,7 @@ static int memfd_wait_for_pins(struct address_space *mapping)
 			scan = LAST_SCAN;
 
 		xas_set(&xas, 0);
-		xas_lock_irq(&xas);
+		xas_lock_bh(&xas);
 		xas_for_each_marked(&xas, page, ULONG_MAX, MEMFD_TAG_PINNED) {
 			bool clear = true;
 			if (xa_is_value(page))
@@ -107,11 +107,11 @@ static int memfd_wait_for_pins(struct address_space *mapping)
 				continue;
 
 			xas_pause(&xas);
-			xas_unlock_irq(&xas);
+			xas_unlock_bh(&xas);
 			cond_resched();
-			xas_lock_irq(&xas);
+			xas_lock_bh(&xas);
 		}
-		xas_unlock_irq(&xas);
+		xas_unlock_bh(&xas);
 	}
 
 	return error;
