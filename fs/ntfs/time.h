@@ -8,7 +8,6 @@
 #ifndef _LINUX_NTFS_TIME_H
 #define _LINUX_NTFS_TIME_H
 
-#include <linux/time.h>		/* For current_kernel_time(). */
 #include <asm/div64.h>		/* For do_div(). */
 
 #include "endian.h"
