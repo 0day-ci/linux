@@ -415,6 +415,7 @@ static void kvm_vcpu_init(struct kvm_vcpu *vcpu, struct kvm *kvm, unsigned id)
 	vcpu->preempted = false;
 	vcpu->ready = false;
 	preempt_notifier_init(&vcpu->preempt_notifier, &kvm_preempt_ops);
+	vcpu->lru_slot_index = 0;
 }
 
 void kvm_vcpu_destroy(struct kvm_vcpu *vcpu)
@@ -2024,7 +2025,25 @@ EXPORT_SYMBOL_GPL(gfn_to_memslot);
 
 struct kvm_memory_slot *kvm_vcpu_gfn_to_memslot(struct kvm_vcpu *vcpu, gfn_t gfn)
 {
-	return __gfn_to_memslot(kvm_vcpu_memslots(vcpu), gfn);
+	struct kvm_memslots *slots = kvm_vcpu_memslots(vcpu);
+	int slot_index = vcpu->lru_slot_index;
+	struct kvm_memory_slot *slot;
+
+	if (!slot_contains_gfn(slots, slot_index, gfn))
+		slot_index = __search_memslots(slots, gfn);
+
+	slot = get_slot(slots, slot_index);
+
+	/*
+	 * Purposely avoid updating vcpu->lru_slot_index if the gfn is not
+	 * backed by memslot as that will guarantee a cache miss on the next
+	 * try. By leaving vcpu->lru_slot_index untouched we have a chance of
+	 * a hit on the next lookup.
+	 */
+	if (slot)
+		vcpu->lru_slot_index = slot_index;
+
+	return slot;
 }
 EXPORT_SYMBOL_GPL(kvm_vcpu_gfn_to_memslot);
 

@@ -354,6 +354,13 @@ struct kvm_vcpu {
 	struct kvm_vcpu_stat stat;
 	char stats_id[KVM_STATS_NAME_SIZE];
 	struct kvm_dirty_ring dirty_ring;
+
+	/*
+	 * The index of the least recently used memslot by this vCPU. It's ok
+	 * if this becomes stale due to memslot changes since we always check
+	 * it is a valid slot.
+	 */
+	int lru_slot_index;
 };
 
 /* must be called with irqs disabled */
@@ -1189,27 +1196,38 @@ int kvm_request_irq_source_id(struct kvm *kvm);
 void kvm_free_irq_source_id(struct kvm *kvm, int irq_source_id);
 bool kvm_arch_irqfd_allowed(struct kvm *kvm, struct kvm_irqfd *args);
 
+static inline struct kvm_memory_slot *get_slot(struct kvm_memslots *slots, int slot_index)
+{
+	if (slot_index < 0 || slot_index >= slots->used_slots)
+		return NULL;
+
+	return &slots->memslots[slot_index];
+}
+
+static inline bool slot_contains_gfn(struct kvm_memslots *slots, int slot_index, gfn_t gfn)
+{
+	struct kvm_memory_slot *memslot = get_slot(slots, slot_index);
+
+	if (!memslot)
+		return false;
+
+	return gfn >= memslot->base_gfn && gfn < memslot->base_gfn + memslot->npages;
+}
+
 /*
- * search_memslots() and __gfn_to_memslot() are here because they are
- * used in non-modular code in arch/powerpc/kvm/book3s_hv_rm_mmu.c.
- * gfn_to_memslot() itself isn't here as an inline because that would
- * bloat other code too much.
- *
  * IMPORTANT: Slots are sorted from highest GFN to lowest GFN!
  */
-static inline struct kvm_memory_slot *
-search_memslots(struct kvm_memslots *slots, gfn_t gfn)
+static inline int __search_memslots(struct kvm_memslots *slots, gfn_t gfn)
 {
 	int start = 0, end = slots->used_slots;
 	int slot = atomic_read(&slots->lru_slot);
 	struct kvm_memory_slot *memslots = slots->memslots;
 
 	if (unlikely(!slots->used_slots))
-		return NULL;
+		return -1;
 
-	if (gfn >= memslots[slot].base_gfn &&
-	    gfn < memslots[slot].base_gfn + memslots[slot].npages)
-		return &memslots[slot];
+	if (slot_contains_gfn(slots, slot, gfn))
+		return slot;
 
 	while (start < end) {
 		slot = start + (end - start) / 2;
@@ -1220,13 +1238,26 @@ search_memslots(struct kvm_memslots *slots, gfn_t gfn)
 			start = slot + 1;
 	}
 
-	if (start < slots->used_slots && gfn >= memslots[start].base_gfn &&
-	    gfn < memslots[start].base_gfn + memslots[start].npages) {
+	if (slot_contains_gfn(slots, start, gfn)) {
 		atomic_set(&slots->lru_slot, start);
-		return &memslots[start];
+		return start;
 	}
 
-	return NULL;
+	return -1;
+}
+
+/*
+ * search_memslots() and __gfn_to_memslot() are here because they are
+ * used in non-modular code in arch/powerpc/kvm/book3s_hv_rm_mmu.c.
+ * gfn_to_memslot() itself isn't here as an inline because that would
+ * bloat other code too much.
+ */
+static inline struct kvm_memory_slot *
+search_memslots(struct kvm_memslots *slots, gfn_t gfn)
+{
+	int slot_index = __search_memslots(slots, gfn);
+
+	return get_slot(slots, slot_index);
 }
 
 static inline struct kvm_memory_slot *
