@@ -389,6 +389,7 @@ static inline int qedr_gsi_build_header(struct qedr_dev *dev,
 	const struct ib_global_route *grh = rdma_ah_read_grh(ah_attr);
 	const struct ib_gid_attr *sgid_attr = grh->sgid_attr;
 	int send_size = 0;
+	u8 vlan_pri, dscp;
 	u16 vlan_id = 0;
 	u16 ether_type;
 	int rc;
@@ -437,8 +438,16 @@ static inline int qedr_gsi_build_header(struct qedr_dev *dev,
 	ether_addr_copy(udh->eth.dmac_h, ah_attr->roce.dmac);
 	ether_addr_copy(udh->eth.smac_h, dev->ndev->dev_addr);
 	if (has_vlan) {
-		udh->eth.type = htons(ETH_P_8021Q);
+		dscp = GET_FIELD(grh->traffic_class, QED_RDMA_TC_TOS_DSCP);
+
+		/* get the vlan priority associated with the dscp value */
+		if (!dev->ops->rdma_get_dscp_priority(dev->rdma_ctx, dscp,
+						      &vlan_pri))
+			vlan_id |= vlan_pri << VLAN_PRIO_SHIFT;
+
 		udh->vlan.tag = htons(vlan_id);
+
+		udh->eth.type = htons(ETH_P_8021Q);
 		udh->vlan.type = htons(ether_type);
 	} else {
 		udh->eth.type = htons(ether_type);

@@ -102,8 +102,7 @@ void qed_dcbx_set_pf_update_params(struct qed_dcbx_results *p_src,
 				   struct pf_update_ramrod_data *p_dest);
 
 /* Returns priority value for a given dscp index */
-int qed_dcbx_get_dscp_priority(struct qed_hwfn *p_hwfn, u8 dscp_index,
-			       u8 *p_dscp_pri);
+int qed_dcbx_get_dscp_priority(struct qed_hwfn *p_hwfn, u8 dscp_index, u8 *pri);
 
 /* Sets priority value for a given dscp index */
 int qed_dcbx_set_dscp_priority(struct qed_hwfn *p_hwfn, struct qed_ptt *p_ptt,
@@ -112,4 +111,6 @@ int qed_dcbx_set_dscp_priority(struct qed_hwfn *p_hwfn, struct qed_ptt *p_ptt,
 #define QED_DCBX_DEFAULT_TC	0
 
 u8 qed_dcbx_get_priority_tc(struct qed_hwfn *p_hwfn, u8 pri);
+
+bool qed_dcbx_get_dscp_state(struct qed_hwfn *p_hwfn);
 #endif

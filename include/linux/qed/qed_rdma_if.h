@@ -363,6 +363,10 @@ struct qed_rdma_modify_qp_in_params {
 	u32 dest_qp;
 	bool lb_indication;
 	u16 mtu;
+#define QED_RDMA_TC_TOS_ECN_SHIFT 0
+#define QED_RDMA_TC_TOS_ECN_MASK 0x3
+#define QED_RDMA_TC_TOS_DSCP_SHIFT 2
+#define QED_RDMA_TC_TOS_DSCP_MASK 0x3f
 	u8 traffic_class_tos;
 	u8 hop_limit_ttl;
 	u32 flow_label;
@@ -638,6 +642,9 @@ struct qed_rdma_ops {
 				struct qed_rdma_destroy_srq_in_params *iparams);
 	int (*rdma_modify_srq)(void *rdma_cxt,
 			       struct qed_rdma_modify_srq_in_params *iparams);
+
+	int (*rdma_get_dscp_priority)(void *rdma_cxt, u8 dscp_index,
+				      u8 *p_dscp_pri);
 
 	int (*ll2_acquire_connection)(void *rdma_cxt,
 				      struct qed_ll2_acquire_data *data);
