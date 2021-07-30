@@ -22,6 +22,7 @@ extern int threadpool__wait(struct threadpool *pool);
 
 extern int threadpool__size(struct threadpool *pool);
 extern bool threadpool__is_ready(struct threadpool *pool);
+extern int threadpool__is_busy(struct threadpool *pool);
 
 /* Error management */
 #define THREADPOOL_STRERR_BUFSIZE (128+STRERR_BUFSIZE)

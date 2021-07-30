@@ -26,6 +26,7 @@ static inline pid_t gettid(void)
 enum threadpool_status {
 	THREADPOOL_STATUS__STOPPED,		/* no threads */
 	THREADPOOL_STATUS__READY,		/* threads are ready but idle */
+	THREADPOOL_STATUS__BUSY,		/* threads are busy */
 	THREADPOOL_STATUS__ERROR,		/* errors */
 	THREADPOOL_STATUS__MAX
 };
@@ -33,6 +34,7 @@ enum threadpool_status {
 static const char * const threadpool_status_tags[] = {
 	"stopped",
 	"ready",
+	"busy",
 	"error"
 };
 
@@ -182,6 +184,28 @@ static int threadpool__terminate_thread(struct threadpool_entry *thread)
 }
 
 /**
+ * threadpool__wake_thread - send wake msg to @thread
+ *
+ * This function does not wait for the thread to actually wake
+ * NB: call only from main thread!
+ */
+static int threadpool__wake_thread(struct threadpool_entry *thread)
+{
+	int res;
+	enum threadpool_msg msg = THREADPOOL_MSG__WAKE;
+
+	res = writen(thread->pipes.cmd[1], &msg, sizeof(msg));
+	if (res < 0) {
+		pr_debug2("threadpool: error sending wake msg: %s\n", strerror(errno));
+		return -THREADPOOL_ERROR__WRITEPIPE;
+	}
+
+	pr_debug2("threadpool: sent wake msg %s to tid=%d\n",
+		threadpool_msg_tags[msg], thread->tid);
+	return 0;
+}
+
+/**
  * threadpool_entry__function - send ack to main thread
  */
 static int threadpool_entry__send_ack(struct threadpool_entry *thread)
@@ -249,6 +273,15 @@ static void *threadpool_entry__function(void *args)
 
 		if (cmd == THREADPOOL_MSG__STOP)
 			break;
+
+		if (!thread->pool->current_task) {
+			pr_debug("threadpool[%d]: received wake without task\n",
+				thread->tid);
+			break;
+		}
+
+		pr_debug("threadpool[%d]: executing task\n", thread->tid);
+		thread->pool->current_task->fn(thread->idx, thread->pool->current_task);
 	}
 
 	pr_debug2("threadpool[%d]: exit\n", thread->tid);
@@ -502,10 +535,14 @@ static int __threadpool__stop(struct threadpool *pool)
  * threadpool__stop - stop all threads in the pool.
  *
  * This function blocks waiting for ack from all threads.
+ * If the pool was busy, it will first wait for the task to finish.
  */
 int threadpool__stop(struct threadpool *pool)
 {
-	int ret;
+	int ret = threadpool__wait(pool);
+
+	if (ret)
+		return ret;
 
 	if (pool->status != THREADPOOL_STATUS__READY) {
 		pr_debug2("threadpool: stopping not ready pool\n");
@@ -527,4 +564,111 @@ int threadpool__stop(struct threadpool *pool)
 bool threadpool__is_ready(struct threadpool *pool)
 {
 	return pool->status == THREADPOOL_STATUS__READY;
+}
+
+/**
+ * __threadpool__execute - execute @task on all threads of the @pool
+ *
+ * NB: use threadpool__execute. This function does not change @pool->status.
+ */
+static int __threadpool__execute(struct threadpool *pool, struct task_struct *task)
+{
+	int t, ret;
+
+	pool->current_task = task;
+
+	for (t = 0; t < pool->nr_threads; t++) {
+		ret = threadpool__wake_thread(&pool->threads[t]);
+		if (ret)
+			return ret;
+	}
+
+	return 0;
+}
+
+/**
+ * threadpool__execute - execute @task on all threads of the @pool
+ *
+ * The task will run asynchronously wrt the main thread.
+ * The task can be waited with threadpool__wait.
+ *
+ * NB: make sure the pool is ready before calling this, since no queueing is
+ *     performed. If you need queueing, have a look at the workqueue.
+ */
+int threadpool__execute(struct threadpool *pool, struct task_struct *task)
+{
+	int ret;
+
+	if (pool->status != THREADPOOL_STATUS__READY) {
+		pr_debug2("threadpool: executing on not ready pool\n");
+		return -THREADPOOL_ERROR__NOTALLOWED;
+	}
+
+	ret = __threadpool__execute(pool, task);
+	if (ret) {
+		pool->status = THREADPOOL_STATUS__ERROR;
+		return ret;
+	}
+	pool->status = THREADPOOL_STATUS__BUSY;
+	return 0;
+}
+
+/**
+ * __threadpool__wait - wait until all threads in @pool are done
+ *
+ * NB: use threadpool__wait. This function does not change @pool->status.
+ */
+static int __threadpool__wait(struct threadpool *pool)
+{
+	int t, err = 0, ret;
+
+	for (t = 0; t < pool->nr_threads; t++) {
+		ret = threadpool__wait_thread(&pool->threads[t]);
+		if (ret)
+			err = ret;
+	}
+
+	pool->current_task = NULL;
+	return err;
+}
+
+/**
+ * threadpool__wait - wait until all threads in @pool are done
+ *
+ * This function will wait for all threads to finish execution and send their
+ * ack message.
+ *
+ * NB: call only from main thread!
+ */
+int threadpool__wait(struct threadpool *pool)
+{
+	int ret;
+
+	switch (pool->status) {
+	case THREADPOOL_STATUS__BUSY:
+		break;
+	case THREADPOOL_STATUS__READY:
+		return 0;
+	default:
+	case THREADPOOL_STATUS__STOPPED:
+	case THREADPOOL_STATUS__ERROR:
+	case THREADPOOL_STATUS__MAX:
+		return -THREADPOOL_ERROR__NOTALLOWED;
+	}
+
+	ret = __threadpool__wait(pool);
+	if (ret) {
+		pool->status = THREADPOOL_STATUS__ERROR;
+		return ret;
+	}
+	pool->status = THREADPOOL_STATUS__READY;
+	return 0;
+}
+
+/**
+ * threadpool__is_busy - check if the pool is busy
+ */
+int threadpool__is_busy(struct threadpool *pool)
+{
+	return pool->status == THREADPOOL_STATUS__BUSY;
 }
