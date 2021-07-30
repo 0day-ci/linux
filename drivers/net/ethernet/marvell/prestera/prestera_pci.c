@@ -359,12 +359,7 @@ static int prestera_fw_cmd_send(struct prestera_fw *fw,
 	}
 
 	ret_size = prestera_fw_read(fw, PRESTERA_CMD_RCV_LEN_REG);
-	if (ret_size > out_size) {
-		dev_err(fw->dev.dev, "ret_size (%u) > out_len(%zu)\n",
-			ret_size, out_size);
-		err = -EMSGSIZE;
-		goto cmd_exit;
-	}
+	ret_size = min_t(u32, ret_size, out_size);
 
 	memcpy_fromio(out_msg, fw->cmd_mbox + in_size, ret_size);
 
