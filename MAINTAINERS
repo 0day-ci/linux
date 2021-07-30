@@ -2487,6 +2487,7 @@ F:	drivers/pwm/pwm-samsung.c
 F:	drivers/soc/samsung/
 F:	drivers/tty/serial/samsung*
 F:	include/clocksource/samsung_pwm.h
+F:	include/dt-bindings/interrupt-controller/exynos*.h
 F:	include/linux/platform_data/*s3c*
 F:	include/linux/serial_s3c.h
 F:	include/linux/soc/samsung/
