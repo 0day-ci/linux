@@ -20,6 +20,13 @@ properties:
 
   compatible:
     enum:
+      - qcom,msm8996-a1noc
+      - qcom,msm8996-a2noc
+      - qcom,msm8996-bimc
+      - qcom,msm8996-cnoc
+      - qcom,msm8996-mnoc
+      - qcom,msm8996-pnoc
+      - qcom,msm8996-snoc
       - qcom,sdm660-a2noc
       - qcom,sdm660-bimc
       - qcom,sdm660-cnoc
@@ -53,6 +60,7 @@ allOf:
         compatible:
           contains:
             enum:
+              - qcom,msm8996-mnoc
               - qcom,sdm660-mnoc
     then:
       properties:
@@ -72,6 +80,12 @@ allOf:
         compatible:
           contains:
             enum:
+              - qcom,msm8996-a1noc
+              - qcom,msm8996-a2noc
+              - qcom,msm8996-bimc
+              - qcom,msm8996-cnoc
+              - qcom,msm8996-pnoc
+              - qcom,msm8996-snoc
               - qcom,sdm660-a2noc
               - qcom,sdm660-bimc
               - qcom,sdm660-cnoc
