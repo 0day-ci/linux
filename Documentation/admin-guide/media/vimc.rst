@@ -80,7 +80,15 @@ vimc-capture:
 Module options
 --------------
 
-Vimc has a module parameter to configure the driver.
+Vimc has module parameters to configure the driver.
+
+* ``allocator=<unsigned int>``
+
+	memory allocator selection, default is 0. It specifies the way buffers
+	will be allocated.
+
+		- 0: vmalloc
+		- 1: dma-contig
 
 * ``sca_mult=<unsigned int>``
 
