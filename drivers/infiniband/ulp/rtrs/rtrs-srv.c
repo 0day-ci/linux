@@ -758,6 +758,14 @@ static bool exist_sessname(struct rtrs_srv_ctx *ctx,
 	struct rtrs_srv_sess *sess;
 	bool found = false;
 
+	/*
+	 * Session name "ct" is not allowed because
+	 * /sys/devices/virtual/rtrs-server/ctl already exists
+	 * for setup management.
+	 */
+	if (!strcmp(sessname, "ctl"))
+		return true;
+
 	mutex_lock(&ctx->srv_mutex);
 	list_for_each_entry(srv, &ctx->srv_list, ctx_list) {
 		mutex_lock(&srv->paths_mutex);
