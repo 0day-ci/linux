@@ -178,6 +178,7 @@ perf-$(CONFIG_LIBBABELTRACE) += data-convert-bt.o
 perf-y += data-convert-json.o
 
 perf-y += scripting-engines/
+perf-y += workqueue/
 
 perf-$(CONFIG_ZLIB) += zlib.o
 perf-$(CONFIG_LZMA) += lzma.o
