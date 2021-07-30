@@ -782,7 +782,7 @@ static int generate_sched_domains(cpumask_var_t **domains,
 		if (cp == &top_cpuset)
 			continue;
 		/*
-		 * Continue traversing beyond @cp iff @cp has some CPUs and
+		 * Continue traversing beyond @cp if @cp has some CPUs and
 		 * isn't load balancing.  The former is obvious.  The
 		 * latter: All child cpusets contain a subset of the
 		 * parent's cpus, so just skip them, and then we call
@@ -1801,7 +1801,7 @@ static int update_nodemask(struct cpuset *cs, struct cpuset *trialcs,
 	}
 
 	/*
-	 * An empty mems_allowed is ok iff there are no tasks in the cpuset.
+	 * An empty mems_allowed is ok if there are no tasks in the cpuset.
 	 * Since nodelist_parse() fails on an empty mask, we special case
 	 * that parsing.  The validate_change() call ensures that cpusets
 	 * with tasks have memory.

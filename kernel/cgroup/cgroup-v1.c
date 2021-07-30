@@ -120,7 +120,7 @@ int cgroup_transfer_tasks(struct cgroup *to, struct cgroup *from)
 		goto out_err;
 
 	/*
-	 * Migrate tasks one-by-one until @from is empty.  This fails iff
+	 * Migrate tasks one-by-one until @from is empty.  This fails if
 	 * ->can_attach() fails.
 	 */
 	do {
@@ -215,7 +215,7 @@ static void cgroup_pidlist_destroy_work_fn(struct work_struct *work)
 	mutex_lock(&l->owner->pidlist_mutex);
 
 	/*
-	 * Destroy iff we didn't get queued again.  The state won't change
+	 * Destroy if we didn't get queued again.  The state won't change
 	 * as destroy_dwork can only be queued while locked.
 	 */
 	if (!delayed_work_pending(dwork)) {

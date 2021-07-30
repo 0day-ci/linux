@@ -56,7 +56,7 @@ expected.
 The cgroup freezer is hierarchical. Freezing a cgroup freezes all
 tasks belonging to the cgroup and all its descendant cgroups. Each
 cgroup has its own state (self-state) and the state inherited from the
-parent (parent-state). Iff both states are THAWED, the cgroup is
+parent (parent-state). If both states are THAWED, the cgroup is
 THAWED.
 
 The following cgroupfs files are created by cgroup freezer.
@@ -87,7 +87,7 @@ The following cgroupfs files are created by cgroup freezer.
 * freezer.self_freezing: Read only.
 
   Shows the self-state. 0 if the self-state is THAWED; otherwise, 1.
-  This value is 1 iff the last write to freezer.state was "FROZEN".
+  This value is 1 if the last write to freezer.state was "FROZEN".
 
 * freezer.parent_freezing: Read only.
 

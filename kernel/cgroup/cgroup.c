@@ -793,7 +793,7 @@ static bool css_set_populated(struct css_set *cset)
  * One of the css_sets associated with @cgrp is either getting its first
  * task or losing the last.  Update @cgrp->nr_populated_* accordingly.  The
  * count is propagated towards root so that a given cgroup's
- * nr_populated_children is zero iff none of its descendants contain any
+ * nr_populated_children is zero if none of its descendants contain any
  * tasks.
  *
  * @cgrp's interface file "cgroup.populated" is zero if both
@@ -2410,7 +2410,7 @@ struct task_struct *cgroup_taskset_next(struct cgroup_taskset *tset,
  * @mgctx: migration context
  *
  * Migrate tasks in @mgctx as setup by migration preparation functions.
- * This function fails iff one of the ->can_attach callbacks fails and
+ * This function fails if one of the ->can_attach callbacks fails and
  * guarantees that either all or none of the tasks in @mgctx are migrated.
  * @mgctx is consumed regardless of success.
  */
@@ -4264,7 +4264,7 @@ struct cgroup_subsys_state *css_next_child(struct cgroup_subsys_state *pos,
 	 * increasing unique serial number and always appended to the
 	 * sibling list, the next one can be found by walking the parent's
 	 * children until the first css with higher serial number than
-	 * @pos's.  While this path can be slower, it happens iff iteration
+	 * @pos's.  While this path can be slower, it happens if iteration
 	 * races against release and the race window is very small.
 	 */
 	if (!pos) {
