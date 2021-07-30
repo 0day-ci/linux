@@ -333,6 +333,8 @@ patternProperties:
     description: EBV Elektronik
   "^eckelmann,.*":
     description: Eckelmann AG
+  "^econet,.*":
+    description: EcoNet
   "^edt,.*":
     description: Emerging Display Technologies
   "^eeti,.*":
