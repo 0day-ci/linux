@@ -2304,7 +2304,10 @@ static int shmem_memlock_fcntl(struct file *file, unsigned int cmd)
 
 	inode_lock(inode);
 	if (cmd == F_MEM_LOCK) {
-		if (!info->mlock_ucounts) {
+		if (info->fallocend > DIV_ROUND_UP(inode->i_size, PAGE_SIZE)) {
+			/* locking is accounted by i_size: disallow excess */
+			retval = -EPERM;
+		} else if (!info->mlock_ucounts) {
 			struct ucounts *ucounts = current_ucounts();
 			/* capability/rlimit check is down in user_shm_lock */
 			retval = shmem_lock(file, 1, ucounts);
@@ -2854,9 +2857,10 @@ static long shmem_fallocate(struct file *file, int mode, loff_t offset,
 	spin_unlock(&inode->i_lock);
 
 	/*
-	 * info->fallocend is only relevant when huge pages might be
+	 * info->fallocend is mostly relevant when huge pages might be
 	 * involved: to prevent split_huge_page() freeing fallocated
 	 * pages when FALLOC_FL_KEEP_SIZE committed beyond i_size.
+	 * But it is also checked in F_MEM_LOCK validation.
 	 */
 	undo_fallocend = info->fallocend;
 	if (info->fallocend < end)
