@@ -1,0 +1,17 @@
+// SPDX-License-Identifier: GPL-2.0
+/dts-v1/;
+#include "en7523.dtsi"
+
+/ {
+	model = "Econet EN7523 Evaluation Board";
+	compatible = "econet,en7523-evb", "econet,en7523";
+
+	aliases {
+		serial0 = &uart1;
+	};
+
+	chosen {
+		bootargs = "earlycon=uart8250,mmio32,0x1fbf0000 console=ttyS0,115200";
+		stdout-path = "serial0:115200n8";
+	};
+};
