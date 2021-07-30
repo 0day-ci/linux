@@ -21,9 +21,18 @@ extern int threadpool__execute(struct threadpool *pool, struct task_struct *task
 extern int threadpool__wait(struct threadpool *pool);
 
 extern int threadpool__size(struct threadpool *pool);
+extern bool threadpool__is_ready(struct threadpool *pool);
 
 /* Error management */
 #define THREADPOOL_STRERR_BUFSIZE (128+STRERR_BUFSIZE)
+#define THREADPOOL_ERROR__OFFSET 512
+enum {
+	THREADPOOL_ERROR__SIGPROCMASK = THREADPOOL_ERROR__OFFSET,
+	THREADPOOL_ERROR__READPIPE,
+	THREADPOOL_ERROR__WRITEPIPE,
+	THREADPOOL_ERROR__INVALIDMSG,
+	THREADPOOL_ERROR__NOTALLOWED
+};
 extern int threadpool__strerror(struct threadpool *pool, int err, char *buf, size_t size);
 extern int threadpool__new_strerror(struct threadpool *err_ptr, char *buf, size_t size);
 
