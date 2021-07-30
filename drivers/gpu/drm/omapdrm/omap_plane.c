@@ -325,9 +325,11 @@ struct drm_plane *omap_plane_init(struct drm_device *dev,
 						  BIT(DRM_COLOR_YCBCR_BT709),
 						  BIT(DRM_COLOR_YCBCR_FULL_RANGE) |
 						  BIT(DRM_COLOR_YCBCR_LIMITED_RANGE),
+						  BIT(DRM_COLOR_SPACE_BT709),
 						  BIT(DRM_TF_UNDEFINED),
 						  DRM_COLOR_YCBCR_BT601,
 						  DRM_COLOR_YCBCR_FULL_RANGE,
+						  DRM_COLOR_SPACE_BT709,
 						  DRM_TF_UNDEFINED);
 
 	return plane;

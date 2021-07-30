@@ -543,7 +543,7 @@ struct sun8i_vi_layer *sun8i_vi_layer_init_one(struct drm_device *drm,
 					       struct sun8i_mixer *mixer,
 					       int index)
 {
-	u32 supported_encodings, supported_ranges;
+	u32 supported_encodings, supported_ranges, supported_spaces;
 	unsigned int plane_cnt, format_count;
 	struct sun8i_vi_layer *layer;
 	const u32 *formats;
@@ -597,12 +597,16 @@ struct sun8i_vi_layer *sun8i_vi_layer_init_one(struct drm_device *drm,
 	supported_ranges = BIT(DRM_COLOR_YCBCR_LIMITED_RANGE) |
 			   BIT(DRM_COLOR_YCBCR_FULL_RANGE);
 
+	supported_spaces = BIT(DRM_COLOR_SPACE_BT709);
+
 	ret = drm_plane_create_color_properties(&layer->plane,
 						supported_encodings,
 						supported_ranges,
+						supported_spaces,
 						BIT(DRM_TF_UNDEFINED),
 						DRM_COLOR_YCBCR_BT709,
 						DRM_COLOR_YCBCR_LIMITED_RANGE,
+						DRM_COLOR_SPACE_BT709,
 						DRM_TF_UNDEFINED);
 	if (ret) {
 		dev_err(drm->dev, "Couldn't add encoding and range properties!\n");

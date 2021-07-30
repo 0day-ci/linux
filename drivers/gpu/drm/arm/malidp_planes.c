@@ -1023,6 +1023,7 @@ int malidp_de_planes_init(struct drm_device *drm)
 			/* default encoding for YUV->RGB is BT601 NARROW */
 			enum drm_color_encoding enc = DRM_COLOR_YCBCR_BT601;
 			enum drm_color_range range = DRM_COLOR_YCBCR_LIMITED_RANGE;
+			enum drm_color_space space = DRM_COLOR_SPACE_BT709;
 
 			ret = drm_plane_create_color_properties(&plane->base,
 					BIT(DRM_COLOR_YCBCR_BT601) | \
@@ -1030,8 +1031,9 @@ int malidp_de_planes_init(struct drm_device *drm)
 					BIT(DRM_COLOR_YCBCR_BT2020),
 					BIT(DRM_COLOR_YCBCR_LIMITED_RANGE) | \
 					BIT(DRM_COLOR_YCBCR_FULL_RANGE),
+					BIT(DRM_COLOR_SPACE_BT709),
 					BIT(DRM_TF_UNDEFINED),
-					enc, range,
+					enc, range, space,
 					DRM_TF_UNDEFINED);
 			if (!ret)
 				/* program the HW registers */

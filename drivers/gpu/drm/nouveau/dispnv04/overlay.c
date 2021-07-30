@@ -345,9 +345,11 @@ nv10_overlay_init(struct drm_device *device)
 					  BIT(DRM_COLOR_YCBCR_BT601) |
 					  BIT(DRM_COLOR_YCBCR_BT709),
 					  BIT(DRM_COLOR_YCBCR_LIMITED_RANGE),
+					  BIT(DRM_COLOR_SPACE_BT709),
 					  BIT(DRM_TF_UNDEFINED),
 					  DRM_COLOR_YCBCR_BT601,
 					  DRM_COLOR_YCBCR_LIMITED_RANGE,
+					  DRM_COLOR_SPACE_BT709,
 					  DRM_TF_UNDEFINED);
 
 	plane->set_params = nv10_set_params;

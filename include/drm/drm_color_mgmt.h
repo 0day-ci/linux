@@ -99,6 +99,9 @@ static inline int drm_color_lut_size(const struct drm_property_blob *blob)
 	return blob->length / sizeof(struct drm_color_lut);
 }
 
+/**
+ * drm_color_encoding - describes the coefficient for YCbCr-RGB conversion
+ */
 enum drm_color_encoding {
 	DRM_COLOR_YCBCR_BT601,
 	DRM_COLOR_YCBCR_BT709,
@@ -112,12 +115,25 @@ enum drm_color_range {
 	DRM_COLOR_RANGE_MAX,
 };
 
+/**
+ * drm_color_space - describes the color space (primaries & white point)
+ */
+enum drm_color_space {
+	DRM_COLOR_SPACE_BT601,
+	DRM_COLOR_SPACE_BT709,
+	DRM_COLOR_SPACE_BT2020,
+	DRM_COLOR_SPACE_P3,
+	DRM_COLOR_SPACE_MAX,
+};
+
 int drm_plane_create_color_properties(struct drm_plane *plane,
 				      u32 supported_encodings,
 				      u32 supported_ranges,
+				      u32 supported_spaces,
 				      u32 supported_tf,
 				      enum drm_color_encoding default_encoding,
 				      enum drm_color_range default_range,
+				      enum drm_color_space default_space,
 				      enum drm_transfer_function default_tf);
 
 /**

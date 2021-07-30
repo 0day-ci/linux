@@ -180,6 +180,13 @@ struct drm_plane_state {
 	enum drm_color_range color_range;
 
 	/**
+	 * @color_space
+	 *
+	 * Color space (primaries & white point) of the plane
+	 */
+	enum drm_color_space color_space;
+
+	/**
 	 * @transfer_function:
 	 *
 	 * Transfer function for HDR color/luminance mapping. This will allow the
@@ -754,6 +761,15 @@ struct drm_plane {
 	 * See drm_plane_create_color_properties().
 	 */
 	struct drm_property *color_range_property;
+	/**
+	 * @color_space_property:
+	 *
+	 * Optional "COLOR_SPACE" enum property for specifying
+	 * the color space (i.e. primaries and white point) of
+	 * the plane.
+	 * See drm_plane_create_color_properties().
+	 */
+	struct drm_property *color_space_property;
 	/**
 	 * @transfer_function_property:
 	 *

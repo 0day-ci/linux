@@ -186,9 +186,11 @@ struct tidss_plane *tidss_plane_create(struct tidss_device *tidss,
 			       BIT(DRM_COLOR_YCBCR_BT709));
 	u32 color_ranges = (BIT(DRM_COLOR_YCBCR_FULL_RANGE) |
 			    BIT(DRM_COLOR_YCBCR_LIMITED_RANGE));
+	u32 color_spaces = BIT(DRM_COLOR_SPACE_BY709);
 	u32 transfer_functions = BIT(DRM_TF_UNDEFINED;
 	u32 default_encoding = DRM_COLOR_YCBCR_BT601;
 	u32 default_range = DRM_COLOR_YCBCR_FULL_RANGE;
+	u32 default_space = DRM_COLOR_SPACE_BT709;
 	u32 default_tf = DRM_TF_UNDEFINED;;
 	u32 blend_modes = (BIT(DRM_MODE_BLEND_PREMULTI) |
 			   BIT(DRM_MODE_BLEND_COVERAGE));
@@ -219,9 +221,11 @@ struct tidss_plane *tidss_plane_create(struct tidss_device *tidss,
 	ret = drm_plane_create_color_properties(&tplane->plane,
 						color_encodings,
 						color_ranges,
+						color_spaces,
 						transfer_functions,
 						default_encoding,
 						default_range,
+						default_space,
 						default_tf);
 	if (ret)
 		goto err;

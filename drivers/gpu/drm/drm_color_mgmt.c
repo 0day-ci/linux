@@ -526,6 +526,13 @@ static const char * const color_range_name[] = {
 	[DRM_COLOR_YCBCR_LIMITED_RANGE] = "YCbCr limited range",
 };
 
+static const char * const color_space_name[] = {
+	[DRM_COLOR_SPACE_BT601] = "ITU-R BT.601 RGB",
+	[DRM_COLOR_SPACE_BT709] = "ITU-R BT.709 RGB",
+	[DRM_COLOR_SPACE_BT2020] = "ITU-R BT.2020 RGB",
+	[DRM_COLOR_SPACE_P3] = "DCI-P3",
+};
+
 /**
  * drm_get_color_encoding_name - return a string for color encoding
  * @encoding: color encoding to compute name of
@@ -554,6 +561,21 @@ const char *drm_get_color_range_name(enum drm_color_range range)
 		return "unknown";
 
 	return color_range_name[range];
+}
+
+/**
+ * drm_get_color_space_name - return a string for color space
+ * @space: color space to compute name of
+ *
+ * In contrast to the other drm_get_*_name functions this one here returns a
+ * const pointer and hence is threadsafe.
+ */
+const char *drm_get_color_space_name(enum drm_color_space space)
+{
+	if (WARN_ON(space >= ARRAY_SIZE(color_space_name)))
+		return "unknown";
+
+	return color_space_name[space];
 }
 
 int drm_plane_create_sdr_white_level_property(struct drm_plane *plane){
@@ -592,23 +614,28 @@ const char *drm_get_transfer_function_name(enum drm_transfer_function tf)
  * @plane: plane object
  * @supported_encodings: bitfield indicating supported color encodings
  * @supported_ranges: bitfileld indicating supported color ranges
+ * @supported_spaces: bitfield indicating supported color spaces
  * @supported_tfs: bitfield indicating supported transfer functions
  * @default_encoding: default color encoding
  * @default_range: default color range
+ * @default_space: default color space
  * @default_tf: default color transfer function
  *
- * Create and attach plane specific COLOR_ENCODING, COLOR_RANGE and TRANSFER_FUNCTION
- * properties to @plane. The supported encodings, ranges  and tfs should
- * be provided in supported_encodings, supported_ranges and supported_tfs bitmasks.
+ * Create and attach plane specific COLOR_ENCODING, COLOR_RANGE, COLOR_SPACE,
+ * and TRANSFER_FUNCTION properties to @plane. The supported encodings, ranges,
+ * spaces, and tfs should be provided in supported_encodings, supported_ranges,
+ * supported_spaces, and supported_tfs bitmasks.
  * Each bit set in the bitmask indicates that its number as enum
  * value is supported.
  */
 int drm_plane_create_color_properties(struct drm_plane *plane,
 				      u32 supported_encodings,
 				      u32 supported_ranges,
+				      u32 supported_spaces,
 				      u32 supported_tfs,
 				      enum drm_color_encoding default_encoding,
 				      enum drm_color_range default_range,
+				      enum drm_color_space default_space,
 				      enum drm_transfer_function default_tf)
 {
 	struct drm_device *dev = plane->dev;
@@ -626,6 +653,11 @@ int drm_plane_create_color_properties(struct drm_plane *plane,
 	if (WARN_ON(supported_ranges == 0 ||
 		    (supported_ranges & -BIT(DRM_COLOR_RANGE_MAX)) != 0 ||
 		    (supported_ranges & BIT(default_range)) == 0))
+		return -EINVAL;
+
+	if (WARN_ON(supported_spaces == 0 ||
+		    (supported_spaces & -BIT(DRM_COLOR_SPACE_MAX)) != 0 ||
+		    (supported_spaces & BIT(default_space)) == 0))
 		return -EINVAL;
 
 	if (WARN_ON(supported_tfs == 0 ||
@@ -670,6 +702,26 @@ int drm_plane_create_color_properties(struct drm_plane *plane,
 	drm_object_attach_property(&plane->base, prop, default_range);
 	if (plane->state)
 		plane->state->color_range = default_range;
+
+
+	len = 0;
+	for (i = 0; i < DRM_COLOR_SPACE_MAX; i++) {
+		if ((supported_spaces & BIT(i)) == 0)
+			continue;
+
+		enum_list[len].type = i;
+		enum_list[len].name = color_space_name[i];
+		len++;
+	}
+
+	prop = drm_property_create_enum(dev, 0,	"COLOR_SPACE",
+					enum_list, len);
+	if (!prop)
+		return -ENOMEM;
+	plane->color_space_property = prop;
+	drm_object_attach_property(&plane->base, prop, default_space);
+	if (plane->state)
+		plane->state->color_space = default_space;
 
 
 	len = 0;
