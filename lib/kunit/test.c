@@ -397,8 +397,18 @@ int kunit_run_tests(struct kunit_suite *suite)
 {
 	char param_desc[KUNIT_PARAM_DESC_SIZE];
 	struct kunit_case *test_case;
+	int res = 0;
 
 	kunit_print_subtest_start(suite);
+
+	if (suite->init_suite)
+		res = suite->init_suite();
+
+	if (res < 0) {
+		kunit_log(KERN_INFO, suite, KUNIT_SUBTEST_INDENT
+			  "# Suite initialization failed (%d)\n", res);
+		goto end;
+	}
 
 	kunit_suite_for_each_test_case(suite, test_case) {
 		struct kunit test = { .param_value = NULL, .param_index = 0 };
@@ -439,6 +449,10 @@ int kunit_run_tests(struct kunit_suite *suite)
 				      test.status_comment);
 	}
 
+	if (suite->exit_suite)
+		suite->exit_suite();
+
+end:
 	kunit_print_subtest_end(suite);
 
 	return 0;
