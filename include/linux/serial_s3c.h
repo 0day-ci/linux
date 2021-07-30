@@ -28,6 +28,15 @@
 #define S3C2410_UFSTAT	  (0x18)
 #define S3C2410_UMSTAT	  (0x1C)
 
+/* USI Control Register offset */
+#define USI_CON			(0xC4)
+/* USI Option Register offset */
+#define USI_OPTION		(0xC8)
+/* USI_CON[0] = 0b0: clear USI global software reset (Active High) */
+#define USI_RESET		(0<<0)
+/* USI_OPTION[2:1] = 0b01: continuously provide the clock to IP w/o gating */
+#define USI_HWACG_CLKREQ_ON	(1<<1)
+
 #define S3C2410_LCON_CFGMASK	  ((0xF<<3)|(0x3))
 
 #define S3C2410_LCON_CS5	  (0x0)
