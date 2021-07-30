@@ -166,4 +166,10 @@ static inline void arch_io_free_memtype_wc(resource_size_t base,
 }
 #endif
 
+/* IO barriers */
+
+#ifndef flush_wc_write
+#define flush_wc_write()		do { } while (0)
+#endif
+
 #endif /* _LINUX_IO_H */
