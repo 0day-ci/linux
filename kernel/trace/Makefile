@@ -36,6 +36,8 @@ CFLAGS_bpf_trace.o := -I$(src)
 CFLAGS_trace_benchmark.o := -I$(src)
 CFLAGS_trace_events_filter.o := -I$(src)
 
+CFLAGS_trace_osnoise.o := -Wno-main
+
 obj-$(CONFIG_TRACE_CLOCK) += trace_clock.o
 
 obj-$(CONFIG_FUNCTION_TRACER) += libftrace.o
