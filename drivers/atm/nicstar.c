@@ -1917,14 +1917,14 @@ static void process_tsq(ns_dev * card)
 		       card->membase + TSQH);
 }
 
-static void drain_scq(ns_dev * card, scq_info * scq, int pos)
+static void drain_scq(ns_dev *card, scq_info *scq, unsigned int pos)
 {
 	struct atm_vcc *vcc;
 	struct sk_buff *skb;
-	int i;
+	unsigned int i;
 	unsigned long flags;
 
-	XPRINTK("nicstar%d: drain_scq() called, scq at 0x%p, pos %d.\n",
+	XPRINTK("nicstar%d: drain_scq() called, scq at 0x%p, pos %u.\n",
 		card->index, scq, pos);
 	if (pos >= scq->num_entries) {
 		printk("nicstar%d: Bad index on drain_scq().\n", card->index);
@@ -1932,12 +1932,12 @@ static void drain_scq(ns_dev * card, scq_info * scq, int pos)
 	}
 
 	spin_lock_irqsave(&scq->lock, flags);
-	i = (int)(scq->tail - scq->base);
+	i = (unsigned int)(scq->tail - scq->base);
 	if (++i == scq->num_entries)
 		i = 0;
 	while (i != pos) {
 		skb = scq->skb[i];
-		XPRINTK("nicstar%d: freeing skb at 0x%p (index %d).\n",
+		XPRINTK("nicstar%d: freeing skb at 0x%p (index %u).\n",
 			card->index, skb, i);
 		if (skb != NULL) {
 			dma_unmap_single(&card->pcidev->dev,
