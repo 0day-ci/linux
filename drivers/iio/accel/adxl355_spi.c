@@ -34,7 +34,7 @@ static int adxl355_spi_probe(struct spi_device *spi)
 		return PTR_ERR(regmap);
 	}
 
-	return adxl355_core_probe(&spi->dev, regmap, id->name);
+	return adxl355_core_probe(&spi->dev, regmap, id->name, spi->irq);
 }
 
 static const struct spi_device_id adxl355_spi_id[] = {
