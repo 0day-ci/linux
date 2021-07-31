@@ -185,6 +185,7 @@ struct dvb_frontend *isl6421_attach(struct dvb_frontend *fe, struct i2c_adapter 
 	isl6421->config = ISL6421_ISEL1;
 	isl6421->i2c = i2c;
 	isl6421->i2c_addr = i2c_addr;
+	isl6421->is_off = false;
 	fe->sec_priv = isl6421;
 
 	/* bits which should be forced to '1' */
