@@ -640,6 +640,17 @@ static int raw_sendmsg(struct sock *sk, struct msghdr *msg, size_t len)
 			goto done;
 	}
 
+	if (!saddr) {
+		rt = __ip_route_output_key(net, &fl4);
+		if (IS_ERR(rt)) {
+			err = PTR_ERR(rt);
+			rt = NULL;
+			goto done;
+		}
+		ip_rt_put(rt);
+		flowi4_update_output(&fl4, ipc.oif, tos, fl4.daddr, fl4.saddr);
+	}
+
 	security_sk_classify_flow(sk, flowi4_to_flowi_common(&fl4));
 	rt = ip_route_output_flow(net, &fl4, sk);
 	if (IS_ERR(rt)) {
