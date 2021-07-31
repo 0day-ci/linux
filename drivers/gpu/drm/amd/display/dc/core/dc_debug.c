@@ -36,8 +36,48 @@
 
 #include "resource.h"
 
-#define DC_LOGGER_INIT(logger)
+/* define a drm.debug style dyndbg pr-debug control point */
+unsigned long __debug_dc;
+EXPORT_SYMBOL(__debug_dc);
 
+#define _help(key)	"\t\t" key " : help for " key "\n"
+#define cmd_help(key)	{ .prefix = key, .help = "help for " key }
+
+/* Id like to do these inside DEFINE_DYNDBG_BITMAP, later */
+#define MY_DYNDBG_PARM_DESC(name)					\
+	"Enable debug output via /sys/module/amdgpu/parameters/" #name	\
+	", where each bit enables a debug category.\n"			\
+		_help("[SURFACE]:")					\
+		_help("[CURSOR]:")					\
+		_help("[PFLIP]:")					\
+		_help("[VBLANK]:")					\
+		_help("[HW_LINK_TRAINING]:")				\
+		_help("[HW_AUDIO]:")					\
+		_help("[SCALER]:")					\
+		_help("[BIOS]:")					\
+		_help("[BANDWIDTH_CALCS]:")				\
+		_help("[DML]:")						\
+		_help("[IF_TRACE]:")					\
+		_help("[GAMMA]:")					\
+		_help("[SMU_MSG]:")
+MODULE_PARM_DESC(debug_dc, MY_DYNDBG_PARM_DESC(name));
+
+DEFINE_DYNDBG_BITMAP(debug_dc, &__debug_dc,
+		     MY_DYNDBG_PARM_DESC(debug_dc),
+		     cmd_help("[CURSOR]:"),
+		     cmd_help("[PFLIP]:"),
+		     cmd_help("[VBLANK]:"),
+		     cmd_help("[HW_LINK_TRAINING]:"),
+		     cmd_help("[HW_AUDIO]:"),
+		     cmd_help("[SCALER]:"),
+		     cmd_help("[BIOS]:"),
+		     cmd_help("[BANDWIDTH_CALCS]:"),
+		     cmd_help("[DML]:"),
+		     cmd_help("[IF_TRACE]:"),
+		     cmd_help("[GAMMA]:"),
+		     cmd_help("[SMU_MSG]:"));
+
+#define DC_LOGGER_INIT(logger)
 
 #define SURFACE_TRACE(...) do {\
 		if (dc->debug.surface_trace) \
