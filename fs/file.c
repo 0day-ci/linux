@@ -467,7 +467,7 @@ static unsigned int find_next_fd(struct fdtable *fdt, unsigned int start)
 /*
  * allocate a file descriptor, mark it busy.
  */
-static int alloc_fd(unsigned start, unsigned end, unsigned flags)
+static int alloc_fd(unsigned int start, unsigned int end, unsigned int flags)
 {
 	struct files_struct *files = current->files;
 	unsigned int fd;
@@ -525,12 +525,12 @@ out:
 	return error;
 }
 
-int __get_unused_fd_flags(unsigned flags, unsigned long nofile)
+int __get_unused_fd_flags(unsigned int flags, unsigned long nofile)
 {
 	return alloc_fd(0, nofile, flags);
 }
 
-int get_unused_fd_flags(unsigned flags)
+int get_unused_fd_flags(unsigned int flags)
 {
 	return __get_unused_fd_flags(flags, rlimit(RLIMIT_NOFILE));
 }
@@ -606,7 +606,7 @@ EXPORT_SYMBOL(fd_install);
  *
  * Returns: The file associated with @fd, on error returns an error pointer.
  */
-static struct file *pick_file(struct files_struct *files, unsigned fd)
+static struct file *pick_file(struct files_struct *files, unsigned int fd)
 {
 	struct file *file;
 	struct fdtable *fdt;
@@ -630,7 +630,7 @@ out_unlock:
 	return file;
 }
 
-int close_fd(unsigned fd)
+int close_fd(unsigned int fd)
 {
 	struct files_struct *files = current->files;
 	struct file *file;
@@ -651,7 +651,7 @@ EXPORT_SYMBOL(close_fd); /* for ksys_close() */
  *
  * Returns: Last valid index into fdtable.
  */
-static inline unsigned last_fd(struct fdtable *fdt)
+static inline unsigned int last_fd(struct fdtable *fdt)
 {
 	return fdt->max_fds - 1;
 }
@@ -699,7 +699,7 @@ static inline void __range_close(struct files_struct *cur_fds, unsigned int fd,
  * This closes a range of file descriptors. All file descriptors
  * from @fd up to and including @max_fd are closed.
  */
-int __close_range(unsigned fd, unsigned max_fd, unsigned int flags)
+int __close_range(unsigned int fd, unsigned int max_fd, unsigned int flags)
 {
 	struct task_struct *me = current;
 	struct files_struct *cur_fds = me->files, *fds = NULL;
@@ -807,14 +807,14 @@ int close_fd_get_file(unsigned int fd, struct file **res)
 
 void do_close_on_exec(struct files_struct *files)
 {
-	unsigned i;
+	unsigned int i;
 	struct fdtable *fdt;
 
 	/* exec unshares first */
 	spin_lock(&files->file_lock);
 	for (i = 0; ; i++) {
 		unsigned long set;
-		unsigned fd = i * BITS_PER_LONG;
+		unsigned int fd = i * BITS_PER_LONG;
 		fdt = files_fdtable(files);
 		if (fd >= fdt->max_fds)
 			break;
@@ -1030,7 +1030,7 @@ bool get_close_on_exec(unsigned int fd)
 }
 
 static int do_dup2(struct files_struct *files,
-	struct file *file, unsigned fd, unsigned flags)
+	struct file *file, unsigned int fd, unsigned int flags)
 __releases(&files->file_lock)
 {
 	struct file *tofree;
@@ -1073,7 +1073,7 @@ Ebusy:
 	return -EBUSY;
 }
 
-int replace_fd(unsigned fd, struct file *file, unsigned flags)
+int replace_fd(unsigned int fd, struct file *file, unsigned int flags)
 {
 	int err;
 	struct files_struct *files = current->files;
@@ -1219,7 +1219,7 @@ SYSCALL_DEFINE1(dup, unsigned int, fildes)
 	return ret;
 }
 
-int f_dupfd(unsigned int from, struct file *file, unsigned flags)
+int f_dupfd(unsigned int from, struct file *file, unsigned int flags)
 {
 	unsigned long nofile = rlimit(RLIMIT_NOFILE);
 	int err;
@@ -1233,8 +1233,8 @@ int f_dupfd(unsigned int from, struct file *file, unsigned flags)
 	return err;
 }
 
-int iterate_fd(struct files_struct *files, unsigned n,
-		int (*f)(const void *, struct file *, unsigned),
+int iterate_fd(struct files_struct *files, unsigned int n,
+		int (*f)(const void *, struct file *, unsigned int),
 		const void *p)
 {
 	struct fdtable *fdt;
