@@ -623,7 +623,7 @@ static int bfusb_probe(struct usb_interface *intf, const struct usb_device_id *i
 	if (!data)
 		return -ENOMEM;
 
-	data->udev = udev;
+	data->udev = usb_get_dev(udev);
 	data->bulk_in_ep    = bulk_in_ep->desc.bEndpointAddress;
 	data->bulk_out_ep   = bulk_out_ep->desc.bEndpointAddress;
 	data->bulk_pkt_size = le16_to_cpu(bulk_out_ep->desc.wMaxPacketSize);
@@ -698,6 +698,8 @@ static void bfusb_disconnect(struct usb_interface *intf)
 		return;
 
 	usb_set_intfdata(intf, NULL);
+
+	usb_put_dev(interface_to_usbdev(intf));
 
 	bfusb_close(hdev);
 
