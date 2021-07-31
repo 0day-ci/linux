@@ -2975,7 +2975,7 @@ megadev_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
 	mega_passthru	*pthru;		/* copy user passthru here */
 	dma_addr_t	pthru_dma_hndl;
 	void		*data = NULL;	/* data to be transferred */
-	dma_addr_t	data_dma_hndl;	/* dma handle for data xfer area */
+	dma_addr_t	data_dma_hndl = 0;	/* dma handle for data xfer area */
 	megacmd_t	mc;
 #if MEGA_HAVE_STATS
 	megastat_t	__user *ustats = NULL;
