@@ -12,9 +12,7 @@ vdso-syms  += vgettimeofday
 # Files to link into the vdso
 obj-vdso = $(patsubst %, %.o, $(vdso-syms)) note.o
 
-ifneq ($(c-gettimeofday-y),)
-	CFLAGS_vgettimeofday.o += -include $(c-gettimeofday-y)
-endif
+CFLAGS_vgettimeofday.o += -include $(c-gettimeofday-y)
 
 ccflags-y := -fno-stack-protector -DBUILD_VDSO32
 
