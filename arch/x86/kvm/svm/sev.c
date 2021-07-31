@@ -81,7 +81,7 @@ static int sev_flush_asids(int min_asid, int max_asid)
 	int ret, pos, error = 0;
 
 	/* Check if there are any ASIDs to reclaim before performing a flush */
-	pos = find_next_bit(sev_reclaim_asid_bitmap, max_asid, min_asid);
+	pos = find_next_bit(sev_reclaim_asid_bitmap, max_asid, min_asid - 1);
 	if (pos >= max_asid)
 		return -EBUSY;
 
@@ -143,10 +143,10 @@ static int sev_asid_new(struct kvm_sev_info *sev)
 	 * SEV-enabled guests must use asid from min_sev_asid to max_sev_asid.
 	 * SEV-ES-enabled guest can use from 1 to min_sev_asid - 1.
 	 */
-	min_asid = sev->es_active ? 0 : min_sev_asid - 1;
+	min_asid = sev->es_active ? 1 : min_sev_asid;
 	max_asid = sev->es_active ? min_sev_asid - 1 : max_sev_asid;
 again:
-	pos = find_next_zero_bit(sev_asid_bitmap, max_sev_asid, min_asid);
+	pos = find_next_zero_bit(sev_asid_bitmap, max_sev_asid, min_asid - 1);
 	if (pos >= max_asid) {
 		if (retry && __sev_recycle_asids(min_asid, max_asid)) {
 			retry = false;
@@ -1858,7 +1858,10 @@ void __init sev_hardware_setup(void)
 	min_sev_asid = edx;
 	sev_me_mask = 1UL << (ebx & 0x3f);
 
-	/* Initialize SEV ASID bitmaps */
+	/*
+	 * Initialize SEV ASID bitmaps. Note: ASID 0 is skipped since it is
+	 * never used by any VM, thus: ASID value == ASID position + 1;
+	 */
 	sev_asid_bitmap = bitmap_zalloc(max_sev_asid, GFP_KERNEL);
 	if (!sev_asid_bitmap)
 		goto out;
@@ -1908,7 +1911,7 @@ void sev_hardware_teardown(void)
 		return;
 
 	/* No need to take sev_bitmap_lock, all VMs have been destroyed. */
-	sev_flush_asids(0, max_sev_asid);
+	sev_flush_asids(1, max_sev_asid);
 
 	bitmap_free(sev_asid_bitmap);
 	bitmap_free(sev_reclaim_asid_bitmap);
