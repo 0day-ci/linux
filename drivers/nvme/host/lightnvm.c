@@ -835,7 +835,7 @@ static int nvme_nvm_submit_user_cmd(struct request_queue *q,
 			ret = -EFAULT;
 	}
 err_meta:
-	if (meta_buf && meta_len)
+	if (ubuf && bufflen && meta_buf && meta_len)
 		dma_pool_free(dev->dma_pool, metadata, metadata_dma);
 err_map:
 	if (bio)
