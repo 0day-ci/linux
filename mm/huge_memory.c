@@ -2432,6 +2432,8 @@ static void __split_huge_page(struct page *page, struct list_head *list,
 	struct address_space *swap_cache = NULL;
 	unsigned long offset = 0;
 	unsigned int nr = thp_nr_pages(head);
+	LIST_HEAD(pages_to_free);
+	int nr_pages_to_free = 0;
 	int i;
 
 	VM_BUG_ON_PAGE(list && PageLRU(head), head);
@@ -2507,6 +2509,25 @@ static void __split_huge_page(struct page *page, struct list_head *list,
 		unlock_page(subpage);
 
 		/*
+		 * If a tail page has only two references left, one inherited
+		 * from the isolation of its head and the other from
+		 * lru_add_page_tail() which we are about to drop, it means this
+		 * tail page was concurrently zapped. Then we can safely free it
+		 * and save page reclaim or migration the trouble of trying it.
+		 */
+		if (list && page_ref_freeze(subpage, 2)) {
+			VM_BUG_ON_PAGE(PageLRU(subpage), subpage);
+			VM_BUG_ON_PAGE(PageCompound(subpage), subpage);
+			VM_BUG_ON_PAGE(page_mapped(subpage), subpage);
+
+			ClearPageActive(subpage);
+			ClearPageUnevictable(subpage);
+			list_move(&subpage->lru, &pages_to_free);
+			nr_pages_to_free++;
+			continue;
+		}
+
+		/*
 		 * Subpages may be freed if there wasn't any mapping
 		 * like if add_to_swap() is running on a lru page that
 		 * had its mapping zapped. And freeing these pages
@@ -2515,6 +2536,13 @@ static void __split_huge_page(struct page *page, struct list_head *list,
 		 */
 		put_page(subpage);
 	}
+
+	if (!nr_pages_to_free)
+		return;
+
+	mem_cgroup_uncharge_list(&pages_to_free);
+	free_unref_page_list(&pages_to_free);
+	count_vm_events(THP_SPLIT_FREE, nr_pages_to_free);
 }
 
 int total_mapcount(struct page *page)
