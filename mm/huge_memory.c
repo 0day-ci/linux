@@ -2327,7 +2327,7 @@ static void unmap_page(struct page *page)
 	VM_WARN_ON_ONCE_PAGE(page_mapped(page), page);
 }
 
-static void remap_page(struct page *page, unsigned int nr)
+static void remap_page(struct page *page, unsigned int nr, bool unmap_clean)
 {
 	int i;
 
@@ -2335,10 +2335,10 @@ static void remap_page(struct page *page, unsigned int nr)
 	if (!PageAnon(page))
 		return;
 	if (PageTransHuge(page)) {
-		remove_migration_ptes(page, page, true);
+		remove_migration_ptes(page, page, true, false);
 	} else {
 		for (i = 0; i < nr; i++)
-			remove_migration_ptes(page + i, page + i, true);
+			remove_migration_ptes(page + i, page + i, true, unmap_clean);
 	}
 }
 
@@ -2494,7 +2494,7 @@ static void __split_huge_page(struct page *page, struct list_head *list,
 	}
 	local_irq_enable();
 
-	remap_page(head, nr);
+	remap_page(head, nr, !!list);
 
 	if (PageSwapCache(head)) {
 		swp_entry_t entry = { .val = page_private(head) };
@@ -2769,7 +2769,7 @@ fail:
 		if (mapping)
 			xa_unlock(&mapping->i_pages);
 		local_irq_enable();
-		remap_page(head, thp_nr_pages(head));
+		remap_page(head, thp_nr_pages(head), false);
 		ret = -EBUSY;
 	}
 

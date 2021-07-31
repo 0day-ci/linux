@@ -1301,6 +1301,7 @@ const char * const vmstat_text[] = {
 	"thp_split_pud",
 #endif
 	"thp_split_free",
+	"thp_split_unmap",
 	"thp_zero_page_alloc",
 	"thp_zero_page_alloc_failed",
 	"thp_swpout",

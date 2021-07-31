@@ -168,14 +168,53 @@ void putback_movable_pages(struct list_head *l)
 	}
 }
 
+static bool try_to_unmap_clean(struct page_vma_mapped_walk *pvmw, struct page *page)
+{
+	void *addr;
+	bool dirty;
+
+	VM_BUG_ON_PAGE(PageLRU(page), page);
+	VM_BUG_ON_PAGE(PageCompound(page), page);
+	VM_BUG_ON_PAGE(!PageAnon(page), page);
+	VM_BUG_ON_PAGE(!PageLocked(page), page);
+	VM_BUG_ON_PAGE(pte_present(*pvmw->pte), page);
+
+	if (PageMlocked(page) || (pvmw->vma->vm_flags & VM_LOCKED))
+		return false;
+
+	/*
+	 * The pmd entry mapping the old thp was flushed and the pte mapping
+	 * this subpage has been non present. Therefore, this subpage is
+	 * inaccessible. We don't need to remap it if it contains only zeros.
+	 */
+	addr = kmap_atomic(page);
+	dirty = !!memchr_inv(addr, 0, PAGE_SIZE);
+	kunmap_atomic(addr);
+
+	if (dirty)
+		return false;
+
+	pte_clear_not_present_full(pvmw->vma->vm_mm, pvmw->address, pvmw->pte, false);
+	dec_mm_counter(pvmw->vma->vm_mm, mm_counter(page));
+	count_vm_event(THP_SPLIT_UNMAP);
+
+	return true;
+}
+
+struct rmap_walk_arg {
+	struct page *page;
+	bool unmap_clean;
+};
+
 /*
  * Restore a potential migration pte to a working pte entry
  */
 static bool remove_migration_pte(struct page *page, struct vm_area_struct *vma,
-				 unsigned long addr, void *old)
+				 unsigned long addr, void *arg)
 {
+	struct rmap_walk_arg *rmap_walk_arg = arg;
 	struct page_vma_mapped_walk pvmw = {
-		.page = old,
+		.page = rmap_walk_arg->page,
 		.vma = vma,
 		.address = addr,
 		.flags = PVMW_SYNC | PVMW_MIGRATION,
@@ -200,6 +239,8 @@ static bool remove_migration_pte(struct page *page, struct vm_area_struct *vma,
 			continue;
 		}
 #endif
+		if (rmap_walk_arg->unmap_clean && try_to_unmap_clean(&pvmw, new))
+			continue;
 
 		get_page(new);
 		pte = pte_mkold(mk_pte(new, READ_ONCE(vma->vm_page_prot)));
@@ -267,12 +308,18 @@ static bool remove_migration_pte(struct page *page, struct vm_area_struct *vma,
  * Get rid of all migration entries and replace them by
  * references to the indicated page.
  */
-void remove_migration_ptes(struct page *old, struct page *new, bool locked)
+void remove_migration_ptes(struct page *old, struct page *new, bool locked, bool unmap_clean)
 {
+	struct rmap_walk_arg rmap_walk_arg = {
+		.page = old,
+		.unmap_clean = unmap_clean,
+	};
 	struct rmap_walk_control rwc = {
 		.rmap_one = remove_migration_pte,
-		.arg = old,
+		.arg = &rmap_walk_arg,
 	};
+
+	VM_BUG_ON_PAGE(unmap_clean && old != new, old);
 
 	if (locked)
 		rmap_walk_locked(new, &rwc);
@@ -827,7 +874,7 @@ static int writeout(struct address_space *mapping, struct page *page)
 	 * At this point we know that the migration attempt cannot
 	 * be successful.
 	 */
-	remove_migration_ptes(page, page, false);
+	remove_migration_ptes(page, page, false, false);
 
 	rc = mapping->a_ops->writepage(page, &wbc);
 
@@ -1070,7 +1117,7 @@ static int __unmap_and_move(struct page *page, struct page *newpage,
 
 	if (page_was_mapped)
 		remove_migration_ptes(page,
-			rc == MIGRATEPAGE_SUCCESS ? newpage : page, false);
+			rc == MIGRATEPAGE_SUCCESS ? newpage : page, false, false);
 
 out_unlock_both:
 	unlock_page(newpage);
@@ -1292,7 +1339,7 @@ static int unmap_and_move_huge_page(new_page_t get_new_page,
 
 	if (page_was_mapped)
 		remove_migration_ptes(hpage,
-			rc == MIGRATEPAGE_SUCCESS ? new_hpage : hpage, false);
+			rc == MIGRATEPAGE_SUCCESS ? new_hpage : hpage, false, false);
 
 unlock_put_anon:
 	unlock_page(new_hpage);
@@ -2585,7 +2632,7 @@ restore:
 		if (!page || (migrate->src[i] & MIGRATE_PFN_MIGRATE))
 			continue;
 
-		remove_migration_ptes(page, page, false);
+		remove_migration_ptes(page, page, false, false);
 
 		migrate->src[i] = 0;
 		unlock_page(page);
@@ -2963,7 +3010,7 @@ void migrate_vma_finalize(struct migrate_vma *migrate)
 			newpage = page;
 		}
 
-		remove_migration_ptes(page, newpage, false);
+		remove_migration_ptes(page, newpage, false, false);
 		unlock_page(page);
 
 		if (is_zone_device_page(page))
