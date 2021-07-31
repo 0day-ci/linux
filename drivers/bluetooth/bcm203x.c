@@ -166,7 +166,7 @@ static int bcm203x_probe(struct usb_interface *intf, const struct usb_device_id 
 	if (!data)
 		return -ENOMEM;
 
-	data->udev  = udev;
+	data->udev  = usb_get_dev(udev);
 	data->state = BCM203X_LOAD_MINIDRV;
 
 	data->urb = usb_alloc_urb(0, GFP_KERNEL);
@@ -243,6 +243,8 @@ static void bcm203x_disconnect(struct usb_interface *intf)
 	usb_kill_urb(data->urb);
 
 	usb_set_intfdata(intf, NULL);
+
+	usb_put_dev(data->udev);
 
 	usb_free_urb(data->urb);
 	kfree(data->fw_data);
