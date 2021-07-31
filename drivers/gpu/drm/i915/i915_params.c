@@ -265,3 +265,37 @@ void i915_params_free(struct i915_params *params)
 	I915_PARAMS_FOR_EACH(FREE);
 #undef FREE
 }
+
+/* POC for callback -> dynamic_debug_exec_queries */
+unsigned long __gvt_debug;
+EXPORT_SYMBOL(__gvt_debug);
+
+#define _help(key)	"\t\"" key "\"\t: help for " key "\n"
+#define cmd_help(key)	{ .prefix = key, .help = key ": help for " key }
+
+#define I915_DYNDBG_PARM_DESC(name) \
+	"Enable debug output via /sys/module/i915/parameters/" #name	\
+	", where each bit enables a debug category.\n"			\
+	_help("gvt:cmd:")						\
+	_help("gvt:core:")						\
+	_help("gvt:dpy:")						\
+	_help("gvt:el:")						\
+	_help("gvt:irq:")						\
+	_help("gvt:mm:")						\
+	_help("gvt:mmio:")						\
+	_help("gvt:render:")						\
+	_help("gvt:sched:")
+
+MODULE_PARM_DESC(debug_gvt, I915_DYNDBG_PARM_DESC(debug_gvt));
+
+DEFINE_DYNDBG_BITMAP(debug_gvt, &__gvt_debug,
+		   I915_DYNDBG_PARM_DESC(debug_gvt),
+		   cmd_help("gvt:cmd:"),
+		   cmd_help("gvt:core:"),
+		   cmd_help("gvt:dpy:"),
+		   cmd_help("gvt:el:"),
+		   cmd_help("gvt:irq:"),
+		   cmd_help("gvt:mm:"),
+		   cmd_help("gvt:mmio:"),
+		   cmd_help("gvt:render:"),
+		   cmd_help("gvt:sched:"));
