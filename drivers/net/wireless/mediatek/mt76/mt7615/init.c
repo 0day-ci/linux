@@ -54,7 +54,7 @@ int mt7615_thermal_init(struct mt7615_dev *dev)
 		return 0;
 
 	hwmon = devm_hwmon_device_register_with_groups(&wiphy->dev,
-						       wiphy_name(wiphy), dev,
+						       KBUILD_MODNAME, dev,
 						       mt7615_hwmon_groups);
 	if (IS_ERR(hwmon))
 		return PTR_ERR(hwmon);
