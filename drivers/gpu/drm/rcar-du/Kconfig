@@ -2,7 +2,6 @@
 config DRM_RCAR_DU
 	tristate "DRM Support for R-Car Display Unit"
 	depends on DRM && OF
-	depends on ARM || ARM64
 	depends on ARCH_RENESAS || COMPILE_TEST
 	imply DRM_RCAR_CMM
 	imply DRM_RCAR_LVDS
