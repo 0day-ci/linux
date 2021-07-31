@@ -2342,17 +2342,14 @@ static void remap_page(struct page *page, unsigned int nr)
 	}
 }
 
-static void lru_add_page_tail(struct page *head, struct page *tail,
-		struct lruvec *lruvec, struct list_head *list)
+static void lru_add_page_tail(struct page *head, struct page *tail, struct list_head *list)
 {
 	VM_BUG_ON_PAGE(!PageHead(head), head);
 	VM_BUG_ON_PAGE(PageCompound(tail), head);
 	VM_BUG_ON_PAGE(PageLRU(tail), head);
-	lockdep_assert_held(&lruvec->lru_lock);
 
 	if (list) {
-		/* page reclaim is reclaiming a huge page */
-		VM_WARN_ON(PageLRU(head));
+		/* page reclaim or migration is splitting an isolated thp */
 		get_page(tail);
 		list_add_tail(&tail->lru, list);
 	} else {
@@ -2363,8 +2360,7 @@ static void lru_add_page_tail(struct page *head, struct page *tail,
 	}
 }
 
-static void __split_huge_page_tail(struct page *head, int tail,
-		struct lruvec *lruvec, struct list_head *list)
+static void __split_huge_page_tail(struct page *head, int tail, struct list_head *list)
 {
 	struct page *page_tail = head + tail;
 
@@ -2425,18 +2421,20 @@ static void __split_huge_page_tail(struct page *head, int tail,
 	 * pages to show after the currently processed elements - e.g.
 	 * migrate_pages
 	 */
-	lru_add_page_tail(head, page_tail, lruvec, list);
+	lru_add_page_tail(head, page_tail, list);
 }
 
 static void __split_huge_page(struct page *page, struct list_head *list,
 		pgoff_t end)
 {
 	struct page *head = compound_head(page);
-	struct lruvec *lruvec;
+	struct lruvec *lruvec = NULL;
 	struct address_space *swap_cache = NULL;
 	unsigned long offset = 0;
 	unsigned int nr = thp_nr_pages(head);
 	int i;
+
+	VM_BUG_ON_PAGE(list && PageLRU(head), head);
 
 	/* complete memcg works before add pages to LRU */
 	split_page_memcg(head, nr);
@@ -2450,10 +2448,11 @@ static void __split_huge_page(struct page *page, struct list_head *list,
 	}
 
 	/* lock lru list/PageCompound, ref frozen by page_ref_freeze */
-	lruvec = lock_page_lruvec(head);
+	if (!list)
+		lruvec = lock_page_lruvec(head);
 
 	for (i = nr - 1; i >= 1; i--) {
-		__split_huge_page_tail(head, i, lruvec, list);
+		__split_huge_page_tail(head, i, list);
 		/* Some pages can be beyond i_size: drop them from page cache */
 		if (head[i].index >= end) {
 			ClearPageDirty(head + i);
@@ -2471,7 +2470,8 @@ static void __split_huge_page(struct page *page, struct list_head *list,
 	}
 
 	ClearPageCompound(head);
-	unlock_page_lruvec(lruvec);
+	if (lruvec)
+		unlock_page_lruvec(lruvec);
 	/* Caller disabled irqs, so they are still disabled here */
 
 	split_page_owner(head, nr);
@@ -2645,6 +2645,7 @@ int split_huge_page_to_list(struct page *page, struct list_head *list)
 	VM_BUG_ON_PAGE(is_huge_zero_page(head), head);
 	VM_BUG_ON_PAGE(!PageLocked(head), head);
 	VM_BUG_ON_PAGE(!PageCompound(head), head);
+	VM_BUG_ON_PAGE(list && PageLRU(head), head);
 
 	if (PageWriteback(head))
 		return -EBUSY;
