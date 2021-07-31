@@ -1398,6 +1398,8 @@ static int __nbd_ioctl(struct block_device *bdev, struct nbd_device *nbd,
 	case NBD_SET_SIZE:
 		return nbd_set_size(nbd, arg, config->blksize);
 	case NBD_SET_SIZE_BLOCKS:
+		if (arg && (LLONG_MAX / arg <= config->blksize))
+			return -EINVAL;
 		return nbd_set_size(nbd, arg * config->blksize,
 				    config->blksize);
 	case NBD_SET_TIMEOUT:
