@@ -125,13 +125,13 @@ static void mt7915_unregister_thermal(struct mt7915_phy *phy)
 	thermal_cooling_device_unregister(phy->cdev);
 }
 
-static int mt7915_thermal_init(struct mt7915_phy *phy)
+static int mt7915_thermal_init(struct mt7915_phy *phy, const char *prefix)
 {
 	struct wiphy *wiphy = phy->mt76->hw->wiphy;
 	struct thermal_cooling_device *cdev;
 	struct device *hwmon;
 
-	cdev = thermal_cooling_device_register(wiphy_name(wiphy), phy,
+	cdev = thermal_cooling_device_register(prefix, phy,
 					       &mt7915_thermal_ops);
 	if (!IS_ERR(cdev)) {
 		if (sysfs_create_link(&wiphy->dev.kobj, &cdev->device.kobj,
@@ -145,7 +145,7 @@ static int mt7915_thermal_init(struct mt7915_phy *phy)
 		return 0;
 
 	hwmon = devm_hwmon_device_register_with_groups(&wiphy->dev,
-						       wiphy_name(wiphy), phy,
+						       prefix, phy,
 						       mt7915_hwmon_groups);
 	if (IS_ERR(hwmon))
 		return PTR_ERR(hwmon);
@@ -370,7 +370,7 @@ static int mt7915_register_ext_phy(struct mt7915_dev *dev)
 	if (ret)
 		goto error;
 
-	ret = mt7915_thermal_init(phy);
+	ret = mt7915_thermal_init(phy, KBUILD_MODNAME "-ext");
 	if (ret)
 		goto error;
 
@@ -821,7 +821,7 @@ int mt7915_register_device(struct mt7915_dev *dev)
 	if (ret)
 		return ret;
 
-	ret = mt7915_thermal_init(&dev->phy);
+	ret = mt7915_thermal_init(&dev->phy, KBUILD_MODNAME);
 	if (ret)
 		return ret;
 
