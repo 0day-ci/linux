@@ -1154,3 +1154,58 @@ early_initcall(dynamic_debug_init);
 
 /* Debugfs setup must be done later */
 fs_initcall(dynamic_debug_init_control);
+
+#include <linux/moduleparam.h>
+
+#define OUR_QUERY_SIZE 128 /* typically need <40 */
+
+int param_set_dyndbg(const char *instr, const struct kernel_param *kp)
+{
+	unsigned int val;
+	unsigned long changes, result;
+	int rc, chgct = 0, totct = 0, bitpos, bitsmax;
+	char query[OUR_QUERY_SIZE];
+	struct dyndbg_bitdesc *bitmap = (struct dyndbg_bitdesc *) kp->data;
+
+	// pr_info("set_dyndbg: instr: %s curr: %d\n", instr, *kp->arg);
+
+	rc = kstrtouint(instr, 0, &val);
+	if (rc) {
+		pr_err("set_dyndbg: failed\n");
+		return -EINVAL;
+	}
+	result = val;
+	pr_info("set_dyndbg: result:0x%lx from %s\n", result, instr);
+
+	changes = result; // ^ __gvt_debug;
+
+	for (bitsmax = 0; bitmap[bitsmax].prefix; bitsmax++);
+
+	for_each_set_bit(bitpos, &changes, min(--bitsmax, 64)) {
+
+		sprintf(query, "format '^%s' %cp", bitmap[bitpos].prefix,
+			test_bit(bitpos, &result) ? '+' : '-');
+
+		chgct = dynamic_debug_exec_queries(query, "i915");
+
+		pr_info("bit-%d: %d changes on: %s\n", bitpos, chgct, query);
+		totct += chgct;
+	}
+	pr_info("total changes: %d\n", totct);
+	// __gvt_debug = result;
+	return 0;
+}
+EXPORT_SYMBOL(param_set_dyndbg);
+
+int param_get_dyndbg(char *buffer, const struct kernel_param *kp)
+{
+	return scnprintf(buffer, PAGE_SIZE, "%u\n",
+			 *((unsigned int *)kp->arg));
+}
+EXPORT_SYMBOL(param_get_dyndbg);
+
+const struct kernel_param_ops param_ops_dyndbg = {
+	.set = param_set_dyndbg,
+	.get = param_get_dyndbg,
+};
+EXPORT_SYMBOL(param_ops_dyndbg);

@@ -2,6 +2,8 @@
 #ifndef _DYNAMIC_DEBUG_H
 #define _DYNAMIC_DEBUG_H
 
+#include <linux/moduleparam.h>
+
 #if defined(CONFIG_JUMP_LABEL)
 #include <linux/jump_label.h>
 #endif
@@ -227,6 +229,40 @@ static inline int dynamic_debug_exec_queries(const char *query, const char *modn
 	return 0;
 }
 
+static int param_set_dyndbg(const char *instr, struct kernel_param *kp)
+{ return 0; }
+static int param_get_dyndbg(char *buffer, struct kernel_param *kp)
+{ return 0; }
+
 #endif /* !CONFIG_DYNAMIC_DEBUG_CORE */
+
+struct dyndbg_bitdesc {
+	/* bitpos is inferred from index in containing array */
+	char *prefix;
+	char *help;
+};
+
+/**
+ * DYNDBG_BITMAP_DESC(name, var, bitmap_desc, @bit_descs)
+ * @name: basename under /sys
+ * @var: C identifier to map
+ * @bitmap_desc: string summarizing dyndbg categories
+ * @bit_descs: list of struct dydbg_bitdesc initializations
+ *
+ * Defines the mapping of bits 0-N to categories/prefixes of
+ * debug-callsites to be controlled.
+ *
+ * Users should also call MODULE_PARM_DESC(name, bitmap_desc).
+ * Maybe we can invoke it on their behalf, but we want MOD-NAME to be
+ * correct, test soon.  may also need modname in name - "debug" will
+ * not be unique.
+ */
+#define DEFINE_DYNDBG_BITMAP(name, value, bitmap_desc, ...)	\
+	struct dyndbg_bitdesc dyndbg_classes_##name[] =		\
+	{ __VA_ARGS__, { NULL, NULL } };			\
+	module_param_cbd(name, &param_ops_dyndbg, value, 0644,	\
+			 &dyndbg_classes_##name);
+
+extern const struct kernel_param_ops param_ops_dyndbg;
 
 #endif
