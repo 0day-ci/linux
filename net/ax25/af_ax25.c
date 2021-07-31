@@ -1977,17 +1977,32 @@ static int __init ax25_init(void)
 {
 	int rc = proto_register(&ax25_proto, 0);
 
-	if (rc != 0)
+	if (rc)
 		goto out;
 
-	sock_register(&ax25_family_ops);
-	dev_add_pack(&ax25_packet_type);
-	register_netdevice_notifier(&ax25_dev_notifier);
+	rc = sock_register(&ax25_family_ops);
+	if (rc)
+		goto out_proto;
+	rc = dev_add_pack(&ax25_packet_type);
+	if (rc)
+		goto out_sock;
+	rc = register_netdevice_notifier(&ax25_dev_notifier);
+	if (rc)
+		goto out_dev;
 
 	proc_create_seq("ax25_route", 0444, init_net.proc_net, &ax25_rt_seqops);
 	proc_create_seq("ax25", 0444, init_net.proc_net, &ax25_info_seqops);
 	proc_create_seq("ax25_calls", 0444, init_net.proc_net,
 			&ax25_uid_seqops);
+
+	return 0;
+
+out_dev:
+	dev_remove_pack(&ax25_packet_type);
+out_sock:
+	sock_unregister(PF_AX25);
+out_proto:
+	proto_unregister(&ax25_proto);
 out:
 	return rc;
 }
