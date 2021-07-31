@@ -256,110 +256,6 @@ concat_writev(struct mtd_info *mtd, const struct kvec *vecs,
 	return err;
 }
 
-static int
-concat_read_oob(struct mtd_info *mtd, loff_t from, struct mtd_oob_ops *ops)
-{
-	struct mtd_concat *concat = CONCAT(mtd);
-	struct mtd_oob_ops devops = *ops;
-	int i, err, ret = 0;
-
-	ops->retlen = ops->oobretlen = 0;
-
-	for (i = 0; i < concat->num_subdev; i++) {
-		struct mtd_info *subdev = concat->subdev[i];
-
-		if (from >= subdev->size) {
-			from -= subdev->size;
-			continue;
-		}
-
-		/* partial read ? */
-		if (from + devops.len > subdev->size)
-			devops.len = subdev->size - from;
-
-		err = mtd_read_oob(subdev, from, &devops);
-		ops->retlen += devops.retlen;
-		ops->oobretlen += devops.oobretlen;
-
-		/* Save information about bitflips! */
-		if (unlikely(err)) {
-			if (mtd_is_eccerr(err)) {
-				mtd->ecc_stats.failed++;
-				ret = err;
-			} else if (mtd_is_bitflip(err)) {
-				mtd->ecc_stats.corrected++;
-				/* Do not overwrite -EBADMSG !! */
-				if (!ret)
-					ret = err;
-			} else
-				return err;
-		}
-
-		if (devops.datbuf) {
-			devops.len = ops->len - ops->retlen;
-			if (!devops.len)
-				return ret;
-			devops.datbuf += devops.retlen;
-		}
-		if (devops.oobbuf) {
-			devops.ooblen = ops->ooblen - ops->oobretlen;
-			if (!devops.ooblen)
-				return ret;
-			devops.oobbuf += ops->oobretlen;
-		}
-
-		from = 0;
-	}
-	return -EINVAL;
-}
-
-static int
-concat_write_oob(struct mtd_info *mtd, loff_t to, struct mtd_oob_ops *ops)
-{
-	struct mtd_concat *concat = CONCAT(mtd);
-	struct mtd_oob_ops devops = *ops;
-	int i, err;
-
-	if (!(mtd->flags & MTD_WRITEABLE))
-		return -EROFS;
-
-	ops->retlen = ops->oobretlen = 0;
-
-	for (i = 0; i < concat->num_subdev; i++) {
-		struct mtd_info *subdev = concat->subdev[i];
-
-		if (to >= subdev->size) {
-			to -= subdev->size;
-			continue;
-		}
-
-		/* partial write ? */
-		if (to + devops.len > subdev->size)
-			devops.len = subdev->size - to;
-
-		err = mtd_write_oob(subdev, to, &devops);
-		ops->retlen += devops.retlen;
-		ops->oobretlen += devops.oobretlen;
-		if (err)
-			return err;
-
-		if (devops.datbuf) {
-			devops.len = ops->len - ops->retlen;
-			if (!devops.len)
-				return 0;
-			devops.datbuf += devops.retlen;
-		}
-		if (devops.oobbuf) {
-			devops.ooblen = ops->ooblen - ops->oobretlen;
-			if (!devops.ooblen)
-				return 0;
-			devops.oobbuf += devops.oobretlen;
-		}
-		to = 0;
-	}
-	return -EINVAL;
-}
-
 static int concat_erase(struct mtd_info *mtd, struct erase_info *instr)
 {
 	struct mtd_concat *concat = CONCAT(mtd);
@@ -684,10 +580,6 @@ struct mtd_info *mtd_concat_create(struct mtd_info *subdev[],	/* subdevices to c
 	subdev_master = mtd_get_master(subdev[0]);
 	if (subdev_master->_writev)
 		concat->mtd._writev = concat_writev;
-	if (subdev_master->_read_oob)
-		concat->mtd._read_oob = concat_read_oob;
-	if (subdev_master->_write_oob)
-		concat->mtd._write_oob = concat_write_oob;
 	if (subdev_master->_block_isbad)
 		concat->mtd._block_isbad = concat_block_isbad;
 	if (subdev_master->_block_markbad)
@@ -724,15 +616,12 @@ struct mtd_info *mtd_concat_create(struct mtd_info *subdev[],	/* subdevices to c
 				    subdev[i]->flags & MTD_WRITEABLE;
 		}
 
-		subdev_master = mtd_get_master(subdev[i]);
 		concat->mtd.size += subdev[i]->size;
 		concat->mtd.ecc_stats.badblocks +=
 			subdev[i]->ecc_stats.badblocks;
 		if (concat->mtd.writesize   !=  subdev[i]->writesize ||
 		    concat->mtd.subpage_sft != subdev[i]->subpage_sft ||
-		    concat->mtd.oobsize    !=  subdev[i]->oobsize ||
-		    !concat->mtd._read_oob  != !subdev_master->_read_oob ||
-		    !concat->mtd._write_oob != !subdev_master->_write_oob) {
+		    concat->mtd.oobsize    !=  subdev[i]->oobsize) {
 			kfree(concat);
 			printk("Incompatible OOB or ECC data on \"%s\"\n",
 			       subdev[i]->name);
