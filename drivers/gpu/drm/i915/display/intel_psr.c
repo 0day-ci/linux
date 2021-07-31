@@ -2039,6 +2039,9 @@ void intel_psr_invalidate(struct drm_i915_private *dev_priv,
 {
 	struct intel_encoder *encoder;
 
+	if (DISPLAY_VER(dev_priv) >= 12)
+		return;
+
 	if (origin == ORIGIN_FLIP)
 		return;
 
@@ -2122,6 +2125,9 @@ void intel_psr_flush(struct drm_i915_private *dev_priv,
 			tgl_dc3co_flush(intel_dp, frontbuffer_bits, origin);
 			continue;
 		}
+
+		if (DISPLAY_VER(dev_priv) >= 12)
+			continue;
 
 		mutex_lock(&intel_dp->psr.lock);
 		if (!intel_dp->psr.enabled) {
