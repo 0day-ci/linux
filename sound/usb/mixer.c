@@ -1572,8 +1572,9 @@ static size_t append_ctl_name(struct snd_kcontrol *kctl, const char *str)
 static void check_no_speaker_on_headset(struct snd_kcontrol *kctl,
 					struct snd_card *card)
 {
-	const char *names_to_check[] = {
-		"Headset", "headset", "Headphone", "headphone", NULL};
+	static const char *names_to_check[] = {
+		"Headset", "headset", "Headphone", "headphone", NULL
+	};
 	const char **s;
 	bool found = false;
 
