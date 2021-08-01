@@ -1191,7 +1191,7 @@ static acpi_status check_acpi_smo88xx_device(acpi_handle obj_handle,
 
 	kfree(info);
 
-	*((bool *)return_value) = true;
+	*return_value = obj_handle;
 	return AE_CTRL_TERMINATE;
 
 smo88xx_not_found:
@@ -1201,13 +1201,10 @@ smo88xx_not_found:
 
 static bool is_dell_system_with_lis3lv02d(void)
 {
-	bool found;
-	const char *vendor;
+	acpi_handle found = NULL;
 
-	vendor = dmi_get_system_info(DMI_SYS_VENDOR);
-	if (!vendor || strcmp(vendor, "Dell Inc."))
+	if (!dmi_match(DMI_SYS_VENDOR, "Dell Inc."))
 		return false;
-
 	/*
 	 * Check that ACPI device SMO88xx is present and is functioning.
 	 * Function acpi_get_devices() already filters all ACPI devices
@@ -1216,9 +1213,7 @@ static bool is_dell_system_with_lis3lv02d(void)
 	 * accelerometer but unfortunately ACPI does not provide any other
 	 * information (like I2C address).
 	 */
-	found = false;
-	acpi_get_devices(NULL, check_acpi_smo88xx_device, NULL,
-			 (void **)&found);
+	acpi_get_devices(NULL, check_acpi_smo88xx_device, NULL, &found);
 
 	return found;
 }
