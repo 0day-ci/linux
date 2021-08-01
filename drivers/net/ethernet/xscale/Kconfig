@@ -6,8 +6,8 @@
 config NET_VENDOR_XSCALE
 	bool "Intel XScale IXP devices"
 	default y
-	depends on NET_VENDOR_INTEL && (ARM && ARCH_IXP4XX && \
-		   IXP4XX_NPE && IXP4XX_QMGR)
+	depends on NET_VENDOR_INTEL && IXP4XX_NPE && IXP4XX_QMGR
+	depends on ARCH_IXP4XX || COMPILE_TEST
 	help
 	  If you have a network (Ethernet) card belonging to this class, say Y.
 
@@ -20,7 +20,8 @@ if NET_VENDOR_XSCALE
 
 config IXP4XX_ETH
 	tristate "Intel IXP4xx Ethernet support"
-	depends on ARM && ARCH_IXP4XX && IXP4XX_NPE && IXP4XX_QMGR
+	depends on IXP4XX_NPE && IXP4XX_QMGR
+	depends on ARCH_IXP4XX || COMPILE_TEST
 	select PHYLIB
 	select OF_MDIO if OF
 	select NET_PTP_CLASSIFY
