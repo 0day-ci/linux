@@ -2529,6 +2529,9 @@ static bool neigh_master_filtered(struct net_device *dev, int master_idx)
 {
 	struct net_device *master;
 
+	if (master_idx == NDV_NOT_L3_SLAVE)
+		return netif_is_l3_slave(dev);
+
 	if (!master_idx)
 		return false;
 

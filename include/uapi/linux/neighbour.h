@@ -196,4 +196,6 @@ enum {
 };
 #define NFEA_MAX (__NFEA_MAX - 1)
 
+#define NDV_NOT_L3_SLAVE	(-10)
+
 #endif
