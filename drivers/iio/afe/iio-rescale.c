@@ -47,12 +47,17 @@ int rescale_process_scale(struct rescale *rescale, int scale_type,
 		*val2 = rescale->denominator;
 		return IIO_VAL_FRACTIONAL;
 	case IIO_VAL_FRACTIONAL_LOG2:
-		tmp = *val * 1000000000LL;
-		do_div(tmp, rescale->denominator);
-		tmp *= rescale->numerator;
-		do_div(tmp, 1000000000LL);
+		if (check_mul_overflow(*val, rescale->numerator, (s32 *)&tmp) ||
+		    check_mul_overflow(rescale->denominator, (1 << *val2), (s32 *)&tmp2)) {
+			tmp = (s64)*val * rescale->numerator;
+			tmp2 = (s64)rescale->denominator * (1 << *val2);
+			factor = gcd(abs(tmp), abs(tmp2));
+			tmp = div_s64(tmp, factor);
+			tmp2 = div_s64(tmp2, factor);
+		}
 		*val = tmp;
-		return scale_type;
+		*val2 = tmp2;
+		return IIO_VAL_FRACTIONAL;
 	case IIO_VAL_INT_PLUS_NANO:
 	case IIO_VAL_INT_PLUS_MICRO:
 		if (scale_type == IIO_VAL_INT_PLUS_NANO)
