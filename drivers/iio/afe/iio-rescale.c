@@ -21,15 +21,24 @@
 int rescale_process_scale(struct rescale *rescale, int scale_type,
 			  int *val, int *val2)
 {
-	unsigned long long tmp;
+	s64 tmp, tmp2;
+	u32 factor;
 	u32 mult;
 	u32 rem;
 	u32 neg;
 
 	switch (scale_type) {
 	case IIO_VAL_FRACTIONAL:
-		*val *= rescale->numerator;
-		*val2 *= rescale->denominator;
+		if (check_mul_overflow(*val, rescale->numerator, (s32 *)&tmp) ||
+		    check_mul_overflow(*val2, rescale->denominator, (s32 *)&tmp2)) {
+			tmp = (s64)*val * rescale->numerator;
+			tmp2 = (s64)*val2 * rescale->denominator;
+			factor = gcd(abs(tmp), abs(tmp2));
+			tmp = div_s64(tmp, factor);
+			tmp2 = div_s64(tmp2, factor);
+		}
+		*val = tmp;
+		*val2 = tmp2;
 		return scale_type;
 	case IIO_VAL_INT:
 		*val *= rescale->numerator;
