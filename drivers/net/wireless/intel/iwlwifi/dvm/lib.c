@@ -89,7 +89,7 @@ int iwlagn_hwrate_to_mac80211_idx(u32 rate_n_flags, enum nl80211_band band)
 	} else {
 		if (band == NL80211_BAND_5GHZ)
 			band_offset = IWL_FIRST_OFDM_RATE;
-		for (idx = band_offset; idx < IWL_RATE_COUNT_LEGACY; idx++)
+		for (idx = band_offset; idx < IWL_RATE_INDEX_COUNT_LEGACY; idx++)
 			if (iwl_rates[idx].plcp == (rate_n_flags & 0xFF))
 				return idx - band_offset;
 	}

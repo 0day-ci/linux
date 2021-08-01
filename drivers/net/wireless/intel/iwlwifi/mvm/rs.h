@@ -37,8 +37,8 @@ struct iwl_rs_rate_info {
 #define IWL_RATE_60M_PLCP 3
 
 enum {
-	IWL_RATE_INVM_INDEX = IWL_RATE_COUNT,
-	IWL_RATE_INVALID = IWL_RATE_COUNT,
+	IWL_RATE_INVM_INDEX = IWL_RATE_INDEX_COUNT,
+	IWL_RATE_INVALID = IWL_RATE_INDEX_COUNT,
 };
 
 #define LINK_QUAL_MAX_RETRY_NUM 16
@@ -123,7 +123,7 @@ enum {
 	IWL_RATE_HT_MIMO2_MCS_9_PLCP = IWL_RATE_HT_SISO_MCS_INV_PLCP,
 };
 
-#define IWL_RATES_MASK ((1 << IWL_RATE_COUNT) - 1)
+#define IWL_RATES_MASK ((1 << IWL_RATE_INDEX_COUNT) - 1)
 
 #define IWL_INVALID_VALUE    -1
 
@@ -302,7 +302,7 @@ struct iwl_scale_tbl_info {
 	struct rs_rate rate;
 	enum rs_column column;
 	const u16 *expected_tpt;	/* throughput metrics; expected_tpt_G, etc. */
-	struct iwl_rate_scale_data win[IWL_RATE_COUNT]; /* rate histories */
+	struct iwl_rate_scale_data win[IWL_RATE_INDEX_COUNT]; /* rate histories */
 	/* per txpower-reduction history */
 	struct iwl_rate_scale_data tpc_win[TPC_MAX_REDUCTION + 1];
 };
@@ -388,7 +388,7 @@ struct iwl_lq_sta {
 		u8 chains;
 		s8 chain_signal[IEEE80211_MAX_CHAINS];
 		s8 last_rssi;
-		struct rs_rate_stats tx_stats[RS_COLUMN_COUNT][IWL_RATE_COUNT];
+		struct rs_rate_stats tx_stats[RS_COLUMN_COUNT][IWL_RATE_INDEX_COUNT];
 		struct iwl_mvm *drv;
 		spinlock_t lock; /* for races in reinit/update table */
 	} pers;

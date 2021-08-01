@@ -80,7 +80,7 @@ static const u8 ant_toggle_lookup[] = {
  * maps to IWL_RATE_INVALID
  *
  */
-const struct iwl_rate_info iwl_rates[IWL_RATE_COUNT] = {
+const struct iwl_rate_info iwl_rates[IWL_RATE_INDEX_COUNT] = {
 	IWL_DECLARE_RATE_INFO(1, INV, INV, 2, INV, 2, INV, 2),    /*  1mbps */
 	IWL_DECLARE_RATE_INFO(2, INV, 1, 5, 1, 5, 1, 5),          /*  2mbps */
 	IWL_DECLARE_RATE_INFO(5, INV, 2, 6, 2, 11, 2, 11),        /*5.5mbps */
@@ -162,46 +162,46 @@ static void rs_dbgfs_set_mcs(struct iwl_lq_sta *lq_sta,
  * (2.4 GHz) band.
  */
 
-static const u16 expected_tpt_legacy[IWL_RATE_COUNT] = {
+static const u16 expected_tpt_legacy[IWL_RATE_INDEX_COUNT] = {
 	7, 13, 35, 58, 40, 57, 72, 98, 121, 154, 177, 186, 0
 };
 
-static const u16 expected_tpt_siso20MHz[4][IWL_RATE_COUNT] = {
+static const u16 expected_tpt_siso20MHz[4][IWL_RATE_INDEX_COUNT] = {
 	{0, 0, 0, 0, 42, 0,  76, 102, 124, 159, 183, 193, 202}, /* Norm */
 	{0, 0, 0, 0, 46, 0,  82, 110, 132, 168, 192, 202, 210}, /* SGI */
 	{0, 0, 0, 0, 47, 0,  91, 133, 171, 242, 305, 334, 362}, /* AGG */
 	{0, 0, 0, 0, 52, 0, 101, 145, 187, 264, 330, 361, 390}, /* AGG+SGI */
 };
 
-static const u16 expected_tpt_siso40MHz[4][IWL_RATE_COUNT] = {
+static const u16 expected_tpt_siso40MHz[4][IWL_RATE_INDEX_COUNT] = {
 	{0, 0, 0, 0,  77, 0, 127, 160, 184, 220, 242, 250, 257}, /* Norm */
 	{0, 0, 0, 0,  83, 0, 135, 169, 193, 229, 250, 257, 264}, /* SGI */
 	{0, 0, 0, 0,  94, 0, 177, 249, 313, 423, 512, 550, 586}, /* AGG */
 	{0, 0, 0, 0, 104, 0, 193, 270, 338, 454, 545, 584, 620}, /* AGG+SGI */
 };
 
-static const u16 expected_tpt_mimo2_20MHz[4][IWL_RATE_COUNT] = {
+static const u16 expected_tpt_mimo2_20MHz[4][IWL_RATE_INDEX_COUNT] = {
 	{0, 0, 0, 0,  74, 0, 123, 155, 179, 214, 236, 244, 251}, /* Norm */
 	{0, 0, 0, 0,  81, 0, 131, 164, 188, 223, 243, 251, 257}, /* SGI */
 	{0, 0, 0, 0,  89, 0, 167, 235, 296, 402, 488, 526, 560}, /* AGG */
 	{0, 0, 0, 0,  97, 0, 182, 255, 320, 431, 520, 558, 593}, /* AGG+SGI*/
 };
 
-static const u16 expected_tpt_mimo2_40MHz[4][IWL_RATE_COUNT] = {
+static const u16 expected_tpt_mimo2_40MHz[4][IWL_RATE_INDEX_COUNT] = {
 	{0, 0, 0, 0, 123, 0, 182, 214, 235, 264, 279, 285, 289}, /* Norm */
 	{0, 0, 0, 0, 131, 0, 191, 222, 242, 270, 284, 289, 293}, /* SGI */
 	{0, 0, 0, 0, 171, 0, 305, 410, 496, 634, 731, 771, 805}, /* AGG */
 	{0, 0, 0, 0, 186, 0, 329, 439, 527, 667, 764, 803, 838}, /* AGG+SGI */
 };
 
-static const u16 expected_tpt_mimo3_20MHz[4][IWL_RATE_COUNT] = {
+static const u16 expected_tpt_mimo3_20MHz[4][IWL_RATE_INDEX_COUNT] = {
 	{0, 0, 0, 0,  99, 0, 153, 186, 208, 239, 256, 263, 268}, /* Norm */
 	{0, 0, 0, 0, 106, 0, 162, 194, 215, 246, 262, 268, 273}, /* SGI */
 	{0, 0, 0, 0, 134, 0, 249, 346, 431, 574, 685, 732, 775}, /* AGG */
 	{0, 0, 0, 0, 148, 0, 272, 376, 465, 614, 727, 775, 818}, /* AGG+SGI */
 };
 
-static const u16 expected_tpt_mimo3_40MHz[4][IWL_RATE_COUNT] = {
+static const u16 expected_tpt_mimo3_40MHz[4][IWL_RATE_INDEX_COUNT] = {
 	{0, 0, 0, 0, 152, 0, 211, 239, 255, 279,  290,  294,  297}, /* Norm */
 	{0, 0, 0, 0, 160, 0, 219, 245, 261, 284,  294,  297,  300}, /* SGI */
 	{0, 0, 0, 0, 254, 0, 443, 584, 695, 868,  984, 1030, 1070}, /* AGG */
@@ -209,7 +209,7 @@ static const u16 expected_tpt_mimo3_40MHz[4][IWL_RATE_COUNT] = {
 };
 
 /* mbps, mcs */
-static const struct iwl_rate_mcs_info iwl_rate_mcs[IWL_RATE_COUNT] = {
+static const struct iwl_rate_mcs_info iwl_rate_mcs[IWL_RATE_INDEX_COUNT] = {
 	{  "1", "BPSK DSSS"},
 	{  "2", "QPSK DSSS"},
 	{"5.5", "BPSK CCK"},
@@ -454,7 +454,7 @@ static int rs_collect_tx_data(struct iwl_scale_tbl_info *tbl,
 	static const u64 mask = (((u64)1) << (IWL_RATE_MAX_WINDOW - 1));
 	s32 fail_count, tpt;
 
-	if (scale_index < 0 || scale_index >= IWL_RATE_COUNT)
+	if (scale_index < 0 || scale_index >= IWL_RATE_INDEX_COUNT)
 		return -EINVAL;
 
 	/* Select window for current tx bit rate */
@@ -738,7 +738,7 @@ static u16 rs_get_adjacent_rate(struct iwl_priv *priv, u8 index, u16 rate_mask,
 
 		/* Find the next rate that is in the rate mask */
 		i = index + 1;
-		for (mask = (1 << i); i < IWL_RATE_COUNT; i++, mask <<= 1) {
+		for (mask = (1 << i); i < IWL_RATE_INDEX_COUNT; i++, mask <<= 1) {
 			if (rate_mask & mask) {
 				high = i;
 				break;
@@ -1087,7 +1087,7 @@ static void rs_set_expected_tpt_table(struct iwl_lq_sta *lq_sta,
 				      struct iwl_scale_tbl_info *tbl)
 {
 	/* Used to choose among HT tables */
-	const u16 (*ht_tbl_pointer)[IWL_RATE_COUNT];
+	const u16 (*ht_tbl_pointer)[IWL_RATE_INDEX_COUNT];
 
 	/* Check for invalid LQ type */
 	if (WARN_ON_ONCE(!is_legacy(tbl->lq_type) && !is_Ht(tbl->lq_type))) {
@@ -1403,7 +1403,7 @@ static void rs_move_legacy_other(struct iwl_priv *priv,
 				&(lq_sta->lq_info[(1 - lq_sta->active_tbl)]);
 	struct iwl_rate_scale_data *window = &(tbl->win[index]);
 	u32 sz = (sizeof(struct iwl_scale_tbl_info) -
-		  (sizeof(struct iwl_rate_scale_data) * IWL_RATE_COUNT));
+		  (sizeof(struct iwl_rate_scale_data) * IWL_RATE_INDEX_COUNT));
 	u8 start_action;
 	u8 valid_tx_ant = priv->nvm_data->valid_tx_ant;
 	u8 tx_chains_num = priv->hw_params.tx_chains_num;
@@ -1577,7 +1577,7 @@ static void rs_move_siso_to_other(struct iwl_priv *priv,
 	struct iwl_rate_scale_data *window = &(tbl->win[index]);
 	struct ieee80211_sta_ht_cap *ht_cap = &sta->ht_cap;
 	u32 sz = (sizeof(struct iwl_scale_tbl_info) -
-		  (sizeof(struct iwl_rate_scale_data) * IWL_RATE_COUNT));
+		  (sizeof(struct iwl_rate_scale_data) * IWL_RATE_INDEX_COUNT));
 	u8 start_action;
 	u8 valid_tx_ant = priv->nvm_data->valid_tx_ant;
 	u8 tx_chains_num = priv->hw_params.tx_chains_num;
@@ -1747,7 +1747,7 @@ static void rs_move_mimo2_to_other(struct iwl_priv *priv,
 	struct iwl_rate_scale_data *window = &(tbl->win[index]);
 	struct ieee80211_sta_ht_cap *ht_cap = &sta->ht_cap;
 	u32 sz = (sizeof(struct iwl_scale_tbl_info) -
-		  (sizeof(struct iwl_rate_scale_data) * IWL_RATE_COUNT));
+		  (sizeof(struct iwl_rate_scale_data) * IWL_RATE_INDEX_COUNT));
 	u8 start_action;
 	u8 valid_tx_ant = priv->nvm_data->valid_tx_ant;
 	u8 tx_chains_num = priv->hw_params.tx_chains_num;
@@ -1915,7 +1915,7 @@ static void rs_move_mimo3_to_other(struct iwl_priv *priv,
 	struct iwl_rate_scale_data *window = &(tbl->win[index]);
 	struct ieee80211_sta_ht_cap *ht_cap = &sta->ht_cap;
 	u32 sz = (sizeof(struct iwl_scale_tbl_info) -
-		  (sizeof(struct iwl_rate_scale_data) * IWL_RATE_COUNT));
+		  (sizeof(struct iwl_rate_scale_data) * IWL_RATE_INDEX_COUNT));
 	u8 start_action;
 	u8 valid_tx_ant = priv->nvm_data->valid_tx_ant;
 	u8 tx_chains_num = priv->hw_params.tx_chains_num;
@@ -2140,7 +2140,7 @@ static void rs_stay_in_table(struct iwl_lq_sta *lq_sta, bool force_search)
 				lq_sta->table_count = 0;
 
 				IWL_DEBUG_RATE(priv, "LQ: stay in table clear win\n");
-				for (i = 0; i < IWL_RATE_COUNT; i++)
+				for (i = 0; i < IWL_RATE_INDEX_COUNT; i++)
 					rs_rate_scale_clear_window(
 						&(tbl->win[i]));
 			}
@@ -2150,7 +2150,7 @@ static void rs_stay_in_table(struct iwl_lq_sta *lq_sta, bool force_search)
 		 * bitmaps and stats in active table (this will become the new
 		 * "search" table). */
 		if (!lq_sta->stay_in_tbl) {
-			for (i = 0; i < IWL_RATE_COUNT; i++)
+			for (i = 0; i < IWL_RATE_INDEX_COUNT; i++)
 				rs_rate_scale_clear_window(&(tbl->win[i]));
 		}
 	}
@@ -2557,7 +2557,7 @@ lq_update:
 		if (lq_sta->search_better_tbl) {
 			/* Access the "search" table, clear its history. */
 			tbl = &(lq_sta->lq_info[(1 - lq_sta->active_tbl)]);
-			for (i = 0; i < IWL_RATE_COUNT; i++)
+			for (i = 0; i < IWL_RATE_INDEX_COUNT; i++)
 				rs_rate_scale_clear_window(&(tbl->win[i]));
 
 			/* Use new "search" start rate */
@@ -2657,7 +2657,7 @@ static void rs_initialize_lq(struct iwl_priv *priv,
 
 	tbl = &(lq_sta->lq_info[active_tbl]);
 
-	if ((i < 0) || (i >= IWL_RATE_COUNT))
+	if ((i < 0) || (i >= IWL_RATE_INDEX_COUNT))
 		i = 0;
 
 	rate = iwl_rates[i].plcp;
@@ -2701,7 +2701,7 @@ static void rs_get_rate(void *priv_r, struct ieee80211_sta *sta, void *priv_sta,
 		    (lq_sta->max_rate_idx != -1))
 			lq_sta->max_rate_idx += IWL_FIRST_OFDM_RATE;
 		if ((lq_sta->max_rate_idx < 0) ||
-		    (lq_sta->max_rate_idx >= IWL_RATE_COUNT))
+		    (lq_sta->max_rate_idx >= IWL_RATE_INDEX_COUNT))
 			lq_sta->max_rate_idx = -1;
 	}
 
@@ -2734,7 +2734,7 @@ static void rs_get_rate(void *priv_r, struct ieee80211_sta *sta, void *priv_sta,
 			info->control.rates[0].flags |= IEEE80211_TX_RC_GREEN_FIELD;
 	} else {
 		/* Check for invalid rates */
-		if ((rate_idx < 0) || (rate_idx >= IWL_RATE_COUNT_LEGACY) ||
+		if ((rate_idx < 0) || (rate_idx >= IWL_RATE_INDEX_COUNT_LEGACY) ||
 				((sband->band == NL80211_BAND_5GHZ) &&
 				 (rate_idx < IWL_FIRST_OFDM_RATE)))
 			rate_idx = rate_lowest_index(sband, sta);
@@ -2782,7 +2782,7 @@ void iwl_rs_rate_init(struct iwl_priv *priv, struct ieee80211_sta *sta, u8 sta_i
 	lq_sta->lq.sta_id = sta_id;
 
 	for (j = 0; j < LQ_SIZE; j++)
-		for (i = 0; i < IWL_RATE_COUNT; i++)
+		for (i = 0; i < IWL_RATE_INDEX_COUNT; i++)
 			rs_rate_scale_clear_window(&lq_sta->lq_info[j].win[i]);
 
 	lq_sta->flush_timer = 0;
@@ -3198,7 +3198,7 @@ static ssize_t rs_sta_dbgfs_stats_table_read(struct file *file,
 				lq_sta->lq_info[i].is_dup,
 				lq_sta->is_green,
 				lq_sta->lq_info[i].current_rate);
-		for (j = 0; j < IWL_RATE_COUNT; j++) {
+		for (j = 0; j < IWL_RATE_INDEX_COUNT; j++) {
 			desc += sprintf(buff+desc,
 				"counter=%d success=%d %%=%d\n",
 				lq_sta->lq_info[i].win[j].counter,

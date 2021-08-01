@@ -1009,7 +1009,7 @@ static int iwl_mvm_scan_lmac(struct iwl_mvm *mvm, struct ieee80211_vif *vif,
 
 static int rate_to_scan_rate_flag(unsigned int rate)
 {
-	static const int rate_to_scan_rate[IWL_RATE_COUNT] = {
+	static const int rate_to_scan_rate[IWL_RATE_INDEX_COUNT] = {
 		[IWL_RATE_1M_INDEX]	= SCAN_CONFIG_RATE_1M,
 		[IWL_RATE_2M_INDEX]	= SCAN_CONFIG_RATE_2M,
 		[IWL_RATE_5M_INDEX]	= SCAN_CONFIG_RATE_5M,

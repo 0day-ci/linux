@@ -186,7 +186,7 @@ struct iwl_tlc_update_notif {
 
 /*
  * These serve as indexes into
- * struct iwl_rate_info fw_rate_idx_to_plcp[IWL_RATE_COUNT];
+ * struct iwl_rate_info fw_rate_idx_to_plcp[IWL_RATE_INDEX_COUNT];
  * TODO: avoid overlap between legacy and HT rates
  */
 enum {
@@ -224,8 +224,8 @@ enum {
 	IWL_RATE_MCS_10_INDEX,
 	IWL_RATE_MCS_11_INDEX,
 	IWL_LAST_HE_RATE = IWL_RATE_MCS_11_INDEX,
-	IWL_RATE_COUNT_LEGACY = IWL_LAST_NON_HT_RATE + 1,
-	IWL_RATE_COUNT = IWL_LAST_HE_RATE + 1,
+	IWL_RATE_INDEX_COUNT_LEGACY = IWL_LAST_NON_HT_RATE + 1,
+	IWL_RATE_INDEX_COUNT = IWL_LAST_HE_RATE + 1,
 };
 
 #define IWL_RATE_BIT_MSK(r) BIT(IWL_RATE_##r##M_INDEX)

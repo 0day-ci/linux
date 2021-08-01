@@ -284,7 +284,7 @@ static u32 iwl_mvm_get_tx_rate(struct iwl_mvm *mvm,
 	}
 
 	/* if the rate isn't a well known legacy rate, take the lowest one */
-	if (rate_idx < 0 || rate_idx >= IWL_RATE_COUNT_LEGACY)
+	if (rate_idx < 0 || rate_idx >= IWL_RATE_INDEX_COUNT_LEGACY)
 		rate_idx = rate_lowest_index(
 				&mvm->nvm_data->bands[info->band], sta);
 

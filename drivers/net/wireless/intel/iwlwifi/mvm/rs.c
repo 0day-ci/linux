@@ -80,7 +80,7 @@ static const u8 ant_toggle_lookup[] = {
  * maps to IWL_RATE_INVALID
  *
  */
-static const struct iwl_rs_rate_info iwl_rates[IWL_RATE_COUNT] = {
+static const struct iwl_rs_rate_info iwl_rates[IWL_RATE_INDEX_COUNT] = {
 	IWL_DECLARE_RATE_INFO(1, INV, INV, 2),   /*  1mbps */
 	IWL_DECLARE_RATE_INFO(2, INV, 1, 5),     /*  2mbps */
 	IWL_DECLARE_RATE_INFO(5, INV, 2, 11),    /*5.5mbps */
@@ -396,63 +396,63 @@ static void rs_stay_in_table(struct iwl_lq_sta *lq_sta, bool force_search);
  * CCK rates are only valid in legacy table and will only be used in G
  * (2.4 GHz) band.
  */
-static const u16 expected_tpt_legacy[IWL_RATE_COUNT] = {
+static const u16 expected_tpt_legacy[IWL_RATE_INDEX_COUNT] = {
 	7, 13, 35, 58, 40, 57, 72, 98, 121, 154, 177, 186, 0, 0, 0
 };
 
 /* Expected TpT tables. 4 indexes:
  * 0 - NGI, 1 - SGI, 2 - AGG+NGI, 3 - AGG+SGI
  */
-static const u16 expected_tpt_siso_20MHz[4][IWL_RATE_COUNT] = {
+static const u16 expected_tpt_siso_20MHz[4][IWL_RATE_INDEX_COUNT] = {
 	{0, 0, 0, 0, 42, 0,  76, 102, 124, 159, 183, 193, 202, 216, 0},
 	{0, 0, 0, 0, 46, 0,  82, 110, 132, 168, 192, 202, 210, 225, 0},
 	{0, 0, 0, 0, 49, 0,  97, 145, 192, 285, 375, 420, 464, 551, 0},
 	{0, 0, 0, 0, 54, 0, 108, 160, 213, 315, 415, 465, 513, 608, 0},
 };
 
-static const u16 expected_tpt_siso_40MHz[4][IWL_RATE_COUNT] = {
+static const u16 expected_tpt_siso_40MHz[4][IWL_RATE_INDEX_COUNT] = {
 	{0, 0, 0, 0,  77, 0, 127, 160, 184, 220, 242, 250,  257,  269,  275},
 	{0, 0, 0, 0,  83, 0, 135, 169, 193, 229, 250, 257,  264,  275,  280},
 	{0, 0, 0, 0, 101, 0, 199, 295, 389, 570, 744, 828,  911, 1070, 1173},
 	{0, 0, 0, 0, 112, 0, 220, 326, 429, 629, 819, 912, 1000, 1173, 1284},
 };
 
-static const u16 expected_tpt_siso_80MHz[4][IWL_RATE_COUNT] = {
+static const u16 expected_tpt_siso_80MHz[4][IWL_RATE_INDEX_COUNT] = {
 	{0, 0, 0, 0, 130, 0, 191, 223, 244,  273,  288,  294,  298,  305,  308},
 	{0, 0, 0, 0, 138, 0, 200, 231, 251,  279,  293,  298,  302,  308,  312},
 	{0, 0, 0, 0, 217, 0, 429, 634, 834, 1220, 1585, 1760, 1931, 2258, 2466},
 	{0, 0, 0, 0, 241, 0, 475, 701, 921, 1343, 1741, 1931, 2117, 2468, 2691},
 };
 
-static const u16 expected_tpt_siso_160MHz[4][IWL_RATE_COUNT] = {
+static const u16 expected_tpt_siso_160MHz[4][IWL_RATE_INDEX_COUNT] = {
 	{0, 0, 0, 0, 191, 0, 244, 288,  298,  308,  313,  318,  323,  328,  330},
 	{0, 0, 0, 0, 200, 0, 251, 293,  302,  312,  317,  322,  327,  332,  334},
 	{0, 0, 0, 0, 439, 0, 875, 1307, 1736, 2584, 3419, 3831, 4240, 5049, 5581},
 	{0, 0, 0, 0, 488, 0, 972, 1451, 1925, 2864, 3785, 4240, 4691, 5581, 6165},
 };
 
-static const u16 expected_tpt_mimo2_20MHz[4][IWL_RATE_COUNT] = {
+static const u16 expected_tpt_mimo2_20MHz[4][IWL_RATE_INDEX_COUNT] = {
 	{0, 0, 0, 0,  74, 0, 123, 155, 179, 213, 235, 243, 250,  261, 0},
 	{0, 0, 0, 0,  81, 0, 131, 164, 187, 221, 242, 250, 256,  267, 0},
 	{0, 0, 0, 0,  98, 0, 193, 286, 375, 550, 718, 799, 878, 1032, 0},
 	{0, 0, 0, 0, 109, 0, 214, 316, 414, 607, 790, 879, 965, 1132, 0},
 };
 
-static const u16 expected_tpt_mimo2_40MHz[4][IWL_RATE_COUNT] = {
+static const u16 expected_tpt_mimo2_40MHz[4][IWL_RATE_INDEX_COUNT] = {
 	{0, 0, 0, 0, 123, 0, 182, 214, 235,  264,  279,  285,  289,  296,  300},
 	{0, 0, 0, 0, 131, 0, 191, 222, 242,  270,  284,  289,  293,  300,  303},
 	{0, 0, 0, 0, 200, 0, 390, 571, 741, 1067, 1365, 1505, 1640, 1894, 2053},
 	{0, 0, 0, 0, 221, 0, 430, 630, 816, 1169, 1490, 1641, 1784, 2053, 2221},
 };
 
-static const u16 expected_tpt_mimo2_80MHz[4][IWL_RATE_COUNT] = {
+static const u16 expected_tpt_mimo2_80MHz[4][IWL_RATE_INDEX_COUNT] = {
 	{0, 0, 0, 0, 182, 0, 240,  264,  278,  299,  308,  311,  313,  317,  319},
 	{0, 0, 0, 0, 190, 0, 247,  269,  282,  302,  310,  313,  315,  319,  320},
 	{0, 0, 0, 0, 428, 0, 833, 1215, 1577, 2254, 2863, 3147, 3418, 3913, 4219},
 	{0, 0, 0, 0, 474, 0, 920, 1338, 1732, 2464, 3116, 3418, 3705, 4225, 4545},
 };
 
-static const u16 expected_tpt_mimo2_160MHz[4][IWL_RATE_COUNT] = {
+static const u16 expected_tpt_mimo2_160MHz[4][IWL_RATE_INDEX_COUNT] = {
 	{0, 0, 0, 0, 240, 0, 278,  308,  313,  319,  322,  324,  328,  330,   334},
 	{0, 0, 0, 0, 247, 0, 282,  310,  315,  320,  323,  325,  329,  332,   338},
 	{0, 0, 0, 0, 875, 0, 1735, 2582, 3414, 5043, 6619, 7389, 8147, 9629,  10592},
@@ -460,7 +460,7 @@ static const u16 expected_tpt_mimo2_160MHz[4][IWL_RATE_COUNT] = {
 };
 
 /* mbps, mcs */
-static const struct iwl_rate_mcs_info iwl_rate_mcs[IWL_RATE_COUNT] = {
+static const struct iwl_rate_mcs_info iwl_rate_mcs[IWL_RATE_INDEX_COUNT] = {
 	{  "1", "BPSK DSSS"},
 	{  "2", "QPSK DSSS"},
 	{"5.5", "BPSK CCK"},
@@ -586,7 +586,7 @@ static void rs_rate_scale_clear_tbl_windows(struct iwl_mvm *mvm,
 	int i;
 
 	IWL_DEBUG_RATE(mvm, "Clearing up window stats\n");
-	for (i = 0; i < IWL_RATE_COUNT; i++)
+	for (i = 0; i < IWL_RATE_INDEX_COUNT; i++)
 		rs_rate_scale_clear_window(&tbl->win[i]);
 
 	for (i = 0; i < ARRAY_SIZE(tbl->tpc_win); i++)
@@ -794,7 +794,7 @@ static int rs_collect_tlc_data(struct iwl_mvm *mvm,
 {
 	struct iwl_rate_scale_data *window = NULL;
 
-	if (scale_index < 0 || scale_index >= IWL_RATE_COUNT)
+	if (scale_index < 0 || scale_index >= IWL_RATE_INDEX_COUNT)
 		return -EINVAL;
 
 	if (tbl->column != RS_COLUMN_INVALID) {
@@ -1040,7 +1040,7 @@ static u16 rs_get_adjacent_rate(struct iwl_mvm *mvm, u8 index, u16 rate_mask,
 
 		/* Find the next rate that is in the rate mask */
 		i = index + 1;
-		for (mask = (1 << i); i < IWL_RATE_COUNT; i++, mask <<= 1) {
+		for (mask = (1 << i); i < IWL_RATE_INDEX_COUNT; i++, mask <<= 1) {
 			if (rate_mask & mask) {
 				high = i;
 				break;
@@ -1284,7 +1284,7 @@ static const u16 *rs_get_expected_tpt_table(struct iwl_lq_sta *lq_sta,
 					    u32 bw)
 {
 	/* Used to choose among HT tables */
-	const u16 (*ht_tbl_pointer)[IWL_RATE_COUNT];
+	const u16 (*ht_tbl_pointer)[IWL_RATE_INDEX_COUNT];
 
 	if (WARN_ON_ONCE(column->mode != RS_LEGACY &&
 			 column->mode != RS_SISO &&
@@ -3936,7 +3936,7 @@ static ssize_t rs_sta_dbgfs_stats_table_read(struct file *file,
 				is_ht80(rate) ? "80MHz" :
 				is_ht160(rate) ? "160MHz" : "ERR",
 				rate->index);
-		for (j = 0; j < IWL_RATE_COUNT; j++) {
+		for (j = 0; j < IWL_RATE_INDEX_COUNT; j++) {
 			desc += sprintf(buff+desc,
 				"counter=%d success=%d %%=%d\n",
 				tbl->win[j].counter,
@@ -4005,7 +4005,7 @@ static ssize_t rs_sta_dbgfs_drv_tx_stats_read(struct file *file,
 	endpos = pos + bufsz;
 
 	pos += scnprintf(pos, endpos - pos, "COLUMN,");
-	for (rate = 0; rate < IWL_RATE_COUNT; rate++)
+	for (rate = 0; rate < IWL_RATE_INDEX_COUNT; rate++)
 		pos += scnprintf(pos, endpos - pos, "%s,", rate_name[rate]);
 	pos += scnprintf(pos, endpos - pos, "\n");
 
@@ -4013,7 +4013,7 @@ static ssize_t rs_sta_dbgfs_drv_tx_stats_read(struct file *file,
 		pos += scnprintf(pos, endpos - pos,
 				 "%s,", column_name[col]);
 
-		for (rate = 0; rate < IWL_RATE_COUNT; rate++) {
+		for (rate = 0; rate < IWL_RATE_INDEX_COUNT; rate++) {
 			stats = &(lq_sta->pers.tx_stats[col][rate]);
 			pos += scnprintf(pos, endpos - pos,
 					 "%llu/%llu,",

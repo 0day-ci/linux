@@ -156,7 +156,7 @@ static void iwlagn_tx_cmd_build_rate(struct iwl_priv *priv,
 	 */
 	rate_idx = info->control.rates[0].idx;
 	if (info->control.rates[0].flags & IEEE80211_TX_RC_MCS ||
-			(rate_idx < 0) || (rate_idx > IWL_RATE_COUNT_LEGACY))
+			(rate_idx < 0) || (rate_idx > IWL_RATE_INDEX_COUNT_LEGACY))
 		rate_idx = rate_lowest_index(
 				&priv->nvm_data->bands[info->band], sta);
 	/* For 5 GHZ band, remap mac80211 rate indices into driver indices */

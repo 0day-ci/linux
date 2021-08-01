@@ -141,7 +141,7 @@ int iwl_mvm_send_cmd_pdu_status(struct iwl_mvm *mvm, u32 id, u16 len,
 /*
  * Translate from fw_rate_index (IWL_RATE_XXM_INDEX) to PLCP
  */
-static const u8 fw_rate_idx_to_plcp[IWL_RATE_COUNT] = {
+static const u8 fw_rate_idx_to_plcp[IWL_RATE_INDEX_COUNT] = {
 	IWL_DECLARE_RATE_INFO(1),
 	IWL_DECLARE_RATE_INFO(2),
 	IWL_DECLARE_RATE_INFO(5),
@@ -166,7 +166,7 @@ int iwl_mvm_legacy_rate_to_mac80211_idx(u32 rate_n_flags,
 	/* Legacy rate format, search for match in table */
 	if (band != NL80211_BAND_2GHZ)
 		band_offset = IWL_FIRST_OFDM_RATE;
-	for (idx = band_offset; idx < IWL_RATE_COUNT_LEGACY; idx++)
+	for (idx = band_offset; idx < IWL_RATE_INDEX_COUNT_LEGACY; idx++)
 		if (fw_rate_idx_to_plcp[idx] == rate)
 			return idx - band_offset;
 

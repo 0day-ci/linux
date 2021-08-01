@@ -34,7 +34,7 @@ struct iwl_rate_info {
 
 /*
  * These serve as indexes into
- * struct iwl_rate_info iwl_rates[IWL_RATE_COUNT];
+ * struct iwl_rate_info iwl_rates[IWL_RATE_INDEX_COUNT];
  */
 enum {
 	IWL_RATE_1M_INDEX = 0,
@@ -50,10 +50,10 @@ enum {
 	IWL_RATE_48M_INDEX,
 	IWL_RATE_54M_INDEX,
 	IWL_RATE_60M_INDEX,
-	IWL_RATE_COUNT, /*FIXME:RS:change to IWL_RATE_INDEX_COUNT,*/
-	IWL_RATE_COUNT_LEGACY = IWL_RATE_COUNT - 1,	/* Excluding 60M */
-	IWL_RATE_INVM_INDEX = IWL_RATE_COUNT,
-	IWL_RATE_INVALID = IWL_RATE_COUNT,
+	IWL_RATE_INDEX_COUNT,
+	IWL_RATE_INDEX_COUNT_LEGACY = IWL_RATE_INDEX_COUNT - 1,	/* Excluding 60M */
+	IWL_RATE_INVM_INDEX = IWL_RATE_INDEX_COUNT,
+	IWL_RATE_INVALID = IWL_RATE_INDEX_COUNT,
 };
 
 enum {
@@ -161,7 +161,7 @@ enum {
 	IWL_RATE_11M_IEEE = 22,
 };
 
-#define IWL_RATES_MASK ((1 << IWL_RATE_COUNT) - 1)
+#define IWL_RATES_MASK ((1 << IWL_RATE_INDEX_COUNT) - 1)
 
 #define IWL_INVALID_VALUE    -1
 
@@ -246,7 +246,7 @@ enum {
 #define TID_MAX_TIME_DIFF ((TID_QUEUE_MAX_SIZE - 1) * TID_QUEUE_CELL_SPACING)
 #define TIME_WRAP_AROUND(x, y) (((y) > (x)) ? (y) - (x) : (0-(x)) + (y))
 
-extern const struct iwl_rate_info iwl_rates[IWL_RATE_COUNT];
+extern const struct iwl_rate_info iwl_rates[IWL_RATE_INDEX_COUNT];
 
 enum iwl_table_type {
 	LQ_NONE,
@@ -302,7 +302,7 @@ struct iwl_scale_tbl_info {
 	u8 max_search;	/* maximun number of tables we can search */
 	const u16 *expected_tpt;	/* throughput metrics; expected_tpt_G, etc. */
 	u32 current_rate;  /* rate_n_flags, uCode API format */
-	struct iwl_rate_scale_data win[IWL_RATE_COUNT]; /* rate histories */
+	struct iwl_rate_scale_data win[IWL_RATE_INDEX_COUNT]; /* rate histories */
 };
 
 struct iwl_traffic_load {
