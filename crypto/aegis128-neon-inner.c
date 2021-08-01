@@ -15,7 +15,7 @@
 
 #define AEGIS_BLOCK_SIZE	16
 
-#include <stddef.h>
+#include <linux/types.h>
 
 extern int aegis128_have_aes_insn;
 
