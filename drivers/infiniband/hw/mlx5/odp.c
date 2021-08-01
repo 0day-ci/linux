@@ -1791,7 +1791,7 @@ static int mlx5_ib_prefetch_sg_list(struct ib_pd *pd,
 
 		mr = get_prefetchable_mr(pd, advice, sg_list[i].lkey);
 		if (!mr)
-			return -ENOENT;
+			return -EFAULT;
 		ret = pagefault_mr(mr, sg_list[i].addr, sg_list[i].length,
 				   &bytes_mapped, pf_flags);
 		if (ret < 0) {
