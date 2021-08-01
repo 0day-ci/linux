@@ -593,18 +593,18 @@ struct asic_fixed_properties {
  * @completion: fence is implemented using completion
  * @refcount: refcount for this fence
  * @cs_sequence: sequence of the corresponding command submission
+ * @stream_master_qid_map: streams masters QID bitmap to represent all streams
+ *                         masters QIDs that multi cs is waiting on
  * @error: mark this fence with error
  * @timestamp: timestamp upon completion
- * @stream_map: streams bitmap to represent all streams that multi cs is
- *              waiting on
  */
 struct hl_fence {
 	struct completion	completion;
 	struct kref		refcount;
 	u64			cs_sequence;
+	u32			stream_master_qid_map;
 	int			error;
 	ktime_t			timestamp;
-	u8			stream_map;
 };
 
 /**
@@ -1161,6 +1161,7 @@ struct fw_load_mgr {
  * @state_dump_init: initialize constants required for state dump
  * @get_sob_addr: get SOB base address offset.
  * @set_pci_memory_regions: setting properties of PCI memory regions
+ * @get_stream_master_qid_arr: get pointer to stream masters QID array
  */
 struct hl_asic_funcs {
 	int (*early_init)(struct hl_device *hdev);
@@ -1290,6 +1291,7 @@ struct hl_asic_funcs {
 	void (*state_dump_init)(struct hl_device *hdev);
 	u32 (*get_sob_addr)(struct hl_device *hdev, u32 sob_id);
 	void (*set_pci_memory_regions)(struct hl_device *hdev);
+	u32* (*get_stream_master_qid_arr)(void);
 };
 
 
@@ -2283,16 +2285,16 @@ struct hl_mmu_funcs {
  * @completion: completion of any of the CS in the list
  * @lock: spinlock for the completion structure
  * @timestamp: timestamp for the multi-CS completion
+ * @stream_master_qid_map: bitmap of all stream masters on which the multi-CS
+ *                        is waiting
  * @used: 1 if in use, otherwise 0
- * @stream_map: bitmap of all HW/external queues streams on which the multi-CS
- *              is waiting
  */
 struct multi_cs_completion {
 	struct completion	completion;
 	spinlock_t		lock;
 	s64			timestamp;
+	u32			stream_master_qid_map;
 	u8			used;
-	u8			stream_map;
 };
 
 /**
@@ -2304,9 +2306,9 @@ struct multi_cs_completion {
  * @timestamp: timestamp of first completed CS
  * @wait_status: wait for CS status
  * @completion_bitmap: bitmap of completed CSs (1- completed, otherwise 0)
+ * @stream_master_qid_map: bitmap of all stream master QIDs on which the
+ *                         multi-CS is waiting
  * @arr_len: fence_arr and seq_arr array length
- * @stream_map: bitmap of all HW/external queues streams on which the multi-CS
- *              is waiting
  * @gone_cs: indication of gone CS (1- there was gone CS, otherwise 0)
  * @update_ts: update timestamp. 1- update the timestamp, otherwise 0.
  */
@@ -2318,8 +2320,8 @@ struct multi_cs_data {
 	s64		timestamp;
 	long		wait_status;
 	u32		completion_bitmap;
+	u32		stream_master_qid_map;
 	u8		arr_len;
-	u8		stream_map;
 	u8		gone_cs;
 	u8		update_ts;
 };
@@ -2541,6 +2543,7 @@ struct hl_device {
 
 	struct multi_cs_completion	multi_cs_completion[
 							MULTI_CS_MAX_USER_CTX];
+	u32				*stream_master_qid_arr;
 	atomic64_t			dram_used_mem;
 	u64				timeout_jiffies;
 	u64				max_power;
@@ -2592,6 +2595,7 @@ struct hl_device {
 	u8				skip_reset_on_timeout;
 	u8				device_cpu_is_halted;
 	u8				supports_wait_for_multi_cs;
+	u8				stream_master_qid_arr_size;
 
 	/* Parameters for bring-up */
 	u64				nic_ports_mask;
