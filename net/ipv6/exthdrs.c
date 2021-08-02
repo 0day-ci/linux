@@ -55,19 +55,6 @@
 
 #include <linux/uaccess.h>
 
-/*
- *	Parsing tlv encoded headers.
- *
- *	Parsing function "func" returns true, if parsing succeed
- *	and false, if it failed.
- *	It MUST NOT touch skb->h.
- */
-
-struct tlvtype_proc {
-	int	type;
-	bool	(*func)(struct sk_buff *skb, int offset);
-};
-
 /*********************
   Generic functions
  *********************/
@@ -114,14 +101,14 @@ drop:
 
 /* Parse tlv encoded option header (hop-by-hop or destination) */
 
-static bool ip6_parse_tlv(const struct tlvtype_proc *procs,
+static bool ip6_parse_tlv(bool (**procs)(struct sk_buff *skb, int offset),
 			  struct sk_buff *skb,
 			  int max_count)
 {
 	int len = (skb_transport_header(skb)[1] + 1) << 3;
 	const unsigned char *nh = skb_network_header(skb);
+	bool (*func)(struct sk_buff *skb, int offset);
 	int off = skb_network_header_len(skb);
-	const struct tlvtype_proc *curr;
 	bool disallow_unknowns = false;
 	int tlv_count = 0;
 	int padlen = 0;
@@ -176,19 +163,17 @@ static bool ip6_parse_tlv(const struct tlvtype_proc *procs,
 			if (tlv_count > max_count)
 				goto bad;
 
-			for (curr = procs; curr->type >= 0; curr++) {
-				if (curr->type == nh[off]) {
-					/* type specific length/alignment
-					   checks will be performed in the
-					   func(). */
-					if (curr->func(skb, off) == false)
-						return false;
-					break;
-				}
-			}
-			if (curr->type < 0 &&
-			    !ip6_tlvopt_unknown(skb, off, disallow_unknowns))
+			func = procs[nh[off]];
+			if (func) {
+				/* type specific length/alignment checks
+				 * will be performed in the func().
+				 */
+				if (func(skb, off) == false)
+					return false;
+			} else if (!ip6_tlvopt_unknown(skb, off,
+							disallow_unknowns)) {
 				return false;
+			}
 
 			padlen = 0;
 		}
@@ -267,14 +252,16 @@ static bool ipv6_dest_hao(struct sk_buff *skb, int optoff)
 }
 #endif
 
-static const struct tlvtype_proc tlvprocdestopt_lst[] = {
+/*	Parsing tlv encoded headers for Destination Options.
+ *
+ *	Parsing functions below return true, if parsing succeed
+ *	and false, if it failed.
+ *	They MUST NOT touch skb->h.
+ */
+static bool (*tlvprocdestopt[256])(struct sk_buff *skb, int offset) = {
 #if IS_ENABLED(CONFIG_IPV6_MIP6)
-	{
-		.type	= IPV6_TLV_HAO,
-		.func	= ipv6_dest_hao,
-	},
+	[IPV6_TLV_HAO]	= ipv6_dest_hao,
 #endif
-	{-1,			NULL}
 };
 
 static int ipv6_destopt_rcv(struct sk_buff *skb)
@@ -307,7 +294,7 @@ fail_and_free:
 	dstbuf = opt->dst1;
 #endif
 
-	if (ip6_parse_tlv(tlvprocdestopt_lst, skb,
+	if (ip6_parse_tlv(tlvprocdestopt, skb,
 			  net->ipv6.sysctl.max_dst_opts_cnt)) {
 		skb->transport_header += extlen;
 		opt = IP6CB(skb);
@@ -1051,24 +1038,17 @@ drop:
 	return false;
 }
 
-static const struct tlvtype_proc tlvprochopopt_lst[] = {
-	{
-		.type	= IPV6_TLV_ROUTERALERT,
-		.func	= ipv6_hop_ra,
-	},
-	{
-		.type	= IPV6_TLV_IOAM,
-		.func	= ipv6_hop_ioam,
-	},
-	{
-		.type	= IPV6_TLV_JUMBO,
-		.func	= ipv6_hop_jumbo,
-	},
-	{
-		.type	= IPV6_TLV_CALIPSO,
-		.func	= ipv6_hop_calipso,
-	},
-	{ -1, }
+/*	Parsing tlv encoded headers for HopbyHop Options.
+ *
+ *	Parsing functions below return true, if parsing succeed
+ *	and false, if it failed.
+ *	They MUST NOT touch skb->h.
+ */
+static bool (*tlvprochopopt[256])(struct sk_buff *skb, int offset) = {
+	[IPV6_TLV_ROUTERALERT]	= ipv6_hop_ra,
+	[IPV6_TLV_CALIPSO]	= ipv6_hop_calipso,
+	[IPV6_TLV_IOAM]	= ipv6_hop_ioam,
+	[IPV6_TLV_JUMBO]	= ipv6_hop_jumbo,
 };
 
 int ipv6_parse_hopopts(struct sk_buff *skb)
@@ -1096,7 +1076,7 @@ fail_and_free:
 		goto fail_and_free;
 
 	opt->flags |= IP6SKB_HOPBYHOP;
-	if (ip6_parse_tlv(tlvprochopopt_lst, skb,
+	if (ip6_parse_tlv(tlvprochopopt, skb,
 			  net->ipv6.sysctl.max_hbh_opts_cnt)) {
 		skb->transport_header += extlen;
 		opt = IP6CB(skb);
