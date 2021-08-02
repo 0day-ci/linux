@@ -42,6 +42,11 @@ config SUN50I_H6_R_CCU
 	default ARM64 && ARCH_SUNXI
 	depends on (ARM64 && ARCH_SUNXI) || COMPILE_TEST
 
+config SUN50I_R329_CCU
+	bool "Support for the Allwinner R329 CCU"
+	default ARM64 && ARCH_SUNXI
+	depends on (ARM64 && ARCH_SUNXI) || COMPILE_TEST
+
 config SUN50I_R329_R_CCU
 	bool "Support for the Allwinner R329 PRCM CCU"
 	default ARM64 && ARCH_SUNXI
