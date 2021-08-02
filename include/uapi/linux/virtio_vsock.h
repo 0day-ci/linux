@@ -42,7 +42,8 @@
 #define VIRTIO_VSOCK_F_SEQPACKET	1	/* SOCK_SEQPACKET supported */
 
 struct virtio_vsock_config {
-	__le64 guest_cid;
+	__le32 number_cid;
+	__le64 cids[];
 } __attribute__((packed));
 
 enum virtio_vsock_event_id {

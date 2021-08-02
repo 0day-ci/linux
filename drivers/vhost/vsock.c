@@ -43,12 +43,25 @@ enum {
 static DEFINE_MUTEX(vhost_vsock_mutex);
 static DEFINE_READ_MOSTLY_HASHTABLE(vhost_vsock_hash, 8);
 
+struct vhost_vsock_ref {
+	struct vhost_vsock *vsock;
+	struct hlist_node ref_hash;
+	u32 cid;
+};
+
+static bool vhost_transport_contain_cid(u32 cid)
+{
+	if (cid == VHOST_VSOCK_DEFAULT_HOST_CID)
+		return true;
+	return false;
+}
+
 struct vhost_vsock {
 	struct vhost_dev dev;
 	struct vhost_virtqueue vqs[2];
 
 	/* Link to global vhost_vsock_hash, writes use vhost_vsock_mutex */
-	struct hlist_node hash;
+	struct vhost_vsock_ref *ref_list;
 
 	struct vhost_work send_pkt_work;
 	spinlock_t send_pkt_list_lock;
@@ -56,7 +69,8 @@ struct vhost_vsock {
 
 	atomic_t queued_replies;
 
-	u32 guest_cid;
+	u32 *cids;
+	u32 num_cid;
 	bool seqpacket_allow;
 };
 
@@ -70,21 +84,47 @@ static u32 vhost_transport_get_local_cid(void)
  */
 static struct vhost_vsock *vhost_vsock_get(u32 guest_cid)
 {
-	struct vhost_vsock *vsock;
+	struct vhost_vsock_ref *ref;
 
-	hash_for_each_possible_rcu(vhost_vsock_hash, vsock, hash, guest_cid) {
-		u32 other_cid = vsock->guest_cid;
+	hash_for_each_possible_rcu(vhost_vsock_hash, ref, ref_hash, guest_cid) {
+		u32 other_cid = ref->cid;
 
 		/* Skip instances that have no CID yet */
 		if (other_cid == 0)
 			continue;
 
 		if (other_cid == guest_cid)
-			return vsock;
+			return ref->vsock;
 
 	}
 
 	return NULL;
+}
+
+static int check_if_cid_valid(u64 guest_cid, struct vhost_vsock *vsock)
+{
+	struct vhost_vsock *other;
+
+	if (guest_cid <= VMADDR_CID_HOST || guest_cid == U32_MAX)
+		return -EINVAL;
+
+	/* 64-bit CIDs are not yet supported */
+	if (guest_cid > U32_MAX)
+		return -EINVAL;
+	/* Refuse if CID is assigned to the guest->host transport (i.e. nested
+	 * VM), to make the loopback work.
+	 */
+	if (vsock_find_cid(guest_cid))
+		return -EADDRINUSE;
+	/* Refuse if CID is already in use */
+	mutex_lock(&vhost_vsock_mutex);
+	other = vhost_vsock_get(guest_cid);
+	if (other) {
+		mutex_unlock(&vhost_vsock_mutex);
+		return -EADDRINUSE;
+	}
+	mutex_unlock(&vhost_vsock_mutex);
+	return 0;
 }
 
 static void
@@ -427,6 +467,7 @@ static struct virtio_transport vhost_transport = {
 		.module                   = THIS_MODULE,
 
 		.get_local_cid            = vhost_transport_get_local_cid,
+		.contain_cid              = vhost_transport_contain_cid,
 
 		.init                     = virtio_transport_do_socket_init,
 		.destruct                 = virtio_transport_destruct,
@@ -542,9 +583,9 @@ static void vhost_vsock_handle_tx_kick(struct vhost_work *work)
 		virtio_transport_deliver_tap_pkt(pkt);
 
 		/* Only accept correctly addressed packets */
-		if (le64_to_cpu(pkt->hdr.src_cid) == vsock->guest_cid &&
-		    le64_to_cpu(pkt->hdr.dst_cid) ==
-		    vhost_transport_get_local_cid())
+		if (vsock->num_cid > 0 &&
+		    (pkt->hdr.src_cid) == vsock->cids[0] &&
+		    le64_to_cpu(pkt->hdr.dst_cid) == vhost_transport_get_local_cid())
 			virtio_transport_recv_pkt(&vhost_transport, pkt);
 		else
 			virtio_transport_free_pkt(pkt);
@@ -655,6 +696,10 @@ err:
 
 static void vhost_vsock_free(struct vhost_vsock *vsock)
 {
+	if (vsock->ref_list)
+		kvfree(vsock->ref_list);
+	if (vsock->cids)
+		kvfree(vsock->cids);
 	kvfree(vsock);
 }
 
@@ -677,7 +722,9 @@ static int vhost_vsock_dev_open(struct inode *inode, struct file *file)
 		goto out;
 	}
 
-	vsock->guest_cid = 0; /* no CID assigned yet */
+	vsock->ref_list = NULL;
+	vsock->cids = NULL;
+	vsock->num_cid = 0;
 
 	atomic_set(&vsock->queued_replies, 0);
 
@@ -739,11 +786,14 @@ static void vhost_vsock_reset_orphans(struct sock *sk)
 
 static int vhost_vsock_dev_release(struct inode *inode, struct file *file)
 {
+	int index;
 	struct vhost_vsock *vsock = file->private_data;
 
 	mutex_lock(&vhost_vsock_mutex);
-	if (vsock->guest_cid)
-		hash_del_rcu(&vsock->hash);
+	if (vsock->num_cid) {
+		for (index = 0; index < vsock->num_cid; index++)
+			hash_del_rcu(&vsock->ref_list[index].ref_hash);
+	}
 	mutex_unlock(&vhost_vsock_mutex);
 
 	/* Wait for other CPUs to finish using vsock */
@@ -774,41 +824,80 @@ static int vhost_vsock_dev_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static int vhost_vsock_set_cid(struct vhost_vsock *vsock, u64 guest_cid)
+static int vhost_vsock_set_cid(struct vhost_vsock *vsock, u64 __user *cids, u32 number_cid)
 {
-	struct vhost_vsock *other;
+	u64 cid;
+	int i, ret;
 
-	/* Refuse reserved CIDs */
-	if (guest_cid <= VMADDR_CID_HOST ||
-	    guest_cid == U32_MAX)
+	if (number_cid <= 0)
 		return -EINVAL;
-
-	/* 64-bit CIDs are not yet supported */
-	if (guest_cid > U32_MAX)
-		return -EINVAL;
-
-	/* Refuse if CID is assigned to the guest->host transport (i.e. nested
-	 * VM), to make the loopback work.
-	 */
-	if (vsock_find_cid(guest_cid))
-		return -EADDRINUSE;
-
-	/* Refuse if CID is already in use */
-	mutex_lock(&vhost_vsock_mutex);
-	other = vhost_vsock_get(guest_cid);
-	if (other && other != vsock) {
+	/* delete the old CIDs. */
+	if (vsock->num_cid) {
+		mutex_lock(&vhost_vsock_mutex);
+		for (i = 0; i < vsock->num_cid; i++)
+			hash_del_rcu(&vsock->ref_list[i].ref_hash);
 		mutex_unlock(&vhost_vsock_mutex);
-		return -EADDRINUSE;
+		kvfree(vsock->ref_list);
+		vsock->ref_list = NULL;
+		kvfree(vsock->cids);
+		vsock->cids = NULL;
+	}
+	vsock->num_cid = number_cid;
+	vsock->cids = kmalloc_array(vsock->num_cid, sizeof(u32),
+				    GFP_KERNEL | __GFP_RETRY_MAYFAIL);
+	if (!vsock->cids) {
+		vsock->num_cid = 0;
+		ret = -ENOMEM;
+		goto out;
+	}
+	vsock->ref_list = kvmalloc_array(vsock->num_cid, sizeof(*vsock->ref_list),
+			       GFP_KERNEL | __GFP_RETRY_MAYFAIL);
+	if (!vsock->ref_list) {
+		vsock->num_cid = 0;
+		ret = -ENOMEM;
+		goto out;
 	}
 
-	if (vsock->guest_cid)
-		hash_del_rcu(&vsock->hash);
+	for (i = 0; i < number_cid; i++) {
+		if (copy_from_user(&cid, cids + i, sizeof(cid))) {
+			/* record where we failed, to clean up the ref in hash table. */
+			vsock->num_cid = i;
+			ret = -EFAULT;
+			goto out;
+		}
+		ret = check_if_cid_valid(cid, vsock);
+		if (ret) {
+			vsock->num_cid = i;
+			goto out;
+		}
 
-	vsock->guest_cid = guest_cid;
-	hash_add_rcu(vhost_vsock_hash, &vsock->hash, vsock->guest_cid);
-	mutex_unlock(&vhost_vsock_mutex);
-
+		vsock->cids[i] = (u32)cid;
+		vsock->ref_list[i].cid = vsock->cids[i];
+		vsock->ref_list[i].vsock = vsock;
+		mutex_lock(&vhost_vsock_mutex);
+		hash_add_rcu(vhost_vsock_hash, &vsock->ref_list[i].ref_hash,
+			     vsock->cids[i]);
+		mutex_unlock(&vhost_vsock_mutex);
+	}
 	return 0;
+
+out:
+	/* Handle the memory release here. */
+	if (vsock->num_cid) {
+		mutex_lock(&vhost_vsock_mutex);
+		for (i = 0; i < vsock->num_cid; i++)
+			hash_del_rcu(&vsock->ref_list[i].ref_hash);
+		mutex_unlock(&vhost_vsock_mutex);
+		vsock->num_cid = 0;
+	}
+	if (vsock->ref_list)
+		kvfree(vsock->ref_list);
+	if (vsock->cids)
+		kvfree(vsock->cids);
+	/* Set it to null to prevent double release. */
+	vsock->ref_list = NULL;
+	vsock->cids = NULL;
+	return ret;
 }
 
 static int vhost_vsock_set_features(struct vhost_vsock *vsock, u64 features)
@@ -852,16 +941,16 @@ static long vhost_vsock_dev_ioctl(struct file *f, unsigned int ioctl,
 {
 	struct vhost_vsock *vsock = f->private_data;
 	void __user *argp = (void __user *)arg;
-	u64 guest_cid;
 	u64 features;
 	int start;
 	int r;
+	struct multi_cid_message cid_message;
 
 	switch (ioctl) {
 	case VHOST_VSOCK_SET_GUEST_CID:
-		if (copy_from_user(&guest_cid, argp, sizeof(guest_cid)))
+		if (copy_from_user(&cid_message, argp, sizeof(cid_message)))
 			return -EFAULT;
-		return vhost_vsock_set_cid(vsock, guest_cid);
+		return vhost_vsock_set_cid(vsock, cid_message.cid, cid_message.number_cid);
 	case VHOST_VSOCK_SET_RUNNING:
 		if (copy_from_user(&start, argp, sizeof(start)))
 			return -EFAULT;

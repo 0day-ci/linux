@@ -507,13 +507,13 @@ EXPORT_SYMBOL_GPL(vsock_assign_transport);
 
 bool vsock_find_cid(unsigned int cid)
 {
-	if (transport_g2h && cid == transport_g2h->get_local_cid())
+	if (transport_g2h && transport_g2h->contain_cid(cid))
 		return true;
 
-	if (transport_h2g && cid == VMADDR_CID_HOST)
+	if (transport_h2g && transport_h2g->contain_cid(cid))
 		return true;
 
-	if (transport_local && cid == VMADDR_CID_LOCAL)
+	if (transport_local && transport_local->contain_cid(cid))
 		return true;
 
 	return false;

@@ -25,6 +25,11 @@ struct vhost_work {
 	unsigned long		flags;
 };
 
+struct multi_cid_message {
+	u32 number_cid;
+	u64 *cid;
+};
+
 /* Poll a file (eventfd or socket) */
 /* Note: there's nothing vhost specific about this structure. */
 struct vhost_poll {

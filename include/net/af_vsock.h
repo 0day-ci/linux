@@ -170,6 +170,7 @@ struct vsock_transport {
 
 	/* Addressing. */
 	u32 (*get_local_cid)(void);
+	bool (*contain_cid)(u32 cid);
 };
 
 /**** CORE ****/

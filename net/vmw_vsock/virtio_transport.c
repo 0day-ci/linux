@@ -61,9 +61,40 @@ struct virtio_vsock {
 	bool event_run;
 	struct virtio_vsock_event event_list[8];
 
-	u32 guest_cid;
+	/* The following fields are used to hold additional cids given by the hypervisor
+	 * such as qemu.
+	 */
+	u32 number_cid;
+	u32 *cids;
+
 	bool seqpacket_allow;
 };
+
+static bool virtio_transport_contain_cid(u32 cid)
+{
+	struct virtio_vsock *vsock;
+	bool ret;
+	u32 num_cid;
+
+	num_cid = 0;
+	rcu_read_lock();
+	vsock = rcu_dereference(the_virtio_vsock);
+	if (!vsock || !vsock->number_cid) {
+		ret = false;
+		goto out_rcu;
+	}
+
+	for (num_cid = 0; num_cid < vsock->number_cid; num_cid++) {
+		if (vsock->cids[num_cid] == cid) {
+			ret = true;
+			goto out_rcu;
+		}
+	}
+	ret = false;
+out_rcu:
+	rcu_read_unlock();
+	return ret;
+}
 
 static u32 virtio_transport_get_local_cid(void)
 {
@@ -72,12 +103,12 @@ static u32 virtio_transport_get_local_cid(void)
 
 	rcu_read_lock();
 	vsock = rcu_dereference(the_virtio_vsock);
-	if (!vsock) {
+	if (!vsock || !vsock->number_cid) {
 		ret = VMADDR_CID_ANY;
 		goto out_rcu;
 	}
 
-	ret = vsock->guest_cid;
+	ret = vsock->cids[0];
 out_rcu:
 	rcu_read_unlock();
 	return ret;
@@ -176,7 +207,7 @@ virtio_transport_send_pkt(struct virtio_vsock_pkt *pkt)
 		goto out_rcu;
 	}
 
-	if (le64_to_cpu(pkt->hdr.dst_cid) == vsock->guest_cid) {
+	if (le64_to_cpu(pkt->hdr.dst_cid) == vsock->cids[0]) {
 		virtio_transport_free_pkt(pkt);
 		len = -ENODEV;
 		goto out_rcu;
@@ -368,10 +399,33 @@ static void virtio_vsock_update_guest_cid(struct virtio_vsock *vsock)
 {
 	struct virtio_device *vdev = vsock->vdev;
 	__le64 guest_cid;
+	__le32 number_cid;
+	u32 index;
 
-	vdev->config->get(vdev, offsetof(struct virtio_vsock_config, guest_cid),
-			  &guest_cid, sizeof(guest_cid));
-	vsock->guest_cid = le64_to_cpu(guest_cid);
+	vdev->config->get(vdev, offsetof(struct virtio_vsock_config, number_cid),
+			  &number_cid, sizeof(number_cid));
+	vsock->number_cid = le32_to_cpu(number_cid);
+
+	/* number_cid must be greater than 0 in the config space
+	 * to use this feature.
+	 */
+	if (vsock->number_cid > 0) {
+		vsock->cids = kmalloc_array(vsock->number_cid, sizeof(u32), GFP_KERNEL);
+		if (!vsock->cids) {
+			/* Space allocated failed, reset number_cid to 0.
+			 * only use the original guest_cid.
+			 */
+			vsock->number_cid = 0;
+		}
+	}
+
+	for (index = 0; index < vsock->number_cid; index++) {
+		vdev->config->get(vdev,
+				  offsetof(struct virtio_vsock_config, cids)
+				  + index * sizeof(uint64_t),
+				  &guest_cid, sizeof(guest_cid));
+		vsock->cids[index] = le64_to_cpu(guest_cid);
+	}
 }
 
 /* event_lock must be held */
@@ -451,6 +505,7 @@ static struct virtio_transport virtio_transport = {
 		.module                   = THIS_MODULE,
 
 		.get_local_cid            = virtio_transport_get_local_cid,
+		.contain_cid              = virtio_transport_contain_cid,
 
 		.init                     = virtio_transport_do_socket_init,
 		.destruct                 = virtio_transport_destruct,
@@ -594,6 +649,8 @@ static int virtio_vsock_probe(struct virtio_device *vdev)
 	}
 
 	vsock->vdev = vdev;
+	vsock->cids = NULL;
+	vsock->number_cid = 0;
 
 	ret = virtio_find_vqs(vsock->vdev, VSOCK_VQ_MAX,
 			      vsock->vqs, callbacks, names,
@@ -713,6 +770,7 @@ static void virtio_vsock_remove(struct virtio_device *vdev)
 
 	mutex_unlock(&the_virtio_vsock_mutex);
 
+	kfree(vsock->cids);
 	kfree(vsock);
 }
 

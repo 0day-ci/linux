@@ -17,6 +17,13 @@
 
 #define VHOST_FILE_UNBIND -1
 
+/* structs used for hypervisors to send cid info. */
+
+struct multi_cid_message {
+	u32 number_cid;
+	u64 *cid;
+};
+
 /* ioctls */
 
 #define VHOST_VIRTIO 0xAF
