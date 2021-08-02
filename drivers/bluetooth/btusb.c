@@ -1919,8 +1919,11 @@ static int btusb_setup_csr(struct hci_dev *hdev)
 
 			device_set_wakeup_capable(&data->udev->dev, false);
 			/* Re-enable autosuspend if this was requested */
-			if (enable_autosuspend)
+			if (enable_autosuspend) {
+				usb_lock_device(data->udev);
 				usb_enable_autosuspend(data->udev);
+				usb_unlock_device(data->udev);
+			}
 		}
 	}
 
