@@ -206,7 +206,9 @@ static int chaoskey_probe(struct usb_interface *interface,
 	if (!dev->hwrng_registered)
 		usb_err(interface, "Unable to register with hwrng");
 
+	usb_lock_device(udev);
 	usb_enable_autosuspend(udev);
+	usb_unlock_device(udev);
 
 	usb_dbg(interface, "chaoskey probe success, size %d", dev->size);
 	return 0;
