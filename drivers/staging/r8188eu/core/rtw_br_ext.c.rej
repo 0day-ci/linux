@@ -1,0 +1,11 @@
+--- drivers/staging/r8188eu/core/rtw_br_ext.c
++++ drivers/staging/r8188eu/core/rtw_br_ext.c
+@@ -420,7 +420,7 @@ static void __nat25_db_network_insert(st
+ 		}
+ 		db = db->next_hash;
+ 	}
+-	db = (struct nat25_network_db_entry *) rtw_malloc(sizeof(*db));
++	db = kmalloc(sizeof(*db), GFP_KERNEL);
+ 	if (db == NULL) {
+ 		spin_unlock_bh(&priv->br_ext_lock);
+ 		return;

@@ -1,0 +1,20 @@
+--- drivers/staging/r8188eu/core/rtw_efuse.c
++++ drivers/staging/r8188eu/core/rtw_efuse.c
+@@ -533,7 +533,7 @@ u8 rtw_efuse_map_write(struct adapter *p
+ 	if ((addr + cnts) > mapLen)
+ 		return _FAIL;
+ 
+-	map = rtw_zmalloc(mapLen);
++	map = kzalloc(mapLen, GFP_KERNEL);
+ 	if (map == NULL)
+ 		return _FAIL;
+ 
+@@ -625,7 +625,7 @@ u8 rtw_BT_efuse_map_write(struct adapter
+ 	if ((addr + cnts) > mapLen)
+ 		return _FAIL;
+ 
+-	map = rtw_zmalloc(mapLen);
++	map = kzalloc(mapLen, GFP_KERNEL);
+ 	if (map == NULL)
+ 		return _FAIL;
+ 
