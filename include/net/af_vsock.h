@@ -171,6 +171,10 @@ struct vsock_transport {
 	/* Addressing. */
 	u32 (*get_local_cid)(void);
 	bool (*contain_cid)(u32 cid);
+	/* For transport_g2h, this checks if the cid is used by its host. */
+	/* For transport_h2g, this checks if the cid is used by one of its guests. */
+	/* This function is set to NULL for loopback_transport. */
+	bool (*contain_opposite_cid)(u32 cid);
 };
 
 /**** CORE ****/

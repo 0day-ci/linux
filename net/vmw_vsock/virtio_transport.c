@@ -99,6 +99,35 @@ out_rcu:
 	return ret;
 }
 
+/* This function checks if the transport_g2h is using the cid. */
+static bool virtio_transport_contain_opposite_cid(u32 cid)
+{
+	struct virtio_vsock *vsock;
+	bool ret;
+	u32 num_host_cid;
+
+	if (cid == VMADDR_CID_HOST)
+		return true;
+	num_host_cid = 0;
+	rcu_read_lock();
+	vsock = rcu_dereference(the_virtio_vsock);
+	if (!vsock || vsock->number_host_cid == 0) {
+		ret = false;
+		goto out_rcu;
+	}
+
+	for (num_host_cid = 0; num_host_cid < vsock->number_host_cid; num_host_cid++) {
+		if (vsock->host_cids[num_host_cid] == cid) {
+			ret = true;
+			goto out_rcu;
+		}
+	}
+	ret = false;
+out_rcu:
+	rcu_read_unlock();
+	return ret;
+}
+
 static u32 virtio_transport_get_local_cid(void)
 {
 	struct virtio_vsock *vsock;
@@ -532,6 +561,7 @@ static struct virtio_transport virtio_transport = {
 
 		.get_local_cid            = virtio_transport_get_local_cid,
 		.contain_cid              = virtio_transport_contain_cid,
+		.contain_opposite_cid     = virtio_transport_contain_opposite_cid,
 
 		.init                     = virtio_transport_do_socket_init,
 		.destruct                 = virtio_transport_destruct,

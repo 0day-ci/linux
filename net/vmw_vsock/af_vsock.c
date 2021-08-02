@@ -397,9 +397,9 @@ static bool vsock_use_local_transport(unsigned int remote_cid)
 		return true;
 
 	if (transport_g2h) {
-		return remote_cid == transport_g2h->get_local_cid();
+		return transport_g2h->contain_cid(remote_cid);
 	} else {
-		return remote_cid == VMADDR_CID_HOST;
+		return transport_h2g->contain_cid(remote_cid);
 	}
 }
 
@@ -423,7 +423,9 @@ static void vsock_deassign_transport(struct vsock_sock *vsk)
  *    g2h is not loaded, will use local transport;
  *  - remote CID <= VMADDR_CID_HOST or h2g is not loaded or remote flags field
  *    includes VMADDR_FLAG_TO_HOST flag value, will use guest->host transport;
- *  - remote CID > VMADDR_CID_HOST will use host->guest transport;
+ *  - remote CID > VMADDR_CID_HOST will use host->guest transport if
+ *    guest->host transport is not loaded.  Otherwise, if guest->host transport
+ *    contains the remote_cid, then use the guest->host transport.
  */
 int vsock_assign_transport(struct vsock_sock *vsk, struct vsock_sock *psk)
 {
@@ -434,15 +436,18 @@ int vsock_assign_transport(struct vsock_sock *vsk, struct vsock_sock *psk)
 	int ret;
 
 	/* If the packet is coming with the source and destination CIDs higher
-	 * than VMADDR_CID_HOST, then a vsock channel where all the packets are
+	 * than VMADDR_CID_HOST, and the source and destination CIDs are not
+	 * used by the host, then a vsock channel where all the packets are
 	 * forwarded to the host should be established. Then the host will
 	 * need to forward the packets to the guest.
 	 *
 	 * The flag is set on the (listen) receive path (psk is not NULL). On
 	 * the connect path the flag can be set by the user space application.
 	 */
-	if (psk && vsk->local_addr.svm_cid > VMADDR_CID_HOST &&
-	    vsk->remote_addr.svm_cid > VMADDR_CID_HOST)
+	if (psk && transport_h2g && vsk->local_addr.svm_cid > VMADDR_CID_HOST &&
+	    !transport_h2g->contain_cid(vsk->local_addr.svm_cid) &&
+	    vsk->remote_addr.svm_cid > VMADDR_CID_HOST &&
+	    !transport_h2g->contain_cid(vsk->remote_addr.svm_cid))
 		vsk->remote_addr.svm_flags |= VMADDR_FLAG_TO_HOST;
 
 	remote_flags = vsk->remote_addr.svm_flags;
@@ -457,6 +462,9 @@ int vsock_assign_transport(struct vsock_sock *vsk, struct vsock_sock *psk)
 			new_transport = transport_local;
 		else if (remote_cid <= VMADDR_CID_HOST || !transport_h2g ||
 			 (remote_flags & VMADDR_FLAG_TO_HOST))
+			new_transport = transport_g2h;
+		else if (remote_cid > VMADDR_CID_HOST && transport_g2h &&
+			 transport_g2h->contain_opposite_cid(remote_cid))
 			new_transport = transport_g2h;
 		else
 			new_transport = transport_h2g;

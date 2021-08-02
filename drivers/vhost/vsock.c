@@ -57,8 +57,22 @@ struct vhost_vsock_ref {
 
 static bool vhost_transport_contain_cid(u32 cid)
 {
+	unsigned int index;
+	struct vhost_vsock_ref *ref;
+
 	if (cid == VHOST_VSOCK_DEFAULT_HOST_CID)
 		return true;
+
+	mutex_lock(&valid_host_mutex);
+	hash_for_each(valid_host_hash, index, ref, ref_hash) {
+		u32 other_cid = ref->cid;
+
+		if (other_cid == cid) {
+			mutex_unlock(&valid_host_mutex);
+			return true;
+		}
+	}
+	mutex_unlock(&valid_host_mutex);
 	return false;
 }
 
@@ -101,6 +115,21 @@ vhost_vsock_contain_cid(struct vhost_vsock *vsock, u32 cid)
 	return false;
 }
 
+/* Check if a cid is valid for the pkt to be received. */
+static bool
+vhost_vsock_contain_host_cid(struct vhost_vsock *vsock, u32 dst_cid)
+{
+	uint32_t index;
+
+	if (dst_cid == VHOST_VSOCK_DEFAULT_HOST_CID)
+		return true;
+	for (index = 0; index < vsock->num_host_cid; index++) {
+		if (vsock->hostcids[index] == dst_cid)
+			return true;
+	}
+	return false;
+}
+
 static u32 vhost_transport_get_local_cid(void)
 {
 	return VHOST_VSOCK_DEFAULT_HOST_CID;
@@ -126,6 +155,13 @@ static struct vhost_vsock *vhost_vsock_get(u32 guest_cid)
 	}
 
 	return NULL;
+}
+
+/* This function checks if the cid is used by one of the guests. */
+static bool
+vhost_transport_contain_opposite_cid(u32 cid)
+{
+	return vhost_vsock_get(cid) != NULL;
 }
 
 /* Callers that dereference the return value must hold vhost_vsock_mutex or the
@@ -512,6 +548,7 @@ static struct virtio_transport vhost_transport = {
 
 		.get_local_cid            = vhost_transport_get_local_cid,
 		.contain_cid              = vhost_transport_contain_cid,
+		.contain_opposite_cid     = vhost_transport_contain_opposite_cid,
 
 		.init                     = virtio_transport_do_socket_init,
 		.destruct                 = virtio_transport_destruct,
@@ -629,7 +666,7 @@ static void vhost_vsock_handle_tx_kick(struct vhost_work *work)
 		/* Only accept correctly addressed packets */
 		if (vsock->num_cid > 0 &&
 			vhost_vsock_contain_cid(vsock, pkt->hdr.src_cid) &&
-		    le64_to_cpu(pkt->hdr.dst_cid) == vhost_transport_get_local_cid())
+		    vhost_vsock_contain_host_cid(vsock, le64_to_cpu(pkt->hdr.dst_cid)))
 			virtio_transport_recv_pkt(&vhost_transport, pkt);
 		else
 			virtio_transport_free_pkt(pkt);
