@@ -478,6 +478,7 @@ struct tb_nhi {
 	struct tb_ring **rx_rings;
 	struct ida msix_ida;
 	bool going_away;
+	bool is_intr_autoclr;
 	struct work_struct interrupt_work;
 	u32 hop_count;
 };

@@ -74,7 +74,11 @@ static void ring_interrupt_active(struct tb_ring *ring, bool active)
 		if (!(misc & REG_DMA_MISC_INT_AUTO_CLEAR)) {
 			misc |= REG_DMA_MISC_INT_AUTO_CLEAR;
 			iowrite32(misc, ring->nhi->iobase + REG_DMA_MISC);
-		}
+			misc = ioread32(ring->nhi->iobase + REG_DMA_MISC);
+			if (misc & REG_DMA_MISC_INT_AUTO_CLEAR)
+				ring->nhi->is_intr_autoclr = true;
+		} else
+			ring->nhi->is_intr_autoclr = true;
 
 		ivr_base = ring->nhi->iobase + REG_INT_VEC_ALLOC_BASE;
 		step = index / REG_INT_VEC_ALLOC_REGS * REG_INT_VEC_ALLOC_BITS;
@@ -377,11 +381,31 @@ void tb_ring_poll_complete(struct tb_ring *ring)
 }
 EXPORT_SYMBOL_GPL(tb_ring_poll_complete);
 
+static void check_and_clear_intr_status(struct tb_ring *ring, int int_pos)
+{
+	u32 value;
+
+	if (!ring->nhi->is_intr_autoclr) {
+		value = ioread32(ring->nhi->iobase
+					 + REG_RING_NOTIFY_BASE
+					 + 4 * (int_pos / 32));
+		iowrite32(value, ring->nhi->iobase
+			  + (REG_RING_NOTIFY_BASE + 8)
+			  + 4 * (int_pos / 32));
+	}
+}
+
 static irqreturn_t ring_msix(int irq, void *data)
 {
 	struct tb_ring *ring = data;
 
 	spin_lock(&ring->nhi->lock);
+
+	if (ring->is_tx)
+		check_and_clear_intr_status(ring, 0);
+	else
+		check_and_clear_intr_status(ring, ring->nhi->hop_count);
+
 	spin_lock(&ring->lock);
 	__ring_interrupt(ring);
 	spin_unlock(&ring->lock);
