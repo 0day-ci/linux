@@ -5032,9 +5032,13 @@ retry:
 		 * page in our current bio, and thus deadlock, so flush the
 		 * write bio here.
 		 */
-		ret = flush_write_bio(epd);
-		if (!ret)
-			goto retry;
+		if (ret < 0) {
+			end_write_bio(epd, ret);
+		} else {
+			ret = flush_write_bio(epd);
+			if (!ret)
+				goto retry;
+		}
 	}
 
 	if (wbc->range_cyclic || (wbc->nr_to_write > 0 && range_whole))
@@ -5092,9 +5096,11 @@ int extent_write_locked_range(struct inode *inode, u64 start, u64 end,
 	wbc_attach_fdatawrite_inode(&wbc_writepages, inode);
 	while (start <= end) {
 		page = find_get_page(mapping, start >> PAGE_SHIFT);
-		if (clear_page_dirty_for_io(page))
+		if (clear_page_dirty_for_io(page)) {
 			ret = __extent_writepage(page, &wbc_writepages, &epd);
-		else {
+			if (ret < 0)
+				goto out;
+		} else {
 			btrfs_writepage_endio_finish_ordered(BTRFS_I(inode),
 					page, start, start + PAGE_SIZE - 1, true);
 			unlock_page(page);
@@ -5103,6 +5109,7 @@ int extent_write_locked_range(struct inode *inode, u64 start, u64 end,
 		start += PAGE_SIZE;
 	}
 
+out:
 	ASSERT(ret <= 0);
 	if (ret == 0)
 		ret = flush_write_bio(&epd);
