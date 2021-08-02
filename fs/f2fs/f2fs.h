@@ -1754,6 +1754,17 @@ struct f2fs_sb_info {
 	unsigned int compress_watermark;	/* cache page watermark */
 	atomic_t compress_page_hit;		/* cache hit count */
 #endif
+
+#ifdef CONFIG_F2FS_IOSTAT_IO_LATENCY
+	/* for io latency related statistics info in one iostat period */
+	spinlock_t iostat_lat_lock;
+	u64 rd_sum_lat[NR_PAGE_TYPE];		/* sum of read io latencies */
+	u64 rd_peak_lat[NR_PAGE_TYPE];		/* peak read io latency */
+	u64 rd_bio_cnt[NR_PAGE_TYPE];		/* read bio count */
+	u64 wr_sum_lat[2][NR_PAGE_TYPE];	/* sum of write io latencies (sync/async) */
+	u64 wr_peak_lat[2][NR_PAGE_TYPE];	/* peak write io latency (sync/async) */
+	u64 wr_bio_cnt[2][NR_PAGE_TYPE];	/* write bio count (sync/async) */
+#endif
 };
 
 struct f2fs_private_dio {
@@ -3232,6 +3243,26 @@ static inline void f2fs_reset_iostat(struct f2fs_sb_info *sbi)
 		sbi->prev_rw_iostat[i] = 0;
 	}
 	spin_unlock(&sbi->iostat_lock);
+
+#ifdef CONFIG_F2FS_IOSTAT_IO_LATENCY
+	spin_lock_irq(&sbi->iostat_lat_lock);
+	for (i = 0; i < NR_PAGE_TYPE; i++) {
+		sbi->rd_sum_lat[i] = 0;
+		sbi->rd_peak_lat[i] = 0;
+		sbi->rd_bio_cnt[i] = 0;
+	}
+
+	for (i = 0; i < 2; i++) {
+		int iotype;
+
+		for (iotype = 0; iotype < NR_PAGE_TYPE; iotype++) {
+			sbi->wr_sum_lat[i][iotype] = 0;
+			sbi->wr_peak_lat[i][iotype] = 0;
+			sbi->wr_bio_cnt[i][iotype] = 0;
+		}
+	}
+	spin_unlock_irq(&sbi->iostat_lat_lock);
+#endif
 }
 
 extern void f2fs_record_iostat(struct f2fs_sb_info *sbi);
@@ -3257,6 +3288,55 @@ static inline void f2fs_update_iostat(struct f2fs_sb_info *sbi,
 
 	f2fs_record_iostat(sbi);
 }
+
+#ifdef CONFIG_F2FS_IOSTAT_IO_LATENCY
+
+struct bio_post_read_ctx;
+
+struct bio_iostat_ctx {
+	struct f2fs_sb_info *sbi;
+	u64 submit_ts;
+	enum page_type type;
+	struct bio_post_read_ctx *post_read_ctx;
+};
+
+struct f2fs_iostat_latency {
+	unsigned long long peak_lat;
+	unsigned long long avg_lat;
+	unsigned long long cnt;
+};
+
+static inline void __update_iostat_latency(struct f2fs_sb_info *sbi,
+		struct bio *bio, int rw, struct bio_iostat_ctx *iostat_ctx)
+{
+	u64 ts_diff;
+	unsigned int iotype = iostat_ctx->type;
+	unsigned long flags;
+
+	if (!sbi->iostat_enable)
+		return;
+
+	ts_diff = jiffies - iostat_ctx->submit_ts;
+	if (iotype >= META_FLUSH)
+		iotype = META;
+
+	spin_lock_irqsave(&sbi->iostat_lat_lock, flags);
+	if (rw == 0) {
+		sbi->rd_sum_lat[iotype] += ts_diff;
+		sbi->rd_bio_cnt[iotype]++;
+		if (ts_diff > sbi->rd_peak_lat[iotype])
+			sbi->rd_peak_lat[iotype] = ts_diff;
+	} else {
+		int sync = bio->bi_opf & REQ_SYNC ? 0 : 1;
+
+		sbi->wr_sum_lat[sync][iotype] += ts_diff;
+		sbi->wr_bio_cnt[sync][iotype]++;
+		if (ts_diff > sbi->wr_peak_lat[sync][iotype])
+			sbi->wr_peak_lat[sync][iotype] = ts_diff;
+	}
+	spin_unlock_irqrestore(&sbi->iostat_lat_lock, flags);
+}
+#endif
 
 #define __is_large_section(sbi)		((sbi)->segs_per_sec > 1)
 
@@ -3644,6 +3724,13 @@ bool f2fs_overwrite_io(struct inode *inode, loff_t pos, size_t len);
 void f2fs_clear_page_cache_dirty_tag(struct page *page);
 int f2fs_init_post_read_processing(void);
 void f2fs_destroy_post_read_processing(void);
+#ifdef CONFIG_F2FS_IOSTAT_IO_LATENCY
+int f2fs_init_iostat_processing(void);
+void f2fs_destroy_iostat_processing(void);
+#else
+static inline int f2fs_init_iostat_processing(void) { return 0; }
+static inline void f2fs_destroy_iostat_processing(void) {}
+#endif
 int f2fs_init_post_read_wq(struct f2fs_sb_info *sbi);
 void f2fs_destroy_post_read_wq(struct f2fs_sb_info *sbi);
 
