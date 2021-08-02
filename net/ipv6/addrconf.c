@@ -7002,7 +7002,7 @@ static int __addrconf_sysctl_register(struct net *net, char *dev_name,
 
 	if (!strcmp(dev_name, "all"))
 		ifindex = NETCONFA_IFINDEX_ALL;
-	else if (!strcmp(dev_name, "default"))
+	else if (!strcmp(dev_name, "current"))
 		ifindex = NETCONFA_IFINDEX_DEFAULT;
 	else
 		ifindex = idev->dev->ifindex;
@@ -7112,7 +7112,7 @@ static int __net_init addrconf_init_net(struct net *net)
 	if (err < 0)
 		goto err_reg_all;
 
-	err = __addrconf_sysctl_register(net, "default", NULL, dflt);
+	err = __addrconf_sysctl_register(net, "current", NULL, dflt);
 	if (err < 0)
 		goto err_reg_dflt;
 #endif

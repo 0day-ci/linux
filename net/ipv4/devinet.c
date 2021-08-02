@@ -2696,7 +2696,7 @@ static __net_init int devinet_init_net(struct net *net)
 	if (err < 0)
 		goto err_reg_all;
 
-	err = __devinet_sysctl_register(net, "default",
+	err = __devinet_sysctl_register(net, "current",
 					NETCONFA_IFINDEX_DEFAULT, dflt);
 	if (err < 0)
 		goto err_reg_dflt;
