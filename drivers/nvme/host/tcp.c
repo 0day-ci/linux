@@ -1813,8 +1813,10 @@ static int nvme_tcp_configure_io_queues(struct nvme_ctrl *ctrl, bool new)
 		}
 		blk_mq_update_nr_hw_queues(ctrl->tagset,
 			ctrl->queue_count - 1);
-		nvme_unfreeze(ctrl);
 	}
+
+	if (!new)
+		nvme_unfreeze(ctrl);
 
 	ret = nvme_tcp_start_io_queues(ctrl);
 	if (ret)
