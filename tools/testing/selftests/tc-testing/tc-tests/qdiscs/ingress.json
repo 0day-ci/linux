@@ -98,5 +98,89 @@
         "teardown": [
             "$IP link del dev $DUMMY type dummy"
         ]
+    },
+    {
+        "id": "8e8c",
+        "name": "Enable clsact egress mini-qdisc for ingress",
+        "category": [
+            "qdisc",
+            "ingress"
+        ],
+        "setup": [
+            "$IP link add dev $DUMMY type dummy || /bin/true",
+            "$TC qdisc add dev $DUMMY ingress"
+        ],
+        "cmdUnderTest": "$TC qdisc change dev $DUMMY ingress clsact-on",
+        "expExitCode": "0",
+        "verifyCmd": "$TC qdisc show dev $DUMMY",
+        "matchPattern": "qdisc ingress ffff:.*clsact",
+        "matchCount": "1",
+        "teardown": [
+            "$IP link del dev $DUMMY type dummy"
+        ]
+    },
+    {
+        "id": "3a76",
+        "name": "Disable clsact egress mini-qdisc for ingress",
+        "category": [
+            "qdisc",
+            "ingress"
+        ],
+        "setup": [
+            "$IP link add dev $DUMMY type dummy || /bin/true",
+            "$TC qdisc add dev $DUMMY ingress",
+            "$TC qdisc change dev $DUMMY ingress clsact-on"
+        ],
+        "cmdUnderTest": "$TC qdisc change dev $DUMMY ingress clsact-off",
+        "expExitCode": "0",
+        "verifyCmd": "$TC qdisc show dev $DUMMY",
+        "matchPattern": "qdisc ingress ffff:.*clsact",
+        "matchCount": "0",
+        "teardown": [
+            "$IP link del dev $DUMMY type dummy"
+        ]
+    },
+    {
+        "id": "7b2b",
+        "name": "Enable clsact egress mini-qdisc for ingress twice",
+        "category": [
+            "qdisc",
+            "ingress"
+        ],
+        "setup": [
+            "$IP link add dev $DUMMY type dummy || /bin/true",
+            "$TC qdisc add dev $DUMMY ingress",
+            "$TC qdisc change dev $DUMMY ingress clsact-on"
+        ],
+        "cmdUnderTest": "$TC qdisc change dev $DUMMY ingress clsact-on",
+        "expExitCode": "2",
+        "verifyCmd": "$TC qdisc show dev $DUMMY",
+        "matchPattern": "qdisc ingress ffff:.*clsact",
+        "matchCount": "1",
+        "teardown": [
+            "$IP link del dev $DUMMY type dummy"
+        ]
+    },
+    {
+        "id": "05ab",
+        "name": "Disable clsact egress mini-qdisc for ingress twice",
+        "category": [
+            "qdisc",
+            "ingress"
+        ],
+        "setup": [
+            "$IP link add dev $DUMMY type dummy || /bin/true",
+            "$TC qdisc add dev $DUMMY ingress",
+            "$TC qdisc change dev $DUMMY ingress clsact-on",
+            "$TC qdisc change dev $DUMMY ingress clsact-off"
+        ],
+        "cmdUnderTest": "$TC qdisc change dev $DUMMY ingress clsact-off",
+        "expExitCode": "2",
+        "verifyCmd": "$TC qdisc show dev $DUMMY",
+        "matchPattern": "qdisc ingress ffff:.*clsact",
+        "matchCount": "0",
+        "teardown": [
+            "$IP link del dev $DUMMY type dummy"
+        ]
     }
 ]
