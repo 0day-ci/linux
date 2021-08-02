@@ -8,6 +8,8 @@
 #include "prestera_acl.h"
 #include "prestera_span.h"
 
+#define PRESTERA_ACL_DEF_HW_TC		3
+
 struct prestera_acl {
 	struct prestera_switch *sw;
 	struct list_head rules;
@@ -29,6 +31,7 @@ struct prestera_acl_rule {
 	u32 priority;
 	u8 n_actions;
 	u8 n_matches;
+	u8 hw_tc;
 	u32 id;
 };
 
@@ -203,6 +206,7 @@ prestera_acl_rule_create(struct prestera_flow_block *block,
 	INIT_LIST_HEAD(&rule->action_list);
 	rule->cookie = cookie;
 	rule->block = block;
+	rule->hw_tc = PRESTERA_ACL_DEF_HW_TC;
 
 	return rule;
 }
@@ -249,6 +253,16 @@ void prestera_acl_rule_priority_set(struct prestera_acl_rule *rule,
 				    u32 priority)
 {
 	rule->priority = priority;
+}
+
+u8 prestera_acl_rule_hw_tc_get(struct prestera_acl_rule *rule)
+{
+	return rule->hw_tc;
+}
+
+void prestera_acl_rule_hw_tc_set(struct prestera_acl_rule *rule, u8 hw_tc)
+{
+	rule->hw_tc = hw_tc;
 }
 
 int prestera_acl_rule_match_add(struct prestera_acl_rule *rule,
