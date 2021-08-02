@@ -30,12 +30,57 @@
  */
 static int p9_supported_radix_bits[4] = { 5, 9, 9, 13 };
 
+/* LPIDR and PIDR must have already been set */
+static long __copy_from_guest_quadrant(void *dst, void __user *src, size_t size,
+				       unsigned long quadrant)
+{
+	long ret = size;
+	mm_segment_t old_fs = force_uaccess_begin();
+
+	if (access_ok(src, size)) {
+		src += (quadrant << 62);
+
+		pagefault_disable();
+		ret = __copy_from_user_inatomic((void __user *)dst, src, size);
+		pagefault_enable();
+	}
+	force_uaccess_end(old_fs);
+
+	if (!ret)
+		return ret;
+
+	memset(dst + (size - ret), 0, ret);
+
+	return -EFAULT;
+}
+
+/* LPIDR and PIDR must have already been set */
+static long __copy_to_guest_quadrant(void __user *dst, void *src, size_t size,
+				     unsigned long quadrant)
+{
+	long ret = -EFAULT;
+	mm_segment_t old_fs = force_uaccess_begin();
+
+	if (access_ok(dst, size)) {
+		dst += (quadrant << 62);
+
+		pagefault_disable();
+		ret = __copy_to_user_inatomic(dst, (void __user *)src, size);
+		pagefault_enable();
+	}
+	force_uaccess_end(old_fs);
+
+	if (ret)
+		return -EFAULT;
+	return 0;
+}
+
 unsigned long __kvmhv_copy_tofrom_guest_radix(int lpid, int pid,
 					      gva_t eaddr, void *to, void *from,
 					      unsigned long n)
 {
 	int old_pid, old_lpid;
-	unsigned long quadrant, ret = n;
+	unsigned long quadrant, ret;
 	bool is_load = !!to;
 
 	/* Can't access quadrants 1 or 2 in non-HV mode, call the HV to do it */
@@ -47,10 +92,6 @@ unsigned long __kvmhv_copy_tofrom_guest_radix(int lpid, int pid,
 	quadrant = 1;
 	if (!pid)
 		quadrant = 2;
-	if (is_load)
-		from = (void *) (eaddr | (quadrant << 62));
-	else
-		to = (void *) (eaddr | (quadrant << 62));
 
 	preempt_disable();
 
@@ -66,9 +107,9 @@ unsigned long __kvmhv_copy_tofrom_guest_radix(int lpid, int pid,
 	isync();
 
 	if (is_load)
-		ret = copy_from_user_nofault(to, (const void __user *)from, n);
+		ret = __copy_from_guest_quadrant(to, (void __user *)eaddr, n, quadrant);
 	else
-		ret = copy_to_user_nofault((void __user *)to, from, n);
+		ret = __copy_to_guest_quadrant((void __user *)eaddr, from, n, quadrant);
 
 	/* switch the pid first to avoid running host with unallocated pid */
 	if (quadrant == 1 && pid != old_pid)
@@ -109,13 +150,7 @@ static long kvmhv_copy_tofrom_guest_radix(struct kvm_vcpu *vcpu, gva_t eaddr,
 long kvmhv_copy_from_guest_radix(struct kvm_vcpu *vcpu, gva_t eaddr, void *to,
 				 unsigned long n)
 {
-	long ret;
-
-	ret = kvmhv_copy_tofrom_guest_radix(vcpu, eaddr, to, NULL, n);
-	if (ret > 0)
-		memset(to + (n - ret), 0, ret);
-
-	return ret;
+	return kvmhv_copy_tofrom_guest_radix(vcpu, eaddr, to, NULL, n);
 }
 EXPORT_SYMBOL_GPL(kvmhv_copy_from_guest_radix);
 
