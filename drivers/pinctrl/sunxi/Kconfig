@@ -134,4 +134,9 @@ config PINCTRL_SUN50I_R329
 	default ARM64 && ARCH_SUNXI
 	select PINCTRL_SUNXI
 
+config PINCTRL_SUN50I_R329_R
+	bool "Support for the Allwinner R329 R-PIO"
+	default ARM64 && ARCH_SUNXI
+	select PINCTRL_SUNXI
+
 endif
