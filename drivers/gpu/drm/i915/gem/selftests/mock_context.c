@@ -124,7 +124,7 @@ live_context_for_engine(struct intel_engine_cs *engine, struct file *file)
 		return ctx;
 	}
 
-	ce = intel_context_create(engine);
+	ce = intel_context_create_user(engine);
 	if (IS_ERR(ce)) {
 		__free_engines(engines, 0);
 		return ERR_CAST(ce);

@@ -35,6 +35,8 @@ void i915_context_module_exit(void);
 int i915_context_module_init(void);
 
 struct intel_context *
+intel_context_create_user(struct intel_engine_cs *engine);
+struct intel_context *
 intel_context_create(struct intel_engine_cs *engine);
 
 int intel_context_alloc_state(struct intel_context *ce);

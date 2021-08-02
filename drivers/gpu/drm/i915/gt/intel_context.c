@@ -34,6 +34,23 @@ void intel_context_free(struct intel_context *ce)
 	call_rcu(&ce->rcu, rcu_context_free);
 }
 
+/* for user contexts, callers must set ce->vm correctly */
+struct intel_context *
+intel_context_create_user(struct intel_engine_cs *engine)
+{
+	struct intel_context *ce;
+
+	ce = intel_context_alloc();
+	if (!ce)
+		return ERR_PTR(-ENOMEM);
+
+	intel_context_init(ce, engine);
+
+	trace_intel_context_create(ce);
+	return ce;
+}
+
+/* for kernel-internal users only, sets ce->vm to intel_gt.vm */
 struct intel_context *
 intel_context_create(struct intel_engine_cs *engine)
 {
@@ -44,6 +61,8 @@ intel_context_create(struct intel_engine_cs *engine)
 		return ERR_PTR(-ENOMEM);
 
 	intel_context_init(ce, engine);
+	ce->vm = i915_vm_get(engine->gt->vm);
+
 	trace_intel_context_create(ce);
 	return ce;
 }
@@ -368,6 +387,7 @@ static int sw_fence_dummy_notify(struct i915_sw_fence *sf,
 	return NOTIFY_DONE;
 }
 
+/* callers must set ce->vm for user or kernel vm as needed */
 void
 intel_context_init(struct intel_context *ce, struct intel_engine_cs *engine)
 {
@@ -383,8 +403,6 @@ intel_context_init(struct intel_context *ce, struct intel_engine_cs *engine)
 	ce->ring_size = SZ_4K;
 
 	ewma_runtime_init(&ce->runtime.avg);
-
-	ce->vm = i915_vm_get(engine->gt->vm);
 
 	/* NB ce->signal_link/lock is used under RCU */
 	spin_lock_init(&ce->signal_lock);
