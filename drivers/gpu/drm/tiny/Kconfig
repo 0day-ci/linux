@@ -131,6 +131,18 @@ config TINYDRM_REPAPER
 
 	  If M is selected the module will be called repaper.
 
+config TINYDRM_SIMPLE_DBI
+	tristate "DRM support for generic MIPI DBI panels"
+	depends on DRM && SPI
+	select DRM_KMS_HELPER
+	select DRM_KMS_CMA_HELPER
+	select DRM_MIPI_DBI
+	help
+	  DRM driver for generic DBI panels that are MIPI DCS compatible
+	  and needs no vendor-specific setup commands.
+
+	  If M is selected the module will be called simple-dbi.
+
 config TINYDRM_ST7586
 	tristate "DRM support for Sitronix ST7586 display panels"
 	depends on DRM && SPI
