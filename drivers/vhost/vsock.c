@@ -74,6 +74,18 @@ struct vhost_vsock {
 	bool seqpacket_allow;
 };
 
+static bool
+vhost_vsock_contain_cid(struct vhost_vsock *vsock, u32 cid)
+{
+	u32 index;
+
+	for (index = 0; index < vsock->num_cid; index++) {
+		if (cid == vsock->cids[index])
+			return true;
+	}
+	return false;
+}
+
 static u32 vhost_transport_get_local_cid(void)
 {
 	return VHOST_VSOCK_DEFAULT_HOST_CID;
@@ -584,7 +596,7 @@ static void vhost_vsock_handle_tx_kick(struct vhost_work *work)
 
 		/* Only accept correctly addressed packets */
 		if (vsock->num_cid > 0 &&
-		    (pkt->hdr.src_cid) == vsock->cids[0] &&
+			vhost_vsock_contain_cid(vsock, pkt->hdr.src_cid) &&
 		    le64_to_cpu(pkt->hdr.dst_cid) == vhost_transport_get_local_cid())
 			virtio_transport_recv_pkt(&vhost_transport, pkt);
 		else

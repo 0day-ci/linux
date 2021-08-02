@@ -251,7 +251,7 @@ static struct sock *__vsock_find_connected_socket(struct sockaddr_vm *src,
 	list_for_each_entry(vsk, vsock_connected_sockets(src, dst),
 			    connected_table) {
 		if (vsock_addr_equals_addr(src, &vsk->remote_addr) &&
-		    dst->svm_port == vsk->local_addr.svm_port) {
+		    vsock_addr_equals_addr(&vsk->local_addr, dst)) {
 			return sk_vsock(vsk);
 		}
 	}
