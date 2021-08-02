@@ -351,6 +351,7 @@ static void smsusb_term_device(struct usb_interface *intf)
 	}
 
 	usb_set_intfdata(intf, NULL);
+	usb_put_dev(dev->udev);
 }
 
 static void *siano_media_device_register(struct smsusb_device_t *dev,
@@ -398,7 +399,7 @@ static int smsusb_init_device(struct usb_interface *intf, int board_id)
 
 	memset(&params, 0, sizeof(params));
 	usb_set_intfdata(intf, dev);
-	dev->udev = interface_to_usbdev(intf);
+	dev->udev = usb_get_dev(interface_to_usbdev(intf));
 	dev->state = SMSUSB_DISCONNECTED;
 
 	for (i = 0; i < intf->cur_altsetting->desc.bNumEndpoints; i++) {
