@@ -67,6 +67,9 @@ struct virtio_vsock {
 	u32 number_cid;
 	u32 *cids;
 
+	u32 number_host_cid;
+	u32 *host_cids;
+
 	bool seqpacket_allow;
 };
 
@@ -400,11 +403,16 @@ static void virtio_vsock_update_guest_cid(struct virtio_vsock *vsock)
 	struct virtio_device *vdev = vsock->vdev;
 	__le64 guest_cid;
 	__le32 number_cid;
+	__le64 host_cid;
+	__le32 number_host_cid;
 	u32 index;
 
 	vdev->config->get(vdev, offsetof(struct virtio_vsock_config, number_cid),
 			  &number_cid, sizeof(number_cid));
+	vdev->config->get(vdev, offsetof(struct virtio_vsock_config, number_host_cid),
+			  &number_host_cid, sizeof(number_host_cid));
 	vsock->number_cid = le32_to_cpu(number_cid);
+	vsock->number_host_cid = le32_to_cpu(number_host_cid);
 
 	/* number_cid must be greater than 0 in the config space
 	 * to use this feature.
@@ -419,12 +427,30 @@ static void virtio_vsock_update_guest_cid(struct virtio_vsock *vsock)
 		}
 	}
 
+	if (vsock->number_host_cid > 0) {
+		vsock->host_cids = kmalloc_array(vsock->number_host_cid, sizeof(u32), GFP_KERNEL);
+		if (!vsock->host_cids) {
+			/* Space allocated failed, reset number_cid to 0.
+			 * only use the original guest_cid.
+			 */
+			vsock->number_host_cid = 0;
+		}
+	}
+
 	for (index = 0; index < vsock->number_cid; index++) {
 		vdev->config->get(vdev,
 				  offsetof(struct virtio_vsock_config, cids)
 				  + index * sizeof(uint64_t),
 				  &guest_cid, sizeof(guest_cid));
 		vsock->cids[index] = le64_to_cpu(guest_cid);
+	}
+
+	for (index = index; index < vsock->number_cid + vsock->number_host_cid; index++) {
+		vdev->config->get(vdev,
+				  offsetof(struct virtio_vsock_config, cids)
+				  + index * sizeof(uint64_t),
+				  &host_cid, sizeof(host_cid));
+		vsock->host_cids[index - vsock->number_cid] = le64_to_cpu(host_cid);
 	}
 }
 
@@ -771,6 +797,7 @@ static void virtio_vsock_remove(struct virtio_device *vdev)
 	mutex_unlock(&the_virtio_vsock_mutex);
 
 	kfree(vsock->cids);
+	kfree(vsock->host_cids);
 	kfree(vsock);
 }
 

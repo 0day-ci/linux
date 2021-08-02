@@ -41,8 +41,13 @@
 /* The feature bitmap for virtio vsock */
 #define VIRTIO_VSOCK_F_SEQPACKET	1	/* SOCK_SEQPACKET supported */
 
+/* For values stored in cids, the first "number_cid" values
+ * are used for guest additional cid.
+ * The last "number_host_cid" values are used for host additional cid.
+ */
 struct virtio_vsock_config {
 	__le32 number_cid;
+	__le32 number_host_cid;
 	__le64 cids[];
 } __attribute__((packed));
 

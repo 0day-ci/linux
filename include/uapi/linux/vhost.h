@@ -22,6 +22,8 @@
 struct multi_cid_message {
 	u32 number_cid;
 	u64 *cid;
+	u32 number_host_cid;
+	u64 *hostcid;
 };
 
 /* ioctls */
