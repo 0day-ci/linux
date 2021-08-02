@@ -804,6 +804,7 @@ EXPORT_SYMBOL(cros_ec_get_host_event);
 int cros_ec_check_features(struct cros_ec_dev *ec, int feature)
 {
 	struct cros_ec_command *msg;
+	u32 mask;
 	int ret;
 
 	if (ec->features[0] == -1U && ec->features[1] == -1U) {
@@ -830,7 +831,12 @@ int cros_ec_check_features(struct cros_ec_dev *ec, int feature)
 		kfree(msg);
 	}
 
-	return ec->features[feature / 32] & EC_FEATURE_MASK_0(feature);
+	if (feature >= 32)
+		mask = EC_FEATURE_MASK_1(feature);
+	else
+		mask = EC_FEATURE_MASK_0(feature);
+
+	return ec->features[feature / 32] & mask;
 }
 EXPORT_SYMBOL_GPL(cros_ec_check_features);
 
