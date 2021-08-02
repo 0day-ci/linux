@@ -1255,13 +1255,14 @@ static void nvme_keep_alive_work(struct work_struct *work)
 	blk_execute_rq_nowait(NULL, rq, 0, nvme_keep_alive_end_io);
 }
 
-static void nvme_start_keep_alive(struct nvme_ctrl *ctrl)
+void nvme_start_keep_alive(struct nvme_ctrl *ctrl)
 {
 	if (unlikely(ctrl->kato == 0))
 		return;
 
 	nvme_queue_keep_alive_work(ctrl);
 }
+EXPORT_SYMBOL_GPL(nvme_start_keep_alive);
 
 void nvme_stop_keep_alive(struct nvme_ctrl *ctrl)
 {

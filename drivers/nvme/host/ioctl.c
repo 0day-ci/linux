@@ -231,6 +231,23 @@ static int nvme_user_cmd(struct nvme_ctrl *ctrl, struct nvme_ns *ns,
 			return -EFAULT;
 	}
 
+	/*
+	 * Keep alive commands interval on the host should be updated
+	 * when KATO is modified by Set Features commands.
+	 */
+	if (!status && c.common.opcode == nvme_admin_set_features &&
+	    ((u8)c.common.cdw10 & 0xFF) == NVME_FEAT_KATO) {
+		/* ms -> s */
+		unsigned int new_kato = DIV_ROUND_UP(c.common.cdw11, 1000);
+
+		dev_info(ctrl->device,
+			 "keep alive commands interval on the host is updated from %u milliseconds to %u milliseconds\n",
+			 ctrl->kato * 1000 / 2, new_kato * 1000 / 2);
+		nvme_stop_keep_alive(ctrl);
+		ctrl->kato = new_kato;
+		nvme_start_keep_alive(ctrl);
+	}
+
 	return status;
 }
 
