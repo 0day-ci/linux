@@ -5850,6 +5850,31 @@ int devlink_info_version_running_put(struct devlink_info_req *req,
 }
 EXPORT_SYMBOL_GPL(devlink_info_version_running_put);
 
+int devlink_info_device_capability_put(struct devlink_info_req *req,
+				       const char *capability_name)
+{
+	struct nlattr *nest;
+	int err;
+
+	nest = nla_nest_start(req->msg, DEVLINK_ATTR_INFO_DEVICE_CAPABILITY_LIST);
+	if (!nest)
+		return -EMSGSIZE;
+
+	err = nla_put_string(req->msg, DEVLINK_ATTR_INFO_DEVICE_CAPABILITY_NAME,
+			     capability_name);
+	if (err)
+		goto nla_put_failure;
+
+	nla_nest_end(req->msg, nest);
+
+	return 0;
+
+nla_put_failure:
+	nla_nest_cancel(req->msg, nest);
+	return err;
+}
+EXPORT_SYMBOL_GPL(devlink_info_device_capability_put);
+
 static int
 devlink_nl_info_fill(struct sk_buff *msg, struct devlink *devlink,
 		     enum devlink_command cmd, u32 portid,

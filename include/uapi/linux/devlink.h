@@ -551,6 +551,9 @@ enum devlink_attr {
 	DEVLINK_ATTR_RATE_NODE_NAME,		/* string */
 	DEVLINK_ATTR_RATE_PARENT_NODE_NAME,	/* string */
 
+	DEVLINK_ATTR_INFO_DEVICE_CAPABILITY_LIST,	/* nested */
+	DEVLINK_ATTR_INFO_DEVICE_CAPABILITY_NAME,	/* string */
+
 	/* add new attributes above here, update the policy in devlink.c */
 
 	__DEVLINK_ATTR_MAX,

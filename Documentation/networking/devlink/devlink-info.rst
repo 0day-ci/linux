@@ -78,6 +78,9 @@ versions is generally discouraged - here, and via any other Linux API.
        ``stored`` versions when new software is flashed, it must not report
        them.
 
+   * - ``capabilities``
+     - Group for device capabilities.
+
 Each version can be reported at most once in each version group. Firmware
 components stored on the flash should feature in both the ``running`` and
 ``stored`` sections, if device is capable of reporting ``stored`` versions
