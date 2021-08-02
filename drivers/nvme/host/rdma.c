@@ -902,6 +902,8 @@ static int nvme_rdma_configure_admin_queue(struct nvme_rdma_ctrl *ctrl,
 			error = PTR_ERR(ctrl->ctrl.admin_q);
 			goto out_cleanup_fabrics_q;
 		}
+	} else {
+		nvme_unfreeze(&ctrl->ctrl);
 	}
 
 	error = nvme_rdma_start_queue(ctrl, 0);
