@@ -665,7 +665,19 @@ blk_status_t btrfs_csum_one_bio(struct btrfs_inode *inode, struct bio *bio,
 
 		if (!ordered) {
 			ordered = btrfs_lookup_ordered_extent(inode, offset);
-			BUG_ON(!ordered); /* Logic error */
+			/*
+			 * No ordered extent mostly means the OE has been
+			 * removed (mostly for error handling). Normally for
+			 * such case we should not flush_write_bio(), but
+			 * end_write_bio().
+			 *
+			 * But an extra safe net will never hurt. Just error
+			 * out.
+			 */
+			if (unlikely(!ordered)) {
+				kvfree(sums);
+				return BLK_STS_IOERR;
+			}
 		}
 
 		nr_sectors = BTRFS_BYTES_TO_BLKS(fs_info,
