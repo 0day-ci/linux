@@ -3595,7 +3595,7 @@ static struct neigh_sysctl_table {
 			.proc_handler	= proc_dointvec_jiffies,
 		},
 		[NEIGH_VAR_GC_THRESH1] = {
-			.procname	= "gc_thresh1",
+			.procname	= "gc_thresh_min",
 			.maxlen		= sizeof(int),
 			.mode		= 0644,
 			.extra1		= SYSCTL_ZERO,
@@ -3603,7 +3603,7 @@ static struct neigh_sysctl_table {
 			.proc_handler	= proc_dointvec_minmax,
 		},
 		[NEIGH_VAR_GC_THRESH2] = {
-			.procname	= "gc_thresh2",
+			.procname	= "gc_thresh_default",
 			.maxlen		= sizeof(int),
 			.mode		= 0644,
 			.extra1		= SYSCTL_ZERO,
@@ -3611,7 +3611,7 @@ static struct neigh_sysctl_table {
 			.proc_handler	= proc_dointvec_minmax,
 		},
 		[NEIGH_VAR_GC_THRESH3] = {
-			.procname	= "gc_thresh3",
+			.procname	= "gc_thresh_max",
 			.maxlen		= sizeof(int),
 			.mode		= 0644,
 			.extra1		= SYSCTL_ZERO,
