@@ -918,8 +918,12 @@ static int realtek_cr_autosuspend_setup(struct us_data *us)
 	timer_setup(&chip->rts51x_suspend_timer, rts51x_suspend_timer_fn, 0);
 	fw5895_init(us);
 
+	usb_lock_device(us->pusb_dev);
+
 	/* enable autosuspend function of the usb device */
 	usb_enable_autosuspend(us->pusb_dev);
+
+	usb_unlock_device(us->pusb_dev);
 
 	return 0;
 }
