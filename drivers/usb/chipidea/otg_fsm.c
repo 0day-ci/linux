@@ -518,12 +518,14 @@ static void ci_otg_loc_sof(struct otg_fsm *fsm, int on)
 	if (!udev)
 		return;
 
+	usb_lock_device(udev);
 	if (on) {
 		usb_disable_autosuspend(udev);
 	} else {
 		pm_runtime_set_autosuspend_delay(&udev->dev, 0);
 		usb_enable_autosuspend(udev);
 	}
+	usb_unlock_device(udev);
 }
 
 /*
