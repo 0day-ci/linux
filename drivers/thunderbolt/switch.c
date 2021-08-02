@@ -2747,8 +2747,9 @@ int tb_switch_add(struct tb_switch *sw)
 			}
 			ret = tb_init_port(&sw->ports[i]);
 			if (ret) {
+				sw->ports[i].disabled = true;
 				dev_err(&sw->dev, "failed to initialize port %d\n", i);
-				return ret;
+				continue;
 			}
 		}
 
