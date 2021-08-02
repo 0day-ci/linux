@@ -846,7 +846,9 @@ static int gdm_usb_probe(struct usb_interface *intf,
 	udev->intf = intf;
 
 	intf->needs_remote_wakeup = 1;
+	usb_lock_device(usbdev);
 	usb_enable_autosuspend(usbdev);
+	usb_unlock_device(usbdev);
 	pm_runtime_set_autosuspend_delay(&usbdev->dev, AUTO_SUSPEND_TIMER);
 
 	/* List up hosts with big endians, otherwise,
