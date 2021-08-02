@@ -405,7 +405,7 @@ static int drm_open_helper(struct file *filp, struct drm_minor *minor)
  *
  * RETURNS:
  *
- * 0 on success or negative errno value on falure.
+ * 0 on success or negative errno value on failure.
  */
 int drm_open(struct inode *inode, struct file *filp)
 {
@@ -880,9 +880,9 @@ EXPORT_SYMBOL(drm_send_event);
  * @flags: file creation mode (O_RDWR etc)
  *
  * This create a new struct file that wraps a DRM file context around a
- * DRM minor. This mimicks userspace opening e.g. /dev/dri/card0, but without
+ * DRM minor. This mimics userspace opening e.g. /dev/dri/card0, but without
  * invoking userspace. The struct file may be operated on using its f_op
- * (the drm_device.driver.fops) to mimick userspace operations, or be supplied
+ * (the drm_device.driver.fops) to mimic userspace operations, or be supplied
  * to userspace facing functions as an internal/anonymous client.
  *
  * RETURNS:

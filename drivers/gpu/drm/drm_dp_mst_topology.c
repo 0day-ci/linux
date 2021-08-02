@@ -5894,7 +5894,7 @@ struct drm_dp_aux *drm_dp_mst_dsc_aux_for_port(struct drm_dp_mst_port *port)
 				     DP_DSC_SUPPORT, &upstream_dsc, 1) != 1)
 			return NULL;
 
-		/* Enpoint decompression with DP-to-DP peer device */
+		/* Endpoint decompression with DP-to-DP peer device */
 		if ((endpoint_dsc & DP_DSC_DECOMPRESSION_IS_SUPPORTED) &&
 		    (endpoint_fec & DP_FEC_CAPABLE) &&
 		    (upstream_dsc & 0x2) /* DSC passthrough */)

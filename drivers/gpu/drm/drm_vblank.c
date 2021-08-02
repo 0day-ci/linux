@@ -191,7 +191,7 @@ static u32 drm_max_vblank_count(struct drm_device *dev, unsigned int pipe)
 
 /*
  * "No hw counter" fallback implementation of .get_vblank_counter() hook,
- * if there is no useable hardware frame counter available.
+ * if there is no usable hardware frame counter available.
  */
 static u32 drm_vblank_no_hw_counter(struct drm_device *dev, unsigned int pipe)
 {
@@ -2014,7 +2014,7 @@ EXPORT_SYMBOL(drm_crtc_handle_vblank);
  * Get crtc VBLANK count.
  *
  * \param dev DRM device
- * \param data user arguement, pointing to a drm_crtc_get_sequence structure.
+ * \param data user argument, pointing to a drm_crtc_get_sequence structure.
  * \param file_priv drm file private for the user's open file descriptor
  */
 
@@ -2070,7 +2070,7 @@ int drm_crtc_get_sequence_ioctl(struct drm_device *dev, void *data,
  * Queue a event for VBLANK sequence
  *
  * \param dev DRM device
- * \param data user arguement, pointing to a drm_crtc_queue_sequence structure.
+ * \param data user argument, pointing to a drm_crtc_queue_sequence structure.
  * \param file_priv drm file private for the user's open file descriptor
  */
 

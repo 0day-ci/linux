@@ -1686,7 +1686,7 @@ static void commit_work(struct work_struct *work)
 }
 
 /**
- * drm_atomic_helper_async_check - check if state can be commited asynchronously
+ * drm_atomic_helper_async_check - check if state can be committed asynchronously
  * @dev: DRM device
  * @state: the driver state object
  *
@@ -1695,7 +1695,7 @@ static void commit_work(struct work_struct *work)
  * but just do in-place changes on the current state.
  *
  * It will return 0 if the commit can happen in an asynchronous fashion or error
- * if not. Note that error just mean it can't be commited asynchronously, if it
+ * if not. Note that error just mean it can't be committed asynchronously, if it
  * fails the commit should be treated like a normal synchronous commit.
  */
 int drm_atomic_helper_async_check(struct drm_device *dev,
@@ -2193,10 +2193,10 @@ int drm_atomic_helper_setup_commit(struct drm_atomic_state *state,
 EXPORT_SYMBOL(drm_atomic_helper_setup_commit);
 
 /**
- * drm_atomic_helper_wait_for_dependencies - wait for required preceeding commits
+ * drm_atomic_helper_wait_for_dependencies - wait for required preceding commits
  * @old_state: atomic state object with old state structures
  *
- * This function waits for all preceeding commits that touch the same CRTC as
+ * This function waits for all preceding commits that touch the same CRTC as
  * @old_state to both be committed to the hardware (as signalled by
  * drm_atomic_helper_commit_hw_done()) and executed by the hardware (as signalled
  * by calling drm_crtc_send_vblank_event() on the &drm_crtc_state.event).
@@ -2581,9 +2581,9 @@ EXPORT_SYMBOL(drm_atomic_helper_commit_planes);
  * This function is useful when plane updates should be done CRTC-by-CRTC
  * instead of one global step like drm_atomic_helper_commit_planes() does.
  *
- * This function can only be savely used when planes are not allowed to move
+ * This function can only be safely used when planes are not allowed to move
  * between different CRTCs because this function doesn't handle inter-CRTC
- * depencies. Callers need to ensure that either no such depencies exist,
+ * dependencies. Callers need to ensure that either no such dependencies exist,
  * resolve them through ordering of commit calls or through some other means.
  */
 void
@@ -2720,7 +2720,7 @@ EXPORT_SYMBOL(drm_atomic_helper_cleanup_planes);
 /**
  * drm_atomic_helper_swap_state - store atomic state into current sw state
  * @state: atomic state
- * @stall: stall for preceeding commits
+ * @stall: stall for preceding commits
  *
  * This function stores the atomic state into the current state pointers in all
  * driver objects. It should be called after all failing steps have been done

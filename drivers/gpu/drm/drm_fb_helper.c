@@ -565,9 +565,9 @@ struct fb_info *drm_fb_helper_alloc_fbi(struct drm_fb_helper *fb_helper)
 		goto err_release;
 
 	/*
-	 * TODO: We really should be smarter here and alloc an apperture
+	 * TODO: We really should be smarter here and alloc an aperture
 	 * for each IORESOURCE_MEM resource helper->dev->dev has and also
-	 * init the ranges of the appertures based on the resources.
+	 * init the ranges of the apertures based on the resources.
 	 * Note some drivers currently count on there being only 1 empty
 	 * aperture and fill this themselves, these will need to be dealt
 	 * with somehow when fixing this.

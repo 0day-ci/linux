@@ -191,7 +191,7 @@ enum drm_dp_dual_mode_type drm_dp_dual_mode_detect(const struct drm_device *dev,
 	 * Let's see if the adaptor is there the by reading the
 	 * HDMI ID registers.
 	 *
-	 * Note that type 1 DVI adaptors are not required to implemnt
+	 * Note that type 1 DVI adaptors are not required to implement
 	 * any registers, and that presents a problem for detection.
 	 * If the i2c transfer is nacked, we may or may not be dealing
 	 * with a type 1 DVI adaptor. Some other mechanism of detecting
