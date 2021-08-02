@@ -1,0 +1,72 @@
+# SPDX-License-Identifier: GPL-2.0-only
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/display/simple-dbi.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Generic MIPI DCS-compatible DBI panels Device Tree Bindings
+
+maintainers:
+  - Icenowy Zheng <icenowy@sipeed.com>
+
+description:
+  This binding is for display panels that utilizes MIPI DBI Type C, follows
+  MIPI DCS and needs no vendor-specific initialization commands.
+
+properties:
+  compatible:
+    oneOf:
+      - description:
+          Zhishengxin ZSX154-B1206 1.54" 240x240 SPI LCD
+        items:
+          - const: zsx,zsx154-b1206
+
+  spi-max-frequency:
+    maximum: 30000000
+
+  dc-gpios:
+    maxItems: 1
+    description: Display data/command selection (D/CX)
+
+  backlight: true
+  reg: true
+  reset-gpios: true
+  rotation: true
+
+required:
+  - compatible
+  - reg
+
+allOf:
+  - $ref: panel/panel-common.yaml#
+  - if:
+      properties:
+        compatible:
+          contains:
+            const: zsx,zsx154-b1206
+
+    then:
+      required:
+        - dc-gpios
+        - reset-gpios
+
+additionalProperties: false
+
+examples:
+  - |
+    #include <dt-bindings/gpio/gpio.h>
+
+    spi {
+            #address-cells = <1>;
+            #size-cells = <0>;
+
+            display@0 {
+                    compatible = "zsx,zsx154-b1206";
+                    reg = <0>;
+                    spi-max-frequency = <30000000>;
+                    dc-gpios = <&pio 7 4 GPIO_ACTIVE_HIGH>;
+                    reset-gpios = <&r_pio 2 21 GPIO_ACTIVE_HIGH>;
+            };
+    };
+
+...
