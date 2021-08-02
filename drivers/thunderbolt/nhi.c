@@ -1338,6 +1338,10 @@ static struct pci_device_id nhi_ids[] = {
 	{ PCI_VDEVICE(INTEL, PCI_DEVICE_ID_INTEL_ADL_NHI1),
 	  .driver_data = (kernel_ulong_t)&icl_nhi_ops },
 
+	/* AMD USB4 host */
+	{ PCI_VDEVICE(AMD, PCI_DEVICE_ID_AMD_USB4_HIA0) },
+	{ PCI_VDEVICE(AMD, PCI_DEVICE_ID_AMD_USB4_HIA1) },
+
 	/* Any USB4 compliant host */
 	{ PCI_DEVICE_CLASS(PCI_CLASS_SERIAL_USB_USB4, ~0) },
 
