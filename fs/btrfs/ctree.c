@@ -2122,6 +2122,29 @@ int btrfs_search_backwards(struct btrfs_root *root, struct btrfs_key *key,
 	return ret;
 }
 
+int btrfs_valid_slot(struct btrfs_root *root, struct btrfs_key *key,
+		     struct btrfs_path *path)
+{
+	struct extent_buffer *leaf;
+	int slot;
+	int ret;
+
+	while (1) {
+		slot = path->slots[0];
+		leaf = path->nodes[0];
+		if (slot >= btrfs_header_nritems(leaf)) {
+			ret = btrfs_next_leaf(root, path);
+			if (ret)
+				return ret;
+			continue;
+		}
+		btrfs_item_key_to_cpu(leaf, key, slot);
+		break;
+	}
+
+	return 0;
+}
+
 /*
  * adjust the pointers going up the tree, starting at level
  * making sure the right key of each node is points to 'key'.

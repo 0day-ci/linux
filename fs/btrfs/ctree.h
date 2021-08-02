@@ -2912,6 +2912,18 @@ int btrfs_next_old_leaf(struct btrfs_root *root, struct btrfs_path *path,
 int btrfs_search_backwards(struct btrfs_root *root, struct btrfs_key *key,
 			   struct btrfs_path *path);
 
+int btrfs_valid_slot(struct btrfs_root *root, struct btrfs_key *f,
+		     struct btrfs_path *path);
+
+#define btrfs_for_each_slot(root, key, found_key, path, ret)		\
+	for (ret = btrfs_search_slot(NULL, root, key, path, 0, 0);		\
+		({								\
+			ret >= 0 &&						\
+			(ret = btrfs_valid_slot(root, found_key, path)) == 0;	\
+		});								\
+		path->slots[0]++						\
+	)
+
 static inline int btrfs_next_old_item(struct btrfs_root *root,
 				      struct btrfs_path *p, u64 time_seq)
 {
