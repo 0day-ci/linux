@@ -376,7 +376,7 @@ EXPORT_SYMBOL_GPL(acpi_os_map_iomem);
 
 void *__ref acpi_os_map_memory(acpi_physical_address phys, acpi_size size)
 {
-	return (void *)acpi_os_map_iomem(phys, size);
+	return (__force void *)acpi_os_map_iomem(phys, size);
 }
 EXPORT_SYMBOL_GPL(acpi_os_map_memory);
 
