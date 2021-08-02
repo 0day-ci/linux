@@ -22,6 +22,8 @@ static int ice_eswitch_setup_env(struct ice_pf *pf)
 	struct ice_port_info *pi = pf->hw.port_info;
 	bool rule_added = false;
 
+	ice_vsi_manage_vlan_stripping(ctrl_vsi, false);
+
 	ice_remove_vsi_fltr(&pf->hw, uplink_vsi->idx);
 
 	if (ice_vsi_add_vlan(uplink_vsi, 0, ICE_FWD_TO_VSI))
