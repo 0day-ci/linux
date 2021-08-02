@@ -76,6 +76,7 @@ enum {
 	NULL_IRQ_NONE		= 0,
 	NULL_IRQ_SOFTIRQ	= 1,
 	NULL_IRQ_TIMER		= 2,
+	NULL_IRQ_MANAGED	= 3,
 };
 
 enum {
@@ -181,7 +182,7 @@ static int g_irqmode = NULL_IRQ_SOFTIRQ;
 static int null_set_irqmode(const char *str, const struct kernel_param *kp)
 {
 	return null_param_store_val(str, &g_irqmode, NULL_IRQ_NONE,
-					NULL_IRQ_TIMER);
+					NULL_IRQ_MANAGED);
 }
 
 static const struct kernel_param_ops null_irqmode_param_ops = {
@@ -190,7 +191,7 @@ static const struct kernel_param_ops null_irqmode_param_ops = {
 };
 
 device_param_cb(irqmode, &null_irqmode_param_ops, &g_irqmode, 0444);
-MODULE_PARM_DESC(irqmode, "IRQ completion handler. 0-none, 1-softirq, 2-timer");
+MODULE_PARM_DESC(irqmode, "IRQ completion handler. 0-none, 1-softirq, 2-timer, 3-pseudo managed");
 
 static unsigned long g_completion_nsec = 10000;
 module_param_named(completion_nsec, g_completion_nsec, ulong, 0444);
@@ -716,7 +717,18 @@ static void end_cmd(struct nullb_cmd *cmd)
 
 static enum hrtimer_restart null_cmd_timer_expired(struct hrtimer *timer)
 {
-	end_cmd(container_of(timer, struct nullb_cmd, timer));
+	struct nullb_cmd *cmd = container_of(timer, struct nullb_cmd, timer);
+	struct nullb_queue *nq = cmd->nq;
+	struct request *rq = cmd->rq;
+	struct blk_mq_hw_ctx *hctx = rq->mq_hctx;
+
+	if ((nq->dev->irqmode == NULL_IRQ_MANAGED) &&
+	    (cpumask_any_and(hctx->cpumask, cpu_online_mask) >= nr_cpu_ids)) {
+		/* All CPUs associated are offline -> trigger a timeout */
+		cmd->fake_timeout = true;
+	} else {
+		end_cmd(cmd);
+	}
 
 	return HRTIMER_NORESTART;
 }
@@ -1333,6 +1345,7 @@ static inline void nullb_complete_cmd(struct nullb_cmd *cmd)
 		end_cmd(cmd);
 		break;
 	case NULL_IRQ_TIMER:
+	case NULL_IRQ_MANAGED:
 		null_cmd_end_timer(cmd);
 		break;
 	}
@@ -1488,7 +1501,8 @@ static blk_status_t null_queue_rq(struct blk_mq_hw_ctx *hctx,
 
 	might_sleep_if(hctx->flags & BLK_MQ_F_BLOCKING);
 
-	if (nq->dev->irqmode == NULL_IRQ_TIMER) {
+	if (nq->dev->irqmode == NULL_IRQ_TIMER ||
+	    nq->dev->irqmode == NULL_IRQ_MANAGED) {
 		hrtimer_init(&cmd->timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 		cmd->timer.function = null_cmd_timer_expired;
 	}
@@ -1568,12 +1582,23 @@ static int null_init_hctx(struct blk_mq_hw_ctx *hctx, void *driver_data,
 	return 0;
 }
 
+static int null_map_queues(struct blk_mq_tag_set *set)
+{
+	struct blk_mq_queue_map *qmap = &set->map[HCTX_TYPE_DEFAULT];
+
+	if (g_irqmode == NULL_IRQ_MANAGED)
+		qmap->use_managed_irq = 1;
+
+	return blk_mq_map_queues(qmap);
+}
+
 static const struct blk_mq_ops null_mq_ops = {
 	.queue_rq       = null_queue_rq,
 	.complete	= null_complete_rq,
 	.timeout	= null_timeout_rq,
 	.init_hctx	= null_init_hctx,
 	.exit_hctx	= null_exit_hctx,
+	.map_queues	= null_map_queues,
 };
 
 static void null_del_dev(struct nullb *nullb)
@@ -1761,7 +1786,7 @@ static int null_validate_conf(struct nullb_device *dev)
 		dev->submit_queues = 1;
 
 	dev->queue_mode = min_t(unsigned int, dev->queue_mode, NULL_Q_MQ);
-	dev->irqmode = min_t(unsigned int, dev->irqmode, NULL_IRQ_TIMER);
+	dev->irqmode = min_t(unsigned int, dev->irqmode, NULL_IRQ_MANAGED);
 
 	/* Do memory allocation, so set blocking */
 	if (dev->memory_backed)
@@ -1961,6 +1986,12 @@ static int __init null_init(void)
 		pr_err("legacy IO path no longer available\n");
 		return -EINVAL;
 	}
+
+	if (g_queue_mode == NULL_Q_BIO && g_irqmode == NULL_IRQ_MANAGED) {
+		pr_err("bio queue mode not supported with pseudo-managed irqs\n");
+		return -EINVAL;
+	}
+
 	if (g_queue_mode == NULL_Q_MQ && g_use_per_node_hctx) {
 		if (g_submit_queues != nr_online_nodes) {
 			pr_warn("submit_queues param is set to %u.\n",
