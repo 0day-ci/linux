@@ -735,44 +735,6 @@ static int set_proto_ctx_param(struct drm_i915_file_private *fpriv,
 	return ret;
 }
 
-static struct i915_address_space *
-context_get_vm_rcu(struct i915_gem_context *ctx)
-{
-	GEM_BUG_ON(!rcu_access_pointer(ctx->vm));
-
-	do {
-		struct i915_address_space *vm;
-
-		/*
-		 * We do not allow downgrading from full-ppgtt [to a shared
-		 * global gtt], so ctx->vm cannot become NULL.
-		 */
-		vm = rcu_dereference(ctx->vm);
-		if (!kref_get_unless_zero(&vm->ref))
-			continue;
-
-		/*
-		 * This ppgtt may have be reallocated between
-		 * the read and the kref, and reassigned to a third
-		 * context. In order to avoid inadvertent sharing
-		 * of this ppgtt with that third context (and not
-		 * src), we have to confirm that we have the same
-		 * ppgtt after passing through the strong memory
-		 * barrier implied by a successful
-		 * kref_get_unless_zero().
-		 *
-		 * Once we have acquired the current ppgtt of ctx,
-		 * we no longer care if it is released from ctx, as
-		 * it cannot be reallocated elsewhere.
-		 */
-
-		if (vm == rcu_access_pointer(ctx->vm))
-			return rcu_pointer_handoff(vm);
-
-		i915_vm_put(vm);
-	} while (1);
-}
-
 static int intel_context_set_gem(struct intel_context *ce,
 				 struct i915_gem_context *ctx,
 				 struct intel_sseu sseu)
@@ -1193,7 +1155,7 @@ static void context_close(struct i915_gem_context *ctx)
 
 	set_closed_name(ctx);
 
-	vm = i915_gem_context_vm(ctx);
+	vm = ctx->vm;
 	if (vm)
 		i915_vm_close(vm);
 
@@ -1350,7 +1312,7 @@ i915_gem_create_context(struct drm_i915_private *i915,
 		vm = &ppgtt->vm;
 	}
 	if (vm) {
-		RCU_INIT_POINTER(ctx->vm, i915_vm_open(vm));
+		ctx->vm = i915_vm_open(vm);
 
 		/* i915_vm_open() takes a reference */
 		i915_vm_put(vm);
@@ -1576,15 +1538,12 @@ static int get_ppgtt(struct drm_i915_file_private *file_priv,
 	if (!i915_gem_context_is_full_ppgtt(ctx))
 		return -ENODEV;
 
-	rcu_read_lock();
-	vm = context_get_vm_rcu(ctx);
-	rcu_read_unlock();
-	if (!vm)
-		return -ENODEV;
+	vm = ctx->vm;
+	GEM_BUG_ON(!vm);
 
 	err = xa_alloc(&file_priv->vm_xa, &id, vm, xa_limit_32b, GFP_KERNEL);
 	if (err)
-		goto err_put;
+		return err;
 
 	i915_vm_open(vm);
 
@@ -1592,8 +1551,6 @@ static int get_ppgtt(struct drm_i915_file_private *file_priv,
 	args->value = id;
 	args->size = 0;
 
-err_put:
-	i915_vm_put(vm);
 	return err;
 }
 
