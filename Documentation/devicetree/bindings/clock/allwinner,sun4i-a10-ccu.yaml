@@ -43,6 +43,8 @@ properties:
       - allwinner,sun50i-h6-r-ccu
       - allwinner,sun50i-h616-ccu
       - allwinner,sun50i-h616-r-ccu
+      - allwinner,sun50i-r329-ccu
+      - allwinner,sun50i-r329-r-ccu
       - allwinner,suniv-f1c100s-ccu
       - nextthing,gr8-ccu
 
@@ -104,6 +106,8 @@ else:
           - allwinner,sun50i-a100-ccu
           - allwinner,sun50i-h6-ccu
           - allwinner,sun50i-h616-ccu
+          - allwinner,sun50i-r329-ccu
+          - allwinner,sun50i-r329-r-ccu
 
   then:
     properties:
