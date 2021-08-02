@@ -133,8 +133,10 @@ static int scmi_cpufreq_init(struct cpufreq_policy *policy)
 		return -ENODEV;
 	}
 
-	if (!zalloc_cpumask_var(&opp_shared_cpus, GFP_KERNEL))
-		ret = -ENOMEM;
+	if (!zalloc_cpumask_var(&opp_shared_cpus, GFP_KERNEL)) {
+		dev_warn(cpu_dev, "failed to allocate cpumask\n");
+		return -ENOMEM;
+	}
 
 	/* Obtain CPUs that share SCMI performance controls */
 	ret = scmi_get_sharing_cpus(cpu_dev, policy->cpus);
