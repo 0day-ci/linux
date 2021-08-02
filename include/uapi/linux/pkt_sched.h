@@ -586,6 +586,18 @@ enum {
 
 #define TCA_ATM_MAX	(__TCA_ATM_MAX - 1)
 
+/* INGRESS section */
+
+enum {
+	TCA_INGRESS_UNSPEC,
+	TCA_INGRESS_FLAGS,
+#define	TC_INGRESS_CLSACT	   _BITUL(0)	/* enable clsact egress mini-Qdisc */
+#define	TC_INGRESS_SUPPORTED_FLAGS TC_INGRESS_CLSACT
+	__TCA_INGRESS_MAX,
+};
+
+#define	TCA_INGRESS_MAX	(__TCA_INGRESS_MAX - 1)
+
 /* Network emulator */
 
 enum {

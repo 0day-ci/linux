@@ -16,8 +16,12 @@
 
 struct ingress_sched_data {
 	struct tcf_block *block;
+	struct tcf_block *egress_block;
 	struct tcf_block_ext_info block_info;
+	struct tcf_block_ext_info egress_block_info;
 	struct mini_Qdisc_pair miniqp;
+	struct mini_Qdisc_pair miniqp_egress;
+	bool clsact;
 };
 
 static struct Qdisc *ingress_leaf(struct Qdisc *sch, unsigned long arg)
@@ -27,6 +31,11 @@ static struct Qdisc *ingress_leaf(struct Qdisc *sch, unsigned long arg)
 
 static unsigned long ingress_find(struct Qdisc *sch, u32 classid)
 {
+	struct ingress_sched_data *q = qdisc_priv(sch);
+
+	if (q->clsact && TC_H_MIN(classid) == TC_H_MIN(TC_H_MIN_EGRESS))
+		return TC_H_MIN(TC_H_MIN_EGRESS);
+
 	return TC_H_MIN(classid) + 1;
 }
 
@@ -49,6 +58,9 @@ static struct tcf_block *ingress_tcf_block(struct Qdisc *sch, unsigned long cl,
 {
 	struct ingress_sched_data *q = qdisc_priv(sch);
 
+	if (q->clsact && cl == TC_H_MIN(TC_H_MIN_EGRESS))
+		return q->egress_block;
+
 	return q->block;
 }
 
@@ -66,11 +78,26 @@ static void ingress_ingress_block_set(struct Qdisc *sch, u32 block_index)
 	q->block_info.block_index = block_index;
 }
 
+static void ingress_egress_block_set(struct Qdisc *sch, u32 block_index)
+{
+	struct ingress_sched_data *q = qdisc_priv(sch);
+
+	if (q->clsact)
+		q->egress_block_info.block_index = block_index;
+}
+
 static u32 ingress_ingress_block_get(struct Qdisc *sch)
 {
 	struct ingress_sched_data *q = qdisc_priv(sch);
 
 	return q->block_info.block_index;
+}
+
+static u32 ingress_egress_block_get(struct Qdisc *sch)
+{
+	struct ingress_sched_data *q = qdisc_priv(sch);
+
+	return q->clsact ? q->egress_block_info.block_index : 0;
 }
 
 static int ingress_init(struct Qdisc *sch, struct nlattr *opt,
@@ -103,14 +130,76 @@ static void ingress_destroy(struct Qdisc *sch)
 
 	tcf_block_put_ext(q->block, sch, &q->block_info);
 	net_dec_ingress_queue();
+
+	if (q->clsact) {
+		tcf_block_put_ext(q->egress_block, sch, &q->egress_block_info);
+		net_dec_egress_queue();
+	}
+}
+
+static const struct nla_policy ingress_policy[TCA_INGRESS_MAX + 1] = {
+	[TCA_INGRESS_FLAGS] = NLA_POLICY_BITFIELD32(TC_INGRESS_SUPPORTED_FLAGS),
+};
+
+static int ingress_change(struct Qdisc *sch, struct nlattr *arg, struct netlink_ext_ack *extack)
+{
+	struct ingress_sched_data *q = qdisc_priv(sch);
+	struct net_device *dev = qdisc_dev(sch);
+	struct nlattr *tb[TCA_INGRESS_MAX + 1];
+	struct nla_bitfield32 flags;
+	int err;
+
+	err = nla_parse_nested_deprecated(tb, TCA_INGRESS_MAX, arg, ingress_policy, extack);
+	if (err < 0)
+		return err;
+
+	if (!tb[TCA_INGRESS_FLAGS])
+		return -EINVAL;
+
+	flags = nla_get_bitfield32(tb[TCA_INGRESS_FLAGS]);
+
+	if (flags.value & TC_INGRESS_CLSACT) {
+		if (q->clsact)
+			return -EEXIST;
+
+		/* enable clsact egress mini-Qdisc */
+		mini_qdisc_pair_init(&q->miniqp_egress, sch, &dev->miniq_egress);
+
+		q->egress_block_info.binder_type = FLOW_BLOCK_BINDER_TYPE_CLSACT_EGRESS;
+		q->egress_block_info.chain_head_change = clsact_chain_head_change;
+		q->egress_block_info.chain_head_change_priv = &q->miniqp_egress;
+
+		err = tcf_block_get_ext(&q->egress_block, sch, &q->egress_block_info, extack);
+		if (err)
+			return err;
+
+		net_inc_egress_queue();
+		q->clsact = true;
+	} else {
+		if (!q->clsact)
+			return -ENOENT;
+
+		/* disable clsact egress mini-Qdisc */
+		tcf_block_put_ext(q->egress_block, sch, &q->egress_block_info);
+
+		net_dec_egress_queue();
+		q->clsact = false;
+	}
+
+	return 0;
 }
 
 static int ingress_dump(struct Qdisc *sch, struct sk_buff *skb)
 {
+	struct ingress_sched_data *q = qdisc_priv(sch);
 	struct nlattr *nest;
 
 	nest = nla_nest_start_noflag(skb, TCA_OPTIONS);
 	if (nest == NULL)
+		goto nla_put_failure;
+
+	if (nla_put_bitfield32(skb, TCA_INGRESS_FLAGS, q->clsact ? TC_INGRESS_CLSACT : 0,
+			       TC_INGRESS_SUPPORTED_FLAGS))
 		goto nla_put_failure;
 
 	return nla_nest_end(skb, nest);
@@ -137,9 +226,12 @@ static struct Qdisc_ops ingress_qdisc_ops __read_mostly = {
 	.static_flags		=	TCQ_F_CPUSTATS,
 	.init			=	ingress_init,
 	.destroy		=	ingress_destroy,
+	.change			=	ingress_change,
 	.dump			=	ingress_dump,
 	.ingress_block_set	=	ingress_ingress_block_set,
+	.egress_block_set	=	ingress_egress_block_set,
 	.ingress_block_get	=	ingress_ingress_block_get,
+	.egress_block_get	=	ingress_egress_block_get,
 	.owner			=	THIS_MODULE,
 };
 
