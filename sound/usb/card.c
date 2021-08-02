@@ -907,8 +907,13 @@ static void usb_audio_disconnect(struct usb_interface *intf)
 		}
 	}
 
-	if (chip->quirk_type & QUIRK_SETUP_DISABLE_AUTOSUSPEND)
-		usb_enable_autosuspend(interface_to_usbdev(intf));
+	if (chip->quirk_type & QUIRK_SETUP_DISABLE_AUTOSUSPEND) {
+		struct usb_device *udev = interface_to_usbdev(intf);
+
+		usb_lock_device(udev);
+		usb_enable_autosuspend(udev);
+		usb_unlock_device(udev);
+	}
 
 	chip->num_interfaces--;
 	if (chip->num_interfaces <= 0) {
