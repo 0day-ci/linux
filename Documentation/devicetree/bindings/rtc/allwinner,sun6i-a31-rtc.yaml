@@ -26,6 +26,7 @@ properties:
           - const: allwinner,sun50i-a64-rtc
           - const: allwinner,sun8i-h3-rtc
       - const: allwinner,sun50i-h6-rtc
+      - const: allwinner,sun50i-r329-rtc
 
   reg:
     maxItems: 1
@@ -86,6 +87,7 @@ allOf:
             enum:
               - allwinner,sun8i-h3-rtc
               - allwinner,sun50i-h5-rtc
+              - allwinner,sun50i-r329-rtc
 
     then:
       properties:
@@ -109,7 +111,9 @@ allOf:
       properties:
         compatible:
           contains:
-            const: allwinner,sun8i-r40-rtc
+            enum:
+              - allwinner,sun8i-r40-rtc
+              - allwinner,sun50i-r329-rtc
 
     then:
       properties:
