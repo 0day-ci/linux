@@ -5659,8 +5659,10 @@ int btrfs_drop_snapshot(struct btrfs_root *root, int update_ref, int for_reloc)
 		}
 	}
 	btrfs_release_path(path);
-	if (err)
+	if (err) {
+		btrfs_abort_transaction(trans, err);
 		goto out_end_trans;
+	}
 
 	ret = btrfs_del_root(trans, &root->root_key);
 	if (ret) {
