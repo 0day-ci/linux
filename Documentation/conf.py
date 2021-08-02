@@ -341,6 +341,9 @@ latex_elements = {
         verbatimhintsturnover=false,
     ''',
 
+    # For CJK One-half spacing, need to be in front of hyperref
+    'extrapackages': r'\usepackage{setspace}',
+
     # Additional stuff for the LaTeX preamble.
     'preamble': '''
 	% Prevent column squeezing of tabulary.
@@ -405,8 +408,8 @@ latex_elements['preamble']  += '''
 	\\newCJKfontfamily[JPsans]\\jpsans{Noto Sans CJK JP}
 	\\newCJKfontfamily[JPmono]\\jpmono{Noto Sans Mono CJK JP}
 	% Define custom macros to on/off CJK
-	\\newcommand{\\kerneldocCJKon}{\\makexeCJKactive}
-	\\newcommand{\\kerneldocCJKoff}{\\makexeCJKinactive}
+	\\newcommand{\\kerneldocCJKon}{\\makexeCJKactive\\onehalfspacing}
+	\\newcommand{\\kerneldocCJKoff}{\\makexeCJKinactive\\singlespacing}
 	\\newcommand{\\kerneldocBeginSC}{%
 	    \\begingroup%
 	    \\scmain%
@@ -437,6 +440,8 @@ latex_elements['preamble']  += '''
 	    \\renewcommand{\\CJKttdefault}{JPmono}%
 	}
 	\\newcommand{\\kerneldocEndJP}{\\endgroup}
+	% Single spacing in literal blocks
+	\\fvset{baselinestretch=1}
 	% To customize \\sphinxtableofcontents
 	\\usepackage{etoolbox}
 	% Inactivate CJK after tableofcontents
