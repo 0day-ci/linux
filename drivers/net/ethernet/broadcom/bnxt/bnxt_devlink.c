@@ -379,6 +379,25 @@ static int bnxt_hwrm_get_nvm_cfg_ver(struct bnxt *bp,
 	return rc;
 }
 
+static int bnxt_dl_dev_capability_info_put(struct bnxt *bp, struct devlink_info_req *req)
+{
+	int rc;
+
+	if (bp->fw_cap & BNXT_FW_CAP_HOT_RESET) {
+		rc = devlink_info_device_capability_put(req, "hot_reset");
+		if (rc)
+			return rc;
+	}
+
+	if (bp->fw_cap & BNXT_FW_CAP_ERROR_RECOVERY) {
+		rc = devlink_info_device_capability_put(req, "error_recovery");
+		if (rc)
+			return rc;
+	}
+
+	return 0;
+}
+
 static int bnxt_dl_info_put(struct bnxt *bp, struct devlink_info_req *req,
 			    enum bnxt_dl_version_type type, const char *key,
 			    char *buf)
@@ -557,8 +576,16 @@ static int bnxt_dl_info_get(struct devlink *dl, struct devlink_info_req *req,
 	snprintf(roce_ver, FW_VER_STR_LEN, "%d.%d.%d.%d",
 		 nvm_dev_info.roce_fw_major, nvm_dev_info.roce_fw_minor,
 		 nvm_dev_info.roce_fw_build, nvm_dev_info.roce_fw_patch);
-	return bnxt_dl_info_put(bp, req, BNXT_VERSION_STORED,
-				DEVLINK_INFO_VERSION_GENERIC_FW_ROCE, roce_ver);
+	rc = bnxt_dl_info_put(bp, req, BNXT_VERSION_STORED,
+			      DEVLINK_INFO_VERSION_GENERIC_FW_ROCE, roce_ver);
+	if (rc)
+		return rc;
+
+	rc = bnxt_dl_dev_capability_info_put(bp, req);
+	if (rc)
+		return rc;
+
+	return 0;
 }
 
 static int bnxt_hwrm_nvm_req(struct bnxt *bp, u32 param_id, void *msg,
