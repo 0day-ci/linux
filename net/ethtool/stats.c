@@ -117,6 +117,15 @@ static int stats_prepare_data(const struct ethnl_req_info *req_base,
 
 	ops = dev->ethtool_ops;
 
+	BUILD_BUG_ON(sizeof(data->phy_stats) / sizeof(u64) !=
+		     __ETHTOOL_A_STATS_ETH_PHY_CNT);
+	BUILD_BUG_ON(sizeof(data->mac_stats) / sizeof(u64) !=
+		     __ETHTOOL_A_STATS_ETH_MAC_CNT);
+	BUILD_BUG_ON(sizeof(data->ctrl_stats) / sizeof(u64) !=
+		     __ETHTOOL_A_STATS_ETH_CTRL_CNT);
+	BUILD_BUG_ON(offsetof(typeof(data->rmon_stats), hist) / sizeof(u64) !=
+		     __ETHTOOL_A_STATS_RMON_CNT);
+
 	/* Mark all stats as unset (see ETHTOOL_STAT_NOT_SET) to prevent them
 	 * from being reported to user space in case driver did not set them.
 	 */
