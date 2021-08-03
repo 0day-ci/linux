@@ -2828,6 +2828,13 @@ static void destroy_worker_func(struct work_struct *w)
 		intel_gt_pm_unpark_work_add(gt, destroy_worker);
 }
 
+/* Future patches will use this function */
+__maybe_unused
+static void guc_child_context_destroy(struct kref *kref)
+{
+	__guc_context_destroy(container_of(kref, struct intel_context, ref));
+}
+
 static void guc_context_destroy(struct kref *kref)
 {
 	struct intel_context *ce = container_of(kref, typeof(*ce), ref);
