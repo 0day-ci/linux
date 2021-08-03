@@ -181,8 +181,8 @@ enum mt7530_vlan_egress_attr {
 
 /* Register for port STP state control */
 #define MT7530_SSP_P(x)			(0x2000 + ((x) * 0x100))
-#define  FID_PST(x)			((x) & 0x3)
-#define  FID_PST_MASK			FID_PST(0x3)
+#define  FID1_PST(x)			(((x) & 0x3) << 2)
+#define  FID1_PST_MASK			FID1_PST(0x3)
 
 enum mt7530_stp_state {
 	MT7530_STP_DISABLED = 0,
