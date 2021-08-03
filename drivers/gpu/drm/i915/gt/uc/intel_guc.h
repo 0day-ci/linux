@@ -53,6 +53,8 @@ struct intel_guc {
 	 */
 	spinlock_t contexts_lock;
 	struct ida guc_ids;
+	u32 num_guc_ids;
+	u32 max_guc_ids;
 	struct list_head guc_id_list;
 
 	bool submission_supported;
