@@ -4109,8 +4109,8 @@ done:
 	 * Here we used to have a check for PageError() and then set @ret and
 	 * call end_extent_writepage().
 	 *
-	 * But in fact setting @ret here will cause different error paths
-	 * between subpage and regular sectorsize.
+	 * But in fact setting @ret and call end_extent_writepage() here will
+	 * cause different error paths between subpage and regular sectorsize.
 	 *
 	 * For regular page size, we never submit current page, but only add
 	 * current page to current bio.
@@ -4122,7 +4122,12 @@ done:
 	 * thus can get PageError() set by submitted bio of the same page,
 	 * while our @ret is still 0.
 	 *
-	 * So here we unify the behavior and don't set @ret.
+	 * The same is also for end_extent_writepage(), which can finish
+	 * ordered extent before submitting the real bio, causing
+	 * BUG_ON() in btrfs_csum_one_bio().
+	 *
+	 * So here we unify the behavior and don't set @ret nor call
+	 * end_extent_writepage().
 	 * Error can still be properly passed to higher layer as page will
 	 * be set error, here we just don't handle the IO failure.
 	 *
@@ -4136,8 +4141,7 @@ done:
 	 * Currently the full page based __extent_writepage_io() is not
 	 * capable of that.
 	 */
-	if (PageError(page))
-		end_extent_writepage(page, ret, start, page_end);
+
 	unlock_page(page);
 	ASSERT(ret <= 0);
 	return ret;
