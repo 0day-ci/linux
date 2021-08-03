@@ -141,7 +141,7 @@ static inline void *fit_chunk(addr_t *start, addr_t end, size_t len,
 
 	addr = ALIGN(*start, align);
 	if (check_4k && CROSS4K(addr, len)) {
-		addr = ALIGN(addr, 4096);
+		addr = PAGE_ALIGN(addr);
 		addr = ALIGN(addr, align);
 	}
 	if (addr + len > end)
