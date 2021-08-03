@@ -911,15 +911,6 @@ static int bcm_resource(struct acpi_resource *ares, void *data)
 		dev->irq_active_low = true;
 		break;
 
-	case ACPI_RESOURCE_TYPE_GPIO:
-		gpio = &ares->data.gpio;
-		if (gpio->connection_type == ACPI_RESOURCE_GPIO_TYPE_INT) {
-			dev->gpio_int_idx = dev->gpio_count;
-			dev->irq_active_low = gpio->polarity == ACPI_ACTIVE_LOW;
-		}
-		dev->gpio_count++;
-		break;
-
 	default:
 		break;
 	}
@@ -927,6 +918,12 @@ static int bcm_resource(struct acpi_resource *ares, void *data)
 	if (serdev_acpi_get_uart_resource(ares, &uart)) {
 		dev->init_speed = uart->default_baud_rate;
 		dev->oper_speed = 4000000;
+	} else if (acpi_gpio_get_irq_resource(ares, &gpio)) {
+		dev->gpio_int_idx = dev->gpio_count;
+		dev->irq_active_low = gpio->polarity == ACPI_ACTIVE_LOW;
+		dev->gpio_count++;
+	} else if (acpi_gpio_get_io_resource(ares, &gpio)) {
+		dev->gpio_count++;
 	}
 
 	return 0;
