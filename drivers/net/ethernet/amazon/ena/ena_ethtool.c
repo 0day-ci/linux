@@ -90,12 +90,6 @@ static const struct ena_stats ena_stats_rx_strings[] = {
 	ENA_STAT_RX_ENTRY(bad_req_id),
 	ENA_STAT_RX_ENTRY(empty_rx_ring),
 	ENA_STAT_RX_ENTRY(csum_unchecked),
-	ENA_STAT_RX_ENTRY(xdp_aborted),
-	ENA_STAT_RX_ENTRY(xdp_drop),
-	ENA_STAT_RX_ENTRY(xdp_pass),
-	ENA_STAT_RX_ENTRY(xdp_tx),
-	ENA_STAT_RX_ENTRY(xdp_invalid),
-	ENA_STAT_RX_ENTRY(xdp_redirect),
 };
 
 static const struct ena_stats ena_stats_ena_com_strings[] = {
@@ -321,6 +315,44 @@ static void ena_get_ethtool_strings(struct net_device *netdev,
 	case ETH_SS_STATS:
 		ena_get_strings(adapter, data, adapter->eni_stats_supported);
 		break;
+	}
+}
+
+static int ena_get_std_stats_channels(struct net_device *netdev, u32 sset)
+{
+	const struct ena_adapter *adapter = netdev_priv(netdev);
+
+	switch (sset) {
+	case ETH_SS_STATS_XDP:
+		return adapter->num_io_queues;
+	default:
+		return -EOPNOTSUPP;
+	}
+}
+
+static void ena_get_xdp_stats(struct net_device *netdev,
+			      struct ethtool_xdp_stats *xdp_stats)
+{
+	const struct ena_adapter *adapter = netdev_priv(netdev);
+	const struct u64_stats_sync *syncp;
+	const struct ena_stats_rx *stats;
+	struct ethtool_xdp_stats *iter;
+	u32 i;
+
+	for (i = 0; i < adapter->num_io_queues; i++) {
+		stats = &adapter->rx_ring[i].rx_stats;
+		syncp = &adapter->rx_ring[i].syncp;
+		iter = xdp_stats + i;
+
+		ena_safe_update_stat(&stats->xdp_drop, &iter->drop, syncp);
+		ena_safe_update_stat(&stats->xdp_pass, &iter->pass, syncp);
+		ena_safe_update_stat(&stats->xdp_tx, &iter->tx, syncp);
+		ena_safe_update_stat(&stats->xdp_redirect, &iter->redirect,
+				     syncp);
+		ena_safe_update_stat(&stats->xdp_aborted, &iter->aborted,
+				     syncp);
+		ena_safe_update_stat(&stats->xdp_invalid, &iter->invalid,
+				     syncp);
 	}
 }
 
@@ -916,6 +948,8 @@ static const struct ethtool_ops ena_ethtool_ops = {
 	.get_tunable		= ena_get_tunable,
 	.set_tunable		= ena_set_tunable,
 	.get_ts_info            = ethtool_op_get_ts_info,
+	.get_std_stats_channels	= ena_get_std_stats_channels,
+	.get_xdp_stats		= ena_get_xdp_stats,
 };
 
 void ena_set_ethtool_ops(struct net_device *netdev)
