@@ -22,6 +22,7 @@ SYSCALL_DEFINE5(pciconfig_read, unsigned long, bus, unsigned long, dfn,
 	int err, cfg_ret;
 
 	err = -EPERM;
+	dev = NULL;
 	if (!capable(CAP_SYS_ADMIN))
 		goto error;
 
