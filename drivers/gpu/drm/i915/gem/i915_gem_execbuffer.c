@@ -255,6 +255,9 @@ struct i915_execbuffer {
 	/* batch_index in vma list */
 	unsigned int batch_index;
 
+	/* number of batches in execbuf IOCTL */
+	unsigned int num_batches;
+
 	/** actual size of execobj[] as we may extend it for the cmdparser */
 	unsigned int buffer_count;
 
@@ -511,6 +514,14 @@ static bool platform_has_relocs_enabled(const struct i915_execbuffer *eb)
 	return false;
 }
 
+static inline bool
+is_batch_buffer(struct i915_execbuffer *eb, unsigned int buffer_idx)
+{
+	return eb->args->flags & I915_EXEC_BATCH_FIRST ?
+		buffer_idx <= eb->num_batches :
+		buffer_idx >= eb->args->buffer_count - eb->num_batches;
+}
+
 static int
 eb_validate_vma(struct i915_execbuffer *eb,
 		struct drm_i915_gem_exec_object2 *entry,
@@ -562,11 +573,10 @@ eb_validate_vma(struct i915_execbuffer *eb,
 
 static void
 eb_add_vma(struct i915_execbuffer *eb,
-	   unsigned int i, unsigned batch_idx,
-	   struct i915_vma *vma)
+	   unsigned int buffer_idx, struct i915_vma *vma)
 {
-	struct drm_i915_gem_exec_object2 *entry = &eb->exec[i];
-	struct eb_vma *ev = &eb->vma[i];
+	struct drm_i915_gem_exec_object2 *entry = &eb->exec[buffer_idx];
+	struct eb_vma *ev = &eb->vma[buffer_idx];
 
 	ev->vma = vma;
 	ev->exec = entry;
@@ -591,14 +601,15 @@ eb_add_vma(struct i915_execbuffer *eb,
 	 * Note that actual hangs have only been observed on gen7, but for
 	 * paranoia do it everywhere.
 	 */
-	if (i == batch_idx) {
+	if (is_batch_buffer(eb, buffer_idx)) {
 		if (entry->relocation_count &&
 		    !(ev->flags & EXEC_OBJECT_PINNED))
 			ev->flags |= __EXEC_OBJECT_NEEDS_BIAS;
 		if (eb->reloc_cache.has_fence)
 			ev->flags |= EXEC_OBJECT_NEEDS_FENCE;
 
-		eb->batch = ev;
+		if (buffer_idx == eb->batch_index)
+			eb->batch = ev;
 	}
 }
 
@@ -872,7 +883,7 @@ static int eb_lookup_vmas(struct i915_execbuffer *eb)
 			goto err;
 		}
 
-		eb_add_vma(eb, i, eb->batch_index, vma);
+		eb_add_vma(eb, i, vma);
 
 		if (i915_gem_object_is_userptr(vma->obj)) {
 			err = i915_gem_object_userptr_submit_init(vma->obj);
@@ -3147,6 +3158,7 @@ i915_gem_do_execbuffer(struct drm_device *dev,
 		       struct drm_i915_gem_execbuffer2 *args,
 		       struct drm_i915_gem_exec_object2 *exec,
 		       int batch_index,
+		       unsigned int num_batches,
 		       struct dma_fence *in_fence,
 		       struct dma_fence *exec_fence,
 		       struct dma_fence **out_fence)
@@ -3203,6 +3215,7 @@ i915_gem_do_execbuffer(struct drm_device *dev,
 
 	GEM_BUG_ON(!eb.lut_size);
 
+	eb.num_batches = num_batches;
 	if (batch_index >= 0)
 		eb.batch_index = batch_index;
 
@@ -3433,8 +3446,8 @@ i915_gem_execbuffer2_ioctl(struct drm_device *dev, void *data,
 		goto err_copy;
 	}
 
-	err = i915_gem_do_execbuffer(dev, file, args, exec2_list, -1, in_fence,
-				     exec_fence, out_fence_p);
+	err = i915_gem_do_execbuffer(dev, file, args, exec2_list, -1, 1,
+				     in_fence, exec_fence, out_fence_p);
 
 	/*
 	 * Now that we have begun execution of the batchbuffer, we ignore
