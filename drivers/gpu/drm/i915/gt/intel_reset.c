@@ -849,6 +849,7 @@ static void reset_finish(struct intel_gt *gt, intel_engine_mask_t awake)
 
 static void nop_submit_request(struct i915_request *request)
 {
+	struct intel_context *ce = intel_context_to_parent(request->context);
 	RQ_TRACE(request, "-EIO\n");
 
 	/*
@@ -857,7 +858,7 @@ static void nop_submit_request(struct i915_request *request)
 	 * this for now.
 	 */
 	if (intel_engine_uses_guc(request->engine))
-		intel_guc_decr_num_rq_not_ready(request->context);
+		intel_guc_decr_num_rq_not_ready(ce);
 
 	request = i915_request_mark_eio(request);
 	if (request) {

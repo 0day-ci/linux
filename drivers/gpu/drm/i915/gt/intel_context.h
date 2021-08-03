@@ -54,6 +54,12 @@ static inline bool intel_context_is_parent(struct intel_context *ce)
 	return !!ce->guc_number_children;
 }
 
+static inline struct intel_context *
+intel_context_to_parent(struct intel_context *ce)
+{
+	return intel_context_is_child(ce) ? ce->parent : ce;
+}
+
 void intel_context_bind_parent_child(struct intel_context *parent,
 				     struct intel_context *child);
 

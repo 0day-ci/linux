@@ -24,6 +24,7 @@ struct __guc_ads_blob;
 
 enum {
 	GUC_SUBMIT_ENGINE_SINGLE_LRC,
+	GUC_SUBMIT_ENGINE_MULTI_LRC,
 	GUC_SUBMIT_ENGINE_MAX
 };
 
@@ -59,8 +60,10 @@ struct intel_guc {
 	struct ida guc_ids;
 	u32 num_guc_ids;
 	u32 max_guc_ids;
-	struct list_head guc_id_list_no_ref;
-	struct list_head guc_id_list_unpinned;
+	unsigned long *guc_ids_bitmap;
+#define MAX_GUC_ID_ORDER	(order_base_2(MAX_ENGINE_INSTANCE + 1))
+	struct list_head guc_id_list_no_ref[MAX_GUC_ID_ORDER + 1];
+	struct list_head guc_id_list_unpinned[MAX_GUC_ID_ORDER + 1];
 
 	spinlock_t destroy_lock;	/* protects list / worker */
 	struct list_head destroyed_contexts;

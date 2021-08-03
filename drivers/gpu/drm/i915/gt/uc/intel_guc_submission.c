@@ -170,6 +170,15 @@ static void clr_guc_ids_exhausted(struct guc_submit_engine *gse)
 }
 
 /*
+ * We reserve 1/16 of the guc_ids for multi-lrc as these need to be contiguous
+ * and a different allocation algorithm is used (bitmap vs. ida). We believe the
+ * number of multi-lrc contexts in use should be low and 1/16 should be
+ * sufficient. Minimum of 32 ids for multi-lrc.
+ */
+#define NUMBER_MULTI_LRC_GUC_ID(guc) \
+	((guc)->num_guc_ids / 16 > 32 ? (guc)->num_guc_ids / 16 : 32)
+
+/*
  * Below is a set of functions which control the GuC scheduling state which do
  * not require a lock as all state transitions are mutually exclusive. i.e. It
  * is not possible for the context pinning code and submission, for the same
@@ -406,15 +415,9 @@ static inline void decr_context_blocked(struct intel_context *ce)
 }
 
 static inline struct intel_context *
-to_parent(struct intel_context *ce)
-{
-	return intel_context_is_child(ce) ? ce->parent : ce;
-}
-
-static inline struct intel_context *
 request_to_scheduling_context(struct i915_request *rq)
 {
-	return to_parent(rq->context);
+	return intel_context_to_parent(rq->context);
 }
 
 static inline bool context_guc_id_invalid(struct intel_context *ce)
@@ -1436,7 +1439,7 @@ static void destroy_worker_func(struct work_struct *w);
  */
 int intel_guc_submission_init(struct intel_guc *guc)
 {
-	int ret;
+	int ret, i;
 
 	if (guc_submission_initialized(guc))
 		return 0;
@@ -1448,9 +1451,13 @@ int intel_guc_submission_init(struct intel_guc *guc)
 	xa_init_flags(&guc->context_lookup, XA_FLAGS_LOCK_IRQ);
 
 	spin_lock_init(&guc->contexts_lock);
-	INIT_LIST_HEAD(&guc->guc_id_list_no_ref);
-	INIT_LIST_HEAD(&guc->guc_id_list_unpinned);
+	for (i = 0; i < MAX_GUC_ID_ORDER + 1; ++i) {
+		INIT_LIST_HEAD(&guc->guc_id_list_no_ref[i]);
+		INIT_LIST_HEAD(&guc->guc_id_list_unpinned[i]);
+	}
 	ida_init(&guc->guc_ids);
+	guc->guc_ids_bitmap =
+		bitmap_zalloc(NUMBER_MULTI_LRC_GUC_ID(guc), GFP_KERNEL);
 
 	spin_lock_init(&guc->destroy_lock);
 
@@ -1476,6 +1483,8 @@ void intel_guc_submission_fini(struct intel_guc *guc)
 
 		i915_sched_engine_put(sched_engine);
 	}
+
+	bitmap_free(guc->guc_ids_bitmap);
 }
 
 static inline void queue_request(struct i915_sched_engine *sched_engine,
@@ -1499,11 +1508,13 @@ static inline void queue_request(struct i915_sched_engine *sched_engine,
 static bool too_many_guc_ids_not_ready(struct guc_submit_engine *gse,
 				       struct intel_context *ce)
 {
-	u32 available_guc_ids, guc_ids_consumed;
 	struct intel_guc *guc = gse->sched_engine.private_data;
+	u32 available_guc_ids = intel_context_is_parent(ce) ?
+		NUMBER_MULTI_LRC_GUC_ID(guc) :
+		guc->num_guc_ids - NUMBER_MULTI_LRC_GUC_ID(guc);
+	u32 guc_ids_consumed = atomic_read(&gse->num_guc_ids_not_ready);
 
-	available_guc_ids = guc->num_guc_ids;
-	guc_ids_consumed = atomic_read(&gse->num_guc_ids_not_ready);
+	GEM_BUG_ON(intel_context_is_child(ce));
 
 	if (TOO_MANY_GUC_IDS_NOT_READY(available_guc_ids, guc_ids_consumed)) {
 		set_and_update_guc_ids_exhausted(gse);
@@ -1517,17 +1528,26 @@ static void incr_num_rq_not_ready(struct intel_context *ce)
 {
 	struct guc_submit_engine *gse = ce_to_gse(ce);
 
+	GEM_BUG_ON(intel_context_is_child(ce));
+	GEM_BUG_ON(!intel_context_is_parent(ce) &&
+		   ce->guc_number_children);
+
 	if (!atomic_fetch_add(1, &ce->guc_num_rq_not_ready))
-		atomic_inc(&gse->num_guc_ids_not_ready);
+		atomic_add(ce->guc_number_children + 1,
+			   &gse->num_guc_ids_not_ready);
 }
 
 void intel_guc_decr_num_rq_not_ready(struct intel_context *ce)
 {
 	struct guc_submit_engine *gse = ce_to_gse(ce);
 
+	GEM_BUG_ON(intel_context_is_child(ce));
+
 	if (atomic_fetch_add(-1, &ce->guc_num_rq_not_ready) == 1) {
 		GEM_BUG_ON(!atomic_read(&gse->num_guc_ids_not_ready));
-		atomic_dec(&gse->num_guc_ids_not_ready);
+
+		atomic_sub(ce->guc_number_children + 1,
+			   &gse->num_guc_ids_not_ready);
 	}
 }
 
@@ -1579,20 +1599,42 @@ static void guc_submit_request(struct i915_request *rq)
 
 	spin_unlock_irqrestore(&sched_engine->lock, flags);
 
-	intel_guc_decr_num_rq_not_ready(rq->context);
+	intel_guc_decr_num_rq_not_ready(request_to_scheduling_context(rq));
 }
 
-static int new_guc_id(struct intel_guc *guc)
+static int new_guc_id(struct intel_guc *guc, struct intel_context *ce)
 {
-	return ida_simple_get(&guc->guc_ids, 0,
-			      guc->num_guc_ids, GFP_KERNEL |
-			      __GFP_RETRY_MAYFAIL | __GFP_NOWARN);
+	int ret;
+
+	GEM_BUG_ON(intel_context_is_child(ce));
+
+	if (intel_context_is_parent(ce))
+		ret = bitmap_find_free_region(guc->guc_ids_bitmap,
+					      NUMBER_MULTI_LRC_GUC_ID(guc),
+					      order_base_2(ce->guc_number_children
+							   + 1));
+	else
+		ret = ida_simple_get(&guc->guc_ids,
+				     NUMBER_MULTI_LRC_GUC_ID(guc),
+				     guc->num_guc_ids, GFP_KERNEL |
+				     __GFP_RETRY_MAYFAIL | __GFP_NOWARN);
+	if (unlikely(ret < 0))
+		return ret;
+
+	ce->guc_id = ret;
+	return 0;
 }
 
 static void __release_guc_id(struct intel_guc *guc, struct intel_context *ce)
 {
+	GEM_BUG_ON(intel_context_is_child(ce));
 	if (!context_guc_id_invalid(ce)) {
-		ida_simple_remove(&guc->guc_ids, ce->guc_id);
+		if (intel_context_is_parent(ce))
+			bitmap_release_region(guc->guc_ids_bitmap, ce->guc_id,
+					      order_base_2(ce->guc_number_children
+							   + 1));
+		else
+			ida_simple_remove(&guc->guc_ids, ce->guc_id);
 		clr_lrc_desc_registered(guc, ce->guc_id);
 		set_context_guc_id_invalid(ce);
 	}
@@ -1603,6 +1645,8 @@ static void __release_guc_id(struct intel_guc *guc, struct intel_context *ce)
 static void release_guc_id(struct intel_guc *guc, struct intel_context *ce)
 {
 	unsigned long flags;
+
+	GEM_BUG_ON(intel_context_is_child(ce));
 
 	spin_lock_irqsave(&guc->contexts_lock, flags);
 	__release_guc_id(guc, ce);
@@ -1618,54 +1662,93 @@ static void release_guc_id(struct intel_guc *guc, struct intel_context *ce)
  * schedule disable H2G + a deregister H2G.
  */
 static struct list_head *get_guc_id_list(struct intel_guc *guc,
+					 u8 number_children,
 					 bool unpinned)
 {
+	GEM_BUG_ON(order_base_2(number_children + 1) > MAX_GUC_ID_ORDER);
+
 	if (unpinned)
-		return &guc->guc_id_list_unpinned;
+		return &guc->guc_id_list_unpinned[order_base_2(number_children + 1)];
 	else
-		return &guc->guc_id_list_no_ref;
+		return &guc->guc_id_list_no_ref[order_base_2(number_children + 1)];
 }
 
-static int steal_guc_id(struct intel_guc *guc, bool unpinned)
+static int steal_guc_id(struct intel_guc *guc, struct intel_context *ce,
+			bool unpinned)
 {
-	struct intel_context *ce;
-	int guc_id;
-	struct list_head *guc_id_list = get_guc_id_list(guc, unpinned);
+	struct intel_context *cn;
+	u8 number_children = ce->guc_number_children;
 
 	lockdep_assert_held(&guc->contexts_lock);
+	GEM_BUG_ON(intel_context_is_child(ce));
 
-	if (!list_empty(guc_id_list)) {
-		ce = list_first_entry(guc_id_list,
-				      struct intel_context,
-				      guc_id_link);
+	do {
+		struct list_head *guc_id_list =
+			get_guc_id_list(guc, number_children, unpinned);
 
-		/* Ensure context getting stolen in expected state */
-		GEM_BUG_ON(atomic_read(&ce->guc_id_ref));
-		GEM_BUG_ON(context_guc_id_invalid(ce));
-		GEM_BUG_ON(context_guc_id_stolen(ce));
+		if (!list_empty(guc_id_list)) {
+			u8 cn_o2, ce_o2 =
+				order_base_2(ce->guc_number_children + 1);
 
-		list_del_init(&ce->guc_id_link);
-		guc_id = ce->guc_id;
-		clr_context_registered(ce);
+			cn = list_first_entry(guc_id_list,
+					      struct intel_context,
+					      guc_id_link);
+			cn_o2 = order_base_2(cn->guc_number_children + 1);
 
-		/*
-		 * If stealing from the pinned list, defer invalidating
-		 * the guc_id until the retire workqueue processes this
-		 * context.
-		 */
-		if (!unpinned) {
-			GEM_BUG_ON(ce_to_gse(ce)->stalled_context);
+			/*
+			 * Corner case where a multi-lrc context steals a guc_id
+			 * from another context that has more guc_id that itself.
+			 */
+			if (cn_o2 != ce_o2) {
+				bitmap_release_region(guc->guc_ids_bitmap,
+						      cn->guc_id,
+						      cn_o2);
+				bitmap_allocate_region(guc->guc_ids_bitmap,
+						       ce->guc_id,
+						       ce_o2);
+			}
 
-			ce_to_gse(ce)->stalled_context = intel_context_get(ce);
-			set_context_guc_id_stolen(ce);
-		} else {
-			set_context_guc_id_invalid(ce);
+			/* Ensure context getting stolen in expected state */
+			GEM_BUG_ON(atomic_read(&cn->guc_id_ref));
+			GEM_BUG_ON(context_guc_id_invalid(cn));
+			GEM_BUG_ON(context_guc_id_stolen(cn));
+			GEM_BUG_ON(ce_to_gse(ce) != ce_to_gse(cn));
+
+			list_del_init(&cn->guc_id_link);
+			ce->guc_id = cn->guc_id;
+
+			/*
+			 * If stealing from the pinned list, defer invalidating
+			 * the guc_id until the retire workqueue processes this
+			 * context.
+			 */
+			clr_context_registered(cn);
+			if (!unpinned) {
+				GEM_BUG_ON(ce_to_gse(cn)->stalled_context);
+				ce_to_gse(cn)->stalled_context =
+					intel_context_get(cn);
+				set_context_guc_id_stolen(cn);
+			} else {
+				set_context_guc_id_invalid(cn);
+			}
+
+			return 0;
 		}
 
-		return guc_id;
-	} else {
-		return -EAGAIN;
-	}
+		/*
+		 * When using multi-lrc we search the guc_id_lists with the
+		 * least amount of guc_ids required first but will consume a
+		 * block larger of guc_ids if necessary. 2x the children always
+		 * moves you two the next list.
+		 */
+		if (!number_children ||
+		    order_base_2(number_children + 1) == MAX_GUC_ID_ORDER)
+			break;
+
+		number_children *= 2;
+	} while (true);
+
+	return -EAGAIN;
 }
 
 enum {	/* Return values for pin_guc_id / assign_guc_id */
@@ -1674,17 +1757,18 @@ enum {	/* Return values for pin_guc_id / assign_guc_id */
 	NEW_GUC_ID_ENABLED	= 2,
 };
 
-static int assign_guc_id(struct intel_guc *guc, u16 *out, bool tasklet)
+static int assign_guc_id(struct intel_guc *guc, struct intel_context *ce,
+			 bool tasklet)
 {
 	int ret;
 
 	lockdep_assert_held(&guc->contexts_lock);
+	GEM_BUG_ON(intel_context_is_child(ce));
 
-	ret = new_guc_id(guc);
+	ret = new_guc_id(guc, ce);
 	if (unlikely(ret < 0)) {
-		ret = steal_guc_id(guc, true);
-		if (ret >= 0) {
-			*out = ret;
+		ret = steal_guc_id(guc, ce, true);
+		if (!ret) {
 			ret = NEW_GUC_ID_DISABLED;
 		} else if (ret < 0 && tasklet) {
 			/*
@@ -1692,15 +1776,18 @@ static int assign_guc_id(struct intel_guc *guc, u16 *out, bool tasklet)
 			 * enabled if guc_ids are exhausted and we are submitting
 			 * from the tasklet.
 			 */
-			ret = steal_guc_id(guc, false);
-			if (ret >= 0) {
-				*out = ret;
+			ret = steal_guc_id(guc, ce, false);
+			if (!ret)
 				ret = NEW_GUC_ID_ENABLED;
-			}
 		}
-	} else {
-		*out = ret;
-		ret = SAME_GUC_ID;
+	}
+
+	if (!(ret < 0) && intel_context_is_parent(ce)) {
+		struct intel_context *child;
+		int i = 1;
+
+		for_each_child(ce, child)
+			child->guc_id = ce->guc_id + i++;
 	}
 
 	return ret;
@@ -1713,6 +1800,7 @@ static int pin_guc_id(struct intel_guc *guc, struct intel_context *ce,
 	int ret = 0;
 	unsigned long flags, tries = PIN_GUC_ID_TRIES;
 
+	GEM_BUG_ON(intel_context_is_child(ce));
 	GEM_BUG_ON(atomic_read(&ce->guc_id_ref));
 
 try_again:
@@ -1724,7 +1812,7 @@ try_again:
 	}
 
 	if (context_guc_id_invalid(ce)) {
-		ret = assign_guc_id(guc, &ce->guc_id, tasklet);
+		ret = assign_guc_id(guc, ce, tasklet);
 		if (unlikely(ret < 0))
 			goto out_unlock;
 	}
@@ -1770,6 +1858,7 @@ static void unpin_guc_id(struct intel_guc *guc,
 	unsigned long flags;
 
 	GEM_BUG_ON(atomic_read(&ce->guc_id_ref) < 0);
+	GEM_BUG_ON(intel_context_is_child(ce));
 
 	if (unlikely(context_guc_id_invalid(ce)))
 		return;
@@ -1781,7 +1870,8 @@ static void unpin_guc_id(struct intel_guc *guc,
 
 	if (!context_guc_id_invalid(ce) && !context_guc_id_stolen(ce) &&
 	    !atomic_read(&ce->guc_id_ref)) {
-		struct list_head *head = get_guc_id_list(guc, unpinned);
+		struct list_head *head =
+			get_guc_id_list(guc, ce->guc_number_children, unpinned);
 
 		list_add_tail(&ce->guc_id_link, head);
 	}
