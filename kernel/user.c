@@ -137,9 +137,11 @@ static void free_user(struct user_struct *up, unsigned long flags)
 	__releases(&uidhash_lock)
 {
 	uid_hash_remove(up);
+#ifdef CONFIG_EPOLL
 	spin_unlock_irqrestore(&uidhash_lock, flags);
 	percpu_counter_destroy(&up->epoll_watches);
 	kmem_cache_free(uid_cachep, up);
+#endif
 }
 
 /*
@@ -186,10 +188,12 @@ struct user_struct *alloc_uid(kuid_t uid)
 
 		new->uid = uid;
 		refcount_set(&new->__count, 1);
+#ifdef CONFIG_EPOLL
 		if (percpu_counter_init(&new->epoll_watches, 0, GFP_KERNEL)) {
 			kmem_cache_free(uid_cachep, new);
 			return NULL;
 		}
+#endif
 		ratelimit_state_init(&new->ratelimit, HZ, 100);
 		ratelimit_set_flags(&new->ratelimit, RATELIMIT_MSG_ON_RELEASE);
 
@@ -200,7 +204,9 @@ struct user_struct *alloc_uid(kuid_t uid)
 		spin_lock_irq(&uidhash_lock);
 		up = uid_hash_find(uid, hashent);
 		if (up) {
+#ifdef CONFIG_EPOLL
 			percpu_counter_destroy(&new->epoll_watches);
+#endif
 			kmem_cache_free(uid_cachep, new);
 		} else {
 			uid_hash_insert(new, hashent);
@@ -222,8 +228,10 @@ static int __init uid_cache_init(void)
 	for(n = 0; n < UIDHASH_SZ; ++n)
 		INIT_HLIST_HEAD(uidhash_table + n);
 
+#ifdef CONFIG_EPOLL
 	if (percpu_counter_init(&root_user.epoll_watches, 0, GFP_KERNEL))
-		panic("percpu cpunter alloc failed");
+		panic("percpu counter alloc failed");
+#endif
 
 	/* Insert the root user immediately (init already runs as root) */
 	spin_lock_irq(&uidhash_lock);
