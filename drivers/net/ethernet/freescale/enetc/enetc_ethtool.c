@@ -192,18 +192,12 @@ static const struct {
 static const char rx_ring_stats[][ETH_GSTRING_LEN] = {
 	"Rx ring %2d frames",
 	"Rx ring %2d alloc errors",
-	"Rx ring %2d XDP drops",
 	"Rx ring %2d recycles",
 	"Rx ring %2d recycle failures",
-	"Rx ring %2d redirects",
-	"Rx ring %2d redirect failures",
-	"Rx ring %2d redirect S/G",
 };
 
 static const char tx_ring_stats[][ETH_GSTRING_LEN] = {
 	"Tx ring %2d frames",
-	"Tx ring %2d XDP frames",
-	"Tx ring %2d XDP drops",
 };
 
 static int enetc_get_sset_count(struct net_device *ndev, int sset)
@@ -275,21 +269,14 @@ static void enetc_get_ethtool_stats(struct net_device *ndev,
 	for (i = 0; i < ARRAY_SIZE(enetc_si_counters); i++)
 		data[o++] = enetc_rd64(hw, enetc_si_counters[i].reg);
 
-	for (i = 0; i < priv->num_tx_rings; i++) {
+	for (i = 0; i < priv->num_tx_rings; i++)
 		data[o++] = priv->tx_ring[i]->stats.packets;
-		data[o++] = priv->tx_ring[i]->stats.xdp_tx;
-		data[o++] = priv->tx_ring[i]->stats.xdp_tx_drops;
-	}
 
 	for (i = 0; i < priv->num_rx_rings; i++) {
 		data[o++] = priv->rx_ring[i]->stats.packets;
 		data[o++] = priv->rx_ring[i]->stats.rx_alloc_errs;
-		data[o++] = priv->rx_ring[i]->stats.xdp_drops;
 		data[o++] = priv->rx_ring[i]->stats.recycles;
 		data[o++] = priv->rx_ring[i]->stats.recycle_failures;
-		data[o++] = priv->rx_ring[i]->stats.xdp_redirect;
-		data[o++] = priv->rx_ring[i]->stats.xdp_redirect_failures;
-		data[o++] = priv->rx_ring[i]->stats.xdp_redirect_sg;
 	}
 
 	if (!enetc_si_is_pf(priv->si))
@@ -297,6 +284,45 @@ static void enetc_get_ethtool_stats(struct net_device *ndev,
 
 	for (i = 0; i < ARRAY_SIZE(enetc_port_counters); i++)
 		data[o++] = enetc_port_rd(hw, enetc_port_counters[i].reg);
+}
+
+static int enetc_get_std_stats_channels(struct net_device *ndev, u32 sset)
+{
+	const struct enetc_ndev_priv *priv = netdev_priv(ndev);
+
+	switch (sset) {
+	case ETH_SS_STATS_XDP:
+		return max(priv->num_rx_rings, priv->num_tx_rings);
+	default:
+		return -EOPNOTSUPP;
+	}
+}
+
+static void enetc_get_xdp_stats(struct net_device *ndev,
+				struct ethtool_xdp_stats *xdp_stats)
+{
+	const struct enetc_ndev_priv *priv = netdev_priv(ndev);
+	const struct enetc_ring_stats *stats;
+	struct ethtool_xdp_stats *iter;
+	u32 i;
+
+	for (i = 0; i < priv->num_tx_rings; i++) {
+		stats = &priv->tx_ring[i]->stats;
+		iter = xdp_stats + i;
+
+		iter->tx = stats->xdp_tx;
+		iter->tx_errors = stats->xdp_tx_drops;
+	}
+
+	for (i = 0; i < priv->num_rx_rings; i++) {
+		stats = &priv->rx_ring[i]->stats;
+		iter = xdp_stats + i;
+
+		iter->drop = stats->xdp_drops;
+		iter->redirect = stats->xdp_redirect;
+		iter->redirect_errors = stats->xdp_redirect_failures;
+		iter->redirect_errors += stats->xdp_redirect_sg;
+	}
 }
 
 #define ENETC_RSSHASH_L3 (RXH_L2DA | RXH_VLAN | RXH_L3_PROTO | RXH_IP_SRC | \
@@ -772,6 +798,8 @@ static const struct ethtool_ops enetc_pf_ethtool_ops = {
 	.set_wol = enetc_set_wol,
 	.get_pauseparam = enetc_get_pauseparam,
 	.set_pauseparam = enetc_set_pauseparam,
+	.get_std_stats_channels = enetc_get_std_stats_channels,
+	.get_xdp_stats = enetc_get_xdp_stats,
 };
 
 static const struct ethtool_ops enetc_vf_ethtool_ops = {
@@ -793,6 +821,8 @@ static const struct ethtool_ops enetc_vf_ethtool_ops = {
 	.set_coalesce = enetc_set_coalesce,
 	.get_link = ethtool_op_get_link,
 	.get_ts_info = enetc_get_ts_info,
+	.get_std_stats_channels = enetc_get_std_stats_channels,
+	.get_xdp_stats = enetc_get_xdp_stats,
 };
 
 void enetc_set_ethtool_ops(struct net_device *ndev)
