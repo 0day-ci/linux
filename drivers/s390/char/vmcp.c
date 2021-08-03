@@ -60,17 +60,16 @@ void __init vmcp_cma_reserve(void)
 static void vmcp_response_alloc(struct vmcp_session *session)
 {
 	struct page *page = NULL;
-	int nr_pages, order;
+	int order;
 
 	order = get_order(session->bufsize);
-	nr_pages = ALIGN(session->bufsize, PAGE_SIZE) >> PAGE_SHIFT;
 	/*
 	 * For anything below order 3 allocations rely on the buddy
 	 * allocator. If such low-order allocations can't be handled
 	 * anymore the system won't work anyway.
 	 */
 	if (order > 2)
-		page = cma_alloc(vmcp_cma, nr_pages, 0, false);
+		page = cma_alloc(vmcp_cma, PFN_UP(session->bufsize), 0, false);
 	if (page) {
 		session->response = (char *)page_to_phys(page);
 		session->cma_alloc = 1;
@@ -81,16 +80,15 @@ static void vmcp_response_alloc(struct vmcp_session *session)
 
 static void vmcp_response_free(struct vmcp_session *session)
 {
-	int nr_pages, order;
+	int order;
 	struct page *page;
 
 	if (!session->response)
 		return;
 	order = get_order(session->bufsize);
-	nr_pages = ALIGN(session->bufsize, PAGE_SIZE) >> PAGE_SHIFT;
 	if (session->cma_alloc) {
 		page = phys_to_page((unsigned long)session->response);
-		cma_release(vmcp_cma, page, nr_pages);
+		cma_release(vmcp_cma, page, PFN_UP(session->bufsize));
 		session->cma_alloc = 0;
 	} else {
 		free_pages((unsigned long)session->response, order);
