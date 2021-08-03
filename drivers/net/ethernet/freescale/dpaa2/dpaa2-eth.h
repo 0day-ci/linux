@@ -382,9 +382,14 @@ struct dpaa2_eth_ch_stats {
 	__u64 xdp_tx;
 	__u64 xdp_tx_err;
 	__u64 xdp_redirect;
-	/* Must be last, does not show up in ethtool stats */
+	/* The rest of the structure does not show up in ethtool stats */
+	struct { } __eth_end;
+	/* Must be last */
 	__u64 frames;
 };
+
+#define DPAA2_ETH_NUM_CH_STATS		(offsetof(struct dpaa2_eth_ch_stats, \
+						  __eth_end) / sizeof(u64))
 
 /* Maximum number of queues associated with a DPNI */
 #define DPAA2_ETH_MAX_TCS		8
