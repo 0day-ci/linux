@@ -269,7 +269,7 @@ static int e2i_read_data(struct usbtouch_usb *dev, unsigned char *pkt)
 
 	tmp = tmp - 0xA000;
 	dev->touch = (tmp > 0);
-	dev->press = (tmp > 0 ? tmp : 0);
+	dev->press = max(tmp, 0);
 
 	return 1;
 }
