@@ -32,11 +32,11 @@ static int __igt_gpu_reloc(struct i915_execbuffer *eb,
 	if (IS_ERR(vma))
 		return PTR_ERR(vma);
 
-	err = i915_gem_object_lock(obj, &eb->ww);
+	err = i915_gem_object_lock(obj, eb->ww);
 	if (err)
 		return err;
 
-	err = i915_vma_pin_ww(vma, &eb->ww, 0, 0, PIN_USER | PIN_HIGH);
+	err = i915_vma_pin_ww(vma, eb->ww, 0, 0, PIN_USER | PIN_HIGH);
 	if (err)
 		return err;
 
@@ -106,10 +106,12 @@ reloc_err:
 static int igt_gpu_reloc(void *arg)
 {
 	struct i915_execbuffer eb;
+	struct i915_gem_ww_ctx ww;
 	struct drm_i915_gem_object *scratch;
 	int err = 0;
 	u32 *map;
 
+	eb.ww = &ww;
 	eb.i915 = arg;
 
 	scratch = i915_gem_object_create_internal(eb.i915, 4096);
@@ -141,20 +143,20 @@ static int igt_gpu_reloc(void *arg)
 		eb.reloc_pool = NULL;
 		eb.reloc_context = NULL;
 
-		i915_gem_ww_ctx_init(&eb.ww, false);
+		i915_gem_ww_ctx_init(eb.ww, false);
 retry:
-		err = intel_context_pin_ww(eb.context, &eb.ww);
+		err = intel_context_pin_ww(eb.context, eb.ww);
 		if (!err) {
 			err = __igt_gpu_reloc(&eb, scratch);
 
 			intel_context_unpin(eb.context);
 		}
 		if (err == -EDEADLK) {
-			err = i915_gem_ww_ctx_backoff(&eb.ww);
+			err = i915_gem_ww_ctx_backoff(eb.ww);
 			if (!err)
 				goto retry;
 		}
-		i915_gem_ww_ctx_fini(&eb.ww);
+		i915_gem_ww_ctx_fini(eb.ww);
 
 		if (eb.reloc_pool)
 			intel_gt_buffer_pool_put(eb.reloc_pool);
