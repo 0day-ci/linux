@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-2.0-only
-snd-ar-objs := audioreach.o q6apm.o
+snd-ar-objs := audioreach.o q6apm.o topology.o
 
 snd-afe-dai-objs += q6dsp-audio-ports.o q6afe-dai.o
 snd-afe-clks-objs := q6dsp-audio-clocks.o q6afe-clocks.o
