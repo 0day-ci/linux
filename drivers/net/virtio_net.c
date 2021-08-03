@@ -77,8 +77,8 @@ struct virtnet_sq_stats {
 	struct u64_stats_sync syncp;
 	u64 packets;
 	u64 bytes;
-	u64 xdp_tx;
-	u64 xdp_tx_drops;
+	u64 xdp_xmit;
+	u64 xdp_xmit_drops;
 	u64 kicks;
 };
 
@@ -100,8 +100,8 @@ struct virtnet_rq_stats {
 static const struct virtnet_stat_desc virtnet_sq_stats_desc[] = {
 	{ "packets",		VIRTNET_SQ_STAT(packets) },
 	{ "bytes",		VIRTNET_SQ_STAT(bytes) },
-	{ "xdp_tx",		VIRTNET_SQ_STAT(xdp_tx) },
-	{ "xdp_tx_drops",	VIRTNET_SQ_STAT(xdp_tx_drops) },
+	{ "xdp_xmit",		VIRTNET_SQ_STAT(xdp_xmit) },
+	{ "xdp_xmit_drops",	VIRTNET_SQ_STAT(xdp_xmit_drops) },
 	{ "kicks",		VIRTNET_SQ_STAT(kicks) },
 };
 
@@ -619,8 +619,8 @@ out:
 	u64_stats_update_begin(&sq->stats.syncp);
 	sq->stats.bytes += bytes;
 	sq->stats.packets += packets;
-	sq->stats.xdp_tx += n;
-	sq->stats.xdp_tx_drops += n - nxmit;
+	sq->stats.xdp_xmit += n;
+	sq->stats.xdp_xmit_drops += n - nxmit;
 	sq->stats.kicks += kicks;
 	u64_stats_update_end(&sq->stats.syncp);
 
