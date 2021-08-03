@@ -1122,6 +1122,7 @@ int usb4_port_device_resume(struct usb4_port *usb4);
 #define QUIRK_FORCE_POWER_LINK_CONTROLLER		BIT(0)
 
 void tb_check_quirks(struct tb_switch *sw);
+void quirk_enable_intr_auto_clr(struct tb_ring *ring);
 
 #ifdef CONFIG_ACPI
 void tb_acpi_add_links(struct tb_nhi *nhi);

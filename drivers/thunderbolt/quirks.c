@@ -6,6 +6,7 @@
  */
 
 #include "tb.h"
+#include "nhi_regs.h"
 
 static void quirk_force_power_link(struct tb_switch *sw)
 {
@@ -62,5 +63,18 @@ void tb_check_quirks(struct tb_switch *sw)
 			continue;
 
 		q->hook(sw);
+	}
+}
+
+void quirk_enable_intr_auto_clr(struct tb_ring *ring)
+{
+	u32 misc;
+
+	if (ring->nhi->pdev->vendor == PCI_VENDOR_ID_INTEL) {
+		misc = ioread32(ring->nhi->iobase + REG_DMA_MISC);
+		if (!(misc & REG_DMA_MISC_INT_AUTO_CLEAR)) {
+			misc |= REG_DMA_MISC_INT_AUTO_CLEAR;
+			iowrite32(misc, ring->nhi->iobase + REG_DMA_MISC);
+		}
 	}
 }

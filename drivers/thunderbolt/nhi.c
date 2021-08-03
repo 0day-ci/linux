@@ -57,8 +57,8 @@ static void ring_interrupt_active(struct tb_ring *ring, bool active)
 	u32 old, new;
 
 	if (ring->irq > 0) {
-		u32 step, shift, ivr, misc;
 		void __iomem *ivr_base;
+		u32 step, shift, ivr;
 		int index;
 
 		if (ring->is_tx)
@@ -70,11 +70,7 @@ static void ring_interrupt_active(struct tb_ring *ring, bool active)
 		 * Ask the hardware to clear interrupt status bits automatically
 		 * since we already know which interrupt was triggered.
 		 */
-		misc = ioread32(ring->nhi->iobase + REG_DMA_MISC);
-		if (!(misc & REG_DMA_MISC_INT_AUTO_CLEAR)) {
-			misc |= REG_DMA_MISC_INT_AUTO_CLEAR;
-			iowrite32(misc, ring->nhi->iobase + REG_DMA_MISC);
-		}
+		quirk_enable_intr_auto_clr(ring);
 
 		ivr_base = ring->nhi->iobase + REG_INT_VEC_ALLOC_BASE;
 		step = index / REG_INT_VEC_ALLOC_REGS * REG_INT_VEC_ALLOC_BITS;
