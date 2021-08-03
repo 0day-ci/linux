@@ -262,31 +262,29 @@ static struct device_type nsim_bus_dev_type = {
 };
 
 static struct nsim_bus_dev *
-nsim_bus_dev_new(unsigned int id, unsigned int port_count, unsigned int num_queues);
+nsim_bus_dev_new(unsigned int id, unsigned int port_count);
 
 static ssize_t
 new_device_store(struct bus_type *bus, const char *buf, size_t count)
 {
-	unsigned int id, port_count, num_queues;
 	struct nsim_bus_dev *nsim_bus_dev;
+	unsigned int port_count;
+	unsigned int id;
 	int err;
 
-	err = sscanf(buf, "%u %u %u", &id, &port_count, &num_queues);
+	err = sscanf(buf, "%u %u", &id, &port_count);
 	switch (err) {
 	case 1:
 		port_count = 1;
 		fallthrough;
 	case 2:
-		num_queues = 1;
-		fallthrough;
-	case 3:
 		if (id > INT_MAX) {
 			pr_err("Value of \"id\" is too big.\n");
 			return -EINVAL;
 		}
 		break;
 	default:
-		pr_err("Format for adding new device is \"id port_count num_queues\" (uint uint unit).\n");
+		pr_err("Format for adding new device is \"id port_count\" (uint uint).\n");
 		return -EINVAL;
 	}
 
@@ -297,7 +295,7 @@ new_device_store(struct bus_type *bus, const char *buf, size_t count)
 		goto err;
 	}
 
-	nsim_bus_dev = nsim_bus_dev_new(id, port_count, num_queues);
+	nsim_bus_dev = nsim_bus_dev_new(id, port_count);
 	if (IS_ERR(nsim_bus_dev)) {
 		err = PTR_ERR(nsim_bus_dev);
 		goto err;
@@ -399,7 +397,7 @@ static struct bus_type nsim_bus = {
 #define NSIM_BUS_DEV_MAX_VFS 4
 
 static struct nsim_bus_dev *
-nsim_bus_dev_new(unsigned int id, unsigned int port_count, unsigned int num_queues)
+nsim_bus_dev_new(unsigned int id, unsigned int port_count)
 {
 	struct nsim_bus_dev *nsim_bus_dev;
 	int err;
@@ -415,7 +413,6 @@ nsim_bus_dev_new(unsigned int id, unsigned int port_count, unsigned int num_queu
 	nsim_bus_dev->dev.bus = &nsim_bus;
 	nsim_bus_dev->dev.type = &nsim_bus_dev_type;
 	nsim_bus_dev->port_count = port_count;
-	nsim_bus_dev->num_queues = num_queues;
 	nsim_bus_dev->initial_net = current->nsproxy->net_ns;
 	nsim_bus_dev->max_vfs = NSIM_BUS_DEV_MAX_VFS;
 	mutex_init(&nsim_bus_dev->nsim_bus_reload_lock);
