@@ -164,7 +164,7 @@ static void _InitQueueReservedPage(struct adapter *Adapter)
 		if (haldata->OutEpQueueSel & TX_SELE_LQ)
 			numLQ = 0x1C;
 
-		/*  NOTE: This step shall be proceed before writting REG_RQPN. */
+		/*  NOTE: This step shall be proceed before writing REG_RQPN. */
 		if (haldata->OutEpQueueSel & TX_SELE_NQ)
 			numNQ = 0x1C;
 		value8 = (u8)_NPQ(numNQ);
@@ -598,7 +598,7 @@ static void _InitBeaconParameters(struct adapter *Adapter)
 	rtw_write8(Adapter, REG_BCNDMATIM, BCN_DMA_ATIME_INT_TIME); /*  2ms */
 
 	/*  Suggested by designer timchen. Change beacon AIFS to the largest number */
-	/*  beacause test chip does not contension before sending beacon. by tynli. 2009.11.03 */
+	/*  because test chip does not contension before sending beacon. by tynli. 2009.11.03 */
 	rtw_write16(Adapter, REG_BCNTCFG, 0x660F);
 
 	haldata->RegBcnCtrlVal = rtw_read8(Adapter, REG_BCN_CTRL);
@@ -1022,7 +1022,7 @@ static void CardDisableRTL8188EU(struct adapter *Adapter)
 }
 static void rtl8192cu_hw_power_down(struct adapter *adapt)
 {
-	/*  2010/-8/09 MH For power down module, we need to enable register block contrl reg at 0x1c. */
+	/*  2010/-8/09 MH For power down module, we need to enable register block control reg at 0x1c. */
 	/*  Then enable power down control bit of register 0x04 BIT4 and BIT15 as 1. */
 
 	/*  Enable register area 0x0-0xc. */
@@ -1255,7 +1255,7 @@ static void ResumeTxBeacon(struct adapter *adapt)
 {
 	struct hal_data_8188e *haldata = GET_HAL_DATA(adapt);
 
-	/*  2010.03.01. Marked by tynli. No need to call workitem beacause we record the value */
+	/*  2010.03.01. Marked by tynli. No need to call workitem because we record the value */
 	/*  which should be read from register to a global variable. */
 
 	rtw_write8(adapt, REG_FWHW_TXQ_CTRL+2, (haldata->RegFwHwTxQCtrl) | BIT6);
@@ -1269,7 +1269,7 @@ static void StopTxBeacon(struct adapter *adapt)
 {
 	struct hal_data_8188e *haldata = GET_HAL_DATA(adapt);
 
-	/*  2010.03.01. Marked by tynli. No need to call workitem beacause we record the value */
+	/*  2010.03.01. Marked by tynli. No need to call workitem because we record the value */
 	/*  which should be read from register to a global variable. */
 
 	rtw_write8(adapt, REG_FWHW_TXQ_CTRL+2, (haldata->RegFwHwTxQCtrl) & (~BIT6));
@@ -2254,7 +2254,7 @@ void rtl8188eu_set_hal_ops(struct adapter *adapt)
 
 	adapt->HalData = rtw_zmalloc(sizeof(struct hal_data_8188e));
 	if (adapt->HalData == NULL)
-		DBG_88E("cant not alloc memory for HAL DATA\n");
+		DBG_88E("can't alloc memory for HAL DATA\n");
 	adapt->hal_data_sz = sizeof(struct hal_data_8188e);
 
 	halfunc->hal_power_on = rtl8188eu_InitPowerOn;

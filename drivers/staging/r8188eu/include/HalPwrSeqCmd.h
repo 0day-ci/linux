@@ -13,7 +13,7 @@
      /*  offset: the read register offset */
      /*  msk: the mask of the read value */
      /*  value: N/A, left by 0 */
-     /*  note: dirver shall implement this function by read & msk */
+     /*  note: driver shall implement this function by read & msk */
 
 #define PWR_CMD_WRITE			0x01
      /*  offset: the read register offset */

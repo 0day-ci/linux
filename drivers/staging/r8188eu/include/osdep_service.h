@@ -195,11 +195,11 @@ enum {
 	MEM_STAT_PHY_ALLOC_SUCCESS,
 	MEM_STAT_PHY_ALLOC_FAIL,
 	MEM_STAT_PHY_FREE,
-	MEM_STAT_TX, /* used to distinguish TX/RX, asigned from caller */
+	MEM_STAT_TX, /* used to distinguish TX/RX, assigned from caller */
 	MEM_STAT_TX_ALLOC_SUCCESS,
 	MEM_STAT_TX_ALLOC_FAIL,
 	MEM_STAT_TX_FREE,
-	MEM_STAT_RX, /* used to distinguish TX/RX, asigned from caller */
+	MEM_STAT_RX, /* used to distinguish TX/RX, assigned from caller */
 	MEM_STAT_RX_ALLOC_SUCCESS,
 	MEM_STAT_RX_ALLOC_FAIL,
 	MEM_STAT_RX_FREE

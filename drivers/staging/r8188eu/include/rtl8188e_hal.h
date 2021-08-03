@@ -62,7 +62,7 @@
 /*  This structure must be careful with byte-ordering */
 
 struct rt_firmware_hdr {
-	/*  8-byte alinment required */
+	/*  8-byte alignment required */
 	/*  LONG WORD 0 ---- */
 	__le16		Signature;	/* 92C0: test chip; 92C,
 					 * 88C0: test chip; 88C1: MP A-cut;
@@ -178,7 +178,7 @@ struct txpowerinfo24g {
 /*  | 1byte|----8bytes----|1byte|--5bytes--| */
 /*  |         |            Reserved(14bytes)	      | */
 
-/*  PG data exclude header, dummy 6 bytes frome CP test and reserved 1byte. */
+/*  PG data exclude header, dummy 6 bytes from CP test and reserved 1byte. */
 #define EFUSE_OOB_PROTECT_BYTES			15
 
 #define		HWSET_MAX_SIZE_88E		512
@@ -196,7 +196,7 @@ struct txpowerinfo24g {
 /*  9bytes + 1byt + 5bytes and pre 1byte. */
 /*  For worst case: */
 /*  | 2byte|----8bytes----|1byte|--7bytes--| 92D */
-/*  PG data exclude header, dummy 7 bytes frome CP test and reserved 1byte. */
+/*  PG data exclude header, dummy 7 bytes from CP test and reserved 1byte. */
 #define		EFUSE_OOB_PROTECT_BYTES_88E	18
 #define		EFUSE_PROTECT_BYTES_BANK_88E	16
 
@@ -357,7 +357,7 @@ struct hal_data_8188e {
 	u8	OutEpQueueSel;
 	u8	OutEpNumber;
 
-	/*  Add for USB aggreation mode dynamic shceme. */
+	/*  Add for USB aggregation mode dynamic shceme. */
 	bool		UsbRxHighSpeedMode;
 
 	/*  2010/11/22 MH Add for slim combo debug mode selective. */
@@ -377,7 +377,7 @@ struct hal_data_8188e {
 
 	u32	UsbBulkOutSize;
 
-	/*  Interrupt relatd register information. */
+	/*  Interrupt related register information. */
 	u32	IntArray[3];/* HISR0,HISR1,HSISR */
 	u32	IntrMask[3];
 	u8	C2hArray[16];

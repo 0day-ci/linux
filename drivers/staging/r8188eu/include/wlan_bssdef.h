@@ -215,7 +215,7 @@ struct wlan_phy_info {
 };
 
 struct wlan_bcn_info {
-	/* these infor get from rtw_get_encrypt_info when
+	/* the info got from rtw_get_encrypt_info when
 	 *	 * translate scan to UI */
 	u8 encryp_protocol;/* ENCRYP_PROTOCOL_E: OPEN/WEP/WPA/WPA2/WAPI */
 	int group_cipher; /* WPA/WPA2 group cipher */

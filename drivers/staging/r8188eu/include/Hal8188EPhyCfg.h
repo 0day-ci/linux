@@ -93,7 +93,7 @@ enum RF_TYPE_8190P {
 	RF_8256 = 2,		/*  2 11b/g/n */
 	RF_8258 = 3,		/*  3 11a/b/g/n RF */
 	RF_6052 = 4,		/*  4 11b/g/n RF */
-	/*  TODO: We should remove this psudo PHY RF after we get new RF. */
+	/*  TODO: We should remove this pseudo PHY RF after we get new RF. */
 	RF_PSEUDO_11N = 5,	/*  5, It is a temporality RF. */
 };
 
@@ -209,7 +209,7 @@ void PHY_ScanOperationBackup8188E(struct adapter *Adapter, u8 Operation);
 void PHY_SetBWMode8188E(struct adapter *adapter,
 			enum ht_channel_width chnlwidth, unsigned char offset);
 
-/*  channel switch related funciton */
+/*  channel switch related function */
 void PHY_SwChnl8188E(struct adapter *adapter, u8 channel);
 /*  Call after initialization */
 void ChkFwCmdIoDone(struct adapter *adapter);

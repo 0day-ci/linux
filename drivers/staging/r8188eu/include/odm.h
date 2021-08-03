@@ -615,7 +615,7 @@ struct odm_ra_info {
 	u8 PTStopCount;	/* Stop PT counter */
 	u8 PTPreRate;	/*  if rate change do PT */
 	u8 PTPreRssi;	/*  if RSSI change 5% do PT */
-	u8 PTModeSS;	/*  decide whitch rate should do PT */
+	u8 PTModeSS;	/*  decide which rate should do PT */
 	u8 RAstage;	/*  StageRA, decide how many times RA will be done
 			 * between PT */
 	u8 PTSmoothFactor;
@@ -868,7 +868,7 @@ struct odm_dm_struct {
 	/*  Latest packet phy info (ODM write) */
 	struct odm_mac_status_info *pMacInfo;
 
-	/*  Different Team independt structure?? */
+	/*  Different Team independent structure?? */
 
 	/* ODM Structure */
 	struct fast_ant_train DM_FatTable;

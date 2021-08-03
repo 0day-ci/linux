@@ -3,7 +3,7 @@
 
 #include "../include/rtw_iol.h"
 
-struct xmit_frame	*rtw_IOL_accquire_xmit_frame(struct adapter  *adapter)
+struct xmit_frame	*rtw_IOL_acquire_xmit_frame(struct adapter  *adapter)
 {
 	struct xmit_frame	*xmit_frame;
 	struct xmit_buf	*xmitbuf;

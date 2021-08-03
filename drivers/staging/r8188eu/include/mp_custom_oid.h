@@ -12,7 +12,7 @@
 /*  */
 
 /*  by Owen for Production Kit */
-/*  For Production Kit with Agilent Equipments */
+/*  For Production Kit with Agilent Equipment */
 /*  in order to make our custom oids hopefully somewhat unique */
 /*  we will use 0xFF (indicating implementation specific OID) */
 /*	81(first byte of non zero Realtek unique identifier) */

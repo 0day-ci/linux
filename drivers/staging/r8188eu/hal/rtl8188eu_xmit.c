@@ -68,7 +68,7 @@ void rtl8188e_fill_fake_txdesc(struct adapter *adapt, u8 *desc, u32 BufferLen, u
 	/* offset 4 */
 	ptxdesc->txdw1 |= cpu_to_le32((QSLT_MGNT<<QSEL_SHT)&0x00001f00); /*  Fixed queue of Mgnt queue */
 
-	/* Set NAVUSEHDR to prevent Ps-poll AId filed to be changed to error vlaue by Hw. */
+	/* Set NAVUSEHDR to prevent Ps-poll AId filed to be changed to error value by Hw. */
 	if (ispspoll) {
 		ptxdesc->txdw1 |= cpu_to_le32(NAVUSEHDR);
 	} else {
@@ -318,7 +318,7 @@ static s32 update_txdesc(struct xmit_frame *pxmitframe, u8 *pmem, s32 sz, u8 bag
 	/*  (1) The sequence number of each non-Qos frame / broadcast / multicast / */
 	/*  mgnt frame should be controlled by Hw because Fw will also send null data */
 	/*  which we cannot control when Fw LPS enable. */
-	/*  --> default enable non-Qos data sequense number. 2010.06.23. by tynli. */
+	/*  --> default enable non-Qos data sequence number. 2010.06.23. by tynli. */
 	/*  (2) Enable HW SEQ control for beacon packet, because we use Hw beacon. */
 	/*  (3) Use HW Qos SEQ to control the seq num of Ext port non-Qos packets. */
 	/*  2010.06.23. Added by tynli. */
@@ -406,7 +406,7 @@ static u32 xmitframe_need_length(struct xmit_frame *pxmitframe)
 
 	u32 len = 0;
 
-	/*  no consider fragement */
+	/*  no consider fragment */
 	len = pattrib->hdrlen + pattrib->iv_len +
 		SNAP_SIZE + sizeof(u16) +
 		pattrib->pktlen +
@@ -612,7 +612,7 @@ static s32 xmitframe_direct(struct adapter *adapt, struct xmit_frame *pxmitframe
 	if (res == _SUCCESS)
 		rtw_dump_xframe(adapt, pxmitframe);
 	else
-		DBG_88E("==> %s xmitframe_coalsece failed\n", __func__);
+		DBG_88E("==> %s xmitframe_coalesce failed\n", __func__);
 	return res;
 }
 

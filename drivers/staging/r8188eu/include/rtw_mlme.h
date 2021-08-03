@@ -182,7 +182,7 @@ struct wifidirect_info {
 	struct timer_list find_phase_timer;
 	struct timer_list restore_p2p_state_timer;
 
-	/* Used to do the scanning. After confirming the peer is availalble,
+	/* Used to do the scanning. After confirming the peer is available,
 	 * the driver transmits the P2P frame to peer. */
 	struct timer_list pre_tx_scan_timer;
 	struct timer_list reset_ch_sitesurvey;
@@ -226,7 +226,7 @@ struct wifidirect_info {
 	/* The device password ID for group negotiation */
 	u16 device_password_id_for_nego;
 	u8 negotiation_dialog_token;
-	/* SSID information for group negotitation */
+	/* SSID information for group negotiation */
 	u8 nego_ssid[WLAN_SSID_MAXLEN];
 	u8 nego_ssidlen;
 	u8 p2p_group_ssid[WLAN_SSID_MAXLEN];
@@ -267,7 +267,7 @@ struct wifidirect_info {
 	 * attribute of group negotiation response frame. */
 	uint channel_list_attr_len;
 	/* This field will contain the body of P2P Channel List attribute of
-	 * group negotitation response frame. */
+	 * group negotiation response frame. */
 	/* We will use the channel_cnt and channel_list fields when constructing
 	 * the group negotiation confirm frame. */
 	u8 channel_list_attr[100];

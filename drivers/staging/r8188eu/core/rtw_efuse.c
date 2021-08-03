@@ -425,7 +425,7 @@ static u8 efuse_write8(struct adapter *padapter, u16 address, u8 *value)
 }
 
 /*
- * read/wirte raw efuse data
+ * read/write raw efuse data
  */
 u8 rtw_efuse_access(struct adapter *padapter, u8 write, u16 start_addr, u16 cnts, u8 *data)
 {

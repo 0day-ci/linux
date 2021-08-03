@@ -152,9 +152,9 @@ enum HAL_STATUS ODM_ReadAndConfig_MAC_REG_8188E(struct odm_dm_struct *dm_odm)
 	biol = rtw_IOL_applied(adapt);
 
 	if (biol) {
-		pxmit_frame = rtw_IOL_accquire_xmit_frame(adapt);
+		pxmit_frame = rtw_IOL_acquire_xmit_frame(adapt);
 		if (pxmit_frame == NULL) {
-			pr_info("rtw_IOL_accquire_xmit_frame failed\n");
+			pr_info("rtw_IOL_acquire_xmit_frame failed\n");
 			return HAL_STATUS_FAILURE;
 		}
 	}

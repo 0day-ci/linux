@@ -398,7 +398,7 @@ static int recvframe_chkmic(struct adapter *adapter,  struct recv_frame *precvfr
 					 *(pframemic-10), *(pframemic-9)));
 				{
 					uint i;
-					RT_TRACE(_module_rtl871x_recv_c_, _drv_err_, ("\n ======demp packet (len=%d)======\n", precvframe->len));
+					RT_TRACE(_module_rtl871x_recv_c_, _drv_err_, ("\n ====== temp packet (len=%d)======\n", precvframe->len));
 					for (i = 0; i < precvframe->len; i = i+8) {
 						RT_TRACE(_module_rtl871x_recv_c_, _drv_err_, ("0x%02x:0x%02x:0x%02x:0x%02x:0x%02x:0x%02x:0x%02x:0x%02x",
 							 *(precvframe->rx_data+i), *(precvframe->rx_data+i+1),
@@ -406,7 +406,7 @@ static int recvframe_chkmic(struct adapter *adapter,  struct recv_frame *precvfr
 							 *(precvframe->rx_data+i+4), *(precvframe->rx_data+i+5),
 							 *(precvframe->rx_data+i+6), *(precvframe->rx_data+i+7)));
 					}
-					RT_TRACE(_module_rtl871x_recv_c_, _drv_err_, ("\n ====== demp packet end [len=%d]======\n", precvframe->len));
+					RT_TRACE(_module_rtl871x_recv_c_, _drv_err_, ("\n ====== temp packet end [len=%d]======\n", precvframe->len));
 					RT_TRACE(_module_rtl871x_recv_c_, _drv_err_, ("\n hrdlen=%d,\n", prxattrib->hdrlen));
 				}
 
@@ -884,7 +884,7 @@ static int ap2sta_data_frame (
 		/*  */
 
 		if (GetFrameSubType(ptr) & BIT(6)) {
-			/* No data, will not indicate to upper layer, temporily count it here */
+			/* No data, will not indicate to upper layer, temporarily count it here */
 			count_rx_stats(adapter, precv_frame, *psta);
 			ret = RTW_RX_HANDLED;
 			goto exit;
@@ -964,7 +964,7 @@ static int sta2ap_data_frame(struct adapter *adapter,
 		}
 
 		if (GetFrameSubType(ptr) & BIT(6)) {
-			/* No data, will not indicate to upper layer, temporily count it here */
+			/* No data, will not indicate to upper layer, temporarily count it here */
 			count_rx_stats(adapter, precv_frame, *psta);
 			ret = RTW_RX_HANDLED;
 			goto exit;
@@ -1077,7 +1077,7 @@ static int validate_recv_ctrl_frame(struct adapter *padapter,
 				if (psta->sleepq_len == 0) {
 					pstapriv->tim_bitmap &= ~BIT(psta->aid);
 
-					/* upate BCN for TIM IE */
+					/* update BCN for TIM IE */
 					/* update_BCNTIM(padapter); */
 					update_beacon(padapter, _TIM_IE_, NULL, false);
 				}
@@ -1095,7 +1095,7 @@ static int validate_recv_ctrl_frame(struct adapter *padapter,
 
 					pstapriv->tim_bitmap &= ~BIT(psta->aid);
 
-					/* upate BCN for TIM IE */
+					/* update BCN for TIM IE */
 					/* update_BCNTIM(padapter); */
 					update_beacon(padapter, _TIM_IE_, NULL, false);
 				}
@@ -1579,7 +1579,7 @@ struct recv_frame *recvframe_chk_defrag(struct adapter *padapter, struct recv_fr
 			phead = get_list_head(pdefrag_q);
 			list_add_tail(&pfhdr->list, phead);
 
-			RT_TRACE(_module_rtl871x_recv_c_, _drv_info_, ("Enqueuq: ismfrag=%d, fragnum=%d\n", ismfrag, fragnum));
+			RT_TRACE(_module_rtl871x_recv_c_, _drv_info_, ("Enqueue: ismfrag=%d, fragnum=%d\n", ismfrag, fragnum));
 
 			prtnframe = NULL;
 		} else {
@@ -2183,13 +2183,13 @@ void rtw_signal_stat_timer_hdl(struct timer_list *t)
 	} else {
 		if (recvpriv->signal_strength_data.update_req == 0) {/*  update_req is clear, means we got rx */
 			avg_signal_strength = recvpriv->signal_strength_data.avg_val;
-			/*  after avg_vals are accquired, we can re-stat the signal values */
+			/*  after avg_vals are acquired, we can re-stat the signal values */
 			recvpriv->signal_strength_data.update_req = 1;
 		}
 
 		if (recvpriv->signal_qual_data.update_req == 0) {/*  update_req is clear, means we got rx */
 			avg_signal_qual = recvpriv->signal_qual_data.avg_val;
-			/*  after avg_vals are accquired, we can re-stat the signal values */
+			/*  after avg_vals are acquired, we can re-stat the signal values */
 			recvpriv->signal_qual_data.update_req = 1;
 		}
 

@@ -56,7 +56,7 @@ static	u32 phy_CalculateBitShift(u32 BitMask)
 /**
 * Function:	PHY_QueryBBReg
 *
-* OverView:	Read "sepcific bits" from BB register
+* OverView:	Read "specific bits" from BB register
 *
 * Input:
 *			struct adapter *Adapter,
@@ -119,7 +119,7 @@ void rtl8188e_PHY_SetBBReg(struct adapter *Adapter, u32 RegAddr, u32 BitMask, u3
 /**
 * Function:	phy_RFSerialRead
 *
-* OverView:	Read regster from RF chips
+* OverView:	Read register from RF chips
 *
 * Input:
 *			struct adapter *Adapter,
@@ -128,7 +128,7 @@ void rtl8188e_PHY_SetBBReg(struct adapter *Adapter, u32 RegAddr, u32 BitMask, u3
 *
 * Output:	None
 * Return:		u32			reback value
-* Note:		Threre are three types of serial operations:
+* Note:		There are three types of serial operations:
 *			1. Software serial write
 *			2. Hardware LSSI-Low Speed Serial Interface
 *			3. Hardware HSSI-High speed
@@ -204,7 +204,7 @@ phy_RFSerialRead(
 *
 * Output:	None
 * Return:		None
-* Note:		Threre are three types of serial operations:
+* Note:		There are three types of serial operations:
 *			1. Software serial write
 *			2. Hardware LSSI-Low Speed Serial Interface
 *			3. Hardware HSSI-High speed
@@ -340,7 +340,7 @@ rtl8188e_PHY_SetRFReg(
 /*-----------------------------------------------------------------------------
  * Function:    PHY_MACConfig8192C
  *
- * Overview:	Condig MAC by header file or parameter file.
+ * Overview:	Config MAC by header file or parameter file.
  *
  * Input:       NONE
  *
@@ -409,7 +409,7 @@ phy_InitBBRFRegisterDefinition(
 	pHalData->PHYRegDef[RF_PATH_A].rfintfe = rFPGA0_XA_RFInterfaceOE; /*  16 MSBs if read 32-bit from 0x860 (16-bit for 0x862) */
 	pHalData->PHYRegDef[RF_PATH_B].rfintfe = rFPGA0_XB_RFInterfaceOE; /*  16 MSBs if read 32-bit from 0x864 (16-bit for 0x866) */
 
-	/* Addr of LSSI. Wirte RF register by driver */
+	/* Addr of LSSI. Write RF register by driver */
 	pHalData->PHYRegDef[RF_PATH_A].rf3wireOffset = rFPGA0_XA_LSSIParameter; /* LSSI Parameter */
 	pHalData->PHYRegDef[RF_PATH_B].rf3wireOffset = rFPGA0_XB_LSSIParameter;
 
@@ -425,11 +425,11 @@ phy_InitBBRFRegisterDefinition(
 	pHalData->PHYRegDef[RF_PATH_C].rfTxGainStage = rFPGA0_TxGainStage; /* Tx gain stage */
 	pHalData->PHYRegDef[RF_PATH_D].rfTxGainStage = rFPGA0_TxGainStage; /* Tx gain stage */
 
-	/*  Tranceiver A~D HSSI Parameter-1 */
+	/*  Transceiver A~D HSSI Parameter-1 */
 	pHalData->PHYRegDef[RF_PATH_A].rfHSSIPara1 = rFPGA0_XA_HSSIParameter1;  /* wire control parameter1 */
 	pHalData->PHYRegDef[RF_PATH_B].rfHSSIPara1 = rFPGA0_XB_HSSIParameter1;  /* wire control parameter1 */
 
-	/*  Tranceiver A~D HSSI Parameter-2 */
+	/*  Transceiver A~D HSSI Parameter-2 */
 	pHalData->PHYRegDef[RF_PATH_A].rfHSSIPara2 = rFPGA0_XA_HSSIParameter2;  /* wire control parameter2 */
 	pHalData->PHYRegDef[RF_PATH_B].rfHSSIPara2 = rFPGA0_XB_HSSIParameter2;  /* wire control parameter2 */
 
@@ -475,13 +475,13 @@ phy_InitBBRFRegisterDefinition(
 	pHalData->PHYRegDef[RF_PATH_C].rfTxAFE = rOFDM0_XCTxAFE;
 	pHalData->PHYRegDef[RF_PATH_D].rfTxAFE = rOFDM0_XDTxAFE;
 
-	/*  Tranceiver LSSI Readback SI mode */
+	/*  Transceiver LSSI Readback SI mode */
 	pHalData->PHYRegDef[RF_PATH_A].rfLSSIReadBack = rFPGA0_XA_LSSIReadBack;
 	pHalData->PHYRegDef[RF_PATH_B].rfLSSIReadBack = rFPGA0_XB_LSSIReadBack;
 	pHalData->PHYRegDef[RF_PATH_C].rfLSSIReadBack = rFPGA0_XC_LSSIReadBack;
 	pHalData->PHYRegDef[RF_PATH_D].rfLSSIReadBack = rFPGA0_XD_LSSIReadBack;
 
-	/*  Tranceiver LSSI Readback PI mode */
+	/*  Transceiver LSSI Readback PI mode */
 	pHalData->PHYRegDef[RF_PATH_A].rfLSSIReadBackPi = TransceiverA_HSPI_Readback;
 	pHalData->PHYRegDef[RF_PATH_B].rfLSSIReadBackPi = TransceiverB_HSPI_Readback;
 }
@@ -727,7 +727,7 @@ static int phy_TxPwrIdxToDbm(struct adapter *Adapter, enum wireless_mode Wireles
 /*-----------------------------------------------------------------------------
  * Function:    GetTxPowerLevel8190()
  *
- * Overview:    This function is export to "common" moudule
+ * Overview:    This function is export to "common" module
  *
  * Input:       struct adapter *Adapter
  *			psByte			Power Level
@@ -859,7 +859,7 @@ static void phy_PowerIndexCheck88E(struct adapter *Adapter, u8 channel, u8 *cckP
 /*-----------------------------------------------------------------------------
  * Function:    SetTxPowerLevel8190()
  *
- * Overview:    This function is export to "HalCommon" moudule
+ * Overview:    This function is export to "HalCommon" module
  *			We must consider RF path later!!!!!!!
  *
  * Input:       struct adapter *Adapter
@@ -1042,7 +1042,7 @@ _PHY_SetBWMode92C(
  /*-----------------------------------------------------------------------------
  * Function:   SetBWMode8190Pci()
  *
- * Overview:  This function is export to "HalCommon" moudule
+ * Overview:  This function is export to "HalCommon" module
  *
  * Input:		struct adapter *Adapter
  *			enum ht_channel_width Bandwidth	20M or 40M

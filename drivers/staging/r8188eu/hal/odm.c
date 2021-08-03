@@ -294,7 +294,7 @@ void ODM_CmnInfoInit(struct odm_dm_struct *pDM_Odm, enum odm_common_info_def Cmn
 
 	/*  Tx power tracking BB swing table. */
 	/*  The base index = 12. +((12-n)/2)dB 13~?? = decrease tx pwr by -((n-12)/2)dB */
-	pDM_Odm->BbSwingIdxOfdm			= 12; /*  Set defalut value as index 12. */
+	pDM_Odm->BbSwingIdxOfdm			= 12; /*  Set default value as index 12. */
 	pDM_Odm->BbSwingIdxOfdmCurrent	= 12;
 	pDM_Odm->BbSwingFlagOfdm		= false;
 }
@@ -869,7 +869,7 @@ void odm_FalseAlarmCounterStatistics(struct odm_dm_struct *pDM_Odm)
 		FalseAlmCnt->Cnt_Cck_fail = ODM_GetBBReg(pDM_Odm, ODM_REG_CCK_FA_11AC, bMaskLWord);
 		FalseAlmCnt->Cnt_all = FalseAlmCnt->Cnt_Ofdm_fail + FalseAlmCnt->Cnt_Cck_fail;
 
-		/*  reset OFDM FA coutner */
+		/*  reset OFDM FA counter */
 		ODM_SetBBReg(pDM_Odm, ODM_REG_OFDM_FA_RST_11AC, BIT17, 1);
 		ODM_SetBBReg(pDM_Odm, ODM_REG_OFDM_FA_RST_11AC, BIT17, 0);
 		/*  reset CCK FA counter */
@@ -950,7 +950,7 @@ void odm_DynamicBBPowerSaving(struct odm_dm_struct *pDM_Odm)
 		odm_1R_CCA(pDM_Odm);
 	} else {
 	/*  20100628 Joseph: Turn off BB power save for 88CE because it makesthroughput unstable. */
-	/*  20100831 Joseph: Turn ON BB power save again after modifying AGC delay from 900ns ot 600ns. */
+	/*  20100831 Joseph: Turn ON BB power save again after modifying AGC delay from 900ns to 600ns. */
 	/* 1 3.Power Saving for 88C */
 		ODM_RF_Saving(pDM_Odm, false);
 	}

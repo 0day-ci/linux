@@ -12,7 +12,7 @@
 
 #define XMITBUF_ALIGN_SZ	4
 
-/*  xmit extension buff defination */
+/*  xmit extension buff definition */
 #define MAX_XMIT_EXTBUF_SZ	(1536)
 #define NR_XMIT_EXTBUFF		(32)
 
@@ -113,7 +113,7 @@ struct pkt_attrib {
 	u32	last_txcmdsz;
 	u8	nr_frags;
 	u8	encrypt;	/* when 0 indicate no encrypt. when non-zero,
-				 * indicate the encrypt algorith */
+				 * indicate the encrypt algorithm */
 	u8	iv_len;
 	u8	icv_len;
 	u8	iv[18];

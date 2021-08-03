@@ -1042,7 +1042,7 @@ static int rtw_wx_get_range(struct net_device *dev,
 	range->max_qual.updated = 7; /* Updated all three */
 
 	range->avg_qual.qual = 92; /* > 8% missed beacons is 'bad' */
-	/* TODO: Find real 'good' to 'bad' threshol value for RSSI */
+	/* TODO: Find real 'good' to 'bad' threshold value for RSSI */
 	range->avg_qual.level = 178; /* -78 dBm */
 	range->avg_qual.noise = 0;
 	range->avg_qual.updated = 7; /* Updated all three */
@@ -3438,8 +3438,8 @@ static int rtw_p2p_connect(struct net_device *dev,
 	uint uintPeerChannel = 0;
 
 	/*	Commented by Albert 20110304 */
-	/*	The input data contains two informations. */
-	/*	1. First information is the MAC address which wants to formate with */
+	/*	The input data contains two items of information: */
+	/*	1. First information is the MAC address which wants to format with */
 	/*	2. Second information is the WPS PINCode or "pbc" string for push button method */
 	/*	Format: 00:E0:4C:00:00:05 */
 	/*	Format: 00:E0:4C:00:00:05 */
@@ -3519,7 +3519,7 @@ static int rtw_p2p_invite_req(struct net_device *dev,
 	uint p2pielen = 0, attr_contentlen = 0;
 	struct tx_invite_req_info *pinvite_req_info = &pwdinfo->invitereq_info;
 
-	/*	The input data contains two informations. */
+	/*	The input data contains two items of information: */
 	/*	1. First information is the P2P device address which you want to send to. */
 	/*	2. Second information is the group id which combines with GO's mac address, space and GO's ssid. */
 	/*	Command line sample: iwpriv wlan0 p2p_set invite ="00:11:22:33:44:55 00:E0:4C:00:00:05 DIRECT-xy" */
@@ -3657,7 +3657,7 @@ static int rtw_p2p_prov_disc(struct net_device *dev,
 	u8 *p2pie;
 	uint p2pielen = 0, attr_contentlen = 0;
 
-	/*	The input data contains two informations. */
+	/*	The input data contains two items of information: */
 	/*	1. First information is the MAC address which wants to issue the provisioning discovery request frame. */
 	/*	2. Second information is the WPS configuration method which wants to discovery */
 	/*	Format: 00:E0:4C:00:00:05_display */
@@ -3692,7 +3692,7 @@ static int rtw_p2p_prov_disc(struct net_device *dev,
 	} else if (!memcmp(&extra[18], "label", 5)) {
 		pwdinfo->tx_prov_disc_info.wps_config_method_request = WPS_CM_LABEL;
 	} else {
-		DBG_88E("[%s] Unknown WPS config methodn", __func__);
+		DBG_88E("[%s] Unknown WPS config method\n", __func__);
 		return ret;
 	}
 
@@ -3991,7 +3991,7 @@ static int rtw_rereg_nd_name(struct net_device *dev,
 
 	if (!memcmp(new_ifname, "disable%d", 9)) {
 		DBG_88E("%s disable\n", __func__);
-		/*  free network queue for Android's timming issue */
+		/*  free network queue for Android's timing issue */
 		rtw_free_network_queue(padapter, true);
 
 		/*  close led */
@@ -4160,7 +4160,7 @@ static int rtw_dbg_port(struct net_device *dev,
 			u8 page_boundary = 0xf9;
 			struct xmit_frame	*xmit_frame;
 
-			xmit_frame = rtw_IOL_accquire_xmit_frame(padapter);
+			xmit_frame = rtw_IOL_acquire_xmit_frame(padapter);
 			if (!xmit_frame) {
 				ret = -ENOMEM;
 				break;
@@ -4180,7 +4180,7 @@ static int rtw_dbg_port(struct net_device *dev,
 			int i;
 			struct xmit_frame	*xmit_frame;
 
-			xmit_frame = rtw_IOL_accquire_xmit_frame(padapter);
+			xmit_frame = rtw_IOL_acquire_xmit_frame(padapter);
 			if (!xmit_frame) {
 				ret = -ENOMEM;
 				break;
@@ -4206,7 +4206,7 @@ static int rtw_dbg_port(struct net_device *dev,
 			u8 final;
 			struct xmit_frame	*xmit_frame;
 
-			xmit_frame = rtw_IOL_accquire_xmit_frame(padapter);
+			xmit_frame = rtw_IOL_acquire_xmit_frame(padapter);
 			if (!xmit_frame) {
 				ret = -ENOMEM;
 				break;
@@ -4235,7 +4235,7 @@ static int rtw_dbg_port(struct net_device *dev,
 			u16 final;
 			struct xmit_frame	*xmit_frame;
 
-			xmit_frame = rtw_IOL_accquire_xmit_frame(padapter);
+			xmit_frame = rtw_IOL_acquire_xmit_frame(padapter);
 			if (!xmit_frame) {
 				ret = -ENOMEM;
 				break;
@@ -4263,7 +4263,7 @@ static int rtw_dbg_port(struct net_device *dev,
 			u32 final;
 			struct xmit_frame	*xmit_frame;
 
-			xmit_frame = rtw_IOL_accquire_xmit_frame(padapter);
+			xmit_frame = rtw_IOL_acquire_xmit_frame(padapter);
 			if (!xmit_frame) {
 				ret = -ENOMEM;
 				break;
@@ -4339,7 +4339,7 @@ static int rtw_dbg_port(struct net_device *dev,
 				DBG_88E("SSID =%s\n", cur_network->network.Ssid.Ssid);
 				DBG_88E("sta's macaddr: %pM\n", psta->hwaddr);
 				DBG_88E("cur_channel =%d, cur_bwmode =%d, cur_ch_offset =%d\n", pmlmeext->cur_channel, pmlmeext->cur_bwmode, pmlmeext->cur_ch_offset);
-				DBG_88E("rtsen =%d, cts2slef =%d\n", psta->rtsen, psta->cts2self);
+				DBG_88E("rtsen =%d, cts2self =%d\n", psta->rtsen, psta->cts2self);
 				DBG_88E("state = 0x%x, aid =%d, macid =%d, raid =%d\n", psta->state, psta->aid, psta->mac_id, psta->raid);
 				DBG_88E("qos_en =%d, ht_en =%d, init_rate =%d\n", psta->qos_option, psta->htpriv.ht_option, psta->init_rate);
 				DBG_88E("bwmode =%d, ch_offset =%d, sgi =%d\n", psta->htpriv.bwmode, psta->htpriv.ch_offset, psta->htpriv.sgi);
@@ -4400,7 +4400,7 @@ static int rtw_dbg_port(struct net_device *dev,
 
 						if (extra_arg == psta->aid) {
 							DBG_88E("sta's macaddr:%pM\n", (psta->hwaddr));
-							DBG_88E("rtsen =%d, cts2slef =%d\n", psta->rtsen, psta->cts2self);
+							DBG_88E("rtsen =%d, cts2self =%d\n", psta->rtsen, psta->cts2self);
 							DBG_88E("state = 0x%x, aid =%d, macid =%d, raid =%d\n", psta->state, psta->aid, psta->mac_id, psta->raid);
 							DBG_88E("qos_en =%d, ht_en =%d, init_rate =%d\n", psta->qos_option, psta->htpriv.ht_option, psta->init_rate);
 							DBG_88E("bwmode =%d, ch_offset =%d, sgi =%d\n", psta->htpriv.bwmode, psta->htpriv.ch_offset, psta->htpriv.sgi);
@@ -4446,7 +4446,7 @@ static int rtw_dbg_port(struct net_device *dev,
 		case 0x15:
 			{
 				struct pwrctrl_priv *pwrpriv = &padapter->pwrctrlpriv;
-				DBG_88E("==>silent resete cnts:%d\n", pwrpriv->ips_enter_cnts);
+				DBG_88E("==>silent reset cnts:%d\n", pwrpriv->ips_enter_cnts);
 			}
 			break;
 		case 0x10:/*  driver version display */
@@ -5141,7 +5141,7 @@ static int rtw_add_sta(struct net_device *dev, struct ieee_param *param)
 		if (pmlmepriv->qospriv.qos_option == 0)
 			psta->qos_option = 0;
 
-		/* chec 802.11n ht cap. */
+		/* check 802.11n ht cap. */
 		if (WLAN_STA_HT&flags) {
 			psta->htpriv.ht_option = true;
 			psta->qos_option = 1;
@@ -6333,7 +6333,7 @@ exit:
  *		"w" for WORD (2 bytes)
  *		"dw" for DWORD (4 bytes)
  *	1st %d is address(offset)
- *	2st %d is data to write
+ *	2nd %d is data to write
  */
 static int rtw_mp_write_reg(struct net_device *dev,
 			struct iw_request_info *info,
@@ -6407,7 +6407,7 @@ static int rtw_mp_write_reg(struct net_device *dev,
  *	%d is address(offset)
  *
  * Return:
- *	%d for data readed
+ *	%d for data read
  */
 static int rtw_mp_read_reg(struct net_device *dev,
 			struct iw_request_info *info,
@@ -6535,7 +6535,7 @@ static int rtw_mp_read_reg(struct net_device *dev,
  * Input Format: %d,%x,%x
  *	%d is RF path, should be smaller than RF_PATH_MAX
  *	1st %x is address(offset)
- *	2st %x is data to write
+ *	2nd %x is data to write
  */
  static int rtw_mp_write_rf(struct net_device *dev,
 			    struct iw_request_info *info,
@@ -6572,7 +6572,7 @@ static int rtw_mp_read_reg(struct net_device *dev,
  *	%x is address(offset)
  *
  * Return:
- *	%d for data readed
+ *	%d for data read
  */
 static int rtw_mp_read_rf(struct net_device *dev,
 			struct iw_request_info *info,
@@ -7082,7 +7082,7 @@ static int rtw_mp_pwrtrk(struct net_device *dev,
 		if (strncmp(input, "stop", 4) == 0) {
 			enable = 0;
 			sprintf(extra, "mp tx power tracking stop");
-		} else if (sscanf(input, "ther =%d", &thermal)) {
+		} else if (sscanf(input, "thermal =%d", &thermal)) {
 				ret = Hal_SetThermalMeter(padapter, (u8)thermal);
 				if (ret == _FAIL)
 					return -EPERM;
@@ -7534,7 +7534,7 @@ static iw_handler rtw_handlers[] = {
 	rtw_wx_set_wap,		/* SIOCSIWAP */
 	rtw_wx_get_wap,		/* SIOCGIWAP */
 	rtw_wx_set_mlme,		/* request MLME operation; uses struct iw_mlme */
-	dummy,					/* SIOCGIWAPLIST -- depricated */
+	dummy,				/* SIOCGIWAPLIST -- deprecated */
 	rtw_wx_set_scan,		/* SIOCSIWSCAN */
 	rtw_wx_get_scan,		/* SIOCGIWSCAN */
 	rtw_wx_set_essid,		/* SIOCSIWESSID */

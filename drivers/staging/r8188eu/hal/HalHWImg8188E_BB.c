@@ -194,9 +194,9 @@ enum HAL_STATUS ODM_ReadAndConfig_AGC_TAB_1T_8188E(struct odm_dm_struct *dm_odm)
 	biol = rtw_IOL_applied(adapter);
 
 	if (biol) {
-		pxmit_frame = rtw_IOL_accquire_xmit_frame(adapter);
+		pxmit_frame = rtw_IOL_acquire_xmit_frame(adapter);
 		if (pxmit_frame == NULL) {
-			pr_info("rtw_IOL_accquire_xmit_frame failed\n");
+			pr_info("rtw_IOL_acquire_xmit_frame failed\n");
 			return HAL_STATUS_FAILURE;
 		}
 	}
@@ -473,9 +473,9 @@ enum HAL_STATUS ODM_ReadAndConfig_PHY_REG_1T_8188E(struct odm_dm_struct *dm_odm)
 	biol = rtw_IOL_applied(adapter);
 
 	if (biol) {
-		pxmit_frame = rtw_IOL_accquire_xmit_frame(adapter);
+		pxmit_frame = rtw_IOL_acquire_xmit_frame(adapter);
 		if (pxmit_frame == NULL) {
-			pr_info("rtw_IOL_accquire_xmit_frame failed\n");
+			pr_info("rtw_IOL_acquire_xmit_frame failed\n");
 			return HAL_STATUS_FAILURE;
 		}
 	}

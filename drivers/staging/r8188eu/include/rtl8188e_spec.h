@@ -41,7 +41,7 @@
 #define BIT30	0x40000000
 #define BIT31	0x80000000
 
-/*        8192C Regsiter offset definition */
+/*        8192C Register offset definition */
 
 #define		HAL_PS_TIMER_INT_DELAY	50	/*   50 microseconds */
 #define		HAL_92C_NAV_UPPER_UNIT	128	/*  micro-second */
@@ -677,7 +677,7 @@ Current IOREG MAP
 /*  Note: */
 /* 	The bits of stopping AC(VO/VI/BE/BK) queue in datasheet
  *	RTL8192S/RTL8192C are wrong, */
-/* 	the correct arragement is VO - Bit0, VI - Bit1, BE - Bit2,
+/* 	the correct arrangement is VO - Bit0, VI - Bit1, BE - Bit2,
  *	and BK - Bit3. */
 /* 	8723 and 88E may be not correct either in the earlier version. */
 #define		StopBecon			BIT6
@@ -726,7 +726,7 @@ Current IOREG MAP
 
 #define REG_USB_HRPWM			0xFE58
 #define REG_USB_HCPWM			0xFE57
-/*        8192C Regsiter Bit and Content definition */
+/*        8192C Register Bit and Content definition */
 /* 	0x0000h ~ 0x00FFh	System Configuration */
 
 /* 2 SYS_ISO_CTRL */
@@ -1163,7 +1163,7 @@ Current IOREG MAP
 #define SDIO_REG_HCPWM1			0x0024
 /*  HCI Current Power Mode 2 */
 #define SDIO_REG_HCPWM2			0x0026
-/*  HTSF Informaion */
+/*  HTSF Information */
 #define SDIO_REG_HTSFR_INFO		0x0030
 /*  HCI Request Power Mode 1 */
 #define SDIO_REG_HRPWM1			0x0080
@@ -1375,7 +1375,7 @@ Current IOREG MAP
 #define EEPROM_Default_CrystalCap_88E		0x20
 #define	EEPROM_Default_ThermalMeter_88E		0x18
 
-/* New EFUSE deafult value */
+/* New EFUSE default value */
 #define		EEPROM_DEFAULT_24G_INDEX	0x2D
 #define		EEPROM_DEFAULT_24G_HT20_DIFF	0X02
 #define		EEPROM_DEFAULT_24G_OFDM_DIFF	0X04
