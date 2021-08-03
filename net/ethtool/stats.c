@@ -108,11 +108,14 @@ static int stats_prepare_data(const struct ethnl_req_info *req_base,
 	const struct stats_req_info *req_info = STATS_REQINFO(req_base);
 	struct stats_reply_data *data = STATS_REPDATA(reply_base);
 	struct net_device *dev = reply_base->dev;
+	const struct ethtool_ops *ops;
 	int ret;
 
 	ret = ethnl_ops_begin(dev);
 	if (ret < 0)
 		return ret;
+
+	ops = dev->ethtool_ops;
 
 	/* Mark all stats as unset (see ETHTOOL_STAT_NOT_SET) to prevent them
 	 * from being reported to user space in case driver did not set them.
@@ -123,18 +126,17 @@ static int stats_prepare_data(const struct ethnl_req_info *req_base,
 	memset(&data->rmon_stats, 0xff, sizeof(data->rmon_stats));
 
 	if (test_bit(ETHTOOL_STATS_ETH_PHY, req_info->stat_mask) &&
-	    dev->ethtool_ops->get_eth_phy_stats)
-		dev->ethtool_ops->get_eth_phy_stats(dev, &data->phy_stats);
+	    ops->get_eth_phy_stats)
+		ops->get_eth_phy_stats(dev, &data->phy_stats);
 	if (test_bit(ETHTOOL_STATS_ETH_MAC, req_info->stat_mask) &&
-	    dev->ethtool_ops->get_eth_mac_stats)
-		dev->ethtool_ops->get_eth_mac_stats(dev, &data->mac_stats);
+	    ops->get_eth_mac_stats)
+		ops->get_eth_mac_stats(dev, &data->mac_stats);
 	if (test_bit(ETHTOOL_STATS_ETH_CTRL, req_info->stat_mask) &&
-	    dev->ethtool_ops->get_eth_ctrl_stats)
-		dev->ethtool_ops->get_eth_ctrl_stats(dev, &data->ctrl_stats);
+	    ops->get_eth_ctrl_stats)
+		ops->get_eth_ctrl_stats(dev, &data->ctrl_stats);
 	if (test_bit(ETHTOOL_STATS_RMON, req_info->stat_mask) &&
-	    dev->ethtool_ops->get_rmon_stats)
-		dev->ethtool_ops->get_rmon_stats(dev, &data->rmon_stats,
-						 &data->rmon_ranges);
+	    ops->get_rmon_stats)
+		ops->get_rmon_stats(dev, &data->rmon_stats, &data->rmon_ranges);
 
 	ethnl_ops_complete(dev);
 	return 0;
