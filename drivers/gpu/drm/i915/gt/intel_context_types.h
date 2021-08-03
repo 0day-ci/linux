@@ -202,6 +202,18 @@ struct intel_context {
 	/* GuC context blocked fence */
 	struct i915_sw_fence guc_blocked;
 
+	/* Head of children list or link in parent's children list */
+	union {
+		struct list_head guc_child_list;	/* parent */
+		struct list_head guc_child_link;	/* child */
+	};
+
+	/* Pointer to parent */
+	struct intel_context *parent;
+
+	/* Number of children if parent */
+	u8 guc_number_children;
+
 	/*
 	 * GuC priority management
 	 */
