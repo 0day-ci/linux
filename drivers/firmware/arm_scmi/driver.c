@@ -1430,7 +1430,7 @@ static int scmi_probe(struct platform_device *pdev)
 
 	ret = scmi_xfer_info_init(info);
 	if (ret)
-		return ret;
+		goto clear_txrx_setup;
 
 	if (scmi_notification_init(handle))
 		dev_err(dev, "SCMI Notifications NOT available.\n");
@@ -1443,7 +1443,7 @@ static int scmi_probe(struct platform_device *pdev)
 	ret = scmi_protocol_acquire(handle, SCMI_PROTOCOL_BASE);
 	if (ret) {
 		dev_err(dev, "unable to communicate with SCMI\n");
-		return ret;
+		goto notification_exit;
 	}
 
 	mutex_lock(&scmi_list_mutex);
@@ -1482,6 +1482,13 @@ static int scmi_probe(struct platform_device *pdev)
 	}
 
 	return 0;
+
+notification_exit:
+	scmi_notification_exit(&info->handle);
+clear_txrx_setup:
+	idr_for_each(&info->tx_idr, info->desc->ops->chan_free, &info->tx_idr);
+	idr_for_each(&info->rx_idr, info->desc->ops->chan_free, &info->rx_idr);
+	return ret;
 }
 
 void scmi_free_channel(struct scmi_chan_info *cinfo, struct idr *idr, int id)
