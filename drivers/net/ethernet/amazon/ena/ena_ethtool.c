@@ -113,8 +113,8 @@ static const struct ena_stats ena_stats_ena_com_strings[] = {
 #define ENA_STATS_ARRAY_ENI(adapter)	\
 	(ARRAY_SIZE(ena_stats_eni_strings) * (adapter)->eni_stats_supported)
 
-static void ena_safe_update_stat(u64 *src, u64 *dst,
-				 struct u64_stats_sync *syncp)
+static void ena_safe_update_stat(const u64 *src, u64 *dst,
+				 const struct u64_stats_sync *syncp)
 {
 	unsigned int start;
 
