@@ -101,8 +101,6 @@ struct virtnet_rq_stats {
 static const struct virtnet_stat_desc virtnet_sq_stats_desc[] = {
 	{ "packets",		VIRTNET_SQ_STAT(packets) },
 	{ "bytes",		VIRTNET_SQ_STAT(bytes) },
-	{ "xdp_xmit",		VIRTNET_SQ_STAT(xdp_xmit) },
-	{ "xdp_xmit_drops",	VIRTNET_SQ_STAT(xdp_xmit_drops) },
 	{ "kicks",		VIRTNET_SQ_STAT(kicks) },
 };
 
@@ -110,11 +108,6 @@ static const struct virtnet_stat_desc virtnet_rq_stats_desc[] = {
 	{ "packets",		VIRTNET_RQ_STAT(packets) },
 	{ "bytes",		VIRTNET_RQ_STAT(bytes) },
 	{ "drops",		VIRTNET_RQ_STAT(drops) },
-	{ "xdp_packets",	VIRTNET_RQ_STAT(xdp_packets) },
-	{ "xdp_tx",		VIRTNET_RQ_STAT(xdp_tx) },
-	{ "xdp_redirects",	VIRTNET_RQ_STAT(xdp_redirects) },
-	{ "xdp_drops",		VIRTNET_RQ_STAT(xdp_drops) },
-	{ "xdp_errors",		VIRTNET_RQ_STAT(xdp_errors) },
 	{ "kicks",		VIRTNET_RQ_STAT(kicks) },
 };
 
@@ -2295,6 +2288,49 @@ static void virtnet_get_ethtool_stats(struct net_device *dev,
 	}
 }
 
+static int virtnet_get_std_stats_channels(struct net_device *dev, u32 sset)
+{
+	const struct virtnet_info *vi = netdev_priv(dev);
+
+	switch (sset) {
+	case ETH_SS_STATS_XDP:
+		return vi->curr_queue_pairs;
+	default:
+		return -EOPNOTSUPP;
+	}
+}
+
+static void virtnet_get_xdp_stats(struct net_device *dev,
+				  struct ethtool_xdp_stats *xdp_stats)
+{
+	const struct virtnet_info *vi = netdev_priv(dev);
+	u32 i;
+
+	for (i = 0; i < vi->curr_queue_pairs; i++) {
+		const struct virtnet_rq_stats *rqs = &vi->rq[i].stats;
+		const struct virtnet_sq_stats *sqs = &vi->sq[i].stats;
+		struct ethtool_xdp_stats *iter = xdp_stats + i;
+		u32 start;
+
+		do {
+			start = u64_stats_fetch_begin_irq(&rqs->syncp);
+
+			iter->packets = rqs->xdp_packets;
+			iter->tx = rqs->xdp_tx;
+			iter->redirect = rqs->xdp_redirects;
+			iter->drop = rqs->xdp_drops;
+			iter->errors = rqs->xdp_errors;
+		} while (u64_stats_fetch_retry_irq(&rqs->syncp, start));
+
+		do {
+			start = u64_stats_fetch_begin_irq(&sqs->syncp);
+
+			iter->xmit = sqs->xdp_xmit;
+			iter->xmit_drops = sqs->xdp_xmit_drops;
+		} while (u64_stats_fetch_retry_irq(&sqs->syncp, start));
+	}
+}
+
 static void virtnet_get_channels(struct net_device *dev,
 				 struct ethtool_channels *channels)
 {
@@ -2409,6 +2445,8 @@ static const struct ethtool_ops virtnet_ethtool_ops = {
 	.set_link_ksettings = virtnet_set_link_ksettings,
 	.set_coalesce = virtnet_set_coalesce,
 	.get_coalesce = virtnet_get_coalesce,
+	.get_std_stats_channels = virtnet_get_std_stats_channels,
+	.get_xdp_stats = virtnet_get_xdp_stats,
 };
 
 static void virtnet_freeze_down(struct virtio_device *vdev)
