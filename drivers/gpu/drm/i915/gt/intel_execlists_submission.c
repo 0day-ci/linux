@@ -927,8 +927,7 @@ static void execlists_submit_ports(struct intel_engine_cs *engine)
 
 static bool ctx_single_port_submission(const struct intel_context *ce)
 {
-	return (IS_ENABLED(CONFIG_DRM_I915_GVT) &&
-		intel_context_force_single_submission(ce));
+	return intel_context_force_single_submission(ce);
 }
 
 static bool can_merge_ctx(const struct intel_context *prev,
@@ -2602,6 +2601,203 @@ static void execlists_context_cancel_request(struct intel_context *ce,
 				      current->comm);
 }
 
+static int execlists_parent_context_pre_pin(struct intel_context *ce,
+					    struct i915_gem_ww_ctx *ww)
+{
+	struct intel_context *child;
+	int err, i = 0, j = 0;
+
+	GEM_BUG_ON(!intel_context_is_parent(ce));
+
+	for_each_child(ce, child) {
+		err = i915_active_acquire(&child->active);
+		if (unlikely(err))
+			goto unwind_active;
+		++i;
+	}
+
+	for_each_child(ce, child) {
+		err = __execlists_context_pre_pin(child, child->engine, ww);
+		if (unlikely(err))
+			goto unwind_pre_pin;
+		++j;
+	}
+
+	err = __execlists_context_pre_pin(ce, ce->engine, ww);
+	if (unlikely(err))
+		goto unwind_pre_pin;
+
+	return 0;
+
+unwind_pre_pin:
+	for_each_child(ce, child) {
+		if (!j--)
+			break;
+		lrc_post_unpin(child);
+	}
+
+unwind_active:
+	for_each_child(ce, child) {
+		if (!i--)
+			break;
+		i915_active_release(&child->active);
+	}
+
+	return err;
+}
+
+static void execlists_parent_context_post_unpin(struct intel_context *ce)
+{
+	struct intel_context *child;
+
+	GEM_BUG_ON(!intel_context_is_parent(ce));
+
+	for_each_child(ce, child)
+		lrc_post_unpin(child);
+	lrc_post_unpin(ce);
+
+	for_each_child(ce, child) {
+		intel_context_get(child);
+		i915_active_release(&child->active);
+		intel_context_put(child);
+	}
+}
+
+static int execlists_parent_context_pin(struct intel_context *ce)
+{
+	int ret, i = 0, j = 0;
+	struct intel_context *child;
+
+	GEM_BUG_ON(!intel_context_is_parent(ce));
+
+	for_each_child(ce, child) {
+		ret = lrc_pin(child, child->engine);
+		if (unlikely(ret))
+			goto unwind_pin;
+		++i;
+	}
+	ret = lrc_pin(ce, ce->engine);
+	if (unlikely(ret))
+		goto unwind_pin;
+
+	return 0;
+
+unwind_pin:
+	for_each_child(ce, child) {
+		if (++j > i)
+			break;
+		lrc_unpin(child);
+	}
+
+	return ret;
+}
+
+static void execlists_parent_context_unpin(struct intel_context *ce)
+{
+	struct intel_context *child;
+
+	GEM_BUG_ON(!intel_context_is_parent(ce));
+
+	for_each_child(ce, child)
+		lrc_unpin(child);
+	lrc_unpin(ce);
+}
+
+static const struct intel_context_ops parent_context_ops = {
+	.flags = COPS_HAS_INFLIGHT,
+
+	.alloc = execlists_context_alloc,
+
+	.cancel_request = execlists_context_cancel_request,
+
+	.pre_pin = execlists_parent_context_pre_pin,
+	.pin = execlists_parent_context_pin,
+	.unpin = execlists_parent_context_unpin,
+	.post_unpin = execlists_parent_context_post_unpin,
+
+	.enter = intel_context_enter_engine,
+	.exit = intel_context_exit_engine,
+
+	.destroy = lrc_destroy,
+};
+
+static const struct intel_context_ops child_context_ops = {
+	.flags = COPS_HAS_INFLIGHT,
+
+	.alloc = execlists_context_alloc,
+
+	.cancel_request = execlists_context_cancel_request,
+
+	.enter = intel_context_enter_engine,
+	.exit = intel_context_exit_engine,
+
+	.destroy = lrc_destroy,
+};
+
+static struct intel_context *
+execlists_create_parallel(struct intel_engine_cs **engines,
+			  unsigned int num_siblings,
+			  unsigned int width)
+{
+	struct intel_engine_cs **siblings = NULL;
+	struct intel_context *parent = NULL, *ce, *err;
+	int i, j;
+	int ret;
+
+	GEM_BUG_ON(num_siblings != 1);
+
+	siblings = kmalloc_array(num_siblings,
+				 sizeof(*siblings),
+				 GFP_KERNEL);
+	if (!siblings)
+		return ERR_PTR(-ENOMEM);
+
+	for (i = 0; i < width; ++i) {
+		for (j = 0; j < num_siblings; ++j)
+			siblings[j] = engines[i * num_siblings + j];
+
+		ce = intel_context_create(siblings[0]);
+		if (!ce) {
+			err = ERR_PTR(-ENOMEM);
+			goto unwind;
+		}
+
+		if (i == 0) {
+			parent = ce;
+		} else {
+			intel_context_bind_parent_child(parent, ce);
+			ret = intel_context_alloc_state(ce);
+			if (ret) {
+				err = ERR_PTR(ret);
+				goto unwind;
+			}
+		}
+	}
+
+	intel_context_set_nopreempt(parent);
+	intel_context_set_single_submission(parent);
+	for_each_child(parent, ce) {
+		intel_context_set_nopreempt(ce);
+		intel_context_set_single_submission(ce);
+	}
+
+	parent->ops = &parent_context_ops;
+	for_each_child(parent, ce)
+		ce->ops = &child_context_ops;
+
+	kfree(siblings);
+	return parent;
+
+unwind:
+	if (parent) {
+		for_each_child(parent, ce)
+			intel_context_put(ce);
+		intel_context_put(parent);
+	}
+	kfree(siblings);
+	return err;
+}
+
 static const struct intel_context_ops execlists_context_ops = {
 	.flags = COPS_HAS_INFLIGHT,
 
@@ -2620,6 +2816,7 @@ static const struct intel_context_ops execlists_context_ops = {
 	.reset = lrc_reset,
 	.destroy = lrc_destroy,
 
+	.create_parallel = execlists_create_parallel,
 	.create_virtual = execlists_create_virtual,
 };
 
