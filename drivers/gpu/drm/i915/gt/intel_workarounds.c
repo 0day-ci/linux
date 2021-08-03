@@ -80,18 +80,44 @@ static void wa_init_finish(struct i915_wa_list *wal)
 			 wal->wa_count, wal->name, wal->engine_name);
 }
 
+static u32 reg_offset(i915_reg_t reg)
+{
+	return i915_mmio_reg_offset(reg) & RING_FORCE_TO_NONPRIV_ADDRESS_MASK;
+}
+
+static u32 reg_flags(i915_reg_t reg)
+{
+	return i915_mmio_reg_offset(reg) & ~RING_FORCE_TO_NONPRIV_ADDRESS_MASK;
+}
+
+__maybe_unused
+static bool is_nonpriv_flags_valid(u32 flags)
+{
+	/* Check only valid flag bits are set */
+	if (flags & ~RING_FORCE_TO_NONPRIV_MASK_VALID)
+		return false;
+
+	/* NB: Only 3 out of 4 enum values are valid for access field */
+	if ((flags & RING_FORCE_TO_NONPRIV_ACCESS_MASK) ==
+	    RING_FORCE_TO_NONPRIV_ACCESS_INVALID)
+		return false;
+
+	return true;
+}
+
 static int wa_index(struct i915_wa_list *wal, i915_reg_t reg)
 {
-	unsigned int addr = i915_mmio_reg_offset(reg);
 	int start = 0, end = wal->count;
+	u32 addr = reg_offset(reg);
 
 	/* addr and wal->list[].reg, both include the R/W flags */
 	while (start < end) {
 		unsigned int mid = start + (end - start) / 2;
+		u32 pos = reg_offset(wal->list[mid].reg);
 
-		if (i915_mmio_reg_offset(wal->list[mid].reg) < addr)
+		if (pos < addr)
 			start = mid + 1;
-		else if (i915_mmio_reg_offset(wal->list[mid].reg) > addr)
+		else if (pos > addr)
 			end = mid;
 		else
 			return mid;
@@ -117,13 +143,22 @@ static void __wa_add(struct i915_wa_list *wal, const struct i915_wa *wa)
 	struct i915_wa *wa_;
 	int index;
 
+	GEM_BUG_ON(!is_nonpriv_flags_valid(reg_flags(wa->reg)));
+
 	index = wa_index(wal, wa->reg);
 	if (index >= 0) {
 		wa_ = &wal->list[index];
 
+		if (i915_mmio_reg_offset(wa->reg) !=
+		    i915_mmio_reg_offset(wa_->reg)) {
+			DRM_ERROR("Discarding incompatible w/a for reg %04x\n",
+				  reg_offset(wa->reg));
+			return;
+		}
+
 		if ((wa->clr | wa_->clr) && !(wa->clr & ~wa_->clr)) {
 			DRM_ERROR("Discarding overwritten w/a for reg %04x (clear: %08x, set: %08x)\n",
-				  i915_mmio_reg_offset(wa_->reg),
+				  reg_offset(wa_->reg),
 				  wa_->clr, wa_->set);
 
 			wa_->set &= ~wa->clr;
@@ -141,10 +176,8 @@ static void __wa_add(struct i915_wa_list *wal, const struct i915_wa *wa)
 	*wa_ = *wa;
 
 	while (wa_-- > wal->list) {
-		GEM_BUG_ON(i915_mmio_reg_offset(wa_[0].reg) ==
-			   i915_mmio_reg_offset(wa_[1].reg));
-		if (i915_mmio_reg_offset(wa_[1].reg) >
-		    i915_mmio_reg_offset(wa_[0].reg))
+		GEM_BUG_ON(reg_offset(wa_[0].reg) == reg_offset(wa_[1].reg));
+		if (reg_offset(wa_[1].reg) > reg_offset(wa_[0].reg))
 			break;
 
 		swap(wa_[1], wa_[0]);
@@ -160,7 +193,7 @@ static void _wa_add(struct i915_wa_list *wal, const struct i915_wa *wa)
 	if (IS_ALIGNED(wal->count, grow) && /* Either uninitialized or full. */
 	    wa_list_grow(wal, ALIGN(wal->count + 1, grow), GFP_KERNEL)) {
 		DRM_ERROR("Unable to store w/a for reg %04x\n",
-			  i915_mmio_reg_offset(wa->reg));
+			  reg_offset(wa->reg));
 		return;
 	}
 
@@ -1225,21 +1258,6 @@ static bool wa_list_verify(struct intel_gt *gt,
 bool intel_gt_verify_workarounds(struct intel_gt *gt, const char *from)
 {
 	return wa_list_verify(gt, &gt->i915->gt_wa_list, from);
-}
-
-__maybe_unused
-static bool is_nonpriv_flags_valid(u32 flags)
-{
-	/* Check only valid flag bits are set */
-	if (flags & ~RING_FORCE_TO_NONPRIV_MASK_VALID)
-		return false;
-
-	/* NB: Only 3 out of 4 enum values are valid for access field */
-	if ((flags & RING_FORCE_TO_NONPRIV_ACCESS_MASK) ==
-	    RING_FORCE_TO_NONPRIV_ACCESS_INVALID)
-		return false;
-
-	return true;
 }
 
 static void
