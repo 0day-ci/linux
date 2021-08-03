@@ -2398,6 +2398,39 @@ struct drm_i915_perf_open_param {
 #define I915_PERF_IOCTL_CONFIG	_IO('i', 0x2)
 
 /*
+ * Returns OA buffer properties to be used with mmap.
+ *
+ * This ioctl is available in perf revision 8.
+ */
+#define I915_PERF_IOCTL_GET_OA_BUFFER_INFO _IOWR('i', 0x3, struct drm_i915_perf_oa_buffer_info)
+
+/**
+ * OA buffer size and offset.
+ *
+ * OA output buffer
+ *   type: 0
+ *   flags: mbz
+ *
+ *   After querying the info, pass (size,offset) to mmap(),
+ *
+ *   mmap(0, info.size, PROT_READ, MAP_PRIVATE, perf_fd, info.offset).
+ *
+ *   Note that only a private (not shared between processes, or across fork())
+ *   read-only mmapping is allowed.
+ *
+ *   Userspace must treat the incoming data as tainted, but it conforms to the OA
+ *   format as specified by user config. The buffer provides reports that have
+ *   OA counters - A, B and C.
+ */
+struct drm_i915_perf_oa_buffer_info {
+	__u32 type;   /* in */
+	__u32 flags;  /* in */
+	__u64 size;   /* out */
+	__u64 offset; /* out */
+	__u64 rsvd;   /* mbz */
+};
+
+/*
  * Common to all i915 perf records
  */
 struct drm_i915_perf_record_header {
