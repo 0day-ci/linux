@@ -109,12 +109,16 @@ config SND_SOC_QDSP6_APM_DAI
 config SND_SOC_QDSP6_APM_BEDAI
 	tristate
 
+config SND_SOC_QDSP6_PRM
+	tristate
+
 config SND_SOC_QDSP6_AUDIOREACH
 	tristate "SoC ALSA audio drives for Qualcomm QDSP AUDIOREACH Framework"
 	depends on QCOM_GPR
 	select SND_SOC_TOPOLOGY
 	select SND_SOC_QDSP6_APM_DAI
 	select SND_SOC_QDSP6_APM_BEDAI
+	select SND_SOC_QDSP6_PRM
 	help
 	 To add support for Qualcomm QDSP6 AudioReach Audio Framework.
 	 This will enable sound soc platform specific audio drivers.
