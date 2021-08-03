@@ -577,11 +577,21 @@ struct extent_info {
 	u32 blk;			/* start block address of the extent */
 };
 
+#ifdef CONFIG_F2FS_FS_COMPRESSION
+struct extent_info_unaligned {
+	struct extent_info ei;		/* extent info */
+	unsigned int plen;		/* physical extent length of compressed blocks */
+};
+#endif
+
 struct extent_node {
 	struct rb_node rb_node;		/* rb node located in rb-tree */
 	struct extent_info ei;		/* extent info */
 	struct list_head list;		/* node in global extent list of sbi */
 	struct extent_tree *et;		/* extent tree pointer */
+#ifdef CONFIG_F2FS_FS_COMPRESSION
+	unsigned int plen;		/* physical extent length of compressed blocks */
+#endif
 };
 
 struct extent_tree {
@@ -816,22 +826,29 @@ static inline bool __is_discard_front_mergeable(struct discard_info *cur,
 }
 
 static inline bool __is_extent_mergeable(struct extent_info *back,
-						struct extent_info *front)
+				struct extent_info *front, bool unaligned)
 {
+#ifdef CONFIG_F2FS_FS_COMPRESSION
+	struct extent_info_unaligned *be = (struct extent_info_unaligned *)back;
+	struct extent_info_unaligned *fe = (struct extent_info_unaligned *)front;
+
+	if (unaligned && (be->ei.len != be->plen || fe->ei.len != fe->plen))
+		return false;
+#endif
 	return (back->fofs + back->len == front->fofs &&
 			back->blk + back->len == front->blk);
 }
 
 static inline bool __is_back_mergeable(struct extent_info *cur,
-						struct extent_info *back)
+				struct extent_info *back, bool unaligned)
 {
-	return __is_extent_mergeable(back, cur);
+	return __is_extent_mergeable(back, cur, unaligned);
 }
 
 static inline bool __is_front_mergeable(struct extent_info *cur,
-						struct extent_info *front)
+				struct extent_info *front, bool unaligned)
 {
-	return __is_extent_mergeable(cur, front);
+	return __is_extent_mergeable(cur, front, unaligned);
 }
 
 extern void f2fs_mark_inode_dirty_sync(struct inode *inode, bool sync);
@@ -3977,6 +3994,11 @@ struct rb_entry *f2fs_lookup_rb_tree_ret(struct rb_root_cached *root,
 		bool force, bool *leftmost);
 bool f2fs_check_rb_tree_consistence(struct f2fs_sb_info *sbi,
 				struct rb_root_cached *root, bool check_key);
+#ifdef CONFIG_F2FS_FS_COMPRESSION
+void f2fs_update_extent_tree_range_unaligned(struct inode *inode,
+				pgoff_t fofs, block_t blkaddr, unsigned int llen,
+				unsigned int plen);
+#endif
 unsigned int f2fs_shrink_extent_tree(struct f2fs_sb_info *sbi, int nr_shrink);
 void f2fs_init_extent_tree(struct inode *inode, struct page *ipage);
 void f2fs_drop_extent_tree(struct inode *inode);
@@ -3984,6 +4006,8 @@ unsigned int f2fs_destroy_extent_node(struct inode *inode);
 void f2fs_destroy_extent_tree(struct inode *inode);
 bool f2fs_lookup_extent_cache(struct inode *inode, pgoff_t pgofs,
 			struct extent_info *ei);
+bool f2fs_lookup_extent_cache_unaligned(struct inode *inode, pgoff_t pgofs,
+					struct extent_info_unaligned *eiu);
 void f2fs_update_extent_cache(struct dnode_of_data *dn);
 void f2fs_update_extent_cache_range(struct dnode_of_data *dn,
 			pgoff_t fofs, block_t blkaddr, unsigned int len);
@@ -4060,6 +4084,7 @@ int f2fs_read_multi_pages(struct compress_ctx *cc, struct bio **bio_ret,
 struct decompress_io_ctx *f2fs_alloc_dic(struct compress_ctx *cc);
 void f2fs_decompress_end_io(struct decompress_io_ctx *dic, bool failed);
 void f2fs_put_page_dic(struct page *page);
+int f2fs_cluster_blocks_are_contiguous(struct dnode_of_data *dn);
 int f2fs_init_compress_ctx(struct compress_ctx *cc);
 void f2fs_destroy_compress_ctx(struct compress_ctx *cc, bool reuse);
 void f2fs_init_compress_info(struct f2fs_sb_info *sbi);

@@ -235,7 +235,7 @@ static struct kmem_cache *extent_node_slab;
 static struct extent_node *__attach_extent_node(struct f2fs_sb_info *sbi,
 				struct extent_tree *et, struct extent_info *ei,
 				struct rb_node *parent, struct rb_node **p,
-				bool leftmost)
+				bool leftmost, bool unaligned)
 {
 	struct extent_node *en;
 
@@ -246,6 +246,11 @@ static struct extent_node *__attach_extent_node(struct f2fs_sb_info *sbi,
 	en->ei = *ei;
 	INIT_LIST_HEAD(&en->list);
 	en->et = et;
+
+#ifdef CONFIG_F2FS_FS_COMPRESSION
+	if (unaligned)
+		en->plen = ((struct extent_info_unaligned *)ei)->plen;
+#endif
 
 	rb_link_node(&en->rb_node, parent, p);
 	rb_insert_color_cached(&en->rb_node, &et->root, leftmost);
@@ -320,7 +325,7 @@ static struct extent_node *__init_extent_tree(struct f2fs_sb_info *sbi,
 	struct rb_node **p = &et->root.rb_root.rb_node;
 	struct extent_node *en;
 
-	en = __attach_extent_node(sbi, et, ei, NULL, p, true);
+	en = __attach_extent_node(sbi, et, ei, NULL, p, true, false);
 	if (!en)
 		return NULL;
 
@@ -439,6 +444,17 @@ static bool f2fs_lookup_extent_tree(struct inode *inode, pgoff_t pgofs,
 		stat_inc_rbtree_node_hit(sbi);
 
 	*ei = en->ei;
+
+#ifdef CONFIG_F2FS_FS_COMPRESSION
+	if (is_inode_flag_set(inode, FI_COMPRESSED_FILE) &&
+				f2fs_sb_has_readonly(sbi)) {
+		struct extent_info_unaligned *eiu =
+				(struct extent_info_unaligned *)ei;
+
+		eiu->plen = en->plen;
+	}
+#endif
+
 	spin_lock(&sbi->extent_lock);
 	if (!list_empty(&en->list)) {
 		list_move_tail(&en->list, &sbi->extent_list);
@@ -457,17 +473,18 @@ out:
 static struct extent_node *__try_merge_extent_node(struct f2fs_sb_info *sbi,
 				struct extent_tree *et, struct extent_info *ei,
 				struct extent_node *prev_ex,
-				struct extent_node *next_ex)
+				struct extent_node *next_ex,
+				bool unaligned)
 {
 	struct extent_node *en = NULL;
 
-	if (prev_ex && __is_back_mergeable(ei, &prev_ex->ei)) {
+	if (prev_ex && __is_back_mergeable(ei, &prev_ex->ei, unaligned)) {
 		prev_ex->ei.len += ei->len;
 		ei = &prev_ex->ei;
 		en = prev_ex;
 	}
 
-	if (next_ex && __is_front_mergeable(ei, &next_ex->ei)) {
+	if (next_ex && __is_front_mergeable(ei, &next_ex->ei, unaligned)) {
 		next_ex->ei.fofs = ei->fofs;
 		next_ex->ei.blk = ei->blk;
 		next_ex->ei.len += ei->len;
@@ -495,7 +512,7 @@ static struct extent_node *__insert_extent_tree(struct f2fs_sb_info *sbi,
 				struct extent_tree *et, struct extent_info *ei,
 				struct rb_node **insert_p,
 				struct rb_node *insert_parent,
-				bool leftmost)
+				bool leftmost, bool unaligned)
 {
 	struct rb_node **p;
 	struct rb_node *parent = NULL;
@@ -512,7 +529,7 @@ static struct extent_node *__insert_extent_tree(struct f2fs_sb_info *sbi,
 	p = f2fs_lookup_rb_tree_for_insert(sbi, &et->root, &parent,
 						ei->fofs, &leftmost);
 do_insert:
-	en = __attach_extent_node(sbi, et, ei, parent, p, leftmost);
+	en = __attach_extent_node(sbi, et, ei, parent, p, leftmost, unaligned);
 	if (!en)
 		return NULL;
 
@@ -594,7 +611,7 @@ static void f2fs_update_extent_tree_range(struct inode *inode,
 						end - dei.fofs + dei.blk,
 						org_end - end);
 				en1 = __insert_extent_tree(sbi, et, &ei,
-							NULL, NULL, true);
+						NULL, NULL, true, false);
 				next_en = en1;
 			} else {
 				en->ei.fofs = end;
@@ -633,9 +650,10 @@ static void f2fs_update_extent_tree_range(struct inode *inode,
 	if (blkaddr) {
 
 		set_extent_info(&ei, fofs, blkaddr, len);
-		if (!__try_merge_extent_node(sbi, et, &ei, prev_en, next_en))
+		if (!__try_merge_extent_node(sbi, et, &ei,
+					prev_en, next_en, false))
 			__insert_extent_tree(sbi, et, &ei,
-					insert_p, insert_parent, leftmost);
+				insert_p, insert_parent, leftmost, false);
 
 		/* give up extent_cache, if split and small updates happen */
 		if (dei.len >= 1 &&
@@ -660,6 +678,48 @@ static void f2fs_update_extent_tree_range(struct inode *inode,
 	if (updated)
 		f2fs_mark_inode_dirty_sync(inode, true);
 }
+
+#ifdef CONFIG_F2FS_FS_COMPRESSION
+void f2fs_update_extent_tree_range_unaligned(struct inode *inode,
+				pgoff_t fofs, block_t blkaddr, unsigned int llen,
+				unsigned int plen)
+{
+	struct f2fs_sb_info *sbi = F2FS_I_SB(inode);
+	struct extent_tree *et = F2FS_I(inode)->extent_tree;
+	struct extent_node *en = NULL;
+	struct extent_node *prev_en = NULL, *next_en = NULL;
+	struct extent_info_unaligned eiu;
+	struct rb_node **insert_p = NULL, *insert_parent = NULL;
+	bool leftmost = false;
+
+	trace_f2fs_update_extent_tree_range(inode, fofs, blkaddr, llen);
+
+	write_lock(&et->lock);
+
+	if (is_inode_flag_set(inode, FI_NO_EXTENT)) {
+		write_unlock(&et->lock);
+		return;
+	}
+
+	en = (struct extent_node *)f2fs_lookup_rb_tree_ret(&et->root,
+				(struct rb_entry *)et->cached_en, fofs,
+				(struct rb_entry **)&prev_en,
+				(struct rb_entry **)&next_en,
+				&insert_p, &insert_parent, false,
+				&leftmost);
+	f2fs_bug_on(sbi, en);
+
+	set_extent_info(&eiu.ei, fofs, blkaddr, llen);
+	eiu.plen = plen;
+
+	if (!__try_merge_extent_node(sbi, et, (struct extent_info *)&eiu,
+				prev_en, next_en, true))
+		__insert_extent_tree(sbi, et, (struct extent_info *)&eiu,
+				insert_p, insert_parent, leftmost, true);
+
+	write_unlock(&et->lock);
+}
+#endif
 
 unsigned int f2fs_shrink_extent_tree(struct f2fs_sb_info *sbi, int nr_shrink)
 {
@@ -817,6 +877,17 @@ bool f2fs_lookup_extent_cache(struct inode *inode, pgoff_t pgofs,
 
 	return f2fs_lookup_extent_tree(inode, pgofs, ei);
 }
+
+#ifdef CONFIG_F2FS_FS_COMPRESSION
+bool f2fs_lookup_extent_cache_unaligned(struct inode *inode, pgoff_t pgofs,
+					struct extent_info_unaligned *eiu)
+{
+	if (!f2fs_may_extent_tree(inode))
+		return false;
+
+	return f2fs_lookup_extent_tree(inode, pgofs, (struct extent_info *)eiu);
+}
+#endif
 
 void f2fs_update_extent_cache(struct dnode_of_data *dn)
 {

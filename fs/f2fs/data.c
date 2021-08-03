@@ -2126,6 +2126,8 @@ int f2fs_read_multi_pages(struct compress_ctx *cc, struct bio **bio_ret,
 	sector_t last_block_in_file;
 	const unsigned blocksize = blks_to_bytes(inode, 1);
 	struct decompress_io_ctx *dic = NULL;
+	struct extent_info_unaligned eiu;
+	bool extent_cache = false;
 	int i;
 	int ret = 0;
 
@@ -2156,18 +2158,26 @@ int f2fs_read_multi_pages(struct compress_ctx *cc, struct bio **bio_ret,
 	if (f2fs_cluster_is_empty(cc))
 		goto out;
 
-	set_new_dnode(&dn, inode, NULL, NULL, 0);
-	ret = f2fs_get_dnode_of_data(&dn, start_idx, LOOKUP_NODE);
-	if (ret)
-		goto out;
+	if (f2fs_lookup_extent_cache_unaligned(inode, start_idx, &eiu))
+		extent_cache = true;
 
-	f2fs_bug_on(sbi, dn.data_blkaddr != COMPRESS_ADDR);
+	if (!extent_cache) {
+		set_new_dnode(&dn, inode, NULL, NULL, 0);
+		ret = f2fs_get_dnode_of_data(&dn, start_idx, LOOKUP_NODE);
+		if (ret)
+			goto out;
+
+		f2fs_bug_on(sbi, dn.data_blkaddr != COMPRESS_ADDR);
+	}
 
 	for (i = 1; i < cc->cluster_size; i++) {
 		block_t blkaddr;
 
-		blkaddr = data_blkaddr(dn.inode, dn.node_page,
-						dn.ofs_in_node + i);
+		if (extent_cache)
+			blkaddr = eiu.ei.blk + i;
+		else
+			blkaddr = data_blkaddr(dn.inode, dn.node_page,
+							dn.ofs_in_node + i);
 
 		if (!__is_valid_data_blkaddr(blkaddr))
 			break;
@@ -2177,6 +2187,9 @@ int f2fs_read_multi_pages(struct compress_ctx *cc, struct bio **bio_ret,
 			goto out_put_dnode;
 		}
 		cc->nr_cpages++;
+
+		if (extent_cache && i >= eiu.plen)
+			break;
 	}
 
 	/* nothing to decompress */
@@ -2196,7 +2209,10 @@ int f2fs_read_multi_pages(struct compress_ctx *cc, struct bio **bio_ret,
 		block_t blkaddr;
 		struct bio_post_read_ctx *ctx;
 
-		blkaddr = data_blkaddr(dn.inode, dn.node_page,
+		if (extent_cache)
+			blkaddr = eiu.plen + i + 1;
+		else
+			blkaddr = data_blkaddr(dn.inode, dn.node_page,
 						dn.ofs_in_node + i + 1);
 
 		f2fs_wait_on_block_writeback(inode, blkaddr);
@@ -2242,13 +2258,15 @@ submit_and_realloc:
 		*last_block_in_bio = blkaddr;
 	}
 
-	f2fs_put_dnode(&dn);
+	if (!extent_cache)
+		f2fs_put_dnode(&dn);
 
 	*bio_ret = bio;
 	return 0;
 
 out_put_dnode:
-	f2fs_put_dnode(&dn);
+	if (!extent_cache)
+		f2fs_put_dnode(&dn);
 out:
 	for (i = 0; i < cc->cluster_size; i++) {
 		if (cc->rpages[i]) {
