@@ -60,6 +60,7 @@ struct intel_guc {
 	struct ida guc_ids;
 	u32 num_guc_ids;
 	u32 max_guc_ids;
+	u32 guc_ids_in_use[GUC_SUBMIT_ENGINE_MAX];
 	unsigned long *guc_ids_bitmap;
 #define MAX_GUC_ID_ORDER	(order_base_2(MAX_ENGINE_INSTANCE + 1))
 	struct list_head guc_id_list_no_ref[MAX_GUC_ID_ORDER + 1];
@@ -68,6 +69,12 @@ struct intel_guc {
 	spinlock_t destroy_lock;	/* protects list / worker */
 	struct list_head destroyed_contexts;
 	struct intel_gt_pm_unpark_work destroy_worker;
+
+	spinlock_t sched_disable_lock;	/* protects schedule disable list */
+	struct list_head sched_disable_list;
+	struct hrtimer sched_disable_timer;
+#define SCHED_DISABLE_DELAY_NS	1000000000
+	u64 sched_disable_delay_ns;
 
 	bool submission_supported;
 	bool submission_selected;

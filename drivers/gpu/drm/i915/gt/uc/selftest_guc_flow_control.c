@@ -174,7 +174,8 @@ out:
 #define NUM_RQ_PER_CONTEXT	2
 #define HEARTBEAT_INTERVAL	1500
 
-static int __intel_guc_flow_control_guc(void *arg, bool limit_guc_ids, bool hang)
+static int __intel_guc_flow_control_guc(void *arg, bool limit_guc_ids,
+					bool hang, bool sched_disable_delay)
 {
 	struct intel_gt *gt = arg;
 	struct intel_guc *guc = &gt->uc.guc;
@@ -202,6 +203,9 @@ static int __intel_guc_flow_control_guc(void *arg, bool limit_guc_ids, bool hang
 
 	if (limit_guc_ids)
 		guc->num_guc_ids = NUM_GUC_ID;
+
+	if (sched_disable_delay)
+		guc->sched_disable_delay_ns = SCHED_DISABLE_DELAY_NS / 5;
 
 	ce = intel_context_create(intel_selftest_find_any_engine(gt));
 	if (IS_ERR(ce)) {
@@ -391,6 +395,7 @@ err:
 	guc->num_guc_ids = guc->max_guc_ids;
 	guc->gse_hang_expected = false;
 	guc->inject_bad_sched_disable = false;
+	guc->sched_disable_delay_ns = 0;
 	kfree(contexts);
 
 	return ret;
@@ -398,17 +403,22 @@ err:
 
 static int intel_guc_flow_control_guc_ids(void *arg)
 {
-	return __intel_guc_flow_control_guc(arg, true, false);
+	return __intel_guc_flow_control_guc(arg, true, false, false);
+}
+
+static int intel_guc_flow_control_guc_ids_sched_disable_delay(void *arg)
+{
+	return __intel_guc_flow_control_guc(arg, true, false, true);
 }
 
 static int intel_guc_flow_control_lrcd_reg(void *arg)
 {
-	return __intel_guc_flow_control_guc(arg, false, false);
+	return __intel_guc_flow_control_guc(arg, false, false, false);
 }
 
 static int intel_guc_flow_control_hang_state_machine(void *arg)
 {
-	return __intel_guc_flow_control_guc(arg, true, true);
+	return __intel_guc_flow_control_guc(arg, true, true, false);
 }
 
 #define NUM_RQ_STRESS_CTBS	0x4000
@@ -861,6 +871,7 @@ int intel_guc_flow_control(struct drm_i915_private *i915)
 	static const struct i915_subtest tests[] = {
 		SUBTEST(intel_guc_flow_control_stress_ctbs),
 		SUBTEST(intel_guc_flow_control_guc_ids),
+		SUBTEST(intel_guc_flow_control_guc_ids_sched_disable_delay),
 		SUBTEST(intel_guc_flow_control_lrcd_reg),
 		SUBTEST(intel_guc_flow_control_hang_state_machine),
 		SUBTEST(intel_guc_flow_control_multi_lrc_guc_ids),

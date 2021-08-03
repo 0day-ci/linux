@@ -654,10 +654,14 @@ int intel_guc_wait_for_pending_msg(struct intel_guc *guc,
 	return (timeout < 0) ? timeout : 0;
 }
 
+static void sched_disable_contexts_flush(struct intel_guc *guc);
+
 int intel_guc_wait_for_idle(struct intel_guc *guc, long timeout)
 {
 	if (!intel_uc_uses_guc_submission(&guc_to_gt(guc)->uc))
 		return 0;
+
+	sched_disable_contexts_flush(guc);
 
 	return intel_guc_wait_for_pending_msg(guc,
 					      &guc->outstanding_submission_g2h,
@@ -1135,6 +1139,7 @@ static void release_guc_id(struct intel_guc *guc, struct intel_context *ce);
 static void guc_signal_context_fence(struct intel_context *ce);
 static void guc_cancel_context_requests(struct intel_context *ce);
 static void guc_blocked_fence_complete(struct intel_context *ce);
+static void sched_disable_context_delete(struct intel_context *ce);
 
 static void scrub_guc_desc_for_outstanding_g2h(struct intel_guc *guc)
 {
@@ -1160,6 +1165,7 @@ static void scrub_guc_desc_for_outstanding_g2h(struct intel_guc *guc)
 		deregister = context_wait_for_deregister_to_register(ce);
 		banned = context_banned(ce);
 		init_sched_state(ce);
+		sched_disable_context_delete(ce);
 
 		if (pending_enable || destroyed || deregister) {
 			atomic_dec(&guc->outstanding_submission_g2h);
@@ -1299,6 +1305,7 @@ void intel_guc_submission_reset_prepare(struct intel_guc *guc)
 
 	intel_gt_park_heartbeats(guc_to_gt(guc));
 	disable_submission(guc);
+	hrtimer_cancel(&guc->sched_disable_timer);
 	guc->interrupts.disable(guc);
 
 	/* Flush IRQ handler */
@@ -1656,6 +1663,8 @@ static void guc_lrcd_reg_fini(struct intel_guc *guc);
 
 static void destroy_worker_func(struct work_struct *w);
 
+static enum hrtimer_restart sched_disable_timer_func(struct hrtimer *hrtimer);
+
 /*
  * Set up the memory resources to be shared with the GuC (via the GGTT)
  * at firmware loading time.
@@ -1686,6 +1695,13 @@ int intel_guc_submission_init(struct intel_guc *guc)
 
 	INIT_LIST_HEAD(&guc->destroyed_contexts);
 	intel_gt_pm_unpark_work_init(&guc->destroy_worker, destroy_worker_func);
+
+	spin_lock_init(&guc->sched_disable_lock);
+	INIT_LIST_HEAD(&guc->sched_disable_list);
+	hrtimer_init(&guc->sched_disable_timer, CLOCK_MONOTONIC,
+		     HRTIMER_MODE_REL);
+	guc->sched_disable_timer.function = sched_disable_timer_func;
+	guc->sched_disable_delay_ns = SCHED_DISABLE_DELAY_NS;
 
 	return 0;
 }
@@ -1852,6 +1868,12 @@ static int new_guc_id(struct intel_guc *guc, struct intel_context *ce)
 	if (unlikely(ret < 0))
 		return ret;
 
+	if (intel_context_is_parent(ce))
+		guc->guc_ids_in_use[GUC_SUBMIT_ENGINE_MULTI_LRC] +=
+			order_base_2(ce->guc_number_children + 1);
+	else
+		guc->guc_ids_in_use[GUC_SUBMIT_ENGINE_SINGLE_LRC]++;
+
 	ce->guc_id = ret;
 	return 0;
 }
@@ -1860,13 +1882,18 @@ static void __release_guc_id(struct intel_guc *guc, struct intel_context *ce)
 {
 	GEM_BUG_ON(intel_context_is_child(ce));
 	if (!context_guc_id_invalid(ce)) {
-		if (intel_context_is_parent(ce))
+		if (intel_context_is_parent(ce)) {
+			guc->guc_ids_in_use[GUC_SUBMIT_ENGINE_MULTI_LRC] -=
+				order_base_2(ce->guc_number_children + 1);
 			bitmap_release_region(guc->guc_ids_bitmap, ce->guc_id,
 					      order_base_2(ce->guc_number_children
 							   + 1));
-		else
+		} else {
+			guc->guc_ids_in_use[GUC_SUBMIT_ENGINE_SINGLE_LRC]--;
 			ida_simple_remove(&guc->guc_ids, ce->guc_id);
+		}
 		clr_lrc_desc_registered(guc, ce->guc_id);
+
 		set_context_guc_id_invalid(ce);
 	}
 	if (!list_empty(&ce->guc_id_link))
@@ -1931,9 +1958,13 @@ static int steal_guc_id(struct intel_guc *guc, struct intel_context *ce,
 			 * from another context that has more guc_id that itself.
 			 */
 			if (cn_o2 != ce_o2) {
+				guc->guc_ids_in_use[GUC_SUBMIT_ENGINE_MULTI_LRC] -=
+					order_base_2(cn->guc_number_children + 1);
 				bitmap_release_region(guc->guc_ids_bitmap,
 						      cn->guc_id,
 						      cn_o2);
+				guc->guc_ids_in_use[GUC_SUBMIT_ENGINE_MULTI_LRC] +=
+					order_base_2(ce->guc_number_children + 1);
 				bitmap_allocate_region(guc->guc_ids_bitmap,
 						       ce->guc_id,
 						       ce_o2);
@@ -2538,7 +2569,7 @@ static void guc_context_unpin(struct intel_context *ce)
 	__guc_context_unpin(ce);
 
 	if (likely(!intel_context_is_barrier(ce)))
-		intel_engine_pm_put(ce->engine);
+		intel_engine_pm_put_async(ce->engine);
 }
 
 static void guc_context_post_unpin(struct intel_context *ce)
@@ -2665,11 +2696,11 @@ static void guc_parent_context_unpin(struct intel_context *ce)
 
 	for_each_engine_masked(engine, ce->engine->gt,
 			       ce->engine->mask, tmp)
-		intel_engine_pm_put(engine);
+		intel_engine_pm_put_async(engine);
 	for_each_child(ce, child)
 		for_each_engine_masked(engine, child->engine->gt,
 				       child->engine->mask, tmp)
-			intel_engine_pm_put(engine);
+			intel_engine_pm_put_async(engine);
 }
 
 static void __guc_context_sched_enable(struct intel_guc *guc,
@@ -2787,6 +2818,8 @@ static struct i915_sw_fence *guc_context_block(struct intel_context *ce)
 	guc_id = prep_context_pending_disable(ce);
 
 	spin_unlock_irqrestore(&ce->guc_state.lock, flags);
+
+	sched_disable_context_delete(ce);
 
 	with_intel_runtime_pm(runtime_pm, wakeref)
 		__guc_context_sched_disable(guc, ce, guc_id);
@@ -2914,8 +2947,202 @@ static void guc_context_ban(struct intel_context *ce, struct i915_request *rq)
 								     1);
 		spin_unlock_irqrestore(&ce->guc_state.lock, flags);
 	}
+
+	sched_disable_context_delete(ce);
 }
 
+#define next_sched_disable_time(guc, now, ce) \
+	(guc->sched_disable_delay_ns - \
+	 (ktime_to_ns(now) - ktime_to_ns(ce->guc_sched_disable_time)))
+static void ____sched_disable_context_delete(struct intel_guc *guc,
+					     struct intel_context *ce)
+{
+	bool is_first;
+
+	lockdep_assert_held(&guc->sched_disable_lock);
+	GEM_BUG_ON(intel_context_is_child(ce));
+	GEM_BUG_ON(list_empty(&ce->guc_sched_disable_link));
+
+	is_first = list_is_first(&ce->guc_sched_disable_link,
+				 &guc->sched_disable_list);
+	list_del_init(&ce->guc_sched_disable_link);
+	if (list_empty(&guc->sched_disable_list)) {
+		hrtimer_try_to_cancel(&guc->sched_disable_timer);
+	} else if (is_first) {
+		struct intel_context *first =
+			list_first_entry(&guc->sched_disable_list,
+					 typeof(*first),
+					 guc_sched_disable_link);
+		u64 next_time = next_sched_disable_time(guc, ktime_get(),
+							first);
+
+		hrtimer_start(&guc->sched_disable_timer,
+			      ns_to_ktime(next_time),
+			      HRTIMER_MODE_REL_PINNED);
+	}
+}
+
+static void __sched_disable_context_delete(struct intel_guc *guc,
+					   struct intel_context *ce)
+{
+	lockdep_assert_held(&guc->sched_disable_lock);
+	GEM_BUG_ON(intel_context_is_child(ce));
+
+	if (!list_empty(&ce->guc_sched_disable_link)) {
+		intel_context_sched_disable_unpin(ce);
+		____sched_disable_context_delete(guc, ce);
+	}
+}
+
+static void sched_disable_context_delete(struct intel_context *ce)
+{
+	struct intel_guc *guc = ce_to_guc(ce);
+	unsigned long flags;
+
+	GEM_BUG_ON(intel_context_is_child(ce));
+
+	if (!list_empty(&ce->guc_sched_disable_link)) {
+		spin_lock_irqsave(&guc->sched_disable_lock, flags);
+		__sched_disable_context_delete(guc, ce);
+		spin_unlock_irqrestore(&guc->sched_disable_lock, flags);
+	}
+}
+
+static void sched_disable_context_add(struct intel_guc *guc,
+				      struct intel_context *ce)
+{
+	unsigned long flags;
+
+	GEM_BUG_ON(intel_context_is_child(ce));
+	GEM_BUG_ON(!list_empty(&ce->guc_sched_disable_link));
+
+	ce->guc_sched_disable_time = ktime_get();
+
+	spin_lock_irqsave(&guc->sched_disable_lock, flags);
+	if (list_empty(&guc->sched_disable_list))
+		hrtimer_start(&guc->sched_disable_timer,
+			      ns_to_ktime(guc->sched_disable_delay_ns),
+			      HRTIMER_MODE_REL_PINNED);
+	list_add_tail(&ce->guc_sched_disable_link, &guc->sched_disable_list);
+	spin_unlock_irqrestore(&guc->sched_disable_lock, flags);
+}
+
+static void sched_disable_contexts_flush(struct intel_guc *guc)
+{
+	struct intel_runtime_pm *runtime_pm = &guc_to_gt(guc)->i915->runtime_pm;
+	struct intel_context *ce, *cn;
+	unsigned long flags;
+
+	spin_lock_irqsave(&guc->sched_disable_lock, flags);
+
+	list_for_each_entry_safe_reverse(ce, cn, &guc->sched_disable_list,
+					 guc_sched_disable_link) {
+		intel_wakeref_t wakeref;
+		bool enabled;
+		u16 guc_id;
+
+		list_del_init(&ce->guc_sched_disable_link);
+
+		spin_lock(&ce->guc_state.lock);
+		enabled = context_enabled(ce);
+		if (unlikely(!enabled || submission_disabled(guc))) {
+			if (enabled)
+				clr_context_enabled(ce);
+			spin_unlock(&ce->guc_state.lock);
+			intel_context_sched_disable_unpin(ce);
+			continue;
+		}
+		if (unlikely(atomic_add_unless(&ce->pin_count, -2, 2))) {
+			spin_unlock(&ce->guc_state.lock);
+			continue;
+		}
+		guc_id = prep_context_pending_disable(ce);
+		spin_unlock(&ce->guc_state.lock);
+
+		with_intel_runtime_pm(runtime_pm, wakeref)
+			__guc_context_sched_disable(guc, ce, guc_id);
+	}
+
+	hrtimer_try_to_cancel(&guc->sched_disable_timer);
+
+	spin_unlock_irqrestore(&guc->sched_disable_lock, flags);
+}
+
+#define should_sched_be_disabled(guc, now, ce) \
+	((ktime_to_ns(now) - ktime_to_ns(ce->guc_sched_disable_time)) > \
+	(guc->sched_disable_delay_ns / 4) * 3)
+static enum hrtimer_restart sched_disable_timer_func(struct hrtimer *hrtimer)
+{
+	struct intel_guc *guc = container_of(hrtimer, struct intel_guc,
+					     sched_disable_timer);
+	struct intel_runtime_pm *runtime_pm = &guc_to_gt(guc)->i915->runtime_pm;
+	struct intel_context *ce, *cn;
+	unsigned long flags;
+	ktime_t now;
+
+	if (list_empty(&guc->sched_disable_list))
+		return HRTIMER_NORESTART;
+
+	now = ktime_get();
+
+	spin_lock_irqsave(&guc->sched_disable_lock, flags);
+
+	list_for_each_entry_safe_reverse(ce, cn, &guc->sched_disable_list,
+					 guc_sched_disable_link) {
+		intel_wakeref_t wakeref;
+		bool enabled;
+		u16 guc_id;
+
+		/*
+		 * If a context has been waiting for 3/4 of its delay or more,
+		 * issue the schedule disable. Using this heuristic allows more
+		 * than 1 context to have its scheduling disabled when this
+		 * timer is run.
+		 */
+		if (!should_sched_be_disabled(guc, now, ce))
+			break;
+
+		list_del_init(&ce->guc_sched_disable_link);
+
+		spin_lock(&ce->guc_state.lock);
+		enabled = context_enabled(ce);
+		if (unlikely(!enabled || submission_disabled(guc))) {
+			if (enabled)
+				clr_context_enabled(ce);
+			spin_unlock(&ce->guc_state.lock);
+			intel_context_sched_disable_unpin(ce);
+			continue;
+		}
+		if (unlikely(atomic_add_unless(&ce->pin_count, -2, 2))) {
+			spin_unlock(&ce->guc_state.lock);
+			continue;
+		}
+		guc_id = prep_context_pending_disable(ce);
+		spin_unlock(&ce->guc_state.lock);
+
+		with_intel_runtime_pm(runtime_pm, wakeref)
+			__guc_context_sched_disable(guc, ce, guc_id);
+	}
+
+	if (!list_empty(&guc->sched_disable_list)) {
+		struct intel_context *first =
+			list_first_entry(&guc->sched_disable_list,
+					 typeof(*first),
+					 guc_sched_disable_link);
+		u64 next_time = next_sched_disable_time(guc, now, first);
+
+		hrtimer_forward(hrtimer, now, ns_to_ktime(next_time));
+		spin_unlock_irqrestore(&guc->sched_disable_lock, flags);
+
+		return HRTIMER_RESTART;
+	} else {
+		spin_unlock_irqrestore(&guc->sched_disable_lock, flags);
+
+		return HRTIMER_NORESTART;
+	}
+}
+
+#define guc_id_pressure(max, in_use)	(in_use > (max / 4) * 3)
 static void guc_context_sched_disable(struct intel_context *ce)
 {
 	struct intel_guc *guc = ce_to_guc(ce);
@@ -2924,8 +3151,14 @@ static void guc_context_sched_disable(struct intel_context *ce)
 	intel_wakeref_t wakeref;
 	u16 guc_id;
 	bool enabled;
+	int guc_id_index = intel_context_is_parent(ce) ?
+		GUC_SUBMIT_ENGINE_MULTI_LRC : GUC_SUBMIT_ENGINE_SINGLE_LRC;
+	int max_guc_ids = intel_context_is_parent(ce) ?
+	       NUMBER_MULTI_LRC_GUC_ID(guc) :
+	       guc->num_guc_ids - NUMBER_MULTI_LRC_GUC_ID(guc);
 
 	GEM_BUG_ON(intel_context_is_child(ce));
+	GEM_BUG_ON(!list_empty(&ce->guc_sched_disable_link));
 
 	if (submission_disabled(guc) || context_guc_id_invalid(ce) ||
 	    !lrc_desc_registered(guc, ce->guc_id)) {
@@ -2935,6 +3168,18 @@ static void guc_context_sched_disable(struct intel_context *ce)
 
 	if (!context_enabled(ce))
 		goto unpin;
+
+	/*
+	 * If no guc_id pressure and the context isn't closed we delay the
+	 * schedule disable to not to continuously disable / enable scheduling
+	 * putting pressure on both the i915 and GuC. Delay is configurable via
+	 * debugfs, default 1s.
+	 */
+	if (!guc_id_pressure(max_guc_ids, guc->guc_ids_in_use[guc_id_index]) &&
+	    !intel_context_is_closed(ce) && guc->sched_disable_delay_ns) {
+		sched_disable_context_add(guc, ce);
+		return;
+	}
 
 	spin_lock_irqsave(&ce->guc_state.lock, flags);
 
@@ -3294,6 +3539,58 @@ static void remove_from_context(struct i915_request *rq)
 	i915_request_notify_execute_cb_imm(rq);
 }
 
+static void __guc_context_close(struct intel_guc *guc,
+				struct intel_context *ce)
+{
+	lockdep_assert_held(&guc->sched_disable_lock);
+	GEM_BUG_ON(intel_context_is_child(ce));
+
+	if (!list_empty(&ce->guc_sched_disable_link)) {
+		struct intel_runtime_pm *runtime_pm =
+			ce->engine->uncore->rpm;
+		intel_wakeref_t wakeref;
+		bool enabled;
+		u16 guc_id;
+
+		spin_lock(&ce->guc_state.lock);
+		enabled = context_enabled(ce);
+		if (unlikely(!enabled || submission_disabled(guc))) {
+			if (enabled)
+				clr_context_enabled(ce);
+			spin_unlock(&ce->guc_state.lock);
+			intel_context_sched_disable_unpin(ce);
+			goto update_list;
+		}
+		if (unlikely(atomic_add_unless(&ce->pin_count, -2, 2))) {
+			spin_unlock(&ce->guc_state.lock);
+			goto update_list;
+		}
+		guc_id = prep_context_pending_disable(ce);
+		spin_unlock(&ce->guc_state.lock);
+
+		with_intel_runtime_pm(runtime_pm, wakeref)
+			__guc_context_sched_disable(guc, ce, guc_id);
+update_list:
+		____sched_disable_context_delete(guc, ce);
+	}
+}
+
+static void guc_context_close(struct intel_context *ce)
+{
+	struct intel_guc *guc = ce_to_guc(ce);
+	unsigned long flags;
+
+	/*
+	 * If we close the context and a schedule disable is pending a delay, do
+	 * it immediately.
+	 */
+	if (!list_empty(&ce->guc_sched_disable_link)) {
+		spin_lock_irqsave(&guc->sched_disable_lock, flags);
+		__guc_context_close(guc, ce);
+		spin_unlock_irqrestore(&guc->sched_disable_lock, flags);
+	}
+}
+
 static struct intel_context *
 guc_create_parallel(struct intel_engine_cs **engines,
 		    unsigned int num_siblings,
@@ -3308,6 +3605,7 @@ static const struct intel_context_ops guc_context_ops = {
 	.post_unpin = guc_context_post_unpin,
 
 	.ban = guc_context_ban,
+	.close = guc_context_close,
 
 	.cancel_request = guc_context_cancel_request,
 
@@ -3538,6 +3836,10 @@ static int guc_request_alloc(struct i915_request *rq)
 
 	rq->reserved_space -= GUC_REQUEST_SIZE;
 
+	GEM_BUG_ON(!list_empty(&ce->guc_sched_disable_link) &&
+		   atomic_read(&ce->pin_count) < 3);
+	sched_disable_context_delete(ce);
+
 	/*
 	 * guc_ids are exhausted or a heuristic is met indicating too many
 	 * guc_ids are waiting on requests with submission dependencies (not
@@ -3667,7 +3969,7 @@ static void guc_virtual_context_unpin(struct intel_context *ce)
 	__guc_context_unpin(ce);
 
 	for_each_engine_masked(engine, ce->engine->gt, mask, tmp)
-		intel_engine_pm_put(engine);
+		intel_engine_pm_put_async(engine);
 }
 
 static void guc_virtual_context_enter(struct intel_context *ce)
@@ -3708,6 +4010,7 @@ static const struct intel_context_ops virtual_guc_context_ops = {
 	.post_unpin = guc_context_post_unpin,
 
 	.ban = guc_context_ban,
+	.close = guc_context_close,
 
 	.cancel_request = guc_context_cancel_request,
 
@@ -3819,6 +4122,7 @@ static const struct intel_context_ops virtual_parent_context_ops = {
 	.post_unpin = guc_parent_context_post_unpin,
 
 	.ban = guc_context_ban,
+	.close = guc_context_close,
 
 	.enter = guc_virtual_context_enter,
 	.exit = guc_virtual_context_exit,
@@ -4924,7 +5228,11 @@ void intel_guc_submission_print_info(struct intel_guc *guc,
 	drm_printf(p, "GuC Number Outstanding Submission G2H: %u\n",
 		   atomic_read(&guc->outstanding_submission_g2h));
 	drm_printf(p, "GuC Number GuC IDs: %d\n", guc->num_guc_ids);
-	drm_printf(p, "GuC Max Number GuC IDs: %d\n\n", guc->max_guc_ids);
+	drm_printf(p, "GuC Max Number GuC IDs: %d\n", guc->max_guc_ids);
+	drm_printf(p, "GuC single-lrc GuC IDs in use: %d\n",
+		   guc->guc_ids_in_use[GUC_SUBMIT_ENGINE_SINGLE_LRC]);
+	drm_printf(p, "GuC multi-lrc GuC IDs in use: %d\n",
+		   guc->guc_ids_in_use[GUC_SUBMIT_ENGINE_MULTI_LRC]);
 	drm_printf(p, "GuC max context registered: %u\n\n",
 		   guc->lrcd_reg.max_idx);
 

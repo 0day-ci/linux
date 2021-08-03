@@ -11,6 +11,7 @@
 #include <linux/list.h>
 #include <linux/mutex.h>
 #include <linux/types.h>
+#include <linux/ktime.h>
 
 #include "i915_active_types.h"
 #include "i915_sw_fence.h"
@@ -38,6 +39,7 @@ struct intel_context_ops {
 	int (*alloc)(struct intel_context *ce);
 
 	void (*ban)(struct intel_context *ce, struct i915_request *rq);
+	void (*close)(struct intel_context *ce);
 
 	int (*pre_pin)(struct intel_context *ce, struct i915_gem_ww_ctx *ww);
 	int (*pin)(struct intel_context *ce);
@@ -202,6 +204,12 @@ struct intel_context {
 	 * GuC ID link - in list when unpinned but guc_id still valid in GuC
 	 */
 	struct list_head guc_id_link;
+
+	/*
+	 * GuC schedule disable link / time
+	 */
+	struct list_head guc_sched_disable_link;
+	ktime_t guc_sched_disable_time;
 
 	/* GuC context blocked fence */
 	struct i915_sw_fence guc_blocked;

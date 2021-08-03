@@ -80,12 +80,40 @@ static int guc_num_id_set(void *data, u64 val)
 }
 DEFINE_SIMPLE_ATTRIBUTE(guc_num_id_fops, guc_num_id_get, guc_num_id_set, "%lld\n");
 
+static int guc_sched_disable_delay_ns_get(void *data, u64 *val)
+{
+	struct intel_guc *guc = data;
+
+	if (!intel_guc_submission_is_used(guc))
+		return -ENODEV;
+
+	*val = guc->sched_disable_delay_ns;
+
+	return 0;
+}
+
+static int guc_sched_disable_delay_ns_set(void *data, u64 val)
+{
+	struct intel_guc *guc = data;
+
+	if (!intel_guc_submission_is_used(guc))
+		return -ENODEV;
+
+	guc->sched_disable_delay_ns = val;
+
+	return 0;
+}
+DEFINE_SIMPLE_ATTRIBUTE(guc_sched_disable_delay_ns_fops,
+			guc_sched_disable_delay_ns_get,
+			guc_sched_disable_delay_ns_set, "%lld\n");
+
 void intel_guc_debugfs_register(struct intel_guc *guc, struct dentry *root)
 {
 	static const struct debugfs_gt_file files[] = {
 		{ "guc_info", &guc_info_fops, NULL },
 		{ "guc_registered_contexts", &guc_registered_contexts_fops, NULL },
 		{ "guc_num_id", &guc_num_id_fops, NULL },
+		{ "guc_sched_disable_delay_ns", &guc_sched_disable_delay_ns_fops, NULL },
 	};
 
 	if (!intel_guc_is_supported(guc))

@@ -472,6 +472,8 @@ intel_context_init(struct intel_context *ce, struct intel_engine_cs *engine)
 	ce->guc_id = GUC_INVALID_LRC_ID;
 	INIT_LIST_HEAD(&ce->guc_id_link);
 
+	INIT_LIST_HEAD(&ce->guc_sched_disable_link);
+
 	mutex_init(&ce->parallel_submit);
 	ce->fence_context = dma_fence_context_alloc(1);
 
