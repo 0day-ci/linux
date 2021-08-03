@@ -599,10 +599,11 @@ static bool mmu_spte_update(u64 *sptep, u64 new_spte)
  * state bits, it is used to clear the last level sptep.
  * Returns the old PTE.
  */
-static u64 mmu_spte_clear_track_bits(u64 *sptep)
+static int mmu_spte_clear_track_bits(struct kvm *kvm, u64 *sptep)
 {
 	kvm_pfn_t pfn;
 	u64 old_spte = *sptep;
+	int level = sptep_to_sp(sptep)->role.level;
 
 	if (!spte_has_volatile_bits(old_spte))
 		__update_clear_spte_fast(sptep, 0ull);
@@ -611,6 +612,8 @@ static u64 mmu_spte_clear_track_bits(u64 *sptep)
 
 	if (!is_shadow_present_pte(old_spte))
 		return old_spte;
+
+	kvm_update_page_stats(kvm, level, -1);
 
 	pfn = spte_to_pfn(old_spte);
 
@@ -996,15 +999,16 @@ static void __pte_list_remove(u64 *spte, struct kvm_rmap_head *rmap_head)
 	}
 }
 
-static void pte_list_remove(struct kvm_rmap_head *rmap_head, u64 *sptep)
+static void pte_list_remove(struct kvm *kvm, struct kvm_rmap_head *rmap_head,
+			    u64 *sptep)
 {
-	mmu_spte_clear_track_bits(sptep);
+	mmu_spte_clear_track_bits(kvm, sptep);
 	__pte_list_remove(sptep, rmap_head);
 }
 
 /* Return true if rmap existed and callback called, false otherwise */
-static bool pte_list_destroy(struct kvm_rmap_head *rmap_head,
-			     void (*callback)(u64 *sptep))
+static bool pte_list_destroy(struct kvm *kvm, struct kvm_rmap_head *rmap_head,
+			     void (*callback)(struct kvm *kvm, u64 *sptep))
 {
 	struct pte_list_desc *desc, *next;
 	int i;
@@ -1014,7 +1018,7 @@ static bool pte_list_destroy(struct kvm_rmap_head *rmap_head,
 
 	if (!(rmap_head->val & 1)) {
 		if (callback)
-			callback((u64 *)rmap_head->val);
+			callback(kvm, (u64 *)rmap_head->val);
 		goto out;
 	}
 
@@ -1023,7 +1027,7 @@ static bool pte_list_destroy(struct kvm_rmap_head *rmap_head,
 	while (desc) {
 		if (callback)
 			for (i = 0; i < desc->spte_count; i++)
-				callback(desc->sptes[i]);
+				callback(kvm, desc->sptes[i]);
 		next = desc->more;
 		mmu_free_pte_list_desc(desc);
 		desc = next;
@@ -1163,7 +1167,7 @@ out:
 
 static void drop_spte(struct kvm *kvm, u64 *sptep)
 {
-	u64 old_spte = mmu_spte_clear_track_bits(sptep);
+	u64 old_spte = mmu_spte_clear_track_bits(kvm, sptep);
 
 	if (is_shadow_present_pte(old_spte))
 		rmap_remove(kvm, sptep);
@@ -1175,7 +1179,6 @@ static bool __drop_large_spte(struct kvm *kvm, u64 *sptep)
 	if (is_large_pte(*sptep)) {
 		WARN_ON(sptep_to_sp(sptep)->role.level == PG_LEVEL_4K);
 		drop_spte(kvm, sptep);
-		--kvm->stat.lpages;
 		return true;
 	}
 
@@ -1422,15 +1425,15 @@ static bool rmap_write_protect(struct kvm_vcpu *vcpu, u64 gfn)
 	return kvm_mmu_slot_gfn_write_protect(vcpu->kvm, slot, gfn, PG_LEVEL_4K);
 }
 
-static void mmu_spte_clear_track_bits_cb(u64 *sptep)
+static void mmu_spte_clear_track_bits_cb(struct kvm *kvm, u64 *sptep)
 {
-	mmu_spte_clear_track_bits(sptep);
+	mmu_spte_clear_track_bits(kvm, sptep);
 }
 
 static bool kvm_zap_rmapp(struct kvm *kvm, struct kvm_rmap_head *rmap_head,
 			  const struct kvm_memory_slot *slot)
 {
-	return pte_list_destroy(rmap_head, mmu_spte_clear_track_bits_cb);
+	return pte_list_destroy(kvm, rmap_head, mmu_spte_clear_track_bits_cb);
 }
 
 static bool kvm_unmap_rmapp(struct kvm *kvm, struct kvm_rmap_head *rmap_head,
@@ -1461,13 +1464,13 @@ restart:
 		need_flush = 1;
 
 		if (pte_write(pte)) {
-			pte_list_remove(rmap_head, sptep);
+			pte_list_remove(kvm, rmap_head, sptep);
 			goto restart;
 		} else {
 			new_spte = kvm_mmu_changed_pte_notifier_make_spte(
 					*sptep, new_pfn);
 
-			mmu_spte_clear_track_bits(sptep);
+			mmu_spte_clear_track_bits(kvm, sptep);
 			mmu_spte_set(sptep, new_spte);
 		}
 	}
@@ -2276,8 +2279,6 @@ static int mmu_page_zap_pte(struct kvm *kvm, struct kvm_mmu_page *sp,
 	if (is_shadow_present_pte(pte)) {
 		if (is_last_spte(pte, sp->role.level)) {
 			drop_spte(kvm, spte);
-			if (is_large_pte(pte))
-				--kvm->stat.lpages;
 		} else {
 			child = to_shadow_page(pte & PT64_BASE_ADDR_MASK);
 			drop_parent_pte(child, spte);
@@ -2736,8 +2737,7 @@ static int mmu_set_spte(struct kvm_vcpu *vcpu, u64 *sptep,
 	trace_kvm_mmu_set_spte(level, gfn, sptep);
 
 	if (!was_rmapped) {
-		if (is_large_pte(*sptep))
-			++vcpu->kvm->stat.lpages;
+		kvm_update_page_stats(vcpu->kvm, level, 1);
 		rmap_count = rmap_add(vcpu, sptep, gfn);
 		if (rmap_count > RMAP_RECYCLE_THRESHOLD)
 			rmap_recycle(vcpu, sptep, gfn);
@@ -5740,7 +5740,7 @@ restart:
 		if (sp->role.direct && !kvm_is_reserved_pfn(pfn) &&
 		    sp->role.level < kvm_mmu_max_mapping_level(kvm, slot, sp->gfn,
 							       pfn, PG_LEVEL_NUM)) {
-			pte_list_remove(rmap_head, sptep);
+			pte_list_remove(kvm, rmap_head, sptep);
 
 			if (kvm_available_flush_tlb_with_range())
 				kvm_flush_remote_tlbs_with_address(kvm, sp->gfn,
