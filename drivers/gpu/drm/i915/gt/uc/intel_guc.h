@@ -18,6 +18,7 @@
 #include "intel_uc_fw.h"
 #include "i915_utils.h"
 #include "i915_vma.h"
+#include "gt/intel_gt_pm_unpark_work.h"
 
 struct __guc_ads_blob;
 
@@ -63,7 +64,7 @@ struct intel_guc {
 
 	spinlock_t destroy_lock;	/* protects list / worker */
 	struct list_head destroyed_contexts;
-	struct work_struct destroy_worker;
+	struct intel_gt_pm_unpark_work destroy_worker;
 
 	bool submission_supported;
 	bool submission_selected;
