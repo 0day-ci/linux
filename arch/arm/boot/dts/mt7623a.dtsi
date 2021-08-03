@@ -42,3 +42,7 @@
 &usb2 {
 	power-domains = <&scpsys MT7623A_POWER_DOMAIN_HIF>;
 };
+
+&usb3 {
+	power-domains = <&scpsys MT7623A_POWER_DOMAIN_IFR_MSC>;
+};
