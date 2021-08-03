@@ -366,11 +366,9 @@ int rtw_change_ifname(struct adapter *padapter, const char *ifname)
 		ret = register_netdev(pnetdev);
 	else
 		ret = register_netdevice(pnetdev);
-	if (ret != 0) {
-		RT_TRACE(_module_hci_intfs_c_, _drv_err_,
-			 ("register_netdev() failed\n"));
+	if (ret != 0)
 		goto error;
-	}
+
 	rtw_proc_init_one(pnetdev);
 	return 0;
 error:
@@ -462,8 +460,6 @@ bool rtw_cbuf_push(struct rtw_cbuf *cbuf, void *buf)
 	if (rtw_cbuf_full(cbuf))
 		return _FAIL;
 
-	if (0)
-		DBG_88E("%s on %u\n", __func__, cbuf->write);
 	cbuf->bufs[cbuf->write] = buf;
 	cbuf->write = (cbuf->write+1)%cbuf->size;
 
@@ -483,8 +479,6 @@ void *rtw_cbuf_pop(struct rtw_cbuf *cbuf)
 	if (rtw_cbuf_empty(cbuf))
 		return NULL;
 
-	if (0)
-		DBG_88E("%s on %u\n", __func__, cbuf->read);
 	buf = cbuf->bufs[cbuf->read];
 	cbuf->read = (cbuf->read+1)%cbuf->size;
 
