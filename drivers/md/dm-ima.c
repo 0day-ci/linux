@@ -216,7 +216,7 @@ void dm_ima_measure_on_table_load(struct dm_table *table, unsigned int status_fl
 
 	r = crypto_shash_init(shash);
 	if (r)
-		return;
+		goto error;
 
 	device_data_buf_len = strlen(device_data_buf);
 	memcpy(ima_buf + l, device_data_buf, device_data_buf_len);
