@@ -30,6 +30,9 @@ void efx_ethtool_get_strings(struct net_device *net_dev, u32 string_set,
 void efx_ethtool_get_stats(struct net_device *net_dev,
 			   struct ethtool_stats *stats __attribute__ ((unused)),
 			   u64 *data);
+int efx_ethtool_get_std_stats_channels(struct net_device *net_dev, u32 sset);
+void efx_ethtool_get_xdp_stats(struct net_device *net_dev,
+			       struct ethtool_xdp_stats *xdp_stats);
 int efx_ethtool_get_link_ksettings(struct net_device *net_dev,
 				   struct ethtool_link_ksettings *out);
 int efx_ethtool_set_link_ksettings(struct net_device *net_dev,

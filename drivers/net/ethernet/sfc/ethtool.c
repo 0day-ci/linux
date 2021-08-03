@@ -269,4 +269,6 @@ const struct ethtool_ops efx_ethtool_ops = {
 	.get_fec_stats		= efx_ethtool_get_fec_stats,
 	.get_fecparam		= efx_ethtool_get_fecparam,
 	.set_fecparam		= efx_ethtool_set_fecparam,
+	.get_std_stats_channels	= efx_ethtool_get_std_stats_channels,
+	.get_xdp_stats		= efx_ethtool_get_xdp_stats,
 };

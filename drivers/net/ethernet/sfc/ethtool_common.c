@@ -87,10 +87,6 @@ static const struct efx_sw_stat_desc efx_sw_stat_desc[] = {
 	EFX_ETHTOOL_UINT_CHANNEL_STAT(rx_frm_trunc),
 	EFX_ETHTOOL_UINT_CHANNEL_STAT(rx_merge_events),
 	EFX_ETHTOOL_UINT_CHANNEL_STAT(rx_merge_packets),
-	EFX_ETHTOOL_UINT_CHANNEL_STAT(rx_xdp_drops),
-	EFX_ETHTOOL_UINT_CHANNEL_STAT(rx_xdp_bad_drops),
-	EFX_ETHTOOL_UINT_CHANNEL_STAT(rx_xdp_tx),
-	EFX_ETHTOOL_UINT_CHANNEL_STAT(rx_xdp_redirect),
 #ifdef CONFIG_RFS_ACCEL
 	EFX_ETHTOOL_UINT_CHANNEL_STAT_NO_N(rfs_filter_count),
 	EFX_ETHTOOL_UINT_CHANNEL_STAT(rfs_succeeded),
@@ -555,6 +551,37 @@ void efx_ethtool_get_stats(struct net_device *net_dev,
 	}
 
 	efx_ptp_update_stats(efx, data);
+}
+
+int efx_ethtool_get_std_stats_channels(struct net_device *net_dev, u32 sset)
+{
+	const struct efx_nic *efx = netdev_priv(net_dev);
+
+	switch (sset) {
+	case ETH_SS_STATS_XDP:
+		return efx->n_channels;
+	default:
+		return -EOPNOTSUPP;
+	}
+}
+
+void efx_ethtool_get_xdp_stats(struct net_device *net_dev,
+			       struct ethtool_xdp_stats *xdp_stats)
+{
+	struct efx_nic *efx = netdev_priv(net_dev);
+	const struct efx_channel *channel;
+
+	spin_lock_bh(&efx->stats_lock);
+
+	efx_for_each_channel(channel, efx) {
+		xdp_stats->drop = channel->n_rx_xdp_drops;
+		xdp_stats->errors = channel->n_rx_xdp_bad_drops;
+		xdp_stats->redirect = channel->n_rx_xdp_redirect;
+		xdp_stats->tx = channel->n_rx_xdp_tx;
+		xdp_stats++;
+	}
+
+	spin_unlock_bh(&efx->stats_lock);
 }
 
 /* This must be called with rtnl_lock held. */
