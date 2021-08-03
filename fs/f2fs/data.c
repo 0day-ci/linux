@@ -1558,13 +1558,20 @@ next_block:
 			}
 			if (flag == F2FS_GET_BLOCK_PRECACHE)
 				goto sync_out;
-			if (flag == F2FS_GET_BLOCK_FIEMAP &&
-						blkaddr == NULL_ADDR) {
-				if (map->m_next_pgofs)
-					*map->m_next_pgofs = pgofs + 1;
-				goto sync_out;
-			}
-			if (flag != F2FS_GET_BLOCK_FIEMAP) {
+			if (flag == F2FS_GET_BLOCK_FIEMAP) {
+				if (blkaddr == NULL_ADDR) {
+					if (map->m_next_pgofs)
+						*map->m_next_pgofs = pgofs + 1;
+					goto sync_out;
+				}
+#ifdef CONFIG_F2FS_FS_COMPRESSION
+				if (f2fs_compressed_file(inode) &&
+					f2fs_sanity_check_cluster(&dn)) {
+					err = -EFSCORRUPTED;
+					goto sync_out;
+				}
+#endif
+			} else {
 				/* for defragment case */
 				if (map->m_next_pgofs)
 					*map->m_next_pgofs = pgofs + 1;
