@@ -172,7 +172,7 @@ static void fsnotify_connector_destroy_workfn(struct work_struct *work)
 static void fsnotify_get_inode_ref(struct inode *inode)
 {
 	ihold(inode);
-	atomic_long_inc(&inode->i_sb->s_fsnotify_inode_refs);
+	atomic_long_inc(&inode->i_sb->s_fsnotify_connectors);
 }
 
 static void fsnotify_put_inode_ref(struct inode *inode)
@@ -180,8 +180,45 @@ static void fsnotify_put_inode_ref(struct inode *inode)
 	struct super_block *sb = inode->i_sb;
 
 	iput(inode);
-	if (atomic_long_dec_and_test(&sb->s_fsnotify_inode_refs))
-		wake_up_var(&sb->s_fsnotify_inode_refs);
+	if (atomic_long_dec_and_test(&sb->s_fsnotify_connectors))
+		wake_up_var(&sb->s_fsnotify_connectors);
+}
+
+static void fsnotify_get_sb_connectors(struct fsnotify_mark_connector *conn)
+{
+	struct super_block *sb;
+
+	if (conn->type == FSNOTIFY_OBJ_TYPE_DETACHED)
+		return;
+
+	if (conn->type == FSNOTIFY_OBJ_TYPE_INODE)
+		sb = fsnotify_conn_inode(conn)->i_sb;
+	else if (conn->type == FSNOTIFY_OBJ_TYPE_VFSMOUNT)
+		sb = fsnotify_conn_mount(conn)->mnt.mnt_sb;
+	else if (conn->type == FSNOTIFY_OBJ_TYPE_SB)
+		sb = fsnotify_conn_sb(conn);
+
+	atomic_long_inc(&sb->s_fsnotify_connectors);
+}
+
+static void fsnotify_put_sb_connectors(struct fsnotify_mark_connector *conn)
+{
+	struct super_block *sb;
+
+	if (conn->type == FSNOTIFY_OBJ_TYPE_DETACHED)
+		return;
+
+	if (conn->type == FSNOTIFY_OBJ_TYPE_INODE)
+		sb = fsnotify_conn_inode(conn)->i_sb;
+	else if (conn->type == FSNOTIFY_OBJ_TYPE_VFSMOUNT)
+		sb = fsnotify_conn_mount(conn)->mnt.mnt_sb;
+	else if (conn->type == FSNOTIFY_OBJ_TYPE_SB)
+		sb = fsnotify_conn_sb(conn);
+	else
+		return;
+
+	if (atomic_long_dec_and_test(&sb->s_fsnotify_connectors))
+		wake_up_var(&sb->s_fsnotify_connectors);
 }
 
 static void *fsnotify_detach_connector_from_object(
@@ -203,6 +240,7 @@ static void *fsnotify_detach_connector_from_object(
 		fsnotify_conn_sb(conn)->s_fsnotify_mask = 0;
 	}
 
+	fsnotify_put_sb_connectors(conn);
 	rcu_assign_pointer(*(conn->obj), NULL);
 	conn->obj = NULL;
 	conn->type = FSNOTIFY_OBJ_TYPE_DETACHED;
@@ -504,6 +542,7 @@ static int fsnotify_attach_connector_to_object(fsnotify_connp_t *connp,
 		inode = fsnotify_conn_inode(conn);
 		fsnotify_get_inode_ref(inode);
 	}
+	fsnotify_get_sb_connectors(conn);
 
 	/*
 	 * cmpxchg() provides the barrier so that readers of *connp can see
