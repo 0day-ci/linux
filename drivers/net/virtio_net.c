@@ -91,6 +91,7 @@ struct virtnet_rq_stats {
 	u64 xdp_tx;
 	u64 xdp_redirects;
 	u64 xdp_drops;
+	u64 xdp_errors;
 	u64 kicks;
 };
 
@@ -113,6 +114,7 @@ static const struct virtnet_stat_desc virtnet_rq_stats_desc[] = {
 	{ "xdp_tx",		VIRTNET_RQ_STAT(xdp_tx) },
 	{ "xdp_redirects",	VIRTNET_RQ_STAT(xdp_redirects) },
 	{ "xdp_drops",		VIRTNET_RQ_STAT(xdp_drops) },
+	{ "xdp_errors",		VIRTNET_RQ_STAT(xdp_errors) },
 	{ "kicks",		VIRTNET_RQ_STAT(kicks) },
 };
 
@@ -804,7 +806,8 @@ static struct sk_buff *receive_small(struct net_device *dev,
 			trace_xdp_exception(vi->dev, xdp_prog, act);
 			goto err_xdp;
 		case XDP_DROP:
-			goto err_xdp;
+			stats->xdp_drops++;
+			goto xdp_drop;
 		}
 	}
 	rcu_read_unlock();
@@ -828,8 +831,9 @@ err:
 	return skb;
 
 err_xdp:
+	stats->xdp_errors++;
+xdp_drop:
 	rcu_read_unlock();
-	stats->xdp_drops++;
 err_len:
 	stats->drops++;
 	put_page(page);
@@ -1012,7 +1016,12 @@ static struct sk_buff *receive_mergeable(struct net_device *dev,
 		case XDP_DROP:
 			if (unlikely(xdp_page != page))
 				__free_pages(xdp_page, 0);
-			goto err_xdp;
+
+			if (unlikely(act != XDP_DROP))
+				goto err_xdp;
+
+			stats->xdp_drops++;
+			goto xdp_drop;
 		}
 	}
 	rcu_read_unlock();
@@ -1081,8 +1090,9 @@ static struct sk_buff *receive_mergeable(struct net_device *dev,
 	return head_skb;
 
 err_xdp:
+	stats->xdp_errors++;
+xdp_drop:
 	rcu_read_unlock();
-	stats->xdp_drops++;
 err_skb:
 	put_page(page);
 	while (num_buf-- > 1) {
