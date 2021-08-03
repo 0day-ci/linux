@@ -3351,7 +3351,12 @@ i915_gem_do_execbuffer(struct drm_device *dev,
 	}
 
 	if (out_fence) {
-		/* Move ownership to caller (i915_gem_execbuffer2_ioctl) */
+		/*
+		 * Move ownership to caller (i915_gem_execbuffer2_ioctl), this
+		 * must be done before anything in this function can jump to the
+		 * 'err_request' label so the caller can safely cleanup any
+		 * errors.
+		 */
 		out_fence[batch_number] = dma_fence_get(&eb.request->fence);
 
 		/*
@@ -3402,9 +3407,20 @@ i915_gem_do_execbuffer(struct drm_device *dev,
 	err = eb_submit(&eb, batch, first, last);
 
 err_request:
-	if (last)
+	if (last || err)
 		set_bit(I915_FENCE_FLAG_SUBMIT_PARALLEL,
 			&eb.request->fence.flags);
+
+	/*
+	 * If the execbuf IOCTL is generating more than 1 request, we hold all
+	 * the requests until the last request has been generated in case any of
+	 * the requests hit an error. If an error is hit the caller is
+	 * responsible for flaging all the requests generated with an error. The
+	 * caller is always responsible for releasing the fence on the first
+	 * request.
+	 */
+	if (intel_context_is_parallel(eb.context) && first)
+		i915_sw_fence_await(&eb.request->submit);
 
 	i915_request_get(eb.request);
 	err = eb_request_add(&eb, err);
@@ -3498,7 +3514,7 @@ i915_gem_execbuffer2_ioctl(struct drm_device *dev, void *data,
 	struct i915_gem_context *ctx;
 	struct i915_gem_ww_ctx ww;
 	struct intel_context *parent = NULL;
-	unsigned int num_batches = 1, i;
+	unsigned int num_batches = 1, i = 0, j;
 	bool is_parallel = false;
 
 	if (!check_buffer_count(count)) {
@@ -3637,8 +3653,24 @@ i915_gem_execbuffer2_ioctl(struct drm_device *dev, void *data,
 					     out_fences,
 					     &ww);
 
-	if (is_parallel)
+	if (is_parallel) {
+		/*
+		 * Mark all requests generated with an error if any of the
+		 * requests encountered an error.
+		 */
+		for (j = 0; err && j < i; ++j)
+			if (out_fences[j]) {
+				__i915_request_skip(to_request(out_fences[j]));
+				set_bit(I915_FENCE_FLAG_SKIP_PARALLEL,
+					&out_fences[j]->flags);
+			}
+
+		/* Release fence on first request generated */
+		if (out_fences[0])
+			i915_sw_fence_complete(&to_request(out_fences[0])->submit);
+
 		mutex_unlock(&parent->parallel_submit);
+	}
 
 	/*
 	 * Now that we have begun execution of the batchbuffer, we ignore
