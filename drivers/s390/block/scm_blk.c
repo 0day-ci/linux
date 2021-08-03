@@ -158,7 +158,7 @@ static inline struct aidaw *scm_aidaw_alloc(void)
 static inline unsigned long scm_aidaw_bytes(struct aidaw *aidaw)
 {
 	unsigned long _aidaw = (unsigned long) aidaw;
-	unsigned long bytes = ALIGN(_aidaw, PAGE_SIZE) - _aidaw;
+	unsigned long bytes = PAGE_ALIGN(_aidaw) - _aidaw;
 
 	return (bytes / sizeof(*aidaw)) * PAGE_SIZE;
 }
