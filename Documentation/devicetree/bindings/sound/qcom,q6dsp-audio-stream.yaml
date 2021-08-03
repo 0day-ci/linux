@@ -14,7 +14,9 @@ description: |
 
 properties:
   compatible:
-    const: qcom,q6asm-dais
+    enum:
+      - qcom,q6asm-dais
+      - qcom,q6apm-dais
 
   reg:
     maxItems: 1
@@ -88,6 +90,28 @@ examples:
               dai@1 {
                 reg = <1>;
                 is-compress-dai;
+              };
+            };
+        };
+      };
+  - |
+    #include <dt-bindings/soc/qcom,gpr.h>
+    gpr {
+        #address-cells = <1>;
+        #size-cells = <0>;
+        gpr-service@1 {
+            reg = <GPR_APM_MODULE_IID>;
+            #address-cells = <1>;
+            #size-cells = <0>;
+            q6apmdai@1 {
+              compatible = "qcom,q6apm-dais";
+              reg = <1>;
+              #address-cells = <1>;
+              #size-cells = <0>;
+              #sound-dai-cells = <1>;
+
+              dai@1 {
+                reg = <1>;
               };
             };
         };
