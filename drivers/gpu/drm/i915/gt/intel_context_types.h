@@ -188,6 +188,9 @@ struct intel_context {
 	/* Number of rq submitted without a guc_id */
 	u16 guc_num_rq_submit_no_id;
 
+	/* GuC number of requests not ready */
+	atomic_t guc_num_rq_not_ready;
+
 	/*
 	 * GuC ID link - in list when unpinned but guc_id still valid in GuC
 	 */

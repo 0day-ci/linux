@@ -22,6 +22,7 @@
 #include "intel_reset.h"
 
 #include "uc/intel_guc.h"
+#include "uc/intel_guc_submission.h"
 
 #define RESET_MAX_RETRIES 3
 
@@ -849,6 +850,14 @@ static void reset_finish(struct intel_gt *gt, intel_engine_mask_t awake)
 static void nop_submit_request(struct i915_request *request)
 {
 	RQ_TRACE(request, "-EIO\n");
+
+	/*
+	 * XXX: Kinda ugly to check for GuC submission here but this function is
+	 * going away once we switch to the DRM scheduler so we can live with
+	 * this for now.
+	 */
+	if (intel_engine_uses_guc(request->engine))
+		intel_guc_decr_num_rq_not_ready(request->context);
 
 	request = i915_request_mark_eio(request);
 	if (request) {

@@ -1384,6 +1384,41 @@ static inline void queue_request(struct i915_sched_engine *sched_engine,
 		kick_tasklet(&rq->engine->gt->uc.guc);
 }
 
+/* Macro to tweak heuristic, using a simple over 50% not ready for now */
+#define TOO_MANY_GUC_IDS_NOT_READY(avail, consumed) \
+	((consumed) > (avail) / 2)
+static bool too_many_guc_ids_not_ready(struct intel_guc *guc,
+				       struct intel_context *ce)
+{
+	u32 available_guc_ids, guc_ids_consumed;
+
+	available_guc_ids = guc->num_guc_ids;
+	guc_ids_consumed = atomic_read(&guc->num_guc_ids_not_ready);
+
+	if (TOO_MANY_GUC_IDS_NOT_READY(available_guc_ids, guc_ids_consumed)) {
+		set_and_update_guc_ids_exhausted(guc);
+		return true;
+	}
+
+	return false;
+}
+
+static void incr_num_rq_not_ready(struct intel_context *ce)
+{
+	struct intel_guc *guc = ce_to_guc(ce);
+
+	if (!atomic_fetch_add(1, &ce->guc_num_rq_not_ready))
+		atomic_inc(&guc->num_guc_ids_not_ready);
+}
+
+void intel_guc_decr_num_rq_not_ready(struct intel_context *ce)
+{
+	struct intel_guc *guc = ce_to_guc(ce);
+
+	if (atomic_fetch_add(-1, &ce->guc_num_rq_not_ready) == 1)
+		atomic_dec(&guc->num_guc_ids_not_ready);
+}
+
 static bool need_tasklet(struct intel_guc *guc, struct intel_context *ce)
 {
 	struct i915_sched_engine * const sched_engine =
@@ -1430,6 +1465,8 @@ static void guc_submit_request(struct i915_request *rq)
 		kick_tasklet(guc);
 
 	spin_unlock_irqrestore(&sched_engine->lock, flags);
+
+	intel_guc_decr_num_rq_not_ready(rq->context);
 }
 
 static int new_guc_id(struct intel_guc *guc)
@@ -2647,10 +2684,13 @@ static int guc_request_alloc(struct i915_request *rq)
 	rq->reserved_space -= GUC_REQUEST_SIZE;
 
 	/*
-	 * guc_ids are exhausted, don't allocate one here, defer to submission
-	 * in the tasklet.
+	 * guc_ids are exhausted or a heuristic is met indicating too many
+	 * guc_ids are waiting on requests with submission dependencies (not
+	 * ready to submit). Don't allocate one here, defer to submission in the
+	 * tasklet.
 	 */
-	if (test_and_update_guc_ids_exhausted(guc)) {
+	if (test_and_update_guc_ids_exhausted(guc) ||
+	    too_many_guc_ids_not_ready(guc, ce)) {
 		set_bit(I915_FENCE_FLAG_GUC_ID_NOT_PINNED, &rq->fence.flags);
 		goto out;
 	}
@@ -2684,6 +2724,7 @@ static int guc_request_alloc(struct i915_request *rq)
 		 */
 		set_bit(I915_FENCE_FLAG_GUC_ID_NOT_PINNED, &rq->fence.flags);
 		set_and_update_guc_ids_exhausted(guc);
+		incr_num_rq_not_ready(ce);
 
 		return 0;
 	} else if (unlikely(ret < 0)) {
@@ -2708,6 +2749,8 @@ static int guc_request_alloc(struct i915_request *rq)
 	clear_bit(CONTEXT_LRCA_DIRTY, &ce->flags);
 
 out:
+	incr_num_rq_not_ready(ce);
+
 	/*
 	 * We block all requests on this context if a G2H is pending for a
 	 * schedule disable or context deregistration as the GuC will fail a
@@ -3512,6 +3555,8 @@ void intel_guc_submission_print_info(struct intel_guc *guc,
 	drm_printf(p, "GuC submit flags: 0x%04lx\n", guc->flags);
 	drm_printf(p, "GuC total number request without guc_id: %d\n",
 		   guc->total_num_rq_with_no_guc_id);
+	drm_printf(p, "GuC Number GuC IDs not ready: %d\n",
+		   atomic_read(&guc->num_guc_ids_not_ready));
 	drm_printf(p, "GuC stall reason: %d\n", guc->submission_stall_reason);
 	drm_printf(p, "GuC stalled request: %s\n",
 		   yesno(guc->stalled_rq));
@@ -3567,6 +3612,8 @@ void intel_guc_submission_print_context_info(struct intel_guc *guc,
 			   atomic_read(&ce->pin_count));
 		drm_printf(p, "\t\tGuC ID Ref Count: %u\n",
 			   atomic_read(&ce->guc_id_ref));
+		drm_printf(p, "\t\tNumber Requests Not Ready: %u\n",
+			   atomic_read(&ce->guc_num_rq_not_ready));
 		drm_printf(p, "\t\tSchedule State: 0x%x, 0x%x\n\n",
 			   ce->guc_state.sched_state,
 			   atomic_read(&ce->guc_sched_state_no_lock));
