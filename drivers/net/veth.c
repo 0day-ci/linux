@@ -94,21 +94,9 @@ struct veth_q_stat_desc {
 static const struct veth_q_stat_desc veth_rq_stats_desc[] = {
 	{ "packets",		VETH_RQ_STAT(packets) },
 	{ "bytes",		VETH_RQ_STAT(bytes) },
-	{ "xdp_errors",		VETH_RQ_STAT(xdp_errors) },
-	{ "xdp_redirect",	VETH_RQ_STAT(xdp_redirect) },
-	{ "xdp_drops",		VETH_RQ_STAT(xdp_drops) },
-	{ "xdp_tx",		VETH_RQ_STAT(xdp_tx) },
-	{ "xdp_tx_errors",	VETH_RQ_STAT(xdp_tx_err) },
 };
 
 #define VETH_RQ_STATS_LEN	ARRAY_SIZE(veth_rq_stats_desc)
-
-static const struct veth_q_stat_desc veth_tq_stats_desc[] = {
-	{ "xdp_xmit",		VETH_RQ_STAT(peer_tq_xdp_xmit) },
-	{ "xdp_xmit_drops",	VETH_RQ_STAT(peer_tq_xdp_xmit_drops) },
-};
-
-#define VETH_TQ_STATS_LEN	ARRAY_SIZE(veth_tq_stats_desc)
 
 static struct {
 	const char string[ETH_GSTRING_LEN];
@@ -149,14 +137,6 @@ static void veth_get_strings(struct net_device *dev, u32 stringset, u8 *buf)
 				p += ETH_GSTRING_LEN;
 			}
 		}
-		for (i = 0; i < dev->real_num_tx_queues; i++) {
-			for (j = 0; j < VETH_TQ_STATS_LEN; j++) {
-				snprintf(p, ETH_GSTRING_LEN,
-					 "tx_queue_%u_%.18s",
-					 i, veth_tq_stats_desc[j].desc);
-				p += ETH_GSTRING_LEN;
-			}
-		}
 		break;
 	}
 }
@@ -166,8 +146,7 @@ static int veth_get_sset_count(struct net_device *dev, int sset)
 	switch (sset) {
 	case ETH_SS_STATS:
 		return ARRAY_SIZE(ethtool_stats_keys) +
-		       VETH_RQ_STATS_LEN * dev->real_num_rx_queues +
-		       VETH_TQ_STATS_LEN * dev->real_num_tx_queues;
+		       VETH_RQ_STATS_LEN * dev->real_num_rx_queues;
 	default:
 		return -EOPNOTSUPP;
 	}
@@ -176,8 +155,8 @@ static int veth_get_sset_count(struct net_device *dev, int sset)
 static void veth_get_ethtool_stats(struct net_device *dev,
 		struct ethtool_stats *stats, u64 *data)
 {
-	struct veth_priv *rcv_priv, *priv = netdev_priv(dev);
-	struct net_device *peer = rtnl_dereference(priv->peer);
+	const struct veth_priv *priv = netdev_priv(dev);
+	const struct net_device *peer = rtnl_dereference(priv->peer);
 	int i, j, idx;
 
 	data[0] = peer ? peer->ifindex : 0;
@@ -197,25 +176,67 @@ static void veth_get_ethtool_stats(struct net_device *dev,
 		} while (u64_stats_fetch_retry_irq(&rq_stats->syncp, start));
 		idx += VETH_RQ_STATS_LEN;
 	}
+}
+
+static int veth_get_std_stats_channels(struct net_device *dev, u32 sset)
+{
+	switch (sset) {
+	case ETH_SS_STATS_XDP:
+		return max(dev->real_num_rx_queues, dev->real_num_tx_queues);
+	default:
+		return -EOPNOTSUPP;
+	}
+}
+
+static void veth_get_xdp_stats(struct net_device *dev,
+			       struct ethtool_xdp_stats *xdp_stats)
+{
+	const struct veth_priv *priv = netdev_priv(dev);
+	const struct net_device *peer = rtnl_dereference(priv->peer);
+	const struct veth_rq_stats *rq_stats;
+	struct ethtool_xdp_stats *iter;
+	u64 xmit, xmit_drops;
+	u32 i, start;
+
+	for (i = 0; i < dev->real_num_rx_queues; i++) {
+		rq_stats = &priv->rq[i].stats;
+		iter = xdp_stats + i;
+
+		do {
+			start = u64_stats_fetch_begin_irq(&rq_stats->syncp);
+
+			iter->errors = rq_stats->vs.xdp_errors;
+			iter->redirect = rq_stats->vs.xdp_redirect;
+			iter->drop = rq_stats->vs.xdp_drops;
+			iter->tx = rq_stats->vs.xdp_tx;
+			iter->tx_errors = rq_stats->vs.xdp_tx_err;
+		} while (u64_stats_fetch_retry_irq(&rq_stats->syncp, start));
+	}
 
 	if (!peer)
 		return;
 
-	rcv_priv = netdev_priv(peer);
-	for (i = 0; i < peer->real_num_rx_queues; i++) {
-		const struct veth_rq_stats *rq_stats = &rcv_priv->rq[i].stats;
-		const void *base = (void *)&rq_stats->vs;
-		unsigned int start, tx_idx = idx;
-		size_t offset;
+	for (i = 0; i < dev->real_num_tx_queues; i++) {
+		iter = xdp_stats + i;
+		iter->xmit = 0;
+		iter->xmit_drops = 0;
+	}
 
-		tx_idx += (i % dev->real_num_tx_queues) * VETH_TQ_STATS_LEN;
+	priv = netdev_priv(peer);
+
+	for (i = 0; i < peer->real_num_rx_queues; i++) {
+		rq_stats = &priv->rq[i].stats;
+		iter = xdp_stats + (i % dev->real_num_tx_queues);
+
 		do {
 			start = u64_stats_fetch_begin_irq(&rq_stats->syncp);
-			for (j = 0; j < VETH_TQ_STATS_LEN; j++) {
-				offset = veth_tq_stats_desc[j].offset;
-				data[tx_idx + j] += *(u64 *)(base + offset);
-			}
+
+			xmit = rq_stats->vs.peer_tq_xdp_xmit;
+			xmit_drops = rq_stats->vs.peer_tq_xdp_xmit_drops;
 		} while (u64_stats_fetch_retry_irq(&rq_stats->syncp, start));
+
+		iter->xmit += xmit;
+		iter->xmit_drops += xmit_drops;
 	}
 }
 
@@ -241,6 +262,8 @@ static const struct ethtool_ops veth_ethtool_ops = {
 	.get_ts_info		= ethtool_op_get_ts_info,
 	.get_channels		= veth_get_channels,
 	.set_channels		= veth_set_channels,
+	.get_std_stats_channels	= veth_get_std_stats_channels,
+	.get_xdp_stats		= veth_get_xdp_stats,
 };
 
 /* general routines */
