@@ -1108,7 +1108,8 @@ void intel_gt_init_workarounds(struct drm_i915_private *i915)
 }
 
 static enum forcewake_domains
-wal_get_fw_for_rmw(struct intel_uncore *uncore, const struct i915_wa_list *wal)
+wal_get_fw(struct intel_uncore *uncore, const struct i915_wa_list *wal,
+	   unsigned int op)
 {
 	enum forcewake_domains fw = 0;
 	struct i915_wa *wa;
@@ -1117,8 +1118,7 @@ wal_get_fw_for_rmw(struct intel_uncore *uncore, const struct i915_wa_list *wal)
 	for (i = 0, wa = wal->list; i < wal->count; i++, wa++)
 		fw |= intel_uncore_forcewake_for_reg(uncore,
 						     wa->reg,
-						     FW_REG_READ |
-						     FW_REG_WRITE);
+						     op);
 
 	return fw;
 }
@@ -1149,7 +1149,7 @@ wa_list_apply(struct intel_gt *gt, const struct i915_wa_list *wal)
 	if (!wal->count)
 		return;
 
-	fw = wal_get_fw_for_rmw(uncore, wal);
+	fw = wal_get_fw(uncore, wal, FW_REG_READ | FW_REG_WRITE);
 
 	spin_lock_irqsave(&uncore->lock, flags);
 	intel_uncore_forcewake_get__locked(uncore, fw);
@@ -1188,7 +1188,7 @@ static bool wa_list_verify(struct intel_gt *gt,
 	unsigned int i;
 	bool ok = true;
 
-	fw = wal_get_fw_for_rmw(uncore, wal);
+	fw = wal_get_fw(uncore, wal, FW_REG_READ | FW_REG_WRITE);
 
 	spin_lock_irqsave(&uncore->lock, flags);
 	intel_uncore_forcewake_get__locked(uncore, fw);
@@ -1477,27 +1477,45 @@ void intel_engine_init_whitelist(struct intel_engine_cs *engine)
 	wa_init_finish(w);
 }
 
-void intel_engine_apply_whitelist(struct intel_engine_cs *engine)
+static void __engine_apply_whitelist(struct intel_engine_cs *engine)
 {
 	const struct i915_wa_list *wal = &engine->whitelist;
 	struct intel_uncore *uncore = engine->uncore;
 	const u32 base = engine->mmio_base;
+	enum forcewake_domains fw;
 	struct i915_wa *wa;
 	unsigned int i;
+
+	lockdep_assert_held(&uncore->lock);
+
+	fw = wal_get_fw(uncore, wal, FW_REG_WRITE);
+	intel_uncore_forcewake_get__locked(uncore, fw);
+
+	for (i = 0, wa = wal->list; i < wal->count; i++, wa++)
+		intel_uncore_write_fw(uncore,
+				      RING_FORCE_TO_NONPRIV(base, i),
+				      i915_mmio_reg_offset(wa->reg));
+
+	/* And clear the rest just in case of garbage */
+	for (; i < RING_MAX_NONPRIV_SLOTS; i++)
+		intel_uncore_write_fw(uncore,
+				      RING_FORCE_TO_NONPRIV(base, i),
+				      i915_mmio_reg_offset(RING_NOPID(base)));
+
+	intel_uncore_forcewake_put__locked(uncore, fw);
+}
+
+void intel_engine_apply_whitelist(struct intel_engine_cs *engine)
+{
+	const struct i915_wa_list *wal = &engine->whitelist;
+	unsigned long flags;
 
 	if (!wal->count)
 		return;
 
-	for (i = 0, wa = wal->list; i < wal->count; i++, wa++)
-		intel_uncore_write(uncore,
-				   RING_FORCE_TO_NONPRIV(base, i),
-				   i915_mmio_reg_offset(wa->reg));
-
-	/* And clear the rest just in case of garbage */
-	for (; i < RING_MAX_NONPRIV_SLOTS; i++)
-		intel_uncore_write(uncore,
-				   RING_FORCE_TO_NONPRIV(base, i),
-				   i915_mmio_reg_offset(RING_NOPID(base)));
+	spin_lock_irqsave(&engine->uncore->lock, flags);
+	__engine_apply_whitelist(engine);
+	spin_unlock_irqrestore(&engine->uncore->lock, flags);
 }
 
 static void
