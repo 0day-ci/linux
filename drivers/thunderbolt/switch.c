@@ -2740,7 +2740,7 @@ int tb_switch_add(struct tb_switch *sw)
 			return ret;
 		}
 
-		for (i = 0; i <= sw->config.max_port_number; i++) {
+		for (i = 1; i <= sw->config.max_port_number; i++) {
 			if (sw->ports[i].disabled) {
 				tb_port_dbg(&sw->ports[i], "disabled by eeprom\n");
 				continue;
