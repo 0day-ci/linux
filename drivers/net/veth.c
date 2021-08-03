@@ -38,10 +38,10 @@
 #define VETH_XDP_BATCH		16
 
 struct veth_stats {
-	u64	rx_drops;
 	/* xdp */
 	u64	xdp_packets;
 	u64	xdp_bytes;
+	u64	xdp_errors;
 	u64	xdp_redirect;
 	u64	xdp_drops;
 	u64	xdp_tx;
@@ -94,7 +94,7 @@ struct veth_q_stat_desc {
 static const struct veth_q_stat_desc veth_rq_stats_desc[] = {
 	{ "xdp_packets",	VETH_RQ_STAT(xdp_packets) },
 	{ "xdp_bytes",		VETH_RQ_STAT(xdp_bytes) },
-	{ "drops",		VETH_RQ_STAT(rx_drops) },
+	{ "xdp_errors",		VETH_RQ_STAT(xdp_errors) },
 	{ "xdp_redirect",	VETH_RQ_STAT(xdp_redirect) },
 	{ "xdp_drops",		VETH_RQ_STAT(xdp_drops) },
 	{ "xdp_tx",		VETH_RQ_STAT(xdp_tx) },
@@ -379,9 +379,9 @@ static void veth_stats_rx(struct veth_stats *result, struct net_device *dev)
 	result->xdp_packets = 0;
 	result->xdp_tx_err = 0;
 	result->xdp_bytes = 0;
-	result->rx_drops = 0;
+	result->xdp_errors = 0;
 	for (i = 0; i < dev->num_rx_queues; i++) {
-		u64 packets, bytes, drops, xdp_tx_err, peer_tq_xdp_xmit_err;
+		u64 packets, bytes, xdp_err, xdp_tx_err, peer_tq_xdp_xmit_err;
 		struct veth_rq_stats *stats = &priv->rq[i].stats;
 		unsigned int start;
 
@@ -391,13 +391,13 @@ static void veth_stats_rx(struct veth_stats *result, struct net_device *dev)
 			xdp_tx_err = stats->vs.xdp_tx_err;
 			packets = stats->vs.xdp_packets;
 			bytes = stats->vs.xdp_bytes;
-			drops = stats->vs.rx_drops;
+			xdp_err = stats->vs.xdp_errors;
 		} while (u64_stats_fetch_retry_irq(&stats->syncp, start));
 		result->peer_tq_xdp_xmit_err += peer_tq_xdp_xmit_err;
 		result->xdp_tx_err += xdp_tx_err;
 		result->xdp_packets += packets;
 		result->xdp_bytes += bytes;
-		result->rx_drops += drops;
+		result->xdp_errors += xdp_err;
 	}
 }
 
@@ -415,7 +415,7 @@ static void veth_get_stats64(struct net_device *dev,
 
 	veth_stats_rx(&rx, dev);
 	tot->tx_dropped += rx.xdp_tx_err;
-	tot->rx_dropped = rx.rx_drops + rx.peer_tq_xdp_xmit_err;
+	tot->rx_dropped = rx.xdp_errors + rx.peer_tq_xdp_xmit_err;
 	tot->rx_bytes = rx.xdp_bytes;
 	tot->rx_packets = rx.xdp_packets;
 
@@ -633,7 +633,7 @@ static struct xdp_frame *veth_xdp_rcv_one(struct veth_rq *rq,
 			if (unlikely(veth_xdp_tx(rq, &xdp, bq) < 0)) {
 				trace_xdp_exception(rq->dev, xdp_prog, act);
 				frame = &orig_frame;
-				stats->rx_drops++;
+				stats->xdp_errors++;
 				goto err_xdp;
 			}
 			stats->xdp_tx++;
@@ -644,7 +644,7 @@ static struct xdp_frame *veth_xdp_rcv_one(struct veth_rq *rq,
 			xdp.rxq->mem = frame->mem;
 			if (xdp_do_redirect(rq->dev, &xdp, xdp_prog)) {
 				frame = &orig_frame;
-				stats->rx_drops++;
+				stats->xdp_errors++;
 				goto err_xdp;
 			}
 			stats->xdp_redirect++;
@@ -683,7 +683,7 @@ static void veth_xdp_rcv_bulk_skb(struct veth_rq *rq, void **frames,
 			       GFP_ATOMIC | __GFP_ZERO) < 0) {
 		for (i = 0; i < n_xdpf; i++)
 			xdp_return_frame(frames[i]);
-		stats->rx_drops += n_xdpf;
+		stats->xdp_errors += n_xdpf;
 
 		return;
 	}
@@ -695,7 +695,7 @@ static void veth_xdp_rcv_bulk_skb(struct veth_rq *rq, void **frames,
 						 rq->dev);
 		if (!skb) {
 			xdp_return_frame(frames[i]);
-			stats->rx_drops++;
+			stats->xdp_errors++;
 			continue;
 		}
 		napi_gro_receive(&rq->xdp_napi, skb);
@@ -783,7 +783,7 @@ static struct sk_buff *veth_xdp_rcv_skb(struct veth_rq *rq,
 		xdp.rxq->mem = rq->xdp_mem;
 		if (unlikely(veth_xdp_tx(rq, &xdp, bq) < 0)) {
 			trace_xdp_exception(rq->dev, xdp_prog, act);
-			stats->rx_drops++;
+			stats->xdp_errors++;
 			goto err_xdp;
 		}
 		stats->xdp_tx++;
@@ -794,7 +794,7 @@ static struct sk_buff *veth_xdp_rcv_skb(struct veth_rq *rq,
 		consume_skb(skb);
 		xdp.rxq->mem = rq->xdp_mem;
 		if (xdp_do_redirect(rq->dev, &xdp, xdp_prog)) {
-			stats->rx_drops++;
+			stats->xdp_errors++;
 			goto err_xdp;
 		}
 		stats->xdp_redirect++;
@@ -833,7 +833,7 @@ static struct sk_buff *veth_xdp_rcv_skb(struct veth_rq *rq,
 out:
 	return skb;
 drop:
-	stats->rx_drops++;
+	stats->xdp_errors++;
 xdp_drop:
 	rcu_read_unlock();
 	kfree_skb(skb);
@@ -892,7 +892,7 @@ static int veth_xdp_rcv(struct veth_rq *rq, int budget,
 	rq->stats.vs.xdp_redirect += stats->xdp_redirect;
 	rq->stats.vs.xdp_bytes += stats->xdp_bytes;
 	rq->stats.vs.xdp_drops += stats->xdp_drops;
-	rq->stats.vs.rx_drops += stats->rx_drops;
+	rq->stats.vs.xdp_errors += stats->xdp_errors;
 	rq->stats.vs.xdp_packets += done;
 	u64_stats_update_end(&rq->stats.syncp);
 
