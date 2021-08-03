@@ -759,4 +759,24 @@
 			};
 		};
 	};
+
+	pm8941@1 {
+		spmi-flash-leds@d300 {
+			status = "okay";
+
+			led@0 {
+				led-max-microamp = <200000>;
+				flash-max-microamp = <1000000>;
+				flash-max-timeout-us = <1280000>;
+				default-state = "off";
+			};
+
+			led@1 {
+				led-max-microamp = <200000>;
+				flash-max-microamp = <1000000>;
+				flash-max-timeout-us = <1280000>;
+				default-state = "off";
+			};
+		};
+	};
 };
