@@ -65,7 +65,7 @@ static int pfn_array_alloc(struct pfn_array *pa, u64 iova, unsigned int len)
 
 	pa->pa_iova = iova;
 
-	pa->pa_nr = ((iova & ~PAGE_MASK) + len + (PAGE_SIZE - 1)) >> PAGE_SHIFT;
+	pa->pa_nr = PFN_UP((iova & ~PAGE_MASK) + len);
 	if (!pa->pa_nr)
 		return -EINVAL;
 
@@ -161,7 +161,7 @@ static inline void pfn_array_idal_create_words(
 		idaws[i] = pa->pa_pfn[i] << PAGE_SHIFT;
 
 	/* Adjust the first IDAW, since it may not start on a page boundary */
-	idaws[0] += pa->pa_iova & (PAGE_SIZE - 1);
+	idaws[0] += pa->pa_iova & ~PAGE_MASK;
 }
 
 static void convert_ccw0_to_ccw1(struct ccw1 *source, unsigned long len)
@@ -214,8 +214,8 @@ static long copy_from_iova(struct device *mdev,
 		from = pa.pa_pfn[i] << PAGE_SHIFT;
 		m = PAGE_SIZE;
 		if (i == 0) {
-			from += iova & (PAGE_SIZE - 1);
-			m -= iova & (PAGE_SIZE - 1);
+			from += iova & ~PAGE_SIZE;
+			m -= iova & ~PAGE_MASK;
 		}
 
 		m = min(l, m);
