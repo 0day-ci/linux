@@ -1367,11 +1367,19 @@ free_noa_wait(struct i915_perf_stream *stream)
 static const i915_reg_t gen9_oa_wl_regs[] = {
 	{ __OAREPORTTRIG2 | RING_FORCE_TO_NONPRIV_ACCESS_RW },
 	{ __OAREPORTTRIG6 | RING_FORCE_TO_NONPRIV_ACCESS_RW },
+	{ __OA_PERF_COUNTER_A(18) | (RING_FORCE_TO_NONPRIV_ACCESS_RW |
+				     RING_FORCE_TO_NONPRIV_RANGE_4) },
+	{ __GEN8_OASTATUS | (RING_FORCE_TO_NONPRIV_ACCESS_RD |
+			     RING_FORCE_TO_NONPRIV_RANGE_4) },
 };
 
 static const i915_reg_t gen12_oa_wl_regs[] = {
 	{ __GEN12_OAG_OAREPORTTRIG2 | RING_FORCE_TO_NONPRIV_ACCESS_RW },
 	{ __GEN12_OAG_OAREPORTTRIG6 | RING_FORCE_TO_NONPRIV_ACCESS_RW },
+	{ __GEN12_OAG_PERF_COUNTER_A(18) | (RING_FORCE_TO_NONPRIV_ACCESS_RW |
+					    RING_FORCE_TO_NONPRIV_RANGE_4) },
+	{ __GEN12_OAG_OASTATUS | (RING_FORCE_TO_NONPRIV_ACCESS_RD |
+				  RING_FORCE_TO_NONPRIV_RANGE_4) },
 };
 
 static int intel_engine_apply_oa_whitelist(struct i915_perf_stream *stream)
@@ -4623,8 +4631,16 @@ int i915_perf_ioctl_version(void)
 	 *    into the OA buffer. This applies only to gen8+. The feature can
 	 *    only be accessed if perf_stream_paranoid is set to 0 by privileged
 	 *    user.
+	 *
+	 * 7: Whitelist below OA registers for user to identify the location of
+	 *    triggered reports in the OA buffer. This applies only to gen8+.
+	 *    The feature can only be accessed if perf_stream_paranoid is set to
+	 *    0 by privileged user.
+	 *
+	 *    - OA buffer head/tail/status/buffer registers for read only
+	 *    - OA counters A18, A19, A20 for read/write
 	 */
-	return 6;
+	return 7;
 }
 
 #if IS_ENABLED(CONFIG_DRM_I915_SELFTEST)
