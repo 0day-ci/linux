@@ -211,8 +211,14 @@ struct intel_context {
 	/* Pointer to parent */
 	struct intel_context *parent;
 
+	/* GuC workqueue head / tail - only applies to parent */
+	u16 guc_wqi_tail;
+	u16 guc_wqi_head;
+
 	/* Number of children if parent */
 	u8 guc_number_children;
+
+	u8 parent_page; /* if set, page num reserved for parent context */
 
 	/*
 	 * GuC priority management
