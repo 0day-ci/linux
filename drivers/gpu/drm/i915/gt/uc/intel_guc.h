@@ -103,6 +103,12 @@ struct intel_guc {
 
 	/* To serialize the intel_guc_send actions */
 	struct mutex send_mutex;
+
+	I915_SELFTEST_DECLARE(bool gse_hang_expected;)
+	I915_SELFTEST_DECLARE(bool deadlock_expected;)
+	I915_SELFTEST_DECLARE(bool bad_desc_expected;)
+	I915_SELFTEST_DECLARE(bool inject_bad_sched_disable;)
+	I915_SELFTEST_DECLARE(bool inject_corrupt_h2g;)
 };
 
 static inline struct intel_guc *log_to_guc(struct intel_guc_log *log)

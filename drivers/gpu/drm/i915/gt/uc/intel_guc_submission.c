@@ -824,6 +824,7 @@ add_request:
 			GEM_WARN_ON(ret);	/* Unexpected */
 			goto deadlk;
 		}
+		I915_SELFTEST_DECLARE(++gse->tasklets_submit_count;)
 	}
 
 	/*
@@ -2107,7 +2108,15 @@ static void __guc_context_sched_disable(struct intel_guc *guc,
 		GUC_CONTEXT_DISABLE
 	};
 
+#if IS_ENABLED(CONFIG_DRM_I915_SELFTEST)
+	if (guc->inject_bad_sched_disable &&
+	    guc_id == GUC_INVALID_LRC_ID)
+		guc->inject_bad_sched_disable = false;
+	else
+		GEM_BUG_ON(guc_id == GUC_INVALID_LRC_ID);
+#else
 	GEM_BUG_ON(guc_id == GUC_INVALID_LRC_ID);
+#endif
 
 	trace_intel_context_sched_disable(ce);
 
@@ -2769,6 +2778,9 @@ static void retire_worker_sched_disable(struct guc_submit_engine *gse,
 		set_context_block_tasklet(ce);
 		guc_id = prep_context_pending_disable(ce);
 		spin_unlock_irqrestore(&ce->guc_state.lock, flags);
+
+		if (I915_SELFTEST_ONLY(guc->inject_bad_sched_disable))
+			guc_id = GUC_INVALID_LRC_ID;
 
 		with_intel_runtime_pm(runtime_pm, wakeref)
 			__guc_context_sched_disable(guc, ce, guc_id);
@@ -4021,3 +4033,7 @@ bool intel_guc_virtual_engine_has_heartbeat(const struct intel_engine_cs *ve)
 
 	return false;
 }
+
+#if IS_ENABLED(CONFIG_DRM_I915_SELFTEST)
+#include "selftest_guc_flow_control.c"
+#endif

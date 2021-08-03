@@ -3,7 +3,6 @@
  * Copyright © 2016-2019 Intel Corporation
  */
 
-#include <linux/circ_buf.h>
 #include <linux/ktime.h>
 #include <linux/time64.h>
 #include <linux/timekeeping.h>
@@ -414,8 +413,9 @@ static int ct_write(struct intel_guc_ct *ct,
 	u32 *cmds = ctb->cmds;
 	unsigned int i;
 
-	if (unlikely(desc->status))
-		goto corrupted;
+	if (!I915_SELFTEST_ONLY(ct_to_guc(ct)->deadlock_expected))
+		if (unlikely(desc->status))
+			goto corrupted;
 
 	GEM_BUG_ON(tail > size);
 
@@ -442,6 +442,15 @@ static int ct_write(struct intel_guc_ct *ct,
 	header = FIELD_PREP(GUC_CTB_MSG_0_FORMAT, GUC_CTB_FORMAT_HXG) |
 		 FIELD_PREP(GUC_CTB_MSG_0_NUM_DWORDS, len) |
 		 FIELD_PREP(GUC_CTB_MSG_0_FENCE, fence);
+
+#if IS_ENABLED(CONFIG_DRM_I915_SELFTEST)
+	if (ct_to_guc(ct)->inject_corrupt_h2g) {
+		header = FIELD_PREP(GUC_CTB_MSG_0_FORMAT, 3) |
+			 FIELD_PREP(GUC_CTB_MSG_0_NUM_DWORDS, len + 5) |
+			 FIELD_PREP(GUC_CTB_MSG_0_FENCE, 0xdead);
+		ct_to_guc(ct)->inject_corrupt_h2g = false;
+	}
+#endif
 
 	type = (flags & INTEL_GUC_CT_SEND_NB) ? GUC_HXG_TYPE_EVENT :
 		GUC_HXG_TYPE_REQUEST;
@@ -481,8 +490,12 @@ static int ct_write(struct intel_guc_ct *ct,
 	return 0;
 
 corrupted:
-	CT_ERROR(ct, "Corrupted descriptor head=%u tail=%u status=%#x\n",
-		 desc->head, desc->tail, desc->status);
+	if (I915_SELFTEST_ONLY(ct_to_guc(ct)->bad_desc_expected))
+		CT_DEBUG(ct, "Corrupted descriptor head=%u tail=%u status=%#x\n",
+			 desc->head, desc->tail, desc->status);
+	else
+		CT_ERROR(ct, "Corrupted descriptor head=%u tail=%u status=%#x\n",
+			 desc->head, desc->tail, desc->status);
 	ctb->broken = true;
 	return -EPIPE;
 }
@@ -539,9 +552,18 @@ static inline bool ct_deadlocked(struct intel_guc_ct *ct)
 		struct guc_ct_buffer_desc *send = ct->ctbs.send.desc;
 		struct guc_ct_buffer_desc *recv = ct->ctbs.send.desc;
 
-		CT_ERROR(ct, "Communication stalled for %lld ms, desc status=%#x,%#x\n",
-			 ktime_ms_delta(ktime_get(), ct->stall_time),
-			 send->status, recv->status);
+		/*
+		 * CI doesn't like error messages, demote to debug if deadlock was
+		 * intentionally hit.
+		 */
+		if (I915_SELFTEST_ONLY(ct_to_guc(ct)->deadlock_expected))
+			CT_DEBUG(ct, "Communication stalled for %lld ms, desc status=%#x,%#x\n",
+				 ktime_ms_delta(ktime_get(), ct->stall_time),
+				 send->status, recv->status);
+		else
+			CT_ERROR(ct, "Communication stalled for %lld ms, desc status=%#x,%#x\n",
+				 ktime_ms_delta(ktime_get(), ct->stall_time),
+				 send->status, recv->status);
 		ct->ctbs.send.broken = true;
 	}
 
@@ -767,8 +789,9 @@ int intel_guc_ct_send(struct intel_guc_ct *ct, const u32 *action, u32 len,
 		return -ENODEV;
 	}
 
-	if (unlikely(ct->ctbs.send.broken))
-		return -EPIPE;
+	if (!I915_SELFTEST_ONLY(ct_to_guc(ct)->deadlock_expected))
+		if (unlikely(ct->ctbs.send.broken))
+			return -EPIPE;
 
 	if (flags & INTEL_GUC_CT_SEND_NB)
 		return ct_send_nb(ct, action, len, flags);

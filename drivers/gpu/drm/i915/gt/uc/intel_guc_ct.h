@@ -6,6 +6,7 @@
 #ifndef _INTEL_GUC_CT_H_
 #define _INTEL_GUC_CT_H_
 
+#include <linux/circ_buf.h>
 #include <linux/interrupt.h>
 #include <linux/spinlock.h>
 #include <linux/workqueue.h>
@@ -116,5 +117,13 @@ int intel_guc_ct_send(struct intel_guc_ct *ct, const u32 *action, u32 len,
 void intel_guc_ct_event_handler(struct intel_guc_ct *ct);
 
 void intel_guc_ct_print_info(struct intel_guc_ct *ct, struct drm_printer *p);
+
+static inline bool intel_guc_ct_is_recv_buffer_empty(struct intel_guc_ct *ct)
+{
+	struct intel_guc_ct_buffer *ctb = &ct->ctbs.recv;
+
+	return atomic_read(&ctb->space) ==
+		(CIRC_SPACE(0, 0, ctb->size) - ctb->resv_space);
+}
 
 #endif /* _INTEL_GUC_CT_H_ */

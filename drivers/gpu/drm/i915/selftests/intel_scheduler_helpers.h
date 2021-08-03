@@ -10,6 +10,7 @@
 
 struct i915_request;
 struct intel_engine_cs;
+struct intel_gt;
 
 struct intel_selftest_saved_policy {
 	u32 flags;
@@ -29,5 +30,6 @@ int intel_selftest_modify_policy(struct intel_engine_cs *engine,
 int intel_selftest_restore_policy(struct intel_engine_cs *engine,
 				  struct intel_selftest_saved_policy *saved);
 int intel_selftest_wait_for_rq(struct i915_request *rq);
+struct intel_engine_cs *intel_selftest_find_any_engine(struct intel_gt *gt);
 
 #endif
