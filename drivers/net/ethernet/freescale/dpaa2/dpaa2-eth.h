@@ -377,13 +377,13 @@ struct dpaa2_eth_ch_stats {
 	__u64 pull_err;
 	/* Number of CDANs; useful to estimate avg NAPI len */
 	__u64 cdan;
+	/* The rest of the structure does not show up in ethtool stats */
+	struct { } __eth_end;
 	/* XDP counters */
 	__u64 xdp_drop;
 	__u64 xdp_tx;
 	__u64 xdp_tx_err;
 	__u64 xdp_redirect;
-	/* The rest of the structure does not show up in ethtool stats */
-	struct { } __eth_end;
 	/* Must be last */
 	__u64 frames;
 };

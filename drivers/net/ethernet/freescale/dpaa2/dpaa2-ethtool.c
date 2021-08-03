@@ -53,10 +53,6 @@ static char dpaa2_ethtool_extras[][ETH_GSTRING_LEN] = {
 	"[drv] dequeue portal busy",
 	"[drv] channel pull errors",
 	"[drv] cdan",
-	"[drv] xdp drop",
-	"[drv] xdp tx",
-	"[drv] xdp tx errors",
-	"[drv] xdp redirect",
 	/* FQ stats */
 	"[qbman] rx pending frames",
 	"[qbman] rx pending bytes",
@@ -315,6 +311,36 @@ static void dpaa2_eth_get_ethtool_stats(struct net_device *net_dev,
 
 	if (dpaa2_eth_has_mac(priv))
 		dpaa2_mac_get_ethtool_stats(priv->mac, data + i);
+}
+
+static int dpaa2_eth_get_std_stats_channels(struct net_device *net_dev,
+					    u32 sset)
+{
+	const struct dpaa2_eth_priv *priv = netdev_priv(net_dev);
+
+	switch (sset) {
+	case ETH_SS_STATS_XDP:
+		return priv->num_channels;
+	default:
+		return -EOPNOTSUPP;
+	}
+}
+
+static void dpaa2_eth_get_xdp_stats(struct net_device *net_dev,
+				    struct ethtool_xdp_stats *xdp_stats)
+{
+	const struct dpaa2_eth_priv *priv = netdev_priv(net_dev);
+	const struct dpaa2_eth_ch_stats *ch_stats;
+	u32 i;
+
+	for (i = 0; i < priv->num_channels; i++) {
+		ch_stats = &priv->channel[i]->stats;
+
+		xdp_stats[i].drop = ch_stats->xdp_drop;
+		xdp_stats[i].redirect = ch_stats->xdp_redirect;
+		xdp_stats[i].tx = ch_stats->xdp_tx;
+		xdp_stats[i].tx_errors = ch_stats->xdp_tx_err;
+	}
 }
 
 static int dpaa2_eth_prep_eth_rule(struct ethhdr *eth_value, struct ethhdr *eth_mask,
@@ -836,4 +862,6 @@ const struct ethtool_ops dpaa2_ethtool_ops = {
 	.get_ts_info = dpaa2_eth_get_ts_info,
 	.get_tunable = dpaa2_eth_get_tunable,
 	.set_tunable = dpaa2_eth_set_tunable,
+	.get_std_stats_channels = dpaa2_eth_get_std_stats_channels,
+	.get_xdp_stats = dpaa2_eth_get_xdp_stats,
 };
