@@ -264,7 +264,7 @@ static int usblp_ctrl_msg(struct usblp *usblp, int request, int type, int dir, i
 	dev_dbg(&usblp->intf->dev,
 		"usblp_control_msg: rq: 0x%02x dir: %d recip: %d value: %d idx: %d len: %#x result: %d\n",
 		request, !!dir, recip, value, index, len, retval);
-	return retval < 0 ? retval : 0;
+	return min(retval, 0);
 }
 
 #define usblp_read_status(usblp, status)\
