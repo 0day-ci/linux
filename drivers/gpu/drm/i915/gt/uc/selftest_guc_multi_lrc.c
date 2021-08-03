@@ -62,17 +62,28 @@ static void multi_lrc_context_put(struct intel_context *ce)
 }
 
 static struct i915_request *
-multi_lrc_nop_request(struct intel_context *ce)
+multi_lrc_nop_request(struct intel_context *ce, struct i915_request *from)
 {
 	struct intel_context *child;
 	struct i915_request *rq, *child_rq;
 	int i = 0;
+	int ret;
 
 	GEM_BUG_ON(!intel_context_is_parent(ce));
 
 	rq = intel_context_create_request(ce);
 	if (IS_ERR(rq))
 		return rq;
+
+	if (from) {
+		ret = i915_sw_fence_await_dma_fence(&rq->submit,
+						    &from->fence, 0,
+						    I915_FENCE_GFP);
+		if (ret < 0) {
+			i915_request_put(rq);
+			return ERR_PTR(ret);
+		}
+	}
 
 	i915_request_get(rq);
 	i915_request_add(rq);
@@ -112,7 +123,7 @@ static int __intel_guc_multi_lrc_basic(struct intel_gt *gt, unsigned int class)
 		return 0;
 	}
 
-	rq = multi_lrc_nop_request(parent);
+	rq = multi_lrc_nop_request(parent, NULL);
 	if (IS_ERR(rq)) {
 		ret = PTR_ERR(rq);
 		pr_err("Failed creating requests: %d", ret);
