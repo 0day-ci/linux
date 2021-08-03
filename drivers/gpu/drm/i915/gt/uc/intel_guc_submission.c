@@ -105,15 +105,21 @@ static bool tasklet_blocked(struct guc_submit_engine *gse)
 	return test_bit(GSE_STATE_TASKLET_BLOCKED, &gse->flags);
 }
 
+/* 2 seconds seems like a reasonable timeout waiting for a G2H */
+#define MAX_TASKLET_BLOCKED_NS	2000000000
 static void set_tasklet_blocked(struct guc_submit_engine *gse)
 {
 	lockdep_assert_held(&gse->sched_engine.lock);
+	hrtimer_start_range_ns(&gse->hang_timer,
+			       ns_to_ktime(MAX_TASKLET_BLOCKED_NS), 0,
+			       HRTIMER_MODE_REL_PINNED);
 	set_bit(GSE_STATE_TASKLET_BLOCKED, &gse->flags);
 }
 
 static void __clr_tasklet_blocked(struct guc_submit_engine *gse)
 {
 	lockdep_assert_held(&gse->sched_engine.lock);
+	hrtimer_cancel(&gse->hang_timer);
 	clear_bit(GSE_STATE_TASKLET_BLOCKED, &gse->flags);
 }
 
@@ -1028,6 +1034,7 @@ static void disable_submission(struct intel_guc *guc)
 		if (__tasklet_is_enabled(&sched_engine->tasklet)) {
 			GEM_BUG_ON(!guc->ct.enabled);
 			__tasklet_disable_sync_once(&sched_engine->tasklet);
+			hrtimer_try_to_cancel(&guc->gse[i]->hang_timer);
 			sched_engine->tasklet.callback = NULL;
 		}
 	}
@@ -3750,6 +3757,33 @@ static void guc_sched_engine_destroy(struct kref *kref)
 	kfree(gse);
 }
 
+static enum hrtimer_restart gse_hang(struct hrtimer *hrtimer)
+{
+	struct guc_submit_engine *gse =
+		container_of(hrtimer, struct guc_submit_engine, hang_timer);
+	struct intel_guc *guc = gse->sched_engine.private_data;
+
+#if IS_ENABLED(CONFIG_DRM_I915_SELFTEST)
+	if (guc->gse_hang_expected)
+		drm_dbg(&guc_to_gt(guc)->i915->drm,
+			"GSE[%i] hung, disabling submission", gse->id);
+	else
+		drm_err(&guc_to_gt(guc)->i915->drm,
+			"GSE[%i] hung, disabling submission", gse->id);
+#else
+	drm_err(&guc_to_gt(guc)->i915->drm,
+		"GSE[%i] hung, disabling submission", gse->id);
+#endif
+
+	/*
+	 * Tasklet not making forward progress, disable submission which in turn
+	 * will kick in the heartbeat to do a full GPU reset.
+	 */
+	disable_submission(guc);
+
+	return HRTIMER_NORESTART;
+}
+
 static void guc_submit_engine_init(struct intel_guc *guc,
 				   struct guc_submit_engine *gse,
 				   int id)
@@ -3767,6 +3801,8 @@ static void guc_submit_engine_init(struct intel_guc *guc,
 	sched_engine->retire_inflight_request_prio =
 		guc_retire_inflight_request_prio;
 	sched_engine->private_data = guc;
+	hrtimer_init(&gse->hang_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+	gse->hang_timer.function = gse_hang;
 	gse->id = id;
 }
 
