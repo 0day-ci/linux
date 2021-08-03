@@ -716,6 +716,7 @@ enum {
 	ETHTOOL_STATS_ETH_MAC,
 	ETHTOOL_STATS_ETH_CTRL,
 	ETHTOOL_STATS_RMON,
+	ETHTOOL_STATS_XDP,
 
 	/* add new constants above here */
 	__ETHTOOL_STATS_CNT
@@ -736,6 +737,8 @@ enum {
 	ETHTOOL_A_STATS_GRP_HIST_BKT_LOW,	/* u32 */
 	ETHTOOL_A_STATS_GRP_HIST_BKT_HI,	/* u32 */
 	ETHTOOL_A_STATS_GRP_HIST_VAL,		/* u64 */
+
+	ETHTOOL_A_STATS_GRP_STAT_BLOCK,		/* nest */
 
 	/* add new constants above here */
 	__ETHTOOL_A_STATS_GRP_CNT,
@@ -829,6 +832,37 @@ enum {
 	/* add new constants above here */
 	__ETHTOOL_A_STATS_RMON_CNT,
 	ETHTOOL_A_STATS_RMON_MAX = (__ETHTOOL_A_STATS_RMON_CNT - 1)
+};
+
+enum {
+	/* Number of frames passed to bpf_prog_run_xdp() */
+	ETHTOOL_A_STATS_XDP_PACKETS,
+	/* Number o general XDP errors if driver counts them together */
+	ETHTOOL_A_STATS_XDP_ERRORS,
+	/* Number of %XDP_ABORTED returns */
+	ETHTOOL_A_STATS_XDP_ABORTED,
+	/* Number of %XDP_DROP returns */
+	ETHTOOL_A_STATS_XDP_DROP,
+	/* Number of returns of unallowed values (i.e. not XDP_*) */
+	ETHTOOL_A_STATS_XDP_INVALID,
+	/* Number of %XDP_PASS returns */
+	ETHTOOL_A_STATS_XDP_PASS,
+	/* Number of successfully performed %XDP_REDIRECT requests */
+	ETHTOOL_A_STATS_XDP_REDIRECT,
+	/* Number of failed %XDP_REDIRECT requests */
+	ETHTOOL_A_STATS_XDP_REDIRECT_ERRORS,
+	/* Number of successfully performed %XDP_TX requests */
+	ETHTOOL_A_STATS_XDP_TX,
+	/* Number of failed %XDP_TX requests */
+	ETHTOOL_A_STATS_XDP_TX_ERRORS,
+	/* Number of xdp_frames successfully transmitted via .ndo_xdp_xmit() */
+	ETHTOOL_A_STATS_XDP_XMIT,
+	/* Number of frames dropped from .ndo_xdp_xmit() */
+	ETHTOOL_A_STATS_XDP_XMIT_DROPS,
+
+	/* Add new constants above here */
+	__ETHTOOL_A_STATS_XDP_CNT,
+	ETHTOOL_A_STATS_XDP_MAX = (__ETHTOOL_A_STATS_XDP_CNT - 1)
 };
 
 /* generic netlink info */

@@ -19,6 +19,8 @@ struct stats_reply_data {
 	struct ethtool_eth_ctrl_stats	ctrl_stats;
 	struct ethtool_rmon_stats	rmon_stats;
 	const struct ethtool_rmon_hist_range	*rmon_ranges;
+	u32				xdp_stats_channels;
+	struct ethtool_xdp_stats	*xdp_stats;
 };
 
 #define STATS_REPDATA(__reply_base) \
@@ -29,6 +31,7 @@ const char stats_std_names[__ETHTOOL_STATS_CNT][ETH_GSTRING_LEN] = {
 	[ETHTOOL_STATS_ETH_MAC]			= "eth-mac",
 	[ETHTOOL_STATS_ETH_CTRL]		= "eth-ctrl",
 	[ETHTOOL_STATS_RMON]			= "rmon",
+	[ETHTOOL_STATS_XDP]			= "xdp",
 };
 
 const char stats_eth_phy_names[__ETHTOOL_A_STATS_ETH_PHY_CNT][ETH_GSTRING_LEN] = {
@@ -73,6 +76,21 @@ const char stats_rmon_names[__ETHTOOL_A_STATS_RMON_CNT][ETH_GSTRING_LEN] = {
 	[ETHTOOL_A_STATS_RMON_JABBER]		= "etherStatsJabbers",
 };
 
+const char stats_xdp_names[__ETHTOOL_A_STATS_XDP_CNT][ETH_GSTRING_LEN] = {
+	[ETHTOOL_A_STATS_XDP_PACKETS]		= "packets",
+	[ETHTOOL_A_STATS_XDP_ERRORS]		= "errors",
+	[ETHTOOL_A_STATS_XDP_ABORTED]		= "aborted",
+	[ETHTOOL_A_STATS_XDP_DROP]		= "drop",
+	[ETHTOOL_A_STATS_XDP_INVALID]		= "invalid",
+	[ETHTOOL_A_STATS_XDP_PASS]		= "pass",
+	[ETHTOOL_A_STATS_XDP_REDIRECT]		= "redirect",
+	[ETHTOOL_A_STATS_XDP_REDIRECT_ERRORS]	= "redirect-errors",
+	[ETHTOOL_A_STATS_XDP_TX]		= "tx",
+	[ETHTOOL_A_STATS_XDP_TX_ERRORS]		= "tx-errors",
+	[ETHTOOL_A_STATS_XDP_XMIT]		= "xmit",
+	[ETHTOOL_A_STATS_XDP_XMIT_DROPS]	= "xmit-drops",
+};
+
 const struct nla_policy ethnl_stats_get_policy[ETHTOOL_A_STATS_GROUPS + 1] = {
 	[ETHTOOL_A_STATS_HEADER]	=
 		NLA_POLICY_NESTED(ethnl_header_policy),
@@ -101,6 +119,37 @@ static int stats_parse_request(struct ethnl_req_info *req_base,
 	return 0;
 }
 
+static int stats_prepare_data_xdp(struct net_device *dev,
+				  struct stats_reply_data *data)
+{
+	const struct ethtool_ops *ops = dev->ethtool_ops;
+	size_t size;
+	int ret;
+
+	/* Zero means stats are global/device-wide */
+	data->xdp_stats_channels = 0;
+
+	if (ops->get_std_stats_channels) {
+		ret = ops->get_std_stats_channels(dev, ETH_SS_STATS_XDP);
+		if (ret > 0)
+			data->xdp_stats_channels = ret;
+	}
+
+	size = array_size(min_not_zero(data->xdp_stats_channels, 1U),
+			  sizeof(*data->xdp_stats));
+	if (unlikely(size == SIZE_MAX))
+		return -EOVERFLOW;
+
+	data->xdp_stats = kvmalloc(size, GFP_KERNEL);
+	if (!data->xdp_stats)
+		return -ENOMEM;
+
+	memset(data->xdp_stats, 0xff, size);
+	ops->get_xdp_stats(dev, data->xdp_stats);
+
+	return 0;
+}
+
 static int stats_prepare_data(const struct ethnl_req_info *req_base,
 			      struct ethnl_reply_data *reply_base,
 			      struct genl_info *info)
@@ -125,6 +174,8 @@ static int stats_prepare_data(const struct ethnl_req_info *req_base,
 		     __ETHTOOL_A_STATS_ETH_CTRL_CNT);
 	BUILD_BUG_ON(offsetof(typeof(data->rmon_stats), hist) / sizeof(u64) !=
 		     __ETHTOOL_A_STATS_RMON_CNT);
+	BUILD_BUG_ON(sizeof(*data->xdp_stats) / sizeof(u64) !=
+		     __ETHTOOL_A_STATS_XDP_CNT);
 
 	/* Mark all stats as unset (see ETHTOOL_STAT_NOT_SET) to prevent them
 	 * from being reported to user space in case driver did not set them.
@@ -146,15 +197,19 @@ static int stats_prepare_data(const struct ethnl_req_info *req_base,
 	if (test_bit(ETHTOOL_STATS_RMON, req_info->stat_mask) &&
 	    ops->get_rmon_stats)
 		ops->get_rmon_stats(dev, &data->rmon_stats, &data->rmon_ranges);
+	if (test_bit(ETHTOOL_STATS_XDP, req_info->stat_mask) &&
+	    ops->get_xdp_stats)
+		ret = stats_prepare_data_xdp(dev, data);
 
 	ethnl_ops_complete(dev);
-	return 0;
+	return ret;
 }
 
 static int stats_reply_size(const struct ethnl_req_info *req_base,
 			    const struct ethnl_reply_data *reply_base)
 {
 	const struct stats_req_info *req_info = STATS_REQINFO(req_base);
+	const struct stats_reply_data *data = STATS_REPDATA(reply_base);
 	unsigned int n_grps = 0, n_stats = 0;
 	int len = 0;
 
@@ -179,6 +234,14 @@ static int stats_reply_size(const struct ethnl_req_info *req_base,
 			nla_total_size(4) +	/* _A_STATS_GRP_HIST_BKT_LOW */
 			nla_total_size(4)) *	/* _A_STATS_GRP_HIST_BKT_HI */
 			ETHTOOL_RMON_HIST_MAX * 2;
+	}
+	if (test_bit(ETHTOOL_STATS_XDP, req_info->stat_mask)) {
+		n_stats += min_not_zero(data->xdp_stats_channels, 1U) *
+			   sizeof(*data->xdp_stats) / sizeof(u64);
+		n_grps++;
+
+		len += (nla_total_size(0) *	/* _A_STATS_GRP_STAT_BLOCK */
+			data->xdp_stats_channels);
 	}
 
 	len += n_grps * (nla_total_size(0) + /* _A_STATS_GRP */
@@ -356,6 +419,64 @@ static int stats_put_rmon_stats(struct sk_buff *skb,
 	return 0;
 }
 
+static int stats_put_xdp_stats_one(struct sk_buff *skb,
+				   const struct ethtool_xdp_stats *xdp_stats)
+{
+	if (stat_put(skb, ETHTOOL_A_STATS_XDP_PACKETS,
+		     xdp_stats->packets) ||
+	    stat_put(skb, ETHTOOL_A_STATS_XDP_ABORTED,
+		     xdp_stats->aborted) ||
+	    stat_put(skb, ETHTOOL_A_STATS_XDP_DROP,
+		     xdp_stats->drop) ||
+	    stat_put(skb, ETHTOOL_A_STATS_XDP_INVALID,
+		     xdp_stats->invalid) ||
+	    stat_put(skb, ETHTOOL_A_STATS_XDP_PASS,
+		     xdp_stats->pass) ||
+	    stat_put(skb, ETHTOOL_A_STATS_XDP_REDIRECT,
+		     xdp_stats->redirect) ||
+	    stat_put(skb, ETHTOOL_A_STATS_XDP_REDIRECT_ERRORS,
+		     xdp_stats->redirect_errors) ||
+	    stat_put(skb, ETHTOOL_A_STATS_XDP_TX,
+		     xdp_stats->tx) ||
+	    stat_put(skb, ETHTOOL_A_STATS_XDP_TX_ERRORS,
+		     xdp_stats->tx_errors) ||
+	    stat_put(skb, ETHTOOL_A_STATS_XDP_XMIT,
+		     xdp_stats->xmit) ||
+	    stat_put(skb, ETHTOOL_A_STATS_XDP_XMIT_DROPS,
+		     xdp_stats->xmit_drops))
+		return -EMSGSIZE;
+
+	return 0;
+}
+
+static int stats_put_xdp_stats(struct sk_buff *skb,
+			       const struct stats_reply_data *data)
+{
+	struct nlattr *nest;
+	int i;
+
+	if (!data->xdp_stats_channels)
+		return stats_put_xdp_stats_one(skb, data->xdp_stats);
+
+	for (i = 0; i < data->xdp_stats_channels; i++) {
+		nest = nla_nest_start(skb, ETHTOOL_A_STATS_GRP_STAT_BLOCK);
+		if (!nest)
+			return -EMSGSIZE;
+
+		if (stats_put_xdp_stats_one(skb, data->xdp_stats + i))
+			goto err_cancel_xdp;
+
+		nla_nest_end(skb, nest);
+	}
+
+	return 0;
+
+err_cancel_xdp:
+	nla_nest_cancel(skb, nest);
+
+	return -EMSGSIZE;
+}
+
 static int stats_put_stats(struct sk_buff *skb,
 			   const struct stats_reply_data *data,
 			   u32 id, u32 ss_id,
@@ -406,8 +527,18 @@ static int stats_fill_reply(struct sk_buff *skb,
 	if (!ret && test_bit(ETHTOOL_STATS_RMON, req_info->stat_mask))
 		ret = stats_put_stats(skb, data, ETHTOOL_STATS_RMON,
 				      ETH_SS_STATS_RMON, stats_put_rmon_stats);
+	if (!ret && test_bit(ETHTOOL_STATS_XDP, req_info->stat_mask))
+		ret = stats_put_stats(skb, data, ETHTOOL_STATS_XDP,
+				      ETH_SS_STATS_XDP, stats_put_xdp_stats);
 
 	return ret;
+}
+
+static void stats_cleanup_data(struct ethnl_reply_data *reply_data)
+{
+	struct stats_reply_data *data = STATS_REPDATA(reply_data);
+
+	kvfree(data->xdp_stats);
 }
 
 const struct ethnl_request_ops ethnl_stats_request_ops = {
@@ -421,4 +552,5 @@ const struct ethnl_request_ops ethnl_stats_request_ops = {
 	.prepare_data		= stats_prepare_data,
 	.reply_size		= stats_reply_size,
 	.fill_reply		= stats_fill_reply,
+	.cleanup_data		= stats_cleanup_data,
 };

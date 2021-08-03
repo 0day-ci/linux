@@ -380,6 +380,36 @@ struct ethtool_rmon_stats {
 	u64 hist_tx[ETHTOOL_RMON_HIST_MAX];
 };
 
+/**
+ * struct ethtool_xdp_stats - standard driver-side XDP statistics
+ * @packets: number of frames passed to bpf_prog_run_xdp().
+ * @errors: number of general XDP errors, if driver has one unified counter.
+ * @aborted: number of %XDP_ABORTED returns.
+ * @drop: number of %XDP_DROP returns.
+ * @invalid: number of returns of unallowed values (i.e. not XDP_*).
+ * @pass: number of %XDP_PASS returns.
+ * @redirect: number of successfully performed %XDP_REDIRECT requests.
+ * @redirect_errors: number of failed %XDP_REDIRECT requests.
+ * @tx: number of successfully performed %XDP_TX requests.
+ * @tx_errors: number of failed %XDP_TX requests.
+ * @xmit: number of xdp_frames successfully transmitted via .ndo_xdp_xmit().
+ * @xmit_drops: number of frames dropped from .ndo_xdp_xmit().
+ */
+struct ethtool_xdp_stats {
+	u64	packets;
+	u64	errors;
+	u64	aborted;
+	u64	drop;
+	u64	invalid;
+	u64	pass;
+	u64	redirect;
+	u64	redirect_errors;
+	u64	tx;
+	u64	tx_errors;
+	u64	xmit;
+	u64	xmit_drops;
+};
+
 #define ETH_MODULE_EEPROM_PAGE_LEN	128
 #define ETH_MODULE_MAX_I2C_ADDRESS	0x7f
 
@@ -570,6 +600,9 @@ struct ethtool_module_eeprom {
  * @get_eth_ctrl_stats: Query some of the IEEE 802.3 MAC Ctrl statistics.
  * @get_rmon_stats: Query some of the RMON (RFC 2819) statistics.
  *	Set %ranges to a pointer to zero-terminated array of byte ranges.
+ * @get_std_stats_channels: Get the number of channels which get_*_stats will
+ *	return statistics for.
+ * @get_xdp_stats: Query some XDP statistics.
  *
  * All operations are optional (i.e. the function pointer may be set
  * to %NULL) and callers must take this into account.  Callers must
@@ -689,6 +722,9 @@ struct ethtool_ops {
 	void	(*get_rmon_stats)(struct net_device *dev,
 				  struct ethtool_rmon_stats *rmon_stats,
 				  const struct ethtool_rmon_hist_range **ranges);
+	int	(*get_std_stats_channels)(struct net_device *dev, u32 sset);
+	void	(*get_xdp_stats)(struct net_device *dev,
+				 struct ethtool_xdp_stats *xdp_stats);
 };
 
 int ethtool_check_ops(const struct ethtool_ops *ops);

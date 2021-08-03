@@ -105,6 +105,11 @@ static const struct strset_info info_template[] = {
 		.count		= __ETHTOOL_A_STATS_RMON_CNT,
 		.strings	= stats_rmon_names,
 	},
+	[ETH_SS_STATS_XDP] = {
+		.per_dev	= false,
+		.count		= __ETHTOOL_A_STATS_XDP_CNT,
+		.strings	= stats_xdp_names,
+	},
 };
 
 struct strset_req_info {
