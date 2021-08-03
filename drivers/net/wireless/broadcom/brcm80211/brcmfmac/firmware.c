@@ -431,8 +431,6 @@ struct brcmf_fw {
 	void (*done)(struct device *dev, int err, struct brcmf_fw_request *req);
 };
 
-static void brcmf_fw_request_done(const struct firmware *fw, void *ctx);
-
 #ifdef CONFIG_EFI
 /* In some cases the EFI-var stored nvram contains "ccode=ALL" or "ccode=XV"
  * to specify "worldwide" compatible settings, but these 2 ccode-s do not work
@@ -638,10 +636,25 @@ fallback:
 	return request_firmware(fw, cur->path, fwctx->dev);
 }
 
-static void brcmf_fw_request_done(const struct firmware *fw, void *ctx)
+static void brcmf_fw_request_done_first(const struct firmware *fw, void *ctx)
 {
 	struct brcmf_fw *fwctx = ctx;
+	struct brcmf_fw_item *first = &fwctx->req->items[0];
+	static bool retry = true;
 	int ret;
+
+	/*Something failed with the first firmware request , such as not
+	 * getting the per-board firmware. Retry this, now using the less
+	 * specific path for the first firmware item, i.e. without the board
+	 * suffix.
+	 */
+	if (!fw && retry) {
+		ret = request_firmware_nowait(THIS_MODULE, true, first->path,
+					      fwctx->dev, GFP_KERNEL, fwctx,
+					      brcmf_fw_request_done_first);
+		retry = false;
+		return;
+	}
 
 	ret = brcmf_fw_complete_request(fw, fwctx);
 
@@ -702,17 +715,15 @@ int brcmf_fw_get_firmwares(struct device *dev, struct brcmf_fw_request *req,
 	if (alt_path) {
 		ret = request_firmware_nowait(THIS_MODULE, true, alt_path,
 					      fwctx->dev, GFP_KERNEL, fwctx,
-					      brcmf_fw_request_done);
+					      brcmf_fw_request_done_first);
 		kfree(alt_path);
-	}
-	/* Else try canonical path */
-	if (ret) {
+	} else {
 		ret = request_firmware_nowait(THIS_MODULE, true, first->path,
 					      fwctx->dev, GFP_KERNEL, fwctx,
-					      brcmf_fw_request_done);
+					      brcmf_fw_request_done_first);
 	}
 	if (ret < 0)
-		brcmf_fw_request_done(NULL, fwctx);
+		brcmf_fw_request_done_first(NULL, fwctx);
 
 	return 0;
 }
