@@ -2078,12 +2078,22 @@ static bool obj_stock_flush_required(struct memcg_stock_pcp *stock,
  * which is cheap in non-preempt kernel. The interrupt context object stock
  * can only be accessed after disabling interrupt. User context code can
  * access interrupt object stock, but not vice versa.
+ *
+ * For PREEMPT_RT kernel, preempt_disable() and local_irq_save() may have
+ * to be changed to variants of local_lock(). This eliminates the
+ * performance advantage of using preempt_disable(). Fall back to always
+ * use local_irq_save() and use only irq_obj for simplicity.
  */
+static inline bool use_task_obj_stock(void)
+{
+	return !IS_ENABLED(CONFIG_PREEMPT_RT) && likely(in_task());
+}
+
 static inline struct obj_stock *get_obj_stock(unsigned long *pflags)
 {
 	struct memcg_stock_pcp *stock;
 
-	if (likely(in_task())) {
+	if (use_task_obj_stock()) {
 		*pflags = 0UL;
 		preempt_disable();
 		stock = this_cpu_ptr(&memcg_stock);
@@ -2097,7 +2107,7 @@ static inline struct obj_stock *get_obj_stock(unsigned long *pflags)
 
 static inline void put_obj_stock(unsigned long flags)
 {
-	if (likely(in_task()))
+	if (use_task_obj_stock())
 		preempt_enable();
 	else
 		local_irq_restore(flags);
@@ -2170,7 +2180,7 @@ static void drain_local_stock(struct work_struct *dummy)
 
 	stock = this_cpu_ptr(&memcg_stock);
 	drain_obj_stock(&stock->irq_obj);
-	if (in_task())
+	if (use_task_obj_stock())
 		drain_obj_stock(&stock->task_obj);
 	drain_stock(stock);
 	clear_bit(FLUSHING_CACHED_CHARGE, &stock->flags);
@@ -3149,7 +3159,7 @@ static bool obj_stock_flush_required(struct memcg_stock_pcp *stock,
 {
 	struct mem_cgroup *memcg;
 
-	if (in_task() && stock->task_obj.cached_objcg) {
+	if (use_task_obj_stock() && stock->task_obj.cached_objcg) {
 		memcg = obj_cgroup_memcg(stock->task_obj.cached_objcg);
 		if (memcg && mem_cgroup_is_descendant(memcg, root_memcg))
 			return true;
