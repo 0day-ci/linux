@@ -44,7 +44,7 @@ void rds_tcp_keepalive(struct socket *sock)
 	int keepidle = 5; /* send a probe 'keepidle' secs after last data */
 	int keepcnt = 5; /* number of unack'ed probes before declaring dead */
 
-	sock_set_keepalive(sock->sk);
+	sock_set_keepalive(sock->sk, true);
 	tcp_sock_set_keepcnt(sock->sk, keepcnt);
 	tcp_sock_set_keepidle(sock->sk, keepidle);
 	/* KEEPINTVL is the interval between successive probes. We follow

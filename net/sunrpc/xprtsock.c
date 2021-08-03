@@ -2127,7 +2127,7 @@ static void xs_tcp_set_socket_timeouts(struct rpc_xprt *xprt,
 	spin_unlock(&xprt->transport_lock);
 
 	/* TCP Keepalive options */
-	sock_set_keepalive(sock->sk);
+	sock_set_keepalive(sock->sk, true);
 	tcp_sock_set_keepidle(sock->sk, keepidle);
 	tcp_sock_set_keepintvl(sock->sk, keepidle);
 	tcp_sock_set_keepcnt(sock->sk, keepcnt);

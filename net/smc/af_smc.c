@@ -68,7 +68,7 @@ static void smc_set_keepalive(struct sock *sk, int val)
 {
 	struct smc_sock *smc = smc_sk(sk);
 
-	smc->clcsock->sk->sk_prot->keepalive(smc->clcsock->sk, val);
+	sock_set_keepalive(smc->clcsock->sk, !!val);
 }
 
 static struct smc_hashinfo smc_v4_hashinfo = {
