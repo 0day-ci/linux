@@ -158,8 +158,8 @@ static void __ring_retire(struct intel_ring *ring)
 	intel_ring_unpin(ring);
 }
 
-static int intel_context_pre_pin(struct intel_context *ce,
-				 struct i915_gem_ww_ctx *ww)
+static int __intel_context_pre_pin(struct intel_context *ce,
+				   struct i915_gem_ww_ctx *ww)
 {
 	int err;
 
@@ -190,7 +190,7 @@ err_ring:
 	return err;
 }
 
-static void intel_context_post_unpin(struct intel_context *ce)
+static void __intel_context_post_unpin(struct intel_context *ce)
 {
 	if (ce->state)
 		__context_unpin_state(ce->state);
@@ -199,12 +199,84 @@ static void intel_context_post_unpin(struct intel_context *ce)
 	__ring_retire(ce->ring);
 }
 
-int __intel_context_do_pin_ww(struct intel_context *ce,
-			      struct i915_gem_ww_ctx *ww)
+static int intel_context_pre_pin(struct intel_context *ce,
+				 struct i915_gem_ww_ctx *ww)
+{
+	struct intel_context *child;
+	int err, i = 0;
+
+	GEM_BUG_ON(intel_context_is_child(ce));
+
+	for_each_child(ce, child) {
+		err = __intel_context_pre_pin(child, ww);
+		if (unlikely(err))
+			goto unwind;
+		++i;
+	}
+
+	err = __intel_context_pre_pin(ce, ww);
+	if (unlikely(err))
+		goto unwind;
+
+	return 0;
+
+unwind:
+	for_each_child(ce, child) {
+		if (!i--)
+			break;
+		__intel_context_post_unpin(ce);
+	}
+
+	return err;
+}
+
+static void intel_context_post_unpin(struct intel_context *ce)
+{
+	struct intel_context *child;
+
+	GEM_BUG_ON(intel_context_is_child(ce));
+
+	for_each_child(ce, child)
+		__intel_context_post_unpin(child);
+
+	__intel_context_post_unpin(ce);
+}
+
+static int __do_ww_lock(struct intel_context *ce,
+			struct i915_gem_ww_ctx *ww)
+{
+	int err = i915_gem_object_lock(ce->timeline->hwsp_ggtt->obj, ww);
+
+	if (!err && ce->ring->vma->obj)
+		err = i915_gem_object_lock(ce->ring->vma->obj, ww);
+	if (!err && ce->state)
+		err = i915_gem_object_lock(ce->state->obj, ww);
+
+	return err;
+}
+
+static int do_ww_lock(struct intel_context *ce,
+		      struct i915_gem_ww_ctx *ww)
+{
+	struct intel_context *child;
+	int err = 0;
+
+	GEM_BUG_ON(intel_context_is_child(ce));
+
+	for_each_child(ce, child) {
+		err = __do_ww_lock(child, ww);
+		if (unlikely(err))
+			return err;
+	}
+
+	return __do_ww_lock(ce, ww);
+}
+
+static int __intel_context_do_pin_ww(struct intel_context *ce,
+				     struct i915_gem_ww_ctx *ww)
 {
 	bool handoff = false;
-	void *vaddr;
-	int err = 0;
+	int err;
 
 	if (unlikely(!test_bit(CONTEXT_ALLOC_BIT, &ce->flags))) {
 		err = intel_context_alloc_state(ce);
@@ -217,14 +289,11 @@ int __intel_context_do_pin_ww(struct intel_context *ce,
 	 * refcount for __intel_context_active(), which prevent a lock
 	 * inversion of ce->pin_mutex vs dma_resv_lock().
 	 */
+	err = do_ww_lock(ce, ww);
+	if (err)
+		return err;
 
-	err = i915_gem_object_lock(ce->timeline->hwsp_ggtt->obj, ww);
-	if (!err && ce->ring->vma->obj)
-		err = i915_gem_object_lock(ce->ring->vma->obj, ww);
-	if (!err && ce->state)
-		err = i915_gem_object_lock(ce->state->obj, ww);
-	if (!err)
-		err = intel_context_pre_pin(ce, ww);
+	err = intel_context_pre_pin(ce, ww);
 	if (err)
 		return err;
 
@@ -232,7 +301,7 @@ int __intel_context_do_pin_ww(struct intel_context *ce,
 	if (err)
 		goto err_ctx_unpin;
 
-	err = ce->ops->pre_pin(ce, ww, &vaddr);
+	err = ce->ops->pre_pin(ce, ww);
 	if (err)
 		goto err_release;
 
@@ -250,7 +319,7 @@ int __intel_context_do_pin_ww(struct intel_context *ce,
 		if (unlikely(err))
 			goto err_unlock;
 
-		err = ce->ops->pin(ce, vaddr);
+		err = ce->ops->pin(ce);
 		if (err) {
 			intel_context_active_release(ce);
 			goto err_unlock;
@@ -290,7 +359,7 @@ err_ctx_unpin:
 	return err;
 }
 
-int __intel_context_do_pin(struct intel_context *ce)
+static int __intel_context_do_pin(struct intel_context *ce)
 {
 	struct i915_gem_ww_ctx ww;
 	int err;
@@ -337,7 +406,7 @@ static void __intel_context_retire(struct i915_active *active)
 		 intel_context_get_avg_runtime_ns(ce));
 
 	set_bit(CONTEXT_VALID_BIT, &ce->flags);
-	intel_context_post_unpin(ce);
+	__intel_context_post_unpin(ce);
 	intel_context_put(ce);
 }
 
@@ -560,6 +629,88 @@ void intel_context_bind_parent_child(struct intel_context *parent,
 	list_add_tail(&child->guc_child_link,
 		      &parent->guc_child_list);
 	child->parent = parent;
+}
+
+static inline int ____intel_context_pin(struct intel_context *ce)
+{
+	if (likely(intel_context_pin_if_active(ce)))
+		return 0;
+
+	return __intel_context_do_pin(ce);
+}
+
+static inline int __intel_context_pin_ww(struct intel_context *ce,
+					 struct i915_gem_ww_ctx *ww)
+{
+	if (likely(intel_context_pin_if_active(ce)))
+		return 0;
+
+	return __intel_context_do_pin_ww(ce, ww);
+}
+
+static inline void __intel_context_unpin(struct intel_context *ce)
+{
+	if (!ce->ops->sched_disable) {
+		__intel_context_do_unpin(ce, 1);
+	} else {
+		/*
+		 * Move ownership of this pin to the scheduling disable which is
+		 * an async operation. When that operation completes the above
+		 * intel_context_sched_disable_unpin is called potentially
+		 * unpinning the context.
+		 */
+		while (!atomic_add_unless(&ce->pin_count, -1, 1)) {
+			if (atomic_cmpxchg(&ce->pin_count, 1, 2) == 1) {
+				ce->ops->sched_disable(ce);
+				break;
+			}
+		}
+	}
+}
+
+/*
+ * FIXME: This is ugly, these branches are only needed for parallel contexts in
+ * GuC submission. Basically the idea is if any of the contexts, that are
+ * configured for parallel submission, are pinned all the contexts need to be
+ * pinned in order to register these contexts with the GuC. We are adding the
+ * layer here while it should probably be pushed to the backend via a vfunc. But
+ * since we already have ce->pin + a layer atop it is confusing. Definitely
+ * needs a bit of rework how to properly layer / structure this code path. What
+ * is in place works but is not ideal.
+ */
+int intel_context_pin(struct intel_context *ce)
+{
+	if (intel_context_is_child(ce)) {
+		if (!atomic_fetch_add(1, &ce->pin_count))
+			return ____intel_context_pin(ce->parent);
+		else
+			return 0;
+	} else {
+		return ____intel_context_pin(ce);
+	}
+}
+
+int intel_context_pin_ww(struct intel_context *ce,
+			 struct i915_gem_ww_ctx *ww)
+{
+	if (intel_context_is_child(ce)) {
+		if (!atomic_fetch_add(1, &ce->pin_count))
+			return __intel_context_pin_ww(ce->parent, ww);
+		else
+			return 0;
+	} else {
+		return __intel_context_pin_ww(ce, ww);
+	}
+}
+
+void intel_context_unpin(struct intel_context *ce)
+{
+	if (intel_context_is_child(ce)) {
+		if (atomic_fetch_add(-1, &ce->pin_count) == 1)
+			__intel_context_unpin(ce->parent);
+	} else {
+		__intel_context_unpin(ce);
+	}
 }
 
 #if IS_ENABLED(CONFIG_DRM_I915_SELFTEST)

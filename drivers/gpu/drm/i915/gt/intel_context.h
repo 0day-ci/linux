@@ -110,31 +110,15 @@ static inline void intel_context_unlock_pinned(struct intel_context *ce)
 	mutex_unlock(&ce->pin_mutex);
 }
 
-int __intel_context_do_pin(struct intel_context *ce);
-int __intel_context_do_pin_ww(struct intel_context *ce,
-			      struct i915_gem_ww_ctx *ww);
-
 static inline bool intel_context_pin_if_active(struct intel_context *ce)
 {
 	return atomic_inc_not_zero(&ce->pin_count);
 }
 
-static inline int intel_context_pin(struct intel_context *ce)
-{
-	if (likely(intel_context_pin_if_active(ce)))
-		return 0;
+int intel_context_pin(struct intel_context *ce);
 
-	return __intel_context_do_pin(ce);
-}
-
-static inline int intel_context_pin_ww(struct intel_context *ce,
-				       struct i915_gem_ww_ctx *ww)
-{
-	if (likely(intel_context_pin_if_active(ce)))
-		return 0;
-
-	return __intel_context_do_pin_ww(ce, ww);
-}
+int intel_context_pin_ww(struct intel_context *ce,
+			 struct i915_gem_ww_ctx *ww);
 
 static inline void __intel_context_pin(struct intel_context *ce)
 {
@@ -146,28 +130,11 @@ void __intel_context_do_unpin(struct intel_context *ce, int sub);
 
 static inline void intel_context_sched_disable_unpin(struct intel_context *ce)
 {
+	GEM_BUG_ON(intel_context_is_child(ce));
 	__intel_context_do_unpin(ce, 2);
 }
 
-static inline void intel_context_unpin(struct intel_context *ce)
-{
-	if (!ce->ops->sched_disable) {
-		__intel_context_do_unpin(ce, 1);
-	} else {
-		/*
-		 * Move ownership of this pin to the scheduling disable which is
-		 * an async operation. When that operation completes the above
-		 * intel_context_sched_disable_unpin is called potentially
-		 * unpinning the context.
-		 */
-		while (!atomic_add_unless(&ce->pin_count, -1, 1)) {
-			if (atomic_cmpxchg(&ce->pin_count, 1, 2) == 1) {
-				ce->ops->sched_disable(ce);
-				break;
-			}
-		}
-	}
-}
+void intel_context_unpin(struct intel_context *ce);
 
 void intel_context_enter_engine(struct intel_context *ce);
 void intel_context_exit_engine(struct intel_context *ce);

@@ -472,8 +472,7 @@ static int ring_context_init_default_state(struct intel_context *ce,
 }
 
 static int ring_context_pre_pin(struct intel_context *ce,
-				struct i915_gem_ww_ctx *ww,
-				void **unused)
+				struct i915_gem_ww_ctx *ww)
 {
 	struct i915_address_space *vm;
 	int err = 0;
@@ -576,7 +575,7 @@ static int ring_context_alloc(struct intel_context *ce)
 	return 0;
 }
 
-static int ring_context_pin(struct intel_context *ce, void *unused)
+static int ring_context_pin(struct intel_context *ce)
 {
 	return 0;
 }

@@ -947,30 +947,30 @@ void lrc_reset(struct intel_context *ce)
 int
 lrc_pre_pin(struct intel_context *ce,
 	    struct intel_engine_cs *engine,
-	    struct i915_gem_ww_ctx *ww,
-	    void **vaddr)
+	    struct i915_gem_ww_ctx *ww)
 {
+	void *vaddr;
 	GEM_BUG_ON(!ce->state);
 	GEM_BUG_ON(!i915_vma_is_pinned(ce->state));
 
-	*vaddr = i915_gem_object_pin_map(ce->state->obj,
-					 i915_coherent_map_type(ce->engine->i915,
-								ce->state->obj,
-								false) |
-					 I915_MAP_OVERRIDE);
+	vaddr = i915_gem_object_pin_map(ce->state->obj,
+					i915_coherent_map_type(ce->engine->i915,
+							       ce->state->obj,
+							       false) |
+					I915_MAP_OVERRIDE);
 
-	return PTR_ERR_OR_ZERO(*vaddr);
+	ce->lrc_reg_state = vaddr + LRC_STATE_OFFSET;
+
+	return PTR_ERR_OR_ZERO(vaddr);
 }
 
 int
 lrc_pin(struct intel_context *ce,
-	struct intel_engine_cs *engine,
-	void *vaddr)
+	struct intel_engine_cs *engine)
 {
-	ce->lrc_reg_state = vaddr + LRC_STATE_OFFSET;
-
 	if (!__test_and_set_bit(CONTEXT_INIT_BIT, &ce->flags))
-		lrc_init_state(ce, engine, vaddr);
+		lrc_init_state(ce, engine,
+			       (void *)ce->lrc_reg_state - LRC_STATE_OFFSET);
 
 	ce->lrc.lrca = lrc_update_regs(ce, engine, ce->ring->tail);
 	return 0;

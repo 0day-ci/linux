@@ -1905,6 +1905,7 @@ static int guc_lrc_desc_pin(struct intel_context *ce, bool loop)
 
 	GEM_BUG_ON(!engine->mask);
 	GEM_BUG_ON(context_guc_id_invalid(ce));
+	GEM_BUG_ON(intel_context_is_child(ce));
 
 	/*
 	 * Ensure LRC + CT vmas are is same region as write barrier is done
@@ -2008,15 +2009,13 @@ static int guc_lrc_desc_pin(struct intel_context *ce, bool loop)
 
 static int __guc_context_pre_pin(struct intel_context *ce,
 				 struct intel_engine_cs *engine,
-				 struct i915_gem_ww_ctx *ww,
-				 void **vaddr)
+				 struct i915_gem_ww_ctx *ww)
 {
-	return lrc_pre_pin(ce, engine, ww, vaddr);
+	return lrc_pre_pin(ce, engine, ww);
 }
 
 static int __guc_context_pin(struct intel_context *ce,
-			     struct intel_engine_cs *engine,
-			     void *vaddr)
+			     struct intel_engine_cs *engine)
 {
 	if (i915_ggtt_offset(ce->state) !=
 	    (ce->lrc.lrca & CTX_GTT_ADDRESS_MASK))
@@ -2027,20 +2026,33 @@ static int __guc_context_pin(struct intel_context *ce,
 	 * explaination of why.
 	 */
 
-	return lrc_pin(ce, engine, vaddr);
+	return lrc_pin(ce, engine);
+}
+
+static void __guc_context_unpin(struct intel_context *ce)
+{
+	lrc_unpin(ce);
+}
+
+static void __guc_context_post_unpin(struct intel_context *ce)
+{
+	lrc_post_unpin(ce);
 }
 
 static int guc_context_pre_pin(struct intel_context *ce,
-			       struct i915_gem_ww_ctx *ww,
-			       void **vaddr)
+			       struct i915_gem_ww_ctx *ww)
 {
-	return __guc_context_pre_pin(ce, ce->engine, ww, vaddr);
+	return __guc_context_pre_pin(ce, ce->engine, ww);
 }
 
-static int guc_context_pin(struct intel_context *ce, void *vaddr)
+static int guc_context_pin(struct intel_context *ce)
 {
-	int ret = __guc_context_pin(ce, ce->engine, vaddr);
+	int ret;
 
+	GEM_BUG_ON(intel_context_is_parent(ce) ||
+		   intel_context_is_child(ce));
+
+	ret = __guc_context_pin(ce, ce->engine);
 	if (likely(!ret && !intel_context_is_barrier(ce)))
 		intel_engine_pm_get(ce->engine);
 
@@ -2054,7 +2066,7 @@ static void guc_context_unpin(struct intel_context *ce)
 	GEM_BUG_ON(context_enabled(ce));
 
 	unpin_guc_id(guc, ce, true);
-	lrc_unpin(ce);
+	__guc_context_unpin(ce);
 
 	if (likely(!intel_context_is_barrier(ce)))
 		intel_engine_pm_put(ce->engine);
@@ -2062,7 +2074,141 @@ static void guc_context_unpin(struct intel_context *ce)
 
 static void guc_context_post_unpin(struct intel_context *ce)
 {
-	lrc_post_unpin(ce);
+	__guc_context_post_unpin(ce);
+}
+
+/* Future patches will use this function */
+__maybe_unused
+static int guc_parent_context_pre_pin(struct intel_context *ce,
+				      struct i915_gem_ww_ctx *ww)
+{
+	struct intel_context *child;
+	int err, i = 0, j = 0;
+
+	for_each_child(ce, child) {
+		err = i915_active_acquire(&child->active);
+		if (unlikely(err))
+			goto unwind_active;
+		++i;
+	}
+
+	for_each_child(ce, child) {
+		err = __guc_context_pre_pin(child, child->engine, ww);
+		if (unlikely(err))
+			goto unwind_pre_pin;
+		++j;
+	}
+
+	err = __guc_context_pre_pin(ce, ce->engine, ww);
+	if (unlikely(err))
+		goto unwind_pre_pin;
+
+	return 0;
+
+unwind_pre_pin:
+	for_each_child(ce, child) {
+		if (!j--)
+			break;
+		__guc_context_post_unpin(child);
+	}
+
+unwind_active:
+	for_each_child(ce, child) {
+		if (!i--)
+			break;
+		i915_active_release(&child->active);
+	}
+
+	return err;
+}
+
+/* Future patches will use this function */
+__maybe_unused
+static void guc_parent_context_post_unpin(struct intel_context *ce)
+{
+	struct intel_context *child;
+
+	for_each_child(ce, child)
+		__guc_context_post_unpin(child);
+	__guc_context_post_unpin(ce);
+
+	for_each_child(ce, child) {
+		intel_context_get(child);
+		i915_active_release(&child->active);
+		intel_context_put(child);
+	}
+}
+
+/* Future patches will use this function */
+__maybe_unused
+static int guc_parent_context_pin(struct intel_context *ce)
+{
+	int ret, i = 0, j = 0;
+	struct intel_context *child;
+	struct intel_engine_cs *engine;
+	intel_engine_mask_t tmp;
+
+	GEM_BUG_ON(!intel_context_is_parent(ce));
+
+	for_each_child(ce, child) {
+		ret = __guc_context_pin(child, child->engine);
+		if (unlikely(ret))
+			goto unwind_pin;
+		++i;
+	}
+	ret = __guc_context_pin(ce, ce->engine);
+	if (unlikely(ret))
+		goto unwind_pin;
+
+	for_each_child(ce, child)
+		if (test_bit(CONTEXT_LRCA_DIRTY, &child->flags)) {
+			set_bit(CONTEXT_LRCA_DIRTY, &ce->flags);
+			break;
+		}
+
+	for_each_engine_masked(engine, ce->engine->gt,
+			       ce->engine->mask, tmp)
+		intel_engine_pm_get(engine);
+	for_each_child(ce, child)
+		for_each_engine_masked(engine, child->engine->gt,
+				       child->engine->mask, tmp)
+			intel_engine_pm_get(engine);
+
+	return 0;
+
+unwind_pin:
+	for_each_child(ce, child) {
+		if (++j > i)
+			break;
+		__guc_context_unpin(child);
+	}
+
+	return ret;
+}
+
+/* Future patches will use this function */
+__maybe_unused
+static void guc_parent_context_unpin(struct intel_context *ce)
+{
+	struct intel_context *child;
+	struct intel_engine_cs *engine;
+	intel_engine_mask_t tmp;
+
+	GEM_BUG_ON(!intel_context_is_parent(ce));
+	GEM_BUG_ON(context_enabled(ce));
+
+	unpin_guc_id(ce_to_guc(ce), ce, true);
+	for_each_child(ce, child)
+		__guc_context_unpin(child);
+	__guc_context_unpin(ce);
+
+	for_each_engine_masked(engine, ce->engine->gt,
+			       ce->engine->mask, tmp)
+		intel_engine_pm_put(engine);
+	for_each_child(ce, child)
+		for_each_engine_masked(engine, child->engine->gt,
+				       child->engine->mask, tmp)
+			intel_engine_pm_put(engine);
 }
 
 static void __guc_context_sched_enable(struct intel_guc *guc,
@@ -2993,18 +3139,17 @@ out:
 }
 
 static int guc_virtual_context_pre_pin(struct intel_context *ce,
-				       struct i915_gem_ww_ctx *ww,
-				       void **vaddr)
+				       struct i915_gem_ww_ctx *ww)
 {
 	struct intel_engine_cs *engine = guc_virtual_get_sibling(ce->engine, 0);
 
-	return __guc_context_pre_pin(ce, engine, ww, vaddr);
+	return __guc_context_pre_pin(ce, engine, ww);
 }
 
-static int guc_virtual_context_pin(struct intel_context *ce, void *vaddr)
+static int guc_virtual_context_pin(struct intel_context *ce)
 {
 	struct intel_engine_cs *engine = guc_virtual_get_sibling(ce->engine, 0);
-	int ret = __guc_context_pin(ce, engine, vaddr);
+	int ret = __guc_context_pin(ce, engine);
 	intel_engine_mask_t tmp, mask = ce->engine->mask;
 
 	if (likely(!ret))
@@ -3024,7 +3169,7 @@ static void guc_virtual_context_unpin(struct intel_context *ce)
 	GEM_BUG_ON(intel_context_is_barrier(ce));
 
 	unpin_guc_id(guc, ce, true);
-	lrc_unpin(ce);
+	__guc_context_unpin(ce);
 
 	for_each_engine_masked(engine, ce->engine->gt, mask, tmp)
 		intel_engine_pm_put(engine);
