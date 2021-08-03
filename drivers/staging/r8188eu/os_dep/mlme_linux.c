@@ -113,12 +113,8 @@ void rtw_report_sec_ie(struct adapter *adapter, u8 authmode, u8 *sec_ie)
 	u8	*buff, *p, i;
 	union iwreq_data wrqu;
 
-	RT_TRACE(_module_mlme_osdep_c_, _drv_info_,
-		 ("+rtw_report_sec_ie, authmode=%d\n", authmode));
 	buff = NULL;
 	if (authmode == _WPA_IE_ID_) {
-		RT_TRACE(_module_mlme_osdep_c_, _drv_info_,
-			 ("rtw_report_sec_ie, authmode=%d\n", authmode));
 		buff = rtw_malloc(IW_CUSTOM_MAX);
 		if (!buff)
 			return;
@@ -191,8 +187,6 @@ void rtw_indicate_sta_assoc_event(struct adapter *padapter, struct sta_info *pst
 
 	memcpy(wrqu.addr.sa_data, psta->hwaddr, ETH_ALEN);
 
-	DBG_88E("+rtw_indicate_sta_assoc_event\n");
-
 	wireless_send_event(padapter->pnetdev, IWEVREGISTERED, &wrqu, NULL);
 }
 
@@ -213,8 +207,6 @@ void rtw_indicate_sta_disassoc_event(struct adapter *padapter, struct sta_info *
 	wrqu.addr.sa_family = ARPHRD_ETHER;
 
 	memcpy(wrqu.addr.sa_data, psta->hwaddr, ETH_ALEN);
-
-	DBG_88E("+rtw_indicate_sta_disassoc_event\n");
 
 	wireless_send_event(padapter->pnetdev, IWEVEXPIRED, &wrqu, NULL);
 }
