@@ -252,6 +252,9 @@ struct i915_execbuffer {
 	struct eb_vma *batch; /** identity of the batch obj/vma */
 	struct i915_vma *trampoline; /** trampoline used for chaining */
 
+	/** used for excl fence in dma_resv objects when > 1 BB submitted */
+	struct dma_fence *composite_fence;
+
 	/* batch_index in vma list */
 	unsigned int batch_index;
 
@@ -366,11 +369,6 @@ static int eb_create(struct i915_execbuffer *eb)
 	} else {
 		eb->lut_size = -eb->buffer_count;
 	}
-
-	if (eb->args->flags & I915_EXEC_BATCH_FIRST)
-		eb->batch_index = 0;
-	else
-		eb->batch_index = eb->args->buffer_count - 1;
 
 	return 0;
 }
@@ -2241,7 +2239,7 @@ slow:
 	return err;
 }
 
-static int eb_move_to_gpu(struct i915_execbuffer *eb, bool first)
+static int eb_move_to_gpu(struct i915_execbuffer *eb, bool first, bool last)
 {
 	const unsigned int count = eb->buffer_count;
 	unsigned int i = count;
@@ -2289,8 +2287,16 @@ static int eb_move_to_gpu(struct i915_execbuffer *eb, bool first)
 		}
 
 		if (err == 0)
-			err = i915_vma_move_to_active(vma, eb->request,
-						      flags | __EXEC_OBJECT_NO_RESERVE);
+			err = _i915_vma_move_to_active(vma, eb->request,
+						       flags | __EXEC_OBJECT_NO_RESERVE,
+						       !last ?
+						       NULL :
+						       eb->composite_fence ?
+						       eb->composite_fence :
+						       &eb->request->fence,
+						       eb->composite_fence ?
+						       eb->composite_fence :
+						       &eb->request->fence);
 	}
 
 #ifdef CONFIG_MMU_NOTIFIER
@@ -2528,14 +2534,14 @@ err:
 }
 
 static int eb_submit(struct i915_execbuffer *eb, struct i915_vma *batch,
-		     bool first)
+		     bool first, bool last)
 {
 	int err;
 
 	if (intel_context_nopreempt(eb->context))
 		__set_bit(I915_FENCE_FLAG_NOPREEMPT, &eb->request->fence.flags);
 
-	err = eb_move_to_gpu(eb, first);
+	err = eb_move_to_gpu(eb, first, last);
 	if (err)
 		return err;
 
@@ -2748,7 +2754,7 @@ eb_select_legacy_ring(struct i915_execbuffer *eb)
 }
 
 static int
-eb_select_engine(struct i915_execbuffer *eb)
+eb_select_engine(struct i915_execbuffer *eb, unsigned int batch_number)
 {
 	struct intel_context *ce;
 	unsigned int idx;
@@ -2762,6 +2768,18 @@ eb_select_engine(struct i915_execbuffer *eb)
 	ce = i915_gem_context_get_engine(eb->gem_context, idx);
 	if (IS_ERR(ce))
 		return PTR_ERR(ce);
+
+	if (batch_number > 0) {
+		struct intel_context *parent = ce;
+
+		GEM_BUG_ON(!intel_context_is_parent(parent));
+
+		for_each_child(parent, ce)
+			if (!--batch_number)
+				break;
+		intel_context_put(parent);
+		intel_context_get(ce);
+	}
 
 	intel_gt_pm_get(ce->engine->gt);
 
@@ -3155,13 +3173,49 @@ parse_execbuf2_extensions(struct drm_i915_gem_execbuffer2 *args,
 				    eb);
 }
 
+static int setup_composite_fence(struct i915_execbuffer *eb,
+				 struct dma_fence **out_fence,
+				 unsigned int num_batches)
+{
+	struct dma_fence_array *fence_array;
+	struct dma_fence **fences = kmalloc(num_batches * sizeof(*fences),
+					    GFP_KERNEL);
+	struct intel_context *parent = intel_context_to_parent(eb->context);
+	int i;
+
+	if (!fences)
+		return -ENOMEM;
+
+	for (i = 0; i < num_batches; ++i)
+		fences[i] = out_fence[i];
+
+	fence_array = dma_fence_array_create(num_batches,
+					     fences,
+					     parent->fence_context,
+					     ++parent->seqno,
+					     false);
+	if (!fence_array) {
+		kfree(fences);
+		return -ENOMEM;
+	}
+
+	/* Move ownership to the dma_fence_array created above */
+	for (i = 0; i < num_batches; ++i)
+		dma_fence_get(fences[i]);
+
+	eb->composite_fence = &fence_array->base;
+
+	return 0;
+}
+
 static int
 i915_gem_do_execbuffer(struct drm_device *dev,
 		       struct drm_file *file,
 		       struct drm_i915_gem_execbuffer2 *args,
 		       struct drm_i915_gem_exec_object2 *exec,
-		       int batch_index,
+		       unsigned int batch_index,
 		       unsigned int num_batches,
+		       unsigned int batch_number,
 		       struct dma_fence *in_fence,
 		       struct dma_fence *exec_fence,
 		       struct dma_fence **out_fence)
@@ -3170,6 +3224,8 @@ i915_gem_do_execbuffer(struct drm_device *dev,
 	struct i915_execbuffer eb;
 	struct i915_vma *batch;
 	int err;
+	bool first = batch_number == 0;
+	bool last = batch_number + 1 == num_batches;
 
 	BUILD_BUG_ON(__EXEC_INTERNAL_FLAGS & ~__I915_EXEC_ILLEGAL_FLAGS);
 	BUILD_BUG_ON(__EXEC_OBJECT_INTERNAL_FLAGS &
@@ -3194,6 +3250,7 @@ i915_gem_do_execbuffer(struct drm_device *dev,
 	eb.batch_start_offset = args->batch_start_offset;
 	eb.batch_len = args->batch_len;
 	eb.trampoline = NULL;
+	eb.composite_fence = NULL;
 
 	eb.fences = NULL;
 	eb.num_fences = 0;
@@ -3219,14 +3276,13 @@ i915_gem_do_execbuffer(struct drm_device *dev,
 	GEM_BUG_ON(!eb.lut_size);
 
 	eb.num_batches = num_batches;
-	if (batch_index >= 0)
-		eb.batch_index = batch_index;
+	eb.batch_index = batch_index;
 
 	err = eb_select_context(&eb);
 	if (unlikely(err))
 		goto err_destroy;
 
-	err = eb_select_engine(&eb);
+	err = eb_select_engine(&eb, batch_number);
 	if (unlikely(err))
 		goto err_context;
 
@@ -3275,6 +3331,23 @@ i915_gem_do_execbuffer(struct drm_device *dev,
 			goto err_ext;
 	}
 
+	if (out_fence) {
+		/* Move ownership to caller (i915_gem_execbuffer2_ioctl) */
+		out_fence[batch_number] = dma_fence_get(&eb.request->fence);
+
+		/*
+		 * Need to create a composite fence (dma_fence_array,
+		 * eb.composite_fence) for the excl fence of the dma_resv
+		 * objects as each BB can write to the object. Since we create
+		 */
+		if (num_batches > 1 && last) {
+			err = setup_composite_fence(&eb, out_fence,
+						    num_batches);
+			if (err < 0)
+				goto err_request;
+		}
+	}
+
 	if (exec_fence) {
 		err = i915_request_await_execution(eb.request,
 						   exec_fence);
@@ -3307,17 +3380,27 @@ i915_gem_do_execbuffer(struct drm_device *dev,
 		intel_gt_buffer_pool_mark_active(eb.batch_pool, eb.request);
 
 	trace_i915_request_queue(eb.request, eb.batch_flags);
-	err = eb_submit(&eb, batch, true);
+	err = eb_submit(&eb, batch, first, last);
 
 err_request:
+	if (last)
+		set_bit(I915_FENCE_FLAG_SUBMIT_PARALLEL,
+			&eb.request->fence.flags);
+
 	i915_request_get(eb.request);
 	err = eb_request_add(&eb, err);
 
 	if (eb.fences)
 		signal_fence_array(&eb);
 
-	if (!err && out_fence)
-		*out_fence = dma_fence_get(&eb.request->fence);
+	/*
+	 * Ownership of the composite fence (dma_fence_array,
+	 * eb.composite_fence) has been moved to the dma_resv objects these BB
+	 * write to in i915_vma_move_to_active. It is ok to release the creation
+	 * reference of this fence now.
+	 */
+	if (eb.composite_fence)
+		dma_fence_put(eb.composite_fence);
 
 	if (unlikely(eb.gem_context->syncobj)) {
 		drm_syncobj_replace_fence(eb.gem_context->syncobj,
@@ -3368,6 +3451,17 @@ static bool check_buffer_count(size_t count)
 	return !(count < 1 || count > INT_MAX || count > SIZE_MAX / sz - 1);
 }
 
+/* Release fences from the dma_fence_get in i915_gem_do_execbuffer. */
+static inline void put_out_fences(struct dma_fence **out_fences,
+				  unsigned int num_batches)
+{
+	int i;
+
+	for (i = 0; i < num_batches; ++i)
+		if (out_fences[i])
+			dma_fence_put(out_fences[i]);
+}
+
 int
 i915_gem_execbuffer2_ioctl(struct drm_device *dev, void *data,
 			   struct drm_file *file)
@@ -3375,13 +3469,16 @@ i915_gem_execbuffer2_ioctl(struct drm_device *dev, void *data,
 	struct drm_i915_private *i915 = to_i915(dev);
 	struct drm_i915_gem_execbuffer2 *args = data;
 	struct drm_i915_gem_exec_object2 *exec2_list;
-	struct dma_fence **out_fence_p = NULL;
-	struct dma_fence *out_fence = NULL;
+	struct dma_fence **out_fences = NULL;
 	struct dma_fence *in_fence = NULL;
 	struct dma_fence *exec_fence = NULL;
 	int out_fence_fd = -1;
 	const size_t count = args->buffer_count;
 	int err;
+	struct i915_gem_context *ctx;
+	struct intel_context *parent = NULL;
+	unsigned int num_batches = 1, i;
+	bool is_parallel = false;
 
 	if (!check_buffer_count(count)) {
 		drm_dbg(&i915->drm, "execbuf2 with %zd buffers\n", count);
@@ -3404,10 +3501,39 @@ i915_gem_execbuffer2_ioctl(struct drm_device *dev, void *data,
 	if (err)
 		return err;
 
+	ctx = i915_gem_context_lookup(file->driver_priv, args->rsvd1);
+	if (IS_ERR(ctx))
+		return PTR_ERR(ctx);
+
+	if (i915_gem_context_user_engines(ctx)) {
+		parent = i915_gem_context_get_engine(ctx, args->flags &
+						     I915_EXEC_RING_MASK);
+		if (IS_ERR(parent)) {
+			err = PTR_ERR(parent);
+			goto err_context;
+		}
+
+		if (intel_context_is_parent(parent)) {
+			if (args->batch_len) {
+				err = -EINVAL;
+				goto err_context;
+			}
+
+			num_batches = parent->guc_number_children + 1;
+			if (num_batches > count) {
+				i915_gem_context_put(ctx);
+				goto err_parent;
+			}
+			is_parallel = true;
+		}
+	}
+
 	if (args->flags & I915_EXEC_FENCE_IN) {
 		in_fence = sync_file_get_fence(lower_32_bits(args->rsvd2));
-		if (!in_fence)
-			return -EINVAL;
+		if (!in_fence) {
+			err = -EINVAL;
+			goto err_parent;
+		}
 	}
 
 	if (args->flags & I915_EXEC_FENCE_SUBMIT) {
@@ -3423,13 +3549,25 @@ i915_gem_execbuffer2_ioctl(struct drm_device *dev, void *data,
 		}
 	}
 
-	if (args->flags & I915_EXEC_FENCE_OUT) {
-		out_fence_fd = get_unused_fd_flags(O_CLOEXEC);
-		if (out_fence_fd < 0) {
-			err = out_fence_fd;
+	/*
+	 * We always allocate out fences when doing multi-BB submission as
+	 * this is required to create an excl fence for any dma buf objects
+	 * these BBs touch.
+	 */
+	if (args->flags & I915_EXEC_FENCE_OUT || is_parallel) {
+		out_fences = kcalloc(num_batches, sizeof(*out_fences),
+				     GFP_KERNEL);
+		if (!out_fences) {
+			err = -ENOMEM;
 			goto err_out_fence;
 		}
-		out_fence_p = &out_fence;
+		if (args->flags & I915_EXEC_FENCE_OUT) {
+			out_fence_fd = get_unused_fd_flags(O_CLOEXEC);
+			if (out_fence_fd < 0) {
+				err = out_fence_fd;
+				goto err_out_fence;
+			}
+		}
 	}
 
 	/* Allocate extra slots for use by the command parser */
@@ -3449,8 +3587,35 @@ i915_gem_execbuffer2_ioctl(struct drm_device *dev, void *data,
 		goto err_copy;
 	}
 
-	err = i915_gem_do_execbuffer(dev, file, args, exec2_list, -1, 1,
-				     in_fence, exec_fence, out_fence_p);
+	/*
+	 * Downstream submission code expects all parallel submissions to occur
+	 * in intel_context sequence, thus only 1 submission can happen at a
+	 * time.
+	 */
+	if (is_parallel)
+		mutex_lock(&parent->parallel_submit);
+
+	err = i915_gem_do_execbuffer(dev, file, args, exec2_list,
+				     args->flags & I915_EXEC_BATCH_FIRST ?
+				     0 : count - num_batches,
+				     num_batches,
+				     0,
+				     in_fence,
+				     exec_fence,
+				     out_fences);
+
+	for (i = 1; err == 0 && i < num_batches; i++)
+		err = i915_gem_do_execbuffer(dev, file, args, exec2_list,
+					     args->flags & I915_EXEC_BATCH_FIRST ?
+					     i : count - num_batches + i,
+					     num_batches,
+					     i,
+					     NULL,
+					     NULL,
+					     out_fences);
+
+	if (is_parallel)
+		mutex_unlock(&parent->parallel_submit);
 
 	/*
 	 * Now that we have begun execution of the batchbuffer, we ignore
@@ -3491,7 +3656,30 @@ end:;
 	}
 
 	if (!err && out_fence_fd >= 0) {
+		struct dma_fence *out_fence = NULL;
 		struct sync_file *sync_fence;
+
+		if (is_parallel) {
+			struct dma_fence_array *fence_array;
+
+			/*
+			 * The dma_fence_array now owns out_fences (from
+			 * dma_fence_get in i915_gem_do_execbuffer) assuming
+			 * successful creation of dma_fence_array.
+			 */
+			fence_array = dma_fence_array_create(num_batches,
+							     out_fences,
+							     parent->fence_context,
+							     ++parent->seqno,
+							     false);
+			if (!fence_array)
+				goto put_out_fences;
+
+			out_fence = &fence_array->base;
+			out_fences = NULL;
+		} else {
+			out_fence = out_fences[0];
+		}
 
 		sync_fence = sync_file_create(out_fence);
 		if (sync_fence) {
@@ -3500,9 +3688,15 @@ end:;
 			args->rsvd2 |= (u64)out_fence_fd << 32;
 			out_fence_fd = -1;
 		}
+
+		/*
+		 * The sync_file now owns out_fence, drop the creation
+		 * reference.
+		 */
 		dma_fence_put(out_fence);
-	} else if (out_fence) {
-		dma_fence_put(out_fence);
+	} else if (out_fences) {
+put_out_fences:
+		put_out_fences(out_fences, num_batches);
 	}
 
 	args->flags &= ~__I915_EXEC_UNKNOWN_FLAGS;
@@ -3513,9 +3707,15 @@ err_alloc:
 	if (out_fence_fd >= 0)
 		put_unused_fd(out_fence_fd);
 err_out_fence:
+	kfree(out_fences);
 	dma_fence_put(exec_fence);
 err_exec_fence:
 	dma_fence_put(in_fence);
+err_parent:
+	if (parent)
+		intel_context_put(parent);
+err_context:
+	i915_gem_context_put(ctx);
 
 	return err;
 }

@@ -472,6 +472,9 @@ intel_context_init(struct intel_context *ce, struct intel_engine_cs *engine)
 	ce->guc_id = GUC_INVALID_LRC_ID;
 	INIT_LIST_HEAD(&ce->guc_id_link);
 
+	mutex_init(&ce->parallel_submit);
+	ce->fence_context = dma_fence_context_alloc(1);
+
 	/*
 	 * Initialize fence to be complete as this is expected to be complete
 	 * unless there is a pending schedule disable outstanding.
@@ -497,6 +500,8 @@ void intel_context_fini(struct intel_context *ce)
 	if (intel_context_is_parent(ce))
 		for_each_child_safe(ce, child, next)
 			intel_context_put(child);
+
+	mutex_destroy(&ce->parallel_submit);
 
 	mutex_destroy(&ce->pin_mutex);
 	i915_active_fini(&ce->active);
