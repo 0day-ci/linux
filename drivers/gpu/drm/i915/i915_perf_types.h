@@ -312,6 +312,11 @@ struct i915_perf_stream {
 	 * buffer should be checked for available data.
 	 */
 	u64 poll_oa_period;
+
+	/**
+	 * @oa_whitelisted: Indicates that the oa registers are whitelisted.
+	 */
+	bool oa_whitelisted;
 };
 
 /**
@@ -431,6 +436,9 @@ struct i915_perf {
 	u32 gen7_latched_oastatus1;
 	u32 ctx_oactxctrl_offset;
 	u32 ctx_flexeu0_offset;
+
+	const i915_reg_t *oa_wl;
+	unsigned int num_oa_wl;
 
 	/**
 	 * The RPT_ID/reason field for Gen8+ includes a bit
