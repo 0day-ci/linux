@@ -322,6 +322,9 @@ int arch_update_cpu_topology(void)
 	struct device *dev;
 	int cpu, rc;
 
+	if (!ptf(PTF_CHECK))
+		return 0;
+
 	rc = __arch_update_cpu_topology();
 	on_each_cpu(__arch_update_dedicated_flag, NULL, 0);
 	for_each_online_cpu(cpu) {
