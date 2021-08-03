@@ -96,6 +96,7 @@ void machine_restart(char *cmd)
 	while (1) ;
 
 }
+EXPORT_SYMBOL(machine_restart);
 
 void (*chassis_power_off)(void);
 
