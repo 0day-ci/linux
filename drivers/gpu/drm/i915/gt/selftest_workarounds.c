@@ -1177,6 +1177,242 @@ err:
 	return err;
 }
 
+static int rmw_reg(struct intel_engine_cs *engine, const i915_reg_t reg)
+{
+	const u32 values[] = {
+		0x00000000,
+		0x01010101,
+		0x10100101,
+		0x03030303,
+		0x30300303,
+		0x05050505,
+		0x50500505,
+		0x0f0f0f0f,
+		0xf00ff00f,
+		0x10101010,
+		0xf0f01010,
+		0x30303030,
+		0xa0a03030,
+		0x50505050,
+		0xc0c05050,
+		0xf0f0f0f0,
+		0x11111111,
+		0x33333333,
+		0x55555555,
+		0x0000ffff,
+		0x00ff00ff,
+		0xff0000ff,
+		0xffff00ff,
+		0xffffffff,
+	};
+	struct i915_vma *vma, *batch;
+	struct intel_context *ce;
+	struct i915_request *rq;
+	u32 srm, lrm, idx;
+	u32 *cs, *results;
+	u64 addr;
+	int err;
+	int v;
+
+	ce = intel_context_create(engine);
+	if (IS_ERR(ce))
+		return PTR_ERR(ce);
+
+	vma = __vm_create_scratch_for_read(&ce->engine->gt->ggtt->vm,
+					   sizeof(u32));
+	if (IS_ERR(vma)) {
+		err = PTR_ERR(vma);
+		goto out_context;
+	}
+
+	batch = create_batch(ce->vm);
+	if (IS_ERR(batch)) {
+		err = PTR_ERR(batch);
+		goto out_vma;
+	}
+
+	srm = MI_STORE_REGISTER_MEM;
+	lrm = MI_LOAD_REGISTER_MEM;
+	if (GRAPHICS_VER(ce->vm->i915) >= 8)
+		lrm++, srm++;
+
+	addr = vma->node.start;
+
+	cs = i915_gem_object_pin_map(batch->obj, I915_MAP_WC);
+	if (IS_ERR(cs)) {
+		err = PTR_ERR(cs);
+		goto out_batch;
+	}
+
+	/* SRM original */
+	*cs++ = srm;
+	*cs++ = i915_mmio_reg_offset(reg);
+	*cs++ = lower_32_bits(addr);
+	*cs++ = upper_32_bits(addr);
+
+	idx = 1;
+	for (v = 0; v < ARRAY_SIZE(values); v++) {
+		/* LRI garbage */
+		*cs++ = MI_LOAD_REGISTER_IMM(1);
+		*cs++ = i915_mmio_reg_offset(reg);
+		*cs++ = values[v];
+
+		/* SRM result */
+		*cs++ = srm;
+		*cs++ = i915_mmio_reg_offset(reg);
+		*cs++ = lower_32_bits(addr + sizeof(u32) * idx);
+		*cs++ = upper_32_bits(addr + sizeof(u32) * idx);
+		idx++;
+	}
+	for (v = 0; v < ARRAY_SIZE(values); v++) {
+		/* LRI garbage */
+		*cs++ = MI_LOAD_REGISTER_IMM(1);
+		*cs++ = i915_mmio_reg_offset(reg);
+		*cs++ = ~values[v];
+
+		/* SRM result */
+		*cs++ = srm;
+		*cs++ = i915_mmio_reg_offset(reg);
+		*cs++ = lower_32_bits(addr + sizeof(u32) * idx);
+		*cs++ = upper_32_bits(addr + sizeof(u32) * idx);
+		idx++;
+	}
+
+	/* LRM original -- don't leave garbage in the context! */
+	*cs++ = lrm;
+	*cs++ = i915_mmio_reg_offset(reg);
+	*cs++ = lower_32_bits(addr);
+	*cs++ = upper_32_bits(addr);
+
+	*cs++ = MI_BATCH_BUFFER_END;
+
+	i915_gem_object_flush_map(batch->obj);
+	i915_gem_object_unpin_map(batch->obj);
+	intel_gt_chipset_flush(engine->gt);
+
+	rq = intel_context_create_request(ce);
+	if (IS_ERR(rq)) {
+		err = PTR_ERR(rq);
+		goto out_batch;
+	}
+
+	if (engine->emit_init_breadcrumb) { /* Be nice if we hang */
+		err = engine->emit_init_breadcrumb(rq);
+		if (err)
+			goto err_request;
+	}
+
+	i915_vma_lock(batch);
+	err = i915_request_await_object(rq, batch->obj, false);
+	if (err == 0)
+		err = i915_vma_move_to_active(batch, rq, 0);
+	i915_vma_unlock(batch);
+	if (err)
+		goto err_request;
+
+	i915_vma_lock(vma);
+	err = i915_request_await_object(rq, vma->obj, true);
+	if (err == 0)
+		err = i915_vma_move_to_active(vma, rq, EXEC_OBJECT_WRITE);
+	i915_vma_unlock(vma);
+	if (err)
+		goto err_request;
+
+	err = engine->emit_bb_start(rq, batch->node.start, PAGE_SIZE, 0);
+	if (err)
+		goto err_request;
+
+err_request:
+	err = request_add_sync(rq, err);
+	if (err) {
+		pr_err("%s: Futzing %04x timedout; cancelling test\n",
+		       engine->name, i915_mmio_reg_offset(reg));
+		intel_gt_set_wedged(engine->gt);
+		goto out_batch;
+	}
+
+	results = i915_gem_object_pin_map(vma->obj, I915_MAP_WB);
+	if (IS_ERR(results)) {
+		err = PTR_ERR(results);
+		goto out_batch;
+	}
+
+	for (v = 0, idx = 0; v < 2 * ARRAY_SIZE(values); v++) {
+		if (results[++idx] != results[0]) {
+			err = idx;
+			break;
+		}
+	}
+
+out_batch:
+	i915_vma_put(batch);
+out_vma:
+	i915_vma_put(vma);
+out_context:
+	intel_context_put(ce);
+	return err;
+}
+
+static int live_dynamic_whitelist(void *arg)
+{
+	struct intel_gt *gt = arg;
+	struct intel_engine_cs *engine;
+	enum intel_engine_id id;
+	int err = 0;
+
+	if (GRAPHICS_VER(gt->i915) < 8)
+		return 0;
+
+	for_each_engine(engine, gt, id) {
+		const i915_reg_t reg = RING_MAX_IDLE(engine->mmio_base);
+
+		err = rmw_reg(engine, reg);
+		if (err < 0)
+			break;
+
+		if (err) {
+			pr_err("%s: Able to write to protected reg:%04x!\n",
+			       engine->name, i915_mmio_reg_offset(reg));
+			err = -EINVAL;
+			break;
+		}
+
+		err = intel_engine_allow_user_register_access(engine, &reg, 1);
+		if (err)
+			break;
+
+		err = rmw_reg(engine, reg);
+		intel_engine_deny_user_register_access(engine, &reg, 1);
+		if (err < 0)
+			break;
+
+		if (!err) {
+			pr_err("%s: Unable to write to allowed reg:%04x!\n",
+			       engine->name, i915_mmio_reg_offset(reg));
+			err = -EINVAL;
+			break;
+		}
+
+		err = rmw_reg(engine, reg);
+		if (err < 0)
+			break;
+
+		if (err) {
+			pr_err("%s: Able to write to denied reg:%04x!\n",
+			       engine->name, i915_mmio_reg_offset(reg));
+			err = -EINVAL;
+			break;
+		}
+
+		err = 0;
+	}
+
+	if (igt_flush_test(gt->i915))
+		err = -EIO;
+
+	return err;
+}
+
 static bool
 verify_wa_lists(struct intel_gt *gt, struct wa_lists *lists,
 		const char *str)
@@ -1383,6 +1619,7 @@ int intel_workarounds_live_selftests(struct drm_i915_private *i915)
 		SUBTEST(live_dirty_whitelist),
 		SUBTEST(live_reset_whitelist),
 		SUBTEST(live_isolated_whitelist),
+		SUBTEST(live_dynamic_whitelist),
 		SUBTEST(live_gpu_reset_workarounds),
 		SUBTEST(live_engine_reset_workarounds),
 	};

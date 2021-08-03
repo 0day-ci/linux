@@ -200,6 +200,18 @@ static void _wa_add(struct i915_wa_list *wal, const struct i915_wa *wa)
 	__wa_add(wal, wa);
 }
 
+static void _wa_del(struct i915_wa_list *wal, i915_reg_t reg)
+{
+	struct i915_wa *wa = wal->list;
+	int index;
+
+	index = wa_index(wal, reg);
+	if (GEM_DEBUG_WARN_ON(index < 0))
+		return;
+
+	memmove(wa + index, wa + index + 1, (--wal->count - index) * sizeof(*wa));
+}
+
 static void wa_add(struct i915_wa_list *wal, i915_reg_t reg,
 		   u32 clear, u32 set, u32 read_mask, bool masked_reg)
 {
@@ -2010,6 +2022,53 @@ void intel_engine_init_workarounds(struct intel_engine_cs *engine)
 	wa_init_start(wal, "engine", engine->name);
 	engine_init_workarounds(engine, wal);
 	wa_init_finish(wal);
+}
+
+int intel_engine_allow_user_register_access(struct intel_engine_cs *engine,
+					    const i915_reg_t *reg,
+					    unsigned int count)
+{
+	struct i915_wa_list *wal = &engine->whitelist;
+	unsigned long flags;
+	int err;
+
+	if (GEM_DEBUG_WARN_ON(wal->count + count >= RING_MAX_NONPRIV_SLOTS))
+		return -ENOSPC;
+
+	spin_lock_irqsave(&engine->uncore->lock, flags);
+
+	err = wa_list_grow(wal, wal->count + count, GFP_ATOMIC | __GFP_NOWARN);
+	if (err)
+		goto out;
+
+	while (count--) {
+		struct i915_wa wa = { .reg = *reg++ };
+
+		__wa_add(wal, &wa);
+	}
+
+	__engine_apply_whitelist(engine);
+
+out:
+	spin_unlock_irqrestore(&engine->uncore->lock, flags);
+	return err;
+}
+
+void intel_engine_deny_user_register_access(struct intel_engine_cs *engine,
+					    const i915_reg_t *reg,
+					    unsigned int count)
+{
+	struct i915_wa_list *wal = &engine->whitelist;
+	unsigned long flags;
+
+	spin_lock_irqsave(&engine->uncore->lock, flags);
+
+	while (count--)
+		_wa_del(wal, *reg++);
+
+	__engine_apply_whitelist(engine);
+
+	spin_unlock_irqrestore(&engine->uncore->lock, flags);
 }
 
 void intel_engine_apply_workarounds(struct intel_engine_cs *engine)
