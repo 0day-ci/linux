@@ -568,6 +568,7 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
 	case KVM_CAP_S390_VCPU_RESETS:
 	case KVM_CAP_SET_GUEST_DEBUG:
 	case KVM_CAP_S390_DIAG318:
+	case KVM_CAP_S390_CPU_TOPOLOGY:
 		r = 1;
 		break;
 	case KVM_CAP_SET_GUEST_DEBUG2:
@@ -819,6 +820,23 @@ int kvm_vm_ioctl_enable_cap(struct kvm *kvm, struct kvm_enable_cap *cap)
 		icpt_operexc_on_all_vcpus(kvm);
 		r = 0;
 		break;
+	case KVM_CAP_S390_CPU_TOPOLOGY:
+		mutex_lock(&kvm->lock);
+		if (kvm->created_vcpus) {
+			r = -EBUSY;
+		} else {
+			set_kvm_facility(kvm->arch.model.fac_mask, 11);
+			set_kvm_facility(kvm->arch.model.fac_list, 11);
+			r = 0;
+		}
+		mutex_unlock(&kvm->lock);
+		VM_EVENT(kvm, 3, "ENABLE: CPU TOPOLOGY %s",
+			 r ? "(not available)" : "(success)");
+		break;
+
+		r = -EINVAL;
+		break;
+
 	default:
 		r = -EINVAL;
 		break;
@@ -3067,18 +3085,41 @@ __u64 kvm_s390_get_cpu_timer(struct kvm_vcpu *vcpu)
 	return value;
 }
 
+static void kvm_s390_set_mtcr(struct kvm_vcpu *vcpu)
+{
+	struct esca_block *esca = vcpu->kvm->arch.sca;
+
+	if (vcpu->arch.sie_block->ecb & ECB_PTF) {
+		ipte_lock(vcpu);
+		WRITE_ONCE(esca->utility, ESCA_UTILITY_MTCR);
+		ipte_unlock(vcpu);
+	}
+}
+
 void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
 {
-
 	gmap_enable(vcpu->arch.enabled_gmap);
 	kvm_s390_set_cpuflags(vcpu, CPUSTAT_RUNNING);
 	if (vcpu->arch.cputm_enabled && !is_vcpu_idle(vcpu))
 		__start_cpu_timer_accounting(vcpu);
 	vcpu->cpu = cpu;
+
+	/*
+	 * With PTF interpretation the guest will be aware of topology
+	 * change by the Multiprocessor Topology-Change-Report is pending.
+	 * Check for reasons to make the MTCR pending and make it pending.
+	 */
+	if ((vcpu->arch.sie_block->ecb & ECB_PTF) &&
+	    cpu != vcpu->arch.prev_cpu) {
+		if (cpu_topology[cpu].socket_id !=
+		    cpu_topology[vcpu->arch.prev_cpu].socket_id)
+			kvm_s390_set_mtcr(vcpu);
+	}
 }
 
 void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
 {
+	vcpu->arch.prev_cpu = vcpu->cpu;
 	vcpu->cpu = -1;
 	if (vcpu->arch.cputm_enabled && !is_vcpu_idle(vcpu))
 		__stop_cpu_timer_accounting(vcpu);
@@ -3198,6 +3239,11 @@ static int kvm_s390_vcpu_setup(struct kvm_vcpu *vcpu)
 		vcpu->arch.sie_block->ecb |= ECB_HOSTPROTINT;
 	if (test_kvm_facility(vcpu->kvm, 9))
 		vcpu->arch.sie_block->ecb |= ECB_SRSI;
+
+	/* PTF needs both host and guest facilities to enable interpretation */
+	if (test_kvm_facility(vcpu->kvm, 11) && test_facility(11))
+		vcpu->arch.sie_block->ecb |= ECB_PTF;
+
 	if (test_kvm_facility(vcpu->kvm, 73))
 		vcpu->arch.sie_block->ecb |= ECB_TE;
 
