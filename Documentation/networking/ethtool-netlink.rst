@@ -1415,21 +1415,26 @@ Request contents:
 
 Kernel response contents:
 
- +-----------------------------------+--------+--------------------------------+
- | ``ETHTOOL_A_STATS_HEADER``        | nested | reply header                   |
- +-----------------------------------+--------+--------------------------------+
- | ``ETHTOOL_A_STATS_GRP``           | nested | one or more group of stats     |
- +-+---------------------------------+--------+--------------------------------+
- | | ``ETHTOOL_A_STATS_GRP_ID``      | u32    | group ID - ``ETHTOOL_STATS_*`` |
- +-+---------------------------------+--------+--------------------------------+
- | | ``ETHTOOL_A_STATS_GRP_SS_ID``   | u32    | string set ID for names        |
- +-+---------------------------------+--------+--------------------------------+
- | | ``ETHTOOL_A_STATS_GRP_STAT``    | nested | nest containing a statistic    |
- +-+---------------------------------+--------+--------------------------------+
- | | ``ETHTOOL_A_STATS_GRP_HIST_RX`` | nested | histogram statistic (Rx)       |
- +-+---------------------------------+--------+--------------------------------+
- | | ``ETHTOOL_A_STATS_GRP_HIST_TX`` | nested | histogram statistic (Tx)       |
- +-+---------------------------------+--------+--------------------------------+
+ +--------------------------------------+--------+-----------------------------+
+ | ``ETHTOOL_A_STATS_HEADER``           | nested | reply header                |
+ +--------------------------------------+--------+-----------------------------+
+ | ``ETHTOOL_A_STATS_GRP``              | nested | one or more group of stats  |
+ +-+------------------------------------+--------+-----------------------------+
+ | | ``ETHTOOL_A_STATS_GRP_ID``         | u32    | group ID -                  |
+ | |                                    |        | ``ETHTOOL_STATS_*``         |
+ +-+------------------------------------+--------+-----------------------------+
+ | | ``ETHTOOL_A_STATS_GRP_SS_ID``      | u32    | string set ID for names     |
+ +-+------------------------------------+--------+-----------------------------+
+ | | ``ETHTOOL_A_STATS_GRP_STAT``       | nested | nest containing a statistic |
+ +-+------------------------------------+--------+-----------------------------+
+ | | ``ETHTOOL_A_STATS_GRP_STAT_BLOCK`` | nested | block of stats per channel  |
+ +-+-+----------------------------------+--------+-----------------------------+
+ | | | ``ETHTOOL_A_STATS_GRP_STAT``     | nested | nest containing a statistic |
+ +-+-+----------------------------------+--------+-----------------------------+
+ | | ``ETHTOOL_A_STATS_GRP_HIST_RX``    | nested | histogram statistic (Rx)    |
+ +-+------------------------------------+--------+-----------------------------+
+ | | ``ETHTOOL_A_STATS_GRP_HIST_TX``    | nested | histogram statistic (Tx)    |
+ +-+------------------------------------+--------+-----------------------------+
 
 Users specify which groups of statistics they are requesting via
 the ``ETHTOOL_A_STATS_GROUPS`` bitset. Currently defined values are:
@@ -1439,6 +1444,7 @@ the ``ETHTOOL_A_STATS_GROUPS`` bitset. Currently defined values are:
  ETHTOOL_STATS_ETH_PHY  eth-phy  Basic IEEE 802.3 PHY statistics (30.3.2.1.*)
  ETHTOOL_STATS_ETH_CTRL eth-ctrl Basic IEEE 802.3 MAC Ctrl statistics (30.3.3.*)
  ETHTOOL_STATS_RMON     rmon     RMON (RFC 2819) statistics
+ ETHTOOL_STATS_XDP      xdp      XDP statistics
  ====================== ======== ===============================================
 
 Each group should have a corresponding ``ETHTOOL_A_STATS_GRP`` in the reply.
@@ -1451,6 +1457,10 @@ Statistics are added to the ``ETHTOOL_A_STATS_GRP`` nest under
 single 8 byte (u64) attribute inside - the type of that attribute is
 the statistic ID and the value is the value of the statistic.
 Each group has its own interpretation of statistic IDs.
+Statistics can be folded into a consistent (non-broken with any other attr)
+sequence of blocks ``ETHTOOL_A_STATS_GRP_STAT_BLOCK``. This way they are
+treated by Ethtool as per-channel statistics, and are printed with the
+"channel%d-" prefix.
 Attribute IDs correspond to strings from the string set identified
 by ``ETHTOOL_A_STATS_GRP_SS_ID``. Complex statistics (such as RMON histogram
 entries) are also listed inside ``ETHTOOL_A_STATS_GRP`` and do not have
@@ -1478,6 +1488,11 @@ Low and high bounds are inclusive, for example:
  etherStatsPkts64Octets          0    64
  etherStatsPkts512to1023Octets 512  1023
  ============================= ==== ====
+
+Drivers which want to export global (per-device) XDP statistics should
+only implement ``get_xdp_stats`` callback. An additional one
+``get_std_stats_channels`` is needed if the driver exposes per-channel
+statistics.
 
 PHC_VCLOCKS_GET
 ===============
