@@ -1106,7 +1106,7 @@ EXPORT_SYMBOL(radix__flush_tlb_kernel_range);
  * invalidating a full PID, so it has a far lower threshold to change from
  * individual page flushes to full-pid flushes.
  */
-static unsigned long tlb_single_page_flush_ceiling __read_mostly = 33;
+static unsigned long tlb_single_page_flush_ceiling __read_mostly = 32;
 static unsigned long tlb_local_single_page_flush_ceiling __read_mostly = POWER9_TLB_SETS_RADIX * 2;
 
 static inline void __radix__flush_tlb_range(struct mm_struct *mm,
@@ -1133,7 +1133,7 @@ static inline void __radix__flush_tlb_range(struct mm_struct *mm,
 	if (fullmm)
 		flush_pid = true;
 	else if (type == FLUSH_TYPE_GLOBAL)
-		flush_pid = nr_pages > tlb_single_page_flush_ceiling;
+		flush_pid = nr_pages >= tlb_single_page_flush_ceiling;
 	else
 		flush_pid = nr_pages > tlb_local_single_page_flush_ceiling;
 	/*
@@ -1335,7 +1335,7 @@ static void __radix__flush_tlb_range_psize(struct mm_struct *mm,
 	if (fullmm)
 		flush_pid = true;
 	else if (type == FLUSH_TYPE_GLOBAL)
-		flush_pid = nr_pages > tlb_single_page_flush_ceiling;
+		flush_pid = nr_pages >= tlb_single_page_flush_ceiling;
 	else
 		flush_pid = nr_pages > tlb_local_single_page_flush_ceiling;
 
@@ -1505,7 +1505,7 @@ void do_h_rpt_invalidate_prt(unsigned long pid, unsigned long lpid,
 			continue;
 
 		nr_pages = (end - start) >> def->shift;
-		flush_pid = nr_pages > tlb_single_page_flush_ceiling;
+		flush_pid = nr_pages >= tlb_single_page_flush_ceiling;
 
 		/*
 		 * If the number of pages spanning the range is above
