@@ -624,6 +624,10 @@ struct rtl8169_private {
 
 	unsigned supports_gmii:1;
 	unsigned aspm_manageable:1;
+	unsigned aspm_enabled:1;
+	struct timer_list aspm_timer;
+	u32 aspm_packet_count;
+
 	dma_addr_t counters_phys_addr;
 	struct rtl8169_counters *counters;
 	struct rtl8169_tc_offsets tc_offset;
@@ -2671,6 +2675,8 @@ static void rtl_hw_aspm_clkreq_enable(struct rtl8169_private *tp, bool enable)
 		RTL_W8(tp, Config5, RTL_R8(tp, Config5) & ~ASPM_en);
 	}
 
+	tp->aspm_enabled = enable;
+
 	udelay(10);
 }
 
@@ -4408,6 +4414,7 @@ static void rtl_tx(struct net_device *dev, struct rtl8169_private *tp,
 
 	dirty_tx = tp->dirty_tx;
 
+	tp->aspm_packet_count += tp->cur_tx - dirty_tx;
 	while (READ_ONCE(tp->cur_tx) != dirty_tx) {
 		unsigned int entry = dirty_tx % NUM_TX_DESC;
 		u32 status;
@@ -4552,6 +4559,8 @@ release_descriptor:
 		rtl8169_mark_to_asic(desc);
 	}
 
+	tp->aspm_packet_count += count;
+
 	return count;
 }
 
@@ -4659,8 +4668,31 @@ static int r8169_phy_connect(struct rtl8169_private *tp)
 	return 0;
 }
 
+#define ASPM_PACKET_THRESHOLD 10
+#define ASPM_TIMER_INTERVAL 1000
+
+static void rtl8169_aspm_timer(struct timer_list *timer)
+{
+	struct rtl8169_private *tp = from_timer(tp, timer, aspm_timer);
+	bool enable;
+
+	enable = tp->aspm_packet_count <= ASPM_PACKET_THRESHOLD;
+
+	if (tp->aspm_enabled != enable) {
+		rtl_unlock_config_regs(tp);
+		rtl_hw_aspm_clkreq_enable(tp, enable);
+		rtl_lock_config_regs(tp);
+	}
+
+	tp->aspm_packet_count = 0;
+
+	mod_timer(timer, jiffies + msecs_to_jiffies(ASPM_TIMER_INTERVAL));
+}
+
 static void rtl8169_down(struct rtl8169_private *tp)
 {
+	del_timer_sync(&tp->aspm_timer);
+
 	/* Clear all task flags */
 	bitmap_zero(tp->wk.flags, RTL_FLAG_MAX);
 
@@ -4687,6 +4719,10 @@ static void rtl8169_up(struct rtl8169_private *tp)
 	rtl_reset_work(tp);
 
 	phy_start(tp->phydev);
+
+	timer_setup(&tp->aspm_timer, rtl8169_aspm_timer, 0);
+	mod_timer(&tp->aspm_timer,
+		  jiffies + msecs_to_jiffies(ASPM_TIMER_INTERVAL));
 }
 
 static int rtl8169_close(struct net_device *dev)
