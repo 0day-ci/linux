@@ -1458,20 +1458,20 @@ static void stop_per_cpu_kthreads(void)
 static int start_kthread(unsigned int cpu)
 {
 	struct task_struct *kthread;
-	void *main = osnoise_main;
+	void *tracer_main = osnoise_main;
 	char comm[24];
 
 #ifdef CONFIG_TIMERLAT_TRACER
 	if (osnoise_data.timerlat_tracer) {
 		snprintf(comm, 24, "timerlat/%d", cpu);
-		main = timerlat_main;
+		tracer_main = timerlat_main;
 	} else {
 		snprintf(comm, 24, "osnoise/%d", cpu);
 	}
 #else
 	snprintf(comm, 24, "osnoise/%d", cpu);
 #endif
-	kthread = kthread_create_on_cpu(main, NULL, cpu, comm);
+	kthread = kthread_create_on_cpu(tracer_main, NULL, cpu, comm);
 
 	if (IS_ERR(kthread)) {
 		pr_err(BANNER "could not start sampling thread\n");
