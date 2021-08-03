@@ -762,6 +762,8 @@ patternProperties:
     description: MStar Semiconductor, Inc. (acquired by MediaTek Inc.)
   "^mti,.*":
     description: Imagination Technologies Ltd. (formerly MIPS Technologies Inc.)
+  "^mtk,.*":
+    description: MediaTek Inc.
   "^multi-inno,.*":
     description: Multi-Inno Technology Co.,Ltd
   "^mundoreader,.*":
