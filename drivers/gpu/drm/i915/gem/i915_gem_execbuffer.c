@@ -3146,6 +3146,7 @@ i915_gem_do_execbuffer(struct drm_device *dev,
 		       struct drm_file *file,
 		       struct drm_i915_gem_execbuffer2 *args,
 		       struct drm_i915_gem_exec_object2 *exec,
+		       int batch_index,
 		       struct dma_fence *in_fence,
 		       struct dma_fence *exec_fence,
 		       struct dma_fence **out_fence)
@@ -3201,6 +3202,9 @@ i915_gem_do_execbuffer(struct drm_device *dev,
 		goto err_ext;
 
 	GEM_BUG_ON(!eb.lut_size);
+
+	if (batch_index >= 0)
+		eb.batch_index = batch_index;
 
 	err = eb_select_context(&eb);
 	if (unlikely(err))
@@ -3429,7 +3433,7 @@ i915_gem_execbuffer2_ioctl(struct drm_device *dev, void *data,
 		goto err_copy;
 	}
 
-	err = i915_gem_do_execbuffer(dev, file, args, exec2_list, in_fence,
+	err = i915_gem_do_execbuffer(dev, file, args, exec2_list, -1, in_fence,
 				     exec_fence, out_fence_p);
 
 	/*
