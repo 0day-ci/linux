@@ -595,20 +595,22 @@ retry:
 
 struct i915_request *intel_context_find_active_request(struct intel_context *ce)
 {
+	struct intel_context *parent = intel_context_is_child(ce) ?
+		ce->parent : ce;
 	struct i915_request *rq, *active = NULL;
 	unsigned long flags;
 
 	GEM_BUG_ON(!intel_engine_uses_guc(ce->engine));
 
-	spin_lock_irqsave(&ce->guc_active.lock, flags);
-	list_for_each_entry_reverse(rq, &ce->guc_active.requests,
+	spin_lock_irqsave(&parent->guc_active.lock, flags);
+	list_for_each_entry_reverse(rq, &parent->guc_active.requests,
 				    sched.link) {
-		if (i915_request_completed(rq))
+		if (i915_request_completed(rq) && rq->context == ce)
 			break;
 
-		active = rq;
+		active = (rq->context == ce) ? rq : active;
 	}
-	spin_unlock_irqrestore(&ce->guc_active.lock, flags);
+	spin_unlock_irqrestore(&parent->guc_active.lock, flags);
 
 	return active;
 }
