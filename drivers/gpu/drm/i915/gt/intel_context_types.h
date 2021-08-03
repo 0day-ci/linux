@@ -225,6 +225,9 @@ struct intel_context {
 	 */
 	u8 guc_prio;
 	u32 guc_prio_count[GUC_CLIENT_PRIORITY_NUM];
+
+	/* Last request submitted on a parent */
+	struct i915_request *last_rq;
 };
 
 #endif /* __INTEL_CONTEXT_TYPES__ */

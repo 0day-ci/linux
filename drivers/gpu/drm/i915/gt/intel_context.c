@@ -487,6 +487,8 @@ void intel_context_fini(struct intel_context *ce)
 {
 	struct intel_context *child, *next;
 
+	if (ce->last_rq)
+		i915_request_put(ce->last_rq);
 	if (ce->timeline)
 		intel_timeline_put(ce->timeline);
 	i915_vm_put(ce->vm);
