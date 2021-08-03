@@ -914,6 +914,7 @@ static void scrub_guc_desc_for_outstanding_g2h(struct intel_guc *guc)
 			if (deregister)
 				guc_signal_context_fence(ce);
 			if (destroyed) {
+				intel_gt_pm_put_async(guc_to_gt(guc));
 				release_guc_id(guc, ce);
 				__guc_context_destroy(ce);
 			}
@@ -1032,6 +1033,8 @@ static void guc_flush_submissions(struct intel_guc *guc)
 			gse_flush_submissions(guc->gse[i]);
 }
 
+static void guc_flush_destroyed_contexts(struct intel_guc *guc);
+
 void intel_guc_submission_reset_prepare(struct intel_guc *guc)
 {
 	int i;
@@ -1050,6 +1053,7 @@ void intel_guc_submission_reset_prepare(struct intel_guc *guc)
 	spin_unlock_irq(&guc_to_gt(guc)->irq_lock);
 
 	guc_flush_submissions(guc);
+	guc_flush_destroyed_contexts(guc);
 
 	/*
 	 * Handle any outstanding G2Hs before reset. Call IRQ handler directly
@@ -1377,6 +1381,8 @@ static void retire_worker_func(struct work_struct *w)
 static int guc_lrcd_reg_init(struct intel_guc *guc);
 static void guc_lrcd_reg_fini(struct intel_guc *guc);
 
+static void destroy_worker_func(struct work_struct *w);
+
 /*
  * Set up the memory resources to be shared with the GuC (via the GGTT)
  * at firmware loading time.
@@ -1399,6 +1405,10 @@ int intel_guc_submission_init(struct intel_guc *guc)
 	INIT_LIST_HEAD(&guc->guc_id_list_unpinned);
 	ida_init(&guc->guc_ids);
 
+	spin_lock_init(&guc->destroy_lock);
+	INIT_LIST_HEAD(&guc->destroyed_contexts);
+	INIT_WORK(&guc->destroy_worker, destroy_worker_func);
+
 	return 0;
 }
 
@@ -1409,6 +1419,7 @@ void intel_guc_submission_fini(struct intel_guc *guc)
 	if (!guc_submission_initialized(guc))
 		return;
 
+	guc_flush_destroyed_contexts(guc);
 	guc_lrcd_reg_fini(guc);
 
 	for (i = 0; i < GUC_SUBMIT_ENGINE_MAX; ++i) {
@@ -2351,10 +2362,28 @@ unpin:
 static inline void guc_lrc_desc_unpin(struct intel_context *ce)
 {
 	struct intel_guc *guc = ce_to_guc(ce);
+	struct intel_gt *gt = guc_to_gt(guc);
+	unsigned long flags;
+	bool disabled;
 
+	GEM_BUG_ON(!intel_gt_pm_is_awake(gt));
 	GEM_BUG_ON(!lrc_desc_registered(guc, ce->guc_id));
 	GEM_BUG_ON(ce != __get_context(guc, ce->guc_id));
 	GEM_BUG_ON(context_enabled(ce));
+
+	/* Seal race with Reset */
+	spin_lock_irqsave(&ce->guc_state.lock, flags);
+	disabled = submission_disabled(guc);
+	if (likely(!disabled)) {
+		__intel_gt_pm_get(gt);
+		set_context_destroyed(ce);
+	}
+	spin_unlock_irqrestore(&ce->guc_state.lock, flags);
+	if (unlikely(disabled)) {
+		release_guc_id(guc, ce);
+		__guc_context_destroy(ce);
+		return;
+	}
 
 	clr_context_registered(ce);
 	deregister_context(ce, ce->guc_id, true);
@@ -2384,12 +2413,52 @@ static void __guc_context_destroy(struct intel_context *ce)
 	}
 }
 
+static void guc_flush_destroyed_contexts(struct intel_guc *guc)
+{
+	struct intel_context *ce, *cn;
+	unsigned long flags;
+
+	spin_lock_irqsave(&guc->destroy_lock, flags);
+	list_for_each_entry_safe(ce, cn,
+				 &guc->destroyed_contexts, guc_id_link) {
+		list_del_init(&ce->guc_id_link);
+		release_guc_id(guc, ce);
+		__guc_context_destroy(ce);
+	}
+	spin_unlock_irqrestore(&guc->destroy_lock, flags);
+}
+
+static void deregister_destroyed_contexts(struct intel_guc *guc)
+{
+	struct intel_context *ce, *cn;
+	unsigned long flags;
+
+	spin_lock_irqsave(&guc->destroy_lock, flags);
+	list_for_each_entry_safe(ce, cn,
+				 &guc->destroyed_contexts, guc_id_link) {
+		list_del_init(&ce->guc_id_link);
+		spin_unlock_irqrestore(&guc->destroy_lock, flags);
+		guc_lrc_desc_unpin(ce);
+		spin_lock_irqsave(&guc->destroy_lock, flags);
+	}
+	spin_unlock_irqrestore(&guc->destroy_lock, flags);
+}
+
+static void destroy_worker_func(struct work_struct *w)
+{
+	struct intel_guc *guc =
+		container_of(w, struct intel_guc, destroy_worker);
+	struct intel_gt *gt = guc_to_gt(guc);
+	int tmp;
+
+	with_intel_gt_pm(gt, tmp)
+		deregister_destroyed_contexts(guc);
+}
+
 static void guc_context_destroy(struct kref *kref)
 {
 	struct intel_context *ce = container_of(kref, typeof(*ce), ref);
-	struct intel_runtime_pm *runtime_pm = ce->engine->uncore->rpm;
 	struct intel_guc *guc = ce_to_guc(ce);
-	intel_wakeref_t wakeref;
 	unsigned long flags;
 	bool disabled;
 
@@ -2429,12 +2498,12 @@ static void guc_context_destroy(struct kref *kref)
 		list_del_init(&ce->guc_id_link);
 	spin_unlock_irqrestore(&guc->contexts_lock, flags);
 
-	/* Seal race with Reset */
-	spin_lock_irqsave(&ce->guc_state.lock, flags);
+	/* Seal race with reset */
+	spin_lock_irqsave(&guc->destroy_lock, flags);
 	disabled = submission_disabled(guc);
 	if (likely(!disabled))
-		set_context_destroyed(ce);
-	spin_unlock_irqrestore(&ce->guc_state.lock, flags);
+		list_add_tail(&ce->guc_id_link, &guc->destroyed_contexts);
+	spin_unlock_irqrestore(&guc->destroy_lock, flags);
 	if (unlikely(disabled)) {
 		release_guc_id(guc, ce);
 		__guc_context_destroy(ce);
@@ -2442,20 +2511,11 @@ static void guc_context_destroy(struct kref *kref)
 	}
 
 	/*
-	 * We defer GuC context deregistration until the context is destroyed
-	 * in order to save on CTBs. With this optimization ideally we only need
-	 * 1 CTB to register the context during the first pin and 1 CTB to
-	 * deregister the context when the context is destroyed. Without this
-	 * optimization, a CTB would be needed every pin & unpin.
-	 *
-	 * XXX: Need to acqiure the runtime wakeref as this can be triggered
-	 * from context_free_worker when runtime wakeref is not held.
-	 * guc_lrc_desc_unpin requires the runtime as a GuC register is written
-	 * in H2G CTB to deregister the context. A future patch may defer this
-	 * H2G CTB if the runtime wakeref is zero.
+	 * We use a worker to issue the H2G to deregister the context as we can
+	 * take the GT PM for the first time which isn't allowed from an atomic
+	 * context.
 	 */
-	with_intel_runtime_pm(runtime_pm, wakeref)
-		guc_lrc_desc_unpin(ce);
+	queue_work(system_unbound_wq, &guc->destroy_worker);
 }
 
 static int guc_context_alloc(struct intel_context *ce)
@@ -3472,6 +3532,7 @@ int intel_guc_deregister_done_process_msg(struct intel_guc *guc,
 		intel_context_put(ce);
 	} else if (context_destroyed(ce)) {
 		/* Context has been destroyed */
+		intel_gt_pm_put_async(guc_to_gt(guc));
 		release_guc_id(guc, ce);
 		__guc_context_destroy(ce);
 	}

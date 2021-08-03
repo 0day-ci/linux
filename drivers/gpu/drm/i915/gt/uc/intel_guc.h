@@ -61,6 +61,10 @@ struct intel_guc {
 	struct list_head guc_id_list_no_ref;
 	struct list_head guc_id_list_unpinned;
 
+	spinlock_t destroy_lock;	/* protects list / worker */
+	struct list_head destroyed_contexts;
+	struct work_struct destroy_worker;
+
 	bool submission_supported;
 	bool submission_selected;
 
