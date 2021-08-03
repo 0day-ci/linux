@@ -448,15 +448,9 @@ static bool default_disabled(struct i915_sched_engine *sched_engine)
 	return false;
 }
 
-struct i915_sched_engine *
-i915_sched_engine_create(unsigned int subclass)
+void i915_sched_engine_init(struct i915_sched_engine *sched_engine,
+			    unsigned int subclass)
 {
-	struct i915_sched_engine *sched_engine;
-
-	sched_engine = kzalloc(sizeof(*sched_engine), GFP_KERNEL);
-	if (!sched_engine)
-		return NULL;
-
 	kref_init(&sched_engine->ref);
 
 	sched_engine->queue = RB_ROOT_CACHED;
@@ -481,6 +475,18 @@ i915_sched_engine_create(unsigned int subclass)
 	lock_map_release(&sched_engine->lock.dep_map);
 	local_irq_enable();
 #endif
+}
+
+struct i915_sched_engine *
+i915_sched_engine_create(unsigned int subclass)
+{
+	struct i915_sched_engine *sched_engine;
+
+	sched_engine = kzalloc(sizeof(*sched_engine), GFP_KERNEL);
+	if (!sched_engine)
+		return NULL;
+
+	i915_sched_engine_init(sched_engine, subclass);
 
 	return sched_engine;
 }

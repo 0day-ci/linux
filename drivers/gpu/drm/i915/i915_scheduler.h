@@ -48,6 +48,9 @@ static inline void i915_priolist_free(struct i915_priolist *p)
 		__i915_priolist_free(p);
 }
 
+void i915_sched_engine_init(struct i915_sched_engine *sched_engine,
+			    unsigned int subclass);
+
 struct i915_sched_engine *
 i915_sched_engine_create(unsigned int subclass);
 

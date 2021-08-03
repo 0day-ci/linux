@@ -21,6 +21,11 @@
 
 struct __guc_ads_blob;
 
+enum {
+	GUC_SUBMIT_ENGINE_SINGLE_LRC,
+	GUC_SUBMIT_ENGINE_MAX
+};
+
 /*
  * Top level structure of GuC. It handles firmware loading and manages client
  * pool. intel_guc owns a intel_guc_client to replace the legacy ExecList
@@ -30,31 +35,6 @@ struct intel_guc {
 	struct intel_uc_fw fw;
 	struct intel_guc_log log;
 	struct intel_guc_ct ct;
-
-	/* Global engine used to submit requests to GuC */
-	struct i915_sched_engine *sched_engine;
-
-	/* Global state related to submission tasklet */
-	struct i915_request *stalled_rq;
-	struct intel_context *stalled_context;
-	struct work_struct retire_worker;
-	unsigned long flags;
-	int total_num_rq_with_no_guc_id;
-
-	/*
-	 * Submisson stall reason. See intel_guc_submission.c for detailed
-	 * description.
-	 */
-	enum {
-		STALL_NONE,
-		STALL_GUC_ID_WORKQUEUE,
-		STALL_GUC_ID_TASKLET,
-		STALL_SCHED_DISABLE,
-		STALL_REGISTER_CONTEXT,
-		STALL_DEREGISTER_CONTEXT,
-		STALL_MOVE_LRC_TAIL,
-		STALL_ADD_REQUEST,
-	} submission_stall_reason;
 
 	/* intel_guc_recv interrupt related state */
 	spinlock_t irq_lock;
@@ -68,6 +48,8 @@ struct intel_guc {
 		void (*disable)(struct intel_guc *guc);
 	} interrupts;
 
+	struct guc_submit_engine *gse[GUC_SUBMIT_ENGINE_MAX];
+
 	/*
 	 * contexts_lock protects the pool of free guc ids and a linked list of
 	 * guc ids available to be stolen
@@ -76,7 +58,6 @@ struct intel_guc {
 	struct ida guc_ids;
 	u32 num_guc_ids;
 	u32 max_guc_ids;
-	atomic_t num_guc_ids_not_ready;
 	struct list_head guc_id_list_no_ref;
 	struct list_head guc_id_list_unpinned;
 
