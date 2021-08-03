@@ -1824,16 +1824,6 @@ static void mvpp2_port_loopback_set(struct mvpp2_port *port,
 	writel(val, port->base + MVPP2_GMAC_CTRL_1_REG);
 }
 
-enum {
-	ETHTOOL_XDP_REDIRECT,
-	ETHTOOL_XDP_PASS,
-	ETHTOOL_XDP_DROP,
-	ETHTOOL_XDP_TX,
-	ETHTOOL_XDP_TX_ERR,
-	ETHTOOL_XDP_XMIT,
-	ETHTOOL_XDP_XMIT_DROPS,
-};
-
 struct mvpp2_ethtool_counter {
 	unsigned int offset;
 	const char string[ETH_GSTRING_LEN];
@@ -1926,21 +1916,10 @@ static const struct mvpp2_ethtool_counter mvpp2_ethtool_rxq_regs[] = {
 	{ MVPP2_RX_PKTS_BM_DROP_CTR, "rxq_%d_packets_bm_drops" },
 };
 
-static const struct mvpp2_ethtool_counter mvpp2_ethtool_xdp[] = {
-	{ ETHTOOL_XDP_REDIRECT, "rx_xdp_redirect", },
-	{ ETHTOOL_XDP_PASS, "rx_xdp_pass", },
-	{ ETHTOOL_XDP_DROP, "rx_xdp_drop", },
-	{ ETHTOOL_XDP_TX, "rx_xdp_tx", },
-	{ ETHTOOL_XDP_TX_ERR, "rx_xdp_tx_errors", },
-	{ ETHTOOL_XDP_XMIT, "tx_xdp_xmit", },
-	{ ETHTOOL_XDP_XMIT_DROPS, "tx_xdp_xmit_drops", },
-};
-
 #define MVPP2_N_ETHTOOL_STATS(ntxqs, nrxqs)	(ARRAY_SIZE(mvpp2_ethtool_mib_regs) + \
 						 ARRAY_SIZE(mvpp2_ethtool_port_regs) + \
 						 (ARRAY_SIZE(mvpp2_ethtool_txq_regs) * (ntxqs)) + \
-						 (ARRAY_SIZE(mvpp2_ethtool_rxq_regs) * (nrxqs)) + \
-						 ARRAY_SIZE(mvpp2_ethtool_xdp))
+						 (ARRAY_SIZE(mvpp2_ethtool_rxq_regs) * (nrxqs)))
 
 static void mvpp2_ethtool_get_strings(struct net_device *netdev, u32 sset,
 				      u8 *data)
@@ -1979,19 +1958,22 @@ static void mvpp2_ethtool_get_strings(struct net_device *netdev, u32 sset,
 			data += ETH_GSTRING_LEN;
 		}
 	}
-
-	for (i = 0; i < ARRAY_SIZE(mvpp2_ethtool_xdp); i++) {
-		strscpy(data, mvpp2_ethtool_xdp[i].string,
-			ETH_GSTRING_LEN);
-		data += ETH_GSTRING_LEN;
-	}
 }
 
-static void
-mvpp2_get_xdp_stats(struct mvpp2_port *port, struct mvpp2_pcpu_stats *xdp_stats)
+static void mvpp2_ethtool_get_xdp_stats(struct net_device *dev,
+					struct ethtool_xdp_stats *xdp_stats)
 {
+	const struct mvpp2_port *port = netdev_priv(dev);
 	unsigned int start;
 	unsigned int cpu;
+
+	xdp_stats->redirect = 0;
+	xdp_stats->pass = 0;
+	xdp_stats->drop = 0;
+	xdp_stats->xmit = 0;
+	xdp_stats->xmit_drops = 0;
+	xdp_stats->tx = 0;
+	xdp_stats->tx_errors = 0;
 
 	/* Gather XDP Statistics */
 	for_each_possible_cpu(cpu) {
@@ -2016,20 +1998,18 @@ mvpp2_get_xdp_stats(struct mvpp2_port *port, struct mvpp2_pcpu_stats *xdp_stats)
 			xdp_tx_err   = cpu_stats->xdp_tx_err;
 		} while (u64_stats_fetch_retry_irq(&cpu_stats->syncp, start));
 
-		xdp_stats->xdp_redirect += xdp_redirect;
-		xdp_stats->xdp_pass   += xdp_pass;
-		xdp_stats->xdp_drop += xdp_drop;
-		xdp_stats->xdp_xmit   += xdp_xmit;
-		xdp_stats->xdp_xmit_drops += xdp_xmit_drops;
-		xdp_stats->xdp_tx   += xdp_tx;
-		xdp_stats->xdp_tx_err   += xdp_tx_err;
+		xdp_stats->redirect += xdp_redirect;
+		xdp_stats->pass += xdp_pass;
+		xdp_stats->drop += xdp_drop;
+		xdp_stats->xmit += xdp_xmit;
+		xdp_stats->xmit_drops += xdp_xmit_drops;
+		xdp_stats->tx += xdp_tx;
+		xdp_stats->tx_errors  += xdp_tx_err;
 	}
 }
 
 static void mvpp2_read_stats(struct mvpp2_port *port)
 {
-	struct mvpp2_pcpu_stats xdp_stats = {};
-	const struct mvpp2_ethtool_counter *s;
 	u64 *pstats;
 	int i, q;
 
@@ -2057,37 +2037,6 @@ static void mvpp2_read_stats(struct mvpp2_port *port)
 			*pstats++ += mvpp2_read_index(port->priv,
 						      port->first_rxq + q,
 						      mvpp2_ethtool_rxq_regs[i].offset);
-
-	/* Gather XDP Statistics */
-	mvpp2_get_xdp_stats(port, &xdp_stats);
-
-	for (i = 0, s = mvpp2_ethtool_xdp;
-		 s < mvpp2_ethtool_xdp + ARRAY_SIZE(mvpp2_ethtool_xdp);
-	     s++, i++) {
-		switch (s->offset) {
-		case ETHTOOL_XDP_REDIRECT:
-			*pstats++ = xdp_stats.xdp_redirect;
-			break;
-		case ETHTOOL_XDP_PASS:
-			*pstats++ = xdp_stats.xdp_pass;
-			break;
-		case ETHTOOL_XDP_DROP:
-			*pstats++ = xdp_stats.xdp_drop;
-			break;
-		case ETHTOOL_XDP_TX:
-			*pstats++ = xdp_stats.xdp_tx;
-			break;
-		case ETHTOOL_XDP_TX_ERR:
-			*pstats++ = xdp_stats.xdp_tx_err;
-			break;
-		case ETHTOOL_XDP_XMIT:
-			*pstats++ = xdp_stats.xdp_xmit;
-			break;
-		case ETHTOOL_XDP_XMIT_DROPS:
-			*pstats++ = xdp_stats.xdp_xmit_drops;
-			break;
-		}
-	}
 }
 
 static void mvpp2_gather_hw_statistics(struct work_struct *work)
@@ -5735,6 +5684,7 @@ static const struct ethtool_ops mvpp2_eth_tool_ops = {
 	.set_rxfh		= mvpp2_ethtool_set_rxfh,
 	.get_rxfh_context	= mvpp2_ethtool_get_rxfh_context,
 	.set_rxfh_context	= mvpp2_ethtool_set_rxfh_context,
+	.get_xdp_stats		= mvpp2_ethtool_get_xdp_stats,
 };
 
 /* Used for PPv2.1, or PPv2.2 with the old Device Tree binding that
