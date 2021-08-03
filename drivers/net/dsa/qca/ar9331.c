@@ -101,6 +101,46 @@
 	 AR9331_SW_PORT_STATUS_RX_FLOW_EN | AR9331_SW_PORT_STATUS_TX_FLOW_EN | \
 	 AR9331_SW_PORT_STATUS_SPEED_M)
 
+#define AR9331_SW_REG_PORT_CTRL(_port)			(0x104 + (_port) * 0x100)
+#define AR9331_SW_PORT_CTRL_ING_MIRROR_EN		BIT(17)
+#define AR9331_SW_PORT_CTRL_EG_MIRROR_EN		BIT(16)
+#define AR9331_SW_PORT_CTRL_DOUBLE_TAG_VLAN		BIT(15)
+#define AR9331_SW_PORT_CTRL_LEARN_EN			BIT(14)
+#define AR9331_SW_PORT_CTRL_SINGLE_VLAN_EN		BIT(13)
+#define AR9331_SW_PORT_CTRL_MAC_LOOP_BACK		BIT(12)
+#define AR9331_SW_PORT_CTRL_HEAD_EN			BIT(11)
+#define AR9331_SW_PORT_CTRL_IGMP_MLD_EN			BIT(10)
+#define AR9331_SW_PORT_CTRL_EG_VLAN_MODE		GENMASK(9, 8)
+#define AR9331_SW_PORT_CTRL_EG_VLAN_MODE_KEEP		0
+#define AR9331_SW_PORT_CTRL_EG_VLAN_MODE_STRIP		1
+#define AR9331_SW_PORT_CTRL_EG_VLAN_MODE_ADD		2
+#define AR9331_SW_PORT_CTRL_EG_VLAN_MODE_DOUBLE		3
+#define AR9331_SW_PORT_CTRL_LEARN_ONE_LOCK		BIT(7)
+#define AR9331_SW_PORT_CTRL_PORT_LOCK_EN		BIT(6)
+#define AR9331_SW_PORT_CTRL_LOCK_DROP_EN		BIT(5)
+#define AR9331_SW_PORT_CTRL_PORT_STATE			GENMASK(2, 0)
+#define AR9331_SW_PORT_CTRL_PORT_STATE_DISABLED		0
+#define AR9331_SW_PORT_CTRL_PORT_STATE_BLOCKING		1
+#define AR9331_SW_PORT_CTRL_PORT_STATE_LISTENING	2
+#define AR9331_SW_PORT_CTRL_PORT_STATE_LEARNING		3
+#define AR9331_SW_PORT_CTRL_PORT_STATE_FORWARD		4
+
+#define AR9331_SW_REG_PORT_VLAN(_port)			(0x108 + (_port) * 0x100)
+#define AR9331_SW_PORT_VLAN_8021Q_MODE			GENMASK(31, 30)
+#define AR9331_SW_8021Q_MODE_SECURE			3
+#define AR9331_SW_8021Q_MODE_CHECK			2
+#define AR9331_SW_8021Q_MODE_FALLBACK			1
+#define AR9331_SW_8021Q_MODE_NONE			0
+#define AR9331_SW_PORT_VLAN_ING_PORT_PRI		GENMASK(29, 27)
+#define AR9331_SW_PORT_VLAN_FORCE_PORT_VLAN_EN		BIT(26)
+#define AR9331_SW_PORT_VLAN_PORT_VID_MEMBER		GENMASK(25, 16)
+#define AR9331_SW_PORT_VLAN_ARP_LEAKY_EN		BIT(15)
+#define AR9331_SW_PORT_VLAN_UNI_LEAKY_EN		BIT(14)
+#define AR9331_SW_PORT_VLAN_MULTI_LEAKY_EN		BIT(13)
+#define AR9331_SW_PORT_VLAN_FORCE_DEFALUT_VID_EN	BIT(12)
+#define AR9331_SW_PORT_VLAN_PORT_VID			GENMASK(11, 0)
+#define AR9331_SW_PORT_VLAN_PORT_VID_DEF		1
+
 /* MIB registers */
 #define AR9331_MIB_COUNTER(x)			(0x20000 + ((x) * 0x100))
 
@@ -371,11 +411,61 @@ static int ar9331_sw_mbus_init(struct ar9331_sw_priv *priv)
 	return 0;
 }
 
+static int ar9331_sw_setup_port(struct dsa_switch *ds, int port)
+{
+	struct ar9331_sw_priv *priv = (struct ar9331_sw_priv *)ds->priv;
+	struct regmap *regmap = priv->regmap;
+	u32 port_mask, port_ctrl, val;
+	int ret;
+
+	/* Generate default port settings */
+	port_ctrl = FIELD_PREP(AR9331_SW_PORT_CTRL_PORT_STATE,
+			       AR9331_SW_PORT_CTRL_PORT_STATE_DISABLED);
+
+	if (dsa_is_cpu_port(ds, port)) {
+		/* CPU port should be allowed to communicate with all user
+		 * ports.
+		 */
+		port_mask = dsa_user_ports(ds);
+		/* Enable Atheros header on CPU port. This will allow us
+		 * communicate with each port separately
+		 */
+		port_ctrl |= AR9331_SW_PORT_CTRL_HEAD_EN;
+	} else if (dsa_is_user_port(ds, port)) {
+		/* User ports should communicate only with the CPU port.
+		 */
+		port_mask = BIT(dsa_to_port(ds, port)->cpu_dp->index);
+	} else {
+		/* Other ports do not need to communicate at all */
+		port_mask = 0;
+	}
+
+	val = FIELD_PREP(AR9331_SW_PORT_VLAN_8021Q_MODE,
+			 AR9331_SW_8021Q_MODE_NONE) |
+		FIELD_PREP(AR9331_SW_PORT_VLAN_PORT_VID_MEMBER, port_mask) |
+		FIELD_PREP(AR9331_SW_PORT_VLAN_PORT_VID,
+			   AR9331_SW_PORT_VLAN_PORT_VID_DEF);
+
+	ret = regmap_write(regmap, AR9331_SW_REG_PORT_VLAN(port), val);
+	if (ret)
+		goto error;
+
+	ret = regmap_write(regmap, AR9331_SW_REG_PORT_CTRL(port), port_ctrl);
+	if (ret)
+		goto error;
+
+	return 0;
+error:
+	dev_err(priv->dev, "%s: error: %i\n", __func__, ret);
+
+	return ret;
+}
+
 static int ar9331_sw_setup(struct dsa_switch *ds)
 {
 	struct ar9331_sw_priv *priv = (struct ar9331_sw_priv *)ds->priv;
 	struct regmap *regmap = priv->regmap;
-	int ret;
+	int ret, i;
 
 	ret = ar9331_sw_reset(priv);
 	if (ret)
@@ -401,6 +491,12 @@ static int ar9331_sw_setup(struct dsa_switch *ds)
 				AR9331_SW_GLOBAL_CTRL_MFS_M);
 	if (ret)
 		goto error;
+
+	for (i = 0; i < ds->num_ports; i++) {
+		ret = ar9331_sw_setup_port(ds, i);
+		if (ret)
+			goto error;
+	}
 
 	ds->configure_vlan_while_not_filtering = false;
 
