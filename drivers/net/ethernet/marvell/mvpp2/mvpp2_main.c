@@ -1831,7 +1831,7 @@ enum {
 	ETHTOOL_XDP_TX,
 	ETHTOOL_XDP_TX_ERR,
 	ETHTOOL_XDP_XMIT,
-	ETHTOOL_XDP_XMIT_ERR,
+	ETHTOOL_XDP_XMIT_DROPS,
 };
 
 struct mvpp2_ethtool_counter {
@@ -1933,7 +1933,7 @@ static const struct mvpp2_ethtool_counter mvpp2_ethtool_xdp[] = {
 	{ ETHTOOL_XDP_TX, "rx_xdp_tx", },
 	{ ETHTOOL_XDP_TX_ERR, "rx_xdp_tx_errors", },
 	{ ETHTOOL_XDP_XMIT, "tx_xdp_xmit", },
-	{ ETHTOOL_XDP_XMIT_ERR, "tx_xdp_xmit_errors", },
+	{ ETHTOOL_XDP_XMIT_DROPS, "tx_xdp_xmit_drops", },
 };
 
 #define MVPP2_N_ETHTOOL_STATS(ntxqs, nrxqs)	(ARRAY_SIZE(mvpp2_ethtool_mib_regs) + \
@@ -2000,7 +2000,7 @@ mvpp2_get_xdp_stats(struct mvpp2_port *port, struct mvpp2_pcpu_stats *xdp_stats)
 		u64	xdp_pass;
 		u64	xdp_drop;
 		u64	xdp_xmit;
-		u64	xdp_xmit_err;
+		u64	xdp_xmit_drops;
 		u64	xdp_tx;
 		u64	xdp_tx_err;
 
@@ -2011,7 +2011,7 @@ mvpp2_get_xdp_stats(struct mvpp2_port *port, struct mvpp2_pcpu_stats *xdp_stats)
 			xdp_pass   = cpu_stats->xdp_pass;
 			xdp_drop = cpu_stats->xdp_drop;
 			xdp_xmit   = cpu_stats->xdp_xmit;
-			xdp_xmit_err   = cpu_stats->xdp_xmit_err;
+			xdp_xmit_drops = cpu_stats->xdp_xmit_drops;
 			xdp_tx   = cpu_stats->xdp_tx;
 			xdp_tx_err   = cpu_stats->xdp_tx_err;
 		} while (u64_stats_fetch_retry_irq(&cpu_stats->syncp, start));
@@ -2020,7 +2020,7 @@ mvpp2_get_xdp_stats(struct mvpp2_port *port, struct mvpp2_pcpu_stats *xdp_stats)
 		xdp_stats->xdp_pass   += xdp_pass;
 		xdp_stats->xdp_drop += xdp_drop;
 		xdp_stats->xdp_xmit   += xdp_xmit;
-		xdp_stats->xdp_xmit_err   += xdp_xmit_err;
+		xdp_stats->xdp_xmit_drops += xdp_xmit_drops;
 		xdp_stats->xdp_tx   += xdp_tx;
 		xdp_stats->xdp_tx_err   += xdp_tx_err;
 	}
@@ -2083,8 +2083,8 @@ static void mvpp2_read_stats(struct mvpp2_port *port)
 		case ETHTOOL_XDP_XMIT:
 			*pstats++ = xdp_stats.xdp_xmit;
 			break;
-		case ETHTOOL_XDP_XMIT_ERR:
-			*pstats++ = xdp_stats.xdp_xmit_err;
+		case ETHTOOL_XDP_XMIT_DROPS:
+			*pstats++ = xdp_stats.xdp_xmit_drops;
 			break;
 		}
 	}
@@ -3773,7 +3773,7 @@ mvpp2_xdp_xmit(struct net_device *dev, int num_frame,
 	stats->tx_bytes += nxmit_byte;
 	stats->tx_packets += nxmit;
 	stats->xdp_xmit += nxmit;
-	stats->xdp_xmit_err += num_frame - nxmit;
+	stats->xdp_xmit_drops += num_frame - nxmit;
 	u64_stats_update_end(&stats->syncp);
 
 	return nxmit;

@@ -1121,7 +1121,7 @@ struct mvpp2_pcpu_stats {
 	u64	xdp_pass;
 	u64	xdp_drop;
 	u64	xdp_xmit;
-	u64	xdp_xmit_err;
+	u64	xdp_xmit_drops;
 	u64	xdp_tx;
 	u64	xdp_tx_err;
 };
