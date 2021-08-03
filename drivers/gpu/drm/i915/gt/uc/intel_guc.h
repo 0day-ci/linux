@@ -69,8 +69,13 @@ struct intel_guc {
 	u32 ads_regset_size;
 	u32 ads_golden_ctxt_size;
 
-	struct i915_vma *lrc_desc_pool;
-	void *lrc_desc_pool_vaddr;
+	/* GuC LRC descriptor registration */
+	struct {
+		struct i915_vma *vma;
+		void *vaddr;
+		struct ida ida;
+		unsigned int max_idx;
+	} lrcd_reg;
 
 	/* guc_id to intel_context lookup */
 	struct xarray context_lookup;
