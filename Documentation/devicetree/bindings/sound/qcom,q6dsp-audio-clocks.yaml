@@ -14,7 +14,9 @@ description: |
 
 properties:
   compatible:
-    const: qcom,q6afe-clocks
+    enum:
+      - qcom,q6afe-clocks
+      - qcom,q6prm-clocks
 
   reg:
     maxItems: 1
@@ -48,6 +50,23 @@ examples:
             #size-cells = <0>;
             q6afecc@2 {
               compatible = "qcom,q6afe-clocks";
+              reg = <2>;
+              #clock-cells = <2>;
+            };
+        };
+      };
+
+  - |
+    #include <dt-bindings/soc/qcom,gpr.h>
+    gpr {
+        #address-cells = <1>;
+        #size-cells = <0>;
+        gpr-service@2 {
+            reg = <GPR_PRM_MODULE_IID>;
+            #address-cells = <1>;
+            #size-cells = <0>;
+            q6prmcc@2 {
+              compatible = "qcom,q6prm-clocks";
               reg = <2>;
               #clock-cells = <2>;
             };
