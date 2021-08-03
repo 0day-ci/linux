@@ -60,20 +60,19 @@ static void wa_init_start(struct i915_wa_list *wal, const char *name, const char
 
 #define WA_LIST_CHUNK (1 << 4)
 
+static void wa_trim(struct i915_wa_list *wal, gfp_t gfp)
+{
+	struct i915_wa *list;
+
+	/* Trim unused entries. */
+	list = krealloc(wal->list, wal->count * sizeof(*list), gfp);
+	if (list)
+		wal->list = list;
+}
+
 static void wa_init_finish(struct i915_wa_list *wal)
 {
-	/* Trim unused entries. */
-	if (!IS_ALIGNED(wal->count, WA_LIST_CHUNK)) {
-		struct i915_wa *list = kmemdup(wal->list,
-					       wal->count * sizeof(*list),
-					       GFP_KERNEL);
-
-		if (list) {
-			kfree(wal->list);
-			wal->list = list;
-		}
-	}
-
+	wa_trim(wal, GFP_KERNEL);
 	if (!wal->count)
 		return;
 
@@ -81,57 +80,60 @@ static void wa_init_finish(struct i915_wa_list *wal)
 			 wal->wa_count, wal->name, wal->engine_name);
 }
 
-static void _wa_add(struct i915_wa_list *wal, const struct i915_wa *wa)
+static int wa_index(struct i915_wa_list *wal, i915_reg_t reg)
 {
-	unsigned int addr = i915_mmio_reg_offset(wa->reg);
-	unsigned int start = 0, end = wal->count;
-	const unsigned int grow = WA_LIST_CHUNK;
-	struct i915_wa *wa_;
+	unsigned int addr = i915_mmio_reg_offset(reg);
+	int start = 0, end = wal->count;
 
-	GEM_BUG_ON(!is_power_of_2(grow));
-
-	if (IS_ALIGNED(wal->count, grow)) { /* Either uninitialized or full. */
-		struct i915_wa *list;
-
-		list = kmalloc_array(ALIGN(wal->count + 1, grow), sizeof(*wa),
-				     GFP_KERNEL);
-		if (!list) {
-			DRM_ERROR("No space for workaround init!\n");
-			return;
-		}
-
-		if (wal->list) {
-			memcpy(list, wal->list, sizeof(*wa) * wal->count);
-			kfree(wal->list);
-		}
-
-		wal->list = list;
-	}
-
+	/* addr and wal->list[].reg, both include the R/W flags */
 	while (start < end) {
 		unsigned int mid = start + (end - start) / 2;
 
-		if (i915_mmio_reg_offset(wal->list[mid].reg) < addr) {
+		if (i915_mmio_reg_offset(wal->list[mid].reg) < addr)
 			start = mid + 1;
-		} else if (i915_mmio_reg_offset(wal->list[mid].reg) > addr) {
+		else if (i915_mmio_reg_offset(wal->list[mid].reg) > addr)
 			end = mid;
-		} else {
-			wa_ = &wal->list[mid];
+		else
+			return mid;
+	}
 
-			if ((wa->clr | wa_->clr) && !(wa->clr & ~wa_->clr)) {
-				DRM_ERROR("Discarding overwritten w/a for reg %04x (clear: %08x, set: %08x)\n",
-					  i915_mmio_reg_offset(wa_->reg),
-					  wa_->clr, wa_->set);
+	return -ENOENT;
+}
 
-				wa_->set &= ~wa->clr;
-			}
+static int wa_list_grow(struct i915_wa_list *wal, size_t count, gfp_t gfp)
+{
+	struct i915_wa *list;
 
-			wal->wa_count++;
-			wa_->set |= wa->set;
-			wa_->clr |= wa->clr;
-			wa_->read |= wa->read;
-			return;
+	list = krealloc(wal->list, count * sizeof(*list), gfp);
+	if (!list)
+		return -ENOMEM;
+
+	wal->list = list;
+	return 0;
+}
+
+static void __wa_add(struct i915_wa_list *wal, const struct i915_wa *wa)
+{
+	struct i915_wa *wa_;
+	int index;
+
+	index = wa_index(wal, wa->reg);
+	if (index >= 0) {
+		wa_ = &wal->list[index];
+
+		if ((wa->clr | wa_->clr) && !(wa->clr & ~wa_->clr)) {
+			DRM_ERROR("Discarding overwritten w/a for reg %04x (clear: %08x, set: %08x)\n",
+				  i915_mmio_reg_offset(wa_->reg),
+				  wa_->clr, wa_->set);
+
+			wa_->set &= ~wa->clr;
 		}
+
+		wal->wa_count++;
+		wa_->set |= wa->set;
+		wa_->clr |= wa->clr;
+		wa_->read |= wa->read;
+		return;
 	}
 
 	wal->wa_count++;
@@ -147,6 +149,22 @@ static void _wa_add(struct i915_wa_list *wal, const struct i915_wa *wa)
 
 		swap(wa_[1], wa_[0]);
 	}
+}
+
+static void _wa_add(struct i915_wa_list *wal, const struct i915_wa *wa)
+{
+	const unsigned int grow = WA_LIST_CHUNK;
+
+	GEM_BUG_ON(!is_power_of_2(grow));
+
+	if (IS_ALIGNED(wal->count, grow) && /* Either uninitialized or full. */
+	    wa_list_grow(wal, ALIGN(wal->count + 1, grow), GFP_KERNEL)) {
+		DRM_ERROR("Unable to store w/a for reg %04x\n",
+			  i915_mmio_reg_offset(wa->reg));
+		return;
+	}
+
+	__wa_add(wal, wa);
 }
 
 static void wa_add(struct i915_wa_list *wal, i915_reg_t reg,
