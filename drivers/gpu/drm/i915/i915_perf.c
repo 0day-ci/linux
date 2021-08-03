@@ -2554,6 +2554,12 @@ gen12_enable_metric_set(struct i915_perf_stream *stream,
 			    : 0);
 
 	/*
+	 * Initialize Super Queue Internal Cnt Register
+	 * Set PMON Enable in order to collect valid metrics.
+	 */
+	intel_uncore_rmw(uncore, GEN12_SQCNT1, 0, GEN12_SQCNT1_PMON_ENABLE);
+
+	/*
 	 * Update all contexts prior writing the mux configurations as we need
 	 * to make sure all slices/subslices are ON before writing to NOA
 	 * registers.
@@ -2612,6 +2618,9 @@ static void gen12_disable_metric_set(struct i915_perf_stream *stream)
 
 	/* Make sure we disable noa to save power. */
 	intel_uncore_rmw(uncore, RPM_CONFIG1, GEN10_GT_NOA_ENABLE, 0);
+
+	/* Reset PMON Enable to save power. */
+	intel_uncore_rmw(uncore, GEN12_SQCNT1, GEN12_SQCNT1_PMON_ENABLE, 0);
 }
 
 static void gen7_oa_enable(struct i915_perf_stream *stream)
