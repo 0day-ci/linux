@@ -17,6 +17,8 @@ static int handle_enc_init_msg(struct venc_vpu_inst *vpu, const void *data)
 	vpu->vsi = mtk_vcodec_fw_map_dm_addr(vpu->ctx->dev->fw_handler,
 					     msg->vpu_inst_addr);
 
+	if (IS_ERR(vpu->vsi))
+		return PTR_ERR(vpu->vsi);
 	/* Firmware version field value is unspecified on MT8173. */
 	if (vpu->ctx->dev->venc_pdata->chip == MTK_MT8173)
 		return 0;
@@ -42,6 +44,12 @@ static int handle_enc_encode_msg(struct venc_vpu_inst *vpu, const void *data)
 	vpu->state = msg->state;
 	vpu->bs_size = msg->bs_size;
 	vpu->is_key_frm = msg->is_key_frm;
+	if (vpu->state == VEN_IPI_MSG_ENC_STATE_ERROR ||
+	    vpu->state == VEN_IPI_MSG_ENC_STATE_PART) {
+		mtk_vcodec_err(vpu, "bad ipi-enc-state: %s",
+			       vpu->state == VEN_IPI_MSG_ENC_STATE_ERROR ? "ERR" : "PART");
+		return -EINVAL;
+	}
 	return 0;
 }
 
