@@ -746,7 +746,7 @@ static int intel_context_set_gem(struct intel_context *ce,
 
 	ce->ring_size = SZ_16K;
 
-	i915_vm_put(ce->vm);
+	WARN_ON(ce->vm);
 	ce->vm = i915_gem_context_get_eb_vm(ctx);
 
 	if (ctx->sched.priority >= I915_PRIORITY_NORMAL &&
@@ -856,7 +856,7 @@ static struct i915_gem_engines *default_engines(struct i915_gem_context *ctx,
 		GEM_BUG_ON(engine->legacy_idx >= I915_NUM_ENGINES);
 		GEM_BUG_ON(e->engines[engine->legacy_idx]);
 
-		ce = intel_context_create(engine);
+		ce = intel_context_create_user(engine);
 		if (IS_ERR(ce)) {
 			err = ERR_CAST(ce);
 			goto free_engines;
@@ -897,12 +897,12 @@ static struct i915_gem_engines *user_engines(struct i915_gem_context *ctx,
 
 		switch (pe[n].type) {
 		case I915_GEM_ENGINE_TYPE_PHYSICAL:
-			ce = intel_context_create(pe[n].engine);
+			ce = intel_context_create_user(pe[n].engine);
 			break;
 
 		case I915_GEM_ENGINE_TYPE_BALANCED:
-			ce = intel_engine_create_virtual(pe[n].siblings,
-							 pe[n].num_siblings);
+			ce = intel_engine_create_virtual_user(pe[n].siblings,
+							      pe[n].num_siblings);
 			break;
 
 		case I915_GEM_ENGINE_TYPE_INVALID:

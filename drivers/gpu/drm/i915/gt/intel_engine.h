@@ -280,6 +280,10 @@ intel_engine_has_preempt_reset(const struct intel_engine_cs *engine)
 }
 
 struct intel_context *
+intel_engine_create_virtual_user(struct intel_engine_cs **siblings,
+				 unsigned int count);
+
+struct intel_context *
 intel_engine_create_virtual(struct intel_engine_cs **siblings,
 			    unsigned int count);
 

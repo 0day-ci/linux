@@ -1879,9 +1879,10 @@ ktime_t intel_engine_get_busy_time(struct intel_engine_cs *engine, ktime_t *now)
 	return total;
 }
 
+/* for user contexts, callers must set ce->vm correctly */
 struct intel_context *
-intel_engine_create_virtual(struct intel_engine_cs **siblings,
-			    unsigned int count)
+intel_engine_create_virtual_user(struct intel_engine_cs **siblings,
+				 unsigned int count)
 {
 	if (count == 0)
 		return ERR_PTR(-EINVAL);
@@ -1891,6 +1892,22 @@ intel_engine_create_virtual(struct intel_engine_cs **siblings,
 
 	GEM_BUG_ON(!siblings[0]->cops->create_virtual);
 	return siblings[0]->cops->create_virtual(siblings, count);
+}
+
+/* for kernel-internal users only, sets ce->vm to intel_gt.vm */
+struct intel_context *
+intel_engine_create_virtual(struct intel_engine_cs **siblings,
+			    unsigned int count)
+{
+	struct intel_context *ce;
+
+	ce = intel_engine_create_virtual_user(siblings, count);
+	if (IS_ERR(ce))
+		return ce;
+
+	ce->vm = i915_vm_get(siblings[0]->gt->vm);
+
+	return ce;
 }
 
 struct i915_request *

@@ -30,7 +30,10 @@
 
 struct eb_vma {
 	struct i915_vma *vma;
+	struct drm_i915_gem_object *obj;
 	unsigned int flags;
+
+	u32 handle;
 
 	/** This vma's place in the execbuf reservation list */
 	struct drm_i915_gem_exec_object2 *exec;
@@ -38,7 +41,6 @@ struct eb_vma {
 	struct list_head reloc_link;
 
 	struct hlist_node node;
-	u32 handle;
 };
 
 enum {
