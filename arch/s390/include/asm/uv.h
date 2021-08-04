@@ -350,6 +350,15 @@ static inline int uv_remove_shared(unsigned long addr) { return 0; }
 #if IS_ENABLED(CONFIG_KVM)
 extern int prot_virt_host;
 
+struct destroy_page_lazy {
+	struct list_head list;
+	unsigned short count;
+	unsigned long pfns[];
+};
+
+/* This guarantees that up to PV_MAX_LAZY_COUNT can fit in a page */
+#define PV_MAX_LAZY_COUNT ((PAGE_SIZE - sizeof(struct destroy_page_lazy)) / sizeof(long))
+
 static inline int is_prot_virt_host(void)
 {
 	return prot_virt_host;
@@ -358,6 +367,7 @@ static inline int is_prot_virt_host(void)
 int gmap_make_secure(struct gmap *gmap, unsigned long gaddr, void *uvcb);
 int gmap_destroy_page(struct gmap *gmap, unsigned long gaddr);
 int uv_destroy_owned_page(unsigned long paddr);
+int uv_destroy_page_lazy(struct mm_struct *mm, unsigned long paddr);
 int uv_convert_from_secure(unsigned long paddr);
 int uv_convert_owned_from_secure(unsigned long paddr);
 int gmap_convert_to_secure(struct gmap *gmap, unsigned long gaddr);
@@ -370,6 +380,11 @@ static inline void setup_uv(void) {}
 static inline void adjust_to_uv_max(unsigned long *vmax) {}
 
 static inline int uv_destroy_owned_page(unsigned long paddr)
+{
+	return 0;
+}
+
+static inline int uv_destroy_page_lazy(struct mm_struct *mm, unsigned long paddr)
 {
 	return 0;
 }

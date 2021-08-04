@@ -187,6 +187,53 @@ int uv_convert_owned_from_secure(unsigned long paddr)
 }
 
 /*
+ * Set aside the given page and put it in the list of pages to be cleared in
+ * background. The caller must already hold a reference to the page.
+ */
+int uv_destroy_page_lazy(struct mm_struct *mm, unsigned long paddr)
+{
+	struct list_head *head = &mm->context.deferred_list;
+	struct destroy_page_lazy *lazy;
+	struct page *page;
+	int rc;
+
+	/* get an extra reference here */
+	get_page(phys_to_page(paddr));
+
+	lazy = list_first_entry(head, struct destroy_page_lazy, list);
+	/*
+	 * We need a fresh page to store more pointers. The current page
+	 * might be shared, so it cannot be used directly. Instead, make it
+	 * accessible and release it, and let the normal unmap code free it
+	 * later, if needed.
+	 * Afterwards, try to allocate a new page, but not very hard. If the
+	 * allocation fails, we simply return. The next call to this
+	 * function will attempt to do the same again, until enough pages
+	 * have been freed.
+	 */
+	if (list_empty(head) || lazy->count >= PV_MAX_LAZY_COUNT) {
+		rc = uv_convert_owned_from_secure(paddr);
+		/* in case of failure, we intentionally leak the page */
+		if (rc)
+			return rc;
+		/* release the extra reference */
+		put_page(phys_to_page(paddr));
+
+		/* try to allocate a new page quickly, but allow failures */
+		page = alloc_page(GFP_ATOMIC | __GFP_NOMEMALLOC | __GFP_NOWARN);
+		if (!page)
+			return -ENOMEM;
+		lazy = page_to_virt(page);
+		lazy->count = 0;
+		list_add(&lazy->list, head);
+		return 0;
+	}
+	/* the array of pointers has space, just add this entry */
+	lazy->pfns[lazy->count++] = phys_to_pfn(paddr);
+	return 0;
+}
+
+/*
  * Calculate the expected ref_count for a page that would otherwise have no
  * further pins. This was cribbed from similar functions in other places in
  * the kernel, but with some slight modifications. We know that a secure

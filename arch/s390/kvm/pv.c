@@ -19,6 +19,7 @@
 
 struct deferred_priv {
 	struct mm_struct *mm;
+	bool has_mm;
 	unsigned long old_table;
 	u64 handle;
 	void *stor_var;
@@ -197,19 +198,34 @@ static int kvm_s390_pv_deinit_vm_now(struct kvm *kvm, u16 *rc, u16 *rrc)
 
 static int kvm_s390_pv_destroy_vm_thread(void *priv)
 {
+	struct destroy_page_lazy *lazy, *next;
 	struct deferred_priv *p = priv;
 	u16 rc, rrc;
 	int r;
 
-	/* Clear all the pages as long as we are not the only users of the mm */
-	s390_uv_destroy_range(p->mm, 1, 0, TASK_SIZE_MAX);
-	/*
-	 * If we were the last user of the mm, synchronously free (and clear
-	 * if needed) all pages.
-	 * Otherwise simply decrease the reference counter; in this case we
-	 * have already cleared all pages.
-	 */
-	mmput(p->mm);
+	list_for_each_entry_safe(lazy, next, &p->mm->context.deferred_list, list) {
+		list_del(&lazy->list);
+		s390_uv_destroy_pfns(lazy->count, lazy->pfns);
+		free_page(__pa(lazy));
+	}
+
+	if (p->has_mm) {
+		/* Clear all the pages as long as we are not the only users of the mm */
+		s390_uv_destroy_range(p->mm, 1, 0, TASK_SIZE_MAX);
+		if (atomic_read(&p->mm->mm_users) == 1) {
+			mmap_write_lock(p->mm);
+			/* destroy synchronously if there are no other users */
+			p->mm->context.pv_sync_destroy = 1;
+			mmap_write_unlock(p->mm);
+		}
+		/*
+		 * If we were the last user of the mm, synchronously free
+		 * (and clear if needed) all pages.
+		 * Otherwise simply decrease the reference counter; in this
+		 * case we have already cleared all pages.
+		 */
+		mmput(p->mm);
+	}
 
 	r = uv_cmd_nodata(p->handle, UVC_CMD_DESTROY_SEC_CONF, &rc, &rrc);
 	WARN_ONCE(r, "protvirt destroy vm failed rc %x rrc %x", rc, rrc);
@@ -241,7 +257,9 @@ static int deferred_destroy(struct kvm *kvm, struct deferred_priv *priv, u16 *rc
 	priv->old_table = (unsigned long)kvm->arch.gmap->table;
 	WRITE_ONCE(kvm->arch.gmap->guest_handle, 0);
 
-	if (s390_replace_asce(kvm->arch.gmap))
+	if (!priv->has_mm)
+		s390_remove_old_asce(kvm->arch.gmap);
+	else if (s390_replace_asce(kvm->arch.gmap))
 		goto fail;
 
 	t = kthread_create(kvm_s390_pv_destroy_vm_thread, priv,
@@ -300,8 +318,9 @@ int kvm_s390_pv_deinit_vm_deferred(struct kvm *kvm, u16 *rc, u16 *rrc)
 
 	mmgrab(kvm->mm);
 	if (mmget_not_zero(kvm->mm)) {
+		priv->has_mm = true;
 		kvm_s390_clear_2g(kvm);
-	} else {
+	} else if (list_empty(&kvm->mm->context.deferred_list)) {
 		/* No deferred work to do */
 		mmdrop(kvm->mm);
 		kfree(priv);
