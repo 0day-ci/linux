@@ -15,7 +15,11 @@
 #include <linux/pagewalk.h>
 #include <linux/sched/mm.h>
 #include <linux/kthread.h>
+#include <linux/delay.h>
+#include <linux/oom.h>
 #include "kvm-s390.h"
+
+#define KVM_S390_PV_LAZY_DESTROY_OOM_NOTIFY_PRIORITY	70
 
 struct deferred_priv {
 	struct mm_struct *mm;
@@ -24,6 +28,8 @@ struct deferred_priv {
 	u64 handle;
 	void *stor_var;
 	unsigned long stor_base;
+	unsigned long n_pages_freed;
+	struct notifier_block oom_nb;
 };
 
 static int lazy_destroy = 1;
@@ -200,6 +206,24 @@ static int kvm_s390_pv_deinit_vm_now(struct kvm *kvm, u16 *rc, u16 *rrc)
 	return cc ? -EIO : 0;
 }
 
+static int kvm_s390_pv_oom_notify(struct notifier_block *nb,
+				  unsigned long dummy, void *parm)
+{
+	unsigned long *freed = parm;
+	unsigned long free_before;
+	struct deferred_priv *p;
+
+	if (*freed > 1024)
+		return NOTIFY_OK;
+
+	p = container_of(nb, struct deferred_priv, oom_nb);
+	free_before = READ_ONCE(p->n_pages_freed);
+	msleep(20);
+	*freed += READ_ONCE(p->n_pages_freed) - free_before;
+
+	return NOTIFY_OK;
+}
+
 static int kvm_s390_pv_destroy_vm_thread(void *priv)
 {
 	struct destroy_page_lazy *lazy, *next;
@@ -207,11 +231,19 @@ static int kvm_s390_pv_destroy_vm_thread(void *priv)
 	u16 rc, rrc;
 	int r;
 
+	p->oom_nb.priority = KVM_S390_PV_LAZY_DESTROY_OOM_NOTIFY_PRIORITY;
+	p->oom_nb.notifier_call = kvm_s390_pv_oom_notify;
+	r = register_oom_notifier(&p->oom_nb);
+
 	list_for_each_entry_safe(lazy, next, &p->mm->context.deferred_list, list) {
 		list_del(&lazy->list);
 		s390_uv_destroy_pfns(lazy->count, lazy->pfns);
+		WRITE_ONCE(p->n_pages_freed, p->n_pages_freed + lazy->count + 1);
 		free_page(__pa(lazy));
 	}
+
+	if (!r)
+		unregister_oom_notifier(&p->oom_nb);
 
 	if (p->has_mm) {
 		/* Clear all the pages as long as we are not the only users of the mm */
