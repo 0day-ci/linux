@@ -3313,8 +3313,7 @@ unlock:
 static inline void handle_cmd_cnt_and_timer(struct hci_dev *hdev,
 					    u16 opcode, u8 ncmd)
 {
-	if (opcode != HCI_OP_NOP)
-		cancel_delayed_work(&hdev->cmd_timer);
+	cancel_delayed_work(&hdev->cmd_timer);
 
 	if (!test_bit(HCI_RESET, &hdev->flags)) {
 		if (ncmd) {
