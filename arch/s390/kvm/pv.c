@@ -26,6 +26,10 @@ struct deferred_priv {
 	unsigned long stor_base;
 };
 
+static int lazy_destroy = 1;
+module_param(lazy_destroy, int, 0444);
+MODULE_PARM_DESC(lazy_destroy, "Deferred destroy for protected guests");
+
 int kvm_s390_pv_destroy_cpu(struct kvm_vcpu *vcpu, u16 *rc, u16 *rrc)
 {
 	int cc = 0;
@@ -312,6 +316,9 @@ int kvm_s390_pv_deinit_vm_deferred(struct kvm *kvm, u16 *rc, u16 *rrc)
 {
 	struct deferred_priv *priv;
 
+	if (!lazy_destroy)
+		return kvm_s390_pv_deinit_vm_now(kvm, rc, rrc);
+
 	priv = kmalloc(sizeof(*priv), GFP_KERNEL | __GFP_ZERO);
 	if (!priv)
 		return kvm_s390_pv_deinit_vm_now(kvm, rc, rrc);
@@ -359,6 +366,12 @@ int kvm_s390_pv_init_vm(struct kvm *kvm, u16 *rc, u16 *rrc)
 
 	/* Outputs */
 	kvm->arch.pv.handle = uvcb.guest_handle;
+
+	if (!lazy_destroy) {
+		mmap_write_lock(kvm->mm);
+		kvm->mm->context.pv_sync_destroy = 1;
+		mmap_write_unlock(kvm->mm);
+	}
 
 	atomic_inc(&kvm->mm->context.is_protected);
 	if (cc) {
