@@ -162,12 +162,17 @@ void r100_wait_for_vblank(struct radeon_device *rdev, int crtc)
 void r100_page_flip(struct radeon_device *rdev, int crtc_id, u64 crtc_base, bool async)
 {
 	struct radeon_crtc *radeon_crtc = rdev->mode_info.crtcs[crtc_id];
+	struct drm_framebuffer *fb = radeon_crtc->base.primary->fb;
 	u32 tmp = ((u32)crtc_base) | RADEON_CRTC_OFFSET__OFFSET_LOCK;
 	int i;
 
 	/* Lock the graphics update lock */
 	/* update the scanout addresses */
 	WREG32(RADEON_CRTC_OFFSET + radeon_crtc->crtc_offset, tmp);
+
+	/* update pitch */
+	WREG32(RADEON_CRTC_PITCH + radeon_crtc->crtc_offset,
+	       fb->pitches[0] / fb->format->cpp[0]);
 
 	/* Wait for update_pending to go high. */
 	for (i = 0; i < rdev->usec_timeout; i++) {
