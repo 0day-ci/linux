@@ -167,6 +167,22 @@ static void fanotify_unhash_event(struct fsnotify_group *group,
 	hlist_del_init(&event->merge_list);
 }
 
+static struct fanotify_error_event *fanotify_alloc_error_event(
+					struct fanotify_sb_mark *sb_mark)
+
+{
+	struct fanotify_error_event *fee;
+
+	fee = kzalloc(sizeof(*fee), GFP_KERNEL_ACCOUNT);
+	if (!fee)
+		return NULL;
+
+	fanotify_init_event(&fee->fae, 0, FS_ERROR);
+	fee->sb_mark = sb_mark;
+
+	return fee;
+}
+
 /*
  * Get an fanotify notification event if one exists and is small
  * enough to fit in "count". Return an error pointer if the count
@@ -994,6 +1010,7 @@ static int fanotify_add_mark(struct fsnotify_group *group,
 {
 	struct fsnotify_mark *fsn_mark;
 	__u32 added;
+	int ret = 0;
 
 	mutex_lock(&group->mark_mutex);
 	fsn_mark = fsnotify_find_mark(connp, group);
@@ -1004,13 +1021,33 @@ static int fanotify_add_mark(struct fsnotify_group *group,
 			return PTR_ERR(fsn_mark);
 		}
 	}
+
+	/*
+	 * Error events are allocated per super-block mark only if
+	 * strictly needed (i.e. FAN_FS_ERROR was requested).
+	 */
+	if (type == FSNOTIFY_OBJ_TYPE_SB && !(flags & FAN_MARK_IGNORED_MASK) &&
+	    (mask & FAN_FS_ERROR)) {
+		struct fanotify_sb_mark *sb_mark = FANOTIFY_SB_MARK(fsn_mark);
+
+		if (!sb_mark->fee_slot) {
+			sb_mark->fee_slot = fanotify_alloc_error_event(sb_mark);
+			if (!sb_mark->fee_slot) {
+				ret = -ENOMEM;
+				goto out;
+			}
+		}
+	}
+
 	added = fanotify_mark_add_to_mask(fsn_mark, mask, flags);
 	if (added & ~fsnotify_conn_mask(fsn_mark->connector))
 		fsnotify_recalc_mask(fsn_mark->connector);
+
+out:
 	mutex_unlock(&group->mark_mutex);
 
 	fsnotify_put_mark(fsn_mark);
-	return 0;
+	return ret;
 }
 
 static int fanotify_add_vfsmount_mark(struct fsnotify_group *group,
