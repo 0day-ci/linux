@@ -2685,6 +2685,7 @@ static int btrfs_ioctl_get_subvol_info(struct file *file, void __user *argp)
 	unsigned long item_off;
 	unsigned long item_len;
 	struct inode *inode;
+	u64 treeid;
 	int slot;
 	int ret = 0;
 
@@ -2702,15 +2703,15 @@ static int btrfs_ioctl_get_subvol_info(struct file *file, void __user *argp)
 	fs_info = BTRFS_I(inode)->root->fs_info;
 
 	/* Get root_item of inode's subvolume */
-	key.objectid = BTRFS_I(inode)->root->root_key.objectid;
-	root = btrfs_get_fs_root(fs_info, key.objectid, true);
+	treeid = BTRFS_I(inode)->root->root_key.objectid;
+	root = btrfs_get_fs_root(fs_info, treeid, true);
 	if (IS_ERR(root)) {
 		ret = PTR_ERR(root);
 		goto out_free;
 	}
 	root_item = &root->root_item;
 
-	subvol_info->treeid = key.objectid;
+	subvol_info->treeid = treeid;
 
 	subvol_info->generation = btrfs_root_generation(root_item);
 	subvol_info->flags = btrfs_root_flags(root_item);
@@ -2737,44 +2738,31 @@ static int btrfs_ioctl_get_subvol_info(struct file *file, void __user *argp)
 	subvol_info->rtime.sec = btrfs_stack_timespec_sec(&root_item->rtime);
 	subvol_info->rtime.nsec = btrfs_stack_timespec_nsec(&root_item->rtime);
 
-	if (key.objectid != BTRFS_FS_TREE_OBJECTID) {
+	if (treeid != BTRFS_FS_TREE_OBJECTID) {
 		/* Search root tree for ROOT_BACKREF of this subvolume */
-		key.type = BTRFS_ROOT_BACKREF_KEY;
-		key.offset = 0;
-		ret = btrfs_search_slot(NULL, fs_info->tree_root, &key, path, 0, 0);
+		ret = btrfs_find_item(fs_info->tree_root, path, treeid,
+					BTRFS_ROOT_BACKREF_KEY, 0, &key);
 		if (ret < 0) {
 			goto out;
-		} else if (path->slots[0] >=
-			   btrfs_header_nritems(path->nodes[0])) {
-			ret = btrfs_next_leaf(fs_info->tree_root, path);
-			if (ret < 0) {
-				goto out;
-			} else if (ret > 0) {
-				ret = -EUCLEAN;
-				goto out;
-			}
+		} else if (ret > 0) {
+			ret = -EUCLEAN;
+			goto out;
 		}
 
 		leaf = path->nodes[0];
 		slot = path->slots[0];
-		btrfs_item_key_to_cpu(leaf, &key, slot);
-		if (key.objectid == subvol_info->treeid &&
-		    key.type == BTRFS_ROOT_BACKREF_KEY) {
-			subvol_info->parent_id = key.offset;
 
-			rref = btrfs_item_ptr(leaf, slot, struct btrfs_root_ref);
-			subvol_info->dirid = btrfs_root_ref_dirid(leaf, rref);
+		subvol_info->parent_id = key.offset;
 
-			item_off = btrfs_item_ptr_offset(leaf, slot)
-					+ sizeof(struct btrfs_root_ref);
-			item_len = btrfs_item_size_nr(leaf, slot)
-					- sizeof(struct btrfs_root_ref);
-			read_extent_buffer(leaf, subvol_info->name,
-					   item_off, item_len);
-		} else {
-			ret = -ENOENT;
-			goto out;
-		}
+		rref = btrfs_item_ptr(leaf, slot, struct btrfs_root_ref);
+		subvol_info->dirid = btrfs_root_ref_dirid(leaf, rref);
+
+		item_off = btrfs_item_ptr_offset(leaf, slot)
+				+ sizeof(struct btrfs_root_ref);
+		item_len = btrfs_item_size_nr(leaf, slot)
+				- sizeof(struct btrfs_root_ref);
+		read_extent_buffer(leaf, subvol_info->name,
+				   item_off, item_len);
 	}
 
 	if (copy_to_user(argp, subvol_info, sizeof(*subvol_info)))
