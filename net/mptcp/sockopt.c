@@ -81,9 +81,7 @@ static void mptcp_sol_socket_sync_intval(struct mptcp_sock *msk, int optname, in
 			sock_valbool_flag(ssk, SOCK_DBG, !!val);
 			break;
 		case SO_KEEPALIVE:
-			if (ssk->sk_prot->keepalive)
-				ssk->sk_prot->keepalive(ssk, !!val);
-			sock_valbool_flag(ssk, SOCK_KEEPOPEN, !!val);
+			sock_set_keepalive(ssk, !!val);
 			break;
 		case SO_PRIORITY:
 			ssk->sk_priority = val;

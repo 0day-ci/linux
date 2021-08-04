@@ -1356,7 +1356,7 @@ static int tcp_create_listen_sock(struct listen_connection *con,
 		log_print("Can't bind to port %d", dlm_config.ci_tcp_port);
 		goto create_out;
 	}
-	sock_set_keepalive(sock->sk);
+	sock_set_keepalive(sock->sk, true);
 
 	result = sock->ops->listen(sock, 5);
 	if (result < 0) {

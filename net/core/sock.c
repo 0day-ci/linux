@@ -892,12 +892,12 @@ int sock_set_timestamping(struct sock *sk, int optname,
 	return 0;
 }
 
-void sock_set_keepalive(struct sock *sk)
+void sock_set_keepalive(struct sock *sk, bool valbool)
 {
 	lock_sock(sk);
 	if (sk->sk_prot->keepalive)
-		sk->sk_prot->keepalive(sk, true);
-	sock_valbool_flag(sk, SOCK_KEEPOPEN, true);
+		sk->sk_prot->keepalive(sk, valbool);
+	sock_valbool_flag(sk, SOCK_KEEPOPEN, valbool);
 	release_sock(sk);
 }
 EXPORT_SYMBOL(sock_set_keepalive);
@@ -1060,9 +1060,7 @@ set_sndbuf:
 		break;
 
 	case SO_KEEPALIVE:
-		if (sk->sk_prot->keepalive)
-			sk->sk_prot->keepalive(sk, valbool);
-		sock_valbool_flag(sk, SOCK_KEEPOPEN, valbool);
+		sock_set_keepalive(sk, !!valbool);
 		break;
 
 	case SO_OOBINLINE:

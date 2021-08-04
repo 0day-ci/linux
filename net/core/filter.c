@@ -4752,9 +4752,7 @@ static int _bpf_setsockopt(struct sock *sk, int level, int optname,
 			ret = sock_bindtoindex(sk, ifindex, false);
 			break;
 		case SO_KEEPALIVE:
-			if (sk->sk_prot->keepalive)
-				sk->sk_prot->keepalive(sk, valbool);
-			sock_valbool_flag(sk, SOCK_KEEPOPEN, valbool);
+			sock_set_keepalive(sk, !!valbool);
 			break;
 		case SO_REUSEPORT:
 			sk->sk_reuseport = valbool;
