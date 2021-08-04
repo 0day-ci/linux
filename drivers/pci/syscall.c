@@ -65,8 +65,9 @@ SYSCALL_DEFINE5(pciconfig_read, unsigned long, bus, unsigned long, dfn,
 
 error:
 	/* ??? XFree86 doesn't even check the return value.  They
-	   just look for 0xffffffff in the output, since that's what
-	   they get instead of a machine check on x86.  */
+	 * just look for 0xffffffff in the output, since that's what
+	 * they get instead of a machine check on x86.
+	 */
 	switch (len) {
 	case 1:
 		put_user(-1, (unsigned char __user *)buf);

@@ -809,6 +809,7 @@ int pci_wait_for_pending(struct pci_dev *dev, int pos, u16 mask)
 	/* Wait for Transaction Pending bit clean */
 	for (i = 0; i < 4; i++) {
 		u16 status;
+
 		if (i)
 			msleep((1 << (i - 1)) * 100);
 
@@ -1761,6 +1762,7 @@ struct pci_saved_state *pci_store_saved_state(struct pci_dev *dev)
 	cap = state->cap;
 	hlist_for_each_entry(tmp, &dev->saved_cap_space, next) {
 		size_t len = sizeof(struct pci_cap_saved_data) + tmp->cap.size;
+
 		memcpy(cap, &tmp->cap, len);
 		cap = (struct pci_cap_saved_data *)((u8 *)cap + len);
 	}
@@ -1816,6 +1818,7 @@ int pci_load_and_free_saved_state(struct pci_dev *dev,
 				  struct pci_saved_state **state)
 {
 	int ret = pci_load_saved_state(dev, *state);
+
 	kfree(*state);
 	*state = NULL;
 	return ret;
@@ -1912,6 +1915,7 @@ static int pci_enable_device_flags(struct pci_dev *dev, unsigned long flags)
 	 */
 	if (dev->pm_cap) {
 		u16 pmcsr;
+
 		pci_read_config_word(dev, dev->pm_cap + PCI_PM_CTRL, &pmcsr);
 		dev->current_state = (pmcsr & PCI_PM_CTRL_STATE_MASK);
 	}
@@ -2421,6 +2425,7 @@ void pci_pme_active(struct pci_dev *dev, bool enable)
 
 	if (dev->pme_poll) {
 		struct pci_pme_device *pme_dev;
+
 		if (enable) {
 			pme_dev = kmalloc(sizeof(struct pci_pme_device),
 					  GFP_KERNEL);
@@ -4326,7 +4331,7 @@ void __weak pcibios_set_master(struct pci_dev *dev)
 
 	pci_read_config_byte(dev, PCI_LATENCY_TIMER, &lat);
 	if (lat < 16)
-		lat = (64 <= pcibios_max_latency) ? 64 : pcibios_max_latency;
+		lat = (pcibios_max_latency >= 64) ? 64 : pcibios_max_latency;
 	else if (lat > pcibios_max_latency)
 		lat = pcibios_max_latency;
 	else
@@ -4377,7 +4382,8 @@ int pci_set_cacheline_size(struct pci_dev *dev)
 		return -EINVAL;
 
 	/* Validate current setting: the PCI_CACHE_LINE_SIZE must be
-	   equal to or multiple of the right value. */
+	 * equal to or multiple of the right value.
+	 */
 	pci_read_config_byte(dev, PCI_CACHE_LINE_SIZE, &cacheline_size);
 	if (cacheline_size >= pci_cache_line_size &&
 	    (cacheline_size % pci_cache_line_size) == 0)
@@ -6063,6 +6069,7 @@ EXPORT_SYMBOL(pcie_print_link_status);
 int pci_select_bars(struct pci_dev *dev, unsigned long flags)
 {
 	int i, bars = 0;
+
 	for (i = 0; i < PCI_NUM_RESOURCES; i++)
 		if (pci_resource_flags(dev, i) & flags)
 			bars |= (1 << i);
@@ -6178,11 +6185,11 @@ EXPORT_SYMBOL_GPL(pci_pr3_present);
  * cannot be left as a userspace activity).  DMA aliases should therefore
  * be configured via quirks, such as the PCI fixup header quirk.
  */
-void pci_add_dma_alias(struct pci_dev *dev, u8 devfn_from, unsigned nr_devfns)
+void pci_add_dma_alias(struct pci_dev *dev, u8 devfn_from, unsigned int nr_devfns)
 {
 	int devfn_to;
 
-	nr_devfns = min(nr_devfns, (unsigned) MAX_NR_DEVFNS - devfn_from);
+	nr_devfns = min(nr_devfns, (unsigned int) MAX_NR_DEVFNS - devfn_from);
 	devfn_to = devfn_from + nr_devfns - 1;
 
 	if (!dev->dma_alias_mask)
@@ -6597,6 +6604,7 @@ static int __init pci_setup(char *str)
 {
 	while (str) {
 		char *k = strchr(str, ',');
+
 		if (k)
 			*k++ = 0;
 		if (*str && (str = pcibios_setup(str)) && *str) {

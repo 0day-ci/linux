@@ -240,7 +240,7 @@ resource_size_t __weak pcibios_align_resource(void *data,
 					      resource_size_t size,
 					      resource_size_t align)
 {
-       return res->start;
+	return res->start;
 }
 
 static int __pci_assign_resource(struct pci_bus *bus, struct pci_dev *dev,

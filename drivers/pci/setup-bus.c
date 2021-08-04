@@ -186,6 +186,7 @@ static void __dev_sort_resources(struct pci_dev *dev, struct list_head *head)
 	/* Don't touch IOAPIC devices already enabled by firmware */
 	if (class == PCI_CLASS_SYSTEM_PIC) {
 		u16 command;
+
 		pci_read_config_word(dev, PCI_COMMAND, &command);
 		if (command & (PCI_COMMAND_IO | PCI_COMMAND_MEMORY))
 			return;
@@ -1212,6 +1213,7 @@ void __pci_bus_size_bridges(struct pci_bus *bus, struct list_head *realloc_head)
 
 	list_for_each_entry(dev, &bus->devices, bus_list) {
 		struct pci_bus *b = dev->subordinate;
+
 		if (!b)
 			continue;
 
@@ -1525,7 +1527,7 @@ static void pci_bridge_release_resources(struct pci_bus *bus,
 {
 	struct pci_dev *dev = bus->self;
 	struct resource *r;
-	unsigned old_flags = 0;
+	unsigned int old_flags = 0;
 	struct resource *b_res;
 	int idx = 1;
 
@@ -1597,6 +1599,7 @@ static void pci_bus_release_bridge_resources(struct pci_bus *bus,
 
 	list_for_each_entry(dev, &bus->devices, bus_list) {
 		struct pci_bus *b = dev->subordinate;
+
 		if (!b)
 			continue;
 

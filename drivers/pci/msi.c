@@ -129,7 +129,7 @@ void __weak arch_restore_msi_irqs(struct pci_dev *dev)
 	return default_restore_msi_irqs(dev);
 }
 
-static inline __attribute_const__ u32 msi_mask(unsigned x)
+static inline __attribute_const__ u32 msi_mask(unsigned int x)
 {
 	/* Don't shift by >= width of type */
 	if (x >= 5)
@@ -213,7 +213,8 @@ static void msi_set_mask_bit(struct irq_data *data, u32 flag)
 		msix_mask_irq(desc, flag);
 		readl(desc->mask_base);		/* Flush write to device */
 	} else {
-		unsigned offset = data->irq - desc->irq;
+		unsigned int offset = data->irq - desc->irq;
+
 		msi_mask_irq(desc, 1 << offset, flag << offset);
 	}
 }
@@ -619,7 +620,7 @@ static int msi_capability_init(struct pci_dev *dev, int nvec,
 {
 	struct msi_desc *entry;
 	int ret;
-	unsigned mask;
+	unsigned int mask;
 
 	pci_msi_set_enable(dev, 0);	/* Disable MSI during set up */
 
@@ -665,7 +666,7 @@ static int msi_capability_init(struct pci_dev *dev, int nvec,
 	return 0;
 }
 
-static void __iomem *msix_map_region(struct pci_dev *dev, unsigned nr_entries)
+static void __iomem *msix_map_region(struct pci_dev *dev, unsigned int nr_entries)
 {
 	resource_size_t phys_addr;
 	u32 table_offset;
@@ -1108,6 +1109,7 @@ static int __pci_enable_msi_range(struct pci_dev *dev, int minvec, int maxvec,
 int pci_enable_msi(struct pci_dev *dev)
 {
 	int rc = __pci_enable_msi_range(dev, 1, 1, NULL);
+
 	if (rc < 0)
 		return rc;
 	return 0;
@@ -1367,7 +1369,7 @@ static inline bool pci_msi_desc_is_multi_msi(struct msi_desc *desc)
 
 /**
  * pci_msi_domain_check_cap - Verify that @domain supports the capabilities
- * 			      for @dev
+ *			      for @dev
  * @domain:	The interrupt domain to check
  * @info:	The domain info for verification
  * @dev:	The device to check

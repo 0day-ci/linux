@@ -177,7 +177,7 @@ static int __init pci_apply_final_quirks(void)
 				continue;
 
 			pci_info(dev, "CLS mismatch (%u != %u), using %u bytes\n",
-			         cls << 2, tmp << 2,
+				 cls << 2, tmp << 2,
 				 pci_dfl_cache_line_size << 2);
 			pci_cache_line_size = pci_dfl_cache_line_size;
 		}
@@ -299,6 +299,7 @@ DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_SI,	PCI_DEVICE_ID_SI_496,		quirk_nopcipci)
 static void quirk_nopciamd(struct pci_dev *dev)
 {
 	u8 rev;
+
 	pci_read_config_byte(dev, 0x08, &rev);
 	if (rev == 0x13) {
 		/* Erratum 24 */
@@ -501,7 +502,7 @@ static void quirk_s3_64M(struct pci_dev *dev)
 DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_S3,	PCI_DEVICE_ID_S3_868,		quirk_s3_64M);
 DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_S3,	PCI_DEVICE_ID_S3_968,		quirk_s3_64M);
 
-static void quirk_io(struct pci_dev *dev, int pos, unsigned size,
+static void quirk_io(struct pci_dev *dev, int pos, unsigned int size,
 		     const char *name)
 {
 	u32 region;
@@ -552,7 +553,7 @@ static void quirk_cs5536_vsa(struct pci_dev *dev)
 DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_CS5536_ISA, quirk_cs5536_vsa);
 
 static void quirk_io_region(struct pci_dev *dev, int port,
-				unsigned size, int nr, const char *name)
+				unsigned int size, int nr, const char *name)
 {
 	u16 region;
 	struct pci_bus_region bus_region;
@@ -666,7 +667,8 @@ static void piix4_io_quirk(struct pci_dev *dev, const char *name, unsigned int p
 	base = devres & 0xffff;
 	size = 16;
 	for (;;) {
-		unsigned bit = size >> 1;
+		unsigned int bit = size >> 1;
+
 		if ((bit & mask) == bit)
 			break;
 		size = bit;
@@ -692,7 +694,8 @@ static void piix4_mem_quirk(struct pci_dev *dev, const char *name, unsigned int 
 	mask = (devres & 0x3f) << 16;
 	size = 128 << 16;
 	for (;;) {
-		unsigned bit = size >> 1;
+		unsigned int bit = size >> 1;
+
 		if ((bit & mask) == bit)
 			break;
 		size = bit;
@@ -806,7 +809,7 @@ static void ich6_lpc_acpi_gpio(struct pci_dev *dev)
 				"ICH6 GPIO");
 }
 
-static void ich6_lpc_generic_decode(struct pci_dev *dev, unsigned reg,
+static void ich6_lpc_generic_decode(struct pci_dev *dev, unsigned int reg,
 				    const char *name, int dynsize)
 {
 	u32 val;
@@ -850,7 +853,7 @@ static void quirk_ich6_lpc(struct pci_dev *dev)
 DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_ICH6_0, quirk_ich6_lpc);
 DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_ICH6_1, quirk_ich6_lpc);
 
-static void ich7_lpc_generic_decode(struct pci_dev *dev, unsigned reg,
+static void ich7_lpc_generic_decode(struct pci_dev *dev, unsigned int reg,
 				    const char *name)
 {
 	u32 val;
@@ -1194,6 +1197,7 @@ DECLARE_PCI_FIXUP_CLASS_RESUME_EARLY(PCI_ANY_ID, PCI_ANY_ID,
 static void quirk_amd_ordering(struct pci_dev *dev)
 {
 	u32 pcic;
+
 	pci_read_config_dword(dev, 0x4C, &pcic);
 	if ((pcic & 6) != 6) {
 		pcic |= 6;
@@ -1308,6 +1312,7 @@ DECLARE_PCI_FIXUP_RESUME_EARLY(PCI_VENDOR_ID_AMD, 0x7900, quirk_amd_ide_mode);
 static void quirk_svwks_csb5ide(struct pci_dev *pdev)
 {
 	u8 prog;
+
 	pci_read_config_byte(pdev, PCI_CLASS_PROG, &prog);
 	if (prog & 5) {
 		prog &= ~5;
@@ -1348,7 +1353,8 @@ DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_ATI, PCI_ANY_ID,
 DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_AL, PCI_ANY_ID,
 				PCI_CLASS_STORAGE_IDE, 8, quirk_no_ata_d3);
 /* VIA comes back fine but we need to keep it alive or ACPI GTM failures
-   occur when mode detecting */
+ * occur when mode detecting
+ */
 DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_VIA, PCI_ANY_ID,
 				PCI_CLASS_STORAGE_IDE, 8, quirk_no_ata_d3);
 
@@ -1482,7 +1488,8 @@ static void asus_hides_smbus_hostbridge(struct pci_dev *dev)
 			case 0xB16C: /* Compaq Deskpro EP 401963-001 (PCA# 010174) */
 				/* Motherboard doesn't have Host bridge
 				 * subvendor/subdevice IDs, therefore checking
-				 * its on-board VGA controller */
+				 * its on-board VGA controller
+				 */
 				asus_hides_smbus = 1;
 			}
 		else if (dev->device == PCI_DEVICE_ID_INTEL_82801DB_2)
@@ -1494,7 +1501,8 @@ static void asus_hides_smbus_hostbridge(struct pci_dev *dev)
 				 * subvendor/subdevice IDs and on-board VGA
 				 * controller is disabled if an AGP card is
 				 * inserted, therefore checking USB UHCI
-				 * Controller #1 */
+				 * Controller #1
+				 */
 				asus_hides_smbus = 1;
 			}
 		else if (dev->device == PCI_DEVICE_ID_INTEL_82815_CGC)
@@ -1502,7 +1510,8 @@ static void asus_hides_smbus_hostbridge(struct pci_dev *dev)
 			case 0x001A: /* Compaq Deskpro EN SSF P667 815E */
 				/* Motherboard doesn't have host bridge
 				 * subvendor/subdevice IDs, therefore checking
-				 * its on-board VGA controller */
+				 * its on-board VGA controller
+				 */
 				asus_hides_smbus = 1;
 			}
 	}
@@ -1611,6 +1620,7 @@ DECLARE_PCI_FIXUP_RESUME_EARLY(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_ICH6_1,	
 static void quirk_sis_96x_smbus(struct pci_dev *dev)
 {
 	u8 val = 0;
+
 	pci_read_config_byte(dev, 0x77, &val);
 	if (val & 0x10) {
 		pci_info(dev, "Enabling SiS 96x SMBus\n");
@@ -2178,6 +2188,7 @@ static void quirk_plx_pci9050(struct pci_dev *dev)
 		if (pci_resource_len(dev, bar) == 0x80 &&
 		    (pci_resource_start(dev, bar) & 0x80)) {
 			struct resource *r = &dev->resource[bar];
+
 			pci_info(dev, "Re-allocating PLX PCI 9050 BAR %u to length 256 to avoid bit 7 bug\n",
 				 bar);
 			r->flags |= IORESOURCE_UNSET;
@@ -2469,6 +2480,7 @@ static void quirk_brcm_5719_limit_mrrs(struct pci_dev *dev)
 	/* Only CAP the MRRS if the device is a 5719 A0 */
 	if (rev == 0x05719000) {
 		int readrq = pcie_get_readrq(dev);
+
 		if (readrq > 2048)
 			pcie_set_readrq(dev, 2048);
 	}
@@ -3352,6 +3364,7 @@ DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x0e0d, quirk_intel_ntb);
 static void disable_igfx_irq(struct pci_dev *dev)
 {
 	void __iomem *regs = pci_iomap(dev, 0, 0);
+
 	if (regs == NULL) {
 		pci_warn(dev, "igfx quirk: Can't iomap PCI device\n");
 		return;

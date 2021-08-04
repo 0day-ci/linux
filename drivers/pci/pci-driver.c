@@ -189,6 +189,7 @@ static ssize_t new_id_store(struct device_driver *driver, const char *buf,
 
 	if (fields != 7) {
 		struct pci_dev *pdev = kzalloc(sizeof(*pdev), GFP_KERNEL);
+
 		if (!pdev)
 			return -ENOMEM;
 
@@ -208,7 +209,8 @@ static ssize_t new_id_store(struct device_driver *driver, const char *buf,
 	}
 
 	/* Only accept driver_data values that match an existing id_table
-	   entry */
+	 * entry
+	 */
 	if (ids) {
 		retval = -EINVAL;
 		while (ids->vendor || ids->subvendor || ids->class_mask) {
@@ -257,6 +259,7 @@ static ssize_t remove_id_store(struct device_driver *driver, const char *buf,
 	spin_lock(&pdrv->dynids.lock);
 	list_for_each_entry_safe(dynid, n, &pdrv->dynids.list, node) {
 		struct pci_device_id *id = &dynid->id;
+
 		if ((id->vendor == vendor) &&
 		    (id->device == device) &&
 		    (subvendor == PCI_ANY_ID || id->subvendor == subvendor) &&
@@ -514,6 +517,7 @@ static int pci_restore_standard_config(struct pci_dev *pci_dev)
 
 	if (pci_dev->current_state != PCI_D0) {
 		int error = pci_set_power_state(pci_dev, PCI_D0);
+
 		if (error)
 			return error;
 	}
@@ -661,6 +665,7 @@ static int pci_pm_prepare(struct device *dev)
 
 	if (pm && pm->prepare) {
 		int error = pm->prepare(dev);
+
 		if (error < 0)
 			return error;
 
@@ -1425,14 +1430,16 @@ static struct pci_driver pci_compat_driver = {
  */
 struct pci_driver *pci_dev_driver(const struct pci_dev *dev)
 {
+	int i;
+
 	if (dev->driver)
 		return dev->driver;
-	else {
-		int i;
-		for (i = 0; i <= PCI_ROM_RESOURCE; i++)
-			if (dev->resource[i].flags & IORESOURCE_BUSY)
-				return &pci_compat_driver;
+
+	for (i = 0; i <= PCI_ROM_RESOURCE; i++) {
+		if (dev->resource[i].flags & IORESOURCE_BUSY)
+			return &pci_compat_driver;
 	}
+
 	return NULL;
 }
 EXPORT_SYMBOL(pci_dev_driver);

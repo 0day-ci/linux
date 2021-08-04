@@ -178,7 +178,8 @@ static int pci_bus_alloc_from_region(struct pci_bus *bus, struct resource *res,
 			continue;
 
 		/* We cannot allocate a non-prefetching resource
-		   from a pre-fetching area */
+		 * from a pre-fetching area
+		 */
 		if ((r->flags & IORESOURCE_PREFETCH) &&
 		    !(res->flags & IORESOURCE_PREFETCH))
 			continue;

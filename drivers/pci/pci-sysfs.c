@@ -56,6 +56,7 @@ static ssize_t broken_parity_status_show(struct device *dev,
 					 char *buf)
 {
 	struct pci_dev *pdev = to_pci_dev(dev);
+
 	return sysfs_emit(buf, "%u\n", pdev->broken_parity_status);
 }
 
@@ -150,6 +151,7 @@ static ssize_t resource_show(struct device *dev, struct device_attribute *attr,
 
 	for (i = 0; i < max; i++) {
 		struct resource *res =  &pci_dev->resource[i];
+
 		pci_resource_to_user(pci_dev, i, res, &start, &end);
 		len += sysfs_emit_at(buf, len, "0x%016llx 0x%016llx 0x%016llx\n",
 				     (unsigned long long)start,
@@ -523,6 +525,7 @@ static ssize_t d3cold_allowed_show(struct device *dev,
 				   struct device_attribute *attr, char *buf)
 {
 	struct pci_dev *pdev = to_pci_dev(dev);
+
 	return sysfs_emit(buf, "%u\n", pdev->d3cold_allowed);
 }
 static DEVICE_ATTR_RW(d3cold_allowed);
@@ -686,14 +689,14 @@ static ssize_t pci_read_config(struct file *filp, struct kobject *kobj,
 	if (off + count > size) {
 		size -= off;
 		count = size;
-	} else {
+	} else
 		size = count;
-	}
 
 	pci_config_pm_runtime_get(dev);
 
 	if ((off & 1) && size) {
 		u8 val;
+
 		pci_user_read_config_byte(dev, off, &val);
 		data[off - init_off] = val;
 		off++;
@@ -702,6 +705,7 @@ static ssize_t pci_read_config(struct file *filp, struct kobject *kobj,
 
 	if ((off & 3) && size > 2) {
 		u16 val;
+
 		pci_user_read_config_word(dev, off, &val);
 		data[off - init_off] = val & 0xff;
 		data[off - init_off + 1] = (val >> 8) & 0xff;
@@ -711,6 +715,7 @@ static ssize_t pci_read_config(struct file *filp, struct kobject *kobj,
 
 	while (size > 3) {
 		u32 val;
+
 		pci_user_read_config_dword(dev, off, &val);
 		data[off - init_off] = val & 0xff;
 		data[off - init_off + 1] = (val >> 8) & 0xff;
@@ -723,6 +728,7 @@ static ssize_t pci_read_config(struct file *filp, struct kobject *kobj,
 
 	if (size >= 2) {
 		u16 val;
+
 		pci_user_read_config_word(dev, off, &val);
 		data[off - init_off] = val & 0xff;
 		data[off - init_off + 1] = (val >> 8) & 0xff;
@@ -732,6 +738,7 @@ static ssize_t pci_read_config(struct file *filp, struct kobject *kobj,
 
 	if (size > 0) {
 		u8 val;
+
 		pci_user_read_config_byte(dev, off, &val);
 		data[off - init_off] = val;
 		off++;
@@ -774,6 +781,7 @@ static ssize_t pci_write_config(struct file *filp, struct kobject *kobj,
 
 	if ((off & 3) && size > 2) {
 		u16 val = data[off - init_off];
+
 		val |= (u16) data[off - init_off + 1] << 8;
 		pci_user_write_config_word(dev, off, val);
 		off += 2;
@@ -782,6 +790,7 @@ static ssize_t pci_write_config(struct file *filp, struct kobject *kobj,
 
 	while (size > 3) {
 		u32 val = data[off - init_off];
+
 		val |= (u32) data[off - init_off + 1] << 8;
 		val |= (u32) data[off - init_off + 2] << 16;
 		val |= (u32) data[off - init_off + 3] << 24;
@@ -792,6 +801,7 @@ static ssize_t pci_write_config(struct file *filp, struct kobject *kobj,
 
 	if (size >= 2) {
 		u16 val = data[off - init_off];
+
 		val |= (u16) data[off - init_off + 1] << 8;
 		pci_user_write_config_word(dev, off, val);
 		off += 2;

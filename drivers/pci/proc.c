@@ -22,6 +22,7 @@ static int proc_initialized;	/* = 0 */
 static loff_t proc_bus_pci_lseek(struct file *file, loff_t off, int whence)
 {
 	struct pci_dev *dev = PDE_DATA(file_inode(file));
+
 	return fixed_size_llseek(file, off, whence, dev->cfg_size);
 }
 
@@ -60,6 +61,7 @@ static ssize_t proc_bus_pci_read(struct file *file, char __user *buf,
 
 	if ((pos & 1) && cnt) {
 		unsigned char val;
+
 		pci_user_read_config_byte(dev, pos, &val);
 		__put_user(val, buf);
 		buf++;
@@ -69,6 +71,7 @@ static ssize_t proc_bus_pci_read(struct file *file, char __user *buf,
 
 	if ((pos & 3) && cnt > 2) {
 		unsigned short val;
+
 		pci_user_read_config_word(dev, pos, &val);
 		__put_user(cpu_to_le16(val), (__le16 __user *) buf);
 		buf += 2;
@@ -78,6 +81,7 @@ static ssize_t proc_bus_pci_read(struct file *file, char __user *buf,
 
 	while (cnt >= 4) {
 		unsigned int val;
+
 		pci_user_read_config_dword(dev, pos, &val);
 		__put_user(cpu_to_le32(val), (__le32 __user *) buf);
 		buf += 4;
@@ -87,6 +91,7 @@ static ssize_t proc_bus_pci_read(struct file *file, char __user *buf,
 
 	if (cnt >= 2) {
 		unsigned short val;
+
 		pci_user_read_config_word(dev, pos, &val);
 		__put_user(cpu_to_le16(val), (__le16 __user *) buf);
 		buf += 2;
@@ -96,6 +101,7 @@ static ssize_t proc_bus_pci_read(struct file *file, char __user *buf,
 
 	if (cnt) {
 		unsigned char val;
+
 		pci_user_read_config_byte(dev, pos, &val);
 		__put_user(val, buf);
 		buf++;
@@ -137,6 +143,7 @@ static ssize_t proc_bus_pci_write(struct file *file, const char __user *buf,
 
 	if ((pos & 1) && cnt) {
 		unsigned char val;
+
 		__get_user(val, buf);
 		pci_user_write_config_byte(dev, pos, val);
 		buf++;
@@ -146,6 +153,7 @@ static ssize_t proc_bus_pci_write(struct file *file, const char __user *buf,
 
 	if ((pos & 3) && cnt > 2) {
 		__le16 val;
+
 		__get_user(val, (__le16 __user *) buf);
 		pci_user_write_config_word(dev, pos, le16_to_cpu(val));
 		buf += 2;
@@ -155,6 +163,7 @@ static ssize_t proc_bus_pci_write(struct file *file, const char __user *buf,
 
 	while (cnt >= 4) {
 		__le32 val;
+
 		__get_user(val, (__le32 __user *) buf);
 		pci_user_write_config_dword(dev, pos, le32_to_cpu(val));
 		buf += 4;
@@ -164,6 +173,7 @@ static ssize_t proc_bus_pci_write(struct file *file, const char __user *buf,
 
 	if (cnt >= 2) {
 		__le16 val;
+
 		__get_user(val, (__le16 __user *) buf);
 		pci_user_write_config_word(dev, pos, le16_to_cpu(val));
 		buf += 2;
@@ -173,6 +183,7 @@ static ssize_t proc_bus_pci_write(struct file *file, const char __user *buf,
 
 	if (cnt) {
 		unsigned char val;
+
 		__get_user(val, buf);
 		pci_user_write_config_byte(dev, pos, val);
 		buf++;
@@ -356,6 +367,7 @@ static void pci_seq_stop(struct seq_file *m, void *v)
 {
 	if (v) {
 		struct pci_dev *dev = v;
+
 		pci_dev_put(dev);
 	}
 }
@@ -380,6 +392,7 @@ static int show_device(struct seq_file *m, void *v)
 	/* only print standard and ROM resources to preserve compatibility */
 	for (i = 0; i <= PCI_ROM_RESOURCE; i++) {
 		resource_size_t start, end;
+
 		pci_resource_to_user(dev, i, &dev->resource[i], &start, &end);
 		seq_printf(m, "\t%16llx",
 			(unsigned long long)(start |
@@ -387,6 +400,7 @@ static int show_device(struct seq_file *m, void *v)
 	}
 	for (i = 0; i <= PCI_ROM_RESOURCE; i++) {
 		resource_size_t start, end;
+
 		pci_resource_to_user(dev, i, &dev->resource[i], &start, &end);
 		seq_printf(m, "\t%16llx",
 			dev->resource[i].start < dev->resource[i].end ?
@@ -456,6 +470,7 @@ int pci_proc_detach_bus(struct pci_bus *bus)
 static int __init pci_proc_init(void)
 {
 	struct pci_dev *dev = NULL;
+
 	proc_bus_pci_dir = proc_mkdir("bus/pci", NULL);
 	proc_create_seq("devices", 0, proc_bus_pci_dir,
 		    &proc_bus_pci_devices_op);
