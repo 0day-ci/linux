@@ -705,7 +705,9 @@ static void fanotify_insert_error_event(struct fsnotify_group *group,
 {
 	const struct fs_error_report *report = (struct fs_error_report *) data;
 	struct fanotify_event *fae = FANOTIFY_E(event);
+	struct inode *inode = report->inode;
 	struct fanotify_error_event *fee;
+	int fh_len;
 
 	/* This might be an unexpected type of event (i.e. overflow). */
 	if (!fanotify_is_error_event(fae->mask))
@@ -715,6 +717,31 @@ static void fanotify_insert_error_event(struct fsnotify_group *group,
 	fee->fae.type = FANOTIFY_EVENT_TYPE_FS_ERROR;
 	fee->error = report->error;
 	fee->err_count = 1;
+	fee->fsid = fee->sb_mark->fsn_mark.connector->fsid;
+
+	/*
+	 * Error reporting needs to happen in atomic context.  If this
+	 * inode's file handler length is more than we initially
+	 * predicted, there is nothing better we can do than report the
+	 * error with a bad file handler.
+	 */
+	fh_len = fanotify_encode_fh_len(inode);
+	if (fh_len > fee->sb_mark->pred_fh_len) {
+		pr_warn_ratelimited(
+			"FH overflows error event. Drop inode information.\n");
+		/*
+		 * Update the handler size prediction for the next error
+		 * event allocation.  This reduces the chance of another
+		 * overflow.
+		 */
+		fee->sb_mark->pred_fh_len = fh_len;
+
+		/* For the current error, ignore the inode information. */
+		inode = NULL;
+		fh_len = fanotify_encode_fh_len(NULL);
+	}
+
+	fanotify_encode_fh(&fee->object_fh, inode, fh_len, NULL, 0);
 }
 
 /*

@@ -142,6 +142,7 @@ FANOTIFY_MARK_FLAG(SB_MARK);
 
 struct fanotify_sb_mark {
 	struct fsnotify_mark fsn_mark;
+	size_t pred_fh_len;
 	struct fanotify_error_event *fee_slot;
 };
 
@@ -227,6 +228,13 @@ struct fanotify_error_event {
 	u32 err_count; /* Suppressed errors count */
 
 	struct fanotify_sb_mark *sb_mark; /* Back reference to the mark. */
+
+	__kernel_fsid_t fsid; /* FSID this error refers to. */
+	/*
+	 * object_fh is followed by a variable sized buffer, so it must
+	 * be the last element of this structure.
+	 */
+	struct fanotify_fh object_fh;
 };
 
 static inline struct fanotify_error_event *
@@ -241,6 +249,8 @@ static inline __kernel_fsid_t *fanotify_event_fsid(struct fanotify_event *event)
 		return &FANOTIFY_FE(event)->fsid;
 	else if (event->type == FANOTIFY_EVENT_TYPE_FID_NAME)
 		return &FANOTIFY_NE(event)->fsid;
+	else if (event->type == FANOTIFY_EVENT_TYPE_FS_ERROR)
+		return &FANOTIFY_EE(event)->fsid;
 	else
 		return NULL;
 }
@@ -252,6 +262,8 @@ static inline struct fanotify_fh *fanotify_event_object_fh(
 		return &FANOTIFY_FE(event)->object_fh;
 	else if (event->type == FANOTIFY_EVENT_TYPE_FID_NAME)
 		return fanotify_info_file_fh(&FANOTIFY_NE(event)->info);
+	else if (event->type == FANOTIFY_EVENT_TYPE_FS_ERROR)
+		return &FANOTIFY_EE(event)->object_fh;
 	else
 		return NULL;
 }

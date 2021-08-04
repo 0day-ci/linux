@@ -172,8 +172,25 @@ static struct fanotify_error_event *fanotify_alloc_error_event(
 
 {
 	struct fanotify_error_event *fee;
+	struct super_block *sb;
 
-	fee = kzalloc(sizeof(*fee), GFP_KERNEL_ACCOUNT);
+	if (!sb_mark->pred_fh_len) {
+		/*
+		 * The handler size is initially predicted to be the
+		 * same size as the root inode file handler.  It can be
+		 * increased later if a larger file handler is found.
+		 */
+		sb = container_of(sb_mark->fsn_mark.connector->obj,
+				  struct super_block, s_fsnotify_marks);
+		sb_mark->pred_fh_len =
+			fanotify_encode_fh_len(sb->s_root->d_inode);
+	}
+
+	/* Guarantee there is always space to report an invalid FID. */
+	if (sb_mark->pred_fh_len < FANOTIFY_NULL_FH_LEN)
+		sb_mark->pred_fh_len = FANOTIFY_NULL_FH_LEN;
+
+	fee = kzalloc(sizeof(*fee) + sb_mark->pred_fh_len, GFP_KERNEL_ACCOUNT);
 	if (!fee)
 		return NULL;
 
