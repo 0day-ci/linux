@@ -335,24 +335,6 @@ static u32 fanotify_group_event_mask(struct fsnotify_group *group,
 }
 
 /*
- * Check size needed to encode fanotify_fh.
- *
- * Return size of encoded fh without fanotify_fh header.
- * Return 0 on failure to encode.
- */
-static int fanotify_encode_fh_len(struct inode *inode)
-{
-	int dwords = 0;
-
-	if (!inode)
-		return 0;
-
-	exportfs_encode_inode_fh(inode, NULL, &dwords, NULL);
-
-	return dwords << 2;
-}
-
-/*
  * Encode fanotify_fh.
  *
  * Return total size of encoded fh including fanotify_fh header.
