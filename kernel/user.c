@@ -223,7 +223,7 @@ static int __init uid_cache_init(void)
 		INIT_HLIST_HEAD(uidhash_table + n);
 
 	if (percpu_counter_init(&root_user.epoll_watches, 0, GFP_KERNEL))
-		panic("percpu cpunter alloc failed");
+		panic("percpu counter alloc failed");
 
 	/* Insert the root user immediately (init already runs as root) */
 	spin_lock_irq(&uidhash_lock);
