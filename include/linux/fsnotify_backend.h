@@ -500,14 +500,16 @@ extern int fsnotify_insert_event(struct fsnotify_group *group,
 				 int (*merge)(struct fsnotify_group *,
 					      struct fsnotify_event *),
 				 void (*insert)(struct fsnotify_group *,
-						struct fsnotify_event *));
+						struct fsnotify_event *,
+						const void *),
+				 const void *insert_data);
 
 static inline int fsnotify_add_event(struct fsnotify_group *group,
 				     struct fsnotify_event *event,
 				     int (*merge)(struct fsnotify_group *,
 						  struct fsnotify_event *))
 {
-	return fsnotify_insert_event(group, event, merge, NULL);
+	return fsnotify_insert_event(group, event, merge, NULL, NULL);
 }
 
 /* Queue overflow event to a notification group */
