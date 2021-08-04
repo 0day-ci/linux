@@ -19,6 +19,7 @@
 #include <linux/random.h>
 #include <linux/seq_buf.h>
 #include <linux/xarray.h>
+#include "pci.h"
 
 enum pci_p2pdma_map_type {
 	PCI_P2PDMA_MAP_UNKNOWN = 0,
@@ -410,6 +411,41 @@ static unsigned long map_types_idx(struct pci_dev *client)
 		(client->bus->number << 8) | client->devfn;
 }
 
+static bool check_10bit_tags_vaild(struct pci_dev *a, struct pci_dev *b,
+				   bool verbose)
+{
+	bool req;
+	bool comp;
+	u16 ctl2;
+
+	if (a->is_virtfn) {
+#ifdef CONFIG_PCI_IOV
+		req = !!(a->physfn->sriov->ctrl &
+			 PCI_SRIOV_CTRL_VF_10BIT_TAG_REQ_EN);
+#endif
+	} else {
+		pcie_capability_read_word(a, PCI_EXP_DEVCTL2, &ctl2);
+		req = !!(ctl2 & PCI_EXP_DEVCTL2_10BIT_TAG_REQ_EN);
+	}
+
+	comp = !!(b->pcie_devcap2 & PCI_EXP_DEVCAP2_10BIT_TAG_COMP);
+	if (req && (!comp)) {
+		if (verbose) {
+			pci_warn(a, "cannot be used for peer-to-peer DMA as 10-Bit Tag Requester enable is set in device (%s), but peer device (%s) does not support the 10-Bit Tag Completer\n",
+				 pci_name(a), pci_name(b));
+			if (a->is_virtfn)
+				pci_warn(a, "to disable 10-Bit Tag Requester for this device, echo 0 > /sys/bus/pci/devices/%s/sriov_vf_10bit_tag_ctl\n",
+					 pci_name(a));
+			else
+				pci_warn(a, "to disable 10-Bit Tag Requester for this device, echo 0 > /sys/bus/pci/devices/%s/10bit_tag\n",
+					 pci_name(a));
+		}
+		return false;
+	}
+
+	return true;
+}
+
 /*
  * Calculate the P2PDMA mapping type and distance between two PCI devices.
  *
@@ -532,6 +568,10 @@ map_through_host_bridge:
 		map_type = PCI_P2PDMA_MAP_NOT_SUPPORTED;
 	}
 done:
+	if (!check_10bit_tags_vaild(client, provider, verbose) ||
+	    !check_10bit_tags_vaild(provider, client, verbose))
+		map_type = PCI_P2PDMA_MAP_NOT_SUPPORTED;
+
 	rcu_read_lock();
 	p2pdma = rcu_dereference(provider->p2pdma);
 	if (p2pdma)
