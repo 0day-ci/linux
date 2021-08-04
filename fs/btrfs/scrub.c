@@ -3657,11 +3657,10 @@ int scrub_enumerate_chunks(struct scrub_ctx *sctx,
 	struct btrfs_root *root = fs_info->dev_root;
 	u64 length;
 	u64 chunk_offset;
+	u64 offset = 0;
 	int ret = 0;
 	int ro_set;
-	int slot;
 	struct extent_buffer *l;
-	struct btrfs_key key;
 	struct btrfs_key found_key;
 	struct btrfs_block_group *cache;
 	struct btrfs_dev_replace *dev_replace = &fs_info->dev_replace;
@@ -3674,47 +3673,24 @@ int scrub_enumerate_chunks(struct scrub_ctx *sctx,
 	path->search_commit_root = 1;
 	path->skip_locking = 1;
 
-	key.objectid = scrub_dev->devid;
-	key.offset = 0ull;
-	key.type = BTRFS_DEV_EXTENT_KEY;
-
 	while (1) {
-		ret = btrfs_search_slot(NULL, root, &key, path, 0, 0);
-		if (ret < 0)
+		ret = btrfs_find_item(root, path, scrub_dev->devid,
+				BTRFS_DEV_EXTENT_KEY, offset, &found_key);
+		if (ret < 0) {
 			break;
-		if (ret > 0) {
-			if (path->slots[0] >=
-			    btrfs_header_nritems(path->nodes[0])) {
-				ret = btrfs_next_leaf(root, path);
-				if (ret < 0)
-					break;
-				if (ret > 0) {
-					ret = 0;
-					break;
-				}
-			} else {
-				ret = 0;
-			}
+		} else if (ret > 0) {
+			/* Reset error if not found. */
+			ret = 0;
+			break;
 		}
 
+		if (found_key.offset >= end ||
+		    found_key.offset < offset)
+			break;
+
 		l = path->nodes[0];
-		slot = path->slots[0];
-
-		btrfs_item_key_to_cpu(l, &found_key, slot);
-
-		if (found_key.objectid != scrub_dev->devid)
-			break;
-
-		if (found_key.type != BTRFS_DEV_EXTENT_KEY)
-			break;
-
-		if (found_key.offset >= end)
-			break;
-
-		if (found_key.offset < key.offset)
-			break;
-
-		dev_extent = btrfs_item_ptr(l, slot, struct btrfs_dev_extent);
+		dev_extent = btrfs_item_ptr(l, path->slots[0],
+						struct btrfs_dev_extent);
 		length = btrfs_dev_extent_length(l, dev_extent);
 
 		if (found_key.offset + length <= start)
@@ -3938,7 +3914,7 @@ skip_unfreeze:
 			break;
 		}
 skip:
-		key.offset = found_key.offset + length;
+		offset = found_key.offset + length;
 		btrfs_release_path(path);
 	}
 
