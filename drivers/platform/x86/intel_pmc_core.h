@@ -188,6 +188,10 @@ enum ppfear_regs {
 #define ICL_PMC_SLP_S0_RES_COUNTER_STEP		0x64
 
 #define LPM_MAX_NUM_MODES			8
+
+/* Must contain LPM_MAX_NUM_MODES elements */
+#define LPM_DEFAULT_PRI				{ 7, 5, 2, 6, 4, 3, 1, 0 }
+
 #define GET_X2_COUNTER(v)			((v) >> 1)
 #define LPM_STS_LATCH_MODE			BIT(31)
 
