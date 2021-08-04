@@ -591,7 +591,7 @@ static unsigned long num_core_regs(const struct kvm_vcpu *vcpu)
  * ARM64 versions of the TIMER registers, always available on arm64
  */
 
-#define NUM_TIMER_REGS 3
+#define NUM_TIMER_REGS 4
 
 static bool is_timer_reg(u64 index)
 {
@@ -599,6 +599,7 @@ static bool is_timer_reg(u64 index)
 	case KVM_REG_ARM_TIMER_CTL:
 	case KVM_REG_ARM_TIMER_CNT:
 	case KVM_REG_ARM_TIMER_CVAL:
+	case KVM_REG_ARM_TIMER_OFFSET:
 		return true;
 	}
 	return false;
@@ -613,6 +614,9 @@ static int copy_timer_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
 		return -EFAULT;
 	uindices++;
 	if (put_user(KVM_REG_ARM_TIMER_CVAL, uindices))
+		return -EFAULT;
+	uindices++;
+	if (put_user(KVM_REG_ARM_TIMER_OFFSET, uindices))
 		return -EFAULT;
 
 	return 0;
