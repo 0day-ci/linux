@@ -5539,10 +5539,14 @@ int btrfs_drop_snapshot(struct btrfs_root *root, int update_ref, int for_reloc)
 		path->locks[level] = BTRFS_WRITE_LOCK;
 		memset(&wc->update_progress, 0,
 		       sizeof(wc->update_progress));
+		memset(&wc->drop_progress, 0,
+		       sizeof(wc->drop_progress));
 	} else {
 		btrfs_disk_key_to_cpu(&key, &root_item->drop_progress);
 		memcpy(&wc->update_progress, &key,
 		       sizeof(wc->update_progress));
+		memcpy(&wc->drop_progress, &key,
+		       sizeof(wc->drop_progress));
 
 		level = btrfs_root_drop_level(root_item);
 		BUG_ON(level == 0);
@@ -5588,6 +5592,7 @@ int btrfs_drop_snapshot(struct btrfs_root *root, int update_ref, int for_reloc)
 
 	wc->restarted = test_bit(BTRFS_ROOT_DEAD_TREE, &root->state);
 	wc->level = level;
+	wc->drop_level = level;
 	wc->shared_level = -1;
 	wc->stage = DROP_REFERENCE;
 	wc->update_ref = update_ref;
@@ -5659,8 +5664,10 @@ int btrfs_drop_snapshot(struct btrfs_root *root, int update_ref, int for_reloc)
 		}
 	}
 	btrfs_release_path(path);
-	if (err)
+	if (err) {
+		btrfs_abort_transaction(trans, err);
 		goto out_end_trans;
+	}
 
 	ret = btrfs_del_root(trans, &root->root_key);
 	if (ret) {
