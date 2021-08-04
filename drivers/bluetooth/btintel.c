@@ -1736,6 +1736,13 @@ static int btintel_setup_combined(struct hci_dev *hdev)
 		case 0x07:	/* WP */
 		case 0x08:	/* StP */
 			/* Legacy ROM product */
+
+			/* These devices have an issue with LED which doesn't
+			 * go off immediately during shutdown. Set the flag
+			 * here to send the LED OFF command during shutdown.
+			 */
+			btintel_set_flag(hdev, INTEL_BROKEN_LED);
+
 			err = btintel_legacy_rom_setup(hdev, &ver);
 			break;
 		case 0x0b:      /* SfP */
@@ -1780,6 +1787,7 @@ static int btintel_setup_combined(struct hci_dev *hdev)
 static int btintel_shutdown_combined(struct hci_dev *hdev)
 {
 	struct sk_buff *skb;
+	int ret;
 
 	/* Send HCI Reset to the controller to stop any BT activity which
 	 * were triggered. This will help to save power and maintain the
@@ -1791,6 +1799,21 @@ static int btintel_shutdown_combined(struct hci_dev *hdev)
 		return PTR_ERR(skb);
 	}
 	kfree_skb(skb);
+
+
+	/* Some platforms have an issue with BT LED when the interface is
+	 * down or BT radio is turned off, which takes 5 seconds to BT LED
+	 * goes off. This command turns off the BT LED immediately.
+	 */
+	if (btintel_test_flag(hdev, INTEL_BROKEN_LED)) {
+		skb = __hci_cmd_sync(hdev, 0xfc3f, 0, NULL, HCI_INIT_TIMEOUT);
+		if (IS_ERR(skb)) {
+			ret = PTR_ERR(skb);
+			bt_dev_err(hdev, "turning off Intel device LED failed");
+			return ret;
+		}
+		kfree_skb(skb);
+	}
 
 	return 0;
 }
