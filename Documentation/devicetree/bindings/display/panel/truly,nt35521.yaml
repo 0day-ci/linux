@@ -1,0 +1,62 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/display/panel/truly,nt35521.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Truly NT35521 5.24" 1280x720 MIPI-DSI Panel
+
+maintainers:
+  - Shawn Guo <shawn.guo@linaro.org>
+
+description: |
+  The Truly NT35521 is a 5.24" 1280x720 MIPI-DSI panel.  The panel backlight
+  is managed through DSI link.
+
+allOf:
+  - $ref: panel-common.yaml#
+
+properties:
+  compatible:
+    const: truly,nt35521
+
+  reg: true
+
+  reset-gpios: true
+
+  enable-gpios: true
+
+  pwr-positive5-gpios:
+    maxItems: 1
+
+  pwr-negative5-gpios:
+    maxItems: 1
+
+required:
+  - compatible
+  - reg
+  - reset-gpios
+  - enable-gpios
+  - pwr-positive5-gpios
+  - pwr-negative5-gpios
+
+additionalProperties: false
+
+examples:
+  - |
+    #include <dt-bindings/gpio/gpio.h>
+
+    dsi {
+        #address-cells = <1>;
+        #size-cells = <0>;
+
+        panel@0 {
+            compatible = "truly,nt35521";
+            reg = <0>;
+            reset-gpios = <&msmgpio 25 GPIO_ACTIVE_LOW>;
+            pwr-positive5-gpios = <&msmgpio 114 GPIO_ACTIVE_HIGH>;
+            pwr-negative5-gpios = <&msmgpio 17 GPIO_ACTIVE_HIGH>;
+            enable-gpios = <&msmgpio 10 GPIO_ACTIVE_HIGH>;
+        };
+    };
+...
