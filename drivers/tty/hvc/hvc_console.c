@@ -151,9 +151,11 @@ static uint32_t vtermnos[MAX_NR_HVC_CONSOLES] =
 static void hvc_console_print(struct console *co, const char *b,
 			      unsigned count)
 {
-	char c[N_OUTBUF] __ALIGNED__;
+	char *c;
 	unsigned i = 0, n = 0;
 	int r, donecr = 0, index = co->index;
+	unsigned long flags;
+	struct hvc_struct *hp;
 
 	/* Console access attempt outside of acceptable console range. */
 	if (index >= MAX_NR_HVC_CONSOLES)
@@ -163,6 +165,13 @@ static void hvc_console_print(struct console *co, const char *b,
 	if (vtermnos[index] == -1)
 		return;
 
+	list_for_each_entry(hp, &hvc_structs, next)
+		if (hp->vtermno == vtermnos[index])
+			break;
+
+	c = hp->hvc_con_outbuf;
+
+	spin_lock_irqsave(&hp->hvc_con_lock, flags);
 	while (count > 0 || i > 0) {
 		if (count > 0 && i < sizeof(c)) {
 			if (b[n] == '\n' && !donecr) {
@@ -191,6 +200,7 @@ static void hvc_console_print(struct console *co, const char *b,
 			}
 		}
 	}
+	spin_unlock_irqrestore(&hp->hvc_con_lock, flags);
 	hvc_console_flush(cons_ops[index], vtermnos[index]);
 }
 
@@ -878,9 +888,15 @@ static void hvc_poll_put_char(struct tty_driver *driver, int line, char ch)
 	struct tty_struct *tty = driver->ttys[0];
 	struct hvc_struct *hp = tty->driver_data;
 	int n;
+	unsigned long flags;
+	char *c;
 
+	c = hp->hvc_con_outbuf;
 	do {
-		n = hp->ops->put_chars(hp->vtermno, &ch, 1);
+		spin_lock_irqsave(&hp->hvc_con_lock, flags);
+		c[0] = ch;
+		n = hp->ops->put_chars(hp->vtermno, c, 1);
+		spin_unlock_irqrestore(&hp->hvc_con_lock, flags);
 	} while (n <= 0);
 }
 #endif
@@ -932,6 +948,16 @@ struct hvc_struct *hvc_alloc(uint32_t vtermno, int data,
 	hp->ops = ops;
 	hp->outbuf_size = outbuf_size;
 	hp->outbuf = &((char *)hp)[ALIGN(sizeof(*hp), sizeof(long))];
+
+	/*
+	 * hvc_con_outbuf is guaranteed to be aligned at least to the
+	 * size(N_OUTBUF) by kmalloc().
+	 */
+	hp->hvc_con_outbuf = kzalloc(N_OUTBUF, GFP_KERNEL);
+	if (!hp->hvc_con_outbuf)
+		return ERR_PTR(-ENOMEM);
+
+	spin_lock_init(&hp->hvc_con_lock);
 
 	tty_port_init(&hp->port);
 	hp->port.ops = &hvc_port_ops;

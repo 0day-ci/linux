@@ -48,6 +48,8 @@ struct hvc_struct {
 	struct work_struct tty_resize;
 	struct list_head next;
 	unsigned long flags;
+	char *hvc_con_outbuf;
+	spinlock_t hvc_con_lock;
 };
 
 /* implemented by a low level driver */
