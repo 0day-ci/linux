@@ -5929,31 +5929,30 @@ out:
 	return ret;
 }
 
+/*
+ * Iterate over the given and all it's parent directories, logging them if
+ * needed.
+ *
+ * Return 0 if we reach the toplevel directory, or < 0 if error.
+ */
 static int log_new_ancestors(struct btrfs_trans_handle *trans,
 			     struct btrfs_root *root,
 			     struct btrfs_path *path,
 			     struct btrfs_log_ctx *ctx)
 {
+	struct btrfs_fs_info *fs_info = root->fs_info;
 	struct btrfs_key found_key;
+	u64 ino;
 
 	btrfs_item_key_to_cpu(path->nodes[0], &found_key, path->slots[0]);
 
 	while (true) {
-		struct btrfs_fs_info *fs_info = root->fs_info;
-		struct extent_buffer *leaf = path->nodes[0];
-		int slot = path->slots[0];
-		struct btrfs_key search_key;
 		struct inode *inode;
-		u64 ino;
 		int ret = 0;
 
 		btrfs_release_path(path);
 
 		ino = found_key.offset;
-
-		search_key.objectid = found_key.offset;
-		search_key.type = BTRFS_INODE_ITEM_KEY;
-		search_key.offset = 0;
 		inode = btrfs_iget(fs_info->sb, ino, root);
 		if (IS_ERR(inode))
 			return PTR_ERR(inode);
@@ -5966,29 +5965,14 @@ static int log_new_ancestors(struct btrfs_trans_handle *trans,
 		if (ret)
 			return ret;
 
-		if (search_key.objectid == BTRFS_FIRST_FREE_OBJECTID)
+		if (ino == BTRFS_FIRST_FREE_OBJECTID)
 			break;
 
-		search_key.type = BTRFS_INODE_REF_KEY;
-		ret = btrfs_search_slot(NULL, root, &search_key, path, 0, 0);
+		ret = btrfs_find_item(root, path, ino, BTRFS_INODE_REF_KEY, 0,
+					&found_key);
 		if (ret < 0)
 			return ret;
-
-		leaf = path->nodes[0];
-		slot = path->slots[0];
-		if (slot >= btrfs_header_nritems(leaf)) {
-			ret = btrfs_next_leaf(root, path);
-			if (ret < 0)
-				return ret;
-			else if (ret > 0)
-				return -ENOENT;
-			leaf = path->nodes[0];
-			slot = path->slots[0];
-		}
-
-		btrfs_item_key_to_cpu(leaf, &found_key, slot);
-		if (found_key.objectid != search_key.objectid ||
-		    found_key.type != BTRFS_INODE_REF_KEY)
+		else if (ret > 0)
 			return -ENOENT;
 	}
 	return 0;
