@@ -681,6 +681,42 @@ static __kernel_fsid_t fanotify_get_fsid(struct fsnotify_iter_info *iter_info)
 	return fsid;
 }
 
+static int fanotify_merge_error_event(struct fsnotify_group *group,
+				      struct fsnotify_event *event)
+{
+	struct fanotify_event *fae = FANOTIFY_E(event);
+	struct fanotify_error_event *fee = FANOTIFY_EE(fae);
+
+	/*
+	 * When err_count > 0, the reporting slot is full.  Just account
+	 * the additional error and abort the insertion.
+	 */
+	if (fee->err_count) {
+		fee->err_count++;
+		return 1;
+	}
+
+	return 0;
+}
+
+static void fanotify_insert_error_event(struct fsnotify_group *group,
+					struct fsnotify_event *event,
+					const void *data)
+{
+	const struct fs_error_report *report = (struct fs_error_report *) data;
+	struct fanotify_event *fae = FANOTIFY_E(event);
+	struct fanotify_error_event *fee;
+
+	/* This might be an unexpected type of event (i.e. overflow). */
+	if (!fanotify_is_error_event(fae->mask))
+		return;
+
+	fee = FANOTIFY_EE(fae);
+	fee->fae.type = FANOTIFY_EVENT_TYPE_FS_ERROR;
+	fee->error = report->error;
+	fee->err_count = 1;
+}
+
 /*
  * Add an event to hash table for faster merge.
  */
@@ -735,7 +771,7 @@ static int fanotify_handle_event(struct fsnotify_group *group, u32 mask,
 	BUILD_BUG_ON(FAN_OPEN_EXEC_PERM != FS_OPEN_EXEC_PERM);
 	BUILD_BUG_ON(FAN_FS_ERROR != FS_ERROR);
 
-	BUILD_BUG_ON(HWEIGHT32(ALL_FANOTIFY_EVENT_BITS) != 19);
+	BUILD_BUG_ON(HWEIGHT32(ALL_FANOTIFY_EVENT_BITS) != 20);
 
 	mask = fanotify_group_event_mask(group, iter_info, mask, data,
 					 data_type, dir);
@@ -758,6 +794,18 @@ static int fanotify_handle_event(struct fsnotify_group *group, u32 mask,
 		/* Racing with mark destruction or creation? */
 		if (!fsid.val[0] && !fsid.val[1])
 			return 0;
+	}
+
+	if (fanotify_is_error_event(mask)) {
+		struct fanotify_sb_mark *sb_mark =
+			FANOTIFY_SB_MARK(fsnotify_iter_sb_mark(iter_info));
+
+		ret = fsnotify_insert_event(group,
+					    &sb_mark->fee_slot->fae.fse,
+					    fanotify_merge_error_event,
+					    fanotify_insert_error_event,
+					    data);
+		goto finish;
 	}
 
 	event = fanotify_alloc_event(group, mask, data, data_type, dir,

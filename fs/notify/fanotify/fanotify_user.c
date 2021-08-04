@@ -184,6 +184,45 @@ static struct fanotify_error_event *fanotify_alloc_error_event(
 }
 
 /*
+ * Replace a mark's error event with a new structure in preparation for
+ * it to be dequeued.  This is a bit annoying since we need to drop the
+ * lock, so another thread might just steal the event from us.
+ */
+static int fanotify_replace_fs_error_event(struct fsnotify_group *group,
+					   struct fanotify_event *fae)
+{
+	struct fanotify_error_event *new, *fee = FANOTIFY_EE(fae);
+	struct fanotify_sb_mark *sb_mark = fee->sb_mark;
+	struct fsnotify_event *fse;
+
+	pr_debug("%s: event=%p\n", __func__, fae);
+
+	assert_spin_locked(&group->notification_lock);
+
+	spin_unlock(&group->notification_lock);
+	new = fanotify_alloc_error_event(sb_mark);
+	spin_lock(&group->notification_lock);
+
+	if (!new)
+		return -ENOMEM;
+
+	/*
+	 * Since we temporarily dropped the notification_lock, the event
+	 * might have been taken from under us and reported by another
+	 * reader.  If that is the case, don't play games, just retry.
+	 */
+	fse = fsnotify_peek_first_event(group);
+	if (fse != &fae->fse) {
+		kfree(new);
+		return -EAGAIN;
+	}
+
+	sb_mark->fee_slot = new;
+
+	return 0;
+}
+
+/*
  * Get an fanotify notification event if one exists and is small
  * enough to fit in "count". Return an error pointer if the count
  * is not large enough. When permission event is dequeued, its state is
@@ -196,6 +235,7 @@ static struct fanotify_event *get_one_event(struct fsnotify_group *group,
 	struct fanotify_event *event = NULL;
 	struct fsnotify_event *fsn_event;
 	unsigned int fid_mode = FAN_GROUP_FLAG(group, FANOTIFY_FID_BITS);
+	int ret;
 
 	pr_debug("%s: group=%p count=%zd\n", __func__, group, count);
 
@@ -212,9 +252,21 @@ static struct fanotify_event *get_one_event(struct fsnotify_group *group,
 		goto out;
 	}
 
+	if (fanotify_is_error_event(event->mask)) {
+		/*
+		 * Replace the error event ahead of dequeueing so we
+		 * don't need to handle a incorrectly dequeued event.
+		 */
+		ret = fanotify_replace_fs_error_event(group, event);
+		if (ret) {
+			event = ERR_PTR(ret);
+			goto out;
+		}
+	}
+
 	/*
-	 * Held the notification_lock the whole time, so this is the
-	 * same event we peeked above.
+	 * Even though we might have temporarily dropped the lock, this
+	 * is guaranteed to be the same event we peeked above.
 	 */
 	fsnotify_remove_first_event(group);
 	if (fanotify_is_perm_event(event->mask))
@@ -596,6 +648,8 @@ static ssize_t fanotify_read(struct file *file, char __user *buf,
 		event = get_one_event(group, count);
 		if (IS_ERR(event)) {
 			ret = PTR_ERR(event);
+			if (ret == -EAGAIN)
+				continue;
 			break;
 		}
 
@@ -1462,6 +1516,11 @@ static int do_fanotify_mark(int fanotify_fd, unsigned int flags, __u64 mask,
 			goto path_put_and_out;
 
 		fsid = &__fsid;
+	}
+
+	if (mask & FAN_FS_ERROR && mark_type != FAN_MARK_FILESYSTEM) {
+		ret = -EINVAL;
+		goto path_put_and_out;
 	}
 
 	/* inode held in place by reference to path; group by fget on fd */
