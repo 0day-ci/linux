@@ -9,7 +9,7 @@
 #include "venc_ipi_msg.h"
 #include "venc_vpu_if.h"
 
-static void handle_enc_init_msg(struct venc_vpu_inst *vpu, const void *data)
+static int handle_enc_init_msg(struct venc_vpu_inst *vpu, const void *data)
 {
 	const struct venc_vpu_ipi_msg_init *msg = data;
 
@@ -19,7 +19,7 @@ static void handle_enc_init_msg(struct venc_vpu_inst *vpu, const void *data)
 
 	/* Firmware version field value is unspecified on MT8173. */
 	if (vpu->ctx->dev->venc_pdata->chip == MTK_MT8173)
-		return;
+		return 0;
 
 	/* Check firmware version. */
 	mtk_vcodec_debug(vpu, "firmware version: 0x%x\n",
@@ -30,18 +30,19 @@ static void handle_enc_init_msg(struct venc_vpu_inst *vpu, const void *data)
 	default:
 		mtk_vcodec_err(vpu, "unhandled firmware version 0x%x\n",
 			       msg->venc_abi_version);
-		vpu->failure = 1;
-		break;
+		return -EINVAL;
 	}
+	return 0;
 }
 
-static void handle_enc_encode_msg(struct venc_vpu_inst *vpu, const void *data)
+static int handle_enc_encode_msg(struct venc_vpu_inst *vpu, const void *data)
 {
 	const struct venc_vpu_ipi_msg_enc *msg = data;
 
 	vpu->state = msg->state;
 	vpu->bs_size = msg->bs_size;
 	vpu->is_key_frm = msg->is_key_frm;
+	return 0;
 }
 
 static void vpu_enc_ipi_handler(void *data, unsigned int len, void *priv)
@@ -60,12 +61,12 @@ static void vpu_enc_ipi_handler(void *data, unsigned int len, void *priv)
 
 	switch (msg->msg_id) {
 	case VPU_IPIMSG_ENC_INIT_DONE:
-		handle_enc_init_msg(vpu, data);
+		vpu->failure = handle_enc_init_msg(vpu, data);
 		break;
 	case VPU_IPIMSG_ENC_SET_PARAM_DONE:
 		break;
 	case VPU_IPIMSG_ENC_ENCODE_DONE:
-		handle_enc_encode_msg(vpu, data);
+		vpu->failure = handle_enc_encode_msg(vpu, data);
 		break;
 	case VPU_IPIMSG_ENC_DEINIT_DONE:
 		break;
