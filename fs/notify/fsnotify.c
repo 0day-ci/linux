@@ -229,7 +229,8 @@ int __fsnotify_parent(struct dentry *dentry, __u32 mask, const void *data,
 	}
 
 notify:
-	ret = fsnotify(mask, data, data_type, p_inode, file_name, inode, 0);
+	ret = fsnotify(mask, data, data_type, NULL, p_inode, file_name,
+		       inode, 0);
 
 	if (file_name)
 		release_dentry_name_snapshot(&name);
@@ -459,12 +460,13 @@ static void fsnotify_iter_next(struct fsnotify_iter_info *iter_info)
  *		if both are non-NULL event may be reported to both.
  * @cookie:	inotify rename cookie
  */
-int fsnotify(__u32 mask, const void *data, int data_type, struct inode *dir,
-	     const struct qstr *file_name, struct inode *inode, u32 cookie)
+int fsnotify(__u32 mask, const void *data, int data_type,
+	     struct super_block *sb, struct inode *dir,
+	     const struct qstr *file_name, struct inode *inode,
+	     u32 cookie)
 {
 	const struct path *path = fsnotify_data_path(data, data_type);
 	struct fsnotify_iter_info iter_info = {};
-	struct super_block *sb;
 	struct mount *mnt = NULL;
 	struct inode *parent = NULL;
 	int ret = 0;
@@ -483,7 +485,9 @@ int fsnotify(__u32 mask, const void *data, int data_type, struct inode *dir,
 		 */
 		parent = dir;
 	}
-	sb = inode->i_sb;
+
+	if (!sb)
+		sb = inode->i_sb;
 
 	/*
 	 * Optimization: srcu_read_lock() has a memory barrier which can

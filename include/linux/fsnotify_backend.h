@@ -423,8 +423,9 @@ struct fsnotify_mark {
 
 /* main fsnotify call to send events */
 extern int fsnotify(__u32 mask, const void *data, int data_type,
-		    struct inode *dir, const struct qstr *name,
-		    struct inode *inode, u32 cookie);
+		    struct super_block *sb, struct inode *dir,
+		    const struct qstr *name, struct inode *inode,
+		    u32 cookie);
 extern int __fsnotify_parent(struct dentry *dentry, __u32 mask, const void *data,
 			   int data_type);
 extern void __fsnotify_inode_delete(struct inode *inode);
@@ -618,8 +619,9 @@ static inline void fsnotify_init_event(struct fsnotify_event *event)
 #else
 
 static inline int fsnotify(__u32 mask, const void *data, int data_type,
-			   struct inode *dir, const struct qstr *name,
-			   struct inode *inode, u32 cookie)
+			   struct super_block *sb, struct inode *dir,
+			   const struct qstr *name, struct inode *inode,
+			   u32 cookie)
 {
 	return 0;
 }

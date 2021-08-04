@@ -30,7 +30,8 @@ static inline void fsnotify_name(struct inode *dir, __u32 mask,
 				 struct inode *child,
 				 const struct qstr *name, u32 cookie)
 {
-	fsnotify(mask, child, FSNOTIFY_EVENT_INODE, dir, name, NULL, cookie);
+	fsnotify(mask, child, FSNOTIFY_EVENT_INODE, NULL, dir, name, NULL,
+		 cookie);
 }
 
 static inline void fsnotify_dirent(struct inode *dir, struct dentry *dentry,
@@ -44,7 +45,8 @@ static inline void fsnotify_inode(struct inode *inode, __u32 mask)
 	if (S_ISDIR(inode->i_mode))
 		mask |= FS_ISDIR;
 
-	fsnotify(mask, inode, FSNOTIFY_EVENT_INODE, NULL, NULL, inode, 0);
+	fsnotify(mask, inode, FSNOTIFY_EVENT_INODE, NULL, NULL, NULL, inode,
+		 0);
 }
 
 /* Notify this dentry's parent about a child's events. */
@@ -68,7 +70,7 @@ static inline int fsnotify_parent(struct dentry *dentry, __u32 mask,
 	return __fsnotify_parent(dentry, mask, data, data_type);
 
 notify_child:
-	return fsnotify(mask, data, data_type, NULL, NULL, inode, 0);
+	return fsnotify(mask, data, data_type, NULL, NULL, NULL, inode, 0);
 }
 
 /*
