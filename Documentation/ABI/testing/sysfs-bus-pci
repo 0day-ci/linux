@@ -421,3 +421,23 @@ Description:
 		to disable 10-Bit Tag Requester when the driver does not bind
 		the deivce. The typical use case is for p2pdma when the peer
 		device does not support 10-BIT Tag Completer.
+
+What:		/sys/bus/pci/devices/.../sriov_vf_10bit_tag
+Date:		August 2021
+Contact:	Dongdong Liu <liudongdong3@huawei.com>
+Description:
+		This file is associated with a SR-IOV physical function (PF).
+		It is visible when the device has VF 10-Bit Tag Requester
+		Supported. It contains the status of VF 10-Bit Tag Requester
+		Enable. The file is only readable.
+
+What:		/sys/bus/pci/devices/.../sriov_vf_10bit_tag_ctl
+Date:		August 2021
+Contact:	Dongdong Liu <liudongdong3@huawei.com>
+Description:
+		This file is associated with a SR-IOV virtual function (VF).
+		It is visible when the device has VF 10-Bit Tag Requester
+		Supported. It only allows to write 0 to disable VF 10-Bit
+		Tag Requester. The file is only writeable when the vf driver
+		does not bind to a dirver. The typical use case is for p2pdma
+		when the peer device does not support 10-BIT Tag Completer.

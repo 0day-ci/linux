@@ -220,10 +220,38 @@ err_pdev:
 static DEVICE_ATTR_WO(sriov_vf_msix_count);
 #endif
 
+static ssize_t sriov_vf_10bit_tag_ctl_store(struct device *dev,
+					    struct device_attribute *attr,
+					    const char *buf, size_t count)
+{
+	struct pci_dev *vf_dev = to_pci_dev(dev);
+	struct pci_dev *pdev = pci_physfn(vf_dev);
+	struct pci_sriov *iov;
+	bool enable;
+
+	if (kstrtobool(buf, &enable) < 0)
+		return -EINVAL;
+
+	if (enable != false)
+		return -EINVAL;
+
+	if (vf_dev->driver)
+		return -EBUSY;
+
+	iov = pdev->sriov;
+	iov->ctrl &= ~PCI_SRIOV_CTRL_VF_10BIT_TAG_REQ_EN;
+	pci_write_config_word(pdev, iov->pos + PCI_SRIOV_CTRL, iov->ctrl);
+	pci_info(pdev, "disabled SRIOV 10-Bit Tag Requester\n");
+
+	return count;
+}
+static DEVICE_ATTR_WO(sriov_vf_10bit_tag_ctl);
+
 static struct attribute *sriov_vf_dev_attrs[] = {
 #ifdef CONFIG_PCI_MSI
 	&dev_attr_sriov_vf_msix_count.attr,
 #endif
+	&dev_attr_sriov_vf_10bit_tag_ctl.attr,
 	NULL,
 };
 
@@ -234,6 +262,11 @@ static umode_t sriov_vf_attrs_are_visible(struct kobject *kobj,
 	struct pci_dev *pdev = to_pci_dev(dev);
 
 	if (!pdev->is_virtfn)
+		return 0;
+
+	pdev = pci_physfn(pdev);
+	if ((a == &dev_attr_sriov_vf_10bit_tag_ctl.attr) &&
+	     !(pdev->sriov->cap & PCI_SRIOV_CAP_VF_10BIT_TAG_REQ))
 		return 0;
 
 	return a->mode;
@@ -487,12 +520,23 @@ static ssize_t sriov_drivers_autoprobe_store(struct device *dev,
 	return count;
 }
 
+static ssize_t sriov_vf_10bit_tag_show(struct device *dev,
+				       struct device_attribute *attr,
+				       char *buf)
+{
+	struct pci_dev *pdev = to_pci_dev(dev);
+
+	return sysfs_emit(buf, "%u\n",
+		!!(pdev->sriov->ctrl & PCI_SRIOV_CTRL_VF_10BIT_TAG_REQ_EN));
+}
+
 static DEVICE_ATTR_RO(sriov_totalvfs);
 static DEVICE_ATTR_RW(sriov_numvfs);
 static DEVICE_ATTR_RO(sriov_offset);
 static DEVICE_ATTR_RO(sriov_stride);
 static DEVICE_ATTR_RO(sriov_vf_device);
 static DEVICE_ATTR_RW(sriov_drivers_autoprobe);
+static DEVICE_ATTR_RO(sriov_vf_10bit_tag);
 
 static struct attribute *sriov_pf_dev_attrs[] = {
 	&dev_attr_sriov_totalvfs.attr,
@@ -501,6 +545,7 @@ static struct attribute *sriov_pf_dev_attrs[] = {
 	&dev_attr_sriov_stride.attr,
 	&dev_attr_sriov_vf_device.attr,
 	&dev_attr_sriov_drivers_autoprobe.attr,
+	&dev_attr_sriov_vf_10bit_tag.attr,
 #ifdef CONFIG_PCI_MSI
 	&dev_attr_sriov_vf_total_msix.attr,
 #endif
@@ -511,8 +556,13 @@ static umode_t sriov_pf_attrs_are_visible(struct kobject *kobj,
 					  struct attribute *a, int n)
 {
 	struct device *dev = kobj_to_dev(kobj);
+	struct pci_dev *pdev = to_pci_dev(dev);
 
 	if (!dev_is_pf(dev))
+		return 0;
+
+	if ((a == &dev_attr_sriov_vf_10bit_tag.attr) &&
+	     !(pdev->sriov->cap & PCI_SRIOV_CAP_VF_10BIT_TAG_REQ))
 		return 0;
 
 	return a->mode;
