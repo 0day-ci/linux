@@ -100,6 +100,11 @@ leads to a few additional requirements:
   userspace patches land. uAPI always flows from the kernel, doing things the
   other way round risks divergence of the uAPI definitions and header files.
 
+- The kernel patch which adds the new uAPI **must** reference the patch series
+  or merge requests in the userspaces projects which demonstrate the use of the
+  new uAPI and against which the review was done so that future developers can
+  find all of the pieces which tie together.
+
 These are fairly steep requirements, but have grown out from years of shared
 pain and experience with uAPI added hastily, and almost always regretted about
 just as fast. GFX devices change really fast, requiring a paradigm shift and
