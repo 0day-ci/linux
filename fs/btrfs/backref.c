@@ -1691,8 +1691,8 @@ char *btrfs_ref_to_path(struct btrfs_root *fs_root, struct btrfs_path *path,
 				btrfs_tree_read_unlock(eb);
 			free_extent_buffer(eb);
 		}
-		ret = btrfs_find_item(fs_root, path, parent, 0,
-				BTRFS_INODE_REF_KEY, &found_key);
+		ret = btrfs_find_item(fs_root, path, parent, BTRFS_INODE_REF_KEY,
+					0, &found_key);
 		if (ret > 0)
 			ret = -ENOENT;
 		if (ret)
@@ -2063,9 +2063,8 @@ static int iterate_inode_refs(u64 inum, struct btrfs_root *fs_root,
 	struct btrfs_key found_key;
 
 	while (!ret) {
-		ret = btrfs_find_item(fs_root, path, inum,
-				parent ? parent + 1 : 0, BTRFS_INODE_REF_KEY,
-				&found_key);
+		ret = btrfs_find_item(fs_root, path, inum, BTRFS_INODE_REF_KEY,
+				parent ? parent + 1 : 0, &found_key);
 
 		if (ret < 0)
 			break;

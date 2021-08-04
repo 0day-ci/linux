@@ -1528,7 +1528,7 @@ setup_nodes_for_search(struct btrfs_trans_handle *trans,
 }
 
 int btrfs_find_item(struct btrfs_root *fs_root, struct btrfs_path *path,
-		u64 iobjectid, u64 ioff, u8 key_type,
+		u64 iobjectid, u8 key_type, u64 ioff,
 		struct btrfs_key *found_key)
 {
 	int ret;
