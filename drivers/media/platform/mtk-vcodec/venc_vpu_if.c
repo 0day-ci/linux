@@ -92,6 +92,7 @@ static int vpu_enc_send_msg(struct venc_vpu_inst *vpu, void *msg,
 {
 	int status;
 
+	vpu->signaled = 0;
 	mtk_vcodec_debug_enter(vpu);
 
 	if (!vpu->ctx->dev->fw_handler) {
@@ -106,6 +107,8 @@ static int vpu_enc_send_msg(struct venc_vpu_inst *vpu, void *msg,
 			       *(uint32_t *)msg, len, status);
 		return -EINVAL;
 	}
+	if (!vpu->signaled)
+		return -EINVAL;
 	if (vpu->failure)
 		return -EINVAL;
 
@@ -122,7 +125,6 @@ int vpu_enc_init(struct venc_vpu_inst *vpu)
 	mtk_vcodec_debug_enter(vpu);
 
 	init_waitqueue_head(&vpu->wq_hd);
-	vpu->signaled = 0;
 	vpu->failure = 0;
 
 	status = mtk_vcodec_fw_ipi_register(vpu->ctx->dev->fw_handler, vpu->id,
