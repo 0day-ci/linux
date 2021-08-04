@@ -1252,9 +1252,10 @@ sub get_subsystem_name {
 
     my $subsystem = $typevalue[$start];
     if ($output_section_maxlen && length($subsystem) > $output_section_maxlen) {
-	$subsystem = substr($subsystem, 0, $output_section_maxlen - 3);
+	my $parenthesis = substr($subsystem, -1) eq ")";
+	$subsystem = substr($subsystem, 0, $output_section_maxlen - ($parenthesis ? 4 : 3));
 	$subsystem =~ s/\s*$//;
-	$subsystem = $subsystem . "...";
+	$subsystem = $subsystem . "..." . ($parenthesis ? ")" : "");
     }
     return $subsystem;
 }
