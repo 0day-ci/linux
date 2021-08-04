@@ -1109,6 +1109,7 @@ static void mtk_venc_worker(struct work_struct *work)
 		dst_buf->vb2_buf.planes[0].bytesused = 0;
 		v4l2_m2m_buf_done(dst_buf, VB2_BUF_STATE_ERROR);
 		mtk_v4l2_err("venc_if_encode failed=%d", ret);
+		ctx->state = MTK_STATE_ABORT;
 	} else {
 		v4l2_m2m_buf_done(src_buf, VB2_BUF_STATE_DONE);
 		dst_buf->vb2_buf.planes[0].bytesused = enc_result.bs_size;
