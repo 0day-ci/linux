@@ -110,6 +110,7 @@ postcore_initcall(pcibus_class_init);
 static u64 pci_size(u64 base, u64 maxbase, u64 mask)
 {
 	u64 size = mask & maxbase;	/* Find the significant bits */
+
 	if (!size)
 		return 0;
 
@@ -331,12 +332,14 @@ static void pci_read_bases(struct pci_dev *dev, unsigned int howmany, int rom)
 
 	for (pos = 0; pos < howmany; pos++) {
 		struct resource *res = &dev->resource[pos];
+
 		reg = PCI_BASE_ADDRESS_0 + (pos << 2);
 		pos += __pci_read_base(dev, pci_bar_unknown, res, reg);
 	}
 
 	if (rom) {
 		struct resource *res = &dev->resource[PCI_ROM_RESOURCE];
+
 		dev->rom_base_reg = rom;
 		res->flags = IORESOURCE_MEM | IORESOURCE_PREFETCH |
 				IORESOURCE_READONLY | IORESOURCE_SIZEALIGN;
@@ -1376,6 +1379,7 @@ static int pci_scan_bridge_extend(struct pci_bus *bus, struct pci_dev *dev,
 			 */
 			for (i = 0; i < CARDBUS_RESERVE_BUSNR; i++) {
 				struct pci_bus *parent = bus;
+
 				if (pci_find_bus(pci_domain_nr(bus),
 							max+i+1))
 					break;
@@ -1880,6 +1884,7 @@ int pci_setup_device(struct pci_dev *dev)
 		 */
 		if (class == PCI_CLASS_STORAGE_IDE) {
 			u8 progif;
+
 			pci_read_config_byte(dev, PCI_CLASS_PROG, &progif);
 			if ((progif & 1) == 0) {
 				region.start = 0x1F0;
@@ -1948,7 +1953,7 @@ int pci_setup_device(struct pci_dev *dev)
 			dev->hdr_type);
 		return -EIO;
 
-	bad:
+bad:
 		pci_err(dev, "ignoring class %#08x (doesn't match header type %02x)\n",
 			dev->class, dev->hdr_type);
 		dev->class = PCI_CLASS_NOT_DEFINED << 8;
@@ -2155,9 +2160,9 @@ static void pci_configure_ltr(struct pci_dev *dev)
 	 * Complex and all intermediate Switches indicate support for LTR.
 	 * PCIe r4.0, sec 6.18.
 	 */
-	if (pci_pcie_type(dev) == PCI_EXP_TYPE_ROOT_PORT ||
-	    ((bridge = pci_upstream_bridge(dev)) &&
-	      bridge->ltr_path)) {
+	bridge = pci_upstream_bridge(dev);
+	if (pci_pcie_type(dev) == PCI_EXP_TYPE_ROOT_PORT || (bridge &&
+		bridge->ltr_path)) {
 		pcie_capability_set_word(dev, PCI_EXP_DEVCTL2,
 					 PCI_EXP_DEVCTL2_LTR_EN);
 		dev->ltr_path = 1;
@@ -2543,11 +2548,11 @@ struct pci_dev *pci_scan_single_device(struct pci_bus *bus, int devfn)
 }
 EXPORT_SYMBOL(pci_scan_single_device);
 
-static unsigned next_fn(struct pci_bus *bus, struct pci_dev *dev, unsigned fn)
+static unsigned int next_fn(struct pci_bus *bus, struct pci_dev *dev, unsigned int fn)
 {
 	int pos;
 	u16 cap = 0;
-	unsigned next_fn;
+	unsigned int next_fn;
 
 	if (pci_ari_enabled(bus)) {
 		if (!dev)
@@ -2606,7 +2611,7 @@ static int only_one_child(struct pci_bus *bus)
  */
 int pci_scan_slot(struct pci_bus *bus, int devfn)
 {
-	unsigned fn, nr = 0;
+	unsigned int fn, nr = 0;
 	struct pci_dev *dev;
 
 	if (only_one_child(bus) && (devfn > 0))
@@ -3190,11 +3195,11 @@ struct pci_bus *pci_scan_bus(int bus, struct pci_ops *ops,
 	pci_add_resource(&resources, &iomem_resource);
 	pci_add_resource(&resources, &busn_resource);
 	b = pci_create_root_bus(NULL, bus, ops, sysdata, &resources);
-	if (b) {
+	if (b)
 		pci_scan_child_bus(b);
-	} else {
+	else
 		pci_free_resource_list(&resources);
-	}
+
 	return b;
 }
 EXPORT_SYMBOL(pci_scan_bus);
@@ -3269,14 +3274,20 @@ static int __init pci_sort_bf_cmp(const struct device *d_a,
 	const struct pci_dev *a = to_pci_dev(d_a);
 	const struct pci_dev *b = to_pci_dev(d_b);
 
-	if      (pci_domain_nr(a->bus) < pci_domain_nr(b->bus)) return -1;
-	else if (pci_domain_nr(a->bus) > pci_domain_nr(b->bus)) return  1;
+	if (pci_domain_nr(a->bus) < pci_domain_nr(b->bus))
+		return -1;
+	else if (pci_domain_nr(a->bus) > pci_domain_nr(b->bus))
+		return  1;
 
-	if      (a->bus->number < b->bus->number) return -1;
-	else if (a->bus->number > b->bus->number) return  1;
+	if (a->bus->number < b->bus->number)
+		return -1;
+	else if (a->bus->number > b->bus->number)
+		return  1;
 
-	if      (a->devfn < b->devfn) return -1;
-	else if (a->devfn > b->devfn) return  1;
+	if (a->devfn < b->devfn)
+		return -1;
+	else if (a->devfn > b->devfn)
+		return  1;
 
 	return 0;
 }
