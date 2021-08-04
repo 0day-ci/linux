@@ -310,6 +310,25 @@ static bool dev_is_untrusted(struct device *dev)
 	return dev_is_pci(dev) && to_pci_dev(dev)->untrusted;
 }
 
+int iommu_dma_init_fq(struct iommu_domain *domain)
+{
+	struct iommu_dma_cookie *cookie = domain->iova_cookie;
+
+	if (domain->type != IOMMU_DOMAIN_DMA_FQ)
+		return -EINVAL;
+	if (cookie->fq_domain)
+		return 0;
+
+	if (init_iova_flush_queue(&cookie->iovad, iommu_dma_flush_iotlb_all,
+				  iommu_dma_entry_dtor)) {
+		pr_warn("iova flush queue initialization failed\n");
+		domain->type = IOMMU_DOMAIN_DMA;
+		return -ENODEV;
+	}
+	cookie->fq_domain = domain;
+	return 0;
+}
+
 /**
  * iommu_dma_init_domain - Initialise a DMA mapping domain
  * @domain: IOMMU domain previously prepared by iommu_get_dma_cookie()
@@ -362,16 +381,7 @@ static int iommu_dma_init_domain(struct iommu_domain *domain, dma_addr_t base,
 	}
 
 	init_iova_domain(iovad, 1UL << order, base_pfn);
-
-	if (domain->type == IOMMU_DOMAIN_DMA_FQ && !cookie->fq_domain) {
-		if (init_iova_flush_queue(iovad, iommu_dma_flush_iotlb_all,
-					  iommu_dma_entry_dtor)) {
-			pr_warn("iova flush queue initialization failed\n");
-			domain->type = IOMMU_DOMAIN_DMA;
-		} else {
-			cookie->fq_domain = domain;
-		}
-	}
+	iommu_dma_init_fq(domain);
 
 	return iova_reserve_iommu_regions(dev, domain);
 }
