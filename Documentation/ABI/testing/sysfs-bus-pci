@@ -139,7 +139,7 @@ Description:
 		binary file containing the Vital Product Data for the
 		device.  It should follow the VPD format defined in
 		PCI Specification 2.1 or 2.2, but users should consider
-		that some devices may have incorrectly formatted data.  
+		that some devices may have incorrectly formatted data.
 		If the underlying VPD has a writable section then the
 		corresponding section of this file will be writable.
 
@@ -407,3 +407,17 @@ Description:
 
 		The file is writable if the PF is bound to a driver that
 		implements ->sriov_set_msix_vec_count().
+
+What:		/sys/bus/pci/devices/.../10bit_tag
+Date:		August 2021
+Contact:	Dongdong Liu <liudongdong3@huawei.com>
+Description:
+		If a PCI device support 10-Bit Tag Requester, will create the
+		10bit_tag sysfs file. The file is readable, the value
+		indicate current 10-Bit Tag Requester Enable.
+		1 - enabled, 0 - disabled.
+
+		The file is also writeable, the value only accept by write 0
+		to disable 10-Bit Tag Requester when the driver does not bind
+		the deivce. The typical use case is for p2pdma when the peer
+		device does not support 10-BIT Tag Completer.
