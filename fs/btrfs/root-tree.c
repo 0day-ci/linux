@@ -207,10 +207,10 @@ int btrfs_insert_root(struct btrfs_trans_handle *trans, struct btrfs_root *root,
 int btrfs_find_orphan_roots(struct btrfs_fs_info *fs_info)
 {
 	struct btrfs_root *tree_root = fs_info->tree_root;
-	struct extent_buffer *leaf;
 	struct btrfs_path *path;
 	struct btrfs_key key;
 	struct btrfs_root *root;
+	u64 offset = 0;
 	int err = 0;
 	int ret;
 
@@ -218,38 +218,22 @@ int btrfs_find_orphan_roots(struct btrfs_fs_info *fs_info)
 	if (!path)
 		return -ENOMEM;
 
-	key.objectid = BTRFS_ORPHAN_OBJECTID;
-	key.type = BTRFS_ORPHAN_ITEM_KEY;
-	key.offset = 0;
-
 	while (1) {
 		u64 root_objectid;
 
-		ret = btrfs_search_slot(NULL, tree_root, &key, path, 0, 0);
+		ret = btrfs_find_item(tree_root, path, BTRFS_ORPHAN_OBJECTID,
+				BTRFS_ORPHAN_ITEM_KEY, offset, &key);
+
+		btrfs_release_path(path);
 		if (ret < 0) {
 			err = ret;
 			break;
-		}
-
-		leaf = path->nodes[0];
-		if (path->slots[0] >= btrfs_header_nritems(leaf)) {
-			ret = btrfs_next_leaf(tree_root, path);
-			if (ret < 0)
-				err = ret;
-			if (ret != 0)
-				break;
-			leaf = path->nodes[0];
-		}
-
-		btrfs_item_key_to_cpu(leaf, &key, path->slots[0]);
-		btrfs_release_path(path);
-
-		if (key.objectid != BTRFS_ORPHAN_OBJECTID ||
-		    key.type != BTRFS_ORPHAN_ITEM_KEY)
+		} else if (ret > 0) {
 			break;
+		}
 
 		root_objectid = key.offset;
-		key.offset++;
+		offset++;
 
 		root = btrfs_get_fs_root(fs_info, root_objectid, false);
 		err = PTR_ERR_OR_ZERO(root);
