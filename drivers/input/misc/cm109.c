@@ -406,7 +406,7 @@ static void cm109_urb_irq_callback(struct urb *urb)
 
 	dev->irq_urb_pending = 0;
 
-	if (likely(!dev->shutdown)) {
+	if (likely(!dev->shutdown) && likely(!dev->ctl_urb_pending)) {
 
 		if (dev->buzzer_state)
 			dev->ctl_data->byte[HID_OR0] |= BUZZER_ON;
