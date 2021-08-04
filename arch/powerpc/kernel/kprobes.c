@@ -289,10 +289,7 @@ int kprobe_handler(struct pt_regs *regs)
 	unsigned int *addr = (unsigned int *)regs->nip;
 	struct kprobe_ctlblk *kcb;
 
-	if (user_mode(regs))
-		return 0;
-
-	if (!(regs->msr & MSR_IR) || !(regs->msr & MSR_DR))
+	if (user_mode(regs) || real_mode(regs))
 		return 0;
 
 	/*

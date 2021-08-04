@@ -187,6 +187,12 @@ static inline unsigned long frame_pointer(struct pt_regs *regs)
 #define user_mode(regs) (((regs)->msr & MSR_PR) != 0)
 #endif
 
+#ifdef CONFIG_BOOKE
+#define real_mode(regs)	0
+#else
+#define real_mode(regs)	(!((regs)->msr & MSR_IR) || !((regs)->msr & MSR_DR))
+#endif
+
 #define force_successful_syscall_return()   \
 	do { \
 		set_thread_flag(TIF_NOERROR); \
