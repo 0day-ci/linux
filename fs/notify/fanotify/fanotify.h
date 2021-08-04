@@ -349,18 +349,20 @@ static inline unsigned int fanotify_event_hash_bucket(
 	return event->hash & FANOTIFY_HTABLE_MASK;
 }
 
+#define FANOTIFY_NULL_FH_LEN	8
+
 /*
  * Check size needed to encode fanotify_fh.
  *
  * Return size of encoded fh without fanotify_fh header.
- * Return 0 on failure to encode.
+ * For a NULL inode, return the size of a NULL FH.
  */
 static inline int fanotify_encode_fh_len(struct inode *inode)
 {
 	int dwords = 0;
 
 	if (!inode)
-		return 0;
+		return FANOTIFY_NULL_FH_LEN;
 
 	exportfs_encode_inode_fh(inode, NULL, &dwords, NULL);
 

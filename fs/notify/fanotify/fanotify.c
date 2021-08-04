@@ -349,12 +349,6 @@ static int fanotify_encode_fh(struct fanotify_fh *fh, struct inode *inode,
 	void *buf = fh->buf;
 	int err;
 
-	fh->type = FILEID_ROOT;
-	fh->len = 0;
-	fh->flags = 0;
-	if (!inode)
-		return 0;
-
 	/*
 	 * !gpf means preallocated variable size fh, but fh_len could
 	 * be zero in that case if encoding fh len failed.
@@ -363,8 +357,9 @@ static int fanotify_encode_fh(struct fanotify_fh *fh, struct inode *inode,
 	if (fh_len < 4 || WARN_ON_ONCE(fh_len % 4))
 		goto out_err;
 
-	/* No external buffer in a variable size allocated fh */
-	if (gfp && fh_len > FANOTIFY_INLINE_FH_LEN) {
+	fh->flags = 0;
+	/* No external buffer in a variable size allocated fh or null fh */
+	if (inode && gfp && fh_len > FANOTIFY_INLINE_FH_LEN) {
 		/* Treat failure to allocate fh as failure to encode fh */
 		err = -ENOMEM;
 		ext_buf = kmalloc(fh_len, gfp);
@@ -376,14 +371,24 @@ static int fanotify_encode_fh(struct fanotify_fh *fh, struct inode *inode,
 		fh->flags |= FANOTIFY_FH_FLAG_EXT_BUF;
 	}
 
-	dwords = fh_len >> 2;
-	type = exportfs_encode_inode_fh(inode, buf, &dwords, NULL);
-	err = -EINVAL;
-	if (!type || type == FILEID_INVALID || fh_len != dwords << 2)
-		goto out_err;
-
-	fh->type = type;
-	fh->len = fh_len;
+	if (inode) {
+		dwords = fh_len >> 2;
+		type = exportfs_encode_inode_fh(inode, buf, &dwords, NULL);
+		err = -EINVAL;
+		if (!type || type == FILEID_INVALID || fh_len != dwords << 2)
+			goto out_err;
+		fh->type = type;
+		fh->len = fh_len;
+	} else {
+		/*
+		 * Invalid FHs are used on FAN_FS_ERROR for errors not
+		 * linked to any inode. Caller needs to guarantee the fh
+		 * has at least FANOTIFY_NULL_FH_LEN bytes of space.
+		 */
+		fh->type = FILEID_INVALID;
+		fh->len = FANOTIFY_NULL_FH_LEN;
+		memset(buf, 0, FANOTIFY_NULL_FH_LEN);
+	}
 
 	/*
 	 * Mix fh into event merge key.  Hash might be NULL in case of
@@ -511,7 +516,7 @@ static struct fanotify_event *fanotify_alloc_name_event(struct inode *id,
 	struct fanotify_info *info;
 	struct fanotify_fh *dfh, *ffh;
 	unsigned int dir_fh_len = fanotify_encode_fh_len(id);
-	unsigned int child_fh_len = fanotify_encode_fh_len(child);
+	unsigned int child_fh_len = child ? fanotify_encode_fh_len(child) : 0;
 	unsigned int size;
 
 	size = sizeof(*fne) + FANOTIFY_FH_HDR_LEN + dir_fh_len;
