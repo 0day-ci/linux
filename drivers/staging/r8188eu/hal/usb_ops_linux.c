@@ -459,7 +459,7 @@ _exit_recvbuf2recvframe:
 	return _SUCCESS;
 }
 
-void rtl8188eu_recv_tasklet(void *priv)
+void rtl8188eu_recv_tasklet(unsigned long priv)
 {
 	struct sk_buff *pskb;
 	struct adapter *adapt = (struct adapter *)priv;
@@ -649,7 +649,7 @@ static u32 usb_read_port(struct intf_hdl *pintfhdl, u32 addr, u32 cnt, u8 *rmem)
 	return ret;
 }
 
-void rtl8188eu_xmit_tasklet(void *priv)
+void rtl8188eu_xmit_tasklet(unsigned long priv)
 {
 	int ret = false;
 	struct adapter *adapt = (struct adapter *)priv;
