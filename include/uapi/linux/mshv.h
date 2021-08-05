@@ -66,6 +66,11 @@ struct mshv_vp_state {
 	} buf;
 };
 
+struct mshv_partition_property {
+	enum hv_partition_property_code property_code;
+	__u64 property_value;
+};
+
 #define MSHV_IOCTL 0xB8
 
 /* mshv device */
@@ -78,6 +83,10 @@ struct mshv_vp_state {
 #define MSHV_CREATE_VP		_IOW(MSHV_IOCTL, 0x04, struct mshv_create_vp)
 #define MSHV_INSTALL_INTERCEPT	_IOW(MSHV_IOCTL, 0x08, struct mshv_install_intercept)
 #define MSHV_ASSERT_INTERRUPT	_IOW(MSHV_IOCTL, 0x09, struct mshv_assert_interrupt)
+#define MSHV_SET_PARTITION_PROPERTY \
+				_IOW(MSHV_IOCTL, 0xC, struct mshv_partition_property)
+#define MSHV_GET_PARTITION_PROPERTY \
+				_IOWR(MSHV_IOCTL, 0xD, struct mshv_partition_property)
 
 /* vp device */
 #define MSHV_GET_VP_REGISTERS   _IOWR(MSHV_IOCTL, 0x05, struct mshv_vp_registers)
