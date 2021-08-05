@@ -21,10 +21,20 @@ allOf:
 
 properties:
   compatible:
-    description: The LINFlexD controller on S32V234 SoC, which can be
-      configured in UART mode.
-    items:
-      - const: fsl,s32v234-linflexuart
+    minItems: 1
+    maxItems: 2
+    oneOf:
+      - description: The LINFlexD controller on S32G2 SoC, which can be
+          configured in UART mode.
+        items:
+          - enum:
+              - fsl,s32g2-linflexuart
+          - const: fsl,s32v234-linflexuart
+
+      - description: The LINFlexD controller on S32V234 SoC, which can be
+          configured in UART mode.
+        items:
+          - const: fsl,s32v234-linflexuart
 
   reg:
     maxItems: 1
@@ -41,8 +51,16 @@ unevaluatedProperties: false
 
 examples:
   - |
+    /* S32V234 */
     serial@40053000 {
         compatible = "fsl,s32v234-linflexuart";
         reg = <0x40053000 0x1000>;
         interrupts = <0 59 4>;
+    };
+
+    /* S32G2 */
+    serial@401c8000 {
+        compatible = "fsl,s32g2-linflexuart", "fsl,s32v234-linflexuart";
+        reg = <0x401c8000 0x3000>;
+        interrupts = <0 82 1>;
     };
