@@ -27,6 +27,11 @@
 	((HV_HYP_PAGE_SIZE - sizeof(struct hv_set_vp_registers)) \
 		/ sizeof(struct hv_register_assoc))
 
+extern struct mshv mshv;
+
+int mshv_synic_init(unsigned int cpu);
+int mshv_synic_cleanup(unsigned int cpu);
+
 /*
  * Hyper-V hypercalls
  */
