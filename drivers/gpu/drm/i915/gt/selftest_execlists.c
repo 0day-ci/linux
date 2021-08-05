@@ -2050,6 +2050,12 @@ struct live_preempt_cancel {
 	struct preempt_client a, b;
 };
 
+static void context_clear_banned(struct intel_context *ce)
+{
+	clear_bit(CONTEXT_BANNED, &ce->flags);
+	set_bit(CONTEXT_SCHEDULABLE, &ce->flags);
+}
+
 static int __cancel_active0(struct live_preempt_cancel *arg)
 {
 	struct i915_request *rq;
@@ -2068,7 +2074,7 @@ static int __cancel_active0(struct live_preempt_cancel *arg)
 	if (IS_ERR(rq))
 		return PTR_ERR(rq);
 
-	clear_bit(CONTEXT_BANNED, &rq->context->flags);
+	context_clear_banned(rq->context);
 	i915_request_get(rq);
 	i915_request_add(rq);
 	if (!igt_wait_for_spinner(&arg->a.spin, rq)) {
@@ -2112,7 +2118,7 @@ static int __cancel_active1(struct live_preempt_cancel *arg)
 	if (IS_ERR(rq[0]))
 		return PTR_ERR(rq[0]);
 
-	clear_bit(CONTEXT_BANNED, &rq[0]->context->flags);
+	context_clear_banned(rq[0]->context);
 	i915_request_get(rq[0]);
 	i915_request_add(rq[0]);
 	if (!igt_wait_for_spinner(&arg->a.spin, rq[0])) {
@@ -2128,7 +2134,7 @@ static int __cancel_active1(struct live_preempt_cancel *arg)
 		goto out;
 	}
 
-	clear_bit(CONTEXT_BANNED, &rq[1]->context->flags);
+	context_clear_banned(rq[1]->context);
 	i915_request_get(rq[1]);
 	err = i915_request_await_dma_fence(rq[1], &rq[0]->fence);
 	i915_request_add(rq[1]);
@@ -2183,7 +2189,7 @@ static int __cancel_queued(struct live_preempt_cancel *arg)
 	if (IS_ERR(rq[0]))
 		return PTR_ERR(rq[0]);
 
-	clear_bit(CONTEXT_BANNED, &rq[0]->context->flags);
+	context_clear_banned(rq[0]->context);
 	i915_request_get(rq[0]);
 	i915_request_add(rq[0]);
 	if (!igt_wait_for_spinner(&arg->a.spin, rq[0])) {
@@ -2197,7 +2203,7 @@ static int __cancel_queued(struct live_preempt_cancel *arg)
 		goto out;
 	}
 
-	clear_bit(CONTEXT_BANNED, &rq[1]->context->flags);
+	context_clear_banned(rq[1]->context);
 	i915_request_get(rq[1]);
 	err = i915_request_await_dma_fence(rq[1], &rq[0]->fence);
 	i915_request_add(rq[1]);
@@ -2273,7 +2279,7 @@ static int __cancel_hostile(struct live_preempt_cancel *arg)
 	if (IS_ERR(rq))
 		return PTR_ERR(rq);
 
-	clear_bit(CONTEXT_BANNED, &rq->context->flags);
+	context_clear_banned(rq->context);
 	i915_request_get(rq);
 	i915_request_add(rq);
 	if (!igt_wait_for_spinner(&arg->a.spin, rq)) {
@@ -2329,7 +2335,7 @@ static int __cancel_fail(struct live_preempt_cancel *arg)
 	if (IS_ERR(rq))
 		return PTR_ERR(rq);
 
-	clear_bit(CONTEXT_BANNED, &rq->context->flags);
+	context_clear_banned(rq->context);
 	i915_request_get(rq);
 	i915_request_add(rq);
 	if (!igt_wait_for_spinner(&arg->a.spin, rq)) {

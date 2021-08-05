@@ -112,6 +112,7 @@ struct intel_context {
 #define CONTEXT_FORCE_SINGLE_SUBMISSION	7
 #define CONTEXT_NOPREEMPT		8
 #define CONTEXT_LRCA_DIRTY		9
+#define CONTEXT_SCHEDULABLE		10  /* Unless banned or non-persistent closed. */
 
 	struct {
 		u64 timeout_us;
