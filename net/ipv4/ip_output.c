@@ -82,6 +82,7 @@
 #include <linux/netfilter_bridge.h>
 #include <linux/netlink.h>
 #include <linux/tcp.h>
+#include <trace/events/ip.h>
 
 static int
 ip_fragment(struct net *net, struct sock *sk, struct sk_buff *skb,
@@ -536,7 +537,14 @@ EXPORT_SYMBOL(__ip_queue_xmit);
 
 int ip_queue_xmit(struct sock *sk, struct sk_buff *skb, struct flowi *fl)
 {
-	return __ip_queue_xmit(sk, skb, fl, inet_sk(sk)->tos);
+	int ret;
+
+	ret = __ip_queue_xmit(sk, skb, fl, inet_sk(sk)->tos);
+	if (!ret)
+		trace_ip_queue_xmit(sk, skb);
+
+	return ret;
+
 }
 EXPORT_SYMBOL(ip_queue_xmit);
 
