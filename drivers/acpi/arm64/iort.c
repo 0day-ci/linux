@@ -810,6 +810,42 @@ static struct acpi_iort_node *iort_get_msi_resv_iommu(struct device *dev)
 }
 
 /**
+ * iort_iommu_get_rmrs() - Helper to retrieve RMR info associated with IOMMU
+ * @iommu_fwnode: fwnode for the IOMMU
+ * @head: RMR list head to be populated
+ *
+ * Returns: 0 on success, <0 failure. Please note, we will keep the already
+ *          allocated RMR reserve regions in case of a kmemdup()
+ *          failure.
+ */
+int iort_iommu_get_rmrs(struct fwnode_handle *iommu_fwnode,
+			struct list_head *head)
+{
+	struct iommu_resv_region *e;
+	struct acpi_iort_node *iommu;
+	int rmrs = 0;
+
+	iommu = iort_get_iort_node(iommu_fwnode);
+	if (!iommu || list_empty(&iort_rmr_list))
+		return -ENODEV;
+
+	list_for_each_entry(e, &iort_rmr_list, list) {
+		struct iommu_resv_region *region;
+
+		if (e->fw_data.rmr.smmu != iommu)
+			continue;
+
+		region = kmemdup(e, sizeof(*region), GFP_KERNEL);
+		if (region) {
+			list_add_tail(&region->list, head);
+			rmrs++;
+		}
+	}
+
+	return (rmrs == 0) ? -ENODEV : 0;
+}
+
+/**
  * iort_iommu_msi_get_resv_regions - Reserved region driver helper
  * @dev: Device from iommu_get_resv_regions()
  * @head: Reserved region list from iommu_get_resv_regions()
@@ -1040,6 +1076,8 @@ int iort_iommu_configure_id(struct device *dev, const u32 *id_in)
 int iort_iommu_msi_get_resv_regions(struct device *dev, struct list_head *head)
 { return 0; }
 int iort_iommu_configure_id(struct device *dev, const u32 *input_id)
+{ return -ENODEV; }
+int iort_iommu_get_rmrs(struct fwnode_handle *fwnode, struct list_head *head)
 { return -ENODEV; }
 #endif
 
