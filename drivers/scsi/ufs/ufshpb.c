@@ -70,13 +70,14 @@ static int ufshpb_is_valid_srgn(struct ufshpb_region *rgn,
 
 static bool ufshpb_is_read_cmd(struct scsi_cmnd *cmd)
 {
-	return req_op(cmd->request) == REQ_OP_READ;
+	return req_op(scsi_cmd_to_rq(cmd)) == REQ_OP_READ;
 }
 
 static bool ufshpb_is_write_or_discard(struct scsi_cmnd *cmd)
 {
-	return op_is_write(req_op(cmd->request)) ||
-	       op_is_discard(req_op(cmd->request));
+	enum req_opf op = req_op(scsi_cmd_to_rq(cmd));
+
+	return op_is_write(op) || op_is_discard(op);
 }
 
 static bool ufshpb_is_supported_chunk(struct ufshpb_lu *hpb, int transfer_len)
@@ -512,9 +513,9 @@ static int ufshpb_execute_pre_req(struct ufshpb_lu *hpb, struct scsi_cmnd *cmd,
 
 	pre_req->hpb = hpb;
 	pre_req->wb.lpn = sectors_to_logical(cmd->device,
-					     blk_rq_pos(cmd->request));
+					     blk_rq_pos(scsi_cmd_to_rq(cmd)));
 	pre_req->wb.len = sectors_to_logical(cmd->device,
-					     blk_rq_sectors(cmd->request));
+					     blk_rq_sectors(scsi_cmd_to_rq(cmd)));
 	if (ufshpb_pre_req_add_bio_page(hpb, q, pre_req))
 		return -ENOMEM;
 
@@ -592,6 +593,7 @@ int ufshpb_prep(struct ufs_hba *hba, struct ufshcd_lrb *lrbp)
 	struct ufshpb_region *rgn;
 	struct ufshpb_subregion *srgn;
 	struct scsi_cmnd *cmd = lrbp->cmd;
+	struct request *rq = scsi_cmd_to_rq(cmd);
 	u32 lpn;
 	__be64 ppn;
 	unsigned long flags;
@@ -612,17 +614,16 @@ int ufshpb_prep(struct ufs_hba *hba, struct ufshcd_lrb *lrbp)
 		return -ENODEV;
 	}
 
-	if (blk_rq_is_passthrough(cmd->request) ||
+	if (blk_rq_is_passthrough(rq) ||
 	    (!ufshpb_is_write_or_discard(cmd) &&
 	     !ufshpb_is_read_cmd(cmd)))
 		return 0;
 
-	transfer_len = sectors_to_logical(cmd->device,
-					  blk_rq_sectors(cmd->request));
+	transfer_len = sectors_to_logical(cmd->device, blk_rq_sectors(rq));
 	if (unlikely(!transfer_len))
 		return 0;
 
-	lpn = sectors_to_logical(cmd->device, blk_rq_pos(cmd->request));
+	lpn = sectors_to_logical(cmd->device, blk_rq_pos(rq));
 	ufshpb_get_pos_from_lpn(hpb, lpn, &rgn_idx, &srgn_idx, &srgn_offset);
 	rgn = hpb->rgn_tbl + rgn_idx;
 	srgn = rgn->srgn_tbl + srgn_idx;
