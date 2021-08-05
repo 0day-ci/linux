@@ -116,6 +116,15 @@ DEFINE_EVENT(tcp_event_sk_skb, tcp_v4_rcv,
 	TP_ARGS(sk, skb)
 );
 
+#if IS_ENABLED(CONFIG_IPV6)
+DEFINE_EVENT(tcp_event_sk_skb, tcp_v6_rcv,
+
+	TP_PROTO(const struct sock *sk, const struct sk_buff *skb),
+
+	TP_ARGS(sk, skb)
+);
+#endif
+
 /*
  * skb of trace_tcp_send_reset is the skb that caused RST. In case of
  * active reset, skb should be NULL
