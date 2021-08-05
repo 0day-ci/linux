@@ -82,6 +82,23 @@ TRACE_EVENT(udp_v6_send_skb,
 
 	TP_printk("skaddr=%px, skbaddr=%px", __entry->skaddr, __entry->skbaddr)
 );
+
+TRACE_EVENT(udpv6_rcv,
+
+	TP_PROTO(const struct sk_buff *skb),
+
+	TP_ARGS(skb),
+
+	TP_STRUCT__entry(
+		__field(const void *, skbaddr)
+	),
+
+	TP_fast_assign(
+		__entry->skbaddr = skb;
+	),
+
+	TP_printk("skbaddr=%px", __entry->skbaddr)
+);
 #endif
 
 #endif /* _TRACE_UDP_H */

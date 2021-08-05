@@ -1085,7 +1085,12 @@ INDIRECT_CALLABLE_SCOPE void udp_v6_early_demux(struct sk_buff *skb)
 
 INDIRECT_CALLABLE_SCOPE int udpv6_rcv(struct sk_buff *skb)
 {
-	return __udp6_lib_rcv(skb, &udp_table, IPPROTO_UDP);
+	int ret;
+
+	ret = __udp6_lib_rcv(skb, &udp_table, IPPROTO_UDP);
+	if (!ret)
+		trace_udpv6_rcv(skb);
+	return ret;
 }
 
 /*
