@@ -72,6 +72,13 @@ struct mshv_partition_property {
 	__u64 property_value;
 };
 
+struct mshv_translate_gva {
+	__u64 gva;
+	__u64 flags;
+	union hv_translate_gva_result *result;
+	__u64 *gpa;
+};
+
 #define MSHV_IOCTL 0xB8
 
 /* mshv device */
@@ -95,6 +102,7 @@ struct mshv_partition_property {
 #define MSHV_RUN_VP		_IOR(MSHV_IOCTL, 0x07, struct hv_message)
 #define MSHV_GET_VP_STATE	_IOWR(MSHV_IOCTL, 0x0A, struct mshv_vp_state)
 #define MSHV_SET_VP_STATE	_IOWR(MSHV_IOCTL, 0x0B, struct mshv_vp_state)
+#define MSHV_TRANSLATE_GVA	_IOWR(MSHV_IOCTL, 0x0E, struct mshv_translate_gva)
 
 /* register page mapping example:
  * struct hv_vp_register_page *regs = mmap(NULL,
