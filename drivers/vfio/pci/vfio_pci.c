@@ -1440,10 +1440,12 @@ void vfio_pci_memory_unlock_and_restore(struct vfio_pci_device *vdev, u16 cmd)
 	up_write(&vdev->memory_lock);
 }
 
-static int vfio_pci_bar_vma_to_pfn(struct vm_area_struct *vma,
+static int vfio_pci_bar_vma_to_pfn(struct vfio_device *core_vdev,
+				   struct vm_area_struct *vma,
 				   unsigned long *pfn)
 {
-	struct vfio_pci_device *vdev = vma->vm_private_data;
+	struct vfio_pci_device *vdev =
+			container_of(core_vdev, struct vfio_pci_device, vdev);
 	struct pci_dev *pdev = vdev->pdev;
 	int index;
 	u64 pgoff;
@@ -1469,7 +1471,7 @@ static vm_fault_t vfio_pci_mmap_fault(struct vm_fault *vmf)
 	unsigned long vaddr, pfn;
 	vm_fault_t ret = VM_FAULT_SIGBUS;
 
-	if (vfio_pci_bar_vma_to_pfn(vma, &pfn))
+	if (vfio_pci_bar_vma_to_pfn(&vdev->vdev, vma, &pfn))
 		return ret;
 
 	down_read(&vdev->memory_lock);
@@ -1742,6 +1744,7 @@ static const struct vfio_device_ops vfio_pci_ops = {
 	.mmap		= vfio_pci_mmap,
 	.request	= vfio_pci_request,
 	.match		= vfio_pci_match,
+	.vma_to_pfn	= vfio_pci_bar_vma_to_pfn,
 };
 
 static int vfio_pci_reflck_attach(struct vfio_pci_device *vdev);

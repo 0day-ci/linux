@@ -41,6 +41,7 @@ struct vfio_device {
  * @match: Optional device name match callback (return: 0 for no-match, >0 for
  *         match, -errno for abort (ex. match with insufficient or incorrect
  *         additional args)
+ * @vma_to_pfn: Optional pfn from vma lookup against vma mapping device fd
  */
 struct vfio_device_ops {
 	char	*name;
@@ -55,6 +56,8 @@ struct vfio_device_ops {
 	int	(*mmap)(struct vfio_device *vdev, struct vm_area_struct *vma);
 	void	(*request)(struct vfio_device *vdev, unsigned int count);
 	int	(*match)(struct vfio_device *vdev, char *buf);
+	int	(*vma_to_pfn)(struct vfio_device *vdev,
+			      struct vm_area_struct *vma, unsigned long *pfn);
 };
 
 extern struct iommu_group *vfio_iommu_group_get(struct device *dev);
@@ -68,6 +71,9 @@ extern struct vfio_device *vfio_device_get_from_dev(struct device *dev);
 extern void vfio_device_put(struct vfio_device *device);
 extern void vfio_device_unmap_mapping_range(struct vfio_device *device,
 					    loff_t start, loff_t len);
+extern int vfio_device_vma_to_pfn(struct vfio_device *device,
+				  struct vm_area_struct *vma,
+				  unsigned long *pfn);
 
 /* events for the backend driver notify callback */
 enum vfio_iommu_notify_type {

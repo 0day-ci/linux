@@ -875,6 +875,22 @@ struct vfio_device *vfio_device_get_from_dev(struct device *dev)
 }
 EXPORT_SYMBOL_GPL(vfio_device_get_from_dev);
 
+static const struct file_operations vfio_device_fops;
+
+int vfio_device_vma_to_pfn(struct vfio_device *device,
+			   struct vm_area_struct *vma, unsigned long *pfn)
+{
+	if (WARN_ON(!vma->vm_file || vma->vm_file->f_op != &vfio_device_fops ||
+		    vma->vm_file->private_data != device))
+		return -EINVAL;
+
+	if (unlikely(!device->ops->vma_to_pfn))
+		return -EPERM;
+
+	return device->ops->vma_to_pfn(device, vma, pfn);
+}
+EXPORT_SYMBOL_GPL(vfio_device_vma_to_pfn);
+
 static struct vfio_device *vfio_device_get_from_name(struct vfio_group *group,
 						     char *buf)
 {
@@ -1406,8 +1422,6 @@ static int vfio_group_add_container_user(struct vfio_group *group)
 
 	return 0;
 }
-
-static const struct file_operations vfio_device_fops;
 
 static int vfio_group_get_device_fd(struct vfio_group *group, char *buf)
 {
