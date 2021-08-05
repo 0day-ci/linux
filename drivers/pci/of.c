@@ -41,6 +41,8 @@ void pci_set_bus_of_node(struct pci_bus *bus)
 		node = pcibios_get_phb_of_node(bus);
 	} else {
 		node = of_node_get(bus->self->dev.of_node);
+		if (!node)
+			node = of_node_get(bus->self->dev.parent->of_node);
 		if (node && of_property_read_bool(node, "external-facing"))
 			bus->self->external_facing = true;
 	}
