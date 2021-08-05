@@ -1763,6 +1763,16 @@ config RTC_DRV_SNVS
 	   This driver can also be built as a module, if so, the module
 	   will be called "rtc-snvs".
 
+config RTC_DRV_IMX_RPMSG
+	tristate "NXP RPMSG RTC support"
+	select RPMSG_VIRTIO
+	depends on ARCH_MXC || COMPILE_TEST
+	depends on IMX_REMOTEPROC
+	depends on OF
+	help
+	   If you say yes here you get support for the NXP RPMSG
+	   RTC module.
+
 config RTC_DRV_IMX_SC
 	depends on IMX_SCU
 	depends on HAVE_ARM_SMCCC
