@@ -578,6 +578,7 @@ struct fec_enet_private {
 	bool	bufdesc_ex;
 	int	pause_flag;
 	int	wol_flag;
+	int     wake_irq;
 	u32	quirks;
 
 	struct	napi_struct napi;

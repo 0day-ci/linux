@@ -2878,12 +2878,12 @@ fec_enet_set_wol(struct net_device *ndev, struct ethtool_wolinfo *wol)
 	device_set_wakeup_enable(&ndev->dev, wol->wolopts & WAKE_MAGIC);
 	if (device_may_wakeup(&ndev->dev)) {
 		fep->wol_flag |= FEC_WOL_FLAG_ENABLE;
-		if (fep->irq[0] > 0)
-			enable_irq_wake(fep->irq[0]);
+		if (fep->wake_irq > 0)
+			enable_irq_wake(fep->wake_irq);
 	} else {
 		fep->wol_flag &= (~FEC_WOL_FLAG_ENABLE);
-		if (fep->irq[0] > 0)
-			disable_irq_wake(fep->irq[0]);
+		if (fep->wake_irq > 0)
+			disable_irq_wake(fep->wake_irq);
 	}
 
 	return 0;
@@ -3934,6 +3934,13 @@ fec_probe(struct platform_device *pdev)
 
 		fep->irq[i] = irq;
 	}
+
+	/* Get wakeup irq */
+	ret = of_property_read_u32(np, "fsl,wakeup-irq", &irq);
+	if (!ret && irq >= 0 && irq < irq_cnt)
+		fep->wake_irq = fep->irq[irq];
+	else
+		fep->wake_irq = fep->irq[0];
 
 	ret = fec_enet_mii_init(pdev);
 	if (ret)
