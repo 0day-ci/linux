@@ -10,3 +10,11 @@ config CONFIGFS_FS
 
 	  Both sysfs and configfs can and should exist together on the
 	  same system. One is not a replacement for the other.
+
+config CONFIGFS_KUNIT_TEST
+	bool "Configfs Kunit test" if !KUNIT_ALL_TESTS
+	depends on CONFIGFS_FS && KUNIT=y
+	default KUNIT_ALL_TESTS
+	help
+	  Run the configfs unit tests at boot time. For more information, see
+	  also the Kunit documentation in Documentation/dev-tools/kunit/.
