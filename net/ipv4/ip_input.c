@@ -141,6 +141,7 @@
 #include <linux/mroute.h>
 #include <linux/netlink.h>
 #include <net/dst_metadata.h>
+#include <trace/events/ip.h>
 
 /*
  *	Process Router Attention IP option (RFC 2113)
@@ -400,6 +401,7 @@ static int ip_rcv_finish_core(struct net *net, struct sock *sk,
 			goto drop;
 	}
 
+	trace_ip_rcv(skb);
 	return NET_RX_SUCCESS;
 
 drop:

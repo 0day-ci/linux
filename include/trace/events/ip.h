@@ -83,6 +83,22 @@ TRACE_EVENT(ip_queue_xmit,
 		  __entry->saddr_v6, __entry->daddr_v6, __entry->skbaddr)
 );
 
+TRACE_EVENT(ip_rcv,
+	TP_PROTO(const struct sk_buff *skb),
+
+	TP_ARGS(skb),
+
+	TP_STRUCT__entry(
+		__field(const void *, skbaddr)
+	),
+
+	TP_fast_assign(
+		__entry->skbaddr = skb;
+	),
+
+	TP_printk("skbaddr=%px", __entry->skbaddr)
+);
+
 #endif /* _TRACE_IP_H */
 
 /* This part must be outside protection */
