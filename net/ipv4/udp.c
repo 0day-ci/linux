@@ -2617,7 +2617,13 @@ int udp_v4_early_demux(struct sk_buff *skb)
 
 int udp_rcv(struct sk_buff *skb)
 {
-	return __udp4_lib_rcv(skb, &udp_table, IPPROTO_UDP);
+	int ret;
+
+	ret = __udp4_lib_rcv(skb, &udp_table, IPPROTO_UDP);
+	if (!ret)
+		trace_udp_rcv(skb);
+	return ret;
+
 }
 
 void udp_destroy_sock(struct sock *sk)
