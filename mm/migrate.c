@@ -911,9 +911,8 @@ static int move_to_new_page(struct page *newpage, struct page *page,
 		 */
 		VM_BUG_ON_PAGE(!PageIsolated(page), page);
 		if (!PageMovable(page)) {
-			rc = MIGRATEPAGE_SUCCESS;
 			__ClearPageIsolated(page);
-			goto out;
+			return MIGRATEPAGE_SUCCESS;
 		}
 
 		rc = mapping->a_ops->migratepage(mapping, newpage,
@@ -949,7 +948,7 @@ static int move_to_new_page(struct page *newpage, struct page *page,
 			flush_dcache_page(newpage);
 
 	}
-out:
+
 	return rc;
 }
 
@@ -2095,11 +2094,10 @@ static struct page *alloc_misplaced_dst_page_thp(struct page *page,
 	newpage = alloc_pages_node(nid, (GFP_TRANSHUGE_LIGHT | __GFP_THISNODE),
 				   HPAGE_PMD_ORDER);
 	if (!newpage)
-		goto out;
+		return NULL;
 
 	prep_transhuge_page(newpage);
 
-out:
 	return newpage;
 }
 
