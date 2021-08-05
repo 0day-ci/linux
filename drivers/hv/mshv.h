@@ -26,6 +26,12 @@
 #define HV_SET_REGISTER_BATCH_SIZE	\
 	((HV_HYP_PAGE_SIZE - sizeof(struct hv_set_vp_registers)) \
 		/ sizeof(struct hv_register_assoc))
+#define HV_GET_VP_STATE_BATCH_SIZE	\
+	((HV_HYP_PAGE_SIZE - sizeof(struct hv_get_vp_state_in)) \
+		/ sizeof(u64))
+#define HV_SET_VP_STATE_BATCH_SIZE	\
+	((HV_HYP_PAGE_SIZE - sizeof(struct hv_set_vp_state_in)) \
+		/ sizeof(u64))
 
 extern struct mshv mshv;
 
@@ -72,5 +78,24 @@ int hv_call_assert_virtual_interrupt(
 		u32 vector,
 		u64 dest_addr,
 		union hv_interrupt_control control);
+int hv_call_get_vp_state(
+		u32 vp_index,
+		u64 partition_id,
+		enum hv_get_set_vp_state_type type,
+		struct hv_vp_state_data_xsave xsave,
+		/* Choose between pages and ret_output */
+		u64 page_count,
+		struct page **pages,
+		union hv_get_vp_state_out *ret_output);
+int hv_call_set_vp_state(
+		u32 vp_index,
+		u64 partition_id,
+		enum hv_get_set_vp_state_type type,
+		struct hv_vp_state_data_xsave xsave,
+		/* Choose between pages and bytes */
+		u64 page_count,
+		struct page **pages,
+		u32 num_bytes,
+		u8 *bytes);
 
 #endif /* _MSHV_H */

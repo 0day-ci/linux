@@ -53,6 +53,17 @@ struct mshv_assert_interrupt {
 	__u32 vector;
 };
 
+struct mshv_vp_state {
+	enum hv_get_set_vp_state_type type;
+	struct hv_vp_state_data_xsave xsave; /* only for xsave request */
+
+	__u64 buf_size; /* If xsave, must be page-aligned */
+	union {
+		struct hv_local_interrupt_controller_state *lapic;
+		__u8 *bytes; /* Xsave data. must be page-aligned */
+	} buf;
+};
+
 #define MSHV_IOCTL 0xB8
 
 /* mshv device */
@@ -70,5 +81,7 @@ struct mshv_assert_interrupt {
 #define MSHV_GET_VP_REGISTERS   _IOWR(MSHV_IOCTL, 0x05, struct mshv_vp_registers)
 #define MSHV_SET_VP_REGISTERS   _IOW(MSHV_IOCTL, 0x06, struct mshv_vp_registers)
 #define MSHV_RUN_VP		_IOR(MSHV_IOCTL, 0x07, struct hv_message)
+#define MSHV_GET_VP_STATE	_IOWR(MSHV_IOCTL, 0x0A, struct mshv_vp_state)
+#define MSHV_SET_VP_STATE	_IOWR(MSHV_IOCTL, 0x0B, struct mshv_vp_state)
 
 #endif

@@ -168,6 +168,9 @@ struct ms_hyperv_tsc_page {
 #define HVCALL_ASSERT_VIRTUAL_INTERRUPT		0x0094
 #define HVCALL_FLUSH_GUEST_PHYSICAL_ADDRESS_SPACE 0x00af
 #define HVCALL_FLUSH_GUEST_PHYSICAL_ADDRESS_LIST 0x00b0
+#define HVCALL_MAP_VP_STATE_PAGE			0x00e1
+#define HVCALL_GET_VP_STATE				0x00e3
+#define HVCALL_SET_VP_STATE				0x00e4
 
 /* Extended hypercalls */
 #define HV_EXT_CALL_QUERY_CAPABILITIES		0x8001
@@ -830,6 +833,43 @@ struct hv_assert_virtual_interrupt {
 	u8 target_vtl;
 	u8 rsvd_z0;
 	u16 rsvd_z1;
+} __packed;
+
+struct hv_vp_state_data {
+	u32 type;
+	u32 rsvd;
+	struct hv_vp_state_data_xsave xsave;
+} __packed;
+
+struct hv_get_vp_state_in {
+	u64 partition_id;
+	u32 vp_index;
+	u8 input_vtl;
+	u8 rsvd0;
+	u16 rsvd1;
+	struct hv_vp_state_data state_data;
+	u64 output_data_pfns[];
+} __packed;
+
+union hv_get_vp_state_out {
+	struct hv_local_interrupt_controller_state interrupt_controller_state;
+	/* Not supported yet */
+	/* struct hv_synthetic_timers_state synthetic_timers_state; */
+} __packed;
+
+union hv_input_set_vp_state_data {
+	u64 pfns;
+	u8 bytes;
+} __packed;
+
+struct hv_set_vp_state_in {
+	u64 partition_id;
+	u32 vp_index;
+	u8 input_vtl;
+	u8 rsvd0;
+	u16 rsvd1;
+	struct hv_vp_state_data state_data;
+	union hv_input_set_vp_state_data data[];
 } __packed;
 
 #endif

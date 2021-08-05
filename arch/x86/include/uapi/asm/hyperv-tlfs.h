@@ -1013,4 +1013,63 @@ union hv_interrupt_control {
 	__u64 as_uint64;
 };
 
+struct hv_local_interrupt_controller_state {
+	__u32 apic_id;
+	__u32 apic_version;
+	__u32 apic_ldr;
+	__u32 apic_dfr;
+	__u32 apic_spurious;
+	__u32 apic_isr[8];
+	__u32 apic_tmr[8];
+	__u32 apic_irr[8];
+	__u32 apic_esr;
+	__u32 apic_icr_high;
+	__u32 apic_icr_low;
+	__u32 apic_lvt_timer;
+	__u32 apic_lvt_thermal;
+	__u32 apic_lvt_perfmon;
+	__u32 apic_lvt_lint0;
+	__u32 apic_lvt_lint1;
+	__u32 apic_lvt_error;
+	__u32 apic_lvt_cmci;
+	__u32 apic_error_status;
+	__u32 apic_initial_count;
+	__u32 apic_counter_value;
+	__u32 apic_divide_configuration;
+	__u32 apic_remote_read;
+} __packed;
+
+#define HV_XSAVE_DATA_NO_XMM_REGISTERS 1
+
+union hv_x64_xsave_xfem_register {
+	__u64 as_uint64;
+	struct {
+		__u32 low_uint32;
+		__u32 high_uint32;
+	} __packed;
+	struct {
+		__u64 legacy_x87: 1;
+		__u64 legacy_sse: 1;
+		__u64 avx: 1;
+		__u64 mpx_bndreg: 1;
+		__u64 mpx_bndcsr: 1;
+		__u64 avx_512_op_mask: 1;
+		__u64 avx_512_zmmhi: 1;
+		__u64 avx_512_zmm16_31: 1;
+		__u64 rsvd8_9: 2;
+		__u64 pasid: 1;
+		__u64 cet_u: 1;
+		__u64 cet_s: 1;
+		__u64 rsvd13_16: 4;
+		__u64 xtile_cfg: 1;
+		__u64 xtile_data: 1;
+		__u64 rsvd19_63: 45;
+	} __packed;
+};
+
+struct hv_vp_state_data_xsave {
+	__u64 flags;
+	union hv_x64_xsave_xfem_register states;
+} __packed;
+
 #endif
