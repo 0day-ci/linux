@@ -64,5 +64,8 @@ int hv_call_set_vp_registers(
 		u64 partition_id,
 		u16 count,
 		struct hv_register_assoc *registers);
+int hv_call_install_intercept(u64 partition_id, u32 access_type,
+		enum hv_intercept_type intercept_type,
+		union hv_intercept_parameters intercept_parameter);
 
 #endif /* _MSHV_H */

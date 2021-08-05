@@ -41,6 +41,12 @@ struct mshv_vp_registers {
 	struct hv_register_assoc *regs;
 };
 
+struct mshv_install_intercept {
+	__u32 access_type_mask;
+	enum hv_intercept_type intercept_type;
+	union hv_intercept_parameters intercept_parameter;
+};
+
 #define MSHV_IOCTL 0xB8
 
 /* mshv device */
@@ -51,6 +57,7 @@ struct mshv_vp_registers {
 #define MSHV_MAP_GUEST_MEMORY	_IOW(MSHV_IOCTL, 0x02, struct mshv_user_mem_region)
 #define MSHV_UNMAP_GUEST_MEMORY	_IOW(MSHV_IOCTL, 0x03, struct mshv_user_mem_region)
 #define MSHV_CREATE_VP		_IOW(MSHV_IOCTL, 0x04, struct mshv_create_vp)
+#define MSHV_INSTALL_INTERCEPT	_IOW(MSHV_IOCTL, 0x08, struct mshv_install_intercept)
 
 /* vp device */
 #define MSHV_GET_VP_REGISTERS   _IOWR(MSHV_IOCTL, 0x05, struct mshv_vp_registers)

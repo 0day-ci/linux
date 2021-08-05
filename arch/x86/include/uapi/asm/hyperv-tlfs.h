@@ -948,4 +948,47 @@ struct hv_x64_apic_eoi_message {
 	__u32 interrupt_vector;
 } __packed;
 
+enum hv_intercept_type {
+	HV_INTERCEPT_TYPE_X64_IO_PORT			= 0X00000000,
+	HV_INTERCEPT_TYPE_X64_MSR			= 0X00000001,
+	HV_INTERCEPT_TYPE_X64_CPUID			= 0X00000002,
+	HV_INTERCEPT_TYPE_EXCEPTION			= 0X00000003,
+	HV_INTERCEPT_TYPE_REGISTER			= 0X00000004,
+	HV_INTERCEPT_TYPE_MMIO				= 0X00000005,
+	HV_INTERCEPT_TYPE_X64_GLOBAL_CPUID		= 0X00000006,
+	HV_INTERCEPT_TYPE_X64_APIC_SMI			= 0X00000007,
+	HV_INTERCEPT_TYPE_HYPERCALL			= 0X00000008,
+	HV_INTERCEPT_TYPE_X64_APIC_INIT_SIPI		= 0X00000009,
+	HV_INTERCEPT_MC_UPDATE_PATCH_LEVEL_MSR_READ	= 0X0000000A,
+	HV_INTERCEPT_TYPE_X64_APIC_WRITE		= 0X0000000B,
+	HV_INTERCEPT_TYPE_MAX,
+	HV_INTERCEPT_TYPE_INVALID			= 0XFFFFFFFF,
+};
+
+union hv_intercept_parameters {
+	__u64 as_uint64;
+
+	/* hv_intercept_type_x64_io_port */
+	__u16 io_port;
+
+	/* hv_intercept_type_x64_cpuid */
+	__u32 cpuid_index;
+
+	/* hv_intercept_type_x64_apic_write */
+	__u32 apic_write_mask;
+
+	/* hv_intercept_type_exception */
+	__u16 exception_vector;
+
+	/* N.B. Other intercept types do not have any parameters. */
+};
+
+/* Access types for the install intercept hypercall parameter */
+#define HV_INTERCEPT_ACCESS_MASK_NONE		0x00
+#define HV_INTERCEPT_ACCESS_MASK_READ		0X01
+#define HV_INTERCEPT_ACCESS_MASK_WRITE		0x02
+#define HV_INTERCEPT_ACCESS_MASK_EXECUTE	0x04
+
+
+
 #endif

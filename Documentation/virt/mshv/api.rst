@@ -120,4 +120,13 @@ This ioctl will fail on any vp that's already running (not suspended).
 
 Information about the intercept is returned in the hv_message struct.
 
+3.7 MSHV_INSTALL_INTERCEPT
+--------------------------
+:Type: partition ioctl
+:Parameters: struct mshv_install_intercept
+:Returns: 0 on success
+
+Enable and configure different types of intercepts. Intercepts are events in a
+guest partition that will suspend the guest vp and send a message to the root
+partition (returned from MSHV_RUN_VP).
 
