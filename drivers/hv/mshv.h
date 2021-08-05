@@ -11,12 +11,18 @@
 #ifndef _MSHV_H_
 #define _MSHV_H_
 
+#include<asm/hyperv-tlfs.h>
+
 /* Determined empirically */
 #define HV_INIT_PARTITION_DEPOSIT_PAGES 208
+
+#define HV_WITHDRAW_BATCH_SIZE	(HV_HYP_PAGE_SIZE / sizeof(u64))
 
 /*
  * Hyper-V hypercalls
  */
+
+int hv_call_withdraw_memory(u64 count, int node, u64 partition_id);
 int hv_call_create_partition(
 		u64 flags,
 		struct hv_partition_creation_properties creation_properties,

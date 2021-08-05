@@ -14,6 +14,59 @@
 
 #include "mshv.h"
 
+int hv_call_withdraw_memory(u64 count, int node, u64 partition_id)
+{
+	struct hv_withdraw_memory_in *input_page;
+	struct hv_withdraw_memory_out *output_page;
+	struct page *page;
+	u16 completed;
+	unsigned long remaining = count;
+	u64 status;
+	int i;
+	unsigned long flags;
+
+	page = alloc_page(GFP_KERNEL);
+	if (!page)
+		return -ENOMEM;
+	output_page = page_address(page);
+
+	while (remaining) {
+		local_irq_save(flags);
+
+		input_page = (struct hv_withdraw_memory_in *)(*this_cpu_ptr(
+			hyperv_pcpu_input_arg));
+
+		input_page->partition_id = partition_id;
+		input_page->proximity_domain_info.as_uint64 = 0;
+		status = hv_do_rep_hypercall(
+			HVCALL_WITHDRAW_MEMORY,
+			min(remaining, HV_WITHDRAW_BATCH_SIZE), 0, input_page,
+			output_page);
+
+		local_irq_restore(flags);
+
+		completed = hv_repcomp(status);
+
+		for (i = 0; i < completed; i++)
+			__free_page(pfn_to_page(output_page->gpa_page_list[i]));
+
+		if (!hv_result_success(status)) {
+			if (hv_result(status) == HV_STATUS_NO_RESOURCES)
+				status = HV_STATUS_SUCCESS;
+			else
+				pr_err("%s: %s\n", __func__,
+				       hv_status_to_string(status));
+			break;
+		}
+
+		remaining -= completed;
+	}
+	free_page((unsigned long)output_page);
+
+	return hv_status_to_errno(status);
+}
+
+
 int hv_call_create_partition(
 		u64 flags,
 		struct hv_partition_creation_properties creation_properties,

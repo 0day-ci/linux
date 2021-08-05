@@ -149,6 +149,7 @@ struct ms_hyperv_tsc_page {
 #define HVCALL_DELETE_PARTITION			0x0043
 #define HVCALL_GET_PARTITION_ID			0x0046
 #define HVCALL_DEPOSIT_MEMORY			0x0048
+#define HVCALL_WITHDRAW_MEMORY			0x0049
 #define HVCALL_CREATE_VP			0x004e
 #define HVCALL_GET_VP_REGISTERS			0x0050
 #define HVCALL_SET_VP_REGISTERS			0x0051
@@ -513,6 +514,16 @@ union hv_proximity_domain_info {
 		struct hv_proximity_domain_flags flags;
 	};
 	u64 as_uint64;
+} __packed;
+
+struct hv_withdraw_memory_in {
+	u64 partition_id;
+	union hv_proximity_domain_info proximity_domain_info;
+} __packed;
+
+struct hv_withdraw_memory_out {
+	/* Hack - compiler doesn't like empty array size in struct with no other members */
+	u64 gpa_page_list[0];
 } __packed;
 
 struct hv_lp_startup_status {
