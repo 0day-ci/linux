@@ -224,8 +224,9 @@ trace_boot_hist_add_array(struct xbc_node *hnode, char **bufp,
 }
 
 static int __init
-trace_boot_hist_add_handler(struct xbc_node *hnode, char **bufp,
-			    char *end, const char *param)
+trace_boot_hist_add_one_handler(struct xbc_node *hnode, char **bufp,
+				char *end, const char *handler,
+				const char *param)
 {
 	struct xbc_node *knode, *anode;
 	const char *p;
@@ -238,7 +239,7 @@ trace_boot_hist_add_handler(struct xbc_node *hnode, char **bufp,
 		       xbc_node_get_data(hnode), param);
 		return -EINVAL;
 	}
-	append_printf(bufp, end, ":%s(%s)", xbc_node_get_data(hnode), p);
+	append_printf(bufp, end, ":%s(%s)", handler, p);
 
 	/* Compose 'action' parameter */
 	knode = xbc_node_find_child(hnode, "trace");
@@ -273,6 +274,32 @@ trace_boot_hist_add_handler(struct xbc_node *hnode, char **bufp,
 	return 0;
 }
 
+static int __init
+trace_boot_hist_add_handlers(struct xbc_node *hnode, char **bufp,
+			     char *end, const char *param)
+{
+	struct xbc_node *node;
+	const char *p, *handler;
+	int ret;
+
+	handler = xbc_node_get_data(hnode);
+
+	xbc_node_for_each_subkey(hnode, node) {
+		p = xbc_node_get_data(node);
+		if (!isdigit(p[0]))
+			continue;
+		/* All digit started node should be instances. */
+		ret = trace_boot_hist_add_one_handler(node, bufp, end, handler, param);
+		if (ret < 0)
+			break;
+	}
+
+	if (xbc_node_find_child(hnode, param))
+		ret = trace_boot_hist_add_one_handler(hnode, bufp, end, handler, param);
+
+	return ret;
+}
+
 /*
  * Histogram boottime tracing syntax.
  *
@@ -284,8 +311,8 @@ trace_boot_hist_add_handler(struct xbc_node *hnode, char **bufp,
  *	name = <HISTNAME>
  *	var { <VAR> = <EXPR> ... }
  *	pause|continue|clear
- *	onmax|onchange { var = <VAR>; <ACTION> [= <PARAM>] }
- *	onmatch { event = <EVENT>; <ACTION> [= <PARAM>] }
+ *	onmax|onchange[.N] { var = <VAR>; <ACTION> [= <PARAM>] }
+ *	onmatch[.N] { event = <EVENT>; <ACTION> [= <PARAM>] }
  *	filter = <FILTER>
  * }
  *
@@ -345,13 +372,13 @@ trace_boot_compose_hist_cmd(struct xbc_node *hnode, char *buf, size_t size)
 
 	/* Histogram handler and actions */
 	node = xbc_node_find_child(hnode, "onmax");
-	if (node && trace_boot_hist_add_handler(node, &buf, end, "var") < 0)
+	if (node && trace_boot_hist_add_handlers(node, &buf, end, "var") < 0)
 		return -EINVAL;
 	node = xbc_node_find_child(hnode, "onchange");
-	if (node && trace_boot_hist_add_handler(node, &buf, end, "var") < 0)
+	if (node && trace_boot_hist_add_handlers(node, &buf, end, "var") < 0)
 		return -EINVAL;
 	node = xbc_node_find_child(hnode, "onmatch");
-	if (node && trace_boot_hist_add_handler(node, &buf, end, "event") < 0)
+	if (node && trace_boot_hist_add_handlers(node, &buf, end, "event") < 0)
 		return -EINVAL;
 
 	p = xbc_node_find_value(hnode, "filter", NULL);
