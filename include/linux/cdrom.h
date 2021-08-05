@@ -64,6 +64,7 @@ struct cdrom_device_info {
 	int for_data;
 	int (*exit)(struct cdrom_device_info *);
 	int mrw_mode_page;
+	ktime_t last_media_change_time;
 };
 
 struct cdrom_device_ops {
