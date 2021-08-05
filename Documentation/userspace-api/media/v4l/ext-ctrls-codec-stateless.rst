@@ -1458,3 +1458,548 @@ FWHT Flags
 .. raw:: latex
 
     \normalsize
+
+.. _v4l2-codec-stateless-vp9:
+
+``V4L2_CID_STATELESS_VP9_COMPRESSED_HDR_PROBS (struct)``
+    Stores VP9 probabilities updates as parsed from the current compressed frame
+    header. A value of zero in an array element means no update of the relevant
+    probability. Motion vector-related updates contain a new value or zero. All
+    other updates contain values translated with inv_map_table[] (see 6.3.5 in
+    :ref:`vp9`).
+
+.. c:type:: v4l2_ctrl_vp9_compressed_hdr_probs
+
+.. cssclass:: longtable
+
+.. tabularcolumns:: |p{5.8cm}|p{4.8cm}|p{6.6cm}|
+
+.. flat-table:: struct v4l2_ctrl_vp9_compressed_hdr_probs
+    :header-rows:  0
+    :stub-columns: 0
+    :widths:       1 1 2
+
+    * - __u8
+      - ``tx8[2][1]``
+      - TX 8x8 probabilities delta.
+    * - __u8
+      - ``tx16[2][2]``
+      - TX 16x16 probabilities delta.
+    * - __u8
+      - ``tx32[2][3]``
+      - TX 32x32 probabilities delta.
+    * - __u8
+      - ``coef[4][2][2][6][6][3]``
+      - Coefficient probabilities delta.
+    * - __u8
+      - ``skip[3]``
+      - Skip probabilities delta.
+    * - __u8
+      - ``inter_mode[7][3]``
+      - Inter prediction mode probabilities delta.
+    * - __u8
+      - ``interp_filter[4][2]``
+      - Interpolation filter probabilities delta.
+    * - __u8
+      - ``is_inter[4]``
+      - Is inter-block probabilities delta.
+    * - __u8
+      - ``comp_mode[5]``
+      - Compound prediction mode probabilities delta.
+    * - __u8
+      - ``single_ref[5][2]``
+      - Single reference probabilities delta.
+    * - __u8
+      - ``comp_ref[5]``
+      - Compound reference probabilities delta.
+    * - __u8
+      - ``y_mode[4][9]``
+      - Y prediction mode probabilities delta.
+    * - __u8
+      - ``uv_mode[10][9]``
+      - UV prediction mode probabilities delta.
+    * - __u8
+      - ``partition[16][3]``
+      - Partition probabilities delta.
+    * - __u8
+      - ``mv.joint[3]``
+      - Motion vector joint probabilities delta.
+    * - __u8
+      - ``mv.sign[2]``
+      - Motion vector sign probabilities delta.
+    * - __u8
+      - ``mv.classes[2][10]``
+      - Motion vector class probabilities delta.
+    * - __u8
+      - ``mv.class0_bit[2]``
+      - Motion vector class0 bit probabilities delta.
+    * - __u8
+      - ``mv.bits[2][10]``
+      - Motion vector bits probabilities delta.
+    * - __u8
+      - ``mv.class0_fr[2][2][3]``
+      - Motion vector class0 fractional bit probabilities delta.
+    * - __u8
+      - ``mv.fr[2][3]``
+      - Motion vector fractional bit probabilities delta.
+    * - __u8
+      - ``mv.class0_hp[2]``
+      - Motion vector class0 high precision fractional bit probabilities delta.
+    * - __u8
+      - ``mv.hp[2]``
+      - Motion vector high precision fractional bit probabilities delta.
+
+``V4L2_CID_STATELESS_VP9_FRAME (struct)``
+    Specifies the frame parameters for the associated VP9 frame decode request.
+    This includes the necessary parameters for configuring a stateless hardware
+    decoding pipeline for VP9. The bitstream parameters are defined according
+    to :ref:`vp9`.
+
+.. c:type:: v4l2_ctrl_vp9_frame
+
+.. cssclass:: longtable
+
+.. tabularcolumns:: |p{1.5cm}|p{6.3cm}|p{9.4cm}|
+
+.. flat-table:: struct v4l2_ctrl_vp9_frame
+    :header-rows:  0
+    :stub-columns: 0
+    :widths:       1 1 2
+
+    * - struct :c:type:`v4l2_vp9_loop_filter`
+      - ``lf``
+      - Loop filter parameters. See struct :c:type:`v4l2_vp9_loop_filter` for more details.
+    * - struct :c:type:`v4l2_vp9_quantization`
+      - ``quant``
+      - Quantization parameters. See :c:type:`v4l2_vp9_quantization` for more details.
+    * - struct :c:type:`v4l2_vp9_segmentation`
+      - ``seg``
+      - Segmentation parameters. See :c:type:`v4l2_vp9_segmentation` for more details.
+    * - __u32
+      - ``flags``
+      - Combination of V4L2_VP9_FRAME_FLAG_* flags. See :c:type:`v4l2_vp9_frame_flags`.
+    * - __u16
+      - ``compressed_header_size``
+      - Compressed header size in bytes.
+    * - __u16
+      - ``uncompressed_header_size``
+      - Uncompressed header size in bytes.
+    * - __u16
+      - ``frame_width_minus_1``
+      - Add 1 to get the frame width expressed in pixels. See section 7.2.3 in :ref:`vp9`.
+    * - __u16
+      - ``frame_height_minus_1``
+      - Add 1 to get the frame height expressed in pixels. See section 7.2.3 in :ref:`vp9`.
+    * - __u16
+      - ``render_width_minus_1``
+      - Add 1 to get the expected render width expressed in pixels. This is
+        not used during the decoding process but might be used by HW scalers to
+        prepare a frame that's ready for scanout. See section 7.2.4 in :ref:`vp9`.
+    * - __u16
+      - render_height_minus_1
+      - Add 1 to get the expected render height expressed in pixels. This is
+        not used during the decoding process but might be used by HW scalers to
+        prepare a frame that's ready for scanout. See section 7.2.4 in :ref:`vp9`.
+    * - __u64
+      - ``last_frame_ts``
+      - "last" reference buffer timestamp.
+	The timestamp refers to the ``timestamp`` field in
+        struct :c:type:`v4l2_buffer`. Use the :c:func:`v4l2_timeval_to_ns()`
+        function to convert the struct :c:type:`timeval` in struct
+        :c:type:`v4l2_buffer` to a __u64.
+    * - __u64
+      - ``golden_frame_ts``
+      - "golden" reference buffer timestamp.
+	The timestamp refers to the ``timestamp`` field in
+        struct :c:type:`v4l2_buffer`. Use the :c:func:`v4l2_timeval_to_ns()`
+        function to convert the struct :c:type:`timeval` in struct
+        :c:type:`v4l2_buffer` to a __u64.
+    * - __u64
+      - ``alt_frame_ts``
+      - "alt" reference buffer timestamp.
+	The timestamp refers to the ``timestamp`` field in
+        struct :c:type:`v4l2_buffer`. Use the :c:func:`v4l2_timeval_to_ns()`
+        function to convert the struct :c:type:`timeval` in struct
+        :c:type:`v4l2_buffer` to a __u64.
+    * - __u8
+      - ``ref_frame_sign_bias``
+      - a bitfield specifying whether the sign bias is set for a given
+        reference frame. See :c:type:`v4l2_vp9_ref_frame_sign_bias` for more details.
+    * - __u8
+      - ``reset_frame_context``
+      - specifies whether the frame context should be reset to default values. See
+        :c:type:`v4l2_vp9_reset_frame_context` for more details.
+    * - __u8
+      - ``frame_context_idx``
+      - Frame context that should be used/updated.
+    * - __u8
+      - ``profile``
+      - VP9 profile. Can be 0, 1, 2 or 3.
+    * - __u8
+      - ``bit_depth``
+      - Component depth in bits. Can be 8, 10 or 12. Note that not all profiles
+        support 10 and/or 12 bits depths.
+    * - __u8
+      - ``interpolation_filter``
+      - Specifies the filter selection used for performing inter prediction. See
+        :c:type:`v4l2_vp9_interpolation_filter` for more details.
+    * - __u8
+      - ``tile_cols_log2``
+      - Specifies the base 2 logarithm of the width of each tile (where the
+        width is measured in units of 8x8 blocks). Shall be less than or equal
+        to 6.
+    * - __u8
+      - ``tile_rows_log2``
+      - Specifies the base 2 logarithm of the height of each tile (where the
+        height is measured in units of 8x8 blocks).
+    * - __u8
+      - ``tx_mode``
+      - Specifies the TX mode. See :c:type:`v4l2_vp9_tx_mode` for more details.
+    * - __u8
+      - ``reference_mode``
+      - Specifies the type of inter prediction to be used. See
+        :c:type:`v4l2_vp9_reference_mode` for more details.
+    * - __u8
+      - ``reserved[6]``
+      - Applications and drivers must set this to zero.
+
+.. c:type:: v4l2_vp9_frame_flags
+
+.. cssclass:: longtable
+
+.. tabularcolumns:: |p{1.5cm}|p{6.3cm}|p{9.4cm}|
+
+.. flat-table:: enum v4l2_vp9_frame_flags
+    :header-rows:  0
+    :stub-columns: 0
+    :widths:       1 2
+
+    * - ``V4L2_VP9_FRAME_FLAG_KEY_FRAME``
+      - The frame is a key frame.
+    * - ``V4L2_VP9_FRAME_FLAG_SHOW_FRAME``
+      - The frame should be displayed.
+    * - ``V4L2_VP9_FRAME_FLAG_ERROR_RESILIENT``
+      - The decoding should be error resilient.
+    * - ``V4L2_VP9_FRAME_FLAG_INTRA_ONLY``
+      - The frame does not reference other frames.
+    * - ``V4L2_VP9_FRAME_FLAG_ALLOW_HIGH_PREC_MV``
+      - The frame can use high precision motion vectors.
+    * - ``V4L2_VP9_FRAME_FLAG_REFRESH_FRAME_CTX``
+      - Frame context should be updated after decoding.
+    * - ``V4L2_VP9_FRAME_FLAG_PARALLEL_DEC_MODE``
+      - Parallel decoding is used.
+    * - ``V4L2_VP9_FRAME_FLAG_X_SUBSAMPLING``
+      - Vertical subsampling is enabled.
+    * - ``V4L2_VP9_FRAME_FLAG_Y_SUBSAMPLING``
+      - Horizontal subsampling is enabled.
+    * - ``V4L2_VP9_FRAME_FLAG_COLOR_RANGE_FULL_SWING``
+      - The full UV range is used.
+
+.. c:type:: v4l2_vp9_tx_mode
+
+See section '7.3.1 Tx mode semantics' of the VP9 specification for more details.
+
+.. cssclass:: longtable
+
+.. tabularcolumns:: |p{1.5cm}|p{6.3cm}|p{9.4cm}|
+
+.. flat-table:: enum v4l2_vp9_tx_mode
+    :header-rows:  0
+    :stub-columns: 0
+    :widths:       1 2
+
+    * - ``V4L2_VP9_TX_MODE_ONLY_4X4``
+      - Transform size is 4x4.
+    * - ``V4L2_VP9_TX_MODE_ALLOW_8X8``
+      - Transform size can be up to 8x8.
+    * - ``V4L2_VP9_TX_MODE_ALLOW_16X16``
+      - Transform size can be up to 16x16.
+    * - ``V4L2_VP9_TX_MODE_ALLOW_32X32``
+      - transform size can be up to 32x32.
+    * - ``V4L2_VP9_TX_MODE_SELECT``
+      - Bitstream contains the transform size for each block.
+
+.. c:type:: v4l2_vp9_reference_mode
+
+See section '7.3.6 Frame reference mode semantics' of the VP9 specification for more details.
+
+.. cssclass:: longtable
+
+.. tabularcolumns:: |p{1.5cm}|p{6.3cm}|p{9.4cm}|
+
+.. flat-table:: enum v4l2_vp9_reference_mode
+    :header-rows:  0
+    :stub-columns: 0
+    :widths:       1 2
+
+    * - ``V4L2_VP9_REFERENCE_MODE_SINGLE_REFERENCE``
+      - Indicates that all the inter blocks use only a single reference frame
+        to generate motion compensated prediction.
+    * - ``V4L2_VP9_REFERENCE_MODE_COMPOUND_REFERENCE``
+      - Requires all the inter blocks to use compound mode. Single reference
+        frame prediction is not allowed.
+    * - ``V4L2_VP9_REFERENCE_MODE_SELECT``
+      - Allows each individual inter block to select between single and
+        compound prediction modes.
+
+.. c:type:: v4l2_vp9_interpolation_filter
+
+See section '7.2.7 Interpolation filter semantics' of the VP9 specification
+for more details.
+
+.. cssclass:: longtable
+
+.. tabularcolumns:: |p{1.5cm}|p{6.3cm}|p{9.4cm}|
+
+.. flat-table:: enum v4l2_vp9_interpolation_filter
+    :header-rows:  0
+    :stub-columns: 0
+    :widths:       1 2
+
+    * - ``V4L2_VP9_INTERP_FILTER_EIGHTTAP``
+      - Eight tap filter.
+    * - ``V4L2_VP9_INTERP_FILTER_EIGHTTAP_SMOOTH``
+      - Eight tap smooth filter.
+    * - ``V4L2_VP9_INTERP_FILTER_EIGHTTAP_SHARP``
+      - Eeight tap sharp filter.
+    * - ``V4L2_VP9_INTERP_FILTER_BILINEAR``
+      - Bilinear filter.
+    * - ``V4L2_VP9_INTERP_FILTER_SWITCHABLE``
+      - Filter selection is signaled at the block level.
+
+.. c:type:: v4l2_vp9_reset_frame_context
+
+See section '7.2 Uncompressed header semantics' of the VP9 specification
+for more details.
+
+.. cssclass:: longtable
+
+.. tabularcolumns:: |p{1.5cm}|p{6.3cm}|p{9.4cm}|
+
+.. flat-table:: enum v4l2_vp9_reset_frame_context
+    :header-rows:  0
+    :stub-columns: 0
+    :widths:       1 2
+
+    * - ``V4L2_VP9_RESET_FRAME_CTX_NONE``
+      - Do not reset any frame context.
+    * - ``V4L2_VP9_RESET_FRAME_CTX_SPEC``
+      - Reset the frame context pointed to by
+        :c:type:`v4l2_ctrl_vp9_frame`.frame_context_idx.
+    * - ``V4L2_VP9_RESET_FRAME_CTX_ALL``
+      - Reset all frame contexts.
+
+.. c:type:: v4l2_vp9_intra_prediction_mode
+
+See section '7.4.5 Intra frame mode info semantics' for more details.
+
+.. cssclass:: longtable
+
+.. tabularcolumns:: |p{1.5cm}|p{6.3cm}|p{9.4cm}|
+
+.. flat-table:: enum v4l2_vp9_intra_prediction_mode
+    :header-rows:  0
+    :stub-columns: 0
+    :widths:       1 2
+
+    * - ``V4L2_VP9_INTRA_PRED_MODE_DC_PRED``
+      - DC intra prediction.
+    * - ``V4L2_VP9_INTRA_PRED_MODE_V_PRED``
+      - Vertical intra prediction.
+    * - ``V4L2_VP9_INTRA_PRED_MODE_H_PRED``
+      - Horizontal intra prediction.
+    * - ``V4L2_VP9_INTRA_PRED_MODE_D45_PRED``
+      - D45 intra prediction.
+    * - ``V4L2_VP9_INTRA_PRED_MODE_D135_PRED``
+      - D135 intra prediction.
+    * - ``V4L2_VP9_INTRA_PRED_MODE_D117_PRED``
+      - D117 intra prediction.
+    * - ``V4L2_VP9_INTRA_PRED_MODE_D153_PRED``
+      - D153 intra prediction.
+    * - ``V4L2_VP9_INTRA_PRED_MODE_D207_PRED``
+      - D207 intra prediction.
+    * - ``V4L2_VP9_INTRA_PRED_MODE_D63_PRED``
+      - D63 intra prediction.
+    * - ``V4L2_VP9_INTRA_PRED_MODE_TM_PRED``
+      - True motion intra prediction.
+
+.. c:type:: v4l2_vp9_segmentation
+
+Encodes the quantization parameters. See section '7.2.10 Segmentation
+params syntax' of the VP9 specification for more details.
+
+.. cssclass:: longtable
+
+.. tabularcolumns:: |p{1.5cm}|p{6.3cm}|p{9.4cm}|
+
+.. flat-table:: struct v4l2_vp9_segmentation
+    :header-rows:  0
+    :stub-columns: 0
+    :widths:       1 1 2
+
+    * - __u8
+      - ``feature_data[8][4]``
+      - Data attached to each feature. Data entry is only valid if the feature
+        is enabled.
+    * - __u8
+      - ``feature_enabled[8]``
+      - Bitmask defining which features are enabled in each segment.
+    * - __u8
+      - ``tree_probs[7]``
+      - Specifies the probability values to be used when decoding a Segment-ID.
+        See '5.15. Segmentation map' section of :ref:`vp9` for more details.
+    * - __u8
+      - ``pred_probs[3]``
+      - Specifies the probability values to be used when decoding a
+        Predicted-Segment-ID. See '6.4.14. Get segment id syntax'
+        section of :ref:`vp9` for more details.
+    * - __u8
+      - ``flags``
+      - Combination of V4L2_VP9_SEGMENTATION_FLAG_* flags. See
+        :c:type:`v4l2_vp9_segmentation_flags`.
+    * - __u8
+      - ``reserved[5]``
+      - Applications and drivers must set this to zero.
+
+.. c:type:: v4l2_vp9_segment_feature
+
+Segment feature IDs. See section '7.2.10 Segmentation params syntax' of the
+VP9 specification for more details.
+
+.. cssclass:: longtable
+
+.. tabularcolumns:: |p{1.5cm}|p{6.3cm}|p{9.4cm}|
+
+.. flat-table:: enum v4l2_vp9_segment_feature
+    :header-rows:  0
+    :stub-columns: 0
+    :widths:       1 2
+
+    * - ``V4L2_VP9_SEG_LVL_ALT_Q``
+      - Quantizer segment feature.
+    * - ``V4L2_VP9_SEG_LVL_ALT_L``
+      - Loop filter segment feature.
+    * - ``V4L2_VP9_SEG_LVL_REF_FRAME``
+      - Reference frame segment feature.
+    * - ``V4L2_VP9_SEG_LVL_SKIP``
+      - Skip segment feature.
+    * - ``V4L2_VP9_SEG_LVL_MAX``
+      - Number of segment features.
+
+.. c:type:: v4l2_vp9_segmentation_flags
+
+Those are the flags that may be passed to &v4l2_vp9_segmentation.flags. See
+section '7.2.10 Segmentation params syntax' of the VP9 specification for
+more details.
+
+.. cssclass:: longtable
+
+.. tabularcolumns:: |p{1.5cm}|p{6.3cm}|p{9.4cm}|
+
+.. flat-table:: enum v4l2_vp9_segmentation_flags
+    :header-rows:  0
+    :stub-columns: 0
+    :widths:       1 2
+
+    * - ``V4L2_VP9_SEGMENTATION_FLAG_ENABLED``
+      - Indicates that this frame makes use of the segmentation tool.
+    * - ``V4L2_VP9_SEGMENTATION_FLAG_UPDATE_MAP``
+      - Indicates that the segmentation map should be updated during the
+        decoding of this frame.
+    * - ``V4L2_VP9_SEGMENTATION_FLAG_TEMPORAL_UPDATE``
+      - Indicates that the updates to the segmentation map are coded
+        relative to the existing segmentation map.
+    * - ``V4L2_VP9_SEGMENTATION_FLAG_UPDATE_DATA``
+      - Indicates that new parameters are about to be specified for each
+        segment.
+    * - ``V4L2_VP9_SEGMENTATION_FLAG_ABS_OR_DELTA_UPDATE``
+      - Indicates that the segmentation parameters represent the actual values
+        to be used.
+
+.. c:type:: v4l2_vp9_quantization
+
+Encodes the quantization parameters. See section '7.2.9 Quantization params
+syntax' of the VP9 specification for more details.
+
+.. cssclass:: longtable
+
+.. tabularcolumns:: |p{1.5cm}|p{6.3cm}|p{9.4cm}|
+
+.. flat-table:: struct v4l2_vp9_quantization
+    :header-rows:  0
+    :stub-columns: 0
+    :widths:       1 1 2
+
+    * - __u8
+      - ``base_q_idx``
+      - Indicates the base frame qindex.
+    * - __s8
+      - ``delta_q_y_dc``
+      - Indicates the Y DC quantizer relative to base_q_idx.
+    * - __s8
+      - ``delta_q_uv_dc``
+      - Indicates the UV DC quantizer relative to base_q_idx.
+    * - __s8
+      - ``delta_q_uv_ac``
+      - Indicates the UV AC quantizer relative to base_q_idx.
+    * - __u8
+      - ``reserved[4]``
+      - Applications and drivers must set this to zero.
+
+.. c:type:: v4l2_vp9_loop_filter
+
+This structure contains all loop filter related parameters. See sections
+'7.2.8 Loop filter semantics' of the VP9 specification for more details.
+
+.. cssclass:: longtable
+
+.. tabularcolumns:: |p{1.5cm}|p{6.3cm}|p{9.4cm}|
+
+.. flat-table:: struct v4l2_vp9_loop_filter
+    :header-rows:  0
+    :stub-columns: 0
+    :widths:       1 1 2
+
+    * - __s8
+      - ``ref_deltas[4]``
+      - Contains the adjustment needed for the filter level based on the chosen
+        reference frame.
+    * - __s8
+      - ``mode_deltas[2]``
+      - Contains the adjustment needed for the filter level based on the chosen
+        mode.
+    * - __u8
+      - ``level``
+      - Indicates the loop filter strength.
+    * - __u8
+      - ``sharpness``
+      - Indicates the sharpness level.
+    * - __u8
+      - ``flags``
+      - Combination of V4L2_VP9_LOOP_FILTER_FLAG_* flags.
+        See :c:type:`v4l2_vp9_loop_filter_flags`.
+    * - __u8
+      - ``reserved[7]``
+      - Applications and drivers must set this to zero.
+
+
+.. c:type:: v4l2_vp9_loop_filter_flags
+
+Those are the flags that may be passed. See section '7.2.8 Loop filter
+semantics' of the VP9 specification for more details.
+
+.. cssclass:: longtable
+
+.. tabularcolumns:: |p{1.5cm}|p{6.3cm}|p{9.4cm}|
+
+.. flat-table:: enum v4l2_vp9_loop_filter_flags
+    :header-rows:  0
+    :stub-columns: 0
+    :widths:       1 2
+
+    * - ``V4L2_VP9_LOOP_FILTER_FLAG_DELTA_ENABLED``
+      - When set, the filter level depends on the mode and reference frame used
+        to predict a block.
+    * - ``V4L2_VP9_LOOP_FILTER_FLAG_DELTA_UPDATE``
+      - When set, the bitstream contains additional syntax elements that
+        specify which mode and reference frame deltas are to be updated.
