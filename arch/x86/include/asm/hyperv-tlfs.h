@@ -11,6 +11,7 @@
 
 #include <linux/types.h>
 #include <asm/page.h>
+#include <uapi/asm/hyperv-tlfs.h>
 /*
  * The below CPUID leaves are present if VersionAndFeatures.HypervisorPresent
  * is set by CPUID(HvCpuIdFunctionVersionAndFeatures).
