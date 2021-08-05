@@ -634,7 +634,7 @@ bool page_pool_return_skb_page(struct page *page)
 	struct page_pool *pp;
 
 	page = compound_head(page);
-	if (unlikely(page->pp_magic != PP_SIGNATURE))
+	if (unlikely((page->pp_magic & ~0x3UL) != PP_SIGNATURE))
 		return false;
 
 	pp = page->pp;
