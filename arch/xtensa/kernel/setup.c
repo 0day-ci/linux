@@ -564,6 +564,7 @@ void machine_restart(char * cmd)
 {
 	platform_restart();
 }
+EXPORT_SYMBOL(machine_restart);
 
 void machine_halt(void)
 {
