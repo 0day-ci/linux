@@ -143,6 +143,10 @@ struct ms_hyperv_tsc_page {
 #define HVCALL_FLUSH_VIRTUAL_ADDRESS_SPACE_EX	0x0013
 #define HVCALL_FLUSH_VIRTUAL_ADDRESS_LIST_EX	0x0014
 #define HVCALL_SEND_IPI_EX			0x0015
+#define HVCALL_CREATE_PARTITION			0x0040
+#define HVCALL_INITIALIZE_PARTITION		0x0041
+#define HVCALL_FINALIZE_PARTITION		0x0042
+#define HVCALL_DELETE_PARTITION			0x0043
 #define HVCALL_GET_PARTITION_ID			0x0046
 #define HVCALL_DEPOSIT_MEMORY			0x0048
 #define HVCALL_CREATE_VP			0x004e
@@ -824,6 +828,51 @@ struct hv_memory_hint {
 	u64 type:2;
 	u64 reserved:62;
 	union hv_gpa_page_range ranges[];
+} __packed;
+
+union hv_partition_isolation_properties {
+	u64 as_uint64;
+	struct {
+		u64 isolation_type: 5;
+		u64 rsvd_z: 7;
+		u64 shared_gpa_boundary_page_number: 52;
+	};
+} __packed;
+
+/* Non-userspace-visible partition creation flags */
+#define HV_PARTITION_CREATION_FLAG_EXO_PARTITION                    BIT(8)
+
+#define HV_MAKE_COMPATIBILITY_VERSION(major_, minor_)	\
+	((u32)((major_) << 8 | (minor_)))
+
+#define HV_COMPATIBILITY_19_H1		HV_MAKE_COMPATIBILITY_VERSION(0X6, 0X5)
+#define HV_COMPATIBILITY_20_H1		HV_MAKE_COMPATIBILITY_VERSION(0X6, 0X7)
+#define HV_COMPATIBILITY_PRERELEASE	HV_MAKE_COMPATIBILITY_VERSION(0XFE, 0X0)
+#define HV_COMPATIBILITY_EXPERIMENT	HV_MAKE_COMPATIBILITY_VERSION(0XFF, 0X0)
+
+struct hv_create_partition_in {
+	u64 flags;
+	union hv_proximity_domain_info proximity_domain_info;
+	u32 compatibility_version;
+	u32 padding;
+	struct hv_partition_creation_properties partition_creation_properties;
+	union hv_partition_isolation_properties isolation_properties;
+} __packed;
+
+struct hv_create_partition_out {
+	u64 partition_id;
+} __packed;
+
+struct hv_initialize_partition {
+	u64 partition_id;
+} __packed;
+
+struct hv_finalize_partition {
+	u64 partition_id;
+} __packed;
+
+struct hv_delete_partition {
+	u64 partition_id;
 } __packed;
 
 #endif

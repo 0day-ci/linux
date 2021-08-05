@@ -13,4 +13,4 @@ hv_vmbus-y := vmbus_drv.o \
 hv_vmbus-$(CONFIG_HYPERV_TESTING)	+= hv_debugfs.o
 hv_utils-y := hv_util.o hv_kvp.o hv_snapshot.o hv_fcopy.o hv_utils_transport.o
 
-mshv-y                          += mshv_main.o
+mshv-y                          += mshv_main.o hv_call.o
