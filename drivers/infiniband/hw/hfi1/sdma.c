@@ -3079,8 +3079,10 @@ static int _extend_sdma_tx_descs(struct hfi1_devdata *dd, struct sdma_txreq *tx)
 			MAX_DESC,
 			sizeof(struct sdma_desc),
 			GFP_ATOMIC);
-	if (!tx->descp)
+	if (!tx->descp) {
+		tx->num_desc = 0;
 		goto enomem;
+	}
 
 	/* reserve last descriptor for coalescing */
 	tx->desc_limit = MAX_DESC - 1;
