@@ -309,6 +309,12 @@ struct kvm_vm *vm_create(enum vm_guest_mode mode, uint64_t phy_pages, int perm)
 	/* Limit physical addresses to PA-bits. */
 	vm->max_gfn = ((1ULL << vm->pa_bits) >> vm->page_shift) - 1;
 
+#ifdef __x86_64__
+	/* Avoid reserved HyperTransport region on AMD processors.  */
+	if (vm->pa_bits == 48)
+		vm->max_gfn = 0xfffcfffff;
+#endif
+
 	/* Allocate and setup memory for guest. */
 	vm->vpages_mapped = sparsebit_alloc();
 	if (phy_pages != 0)
