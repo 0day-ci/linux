@@ -261,6 +261,25 @@ TRACE_EVENT(inet_sk_error_report,
 		  __entry->error)
 );
 
+TRACE_EVENT(sk_data_ready,
+
+	TP_PROTO(const struct sock *sk, const struct sk_buff *skb),
+
+	TP_ARGS(sk, skb),
+
+	TP_STRUCT__entry(
+		__field(const void *, skaddr)
+		__field(const void *, skbaddr)
+	),
+
+	TP_fast_assign(
+		__entry->skaddr = sk;
+		__entry->skbaddr = skb;
+	),
+
+	TP_printk("skaddr=%px, skbaddr=%px", __entry->skaddr, __entry->skbaddr)
+);
+
 #endif /* _TRACE_SOCK_H */
 
 /* This part must be outside protection */

@@ -108,6 +108,7 @@
 #include <linux/static_key.h>
 #include <linux/btf_ids.h>
 #include <trace/events/skb.h>
+#include <trace/events/sock.h>
 #include <net/busy_poll.h>
 #include "udp_impl.h"
 #include <net/sock_reuseport.h>
@@ -1579,8 +1580,10 @@ int __udp_enqueue_schedule_skb(struct sock *sk, struct sk_buff *skb)
 	__skb_queue_tail(list, skb);
 	spin_unlock(&list->lock);
 
-	if (!sock_flag(sk, SOCK_DEAD))
+	if (!sock_flag(sk, SOCK_DEAD)) {
+		trace_sk_data_ready(sk, skb);
 		sk->sk_data_ready(sk);
+	}
 
 	busylock_release(busy);
 	return 0;

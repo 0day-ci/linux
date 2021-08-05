@@ -77,6 +77,7 @@
 #include <asm/unaligned.h>
 #include <linux/errqueue.h>
 #include <trace/events/tcp.h>
+#include <trace/events/sock.h>
 #include <linux/jump_label_ratelimit.h>
 #include <net/busy_poll.h>
 #include <net/mptcp.h>
@@ -5034,6 +5035,8 @@ queue_and_out:
 
 		tcp_fast_path_check(sk);
 
+		if (!sock_flag(sk, SOCK_DEAD))
+			trace_sk_data_ready(sk, skb);
 		if (eaten > 0)
 			kfree_skb_partial(skb, fragstolen);
 		if (!sock_flag(sk, SOCK_DEAD))
@@ -5601,8 +5604,10 @@ static void tcp_urg(struct sock *sk, struct sk_buff *skb, const struct tcphdr *t
 			if (skb_copy_bits(skb, ptr, &tmp, 1))
 				BUG();
 			tp->urg_data = TCP_URG_VALID | tmp;
-			if (!sock_flag(sk, SOCK_DEAD))
+			if (!sock_flag(sk, SOCK_DEAD)) {
+				trace_sk_data_ready(sk, skb);
 				sk->sk_data_ready(sk);
+			}
 		}
 	}
 }
@@ -5894,6 +5899,7 @@ void tcp_rcv_established(struct sock *sk, struct sk_buff *skb)
 
 			__tcp_ack_snd_check(sk, 0);
 no_ack:
+			trace_sk_data_ready(sk, skb);
 			if (eaten)
 				kfree_skb_partial(skb, fragstolen);
 			tcp_data_ready(sk);
