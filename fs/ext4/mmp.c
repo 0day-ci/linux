@@ -7,6 +7,9 @@
 
 #include "ext4.h"
 
+#define EXT4_KMMP_MAX_INTERVAL		100
+#define EXT4_KMMP_MIN_INTERVAL		5
+
 /* Checksumming functions */
 static __le32 ext4_mmp_csum(struct super_block *sb, struct mmp_struct *mmp)
 {
@@ -140,6 +143,12 @@ static int kmmpd(void *data)
 	unsigned long diff;
 	int retval;
 
+	/* We should avoid unreasonable huge update interval, since it can cause
+	 * task hung bug on umount or on error handling path in ext4_fill_super()
+	 */
+	mmp_update_interval = clamp(mmp_update_interval, EXT4_KMMP_MIN_INTERVAL,
+							 EXT4_KMMP_MAX_INTERVAL);
+
 	mmp_block = le64_to_cpu(es->s_mmp_block);
 	mmp = (struct mmp_struct *)(bh->b_data);
 	mmp->mmp_time = cpu_to_le64(ktime_get_real_seconds());
@@ -155,6 +164,9 @@ static int kmmpd(void *data)
 
 	memcpy(mmp->mmp_nodename, init_utsname()->nodename,
 	       sizeof(mmp->mmp_nodename));
+
+	ext4_msg(sb, KERN_INFO, "Started kmmp thread with update interval = %u\n",
+		 mmp_update_interval);
 
 	while (!kthread_should_stop() && !sb_rdonly(sb)) {
 		if (!ext4_has_feature_mmp(sb)) {
