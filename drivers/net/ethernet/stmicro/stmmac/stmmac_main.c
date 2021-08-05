@@ -5208,7 +5208,7 @@ read_again:
 			/* XDP program may expand or reduce tail */
 			buf1_len = xdp.data_end - xdp.data;
 
-			skb = napi_alloc_skb(&ch->rx_napi, buf1_len);
+			skb = build_skb(xdp.data_hard_start, PAGE_SIZE);
 			if (!skb) {
 				priv->dev->stats.rx_dropped++;
 				count++;
@@ -5216,11 +5216,10 @@ read_again:
 			}
 
 			/* XDP program may adjust header */
-			skb_copy_to_linear_data(skb, xdp.data, buf1_len);
+			skb_reserve(skb, buf->page_offset);
 			skb_put(skb, buf1_len);
 
-			/* Data payload copied into SKB, page ready for recycle */
-			page_pool_recycle_direct(rx_q->page_pool, buf->page);
+			page_pool_release_page(rx_q->page_pool, buf->page);
 			buf->page = NULL;
 		} else if (buf1_len) {
 			dma_sync_single_for_cpu(priv->device, buf->addr,
