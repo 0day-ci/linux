@@ -22,6 +22,26 @@
 #include "block-group.h"
 #include "qgroup.h"
 
+
+/*
+ * struct attributes (sysfs files)	sysfs path
+ * --------------------------------------------------------------------------
+ * btrfs_supported_static_feature_attrs /sys/fs/btrfs/features
+ * btrfs_supported_feature_attrs        /sys/fs/btrfs/features and
+ *					/sys/fs/btrfs/uuid/features (if visible)
+ * btrfs_debug_feature_attrs		/sys/fs/btrfs/debug
+ * btrfs_debug_mount_attrs		/sys/fs/btrfs/<uuid>/debug
+ * discard_debug_attrs			/sys/fs/btrfs/<uuid>/debug/discard
+ * btrfs_attrs				/sys/fs/btrfs/<uuid>
+ * devid_attrs				/sys/fs/btrfs/<uuid>/devinfo/<devid>
+ * allocation_attrs			/sys/fs/btrfs/<uuid>/allocation
+ * qgroup_attrs				/sys/fs/btrfs/<uuid>/qgroups/<subvol-id>/
+ * space_info_attrs		/sys/fs/btrfs/<uuid>/allocation/<bg-type>
+ * raid_attrs		/sys/fs/btrfs/<uuid>/allocation/<bg-type>/<bg-profile>
+ */
+
+
+
 struct btrfs_feature_attr {
 	struct kobj_attribute kobj_attr;
 	enum btrfs_feature_set feature_set;
@@ -573,7 +593,7 @@ static const struct attribute *discard_debug_attrs[] = {
  * Runtime debugging exported via sysfs
  *
  * /sys/fs/btrfs/debug - applies to module or all filesystems
- * /sys/fs/btrfs/UUID  - applies only to the given filesystem
+ * /sys/fs/btrfs/UUID/debug - applies only to the given filesystem
  */
 static const struct attribute *btrfs_debug_mount_attrs[] = {
 	NULL,
