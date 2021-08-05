@@ -1,0 +1,186 @@
+// SPDX-License-Identifier: BSD-3-Clause
+/*
+ * Copyright (c) 2021, Konrad Dybcio <konrad.dybcio@somainline.org>
+ */
+#include "qcom-mdm9607.dtsi"
+#include "qcom-pm8019.dtsi"
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/input/input.h>
+#include <dt-bindings/pinctrl/qcom,pmic-gpio.h>
+
+/ {
+	model = "Quectel EG25-G Modem";
+	compatible = "quectel,eg25-g", "qcom,mdm9607";
+	qcom,msm-id = <290 0x10000>, <296 0x10000>, <297 0x10000>, <298 0x10000>, <299 0x10000>;
+	qcom,board-id = <8 0>;
+
+	memory {
+		device_type = "memory";
+		reg = <0x0 0x0>;
+	};
+
+	usb_extcon: usb-extcon {
+		compatible = "linux,extcon-usb-gpio";
+		vbus-gpio = <&pm8019_mpps 2 GPIO_ACTIVE_HIGH>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&usbdet_mpp>;
+	};
+};
+
+&blsp1_i2c2 {
+	status = "okay";
+};
+
+&blsp1_i2c4 {
+	status = "okay";
+
+	/delete-property/ pinctrl-names;
+	/delete-property/ pinctrl-0;
+};
+
+&blsp1_uart2 {
+	status = "okay";
+};
+
+&blsp1_uart3 {
+	status = "okay";
+};
+
+/* Debug UART */
+&blsp1_uart5 {
+	status = "okay";
+};
+
+&nand {
+	partitions {
+		compatible = "fixed-partitions";
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		partition@27a0000 {
+			label = "recovery";
+			reg = <0x27a0000 0x7c0000>;
+		};
+
+		partition@2f60000 {
+			label = "modem";
+			reg = <0x2f60000 0x3580000>;
+		};
+
+		partition@6580000 {
+			label = "recoveryfs";
+			reg = <0x6580000 0x1440000>;
+		};
+
+		partition@79c0000 {
+			label = "usr_data";
+			reg = <0x79c0000 0x3d80000>;
+		};
+
+		partition@b7c0000 {
+			label = "system";
+			reg = <0xb7c0000 0x4840000>;
+		};
+	};
+};
+
+&pm8019_mpps {
+	pinctrl-names = "default";
+	pinctrl-0 = <&usb_mpp>;
+
+	usb_mpp: usb-mpp {
+		pins = "mpp1";
+		function = "digital";
+		bias-pull-up = <10000>;
+
+		power-source = <3>; /* 1.8V (L11) */
+	};
+
+	usbdet_mpp: usbdet-mpp {
+		pins = "mpp2";
+		function = "digital";
+		bias-disable;
+	};
+};
+
+/* NAND ID: 0x1590aaad | 256MiB | 4-bit ECC */
+&qpic_nand {
+	/*
+	 * This can only be enabled after interconnect lands, otherwise the SoC
+	 * absolutely loses its mind and randomly drops registers, leading to
+	 * null pointer exceptions!
+	 */
+	status = "disabled";
+};
+
+&qpic_bam {
+	status = "okay";
+};
+
+&tlmm {
+	pinctrl-names = "default";
+	pinctrl-0 = <&undocumented_tlmm_gpios>;
+
+	undocumented_tlmm_gpios: undocumented-tlmm-gpios {
+		undocumented-gpio18 {
+			pins = "gpio18";
+			function = "gpio";
+			drive-strength = <16>;
+			bias-pull-up;
+		};
+
+		undocumented-gpio19 {
+			pins = "gpio19";
+			function = "gpio";
+			drive-strength = <16>;
+			bias-pull-up;
+		};
+
+		undocumented-gpio24 {
+			pins = "gpio24";
+			function = "gpio";
+			drive-strength = <2>;
+			bias-disable;
+		};
+
+		wakeup-in-n {
+			pins = "gpio25";
+			function = "gpio";
+			drive-strength = <2>;
+			bias-pull-up;
+		};
+
+		undocumented-gpio55 {
+			pins = "gpio55";
+			function = "gpio";
+			drive-strength = <2>;
+			bias-disable;
+			output-low;
+		};
+
+		undocumented-gpio56 {
+			pins = "gpio56";
+			function = "gpio";
+			drive-strength = <2>;
+			bias-disable;
+			input-low;
+		};
+
+		undocumented-gpio57 {
+			pins = "gpio57";
+			function = "gpio";
+			drive-strength = <2>;
+			bias-disable;
+			output-low;
+		};
+	};
+};
+
+&usb {
+	status = "okay";
+	extcon = <&usb_extcon>, <&usb_extcon>;
+};
+
+&usb_hs_phy {
+	status = "okay";
+};
