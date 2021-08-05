@@ -166,8 +166,10 @@ struct ceph_mdsmap *ceph_mdsmap_decode(void **p, void *end, bool msgr2)
 	m->possible_max_rank = max(m->m_num_active_mds, m->m_max_mds);
 
 	m->m_info = kcalloc(m->possible_max_rank, sizeof(*m->m_info), GFP_NOFS);
-	if (!m->m_info)
-		goto nomem;
+	if (!m->m_info) {
+		kfree(m);
+		return ERR_PTR(-ENOMEM);
+	}
 
 	/* pick out active nodes from mds_info (state > 0) */
 	for (i = 0; i < n; i++) {
