@@ -12,6 +12,7 @@
 #include <linux/interrupt.h>
 #include <linux/v4l2-controls.h>
 #include <media/v4l2-ctrls.h>
+#include <media/v4l2-vp9.h>
 #include <media/videobuf2-core.h>
 
 #define DEC_8190_ALIGN_MASK	0x07U
@@ -161,6 +162,50 @@ struct hantro_vp8_dec_hw_ctx {
 	struct hantro_aux_buf prob_tbl;
 };
 
+struct hantro_vp9_frame_info {
+	u32 valid : 1;
+	u32 frame_context_idx : 2;
+	u32 reference_mode : 2;
+	u32 tx_mode : 3;
+	u32 interpolation_filter : 3;
+	u32 flags;
+	u64 timestamp;
+};
+
+#define MAX_SB_COLS	64
+#define MAX_SB_ROWS	34
+
+/**
+ * struct hantro_vp9_dec_hw_ctx
+ *
+ */
+struct hantro_vp9_dec_hw_ctx {
+	struct hantro_aux_buf tile_edge;
+	struct hantro_aux_buf segment_map;
+	struct hantro_aux_buf misc;
+	struct v4l2_vp9_frame_symbol_counts cnts;
+	struct v4l2_vp9_frame_context probability_tables;
+	struct v4l2_vp9_frame_context frame_context[4];
+	struct hantro_vp9_frame_info cur;
+	struct hantro_vp9_frame_info last;
+
+	unsigned int bsd_ctrl_offset;
+	unsigned int segment_map_size;
+	unsigned int ctx_counters_offset;
+	unsigned int tile_info_offset;
+
+	unsigned short tile_r_info[MAX_SB_ROWS];
+	unsigned short tile_c_info[MAX_SB_COLS];
+	unsigned int last_tile_r;
+	unsigned int last_tile_c;
+	unsigned int last_sbs_r;
+	unsigned int last_sbs_c;
+
+	unsigned int active_segment;
+	u8 feature_enabled[8];
+	s16 feature_data[8][4];
+};
+
 /**
  * struct hantro_postproc_ctx
  *
@@ -267,6 +312,24 @@ void hantro_hevc_ref_remove_unused(struct hantro_ctx *ctx);
 size_t hantro_hevc_chroma_offset(const struct v4l2_ctrl_hevc_sps *sps);
 size_t hantro_hevc_motion_vectors_offset(const struct v4l2_ctrl_hevc_sps *sps);
 
+static inline unsigned short hantro_vp9_num_sbs(unsigned short dimension)
+{
+	return (dimension + 63) / 64;
+}
+
+static inline size_t
+hantro_vp9_mv_size(unsigned int width, unsigned int height)
+{
+	int num_ctbs;
+
+	/*
+	 * There can be up to (CTBs x 64) number of blocks,
+	 * and the motion vector for each block needs 16 bytes.
+	 */
+	num_ctbs = hantro_vp9_num_sbs(width) * hantro_vp9_num_sbs(height);
+	return (num_ctbs * 64) * 16;
+}
+
 static inline size_t
 hantro_h264_mv_size(unsigned int width, unsigned int height)
 {
@@ -308,6 +371,10 @@ void hantro_vp8_dec_exit(struct hantro_ctx *ctx);
 void hantro_vp8_prob_update(struct hantro_ctx *ctx,
 			    const struct v4l2_ctrl_vp8_frame *hdr);
 
+int hantro_g2_vp9_dec_run(struct hantro_ctx *ctx);
+void hantro_g2_vp9_dec_done(struct hantro_ctx *ctx);
+int hantro_vp9_dec_init(struct hantro_ctx *ctx);
+void hantro_vp9_dec_exit(struct hantro_ctx *ctx);
 void hantro_g2_check_idle(struct hantro_dev *vpu);
 
 #endif /* HANTRO_HW_H_ */
