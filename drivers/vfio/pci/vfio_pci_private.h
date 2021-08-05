@@ -128,6 +128,7 @@ struct vfio_pci_device {
 	bool			needs_reset;
 	bool			nointx;
 	bool			needs_pm_restore;
+	bool			zapped_bars;
 	struct pci_saved_state	*pci_saved_state;
 	struct pci_saved_state	*pm_save;
 	struct vfio_pci_reflck	*reflck;
@@ -186,6 +187,8 @@ extern int vfio_pci_set_power_state(struct vfio_pci_device *vdev,
 extern bool __vfio_pci_memory_enabled(struct vfio_pci_device *vdev);
 extern void vfio_pci_zap_and_down_write_memory_lock(struct vfio_pci_device
 						    *vdev);
+extern void vfio_pci_test_and_up_write_memory_lock(struct vfio_pci_device
+						   *vdev);
 extern u16 vfio_pci_memory_lock_and_enable(struct vfio_pci_device *vdev);
 extern void vfio_pci_memory_unlock_and_restore(struct vfio_pci_device *vdev,
 					       u16 cmd);

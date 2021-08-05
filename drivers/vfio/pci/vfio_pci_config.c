@@ -605,7 +605,7 @@ static int vfio_basic_config_write(struct vfio_pci_device *vdev, int pos,
 	count = vfio_default_config_write(vdev, pos, count, perm, offset, val);
 	if (count < 0) {
 		if (offset == PCI_COMMAND)
-			up_write(&vdev->memory_lock);
+			vfio_pci_test_and_up_write_memory_lock(vdev);
 		return count;
 	}
 
@@ -619,7 +619,7 @@ static int vfio_basic_config_write(struct vfio_pci_device *vdev, int pos,
 		*virt_cmd &= cpu_to_le16(~mask);
 		*virt_cmd |= cpu_to_le16(new_cmd & mask);
 
-		up_write(&vdev->memory_lock);
+		vfio_pci_test_and_up_write_memory_lock(vdev);
 	}
 
 	/* Emulate INTx disable */
@@ -860,7 +860,7 @@ static int vfio_exp_config_write(struct vfio_pci_device *vdev, int pos,
 		if (!ret && (cap & PCI_EXP_DEVCAP_FLR)) {
 			vfio_pci_zap_and_down_write_memory_lock(vdev);
 			pci_try_reset_function(vdev->pdev);
-			up_write(&vdev->memory_lock);
+			vfio_pci_test_and_up_write_memory_lock(vdev);
 		}
 	}
 
@@ -942,7 +942,7 @@ static int vfio_af_config_write(struct vfio_pci_device *vdev, int pos,
 		if (!ret && (cap & PCI_AF_CAP_FLR) && (cap & PCI_AF_CAP_TP)) {
 			vfio_pci_zap_and_down_write_memory_lock(vdev);
 			pci_try_reset_function(vdev->pdev);
-			up_write(&vdev->memory_lock);
+			vfio_pci_test_and_up_write_memory_lock(vdev);
 		}
 	}
 

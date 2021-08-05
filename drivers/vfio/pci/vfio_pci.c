@@ -447,6 +447,7 @@ static void vfio_pci_disable(struct vfio_pci_device *vdev)
 		kfree(dummy_res);
 	}
 
+	vdev->zapped_bars = false;
 	vdev->needs_reset = true;
 
 	/*
@@ -1057,7 +1058,7 @@ static long vfio_pci_ioctl(struct vfio_device *core_vdev,
 
 		vfio_pci_zap_and_down_write_memory_lock(vdev);
 		ret = pci_try_reset_function(vdev->pdev);
-		up_write(&vdev->memory_lock);
+		vfio_pci_test_and_up_write_memory_lock(vdev);
 
 		return ret;
 
@@ -1256,7 +1257,7 @@ hot_reset_release:
 		for (i = 0; i < devs.cur_index; i++) {
 			struct vfio_pci_device *tmp = devs.devices[i];
 
-			up_write(&tmp->memory_lock);
+			vfio_pci_test_and_up_write_memory_lock(tmp);
 			vfio_device_put(&tmp->vdev);
 		}
 		kfree(devs.devices);
@@ -1413,12 +1414,32 @@ static void vfio_pci_zap_bars(struct vfio_pci_device *vdev)
 			VFIO_PCI_INDEX_TO_OFFSET(VFIO_PCI_BAR0_REGION_INDEX),
 			VFIO_PCI_INDEX_TO_OFFSET(VFIO_PCI_ROM_REGION_INDEX) -
 			VFIO_PCI_INDEX_TO_OFFSET(VFIO_PCI_BAR0_REGION_INDEX));
+
+	/*
+	 * Modified under memory_lock write semaphore.  Device handoff
+	 * with memory enabled, therefore any disable will zap and setup
+	 * a remap when re-enabled.  io_remap_pfn_range() is not forgiving
+	 * of duplicate mappings so we must track.
+	 */
+	vdev->zapped_bars = true;
 }
 
 void vfio_pci_zap_and_down_write_memory_lock(struct vfio_pci_device *vdev)
 {
 	down_write(&vdev->memory_lock);
 	vfio_pci_zap_bars(vdev);
+}
+
+void vfio_pci_test_and_up_write_memory_lock(struct vfio_pci_device *vdev)
+{
+	if (vdev->zapped_bars && __vfio_pci_memory_enabled(vdev)) {
+		WARN_ON(vfio_device_io_remap_mapping_range(&vdev->vdev,
+			VFIO_PCI_INDEX_TO_OFFSET(VFIO_PCI_BAR0_REGION_INDEX),
+			VFIO_PCI_INDEX_TO_OFFSET(VFIO_PCI_ROM_REGION_INDEX) -
+			VFIO_PCI_INDEX_TO_OFFSET(VFIO_PCI_BAR0_REGION_INDEX)));
+		vdev->zapped_bars = false;
+	}
+	up_write(&vdev->memory_lock);
 }
 
 u16 vfio_pci_memory_lock_and_enable(struct vfio_pci_device *vdev)
@@ -1464,39 +1485,6 @@ static int vfio_pci_bar_vma_to_pfn(struct vfio_device *core_vdev,
 	return 0;
 }
 
-static vm_fault_t vfio_pci_mmap_fault(struct vm_fault *vmf)
-{
-	struct vm_area_struct *vma = vmf->vma;
-	struct vfio_pci_device *vdev = vma->vm_private_data;
-	unsigned long vaddr, pfn;
-	vm_fault_t ret = VM_FAULT_SIGBUS;
-
-	if (vfio_pci_bar_vma_to_pfn(&vdev->vdev, vma, &pfn))
-		return ret;
-
-	down_read(&vdev->memory_lock);
-
-	if (__vfio_pci_memory_enabled(vdev)) {
-		for (vaddr = vma->vm_start;
-		     vaddr < vma->vm_end; vaddr += PAGE_SIZE, pfn++) {
-			ret = vmf_insert_pfn(vma, vaddr, pfn);
-			if (ret != VM_FAULT_NOPAGE) {
-				zap_vma_ptes(vma, vma->vm_start,
-					     vaddr - vma->vm_start);
-				break;
-			}
-		}
-	}
-
-	up_read(&vdev->memory_lock);
-
-	return ret;
-}
-
-static const struct vm_operations_struct vfio_pci_mmap_ops = {
-	.fault = vfio_pci_mmap_fault,
-};
-
 static int vfio_pci_mmap(struct vfio_device *core_vdev, struct vm_area_struct *vma)
 {
 	struct vfio_pci_device *vdev =
@@ -1504,6 +1492,7 @@ static int vfio_pci_mmap(struct vfio_device *core_vdev, struct vm_area_struct *v
 	struct pci_dev *pdev = vdev->pdev;
 	unsigned int index;
 	u64 phys_len, req_len, pgoff, req_start;
+	unsigned long pfn;
 	int ret;
 
 	index = vma->vm_pgoff >> (VFIO_PCI_OFFSET_SHIFT - PAGE_SHIFT);
@@ -1554,18 +1543,25 @@ static int vfio_pci_mmap(struct vfio_device *core_vdev, struct vm_area_struct *v
 		}
 	}
 
-	vma->vm_private_data = vdev;
+	ret = vfio_pci_bar_vma_to_pfn(core_vdev, vma, &pfn);
+	if (ret)
+		return ret;
+
 	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
-	vma->vm_page_prot = pgprot_decrypted(vma->vm_page_prot);
 
+	down_read(&vdev->memory_lock);
 	/*
-	 * See remap_pfn_range(), called from vfio_pci_fault() but we can't
-	 * change vm_flags within the fault handler.  Set them now.
+	 * Only perform the mapping now if BAR is not in zapped state, VFs
+	 * always report memory enabled so relying on device enable state
+	 * could lead to duplicate remaps.
 	 */
-	vma->vm_flags |= VM_IO | VM_PFNMAP | VM_DONTEXPAND | VM_DONTDUMP;
-	vma->vm_ops = &vfio_pci_mmap_ops;
+	if (!vdev->zapped_bars)
+		ret = io_remap_pfn_range(vma, vma->vm_start, pfn,
+					 vma->vm_end - vma->vm_start,
+					 vma->vm_page_prot);
+	up_read(&vdev->memory_lock);
 
-	return 0;
+	return ret;
 }
 
 static void vfio_pci_request(struct vfio_device *core_vdev, unsigned int count)
