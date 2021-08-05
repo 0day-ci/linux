@@ -99,6 +99,24 @@ TRACE_EVENT(ip_rcv,
 	TP_printk("skbaddr=%px", __entry->skbaddr)
 );
 
+#if IS_ENABLED(CONFIG_IPV6)
+TRACE_EVENT(ipv6_rcv,
+	TP_PROTO(const struct sk_buff *skb),
+
+	TP_ARGS(skb),
+
+	TP_STRUCT__entry(
+		__field(const void *, skbaddr)
+	),
+
+	TP_fast_assign(
+		__entry->skbaddr = skb;
+	),
+
+	TP_printk("skbaddr=%px", __entry->skbaddr)
+);
+#endif
+
 #endif /* _TRACE_IP_H */
 
 /* This part must be outside protection */

@@ -44,6 +44,7 @@
 #include <net/xfrm.h>
 #include <net/inet_ecn.h>
 #include <net/dst_metadata.h>
+#include <trace/events/ip.h>
 
 INDIRECT_CALLABLE_DECLARE(void tcp_v6_early_demux(struct sk_buff *));
 static void ip6_rcv_finish_core(struct net *net, struct sock *sk,
@@ -59,8 +60,10 @@ static void ip6_rcv_finish_core(struct net *net, struct sock *sk,
 			INDIRECT_CALL_2(edemux, tcp_v6_early_demux,
 					udp_v6_early_demux, skb);
 	}
-	if (!skb_valid_dst(skb))
+	if (!skb_valid_dst(skb)) {
+		trace_ipv6_rcv(skb);
 		ip6_route_input(skb);
+	}
 }
 
 int ip6_rcv_finish(struct net *net, struct sock *sk, struct sk_buff *skb)
