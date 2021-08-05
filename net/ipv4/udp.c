@@ -970,9 +970,11 @@ send:
 				      UDP_MIB_SNDBUFERRORS, is_udplite);
 			err = 0;
 		}
-	} else
+	} else {
 		UDP_INC_STATS(sock_net(sk),
 			      UDP_MIB_OUTDATAGRAMS, is_udplite);
+		trace_udp_send_skb(sk, skb);
+	}
 	return err;
 }
 
