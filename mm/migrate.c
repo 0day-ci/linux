@@ -402,14 +402,14 @@ int migrate_page_move_mapping(struct address_space *mapping,
 	oldzone = page_zone(page);
 	newzone = page_zone(newpage);
 
-	xas_lock_irq(&xas);
+	xas_lock_bh(&xas);
 	if (page_count(page) != expected_count || xas_load(&xas) != page) {
-		xas_unlock_irq(&xas);
+		xas_unlock_bh(&xas);
 		return -EAGAIN;
 	}
 
 	if (!page_ref_freeze(page, expected_count)) {
-		xas_unlock_irq(&xas);
+		xas_unlock_bh(&xas);
 		return -EAGAIN;
 	}
 
@@ -454,8 +454,7 @@ int migrate_page_move_mapping(struct address_space *mapping,
 	 */
 	page_ref_unfreeze(page, expected_count - nr);
 
-	xas_unlock(&xas);
-	/* Leave irq disabled to prevent preemption while updating stats */
+	xas_unlock_bh(&xas);
 
 	/*
 	 * If moved to a different zone then also account
@@ -494,7 +493,6 @@ int migrate_page_move_mapping(struct address_space *mapping,
 			__mod_zone_page_state(newzone, NR_ZONE_WRITE_PENDING, nr);
 		}
 	}
-	local_irq_enable();
 
 	return MIGRATEPAGE_SUCCESS;
 }
@@ -510,15 +508,15 @@ int migrate_huge_page_move_mapping(struct address_space *mapping,
 	XA_STATE(xas, &mapping->i_pages, page_index(page));
 	int expected_count;
 
-	xas_lock_irq(&xas);
+	xas_lock_bh(&xas);
 	expected_count = 2 + page_has_private(page);
 	if (page_count(page) != expected_count || xas_load(&xas) != page) {
-		xas_unlock_irq(&xas);
+		xas_unlock_bh(&xas);
 		return -EAGAIN;
 	}
 
 	if (!page_ref_freeze(page, expected_count)) {
-		xas_unlock_irq(&xas);
+		xas_unlock_bh(&xas);
 		return -EAGAIN;
 	}
 
@@ -531,7 +529,7 @@ int migrate_huge_page_move_mapping(struct address_space *mapping,
 
 	page_ref_unfreeze(page, expected_count - 1);
 
-	xas_unlock_irq(&xas);
+	xas_unlock_bh(&xas);
 
 	return MIGRATEPAGE_SUCCESS;
 }

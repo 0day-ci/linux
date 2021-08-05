@@ -376,7 +376,7 @@ static bool inode_do_switch_wbs(struct inode *inode,
 	bool switched = false;
 
 	spin_lock(&inode->i_lock);
-	xa_lock_irq(&mapping->i_pages);
+	xa_lock_bh(&mapping->i_pages);
 
 	/*
 	 * Once I_FREEING or I_WILL_FREE are visible under i_lock, the eviction
@@ -447,7 +447,7 @@ skip_switch:
 	 */
 	smp_store_release(&inode->i_state, inode->i_state & ~I_WB_SWITCH);
 
-	xa_unlock_irq(&mapping->i_pages);
+	xa_unlock_bh(&mapping->i_pages);
 	spin_unlock(&inode->i_lock);
 
 	return switched;

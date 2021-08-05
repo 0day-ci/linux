@@ -274,10 +274,10 @@ int free_swap_slot(swp_entry_t entry)
 
 	cache = raw_cpu_ptr(&swp_slots);
 	if (likely(use_swap_slot_cache && cache->slots_ret)) {
-		spin_lock_irq(&cache->free_lock);
+		spin_lock_bh(&cache->free_lock);
 		/* Swap slots cache may be deactivated before acquiring lock */
 		if (!use_swap_slot_cache || !cache->slots_ret) {
-			spin_unlock_irq(&cache->free_lock);
+			spin_unlock_bh(&cache->free_lock);
 			goto direct_free;
 		}
 		if (cache->n_ret >= SWAP_SLOTS_CACHE_SIZE) {
@@ -291,7 +291,7 @@ int free_swap_slot(swp_entry_t entry)
 			cache->n_ret = 0;
 		}
 		cache->slots_ret[cache->n_ret++] = entry;
-		spin_unlock_irq(&cache->free_lock);
+		spin_unlock_bh(&cache->free_lock);
 	} else {
 direct_free:
 		swapcache_free_entries(&entry, 1);

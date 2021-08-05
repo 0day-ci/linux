@@ -114,7 +114,7 @@ int add_to_swap_cache(struct page *page, swp_entry_t entry,
 	SetPageSwapCache(page);
 
 	do {
-		xas_lock_irq(&xas);
+		xas_lock_bh(&xas);
 		xas_create_range(&xas);
 		if (xas_error(&xas))
 			goto unlock;
@@ -134,7 +134,7 @@ int add_to_swap_cache(struct page *page, swp_entry_t entry,
 		__mod_lruvec_page_state(page, NR_SWAPCACHE, nr);
 		ADD_CACHE_INFO(add_total, nr);
 unlock:
-		xas_unlock_irq(&xas);
+		xas_unlock_bh(&xas);
 	} while (xas_nomem(&xas, gfp));
 
 	if (!xas_error(&xas))
@@ -242,9 +242,9 @@ void delete_from_swap_cache(struct page *page)
 	swp_entry_t entry = { .val = page_private(page) };
 	struct address_space *address_space = swap_address_space(entry);
 
-	xa_lock_irq(&address_space->i_pages);
+	xa_lock_bh(&address_space->i_pages);
 	__delete_from_swap_cache(page, entry, NULL);
-	xa_unlock_irq(&address_space->i_pages);
+	xa_unlock_bh(&address_space->i_pages);
 
 	put_swap_page(page, entry);
 	page_ref_sub(page, thp_nr_pages(page));
@@ -261,13 +261,13 @@ void clear_shadow_from_swap_cache(int type, unsigned long begin,
 		struct address_space *address_space = swap_address_space(entry);
 		XA_STATE(xas, &address_space->i_pages, curr);
 
-		xa_lock_irq(&address_space->i_pages);
+		xa_lock_bh(&address_space->i_pages);
 		xas_for_each(&xas, old, end) {
 			if (!xa_is_value(old))
 				continue;
 			xas_store(&xas, NULL);
 		}
-		xa_unlock_irq(&address_space->i_pages);
+		xa_unlock_bh(&address_space->i_pages);
 
 		/* search the next swapcache until we meet end */
 		curr >>= SWAP_ADDRESS_SPACE_SHIFT;
@@ -679,7 +679,7 @@ int init_swap_address_space(unsigned int type, unsigned long nr_pages)
 		return -ENOMEM;
 	for (i = 0; i < nr; i++) {
 		space = spaces + i;
-		xa_init_flags(&space->i_pages, XA_FLAGS_LOCK_IRQ);
+		xa_init_flags(&space->i_pages, XA_FLAGS_LOCK_BH);
 		atomic_set(&space->i_mmap_writable, 0);
 		space->a_ops = &swap_aops;
 		/* swap cache doesn't use writeback related tags */

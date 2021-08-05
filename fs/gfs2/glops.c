@@ -537,9 +537,9 @@ static void inode_go_dump(struct seq_file *seq, struct gfs2_glock *gl,
 	if (ip == NULL)
 		return;
 
-	xa_lock_irq(&inode->i_data.i_pages);
+	xa_lock_bh(&inode->i_data.i_pages);
 	nrpages = inode->i_data.nrpages;
-	xa_unlock_irq(&inode->i_data.i_pages);
+	xa_unlock_bh(&inode->i_data.i_pages);
 
 	gfs2_print_dbg(seq, "%s I: n:%llu/%llu t:%u f:0x%02lx d:0x%08x s:%llu "
 		       "p:%lu\n", fs_id_buf,

@@ -440,7 +440,6 @@ void workingset_update_node(struct xa_node *node)
 	 * already where they should be. The list_empty() test is safe
 	 * as node->private_list is protected by the i_pages lock.
 	 */
-	VM_WARN_ON_ONCE(!irqs_disabled());  /* For __inc_lruvec_page_state */
 
 	if (node->count && node->count == node->nr_values) {
 		if (list_empty(&node->private_list)) {
@@ -532,12 +531,10 @@ static enum lru_status shadow_lru_isolate(struct list_head *item,
 	 * pin only the address_space of the particular node we want
 	 * to reclaim, take the node off-LRU, and drop the lru_lock.
 	 */
-
 	mapping = container_of(node->array, struct address_space, i_pages);
-
 	/* Coming from the list, invert the lock order */
 	if (!xa_trylock(&mapping->i_pages)) {
-		spin_unlock_irq(lru_lock);
+		spin_unlock_bh(lru_lock);
 		ret = LRU_RETRY;
 		goto out;
 	}
@@ -560,19 +557,19 @@ static enum lru_status shadow_lru_isolate(struct list_head *item,
 	__inc_lruvec_kmem_state(node, WORKINGSET_NODERECLAIM);
 
 out_invalid:
-	xa_unlock_irq(&mapping->i_pages);
+	xa_unlock_bh(&mapping->i_pages);
 	ret = LRU_REMOVED_RETRY;
 out:
 	cond_resched();
-	spin_lock_irq(lru_lock);
+	spin_lock_bh(lru_lock);
 	return ret;
 }
 
 static unsigned long scan_shadow_nodes(struct shrinker *shrinker,
 				       struct shrink_control *sc)
 {
-	/* list_lru lock nests inside the IRQ-safe i_pages lock */
-	return list_lru_shrink_walk_irq(&shadow_nodes, sc, shadow_lru_isolate,
+	/* list_lru lock nests inside the BH-safe i_pages lock */
+	return list_lru_shrink_walk_bh(&shadow_nodes, sc, shadow_lru_isolate,
 					NULL);
 }
 

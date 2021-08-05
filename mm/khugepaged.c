@@ -1666,11 +1666,11 @@ static void collapse_file(struct mm_struct *mm,
 
 	/* This will be less messy when we use multi-index entries */
 	do {
-		xas_lock_irq(&xas);
+		xas_lock_bh(&xas);
 		xas_create_range(&xas);
 		if (!xas_error(&xas))
 			break;
-		xas_unlock_irq(&xas);
+		xas_unlock_bh(&xas);
 		if (!xas_nomem(&xas, GFP_KERNEL)) {
 			result = SCAN_FAIL;
 			goto out;
@@ -1718,7 +1718,7 @@ static void collapse_file(struct mm_struct *mm,
 			}
 
 			if (xa_is_value(page) || !PageUptodate(page)) {
-				xas_unlock_irq(&xas);
+				xas_unlock_bh(&xas);
 				/* swap in or instantiate fallocated page */
 				if (shmem_getpage(mapping->host, index, &page,
 						  SGP_NOHUGE)) {
@@ -1727,14 +1727,14 @@ static void collapse_file(struct mm_struct *mm,
 				}
 			} else if (trylock_page(page)) {
 				get_page(page);
-				xas_unlock_irq(&xas);
+				xas_unlock_bh(&xas);
 			} else {
 				result = SCAN_PAGE_LOCK;
 				goto xa_locked;
 			}
 		} else {	/* !is_shmem */
 			if (!page || xa_is_value(page)) {
-				xas_unlock_irq(&xas);
+				xas_unlock_bh(&xas);
 				page_cache_sync_readahead(mapping, &file->f_ra,
 							  file, index,
 							  end - index);
@@ -1759,13 +1759,13 @@ static void collapse_file(struct mm_struct *mm,
 				 * This is a one-off situation. We are not
 				 * forcing writeback in loop.
 				 */
-				xas_unlock_irq(&xas);
+				xas_unlock_bh(&xas);
 				filemap_flush(mapping);
 				result = SCAN_FAIL;
 				goto xa_unlocked;
 			} else if (trylock_page(page)) {
 				get_page(page);
-				xas_unlock_irq(&xas);
+				xas_unlock_bh(&xas);
 			} else {
 				result = SCAN_PAGE_LOCK;
 				goto xa_locked;
@@ -1823,7 +1823,7 @@ static void collapse_file(struct mm_struct *mm,
 		if (page_mapped(page))
 			unmap_mapping_pages(mapping, index, 1, false);
 
-		xas_lock_irq(&xas);
+		xas_lock_bh(&xas);
 		xas_set(&xas, index);
 
 		VM_BUG_ON_PAGE(page != xas_load(&xas), page);
@@ -1837,7 +1837,7 @@ static void collapse_file(struct mm_struct *mm,
 		 */
 		if (!page_ref_freeze(page, 3)) {
 			result = SCAN_PAGE_COUNT;
-			xas_unlock_irq(&xas);
+			xas_unlock_bh(&xas);
 			putback_lru_page(page);
 			goto out_unlock;
 		}
@@ -1885,7 +1885,7 @@ out_unlock:
 	}
 
 xa_locked:
-	xas_unlock_irq(&xas);
+	xas_unlock_bh(&xas);
 xa_unlocked:
 
 	if (result == SCAN_SUCCEED) {
@@ -1934,7 +1934,7 @@ xa_unlocked:
 		struct page *page;
 
 		/* Something went wrong: roll back page cache changes */
-		xas_lock_irq(&xas);
+		xas_lock_bh(&xas);
 		mapping->nrpages -= nr_none;
 
 		if (is_shmem)
@@ -1960,13 +1960,13 @@ xa_unlocked:
 			page_ref_unfreeze(page, 2);
 			xas_store(&xas, page);
 			xas_pause(&xas);
-			xas_unlock_irq(&xas);
+			xas_unlock_bh(&xas);
 			unlock_page(page);
 			putback_lru_page(page);
-			xas_lock_irq(&xas);
+			xas_lock_bh(&xas);
 		}
 		VM_BUG_ON(nr_none);
-		xas_unlock_irq(&xas);
+		xas_unlock_bh(&xas);
 
 		new_page->mapping = NULL;
 	}

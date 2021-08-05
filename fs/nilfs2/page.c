@@ -321,13 +321,13 @@ repeat:
 			struct page *p;
 
 			/* move the page to the destination cache */
-			xa_lock_irq(&smap->i_pages);
+			xa_lock_bh(&smap->i_pages);
 			p = __xa_erase(&smap->i_pages, offset);
 			WARN_ON(page != p);
 			smap->nrpages--;
-			xa_unlock_irq(&smap->i_pages);
+			xa_unlock_bh(&smap->i_pages);
 
-			xa_lock_irq(&dmap->i_pages);
+			xa_lock_bh(&dmap->i_pages);
 			p = __xa_store(&dmap->i_pages, offset, page, GFP_NOFS);
 			if (unlikely(p)) {
 				/* Probably -ENOMEM */
@@ -340,7 +340,7 @@ repeat:
 					__xa_set_mark(&dmap->i_pages, offset,
 							PAGECACHE_TAG_DIRTY);
 			}
-			xa_unlock_irq(&dmap->i_pages);
+			xa_unlock_bh(&dmap->i_pages);
 		}
 		unlock_page(page);
 	}
@@ -461,14 +461,14 @@ int __nilfs_clear_page_dirty(struct page *page)
 	struct address_space *mapping = page->mapping;
 
 	if (mapping) {
-		xa_lock_irq(&mapping->i_pages);
+		xa_lock_bh(&mapping->i_pages);
 		if (test_bit(PG_dirty, &page->flags)) {
 			__xa_clear_mark(&mapping->i_pages, page_index(page),
 					     PAGECACHE_TAG_DIRTY);
-			xa_unlock_irq(&mapping->i_pages);
+			xa_unlock_bh(&mapping->i_pages);
 			return clear_page_dirty_for_io(page);
 		}
-		xa_unlock_irq(&mapping->i_pages);
+		xa_unlock_bh(&mapping->i_pages);
 		return 0;
 	}
 	return TestClearPageDirty(page);

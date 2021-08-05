@@ -241,11 +241,11 @@ static void *get_unlocked_entry(struct xa_state *xas, unsigned int order)
 		wq = dax_entry_waitqueue(xas, entry, &ewait.key);
 		prepare_to_wait_exclusive(wq, &ewait.wait,
 					  TASK_UNINTERRUPTIBLE);
-		xas_unlock_irq(xas);
+		xas_unlock_bh(xas);
 		xas_reset(xas);
 		schedule();
 		finish_wait(wq, &ewait.wait);
-		xas_lock_irq(xas);
+		xas_lock_bh(xas);
 	}
 }
 
@@ -270,7 +270,7 @@ static void wait_entry_unlocked(struct xa_state *xas, void *entry)
 	 * never successfully performs its own wake up.
 	 */
 	prepare_to_wait(wq, &ewait.wait, TASK_UNINTERRUPTIBLE);
-	xas_unlock_irq(xas);
+	xas_unlock_bh(xas);
 	schedule();
 	finish_wait(wq, &ewait.wait);
 }
@@ -293,9 +293,9 @@ static void dax_unlock_entry(struct xa_state *xas, void *entry)
 
 	BUG_ON(dax_is_locked(entry));
 	xas_reset(xas);
-	xas_lock_irq(xas);
+	xas_lock_bh(xas);
 	old = xas_store(xas, entry);
-	xas_unlock_irq(xas);
+	xas_unlock_bh(xas);
 	BUG_ON(!dax_is_locked(old));
 	dax_wake_entry(xas, entry, WAKE_NEXT);
 }
@@ -423,9 +423,9 @@ dax_entry_t dax_lock_page(struct page *page)
 			break;
 
 		xas.xa = &mapping->i_pages;
-		xas_lock_irq(&xas);
+		xas_lock_bh(&xas);
 		if (mapping != page->mapping) {
-			xas_unlock_irq(&xas);
+			xas_unlock_bh(&xas);
 			continue;
 		}
 		xas_set(&xas, page->index);
@@ -437,7 +437,7 @@ dax_entry_t dax_lock_page(struct page *page)
 			continue;
 		}
 		dax_lock_entry(&xas, entry);
-		xas_unlock_irq(&xas);
+		xas_unlock_bh(&xas);
 		break;
 	}
 	rcu_read_unlock();
@@ -493,7 +493,7 @@ static void *grab_mapping_entry(struct xa_state *xas,
 
 retry:
 	pmd_downgrade = false;
-	xas_lock_irq(xas);
+	xas_lock_bh(xas);
 	entry = get_unlocked_entry(xas, order);
 
 	if (entry) {
@@ -526,12 +526,12 @@ retry:
 		 * unmapped.
 		 */
 		if (dax_is_zero_entry(entry)) {
-			xas_unlock_irq(xas);
+			xas_unlock_bh(xas);
 			unmap_mapping_pages(mapping,
 					xas->xa_index & ~PG_PMD_COLOUR,
 					PG_PMD_NR, false);
 			xas_reset(xas);
-			xas_lock_irq(xas);
+			xas_lock_bh(xas);
 		}
 
 		dax_disassociate_entry(entry, mapping, false);
@@ -557,7 +557,7 @@ retry:
 	}
 
 out_unlock:
-	xas_unlock_irq(xas);
+	xas_unlock_bh(xas);
 	if (xas_nomem(xas, mapping_gfp_mask(mapping) & ~__GFP_HIGHMEM))
 		goto retry;
 	if (xas->xa_node == XA_ERROR(-ENOMEM))
@@ -566,7 +566,7 @@ out_unlock:
 		return xa_mk_internal(VM_FAULT_SIGBUS);
 	return entry;
 fallback:
-	xas_unlock_irq(xas);
+	xas_unlock_bh(xas);
 	return xa_mk_internal(VM_FAULT_FALLBACK);
 }
 
@@ -626,7 +626,7 @@ struct page *dax_layout_busy_page_range(struct address_space *mapping,
 	 */
 	unmap_mapping_pages(mapping, start_idx, end_idx - start_idx + 1, 0);
 
-	xas_lock_irq(&xas);
+	xas_lock_bh(&xas);
 	xas_for_each(&xas, entry, end_idx) {
 		if (WARN_ON_ONCE(!xa_is_value(entry)))
 			continue;
@@ -641,11 +641,11 @@ struct page *dax_layout_busy_page_range(struct address_space *mapping,
 			continue;
 
 		xas_pause(&xas);
-		xas_unlock_irq(&xas);
+		xas_unlock_bh(&xas);
 		cond_resched();
-		xas_lock_irq(&xas);
+		xas_lock_bh(&xas);
 	}
-	xas_unlock_irq(&xas);
+	xas_unlock_bh(&xas);
 	return page;
 }
 EXPORT_SYMBOL_GPL(dax_layout_busy_page_range);
@@ -663,7 +663,7 @@ static int __dax_invalidate_entry(struct address_space *mapping,
 	int ret = 0;
 	void *entry;
 
-	xas_lock_irq(&xas);
+	xas_lock_bh(&xas);
 	entry = get_unlocked_entry(&xas, 0);
 	if (!entry || WARN_ON_ONCE(!xa_is_value(entry)))
 		goto out;
@@ -677,7 +677,7 @@ static int __dax_invalidate_entry(struct address_space *mapping,
 	ret = 1;
 out:
 	put_unlocked_entry(&xas, entry, WAKE_ALL);
-	xas_unlock_irq(&xas);
+	xas_unlock_bh(&xas);
 	return ret;
 }
 
@@ -761,7 +761,7 @@ static void *dax_insert_entry(struct xa_state *xas,
 	}
 
 	xas_reset(xas);
-	xas_lock_irq(xas);
+	xas_lock_bh(xas);
 	if (dax_is_zero_entry(entry) || dax_is_empty_entry(entry)) {
 		void *old;
 
@@ -786,7 +786,7 @@ static void *dax_insert_entry(struct xa_state *xas,
 	if (dirty)
 		xas_set_mark(xas, PAGECACHE_TAG_DIRTY);
 
-	xas_unlock_irq(xas);
+	xas_unlock_bh(xas);
 	return entry;
 }
 
@@ -924,7 +924,7 @@ static int dax_writeback_one(struct xa_state *xas, struct dax_device *dax_dev,
 	 * they will see the entry locked and wait for it to unlock.
 	 */
 	xas_clear_mark(xas, PAGECACHE_TAG_TOWRITE);
-	xas_unlock_irq(xas);
+	xas_unlock_bh(xas);
 
 	/*
 	 * If dax_writeback_mapping_range() was given a wbc->range_start
@@ -946,7 +946,7 @@ static int dax_writeback_one(struct xa_state *xas, struct dax_device *dax_dev,
 	 * entry lock.
 	 */
 	xas_reset(xas);
-	xas_lock_irq(xas);
+	xas_lock_bh(xas);
 	xas_store(xas, entry);
 	xas_clear_mark(xas, PAGECACHE_TAG_DIRTY);
 	dax_wake_entry(xas, entry, WAKE_NEXT);
@@ -984,7 +984,7 @@ int dax_writeback_mapping_range(struct address_space *mapping,
 
 	tag_pages_for_writeback(mapping, xas.xa_index, end_index);
 
-	xas_lock_irq(&xas);
+	xas_lock_bh(&xas);
 	xas_for_each_marked(&xas, entry, end_index, PAGECACHE_TAG_TOWRITE) {
 		ret = dax_writeback_one(&xas, dax_dev, mapping, entry);
 		if (ret < 0) {
@@ -995,11 +995,11 @@ int dax_writeback_mapping_range(struct address_space *mapping,
 			continue;
 
 		xas_pause(&xas);
-		xas_unlock_irq(&xas);
+		xas_unlock_bh(&xas);
 		cond_resched();
-		xas_lock_irq(&xas);
+		xas_lock_bh(&xas);
 	}
-	xas_unlock_irq(&xas);
+	xas_unlock_bh(&xas);
 	trace_dax_writeback_range_done(inode, xas.xa_index, end_index);
 	return ret;
 }
@@ -1691,20 +1691,20 @@ dax_insert_pfn_mkwrite(struct vm_fault *vmf, pfn_t pfn, unsigned int order)
 	void *entry;
 	vm_fault_t ret;
 
-	xas_lock_irq(&xas);
+	xas_lock_bh(&xas);
 	entry = get_unlocked_entry(&xas, order);
 	/* Did we race with someone splitting entry or so? */
 	if (!entry || dax_is_conflict(entry) ||
 	    (order == 0 && !dax_is_pte_entry(entry))) {
 		put_unlocked_entry(&xas, entry, WAKE_NEXT);
-		xas_unlock_irq(&xas);
+		xas_unlock_bh(&xas);
 		trace_dax_insert_pfn_mkwrite_no_entry(mapping->host, vmf,
 						      VM_FAULT_NOPAGE);
 		return VM_FAULT_NOPAGE;
 	}
 	xas_set_mark(&xas, PAGECACHE_TAG_DIRTY);
 	dax_lock_entry(&xas, entry);
-	xas_unlock_irq(&xas);
+	xas_unlock_bh(&xas);
 	if (order == 0)
 		ret = vmf_insert_mixed_mkwrite(vmf->vma, vmf->address, pfn);
 #ifdef CONFIG_FS_DAX_PMD
