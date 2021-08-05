@@ -52,6 +52,7 @@
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 #include <trace/events/skb.h>
+#include <trace/events/udp.h>
 #include "udp_impl.h"
 
 static u32 udp6_ehashfn(const struct net *net,
@@ -1255,6 +1256,7 @@ send:
 	} else {
 		UDP6_INC_STATS(sock_net(sk),
 			       UDP_MIB_OUTDATAGRAMS, is_udplite);
+		trace_udp_v6_send_skb(sk, skb);
 	}
 	return err;
 }
