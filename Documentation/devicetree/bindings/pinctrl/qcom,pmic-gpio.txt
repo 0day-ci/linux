@@ -9,6 +9,7 @@ PMIC's from Qualcomm.
 	Definition: must be one of:
 		    "qcom,pm8005-gpio"
 		    "qcom,pm8018-gpio"
+		    "qcom,pm8019-gpio"
 		    "qcom,pm8038-gpio"
 		    "qcom,pm8058-gpio"
 		    "qcom,pm8916-gpio"
