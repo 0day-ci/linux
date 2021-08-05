@@ -18,6 +18,9 @@
 #ifdef CONFIG_PCI
 void pci_set_of_node(struct pci_dev *dev)
 {
+	dev_dbg(&dev->dev, "%s: of_node: %pOF\n",
+		__func__, dev->bus->dev.of_node);
+
 	if (!dev->bus->dev.of_node)
 		return;
 	dev->dev.of_node = of_pci_find_child_device(dev->bus->dev.of_node,
@@ -41,12 +44,16 @@ void pci_set_bus_of_node(struct pci_bus *bus)
 		node = pcibios_get_phb_of_node(bus);
 	} else {
 		node = of_node_get(bus->self->dev.of_node);
-		if (!node)
+		if (!node) {
 			node = of_node_get(bus->self->dev.parent->of_node);
+			dev_dbg(&bus->dev, "%s: use of_node of the parent",
+				__func__);
+		}
 		if (node && of_property_read_bool(node, "external-facing"))
 			bus->self->external_facing = true;
 	}
 
+	dev_dbg(&bus->dev, "%s: of_node: %pOF\n", __func__, node);
 	bus->dev.of_node = node;
 
 	if (bus->dev.of_node)
