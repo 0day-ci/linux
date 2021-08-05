@@ -122,6 +122,13 @@
 				 <&pcc2 IMX7ULP_CLK_DMA_MUX1>;
 		};
 
+		mu: mailbox@40220000 {
+			compatible = "fsl,imx7ulp-mu";
+			reg = <0x40220000 0x1000>;
+			interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>;
+			#mbox-cells = <2>;
+		};
+
 		crypto: crypto@40240000 {
 			compatible = "fsl,sec-v4.0";
 			#address-cells = <1>;

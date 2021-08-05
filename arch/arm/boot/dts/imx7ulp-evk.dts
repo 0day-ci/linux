@@ -8,6 +8,7 @@
 /dts-v1/;
 
 #include "imx7ulp.dtsi"
+#include "imx7ulp-evk-m4.dtsi"
 
 / {
 	model = "NXP i.MX7ULP EVK";

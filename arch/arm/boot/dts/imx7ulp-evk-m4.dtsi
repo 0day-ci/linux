@@ -1,0 +1,48 @@
+// SPDX-License-Identifier: GPL-2.0+
+/*
+ * Copyright 2021 NXP
+ *   Dong Aisheng <aisheng.dong@nxp.com>
+ */
+
+/ {
+	reserved-memory {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges;
+
+		vdev0vring0: vdev0vring0@9ff00000 {
+			reg = <0x9ff00000 0x8000>;
+			no-map;
+		};
+
+		vdev0vring1: vdev0vring1@9ff08000 {
+			reg = <0x9ff08000 0x8000>;
+			no-map;
+		};
+
+		vdev1vring0: vdev1vring0@9ff10000 {
+			reg = <0x9ff10000 0x8000>;
+			no-map;
+		};
+
+		vdev1vring1: vdev1vring1@9ff18000 {
+			reg = <0x9ff18000 0x8000>;
+			no-map;
+		};
+
+		rsc_table: rsc-table@1fff8000{
+			reg = <0x1fff8000 0x1000>;
+			no-map;
+		};
+	};
+
+	imx7ulp-cm4 {
+		compatible = "fsl,imx7ulp-cm4";
+		mbox-names = "tx", "rx", "rxdb";
+		mboxes = <&mu 0 1
+			  &mu 1 1
+			  &mu 3 1>;
+		memory-region = <&vdev0vring0>, <&vdev0vring1>,
+				<&vdev1vring0>, <&vdev1vring1>, <&rsc_table>;
+	};
+};
