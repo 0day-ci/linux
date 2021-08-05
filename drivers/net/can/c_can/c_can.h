@@ -200,6 +200,7 @@ struct c_can_priv {
 	atomic_t sie_pending;
 	unsigned long tx_dir;
 	int last_status;
+	spinlock_t tx_lock;
 	struct c_can_tx_ring tx;
 	u16 (*read_reg)(const struct c_can_priv *priv, enum reg index);
 	void (*write_reg)(const struct c_can_priv *priv, enum reg index, u16 val);
@@ -238,16 +239,7 @@ static inline u8 c_can_get_tx_tail(const struct c_can_tx_ring *ring)
 
 static inline u8 c_can_get_tx_free(const struct c_can_tx_ring *ring)
 {
-	u8 head = c_can_get_tx_head(ring);
-	u8 tail = c_can_get_tx_tail(ring);
-
-	/* This is not a FIFO. C/D_CAN sends out the buffers
-	 * prioritized. The lowest buffer number wins.
-	 */
-	if (head < tail)
-		return 0;
-
-	return ring->obj_num - head;
+	return ring->obj_num - (ring->head - ring->tail);
 }
 
 #endif /* C_CAN_H */
