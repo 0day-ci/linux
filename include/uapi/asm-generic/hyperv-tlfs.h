@@ -139,6 +139,7 @@ enum hv_vp_state_page_type {
 enum hv_partition_property_code {
 	/* Privilege properties */
 	HV_PARTITION_PROPERTY_PRIVILEGE_FLAGS				= 0x00010000,
+	HV_PARTITION_PROPERTY_SYNTHETIC_PROC_FEATURES			= 0x00010001,
 
 	/* Scheduling properties */
 	HV_PARTITION_PROPERTY_SUSPEND					= 0x00020000,
