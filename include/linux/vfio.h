@@ -71,6 +71,8 @@ extern struct vfio_device *vfio_device_get_from_dev(struct device *dev);
 extern void vfio_device_put(struct vfio_device *device);
 extern void vfio_device_unmap_mapping_range(struct vfio_device *device,
 					    loff_t start, loff_t len);
+extern int vfio_device_io_remap_mapping_range(struct vfio_device *device,
+					      loff_t start, loff_t len);
 extern int vfio_device_vma_to_pfn(struct vfio_device *device,
 				  struct vm_area_struct *vma,
 				  unsigned long *pfn);

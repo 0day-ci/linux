@@ -33,6 +33,7 @@
 #include <linux/uaccess.h>
 #include <linux/vfio.h>
 #include <linux/wait.h>
+#include <linux/sched/mm.h>
 #include <linux/sched/signal.h>
 
 #define DRIVER_VERSION	"0.3"
@@ -566,6 +567,49 @@ void vfio_device_unmap_mapping_range(struct vfio_device *device,
 	unmap_mapping_range(device->inode->i_mapping, start, len, true);
 }
 EXPORT_SYMBOL_GPL(vfio_device_unmap_mapping_range);
+
+int vfio_device_io_remap_mapping_range(struct vfio_device *device,
+				       loff_t start, loff_t len)
+{
+	struct address_space *mapping = device->inode->i_mapping;
+	int ret = 0;
+
+	i_mmap_lock_write(mapping);
+	if (mapping_mapped(mapping)) {
+		struct rb_root_cached *root = &mapping->i_mmap;
+		pgoff_t pgstart = start >> PAGE_SHIFT;
+		pgoff_t pgend = (start + len - 1) >> PAGE_SHIFT;
+		struct vm_area_struct *vma;
+
+		vma_interval_tree_foreach(vma, root, pgstart, pgend) {
+			unsigned long pfn;
+			unsigned int flags;
+
+			ret = vfio_device_vma_to_pfn(device, vma, &pfn);
+			if (ret)
+				break;
+
+			/*
+			 * Force NOFS memory allocation context to avoid
+			 * deadlock while we hold i_mmap_rwsem.
+			 */
+			flags = memalloc_nofs_save();
+			ret = io_remap_pfn_range(vma, vma->vm_start, pfn,
+						 vma->vm_end - vma->vm_start,
+						 vma->vm_page_prot);
+			memalloc_nofs_restore(flags);
+			if (ret)
+				break;
+		}
+	}
+	i_mmap_unlock_write(mapping);
+
+	if (ret)
+		vfio_device_unmap_mapping_range(device, start, len);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(vfio_device_io_remap_mapping_range);
 
 /**
  * Device objects - create, release, get, put, search
