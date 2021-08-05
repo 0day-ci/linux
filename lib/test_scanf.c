@@ -269,7 +269,13 @@ static void __init numbers_simple(void)
  */
 static u32 __init next_test_random(u32 max_bits)
 {
-	u32 n_bits = hweight32(prandom_u32_state(&rnd_state)) % (max_bits + 1);
+	u32 n_bits;
+
+	/* shifting a 32 bit unsigned int by 32 is undefined behavior */
+	do {
+		n_bits = hweight32(prandom_u32_state(&rnd_state))
+			% (max_bits + 1);
+	} while (n_bits == 0);
 
 	return prandom_u32_state(&rnd_state) & (UINT_MAX >> (32 - n_bits));
 }
