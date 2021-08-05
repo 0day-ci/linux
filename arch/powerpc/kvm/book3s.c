@@ -284,11 +284,11 @@ void kvmppc_core_dequeue_external(struct kvm_vcpu *vcpu)
 }
 
 void kvmppc_core_queue_data_storage(struct kvm_vcpu *vcpu, ulong dar,
-				    ulong flags)
+				    ulong dsisr, ulong srr1)
 {
 	kvmppc_set_dar(vcpu, dar);
-	kvmppc_set_dsisr(vcpu, flags);
-	kvmppc_inject_interrupt(vcpu, BOOK3S_INTERRUPT_DATA_STORAGE, 0);
+	kvmppc_set_dsisr(vcpu, dsisr);
+	kvmppc_inject_interrupt(vcpu, BOOK3S_INTERRUPT_DATA_STORAGE, srr1);
 }
 EXPORT_SYMBOL_GPL(kvmppc_core_queue_data_storage);
 

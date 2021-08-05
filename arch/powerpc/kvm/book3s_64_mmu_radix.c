@@ -946,7 +946,7 @@ int kvmppc_book3s_radix_page_fault(struct kvm_vcpu *vcpu,
 	if (dsisr & DSISR_BADACCESS) {
 		/* Reflect to the guest as DSI */
 		pr_err("KVM: Got radix HV page fault with DSISR=%lx\n", dsisr);
-		kvmppc_core_queue_data_storage(vcpu, ea, dsisr);
+		kvmppc_core_queue_data_storage(vcpu, ea, dsisr, 0);
 		return RESUME_GUEST;
 	}
 
@@ -971,7 +971,7 @@ int kvmppc_book3s_radix_page_fault(struct kvm_vcpu *vcpu,
 			 * Bad address in guest page table tree, or other
 			 * unusual error - reflect it to the guest as DSI.
 			 */
-			kvmppc_core_queue_data_storage(vcpu, ea, dsisr);
+			kvmppc_core_queue_data_storage(vcpu, ea, dsisr, 0);
 			return RESUME_GUEST;
 		}
 		return kvmppc_hv_emulate_mmio(vcpu, gpa, ea, writing);
@@ -981,7 +981,7 @@ int kvmppc_book3s_radix_page_fault(struct kvm_vcpu *vcpu,
 		if (writing) {
 			/* give the guest a DSI */
 			kvmppc_core_queue_data_storage(vcpu, ea, DSISR_ISSTORE |
-						       DSISR_PROTFAULT);
+						       DSISR_PROTFAULT, 0);
 			return RESUME_GUEST;
 		}
 		kvm_ro = true;

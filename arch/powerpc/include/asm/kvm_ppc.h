@@ -143,7 +143,8 @@ extern void kvmppc_core_queue_dtlb_miss(struct kvm_vcpu *vcpu, ulong dear_flags,
 					ulong esr_flags);
 extern void kvmppc_core_queue_data_storage(struct kvm_vcpu *vcpu,
 					   ulong dear_flags,
-					   ulong esr_flags);
+					   ulong esr_flags,
+					   ulong srr1_flags);
 extern void kvmppc_core_queue_itlb_miss(struct kvm_vcpu *vcpu);
 extern void kvmppc_core_queue_inst_storage(struct kvm_vcpu *vcpu,
 					   ulong esr_flags);

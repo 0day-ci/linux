@@ -1592,7 +1592,7 @@ static int kvmppc_handle_exit_hv(struct kvm_vcpu *vcpu,
 
 		if (!(vcpu->arch.fault_dsisr & (DSISR_NOHPTE | DSISR_PROTFAULT))) {
 			kvmppc_core_queue_data_storage(vcpu,
-				vcpu->arch.fault_dar, vcpu->arch.fault_dsisr);
+				vcpu->arch.fault_dar, vcpu->arch.fault_dsisr, 0);
 			r = RESUME_GUEST;
 			break;
 		}
@@ -1610,7 +1610,7 @@ static int kvmppc_handle_exit_hv(struct kvm_vcpu *vcpu,
 			r = RESUME_PAGE_FAULT;
 		} else {
 			kvmppc_core_queue_data_storage(vcpu,
-				vcpu->arch.fault_dar, err);
+				vcpu->arch.fault_dar, err, 0);
 			r = RESUME_GUEST;
 		}
 		break;
