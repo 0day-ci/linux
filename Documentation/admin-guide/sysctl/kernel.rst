@@ -411,6 +411,16 @@ This file shows up if ``CONFIG_DETECT_HUNG_TASK`` is enabled.
 
 -1: report an infinite number of warnings.
 
+hung_task_filter_kthread
+========================
+
+We should skip kthread when a hung task is detected.
+This file shows up if ``CONFIG_DEFAULT_HUNG_TASK_FILTER_KTHREAD`` is enabled.
+
+= =========================================================
+0 Not skip detect kthread.
+1 Skip detect kthread.
+= =========================================================
 
 hyperv_record_panic_msg
 =======================
