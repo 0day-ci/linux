@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later OR MIT
 /*
  * Copyright (c) 2021 SUSE LLC
+ * Copyright 2019-2020 NXP
  */
 
 /dts-v1/;
@@ -13,6 +14,13 @@
 
 	chosen {
 		stdout-path = "serial0:115200n8";
+	};
+
+	memory@80000000 {
+		device_type = "memory";
+		/* 4GB RAM */
+		reg = <0 0x80000000 0 0x80000000>,
+		      <8 0x80000000 0 0x80000000>;
 	};
 };
 
