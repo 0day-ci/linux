@@ -15,8 +15,12 @@
 
 /* Determined empirically */
 #define HV_INIT_PARTITION_DEPOSIT_PAGES 208
+#define HV_MAP_GPA_DEPOSIT_PAGES	256
 
 #define HV_WITHDRAW_BATCH_SIZE	(HV_HYP_PAGE_SIZE / sizeof(u64))
+#define HV_MAP_GPA_BATCH_SIZE	\
+		((HV_HYP_PAGE_SIZE - sizeof(struct hv_map_gpa_pages)) / sizeof(u64))
+#define PIN_PAGES_BATCH_SIZE	(0x10000000 / HV_HYP_PAGE_SIZE)
 
 /*
  * Hyper-V hypercalls
@@ -30,5 +34,14 @@ int hv_call_create_partition(
 int hv_call_initialize_partition(u64 partition_id);
 int hv_call_finalize_partition(u64 partition_id);
 int hv_call_delete_partition(u64 partition_id);
+int hv_call_map_gpa_pages(
+		u64 partition_id,
+		u64 gpa_target,
+		u64 page_count, u32 flags,
+		struct page **pages);
+int hv_call_unmap_gpa_pages(
+		u64 partition_id,
+		u64 gpa_target,
+		u64 page_count, u32 flags);
 
 #endif /* _MSHV_H */

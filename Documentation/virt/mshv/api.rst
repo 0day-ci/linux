@@ -70,3 +70,20 @@ will be supported when the core API is stable.
 This ioctl creates a guest partition, returning a file descriptor to use as a
 handle for partition ioctls.
 
+3.3 MSHV_MAP_GUEST_MEMORY and MSHV_UNMAP_GUEST_MEMORY
+-----------------------------------------------------
+:Type: partition ioctl
+:Parameters: struct mshv_user_mem_region
+:Returns: 0 on success
+
+Create a mapping from memory in the user space of the calling process (running
+in the root partition) to a region of guest physical memory in a guest partition.
+
+Mappings must be disjoint from each other in both userspace and guest physical
+address space.
+
+Note: In the current implementation, this memory is pinned to real physical
+memory to stop the pages being moved by Linux in the root partition,
+and subsequently being clobbered by the hypervisor. So the region is backed
+by real physical memory.
+
