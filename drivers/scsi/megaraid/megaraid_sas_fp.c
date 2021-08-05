@@ -229,8 +229,8 @@ static int MR_PopulateDrvRaidMap(struct megasas_instance *instance, u64 map_id)
 					le32_to_cpu(desc_table->raid_map_desc_offset));
 				memcpy(pDrvRaidMap->ldSpanMap,
 				       fw_map_dyn->ld_span_map,
-				       sizeof(struct MR_LD_SPAN_MAP) *
-				       le32_to_cpu(desc_table->raid_map_desc_elements));
+				       flex_array_size(pDrvRaidMap, ldSpanMap,
+				       le32_to_cpu(desc_table->raid_map_desc_elements)));
 			break;
 			default:
 				dev_dbg(&instance->pdev->dev, "wrong number of desctableElements %d\n",
@@ -254,7 +254,7 @@ static int MR_PopulateDrvRaidMap(struct megasas_instance *instance, u64 map_id)
 			pDrvRaidMap->ldTgtIdToLd[i] =
 				(u16)fw_map_ext->ldTgtIdToLd[i];
 		memcpy(pDrvRaidMap->ldSpanMap, fw_map_ext->ldSpanMap,
-		       sizeof(struct MR_LD_SPAN_MAP) * ld_count);
+		       flex_array_size(pDrvRaidMap, ldSpanMap, ld_count));
 		memcpy(pDrvRaidMap->arMapInfo, fw_map_ext->arMapInfo,
 		       sizeof(struct MR_ARRAY_INFO) * MAX_API_ARRAYS_EXT);
 		memcpy(pDrvRaidMap->devHndlInfo, fw_map_ext->devHndlInfo,
