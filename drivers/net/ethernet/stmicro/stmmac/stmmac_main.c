@@ -5219,7 +5219,7 @@ read_again:
 			skb_reserve(skb, buf->page_offset);
 			skb_put(skb, buf1_len);
 
-			page_pool_release_page(rx_q->page_pool, buf->page);
+			skb_mark_for_recycle(skb, buf->page, rx_q->page_pool);
 			buf->page = NULL;
 		} else if (buf1_len) {
 			dma_sync_single_for_cpu(priv->device, buf->addr,
@@ -5229,7 +5229,7 @@ read_again:
 					priv->dma_buf_sz);
 
 			/* Data payload appended into SKB */
-			page_pool_release_page(rx_q->page_pool, buf->page);
+			page_pool_store_mem_info(buf->page, rx_q->page_pool);
 			buf->page = NULL;
 		}
 
@@ -5241,7 +5241,7 @@ read_again:
 					priv->dma_buf_sz);
 
 			/* Data payload appended into SKB */
-			page_pool_release_page(rx_q->page_pool, buf->sec_page);
+			page_pool_store_mem_info(buf->sec_page, rx_q->page_pool);
 			buf->sec_page = NULL;
 		}
 
