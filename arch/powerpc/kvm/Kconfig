@@ -85,6 +85,8 @@ config KVM_BOOK3S_64_HV
 	depends on KVM_BOOK3S_64 && PPC_POWERNV
 	select KVM_BOOK3S_HV_POSSIBLE
 	select MMU_NOTIFIER
+	select KVM_ASYNC_PF
+	select KVM_ASYNC_PF_SYNC
 	select CMA
 	help
 	  Support running unmodified book3s_64 guest kernels in

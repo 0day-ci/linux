@@ -77,6 +77,7 @@
 #include <asm/ultravisor.h>
 #include <asm/dtl.h>
 #include <asm/plpar_wrappers.h>
+#include <asm/kvm_book3s_esn.h>
 
 #include "book3s.h"
 
@@ -4570,6 +4571,11 @@ static int kvmppc_vcpu_run_hv(struct kvm_vcpu *vcpu)
 		return -EINTR;
 	}
 
+	if (kvm_request_pending(vcpu)) {
+		if (!kvmppc_core_check_requests(vcpu))
+			return 0;
+	}
+
 	kvm = vcpu->kvm;
 	atomic_inc(&kvm->arch.vcpus_running);
 	/* Order vcpus_running vs. mmu_ready, see kvmppc_alloc_reset_hpt */
@@ -4591,6 +4597,7 @@ static int kvmppc_vcpu_run_hv(struct kvm_vcpu *vcpu)
 	vcpu->arch.state = KVMPPC_VCPU_BUSY_IN_HOST;
 
 	do {
+		kvm_check_async_pf_completion(vcpu);
 		if (cpu_has_feature(CPU_FTR_ARCH_300))
 			r = kvmhv_run_single_vcpu(vcpu, ~(u64)0,
 						  vcpu->arch.vcore->lpcr);
@@ -5257,6 +5264,8 @@ static void kvmppc_free_vcores(struct kvm *kvm)
 
 static void kvmppc_core_destroy_vm_hv(struct kvm *kvm)
 {
+	struct kvm_ppc_sns_reg sns_reg;
+
 	debugfs_remove_recursive(kvm->arch.debugfs_dir);
 
 	if (!cpu_has_feature(CPU_FTR_ARCH_300))
@@ -5283,6 +5292,11 @@ static void kvmppc_core_destroy_vm_hv(struct kvm *kvm)
 	kvmppc_free_lpid(kvm->arch.lpid);
 
 	kvmppc_free_pimap(kvm);
+
+	/* Needed for de-registering SNS buffer */
+	sns_reg.addr = -1;
+	sns_reg.len = 0;
+	kvm_vm_ioctl_set_sns(kvm, &sns_reg);
 }
 
 /* We don't need to emulate any privileged instructions or dcbz */
@@ -5558,6 +5572,17 @@ static long kvm_arch_vm_ioctl_hv(struct file *filp,
 			break;
 
 		r = kvm_vm_ioctl_resize_hpt_commit(kvm, &rhpt);
+		break;
+	}
+
+	case KVM_PPC_SET_SNS: {
+		struct kvm_ppc_sns_reg sns_reg;
+
+		r = -EFAULT;
+		if (copy_from_user(&sns_reg, argp, sizeof(sns_reg)))
+			break;
+
+		r = kvm_vm_ioctl_set_sns(kvm, &sns_reg);
 		break;
 	}
 

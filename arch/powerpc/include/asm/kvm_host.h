@@ -25,6 +25,7 @@
 #include <asm/cacheflush.h>
 #include <asm/hvcall.h>
 #include <asm/mce.h>
+#include <asm/kvm_book3s_esn.h>
 
 #define KVM_MAX_VCPUS		NR_CPUS
 #define KVM_MAX_VCORES		NR_CPUS
@@ -325,6 +326,7 @@ struct kvm_arch {
 #endif
 	struct kvmppc_ops *kvm_ops;
 #ifdef CONFIG_KVM_BOOK3S_HV_POSSIBLE
+	struct kvmppc_sns sns;
 	struct mutex uvmem_lock;
 	struct list_head uvmem_pfns;
 	struct mutex mmu_setup_lock;	/* nests inside vcpu mutexes */
@@ -854,6 +856,25 @@ struct kvm_vcpu_arch {
 
 #define __KVM_HAVE_ARCH_WQP
 #define __KVM_HAVE_CREATE_DEVICE
+
+/* Async pf */
+#define ASYNC_PF_PER_VCPU       64
+struct kvm_arch_async_pf {
+	unsigned long exp_token;
+};
+int kvm_arch_setup_async_pf(struct kvm_vcpu *vcpu,
+			       unsigned long gpa, unsigned long hva);
+
+void kvm_arch_async_page_ready(struct kvm_vcpu *vcpu,
+			       struct kvm_async_pf *work);
+
+bool kvm_arch_async_page_not_present(struct kvm_vcpu *vcpu,
+				     struct kvm_async_pf *work);
+
+void kvm_arch_async_page_present(struct kvm_vcpu *vcpu,
+				 struct kvm_async_pf *work);
+bool kvm_arch_can_dequeue_async_page_present(struct kvm_vcpu *vcpu);
+static inline void kvm_arch_async_page_present_queued(struct kvm_vcpu *vcpu) {}
 
 static inline void kvm_arch_hardware_disable(void) {}
 static inline void kvm_arch_hardware_unsetup(void) {}

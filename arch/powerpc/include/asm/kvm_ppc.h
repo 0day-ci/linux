@@ -228,6 +228,7 @@ extern long kvm_vm_ioctl_resize_hpt_commit(struct kvm *kvm,
 int kvm_vcpu_ioctl_interrupt(struct kvm_vcpu *vcpu, struct kvm_interrupt *irq);
 
 extern int kvm_vm_ioctl_rtas_define_token(struct kvm *kvm, void __user *argp);
+long kvm_vm_ioctl_set_sns(struct kvm *kvm, struct kvm_ppc_sns_reg *sns_reg);
 extern int kvmppc_rtas_hcall(struct kvm_vcpu *vcpu);
 extern void kvmppc_rtas_tokens_free(struct kvm *kvm);
 

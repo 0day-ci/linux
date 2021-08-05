@@ -104,7 +104,17 @@ struct lppaca {
 	volatile __be32 dispersion_count; /* dispatch changed physical cpu */
 	volatile __be64 cmo_faults;	/* CMO page fault count */
 	volatile __be64 cmo_fault_time;	/* CMO page fault time */
-	u8	reserved10[104];
+
+	/*
+	 * TODO: Insert this at correct offset
+	 * 0x17D - Exp flags (1 byte)
+	 * 0x17E - Exp corr number (2 bytes)
+	 *
+	 * Here I am using only exp corr number at an easy to insert
+	 * offset.
+	 */
+	__be16 exp_corr_nr; /* Exproppriation correlation number */
+	u8	reserved10[102];
 
 	/* cacheline 4-5 */
 

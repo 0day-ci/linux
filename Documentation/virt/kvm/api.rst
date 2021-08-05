@@ -5293,6 +5293,21 @@ the trailing ``'\0'``, is indicated by ``name_size`` in the header.
 The Stats Data block contains an array of 64-bit values in the same order
 as the descriptors in Descriptors block.
 
+4.134 KVM_PPC_SET_SNS
+---------------------
+
+:Capability: basic
+:Architectures: powerpc
+:Type: vm ioctl
+:Parameters: none
+:Returns: 0 on successful completion,
+
+As part of H_REG_SNS hypercall, this ioctl is used to map and pin
+the guest provided SNS structure in the host.
+
+This is used for providing asynchronous page fault support for
+powerpc pseries KVM guests.
+
 5. The kvm_run structure
 ========================
 
