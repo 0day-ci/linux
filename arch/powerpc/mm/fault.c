@@ -44,7 +44,7 @@
 #include <asm/debug.h>
 #include <asm/kup.h>
 #include <asm/inst.h>
-
+#include <asm/async-pf.h>
 
 /*
  * do_page_fault error handling helpers
@@ -394,6 +394,11 @@ static int ___do_page_fault(struct pt_regs *regs, unsigned long address,
 	int is_write = page_fault_is_write(error_code);
 	vm_fault_t fault, major = 0;
 	bool kprobe_fault = kprobe_page_fault(regs, 11);
+
+#ifdef CONFIG_PPC_PSERIES
+	if (handle_async_page_fault(regs, address))
+		return 0;
+#endif
 
 	if (unlikely(debugger_fault_handler(regs) || kprobe_fault))
 		return 0;
