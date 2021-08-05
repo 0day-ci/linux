@@ -34,6 +34,13 @@ struct mshv_create_vp {
 	__u32 vp_index;
 };
 
+#define MSHV_VP_MAX_REGISTERS	128
+
+struct mshv_vp_registers {
+	int count; /* at most MSHV_VP_MAX_REGISTERS */
+	struct hv_register_assoc *regs;
+};
+
 #define MSHV_IOCTL 0xB8
 
 /* mshv device */
@@ -44,5 +51,9 @@ struct mshv_create_vp {
 #define MSHV_MAP_GUEST_MEMORY	_IOW(MSHV_IOCTL, 0x02, struct mshv_user_mem_region)
 #define MSHV_UNMAP_GUEST_MEMORY	_IOW(MSHV_IOCTL, 0x03, struct mshv_user_mem_region)
 #define MSHV_CREATE_VP		_IOW(MSHV_IOCTL, 0x04, struct mshv_create_vp)
+
+/* vp device */
+#define MSHV_GET_VP_REGISTERS   _IOWR(MSHV_IOCTL, 0x05, struct mshv_vp_registers)
+#define MSHV_SET_VP_REGISTERS   _IOW(MSHV_IOCTL, 0x06, struct mshv_vp_registers)
 
 #endif

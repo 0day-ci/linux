@@ -665,23 +665,17 @@ struct hv_retarget_device_interrupt {
 	struct hv_device_interrupt_target int_target;
 } __packed __aligned(8);
 
-
-/* HvGetVpRegisters hypercall input with variable size reg name list*/
-struct hv_get_vp_registers_input {
-	struct {
-		u64 partitionid;
-		u32 vpindex;
-		u8  inputvtl;
-		u8  padding[3];
-	} header;
-	struct input {
-		u32 name0;
-		u32 name1;
-	} element[];
+/* HvGetVpRegisters hypercall with variable size reg name list*/
+struct hv_get_vp_registers {
+	u64 partition_id;
+	u32 vp_index;
+	u8  input_vtl;
+	u8  rsvd_z8;
+	u16 rsvd_z16;
+	u32 names[];
 } __packed;
 
-
-/* HvGetVpRegisters returns an array of these output elements */
+/* HvGetVpRegisters returns an array of register values */
 struct hv_get_vp_registers_output {
 	union {
 		struct {
@@ -695,23 +689,16 @@ struct hv_get_vp_registers_output {
 			u64 high;
 		} as64 __packed;
 	};
-};
+} __packed;
 
 /* HvSetVpRegisters hypercall with variable size reg name/value list*/
-struct hv_set_vp_registers_input {
-	struct {
-		u64 partitionid;
-		u32 vpindex;
-		u8  inputvtl;
-		u8  padding[3];
-	} header;
-	struct {
-		u32 name;
-		u32 padding1;
-		u64 padding2;
-		u64 valuelow;
-		u64 valuehigh;
-	} element[];
+struct hv_set_vp_registers {
+	u64 partition_id;
+	u32 vp_index;
+	u8  input_vtl;
+	u8  rsvd_z8;
+	u16 rsvd_z16;
+	struct hv_register_assoc elements[];
 } __packed;
 
 enum hv_device_type {

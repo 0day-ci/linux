@@ -21,4 +21,11 @@
 #define HV_MAP_GPA_EXECUTABLE           0xC
 #define HV_MAP_GPA_PERMISSIONS_MASK     0xF
 
+struct hv_register_assoc {
+	__u32 name;			/* enum hv_register_name */
+	__u32 reserved1;
+	__u64 reserved2;
+	union hv_register_value value;
+} __packed;
+
 #endif

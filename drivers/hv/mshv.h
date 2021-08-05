@@ -21,6 +21,11 @@
 #define HV_MAP_GPA_BATCH_SIZE	\
 		((HV_HYP_PAGE_SIZE - sizeof(struct hv_map_gpa_pages)) / sizeof(u64))
 #define PIN_PAGES_BATCH_SIZE	(0x10000000 / HV_HYP_PAGE_SIZE)
+#define HV_GET_REGISTER_BATCH_SIZE	\
+	(HV_HYP_PAGE_SIZE / sizeof(union hv_register_value))
+#define HV_SET_REGISTER_BATCH_SIZE	\
+	((HV_HYP_PAGE_SIZE - sizeof(struct hv_set_vp_registers)) \
+		/ sizeof(struct hv_register_assoc))
 
 /*
  * Hyper-V hypercalls
@@ -43,5 +48,15 @@ int hv_call_unmap_gpa_pages(
 		u64 partition_id,
 		u64 gpa_target,
 		u64 page_count, u32 flags);
+int hv_call_get_vp_registers(
+		u32 vp_index,
+		u64 partition_id,
+		u16 count,
+		struct hv_register_assoc *registers);
+int hv_call_set_vp_registers(
+		u32 vp_index,
+		u64 partition_id,
+		u16 count,
+		struct hv_register_assoc *registers);
 
 #endif /* _MSHV_H */

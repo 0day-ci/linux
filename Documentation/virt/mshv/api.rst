@@ -96,3 +96,14 @@ by real physical memory.
 Create a virtual processor in a guest partition, returning a file descriptor to
 represent the vp and perform ioctls on.
 
+3.5 MSHV_GET_VP_REGISTERS and MSHV_SET_VP_REGISTERS
+---------------------------------------------------
+:Type: vp ioctl
+:Parameters: struct mshv_vp_registers
+:Returns: 0 on success
+
+Get/set vp registers. See asm/hyperv-tlfs.h for the complete set of registers.
+Includes general purpose platform registers, MSRs, and virtual registers that
+are part of Microsoft Hypervisor platform and not directly exposed to the guest.
+
+
