@@ -52,6 +52,9 @@ static struct msm_gem_submit *submit_create(struct drm_device *dev,
 		return ERR_PTR(ret);
 	}
 
+	/* FIXME: this is way too early */
+	drm_sched_job_arm(&job->base);
+
 	xa_init_flags(&submit->deps, XA_FLAGS_ALLOC);
 
 	kref_init(&submit->ref);
