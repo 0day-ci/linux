@@ -164,6 +164,13 @@ properties:
       req_gpr is the gpr register offset for ENET stop request.
       req_bit is the gpr bit offset for ENET stop request.
 
+  fsl,wakeup-irq:
+    $ref: /schemas/types.yaml#/definitions/uint32
+    description:
+      The property defines the wakeup irq index in enet irq source, the default
+      value is 0 if not specified.
+    enum: [0, 1, 2, 3]
+
   mdio:
     type: object
     description:
