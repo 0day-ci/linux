@@ -12,12 +12,12 @@ struct ice_vsi;
 int ice_xsk_pool_setup(struct ice_vsi *vsi, struct xsk_buff_pool *pool,
 		       u16 qid);
 int ice_clean_rx_irq_zc(struct ice_ring *rx_ring, int budget);
-bool ice_clean_tx_irq_zc(struct ice_ring *xdp_ring, int budget);
+bool ice_clean_tx_irq_zc(struct ice_tx_ring *xdp_ring, int budget);
 int ice_xsk_wakeup(struct net_device *netdev, u32 queue_id, u32 flags);
 bool ice_alloc_rx_bufs_zc(struct ice_ring *rx_ring, u16 count);
 bool ice_xsk_any_rx_ring_ena(struct ice_vsi *vsi);
 void ice_xsk_clean_rx_ring(struct ice_ring *rx_ring);
-void ice_xsk_clean_xdp_ring(struct ice_ring *xdp_ring);
+void ice_xsk_clean_xdp_ring(struct ice_tx_ring *xdp_ring);
 #else
 static inline int
 ice_xsk_pool_setup(struct ice_vsi __always_unused *vsi,
@@ -35,7 +35,7 @@ ice_clean_rx_irq_zc(struct ice_ring __always_unused *rx_ring,
 }
 
 static inline bool
-ice_clean_tx_irq_zc(struct ice_ring __always_unused *xdp_ring,
+ice_clean_tx_irq_zc(struct ice_tx_ring __always_unused *xdp_ring,
 		    int __always_unused budget)
 {
 	return false;
@@ -61,6 +61,6 @@ ice_xsk_wakeup(struct net_device __always_unused *netdev,
 }
 
 static inline void ice_xsk_clean_rx_ring(struct ice_ring *rx_ring) { }
-static inline void ice_xsk_clean_xdp_ring(struct ice_ring *xdp_ring) { }
+static inline void ice_xsk_clean_xdp_ring(struct ice_tx_ring *xdp_ring) { }
 #endif /* CONFIG_XDP_SOCKETS */
 #endif /* !_ICE_XSK_H_ */

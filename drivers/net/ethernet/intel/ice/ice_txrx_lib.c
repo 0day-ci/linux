@@ -217,7 +217,7 @@ ice_receive_skb(struct ice_ring *rx_ring, struct sk_buff *skb, u16 vlan_tag)
  * @size: packet data size
  * @xdp_ring: XDP ring for transmission
  */
-int ice_xmit_xdp_ring(void *data, u16 size, struct ice_ring *xdp_ring)
+int ice_xmit_xdp_ring(void *data, u16 size, struct ice_tx_ring *xdp_ring)
 {
 	u16 i = xdp_ring->next_to_use;
 	struct ice_tx_desc *tx_desc;
@@ -269,7 +269,7 @@ int ice_xmit_xdp_ring(void *data, u16 size, struct ice_ring *xdp_ring)
  *
  * Returns negative on failure, 0 on success.
  */
-int ice_xmit_xdp_buff(struct xdp_buff *xdp, struct ice_ring *xdp_ring)
+int ice_xmit_xdp_buff(struct xdp_buff *xdp, struct ice_tx_ring *xdp_ring)
 {
 	struct xdp_frame *xdpf = xdp_convert_buff_to_frame(xdp);
 
@@ -294,7 +294,7 @@ void ice_finalize_xdp_rx(struct ice_ring *rx_ring, unsigned int xdp_res)
 		xdp_do_flush_map();
 
 	if (xdp_res & ICE_XDP_TX) {
-		struct ice_ring *xdp_ring =
+		struct ice_tx_ring *xdp_ring =
 			rx_ring->vsi->xdp_rings[rx_ring->q_index];
 
 		ice_xdp_ring_update_tail(xdp_ring);

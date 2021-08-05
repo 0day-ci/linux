@@ -28,7 +28,7 @@ void ice_vsi_cfg_dcb_rings(struct ice_vsi *vsi);
 int ice_init_pf_dcb(struct ice_pf *pf, bool locked);
 void ice_update_dcb_stats(struct ice_pf *pf);
 void
-ice_tx_prepare_vlan_flags_dcb(struct ice_ring *tx_ring,
+ice_tx_prepare_vlan_flags_dcb(struct ice_tx_ring *tx_ring,
 			      struct ice_tx_buf *first);
 void
 ice_dcb_process_lldp_set_mib_change(struct ice_pf *pf,
@@ -49,9 +49,9 @@ static inline bool ice_find_q_in_range(u16 low, u16 high, unsigned int tx_q)
 }
 
 static inline void
-ice_set_cgd_num(struct ice_tlan_ctx *tlan_ctx, struct ice_ring *ring)
+ice_set_cgd_num(struct ice_tlan_ctx *tlan_ctx, u8 dcb_tc)
 {
-	tlan_ctx->cgd_num = ring->dcb_tc;
+	tlan_ctx->cgd_num = dcb_tc;
 }
 
 static inline bool ice_is_dcb_active(struct ice_pf *pf)

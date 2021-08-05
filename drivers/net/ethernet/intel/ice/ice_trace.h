@@ -115,7 +115,7 @@ DEFINE_EVENT(ice_tx_dim_template, ice_tx_dim_work,
 
 /* Events related to a vsi & ring */
 DECLARE_EVENT_CLASS(ice_tx_template,
-		    TP_PROTO(struct ice_ring *ring, struct ice_tx_desc *desc,
+		    TP_PROTO(struct ice_tx_ring *ring, struct ice_tx_desc *desc,
 			     struct ice_tx_buf *buf),
 
 		    TP_ARGS(ring, desc, buf),
@@ -135,7 +135,7 @@ DECLARE_EVENT_CLASS(ice_tx_template,
 
 #define DEFINE_TX_TEMPLATE_OP_EVENT(name) \
 DEFINE_EVENT(ice_tx_template, name, \
-	     TP_PROTO(struct ice_ring *ring, \
+	     TP_PROTO(struct ice_tx_ring *ring, \
 		      struct ice_tx_desc *desc, \
 		      struct ice_tx_buf *buf), \
 	     TP_ARGS(ring, desc, buf))
@@ -192,7 +192,7 @@ DEFINE_EVENT(ice_rx_indicate_template, ice_clean_rx_irq_indicate,
 );
 
 DECLARE_EVENT_CLASS(ice_xmit_template,
-		    TP_PROTO(struct ice_ring *ring, struct sk_buff *skb),
+		    TP_PROTO(struct ice_tx_ring *ring, struct sk_buff *skb),
 
 		    TP_ARGS(ring, skb),
 
@@ -210,7 +210,7 @@ DECLARE_EVENT_CLASS(ice_xmit_template,
 
 #define DEFINE_XMIT_TEMPLATE_OP_EVENT(name) \
 DEFINE_EVENT(ice_xmit_template, name, \
-	     TP_PROTO(struct ice_ring *ring, struct sk_buff *skb), \
+	     TP_PROTO(struct ice_tx_ring *ring, struct sk_buff *skb), \
 	     TP_ARGS(ring, skb))
 
 DEFINE_XMIT_TEMPLATE_OP_EVENT(ice_xmit_frame_ring);
