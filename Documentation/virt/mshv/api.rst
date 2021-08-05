@@ -87,3 +87,12 @@ memory to stop the pages being moved by Linux in the root partition,
 and subsequently being clobbered by the hypervisor. So the region is backed
 by real physical memory.
 
+3.4 MSHV_CREATE_VP
+------------------
+:Type: partition ioctl
+:Parameters: struct mshv_create_vp
+:Returns: vp file descriptor, or -1 on failure
+
+Create a virtual processor in a guest partition, returning a file descriptor to
+represent the vp and perform ioctls on.
+
