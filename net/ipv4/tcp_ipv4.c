@@ -2093,6 +2093,8 @@ process:
 	bh_unlock_sock(sk);
 	if (skb_to_free)
 		__kfree_skb(skb_to_free);
+	if (!ret)
+		trace_tcp_v4_rcv(sk, skb);
 
 put_and_return:
 	if (refcounted)
