@@ -244,15 +244,20 @@ int ip_local_deliver(struct sk_buff *skb)
 	 *	Reassemble IP fragments.
 	 */
 	struct net *net = dev_net(skb->dev);
+	int ret;
 
 	if (ip_is_fragment(ip_hdr(skb))) {
 		if (ip_defrag(net, skb, IP_DEFRAG_LOCAL_DELIVER))
 			return 0;
 	}
 
-	return NF_HOOK(NFPROTO_IPV4, NF_INET_LOCAL_IN,
+	ret = NF_HOOK(NFPROTO_IPV4, NF_INET_LOCAL_IN,
 		       net, NULL, skb, skb->dev, NULL,
 		       ip_local_deliver_finish);
+	if (!ret)
+		trace_ip_local_deliver_finish(skb);
+	return ret;
+
 }
 EXPORT_SYMBOL(ip_local_deliver);
 

@@ -117,6 +117,23 @@ TRACE_EVENT(ipv6_rcv,
 );
 #endif
 
+TRACE_EVENT(ip_local_deliver_finish,
+
+	TP_PROTO(const struct sk_buff *skb),
+
+	TP_ARGS(skb),
+
+	TP_STRUCT__entry(
+		__field(const void *, skbaddr)
+	),
+
+	TP_fast_assign(
+		__entry->skbaddr = skb;
+	),
+
+	TP_printk("skbaddr=%px", __entry->skbaddr)
+);
+
 #endif /* _TRACE_IP_H */
 
 /* This part must be outside protection */
