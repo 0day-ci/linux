@@ -80,7 +80,7 @@ struct lppaca {
 	u8	ebb_regs_in_use;
 	u8	reserved7[6];
 	u8	dtl_enable_mask;	/* Dispatch Trace Log mask */
-	u8	donate_dedicated_cpu;	/* Donate dedicated CPU cycles */
+	u8	byte_b9; /* Donate dedicated CPU cycles & Expropriation int */
 	u8	fpregs_in_use;
 	u8	pmcregs_in_use;
 	u8	reserved8[28];
@@ -115,6 +115,12 @@ struct lppaca {
 } ____cacheline_aligned;
 
 #define lppaca_of(cpu)	(*paca_ptrs[cpu]->lppaca_ptr)
+
+/*
+ * Flags for Byte offset 0xB9
+ */
+#define LPPACA_DONATE_DED_CPU_CYCLES   0x1
+#define LPPACA_EXP_INT_ENABLED         0x2
 
 /*
  * We are using a non architected field to determine if a partition is

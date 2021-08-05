@@ -221,7 +221,7 @@ static int dedicated_cede_loop(struct cpuidle_device *dev,
 	u8 old_latency_hint;
 
 	pseries_idle_prolog();
-	get_lppaca()->donate_dedicated_cpu = 1;
+	get_lppaca()->byte_b9 |= LPPACA_DONATE_DED_CPU_CYCLES;
 	old_latency_hint = get_lppaca()->cede_latency_hint;
 	get_lppaca()->cede_latency_hint = cede_latency_hint[index];
 
@@ -229,7 +229,7 @@ static int dedicated_cede_loop(struct cpuidle_device *dev,
 	check_and_cede_processor();
 
 	local_irq_disable();
-	get_lppaca()->donate_dedicated_cpu = 0;
+	get_lppaca()->byte_b9 &= ~LPPACA_DONATE_DED_CPU_CYCLES;
 	get_lppaca()->cede_latency_hint = old_latency_hint;
 
 	pseries_idle_epilog();
