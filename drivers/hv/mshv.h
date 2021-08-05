@@ -97,5 +97,9 @@ int hv_call_set_vp_state(
 		struct page **pages,
 		u32 num_bytes,
 		u8 *bytes);
+int hv_call_map_vp_state_page(
+		u32 vp_index,
+		u64 partition_id,
+		struct page **state_page);
 
 #endif /* _MSHV_H */

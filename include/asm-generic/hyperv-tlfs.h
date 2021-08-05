@@ -872,4 +872,14 @@ struct hv_set_vp_state_in {
 	union hv_input_set_vp_state_data data[];
 } __packed;
 
+struct hv_map_vp_state_page_in {
+	u64 partition_id;
+	u32 vp_index;
+	u32 type; /* enum hv_vp_state_page_type */
+} __packed;
+
+struct hv_map_vp_state_page_out {
+	u64 map_location; /* page number */
+} __packed;
+
 #endif
