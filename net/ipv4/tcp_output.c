@@ -1420,8 +1420,14 @@ static int __tcp_transmit_skb(struct sock *sk, struct sk_buff *skb,
 static int tcp_transmit_skb(struct sock *sk, struct sk_buff *skb, int clone_it,
 			    gfp_t gfp_mask)
 {
-	return __tcp_transmit_skb(sk, skb, clone_it, gfp_mask,
+	int ret;
+
+	ret = __tcp_transmit_skb(sk, skb, clone_it, gfp_mask,
 				  tcp_sk(sk)->rcv_nxt);
+	if (!ret)
+		trace_tcp_transmit_skb(sk, skb);
+	return ret;
+
 }
 
 /* This routine just queues the buffer for sending.
