@@ -1062,6 +1062,18 @@ static int ingenic_drm_bind(struct device *dev, bool has_components)
 	for (i = 0; ; i++) {
 		ret = drm_of_find_panel_or_bridge(dev->of_node, 0, i, &panel, &bridge);
 		if (ret) {
+			/*
+			 * Workaround for the case where the drivers for the
+			 * remote devices are not enabled. When that happens,
+			 * drm_of_find_panel_or_bridge() returns -EPROBE_DEFER
+			 * endlessly, which prevents the ingenic-drm driver from
+			 * working at all.
+			 */
+			if (ret == -EPROBE_DEFER) {
+				ret = driver_deferred_probe_check_state(dev);
+				if (ret == -ENODEV || ret == -ETIMEDOUT)
+					continue;
+			}
 			if (ret == -ENODEV)
 				break; /* we're done */
 			if (ret != -EPROBE_DEFER)
