@@ -2820,6 +2820,14 @@ static void kvmppc_core_vcpu_free_hv(struct kvm_vcpu *vcpu)
 
 static int kvmppc_core_check_requests_hv(struct kvm_vcpu *vcpu)
 {
+	/*
+	 * If subvention interrupt needs to be injected to the guest
+	 * exit to user space.
+	 */
+	if (kvm_check_request(KVM_REQ_ESN_EXIT, vcpu)) {
+		vcpu->run->exit_reason = KVM_EXIT_ESN;
+		return 0;
+	}
 	/* Indicate we want to get back into the guest */
 	return 1;
 }
