@@ -1338,7 +1338,7 @@ next:
 			}
 
 			ql_log(ql_log_warn, vha, 0x7097,
-			    "Failed burst-write at %x (%p/%#llx)....\n",
+			    "Failed burst-write at %x (%px/%#llx)....\n",
 			    flash_data_addr(ha, faddr), optrom,
 			    (u64)optrom_dma);
 
@@ -2927,7 +2927,7 @@ qla28xx_write_flash_data(scsi_qla_host_t *vha, uint32_t *dwptr, uint32_t faddr,
 		    flash_data_addr(ha, faddr), dburst);
 		if (rval != QLA_SUCCESS) {
 			ql_log(ql_log_warn, vha, 0x7097,
-			    "Failed burst write at %x (%p/%#llx)...\n",
+			    "Failed burst write at %x (%px/%#llx)...\n",
 			    flash_data_addr(ha, faddr), optrom,
 			    (u64)optrom_dma);
 			break;

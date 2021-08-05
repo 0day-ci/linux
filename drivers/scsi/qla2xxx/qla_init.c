@@ -1610,7 +1610,7 @@ int qla24xx_fcport_handle_login(struct scsi_qla_host *vha, fc_port_t *fcport)
 	u16 sec;
 
 	ql_dbg(ql_dbg_disc, vha, 0x20d8,
-	    "%s %8phC DS %d LS %d P %d fl %x confl %p rscn %d|%d login %d lid %d scan %d\n",
+	    "%s %8phC DS %d LS %d P %d fl %x confl %px rscn %d|%d login %d lid %d scan %d\n",
 	    __func__, fcport->port_name, fcport->disc_state,
 	    fcport->fw_login_state, fcport->login_pause, fcport->flags,
 	    fcport->conflict, fcport->last_rscn_gen, fcport->rscn_gen,
@@ -1809,7 +1809,7 @@ void qla24xx_handle_relogin_event(scsi_qla_host_t *vha,
 		return;
 
 	ql_dbg(ql_dbg_disc, vha, 0x2102,
-	    "%s %8phC DS %d LS %d P %d del %d cnfl %p rscn %d|%d login %d|%d fl %x\n",
+	    "%s %8phC DS %d LS %d P %d del %d cnfl %px rscn %d|%d login %d|%d fl %x\n",
 	    __func__, fcport->port_name, fcport->disc_state,
 	    fcport->fw_login_state, fcport->login_pause,
 	    fcport->deleted, fcport->conflict,
@@ -3169,7 +3169,7 @@ qla2x00_chip_diag(scsi_qla_host_t *vha)
 	/* Assume a failed state */
 	rval = QLA_FUNCTION_FAILED;
 
-	ql_dbg(ql_dbg_init, vha, 0x007b, "Testing device at %p.\n",
+	ql_dbg(ql_dbg_init, vha, 0x007b, "Testing device at %px.\n",
 	       &reg->flash_address);
 
 	spin_lock_irqsave(&ha->hardware_lock, flags);
@@ -3638,7 +3638,7 @@ qla2x00_alloc_outstanding_cmds(struct qla_hw_data *ha, struct req_que *req)
 		if (!req->outstanding_cmds) {
 			ql_log(ql_log_fatal, NULL, 0x0126,
 			    "Failed to allocate memory for "
-			    "outstanding_cmds for req_que %p.\n", req);
+			    "outstanding_cmds for req_que %px.\n", req);
 			req->num_outstanding_cmds = 0;
 			return QLA_FUNCTION_FAILED;
 		}
@@ -5072,7 +5072,7 @@ qla2x00_rport_del(void *data)
 	spin_unlock_irqrestore(fcport->vha->host->host_lock, flags);
 	if (rport) {
 		ql_dbg(ql_dbg_disc, fcport->vha, 0x210b,
-		    "%s %8phN. rport %p roles %x\n",
+		    "%s %8phN. rport %px roles %x\n",
 		    __func__, fcport->port_name, rport,
 		    rport->roles);
 
@@ -5678,7 +5678,7 @@ qla2x00_reg_remote_port(scsi_qla_host_t *vha, fc_port_t *fcport)
 	fc_remote_port_rolechg(rport, rport_ids.roles);
 
 	ql_dbg(ql_dbg_disc, vha, 0x20ee,
-	    "%s: %8phN. rport %ld:0:%d (%p) is %s mode\n",
+	    "%s: %8phN. rport %ld:0:%d (%px) is %s mode\n",
 	    __func__, fcport->port_name, vha->host_no,
 	    rport->scsi_target_id, rport,
 	    (fcport->port_type == FCT_TARGET) ? "tgt" :
@@ -6884,7 +6884,7 @@ qla2xxx_mctp_dump(scsi_qla_host_t *vha)
 		    "Failed to capture mctp dump\n");
 	} else {
 		ql_log(ql_log_info, vha, 0x5070,
-		    "Mctp dump capture for host (%ld/%p).\n",
+		    "Mctp dump capture for host (%ld/%px).\n",
 		    vha->host_no, ha->mctp_dump);
 		ha->mctp_dumped = 1;
 	}
@@ -6921,7 +6921,7 @@ qla2x00_quiesce_io(scsi_qla_host_t *vha)
 	struct scsi_qla_host *vp;
 
 	ql_dbg(ql_dbg_dpc, vha, 0x401d,
-	    "Quiescing I/O - ha=%p.\n", ha);
+	    "Quiescing I/O - ha=%px.\n", ha);
 
 	atomic_set(&ha->loop_down_timer, LOOP_DOWN_TIME);
 	if (atomic_read(&vha->loop_state) != LOOP_DOWN) {
@@ -6958,7 +6958,7 @@ qla2x00_abort_isp_cleanup(scsi_qla_host_t *vha)
 	vha->qla_stats.total_isp_aborts++;
 
 	ql_log(ql_log_info, vha, 0x00af,
-	    "Performing ISP error recovery - ha=%p.\n", ha);
+	    "Performing ISP error recovery - ha=%px.\n", ha);
 
 	ha->flags.purge_mbox = 1;
 	/* For ISP82XX, reset_chip is just disabling interrupts.

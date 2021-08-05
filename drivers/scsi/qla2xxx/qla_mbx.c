@@ -240,7 +240,7 @@ qla2x00_mailbox_command(scsi_qla_host_t *vha, mbx_cmd_t *mcp)
 	}
 
 	ql_dbg(ql_dbg_mbx + ql_dbg_buffer, vha, 0x1117,
-	    "I/O Address = %p.\n", optr);
+	    "I/O Address = %px.\n", optr);
 
 	/* Issue set host interrupt command to send cmd out. */
 	ha->flags.mbox_int = 0;

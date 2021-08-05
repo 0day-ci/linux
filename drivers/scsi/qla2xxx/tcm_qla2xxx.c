@@ -392,7 +392,7 @@ static int tcm_qla2xxx_write_pending(struct se_cmd *se_cmd)
 		 * can get ahead of this cmd. tcm_qla2xxx_aborted_task
 		 * already kick start the free.
 		 */
-		pr_debug("write_pending aborted cmd[%p] refcount %d "
+		pr_debug("write_pending aborted cmd[%px] refcount %d "
 			"transport_state %x, t_state %x, se_cmd_flags %x\n",
 			cmd, kref_read(&cmd->se_cmd.cmd_kref),
 			cmd->se_cmd.transport_state,
@@ -659,7 +659,7 @@ static int tcm_qla2xxx_queue_data_in(struct se_cmd *se_cmd)
 		 * can get ahead of this cmd. tcm_qla2xxx_aborted_task
 		 * already kick start the free.
 		 */
-		pr_debug("queue_data_in aborted cmd[%p] refcount %d "
+		pr_debug("queue_data_in aborted cmd[%px] refcount %d "
 			"transport_state %x, t_state %x, se_cmd_flags %x\n",
 			cmd, kref_read(&cmd->se_cmd.cmd_kref),
 			cmd->se_cmd.transport_state,
@@ -701,7 +701,7 @@ static int tcm_qla2xxx_queue_status(struct se_cmd *se_cmd)
 		 * already kick start the free.
 		 */
 		pr_debug(
-		    "queue_data_in aborted cmd[%p] refcount %d transport_state %x, t_state %x, se_cmd_flags %x\n",
+		    "queue_data_in aborted cmd[%px] refcount %d transport_state %x, t_state %x, se_cmd_flags %x\n",
 		    cmd, kref_read(&cmd->se_cmd.cmd_kref),
 		    cmd->se_cmd.transport_state, cmd->se_cmd.t_state,
 		    cmd->se_cmd.se_cmd_flags);
@@ -740,7 +740,7 @@ static void tcm_qla2xxx_queue_tm_rsp(struct se_cmd *se_cmd)
 	struct qla_tgt_mgmt_cmd *mcmd = container_of(se_cmd,
 				struct qla_tgt_mgmt_cmd, se_cmd);
 
-	pr_debug("queue_tm_rsp: mcmd: %p func: 0x%02x response: 0x%02x\n",
+	pr_debug("queue_tm_rsp: mcmd: %px func: 0x%02x response: 0x%02x\n",
 			mcmd, se_tmr->function, se_tmr->response);
 	/*
 	 * Do translation between TCM TM response codes and
@@ -815,7 +815,7 @@ static void tcm_qla2xxx_clear_nacl_from_fcport_map(struct fc_port *sess)
 			       node, GFP_ATOMIC);
 	}
 
-	pr_debug("Removed from fcport_map: %p for WWNN: 0x%016LX, port_id: 0x%06x\n",
+	pr_debug("Removed from fcport_map: %px for WWNN: 0x%016LX, port_id: 0x%06x\n",
 	    se_nacl, nacl->nport_wwnn, nacl->nport_id);
 	/*
 	 * Now clear the se_nacl and session pointers from our HW lport lookup
@@ -1202,7 +1202,7 @@ static struct fc_port *tcm_qla2xxx_find_sess_by_s_id(scsi_qla_host_t *vha,
 		pr_debug("Unable to locate s_id: 0x%06x\n", key);
 		return NULL;
 	}
-	pr_debug("find_sess_by_s_id: located se_nacl: %p, initiatorname: %s\n",
+	pr_debug("find_sess_by_s_id: located se_nacl: %px, initiatorname: %s\n",
 	    se_nacl, se_nacl->initiatorname);
 
 	nacl = container_of(se_nacl, struct tcm_qla2xxx_nacl, se_node_acl);
@@ -1276,7 +1276,7 @@ static void tcm_qla2xxx_set_sess_by_s_id(
 	fc_port->se_sess = se_sess;
 	nacl->fc_port = fc_port;
 
-	pr_debug("Setup nacl->fc_port %p by s_id for se_nacl: %p, initiatorname: %s\n",
+	pr_debug("Setup nacl->fc_port %px by s_id for se_nacl: %px, initiatorname: %s\n",
 	    nacl->fc_port, new_se_nacl, new_se_nacl->initiatorname);
 }
 
@@ -1379,7 +1379,7 @@ static void tcm_qla2xxx_set_sess_by_loop_id(
 	if (nacl->fc_port != fc_port)
 		nacl->fc_port = fc_port;
 
-	pr_debug("Setup nacl->fc_port %p by loop_id for se_nacl: %p, initiatorname: %s\n",
+	pr_debug("Setup nacl->fc_port %px by loop_id for se_nacl: %px, initiatorname: %s\n",
 	    nacl->fc_port, new_se_nacl, new_se_nacl->initiatorname);
 }
 
@@ -1516,7 +1516,7 @@ static void tcm_qla2xxx_update_sess(struct fc_port *sess, port_id_t s_id,
 
 
 	if (sess->loop_id != loop_id || sess->d_id.b24 != s_id.b24)
-		pr_info("Updating session %p from port %8phC loop_id %d -> %d s_id %x:%x:%x -> %x:%x:%x\n",
+		pr_info("Updating session %px from port %8phC loop_id %d -> %d s_id %x:%x:%x -> %x:%x:%x\n",
 		    sess, sess->port_name,
 		    sess->loop_id, loop_id, sess->d_id.b.domain,
 		    sess->d_id.b.area, sess->d_id.b.al_pa, s_id.b.domain,

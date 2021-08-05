@@ -1017,7 +1017,7 @@ qla27xx_mpi_fwdump(scsi_qla_host_t *vha, int hardware_locked)
 			buf += fwdt->dump_size;
 			walk_template_only = true;
 			ql_log(ql_log_warn, vha, 0x02f4,
-			       "-> MPI firmware already dumped -- dump saving to temporary buffer %p.\n",
+			       "-> MPI firmware already dumped -- dump saving to temporary buffer %px.\n",
 			       buf);
 		}
 
@@ -1043,7 +1043,7 @@ qla27xx_mpi_fwdump(scsi_qla_host_t *vha, int hardware_locked)
 		vha->hw->mpi_fw_dumped = 1;
 
 		ql_log(ql_log_warn, vha, 0x02f8,
-		       "-> MPI firmware dump saved to buffer (%lu/%p)\n",
+		       "-> MPI firmware dump saved to buffer (%lu/%px)\n",
 		       vha->host_no, vha->hw->mpi_fw_dump);
 		qla2x00_post_uevent_work(vha, QLA_UEVENT_CODE_FW_DUMP);
 	}
@@ -1062,7 +1062,7 @@ qla27xx_fwdump(scsi_qla_host_t *vha)
 		ql_log(ql_log_warn, vha, 0xd01e, "-> fwdump no buffer\n");
 	} else if (vha->hw->fw_dumped) {
 		ql_log(ql_log_warn, vha, 0xd01f,
-		    "-> Firmware already dumped (%p) -- ignoring request\n",
+		    "-> Firmware already dumped (%px) -- ignoring request\n",
 		    vha->hw->fw_dump);
 	} else {
 		struct fwdt *fwdt = vha->hw->fwdt;
@@ -1088,7 +1088,7 @@ qla27xx_fwdump(scsi_qla_host_t *vha)
 		vha->hw->fw_dumped = true;
 
 		ql_log(ql_log_warn, vha, 0xd015,
-		    "-> Firmware dump saved to buffer (%lu/%p) <%lx>\n",
+		    "-> Firmware dump saved to buffer (%lu/%px) <%lx>\n",
 		    vha->host_no, vha->hw->fw_dump, vha->hw->fw_dump_cap_flags);
 		qla2x00_post_uevent_work(vha, QLA_UEVENT_CODE_FW_DUMP);
 	}
