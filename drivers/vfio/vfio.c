@@ -21,8 +21,10 @@
 #include <linux/list.h>
 #include <linux/miscdevice.h>
 #include <linux/module.h>
+#include <linux/mount.h>
 #include <linux/mutex.h>
 #include <linux/pci.h>
+#include <linux/pseudo_fs.h>
 #include <linux/rwsem.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
@@ -37,6 +39,14 @@
 #define DRIVER_AUTHOR	"Alex Williamson <alex.williamson@redhat.com>"
 #define DRIVER_DESC	"VFIO - User Level meta-driver"
 
+/*
+ * Not exposed via UAPI
+ *
+ * XXX Adopt the following when available:
+ * https://lore.kernel.org/lkml/20210309155348.974875-1-hch@lst.de/
+ */
+#define VFIO_MAGIC 0x5646494f /* "VFIO" */
+
 static struct vfio {
 	struct class			*class;
 	struct list_head		iommu_drivers_list;
@@ -46,6 +56,8 @@ static struct vfio {
 	struct mutex			group_lock;
 	struct cdev			group_cdev;
 	dev_t				group_devt;
+	struct vfsmount			*vfio_fs_mnt;
+	int				vfio_fs_cnt;
 } vfio;
 
 struct vfio_iommu_driver {
@@ -519,6 +531,35 @@ static struct vfio_group *vfio_group_get_from_dev(struct device *dev)
 	return group;
 }
 
+static int vfio_fs_init_fs_context(struct fs_context *fc)
+{
+	return init_pseudo(fc, VFIO_MAGIC) ? 0 : -ENOMEM;
+}
+
+static struct file_system_type vfio_fs_type = {
+	.name = "vfio",
+	.owner = THIS_MODULE,
+	.init_fs_context = vfio_fs_init_fs_context,
+	.kill_sb = kill_anon_super,
+};
+
+static struct inode *vfio_fs_inode_new(void)
+{
+	struct inode *inode;
+	int ret;
+
+	ret = simple_pin_fs(&vfio_fs_type,
+			    &vfio.vfio_fs_mnt, &vfio.vfio_fs_cnt);
+	if (ret)
+		return ERR_PTR(ret);
+
+	inode = alloc_anon_inode(vfio.vfio_fs_mnt->mnt_sb);
+	if (IS_ERR(inode))
+		simple_release_fs(&vfio.vfio_fs_mnt, &vfio.vfio_fs_cnt);
+
+	return inode;
+}
+
 /**
  * Device objects - create, release, get, put, search
  */
@@ -783,6 +824,12 @@ int vfio_register_group_dev(struct vfio_device *device)
 		return -EBUSY;
 	}
 
+	device->inode = vfio_fs_inode_new();
+	if (IS_ERR(device->inode)) {
+		vfio_group_put(group);
+		return PTR_ERR(device->inode);
+	}
+
 	/* Our reference on group is moved to the device */
 	device->group = group;
 
@@ -906,6 +953,9 @@ void vfio_unregister_group_dev(struct vfio_device *device)
 	list_del(&device->group_next);
 	group->dev_counter--;
 	mutex_unlock(&group->device_lock);
+
+	iput(device->inode);
+	simple_release_fs(&vfio.vfio_fs_mnt, &vfio.vfio_fs_cnt);
 
 	/*
 	 * In order to support multiple devices per group, devices can be
@@ -1410,6 +1460,13 @@ static int vfio_group_get_device_fd(struct vfio_group *group, char *buf)
 	 * explicitly prevented.  Now there's need.
 	 */
 	filep->f_mode |= (FMODE_LSEEK | FMODE_PREAD | FMODE_PWRITE);
+
+	/*
+	 * Use the pseudo fs inode on the device to link all mmaps
+	 * to the same address space, allowing us to unmap all vmas
+	 * associated to this device using unmap_mapping_range().
+	 */
+	filep->f_mapping = device->inode->i_mapping;
 
 	atomic_inc(&group->container_users);
 
