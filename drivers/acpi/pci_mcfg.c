@@ -169,6 +169,9 @@ static struct mcfg_fixup mcfg_quirks[] = {
 	ALTRA_ECAM_QUIRK(1, 13),
 	ALTRA_ECAM_QUIRK(1, 14),
 	ALTRA_ECAM_QUIRK(1, 15),
+
+	{ "bcm2711", "", 0, 0, MCFG_BUS_ANY, &bcm2711_pcie_ops,
+	  DEFINE_RES_MEM(0xFD500000, 0xA000) },
 };
 
 static char mcfg_oem_id[ACPI_OEM_ID_SIZE];
@@ -198,7 +201,18 @@ static void pci_mcfg_apply_quirks(struct acpi_pci_root *root,
 	u16 segment = root->segment;
 	struct resource *bus_range = &root->secondary;
 	struct mcfg_fixup *f;
+	const char *soc;
 	int i;
+
+	/*
+	 * This could be a machine with a PCI/SMC conduit,
+	 * which means it doens't have MCFG. Get the machineid from
+	 * the namespace definition instead.
+	 */
+	if (!fwnode_property_read_string(acpi_fwnode_handle(root->device),
+					 "linux,pcie-quirk", &soc)) {
+		memcpy(mcfg_oem_id, soc, ACPI_OEM_ID_SIZE);
+	}
 
 	for (i = 0, f = mcfg_quirks; i < ARRAY_SIZE(mcfg_quirks); i++, f++) {
 		if (pci_mcfg_quirk_matches(f, segment, bus_range)) {
