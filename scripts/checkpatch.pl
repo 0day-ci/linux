@@ -4029,6 +4029,12 @@ sub process {
 			     "Using $1 is unnecessary\n" . $herecurr);
 		}
 
+# prefer = {}; to = {0};
+		if ($line =~ /= \{ *0 *\}/) {
+			WARN("ZERO_INITIALIZER",
+			     "= {} is preferred over = {0}\n" . $herecurr);
+		}
+
 # Check for potential 'bare' types
 		my ($stat, $cond, $line_nr_next, $remain_next, $off_next,
 		    $realline_next);
