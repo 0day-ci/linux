@@ -47,6 +47,12 @@ struct mshv_install_intercept {
 	union hv_intercept_parameters intercept_parameter;
 };
 
+struct mshv_assert_interrupt {
+	union hv_interrupt_control control;
+	__u64 dest_addr;
+	__u32 vector;
+};
+
 #define MSHV_IOCTL 0xB8
 
 /* mshv device */
@@ -58,6 +64,7 @@ struct mshv_install_intercept {
 #define MSHV_UNMAP_GUEST_MEMORY	_IOW(MSHV_IOCTL, 0x03, struct mshv_user_mem_region)
 #define MSHV_CREATE_VP		_IOW(MSHV_IOCTL, 0x04, struct mshv_create_vp)
 #define MSHV_INSTALL_INTERCEPT	_IOW(MSHV_IOCTL, 0x08, struct mshv_install_intercept)
+#define MSHV_ASSERT_INTERRUPT	_IOW(MSHV_IOCTL, 0x09, struct mshv_assert_interrupt)
 
 /* vp device */
 #define MSHV_GET_VP_REGISTERS   _IOWR(MSHV_IOCTL, 0x05, struct mshv_vp_registers)

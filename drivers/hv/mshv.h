@@ -67,5 +67,10 @@ int hv_call_set_vp_registers(
 int hv_call_install_intercept(u64 partition_id, u32 access_type,
 		enum hv_intercept_type intercept_type,
 		union hv_intercept_parameters intercept_parameter);
+int hv_call_assert_virtual_interrupt(
+		u64 partition_id,
+		u32 vector,
+		u64 dest_addr,
+		union hv_interrupt_control control);
 
 #endif /* _MSHV_H */
