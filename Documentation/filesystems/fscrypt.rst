@@ -734,22 +734,39 @@ as follows:
 
 - ``key_id`` is 0 if the raw key is given directly in the ``raw``
   field.  Otherwise ``key_id`` is the ID of a Linux keyring key of
-  type "fscrypt-provisioning" whose payload is
+  type "fscrypt-provisioning" or "trusted":
+  "fscrypt-provisioning" keys have a payload of
   struct fscrypt_provisioning_key_payload whose ``raw`` field contains
   the raw key and whose ``type`` field matches ``key_spec.type``.
   Since ``raw`` is variable-length, the total size of this key's
   payload must be ``sizeof(struct fscrypt_provisioning_key_payload)``
-  plus the raw key size.  The process must have Search permission on
-  this key.
+  plus the raw key size.
+  For "trusted" keys, the payload is directly taken as the raw key.
 
-  Most users should leave this 0 and specify the raw key directly.
-  The support for specifying a Linux keyring key is intended mainly to
-  allow re-adding keys after a filesystem is unmounted and re-mounted,
+  The process must have Search permission on this key.
+
+  Most users leave this 0 and specify the raw key directly.
+  "trusted" keys are useful to leverage kernel support for sealing
+  and unsealing key material. Sealed keys can be persisted to
+  unencrypted storage and later be used to decrypt the file system
+  without requiring userspace to have knowledge of the raw key
+  material.
+  "fscrypt-provisioning" key support is intended mainly to allow
+  re-adding keys after a filesystem is unmounted and re-mounted,
   without having to store the raw keys in userspace memory.
 
 - ``raw`` is a variable-length field which must contain the actual
   key, ``raw_size`` bytes long.  Alternatively, if ``key_id`` is
   nonzero, then this field is unused.
+
+.. note::
+
+   Users should take care not to reuse the fscrypt key material with
+   different ciphers or in multiple contexts as this may make it
+   easier to deduce the key.
+   This also applies when the key material is supplied indirectly
+   via a kernel trusted key. In this case, the trusted key should
+   perferably be used only in a single context.
 
 For v2 policy keys, the kernel keeps track of which user (identified
 by effective user ID) added the key, and only allows the key to be

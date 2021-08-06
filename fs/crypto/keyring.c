@@ -20,6 +20,7 @@
 
 #include <crypto/skcipher.h>
 #include <linux/key-type.h>
+#include <keys/trusted-type.h>
 #include <linux/random.h>
 #include <linux/seq_file.h>
 
@@ -577,28 +578,44 @@ static int get_keyring_key(u32 key_id, u32 type,
 	key_ref_t ref;
 	struct key *key;
 	const struct fscrypt_provisioning_key_payload *payload;
-	int err;
+	int err = 0;
 
 	ref = lookup_user_key(key_id, 0, KEY_NEED_SEARCH);
 	if (IS_ERR(ref))
 		return PTR_ERR(ref);
 	key = key_ref_to_ptr(ref);
 
-	if (key->type != &key_type_fscrypt_provisioning)
-		goto bad_key;
-	payload = key->payload.data[0];
+	if (key->type == &key_type_fscrypt_provisioning) {
+		payload = key->payload.data[0];
 
-	/* Don't allow fscrypt v1 keys to be used as v2 keys and vice versa. */
-	if (payload->type != type)
-		goto bad_key;
+		/* Don't allow fscrypt v1 keys to be used as v2 keys and vice versa. */
+		if (payload->type != type) {
+			err = -EKEYREJECTED;
+			goto out_put;
+		}
 
-	secret->size = key->datalen - sizeof(*payload);
-	memcpy(secret->raw, payload->raw, secret->size);
-	err = 0;
-	goto out_put;
+		secret->size = key->datalen - sizeof(*payload);
+		memcpy(secret->raw, payload->raw, secret->size);
+	} else if (IS_REACHABLE(CONFIG_TRUSTED_KEYS) && key->type == &key_type_trusted) {
+		struct trusted_key_payload *tkp;
 
-bad_key:
-	err = -EKEYREJECTED;
+		/* avoid reseal changing payload while we memcpy key */
+		down_read(&key->sem);
+		tkp = key->payload.data[0];
+		if (!tkp || tkp->key_len < FSCRYPT_MIN_KEY_SIZE ||
+		    tkp->key_len > FSCRYPT_MAX_KEY_SIZE) {
+			up_read(&key->sem);
+			err = -EINVAL;
+			goto out_put;
+		}
+
+		secret->size = tkp->key_len;
+		memcpy(secret->raw, tkp->key, secret->size);
+		up_read(&key->sem);
+	} else {
+		err = -EKEYREJECTED;
+	}
+
 out_put:
 	key_ref_put(ref);
 	return err;
