@@ -5145,7 +5145,7 @@ static int ice_set_mac_address(struct net_device *netdev, void *pi)
 		 * modified outside of the driver and needs to be restored back
 		 * to this value.
 		 */
-		memcpy(netdev->dev_addr, mac, netdev->addr_len);
+		ether_addr_copy(netdev->dev_addr, mac);
 		netdev_dbg(netdev, "filter for MAC %pM already exists\n", mac);
 		return 0;
 	}
@@ -5162,7 +5162,7 @@ err_update_filters:
 	}
 
 	/* change the netdev's MAC address */
-	memcpy(netdev->dev_addr, mac, netdev->addr_len);
+	ether_addr_copy(netdev->dev_addr, mac);
 	netdev_dbg(vsi->netdev, "updated MAC address to %pM\n",
 		   netdev->dev_addr);
 
