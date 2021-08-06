@@ -50,7 +50,7 @@ static int add_to_rbuf(struct mbox_chan *chan, void *mssg)
 	return idx;
 }
 
-static void msg_submit(struct mbox_chan *chan)
+static void msg_submit(struct mbox_chan *chan, int last_submit)
 {
 	unsigned count, idx;
 	unsigned long flags;
@@ -75,7 +75,7 @@ static void msg_submit(struct mbox_chan *chan)
 		chan->cl->tx_prepare(chan->cl, data);
 	/* Try to submit a message to the MBOX controller */
 	err = chan->mbox->ops->send_data(chan, data);
-	if (!err) {
+	if (!err || last_submit == -ETIME) {
 		chan->active_req = data;
 		chan->msg_count--;
 	}
@@ -101,7 +101,7 @@ static void tx_tick(struct mbox_chan *chan, int r)
 	spin_unlock_irqrestore(&chan->lock, flags);
 
 	/* Submit next message */
-	msg_submit(chan);
+	msg_submit(chan, r);
 
 	if (!mssg)
 		return;
@@ -260,7 +260,7 @@ int mbox_send_message(struct mbox_chan *chan, void *mssg)
 		return t;
 	}
 
-	msg_submit(chan);
+	msg_submit(chan, 0);
 
 	if (chan->cl->tx_block) {
 		unsigned long wait;
