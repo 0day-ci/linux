@@ -5062,33 +5062,17 @@ _scsih_setup_eedp(struct MPT3SAS_ADAPTER *ioc, struct scsi_cmnd *scmd,
 	else
 		return;
 
-	switch (prot_type) {
-	case SCSI_PROT_DIF_TYPE1:
-	case SCSI_PROT_DIF_TYPE2:
-
-		/*
-		* enable ref/guard checking
-		* auto increment ref tag
-		*/
-		eedp_flags |= MPI2_SCSIIO_EEDPFLAGS_INC_PRI_REFTAG |
-		    MPI2_SCSIIO_EEDPFLAGS_CHECK_REFTAG |
-		    MPI2_SCSIIO_EEDPFLAGS_CHECK_GUARD;
-		mpi_request->CDB.EEDP32.PrimaryReferenceTag =
-		    cpu_to_be32(t10_pi_ref_tag(scmd->request));
-		break;
-
-	case SCSI_PROT_DIF_TYPE3:
-
-		/*
-		* enable guard checking
-		*/
+	if (scmd->prot_op & SCSI_PROT_GUARD_CHECK)
 		eedp_flags |= MPI2_SCSIIO_EEDPFLAGS_CHECK_GUARD;
 
-		break;
+	if (scmd->prot_op & SCSI_PROT_REF_CHECK) {
+		eedp_flags |= MPI2_SCSIIO_EEDPFLAGS_INC_PRI_REFTAG |
+			MPI2_SCSIIO_EEDPFLAGS_CHECK_REFTAG;
+		mpi_request->CDB.EEDP32.PrimaryReferenceTag =
+			cpu_to_be32(scsi_prot_ref_tag(scmd));
 	}
 
-	mpi_request_3v->EEDPBlockSize =
-	    cpu_to_le16(scmd->device->sector_size);
+	mpi_request_3v->EEDPBlockSize = scsi_prot_interval(scmd);
 
 	if (ioc->is_gen35_ioc)
 		eedp_flags |= MPI25_SCSIIO_EEDPFLAGS_APPTAG_DISABLE_MODE;
