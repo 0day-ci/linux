@@ -9,10 +9,16 @@
 #include <linux/dma-map-ops.h>
 #include <linux/highmem.h>
 #include <linux/list.h>
+#include <linux/moduleparam.h>
 #include <linux/slab.h>
 
 #include "io-buffer-manager.h"
 #include "io-bounce-buffers.h"
+
+// Specifies the number of slots in each buffer pool. The total amount of
+// preallocated IOVA range per 1024 slots is slightly under 1GB.
+static unsigned int buffer_pool_size = 1024;
+module_param(buffer_pool_size, uint, 0);
 
 struct io_bounce_buffers {
 	struct iommu_domain *domain;
@@ -40,7 +46,8 @@ struct io_bounce_buffers *io_bounce_buffers_init(struct device *dev,
 	if (!buffers)
 		return ERR_PTR(-ENOMEM);
 
-	ret = io_buffer_manager_init(&buffers->manager);
+	ret = io_buffer_manager_init(&buffers->manager, dev, iovad,
+				     buffer_pool_size);
 	if (ret) {
 		kfree(buffers);
 		return ERR_PTR(ret);
@@ -53,8 +60,26 @@ struct io_bounce_buffers *io_bounce_buffers_init(struct device *dev,
 	return buffers;
 }
 
+bool io_bounce_buffer_reinit_check(struct io_bounce_buffers *buffers,
+				   struct device *dev, dma_addr_t base,
+				   dma_addr_t limit)
+{
+	if (!io_buffer_manager_reinit_check(&buffers->manager, dev,
+					    buffers->iovad, base, limit)) {
+		pr_warn("io-buffer-buffers out of range of %s\n",
+			dev_name(dev));
+		return false;
+	}
+
+	if (buffers->nid != dev_to_node(dev))
+		pr_info("node mismatch: buffers=%d dev=%d\n", buffers->nid,
+			dev_to_node(dev));
+	return true;
+}
+
 void io_bounce_buffers_destroy(struct io_bounce_buffers *buffers)
 {
+	io_buffer_manager_destroy(&buffers->manager, buffers->domain);
 	kfree(buffers);
 }
 
@@ -377,7 +402,7 @@ bool io_bounce_buffers_map_page(struct io_bounce_buffers *buffers,
 				enum dma_data_direction dir,
 				unsigned long attrs, dma_addr_t *handle)
 {
-	bool skip_cpu_sync = attrs & DMA_ATTR_SKIP_CPU_SYNC;
+	bool new_buffer, skip_cpu_sync = attrs & DMA_ATTR_SKIP_CPU_SYNC;
 	struct io_bounce_buffer_info info;
 	bool force_bounce = iova_offset(buffers->iovad, offset | size);
 
@@ -387,14 +412,15 @@ bool io_bounce_buffers_map_page(struct io_bounce_buffers *buffers,
 	*handle = DMA_MAPPING_ERROR;
 	if (!io_buffer_manager_alloc_buffer(&buffers->manager, dev, page,
 					    offset + size, prot, buffers->nid,
-					    &info))
+					    &info, &new_buffer))
 		return true;
 
 	if (!skip_cpu_sync)
 		io_bounce_buffers_do_sync(buffers, info.bounce_buffer, offset,
 					  page, offset, size, dir, prot, false);
 
-	if (!io_bounce_buffers_map_buffer(buffers, &info, prot, skip_cpu_sync,
+	if (new_buffer &&
+	    !io_bounce_buffers_map_buffer(buffers, &info, prot, skip_cpu_sync,
 					  offset, size)) {
 		io_buffer_manager_release_buffer(&buffers->manager,
 						 buffers->domain, info.iova,
@@ -414,7 +440,7 @@ bool io_bounce_buffers_map_sg(struct io_bounce_buffers *buffers,
 	struct io_bounce_buffer_info info;
 	struct scatterlist *iter;
 	size_t size = 0;
-	bool skip_cpu_sync = attrs & DMA_ATTR_SKIP_CPU_SYNC;
+	bool new_buffer, skip_cpu_sync = attrs & DMA_ATTR_SKIP_CPU_SYNC;
 	dma_addr_t seg_iova;
 	int i;
 	bool force_bounce = false;
@@ -430,7 +456,8 @@ bool io_bounce_buffers_map_sg(struct io_bounce_buffers *buffers,
 
 	*out_nents = 0;
 	if (!io_buffer_manager_alloc_buffer(&buffers->manager, dev, sgl, size,
-					    prot, buffers->nid, &info))
+					    prot, buffers->nid, &info,
+					    &new_buffer))
 		return true;
 
 	if (!skip_cpu_sync)
@@ -438,7 +465,8 @@ bool io_bounce_buffers_map_sg(struct io_bounce_buffers *buffers,
 					    info.bounce_buffer, dir, prot,
 					    false);
 
-	if (!io_bounce_buffers_map_buffer(buffers, &info, prot, skip_cpu_sync,
+	if (new_buffer &&
+	    !io_bounce_buffers_map_buffer(buffers, &info, prot, skip_cpu_sync,
 					  0, size)) {
 		io_buffer_manager_release_buffer(&buffers->manager,
 						 buffers->domain, info.iova,

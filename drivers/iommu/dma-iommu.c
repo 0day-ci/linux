@@ -378,6 +378,11 @@ static int iommu_dma_init_domain(struct iommu_domain *domain, dma_addr_t base,
 			return -EFAULT;
 		}
 
+		if (cookie->bounce_buffers &&
+		    !io_bounce_buffer_reinit_check(cookie->bounce_buffers,
+						   dev, base, limit))
+			return -EFAULT;
+
 		return 0;
 	}
 
@@ -436,12 +441,24 @@ static int dma_info_to_prot(enum dma_data_direction dir, bool coherent,
 	}
 }
 
+u64 __iommu_dma_limit(struct iommu_domain *domain, struct device *dev, u64 mask)
+{
+	u64 dma_limit = mask;
+
+	dma_limit = min_not_zero(dma_limit, dev->bus_dma_limit);
+	if (domain->geometry.force_aperture)
+		dma_limit = min(dma_limit, (u64)domain->geometry.aperture_end);
+
+	return dma_limit;
+}
+
 dma_addr_t __iommu_dma_alloc_iova(struct iommu_domain *domain,
-		size_t size, u64 dma_limit, struct device *dev)
+		size_t size, u64 mask, struct device *dev)
 {
 	struct iommu_dma_cookie *cookie = domain->iova_cookie;
 	struct iova_domain *iovad = &cookie->iovad;
 	unsigned long shift, iova_len, iova = 0;
+	u64 dma_limit = __iommu_dma_limit(domain, dev, mask);
 
 	if (cookie->type == IOMMU_DMA_MSI_COOKIE) {
 		cookie->msi_iova += size;
@@ -458,11 +475,6 @@ dma_addr_t __iommu_dma_alloc_iova(struct iommu_domain *domain,
 	 */
 	if (iova_len < (1 << (IOVA_RANGE_CACHE_MAX_SIZE - 1)))
 		iova_len = roundup_pow_of_two(iova_len);
-
-	dma_limit = min_not_zero(dma_limit, dev->bus_dma_limit);
-
-	if (domain->geometry.force_aperture)
-		dma_limit = min(dma_limit, (u64)domain->geometry.aperture_end);
 
 	/* Try to get PCI devices a SAC address */
 	if (dma_limit > DMA_BIT_MASK(32) && !iommu_dma_forcedac && dev_is_pci(dev))

@@ -14,6 +14,9 @@ struct io_bounce_buffers;
 struct io_bounce_buffers *io_bounce_buffers_init(struct device *dev,
 						 struct iommu_domain *domain,
 						 struct iova_domain *iovad);
+bool io_bounce_buffer_reinit_check(struct io_bounce_buffers *buffers,
+				   struct device *dev, dma_addr_t base,
+				   dma_addr_t limit);
 void io_bounce_buffers_destroy(struct io_bounce_buffers *buffers);
 
 bool io_bounce_buffers_sync_single(struct io_bounce_buffers *buffers,
