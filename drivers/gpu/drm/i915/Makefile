@@ -155,6 +155,7 @@ gem-y += \
 	gem/i915_gem_stolen.o \
 	gem/i915_gem_throttle.o \
 	gem/i915_gem_tiling.o \
+	gem/i915_gem_ttm.o \
 	gem/i915_gem_userptr.o \
 	gem/i915_gem_wait.o \
 	gem/i915_gemfs.o
@@ -265,6 +266,7 @@ i915-y += \
 	display/intel_pps.o \
 	display/intel_qp_tables.o \
 	display/intel_sdvo.o \
+	display/intel_snps_phy.o \
 	display/intel_tv.o \
 	display/intel_vdsc.o \
 	display/intel_vrr.o \

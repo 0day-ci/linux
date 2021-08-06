@@ -454,6 +454,7 @@ static const struct ib_device_ops hns_roce_dev_ops = {
 	INIT_RDMA_OBJ_SIZE(ib_ah, hns_roce_ah, ibah),
 	INIT_RDMA_OBJ_SIZE(ib_cq, hns_roce_cq, ib_cq),
 	INIT_RDMA_OBJ_SIZE(ib_pd, hns_roce_pd, ibpd),
+	INIT_RDMA_OBJ_SIZE(ib_qp, hns_roce_qp, ibqp),
 	INIT_RDMA_OBJ_SIZE(ib_ucontext, hns_roce_ucontext, ibucontext),
 };
 
@@ -873,11 +874,9 @@ int hns_roce_init(struct hns_roce_dev *hr_dev)
 
 	if (hr_dev->cmd_mod) {
 		ret = hns_roce_cmd_use_events(hr_dev);
-		if (ret) {
+		if (ret)
 			dev_warn(dev,
 				 "Cmd event  mode failed, set back to poll!\n");
-			hns_roce_cmd_use_polling(hr_dev);
-		}
 	}
 
 	ret = hns_roce_init_hem(hr_dev);
