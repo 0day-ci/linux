@@ -543,6 +543,219 @@ ice_aq_sw_rules(struct ice_hw *hw, void *rule_list, u16 rule_list_sz,
 	return status;
 }
 
+/**
+ * ice_aq_add_recipe - add switch recipe
+ * @hw: pointer to the HW struct
+ * @s_recipe_list: pointer to switch rule population list
+ * @num_recipes: number of switch recipes in the list
+ * @cd: pointer to command details structure or NULL
+ *
+ * Add(0x0290)
+ */
+static enum ice_status
+ice_aq_add_recipe(struct ice_hw *hw,
+		  struct ice_aqc_recipe_data_elem *s_recipe_list,
+		  u16 num_recipes, struct ice_sq_cd *cd)
+{
+	struct ice_aqc_add_get_recipe *cmd;
+	struct ice_aq_desc desc;
+	u16 buf_size;
+
+	cmd = &desc.params.add_get_recipe;
+	ice_fill_dflt_direct_cmd_desc(&desc, ice_aqc_opc_add_recipe);
+
+	cmd->num_sub_recipes = cpu_to_le16(num_recipes);
+	desc.flags |= cpu_to_le16(ICE_AQ_FLAG_RD);
+
+	buf_size = num_recipes * sizeof(*s_recipe_list);
+
+	return ice_aq_send_cmd(hw, &desc, s_recipe_list, buf_size, cd);
+}
+
+/**
+ * ice_aq_get_recipe - get switch recipe
+ * @hw: pointer to the HW struct
+ * @s_recipe_list: pointer to switch rule population list
+ * @num_recipes: pointer to the number of recipes (input and output)
+ * @recipe_root: root recipe number of recipe(s) to retrieve
+ * @cd: pointer to command details structure or NULL
+ *
+ * Get(0x0292)
+ *
+ * On input, *num_recipes should equal the number of entries in s_recipe_list.
+ * On output, *num_recipes will equal the number of entries returned in
+ * s_recipe_list.
+ *
+ * The caller must supply enough space in s_recipe_list to hold all possible
+ * recipes and *num_recipes must equal ICE_MAX_NUM_RECIPES.
+ */
+static enum ice_status
+ice_aq_get_recipe(struct ice_hw *hw,
+		  struct ice_aqc_recipe_data_elem *s_recipe_list,
+		  u16 *num_recipes, u16 recipe_root, struct ice_sq_cd *cd)
+{
+	struct ice_aqc_add_get_recipe *cmd;
+	struct ice_aq_desc desc;
+	enum ice_status status;
+	u16 buf_size;
+
+	if (*num_recipes != ICE_MAX_NUM_RECIPES)
+		return ICE_ERR_PARAM;
+
+	cmd = &desc.params.add_get_recipe;
+	ice_fill_dflt_direct_cmd_desc(&desc, ice_aqc_opc_get_recipe);
+
+	cmd->return_index = cpu_to_le16(recipe_root);
+	cmd->num_sub_recipes = 0;
+
+	buf_size = *num_recipes * sizeof(*s_recipe_list);
+
+	status = ice_aq_send_cmd(hw, &desc, s_recipe_list, buf_size, cd);
+	*num_recipes = le16_to_cpu(cmd->num_sub_recipes);
+
+	return status;
+}
+
+/**
+ * ice_update_recipe_lkup_idx - update a default recipe based on the lkup_idx
+ * @hw: pointer to the HW struct
+ * @params: parameters used to update the default recipe
+ *
+ * This function only supports updating default recipes and it only supports
+ * updating a single recipe based on the lkup_idx at a time.
+ *
+ * This is done as a read-modify-write operation. First, get the current recipe
+ * contents based on the recipe's ID. Then modify the field vector index and
+ * mask if it's valid at the lkup_idx. Finally, use the add recipe AQ to update
+ * the pre-existing recipe with the modifications.
+ */
+static enum ice_status __maybe_unused
+ice_update_recipe_lkup_idx(struct ice_hw *hw,
+			   struct ice_update_recipe_lkup_idx_params *params)
+{
+	struct ice_aqc_recipe_data_elem *rcp_list;
+	u16 num_recps = ICE_MAX_NUM_RECIPES;
+	enum ice_status status;
+
+	rcp_list = kcalloc(num_recps, sizeof(*rcp_list), GFP_KERNEL);
+	if (!rcp_list)
+		return ICE_ERR_NO_MEMORY;
+
+	/* read current recipe list from firmware */
+	rcp_list->recipe_indx = params->rid;
+	status = ice_aq_get_recipe(hw, rcp_list, &num_recps, params->rid, NULL);
+	if (status) {
+		ice_debug(hw, ICE_DBG_SW, "Failed to get recipe %d, status %d\n",
+			  params->rid, status);
+		goto error_out;
+	}
+
+	/* only modify existing recipe's lkup_idx and mask if valid, while
+	 * leaving all other fields the same, then update the recipe firmware
+	 */
+	rcp_list->content.lkup_indx[params->lkup_idx] = params->fv_idx;
+	if (params->mask_valid)
+		rcp_list->content.mask[params->lkup_idx] =
+			cpu_to_le16(params->mask);
+
+	if (params->ignore_valid)
+		rcp_list->content.lkup_indx[params->lkup_idx] |=
+			ICE_AQ_RECIPE_LKUP_IGNORE;
+
+	status = ice_aq_add_recipe(hw, &rcp_list[0], 1, NULL);
+	if (status)
+		ice_debug(hw, ICE_DBG_SW, "Failed to update recipe %d lkup_idx %d fv_idx %d mask %d mask_valid %s, status %d\n",
+			  params->rid, params->lkup_idx, params->fv_idx,
+			  params->mask, params->mask_valid ? "true" : "false",
+			  status);
+
+error_out:
+	kfree(rcp_list);
+	return status;
+}
+
+/**
+ * ice_aq_map_recipe_to_profile - Map recipe to packet profile
+ * @hw: pointer to the HW struct
+ * @profile_id: package profile ID to associate the recipe with
+ * @r_bitmap: Recipe bitmap filled in and need to be returned as response
+ * @cd: pointer to command details structure or NULL
+ * Recipe to profile association (0x0291)
+ */
+static enum ice_status __maybe_unused
+ice_aq_map_recipe_to_profile(struct ice_hw *hw, u32 profile_id, u8 *r_bitmap,
+			     struct ice_sq_cd *cd)
+{
+	struct ice_aqc_recipe_to_profile *cmd;
+	struct ice_aq_desc desc;
+
+	cmd = &desc.params.recipe_to_profile;
+	ice_fill_dflt_direct_cmd_desc(&desc, ice_aqc_opc_recipe_to_profile);
+	cmd->profile_id = cpu_to_le16(profile_id);
+	/* Set the recipe ID bit in the bitmask to let the device know which
+	 * profile we are associating the recipe to
+	 */
+	memcpy(cmd->recipe_assoc, r_bitmap, sizeof(cmd->recipe_assoc));
+
+	return ice_aq_send_cmd(hw, &desc, NULL, 0, cd);
+}
+
+/**
+ * ice_aq_get_recipe_to_profile - Map recipe to packet profile
+ * @hw: pointer to the HW struct
+ * @profile_id: package profile ID to associate the recipe with
+ * @r_bitmap: Recipe bitmap filled in and need to be returned as response
+ * @cd: pointer to command details structure or NULL
+ * Associate profile ID with given recipe (0x0293)
+ */
+static enum ice_status __maybe_unused
+ice_aq_get_recipe_to_profile(struct ice_hw *hw, u32 profile_id, u8 *r_bitmap,
+			     struct ice_sq_cd *cd)
+{
+	struct ice_aqc_recipe_to_profile *cmd;
+	struct ice_aq_desc desc;
+	enum ice_status status;
+
+	cmd = &desc.params.recipe_to_profile;
+	ice_fill_dflt_direct_cmd_desc(&desc, ice_aqc_opc_get_recipe_to_profile);
+	cmd->profile_id = cpu_to_le16(profile_id);
+
+	status = ice_aq_send_cmd(hw, &desc, NULL, 0, cd);
+	if (!status)
+		memcpy(r_bitmap, cmd->recipe_assoc, sizeof(cmd->recipe_assoc));
+
+	return status;
+}
+
+/**
+ * ice_alloc_recipe - add recipe resource
+ * @hw: pointer to the hardware structure
+ * @rid: recipe ID returned as response to AQ call
+ */
+static enum ice_status __maybe_unused ice_alloc_recipe(struct ice_hw *hw, u16 *rid)
+{
+	struct ice_aqc_alloc_free_res_elem *sw_buf;
+	enum ice_status status;
+	u16 buf_len;
+
+	buf_len = struct_size(sw_buf, elem, 1);
+	sw_buf = kzalloc(buf_len, GFP_KERNEL);
+	if (!sw_buf)
+		return ICE_ERR_NO_MEMORY;
+
+	sw_buf->num_elems = cpu_to_le16(1);
+	sw_buf->res_type = cpu_to_le16((ICE_AQC_RES_TYPE_RECIPE <<
+					ICE_AQC_RES_TYPE_S) |
+					ICE_AQC_RES_TYPE_FLAG_SHARED);
+	status = ice_aq_alloc_free_res(hw, 1, sw_buf, buf_len,
+				       ice_aqc_opc_alloc_res, NULL);
+	if (!status)
+		*rid = le16_to_cpu(sw_buf->elem[0].e.sw_resp);
+	kfree(sw_buf);
+
+	return status;
+}
+
 /* ice_init_port_info - Initialize port_info with switch configuration data
  * @pi: pointer to port_info
  * @vsi_port_num: VSI number or port number
