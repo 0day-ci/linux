@@ -1500,9 +1500,6 @@ int sja1105pqrs_fdb_add(struct dsa_switch *ds, int port,
 	l2_lookup.macaddr = ether_addr_to_u64(addr);
 	l2_lookup.vlanid = vid;
 	l2_lookup.mask_macaddr = GENMASK_ULL(ETH_ALEN * 8 - 1, 0);
-<<<<<<< HEAD
-	l2_lookup.mask_vlanid = VLAN_VID_MASK;
-=======
 	if (priv->vlan_aware) {
 		l2_lookup.mask_vlanid = VLAN_VID_MASK;
 		l2_lookup.mask_iotag = BIT(0);
@@ -1510,7 +1507,6 @@ int sja1105pqrs_fdb_add(struct dsa_switch *ds, int port,
 		l2_lookup.mask_vlanid = 0;
 		l2_lookup.mask_iotag = 0;
 	}
->>>>>>> linux-next/akpm-base
 	l2_lookup.destports = BIT(port);
 
 	tmp = l2_lookup;
@@ -1601,9 +1597,6 @@ int sja1105pqrs_fdb_del(struct dsa_switch *ds, int port,
 	l2_lookup.macaddr = ether_addr_to_u64(addr);
 	l2_lookup.vlanid = vid;
 	l2_lookup.mask_macaddr = GENMASK_ULL(ETH_ALEN * 8 - 1, 0);
-<<<<<<< HEAD
-	l2_lookup.mask_vlanid = VLAN_VID_MASK;
-=======
 	if (priv->vlan_aware) {
 		l2_lookup.mask_vlanid = VLAN_VID_MASK;
 		l2_lookup.mask_iotag = BIT(0);
@@ -1611,7 +1604,6 @@ int sja1105pqrs_fdb_del(struct dsa_switch *ds, int port,
 		l2_lookup.mask_vlanid = 0;
 		l2_lookup.mask_iotag = 0;
 	}
->>>>>>> linux-next/akpm-base
 	l2_lookup.destports = BIT(port);
 
 	rc = sja1105_dynamic_config_read(priv, BLK_IDX_L2_LOOKUP,

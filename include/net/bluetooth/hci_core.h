@@ -1231,11 +1231,7 @@ struct hci_dev *hci_alloc_dev(void);
 void hci_free_dev(struct hci_dev *hdev);
 int hci_register_dev(struct hci_dev *hdev);
 void hci_unregister_dev(struct hci_dev *hdev);
-<<<<<<< HEAD
-void hci_cleanup_dev(struct hci_dev *hdev);
-=======
 void hci_release_dev(struct hci_dev *hdev);
->>>>>>> linux-next/akpm-base
 int hci_suspend_dev(struct hci_dev *hdev);
 int hci_resume_dev(struct hci_dev *hdev);
 int hci_reset_dev(struct hci_dev *hdev);

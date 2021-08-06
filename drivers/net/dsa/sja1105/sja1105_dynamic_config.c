@@ -330,15 +330,9 @@ sja1110_l2_lookup_cmd_packing(void *buf, struct sja1105_dyn_cmd *cmd,
 			      enum packing_op op)
 {
 	int entry_size = SJA1110_SIZE_L2_LOOKUP_ENTRY;
-<<<<<<< HEAD
 
 	sja1105pqrs_common_l2_lookup_cmd_packing(buf, cmd, op, entry_size);
 
-=======
-
-	sja1105pqrs_common_l2_lookup_cmd_packing(buf, cmd, op, entry_size);
-
->>>>>>> linux-next/akpm-base
 	sja1105_packing(buf, &cmd->index, 10, 1, entry_size, op);
 }
 
