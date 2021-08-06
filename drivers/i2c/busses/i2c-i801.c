@@ -1247,28 +1247,22 @@ static const struct {
 
 static void register_dell_lis3lv02d_i2c_device(struct i801_priv *priv)
 {
-	struct i2c_board_info info;
-	const char *dmi_product_name;
 	int i;
 
-	dmi_product_name = dmi_get_system_info(DMI_PRODUCT_NAME);
 	for (i = 0; i < ARRAY_SIZE(dell_lis3lv02d_devices); ++i) {
-		if (strcmp(dmi_product_name,
-			   dell_lis3lv02d_devices[i].dmi_product_name) == 0)
-			break;
+		if (dmi_match(DMI_PRODUCT_NAME, dell_lis3lv02d_devices[i].dmi_product_name)) {
+			struct i2c_board_info info = {
+				.type = "lis3lv02d",
+				.addr = dell_lis3lv02d_devices[i].i2c_addr,
+			};
+
+			i2c_new_client_device(&priv->adapter, &info);
+			return;
+		}
 	}
 
-	if (i == ARRAY_SIZE(dell_lis3lv02d_devices)) {
-		dev_warn(&priv->pci_dev->dev,
-			 "Accelerometer lis3lv02d is present on SMBus but its"
-			 " address is unknown, skipping registration\n");
-		return;
-	}
-
-	memset(&info, 0, sizeof(struct i2c_board_info));
-	info.addr = dell_lis3lv02d_devices[i].i2c_addr;
-	strlcpy(info.type, "lis3lv02d", I2C_NAME_SIZE);
-	i2c_new_client_device(&priv->adapter, &info);
+	pci_warn(priv->pci_dev,
+		 "Accelerometer lis3lv02d is present on SMBus but its address is unknown, skipping registration\n");
 }
 
 /* Register optional slaves */
