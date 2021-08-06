@@ -114,7 +114,7 @@ void save_mce_event(struct pt_regs *regs, long handled,
 	mce->srr0 = nip;
 	mce->srr1 = regs->msr;
 	mce->gpr3 = regs->gpr[3];
-	mce->in_use = 1;
+	mce->valid = 1;
 	mce->cpu = get_paca()->paca_index;
 
 	/* Mark it recovered if we have handled it and MSR(RI=1). */
@@ -202,7 +202,7 @@ int get_mce_event(struct machine_check_event *mce, bool release)
 		if (mce)
 			*mce = *mc_evt;
 		if (release)
-			mc_evt->in_use = 0;
+			mc_evt->valid = 0;
 		ret = 1;
 	}
 	/* Decrement the count to free the slot. */
@@ -412,6 +412,9 @@ void machine_check_print_event_info(struct machine_check_event *evt,
 		"Software error",
 		"Probable Software error (some chance of hardware cause)",
 	};
+
+	if (!evt->valid)
+		return;
 
 	/* Print things out */
 	if (evt->version != MCE_V1) {

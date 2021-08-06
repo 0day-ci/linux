@@ -113,7 +113,7 @@ enum MCE_LinkErrorType {
 
 struct machine_check_event {
 	enum MCE_Version	version:8;
-	u8			in_use;
+	u8			valid;
 	enum MCE_Severity	severity:8;
 	enum MCE_Initiator	initiator:8;
 	enum MCE_ErrorType	error_type:8;
