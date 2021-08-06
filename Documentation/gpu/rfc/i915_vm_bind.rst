@@ -117,6 +117,12 @@ VM_BIND interface can be used to map system memory directly (without gem BO
 abstraction) using the HMM interface.
 
 
+UAPI
+=====
+Uapi definiton can be found here:
+.. kernel-doc:: Documentation/gpu/rfc/i915_vm_bind.h
+
+
 Links:
 ======
 - Reference WIP VM_BIND implementation can be found here.
