@@ -1837,6 +1837,19 @@ static int kvmppc_handle_nested_exit(struct kvm_vcpu *vcpu)
 		r = RESUME_HOST;
 		break;
 	}
+	case BOOK3S_INTERRUPT_H_FAC_UNAVAIL:
+		/*
+		 * We might decide later to turn this interrupt into a
+		 * HEAI. Load the last instruction now that we can go
+		 * back into the guest to retry if needed.
+		 */
+		r = kvmppc_get_last_inst(vcpu, INST_GENERIC,
+					 &vcpu->arch.emul_inst);
+		if (r != EMULATE_DONE)
+			r = RESUME_GUEST;
+		else
+			r = RESUME_HOST;
+		break;
 	default:
 		r = RESUME_HOST;
 		break;
