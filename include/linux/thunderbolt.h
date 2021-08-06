@@ -480,6 +480,7 @@ struct tb_nhi {
 	bool going_away;
 	struct work_struct interrupt_work;
 	u32 hop_count;
+	u32 quirks;
 };
 
 /**

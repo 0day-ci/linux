@@ -43,6 +43,12 @@ static int ring_interrupt_index(struct tb_ring *ring)
 	return bit;
 }
 
+static void nhi_check_quirks(struct tb_nhi *nhi)
+{
+	if (nhi->pdev->vendor == PCI_VENDOR_ID_INTEL)
+		nhi->quirks |= REG_DMA_MISC_INT_AUTO_CLEAR;
+}
+
 /*
  * ring_interrupt_active() - activate/deactivate interrupts for a single ring
  *
@@ -70,10 +76,12 @@ static void ring_interrupt_active(struct tb_ring *ring, bool active)
 		 * Ask the hardware to clear interrupt status bits automatically
 		 * since we already know which interrupt was triggered.
 		 */
-		misc = ioread32(ring->nhi->iobase + REG_DMA_MISC);
-		if (!(misc & REG_DMA_MISC_INT_AUTO_CLEAR)) {
-			misc |= REG_DMA_MISC_INT_AUTO_CLEAR;
-			iowrite32(misc, ring->nhi->iobase + REG_DMA_MISC);
+		if (ring->nhi->quirks & REG_DMA_MISC_INT_AUTO_CLEAR) {
+			misc = ioread32(ring->nhi->iobase + REG_DMA_MISC);
+			if (!(misc & REG_DMA_MISC_INT_AUTO_CLEAR)) {
+				misc |= REG_DMA_MISC_INT_AUTO_CLEAR;
+				iowrite32(misc, ring->nhi->iobase + REG_DMA_MISC);
+			}
 		}
 
 		ivr_base = ring->nhi->iobase + REG_INT_VEC_ALLOC_BASE;
@@ -1189,6 +1197,8 @@ static int nhi_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 				     sizeof(*nhi->rx_rings), GFP_KERNEL);
 	if (!nhi->tx_rings || !nhi->rx_rings)
 		return -ENOMEM;
+
+	nhi_check_quirks(nhi);
 
 	res = nhi_init_msi(nhi);
 	if (res) {
