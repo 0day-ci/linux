@@ -859,8 +859,14 @@ reset_entity_pointer:
 void bfq_weights_tree_remove(struct bfq_data *bfqd,
 			     struct bfq_queue *bfqq)
 {
-	struct bfq_entity *entity = bfqq->entity.parent;
+	struct bfq_entity *entity = &bfqq->entity;
 
+	if (entity->in_groups_with_pending_reqs) {
+		entity->in_groups_with_pending_reqs = false;
+		bfqd->num_queues_with_pending_reqs_in_root--;
+	}
+
+	entity = entity->parent;
 	for_each_entity(entity) {
 		struct bfq_sched_data *sd = entity->my_sched_data;
 

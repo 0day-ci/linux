@@ -946,6 +946,29 @@ static void bfq_update_fin_time_enqueue(struct bfq_entity *entity,
 	bfq_active_insert(st, entity);
 }
 
+static void bfq_update_groups_with_pending_reqs(struct bfq_entity *entity)
+{
+#ifdef CONFIG_BFQ_GROUP_IOSCHED
+	struct bfq_queue *bfqq = bfq_entity_to_bfqq(entity);
+
+	if (bfqq) {
+		if (!entity->parent && !entity->in_groups_with_pending_reqs) {
+			entity->in_groups_with_pending_reqs = true;
+			bfqq->bfqd->num_queues_with_pending_reqs_in_root++;
+		}
+	} else {
+		if (!entity->in_groups_with_pending_reqs) {
+			struct bfq_group *bfqg =
+				container_of(entity, struct bfq_group, entity);
+			struct bfq_data *bfqd = bfqg->bfqd;
+
+			entity->in_groups_with_pending_reqs = true;
+			bfqd->num_groups_with_pending_reqs++;
+		}
+	}
+#endif
+}
+
 /**
  * __bfq_activate_entity - handle activation of entity.
  * @entity: the entity being activated.
@@ -999,19 +1022,7 @@ static void __bfq_activate_entity(struct bfq_entity *entity,
 		entity->on_st_or_in_serv = true;
 	}
 
-#ifdef CONFIG_BFQ_GROUP_IOSCHED
-	if (!bfq_entity_to_bfqq(entity)) { /* bfq_group */
-		struct bfq_group *bfqg =
-			container_of(entity, struct bfq_group, entity);
-		struct bfq_data *bfqd = bfqg->bfqd;
-
-		if (!entity->in_groups_with_pending_reqs) {
-			entity->in_groups_with_pending_reqs = true;
-			bfqd->num_groups_with_pending_reqs++;
-		}
-	}
-#endif
-
+	bfq_update_groups_with_pending_reqs(entity);
 	bfq_update_fin_time_enqueue(entity, st, backshifted);
 }
 

@@ -195,7 +195,12 @@ struct bfq_entity {
 	/* flag, set to request a weight, ioprio or ioprio_class change  */
 	int prio_changed;
 
-	/* flag, set if the entity is counted in groups_with_pending_reqs */
+	/*
+	 * If entity represents bfq_group, this flag will set if the group is
+	 * not root_group and have any pending requests; If entity represents
+	 * bfq_queue, this flag will set if the queue is in root_group and have
+	 * any pending requests.
+	 */
 	bool in_groups_with_pending_reqs;
 
 	/* last child queue of entity created (for non-leaf entities) */
@@ -539,7 +544,11 @@ struct bfq_data {
 	 * with no request waiting for completion.
 	 */
 	unsigned int num_groups_with_pending_reqs;
-
+	/*
+	 * number of queues that are in root_group with at least one request
+	 * waiting for completion.
+	 */
+	unsigned int num_queues_with_pending_reqs_in_root;
 	/*
 	 * Per-class (RT, BE, IDLE) number of bfq_queues containing
 	 * requests (including the queue in service, even if it is
