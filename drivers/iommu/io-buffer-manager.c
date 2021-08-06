@@ -324,7 +324,8 @@ static bool io_buffer_manager_alloc_slot(struct io_buffer_manager *manager,
 
 bool io_buffer_manager_alloc_buffer(struct io_buffer_manager *manager,
 				    struct device *dev, void *orig_buffer,
-				    size_t size, int prot, unsigned int nid,
+				    size_t size, int prot, bool require_bounce,
+				    unsigned int nid,
 				    struct io_bounce_buffer_info *info,
 				    bool *new_buffer)
 {
@@ -335,6 +336,9 @@ bool io_buffer_manager_alloc_buffer(struct io_buffer_manager *manager,
 	if (io_buffer_manager_alloc_slot(manager, orig_buffer, size, prot,
 					 nid, info, new_buffer))
 		return true;
+
+	if (!require_bounce)
+		return false;
 
 	node = kzalloc(sizeof(*node), GFP_ATOMIC);
 	if (!node)
@@ -401,7 +405,7 @@ static bool __io_buffer_manager_find_slot(struct io_buffer_manager *manager,
 }
 
 bool io_buffer_manager_find_buffer(struct io_buffer_manager *manager,
-				   dma_addr_t handle,
+				   dma_addr_t handle, bool may_use_fallback,
 				   struct io_bounce_buffer_info *info,
 				   void **orig_buffer, int *prot)
 {
@@ -415,7 +419,8 @@ bool io_buffer_manager_find_buffer(struct io_buffer_manager *manager,
 		*orig_buffer = slot->orig_buffer;
 		*prot = slot->prot;
 		return true;
-	}
+	} else if (!may_use_fallback)
+		return false;
 
 	spin_lock_irqsave(&manager->fallback_lock, flags);
 	node = find_fallback_node(&manager->fallback_buffers, handle);
@@ -433,7 +438,8 @@ bool io_buffer_manager_find_buffer(struct io_buffer_manager *manager,
 bool io_buffer_manager_release_buffer(struct io_buffer_manager *manager,
 				      struct iommu_domain *domain,
 				      dma_addr_t handle, bool inited,
-				      prerelease_cb cb, void *ctx)
+				      bool may_use_fallback, prerelease_cb cb,
+				      void *ctx)
 {
 	struct io_buffer_slot *slot, **cache;
 	struct io_buffer_pool *pool;
@@ -472,7 +478,8 @@ bool io_buffer_manager_release_buffer(struct io_buffer_manager *manager,
 
 		spin_unlock_irqrestore(&pool->lock, flags);
 		return true;
-	}
+	} else if (!may_use_fallback)
+		return false;
 
 	spin_lock_irqsave(&manager->fallback_lock, flags);
 	node = find_fallback_node(&manager->fallback_buffers, handle);

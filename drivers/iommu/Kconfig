@@ -463,4 +463,15 @@ config SPRD_IOMMU
 
 	  Say Y here if you want to use the multimedia devices listed above.
 
+config IOMMU_BOUNCE_BUFFERS
+	bool "Use IOMMU bounce buffers"
+	depends on IOMMU_DMA
+	default n
+	help
+	  Use bounce buffers for small, streaming DMA operations. This may
+	  have performance benefits on systems where establishing IOMMU mappings
+	  is particularly expensive, such as when running as a guest.
+
+	  If unsure, say N here.
+
 endif # IOMMU_SUPPORT

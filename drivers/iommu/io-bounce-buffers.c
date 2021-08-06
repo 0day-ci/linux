@@ -20,10 +20,20 @@
 static unsigned int buffer_pool_size = 1024;
 module_param(buffer_pool_size, uint, 0);
 
+#ifdef CONFIG_IOMMU_BOUNCE_BUFFERS
+// All buffers at most this size will always use bounce buffers if there
+// are slots of the appropriate size available.
+static unsigned int always_bounce_limit = PAGE_SIZE;
+module_param(always_bounce_limit, uint, 0644);
+#else
+static const unsigned int always_bounce_limit;
+#endif
+
 struct io_bounce_buffers {
 	struct iommu_domain *domain;
 	struct iova_domain *iovad;
 	unsigned int nid;
+	bool untrusted;
 	struct io_buffer_manager manager;
 };
 
@@ -56,6 +66,7 @@ struct io_bounce_buffers *io_bounce_buffers_init(struct device *dev,
 	buffers->domain = domain;
 	buffers->iovad = iovad;
 	buffers->nid = dev_to_node(dev);
+	buffers->untrusted = dev_is_untrusted(dev);
 
 	return buffers;
 }
@@ -201,7 +212,8 @@ bool io_bounce_buffers_sync_single(struct io_bounce_buffers *buffers,
 	void *orig_buffer;
 	int prot;
 
-	if (!io_buffer_manager_find_buffer(&buffers->manager, dma_handle, &info,
+	if (!io_buffer_manager_find_buffer(&buffers->manager, dma_handle,
+					   buffers->untrusted, &info,
 					   &orig_buffer, &prot))
 		return false;
 
@@ -237,9 +249,9 @@ bool io_bounce_buffers_sync_sg(struct io_bounce_buffers *buffers,
 	void *orig_buffer;
 	int prot;
 
-	if (!io_buffer_manager_find_buffer(&buffers->manager,
-					   sg_dma_address(sgl), &info,
-					   &orig_buffer, &prot))
+	if (!io_buffer_manager_find_buffer(
+		    &buffers->manager, sg_dma_address(sgl), buffers->untrusted,
+		    &info, &orig_buffer, &prot))
 		return false;
 
 	// In the non bounce buffer case, iommu_dma_map_sg syncs before setting
@@ -291,7 +303,7 @@ bool io_bounce_buffers_unmap_page(struct io_bounce_buffers *buffers,
 
 	return io_buffer_manager_release_buffer(
 		&buffers->manager, buffers->domain, handle, true,
-		io_bounce_buffers_unmap_page_sync, &args);
+		buffers->untrusted, io_bounce_buffers_unmap_page_sync, &args);
 }
 
 static void io_bounce_buffers_unmap_sg_sync(struct io_bounce_buffer_info *info,
@@ -318,7 +330,7 @@ bool io_bounce_buffers_unmap_sg(struct io_bounce_buffers *buffers,
 
 	return io_buffer_manager_release_buffer(
 		&buffers->manager, buffers->domain, sg_dma_address(sgl), true,
-		io_bounce_buffers_unmap_sg_sync, &args);
+		buffers->untrusted, io_bounce_buffers_unmap_sg_sync, &args);
 }
 
 static void io_bounce_buffers_clear_padding(struct io_bounce_buffer_info *info,
@@ -370,7 +382,8 @@ static bool io_bounce_buffers_map_buffer(struct io_bounce_buffers *buffers,
 	struct sg_table sgt;
 	size_t mapped;
 
-	if (offset || offset + orig_size < info->size || skiped_sync) {
+	if (buffers->untrusted &&
+	    (offset || offset + orig_size < info->size || skiped_sync)) {
 		// Ensure that nothing is leaked to untrusted devices when
 		// mapping the buffer by clearing any part of the bounce buffer
 		// that wasn't already cleared by syncing.
@@ -396,6 +409,15 @@ static bool io_bounce_buffers_map_buffer(struct io_bounce_buffers *buffers,
 	return mapped >= info->size;
 }
 
+static bool use_bounce_buffer(bool force_bounce, size_t size)
+{
+	if (IS_ENABLED(CONFIG_IOMMU_BOUNCE_BUFFERS) &&
+	    size <= always_bounce_limit)
+		return true;
+
+	return force_bounce;
+}
+
 bool io_bounce_buffers_map_page(struct io_bounce_buffers *buffers,
 				struct device *dev, struct page *page,
 				unsigned long offset, size_t size, int prot,
@@ -404,16 +426,17 @@ bool io_bounce_buffers_map_page(struct io_bounce_buffers *buffers,
 {
 	bool new_buffer, skip_cpu_sync = attrs & DMA_ATTR_SKIP_CPU_SYNC;
 	struct io_bounce_buffer_info info;
-	bool force_bounce = iova_offset(buffers->iovad, offset | size);
+	bool force_bounce = buffers->untrusted &&
+			    iova_offset(buffers->iovad, offset | size);
 
-	if (!force_bounce)
+	if (!use_bounce_buffer(force_bounce, size))
 		return false;
 
 	*handle = DMA_MAPPING_ERROR;
 	if (!io_buffer_manager_alloc_buffer(&buffers->manager, dev, page,
-					    offset + size, prot, buffers->nid,
-					    &info, &new_buffer))
-		return true;
+					    offset + size, prot, force_bounce,
+					    buffers->nid, &info, &new_buffer))
+		return force_bounce;
 
 	if (!skip_cpu_sync)
 		io_bounce_buffers_do_sync(buffers, info.bounce_buffer, offset,
@@ -424,8 +447,9 @@ bool io_bounce_buffers_map_page(struct io_bounce_buffers *buffers,
 					  offset, size)) {
 		io_buffer_manager_release_buffer(&buffers->manager,
 						 buffers->domain, info.iova,
-						 false, NULL, NULL);
-		return true;
+						 false, force_bounce, NULL,
+						 NULL);
+		return force_bounce;
 	}
 
 	*handle = info.iova + offset;
@@ -447,18 +471,19 @@ bool io_bounce_buffers_map_sg(struct io_bounce_buffers *buffers,
 
 	for_each_sg(sgl, iter, nents, i) {
 		size += iter->length;
-		force_bounce |= iova_offset(buffers->iovad,
-					    iter->offset | iter->length);
+		if (buffers->untrusted)
+			force_bounce |= iova_offset(
+				buffers->iovad, iter->offset | iter->length);
 	}
 
-	if (!force_bounce)
+	if (!use_bounce_buffer(force_bounce, size))
 		return false;
 
 	*out_nents = 0;
 	if (!io_buffer_manager_alloc_buffer(&buffers->manager, dev, sgl, size,
-					    prot, buffers->nid, &info,
-					    &new_buffer))
-		return true;
+					    prot, force_bounce, buffers->nid,
+					    &info, &new_buffer))
+		return force_bounce;
 
 	if (!skip_cpu_sync)
 		__io_bounce_buffers_sync_sg(buffers, sgl, nents,
@@ -470,8 +495,9 @@ bool io_bounce_buffers_map_sg(struct io_bounce_buffers *buffers,
 					  0, size)) {
 		io_buffer_manager_release_buffer(&buffers->manager,
 						 buffers->domain, info.iova,
-						 false, NULL, NULL);
-		return true;
+						 false, force_bounce, NULL,
+						 NULL);
+		return force_bounce;
 	}
 
 	i = 0;

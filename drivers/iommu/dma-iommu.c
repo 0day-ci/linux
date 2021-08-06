@@ -324,7 +324,7 @@ static void iommu_dma_flush_iotlb_all(struct iova_domain *iovad)
 	domain->ops->flush_iotlb_all(domain);
 }
 
-static bool dev_is_untrusted(struct device *dev)
+bool dev_is_untrusted(struct device *dev)
 {
 	return dev_is_pci(dev) && to_pci_dev(dev)->untrusted;
 }
@@ -402,7 +402,8 @@ static int iommu_dma_init_domain(struct iommu_domain *domain, dma_addr_t base,
 
 	ret = iova_reserve_iommu_regions(dev, domain);
 
-	if (ret == 0 && dev_is_untrusted(dev)) {
+	if (ret == 0 && (dev_is_untrusted(dev) ||
+			 IS_ENABLED(CONFIG_IOMMU_BOUNCE_BUFFERS))) {
 		cookie->bounce_buffers =
 			io_bounce_buffers_init(dev, domain, iovad);
 		if (IS_ERR(cookie->bounce_buffers))

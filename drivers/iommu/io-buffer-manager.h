@@ -57,12 +57,13 @@ struct io_bounce_buffer_info {
 
 bool io_buffer_manager_alloc_buffer(struct io_buffer_manager *manager,
 				    struct device *dev, void *orig_buffer,
-				    size_t size, int prot, unsigned int nid,
+				    size_t size, int prot, bool use_fallback,
+				    unsigned int nid,
 				    struct io_bounce_buffer_info *info,
 				    bool *new_buffer);
 
 bool io_buffer_manager_find_buffer(struct io_buffer_manager *manager,
-				   dma_addr_t handle,
+				   dma_addr_t handle, bool may_use_fallback,
 				   struct io_bounce_buffer_info *info,
 				   void **orig_buffer, int *prot);
 
@@ -72,7 +73,8 @@ typedef void (*prerelease_cb)(struct io_bounce_buffer_info *info, int prot,
 bool io_buffer_manager_release_buffer(struct io_buffer_manager *manager,
 				      struct iommu_domain *domain,
 				      dma_addr_t handle, bool inited,
-				      prerelease_cb cb, void *ctx);
+				      bool may_use_fallback, prerelease_cb cb,
+				      void *ctx);
 
 int io_buffer_manager_init(struct io_buffer_manager *manager,
 			   struct device *dev, struct iova_domain *iovad,

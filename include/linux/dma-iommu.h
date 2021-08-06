@@ -52,6 +52,8 @@ void __iommu_dma_free_iova(struct iommu_dma_cookie *cookie,
 u64 __iommu_dma_limit(struct iommu_domain *domain,
 		      struct device *dev, u64 mask);
 
+bool dev_is_untrusted(struct device *dev);
+
 #else /* CONFIG_IOMMU_DMA */
 
 struct iommu_domain;
