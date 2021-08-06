@@ -188,7 +188,6 @@ static inline unsigned int get_secindex(unsigned int shndx,
 /* 32 bit and 64 bit are very similar */
 #include "sorttable.h"
 #define SORTTABLE_64
-#include "sorttable.h"
 
 static int compare_relative_table(const void *a, const void *b)
 {
