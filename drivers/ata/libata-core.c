@@ -5458,7 +5458,7 @@ struct ata_host *ata_host_alloc_pinfo(struct device *dev,
 		ap->link.flags |= pi->link_flags;
 		ap->ops = pi->port_ops;
 
-		if (!host->ops && (pi->port_ops != &ata_dummy_port_ops))
+		if (!host->ops && pi && pi->port_ops != &ata_dummy_port_ops)
 			host->ops = pi->port_ops;
 	}
 
