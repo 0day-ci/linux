@@ -493,8 +493,7 @@ static void can_rx_delete_receiver(struct rcu_head *rp)
 	struct sock *sk = rcv->sk;
 
 	kmem_cache_free(rcv_cache, rcv);
-	if (sk)
-		sock_put(sk);
+	sock_put(sk);
 }
 
 /**
@@ -562,8 +561,7 @@ void can_rx_unregister(struct net *net, struct net_device *dev, canid_t can_id,
 
 	/* schedule the receiver item for deletion */
 	if (rcv) {
-		if (rcv->sk)
-			sock_hold(rcv->sk);
+		sock_hold(rcv->sk);
 		call_rcu(&rcv->rcu, can_rx_delete_receiver);
 	}
 }

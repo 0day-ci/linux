@@ -958,8 +958,7 @@ int nr_rx_frame(struct sk_buff *skb, struct net_device *dev)
 	if (sk == NULL || sk_acceptq_is_full(sk) ||
 	    (make = nr_make_new(sk)) == NULL) {
 		nr_transmit_refusal(skb, 0);
-		if (sk)
-			sock_put(sk);
+		sock_put(sk);
 		return 0;
 	}
 

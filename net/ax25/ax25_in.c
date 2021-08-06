@@ -380,8 +380,7 @@ static int ax25_rcv(struct sk_buff *skb, struct net_device *dev,
 	    (ax25->digipeat = kmalloc(sizeof(ax25_digi), GFP_ATOMIC)) == NULL) {
 		kfree_skb(skb);
 		ax25_destroy_socket(ax25);
-		if (sk)
-			sock_put(sk);
+		sock_put(sk);
 		return 0;
 	}
 

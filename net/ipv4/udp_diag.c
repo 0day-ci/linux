@@ -80,8 +80,7 @@ static int udp_dump_one(struct udp_table *tbl,
 	err = nlmsg_unicast(net->diag_nlsk, rep, NETLINK_CB(in_skb).portid);
 
 out:
-	if (sk)
-		sock_put(sk);
+	sock_put(sk);
 out_nosk:
 	return err;
 }

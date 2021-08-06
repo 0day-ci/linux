@@ -53,9 +53,7 @@ static void nf_queue_entry_release_refs(struct nf_queue_entry *entry)
 	/* Release those devices we held, or Alexey will kill me. */
 	dev_put(state->in);
 	dev_put(state->out);
-	if (state->sk)
-		sock_put(state->sk);
-
+	sock_put(state->sk);
 #if IS_ENABLED(CONFIG_BRIDGE_NETFILTER)
 	dev_put(entry->physin);
 	dev_put(entry->physout);
@@ -93,9 +91,7 @@ void nf_queue_entry_get_refs(struct nf_queue_entry *entry)
 
 	dev_hold(state->in);
 	dev_hold(state->out);
-	if (state->sk)
-		sock_hold(state->sk);
-
+	sock_hold(state->sk);
 #if IS_ENABLED(CONFIG_BRIDGE_NETFILTER)
 	dev_hold(entry->physin);
 	dev_hold(entry->physout);

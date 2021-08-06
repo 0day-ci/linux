@@ -40,8 +40,7 @@ static void qcom_mhi_qrtr_ul_callback(struct mhi_device *mhi_dev,
 {
 	struct sk_buff *skb = mhi_res->buf_addr;
 
-	if (skb->sk)
-		sock_put(skb->sk);
+	sock_put(skb->sk);
 	consume_skb(skb);
 }
 
@@ -55,8 +54,7 @@ static int qcom_mhi_qrtr_send(struct qrtr_endpoint *ep, struct sk_buff *skb)
 	if (rc)
 		goto free_skb;
 
-	if (skb->sk)
-		sock_hold(skb->sk);
+	sock_hold(skb->sk);
 
 	rc = skb_linearize(skb);
 	if (rc)
@@ -70,8 +68,7 @@ static int qcom_mhi_qrtr_send(struct qrtr_endpoint *ep, struct sk_buff *skb)
 	return rc;
 
 free_skb:
-	if (skb->sk)
-		sock_put(skb->sk);
+	sock_put(skb->sk);
 	kfree_skb(skb);
 
 	return rc;

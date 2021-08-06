@@ -41,9 +41,7 @@ static void subflow_req_destructor(struct request_sock *req)
 
 	pr_debug("subflow_req=%p", subflow_req);
 
-	if (subflow_req->msk)
-		sock_put((struct sock *)subflow_req->msk);
-
+	sock_put((struct sock *)subflow_req->msk);
 	mptcp_token_destroy_request(req);
 	tcp_request_sock_ops.destructor(req);
 }
@@ -601,9 +599,7 @@ static void subflow_drop_ctx(struct sock *ssk)
 		return;
 
 	subflow_ulp_fallback(ssk, ctx);
-	if (ctx->conn)
-		sock_put(ctx->conn);
-
+	sock_put(ctx->conn);
 	kfree_rcu(ctx, rcu);
 }
 

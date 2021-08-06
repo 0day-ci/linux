@@ -1896,8 +1896,7 @@ static void le_enable_complete(struct hci_dev *hdev, u8 status, u16 opcode)
 
 	new_settings(hdev, match.sk);
 
-	if (match.sk)
-		sock_put(match.sk);
+	sock_put(match.sk);
 
 	/* Make sure the controller has a good default for
 	 * advertising data. Restrict the update to when LE
@@ -5335,8 +5334,7 @@ static void set_advertising_complete(struct hci_dev *hdev, u8 status,
 
 	new_settings(hdev, match.sk);
 
-	if (match.sk)
-		sock_put(match.sk);
+	sock_put(match.sk);
 
 	/* Handle suspend notifier */
 	if (test_and_clear_bit(SUSPEND_PAUSE_ADVERTISING,
@@ -8569,8 +8567,7 @@ void mgmt_power_on(struct hci_dev *hdev, int err)
 
 	new_settings(hdev, match.sk);
 
-	if (match.sk)
-		sock_put(match.sk);
+	sock_put(match.sk);
 
 	hci_dev_unlock(hdev);
 }
@@ -8605,8 +8602,7 @@ void __mgmt_power_off(struct hci_dev *hdev)
 
 	new_settings(hdev, match.sk);
 
-	if (match.sk)
-		sock_put(match.sk);
+	sock_put(match.sk);
 }
 
 void mgmt_set_powered_failed(struct hci_dev *hdev, int err)
@@ -8887,8 +8883,7 @@ void mgmt_device_disconnected(struct hci_dev *hdev, bdaddr_t *bdaddr,
 
 	mgmt_event(MGMT_EV_DEVICE_DISCONNECTED, hdev, &ev, sizeof(ev), sk);
 
-	if (sk)
-		sock_put(sk);
+	sock_put(sk);
 
 	mgmt_pending_foreach(MGMT_OP_UNPAIR_DEVICE, hdev, unpair_device_rsp,
 			     hdev);
@@ -9114,8 +9109,7 @@ void mgmt_auth_enable_complete(struct hci_dev *hdev, u8 status)
 	if (changed)
 		new_settings(hdev, match.sk);
 
-	if (match.sk)
-		sock_put(match.sk);
+	sock_put(match.sk);
 }
 
 static void clear_eir(struct hci_request *req)
@@ -9169,8 +9163,7 @@ void mgmt_ssp_enable_complete(struct hci_dev *hdev, u8 enable, u8 status)
 	if (changed)
 		new_settings(hdev, match.sk);
 
-	if (match.sk)
-		sock_put(match.sk);
+	sock_put(match.sk);
 
 	hci_req_init(&req, hdev);
 
@@ -9211,8 +9204,7 @@ void mgmt_set_class_of_dev_complete(struct hci_dev *hdev, u8 *dev_class,
 		ext_info_changed(hdev, NULL);
 	}
 
-	if (match.sk)
-		sock_put(match.sk);
+	sock_put(match.sk);
 }
 
 void mgmt_set_local_name_complete(struct hci_dev *hdev, u8 *name, u8 status)

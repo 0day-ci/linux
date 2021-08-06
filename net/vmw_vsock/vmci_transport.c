@@ -792,8 +792,7 @@ static int vmci_transport_recv_stream_cb(void *data, struct vmci_datagram *dg)
 	}
 
 out:
-	if (sk)
-		sock_put(sk);
+	sock_put(sk);
 
 	return err;
 }

@@ -1314,9 +1314,7 @@ static void pep_sock_unhash(struct sock *sk)
 	if (hlist_empty(&pn->hlist))
 		pn_sock_unhash(&pn->pn_sk.sk);
 	release_sock(sk);
-
-	if (skparent)
-		sock_put(skparent);
+	sock_put(skparent);
 }
 
 static struct proto pep_proto = {

@@ -141,8 +141,7 @@ static struct sock *pppol2tp_session_get_sock(struct l2tp_session *session)
 
 	rcu_read_lock();
 	sk = rcu_dereference(ps->sk);
-	if (sk)
-		sock_hold(sk);
+	sock_hold(sk);
 	rcu_read_unlock();
 
 	return sk;

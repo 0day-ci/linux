@@ -206,8 +206,7 @@ struct sock *unix_peer_get(struct sock *s)
 
 	unix_state_lock(s);
 	peer = unix_peer(s);
-	if (peer)
-		sock_hold(peer);
+	sock_hold(peer);
 	unix_state_unlock(s);
 	return peer;
 }
@@ -311,8 +310,7 @@ static inline struct sock *unix_find_socket_byname(struct net *net,
 
 	spin_lock(&unix_table_lock);
 	s = __unix_find_socket_byname(net, sunname, len, hash);
-	if (s)
-		sock_hold(s);
+	sock_hold(s);
 	spin_unlock(&unix_table_lock);
 	return s;
 }
@@ -1439,8 +1437,7 @@ out:
 	kfree_skb(skb);
 	if (newsk)
 		unix_release_sock(newsk, 0);
-	if (other)
-		sock_put(other);
+	sock_put(other);
 	return err;
 }
 
@@ -1884,8 +1881,7 @@ out_unlock:
 out_free:
 	kfree_skb(skb);
 out:
-	if (other)
-		sock_put(other);
+	sock_put(other);
 	scm_destroy(&scm);
 	return err;
 }
@@ -2765,8 +2761,7 @@ static int unix_shutdown(struct socket *sock, int mode)
 	unix_state_lock(sk);
 	sk->sk_shutdown |= mode;
 	other = unix_peer(sk);
-	if (other)
-		sock_hold(other);
+	sock_hold(other);
 	unix_state_unlock(sk);
 	sk->sk_state_change(sk);
 
@@ -2788,8 +2783,7 @@ static int unix_shutdown(struct socket *sock, int mode)
 		else if (peer_mode & RCV_SHUTDOWN)
 			sk_wake_async(other, SOCK_WAKE_WAITD, POLL_IN);
 	}
-	if (other)
-		sock_put(other);
+	sock_put(other);
 
 	return 0;
 }

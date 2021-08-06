@@ -782,8 +782,7 @@ static void sk_psock_destroy(struct work_struct *work)
 	sk_psock_link_destroy(psock);
 	sk_psock_cork_free(psock);
 
-	if (psock->sk_redir)
-		sock_put(psock->sk_redir);
+	sock_put(psock->sk_redir);
 	sock_put(psock->sk);
 	kfree(psock);
 }
@@ -838,8 +837,7 @@ int sk_psock_msg_verdict(struct sock *sk, struct sk_psock *psock,
 	ret = sk_psock_map_verd(ret, msg->sk_redir);
 	psock->apply_bytes = msg->apply_bytes;
 	if (ret == __SK_REDIRECT) {
-		if (psock->sk_redir)
-			sock_put(psock->sk_redir);
+		sock_put(psock->sk_redir);
 		psock->sk_redir = msg->sk_redir;
 		if (!psock->sk_redir) {
 			ret = __SK_DROP;

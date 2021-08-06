@@ -620,8 +620,7 @@ struct sock *pn_find_sock_by_res(struct net *net, u8 res)
 
 	rcu_read_lock();
 	sk = rcu_dereference(pnres.sk[res]);
-	if (sk)
-		sock_hold(sk);
+	sock_hold(sk);
 	rcu_read_unlock();
 	return sk;
 }
