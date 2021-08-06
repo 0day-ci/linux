@@ -2573,7 +2573,8 @@ static int __btrfs_add_free_space_zoned(struct btrfs_block_group *block_group,
 	/* All the region is now unusable. Mark it as unused and reclaim */
 	if (block_group->zone_unusable == block_group->length) {
 		btrfs_mark_bg_unused(block_group);
-	} else if (block_group->zone_unusable >=
+	} else if (fs_info->bg_reclaim_threshold &&
+		   block_group->zone_unusable >=
 		   div_factor_fine(block_group->length,
 				   fs_info->bg_reclaim_threshold)) {
 		btrfs_mark_bg_to_reclaim(block_group);
