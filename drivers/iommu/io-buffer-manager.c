@@ -169,7 +169,8 @@ bool io_buffer_manager_find_buffer(struct io_buffer_manager *manager,
 
 bool io_buffer_manager_release_buffer(struct io_buffer_manager *manager,
 				      struct iommu_domain *domain,
-				      dma_addr_t handle, bool inited)
+				      dma_addr_t handle, bool inited,
+				      prerelease_cb cb, void *ctx)
 {
 	struct io_buffer_node *node;
 	unsigned long flags;
@@ -183,6 +184,9 @@ bool io_buffer_manager_release_buffer(struct io_buffer_manager *manager,
 
 	if (!node)
 		return false;
+
+	if (cb)
+		cb(&node->info, node->prot, node->orig_buffer, ctx);
 
 	if (inited)
 		free_buffer = io_bounce_buffers_release_buffer_cb(

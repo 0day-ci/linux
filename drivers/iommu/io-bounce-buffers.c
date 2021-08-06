@@ -153,6 +153,20 @@ static void io_bounce_buffers_do_sync(struct io_bounce_buffers *buffers,
 	}
 }
 
+static void __io_bounce_buffers_sync_single(struct io_bounce_buffers *buffers,
+					    dma_addr_t dma_handle, size_t size,
+					    struct io_bounce_buffer_info *info,
+					    struct page *orig_buffer, int prot,
+					    enum dma_data_direction dir,
+					    bool sync_for_cpu)
+{
+	size_t offset = dma_handle - info->iova;
+
+	io_bounce_buffers_do_sync(buffers, info->bounce_buffer, offset,
+				  orig_buffer, offset, size, dir, prot,
+				  sync_for_cpu);
+}
+
 bool io_bounce_buffers_sync_single(struct io_bounce_buffers *buffers,
 				   dma_addr_t dma_handle, size_t size,
 				   enum dma_data_direction dir,
@@ -160,17 +174,14 @@ bool io_bounce_buffers_sync_single(struct io_bounce_buffers *buffers,
 {
 	struct io_bounce_buffer_info info;
 	void *orig_buffer;
-	size_t offset;
 	int prot;
 
 	if (!io_buffer_manager_find_buffer(&buffers->manager, dma_handle, &info,
 					   &orig_buffer, &prot))
 		return false;
 
-	offset = dma_handle - info.iova;
-	io_bounce_buffers_do_sync(buffers, info.bounce_buffer, offset,
-				  orig_buffer, offset, size, dir, prot,
-				  sync_for_cpu);
+	__io_bounce_buffers_sync_single(buffers, dma_handle, size, &info,
+					orig_buffer, prot, dir, sync_for_cpu);
 	return true;
 }
 
@@ -219,16 +230,56 @@ bool io_bounce_buffers_sync_sg(struct io_bounce_buffers *buffers,
 	return true;
 }
 
+struct unmap_sync_args {
+	struct io_bounce_buffers *buffers;
+	unsigned long attrs;
+	enum dma_data_direction dir;
+	dma_addr_t handle;
+	size_t size;
+	int nents;
+};
+
+static void
+io_bounce_buffers_unmap_page_sync(struct io_bounce_buffer_info *info, int prot,
+				  void *orig_buffer, void *ctx)
+{
+	struct unmap_sync_args *args = ctx;
+
+	if (args->attrs & DMA_ATTR_SKIP_CPU_SYNC)
+		return;
+
+	__io_bounce_buffers_sync_single(args->buffers, args->handle, args->size,
+					info, orig_buffer, prot, args->dir,
+					true);
+}
+
 bool io_bounce_buffers_unmap_page(struct io_bounce_buffers *buffers,
 				  dma_addr_t handle, size_t size,
 				  enum dma_data_direction dir,
 				  unsigned long attrs)
 {
-	if (!(attrs & DMA_ATTR_SKIP_CPU_SYNC))
-		io_bounce_buffers_sync_single(buffers, handle, size, dir, true);
+	struct unmap_sync_args args = { .buffers = buffers,
+					.attrs = attrs,
+					.dir = dir,
+					.handle = handle,
+					.size = size };
 
-	return io_buffer_manager_release_buffer(&buffers->manager,
-						buffers->domain, handle, true);
+	return io_buffer_manager_release_buffer(
+		&buffers->manager, buffers->domain, handle, true,
+		io_bounce_buffers_unmap_page_sync, &args);
+}
+
+static void io_bounce_buffers_unmap_sg_sync(struct io_bounce_buffer_info *info,
+					    int prot, void *orig_buffer,
+					    void *ctx)
+{
+	struct unmap_sync_args *args = ctx;
+
+	if (args->attrs & DMA_ATTR_SKIP_CPU_SYNC)
+		return;
+
+	__io_bounce_buffers_sync_sg(args->buffers, orig_buffer, args->nents,
+				    info->bounce_buffer, args->dir, prot, true);
 }
 
 bool io_bounce_buffers_unmap_sg(struct io_bounce_buffers *buffers,
@@ -236,11 +287,13 @@ bool io_bounce_buffers_unmap_sg(struct io_bounce_buffers *buffers,
 				enum dma_data_direction dir,
 				unsigned long attrs)
 {
-	if (!(attrs & DMA_ATTR_SKIP_CPU_SYNC))
-		io_bounce_buffers_sync_sg(buffers, sgl, nents, dir, true);
+	struct unmap_sync_args args = {
+		.buffers = buffers, .attrs = attrs, .dir = dir, .nents = nents
+	};
 
 	return io_buffer_manager_release_buffer(
-		&buffers->manager, buffers->domain, sg_dma_address(sgl), true);
+		&buffers->manager, buffers->domain, sg_dma_address(sgl), true,
+		io_bounce_buffers_unmap_sg_sync, &args);
 }
 
 static bool io_bounce_buffers_map_buffer(struct io_bounce_buffers *buffers,
@@ -286,8 +339,9 @@ bool io_bounce_buffers_map_page(struct io_bounce_buffers *buffers,
 					  page, offset, size, dir, prot, false);
 
 	if (!io_bounce_buffers_map_buffer(buffers, &info, prot)) {
-		io_buffer_manager_release_buffer(
-			&buffers->manager, buffers->domain, info.iova, false);
+		io_buffer_manager_release_buffer(&buffers->manager,
+						 buffers->domain, info.iova,
+						 false, NULL, NULL);
 		return true;
 	}
 
@@ -328,8 +382,9 @@ bool io_bounce_buffers_map_sg(struct io_bounce_buffers *buffers,
 					    false);
 
 	if (!io_bounce_buffers_map_buffer(buffers, &info, prot)) {
-		io_buffer_manager_release_buffer(
-			&buffers->manager, buffers->domain, info.iova, false);
+		io_buffer_manager_release_buffer(&buffers->manager,
+						 buffers->domain, info.iova,
+						 false, NULL, NULL);
 		return true;
 	}
 

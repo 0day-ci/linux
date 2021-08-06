@@ -31,9 +31,13 @@ bool io_buffer_manager_find_buffer(struct io_buffer_manager *manager,
 				   struct io_bounce_buffer_info *info,
 				   void **orig_buffer, int *prot);
 
+typedef void (*prerelease_cb)(struct io_bounce_buffer_info *info, int prot,
+			      void *orig_buffer, void *ctx);
+
 bool io_buffer_manager_release_buffer(struct io_buffer_manager *manager,
 				      struct iommu_domain *domain,
-				      dma_addr_t handle, bool inited);
+				      dma_addr_t handle, bool inited,
+				      prerelease_cb cb, void *ctx);
 
 int io_buffer_manager_init(struct io_buffer_manager *manager);
 
