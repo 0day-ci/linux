@@ -56,10 +56,13 @@ struct iommu_domain_geometry {
 };
 
 /* Domain feature flags */
-#define __IOMMU_DOMAIN_PAGING	(1U << 0)  /* Support for iommu_map/unmap */
-#define __IOMMU_DOMAIN_DMA_API	(1U << 1)  /* Domain for use in DMA-API
-					      implementation              */
-#define __IOMMU_DOMAIN_PT	(1U << 2)  /* Domain is identity mapped   */
+#define __IOMMU_DOMAIN_PAGING       (1U << 0)  /* Support for iommu_map/unmap */
+#define __IOMMU_DOMAIN_DMA_API      (1U << 1)  /* Domain for use in DMA-API
+						   implementation              */
+#define __IOMMU_DOMAIN_PT           (1U << 2)  /* Domain is identity mapped   */
+#define __IOMMU_DOMAIN_LARGE_PAGES  (1U << 3)  /* Domain can handle IOMMU page
+						  sizes larger than the CPU
+						  page size                   */
 
 /*
  * This are the possible domain-types
@@ -77,7 +80,8 @@ struct iommu_domain_geometry {
 #define IOMMU_DOMAIN_IDENTITY	(__IOMMU_DOMAIN_PT)
 #define IOMMU_DOMAIN_UNMANAGED	(__IOMMU_DOMAIN_PAGING)
 #define IOMMU_DOMAIN_DMA	(__IOMMU_DOMAIN_PAGING |	\
-				 __IOMMU_DOMAIN_DMA_API)
+				 __IOMMU_DOMAIN_DMA_API |       \
+				 __IOMMU_DOMAIN_LARGE_PAGES)
 
 struct iommu_domain {
 	unsigned type;
