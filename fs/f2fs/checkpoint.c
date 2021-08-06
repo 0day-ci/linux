@@ -467,7 +467,7 @@ static void __add_ino_entry(struct f2fs_sb_info *sbi, nid_t ino,
 	struct inode_management *im = &sbi->im[type];
 	struct ino_entry *e, *tmp;
 
-	tmp = f2fs_kmem_cache_alloc(ino_entry_slab, GFP_NOFS);
+	tmp = f2fs_kmem_cache_alloc(ino_entry_slab, GFP_NOFS, true, NULL);
 
 	radix_tree_preload(GFP_NOFS | __GFP_NOFAIL);
 
