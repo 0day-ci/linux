@@ -1101,6 +1101,11 @@ unsigned long mem_cgroup_soft_limit_reclaim(pg_data_t *pgdat, int order,
 						gfp_t gfp_mask,
 						unsigned long *total_scanned);
 
+static inline
+struct cgroup_subsys_state *memcg_get_e_css(struct cgroup_subsys_state *css)
+{
+	return cgroup_get_e_css(css->cgroup, &memory_cgrp_subsys);
+}
 #else /* CONFIG_MEMCG */
 
 #define MEM_CGROUP_ID_SHIFT	0
@@ -1455,6 +1460,11 @@ unsigned long mem_cgroup_soft_limit_reclaim(pg_data_t *pgdat, int order,
 					    unsigned long *total_scanned)
 {
 	return 0;
+}
+static inline
+struct cgroup_subsys_state *memcg_get_e_css(struct cgroup_subsys_state *css)
+{
+	return NULL;
 }
 #endif /* CONFIG_MEMCG */
 
