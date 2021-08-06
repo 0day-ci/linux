@@ -50,7 +50,7 @@ struct wg_device {
 	struct multicore_worker __percpu *incoming_handshakes_worker;
 	struct cookie_checker cookie_checker;
 	struct pubkey_hashtable *peer_hashtable;
-	struct index_hashtable *index_hashtable;
+	struct rhashtable *index_hashtable;
 	struct allowedips peer_allowedips;
 	struct mutex device_update_lock, socket_update_lock;
 	struct list_head device_list, peer_list;

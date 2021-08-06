@@ -797,6 +797,7 @@ bool wg_noise_handshake_begin_session(struct noise_handshake *handshake,
 	new_keypair->i_am_the_initiator = handshake->state ==
 					  HANDSHAKE_CONSUMED_RESPONSE;
 	new_keypair->remote_index = handshake->remote_index;
+	new_keypair->entry.index = handshake->entry.index;
 
 	if (new_keypair->i_am_the_initiator)
 		derive_keys(&new_keypair->sending, &new_keypair->receiving,

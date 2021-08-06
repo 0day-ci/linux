@@ -72,6 +72,7 @@ struct noise_handshake {
 
 	u8 ephemeral_private[NOISE_PUBLIC_KEY_LEN];
 	u8 remote_static[NOISE_PUBLIC_KEY_LEN];
+	siphash_key_t skey;
 	u8 remote_ephemeral[NOISE_PUBLIC_KEY_LEN];
 	u8 precomputed_static_static[NOISE_PUBLIC_KEY_LEN];
 

@@ -243,7 +243,9 @@ static void wg_destruct(struct net_device *dev)
 	skb_queue_purge(&wg->incoming_handshakes);
 	free_percpu(dev->tstats);
 	free_percpu(wg->incoming_handshakes_worker);
+	wg_index_hashtable_destroy(wg->index_hashtable);
 	kvfree(wg->index_hashtable);
+	wg_pubkey_hashtable_destroy(wg->peer_hashtable);
 	kvfree(wg->peer_hashtable);
 	mutex_unlock(&wg->device_update_lock);
 
@@ -382,8 +384,10 @@ err_free_incoming_handshakes:
 err_free_tstats:
 	free_percpu(dev->tstats);
 err_free_index_hashtable:
+	wg_index_hashtable_destroy(wg->index_hashtable);
 	kvfree(wg->index_hashtable);
 err_free_peer_hashtable:
+	wg_pubkey_hashtable_destroy(wg->peer_hashtable);
 	kvfree(wg->peer_hashtable);
 	return ret;
 }
