@@ -1609,9 +1609,8 @@ out2:
  */
 int generic_write_check_limits(struct file *file, loff_t pos, loff_t *count)
 {
-	struct inode *inode = file->f_mapping->host;
-	loff_t max_size = inode->i_sb->s_maxbytes;
 	loff_t limit = rlimit(RLIMIT_FSIZE);
+	loff_t max_size = MAX_NON_LFS;
 
 	if (limit != RLIM_INFINITY) {
 		if (pos >= limit) {
@@ -1621,8 +1620,11 @@ int generic_write_check_limits(struct file *file, loff_t pos, loff_t *count)
 		*count = min(*count, limit - pos);
 	}
 
-	if (!(file->f_flags & O_LARGEFILE))
-		max_size = MAX_NON_LFS;
+	if (file->f_flags & O_LARGEFILE) {
+		struct inode *inode = file->f_mapping->host;
+
+		max_size = inode->i_sb->s_maxbytes;
+	}
 
 	if (unlikely(pos >= max_size))
 		return -EFBIG;
