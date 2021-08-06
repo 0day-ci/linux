@@ -1,0 +1,42 @@
+#! /bin/bash
+# SPDX-License-Identifier: GPL-2.0
+# Copyright (c) 2021 SUSE Linux Products GmbH.  All Rights Reserved.
+#
+# FS QA Test 244
+#
+# Make sure "btrfs device remove" won't crash when non-existing devid
+# is provided
+#
+. ./common/preamble
+_begin_fstest auto quick volume dangerous
+
+# Override the default cleanup function.
+# _cleanup()
+# {
+# 	cd /
+# 	rm -r -f $tmp.*
+# }
+
+# Import common functions.
+# . ./common/filter
+
+# real QA test starts here
+
+# Modify as appropriate.
+_supported_fs btrfs
+_require_scratch
+
+_scratch_mkfs >> $seqres.full 2>&1
+_scratch_mount
+
+# Above created fs only contains one device with devid 1, device remove 3
+# should just fail.
+# We don't care about the failure itself, but care whether this would cause
+# kernel crash.
+$BTRFS_UTIL_PROG device remove 3 $SCRATCH_MNT >> $seqres.full 2>&1
+
+echo "Silence is golden"
+
+# success, all done
+status=0
+exit
