@@ -664,7 +664,7 @@ int zynqmp_pm_write_ggs(u32 index, u32 value)
 EXPORT_SYMBOL_GPL(zynqmp_pm_write_ggs);
 
 /**
- * zynqmp_pm_write_ggs() - PM API for reading global general storage (ggs)
+ * zynqmp_pm_read_ggs() - PM API for reading global general storage (ggs)
  * @index:	GGS register index
  * @value:	Register value to be written
  *
@@ -697,7 +697,7 @@ int zynqmp_pm_write_pggs(u32 index, u32 value)
 EXPORT_SYMBOL_GPL(zynqmp_pm_write_pggs);
 
 /**
- * zynqmp_pm_write_pggs() - PM API for reading persistent global general
+ * zynqmp_pm_read_pggs() - PM API for reading persistent global general
  *			     storage (pggs)
  * @index:	PGGS register index
  * @value:	Register value to be written
@@ -1012,7 +1012,7 @@ int zynqmp_pm_set_requirement(const u32 node, const u32 capabilities,
 EXPORT_SYMBOL_GPL(zynqmp_pm_set_requirement);
 
 /**
- * zynqmp_pm_aes - Access AES hardware to encrypt/decrypt the data using
+ * zynqmp_pm_aes_engine - Access AES hardware to encrypt/decrypt the data using
  * AES-GCM core.
  * @address:	Address of the AesParams structure.
  * @out:	Returned output value
