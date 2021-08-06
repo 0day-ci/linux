@@ -24,6 +24,8 @@
 #include <linux/vmalloc.h>
 #include <linux/crash_dump.h>
 
+#include "io-bounce-buffers.h"
+
 struct iommu_dma_msi_page {
 	struct list_head	list;
 	dma_addr_t		iova;
@@ -44,6 +46,7 @@ struct iommu_dma_cookie {
 		dma_addr_t		msi_iova;
 	};
 	struct list_head		msi_page_list;
+	struct io_bounce_buffers	*bounce_buffers;
 
 	/* Domain for flush queue callback; NULL if flush queue not in use */
 	struct iommu_domain		*fq_domain;
@@ -79,6 +82,14 @@ static inline size_t cookie_msi_granule(struct iommu_dma_cookie *cookie)
 	if (cookie->type == IOMMU_DMA_IOVA_COOKIE)
 		return cookie->iovad.granule;
 	return PAGE_SIZE;
+}
+
+static struct io_bounce_buffers *dev_to_io_bounce_buffers(struct device *dev)
+{
+	struct iommu_domain *domain = iommu_get_dma_domain(dev);
+	struct iommu_dma_cookie *cookie = domain->iova_cookie;
+
+	return cookie->bounce_buffers;
 }
 
 static struct iommu_dma_cookie *cookie_alloc(enum iommu_dma_cookie_type type)
@@ -159,6 +170,9 @@ void iommu_put_dma_cookie(struct iommu_domain *domain)
 
 	if (!cookie)
 		return;
+
+	if (cookie->bounce_buffers)
+		io_bounce_buffers_destroy(cookie->bounce_buffers);
 
 	if (cookie->type == IOMMU_DMA_IOVA_COOKIE && cookie->iovad.granule)
 		put_iova_domain(&cookie->iovad);
@@ -333,6 +347,7 @@ static int iommu_dma_init_domain(struct iommu_domain *domain, dma_addr_t base,
 	struct iommu_dma_cookie *cookie = domain->iova_cookie;
 	unsigned long order, base_pfn;
 	struct iova_domain *iovad;
+	int ret;
 
 	if (!cookie || cookie->type != IOMMU_DMA_IOVA_COOKIE)
 		return -EINVAL;
@@ -380,7 +395,16 @@ static int iommu_dma_init_domain(struct iommu_domain *domain, dma_addr_t base,
 	if (!dev)
 		return 0;
 
-	return iova_reserve_iommu_regions(dev, domain);
+	ret = iova_reserve_iommu_regions(dev, domain);
+
+	if (ret == 0 && dev_is_untrusted(dev)) {
+		cookie->bounce_buffers =
+			io_bounce_buffers_init(dev, domain, iovad);
+		if (IS_ERR(cookie->bounce_buffers))
+			ret = PTR_ERR(cookie->bounce_buffers);
+	}
+
+	return ret;
 }
 
 /**
@@ -711,7 +735,12 @@ static void iommu_dma_free_noncontiguous(struct device *dev, size_t size,
 static void iommu_dma_sync_single_for_cpu(struct device *dev,
 		dma_addr_t dma_handle, size_t size, enum dma_data_direction dir)
 {
+	struct io_bounce_buffers *bounce = dev_to_io_bounce_buffers(dev);
 	phys_addr_t phys;
+
+	if (bounce && io_bounce_buffers_sync_single(bounce, dma_handle,
+						    size, dir, true))
+		return;
 
 	if (dev_is_dma_coherent(dev))
 		return;
@@ -723,7 +752,12 @@ static void iommu_dma_sync_single_for_cpu(struct device *dev,
 static void iommu_dma_sync_single_for_device(struct device *dev,
 		dma_addr_t dma_handle, size_t size, enum dma_data_direction dir)
 {
+	struct io_bounce_buffers *bounce = dev_to_io_bounce_buffers(dev);
 	phys_addr_t phys;
+
+	if (bounce && io_bounce_buffers_sync_single(bounce, dma_handle,
+						    size, dir, false))
+		return;
 
 	if (dev_is_dma_coherent(dev))
 		return;
@@ -736,8 +770,12 @@ static void iommu_dma_sync_sg_for_cpu(struct device *dev,
 		struct scatterlist *sgl, int nelems,
 		enum dma_data_direction dir)
 {
+	struct io_bounce_buffers *bounce = dev_to_io_bounce_buffers(dev);
 	struct scatterlist *sg;
 	int i;
+
+	if (bounce && io_bounce_buffers_sync_sg(bounce, sgl, nelems, dir, true))
+		return;
 
 	if (dev_is_dma_coherent(dev))
 		return;
@@ -750,8 +788,13 @@ static void iommu_dma_sync_sg_for_device(struct device *dev,
 		struct scatterlist *sgl, int nelems,
 		enum dma_data_direction dir)
 {
+	struct io_bounce_buffers *bounce = dev_to_io_bounce_buffers(dev);
 	struct scatterlist *sg;
 	int i;
+
+	if (bounce && io_bounce_buffers_sync_sg(bounce, sgl,
+						nelems, dir, false))
+		return;
 
 	if (dev_is_dma_coherent(dev))
 		return;
@@ -764,10 +807,18 @@ static dma_addr_t iommu_dma_map_page(struct device *dev, struct page *page,
 		unsigned long offset, size_t size, enum dma_data_direction dir,
 		unsigned long attrs)
 {
+	struct iommu_domain *domain = iommu_get_dma_domain(dev);
+	struct iommu_dma_cookie *cookie = domain->iova_cookie;
 	phys_addr_t phys = page_to_phys(page) + offset;
 	bool coherent = dev_is_dma_coherent(dev);
 	int prot = dma_info_to_prot(dir, coherent, attrs);
 	dma_addr_t dma_handle;
+
+	if (cookie->bounce_buffers &&
+	    io_bounce_buffers_map_page(cookie->bounce_buffers, dev, page,
+				       offset, size, prot, dir, attrs,
+				       &dma_handle))
+		return dma_handle;
 
 	dma_handle = __iommu_dma_map(dev, phys, size, prot, dma_get_mask(dev));
 	if (!coherent && !(attrs & DMA_ATTR_SKIP_CPU_SYNC) &&
@@ -779,6 +830,12 @@ static dma_addr_t iommu_dma_map_page(struct device *dev, struct page *page,
 static void iommu_dma_unmap_page(struct device *dev, dma_addr_t dma_handle,
 		size_t size, enum dma_data_direction dir, unsigned long attrs)
 {
+	struct io_bounce_buffers *bounce = dev_to_io_bounce_buffers(dev);
+
+	if (bounce &&
+	    io_bounce_buffers_unmap_page(bounce, dma_handle, size, dir, attrs))
+		return;
+
 	if (!(attrs & DMA_ATTR_SKIP_CPU_SYNC))
 		iommu_dma_sync_single_for_cpu(dev, dma_handle, size, dir);
 	__iommu_dma_unmap(dev, dma_handle, size);
@@ -877,11 +934,16 @@ static int iommu_dma_map_sg(struct device *dev, struct scatterlist *sg,
 	dma_addr_t iova;
 	size_t iova_len = 0;
 	unsigned long mask = dma_get_seg_boundary(dev);
-	int i;
+	int i, ret;
 
 	if (static_branch_unlikely(&iommu_deferred_attach_enabled) &&
 	    iommu_deferred_attach(dev, domain))
 		return 0;
+
+	if (cookie->bounce_buffers &&
+	    io_bounce_buffers_map_sg(cookie->bounce_buffers, dev, sg, nents,
+				     prot, dir, attrs, &ret))
+		return ret;
 
 	if (!(attrs & DMA_ATTR_SKIP_CPU_SYNC))
 		iommu_dma_sync_sg_for_device(dev, sg, nents, dir);
@@ -948,9 +1010,13 @@ out_restore_sg:
 static void iommu_dma_unmap_sg(struct device *dev, struct scatterlist *sg,
 		int nents, enum dma_data_direction dir, unsigned long attrs)
 {
+	struct io_bounce_buffers *bounce = dev_to_io_bounce_buffers(dev);
 	dma_addr_t start, end;
 	struct scatterlist *tmp;
 	int i;
+
+	if (bounce && io_bounce_buffers_unmap_sg(bounce, sg, nents, dir, attrs))
+		return;
 
 	if (!(attrs & DMA_ATTR_SKIP_CPU_SYNC))
 		iommu_dma_sync_sg_for_cpu(dev, sg, nents, dir);
