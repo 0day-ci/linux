@@ -1376,7 +1376,7 @@ static void nbd_set_cmd_timeout(struct nbd_device *nbd, u64 timeout)
 	if (timeout)
 		blk_queue_rq_timeout(nbd->disk->queue, timeout * HZ);
 	else
-		blk_queue_rq_timeout(nbd->disk->queue, 30 * HZ);
+		blk_queue_rq_timeout(nbd->disk->queue, BLK_DEFAULT_CMD_TIMEOUT);
 }
 
 /* Must be called with config_lock held */

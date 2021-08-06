@@ -378,6 +378,8 @@ static inline int blkdev_zone_mgmt_ioctl(struct block_device *bdev,
 
 #endif /* CONFIG_BLK_DEV_ZONED */
 
+#define BLK_DEFAULT_CMD_TIMEOUT	(30*HZ) /* 30 seconds */
+
 struct request_queue {
 	struct request		*last_merge;
 	struct elevator_queue	*elevator;
