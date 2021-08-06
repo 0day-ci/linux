@@ -989,12 +989,34 @@ static inline int queue_on_root_worker(struct cgroup_subsys_state *css)
 {
 	return !css || css == blkcg_root_css;
 }
+static struct cgroup_subsys_state *loop_rq_blkcg_css(struct loop_cmd *cmd)
+{
+	struct request *rq = blk_mq_rq_from_pdu(cmd);
+	/* always use the first bio's css */
+	struct blkcg *blkcg = bio_blkcg(rq->bio);
+
+	if (blkcg)
+		return &blkcg->css;
+	return NULL;
+}
 #else
 static inline int queue_on_root_worker(struct cgroup_subsys_state *css)
 {
 	return !css;
 }
+static struct cgroup_subsys_state *loop_rq_blkcg_css(struct loop_cmd *cmd)
+{
+	return NULL;
+}
 #endif
+
+static struct cgroup_subsys_state *loop_rq_get_memcg_css(
+		struct cgroup_subsys_state *blkcg_css)
+{
+	if (blkcg_css)
+		return memcg_get_e_css(blkcg_css->cgroup);
+	return NULL;
+}
 
 static void loop_queue_work(struct loop_device *lo, struct loop_cmd *cmd)
 {
@@ -1002,10 +1024,11 @@ static void loop_queue_work(struct loop_device *lo, struct loop_cmd *cmd)
 	struct loop_worker *cur_worker, *worker = NULL;
 	struct work_struct *work;
 	struct list_head *cmd_list;
+	struct cgroup_subsys_state *blkcg_css = loop_rq_blkcg_css(cmd);
 
 	spin_lock_irq(&lo->lo_work_lock);
 
-	if (queue_on_root_worker(cmd->blkcg_css))
+	if (queue_on_root_worker(blkcg_css))
 		goto queue_work;
 
 	node = &lo->worker_tree.rb_node;
@@ -1013,10 +1036,10 @@ static void loop_queue_work(struct loop_device *lo, struct loop_cmd *cmd)
 	while (*node) {
 		parent = *node;
 		cur_worker = container_of(*node, struct loop_worker, rb_node);
-		if (cur_worker->blkcg_css == cmd->blkcg_css) {
+		if (cur_worker->blkcg_css == blkcg_css) {
 			worker = cur_worker;
 			break;
-		} else if ((long)cur_worker->blkcg_css < (long)cmd->blkcg_css) {
+		} else if ((long)cur_worker->blkcg_css < (long)blkcg_css) {
 			node = &(*node)->rb_left;
 		} else {
 			node = &(*node)->rb_right;
@@ -1030,15 +1053,10 @@ static void loop_queue_work(struct loop_device *lo, struct loop_cmd *cmd)
 	 * In the event we cannot allocate a worker, just queue on the
 	 * rootcg worker and issue the I/O as the rootcg
 	 */
-	if (!worker) {
-		cmd->blkcg_css = NULL;
-		if (cmd->memcg_css)
-			css_put(cmd->memcg_css);
-		cmd->memcg_css = NULL;
+	if (!worker)
 		goto queue_work;
-	}
 
-	worker->blkcg_css = cmd->blkcg_css;
+	worker->blkcg_css = blkcg_css;
 	css_get(worker->blkcg_css);
 	INIT_WORK(&worker->work, loop_workfn);
 	INIT_LIST_HEAD(&worker->cmd_list);
@@ -2162,19 +2180,6 @@ static blk_status_t loop_queue_rq(struct blk_mq_hw_ctx *hctx,
 		break;
 	}
 
-	/* always use the first bio's css */
-	cmd->blkcg_css = NULL;
-	cmd->memcg_css = NULL;
-#ifdef CONFIG_BLK_CGROUP
-	if (rq->bio && rq->bio->bi_blkg) {
-		cmd->blkcg_css = &bio_blkcg(rq->bio)->css;
-#ifdef CONFIG_MEMCG
-		cmd->memcg_css =
-			cgroup_get_e_css(cmd->blkcg_css->cgroup,
-					&memory_cgrp_subsys);
-#endif
-	}
-#endif
 	loop_queue_work(lo, cmd);
 
 	return BLK_STS_OK;
@@ -2186,28 +2191,14 @@ static void loop_handle_cmd(struct loop_cmd *cmd)
 	const bool write = op_is_write(req_op(rq));
 	struct loop_device *lo = rq->q->queuedata;
 	int ret = 0;
-	struct mem_cgroup *old_memcg = NULL;
 
 	if (write && (lo->lo_flags & LO_FLAGS_READ_ONLY)) {
 		ret = -EIO;
 		goto failed;
 	}
 
-	if (cmd->blkcg_css)
-		kthread_associate_blkcg(cmd->blkcg_css);
-	if (cmd->memcg_css)
-		old_memcg = set_active_memcg(
-			mem_cgroup_from_css(cmd->memcg_css));
-
 	ret = do_req_filebacked(lo, rq);
 
-	if (cmd->blkcg_css)
-		kthread_associate_blkcg(NULL);
-
-	if (cmd->memcg_css) {
-		set_active_memcg(old_memcg);
-		css_put(cmd->memcg_css);
-	}
  failed:
 	/* complete non-aio request */
 	if (!cmd->use_aio || ret) {
@@ -2263,7 +2254,21 @@ static void loop_workfn(struct work_struct *work)
 {
 	struct loop_worker *worker =
 		container_of(work, struct loop_worker, work);
-	loop_process_work(worker, &worker->cmd_list, worker->lo);
+	struct mem_cgroup *old_memcg = NULL;
+	struct cgroup_subsys_state *memcg_css = NULL;
+
+	kthread_associate_blkcg(worker->blkcg_css);
+	memcg_css = loop_rq_get_memcg_css(worker->blkcg_css);
+	if (memcg_css) {
+		old_memcg = set_active_memcg(
+				mem_cgroup_from_css(memcg_css));
+		loop_process_work(worker, &worker->cmd_list, worker->lo);
+		set_active_memcg(old_memcg);
+		css_put(memcg_css);
+	} else {
+		loop_process_work(worker, &worker->cmd_list, worker->lo);
+	}
+	kthread_associate_blkcg(NULL);
 }
 
 static void loop_rootcg_workfn(struct work_struct *work)
