@@ -6428,6 +6428,16 @@ static irqreturn_t ufshcd_tmc_handler(struct ufs_hba *hba)
 static irqreturn_t ufshcd_sl_intr(struct ufs_hba *hba, u32 intr_status)
 {
 	irqreturn_t retval = IRQ_NONE;
+	int res = 0;
+	unsigned long flags;
+
+	retval = ufshcd_vops_intr(hba, &res);
+	if (res) {
+		spin_lock_irqsave(hba->host->host_lock, flags);
+		hba->force_reset = true;
+		ufshcd_schedule_eh_work(hba);
+		spin_unlock_irqrestore(hba->host->host_lock, flags);
+	}
 
 	if (intr_status & UFSHCD_UIC_MASK)
 		retval |= ufshcd_uic_cmd_compl(hba, intr_status);

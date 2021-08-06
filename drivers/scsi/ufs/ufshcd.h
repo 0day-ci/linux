@@ -356,6 +356,7 @@ struct ufs_hba_variant_ops {
 			       const union ufs_crypto_cfg_entry *cfg, int slot);
 	void	(*event_notify)(struct ufs_hba *hba,
 				enum ufs_event_type evt, void *data);
+	irqreturn_t	(*intr)(struct ufs_hba *hba, int *res);
 };
 
 /* clock gating state  */
@@ -1294,6 +1295,13 @@ static inline void ufshcd_vops_config_scaling_param(struct ufs_hba *hba,
 {
 	if (hba->vops && hba->vops->config_scaling_param)
 		hba->vops->config_scaling_param(hba, profile, data);
+}
+
+static inline irqreturn_t ufshcd_vops_intr(struct ufs_hba *hba, int *res)
+{
+	if (hba->vops && hba->vops->intr)
+		return hba->vops->intr(hba, res);
+	return IRQ_NONE;
 }
 
 extern struct ufs_pm_lvl_states ufs_pm_lvl_states[];
