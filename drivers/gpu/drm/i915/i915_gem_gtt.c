@@ -33,7 +33,8 @@ int i915_gem_gtt_prepare_pages(struct drm_i915_gem_object *obj,
 				     PCI_DMA_BIDIRECTIONAL,
 				     DMA_ATTR_SKIP_CPU_SYNC |
 				     DMA_ATTR_NO_KERNEL_MAPPING |
-				     DMA_ATTR_NO_WARN))
+				     DMA_ATTR_NO_WARN |
+				     DMA_ATTR_PERSISTENT_STREAMING))
 			return 0;
 
 		/*

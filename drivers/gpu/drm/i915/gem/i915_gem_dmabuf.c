@@ -48,7 +48,9 @@ static struct sg_table *i915_gem_map_dma_buf(struct dma_buf_attachment *attachme
 		src = sg_next(src);
 	}
 
-	ret = dma_map_sgtable(attachment->dev, st, dir, DMA_ATTR_SKIP_CPU_SYNC);
+	ret = dma_map_sgtable(attachment->dev, st, dir,
+			      DMA_ATTR_SKIP_CPU_SYNC |
+			      DMA_ATTR_PERSISTENT_STREAMING);
 	if (ret)
 		goto err_free_sg;
 
