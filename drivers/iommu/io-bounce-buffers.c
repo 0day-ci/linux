@@ -296,13 +296,69 @@ bool io_bounce_buffers_unmap_sg(struct io_bounce_buffers *buffers,
 		io_bounce_buffers_unmap_sg_sync, &args);
 }
 
+static void io_bounce_buffers_clear_padding(struct io_bounce_buffer_info *info,
+					    size_t pad_hd_end,
+					    size_t pad_tl_start)
+{
+	size_t idx, pad_hd_idx, pad_tl_idx, count;
+
+	count = info->size / PAGE_SIZE;
+	pad_hd_idx = pad_hd_end / PAGE_SIZE;
+	pad_tl_idx = pad_tl_start / PAGE_SIZE;
+
+	if (!IS_ALIGNED(pad_hd_end, PAGE_SIZE)) {
+		struct page *page = info->bounce_buffer[pad_hd_idx];
+		size_t len = offset_in_page(pad_hd_end);
+
+		memset_page(page, 0, 0, len);
+		arch_sync_dma_for_device(page_to_phys(page), 0, len);
+	}
+
+	if (!IS_ALIGNED(pad_tl_start, PAGE_SIZE)) {
+		size_t off = offset_in_page(pad_tl_start);
+		size_t len = PAGE_SIZE - off;
+		struct page *page = info->bounce_buffer[pad_tl_idx];
+
+		memset_page(page, off, 0, len);
+		arch_sync_dma_for_device(page_to_phys(page) + off, 0, len);
+
+		pad_tl_idx++;
+	}
+
+	idx = pad_hd_idx ? 0 : pad_tl_idx;
+	while (idx < count) {
+		struct page *page = info->bounce_buffer[idx++];
+
+		clear_highpage(page);
+		arch_sync_dma_for_device(page_to_phys(page), 0, PAGE_SIZE);
+		if (idx == pad_hd_idx)
+			idx = pad_tl_idx;
+	}
+}
+
 static bool io_bounce_buffers_map_buffer(struct io_bounce_buffers *buffers,
 					 struct io_bounce_buffer_info *info,
-					 int prot)
+					 int prot, bool skiped_sync,
+					 size_t offset, size_t orig_size)
 {
 	unsigned int count = info->size >> PAGE_SHIFT;
 	struct sg_table sgt;
 	size_t mapped;
+
+	if (offset || offset + orig_size < info->size || skiped_sync) {
+		// Ensure that nothing is leaked to untrusted devices when
+		// mapping the buffer by clearing any part of the bounce buffer
+		// that wasn't already cleared by syncing.
+		size_t pad_hd_end, pad_tl_start;
+
+		if (skiped_sync) {
+			pad_hd_end = pad_tl_start = 0;
+		} else {
+			pad_hd_end = offset;
+			pad_tl_start = offset + orig_size;
+		}
+		io_bounce_buffers_clear_padding(info, pad_hd_end, pad_tl_start);
+	}
 
 	if (sg_alloc_table_from_pages(&sgt, info->bounce_buffer, count, 0,
 				      info->size, GFP_ATOMIC))
@@ -338,7 +394,8 @@ bool io_bounce_buffers_map_page(struct io_bounce_buffers *buffers,
 		io_bounce_buffers_do_sync(buffers, info.bounce_buffer, offset,
 					  page, offset, size, dir, prot, false);
 
-	if (!io_bounce_buffers_map_buffer(buffers, &info, prot)) {
+	if (!io_bounce_buffers_map_buffer(buffers, &info, prot, skip_cpu_sync,
+					  offset, size)) {
 		io_buffer_manager_release_buffer(&buffers->manager,
 						 buffers->domain, info.iova,
 						 false, NULL, NULL);
@@ -381,7 +438,8 @@ bool io_bounce_buffers_map_sg(struct io_bounce_buffers *buffers,
 					    info.bounce_buffer, dir, prot,
 					    false);
 
-	if (!io_bounce_buffers_map_buffer(buffers, &info, prot)) {
+	if (!io_bounce_buffers_map_buffer(buffers, &info, prot, skip_cpu_sync,
+					  0, size)) {
 		io_buffer_manager_release_buffer(&buffers->manager,
 						 buffers->domain, info.iova,
 						 false, NULL, NULL);

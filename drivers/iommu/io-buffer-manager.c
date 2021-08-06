@@ -37,13 +37,10 @@ static struct page **io_buffer_manager_alloc_pages(int count, unsigned int nid)
 	// pages first to make accessing the buffer cheaper.
 	for (i = 0; i < count; i++) {
 		pages[i] = alloc_pages_node(
-			nid,
-			GFP_ATOMIC | __GFP_ZERO | __GFP_NORETRY | __GFP_NOWARN,
-			0);
+			nid, GFP_ATOMIC | __GFP_NORETRY | __GFP_NOWARN, 0);
 		if (!pages[i]) {
 			pages[i] = alloc_pages_node(
-				nid, GFP_ATOMIC | __GFP_ZERO | __GFP_HIGHMEM,
-				0);
+				nid, GFP_ATOMIC | __GFP_HIGHMEM, 0);
 			if (!pages[i]) {
 				io_buffer_manager_free_pages(pages, i);
 				return NULL;
