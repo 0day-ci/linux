@@ -158,6 +158,7 @@ static void nbd_connect_reply(struct genl_info *info, int index);
 static int nbd_genl_status(struct sk_buff *skb, struct genl_info *info);
 static void nbd_dead_link_work(struct work_struct *work);
 static void nbd_disconnect_and_put(struct nbd_device *nbd);
+static void nbd_set_cmd_timeout(struct nbd_device *nbd, u64 timeout);
 
 static inline struct device *nbd_to_dev(struct nbd_device *nbd)
 {
@@ -1250,7 +1251,7 @@ static void nbd_config_put(struct nbd_device *nbd)
 			destroy_workqueue(nbd->recv_workq);
 		nbd->recv_workq = NULL;
 
-		nbd->tag_set.timeout = 0;
+		nbd_set_cmd_timeout(nbd, 0);
 		nbd->disk->queue->limits.discard_granularity = 0;
 		nbd->disk->queue->limits.discard_alignment = 0;
 		blk_queue_max_discard_sectors(nbd->disk->queue, UINT_MAX);
@@ -2124,6 +2125,10 @@ static int nbd_genl_reconfigure(struct sk_buff *skb, struct genl_info *info)
 	if (ret)
 		goto out;
 
+	/*
+	 * On reconfigure, if NBD_ATTR_TIMEOUT is not provided, we will
+	 * continue to use the cmd timeout provided with connect initially.
+	 */
 	if (info->attrs[NBD_ATTR_TIMEOUT])
 		nbd_set_cmd_timeout(nbd,
 				    nla_get_u64(info->attrs[NBD_ATTR_TIMEOUT]));
