@@ -767,15 +767,17 @@ static void rxrpc_input_soft_acks(struct rxrpc_call *call, u8 *acks,
 				  rxrpc_seq_t seq, int nr_acks,
 				  struct rxrpc_ack_summary *summary)
 {
-	int ix;
-	u8 annotation, anno_type;
+	int ix, i;
+	u8 annotation, anno_type, ack;
 
-	for (; nr_acks > 0; nr_acks--, seq++) {
+	for (i = 0; i < nr_acks; i++, seq++) {
 		ix = seq & RXRPC_RXTX_BUFF_MASK;
 		annotation = call->rxtx_annotations[ix];
 		anno_type = annotation & RXRPC_TX_ANNO_MASK;
 		annotation &= ~RXRPC_TX_ANNO_MASK;
-		switch (*acks++) {
+		ack = acks[i % RXRPC_EXTENDED_SACK_SIZE];
+		ack >>= i / RXRPC_EXTENDED_SACK_SIZE;
+		switch (ack) {
 		case RXRPC_ACK_TYPE_ACK:
 			summary->nr_acks++;
 			if (anno_type == RXRPC_TX_ANNO_ACK)
@@ -846,7 +848,7 @@ static void rxrpc_input_ack(struct rxrpc_call *call, struct sk_buff *skb)
 	union {
 		struct rxrpc_ackpacket ack;
 		struct rxrpc_ackinfo info;
-		u8 acks[RXRPC_MAXACKS];
+		u8 acks[RXRPC_EXTENDED_SACK_SIZE];
 	} buf;
 	rxrpc_serial_t ack_serial, acked_serial;
 	rxrpc_seq_t first_soft_ack, hard_ack, prev_pkt;
@@ -874,6 +876,10 @@ static void rxrpc_input_ack(struct rxrpc_call *call, struct sk_buff *skb)
 			   first_soft_ack, prev_pkt,
 			   summary.ack_reason, nr_acks);
 
+	if ((nr_acks > RXRPC_MAXACKS && !(sp->hdr.flags & RXRPC_EXTENDED_SACK)) ||
+	    (nr_acks > RXRPC_MAXACKS_EXTENDED))
+		return rxrpc_proto_abort("AKC", call, 0);
+	
 	switch (buf.ack.reason) {
 	case RXRPC_ACK_PING_RESPONSE:
 		rxrpc_input_ping_response(call, skb->tstamp, acked_serial,
@@ -912,7 +918,7 @@ static void rxrpc_input_ack(struct rxrpc_call *call, struct sk_buff *skb)
 	}
 
 	buf.info.rxMTU = 0;
-	ioffset = offset + nr_acks + 3;
+	ioffset = offset + min(nr_acks, RXRPC_MAXACKS) + 3;
 	if (skb->len >= ioffset + sizeof(buf.info) &&
 	    skb_copy_bits(skb, ioffset, &buf.info, sizeof(buf.info)) < 0)
 		return rxrpc_proto_abort("XAI", call, 0);
@@ -969,7 +975,8 @@ static void rxrpc_input_ack(struct rxrpc_call *call, struct sk_buff *skb)
 	}
 
 	if (nr_acks > 0) {
-		if (skb_copy_bits(skb, offset, buf.acks, nr_acks) < 0) {
+		if (skb_copy_bits(skb, offset, buf.acks,
+				  min_t(unsigned int, nr_acks, sizeof(buf.acks))) < 0) {
 			rxrpc_proto_abort("XSA", call, 0);
 			goto out;
 		}
