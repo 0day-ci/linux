@@ -20,6 +20,7 @@
 #include <linux/kernel.h>
 #include <linux/zalloc.h>
 #include <sys/time.h>
+#include <sys/mman.h>
 #include <perf/cpumap.h>
 
 #include "../util/stat.h"
@@ -51,6 +52,7 @@ struct parameters {
 	unsigned int runtime;
 	bool silent;
 	bool fshared;
+	bool mlockall;
 };
 
 static struct parameters params = {
@@ -69,6 +71,8 @@ static const struct option options[] = {
 		     "Silent mode: do not display data/details"),
 	OPT_BOOLEAN( 'S', "shared",  &params.fshared,
 		     "Use shared futexes instead of private ones"),
+	OPT_BOOLEAN( 'm', "mlockall",  &params.mlockall,
+		     "Lock all current and future memory"),
 	OPT_END()
 };
 
@@ -154,6 +158,11 @@ int bench_futex_hash(int argc, const char **argv)
 	sigfillset(&act.sa_mask);
 	act.sa_sigaction = toggle_done;
 	sigaction(SIGINT, &act, NULL);
+
+	if (params.mlockall) {
+		if (mlockall(MCL_CURRENT | MCL_FUTURE))
+			err(EXIT_FAILURE, "mlockall");
+	}
 
 	if (!params.nthreads) /* default to the number of CPUs */
 		params.nthreads = cpu->nr;
