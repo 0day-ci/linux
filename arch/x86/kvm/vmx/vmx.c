@@ -4513,8 +4513,10 @@ static void vmx_vcpu_reset(struct kvm_vcpu *vcpu, bool init_event)
 	vmx_update_exception_bitmap(vcpu);
 
 	vpid_sync_context(vmx->vpid);
-	if (init_event)
+	if (init_event) {
 		vmx_clear_hlt(vcpu);
+		flip_arch_lbr_ctl(vcpu, false);
+	}
 }
 
 static void vmx_enable_irq_window(struct kvm_vcpu *vcpu)
@@ -7513,6 +7515,7 @@ static int vmx_enter_smm(struct kvm_vcpu *vcpu, char *smstate)
 	vmx->nested.smm.vmxon = vmx->nested.vmxon;
 	vmx->nested.vmxon = false;
 	vmx_clear_hlt(vcpu);
+	flip_arch_lbr_ctl(vcpu, false);
 	return 0;
 }
 
@@ -7533,6 +7536,7 @@ static int vmx_leave_smm(struct kvm_vcpu *vcpu, const char *smstate)
 
 		vmx->nested.smm.guest_mode = false;
 	}
+	flip_arch_lbr_ctl(vcpu, true);
 	return 0;
 }
 
