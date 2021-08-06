@@ -887,7 +887,8 @@ unsigned int ovl_get_nlink(struct ovl_fs *ofs, struct dentry *lowerdentry,
 	char buf[13];
 	int err;
 
-	if (!lowerdentry || !upperdentry || d_inode(lowerdentry)->i_nlink == 1)
+	if (!lowerdentry || !upperdentry ||
+		(!ofs->config.nfs_export && d_inode(lowerdentry)->i_nlink == 1))
 		return fallback;
 
 	err = ovl_do_getxattr(ofs, upperdentry, OVL_XATTR_NLINK,
