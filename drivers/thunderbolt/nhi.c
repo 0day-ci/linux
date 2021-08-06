@@ -385,11 +385,25 @@ void tb_ring_poll_complete(struct tb_ring *ring)
 }
 EXPORT_SYMBOL_GPL(tb_ring_poll_complete);
 
+static void check_and_clear_intr_status(struct tb_ring *ring)
+{
+	if (!(ring->nhi->quirks & REG_DMA_MISC_INT_AUTO_CLEAR)) {
+		if (ring->is_tx)
+			ioread32(ring->nhi->iobase
+				 + REG_RING_NOTIFY_BASE);
+		else
+			ioread32(ring->nhi->iobase
+				 + REG_RING_NOTIFY_BASE
+				 + 4 * (ring->nhi->hop_count / 32));
+	}
+}
+
 static irqreturn_t ring_msix(int irq, void *data)
 {
 	struct tb_ring *ring = data;
 
 	spin_lock(&ring->nhi->lock);
+	check_and_clear_intr_status(ring);
 	spin_lock(&ring->lock);
 	__ring_interrupt(ring);
 	spin_unlock(&ring->lock);
