@@ -8,6 +8,7 @@
  * Copyright (C) 2000-2004 Russell King
  */
 
+#include <linux/align.h>
 #include <linux/acpi_iort.h>
 #include <linux/device.h>
 #include <linux/dma-map-ops.h>
@@ -50,6 +51,15 @@ struct iommu_dma_cookie {
 	/* Domain for flush queue callback; NULL if flush queue not in use */
 	struct iommu_domain		*fq_domain;
 };
+
+/* aligns size to CPU and IOMMU page size */
+static inline size_t iommu_page_align(struct device *dev, size_t size)
+{
+	struct iommu_domain *domain = iommu_get_dma_domain(dev);
+	struct iommu_dma_cookie *cookie = domain->iova_cookie;
+
+	return iova_align(&cookie->iovad, PAGE_ALIGN(size));
+}
 
 static DEFINE_STATIC_KEY_FALSE(iommu_deferred_attach_enabled);
 bool iommu_dma_forcedac __read_mostly;
@@ -647,6 +657,8 @@ static struct page **__iommu_dma_alloc_pages(struct device *dev,
 /*
  * If size is less than PAGE_SIZE, then a full CPU page will be allocated,
  * but an IOMMU which supports smaller pages might not map the whole thing.
+ * If the IOMMU page size is larger than the CPU page size, then the size
+ * will be aligned to that granularity and some memory will be left unused.
  */
 static struct page **__iommu_dma_alloc_noncontiguous(struct device *dev,
 		size_t size, struct sg_table *sgt, gfp_t gfp, pgprot_t prot,
@@ -736,7 +748,7 @@ static void *iommu_dma_alloc_remap(struct device *dev, size_t size,
 
 out_unmap:
 	__iommu_dma_unmap(dev, *dma_handle, size);
-	__iommu_dma_free_pages(pages, PAGE_ALIGN(size) >> PAGE_SHIFT);
+	__iommu_dma_free_pages(pages, iommu_page_align(dev, size) >> PAGE_SHIFT);
 	return NULL;
 }
 
@@ -766,7 +778,8 @@ static void iommu_dma_free_noncontiguous(struct device *dev, size_t size,
 	struct dma_sgt_handle *sh = sgt_handle(sgt);
 
 	__iommu_dma_unmap(dev, sgt->sgl->dma_address, size);
-	__iommu_dma_free_pages(sh->pages, PAGE_ALIGN(size) >> PAGE_SHIFT);
+	__iommu_dma_free_pages(sh->pages,
+		iommu_page_align(dev, size) >> PAGE_SHIFT);
 	sg_free_table(&sh->sgt);
 	kfree(sh);
 }
@@ -1007,6 +1020,31 @@ static int iommu_dma_map_sg(struct device *dev, struct scatterlist *sg,
 		return iommu_dma_map_sg_swiotlb(dev, sg, nents, dir, attrs);
 
 	/*
+	 * If the IOMMU pagesize is larger than the CPU pagesize we will
+	 * very likely run into sgs with a physical address that is not aligned
+	 * to an IOMMU page boundary. Fall back to just mapping every entry
+	 * independently with __iommu_dma_map then.
+	 */
+	if (iovad->granule > PAGE_SIZE) {
+		for_each_sg(sg, s, nents, i) {
+			sg_dma_address(s) = __iommu_dma_map(dev, sg_phys(s),
+				s->length, prot, dma_get_mask(dev));
+			if (sg_dma_address(s) == DMA_MAPPING_ERROR)
+				break;
+			sg_dma_len(s) = s->length;
+		}
+
+		if (unlikely(i != nents)) {
+			nents = i;
+			for_each_sg(sg, s, nents, i)
+				__iommu_dma_unmap(dev, sg_dma_address(s), sg_dma_len(s));
+			return 0;
+		}
+
+		return nents;
+	}
+
+	/*
 	 * Work out how much IOVA space we need, and align the segments to
 	 * IOVA granules for the IOMMU driver to handle. With some clever
 	 * trickery we can modify the list in-place, but reversibly, by
@@ -1068,6 +1106,9 @@ out_restore_sg:
 static void iommu_dma_unmap_sg(struct device *dev, struct scatterlist *sg,
 		int nents, enum dma_data_direction dir, unsigned long attrs)
 {
+	struct iommu_domain *domain = iommu_get_dma_domain(dev);
+	struct iommu_dma_cookie *cookie = domain->iova_cookie;
+	struct iova_domain *iovad = &cookie->iovad;
 	dma_addr_t start, end;
 	struct scatterlist *tmp;
 	int i;
@@ -1077,6 +1118,17 @@ static void iommu_dma_unmap_sg(struct device *dev, struct scatterlist *sg,
 
 	if (dev_is_untrusted(dev)) {
 		iommu_dma_unmap_sg_swiotlb(dev, sg, nents, dir, attrs);
+		return;
+	}
+
+	/*
+	 * If the IOMMU pagesize is larger than the CPU pagesize we mapped
+	 * every entry indepedently with __iommu_dma_map then. Let's do the
+	 * opposite here.
+	 */
+	if (iovad->granule > PAGE_SIZE) {
+		for_each_sg(sg, tmp, nents, i)
+			__iommu_dma_unmap(dev, sg_dma_address(tmp), sg_dma_len(tmp));
 		return;
 	}
 
@@ -1110,7 +1162,7 @@ static void iommu_dma_unmap_resource(struct device *dev, dma_addr_t handle,
 
 static void __iommu_dma_free(struct device *dev, size_t size, void *cpu_addr)
 {
-	size_t alloc_size = PAGE_ALIGN(size);
+	size_t alloc_size = iommu_page_align(dev, size);
 	int count = alloc_size >> PAGE_SHIFT;
 	struct page *page = NULL, **pages = NULL;
 
@@ -1150,7 +1202,7 @@ static void *iommu_dma_alloc_pages(struct device *dev, size_t size,
 		struct page **pagep, gfp_t gfp, unsigned long attrs)
 {
 	bool coherent = dev_is_dma_coherent(dev);
-	size_t alloc_size = PAGE_ALIGN(size);
+	size_t alloc_size = iommu_page_align(dev, size);
 	int node = dev_to_node(dev);
 	struct page *page = NULL;
 	void *cpu_addr;
@@ -1201,8 +1253,8 @@ static void *iommu_dma_alloc(struct device *dev, size_t size,
 
 	if (IS_ENABLED(CONFIG_DMA_DIRECT_REMAP) &&
 	    !gfpflags_allow_blocking(gfp) && !coherent)
-		page = dma_alloc_from_pool(dev, PAGE_ALIGN(size), &cpu_addr,
-					       gfp, NULL);
+		page = dma_alloc_from_pool(dev, iommu_page_align(dev, size),
+					       &cpu_addr, gfp, NULL);
 	else
 		cpu_addr = iommu_dma_alloc_pages(dev, size, &page, gfp, attrs);
 	if (!cpu_addr)
@@ -1253,6 +1305,7 @@ static int iommu_dma_get_sgtable(struct device *dev, struct sg_table *sgt,
 		void *cpu_addr, dma_addr_t dma_addr, size_t size,
 		unsigned long attrs)
 {
+	size_t aligned_size = iommu_page_align(dev, size);
 	struct page *page;
 	int ret;
 
@@ -1261,7 +1314,7 @@ static int iommu_dma_get_sgtable(struct device *dev, struct sg_table *sgt,
 
 		if (pages) {
 			return sg_alloc_table_from_pages(sgt, pages,
-					PAGE_ALIGN(size) >> PAGE_SHIFT,
+					aligned_size >> PAGE_SHIFT,
 					0, size, GFP_KERNEL);
 		}
 
@@ -1272,7 +1325,7 @@ static int iommu_dma_get_sgtable(struct device *dev, struct sg_table *sgt,
 
 	ret = sg_alloc_table(sgt, 1, GFP_KERNEL);
 	if (!ret)
-		sg_set_page(sgt->sgl, page, PAGE_ALIGN(size), 0);
+		sg_set_page(sgt->sgl, page, aligned_size, 0);
 	return ret;
 }
 
@@ -1283,11 +1336,25 @@ static unsigned long iommu_dma_get_merge_boundary(struct device *dev)
 	return (1UL << __ffs(domain->pgsize_bitmap)) - 1;
 }
 
+static struct page *iommu_dma_alloc_aligned_pages(struct device *dev, size_t size,
+		dma_addr_t *dma_handle, enum dma_data_direction dir, gfp_t gfp)
+{
+	size = iommu_page_align(dev, size);
+	return dma_common_alloc_pages(dev, size, dma_handle, dir, gfp);
+}
+
+static void iommu_dma_free_aligned_pages(struct device *dev, size_t size, struct page *page,
+		dma_addr_t dma_handle, enum dma_data_direction dir)
+{
+	size = iommu_page_align(dev, size);
+	return dma_common_free_pages(dev, size, page, dma_handle, dir);
+}
+
 static const struct dma_map_ops iommu_dma_ops = {
 	.alloc			= iommu_dma_alloc,
 	.free			= iommu_dma_free,
-	.alloc_pages		= dma_common_alloc_pages,
-	.free_pages		= dma_common_free_pages,
+	.alloc_pages		= iommu_dma_alloc_aligned_pages,
+	.free_pages		= iommu_dma_free_aligned_pages,
 #ifdef CONFIG_DMA_REMAP
 	.alloc_noncontiguous	= iommu_dma_alloc_noncontiguous,
 	.free_noncontiguous	= iommu_dma_free_noncontiguous,
