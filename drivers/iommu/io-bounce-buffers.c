@@ -409,8 +409,16 @@ static bool io_bounce_buffers_map_buffer(struct io_bounce_buffers *buffers,
 	return mapped >= info->size;
 }
 
-static bool use_bounce_buffer(bool force_bounce, size_t size)
+static bool use_bounce_buffer(struct device *dev, unsigned long attrs,
+			      bool force_bounce, size_t size)
 {
+	if (attrs & DMA_ATTR_PERSISTENT_STREAMING) {
+		WARN_ONCE(force_bounce,
+			  "Skipping bounce buffer for untrusted mapping %s\n",
+			  dev_name(dev));
+		return false;
+	}
+
 	if (IS_ENABLED(CONFIG_IOMMU_BOUNCE_BUFFERS) &&
 	    size <= always_bounce_limit)
 		return true;
@@ -429,7 +437,7 @@ bool io_bounce_buffers_map_page(struct io_bounce_buffers *buffers,
 	bool force_bounce = buffers->untrusted &&
 			    iova_offset(buffers->iovad, offset | size);
 
-	if (!use_bounce_buffer(force_bounce, size))
+	if (!use_bounce_buffer(dev, attrs, force_bounce, size))
 		return false;
 
 	*handle = DMA_MAPPING_ERROR;
@@ -476,7 +484,7 @@ bool io_bounce_buffers_map_sg(struct io_bounce_buffers *buffers,
 				buffers->iovad, iter->offset | iter->length);
 	}
 
-	if (!use_bounce_buffer(force_bounce, size))
+	if (!use_bounce_buffer(dev, attrs, force_bounce, size))
 		return false;
 
 	*out_nents = 0;

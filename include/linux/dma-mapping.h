@@ -62,6 +62,17 @@
 #define DMA_ATTR_PRIVILEGED		(1UL << 9)
 
 /*
+ * DMA_ATTR_PERSISTENT_STREAMING: Indicates that the streaming mapping is long
+ * lived, so syncing performance should be prioritized over mapping/unmapping
+ * performance. Platform code will establish a mapping which only requires CPU
+ * cache synchronization.
+ *
+ * Callers that create long lived mappings and directly handle CPU cache
+ * management without calling using dma_sync_* functions must set this flag.
+ */
+#define DMA_ATTR_PERSISTENT_STREAMING	(1UL << 10)
+
+/*
  * A dma_addr_t can hold any valid DMA or bus address for the platform.  It can
  * be given to a device to use as a DMA source or target.  It is specific to a
  * given device and there may be a translation between the CPU physical address
