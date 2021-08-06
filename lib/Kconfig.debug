@@ -87,6 +87,20 @@ config MESSAGE_LOGLEVEL_DEFAULT
 	  by default. To change that, use loglevel=<x> in the kernel bootargs,
 	  or pick a different CONSOLE_LOGLEVEL_DEFAULT configuration value.
 
+config DEBUG_SYNCHRO_TEST
+	tristate "Synchronisation primitive testing module"
+	depends on DEBUG_KERNEL
+	default n
+	help
+	  This option provides a kernel module that can thrash the sleepable
+	  synchronisation primitives (mutexes and semaphores).
+
+	  You should say N or M here. Whilst the module can be built in, it's
+	  not recommended as it requires module parameters supplying to get it
+	  to do anything.
+
+	  See Documentation/synchro-test.txt.
+
 config BOOT_PRINTK_DELAY
 	bool "Delay each boot printk message by N milliseconds"
 	depends on DEBUG_KERNEL && PRINTK && GENERIC_CALIBRATE_DELAY
