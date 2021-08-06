@@ -125,6 +125,15 @@ struct ice_fltr_info {
 	u8 lan_en;	/* Indicate if packet can be forwarded to the uplink */
 };
 
+struct ice_update_recipe_lkup_idx_params {
+	u16 rid;
+	u16 fv_idx;
+	bool ignore_valid;
+	u16 mask;
+	bool mask_valid;
+	u8 lkup_idx;
+};
+
 struct ice_sw_recipe {
 	struct list_head l_entry;
 
