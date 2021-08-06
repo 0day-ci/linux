@@ -186,12 +186,50 @@ __get_data_size(struct trace_probe *tp, struct pt_regs *regs)
 	return ret;
 }
 
+static unsigned long get_event_field(struct fetch_insn *code, void *rec)
+{
+	struct ftrace_event_field *field = code->data;
+	unsigned long val;
+	void *addr;
+
+	addr = rec + field->offset;
+
+	switch (field->size) {
+	case 1:
+		if (field->is_signed)
+			val = *(char *)addr;
+		else
+			val = *(unsigned char *)addr;
+		break;
+	case 2:
+		if (field->is_signed)
+			val = *(short *)addr;
+		else
+			val = *(unsigned short *)addr;
+		break;
+	case 4:
+		if (field->is_signed)
+			val = *(int *)addr;
+		else
+			val = *(unsigned int *)addr;
+		break;
+	default:
+		if (field->is_signed)
+			val = *(long *)addr;
+		else
+			val = *(unsigned long *)addr;
+		break;
+	}
+	return val;
+}
+
 /* Store the value of each argument */
 static nokprobe_inline void
-store_trace_args(void *data, struct trace_probe *tp, struct pt_regs *regs,
-		 int header_size, int maxlen)
+store_trace_args_ext(void *data, struct trace_probe *tp, void *rec,
+		     int header_size, int maxlen, bool reg)
 {
 	struct probe_arg *arg;
+	unsigned long val;
 	void *base = data - header_size;
 	void *dyndata = data + tp->size;
 	u32 *dl;	/* Data location */
@@ -203,7 +241,12 @@ store_trace_args(void *data, struct trace_probe *tp, struct pt_regs *regs,
 		/* Point the dynamic data area if needed */
 		if (unlikely(arg->dynamic))
 			*dl = make_data_loc(maxlen, dyndata - base);
-		ret = process_fetch_insn(arg->code, regs, dl, base);
+		if (reg) {
+			ret = process_fetch_insn(arg->code, rec, dl, base);
+		} else {
+			val = get_event_field(arg->code, rec);
+			ret = process_fetch_insn_bottom(arg->code + 1, val, dl, base);
+		}
 		if (unlikely(ret < 0 && arg->dynamic)) {
 			*dl = make_data_loc(0, dyndata - base);
 		} else {
@@ -211,6 +254,13 @@ store_trace_args(void *data, struct trace_probe *tp, struct pt_regs *regs,
 			maxlen -= ret;
 		}
 	}
+}
+
+static nokprobe_inline void
+store_trace_args(void *data, struct trace_probe *tp, struct pt_regs *regs,
+		 int header_size, int maxlen)
+{
+	store_trace_args_ext(data, tp, regs, header_size, maxlen, true);
 }
 
 static inline int

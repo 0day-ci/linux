@@ -154,6 +154,16 @@ struct kretprobe {
 	struct kretprobe_holder *rph;
 };
 
+struct keventprobe {
+	/* tracepoint system */
+	const char *event_system;
+
+	/* tracepoint event */
+	const char *event_name;
+
+	struct trace_event_call *event;
+};
+
 struct kretprobe_instance {
 	union {
 		struct freelist_node freelist;

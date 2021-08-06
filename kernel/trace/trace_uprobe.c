@@ -641,7 +641,7 @@ static int __trace_uprobe_create(int argc, const char **argv)
 	trace_probe_log_set_index(0);
 	if (event) {
 		ret = traceprobe_parse_event_name(&event, &group, buf,
-						  event - argv[0]);
+						  event - argv[0], '/');
 		if (ret)
 			goto fail_address_parse;
 	} else {
