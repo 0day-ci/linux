@@ -146,6 +146,7 @@ static void ice_free_q_vector(struct ice_vsi *vsi, int v_idx)
 {
 	struct ice_q_vector *q_vector;
 	struct ice_pf *pf = vsi->back;
+	struct ice_tx_ring *tx_ring;
 	struct ice_ring *ring;
 	struct device *dev;
 
@@ -156,8 +157,8 @@ static void ice_free_q_vector(struct ice_vsi *vsi, int v_idx)
 	}
 	q_vector = vsi->q_vectors[v_idx];
 
-	ice_for_each_ring(ring, q_vector->tx)
-		ring->q_vector = NULL;
+	ice_for_each_tx_ring(tx_ring, q_vector->tx)
+		tx_ring->q_vector = NULL;
 	ice_for_each_ring(ring, q_vector->rx)
 		ring->q_vector = NULL;
 
@@ -206,7 +207,7 @@ static void ice_cfg_itr_gran(struct ice_hw *hw)
  * @ring: ring to get the absolute queue index
  * @tc: traffic class number
  */
-static u16 ice_calc_q_handle(struct ice_vsi *vsi, struct ice_ring *ring, u8 tc)
+static u16 ice_calc_q_handle(struct ice_vsi *vsi, struct ice_tx_ring *ring, u8 tc)
 {
 	WARN_ONCE(ice_ring_is_xdp(ring) && tc, "XDP ring can't belong to TC other than 0\n");
 
@@ -224,7 +225,7 @@ static u16 ice_calc_q_handle(struct ice_vsi *vsi, struct ice_ring *ring, u8 tc)
  * This enables/disables XPS for a given Tx descriptor ring
  * based on the TCs enabled for the VSI that ring belongs to.
  */
-static void ice_cfg_xps_tx_ring(struct ice_ring *ring)
+static void ice_cfg_xps_tx_ring(struct ice_tx_ring *ring)
 {
 	if (!ring->q_vector || !ring->netdev)
 		return;
@@ -246,7 +247,7 @@ static void ice_cfg_xps_tx_ring(struct ice_ring *ring)
  * Configure the Tx descriptor ring in TLAN context.
  */
 static void
-ice_setup_tx_ctx(struct ice_ring *ring, struct ice_tlan_ctx *tlan_ctx, u16 pf_q)
+ice_setup_tx_ctx(struct ice_tx_ring *ring, struct ice_tlan_ctx *tlan_ctx, u16 pf_q)
 {
 	struct ice_vsi *vsi = ring->vsi;
 	struct ice_hw *hw = &vsi->back->hw;
@@ -258,7 +259,7 @@ ice_setup_tx_ctx(struct ice_ring *ring, struct ice_tlan_ctx *tlan_ctx, u16 pf_q)
 	/* Transmit Queue Length */
 	tlan_ctx->qlen = ring->count;
 
-	ice_set_cgd_num(tlan_ctx, ring);
+	ice_set_cgd_num(tlan_ctx, ring->dcb_tc);
 
 	/* PF number */
 	tlan_ctx->pf_num = hw->pf_id;
@@ -660,16 +661,16 @@ void ice_vsi_map_rings_to_vectors(struct ice_vsi *vsi)
 		tx_rings_per_v = (u8)DIV_ROUND_UP(tx_rings_rem,
 						  q_vectors - v_id);
 		q_vector->num_ring_tx = tx_rings_per_v;
-		q_vector->tx.ring = NULL;
+		q_vector->tx.tx_ring = NULL;
 		q_vector->tx.itr_idx = ICE_TX_ITR;
 		q_base = vsi->num_txq - tx_rings_rem;
 
 		for (q_id = q_base; q_id < (q_base + tx_rings_per_v); q_id++) {
-			struct ice_ring *tx_ring = vsi->tx_rings[q_id];
+			struct ice_tx_ring *tx_ring = vsi->tx_rings[q_id];
 
 			tx_ring->q_vector = q_vector;
-			tx_ring->next = q_vector->tx.ring;
-			q_vector->tx.ring = tx_ring;
+			tx_ring->next = q_vector->tx.tx_ring;
+			q_vector->tx.tx_ring = tx_ring;
 		}
 		tx_rings_rem -= tx_rings_per_v;
 
@@ -711,7 +712,7 @@ void ice_vsi_free_q_vectors(struct ice_vsi *vsi)
  * @qg_buf: queue group buffer
  */
 int
-ice_vsi_cfg_txq(struct ice_vsi *vsi, struct ice_ring *ring,
+ice_vsi_cfg_txq(struct ice_vsi *vsi, struct ice_tx_ring *ring,
 		struct ice_aqc_add_tx_qgrp *qg_buf)
 {
 	u8 buf_len = struct_size(qg_buf, txqs, 1);
@@ -870,7 +871,7 @@ void ice_trigger_sw_intr(struct ice_hw *hw, struct ice_q_vector *q_vector)
  */
 int
 ice_vsi_stop_tx_ring(struct ice_vsi *vsi, enum ice_disq_rst_src rst_src,
-		     u16 rel_vmvf_num, struct ice_ring *ring,
+		     u16 rel_vmvf_num, struct ice_tx_ring *ring,
 		     struct ice_txq_meta *txq_meta)
 {
 	struct ice_pf *pf = vsi->back;
@@ -927,7 +928,7 @@ ice_vsi_stop_tx_ring(struct ice_vsi *vsi, enum ice_disq_rst_src rst_src,
  * are needed for stopping Tx queue
  */
 void
-ice_fill_txq_meta(struct ice_vsi *vsi, struct ice_ring *ring,
+ice_fill_txq_meta(struct ice_vsi *vsi, struct ice_tx_ring *ring,
 		  struct ice_txq_meta *txq_meta)
 {
 	u8 tc;

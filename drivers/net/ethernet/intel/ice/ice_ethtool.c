@@ -584,7 +584,7 @@ static bool ice_lbtest_check_frame(u8 *frame)
  *
  * Function sends loopback packets on a test Tx ring.
  */
-static int ice_diag_send(struct ice_ring *tx_ring, u8 *data, u16 size)
+static int ice_diag_send(struct ice_tx_ring *tx_ring, u8 *data, u16 size)
 {
 	struct ice_tx_desc *tx_desc;
 	struct ice_tx_buf *tx_buf;
@@ -676,9 +676,10 @@ static u64 ice_loopback_test(struct net_device *netdev)
 	struct ice_netdev_priv *np = netdev_priv(netdev);
 	struct ice_vsi *orig_vsi = np->vsi, *test_vsi;
 	struct ice_pf *pf = orig_vsi->back;
-	struct ice_ring *tx_ring, *rx_ring;
 	u8 broadcast[ETH_ALEN], ret = 0;
 	int num_frames, valid_frames;
+	struct ice_tx_ring *tx_ring;
+	struct ice_ring *rx_ring;
 	struct device *dev;
 	u8 *tx_frame;
 	int i;
@@ -1318,6 +1319,7 @@ ice_get_ethtool_stats(struct net_device *netdev,
 	struct ice_netdev_priv *np = netdev_priv(netdev);
 	struct ice_vsi *vsi = np->vsi;
 	struct ice_pf *pf = vsi->back;
+	struct ice_tx_ring *tx_ring;
 	struct ice_ring *ring;
 	unsigned int j;
 	int i = 0;
@@ -1336,10 +1338,10 @@ ice_get_ethtool_stats(struct net_device *netdev,
 	rcu_read_lock();
 
 	ice_for_each_alloc_txq(vsi, j) {
-		ring = READ_ONCE(vsi->tx_rings[j]);
+		tx_ring = READ_ONCE(vsi->tx_rings[j]);
 		if (ring) {
-			data[i++] = ring->stats.pkts;
-			data[i++] = ring->stats.bytes;
+			data[i++] = tx_ring->stats.pkts;
+			data[i++] = tx_ring->stats.bytes;
 		} else {
 			data[i++] = 0;
 			data[i++] = 0;
@@ -2667,9 +2669,10 @@ ice_get_ringparam(struct net_device *netdev, struct ethtool_ringparam *ring)
 static int
 ice_set_ringparam(struct net_device *netdev, struct ethtool_ringparam *ring)
 {
-	struct ice_ring *tx_rings = NULL, *rx_rings = NULL;
+	struct ice_tx_ring *tx_rings = NULL;
+	struct ice_ring *rx_rings = NULL;
 	struct ice_netdev_priv *np = netdev_priv(netdev);
-	struct ice_ring *xdp_rings = NULL;
+	struct ice_tx_ring *xdp_rings = NULL;
 	struct ice_vsi *vsi = np->vsi;
 	struct ice_pf *pf = vsi->back;
 	int i, timeout = 50, err = 0;
