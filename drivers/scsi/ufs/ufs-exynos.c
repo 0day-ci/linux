@@ -31,6 +31,8 @@
 #define HCI_RXPRDT_ENTRY_SIZE	0x04
 #define HCI_1US_TO_CNT_VAL	0x0C
 #define CNT_VAL_1US_MASK	0x3FF
+#define VENDOR_SPECIFIC_IS	0x38
+#define VENDOR_SPECIFIC_IE	0x3C
 #define HCI_UTRL_NEXUS_TYPE	0x40
 #define HCI_UTMRL_NEXUS_TYPE	0x44
 #define HCI_SW_RST		0x50
@@ -73,6 +75,18 @@
 				 UIC_TRANSPORT_UNKNOWN_CPORTID |\
 				 UIC_TRANSPORT_NO_CONNECTION_RX |\
 				 UIC_TRANSPORT_BAD_TC)
+
+enum exynos_ufs_vs_interrupt {
+	/*
+	 * This occurs when information of a pending request isn't
+	 * the same with incoming UPIU for the request. For example,
+	 * if UFS driver rings with task tag #1, subsequential UPIUs
+	 * for this must have one as the value of task tag. But if
+	 * it's corrutped until the host receives it or incoming UPIUs
+	 * has an unexpected value for task tag, this raises.
+	 */
+	RX_UPIU_HIT_ERROR	= 1 << 19,
+};
 
 enum {
 	UNIPRO_L1_5 = 0,/* PHY Adapter */
@@ -996,6 +1010,10 @@ static int exynos_ufs_init(struct ufs_hba *hba)
 		goto out;
 	exynos_ufs_specify_phy_time_attr(ufs);
 	exynos_ufs_config_smu(ufs);
+
+	/* enable vendor interrupts */
+	hci_writel(ufs, VENDOR_SPECIFIC_IE, RX_UPIU_HIT_ERROR);
+
 	return 0;
 
 phy_off:
@@ -1005,26 +1023,33 @@ out:
 	return ret;
 }
 
-static int exynos_ufs_host_reset(struct ufs_hba *hba)
+static int exynos_ufs_host_reset(struct exynos_ufs *ufs)
+{
+	unsigned long timeout = jiffies + msecs_to_jiffies(1);
+
+	/* host reset */
+	hci_writel(ufs, UFS_SW_RST_MASK, HCI_SW_RST);
+	do {
+		if (!(hci_readl(ufs, HCI_SW_RST) & UFS_SW_RST_MASK))
+			return 0;
+	} while (time_before(jiffies, timeout));
+
+	pr_err("timeout host sw-reset\n");
+	return -ETIMEDOUT;
+}
+
+static int exynos_ufs_host_init(struct ufs_hba *hba)
 {
 	struct exynos_ufs *ufs = ufshcd_get_variant(hba);
-	unsigned long timeout = jiffies + msecs_to_jiffies(1);
 	u32 val;
-	int ret = 0;
+	int ret;
 
 	exynos_ufs_disable_auto_ctrl_hcc_save(ufs, &val);
 
-	hci_writel(ufs, UFS_SW_RST_MASK, HCI_SW_RST);
+	ret = exynos_ufs_host_reset(ufs);
+	if (ret)
+		return ret;
 
-	do {
-		if (!(hci_readl(ufs, HCI_SW_RST) & UFS_SW_RST_MASK))
-			goto out;
-	} while (time_before(jiffies, timeout));
-
-	dev_err(hba->dev, "timeout host sw-reset\n");
-	ret = -ETIMEDOUT;
-
-out:
 	exynos_ufs_auto_ctrl_hcc_restore(ufs, &val);
 	return ret;
 }
@@ -1110,7 +1135,7 @@ static int exynos_ufs_hce_enable_notify(struct ufs_hba *hba,
 
 	switch (status) {
 	case PRE_CHANGE:
-		ret = exynos_ufs_host_reset(hba);
+		ret = exynos_ufs_host_init(hba);
 		if (ret)
 			return ret;
 		exynos_ufs_dev_hw_reset(hba);
@@ -1198,6 +1223,34 @@ static int exynos_ufs_resume(struct ufs_hba *hba, enum ufs_pm_op pm_op)
 	return 0;
 }
 
+static irqreturn_t exynos_ufs_isr(struct ufs_hba *hba, int *res)
+{
+	struct exynos_ufs *ufs = ufshcd_get_variant(hba);
+	u32 status;
+
+	status = hci_readl(ufs, VENDOR_SPECIFIC_IS);
+	hci_writel(ufs, status, VENDOR_SPECIFIC_IS);
+	/*
+	 * If host doesn't guarantee integrity of UTP transmission,
+	 * it needs to be reset immediately to make it unable to
+	 * proceed requests. Because w/o this, if UTP functions
+	 * in host doesn't work properly for such system power margins,
+	 * DATA IN from broken devices or whatever in the real world,
+	 * some unexpected events could happen, such as tranferring
+	 * a broken DATA IN to a device. It could be various types of
+	 * problems on the level of file system. In this case, I think
+	 * blocking the host's functionality is the best strategy.
+	 * Perhaps, if its root cause is temporary, system could recover.
+	 */
+	if (status & RX_UPIU_HIT_ERROR) {
+		pr_err("%s: status: 0x%08x\n", __func__, status);
+		exynos_ufs_host_reset(ufs);
+		*res = 1;
+		return IRQ_HANDLED;
+	}
+	return IRQ_NONE;
+}
+
 static struct ufs_hba_variant_ops ufs_hba_exynos_ops = {
 	.name				= "exynos_ufs",
 	.init				= exynos_ufs_init,
@@ -1209,6 +1262,7 @@ static struct ufs_hba_variant_ops ufs_hba_exynos_ops = {
 	.hibern8_notify			= exynos_ufs_hibern8_notify,
 	.suspend			= exynos_ufs_suspend,
 	.resume				= exynos_ufs_resume,
+	.intr				= exynos_ufs_isr,
 };
 
 static int exynos_ufs_probe(struct platform_device *pdev)
