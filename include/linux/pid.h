@@ -5,14 +5,16 @@
 #include <linux/rculist.h>
 #include <linux/wait.h>
 #include <linux/refcount.h>
+#include <uapi/linux/pid.h>
 
 enum pid_type
 {
-	PIDTYPE_PID,
-	PIDTYPE_TGID,
-	PIDTYPE_PGID,
-	PIDTYPE_SID,
-	PIDTYPE_MAX,
+	PIDTYPE_PID = __PIDTYPE_PID,
+	PIDTYPE_TGID = __PIDTYPE_TGID,
+	PIDTYPE_PGID = __PIDTYPE_PGID,
+	PIDTYPE_SID = __PIDTYPE_SID,
+
+	PIDTYPE_MAX = __PIDTYPE_MAX
 };
 
 /*

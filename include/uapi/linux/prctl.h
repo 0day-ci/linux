@@ -3,6 +3,7 @@
 #define _LINUX_PRCTL_H
 
 #include <linux/types.h>
+#include <linux/pid.h> /* enum __kernel_pid_type */
 
 /* Values to pass as first argument to prctl() */
 
