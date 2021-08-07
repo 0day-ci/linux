@@ -987,10 +987,11 @@ qca8k_setup(struct dsa_switch *ds)
 		return ret;
 	}
 
-	/* Disable forwarding by default on all ports */
+	/* Disable forwarding and learning by default on all ports */
 	for (i = 0; i < QCA8K_NUM_PORTS; i++) {
 		ret = qca8k_rmw(priv, QCA8K_PORT_LOOKUP_CTRL(i),
-				QCA8K_PORT_LOOKUP_MEMBER, 0);
+				QCA8K_PORT_LOOKUP_MEMBER |
+				QCA8K_PORT_LOOKUP_LEARN, 0);
 		if (ret)
 			return ret;
 	}
@@ -1025,12 +1026,6 @@ qca8k_setup(struct dsa_switch *ds)
 			ret = qca8k_rmw(priv, QCA8K_PORT_LOOKUP_CTRL(i),
 					QCA8K_PORT_LOOKUP_MEMBER,
 					BIT(QCA8K_CPU_PORT));
-			if (ret)
-				return ret;
-
-			/* Enable ARP Auto-learning by default */
-			ret = qca8k_reg_set(priv, QCA8K_PORT_LOOKUP_CTRL(i),
-					    QCA8K_PORT_LOOKUP_LEARN);
 			if (ret)
 				return ret;
 
@@ -1505,6 +1500,53 @@ qca8k_port_stp_state_set(struct dsa_switch *ds, int port, u8 state)
 }
 
 static int
+qca8k_port_pre_bridge_flags(struct dsa_switch *ds, int port,
+			    struct switchdev_brport_flags flags,
+			    struct netlink_ext_ack *extack)
+{
+	if (flags.mask & ~(BR_LEARNING | BR_FLOOD | BR_MCAST_FLOOD |
+			   BR_BCAST_FLOOD))
+		return -EINVAL;
+
+	return 0;
+}
+
+static int
+qca8k_port_bridge_flags(struct dsa_switch *ds, int port,
+			struct switchdev_brport_flags flags,
+			struct netlink_ext_ack *extack)
+{
+	struct qca8k_priv *priv = ds->priv;
+	int ret = 0;
+
+	if (!ret && flags.mask & BR_LEARNING)
+		ret = qca8k_rmw(priv, QCA8K_PORT_LOOKUP_CTRL(port),
+				QCA8K_PORT_LOOKUP_LEARN,
+				flags.val & BR_LEARNING ?
+				QCA8K_PORT_LOOKUP_LEARN : 0);
+
+	if (!ret && flags.mask & BR_FLOOD)
+		ret = qca8k_rmw(priv, QCA8K_REG_GLOBAL_FW_CTRL1,
+				BIT(port + QCA8K_GLOBAL_FW_CTRL1_UC_DP_S),
+				flags.val & BR_FLOOD ?
+				BIT(port + QCA8K_GLOBAL_FW_CTRL1_UC_DP_S) : 0);
+
+	if (!ret && flags.mask & BR_MCAST_FLOOD)
+		ret = qca8k_rmw(priv, QCA8K_REG_GLOBAL_FW_CTRL1,
+				BIT(port + QCA8K_GLOBAL_FW_CTRL1_MC_DP_S),
+				flags.val & BR_MCAST_FLOOD ?
+				BIT(port + QCA8K_GLOBAL_FW_CTRL1_MC_DP_S) : 0);
+
+	if (!ret && flags.mask & BR_BCAST_FLOOD)
+		ret = qca8k_rmw(priv, QCA8K_REG_GLOBAL_FW_CTRL1,
+				BIT(port + QCA8K_GLOBAL_FW_CTRL1_BC_DP_S),
+				flags.val & BR_BCAST_FLOOD ?
+				BIT(port + QCA8K_GLOBAL_FW_CTRL1_BC_DP_S) : 0);
+
+	return ret;
+}
+
+static int
 qca8k_port_bridge_join(struct dsa_switch *ds, int port, struct net_device *br)
 {
 	struct qca8k_priv *priv = (struct qca8k_priv *)ds->priv;
@@ -1764,6 +1806,8 @@ static const struct dsa_switch_ops qca8k_switch_ops = {
 	.port_change_mtu	= qca8k_port_change_mtu,
 	.port_max_mtu		= qca8k_port_max_mtu,
 	.port_stp_state_set	= qca8k_port_stp_state_set,
+	.port_pre_bridge_flags	= qca8k_port_pre_bridge_flags,
+	.port_bridge_flags	= qca8k_port_bridge_flags,
 	.port_bridge_join	= qca8k_port_bridge_join,
 	.port_bridge_leave	= qca8k_port_bridge_leave,
 	.port_fdb_add		= qca8k_port_fdb_add,
