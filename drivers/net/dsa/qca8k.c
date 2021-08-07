@@ -1114,6 +1114,8 @@ qca8k_setup(struct dsa_switch *ds)
 	/* We don't have interrupts for link changes, so we need to poll */
 	ds->pcs_poll = true;
 
+	ds->assisted_learning_on_cpu_port = true;
+
 	return 0;
 }
 
