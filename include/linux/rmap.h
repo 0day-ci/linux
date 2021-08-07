@@ -95,6 +95,7 @@ enum ttu_flags {
 					 * do a final flush if necessary */
 	TTU_RMAP_LOCKED		= 0x80,	/* do not grab rmap lock:
 					 * caller holds it */
+	TTU_HINT_PAGEOUT	= 0x100, /* Hint for pageout operation */
 };
 
 #ifdef CONFIG_MMU

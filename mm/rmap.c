@@ -1384,6 +1384,22 @@ out:
 	unlock_page_memcg(page);
 }
 
+static inline void
+pte_marker_install(struct vm_area_struct *vma, pte_t *pte,
+		   struct page *page, unsigned long address)
+{
+#ifdef CONFIG_PTE_MARKER_PAGEOUT
+	swp_entry_t entry;
+	pte_t pteval;
+
+	if (vma_is_shmem(vma) && !PageAnon(page) && pte_none(*pte)) {
+		entry = make_pte_marker_entry(PTE_MARKER_PAGEOUT);
+		pteval = swp_entry_to_pte(entry);
+		set_pte_at(vma->vm_mm, address, pte, pteval);
+	}
+#endif
+}
+
 /*
  * @arg: enum ttu_flags will be passed to this argument
  */
@@ -1628,6 +1644,9 @@ static bool try_to_unmap_one(struct page *page, struct vm_area_struct *vma,
 			 */
 			dec_mm_counter(mm, mm_counter_file(page));
 		}
+
+		if (flags & TTU_HINT_PAGEOUT)
+			pte_marker_install(vma, pvmw.pte, page, address);
 discard:
 		/*
 		 * No need to call mmu_notifier_invalidate_range() it has be

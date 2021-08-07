@@ -1493,7 +1493,7 @@ static unsigned int shrink_page_list(struct list_head *page_list,
 		 * processes. Try to unmap it here.
 		 */
 		if (page_mapped(page)) {
-			enum ttu_flags flags = TTU_BATCH_FLUSH;
+			enum ttu_flags flags = TTU_BATCH_FLUSH | TTU_HINT_PAGEOUT;
 			bool was_swapbacked = PageSwapBacked(page);
 
 			if (unlikely(PageTransHuge(page)))
