@@ -247,6 +247,51 @@ static inline int is_writable_migration_entry(swp_entry_t entry)
 
 #endif
 
+#ifdef CONFIG_PTE_MARKER
+
+#ifdef CONFIG_PTE_MARKER_PAGEOUT
+/* When this bit is set, it means this page is swapped out previously */
+#define  PTE_MARKER_PAGEOUT  (1UL << 0)
+#else
+#define  PTE_MARKER_PAGEOUT  0
+#endif
+
+#define  PTE_MARKER_MASK     (PTE_MARKER_PAGEOUT)
+
+static inline swp_entry_t make_pte_marker_entry(unsigned long marker)
+{
+	return swp_entry(SWP_PTE_MARKER, marker);
+}
+
+static inline bool is_pte_marker_entry(swp_entry_t entry)
+{
+	return swp_type(entry) == SWP_PTE_MARKER;
+}
+
+static inline unsigned long pte_marker_get(swp_entry_t entry)
+{
+	return swp_offset(entry) & PTE_MARKER_MASK;
+}
+
+#else /* CONFIG_PTE_MARKER */
+
+static inline swp_entry_t make_pte_marker_entry(unsigned long marker)
+{
+	return swp_entry(0, 0);
+}
+
+static inline bool is_pte_marker_entry(swp_entry_t entry)
+{
+	return false;
+}
+
+static inline unsigned long pte_marker_get(swp_entry_t entry)
+{
+	return 0;
+}
+
+#endif /* CONFIG_PTE_MARKER */
+
 static inline struct page *pfn_swap_entry_to_page(swp_entry_t entry)
 {
 	struct page *p = pfn_to_page(swp_offset(entry));

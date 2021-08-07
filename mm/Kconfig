@@ -889,4 +889,21 @@ config IO_MAPPING
 config SECRETMEM
 	def_bool ARCH_HAS_SET_DIRECT_MAP && !EMBEDDED
 
+config PTE_MARKER
+        def_bool n
+        bool "Marker PTEs support"
+
+	help
+	  Allows to create marker PTEs for file-backed memory.
+
+config PTE_MARKER_PAGEOUT
+        def_bool n
+        depends on PTE_MARKER
+        bool "Shmem pagemap PM_SWAP support"
+
+	help
+	  Allows to create marker PTEs for file-backed memory when the page is
+	  swapped out.  It's required for pagemap to work correctly with shmem
+	  on page swapping.
+
 endmenu
