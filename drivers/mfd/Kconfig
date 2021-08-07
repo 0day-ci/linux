@@ -11,6 +11,16 @@ config MFD_CORE
 	select IRQ_DOMAIN
 	default n
 
+config MFD_RPISENSE
+	tristate "Raspberry Pi Sense HAT driver"
+	depends on I2C && GPIOLIB
+	select MFD_CORE
+	help
+	  This is the driver for the Raspberry Pi Sense HAT. This provides
+	  the necessary functions to communicate with the hardware as well
+	  as a joystick and display interface. Linux communicates with the
+	  hardwire using the GPIO pins via the I2C protocol.
+
 config MFD_CS5535
 	tristate "AMD CS5535 and CS5536 southbridge core functions"
 	select MFD_CORE
