@@ -217,11 +217,6 @@ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/tty.git
 F:	drivers/tty/serial/8250*
 F:	include/linux/serial_8250.h
 
-8390 NETWORK DRIVERS [WD80x3/SMC-ELITE, SMC-ULTRA, NE2000, 3C503, etc.]
-L:	netdev@vger.kernel.org
-S:	Orphan / Obsolete
-F:	drivers/net/ethernet/8390/
-
 9P FILE SYSTEM
 M:	Eric Van Hensbergen <ericvh@gmail.com>
 M:	Latchesar Ionkov <lucho@ionkov.net>
@@ -2440,7 +2435,6 @@ F:	arch/arm/include/asm/hardware/ioc.h
 F:	arch/arm/include/asm/hardware/iomd.h
 F:	arch/arm/include/asm/hardware/memc.h
 F:	arch/arm/mach-rpc/
-F:	drivers/net/ethernet/8390/etherh.c
 F:	drivers/net/ethernet/i825xx/ether1*
 F:	drivers/net/ethernet/seeq/ether3*
 F:	drivers/scsi/arm/
