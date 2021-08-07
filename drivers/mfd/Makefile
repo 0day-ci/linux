@@ -266,6 +266,7 @@ obj-$(CONFIG_MFD_STMFX) 	+= stmfx.o
 obj-$(CONFIG_MFD_KHADAS_MCU) 	+= khadas-mcu.o
 obj-$(CONFIG_MFD_RPISENSE) 	+= rpisense-core.o
 obj-$(CONFIG_MFD_RPISENSE)	+= rpisense-js.o
+obj-$(CONFIG_MFD_RPISENSE)	+= rpisense-display.o
 obj-$(CONFIG_MFD_ACER_A500_EC)	+= acer-ec-a500.o
 obj-$(CONFIG_MFD_QCOM_PM8008)	+= qcom-pm8008.o
 
