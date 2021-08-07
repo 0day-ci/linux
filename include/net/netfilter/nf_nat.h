@@ -101,6 +101,11 @@ int nf_nat_inet_register_fn(struct net *net, const struct nf_hook_ops *ops);
 void nf_nat_inet_unregister_fn(struct net *net, const struct nf_hook_ops *ops);
 
 unsigned int
+__nf_nat_inet_fn(void *priv, struct sk_buff *skb,
+		 const struct nf_hook_state *state, struct nf_conn *ct,
+		 enum ip_conntrack_info ctinfo);
+
+unsigned int
 nf_nat_inet_fn(void *priv, struct sk_buff *skb,
 	       const struct nf_hook_state *state);
 

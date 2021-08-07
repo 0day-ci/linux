@@ -683,23 +683,13 @@ unsigned int nf_nat_packet(struct nf_conn *ct,
 EXPORT_SYMBOL_GPL(nf_nat_packet);
 
 unsigned int
-nf_nat_inet_fn(void *priv, struct sk_buff *skb,
-	       const struct nf_hook_state *state)
+__nf_nat_inet_fn(void *priv, struct sk_buff *skb,
+		 const struct nf_hook_state *state, struct nf_conn *ct,
+		 enum ip_conntrack_info ctinfo)
 {
-	struct nf_conn *ct;
-	enum ip_conntrack_info ctinfo;
 	struct nf_conn_nat *nat;
 	/* maniptype == SRC for postrouting. */
 	enum nf_nat_manip_type maniptype = HOOK2MANIP(state->hook);
-
-	ct = nf_ct_get(skb, &ctinfo);
-	/* Can't track?  It's not due to stress, or conntrack would
-	 * have dropped it.  Hence it's the user's responsibilty to
-	 * packet filter it out, or implement conntrack/NAT for that
-	 * protocol. 8) --RR
-	 */
-	if (!ct)
-		return NF_ACCEPT;
 
 	nat = nfct_nat(ct);
 
@@ -754,6 +744,26 @@ do_nat:
 oif_changed:
 	nf_ct_kill_acct(ct, ctinfo, skb);
 	return NF_DROP;
+}
+EXPORT_SYMBOL_GPL(__nf_nat_inet_fn);
+
+unsigned int
+nf_nat_inet_fn(void *priv, struct sk_buff *skb,
+	       const struct nf_hook_state *state)
+{
+	struct nf_conn *ct;
+	enum ip_conntrack_info ctinfo;
+
+	ct = nf_ct_get(skb, &ctinfo);
+	/* Can't track?  It's not due to stress, or conntrack would
+	 * have dropped it.  Hence it's the user's responsibilty to
+	 * packet filter it out, or implement conntrack/NAT for that
+	 * protocol. 8) --RR
+	 */
+	if (!ct)
+		return NF_ACCEPT;
+
+	return __nf_nat_inet_fn(priv, skb, state, ct, ctinfo);
 }
 EXPORT_SYMBOL_GPL(nf_nat_inet_fn);
 

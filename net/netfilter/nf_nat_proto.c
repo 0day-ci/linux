@@ -642,7 +642,7 @@ nf_nat_ipv4_fn(void *priv, struct sk_buff *skb,
 		}
 	}
 
-	return nf_nat_inet_fn(priv, skb, state);
+	return __nf_nat_inet_fn(priv, skb, state, ct, ctinfo);
 }
 
 static unsigned int
@@ -934,7 +934,7 @@ nf_nat_ipv6_fn(void *priv, struct sk_buff *skb,
 		}
 	}
 
-	return nf_nat_inet_fn(priv, skb, state);
+	return __nf_nat_inet_fn(priv, skb, state, ct, ctinfo);
 }
 
 static unsigned int
