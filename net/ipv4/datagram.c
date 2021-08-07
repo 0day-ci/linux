@@ -27,13 +27,6 @@ int __ip4_datagram_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len
 	int oif;
 	int err;
 
-
-	if (addr_len < sizeof(*usin))
-		return -EINVAL;
-
-	if (usin->sin_family != AF_INET)
-		return -EAFNOSUPPORT;
-
 	sk_dst_reset(sk);
 
 	oif = sk->sk_bound_dev_if;
