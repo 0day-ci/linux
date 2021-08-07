@@ -264,6 +264,7 @@ int inv_mpu_magn_set_orient(struct inv_mpu6050_state *st)
 	const char *orient;
 	char *str;
 	int i;
+	size_t n;
 
 	/* fill magnetometer orientation */
 	switch (st->chip_type) {
@@ -282,17 +283,18 @@ int inv_mpu_magn_set_orient(struct inv_mpu6050_state *st)
 		for (i = 0; i < 3; ++i) {
 			orient = st->orientation.rotation[6 + i];
 			/* use length + 2 for adding minus sign if needed */
-			str = devm_kzalloc(regmap_get_device(st->map),
-					   strlen(orient) + 2, GFP_KERNEL);
+			n = strlen(orient) + 2;
+			str = devm_kzalloc(regmap_get_device(st->map), n,
+					   GFP_KERNEL);
 			if (str == NULL)
 				return -ENOMEM;
 			if (strcmp(orient, "0") == 0) {
-				strcpy(str, orient);
+				strscpy(str, orient, n);
 			} else if (orient[0] == '-') {
-				strcpy(str, &orient[1]);
+				strscpy(str, &orient[1], n);
 			} else {
 				str[0] = '-';
-				strcpy(&str[1], orient);
+				strscpy(&str[1], orient, n - 1);
 			}
 			st->magn_orient.rotation[6 + i] = str;
 		}
