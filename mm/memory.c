@@ -98,6 +98,8 @@ struct page *mem_map;
 EXPORT_SYMBOL(mem_map);
 #endif
 
+static vm_fault_t do_fault(struct vm_fault *vmf);
+
 /*
  * A number of key systems in x86 including ioremap() rely on the assumption
  * that high_memory defines the upper bound on direct map memory, then end
@@ -1393,6 +1395,10 @@ again:
 				page_remove_rmap(page, false);
 
 			put_page(page);
+			continue;
+		} else if (is_pte_marker_entry(entry)) {
+			/* Drop PTE_MARKER_PAGEOUT when zapped */
+			pte_clear_not_present_full(mm, addr, pte, tlb->fullmm);
 			continue;
 		}
 
@@ -3468,6 +3474,39 @@ static vm_fault_t remove_device_exclusive_entry(struct vm_fault *vmf)
 }
 
 /*
+ * This function parses PTE markers and handle the faults.  Returns true if we
+ * finished the fault, and we should have put the return value into "*ret".
+ * Otherwise it means we want to continue the swap path, and "*ret" untouched.
+ */
+static vm_fault_t handle_pte_marker(struct vm_fault *vmf)
+{
+	swp_entry_t entry = pte_to_swp_entry(vmf->orig_pte);
+	unsigned long marker;
+
+	marker = pte_marker_get(entry);
+
+	/*
+	 * PTE markers should always be with file-backed memories, and the
+	 * marker should never be empty.  If anything weird happened, the best
+	 * thing to do is to kill the process along with its mm.
+	 */
+	if (WARN_ON_ONCE(vma_is_anonymous(vmf->vma) || !marker))
+		return VM_FAULT_SIGBUS;
+
+#ifdef CONFIG_PTE_MARKER_PAGEOUT
+	if (marker == PTE_MARKER_PAGEOUT)
+		/*
+		 * This pte is previously zapped for swap, the PAGEOUT is only
+		 * a flag before it's accessed again.  Safe to drop it now.
+		 */
+		return do_fault(vmf);
+#endif
+
+	/* We see some marker that we can't handle */
+	return VM_FAULT_SIGBUS;
+}
+
+/*
  * We enter with non-exclusive mmap_lock (to exclude vma changes,
  * but allow concurrent faults), and pte mapped but not yet locked.
  * We return with pte unmapped and unlocked.
@@ -3503,6 +3542,8 @@ vm_fault_t do_swap_page(struct vm_fault *vmf)
 			ret = vmf->page->pgmap->ops->migrate_to_ram(vmf);
 		} else if (is_hwpoison_entry(entry)) {
 			ret = VM_FAULT_HWPOISON;
+		} else if (is_pte_marker_entry(entry)) {
+			ret = handle_pte_marker(vmf);
 		} else {
 			print_bad_pte(vma, vmf->address, vmf->orig_pte, NULL);
 			ret = VM_FAULT_SIGBUS;
