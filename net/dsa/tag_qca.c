@@ -50,7 +50,7 @@ static struct sk_buff *qca_tag_xmit(struct sk_buff *skb, struct net_device *dev)
 
 static struct sk_buff *qca_tag_rcv(struct sk_buff *skb, struct net_device *dev)
 {
-	u8 ver;
+	u8 ver, type;
 	u16  hdr;
 	int port;
 	__be16 *phdr;
@@ -81,6 +81,15 @@ static struct sk_buff *qca_tag_rcv(struct sk_buff *skb, struct net_device *dev)
 	skb->dev = dsa_master_find_slave(dev, 0, port);
 	if (!skb->dev)
 		return NULL;
+
+	type = (hdr & QCA_HDR_RECV_TYPE_MASK) >> QCA_HDR_RECV_TYPE_S;
+	switch (type) {
+	case 0x00: /* Normal packet */
+	case 0x19: /* Flooding to CPU */
+	case 0x1a: /* Forwarding to CPU */
+		dsa_default_offload_fwd_mark(skb);
+		break;
+	}
 
 	return skb;
 }
