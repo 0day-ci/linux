@@ -678,13 +678,13 @@ static struct dentry *befs_get_parent(struct dentry *child)
 }
 
 enum {
-	Opt_uid, Opt_gid, Opt_charset, Opt_debug, Opt_err,
+	Opt_uid, Opt_gid, Opt_iocharset, Opt_debug, Opt_err,
 };
 
 static const match_table_t befs_tokens = {
 	{Opt_uid, "uid=%d"},
 	{Opt_gid, "gid=%d"},
-	{Opt_charset, "iocharset=%s"},
+	{Opt_iocharset, "iocharset=%s"},
 	{Opt_debug, "debug"},
 	{Opt_err, NULL}
 };
@@ -745,7 +745,7 @@ parse_options(char *options, struct befs_mount_options *opts)
 			opts->gid = gid;
 			opts->use_gid = 1;
 			break;
-		case Opt_charset:
+		case Opt_iocharset:
 			kfree(opts->iocharset);
 			opts->iocharset = match_strdup(&args[0]);
 			if (!opts->iocharset) {
