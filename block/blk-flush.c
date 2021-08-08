@@ -222,7 +222,8 @@ static void flush_end_io(struct request *flush_rq, blk_status_t error)
 	/* release the tag's ownership to the req cloned from */
 	spin_lock_irqsave(&fq->mq_flush_lock, flags);
 
-	if (!refcount_dec_and_test(&flush_rq->ref)) {
+	if (blk_mq_rq_state(flush_rq) == MQ_RQ_IDLE ||
+	    !refcount_dec_and_test(&flush_rq->ref)) {
 		fq->rq_status = error;
 		spin_unlock_irqrestore(&fq->mq_flush_lock, flags);
 		return;
