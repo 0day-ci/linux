@@ -44,7 +44,7 @@ int hfs_mac2asc(struct super_block *sb, char *out, const struct hfs_name *in)
 		srclen = HFS_NAMELEN;
 	dst = out;
 	dstlen = HFS_MAX_NAMELEN;
-	if (nls_io) {
+	if (nls_disk) {
 		wchar_t ch;
 
 		while (srclen > 0) {
@@ -57,7 +57,12 @@ int hfs_mac2asc(struct super_block *sb, char *out, const struct hfs_name *in)
 			srclen -= size;
 			if (ch == '/')
 				ch = ':';
-			size = nls_io->uni2char(ch, dst, dstlen);
+			if (nls_io)
+				size = nls_io->uni2char(ch, dst, dstlen);
+			else if (dstlen > 0)
+				size = utf32_to_utf8(ch, dst, dstlen);
+			else
+				size = -ENAMETOOLONG;
 			if (size < 0) {
 				if (size == -ENAMETOOLONG)
 					goto out;
@@ -101,11 +106,22 @@ void hfs_asc2mac(struct super_block *sb, struct hfs_name *out, const struct qstr
 	srclen = in->len;
 	dst = out->name;
 	dstlen = HFS_NAMELEN;
-	if (nls_io) {
+	if (nls_disk) {
 		wchar_t ch;
+		unicode_t u;
 
 		while (srclen > 0) {
-			size = nls_io->char2uni(src, srclen, &ch);
+			if (nls_io)
+				size = nls_io->char2uni(src, srclen, &ch);
+			else {
+				size = utf8_to_utf32(str, strlen, &u);
+				if (size >= 0) {
+					if (u <= MAX_WCHAR_T)
+						ch = u;
+					else
+						size = -EINVAL;
+				}
+			}
 			if (size < 0) {
 				ch = '?';
 				size = 1;

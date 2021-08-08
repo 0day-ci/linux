@@ -149,10 +149,13 @@ static int hfs_show_options(struct seq_file *seq, struct dentry *root)
 		seq_printf(seq, ",part=%u", sbi->part);
 	if (sbi->session >= 0)
 		seq_printf(seq, ",session=%u", sbi->session);
-	if (sbi->nls_disk)
+	if (sbi->nls_disk) {
 		seq_printf(seq, ",codepage=%s", sbi->nls_disk->charset);
-	if (sbi->nls_io)
-		seq_printf(seq, ",iocharset=%s", sbi->nls_io->charset);
+		if (sbi->nls_io)
+			seq_printf(seq, ",iocharset=%s", sbi->nls_io->charset);
+		else
+			seq_puts(seq, ",iocharset=utf8");
+	}
 	if (sbi->s_quiet)
 		seq_printf(seq, ",quiet");
 	return 0;
@@ -225,6 +228,7 @@ static int parse_options(char *options, struct hfs_sb_info *hsb)
 	char *p;
 	substring_t args[MAX_OPT_ARGS];
 	int tmp, token;
+	int have_iocharset;
 
 	/* initialize the sb with defaults */
 	hsb->s_uid = current_uid();
@@ -238,6 +242,8 @@ static int parse_options(char *options, struct hfs_sb_info *hsb)
 
 	if (!options)
 		return 1;
+
+	have_iocharset = 0;
 
 	while ((p = strsep(&options, ",")) != NULL) {
 		if (!*p)
@@ -332,18 +338,22 @@ static int parse_options(char *options, struct hfs_sb_info *hsb)
 			kfree(p);
 			break;
 		case opt_iocharset:
-			if (hsb->nls_io) {
+			if (have_iocharset) {
 				pr_err("unable to change iocharset\n");
 				return 0;
 			}
 			p = match_strdup(&args[0]);
-			if (p)
-				hsb->nls_io = load_nls(p);
-			if (!hsb->nls_io) {
-				pr_err("unable to load iocharset \"%s\"\n", p);
-				kfree(p);
+			if (!p)
 				return 0;
+			if (strcmp(p, "utf8") != 0) {
+				hsb->nls_io = load_nls(p);
+				if (!hsb->nls_io) {
+					pr_err("unable to load iocharset \"%s\"\n", p);
+					kfree(p);
+					return 0;
+				}
 			}
+			have_iocharset = 1;
 			kfree(p);
 			break;
 		default:
@@ -351,7 +361,7 @@ static int parse_options(char *options, struct hfs_sb_info *hsb)
 		}
 	}
 
-	if (hsb->nls_io && !hsb->nls_disk) {
+	if (have_iocharset && !hsb->nls_disk) {
 		/*
 		 * Previous version of hfs driver did something unexpected:
 		 * When codepage was not defined but iocharset was then
@@ -382,7 +392,8 @@ static int parse_options(char *options, struct hfs_sb_info *hsb)
 			return 0;
 		}
 	}
-	if (hsb->nls_disk && !hsb->nls_io) {
+	if (hsb->nls_disk &&
+	    !have_iocharset && strcmp(CONFIG_NLS_DEFAULT, "utf8") != 0) {
 		hsb->nls_io = load_nls_default();
 		if (!hsb->nls_io) {
 			pr_err("unable to load default iocharset\n");
