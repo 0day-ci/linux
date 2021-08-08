@@ -691,7 +691,7 @@ static int dma_init(struct device_node *cloud, struct device_node *dma_node)
 	dma->max_rx_flow = max_rx_flow;
 	dma->max_tx_chan = min(max_tx_chan, max_tx_sched);
 	atomic_set(&dma->ref_count, 0);
-	strcpy(dma->name, node->name);
+	strscpy(dma->name, node->name, sizeof(dma->name));
 	spin_lock_init(&dma->lock);
 
 	for (i = 0; i < dma->max_tx_chan; i++) {
