@@ -778,7 +778,7 @@ static int befs_show_options(struct seq_file *m, struct dentry *root)
 		seq_printf(m, ",gid=%u",
 			   from_kgid_munged(&init_user_ns, opts->gid));
 	if (opts->iocharset)
-		seq_printf(m, ",charset=%s", opts->iocharset);
+		seq_printf(m, ",iocharset=%s", opts->iocharset);
 	if (opts->debug)
 		seq_puts(m, ",debug");
 	return 0;
