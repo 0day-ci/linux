@@ -19,7 +19,7 @@ typedef struct {
 extern signed char UniUpperTable[512];
 extern UNICASERANGE UniUpperRange[];
 extern int get_UCSname(struct component_name *, struct dentry *);
-extern int jfs_strfromUCS_le(char *, const __le16 *, int, struct nls_table *);
+extern int jfs_strfromUCS_le(char *, int, const __le16 *, int, struct nls_table *);
 
 #define free_UCSname(COMP) kfree((COMP)->name)
 

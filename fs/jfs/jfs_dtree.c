@@ -3013,6 +3013,7 @@ int jfs_readdir(struct file *file, struct dir_context *ctx)
 	int d_namleft, len, outlen;
 	unsigned long dirent_buf;
 	char *name_ptr;
+	int maxlen;
 	u32 dir_index;
 	int do_index = 0;
 	uint loop_count = 0;
@@ -3235,7 +3236,10 @@ int jfs_readdir(struct file *file, struct dir_context *ctx)
 			}
 
 			/* copy the name of head/only segment */
-			outlen = jfs_strfromUCS_le(name_ptr, d->name, len,
+			maxlen = PAGE_SIZE - sizeof(struct jfs_dirent) -
+				 (name_ptr - jfs_dirent->name);
+			outlen = jfs_strfromUCS_le(name_ptr, maxlen,
+						   d->name, len,
 						   codepage);
 			jfs_dirent->name_len = outlen;
 
@@ -3255,8 +3259,11 @@ int jfs_readdir(struct file *file, struct dir_context *ctx)
 					goto skip_one;
 				}
 				len = min(d_namleft, DTSLOTDATALEN);
-				outlen = jfs_strfromUCS_le(name_ptr, t->name,
-							   len, codepage);
+				maxlen = PAGE_SIZE - sizeof(struct jfs_dirent) -
+					 (name_ptr - jfs_dirent->name);
+				outlen = jfs_strfromUCS_le(name_ptr, maxlen,
+							   t->name, len,
+							   codepage);
 				jfs_dirent->name_len += outlen;
 
 				next = t->next;

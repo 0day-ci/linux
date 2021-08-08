@@ -16,7 +16,7 @@
  * FUNCTION:	Convert little-endian unicode string to character string
  *
  */
-int jfs_strfromUCS_le(char *to, const __le16 * from,
+int jfs_strfromUCS_le(char *to, int maxlen, const __le16 * from,
 		      int len, struct nls_table *codepage)
 {
 	int i;
@@ -25,12 +25,12 @@ int jfs_strfromUCS_le(char *to, const __le16 * from,
 	int warn = !!warn_again;	/* once per string */
 
 	if (codepage) {
-		for (i = 0; (i < len) && from[i]; i++) {
+		for (i = 0; (i < len) && from[i] && outlen < maxlen-1; i++) {
 			int charlen;
 			charlen =
 			    codepage->uni2char(le16_to_cpu(from[i]),
 					       &to[outlen],
-					       NLS_MAX_CHARSET_SIZE);
+					       maxlen-1-outlen);
 			if (charlen > 0)
 				outlen += charlen;
 			else {
