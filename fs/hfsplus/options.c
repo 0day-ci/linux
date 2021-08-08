@@ -104,6 +104,9 @@ int hfsplus_parse_options(char *input, struct hfsplus_sb_info *sbi)
 	char *p;
 	substring_t args[MAX_OPT_ARGS];
 	int tmp, token;
+	int have_iocharset;
+
+	have_iocharset = 0;
 
 	if (!input)
 		goto done;
@@ -171,20 +174,24 @@ int hfsplus_parse_options(char *input, struct hfsplus_sb_info *sbi)
 			pr_warn("option nls= is deprecated, use iocharset=\n");
 			/* fallthrough */
 		case opt_iocharset:
-			if (sbi->nls) {
+			if (have_iocharset) {
 				pr_err("unable to change nls mapping\n");
 				return 0;
 			}
 			p = match_strdup(&args[0]);
-			if (p)
-				sbi->nls = load_nls(p);
-			if (!sbi->nls) {
-				pr_err("unable to load nls mapping \"%s\"\n",
-				       p);
-				kfree(p);
+			if (!p)
 				return 0;
+			if (strcmp(p, "utf8") != 0) {
+				sbi->nls = load_nls(p);
+				if (!sbi->nls) {
+					pr_err("unable to load nls mapping "
+						"\"%s\"\n", p);
+					kfree(p);
+					return 0;
+				}
 			}
 			kfree(p);
+			have_iocharset = 1;
 			break;
 		case opt_decompose:
 			clear_bit(HFSPLUS_SB_NODECOMPOSE, &sbi->flags);
@@ -207,13 +214,10 @@ int hfsplus_parse_options(char *input, struct hfsplus_sb_info *sbi)
 	}
 
 done:
-	if (!sbi->nls) {
-		/* try utf8 first, as this is the old default behaviour */
-		sbi->nls = load_nls("utf8");
-		if (!sbi->nls)
-			sbi->nls = load_nls_default();
-		if (!sbi->nls)
-			return 0;
+	if (!have_iocharset) {
+		/* use utf8, as this is the old default behaviour */
+		pr_debug("using native UTF-8 without nls\n");
+		/* no sbi->nls means that native UTF-8 code is used */
 	}
 
 	return 1;

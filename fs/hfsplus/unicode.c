@@ -190,7 +190,12 @@ int hfsplus_uni2asc(struct super_block *sb,
 				c0 = ':';
 				break;
 			}
-			res = nls->uni2char(c0, op, len);
+			if (nls)
+				res = nls->uni2char(c0, op, len);
+			else (len > 0)
+				res = utf32_to_utf8(c0, op, len);
+			else
+				res = -ENAMETOOLONG;
 			if (res < 0) {
 				if (res == -ENAMETOOLONG)
 					goto out;
@@ -233,7 +238,12 @@ same:
 			cc = c0;
 		}
 done:
-		res = nls->uni2char(cc, op, len);
+		if (nls)
+			res = nls->uni2char(cc, op, len);
+		else (len > 0)
+			res = utf32_to_utf8(cc, op, len);
+		else
+			res = -ENAMETOOLONG;
 		if (res < 0) {
 			if (res == -ENAMETOOLONG)
 				goto out;
@@ -256,7 +266,22 @@ out:
 static inline int asc2unichar(struct super_block *sb, const char *astr, int len,
 			      wchar_t *uc)
 {
-	int size = HFSPLUS_SB(sb)->nls->char2uni(astr, len, uc);
+	struct nls_table *nls = HFSPLUS_SB(sb)->nls;
+	unicode_t u;
+	int size;
+
+	if (nls)
+		size = nls->char2uni(astr, len, uc);
+	else {
+		size = utf8_to_utf32(astr, len, &u);
+		if (size >= 0) {
+			/* TODO: Add support for UTF-16 surrogate pairs */
+			if (u <= MAX_WCHAR_T)
+				*uc = u;
+			else
+				size = -EINVAL;
+		}
+	}
 	if (size <= 0) {
 		*uc = '?';
 		size = 1;

@@ -144,7 +144,8 @@ static int hfsplus_readdir(struct file *file, struct dir_context *ctx)
 	err = hfs_find_init(HFSPLUS_SB(sb)->cat_tree, &fd);
 	if (err)
 		return err;
-	strbuf = kmalloc(NLS_MAX_CHARSET_SIZE * HFSPLUS_MAX_STRLEN + 1, GFP_KERNEL);
+	strbuf = kmalloc((HFSPLUS_SB(sb)->nls ? NLS_MAX_CHARSET_SIZE : 4) *
+			HFSPLUS_MAX_STRLEN + 1, GFP_KERNEL);
 	if (!strbuf) {
 		err = -ENOMEM;
 		goto out;
@@ -203,7 +204,8 @@ static int hfsplus_readdir(struct file *file, struct dir_context *ctx)
 		hfs_bnode_read(fd.bnode, &entry, fd.entryoffset,
 			fd.entrylength);
 		type = be16_to_cpu(entry.type);
-		len = NLS_MAX_CHARSET_SIZE * HFSPLUS_MAX_STRLEN;
+		len = (HFSPLUS_SB(sb)->nls ? NLS_MAX_CHARSET_SIZE : 4) *
+		      HFSPLUS_MAX_STRLEN;
 		err = hfsplus_uni2asc(sb, &fd.key->cat.name, strbuf, &len);
 		if (err)
 			goto out;

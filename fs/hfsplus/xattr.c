@@ -425,7 +425,8 @@ int hfsplus_setxattr(struct inode *inode, const char *name,
 	char *xattr_name;
 	int res;
 
-	xattr_name = kmalloc(NLS_MAX_CHARSET_SIZE * HFSPLUS_ATTR_MAX_STRLEN + 1,
+	xattr_name = kmalloc((HFSPLUS_SB(sb)->nls ? NLS_MAX_CHARSET_SIZE : 4) *
+			     HFSPLUS_ATTR_MAX_STRLEN + 1,
 		GFP_KERNEL);
 	if (!xattr_name)
 		return -ENOMEM;
@@ -579,7 +580,8 @@ ssize_t hfsplus_getxattr(struct inode *inode, const char *name,
 	int res;
 	char *xattr_name;
 
-	xattr_name = kmalloc(NLS_MAX_CHARSET_SIZE * HFSPLUS_ATTR_MAX_STRLEN + 1,
+	xattr_name = kmalloc((HFSPLUS_SB(sb)->nls ? NLS_MAX_CHARSET_SIZE : 4) *
+			     HFSPLUS_ATTR_MAX_STRLEN + 1,
 			     GFP_KERNEL);
 	if (!xattr_name)
 		return -ENOMEM;
@@ -699,8 +701,9 @@ ssize_t hfsplus_listxattr(struct dentry *dentry, char *buffer, size_t size)
 		return err;
 	}
 
-	strbuf = kmalloc(NLS_MAX_CHARSET_SIZE * HFSPLUS_ATTR_MAX_STRLEN +
-			XATTR_MAC_OSX_PREFIX_LEN + 1, GFP_KERNEL);
+	strbuf = kmalloc((HFSPLUS_SB(sb)->nls ? NLS_MAX_CHARSET_SIZE : 4) *
+			HFSPLUS_ATTR_MAX_STRLEN + XATTR_MAC_OSX_PREFIX_LEN + 1,
+			GFP_KERNEL);
 	if (!strbuf) {
 		res = -ENOMEM;
 		goto out;
@@ -732,7 +735,8 @@ ssize_t hfsplus_listxattr(struct dentry *dentry, char *buffer, size_t size)
 		if (be32_to_cpu(attr_key.cnid) != inode->i_ino)
 			goto end_listxattr;
 
-		xattr_name_len = NLS_MAX_CHARSET_SIZE * HFSPLUS_ATTR_MAX_STRLEN;
+		xattr_name_len = (HFSPLUS_SB(sb)->nls ? NLS_MAX_CHARSET_SIZE : 4)
+				* HFSPLUS_ATTR_MAX_STRLEN;
 		if (hfsplus_uni2asc(inode->i_sb,
 			(const struct hfsplus_unistr *)&fd.key->attr.key_name,
 					strbuf, &xattr_name_len)) {

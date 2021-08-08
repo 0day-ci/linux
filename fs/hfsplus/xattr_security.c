@@ -41,7 +41,8 @@ static int hfsplus_initxattrs(struct inode *inode,
 	char *xattr_name;
 	int err = 0;
 
-	xattr_name = kmalloc(NLS_MAX_CHARSET_SIZE * HFSPLUS_ATTR_MAX_STRLEN + 1,
+	xattr_name = kmalloc((HFSPLUS_SB(sb)->nls ? NLS_MAX_CHARSET_SIZE : 4) *
+			     HFSPLUS_ATTR_MAX_STRLEN + 1,
 		GFP_KERNEL);
 	if (!xattr_name)
 		return -ENOMEM;
