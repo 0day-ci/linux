@@ -1034,7 +1034,8 @@ static inline int ntfs_filldir(ntfs_volume *vol,
 	}
 	name_len = ntfs_ucstonls(vol, (ntfschar*)&ie->key.file_name.file_name,
 			ie->key.file_name.file_name_length, &name,
-			NTFS_MAX_NAME_LEN * NLS_MAX_CHARSET_SIZE + 1);
+			NTFS_MAX_NAME_LEN *
+			(vol->nls_map ? NLS_MAX_CHARSET_SIZE : 4) + 1);
 	if (name_len <= 0) {
 		ntfs_warning(vol->sb, "Skipping unrepresentable inode 0x%llx.",
 				(long long)MREF_LE(ie->data.dir.indexed_file));
@@ -1118,7 +1119,8 @@ static int ntfs_readdir(struct file *file, struct dir_context *actor)
 	 * Allocate a buffer to store the current name being processed
 	 * converted to format determined by current NLS.
 	 */
-	name = kmalloc(NTFS_MAX_NAME_LEN * NLS_MAX_CHARSET_SIZE + 1, GFP_NOFS);
+	name = kmalloc(NTFS_MAX_NAME_LEN *
+		       (vol->nls_map ? NLS_MAX_CHARSET_SIZE : 4) + 1, GFP_NOFS);
 	if (unlikely(!name)) {
 		err = -ENOMEM;
 		goto err_out;

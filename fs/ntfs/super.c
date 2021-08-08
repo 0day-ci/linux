@@ -84,7 +84,7 @@ static int simple_getbool(char *s, bool *setval)
  *
  * Parse the recognized options in @opt for the ntfs volume described by @vol.
  */
-static bool parse_options(ntfs_volume *vol, char *opt)
+static bool parse_options(ntfs_volume *vol, char *opt, int remount)
 {
 	char *p, *v, *ov;
 	static char *utf8 = "utf8";
@@ -95,6 +95,7 @@ static bool parse_options(ntfs_volume *vol, char *opt)
 	int mft_zone_multiplier = -1, on_errors = -1;
 	int show_sys_files = -1, case_sensitive = -1, disable_sparse = -1;
 	struct nls_table *nls_map = NULL;
+	int have_iocharset = 0;
 
 	/* I am lazy... (-8 */
 #define NTFS_GETOPT_WITH_DEFAULT(option, variable, default_value)	\
@@ -196,12 +197,16 @@ static bool parse_options(ntfs_volume *vol, char *opt)
 				goto needs_arg;
 use_utf8:
 			unload_nls(nls_map);
-			nls_map = load_nls(v);
-			if (!nls_map) {
-				ntfs_error(vol->sb, "NLS character set "
-					   "%s not found.", v);
-				return false;
+			nls_map = NULL;
+			if (strcmp(v, "utf8") != 0) {
+				nls_map = load_nls(v);
+				if (!nls_map) {
+					ntfs_error(vol->sb, "NLS character set "
+						   "%s not found.", v);
+					return false;
+				}
 			}
+			have_iocharset = 1;
 		} else if (!strcmp(p, "utf8")) {
 			bool val = false;
 			ntfs_warning(vol->sb, "Option utf8 is no longer "
@@ -241,25 +246,27 @@ no_mount_options:
 			return false;
 		}
 	}
-	if (nls_map) {
-		if (vol->nls_map && vol->nls_map != nls_map) {
+	if (have_iocharset) {
+		if (remount && vol->nls_map != nls_map) {
 			ntfs_error(vol->sb, "Cannot change NLS character set "
 					"on remount.");
 			return false;
-		} /* else (!vol->nls_map) */
-		ntfs_debug("Using NLS character set %s.", nls_map->charset);
-		vol->nls_map = nls_map;
-	} else /* (!nls_map) */ {
-		if (!vol->nls_map) {
+		} else (!remount) {
+			ntfs_debug("Using NLS character set %s.",
+					nls_map ? nls_map->charset : "utf8");
+			vol->nls_map = nls_map;
+		}
+	} else if (!remount) {
+		if (strcmp(CONFIG_NLS_DEFAULT, "utf8") != 0) {
 			vol->nls_map = load_nls_default();
 			if (!vol->nls_map) {
 				ntfs_error(vol->sb, "Failed to load default "
 						"NLS character set.");
 				return false;
 			}
-			ntfs_debug("Using default NLS character set (%s).",
-					vol->nls_map->charset);
 		}
+		ntfs_debug("Using default NLS character set (%s).",
+				vol->nls_map ? vol->nls_map->charset : "utf8");
 	}
 	if (mft_zone_multiplier != -1) {
 		if (vol->mft_zone_multiplier && vol->mft_zone_multiplier !=
@@ -534,7 +541,7 @@ static int ntfs_remount(struct super_block *sb, int *flags, char *opt)
 
 	// TODO: Deal with *flags.
 
-	if (!parse_options(vol, opt))
+	if (!parse_options(vol, opt, 1))
 		return -EINVAL;
 
 	ntfs_debug("Done.");
@@ -2731,7 +2738,7 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 	NVolSetSparseEnabled(vol);
 
 	/* Important to get the mount options dealt with now. */
-	if (!parse_options(vol, (char*)opt))
+	if (!parse_options(vol, (char*)opt, 0))
 		goto err_out_now;
 
 	/* We support sector sizes up to the PAGE_SIZE. */

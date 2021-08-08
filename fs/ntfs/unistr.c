@@ -254,6 +254,16 @@ int ntfs_nlstoucs(const ntfs_volume *vol, const char *ins,
 	if (likely(ins)) {
 		ucs = kmem_cache_alloc(ntfs_name_cache, GFP_NOFS);
 		if (likely(ucs)) {
+			if (!nls) {
+				wc_len = utf8s_to_utf16s(ins, ins_len,
+						UTF16_LITTLE_ENDIAN, ucs,
+						NTFS_MAX_NAME_LEN);
+				if (wc_len < 0 || wc_len >= NTFS_MAX_NAME_LEN)
+					goto name_err;
+				ucs[wc_len] = 0;
+				*outs = ucs;
+				return o;
+			}
 			for (i = o = 0; i < ins_len; i += wc_len) {
 				wc_len = nls->char2uni(ins + i, ins_len - i,
 						&wc);
@@ -283,7 +293,7 @@ name_err:
 	if (wc_len < 0) {
 		ntfs_error(vol->sb, "Name using character set %s contains "
 				"characters that cannot be converted to "
-				"Unicode.", nls->charset);
+				"Unicode.", nls ? nls->charset : "utf8");
 		i = -EILSEQ;
 	} else /* if (o >= NTFS_MAX_NAME_LEN) */ {
 		ntfs_error(vol->sb, "Name is too long (maximum length for a "
@@ -335,10 +345,21 @@ int ntfs_ucstonls(const ntfs_volume *vol, const ntfschar *ins,
 			goto conversion_err;
 		}
 		if (!ns) {
-			ns_len = ins_len * NLS_MAX_CHARSET_SIZE;
+			ns_len = ins_len * (nls ? NLS_MAX_CHARSET_SIZE : 4);
 			ns = kmalloc(ns_len + 1, GFP_NOFS);
 			if (!ns)
 				goto mem_err_out;
+		}
+		if (!nls) {
+			o = utf16s_to_utf8s(ins, ins_len, UTF16_LITTLE_ENDIAN,
+					ns, ns_len);
+			if (o >= ns_len) {
+				wc = -ENAMETOOLONG;
+				goto conversion_err;
+			}
+			ns[o] = 0;
+			*outs = ns;
+			return o;
 		}
 		for (i = o = 0; i < ins_len; i++) {
 retry:			wc = nls->uni2char(le16_to_cpu(ins[i]), ns + o,
@@ -373,7 +394,7 @@ conversion_err:
 	ntfs_error(vol->sb, "Unicode name contains characters that cannot be "
 			"converted to character set %s.  You might want to "
 			"try to use the mount option iocharset=utf8.",
-			nls->charset);
+			nls ? nls->charset : "utf8");
 	if (ns != *outs)
 		kfree(ns);
 	if (wc != -ENAMETOOLONG)
