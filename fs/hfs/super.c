@@ -351,6 +351,37 @@ static int parse_options(char *options, struct hfs_sb_info *hsb)
 		}
 	}
 
+	if (hsb->nls_io && !hsb->nls_disk) {
+		/*
+		 * Previous version of hfs driver did something unexpected:
+		 * When codepage was not defined but iocharset was then
+		 * hfs driver copied 8bit character from disk directly to
+		 * 16bit unicode wchar_t type. Which means it did conversion
+		 * from Latin1 (ISO-8859-1) to Unicode because first 256
+		 * Unicode code points matches 8bit ISO-8859-1 codepage table.
+		 * So when iocharset was specified and codepage not, then
+		 * codepage used implicit value "iso8859-1".
+		 *
+		 * To not change this previous default behavior as some users
+		 * may depend on it, we load iso8859-1 NLS table explicitly
+		 * to simplify code and make it more reable what happens.
+		 *
+		 * In context of hfs driver it is really strange to use
+		 * ISO-8859-1 codepage table for storing data to disk, but
+		 * nothing forbids it. Just it is highly incompatible with
+		 * Mac OS systems. So via pr_warn() inform user that this
+		 * is not probably what he wants.
+		 */
+		pr_warn("iocharset was specified but codepage not, "
+			"using default codepage=iso8859-1\n");
+		pr_warn("this default codepage=iso8859-1 is incompatible with "
+			"Mac OS systems and may be changed in the future");
+		hsb->nls_disk = load_nls("iso8859-1");
+		if (!hsb->nls_disk) {
+			pr_err("unable to load iso8859-1 codepage\n");
+			return 0;
+		}
+	}
 	if (hsb->nls_disk && !hsb->nls_io) {
 		hsb->nls_io = load_nls_default();
 		if (!hsb->nls_io) {

@@ -48,18 +48,13 @@ int hfs_mac2asc(struct super_block *sb, char *out, const struct hfs_name *in)
 		wchar_t ch;
 
 		while (srclen > 0) {
-			if (nls_disk) {
-				size = nls_disk->char2uni(src, srclen, &ch);
-				if (size <= 0) {
-					ch = '?';
-					size = 1;
-				}
-				src += size;
-				srclen -= size;
-			} else {
-				ch = *src++;
-				srclen--;
+			size = nls_disk->char2uni(src, srclen, &ch);
+			if (size <= 0) {
+				ch = '?';
+				size = 1;
 			}
+			src += size;
+			srclen -= size;
 			if (ch == '/')
 				ch = ':';
 			size = nls_io->uni2char(ch, dst, dstlen);
@@ -119,20 +114,15 @@ void hfs_asc2mac(struct super_block *sb, struct hfs_name *out, const struct qstr
 			srclen -= size;
 			if (ch == ':')
 				ch = '/';
-			if (nls_disk) {
-				size = nls_disk->uni2char(ch, dst, dstlen);
-				if (size < 0) {
-					if (size == -ENAMETOOLONG)
-						goto out;
-					*dst = '?';
-					size = 1;
-				}
-				dst += size;
-				dstlen -= size;
-			} else {
-				*dst++ = ch > 0xff ? '?' : ch;
-				dstlen--;
+			size = nls_disk->uni2char(ch, dst, dstlen);
+			if (size < 0) {
+				if (size == -ENAMETOOLONG)
+					goto out;
+				*dst = '?';
+				size = 1;
 			}
+			dst += size;
+			dstlen -= size;
 		}
 	} else {
 		char ch;
