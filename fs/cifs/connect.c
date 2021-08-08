@@ -2338,7 +2338,11 @@ compare_mount_options(struct super_block *sb, struct cifs_mnt_data *mnt_data)
 	    old->ctx->dir_mode != new->ctx->dir_mode)
 		return 0;
 
-	if (strcmp(old->local_nls->charset, new->local_nls->charset))
+	if (old->local_nls && !new->local_nls)
+		return 0;
+	if (!old->local_nls && new->local_nls)
+		return 0;
+	if (old->local_nls && new->local_nls && strcmp(old->local_nls->charset, new->local_nls->charset))
 		return 0;
 
 	if (old->ctx->acregmax != new->ctx->acregmax)
@@ -2800,7 +2804,7 @@ int cifs_setup_cifs_sb(struct cifs_sb_info *cifs_sb)
 	if (ctx->iocharset == NULL) {
 		/* load_nls_default cannot return null */
 		cifs_sb->local_nls = load_nls_default();
-	} else {
+	} else if (strcmp(ctx->iocharset, "utf8") != 0) {
 		cifs_sb->local_nls = load_nls(ctx->iocharset);
 		if (cifs_sb->local_nls == NULL) {
 			cifs_dbg(VFS, "CIFS mount error: iocharset %s not found\n",

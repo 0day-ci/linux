@@ -789,16 +789,22 @@ static int cifs_ci_hash(const struct dentry *dentry, struct qstr *q)
 {
 	struct nls_table *codepage = CIFS_SB(dentry->d_sb)->local_nls;
 	unsigned long hash;
+	unicode_t u;
 	wchar_t c;
 	int i, charlen;
 
 	hash = init_name_hash(dentry);
 	for (i = 0; i < q->len; i += charlen) {
-		charlen = codepage->char2uni(&q->name[i], q->len - i, &c);
+		if (codepage) {
+			charlen = codepage->char2uni(&q->name[i], q->len - i, &c);
+			if (likely(charlen > 0))
+				u = c;
+		} else
+			charlen = utf8_to_utf32(&q->name[i], q->len - i, &u);
 		/* error out if we can't convert the character */
 		if (unlikely(charlen < 0))
 			return charlen;
-		hash = partial_name_hash(cifs_toupper(c), hash);
+		hash = partial_name_hash(cifs_toupper(u), hash);
 	}
 	q->hash = end_name_hash(hash);
 
@@ -809,6 +815,7 @@ static int cifs_ci_compare(const struct dentry *dentry,
 		unsigned int len, const char *str, const struct qstr *name)
 {
 	struct nls_table *codepage = CIFS_SB(dentry->d_sb)->local_nls;
+	unicode_t u1, u2;
 	wchar_t c1, c2;
 	int i, l1, l2;
 
@@ -822,9 +829,18 @@ static int cifs_ci_compare(const struct dentry *dentry,
 		return 1;
 
 	for (i = 0; i < len; i += l1) {
-		/* Convert characters in both strings to UTF-16. */
-		l1 = codepage->char2uni(&str[i], len - i, &c1);
-		l2 = codepage->char2uni(&name->name[i], name->len - i, &c2);
+		/* Convert characters in both strings to UTF-32. */
+		if (codepage) {
+			l1 = codepage->char2uni(&str[i], len - i, &c1);
+			l2 = codepage->char2uni(&name->name[i], name->len - i, &c2);
+			if (likely(l1 > 0))
+				u1 = c1;
+			if (likely(l2 > 0))
+				u2 = c2;
+		} else {
+			l1 = utf8_to_utf32(&str[i], len - i, &u1);
+			l2 = utf8_to_utf32(&name->name[i], name->len - i, &u2);
+		}
 
 		/*
 		 * If we can't convert either character, just declare it to
@@ -845,7 +861,7 @@ static int cifs_ci_compare(const struct dentry *dentry,
 			return 1;
 
 		/* Now compare uppercase versions of these characters */
-		if (cifs_toupper(c1) != cifs_toupper(c2))
+		if (cifs_toupper(u1) != cifs_toupper(u2))
 			return 1;
 	}
 

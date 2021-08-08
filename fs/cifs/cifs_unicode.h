@@ -106,7 +106,7 @@ extern __le16 *cifs_strndup_to_utf16(const char *src, const int maxlen,
 				     int remap);
 #endif
 
-wchar_t cifs_toupper(wchar_t in);
+unicode_t cifs_toupper(unicode_t in);
 
 /*
  * UniStrcat:  Concatenate the second string to the first

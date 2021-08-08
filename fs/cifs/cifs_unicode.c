@@ -131,20 +131,17 @@ cifs_mapchar(char *target, const __u16 *from, const struct nls_table *cp,
 		  convert_sfu_char(src_char, target))
 		return len;
 
-	/* if character not one of seven in special remap set */
-	len = cp->uni2char(src_char, target, NLS_MAX_CHARSET_SIZE);
-	if (len <= 0)
-		goto surrogate_pair;
+	if (cp) {
+		/* if character not one of seven in special remap set */
+		len = cp->uni2char(src_char, target, NLS_MAX_CHARSET_SIZE);
+		if (len <= 0)
+			goto unknown;
+	} else {
+		len = utf16s_to_utf8s(from, 3, UTF16_LITTLE_ENDIAN, target, 6);
+		if (len <= 0)
+			goto unknown;
+	}
 
-	return len;
-
-surrogate_pair:
-	/* convert SURROGATE_PAIR and IVS */
-	if (strcmp(cp->charset, "utf8"))
-		goto unknown;
-	len = utf16s_to_utf8s(from, 3, UTF16_LITTLE_ENDIAN, target, 6);
-	if (len <= 0)
-		goto unknown;
 	return len;
 
 unknown:
@@ -240,6 +237,37 @@ cifs_from_utf16(char *to, const __le16 *from, int tolen, int fromlen,
 	return outlen;
 }
 
+static int cifs_utf8s_to_utf16s(const char *s, int inlen, __le16 *pwcs)
+{
+	__le16 *op;
+	int size;
+	unicode_t u;
+
+	op = pwcs;
+	while (inlen > 0 && *s) {
+		if (*s & 0x80) {
+			size = utf8_to_utf32(s, inlen, &u);
+			if (size <= 0) {
+				u = 0x003f; /* A question mark */
+				size = 1;
+			}
+			s += size;
+			inlen -= size;
+			if (u >= 0x10000) {
+				u -= 0x10000;
+				*op++ = __cpu_to_le16(0xd800 | ((u >> 10) & 0x03ff));
+				*op++ = __cpu_to_le16(0xdc00 | (u & 0x03ff));
+			} else {
+				*op++ = __cpu_to_le16(u);
+			}
+		} else {
+			*op++ = __cpu_to_le16(*s++);
+			inlen--;
+		}
+	}
+	return op - pwcs;
+}
+
 /*
  * NAME:	cifs_strtoUTF16()
  *
@@ -255,24 +283,14 @@ cifs_strtoUTF16(__le16 *to, const char *from, int len,
 	wchar_t wchar_to; /* needed to quiet sparse */
 
 	/* special case for utf8 to handle no plane0 chars */
-	if (!strcmp(codepage->charset, "utf8")) {
+	if (!codepage) {
 		/*
 		 * convert utf8 -> utf16, we assume we have enough space
 		 * as caller should have assumed conversion does not overflow
-		 * in destination len is length in wchar_t units (16bits)
+		 * in destination len is length in __le16 units
 		 */
-		i  = utf8s_to_utf16s(from, len, UTF16_LITTLE_ENDIAN,
-				       (wchar_t *) to, len);
-
-		/* if success terminate and exit */
-		if (i >= 0)
-			goto success;
-		/*
-		 * if fails fall back to UCS encoding as this
-		 * function should not return negative values
-		 * currently can fail only if source contains
-		 * invalid encoded characters
-		 */
+		i  = cifs_utf8s_to_utf16s(from, len, to);
+		goto success;
 	}
 
 	for (i = 0; len && *from; i++, from += charlen, len -= charlen) {
@@ -508,25 +526,29 @@ cifsConvertToUTF16(__le16 *target, const char *source, int srclen,
 		 * as they use backslash as separator.
 		 */
 		if (dst_char == 0) {
-			charlen = cp->char2uni(source + i, srclen - i, &tmp);
-			dst_char = cpu_to_le16(tmp);
+			if (cp) {
+				charlen = cp->char2uni(source + i, srclen - i, &tmp);
+				dst_char = cpu_to_le16(tmp);
 
-			/*
-			 * if no match, use question mark, which at least in
-			 * some cases serves as wild card
-			 */
-			if (charlen > 0)
-				goto ctoUTF16;
-
-			/* convert SURROGATE_PAIR */
-			if (strcmp(cp->charset, "utf8") || !wchar_to)
-				goto unknown;
-			if (*(source + i) & 0x80) {
-				charlen = utf8_to_utf32(source + i, 6, &u);
-				if (charlen < 0)
+				/*
+				 * if no match, use question mark, which at least in
+				 * some cases serves as wild card
+				 */
+				if (charlen > 0)
+					goto ctoUTF16;
+				else
 					goto unknown;
-			} else
+			}
+
+			/* UTF-8 to UTF-16 conversion */
+
+			if (!wchar_to)
 				goto unknown;
+
+			charlen = utf8_to_utf32(source + i, 6, &u);
+			if (charlen < 0)
+				goto unknown;
+
 			ret  = utf8s_to_utf16s(source + i, charlen,
 					       UTF16_LITTLE_ENDIAN,
 					       wchar_to, 6);
@@ -595,7 +617,25 @@ cifs_local_to_utf16_bytes(const char *from, int len,
 {
 	int charlen;
 	int i;
+	int outlen;
+	unicode_t u_to;
 	wchar_t wchar_to;
+
+	if (!codepage) {
+		outlen = 0;
+		for (i = 0; len && *from; i++, from += charlen, len -= charlen) {
+			charlen = utf8_to_utf32(from, len, &u_to);
+			/* Failed conversion defaults to a question mark */
+			if (charlen < 1) {
+				charlen = 1;
+				outlen += 2;
+			} else if (u_to <= 0xFFFF)
+				outlen += 2;
+			else
+				outlen += 4;
+		}
+		return outlen;
+	}
 
 	for (i = 0; len && *from; i++, from += charlen, len -= charlen) {
 		charlen = codepage->char2uni(from, len, &wchar_to);

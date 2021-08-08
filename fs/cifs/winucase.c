@@ -18,7 +18,7 @@
 
 #include <linux/nls.h>
 
-wchar_t cifs_toupper(wchar_t in);  /* quiet sparse */
+unicode_t cifs_toupper(unicode_t in);  /* quiet sparse */
 
 static const wchar_t t2_00[256] = {
 	0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000,
@@ -616,19 +616,23 @@ static const wchar_t *const toplevel[256] = {
 };
 
 /**
- * cifs_toupper - convert a wchar_t from lower to uppercase
+ * cifs_toupper - convert a unicode_t from lower to uppercase
  * @in: character to convert from lower to uppercase
  *
- * This function consults the static tables above to convert a wchar_t from
+ * This function consults the static tables above to convert a unicode_t from
  * lower to uppercase. In the event that there is no mapping, the original
  * "in" character is returned.
  */
-wchar_t
-cifs_toupper(wchar_t in)
+unicode_t
+cifs_toupper(unicode_t in)
 {
 	unsigned char idx;
 	const wchar_t *tbl;
 	wchar_t out;
+
+	/* cifs_toupper table has only defines for plane-0 */
+	if (in > 0xffff)
+		return in;
 
 	/* grab upper byte */
 	idx = (in & 0xff00) >> 8;

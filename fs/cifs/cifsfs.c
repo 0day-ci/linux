@@ -569,6 +569,8 @@ cifs_show_options(struct seq_file *s, struct dentry *root)
 					   cifs_sb->ctx->dir_mode);
 	if (cifs_sb->ctx->iocharset)
 		seq_printf(s, ",iocharset=%s", cifs_sb->ctx->iocharset);
+	else
+		seq_puts(s, ",iocharset=utf8");
 	if (tcon->seal)
 		seq_puts(s, ",seal");
 	else if (tcon->ses->server->ignore_signature)
