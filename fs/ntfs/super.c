@@ -94,7 +94,7 @@ static bool parse_options(ntfs_volume *vol, char *opt)
 	umode_t fmask = (umode_t)-1, dmask = (umode_t)-1;
 	int mft_zone_multiplier = -1, on_errors = -1;
 	int show_sys_files = -1, case_sensitive = -1, disable_sparse = -1;
-	struct nls_table *nls_map = NULL, *old_nls;
+	struct nls_table *nls_map = NULL;
 
 	/* I am lazy... (-8 */
 #define NTFS_GETOPT_WITH_DEFAULT(option, variable, default_value)	\
@@ -195,20 +195,12 @@ static bool parse_options(ntfs_volume *vol, char *opt)
 			if (!v || !*v)
 				goto needs_arg;
 use_utf8:
-			old_nls = nls_map;
+			unload_nls(nls_map);
 			nls_map = load_nls(v);
 			if (!nls_map) {
-				if (!old_nls) {
-					ntfs_error(vol->sb, "NLS character set "
-							"%s not found.", v);
-					return false;
-				}
-				ntfs_error(vol->sb, "NLS character set %s not "
-						"found. Using previous one %s.",
-						v, old_nls->charset);
-				nls_map = old_nls;
-			} else /* nls_map */ {
-				unload_nls(old_nls);
+				ntfs_error(vol->sb, "NLS character set "
+					   "%s not found.", v);
+				return false;
 			}
 		} else if (!strcmp(p, "utf8")) {
 			bool val = false;
