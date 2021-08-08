@@ -641,4 +641,6 @@ blk_qc_t blk_mq_submit_bio(struct bio *bio);
 void blk_mq_hctx_set_fq_lock_class(struct blk_mq_hw_ctx *hctx,
 		struct lock_class_key *key);
 
+void blk_mq_tags_lock(struct blk_mq_tags *tags, unsigned long *flags);
+void blk_mq_tags_unlock(struct blk_mq_tags *tags, unsigned long *flags);
 #endif

@@ -652,3 +652,15 @@ u32 blk_mq_unique_tag(struct request *rq)
 		(rq->tag & BLK_MQ_UNIQUE_TAG_MASK);
 }
 EXPORT_SYMBOL(blk_mq_unique_tag);
+
+void blk_mq_tags_lock(struct blk_mq_tags *tags, unsigned long *flags)
+{
+	spin_lock_irqsave(&tags->lock, *flags);
+}
+EXPORT_SYMBOL(blk_mq_tags_lock);
+
+void blk_mq_tags_unlock(struct blk_mq_tags *tags, unsigned long *flags)
+{
+	spin_unlock_irqrestore(&tags->lock, *flags);
+}
+EXPORT_SYMBOL(blk_mq_tags_unlock);
