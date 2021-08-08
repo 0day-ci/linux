@@ -914,10 +914,9 @@ befs_fill_super(struct super_block *sb, void *data, int silent)
 			   befs_sb->mount_opts.iocharset);
 		befs_sb->nls = load_nls(befs_sb->mount_opts.iocharset);
 		if (!befs_sb->nls) {
-			befs_warning(sb, "Cannot load nls %s"
-					" loading default nls",
+			befs_error(sb, "Cannot load nls %s",
 					befs_sb->mount_opts.iocharset);
-			befs_sb->nls = load_nls_default();
+			goto unacquire_priv_sbp;
 		}
 	/* load default nls if none is specified  in mount options */
 	} else {
