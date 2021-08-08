@@ -23,6 +23,7 @@ enum {
 	opt_creator, opt_type,
 	opt_umask, opt_uid, opt_gid,
 	opt_part, opt_session, opt_nls,
+	opt_iocharset,
 	opt_nodecompose, opt_decompose,
 	opt_barrier, opt_nobarrier,
 	opt_force, opt_err
@@ -37,6 +38,7 @@ static const match_table_t tokens = {
 	{ opt_part, "part=%u" },
 	{ opt_session, "session=%u" },
 	{ opt_nls, "nls=%s" },
+	{ opt_iocharset, "iocharset=%s" },
 	{ opt_decompose, "decompose" },
 	{ opt_nodecompose, "nodecompose" },
 	{ opt_barrier, "barrier" },
@@ -166,6 +168,9 @@ int hfsplus_parse_options(char *input, struct hfsplus_sb_info *sbi)
 			}
 			break;
 		case opt_nls:
+			pr_warn("option nls= is deprecated, use iocharset=\n");
+			/* fallthrough */
+		case opt_iocharset:
 			if (sbi->nls) {
 				pr_err("unable to change nls mapping\n");
 				return 0;
@@ -230,7 +235,7 @@ int hfsplus_show_options(struct seq_file *seq, struct dentry *root)
 	if (sbi->session >= 0)
 		seq_printf(seq, ",session=%u", sbi->session);
 	if (sbi->nls)
-		seq_printf(seq, ",nls=%s", sbi->nls->charset);
+		seq_printf(seq, ",iocharset=%s", sbi->nls->charset);
 	if (test_bit(HFSPLUS_SB_NODECOMPOSE, &sbi->flags))
 		seq_puts(seq, ",nodecompose");
 	if (test_bit(HFSPLUS_SB_NOBARRIER, &sbi->flags))
