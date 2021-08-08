@@ -608,13 +608,4 @@ config NLS_MAC_TURKISH
 
 	  If unsure, say Y.
 
-config NLS_UTF8
-	tristate "NLS UTF-8"
-	help
-	  If you want to display filenames with native language characters
-	  from the Microsoft FAT file system family or from JOLIET CD-ROMs
-	  correctly on the screen, you need to include the appropriate
-	  input/output character sets. Say Y here for the UTF-8 encoding of
-	  the Unicode/ISO9646 universal character set.
-
 endif # NLS

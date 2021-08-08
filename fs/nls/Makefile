@@ -42,7 +42,6 @@ obj-$(CONFIG_NLS_ISO8859_14)	+= nls_iso8859-14.o
 obj-$(CONFIG_NLS_ISO8859_15)	+= nls_iso8859-15.o
 obj-$(CONFIG_NLS_KOI8_R)	+= nls_koi8-r.o
 obj-$(CONFIG_NLS_KOI8_U)	+= nls_koi8-u.o nls_koi8-ru.o
-obj-$(CONFIG_NLS_UTF8)		+= nls_utf8.o
 obj-$(CONFIG_NLS_MAC_CELTIC)    += mac-celtic.o
 obj-$(CONFIG_NLS_MAC_CENTEURO)  += mac-centeuro.o
 obj-$(CONFIG_NLS_MAC_CROATIAN)  += mac-croatian.o
