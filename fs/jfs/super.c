@@ -231,7 +231,7 @@ static const match_table_t tokens = {
 };
 
 static int parse_options(char *options, struct super_block *sb, s64 *newLVSize,
-			 int *flag)
+			 int *flag, int remount)
 {
 	void *nls_map = (void *)-1;	/* -1: no change;  NULL: none */
 	char *p;
@@ -263,14 +263,14 @@ static int parse_options(char *options, struct super_block *sb, s64 *newLVSize,
 		case Opt_iocharset:
 			if (nls_map && nls_map != (void *) -1)
 				unload_nls(nls_map);
-			if (!strcmp(args[0].from, "none"))
-				nls_map = NULL;
-			else {
+			/* compatibility alias none means ISO-8859-1 */
+			if (strcmp(args[0].from, "none") == 0)
+				nls_map = load_nls("iso8859-1");
+			else
 				nls_map = load_nls(args[0].from);
-				if (!nls_map) {
-					pr_err("JFS: charset not found\n");
-					goto cleanup;
-				}
+			if (!nls_map) {
+				pr_err("JFS: charset not found\n");
+				goto cleanup;
 			}
 			break;
 		case Opt_resize:
@@ -414,6 +414,15 @@ static int parse_options(char *options, struct super_block *sb, s64 *newLVSize,
 		}
 	}
 
+	if (!remount && nls_map == (void *) -1) {
+		/* Previously default NLS table was ISO-8859-1 */
+		nls_map = load_nls("iso8859-1");
+		if (!nls_map) {
+			pr_err("JFS: iso8859-1 charset not found\n");
+			goto cleanup;
+		}
+	}
+
 	if (nls_map != (void *) -1) {
 		/* Discard old (if remount) */
 		unload_nls(sbi->nls_tab);
@@ -435,7 +444,7 @@ static int jfs_remount(struct super_block *sb, int *flags, char *data)
 	int ret;
 
 	sync_filesystem(sb);
-	if (!parse_options(data, sb, &newLVSize, &flag))
+	if (!parse_options(data, sb, &newLVSize, &flag, 1))
 		return -EINVAL;
 
 	if (newLVSize) {
@@ -513,7 +522,7 @@ static int jfs_fill_super(struct super_block *sb, void *data, int silent)
 	/* initialize the mount flag and determine the default error handler */
 	flag = JFS_ERR_REMOUNT_RO;
 
-	if (!parse_options((char *) data, sb, &newLVSize, &flag))
+	if (!parse_options((char *) data, sb, &newLVSize, &flag, 0))
 		goto out_kfree;
 	sbi->flag = flag;
 
