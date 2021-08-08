@@ -66,8 +66,6 @@ static struct workqueue_struct *dfscache_wq __read_mostly;
 static int cache_ttl;
 static DEFINE_SPINLOCK(cache_ttl_lock);
 
-static struct nls_table *cache_cp;
-
 /*
  * Number of entries in the cache
  */
@@ -194,14 +192,14 @@ char *dfs_cache_canonical_path(const char *path, const struct nls_table *cp, int
 	if (!path || strlen(path) < 3 || (*path != '\\' && *path != '/'))
 		return ERR_PTR(-EINVAL);
 
-	if (unlikely(strcmp(cp->charset, cache_cp->charset))) {
+	if (unlikely(cp)) {
 		tmp = (char *)cifs_strndup_to_utf16(path, strlen(path), &plen, cp, remap);
 		if (!tmp) {
 			cifs_dbg(VFS, "%s: failed to convert path to utf16\n", __func__);
 			return ERR_PTR(-EINVAL);
 		}
 
-		npath = cifs_strndup_from_utf16(tmp, plen, true, cache_cp);
+		npath = cifs_strndup_from_utf16(tmp, plen, true, NULL);
 		kfree(tmp);
 
 		if (!npath) {
@@ -413,9 +411,6 @@ int dfs_cache_init(void)
 		INIT_HLIST_HEAD(&cache_htable[i]);
 
 	atomic_set(&cache_count, 0);
-	cache_cp = load_nls("utf8");
-	if (!cache_cp)
-		cache_cp = load_nls_default();
 
 	cifs_dbg(FYI, "%s: initialized DFS referral cache\n", __func__);
 	return 0;
@@ -429,11 +424,11 @@ static int cache_entry_hash(const void *data, int size, unsigned int *hash)
 {
 	int i, clen;
 	const unsigned char *s = data;
-	wchar_t c;
+	unicode_t c;
 	unsigned int h = 0;
 
 	for (i = 0; i < size; i += clen) {
-		clen = cache_cp->char2uni(&s[i], size - i, &c);
+		clen = utf8_to_utf32(&s[i], size - i, &c);
 		if (unlikely(clen < 0)) {
 			cifs_dbg(VFS, "%s: can't convert char\n", __func__);
 			return clen;
@@ -622,14 +617,14 @@ static int add_cache_entry_locked(struct dfs_info3_param *refs, int numrefs)
 static bool dfs_path_equal(const char *s1, int len1, const char *s2, int len2)
 {
 	int i, l1, l2;
-	wchar_t c1, c2;
+	unicode_t c1, c2;
 
 	if (len1 != len2)
 		return false;
 
 	for (i = 0; i < len1; i += l1) {
-		l1 = cache_cp->char2uni(&s1[i], len1 - i, &c1);
-		l2 = cache_cp->char2uni(&s2[i], len2 - i, &c2);
+		l1 = utf8_to_utf32(&s1[i], len1 - i, &c1);
+		l2 = utf8_to_utf32(&s2[i], len2 - i, &c2);
 		if (unlikely(l1 < 0 && l2 < 0)) {
 			if (s1[i] != s2[i])
 				return false;
@@ -719,7 +714,6 @@ static struct cache_entry *lookup_cache_entry(const char *path)
 void dfs_cache_destroy(void)
 {
 	cancel_delayed_work_sync(&refresh_task);
-	unload_nls(cache_cp);
 	free_mount_group_list();
 	flush_cache_ents();
 	kmem_cache_destroy(cache_slab);
@@ -767,10 +761,8 @@ static int get_dfs_referral(const unsigned int xid, struct cifs_ses *ses, const 
 
 	if (!ses || !ses->server || !ses->server->ops->get_dfs_refer)
 		return -EOPNOTSUPP;
-	if (unlikely(!cache_cp))
-		return -EINVAL;
 
-	rc =  ses->server->ops->get_dfs_refer(xid, ses, path, refs, numrefs, cache_cp,
+	rc =  ses->server->ops->get_dfs_refer(xid, ses, path, refs, numrefs, NULL,
 					      NO_MAP_UNI_RSVD);
 	if (!rc) {
 		struct dfs_info3_param *ref = *refs;

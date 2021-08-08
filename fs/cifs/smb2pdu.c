@@ -145,7 +145,6 @@ smb2_reconnect(__le16 smb2_command, struct cifs_tcon *tcon,
 	       struct TCP_Server_Info *server)
 {
 	int rc;
-	struct nls_table *nls_codepage;
 	struct cifs_ses *ses;
 	int retries;
 
@@ -233,8 +232,6 @@ smb2_reconnect(__le16 smb2_command, struct cifs_tcon *tcon,
 	if (!tcon->ses->need_reconnect && !tcon->need_reconnect)
 		return 0;
 
-	nls_codepage = load_nls_default();
-
 	/*
 	 * need to prevent multiple threads trying to simultaneously reconnect
 	 * the same SMB session
@@ -262,7 +259,7 @@ smb2_reconnect(__le16 smb2_command, struct cifs_tcon *tcon,
 
 	rc = cifs_negotiate_protocol(0, tcon->ses);
 	if (!rc && tcon->ses->need_reconnect) {
-		rc = cifs_setup_session(0, tcon->ses, nls_codepage);
+		rc = cifs_setup_session(0, tcon->ses, NULL);
 		if ((rc == -EACCES) && !tcon->retry) {
 			rc = -EHOSTDOWN;
 			ses->binding = false;
@@ -286,7 +283,7 @@ smb2_reconnect(__le16 smb2_command, struct cifs_tcon *tcon,
 	if (tcon->use_persistent)
 		tcon->need_reopen_files = true;
 
-	rc = cifs_tree_connect(0, tcon, nls_codepage);
+	rc = cifs_tree_connect(0, tcon, NULL);
 	mutex_unlock(&tcon->ses->session_mutex);
 
 	cifs_dbg(FYI, "reconnect tcon rc = %d\n", rc);
@@ -322,7 +319,6 @@ out:
 		rc = -EAGAIN;
 	}
 failed:
-	unload_nls(nls_codepage);
 	return rc;
 }
 
@@ -481,12 +477,10 @@ build_encrypt_ctxt(struct smb2_encryption_neg_context *pneg_ctxt)
 static unsigned int
 build_netname_ctxt(struct smb2_netname_neg_context *pneg_ctxt, char *hostname)
 {
-	struct nls_table *cp = load_nls_default();
-
 	pneg_ctxt->ContextType = SMB2_NETNAME_NEGOTIATE_CONTEXT_ID;
 
 	/* copy up to max of first 100 bytes of server name to NetName field */
-	pneg_ctxt->DataLength = cpu_to_le16(2 * cifs_strtoUTF16(pneg_ctxt->NetName, hostname, 100, cp));
+	pneg_ctxt->DataLength = cpu_to_le16(2 * cifs_strtoUTF16(pneg_ctxt->NetName, hostname, 100, NULL));
 	/* context size is DataLength + minimal smb2_neg_context */
 	return DIV_ROUND_UP(le16_to_cpu(pneg_ctxt->DataLength) +
 			sizeof(struct smb2_neg_context), 8) * 8;
@@ -2498,7 +2492,6 @@ alloc_path_with_tree_prefix(__le16 **out_path, int *out_size, int *out_len,
 			    const char *treename, const __le16 *path)
 {
 	int treename_len, path_len;
-	struct nls_table *cp;
 	const __le16 sep[] = {cpu_to_le16('\\'), cpu_to_le16(0x0000)};
 
 	/*
@@ -2529,11 +2522,9 @@ alloc_path_with_tree_prefix(__le16 **out_path, int *out_size, int *out_len,
 	if (!*out_path)
 		return -ENOMEM;
 
-	cp = load_nls_default();
-	cifs_strtoUTF16(*out_path, treename, treename_len, cp);
+	cifs_strtoUTF16(*out_path, treename, treename_len, NULL);
 	UniStrcat(*out_path, sep);
 	UniStrcat(*out_path, path);
-	unload_nls(cp);
 
 	return 0;
 }
