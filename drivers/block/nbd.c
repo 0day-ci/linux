@@ -712,12 +712,22 @@ static struct nbd_cmd *nbd_read_stat(struct nbd_device *nbd, int index)
 	memcpy(&handle, reply.handle, sizeof(handle));
 	tag = nbd_handle_to_tag(handle);
 	hwq = blk_mq_unique_tag_to_hwq(tag);
-	if (hwq < nbd->tag_set.nr_hw_queues)
-		req = blk_mq_tag_to_rq(nbd->tag_set.tags[hwq],
-				       blk_mq_unique_tag_to_tag(tag));
-	if (!req || !blk_mq_request_started(req)) {
-		dev_err(disk_to_dev(nbd->disk), "Unexpected reply (%d) %p\n",
-			tag, req);
+	if (hwq < nbd->tag_set.nr_hw_queues) {
+		unsigned long flags;
+		struct blk_mq_tags *tags = nbd->tag_set.tags[hwq];
+
+		blk_mq_tags_lock(tags, &flags);
+		req = blk_mq_tag_to_rq(tags, blk_mq_unique_tag_to_tag(tag));
+		if (!blk_mq_request_started(req)) {
+			dev_err(disk_to_dev(nbd->disk), "Request not started (%d) %p\n",
+				tag, req);
+			req = NULL;
+		}
+		blk_mq_tags_unlock(tags, &flags);
+	}
+
+	if (!req) {
+		dev_err(disk_to_dev(nbd->disk), "Unexpected reply (%d)\n", tag);
 		return ERR_PTR(-ENOENT);
 	}
 	trace_nbd_header_received(req, handle);
