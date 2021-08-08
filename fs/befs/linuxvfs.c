@@ -770,6 +770,7 @@ static int befs_show_options(struct seq_file *m, struct dentry *root)
 {
 	struct befs_sb_info *befs_sb = BEFS_SB(root->d_sb);
 	struct befs_mount_options *opts = &befs_sb->mount_opts;
+	struct nls_table *nls = befs_sb->nls;
 
 	if (!uid_eq(opts->uid, GLOBAL_ROOT_UID))
 		seq_printf(m, ",uid=%u",
@@ -777,8 +778,10 @@ static int befs_show_options(struct seq_file *m, struct dentry *root)
 	if (!gid_eq(opts->gid, GLOBAL_ROOT_GID))
 		seq_printf(m, ",gid=%u",
 			   from_kgid_munged(&init_user_ns, opts->gid));
-	if (opts->iocharset)
-		seq_printf(m, ",iocharset=%s", opts->iocharset);
+	if (nls)
+		seq_printf(m, ",iocharset=%s", nls->charset);
+	else
+		seq_puts(m, ",iocharset=utf8");
 	if (opts->debug)
 		seq_puts(m, ",debug");
 	return 0;
@@ -908,8 +911,10 @@ befs_fill_super(struct super_block *sb, void *data, int silent)
 		goto unacquire_priv_sbp;
 	}
 
+	if (strcmp(opt.iocharset ? opt.iocharset : CONFIG_NLS_DEFAULT, "utf8") == 0) {
+		befs_debug(sb, "Using native UTF-8 without nls");
 	/* load nls library */
-	if (befs_sb->mount_opts.iocharset) {
+	} else if (befs_sb->mount_opts.iocharset) {
 		befs_debug(sb, "Loading nls: %s",
 			   befs_sb->mount_opts.iocharset);
 		befs_sb->nls = load_nls(befs_sb->mount_opts.iocharset);
