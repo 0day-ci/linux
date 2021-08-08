@@ -198,6 +198,10 @@ struct intel_context {
 	 */
 	u8 guc_prio;
 	u32 guc_prio_count[GUC_CLIENT_PRIORITY_NUM];
+
+	I915_SELFTEST_DECLARE(bool drop_schedule_enable);
+	I915_SELFTEST_DECLARE(bool drop_schedule_disable);
+	I915_SELFTEST_DECLARE(bool drop_deregister);
 };
 
 #endif /* __INTEL_CONTEXT_TYPES__ */
