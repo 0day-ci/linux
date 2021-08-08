@@ -46,6 +46,9 @@ int jfs_strfromUCS_le(char *to, int maxlen, const __le16 * from,
 				}
 			}
 		}
+	} else {
+		outlen = utf16s_to_utf8s(from, len,
+					 UTF16_LITTLE_ENDIAN, to, maxlen-1);
 	}
 	to[outlen] = 0;
 	return outlen;
@@ -61,6 +64,7 @@ static int jfs_strtoUCS(wchar_t * to, const unsigned char *from, int len,
 		struct nls_table *codepage)
 {
 	int charlen;
+	int outlen;
 	int i;
 
 	if (codepage) {
@@ -75,10 +79,19 @@ static int jfs_strtoUCS(wchar_t * to, const unsigned char *from, int len,
 				return charlen;
 			}
 		}
+		outlen = i;
+	} else {
+		outlen = utf8s_to_utf16s(from, len, UTF16_LITTLE_ENDIAN,
+					 to, len);
+		if (outlen < 1) {
+			jfs_err("jfs_strtoUCS: utf8s_to_utf16s returned %d.",
+				outlen);
+			return outlen;
+		}
 	}
 
-	to[i] = 0;
-	return i;
+	to[outlen] = 0;
+	return outlen;
 }
 
 /*

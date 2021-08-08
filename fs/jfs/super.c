@@ -261,16 +261,20 @@ static int parse_options(char *options, struct super_block *sb, s64 *newLVSize,
 			/* Don't do anything ;-) */
 			break;
 		case Opt_iocharset:
-			if (nls_map && nls_map != (void *) -1)
+			if (nls_map && nls_map != (void *) -1) {
 				unload_nls(nls_map);
-			/* compatibility alias none means ISO-8859-1 */
-			if (strcmp(args[0].from, "none") == 0)
-				nls_map = load_nls("iso8859-1");
-			else
-				nls_map = load_nls(args[0].from);
-			if (!nls_map) {
-				pr_err("JFS: charset not found\n");
-				goto cleanup;
+				nls_map = NULL;
+			}
+			if (strcmp(args[0].from, "utf8") != 0) {
+				/* compatibility alias none means ISO-8859-1 */
+				if (strcmp(args[0].from, "none") == 0)
+					nls_map = load_nls("iso8859-1");
+				else
+					nls_map = load_nls(args[0].from);
+				if (!nls_map) {
+					pr_err("JFS: charset not found\n");
+					goto cleanup;
+				}
 			}
 			break;
 		case Opt_resize:
@@ -718,6 +722,8 @@ static int jfs_show_options(struct seq_file *seq, struct dentry *root)
 		seq_printf(seq, ",discard=%u", sbi->minblks_trim);
 	if (sbi->nls_tab)
 		seq_printf(seq, ",iocharset=%s", sbi->nls_tab->charset);
+	else
+		seq_puts(seq, ",iocharset=utf8");
 	if (sbi->flag & JFS_ERR_CONTINUE)
 		seq_printf(seq, ",errors=continue");
 	if (sbi->flag & JFS_ERR_PANIC)
