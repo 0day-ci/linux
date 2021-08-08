@@ -134,6 +134,7 @@ static int vfat_hash(const struct dentry *dentry, struct qstr *qstr)
 static int vfat_hashi(const struct dentry *dentry, struct qstr *qstr)
 {
 	struct nls_table *t = MSDOS_SB(dentry->d_sb)->nls_io;
+	int utf8 = MSDOS_SB(dentry->d_sb)->options.utf8;
 	const unsigned char *name;
 	unsigned int len;
 	unsigned long hash;
@@ -142,8 +143,17 @@ static int vfat_hashi(const struct dentry *dentry, struct qstr *qstr)
 	len = vfat_striptail_len(qstr);
 
 	hash = init_name_hash(dentry);
-	while (len--)
-		hash = partial_name_hash(nls_tolower(t, *name++), hash);
+	if (utf8) {
+		/*
+		 * FIXME: UTF-8 doesn't provide FAT semantics
+		 * Case-insensitive support is only for 7-bit ASCII characters
+		 */
+		while (len--)
+			hash = partial_name_hash(fat_ascii_to_lower(*name++), hash);
+	} else {
+		while (len--)
+			hash = partial_name_hash(nls_tolower(t, *name++), hash);
+	}
 	qstr->hash = end_name_hash(hash);
 
 	return 0;
@@ -156,16 +166,18 @@ static int vfat_cmpi(const struct dentry *dentry,
 		unsigned int len, const char *str, const struct qstr *name)
 {
 	struct nls_table *t = MSDOS_SB(dentry->d_sb)->nls_io;
+	int utf8 = MSDOS_SB(dentry->d_sb)->options.utf8;
 	unsigned int alen, blen;
 
 	/* A filename cannot end in '.' or we treat it like it has none */
 	alen = vfat_striptail_len(name);
 	blen = __vfat_striptail_len(len, str);
-	if (alen == blen) {
-		if (nls_strnicmp(t, name->name, str, alen) == 0)
-			return 0;
-	}
-	return 1;
+	if (alen != blen)
+		return 1;
+	else if (utf8)
+		return fat_utf8_strnicmp(name->name, str, alen);
+	else
+		return nls_strnicmp(t, name->name, str, alen);
 }
 
 /*

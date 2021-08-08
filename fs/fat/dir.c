@@ -33,11 +33,6 @@
 #define FAT_MAX_UNI_CHARS	((MSDOS_SLOTS - 1) * 13 + 1)
 #define FAT_MAX_UNI_SIZE	(FAT_MAX_UNI_CHARS * sizeof(wchar_t))
 
-static inline unsigned char fat_tolower(unsigned char c)
-{
-	return ((c >= 'A') && (c <= 'Z')) ? c+32 : c;
-}
-
 static inline loff_t fat_make_i_pos(struct super_block *sb,
 				    struct buffer_head *bh,
 				    struct msdos_dir_entry *de)
@@ -258,10 +253,12 @@ static inline int fat_name_match(struct msdos_sb_info *sbi,
 	if (a_len != b_len)
 		return 0;
 
-	if (sbi->options.name_check != 's')
-		return !nls_strnicmp(sbi->nls_io, a, b, a_len);
-	else
+	if (sbi->options.name_check == 's')
 		return !memcmp(a, b, a_len);
+	else if (sbi->options.utf8)
+		return !fat_utf8_strnicmp(a, b, a_len);
+	else
+		return !nls_strnicmp(sbi->nls_io, a, b, a_len);
 }
 
 enum { PARSE_INVALID = 1, PARSE_NOT_LONGNAME, PARSE_EOF, };
@@ -384,7 +381,7 @@ static int fat_parse_short(struct super_block *sb,
 					de->lcase & CASE_LOWER_BASE);
 		if (chl <= 1) {
 			if (!isvfat)
-				ptname[i] = nocase ? c : fat_tolower(c);
+				ptname[i] = nocase ? c : fat_ascii_to_lower(c);
 			i++;
 			if (c != ' ') {
 				name_len = i;
@@ -421,7 +418,7 @@ static int fat_parse_short(struct super_block *sb,
 		if (chl <= 1) {
 			k++;
 			if (!isvfat)
-				ptname[i] = nocase ? c : fat_tolower(c);
+				ptname[i] = nocase ? c : fat_ascii_to_lower(c);
 			i++;
 			if (c != ' ') {
 				name_len = i;

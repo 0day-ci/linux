@@ -957,7 +957,9 @@ static int fat_show_options(struct seq_file *m, struct dentry *root)
 		/* strip "cp" prefix from displayed option */
 		seq_printf(m, ",codepage=%s", &sbi->nls_disk->charset[2]);
 	if (isvfat) {
-		if (sbi->nls_io)
+		if (opts->utf8)
+			seq_printf(m, ",iocharset=utf8");
+		else if (sbi->nls_io)
 			seq_printf(m, ",iocharset=%s", sbi->nls_io->charset);
 
 		switch (opts->shortname) {
@@ -994,8 +996,6 @@ static int fat_show_options(struct seq_file *m, struct dentry *root)
 		if (opts->nocase)
 			seq_puts(m, ",nocase");
 	} else {
-		if (opts->utf8)
-			seq_puts(m, ",utf8");
 		if (opts->unicode_xlate)
 			seq_puts(m, ",uni_xlate");
 		if (!opts->numtail)
@@ -1157,8 +1157,6 @@ static int parse_options(struct super_block *sb, char *options, int is_vfat,
 	opts->errors = FAT_ERRORS_RO;
 	*debug = 0;
 
-	opts->utf8 = IS_ENABLED(CONFIG_FAT_DEFAULT_UTF8) && is_vfat;
-
 	if (!options)
 		goto out;
 
@@ -1319,10 +1317,14 @@ static int parse_options(struct super_block *sb, char *options, int is_vfat,
 					| VFAT_SFN_CREATE_WIN95;
 			break;
 		case Opt_utf8_no:		/* 0 or no or false */
-			opts->utf8 = 0;
+			fat_reset_iocharset(opts);
 			break;
 		case Opt_utf8_yes:		/* empty or 1 or yes or true */
-			opts->utf8 = 1;
+			fat_reset_iocharset(opts);
+			iocharset = kstrdup("utf8", GFP_KERNEL);
+			if (!iocharset)
+				return -ENOMEM;
+			opts->iocharset = iocharset;
 			break;
 		case Opt_uni_xl_no:		/* 0 or no or false */
 			opts->unicode_xlate = 0;
@@ -1360,18 +1362,11 @@ static int parse_options(struct super_block *sb, char *options, int is_vfat,
 	}
 
 out:
-	/* UTF-8 doesn't provide FAT semantics */
-	if (!strcmp(opts->iocharset, "utf8")) {
-		fat_msg(sb, KERN_WARNING, "utf8 is not a recommended IO charset"
-		       " for FAT filesystems, filesystem will be "
-		       "case sensitive!");
-	}
+	opts->utf8 = !strcmp(opts->iocharset, "utf8") && is_vfat;
 
 	/* If user doesn't specify allow_utime, it's initialized from dmask. */
 	if (opts->allow_utime == (unsigned short)-1)
 		opts->allow_utime = ~opts->fs_dmask & (S_IWGRP | S_IWOTH);
-	if (opts->unicode_xlate)
-		opts->utf8 = 0;
 	if (opts->nfs == FAT_NFS_NOSTALE_RO) {
 		sb->s_flags |= SB_RDONLY;
 		sb->s_export_op = &fat_export_ops_nostale;
@@ -1832,8 +1827,7 @@ int fat_fill_super(struct super_block *sb, void *data, int silent, int isvfat,
 		goto out_fail;
 	}
 
-	/* FIXME: utf8 is using iocharset for upper/lower conversion */
-	if (sbi->options.isvfat) {
+	if (sbi->options.isvfat && !sbi->options.utf8) {
 		sbi->nls_io = load_nls(sbi->options.iocharset);
 		if (!sbi->nls_io) {
 			fat_msg(sb, KERN_ERR, "IO charset %s not found",

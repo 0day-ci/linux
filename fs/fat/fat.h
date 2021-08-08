@@ -310,6 +310,28 @@ static inline void fatwchar_to16(__u8 *dst, const wchar_t *src, size_t len)
 #endif
 }
 
+static inline unsigned char fat_ascii_to_lower(unsigned char c)
+{
+	return ((c >= 'A') && (c <= 'Z')) ? c+32 : c;
+}
+
+static inline int fat_utf8_strnicmp(const unsigned char *a,
+				    const unsigned char *b,
+				    int len)
+{
+	int i;
+
+	/*
+	 * FIXME: UTF-8 doesn't provide FAT semantics
+	 * Case-insensitive support is only for 7-bit ASCII characters
+	 */
+	for (i = 0; i < len; i++) {
+		if (fat_ascii_to_lower(a[i]) != fat_ascii_to_lower(b[i]))
+			return 1;
+	}
+	return 0;
+}
+
 /* fat/cache.c */
 extern void fat_cache_inval_inode(struct inode *inode);
 extern int fat_get_cluster(struct inode *inode, int cluster,

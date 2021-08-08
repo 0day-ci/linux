@@ -100,18 +100,3 @@ config FAT_DEFAULT_IOCHARSET
 
 	  Enable any character sets you need in File Systems/Native Language
 	  Support.
-
-config FAT_DEFAULT_UTF8
-	bool "Enable FAT UTF-8 option by default"
-	depends on VFAT_FS
-	default n
-	help
-	  Set this if you would like to have "utf8" mount option set
-	  by default when mounting FAT filesystems.
-
-	  Even if you say Y here can always disable UTF-8 for
-	  particular mount by adding "utf8=0" to mount options.
-
-	  Say Y if you use UTF-8 encoding for file names, N otherwise.
-
-	  See <file:Documentation/filesystems/vfat.rst> for more information.
