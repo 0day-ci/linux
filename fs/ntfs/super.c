@@ -192,11 +192,6 @@ static bool parse_options(ntfs_volume *vol, char *opt)
 			ntfs_warning(vol->sb, "Ignoring obsolete option %s.",
 					p);
 		else if (!strcmp(p, "nls") || !strcmp(p, "iocharset")) {
-			if (!strcmp(p, "iocharset"))
-				ntfs_warning(vol->sb, "Option iocharset is "
-						"deprecated. Please use "
-						"option nls=<charsetname> in "
-						"the future.");
 			if (!v || !*v)
 				goto needs_arg;
 use_utf8:
@@ -218,10 +213,10 @@ use_utf8:
 		} else if (!strcmp(p, "utf8")) {
 			bool val = false;
 			ntfs_warning(vol->sb, "Option utf8 is no longer "
-				   "supported, using option nls=utf8. Please "
-				   "use option nls=utf8 in the future and "
-				   "make sure utf8 is compiled either as a "
-				   "module or into the kernel.");
+				   "supported, using option iocharset=utf8. "
+				   "Please use option iocharset=utf8 in the "
+				   "future and make sure utf8 is compiled "
+				   "either as a module or into the kernel.");
 			if (!v || !*v)
 				val = true;
 			else if (!simple_getbool(v, &val))

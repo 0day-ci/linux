@@ -372,7 +372,8 @@ retry:			wc = nls->uni2char(le16_to_cpu(ins[i]), ns + o,
 conversion_err:
 	ntfs_error(vol->sb, "Unicode name contains characters that cannot be "
 			"converted to character set %s.  You might want to "
-			"try to use the mount option nls=utf8.", nls->charset);
+			"try to use the mount option iocharset=utf8.",
+			nls->charset);
 	if (ns != *outs)
 		kfree(ns);
 	if (wc != -ENAMETOOLONG)
