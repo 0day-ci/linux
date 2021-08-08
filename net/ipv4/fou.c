@@ -572,13 +572,13 @@ static int fou_create(struct net *net, struct fou_cfg *cfg,
 	/* Open UDP socket */
 	err = udp_sock_create(net, &cfg->udp_config, &sock);
 	if (err < 0)
-		goto error;
+		goto error_sock;
 
 	/* Allocate FOU port structure */
 	fou = kzalloc(sizeof(*fou), GFP_KERNEL);
 	if (!fou) {
 		err = -ENOMEM;
-		goto error;
+		goto error_alloc;
 	}
 
 	sk = sock->sk;
@@ -627,9 +627,10 @@ static int fou_create(struct net *net, struct fou_cfg *cfg,
 
 error:
 	kfree(fou);
+error_alloc:
 	if (sock)
 		udp_tunnel_sock_release(sock);
-
+error_sock:
 	return err;
 }
 
