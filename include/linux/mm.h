@@ -1207,14 +1207,15 @@ bool __must_check try_grab_page(struct page *page, unsigned int flags);
 __maybe_unused struct page *try_grab_compound_head(struct page *page, int refs,
 						   unsigned int flags);
 
+struct page *try_get_compound_head(struct page *page, int refs);
 
+/*
+ * This has the same functionality as try_get_compound_head(), just with a
+ * slightly different API.
+ */
 static inline __must_check bool try_get_page(struct page *page)
 {
-	page = compound_head(page);
-	if (WARN_ON_ONCE(page_ref_count(page) <= 0))
-		return false;
-	page_ref_inc(page);
-	return true;
+	return try_get_compound_head(page, 1) != NULL;
 }
 
 /**

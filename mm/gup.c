@@ -66,7 +66,7 @@ static void put_page_refs(struct page *page, int refs)
  * Return the compound head page with ref appropriately incremented,
  * or NULL if that failed.
  */
-static inline struct page *try_get_compound_head(struct page *page, int refs)
+struct page *try_get_compound_head(struct page *page, int refs)
 {
 	struct page *head = compound_head(page);
 
