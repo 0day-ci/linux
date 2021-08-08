@@ -14,7 +14,9 @@ allOf:
 
 properties:
   compatible:
-    const: qcom,ipq4019-mdio
+    enum:
+      - qcom,ipq4019-mdio
+      - qcom,ipq5018-mdio
 
   "#address-cells":
     const: 1
@@ -23,7 +25,15 @@ properties:
     const: 0
 
   reg:
-    maxItems: 1
+    minItems: 1
+    maxItems: 2
+    description:
+      the first Address and length of the register set for the MDIO controller.
+      the optional second Address and length of the register for ethernet LDO.
+
+  clocks:
+    items:
+      - description: MDIO clock
 
 required:
   - compatible
