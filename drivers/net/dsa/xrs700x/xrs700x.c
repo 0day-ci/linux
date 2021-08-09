@@ -297,7 +297,6 @@ static void xrs700x_port_stp_state_set(struct dsa_switch *ds, int port,
 static int xrs700x_port_add_bpdu_ipf(struct dsa_switch *ds, int port)
 {
 	struct xrs700x *priv = ds->priv;
-	unsigned int val = 0;
 	int i = 0;
 	int ret;
 
@@ -316,12 +315,8 @@ static int xrs700x_port_add_bpdu_ipf(struct dsa_switch *ds, int port)
 	}
 
 	/* Mirror BPDU to CPU port */
-	for (i = 0; i < ds->num_ports; i++) {
-		if (dsa_is_cpu_port(ds, i))
-			val |= BIT(i);
-	}
-
-	ret = regmap_write(priv->regmap, XRS_ETH_ADDR_FWD_MIRROR(port, 0), val);
+	ret = regmap_write(priv->regmap, XRS_ETH_ADDR_FWD_MIRROR(port, 0),
+			   dsa_cpu_ports(ds));
 	if (ret)
 		return ret;
 
@@ -340,8 +335,8 @@ static int xrs700x_port_add_bpdu_ipf(struct dsa_switch *ds, int port)
 static int xrs700x_port_add_hsrsup_ipf(struct dsa_switch *ds, int port,
 				       int fwdport)
 {
+	unsigned int val = dsa_cpu_ports(ds);
 	struct xrs700x *priv = ds->priv;
-	unsigned int val = 0;
 	int i = 0;
 	int ret;
 
@@ -360,11 +355,6 @@ static int xrs700x_port_add_hsrsup_ipf(struct dsa_switch *ds, int port,
 	}
 
 	/* Mirror HSR/PRP supervision to CPU port */
-	for (i = 0; i < ds->num_ports; i++) {
-		if (dsa_is_cpu_port(ds, i))
-			val |= BIT(i);
-	}
-
 	ret = regmap_write(priv->regmap, XRS_ETH_ADDR_FWD_MIRROR(port, 1), val);
 	if (ret)
 		return ret;
@@ -505,28 +495,27 @@ static void xrs700x_mac_link_up(struct dsa_switch *ds, int port,
 static int xrs700x_bridge_common(struct dsa_switch *ds, int port,
 				 struct net_device *bridge, bool join)
 {
-	unsigned int i, cpu_mask = 0, mask = 0;
+	unsigned int cpu_mask = 0, mask = 0;
 	struct xrs700x *priv = ds->priv;
+	struct dsa_port *dp;
 	int ret;
 
-	for (i = 0; i < ds->num_ports; i++) {
-		if (dsa_is_cpu_port(ds, i))
+	dsa_switch_for_each_user_port(dp, ds) {
+		cpu_mask |= BIT(dp->index);
+
+		if (dp->bridge_dev == bridge)
 			continue;
 
-		cpu_mask |= BIT(i);
-
-		if (dsa_to_port(ds, i)->bridge_dev == bridge)
-			continue;
-
-		mask |= BIT(i);
+		mask |= BIT(dp->index);
 	}
 
-	for (i = 0; i < ds->num_ports; i++) {
-		if (dsa_to_port(ds, i)->bridge_dev != bridge)
+	dsa_switch_for_each_port(dp, ds) {
+		if (dp->bridge_dev != bridge)
 			continue;
 
 		/* 1 = Disable forwarding to the port */
-		ret = regmap_write(priv->regmap, XRS_PORT_FWD_MASK(i), mask);
+		ret = regmap_write(priv->regmap, XRS_PORT_FWD_MASK(dp->index),
+				   mask);
 		if (ret)
 			return ret;
 	}

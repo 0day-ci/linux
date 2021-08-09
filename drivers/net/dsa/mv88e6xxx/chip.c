@@ -1635,9 +1635,11 @@ static int mv88e6xxx_atu_new(struct mv88e6xxx_chip *chip, u16 *fid)
 static int mv88e6xxx_port_check_hw_vlan(struct dsa_switch *ds, int port,
 					u16 vid)
 {
+	struct dsa_port *dp = dsa_to_port(ds, port);
 	struct mv88e6xxx_chip *chip = ds->priv;
 	struct mv88e6xxx_vtu_entry vlan;
-	int i, err;
+	struct dsa_port *other_dp;
+	int err;
 
 	/* DSA and CPU ports have to be members of multiple vlans */
 	if (dsa_is_dsa_port(ds, port) || dsa_is_cpu_port(ds, port))
@@ -1650,27 +1652,20 @@ static int mv88e6xxx_port_check_hw_vlan(struct dsa_switch *ds, int port,
 	if (!vlan.valid)
 		return 0;
 
-	for (i = 0; i < mv88e6xxx_num_ports(chip); ++i) {
-		if (dsa_is_dsa_port(ds, i) || dsa_is_cpu_port(ds, i))
-			continue;
-
-		if (!dsa_to_port(ds, i)->slave)
-			continue;
-
-		if (vlan.member[i] ==
+	dsa_switch_for_each_user_port(other_dp, ds) {
+		if (vlan.member[other_dp->index] ==
 		    MV88E6XXX_G1_VTU_DATA_MEMBER_TAG_NON_MEMBER)
 			continue;
 
-		if (dsa_to_port(ds, i)->bridge_dev ==
-		    dsa_to_port(ds, port)->bridge_dev)
+		if (other_dp->bridge_dev == dp->bridge_dev)
 			break; /* same bridge, check next VLAN */
 
-		if (!dsa_to_port(ds, i)->bridge_dev)
+		if (!other_dp->bridge_dev)
 			continue;
 
 		dev_err(ds->dev, "p%d: hw VLAN %d already used by port %d in %s\n",
-			port, vlan.vid, i,
-			netdev_name(dsa_to_port(ds, i)->bridge_dev));
+			port, vlan.vid, other_dp->index,
+			netdev_name(other_dp->bridge_dev));
 		return -EOPNOTSUPP;
 	}
 
@@ -1996,15 +1991,13 @@ static int mv88e6xxx_port_add_broadcast(struct mv88e6xxx_chip *chip, int port,
 
 static int mv88e6xxx_broadcast_setup(struct mv88e6xxx_chip *chip, u16 vid)
 {
+	struct dsa_switch *ds = chip->ds;
+	struct dsa_port *dp;
 	int port;
 	int err;
 
-	for (port = 0; port < mv88e6xxx_num_ports(chip); port++) {
-		struct dsa_port *dp = dsa_to_port(chip->ds, port);
+	dsa_switch_for_each_available_port(dp, ds) {
 		struct net_device *brport;
-
-		if (dsa_is_unused_port(chip->ds, port))
-			continue;
 
 		brport = dsa_port_to_bridge_port(dp);
 		if (brport && !br_port_flag_is_set(brport, BR_BCAST_FLOOD))
@@ -3077,6 +3070,7 @@ static void mv88e6xxx_teardown(struct dsa_switch *ds)
 static int mv88e6xxx_setup(struct dsa_switch *ds)
 {
 	struct mv88e6xxx_chip *chip = ds->priv;
+	struct dsa_port *dp;
 	u8 cmode;
 	int err;
 	int i;
@@ -3113,9 +3107,8 @@ static int mv88e6xxx_setup(struct dsa_switch *ds)
 	}
 
 	/* Setup Switch Port Registers */
-	for (i = 0; i < mv88e6xxx_num_ports(chip); i++) {
-		if (dsa_is_unused_port(ds, i))
-			continue;
+	dsa_switch_for_each_available_port(dp, ds) {
+		i = dp->index;
 
 		/* Prevent the use of an invalid port. */
 		if (mv88e6xxx_is_invalid_port(chip, i)) {

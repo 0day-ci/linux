@@ -1266,11 +1266,14 @@ static void ksz9477_port_setup(struct ksz_device *dev, int port, bool cpu_port)
 static void ksz9477_config_cpu_port(struct dsa_switch *ds)
 {
 	struct ksz_device *dev = ds->priv;
+	struct dsa_port *dp;
 	struct ksz_port *p;
 	int i;
 
-	for (i = 0; i < dev->port_cnt; i++) {
-		if (dsa_is_cpu_port(ds, i) && (dev->cpu_ports & (1 << i))) {
+	dsa_switch_for_each_port(dp, ds) {
+		i = dp->index;
+
+		if (dsa_port_is_cpu(dp) && (dev->cpu_ports & (1 << i))) {
 			phy_interface_t interface;
 			const char *prev_msg;
 			const char *prev_mode;
@@ -1609,18 +1612,22 @@ static const struct ksz_dev_ops ksz9477_dev_ops = {
 
 int ksz9477_switch_register(struct ksz_device *dev)
 {
-	int ret, i;
 	struct phy_device *phydev;
+	struct dsa_switch *ds;
+	struct dsa_port *dp;
+	int ret;
 
 	ret = ksz_switch_register(dev, &ksz9477_dev_ops);
 	if (ret)
 		return ret;
 
-	for (i = 0; i < dev->phy_port_cnt; ++i) {
-		if (!dsa_is_user_port(dev->ds, i))
+	ds = dev->ds;
+
+	dsa_switch_for_each_user_port(dp, ds) {
+		if (dp->index >= dev->phy_port_cnt)
 			continue;
 
-		phydev = dsa_to_port(dev->ds, i)->slave->phydev;
+		phydev = dp->slave->phydev;
 
 		/* The MAC actually cannot run in 1000 half-duplex mode. */
 		phy_remove_link_mode(phydev,

@@ -266,12 +266,12 @@ static void felix_8021q_cpu_port_deinit(struct ocelot *ocelot, int port)
  */
 static int felix_setup_mmio_filtering(struct felix *felix)
 {
-	unsigned long user_ports = 0, cpu_ports = 0;
+	unsigned long user_ports = dsa_user_ports(felix->ds);
+	unsigned long cpu_ports = dsa_cpu_ports(felix->ds);
 	struct ocelot_vcap_filter *redirect_rule;
 	struct ocelot_vcap_filter *tagging_rule;
 	struct ocelot *ocelot = &felix->ocelot;
-	struct dsa_switch *ds = felix->ds;
-	int port, ret;
+	int ret;
 
 	tagging_rule = kzalloc(sizeof(struct ocelot_vcap_filter), GFP_KERNEL);
 	if (!tagging_rule)
@@ -281,13 +281,6 @@ static int felix_setup_mmio_filtering(struct felix *felix)
 	if (!redirect_rule) {
 		kfree(tagging_rule);
 		return -ENOMEM;
-	}
-
-	for (port = 0; port < ocelot->num_phys_ports; port++) {
-		if (dsa_is_user_port(ds, port))
-			user_ports |= BIT(port);
-		if (dsa_is_cpu_port(ds, port))
-			cpu_ports |= BIT(port);
 	}
 
 	tagging_rule->key_type = OCELOT_VCAP_KEY_ETYPE;
@@ -388,14 +381,12 @@ static int felix_setup_tag_8021q(struct dsa_switch *ds, int cpu)
 	struct ocelot *ocelot = ds->priv;
 	struct felix *felix = ocelot_to_felix(ocelot);
 	unsigned long cpu_flood;
-	int port, err;
+	struct dsa_port *dp;
+	int err;
 
 	felix_8021q_cpu_port_init(ocelot, cpu);
 
-	for (port = 0; port < ds->num_ports; port++) {
-		if (dsa_is_unused_port(ds, port))
-			continue;
-
+	dsa_switch_for_each_available_port(dp, ds) {
 		/* This overwrites ocelot_init():
 		 * Do not forward BPDU frames to the CPU port module,
 		 * for 2 reasons:
@@ -408,7 +399,7 @@ static int felix_setup_tag_8021q(struct dsa_switch *ds, int cpu)
 		 */
 		ocelot_write_gix(ocelot,
 				 ANA_PORT_CPU_FWD_BPDU_CFG_BPDU_REDIR_ENA(0),
-				 ANA_PORT_CPU_FWD_BPDU_CFG, port);
+				 ANA_PORT_CPU_FWD_BPDU_CFG, dp->index);
 	}
 
 	/* In tag_8021q mode, the CPU port module is unused, except for PTP
@@ -439,7 +430,8 @@ static void felix_teardown_tag_8021q(struct dsa_switch *ds, int cpu)
 {
 	struct ocelot *ocelot = ds->priv;
 	struct felix *felix = ocelot_to_felix(ocelot);
-	int err, port;
+	struct dsa_port *dp;
+	int err;
 
 	err = felix_teardown_mmio_filtering(felix);
 	if (err)
@@ -448,17 +440,14 @@ static void felix_teardown_tag_8021q(struct dsa_switch *ds, int cpu)
 
 	dsa_tag_8021q_unregister(ds);
 
-	for (port = 0; port < ds->num_ports; port++) {
-		if (dsa_is_unused_port(ds, port))
-			continue;
-
+	dsa_switch_for_each_available_port(dp, ds) {
 		/* Restore the logic from ocelot_init:
 		 * do not forward BPDU frames to the front ports.
 		 */
 		ocelot_write_gix(ocelot,
 				 ANA_PORT_CPU_FWD_BPDU_CFG_BPDU_REDIR_ENA(0xffff),
 				 ANA_PORT_CPU_FWD_BPDU_CFG,
-				 port);
+				 dp->index);
 	}
 
 	felix_8021q_cpu_port_deinit(ocelot, cpu);
@@ -1178,7 +1167,8 @@ static int felix_setup(struct dsa_switch *ds)
 {
 	struct ocelot *ocelot = ds->priv;
 	struct felix *felix = ocelot_to_felix(ocelot);
-	int port, err;
+	struct dsa_port *dp;
+	int err;
 
 	err = felix_init_structs(felix, ds->num_ports);
 	if (err)
@@ -1197,31 +1187,24 @@ static int felix_setup(struct dsa_switch *ds)
 		}
 	}
 
-	for (port = 0; port < ds->num_ports; port++) {
-		if (dsa_is_unused_port(ds, port))
-			continue;
-
-		ocelot_init_port(ocelot, port);
+	dsa_switch_for_each_available_port(dp, ds) {
+		ocelot_init_port(ocelot, dp->index);
 
 		/* Set the default QoS Classification based on PCP and DEI
 		 * bits of vlan tag.
 		 */
-		felix_port_qos_map_init(ocelot, port);
+		felix_port_qos_map_init(ocelot, dp->index);
 	}
 
 	err = ocelot_devlink_sb_register(ocelot);
 	if (err)
 		goto out_deinit_ports;
 
-	for (port = 0; port < ds->num_ports; port++) {
-		if (!dsa_is_cpu_port(ds, port))
-			continue;
-
+	dsa_switch_for_each_cpu_port(dp, ds)
 		/* The initial tag protocol is NPI which always returns 0, so
 		 * there's no real point in checking for errors.
 		 */
-		felix_set_tag_protocol(ds, port, felix->tag_proto);
-	}
+		felix_set_tag_protocol(ds, dp->index, felix->tag_proto);
 
 	ds->mtu_enforcement_ingress = true;
 	ds->assisted_learning_on_cpu_port = true;
@@ -1229,12 +1212,8 @@ static int felix_setup(struct dsa_switch *ds)
 	return 0;
 
 out_deinit_ports:
-	for (port = 0; port < ocelot->num_phys_ports; port++) {
-		if (dsa_is_unused_port(ds, port))
-			continue;
-
-		ocelot_deinit_port(ocelot, port);
-	}
+	dsa_switch_for_each_available_port(dp, ds)
+		ocelot_deinit_port(ocelot, dp->index);
 
 	ocelot_deinit_timestamp(ocelot);
 	ocelot_deinit(ocelot);
@@ -1250,25 +1229,17 @@ static void felix_teardown(struct dsa_switch *ds)
 {
 	struct ocelot *ocelot = ds->priv;
 	struct felix *felix = ocelot_to_felix(ocelot);
-	int port;
+	struct dsa_port *dp;
 
-	for (port = 0; port < ds->num_ports; port++) {
-		if (!dsa_is_cpu_port(ds, port))
-			continue;
-
-		felix_del_tag_protocol(ds, port, felix->tag_proto);
-	}
+	dsa_switch_for_each_cpu_port(dp, ds)
+		felix_del_tag_protocol(ds, dp->index, felix->tag_proto);
 
 	ocelot_devlink_sb_unregister(ocelot);
 	ocelot_deinit_timestamp(ocelot);
 	ocelot_deinit(ocelot);
 
-	for (port = 0; port < ocelot->num_phys_ports; port++) {
-		if (dsa_is_unused_port(ds, port))
-			continue;
-
-		ocelot_deinit_port(ocelot, port);
-	}
+	dsa_switch_for_each_available_port(dp, ds)
+		ocelot_deinit_port(ocelot, dp->index);
 
 	if (felix->info->mdio_bus_free)
 		felix->info->mdio_bus_free(ocelot);

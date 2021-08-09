@@ -1085,9 +1085,10 @@ static const struct ocelot_ops vsc9953_ops = {
 static int vsc9953_mdio_bus_alloc(struct ocelot *ocelot)
 {
 	struct felix *felix = ocelot_to_felix(ocelot);
+	struct dsa_switch *ds = felix->ds;
 	struct device *dev = ocelot->dev;
+	struct dsa_port *dp;
 	struct mii_bus *bus;
-	int port;
 	int rc;
 
 	felix->pcs = devm_kcalloc(dev, felix->info->num_ports,
@@ -1118,14 +1119,11 @@ static int vsc9953_mdio_bus_alloc(struct ocelot *ocelot)
 
 	felix->imdio = bus;
 
-	for (port = 0; port < felix->info->num_ports; port++) {
-		struct ocelot_port *ocelot_port = ocelot->ports[port];
-		int addr = port + 4;
+	dsa_switch_for_each_available_port(dp, ds) {
+		struct ocelot_port *ocelot_port = ocelot->ports[dp->index];
+		int addr = dp->index + 4;
 		struct mdio_device *pcs;
 		struct lynx_pcs *lynx;
-
-		if (dsa_is_unused_port(felix->ds, port))
-			continue;
 
 		if (ocelot_port->phy_mode == PHY_INTERFACE_MODE_INTERNAL)
 			continue;
@@ -1140,7 +1138,7 @@ static int vsc9953_mdio_bus_alloc(struct ocelot *ocelot)
 			continue;
 		}
 
-		felix->pcs[port] = lynx;
+		felix->pcs[dp->index] = lynx;
 
 		dev_info(dev, "Found PCS at internal MDIO address %d\n", addr);
 	}

@@ -68,28 +68,23 @@ static void ksz_mib_read_work(struct work_struct *work)
 {
 	struct ksz_device *dev = container_of(work, struct ksz_device,
 					      mib_read.work);
+	struct dsa_switch *ds = dev->ds;
 	struct ksz_port_mib *mib;
+	struct dsa_port *dp;
 	struct ksz_port *p;
-	int i;
 
-	for (i = 0; i < dev->port_cnt; i++) {
-		if (dsa_is_unused_port(dev->ds, i))
-			continue;
-
-		p = &dev->ports[i];
+	dsa_switch_for_each_available_port(dp, ds) {
+		p = &dev->ports[dp->index];
 		mib = &p->mib;
 		mutex_lock(&mib->cnt_mutex);
 
 		/* Only read MIB counters when the port is told to do.
 		 * If not, read only dropped counters when link is not up.
 		 */
-		if (!p->read) {
-			const struct dsa_port *dp = dsa_to_port(dev->ds, i);
+		if (!p->read && !netif_carrier_ok(dp->slave))
+			mib->cnt_ptr = dev->reg_mib_cnt;
 
-			if (!netif_carrier_ok(dp->slave))
-				mib->cnt_ptr = dev->reg_mib_cnt;
-		}
-		port_r_cnt(dev, i);
+		port_r_cnt(dev, dp->index);
 		p->read = false;
 		mutex_unlock(&mib->cnt_mutex);
 	}

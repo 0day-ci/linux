@@ -913,7 +913,7 @@ static void bcm_sf2_enable_acb(struct dsa_switch *ds)
 static int bcm_sf2_sw_suspend(struct dsa_switch *ds)
 {
 	struct bcm_sf2_priv *priv = bcm_sf2_to_priv(ds);
-	unsigned int port;
+	struct dsa_port *dp;
 
 	bcm_sf2_intr_disable(priv);
 
@@ -921,10 +921,8 @@ static int bcm_sf2_sw_suspend(struct dsa_switch *ds)
 	 * port, the other ones have already been disabled during
 	 * bcm_sf2_sw_setup
 	 */
-	for (port = 0; port < ds->num_ports; port++) {
-		if (dsa_is_user_port(ds, port) || dsa_is_cpu_port(ds, port))
-			bcm_sf2_port_disable(ds, port);
-	}
+	dsa_switch_for_each_available_port(dp, ds)
+		bcm_sf2_port_disable(ds, dp->index);
 
 	if (!priv->wol_ports_mask)
 		clk_disable_unprepare(priv->clk);

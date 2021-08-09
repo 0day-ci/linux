@@ -475,6 +475,14 @@ static inline bool dsa_is_user_port(struct dsa_switch *ds, int p)
 	list_for_each_entry((_dp), &(_ds)->dst->ports, list) \
 		if ((_dp)->ds == (_ds))
 
+#define dsa_switch_for_each_port_continue_reverse(_dp, _ds) \
+	list_for_each_entry_continue_reverse((_dp), &(_ds)->dst->ports, list) \
+		if ((_dp)->ds == (_ds))
+
+#define dsa_switch_for_each_available_port(_dp, _ds) \
+	dsa_switch_for_each_port((_dp), (_ds)) \
+		if (!dsa_port_is_unused((_dp)))
+
 #define dsa_switch_for_each_user_port(_dp, _ds) \
 	dsa_switch_for_each_port((_dp), (_ds)) \
 		if (dsa_port_is_user((_dp)))
@@ -489,6 +497,17 @@ static inline u32 dsa_user_ports(struct dsa_switch *ds)
 	u32 mask = 0;
 
 	dsa_switch_for_each_user_port(dp, ds)
+		mask |= BIT(dp->index);
+
+	return mask;
+}
+
+static inline u32 dsa_cpu_ports(struct dsa_switch *ds)
+{
+	struct dsa_port *dp;
+	u32 mask = 0;
+
+	dsa_switch_for_each_cpu_port(dp, ds)
 		mask |= BIT(dp->index);
 
 	return mask;
