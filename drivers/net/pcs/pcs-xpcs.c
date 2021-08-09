@@ -1081,7 +1081,8 @@ static const struct phylink_pcs_ops xpcs_phylink_ops = {
 };
 
 struct dw_xpcs *xpcs_create(struct mdio_device *mdiodev,
-			    phy_interface_t interface)
+			    phy_interface_t interface,
+			    bool skip_reset)
 {
 	struct dw_xpcs *xpcs;
 	u32 xpcs_id;
@@ -1113,9 +1114,16 @@ struct dw_xpcs *xpcs_create(struct mdio_device *mdiodev,
 		xpcs->pcs.ops = &xpcs_phylink_ops;
 		xpcs->pcs.poll = true;
 
-		ret = xpcs_soft_reset(xpcs, compat);
-		if (ret)
-			goto out;
+		if (!skip_reset) {
+			dev_info(&xpcs->mdiodev->dev, "%s: xPCS soft reset\n",
+				 __func__);
+			ret = xpcs_soft_reset(xpcs, compat);
+			if (ret)
+				goto out;
+		} else {
+			dev_info(&xpcs->mdiodev->dev,
+				 "%s: skip xpcs soft reset\n", __func__);
+		}
 
 		return xpcs;
 	}
