@@ -729,7 +729,12 @@ int tpm2_auto_startup(struct tpm_chip *chip)
 		goto out;
 
 	rc = tpm2_do_selftest(chip);
-	if (rc && rc != TPM2_RC_INITIALIZE)
+	if (rc == TPM2_RC_UPGRADE) {
+		dev_info(&chip->dev, "TPM is in upgrade mode, functionality limited\n");
+		chip->flags |= TPM_CHIP_FLAG_LIMITED_MODE;
+		rc = 0;
+		goto out;
+	} else if (rc && rc != TPM2_RC_INITIALIZE)
 		goto out;
 
 	if (rc == TPM2_RC_INITIALIZE) {
@@ -743,6 +748,12 @@ int tpm2_auto_startup(struct tpm_chip *chip)
 	}
 
 	rc = tpm2_get_cc_attrs_tbl(chip);
+	if (rc) {
+		dev_info(&chip->dev, "TPM is in failure mode, functionality limited\n");
+		chip->flags |= TPM_CHIP_FLAG_LIMITED_MODE;
+		rc = 0;
+		goto out;
+	}
 
 out:
 	if (rc > 0)

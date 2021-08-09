@@ -478,6 +478,9 @@ void tpm_sysfs_add_device(struct tpm_chip *chip)
 {
 	int i;
 
+	if (chip->flags & TPM_CHIP_FLAG_LIMITED_MODE)
+		return;
+
 	WARN_ON(chip->groups_cnt != 0);
 
 	if (chip->flags & TPM_CHIP_FLAG_TPM2)
