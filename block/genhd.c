@@ -1030,6 +1030,11 @@ static struct device_attribute dev_attr_fail_timeout =
 	__ATTR(io-timeout-fail, 0644, part_timeout_show, part_timeout_store);
 #endif
 
+#ifdef CONFIG_BLK_LED_TRIGGERS
+static struct device_attribute dev_attr_led =
+	__ATTR(led, 0644, blk_ledtrig_dev_led_show, blk_ledtrig_dev_led_store);
+#endif
+
 static struct attribute *disk_attrs[] = {
 	&dev_attr_range.attr,
 	&dev_attr_ext_range.attr,
@@ -1052,6 +1057,9 @@ static struct attribute *disk_attrs[] = {
 #endif
 #ifdef CONFIG_FAIL_IO_TIMEOUT
 	&dev_attr_fail_timeout.attr,
+#endif
+#ifdef CONFIG_BLK_LED_TRIGGERS
+	&dev_attr_led.attr,
 #endif
 	NULL
 };

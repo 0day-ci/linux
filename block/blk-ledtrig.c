@@ -6,6 +6,7 @@
  *	Copyright 2021 Ian Pilcher <arequipeno@gmail.com>
  */
 
+#include <linux/ctype.h>
 #include <linux/genhd.h>
 #include <linux/leds.h>
 #include <linux/mutex.h>
@@ -137,5 +138,113 @@ static int blk_ledtrig_dev_set(struct gendisk *const disk,
 led_set_exit_unlock:
 	mutex_unlock(&blk_ledtrig_mutex);
 led_set_exit_return:
+	return ret;
+}
+
+
+/*
+ *
+ *	sysfs attribute store function to set or clear device LED
+ *
+ */
+
+// Returns a pointer to the first non-whitespace character in s (or a pointer
+// to the terminating null).
+static const char *blk_ledtrig_skip_whitespace(const char *s)
+{
+	while (*s != 0 && isspace(*s))
+		++s;
+
+	return s;
+}
+
+// Returns a pointer to the first whitespace character in s (or a pointer to
+// the terminating null), which is effectively a pointer to the position *after*
+// the last character in the non-whitespace token at the beginning of s.  (s is
+// expected to be the result of a previous call to blk_ledtrig_skip_whitespace.)
+static const char *blk_ledtrig_find_whitespace(const char *s)
+{
+	while (*s != 0 && !isspace(*s))
+		++s;
+
+	return s;
+}
+
+static bool blk_ledtrig_name_is_none(const char *const name, const size_t len)
+{
+	static const char none[4] = "none";	// no terminating null
+
+	return len == sizeof(none) && memcmp(name, none, sizeof(none)) == 0;
+}
+
+ssize_t blk_ledtrig_dev_led_store(struct device *const dev,
+				  struct device_attribute *const attr,
+				  const char *const buf, const size_t count)
+{
+	struct gendisk *const disk = dev_to_disk(dev);
+	const char *const led_name = blk_ledtrig_skip_whitespace(buf);
+	const char *const endp = blk_ledtrig_find_whitespace(led_name);
+	const ptrdiff_t name_len = endp - led_name;	// always >= 0
+	int ret;
+
+	if (name_len == 0 || blk_ledtrig_name_is_none(led_name, name_len)) {
+		blk_ledtrig_dev_clear(disk);
+		ret = 0;
+	} else {
+		ret = blk_ledtrig_dev_set(disk, led_name, name_len);
+	}
+
+	if (ret < 0)
+		return ret;
+
+	return count;
+}
+
+
+/*
+ *
+ *	sysfs attribute show function for device LED
+ *
+ */
+
+ssize_t blk_ledtrig_dev_led_show(struct device *const dev,
+				 struct device_attribute *const attr,
+				 char *const buf)
+{
+	struct gendisk *const disk = dev_to_disk(dev);
+	struct blk_ledtrig_led *bd_led, *disk_led;
+	int ret, c = 0;
+
+	ret = mutex_lock_interruptible(&blk_ledtrig_mutex);
+	if (ret != 0)
+		goto led_show_exit_return;
+
+	disk_led = rcu_dereference_protected(disk->led,
+					lockdep_is_held(&blk_ledtrig_mutex));
+
+	if (disk_led == NULL)
+		c += sprintf(buf, "[none]");
+	else
+		c += sprintf(buf, "none");
+
+	list_for_each_entry(bd_led, &blk_ledtrig_leds, leds_list_node) {
+
+		ret = snprintf(buf + c, PAGE_SIZE - c - 1,
+			       bd_led == disk_led ? " [%s]" : " %s",
+			       bd_led->led->name);
+		if (ret >= PAGE_SIZE - c - 1) {
+			ret = -EOVERFLOW;
+			goto led_show_exit_unlock;
+		}
+
+		c += ret;
+	}
+
+	buf[c] = '\n';
+	ret = c + 1;
+
+led_show_exit_unlock:
+	mutex_unlock(&blk_ledtrig_mutex);
+led_show_exit_return:
 	return ret;
 }
