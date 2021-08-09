@@ -210,6 +210,14 @@ config BLK_INLINE_ENCRYPTION_FALLBACK
 	  by falling back to the kernel crypto API when inline
 	  encryption hardware is not present.
 
+config BLK_LED_TRIGGERS
+	bool "Enable the blkdev LED trigger"
+	depends on LEDS_TRIGGERS
+	help
+	  The blkdev LED trigger allows LEDs to be controlled by
+	  block device activity (reads and writes).  See
+	  Documentation/block/blk-ledtrig.rst.
+
 menu "Partition Types"
 
 source "block/partitions/Kconfig"
