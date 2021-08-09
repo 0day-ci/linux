@@ -158,6 +158,7 @@ struct gendisk {
 	struct mutex open_mutex;	/* open/close mutex */
 	unsigned open_partitions;	/* number of open partitions */
 
+	struct backing_dev_info	*bdi;
 	struct kobject *slave_dir;
 
 	struct timer_rand_state *random;
