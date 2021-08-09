@@ -30,7 +30,6 @@
 #include <err.h>
 
 static bool done = false;
-static int futex_flag = 0;
 
 struct timeval bench__start, bench__end, bench__runtime;
 static pthread_mutex_t thread_lock;

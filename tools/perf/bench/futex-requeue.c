@@ -36,7 +36,6 @@ static pthread_mutex_t thread_lock;
 static pthread_cond_t thread_parent, thread_worker;
 static struct stats requeuetime_stats, requeued_stats;
 static unsigned int threads_starting;
-static int futex_flag = 0;
 
 static struct bench_futex_parameters params = {
 	/*

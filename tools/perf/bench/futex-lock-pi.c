@@ -32,7 +32,6 @@ struct worker {
 static u_int32_t global_futex = 0;
 static struct worker *worker;
 static bool done = false;
-static int futex_flag = 0;
 static pthread_mutex_t thread_lock;
 static unsigned int threads_starting;
 static struct stats throughput_stats;

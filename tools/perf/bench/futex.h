@@ -13,6 +13,9 @@
 #include <sys/types.h>
 #include <linux/futex.h>
 
+/* FUTEX_PRIVATE_FLAG or zero */
+static int futex_flag = 0;
+
 struct bench_futex_parameters {
 	bool silent;
 	bool fshared;
