@@ -10988,10 +10988,14 @@ static int pmu_dev_alloc(struct pmu *pmu)
 		ret = sysfs_update_groups(&pmu->dev->kobj, pmu->attr_update);
 
 	if (ret)
-		goto del_dev;
+		goto remove_file;
 
 out:
 	return ret;
+
+remove_file:
+	if (pmu->nr_addr_filters)
+		device_remove_file(pmu->dev, &dev_attr_nr_addr_filters);
 
 del_dev:
 	device_del(pmu->dev);
