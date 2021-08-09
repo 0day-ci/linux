@@ -2725,7 +2725,7 @@ static int offload_pedit_fields(struct mlx5e_priv *priv,
 		if (s_mask && a_mask) {
 			NL_SET_ERR_MSG_MOD(extack,
 					   "can't set and add to the same HW field");
-			printk(KERN_WARNING "mlx5: can't set and add to the same HW field (%x)\n", f->field);
+			pr_warn("mlx5: can't set and add to the same HW field (%x)\n", f->field);
 			return -EOPNOTSUPP;
 		}
 
@@ -2764,8 +2764,8 @@ static int offload_pedit_fields(struct mlx5e_priv *priv,
 		if (first < next_z && next_z < last) {
 			NL_SET_ERR_MSG_MOD(extack,
 					   "rewrite of few sub-fields isn't supported");
-			printk(KERN_WARNING "mlx5: rewrite of few sub-fields (mask %lx) isn't offloaded\n",
-			       mask);
+			pr_warn("mlx5: rewrite of few sub-fields (mask %lx) isn't offloaded\n",
+				mask);
 			return -EOPNOTSUPP;
 		}
 
