@@ -522,14 +522,19 @@ static int blk_mq_sched_alloc_map_and_request(struct request_queue *q,
 	struct blk_mq_tag_set *set = q->tag_set;
 	int ret;
 
+	if (blk_mq_is_sbitmap_shared(q->tag_set->flags)) {
+		hctx->sched_tags = q->shared_sbitmap_tags;
+		return 0;
+	}
+
 	hctx->sched_tags = blk_mq_alloc_rq_map(set, hctx_idx, q->nr_requests,
-					       set->reserved_tags, set->flags);
+					       set->reserved_tags);
 	if (!hctx->sched_tags)
 		return -ENOMEM;
 
 	ret = blk_mq_alloc_rqs(set, hctx->sched_tags, hctx_idx, q->nr_requests);
 	if (ret) {
-		blk_mq_free_rq_map(hctx->sched_tags, set->flags);
+		blk_mq_free_rq_map(hctx->sched_tags);
 		hctx->sched_tags = NULL;
 	}
 
@@ -544,46 +549,44 @@ static void blk_mq_sched_tags_teardown(struct request_queue *q)
 
 	queue_for_each_hw_ctx(q, hctx, i) {
 		if (hctx->sched_tags) {
-			blk_mq_free_rq_map(hctx->sched_tags, hctx->flags);
+			if (!blk_mq_is_sbitmap_shared(q->tag_set->flags))
+				blk_mq_free_rq_map(hctx->sched_tags);
 			hctx->sched_tags = NULL;
 		}
 	}
 }
 
+static void blk_mq_exit_sched_shared_sbitmap(struct request_queue *queue)
+{
+	blk_mq_free_rq_map(queue->shared_sbitmap_tags);
+	queue->shared_sbitmap_tags = NULL;
+}
+
 static int blk_mq_init_sched_shared_sbitmap(struct request_queue *queue)
 {
 	struct blk_mq_tag_set *set = queue->tag_set;
-	int alloc_policy = BLK_MQ_FLAG_TO_ALLOC_POLICY(set->flags);
-	struct blk_mq_hw_ctx *hctx;
-	int ret, i;
+	struct blk_mq_tags *tags;
+	int ret;
 
 	/*
 	 * Set initial depth at max so that we don't need to reallocate for
 	 * updating nr_requests.
 	 */
-	ret = blk_mq_init_bitmaps(&queue->sched_bitmap_tags,
-				  &queue->sched_breserved_tags,
-				  MAX_SCHED_RQ, set->reserved_tags,
-				  set->numa_node, alloc_policy);
-	if (ret)
-		return ret;
+	tags = queue->shared_sbitmap_tags = blk_mq_alloc_rq_map(set, 0,
+					  set->queue_depth,
+					  set->reserved_tags);
+	if (!queue->shared_sbitmap_tags)
+		return -ENOMEM;
 
-	queue_for_each_hw_ctx(queue, hctx, i) {
-		hctx->sched_tags->bitmap_tags =
-					&queue->sched_bitmap_tags;
-		hctx->sched_tags->breserved_tags =
-					&queue->sched_breserved_tags;
+	ret = blk_mq_alloc_rqs(set, tags, 0, set->queue_depth);
+	if (ret) {
+		blk_mq_exit_sched_shared_sbitmap(queue);
+		return ret;
 	}
 
 	blk_mq_tag_update_sched_shared_sbitmap(queue);
 
 	return 0;
-}
-
-static void blk_mq_exit_sched_shared_sbitmap(struct request_queue *queue)
-{
-	sbitmap_queue_free(&queue->sched_bitmap_tags);
-	sbitmap_queue_free(&queue->sched_breserved_tags);
 }
 
 int blk_mq_init_sched(struct request_queue *q, struct elevator_type *e)
@@ -607,21 +610,21 @@ int blk_mq_init_sched(struct request_queue *q, struct elevator_type *e)
 	q->nr_requests = 2 * min_t(unsigned int, q->tag_set->queue_depth,
 				   BLKDEV_DEFAULT_RQ);
 
+	if (blk_mq_is_sbitmap_shared(q->tag_set->flags)) {
+		ret = blk_mq_init_sched_shared_sbitmap(q);
+		if (ret)
+			return ret;
+	}
+
 	queue_for_each_hw_ctx(q, hctx, i) {
 		ret = blk_mq_sched_alloc_map_and_request(q, hctx, i);
 		if (ret)
 			goto err_free_map_and_request;
 	}
 
-	if (blk_mq_is_sbitmap_shared(q->tag_set->flags)) {
-		ret = blk_mq_init_sched_shared_sbitmap(q);
-		if (ret)
-			goto err_free_map_and_request;
-	}
-
 	ret = e->ops.init_sched(q, e);
 	if (ret)
-		goto err_free_sbitmap;
+		goto err_free_map_and_request;
 
 	blk_mq_debugfs_register_sched(q);
 
@@ -641,12 +644,12 @@ int blk_mq_init_sched(struct request_queue *q, struct elevator_type *e)
 
 	return 0;
 
-err_free_sbitmap:
-	if (blk_mq_is_sbitmap_shared(q->tag_set->flags))
-		blk_mq_exit_sched_shared_sbitmap(q);
 err_free_map_and_request:
 	blk_mq_sched_free_requests(q);
 	blk_mq_sched_tags_teardown(q);
+	if (blk_mq_is_sbitmap_shared(q->tag_set->flags))
+		blk_mq_exit_sched_shared_sbitmap(q);
+
 	q->elevator = NULL;
 	return ret;
 }
@@ -660,9 +663,13 @@ void blk_mq_sched_free_requests(struct request_queue *q)
 	struct blk_mq_hw_ctx *hctx;
 	int i;
 
-	queue_for_each_hw_ctx(q, hctx, i) {
-		if (hctx->sched_tags)
-			blk_mq_free_rqs(q->tag_set, hctx->sched_tags, i);
+	if (blk_mq_is_sbitmap_shared(q->tag_set->flags)) {
+		blk_mq_free_rqs(q->tag_set, q->shared_sbitmap_tags, 0);
+	} else {
+		queue_for_each_hw_ctx(q, hctx, i) {
+			if (hctx->sched_tags)
+				blk_mq_free_rqs(q->tag_set, hctx->sched_tags, i);
+		}
 	}
 }
 
