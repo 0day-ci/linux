@@ -44,11 +44,13 @@
 #define CNTACR_RWVT	BIT(4)
 #define CNTACR_RWPT	BIT(5)
 
-#define CNTVCT_LO	0x08
-#define CNTVCT_HI	0x0c
+#define CNTVCT_LO	0x00
+#define CNTPCT_LO	0x08
 #define CNTFRQ		0x10
+#define CNTP_CVAL_LO	0x20
 #define CNTP_TVAL	0x28
 #define CNTP_CTL	0x2c
+#define CNTV_CVAL_LO	0x30
 #define CNTV_TVAL	0x38
 #define CNTV_CTL	0x3c
 
@@ -113,7 +115,12 @@ void arch_timer_reg_write(int access, enum arch_timer_reg reg, u64 val,
 			writel_relaxed((u32)val, timer->base + CNTP_TVAL);
 			break;
 		case ARCH_TIMER_REG_CVAL:
-			BUG();
+			/*
+			 * Not guaranteed to be atomic, so the timer
+			 * must be disabled at this point.
+			 */
+			writeq_relaxed(val, timer->base + CNTP_CVAL_LO);
+			break;
 		}
 	} else if (access == ARCH_TIMER_MEM_VIRT_ACCESS) {
 		struct arch_timer *timer = to_arch_timer(clk);
@@ -125,7 +132,9 @@ void arch_timer_reg_write(int access, enum arch_timer_reg reg, u64 val,
 			writel_relaxed((u32)val, timer->base + CNTV_TVAL);
 			break;
 		case ARCH_TIMER_REG_CVAL:
-			BUG();
+			/* Same restriction as above */
+			writeq_relaxed(val, timer->base + CNTV_CVAL_LO);
+			break;
 		}
 	} else {
 		arch_timer_reg_write_cp15(access, reg, val);
@@ -722,15 +731,36 @@ static int arch_timer_set_next_event_phys(unsigned long evt,
 	return 0;
 }
 
+static u64 arch_counter_get_cnt_mem(struct arch_timer *t, int offset_lo)
+{
+	u32 cnt_lo, cnt_hi, tmp_hi;
+
+	do {
+		cnt_hi = readl_relaxed(t->base + offset_lo + 4);
+		cnt_lo = readl_relaxed(t->base + offset_lo);
+		tmp_hi = readl_relaxed(t->base + offset_lo + 4);
+	} while (cnt_hi != tmp_hi);
+
+	return ((u64) cnt_hi << 32) | cnt_lo;
+}
+
 static __always_inline void set_next_event_mem(const int access, unsigned long evt,
 					   struct clock_event_device *clk)
 {
+	struct arch_timer *timer = to_arch_timer(clk);
 	unsigned long ctrl;
+	u64 cnt;
+
 	ctrl = arch_timer_reg_read(access, ARCH_TIMER_REG_CTRL, clk);
 	ctrl |= ARCH_TIMER_CTRL_ENABLE;
 	ctrl &= ~ARCH_TIMER_CTRL_IT_MASK;
 
-	arch_timer_reg_write(access, ARCH_TIMER_REG_TVAL, evt, clk);
+	if (access ==  ARCH_TIMER_MEM_VIRT_ACCESS)
+		cnt = arch_counter_get_cnt_mem(timer, CNTVCT_LO);
+	else
+		cnt = arch_counter_get_cnt_mem(timer, CNTPCT_LO);
+
+	arch_timer_reg_write(access, ARCH_TIMER_REG_CVAL, evt + cnt, clk);
 	arch_timer_reg_write(access, ARCH_TIMER_REG_CTRL, ctrl, clk);
 }
 
@@ -972,15 +1002,7 @@ bool arch_timer_evtstrm_available(void)
 
 static u64 arch_counter_get_cntvct_mem(void)
 {
-	u32 vct_lo, vct_hi, tmp_hi;
-
-	do {
-		vct_hi = readl_relaxed(arch_timer_mem->base + CNTVCT_HI);
-		vct_lo = readl_relaxed(arch_timer_mem->base + CNTVCT_LO);
-		tmp_hi = readl_relaxed(arch_timer_mem->base + CNTVCT_HI);
-	} while (vct_hi != tmp_hi);
-
-	return ((u64) vct_hi << 32) | vct_lo;
+	return arch_counter_get_cnt_mem(arch_timer_mem, CNTVCT_LO);
 }
 
 static struct arch_timer_kvm_info arch_timer_kvm_info;
