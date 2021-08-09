@@ -15,6 +15,9 @@
 #ifndef __SVM_SVM_H
 #define __SVM_SVM_H
 
+#undef pr_fmt
+#define pr_fmt(fmt) "SVM: " fmt
+
 #include <linux/kvm_types.h>
 #include <linux/kvm_host.h>
 #include <linux/bits.h>

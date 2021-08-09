@@ -12,8 +12,6 @@
  *   Avi Kivity   <avi@qumranet.com>
  */
 
-#define pr_fmt(fmt) "SVM: " fmt
-
 #include <linux/kvm_types.h>
 #include <linux/hashtable.h>
 #include <linux/amd-iommu.h>
