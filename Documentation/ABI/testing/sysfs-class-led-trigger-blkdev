@@ -1,0 +1,28 @@
+What:		/sys/class/leds/<led>/blink_on
+Date:		August 2021
+Contact:	Ian Pilcher <arequipeno@gmail.com>
+Description:
+		Time (in milliseconds) that the LED will be on during a single
+		"blink".
+
+What:		/sys/class/leds/<led>/blink_off
+Date:		August 2021
+Contact:	Ian Pilcher <arequipeno@gmail.com>
+Description:
+		Time (in milliseconds) that the LED will be off during a single
+		"blink".  Effectively the amount of time that the LED will be
+		off before the next blink, when the associated block device(s)
+		are continuously active.
+
+What:		/sys/class/leds/<led>/block_devices
+Date:		August 2021
+Contact:	Ian Pilcher <arequipeno@gmail.com>
+Description:
+		Directory containing links to all block devices that are
+		associated with this LED.
+
+		Once an LED has been associated with the blkdev trigger, a block
+		device can be associated with that LED by writing the LED name
+		to the device's /sys/[class/]block/<disk>/led attribute.  (See
+		Documentation/ABI/testing/sysfs-block and
+		Documentation/block/blk-ledtrig.rst.)

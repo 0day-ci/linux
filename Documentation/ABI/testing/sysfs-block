@@ -328,3 +328,19 @@ Description:
 		does not complete in this time then the block driver timeout
 		handler is invoked. That timeout handler can decide to retry
 		the request, to fail it or to start a device recovery strategy.
+
+What:		/sys/block/<disk>/led
+Date:		August 2021
+Contact:	Ian Pilcher <arequipeno@gmail.com>
+Description:
+		Set the LED associated with this block device (or show available
+		LEDs and the currently selected LED, if any).
+
+		Reading the attribute will display the available LEDs (LEDs that
+		are associated with the blkdev LED trigger).  The currently
+		selected LED is enclosed in square brackets.  To clear the
+		device's LED association write 'none' (without the quotes) or
+		an empty string/line to the attribute.
+
+		See Documentation/ABI/testing/sysfs-class-led-trigger-blkdev and
+		Documentation/block/blk-ledtrig.rst.)
