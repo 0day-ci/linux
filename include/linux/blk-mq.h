@@ -357,6 +357,13 @@ struct blk_mq_ops {
 	 */
 	int (*init_request)(struct blk_mq_tag_set *set, struct request *,
 			    unsigned int, unsigned int);
+
+	/**
+	 * @init_request: Same as init_request, except no hw queue index is passed
+	 */
+	int (*init_request_no_hctx)(struct blk_mq_tag_set *set, struct request *,
+				    unsigned int);
+
 	/**
 	 * @exit_request: Ditto for exit/teardown.
 	 */

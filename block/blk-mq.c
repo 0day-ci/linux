@@ -2427,13 +2427,15 @@ struct blk_mq_tags *blk_mq_alloc_rq_map(struct blk_mq_tag_set *set,
 static int blk_mq_init_request(struct blk_mq_tag_set *set, struct request *rq,
 			       unsigned int hctx_idx, int node)
 {
-	int ret;
+	int ret = 0;
 
-	if (set->ops->init_request) {
+	if (set->ops->init_request)
 		ret = set->ops->init_request(set, rq, hctx_idx, node);
-		if (ret)
-			return ret;
-	}
+	else if (set->ops->init_request_no_hctx)
+		ret = set->ops->init_request_no_hctx(set, rq, node);
+
+	if (ret)
+		return ret;
 
 	WRITE_ONCE(rq->state, MQ_RQ_IDLE);
 	return 0;
@@ -3485,6 +3487,9 @@ int blk_mq_alloc_tag_set(struct blk_mq_tag_set *set)
 		return -EINVAL;
 
 	if (!set->ops->get_budget ^ !set->ops->put_budget)
+		return -EINVAL;
+
+	if (set->ops->init_request && set->ops->init_request_no_hctx)
 		return -EINVAL;
 
 	if (set->queue_depth > BLK_MQ_MAX_DEPTH) {
