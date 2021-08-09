@@ -112,6 +112,8 @@ void arch_timer_reg_write(int access, enum arch_timer_reg reg, u64 val,
 		case ARCH_TIMER_REG_TVAL:
 			writel_relaxed((u32)val, timer->base + CNTP_TVAL);
 			break;
+		case ARCH_TIMER_REG_CVAL:
+			BUG();
 		}
 	} else if (access == ARCH_TIMER_MEM_VIRT_ACCESS) {
 		struct arch_timer *timer = to_arch_timer(clk);
@@ -122,6 +124,8 @@ void arch_timer_reg_write(int access, enum arch_timer_reg reg, u64 val,
 		case ARCH_TIMER_REG_TVAL:
 			writel_relaxed((u32)val, timer->base + CNTV_TVAL);
 			break;
+		case ARCH_TIMER_REG_CVAL:
+			BUG();
 		}
 	} else {
 		arch_timer_reg_write_cp15(access, reg, val);
@@ -141,6 +145,7 @@ u32 arch_timer_reg_read(int access, enum arch_timer_reg reg,
 			val = readl_relaxed(timer->base + CNTP_CTL);
 			break;
 		case ARCH_TIMER_REG_TVAL:
+		case ARCH_TIMER_REG_CVAL:
 			BUG();
 		}
 	} else if (access == ARCH_TIMER_MEM_VIRT_ACCESS) {
@@ -150,6 +155,7 @@ u32 arch_timer_reg_read(int access, enum arch_timer_reg reg,
 			val = readl_relaxed(timer->base + CNTV_CTL);
 			break;
 		case ARCH_TIMER_REG_TVAL:
+		case ARCH_TIMER_REG_CVAL:
 			BUG();
 		}
 	} else {
@@ -687,10 +693,18 @@ static __always_inline void set_next_event(const int access, unsigned long evt,
 					   struct clock_event_device *clk)
 {
 	unsigned long ctrl;
+	u64 cnt;
+
 	ctrl = arch_timer_reg_read(access, ARCH_TIMER_REG_CTRL, clk);
 	ctrl |= ARCH_TIMER_CTRL_ENABLE;
 	ctrl &= ~ARCH_TIMER_CTRL_IT_MASK;
-	arch_timer_reg_write(access, ARCH_TIMER_REG_TVAL, evt, clk);
+
+	if (access == ARCH_TIMER_PHYS_ACCESS)
+		cnt = __arch_counter_get_cntpct();
+	else
+		cnt = __arch_counter_get_cntvct();
+
+	arch_timer_reg_write(access, ARCH_TIMER_REG_CVAL, evt + cnt, clk);
 	arch_timer_reg_write(access, ARCH_TIMER_REG_CTRL, ctrl, clk);
 }
 
@@ -708,17 +722,29 @@ static int arch_timer_set_next_event_phys(unsigned long evt,
 	return 0;
 }
 
+static __always_inline void set_next_event_mem(const int access, unsigned long evt,
+					   struct clock_event_device *clk)
+{
+	unsigned long ctrl;
+	ctrl = arch_timer_reg_read(access, ARCH_TIMER_REG_CTRL, clk);
+	ctrl |= ARCH_TIMER_CTRL_ENABLE;
+	ctrl &= ~ARCH_TIMER_CTRL_IT_MASK;
+
+	arch_timer_reg_write(access, ARCH_TIMER_REG_TVAL, evt, clk);
+	arch_timer_reg_write(access, ARCH_TIMER_REG_CTRL, ctrl, clk);
+}
+
 static int arch_timer_set_next_event_virt_mem(unsigned long evt,
 					      struct clock_event_device *clk)
 {
-	set_next_event(ARCH_TIMER_MEM_VIRT_ACCESS, evt, clk);
+	set_next_event_mem(ARCH_TIMER_MEM_VIRT_ACCESS, evt, clk);
 	return 0;
 }
 
 static int arch_timer_set_next_event_phys_mem(unsigned long evt,
 					      struct clock_event_device *clk)
 {
-	set_next_event(ARCH_TIMER_MEM_PHYS_ACCESS, evt, clk);
+	set_next_event_mem(ARCH_TIMER_MEM_PHYS_ACCESS, evt, clk);
 	return 0;
 }
 
