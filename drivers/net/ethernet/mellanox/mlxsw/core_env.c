@@ -587,6 +587,34 @@ err_module_low_power_set:
 }
 EXPORT_SYMBOL(mlxsw_env_set_module_low_power);
 
+static int mlxsw_env_module_reset(struct mlxsw_core *mlxsw_core, u8 module)
+{
+	char pmaos_pl[MLXSW_REG_PMAOS_LEN];
+
+	mlxsw_reg_pmaos_pack(pmaos_pl, module);
+	mlxsw_reg_pmaos_rst_set(pmaos_pl, true);
+
+	return mlxsw_reg_write(mlxsw_core, MLXSW_REG(pmaos), pmaos_pl);
+}
+
+int mlxsw_env_reset_module(struct mlxsw_core *mlxsw_core, u8 module,
+			   struct netlink_ext_ack *extack)
+{
+	int err;
+
+	err = mlxsw_env_module_reset(mlxsw_core, module);
+	if (err) {
+		NL_SET_ERR_MSG_MOD(extack, "Failed to reset module");
+		return err;
+	}
+
+	/* Wait for the module to reach a valid operational state following its
+	 * reset.
+	 */
+	return mlxsw_env_module_oper_wait(mlxsw_core, module, extack);
+}
+EXPORT_SYMBOL(mlxsw_env_reset_module);
+
 static int mlxsw_env_module_has_temp_sensor(struct mlxsw_core *mlxsw_core,
 					    u8 module,
 					    bool *p_has_temp_sensor)

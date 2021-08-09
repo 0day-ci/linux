@@ -1244,6 +1244,24 @@ static int mlxsw_sp_set_module_low_power(struct net_device *dev, bool low_power,
 					      extack);
 }
 
+static int mlxsw_sp_reset_module(struct net_device *dev,
+				 struct netlink_ext_ack *extack)
+{
+	struct mlxsw_sp_port *mlxsw_sp_port = netdev_priv(dev);
+	struct mlxsw_sp *mlxsw_sp = mlxsw_sp_port->mlxsw_sp;
+	u8 module = mlxsw_sp_port->mapping.module;
+
+	/* We are going to take the module down, so no port using it can be
+	 * administratively up.
+	 */
+	if (mlxsw_sp_module_ports_up_check(mlxsw_sp, module)) {
+		NL_SET_ERR_MSG_MOD(extack, "Cannot reset module when ports using it are administratively up");
+		return -EINVAL;
+	}
+
+	return mlxsw_env_reset_module(mlxsw_sp->core, module, extack);
+}
+
 const struct ethtool_ops mlxsw_sp_port_ethtool_ops = {
 	.cap_link_lanes_supported	= true,
 	.get_drvinfo			= mlxsw_sp_port_get_drvinfo,
@@ -1267,6 +1285,7 @@ const struct ethtool_ops mlxsw_sp_port_ethtool_ops = {
 	.get_rmon_stats			= mlxsw_sp_get_rmon_stats,
 	.get_module_low_power		= mlxsw_sp_get_module_low_power,
 	.set_module_low_power		= mlxsw_sp_set_module_low_power,
+	.reset_module			= mlxsw_sp_reset_module,
 };
 
 struct mlxsw_sp1_port_link_mode {
