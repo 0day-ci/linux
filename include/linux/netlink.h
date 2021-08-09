@@ -89,13 +89,12 @@ struct netlink_ext_ack {
  * to the lack of an output buffer.)
  */
 #define NL_SET_ERR_MSG(extack, msg) do {		\
-	static const char __msg[] = msg;		\
 	struct netlink_ext_ack *__extack = (extack);	\
 							\
-	do_trace_netlink_extack(__msg);			\
+	do_trace_netlink_extack(msg);			\
 							\
 	if (__extack)					\
-		__extack->_msg = __msg;			\
+		__extack->_msg = msg;			\
 } while (0)
 
 #define NL_SET_ERR_MSG_MOD(extack, msg)			\
@@ -111,13 +110,12 @@ struct netlink_ext_ack {
 #define NL_SET_BAD_ATTR(extack, attr) NL_SET_BAD_ATTR_POLICY(extack, attr, NULL)
 
 #define NL_SET_ERR_MSG_ATTR_POL(extack, attr, pol, msg) do {	\
-	static const char __msg[] = msg;			\
 	struct netlink_ext_ack *__extack = (extack);		\
 								\
-	do_trace_netlink_extack(__msg);				\
+	do_trace_netlink_extack(msg);				\
 								\
 	if (__extack) {						\
-		__extack->_msg = __msg;				\
+		__extack->_msg = msg;				\
 		__extack->bad_attr = (attr);			\
 		__extack->policy = (pol);			\
 	}							\
