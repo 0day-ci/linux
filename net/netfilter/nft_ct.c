@@ -10,6 +10,7 @@
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/netlink.h>
+#include <linux/mutex.h>
 #include <linux/netfilter.h>
 #include <linux/netfilter/nf_tables.h>
 #include <net/netfilter/nf_tables.h>
@@ -41,6 +42,7 @@ struct nft_ct_helper_obj  {
 #ifdef CONFIG_NF_CONNTRACK_ZONES
 static DEFINE_PER_CPU(struct nf_conn *, nft_ct_pcpu_template);
 static unsigned int nft_ct_pcpu_template_refcnt __read_mostly;
+static DEFINE_MUTEX(nft_ct_pcpu_template_mutex);
 #endif
 
 static u64 nft_ct_get_eval_counter(const struct nf_conn_counter *c,
@@ -344,11 +346,13 @@ static const struct nla_policy nft_ct_policy[NFTA_CT_MAX + 1] = {
 };
 
 #ifdef CONFIG_NF_CONNTRACK_ZONES
-static void nft_ct_tmpl_put_pcpu(void)
+static void nft_ct_tmpl_put_pcpu(bool lock)
 {
 	struct nf_conn *ct;
 	int cpu;
 
+	if (lock)
+		mutex_lock(&nft_ct_pcpu_template_mutex);
 	for_each_possible_cpu(cpu) {
 		ct = per_cpu(nft_ct_pcpu_template, cpu);
 		if (!ct)
@@ -356,6 +360,8 @@ static void nft_ct_tmpl_put_pcpu(void)
 		nf_ct_put(ct);
 		per_cpu(nft_ct_pcpu_template, cpu) = NULL;
 	}
+	if (lock)
+		mutex_unlock(&nft_ct_pcpu_template_mutex);
 }
 
 static bool nft_ct_tmpl_alloc_pcpu(void)
@@ -367,16 +373,18 @@ static bool nft_ct_tmpl_alloc_pcpu(void)
 	if (nft_ct_pcpu_template_refcnt)
 		return true;
 
+	mutex_lock(&nft_ct_pcpu_template_mutex);
 	for_each_possible_cpu(cpu) {
 		tmp = nf_ct_tmpl_alloc(&init_net, &zone, GFP_KERNEL);
 		if (!tmp) {
-			nft_ct_tmpl_put_pcpu();
+			nft_ct_tmpl_put_pcpu(false);
 			return false;
 		}
 
 		atomic_set(&tmp->ct_general.use, 1);
 		per_cpu(nft_ct_pcpu_template, cpu) = tmp;
 	}
+	mutex_unlock(&nft_ct_pcpu_template_mutex);
 
 	return true;
 }
@@ -526,7 +534,7 @@ static void __nft_ct_set_destroy(const struct nft_ctx *ctx, struct nft_ct *priv)
 #ifdef CONFIG_NF_CONNTRACK_ZONES
 	case NFT_CT_ZONE:
 		if (--nft_ct_pcpu_template_refcnt == 0)
-			nft_ct_tmpl_put_pcpu();
+			nft_ct_tmpl_put_pcpu(true);
 		break;
 #endif
 	default:
