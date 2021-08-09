@@ -1743,9 +1743,8 @@ retry_discard:
 	for (disk = 0; disk < geo->raid_disks; disk++) {
 		sector_t dev_start, dev_end;
 		struct bio *mbio, *rbio = NULL;
-		struct md_rdev *rdev = rcu_dereference(conf->mirrors[disk].rdev);
-		struct md_rdev *rrdev = rcu_dereference(
-			conf->mirrors[disk].replacement);
+		struct md_rdev *rdev = conf->mirrors[disk].rdev;
+		struct md_rdev *rrdev = conf->mirrors[disk].replacement;
 
 		/*
 		 * Now start to calculate the start and end address for each disk.
