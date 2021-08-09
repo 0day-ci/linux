@@ -343,3 +343,66 @@ static void blk_ledtrig_deactivate(struct led_classdev *const led)
 	synchronize_rcu();
 	kfree(bd_led);
 }
+
+
+/*
+ *
+ *	Per-LED blink_on & blink_off device attributes
+ *
+ */
+
+static ssize_t blk_ledtrig_blink_show(struct device *const dev,
+				      struct device_attribute *const attr,
+				      char *const buf);
+
+static ssize_t blk_ledtrig_blink_store(struct device *const dev,
+				       struct device_attribute *const attr,
+				       const char *const buf,
+				       const size_t count);
+
+static struct device_attribute blk_ledtrig_attr_blink_on =
+	__ATTR(blink_on, 0644,
+	       blk_ledtrig_blink_show, blk_ledtrig_blink_store);
+
+static struct device_attribute blk_ledtrig_attr_blink_off =
+	__ATTR(blink_off, 0644,
+	       blk_ledtrig_blink_show, blk_ledtrig_blink_store);
+
+static ssize_t blk_ledtrig_blink_show(struct device *const dev,
+				      struct device_attribute *const attr,
+				      char *const buf)
+{
+	struct blk_ledtrig_led *const bd_led = led_trigger_get_drvdata(dev);
+	unsigned int value;
+
+	if (attr == &blk_ledtrig_attr_blink_on)
+		value = READ_ONCE(bd_led->blink_on);
+	else	// attr == &blk_ledtrig_attr_blink_off
+		value = READ_ONCE(bd_led->blink_off);
+
+	return sprintf(buf, "%u\n", value);
+}
+
+static ssize_t blk_ledtrig_blink_store(struct device *const dev,
+				       struct device_attribute *const attr,
+				       const char *const buf,
+				       const size_t count)
+{
+	struct blk_ledtrig_led *const bd_led = led_trigger_get_drvdata(dev);
+	unsigned int value;
+	int ret;
+
+	ret = kstrtouint(buf, 0, &value);
+	if (ret != 0)
+		return ret;
+
+	if (value > BLK_LEDTRIG_BLINK_MAX)
+		return -ERANGE;
+
+	if (attr == &blk_ledtrig_attr_blink_on)
+		WRITE_ONCE(bd_led->blink_on, value);
+	else	// attr == &blk_ledtrig_attr_blink_off
+		WRITE_ONCE(bd_led->blink_off, value);
+
+	return count;
+}
