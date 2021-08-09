@@ -133,6 +133,8 @@ struct kasan_cache {
 	bool is_kmalloc;
 };
 
+void kasan_populate_early_vm_area_shadow(void *start, unsigned long size);
+
 slab_flags_t __kasan_never_merge(void);
 static __always_inline slab_flags_t kasan_never_merge(void)
 {
@@ -302,6 +304,10 @@ bool kasan_save_enable_multi_shot(void);
 void kasan_restore_multi_shot(bool enabled);
 
 #else /* CONFIG_KASAN */
+
+static inline void kasan_populate_early_vm_area_shadow(void *start,
+						       unsigned long size)
+{ }
 
 static inline slab_flags_t kasan_never_merge(void)
 {
