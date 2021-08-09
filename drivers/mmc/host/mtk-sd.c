@@ -2339,6 +2339,8 @@ static void msdc_cqe_disable(struct mmc_host *mmc, bool recovery)
 	if (recovery) {
 		sdr_set_field(host->base + MSDC_DMA_CTRL,
 			      MSDC_DMA_CTRL_STOP, 1);
+		while (readl(host->base + MSDC_DMA_CFG) & MSDC_DMA_CFG_STS)
+			cpu_relax();
 		msdc_reset_hw(host);
 	}
 }
