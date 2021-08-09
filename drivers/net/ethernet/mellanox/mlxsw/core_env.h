@@ -24,6 +24,14 @@ mlxsw_env_get_module_eeprom_by_page(struct mlxsw_core *mlxsw_core, u8 module,
 				    const struct ethtool_module_eeprom *page,
 				    struct netlink_ext_ack *extack);
 
+int mlxsw_env_get_module_low_power(struct mlxsw_core *mlxsw_core, u8 module,
+				   bool *p_low_power,
+				   struct netlink_ext_ack *extack);
+
+int mlxsw_env_set_module_low_power(struct mlxsw_core *mlxsw_core, u8 module,
+				   bool low_power,
+				   struct netlink_ext_ack *extack);
+
 int
 mlxsw_env_module_overheat_counter_get(struct mlxsw_core *mlxsw_core, u8 module,
 				      u64 *p_counter);

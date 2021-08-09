@@ -124,11 +124,35 @@ mlxsw_m_get_module_eeprom_by_page(struct net_device *netdev,
 						   page, extack);
 }
 
+static int mlxsw_m_get_module_low_power(struct net_device *netdev,
+					bool *p_low_power,
+					struct netlink_ext_ack *extack)
+{
+	struct mlxsw_m_port *mlxsw_m_port = netdev_priv(netdev);
+	struct mlxsw_core *core = mlxsw_m_port->mlxsw_m->core;
+
+	return mlxsw_env_get_module_low_power(core, mlxsw_m_port->module,
+					      p_low_power, extack);
+}
+
+static int mlxsw_m_set_module_low_power(struct net_device *netdev,
+					bool low_power,
+					struct netlink_ext_ack *extack)
+{
+	struct mlxsw_m_port *mlxsw_m_port = netdev_priv(netdev);
+	struct mlxsw_core *core = mlxsw_m_port->mlxsw_m->core;
+
+	return mlxsw_env_set_module_low_power(core, mlxsw_m_port->module,
+					      low_power, extack);
+}
+
 static const struct ethtool_ops mlxsw_m_port_ethtool_ops = {
 	.get_drvinfo		= mlxsw_m_module_get_drvinfo,
 	.get_module_info	= mlxsw_m_get_module_info,
 	.get_module_eeprom	= mlxsw_m_get_module_eeprom,
 	.get_module_eeprom_by_page = mlxsw_m_get_module_eeprom_by_page,
+	.get_module_low_power	= mlxsw_m_get_module_low_power,
+	.set_module_low_power	= mlxsw_m_set_module_low_power,
 };
 
 static int

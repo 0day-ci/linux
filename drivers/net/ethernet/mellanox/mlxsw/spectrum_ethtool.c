@@ -1197,6 +1197,53 @@ mlxsw_sp_get_rmon_stats(struct net_device *dev,
 	*ranges = mlxsw_rmon_ranges;
 }
 
+static int mlxsw_sp_get_module_low_power(struct net_device *dev,
+					 bool *p_low_power,
+					 struct netlink_ext_ack *extack)
+{
+	struct mlxsw_sp_port *mlxsw_sp_port = netdev_priv(dev);
+	struct mlxsw_sp *mlxsw_sp = mlxsw_sp_port->mlxsw_sp;
+	u8 module = mlxsw_sp_port->mapping.module;
+
+	return mlxsw_env_get_module_low_power(mlxsw_sp->core, module,
+					      p_low_power, extack);
+}
+
+static bool mlxsw_sp_module_ports_up_check(struct mlxsw_sp *mlxsw_sp, u8 module)
+{
+	int i;
+
+	for (i = 1; i < mlxsw_core_max_ports(mlxsw_sp->core); i++) {
+		if (!mlxsw_sp->ports[i])
+			continue;
+		if (mlxsw_sp->ports[i]->mapping.module != module)
+			continue;
+		if (netif_running(mlxsw_sp->ports[i]->dev))
+			return true;
+	}
+
+	return false;
+}
+
+static int mlxsw_sp_set_module_low_power(struct net_device *dev, bool low_power,
+					 struct netlink_ext_ack *extack)
+{
+	struct mlxsw_sp_port *mlxsw_sp_port = netdev_priv(dev);
+	struct mlxsw_sp *mlxsw_sp = mlxsw_sp_port->mlxsw_sp;
+	u8 module = mlxsw_sp_port->mapping.module;
+
+	/* We are going to take the module down, so no port using it can be
+	 * administratively up.
+	 */
+	if (mlxsw_sp_module_ports_up_check(mlxsw_sp, module)) {
+		NL_SET_ERR_MSG_MOD(extack, "Cannot set low power mode when ports using the module are administratively up");
+		return -EINVAL;
+	}
+
+	return mlxsw_env_set_module_low_power(mlxsw_sp->core, module, low_power,
+					      extack);
+}
+
 const struct ethtool_ops mlxsw_sp_port_ethtool_ops = {
 	.cap_link_lanes_supported	= true,
 	.get_drvinfo			= mlxsw_sp_port_get_drvinfo,
@@ -1218,6 +1265,8 @@ const struct ethtool_ops mlxsw_sp_port_ethtool_ops = {
 	.get_eth_mac_stats		= mlxsw_sp_get_eth_mac_stats,
 	.get_eth_ctrl_stats		= mlxsw_sp_get_eth_ctrl_stats,
 	.get_rmon_stats			= mlxsw_sp_get_rmon_stats,
+	.get_module_low_power		= mlxsw_sp_get_module_low_power,
+	.set_module_low_power		= mlxsw_sp_set_module_low_power,
 };
 
 struct mlxsw_sp1_port_link_mode {

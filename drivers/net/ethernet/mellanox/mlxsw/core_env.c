@@ -5,6 +5,7 @@
 #include <linux/err.h>
 #include <linux/ethtool.h>
 #include <linux/sfp.h>
+#include <linux/jiffies.h>
 
 #include "core.h"
 #include "core_env.h"
@@ -388,6 +389,203 @@ mlxsw_env_get_module_eeprom_by_page(struct mlxsw_core *mlxsw_core, u8 module,
 	return bytes_read;
 }
 EXPORT_SYMBOL(mlxsw_env_get_module_eeprom_by_page);
+
+int mlxsw_env_get_module_low_power(struct mlxsw_core *mlxsw_core, u8 module,
+				   bool *p_low_power,
+				   struct netlink_ext_ack *extack)
+{
+	char mcion_pl[MLXSW_REG_MCION_LEN];
+	u16 status_bits;
+	int err;
+
+	mlxsw_reg_mcion_pack(mcion_pl, module);
+
+	err = mlxsw_reg_query(mlxsw_core, MLXSW_REG(mcion), mcion_pl);
+	if (err) {
+		NL_SET_ERR_MSG_MOD(extack, "Failed to retrieve module's low power mode");
+		return err;
+	}
+
+	status_bits = mlxsw_reg_mcion_module_status_bits_get(mcion_pl);
+	*p_low_power =
+		status_bits & MLXSW_REG_MCION_MODULE_STATUS_BITS_LOW_POWER_MASK;
+
+	return 0;
+}
+EXPORT_SYMBOL(mlxsw_env_get_module_low_power);
+
+static int mlxsw_env_module_enable_set(struct mlxsw_core *mlxsw_core, u8 module,
+				       bool enable)
+{
+	enum mlxsw_reg_pmaos_admin_status admin_status;
+	char pmaos_pl[MLXSW_REG_PMAOS_LEN];
+
+	mlxsw_reg_pmaos_pack(pmaos_pl, module);
+	admin_status = enable ? MLXSW_REG_PMAOS_ADMIN_STATUS_ENABLED :
+				MLXSW_REG_PMAOS_ADMIN_STATUS_DISABLED;
+	mlxsw_reg_pmaos_admin_status_set(pmaos_pl, admin_status);
+	mlxsw_reg_pmaos_ase_set(pmaos_pl, true);
+
+	return mlxsw_reg_write(mlxsw_core, MLXSW_REG(pmaos), pmaos_pl);
+}
+
+static int mlxsw_env_module_low_power_set(struct mlxsw_core *mlxsw_core,
+					  u8 module, bool low_power)
+{
+	u16 eeprom_override_mask, eeprom_override;
+	char pmmp_pl[MLXSW_REG_PMMP_LEN];
+
+	mlxsw_reg_pmmp_pack(pmmp_pl, module);
+	/* Mask all the bits except low power mode. */
+	eeprom_override_mask = ~MLXSW_REG_PMMP_EEPROM_OVERRIDE_LOW_POWER_MASK;
+	mlxsw_reg_pmmp_eeprom_override_mask_set(pmmp_pl, eeprom_override_mask);
+	eeprom_override = low_power ? MLXSW_REG_PMMP_EEPROM_OVERRIDE_LOW_POWER_MASK :
+				      0;
+	mlxsw_reg_pmmp_eeprom_override_set(pmmp_pl, eeprom_override);
+
+	return mlxsw_reg_write(mlxsw_core, MLXSW_REG(pmmp), pmmp_pl);
+}
+
+static int mlxsw_env_module_error_process(const char *pmaos_pl,
+					  struct netlink_ext_ack *extack)
+{
+	enum mlxsw_reg_pmaos_error_type error_type;
+
+	error_type = mlxsw_reg_pmaos_error_type_get(pmaos_pl);
+	switch (error_type) {
+	case MLXSW_REG_PMAOS_ERROR_TYPE_POWER_BUDGET_EXCEEDED:
+		NL_SET_ERR_MSG_MOD(extack, "Module's power budget exceeded");
+		return -EINVAL;
+	case MLXSW_REG_PMAOS_ERROR_TYPE_BUS_STUCK:
+		NL_SET_ERR_MSG_MOD(extack, "Module's I2C bus is stuck. Data or clock shorted");
+		return -EIO;
+	case MLXSW_REG_PMAOS_ERROR_TYPE_BAD_UNSUPPORTED_EEPROM:
+		NL_SET_ERR_MSG_MOD(extack, "Bad or unsupported module EEPROM");
+		return -EOPNOTSUPP;
+	case MLXSW_REG_PMAOS_ERROR_TYPE_UNSUPPORTED_CABLE:
+		NL_SET_ERR_MSG_MOD(extack, "Unsupported cable");
+		return -EOPNOTSUPP;
+	case MLXSW_REG_PMAOS_ERROR_TYPE_HIGH_TEMP:
+		NL_SET_ERR_MSG_MOD(extack, "Module's temperature is too high");
+		return -EINVAL;
+	case MLXSW_REG_PMAOS_ERROR_TYPE_BAD_CABLE:
+		NL_SET_ERR_MSG_MOD(extack, "Bad module. Module / cable is shorted");
+		return -EINVAL;
+	default:
+		NL_SET_ERR_MSG_MOD(extack, "Encountered unknown module error type");
+		return -EINVAL;
+	}
+}
+
+static bool mlxsw_env_module_oper_should_wait(const char *pmaos_pl)
+{
+	enum mlxsw_reg_pmaos_oper_status oper_status;
+
+	oper_status = mlxsw_reg_pmaos_oper_status_get(pmaos_pl);
+	switch (oper_status) {
+	case MLXSW_REG_PMAOS_OPER_STATUS_PLUGGED_ENABLED:
+	case MLXSW_REG_PMAOS_OPER_STATUS_UNPLUGGED:
+		return false;
+	default:
+		/* Module might not be accessible just after its re-enablement,
+		 * so ignore errors or unknown states during this time period.
+		 */
+		return true;
+	}
+}
+
+static int mlxsw_env_module_oper_status_process(const char *pmaos_pl,
+						struct netlink_ext_ack *extack)
+{
+	enum mlxsw_reg_pmaos_oper_status oper_status;
+
+	oper_status = mlxsw_reg_pmaos_oper_status_get(pmaos_pl);
+	switch (oper_status) {
+	case MLXSW_REG_PMAOS_OPER_STATUS_INITIALIZING:
+		NL_SET_ERR_MSG_MOD(extack, "Module is still initializing");
+		return -EBUSY;
+	case MLXSW_REG_PMAOS_OPER_STATUS_PLUGGED_ENABLED:
+	case MLXSW_REG_PMAOS_OPER_STATUS_UNPLUGGED:
+		return 0;
+	case MLXSW_REG_PMAOS_OPER_STATUS_PLUGGED_ERROR:
+		return mlxsw_env_module_error_process(pmaos_pl, extack);
+	default:
+		NL_SET_ERR_MSG_MOD(extack, "Encountered unknown module operational status");
+		return -EINVAL;
+	}
+}
+
+/* Firmware should take about 2-3 seconds to initialize the module. */
+#define MLXSW_ENV_MODULE_TIMEOUT_MSECS		5000
+#define MLXSW_ENV_MODULE_WAIT_INTERVAL_MSECS	100
+
+static int mlxsw_env_module_oper_wait(struct mlxsw_core *mlxsw_core, u8 module,
+				      struct netlink_ext_ack *extack)
+{
+	char pmaos_pl[MLXSW_REG_PMAOS_LEN];
+	unsigned long end;
+
+	end = jiffies + msecs_to_jiffies(MLXSW_ENV_MODULE_TIMEOUT_MSECS);
+	do {
+		int err;
+
+		mlxsw_reg_pmaos_pack(pmaos_pl, module);
+		err = mlxsw_reg_query(mlxsw_core, MLXSW_REG(pmaos), pmaos_pl);
+		if (err) {
+			NL_SET_ERR_MSG_MOD(extack, "Failed to query module's operational status");
+			return err;
+		}
+
+		if (!mlxsw_env_module_oper_should_wait(pmaos_pl))
+			break;
+		msleep(MLXSW_ENV_MODULE_WAIT_INTERVAL_MSECS);
+	} while (time_before(jiffies, end));
+
+	return mlxsw_env_module_oper_status_process(pmaos_pl, extack);
+}
+
+int mlxsw_env_set_module_low_power(struct mlxsw_core *mlxsw_core, u8 module,
+				   bool low_power,
+				   struct netlink_ext_ack *extack)
+{
+	int err;
+
+	err = mlxsw_env_module_enable_set(mlxsw_core, module, false);
+	if (err) {
+		NL_SET_ERR_MSG_MOD(extack, "Failed to disable module");
+		return err;
+	}
+
+	err = mlxsw_env_module_low_power_set(mlxsw_core, module, low_power);
+	if (err) {
+		NL_SET_ERR_MSG_MOD(extack, "Failed to set module's low power mode");
+		goto err_module_low_power_set;
+	}
+
+	err = mlxsw_env_module_enable_set(mlxsw_core, module, true);
+	if (err) {
+		NL_SET_ERR_MSG_MOD(extack, "Failed to enable module");
+		goto err_module_enable_set;
+	}
+
+	/* Wait for the module to reach a valid operational state following its
+	 * re-enablement.
+	 */
+	err = mlxsw_env_module_oper_wait(mlxsw_core, module, extack);
+	if (err)
+		goto err_module_oper_wait;
+
+	return 0;
+
+err_module_oper_wait:
+	mlxsw_env_module_enable_set(mlxsw_core, module, false);
+err_module_enable_set:
+	mlxsw_env_module_low_power_set(mlxsw_core, module, !low_power);
+err_module_low_power_set:
+	mlxsw_env_module_enable_set(mlxsw_core, module, true);
+	return err;
+}
+EXPORT_SYMBOL(mlxsw_env_set_module_low_power);
 
 static int mlxsw_env_module_has_temp_sensor(struct mlxsw_core *mlxsw_core,
 					    u8 module,
