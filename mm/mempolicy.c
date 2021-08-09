@@ -2172,7 +2172,7 @@ struct page *alloc_pages(gfp_t gfp, unsigned order)
 	struct mempolicy *pol = &default_policy;
 	struct page *page;
 
-	if (!in_interrupt() && !(gfp & __GFP_THISNODE))
+	if (in_task() && !(gfp & __GFP_THISNODE))
 		pol = get_task_policy(current);
 
 	/*
