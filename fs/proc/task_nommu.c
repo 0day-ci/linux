@@ -145,7 +145,7 @@ static int is_stack(struct vm_area_struct *vma)
 static int nommu_vma_show(struct seq_file *m, struct vm_area_struct *vma)
 {
 	struct mm_struct *mm = vma->vm_mm;
-	unsigned long ino = 0;
+	unsigned long ino = 0, tree = 0;
 	struct file *file;
 	dev_t dev = 0;
 	int flags;
@@ -158,12 +158,13 @@ static int nommu_vma_show(struct seq_file *m, struct vm_area_struct *vma)
 		struct inode *inode = file_inode(vma->vm_file);
 		dev = inode->i_sb->s_dev;
 		ino = inode->i_ino;
+		tree = inode->i_tree;
 		pgoff = (loff_t)vma->vm_pgoff << PAGE_SHIFT;
 	}
 
 	seq_setwidth(m, 25 + sizeof(void *) * 6 - 1);
 	seq_printf(m,
-		   "%08lx-%08lx %c%c%c%c %08llx %02x:%02x %lu ",
+		   "%08lx-%08lx %c%c%c%c %08llx %02x:%02x ",
 		   vma->vm_start,
 		   vma->vm_end,
 		   flags & VM_READ ? 'r' : '-',
@@ -171,7 +172,11 @@ static int nommu_vma_show(struct seq_file *m, struct vm_area_struct *vma)
 		   flags & VM_EXEC ? 'x' : '-',
 		   flags & VM_MAYSHARE ? flags & VM_SHARED ? 'S' : 's' : 'p',
 		   pgoff,
-		   MAJOR(dev), MINOR(dev), ino);
+		   MAJOR(dev), MINOR(dev));
+	if (tree)
+		seq_printf(m, "%lu:%lu ", ino, tree);
+	else
+		seq_printf(m, "%lu ", ino);
 
 	if (file) {
 		seq_pad(m, ' ');

@@ -90,9 +90,13 @@ static void inotify_fdinfo(struct seq_file *m, struct fsnotify_mark *mark)
 		 * used only internally to the kernel.
 		 */
 		u32 mask = mark->mask & IN_ALL_EVENTS;
-		seq_printf(m, "inotify wd:%x ino:%lx sdev:%x mask:%x ignored_mask:%x ",
-			   inode_mark->wd, inode->i_ino, inode->i_sb->s_dev,
-			   mask, mark->ignored_mask);
+		seq_printf(m, "inotify wd:%x ", inode_mark->wd);
+		if (inode->i_tree)
+			seq_printf(m, "ino:%lx:%lx ", inode->i_tree, inode->i_ino);
+		else
+			seq_printf(m, "ino:%lx ", inode->i_ino);
+		seq_printf(m, "sdev:%x mask:%x ignored_mask:%x ",
+			   inode->i_sb->s_dev, mask, mark->ignored_mask);
 		show_mark_fhandle(m, inode);
 		seq_putc(m, '\n');
 		iput(inode);
@@ -120,8 +124,13 @@ static void fanotify_fdinfo(struct seq_file *m, struct fsnotify_mark *mark)
 		inode = igrab(fsnotify_conn_inode(mark->connector));
 		if (!inode)
 			return;
-		seq_printf(m, "fanotify ino:%lx sdev:%x mflags:%x mask:%x ignored_mask:%x ",
-			   inode->i_ino, inode->i_sb->s_dev,
+		if (inode->i_tree)
+			seq_printf(m, "fanotify ino:%lx:%lx", inode->i_tree,
+				   inode->i_ino);
+		else
+			seq_printf(m, "fanotify ino:%lx", inode->i_ino);
+		seq_printf(m, " sdev:%x mflags:%x mask:%x ignored_mask:%x ",
+			   inode->i_sb->s_dev,
 			   mflags, mark->mask, mark->ignored_mask);
 		show_mark_fhandle(m, inode);
 		seq_putc(m, '\n');

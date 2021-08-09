@@ -5839,6 +5839,8 @@ static int btrfs_init_locked_inode(struct inode *inode, void *p)
 		 * 'root', and should be nearly unique across the filesystem.
 		 */
 		inode->i_ino ^= args->root->inum_overlay;
+	if (args->root && args->root->fs_info->num_devs == 1)
+		inode->i_tree = args->root->root_key.objectid;
 	BTRFS_I(inode)->location.objectid = args->ino;
 	BTRFS_I(inode)->location.type = BTRFS_INODE_ITEM_KEY;
 	BTRFS_I(inode)->location.offset = 0;
@@ -5928,6 +5930,8 @@ static struct inode *new_simple_dir(struct super_block *s,
 	set_bit(BTRFS_INODE_DUMMY, &BTRFS_I(inode)->runtime_flags);
 
 	inode->i_ino = BTRFS_EMPTY_SUBVOL_DIR_OBJECTID;
+	if (root->fs_info->num_devs == 1)
+		inode->i_tree = root->root_key.objectid;
 	/*
 	 * We only need lookup, the rest is read-only and there's no inode
 	 * associated with the dentry
@@ -6477,6 +6481,8 @@ static struct inode *btrfs_new_inode(struct btrfs_trans_handle *trans,
 	inode->i_ino = objectid;
 	if (objectid != root->inum_overlay)
 		inode->i_ino ^= root->inum_overlay;
+	if (root->fs_info->num_devs == 1)
+		inode->i_tree = root->root_key.objectid;
 
 	if (dir && name) {
 		trace_btrfs_inode_request(dir);

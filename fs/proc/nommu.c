@@ -31,7 +31,7 @@
  */
 static int nommu_region_show(struct seq_file *m, struct vm_region *region)
 {
-	unsigned long ino = 0;
+	unsigned long ino = 0, tree = 0;
 	struct file *file;
 	dev_t dev = 0;
 	int flags;
@@ -43,11 +43,12 @@ static int nommu_region_show(struct seq_file *m, struct vm_region *region)
 		struct inode *inode = file_inode(region->vm_file);
 		dev = inode->i_sb->s_dev;
 		ino = inode->i_ino;
+		tree = inode->i_tree;
 	}
 
 	seq_setwidth(m, 25 + sizeof(void *) * 6 - 1);
 	seq_printf(m,
-		   "%08lx-%08lx %c%c%c%c %08llx %02x:%02x %lu ",
+		   "%08lx-%08lx %c%c%c%c %08llx %02x:%02x ",
 		   region->vm_start,
 		   region->vm_end,
 		   flags & VM_READ ? 'r' : '-',
@@ -55,7 +56,11 @@ static int nommu_region_show(struct seq_file *m, struct vm_region *region)
 		   flags & VM_EXEC ? 'x' : '-',
 		   flags & VM_MAYSHARE ? flags & VM_SHARED ? 'S' : 's' : 'p',
 		   ((loff_t)region->vm_pgoff) << PAGE_SHIFT,
-		   MAJOR(dev), MINOR(dev), ino);
+		   MAJOR(dev), MINOR(dev));
+	if (tree)
+		seq_printf(m, "%lu:%lu ", tree, ino);
+	else
+		seq_printf(m, "%lu ", ino);
 
 	if (file) {
 		seq_pad(m, ' ');

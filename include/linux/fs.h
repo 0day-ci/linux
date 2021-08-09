@@ -630,6 +630,7 @@ struct inode {
 
 	/* Stat data, not accessed from path walking */
 	unsigned long		i_ino;
+	unsigned long		i_tree;
 	/*
 	 * Filesystems may only read i_nlink directly.  They shall use the
 	 * following functions for modification:

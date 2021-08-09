@@ -45,6 +45,7 @@ void generic_fillattr(struct user_namespace *mnt_userns, struct inode *inode,
 {
 	stat->dev = inode->i_sb->s_dev;
 	stat->ino = inode->i_ino;
+	stat->tree_id = inode->i_tree;
 	stat->mode = inode->i_mode;
 	stat->nlink = inode->i_nlink;
 	stat->uid = i_uid_into_mnt(mnt_userns, inode);

@@ -250,7 +250,8 @@ static int is_stack(struct vm_area_struct *vma)
 static void show_vma_header_prefix(struct seq_file *m,
 				   unsigned long start, unsigned long end,
 				   vm_flags_t flags, unsigned long long pgoff,
-				   dev_t dev, unsigned long ino)
+				   dev_t dev, unsigned long ino,
+				   unsigned long tree)
 {
 	seq_setwidth(m, 25 + sizeof(void *) * 6 - 1);
 	seq_put_hex_ll(m, NULL, start, 8);
@@ -263,7 +264,12 @@ static void show_vma_header_prefix(struct seq_file *m,
 	seq_put_hex_ll(m, " ", pgoff, 8);
 	seq_put_hex_ll(m, " ", MAJOR(dev), 2);
 	seq_put_hex_ll(m, ":", MINOR(dev), 2);
-	seq_put_decimal_ull(m, " ", ino);
+	if (tree) {
+		seq_put_decimal_ull(m, " ", tree);
+		seq_put_decimal_ull(m, ":", ino);
+	} else {
+		seq_put_decimal_ull(m, " ", ino);
+	}
 	seq_putc(m, ' ');
 }
 
@@ -273,7 +279,7 @@ show_map_vma(struct seq_file *m, struct vm_area_struct *vma)
 	struct mm_struct *mm = vma->vm_mm;
 	struct file *file = vma->vm_file;
 	vm_flags_t flags = vma->vm_flags;
-	unsigned long ino = 0;
+	unsigned long ino = 0, tree = 0;
 	unsigned long long pgoff = 0;
 	unsigned long start, end;
 	dev_t dev = 0;
@@ -283,12 +289,13 @@ show_map_vma(struct seq_file *m, struct vm_area_struct *vma)
 		struct inode *inode = file_inode(vma->vm_file);
 		dev = inode->i_sb->s_dev;
 		ino = inode->i_ino;
+		tree = inode->i_tree;
 		pgoff = ((loff_t)vma->vm_pgoff) << PAGE_SHIFT;
 	}
 
 	start = vma->vm_start;
 	end = vma->vm_end;
-	show_vma_header_prefix(m, start, end, flags, pgoff, dev, ino);
+	show_vma_header_prefix(m, start, end, flags, pgoff, dev, ino, tree);
 
 	/*
 	 * Print the dentry name for named mappings, and a
@@ -934,7 +941,7 @@ static int show_smaps_rollup(struct seq_file *m, void *v)
 	}
 
 	show_vma_header_prefix(m, priv->mm->mmap->vm_start,
-			       last_vma_end, 0, 0, 0, 0);
+			       last_vma_end, 0, 0, 0, 0, 0);
 	seq_pad(m, ' ');
 	seq_puts(m, "[rollup]\n");
 
