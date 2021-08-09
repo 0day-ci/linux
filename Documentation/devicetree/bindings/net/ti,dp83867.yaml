@@ -106,6 +106,12 @@ properties:
       Transmitt FIFO depth- see dt-bindings/net/ti-dp83867.h for applicable
       values.
 
+  ti,led-sel:
+    $ref: /schemas/types.yaml#/definitions/uint32
+    description: |
+      This configure the status led. See dt-bindings/net/ti-dp83867.h
+      for different status led settings,select different configures
+
 required:
   - reg
 
