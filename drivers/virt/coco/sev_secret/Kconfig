@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: GPL-2.0-only
+config AMD_SEV_SECRET
+	tristate "AMD SEV secret area securityfs support"
+	depends on AMD_MEM_ENCRYPT && EFI
+	select SECURITYFS
+	help
+	  This is a driver for accessing the AMD SEV secret area via
+	  securityfs.
+
+	  To compile this driver as a module, choose M here.
+	  The module will be called sev_secret.
