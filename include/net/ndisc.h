@@ -501,5 +501,6 @@ int ndisc_ifinfo_sysctl_strategy(struct ctl_table *ctl,
 #endif
 
 void inet6_ifinfo_notify(int event, struct inet6_dev *idev);
+void inet6_iframtu_notify(struct inet6_dev *idev);
 
 #endif
