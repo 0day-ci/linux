@@ -67,6 +67,8 @@ static __always_inline void kvm_guest_exit_irqoff(void)
 	failed;								\
 })
 
+#define CC KVM_NESTED_VMENTER_CONSISTENCY_CHECK
+
 #define KVM_DEFAULT_PLE_GAP		128
 #define KVM_VMX_DEFAULT_PLE_WINDOW	4096
 #define KVM_DEFAULT_PLE_WINDOW_GROW	2

@@ -22,8 +22,6 @@ module_param_named(enable_shadow_vmcs, enable_shadow_vmcs, bool, S_IRUGO);
 static bool __read_mostly nested_early_check = 0;
 module_param(nested_early_check, bool, S_IRUGO);
 
-#define CC KVM_NESTED_VMENTER_CONSISTENCY_CHECK
-
 /*
  * Hyper-V requires all of these, so mark them as supported even though
  * they are just treated the same as all-context.
