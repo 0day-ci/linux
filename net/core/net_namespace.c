@@ -367,10 +367,8 @@ static int __net_init net_defaults_init_net(struct net *net)
 {
 	net->core.sysctl_somaxconn = SOMAXCONN;
 
-	/* Default rethink mode is aggrssive (i.e. rethink on first RTO) */
-	net->core.sysctl_txrehash_mode = SOCK_TXREHASH_MODE_NEG_ADVICE |
-					 SOCK_TXREHASH_MODE_SYN_RTO |
-					 SOCK_TXREHASH_MODE_RTO;
+	/* Default rethink mode is negative advice (i.e. not rthink on RTO) */
+	net->core.sysctl_txrehash_mode = SOCK_TXREHASH_MODE_NEG_ADVICE;
 
 	return 0;
 }
