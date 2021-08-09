@@ -1,0 +1,156 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+/*
+ * Device tree file for Zyxel NSA-210
+ */
+
+/dts-v1/;
+#include "ox810se.dtsi"
+#include <dt-bindings/gpio/gpio.h>
+
+/ {
+	model = "Zyxel NSA-210";
+
+	compatible = "zyxel,nsa210", "oxsemi,ox810se";
+
+	chosen {
+		bootargs = "console=ttyS2,115200n8";
+	};
+
+	memory {
+		reg = <0x48000000 0x8000000>;
+	};
+
+	aliases {
+		serial2 = &uart2;
+	};
+
+	flash@41000000 {
+		compatible = "cfi-flash";
+		reg = <0x41000000 0x00400000>;
+		bank-width = <1>;
+
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			partitions@0 {
+				label = "uboot";
+				reg = <0x00000000 0x00020000>;
+			};
+
+			partitions@1 {
+				label = "kernel";
+				reg = <0x00020000 0x001c0000>;
+			};
+
+			partitions@2 {
+				label = "initrd";
+				reg = <0x001e0000 0x001a0000>;
+			};
+
+			partitions@3 {
+				label = "etc";
+				reg = <0x00380000 0x00070000>;
+			};
+
+			/* 448k gap */
+
+			partitions@4 {
+				label = "env1";
+				reg = <0x003fc000 0x00002000>;
+			};
+
+			partitions@5 {
+				label = "env2";
+				reg = <0x003fe000 0x00002000>;
+			};
+		};
+	};
+
+	keys {
+		compatible = "gpio-keys";
+
+		reset {
+			label = "Reset";
+			gpios = <&gpio0 2 GPIO_ACTIVE_LOW>;
+		};
+
+		power {
+			label = "Power";
+			gpios = <&gpio0 4 GPIO_ACTIVE_LOW>;
+		};
+
+		sync {
+			label = "Copy/Sync";
+			gpio = <&gpio0 10 GPIO_ACTIVE_LOW>;
+		};
+	};
+
+	leds {
+		compatible = "gpio-leds";
+
+		/*
+		 * The vendor U-Boot enables a PWM to make this LED blink during boot.
+		 * This must be disabled to be able to drive the LED using the
+		 * GPIO as defined here by unsetting bit 9 in the
+		 * SYS_CTRL_GPIO_PWMSEL_CTRL_0 register.
+		 * E.g. do before starting Linux: mw 0x4500009c 0
+		 */
+		led1 {
+			label = "nsa210:green:sys";
+			gpios = <&gpio0 9 GPIO_ACTIVE_HIGH>;
+		};
+
+		led2 {
+			label = "nsa210:red:hdd";
+			gpios = <&gpio0 27 GPIO_ACTIVE_HIGH>;
+		};
+
+		led3 {
+			label = "nsa210:green:hdd";
+			gpios = <&gpio0 22 GPIO_ACTIVE_HIGH>;
+		};
+
+		led4 {
+			label = "nsa210:red:usb";
+			gpios = <&gpio1 0 GPIO_ACTIVE_HIGH>;
+		};
+
+		led5 {
+			label = "nsa210:green:usb";
+			gpios = <&gpio0 31 GPIO_ACTIVE_HIGH>;
+		};
+
+		led6 {
+			label = "nsa210:red:esata";
+			gpios = <&gpio0 28 GPIO_ACTIVE_HIGH>;
+		};
+
+		led7 {
+			label = "nsa210:green:esata";
+			gpios = <&gpio0 26 GPIO_ACTIVE_HIGH>;
+		};
+
+		led8 {
+			label = "nsa210:red:copy";
+			gpios = <&gpio0 24 GPIO_ACTIVE_HIGH>;
+		};
+
+		led9 {
+			label = "nsa210:green:copy";
+			gpios = <&gpio1 1 GPIO_ACTIVE_HIGH>;
+		};
+	};
+};
+
+&uart2 {
+	/*
+	 * To make this device work as expected bit 2 of register
+	 * SYS_CTRL_UART_CTRL must be set. Otherwise the interrupt doesn't
+	 * trigger, so console messages make it through, but userspace cannot
+	 * make use of it.
+	 * E.g. do before starting Linux: mw 0x45000094 4
+	 */
+	status = "okay";
+};
