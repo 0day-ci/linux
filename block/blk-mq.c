@@ -40,6 +40,7 @@
 #include "blk-stat.h"
 #include "blk-mq-sched.h"
 #include "blk-rq-qos.h"
+#include "blk-ledtrig.h"
 
 static DEFINE_PER_CPU(struct llist_head, blk_cpu_done);
 
@@ -1381,6 +1382,7 @@ bool blk_mq_dispatch_rq_list(struct blk_mq_hw_ctx *hctx, struct list_head *list,
 		switch (ret) {
 		case BLK_STS_OK:
 			queued++;
+			blk_ledtrig_try_blink(rq);
 			break;
 		case BLK_STS_RESOURCE:
 		case BLK_STS_DEV_RESOURCE:

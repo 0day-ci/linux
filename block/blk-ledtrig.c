@@ -6,6 +6,7 @@
  *	Copyright 2021 Ian Pilcher <arequipeno@gmail.com>
  */
 
+#include <linux/blkdev.h>
 #include <linux/ctype.h>
 #include <linux/genhd.h>
 #include <linux/leds.h>
@@ -441,3 +442,28 @@ static int __init blk_ledtrig_init(void)
 	return led_trigger_register(&blk_ledtrig_trigger);
 }
 device_initcall(blk_ledtrig_init);
+
+
+/*
+ *
+ *	Blink the LED associated with a (non-NULL) disk (if set)
+ *
+ */
+
+void __blk_ledtrig_try_blink(struct request *const rq)
+{
+	struct blk_ledtrig_led *bd_led;
+	unsigned long delay_on, delay_off;
+
+	rcu_read_lock();
+
+	bd_led = rcu_dereference(rq->rq_disk->led);
+
+	if (bd_led != NULL) {
+		delay_on = READ_ONCE(bd_led->blink_on);
+		delay_off = READ_ONCE(bd_led->blink_off);
+		led_blink_set_oneshot(bd_led->led, &delay_on, &delay_off, 0);
+	}
+
+	rcu_read_unlock();
+}
