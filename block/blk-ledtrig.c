@@ -406,3 +406,38 @@ static ssize_t blk_ledtrig_blink_store(struct device *const dev,
 
 	return count;
 }
+
+
+/*
+ *
+ *	Initialization - register the trigger
+ *
+ */
+
+static struct attribute *blk_ledtrig_attrs[] = {
+	&blk_ledtrig_attr_blink_on.attr,
+	&blk_ledtrig_attr_blink_off.attr,
+	NULL
+};
+
+static const struct attribute_group blk_ledtrig_attr_group = {
+	.attrs	= blk_ledtrig_attrs,
+};
+
+static const struct attribute_group *blk_ledtrig_attr_groups[] = {
+	&blk_ledtrig_attr_group,
+	NULL
+};
+
+static struct led_trigger blk_ledtrig_trigger = {
+	.name		= "blkdev",
+	.activate	= blk_ledtrig_activate,
+	.deactivate	= blk_ledtrig_deactivate,
+	.groups		= blk_ledtrig_attr_groups,
+};
+
+static int __init blk_ledtrig_init(void)
+{
+	return led_trigger_register(&blk_ledtrig_trigger);
+}
+device_initcall(blk_ledtrig_init);
