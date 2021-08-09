@@ -82,7 +82,7 @@ struct kcov_remote {
 	struct hlist_node	hnode;
 };
 
-static DEFINE_SPINLOCK(kcov_remote_lock);
+static DEFINE_RAW_SPINLOCK(kcov_remote_lock);
 static DEFINE_HASHTABLE(kcov_remote_map, 4);
 static struct list_head kcov_remote_areas = LIST_HEAD_INIT(kcov_remote_areas);
 
@@ -375,7 +375,7 @@ static void kcov_remote_reset(struct kcov *kcov)
 	struct hlist_node *tmp;
 	unsigned long flags;
 
-	spin_lock_irqsave(&kcov_remote_lock, flags);
+	raw_spin_lock_irqsave(&kcov_remote_lock, flags);
 	hash_for_each_safe(kcov_remote_map, bkt, tmp, remote, hnode) {
 		if (remote->kcov != kcov)
 			continue;
@@ -384,7 +384,7 @@ static void kcov_remote_reset(struct kcov *kcov)
 	}
 	/* Do reset before unlock to prevent races with kcov_remote_start(). */
 	kcov_reset(kcov);
-	spin_unlock_irqrestore(&kcov_remote_lock, flags);
+	raw_spin_unlock_irqrestore(&kcov_remote_lock, flags);
 }
 
 static void kcov_disable(struct task_struct *t, struct kcov *kcov)
@@ -638,18 +638,18 @@ static int kcov_ioctl_locked(struct kcov *kcov, unsigned int cmd,
 		kcov->t = t;
 		kcov->remote = true;
 		kcov->remote_size = remote_arg->area_size;
-		spin_lock_irqsave(&kcov_remote_lock, flags);
+		raw_spin_lock_irqsave(&kcov_remote_lock, flags);
 		for (i = 0; i < remote_arg->num_handles; i++) {
 			if (!kcov_check_handle(remote_arg->handles[i],
 						false, true, false)) {
-				spin_unlock_irqrestore(&kcov_remote_lock,
+				raw_spin_unlock_irqrestore(&kcov_remote_lock,
 							flags);
 				kcov_disable(t, kcov);
 				return -EINVAL;
 			}
 			remote = kcov_remote_add(kcov, remote_arg->handles[i]);
 			if (IS_ERR(remote)) {
-				spin_unlock_irqrestore(&kcov_remote_lock,
+				raw_spin_unlock_irqrestore(&kcov_remote_lock,
 							flags);
 				kcov_disable(t, kcov);
 				return PTR_ERR(remote);
@@ -658,7 +658,7 @@ static int kcov_ioctl_locked(struct kcov *kcov, unsigned int cmd,
 		if (remote_arg->common_handle) {
 			if (!kcov_check_handle(remote_arg->common_handle,
 						true, false, false)) {
-				spin_unlock_irqrestore(&kcov_remote_lock,
+				raw_spin_unlock_irqrestore(&kcov_remote_lock,
 							flags);
 				kcov_disable(t, kcov);
 				return -EINVAL;
@@ -666,14 +666,14 @@ static int kcov_ioctl_locked(struct kcov *kcov, unsigned int cmd,
 			remote = kcov_remote_add(kcov,
 					remote_arg->common_handle);
 			if (IS_ERR(remote)) {
-				spin_unlock_irqrestore(&kcov_remote_lock,
+				raw_spin_unlock_irqrestore(&kcov_remote_lock,
 							flags);
 				kcov_disable(t, kcov);
 				return PTR_ERR(remote);
 			}
 			t->kcov_handle = remote_arg->common_handle;
 		}
-		spin_unlock_irqrestore(&kcov_remote_lock, flags);
+		raw_spin_unlock_irqrestore(&kcov_remote_lock, flags);
 		/* Put either in kcov_task_exit() or in KCOV_DISABLE. */
 		kcov_get(kcov);
 		return 0;
@@ -845,10 +845,10 @@ void kcov_remote_start(u64 handle)
 		return;
 	}
 
-	spin_lock(&kcov_remote_lock);
+	raw_spin_lock(&kcov_remote_lock);
 	remote = kcov_remote_find(handle);
 	if (!remote) {
-		spin_unlock_irqrestore(&kcov_remote_lock, flags);
+		raw_spin_unlock_irqrestore(&kcov_remote_lock, flags);
 		return;
 	}
 	kcov_debug("handle = %llx, context: %s\n", handle,
@@ -869,7 +869,7 @@ void kcov_remote_start(u64 handle)
 		size = CONFIG_KCOV_IRQ_AREA_SIZE;
 		area = this_cpu_ptr(&kcov_percpu_data)->irq_area;
 	}
-	spin_unlock_irqrestore(&kcov_remote_lock, flags);
+	raw_spin_unlock_irqrestore(&kcov_remote_lock, flags);
 
 	/* Can only happen when in_task(). */
 	if (!area) {
@@ -1008,9 +1008,9 @@ void kcov_remote_stop(void)
 	spin_unlock(&kcov->lock);
 
 	if (in_task()) {
-		spin_lock(&kcov_remote_lock);
+		raw_spin_lock(&kcov_remote_lock);
 		kcov_remote_area_put(area, size);
-		spin_unlock(&kcov_remote_lock);
+		raw_spin_unlock(&kcov_remote_lock);
 	}
 
 	local_irq_restore(flags);
