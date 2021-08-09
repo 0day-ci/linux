@@ -72,3 +72,18 @@ Image Source Control IDs
     * - __u32
       - ``height``
       - Height of the area.
+
+``V4L2_CID_NOTIFY_GAINS (integer)``
+    The sensor is notified what gains will be applied to the different
+    colour channels by subsequent processing (such as by an ISP). The
+    sensor is merely informed of these values in case it performs
+    processing that requires them, but it does not apply them itself to
+    the output pixels.
+
+    For Bayer sensors this is an array control taking 4 gain values,
+    being the gains for each of the Bayer channels. The gains are always
+    in the order B, Gb, Gr and R, irrespective of the exact Bayer order
+    of the sensor itself.
+
+    The units for the gain values are linear, with the default value
+    representing a gain of exactly 1.
