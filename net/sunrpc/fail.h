@@ -12,6 +12,7 @@ struct fail_sunrpc_attr {
 	struct fault_attr	attr;
 
 	bool			ignore_server_disconnect;
+	bool			ignore_client_disconnect;
 };
 
 extern struct fail_sunrpc_attr fail_sunrpc;
