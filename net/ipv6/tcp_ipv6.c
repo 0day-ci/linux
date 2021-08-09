@@ -42,6 +42,7 @@
 #include <linux/indirect_call_wrapper.h>
 
 #include <net/tcp.h>
+#include <net/tcp_authopt.h>
 #include <net/ndisc.h>
 #include <net/inet6_hashtables.h>
 #include <net/inet6_connection_sock.h>
@@ -1733,6 +1734,9 @@ process:
 		goto discard_and_relse;
 
 	if (tcp_v6_inbound_md5_hash(sk, skb, dif, sdif))
+		goto discard_and_relse;
+
+	if (tcp_authopt_inbound_check(sk, skb))
 		goto discard_and_relse;
 
 	if (tcp_filter(sk, skb))
