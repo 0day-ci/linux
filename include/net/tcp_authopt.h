@@ -27,7 +27,15 @@ struct tcp_authopt_key_info {
 struct tcp_authopt_info {
 	/* List of tcp_authopt_key_info */
 	struct hlist_head head;
+	/* Current send_key, cached.
+	 * Once a key is found it only changes by user or remote request.
+	 */
+	struct tcp_authopt_key_info *send_key;
 	u32 flags;
+	u32 local_send_id;
+	u8 send_rnextkeyid;
+	u8 recv_keyid;
+	u8 recv_rnextkeyid;
 	u32 src_isn;
 	u32 dst_isn;
 	struct rcu_head rcu;
