@@ -16,9 +16,12 @@ static inline void blk_ledtrig_disk_init(struct gendisk *const disk)
 	RCU_INIT_POINTER(disk->led, NULL);
 }
 
+void blk_ledtrig_dev_clear(struct gendisk *const disk);
+
 #else	// CONFIG_BLK_LED_TRIGGERS
 
 static inline void blk_ledtrig_disk_init(const struct gendisk *disk) {}
+static inline void blk_ledtrig_dev_clear(const struct gendisk *disk) {}
 
 #endif	// CONFIG_BLK_LED_TRIGGERS
 

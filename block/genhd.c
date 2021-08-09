@@ -601,6 +601,7 @@ void del_gendisk(struct gendisk *disk)
 	if (WARN_ON_ONCE(!disk->queue))
 		return;
 
+	blk_ledtrig_dev_clear(disk);
 	blk_integrity_del(disk);
 	disk_del_events(disk);
 
