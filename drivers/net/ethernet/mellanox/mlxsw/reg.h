@@ -5681,6 +5681,14 @@ static inline void mlxsw_reg_pspa_pack(char *payload, u8 swid, u8 local_port)
 
 MLXSW_REG_DEFINE(pmaos, MLXSW_REG_PMAOS_ID, MLXSW_REG_PMAOS_LEN);
 
+/* reg_pmaos_rst
+ * Module reset toggle.
+ * Note: Setting reset while module is plugged-in will result in transition to
+ * "initializing" operational state.
+ * Access: OP
+ */
+MLXSW_ITEM32(reg, pmaos, rst, 0x00, 31, 1);
+
 /* reg_pmaos_slot_index
  * Slot index.
  * Access: Index
@@ -5692,6 +5700,38 @@ MLXSW_ITEM32(reg, pmaos, slot_index, 0x00, 24, 4);
  * Access: Index
  */
 MLXSW_ITEM32(reg, pmaos, module, 0x00, 16, 8);
+
+enum mlxsw_reg_pmaos_admin_status {
+	MLXSW_REG_PMAOS_ADMIN_STATUS_ENABLED = 1,
+	MLXSW_REG_PMAOS_ADMIN_STATUS_DISABLED = 2,
+	/* If the module is active and then unplugged, or experienced an error
+	 * event, the operational status should go to "disabled" and can only
+	 * be enabled upon explicit enable command.
+	 */
+	MLXSW_REG_PMAOS_ADMIN_STATUS_ENABLED_ONCE = 3,
+};
+
+/* reg_pmaos_admin_status
+ * Module administrative state (the desired state of the module).
+ * Note: To disable a module, all ports associated with the port must be
+ * administatively down first.
+ * Access: RW
+ */
+MLXSW_ITEM32(reg, pmaos, admin_status, 0x00, 8, 4);
+
+enum mlxsw_reg_pmaos_oper_status {
+	MLXSW_REG_PMAOS_OPER_STATUS_INITIALIZING,
+	MLXSW_REG_PMAOS_OPER_STATUS_PLUGGED_ENABLED,
+	MLXSW_REG_PMAOS_OPER_STATUS_UNPLUGGED,
+	/* Error code can be read from PMAOS.error_type */
+	MLXSW_REG_PMAOS_OPER_STATUS_PLUGGED_ERROR,
+};
+
+/* reg_pmaos_oper_status
+ * Module state. Reserved while administrative state is disabled.
+ * Access: RO
+ */
+MLXSW_ITEM32(reg, pmaos, oper_status, 0x00, 0, 4);
 
 /* reg_pmaos_ase
  * Admin state update enable.
@@ -5708,6 +5748,24 @@ MLXSW_ITEM32(reg, pmaos, ase, 0x04, 31, 1);
  * Access: WO
  */
 MLXSW_ITEM32(reg, pmaos, ee, 0x04, 30, 1);
+
+enum mlxsw_reg_pmaos_error_type {
+	MLXSW_REG_PMAOS_ERROR_TYPE_POWER_BUDGET_EXCEEDED = 0,
+	/* I2C data or clock shorted */
+	MLXSW_REG_PMAOS_ERROR_TYPE_BUS_STUCK = 2,
+	MLXSW_REG_PMAOS_ERROR_TYPE_BAD_UNSUPPORTED_EEPROM = 3,
+	MLXSW_REG_PMAOS_ERROR_TYPE_UNSUPPORTED_CABLE = 5,
+	MLXSW_REG_PMAOS_ERROR_TYPE_HIGH_TEMP = 6,
+	/* Module / cable is shorted */
+	MLXSW_REG_PMAOS_ERROR_TYPE_BAD_CABLE = 7,
+};
+
+/* reg_pmaos_error_type
+ * Module error details. Only valid when operational status is "plugged with
+ * error".
+ * Access: RO
+ */
+MLXSW_ITEM32(reg, pmaos, error_type, 0x04, 8, 4);
 
 enum mlxsw_reg_pmaos_e {
 	MLXSW_REG_PMAOS_E_DO_NOT_GENERATE_EVENT,
