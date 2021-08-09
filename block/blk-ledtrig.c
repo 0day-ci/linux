@@ -13,6 +13,11 @@
 
 #include "blk-ledtrig.h"
 
+// Default blink_on & blink_off values
+#define BLK_LEDTRIG_BLINK_ON	75
+#define BLK_LEDTRIG_BLINK_OFF	25
+#define BLK_LEDTRIG_BLINK_MAX	10000		// 10 seconds
+
 
 /*
  *
@@ -247,4 +252,94 @@ led_show_exit_unlock:
 	mutex_unlock(&blk_ledtrig_mutex);
 led_show_exit_return:
 	return ret;
+}
+
+
+/*
+ *
+ *	Associate an LED with the blkdev trigger
+ *
+ */
+
+// Helper function to create <LED>/blkdevs subdirectory - doesn't
+// swallow error code like kobject_create_and_add()
+static int blk_ledtrig_subdir_create(struct blk_ledtrig_led *const bd_led,
+				     struct led_classdev *const led)
+{
+	int ret;
+
+	bd_led->dir = kobject_create();
+	if (bd_led->dir == NULL)
+		return -ENOMEM;
+
+	ret = kobject_add(bd_led->dir, &led->dev->kobj, "block_devices");
+	if (ret != 0)
+		kobject_put(bd_led->dir);
+
+	return ret;
+}
+
+static int blk_ledtrig_activate(struct led_classdev *const led)
+{
+	struct blk_ledtrig_led *bd_led;
+	int ret;
+
+	bd_led = kmalloc(sizeof(*bd_led), GFP_KERNEL);
+	if (bd_led == NULL) {
+		ret = -ENOMEM;
+		goto activate_exit_return;
+	}
+
+	bd_led->led = led;
+	bd_led->blink_on = BLK_LEDTRIG_BLINK_ON;
+	bd_led->blink_off = BLK_LEDTRIG_BLINK_OFF;
+	INIT_LIST_HEAD(&bd_led->dev_list);
+
+	ret = mutex_lock_interruptible(&blk_ledtrig_mutex);
+	if (ret != 0)
+		goto activate_exit_free;
+
+	ret = blk_ledtrig_subdir_create(bd_led, led);
+	if (ret != 0)
+		goto activate_exit_unlock;
+
+	list_add(&bd_led->leds_list_node, &blk_ledtrig_leds);
+	led_set_trigger_data(led, bd_led);
+	ret = 0;
+
+activate_exit_unlock:
+	mutex_unlock(&blk_ledtrig_mutex);
+activate_exit_free:
+	if (ret != 0)
+		kfree(bd_led);
+activate_exit_return:
+	return ret;
+}
+
+
+/*
+ *
+ *	Disassociate an LED from the blkdev trigger
+ *
+ */
+
+static void blk_ledtrig_deactivate(struct led_classdev *const led)
+{
+	struct blk_ledtrig_led *const bd_led = led_get_trigger_data(led);
+	struct gendisk *disk, *next;
+
+	mutex_lock(&blk_ledtrig_mutex);
+
+	list_for_each_entry_safe(disk, next,
+				 &bd_led->dev_list, led_dev_list_node) {
+
+		blk_ledtrig_dev_clear_locked(disk, bd_led);
+	}
+
+	list_del(&bd_led->leds_list_node);
+	kobject_put(bd_led->dir);
+
+	mutex_unlock(&blk_ledtrig_mutex);
+	synchronize_rcu();
+	kfree(bd_led);
 }
