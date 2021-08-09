@@ -124,8 +124,9 @@
 
 #define SO_BUF_LOCK              0x0051
 
-#if !defined(__KERNEL__)
+#define SO_TXREHASH_MODE	 0x0052
 
+#if !defined(__KERNEL__)
 
 #if __BITS_PER_LONG == 64
 #define SO_TIMESTAMP		SO_TIMESTAMP_OLD

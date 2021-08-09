@@ -1367,6 +1367,17 @@ set_sndbuf:
 					  ~SOCK_BUF_LOCK_MASK);
 		break;
 
+	case SO_TXREHASH_MODE:
+		if (val == SOCK_TXREHASH_MODE_DEFAULT ||
+		    (val & ~SOCK_TXREHASH_MODE_MASK)) {
+			ret = -EINVAL;
+			break;
+		}
+
+		sk->sk_txrehash_mode =  val;
+
+		break;
+
 	default:
 		ret = -ENOPROTOOPT;
 		break;
@@ -1731,6 +1742,10 @@ int sock_getsockopt(struct socket *sock, int level, int optname,
 
 	case SO_BUF_LOCK:
 		v.val = sk->sk_userlocks & SOCK_BUF_LOCK_MASK;
+		break;
+
+	case SO_TXREHASH_MODE:
+		v.val = sk->sk_txrehash_mode;
 		break;
 
 	default:
@@ -3158,6 +3173,7 @@ void sock_init_data(struct socket *sock, struct sock *sk)
 	sk->sk_pacing_rate = ~0UL;
 	WRITE_ONCE(sk->sk_pacing_shift, 10);
 	sk->sk_incoming_cpu = -1;
+	sk->sk_txrehash_mode = SOCK_TXREHASH_MODE_DEFAULT;
 
 	sk_rx_queue_clear(sk);
 	/*
