@@ -2883,8 +2883,12 @@ static void shrink_node(pg_data_t *pgdat, struct scan_control *sc)
 	struct lruvec *target_lruvec;
 	bool reclaimable = false;
 	unsigned long file;
+	struct mem_cgroup *memcg;
+	int swappiness;
 
 	target_lruvec = mem_cgroup_lruvec(sc->target_mem_cgroup, pgdat);
+	memcg = lruvec_memcg(target_lruvec);
+	swappiness = mem_cgroup_swappiness(memcg);
 
 again:
 	memset(&sc->nr, 0, sizeof(sc->nr));
@@ -2909,7 +2913,7 @@ again:
 
 		refaults = lruvec_page_state(target_lruvec,
 				WORKINGSET_ACTIVATE_ANON);
-		if (refaults != target_lruvec->refaults[0] ||
+		if ((swappiness && refaults != target_lruvec->refaults[0]) ||
 			inactive_is_low(target_lruvec, LRU_INACTIVE_ANON))
 			sc->may_deactivate |= DEACTIVATE_ANON;
 		else
