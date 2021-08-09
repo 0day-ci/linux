@@ -84,20 +84,6 @@ static void tpci200_set_mask(struct tpci200_board *tpci200,
 	spin_unlock_irqrestore(&tpci200->regs_lock, flags);
 }
 
-static void tpci200_unregister(struct tpci200_board *tpci200)
-{
-	free_irq(tpci200->info->pdev->irq, (void *) tpci200);
-
-	iounmap(tpci200->info->pdev, tpci200->info->interface_regs);
-
-	pci_release_region(tpci200->info->pdev, TPCI200_IP_INTERFACE_BAR);
-	pci_release_region(tpci200->info->pdev, TPCI200_IO_ID_INT_SPACES_BAR);
-	pci_release_region(tpci200->info->pdev, TPCI200_MEM16_SPACE_BAR);
-	pci_release_region(tpci200->info->pdev, TPCI200_MEM8_SPACE_BAR);
-
-	pci_disable_device(tpci200->info->pdev);
-}
-
 static void tpci200_enable_irq(struct tpci200_board *tpci200,
 			       int islot)
 {
@@ -234,6 +220,20 @@ static int tpci200_request_irq(struct ipack_device *dev,
 out_unlock:
 	mutex_unlock(&tpci200->mutex);
 	return res;
+}
+
+static void tpci200_unregister(struct tpci200_board *tpci200)
+{
+	free_irq(tpci200->info->pdev->irq, (void *) tpci200);
+
+	iounmap(tpci200->info->pdev, tpci200->info->interface_regs);
+
+	pci_release_region(tpci200->info->pdev, TPCI200_IP_INTERFACE_BAR);
+	pci_release_region(tpci200->info->pdev, TPCI200_IO_ID_INT_SPACES_BAR);
+	pci_release_region(tpci200->info->pdev, TPCI200_MEM16_SPACE_BAR);
+	pci_release_region(tpci200->info->pdev, TPCI200_MEM8_SPACE_BAR);
+
+	pci_disable_device(tpci200->info->pdev);
 }
 
 static int tpci200_register(struct tpci200_board *tpci200)
