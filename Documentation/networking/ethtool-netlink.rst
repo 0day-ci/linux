@@ -215,6 +215,7 @@ Userspace to kernel:
   ``ETHTOOL_MSG_PHC_VCLOCKS_GET``       get PHC virtual clocks info
   ``ETHTOOL_MSG_MODULE_SET``            set transceiver module parameters
   ``ETHTOOL_MSG_MODULE_GET``            get transceiver module parameters
+  ``ETHTOOL_MSG_MODULE_RESET_ACT``      action reset transceiver module
   ===================================== =================================
 
 Kernel to userspace:
@@ -255,6 +256,7 @@ Kernel to userspace:
   ``ETHTOOL_MSG_STATS_GET_REPLY``          standard statistics
   ``ETHTOOL_MSG_PHC_VCLOCKS_GET_REPLY``    PHC virtual clocks info
   ``ETHTOOL_MSG_MODULE_GET_REPLY``         transceiver module parameters
+  ``ETHTOOL_MSG_MODULE_RESET_NTF``         transceiver module reset
   ======================================== =================================
 
 ``GET`` requests are sent by userspace applications to retrieve device
@@ -1547,6 +1549,31 @@ For SFF-8636 modules, low power mode is forced by the host according to table
 For CMIS modules, low power mode is forced by the host according to table 6-12
 in revision 5.0 of the specification.
 
+MODULE_RESET_ACT
+================
+
+Resets the transceiver module to its initial state, as if it was just
+plugged-in. The Module State Machine (MSM) is reset to the "Reset" steady state
+and module's registers are reset to their default values.
+
+Action contents:
+
+  ======================================  ======  ==========================
+  ``ETHTOOL_A_MODULE_HEADER``             nested  request header
+  ======================================  ======  ==========================
+
+Upon a successful reset, a ``ETHTOOL_MSG_MODULE_RESET_NTF`` notification is
+sent to user space.
+
+To avoid changes to the operational state of the device, reset can only be
+performed when the device is administratively down.
+
+For SFF-8636 modules, reset can be implemented according to section 4.4.3 in
+revision 2.10a of the specification.
+
+For CMIS modules, reset can be implemented according to table 6-11 in revision
+5.0 of the specification.
+
 Request translation
 ===================
 
@@ -1648,4 +1675,5 @@ are netlink only.
   n/a                                 ``ETHTOOL_MSG_PHC_VCLOCKS_GET``
   n/a                                 ``ETHTOOL_MSG_MODULE_GET``
   n/a                                 ``ETHTOOL_MSG_MODULE_SET``
+  n/a                                 ``ETHTOOL_MSG_MODULE_RESET_ACT``
   =================================== =====================================

@@ -182,3 +182,83 @@ out_rtnl:
 	dev_put(dev);
 	return ret;
 }
+
+/* MODULE_RESET_ACT */
+
+const struct nla_policy ethnl_module_reset_act_policy[ETHTOOL_A_MODULE_HEADER + 1] = {
+	[ETHTOOL_A_MODULE_HEADER] = NLA_POLICY_NESTED(ethnl_header_policy),
+};
+
+static void ethnl_module_reset_done(struct net_device *dev)
+{
+	struct sk_buff *skb;
+	void *ehdr;
+	int ret;
+
+	skb = genlmsg_new(NLMSG_GOODSIZE, GFP_KERNEL);
+	if (!skb)
+		return;
+
+	ehdr = ethnl_bcastmsg_put(skb, ETHTOOL_MSG_MODULE_RESET_NTF);
+	if (!ehdr)
+		goto out;
+
+	ret = ethnl_fill_reply_header(skb, dev, ETHTOOL_A_MODULE_HEADER);
+	if (ret < 0)
+		goto out;
+
+	genlmsg_end(skb, ehdr);
+	ethnl_multicast(skb, dev);
+	return;
+
+out:
+	nlmsg_free(skb);
+}
+
+int ethnl_act_module_reset(struct sk_buff *skb, struct genl_info *info)
+{
+	struct ethnl_req_info req_info = {};
+	struct nlattr **tb = info->attrs;
+	const struct ethtool_ops *ops;
+	struct net_device *dev;
+	int ret;
+
+	ret = ethnl_parse_header_dev_get(&req_info,
+					 tb[ETHTOOL_A_MODULE_HEADER],
+					 genl_info_net(info), info->extack,
+					 true);
+	if (ret < 0)
+		return ret;
+
+	dev = req_info.dev;
+
+	rtnl_lock();
+	ops = dev->ethtool_ops;
+	if (!ops->reset_module) {
+		ret = -EOPNOTSUPP;
+		goto out_rtnl;
+	}
+
+	if (netif_running(dev)) {
+		NL_SET_ERR_MSG(info->extack,
+			       "Cannot reset module when port is administratively up");
+		ret = -EINVAL;
+		goto out_rtnl;
+	}
+
+	ret = ethnl_ops_begin(dev);
+	if (ret < 0)
+		goto out_rtnl;
+
+	ret = ops->reset_module(dev, info->extack);
+
+	ethnl_ops_complete(dev);
+
+	if (!ret)
+		ethnl_module_reset_done(dev);
+
+out_rtnl:
+	rtnl_unlock();
+	dev_put(dev);
+	return ret;
+}

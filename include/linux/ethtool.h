@@ -574,6 +574,7 @@ struct ethtool_module_eeprom {
  *	used by the network device.
  * @set_module_low_power: Set the low power mode status of the plug-in module
  *	used by the network device.
+ * @reset_module: Reset the plug-in module used by the network device.
  *
  * All operations are optional (i.e. the function pointer may be set
  * to %NULL) and callers must take this into account.  Callers must
@@ -698,6 +699,8 @@ struct ethtool_ops {
 					struct netlink_ext_ack *extack);
 	int	(*set_module_low_power)(struct net_device *dev, bool low_power,
 					struct netlink_ext_ack *extack);
+	int	(*reset_module)(struct net_device *dev,
+				struct netlink_ext_ack *extack);
 };
 
 int ethtool_check_ops(const struct ethtool_ops *ops);
