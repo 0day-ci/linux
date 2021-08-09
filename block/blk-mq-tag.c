@@ -652,3 +652,36 @@ u32 blk_mq_unique_tag(struct request *rq)
 		(rq->tag & BLK_MQ_UNIQUE_TAG_MASK);
 }
 EXPORT_SYMBOL(blk_mq_unique_tag);
+
+/**
+ * blk_mq_get_rq_by_tag - if the request that is represented by the tag is
+ * not idle, increment it's reference and then return it. Otherwise return
+ * NULL.
+ */
+struct request *blk_mq_get_rq_by_tag(struct blk_mq_tags *tags,
+				     unsigned int tag)
+{
+	unsigned long flags;
+	struct request *rq;
+
+	/* hold lock to prevent accessing freed request by tag */
+	spin_lock_irqsave(&tags->lock, flags);
+	rq = blk_mq_tag_to_rq(tags, tag);
+	if (!rq)
+		goto out_unlock;
+
+	if (!refcount_inc_not_zero(&rq->ref)) {
+		rq = NULL;
+		goto out_unlock;
+	}
+
+	if (!blk_mq_request_started(rq)) {
+		blk_mq_put_rq_ref(rq);
+		rq = NULL;
+	}
+
+out_unlock:
+	spin_unlock_irqrestore(&tags->lock, flags);
+	return rq;
+}
+EXPORT_SYMBOL(blk_mq_get_rq_by_tag);
