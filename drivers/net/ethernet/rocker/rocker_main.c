@@ -2717,6 +2717,7 @@ rocker_fdb_offload_notify(struct rocker_port *rocker_port,
 {
 	struct switchdev_notifier_fdb_info info;
 
+	memset(&info, 0, sizeof(info));
 	info.addr = recv_info->addr;
 	info.vid = recv_info->vid;
 	info.offloaded = true;

@@ -360,6 +360,7 @@ static void am65_cpsw_fdb_offload_notify(struct net_device *ndev,
 {
 	struct switchdev_notifier_fdb_info info;
 
+	memset(&info, 0, sizeof(info));
 	info.addr = rcv->addr;
 	info.vid = rcv->vid;
 	info.offloaded = true;

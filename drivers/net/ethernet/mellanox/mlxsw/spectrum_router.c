@@ -9086,6 +9086,7 @@ static void mlxsw_sp_rif_fid_fdb_del(struct mlxsw_sp_rif *rif, const char *mac)
 	if (!dev)
 		return;
 
+	memset(&info, 0, sizeof(info));
 	info.addr = mac;
 	info.vid = 0;
 	call_switchdev_notifiers(SWITCHDEV_FDB_DEL_TO_BRIDGE, dev, &info.info,
@@ -9137,6 +9138,7 @@ static void mlxsw_sp_rif_vlan_fdb_del(struct mlxsw_sp_rif *rif, const char *mac)
 	if (!dev)
 		return;
 
+	memset(&info, 0, sizeof(info));
 	info.addr = mac;
 	info.vid = vid;
 	call_switchdev_notifiers(SWITCHDEV_FDB_DEL_TO_BRIDGE, dev, &info.info,

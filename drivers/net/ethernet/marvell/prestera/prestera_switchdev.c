@@ -750,6 +750,7 @@ prestera_fdb_offload_notify(struct prestera_port *port,
 {
 	struct switchdev_notifier_fdb_info send_info;
 
+	memset(&send_info, 0, sizeof(send_info));
 	send_info.addr = info->addr;
 	send_info.vid = info->vid;
 	send_info.offloaded = true;
@@ -1146,6 +1147,7 @@ static void prestera_fdb_event(struct prestera_switch *sw,
 	if (!dev)
 		return;
 
+	memset(&info, 0, sizeof(info));
 	info.addr = evt->fdb_evt.data.mac;
 	info.vid = evt->fdb_evt.vid;
 	info.offloaded = true;

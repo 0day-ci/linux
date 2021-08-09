@@ -2510,6 +2510,7 @@ mlxsw_sp_fdb_call_notifiers(enum switchdev_notifier_type type,
 {
 	struct switchdev_notifier_fdb_info info;
 
+	memset(&info, 0, sizeof(info));
 	info.addr = mac;
 	info.vid = vid;
 	info.offloaded = offloaded;

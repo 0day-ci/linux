@@ -71,6 +71,7 @@ mlx5_esw_bridge_fdb_offload_notify(struct net_device *dev, const unsigned char *
 {
 	struct switchdev_notifier_fdb_info send_info;
 
+	memset(&send_info, 0, sizeof(send_info));
 	send_info.addr = addr;
 	send_info.vid = vid;
 	send_info.offloaded = true;

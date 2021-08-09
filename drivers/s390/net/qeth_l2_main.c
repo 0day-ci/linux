@@ -283,6 +283,7 @@ static void qeth_l2_dev2br_fdb_flush(struct qeth_card *card)
 
 	QETH_CARD_TEXT(card, 2, "fdbflush");
 
+	memset(&info, 0, sizeof(info));
 	info.addr = NULL;
 	/* flush all VLANs: */
 	info.vid = 0;
@@ -693,6 +694,7 @@ static void qeth_l2_dev2br_fdb_notify(struct qeth_card *card, u8 code,
 	if (qeth_is_my_net_if_token(card, token))
 		return;
 
+	memset(&info, 0, sizeof(info));
 	info.addr = ntfy_mac;
 	/* don't report VLAN IDs */
 	info.vid = 0;

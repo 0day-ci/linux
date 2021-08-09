@@ -1824,6 +1824,7 @@ static void ofdpa_port_fdb_learn_work(struct work_struct *work)
 	bool learned = (lw->flags & OFDPA_OP_FLAG_LEARNED);
 	struct switchdev_notifier_fdb_info info;
 
+	memset(&info, 0, sizeof(info));
 	info.addr = lw->addr;
 	info.vid = lw->vid;
 

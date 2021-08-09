@@ -2298,6 +2298,7 @@ dsa_fdb_offload_notify(struct dsa_switchdev_event_work *switchdev_work)
 	if (!dsa_is_user_port(ds, switchdev_work->port))
 		return;
 
+	memset(&info, 0, sizeof(info));
 	info.addr = switchdev_work->addr;
 	info.vid = switchdev_work->vid;
 	info.offloaded = true;
