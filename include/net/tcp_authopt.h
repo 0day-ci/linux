@@ -4,6 +4,8 @@
 
 #include <uapi/linux/tcp.h>
 
+struct tcp_authopt_alg_imp;
+
 /* Representation of a Master Key Tuple as per RFC5925 */
 struct tcp_authopt_key_info {
 	struct hlist_node node;
@@ -17,6 +19,7 @@ struct tcp_authopt_key_info {
 	u8 key[TCP_AUTHOPT_MAXKEYLEN];
 	struct rcu_head rcu;
 	struct sockaddr_storage addr;
+	struct tcp_authopt_alg_imp *alg;
 };
 
 /* Per-socket information regarding tcp_authopt */
