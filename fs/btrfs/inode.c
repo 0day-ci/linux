@@ -9308,6 +9308,10 @@ static int btrfs_getattr(struct user_namespace *mnt_userns,
 	case BTRFS_MANY_DEVS:
 		stat->dev = BTRFS_I(inode)->root->anon_dev;
 	}
+	if (request_mask & STATX_TREE_ID) {
+		stat->tree_id = BTRFS_I(inode)->root->root_key.objectid;
+		stat->result_mask |= STATX_TREE_ID;
+	}
 
 	spin_lock(&BTRFS_I(inode)->lock);
 	delalloc_bytes = BTRFS_I(inode)->new_delalloc_bytes;

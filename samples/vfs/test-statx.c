@@ -118,6 +118,8 @@ static void dump_statx(struct statx *stx)
 			break;
 		}
 	}
+	if (stx->stx_mask & STATX_TREE_ID)
+		printf(" Tree: %-12llu", (unsigned long long) stx->stx_tree_id);
 	printf("\n");
 
 	if (stx->stx_mask & STATX_MODE)
@@ -218,7 +220,7 @@ int main(int argc, char **argv)
 	struct statx stx;
 	int ret, raw = 0, atflag = AT_SYMLINK_NOFOLLOW;
 
-	unsigned int mask = STATX_BASIC_STATS | STATX_BTIME;
+	unsigned int mask = STATX_BASIC_STATS | STATX_BTIME | STATX_TREE_ID;
 
 	for (argv++; *argv; argv++) {
 		if (strcmp(*argv, "-F") == 0) {

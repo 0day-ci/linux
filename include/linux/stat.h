@@ -46,6 +46,19 @@ struct kstat {
 	struct timespec64 btime;			/* File creation time */
 	u64		blocks;
 	u64		mnt_id;
+	/* Treeid can be used to extend the inode number space.  Two inodes
+	 * with different 'tree_id' are different, even if 'ino' is the same
+	 * (though fs should make ino different as often as possible).
+	 * When tree_id is requested and STATX_TREE_ID is set in result_mask,
+	 * 'ino' MUST be unique across the filesystem.  Specifically, two
+	 * open files that report the same dev, ino, and tree_id MUST be
+	 * the same.
+	 * If a directory and an object in that directory have the same dev
+	 * and tree_id, they can be assumed to be in a meaningful tree, though
+	 * the meaning is subject to local interpretation.  The set of inodes
+	 * with a common tree_id is not required to be contiguous.
+	 */
+	u64		tree_id;
 };
 
 #endif

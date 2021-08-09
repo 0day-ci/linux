@@ -1482,7 +1482,7 @@ struct super_block {
 
 	unsigned int		s_max_links;
 	fmode_t			s_mode;
-
+	short			s_tree_id_bits;
 	/*
 	 * The next field is for VFS *only*. No filesystems have any business
 	 * even looking at it. You had been warned.
