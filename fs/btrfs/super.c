@@ -361,6 +361,7 @@ enum {
 	Opt_discard_mode,
 	Opt_inumbits,
 	Opt_norecovery,
+	Opt_numdevs,
 	Opt_ratio,
 	Opt_rescan_uuid_tree,
 	Opt_skip_balance,
@@ -431,6 +432,7 @@ static const match_table_t tokens = {
 	{Opt_inumbits, "inumbits=%u"},
 	{Opt_nodiscard, "nodiscard"},
 	{Opt_norecovery, "norecovery"},
+	{Opt_numdevs, "numdevs=%s"},
 	{Opt_ratio, "metadata_ratio=%u"},
 	{Opt_rescan_uuid_tree, "rescan_uuid_tree"},
 	{Opt_skip_balance, "skip_balance"},
@@ -849,7 +851,34 @@ int btrfs_parse_options(struct btrfs_fs_info *info, char *options,
 				ret = -EINVAL;
 				goto out;
 			}
+			if (intarg == 0 && info->num_devs == 1) {
+				btrfs_err(info,
+					  "inumbits=0 not permitted when numdevs=1");
+				ret = -EINVAL;
+				goto out;
+			}
 			info->inumbits = intarg;
+			break;
+		case Opt_numdevs:
+			if (info->num_devs) {
+				; /* silently ignore attempts to change this */
+			} else if (strcmp(args[0].from, "many") == 0) {
+				info->num_devs = BTRFS_MANY_DEVS;
+			} else if (strcmp(args[0].from, "1") == 0) {
+				if (info->inumbits == 0) {
+					btrfs_err(info,
+"numdevs=1 not permitted with inumbits=0");
+					ret = -EINVAL;
+				}
+				info->num_devs = 1;
+			} else if (strcmp(args[0].from, "2") == 0) {
+				info->num_devs = 2;
+			} else {
+				btrfs_err(info,
+					  "numdevs must be \"1\", \"2\", or \"many\".");
+				ret = -EINVAL;
+				goto out;
+			}
 			break;
 		case Opt_ratio:
 			ret = match_int(&args[0], &intarg);
@@ -1548,6 +1577,7 @@ static int btrfs_show_options(struct seq_file *seq, struct dentry *dentry)
 	if (btrfs_test_opt(info, REF_VERIFY))
 		seq_puts(seq, ",ref_verify");
 	seq_printf(seq, ",inumbits=%u", info->inumbits);
+	seq_printf(seq, ",numdevs=%u", info->num_devs);
 	seq_printf(seq, ",subvolid=%llu",
 		  BTRFS_I(d_inode(dentry))->root->root_key.objectid);
 	subvol_name = btrfs_get_subvol_name_from_objectid(info,

@@ -529,7 +529,8 @@ static noinline int create_subvol(struct inode *dir,
 	if (ret)
 		goto fail_free;
 
-	ret = get_anon_bdev(&anon_dev);
+	if (fs_info->num_devs == BTRFS_MANY_DEVS)
+		ret = get_anon_bdev(&anon_dev);
 	if (ret < 0)
 		goto fail_free;
 
@@ -736,7 +737,8 @@ static int create_snapshot(struct btrfs_root *root, struct inode *dir,
 	if (!pending_snapshot)
 		return -ENOMEM;
 
-	ret = get_anon_bdev(&pending_snapshot->anon_dev);
+	if (fs_info->num_devs == BTRFS_MANY_DEVS)
+		ret = get_anon_bdev(&pending_snapshot->anon_dev);
 	if (ret < 0)
 		goto free_pending;
 	pending_snapshot->root_item = kzalloc(sizeof(struct btrfs_root_item),

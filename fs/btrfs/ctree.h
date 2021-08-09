@@ -989,6 +989,14 @@ struct btrfs_fs_info {
 	u32 stripesize;
 
 	unsigned short inumbits;
+	/* num_devs can be:
+	 * 1 - all files in all trees use sb->s_dev
+	 * 2 - file trees alternate between using sb->s_dev and
+	 *     secondary_anon_dev.
+	 * 3 (BTTSF_MANY_DEVS) - Each subtree uses a unique ->anon_dev
+	 */
+	unsigned short num_devs;
+	dev_t secondary_anon_dev;
 
 	/* Block groups and devices containing active swapfiles. */
 	spinlock_t swapfile_pins_lock;
@@ -1033,6 +1041,8 @@ struct btrfs_fs_info {
 	struct list_head allocated_ebs;
 #endif
 };
+
+#define BTRFS_MANY_DEVS	(3)
 
 static inline struct btrfs_fs_info *btrfs_sb(struct super_block *sb)
 {
@@ -1175,10 +1185,13 @@ struct btrfs_root {
 	 */
 	struct radix_tree_root delayed_nodes_tree;
 	/*
-	 * right now this just gets used so that a root has its own devid
-	 * for stat.  It may be used for more later
+	 * If fs_info->num_devs == 3 (BTRFS_MANY_DEVS) anon_dev holds a device
+	 * number to be reported by ->getattr().
+	 * If fs_info->num_devs == 2, anon_dev is 0 and use_secondary_dev
+	 * is true when this root uses the secondary, not primary, dev.
 	 */
 	dev_t anon_dev;
+	bool use_secondary_dev;
 
 	spinlock_t root_item_lock;
 	refcount_t refs;

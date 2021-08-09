@@ -6018,6 +6018,8 @@ struct inode *btrfs_lookup_dentry(struct inode *dir, struct dentry *dentry)
 			iput(inode);
 			inode = ERR_PTR(ret);
 		}
+		if (fs_info->num_devs == 2)
+			sub_root->use_secondary_dev = !root->use_secondary_dev;
 	}
 
 	return inode;
@@ -9297,7 +9299,15 @@ static int btrfs_getattr(struct user_namespace *mnt_userns,
 				  STATX_ATTR_NODUMP);
 
 	generic_fillattr(&init_user_ns, inode, stat);
-	stat->dev = BTRFS_I(inode)->root->anon_dev;
+	/* If we don't set stat->dev here, sb->s_dev will be used */
+	switch (btrfs_sb(inode->i_sb)->num_devs) {
+	case 2:
+		if (BTRFS_I(inode)->root->use_secondary_dev)
+			stat->dev = btrfs_sb(inode->i_sb)->secondary_anon_dev;
+		break;
+	case BTRFS_MANY_DEVS:
+		stat->dev = BTRFS_I(inode)->root->anon_dev;
+	}
 
 	spin_lock(&BTRFS_I(inode)->lock);
 	delalloc_bytes = BTRFS_I(inode)->new_delalloc_bytes;
@@ -9500,6 +9510,15 @@ static int btrfs_rename_exchange(struct inode *old_dir,
 	if (new_inode->i_nlink == 1)
 		BTRFS_I(new_inode)->dir_index = new_idx;
 
+	if (fs_info->num_devs == 2 &&
+	    root->use_secondary_dev != dest->use_secondary_dev) {
+		BTRFS_I(old_inode)->root->use_secondary_dev =
+				!dest->use_secondary_dev;
+		BTRFS_I(new_inode)->root->use_secondary_dev =
+				!root->use_secondary_dev;
+		// FIXME any subvols beneeath 'old_inode' or 'new_inode'
+		// that are in cache are now wrong.
+	}
 	if (root_log_pinned) {
 		btrfs_log_new_name(trans, BTRFS_I(old_inode), BTRFS_I(old_dir),
 				   new_dentry->d_parent);
@@ -9781,6 +9800,14 @@ static int btrfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 	if (ret) {
 		btrfs_abort_transaction(trans, ret);
 		goto out_fail;
+	}
+
+	if (fs_info->num_devs == 2 &&
+	    root->use_secondary_dev != dest->use_secondary_dev) {
+		BTRFS_I(old_inode)->root->use_secondary_dev =
+				!dest->use_secondary_dev;
+		// FIXME any subvols beneeath 'old_inode' that are
+		// in cache are now wrong.
 	}
 
 	if (old_inode->i_nlink == 1)

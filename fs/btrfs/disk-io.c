@@ -1519,7 +1519,8 @@ static int btrfs_init_fs_root(struct btrfs_root *root, dev_t anon_dev)
 	 * userspace, the id pool is limited to 1M
 	 */
 	if (is_fstree(root->root_key.objectid) &&
-	    btrfs_root_refs(&root->root_item) > 0) {
+	    btrfs_root_refs(&root->root_item) > 0 &&
+	    root->fs_info->num_devs == BTRFS_MANY_DEVS) {
 		if (!anon_dev) {
 			ret = get_anon_bdev(&root->anon_dev);
 			if (ret)
@@ -3334,8 +3335,12 @@ int __cold open_ctree(struct super_block *sb, struct btrfs_fs_devices *fs_device
 	 * "-o inumbits" can over-ride this default.
 	 * BITS_PER_LONG * 7 / 8 is a good value to use
 	 */
-	if (fs_info->inumbits > BITS_PER_LONG)
-		fs_info->inumbits = 0;
+	if (fs_info->inumbits > BITS_PER_LONG) {
+		if (fs_info->num_devs == 1)
+			fs_info->inumbits = BITS_PER_LONG * 7 / 8;
+		else
+			fs_info->inumbits = 0;
+	}
 
 	features = btrfs_super_incompat_flags(disk_super) &
 		~BTRFS_FEATURE_INCOMPAT_SUPP;
@@ -3381,6 +3386,15 @@ int __cold open_ctree(struct super_block *sb, struct btrfs_fs_devices *fs_device
 	fs_info->csums_per_leaf = BTRFS_MAX_ITEM_SIZE(fs_info) / fs_info->csum_size;
 	fs_info->stripesize = stripesize;
 
+	if (fs_info->num_devs == 0)
+		/* set default value */
+		fs_info->num_devs = BTRFS_MANY_DEVS;
+
+	if (fs_info->num_devs == 2) {
+		err = get_anon_bdev(&fs_info->secondary_anon_dev);
+		if (err)
+			goto fail_alloc;
+	}
 	/*
 	 * mixed block groups end up with duplicate but slightly offset
 	 * extent buffers for the same range.  It leads to corruptions
@@ -4452,6 +4466,10 @@ void __cold close_ctree(struct btrfs_fs_info *fs_info)
 
 	btrfs_mapping_tree_free(&fs_info->mapping_tree);
 	btrfs_close_devices(fs_info->fs_devices);
+
+	if (fs_info->secondary_anon_dev)
+		free_anon_bdev(fs_info->secondary_anon_dev);
+	fs_info->secondary_anon_dev = 0;
 }
 
 int btrfs_buffer_uptodate(struct extent_buffer *buf, u64 parent_transid,
