@@ -16,7 +16,7 @@ MODULE_AUTHOR("Netfilter Core Team <coreteam@netfilter.org>");
 MODULE_DESCRIPTION("Xtables: automatic-address SNAT");
 
 /* FIXME: Multiple targets. --RR */
-static int masquerade_tg_check(const struct xt_tgchk_param *par)
+static int masquerade_tg_check_v0(const struct xt_tgchk_param *par)
 {
 	const struct nf_nat_ipv4_multi_range_compat *mr = par->targinfo;
 
@@ -31,8 +31,19 @@ static int masquerade_tg_check(const struct xt_tgchk_param *par)
 	return nf_ct_netns_get(par->net, par->family);
 }
 
+static int masquerade_tg_check_v1(const struct xt_tgchk_param *par)
+{
+	const struct nf_nat_range2 *range = par->targinfo;
+
+	if (range->flags & NF_NAT_RANGE_MAP_IPS) {
+		pr_debug("bad MAP_IPS.\n");
+		return -EINVAL;
+	}
+	return nf_ct_netns_get(par->net, par->family);
+}
+
 static unsigned int
-masquerade_tg(struct sk_buff *skb, const struct xt_action_param *par)
+masquerade_tg_v0(struct sk_buff *skb, const struct xt_action_param *par)
 {
 	struct nf_nat_range2 range;
 	const struct nf_nat_ipv4_multi_range_compat *mr;
@@ -43,6 +54,15 @@ masquerade_tg(struct sk_buff *skb, const struct xt_action_param *par)
 	range.max_proto = mr->range[0].max;
 
 	return nf_nat_masquerade_ipv4(skb, xt_hooknum(par), &range,
+				      xt_out(par));
+}
+
+static unsigned int
+masquerade_tg_v1(struct sk_buff *skb, const struct xt_action_param *par)
+{
+	const struct nf_nat_range2 *range = par->targinfo;
+
+	return nf_nat_masquerade_ipv4(skb, xt_hooknum(par), range,
 				      xt_out(par));
 }
 
@@ -73,6 +93,7 @@ static struct xt_target masquerade_tg_reg[] __read_mostly = {
 	{
 #if IS_ENABLED(CONFIG_IPV6)
 		.name		= "MASQUERADE",
+		.revision	= 0,
 		.family		= NFPROTO_IPV6,
 		.target		= masquerade_tg6,
 		.targetsize	= sizeof(struct nf_nat_range),
@@ -84,15 +105,28 @@ static struct xt_target masquerade_tg_reg[] __read_mostly = {
 	}, {
 #endif
 		.name		= "MASQUERADE",
+		.revision	= 0,
 		.family		= NFPROTO_IPV4,
-		.target		= masquerade_tg,
+		.target		= masquerade_tg_v0,
 		.targetsize	= sizeof(struct nf_nat_ipv4_multi_range_compat),
 		.table		= "nat",
 		.hooks		= 1 << NF_INET_POST_ROUTING,
-		.checkentry	= masquerade_tg_check,
+		.checkentry	= masquerade_tg_check_v0,
 		.destroy	= masquerade_tg_destroy,
 		.me		= THIS_MODULE,
-	}
+	},
+	{
+		.name		= "MASQUERADE",
+		.revision	= 1,
+		.family		= NFPROTO_IPV4,
+		.target		= masquerade_tg_v1,
+		.targetsize	= sizeof(struct nf_nat_range2),
+		.table		= "nat",
+		.hooks		= 1 << NF_INET_POST_ROUTING,
+		.checkentry	= masquerade_tg_check_v1,
+		.destroy	= masquerade_tg_destroy,
+		.me		= THIS_MODULE,
+	},
 };
 
 static int __init masquerade_tg_init(void)
