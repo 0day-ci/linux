@@ -234,6 +234,7 @@ static int tcp_write_timeout(struct sock *sk)
 	struct tcp_sock *tp = tcp_sk(sk);
 	struct net *net = sock_net(sk);
 	bool expired = false, do_reset;
+	unsigned int rehash_mode;
 	int retry_until;
 
 	if ((1 << sk->sk_state) & (TCPF_SYN_SENT | TCPF_SYN_RECV)) {
@@ -241,6 +242,7 @@ static int tcp_write_timeout(struct sock *sk)
 			__dst_negative_advice(sk);
 		retry_until = icsk->icsk_syn_retries ? : net->ipv4.sysctl_tcp_syn_retries;
 		expired = icsk->icsk_retransmits >= retry_until;
+		rehash_mode = SOCK_TXREHASH_MODE_SYN_RTO;
 	} else {
 		if (retransmits_timed_out(sk, net->ipv4.sysctl_tcp_retries1, 0)) {
 			/* Black hole detection */
@@ -260,6 +262,7 @@ static int tcp_write_timeout(struct sock *sk)
 			if (tcp_out_of_resources(sk, do_reset))
 				return 1;
 		}
+		rehash_mode = SOCK_TXREHASH_MODE_RTO;
 	}
 	if (!expired)
 		expired = retransmits_timed_out(sk, retry_until,
@@ -277,7 +280,7 @@ static int tcp_write_timeout(struct sock *sk)
 		return 1;
 	}
 
-	if (sk_rethink_txhash(sk)) {
+	if (sk_rethink_txhash(sk, rehash_mode)) {
 		tp->timeout_rehash++;
 		__NET_INC_STATS(sock_net(sk), LINUX_MIB_TCPTIMEOUTREHASH);
 	}

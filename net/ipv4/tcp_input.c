@@ -4442,7 +4442,7 @@ static void tcp_rcv_spurious_retrans(struct sock *sk, const struct sk_buff *skb)
 	 * DSACK state and change the txhash to re-route speculatively.
 	 */
 	if (TCP_SKB_CB(skb)->seq == tcp_sk(sk)->duplicate_sack[0].start_seq &&
-	    sk_rethink_txhash(sk))
+	    sk_rethink_txhash(sk, SOCK_TXREHASH_MODE_RTO))
 		NET_INC_STATS(sock_net(sk), LINUX_MIB_TCPDUPLICATEDATAREHASH);
 }
 

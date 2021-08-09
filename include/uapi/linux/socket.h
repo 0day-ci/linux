@@ -31,4 +31,17 @@ struct __kernel_sockaddr_storage {
 
 #define SOCK_BUF_LOCK_MASK (SOCK_SNDBUF_LOCK | SOCK_RCVBUF_LOCK)
 
+#define SOCK_TXREHASH_MODE_DISABLE	0
+
+/* Flag bits for individual rehash function modes */
+#define SOCK_TXREHASH_MODE_NEG_ADVICE	0x1
+#define SOCK_TXREHASH_MODE_SYN_RTO	0x2
+#define SOCK_TXREHASH_MODE_RTO		0x4
+
+#define SOCK_TXREHASH_MODE_DEFAULT	-1U
+
+#define SOCK_TXREHASH_MODE_MASK	(SOCK_TXREHASH_MODE_NEG_ADVICE |	\
+				 SOCK_TXREHASH_MODE_SYN_RTO |		\
+				 SOCK_TXREHASH_MODE_RTO)
+
 #endif /* _UAPI_LINUX_SOCKET_H */

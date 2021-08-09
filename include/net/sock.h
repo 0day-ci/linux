@@ -577,6 +577,12 @@ static inline bool sk_user_data_is_nocopy(const struct sock *sk)
 			   __tmp | SK_USER_DATA_NOCOPY);		\
 })
 
+static inline
+struct net *sock_net(const struct sock *sk)
+{
+	return read_pnet(&sk->sk_net);
+}
+
 /*
  * SK_CAN_REUSE and SK_NO_REUSE on a socket mean that the socket is OK
  * or not whether his port will be reused by someone else. SK_FORCE_REUSE
@@ -1940,12 +1946,20 @@ static inline void sk_set_txhash(struct sock *sk)
 	WRITE_ONCE(sk->sk_txhash, net_tx_rndhash());
 }
 
-static inline bool sk_rethink_txhash(struct sock *sk)
+static inline bool sk_rethink_txhash(struct sock *sk, unsigned int level)
 {
-	if (sk->sk_txhash) {
+	unsigned int rehash_mode;
+
+	if (!sk->sk_txhash)
+		return false;
+
+	rehash_mode = READ_ONCE(sock_net(sk)->core.sysctl_txrehash_mode);
+
+	if (level & rehash_mode) {
 		sk_set_txhash(sk);
 		return true;
 	}
+
 	return false;
 }
 
@@ -1986,7 +2000,7 @@ static inline void __dst_negative_advice(struct sock *sk)
 
 static inline void dst_negative_advice(struct sock *sk)
 {
-	sk_rethink_txhash(sk);
+	sk_rethink_txhash(sk, SOCK_TXREHASH_MODE_NEG_ADVICE);
 	__dst_negative_advice(sk);
 }
 
@@ -2589,12 +2603,6 @@ static inline void sk_eat_skb(struct sock *sk, struct sk_buff *skb)
 		return;
 	}
 	__kfree_skb(skb);
-}
-
-static inline
-struct net *sock_net(const struct sock *sk)
-{
-	return read_pnet(&sk->sk_net);
 }
 
 static inline
