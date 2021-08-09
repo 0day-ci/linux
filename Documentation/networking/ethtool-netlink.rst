@@ -179,7 +179,7 @@ according to message purpose:
 
 Userspace to kernel:
 
-  ===================================== ================================
+  ===================================== =================================
   ``ETHTOOL_MSG_STRSET_GET``            get string set
   ``ETHTOOL_MSG_LINKINFO_GET``          get link settings
   ``ETHTOOL_MSG_LINKINFO_SET``          set link settings
@@ -213,7 +213,9 @@ Userspace to kernel:
   ``ETHTOOL_MSG_MODULE_EEPROM_GET``     read SFP module EEPROM
   ``ETHTOOL_MSG_STATS_GET``             get standard statistics
   ``ETHTOOL_MSG_PHC_VCLOCKS_GET``       get PHC virtual clocks info
-  ===================================== ================================
+  ``ETHTOOL_MSG_MODULE_SET``            set transceiver module parameters
+  ``ETHTOOL_MSG_MODULE_GET``            get transceiver module parameters
+  ===================================== =================================
 
 Kernel to userspace:
 
@@ -252,6 +254,7 @@ Kernel to userspace:
   ``ETHTOOL_MSG_MODULE_EEPROM_GET_REPLY``  read SFP module EEPROM
   ``ETHTOOL_MSG_STATS_GET_REPLY``          standard statistics
   ``ETHTOOL_MSG_PHC_VCLOCKS_GET_REPLY``    PHC virtual clocks info
+  ``ETHTOOL_MSG_MODULE_GET_REPLY``         transceiver module parameters
   ======================================== =================================
 
 ``GET`` requests are sent by userspace applications to retrieve device
@@ -1498,6 +1501,52 @@ Kernel response contents:
   ``ETHTOOL_A_PHC_VCLOCKS_INDEX``       s32     PHC index array
   ====================================  ======  ==========================
 
+MODULE_GET
+==========
+
+Gets transceiver module parameters.
+
+Request contents:
+
+  =====================================  ======  ==========================
+  ``ETHTOOL_A_MODULE_HEADER``            nested  request header
+  =====================================  ======  ==========================
+
+Kernel response contents:
+
+  ======================================  ======  ==========================
+  ``ETHTOOL_A_MODULE_HEADER``             nested  reply header
+  ``ETHTOOL_A_MODULE_LOW_POWER_ENABLED``  bool    low power mode is enabled
+  ======================================  ======  ==========================
+
+The optional ``ETHTOOL_A_MODULE_LOW_POWER_ENABLED`` attribute encodes whether
+low power mode is forced by the host.
+
+MODULE_SET
+==========
+
+Sets transceiver module parameters.
+
+Request contents:
+
+  ======================================  ======  ==========================
+  ``ETHTOOL_A_MODULE_HEADER``             nested  request header
+  ``ETHTOOL_A_MODULE_LOW_POWER_ENABLED``  bool    low power mode is enabled
+  ======================================  ======  ==========================
+
+When set, the optional ``ETHTOOL_A_MODULE_LOW_POWER_ENABLED`` attribute is used
+to force the module to stay in low power mode or force it back into low power
+mode. When cleared, capable modules can transition to high power mode.
+
+To avoid changes to the operational state of the device, low power mode can
+only be set when the device is administratively down.
+
+For SFF-8636 modules, low power mode is forced by the host according to table
+6-10 in revision 2.10a of the specification.
+
+For CMIS modules, low power mode is forced by the host according to table 6-12
+in revision 5.0 of the specification.
+
 Request translation
 ===================
 
@@ -1597,4 +1646,6 @@ are netlink only.
   n/a                                 ``ETHTOOL_MSG_CABLE_TEST_TDR_ACT``
   n/a                                 ``ETHTOOL_MSG_TUNNEL_INFO_GET``
   n/a                                 ``ETHTOOL_MSG_PHC_VCLOCKS_GET``
+  n/a                                 ``ETHTOOL_MSG_MODULE_GET``
+  n/a                                 ``ETHTOOL_MSG_MODULE_SET``
   =================================== =====================================

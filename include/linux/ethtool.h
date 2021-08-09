@@ -570,6 +570,10 @@ struct ethtool_module_eeprom {
  * @get_eth_ctrl_stats: Query some of the IEEE 802.3 MAC Ctrl statistics.
  * @get_rmon_stats: Query some of the RMON (RFC 2819) statistics.
  *	Set %ranges to a pointer to zero-terminated array of byte ranges.
+ * @get_module_low_power: Get the low power mode status of the plug-in module
+ *	used by the network device.
+ * @set_module_low_power: Set the low power mode status of the plug-in module
+ *	used by the network device.
  *
  * All operations are optional (i.e. the function pointer may be set
  * to %NULL) and callers must take this into account.  Callers must
@@ -689,6 +693,11 @@ struct ethtool_ops {
 	void	(*get_rmon_stats)(struct net_device *dev,
 				  struct ethtool_rmon_stats *rmon_stats,
 				  const struct ethtool_rmon_hist_range **ranges);
+	int	(*get_module_low_power)(struct net_device *dev,
+					bool *p_low_power,
+					struct netlink_ext_ack *extack);
+	int	(*set_module_low_power)(struct net_device *dev, bool low_power,
+					struct netlink_ext_ack *extack);
 };
 
 int ethtool_check_ops(const struct ethtool_ops *ops);
