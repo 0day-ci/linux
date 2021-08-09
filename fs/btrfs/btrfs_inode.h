@@ -255,13 +255,6 @@ static inline unsigned long btrfs_inode_hash(u64 objectid,
 	return (unsigned long)h;
 }
 
-static inline void btrfs_insert_inode_hash(struct inode *inode)
-{
-	unsigned long h = btrfs_inode_hash(inode->i_ino, BTRFS_I(inode)->root);
-
-	__insert_inode_hash(inode, h);
-}
-
 static inline u64 btrfs_ino(const struct btrfs_inode *inode)
 {
 	u64 ino = inode->location.objectid;
@@ -270,9 +263,22 @@ static inline u64 btrfs_ino(const struct btrfs_inode *inode)
 	 * !ino: btree_inode
 	 * type == BTRFS_ROOT_ITEM_KEY: subvol dir
 	 */
-	if (!ino || inode->location.type == BTRFS_ROOT_ITEM_KEY)
+	if (!ino || inode->location.type == BTRFS_ROOT_ITEM_KEY) {
+		/* vfs_inode.i_ino has inum_overlay merged in, when
+		 * that wouldn't produce zero. We need to remove it here.
+		 */
 		ino = inode->vfs_inode.i_ino;
+		if (ino != inode->root->inum_overlay)
+			ino ^= inode->root->inum_overlay;
+	}
 	return ino;
+}
+
+static inline void btrfs_insert_inode_hash(struct inode *inode)
+{
+	unsigned long h = btrfs_inode_hash(btrfs_ino(BTRFS_I(inode)), BTRFS_I(inode)->root);
+
+	__insert_inode_hash(inode, h);
 }
 
 static inline void btrfs_i_size_write(struct btrfs_inode *inode, u64 size)

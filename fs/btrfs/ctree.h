@@ -988,6 +988,8 @@ struct btrfs_fs_info {
 	u32 csums_per_leaf;
 	u32 stripesize;
 
+	unsigned short inumbits;
+
 	/* Block groups and devices containing active swapfiles. */
 	spinlock_t swapfile_pins_lock;
 	struct rb_root swapfile_pins;
@@ -1143,6 +1145,8 @@ struct btrfs_root {
 	pid_t log_start_pid;
 
 	u64 last_trans;
+
+	u64 inum_overlay;
 
 	u32 type;
 

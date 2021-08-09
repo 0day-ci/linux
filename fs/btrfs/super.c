@@ -359,6 +359,7 @@ enum {
 	Opt_defrag, Opt_nodefrag,
 	Opt_discard, Opt_nodiscard,
 	Opt_discard_mode,
+	Opt_inumbits,
 	Opt_norecovery,
 	Opt_ratio,
 	Opt_rescan_uuid_tree,
@@ -427,6 +428,7 @@ static const match_table_t tokens = {
 	{Opt_nodefrag, "noautodefrag"},
 	{Opt_discard, "discard"},
 	{Opt_discard_mode, "discard=%s"},
+	{Opt_inumbits, "inumbits=%u"},
 	{Opt_nodiscard, "nodiscard"},
 	{Opt_norecovery, "norecovery"},
 	{Opt_ratio, "metadata_ratio=%u"},
@@ -829,6 +831,25 @@ int btrfs_parse_options(struct btrfs_fs_info *info, char *options,
 		case Opt_noflushoncommit:
 			btrfs_clear_and_info(info, FLUSHONCOMMIT,
 					     "turning off flush-on-commit");
+			break;
+		case Opt_inumbits:
+			if (info->inumbits <= BITS_PER_LONG)
+				/* silently ignore subsequent change
+				 * e.g. on remount
+				 */
+				break;
+			ret = match_int(&args[0], &intarg);
+			if (ret)
+				goto out;
+			if (intarg > BITS_PER_LONG ||
+			    (intarg && intarg < BITS_PER_LONG / 2)) {
+				btrfs_err(info,
+					  "inumbits must be 0 or in range [%d..%d]",
+					  BITS_PER_LONG/2, BITS_PER_LONG);
+				ret = -EINVAL;
+				goto out;
+			}
+			info->inumbits = intarg;
 			break;
 		case Opt_ratio:
 			ret = match_int(&args[0], &intarg);
@@ -1526,6 +1547,7 @@ static int btrfs_show_options(struct seq_file *seq, struct dentry *dentry)
 #endif
 	if (btrfs_test_opt(info, REF_VERIFY))
 		seq_puts(seq, ",ref_verify");
+	seq_printf(seq, ",inumbits=%u", info->inumbits);
 	seq_printf(seq, ",subvolid=%llu",
 		  BTRFS_I(d_inode(dentry))->root->root_key.objectid);
 	subvol_name = btrfs_get_subvol_name_from_objectid(info,
@@ -1559,7 +1581,7 @@ static int btrfs_set_super(struct super_block *s, void *data)
  */
 static inline int is_subvolume_inode(struct inode *inode)
 {
-	if (inode && inode->i_ino == BTRFS_FIRST_FREE_OBJECTID)
+	if (inode && btrfs_ino(BTRFS_I(inode)) == BTRFS_FIRST_FREE_OBJECTID)
 		return 1;
 	return 0;
 }

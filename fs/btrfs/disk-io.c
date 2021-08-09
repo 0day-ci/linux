@@ -1205,6 +1205,12 @@ static void __setup_root(struct btrfs_root *root, struct btrfs_fs_info *fs_info,
 	memset(&root->defrag_progress, 0, sizeof(root->defrag_progress));
 	root->root_key.objectid = objectid;
 	root->anon_dev = 0;
+	if (fs_info->inumbits &&
+	    objectid != BTRFS_FS_TREE_OBJECTID &&
+	    is_fstree(objectid))
+		root->inum_overlay = swab64(objectid) >> (64 - fs_info->inumbits);
+	else
+		root->inum_overlay = 0;
 
 	spin_lock_init(&root->root_item_lock);
 	btrfs_qgroup_init_swapped_blocks(&root->swapped_blocks);
@@ -3316,11 +3322,20 @@ int __cold open_ctree(struct super_block *sb, struct btrfs_fs_devices *fs_device
 	 */
 	fs_info->compress_type = BTRFS_COMPRESS_ZLIB;
 
+	fs_info->inumbits = BITS_PER_LONG + 1; /* impossible value */
+
 	ret = btrfs_parse_options(fs_info, options, sb->s_flags);
 	if (ret) {
 		err = ret;
 		goto fail_alloc;
 	}
+
+	/* By default, use inumbits=0 to avoid behaviour change.
+	 * "-o inumbits" can over-ride this default.
+	 * BITS_PER_LONG * 7 / 8 is a good value to use
+	 */
+	if (fs_info->inumbits > BITS_PER_LONG)
+		fs_info->inumbits = 0;
 
 	features = btrfs_super_incompat_flags(disk_super) &
 		~BTRFS_FEATURE_INCOMPAT_SUPP;

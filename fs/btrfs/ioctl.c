@@ -914,7 +914,7 @@ static noinline int btrfs_mksubvol(const struct path *parent,
 	 * check for them now when we can safely fail
 	 */
 	error = btrfs_check_dir_item_collision(BTRFS_I(dir)->root,
-					       dir->i_ino, name,
+					       btrfs_ino(BTRFS_I(dir)), name,
 					       namelen);
 	if (error)
 		goto out_dput;

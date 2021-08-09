@@ -5834,6 +5834,11 @@ static int btrfs_init_locked_inode(struct inode *inode, void *p)
 	struct btrfs_iget_args *args = p;
 
 	inode->i_ino = args->ino;
+	if (args->root && args->ino != args->root->inum_overlay)
+		/* This inode number will still be unique within this
+		 * 'root', and should be nearly unique across the filesystem.
+		 */
+		inode->i_ino ^= args->root->inum_overlay;
 	BTRFS_I(inode)->location.objectid = args->ino;
 	BTRFS_I(inode)->location.type = BTRFS_INODE_ITEM_KEY;
 	BTRFS_I(inode)->location.offset = 0;
@@ -6144,6 +6149,7 @@ again:
 
 	while (1) {
 		struct dir_entry *entry;
+		u64 inum;
 
 		leaf = path->nodes[0];
 		slot = path->slots[0];
@@ -6188,7 +6194,10 @@ again:
 		put_unaligned(fs_ftype_to_dtype(btrfs_dir_type(leaf, di)),
 				&entry->type);
 		btrfs_dir_item_key_to_cpu(leaf, di, &location);
-		put_unaligned(location.objectid, &entry->ino);
+		inum = location.objectid;
+		if (inum != root->inum_overlay)
+			inum ^= root->inum_overlay;
+		put_unaligned(inum, &entry->ino);
 		put_unaligned(found_key.offset, &entry->offset);
 		entries++;
 		addr += sizeof(struct dir_entry) + name_len;
@@ -6385,7 +6394,7 @@ static int btrfs_insert_inode_locked(struct inode *inode)
 	args.root = BTRFS_I(inode)->root;
 
 	return insert_inode_locked4(inode,
-		   btrfs_inode_hash(inode->i_ino, BTRFS_I(inode)->root),
+		   btrfs_inode_hash(btrfs_ino(BTRFS_I(inode)), BTRFS_I(inode)->root),
 		   btrfs_find_actor, &args);
 }
 
@@ -6464,6 +6473,8 @@ static struct inode *btrfs_new_inode(struct btrfs_trans_handle *trans,
 	 * number if we fail afterwards in this function.
 	 */
 	inode->i_ino = objectid;
+	if (objectid != root->inum_overlay)
+		inode->i_ino ^= root->inum_overlay;
 
 	if (dir && name) {
 		trace_btrfs_inode_request(dir);
@@ -9625,7 +9636,7 @@ static int btrfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 
 
 	/* check for collisions, even if the  name isn't there */
-	ret = btrfs_check_dir_item_collision(dest, new_dir->i_ino,
+	ret = btrfs_check_dir_item_collision(dest, btrfs_ino(BTRFS_I(new_dir)),
 			     new_dentry->d_name.name,
 			     new_dentry->d_name.len);
 
