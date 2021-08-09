@@ -31,7 +31,8 @@ static int adxl355_i2c_probe(struct i2c_client *client)
 		return PTR_ERR(regmap);
 	}
 
-	return adxl355_core_probe(&client->dev, regmap, client->name);
+	return adxl355_core_probe(&client->dev, regmap, client->name,
+				  client->irq);
 }
 
 static const struct i2c_device_id adxl355_i2c_id[] = {
