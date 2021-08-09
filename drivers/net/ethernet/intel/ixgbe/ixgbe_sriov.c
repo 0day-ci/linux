@@ -206,8 +206,12 @@ int ixgbe_disable_sriov(struct ixgbe_adapter *adapter)
 	unsigned int num_vfs = adapter->num_vfs, vf;
 	int rss;
 
+	while (test_and_set_bit(__IXGBE_DISABLING_VFS, &adapter->state))
+		usleep_range(1000, 2000);
+
 	/* set num VFs to 0 to prevent access to vfinfo */
 	adapter->num_vfs = 0;
+	clear_bit(__IXGBE_DISABLING_VFS, &adapter->state);
 
 	/* put the reference to all of the vf devices */
 	for (vf = 0; vf < num_vfs; ++vf) {
@@ -1307,6 +1311,9 @@ void ixgbe_msg_task(struct ixgbe_adapter *adapter)
 	struct ixgbe_hw *hw = &adapter->hw;
 	u32 vf;
 
+	if (test_and_set_bit(__IXGBE_DISABLING_VFS, &adapter->state))
+		return;
+
 	for (vf = 0; vf < adapter->num_vfs; vf++) {
 		/* process any reset requests */
 		if (!ixgbe_check_for_rst(hw, vf))
@@ -1320,6 +1327,7 @@ void ixgbe_msg_task(struct ixgbe_adapter *adapter)
 		if (!ixgbe_check_for_ack(hw, vf))
 			ixgbe_rcv_ack_from_vf(adapter, vf);
 	}
+	clear_bit(__IXGBE_DISABLING_VFS, &adapter->state);
 }
 
 void ixgbe_disable_tx_rx(struct ixgbe_adapter *adapter)
