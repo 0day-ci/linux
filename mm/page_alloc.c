@@ -4716,7 +4716,7 @@ static inline int __gfp_pfmemalloc_flags(gfp_t gfp_mask)
 		return ALLOC_NO_WATERMARKS;
 	if (in_serving_softirq() && (current->flags & PF_MEMALLOC))
 		return ALLOC_NO_WATERMARKS;
-	if (!in_interrupt()) {
+	if (in_task()) {
 		if (current->flags & PF_MEMALLOC)
 			return ALLOC_NO_WATERMARKS;
 		else if (oom_reserves_allowed(current))
