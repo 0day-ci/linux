@@ -99,8 +99,6 @@ void arch_timer_reg_write_cp15(int access, enum arch_timer_reg reg, u64 val)
 		case ARCH_TIMER_REG_CVAL:
 			write_sysreg(val, cntp_cval_el0);
 			break;
-		case ARCH_TIMER_REG_TVAL:
-			BUG();
 		}
 	} else if (access == ARCH_TIMER_VIRT_ACCESS) {
 		switch (reg) {
@@ -110,8 +108,6 @@ void arch_timer_reg_write_cp15(int access, enum arch_timer_reg reg, u64 val)
 		case ARCH_TIMER_REG_CVAL:
 			write_sysreg(val, cntv_cval_el0);
 			break;
-		case ARCH_TIMER_REG_TVAL:
-			BUG();
 		}
 	}
 
@@ -125,7 +121,6 @@ u64 arch_timer_reg_read_cp15(int access, enum arch_timer_reg reg)
 		switch (reg) {
 		case ARCH_TIMER_REG_CTRL:
 			return read_sysreg(cntp_ctl_el0);
-		case ARCH_TIMER_REG_TVAL:
 		case ARCH_TIMER_REG_CVAL:
 			break;
 		}
@@ -133,7 +128,6 @@ u64 arch_timer_reg_read_cp15(int access, enum arch_timer_reg reg)
 		switch (reg) {
 		case ARCH_TIMER_REG_CTRL:
 			return read_sysreg(cntv_ctl_el0);
-		case ARCH_TIMER_REG_TVAL:
 		case ARCH_TIMER_REG_CVAL:
 			break;
 		}
