@@ -19,6 +19,7 @@ static int futex_flag = 0;
 struct bench_futex_parameters {
 	bool silent;
 	bool fshared;
+	bool mlockall;
 	bool multi; /* lock-pi */
 	unsigned int runtime; /* seconds*/
 	unsigned int nthreads;
