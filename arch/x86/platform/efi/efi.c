@@ -93,6 +93,7 @@ static const unsigned long * const efi_tables[] = {
 #ifdef CONFIG_LOAD_UEFI_KEYS
 	&efi.mokvar_table,
 #endif
+	&efi.coco_secret,
 };
 
 u64 efi_setup;		/* efi setup_data physical address */
