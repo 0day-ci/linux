@@ -778,9 +778,42 @@ static int arch_timer_set_next_event_phys_mem(unsigned long evt,
 	return 0;
 }
 
+static u64 __arch_timer_check_delta(void)
+{
+#ifdef CONFIG_ARM64
+	u64 tmp;
+
+	/*
+	 * XGene-1 implements CVAL in terms of TVAL, meaning that the
+	 * maximum timer range is 32bit. Shame on them. Detect the
+	 * issue by setting a timer to now+(1<<32), which will
+	 * immediately fire on the duff CPU.
+	 */
+	write_sysreg(0, cntv_ctl_el0);
+	isb();
+	tmp = read_sysreg(cntvct_el0) | BIT(32);
+	write_sysreg(tmp, cntv_cval_el0);
+	write_sysreg(ARCH_TIMER_CTRL_ENABLE | ARCH_TIMER_CTRL_IT_MASK,
+		     cntv_ctl_el0);
+	isb();
+
+	tmp = read_sysreg(cntv_ctl_el0);
+	write_sysreg(0, cntv_ctl_el0);
+	isb();
+
+	if (tmp & ARCH_TIMER_CTRL_IT_STAT) {
+		pr_warn_once("Detected broken implementation, limiting width to 32bits");
+		return CLOCKSOURCE_MASK(32);
+	}
+#endif
+	return CLOCKSOURCE_MASK(56);
+}
+
 static void __arch_timer_setup(unsigned type,
 			       struct clock_event_device *clk)
 {
+	u64 max_delta;
+
 	clk->features = CLOCK_EVT_FEAT_ONESHOT;
 
 	if (type == ARCH_TIMER_TYPE_CP15) {
@@ -812,6 +845,7 @@ static void __arch_timer_setup(unsigned type,
 		}
 
 		clk->set_next_event = sne;
+		max_delta = __arch_timer_check_delta();
 	} else {
 		clk->features |= CLOCK_EVT_FEAT_DYNIRQ;
 		clk->name = "arch_mem_timer";
@@ -828,11 +862,13 @@ static void __arch_timer_setup(unsigned type,
 			clk->set_next_event =
 				arch_timer_set_next_event_phys_mem;
 		}
+
+		max_delta = CLOCKSOURCE_MASK(56);
 	}
 
 	clk->set_state_shutdown(clk);
 
-	clockevents_config_and_register(clk, arch_timer_rate, 0xf, CLOCKSOURCE_MASK(56));
+	clockevents_config_and_register(clk, arch_timer_rate, 0xf, max_delta);
 }
 
 static void arch_timer_evtstrm_enable(int divider)
