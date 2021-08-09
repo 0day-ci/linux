@@ -21,6 +21,7 @@ struct bench_futex_parameters {
 	bool fshared;
 	bool mlockall;
 	bool multi; /* lock-pi */
+	bool broadcast; /* requeue */
 	unsigned int runtime; /* seconds*/
 	unsigned int nthreads;
 	unsigned int nfutexes;
