@@ -1823,6 +1823,8 @@ asmlinkage void kvm_spurious_fault(void);
 	"668: \n\t"							\
 	_ASM_EXTABLE(666b, 667b)
 
+#define __ex(x) __kvm_handle_fault_on_reboot(x)
+
 #define KVM_ARCH_WANT_MMU_NOTIFIER
 
 int kvm_cpu_has_injectable_intr(struct kvm_vcpu *v);
