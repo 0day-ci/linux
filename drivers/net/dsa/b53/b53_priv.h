@@ -145,10 +145,10 @@ struct b53_device {
 	struct b53_port *ports;
 };
 
-#define b53_for_each_port(dev, i) \
-	for (i = 0; i < B53_N_PORTS; i++) \
-		if (dev->enabled_ports & BIT(i))
 
+#define b53_for_each_port(_dp, _dev) \
+	dsa_switch_for_each_port((_dp), (_dev)->ds) \
+		if ((_dev)->enabled_ports & BIT((_dp)->index))
 
 static inline int is5325(struct b53_device *dev)
 {
