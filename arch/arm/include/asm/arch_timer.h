@@ -60,8 +60,7 @@ u32 arch_timer_reg_read_cp15(int access, enum arch_timer_reg reg)
 			asm volatile("mrc p15, 0, %0, c14, c2, 1" : "=r" (val));
 			break;
 		case ARCH_TIMER_REG_TVAL:
-			asm volatile("mrc p15, 0, %0, c14, c2, 0" : "=r" (val));
-			break;
+			BUG();
 		}
 	} else if (access == ARCH_TIMER_VIRT_ACCESS) {
 		switch (reg) {
@@ -69,8 +68,7 @@ u32 arch_timer_reg_read_cp15(int access, enum arch_timer_reg reg)
 			asm volatile("mrc p15, 0, %0, c14, c3, 1" : "=r" (val));
 			break;
 		case ARCH_TIMER_REG_TVAL:
-			asm volatile("mrc p15, 0, %0, c14, c3, 0" : "=r" (val));
-			break;
+			BUG();
 		}
 	}
 
