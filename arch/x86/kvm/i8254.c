@@ -40,12 +40,6 @@
 #include "i8254.h"
 #include "x86.h"
 
-#ifndef CONFIG_X86_64
-#define mod_64(x, y) ((x) - (y) * div64_u64(x, y))
-#else
-#define mod_64(x, y) ((x) % (y))
-#endif
-
 #define RW_STATE_LSB 1
 #define RW_STATE_MSB 2
 #define RW_STATE_WORD0 3

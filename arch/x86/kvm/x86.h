@@ -8,6 +8,12 @@
 #include "kvm_cache_regs.h"
 #include "kvm_emulate.h"
 
+#ifndef CONFIG_X86_64
+#define mod_64(x, y) ((x) - (y) * div64_u64(x, y))
+#else
+#define mod_64(x, y) ((x) % (y))
+#endif
+
 static __always_inline void kvm_guest_enter_irqoff(void)
 {
 	/*

@@ -42,12 +42,6 @@
 #include "cpuid.h"
 #include "hyperv.h"
 
-#ifndef CONFIG_X86_64
-#define mod_64(x, y) ((x) - (y) * div64_u64(x, y))
-#else
-#define mod_64(x, y) ((x) % (y))
-#endif
-
 #define PRId64 "d"
 #define PRIx64 "llx"
 #define PRIu64 "u"
