@@ -250,6 +250,9 @@ static void release_nbp(struct kobject *kobj)
 {
 	struct net_bridge_port *p
 		= container_of(kobj, struct net_bridge_port, kobj);
+#if IS_ENABLED(CONFIG_BRIDGE_IGMP_SNOOPING)
+	free_percpu(p->mcast_stats);
+#endif
 	kfree(p);
 }
 
@@ -616,7 +619,7 @@ int br_add_if(struct net_bridge *br, struct net_device *dev,
 
 	err = dev_set_allmulti(dev, 1);
 	if (err) {
-		kfree(p);	/* kobject not yet init'd, manually free */
+		release_nbp(&p->kobj);	/* kobject not yet init'd, manually free */
 		goto err1;
 	}
 

@@ -1715,7 +1715,6 @@ void br_multicast_del_port(struct net_bridge_port *port)
 #if IS_ENABLED(CONFIG_IPV6)
 	del_timer_sync(&port->ip6_mc_router_timer);
 #endif
-	free_percpu(port->mcast_stats);
 }
 
 static void br_multicast_enable(struct bridge_mcast_own_query *query)
