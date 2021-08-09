@@ -148,6 +148,10 @@
 /* FLD_THR_CFG */
 #define DP83867_FLD_THR_CFG_ENERGY_LOST_THR_MASK	0x7
 
+/* Led Configuration */
+#define DP83867_LEDCR_1      0x0018
+#define LED_GPIO_NUM_SEL	 0x4
+
 enum {
 	DP83867_PORT_MIRROING_KEEP,
 	DP83867_PORT_MIRROING_EN,
@@ -527,6 +531,9 @@ static int dp83867_of_init(struct phy_device *phydev)
 	struct device *dev = &phydev->mdio.dev;
 	struct device_node *of_node = dev->of_node;
 	int ret;
+	u32 led_conf;
+	u32 led_select_value;
+	int index;
 
 	if (!of_node)
 		return -ENODEV;
@@ -613,6 +620,19 @@ static int dp83867_of_init(struct phy_device *phydev)
 			   dp83867->rx_fifo_depth);
 		return -EINVAL;
 	}
+
+	/* Optional LED configuration */
+	for (index = 0; index < LED_GPIO_NUM_SEL; index++) {
+		ret = of_property_read_u32_index(of_node, "ti,led-sel",
+						 index, &led_select_value);
+		if (ret < 0) {
+			phydev_info(phydev, "Use default value for led configuration\n");
+			return -EINVAL;
+		}
+		led_conf = led_conf << 4 | led_select_value;
+	}
+
+	phy_write_mmd(phydev, DP83867_DEVADDR, DP83867_LEDCR_1, led_conf);
 
 	return 0;
 }
