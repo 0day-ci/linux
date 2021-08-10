@@ -23,6 +23,7 @@
 #include <linux/kernel_stat.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
+#include <linux/pm_opp.h>
 #include <linux/pm_qos.h>
 #include <linux/slab.h>
 #include <linux/suspend.h>
@@ -1511,6 +1512,11 @@ static int cpufreq_online(unsigned int cpu)
 	if (cpufreq_thermal_control_enabled(cpufreq_driver))
 		policy->cdev = of_cpufreq_cooling_register(policy);
 
+	if (cpufreq_driver->flags & CPUFREQ_REGISTER_WITH_EM) {
+		dev_pm_opp_of_register_em(get_cpu_device(policy->cpu),
+					  policy->related_cpus);
+	}
+
 	pr_debug("initialization complete\n");
 
 	return 0;
@@ -1601,6 +1607,9 @@ static int cpufreq_offline(unsigned int cpu)
 
 		goto unlock;
 	}
+
+	if (cpufreq_driver->flags & CPUFREQ_REGISTER_WITH_EM)
+		dev_pm_opp_of_unregister_em(get_cpu_device(cpu));
 
 	if (cpufreq_thermal_control_enabled(cpufreq_driver)) {
 		cpufreq_cooling_unregister(policy->cdev);
