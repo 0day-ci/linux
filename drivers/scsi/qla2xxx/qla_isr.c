@@ -2188,7 +2188,7 @@ qla24xx_els_ct_entry(scsi_qla_host_t *v, struct req_que *req,
 		type = "Driver ELS logo";
 		if (iocb_type != ELS_IOCB_TYPE) {
 			ql_dbg(ql_dbg_user, vha, 0x5047,
-			    "Completing %s: (%p) type=%d.\n",
+			    "Completing %s: (%px) type=%d.\n",
 			    type, sp, sp->type);
 			sp->done(sp, 0);
 			return;
@@ -2205,7 +2205,7 @@ qla24xx_els_ct_entry(scsi_qla_host_t *v, struct req_que *req,
 		return;
 	default:
 		ql_dbg(ql_dbg_user, vha, 0x503e,
-		    "Unrecognized SRB: (%p) type=%d.\n", sp, sp->type);
+		    "Unrecognized SRB: (%px) type=%d.\n", sp, sp->type);
 		return;
 	}
 
@@ -2808,7 +2808,7 @@ qla2x00_handle_sense(srb_t *sp, uint8_t *sense_data, uint32_t par_sense_len,
 
 	if (sense_len) {
 		ql_dbg(ql_dbg_io + ql_dbg_buffer, vha, 0x301c,
-		    "Check condition Sense data, nexus%ld:%d:%llu cmd=%p.\n",
+		    "Check condition Sense data, nexus%ld:%d:%llu cmd=%px.\n",
 		    sp->vha->host_no, cp->device->id, cp->device->lun,
 		    cp);
 		ql_dump_buffer(ql_dbg_io + ql_dbg_buffer, vha, 0x302b,
@@ -2851,7 +2851,7 @@ qla2x00_handle_dif_error(srb_t *sp, struct sts_entry_24xx *sts24)
 	e_ref_tag = get_unaligned_le32(ep + 4);
 
 	ql_dbg(ql_dbg_io, vha, 0x3023,
-	    "iocb(s) %p Returned STATUS.\n", sts24);
+	    "iocb(s) %px Returned STATUS.\n", sts24);
 
 	ql_dbg(ql_dbg_io, vha, 0x3024,
 	    "DIF ERROR in cmd 0x%x lba 0x%llx act ref"
@@ -3136,7 +3136,7 @@ qla2x00_status_entry(scsi_qla_host_t *vha, struct rsp_que *rsp, void *pkt)
 	if (req == NULL ||
 	    que >= find_first_zero_bit(ha->req_qid_map, ha->max_req_queues)) {
 		ql_dbg(ql_dbg_io, vha, 0x3059,
-		    "Invalid status handle (0x%x): Bad req pointer. req=%p, "
+		    "Invalid status handle (0x%x): Bad req pointer. req=%px, "
 		    "que=%u.\n", sts->handle, req, que);
 		return;
 	}
@@ -3169,7 +3169,7 @@ qla2x00_status_entry(scsi_qla_host_t *vha, struct rsp_que *rsp, void *pkt)
 	if (sp->cmd_type != TYPE_SRB) {
 		req->outstanding_cmds[handle] = NULL;
 		ql_dbg(ql_dbg_io, vha, 0x3015,
-		    "Unknown sp->cmd_type %x %p).\n",
+		    "Unknown sp->cmd_type %x %px).\n",
 		    sp->cmd_type, sp);
 		return;
 	}
@@ -3206,7 +3206,7 @@ qla2x00_status_entry(scsi_qla_host_t *vha, struct rsp_que *rsp, void *pkt)
 	cp = GET_CMD_SP(sp);
 	if (cp == NULL) {
 		ql_dbg(ql_dbg_io, vha, 0x3018,
-		    "Command already returned (0x%x/%p).\n",
+		    "Command already returned (0x%x/%px).\n",
 		    sts->handle, sp);
 
 		return;
@@ -3453,7 +3453,7 @@ check_scsi_status:
 
 	case CS_DMA:
 		ql_log(ql_log_info, fcport->vha, 0x3022,
-		    "CS_DMA error: 0x%x-0x%x (0x%x) nexus=%ld:%d:%llu portid=%06x oxid=0x%x cdb=%10phN len=0x%x rsp_info=0x%x resid=0x%x fw_resid=0x%x sp=%p cp=%p.\n",
+		    "CS_DMA error: 0x%x-0x%x (0x%x) nexus=%ld:%d:%llu portid=%06x oxid=0x%x cdb=%10phN len=0x%x rsp_info=0x%x resid=0x%x fw_resid=0x%x sp=%px cp=%px.\n",
 		    comp_status, scsi_status, res, vha->host_no,
 		    cp->device->id, cp->device->lun, fcport->d_id.b24,
 		    ox_id, cp->cmnd, scsi_bufflen(cp), rsp_info_len,
@@ -3471,7 +3471,7 @@ check_scsi_status:
 out:
 	if (logit)
 		ql_log(ql_log_warn, fcport->vha, 0x3022,
-		       "FCP command status: 0x%x-0x%x (0x%x) nexus=%ld:%d:%llu portid=%02x%02x%02x oxid=0x%x cdb=%10phN len=0x%x rsp_info=0x%x resid=0x%x fw_resid=0x%x sp=%p cp=%p.\n",
+		       "FCP command status: 0x%x-0x%x (0x%x) nexus=%ld:%d:%llu portid=%02x%02x%02x oxid=0x%x cdb=%10phN len=0x%x rsp_info=0x%x resid=0x%x fw_resid=0x%x sp=%px cp=%px.\n",
 		       comp_status, scsi_status, res, vha->host_no,
 		       cp->device->id, cp->device->lun, fcport->d_id.b.domain,
 		       fcport->d_id.b.area, fcport->d_id.b.al_pa, ox_id,
@@ -3509,7 +3509,7 @@ qla2x00_status_cont_entry(struct rsp_que *rsp, sts_cont_entry_t *pkt)
 	cp = GET_CMD_SP(sp);
 	if (cp == NULL) {
 		ql_log(ql_log_warn, vha, 0x3025,
-		    "cmd is NULL: already returned to OS (sp=%p).\n", sp);
+		    "cmd is NULL: already returned to OS (sp=%px).\n", sp);
 
 		rsp->status_srb = NULL;
 		return;
@@ -4405,10 +4405,10 @@ msix_register_fail:
 		     ql2xmqsupport))
 			ha->mqenable = 1;
 	ql_dbg(ql_dbg_multiq, vha, 0xc005,
-	    "mqiobase=%p, max_rsp_queues=%d, max_req_queues=%d.\n",
+	    "mqiobase=%px, max_rsp_queues=%d, max_req_queues=%d.\n",
 	    ha->mqiobase, ha->max_rsp_queues, ha->max_req_queues);
 	ql_dbg(ql_dbg_init, vha, 0x0055,
-	    "mqiobase=%p, max_rsp_queues=%d, max_req_queues=%d.\n",
+	    "mqiobase=%px, max_rsp_queues=%d, max_req_queues=%d.\n",
 	    ha->mqiobase, ha->max_rsp_queues, ha->max_req_queues);
 
 msix_out:

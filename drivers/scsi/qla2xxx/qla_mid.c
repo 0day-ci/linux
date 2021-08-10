@@ -284,7 +284,7 @@ qla2x00_alert_all_vps(struct rsp_que *rsp, uint16_t *mb)
 			case MBA_POINT_TO_POINT:
 			case MBA_CHG_IN_CONNECTION:
 				ql_dbg(ql_dbg_async, vha, 0x5024,
-				    "Async_event for VP[%d], mb=0x%x vha=%p.\n",
+				    "Async_event for VP[%d], mb=0x%x vha=%px.\n",
 				    i, *mb, vha);
 				qla2x00_async_event(vha, rsp, mb);
 				break;
@@ -292,7 +292,7 @@ qla2x00_alert_all_vps(struct rsp_que *rsp, uint16_t *mb)
 			case MBA_RSCN_UPDATE:
 				if ((mb[3] & 0xff) == vha->vp_idx) {
 					ql_dbg(ql_dbg_async, vha, 0x5024,
-					    "Async_event for VP[%d], mb=0x%x vha=%p\n",
+					    "Async_event for VP[%d], mb=0x%x vha=%px\n",
 					    i, *mb, vha);
 					qla2x00_async_event(vha, rsp, mb);
 				}
@@ -549,7 +549,7 @@ qla24xx_create_vhost(struct fc_vport *fc_vport)
 	host->transportt = qla2xxx_transport_vport_template;
 
 	ql_dbg(ql_dbg_vport, vha, 0xa007,
-	    "Detect vport hba %ld at address = %p.\n",
+	    "Detect vport hba %ld at address = %px.\n",
 	    vha->host_no, vha);
 
 	vha->flags.init_done = 1;
@@ -777,12 +777,12 @@ qla25xx_create_req_que(struct qla_hw_data *ha, uint16_t options,
 	req->out_ptr = (uint16_t *)(req->ring + req->length);
 	mutex_unlock(&ha->mq_lock);
 	ql_dbg(ql_dbg_multiq, base_vha, 0xc004,
-	    "ring_ptr=%p ring_index=%d, "
+	    "ring_ptr=%px ring_index=%d, "
 	    "cnt=%d id=%d max_q_depth=%d.\n",
 	    req->ring_ptr, req->ring_index,
 	    req->cnt, req->id, req->max_q_depth);
 	ql_dbg(ql_dbg_init, base_vha, 0x00de,
-	    "ring_ptr=%p ring_index=%d, "
+	    "ring_ptr=%px ring_index=%d, "
 	    "cnt=%d id=%d max_q_depth=%d.\n",
 	    req->ring_ptr, req->ring_index, req->cnt,
 	    req->id, req->max_q_depth);
@@ -866,7 +866,7 @@ qla25xx_create_rsp_que(struct qla_hw_data *ha, uint16_t options,
 	rsp->vp_idx = vp_idx;
 	rsp->hw = ha;
 	ql_dbg(ql_dbg_init, base_vha, 0x00e4,
-	    "rsp queue_id=%d rid=%d vp_idx=%d hw=%p.\n",
+	    "rsp queue_id=%d rid=%d vp_idx=%d hw=%px.\n",
 	    que_id, rsp->rid, rsp->vp_idx, rsp->hw);
 	/* Use alternate PCI bus number */
 	if (MSB(rsp->rid))
@@ -889,11 +889,11 @@ qla25xx_create_rsp_que(struct qla_hw_data *ha, uint16_t options,
 	rsp->in_ptr = (uint16_t *)(rsp->ring + rsp->length);
 	mutex_unlock(&ha->mq_lock);
 	ql_dbg(ql_dbg_multiq, base_vha, 0xc00b,
-	    "options=%x id=%d rsp_q_in=%p rsp_q_out=%p\n",
+	    "options=%x id=%d rsp_q_in=%px rsp_q_out=%px\n",
 	    rsp->options, rsp->id, rsp->rsp_q_in,
 	    rsp->rsp_q_out);
 	ql_dbg(ql_dbg_init, base_vha, 0x00e5,
-	    "options=%x id=%d rsp_q_in=%p rsp_q_out=%p\n",
+	    "options=%x id=%d rsp_q_in=%px rsp_q_out=%px\n",
 	    rsp->options, rsp->id, rsp->rsp_q_in,
 	    rsp->rsp_q_out);
 

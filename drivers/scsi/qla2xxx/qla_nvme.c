@@ -98,7 +98,7 @@ static int qla_nvme_alloc_queue(struct nvme_fc_local_port *lport,
 	ha = vha->hw;
 
 	ql_log(ql_log_info, vha, 0x2104,
-	    "%s: handle %p, idx =%d, qsize %d\n",
+	    "%s: handle %px, idx =%d, qsize %d\n",
 	    __func__, handle, qidx, qsize);
 
 	if (qidx > qla_nvme_fc_transport.max_hw_queues) {
@@ -111,7 +111,7 @@ static int qla_nvme_alloc_queue(struct nvme_fc_local_port *lport,
 	if (ha->queue_pair_map[qidx]) {
 		*handle = ha->queue_pair_map[qidx];
 		ql_log(ql_log_info, vha, 0x2121,
-		    "Returning existing qpair of %p for idx=%x\n",
+		    "Returning existing qpair of %px for idx=%x\n",
 		    *handle, qidx);
 		return 0;
 	}
@@ -224,7 +224,7 @@ static void qla_nvme_abort_work(struct work_struct *work)
 	int rval;
 
 	ql_dbg(ql_dbg_io, fcport->vha, 0xffff,
-	       "%s called for sp=%p, hndl=%x on fcport=%p deleted=%d\n",
+	       "%s called for sp=%px, hndl=%x on fcport=%px deleted=%d\n",
 	       __func__, sp, sp->handle, fcport, fcport->deleted);
 
 	if (!ha->flags.fw_started || fcport->deleted)
@@ -232,7 +232,7 @@ static void qla_nvme_abort_work(struct work_struct *work)
 
 	if (ha->flags.host_shutting_down) {
 		ql_log(ql_log_info, sp->fcport->vha, 0xffff,
-		    "%s Calling done on sp: %p, type: 0x%x\n",
+		    "%s Calling done on sp: %px, type: 0x%x\n",
 		    __func__, sp, sp->type);
 		sp->done(sp, 0);
 		goto out;
@@ -241,7 +241,7 @@ static void qla_nvme_abort_work(struct work_struct *work)
 	rval = ha->isp_ops->abort_command(sp);
 
 	ql_dbg(ql_dbg_io, fcport->vha, 0x212b,
-	    "%s: %s command for sp=%p, handle=%x on fcport=%p rval=%x\n",
+	    "%s: %s command for sp=%px, handle=%x on fcport=%px rval=%x\n",
 	    __func__, (rval != QLA_SUCCESS) ? "Failed to abort" : "Aborted",
 	    sp, sp->handle, fcport, rval);
 
@@ -633,7 +633,7 @@ static void qla_nvme_localport_delete(struct nvme_fc_local_port *lport)
 	struct scsi_qla_host *vha = lport->private;
 
 	ql_log(ql_log_info, vha, 0x210f,
-	    "localport delete of %p completed.\n", vha->nvme_local_port);
+	    "localport delete of %px completed.\n", vha->nvme_local_port);
 	vha->nvme_local_port = NULL;
 	complete(&vha->nvme_del_done);
 }
@@ -648,7 +648,7 @@ static void qla_nvme_remoteport_delete(struct nvme_fc_remote_port *rport)
 	fcport->nvme_flag &= ~NVME_FLAG_REGISTERED;
 	fcport->nvme_flag &= ~NVME_FLAG_DELETING;
 	ql_log(ql_log_info, fcport->vha, 0x2110,
-	    "remoteport_delete of %p %8phN completed.\n",
+	    "remoteport_delete of %px %8phN completed.\n",
 	    fcport, fcport->port_name);
 	complete(&fcport->nvme_del_done);
 }
@@ -680,7 +680,7 @@ void qla_nvme_unregister_remote_port(struct fc_port *fcport)
 		return;
 
 	ql_log(ql_log_warn, fcport->vha, 0x2112,
-	    "%s: unregister remoteport on %p %8phN\n",
+	    "%s: unregister remoteport on %px %8phN\n",
 	    __func__, fcport, fcport->port_name);
 
 	if (test_bit(PFLG_DRIVER_REMOVING, &fcport->vha->pci_flags))
@@ -705,7 +705,7 @@ void qla_nvme_delete(struct scsi_qla_host *vha)
 	if (vha->nvme_local_port) {
 		init_completion(&vha->nvme_del_done);
 		ql_log(ql_log_info, vha, 0x2116,
-			"unregister localport=%p\n",
+			"unregister localport=%px\n",
 			vha->nvme_local_port);
 		nv_ret = nvme_fc_unregister_localport(vha->nvme_local_port);
 		if (nv_ret)
