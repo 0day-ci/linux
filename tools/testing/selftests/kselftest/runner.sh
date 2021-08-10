@@ -65,15 +65,16 @@ run_one()
 
 	TEST_HDR_MSG="selftests: $DIR: $BASENAME_TEST"
 	echo "# $TEST_HDR_MSG"
-	if [ ! -x "$TEST" ]; then
-		echo -n "# Warning: file $TEST is "
-		if [ ! -e "$TEST" ]; then
-			echo "missing!"
-		else
-			echo "not executable, correct this."
-		fi
+	if [ ! -e "$TEST" ]; then
+		echo "# Warning: file $TEST is missing!"
 		echo "not ok $test_num $TEST_HDR_MSG"
 	else
+		permission_added="false"
+		if [ ! -x "$TEST" ]; then
+			echo "# Warning: file $TEST is not executable"
+			chmod u+x "$TEST"
+			permission_added="true"
+		fi
 		cd `dirname $TEST` > /dev/null
 		((((( tap_timeout ./$BASENAME_TEST 2>&1; echo $? >&3) |
 			tap_prefix >&4) 3>&1) |
@@ -88,6 +89,9 @@ run_one()
 		else
 			echo "not ok $test_num $TEST_HDR_MSG # exit=$rc"
 		fi)
+		if [ "$permission_added" = "true" ]; then
+			chmod u-x "$TEST"
+		fi
 		cd - >/dev/null
 	fi
 }
