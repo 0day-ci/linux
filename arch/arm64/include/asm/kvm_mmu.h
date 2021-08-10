@@ -141,7 +141,8 @@ static __always_inline unsigned long __kern_hyp_va(unsigned long v)
  * We currently support using a VM-specified IPA size. For backward
  * compatibility, the default IPA size is fixed to 40bits.
  */
-#define KVM_PHYS_SHIFT	(40)
+#define KVM_PHYS_SHIFT		(40)
+#define KVM_PHYS_SHIFT_MIN	(32)
 
 #define kvm_phys_shift(kvm)		VTCR_EL2_IPA(kvm->arch.vtcr)
 #define kvm_phys_size(kvm)		(_AC(1, ULL) << kvm_phys_shift(kvm))
