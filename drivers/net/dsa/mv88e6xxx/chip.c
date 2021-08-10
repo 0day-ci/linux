@@ -1641,7 +1641,7 @@ static int mv88e6xxx_port_check_hw_vlan(struct dsa_switch *ds, int port,
 	int err;
 
 	/* DSA and CPU ports have to be members of multiple vlans */
-	if (dsa_is_dsa_port(ds, port) || dsa_is_cpu_port(ds, port))
+	if (dsa_port_is_dsa(dp) || dsa_port_is_cpu(dp))
 		return 0;
 
 	err = mv88e6xxx_vtu_get(chip, vid, &vlan);
