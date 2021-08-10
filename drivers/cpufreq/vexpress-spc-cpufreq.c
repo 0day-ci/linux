@@ -442,8 +442,6 @@ static int ve_spc_cpufreq_init(struct cpufreq_policy *policy)
 	policy->freq_table = freq_table[cur_cluster];
 	policy->cpuinfo.transition_latency = 1000000; /* 1 ms */
 
-	dev_pm_opp_of_register_em(cpu_dev, policy->cpus);
-
 	if (is_bL_switching_enabled())
 		per_cpu(cpu_last_req_freq, policy->cpu) =
 						clk_get_cpu_rate(policy->cpu);
@@ -487,7 +485,8 @@ static void ve_spc_cpufreq_ready(struct cpufreq_policy *policy)
 static struct cpufreq_driver ve_spc_cpufreq_driver = {
 	.name			= "vexpress-spc",
 	.flags			= CPUFREQ_HAVE_GOVERNOR_PER_POLICY |
-					CPUFREQ_NEED_INITIAL_FREQ_CHECK,
+				  CPUFREQ_NEED_INITIAL_FREQ_CHECK |
+				  CPUFREQ_REGISTER_WITH_EM,
 	.verify			= cpufreq_generic_frequency_table_verify,
 	.target_index		= ve_spc_cpufreq_set_target,
 	.get			= ve_spc_cpufreq_get_rate,
