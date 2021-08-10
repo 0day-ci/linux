@@ -431,6 +431,11 @@ static inline struct dsa_port *dsa_to_port(struct dsa_switch *ds, int p)
 	return NULL;
 }
 
+static inline bool dsa_port_is_unused(struct dsa_port *port)
+{
+	return port->type == DSA_PORT_TYPE_UNUSED;
+}
+
 static inline bool dsa_port_is_dsa(struct dsa_port *port)
 {
 	return port->type == DSA_PORT_TYPE_DSA;
