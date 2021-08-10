@@ -3635,7 +3635,7 @@ enum dc_status dcn10_set_clock(struct dc *dc,
 				dc->clk_mgr->funcs->get_clock(dc->clk_mgr,
 						context, clock_type, &clock_cfg);
 
-	if (!dc->clk_mgr->funcs->get_clock)
+	if (dc->clk_mgr && !dc->clk_mgr->funcs->get_clock)
 		return DC_FAIL_UNSUPPORTED_1;
 
 	if (clk_khz > clock_cfg.max_clock_khz)
