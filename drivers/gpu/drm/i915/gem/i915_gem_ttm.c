@@ -168,7 +168,7 @@ i915_ttm_placement_from_obj(const struct drm_i915_gem_object *obj,
 }
 
 static struct ttm_tt *i915_ttm_tt_create(struct ttm_buffer_object *bo,
-					 uint32_t page_flags)
+					 u32 page_flags)
 {
 	struct ttm_resource_manager *man =
 		ttm_manager_type(bo->bdev, bo->resource->mem_type);
