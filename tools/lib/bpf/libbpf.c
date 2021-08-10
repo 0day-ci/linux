@@ -5277,11 +5277,11 @@ bpf_object__relocate_data(struct bpf_object *obj, struct bpf_program *prog)
 				}
 				insn[1].imm = ext->kcfg.data_off;
 			} else /* EXT_KSYM */ {
-				if (ext->ksym.type_id) { /* typed ksyms */
+				if (ext->ksym.type_id && ext->is_set) { /* typed ksyms */
 					insn[0].src_reg = BPF_PSEUDO_BTF_ID;
 					insn[0].imm = ext->ksym.kernel_btf_id;
 					insn[1].imm = ext->ksym.kernel_btf_obj_fd;
-				} else { /* typeless ksyms */
+				} else { /* typeless ksyms or unresolved typed ksyms */
 					insn[0].imm = (__u32)ext->ksym.addr;
 					insn[1].imm = ext->ksym.addr >> 32;
 				}
@@ -6584,7 +6584,7 @@ out:
 }
 
 static int find_ksym_btf_id(struct bpf_object *obj, const char *ksym_name,
-			    __u16 kind, struct btf **res_btf,
+			    __u16 kind, bool is_weak, struct btf **res_btf,
 			    int *res_btf_fd)
 {
 	int i, id, btf_fd, err;
@@ -6608,6 +6608,9 @@ static int find_ksym_btf_id(struct bpf_object *obj, const char *ksym_name,
 				break;
 		}
 	}
+	if (is_weak && id == -ENOENT)
+		return 0;
+
 	if (id <= 0) {
 		pr_warn("extern (%s ksym) '%s': failed to find BTF ID in kernel BTF(s).\n",
 			__btf_kind_str(kind), ksym_name);
@@ -6627,10 +6630,14 @@ static int bpf_object__resolve_ksym_var_btf_id(struct bpf_object *obj,
 	const char *targ_var_name;
 	int id, btf_fd = 0, err;
 	struct btf *btf = NULL;
+	bool is_weak = ext->is_weak;
 
-	id = find_ksym_btf_id(obj, ext->name, BTF_KIND_VAR, &btf, &btf_fd);
+	id = find_ksym_btf_id(obj, ext->name, BTF_KIND_VAR, is_weak, &btf, &btf_fd);
 	if (id < 0)
 		return id;
+
+	if (is_weak && id == 0)
+		return 0;
 
 	/* find local type_id */
 	local_type_id = ext->ksym.type_id;
@@ -6676,7 +6683,7 @@ static int bpf_object__resolve_ksym_func_btf_id(struct bpf_object *obj,
 
 	local_func_proto_id = ext->ksym.type_id;
 
-	kfunc_id = find_ksym_btf_id(obj, ext->name, BTF_KIND_FUNC,
+	kfunc_id = find_ksym_btf_id(obj, ext->name, BTF_KIND_FUNC, false,
 				    &kern_btf, &kern_btf_fd);
 	if (kfunc_id < 0) {
 		pr_warn("extern (func ksym) '%s': not found in kernel BTF\n",
