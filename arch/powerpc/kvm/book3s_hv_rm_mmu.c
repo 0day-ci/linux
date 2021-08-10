@@ -109,6 +109,7 @@ void kvmppc_update_dirty_map(const struct kvm_memory_slot *memslot,
 	npages = (psize + PAGE_SIZE - 1) / PAGE_SIZE;
 	gfn -= memslot->base_gfn;
 	set_dirty_bits_atomic(memslot->dirty_bitmap, gfn, npages);
+	kvm->stat.generic.dirty_pages += npages;
 }
 EXPORT_SYMBOL_GPL(kvmppc_update_dirty_map);
 

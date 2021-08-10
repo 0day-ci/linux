@@ -1150,6 +1150,7 @@ long kvmppc_hv_get_dirty_log_radix(struct kvm *kvm,
 		j = i + 1;
 		if (npages) {
 			set_dirty_bits(map, i, npages);
+			kvm->stat.generic.dirty_pages += npages;
 			j = i + npages;
 		}
 	}

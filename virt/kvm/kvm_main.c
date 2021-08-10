@@ -1228,6 +1228,19 @@ static int kvm_alloc_dirty_bitmap(struct kvm_memory_slot *memslot)
 	return 0;
 }
 
+static inline unsigned long hweight_dirty_bitmap(
+						struct kvm_memory_slot *memslot)
+{
+	unsigned long i;
+	unsigned long count = 0;
+	unsigned long n = kvm_dirty_bitmap_bytes(memslot);
+
+	for (i = 0; i < n / sizeof(long); ++i)
+		count += hweight_long(memslot->dirty_bitmap[i]);
+
+	return count;
+}
+
 /*
  * Delete a memslot by decrementing the number of used slots and shifting all
  * other entries in the array forward one spot.
@@ -1612,6 +1625,7 @@ static int kvm_delete_memslot(struct kvm *kvm,
 	if (r)
 		return r;
 
+	kvm->stat.generic.dirty_pages -= hweight_dirty_bitmap(old);
 	kvm_free_memslot(kvm, old);
 	return 0;
 }
@@ -1733,8 +1747,10 @@ int __kvm_set_memory_region(struct kvm *kvm,
 	if (r)
 		goto out_bitmap;
 
-	if (old.dirty_bitmap && !new.dirty_bitmap)
+	if (old.dirty_bitmap && !new.dirty_bitmap) {
+		kvm->stat.generic.dirty_pages -= hweight_dirty_bitmap(&old);
 		kvm_destroy_dirty_bitmap(&old);
+	}
 	return 0;
 
 out_bitmap:
@@ -1895,6 +1911,7 @@ static int kvm_get_dirty_log_protect(struct kvm *kvm, struct kvm_dirty_log *log)
 			offset = i * BITS_PER_LONG;
 			kvm_arch_mmu_enable_log_dirty_pt_masked(kvm, memslot,
 								offset, mask);
+			kvm->stat.generic.dirty_pages -= hweight_long(mask);
 		}
 		KVM_MMU_UNLOCK(kvm);
 	}
@@ -2012,6 +2029,7 @@ static int kvm_clear_dirty_log_protect(struct kvm *kvm,
 			flush = true;
 			kvm_arch_mmu_enable_log_dirty_pt_masked(kvm, memslot,
 								offset, mask);
+			kvm->stat.generic.dirty_pages -= hweight_long(mask);
 		}
 	}
 	KVM_MMU_UNLOCK(kvm);
@@ -3062,11 +3080,13 @@ void mark_page_dirty_in_slot(struct kvm *kvm,
 		unsigned long rel_gfn = gfn - memslot->base_gfn;
 		u32 slot = (memslot->as_id << 16) | memslot->id;
 
-		if (kvm->dirty_ring_size)
+		if (kvm->dirty_ring_size) {
 			kvm_dirty_ring_push(kvm_dirty_ring_get(kvm),
 					    slot, rel_gfn);
-		else
+		} else {
 			set_bit_le(rel_gfn, memslot->dirty_bitmap);
+			++kvm->stat.generic.dirty_pages;
+		}
 	}
 }
 EXPORT_SYMBOL_GPL(mark_page_dirty_in_slot);
