@@ -177,23 +177,21 @@ static void dce_abm_init(struct abm *abm, uint32_t backlight)
 static unsigned int dce_abm_get_current_backlight(struct abm *abm)
 {
 	struct dce_abm *abm_dce = TO_DCE_ABM(abm);
-	unsigned int backlight = REG_READ(BL1_PWM_CURRENT_ABM_LEVEL);
 
 	/* return backlight in hardware format which is unsigned 17 bits, with
 	 * 1 bit integer and 16 bit fractional
 	 */
-	return backlight;
+	return REG_READ(BL1_PWM_CURRENT_ABM_LEVEL);
 }
 
 static unsigned int dce_abm_get_target_backlight(struct abm *abm)
 {
 	struct dce_abm *abm_dce = TO_DCE_ABM(abm);
-	unsigned int backlight = REG_READ(BL1_PWM_TARGET_ABM_LEVEL);
 
 	/* return backlight in hardware format which is unsigned 17 bits, with
 	 * 1 bit integer and 16 bit fractional
 	 */
-	return backlight;
+	return REG_READ(BL1_PWM_TARGET_ABM_LEVEL);
 }
 
 static bool dce_abm_set_level(struct abm *abm, uint32_t level)
