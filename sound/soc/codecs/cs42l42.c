@@ -884,7 +884,11 @@ static int cs42l42_pcm_hw_params(struct snd_pcm_substream *substream,
 		break;
 	}
 
-	return cs42l42_pll_config(component);
+	/* Configure the PLL if this is the first active stream */
+	if (!cs42l42->stream_use)
+		return cs42l42_pll_config(component);
+	else
+		return 0;
 }
 
 static int cs42l42_set_sysclk(struct snd_soc_dai *dai,
