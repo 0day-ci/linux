@@ -1299,7 +1299,6 @@ int msm_vfe_subdev_init(struct camss *camss, struct vfe_device *vfe,
 		return -EINVAL;
 	}
 	vfe->ops->subdev_init(dev, vfe);
-	vfe->ops->hw_version(vfe);
 
 	/* Memory */
 
@@ -1308,6 +1307,8 @@ int msm_vfe_subdev_init(struct camss *camss, struct vfe_device *vfe,
 		dev_err(dev, "could not map memory\n");
 		return PTR_ERR(vfe->base);
 	}
+
+	vfe->ops->hw_version(vfe);
 
 	/* Interrupt */
 
