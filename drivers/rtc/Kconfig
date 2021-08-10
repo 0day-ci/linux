@@ -565,6 +565,16 @@ config RTC_DRV_PALMAS
 	  This driver can also be built as a module. If so, the module
 	  will be called rtc-palma.
 
+config RTC_DRV_PCH
+	tristate "PCH RTC driver"
+	help
+	  If you say yes here you get support for the Intel Series PCH
+	  built-in read-only RTC. This driver is not for in-system use on x86,
+	  but rather is for external access over I2C from a BMC.
+
+	  This driver can also be built as a module. If so, the module
+	  will be called rtc-pch.
+
 config RTC_DRV_TPS6586X
 	tristate "TI TPS6586X RTC driver"
 	depends on MFD_TPS6586X
