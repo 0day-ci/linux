@@ -139,12 +139,13 @@ dsa_tag_8021q_vlan_find(struct dsa_8021q_context *ctx, int port, u16 vid)
 	return NULL;
 }
 
-static int dsa_switch_do_tag_8021q_vlan_add(struct dsa_switch *ds, int port,
-					    u16 vid, u16 flags)
+static int dsa_port_do_tag_8021q_vlan_add(struct dsa_port *dp, u16 vid,
+					  u16 flags)
 {
-	struct dsa_8021q_context *ctx = ds->tag_8021q_ctx;
-	struct dsa_port *dp = dsa_to_port(ds, port);
+	struct dsa_8021q_context *ctx = dp->ds->tag_8021q_ctx;
+	struct dsa_switch *ds = dp->ds;
 	struct dsa_tag_8021q_vlan *v;
+	int port = dp->index;
 	int err;
 
 	/* No need to bother with refcounting for user ports */
@@ -175,12 +176,12 @@ static int dsa_switch_do_tag_8021q_vlan_add(struct dsa_switch *ds, int port,
 	return 0;
 }
 
-static int dsa_switch_do_tag_8021q_vlan_del(struct dsa_switch *ds, int port,
-					    u16 vid)
+static int dsa_port_do_tag_8021q_vlan_del(struct dsa_port *dp, u16 vid)
 {
-	struct dsa_8021q_context *ctx = ds->tag_8021q_ctx;
-	struct dsa_port *dp = dsa_to_port(ds, port);
+	struct dsa_8021q_context *ctx = dp->ds->tag_8021q_ctx;
+	struct dsa_switch *ds = dp->ds;
 	struct dsa_tag_8021q_vlan *v;
+	int port = dp->index;
 	int err;
 
 	/* No need to bother with refcounting for user ports */
@@ -207,14 +208,16 @@ static int dsa_switch_do_tag_8021q_vlan_del(struct dsa_switch *ds, int port,
 }
 
 static bool
-dsa_switch_tag_8021q_vlan_match(struct dsa_switch *ds, int port,
-				struct dsa_notifier_tag_8021q_vlan_info *info)
+dsa_port_tag_8021q_vlan_match(struct dsa_port *dp,
+			      struct dsa_notifier_tag_8021q_vlan_info *info)
 {
-	if (dsa_is_dsa_port(ds, port) || dsa_is_cpu_port(ds, port))
+	struct dsa_switch *ds = dp->ds;
+
+	if (dsa_port_is_dsa(dp) || dsa_port_is_cpu(dp))
 		return true;
 
 	if (ds->dst->index == info->tree_index && ds->index == info->sw_index)
-		return port == info->port;
+		return dp->index == info->port;
 
 	return false;
 }
@@ -222,7 +225,8 @@ dsa_switch_tag_8021q_vlan_match(struct dsa_switch *ds, int port,
 int dsa_switch_tag_8021q_vlan_add(struct dsa_switch *ds,
 				  struct dsa_notifier_tag_8021q_vlan_info *info)
 {
-	int port, err;
+	struct dsa_port *dp;
+	int err;
 
 	/* Since we use dsa_broadcast(), there might be other switches in other
 	 * trees which don't support tag_8021q, so don't return an error.
@@ -232,21 +236,20 @@ int dsa_switch_tag_8021q_vlan_add(struct dsa_switch *ds,
 	if (!ds->ops->tag_8021q_vlan_add || !ds->tag_8021q_ctx)
 		return 0;
 
-	for (port = 0; port < ds->num_ports; port++) {
-		if (dsa_switch_tag_8021q_vlan_match(ds, port, info)) {
+	dsa_switch_for_each_port(dp, ds) {
+		if (dsa_port_tag_8021q_vlan_match(dp, info)) {
 			u16 flags = 0;
 
-			if (dsa_is_user_port(ds, port))
+			if (dsa_port_is_user(dp))
 				flags |= BRIDGE_VLAN_INFO_UNTAGGED;
 
 			if (vid_is_dsa_8021q_rxvlan(info->vid) &&
 			    dsa_8021q_rx_switch_id(info->vid) == ds->index &&
-			    dsa_8021q_rx_source_port(info->vid) == port)
+			    dsa_8021q_rx_source_port(info->vid) == dp->index)
 				flags |= BRIDGE_VLAN_INFO_PVID;
 
-			err = dsa_switch_do_tag_8021q_vlan_add(ds, port,
-							       info->vid,
-							       flags);
+			err = dsa_port_do_tag_8021q_vlan_add(dp, info->vid,
+							     flags);
 			if (err)
 				return err;
 		}
@@ -258,15 +261,15 @@ int dsa_switch_tag_8021q_vlan_add(struct dsa_switch *ds,
 int dsa_switch_tag_8021q_vlan_del(struct dsa_switch *ds,
 				  struct dsa_notifier_tag_8021q_vlan_info *info)
 {
-	int port, err;
+	struct dsa_port *dp;
+	int err;
 
 	if (!ds->ops->tag_8021q_vlan_del || !ds->tag_8021q_ctx)
 		return 0;
 
-	for (port = 0; port < ds->num_ports; port++) {
-		if (dsa_switch_tag_8021q_vlan_match(ds, port, info)) {
-			err = dsa_switch_do_tag_8021q_vlan_del(ds, port,
-							       info->vid);
+	dsa_switch_for_each_port(dp, ds) {
+		if (dsa_port_tag_8021q_vlan_match(dp, info)) {
+			err = dsa_port_do_tag_8021q_vlan_del(dp, info->vid);
 			if (err)
 				return err;
 		}
