@@ -66,7 +66,8 @@
 	C(EMPTY_SORT_FIELD,	"Empty sort field"),			\
 	C(TOO_MANY_SORT_FIELDS,	"Too many sort fields (Max = 2)"),	\
 	C(INVALID_SORT_FIELD,	"Sort field must be a key or a val"),	\
-	C(INVALID_STR_OPERAND,	"String type can not be an operand in expression"),
+	C(INVALID_STR_OPERAND,	"String type can not be an operand in expression"),  \
+	C(SYNTH_ON_EPROBE,	"Synthetic event on eprobe is not supported"),
 
 #undef C
 #define C(a, b)		HIST_ERR_##a
@@ -2413,7 +2414,7 @@ find_compatible_hist(struct hist_trigger_data *target_hist_data,
 }
 
 static struct trace_event_file *event_file(struct trace_array *tr,
-					   char *system, char *event_name)
+					   const char *system, const char *event_name)
 {
 	struct trace_event_file *file;
 
@@ -3165,9 +3166,21 @@ static int parse_action_params(struct trace_array *tr, char *params,
 	return ret;
 }
 
-static int action_parse(struct trace_array *tr, char *str, struct action_data *data,
+static inline bool check_match_on_eprobe(struct trace_array *tr,
+					 const char *system, const char *event)
+{
+	struct trace_event_file *file;
+
+	file = event_file(tr, system, event);
+	if (file && (file->event_call->flags & TRACE_EVENT_FL_EPROBE))
+		return true;
+	return false;
+}
+
+static int action_parse(struct hist_trigger_data *hist_data, char *str, struct action_data *data,
 			enum handler_id handler)
 {
+	struct trace_array *tr =  hist_data->event_file->tr;
 	char *action_name;
 	int ret = 0;
 
@@ -3235,6 +3248,12 @@ static int action_parse(struct trace_array *tr, char *str, struct action_data *d
 		data->action = ACTION_SNAPSHOT;
 	} else {
 		char *params = strsep(&str, ")");
+		if (check_match_on_eprobe(tr, hist_data->event_file->system->subsystem->name,
+					  trace_event_name(hist_data->event_file->event_call))) {
+			hist_err(tr, HIST_ERR_SYNTH_ON_EPROBE, 0);
+			ret = -EINVAL;
+			goto out;
+		}
 
 		if (str_has_prefix(action_name, "trace"))
 			data->use_trace_keyword = true;
@@ -3293,7 +3312,7 @@ static struct action_data *track_data_parse(struct hist_trigger_data *hist_data,
 		goto free;
 	}
 
-	ret = action_parse(hist_data->event_file->tr, str, data, handler);
+	ret = action_parse(hist_data, str, data, handler);
 	if (ret)
 		goto free;
  out:
@@ -3626,8 +3645,9 @@ static int onmatch_create(struct hist_trigger_data *hist_data,
 	return action_create(hist_data, data);
 }
 
-static struct action_data *onmatch_parse(struct trace_array *tr, char *str)
+static struct action_data *onmatch_parse(struct hist_trigger_data *hist_data, char *str)
 {
+	struct trace_array *tr = hist_data->event_file->tr;
 	char *match_event, *match_event_system;
 	struct action_data *data;
 	int ret = -EINVAL;
@@ -3665,7 +3685,7 @@ static struct action_data *onmatch_parse(struct trace_array *tr, char *str)
 		goto free;
 	}
 
-	ret = action_parse(tr, str, data, HANDLER_ONMATCH);
+	ret = action_parse(hist_data, str, data, HANDLER_ONMATCH);
 	if (ret)
 		goto free;
  out:
@@ -4120,7 +4140,6 @@ static void destroy_actions(struct hist_trigger_data *hist_data)
 
 static int parse_actions(struct hist_trigger_data *hist_data)
 {
-	struct trace_array *tr = hist_data->event_file->tr;
 	struct action_data *data;
 	unsigned int i;
 	int ret = 0;
@@ -4133,7 +4152,7 @@ static int parse_actions(struct hist_trigger_data *hist_data)
 		if ((len = str_has_prefix(str, "onmatch("))) {
 			char *action_str = str + len;
 
-			data = onmatch_parse(tr, action_str);
+			data = onmatch_parse(hist_data, action_str);
 			if (IS_ERR(data)) {
 				ret = PTR_ERR(data);
 				break;
