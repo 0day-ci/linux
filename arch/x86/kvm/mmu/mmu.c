@@ -1887,6 +1887,8 @@ static int mmu_unsync_walk(struct kvm_mmu_page *sp,
 
 static void kvm_unlink_unsync_page(struct kvm *kvm, struct kvm_mmu_page *sp)
 {
+	lockdep_assert_held_write(&kvm->mmu_lock);
+
 	WARN_ON(!sp->unsync);
 	trace_kvm_mmu_sync_page(sp);
 	sp->unsync = 0;
@@ -2592,9 +2594,16 @@ static void kvm_unsync_page(struct kvm_vcpu *vcpu, struct kvm_mmu_page *sp)
  * were marked unsync (or if there is no shadow page), -EPERM if the SPTE must
  * be write-protected.
  */
-int mmu_try_to_unsync_pages(struct kvm_vcpu *vcpu, gfn_t gfn, bool can_unsync)
+int mmu_try_to_unsync_pages(struct kvm_vcpu *vcpu, gfn_t gfn, bool can_unsync,
+			    spinlock_t *unsync_lock)
 {
+	bool locked_write = !unsync_lock;
 	struct kvm_mmu_page *sp;
+
+	if (locked_write)
+		lockdep_assert_held_write(&vcpu->kvm->mmu_lock);
+	else
+		lockdep_assert_held_read(&vcpu->kvm->mmu_lock);
 
 	/*
 	 * Force write-protection if the page is being tracked.  Note, the page
@@ -2617,9 +2626,32 @@ int mmu_try_to_unsync_pages(struct kvm_vcpu *vcpu, gfn_t gfn, bool can_unsync)
 		if (sp->unsync)
 			continue;
 
+		/*
+		 * TDP MMU page faults require an additional spinlock as they
+		 * run with mmu_lock held for read, not write, and the unsync
+		 * logic is not thread safe.
+		 */
+		if (!locked_write) {
+			locked_write = true;
+			spin_lock(unsync_lock);
+
+			/*
+			 * Recheck after taking the spinlock, a different vCPU
+			 * may have since marked the page unsync.  A false
+			 * positive on the unprotected check above is not
+			 * possible as clearing sp->unsync _must_ hold mmu_lock
+			 * for write, i.e. unsync cannot transition from 0->1
+			 * while this CPU holds mmu_lock for read.
+			 */
+			if (READ_ONCE(sp->unsync))
+				continue;
+		}
+
 		WARN_ON(sp->role.level != PG_LEVEL_4K);
 		kvm_unsync_page(vcpu, sp);
 	}
+	if (unsync_lock && locked_write)
+		spin_unlock(unsync_lock);
 
 	/*
 	 * We need to ensure that the marking of unsync pages is visible
@@ -2675,7 +2707,7 @@ static int set_spte(struct kvm_vcpu *vcpu, u64 *sptep,
 	sp = sptep_to_sp(sptep);
 
 	ret = make_spte(vcpu, pte_access, level, gfn, pfn, *sptep, speculative,
-			can_unsync, host_writable, sp_ad_disabled(sp), &spte);
+			can_unsync, host_writable, sp_ad_disabled(sp), &spte, NULL);
 
 	if (spte & PT_WRITABLE_MASK)
 		kvm_vcpu_mark_page_dirty(vcpu, gfn);

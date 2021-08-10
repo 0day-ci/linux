@@ -25,6 +25,7 @@ bool kvm_mmu_init_tdp_mmu(struct kvm *kvm)
 	INIT_LIST_HEAD(&kvm->arch.tdp_mmu_roots);
 	spin_lock_init(&kvm->arch.tdp_mmu_pages_lock);
 	INIT_LIST_HEAD(&kvm->arch.tdp_mmu_pages);
+	spin_lock_init(&kvm->arch.tdp_mmu_unsync_pages_lock);
 
 	return true;
 }
@@ -952,7 +953,7 @@ static int tdp_mmu_map_handle_target_level(struct kvm_vcpu *vcpu, int write,
 		make_spte_ret = make_spte(vcpu, ACC_ALL, iter->level, iter->gfn,
 					 pfn, iter->old_spte, prefault, true,
 					 map_writable, !shadow_accessed_mask,
-					 &new_spte);
+					 &new_spte, &vcpu->kvm->arch.tdp_mmu_unsync_pages_lock);
 
 	if (new_spte == iter->old_spte)
 		ret = RET_PF_SPURIOUS;

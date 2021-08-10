@@ -1176,6 +1176,9 @@ struct kvm_arch {
 	 * the thread holds the MMU lock in write mode.
 	 */
 	spinlock_t tdp_mmu_pages_lock;
+
+	/* Protects marking pages unsync during TDP MMU page faults. */
+	spinlock_t tdp_mmu_unsync_pages_lock;
 #endif /* CONFIG_X86_64 */
 
 	/*

@@ -342,7 +342,7 @@ static inline u64 get_mmio_spte_generation(u64 spte)
 int make_spte(struct kvm_vcpu *vcpu, unsigned int pte_access, int level,
 		     gfn_t gfn, kvm_pfn_t pfn, u64 old_spte, bool speculative,
 		     bool can_unsync, bool host_writable, bool ad_disabled,
-		     u64 *new_spte);
+		     u64 *new_spte, spinlock_t *unsync_lock);
 u64 make_nonleaf_spte(u64 *child_pt, bool ad_disabled);
 u64 make_mmio_spte(struct kvm_vcpu *vcpu, u64 gfn, unsigned int access);
 u64 mark_spte_for_access_track(u64 spte);
