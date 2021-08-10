@@ -313,6 +313,42 @@ static int udp6_skb_len(struct sk_buff *skb)
 	return unlikely(inet6_is_jumbogram(skb)) ? skb->len : udp_skb_len(skb);
 }
 
+static int udp6_copy_addr(struct sock *sk, struct msghdr *msg, int *addr_len)
+{
+	struct inet_sock *inet = inet_sk(sk);
+	struct flowi4 *fl4;
+	struct flowi6 *fl6;
+	DECLARE_SOCKADDR(struct sockaddr_in6 *, sin6, msg->msg_name);
+
+	if (sin6) {
+		switch (udp_sk(sk)->pending) {
+		case AF_INET:
+			fl4 = &inet->cork.fl.u.ip4;
+			sin6->sin6_family = AF_INET6;
+			sin6->sin6_port = fl4->fl4_dport;
+			ipv6_addr_set_v4mapped(fl4->daddr,
+					       &sin6->sin6_addr);
+			sin6->sin6_flowinfo = 0;
+			sin6->sin6_scope_id = 0;
+			*addr_len = sizeof(*sin6);
+			break;
+		case AF_INET6:
+			fl6 = &inet->cork.fl.u.ip6;
+			sin6->sin6_family = AF_INET6;
+			sin6->sin6_port = fl6->fl6_dport;
+			sin6->sin6_addr = fl6->daddr;
+			sin6->sin6_flowinfo = fl6->flowlabel & IPV6_FLOWINFO_MASK;
+			sin6->sin6_scope_id = fl6->flowi6_oif;
+			*addr_len = sizeof(*sin6);
+			break;
+		default:
+			return -EAGAIN;
+		}
+	}
+
+	return 0;
+}
+
 /*
  *	This should be easy, if there is something there we
  *	return it, otherwise we block.
@@ -330,6 +366,7 @@ int udpv6_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 	struct udp_mib __percpu *mib;
 	bool checksum_valid = false;
 	int is_udp4;
+	struct udp_sock *up = udp_sk(sk);
 
 	if (flags & MSG_ERRQUEUE)
 		return ipv6_recv_error(sk, msg, len, addr_len);
@@ -337,6 +374,21 @@ int udpv6_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 	if (np->rxpmtu && np->rxopt.bits.rxpmtu)
 		return ipv6_recv_rxpmtu(sk, msg, len, addr_len);
 
+	if (unlikely(up->repair)) {
+		if (!peeking)
+			return -EPERM;
+
+		lock_sock(sk);
+		err = udp6_copy_addr(sk, msg, addr_len);
+		if (err) {
+			release_sock(sk);
+			return err;
+		}
+
+		err = udp_peek_sndq(sk, msg, len);
+		release_sock(sk);
+		return err;
+	}
 try_again:
 	off = sk_peek_offset(sk, flags);
 	skb = __skb_recv_udp(sk, flags, noblock, &off, &err);
@@ -413,7 +465,7 @@ try_again:
 						      (struct sockaddr *)sin6);
 	}
 
-	if (udp_sk(sk)->gro_enabled)
+	if (up->gro_enabled)
 		udp_cmsg_recv(msg, sk, skb);
 
 	if (np->rxopt.all)
@@ -436,7 +488,7 @@ try_again:
 	return err;
 
 csum_copy_err:
-	if (!__sk_queue_drop_skb(sk, &udp_sk(sk)->reader_queue, skb, flags,
+	if (!__sk_queue_drop_skb(sk, &up->reader_queue, skb, flags,
 				 udp_skb_destructor)) {
 		SNMP_INC_STATS(mib, UDP_MIB_CSUMERRORS);
 		SNMP_INC_STATS(mib, UDP_MIB_INERRORS);
