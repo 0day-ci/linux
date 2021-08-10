@@ -11,8 +11,13 @@
 #include <linux/ctype.h>
 #include <linux/pci.h>
 #include <linux/pci-p2pdma.h>
+#include <crypto/hash.h>
+#include <crypto/kpp.h>
 
 #include "nvmet.h"
+#ifdef CONFIG_NVME_TARGET_AUTH
+#include "../host/auth.h"
+#endif
 
 static const struct config_item_type nvmet_host_type;
 static const struct config_item_type nvmet_subsys_type;
@@ -1656,10 +1661,71 @@ static const struct config_item_type nvmet_ports_type = {
 static struct config_group nvmet_subsystems_group;
 static struct config_group nvmet_ports_group;
 
+#ifdef CONFIG_NVME_TARGET_AUTH
+static ssize_t nvmet_host_dhchap_key_show(struct config_item *item,
+		char *page)
+{
+	u8 *dhchap_secret = to_host(item)->dhchap_secret;
+
+	if (!dhchap_secret)
+		return sprintf(page, "\n");
+	return sprintf(page, "%s\n", dhchap_secret);
+}
+
+static ssize_t nvmet_host_dhchap_key_store(struct config_item *item,
+		const char *page, size_t count)
+{
+	struct nvmet_host *host = to_host(item);
+	int ret;
+
+	ret = nvmet_auth_set_host_key(host, page);
+	if (ret < 0)
+		return ret;
+	return count;
+}
+
+CONFIGFS_ATTR(nvmet_host_, dhchap_key);
+
+static ssize_t nvmet_host_dhchap_hash_show(struct config_item *item,
+		char *page)
+{
+	struct nvmet_host *host = to_host(item);
+	const char *hash_name = nvme_auth_hmac_name(host->dhchap_hash_id);
+
+	return sprintf(page, "%s\n", hash_name ? hash_name : "none");
+}
+
+static ssize_t nvmet_host_dhchap_hash_store(struct config_item *item,
+		const char *page, size_t count)
+{
+	struct nvmet_host *host = to_host(item);
+	int hmac_id;
+
+	hmac_id = nvme_auth_hmac_id(page);
+	if (hmac_id < 0)
+		return -EINVAL;
+	if (!crypto_has_shash(nvme_auth_hmac_name(hmac_id), 0, 0))
+		return -ENOTSUPP;
+	host->dhchap_hash_id = hmac_id;
+	return count;
+}
+
+CONFIGFS_ATTR(nvmet_host_, dhchap_hash);
+
+static struct configfs_attribute *nvmet_host_attrs[] = {
+	&nvmet_host_attr_dhchap_key,
+	&nvmet_host_attr_dhchap_hash,
+	NULL,
+};
+#endif /* CONFIG_NVME_TARGET_AUTH */
+
 static void nvmet_host_release(struct config_item *item)
 {
 	struct nvmet_host *host = to_host(item);
-
+#ifdef CONFIG_NVME_TARGET_AUTH
+	if (host->dhchap_secret)
+		kfree(host->dhchap_secret);
+#endif
 	kfree(host);
 }
 
@@ -1669,6 +1735,9 @@ static struct configfs_item_operations nvmet_host_item_ops = {
 
 static const struct config_item_type nvmet_host_type = {
 	.ct_item_ops		= &nvmet_host_item_ops,
+#ifdef CONFIG_NVME_TARGET_AUTH
+	.ct_attrs		= nvmet_host_attrs,
+#endif
 	.ct_owner		= THIS_MODULE,
 };
 
