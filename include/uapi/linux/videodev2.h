@@ -701,6 +701,7 @@ struct v4l2_pix_format {
 #define V4L2_PIX_FMT_FWHT     v4l2_fourcc('F', 'W', 'H', 'T') /* Fast Walsh Hadamard Transform (vicodec) */
 #define V4L2_PIX_FMT_FWHT_STATELESS     v4l2_fourcc('S', 'F', 'W', 'H') /* Stateless FWHT (vicodec) */
 #define V4L2_PIX_FMT_H264_SLICE v4l2_fourcc('S', '2', '6', '4') /* H264 parsed slices */
+#define V4L2_PIX_FMT_AV1_FRAME	v4l2_fourcc('A', 'V', '1', 'F') /* AV1 parsed frame */
 
 /*  Vendor-specific formats   */
 #define V4L2_PIX_FMT_CPIA1    v4l2_fourcc('C', 'P', 'I', 'A') /* cpia1 YUV */
@@ -1750,6 +1751,13 @@ struct v4l2_ext_control {
 		struct v4l2_ctrl_mpeg2_sequence __user *p_mpeg2_sequence;
 		struct v4l2_ctrl_mpeg2_picture __user *p_mpeg2_picture;
 		struct v4l2_ctrl_mpeg2_quantisation __user *p_mpeg2_quantisation;
+
+		struct v4l2_ctrl_av1_sequence __user *p_av1_sequence;
+		struct v4l2_ctrl_av1_tile_group __user *p_av1_tile_group;
+		struct v4l2_ctrl_av1_tile_group_entry __user *p_av1_tile_group_entry;
+		struct v4l2_ctrl_av1_tile_list __user *p_av1_tile_list;
+		struct v4l2_ctrl_av1_tile_list_entry __user *p_av1_tile_list_entry;
+		struct v4l2_ctrl_av1_frame_header __user *p_av1_frame_header;
 		void __user *ptr;
 	};
 } __attribute__ ((packed));
@@ -1814,6 +1822,13 @@ enum v4l2_ctrl_type {
 	V4L2_CTRL_TYPE_MPEG2_QUANTISATION   = 0x0250,
 	V4L2_CTRL_TYPE_MPEG2_SEQUENCE       = 0x0251,
 	V4L2_CTRL_TYPE_MPEG2_PICTURE        = 0x0252,
+
+	V4L2_CTRL_TYPE_AV1_SEQUENCE	    = 0x280,
+	V4L2_CTRL_TYPE_AV1_TILE_GROUP	    = 0x281,
+	V4L2_CTRL_TYPE_AV1_TILE_GROUP_ENTRY = 0x282,
+	V4L2_CTRL_TYPE_AV1_TILE_LIST	    = 0x283,
+	V4L2_CTRL_TYPE_AV1_TILE_LIST_ENTRY  = 0x284,
+	V4L2_CTRL_TYPE_AV1_FRAME_HEADER	    = 0x285,
 };
 
 /*  Used in the VIDIOC_QUERYCTRL ioctl for querying controls */

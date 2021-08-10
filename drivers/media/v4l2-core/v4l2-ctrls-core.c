@@ -283,6 +283,25 @@ static void std_log(const struct v4l2_ctrl *ctrl)
 	case V4L2_CTRL_TYPE_MPEG2_PICTURE:
 		pr_cont("MPEG2_PICTURE");
 		break;
+	case V4L2_CTRL_TYPE_AV1_SEQUENCE:
+		pr_cont("AV1_SEQUENCE");
+		break;
+	case V4L2_CTRL_TYPE_AV1_TILE_GROUP:
+		pr_cont("AV1_TILE_GROUP");
+		break;
+	case V4L2_CTRL_TYPE_AV1_TILE_GROUP_ENTRY:
+		pr_cont("AV1_TILE_GROUP_ENTRY");
+		break;
+	case V4L2_CTRL_TYPE_AV1_TILE_LIST:
+		pr_cont("AV1_TILE_LIST");
+		break;
+	case V4L2_CTRL_TYPE_AV1_TILE_LIST_ENTRY:
+		pr_cont("AV1_TILE_LIST_ENTRY");
+		break;
+	case V4L2_CTRL_TYPE_AV1_FRAME_HEADER:
+		pr_cont("AV1_FRAME_HEADER");
+		break;
+
 	default:
 		pr_cont("unknown type %d", ctrl->type);
 		break;
@@ -316,6 +335,244 @@ static void std_log(const struct v4l2_ctrl *ctrl)
 	memset(&(s).padding, 0, sizeof((s).padding))
 #define zero_reserved(s) \
 	memset(&(s).reserved, 0, sizeof((s).reserved))
+
+static int validate_av1_quantization(struct v4l2_av1_quantization *q)
+{
+	if (q->flags > GENMASK(2, 0))
+		return -EINVAL;
+
+	if (q->delta_q_y_dc < -63 || q->delta_q_y_dc > 63 ||
+	    q->delta_q_u_dc < -63 || q->delta_q_u_dc > 63 ||
+	    q->delta_q_v_dc < -63 || q->delta_q_v_dc > 63 ||
+	    q->delta_q_u_ac < -63 || q->delta_q_u_ac > 63 ||
+	    q->delta_q_v_ac < -63 || q->delta_q_v_ac > 63 ||
+	    q->delta_q_res > GENMASK(1, 0))
+		return -EINVAL;
+
+	if (q->qm_y > GENMASK(3, 0) ||
+	    q->qm_u > GENMASK(3, 0) ||
+	    q->qm_v > GENMASK(3, 0))
+		return -EINVAL;
+
+	return 0;
+}
+
+static int validate_av1_segmentation(struct v4l2_av1_segmentation *s)
+{
+	u32 i;
+	u32 j;
+	s32 limit;
+
+	if (s->flags > GENMASK(3, 0))
+		return -EINVAL;
+
+	for (i = 0; i < ARRAY_SIZE(s->feature_data); i++) {
+		const int segmentation_feature_signed[] = { 1, 1, 1, 1, 1, 0, 0, 0 };
+		const int segmentation_feature_max[] = { 255, 63, 63, 63, 63, 7, 0, 0};
+
+		for (j = 0; j < ARRAY_SIZE(s->feature_data[j]); j++) {
+			if (segmentation_feature_signed[j]) {
+				limit = segmentation_feature_max[j];
+
+				if (s->feature_data[i][j] < -limit ||
+				    s->feature_data[i][j] > limit)
+					return -EINVAL;
+			} else {
+				if (s->feature_data[i][j] > limit)
+					return -EINVAL;
+			}
+		}
+	}
+
+	return 0;
+}
+
+static int validate_av1_loop_filter(struct v4l2_av1_loop_filter *lf)
+{
+	u32 i;
+
+	if (lf->flags > GENMASK(2, 0))
+		return -EINVAL;
+
+	for (i = 0; i < ARRAY_SIZE(lf->level); i++) {
+		if (lf->level[i] > GENMASK(5, 0))
+			return -EINVAL;
+	}
+
+	if (lf->sharpness > GENMASK(2, 0))
+		return -EINVAL;
+
+	for (i = 0; i < ARRAY_SIZE(lf->ref_deltas); i++) {
+		if (lf->ref_deltas[i] < -63 || lf->ref_deltas[i] > 63)
+			return -EINVAL;
+	}
+
+	for (i = 0; i < ARRAY_SIZE(lf->mode_deltas); i++) {
+		if (lf->mode_deltas[i] < -63 || lf->mode_deltas[i] > 63)
+			return -EINVAL;
+	}
+
+	return 0;
+}
+
+static int validate_av1_cdef(struct v4l2_av1_cdef *cdef)
+{
+	u32 i;
+
+	if (cdef->damping_minus_3 > GENMASK(1, 0) ||
+	    cdef->bits > GENMASK(1, 0))
+		return -EINVAL;
+
+	for (i = 0; i < 1 << cdef->bits; i++) {
+		if (cdef->y_pri_strength[i] > GENMASK(3, 0) ||
+		    cdef->y_sec_strength[i] > 4 ||
+		    cdef->uv_pri_strength[i] > GENMASK(3, 0) ||
+		    cdef->uv_sec_strength[i] > 4)
+			return -EINVAL;
+	}
+
+	return 0;
+}
+
+static int validate_av1_loop_restauration(struct v4l2_av1_loop_restoration *lr)
+{
+	if (lr->lr_unit_shift > 3 || lr->lr_uv_shift > 1)
+		return -EINVAL;
+
+	return 0;
+}
+
+static int validate_av1_film_grain(struct v4l2_av1_film_grain *fg)
+{
+	u32 i;
+
+	if (fg->flags > GENMASK(4, 0))
+		return -EINVAL;
+
+	if (fg->film_grain_params_ref_idx > GENMASK(2, 0) ||
+	    fg->num_y_points > 14 ||
+	    fg->num_cb_points > 10 ||
+	    fg->num_cr_points > GENMASK(3, 0) ||
+	    fg->grain_scaling_minus_8 > GENMASK(1, 0) ||
+	    fg->ar_coeff_lag > GENMASK(1, 0) ||
+	    fg->ar_coeff_shift_minus_6 > GENMASK(1, 0) ||
+	    fg->grain_scale_shift > GENMASK(1, 0))
+		return -EINVAL;
+
+	if (!(fg->flags & V4L2_AV1_FILM_GRAIN_FLAG_APPLY_GRAIN))
+		return 0;
+
+	for (i = 1; i < ARRAY_SIZE(fg->point_y_value); i++)
+		if (fg->point_y_value[i] <= fg->point_y_value[i - 1])
+			return -EINVAL;
+
+	for (i = 1; i < ARRAY_SIZE(fg->point_cb_value); i++)
+		if (fg->point_cb_value[i] <= fg->point_cb_value[i - 1])
+			return -EINVAL;
+
+	for (i = 1; i < ARRAY_SIZE(fg->point_cr_value); i++)
+		if (fg->point_cr_value[i] <= fg->point_cr_value[i - 1])
+			return -EINVAL;
+
+	return 0;
+}
+
+static int validate_av1_frame_header(struct v4l2_ctrl_av1_frame_header *f)
+{
+	int ret = 0;
+
+	ret = validate_av1_quantization(&f->quantization);
+	if (ret)
+		return ret;
+	ret = validate_av1_segmentation(&f->segmentation);
+	if (ret)
+		return ret;
+	ret = validate_av1_loop_filter(&f->loop_filter);
+	if (ret)
+		return ret;
+	ret = validate_av1_cdef(&f->cdef);
+	if (ret)
+		return ret;
+	ret = validate_av1_loop_restauration(&f->loop_restoration);
+	if (ret)
+		return ret;
+	ret = validate_av1_film_grain(&f->film_grain);
+	if (ret)
+		return ret;
+
+	if (f->flags &
+	~(V4L2_AV1_FRAME_HEADER_FLAG_SHOW_FRAME |
+	  V4L2_AV1_FRAME_HEADER_FLAG_SHOWABLE_FRAME |
+	  V4L2_AV1_FRAME_HEADER_FLAG_ERROR_RESILIENT_MODE |
+	  V4L2_AV1_FRAME_HEADER_FLAG_DISABLE_CDF_UPDATE |
+	  V4L2_AV1_FRAME_HEADER_FLAG_ALLOW_SCREEN_CONTENT_TOOLS |
+	  V4L2_AV1_FRAME_HEADER_FLAG_FORCE_INTEGER_MV |
+	  V4L2_AV1_FRAME_HEADER_FLAG_ALLOW_INTRABC |
+	  V4L2_AV1_FRAME_HEADER_FLAG_USE_SUPERRES |
+	  V4L2_AV1_FRAME_HEADER_FLAG_ALLOW_HIGH_PRECISION_MV |
+	  V4L2_AV1_FRAME_HEADER_FLAG_IS_MOTION_MODE_SWITCHABLE |
+	  V4L2_AV1_FRAME_HEADER_FLAG_USE_REF_FRAME_MVS |
+	  V4L2_AV1_FRAME_HEADER_FLAG_DISABLE_FRAME_END_UPDATE_CDF |
+	  V4L2_AV1_FRAME_HEADER_FLAG_UNIFORM_TILE_SPACING |
+	  V4L2_AV1_FRAME_HEADER_FLAG_ALLOW_WARPED_MOTION |
+	  V4L2_AV1_FRAME_HEADER_FLAG_REFERENCE_SELECT |
+	  V4L2_AV1_FRAME_HEADER_FLAG_REDUCED_TX_SET |
+	  V4L2_AV1_FRAME_HEADER_FLAG_FRAME_SIZE_OVERRIDE |
+	  V4L2_AV1_FRAME_HEADER_FLAG_BUFFER_REMOVAL_TIME_PRESENT |
+	  V4L2_AV1_FRAME_HEADER_FLAG_FRAME_REFS_SHORT_SIGNALING))
+		return -EINVAL;
+
+	if (f->superres_denom > GENMASK(2, 0) + 9)
+		return -EINVAL;
+
+	return 0;
+}
+
+static int validate_av1_sequence(struct v4l2_ctrl_av1_sequence *s)
+{
+	if (s->flags &
+	~(V4L2_AV1_SEQUENCE_FLAG_STILL_PICTURE |
+	 V4L2_AV1_SEQUENCE_FLAG_USE_128X128_SUPERBLOCK |
+	 V4L2_AV1_SEQUENCE_FLAG_ENABLE_FILTER_INTRA |
+	 V4L2_AV1_SEQUENCE_FLAG_ENABLE_INTRA_EDGE_FILTER |
+	 V4L2_AV1_SEQUENCE_FLAG_ENABLE_INTERINTRA_COMPOUND |
+	 V4L2_AV1_SEQUENCE_FLAG_ENABLE_MASKED_COMPOUND |
+	 V4L2_AV1_SEQUENCE_FLAG_ENABLE_WARPED_MOTION |
+	 V4L2_AV1_SEQUENCE_FLAG_ENABLE_DUAL_FILTER |
+	 V4L2_AV1_SEQUENCE_FLAG_ENABLE_ORDER_HINT |
+	 V4L2_AV1_SEQUENCE_FLAG_ENABLE_JNT_COMP |
+	 V4L2_AV1_SEQUENCE_FLAG_ENABLE_REF_FRAME_MVS |
+	 V4L2_AV1_SEQUENCE_FLAG_ENABLE_SUPERRES |
+	 V4L2_AV1_SEQUENCE_FLAG_ENABLE_CDEF |
+	 V4L2_AV1_SEQUENCE_FLAG_ENABLE_RESTORATION |
+	 V4L2_AV1_SEQUENCE_FLAG_MONO_CHROME |
+	 V4L2_AV1_SEQUENCE_FLAG_COLOR_RANGE |
+	 V4L2_AV1_SEQUENCE_FLAG_SUBSAMPLING_X |
+	 V4L2_AV1_SEQUENCE_FLAG_SUBSAMPLING_Y |
+	 V4L2_AV1_SEQUENCE_FLAG_FILM_GRAIN_PARAMS_PRESENT |
+	 V4L2_AV1_SEQUENCE_FLAG_SEPARATE_UV_DELTA_Q))
+		return -EINVAL;
+
+	if (s->seq_profile == 1 && s->flags & V4L2_AV1_SEQUENCE_FLAG_MONO_CHROME)
+		return -EINVAL;
+
+	/* reserved */
+	if (s->seq_profile > 2)
+		return -EINVAL;
+
+	/* TODO: PROFILES */
+	return 0;
+}
+
+static int validate_av1_tile_group(struct v4l2_ctrl_av1_tile_group *t)
+{
+	if (t->flags & ~(V4L2_AV1_TILE_GROUP_FLAG_START_AND_END_PRESENT))
+		return -EINVAL;
+	if (t->tg_start > t->tg_end)
+		return -EINVAL;
+
+	return 0;
+}
 
 /*
  * Compound controls validation requires setting unused fields/flags to zero
@@ -573,7 +830,16 @@ static int std_validate_compound(const struct v4l2_ctrl *ctrl, u32 idx,
 		zero_padding(p_vp8_frame->entropy);
 		zero_padding(p_vp8_frame->coder_state);
 		break;
-
+	case V4L2_CTRL_TYPE_AV1_FRAME_HEADER:
+		return validate_av1_frame_header(p);
+	case V4L2_CTRL_TYPE_AV1_SEQUENCE:
+		return validate_av1_sequence(p);
+	case V4L2_CTRL_TYPE_AV1_TILE_GROUP:
+		return validate_av1_tile_group(p);
+	case V4L2_CTRL_TYPE_AV1_TILE_GROUP_ENTRY:
+	case V4L2_CTRL_TYPE_AV1_TILE_LIST:
+	case V4L2_CTRL_TYPE_AV1_TILE_LIST_ENTRY:
+		break;
 	case V4L2_CTRL_TYPE_HEVC_SPS:
 		p_hevc_sps = p;
 
@@ -1230,6 +1496,24 @@ static struct v4l2_ctrl *v4l2_ctrl_new(struct v4l2_ctrl_handler *hdl,
 		break;
 	case V4L2_CTRL_TYPE_VP8_FRAME:
 		elem_size = sizeof(struct v4l2_ctrl_vp8_frame);
+		break;
+	case V4L2_CTRL_TYPE_AV1_SEQUENCE:
+		elem_size = sizeof(struct v4l2_ctrl_av1_sequence);
+		break;
+	case V4L2_CTRL_TYPE_AV1_TILE_GROUP:
+		elem_size = sizeof(struct v4l2_ctrl_av1_tile_group);
+		break;
+	case V4L2_CTRL_TYPE_AV1_TILE_GROUP_ENTRY:
+		elem_size = sizeof(struct v4l2_ctrl_av1_tile_group_entry);
+		break;
+	case V4L2_CTRL_TYPE_AV1_TILE_LIST:
+		elem_size = sizeof(struct v4l2_ctrl_av1_tile_list);
+		break;
+	case V4L2_CTRL_TYPE_AV1_TILE_LIST_ENTRY:
+		elem_size = sizeof(struct v4l2_ctrl_av1_tile_list_entry);
+		break;
+	case V4L2_CTRL_TYPE_AV1_FRAME_HEADER:
+		elem_size = sizeof(struct v4l2_ctrl_av1_frame_header);
 		break;
 	case V4L2_CTRL_TYPE_HEVC_SPS:
 		elem_size = sizeof(struct v4l2_ctrl_hevc_sps);

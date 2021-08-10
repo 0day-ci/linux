@@ -417,3 +417,13 @@ VP8
 :title:     RFC 6386: "VP8 Data Format and Decoding Guide"
 
 :author:    J. Bankoski et al.
+
+.. _av1:
+
+AV1
+===
+
+
+:title:     AV1 Bitstream & Decoding Process Specification
+
+:author:    Peter de Rivaz, Argon Design Ltd, Jack Haughton, Argon Design Ltd
