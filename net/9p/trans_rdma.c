@@ -279,7 +279,8 @@ p9_cm_event_handler(struct rdma_cm_id *id, struct rdma_cm_event *event)
 	default:
 		BUG();
 	}
-	complete(&rdma->cm_done);
+	if (rdma)
+		complete(&rdma->cm_done);
 	return 0;
 }
 
