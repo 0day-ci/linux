@@ -63,8 +63,11 @@ static int failover_slave_register(struct net_device *slave_dev)
 	    fops->slave_pre_register(slave_dev, failover_dev))
 		goto done;
 
-	err = netdev_rx_handler_register(slave_dev, fops->slave_handle_frame,
+	if (fops)
+		err = netdev_rx_handler_register(slave_dev, fops->slave_handle_frame,
 					 failover_dev);
+	else
+		err = -EINVAL;
 	if (err) {
 		netdev_err(slave_dev, "can not register failover rx handler (err = %d)\n",
 			   err);
