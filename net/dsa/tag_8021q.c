@@ -428,13 +428,13 @@ void dsa_tag_8021q_bridge_tx_fwd_unoffload(struct dsa_switch *ds, int port,
 EXPORT_SYMBOL_GPL(dsa_tag_8021q_bridge_tx_fwd_unoffload);
 
 /* Set up a port's tag_8021q RX and TX VLAN for standalone mode operation */
-static int dsa_tag_8021q_port_setup(struct dsa_switch *ds, int port)
+static int dsa_port_tag_8021q_setup(struct dsa_port *dp)
 {
-	struct dsa_8021q_context *ctx = ds->tag_8021q_ctx;
-	struct dsa_port *dp = dsa_to_port(ds, port);
-	u16 rx_vid = dsa_8021q_rx_vid(ds, port);
-	u16 tx_vid = dsa_8021q_tx_vid(ds, port);
+	struct dsa_8021q_context *ctx = dp->ds->tag_8021q_ctx;
+	struct dsa_switch *ds = dp->ds;
 	struct net_device *master;
+	int port = dp->index;
+	u16 rx_vid, tx_vid;
 	int err;
 
 	/* The CPU port is implicitly configured by
@@ -443,6 +443,8 @@ static int dsa_tag_8021q_port_setup(struct dsa_switch *ds, int port)
 	if (!dsa_port_is_user(dp))
 		return 0;
 
+	rx_vid = dsa_8021q_rx_vid(ds, port);
+	tx_vid = dsa_8021q_tx_vid(ds, port);
 	master = dp->cpu_dp->master;
 
 	/* Add this user port's RX VID to the membership list of all others
@@ -473,13 +475,13 @@ static int dsa_tag_8021q_port_setup(struct dsa_switch *ds, int port)
 	return err;
 }
 
-static void dsa_tag_8021q_port_teardown(struct dsa_switch *ds, int port)
+static void dsa_port_tag_8021q_teardown(struct dsa_port *dp)
 {
-	struct dsa_8021q_context *ctx = ds->tag_8021q_ctx;
-	struct dsa_port *dp = dsa_to_port(ds, port);
-	u16 rx_vid = dsa_8021q_rx_vid(ds, port);
-	u16 tx_vid = dsa_8021q_tx_vid(ds, port);
+	struct dsa_8021q_context *ctx = dp->ds->tag_8021q_ctx;
+	struct dsa_switch *ds = dp->ds;
 	struct net_device *master;
+	int port = dp->index;
+	u16 rx_vid, tx_vid;
 
 	/* The CPU port is implicitly configured by
 	 * configuring the front-panel ports
@@ -487,6 +489,8 @@ static void dsa_tag_8021q_port_teardown(struct dsa_switch *ds, int port)
 	if (!dsa_port_is_user(dp))
 		return;
 
+	rx_vid = dsa_8021q_rx_vid(ds, port);
+	tx_vid = dsa_8021q_tx_vid(ds, port);
 	master = dp->cpu_dp->master;
 
 	dsa_port_tag_8021q_vlan_del(dp, rx_vid);
@@ -498,16 +502,17 @@ static void dsa_tag_8021q_port_teardown(struct dsa_switch *ds, int port)
 
 static int dsa_tag_8021q_setup(struct dsa_switch *ds)
 {
-	int err, port;
+	struct dsa_port *dp;
+	int err;
 
 	ASSERT_RTNL();
 
-	for (port = 0; port < ds->num_ports; port++) {
-		err = dsa_tag_8021q_port_setup(ds, port);
+	dsa_switch_for_each_available_port(dp, ds) {
+		err = dsa_port_tag_8021q_setup(dp);
 		if (err < 0) {
 			dev_err(ds->dev,
 				"Failed to setup VLAN tagging for port %d: %pe\n",
-				port, ERR_PTR(err));
+				dp->index, ERR_PTR(err));
 			return err;
 		}
 	}
@@ -517,12 +522,12 @@ static int dsa_tag_8021q_setup(struct dsa_switch *ds)
 
 static void dsa_tag_8021q_teardown(struct dsa_switch *ds)
 {
-	int port;
+	struct dsa_port *dp;
 
 	ASSERT_RTNL();
 
-	for (port = 0; port < ds->num_ports; port++)
-		dsa_tag_8021q_port_teardown(ds, port);
+	dsa_switch_for_each_available_port(dp, ds)
+		dsa_port_tag_8021q_teardown(dp);
 }
 
 int dsa_tag_8021q_register(struct dsa_switch *ds, __be16 proto)
