@@ -296,7 +296,7 @@ static void alloc_init_cont_pmd(pud_t *pudp, unsigned long addr,
 static inline bool use_1G_block(unsigned long addr, unsigned long next,
 			unsigned long phys)
 {
-	if (PAGE_SHIFT != 12)
+	if (!IS_ENABLED(CONFIG_ARM64_4K_PAGES))
 		return false;
 
 	if (((addr | next | phys) & ~PUD_MASK) != 0)

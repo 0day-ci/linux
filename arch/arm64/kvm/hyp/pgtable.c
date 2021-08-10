@@ -85,7 +85,7 @@ static bool kvm_level_supports_block_mapping(u32 level)
 	 * Reject invalid block mappings and don't bother with 4TB mappings for
 	 * 52-bit PAs.
 	 */
-	return !(level == 0 || (PAGE_SIZE != SZ_4K && level == 1));
+	return !(level == 0 || (!IS_ENABLED(CONFIG_ARM64_4K_PAGES) && level == 1));
 }
 
 static bool kvm_block_mapping_supported(u64 addr, u64 end, u64 phys, u32 level)
@@ -155,7 +155,7 @@ static u64 kvm_pte_to_phys(kvm_pte_t pte)
 {
 	u64 pa = pte & KVM_PTE_ADDR_MASK;
 
-	if (PAGE_SHIFT == 16)
+	if (IS_ENABLED(CONFIG_ARM64_64K_PAGES))
 		pa |= FIELD_GET(KVM_PTE_ADDR_51_48, pte) << 48;
 
 	return pa;
@@ -165,7 +165,7 @@ static kvm_pte_t kvm_phys_to_pte(u64 pa)
 {
 	kvm_pte_t pte = pa & KVM_PTE_ADDR_MASK;
 
-	if (PAGE_SHIFT == 16)
+	if (IS_ENABLED(CONFIG_ARM64_64K_PAGES))
 		pte |= FIELD_PREP(KVM_PTE_ADDR_51_48, pa >> 48);
 
 	return pte;
