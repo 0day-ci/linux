@@ -61,6 +61,11 @@ patternProperties:
               description:
                 Size in bit within the address range specified by reg.
 
+      reverse-data:
+        $ref: /schemas/types.yaml#/definitions/flag
+        description:
+          Reverse the data that read from the storage device.
+
     required:
       - reg
 
