@@ -438,7 +438,7 @@ static int sja1105_mdiobus_pcs_register(struct sja1105_private *priv)
 		}
 
 		xpcs = xpcs_create(mdiodev, priv->phy_mode[port]);
-		if (IS_ERR(xpcs)) {
+		if (IS_ERR_OR_NULL(xpcs)) {
 			rc = PTR_ERR(xpcs);
 			goto out_pcs_free;
 		}
