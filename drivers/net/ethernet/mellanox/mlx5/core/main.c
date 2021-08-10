@@ -1494,10 +1494,20 @@ static int probe_one(struct pci_dev *pdev, const struct pci_device_id *id)
 		dev_err(&pdev->dev, "mlx5_crdump_enable failed with error code %d\n", err);
 
 	pci_save_state(pdev);
+	err = devlink_register(devlink);
+	if (err) {
+		mlx5_core_err(dev,
+			      "devlink_register failed with error code %d\n",
+			      err);
+		goto devlink_reg_err;
+	}
 	if (!mlx5_core_is_mp_slave(dev))
 		devlink_reload_enable(devlink);
 	return 0;
-
+devlink_reg_err:
+	mlx5_crdump_disable(dev);
+	mlx5_drain_health_wq(dev);
+	mlx5_uninit_one(dev);
 err_init_one:
 	mlx5_pci_close(dev);
 pci_init_err:
@@ -1516,6 +1526,7 @@ static void remove_one(struct pci_dev *pdev)
 	struct devlink *devlink = priv_to_devlink(dev);
 
 	devlink_reload_disable(devlink);
+	devlink_unregister(devlink);
 	mlx5_crdump_disable(dev);
 	mlx5_drain_health_wq(dev);
 	mlx5_uninit_one(dev);
