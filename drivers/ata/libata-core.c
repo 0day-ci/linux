@@ -5441,15 +5441,16 @@ struct ata_host *ata_host_alloc_pinfo(struct device *dev,
 	struct ata_host *host;
 	int i, j;
 
+	/* We must have at least one port info */
+	if (!ppi[0])
+		return NULL;
+
 	host = ata_host_alloc(dev, n_ports);
 	if (!host)
 		return NULL;
 
-	for (i = 0, j = 0, pi = NULL; i < host->n_ports; i++) {
+	for (i = 0, j = 0, pi = ppi[0]; i < host->n_ports; i++) {
 		struct ata_port *ap = host->ports[i];
-
-		if (ppi[j])
-			pi = ppi[j++];
 
 		ap->pio_mask = pi->pio_mask;
 		ap->mwdma_mask = pi->mwdma_mask;
@@ -5460,6 +5461,15 @@ struct ata_host *ata_host_alloc_pinfo(struct device *dev,
 
 		if (!host->ops && (pi->port_ops != &ata_dummy_port_ops))
 			host->ops = pi->port_ops;
+
+		/*
+		 * Check that the next port info is not NULL.
+		 * If it is, keep using the current one.
+		 */
+		if (j < n_ports - 1 && ppi[j + 1]) {
+			j++;
+			pi = ppi[j];
+		}
 	}
 
 	return host;
