@@ -4292,6 +4292,18 @@ out_trace:
 	return err;
 }
 
+static void ext4_end_inode_loc_read(struct buffer_head *bh, int uptodate)
+{
+	if (buffer_new(bh))
+		clear_buffer_new(bh);
+	if (uptodate)
+		set_buffer_uptodate(bh);
+	else
+		clear_buffer_uptodate(bh);
+	unlock_buffer(bh);
+	put_bh(bh);
+}
+
 /*
  * ext4_get_inode_loc returns with an extra refcount against the inode's
  * underlying buffer_head on success. If 'in_mem' is true, we have all
@@ -4367,9 +4379,11 @@ static int __ext4_get_inode_loc(struct super_block *sb, unsigned long ino,
 		}
 		brelse(bitmap_bh);
 		if (i == start + inodes_per_block) {
-			/* all other inodes are free, so skip I/O */
-			memset(bh->b_data, 0, bh->b_size);
-			set_buffer_uptodate(bh);
+			if (!buffer_new(bh)) {
+				/* all other inodes are free, so skip I/O */
+				memset(bh->b_data, 0, bh->b_size);
+				set_buffer_new(bh);
+			}
 			unlock_buffer(bh);
 			goto has_buffer;
 		}
@@ -4408,7 +4422,7 @@ make_io:
 	 * Read the block from disk.
 	 */
 	trace_ext4_load_inode(sb, ino);
-	ext4_read_bh_nowait(bh, REQ_META | REQ_PRIO, NULL);
+	ext4_read_bh_nowait(bh, REQ_META | REQ_PRIO, ext4_end_inode_loc_read);
 	blk_finish_plug(&plug);
 	wait_on_buffer(bh);
 	ext4_simulate_fail_bh(sb, bh, EXT4_SIM_INODE_EIO);
@@ -5132,6 +5146,11 @@ static int ext4_do_update_inode(handle_t *handle,
 	if (err)
 		goto out_brelse;
 	ext4_clear_inode_state(inode, EXT4_STATE_NEW);
+	if (buffer_new(bh)) {
+		clear_buffer_new(bh);
+		set_buffer_uptodate(bh);
+	}
+
 	if (set_large_file) {
 		BUFFER_TRACE(EXT4_SB(sb)->s_sbh, "get write access");
 		err = ext4_journal_get_write_access(handle, EXT4_SB(sb)->s_sbh);
