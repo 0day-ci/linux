@@ -9451,4 +9451,15 @@ bool take_page_off_buddy(struct page *page)
 	spin_unlock_irqrestore(&zone->lock, flags);
 	return ret;
 }
+
+bool has_managed_dma(void)
+{
+	struct zone *zone;
+
+	for_each_managed_zone(zone) {
+		if (zone_is_dma(zone))
+			return true;
+	}
+	return false;
+}
 #endif

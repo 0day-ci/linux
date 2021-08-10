@@ -983,6 +983,18 @@ static inline bool zone_is_zone_device(struct zone *zone)
 }
 #endif
 
+#ifdef CONFIG_ZONE_DMA
+static inline bool zone_is_dma(struct zone *zone)
+{
+	return zone_idx(zone) == ZONE_DMA;
+}
+#else
+static inline bool zone_is_dma(struct zone *zone)
+{
+	return false;
+}
+#endif
+
 /*
  * Returns true if a zone has pages managed by the buddy allocator.
  * All the reclaim decisions have to use this function rather than
@@ -1031,6 +1043,7 @@ static inline int is_highmem_idx(enum zone_type idx)
 #endif
 }
 
+bool has_managed_dma(void);
 /**
  * is_highmem - helper function to quickly check if a struct zone is a
  *              highmem zone or not.  This is an attempt to keep references
@@ -1113,6 +1126,14 @@ extern struct zone *next_zone(struct zone *zone);
 	     zone;					\
 	     zone = next_zone(zone))			\
 		if (!populated_zone(zone))		\
+			; /* do nothing */		\
+		else
+
+#define for_each_managed_zone(zone)		        \
+	for (zone = (first_online_pgdat())->node_zones; \
+	     zone;					\
+	     zone = next_zone(zone))			\
+		if (!managed_zone(zone))		\
 			; /* do nothing */		\
 		else
 
