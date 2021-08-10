@@ -1,0 +1,39 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/rtc/intel,pch-rtc.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Intel Series PCH built-in read-only RTC
+
+maintainers:
+  - Ivan Mikhaylov <i.mikhaylov@yadro.com>
+
+allOf:
+  - $ref: rtc.yaml#
+
+properties:
+  compatible:
+    enum:
+      - intel,pch-rtc
+
+  reg:
+    maxItems: 1
+
+required:
+  - compatible
+  - reg
+
+additionalProperties: false
+
+examples:
+  - |
+    i2c {
+        #address-cells = <1>;
+        #size-cells = <0>;
+
+        rtc@0 {
+            compatible = "intel,pch-rtc";
+            reg = <0x44>;
+        };
+    };
