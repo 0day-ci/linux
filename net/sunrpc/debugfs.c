@@ -16,8 +16,6 @@ static struct dentry *topdir;
 static struct dentry *rpc_clnt_dir;
 static struct dentry *rpc_xprt_dir;
 
-unsigned int rpc_inject_disconnect;
-
 static int
 tasks_show(struct seq_file *f, void *v)
 {
@@ -237,8 +235,6 @@ rpc_xprt_debugfs_register(struct rpc_xprt *xprt)
 	/* make tasks file */
 	debugfs_create_file("info", S_IFREG | 0400, xprt->debugfs, xprt,
 			    &xprt_info_fops);
-
-	atomic_set(&xprt->inject_disconnect, rpc_inject_disconnect);
 }
 
 void
@@ -247,58 +243,6 @@ rpc_xprt_debugfs_unregister(struct rpc_xprt *xprt)
 	debugfs_remove_recursive(xprt->debugfs);
 	xprt->debugfs = NULL;
 }
-
-static int
-fault_open(struct inode *inode, struct file *filp)
-{
-	filp->private_data = kmalloc(128, GFP_KERNEL);
-	if (!filp->private_data)
-		return -ENOMEM;
-	return 0;
-}
-
-static int
-fault_release(struct inode *inode, struct file *filp)
-{
-	kfree(filp->private_data);
-	return 0;
-}
-
-static ssize_t
-fault_disconnect_read(struct file *filp, char __user *user_buf,
-		      size_t len, loff_t *offset)
-{
-	char *buffer = (char *)filp->private_data;
-	size_t size;
-
-	size = sprintf(buffer, "%u\n", rpc_inject_disconnect);
-	return simple_read_from_buffer(user_buf, len, offset, buffer, size);
-}
-
-static ssize_t
-fault_disconnect_write(struct file *filp, const char __user *user_buf,
-		       size_t len, loff_t *offset)
-{
-	char buffer[16];
-
-	if (len >= sizeof(buffer))
-		len = sizeof(buffer) - 1;
-	if (copy_from_user(buffer, user_buf, len))
-		return -EFAULT;
-	buffer[len] = '\0';
-	if (kstrtouint(buffer, 10, &rpc_inject_disconnect))
-		return -EINVAL;
-	return len;
-}
-
-static const struct file_operations fault_disconnect_fops = {
-	.owner		= THIS_MODULE,
-	.open		= fault_open,
-	.read		= fault_disconnect_read,
-	.write		= fault_disconnect_write,
-	.release	= fault_release,
-};
-
 
 #if IS_ENABLED(CONFIG_FAULT_INJECTION)
 struct fail_sunrpc_attr fail_sunrpc = {
@@ -315,6 +259,8 @@ static void fail_sunrpc_init(void)
 
 	debugfs_create_bool("ignore-server-disconnect", S_IFREG | 0600, dir,
 			    &fail_sunrpc.ignore_server_disconnect);
+	debugfs_create_bool("ignore-client-disconnect", S_IFREG | 0600, dir,
+			    &fail_sunrpc.ignore_client_disconnect);
 }
 #else
 static inline void fail_sunrpc_init(void)
@@ -335,18 +281,11 @@ sunrpc_debugfs_exit(void)
 void __init
 sunrpc_debugfs_init(void)
 {
-	struct dentry *rpc_fault_dir;
-
 	topdir = debugfs_create_dir("sunrpc", NULL);
 
 	rpc_clnt_dir = debugfs_create_dir("rpc_clnt", topdir);
 
 	rpc_xprt_dir = debugfs_create_dir("rpc_xprt", topdir);
-
-	rpc_fault_dir = debugfs_create_dir("inject_fault", topdir);
-
-	debugfs_create_file("disconnect", S_IFREG | 0400, rpc_fault_dir, NULL,
-			    &fault_disconnect_fops);
 
 	fail_sunrpc_init();
 }
