@@ -17,6 +17,7 @@ properties:
   compatible:
     enum:
       - qcom,qcs404-cdsp-pil
+      - qcom,sc7280-wpss-pil
       - qcom,sdm845-adsp-pil
 
   reg:
@@ -26,25 +27,30 @@ properties:
 
   interrupts-extended:
     minItems: 5
-    maxItems: 5
+    maxItems: 6
 
   interrupt-names:
     minItems: 5
-    maxItems: 5
+    maxItems: 6
 
   clocks:
-    minItems: 7
+    minItems: 3
     maxItems: 8
     description:
       List of phandles and clock specifier pairs for the Hexagon,
       per clock-names below.
 
   clock-names:
-    minItems: 7
+    minItems: 3
     maxItems: 8
 
   power-domains:
-    maxItems: 1
+    minItems: 1
+    maxItems: 2
+
+  power-domain-names:
+    minItems: 1
+    maxItems: 2
 
   resets:
     minItems: 1
@@ -92,6 +98,7 @@ required:
   - clocks
   - clock-names
   - power-domains
+  - power-domain-names
   - qcom,halt-regs
   - memory-region
   - qcom,smem-states
@@ -123,6 +130,31 @@ allOf:
             - const: ready
             - const: handover
             - const: stop-ack
+
+  - if:
+      properties:
+        compatible:
+          contains:
+            enum:
+              - qcom,sc7280-wpss-pil
+    then:
+      properties:
+        interrupts-extended:
+          items:
+            - description: Watchdog interrupt
+            - description: Fatal interrupt
+            - description: Ready interrupt
+            - description: Handover interrupt
+            - description: Stop acknowledge interrupt
+            - description: Shutdown acknowledge interrupt
+        interrupt-names:
+          items:
+            - const: wdog
+            - const: fatal
+            - const: ready
+            - const: handover
+            - const: stop-ack
+            - const: shutdown-ack
 
   - if:
       properties:
@@ -211,6 +243,26 @@ allOf:
         power-domains:
           items:
             - description: CX power domain
+        power-domain-names:
+          items:
+            - const: cx
+
+  - if:
+      properties:
+        compatible:
+          contains:
+            enum:
+              - qcom,sc7280-wpss-pil
+    then:
+      properties:
+        power-domains:
+          items:
+            - description: CX power domain
+            - description: MX power domain
+        power-domain-names:
+          items:
+            - const: cx
+            - const: mx
 
   - if:
       properties:
@@ -243,6 +295,23 @@ allOf:
         reset-names:
           items:
             - const: restart
+
+  - if:
+      properties:
+        compatible:
+          contains:
+            enum:
+              - qcom,sc7280-wpss-pil
+    then:
+      properties:
+        resets:
+          items:
+            - description: AOSS restart
+            - description: PDC SYNC
+        reset-names:
+          items:
+            - const: restart
+            - const: pdc_sync
 
 examples:
   - |
