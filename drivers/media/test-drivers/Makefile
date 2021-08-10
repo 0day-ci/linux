@@ -7,4 +7,5 @@ obj-$(CONFIG_VIDEO_VIMC)		+= vimc/
 obj-$(CONFIG_VIDEO_VIVID)		+= vivid/
 obj-$(CONFIG_VIDEO_VIM2M)		+= vim2m.o
 obj-$(CONFIG_VIDEO_VICODEC)		+= vicodec/
+obj-$(CONFIG_VIDEO_VIVPU)		+= vivpu/
 obj-$(CONFIG_DVB_VIDTV)			+= vidtv/

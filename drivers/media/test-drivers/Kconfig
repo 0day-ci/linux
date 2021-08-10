@@ -22,6 +22,7 @@ config VIDEO_VIM2M
 	  framework.
 
 source "drivers/media/test-drivers/vicodec/Kconfig"
+source "drivers/media/test-drivers/vivpu/Kconfig"
 
 endif #V4L_TEST_DRIVERS
 
