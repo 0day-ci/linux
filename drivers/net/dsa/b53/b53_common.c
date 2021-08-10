@@ -498,6 +498,7 @@ static int b53_fast_age_vlan(struct b53_device *dev, u16 vid)
 void b53_imp_vlan_setup(struct dsa_switch *ds, int cpu_port)
 {
 	struct b53_device *dev = ds->priv;
+	struct dsa_port *dp;
 	unsigned int i;
 	u16 pvlan;
 
@@ -505,7 +506,9 @@ void b53_imp_vlan_setup(struct dsa_switch *ds, int cpu_port)
 	 * on a per-port basis such that we only have Port i and IMP in
 	 * the same VLAN.
 	 */
-	b53_for_each_port(dev, i) {
+	b53_for_each_port(dp, dev) {
+		i = dp->index;
+
 		b53_read16(dev, B53_PVLAN_PAGE, B53_PVLAN_PORT_MASK(i), &pvlan);
 		pvlan |= BIT(cpu_port);
 		b53_write16(dev, B53_PVLAN_PAGE, B53_PVLAN_PORT_MASK(i), pvlan);
@@ -739,6 +742,7 @@ int b53_configure_vlan(struct dsa_switch *ds)
 {
 	struct b53_device *dev = ds->priv;
 	struct b53_vlan vl = { 0 };
+	struct dsa_port *dp;
 	struct b53_vlan *v;
 	int i, def_vid;
 	u16 vid;
@@ -761,7 +765,9 @@ int b53_configure_vlan(struct dsa_switch *ds)
 	 * entry. Do this only when the tagging protocol is not
 	 * DSA_TAG_PROTO_NONE
 	 */
-	b53_for_each_port(dev, i) {
+	b53_for_each_port(dp, dev) {
+		i = dp->index;
+
 		v = &dev->vlans[def_vid];
 		v->members |= BIT(i);
 		if (!b53_vlan_port_needs_forced_tagged(ds, i))
@@ -1874,11 +1880,8 @@ int b53_br_join(struct dsa_switch *ds, int port, struct net_device *br)
 
 	b53_read16(dev, B53_PVLAN_PAGE, B53_PVLAN_PORT_MASK(port), &pvlan);
 
-	dsa_switch_for_each_port(dp, ds) {
+	b53_for_each_port(dp, dev) {
 		i = dp->index;
-
-		if (!(dev->enabled_ports & BIT(i)))
-			continue;
 
 		if (dp->bridge_dev != br)
 			continue;
@@ -1915,11 +1918,8 @@ void b53_br_leave(struct dsa_switch *ds, int port, struct net_device *br)
 
 	b53_read16(dev, B53_PVLAN_PAGE, B53_PVLAN_PORT_MASK(port), &pvlan);
 
-	dsa_switch_for_each_port(dp, ds) {
+	b53_for_each_port(dp, dev) {
 		i = dp->index;
-
-		if (!(dev->enabled_ports & BIT(i)))
-			continue;
 
 		/* Don't touch the remaining ports */
 		if (dp->bridge_dev != br)
