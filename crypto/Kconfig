@@ -231,6 +231,14 @@ config CRYPTO_DH
 	help
 	  Generic implementation of the Diffie-Hellman algorithm.
 
+config CRYPTO_FFDHE
+	tristate "Finite Field DH (RFC 7919) ephemeral parameters"
+	select CRYPTO_DH
+	select CRYPTO_KPP
+	select CRYPTO_RNG_DEFAULT
+	help
+	  Generic implementation of the Finite Field DH algorithm
+
 config CRYPTO_ECC
 	tristate
 
