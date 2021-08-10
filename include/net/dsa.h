@@ -475,6 +475,10 @@ static inline bool dsa_is_user_port(struct dsa_switch *ds, int p)
 	list_for_each_entry((_dp), &(_ds)->dst->ports, list) \
 		if ((_dp)->ds == (_ds))
 
+#define dsa_switch_for_each_port_safe(_dp, _next, _ds) \
+	list_for_each_entry_safe((_dp), (_next), &(_ds)->dst->ports, list) \
+		if ((_dp)->ds == (_ds))
+
 #define dsa_switch_for_each_port_continue_reverse(_dp, _ds) \
 	list_for_each_entry_continue_reverse((_dp), &(_ds)->dst->ports, list) \
 		if ((_dp)->ds == (_ds))
