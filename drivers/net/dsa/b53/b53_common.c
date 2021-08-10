@@ -1851,6 +1851,7 @@ int b53_br_join(struct dsa_switch *ds, int port, struct net_device *br)
 {
 	struct b53_device *dev = ds->priv;
 	s8 cpu_port = dsa_to_port(ds, port)->cpu_dp->index;
+	struct dsa_port *dp;
 	u16 pvlan, reg;
 	unsigned int i;
 
@@ -1873,8 +1874,13 @@ int b53_br_join(struct dsa_switch *ds, int port, struct net_device *br)
 
 	b53_read16(dev, B53_PVLAN_PAGE, B53_PVLAN_PORT_MASK(port), &pvlan);
 
-	b53_for_each_port(dev, i) {
-		if (dsa_to_port(ds, i)->bridge_dev != br)
+	dsa_switch_for_each_port(dp, ds) {
+		i = dp->index;
+
+		if (!(dev->enabled_ports & BIT(i)))
+			continue;
+
+		if (dp->bridge_dev != br)
 			continue;
 
 		/* Add this local port to the remote port VLAN control
@@ -1903,14 +1909,20 @@ void b53_br_leave(struct dsa_switch *ds, int port, struct net_device *br)
 	struct b53_device *dev = ds->priv;
 	struct b53_vlan *vl = &dev->vlans[0];
 	s8 cpu_port = dsa_to_port(ds, port)->cpu_dp->index;
-	unsigned int i;
 	u16 pvlan, reg, pvid;
+	struct dsa_port *dp;
+	unsigned int i;
 
 	b53_read16(dev, B53_PVLAN_PAGE, B53_PVLAN_PORT_MASK(port), &pvlan);
 
-	b53_for_each_port(dev, i) {
+	dsa_switch_for_each_port(dp, ds) {
+		i = dp->index;
+
+		if (!(dev->enabled_ports & BIT(i)))
+			continue;
+
 		/* Don't touch the remaining ports */
-		if (dsa_to_port(ds, i)->bridge_dev != br)
+		if (dp->bridge_dev != br)
 			continue;
 
 		b53_read16(dev, B53_PVLAN_PAGE, B53_PVLAN_PORT_MASK(i), &reg);

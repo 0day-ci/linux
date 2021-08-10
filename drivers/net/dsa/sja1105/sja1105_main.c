@@ -195,10 +195,7 @@ static int sja1105_init_mac_settings(struct sja1105_private *priv)
 
 	mac = table->entries;
 
-	list_for_each_entry(dp, &ds->dst->ports, list) {
-		if (dp->ds != ds)
-			continue;
-
+	dsa_switch_for_each_available_port(dp, ds) {
 		mac[dp->index] = default_mac;
 
 		/* Let sja1105_bridge_stp_state_set() keep address learning
@@ -221,7 +218,7 @@ static int sja1105_init_mii_settings(struct sja1105_private *priv)
 	struct sja1105_xmii_params_entry *mii;
 	struct dsa_switch *ds = priv->ds;
 	struct sja1105_table *table;
-	int i;
+	struct dsa_port *dp;
 
 	table = &priv->static_config.tables[BLK_IDX_XMII_PARAMS];
 
@@ -241,11 +238,9 @@ static int sja1105_init_mii_settings(struct sja1105_private *priv)
 
 	mii = table->entries;
 
-	for (i = 0; i < ds->num_ports; i++) {
+	dsa_switch_for_each_available_port(dp, ds) {
 		sja1105_mii_role_t role = XMII_MAC;
-
-		if (dsa_is_unused_port(priv->ds, i))
-			continue;
+		int i = dp->index;
 
 		switch (priv->phy_mode[i]) {
 		case PHY_INTERFACE_MODE_INTERNAL:
@@ -313,8 +308,9 @@ unsupported:
 static int sja1105_init_static_fdb(struct sja1105_private *priv)
 {
 	struct sja1105_l2_lookup_entry *l2_lookup;
+	struct dsa_switch *ds = priv->ds;
 	struct sja1105_table *table;
-	int port;
+	struct dsa_port *dp;
 
 	table = &priv->static_config.tables[BLK_IDX_L2_LOOKUP];
 
@@ -345,9 +341,8 @@ static int sja1105_init_static_fdb(struct sja1105_private *priv)
 	l2_lookup[0].index = SJA1105_MAX_L2_LOOKUP_COUNT - 1;
 
 	/* Flood multicast to every port by default */
-	for (port = 0; port < priv->ds->num_ports; port++)
-		if (!dsa_is_unused_port(priv->ds, port))
-			l2_lookup[0].destports |= BIT(port);
+	dsa_switch_for_each_available_port(dp, ds)
+		l2_lookup[0].destports |= BIT(dp->index);
 
 	return 0;
 }
@@ -387,20 +382,16 @@ static int sja1105_init_l2_lookup_params(struct sja1105_private *priv)
 	struct dsa_switch *ds = priv->ds;
 	int port, num_used_ports = 0;
 	struct sja1105_table *table;
+	struct dsa_port *dp;
 	u64 max_fdb_entries;
 
-	for (port = 0; port < ds->num_ports; port++)
-		if (!dsa_is_unused_port(ds, port))
-			num_used_ports++;
+	dsa_switch_for_each_available_port(dp, ds)
+		num_used_ports++;
 
 	max_fdb_entries = SJA1105_MAX_L2_LOOKUP_COUNT / num_used_ports;
 
-	for (port = 0; port < ds->num_ports; port++) {
-		if (dsa_is_unused_port(ds, port))
-			continue;
-
+	dsa_switch_for_each_available_port(dp, ds)
 		default_l2_lookup_params.maxaddrp[port] = max_fdb_entries;
-	}
 
 	table = &priv->static_config.tables[BLK_IDX_L2_LOOKUP_PARAMS];
 
@@ -443,7 +434,7 @@ static int sja1105_init_static_vlan(struct sja1105_private *priv)
 		.vlanid = SJA1105_DEFAULT_VLAN,
 	};
 	struct dsa_switch *ds = priv->ds;
-	int port;
+	struct dsa_port *dp;
 
 	table = &priv->static_config.tables[BLK_IDX_VLAN_LOOKUP];
 
@@ -459,15 +450,14 @@ static int sja1105_init_static_vlan(struct sja1105_private *priv)
 
 	table->entry_count = 1;
 
-	for (port = 0; port < ds->num_ports; port++) {
-		if (dsa_is_unused_port(ds, port))
-			continue;
+	dsa_switch_for_each_available_port(dp, ds) {
+		int port = dp->index;
 
 		pvid.vmemb_port |= BIT(port);
 		pvid.vlan_bc |= BIT(port);
 		pvid.tag_port &= ~BIT(port);
 
-		if (dsa_is_cpu_port(ds, port) || dsa_is_dsa_port(ds, port)) {
+		if (dsa_port_is_cpu(dp) || dsa_port_is_dsa(dp)) {
 			priv->tag_8021q_pvid[port] = SJA1105_DEFAULT_VLAN;
 			priv->bridge_pvid[port] = SJA1105_DEFAULT_VLAN;
 		}
@@ -480,12 +470,12 @@ static int sja1105_init_static_vlan(struct sja1105_private *priv)
 static int sja1105_init_l2_forwarding(struct sja1105_private *priv)
 {
 	struct sja1105_l2_forwarding_entry *l2fwd;
+	struct dsa_port *dp, *from_dp, *to_dp;
 	struct dsa_switch *ds = priv->ds;
 	struct dsa_switch_tree *dst;
 	struct sja1105_table *table;
 	struct dsa_link *dl;
-	int port, tc;
-	int from, to;
+	int tc;
 
 	table = &priv->static_config.tables[BLK_IDX_L2_FORWARDING];
 
@@ -507,24 +497,21 @@ static int sja1105_init_l2_forwarding(struct sja1105_private *priv)
 	 * rules and the VLAN PCP to ingress queue mapping.
 	 * Set up the ingress queue mapping first.
 	 */
-	for (port = 0; port < ds->num_ports; port++) {
-		if (dsa_is_unused_port(ds, port))
-			continue;
-
+	dsa_switch_for_each_available_port(dp, ds)
 		for (tc = 0; tc < SJA1105_NUM_TC; tc++)
-			l2fwd[port].vlan_pmap[tc] = tc;
-	}
+			l2fwd[dp->index].vlan_pmap[tc] = tc;
 
 	/* Then manage the forwarding domain for user ports. These can forward
 	 * only to the always-on domain (CPU port and DSA links)
 	 */
-	for (from = 0; from < ds->num_ports; from++) {
-		if (!dsa_is_user_port(ds, from))
-			continue;
+	dsa_switch_for_each_user_port(from_dp, ds) {
+		int from = from_dp->index;
 
-		for (to = 0; to < ds->num_ports; to++) {
-			if (!dsa_is_cpu_port(ds, to) &&
-			    !dsa_is_dsa_port(ds, to))
+		dsa_switch_for_each_port(to_dp, ds) {
+			int to = to_dp->index;
+
+			if (!dsa_port_is_cpu(to_dp) &&
+			    !dsa_port_is_dsa(to_dp))
 				continue;
 
 			l2fwd[from].bc_domain |= BIT(to);
@@ -538,13 +525,14 @@ static int sja1105_init_l2_forwarding(struct sja1105_private *priv)
 	 * always-on domain). These can send packets to any enabled port except
 	 * themselves.
 	 */
-	for (from = 0; from < ds->num_ports; from++) {
-		if (!dsa_is_cpu_port(ds, from) && !dsa_is_dsa_port(ds, from))
+	dsa_switch_for_each_port(from_dp, ds) {
+		int from = from_dp->index;
+
+		if (!dsa_port_is_cpu(from_dp) && !dsa_port_is_dsa(from_dp))
 			continue;
 
-		for (to = 0; to < ds->num_ports; to++) {
-			if (dsa_is_unused_port(ds, to))
-				continue;
+		dsa_switch_for_each_available_port(to_dp, ds) {
+			int to = to_dp->index;
 
 			if (from == to)
 				continue;
@@ -567,6 +555,8 @@ static int sja1105_init_l2_forwarding(struct sja1105_private *priv)
 	dst = ds->dst;
 
 	list_for_each_entry(dl, &dst->rtable, list) {
+		int from, to;
+
 		if (dl->dp->ds != ds || dl->link_dp->cpu_dp == dl->dp->cpu_dp)
 			continue;
 
@@ -586,24 +576,17 @@ static int sja1105_init_l2_forwarding(struct sja1105_private *priv)
 	/* Finally, manage the egress flooding domain. All ports start up with
 	 * flooding enabled, including the CPU port and DSA links.
 	 */
-	for (port = 0; port < ds->num_ports; port++) {
-		if (dsa_is_unused_port(ds, port))
-			continue;
-
-		priv->ucast_egress_floods |= BIT(port);
-		priv->bcast_egress_floods |= BIT(port);
+	dsa_switch_for_each_available_port(dp, ds) {
+		priv->ucast_egress_floods |= BIT(dp->index);
+		priv->bcast_egress_floods |= BIT(dp->index);
 	}
 
 	/* Next 8 entries define VLAN PCP mapping from ingress to egress.
 	 * Create a one-to-one mapping.
 	 */
 	for (tc = 0; tc < SJA1105_NUM_TC; tc++) {
-		for (port = 0; port < ds->num_ports; port++) {
-			if (dsa_is_unused_port(ds, port))
-				continue;
-
-			l2fwd[ds->num_ports + tc].vlan_pmap[port] = tc;
-		}
+		dsa_switch_for_each_available_port(dp, ds)
+			l2fwd[ds->num_ports + tc].vlan_pmap[dp->index] = tc;
 
 		l2fwd[ds->num_ports + tc].type_egrpcp2outputq = true;
 	}
@@ -616,7 +599,8 @@ static int sja1110_init_pcp_remapping(struct sja1105_private *priv)
 	struct sja1110_pcp_remapping_entry *pcp_remap;
 	struct dsa_switch *ds = priv->ds;
 	struct sja1105_table *table;
-	int port, tc;
+	struct dsa_port *dp;
+	int tc;
 
 	table = &priv->static_config.tables[BLK_IDX_PCP_REMAPPING];
 
@@ -639,13 +623,9 @@ static int sja1110_init_pcp_remapping(struct sja1105_private *priv)
 	pcp_remap = table->entries;
 
 	/* Repeat the configuration done for vlan_pmap */
-	for (port = 0; port < ds->num_ports; port++) {
-		if (dsa_is_unused_port(ds, port))
-			continue;
-
+	dsa_switch_for_each_available_port(dp, ds)
 		for (tc = 0; tc < SJA1105_NUM_TC; tc++)
-			pcp_remap[port].egrpcp[tc] = tc;
-	}
+			pcp_remap[dp->index].egrpcp[tc] = tc;
 
 	return 0;
 }
@@ -981,7 +961,8 @@ static int sja1105_init_l2_policing(struct sja1105_private *priv)
 	struct sja1105_l2_policing_entry *policing;
 	struct dsa_switch *ds = priv->ds;
 	struct sja1105_table *table;
-	int port, tc;
+	struct dsa_port *dp;
+	int tc;
 
 	table = &priv->static_config.tables[BLK_IDX_L2_POLICING];
 
@@ -1001,9 +982,10 @@ static int sja1105_init_l2_policing(struct sja1105_private *priv)
 	policing = table->entries;
 
 	/* Setup shared indices for the matchall policers */
-	for (port = 0; port < ds->num_ports; port++) {
-		int mcast = (ds->num_ports * (SJA1105_NUM_TC + 1)) + port;
-		int bcast = (ds->num_ports * SJA1105_NUM_TC) + port;
+	dsa_switch_for_each_available_port(dp, ds) {
+		int mcast = (ds->num_ports * (SJA1105_NUM_TC + 1)) + dp->index;
+		int bcast = (ds->num_ports * SJA1105_NUM_TC) + dp->index;
+		int port = dp->index;
 
 		for (tc = 0; tc < SJA1105_NUM_TC; tc++)
 			policing[port * SJA1105_NUM_TC + tc].sharindx = port;
@@ -1015,10 +997,11 @@ static int sja1105_init_l2_policing(struct sja1105_private *priv)
 	}
 
 	/* Setup the matchall policer parameters */
-	for (port = 0; port < ds->num_ports; port++) {
+	dsa_switch_for_each_available_port(dp, ds) {
 		int mtu = VLAN_ETH_FRAME_LEN + ETH_FCS_LEN;
+		int port = dp->index;
 
-		if (dsa_is_cpu_port(ds, port) || dsa_is_dsa_port(ds, port))
+		if (dsa_port_is_cpu(dp) || dsa_port_is_dsa(dp))
 			mtu += VLAN_HLEN;
 
 		policing[port].smax = 65535; /* Burst size in bytes */
@@ -1895,16 +1878,17 @@ static int sja1105_bridge_member(struct dsa_switch *ds, int port,
 {
 	struct sja1105_l2_forwarding_entry *l2_fwd;
 	struct sja1105_private *priv = ds->priv;
-	int i, rc;
+	struct dsa_port *dp;
+	int rc;
 
 	l2_fwd = priv->static_config.tables[BLK_IDX_L2_FORWARDING].entries;
 
-	for (i = 0; i < ds->num_ports; i++) {
-		/* Add this port to the forwarding matrix of the
-		 * other ports in the same bridge, and viceversa.
-		 */
-		if (!dsa_is_user_port(ds, i))
-			continue;
+	/* Add this port to the forwarding matrix of the
+	 * other ports in the same bridge, and viceversa.
+	 */
+	dsa_switch_for_each_user_port(dp, ds) {
+		int i = dp->index;
+
 		/* For the ports already under the bridge, only one thing needs
 		 * to be done, and that is to add this port to their
 		 * reachability domain. So we can perform the SPI write for
@@ -1916,8 +1900,10 @@ static int sja1105_bridge_member(struct dsa_switch *ds, int port,
 		 */
 		if (i == port)
 			continue;
-		if (dsa_to_port(ds, i)->bridge_dev != br)
+
+		if (dp->bridge_dev != br)
 			continue;
+
 		sja1105_port_allow_traffic(l2_fwd, i, port, member);
 		sja1105_port_allow_traffic(l2_fwd, port, i, member);
 
@@ -2257,6 +2243,7 @@ int sja1105_vlan_filtering(struct dsa_switch *ds, int port, bool enabled,
 	struct sja1105_private *priv = ds->priv;
 	struct sja1105_table *table;
 	struct sja1105_rule *rule;
+	struct dsa_port *dp;
 	u16 tpid, tpid2;
 	int rc;
 
@@ -2326,11 +2313,8 @@ int sja1105_vlan_filtering(struct dsa_switch *ds, int port, bool enabled,
 	l2_lookup_params = table->entries;
 	l2_lookup_params->shared_learn = !priv->vlan_aware;
 
-	for (port = 0; port < ds->num_ports; port++) {
-		if (dsa_is_unused_port(ds, port))
-			continue;
-
-		rc = sja1105_commit_pvid(ds, port);
+	dsa_switch_for_each_available_port(dp, ds) {
+		rc = sja1105_commit_pvid(ds, dp->index);
 		if (rc)
 			return rc;
 	}
@@ -2632,17 +2616,14 @@ out_static_config_free:
 static void sja1105_teardown(struct dsa_switch *ds)
 {
 	struct sja1105_private *priv = ds->priv;
-	int port;
+	struct dsa_port *dp;
 
 	rtnl_lock();
 	dsa_tag_8021q_unregister(ds);
 	rtnl_unlock();
 
-	for (port = 0; port < ds->num_ports; port++) {
-		struct sja1105_port *sp = &priv->ports[port];
-
-		if (!dsa_is_user_port(ds, port))
-			continue;
+	dsa_switch_for_each_user_port(dp, ds) {
+		struct sja1105_port *sp = &priv->ports[dp->index];
 
 		if (sp->xmit_worker)
 			kthread_destroy_worker(sp->xmit_worker);
@@ -3163,7 +3144,8 @@ static int sja1105_probe(struct spi_device *spi)
 	struct sja1105_private *priv;
 	size_t max_xfer, max_msg;
 	struct dsa_switch *ds;
-	int rc, port;
+	struct dsa_port *dp;
+	int rc;
 
 	if (!dev->of_node) {
 		dev_err(dev, "No DTS bindings for SJA1105 driver\n");
@@ -3266,13 +3248,9 @@ static int sja1105_probe(struct spi_device *spi)
 	}
 
 	/* Connections between dsa_port and sja1105_port */
-	for (port = 0; port < ds->num_ports; port++) {
-		struct sja1105_port *sp = &priv->ports[port];
-		struct dsa_port *dp = dsa_to_port(ds, port);
+	dsa_switch_for_each_user_port(dp, ds) {
+		struct sja1105_port *sp = &priv->ports[dp->index];
 		struct net_device *slave;
-
-		if (!dsa_is_user_port(ds, port))
-			continue;
 
 		dp->priv = sp;
 		sp->dp = dp;
@@ -3295,10 +3273,10 @@ static int sja1105_probe(struct spi_device *spi)
 	return 0;
 
 out_destroy_workers:
-	while (port-- > 0) {
-		struct sja1105_port *sp = &priv->ports[port];
+	dsa_switch_for_each_port_continue_reverse(dp, ds) {
+		struct sja1105_port *sp = &priv->ports[dp->index];
 
-		if (!dsa_is_user_port(ds, port))
+		if (!dsa_port_is_user(dp))
 			continue;
 
 		kthread_destroy_worker(sp->xmit_worker);

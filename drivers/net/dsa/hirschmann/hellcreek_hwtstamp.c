@@ -354,13 +354,12 @@ long hellcreek_hwtstamp_work(struct ptp_clock_info *ptp)
 {
 	struct hellcreek *hellcreek = ptp_to_hellcreek(ptp);
 	struct dsa_switch *ds = hellcreek->ds;
-	int i, restart = 0;
+	struct dsa_port *dp;
+	int restart = 0;
 
-	for (i = 0; i < ds->num_ports; i++) {
+	dsa_switch_for_each_user_port(dp, ds) {
 		struct hellcreek_port_hwtstamp *ps;
-
-		if (!dsa_is_user_port(ds, i))
-			continue;
+		int i = dp->index;
 
 		ps = &hellcreek->ports[i].port_hwtstamp;
 
@@ -459,15 +458,11 @@ static void hellcreek_hwtstamp_port_setup(struct hellcreek *hellcreek, int port)
 int hellcreek_hwtstamp_setup(struct hellcreek *hellcreek)
 {
 	struct dsa_switch *ds = hellcreek->ds;
-	int i;
+	struct dsa_port *dp;
 
 	/* Initialize timestamping ports. */
-	for (i = 0; i < ds->num_ports; ++i) {
-		if (!dsa_is_user_port(ds, i))
-			continue;
-
-		hellcreek_hwtstamp_port_setup(hellcreek, i);
-	}
+	dsa_switch_for_each_user_port(dp, ds)
+		hellcreek_hwtstamp_port_setup(hellcreek, dp->index);
 
 	/* Select the synchronized clock as the source timekeeper for the
 	 * timestamps and enable inline timestamping.

@@ -1034,13 +1034,14 @@ static const struct ocelot_ops vsc9959_ops = {
 static int vsc9959_mdio_bus_alloc(struct ocelot *ocelot)
 {
 	struct felix *felix = ocelot_to_felix(ocelot);
+	struct dsa_switch *ds = felix->ds;
 	struct enetc_mdio_priv *mdio_priv;
 	struct device *dev = ocelot->dev;
 	void __iomem *imdio_regs;
 	struct resource res;
 	struct enetc_hw *hw;
 	struct mii_bus *bus;
-	int port;
+	struct dsa_port *dp;
 	int rc;
 
 	felix->pcs = devm_kcalloc(dev, felix->info->num_ports,
@@ -1091,13 +1092,11 @@ static int vsc9959_mdio_bus_alloc(struct ocelot *ocelot)
 
 	felix->imdio = bus;
 
-	for (port = 0; port < felix->info->num_ports; port++) {
-		struct ocelot_port *ocelot_port = ocelot->ports[port];
+	dsa_switch_for_each_available_port(dp, ds) {
+		struct ocelot_port *ocelot_port = ocelot->ports[dp->index];
 		struct mdio_device *pcs;
 		struct lynx_pcs *lynx;
-
-		if (dsa_is_unused_port(felix->ds, port))
-			continue;
+		int port = dp->index;
 
 		if (ocelot_port->phy_mode == PHY_INTERFACE_MODE_INTERNAL)
 			continue;

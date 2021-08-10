@@ -390,9 +390,9 @@ static int sja1105_mdiobus_pcs_register(struct sja1105_private *priv)
 {
 	struct sja1105_mdio_private *mdio_priv;
 	struct dsa_switch *ds = priv->ds;
+	struct dsa_port *dp;
 	struct mii_bus *bus;
 	int rc = 0;
-	int port;
 
 	if (!priv->info->pcs_mdio_read || !priv->info->pcs_mdio_write)
 		return 0;
@@ -420,12 +420,10 @@ static int sja1105_mdiobus_pcs_register(struct sja1105_private *priv)
 		return rc;
 	}
 
-	for (port = 0; port < ds->num_ports; port++) {
+	dsa_switch_for_each_available_port(dp, ds) {
 		struct mdio_device *mdiodev;
 		struct dw_xpcs *xpcs;
-
-		if (dsa_is_unused_port(ds, port))
-			continue;
+		int port = dp->index;
 
 		if (priv->phy_mode[port] != PHY_INTERFACE_MODE_SGMII &&
 		    priv->phy_mode[port] != PHY_INTERFACE_MODE_2500BASEX)
@@ -451,7 +449,9 @@ static int sja1105_mdiobus_pcs_register(struct sja1105_private *priv)
 	return 0;
 
 out_pcs_free:
-	for (port = 0; port < ds->num_ports; port++) {
+	dsa_switch_for_each_port_continue_reverse(dp, ds) {
+		int port = dp->index;
+
 		if (!priv->xpcs[port])
 			continue;
 

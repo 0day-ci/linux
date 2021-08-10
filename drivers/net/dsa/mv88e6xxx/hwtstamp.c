@@ -452,13 +452,11 @@ long mv88e6xxx_hwtstamp_work(struct ptp_clock_info *ptp)
 	struct mv88e6xxx_chip *chip = ptp_to_chip(ptp);
 	struct dsa_switch *ds = chip->ds;
 	struct mv88e6xxx_port_hwtstamp *ps;
-	int i, restart = 0;
+	struct dsa_port *dp;
+	int restart = 0;
 
-	for (i = 0; i < ds->num_ports; i++) {
-		if (!dsa_is_user_port(ds, i))
-			continue;
-
-		ps = &chip->port_hwtstamp[i];
+	dsa_switch_for_each_user_port(dp, ds) {
+		ps = &chip->port_hwtstamp[dp->index];
 		if (test_bit(MV88E6XXX_HWTSTAMP_TX_IN_PROGRESS, &ps->state))
 			restart |= mv88e6xxx_txtstamp_work(chip, ps);
 

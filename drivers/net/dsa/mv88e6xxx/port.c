@@ -1381,13 +1381,13 @@ static int mv88e6393x_port_policy_write(struct mv88e6xxx_chip *chip, int port,
 static int mv88e6393x_port_policy_write_all(struct mv88e6xxx_chip *chip,
 					    u16 pointer, u8 data)
 {
-	int err, port;
+	struct dsa_switch *ds = chip->ds;
+	struct dsa_port *dp;
+	int err;
 
-	for (port = 0; port < mv88e6xxx_num_ports(chip); port++) {
-		if (dsa_is_unused_port(chip->ds, port))
-			continue;
-
-		err = mv88e6393x_port_policy_write(chip, port, pointer, data);
+	dsa_switch_for_each_available_port(dp, ds) {
+		err = mv88e6393x_port_policy_write(chip, dp->index, pointer,
+						   data);
 		if (err)
 			return err;
 	}

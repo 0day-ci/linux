@@ -345,7 +345,7 @@ static int hellcreek_vlan_prepare(struct dsa_switch *ds, int port,
 				  struct netlink_ext_ack *extack)
 {
 	struct hellcreek *hellcreek = ds->priv;
-	int i;
+	struct dsa_port *dp;
 
 	dev_dbg(hellcreek->dev, "VLAN prepare for port %d\n", port);
 
@@ -353,11 +353,8 @@ static int hellcreek_vlan_prepare(struct dsa_switch *ds, int port,
 	 * VLANs are internally used by the driver to ensure port
 	 * separation. Thus, they cannot be used by someone else.
 	 */
-	for (i = 0; i < hellcreek->pdata->num_ports; ++i) {
-		const u16 restricted_vid = hellcreek_private_vid(i);
-
-		if (!dsa_is_user_port(ds, i))
-			continue;
+	dsa_switch_for_each_user_port(dp, ds) {
+		const u16 restricted_vid = hellcreek_private_vid(dp->index);
 
 		if (vlan->vid == restricted_vid) {
 			NL_SET_ERR_MSG_MOD(extack, "VID restricted by driver");
@@ -1301,8 +1298,9 @@ static void hellcreek_teardown_devlink_regions(struct dsa_switch *ds)
 static int hellcreek_setup(struct dsa_switch *ds)
 {
 	struct hellcreek *hellcreek = ds->priv;
+	struct dsa_port *dp;
 	u16 swcfg = 0;
-	int ret, i;
+	int ret;
 
 	dev_dbg(hellcreek->dev, "Set up the switch\n");
 
@@ -1328,12 +1326,8 @@ static int hellcreek_setup(struct dsa_switch *ds)
 	hellcreek_write(hellcreek, swcfg, HR_SWCFG);
 
 	/* Initial vlan membership to reflect port separation */
-	for (i = 0; i < ds->num_ports; ++i) {
-		if (!dsa_is_user_port(ds, i))
-			continue;
-
-		hellcreek_setup_vlan_membership(ds, i, true);
-	}
+	dsa_switch_for_each_user_port(dp, ds)
+		hellcreek_setup_vlan_membership(ds, dp->index, true);
 
 	/* Configure PCP <-> TC mapping */
 	hellcreek_setup_tc_identity_mapping(hellcreek);
@@ -1410,10 +1404,10 @@ hellcreek_port_prechangeupper(struct dsa_switch *ds, int port,
 			      struct netdev_notifier_changeupper_info *info)
 {
 	struct hellcreek *hellcreek = ds->priv;
+	struct dsa_port *dp;
 	bool used = true;
 	int ret = -EBUSY;
 	u16 vid;
-	int i;
 
 	dev_dbg(hellcreek->dev, "Pre change upper for port %d\n", port);
 
@@ -1432,9 +1426,8 @@ hellcreek_port_prechangeupper(struct dsa_switch *ds, int port,
 
 	/* For all ports, check bitmaps */
 	mutex_lock(&hellcreek->vlan_lock);
-	for (i = 0; i < hellcreek->pdata->num_ports; ++i) {
-		if (!dsa_is_user_port(ds, i))
-			continue;
+	dsa_switch_for_each_user_port(dp, ds) {
+		int i = dp->index;
 
 		if (port == i)
 			continue;

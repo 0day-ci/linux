@@ -940,6 +940,7 @@ static int
 qca8k_setup(struct dsa_switch *ds)
 {
 	struct qca8k_priv *priv = (struct qca8k_priv *)ds->priv;
+	struct dsa_port *dp;
 	int ret, i;
 	u32 mask;
 
@@ -1009,9 +1010,11 @@ qca8k_setup(struct dsa_switch *ds)
 		return ret;
 
 	/* Setup connection between CPU port & user ports */
-	for (i = 0; i < QCA8K_NUM_PORTS; i++) {
+	dsa_switch_for_each_port(dp, ds) {
+		i = dp->index;
+
 		/* CPU port gets connected to all user ports of the switch */
-		if (dsa_is_cpu_port(ds, i)) {
+		if (dsa_port_is_cpu(dp)) {
 			ret = qca8k_rmw(priv, QCA8K_PORT_LOOKUP_CTRL(QCA8K_CPU_PORT),
 					QCA8K_PORT_LOOKUP_MEMBER, dsa_user_ports(ds));
 			if (ret)
@@ -1019,7 +1022,7 @@ qca8k_setup(struct dsa_switch *ds)
 		}
 
 		/* Individual user ports get connected to CPU port only */
-		if (dsa_is_user_port(ds, i)) {
+		if (dsa_port_is_user(dp)) {
 			int shift = 16 * (i % 2);
 
 			ret = qca8k_rmw(priv, QCA8K_PORT_LOOKUP_CTRL(i),
@@ -1509,21 +1512,23 @@ qca8k_port_bridge_join(struct dsa_switch *ds, int port, struct net_device *br)
 {
 	struct qca8k_priv *priv = (struct qca8k_priv *)ds->priv;
 	int port_mask = BIT(QCA8K_CPU_PORT);
-	int i, ret;
+	struct dsa_port *dp;
+	int ret;
 
-	for (i = 1; i < QCA8K_NUM_PORTS; i++) {
-		if (dsa_to_port(ds, i)->bridge_dev != br)
+	dsa_switch_for_each_port(dp, ds) {
+		if (dp->bridge_dev != br)
 			continue;
+
 		/* Add this port to the portvlan mask of the other ports
 		 * in the bridge
 		 */
 		ret = qca8k_reg_set(priv,
-				    QCA8K_PORT_LOOKUP_CTRL(i),
+				    QCA8K_PORT_LOOKUP_CTRL(dp->index),
 				    BIT(port));
 		if (ret)
 			return ret;
-		if (i != port)
-			port_mask |= BIT(i);
+		if (dp->index != port)
+			port_mask |= BIT(dp->index);
 	}
 
 	/* Add all other ports to this ports portvlan mask */
@@ -1537,16 +1542,17 @@ static void
 qca8k_port_bridge_leave(struct dsa_switch *ds, int port, struct net_device *br)
 {
 	struct qca8k_priv *priv = (struct qca8k_priv *)ds->priv;
-	int i;
+	struct dsa_port *dp;
 
-	for (i = 1; i < QCA8K_NUM_PORTS; i++) {
-		if (dsa_to_port(ds, i)->bridge_dev != br)
+	dsa_switch_for_each_port(dp, ds) {
+		if (dp->bridge_dev != br)
 			continue;
+
 		/* Remove this port to the portvlan mask of the other ports
 		 * in the bridge
 		 */
 		qca8k_reg_clear(priv,
-				QCA8K_PORT_LOOKUP_CTRL(i),
+				QCA8K_PORT_LOOKUP_CTRL(dp->index),
 				BIT(port));
 	}
 
