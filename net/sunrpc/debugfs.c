@@ -308,8 +308,13 @@ struct fail_sunrpc_attr fail_sunrpc = {
 #if IS_ENABLED(CONFIG_FAULT_INJECTION_DEBUG_FS)
 static void fail_sunrpc_init(void)
 {
-	fault_create_debugfs_attr("fail_sunrpc", NULL,
-				  &fail_sunrpc.attr);
+	struct dentry *dir;
+
+	dir = fault_create_debugfs_attr("fail_sunrpc", NULL,
+					&fail_sunrpc.attr);
+
+	debugfs_create_bool("ignore-server-disconnect", S_IFREG | 0600, dir,
+			    &fail_sunrpc.ignore_server_disconnect);
 }
 #else
 static inline void fail_sunrpc_init(void)
