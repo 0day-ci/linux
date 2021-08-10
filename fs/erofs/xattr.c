@@ -673,11 +673,14 @@ ssize_t erofs_listxattr(struct dentry *dentry,
 }
 
 #ifdef CONFIG_EROFS_FS_POSIX_ACL
-struct posix_acl *erofs_get_acl(struct inode *inode, int type)
+struct posix_acl *erofs_get_acl(struct inode *inode, int type, int flags)
 {
 	struct posix_acl *acl;
 	int prefix, rc;
 	char *value = NULL;
+
+	if (flags)
+		return ERR_PTR(-EINVAL);
 
 	switch (type) {
 	case ACL_TYPE_ACCESS:
