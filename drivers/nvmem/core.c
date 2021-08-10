@@ -55,6 +55,7 @@ struct nvmem_cell {
 	struct device_node	*np;
 	struct nvmem_device	*nvmem;
 	struct list_head	node;
+	u32			flags;
 };
 
 static DEFINE_MUTEX(nvmem_mutex);
@@ -90,6 +91,26 @@ static int __nvmem_reg_write(struct nvmem_device *nvmem, unsigned int offset,
 	}
 
 	return -EINVAL;
+}
+
+static int nvmem_buffer_reverse(void *bufaddr, int len)
+{
+	u8 *buf = (u8 *)bufaddr;
+	u8 *temp;
+	int i;
+
+	temp = kzalloc(len, GFP_KERNEL);
+	if (!temp)
+		return -ENOMEM;
+
+	memcpy(temp, buf, len);
+
+	for (i = 0; i < len; i++)
+		buf[i] = temp[len - i - 1];
+
+	kfree(temp);
+
+	return 0;
 }
 
 static int nvmem_access_with_keepouts(struct nvmem_device *nvmem,
@@ -704,6 +725,9 @@ static int nvmem_add_cells_from_of(struct nvmem_device *nvmem)
 		cell->offset = be32_to_cpup(addr++);
 		cell->bytes = be32_to_cpup(addr);
 		cell->name = kasprintf(GFP_KERNEL, "%pOFn", child);
+
+		if (of_property_read_bool(child, "reverse-data"))
+			cell->flags |= NVMEM_FLAGS_REVERSE_DATA;
 
 		addr = of_get_property(child, "bits", &len);
 		if (addr && len == (2 * sizeof(u32))) {
@@ -1397,6 +1421,12 @@ static int __nvmem_cell_read(struct nvmem_device *nvmem,
 	/* shift bits in-place */
 	if (cell->bit_offset || cell->nbits)
 		nvmem_shift_read_buffer_in_place(cell, buf);
+
+	if (cell->flags & NVMEM_FLAGS_REVERSE_DATA) {
+		rc = nvmem_buffer_reverse(buf, cell->bytes);
+		if (rc < 0)
+			return rc;
+	}
 
 	if (len)
 		*len = cell->bytes;

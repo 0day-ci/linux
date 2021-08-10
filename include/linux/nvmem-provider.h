@@ -31,6 +31,8 @@ enum nvmem_type {
 #define NVMEM_DEVID_NONE	(-1)
 #define NVMEM_DEVID_AUTO	(-2)
 
+#define NVMEM_FLAGS_REVERSE_DATA	BIT(0)
+
 /**
  * struct nvmem_keepout - NVMEM register keepout range.
  *
