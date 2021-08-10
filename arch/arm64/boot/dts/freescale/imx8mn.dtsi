@@ -544,6 +544,7 @@
 
 				fec_mac_address: mac-address@90 {
 					reg = <0x90 6>;
+					reverse-data;
 				};
 			};
 
