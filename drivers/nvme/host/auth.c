@@ -9,6 +9,8 @@
 #include <crypto/hash.h>
 #include <crypto/dh.h>
 #include <crypto/ffdhe.h>
+#include <crypto/ecdh.h>
+#include <crypto/curve25519.h>
 #include "nvme.h"
 #include "fabrics.h"
 #include "auth.h"
@@ -69,6 +71,13 @@ static struct nvme_auth_dhgroup_map {
 	{ .id = NVME_AUTH_DHCHAP_DHGROUP_8192,
 	  .name = "ffdhe8192", .kpp = "dh",
 	  .privkey_size = 1024, .pubkey_size = 1024 },
+	{ .id = NVME_AUTH_DHCHAP_DHGROUP_ECDH,
+	  .name = "ecdh", .kpp = "ecdh-nist-p256",
+	  .privkey_size = 32, .pubkey_size = 64 },
+	{ .id = NVME_AUTH_DHCHAP_DHGROUP_25519,
+	  .name = "curve25519", .kpp = "curve25519",
+	  .privkey_size = CURVE25519_KEY_SIZE,
+	  .pubkey_size = CURVE25519_KEY_SIZE },
 };
 
 const char *nvme_auth_dhgroup_name(int dhgroup_id)
@@ -424,6 +433,27 @@ int nvme_auth_gen_privkey(struct crypto_kpp *dh_tfm, int dh_gid)
 			kfree_sensitive(dh_secret);
 			goto out;
 		}
+	} else if (dh_gid == NVME_AUTH_DHCHAP_DHGROUP_ECDH) {
+		struct ecdh p = {0};
+
+		pkey_len = crypto_ecdh_key_len(&p);
+		pkey = kmalloc(pkey_len, GFP_KERNEL);
+		if (!pkey)
+			return -ENOMEM;
+
+		get_random_bytes(pkey, pkey_len);
+		ret = crypto_ecdh_encode_key(pkey, pkey_len, &p);
+		if (ret) {
+			pr_debug("failed to encode private key, error %d\n",
+				 ret);
+			goto out;
+		}
+	} else if (dh_gid == NVME_AUTH_DHCHAP_DHGROUP_25519) {
+		pkey_len = CURVE25519_KEY_SIZE;
+		pkey = kmalloc(pkey_len, GFP_KERNEL);
+		if (!pkey)
+			return -ENOMEM;
+		get_random_bytes(pkey, pkey_len);
 	} else {
 		pr_warn("invalid dh group %d\n", dh_gid);
 		return -EINVAL;
@@ -597,7 +627,7 @@ static int nvme_auth_set_dhchap_negotiate_data(struct nvme_ctrl *ctrl,
 	data->napd = 1;
 	data->auth_protocol[0].dhchap.authid = NVME_AUTH_DHCHAP_AUTH_ID;
 	data->auth_protocol[0].dhchap.halen = 3;
-	data->auth_protocol[0].dhchap.dhlen = 6;
+	data->auth_protocol[0].dhchap.dhlen = 8;
 	data->auth_protocol[0].dhchap.idlist[0] = NVME_AUTH_DHCHAP_SHA256;
 	data->auth_protocol[0].dhchap.idlist[1] = NVME_AUTH_DHCHAP_SHA384;
 	data->auth_protocol[0].dhchap.idlist[2] = NVME_AUTH_DHCHAP_SHA512;
@@ -607,6 +637,8 @@ static int nvme_auth_set_dhchap_negotiate_data(struct nvme_ctrl *ctrl,
 	data->auth_protocol[0].dhchap.idlist[6] = NVME_AUTH_DHCHAP_DHGROUP_4096;
 	data->auth_protocol[0].dhchap.idlist[7] = NVME_AUTH_DHCHAP_DHGROUP_6144;
 	data->auth_protocol[0].dhchap.idlist[8] = NVME_AUTH_DHCHAP_DHGROUP_8192;
+	data->auth_protocol[0].dhchap.idlist[9] = NVME_AUTH_DHCHAP_DHGROUP_ECDH;
+	data->auth_protocol[0].dhchap.idlist[10] = NVME_AUTH_DHCHAP_DHGROUP_25519;
 
 	return size;
 }
