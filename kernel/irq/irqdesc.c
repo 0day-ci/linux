@@ -147,19 +147,20 @@ static ssize_t per_cpu_count_show(struct kobject *kobj,
 				  struct kobj_attribute *attr, char *buf)
 {
 	struct irq_desc *desc = container_of(kobj, struct irq_desc, kobj);
-	ssize_t ret = 0;
-	char *p = "";
+	int len = 0;
+	const char *p = "";
 	int cpu;
 
 	for_each_possible_cpu(cpu) {
 		unsigned int c = irq_desc_kstat_cpu(desc, cpu);
 
-		ret += scnprintf(buf + ret, PAGE_SIZE - ret, "%s%u", p, c);
+		len += sysfs_emit_at(buf, len, "%s%u", p, c);
 		p = ",";
 	}
 
-	ret += scnprintf(buf + ret, PAGE_SIZE - ret, "\n");
-	return ret;
+	len += sysfs_emit_at(buf, len, "\n");
+
+	return len;
 }
 IRQ_ATTR_RO(per_cpu_count);
 
@@ -167,16 +168,15 @@ static ssize_t chip_name_show(struct kobject *kobj,
 			      struct kobj_attribute *attr, char *buf)
 {
 	struct irq_desc *desc = container_of(kobj, struct irq_desc, kobj);
-	ssize_t ret = 0;
+	int len = 0;
 
 	raw_spin_lock_irq(&desc->lock);
-	if (desc->irq_data.chip && desc->irq_data.chip->name) {
-		ret = scnprintf(buf, PAGE_SIZE, "%s\n",
-				desc->irq_data.chip->name);
-	}
+	len = sysfs_emit(buf, "%s\n",
+			 desc->irq_data.chip && desc->irq_data.chip->name ?
+			 desc->irq_data.chip->name : "");
 	raw_spin_unlock_irq(&desc->lock);
 
-	return ret;
+	return len;
 }
 IRQ_ATTR_RO(chip_name);
 
@@ -184,14 +184,16 @@ static ssize_t hwirq_show(struct kobject *kobj,
 			  struct kobj_attribute *attr, char *buf)
 {
 	struct irq_desc *desc = container_of(kobj, struct irq_desc, kobj);
-	ssize_t ret = 0;
+	int len = 0;
 
 	raw_spin_lock_irq(&desc->lock);
 	if (desc->irq_data.domain)
-		ret = sprintf(buf, "%d\n", (int)desc->irq_data.hwirq);
+		len = sysfs_emit(buf, "%lu\n", desc->irq_data.hwirq);
+	else
+		len = sysfs_emit(buf, "\n");
 	raw_spin_unlock_irq(&desc->lock);
 
-	return ret;
+	return len;
 }
 IRQ_ATTR_RO(hwirq);
 
@@ -199,14 +201,14 @@ static ssize_t type_show(struct kobject *kobj,
 			 struct kobj_attribute *attr, char *buf)
 {
 	struct irq_desc *desc = container_of(kobj, struct irq_desc, kobj);
-	ssize_t ret = 0;
+	int len = 0;
 
 	raw_spin_lock_irq(&desc->lock);
-	ret = sprintf(buf, "%s\n",
-		      irqd_is_level_type(&desc->irq_data) ? "level" : "edge");
+	len = sysfs_emit(buf, "%s\n",
+			 irqd_is_level_type(&desc->irq_data) ? "level" : "edge");
 	raw_spin_unlock_irq(&desc->lock);
 
-	return ret;
+	return len;
 
 }
 IRQ_ATTR_RO(type);
@@ -215,14 +217,14 @@ static ssize_t wakeup_show(struct kobject *kobj,
 			   struct kobj_attribute *attr, char *buf)
 {
 	struct irq_desc *desc = container_of(kobj, struct irq_desc, kobj);
-	ssize_t ret = 0;
+	int len = 0;
 
 	raw_spin_lock_irq(&desc->lock);
-	ret = sprintf(buf, "%s\n",
-		      irqd_is_wakeup_set(&desc->irq_data) ? "enabled" : "disabled");
+	len = sysfs_emit(buf, "%s\n",
+			 irqd_is_wakeup_set(&desc->irq_data) ? "enabled" : "disabled");
 	raw_spin_unlock_irq(&desc->lock);
 
-	return ret;
+	return len;
 
 }
 IRQ_ATTR_RO(wakeup);
@@ -231,14 +233,13 @@ static ssize_t name_show(struct kobject *kobj,
 			 struct kobj_attribute *attr, char *buf)
 {
 	struct irq_desc *desc = container_of(kobj, struct irq_desc, kobj);
-	ssize_t ret = 0;
+	int len = 0;
 
 	raw_spin_lock_irq(&desc->lock);
-	if (desc->name)
-		ret = scnprintf(buf, PAGE_SIZE, "%s\n", desc->name);
+	len = sysfs_emit(buf, "%s\n", desc->name ?: "");
 	raw_spin_unlock_irq(&desc->lock);
 
-	return ret;
+	return len;
 }
 IRQ_ATTR_RO(name);
 
@@ -247,21 +248,19 @@ static ssize_t actions_show(struct kobject *kobj,
 {
 	struct irq_desc *desc = container_of(kobj, struct irq_desc, kobj);
 	struct irqaction *action;
-	ssize_t ret = 0;
-	char *p = "";
+	int len = 0;
+	const char *p = "";
 
 	raw_spin_lock_irq(&desc->lock);
 	for (action = desc->action; action != NULL; action = action->next) {
-		ret += scnprintf(buf + ret, PAGE_SIZE - ret, "%s%s",
-				 p, action->name);
+		len += sysfs_emit_at(buf, len, "%s%s", p, action->name);
 		p = ",";
 	}
 	raw_spin_unlock_irq(&desc->lock);
 
-	if (ret)
-		ret += scnprintf(buf + ret, PAGE_SIZE - ret, "\n");
+	len += sysfs_emit_at(buf, len, "\n");
 
-	return ret;
+	return len;
 }
 IRQ_ATTR_RO(actions);
 
