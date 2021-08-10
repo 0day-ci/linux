@@ -1429,7 +1429,7 @@ ptp_ocp_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	if (err)
 		goto out_free;
 
-	err = pci_enable_device(pdev);
+	err = pcim_enable_device(pdev);
 	if (err) {
 		dev_err(&pdev->dev, "pci_enable_device\n");
 		goto out_unregister;
@@ -1476,7 +1476,6 @@ ptp_ocp_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 out:
 	ptp_ocp_detach(bp);
-	pci_disable_device(pdev);
 	pci_set_drvdata(pdev, NULL);
 out_unregister:
 	devlink_unregister(devlink);
@@ -1493,7 +1492,6 @@ ptp_ocp_remove(struct pci_dev *pdev)
 	struct devlink *devlink = priv_to_devlink(bp);
 
 	ptp_ocp_detach(bp);
-	pci_disable_device(pdev);
 	pci_set_drvdata(pdev, NULL);
 
 	devlink_unregister(devlink);
