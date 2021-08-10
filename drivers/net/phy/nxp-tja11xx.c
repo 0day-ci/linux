@@ -47,12 +47,14 @@
 #define MII_INTSRC_LINK_FAIL		BIT(10)
 #define MII_INTSRC_LINK_UP		BIT(9)
 #define MII_INTSRC_MASK			(MII_INTSRC_LINK_FAIL | MII_INTSRC_LINK_UP)
-#define MII_INTSRC_TEMP_ERR		BIT(1)
 #define MII_INTSRC_UV_ERR		BIT(3)
+#define MII_INTSRC_TEMP_ERR		BIT(1)
 
 #define MII_INTEN			22
 #define MII_INTEN_LINK_FAIL		BIT(10)
 #define MII_INTEN_LINK_UP		BIT(9)
+#define MII_INTEN_UV_ERR		BIT(3)
+#define MII_INTEN_TEMP_ERR		BIT(1)
 
 #define MII_COMMSTAT			23
 #define MII_COMMSTAT_LINK_UP		BIT(15)
@@ -89,6 +91,12 @@ static struct tja11xx_phy_stats tja11xx_hw_stats[] = {
 	{ "phy_polarity_detect", 25, 6, BIT(6) },
 	{ "phy_open_detect", 25, 7, BIT(7) },
 	{ "phy_short_detect", 25, 8, BIT(8) },
+	{ "phy_temp_warn (temp > 155C°)", 25, 9, BIT(9) },
+	{ "phy_temp_high (temp > 180C°)", 25, 10, BIT(10) },
+	{ "phy_uv_vddio", 25, 11, BIT(11) },
+	{ "phy_uv_vddd_1v8", 25, 13, BIT(13) },
+	{ "phy_uv_vdda_3v3", 25, 14, BIT(14) },
+	{ "phy_uv_vddd_3v3", 25, 15, BIT(15) },
 	{ "phy_rem_rcvr_count", 26, 0, GENMASK(7, 0) },
 	{ "phy_loc_rcvr_count", 26, 8, GENMASK(15, 8) },
 };
@@ -607,7 +615,8 @@ static int tja11xx_config_intr(struct phy_device *phydev)
 		if (err)
 			return err;
 
-		value = MII_INTEN_LINK_FAIL | MII_INTEN_LINK_UP;
+		value = MII_INTEN_LINK_FAIL | MII_INTEN_LINK_UP |
+			MII_INTEN_UV_ERR | MII_INTEN_TEMP_ERR;
 		err = phy_write(phydev, MII_INTEN, value);
 	} else {
 		err = phy_write(phydev, MII_INTEN, value);
@@ -622,6 +631,7 @@ static int tja11xx_config_intr(struct phy_device *phydev)
 
 static irqreturn_t tja11xx_handle_interrupt(struct phy_device *phydev)
 {
+	struct device *dev = &phydev->mdio.dev;
 	int irq_status;
 
 	irq_status = phy_read(phydev, MII_INTSRC);
@@ -629,6 +639,11 @@ static irqreturn_t tja11xx_handle_interrupt(struct phy_device *phydev)
 		phy_error(phydev);
 		return IRQ_NONE;
 	}
+
+	if (irq_status & MII_INTSRC_TEMP_ERR)
+		dev_err(dev, "Overtemperature error detected (temp > 155C°).\n");
+	if (irq_status & MII_INTSRC_UV_ERR)
+		dev_err(dev, "Undervoltage error detected.\n");
 
 	if (!(irq_status & MII_INTSRC_MASK))
 		return IRQ_NONE;
