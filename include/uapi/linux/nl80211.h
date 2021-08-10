@@ -2560,6 +2560,13 @@ enum nl80211_commands {
  *	disassoc events to indicate that an immediate reconnect to the AP
  *	is desired.
  *
+ * @NL80211_ATTR_BEACON_TX_MODE: used to configure the beacon tx mode (u32),
+ *	as specified in the &enum nl80211_beacon_tx_mode. The user-space
+ *	shall use this attribute to configure the tx mode of beacons.
+ *	Beacons can be sent out in burst(continuously in a single shot
+ *	one after another) or staggered (equally spread out over beacon
+ *	interval) mode.
+ *
  * @NUM_NL80211_ATTR: total number of nl80211_attrs available
  * @NL80211_ATTR_MAX: highest attribute number currently defined
  * @__NL80211_ATTR_AFTER_LAST: internal use
@@ -3056,6 +3063,8 @@ enum nl80211_attrs {
 	NL80211_ATTR_SAR_SPEC,
 
 	NL80211_ATTR_DISABLE_HE,
+
+	NL80211_ATTR_BEACON_TX_MODE,
 
 	/* add attributes here, update the policy in nl80211.c */
 
@@ -7304,6 +7313,17 @@ enum nl80211_sar_specs_attrs {
 
 	__NL80211_SAR_ATTR_SPECS_LAST,
 	NL80211_SAR_ATTR_SPECS_MAX = __NL80211_SAR_ATTR_SPECS_LAST - 1,
+};
+
+/**
+ * enum nl80211_beacon_tx_mode - Beacon Tx Mode enum.
+ * @NL80211_BEACON_STAGGERED_MODE: Used to configure beacon tx mode as
+ *	staggered mode. This is the default beacon tx mode.
+ * @NL80211_BEACON_BURST_MODE: Used to configure beacon tx mode as burst mode.
+ */
+enum nl80211_beacon_tx_mode {
+	NL80211_BEACON_STAGGERED_MODE = 1,
+	NL80211_BEACON_BURST_MODE = 2,
 };
 
 #endif /* __LINUX_NL80211_H */
