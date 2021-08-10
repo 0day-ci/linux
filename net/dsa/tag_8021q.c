@@ -322,15 +322,13 @@ int dsa_switch_tag_8021q_vlan_del(struct dsa_switch *ds,
  * +-+-----+-+-----+-+-----+-+-----+-+    +-+-----+-+-----+-+-----+-+-----+-+
  *   swp0    swp1    swp2    swp3           swp0    swp1    swp2    swp3
  */
-static bool dsa_tag_8021q_bridge_match(struct dsa_switch *ds, int port,
+static bool dsa_tag_8021q_bridge_match(struct dsa_port *dp,
 				       struct dsa_notifier_bridge_info *info)
 {
-	struct dsa_port *dp = dsa_to_port(ds, port);
-
 	/* Don't match on self */
-	if (ds->dst->index == info->tree_index &&
-	    ds->index == info->sw_index &&
-	    port == info->port)
+	if (dp->ds->dst->index == info->tree_index &&
+	    dp->ds->index == info->sw_index &&
+	    dp->index == info->port)
 		return false;
 
 	if (dsa_port_is_user(dp))
@@ -344,8 +342,9 @@ int dsa_tag_8021q_bridge_join(struct dsa_switch *ds,
 {
 	struct dsa_switch *targeted_ds;
 	struct dsa_port *targeted_dp;
+	struct dsa_port *dp;
 	u16 targeted_rx_vid;
-	int err, port;
+	int err;
 
 	if (!ds->tag_8021q_ctx)
 		return 0;
@@ -354,11 +353,10 @@ int dsa_tag_8021q_bridge_join(struct dsa_switch *ds,
 	targeted_dp = dsa_to_port(targeted_ds, info->port);
 	targeted_rx_vid = dsa_8021q_rx_vid(targeted_ds, info->port);
 
-	for (port = 0; port < ds->num_ports; port++) {
-		struct dsa_port *dp = dsa_to_port(ds, port);
-		u16 rx_vid = dsa_8021q_rx_vid(ds, port);
+	dsa_switch_for_each_port(dp, ds) {
+		u16 rx_vid = dsa_8021q_rx_vid(ds, dp->index);
 
-		if (!dsa_tag_8021q_bridge_match(ds, port, info))
+		if (!dsa_tag_8021q_bridge_match(dp, info))
 			continue;
 
 		/* Install the RX VID of the targeted port in our VLAN table */
@@ -380,8 +378,8 @@ int dsa_tag_8021q_bridge_leave(struct dsa_switch *ds,
 {
 	struct dsa_switch *targeted_ds;
 	struct dsa_port *targeted_dp;
+	struct dsa_port *dp;
 	u16 targeted_rx_vid;
-	int port;
 
 	if (!ds->tag_8021q_ctx)
 		return 0;
@@ -390,11 +388,10 @@ int dsa_tag_8021q_bridge_leave(struct dsa_switch *ds,
 	targeted_dp = dsa_to_port(targeted_ds, info->port);
 	targeted_rx_vid = dsa_8021q_rx_vid(targeted_ds, info->port);
 
-	for (port = 0; port < ds->num_ports; port++) {
-		struct dsa_port *dp = dsa_to_port(ds, port);
-		u16 rx_vid = dsa_8021q_rx_vid(ds, port);
+	dsa_switch_for_each_port(dp, ds) {
+		u16 rx_vid = dsa_8021q_rx_vid(ds, dp->index);
 
-		if (!dsa_tag_8021q_bridge_match(ds, port, info))
+		if (!dsa_tag_8021q_bridge_match(dp, info))
 			continue;
 
 		/* Remove the RX VID of the targeted port from our VLAN table */

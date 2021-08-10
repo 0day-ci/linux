@@ -537,7 +537,8 @@ static bool dsa_port_can_apply_vlan_filtering(struct dsa_port *dp,
 					      struct netlink_ext_ack *extack)
 {
 	struct dsa_switch *ds = dp->ds;
-	int err, i;
+	struct dsa_port *other_dp;
+	int err;
 
 	/* VLAN awareness was off, so the question is "can we turn it on".
 	 * We may have had 8021q uppers, those need to go. Make sure we don't
@@ -579,10 +580,10 @@ static bool dsa_port_can_apply_vlan_filtering(struct dsa_port *dp,
 	 * different ports of the same switch device and one of them has a
 	 * different setting than what is being requested.
 	 */
-	for (i = 0; i < ds->num_ports; i++) {
+	dsa_switch_for_each_port(other_dp, ds) {
 		struct net_device *other_bridge;
 
-		other_bridge = dsa_to_port(ds, i)->bridge_dev;
+		other_bridge = other_dp->bridge_dev;
 		if (!other_bridge)
 			continue;
 		/* If it's the same bridge, it also has same
