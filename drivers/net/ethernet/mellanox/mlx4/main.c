@@ -3996,6 +3996,8 @@ static const struct devlink_ops mlx4_devlink_ops = {
 	.reload_up	= mlx4_devlink_reload_up,
 };
 
+static void _mlx4_remove_one(struct pci_dev *pdev);
+
 static int mlx4_init_one(struct pci_dev *pdev, const struct pci_device_id *id)
 {
 	struct devlink *devlink;
@@ -4024,28 +4026,29 @@ static int mlx4_init_one(struct pci_dev *pdev, const struct pci_device_id *id)
 	mutex_init(&dev->persist->interface_state_mutex);
 	mutex_init(&dev->persist->pci_status_mutex);
 
-	ret = devlink_register(devlink);
-	if (ret)
-		goto err_persist_free;
 	ret = devlink_params_register(devlink, mlx4_devlink_params,
 				      ARRAY_SIZE(mlx4_devlink_params));
 	if (ret)
-		goto err_devlink_unregister;
+		goto err_persist_free;
 	mlx4_devlink_set_params_init_values(devlink);
 	ret =  __mlx4_init_one(pdev, id->driver_data, priv);
 	if (ret)
 		goto err_params_unregister;
 
 	devlink_params_publish(devlink);
-	devlink_reload_enable(devlink);
 	pci_save_state(pdev);
+
+	ret = devlink_register(devlink);
+	if (ret) {
+		_mlx4_remove_one(pdev);
+		return ret;
+	}
+	devlink_reload_enable(devlink);
 	return 0;
 
 err_params_unregister:
 	devlink_params_unregister(devlink, mlx4_devlink_params,
 				  ARRAY_SIZE(mlx4_devlink_params));
-err_devlink_unregister:
-	devlink_unregister(devlink);
 err_persist_free:
 	kfree(dev->persist);
 err_devlink_free:
@@ -4141,15 +4144,13 @@ static void mlx4_unload_one(struct pci_dev *pdev)
 	priv->removed = 1;
 }
 
-static void mlx4_remove_one(struct pci_dev *pdev)
+static void _mlx4_remove_one(struct pci_dev *pdev)
 {
 	struct mlx4_dev_persistent *persist = pci_get_drvdata(pdev);
 	struct mlx4_dev  *dev  = persist->dev;
 	struct mlx4_priv *priv = mlx4_priv(dev);
 	struct devlink *devlink = priv_to_devlink(priv);
 	int active_vfs = 0;
-
-	devlink_reload_disable(devlink);
 
 	if (mlx4_is_slave(dev))
 		persist->interface_state |= MLX4_INTERFACE_STATE_NOWAIT;
@@ -4185,9 +4186,24 @@ static void mlx4_remove_one(struct pci_dev *pdev)
 	mlx4_pci_disable_device(dev);
 	devlink_params_unregister(devlink, mlx4_devlink_params,
 				  ARRAY_SIZE(mlx4_devlink_params));
-	devlink_unregister(devlink);
 	kfree(dev->persist);
 	devlink_free(devlink);
+}
+
+static void mlx4_remove_one(struct pci_dev *pdev)
+{
+	struct mlx4_dev_persistent *persist = pci_get_drvdata(pdev);
+	struct devlink *devlink;
+	struct mlx4_priv *priv;
+	struct mlx4_dev *dev;
+
+	dev = persist->dev;
+	priv = mlx4_priv(dev);
+	devlink = priv_to_devlink(priv);
+
+	devlink_reload_disable(devlink);
+	devlink_unregister(devlink);
+	_mlx4_remove_one(pdev);
 }
 
 static int restore_current_port_types(struct mlx4_dev *dev,
