@@ -399,6 +399,13 @@ static void clocksource_watchdog(struct timer_list *unused)
 		cs->cs_last = csnow;
 		cs->wd_last = wdnow;
 
+		if (!wd_nsec) {
+			pr_warn("timekeeping watchdog on CPU%d seems hung up or unstable:");
+			pr_warn("'%s' wd_now: %llx wd_last: %llx mask: %llx\n",
+				watchdog->name, wdnow, wdlast, watchdog->mask);
+			continue;
+		}
+
 		if (atomic_read(&watchdog_reset_pending))
 			continue;
 
