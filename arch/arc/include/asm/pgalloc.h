@@ -86,6 +86,28 @@ static inline void pgd_free(struct mm_struct *mm, pgd_t *pgd)
 }
 
 
+#if CONFIG_PGTABLE_LEVELS > 2
+
+static inline void pud_populate(struct mm_struct *mm, pud_t *pudp, pmd_t *pmdp)
+{
+	set_pud(pudp, __pud((unsigned long)pmdp));
+}
+
+static inline pmd_t *pmd_alloc_one(struct mm_struct *mm, unsigned long addr)
+{
+	return (pmd_t *)__get_free_page(
+		GFP_KERNEL | __GFP_RETRY_MAYFAIL | __GFP_ZERO);
+}
+
+static inline void pmd_free(struct mm_struct *mm, pmd_t *pmd)
+{
+	free_page((unsigned long)pmd);
+}
+
+#define __pmd_free_tlb(tlb, pmd, addr)  pmd_free((tlb)->mm, pmd)
+
+#endif
+
 /*
  * With software-only page-tables, addr-split for traversal is tweakable and
  * that directly governs how big tables would be at each level.
