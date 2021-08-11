@@ -831,17 +831,23 @@ __unwind_incomplete_requests(struct intel_context *ce)
 static void __guc_reset_context(struct intel_context *ce, bool stalled)
 {
 	struct i915_request *rq;
+	unsigned long flags;
 	u32 head;
 
 	intel_context_get(ce);
 
 	/*
-	 * GuC will implicitly mark the context as non-schedulable
-	 * when it sends the reset notification. Make sure our state
-	 * reflects this change. The context will be marked enabled
-	 * on resubmission.
+	 * GuC will implicitly mark the context as non-schedulable when it sends
+	 * the reset notification. Make sure our state reflects this change. The
+	 * context will be marked enabled on resubmission. A small window exists
+	 * where the context could be block & unblocked (scheduling enable) while
+	 * this reset was inflight. If a scheduling enable is already is in
+	 * flight do not clear the enable.
 	 */
-	clr_context_enabled(ce);
+	spin_lock_irqsave(&ce->guc_state.lock, flags);
+	if (!context_pending_enable(ce))
+		clr_context_enabled(ce);
+	spin_unlock_irqrestore(&ce->guc_state.lock, flags);
 
 	rq = intel_context_find_active_request(ce);
 	if (!rq) {
