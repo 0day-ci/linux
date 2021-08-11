@@ -1260,22 +1260,19 @@ static bool iomap_can_add_to_ioend(struct iomap *iomap,
  * Test to see if we have an existing ioend structure that we could append to
  * first; otherwise finish off the current ioend and start another.
  */
-static void
-iomap_add_to_ioend(struct inode *inode, loff_t offset, struct page *page,
-		struct iomap_page *iop, struct iomap_writepage_ctx *wpc,
+static struct iomap_ioend *iomap_add_to_ioend(struct inode *inode,
+		loff_t pos, struct page *page, struct iomap_page *iop,
+		struct iomap *iomap, struct iomap_ioend *ioend,
 		struct writeback_control *wbc, struct list_head *iolist)
 {
-	struct iomap *iomap = &wpc->iomap;
-	struct iomap_ioend *ioend = wpc->ioend;
-	sector_t sector = iomap_sector(iomap, offset);
+	sector_t sector = iomap_sector(iomap, pos);
 	unsigned len = i_blocksize(inode);
-	unsigned poff = offset & (PAGE_SIZE - 1);
+	unsigned poff = offset_in_page(pos);
 
-	if (!ioend || !iomap_can_add_to_ioend(iomap, ioend, offset, sector)) {
+	if (!ioend || !iomap_can_add_to_ioend(iomap, ioend, pos, sector)) {
 		if (ioend)
 			list_add(&ioend->io_list, iolist);
-		ioend = iomap_alloc_ioend(inode, iomap, offset, sector, wbc);
-		wpc->ioend = ioend;
+		ioend = iomap_alloc_ioend(inode, iomap, pos, sector, wbc);
 	}
 
 	if (bio_add_page(ioend->io_bio, page, len, poff) != len) {
@@ -1287,6 +1284,7 @@ iomap_add_to_ioend(struct inode *inode, loff_t offset, struct page *page,
 		atomic_add(len, &iop->write_bytes_pending);
 	ioend->io_size += len;
 	wbc_account_cgroup_owner(wbc, page, len);
+	return ioend;
 }
 
 /*
@@ -1337,8 +1335,8 @@ iomap_writepage_map(struct iomap_writepage_ctx *wpc,
 			continue;
 		if (wpc->iomap.type == IOMAP_HOLE)
 			continue;
-		iomap_add_to_ioend(inode, file_offset, page, iop, wpc, wbc,
-				 &submit_list);
+		wpc->ioend = iomap_add_to_ioend(inode, file_offset, page, iop,
+				&wpc->iomap, wpc->ioend, wbc, &submit_list);
 		count++;
 	}
 
