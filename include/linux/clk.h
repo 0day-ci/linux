@@ -340,7 +340,7 @@ struct clk *clk_get(struct device *dev, const char *id);
  * that were obtained will be freed before returning to the caller.
  *
  * Returns 0 if all clocks specified in clk_bulk_data table are obtained
- * successfully, or valid IS_ERR() condition containing errno.
+ * successfully, or an errno otherwise.
  * The implementation uses @dev and @clk_bulk_data.id to determine the
  * clock consumer, and thereby the clock producer.
  * The clock returned is stored in each @clk_bulk_data.clk field.
@@ -409,8 +409,8 @@ int __must_check devm_clk_bulk_get(struct device *dev, int num_clks,
  * NULL for given clk. It is assumed all clocks in clk_bulk_data are optional.
  *
  * Returns 0 if all clocks specified in clk_bulk_data table are obtained
- * successfully or for any clk there was no clk provider available, otherwise
- * returns valid IS_ERR() condition containing errno.
+ * successfully or for any clk there was no clk provider available, or an errno
+ * otherwise.
  * The implementation uses @dev and @clk_bulk_data.id to determine the
  * clock consumer, and thereby the clock producer.
  * The clock returned is stored in each @clk_bulk_data.clk field.
