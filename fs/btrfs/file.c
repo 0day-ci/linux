@@ -3325,6 +3325,7 @@ static long btrfs_fallocate(struct file *file, int mode,
 	struct falloc_range *range;
 	struct falloc_range *tmp;
 	struct list_head reserve_list;
+	u64 old_isize;
 	u64 cur_offset;
 	u64 last_byte;
 	u64 alloc_start;
@@ -3365,6 +3366,7 @@ static long btrfs_fallocate(struct file *file, int mode,
 	}
 
 	btrfs_inode_lock(inode, BTRFS_ILOCK_MMAP);
+	old_isize = i_size_read(inode);
 
 	if (!(mode & FALLOC_FL_KEEP_SIZE) && offset + len > inode->i_size) {
 		ret = inode_newsize_ok(inode, offset + len);
@@ -3373,7 +3375,7 @@ static long btrfs_fallocate(struct file *file, int mode,
 	}
 
 	/*
-	 * TODO: Move these two operations after we have checked
+	 * TODO: Move this operation after we have checked
 	 * accurate reserved space, or fallocate can still fail but
 	 * with page truncated or size expanded.
 	 *
@@ -3382,15 +3384,6 @@ static long btrfs_fallocate(struct file *file, int mode,
 	if (alloc_start > inode->i_size) {
 		ret = btrfs_cont_expand(BTRFS_I(inode), i_size_read(inode),
 					alloc_start);
-		if (ret)
-			goto out;
-	} else if (offset + len > inode->i_size) {
-		/*
-		 * If we are fallocating from the end of the file onward we
-		 * need to zero out the end of the block if i_size lands in the
-		 * middle of a block.
-		 */
-		ret = btrfs_truncate_block(BTRFS_I(inode), inode->i_size, 0, 0);
 		if (ret)
 			goto out;
 	}
@@ -3515,6 +3508,18 @@ static long btrfs_fallocate(struct file *file, int mode,
 out_unlock:
 	unlock_extent_cached(&BTRFS_I(inode)->io_tree, alloc_start, locked_end,
 			     &cached_state);
+
+	/*
+	 * If we are fallocating from the end of the file onward we
+	 * need to zero out the end of the block if i_size lands in the
+	 * middle of a block.
+	 *
+	 * This needs to be done after isize update, or the truncated sector
+	 * will still be written back as inline extent, resulting mixing
+	 * inline and regular extents.
+	 */
+	if (!ret && offset + len > old_isize)
+		ret = btrfs_truncate_block(BTRFS_I(inode), old_isize, 0, 0);
 out:
 	btrfs_inode_unlock(inode, BTRFS_ILOCK_MMAP);
 	/* Let go of our reservation. */
