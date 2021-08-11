@@ -1952,16 +1952,16 @@ void iwl_mvm_enter_ctkill(struct iwl_mvm *mvm);
 int iwl_mvm_send_temp_report_ths_cmd(struct iwl_mvm *mvm);
 int iwl_mvm_ctdp_command(struct iwl_mvm *mvm, u32 op, u32 budget);
 
-#ifdef CONFIG_IWLMVM_VENDOR_CMDS
+#if IS_ENABLED(CONFIG_IWLMEI)
 
 /* vendor commands */
 void iwl_mvm_vendor_cmds_register(struct iwl_mvm *mvm);
 
-#else // IWLMVM_VENDOR_CMDS
+#else // CONFIG_IWLMEI
 
 static inline void iwl_mvm_vendor_cmds_register(struct iwl_mvm *mvm) {}
 
-#endif // IWLMVM_VENDOR_CMDS
+#endif // CONFIG_IWLMEI
 
 /* Location Aware Regulatory */
 struct iwl_mcc_update_resp *
@@ -2216,11 +2216,8 @@ static inline void iwl_mvm_mei_set_sw_rfkill_state(struct iwl_mvm *mvm, bool sw_
 		iwl_mei_set_rfkill_state(iwl_mvm_is_radio_killed(mvm), sw_rfkill);
 }
 
-static inline void iwl_mvm_send_roaming_forbidden_event(struct iwl_mvm *mvm,
-							struct ieee80211_vif *vif,
-							bool forbidden)
-{
-	/* TODO */
-}
+void iwl_mvm_send_roaming_forbidden_event(struct iwl_mvm *mvm,
+					  struct ieee80211_vif *vif,
+					  bool forbidden);
 
 #endif /* __IWL_MVM_H__ */
