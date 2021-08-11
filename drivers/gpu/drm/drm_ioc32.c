@@ -855,17 +855,19 @@ static int compat_drm_wait_vblank(struct file *file, unsigned int cmd,
 	req.request.sequence = req32.request.sequence;
 	req.request.signal = req32.request.signal;
 	err = drm_ioctl_kernel(file, drm_wait_vblank_ioctl, &req, DRM_UNLOCKED);
-	if (err)
-		return err;
 
 	req32.reply.type = req.reply.type;
 	req32.reply.sequence = req.reply.sequence;
 	req32.reply.tval_sec = req.reply.tval_sec;
 	req32.reply.tval_usec = req.reply.tval_usec;
+	/* drm_wait_vblank_ioctl modifies Request, update their values here as well. */
+	req32.request.type = req.request.type;
+	req32.request.sequence = req.request.sequence;
+	req32.request.signal = req.request.signal;
 	if (copy_to_user(argp, &req32, sizeof(req32)))
 		return -EFAULT;
 
-	return 0;
+	return err;
 }
 
 #if defined(CONFIG_X86)
