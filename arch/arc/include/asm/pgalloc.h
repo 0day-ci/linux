@@ -86,6 +86,28 @@ static inline void pgd_free(struct mm_struct *mm, pgd_t *pgd)
 }
 
 
+#if CONFIG_PGTABLE_LEVELS > 3
+
+static inline void p4d_populate(struct mm_struct *mm, p4d_t *p4dp, pud_t *pudp)
+{
+	set_p4d(p4dp, __p4d((unsigned long)pudp));
+}
+
+static inline pud_t *pud_alloc_one(struct mm_struct *mm, unsigned long addr)
+{
+	return (pud_t *)__get_free_page(
+		GFP_KERNEL | __GFP_RETRY_MAYFAIL | __GFP_ZERO);
+}
+
+static inline void pud_free(struct mm_struct *mm, pud_t *pudp)
+{
+	free_page((unsigned long)pudp);
+}
+
+#define __pud_free_tlb(tlb, pmd, addr)  pud_free((tlb)->mm, pmd)
+
+#endif
+
 #if CONFIG_PGTABLE_LEVELS > 2
 
 static inline void pud_populate(struct mm_struct *mm, pud_t *pudp, pmd_t *pmdp)
