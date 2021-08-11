@@ -598,6 +598,15 @@ static struct auxiliary_driver ti_sn_aux_driver = {
 	.id_table = ti_sn_aux_id_table,
 };
 
+static enum drm_mode_status check_mode(const struct drm_display_mode *mode)
+{
+	/* maximum supported resolution is 4K at 60 fps */
+	if (mode->clock > 594000)
+		return MODE_CLOCK_HIGH;
+
+	return MODE_OK;
+}
+
 /* -----------------------------------------------------------------------------
  * DRM Connector Operations
  */
@@ -619,11 +628,7 @@ static enum drm_mode_status
 ti_sn_bridge_connector_mode_valid(struct drm_connector *connector,
 				  struct drm_display_mode *mode)
 {
-	/* maximum supported resolution is 4K at 60 fps */
-	if (mode->clock > 594000)
-		return MODE_CLOCK_HIGH;
-
-	return MODE_OK;
+	return check_mode(mode);
 }
 
 static struct drm_connector_helper_funcs ti_sn_bridge_connector_helper_funcs = {
@@ -764,6 +769,14 @@ err_conn_init:
 static void ti_sn_bridge_detach(struct drm_bridge *bridge)
 {
 	drm_dp_aux_unregister(&bridge_to_ti_sn65dsi86(bridge)->aux);
+}
+
+static enum drm_mode_status
+ti_sn_bridge_mode_valid(struct drm_bridge *bridge,
+			const struct drm_display_info *info,
+			const struct drm_display_mode *mode)
+{
+	return check_mode(mode);
 }
 
 static void ti_sn_bridge_disable(struct drm_bridge *bridge)
@@ -1127,6 +1140,7 @@ static void ti_sn_bridge_post_disable(struct drm_bridge *bridge)
 static const struct drm_bridge_funcs ti_sn_bridge_funcs = {
 	.attach = ti_sn_bridge_attach,
 	.detach = ti_sn_bridge_detach,
+	.mode_valid = ti_sn_bridge_mode_valid,
 	.pre_enable = ti_sn_bridge_pre_enable,
 	.enable = ti_sn_bridge_enable,
 	.disable = ti_sn_bridge_disable,
