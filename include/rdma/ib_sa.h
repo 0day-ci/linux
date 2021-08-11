@@ -430,16 +430,6 @@ int ib_sa_path_rec_get(struct ib_sa_client *client, struct ib_device *device,
 					void *context),
 		       void *context, struct ib_sa_query **query);
 
-int ib_sa_service_rec_query(struct ib_sa_client *client,
-			    struct ib_device *device, u32 port_num, u8 method,
-			    struct ib_sa_service_rec *rec,
-			    ib_sa_comp_mask comp_mask, unsigned long timeout_ms,
-			    gfp_t gfp_mask,
-			    void (*callback)(int status,
-					     struct ib_sa_service_rec *resp,
-					     void *context),
-			    void *context, struct ib_sa_query **sa_query);
-
 struct ib_sa_multicast {
 	struct ib_sa_mcmember_rec rec;
 	ib_sa_comp_mask		comp_mask;
