@@ -350,6 +350,15 @@ int kvm_set_ipa_limit(void)
 		return -EINVAL;
 	}
 
+	/*
+	 * IPA size beyond 48 bits could not be supported
+	 * on either 4K or 16K page size. Hence let's cap
+	 * it to 48 bits, in case it's reported as larger
+	 * on the system.
+	 */
+	if (!IS_ENABLED(CONFIG_ARM64_64K_PAGES))
+		parange = min(parange, (unsigned int)ID_AA64MMFR0_PARANGE_48);
+
 	kvm_ipa_limit = id_aa64mmfr0_parange_to_phys_shift(parange);
 	kvm_info("IPA Size Limit: %d bits%s\n", kvm_ipa_limit,
 		 ((kvm_ipa_limit < KVM_PHYS_SHIFT) ?
