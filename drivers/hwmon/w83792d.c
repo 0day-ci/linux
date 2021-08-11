@@ -950,7 +950,7 @@ w83792d_detect_subclients(struct i2c_client *new_client)
 		data->lm75[0] = devm_i2c_new_dummy_device(&new_client->dev, adapter,
 							  0x48 + (val & 0x7));
 	if (!(val & 0x80)) {
-		if (!IS_ERR(data->lm75[0]) &&
+		if (!IS_ERR_OR_NULL(data->lm75[0]) &&
 			((val & 0x7) == ((val >> 4) & 0x7))) {
 			dev_err(&new_client->dev,
 				"duplicate addresses 0x%x, use force_subclient\n",
