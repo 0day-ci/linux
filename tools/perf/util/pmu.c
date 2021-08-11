@@ -946,6 +946,18 @@ perf_pmu__get_default_config(struct perf_pmu *pmu __maybe_unused)
 	return NULL;
 }
 
+char * __weak
+pmu_find_real_name(const char *name)
+{
+	return strdup(name);
+}
+
+char * __weak
+pmu_find_alias_name(const char *name __maybe_unused)
+{
+	return NULL;
+}
+
 static int pmu_max_precise(const char *name)
 {
 	char path[PATH_MAX];
@@ -959,19 +971,25 @@ static int pmu_max_precise(const char *name)
 	return max_precise;
 }
 
-static struct perf_pmu *pmu_lookup(const char *name)
+static struct perf_pmu *pmu_lookup(const char *lookup_name)
 {
-	struct perf_pmu *pmu;
+	struct perf_pmu *pmu = NULL;
 	LIST_HEAD(format);
 	LIST_HEAD(aliases);
 	__u32 type;
-	bool is_hybrid = perf_pmu__hybrid_mounted(name);
+	bool is_hybrid;
+	char *name = pmu_find_real_name(lookup_name);
+
+	if (!name)
+		return NULL;
+
+	is_hybrid = perf_pmu__hybrid_mounted(name);
 
 	/*
 	 * Check pmu name for hybrid and the pmu may be invalid in sysfs
 	 */
 	if (!strncmp(name, "cpu_", 4) && !is_hybrid)
-		return NULL;
+		goto out;
 
 	/*
 	 * The pmu data we store & need consists of the pmu
@@ -979,23 +997,24 @@ static struct perf_pmu *pmu_lookup(const char *name)
 	 * now.
 	 */
 	if (pmu_format(name, &format))
-		return NULL;
+		goto out;
 
 	/*
 	 * Check the type first to avoid unnecessary work.
 	 */
 	if (pmu_type(name, &type))
-		return NULL;
+		goto out;
 
 	if (pmu_aliases(name, &aliases))
-		return NULL;
+		goto out;
 
 	pmu = zalloc(sizeof(*pmu));
 	if (!pmu)
-		return NULL;
+		goto out;
 
 	pmu->cpus = pmu_cpumask(name);
-	pmu->name = strdup(name);
+	pmu->name = name;
+	pmu->alias_name = pmu_find_alias_name(name);
 	pmu->type = type;
 	pmu->is_uncore = pmu_is_uncore(name);
 	if (pmu->is_uncore)
@@ -1017,6 +1036,10 @@ static struct perf_pmu *pmu_lookup(const char *name)
 
 	pmu->default_config = perf_pmu__get_default_config(pmu);
 
+out:
+	if (!pmu)
+		free(name);
+
 	return pmu;
 }
 
@@ -1025,7 +1048,8 @@ static struct perf_pmu *pmu_find(const char *name)
 	struct perf_pmu *pmu;
 
 	list_for_each_entry(pmu, &pmus, list)
-		if (!strcmp(pmu->name, name))
+		if (!strcmp(pmu->name, name) ||
+		    (pmu->alias_name && !strcmp(pmu->alias_name, name)))
 			return pmu;
 
 	return NULL;
@@ -1920,6 +1944,9 @@ bool perf_pmu__has_hybrid(void)
 
 int perf_pmu__match(char *pattern, char *name, char *tok)
 {
+	if (!name)
+		return -1;
+
 	if (fnmatch(pattern, name, 0))
 		return -1;
 
