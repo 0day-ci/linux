@@ -1991,6 +1991,7 @@ static inline bool is_sbi_flag_set(struct f2fs_sb_info *sbi, unsigned int type)
 
 static inline void set_sbi_flag(struct f2fs_sb_info *sbi, unsigned int type)
 {
+	WARN_ON_ONCE(type ==  SBI_NEED_FSCK);
 	set_bit(type, &sbi->s_flag);
 }
 
