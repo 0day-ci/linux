@@ -161,6 +161,7 @@ static int qcom_cpufreq_hw_read_lut(struct device *cpu_dev,
 		return ret;
 	} else {
 		policy->fast_switch_possible = true;
+		policy->dvfs_possible_from_any_cpu = true;
 		icc_scaling_enabled = false;
 	}
 
