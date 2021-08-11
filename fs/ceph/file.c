@@ -1834,12 +1834,8 @@ retry_snap:
 		goto retry_snap;
 	}
 
-	if (written >= 0) {
-		if ((map_flags & CEPH_OSDMAP_NEARFULL) ||
-		    (pool_flags & CEPH_POOL_FLAG_NEARFULL))
-			iocb->ki_flags |= IOCB_DSYNC;
+	if (written >= 0)
 		written = generic_write_sync(iocb, written);
-	}
 
 	goto out_unlocked;
 out:
