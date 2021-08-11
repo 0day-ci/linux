@@ -75,13 +75,13 @@ int qcom_icc_aggregate(struct icc_node *node, u32 tag, u32 avg_bw,
 EXPORT_SYMBOL_GPL(qcom_icc_aggregate);
 
 /**
- * qcom_icc_set - set the constraints based on path
+ * qcom_icc_rpmh_set - set the constraints based on path
  * @src: source node for the path to set constraints on
  * @dst: destination node for the path to set constraints on
  *
  * Return: 0 on success, or an error code otherwise
  */
-int qcom_icc_set(struct icc_node *src, struct icc_node *dst)
+int qcom_icc_rpmh_set(struct icc_node *src, struct icc_node *dst)
 {
 	struct qcom_icc_provider *qp;
 	struct icc_node *node;
@@ -97,7 +97,7 @@ int qcom_icc_set(struct icc_node *src, struct icc_node *dst)
 
 	return 0;
 }
-EXPORT_SYMBOL_GPL(qcom_icc_set);
+EXPORT_SYMBOL_GPL(qcom_icc_rpmh_set);
 
 struct icc_node_data *qcom_icc_xlate_extended(struct of_phandle_args *spec, void *data)
 {
