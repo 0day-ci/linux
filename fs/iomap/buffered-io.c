@@ -1241,18 +1241,17 @@ iomap_chain_bio(struct bio *prev)
 	return new;
 }
 
-static bool
-iomap_can_add_to_ioend(struct iomap_writepage_ctx *wpc, loff_t offset,
-		sector_t sector)
+static bool iomap_can_add_to_ioend(struct iomap *iomap,
+		struct iomap_ioend *ioend, loff_t offset, sector_t sector)
 {
-	if ((wpc->iomap.flags & IOMAP_F_SHARED) !=
-	    (wpc->ioend->io_flags & IOMAP_F_SHARED))
+	if ((iomap->flags & IOMAP_F_SHARED) !=
+	    (ioend->io_flags & IOMAP_F_SHARED))
 		return false;
-	if (wpc->iomap.type != wpc->ioend->io_type)
+	if (iomap->type != ioend->io_type)
 		return false;
-	if (offset != wpc->ioend->io_offset + wpc->ioend->io_size)
+	if (offset != ioend->io_offset + ioend->io_size)
 		return false;
-	if (sector != bio_end_sector(wpc->ioend->io_bio))
+	if (sector != bio_end_sector(ioend->io_bio))
 		return false;
 	return true;
 }
@@ -1267,25 +1266,26 @@ iomap_add_to_ioend(struct inode *inode, loff_t offset, struct page *page,
 		struct writeback_control *wbc, struct list_head *iolist)
 {
 	struct iomap *iomap = &wpc->iomap;
+	struct iomap_ioend *ioend = wpc->ioend;
 	sector_t sector = iomap_sector(iomap, offset);
 	unsigned len = i_blocksize(inode);
 	unsigned poff = offset & (PAGE_SIZE - 1);
 
-	if (!wpc->ioend || !iomap_can_add_to_ioend(wpc, offset, sector)) {
-		if (wpc->ioend)
-			list_add(&wpc->ioend->io_list, iolist);
-		wpc->ioend = iomap_alloc_ioend(inode, iomap, offset, sector,
-				wbc);
+	if (!ioend || !iomap_can_add_to_ioend(iomap, ioend, offset, sector)) {
+		if (ioend)
+			list_add(&ioend->io_list, iolist);
+		ioend = iomap_alloc_ioend(inode, iomap, offset, sector, wbc);
+		wpc->ioend = ioend;
 	}
 
-	if (bio_add_page(wpc->ioend->io_bio, page, len, poff) != len) {
-		wpc->ioend->io_bio = iomap_chain_bio(wpc->ioend->io_bio);
-		__bio_add_page(wpc->ioend->io_bio, page, len, poff);
+	if (bio_add_page(ioend->io_bio, page, len, poff) != len) {
+		ioend->io_bio = iomap_chain_bio(ioend->io_bio);
+		__bio_add_page(ioend->io_bio, page, len, poff);
 	}
 
 	if (iop)
 		atomic_add(len, &iop->write_bytes_pending);
-	wpc->ioend->io_size += len;
+	ioend->io_size += len;
 	wbc_account_cgroup_owner(wbc, page, len);
 }
 
