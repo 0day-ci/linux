@@ -10,11 +10,14 @@ maintainers:
   - Matt Johnston <matt@codeconstruct.com.au>
 
 description:
-  The generic MCTP I2C binding defines an MCTP endpoint on an existing I2C
-  adapter. MCTP I2C is specified by DMTF DSP0237.
+  An mctp-i2c-generic controller defines an MCTP endpoint on an existing I2C
+  controller. MCTP I2C is specified by DMTF DSP0237.
 
-  An mctp-i2c-generic device must be attached to a hardware bus adapter
-  which supports slave functionality.
+  An mctp-i2c-generic controller must be attached to an I2C controller
+  which supports slave functionality. Subordinate busses in a mux topology
+  can be attached to the same mctp-i2c-generic controller with the bus-attach
+  property. These will be presented to the host system as separate MCTP I2C
+  instances.
 
 properties:
   compatible:
@@ -26,6 +29,16 @@ properties:
       7 bit I2C address of the endpoint.
       I2C_OWN_SLAVE_ADDRESS flag must be set (described in i2c.txt)
 
+  bus-attach:
+    $ref: "/schemas/types.yaml#/definitions/phandle-array"
+    description: |
+      List of phandles of I2C busses to attach to. All busses must
+      be in the same mux topology as the node's parent I2C controller.
+
+      If no bus-attach property is specified then only the direct parent
+      I2C bus is attached. Otherwise to include a direct parent bus it
+      must be included in the bus-attach list if needed.
+
 additionalProperties: false
 
 required:
@@ -35,7 +48,9 @@ required:
 examples:
   - |
     #include <dt-bindings/i2c/i2c.h>
-    i2c {
+
+    // simple attaching to a root adapter i2c0
+    i2c0: i2cbus0 {
         #address-cells = <1>;
         #size-cells = <0>;
 
@@ -43,4 +58,32 @@ examples:
             compatible = "mctp-i2c";
             reg = <(0x50 | I2C_OWN_SLAVE_ADDRESS)>;
         };
+    };
+
+    // attaching to a root adapter i2c5 and a child mux bus i2c14
+    i2c5: i2cbus5 {
+        #address-cells = <1>;
+        #size-cells = <0>;
+
+        mctp@50 {
+            compatible = "mctp-i2c";
+            reg = <(0x50 | I2C_OWN_SLAVE_ADDRESS)>;
+            attach-bus = <&i2c5 &i2c14>;
+        };
+    };
+
+    i2cmux0 {
+      compatible = "i2c-mux";
+      #address-cells = <1>;
+      #size-cells = <0>;
+      i2c-parent = <&i2c5>;
+      mux-controls = <&mux>;
+
+      i2c14: i2c@0 {
+        reg = <0>;
+      };
+
+      i2c15: i2c@1 {
+        reg = <1>;
+      };
     };
