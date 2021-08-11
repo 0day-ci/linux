@@ -860,8 +860,11 @@ static dma_addr_t iommu_dma_map_page(struct device *dev, struct page *page,
 static void iommu_dma_unmap_page(struct device *dev, dma_addr_t dma_handle,
 		size_t size, enum dma_data_direction dir, unsigned long attrs)
 {
-	if (!(attrs & DMA_ATTR_SKIP_CPU_SYNC))
+	if (!(attrs & DMA_ATTR_SKIP_CPU_SYNC)) {
 		iommu_dma_sync_single_for_cpu(dev, dma_handle, size, dir);
+		attrs |= DMA_ATTR_SKIP_CPU_SYNC;
+	}
+
 	__iommu_dma_unmap_swiotlb(dev, dma_handle, size, dir, attrs);
 }
 
@@ -1000,8 +1003,10 @@ static int iommu_dma_map_sg(struct device *dev, struct scatterlist *sg,
 	if (dev_is_untrusted(dev))
 		return iommu_dma_map_sg_swiotlb(dev, sg, nents, dir, attrs);
 
-	if (!(attrs & DMA_ATTR_SKIP_CPU_SYNC))
+	if (!(attrs & DMA_ATTR_SKIP_CPU_SYNC)) {
 		iommu_dma_sync_sg_for_device(dev, sg, nents, dir);
+		attrs |= DMA_ATTR_SKIP_CPU_SYNC;
+	}
 
 	/*
 	 * Work out how much IOVA space we need, and align the segments to
@@ -1069,8 +1074,10 @@ static void iommu_dma_unmap_sg(struct device *dev, struct scatterlist *sg,
 	struct scatterlist *tmp;
 	int i;
 
-	if (!(attrs & DMA_ATTR_SKIP_CPU_SYNC))
+	if (!(attrs & DMA_ATTR_SKIP_CPU_SYNC)) {
 		iommu_dma_sync_sg_for_cpu(dev, sg, nents, dir);
+		attrs |= DMA_ATTR_SKIP_CPU_SYNC;
+	}
 
 	if (dev_is_untrusted(dev)) {
 		iommu_dma_unmap_sg_swiotlb(dev, sg, nents, dir, attrs);
