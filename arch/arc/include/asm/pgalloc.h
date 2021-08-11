@@ -29,6 +29,11 @@
 #ifndef _ASM_ARC_PGALLOC_H
 #define _ASM_ARC_PGALLOC_H
 
+/*
+ * For ARC, pgtable_t is not struct page *, but pte_t * (to avoid
+ * extraneous page_address() calculations) hence can't use
+ * use asm-generic/pgalloc.h which assumes it being struct page *
+ */
 #include <linux/mm.h>
 #include <linux/log2.h>
 
@@ -36,7 +41,7 @@ static inline void
 pmd_populate_kernel(struct mm_struct *mm, pmd_t *pmdp, pte_t *ptep)
 {
 	/*
-	 * The cast to long below is OK even when pte is long long (PAE40)
+	 * The cast to long below is OK in 32-bit PAE40 regime with long long pte
 	 * Despite "wider" pte, the pte table needs to be in non-PAE low memory
 	 * as all higher levels can only hold long pointers.
 	 *
