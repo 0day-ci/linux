@@ -44,6 +44,7 @@ struct nfs_mount_data {
 	struct nfs3_fh	root;			/* 4 */
 	int		pseudoflavor;		/* 5 */
 	char		context[NFS_MAX_CONTEXT_LEN + 1];	/* 6 */
+	int		rasize;			/* 1 */
 };
 
 /* bits in the flags field visible to user space */

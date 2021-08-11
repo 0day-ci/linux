@@ -713,6 +713,8 @@ static int nfs_init_server(struct nfs_server *server,
 		server->rsize = nfs_block_size(ctx->rsize, NULL);
 	if (ctx->wsize)
 		server->wsize = nfs_block_size(ctx->wsize, NULL);
+	if (ctx->rasize)
+		server->rasize = ctx->rasize;
 
 	server->acregmin = ctx->acregmin * HZ;
 	server->acregmax = ctx->acregmax * HZ;
@@ -869,6 +871,7 @@ void nfs_server_copy_userdata(struct nfs_server *target, struct nfs_server *sour
 {
 	target->flags = source->flags;
 	target->rsize = source->rsize;
+	target->rasize = source->rasize;
 	target->wsize = source->wsize;
 	target->acregmin = source->acregmin;
 	target->acregmax = source->acregmax;

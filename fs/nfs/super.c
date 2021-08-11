@@ -456,6 +456,7 @@ static void nfs_show_mount_options(struct seq_file *m, struct nfs_server *nfss,
 	seq_printf(m, ",wsize=%u", nfss->wsize);
 	if (nfss->bsize != 0)
 		seq_printf(m, ",bsize=%u", nfss->bsize);
+	seq_printf(m, ",rasize=%lu", nfss->super->s_bdi->ra_pages * PAGE_SIZE);
 	seq_printf(m, ",namlen=%u", nfss->namelen);
 	if (nfss->acregmin != NFS_DEF_ACREGMIN*HZ || showdefaults)
 		seq_printf(m, ",acregmin=%u", nfss->acregmin/HZ);
@@ -1281,6 +1282,7 @@ int nfs_get_tree_common(struct fs_context *fc)
 		if (error)
 			goto error_splat_super;
 		s->s_bdi->io_pages = server->rpages;
+		s->s_bdi->ra_pages = server->rasize / PAGE_SIZE;
 		server->super = s;
 	}
 

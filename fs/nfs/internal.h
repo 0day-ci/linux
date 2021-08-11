@@ -97,6 +97,7 @@ struct nfs_fs_context {
 	unsigned short		protofamily;
 	unsigned short		mountfamily;
 	bool			has_sec_mnt_opts;
+	unsigned int            rasize;
 
 	struct {
 		union {

@@ -1130,6 +1130,8 @@ static int nfs4_init_server(struct nfs_server *server, struct fs_context *fc)
 		server->rsize = nfs_block_size(ctx->rsize, NULL);
 	if (ctx->wsize)
 		server->wsize = nfs_block_size(ctx->wsize, NULL);
+	if (ctx->rasize)
+		server->rasize = ctx->rasize;
 
 	server->acregmin = ctx->acregmin * HZ;
 	server->acregmax = ctx->acregmax * HZ;

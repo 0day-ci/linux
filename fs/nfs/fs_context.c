@@ -65,6 +65,7 @@ enum nfs_param {
 	Opt_proto,
 	Opt_rdirplus,
 	Opt_rdma,
+	Opt_rasize,
 	Opt_resvport,
 	Opt_retrans,
 	Opt_retry,
@@ -162,6 +163,7 @@ static const struct fs_parameter_spec nfs_fs_parameters[] = {
 	fsparam_u32   ("port",		Opt_port),
 	fsparam_flag_no("posix",	Opt_posix),
 	fsparam_string("proto",		Opt_proto),
+	fsparam_u32   ("rasize",        Opt_rasize),
 	fsparam_flag_no("rdirplus",	Opt_rdirplus),
 	fsparam_flag  ("rdma",		Opt_rdma),
 	fsparam_flag_no("resvport",	Opt_resvport),
@@ -476,7 +478,6 @@ static int nfs_fs_context_parse_param(struct fs_context *fc,
 	int ret, opt;
 
 	dfprintk(MOUNT, "NFS:   parsing nfs mount option '%s'\n", param->key);
-
 	opt = fs_parse(fc, nfs_fs_parameters, param, &result);
 	if (opt < 0)
 		return ctx->sloppy ? 1 : opt;
@@ -824,6 +825,9 @@ static int nfs_fs_context_parse_param(struct fs_context *fc,
 			goto out_invalid_value;
 		}
 		break;
+	case Opt_rasize:
+		ctx->rasize = result.uint_32;
+		break;
 
 		/*
 		 * Special options
@@ -1012,6 +1016,7 @@ static int nfs23_parse_monolithic(struct fs_context *fc,
 		ctx->flags	|= extra_flags;
 		ctx->rsize	= data->rsize;
 		ctx->wsize	= data->wsize;
+		ctx->rasize     = data->rasize;
 		ctx->timeo	= data->timeo;
 		ctx->retrans	= data->retrans;
 		ctx->acregmin	= data->acregmin;
@@ -1145,6 +1150,7 @@ struct compat_nfs4_mount_data_v1 {
 	compat_int_t proto;
 	compat_int_t auth_flavourlen;
 	compat_uptr_t auth_flavours;
+	compat_int_t rasize;
 };
 
 static void nfs4_compat_mount_data_conv(struct nfs4_mount_data *data)
@@ -1169,6 +1175,7 @@ static void nfs4_compat_mount_data_conv(struct nfs4_mount_data *data)
 	data->timeo = compat->timeo;
 	data->wsize = compat->wsize;
 	data->rsize = compat->rsize;
+	data->rasize = compat->rasize;
 	data->flags = compat->flags;
 	data->version = compat->version;
 }
@@ -1247,6 +1254,7 @@ static int nfs4_parse_monolithic(struct fs_context *fc,
 	ctx->flags	= data->flags & NFS4_MOUNT_FLAGMASK;
 	ctx->rsize	= data->rsize;
 	ctx->wsize	= data->wsize;
+	ctx->rasize     = data->rasize;
 	ctx->timeo	= data->timeo;
 	ctx->retrans	= data->retrans;
 	ctx->acregmin	= data->acregmin;
@@ -1508,6 +1516,7 @@ static int nfs_init_fs_context(struct fs_context *fc)
 		ctx->flags		= nfss->flags;
 		ctx->rsize		= nfss->rsize;
 		ctx->wsize		= nfss->wsize;
+		ctx->rasize             = nfss->rasize;
 		ctx->retrans		= nfss->client->cl_timeout->to_retries;
 		ctx->selected_flavor	= nfss->client->cl_auth->au_flavor;
 		ctx->acregmin		= nfss->acregmin / HZ;

@@ -54,6 +54,7 @@ struct nfs4_mount_data {
 	/* Pseudo-flavours to use for authentication. See RFC2623 */
 	int auth_flavourlen;			/* 1 */
 	int __user *auth_flavours;		/* 1 */
+	int rasize;                             /* 1 */
 };
 
 /* bits in the flags field */
