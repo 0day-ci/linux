@@ -8111,7 +8111,7 @@ static void kvm_hyperv_tsc_notifier(void)
 
 	mutex_lock(&kvm_lock);
 	list_for_each_entry(kvm, &vm_list, vm_list)
-		kvm_make_mclock_inprogress_request(kvm);
+		kvm_hv_invalidate_tsc_page(kvm);
 
 	hyperv_stop_tsc_emulation();
 
@@ -8123,6 +8123,7 @@ static void kvm_hyperv_tsc_notifier(void)
 	list_for_each_entry(kvm, &vm_list, vm_list) {
 		struct kvm_arch *ka = &kvm->arch;
 
+		kvm_make_mclock_inprogress_request(kvm);
 		spin_lock_irqsave(&ka->pvclock_gtod_sync_lock, flags);
 		pvclock_update_vm_gtod_copy(kvm);
 		spin_unlock_irqrestore(&ka->pvclock_gtod_sync_lock, flags);
