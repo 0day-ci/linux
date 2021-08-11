@@ -385,6 +385,8 @@ int dsa_port_bridge_join(struct dsa_port *dp, struct net_device *br,
 	if (err)
 		goto out_rollback_unoffload;
 
+	dsa_bridge_mtu_normalization(dp);
+
 	return 0;
 
 out_rollback_unoffload:

@@ -320,6 +320,7 @@ int dsa_slave_register_notifier(void);
 void dsa_slave_unregister_notifier(void);
 void dsa_slave_setup_tagger(struct net_device *slave);
 int dsa_slave_change_mtu(struct net_device *dev, int new_mtu);
+void dsa_bridge_mtu_normalization(struct dsa_port *dp);
 
 static inline struct dsa_port *dsa_slave_to_port(const struct net_device *dev)
 {

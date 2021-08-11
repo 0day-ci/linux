@@ -1452,7 +1452,7 @@ static void dsa_hw_port_list_free(struct list_head *hw_port_list)
 }
 
 /* Make the hardware datapath to/from @dev limited to a common MTU */
-static void dsa_bridge_mtu_normalization(struct dsa_port *dp)
+void dsa_bridge_mtu_normalization(struct dsa_port *dp)
 {
 	struct list_head hw_port_list;
 	struct dsa_switch_tree *dst;
@@ -2007,8 +2007,6 @@ static int dsa_slave_changeupper(struct net_device *dev,
 	if (netif_is_bridge_master(info->upper_dev)) {
 		if (info->linking) {
 			err = dsa_port_bridge_join(dp, info->upper_dev, extack);
-			if (!err)
-				dsa_bridge_mtu_normalization(dp);
 			err = notifier_from_errno(err);
 		} else {
 			dsa_port_bridge_leave(dp, info->upper_dev);
