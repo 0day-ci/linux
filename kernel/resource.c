@@ -1754,9 +1754,8 @@ static int strict_iomem_checks;
  */
 bool iomem_is_exclusive(u64 addr)
 {
-	struct resource *p = &iomem_resource;
+	struct resource *p;
 	bool err = false;
-	loff_t l;
 	int size = PAGE_SIZE;
 
 	if (!strict_iomem_checks)
@@ -1765,27 +1764,31 @@ bool iomem_is_exclusive(u64 addr)
 	addr = addr & PAGE_MASK;
 
 	read_lock(&resource_lock);
-	for (p = p->child; p ; p = r_next(NULL, p, &l)) {
+	for (p = iomem_resource.child; p ;) {
 		/*
 		 * We can probably skip the resources without
 		 * IORESOURCE_IO attribute?
 		 */
 		if (p->start >= addr + size)
 			break;
-		if (p->end < addr)
+		if (p->end < addr) {
+			/* No need to consider children */
+			p = next_resource_skip_children(p);
 			continue;
+		}
+
 		/*
 		 * A resource is exclusive if IORESOURCE_EXCLUSIVE is set
 		 * or CONFIG_IO_STRICT_DEVMEM is enabled and the
 		 * resource is busy.
 		 */
-		if ((p->flags & IORESOURCE_BUSY) == 0)
-			continue;
-		if (IS_ENABLED(CONFIG_IO_STRICT_DEVMEM)
-				|| p->flags & IORESOURCE_EXCLUSIVE) {
+		if (p->flags & IORESOURCE_BUSY &&
+		    (IS_ENABLED(CONFIG_IO_STRICT_DEVMEM) ||
+		     p->flags & IORESOURCE_EXCLUSIVE)) {
 			err = true;
 			break;
 		}
+		p = next_resource(p);
 	}
 	read_unlock(&resource_lock);
 
