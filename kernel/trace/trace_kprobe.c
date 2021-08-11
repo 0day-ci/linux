@@ -703,14 +703,6 @@ static struct notifier_block trace_kprobe_module_nb = {
 	.priority = 1	/* Invoked after kprobe module callback */
 };
 
-/* Convert certain expected symbols into '_' when generating event names */
-static inline void sanitize_event_name(char *name)
-{
-	while (*name++ != '\0')
-		if (*name == ':' || *name == '.')
-			*name = '_';
-}
-
 static int __trace_kprobe_create(int argc, const char *argv[])
 {
 	/*
@@ -841,7 +833,7 @@ static int __trace_kprobe_create(int argc, const char *argv[])
 	trace_probe_log_set_index(0);
 	if (event) {
 		ret = traceprobe_parse_event_name(&event, &group, buf,
-						  event - argv[0]);
+						  event - argv[0], '/');
 		if (ret)
 			goto parse_error;
 	} else {
@@ -1330,9 +1322,10 @@ probe_mem_read(void *dest, void *src, size_t size)
 
 /* Note that we don't verify it, since the code does not come from user space */
 static int
-process_fetch_insn(struct fetch_insn *code, struct pt_regs *regs, void *dest,
+process_fetch_insn(struct fetch_insn *code, void *rec, void *dest,
 		   void *base)
 {
+	struct pt_regs *regs = rec;
 	unsigned long val;
 
 retry:
