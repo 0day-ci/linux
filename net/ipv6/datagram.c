@@ -145,17 +145,9 @@ int __ip6_datagram_connect(struct sock *sk, struct sockaddr *uaddr,
 	int			err;
 
 	if (usin->sin6_family == AF_INET) {
-		if (__ipv6_only_sock(sk))
-			return -EAFNOSUPPORT;
 		err = __ip4_datagram_connect(sk, uaddr, addr_len);
 		goto ipv4_connected;
 	}
-
-	if (addr_len < SIN6_LEN_RFC2133)
-		return -EINVAL;
-
-	if (usin->sin6_family != AF_INET6)
-		return -EAFNOSUPPORT;
 
 	if (np->sndflow)
 		fl6_flowlabel = usin->sin6_flowinfo & IPV6_FLOWINFO_MASK;

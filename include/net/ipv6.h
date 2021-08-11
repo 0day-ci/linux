@@ -1129,6 +1129,8 @@ int inet6_sendmsg(struct socket *sock, struct msghdr *msg, size_t size);
 int inet6_recvmsg(struct socket *sock, struct msghdr *msg, size_t size,
 		  int flags);
 
+int inet6_dgram_connect(struct socket *sock, struct sockaddr *uaddr,
+		       int addr_len, int flags);
 /*
  * reassembly.c
  */

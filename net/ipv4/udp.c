@@ -1941,13 +1941,6 @@ csum_copy_err:
 
 int udp_pre_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 {
-	/* This check is replicated from __ip4_datagram_connect() and
-	 * intended to prevent BPF program called below from accessing bytes
-	 * that are out of the bound specified by user in addr_len.
-	 */
-	if (addr_len < sizeof(struct sockaddr_in))
-		return -EINVAL;
-
 	return BPF_CGROUP_RUN_PROG_INET4_CONNECT_LOCK(sk, uaddr);
 }
 EXPORT_SYMBOL(udp_pre_connect);

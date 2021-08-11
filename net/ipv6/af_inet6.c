@@ -463,6 +463,41 @@ int inet6_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 }
 EXPORT_SYMBOL(inet6_bind);
 
+int inet6_dgram_connect(struct socket *sock, struct sockaddr *uaddr,
+			int addr_len, int flags)
+{
+	struct sock *sk = sock->sk;
+	int err;
+
+	if (addr_len < sizeof(uaddr->sa_family))
+		return -EINVAL;
+	if (uaddr->sa_family == AF_UNSPEC)
+		return sk->sk_prot->disconnect(sk, flags);
+
+	if (uaddr->sa_family == AF_INET) {
+		if (__ipv6_only_sock(sk))
+			return -EAFNOSUPPORT;
+		if (addr_len < sizeof(struct sockaddr_in))
+			return -EINVAL;
+	} else {
+		if (uaddr->sa_family != AF_INET6)
+			return -EAFNOSUPPORT;
+		if (addr_len < SIN6_LEN_RFC2133)
+			return -EINVAL;
+	}
+
+	if (BPF_CGROUP_PRE_CONNECT_ENABLED(sk)) {
+		err = sk->sk_prot->pre_connect(sk, uaddr, addr_len);
+		if (err)
+			return err;
+	}
+
+	if (data_race(!inet_sk(sk)->inet_num) && inet_autobind(sk))
+		return -EAGAIN;
+	return sk->sk_prot->connect(sk, uaddr, addr_len);
+}
+EXPORT_SYMBOL(inet6_dgram_connect);
+
 int inet6_release(struct socket *sock)
 {
 	struct sock *sk = sock->sk;
@@ -702,7 +737,7 @@ const struct proto_ops inet6_dgram_ops = {
 	.owner		   = THIS_MODULE,
 	.release	   = inet6_release,
 	.bind		   = inet6_bind,
-	.connect	   = inet_dgram_connect,	/* ok		*/
+	.connect	   = inet6_dgram_connect,	/* ok		*/
 	.socketpair	   = sock_no_socketpair,	/* a do nothing	*/
 	.accept		   = sock_no_accept,		/* a do nothing	*/
 	.getname	   = inet6_getname,

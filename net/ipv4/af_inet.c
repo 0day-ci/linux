@@ -173,7 +173,7 @@ EXPORT_SYMBOL(inet_sock_destruct);
  *	Automatically bind an unbound socket.
  */
 
-static int inet_autobind(struct sock *sk)
+int inet_autobind(struct sock *sk)
 {
 	struct inet_sock *inet;
 	/* We may need to bind the socket. */
@@ -189,6 +189,7 @@ static int inet_autobind(struct sock *sk)
 	release_sock(sk);
 	return 0;
 }
+EXPORT_SYMBOL(inet_autobind);
 
 /*
  *	Move a socket into listening state.
@@ -568,6 +569,11 @@ int inet_dgram_connect(struct socket *sock, struct sockaddr *uaddr,
 		return -EINVAL;
 	if (uaddr->sa_family == AF_UNSPEC)
 		return sk->sk_prot->disconnect(sk, flags);
+
+	if (uaddr->sa_family != AF_INET)
+		return -EAFNOSUPPORT;
+	if (addr_len < sizeof(struct sockaddr_in))
+		return -EINVAL;
 
 	if (BPF_CGROUP_PRE_CONNECT_ENABLED(sk)) {
 		err = sk->sk_prot->pre_connect(sk, uaddr, addr_len);
