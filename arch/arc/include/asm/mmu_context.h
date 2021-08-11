@@ -19,6 +19,7 @@
 
 #include <asm/tlb.h>
 #include <asm-generic/mm_hooks.h>
+#include <asm/mmu-arcv2.h>
 
 /*		ARC ASID Management
  *
