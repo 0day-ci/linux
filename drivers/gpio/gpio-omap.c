@@ -189,7 +189,7 @@ static int omap2_set_gpio_debounce(struct gpio_bank *bank, unsigned offset,
 	if (enable) {
 		debounce = DIV_ROUND_UP(debounce, 31) - 1;
 		if ((debounce & OMAP4_GPIO_DEBOUNCINGTIME_MASK) != debounce)
-			return -EINVAL;
+			return -ENOTSUPP;
 	}
 
 	l = BIT(offset);
@@ -886,9 +886,9 @@ static int omap_gpio_debounce(struct gpio_chip *chip, unsigned offset,
 	raw_spin_unlock_irqrestore(&bank->lock, flags);
 
 	if (ret)
-		dev_info(chip->parent,
-			 "Could not set line %u debounce to %u microseconds (%d)",
-			 offset, debounce, ret);
+		dev_dbg(chip->parent,
+			"Could not set line %u debounce to %u microseconds (%d)",
+			offset, debounce, ret);
 
 	return ret;
 }
