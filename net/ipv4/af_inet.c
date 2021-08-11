@@ -1136,23 +1136,23 @@ static struct inet_protosw inetsw_array[] =
 		.prot =       &udp_prot,
 		.ops =        &inet_dgram_ops,
 		.flags =      INET_PROTOSW_PERMANENT,
-       },
+	},
 
-       {
+	{
 		.type =       SOCK_DGRAM,
 		.protocol =   IPPROTO_ICMP,
 		.prot =       &ping_prot,
 		.ops =        &inet_sockraw_ops,
 		.flags =      INET_PROTOSW_REUSE,
-       },
+	},
 
-       {
-	       .type =       SOCK_RAW,
-	       .protocol =   IPPROTO_IP,	/* wild card */
-	       .prot =       &raw_prot,
-	       .ops =        &inet_sockraw_ops,
-	       .flags =      INET_PROTOSW_REUSE,
-       }
+	{
+		.type =       SOCK_RAW,
+		.protocol =   IPPROTO_IP,	/* wild card */
+		.prot =       &raw_prot,
+		.ops =        &inet_sockraw_ops,
+		.flags =      INET_PROTOSW_REUSE,
+	}
 };
 
 #define INETSW_ARRAY_LEN ARRAY_SIZE(inetsw_array)
