@@ -5664,6 +5664,15 @@ static long _perf_ioctl(struct perf_event *event, unsigned int cmd, unsigned lon
 
 		return perf_event_modify_attr(event,  &new_attr);
 	}
+
+	case PERF_EVENT_IOC_LOST_SAMPLES: {
+		u64 lost = atomic_read(&event->lost_samples);
+
+		if (copy_to_user((void __user *)arg, &lost, sizeof(lost)))
+			return -EFAULT;
+		return 0;
+	}
+
 	default:
 		return -ENOTTY;
 	}
