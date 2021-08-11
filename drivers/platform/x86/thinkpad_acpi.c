@@ -1160,6 +1160,13 @@ struct tpacpi_rfk_ops {
 
 static struct tpacpi_rfk *tpacpi_rfkill_switches[TPACPI_RFK_SW_MAX];
 
+/*Foxconn SDX55 T77W175 products. All available device ID*/
+static const struct pci_device_id foxconn_device_ids[] = {
+	{ PCI_DEVICE(PCI_VENDOR_ID_FOXCONN, 0xE0AB) },
+	{ PCI_DEVICE(PCI_VENDOR_ID_FOXCONN, 0xE0AF) },
+	{ PCI_DEVICE(PCI_VENDOR_ID_FOXCONN, 0xE0B4) },
+	{}
+};
 /* Query FW and update rfkill sw state for a given rfkill switch */
 static int tpacpi_rfk_update_swstate(const struct tpacpi_rfk *tp_rfk)
 {
@@ -1183,8 +1190,13 @@ static void tpacpi_rfk_update_swstate_all(void)
 {
 	unsigned int i;
 
-	for (i = 0; i < TPACPI_RFK_SW_MAX; i++)
-		tpacpi_rfk_update_swstate(tpacpi_rfkill_switches[i]);
+	for (i = 0; i < TPACPI_RFK_SW_MAX; i++) {
+		if (pci_dev_present(foxconn_device_ids) && i == 1)
+			pr_info("Find Foxconn wwan device, ignore to update rfkill switch status\n");
+		else
+			tpacpi_rfk_update_swstate(tpacpi_rfkill_switches[i]);
+
+	}
 }
 
 /*
