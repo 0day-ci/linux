@@ -1734,6 +1734,7 @@ void f2fs_stop_discard_thread(struct f2fs_sb_info *sbi)
 
 		dcc->f2fs_issue_discard = NULL;
 		kthread_stop(discard_thread);
+		put_task_struct(discard_thread);
 	}
 }
 
@@ -2161,6 +2162,7 @@ init_thread:
 		SM_I(sbi)->dcc_info = NULL;
 		return err;
 	}
+	get_task_struct(dcc->f2fs_issue_discard);
 
 	return err;
 }
