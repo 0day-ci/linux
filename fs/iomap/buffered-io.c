@@ -516,6 +516,13 @@ enum {
 	IOMAP_WRITE_F_UNSHARE		= (1 << 0),
 };
 
+struct iomap_write_ctx {
+	struct iov_iter *iter;
+	struct iomap_ioend *ioend;
+	struct list_head iolist;
+	bool write_through;
+};
+
 static void
 iomap_write_failed(struct inode *inode, loff_t pos, unsigned len)
 {
@@ -736,7 +743,8 @@ static loff_t
 iomap_write_actor(struct inode *inode, loff_t pos, loff_t length, void *data,
 		struct iomap *iomap, struct iomap *srcmap)
 {
-	struct iov_iter *i = data;
+	struct iomap_write_ctx *iwc = data;
+	struct iov_iter *i = iwc->iter;
 	long status = 0;
 	ssize_t written = 0;
 
@@ -806,12 +814,17 @@ ssize_t
 iomap_file_buffered_write(struct kiocb *iocb, struct iov_iter *iter,
 		const struct iomap_ops *ops)
 {
+	struct iomap_write_ctx iwc = {
+		.iter = iter,
+		.iolist = LIST_HEAD_INIT(iwc.iolist),
+		.write_through = iocb->ki_flags & IOCB_SYNC,
+	};
 	struct inode *inode = iocb->ki_filp->f_mapping->host;
 	loff_t pos = iocb->ki_pos, ret = 0, written = 0;
 
 	while (iov_iter_count(iter)) {
 		ret = iomap_apply(inode, pos, iov_iter_count(iter),
-				IOMAP_WRITE, ops, iter, iomap_write_actor);
+				IOMAP_WRITE, ops, &iwc, iomap_write_actor);
 		if (ret <= 0)
 			break;
 		pos += ret;
