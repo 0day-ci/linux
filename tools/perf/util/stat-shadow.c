@@ -981,8 +981,9 @@ void perf_stat__print_shadow_stats(struct perf_stat_config *config,
 		total = max(total, runtime_stat_avg(st,
 						    STAT_STALLED_CYCLES_BACK,
 						    cpu, &rsd));
-
-		if (total && avg) {
+// TODO: Refactor code to avoid errors in JSON output b/194436171
+// !config->json_output is temporary workaround for JSON linter.
+		if (total && avg && !config->json_output) {
 			out->new_line(config, ctxp);
 			ratio = total / avg;
 			print_metric(config, ctxp, NULL, "%7.2f ",
