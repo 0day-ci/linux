@@ -908,12 +908,8 @@ static const struct of_device_id stm32_spdifrx_ids[] = {
 static int stm32_spdifrx_parse_of(struct platform_device *pdev,
 				  struct stm32_spdifrx_data *spdifrx)
 {
-	struct device_node *np = pdev->dev.of_node;
 	const struct of_device_id *of_id;
 	struct resource *res;
-
-	if (!np)
-		return -ENODEV;
 
 	of_id = of_match_device(stm32_spdifrx_ids, &pdev->dev);
 	if (of_id)
