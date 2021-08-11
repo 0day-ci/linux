@@ -139,6 +139,8 @@ int btrfs_get_free_objectid(struct btrfs_root *root, u64 *objectid);
 int btrfs_init_root_free_objectid(struct btrfs_root *root);
 int __init btrfs_end_io_wq_init(void);
 void __cold btrfs_end_io_wq_exit(void);
+void btrfs_stop_all_workers(struct btrfs_fs_info *fs_info);
+int btrfs_init_workqueues(struct btrfs_fs_info *fs_info, struct btrfs_fs_devices *fs_devices);
 
 #ifdef CONFIG_DEBUG_LOCK_ALLOC
 void btrfs_set_buffer_lockdep_class(u64 objectid,

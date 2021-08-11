@@ -2212,6 +2212,26 @@ int btrfs_read_block_groups(struct btrfs_fs_info *info)
 	ret = check_chunk_block_group_mappings(info);
 error:
 	btrfs_free_path(path);
+
+	if (ret == -EIO && btrfs_test_opt(info, IGNOREBADROOTS)) {
+
+		if (btrfs_super_log_root(info->super_copy) != 0) {
+			btrfs_warn(info, "Ignoring tree-log replay due to extent tree corruption!");
+			btrfs_set_super_log_root(info->super_copy, 0);
+		}
+
+		btrfs_put_block_group_cache(info);
+		btrfs_stop_all_workers(info);
+		btrfs_free_block_groups(info);
+		ret = btrfs_init_workqueues(info, NULL);
+		if (ret)
+			return ret;
+		ret = btrfs_init_space_info(info);
+		if (ret)
+			return ret;
+		return fill_dummy_bgs(info);
+	}
+
 	return ret;
 }
 

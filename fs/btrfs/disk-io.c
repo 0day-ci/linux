@@ -2115,7 +2115,7 @@ static int read_backup_root(struct btrfs_fs_info *fs_info, u8 priority)
 }
 
 /* helper to cleanup workers */
-static void btrfs_stop_all_workers(struct btrfs_fs_info *fs_info)
+void btrfs_stop_all_workers(struct btrfs_fs_info *fs_info)
 {
 	btrfs_destroy_workqueue(fs_info->fixup_workers);
 	btrfs_destroy_workqueue(fs_info->delalloc_workers);
@@ -2283,7 +2283,7 @@ static void btrfs_init_qgroup(struct btrfs_fs_info *fs_info)
 	mutex_init(&fs_info->qgroup_rescan_lock);
 }
 
-static int btrfs_init_workqueues(struct btrfs_fs_info *fs_info,
+int btrfs_init_workqueues(struct btrfs_fs_info *fs_info,
 		struct btrfs_fs_devices *fs_devices)
 {
 	u32 max_active = fs_info->thread_pool_size;
