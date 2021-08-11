@@ -200,6 +200,8 @@ config VIDEO_TI_CAL_MC
 
 endif # VIDEO_TI_CAL
 
+source "drivers/media/platform/imx/Kconfig"
+
 endif # V4L_PLATFORM_DRIVERS
 
 menuconfig V4L_MEM2MEM_DRIVERS
