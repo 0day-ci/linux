@@ -65,6 +65,24 @@ static int bpa_rs600_read_vin(struct i2c_client *client)
 	return ret;
 }
 
+/*
+ * The firmware on some BPD-RS600 models incorrectly reports 1640W
+ * for MFR_PIN_MAX. Deal with this by returning a sensible value.
+ */
+static int bpa_rs600_read_pin_max(struct i2c_client *client)
+{
+	int ret;
+
+	ret = pmbus_read_word_data(client, 0, 0xff, PMBUS_MFR_PIN_MAX);
+	if (ret < 0)
+		return ret;
+
+	if (ret == 0x0b34)
+		return 0x095e;
+
+	return ret;
+}
+
 static int bpa_rs600_read_word_data(struct i2c_client *client, int page, int phase, int reg)
 {
 	int ret;
@@ -92,7 +110,8 @@ static int bpa_rs600_read_word_data(struct i2c_client *client, int page, int pha
 		ret = pmbus_read_word_data(client, 0, 0xff, PMBUS_MFR_IOUT_MAX);
 		break;
 	case PMBUS_PIN_OP_WARN_LIMIT:
-		ret = pmbus_read_word_data(client, 0, 0xff, PMBUS_MFR_PIN_MAX);
+	case PMBUS_MFR_PIN_MAX:
+		ret = bpa_rs600_read_pin_max(client);
 		break;
 	case PMBUS_POUT_OP_WARN_LIMIT:
 		ret = pmbus_read_word_data(client, 0, 0xff, PMBUS_MFR_POUT_MAX);
