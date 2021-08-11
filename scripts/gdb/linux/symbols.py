@@ -14,44 +14,22 @@
 import gdb
 import os
 import re
+import signal
 
 from linux import modules, utils
 
 
 if hasattr(gdb, 'Breakpoint'):
-    class LoadModuleBreakpoint(gdb.Breakpoint):
-        def __init__(self, spec, gdb_command):
-            super(LoadModuleBreakpoint, self).__init__(spec, internal=True)
+
+    class BreakpointWrapper(gdb.Breakpoint):
+        def __init__(self, callback, **kwargs):
+            super(BreakpointWrapper, self).__init__(internal=True, **kwargs)
             self.silent = True
-            self.gdb_command = gdb_command
+            self.callback = callback
 
         def stop(self):
-            module = gdb.parse_and_eval("mod")
-            module_name = module['name'].string()
-            cmd = self.gdb_command
-
-            # enforce update if object file is not found
-            cmd.module_files_updated = False
-
-            # Disable pagination while reporting symbol (re-)loading.
-            # The console input is blocked in this context so that we would
-            # get stuck waiting for the user to acknowledge paged output.
-            show_pagination = gdb.execute("show pagination", to_string=True)
-            pagination = show_pagination.endswith("on.\n")
-            gdb.execute("set pagination off")
-
-            if module_name in cmd.loaded_modules:
-                gdb.write("refreshing all symbols to reload module "
-                          "'{0}'\n".format(module_name))
-                cmd.load_all_symbols()
-            else:
-                cmd.load_module_symbols(module)
-
-            # restore pagination state
-            gdb.execute("set pagination %s" % ("on" if pagination else "off"))
-
+            self.callback()
             return False
-
 
 class LxSymbols(gdb.Command):
     """(Re-)load symbols of Linux kernel and currently loaded modules.
@@ -61,15 +39,52 @@ are scanned recursively, starting in the same directory. Optionally, the module
 search path can be extended by a space separated list of paths passed to the
 lx-symbols command."""
 
-    module_paths = []
-    module_files = []
-    module_files_updated = False
-    loaded_modules = []
-    breakpoint = None
-
     def __init__(self):
         super(LxSymbols, self).__init__("lx-symbols", gdb.COMMAND_FILES,
                                         gdb.COMPLETE_FILENAME)
+        self.module_paths = []
+        self.module_files = []
+        self.module_files_updated = False
+        self.loaded_modules = {}
+        self.internal_breakpoints = []
+
+    # prepare GDB for loading/unloading a module
+    def _prepare_for_module_load_unload(self):
+
+        self.blocked_sigint = False
+
+        # block SIGINT during execution to avoid gdb crash
+        sigmask = signal.pthread_sigmask(signal.SIG_BLOCK, [])
+        if not signal.SIGINT in sigmask:
+            self.blocked_sigint = True
+            signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGINT})
+
+        # disable all breakpoints to workaround a GDB bug where it would
+        # not correctly resume from an internal breakpoint we placed
+        # in do_module_init/free_module (it leaves the int3
+        self.saved_breakpoints = []
+        if hasattr(gdb, 'breakpoints') and not gdb.breakpoints() is None:
+            for bp in gdb.breakpoints():
+                self.saved_breakpoints.append({'breakpoint': bp, 'enabled': bp.enabled})
+                bp.enabled = False
+
+        # disable pagination to avoid asking user for continue
+        show_pagination = gdb.execute("show pagination", to_string=True)
+        self.saved_pagination = show_pagination.endswith("on.\n")
+        gdb.execute("set pagination off")
+
+    def _unprepare_for_module_load_unload(self):
+        # restore breakpoint state
+        for breakpoint in self.saved_breakpoints:
+            breakpoint['breakpoint'].enabled = breakpoint['enabled']
+
+        # restore pagination state
+        gdb.execute("set pagination %s" % ("on" if self.saved_pagination else "off"))
+
+        # unblock SIGINT
+        if self.blocked_sigint:
+            sigmask = signal.pthread_sigmask(signal.SIG_UNBLOCK, {signal.SIGINT})
+            self.blocked_sigint = False
 
     def _update_module_files(self):
         self.module_files = []
@@ -107,7 +122,7 @@ lx-symbols command."""
                     name=section_name, addr=str(address)))
         return "".join(args)
 
-    def load_module_symbols(self, module):
+    def _do_load_module_symbols(self, module):
         module_name = module['name'].string()
         module_addr = str(module['core_layout']['base']).split()[0]
 
@@ -130,56 +145,112 @@ lx-symbols command."""
                 addr=module_addr,
                 sections=self._section_arguments(module))
             gdb.execute(cmdline, to_string=True)
-            if module_name not in self.loaded_modules:
-                self.loaded_modules.append(module_name)
+
+            self.loaded_modules[module_name] = {"module_file": module_file,
+                                                "module_addr": module_addr}
         else:
             gdb.write("no module object found for '{0}'\n".format(module_name))
+
+
+    def load_module_symbols(self):
+        module = gdb.parse_and_eval("mod")
+
+                # module already loaded, false alarm
+        # can happen if 'do_init_module' breakpoint is hit multiple times
+        # due to interrupts
+        module_name = module['name'].string()
+        if module_name in self.loaded_modules:
+            gdb.write("spurious module load breakpoint\n")
+            return
+
+        # enforce update if object file is not found
+        self.module_files_updated = False
+        self._prepare_for_module_load_unload()
+        try:
+            self._do_load_module_symbols(module)
+        finally:
+            self._unprepare_for_module_load_unload()
+
+
+    def unload_module_symbols(self):
+        module = gdb.parse_and_eval("mod")
+        module_name = module['name'].string()
+
+        # module already unloaded, false alarm
+        # can happen if 'free_module' breakpoint is hit multiple times
+        # due to interrupts
+        if not module_name in self.loaded_modules:
+            gdb.write("spurious module unload breakpoint\n")
+            return
+
+        module_file = self.loaded_modules[module_name]["module_file"]
+        module_addr = self.loaded_modules[module_name]["module_addr"]
+
+        self._prepare_for_module_load_unload()
+        try:
+            gdb.write("unloading @{addr}: {filename}\n".format(
+                addr=module_addr, filename=module_file))
+            cmdline = "remove-symbol-file {filename}".format(
+                filename=module_file)
+            gdb.execute(cmdline, to_string=True)
+            del self.loaded_modules[module_name]
+
+        finally:
+            self._unprepare_for_module_load_unload()
 
     def load_all_symbols(self):
         gdb.write("loading vmlinux\n")
 
-        # Dropping symbols will disable all breakpoints. So save their states
-        # and restore them afterward.
-        saved_states = []
-        if hasattr(gdb, 'breakpoints') and not gdb.breakpoints() is None:
-            for bp in gdb.breakpoints():
-                saved_states.append({'breakpoint': bp, 'enabled': bp.enabled})
+        self._prepare_for_module_load_unload()
+        try:
+            # drop all current symbols and reload vmlinux
+            orig_vmlinux = 'vmlinux'
+            for obj in gdb.objfiles():
+                if obj.filename.endswith('vmlinux'):
+                    orig_vmlinux = obj.filename
+            gdb.execute("symbol-file", to_string=True)
+            gdb.execute("symbol-file {0}".format(orig_vmlinux))
+            self.loaded_modules = {}
+            module_list = modules.module_list()
+            if not module_list:
+                gdb.write("no modules found\n")
+            else:
+                [self._do_load_module_symbols(module) for module in module_list]
+        finally:
+            self._unprepare_for_module_load_unload()
 
-        # drop all current symbols and reload vmlinux
-        orig_vmlinux = 'vmlinux'
-        for obj in gdb.objfiles():
-            if obj.filename.endswith('vmlinux'):
-                orig_vmlinux = obj.filename
-        gdb.execute("symbol-file", to_string=True)
-        gdb.execute("symbol-file {0}".format(orig_vmlinux))
-
-        self.loaded_modules = []
-        module_list = modules.module_list()
-        if not module_list:
-            gdb.write("no modules found\n")
-        else:
-            [self.load_module_symbols(module) for module in module_list]
-
-        for saved_state in saved_states:
-            saved_state['breakpoint'].enabled = saved_state['enabled']
+        self._unprepare_for_module_load_unload()
 
     def invoke(self, arg, from_tty):
         self.module_paths = [os.path.abspath(os.path.expanduser(p))
                              for p in arg.split()]
         self.module_paths.append(os.getcwd())
 
+        try:
+            gdb.parse_and_eval("*start_kernel").fetch_lazy()
+        except gdb.MemoryError:
+            gdb.write("Error: Kernel is not yet loaded\n")
+            return
+
         # enforce update
         self.module_files = []
         self.module_files_updated = False
 
+        for bp in self.internal_breakpoints:
+            bp.delete()
+        self.internal_breakpoints = []
+
         self.load_all_symbols()
 
         if hasattr(gdb, 'Breakpoint'):
-            if self.breakpoint is not None:
-                self.breakpoint.delete()
-                self.breakpoint = None
-            self.breakpoint = LoadModuleBreakpoint(
-                "kernel/module.c:do_init_module", self)
+            self.internal_breakpoints.append(
+                BreakpointWrapper(self.load_module_symbols,
+                                  spec="kernel/module.c:do_init_module",
+                                  ))
+            self.internal_breakpoints.append(
+                BreakpointWrapper(self.unload_module_symbols,
+                                  spec="kernel/module.c:free_module",
+                                  ))
         else:
             gdb.write("Note: symbol update on module loading not supported "
                       "with this gdb version\n")

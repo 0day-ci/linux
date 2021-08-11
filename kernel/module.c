@@ -906,8 +906,12 @@ int module_refcount(struct module *mod)
 }
 EXPORT_SYMBOL(module_refcount);
 
-/* This exists whether we can unload or not */
-static void free_module(struct module *mod);
+/* This exists whether we can unload or not
+ * Keep it uninlined to provide a reliable breakpoint target,
+ * e.g. for the gdb helper command 'lx-symbols'.
+ */
+
+static noinline void free_module(struct module *mod);
 
 SYSCALL_DEFINE2(delete_module, const char __user *, name_user,
 		unsigned int, flags)
