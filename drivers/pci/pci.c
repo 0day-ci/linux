@@ -4460,11 +4460,7 @@ EXPORT_SYMBOL(pcim_set_mwi);
  */
 int pci_try_set_mwi(struct pci_dev *dev)
 {
-#ifdef PCI_DISABLE_MWI
-	return 0;
-#else
 	return pci_set_mwi(dev);
-#endif
 }
 EXPORT_SYMBOL(pci_try_set_mwi);
 
