@@ -33,16 +33,23 @@
 #include <linux/log2.h>
 
 static inline void
-pmd_populate_kernel(struct mm_struct *mm, pmd_t *pmd, pte_t *pte)
+pmd_populate_kernel(struct mm_struct *mm, pmd_t *pmdp, pte_t *ptep)
 {
-	pmd_set(pmd, pte);
+	/*
+	 * The cast to long below is OK even when pte is long long (PAE40)
+	 * Despite "wider" pte, the pte table needs to be in non-PAE low memory
+	 * as all higher levels can only hold long pointers.
+	 *
+	 * The cast itself is needed given simplistic definition of set_pmd()
+	 */
+	set_pmd(pmdp, __pmd((unsigned long)ptep));
 }
 
-static inline void
-pmd_populate(struct mm_struct *mm, pmd_t *pmd, pgtable_t ptep)
-{
-	pmd_set(pmd, (pte_t *) ptep);
-}
+/*
+ * pmd_populate can be implemented in terms of pmd_populate_kernel since
+ * pgtable_t is pte * on ARC
+ */
+#define pmd_populate(mm, pmdp, ptep)	pmd_populate_kernel(mm, pmdp, ptep)
 
 static inline int __get_order_pgd(void)
 {
