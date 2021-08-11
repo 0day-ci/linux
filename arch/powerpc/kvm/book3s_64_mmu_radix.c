@@ -442,7 +442,7 @@ void kvmppc_unmap_pte(struct kvm *kvm, pte_t *pte, unsigned long gpa,
 	kvmhv_remove_nest_rmap_range(kvm, memslot, gpa, hpa, page_size);
 
 	if ((old & _PAGE_DIRTY) && memslot->dirty_bitmap)
-		kvmppc_update_dirty_map(memslot, gfn, page_size);
+		kvmppc_update_dirty_map(kvm, memslot, gfn, page_size);
 }
 
 /*
@@ -1150,6 +1150,7 @@ long kvmppc_hv_get_dirty_log_radix(struct kvm *kvm,
 		j = i + 1;
 		if (npages) {
 			set_dirty_bits(map, i, npages);
+			kvm->stat.generic.dirty_pages += npages;
 			j = i + npages;
 		}
 	}

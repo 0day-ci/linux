@@ -99,7 +99,8 @@ void kvmppc_add_revmap_chain(struct kvm *kvm, struct revmap_entry *rev,
 EXPORT_SYMBOL_GPL(kvmppc_add_revmap_chain);
 
 /* Update the dirty bitmap of a memslot */
-void kvmppc_update_dirty_map(const struct kvm_memory_slot *memslot,
+void kvmppc_update_dirty_map(struct kvm *kvm,
+			     const struct kvm_memory_slot *memslot,
 			     unsigned long gfn, unsigned long psize)
 {
 	unsigned long npages;
@@ -109,6 +110,7 @@ void kvmppc_update_dirty_map(const struct kvm_memory_slot *memslot,
 	npages = (psize + PAGE_SIZE - 1) / PAGE_SIZE;
 	gfn -= memslot->base_gfn;
 	set_dirty_bits_atomic(memslot->dirty_bitmap, gfn, npages);
+	kvm->stat.generic.dirty_pages += npages;
 }
 EXPORT_SYMBOL_GPL(kvmppc_update_dirty_map);
 
@@ -123,7 +125,7 @@ static void kvmppc_set_dirty_from_hpte(struct kvm *kvm,
 	gfn = hpte_rpn(hpte_gr, psize);
 	memslot = __gfn_to_memslot(kvm_memslots_raw(kvm), gfn);
 	if (memslot && memslot->dirty_bitmap)
-		kvmppc_update_dirty_map(memslot, gfn, psize);
+		kvmppc_update_dirty_map(kvm, memslot, gfn, psize);
 }
 
 /* Returns a pointer to the revmap entry for the page mapped by a HPTE */
@@ -182,7 +184,7 @@ static void remove_revmap_chain(struct kvm *kvm, long pte_index,
 	}
 	*rmap |= rcbits << KVMPPC_RMAP_RC_SHIFT;
 	if (rcbits & HPTE_R_C)
-		kvmppc_update_dirty_map(memslot, gfn,
+		kvmppc_update_dirty_map(kvm, memslot, gfn,
 					kvmppc_actual_pgsz(hpte_v, hpte_r));
 	unlock_rmap(rmap);
 }
@@ -941,7 +943,7 @@ static long kvmppc_do_h_page_init_zero(struct kvm_vcpu *vcpu,
 	/* Zero the page */
 	for (i = 0; i < SZ_4K; i += L1_CACHE_BYTES, pa += L1_CACHE_BYTES)
 		dcbz((void *)pa);
-	kvmppc_update_dirty_map(memslot, dest >> PAGE_SHIFT, PAGE_SIZE);
+	kvmppc_update_dirty_map(kvm, memslot, dest >> PAGE_SHIFT, PAGE_SIZE);
 
 out_unlock:
 	arch_spin_unlock(&kvm->mmu_lock.rlock.raw_lock);
@@ -972,7 +974,8 @@ static long kvmppc_do_h_page_init_copy(struct kvm_vcpu *vcpu,
 	/* Copy the page */
 	memcpy((void *)dest_pa, (void *)src_pa, SZ_4K);
 
-	kvmppc_update_dirty_map(dest_memslot, dest >> PAGE_SHIFT, PAGE_SIZE);
+	kvmppc_update_dirty_map(kvm, dest_memslot,
+				dest >> PAGE_SHIFT, PAGE_SIZE);
 
 out_unlock:
 	arch_spin_unlock(&kvm->mmu_lock.rlock.raw_lock);

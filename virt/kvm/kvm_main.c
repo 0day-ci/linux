@@ -3084,6 +3084,8 @@ void mark_page_dirty_in_slot(struct kvm *kvm,
 					    slot, rel_gfn);
 		else
 			set_bit_le(rel_gfn, memslot->dirty_bitmap);
+
+		++kvm->stat.generic.dirty_pages;
 	}
 }
 EXPORT_SYMBOL_GPL(mark_page_dirty_in_slot);
