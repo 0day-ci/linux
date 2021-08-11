@@ -696,9 +696,11 @@ static int ti_sn_bridge_attach(struct drm_bridge *bridge,
 		return ret;
 	}
 
-	ret = ti_sn_bridge_connector_init(pdata);
-	if (ret < 0)
-		goto err_conn_init;
+	if (!(flags & DRM_BRIDGE_ATTACH_NO_CONNECTOR)) {
+		ret = ti_sn_bridge_connector_init(pdata);
+		if (ret < 0)
+			goto err_conn_init;
+	}
 
 	/*
 	 * TODO: ideally finding host resource and dsi dev registration needs
@@ -760,7 +762,8 @@ err_dsi_detach:
 err_dsi_attach:
 	mipi_dsi_device_unregister(dsi);
 err_dsi_host:
-	drm_connector_cleanup(&pdata->connector);
+	if (!(flags & DRM_BRIDGE_ATTACH_NO_CONNECTOR))
+		drm_connector_cleanup(&pdata->connector);
 err_conn_init:
 	drm_dp_aux_unregister(&pdata->aux);
 	return ret;
@@ -805,9 +808,30 @@ static void ti_sn_bridge_set_dsi_rate(struct ti_sn65dsi86 *pdata)
 	regmap_write(pdata->regmap, SN_DSIA_CLK_FREQ_REG, val);
 }
 
+/*
+ * Find the connector and fish out the bpc from display_info.  It would
+ * be nice if we could get this instead from drm_bridge_state, but that
+ * doesn't yet appear to be the case.
+ */
 static unsigned int ti_sn_bridge_get_bpp(struct ti_sn65dsi86 *pdata)
 {
-	if (pdata->connector.display_info.bpc <= 6)
+	struct drm_bridge *bridge = &pdata->bridge;
+	struct drm_connector_list_iter conn_iter;
+	struct drm_connector *connector;
+	unsigned bpc = 0;
+
+	drm_connector_list_iter_begin(bridge->dev, &conn_iter);
+	drm_for_each_connector_iter(connector, &conn_iter) {
+		if (drm_connector_has_possible_encoder(connector, bridge->encoder)) {
+			bpc = connector->display_info.bpc;
+			break;
+		}
+	}
+	drm_connector_list_iter_end(&conn_iter);
+
+	WARN_ON(bpc == 0);
+
+	if (bpc <= 6)
 		return 18;
 	else
 		return 24;
