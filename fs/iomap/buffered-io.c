@@ -1174,7 +1174,7 @@ iomap_submit_ioend(struct iomap_writepage_ctx *wpc, struct iomap_ioend *ioend,
 	ioend->io_bio->bi_private = ioend;
 	ioend->io_bio->bi_end_io = iomap_writepage_end_bio;
 
-	if (wpc->ops->prepare_ioend)
+	if (wpc && wpc->ops->prepare_ioend)
 		error = wpc->ops->prepare_ioend(ioend, error);
 	if (error) {
 		/*
