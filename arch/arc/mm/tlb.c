@@ -813,5 +813,8 @@ void do_tlb_overlap_fault(unsigned long cause, unsigned long address,
 		}
 	}
 
+	/* Re-enable MMU as hardware may have auto-disabled it upon exception */
+	write_aux_reg(ARC_REG_PID, read_aux_reg(ARC_REG_PID) | MMU_ENABLE);
+
 	local_irq_restore(flags);
 }
