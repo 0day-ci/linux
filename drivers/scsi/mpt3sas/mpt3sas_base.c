@@ -1651,8 +1651,10 @@ static u32 base_mod64(u64 dividend, u32 divisor)
 {
 	u32 remainder;
 
-	if (!divisor)
+	if (!divisor) {
 		pr_err("mpt3sas: DIVISOR is zero, in div fn\n");
+		return 0;
+	}
 	remainder = do_div(dividend, divisor);
 	return remainder;
 }
