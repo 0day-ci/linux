@@ -1769,7 +1769,9 @@ config STRICT_DEVMEM
 	  access to this is obviously disastrous, but specific access can
 	  be used by people debugging the kernel. Note that with PAT support
 	  enabled, even in this case there are restrictions on /dev/mem
-	  use due to the cache aliasing requirements.
+	  use due to the cache aliasing requirements. Further, some drivers
+	  will still restrict access to some physical memory regions either
+	  already used or to be used in the future as system RAM.
 
 	  If this option is switched on, and IO_STRICT_DEVMEM=n, the /dev/mem
 	  file only allows userspace access to PCI space and the BIOS code and

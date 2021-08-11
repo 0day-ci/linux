@@ -73,6 +73,13 @@ static struct resource *next_resource(struct resource *p)
 	return p->sibling;
 }
 
+static struct resource *next_resource_skip_children(struct resource *p)
+{
+	while (!p->sibling && p->parent)
+		p = p->parent;
+	return p->sibling;
+}
+
 static void *r_next(struct seq_file *m, void *v, loff_t *pos)
 {
 	struct resource *p = v;
@@ -1698,6 +1705,41 @@ int iomem_map_sanity_check(resource_size_t addr, unsigned long size)
 	read_unlock(&resource_lock);
 
 	return err;
+}
+
+/*
+ * Check if a physical memory range is completely excluded from getting
+ * mapped/accessed via /dev/mem.
+ */
+bool iomem_range_contains_excluded(u64 addr, u64 size)
+{
+	const unsigned int flags = IORESOURCE_SYSTEM_RAM | IORESOURCE_EXCLUSIVE;
+	bool excluded = false;
+	struct resource *p;
+
+	read_lock(&resource_lock);
+	for (p = iomem_resource.child; p ;) {
+		if (p->start >= addr + size)
+			break;
+		if (p->end < addr) {
+			/* No need to consider children */
+			p = next_resource_skip_children(p);
+			continue;
+		}
+		/*
+		 * A system RAM resource is excluded if IORESOURCE_EXCLUSIVE
+		 * is set, even if not busy and even if we don't have strict
+		 * checks enabled -- no ifs or buts.
+		 */
+		if ((p->flags & flags) == flags) {
+			excluded = true;
+			break;
+		}
+		p = next_resource(p);
+	}
+	read_unlock(&resource_lock);
+
+	return excluded;
 }
 
 #ifdef CONFIG_STRICT_DEVMEM

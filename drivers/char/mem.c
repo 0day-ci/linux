@@ -61,13 +61,18 @@ static inline int valid_mmap_phys_addr_range(unsigned long pfn, size_t size)
 }
 #endif
 
-#ifdef CONFIG_STRICT_DEVMEM
 static inline int page_is_allowed(unsigned long pfn)
 {
-	return devmem_is_allowed(pfn);
+#ifdef CONFIG_STRICT_DEVMEM
+	if (!devmem_is_allowed(pfn))
+		return 0;
+#endif /* CONFIG_STRICT_DEVMEM */
+	return !iomem_range_contains_excluded(PFN_PHYS(pfn), PAGE_SIZE);
 }
+
 static inline int range_is_allowed(unsigned long pfn, unsigned long size)
 {
+#ifdef CONFIG_STRICT_DEVMEM
 	u64 from = ((u64)pfn) << PAGE_SHIFT;
 	u64 to = from + size;
 	u64 cursor = from;
@@ -78,18 +83,9 @@ static inline int range_is_allowed(unsigned long pfn, unsigned long size)
 		cursor += PAGE_SIZE;
 		pfn++;
 	}
-	return 1;
+#endif /* CONFIG_STRICT_DEVMEM */
+	return !iomem_range_contains_excluded(PFN_PHYS(pfn), size);
 }
-#else
-static inline int page_is_allowed(unsigned long pfn)
-{
-	return 1;
-}
-static inline int range_is_allowed(unsigned long pfn, unsigned long size)
-{
-	return 1;
-}
-#endif
 
 #ifndef unxlate_dev_mem_ptr
 #define unxlate_dev_mem_ptr unxlate_dev_mem_ptr
