@@ -1826,6 +1826,65 @@ int udp_read_sock(struct sock *sk, read_descriptor_t *desc,
 }
 EXPORT_SYMBOL(udp_read_sock);
 
+static int udp_copy_addr(struct sock *sk, struct msghdr *msg, int *addr_len)
+{
+	struct inet_sock *inet = inet_sk(sk);
+	struct flowi4 *fl4;
+	DECLARE_SOCKADDR(struct sockaddr_in *, sin, msg->msg_name);
+
+	if (udp_sk(sk)->pending != AF_INET)
+		return -EAGAIN;
+
+	if (sin) {
+		fl4 = &inet->cork.fl.u.ip4;
+		sin->sin_family = AF_INET;
+		sin->sin_port = fl4->fl4_dport;
+		sin->sin_addr.s_addr = fl4->daddr;
+		memset(sin->sin_zero, 0, sizeof(sin->sin_zero));
+		*addr_len = sizeof(*sin);
+	}
+
+	return 0;
+}
+
+int udp_peek_sndq(struct sock *sk, struct msghdr *msg, size_t len)
+{
+	struct sk_buff *skb;
+	int copied = 0, err = 0, peek_off, off, header_off, copy_len;
+
+	peek_off = READ_ONCE(sk->sk_peek_off);
+	if (peek_off < 0)
+		off = 0;
+	else
+		off = peek_off;
+
+	skb_queue_walk(&sk->sk_write_queue, skb) {
+		header_off = skb_transport_offset(skb) + sizeof(struct udphdr);
+		if (off > skb->len - header_off) {
+			off -= skb->len - header_off;
+			continue;
+		}
+
+		if (len > skb->len - off - header_off)
+			copy_len = skb->len - off - header_off;
+		else
+			copy_len = len;
+
+		err = skb_copy_datagram_msg(skb, off + header_off, msg, copy_len);
+		if (err)
+			return err;
+
+		copied += copy_len;
+		len -= copy_len;
+		off = 0;
+	}
+
+	if (peek_off >= 0)
+		sk_peek_offset_bwd(sk, -copied);
+	return copied;
+}
+EXPORT_SYMBOL(udp_peek_sndq);
+
 /*
  * 	This should be easy, if there is something there we
  * 	return it, otherwise we block.
@@ -1841,9 +1900,26 @@ int udp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len, int noblock,
 	int off, err, peeking = flags & MSG_PEEK;
 	int is_udplite = IS_UDPLITE(sk);
 	bool checksum_valid = false;
+	struct udp_sock *up = udp_sk(sk);
 
 	if (flags & MSG_ERRQUEUE)
 		return ip_recv_error(sk, msg, len, addr_len);
+
+	if (unlikely(up->repair)) {
+		if (!peeking)
+			return -EPERM;
+
+		lock_sock(sk);
+		err = udp_copy_addr(sk, msg, addr_len);
+		if (err) {
+			release_sock(sk);
+			return err;
+		}
+
+		err = udp_peek_sndq(sk, msg, len);
+		release_sock(sk);
+		return err;
+	}
 
 try_again:
 	off = sk_peek_offset(sk, flags);
@@ -1912,7 +1988,7 @@ try_again:
 						      (struct sockaddr *)sin);
 	}
 
-	if (udp_sk(sk)->gro_enabled)
+	if (up->gro_enabled)
 		udp_cmsg_recv(msg, sk, skb);
 
 	if (inet->cmsg_flags)
@@ -1926,7 +2002,7 @@ try_again:
 	return err;
 
 csum_copy_err:
-	if (!__sk_queue_drop_skb(sk, &udp_sk(sk)->reader_queue, skb, flags,
+	if (!__sk_queue_drop_skb(sk, &up->reader_queue, skb, flags,
 				 udp_skb_destructor)) {
 		UDP_INC_STATS(sock_net(sk), UDP_MIB_CSUMERRORS, is_udplite);
 		UDP_INC_STATS(sock_net(sk), UDP_MIB_INERRORS, is_udplite);
@@ -2752,6 +2828,16 @@ int udp_lib_setsockopt(struct sock *sk, int level, int optname,
 		up->pcflag |= UDPLITE_RECV_CC;
 		break;
 
+	case UDP_REPAIR:
+		if (!sk_net_capable(sk, CAP_NET_ADMIN)) {
+			err = -EPERM;
+			break;
+		}
+
+		up->repair = valbool;
+		sk->sk_peek_off = -1;
+		break;
+
 	default:
 		err = -ENOPROTOOPT;
 		break;
@@ -2818,6 +2904,10 @@ int udp_lib_getsockopt(struct sock *sk, int level, int optname,
 
 	case UDPLITE_RECV_CSCOV:
 		val = up->pcrlen;
+		break;
+
+	case UDP_REPAIR:
+		val = up->repair;
 		break;
 
 	default:
