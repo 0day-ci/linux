@@ -1215,9 +1215,13 @@ static struct iomap_ioend *iomap_alloc_ioend(struct inode *inode,
 	bio = bio_alloc_bioset(GFP_NOFS, BIO_MAX_VECS, &iomap_ioend_bioset);
 	bio_set_dev(bio, iomap->bdev);
 	bio->bi_iter.bi_sector = sector;
-	bio->bi_opf = REQ_OP_WRITE | wbc_to_write_flags(wbc);
+	bio->bi_opf = REQ_OP_WRITE;
 	bio->bi_write_hint = inode->i_write_hint;
-	wbc_init_bio(wbc, bio);
+
+	if (wbc) {
+		bio->bi_opf |= wbc_to_write_flags(wbc);
+		wbc_init_bio(wbc, bio);
+	}
 
 	ioend = container_of(bio, struct iomap_ioend, io_inline_bio);
 	INIT_LIST_HEAD(&ioend->io_list);
