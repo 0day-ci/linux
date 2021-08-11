@@ -659,8 +659,45 @@ out_no_page:
 	return status;
 }
 
-static size_t __iomap_write_end(struct inode *inode, loff_t pos, size_t len,
-		size_t copied, struct page *page)
+/* Rearrange file so we don't need this forward declaration */
+static struct iomap_ioend *iomap_add_to_ioend(struct inode *inode,
+		loff_t pos, size_t len, struct page *page,
+		struct iomap_page *iop, struct iomap *iomap,
+		struct iomap_ioend *ioend, struct writeback_control *wbc,
+		struct list_head *iolist);
+
+/* Returns true if we can skip dirtying the page */
+static bool iomap_write_through(struct iomap_write_ctx *iwc,
+		struct iomap *iomap, struct inode *inode, struct page *page,
+		loff_t pos, size_t len)
+{
+	unsigned int blksize = i_blocksize(inode);
+
+	if (!iwc || !iwc->write_through)
+		return false;
+	if (PageDirty(page))
+		return true;
+	if (PageWriteback(page))
+		return false;
+
+	/* Can't allocate blocks here because we don't have ->prepare_ioend */
+	if (iomap->type != IOMAP_MAPPED || iomap->type != IOMAP_UNWRITTEN ||
+	    iomap->flags & IOMAP_F_SHARED)
+		return false;
+
+	len = round_up(pos + len - 1, blksize);
+	pos = round_down(pos, blksize);
+	len -= pos;
+	iwc->ioend = iomap_add_to_ioend(inode, pos, len, page,
+			iomap_page_create(inode, page), iomap, iwc->ioend, NULL,
+			&iwc->iolist);
+	set_page_writeback(page);
+	return true;
+}
+
+static size_t __iomap_write_end(struct iomap_write_ctx *iwc,
+		struct iomap *iomap, struct inode *inode, loff_t pos,
+		size_t len, size_t copied, struct page *page)
 {
 	flush_dcache_page(page);
 
@@ -678,7 +715,8 @@ static size_t __iomap_write_end(struct inode *inode, loff_t pos, size_t len,
 	if (unlikely(copied < len && !PageUptodate(page)))
 		return 0;
 	iomap_set_range_uptodate(page, offset_in_page(pos), len);
-	__set_page_dirty_nobuffers(page);
+	if (!iomap_write_through(iwc, iomap, inode, page, pos, len))
+		__set_page_dirty_nobuffers(page);
 	return copied;
 }
 
@@ -700,9 +738,9 @@ static size_t iomap_write_end_inline(struct inode *inode, struct page *page,
 }
 
 /* Returns the number of bytes copied.  May be 0.  Cannot be an errno. */
-static size_t iomap_write_end(struct inode *inode, loff_t pos, size_t len,
-		size_t copied, struct page *page, struct iomap *iomap,
-		struct iomap *srcmap)
+static size_t iomap_write_end(struct iomap_write_ctx *iwc, struct inode *inode,
+		loff_t pos, size_t len, size_t copied, struct page *page,
+		struct iomap *iomap, struct iomap *srcmap)
 {
 	const struct iomap_page_ops *page_ops = iomap->page_ops;
 	loff_t old_size = inode->i_size;
@@ -714,7 +752,8 @@ static size_t iomap_write_end(struct inode *inode, loff_t pos, size_t len,
 		ret = block_write_end(NULL, inode->i_mapping, pos, len, copied,
 				page, NULL);
 	} else {
-		ret = __iomap_write_end(inode, pos, len, copied, page);
+		ret = __iomap_write_end(iwc, iomap, inode, pos, len, copied,
+				page);
 	}
 
 	/*
@@ -782,8 +821,8 @@ again:
 
 		copied = copy_page_from_iter_atomic(page, offset, bytes, i);
 
-		status = iomap_write_end(inode, pos, bytes, copied, page, iomap,
-				srcmap);
+		status = iomap_write_end(iwc, inode, pos, bytes, copied, page,
+				iomap, srcmap);
 
 		if (unlikely(copied != status))
 			iov_iter_revert(i, copied - status);
@@ -810,6 +849,10 @@ again:
 	return written ? written : status;
 }
 
+/* Also rearrange */
+static int iomap_submit_ioend(struct iomap_writepage_ctx *wpc,
+		struct iomap_ioend *ioend, int error);
+
 ssize_t
 iomap_file_buffered_write(struct kiocb *iocb, struct iov_iter *iter,
 		const struct iomap_ops *ops)
@@ -819,6 +862,7 @@ iomap_file_buffered_write(struct kiocb *iocb, struct iov_iter *iter,
 		.iolist = LIST_HEAD_INIT(iwc.iolist),
 		.write_through = iocb->ki_flags & IOCB_SYNC,
 	};
+	struct iomap_ioend *ioend, *next;
 	struct inode *inode = iocb->ki_filp->f_mapping->host;
 	loff_t pos = iocb->ki_pos, ret = 0, written = 0;
 
@@ -831,6 +875,15 @@ iomap_file_buffered_write(struct kiocb *iocb, struct iov_iter *iter,
 		written += ret;
 	}
 
+	if (ret > 0)
+		ret = 0;
+
+	list_for_each_entry_safe(ioend, next, &iwc.iolist, io_list) {
+		list_del_init(&ioend->io_list);
+		ret = iomap_submit_ioend(NULL, ioend, ret);
+	}
+	if (iwc.ioend)
+		ret = iomap_submit_ioend(NULL, iwc.ioend, ret);
 	return written ? written : ret;
 }
 EXPORT_SYMBOL_GPL(iomap_file_buffered_write);
@@ -859,8 +912,8 @@ iomap_unshare_actor(struct inode *inode, loff_t pos, loff_t length, void *data,
 		if (unlikely(status))
 			return status;
 
-		status = iomap_write_end(inode, pos, bytes, bytes, page, iomap,
-				srcmap);
+		status = iomap_write_end(NULL, inode, pos, bytes, bytes, page,
+				iomap, srcmap);
 		if (WARN_ON_ONCE(status == 0))
 			return -EIO;
 
@@ -910,7 +963,8 @@ static s64 iomap_zero(struct inode *inode, loff_t pos, u64 length,
 	zero_user(page, offset, bytes);
 	mark_page_accessed(page);
 
-	return iomap_write_end(inode, pos, bytes, bytes, page, iomap, srcmap);
+	return iomap_write_end(NULL, inode, pos, bytes, bytes, page, iomap,
+			srcmap);
 }
 
 static loff_t iomap_zero_range_actor(struct inode *inode, loff_t pos,
