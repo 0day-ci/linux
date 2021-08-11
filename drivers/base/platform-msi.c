@@ -23,6 +23,7 @@
 struct platform_msi_priv_data {
 	struct device		*dev;
 	void 			*host_data;
+	const struct attribute_group    **msi_irq_groups;
 	msi_alloc_info_t	arg;
 	irq_write_msi_msg_t	write_msg;
 	int			devid;
@@ -245,6 +246,120 @@ static void platform_msi_free_priv_data(struct platform_msi_priv_data *data)
 	kfree(data);
 }
 
+static ssize_t platform_msi_show(struct device *dev, struct device_attribute *attr,
+			     char *buf)
+{
+	struct msi_desc *entry;
+	unsigned long irq;
+	int retval;
+
+	retval = kstrtoul(attr->attr.name, 10, &irq);
+	if (retval)
+		return retval;
+
+	entry = irq_get_msi_desc(irq);
+	if (entry)
+		return sprintf(buf, "msi\n");
+
+	return -ENODEV;
+}
+
+static int platform_msi_populate_sysfs(struct device *dev,
+				       int nvec,
+				       struct platform_msi_priv_data *data)
+{
+	struct attribute **msi_attrs;
+	struct attribute *msi_attr;
+	struct device_attribute *msi_dev_attr;
+	struct attribute_group *msi_irq_group;
+	const struct attribute_group **msi_irq_groups;
+	struct msi_desc *entry;
+	int ret = -ENOMEM;
+	int count = 0;
+	int i;
+
+	/* Dynamically create the MSI attributes for the device */
+	msi_attrs = kcalloc(nvec + 1, sizeof(void *), GFP_KERNEL);
+	if (!msi_attrs)
+		return -ENOMEM;
+	for_each_msi_entry(entry, dev) {
+		for (i = 0; i < entry->nvec_used; i++) {
+			msi_dev_attr = kzalloc(sizeof(*msi_dev_attr), GFP_KERNEL);
+			if (!msi_dev_attr)
+				goto error_attrs;
+			msi_attrs[count] = &msi_dev_attr->attr;
+
+			sysfs_attr_init(&msi_dev_attr->attr);
+			msi_dev_attr->attr.name = kasprintf(GFP_KERNEL, "%d",
+							    entry->irq + i);
+			if (!msi_dev_attr->attr.name)
+				goto error_attrs;
+			msi_dev_attr->attr.mode = S_IRUGO;
+			msi_dev_attr->show = platform_msi_show;
+			++count;
+		}
+	}
+
+	msi_irq_group = kzalloc(sizeof(*msi_irq_group), GFP_KERNEL);
+	if (!msi_irq_group)
+		goto error_attrs;
+	msi_irq_group->name = "msi_irqs";
+	msi_irq_group->attrs = msi_attrs;
+
+	msi_irq_groups = kcalloc(2, sizeof(void *), GFP_KERNEL);
+	if (!msi_irq_groups)
+		goto error_irq_group;
+	msi_irq_groups[0] = msi_irq_group;
+
+	ret = sysfs_create_groups(&dev->kobj, msi_irq_groups);
+	if (ret)
+		goto error_irq_groups;
+	data->msi_irq_groups = msi_irq_groups;
+
+	return 0;
+
+error_irq_groups:
+	kfree(msi_irq_groups);
+error_irq_group:
+	kfree(msi_irq_group);
+error_attrs:
+	count = 0;
+	msi_attr = msi_attrs[count];
+	while (msi_attr) {
+		msi_dev_attr = container_of(msi_attr, struct device_attribute, attr);
+		kfree(msi_attr->name);
+		kfree(msi_dev_attr);
+		++count;
+		msi_attr = msi_attrs[count];
+	}
+	kfree(msi_attrs);
+	return ret;
+}
+
+static void platform_msi_destroy_sysfs(struct device *dev,
+				      struct platform_msi_priv_data *data)
+{
+	struct attribute **msi_attrs;
+	struct device_attribute *dev_attr;
+	int count = 0;
+
+	if (data->msi_irq_groups) {
+		sysfs_remove_groups(&dev->kobj, data->msi_irq_groups);
+		msi_attrs = data->msi_irq_groups[0]->attrs;
+		while (msi_attrs[count]) {
+			dev_attr = container_of(msi_attrs[count],
+					struct device_attribute, attr);
+			kfree(dev_attr->attr.name);
+			kfree(dev_attr);
+			++count;
+		}
+		kfree(msi_attrs);
+		kfree(data->msi_irq_groups[0]);
+		kfree(data->msi_irq_groups);
+		data->msi_irq_groups = NULL;
+	}
+}
+
 /**
  * platform_msi_domain_alloc_irqs - Allocate MSI interrupts for @dev
  * @dev:		The device for which to allocate interrupts
@@ -272,8 +387,14 @@ int platform_msi_domain_alloc_irqs(struct device *dev, unsigned int nvec,
 	if (err)
 		goto out_free_desc;
 
+	err = platform_msi_populate_sysfs(dev, nvec, priv_data);
+	if (err)
+		goto out_free_irqs;
+
 	return 0;
 
+out_free_irqs:
+	msi_domain_free_irqs(dev->msi_domain, dev);
 out_free_desc:
 	platform_msi_free_descs(dev, 0, nvec);
 out_free_priv_data:
@@ -293,6 +414,7 @@ void platform_msi_domain_free_irqs(struct device *dev)
 		struct msi_desc *desc;
 
 		desc = first_msi_entry(dev);
+		platform_msi_destroy_sysfs(dev, desc->platform.msi_priv_data);
 		platform_msi_free_priv_data(desc->platform.msi_priv_data);
 	}
 
