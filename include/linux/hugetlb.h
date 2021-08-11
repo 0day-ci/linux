@@ -124,6 +124,7 @@ struct hugepage_subpool *hugepage_new_subpool(struct hstate *h, long max_hpages,
 void hugepage_put_subpool(struct hugepage_subpool *spool);
 
 void reset_vma_resv_huge_pages(struct vm_area_struct *vma);
+void clear_vma_resv_huge_pages(struct vm_area_struct *vma);
 int hugetlb_sysctl_handler(struct ctl_table *, int, void *, size_t *, loff_t *);
 int hugetlb_overcommit_handler(struct ctl_table *, int, void *, size_t *,
 		loff_t *);
@@ -132,6 +133,8 @@ int hugetlb_treat_movable_handler(struct ctl_table *, int, void *, size_t *,
 int hugetlb_mempolicy_sysctl_handler(struct ctl_table *, int, void *, size_t *,
 		loff_t *);
 
+int move_hugetlb_page_tables(struct vm_area_struct *vma, unsigned long old_addr,
+			     unsigned long new_addr, unsigned long len);
 int copy_hugetlb_page_range(struct mm_struct *, struct mm_struct *, struct vm_area_struct *);
 long follow_hugetlb_page(struct mm_struct *, struct vm_area_struct *,
 			 struct page **, struct vm_area_struct **,
@@ -190,6 +193,7 @@ pte_t *huge_pte_offset(struct mm_struct *mm,
 		       unsigned long addr, unsigned long sz);
 int huge_pmd_unshare(struct mm_struct *mm, struct vm_area_struct *vma,
 				unsigned long *addr, pte_t *ptep);
+int huge_pmd_shared(struct vm_area_struct *vma, pte_t *ptep);
 void adjust_range_if_pmd_sharing_possible(struct vm_area_struct *vma,
 				unsigned long *start, unsigned long *end);
 struct page *follow_huge_addr(struct mm_struct *mm, unsigned long address,
@@ -211,10 +215,16 @@ unsigned long hugetlb_change_protection(struct vm_area_struct *vma,
 
 bool is_hugetlb_entry_migration(pte_t pte);
 void hugetlb_unshare_all_pmds(struct vm_area_struct *vma);
+bool hugetlb_vma_shareable(struct vm_area_struct *vma, unsigned long addr);
+
 
 #else /* !CONFIG_HUGETLB_PAGE */
 
 static inline void reset_vma_resv_huge_pages(struct vm_area_struct *vma)
+{
+}
+
+static inline void clear_vma_resv_huge_pages(struct vm_area_struct *vma)
 {
 }
 
@@ -227,6 +237,10 @@ static inline struct address_space *hugetlb_page_mapping_lock_write(
 							struct page *hpage)
 {
 	return NULL;
+}
+
+static int huge_pmd_shared(struct vm_area_struct *vma, pte_t *ptep) {
+	return 0;
 }
 
 static inline int huge_pmd_unshare(struct mm_struct *mm,
@@ -264,6 +278,12 @@ static inline int copy_hugetlb_page_range(struct mm_struct *dst,
 	BUG();
 	return 0;
 }
+
+#define move_hugetlb_page_tables(vma, old_addr, new_addr, len)                 \
+	({                                                                     \
+		BUG();                                                         \
+		0;                                                             \
+	})
 
 static inline void hugetlb_report_meminfo(struct seq_file *m)
 {
@@ -401,6 +421,10 @@ static inline vm_fault_t hugetlb_fault(struct mm_struct *mm,
 }
 
 static inline void hugetlb_unshare_all_pmds(struct vm_area_struct *vma) { }
+
+bool hugetlb_vma_shareable(struct vm_area_struct *vma, unsigned long addr) {
+	return 0;
+}
 
 #endif /* !CONFIG_HUGETLB_PAGE */
 /*
