@@ -727,6 +727,11 @@ void intel_guc_submission_reset_prepare(struct intel_guc *guc)
 			wait_for_reset(guc, &guc->outstanding_submission_g2h);
 		} while (!list_empty(&guc->ct.requests.incoming));
 	}
+
+	/* Flush any GuC generated G2H */
+	while (!list_empty(&guc->ct.requests.incoming))
+		msleep(20);
+
 	scrub_guc_desc_for_outstanding_g2h(guc);
 }
 
