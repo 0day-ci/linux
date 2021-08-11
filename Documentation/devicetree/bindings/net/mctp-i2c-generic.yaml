@@ -1,0 +1,46 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/net/mctp-i2c-generic.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Generic MCTP I2C transport binding
+
+maintainers:
+  - Matt Johnston <matt@codeconstruct.com.au>
+
+description:
+  The generic MCTP I2C binding defines an MCTP endpoint on an existing I2C
+  adapter. MCTP I2C is specified by DMTF DSP0237.
+
+  An mctp-i2c-generic device must be attached to a hardware bus adapter
+  which supports slave functionality.
+
+properties:
+  compatible:
+    const: mctp-i2c-generic
+
+  reg:
+    maxItems: 1
+    description:
+      7 bit I2C address of the endpoint.
+      I2C_OWN_SLAVE_ADDRESS flag must be set (described in i2c.txt)
+
+additionalProperties: false
+
+required:
+  - compatible
+  - reg
+
+examples:
+  - |
+    #include <dt-bindings/i2c/i2c.h>
+    i2c {
+        #address-cells = <1>;
+        #size-cells = <0>;
+
+        mctp@50 {
+            compatible = "mctp-i2c";
+            reg = <(0x50 | I2C_OWN_SLAVE_ADDRESS)>;
+        };
+    };
