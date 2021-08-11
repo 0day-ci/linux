@@ -6955,6 +6955,13 @@ void __netif_napi_del(struct napi_struct *napi)
 	list_del_rcu(&napi->dev_list);
 	napi_free_frags(napi);
 
+	if (napi->rx_count) {
+		struct sk_buff *skb, *n;
+
+		list_for_each_entry_safe(skb, n, &napi->rx_list, list)
+			kfree_skb(skb);
+	}
+
 	flush_gro_hash(napi);
 	napi->gro_bitmask = 0;
 
