@@ -1278,12 +1278,12 @@ static bool iomap_can_add_to_ioend(struct iomap *iomap,
  * first; otherwise finish off the current ioend and start another.
  */
 static struct iomap_ioend *iomap_add_to_ioend(struct inode *inode,
-		loff_t pos, struct page *page, struct iomap_page *iop,
-		struct iomap *iomap, struct iomap_ioend *ioend,
-		struct writeback_control *wbc, struct list_head *iolist)
+		loff_t pos, size_t len, struct page *page,
+		struct iomap_page *iop, struct iomap *iomap,
+		struct iomap_ioend *ioend, struct writeback_control *wbc,
+		struct list_head *iolist)
 {
 	sector_t sector = iomap_sector(iomap, pos);
-	unsigned len = i_blocksize(inode);
 	unsigned poff = offset_in_page(pos);
 
 	if (!ioend || !iomap_can_add_to_ioend(iomap, ioend, pos, sector)) {
@@ -1352,8 +1352,9 @@ iomap_writepage_map(struct iomap_writepage_ctx *wpc,
 			continue;
 		if (wpc->iomap.type == IOMAP_HOLE)
 			continue;
-		wpc->ioend = iomap_add_to_ioend(inode, file_offset, page, iop,
-				&wpc->iomap, wpc->ioend, wbc, &submit_list);
+		wpc->ioend = iomap_add_to_ioend(inode, file_offset, len, page,
+				iop, &wpc->iomap, wpc->ioend, wbc,
+				&submit_list);
 		count++;
 	}
 
