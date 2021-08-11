@@ -21,6 +21,7 @@
 #include <linux/libps2.h>
 #include <linux/mutex.h>
 #include <linux/types.h>
+#include <linux/suspend.h>
 
 #include "psmouse.h"
 #include "synaptics.h"
@@ -1457,11 +1458,13 @@ static void psmouse_cleanup(struct serio *serio)
 	 */
 	ps2_command(&psmouse->ps2dev, NULL, PSMOUSE_CMD_RESET_DIS);
 
-	/*
-	 * Some boxes, such as HP nx7400, get terribly confused if mouse
-	 * is not fully enabled before suspending/shutting down.
-	 */
-	ps2_command(&psmouse->ps2dev, NULL, PSMOUSE_CMD_ENABLE);
+	if (!pm_suspend_default_s2idle() || device_may_wakeup(&serio->dev)) {
+		/*
+		 * Some boxes, such as HP nx7400, get terribly confused if mouse
+		 * is not fully enabled before suspending/shutting down.
+		 */
+		ps2_command(&psmouse->ps2dev, NULL, PSMOUSE_CMD_ENABLE);
+	}
 
 	if (parent) {
 		if (parent->pt_deactivate)
