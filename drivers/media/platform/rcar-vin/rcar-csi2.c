@@ -553,6 +553,12 @@ static int rcsi2_start_receiver(struct rcar_csi2 *priv)
 
 	/* Code is validated in set_fmt. */
 	format = rcsi2_code_to_fmt(priv->mf.code);
+	if (!format) {
+		dev_err(priv->dev,
+			"Incorrect mbus frame format code %u\n",
+			priv->mf.code);
+		return -EINVAL;
+	}
 
 	/*
 	 * Enable all supported CSI-2 channels with virtual channel and
