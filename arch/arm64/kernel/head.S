@@ -547,6 +547,8 @@ SYM_INNER_LABEL(init_el2, SYM_L_LOCAL)
 	mov_q	x0, INIT_SCTLR_EL1_MMU_OFF
 	msr	sctlr_el1, x0
 
+	mov_q	x0, INIT_PSTATE_EL1
+	msr	spsr_el2, x0
 	msr	elr_el2, lr
 	mov	w0, #BOOT_CPU_MODE_EL2
 	eret
