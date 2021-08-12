@@ -16,17 +16,31 @@ static void *memcpy(void *dest, const void *src, size_t n)
 	return dest;
 }
 
+void do_encl_op_put(void *op)
+{
+	struct encl_op_put *op2 = op;
+
+	memcpy(&encl_buffer[0], &op2->value, 8);
+}
+
+void do_encl_op_get(void *op)
+{
+	struct encl_op_get *op2 = op;
+
+	memcpy(&op2->value, &encl_buffer[0], 8);
+}
+
 void encl_body(void *rdi,  void *rsi)
 {
-	struct encl_op *op = (struct encl_op *)rdi;
+	struct encl_op_header *op = (struct encl_op_header *)rdi;
 
 	switch (op->type) {
 	case ENCL_OP_PUT:
-		memcpy(&encl_buffer[0], &op->buffer, 8);
+		do_encl_op_put(op);
 		break;
 
 	case ENCL_OP_GET:
-		memcpy(&op->buffer, &encl_buffer[0], 8);
+		do_encl_op_get(op);
 		break;
 
 	default:
