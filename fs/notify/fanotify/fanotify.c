@@ -745,6 +745,7 @@ static int fanotify_handle_error_event(struct fsnotify_iter_info *iter_info,
 	spin_unlock(&group->notification_lock);
 
 	fee->fae.type = FANOTIFY_EVENT_TYPE_FS_ERROR;
+	fee->error = report->error;
 	fee->fsid = fee->sb_mark->fsn_mark.connector->fsid;
 
 	fh_len = fanotify_encode_fh_len(inode);
