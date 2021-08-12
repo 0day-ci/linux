@@ -60,6 +60,11 @@ void nbp_switchdev_frame_mark(const struct net_bridge_port *p,
 		BR_INPUT_SKB_CB(skb)->src_hwdom = p->hwdom;
 }
 
+int nbp_switchdev_get_hwdom(const struct net_bridge_port *p)
+{
+	return p->hwdom;
+}
+
 bool nbp_switchdev_allowed_egress(const struct net_bridge_port *p,
 				  const struct sk_buff *skb)
 {

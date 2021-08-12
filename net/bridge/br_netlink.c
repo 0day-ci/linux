@@ -203,6 +203,7 @@ static inline size_t br_port_info_size(void)
 		+ nla_total_size(sizeof(u8))	/* IFLA_BRPORT_MRP_IN_OPEN */
 		+ nla_total_size(sizeof(u32))	/* IFLA_BRPORT_MCAST_EHT_HOSTS_LIMIT */
 		+ nla_total_size(sizeof(u32))	/* IFLA_BRPORT_MCAST_EHT_HOSTS_CNT */
+		+ nla_total_size(sizeof(u32))	/* IFLA_BRPORT_HWDOM */
 		+ 0;
 }
 
@@ -294,6 +295,9 @@ static int br_port_fill_attrs(struct sk_buff *skb,
 			p->multicast_eht_hosts_cnt))
 		return -EMSGSIZE;
 #endif
+
+	if (nla_put_u32(skb, IFLA_BRPORT_HWDOM, nbp_switchdev_get_hwdom(p)))
+		return -EMSGSIZE;
 
 	/* we might be called only with br->lock */
 	rcu_read_lock();
@@ -829,6 +833,7 @@ static const struct nla_policy br_port_policy[IFLA_BRPORT_MAX + 1] = {
 	[IFLA_BRPORT_ISOLATED]	= { .type = NLA_U8 },
 	[IFLA_BRPORT_BACKUP_PORT] = { .type = NLA_U32 },
 	[IFLA_BRPORT_MCAST_EHT_HOSTS_LIMIT] = { .type = NLA_U32 },
+	[IFLA_BRPORT_HWDOM] = { .type = NLA_U32 },
 };
 
 /* Change the state of the port and notify spanning tree */
