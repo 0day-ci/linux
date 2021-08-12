@@ -1378,9 +1378,6 @@ static void _opp_table_kref_release(struct kref *kref)
 	list_del(&opp_table->node);
 	mutex_unlock(&opp_table_lock);
 
-	if (opp_table->current_opp)
-		dev_pm_opp_put(opp_table->current_opp);
-
 	_of_clear_opp_table(opp_table);
 
 	/* Release clk */
@@ -2900,6 +2897,12 @@ void dev_pm_opp_remove_table(struct device *dev)
 	 **/
 	if (_opp_remove_all_static(opp_table))
 		dev_pm_opp_put_opp_table(opp_table);
+
+	/* Drop reference taken by _find_current_opp() */
+	if (opp_table->current_opp) {
+		dev_pm_opp_put(opp_table->current_opp);
+		opp_table->current_opp = NULL;
+	}
 
 	/* Drop reference taken by _find_opp_table() */
 	dev_pm_opp_put_opp_table(opp_table);
