@@ -709,6 +709,55 @@ static __kernel_fsid_t fanotify_get_fsid(struct fsnotify_iter_info *iter_info)
 	return fsid;
 }
 
+static void fanotify_insert_error_event(struct fsnotify_group *group,
+					struct fsnotify_event *fsn_event)
+
+{
+	struct fanotify_event *event = FANOTIFY_E(fsn_event);
+
+	if (!fanotify_is_error_event(event->mask))
+		return;
+
+	/*
+	 * Prevent the mark from going away while an outstanding error
+	 * event is queued.  The reference is released by
+	 * fanotify_dequeue_first_event.
+	 */
+	fsnotify_get_mark(&FANOTIFY_EE(event)->sb_mark->fsn_mark);
+
+}
+
+static int fanotify_handle_error_event(struct fsnotify_iter_info *iter_info,
+				       struct fsnotify_group *group,
+				       const struct fs_error_report *report)
+{
+	struct fanotify_sb_mark *sb_mark =
+		FANOTIFY_SB_MARK(fsnotify_iter_sb_mark(iter_info));
+	struct fanotify_error_event *fee = sb_mark->fee_slot;
+
+	spin_lock(&group->notification_lock);
+	if (fee->err_count++) {
+		spin_unlock(&group->notification_lock);
+		return 0;
+	}
+	spin_unlock(&group->notification_lock);
+
+	fee->fae.type = FANOTIFY_EVENT_TYPE_FS_ERROR;
+
+	if (fsnotify_insert_event(group, &fee->fae.fse,
+				  NULL, fanotify_insert_error_event)) {
+		/*
+		 *  Even if an error occurred, an overflow event is
+		 *  queued. Just reset the error count and succeed.
+		 */
+		spin_lock(&group->notification_lock);
+		fanotify_reset_error_slot(fee);
+		spin_unlock(&group->notification_lock);
+	}
+
+	return 0;
+}
+
 /*
  * Add an event to hash table for faster merge.
  */
@@ -762,7 +811,7 @@ static int fanotify_handle_event(struct fsnotify_group *group, u32 mask,
 	BUILD_BUG_ON(FAN_OPEN_EXEC_PERM != FS_OPEN_EXEC_PERM);
 	BUILD_BUG_ON(FAN_FS_ERROR != FS_ERROR);
 
-	BUILD_BUG_ON(HWEIGHT32(ALL_FANOTIFY_EVENT_BITS) != 19);
+	BUILD_BUG_ON(HWEIGHT32(ALL_FANOTIFY_EVENT_BITS) != 20);
 
 	mask = fanotify_group_event_mask(group, iter_info, mask, data,
 					 data_type, dir);
@@ -786,6 +835,9 @@ static int fanotify_handle_event(struct fsnotify_group *group, u32 mask,
 		if (!fsid.val[0] && !fsid.val[1])
 			return 0;
 	}
+
+	if (fanotify_is_error_event(mask))
+		return fanotify_handle_error_event(iter_info, group, data);
 
 	event = fanotify_alloc_event(group, mask, data, data_type, dir,
 				     file_name, &fsid);
@@ -857,10 +909,13 @@ static void fanotify_free_name_event(struct fanotify_event *event)
 
 static void fanotify_free_error_event(struct fanotify_event *event)
 {
+	struct fanotify_error_event *fee = FANOTIFY_EE(event);
+
 	/*
 	 * The actual event is tied to a mark, and is released on mark
 	 * removal
 	 */
+	fsnotify_put_mark(&fee->sb_mark->fsn_mark);
 }
 
 static void fanotify_free_event(struct fsnotify_event *fsn_event)

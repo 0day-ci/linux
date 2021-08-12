@@ -167,6 +167,19 @@ static void fanotify_unhash_event(struct fsnotify_group *group,
 	hlist_del_init(&event->merge_list);
 }
 
+static struct fanotify_event *fanotify_dup_error_to_stack(
+				struct fanotify_error_event *fee,
+				struct fanotify_error_event *error_on_stack)
+{
+	fanotify_init_event(&error_on_stack->fae, 0, FS_ERROR);
+
+	error_on_stack->fae.type = FANOTIFY_EVENT_TYPE_FS_ERROR;
+	error_on_stack->err_count = fee->err_count;
+	error_on_stack->sb_mark = fee->sb_mark;
+
+	return &error_on_stack->fae;
+}
+
 /*
  * Get an fanotify notification event if one exists and is small
  * enough to fit in "count". Return an error pointer if the count
@@ -174,7 +187,9 @@ static void fanotify_unhash_event(struct fsnotify_group *group,
  * updated accordingly.
  */
 static struct fanotify_event *get_one_event(struct fsnotify_group *group,
-					    size_t count)
+				    size_t count,
+				    struct fanotify_error_event *error_on_stack)
+
 {
 	size_t event_size;
 	struct fanotify_event *event = NULL;
@@ -205,6 +220,16 @@ static struct fanotify_event *get_one_event(struct fsnotify_group *group,
 		FANOTIFY_PERM(event)->state = FAN_EVENT_REPORTED;
 	if (fanotify_is_hashed_event(event->mask))
 		fanotify_unhash_event(group, event);
+
+	if (fanotify_is_error_event(event->mask)) {
+		/*
+		 * Error events are returned as a copy of the error
+		 * slot.  The actual error slot is reused.
+		 */
+		fanotify_dup_error_to_stack(FANOTIFY_EE(event), error_on_stack);
+		fanotify_reset_error_slot(FANOTIFY_EE(event));
+		event = &error_on_stack->fae;
+	}
 out:
 	spin_unlock(&group->notification_lock);
 	return event;
@@ -564,6 +589,7 @@ static __poll_t fanotify_poll(struct file *file, poll_table *wait)
 static ssize_t fanotify_read(struct file *file, char __user *buf,
 			     size_t count, loff_t *pos)
 {
+	struct fanotify_error_event error_on_stack;
 	struct fsnotify_group *group;
 	struct fanotify_event *event;
 	char __user *start;
@@ -582,7 +608,7 @@ static ssize_t fanotify_read(struct file *file, char __user *buf,
 		 * in case there are lots of available events.
 		 */
 		cond_resched();
-		event = get_one_event(group, count);
+		event = get_one_event(group, count, &error_on_stack);
 		if (IS_ERR(event)) {
 			ret = PTR_ERR(event);
 			break;
@@ -1031,6 +1057,10 @@ static int fanotify_add_mark(struct fsnotify_group *group,
 			fanotify_init_event(&fee->fae, 0, FS_ERROR);
 			fee->sb_mark = sb_mark;
 			sb_mark->fee_slot = fee;
+
+			/* Mark the error slot ready to receive events. */
+			fanotify_reset_error_slot(fee);
+
 		}
 	}
 
@@ -1457,6 +1487,11 @@ static int do_fanotify_mark(int fanotify_fd, unsigned int flags, __u64 mask,
 			goto path_put_and_out;
 
 		fsid = &__fsid;
+	}
+
+	if (mask & FAN_FS_ERROR && mark_type != FAN_MARK_FILESYSTEM) {
+		ret = -EINVAL;
+		goto path_put_and_out;
 	}
 
 	/* inode held in place by reference to path; group by fget on fd */

@@ -220,6 +220,8 @@ FANOTIFY_NE(struct fanotify_event *event)
 
 struct fanotify_error_event {
 	struct fanotify_event fae;
+	u32 err_count; /* Suppressed errors count */
+
 	struct fanotify_sb_mark *sb_mark; /* Back reference to the mark. */
 };
 
@@ -320,6 +322,11 @@ static inline struct fanotify_event *FANOTIFY_E(struct fsnotify_event *fse)
 	return container_of(fse, struct fanotify_event, fse);
 }
 
+static inline bool fanotify_is_error_event(u32 mask)
+{
+	return mask & FAN_FS_ERROR;
+}
+
 static inline bool fanotify_event_has_path(struct fanotify_event *event)
 {
 	return event->type == FANOTIFY_EVENT_TYPE_PATH ||
@@ -349,6 +356,7 @@ static inline struct path *fanotify_event_path(struct fanotify_event *event)
 static inline bool fanotify_is_hashed_event(u32 mask)
 {
 	return !(fanotify_is_perm_event(mask) ||
+		 fanotify_is_error_event(mask) ||
 		 fsnotify_is_overflow_event(mask));
 }
 
@@ -357,4 +365,17 @@ static inline unsigned int fanotify_event_hash_bucket(
 						struct fanotify_event *event)
 {
 	return event->hash & FANOTIFY_HTABLE_MASK;
+}
+
+/*
+ * Reset the FAN_FS_ERROR event slot
+ *
+ * This is used to restore the error event slot to a a zeroed state,
+ * where it can be used for a new incoming error.  It does not
+ * initialize the event, but clear only the required data to free the
+ * slot.
+ */
+static inline void fanotify_reset_error_slot(struct fanotify_error_event *fee)
+{
+	fee->err_count = 0;
 }
