@@ -827,11 +827,14 @@ static void init_once(void *data)
 
 static void bdev_evict_inode(struct inode *inode)
 {
+	struct block_device *bdev = I_BDEV(inode);
+
 	truncate_inode_pages_final(&inode->i_data);
 	invalidate_inode_buffers(inode); /* is it needed here? */
 	clear_inode(inode);
-	/* Detach inode from wb early as bdi_put() may free bdi->wb */
 	inode_detach_wb(inode);
+	if (!bdev_is_partition(bdev))
+		bdi_put(bdev->bd_disk->bdi);
 }
 
 static const struct super_operations bdev_sops = {
