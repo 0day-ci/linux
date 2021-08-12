@@ -736,11 +736,16 @@ static int pt3_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	pt3->pdev = pdev;
 	mutex_init(&pt3->lock);
 	pt3->regs[0] = pci_ioremap_bar(pdev, 0);
-	pt3->regs[1] = pci_ioremap_bar(pdev, 2);
-	if (pt3->regs[0] == NULL || pt3->regs[1] == NULL) {
+	if (pt3->regs[0] == NULL) {
 		dev_err(&pdev->dev, "Failed to ioremap\n");
 		ret = -ENOMEM;
 		goto err_kfree;
+	}
+	pt3->regs[1] = pci_ioremap_bar(pdev, 2);
+	if (pt3->regs[1] == NULL) {
+		dev_err(&pdev->dev, "Failed to ioremap\n");
+		ret = -ENOMEM;
+		goto err_iounmap0;
 	}
 
 	ver = ioread32(pt3->regs[0] + REG_VERSION);
@@ -748,7 +753,7 @@ static int pt3_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		dev_warn(&pdev->dev, "PT%d, I/F-ver.:%d not supported\n",
 			 ver >> 24, (ver & 0x00ff0000) >> 16);
 		ret = -ENODEV;
-		goto err_iounmap;
+		goto err_iounmap1;
 	}
 
 	pt3->num_bufs = clamp_val(num_bufs, MIN_DATA_BUFS, MAX_DATA_BUFS);
@@ -756,7 +761,7 @@ static int pt3_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	pt3->i2c_buf = kmalloc(sizeof(*pt3->i2c_buf), GFP_KERNEL);
 	if (pt3->i2c_buf == NULL) {
 		ret = -ENOMEM;
-		goto err_iounmap;
+		goto err_iounmap1;
 	}
 	i2c = &pt3->i2c_adap;
 	i2c->owner = THIS_MODULE;
@@ -801,11 +806,12 @@ err_cleanup_adapters:
 	i2c_del_adapter(i2c);
 err_i2cbuf:
 	kfree(pt3->i2c_buf);
-err_iounmap:
-	if (pt3->regs[0])
-		pci_iounmap(pdev, pt3->regs[0]);
+err_iounmap1:
 	if (pt3->regs[1])
 		pci_iounmap(pdev, pt3->regs[1]);
+err_iounmap0:
+	if (pt3->regs[0])
+		pci_iounmap(pdev, pt3->regs[0]);
 err_kfree:
 	kfree(pt3);
 err_release_regions:
