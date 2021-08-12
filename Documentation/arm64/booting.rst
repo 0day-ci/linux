@@ -212,6 +212,11 @@ Before jumping into the kernel, the following conditions must be met:
   - The value of SCR_EL3.FIQ must be the same as the one present at boot
     time whenever the kernel is executing.
 
+  For all systems:
+  - If EL3 is present and the kernel is entered at EL2:
+
+    - SCR_EL3.HCE (bit 8) must be initialised to 0b1.
+
   For systems with a GICv3 interrupt controller to be used in v3 mode:
   - If EL3 is present:
 
