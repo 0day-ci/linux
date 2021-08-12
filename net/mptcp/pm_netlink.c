@@ -1324,6 +1324,8 @@ static void mptcp_pm_free_addr_entry(struct mptcp_pm_addr_entry *entry)
 		INIT_RCU_WORK(&w->rwork, mptcp_pm_release_addr_entry);
 		w->entry = entry;
 		queue_rcu_work(system_wq, &w->rwork);
+	} else {
+		kfree(entry);
 	}
 }
 
