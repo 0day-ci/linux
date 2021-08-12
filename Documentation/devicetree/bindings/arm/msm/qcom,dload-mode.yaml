@@ -1,0 +1,53 @@
+# SPDX-License-Identifier: (GPL-2.0 OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/arm/msm/qcom,dload-mode.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Qualcomm Download Mode binding
+
+maintainers:
+  - Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>
+
+description:
+  Qualcomm download mode cookies memory region in IMEM is used by SDI
+  (System Debug Image) firmware to determine whether to enter download
+  mode or not to collect ramdump for post mortem debug.
+
+properties:
+  compatible:
+    const: qcom,dload-mode
+
+  reg:
+    maxItems: 1
+
+  qcom,sdi-disable-regs:
+    $ref: /schemas/types.yaml#/definitions/phandle-array
+    description:
+      Phandle reference to a syscon representing TCSR followed by the
+      offset and length for SDI disable register.
+
+required:
+  - compatible
+  - reg
+
+additionalProperties: false
+
+examples:
+  - |
+    imem@146aa000 {
+      compatible = "simple-mfd";
+      reg = <0x146aa000 0x2000>;
+
+      #address-cells = <1>;
+      #size-cells = <1>;
+
+      ranges = <0 0x146aa000 0x2000>;
+
+      dload-mode@1c00 {
+        compatible = "qcom,dload-mode";
+        reg = <0x1c00 0x1000>;
+        qcom,sdi-disable-regs = <&tcsr_regs 0x3a000 0x4>;
+      };
+    };
+...
