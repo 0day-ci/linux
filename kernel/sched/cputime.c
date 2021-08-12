@@ -228,6 +228,34 @@ void account_idle_time(u64 cputime)
 }
 
 /*
+ * Returns the total idle time for the given cpu.
+ * @kcs: The kernel_cpustat for the desired cpu.
+ * @cpu: The desired cpu.
+ */
+u64 get_idle_time(const struct kernel_cpustat *kcs, int cpu)
+{
+	u64 idle;
+	u64 __maybe_unused idle_usecs = -1ULL;
+
+#ifdef arch_idle_time
+	idle = kcs->cpustat[CPUTIME_IDLE];
+	if (cpu_online(cpu) && !nr_iowait_cpu(cpu))
+		idle += arch_idle_time(cpu);
+#else
+	if (cpu_online(cpu))
+		idle_usecs = get_cpu_idle_time_us(cpu, NULL);
+
+	if (idle_usecs == -1ULL)
+		/* !NO_HZ or cpu offline so we can rely on cpustat.idle */
+		idle = kcs->cpustat[CPUTIME_IDLE];
+	else
+		idle = idle_usecs * NSEC_PER_USEC;
+#endif
+
+	return idle;
+}
+
+/*
  * When a guest is interrupted for a longer amount of time, missed clock
  * ticks are not redelivered later. Due to that, this function may on
  * occasion account more time than the calling functions think elapsed.
