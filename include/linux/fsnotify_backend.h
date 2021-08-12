@@ -363,6 +363,20 @@ struct fsnotify_mark_connector {
 	struct hlist_head list;
 };
 
+enum fsnotify_mark_bits {
+	FSN_MARK_FL_BIT_IGNORED_SURV_MODIFY,
+	FSN_MARK_FL_BIT_ALIVE,
+	FSN_MARK_FL_BIT_ATTACHED,
+	FSN_MARK_PRIVATE_FLAGS,
+};
+
+#define FSNOTIFY_MARK_FLAG_IGNORED_SURV_MODIFY \
+	(1 << FSN_MARK_FL_BIT_IGNORED_SURV_MODIFY)
+#define FSNOTIFY_MARK_FLAG_ALIVE \
+	(1 << FSN_MARK_FL_BIT_ALIVE)
+#define FSNOTIFY_MARK_FLAG_ATTACHED \
+	(1 << FSN_MARK_FL_BIT_ATTACHED)
+
 /*
  * A mark is simply an object attached to an in core inode which allows an
  * fsnotify listener to indicate they are either no longer interested in events
@@ -398,9 +412,7 @@ struct fsnotify_mark {
 	struct fsnotify_mark_connector *connector;
 	/* Events types to ignore [mark->lock, group->mark_mutex] */
 	__u32 ignored_mask;
-#define FSNOTIFY_MARK_FLAG_IGNORED_SURV_MODIFY	0x01
-#define FSNOTIFY_MARK_FLAG_ALIVE		0x02
-#define FSNOTIFY_MARK_FLAG_ATTACHED		0x04
+	/* Upper bits [31:PRIVATE_FLAGS] are reserved for backend usage */
 	unsigned int flags;		/* flags [mark->lock] */
 };
 
