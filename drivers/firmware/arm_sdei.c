@@ -496,7 +496,7 @@ int sdei_event_unregister(u32 event_num)
 	mutex_lock(&sdei_events_lock);
 	event = sdei_event_find(event_num);
 	if (!event) {
-		pr_warn("Event %u not registered\n", event_num);
+		pr_warn("Event 0x%x not registered\n", event_num);
 		err = -ENOENT;
 		goto unlock;
 	}
@@ -579,7 +579,7 @@ int sdei_event_register(u32 event_num, sdei_event_callback *cb, void *arg)
 
 	mutex_lock(&sdei_events_lock);
 	if (sdei_event_find(event_num)) {
-		pr_warn("Event %u already registered\n", event_num);
+		pr_warn("Event 0x%x already registered\n", event_num);
 		err = -EBUSY;
 		goto unlock;
 	}
@@ -587,7 +587,7 @@ int sdei_event_register(u32 event_num, sdei_event_callback *cb, void *arg)
 	event = sdei_event_create(event_num, cb, arg);
 	if (IS_ERR(event)) {
 		err = PTR_ERR(event);
-		pr_warn("Failed to create event %u: %d\n", event_num, err);
+		pr_warn("Failed to create event 0x%x: %d\n", event_num, err);
 		goto unlock;
 	}
 
@@ -605,7 +605,7 @@ int sdei_event_register(u32 event_num, sdei_event_callback *cb, void *arg)
 
 	if (err) {
 		sdei_event_destroy(event);
-		pr_warn("Failed to register event %u: %d\n", event_num, err);
+		pr_warn("Failed to register event 0x%x: %d\n", event_num, err);
 		goto cpu_unlock;
 	}
 
@@ -635,7 +635,7 @@ static int sdei_reregister_shared(void)
 					sdei_entry_point, event->registered,
 					SDEI_EVENT_REGISTER_RM_ANY, 0);
 			if (err) {
-				pr_err("Failed to re-register event %u\n",
+				pr_err("Failed to re-register event 0x%x\n",
 				       event->event_num);
 				sdei_event_destroy_llocked(event);
 				break;
@@ -645,7 +645,7 @@ static int sdei_reregister_shared(void)
 		if (event->reenable) {
 			err = sdei_api_event_enable(event->event_num);
 			if (err) {
-				pr_err("Failed to re-enable event %u\n",
+				pr_err("Failed to re-enable event 0x%x\n",
 				       event->event_num);
 				break;
 			}
@@ -670,7 +670,7 @@ static int sdei_cpuhp_down(unsigned int cpu)
 
 		err = sdei_do_local_call(_local_event_unregister, event);
 		if (err) {
-			pr_err("Failed to unregister event %u: %d\n",
+			pr_err("Failed to unregister event 0x%x: %d\n",
 			       event->event_num, err);
 		}
 	}
@@ -693,7 +693,7 @@ static int sdei_cpuhp_up(unsigned int cpu)
 		if (event->reregister) {
 			err = sdei_do_local_call(_local_event_register, event);
 			if (err) {
-				pr_err("Failed to re-register event %u: %d\n",
+				pr_err("Failed to re-register event 0x%x: %d\n",
 				       event->event_num, err);
 			}
 		}
@@ -701,7 +701,7 @@ static int sdei_cpuhp_up(unsigned int cpu)
 		if (event->reenable) {
 			err = sdei_do_local_call(_local_event_enable, event);
 			if (err) {
-				pr_err("Failed to re-enable event %u: %d\n",
+				pr_err("Failed to re-enable event 0x%x: %d\n",
 				       event->event_num, err);
 			}
 		}
@@ -1095,7 +1095,7 @@ int sdei_event_handler(struct pt_regs *regs,
 
 	err = arg->callback(event_num, regs, arg->callback_arg);
 	if (err)
-		pr_err_ratelimited("event %u on CPU %u failed with error: %d\n",
+		pr_err_ratelimited("event 0x%x on CPU 0x%x failed with error: %d\n",
 				   event_num, smp_processor_id(), err);
 
 	return err;
