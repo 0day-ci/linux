@@ -751,6 +751,16 @@ static bool zap_gfn_range(struct kvm *kvm, struct kvm_mmu_page *root,
 {
 	bool zap_all = (end == ZAP_ALL_END);
 	struct tdp_iter iter;
+	int min_level;
+
+	/*
+	 * No need to step down in the iterator when zapping all SPTEs, zapping
+	 * the top-level non-leaf SPTEs will recurse on all their children.
+	 */
+	if (zap_all)
+		min_level = root->role.level;
+	else
+		min_level = PG_LEVEL_4K;
 
 	/*
 	 * Bound the walk at host.MAXPHYADDR, guest accesses beyond that will
@@ -763,7 +773,8 @@ static bool zap_gfn_range(struct kvm *kvm, struct kvm_mmu_page *root,
 
 	rcu_read_lock();
 
-	tdp_root_for_each_pte(iter, root, start, end) {
+	for_each_tdp_pte_min_level(iter, root->spt, root->role.level,
+				   min_level, start, end) {
 retry:
 		if (can_yield &&
 		    tdp_mmu_iter_cond_resched(kvm, &iter, flush, shared)) {
