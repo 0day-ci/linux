@@ -98,7 +98,7 @@
 
 /* In 4 level paging, p4d_* macros work on pgd */
 #define p4d_none(x)		(!p4d_val(x))
-#define p4d_bad(x)		((p4d_val(x) & ~PAGE_MASK))
+#define p4d_bad(x)		(!(p4d_val(x) & _PAGE_TABLE))
 #define p4d_present(x)		(p4d_val(x))
 #define p4d_clear(xp)		do { p4d_val(*(xp)) = 0; } while (0)
 #define p4d_pgtable(p4d)	((pud_t *)(p4d_val(p4d) & PAGE_MASK))
@@ -120,7 +120,7 @@
  * In 4 level paging, pud_* macros work on pud
  */
 #define pud_none(x)		(!pud_val(x))
-#define pud_bad(x)		((pud_val(x) & ~PAGE_MASK))
+#define pud_bad(x)		(!(pud_val(x) & _PAGE_TABLE))
 #define pud_present(x)		(pud_val(x))
 #define pud_clear(xp)		do { pud_val(*(xp)) = 0; } while (0)
 #define pud_pgtable(pud)	((pmd_t *)(pud_val(pud) & PAGE_MASK))
@@ -147,7 +147,7 @@
  * In 3+ level paging (pgd -> pmd -> pte), pmd_* macros work on pmd
  */
 #define pmd_none(x)		(!pmd_val(x))
-#define pmd_bad(x)		((pmd_val(x) & ~PAGE_MASK))
+#define pmd_bad(pmd)		(!(pmd_val(pmd) & _PAGE_TABLE))
 #define pmd_present(x)		(pmd_val(x))
 #define pmd_clear(xp)		do { pmd_val(*(xp)) = 0; } while (0)
 #define pmd_page_vaddr(pmd)	(pmd_val(pmd) & PAGE_MASK)
