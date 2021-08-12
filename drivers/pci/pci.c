@@ -2298,6 +2298,32 @@ void pci_pme_wakeup_bus(struct pci_bus *bus)
 		pci_walk_bus(bus, pci_pme_wakeup, (void *)true);
 }
 
+#ifdef CONFIG_PCIE_PME
+static bool pci_pcie_port_pme_enabled(struct pci_dev *dev)
+{
+	struct pci_dev *bridge = pci_upstream_bridge(dev);
+	u16 val;
+	int ret;
+
+	if (!bridge)
+		return true;
+
+	if (pci_pcie_type(bridge) != PCI_EXP_TYPE_ROOT_PORT &&
+	    pci_pcie_type(bridge) != PCI_EXP_TYPE_RC_EC)
+		return true;
+
+	ret = pcie_capability_read_word(bridge, PCI_EXP_RTCTL, &val);
+	if (ret)
+		return false;
+
+	return val & PCI_EXP_RTCTL_PMEIE;
+}
+#else
+static bool pci_pcie_port_pme_enabled(struct pci_dev *dev)
+{
+	return true;
+}
+#endif
 
 /**
  * pci_pme_capable - check the capability of PCI device to generate PME#
@@ -3099,7 +3125,7 @@ void pci_pm_init(struct pci_dev *dev)
 	}
 
 	pmc &= PCI_PM_CAP_PME_MASK;
-	if (pmc) {
+	if (pmc && pci_pcie_port_pme_enabled(dev)) {
 		pci_info(dev, "PME# supported from%s%s%s%s%s\n",
 			 (pmc & PCI_PM_CAP_PME_D0) ? " D0" : "",
 			 (pmc & PCI_PM_CAP_PME_D1) ? " D1" : "",
