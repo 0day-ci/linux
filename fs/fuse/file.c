@@ -151,10 +151,16 @@ struct fuse_file *fuse_file_open(struct fuse_mount *fm, u64 nodeid,
 			fuse_file_free(ff);
 			return ERR_PTR(err);
 		} else {
-			if (isdir)
+			if (isdir) {
 				fc->no_opendir = 1;
-			else
+			} else {
 				fc->no_open = 1;
+				/*
+				 * In case of no_open, disable atomic_o_trunc as
+				 * well.
+				 */
+				fc->atomic_o_trunc = 0;
+			}
 		}
 	}
 
