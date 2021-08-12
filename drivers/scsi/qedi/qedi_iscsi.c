@@ -599,7 +599,7 @@ static int qedi_iscsi_offload_conn(struct qedi_endpoint *qedi_ep)
 	}
 
 	rval = qedi_ops->offload_conn(qedi->cdev, qedi_ep->handle, conn_info);
-	if (rval)
+	if (rval) {
 		/* delete doorbell from doorbell recovery mechanism */
 		rval = qedi_ops->common->db_recovery_del(qedi->cdev,
 							 qedi_ep->p_doorbell,
@@ -607,6 +607,7 @@ static int qedi_iscsi_offload_conn(struct qedi_endpoint *qedi_ep)
 
 		QEDI_ERR(&qedi->dbg_ctx, "offload_conn returned %d, ep=%p\n",
 			 rval, qedi_ep);
+	}
 
 	kfree(conn_info);
 	return rval;
