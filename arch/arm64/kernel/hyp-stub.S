@@ -46,7 +46,16 @@ SYM_CODE_END(__hyp_stub_vectors)
 	.align 11
 
 SYM_CODE_START_LOCAL(elx_sync)
-	cmp	x0, #HVC_SET_VECTORS
+	mrs	x4, spsr_el2
+	and	x4, x4, #PSR_MODE_MASK
+	orr	x4, x4, #1
+	cmp	x4, #PSR_MODE_EL2h
+	b.ne	0f
+	mrs	x4, esr_el2
+	eor	x4, x4, #ESR_ELx_IL
+	cbz	x4, el2_undef
+
+0:	cmp	x0, #HVC_SET_VECTORS
 	b.ne	1f
 	msr	vbar_el2, x1
 	b	9f
@@ -70,6 +79,14 @@ SYM_CODE_START_LOCAL(elx_sync)
 	eret
 
 9:	mov	x0, xzr
+	eret
+
+el2_undef:
+	// Assumes this was a HVC that went really wrong...
+	mrs	x0, elr_el2
+	add	x0, x0, #4
+	msr	elr_el2, x0
+	mov_q	x0, HVC_STUB_ERR
 	eret
 SYM_CODE_END(elx_sync)
 
