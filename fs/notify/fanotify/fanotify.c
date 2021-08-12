@@ -334,6 +334,8 @@ static u32 fanotify_group_event_mask(struct fsnotify_group *group,
 	return test_mask & user_mask;
 }
 
+#define FANOTIFY_NULL_FH_LEN	4
+
 /*
  * Check size needed to encode fanotify_fh.
  *
@@ -345,7 +347,7 @@ static int fanotify_encode_fh_len(struct inode *inode)
 	int dwords = 0;
 
 	if (!inode)
-		return 0;
+		return FANOTIFY_NULL_FH_LEN;
 
 	exportfs_encode_inode_fh(inode, NULL, &dwords, NULL);
 
@@ -367,11 +369,23 @@ static int fanotify_encode_fh(struct fanotify_fh *fh, struct inode *inode,
 	void *buf = fh->buf;
 	int err;
 
-	fh->type = FILEID_ROOT;
-	fh->len = 0;
+	BUILD_BUG_ON(FANOTIFY_NULL_FH_LEN < 4 ||
+		     FANOTIFY_NULL_FH_LEN > FANOTIFY_INLINE_FH_LEN);
+
 	fh->flags = 0;
-	if (!inode)
-		return 0;
+
+	if (!inode) {
+		/*
+		 * Invalid FHs are used on FAN_FS_ERROR for errors not
+		 * linked to any inode. The f_handle won't be reported
+		 * back to userspace.  The extra bytes are cleared prior
+		 * to reporting.
+		 */
+		type = FILEID_INVALID;
+		fh_len = FANOTIFY_NULL_FH_LEN;
+
+		goto success;
+	}
 
 	/*
 	 * !gpf means preallocated variable size fh, but fh_len could
@@ -400,6 +414,7 @@ static int fanotify_encode_fh(struct fanotify_fh *fh, struct inode *inode,
 	if (!type || type == FILEID_INVALID || fh_len != dwords << 2)
 		goto out_err;
 
+success:
 	fh->type = type;
 	fh->len = fh_len;
 
@@ -529,7 +544,7 @@ static struct fanotify_event *fanotify_alloc_name_event(struct inode *id,
 	struct fanotify_info *info;
 	struct fanotify_fh *dfh, *ffh;
 	unsigned int dir_fh_len = fanotify_encode_fh_len(id);
-	unsigned int child_fh_len = fanotify_encode_fh_len(child);
+	unsigned int child_fh_len = child ? fanotify_encode_fh_len(child) : 0;
 	unsigned int size;
 
 	size = sizeof(*fne) + FANOTIFY_FH_HDR_LEN + dir_fh_len;

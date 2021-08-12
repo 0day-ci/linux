@@ -360,7 +360,10 @@ static int copy_info_to_user(__kernel_fsid_t *fsid, struct fanotify_fh *fh,
 		return -EFAULT;
 
 	handle.handle_type = fh->type;
-	handle.handle_bytes = fh_len;
+
+	/* FILEID_INVALID handle type is reported without its f_handle. */
+	if (fh->type != FILEID_INVALID)
+		handle.handle_bytes = fh_len;
 	if (copy_to_user(buf, &handle, sizeof(handle)))
 		return -EFAULT;
 
@@ -369,20 +372,22 @@ static int copy_info_to_user(__kernel_fsid_t *fsid, struct fanotify_fh *fh,
 	if (WARN_ON_ONCE(len < fh_len))
 		return -EFAULT;
 
-	/*
-	 * For an inline fh and inline file name, copy through stack to exclude
-	 * the copy from usercopy hardening protections.
-	 */
-	fh_buf = fanotify_fh_buf(fh);
-	if (fh_len <= FANOTIFY_INLINE_FH_LEN) {
-		memcpy(bounce, fh_buf, fh_len);
-		fh_buf = bounce;
+	if (fh->type != FILEID_INVALID) {
+		/*
+		 * For an inline fh and inline file name, copy through
+		 * stack to exclude the copy from usercopy hardening
+		 * protections.
+		 */
+		fh_buf = fanotify_fh_buf(fh);
+		if (fh_len <= FANOTIFY_INLINE_FH_LEN) {
+			memcpy(bounce, fh_buf, fh_len);
+			fh_buf = bounce;
+		}
+		if (copy_to_user(buf, fh_buf, fh_len))
+			return -EFAULT;
+		buf += fh_len;
+		len -= fh_len;
 	}
-	if (copy_to_user(buf, fh_buf, fh_len))
-		return -EFAULT;
-
-	buf += fh_len;
-	len -= fh_len;
 
 	if (name_len) {
 		/* Copy the filename with terminating null */
@@ -398,7 +403,7 @@ static int copy_info_to_user(__kernel_fsid_t *fsid, struct fanotify_fh *fh,
 	}
 
 	/* Pad with 0's */
-	WARN_ON_ONCE(len < 0 || len >= FANOTIFY_EVENT_ALIGN);
+	WARN_ON_ONCE(len < 0);
 	if (len > 0 && clear_user(buf, len))
 		return -EFAULT;
 
