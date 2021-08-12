@@ -6,6 +6,7 @@
 #include <linux/hashtable.h>
 
 extern struct kmem_cache *fanotify_mark_cache;
+extern struct kmem_cache *fanotify_sb_mark_cache;
 extern struct kmem_cache *fanotify_fid_event_cachep;
 extern struct kmem_cache *fanotify_path_event_cachep;
 extern struct kmem_cache *fanotify_perm_event_cachep;
@@ -127,6 +128,25 @@ static inline void fanotify_info_copy_name(struct fanotify_info *info,
 	info->name_len = name->len;
 	strcpy(info->buf + info->dir_fh_totlen + info->file_fh_totlen,
 	       name->name);
+}
+
+enum fanotify_mark_bits {
+	FANOTIFY_MARK_FLAG_BIT_SB_MARK = FSN_MARK_PRIVATE_FLAGS,
+};
+
+#define FANOTIFY_MARK_FLAG_SB_MARK \
+	(1 << FANOTIFY_MARK_FLAG_BIT_SB_MARK)
+
+struct fanotify_sb_mark {
+	struct fsnotify_mark fsn_mark;
+};
+
+static inline
+struct fanotify_sb_mark *FANOTIFY_SB_MARK(struct fsnotify_mark *mark)
+{
+	WARN_ON(!(mark->flags & FANOTIFY_MARK_FLAG_SB_MARK));
+
+	return container_of(mark, struct fanotify_sb_mark, fsn_mark);
 }
 
 /*

@@ -869,9 +869,15 @@ static void fanotify_freeing_mark(struct fsnotify_mark *mark,
 		dec_ucount(group->fanotify_data.ucounts, UCOUNT_FANOTIFY_MARKS);
 }
 
-static void fanotify_free_mark(struct fsnotify_mark *fsn_mark)
+static void fanotify_free_mark(struct fsnotify_mark *mark)
 {
-	kmem_cache_free(fanotify_mark_cache, fsn_mark);
+	if (mark->flags & FANOTIFY_MARK_FLAG_SB_MARK) {
+		struct fanotify_sb_mark *fa_mark = FANOTIFY_SB_MARK(mark);
+
+		kmem_cache_free(fanotify_sb_mark_cache, fa_mark);
+	} else {
+		kmem_cache_free(fanotify_mark_cache, mark);
+	}
 }
 
 const struct fsnotify_ops fanotify_fsnotify_ops = {

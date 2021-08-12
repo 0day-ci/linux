@@ -99,6 +99,7 @@ struct ctl_table fanotify_table[] = {
 extern const struct fsnotify_ops fanotify_fsnotify_ops;
 
 struct kmem_cache *fanotify_mark_cache __read_mostly;
+struct kmem_cache *fanotify_sb_mark_cache __read_mostly;
 struct kmem_cache *fanotify_fid_event_cachep __read_mostly;
 struct kmem_cache *fanotify_path_event_cachep __read_mostly;
 struct kmem_cache *fanotify_perm_event_cachep __read_mostly;
@@ -915,6 +916,38 @@ static __u32 fanotify_mark_add_to_mask(struct fsnotify_mark *fsn_mark,
 	return mask & ~oldmask;
 }
 
+static struct fsnotify_mark *fanotify_alloc_mark(struct fsnotify_group *group,
+						 unsigned int type)
+{
+	struct fanotify_sb_mark *sb_mark;
+	struct fsnotify_mark *mark;
+
+	switch (type) {
+	case FSNOTIFY_OBJ_TYPE_SB:
+		sb_mark = kmem_cache_alloc(fanotify_sb_mark_cache, GFP_KERNEL);
+		if (!sb_mark)
+			return NULL;
+		mark = &sb_mark->fsn_mark;
+		break;
+
+	case FSNOTIFY_OBJ_TYPE_INODE:
+	case FSNOTIFY_OBJ_TYPE_PARENT:
+	case FSNOTIFY_OBJ_TYPE_VFSMOUNT:
+		mark = kmem_cache_alloc(fanotify_mark_cache, GFP_KERNEL);
+		break;
+	default:
+		WARN_ON(1);
+		return NULL;
+	}
+
+	fsnotify_init_mark(mark, group);
+
+	if (type == FSNOTIFY_OBJ_TYPE_SB)
+		mark->flags |= FANOTIFY_MARK_FLAG_SB_MARK;
+
+	return mark;
+}
+
 static struct fsnotify_mark *fanotify_add_new_mark(struct fsnotify_group *group,
 						   fsnotify_connp_t *connp,
 						   unsigned int type,
@@ -933,13 +966,12 @@ static struct fsnotify_mark *fanotify_add_new_mark(struct fsnotify_group *group,
 	    !inc_ucount(ucounts->ns, ucounts->uid, UCOUNT_FANOTIFY_MARKS))
 		return ERR_PTR(-ENOSPC);
 
-	mark = kmem_cache_alloc(fanotify_mark_cache, GFP_KERNEL);
+	mark = fanotify_alloc_mark(group, type);
 	if (!mark) {
 		ret = -ENOMEM;
 		goto out_dec_ucounts;
 	}
 
-	fsnotify_init_mark(mark, group);
 	ret = fsnotify_add_mark_locked(mark, connp, type, 0, fsid);
 	if (ret) {
 		fsnotify_put_mark(mark);
@@ -1497,6 +1529,8 @@ static int __init fanotify_user_setup(void)
 
 	fanotify_mark_cache = KMEM_CACHE(fsnotify_mark,
 					 SLAB_PANIC|SLAB_ACCOUNT);
+	fanotify_sb_mark_cache = KMEM_CACHE(fanotify_sb_mark,
+					    SLAB_PANIC|SLAB_ACCOUNT);
 	fanotify_fid_event_cachep = KMEM_CACHE(fanotify_fid_event,
 					       SLAB_PANIC);
 	fanotify_path_event_cachep = KMEM_CACHE(fanotify_path_event,
