@@ -13,6 +13,17 @@
 static bool __read_mostly tdp_mmu_enabled = true;
 module_param_named(tdp_mmu, tdp_mmu_enabled, bool, 0644);
 
+/*
+ * Magic numbers for 'start' and 'end' used when zapping all SPTEs.  The values
+ * are not completely arbitrary; start must be 0, and end must be greater than
+ * the max theoretical GFN that KVM can fault into the TDP MMU.
+ */
+#define ZAP_ALL_START	0
+#define ZAP_ALL_END	-1ull
+
+/* start+end pair for zapping SPTEs for all possible GFNs. */
+#define ZAP_ALL ZAP_ALL_START, ZAP_ALL_END
+
 /* Initializes the TDP MMU for the VM, if enabled. */
 bool kvm_mmu_init_tdp_mmu(struct kvm *kvm)
 {
@@ -43,6 +54,7 @@ void kvm_mmu_uninit_tdp_mmu(struct kvm *kvm)
 	if (!kvm->arch.tdp_mmu_enabled)
 		return;
 
+	WARN_ON(!list_empty(&kvm->arch.tdp_mmu_pages));
 	WARN_ON(!list_empty(&kvm->arch.tdp_mmu_roots));
 
 	/*
@@ -81,8 +93,6 @@ static void tdp_mmu_free_sp_rcu_callback(struct rcu_head *head)
 void kvm_tdp_mmu_put_root(struct kvm *kvm, struct kvm_mmu_page *root,
 			  bool shared)
 {
-	gfn_t max_gfn = 1ULL << (shadow_phys_bits - PAGE_SHIFT);
-
 	kvm_lockdep_assert_mmu_lock_held(kvm, shared);
 
 	if (!refcount_dec_and_test(&root->tdp_mmu_root_count))
@@ -94,7 +104,7 @@ void kvm_tdp_mmu_put_root(struct kvm *kvm, struct kvm_mmu_page *root,
 	list_del_rcu(&root->link);
 	spin_unlock(&kvm->arch.tdp_mmu_pages_lock);
 
-	zap_gfn_range(kvm, root, 0, max_gfn, false, false, shared);
+	zap_gfn_range(kvm, root, ZAP_ALL, false, false, shared);
 
 	call_rcu(&root->rcu_head, tdp_mmu_free_sp_rcu_callback);
 }
@@ -739,7 +749,15 @@ static bool zap_gfn_range(struct kvm *kvm, struct kvm_mmu_page *root,
 			  gfn_t start, gfn_t end, bool can_yield, bool flush,
 			  bool shared)
 {
+	bool zap_all = (end == ZAP_ALL_END);
 	struct tdp_iter iter;
+
+	/*
+	 * Bound the walk at host.MAXPHYADDR, guest accesses beyond that will
+	 * hit a #PF(RSVD) and never get to an EPT Violation/Misconfig / #NPF,
+	 * and so KVM will never install a SPTE for such addresses.
+	 */
+	end = min(end, 1ULL << (shadow_phys_bits - PAGE_SHIFT));
 
 	kvm_lockdep_assert_mmu_lock_held(kvm, shared);
 
@@ -759,9 +777,10 @@ retry:
 		/*
 		 * If this is a non-last-level SPTE that covers a larger range
 		 * than should be zapped, continue, and zap the mappings at a
-		 * lower level.
+		 * lower level, except when zapping all SPTEs.
 		 */
-		if ((iter.gfn < start ||
+		if (!zap_all &&
+		    (iter.gfn < start ||
 		     iter.gfn + KVM_PAGES_PER_HPAGE(iter.level) > end) &&
 		    !is_last_spte(iter.old_spte, iter.level))
 			continue;
@@ -803,12 +822,11 @@ bool __kvm_tdp_mmu_zap_gfn_range(struct kvm *kvm, int as_id, gfn_t start,
 
 void kvm_tdp_mmu_zap_all(struct kvm *kvm)
 {
-	gfn_t max_gfn = 1ULL << (shadow_phys_bits - PAGE_SHIFT);
 	bool flush = false;
 	int i;
 
 	for (i = 0; i < KVM_ADDRESS_SPACE_NUM; i++)
-		flush = kvm_tdp_mmu_zap_gfn_range(kvm, i, 0, max_gfn, flush);
+		flush = kvm_tdp_mmu_zap_gfn_range(kvm, i, ZAP_ALL, flush);
 
 	if (flush)
 		kvm_flush_remote_tlbs(kvm);
@@ -846,7 +864,6 @@ static struct kvm_mmu_page *next_invalidated_root(struct kvm *kvm,
  */
 void kvm_tdp_mmu_zap_invalidated_roots(struct kvm *kvm)
 {
-	gfn_t max_gfn = 1ULL << (shadow_phys_bits - PAGE_SHIFT);
 	struct kvm_mmu_page *next_root;
 	struct kvm_mmu_page *root;
 	bool flush = false;
@@ -862,8 +879,7 @@ void kvm_tdp_mmu_zap_invalidated_roots(struct kvm *kvm)
 
 		rcu_read_unlock();
 
-		flush = zap_gfn_range(kvm, root, 0, max_gfn, true, flush,
-				      true);
+		flush = zap_gfn_range(kvm, root, ZAP_ALL, true, flush, true);
 
 		/*
 		 * Put the reference acquired in
