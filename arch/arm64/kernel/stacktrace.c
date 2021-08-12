@@ -18,6 +18,31 @@
 #include <asm/stack_pointer.h>
 #include <asm/stacktrace.h>
 
+struct code_range {
+	unsigned long	start;
+	unsigned long	end;
+};
+
+static struct code_range	*sym_code_functions;
+static int			num_sym_code_functions;
+
+int __init init_sym_code_functions(void)
+{
+	size_t size = (unsigned long)__sym_code_functions_end -
+		      (unsigned long)__sym_code_functions_start;
+
+	sym_code_functions = (struct code_range *)__sym_code_functions_start;
+	/*
+	 * Order it so that sym_code_functions is not visible before
+	 * num_sym_code_functions.
+	 */
+	smp_mb();
+	num_sym_code_functions = size / sizeof(struct code_range);
+
+	return 0;
+}
+early_initcall(init_sym_code_functions);
+
 /*
  * AArch64 PCS assigns the frame pointer to x29.
  *
@@ -185,6 +210,10 @@ void show_stack(struct task_struct *tsk, unsigned long *sp, const char *loglvl)
  */
 static bool notrace unwind_is_reliable(struct stackframe *frame)
 {
+	const struct code_range *range;
+	unsigned long pc;
+	int i;
+
 	/*
 	 * If the PC is not a known kernel text address, then we cannot
 	 * be sure that a subsequent unwind will be reliable, as we
@@ -192,6 +221,30 @@ static bool notrace unwind_is_reliable(struct stackframe *frame)
 	 */
 	if (!__kernel_text_address(frame->pc))
 		return false;
+
+	/*
+	 * Check the return PC against sym_code_functions[]. If there is a
+	 * match, then the consider the stack frame unreliable.
+	 *
+	 * As SYM_CODE functions don't follow the usual calling conventions,
+	 * we assume by default that any SYM_CODE function cannot be unwound
+	 * reliably.
+	 *
+	 * Note that this includes:
+	 *
+	 * - Exception handlers and entry assembly
+	 * - Trampoline assembly (e.g., ftrace, kprobes)
+	 * - Hypervisor-related assembly
+	 * - Hibernation-related assembly
+	 * - CPU start-stop, suspend-resume assembly
+	 * - Kernel relocation assembly
+	 */
+	pc = frame->pc;
+	for (i = 0; i < num_sym_code_functions; i++) {
+		range = &sym_code_functions[i];
+		if (pc >= range->start && pc < range->end)
+			return false;
+	}
 	return true;
 }
 
