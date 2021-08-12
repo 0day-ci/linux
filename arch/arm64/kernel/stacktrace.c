@@ -32,10 +32,11 @@
  *	add	sp, sp, #0x10
  */
 
-
-void start_backtrace(struct stackframe *frame, unsigned long fp,
-		     unsigned long pc)
+static void notrace unwind_start(struct stackframe *frame,
+				 struct task_struct *task,
+				 unsigned long fp, unsigned long pc)
 {
+	frame->task = task;
 	frame->fp = fp;
 	frame->pc = pc;
 #ifdef CONFIG_FUNCTION_GRAPH_TRACER
@@ -45,7 +46,7 @@ void start_backtrace(struct stackframe *frame, unsigned long fp,
 	/*
 	 * Prime the first unwind.
 	 *
-	 * In unwind_frame() we'll check that the FP points to a valid stack,
+	 * In unwind_next() we'll check that the FP points to a valid stack,
 	 * which can't be STACK_TYPE_UNKNOWN, and the first unwind will be
 	 * treated as a transition to whichever stack that happens to be. The
 	 * prev_fp value won't be used, but we set it to 0 such that it is
@@ -54,7 +55,10 @@ void start_backtrace(struct stackframe *frame, unsigned long fp,
 	bitmap_zero(frame->stacks_done, __NR_STACK_TYPES);
 	frame->prev_fp = 0;
 	frame->prev_type = STACK_TYPE_UNKNOWN;
+	frame->failed = false;
 }
+
+NOKPROBE_SYMBOL(unwind_start);
 
 /*
  * Unwind from one frame record (A) to the next frame record (B).
@@ -63,26 +67,26 @@ void start_backtrace(struct stackframe *frame, unsigned long fp,
  * records (e.g. a cycle), determined based on the location and fp value of A
  * and the location (but not the fp value) of B.
  */
-int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
+static void notrace unwind_next(struct stackframe *frame)
 {
 	unsigned long fp = frame->fp;
 	struct stack_info info;
+	struct task_struct *tsk = frame->task;
 
-	if (!tsk)
-		tsk = current;
+	if (fp & 0x7) {
+		frame->failed = true;
+		return;
+	}
 
-	/* Final frame; nothing to unwind */
-	if (fp == (unsigned long)task_pt_regs(tsk)->stackframe)
-		return -ENOENT;
+	if (!on_accessible_stack(tsk, fp, 16, &info)) {
+		frame->failed = true;
+		return;
+	}
 
-	if (fp & 0x7)
-		return -EINVAL;
-
-	if (!on_accessible_stack(tsk, fp, 16, &info))
-		return -EINVAL;
-
-	if (test_bit(info.type, frame->stacks_done))
-		return -EINVAL;
+	if (test_bit(info.type, frame->stacks_done)) {
+		frame->failed = true;
+		return;
+	}
 
 	/*
 	 * As stacks grow downward, any valid record on the same stack must be
@@ -98,15 +102,17 @@ int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
 	 * stack.
 	 */
 	if (info.type == frame->prev_type) {
-		if (fp <= frame->prev_fp)
-			return -EINVAL;
+		if (fp <= frame->prev_fp) {
+			frame->failed = true;
+			return;
+		}
 	} else {
 		set_bit(frame->prev_type, frame->stacks_done);
 	}
 
 	/*
 	 * Record this frame record's values and location. The prev_fp and
-	 * prev_type are only meaningful to the next unwind_frame() invocation.
+	 * prev_type are only meaningful to the next unwind_next() invocation.
 	 */
 	frame->fp = READ_ONCE_NOCHECK(*(unsigned long *)(fp));
 	frame->pc = READ_ONCE_NOCHECK(*(unsigned long *)(fp + 8));
@@ -124,32 +130,18 @@ int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
 		 * So replace it to an original value.
 		 */
 		ret_stack = ftrace_graph_get_ret_stack(tsk, frame->graph++);
-		if (WARN_ON_ONCE(!ret_stack))
-			return -EINVAL;
+		if (WARN_ON_ONCE(!ret_stack)) {
+			frame->failed = true;
+			return;
+		}
 		frame->pc = ret_stack->ret;
 	}
 #endif /* CONFIG_FUNCTION_GRAPH_TRACER */
 
 	frame->pc = ptrauth_strip_insn_pac(frame->pc);
-
-	return 0;
 }
-NOKPROBE_SYMBOL(unwind_frame);
 
-void notrace walk_stackframe(struct task_struct *tsk, struct stackframe *frame,
-			     bool (*fn)(void *, unsigned long), void *data)
-{
-	while (1) {
-		int ret;
-
-		if (!fn(data, frame->pc))
-			break;
-		ret = unwind_frame(tsk, frame);
-		if (ret < 0)
-			break;
-	}
-}
-NOKPROBE_SYMBOL(walk_stackframe);
+NOKPROBE_SYMBOL(unwind_next);
 
 static bool dump_backtrace_entry(void *arg, unsigned long where)
 {
@@ -186,25 +178,74 @@ void show_stack(struct task_struct *tsk, unsigned long *sp, const char *loglvl)
 	barrier();
 }
 
+static bool notrace unwind_consume(struct stackframe *frame,
+				   stack_trace_consume_fn consume_entry,
+				   void *cookie)
+{
+	if (frame->failed) {
+		/* PC is suspect. Cannot consume it. */
+		return false;
+	}
+
+	if (!consume_entry(cookie, frame->pc)) {
+		/* Caller terminated the unwind. */
+		frame->failed = true;
+		return false;
+	}
+
+	if (frame->fp == (unsigned long)task_pt_regs(frame->task)->stackframe) {
+		/* Final frame; nothing to unwind */
+		return false;
+	}
+	return true;
+}
+
+NOKPROBE_SYMBOL(unwind_consume);
+
+static inline bool unwind_failed(struct stackframe *frame)
+{
+	return frame->failed;
+}
+
+/* Core unwind function */
+static bool notrace unwind(stack_trace_consume_fn consume_entry, void *cookie,
+			   struct task_struct *task,
+			   unsigned long fp, unsigned long pc)
+{
+	struct stackframe frame;
+
+	unwind_start(&frame, task, fp, pc);
+	while (unwind_consume(&frame, consume_entry, cookie))
+		unwind_next(&frame);
+	return !unwind_failed(&frame);
+}
+
+NOKPROBE_SYMBOL(unwind);
+
 #ifdef CONFIG_STACKTRACE
 
 noinline notrace void arch_stack_walk(stack_trace_consume_fn consume_entry,
 			      void *cookie, struct task_struct *task,
 			      struct pt_regs *regs)
 {
-	struct stackframe frame;
+	unsigned long fp, pc;
 
-	if (regs)
-		start_backtrace(&frame, regs->regs[29], regs->pc);
-	else if (task == current)
-		start_backtrace(&frame,
-				(unsigned long)__builtin_frame_address(1),
-				(unsigned long)__builtin_return_address(0));
-	else
-		start_backtrace(&frame, thread_saved_fp(task),
-				thread_saved_pc(task));
+	if (!task)
+		task = current;
 
-	walk_stackframe(task, &frame, consume_entry, cookie);
+	if (regs) {
+		fp = regs->regs[29];
+		pc = regs->pc;
+	} else if (task == current) {
+		/* Skip arch_stack_walk() in the stack trace. */
+		fp = (unsigned long)__builtin_frame_address(1);
+		pc = (unsigned long)__builtin_return_address(0);
+	} else {
+		/* Caller guarantees that the task is not running. */
+		fp = thread_saved_fp(task);
+		pc = thread_saved_pc(task);
+	}
+	unwind(consume_entry, cookie, task, fp, pc);
 }
 
 #endif

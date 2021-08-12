@@ -34,6 +34,8 @@ struct stack_info {
  * A snapshot of a frame record or fp/lr register values, along with some
  * accounting information necessary for robust unwinding.
  *
+ * @task:        The task whose stack is being unwound.
+ *
  * @fp:          The fp value in the frame record (or the real fp)
  * @pc:          The lr value in the frame record (or the real lr)
  *
@@ -49,8 +51,11 @@ struct stack_info {
  *
  * @graph:       When FUNCTION_GRAPH_TRACER is selected, holds the index of a
  *               replacement lr value in the ftrace graph stack.
+ *
+ * @failed:      Unwind failed.
  */
 struct stackframe {
+	struct task_struct *task;
 	unsigned long fp;
 	unsigned long pc;
 	DECLARE_BITMAP(stacks_done, __NR_STACK_TYPES);
@@ -59,6 +64,7 @@ struct stackframe {
 #ifdef CONFIG_FUNCTION_GRAPH_TRACER
 	int graph;
 #endif
+	bool failed;
 };
 
 extern void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk,
@@ -144,8 +150,5 @@ static inline bool on_accessible_stack(const struct task_struct *tsk,
 
 	return false;
 }
-
-void start_backtrace(struct stackframe *frame, unsigned long fp,
-		     unsigned long pc);
 
 #endif	/* __ASM_STACKTRACE_H */
