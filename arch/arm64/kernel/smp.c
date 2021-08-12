@@ -425,6 +425,9 @@ static void __init hyp_mode_check(void)
 	else if (is_hyp_mode_mismatched())
 		WARN_TAINT(1, TAINT_CPU_OUT_OF_SPEC,
 			   "CPU: CPUs started in inconsistent modes");
+	else if (__boot_cpu_mode_flags[0] & BOOT_CPU_MODE_DOWNGRADED)
+		WARN_TAINT(1, TAINT_CPU_OUT_OF_SPEC,
+			   "CPU: CPUs downgraded to EL1, HVC disabled");
 	else
 		pr_info("CPU: All CPU(s) started at EL1\n");
 	if (IS_ENABLED(CONFIG_KVM) && !is_kernel_in_hyp_mode()) {

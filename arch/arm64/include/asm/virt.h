@@ -49,6 +49,9 @@
 #define BOOT_CPU_MODE_EL1	(0xe11)
 #define BOOT_CPU_MODE_EL2	(0xe12)
 
+/* Flags associated to the boot mode */
+#define BOOT_CPU_MODE_DOWNGRADED (1 << 0)
+
 #ifndef __ASSEMBLY__
 
 #include <asm/ptrace.h>
@@ -66,6 +69,13 @@
  * This allows the kernel to flag an error when the secondaries have come up.
  */
 extern u32 __boot_cpu_mode[2];
+
+/*
+ * __boot_cpu_mode_flags records events that are associated with CPUs
+ * coming online. A CPU having been downgraded from EL2 to EL1 because
+ * of HVC not being enabled will have BOOT_CPU_MODE_DOWNGRADED set.
+ */
+extern u32 __boot_cpu_mode_flags[1];
 
 void __hyp_set_vectors(phys_addr_t phys_vector_base);
 void __hyp_reset_vectors(void);

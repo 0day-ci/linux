@@ -530,7 +530,13 @@ SYM_INNER_LABEL(init_el2, SYM_L_LOCAL)
 	/*
 	 * HVC is unusable, so pretend we actually booted at EL1.
 	 * Once we have left EL2, there will be no going back.
+	 * set_cpu_boot_mode_flag will do the necessary CMOs for us.
 	 */
+	adr_l	x1, __boot_cpu_mode_flags
+	ldr	w0, [x1]
+	orr	w0, w0, BOOT_CPU_MODE_DOWNGRADED
+	str	w0, [x1]
+
 	mov_q	x0, INIT_SCTLR_EL1_MMU_OFF
 	msr	sctlr_el1, x0
 
@@ -622,6 +628,10 @@ SYM_DATA_END(__boot_cpu_mode)
 SYM_DATA_START(__early_cpu_boot_status)
 	.quad 	0
 SYM_DATA_END(__early_cpu_boot_status)
+
+SYM_DATA_START(__boot_cpu_mode_flags)
+	.long	0
+SYM_DATA_END(__boot_cpu_mode_flags)
 
 	.popsection
 
