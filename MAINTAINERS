@@ -15328,6 +15328,13 @@ L:	linux-arm-msm@vger.kernel.org
 S:	Maintained
 F:	drivers/crypto/qce/
 
+QUALCOMM DOWNLOAD MODE DRIVER
+M:	Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>
+L:	linux-arm-msm@vger.kernel.org
+S:	Maintained
+F:	Documentation/devicetree/bindings/arm/msm/qcom,dload-mode.yaml
+F:	drivers/soc/qcom/download_mode.c
+
 QUALCOMM EMAC GIGABIT ETHERNET DRIVER
 M:	Timur Tabi <timur@kernel.org>
 L:	netdev@vger.kernel.org

@@ -42,6 +42,16 @@ config QCOM_CPR
 	  To compile this driver as a module, choose M here: the module will
 	  be called qcom-cpr
 
+config QCOM_DLOAD_MODE
+	tristate "QCOM Download Mode support"
+	depends on ARCH_QCOM || COMPILE_TEST
+	help
+	  Say Y here to enable support for download mode on QTI platforms.
+
+	  Download mode driver configures the download mode cookies and SDI
+	  (System Debug Image) required to collect ramdump for post-mortem
+	  debug on Qualcomm Technologies, Inc. platforms.
+
 config QCOM_GENI_SE
 	tristate "QCOM GENI Serial Engine Driver"
 	depends on ARCH_QCOM || COMPILE_TEST
