@@ -1,0 +1,45 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/perf/marvell-cn10k-tad.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Marvell CN10K LLC-TAD performance monitor
+
+maintainers:
+  - Bhaskara Budiredla <bbudiredla@marvell.com>
+
+description: |
+  The Tag-and-Data units (TADs) maintain coherence and contain CN10K
+  shared on-chip last level cache (LLC). The tad pmu measures the
+  performance of last-level cache. Each tad pmu supports up to eight
+  counters.
+
+  The DT setup comprises of number of tad blocks, the sizes of pmu
+  regions, tad blocks and overall base address of the HW.
+
+properties:
+  compatible:
+    const: marvell,cn10k-tad-pmu
+
+  reg:
+    maxItems: 1
+
+required:
+  - compatible
+  - tad-cnt
+  - tad-page-size
+  - tad-pmu-page-size
+  - reg
+
+additionalProperties: false
+
+examples:
+  - |
+    tad_pmu@0x87e280000000 {
+        compatible = "marvell,cn10k-tad-pmu";
+        tad-cnt = <1>;
+        tad-page-size = <0x1000>;
+        tad-pmu-page-size = <0x1000>;
+        reg = <0x87e2 0x80000000 0x0 0x1000>;
+    };
