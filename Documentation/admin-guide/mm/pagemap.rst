@@ -207,3 +207,9 @@ Before Linux 3.11 pagemap bits 55-60 were used for "page-shift" (which is
 always 12 at most architectures). Since Linux 3.11 their meaning changes
 after first clear of soft-dirty bits. Since Linux 4.2 they are used for
 flags unconditionally.
+
+Note that the page table entries for swappable and non-syncable pages are
+cleared when those pages are zapped or swapped out. This makes information
+about the page disappear from the pagemap.  The location of the swapped
+page can still be retrieved from the page cache, but flags like SOFT_DIRTY
+and UFFD_WP are lost irretrievably.
