@@ -77,6 +77,7 @@
 #define USDHI6_SD_INFO1_WP		BIT(7)
 #define USDHI6_SD_INFO1_D3_CARD_OUT	BIT(8)
 #define USDHI6_SD_INFO1_D3_CARD_IN	BIT(9)
+#define USDHI6_SD_INFO1_SDDAT3		BIT(10)
 
 #define USDHI6_SD_INFO2_CMD_ERR		BIT(0)
 #define USDHI6_SD_INFO2_CRC_ERR		BIT(1)
@@ -1186,6 +1187,21 @@ static int usdhi6_sig_volt_switch(struct mmc_host *mmc, struct mmc_ios *ios)
 	return ret;
 }
 
+static int usdhi6_card_busy(struct mmc_host *mmc)
+{
+	struct usdhi6_host *host = mmc_priv(mmc);
+	u32 info1 = usdhi6_read(host, USDHI6_SD_INFO1);
+	u32 info2 = usdhi6_read(host, USDHI6_SD_INFO2);
+
+	/* Check if the SD bus is processing a command */
+	if (!(info2 & USDHI6_SD_INFO2_SCLKDIVEN))
+		return 0;
+
+	/* Card is busy if it is pulling dat[0] & dat[3] low */
+	return !(info2 & USDHI6_SD_INFO2_SDDAT0 ||
+		 info1 & USDHI6_SD_INFO1_SDDAT3);
+}
+
 static const struct mmc_host_ops usdhi6_ops = {
 	.request	= usdhi6_request,
 	.set_ios	= usdhi6_set_ios,
@@ -1193,6 +1209,7 @@ static const struct mmc_host_ops usdhi6_ops = {
 	.get_ro		= usdhi6_get_ro,
 	.enable_sdio_irq = usdhi6_enable_sdio_irq,
 	.start_signal_voltage_switch = usdhi6_sig_volt_switch,
+	.card_busy = usdhi6_card_busy,
 };
 
 /*			State machine handlers				*/
