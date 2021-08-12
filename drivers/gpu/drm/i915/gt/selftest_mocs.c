@@ -155,6 +155,47 @@ static int read_l3cc_table(struct i915_request *rq,
 	return read_regs(rq, addr, (table->n_entries + 1) / 2, offset);
 }
 
+static int read_aux_regs(struct i915_request *rq,
+			 const struct drm_i915_aux_table *r,
+			 u32 *offset)
+{
+	int err;
+
+	while (r) {
+		err = read_regs(rq,
+				rq->engine->mmio_base + i915_mmio_reg_offset(r->offset), 1,
+				offset);
+		if (err)
+			return err;
+
+		r = r->next;
+	}
+
+	return 0;
+}
+
+static int check_aux_regs(struct intel_engine_cs *engine,
+			  const struct drm_i915_aux_table *r,
+			  u32 **vaddr)
+{
+	while (r) {
+		u32 expect = r->value & r->readmask;
+		u32 masked_value = **vaddr & r->readmask;
+
+		if (!r->skip_check && (masked_value != expect)) {
+			pr_err("%s: Invalid entry %s[%x]=0x%x, relevant bits were 0x%x vs expected 0x%x\n",
+			       engine->name, r->name,
+			       i915_mmio_reg_offset(r->offset), **vaddr,
+			       masked_value, expect);
+			return -EINVAL;
+		}
+		++*vaddr;
+		r = r->next;
+	}
+
+	return 0;
+}
+
 static int check_mocs_table(struct intel_engine_cs *engine,
 			    const struct drm_i915_mocs_table *table,
 			    u32 **vaddr)
@@ -216,12 +257,15 @@ static int check_mocs_engine(struct live_mocs *arg,
 			     struct intel_context *ce)
 {
 	struct i915_vma *vma = arg->scratch;
+	const struct drm_i915_aux_table *aux;
 	struct i915_request *rq;
 	u32 offset;
 	u32 *vaddr;
 	int err;
 
 	memset32(arg->vaddr, STACK_MAGIC, PAGE_SIZE / sizeof(u32));
+
+	aux = build_aux_regs(ce->engine, &arg->table);
 
 	rq = intel_context_create_request(ce);
 	if (IS_ERR(rq))
@@ -239,6 +283,8 @@ static int check_mocs_engine(struct live_mocs *arg,
 		err = read_mocs_table(rq, arg->mocs, &offset);
 	if (!err && ce->engine->class == RENDER_CLASS)
 		err = read_l3cc_table(rq, arg->l3cc, &offset);
+	if (!err)
+		err = read_aux_regs(rq, aux, &offset);
 	offset -= i915_ggtt_offset(vma);
 	GEM_BUG_ON(offset > PAGE_SIZE);
 
@@ -252,10 +298,13 @@ static int check_mocs_engine(struct live_mocs *arg,
 		err = check_mocs_table(ce->engine, arg->mocs, &vaddr);
 	if (!err && ce->engine->class == RENDER_CLASS)
 		err = check_l3cc_table(ce->engine, arg->l3cc, &vaddr);
+	if (!err)
+		err = check_aux_regs(ce->engine, aux, &vaddr);
 	if (err)
 		return err;
 
 	GEM_BUG_ON(arg->vaddr + offset != vaddr);
+	free_aux_regs(aux);
 	return 0;
 }
 

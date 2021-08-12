@@ -25,6 +25,15 @@ struct drm_i915_mocs_table {
 	u8 uc_index;
 };
 
+struct drm_i915_aux_table {
+	const char *name;
+	i915_reg_t offset;
+	u32 value;
+	u32 readmask;
+	bool skip_check;
+	struct drm_i915_aux_table *next;
+};
+
 /* Defines for the tables (XXX_MOCS_0 - XXX_MOCS_63) */
 #define _LE_CACHEABILITY(value)	((value) << 0)
 #define _LE_TGT_CACHE(value)	((value) << 2)
@@ -336,6 +345,86 @@ static bool has_mocs(const struct drm_i915_private *i915)
 	return !IS_DGFX(i915);
 }
 
+static struct drm_i915_aux_table *
+add_aux_reg(struct drm_i915_aux_table *aux,
+	    const char *name,
+	    i915_reg_t offset,
+	    u32 value,
+	    u32 read,
+	    bool skip_check)
+
+{
+	struct drm_i915_aux_table *x;
+
+	x = kmalloc(sizeof(*x), GFP_ATOMIC);
+	if (!x) {
+		DRM_ERROR("Failed to allocate aux reg '%s'\n", name);
+		return aux;
+	}
+
+	x->name = name;
+	x->offset = offset;
+	x->value = value;
+	x->readmask = read;
+	x->skip_check = skip_check;
+
+	x->next = aux;
+	return x;
+}
+
+static struct drm_i915_aux_table *
+add_cmd_cctl_override(struct drm_i915_aux_table *aux, u8 idx)
+{
+	return add_aux_reg(aux,
+			   "CMD_CCTL",
+			   RING_CMD_CCTL(0),
+			   CMD_CCTL_MOCS_OVERRIDE(idx, idx),
+			   CMD_CCTL_WRITE_OVERRIDE_MASK | CMD_CCTL_READ_OVERRIDE_MASK,
+			   false);
+}
+
+static const struct drm_i915_aux_table *
+build_aux_regs(const struct intel_engine_cs *engine,
+	       const struct drm_i915_mocs_table *mocs)
+{
+	struct drm_i915_aux_table *aux = NULL;
+
+	if (GRAPHICS_VER(engine->i915) >= 12 &&
+	    !drm_WARN_ONCE(&engine->i915->drm, !mocs->uc_index,
+	                   "Platform that should have UC index defined and does not\n")) {
+		/*
+		 * Index-0 does not operate as an uncached value as believed,
+		 * but causes invalid write cycles. Steer CMD_CCTL to another
+		 * uncached index.
+		 */
+		aux = add_cmd_cctl_override(aux, mocs->uc_index);
+	}
+
+	return aux;
+}
+
+static void
+free_aux_regs(const struct drm_i915_aux_table *aux)
+{
+	while (aux) {
+		struct drm_i915_aux_table *next = aux->next;
+
+		kfree(aux);
+		aux = next;
+	}
+}
+
+static void apply_aux_regs(struct intel_engine_cs *engine,
+			   const struct drm_i915_aux_table *aux)
+{
+	while (aux) {
+		intel_uncore_write_fw(engine->uncore,
+				      _MMIO(engine->mmio_base + i915_mmio_reg_offset(aux->offset)),
+				      aux->value);
+		aux = aux->next;
+	}
+}
+
 static unsigned int get_mocs_settings(const struct drm_i915_private *i915,
 				      struct drm_i915_mocs_table *table)
 {
@@ -347,10 +436,12 @@ static unsigned int get_mocs_settings(const struct drm_i915_private *i915,
 		table->size = ARRAY_SIZE(dg1_mocs_table);
 		table->table = dg1_mocs_table;
 		table->n_entries = GEN9_NUM_MOCS_ENTRIES;
+		table->uc_index = 1;
 	} else if (GRAPHICS_VER(i915) >= 12) {
 		table->size  = ARRAY_SIZE(tgl_mocs_table);
 		table->table = tgl_mocs_table;
 		table->n_entries = GEN9_NUM_MOCS_ENTRIES;
+		table->uc_index = 3;
 	} else if (GRAPHICS_VER(i915) == 11) {
 		table->size  = ARRAY_SIZE(icl_mocs_table);
 		table->table = icl_mocs_table;
@@ -484,6 +575,7 @@ static void init_l3cc_table(struct intel_engine_cs *engine,
 
 void intel_mocs_init_engine(struct intel_engine_cs *engine)
 {
+	const struct drm_i915_aux_table *aux;
 	struct drm_i915_mocs_table table;
 	unsigned int flags;
 
@@ -500,6 +592,10 @@ void intel_mocs_init_engine(struct intel_engine_cs *engine)
 
 	if (flags & HAS_RENDER_L3CC && engine->class == RENDER_CLASS)
 		init_l3cc_table(engine, &table);
+
+	aux = build_aux_regs(engine, &table);
+	apply_aux_regs(engine, aux);
+	free_aux_regs(aux);
 }
 
 static u32 global_mocs_offset(void)
