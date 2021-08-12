@@ -17,6 +17,9 @@ properties:
   compatible:
     enum:
       - qcom,sc7180-dp
+      - qcom,sc8180x-dp
+      - qcom,sc8180x-edp
+      - qcom,sc7280-edp
 
   reg:
     maxItems: 1
