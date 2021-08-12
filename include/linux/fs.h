@@ -319,6 +319,7 @@ enum rw_hint {
 /* iocb->ki_waitq is valid */
 #define IOCB_WAITQ		(1 << 19)
 #define IOCB_NOIO		(1 << 20)
+#define IOCB_SWAP		(1 << 21)	/* This is a swap request */
 
 struct kiocb {
 	struct file		*ki_filp;

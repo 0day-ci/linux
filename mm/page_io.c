@@ -303,7 +303,8 @@ int __swap_writepage(struct page *page, struct writeback_control *wbc,
 
 		iov_iter_bvec(&from, WRITE, &bv, 1, PAGE_SIZE);
 		init_sync_kiocb(&kiocb, swap_file);
-		kiocb.ki_pos = page_file_offset(page);
+		kiocb.ki_pos	= page_file_offset(page);
+		kiocb.ki_flags	= IOCB_DIRECT | IOCB_WRITE | IOCB_SWAP;
 
 		set_page_writeback(page);
 		unlock_page(page);
@@ -324,8 +325,8 @@ int __swap_writepage(struct page *page, struct writeback_control *wbc,
 			 */
 			set_page_dirty(page);
 			ClearPageReclaim(page);
-			pr_err_ratelimited("Write error on dio swapfile (%llu)\n",
-					   page_file_offset(page));
+			pr_err_ratelimited("Write error (%d) on dio swapfile (%llu)\n",
+					   ret, page_file_offset(page));
 		}
 		end_page_writeback(page);
 		return ret;
