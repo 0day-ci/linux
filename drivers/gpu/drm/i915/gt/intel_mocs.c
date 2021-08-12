@@ -22,6 +22,7 @@ struct drm_i915_mocs_table {
 	unsigned int size;
 	unsigned int n_entries;
 	const struct drm_i915_mocs_entry *table;
+	u8 uc_index;
 };
 
 /* Defines for the tables (XXX_MOCS_0 - XXX_MOCS_63) */
@@ -340,6 +341,8 @@ static unsigned int get_mocs_settings(const struct drm_i915_private *i915,
 {
 	unsigned int flags;
 
+	memset(table, 0, sizeof(struct drm_i915_mocs_table));
+
 	if (IS_DG1(i915)) {
 		table->size = ARRAY_SIZE(dg1_mocs_table);
 		table->table = dg1_mocs_table;
@@ -504,6 +507,12 @@ static u32 global_mocs_offset(void)
 	return i915_mmio_reg_offset(GEN12_GLOBAL_MOCS(0));
 }
 
+static void set_mocs_index(struct intel_gt *gt,
+			    struct drm_i915_mocs_table *table)
+{
+	gt->mocs.uc_index = table->uc_index;
+}
+
 void intel_mocs_init(struct intel_gt *gt)
 {
 	struct drm_i915_mocs_table table;
@@ -515,6 +524,7 @@ void intel_mocs_init(struct intel_gt *gt)
 	flags = get_mocs_settings(gt->i915, &table);
 	if (flags & HAS_GLOBAL_MOCS)
 		__init_mocs_table(gt->uncore, &table, global_mocs_offset());
+	set_mocs_index(gt, &table);
 }
 
 #if IS_ENABLED(CONFIG_DRM_I915_SELFTEST)
