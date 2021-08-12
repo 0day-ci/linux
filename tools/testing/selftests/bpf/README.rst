@@ -228,3 +228,41 @@ To fix this issue, user newer libbpf.
 .. Links
 .. _clang reloc patch: https://reviews.llvm.org/D102712
 .. _kernel llvm reloc: /Documentation/bpf/llvm_reloc.rst
+
+bpf_iter_unix.o test failure and LLVM optimisation
+==================================================
+
+The ``bpf_iter/unix`` subtest requires `the fix`__ to prevent the LLVM compiler
+from transforming the loop exit condition.
+
+Without the fix, the compiler generates the following code:
+
+.. code-block:: c
+
+  ; 				 for (i = 1; i < len; i++)
+       110:	07 09 00 00 01 00 00 00	r9 += 1
+       111:	5d 98 09 00 00 00 00 00	if r8 != r9 goto +9 <LBB0_18>
+
+The loop exit condition, where the upper bound is not a constant, is
+changed from ``<`` to ``!=``.  Thus, the verifier always evaluates it as true,
+misleading to an infinite loop.
+
+.. code-block:: c
+
+  The sequence of 8193 jumps is too complex.
+  processed 196506 insns (limit 1000000) max_states_per_insn 4 total_states 1830 peak_states 1830 mark_read 3
+
+The fix prevents the optimisation by estimating its cost higher in such a
+case:
+
+.. code-block:: c
+
+  ; 				 for (i = 1; i < len; i++)
+       110:	07 09 00 00 01 00 00 00	r9 += 1
+       111:	ad 89 09 00 00 00 00 00	if r9 < r8 goto +9 <LBB0_18>
+
+The patch is available in LLVM 14 trunk and has been `backported`__ to the LLVM
+13.x release branch.
+
+__ https://reviews.llvm.org/D107483
+__ https://bugs.llvm.org/show_bug.cgi?id=51363
