@@ -103,6 +103,9 @@ static struct super_block *fsnotify_data_sb(const void *data, int data_type)
 	struct inode *inode = fsnotify_data_inode(data, data_type);
 	struct super_block *sb = inode ? inode->i_sb : NULL;
 
+	if (!sb && data_type == FSNOTIFY_EVENT_ERROR)
+		sb = ((struct fs_error_report *) data)->sb;
+
 	return sb;
 }
 
