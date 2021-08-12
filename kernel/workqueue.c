@@ -280,6 +280,12 @@ struct workqueue_struct {
 	struct pool_workqueue __rcu *numa_pwq_tbl[]; /* PWR: unbound pwqs indexed by node */
 };
 
+struct wq_barrier {
+	struct work_struct	work;
+	struct completion	done;
+	struct task_struct	*task;	/* purely informational */
+};
+
 static struct kmem_cache *pwq_cache;
 
 static cpumask_var_t *wq_numa_possible_cpumask;
@@ -2151,6 +2157,11 @@ static bool manage_workers(struct worker *worker)
 	return true;
 }
 
+static inline bool is_barrier_func(work_func_t func)
+{
+	return func == NULL;
+}
+
 /**
  * process_one_work - process single work
  * @worker: self
@@ -2272,7 +2283,8 @@ __acquires(&pool->lock)
 	 */
 	lockdep_invariant_state(true);
 	trace_workqueue_execute_start(work);
-	worker->current_func(work);
+	if (likely(!is_barrier_func(worker->current_func)))
+		worker->current_func(work);
 	/*
 	 * While we must be careful to not use "work" after this, the trace
 	 * point will only record its address.
@@ -2301,6 +2313,11 @@ __acquires(&pool->lock)
 	cond_resched();
 
 	raw_spin_lock_irq(&pool->lock);
+
+	if (unlikely(is_barrier_func(worker->current_func))) {
+		struct wq_barrier *barr = container_of(work, struct wq_barrier, work);
+		complete(&barr->done);
+	}
 
 	/* clear cpu intensive status */
 	if (unlikely(cpu_intensive))
@@ -2617,18 +2634,6 @@ static void check_flush_dependency(struct workqueue_struct *target_wq,
 		  target_wq->name, target_func);
 }
 
-struct wq_barrier {
-	struct work_struct	work;
-	struct completion	done;
-	struct task_struct	*task;	/* purely informational */
-};
-
-static void wq_barrier_func(struct work_struct *work)
-{
-	struct wq_barrier *barr = container_of(work, struct wq_barrier, work);
-	complete(&barr->done);
-}
-
 /**
  * insert_wq_barrier - insert a barrier work
  * @pwq: pwq to insert barrier into
@@ -2666,7 +2671,11 @@ static void insert_wq_barrier(struct pool_workqueue *pwq,
 	 * checks and call back into the fixup functions where we
 	 * might deadlock.
 	 */
-	INIT_WORK_ONSTACK(&barr->work, wq_barrier_func);
+	/* no need to init func because complete() has been moved to
+	 * proccess_one_work(), which means that we use NULL to identify
+	 * if this work is a barrier
+	 */
+	INIT_WORK_ONSTACK(&barr->work, NULL);
 	__set_bit(WORK_STRUCT_PENDING_BIT, work_data_bits(&barr->work));
 
 	init_completion_map(&barr->done, &target->lockdep_map);
@@ -4681,7 +4690,7 @@ static void pr_cont_pool_info(struct worker_pool *pool)
 
 static void pr_cont_work(bool comma, struct work_struct *work)
 {
-	if (work->func == wq_barrier_func) {
+	if (is_barrier_func(work->func)) {
 		struct wq_barrier *barr;
 
 		barr = container_of(work, struct wq_barrier, work);
