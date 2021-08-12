@@ -98,6 +98,14 @@ void fsnotify_sb_delete(struct super_block *sb)
 	fsnotify_clear_marks_by_sb(sb);
 }
 
+static struct super_block *fsnotify_data_sb(const void *data, int data_type)
+{
+	struct inode *inode = fsnotify_data_inode(data, data_type);
+	struct super_block *sb = inode ? inode->i_sb : NULL;
+
+	return sb;
+}
+
 /*
  * Given an inode, first check if we care what happens to our children.  Inotify
  * and dnotify both tell their parents about events.  If we care about any event
@@ -455,8 +463,10 @@ static void fsnotify_iter_next(struct fsnotify_iter_info *iter_info)
  *		@file_name is relative to
  * @file_name:	optional file name associated with event
  * @inode:	optional inode associated with event -
- *		either @dir or @inode must be non-NULL.
- *		if both are non-NULL event may be reported to both.
+ *		If @dir and @inode are NULL, @data must have a type that
+ *		allows retrieving the file system associated with this
+ *		event.  if both are non-NULL event may be reported to
+ *		both.
  * @cookie:	inotify rename cookie
  */
 int fsnotify(__u32 mask, const void *data, int data_type, struct inode *dir,
@@ -483,7 +493,7 @@ int fsnotify(__u32 mask, const void *data, int data_type, struct inode *dir,
 		 */
 		parent = dir;
 	}
-	sb = inode->i_sb;
+	sb = inode ? inode->i_sb : fsnotify_data_sb(data, data_type);
 
 	/*
 	 * Optimization: srcu_read_lock() has a memory barrier which can
