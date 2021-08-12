@@ -624,6 +624,11 @@ struct rtl8169_private {
 
 	unsigned supports_gmii:1;
 	unsigned aspm_manageable:1;
+	unsigned aspm_enabled:1;
+	struct delayed_work aspm_toggle;
+	struct mutex aspm_mutex;
+	u32 aspm_packet_count;
+
 	dma_addr_t counters_phys_addr;
 	struct rtl8169_counters *counters;
 	struct rtl8169_tc_offsets tc_offset;
@@ -2671,6 +2676,8 @@ static void rtl_hw_aspm_clkreq_enable(struct rtl8169_private *tp, bool enable)
 		RTL_W8(tp, Config5, RTL_R8(tp, Config5) & ~ASPM_en);
 	}
 
+	tp->aspm_enabled = enable;
+
 	udelay(10);
 }
 
@@ -4408,6 +4415,9 @@ static void rtl_tx(struct net_device *dev, struct rtl8169_private *tp,
 
 	dirty_tx = tp->dirty_tx;
 
+	mutex_lock(&tp->aspm_mutex);
+	tp->aspm_packet_count += tp->cur_tx - dirty_tx;
+	mutex_unlock(&tp->aspm_mutex);
 	while (READ_ONCE(tp->cur_tx) != dirty_tx) {
 		unsigned int entry = dirty_tx % NUM_TX_DESC;
 		u32 status;
@@ -4552,6 +4562,10 @@ release_descriptor:
 		rtl8169_mark_to_asic(desc);
 	}
 
+	mutex_lock(&tp->aspm_mutex);
+	tp->aspm_packet_count += count;
+	mutex_unlock(&tp->aspm_mutex);
+
 	return count;
 }
 
@@ -4659,8 +4673,33 @@ static int r8169_phy_connect(struct rtl8169_private *tp)
 	return 0;
 }
 
+#define ASPM_PACKET_THRESHOLD 10
+#define ASPM_TOGGLE_INTERVAL 1000
+
+static void rtl8169_aspm_toggle(struct work_struct *work)
+{
+	struct rtl8169_private *tp = container_of(work, struct rtl8169_private,
+						  aspm_toggle.work);
+	bool enable;
+
+	mutex_lock(&tp->aspm_mutex);
+	enable = tp->aspm_packet_count <= ASPM_PACKET_THRESHOLD;
+	tp->aspm_packet_count = 0;
+	mutex_unlock(&tp->aspm_mutex);
+
+	if (tp->aspm_enabled != enable) {
+		rtl_unlock_config_regs(tp);
+		rtl_hw_aspm_clkreq_enable(tp, enable);
+		rtl_lock_config_regs(tp);
+	}
+
+	schedule_delayed_work(&tp->aspm_toggle, ASPM_TOGGLE_INTERVAL);
+}
+
 static void rtl8169_down(struct rtl8169_private *tp)
 {
+	cancel_delayed_work_sync(&tp->aspm_toggle);
+
 	/* Clear all task flags */
 	bitmap_zero(tp->wk.flags, RTL_FLAG_MAX);
 
@@ -4687,6 +4726,8 @@ static void rtl8169_up(struct rtl8169_private *tp)
 	rtl_reset_work(tp);
 
 	phy_start(tp->phydev);
+
+	schedule_delayed_work(&tp->aspm_toggle, ASPM_TOGGLE_INTERVAL);
 }
 
 static int rtl8169_close(struct net_device *dev)
@@ -5346,6 +5387,10 @@ static int rtl_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	}
 
 	INIT_WORK(&tp->wk.work, rtl_task);
+
+	INIT_DELAYED_WORK(&tp->aspm_toggle, rtl8169_aspm_toggle);
+
+	mutex_init(&tp->aspm_mutex);
 
 	rtl_init_mac_address(tp);
 
