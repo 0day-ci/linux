@@ -509,9 +509,15 @@ static int mxic_nfc_probe(struct platform_device *pdev)
 	if (IS_ERR(nfc->send_dly_clk))
 		return PTR_ERR(nfc->send_dly_clk);
 
+	err = mxic_nfc_clk_enable(nfc);
+	if (err)
+		return err;
+
 	nfc->regs = devm_platform_ioremap_resource(pdev, 0);
-	if (IS_ERR(nfc->regs))
-		return PTR_ERR(nfc->regs);
+	if (IS_ERR(nfc->regs)) {
+		err = PTR_ERR(nfc->regs);
+		goto fail;
+	}
 
 	nand_chip = &nfc->chip;
 	mtd = nand_to_mtd(nand_chip);
@@ -527,8 +533,10 @@ static int mxic_nfc_probe(struct platform_device *pdev)
 	nand_chip->controller = &nfc->controller;
 
 	irq = platform_get_irq(pdev, 0);
-	if (irq < 0)
-		return irq;
+	if (irq < 0) {
+		err = irq;
+		goto fail;
+	}
 
 	mxic_nfc_hw_init(nfc);
 
