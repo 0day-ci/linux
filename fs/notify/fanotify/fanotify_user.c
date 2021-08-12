@@ -177,6 +177,13 @@ static struct fanotify_event *fanotify_dup_error_to_stack(
 	error_on_stack->err_count = fee->err_count;
 	error_on_stack->sb_mark = fee->sb_mark;
 
+	error_on_stack->fsid = fee->fsid;
+
+	memcpy(&error_on_stack->object_fh, &fee->object_fh,
+	       sizeof(fee->object_fh));
+	memcpy(error_on_stack->object_fh.buf, fee->object_fh.buf,
+		fee->object_fh.len);
+
 	return &error_on_stack->fae;
 }
 

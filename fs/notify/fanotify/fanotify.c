@@ -734,6 +734,8 @@ static int fanotify_handle_error_event(struct fsnotify_iter_info *iter_info,
 	struct fanotify_sb_mark *sb_mark =
 		FANOTIFY_SB_MARK(fsnotify_iter_sb_mark(iter_info));
 	struct fanotify_error_event *fee = sb_mark->fee_slot;
+	struct inode *inode = report->inode;
+	int fh_len;
 
 	spin_lock(&group->notification_lock);
 	if (fee->err_count++) {
@@ -743,6 +745,19 @@ static int fanotify_handle_error_event(struct fsnotify_iter_info *iter_info,
 	spin_unlock(&group->notification_lock);
 
 	fee->fae.type = FANOTIFY_EVENT_TYPE_FS_ERROR;
+	fee->fsid = fee->sb_mark->fsn_mark.connector->fsid;
+
+	fh_len = fanotify_encode_fh_len(inode);
+	if (WARN_ON(fh_len > MAX_HANDLE_SZ)) {
+		/*
+		 * Fallback to reporting the error against the super
+		 * block.  It should never happen.
+		 */
+		inode = NULL;
+		fh_len = fanotify_encode_fh_len(NULL);
+	}
+
+	fanotify_encode_fh(&fee->object_fh, inode, fh_len, NULL, 0);
 
 	if (fsnotify_insert_event(group, &fee->fae.fse,
 				  NULL, fanotify_insert_error_event)) {
