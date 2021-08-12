@@ -2418,6 +2418,16 @@ static void kiocb_end_write(struct io_kiocb *req)
 	}
 }
 
+static inline bool io_check_truncated(struct iov_iter *i, size_t len)
+{
+	if (unlikely(i->truncated)) {
+		if (iov_iter_count(i) != len)
+			return false;
+		i->truncated = false;
+	}
+	return true;
+}
+
 #ifdef CONFIG_BLOCK
 static bool io_resubmit_prep(struct io_kiocb *req)
 {
@@ -2425,6 +2435,8 @@ static bool io_resubmit_prep(struct io_kiocb *req)
 
 	if (!rw)
 		return !io_req_prep_async(req);
+	if (!io_check_truncated(&rw->iter, req->result))
+		return false;
 	/* may have left rw->iter inconsistent on -EIOCBQUEUED */
 	iov_iter_revert(&rw->iter, req->result - iov_iter_count(&rw->iter));
 	return true;
@@ -3316,6 +3328,8 @@ static int io_read(struct io_kiocb *req, unsigned int issue_flags)
 		/* no retry on NONBLOCK nor RWF_NOWAIT */
 		if (req->flags & REQ_F_NOWAIT)
 			goto done;
+		if (!io_check_truncated(iter, io_size))
+			goto done;
 		/* some cases will consume bytes even on error returns */
 		iov_iter_revert(iter, io_size - iov_iter_count(iter));
 		ret = 0;
@@ -3455,6 +3469,8 @@ done:
 		kiocb_done(kiocb, ret2, issue_flags);
 	} else {
 copy_iov:
+		if (!io_check_truncated(iter, io_size))
+			goto done;
 		/* some cases will consume bytes even on error returns */
 		iov_iter_revert(iter, io_size - iov_iter_count(iter));
 		ret = io_setup_async_rw(req, iovec, inline_vecs, iter, false);
