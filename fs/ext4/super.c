@@ -5032,6 +5032,12 @@ no_journal:
 		err = percpu_counter_init(&sbi->s_freeinodes_counter, freei,
 					  GFP_KERNEL);
 	}
+	/*
+	 * Let's update the checksum after updating free space/inode counters.
+	 * Otherwise sb will have incorrect checksum in the buffer cache until
+	 * sb is written out and tune2fs can get confused.
+	 */
+	ext4_superblock_csum_set(sb);
 	if (!err)
 		err = percpu_counter_init(&sbi->s_dirs_counter,
 					  ext4_count_dirs(sb), GFP_KERNEL);
