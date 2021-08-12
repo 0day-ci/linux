@@ -553,11 +553,13 @@ static int __mmc_blk_ioctl_cmd(struct mmc_card *card, struct mmc_blk_data *md,
 	if (cmd.error) {
 		dev_err(mmc_dev(card->host), "%s: cmd error %d\n",
 						__func__, cmd.error);
+		memcpy(&idata->ic.response, cmd.resp, sizeof(cmd.resp));
 		return cmd.error;
 	}
 	if (data.error) {
 		dev_err(mmc_dev(card->host), "%s: data error %d\n",
 						__func__, data.error);
+		memcpy(&idata->ic.response, cmd.resp, sizeof(cmd.resp));
 		return data.error;
 	}
 
