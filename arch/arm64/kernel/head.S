@@ -519,6 +519,28 @@ SYM_INNER_LABEL(init_el2, SYM_L_LOCAL)
 	msr	vbar_el2, x0
 	isb
 
+	// Check that HVC actually works...
+	mov	x0, #HVC_RESET_VECTORS
+	hvc	#0
+
+	mov_q	x1, HVC_STUB_ERR
+	cmp	x0, x1
+	b.ne	0f
+
+	/*
+	 * HVC is unusable, so pretend we actually booted at EL1.
+	 * Once we have left EL2, there will be no going back.
+	 */
+	mov_q	x0, INIT_SCTLR_EL1_MMU_OFF
+	msr	sctlr_el1, x0
+
+	mov_q	x0, INIT_PSTATE_EL1
+	msr	spsr_el2, x0
+	msr	elr_el2, lr
+	mov_q	w0, BOOT_CPU_MODE_EL1
+	eret
+
+0:
 	/*
 	 * Fruity CPUs seem to have HCR_EL2.E2H set to RES1,
 	 * making it impossible to start in nVHE mode. Is that
