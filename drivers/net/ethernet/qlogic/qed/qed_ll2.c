@@ -106,7 +106,7 @@ static int qed_ll2_alloc_buffer(struct qed_dev *cdev,
 }
 
 static int qed_ll2_dealloc_buffer(struct qed_dev *cdev,
-				 struct qed_ll2_buffer *buffer)
+				  struct qed_ll2_buffer *buffer)
 {
 	spin_lock_bh(&cdev->ll2->lock);
 
@@ -327,6 +327,9 @@ static int qed_ll2_txq_completion(struct qed_hwfn *p_hwfn, void *p_cookie)
 	unsigned long flags;
 	int rc = -EINVAL;
 
+	if (!p_ll2_conn)
+		return rc;
+
 	spin_lock_irqsave(&p_tx->lock, flags);
 	if (p_tx->b_completing_packet) {
 		rc = -EBUSY;
@@ -500,7 +503,16 @@ static int qed_ll2_rxq_completion(struct qed_hwfn *p_hwfn, void *cookie)
 	unsigned long flags = 0;
 	int rc = 0;
 
+	if (!p_ll2_conn)
+		return rc;
+
 	spin_lock_irqsave(&p_rx->lock, flags);
+
+	if (!QED_LL2_RX_REGISTERED(p_ll2_conn)) {
+		spin_unlock_irqrestore(&p_rx->lock, flags);
+		return 0;
+	}
+
 	cq_new_idx = le16_to_cpu(*p_rx->p_fw_cons);
 	cq_old_idx = qed_chain_get_cons_idx(&p_rx->rcq_chain);
 
@@ -670,11 +682,11 @@ static int qed_ll2_lb_rxq_handler(struct qed_hwfn *p_hwfn,
 		p_pkt = list_first_entry(&p_rx->active_descq,
 					 struct qed_ll2_rx_packet, list_entry);
 
-		if ((iscsi_ooo->ooo_opcode == TCP_EVENT_ADD_NEW_ISLE) ||
-		    (iscsi_ooo->ooo_opcode == TCP_EVENT_ADD_ISLE_RIGHT) ||
-		    (iscsi_ooo->ooo_opcode == TCP_EVENT_ADD_ISLE_LEFT) ||
-		    (iscsi_ooo->ooo_opcode == TCP_EVENT_ADD_PEN) ||
-		    (iscsi_ooo->ooo_opcode == TCP_EVENT_JOIN)) {
+		if (iscsi_ooo->ooo_opcode == TCP_EVENT_ADD_NEW_ISLE ||
+		    iscsi_ooo->ooo_opcode == TCP_EVENT_ADD_ISLE_RIGHT ||
+		    iscsi_ooo->ooo_opcode == TCP_EVENT_ADD_ISLE_LEFT ||
+		    iscsi_ooo->ooo_opcode == TCP_EVENT_ADD_PEN ||
+		    iscsi_ooo->ooo_opcode == TCP_EVENT_JOIN) {
 			if (!p_pkt) {
 				DP_NOTICE(p_hwfn,
 					  "LL2 OOO RX packet is not valid\n");
@@ -821,6 +833,9 @@ static int qed_ll2_lb_rxq_completion(struct qed_hwfn *p_hwfn, void *p_cookie)
 	struct qed_ll2_info *p_ll2_conn = (struct qed_ll2_info *)p_cookie;
 	int rc;
 
+	if (!p_ll2_conn)
+		return 0;
+
 	if (!QED_LL2_RX_REGISTERED(p_ll2_conn))
 		return 0;
 
@@ -843,6 +858,9 @@ static int qed_ll2_lb_txq_completion(struct qed_hwfn *p_hwfn, void *p_cookie)
 	bool b_dont_submit_rx = false;
 	u16 new_idx = 0, num_bds = 0;
 	int rc;
+
+	if (!p_ll2_conn)
+		return 0;
 
 	if (!QED_LL2_TX_REGISTERED(p_ll2_conn))
 		return 0;
@@ -1106,6 +1124,7 @@ static int qed_sp_ll2_tx_queue_stop(struct qed_hwfn *p_hwfn,
 	struct qed_spq_entry *p_ent = NULL;
 	struct qed_sp_init_data init_data;
 	int rc = -EINVAL;
+
 	qed_db_recovery_del(p_hwfn->cdev, p_tx->doorbell_addr, &p_tx->db_msg);
 
 	/* Get SPQ entry */
@@ -1728,6 +1747,8 @@ int qed_ll2_post_rx_buffer(void *cxt,
 	if (!p_ll2_conn)
 		return -EINVAL;
 	p_rx = &p_ll2_conn->rx_queue;
+	if (!p_rx->set_prod_addr)
+		return -EIO;
 
 	spin_lock_irqsave(&p_rx->lock, flags);
 	if (!list_empty(&p_rx->free_descq))
@@ -1742,7 +1763,7 @@ int qed_ll2_post_rx_buffer(void *cxt,
 		}
 	}
 
-	/* If we're lacking entires, let's try to flush buffers to FW */
+	/* If we're lacking entries, let's try to flush buffers to FW */
 	if (!p_curp || !p_curb) {
 		rc = -EBUSY;
 		p_curp = NULL;
@@ -2258,7 +2279,7 @@ static int __qed_ll2_get_stats(void *cxt, u8 connection_handle,
 	struct qed_ll2_info *p_ll2_conn = NULL;
 	struct qed_ptt *p_ptt;
 
-	if ((connection_handle >= QED_MAX_NUM_OF_LL2_CONNECTIONS) ||
+	if (connection_handle >= QED_MAX_NUM_OF_LL2_CONNECTIONS ||
 	    !p_hwfn->p_ll2_info)
 		return -EINVAL;
 
@@ -2589,7 +2610,6 @@ static int qed_ll2_start(struct qed_dev *cdev, struct qed_ll2_params *params)
 			DP_NOTICE(cdev, "Failed to add an LLH filter\n");
 			goto err3;
 		}
-
 	}
 
 	ether_addr_copy(cdev->ll2_mac_address, params->ll2_mac_address);
