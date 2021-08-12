@@ -231,6 +231,9 @@ struct btrfs_inode {
 
 	struct rw_semaphore i_mmap_lock;
 	struct inode vfs_inode;
+
+	/* Protects relocation from page writeback on a zoned FS */
+	struct mutex relocation_lock;
 };
 
 static inline u32 btrfs_inode_sectorsize(const struct btrfs_inode *inode)

@@ -5003,7 +5003,9 @@ retry:
 				continue;
 			}
 
+			btrfs_zoned_relocation_io_lock(BTRFS_I(inode));
 			ret = __extent_writepage(page, wbc, epd);
+			btrfs_zoned_relocation_io_unlock(BTRFS_I(inode));
 			if (ret < 0) {
 				done = 1;
 				break;
@@ -5054,7 +5056,9 @@ int extent_write_full_page(struct page *page, struct writeback_control *wbc)
 		.sync_io = wbc->sync_mode == WB_SYNC_ALL,
 	};
 
+	btrfs_zoned_relocation_io_lock(BTRFS_I(page->mapping->host));
 	ret = __extent_writepage(page, wbc, &epd);
+	btrfs_zoned_relocation_io_unlock(BTRFS_I(page->mapping->host));
 	ASSERT(ret <= 0);
 	if (ret < 0) {
 		end_write_bio(&epd, ret);

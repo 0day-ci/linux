@@ -25,6 +25,7 @@
 #include "backref.h"
 #include "misc.h"
 #include "subpage.h"
+#include "zoned.h"
 
 /*
  * Relocation overview
@@ -3069,8 +3070,6 @@ static int relocate_one_page(struct inode *inode, struct file_ra_state *ra,
 	unlock_page(page);
 	put_page(page);
 
-	balance_dirty_pages_ratelimited(inode->i_mapping);
-	btrfs_throttle(fs_info);
 	if (btrfs_should_cancel_balance(fs_info))
 		ret = -ECANCELED;
 	return ret;
@@ -3111,9 +3110,14 @@ static int relocate_file_extent_cluster(struct inode *inode,
 		goto out;
 
 	last_index = (cluster->end - offset) >> PAGE_SHIFT;
+	btrfs_zoned_relocation_io_lock(BTRFS_I(inode));
 	for (index = (cluster->start - offset) >> PAGE_SHIFT;
-	     index <= last_index && !ret; index++)
+	     index <= last_index && !ret; index++) {
 		ret = relocate_one_page(inode, ra, cluster, &cluster_nr, index);
+	}
+	btrfs_zoned_relocation_io_unlock(BTRFS_I(inode));
+	balance_dirty_pages_ratelimited(inode->i_mapping);
+	btrfs_throttle(fs_info);
 	if (btrfs_is_zoned(fs_info) && !ret)
 		ret = btrfs_wait_ordered_range(inode, 0, (u64)-1);
 	if (ret == 0)
