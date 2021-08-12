@@ -40,6 +40,7 @@ int handler(const void *ctx)
 	/* Convenient values to pretty-print */
 	const __u8 ex_ipv4[] = {127, 0, 0, 1};
 	const __u8 ex_ipv6[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1};
+	const __u32 chr1 = 0x64636261; /* dcba */
 	static const char str1[] = "str1";
 	static const char longstr[] = "longstr";
 
@@ -59,9 +60,9 @@ int handler(const void *ctx)
 	/* Kernel pointers */
 	addr_ret = BPF_SNPRINTF(addr_out, sizeof(addr_out), "%pK %px %p",
 				0, 0xFFFF00000ADD4E55, 0xFFFF00000ADD4E55);
-	/* Strings embedding */
-	str_ret  = BPF_SNPRINTF(str_out, sizeof(str_out), "%s %+05s",
-				str1, longstr);
+	/* Strings and single-byte character embedding */
+	str_ret  = BPF_SNPRINTF(str_out, sizeof(str_out), "%s % 9c %+05s",
+				str1, chr1, longstr);
 	/* Overflow */
 	over_ret = BPF_SNPRINTF(over_out, sizeof(over_out), "%%overflow");
 	/* Padding of fixed width numbers */
