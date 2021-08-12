@@ -90,7 +90,9 @@ TODOList:
 
 .. toctree::
    :maxdepth: 2
+
    cpu-freq/index
+   filesystems/index
 
 TODOList:
 
@@ -125,7 +127,6 @@ TODOList:
 * security/index
 * sound/index
 * crypto/index
-* filesystems/index
 * vm/index
 * bpf/index
 * usb/index
