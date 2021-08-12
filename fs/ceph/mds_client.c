@@ -4149,12 +4149,23 @@ static void check_new_map(struct ceph_mds_client *mdsc,
 			  struct ceph_mdsmap *newmap,
 			  struct ceph_mdsmap *oldmap)
 {
-	int i;
+	int i, err;
+	int *export_targets;
 	int oldstate, newstate;
 	struct ceph_mds_session *s;
+	struct ceph_mds_info *m_info;
 
 	dout("check_new_map new %u old %u\n",
 	     newmap->m_epoch, oldmap->m_epoch);
+
+	m_info = newmap->m_info;
+	export_targets = kcalloc(newmap->possible_max_rank, sizeof(int), GFP_NOFS);
+	if (export_targets && m_info) {
+		for (i = 0; i < m_info->num_export_targets; i++) {
+			BUG_ON(m_info->export_targets[i] >= newmap->possible_max_rank);
+			export_targets[m_info->export_targets[i]] = 1;
+		}
+	}
 
 	for (i = 0; i < oldmap->possible_max_rank && i < mdsc->max_sessions; i++) {
 		if (!mdsc->sessions[i])
@@ -4209,6 +4220,8 @@ static void check_new_map(struct ceph_mds_client *mdsc,
 		if (s->s_state == CEPH_MDS_SESSION_RESTARTING &&
 		    newstate >= CEPH_MDS_STATE_RECONNECT) {
 			mutex_unlock(&mdsc->mutex);
+			if (export_targets)
+				export_targets[i] = 0;
 			send_mds_reconnect(mdsc, s);
 			mutex_lock(&mdsc->mutex);
 		}
@@ -4231,6 +4244,47 @@ static void check_new_map(struct ceph_mds_client *mdsc,
 		}
 	}
 
+	for (i = 0; i < newmap->possible_max_rank; i++) {
+		if (!export_targets)
+			break;
+
+		/*
+		 * Only open and reconnect sessions that don't
+		 * exist yet.
+		 */
+		if (!export_targets[i] || __have_session(mdsc, i))
+			continue;
+
+		/*
+		 * In case the export MDS is crashed just after
+		 * the EImportStart journal is flushed, so when
+		 * a standby MDS takes over it and is replaying
+		 * the EImportStart journal the new MDS daemon
+		 * will wait the client to reconnect it, but the
+		 * client may never register/open the sessions
+		 * yet.
+		 *
+		 * It will try to reconnect that MDS daemons if
+		 * the MDSes are in the export targets and is the
+		 * RECONNECT state.
+		 */
+		newstate = ceph_mdsmap_get_state(newmap, i);
+		if (newstate != CEPH_MDS_STATE_RECONNECT)
+			continue;
+		s = __open_export_target_session(mdsc, i);
+		if (IS_ERR(s)) {
+			err = PTR_ERR(s);
+			pr_err("failed to open export target session, err %d\n",
+			       err);
+			continue;
+		}
+		dout("send reconnect to target mds.%d\n", i);
+		mutex_unlock(&mdsc->mutex);
+		send_mds_reconnect(mdsc, s);
+		mutex_lock(&mdsc->mutex);
+		ceph_put_mds_session(s);
+	}
+
 	for (i = 0; i < newmap->possible_max_rank && i < mdsc->max_sessions; i++) {
 		s = mdsc->sessions[i];
 		if (!s)
@@ -4245,6 +4299,8 @@ static void check_new_map(struct ceph_mds_client *mdsc,
 			__open_export_target_sessions(mdsc, s);
 		}
 	}
+
+	kfree(export_targets);
 }
 
 
