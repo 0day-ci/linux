@@ -9,6 +9,7 @@
 #include <linux/platform_device.h>
 #include <linux/phy/phy.h>
 #include <linux/phy/phy-dp.h>
+#include <linux/gpio/consumer.h>
 
 #include "dpu_io_util.h"
 #include "msm_drv.h"
@@ -112,6 +113,10 @@ struct dp_parser {
 	struct platform_device *pdev;
 	struct dss_module_power mp[DP_MAX_PM];
 	struct dp_pinctrl pinctrl;
+
+	struct gpio_desc *panel_bklt_gpio;
+	struct gpio_desc *panel_pwm_gpio;
+
 	struct dp_io io;
 	struct dp_display_data disp_data;
 	const struct dp_regulator_cfg *regulator_cfg;

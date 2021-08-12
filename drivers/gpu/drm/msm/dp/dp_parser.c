@@ -248,6 +248,33 @@ static int dp_parser_clock(struct dp_parser *parser)
 	return 0;
 }
 
+static int dp_parser_gpio(struct dp_parser *parser)
+{
+	struct device *dev = &parser->pdev->dev;
+	int ret;
+
+	parser->panel_bklt_gpio = devm_gpiod_get(dev, "panel-bklt",
+			GPIOD_OUT_HIGH);
+	if (IS_ERR(parser->panel_bklt_gpio)) {
+		ret = PTR_ERR(parser->panel_bklt_gpio);
+		parser->panel_bklt_gpio = NULL;
+		DRM_ERROR("%s: cannot get panel-bklt gpio, %d\n", __func__, ret);
+		goto fail;
+	}
+
+	parser->panel_pwm_gpio = devm_gpiod_get(dev, "panel-pwm", GPIOD_OUT_HIGH);
+	if (IS_ERR(parser->panel_pwm_gpio)) {
+		ret = PTR_ERR(parser->panel_pwm_gpio);
+		parser->panel_pwm_gpio = NULL;
+		DRM_ERROR("%s: cannot get panel-pwm gpio, %d\n", __func__, ret);
+		goto fail;
+	}
+
+	DRM_INFO("gpio on");
+fail:
+	return 0;
+}
+
 static int dp_parser_parse(struct dp_parser *parser)
 {
 	int rc = 0;
@@ -266,6 +293,10 @@ static int dp_parser_parse(struct dp_parser *parser)
 		return rc;
 
 	rc = dp_parser_clock(parser);
+	if (rc)
+		return rc;
+
+	rc = dp_parser_gpio(parser);
 	if (rc)
 		return rc;
 
