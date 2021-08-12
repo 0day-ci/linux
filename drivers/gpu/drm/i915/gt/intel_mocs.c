@@ -373,6 +373,17 @@ add_aux_reg(struct drm_i915_aux_table *aux,
 }
 
 static struct drm_i915_aux_table *
+add_blit_cctl_override(struct drm_i915_aux_table *aux, u8 idx)
+{
+	return add_aux_reg(aux,
+			   "BLIT_CCTL",
+			   BLIT_CCTL(0),
+			   BLIT_CCTL_MOCS(idx, idx),
+			   BLIT_CCTL_DST_MOCS_MASK | BLIT_CCTL_SRC_MOCS_MASK,
+			   true);
+}
+
+static struct drm_i915_aux_table *
 add_cmd_cctl_override(struct drm_i915_aux_table *aux, u8 idx)
 {
 	return add_aux_reg(aux,
@@ -398,6 +409,8 @@ build_aux_regs(const struct intel_engine_cs *engine,
 		 * uncached index.
 		 */
 		aux = add_cmd_cctl_override(aux, mocs->uc_index);
+		if (engine->class == COPY_ENGINE_CLASS && mocs->uc_index)
+			aux = add_blit_cctl_override(aux, mocs->uc_index);
 	}
 
 	return aux;
