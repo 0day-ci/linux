@@ -3138,6 +3138,27 @@
 			cell-index = <0>;
 		};
 
+		imem@146aa000 {
+			compatible = "simple-mfd";
+			reg = <0 0x146aa000 0 0x2000>;
+
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			ranges = <0 0 0x146aa000 0x2000>;
+
+			pil-reloc@94c {
+				compatible = "qcom,pil-reloc-info";
+				reg = <0x94c 0xc8>;
+			};
+
+			dload-mode@1c00 {
+				compatible = "qcom,dload-mode";
+				reg = <0x1c00 0x1000>;
+				qcom,sdi-disable-regs = <&tcsr_regs 0x3a000 0x4>;
+			};
+		};
+
 		apps_smmu: iommu@15000000 {
 			compatible = "qcom,sc7180-smmu-500", "arm,mmu-500";
 			reg = <0 0x15000000 0 0x100000>;
