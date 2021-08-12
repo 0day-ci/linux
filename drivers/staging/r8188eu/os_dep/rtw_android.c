@@ -7,7 +7,6 @@
 #include "../include/rtw_android.h"
 #include "../include/osdep_service.h"
 #include "../include/rtw_debug.h"
-#include "../include/ioctl_cfg80211.h"
 #include "../include/rtw_ioctl_set.h"
 
 static const char *android_wifi_cmd_str[ANDROID_WIFI_CMD_MAX] = {
