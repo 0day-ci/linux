@@ -322,6 +322,38 @@ static const struct drm_i915_mocs_entry dg1_mocs_table[] = {
 	MOCS_ENTRY(62, 0, L3_1_UC),
 	MOCS_ENTRY(63, 0, L3_1_UC),
 };
+static const struct drm_i915_mocs_entry adl_mocs_table[] = {
+	/* wa_1608975824 */
+	MOCS_ENTRY(0,
+			LE_3_WB | LE_TC_1_LLC | LE_LRUM(3),
+			L3_3_WB),
+
+	GEN11_MOCS_ENTRIES,
+	/* Implicitly enable L1 - HDC:L1 + L3 + LLC */
+	MOCS_ENTRY(48,
+			LE_3_WB | LE_TC_1_LLC | LE_LRUM(3),
+			L3_3_WB),
+	/* Implicitly enable L1 - HDC:L1 + L3 */
+	MOCS_ENTRY(49,
+			LE_1_UC | LE_TC_1_LLC,
+			L3_3_WB),
+	/* Implicitly enable L1 - HDC:L1 + LLC */
+	MOCS_ENTRY(50,
+			LE_3_WB | LE_TC_1_LLC | LE_LRUM(3),
+			L3_1_UC),
+	/* Implicitly enable L1 - HDC:L1 */
+	MOCS_ENTRY(51,
+			LE_1_UC | LE_TC_1_LLC,
+			L3_1_UC),
+	/* HW Special Case (CCS) */
+	MOCS_ENTRY(60,
+			LE_3_WB | LE_TC_1_LLC | LE_LRUM(3),
+			L3_1_UC),
+	/* HW Special Case (Displayable) */
+	MOCS_ENTRY(61,
+			LE_1_UC | LE_TC_1_LLC,
+			L3_3_WB),
+};
 
 enum {
 	HAS_GLOBAL_MOCS = BIT(0),
@@ -444,7 +476,13 @@ static unsigned int get_mocs_settings(const struct drm_i915_private *i915,
 
 	memset(table, 0, sizeof(struct drm_i915_mocs_table));
 
-	if (IS_DG1(i915)) {
+	if (IS_ALDERLAKE_S(i915) || IS_ALDERLAKE_P(i915)) {
+		table->size = ARRAY_SIZE(adl_mocs_table);
+		table->table = adl_mocs_table;
+		table->n_entries = GEN9_NUM_MOCS_ENTRIES;
+		table->uc_index = 3;
+		table->unused_entries_index = 2;
+	} else if (IS_DG1(i915)) {
 		table->size = ARRAY_SIZE(dg1_mocs_table);
 		table->table = dg1_mocs_table;
 		table->n_entries = GEN9_NUM_MOCS_ENTRIES;
