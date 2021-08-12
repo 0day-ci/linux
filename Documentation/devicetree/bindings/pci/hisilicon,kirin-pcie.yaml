@@ -97,7 +97,6 @@ examples:
               <0x0 0xfc180000 0x0 0x1000>,
               <0x0 0xf5000000 0x0 0x2000>;
         reg-names = "dbi", "apb", "config";
-        msi-parent = <&its_pcie>;
         #address-cells = <3>;
         #size-cells = <2>;
         device_type = "pci";
@@ -116,43 +115,52 @@ examples:
                         <0x0 0 0 4 &gic GIC_SPI 285 IRQ_TYPE_LEVEL_HIGH>;
         reset-gpios = <&gpio7 0 0>;
         hisilicon,clken-gpios = <&gpio27 3 0>, <&gpio17 0 0>, <&gpio20 6 0>;
-
-        pcie@0 { // Lane 0: PCIe switch: Bus 1, Device 0
-          reg = <0 0 0 0 0>;
+        pcie@0,0 { // Lane 0: PCIe switch: Bus 1, Device 0
+          reg = <0x80 0 0 0 0>;
           compatible = "pciclass,0604";
           device_type = "pci";
           #address-cells = <3>;
           #size-cells = <2>;
           ranges;
-          pcie@1,0 { // Lane 4: M.2
-            reg = <0x800 0 0 0 0>;
+          msi-parent = <&its_pcie>;
+
+          pcie@0,0 { // Lane 0: upstream
+            reg = <0 0 0 0 0>;
             compatible = "pciclass,0604";
             device_type = "pci";
-            reset-gpios = <&gpio3 1 0>;
-            clkreq-gpios = <&gpio27 3 0 >;
             #address-cells = <3>;
             #size-cells = <2>;
             ranges;
-          };
-          pcie@5,0 { // Lane 5: Mini PCIe
-            reg = <0x2800 0 0 0 0>;
-            compatible = "pciclass,0604";
-            device_type = "pci";
-            reset-gpios = <&gpio27 4 0 >;
-            clkreq-gpios = <&gpio17 0 0 >;
-            #address-cells = <3>;
-            #size-cells = <2>;
-            ranges;
-          };
-          pcie@7,0 { // Lane 6: Ethernet
-            reg = <0x3800 0 0 0 0>;
-            compatible = "pciclass,0604";
-            device_type = "pci";
-            reset-gpios = <&gpio25 2 0 >;
-            clkreq-gpios = <&gpio20 6 0 >;
-            #address-cells = <3>;
-            #size-cells = <2>;
-            ranges;
+
+            pcie@1,0 { // Lane 4: M.2
+              reg = <0x0800 0 0 0 0>;
+              compatible = "pciclass,0604";
+              device_type = "pci";
+              reset-gpios = <&gpio3 1 0>;
+              #address-cells = <3>;
+              #size-cells = <2>;
+              ranges;
+            };
+
+            pcie@5,0 { // Lane 5: Mini PCIe
+              reg = <0x2800 0 0 0 0>;
+              compatible = "pciclass,0604";
+              device_type = "pci";
+              reset-gpios = <&gpio27 4 0 >;
+              #address-cells = <3>;
+              #size-cells = <2>;
+              ranges;
+            };
+
+            pcie@7,0 { // Lane 6: Ethernet
+              reg = <0x03800 0 0 0 0>;
+              compatible = "pciclass,0604";
+              device_type = "pci";
+              reset-gpios = <&gpio25 2 0 >;
+              #address-cells = <3>;
+              #size-cells = <2>;
+              ranges;
+            };
           };
         };
       };
