@@ -53,6 +53,9 @@ struct stack_info {
  *               replacement lr value in the ftrace graph stack.
  *
  * @failed:      Unwind failed.
+ *
+ * @need_reliable The caller needs a reliable stack trace. Treat any
+ *                unreliability as a fatal error.
  */
 struct stackframe {
 	struct task_struct *task;
@@ -65,6 +68,7 @@ struct stackframe {
 	int graph;
 #endif
 	bool failed;
+	bool need_reliable;
 };
 
 extern void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk,
