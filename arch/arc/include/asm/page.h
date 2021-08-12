@@ -58,7 +58,7 @@ typedef struct {
 
 #define pte_pgprot(x) __pgprot(pte_val(x))
 
-typedef pte_t * pgtable_t;
+typedef struct page *pgtable_t;
 
 /*
  * Use virt_to_pfn with caution:
