@@ -497,14 +497,14 @@ int vmw_host_printf(const char *fmt, ...)
 		return ret;
 
 	va_start(ap, fmt);
-	log = kvasprintf(GFP_KERNEL, fmt, ap);
+	log = kvasprintf(GFP_ATOMIC, fmt, ap);
 	va_end(ap);
 	if (!log) {
 		DRM_ERROR("Cannot allocate memory for the log message.\n");
 		return -ENOMEM;
 	}
 
-	msg = kasprintf(GFP_KERNEL, "log %s", log);
+	msg = kasprintf(GFP_ATOMIC, "log %s", log);
 	if (!msg) {
 		DRM_ERROR("Cannot allocate memory for host log message.\n");
 		kfree(log);
