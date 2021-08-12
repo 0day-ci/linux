@@ -34,7 +34,8 @@
 
 static void notrace unwind_start(struct stackframe *frame,
 				 struct task_struct *task,
-				 unsigned long fp, unsigned long pc)
+				 unsigned long fp, unsigned long pc,
+				 bool need_reliable)
 {
 	frame->task = task;
 	frame->fp = fp;
@@ -56,6 +57,7 @@ static void notrace unwind_start(struct stackframe *frame,
 	frame->prev_fp = 0;
 	frame->prev_type = STACK_TYPE_UNKNOWN;
 	frame->failed = false;
+	frame->need_reliable = need_reliable;
 }
 
 NOKPROBE_SYMBOL(unwind_start);
@@ -178,6 +180,23 @@ void show_stack(struct task_struct *tsk, unsigned long *sp, const char *loglvl)
 	barrier();
 }
 
+/*
+ * Check the stack frame for conditions that make further unwinding unreliable.
+ */
+static bool notrace unwind_is_reliable(struct stackframe *frame)
+{
+	/*
+	 * If the PC is not a known kernel text address, then we cannot
+	 * be sure that a subsequent unwind will be reliable, as we
+	 * don't know that the code follows our unwind requirements.
+	 */
+	if (!__kernel_text_address(frame->pc))
+		return false;
+	return true;
+}
+
+NOKPROBE_SYMBOL(unwind_is_reliable);
+
 static bool notrace unwind_consume(struct stackframe *frame,
 				   stack_trace_consume_fn consume_entry,
 				   void *cookie)
@@ -197,6 +216,12 @@ static bool notrace unwind_consume(struct stackframe *frame,
 		/* Final frame; nothing to unwind */
 		return false;
 	}
+
+	if (frame->need_reliable && !unwind_is_reliable(frame)) {
+		/* Cannot unwind to the next frame reliably. */
+		frame->failed = true;
+		return false;
+	}
 	return true;
 }
 
@@ -210,11 +235,12 @@ static inline bool unwind_failed(struct stackframe *frame)
 /* Core unwind function */
 static bool notrace unwind(stack_trace_consume_fn consume_entry, void *cookie,
 			   struct task_struct *task,
-			   unsigned long fp, unsigned long pc)
+			   unsigned long fp, unsigned long pc,
+			   bool need_reliable)
 {
 	struct stackframe frame;
 
-	unwind_start(&frame, task, fp, pc);
+	unwind_start(&frame, task, fp, pc, need_reliable);
 	while (unwind_consume(&frame, consume_entry, cookie))
 		unwind_next(&frame);
 	return !unwind_failed(&frame);
@@ -245,7 +271,36 @@ noinline notrace void arch_stack_walk(stack_trace_consume_fn consume_entry,
 		fp = thread_saved_fp(task);
 		pc = thread_saved_pc(task);
 	}
-	unwind(consume_entry, cookie, task, fp, pc);
+	unwind(consume_entry, cookie, task, fp, pc, false);
+}
+
+/*
+ * arch_stack_walk_reliable() may not be used for livepatch until all of
+ * the reliability checks are in place in unwind_consume(). However,
+ * debug and test code can choose to use it even if all the checks are not
+ * in place.
+ */
+noinline int notrace arch_stack_walk_reliable(stack_trace_consume_fn consume_fn,
+					      void *cookie,
+					      struct task_struct *task)
+{
+	unsigned long fp, pc;
+
+	if (!task)
+		task = current;
+
+	if (task == current) {
+		/* Skip arch_stack_walk_reliable() in the stack trace. */
+		fp = (unsigned long)__builtin_frame_address(1);
+		pc = (unsigned long)__builtin_return_address(0);
+	} else {
+		/* Caller guarantees that the task is not running. */
+		fp = thread_saved_fp(task);
+		pc = thread_saved_pc(task);
+	}
+	if (unwind(consume_fn, cookie, task, fp, pc, true))
+		return 0;
+	return -EINVAL;
 }
 
 #endif
