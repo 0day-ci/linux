@@ -455,6 +455,15 @@ static void vfio_pci_disable(struct vfio_pci_device *vdev)
 	vdev->needs_reset = true;
 
 	/*
+	 * Userspace may have left the device in a low power state which
+	 * affects our ability to trigger a PM reset, restore to D0 and
+	 * toss any saved state from the previous session.
+	 */
+	pci_set_power_state(pdev, PCI_D0);
+	kfree(vdev->pm_save);
+	vdev->pm_save = NULL;
+
+	/*
 	 * If we have saved state, restore it.  If we can reset the device,
 	 * even better.  Resetting with current state seems better than
 	 * nothing, but saving and restoring current state without reset
@@ -1012,6 +1021,9 @@ static long vfio_pci_ioctl(struct vfio_device *core_vdev,
 
 		if (!vdev->reset_works)
 			return -EINVAL;
+
+		/* PM reset depends on the device not already being in D3 */
+		vfio_pci_set_power_state(vdev, PCI_D0);
 
 		vfio_pci_zap_and_down_write_memory_lock(vdev);
 		ret = pci_try_reset_function(vdev->pdev);
