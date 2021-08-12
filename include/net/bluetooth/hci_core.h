@@ -1229,6 +1229,7 @@ static inline void *hci_get_priv(struct hci_dev *hdev)
 	return (char *)hdev + sizeof(*hdev);
 }
 
+void hci_set_msft(bool enable);
 struct hci_dev *hci_dev_get(int index);
 struct hci_dev *hci_get_route(bdaddr_t *dst, bdaddr_t *src, u8 src_type);
 

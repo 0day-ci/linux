@@ -1045,6 +1045,22 @@ static int hci_linkpol_req(struct hci_request *req, unsigned long opt)
 	return 0;
 }
 
+void hci_set_msft(bool enable)
+{
+	struct hci_dev *hdev = NULL, *d;
+
+	read_lock(&hci_dev_list_lock);
+	list_for_each_entry(d, &hci_dev_list, list) {
+		hdev = hci_dev_hold(d);
+		if (enable)
+			msft_do_open(hdev);
+		else
+			msft_do_close(hdev);
+		hci_dev_put(hdev);
+	}
+	read_unlock(&hci_dev_list_lock);
+}
+
 /* Get HCI device by index.
  * Device is held on return. */
 struct hci_dev *hci_dev_get(int index)

@@ -97,6 +97,34 @@ struct msft_data {
 	__u8 filter_enabled;
 };
 
+static bool msft_enable = true;
+
+static int msft_set_enable(const char *s, const struct kernel_param *kp)
+{
+	bool do_enable;
+	int ret;
+
+	if (!s)
+		return 0;
+
+	ret = strtobool(s, &do_enable);
+	if (ret || msft_enable == do_enable)
+		return ret;
+
+	hci_set_msft(do_enable);
+
+	msft_enable = do_enable;
+
+	return ret;
+}
+
+static const struct kernel_param_ops msft_enable_ops = {
+	.set = msft_set_enable,
+	.get = param_get_bool,
+};
+
+module_param_cb(msft_enable, &msft_enable_ops, &msft_enable, 0644);
+
 static int __msft_add_monitor_pattern(struct hci_dev *hdev,
 				      struct adv_monitor *monitor);
 
@@ -186,7 +214,7 @@ void msft_do_open(struct hci_dev *hdev)
 {
 	struct msft_data *msft;
 
-	if (hdev->msft_opcode == HCI_OP_NOP)
+	if (!msft_enable || hdev->msft_opcode == HCI_OP_NOP)
 		return;
 
 	bt_dev_dbg(hdev, "Initialize MSFT extension");
