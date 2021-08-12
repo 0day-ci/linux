@@ -587,8 +587,7 @@ static inline int nlmsg_len(const struct nlmsghdr *nlh)
 static inline struct nlattr *nlmsg_attrdata(const struct nlmsghdr *nlh,
 					    int hdrlen)
 {
-	unsigned char *data = nlmsg_data(nlh);
-	return (struct nlattr *) (data + NLMSG_ALIGN(hdrlen));
+	return nlmsg_data(nlh) + NLMSG_ALIGN(hdrlen);
 }
 
 /**
