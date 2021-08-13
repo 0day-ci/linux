@@ -1116,13 +1116,14 @@ int drm_fb_helper_setcmap(struct fb_cmap *cmap, struct fb_info *info)
 	struct drm_fb_helper *fb_helper = info->par;
 	struct drm_device *dev = fb_helper->dev;
 	int ret;
+	int idx;
 
 	if (oops_in_progress)
 		return -EBUSY;
 
 	mutex_lock(&fb_helper->lock);
 
-	if (!drm_master_internal_acquire(dev)) {
+	if (!drm_master_internal_acquire(dev, &idx)) {
 		ret = -EBUSY;
 		goto unlock;
 	}
@@ -1136,7 +1137,7 @@ int drm_fb_helper_setcmap(struct fb_cmap *cmap, struct fb_info *info)
 		ret = setcmap_legacy(cmap, info);
 	mutex_unlock(&fb_helper->client.modeset_mutex);
 
-	drm_master_internal_release(dev);
+	drm_master_internal_release(dev, idx);
 unlock:
 	mutex_unlock(&fb_helper->lock);
 
@@ -1160,9 +1161,10 @@ int drm_fb_helper_ioctl(struct fb_info *info, unsigned int cmd,
 	struct drm_device *dev = fb_helper->dev;
 	struct drm_crtc *crtc;
 	int ret = 0;
+	int idx;
 
 	mutex_lock(&fb_helper->lock);
-	if (!drm_master_internal_acquire(dev)) {
+	if (!drm_master_internal_acquire(dev, &idx)) {
 		ret = -EBUSY;
 		goto unlock;
 	}
@@ -1204,7 +1206,7 @@ int drm_fb_helper_ioctl(struct fb_info *info, unsigned int cmd,
 		ret = -ENOTTY;
 	}
 
-	drm_master_internal_release(dev);
+	drm_master_internal_release(dev, idx);
 unlock:
 	mutex_unlock(&fb_helper->lock);
 	return ret;
@@ -1474,12 +1476,13 @@ int drm_fb_helper_pan_display(struct fb_var_screeninfo *var,
 	struct drm_fb_helper *fb_helper = info->par;
 	struct drm_device *dev = fb_helper->dev;
 	int ret;
+	int idx;
 
 	if (oops_in_progress)
 		return -EBUSY;
 
 	mutex_lock(&fb_helper->lock);
-	if (!drm_master_internal_acquire(dev)) {
+	if (!drm_master_internal_acquire(dev, &idx)) {
 		ret = -EBUSY;
 		goto unlock;
 	}
@@ -1489,7 +1492,7 @@ int drm_fb_helper_pan_display(struct fb_var_screeninfo *var,
 	else
 		ret = pan_display_legacy(var, info);
 
-	drm_master_internal_release(dev);
+	drm_master_internal_release(dev, idx);
 unlock:
 	mutex_unlock(&fb_helper->lock);
 
@@ -1948,6 +1951,7 @@ EXPORT_SYMBOL(drm_fb_helper_initial_config);
 int drm_fb_helper_hotplug_event(struct drm_fb_helper *fb_helper)
 {
 	int err = 0;
+	int idx;
 
 	if (!drm_fbdev_emulation || !fb_helper)
 		return 0;
@@ -1959,13 +1963,13 @@ int drm_fb_helper_hotplug_event(struct drm_fb_helper *fb_helper)
 		return err;
 	}
 
-	if (!fb_helper->fb || !drm_master_internal_acquire(fb_helper->dev)) {
+	if (!fb_helper->fb || !drm_master_internal_acquire(fb_helper->dev, &idx)) {
 		fb_helper->delayed_hotplug = true;
 		mutex_unlock(&fb_helper->lock);
 		return err;
 	}
 
-	drm_master_internal_release(fb_helper->dev);
+	drm_master_internal_release(fb_helper->dev, idx);
 
 	drm_dbg_kms(fb_helper->dev, "\n");
 

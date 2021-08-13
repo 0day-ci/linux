@@ -112,6 +112,17 @@ struct drm_device {
 	struct drm_master *master;
 
 	/**
+	 * @master_barrier_srcu:
+	 *
+	 * Used to synchronize modesetting rights between multiple users. Users
+	 * that can change the modeset or display state must hold an
+	 * srcu_read_lock() on @master_barrier_srcu, and ioctls that can change
+	 * modesetting rights should call synchronize_srcu() before returning
+	 * to userspace.
+	 */
+	struct srcu_struct master_barrier_srcu;
+
+	/**
 	 * @driver_features: per-device driver features
 	 *
 	 * Drivers can clear specific flags here to disallow

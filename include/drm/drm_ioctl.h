@@ -130,6 +130,13 @@ enum drm_ioctl_flags {
 	 * not set DRM_AUTH because they do not require authentication.
 	 */
 	DRM_RENDER_ALLOW	= BIT(5),
+	/**
+	 * @DRM_MASTER_FLUSH:
+	 *
+	 * This must be set for any ioctl which can change the modesetting
+	 * permissions for DRM users.
+	 */
+	DRM_MASTER_FLUSH	= BIT(6),
 };
 
 /**

@@ -142,8 +142,9 @@ int drm_dropmaster_ioctl(struct drm_device *dev, void *data,
 			 struct drm_file *file_priv);
 int drm_master_open(struct drm_file *file_priv);
 void drm_master_release(struct drm_file *file_priv);
-bool drm_master_internal_acquire(struct drm_device *dev);
-void drm_master_internal_release(struct drm_device *dev);
+bool drm_master_internal_acquire(struct drm_device *dev, int *idx);
+void drm_master_internal_release(struct drm_device *dev, int idx);
+void drm_master_flush(struct drm_device *dev);
 
 /* drm_sysfs.c */
 extern struct class *drm_class;

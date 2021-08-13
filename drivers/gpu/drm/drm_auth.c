@@ -29,6 +29,7 @@
  */
 
 #include <linux/slab.h>
+#include <linux/srcu.h>
 
 #include <drm/drm_auth.h>
 #include <drm/drm_drv.h>
@@ -404,21 +405,31 @@ void drm_master_put(struct drm_master **master)
 EXPORT_SYMBOL(drm_master_put);
 
 /* Used by drm_client and drm_fb_helper */
-bool drm_master_internal_acquire(struct drm_device *dev)
+bool drm_master_internal_acquire(struct drm_device *dev, int *idx)
 {
+	*idx = srcu_read_lock(&dev->master_barrier_srcu);
+
 	mutex_lock(&dev->master_mutex);
 	if (dev->master) {
 		mutex_unlock(&dev->master_mutex);
+		srcu_read_unlock(&dev->master_barrier_srcu, *idx);
 		return false;
 	}
+	mutex_unlock(&dev->master_mutex);
 
 	return true;
 }
 EXPORT_SYMBOL(drm_master_internal_acquire);
 
 /* Used by drm_client and drm_fb_helper */
-void drm_master_internal_release(struct drm_device *dev)
+void drm_master_internal_release(struct drm_device *dev, int idx)
 {
-	mutex_unlock(&dev->master_mutex);
+	srcu_read_unlock(&dev->master_barrier_srcu, idx);
 }
 EXPORT_SYMBOL(drm_master_internal_release);
+
+/* Used by drm_ioctl */
+void drm_master_flush(struct drm_device *dev)
+{
+	synchronize_srcu(&dev->master_barrier_srcu);
+}

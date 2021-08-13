@@ -574,6 +574,7 @@ static void drm_dev_init_release(struct drm_device *dev, void *res)
 	mutex_destroy(&dev->clientlist_mutex);
 	mutex_destroy(&dev->filelist_mutex);
 	mutex_destroy(&dev->struct_mutex);
+	cleanup_srcu_struct(&dev->master_barrier_srcu);
 	drm_legacy_destroy_members(dev);
 }
 
@@ -612,6 +613,7 @@ static int drm_dev_init(struct drm_device *dev,
 	mutex_init(&dev->filelist_mutex);
 	mutex_init(&dev->clientlist_mutex);
 	mutex_init(&dev->master_mutex);
+	init_srcu_struct(&dev->master_barrier_srcu);
 
 	ret = drmm_add_action(dev, drm_dev_init_release, NULL);
 	if (ret)

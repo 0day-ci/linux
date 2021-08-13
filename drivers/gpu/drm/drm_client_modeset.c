@@ -1165,13 +1165,14 @@ int drm_client_modeset_commit(struct drm_client_dev *client)
 {
 	struct drm_device *dev = client->dev;
 	int ret;
+	int idx;
 
-	if (!drm_master_internal_acquire(dev))
+	if (!drm_master_internal_acquire(dev, &idx))
 		return -EBUSY;
 
 	ret = drm_client_modeset_commit_locked(client);
 
-	drm_master_internal_release(dev);
+	drm_master_internal_release(dev, idx);
 
 	return ret;
 }
@@ -1215,8 +1216,9 @@ int drm_client_modeset_dpms(struct drm_client_dev *client, int mode)
 {
 	struct drm_device *dev = client->dev;
 	int ret = 0;
+	int idx;
 
-	if (!drm_master_internal_acquire(dev))
+	if (!drm_master_internal_acquire(dev, &idx))
 		return -EBUSY;
 
 	mutex_lock(&client->modeset_mutex);
@@ -1226,7 +1228,7 @@ int drm_client_modeset_dpms(struct drm_client_dev *client, int mode)
 		drm_client_modeset_dpms_legacy(client, mode);
 	mutex_unlock(&client->modeset_mutex);
 
-	drm_master_internal_release(dev);
+	drm_master_internal_release(dev, idx);
 
 	return ret;
 }
