@@ -939,6 +939,10 @@ Kernel response contents:
   ``ETHTOOL_A_COALESCE_TX_USECS_HIGH``         u32     delay (us), high Tx
   ``ETHTOOL_A_COALESCE_TX_MAX_FRAMES_HIGH``    u32     max packets, high Tx
   ``ETHTOOL_A_COALESCE_RATE_SAMPLE_INTERVAL``  u32     rate sampling interval
+  ``ETHTOOL_A_COALESCE_USE_CQE_TX``            bool    with timer reset on
+                                                       packet arrival, Tx
+  ``ETHTOOL_A_COALESCE_USE_CQE_RX``            bool    with timer reset on
+                                                       packet arrival, Rx
   ===========================================  ======  =======================
 
 Attributes are only included in reply if their value is not zero or the
@@ -977,6 +981,10 @@ Request contents:
   ``ETHTOOL_A_COALESCE_TX_USECS_HIGH``         u32     delay (us), high Tx
   ``ETHTOOL_A_COALESCE_TX_MAX_FRAMES_HIGH``    u32     max packets, high Tx
   ``ETHTOOL_A_COALESCE_RATE_SAMPLE_INTERVAL``  u32     rate sampling interval
+  ``ETHTOOL_A_COALESCE_USE_CQE_TX``            bool    with timer reset on
+                                                       packet arrival, Tx
+  ``ETHTOOL_A_COALESCE_USE_CQE_RX``            bool    with timer reset on
+                                                       packet arrival, Rx
   ===========================================  ======  =======================
 
 Request is rejected if it attributes declared as unsupported by driver (i.e.
