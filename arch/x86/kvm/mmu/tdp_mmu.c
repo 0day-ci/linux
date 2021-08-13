@@ -533,6 +533,7 @@ static inline bool tdp_mmu_set_spte_atomic_no_dirty_log(struct kvm *kvm,
  * TDP page fault.
  *
  * @vcpu: The vcpu instance that took the TDP page fault.
+ * @fault: The kvm_page_fault being resolved by this SPTE.
  * @iter: a tdp_iter instance currently on the SPTE that should be set
  * @new_spte: The value the SPTE should be set to
  *
@@ -540,6 +541,7 @@ static inline bool tdp_mmu_set_spte_atomic_no_dirty_log(struct kvm *kvm,
  *	    this function will have no side-effects.
  */
 static inline bool tdp_mmu_map_set_spte_atomic(struct kvm_vcpu *vcpu,
+					       struct kvm_page_fault *fault,
 					       struct tdp_iter *iter,
 					       u64 new_spte)
 {
@@ -553,12 +555,10 @@ static inline bool tdp_mmu_map_set_spte_atomic(struct kvm_vcpu *vcpu,
 	 * handle_changed_spte_dirty_log() to leverage vcpu->last_used_slot.
 	 */
 	if (is_writable_pte(new_spte)) {
-		struct kvm_memory_slot *slot = kvm_vcpu_gfn_to_memslot(vcpu, iter->gfn);
-
-		if (slot && kvm_slot_dirty_track_enabled(slot)) {
+		if (fault->slot && kvm_slot_dirty_track_enabled(fault->slot)) {
 			/* Enforced by kvm_mmu_hugepage_adjust. */
 			WARN_ON_ONCE(iter->level > PG_LEVEL_4K);
-			mark_page_dirty_in_slot(kvm, slot, iter->gfn);
+			mark_page_dirty_in_slot(kvm, fault->slot, iter->gfn);
 		}
 	}
 
@@ -934,7 +934,7 @@ static int tdp_mmu_map_handle_target_level(struct kvm_vcpu *vcpu,
 
 	if (new_spte == iter->old_spte)
 		ret = RET_PF_SPURIOUS;
-	else if (!tdp_mmu_map_set_spte_atomic(vcpu, iter, new_spte))
+	else if (!tdp_mmu_map_set_spte_atomic(vcpu, fault, iter, new_spte))
 		return RET_PF_RETRY;
 
 	/*
