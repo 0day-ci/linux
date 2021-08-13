@@ -702,10 +702,9 @@ void intel_read_infoframe(struct intel_encoder *encoder,
 			    frame->any.type, type);
 }
 
-static bool
-intel_hdmi_compute_avi_infoframe(struct intel_encoder *encoder,
-				 struct intel_crtc_state *crtc_state,
-				 struct drm_connector_state *conn_state)
+bool intel_hdmi_compute_avi_infoframe(struct intel_encoder *encoder,
+				      struct intel_crtc_state *crtc_state,
+				      struct drm_connector_state *conn_state)
 {
 	struct hdmi_avi_infoframe *frame = &crtc_state->infoframes.avi.avi;
 	const struct drm_display_mode *adjusted_mode =
@@ -758,6 +757,7 @@ intel_hdmi_compute_avi_infoframe(struct intel_encoder *encoder,
 
 	return true;
 }
+EXPORT_SYMBOL(intel_hdmi_compute_avi_infoframe);
 
 static bool
 intel_hdmi_compute_spd_infoframe(struct intel_encoder *encoder,
