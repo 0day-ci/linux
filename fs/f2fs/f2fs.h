@@ -24,6 +24,8 @@
 #include <linux/quotaops.h>
 #include <linux/part_stat.h>
 #include <crypto/hash.h>
+#include <linux/stackdepot.h>
+#include <linux/stacktrace.h>
 
 #include <linux/fscrypt.h>
 #include <linux/fsverity.h>
@@ -116,6 +118,8 @@ typedef u32 block_t;	/*
 typedef u32 nid_t;
 
 #define COMPRESS_EXT_NUM		16
+
+#define FSCK_STACK_DEPTH 64
 
 struct f2fs_mount_info {
 	unsigned int opt;
@@ -1748,6 +1752,8 @@ struct f2fs_sb_info {
 	unsigned int compress_watermark;	/* cache page watermark */
 	atomic_t compress_page_hit;		/* cache hit count */
 #endif
+	depot_stack_handle_t *fsck_stack;
+	unsigned int fsck_count;
 };
 
 struct f2fs_private_dio {
@@ -1959,9 +1965,35 @@ static inline bool is_sbi_flag_set(struct f2fs_sb_info *sbi, unsigned int type)
 	return test_bit(type, &sbi->s_flag);
 }
 
-static inline void set_sbi_flag(struct f2fs_sb_info *sbi, unsigned int type)
+static void set_sbi_flag(struct f2fs_sb_info *sbi, unsigned int type)
 {
 	set_bit(type, &sbi->s_flag);
+
+	if (unlikely(type ==  SBI_NEED_FSCK)) {
+		unsigned long entries[FSCK_STACK_DEPTH];
+		depot_stack_handle_t stack, *new;
+		unsigned int nr_entries;
+		int i;
+
+		nr_entries = stack_trace_save(entries, ARRAY_SIZE(entries), 0);
+		nr_entries = filter_irq_stacks(entries, nr_entries);
+		stack = stack_depot_save(entries, nr_entries, GFP_KERNEL);
+		if (!stack)
+			return;
+
+		/* Try to find an existing entry for this backtrace */
+		for (i = 0; i < sbi->fsck_count; i++)
+			if (sbi->fsck_stack[i] == stack)
+				return;
+
+		new = krealloc(sbi->fsck_stack, (sbi->fsck_count + 1) *
+			       sizeof(*sbi->fsck_stack), GFP_KERNEL);
+		if (!new)
+			return;
+
+		sbi->fsck_stack = new;
+		sbi->fsck_stack[sbi->fsck_count++] = stack;
+	}
 }
 
 static inline void clear_sbi_flag(struct f2fs_sb_info *sbi, unsigned int type)
