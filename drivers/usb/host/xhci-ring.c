@@ -960,19 +960,19 @@ static int xhci_invalidate_cancelled_tds(struct xhci_virt_ep *ep)
 			td_to_noop(xhci, ring, td, false);
 			td->cancel_status = TD_CLEARED;
 		}
-	}
-	if (cached_td) {
-		cached_td->cancel_status = TD_CLEARING_CACHE;
+		if (cached_td) {
+			cached_td->cancel_status = TD_CLEARING_CACHE;
 
-		err = xhci_move_dequeue_past_td(xhci, slot_id, ep->ep_index,
-						cached_td->urb->stream_id,
-						cached_td);
-		/* Failed to move past cached td, try just setting it noop */
-		if (err) {
-			td_to_noop(xhci, ring, cached_td, false);
-			cached_td->cancel_status = TD_CLEARED;
+			err = xhci_move_dequeue_past_td(xhci, slot_id, ep->ep_index,
+							cached_td->urb->stream_id,
+							cached_td);
+			/* Failed to move past cached td, try just setting it noop */
+			if (err) {
+				td_to_noop(xhci, ring, cached_td, false);
+				cached_td->cancel_status = TD_CLEARED;
+			}
+			cached_td = NULL;
 		}
-		cached_td = NULL;
 	}
 	return 0;
 }
