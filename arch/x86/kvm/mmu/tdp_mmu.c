@@ -927,7 +927,7 @@ static int tdp_mmu_map_handle_target_level(struct kvm_vcpu *vcpu,
 	if (unlikely(is_noslot_pfn(fault->pfn)))
 		new_spte = make_mmio_spte(vcpu, iter->gfn, ACC_ALL);
 	else
-		make_spte_ret = make_spte(vcpu, ACC_ALL, iter->level, iter->gfn,
+		make_spte_ret = make_spte(vcpu, fault->slot, ACC_ALL, iter->level, iter->gfn,
 					 fault->pfn, iter->old_spte, fault->prefault, true,
 					 fault->map_writable, !shadow_accessed_mask,
 					 &new_spte);

@@ -1086,6 +1086,7 @@ static int FNAME(sync_page)(struct kvm_vcpu *vcpu, struct kvm_mmu_page *sp)
 	first_pte_gpa = FNAME(get_level1_sp_gpa)(sp);
 
 	for (i = 0; i < PT64_ENT_PER_PAGE; i++) {
+		struct kvm_memory_slot *slot;
 		unsigned pte_access;
 		pt_element_t gpte;
 		gpa_t pte_gpa;
@@ -1135,7 +1136,8 @@ static int FNAME(sync_page)(struct kvm_vcpu *vcpu, struct kvm_mmu_page *sp)
 
 		host_writable = sp->spt[i] & shadow_host_writable_mask;
 
-		set_spte_ret |= set_spte(vcpu, &sp->spt[i],
+		slot = kvm_vcpu_gfn_to_memslot(vcpu, gfn);
+		set_spte_ret |= set_spte(vcpu, slot, &sp->spt[i],
 					 pte_access, PG_LEVEL_4K,
 					 gfn, spte_to_pfn(sp->spt[i]),
 					 true, false, host_writable);
