@@ -77,7 +77,7 @@ void local_flush_tlb_range(struct vm_area_struct *vma, unsigned long start,
 		unsigned long size, flags;
 
 #ifdef DEBUG_TLB
-		printk("[tlbrange<%lu,0x%08lx,0x%08lx>]",
+		printk("[tlbrange<%llu,0x%08lx,0x%08lx>]",
 			cpu_context(cpu, mm) & asid_mask, start, end);
 #endif
 		local_irq_save(flags);
@@ -115,7 +115,7 @@ void local_flush_tlb_kernel_range(unsigned long start, unsigned long end)
 	unsigned long size, flags;
 
 #ifdef DEBUG_TLB
-	printk("[tlbrange<%lu,0x%08lx,0x%08lx>]", start, end);
+	printk("[tlbrange<0x%08lx,0x%08lx>]", start, end);
 #endif
 	local_irq_save(flags);
 	size = (end - start + (PAGE_SIZE - 1)) >> PAGE_SHIFT;
@@ -156,7 +156,7 @@ void local_flush_tlb_page(struct vm_area_struct *vma, unsigned long page)
 		int oldpid, newpid, idx;
 
 #ifdef DEBUG_TLB
-		printk("[tlbpage<%lu,0x%08lx>]", cpu_context(cpu, vma->vm_mm), page);
+		printk("[tlbpage<%llu,0x%08lx>]", cpu_context(cpu, vma->vm_mm), page);
 #endif
 		newpid = cpu_context(cpu, vma->vm_mm) & asid_mask;
 		page &= PAGE_MASK;
@@ -183,6 +183,9 @@ void __update_tlb(struct vm_area_struct *vma, unsigned long address, pte_t pte)
 	unsigned long asid_mask = cpu_asid_mask(&current_cpu_data);
 	unsigned long flags;
 	int idx, pid;
+#ifdef DEBUG_TLB
+	int cpu = smp_processor_id();
+#endif
 
 	/*
 	 * Handle debugger faulting in for debugee.
@@ -194,7 +197,7 @@ void __update_tlb(struct vm_area_struct *vma, unsigned long address, pte_t pte)
 
 #ifdef DEBUG_TLB
 	if ((pid != (cpu_context(cpu, vma->vm_mm) & asid_mask)) || (cpu_context(cpu, vma->vm_mm) == 0)) {
-		printk("update_mmu_cache: Wheee, bogus tlbpid mmpid=%lu tlbpid=%d\n",
+		printk("update_mmu_cache: Wheee, bogus tlbpid mmpid=%llu tlbpid=%d\n",
 		       (cpu_context(cpu, vma->vm_mm)), pid);
 	}
 #endif
@@ -229,7 +232,7 @@ void add_wired_entry(unsigned long entrylo0, unsigned long entrylo1,
 		unsigned long w;
 
 #ifdef DEBUG_TLB
-		printk("[tlbwired<entry lo0 %8x, hi %8x\n, pagemask %8x>]\n",
+		printk("[tlbwired<entry lo0 %8lx, hi %8lx\n, pagemask %8lx>]\n",
 		       entrylo0, entryhi, pagemask);
 #endif
 
@@ -253,7 +256,7 @@ void add_wired_entry(unsigned long entrylo0, unsigned long entrylo1,
 
 	} else if (wired < 8) {
 #ifdef DEBUG_TLB
-		printk("[tlbwired<entry lo0 %8x, hi %8x\n>]\n",
+		printk("[tlbwired<entry lo0 %8lx, hi %8lx\n>]\n",
 		       entrylo0, entryhi);
 #endif
 
