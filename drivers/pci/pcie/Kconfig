@@ -142,3 +142,14 @@ config PCIE_EDR
 	  the PCI Firmware Specification r3.2.  Enable this if you want to
 	  support hybrid DPC model which uses both firmware and OS to
 	  implement DPC.
+
+config PCIE_SSD_LEDS
+	tristate "PCIe SSD status LED support"
+	depends on ACPI && LEDS_CLASS
+	help
+	  Driver for PCIe SSD status LED management as described in a PCI
+	  Firmware Specification, Revision 3.2 ECN.
+
+	  When enabled, LED interfaces will be created for supported drive
+	  states for each PCIe device that has the ACPI _DSM method described
+	  in the referenced specification.
