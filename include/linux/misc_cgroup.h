@@ -31,12 +31,12 @@ struct misc_cg;
  * struct misc_res: Per cgroup per misc type resource
  * @max: Maximum limit on the resource.
  * @usage: Current usage of the resource.
- * @failed: True if charged failed for the resource in a cgroup.
+ * @failcnt: Failure count of the resource
  */
 struct misc_res {
 	unsigned long max;
 	atomic_long_t usage;
-	bool failed;
+	atomic_long_t failcnt;
 };
 
 /**
