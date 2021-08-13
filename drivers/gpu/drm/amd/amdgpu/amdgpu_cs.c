@@ -1486,7 +1486,7 @@ static int amdgpu_cs_wait_all_fences(struct amdgpu_device *adev,
 				     struct drm_amdgpu_fence *fences)
 {
 	uint32_t fence_count = wait->in.fence_count;
-	unsigned int i;
+	unsigned int i, error;
 	long r = 1;
 
 	for (i = 0; i < fence_count; i++) {
@@ -1500,6 +1500,7 @@ static int amdgpu_cs_wait_all_fences(struct amdgpu_device *adev,
 			continue;
 
 		r = dma_fence_wait_timeout(fence, true, timeout);
+		error = fence->error;
 		dma_fence_put(fence);
 		if (r < 0)
 			return r;
@@ -1507,8 +1508,8 @@ static int amdgpu_cs_wait_all_fences(struct amdgpu_device *adev,
 		if (r == 0)
 			break;
 
-		if (fence->error)
-			return fence->error;
+		if (error)
+			return error;
 	}
 
 	memset(wait, 0, sizeof(*wait));
