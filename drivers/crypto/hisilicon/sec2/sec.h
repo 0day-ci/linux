@@ -129,6 +129,8 @@ struct sec_auth_ctx {
 	 */
 	char metamac_idx[SEC_MAX_STREAMS];
 	struct crypto_shash *hash_tfm;
+	/* alloc soft hash tfm for not support parameter */
+	struct crypto_shash *fallback_ahash_tfm;
 	struct shash_desc *desc;
 	struct crypto_aead *fallback_aead_tfm;
 };

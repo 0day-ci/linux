@@ -1224,6 +1224,17 @@ static int sec_ahash_set_key(struct crypto_ahash *tfm, const u8 *key,
 	struct crypto_shash *shash_tfm = a_ctx->hash_tfm;
 	int blocksize, ret, digestsize;
 
+	ret = crypto_shash_setkey(a_ctx->fallback_ahash_tfm, key, keylen);
+	if (ret) {
+		pr_err("hisi_sec2: fallback shash set key error!\n");
+		return ret;
+	}
+
+	if (keylen & WORD_ALIGNMENT_MASK) {
+		a_ctx->fallback = true;
+		return 0;
+	}
+
 	blocksize = crypto_shash_blocksize(shash_tfm);
 	digestsize = crypto_shash_digestsize(shash_tfm);
 	if (keylen > blocksize) {
@@ -2575,6 +2586,8 @@ static int sec_ahash_req_init(struct ahash_request *req)
 	int sid;
 
 	sreq->ctx = ctx;
+	if (unlikely(a_ctx->fallback))
+		return crypto_shash_init(a_ctx->desc);
 
 	tfm_alg_name = tfm->base.__crt_alg->cra_name;
 	a_ctx->mac_len = crypto_ahash_digestsize(tfm);
@@ -2746,6 +2759,27 @@ static int sec_ahash_process(struct ahash_request *req)
 	return ctx->req_op->process(ctx, sreq);
 }
 
+static int sec_shash_update(struct ahash_request *req, struct sec_auth_ctx *ctx)
+{
+	int nents = sg_nents(req->src);
+	int total_sgl_len = 0;
+	struct scatterlist *sg;
+	int ret, i;
+
+	for_each_sg(req->src, sg, nents, i) {
+		ret = crypto_shash_update(ctx->desc, sg_virt(sg), sg->length);
+		if (ret) {
+			pr_err("ahash use fallback ahash is error!\n");
+			return ret;
+		}
+		total_sgl_len += sg->length;
+		if (total_sgl_len == req->nbytes)
+			break;
+	}
+
+	return 0;
+}
+
 static int sec_ahash_update(struct ahash_request *req)
 {
 	struct sec_req *sreq = ahash_request_ctx(req);
@@ -2756,6 +2790,9 @@ static int sec_ahash_update(struct ahash_request *req)
 	int sid = sareq->sid;
 	u32 data_len;
 	u8 idx;
+
+	if (unlikely(a_ctx->fallback))
+		return sec_shash_update(req, a_ctx);
 
 	if (unlikely(req->nbytes > SEC_HW_MAX_LEN)) {
 		dev_err_ratelimited(ctx->dev, "too long input for updating!\n");
@@ -2800,6 +2837,9 @@ static int sec_ahash_final(struct ahash_request *req)
 	u32 sid = sareq->sid;
 	u8 idx;
 
+	if (unlikely(a_ctx->fallback))
+		return crypto_shash_final(a_ctx->desc, req->result);
+
 	sareq->op = SEC_SHA_FINAL;
 	if (sareq->is_stream_mode) {
 		idx = ctx->pingpong_idx[sid];
@@ -2825,6 +2865,20 @@ static int sec_ahash_finup(struct ahash_request *req)
 	struct scatterlist *sg;
 	int i = 0;
 	int ret;
+
+	if (unlikely(a_ctx->fallback)) {
+		for_each_sg(req->src, sg, nents, i) {
+			if (i + 1 == sg_nents(req->src))
+				return crypto_shash_finup(a_ctx->desc, sg_virt(sg),
+							sg->length, req->result);
+
+			ret = crypto_shash_update(a_ctx->desc, sg_virt(sg), sg->length);
+			if (ret) {
+				pr_err("ahash use fallback ahash is error!\n");
+				return ret;
+			}
+		}
+	}
 
 	if (sareq->op == SEC_SHA_UPDATE) {
 		if (unlikely(req->nbytes > SEC_HW_MAX_LEN)) {
@@ -2940,6 +2994,23 @@ static int sec_ahash_digest(struct ahash_request *req)
 	if (req->nbytes > SEC_HW_MAX_LEN)
 		return sec_ahash_larger_digest(req);
 
+	/* kunpeng 920, digest mode not support input 0 size */
+	if (unlikely(ctx->type_supported == SEC_BD_TYPE2 && !req->nbytes))
+		return crypto_shash_digest(a_ctx->desc, sg_virt(req->src), 0,
+								req->result);
+
+	if (unlikely(a_ctx->fallback)) {
+		for_each_sg(req->src, sg, nents, i) {
+			ret = crypto_shash_update(a_ctx->desc, sg_virt(sg),
+						  sg->length);
+			if (ret) {
+				pr_err("ahash use fallback ahash is error!\n");
+				return ret;
+			}
+		}
+
+		return crypto_shash_final(a_ctx->desc, req->result);
+	}
 	sareq->op = SEC_SHA_DIGEST;
 
 	return sec_ahash_finup(req);
@@ -2968,6 +3039,40 @@ static int sec_ahash_import(struct ahash_request *req, const void *in)
 	struct sec_req *sreq = ahash_request_ctx(req);
 
 	memcpy(sreq, in, sizeof(struct sec_req));
+	return 0;
+}
+
+static void sec_release_fallback_shash(struct crypto_shash *tfm,
+				       struct shash_desc *desc)
+{
+	crypto_free_shash(tfm);
+	kfree(desc);
+}
+
+static int sec_alloc_fallback_shash(const char *driver,
+				    struct crypto_shash **tfm_ret,
+				    struct shash_desc **desc_ret)
+{
+	struct crypto_shash *tfm;
+	struct shash_desc *desc;
+	int ret;
+
+	tfm = crypto_alloc_shash(driver, 0, CRYPTO_ALG_NEED_FALLBACK);
+	if (IS_ERR(tfm)) {
+		pr_err("ahash driver alloc hmac shash error!\n");
+		ret = PTR_ERR(tfm);
+		return ret;
+	}
+	desc = kmalloc(sizeof(*desc) + crypto_shash_descsize(tfm), GFP_KERNEL);
+	if (!desc) {
+		crypto_free_shash(tfm);
+		return -ENOMEM;
+	}
+	desc->tfm = tfm;
+
+	*tfm_ret = tfm;
+	*desc_ret = desc;
+
 	return 0;
 }
 
