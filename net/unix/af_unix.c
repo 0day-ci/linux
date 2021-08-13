@@ -1908,7 +1908,6 @@ static int queue_oob(struct socket *sock, struct msghdr *msg, struct sock *other
 		return err;
 
 	skb_put(skb, 1);
-	skb->len = 1;
 	err = skb_copy_datagram_from_iter(skb, 0, &msg->msg_iter, 1);
 
 	if (err) {
@@ -1917,11 +1916,19 @@ static int queue_oob(struct socket *sock, struct msghdr *msg, struct sock *other
 	}
 
 	unix_state_lock(other);
+
+	if (sock_flag(other, SOCK_DEAD) ||
+	    (other->sk_shutdown & RCV_SHUTDOWN)) {
+		unix_state_unlock(other);
+		kfree_skb(skb);
+		return -EPIPE;
+	}
+
 	maybe_add_creds(skb, sock, other);
 	skb_get(skb);
 
 	if (ousk->oob_skb)
-		kfree_skb(ousk->oob_skb);
+		consume_skb(ousk->oob_skb);
 
 	ousk->oob_skb = skb;
 
@@ -2426,19 +2433,37 @@ static int unix_stream_recv_urg(struct unix_stream_read_state *state)
 	struct sock *sk = sock->sk;
 	struct unix_sock *u = unix_sk(sk);
 	int chunk = 1;
+	struct sk_buff *oob_skb;
 
-	if (sock_flag(sk, SOCK_URGINLINE) || !u->oob_skb)
+	mutex_lock(&u->iolock);
+	unix_state_lock(sk);
+
+	if (sock_flag(sk, SOCK_URGINLINE) || !u->oob_skb) {
+		unix_state_unlock(sk);
+		mutex_unlock(&u->iolock);
 		return -EINVAL;
+	}
 
-	chunk = state->recv_actor(u->oob_skb, 0, chunk, state);
+	oob_skb = u->oob_skb;
+
+	if (!(state->flags & MSG_PEEK)) {
+		u->oob_skb = NULL;
+	}
+
+	unix_state_unlock(sk);
+
+	chunk = state->recv_actor(oob_skb, 0, chunk, state);
+
+	if (!(state->flags & MSG_PEEK)) {
+		UNIXCB(oob_skb).consumed += 1;
+		kfree_skb(oob_skb);
+	}
+
+	mutex_unlock(&u->iolock);
+
 	if (chunk < 0)
 		return -EFAULT;
 
-	if (!(state->flags & MSG_PEEK)) {
-		UNIXCB(u->oob_skb).consumed += 1;
-		kfree_skb(u->oob_skb);
-		u->oob_skb = NULL;
-	}
 	state->msg->msg_flags |= MSG_OOB;
 	return 1;
 }
@@ -2498,13 +2523,7 @@ static int unix_stream_read_generic(struct unix_stream_read_state *state,
 	if (unlikely(flags & MSG_OOB)) {
 		err = -EOPNOTSUPP;
 #if IS_ENABLED(CONFIG_AF_UNIX_OOB)
-		mutex_lock(&u->iolock);
-		unix_state_lock(sk);
-
 		err = unix_stream_recv_urg(state);
-
-		unix_state_unlock(sk);
-		mutex_unlock(&u->iolock);
 #endif
 		goto out;
 	}
