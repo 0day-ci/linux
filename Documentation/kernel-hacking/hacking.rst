@@ -77,7 +77,7 @@ fast: frequently it simply acknowledges the interrupt, marks a 'software
 interrupt' for execution and exits.
 
 You can tell you are in a hardware interrupt, because
-:c:func:`in_irq()` returns true.
+:c:func:`in_hardirq()` returns true.
 
 .. warning::
 
