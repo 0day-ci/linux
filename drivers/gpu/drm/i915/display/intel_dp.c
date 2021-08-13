@@ -1676,7 +1676,7 @@ static int intel_dp_hdmi_sink_max_frl(struct intel_dp *intel_dp)
 	return max_frl_rate;
 }
 
-static bool intel_dp_is_hdmi_2_1_sink(struct intel_dp *intel_dp)
+bool intel_dp_is_hdmi_2_1_sink(struct intel_dp *intel_dp)
 {
 	if (drm_dp_is_branch(intel_dp->dpcd) &&
 	    intel_dp->has_hdmi_sink &&
@@ -3044,6 +3044,44 @@ intel_dp_hdr_metadata_infoframe_sdp_unpack(struct hdmi_drm_infoframe *drm_infofr
 	return ret;
 }
 
+static int
+intel_dp_avi_infoframe_sdp_unpack(struct hdmi_avi_infoframe *frame,
+				  const void *buffer, size_t size)
+{
+	int ret;
+
+	const struct dp_sdp *sdp = buffer;
+
+	if (size < sizeof(struct dp_sdp))
+		return -EINVAL;
+
+	if (sdp->sdp_header.HB0 != 0)
+		return -EINVAL;
+
+	if (sdp->sdp_header.HB1 != HDMI_INFOFRAME_TYPE_AVI)
+		return -EINVAL;
+
+	if (sdp->sdp_header.HB2 != 0x1D)
+		return -EINVAL;
+
+	if ((sdp->sdp_header.HB3 & 0x3) != 0)
+		return -EINVAL;
+
+	if (((sdp->sdp_header.HB3 >> 2) & 0x3f) != 0x13)
+		return -EINVAL;
+
+	if (sdp->db[0] != 2)
+		return -EINVAL;
+
+	if (sdp->db[1] != HDMI_AVI_INFOFRAME_SIZE)
+		return -EINVAL;
+
+	ret = hdmi_avi_infoframe_unpack_only(frame, &sdp->db[2],
+					     HDMI_AVI_INFOFRAME_SIZE);
+
+	return ret;
+}
+
 static void intel_read_dp_vsc_sdp(struct intel_encoder *encoder,
 				  struct intel_crtc_state *crtc_state,
 				  struct drm_dp_vsc_sdp *vsc)
@@ -3095,18 +3133,58 @@ static void intel_read_dp_hdr_metadata_infoframe_sdp(struct intel_encoder *encod
 			    "Failed to unpack DP HDR Metadata Infoframe SDP\n");
 }
 
+static void intel_read_dp_avi_infoframe_sdp(struct intel_encoder *encoder,
+					    struct intel_crtc_state *crtc_state,
+					    struct hdmi_avi_infoframe *frame)
+{
+	struct intel_digital_port *dig_port = enc_to_dig_port(encoder);
+	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
+	unsigned int type = HDMI_PACKET_TYPE_GAMUT_METADATA;
+	struct dp_sdp sdp = {};
+	int ret;
+
+	if ((crtc_state->infoframes.enable &
+	    intel_hdmi_infoframe_enable(type)) == 0)
+		return;
+
+	dig_port->read_infoframe(encoder, crtc_state, type, &sdp,
+				 sizeof(sdp));
+
+	ret = intel_dp_avi_infoframe_sdp_unpack(frame, &sdp,
+						sizeof(sdp));
+
+	if (ret)
+		drm_dbg_kms(&dev_priv->drm,
+			    "Failed to unpack DP AVI Infoframe SDP\n");
+}
+
 void intel_read_dp_sdp(struct intel_encoder *encoder,
 		       struct intel_crtc_state *crtc_state,
 		       unsigned int type)
 {
+	struct intel_dp *intel_dp;
+
+	if (!intel_encoder_is_dig_port(encoder))
+		return;
+
+	intel_dp = enc_to_intel_dp(encoder);
+
 	switch (type) {
 	case DP_SDP_VSC:
 		intel_read_dp_vsc_sdp(encoder, crtc_state,
 				      &crtc_state->infoframes.vsc);
 		break;
 	case HDMI_PACKET_TYPE_GAMUT_METADATA:
+		if (intel_dp_is_hdmi_2_1_sink(intel_dp))
+			break;
 		intel_read_dp_hdr_metadata_infoframe_sdp(encoder, crtc_state,
 							 &crtc_state->infoframes.drm.drm);
+		break;
+	case HDMI_INFOFRAME_TYPE_AVI:
+		if (!intel_dp_is_hdmi_2_1_sink(intel_dp))
+			break;
+		intel_read_dp_avi_infoframe_sdp(encoder, crtc_state,
+						&crtc_state->infoframes.avi.avi);
 		break;
 	default:
 		MISSING_CASE(type);
@@ -5524,4 +5602,22 @@ void intel_dp_mst_resume(struct drm_i915_private *dev_priv)
 							false);
 		}
 	}
+}
+
+u32 intel_dp_hdmi_21_infoframes_enabled(struct intel_encoder *encoder,
+					struct intel_crtc_state *crtc_state)
+{
+	struct intel_digital_port *dig_port = enc_to_dig_port(encoder);
+	u32 val, ret = 0;
+
+	/*
+	 * For HDMI2.1 connected via PCON, AVI infoframes are sent via
+	 * GMP SDP packets.
+	 */
+	val = dig_port->infoframes_enabled(encoder, crtc_state);
+
+	if (val & VIDEO_DIP_ENABLE_GMP_HSW)
+		ret |= intel_hdmi_infoframe_enable(HDMI_INFOFRAME_TYPE_AVI);
+
+	return ret;
 }

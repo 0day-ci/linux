@@ -128,5 +128,8 @@ void intel_dp_check_frl_training(struct intel_dp *intel_dp);
 void intel_dp_pcon_dsc_configure(struct intel_dp *intel_dp,
 				 const struct intel_crtc_state *crtc_state);
 void intel_dp_phy_test(struct intel_encoder *encoder);
+bool intel_dp_is_hdmi_2_1_sink(struct intel_dp *intel_dp);
+u32 intel_dp_hdmi_21_infoframes_enabled(struct intel_encoder *encoder,
+					struct intel_crtc_state *crtc_state);
 
 #endif /* __INTEL_DP_H__ */

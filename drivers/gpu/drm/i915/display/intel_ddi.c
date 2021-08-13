@@ -3579,6 +3579,9 @@ static void intel_ddi_read_func_ctl(struct intel_encoder *encoder,
 		if (dig_port->lspcon.active && dig_port->dp.has_hdmi_sink)
 			pipe_config->infoframes.enable |=
 				intel_lspcon_infoframes_enabled(encoder, pipe_config);
+		else if (intel_dp_is_hdmi_2_1_sink(&dig_port->dp))
+			pipe_config->infoframes.enable |=
+			intel_dp_hdmi_21_infoframes_enabled(encoder, pipe_config);
 		else
 			pipe_config->infoframes.enable |=
 				intel_hdmi_infoframes_enabled(encoder, pipe_config);
@@ -3680,6 +3683,7 @@ static void intel_ddi_get_config(struct intel_encoder *encoder,
 
 	intel_read_dp_sdp(encoder, pipe_config, HDMI_PACKET_TYPE_GAMUT_METADATA);
 	intel_read_dp_sdp(encoder, pipe_config, DP_SDP_VSC);
+	intel_read_dp_sdp(encoder, pipe_config, HDMI_INFOFRAME_TYPE_AVI);
 
 	intel_psr_get_config(encoder, pipe_config);
 }
