@@ -1494,6 +1494,15 @@ static void kvm_copy_memslots(struct kvm_memslots *to,
 	memcpy(to, from, kvm_memslots_size(from->used_slots));
 }
 
+static void kvm_copy_memslots_arch(struct kvm_memslots *to,
+				   struct kvm_memslots *from)
+{
+	int i;
+
+	for (i = 0; i < from->used_slots; i++)
+		to->memslots[i].arch = from->memslots[i].arch;
+}
+
 /*
  * Note, at a minimum, the current number of used slots must be allocated, even
  * when deleting a memslot, as we need a complete duplicate of the memslots for
@@ -1579,10 +1588,10 @@ static int kvm_set_memslot(struct kvm *kvm,
 		/*
 		 * The arch-specific fields of the memslots could have changed
 		 * between releasing the slots_arch_lock in
-		 * install_new_memslots and here, so get a fresh copy of the
-		 * slots.
+		 * install_new_memslots and here, so get a fresh copy of these
+		 * fields.
 		 */
-		kvm_copy_memslots(slots, __kvm_memslots(kvm, as_id));
+		kvm_copy_memslots_arch(slots, __kvm_memslots(kvm, as_id));
 	}
 
 	r = kvm_arch_prepare_memory_region(kvm, old, new, mem, change);
@@ -1599,8 +1608,6 @@ static int kvm_set_memslot(struct kvm *kvm,
 
 out_slots:
 	if (change == KVM_MR_DELETE || change == KVM_MR_MOVE) {
-		slot = id_to_memslot(slots, old->id);
-		slot->flags &= ~KVM_MEMSLOT_INVALID;
 		slots = install_new_memslots(kvm, as_id, slots);
 	} else {
 		mutex_unlock(&kvm->slots_arch_lock);
