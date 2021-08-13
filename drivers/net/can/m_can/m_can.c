@@ -21,6 +21,7 @@
 #include <linux/iopoll.h>
 #include <linux/can/dev.h>
 #include <linux/pinctrl/consumer.h>
+#include <linux/phy/phy.h>
 
 #include "m_can.h"
 
@@ -1058,6 +1059,9 @@ static irqreturn_t m_can_isr(int irq, void *dev_id)
 		}
 	}
 
+	if (cdev->is_peripheral)
+		can_rx_offload_threaded_irq_finish(&cdev->offload);
+
 	return IRQ_HANDLED;
 }
 
@@ -1164,10 +1168,10 @@ static int m_can_set_bittiming(struct net_device *dev)
 				    FIELD_PREP(TDCR_TDCO_MASK, tdco));
 		}
 
-		reg_btp = FIELD_PREP(NBTP_NBRP_MASK, brp) |
-			  FIELD_PREP(NBTP_NSJW_MASK, sjw) |
-			  FIELD_PREP(NBTP_NTSEG1_MASK, tseg1) |
-			  FIELD_PREP(NBTP_NTSEG2_MASK, tseg2);
+		reg_btp |= FIELD_PREP(DBTP_DBRP_MASK, brp) |
+			FIELD_PREP(DBTP_DSJW_MASK, sjw) |
+			FIELD_PREP(DBTP_DTSEG1_MASK, tseg1) |
+			FIELD_PREP(DBTP_DTSEG2_MASK, tseg2);
 
 		m_can_write(cdev, M_CAN_DBTP, reg_btp);
 	}
@@ -1436,32 +1440,20 @@ static int m_can_dev_setup(struct m_can_classdev *cdev)
 	case 30:
 		/* CAN_CTRLMODE_FD_NON_ISO is fixed with M_CAN IP v3.0.x */
 		can_set_static_ctrlmode(dev, CAN_CTRLMODE_FD_NON_ISO);
-		cdev->can.bittiming_const = cdev->bit_timing ?
-			cdev->bit_timing : &m_can_bittiming_const_30X;
-
-		cdev->can.data_bittiming_const = cdev->data_timing ?
-			cdev->data_timing :
-			&m_can_data_bittiming_const_30X;
+		cdev->can.bittiming_const = &m_can_bittiming_const_30X;
+		cdev->can.data_bittiming_const = &m_can_data_bittiming_const_30X;
 		break;
 	case 31:
 		/* CAN_CTRLMODE_FD_NON_ISO is fixed with M_CAN IP v3.1.x */
 		can_set_static_ctrlmode(dev, CAN_CTRLMODE_FD_NON_ISO);
-		cdev->can.bittiming_const = cdev->bit_timing ?
-			cdev->bit_timing : &m_can_bittiming_const_31X;
-
-		cdev->can.data_bittiming_const = cdev->data_timing ?
-			cdev->data_timing :
-			&m_can_data_bittiming_const_31X;
+		cdev->can.bittiming_const = &m_can_bittiming_const_31X;
+		cdev->can.data_bittiming_const = &m_can_data_bittiming_const_31X;
 		break;
 	case 32:
 	case 33:
 		/* Support both MCAN version v3.2.x and v3.3.0 */
-		cdev->can.bittiming_const = cdev->bit_timing ?
-			cdev->bit_timing : &m_can_bittiming_const_31X;
-
-		cdev->can.data_bittiming_const = cdev->data_timing ?
-			cdev->data_timing :
-			&m_can_data_bittiming_const_31X;
+		cdev->can.bittiming_const = &m_can_bittiming_const_31X;
+		cdev->can.data_bittiming_const = &m_can_data_bittiming_const_31X;
 
 		cdev->can.ctrlmode_supported |=
 			(m_can_niso_supported(cdev) ?
@@ -1517,6 +1509,8 @@ static int m_can_close(struct net_device *dev)
 
 	close_candev(dev);
 	can_led_event(dev, CAN_LED_EVENT_STOP);
+
+	phy_power_off(cdev->transceiver);
 
 	return 0;
 }
@@ -1703,9 +1697,13 @@ static int m_can_open(struct net_device *dev)
 	struct m_can_classdev *cdev = netdev_priv(dev);
 	int err;
 
-	err = m_can_clk_start(cdev);
+	err = phy_power_on(cdev->transceiver);
 	if (err)
 		return err;
+
+	err = m_can_clk_start(cdev);
+	if (err)
+		goto out_phy_power_off;
 
 	/* open the can device */
 	err = open_candev(dev);
@@ -1763,6 +1761,8 @@ out_wq_fail:
 	close_candev(dev);
 exit_disable_clks:
 	m_can_clk_stop(cdev);
+out_phy_power_off:
+	phy_power_off(cdev->transceiver);
 	return err;
 }
 

@@ -157,8 +157,11 @@ Image: vmlinux
 Image.%: Image
 	$(Q)$(MAKE) $(build)=$(boot) $(boot)/$@
 
-zinstall install:
-	$(Q)$(MAKE) $(build)=$(boot) $@
+install: install-image := Image
+zinstall: install-image := Image.gz
+install zinstall:
+	$(CONFIG_SHELL) $(srctree)/$(boot)/install.sh $(KERNELRELEASE) \
+	$(boot)/$(install-image) System.map "$(INSTALL_PATH)"
 
 PHONY += vdso_install
 vdso_install:
@@ -183,6 +186,8 @@ endif
 # We use MRPROPER_FILES and CLEAN_FILES now
 archclean:
 	$(Q)$(MAKE) $(clean)=$(boot)
+	$(Q)$(MAKE) $(clean)=arch/arm64/kernel/vdso
+	$(Q)$(MAKE) $(clean)=arch/arm64/kernel/vdso32
 
 ifeq ($(KBUILD_EXTMOD),)
 # We need to generate vdso-offsets.h before compiling certain files in kernel/.

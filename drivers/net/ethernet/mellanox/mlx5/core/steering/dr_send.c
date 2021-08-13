@@ -749,7 +749,6 @@ static struct mlx5dr_cq *dr_create_cq(struct mlx5_core_dev *mdev,
 	struct mlx5_cqe64 *cqe;
 	struct mlx5dr_cq *cq;
 	int inlen, err, eqn;
-	unsigned int irqn;
 	void *cqc, *in;
 	__be64 *pas;
 	int vector;
@@ -782,7 +781,7 @@ static struct mlx5dr_cq *dr_create_cq(struct mlx5_core_dev *mdev,
 		goto err_cqwq;
 
 	vector = raw_smp_processor_id() % mlx5_comp_vectors_count(mdev);
-	err = mlx5_vector2eqn(mdev, vector, &eqn, &irqn);
+	err = mlx5_vector2eqn(mdev, vector, &eqn);
 	if (err) {
 		kvfree(in);
 		goto err_cqwq;
@@ -790,7 +789,7 @@ static struct mlx5dr_cq *dr_create_cq(struct mlx5_core_dev *mdev,
 
 	cqc = MLX5_ADDR_OF(create_cq_in, in, cq_context);
 	MLX5_SET(cqc, cqc, log_cq_size, ilog2(ncqe));
-	MLX5_SET(cqc, cqc, c_eqn, eqn);
+	MLX5_SET(cqc, cqc, c_eqn_or_apu_element, eqn);
 	MLX5_SET(cqc, cqc, uar_page, uar->index);
 	MLX5_SET(cqc, cqc, log_page_size, cq->wq_ctrl.buf.page_shift -
 		 MLX5_ADAPTER_PAGE_SHIFT);
@@ -818,7 +817,6 @@ static struct mlx5dr_cq *dr_create_cq(struct mlx5_core_dev *mdev,
 	*cq->mcq.arm_db = cpu_to_be32(2 << 28);
 
 	cq->mcq.vector = 0;
-	cq->mcq.irqn = irqn;
 	cq->mcq.uar = uar;
 
 	return cq;
