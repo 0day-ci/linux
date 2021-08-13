@@ -11384,8 +11384,10 @@ int alloc_all_memslots_rmaps(struct kvm *kvm)
 	}
 
 	for (i = 0; i < KVM_ADDRESS_SPACE_NUM; i++) {
+		int bkt;
+
 		slots = __kvm_memslots(kvm, i);
-		kvm_for_each_memslot(slot, slots) {
+		kvm_for_each_memslot(slot, bkt, slots) {
 			r = memslot_rmap_alloc(slot, slot->npages);
 			if (r) {
 				mutex_unlock(&kvm->slots_arch_lock);

@@ -415,7 +415,7 @@ static void kvm_vcpu_init(struct kvm_vcpu *vcpu, struct kvm *kvm, unsigned id)
 	vcpu->preempted = false;
 	vcpu->ready = false;
 	preempt_notifier_init(&vcpu->preempt_notifier, &kvm_preempt_ops);
-	vcpu->last_used_slot = 0;
+	vcpu->last_used_slot = NULL;
 }
 
 void kvm_vcpu_destroy(struct kvm_vcpu *vcpu)
@@ -514,7 +514,7 @@ static __always_inline int __kvm_handle_hva_range(struct kvm *kvm,
 						  range->start, range->end - 1) {
 			unsigned long hva_start, hva_end;
 
-			slot = container_of(node, struct kvm_memory_slot, hva_node);
+			slot = container_of(node, struct kvm_memory_slot, hva_node[slots->node_idx]);
 			hva_start = max(range->start, slot->userspace_addr);
 			hva_end = min(range->end, slot->userspace_addr +
 						  (slot->npages << PAGE_SHIFT));
@@ -848,20 +848,6 @@ static void kvm_destroy_pm_notifier(struct kvm *kvm)
 }
 #endif /* CONFIG_HAVE_KVM_PM_NOTIFIER */
 
-static struct kvm_memslots *kvm_alloc_memslots(void)
-{
-	struct kvm_memslots *slots;
-
-	slots = kvzalloc(sizeof(struct kvm_memslots), GFP_KERNEL_ACCOUNT);
-	if (!slots)
-		return NULL;
-
-	slots->hva_tree = RB_ROOT_CACHED;
-	hash_init(slots->id_hash);
-
-	return slots;
-}
-
 static void kvm_destroy_dirty_bitmap(struct kvm_memory_slot *memslot)
 {
 	if (!memslot->dirty_bitmap)
@@ -871,27 +857,33 @@ static void kvm_destroy_dirty_bitmap(struct kvm_memory_slot *memslot)
 	memslot->dirty_bitmap = NULL;
 }
 
+/* This does not remove the slot from struct kvm_memslots data structures */
 static void kvm_free_memslot(struct kvm *kvm, struct kvm_memory_slot *slot)
 {
 	kvm_destroy_dirty_bitmap(slot);
 
 	kvm_arch_free_memslot(kvm, slot);
 
-	slot->flags = 0;
-	slot->npages = 0;
+	kfree(slot);
 }
 
 static void kvm_free_memslots(struct kvm *kvm, struct kvm_memslots *slots)
 {
+	struct hlist_node *idnode;
 	struct kvm_memory_slot *memslot;
+	int bkt;
 
-	if (!slots)
+	/*
+	 * The same memslot objects live in both active and inactive sets,
+	 * arbitrarily free using index '1' so the second invocation of this
+	 * function isn't operating over a structure with dangling pointers
+	 * (even though this function isn't actually touching them).
+	 */
+	if (!slots->node_idx)
 		return;
 
-	kvm_for_each_memslot(memslot, slots)
+	hash_for_each_safe(slots->id_hash, bkt, idnode, memslot, id_node[1])
 		kvm_free_memslot(kvm, memslot);
-
-	kvfree(slots);
 }
 
 static umode_t kvm_stats_debugfs_mode(const struct _kvm_stats_desc *pdesc)
@@ -1030,8 +1022,9 @@ int __weak kvm_arch_create_vm_debugfs(struct kvm *kvm)
 static struct kvm *kvm_create_vm(unsigned long type)
 {
 	struct kvm *kvm = kvm_arch_alloc_vm();
+	struct kvm_memslots *slots;
 	int r = -ENOMEM;
-	int i;
+	int i, j;
 
 	if (!kvm)
 		return ERR_PTR(-ENOMEM);
@@ -1058,13 +1051,20 @@ static struct kvm *kvm_create_vm(unsigned long type)
 
 	refcount_set(&kvm->users_count, 1);
 	for (i = 0; i < KVM_ADDRESS_SPACE_NUM; i++) {
-		struct kvm_memslots *slots = kvm_alloc_memslots();
+		for (j = 0; j < 2; j++) {
+			slots = &kvm->__memslots[i][j];
 
-		if (!slots)
-			goto out_err_no_arch_destroy_vm;
-		/* Generations must be different for each address space. */
-		slots->generation = i;
-		rcu_assign_pointer(kvm->memslots[i], slots);
+			atomic_long_set(&slots->last_used_slot, (unsigned long)NULL);
+			slots->hva_tree = RB_ROOT_CACHED;
+			slots->gfn_tree = RB_ROOT;
+			hash_init(slots->id_hash);
+			slots->node_idx = j;
+
+			/* Generations must be different for each address space. */
+			slots->generation = i;
+		}
+
+		rcu_assign_pointer(kvm->memslots[i], &kvm->__memslots[i][0]);
 	}
 
 	for (i = 0; i < KVM_NR_BUSES; i++) {
@@ -1118,8 +1118,6 @@ out_err_no_arch_destroy_vm:
 	WARN_ON_ONCE(!refcount_dec_and_test(&kvm->users_count));
 	for (i = 0; i < KVM_NR_BUSES; i++)
 		kfree(kvm_get_bus(kvm, i));
-	for (i = 0; i < KVM_ADDRESS_SPACE_NUM; i++)
-		kvm_free_memslots(kvm, __kvm_memslots(kvm, i));
 	cleanup_srcu_struct(&kvm->irq_srcu);
 out_err_no_irq_srcu:
 	cleanup_srcu_struct(&kvm->srcu);
@@ -1184,8 +1182,10 @@ static void kvm_destroy_vm(struct kvm *kvm)
 #endif
 	kvm_arch_destroy_vm(kvm);
 	kvm_destroy_devices(kvm);
-	for (i = 0; i < KVM_ADDRESS_SPACE_NUM; i++)
-		kvm_free_memslots(kvm, __kvm_memslots(kvm, i));
+	for (i = 0; i < KVM_ADDRESS_SPACE_NUM; i++) {
+		kvm_free_memslots(kvm, &kvm->__memslots[i][0]);
+		kvm_free_memslots(kvm, &kvm->__memslots[i][1]);
+	}
 	cleanup_srcu_struct(&kvm->irq_srcu);
 	cleanup_srcu_struct(&kvm->srcu);
 	kvm_arch_free_vm(kvm);
@@ -1255,217 +1255,6 @@ static int kvm_alloc_dirty_bitmap(struct kvm_memory_slot *memslot)
 	return 0;
 }
 
-/*
- * Delete a memslot by decrementing the number of used slots and shifting all
- * other entries in the array forward one spot.
- * @memslot is a detached dummy struct with just .id and .as_id filled.
- */
-static inline void kvm_memslot_delete(struct kvm_memslots *slots,
-				      struct kvm_memory_slot *memslot)
-{
-	struct kvm_memory_slot *mslots = slots->memslots;
-	struct kvm_memory_slot *oldslot = id_to_memslot(slots, memslot->id);
-	int i;
-
-	if (WARN_ON(!oldslot))
-		return;
-
-	slots->used_slots--;
-
-	if (atomic_read(&slots->last_used_slot) >= slots->used_slots)
-		atomic_set(&slots->last_used_slot, 0);
-
-	for (i = oldslot - mslots; i < slots->used_slots; i++) {
-		interval_tree_remove(&mslots[i].hva_node, &slots->hva_tree);
-		hash_del(&mslots[i].id_node);
-
-		mslots[i] = mslots[i + 1];
-		interval_tree_insert(&mslots[i].hva_node, &slots->hva_tree);
-		hash_add(slots->id_hash, &mslots[i].id_node, mslots[i].id);
-	}
-	interval_tree_remove(&mslots[i].hva_node, &slots->hva_tree);
-	hash_del(&mslots[i].id_node);
-	mslots[i] = *memslot;
-}
-
-/*
- * "Insert" a new memslot by incrementing the number of used slots.  Returns
- * the new slot's initial index into the memslots array.
- */
-static inline int kvm_memslot_insert_back(struct kvm_memslots *slots)
-{
-	return slots->used_slots++;
-}
-
-/*
- * Move a changed memslot backwards in the array by shifting existing slots
- * with a higher GFN toward the front of the array.  Note, the changed memslot
- * itself is not preserved in the array, i.e. not swapped at this time, only
- * its new index into the array is tracked.  Returns the changed memslot's
- * current index into the memslots array.
- * The memslot at the returned index will not be in @slots->hva_tree or
- * @slots->id_hash by then.
- * @memslot is a detached struct with desired final data of the changed slot.
- */
-static inline int kvm_memslot_move_backward(struct kvm_memslots *slots,
-					    struct kvm_memory_slot *memslot)
-{
-	struct kvm_memory_slot *mslots = slots->memslots;
-	struct kvm_memory_slot *mmemslot = id_to_memslot(slots, memslot->id);
-	int i;
-
-	if (!mmemslot || !slots->used_slots)
-		return -1;
-
-	/*
-	 * The loop below will (possibly) overwrite the target memslot with
-	 * data of the next memslot, or a similar loop in
-	 * kvm_memslot_move_forward() will overwrite it with data of the
-	 * previous memslot.
-	 * Then update_memslots() will unconditionally overwrite and re-add
-	 * it to the hash table.
-	 * That's why the memslot has to be first removed from the hash table
-	 * here.
-	 */
-	interval_tree_remove(&mmemslot->hva_node, &slots->hva_tree);
-	hash_del(&mmemslot->id_node);
-
-	/*
-	 * Move the target memslot backward in the array by shifting existing
-	 * memslots with a higher GFN (than the target memslot) towards the
-	 * front of the array.
-	 */
-	for (i = mmemslot - mslots; i < slots->used_slots - 1; i++) {
-		if (memslot->base_gfn > mslots[i + 1].base_gfn)
-			break;
-
-		WARN_ON_ONCE(memslot->base_gfn == mslots[i + 1].base_gfn);
-
-		/* Shift the next memslot forward one and update its index. */
-		interval_tree_remove(&mslots[i + 1].hva_node, &slots->hva_tree);
-		hash_del(&mslots[i + 1].id_node);
-
-		mslots[i] = mslots[i + 1];
-		interval_tree_insert(&mslots[i].hva_node, &slots->hva_tree);
-		hash_add(slots->id_hash, &mslots[i].id_node, mslots[i].id);
-	}
-	return i;
-}
-
-/*
- * Move a changed memslot forwards in the array by shifting existing slots with
- * a lower GFN toward the back of the array.  Note, the changed memslot itself
- * is not preserved in the array, i.e. not swapped at this time, only its new
- * index into the array is tracked.  Returns the changed memslot's final index
- * into the memslots array.
- * The memslot at the returned index will not be in @slots->hva_tree or
- * @slots->id_hash by then.
- * @memslot is a detached struct with desired final data of the new or
- * changed slot.
- * Assumes that the memslot at @start index is not in @slots->hva_tree or
- * @slots->id_hash.
- */
-static inline int kvm_memslot_move_forward(struct kvm_memslots *slots,
-					   struct kvm_memory_slot *memslot,
-					   int start)
-{
-	struct kvm_memory_slot *mslots = slots->memslots;
-	int i;
-
-	for (i = start; i > 0; i--) {
-		if (memslot->base_gfn < mslots[i - 1].base_gfn)
-			break;
-
-		WARN_ON_ONCE(memslot->base_gfn == mslots[i - 1].base_gfn);
-
-		/* Shift the next memslot back one and update its index. */
-		interval_tree_remove(&mslots[i - 1].hva_node, &slots->hva_tree);
-		hash_del(&mslots[i - 1].id_node);
-
-		mslots[i] = mslots[i - 1];
-		interval_tree_insert(&mslots[i].hva_node, &slots->hva_tree);
-		hash_add(slots->id_hash, &mslots[i].id_node, mslots[i].id);
-	}
-	return i;
-}
-
-/*
- * Re-sort memslots based on their GFN to account for an added, deleted, or
- * moved memslot.  Sorting memslots by GFN allows using a binary search during
- * memslot lookup.
- *
- * IMPORTANT: Slots are sorted from highest GFN to lowest GFN!  I.e. the entry
- * at memslots[0] has the highest GFN.
- *
- * The sorting algorithm takes advantage of having initially sorted memslots
- * and knowing the position of the changed memslot.  Sorting is also optimized
- * by not swapping the updated memslot and instead only shifting other memslots
- * and tracking the new index for the update memslot.  Only once its final
- * index is known is the updated memslot copied into its position in the array.
- *
- *  - When deleting a memslot, the deleted memslot simply needs to be moved to
- *    the end of the array.
- *
- *  - When creating a memslot, the algorithm "inserts" the new memslot at the
- *    end of the array and then it forward to its correct location.
- *
- *  - When moving a memslot, the algorithm first moves the updated memslot
- *    backward to handle the scenario where the memslot's GFN was changed to a
- *    lower value.  update_memslots() then falls through and runs the same flow
- *    as creating a memslot to move the memslot forward to handle the scenario
- *    where its GFN was changed to a higher value.
- *
- * Note, slots are sorted from highest->lowest instead of lowest->highest for
- * historical reasons.  Originally, invalid memslots where denoted by having
- * GFN=0, thus sorting from highest->lowest naturally sorted invalid memslots
- * to the end of the array.  The current algorithm uses dedicated logic to
- * delete a memslot and thus does not rely on invalid memslots having GFN=0.
- *
- * The other historical motiviation for highest->lowest was to improve the
- * performance of memslot lookup.  KVM originally used a linear search starting
- * at memslots[0].  On x86, the largest memslot usually has one of the highest,
- * if not *the* highest, GFN, as the bulk of the guest's RAM is located in a
- * single memslot above the 4gb boundary.  As the largest memslot is also the
- * most likely to be referenced, sorting it to the front of the array was
- * advantageous.  The current binary search starts from the middle of the array
- * and uses an LRU pointer to improve performance for all memslots and GFNs.
- *
- * @memslot is a detached struct, not a part of the current or new memslot
- * array.
- */
-static void update_memslots(struct kvm_memslots *slots,
-			    struct kvm_memory_slot *memslot,
-			    enum kvm_mr_change change)
-{
-	int i;
-
-	if (change == KVM_MR_DELETE) {
-		kvm_memslot_delete(slots, memslot);
-	} else {
-		if (change == KVM_MR_CREATE)
-			i = kvm_memslot_insert_back(slots);
-		else
-			i = kvm_memslot_move_backward(slots, memslot);
-		i = kvm_memslot_move_forward(slots, memslot, i);
-
-		if (WARN_ON_ONCE(i < 0))
-			return;
-
-		/*
-		 * Copy the memslot to its new position in memslots and update
-		 * its index accordingly.
-		 */
-		slots->memslots[i] = *memslot;
-		slots->memslots[i].hva_node.start = memslot->userspace_addr;
-		slots->memslots[i].hva_node.last = memslot->userspace_addr +
-			(memslot->npages << PAGE_SHIFT) - 1;
-		interval_tree_insert(&slots->memslots[i].hva_node,
-				     &slots->hva_tree);
-		hash_add(slots->id_hash, &slots->memslots[i].id_node,
-			 memslot->id);
-	}
-}
-
 static int check_memory_region_flags(const struct kvm_userspace_memory_region *mem)
 {
 	u32 valid_flags = KVM_MEM_LOG_DIRTY_PAGES;
@@ -1480,11 +1269,12 @@ static int check_memory_region_flags(const struct kvm_userspace_memory_region *m
 	return 0;
 }
 
-static struct kvm_memslots *install_new_memslots(struct kvm *kvm,
-		int as_id, struct kvm_memslots *slots)
+static void kvm_swap_active_memslots(struct kvm *kvm, int as_id,
+				     struct kvm_memslots **active,
+				     struct kvm_memslots **inactive)
 {
-	struct kvm_memslots *old_memslots = __kvm_memslots(kvm, as_id);
-	u64 gen = old_memslots->generation;
+	struct kvm_memslots *slots = *inactive;
+	u64 gen = (*active)->generation;
 
 	WARN_ON(gen & KVM_MEMSLOT_GEN_UPDATE_IN_PROGRESS);
 	slots->generation = gen | KVM_MEMSLOT_GEN_UPDATE_IN_PROGRESS;
@@ -1536,61 +1326,139 @@ static struct kvm_memslots *install_new_memslots(struct kvm *kvm,
 
 	slots->generation = gen;
 
-	return old_memslots;
+	swap(*active, *inactive);
 }
 
-static size_t kvm_memslots_size(int slots)
+static void kvm_memslot_gfn_insert(struct kvm_memslots *slots,
+				   struct kvm_memory_slot *slot)
 {
-	return sizeof(struct kvm_memslots) +
-	       (sizeof(struct kvm_memory_slot) * slots);
+	struct rb_root *gfn_tree = &slots->gfn_tree;
+	struct rb_node **node, *parent;
+	int idx = slots->node_idx;
+
+	parent = NULL;
+	for (node = &gfn_tree->rb_node; *node; ) {
+		struct kvm_memory_slot *tmp;
+
+		tmp = container_of(*node, struct kvm_memory_slot, gfn_node[idx]);
+		parent = *node;
+		if (slot->base_gfn < tmp->base_gfn)
+			node = &(*node)->rb_left;
+		else if (slot->base_gfn > tmp->base_gfn)
+			node = &(*node)->rb_right;
+		else
+			BUG();
+	}
+
+	rb_link_node(&slot->gfn_node[idx], parent, node);
+	rb_insert_color(&slot->gfn_node[idx], gfn_tree);
 }
 
-static void kvm_copy_memslots(struct kvm_memslots *to,
-			      struct kvm_memslots *from)
+static void kvm_memslot_gfn_erase(struct kvm_memslots *slots,
+				  struct kvm_memory_slot *slot)
 {
-	memcpy(to, from, kvm_memslots_size(from->used_slots));
+	rb_erase(&slot->gfn_node[slots->node_idx], &slots->gfn_tree);
 }
 
-static void kvm_copy_memslots_arch(struct kvm_memslots *to,
-				   struct kvm_memslots *from)
+static void kvm_memslot_gfn_replace(struct kvm_memslots *slots,
+				    struct kvm_memory_slot *old,
+				    struct kvm_memory_slot *new)
 {
-	int i;
+	int idx = slots->node_idx;
 
-	for (i = 0; i < from->used_slots; i++)
-		to->memslots[i].arch = from->memslots[i].arch;
+	WARN_ON_ONCE(old->base_gfn != new->base_gfn);
+
+	rb_replace_node(&old->gfn_node[idx], &new->gfn_node[idx],
+			&slots->gfn_tree);
+}
+
+static void kvm_copy_memslot(struct kvm_memory_slot *dest,
+			     const struct kvm_memory_slot *src)
+{
+	dest->base_gfn = src->base_gfn;
+	dest->npages = src->npages;
+	dest->dirty_bitmap = src->dirty_bitmap;
+	dest->arch = src->arch;
+	dest->userspace_addr = src->userspace_addr;
+	dest->flags = src->flags;
+	dest->id = src->id;
+	dest->as_id = src->as_id;
+
+	dest->hva_node[0].start = dest->hva_node[1].start =
+		dest->userspace_addr;
+	dest->hva_node[0].last = dest->hva_node[1].last =
+		dest->userspace_addr + (dest->npages << PAGE_SHIFT) - 1;
 }
 
 /*
- * Note, at a minimum, the current number of used slots must be allocated, even
- * when deleting a memslot, as we need a complete duplicate of the memslots for
- * use when invalidating a memslot prior to deleting/moving the memslot.
+ * Replace @old with @new in @slots.
+ *
+ * With NULL @old this simply adds @new to @slots.
+ * With NULL @new this simply removes @old from @slots.
+ *
+ * If @new is non-NULL its hva_node[slots_idx] range has to be set
+ * appropriately.
  */
-static struct kvm_memslots *kvm_dup_memslots(struct kvm_memslots *old,
-					     enum kvm_mr_change change)
+static void kvm_replace_memslot(struct kvm_memslots *slots,
+				struct kvm_memory_slot *old,
+				struct kvm_memory_slot *new)
 {
-	struct kvm_memslots *slots;
-	size_t new_size;
-	struct kvm_memory_slot *memslot;
+	int idx = slots->node_idx;
 
-	if (change == KVM_MR_CREATE)
-		new_size = kvm_memslots_size(old->used_slots + 1);
-	else
-		new_size = kvm_memslots_size(old->used_slots);
-
-	slots = kvzalloc(new_size, GFP_KERNEL_ACCOUNT);
-	if (unlikely(!slots))
-		return NULL;
-
-	kvm_copy_memslots(slots, old);
-
-	slots->hva_tree = RB_ROOT_CACHED;
-	hash_init(slots->id_hash);
-	kvm_for_each_memslot(memslot, slots) {
-		interval_tree_insert(&memslot->hva_node, &slots->hva_tree);
-		hash_add(slots->id_hash, &memslot->id_node, memslot->id);
+	if (old) {
+		hash_del(&old->id_node[idx]);
+		interval_tree_remove(&old->hva_node[idx], &slots->hva_tree);
+		atomic_long_cmpxchg(&slots->last_used_slot,
+				    (unsigned long)old, (unsigned long)new);
+		if (!new) {
+			kvm_memslot_gfn_erase(slots, old);
+			return;
+		}
 	}
 
-	return slots;
+	WARN_ON(PAGE_SHIFT > 0 &&
+		new->hva_node[idx].start >= new->hva_node[idx].last);
+	hash_add(slots->id_hash, &new->id_node[idx], new->id);
+	interval_tree_insert(&new->hva_node[idx], &slots->hva_tree);
+
+	/* Shame there is no O(1) interval_tree_replace()... */
+	if (old && old->base_gfn == new->base_gfn) {
+		kvm_memslot_gfn_replace(slots, old, new);
+	} else {
+		if (old)
+			kvm_memslot_gfn_erase(slots, old);
+		kvm_memslot_gfn_insert(slots, new);
+	}
+}
+
+/*
+ * Replace @old with @new in @active set, first activating the @inactive
+ * set so @active will no longer be active and can be modified.
+ * Then free @old and return with pointers in @active and @inactive swapped
+ * (since the actual active <-> inactive sets have been swapped).
+ *
+ * With NULL @old this simply adds @new to @active (while swapping the sets).
+ * With NULL @new this simply removes @old from @active and frees it
+ * (while also swapping the sets).
+ */
+static void kvm_activate_memslot(struct kvm *kvm, int as_id,
+				 struct kvm_memslots **active,
+				 struct kvm_memslots **inactive,
+				 struct kvm_memory_slot *old,
+				 struct kvm_memory_slot *new)
+{
+	/*
+	 * Swap the active <-> inactive memslots.
+	 * Note, this also swaps the active and inactive pointers themselves
+	 * and releases slots_arch_lock.
+	 */
+	kvm_swap_active_memslots(kvm, as_id, active, inactive);
+
+	/* Propagate the new memslot to the now inactive memslots. */
+	kvm_replace_memslot(*inactive, old, new);
+
+	/* And free the old slot (if there was one). */
+	kfree(old);
 }
 
 static int kvm_set_memslot(struct kvm *kvm,
@@ -1599,16 +1467,47 @@ static int kvm_set_memslot(struct kvm *kvm,
 			   struct kvm_memory_slot *new, int as_id,
 			   enum kvm_mr_change change)
 {
-	struct kvm_memory_slot *slot;
-	struct kvm_memslots *slots;
+	struct kvm_memslots *active = __kvm_memslots(kvm, as_id);
+	int node_idx_inactive = active->node_idx == 0 ? 1 : 0;
+	struct kvm_memslots *inactive = &kvm->__memslots[as_id][node_idx_inactive];
+	/*
+	 * "slotina" (from "slot inactive") is a slot that is never in the
+	 * active memslot set.
+	 * This slot may be a part of the inactive memslot set or it might be detached.
+	 *
+	 * Conversely, an "slotact" (from "slot active") is a slot that is
+	 * in the active memslot set.
+	 * This slot might be a part of the inactive memslot set, too.
+	 *
+	 * The above terms only apply to a particular variable if it is going
+	 * to see further accesses later during this function execution
+	 * (that is, an invariant may no longer be true if the particular variable
+	 * won't be accessed anymore).
+	 */
+	struct kvm_memory_slot *slotina, *slotact;
 	int r;
 
+	if (change != KVM_MR_CREATE) {
+		slotact = id_to_memslot(active, old->id);
+		if (WARN_ON_ONCE(!slotact))
+			return -EIO;
+	}
+
 	/*
-	 * Released in install_new_memslots.
+	 * Modifications are done on a temporary, unreachable slot.
+	 * The changes are then (eventually) propagated to both the
+	 * active and inactive slots.
+	 */
+	slotina = kzalloc(sizeof(*slotina), GFP_KERNEL_ACCOUNT);
+	if (!slotina)
+		return -ENOMEM;
+
+	/*
+	 * Released in kvm_swap_active_memslots.
 	 *
 	 * Must be held from before the current memslots are copied until
 	 * after the new memslots are installed with rcu_assign_pointer,
-	 * then released before the synchronize srcu in install_new_memslots.
+	 * then released before the synchronize srcu in kvm_swap_active_memslots.
 	 *
 	 * When modifying memslots outside of the slots_lock, must be held
 	 * before reading the pointer to the current memslots until after all
@@ -1619,68 +1518,145 @@ static int kvm_set_memslot(struct kvm *kvm,
 	 */
 	mutex_lock(&kvm->slots_arch_lock);
 
-	slots = kvm_dup_memslots(__kvm_memslots(kvm, as_id), change);
-	if (!slots) {
-		mutex_unlock(&kvm->slots_arch_lock);
-		return -ENOMEM;
-	}
-
 	if (change == KVM_MR_DELETE || change == KVM_MR_MOVE) {
 		/*
-		 * Note, the INVALID flag needs to be in the appropriate entry
-		 * in the freshly allocated memslots, not in @old or @new.
+		 * Mark the current slot INVALID.
+		 * This must be done on the temporary slot to avoid
+		 * modifying the current slot in the active tree.
 		 */
-		slot = id_to_memslot(slots, old->id);
-		slot->flags |= KVM_MEMSLOT_INVALID;
+		kvm_copy_memslot(slotina, slotact);
+		slotina->flags |= KVM_MEMSLOT_INVALID;
+		kvm_replace_memslot(inactive, slotact, slotina);
 
 		/*
-		 * We can re-use the memory from the old memslots.
-		 * It will be overwritten with a copy of the new memslots
-		 * after reacquiring the slots_arch_lock below.
-		 */
-		slots = install_new_memslots(kvm, as_id, slots);
+		 * Activate the slot that is now marked INVALID, but don't
+		 * propagate the slot to the now inactive slots. The slot is
+		 * either going to be deleted or recreated as a new slot.
+		*/
+		kvm_swap_active_memslots(kvm, as_id, &active, &inactive);
 
-		/* From this point no new shadow pages pointing to a deleted,
+		/*
+		 * The temporary and current slot have swapped roles,
+		 * slotina is now in the active set and slotact is not,
+		 * so swap the variables appropriately, too.
+		 */
+		swap(slotina, slotact);
+
+		/*
+		 * From this point no new shadow pages pointing to a deleted,
 		 * or moved, memslot will be created.
 		 *
 		 * validation of sp->gfn happens in:
 		 *	- gfn_to_hva (kvm_read_guest, gfn_to_pfn)
 		 *	- kvm_is_visible_gfn (mmu_check_root)
 		 */
-		kvm_arch_flush_shadow_memslot(kvm, slot);
+		kvm_arch_flush_shadow_memslot(kvm, slotact);
 
-		/* Released in install_new_memslots. */
+		/* Was released by kvm_swap_active_memslots, reacquire. */
 		mutex_lock(&kvm->slots_arch_lock);
+	}
 
+	if (change != KVM_MR_CREATE) {
 		/*
-		 * The arch-specific fields of the memslots could have changed
-		 * between releasing the slots_arch_lock in
-		 * install_new_memslots and here, so get a fresh copy of these
-		 * fields.
+		 * The arch-specific fields of the memslot could have changed
+		 * between reading them and taking slots_arch_lock in one of two
+		 * places above.
+		 * That includes old and new which were read in __kvm_set_memory_region.
 		 */
-		kvm_copy_memslots_arch(slots, __kvm_memslots(kvm, as_id));
+		old->arch = new->arch = slotina->arch = slotact->arch;
 	}
 
 	r = kvm_arch_prepare_memory_region(kvm, old, new, mem, change);
-	if (r)
-		goto out_slots;
+	if (r) {
+		if (change == KVM_MR_DELETE || change == KVM_MR_MOVE) {
+			/*
+			 * Revert the above INVALID change.
+			 * No modifications required since the original slot
+			 * was preserved in the inactive slots.
+			 * This also frees the temporary slot and releases slots_arch_lock.
+			 */
+			kvm_activate_memslot(kvm, as_id, &active, &inactive, slotact, slotina);
+		} else {
+			mutex_unlock(&kvm->slots_arch_lock);
+			kfree(slotina);
+		}
+		return r;
+	}
 
-	update_memslots(slots, new, change);
-	slots = install_new_memslots(kvm, as_id, slots);
+	if (change == KVM_MR_MOVE) {
+		/*
+		 * The memslot's gfn is changing, remove it from the inactive
+		 * tree, it will be re-added with its updated gfn. Because its
+		 * range is changing, an in-place replace is not possible.
+		 */
+		kvm_memslot_gfn_erase(inactive, slotina);
 
+		slotina->base_gfn = new->base_gfn;
+		slotina->flags = new->flags;
+		slotina->dirty_bitmap = new->dirty_bitmap;
+		/* kvm_arch_prepare_memory_region() might have modified arch */
+		slotina->arch = new->arch;
+
+		/* Re-add to the gfn tree with the updated gfn */
+		kvm_memslot_gfn_insert(inactive, slotina);
+
+		/* Replace the current INVALID slot with the updated memslot. */
+		kvm_activate_memslot(kvm, as_id, &active, &inactive, slotact, slotina);
+	} else if (change == KVM_MR_FLAGS_ONLY) {
+		/*
+		 * Similar to the MOVE case, but the slot doesn't need to be
+		 * zapped as an intermediate step. Instead, the old memslot is
+		 * simply replaced with a new, updated copy in both memslot sets.
+		 *
+		 * Since the memslot gfn is unchanged, kvm_copy_replace_memslot()
+		 * and kvm_memslot_gfn_replace() can be used to switch the node
+		 * in the gfn tree instead of removing the old and inserting the
+		 * new as two separate operations. Replacement is a single O(1)
+		 * operation versus two O(log(n)) operations for remove+insert.
+		 */
+		kvm_copy_memslot(slotina, slotact);
+		slotina->flags = new->flags;
+		slotina->dirty_bitmap = new->dirty_bitmap;
+		/* kvm_arch_prepare_memory_region() might have modified arch */
+		slotina->arch = new->arch;
+		kvm_replace_memslot(inactive, slotact, slotina);
+
+		kvm_activate_memslot(kvm, as_id, &active, &inactive, slotact, slotina);
+	} else if (change == KVM_MR_CREATE) {
+		/*
+		 * Add the new memslot to the inactive set as a copy of the
+		 * new memslot data provided by userspace.
+		 */
+		kvm_copy_memslot(slotina, new);
+		kvm_replace_memslot(inactive, NULL, slotina);
+
+		kvm_activate_memslot(kvm, as_id, &active, &inactive, NULL, slotina);
+	} else if (change == KVM_MR_DELETE) {
+		/*
+		 * Remove the old memslot (in the inactive memslots)
+		 * by passing NULL as the new slot.
+		 */
+		kvm_replace_memslot(inactive, slotina, NULL);
+		kvm_activate_memslot(kvm, as_id, &active, &inactive, slotact, NULL);
+	} else {
+		BUG();
+	}
+
+	/*
+	 * No need to refresh new->arch since this runs without slots_arch_lock anyway
+	 * (was released by kvm_activate_memslot call in one of the branches above).
+	 */
 	kvm_arch_commit_memory_region(kvm, mem, old, new, change);
 
-	kvfree(slots);
-	return 0;
+	/*
+	 * Free the memslot and its metadata.
+	 * Note, slotact and slotina hold the same metadata, but slotact
+	 * was freed by kvm_activate_memslot(). It's slotina's turn now.
+	 */
+	if (change == KVM_MR_DELETE)
+		kvm_free_memslot(kvm, slotina);
 
-out_slots:
-	if (change == KVM_MR_DELETE || change == KVM_MR_MOVE) {
-		slots = install_new_memslots(kvm, as_id, slots);
-	} else {
-		mutex_unlock(&kvm->slots_arch_lock);
-	}
-	kvfree(slots);
-	return r;
+	return 0;
 }
 
 static int kvm_delete_memslot(struct kvm *kvm,
@@ -1688,7 +1664,6 @@ static int kvm_delete_memslot(struct kvm *kvm,
 			      struct kvm_memory_slot *old, int as_id)
 {
 	struct kvm_memory_slot new;
-	int r;
 
 	if (!old->npages)
 		return -EINVAL;
@@ -1701,12 +1676,7 @@ static int kvm_delete_memslot(struct kvm *kvm,
 	 */
 	new.as_id = as_id;
 
-	r = kvm_set_memslot(kvm, mem, old, &new, as_id, KVM_MR_DELETE);
-	if (r)
-		return r;
-
-	kvm_free_memslot(kvm, old);
-	return 0;
+	return kvm_set_memslot(kvm, mem, old, &new, as_id, KVM_MR_DELETE);
 }
 
 /*
@@ -1749,12 +1719,6 @@ int __kvm_set_memory_region(struct kvm *kvm,
 	if (mem->guest_phys_addr + mem->memory_size < mem->guest_phys_addr)
 		return -EINVAL;
 
-	/*
-	 * Make a full copy of the old memslot, the pointer will become stale
-	 * when the memslots are re-sorted by update_memslots(), and the old
-	 * memslot needs to be referenced after calling update_memslots(), e.g.
-	 * to free its resources and for arch specific behavior.
-	 */
 	tmp = id_to_memslot(__kvm_memslots(kvm, as_id), id);
 	if (tmp) {
 		old = *tmp;
@@ -1800,8 +1764,10 @@ int __kvm_set_memory_region(struct kvm *kvm,
 	}
 
 	if ((change == KVM_MR_CREATE) || (change == KVM_MR_MOVE)) {
+		int bkt;
+
 		/* Check for overlaps */
-		kvm_for_each_memslot(tmp, __kvm_memslots(kvm, as_id)) {
+		kvm_for_each_memslot(tmp, bkt, __kvm_memslots(kvm, as_id)) {
 			if (tmp->id == id)
 				continue;
 			if (!((new.base_gfn + new.npages <= tmp->base_gfn) ||
@@ -2138,21 +2104,30 @@ EXPORT_SYMBOL_GPL(gfn_to_memslot);
 struct kvm_memory_slot *kvm_vcpu_gfn_to_memslot(struct kvm_vcpu *vcpu, gfn_t gfn)
 {
 	struct kvm_memslots *slots = kvm_vcpu_memslots(vcpu);
+	u64 gen = slots->generation;
 	struct kvm_memory_slot *slot;
-	int slot_index;
 
-	slot = try_get_memslot(slots, vcpu->last_used_slot, gfn);
+	/*
+	 * This also protects against using a memslot from a different address space,
+	 * since different address spaces have different generation numbers.
+	 */
+	if (unlikely(gen != vcpu->last_used_slot_gen)) {
+		vcpu->last_used_slot = NULL;
+		vcpu->last_used_slot_gen = gen;
+	}
+
+	slot = try_get_memslot(vcpu->last_used_slot, gfn);
 	if (slot)
 		return slot;
 
 	/*
 	 * Fall back to searching all memslots. We purposely use
 	 * search_memslots() instead of __gfn_to_memslot() to avoid
-	 * thrashing the VM-wide last_used_index in kvm_memslots.
+	 * thrashing the VM-wide last_used_slot in kvm_memslots.
 	 */
-	slot = search_memslots(slots, gfn, &slot_index, false);
+	slot = search_memslots(slots, gfn, false);
 	if (slot) {
-		vcpu->last_used_slot = slot_index;
+		vcpu->last_used_slot = slot;
 		return slot;
 	}
 

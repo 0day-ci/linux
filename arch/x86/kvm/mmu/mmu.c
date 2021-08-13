@@ -5643,8 +5643,10 @@ void kvm_zap_gfn_range(struct kvm *kvm, gfn_t gfn_start, gfn_t gfn_end)
 
 	if (kvm_memslots_have_rmaps(kvm)) {
 		for (i = 0; i < KVM_ADDRESS_SPACE_NUM; i++) {
+			int bkt;
+
 			slots = __kvm_memslots(kvm, i);
-			kvm_for_each_memslot(memslot, slots) {
+			kvm_for_each_memslot(memslot, bkt, slots) {
 				gfn_t start, end;
 
 				start = max(gfn_start, memslot->base_gfn);
