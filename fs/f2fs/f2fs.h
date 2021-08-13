@@ -1254,6 +1254,7 @@ enum {
 	SBI_QUOTA_NEED_REPAIR,			/* quota file may be corrupted */
 	SBI_IS_RESIZEFS,			/* resizefs is in process */
 };
+extern char *s_flag[];
 
 enum {
 	CP_TIME,
