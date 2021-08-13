@@ -193,12 +193,12 @@ static void fuse_link_write_file(struct file *file)
 	spin_unlock(&fi->lock);
 }
 
-void fuse_finish_open(struct inode *inode, struct file *file)
+void fuse_finish_open(struct inode *inode, struct file *file, bool no_write)
 {
 	struct fuse_file *ff = file->private_data;
 	struct fuse_conn *fc = get_fuse_conn(inode);
 
-	if (!(ff->open_flags & FOPEN_KEEP_CACHE))
+	if (!(ff->open_flags & FOPEN_KEEP_CACHE) && !no_write)
 		invalidate_inode_pages2(inode->i_mapping);
 	if (ff->open_flags & FOPEN_STREAM)
 		stream_open(inode, file);
@@ -229,6 +229,7 @@ int fuse_open_common(struct inode *inode, struct file *file, bool isdir)
 			  fc->writeback_cache;
 	bool dax_truncate = (file->f_flags & O_TRUNC) &&
 			  fc->atomic_o_trunc && FUSE_IS_DAX(inode);
+	bool keep_cache = true;
 
 	if (fuse_is_bad(inode))
 		return -EIO;
@@ -250,8 +251,12 @@ int fuse_open_common(struct inode *inode, struct file *file, bool isdir)
 	}
 
 	err = fuse_do_open(fm, get_node_id(inode), file, isdir);
-	if (!err)
-		fuse_finish_open(inode, file);
+	if (!err) {
+		struct fuse_file *ff = file->private_data;
+
+		fuse_finish_open(inode, file, is_wb_truncate | dax_truncate);
+		keep_cache = ff->open_flags & FOPEN_KEEP_CACHE;
+	}
 
 out:
 	if (dax_truncate)
@@ -259,6 +264,12 @@ out:
 
 	if (is_wb_truncate | dax_truncate) {
 		fuse_release_nowrite(inode);
+		/*
+		 * Only call invalidate_inode_pages2() after removing
+		 * FUSE_NOWRITE, otherwise fuse_launder_page() would deadlock.
+		 */
+		if (!keep_cache)
+			invalidate_inode_pages2(inode->i_mapping);
 		inode_unlock(inode);
 	}
 

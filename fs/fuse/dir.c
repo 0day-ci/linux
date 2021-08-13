@@ -548,7 +548,7 @@ static int fuse_create_open(struct inode *dir, struct dentry *entry,
 		fuse_sync_release(fi, ff, flags);
 	} else {
 		file->private_data = ff;
-		fuse_finish_open(inode, file);
+		fuse_finish_open(inode, file, false);
 	}
 	return err;
 
