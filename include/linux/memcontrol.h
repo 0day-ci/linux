@@ -369,7 +369,6 @@ enum page_memcg_data_flags {
 
 #define MEMCG_DATA_FLAGS_MASK (__NR_MEMCG_DATA_FLAGS - 1)
 
-static inline bool PageMemcgKmem(struct page *page);
 static inline bool folio_memcg_kmem(struct folio *folio);
 
 /*
