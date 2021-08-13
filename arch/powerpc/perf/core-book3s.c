@@ -2260,7 +2260,7 @@ unsigned long perf_instruction_pointer(struct pt_regs *regs)
 		else
 			return regs->nip;
 	} else if (use_siar && siar_valid(regs))
-		return siar + perf_ip_adjust(regs);
+		return siar ? siar + perf_ip_adjust(regs) : regs->nip;
 	else if (use_siar)
 		return 0;		// no valid instruction pointer
 	else
