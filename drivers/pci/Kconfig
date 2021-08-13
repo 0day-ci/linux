@@ -34,6 +34,9 @@ config PCI_DOMAINS_GENERIC
 config PCI_SYSCALL
 	bool
 
+config NEED_PCIE_MAX_MRRS
+	bool
+
 source "drivers/pci/pcie/Kconfig"
 
 config PCI_MSI

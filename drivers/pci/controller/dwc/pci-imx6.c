@@ -1148,6 +1148,7 @@ static int imx6_pcie_probe(struct platform_device *pdev)
 		imx6_pcie->vph = NULL;
 	}
 
+	max_pcie_mrrs = 512;
 	platform_set_drvdata(pdev, imx6_pcie);
 
 	ret = imx6_pcie_attach_pd(dev);
