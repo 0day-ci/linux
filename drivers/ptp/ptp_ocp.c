@@ -301,30 +301,25 @@ ptp_ocp_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	struct ptp_ocp *bp;
 	int err;
 
-	bp = kzalloc(sizeof(*bp), GFP_KERNEL);
+	bp = devm_kzalloc(&pdev->dev, sizeof(*bp), GFP_KERNEL);
 	if (!bp)
 		return -ENOMEM;
 	bp->pdev = pdev;
 	pci_set_drvdata(pdev, bp);
 
-	err = pci_enable_device(pdev);
+	err = pcim_enable_device(pdev);
 	if (err) {
 		dev_err(&pdev->dev, "pci_enable_device\n");
-		goto out_free;
+		return err;
 	}
 
-	err = pci_request_regions(pdev, KBUILD_MODNAME);
+	err = pcim_iomap_regions(pdev, BIT(0), KBUILD_MODNAME);
 	if (err) {
-		dev_err(&pdev->dev, "pci_request_region\n");
-		goto out_disable;
+		dev_err(&pdev->dev, "io_remap bar0\n");
+		return err;
 	}
 
-	bp->base = pci_ioremap_bar(pdev, 0);
-	if (!bp->base) {
-		dev_err(&pdev->dev, "io_remap bar0\n");
-		err = -ENOMEM;
-		goto out_release_regions;
-	}
+	bp->base = pcim_iomap_table(pdev)[0];
 	bp->reg = bp->base + OCP_REGISTER_OFFSET;
 	bp->tod = bp->base + TOD_REGISTER_OFFSET;
 	bp->ptp_info = ptp_ocp_clock_info;
@@ -332,29 +327,17 @@ ptp_ocp_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	err = ptp_ocp_check_clock(bp);
 	if (err)
-		goto out;
+		return err;
 
 	bp->ptp = ptp_clock_register(&bp->ptp_info, &pdev->dev);
 	if (IS_ERR(bp->ptp)) {
 		dev_err(&pdev->dev, "ptp_clock_register\n");
-		err = PTR_ERR(bp->ptp);
-		goto out;
+		return PTR_ERR(bp->ptp);
 	}
 
 	ptp_ocp_info(bp);
 
 	return 0;
-
-out:
-	pci_iounmap(pdev, bp->base);
-out_release_regions:
-	pci_release_regions(pdev);
-out_disable:
-	pci_disable_device(pdev);
-out_free:
-	kfree(bp);
-
-	return err;
 }
 
 static void
@@ -363,11 +346,6 @@ ptp_ocp_remove(struct pci_dev *pdev)
 	struct ptp_ocp *bp = pci_get_drvdata(pdev);
 
 	ptp_clock_unregister(bp->ptp);
-	pci_iounmap(pdev, bp->base);
-	pci_release_regions(pdev);
-	pci_disable_device(pdev);
-	pci_set_drvdata(pdev, NULL);
-	kfree(bp);
 }
 
 static struct pci_driver ptp_ocp_driver = {
