@@ -84,6 +84,10 @@ struct irq_domain *pci_host_bridge_of_msi_domain(struct pci_bus *bus)
 	if (!bus->dev.of_node)
 		return NULL;
 
+	/* Find the host bridge bus */
+	while (!pci_is_root_bus(bus))
+		bus = bus->parent;
+
 	/* Start looking for a phandle to an MSI controller. */
 	d = of_msi_get_domain(&bus->dev, bus->dev.of_node, DOMAIN_BUS_PCI_MSI);
 	if (d)
