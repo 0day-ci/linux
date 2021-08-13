@@ -481,6 +481,12 @@ static void kvm_null_fn(void)
 }
 #define IS_KVM_NULL_FN(fn) ((fn) == (void *)kvm_null_fn)
 
+/* Iterate over each memslot intersecting [start, last] (inclusive) range */
+#define kvm_for_each_memslot_in_hva_range(node, slots, start, last)	     \
+	for (node = interval_tree_iter_first(&slots->hva_tree, start, last); \
+	     node;							     \
+	     node = interval_tree_iter_next(node, start, last))	     \
+
 static __always_inline int __kvm_handle_hva_range(struct kvm *kvm,
 						  const struct kvm_hva_range *range)
 {
@@ -490,6 +496,9 @@ static __always_inline int __kvm_handle_hva_range(struct kvm *kvm,
 	struct kvm_memslots *slots;
 	int i, idx;
 
+	if (WARN_ON_ONCE(range->end <= range->start))
+		return 0;
+
 	/* A null handler is allowed if and only if on_lock() is provided. */
 	if (WARN_ON_ONCE(IS_KVM_NULL_FN(range->on_lock) &&
 			 IS_KVM_NULL_FN(range->handler)))
@@ -498,15 +507,17 @@ static __always_inline int __kvm_handle_hva_range(struct kvm *kvm,
 	idx = srcu_read_lock(&kvm->srcu);
 
 	for (i = 0; i < KVM_ADDRESS_SPACE_NUM; i++) {
+		struct interval_tree_node *node;
+
 		slots = __kvm_memslots(kvm, i);
-		kvm_for_each_memslot(slot, slots) {
+		kvm_for_each_memslot_in_hva_range(node, slots,
+						  range->start, range->end - 1) {
 			unsigned long hva_start, hva_end;
 
+			slot = container_of(node, struct kvm_memory_slot, hva_node);
 			hva_start = max(range->start, slot->userspace_addr);
 			hva_end = min(range->end, slot->userspace_addr +
 						  (slot->npages << PAGE_SHIFT));
-			if (hva_start >= hva_end)
-				continue;
 
 			/*
 			 * To optimize for the likely case where the address
@@ -845,6 +856,7 @@ static struct kvm_memslots *kvm_alloc_memslots(void)
 	if (!slots)
 		return NULL;
 
+	slots->hva_tree = RB_ROOT_CACHED;
 	hash_init(slots->id_hash);
 
 	return slots;
@@ -1264,10 +1276,14 @@ static inline void kvm_memslot_delete(struct kvm_memslots *slots,
 		atomic_set(&slots->last_used_slot, 0);
 
 	for (i = oldslot - mslots; i < slots->used_slots; i++) {
+		interval_tree_remove(&mslots[i].hva_node, &slots->hva_tree);
 		hash_del(&mslots[i].id_node);
+
 		mslots[i] = mslots[i + 1];
+		interval_tree_insert(&mslots[i].hva_node, &slots->hva_tree);
 		hash_add(slots->id_hash, &mslots[i].id_node, mslots[i].id);
 	}
+	interval_tree_remove(&mslots[i].hva_node, &slots->hva_tree);
 	hash_del(&mslots[i].id_node);
 	mslots[i] = *memslot;
 }
@@ -1287,7 +1303,8 @@ static inline int kvm_memslot_insert_back(struct kvm_memslots *slots)
  * itself is not preserved in the array, i.e. not swapped at this time, only
  * its new index into the array is tracked.  Returns the changed memslot's
  * current index into the memslots array.
- * The memslot at the returned index will not be in @slots->id_hash by then.
+ * The memslot at the returned index will not be in @slots->hva_tree or
+ * @slots->id_hash by then.
  * @memslot is a detached struct with desired final data of the changed slot.
  */
 static inline int kvm_memslot_move_backward(struct kvm_memslots *slots,
@@ -1310,6 +1327,7 @@ static inline int kvm_memslot_move_backward(struct kvm_memslots *slots,
 	 * That's why the memslot has to be first removed from the hash table
 	 * here.
 	 */
+	interval_tree_remove(&mmemslot->hva_node, &slots->hva_tree);
 	hash_del(&mmemslot->id_node);
 
 	/*
@@ -1324,8 +1342,11 @@ static inline int kvm_memslot_move_backward(struct kvm_memslots *slots,
 		WARN_ON_ONCE(memslot->base_gfn == mslots[i + 1].base_gfn);
 
 		/* Shift the next memslot forward one and update its index. */
+		interval_tree_remove(&mslots[i + 1].hva_node, &slots->hva_tree);
 		hash_del(&mslots[i + 1].id_node);
+
 		mslots[i] = mslots[i + 1];
+		interval_tree_insert(&mslots[i].hva_node, &slots->hva_tree);
 		hash_add(slots->id_hash, &mslots[i].id_node, mslots[i].id);
 	}
 	return i;
@@ -1337,10 +1358,12 @@ static inline int kvm_memslot_move_backward(struct kvm_memslots *slots,
  * is not preserved in the array, i.e. not swapped at this time, only its new
  * index into the array is tracked.  Returns the changed memslot's final index
  * into the memslots array.
- * The memslot at the returned index will not be in @slots->id_hash by then.
+ * The memslot at the returned index will not be in @slots->hva_tree or
+ * @slots->id_hash by then.
  * @memslot is a detached struct with desired final data of the new or
  * changed slot.
- * Assumes that the memslot at @start index is not in @slots->id_hash.
+ * Assumes that the memslot at @start index is not in @slots->hva_tree or
+ * @slots->id_hash.
  */
 static inline int kvm_memslot_move_forward(struct kvm_memslots *slots,
 					   struct kvm_memory_slot *memslot,
@@ -1356,8 +1379,11 @@ static inline int kvm_memslot_move_forward(struct kvm_memslots *slots,
 		WARN_ON_ONCE(memslot->base_gfn == mslots[i - 1].base_gfn);
 
 		/* Shift the next memslot back one and update its index. */
+		interval_tree_remove(&mslots[i - 1].hva_node, &slots->hva_tree);
 		hash_del(&mslots[i - 1].id_node);
+
 		mslots[i] = mslots[i - 1];
+		interval_tree_insert(&mslots[i].hva_node, &slots->hva_tree);
 		hash_add(slots->id_hash, &mslots[i].id_node, mslots[i].id);
 	}
 	return i;
@@ -1430,6 +1456,11 @@ static void update_memslots(struct kvm_memslots *slots,
 		 * its index accordingly.
 		 */
 		slots->memslots[i] = *memslot;
+		slots->memslots[i].hva_node.start = memslot->userspace_addr;
+		slots->memslots[i].hva_node.last = memslot->userspace_addr +
+			(memslot->npages << PAGE_SHIFT) - 1;
+		interval_tree_insert(&slots->memslots[i].hva_node,
+				     &slots->hva_tree);
 		hash_add(slots->id_hash, &slots->memslots[i].id_node,
 			 memslot->id);
 	}
@@ -1552,9 +1583,12 @@ static struct kvm_memslots *kvm_dup_memslots(struct kvm_memslots *old,
 
 	kvm_copy_memslots(slots, old);
 
+	slots->hva_tree = RB_ROOT_CACHED;
 	hash_init(slots->id_hash);
-	kvm_for_each_memslot(memslot, slots)
+	kvm_for_each_memslot(memslot, slots) {
+		interval_tree_insert(&memslot->hva_node, &slots->hva_tree);
 		hash_add(slots->id_hash, &memslot->id_node, memslot->id);
+	}
 
 	return slots;
 }
