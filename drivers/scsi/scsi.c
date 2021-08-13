@@ -339,47 +339,43 @@ static int scsi_vpd_inquiry(struct scsi_device *sdev, unsigned char *buffer,
  *
  * SCSI devices may optionally supply Vital Product Data.  Each 'page'
  * of VPD is defined in the appropriate SCSI document (eg SPC, SBC).
- * If the device supports this VPD page, this routine returns a pointer
- * to a buffer containing the data from that page.  The caller is
- * responsible for calling kfree() on this pointer when it is no longer
- * needed.  If we cannot retrieve the VPD page this routine returns %NULL.
+ * If the device supports this VPD page, this routine fills @buf
+ * with the data from that page and return 0. If the VPD page is not
+ * supported or its content cannot be retrieved, -EINVAL is returned.
  */
 int scsi_get_vpd_page(struct scsi_device *sdev, u8 page, unsigned char *buf,
 		      int buf_len)
 {
-	int i, result;
+	int result;
 
 	if (sdev->skip_vpd_pages)
-		goto fail;
+		return -EINVAL;
 
 	/* Ask for all the pages supported by this device */
 	result = scsi_vpd_inquiry(sdev, buf, 0, buf_len);
 	if (result < 4)
-		goto fail;
+		return -EINVAL;
 
 	/* If the user actually wanted this page, we can skip the rest */
 	if (page == 0)
 		return 0;
 
-	for (i = 4; i < min(result, buf_len); i++)
-		if (buf[i] == page)
-			goto found;
-
-	if (i < result && i >= buf_len)
-		/* ran off the end of the buffer, give us benefit of doubt */
+	if (memchr(&buf[4], page, min(result, buf_len)))
 		goto found;
+
+	/* If we ran off the end of the buffer, give us benefit of doubt */
+	if (result > buf_len)
+		goto found;
+
 	/* The device claims it doesn't support the requested page */
-	goto fail;
+	return -EINVAL;
 
  found:
 	result = scsi_vpd_inquiry(sdev, buf, page, buf_len);
 	if (result < 0)
-		goto fail;
+		return -EINVAL;
 
 	return 0;
-
- fail:
-	return -EINVAL;
 }
 EXPORT_SYMBOL_GPL(scsi_get_vpd_page);
 
