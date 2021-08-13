@@ -193,7 +193,7 @@ static int mpol_new_interleave(struct mempolicy *pol, const nodemask_t *nodes)
 {
 	if (nodes_empty(*nodes))
 		return -EINVAL;
-	pol->nodes = *nodes;
+	WRITE_ONCE(pol->nodes, *nodes);
 	return 0;
 }
 
@@ -211,7 +211,7 @@ static int mpol_new_bind(struct mempolicy *pol, const nodemask_t *nodes)
 {
 	if (nodes_empty(*nodes))
 		return -EINVAL;
-	pol->nodes = *nodes;
+	WRITE_ONCE(pol->nodes, *nodes);
 	return 0;
 }
 
@@ -334,7 +334,7 @@ static void mpol_rebind_nodemask(struct mempolicy *pol, const nodemask_t *nodes)
 	if (nodes_empty(tmp))
 		tmp = *nodes;
 
-	pol->nodes = tmp;
+	WRITE_ONCE(pol->nodes, tmp);
 }
 
 static void mpol_rebind_preferred(struct mempolicy *pol,
@@ -1965,7 +1965,8 @@ unsigned int mempolicy_slab_node(void)
  */
 static unsigned offset_il_node(struct mempolicy *pol, unsigned long n)
 {
-	unsigned nnodes = nodes_weight(pol->nodes);
+	nodemask_t nodemask = READ_ONCE(pol->nodes);
+	unsigned nnodes = nodes_weight(nodemask);
 	unsigned target;
 	int i;
 	int nid;
@@ -1973,9 +1974,9 @@ static unsigned offset_il_node(struct mempolicy *pol, unsigned long n)
 	if (!nnodes)
 		return numa_node_id();
 	target = (unsigned int)n % nnodes;
-	nid = first_node(pol->nodes);
+	nid = first_node(nodemask);
 	for (i = 0; i < target; i++)
-		nid = next_node(nid, pol->nodes);
+		nid = next_node(nid, nodemask);
 	return nid;
 }
 
