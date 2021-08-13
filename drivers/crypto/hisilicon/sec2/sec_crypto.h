@@ -8,6 +8,8 @@
 #define SEC_IV_SIZE		24
 #define SEC_MAX_KEY_SIZE	64
 #define SEC_COMM_SCENE		0
+#define SEC_MAX_STREAMS		128
+#define PINGPONG_BUF_NUM	2
 #define SEC_MIN_BLOCK_SZ	1
 
 enum sec_calg {

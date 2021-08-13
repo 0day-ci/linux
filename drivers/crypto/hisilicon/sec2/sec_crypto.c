@@ -77,6 +77,8 @@
 #define SEC_TOTAL_PBUF_SZ	(PAGE_SIZE * SEC_PBUF_PAGE_NUM +	\
 			SEC_PBUF_LEFT_SZ)
 
+#define SEC_SID_BUF_LEN		(PAGE_SIZE)
+#define SEC_MAX_AD_SG_NENT	8
 #define SEC_SQE_LEN_RATE	4
 #define SEC_SQE_CFLAG		2
 #define SEC_SQE_AEAD_FLAG	3
@@ -156,6 +158,89 @@ static void sec_free_req_id(struct sec_req *req)
 	mutex_lock(&qp_ctx->req_lock);
 	idr_remove(&qp_ctx->req_idr, req_id);
 	mutex_unlock(&qp_ctx->req_lock);
+}
+
+static int sec_alloc_stream_id(struct sec_ctx *ctx)
+{
+	int s_id;
+
+	mutex_lock(&ctx->stream_idr_lock);
+
+	s_id = idr_alloc_cyclic(&ctx->stream_idr, NULL,
+				0, SEC_MAX_STREAMS, GFP_ATOMIC);
+
+	mutex_unlock(&ctx->stream_idr_lock);
+	if (unlikely(s_id < 0))
+		dev_err(ctx->dev, "alloc stream id fail!\n");
+
+	return s_id;
+}
+
+static void sec_free_stream_id(struct sec_ctx *ctx, int stream_id)
+{
+	if (unlikely(stream_id < 0 || stream_id >= SEC_MAX_STREAMS)) {
+		dev_err(ctx->dev, "free stream id invalid!\n");
+		return;
+	}
+
+	mutex_lock(&ctx->stream_idr_lock);
+	idr_remove(&ctx->stream_idr, stream_id);
+	mutex_unlock(&ctx->stream_idr_lock);
+}
+
+/* For stream mode, we pre-create buffer to hold some small packets */
+static int sec_stream_mode_init(struct sec_ctx *ctx)
+{
+	u32 buf_len = SEC_MAX_STREAMS * SEC_SID_BUF_LEN * PINGPONG_BUF_NUM;
+	u32 buf_step = SEC_SID_BUF_LEN * PINGPONG_BUF_NUM;
+	struct device *dev = ctx->dev;
+	unsigned int order, i, j;
+	unsigned long buf;
+	void *temp_buf;
+
+	mutex_init(&ctx->stream_idr_lock);
+	idr_init(&ctx->stream_idr);
+
+	order = get_order(buf_len);
+	if (order > MAX_ORDER) {
+		dev_err(dev, "too large order %u for pingpong buf!\n", order);
+		return -ENOMEM;
+	}
+
+	buf = __get_free_pages(GFP_KERNEL, order);
+	if (!buf) {
+		dev_err(dev, "fail to get pingpong pages!\n");
+		return -ENOMEM;
+	}
+
+	/*
+	 * stream 0: | ping buf | pong buf
+	 * stream 1: | ping buf | pong buf
+	 * stream xx: | ping buf | pong buf
+	 * scatterlist ping-pong buffer initiation
+	 */
+	for (j = 0; j < SEC_MAX_STREAMS; j++) {
+		for (i = 0; i < PINGPONG_BUF_NUM; i++) {
+			temp_buf = (void *)(uintptr_t)buf + SEC_SID_BUF_LEN * i;
+
+			sg_init_one(&ctx->pingpong_sg[j][i], temp_buf, SEC_SID_BUF_LEN);
+		}
+		buf = buf + buf_step;
+	}
+
+	return 0;
+}
+
+static void sec_stream_mode_uninit(struct sec_ctx *ctx)
+{
+	struct scatterlist *sgl = &ctx->pingpong_sg[0][0];
+	unsigned int order;
+
+	order = get_order(SEC_SID_BUF_LEN * SEC_MAX_STREAMS * PINGPONG_BUF_NUM);
+
+	free_pages((unsigned long)(uintptr_t)sg_virt(sgl), order);
+
+	idr_destroy(&ctx->stream_idr);
 }
 
 static u8 pre_parse_finished_bd(struct bd_status *status, void *resp)

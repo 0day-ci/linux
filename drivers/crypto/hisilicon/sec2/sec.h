@@ -154,6 +154,16 @@ struct sec_ctx {
 	struct sec_cipher_ctx c_ctx;
 	struct sec_auth_ctx a_ctx;
 	u8 type_supported;
+
+	/*
+	 * For stream mode operations, we don't send data into HW everytime.
+	 * now ahash uses this. To avoid multiple copy, use pingpong buffers.
+	 */
+	struct scatterlist pingpong_sg[SEC_MAX_STREAMS][PINGPONG_BUF_NUM];
+	u8 pingpong_idx[SEC_MAX_STREAMS];
+	u32 pp_data_len[SEC_MAX_STREAMS][PINGPONG_BUF_NUM];
+	struct idr stream_idr;
+	struct mutex stream_idr_lock;
 	struct device *dev;
 };
 
