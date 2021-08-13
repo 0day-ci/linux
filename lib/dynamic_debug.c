@@ -529,7 +529,7 @@ static int ddebug_exec_queries(char *query, const char *modname)
 		if (!query || !*query || *query == '#')
 			continue;
 
-		vpr_info("query %d: \"%s\"\n", i, query);
+		vpr_info("query %d: \"%s\" %s\n", i, query, (modname) ? modname : "");
 
 		rc = ddebug_exec_query(query, modname);
 		if (rc < 0) {
@@ -1154,3 +1154,63 @@ early_initcall(dynamic_debug_init);
 
 /* Debugfs setup must be done later */
 fs_initcall(dynamic_debug_init_control);
+
+#include <linux/moduleparam.h>
+
+#define OUR_QUERY_SIZE 128 /* typically need <40 */
+
+/**
+ * param_set_dyndbg() - drm.debug style bitmap to format-prefix categories
+ * @instr: string echo>d to sysfs
+ * @kp:    struct kernel_param* ->data has bitmap
+ * Exported to support DEFINE_DYNAMIC_DEBUG_CATEGORIES
+ */
+int param_set_dyndbg(const char *instr, const struct kernel_param *kp)
+{
+	unsigned long inbits;
+	int rc, i, chgct = 0, totct = 0;
+	char query[OUR_QUERY_SIZE];
+	struct dyndbg_bitdesc *bitmap = (struct dyndbg_bitdesc *) kp->data;
+
+	rc = kstrtoul(instr, 0, &inbits);
+	if (rc) {
+		pr_err("set_dyndbg: failed\n");
+		return -EINVAL;
+	}
+	vpr_info("set_dyndbg: input 0x%lx\n", inbits);
+
+	for (i = 0; !!bitmap[i].prefix; i++) {
+
+		sprintf(query, "format '^%s' %cp", bitmap[i].prefix,
+			test_bit(i, &inbits) ? '+' : '-');
+
+		chgct = dynamic_debug_exec_queries(query, kp->mod->name);
+
+		v2pr_info("bit-%d: %d changes by '%s'\n", i, chgct, query);
+		totct += chgct;
+	}
+	vpr_info("total changes: %d\n", totct);
+	return 0;
+}
+EXPORT_SYMBOL(param_set_dyndbg);
+
+/**
+ * param_get_dyndbg() - drm.debug style bitmap to format-prefix categories
+ * @buffer: string returned to user via sysfs
+ * @kp:     struct kernel_param*
+ * Exported to support DEFINE_DYNAMIC_DEBUG_CATEGORIES interfaces, not
+ * useful; pr_debugs may be altered after setting via >control
+ */
+int param_get_dyndbg(char *buffer, const struct kernel_param *kp)
+{
+	return scnprintf(buffer, PAGE_SIZE, "%u\n",
+			 *((unsigned int *)kp->arg));
+}
+EXPORT_SYMBOL(param_get_dyndbg);
+
+const struct kernel_param_ops param_ops_dyndbg = {
+	.set = param_set_dyndbg,
+	.get = param_get_dyndbg,
+};
+/* support DEFINE_DYNAMIC_DEBUG_CATEGORIES users */
+EXPORT_SYMBOL(param_ops_dyndbg);

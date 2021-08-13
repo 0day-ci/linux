@@ -52,6 +52,7 @@ struct _ddebug {
 } __attribute__((aligned(8)));
 
 
+struct kernel_param;
 
 #if defined(CONFIG_DYNAMIC_DEBUG_CORE)
 
@@ -181,6 +182,9 @@ void __dynamic_ibdev_dbg(struct _ddebug *descriptor,
 				   KERN_DEBUG, prefix_str, prefix_type,	\
 				   rowsize, groupsize, buf, len, ascii)
 
+int param_set_dyndbg(const char *instr, const struct kernel_param *kp);
+int param_get_dyndbg(char *buffer, const struct kernel_param *kp);
+
 #else /* !CONFIG_DYNAMIC_DEBUG_CORE */
 
 #include <linux/string.h>
@@ -227,6 +231,52 @@ static inline int dynamic_debug_exec_queries(const char *query, const char *modn
 	return 0;
 }
 
+static inline int param_set_dyndbg(const char *instr, const struct kernel_param *kp)
+{ return 0; }
+static inline int param_get_dyndbg(char *buffer, const struct kernel_param *kp)
+{ return 0; }
+
 #endif /* !CONFIG_DYNAMIC_DEBUG_CORE */
+
+struct dyndbg_bitdesc {
+	/* bitpos is inferred from index in containing array */
+	const char *prefix;
+	const char *help;
+};
+
+#if defined(CONFIG_DYNAMIC_DEBUG) || \
+	(defined(CONFIG_DYNAMIC_DEBUG_CORE) && defined(DYNAMIC_DEBUG_MODULE))
+/**
+ * DEFINE_DYNAMIC_DEBUG_CATEGORIES() - define debug categories, bitmap, sysfs-knob
+ * @fsname: parameter basename under /sys
+ * @var:    C-identifier holding state
+ * @_desc:  string summarizing the controls provided
+ * @...:    list of struct dyndbg_bitdesc initializations
+ *
+ * Defines /sys/modules/$modname/parameters/@fsname, and @bit_descs,
+ * which maps bits 0-N to categories of pr_debugs to be controlled.
+ * This is effectively write only, because controlled callsites can be
+ * further modified via >control.
+ *
+ * Also calls MODULE_PARM_DESC(fsname, _desc), with the intent to
+ * generate the bit_legend and apply it to the given bit_descs
+ */
+#define DEFINE_DYNAMIC_DEBUG_CATEGORIES(fsname, var, _desc, ...)	\
+	MODULE_PARM_DESC(fsname, _desc);				\
+	static struct dyndbg_bitdesc const dyndbg_cats_##fsname[] =	\
+		{ __VA_ARGS__, { NULL, NULL } };			\
+	module_param_cbd(fsname, &param_ops_dyndbg, &var, 0644,		\
+			 &dyndbg_cats_##fsname);
+
+#define _DD_cat_(pfx)		{ .prefix = pfx, .help = "help for " pfx }
+#define _DD_cat_help_(pfx)	"\t   " pfx "\t- help for " pfx "\n"
+
+extern const struct kernel_param_ops param_ops_dyndbg;
+#else
+#define DEFINE_DYNAMIC_DEBUG_CATEGORIES(fsname, var, bitmap_desc, ...) \
+	MODULE_PARM_DESC(fsname, "auto: " bitmap_desc);
+#define _DD_cat_(pfx)
+#define _DD_cat_help_(pfx)
+#endif
 
 #endif
