@@ -4,7 +4,6 @@
 #include <linux/err.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
-#include <linux/init.h>
 #include <linux/pci.h>
 #include <linux/ptp_clock_kernel.h>
 
@@ -377,24 +376,7 @@ static struct pci_driver ptp_ocp_driver = {
 	.probe		= ptp_ocp_probe,
 	.remove		= ptp_ocp_remove,
 };
-
-static int __init
-ptp_ocp_init(void)
-{
-	int err;
-
-	err = pci_register_driver(&ptp_ocp_driver);
-	return err;
-}
-
-static void __exit
-ptp_ocp_fini(void)
-{
-	pci_unregister_driver(&ptp_ocp_driver);
-}
-
-module_init(ptp_ocp_init);
-module_exit(ptp_ocp_fini);
+module_pci_driver(ptp_ocp_driver);
 
 MODULE_DESCRIPTION("OpenCompute TimeCard driver");
 MODULE_LICENSE("GPL v2");
