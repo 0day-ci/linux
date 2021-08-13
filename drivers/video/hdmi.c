@@ -1537,37 +1537,29 @@ void hdmi_infoframe_log(const char *level,
 EXPORT_SYMBOL(hdmi_infoframe_log);
 
 /**
- * hdmi_avi_infoframe_unpack() - unpack binary buffer to a HDMI AVI infoframe
+ * hdmi_avi_infoframe_unpack_only() - unpack binary buffer of CTA-861-G AVI
+ *                                    infoframe DataBytes to a HDMI AVI
+ *                                    infoframe
  * @frame: HDMI AVI infoframe
  * @buffer: source buffer
  * @size: size of buffer
  *
- * Unpacks the information contained in binary @buffer into a structured
- * @frame of the HDMI Auxiliary Video (AVI) information frame.
- * Also verifies the checksum as required by section 5.3.5 of the HDMI 1.4
- * specification.
+ * Unpacks CTA-861-G AVI infoframe DataBytes contained in the binary @buffer
+ * into a structured @frame of the HDMI Auxiliary Video Information (AVI)
+ * infoframe.
  *
  * Returns 0 on success or a negative error code on failure.
  */
-static int hdmi_avi_infoframe_unpack(struct hdmi_avi_infoframe *frame,
-				     const void *buffer, size_t size)
+
+int hdmi_avi_infoframe_unpack_only(struct hdmi_avi_infoframe *frame,
+				   const void *buffer, size_t size)
 {
 	const u8 *ptr = buffer;
 
-	if (size < HDMI_INFOFRAME_SIZE(AVI))
-		return -EINVAL;
-
-	if (ptr[0] != HDMI_INFOFRAME_TYPE_AVI ||
-	    ptr[1] != 2 ||
-	    ptr[2] != HDMI_AVI_INFOFRAME_SIZE)
-		return -EINVAL;
-
-	if (hdmi_infoframe_checksum(buffer, HDMI_INFOFRAME_SIZE(AVI)) != 0)
+	if (size < HDMI_AVI_INFOFRAME_SIZE)
 		return -EINVAL;
 
 	hdmi_avi_infoframe_init(frame);
-
-	ptr += HDMI_INFOFRAME_HEADER_SIZE;
 
 	frame->colorspace = (ptr[0] >> 5) & 0x3;
 	if (ptr[0] & 0x10)
@@ -1598,6 +1590,43 @@ static int hdmi_avi_infoframe_unpack(struct hdmi_avi_infoframe *frame,
 	frame->pixel_repeat = ptr[4] & 0xf;
 
 	return 0;
+}
+EXPORT_SYMBOL(hdmi_avi_infoframe_unpack_only);
+
+/**
+ * hdmi_avi_infoframe_unpack() - unpack binary buffer to a HDMI AVI infoframe
+ * @frame: HDMI AVI infoframe
+ * @buffer: source buffer
+ * @size: size of buffer
+ *
+ * Unpacks the information contained in binary @buffer into a structured
+ * @frame of the HDMI Auxiliary Video (AVI) information frame.
+ * Also verifies the checksum as required by section 5.3.5 of the HDMI 1.4
+ * specification.
+ *
+ * Returns 0 on success or a negative error code on failure.
+ */
+static int hdmi_avi_infoframe_unpack(struct hdmi_avi_infoframe *frame,
+				     const void *buffer, size_t size)
+{
+	const u8 *ptr = buffer;
+	int ret;
+
+	if (size < HDMI_INFOFRAME_SIZE(AVI))
+		return -EINVAL;
+
+	if (ptr[0] != HDMI_INFOFRAME_TYPE_AVI ||
+	    ptr[1] != 2 ||
+	    ptr[2] != HDMI_AVI_INFOFRAME_SIZE)
+		return -EINVAL;
+
+	if (hdmi_infoframe_checksum(buffer, HDMI_INFOFRAME_SIZE(AVI)) != 0)
+		return -EINVAL;
+
+	ret = hdmi_avi_infoframe_unpack_only(frame, ptr + HDMI_INFOFRAME_HEADER_SIZE,
+					     size - HDMI_INFOFRAME_HEADER_SIZE);
+
+	return ret;
 }
 
 /**
