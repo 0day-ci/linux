@@ -841,6 +841,17 @@ static int mtk_iommu_mm_dts_parse(struct device *dev,
 	if (!smicomm_node)
 		return -EINVAL;
 
+	/* Find smi-common again if this is smi-sub-common */
+	if (of_property_read_bool(smicomm_node, "mediatek,smi_sub_common")) {
+		of_node_put(smicomm_node); /* put the sub common */
+
+		smicomm_node = of_parse_phandle(smicomm_node, "mediatek,smi", 0);
+		if (!smicomm_node) {
+			dev_err(dev, "sub-comm has no common.\n");
+			return -EINVAL;
+		}
+	}
+
 	plarbdev = of_find_device_by_node(smicomm_node);
 	of_node_put(smicomm_node);
 	data->smicomm_dev = &plarbdev->dev;
