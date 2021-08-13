@@ -5637,18 +5637,25 @@ void kvm_zap_gfn_range(struct kvm *kvm, gfn_t gfn_start, gfn_t gfn_end)
 	int i;
 	bool flush = false;
 
+	if (WARN_ON_ONCE(gfn_end <= gfn_start))
+		return;
+
 	write_lock(&kvm->mmu_lock);
 
 	kvm_inc_notifier_count(kvm, gfn_start, gfn_end);
 
 	if (kvm_memslots_have_rmaps(kvm)) {
 		for (i = 0; i < KVM_ADDRESS_SPACE_NUM; i++) {
-			int bkt;
+			int idx;
+			struct rb_node *node;
 
 			slots = __kvm_memslots(kvm, i);
-			kvm_for_each_memslot(memslot, bkt, slots) {
+			idx = slots->node_idx;
+
+			kvm_for_each_memslot_in_gfn_range(node, slots, gfn_start, gfn_end) {
 				gfn_t start, end;
 
+				memslot = container_of(node, struct kvm_memory_slot, gfn_node[idx]);
 				start = max(gfn_start, memslot->base_gfn);
 				end = min(gfn_end, memslot->base_gfn + memslot->npages);
 				if (start >= end)
