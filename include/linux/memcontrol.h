@@ -257,8 +257,10 @@ struct mem_cgroup {
 
 	unsigned long soft_limit;
 
+#ifdef CONFIG_MEMCG_VMPRESSURE
 	/* vmpressure notifications */
 	struct vmpressure vmpressure;
+#endif
 
 	/*
 	 * Should the OOM killer kill all belonging tasks, had it kill one?
