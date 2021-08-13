@@ -1,0 +1,27 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Device Tree file for NXP LS1028A RDB with dsa master swp5-eno3.
+ *
+ * Copyright 2018-2021 NXP
+ *
+ * Hongbo Wang <hongbo.wang@nxp.com>
+ *
+ */
+
+/dts-v1/;
+#include "fsl-ls1028a-rdb.dts"
+
+&enetc_port3 {
+	status = "okay";
+};
+
+&mscc_felix_port4 {
+	label = "swp4";
+	/delete-property/ ethernet;
+	status = "okay";
+};
+
+&mscc_felix_port5 {
+	ethernet = <&enetc_port3>;
+	status = "okay";
+};
