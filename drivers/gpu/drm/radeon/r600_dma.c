@@ -243,7 +243,7 @@ int r600_dma_ring_test(struct radeon_device *rdev,
 	gpu_addr = rdev->wb.gpu_addr + index;
 
 	tmp = 0xCAFEDEAD;
-	rdev->wb.wb[index/4] = cpu_to_le32(tmp);
+	rdev->wb.wb[index/4] = lower_32_bits(tmp);
 
 	r = radeon_ring_lock(rdev, ring, 4);
 	if (r) {
