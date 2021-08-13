@@ -4915,10 +4915,12 @@ static void drm_parse_hdmi_forum_vsdb(struct drm_connector *connector,
 		u8 dsc_max_slices;
 		struct drm_hdmi_dsc_cap *hdmi_dsc = &hdmi->dsc_cap;
 
-		DRM_DEBUG_KMS("hdmi_21 sink detected. parsing edid\n");
 		max_frl_rate = (hf_vsdb[7] & DRM_EDID_MAX_FRL_RATE_MASK) >> 4;
 		drm_get_max_frl_rate(max_frl_rate, &hdmi->max_lanes,
 				     &hdmi->max_frl_rate_per_lane);
+		if (max_frl_rate)
+			DRM_DEBUG_KMS("hdmi_21 sink detected. parsing edid\n");
+
 		hdmi_dsc->v_1p2 = hf_vsdb[11] & DRM_EDID_DSC_1P2;
 
 		if (hdmi_dsc->v_1p2) {
@@ -5490,6 +5492,18 @@ void drm_set_preferred_mode(struct drm_connector *connector,
 }
 EXPORT_SYMBOL(drm_set_preferred_mode);
 
+static bool is_hdmi21_sink(const struct drm_connector *connector)
+{
+	/*
+	 * FIXME: sil-sii8620 doesn't have a connector around when
+	 * we need one, so we have to be prepared for a NULL connector.
+	 */
+	if (!connector)
+		return true;
+
+	return connector->display_info.hdmi.max_frl_rate_per_lane ? true : false;
+}
+
 static bool is_hdmi2_sink(const struct drm_connector *connector)
 {
 	/*
@@ -5611,8 +5625,18 @@ static u8 drm_mode_cea_vic(const struct drm_connector *connector,
 	 * HDMI 1.4 VIC range: 1 <= VIC <= 64 (CEA-861-D) but
 	 * HDMI 2.0 VIC range: 1 <= VIC <= 107 (CEA-861-F). So we
 	 * have to make sure we dont break HDMI 1.4 sinks.
+	 * Similarly,
+	 * HDMI 2.1 VIC range: 1 <= VIC <= 219 (CEA-861-G), we have
+	 * to make sure we dont break HDMI2.0 sinks.
 	 */
-	if (!is_hdmi2_sink(connector) && vic > 64)
+
+	if (!is_hdmi21_sink(connector) && !is_hdmi2_sink(connector) && vic > 64)
+		return 0;
+
+	if (!is_hdmi21_sink(connector) && vic > 107)
+		return 0;
+
+	if (vic > 219)
 		return 0;
 
 	return vic;
