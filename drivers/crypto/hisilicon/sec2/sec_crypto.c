@@ -2719,6 +2719,80 @@ static int sec_ahash_finup(struct ahash_request *req)
 	return sec_ahash_process(req);
 }
 
+static int digest_hardware_update(struct sec_req *sreq, struct scatterlist *src,
+				  u32 start, u32 nbytes)
+{
+	struct sec_ahash_req *sareq = &sreq->hash_req;
+	struct scatterlist *pingpong_sg;
+	struct sec_ctx *ctx = sreq->ctx;
+	int nents = sg_nents(src);
+	int sid = sareq->sid;
+	u8 idx;
+
+	idx = ctx->pingpong_idx[sid];
+	pingpong_sg = &ctx->pingpong_sg[sid][idx];
+
+	sareq->op = SEC_SHA_UPDATE;
+	sareq->pp_sg = pingpong_sg;
+
+	/* The pingpong buffer can hold the one block input of this request */
+	sg_pcopy_to_buffer(src, nents, sg_virt(pingpong_sg), nbytes, start);
+	ctx->pp_data_len[sid][idx] = nbytes;
+
+	sareq->req_data_len = 0;
+	sareq->pp_data_len = nbytes;
+	sareq->block_data_len = nbytes;
+	sareq->total_data_len += nbytes;
+
+	return ctx->req_op->process(ctx, sreq);
+}
+
+static int sec_ahash_larger_digest(struct ahash_request *req)
+{
+	struct sec_req *sreq = ahash_request_ctx(req);
+	struct sec_ahash_req *sareq = &sreq->hash_req;
+	u32 input_len = req->nbytes;
+	struct scatterlist *pingpong_sg;
+	struct sec_ctx *ctx = sreq->ctx;
+	u32 sid = sareq->sid;
+	u8 idx = ctx->pingpong_idx[sid];
+	u32 start = 0;
+	int ret;
+
+	while (input_len > SEC_SID_BUF_LEN) {
+		/* setting one block size is PAGE_SIZE */
+		req->nbytes = SEC_SID_BUF_LEN;
+		input_len -= SEC_SID_BUF_LEN;
+
+		ret = digest_hardware_update(sreq, req->src, start,
+					     req->nbytes);
+		if (unlikely(ret == -EINVAL)) {
+			pr_err("ahash digest: hardware update process is error!\n");
+			return ret;
+		}
+
+		stream_hash_wait(sareq);
+
+		start += SEC_SID_BUF_LEN;
+	}
+
+	/* last packet send to the hardware */
+	req->nbytes = input_len;
+	sareq->req_data_len = 0;
+
+	pingpong_sg = &ctx->pingpong_sg[sid][idx];
+	sg_pcopy_to_buffer(req->src, sg_nents(req->src), sg_virt(pingpong_sg),
+			   input_len, start);
+	ctx->pp_data_len[sid][idx] = input_len;
+	sareq->pp_data_len = input_len;
+	sareq->block_data_len = input_len;
+	sareq->total_data_len += input_len;
+
+	sareq->op = SEC_SHA_FINAL;
+
+	return ctx->req_op->process(ctx, sreq);
+}
+
 static int sec_ahash_digest(struct ahash_request *req)
 {
 	struct sec_req *sreq = ahash_request_ctx(req);
@@ -2735,6 +2809,8 @@ static int sec_ahash_digest(struct ahash_request *req)
 
 	ctx = sreq->ctx;
 	a_ctx = &ctx->a_ctx;
+	if (req->nbytes > SEC_HW_MAX_LEN)
+		return sec_ahash_larger_digest(req);
 
 	sareq->op = SEC_SHA_DIGEST;
 
