@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2020 Facebook */
 
+#include <linux/bits.h>
 #include <linux/err.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -60,10 +61,10 @@ struct tod_reg {
 #define TOD_CTRL_DISABLE_FMT_A	BIT(17)
 #define TOD_CTRL_DISABLE_FMT_B	BIT(16)
 #define TOD_CTRL_ENABLE		BIT(0)
-#define TOD_CTRL_GNSS_MASK	((1U << 4) - 1)
+#define TOD_CTRL_GNSS_MASK	GENMASK(3, 0)
 #define TOD_CTRL_GNSS_SHIFT	24
 
-#define TOD_STATUS_UTC_MASK	0xff
+#define TOD_STATUS_UTC_MASK	GENMASK(7, 0)
 #define TOD_STATUS_UTC_VALID	BIT(8)
 #define TOD_STATUS_LEAP_VALID	BIT(16)
 
