@@ -1456,6 +1456,7 @@ static void raid1_write_request(struct mddev *mddev, struct bio *bio,
 		goto retry_write;
 	}
 
+	max_sectors = min_t(int, max_sectors, BIO_MAX_VECS * PAGE_SECTORS);
 	if (max_sectors < bio_sectors(bio)) {
 		struct bio *split = bio_split(bio, max_sectors,
 					      GFP_NOIO, &conf->bio_split);
