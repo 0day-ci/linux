@@ -1630,16 +1630,15 @@ static bool kvm_test_age_rmapp(struct kvm *kvm, struct kvm_rmap_head *rmap_head,
 
 #define RMAP_RECYCLE_THRESHOLD 1000
 
-static void rmap_add(struct kvm_vcpu *vcpu, u64 *spte, gfn_t gfn)
+static void rmap_add(struct kvm_vcpu *vcpu, struct kvm_memory_slot *slot,
+		     u64 *spte, gfn_t gfn)
 {
-	struct kvm_memory_slot *slot;
 	struct kvm_mmu_page *sp;
 	struct kvm_rmap_head *rmap_head;
 	int rmap_count;
 
 	sp = sptep_to_sp(spte);
 	kvm_mmu_page_set_gfn(sp, spte - sp->spt, gfn);
-	slot = kvm_vcpu_gfn_to_memslot(vcpu, gfn);
 	rmap_head = gfn_to_rmap(gfn, sp->role.level, slot);
 	rmap_count = pte_list_add(vcpu, spte, rmap_head);
 
@@ -2679,9 +2678,9 @@ static int set_spte(struct kvm_vcpu *vcpu, u64 *sptep,
 	return ret;
 }
 
-static int mmu_set_spte(struct kvm_vcpu *vcpu, u64 *sptep,
-			unsigned int pte_access, bool write_fault, int level,
-			gfn_t gfn, kvm_pfn_t pfn, bool speculative,
+static int mmu_set_spte(struct kvm_vcpu *vcpu, struct kvm_memory_slot *slot,
+			u64 *sptep, unsigned int pte_access, bool write_fault,
+			int level, gfn_t gfn, kvm_pfn_t pfn, bool speculative,
 			bool host_writable)
 {
 	int was_rmapped = 0;
@@ -2744,22 +2743,10 @@ static int mmu_set_spte(struct kvm_vcpu *vcpu, u64 *sptep,
 
 	if (!was_rmapped) {
 		kvm_update_page_stats(vcpu->kvm, level, 1);
-		rmap_add(vcpu, sptep, gfn);
+		rmap_add(vcpu, slot, sptep, gfn);
 	}
 
 	return ret;
-}
-
-static kvm_pfn_t pte_prefetch_gfn_to_pfn(struct kvm_vcpu *vcpu, gfn_t gfn,
-				     bool no_dirty_log)
-{
-	struct kvm_memory_slot *slot;
-
-	slot = gfn_to_memslot_dirty_bitmap(vcpu, gfn, no_dirty_log);
-	if (!slot)
-		return KVM_PFN_ERR_FAULT;
-
-	return gfn_to_pfn_memslot_atomic(slot, gfn);
 }
 
 static int direct_pte_prefetch_many(struct kvm_vcpu *vcpu,
@@ -2782,7 +2769,7 @@ static int direct_pte_prefetch_many(struct kvm_vcpu *vcpu,
 		return -1;
 
 	for (i = 0; i < ret; i++, gfn++, start++) {
-		mmu_set_spte(vcpu, start, access, false, sp->role.level, gfn,
+		mmu_set_spte(vcpu, slot, start, access, false, sp->role.level, gfn,
 			     page_to_pfn(pages[i]), true, true);
 		put_page(pages[i]);
 	}
@@ -2979,7 +2966,7 @@ static int __direct_map(struct kvm_vcpu *vcpu, struct kvm_page_fault *fault)
 			account_huge_nx_page(vcpu->kvm, sp);
 	}
 
-	ret = mmu_set_spte(vcpu, it.sptep, ACC_ALL,
+	ret = mmu_set_spte(vcpu, fault->slot, it.sptep, ACC_ALL,
 			   fault->write, fault->goal_level, base_gfn, fault->pfn,
 			   fault->prefault, fault->map_writable);
 	if (ret == RET_PF_SPURIOUS)
