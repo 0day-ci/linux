@@ -46,6 +46,23 @@ struct kstat {
 	struct timespec64 btime;			/* File creation time */
 	u64		blocks;
 	u64		mnt_id;
+	/*
+	 * BTRFS does not provide unique inode numbers within a filesystem,
+	 * depending on a synthetic 'dev' to provide uniqueness.
+	 * NFSd cannot make use of this 'dev' number so clients often see
+	 * duplicate inode numbers.
+	 * For BTRFS, 'ino' is unlikely to use the high bits.  It puts
+	 * another number in ino_uniquifier which:
+	 * - has most entropy in the high bits
+	 * - is different precisely when 'dev' is different
+	 * - is stable across unmount/remount
+	 * NFSd can xor this with 'ino' to get a substantially more unique
+	 * number for reporting to the client.
+	 * The ino_uniquifier for a directory can reasonably be applied
+	 * to inode numbers reported by the readdir filldir callback.
+	 * It is NOT currently exported to user-space.
+	 */
+	u64		ino_uniquifier;
 };
 
 #endif

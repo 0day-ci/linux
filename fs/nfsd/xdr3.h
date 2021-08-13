@@ -179,6 +179,8 @@ struct nfsd3_readdirres {
 	struct xdr_buf		dirlist;
 	struct svc_fh		scratch;
 	struct readdir_cd	common;
+	u64			dir_ino_uniquifier;
+	int			dir_have_uniquifier;
 	unsigned int		cookie_offset;
 	struct svc_rqst *	rqstp;
 

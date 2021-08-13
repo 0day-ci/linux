@@ -3114,10 +3114,14 @@ out_acl:
 					fhp->fh_handle.fh_size);
 	}
 	if (bmval0 & FATTR4_WORD0_FILEID) {
+		u64 ino = stat.ino;
+		if (stat.ino_uniquifier &&
+		    stat.ino_uniquifier != stat.ino)
+			ino ^= stat.ino_uniquifier;
 		p = xdr_reserve_space(xdr, 8);
 		if (!p)
 			goto out_resource;
-		p = xdr_encode_hyper(p, stat.ino);
+		p = xdr_encode_hyper(p, ino);
 	}
 	if (bmval0 & FATTR4_WORD0_FILES_AVAIL) {
 		p = xdr_reserve_space(xdr, 8);
@@ -3285,6 +3289,9 @@ out_acl:
 			if (err)
 				goto out_nfserr;
 			ino = parent_stat.ino;
+			if (parent_stat.ino_uniquifier &&
+			    parent_stat.ino_uniquifier != ino)
+				ino ^= parent_stat.ino_uniquifier;
 		}
 		p = xdr_encode_hyper(p, ino);
 	}
