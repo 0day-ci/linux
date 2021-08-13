@@ -299,14 +299,11 @@ static int chaoskey_release(struct inode *inode, struct file *file)
 
 	--dev->open;
 
-	if (!dev->present) {
-		if (dev->open == 0) {
-			mutex_unlock(&dev->lock);
+	mutex_unlock(&dev->lock);
+
+	if (!dev->present)
+		if (dev->open == 0)
 			chaoskey_free(dev);
-		} else
-			mutex_unlock(&dev->lock);
-	} else
-		mutex_unlock(&dev->lock);
 
 	usb_dbg(interface, "release success");
 	return 0;
