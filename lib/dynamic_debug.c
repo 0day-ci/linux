@@ -85,6 +85,7 @@ static inline const char *trim_prefix(const char *path)
 
 static struct { unsigned flag:8; char opt_char; } opt_array[] = {
 	{ _DPRINTK_FLAGS_PRINT, 'p' },
+	{ _DPRINTK_FLAGS_PRINT_TRACE, 'T' },
 	{ _DPRINTK_FLAGS_INCL_MODNAME, 'm' },
 	{ _DPRINTK_FLAGS_INCL_FUNCNAME, 'f' },
 	{ _DPRINTK_FLAGS_INCL_LINENO, 'l' },
@@ -146,7 +147,8 @@ static void vpr_info_dq(const struct ddebug_query *query, const char *msg)
  * logs the changes.  Takes ddebug_lock.
  */
 static int ddebug_change(const struct ddebug_query *query,
-			 struct flag_settings *modifiers)
+			 struct flag_settings *modifiers,
+			 int (*tracer)(const char *, char *, char *, struct va_format *))
 {
 	int i;
 	struct ddebug_table *dt;
@@ -205,11 +207,43 @@ static int ddebug_change(const struct ddebug_query *query,
 			newflags = (dp->flags & modifiers->mask) | modifiers->flags;
 			if (newflags == dp->flags)
 				continue;
+
+			/* handle T flag */
+			if (newflags & _DPRINTK_FLAGS_PRINT_TRACE) {
+				if (!tracer)
+					v2pr_info("tracer enable\n");
+				else {
+					/* register attempt */
+					if (!dp->tracer) {
+						v2pr_info("register tracer\n");
+						dp->tracer = tracer;
+					}
+					else if (tracer == dp->tracer)
+						v2pr_info("tracer equal, ok\n");
+					else
+						pr_warn("tracer register error\n");
+				}
+			} else if (dp->flags & _DPRINTK_FLAGS_PRINT_TRACE) {
+				if (!tracer)
+					v2pr_info("ok: disabling\n");
+				else {
+					/* only unregister has a !!tracer */
+					if (!dp->tracer)
+						pr_warn("nok: tracer already unset\n");
+
+					else if (dp->tracer == tracer) {
+						v2pr_info("ok: cookie match, unregistering\n");
+						dp->tracer = NULL;
+					}
+					else
+						pr_warn("nok: tracer cookie match fail\n");
+				}
+			}
 #ifdef CONFIG_JUMP_LABEL
-			if (dp->flags & _DPRINTK_FLAGS_PRINT) {
-				if (!(modifiers->flags & _DPRINTK_FLAGS_PRINT))
+			if (dp->flags & _DPRINTK_ENABLED) {
+				if (!(modifiers->flags & _DPRINTK_ENABLED))
 					static_branch_disable(&dp->key.dd_key_true);
-			} else if (modifiers->flags & _DPRINTK_FLAGS_PRINT)
+			} else if (modifiers->flags & _DPRINTK_ENABLED)
 				static_branch_enable(&dp->key.dd_key_true);
 #endif
 			dp->flags = newflags;
@@ -482,7 +516,7 @@ static int ddebug_parse_flags(const char *str, struct flag_settings *modifiers)
 	return 0;
 }
 
-static int ddebug_exec_query(char *query_string, const char *modname)
+static int ddebug_exec_query(char *query_string, const char *modname, void *tracer)
 {
 	struct flag_settings modifiers = {};
 	struct ddebug_query query = {};
@@ -505,7 +539,7 @@ static int ddebug_exec_query(char *query_string, const char *modname)
 		return -EINVAL;
 	}
 	/* actually go and implement the change */
-	nfound = ddebug_change(&query, &modifiers);
+	nfound = ddebug_change(&query, &modifiers, tracer);
 	vpr_info_dq(&query, nfound ? "applied" : "no-match");
 
 	return nfound;
@@ -515,10 +549,19 @@ static int ddebug_exec_query(char *query_string, const char *modname)
    last error or number of matching callsites.  Module name is either
    in param (for boot arg) or perhaps in query string.
 */
-static int ddebug_exec_queries(char *query, const char *modname)
+static int ddebug_exec_queries(const char *query_in, const char *modname, void *tracer)
 {
 	char *split;
 	int i, errs = 0, exitcode = 0, rc, nfound = 0;
+	char *query; /* writable copy of query_in */
+
+	if (!query_in) {
+		pr_err("non-null query/command string expected\n");
+		return -EINVAL;
+	}
+	query = kstrndup(query_in, PAGE_SIZE, GFP_KERNEL);
+	if (!query)
+		return -ENOMEM;
 
 	for (i = 0; query; query = split) {
 		split = strpbrk(query, ";\n");
@@ -531,7 +574,7 @@ static int ddebug_exec_queries(char *query, const char *modname)
 
 		vpr_info("query %d: \"%s\" %s\n", i, query, (modname) ? modname : "");
 
-		rc = ddebug_exec_query(query, modname);
+		rc = ddebug_exec_query(query, modname, tracer);
 		if (rc < 0) {
 			errs++;
 			exitcode = rc;
@@ -540,6 +583,7 @@ static int ddebug_exec_queries(char *query, const char *modname)
 		}
 		i++;
 	}
+	kfree(query);
 	vpr_info("processed %d queries, with %d matches, %d errs\n",
 		 i, nfound, errs);
 
@@ -560,20 +604,7 @@ static int ddebug_exec_queries(char *query, const char *modname)
  */
 int dynamic_debug_exec_queries(const char *query, const char *modname)
 {
-	int rc;
-	char *qry; /* writable copy of query */
-
-	if (!query) {
-		pr_err("non-null query/command string expected\n");
-		return -EINVAL;
-	}
-	qry = kstrndup(query, PAGE_SIZE, GFP_KERNEL);
-	if (!qry)
-		return -ENOMEM;
-
-	rc = ddebug_exec_queries(qry, modname);
-	kfree(qry);
-	return rc;
+	return ddebug_exec_queries(query, modname, NULL);
 }
 EXPORT_SYMBOL_GPL(dynamic_debug_exec_queries);
 
@@ -637,8 +668,20 @@ void __dynamic_pr_debug(struct _ddebug *descriptor, const char *fmt, ...)
 	vaf.fmt = fmt;
 	vaf.va = &args;
 
-	printk(KERN_DEBUG "%s%pV", dynamic_emit_prefix(descriptor, buf), &vaf);
+	if (descriptor->flags & _DPRINTK_ENABLED)
+		dynamic_emit_prefix(descriptor, buf);
 
+	if (descriptor->flags & _DPRINTK_FLAGS_PRINT)
+		printk(KERN_DEBUG "%s%pV", buf, &vaf);
+
+	if (descriptor->flags & _DPRINTK_FLAGS_PRINT_TRACE) {
+
+		if (descriptor->tracer) {
+			(*descriptor->tracer)("%s:%ps %pV", buf,
+						 __builtin_return_address(0), &vaf);
+		}
+		/* else shouldnt matter, but maybe for consistency */
+	}
 	va_end(args);
 }
 EXPORT_SYMBOL(__dynamic_pr_debug);
@@ -783,7 +826,7 @@ static ssize_t ddebug_proc_write(struct file *file, const char __user *ubuf,
 		return PTR_ERR(tmpbuf);
 	vpr_info("read %d bytes from userspace\n", (int)len);
 
-	ret = ddebug_exec_queries(tmpbuf, NULL);
+	ret = ddebug_exec_queries(tmpbuf, NULL, NULL);
 	kfree(tmpbuf);
 	if (ret < 0)
 		return ret;
@@ -989,7 +1032,7 @@ static int ddebug_dyndbg_param_cb(char *param, char *val,
 	if (strcmp(param, "dyndbg"))
 		return on_err; /* determined by caller */
 
-	ddebug_exec_queries((val ? val : "+p"), modname);
+	ddebug_exec_queries((val ? val : "+p"), modname, NULL);
 
 	return 0; /* query failure shouldn't stop module load */
 }
@@ -1124,7 +1167,7 @@ static int __init dynamic_debug_init(void)
 	/* apply ddebug_query boot param, dont unload tables on err */
 	if (ddebug_setup_string[0] != '\0') {
 		pr_warn("ddebug_query param name is deprecated, change it to dyndbg\n");
-		ret = ddebug_exec_queries(ddebug_setup_string, NULL);
+		ret = ddebug_exec_queries(ddebug_setup_string, NULL, NULL);
 		if (ret < 0)
 			pr_warn("Invalid ddebug boot param %s\n",
 				ddebug_setup_string);
@@ -1214,3 +1257,17 @@ const struct kernel_param_ops param_ops_dyndbg = {
 };
 /* support DEFINE_DYNAMIC_DEBUG_CATEGORIES users */
 EXPORT_SYMBOL(param_ops_dyndbg);
+
+int dynamic_debug_register_tracer(const char *query, const char *mod,
+	int (*tracer) (const char *fmt, char *prefix, char *label, struct va_format *vaf))
+{
+	return ddebug_exec_queries(query, mod, tracer);
+}
+EXPORT_SYMBOL(dynamic_debug_register_tracer);
+
+int dynamic_debug_unregister_tracer(const char *query, const char *mod,
+	int (*tracer) (const char *fmt, char *prefix, char *label, struct va_format *vaf))
+{
+	return ddebug_exec_queries(query, mod, tracer);
+}
+EXPORT_SYMBOL(dynamic_debug_unregister_tracer);
