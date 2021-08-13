@@ -15,6 +15,7 @@
 
 #include <linux/bitmap.h>
 #include <linux/compat.h>
+#include <linux/netlink.h>
 #include <uapi/linux/ethtool.h>
 
 struct compat_ethtool_rx_flow_spec {
@@ -171,6 +172,11 @@ struct ethtool_link_ksettings {
 extern int
 __ethtool_get_link_ksettings(struct net_device *dev,
 			     struct ethtool_link_ksettings *link_ksettings);
+
+struct kernel_ethtool_coalesce {
+	u8 use_cqe_mode_tx;
+	u8 use_cqe_mode_rx;
+};
 
 /**
  * ethtool_intersect_link_masks - Given two link masks, AND them together
@@ -606,8 +612,14 @@ struct ethtool_ops {
 			      struct ethtool_eeprom *, u8 *);
 	int	(*set_eeprom)(struct net_device *,
 			      struct ethtool_eeprom *, u8 *);
-	int	(*get_coalesce)(struct net_device *, struct ethtool_coalesce *);
-	int	(*set_coalesce)(struct net_device *, struct ethtool_coalesce *);
+	int	(*get_coalesce)(struct net_device *,
+				struct ethtool_coalesce *,
+				struct kernel_ethtool_coalesce *,
+				struct netlink_ext_ack *);
+	int	(*set_coalesce)(struct net_device *,
+				struct ethtool_coalesce *,
+				struct kernel_ethtool_coalesce *,
+				struct netlink_ext_ack *);
 	void	(*get_ringparam)(struct net_device *,
 				 struct ethtool_ringparam *);
 	int	(*set_ringparam)(struct net_device *,
