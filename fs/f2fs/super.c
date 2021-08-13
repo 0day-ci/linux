@@ -2103,12 +2103,15 @@ static int f2fs_remount(struct super_block *sb, int *flags, char *data)
 	bool need_restart_gc = false, need_stop_gc = false;
 	bool need_restart_ckpt = false, need_stop_ckpt = false;
 	bool need_restart_flush = false, need_stop_flush = false;
+	bool need_enable_ckpt = false, need_disable_ckpt = false;
 	bool no_extent_cache = !test_opt(sbi, EXTENT_CACHE);
 	bool enable_checkpoint = !test_opt(sbi, DISABLE_CHECKPOINT);
 	bool no_io_align = !F2FS_IO_ALIGNED(sbi);
 	bool no_atgc = !test_opt(sbi, ATGC);
+	bool no_discard = !test_opt(sbi, DISCARD);
 	bool no_compress_cache = !test_opt(sbi, COMPRESS_CACHE);
 	bool block_unit_discard = f2fs_block_unit_discard(sbi);
+	struct discard_cmd_control *dcc;
 #ifdef CONFIG_QUOTA
 	int i, j;
 #endif
@@ -2276,7 +2279,7 @@ static int f2fs_remount(struct super_block *sb, int *flags, char *data)
 	} else {
 		err = f2fs_create_flush_cmd_control(sbi);
 		if (err)
-			goto restore_ckpt;
+			goto restore_ckpt_thread;
 		need_stop_flush = true;
 	}
 
@@ -2285,8 +2288,28 @@ static int f2fs_remount(struct super_block *sb, int *flags, char *data)
 			err = f2fs_disable_checkpoint(sbi);
 			if (err)
 				goto restore_flush;
+			need_enable_ckpt = true;
 		} else {
 			f2fs_enable_checkpoint(sbi);
+			need_disable_ckpt = true;
+		}
+	}
+
+	if (no_discard == !!test_opt(sbi, DISCARD)) {
+		if (test_opt(sbi, DISCARD)) {
+			err = f2fs_start_discard_thread(sbi);
+			if (err)
+				goto restore_ckpt;
+
+		} else {
+			dcc = SM_I(sbi)->dcc_info;
+			if (!dcc) {
+				err = -EINVAL;
+				goto restore_ckpt;
+			}
+			f2fs_stop_discard_thread(sbi);
+			if (unlikely(atomic_read(&dcc->discard_cmd_cnt)))
+				f2fs_issue_discard_timeout(sbi);
 		}
 	}
 
@@ -2304,6 +2327,13 @@ skip:
 	adjust_unusable_cap_perc(sbi);
 	*flags = (*flags & ~SB_LAZYTIME) | (sb->s_flags & SB_LAZYTIME);
 	return 0;
+restore_ckpt:
+	if (need_enable_ckpt) {
+		f2fs_enable_checkpoint(sbi);
+	} else if (need_disable_ckpt) {
+		if (f2fs_disable_checkpoint(sbi))
+			f2fs_warn(sbi, "checkpoint has been enable");
+	}
 restore_flush:
 	if (need_restart_flush) {
 		if (f2fs_create_flush_cmd_control(sbi))
@@ -2312,7 +2342,7 @@ restore_flush:
 		clear_opt(sbi, FLUSH_MERGE);
 		f2fs_destroy_flush_cmd_control(sbi, false);
 	}
-restore_ckpt:
+restore_ckpt_thread:
 	if (need_restart_ckpt) {
 		if (f2fs_start_ckpt_thread(sbi))
 			f2fs_warn(sbi, "background ckpt thread has stopped");
