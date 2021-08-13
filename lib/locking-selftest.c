@@ -196,7 +196,7 @@ static void init_shared_classes(void)
 	local_irq_disable();			\
 	__irq_enter();				\
 	lockdep_hardirq_threaded();		\
-	WARN_ON(!in_irq());
+	WARN_ON(!in_hardirq());
 
 #define HARDIRQ_EXIT()				\
 	__irq_exit();				\
@@ -2456,7 +2456,7 @@ static void hardirq_exit(int *_)
 	int notthreaded_hardirq_guard_##name __guard(hardirq_exit);	\
 	local_irq_disable();						\
 	__irq_enter();							\
-	WARN_ON(!in_irq());
+	WARN_ON(!in_hardirq());
 
 static void softirq_exit(int *_)
 {
