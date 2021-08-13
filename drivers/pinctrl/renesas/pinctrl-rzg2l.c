@@ -1077,7 +1077,7 @@ static int rzg2l_pinctrl_register(struct rzg2l_pinctrl *pctrl)
 	if (ret) {
 		dev_err(pctrl->dev, "failed to add GPIO chip: %i\n", ret);
 		return ret;
-	};
+	}
 
 	return 0;
 }
@@ -1111,7 +1111,7 @@ static int rzg2l_pinctrl_probe(struct platform_device *pdev)
 		ret = PTR_ERR(pctrl->clk);
 		dev_err(pctrl->dev, "failed to get GPIO clk : %i\n", ret);
 		return ret;
-	};
+	}
 
 	spin_lock_init(&pctrl->lock);
 
@@ -1121,7 +1121,7 @@ static int rzg2l_pinctrl_probe(struct platform_device *pdev)
 	if (ret) {
 		dev_err(pctrl->dev, "failed to enable GPIO clk: %i\n", ret);
 		return ret;
-	};
+	}
 
 	ret = devm_add_action_or_reset(&pdev->dev, rzg2l_pinctrl_clk_disable,
 				       pctrl->clk);
