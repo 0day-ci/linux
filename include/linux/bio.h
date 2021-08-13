@@ -5,7 +5,6 @@
 #ifndef __LINUX_BIO_H
 #define __LINUX_BIO_H
 
-#include <linux/highmem.h>
 #include <linux/mempool.h>
 #include <linux/ioprio.h>
 /* struct bio, bio_vec and BIO_* flags are defined in blk_types.h */
@@ -375,7 +374,7 @@ static inline void bip_set_seed(struct bio_integrity_payload *bip,
 
 #endif /* CONFIG_BLK_DEV_INTEGRITY */
 
-extern void bio_trim(struct bio *bio, int offset, int size);
+void bio_trim(struct bio *bio, sector_t offset, sector_t size);
 extern struct bio *bio_split(struct bio *bio, int sectors,
 			     gfp_t gfp, struct bio_set *bs);
 
@@ -401,6 +400,7 @@ static inline struct bio *bio_next_split(struct bio *bio, int sectors,
 enum {
 	BIOSET_NEED_BVECS = BIT(0),
 	BIOSET_NEED_RESCUER = BIT(1),
+	BIOSET_PERCPU_CACHE = BIT(2),
 };
 extern int bioset_init(struct bio_set *, unsigned int, unsigned int, int flags);
 extern void bioset_exit(struct bio_set *);
@@ -408,6 +408,8 @@ extern int biovec_init_pool(mempool_t *pool, int pool_entries);
 extern int bioset_init_from_src(struct bio_set *bs, struct bio_set *src);
 
 struct bio *bio_alloc_bioset(gfp_t gfp, unsigned short nr_iovecs,
+		struct bio_set *bs);
+struct bio *bio_alloc_kiocb(struct kiocb *kiocb, gfp_t, unsigned short nr_vecs,
 		struct bio_set *bs);
 struct bio *bio_kmalloc(gfp_t gfp_mask, unsigned short nr_iovecs);
 extern void bio_put(struct bio *);
@@ -519,47 +521,6 @@ static inline void bio_clone_blkg_association(struct bio *dst,
 					      struct bio *src) { }
 #endif	/* CONFIG_BLK_CGROUP */
 
-#ifdef CONFIG_HIGHMEM
-/*
- * remember never ever reenable interrupts between a bvec_kmap_irq and
- * bvec_kunmap_irq!
- */
-static inline char *bvec_kmap_irq(struct bio_vec *bvec, unsigned long *flags)
-{
-	unsigned long addr;
-
-	/*
-	 * might not be a highmem page, but the preempt/irq count
-	 * balancing is a lot nicer this way
-	 */
-	local_irq_save(*flags);
-	addr = (unsigned long) kmap_atomic(bvec->bv_page);
-
-	BUG_ON(addr & ~PAGE_MASK);
-
-	return (char *) addr + bvec->bv_offset;
-}
-
-static inline void bvec_kunmap_irq(char *buffer, unsigned long *flags)
-{
-	unsigned long ptr = (unsigned long) buffer & PAGE_MASK;
-
-	kunmap_atomic((void *) ptr);
-	local_irq_restore(*flags);
-}
-
-#else
-static inline char *bvec_kmap_irq(struct bio_vec *bvec, unsigned long *flags)
-{
-	return page_address(bvec->bv_page) + bvec->bv_offset;
-}
-
-static inline void bvec_kunmap_irq(char *buffer, unsigned long *flags)
-{
-	*flags = 0;
-}
-#endif
-
 /*
  * BIO list management for use by remapping drivers (e.g. DM or MD) and loop.
  *
@@ -652,18 +613,22 @@ static inline struct bio *bio_list_peek(struct bio_list *bl)
 	return bl->head;
 }
 
-static inline struct bio *bio_list_pop(struct bio_list *bl)
+static inline void bio_list_del_head(struct bio_list *bl, struct bio *head)
 {
-	struct bio *bio = bl->head;
-
-	if (bio) {
+	if (head) {
 		bl->head = bl->head->bi_next;
 		if (!bl->head)
 			bl->tail = NULL;
 
-		bio->bi_next = NULL;
+		head->bi_next = NULL;
 	}
+}
 
+static inline struct bio *bio_list_pop(struct bio_list *bl)
+{
+	struct bio *bio = bl->head;
+
+	bio_list_del_head(bl, bio);
 	return bio;
 }
 
@@ -698,6 +663,12 @@ static inline void bio_inc_remaining(struct bio *bio)
 struct bio_set {
 	struct kmem_cache *bio_slab;
 	unsigned int front_pad;
+
+	/*
+	 * per-cpu bio alloc cache and notifier
+	 */
+	struct bio_alloc_cache __percpu *cache;
+	struct hlist_node cpuhp_dead;
 
 	mempool_t bio_pool;
 	mempool_t bvec_pool;

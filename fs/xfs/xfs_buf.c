@@ -315,7 +315,6 @@ xfs_buf_alloc_kmem(
 	struct xfs_buf	*bp,
 	xfs_buf_flags_t	flags)
 {
-	int		align_mask = xfs_buftarg_dma_alignment(bp->b_target);
 	xfs_km_flags_t	kmflag_mask = KM_NOFS;
 	size_t		size = BBTOB(bp->b_length);
 
@@ -323,7 +322,7 @@ xfs_buf_alloc_kmem(
 	if (!(flags & XBF_READ))
 		kmflag_mask |= KM_ZERO;
 
-	bp->b_addr = kmem_alloc_io(size, align_mask, kmflag_mask);
+	bp->b_addr = kmem_alloc(size, kmflag_mask);
 	if (!bp->b_addr)
 		return -ENOMEM;
 
@@ -844,7 +843,7 @@ xfs_buf_readahead_map(
 {
 	struct xfs_buf		*bp;
 
-	if (bdi_read_congested(target->bt_bdev->bd_bdi))
+	if (bdi_read_congested(target->bt_bdev->bd_disk->bdi))
 		return;
 
 	xfs_buf_read_map(target, map, nmaps,
