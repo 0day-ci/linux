@@ -1131,6 +1131,29 @@ static int __maybe_unused iostat_info_seq_show(struct seq_file *seq,
 	return 0;
 }
 
+static int __maybe_unused fsck_stack_seq_show(struct seq_file *seq,
+						void *offset)
+{
+	struct super_block *sb = seq->private;
+	struct f2fs_sb_info *sbi = F2FS_SB(sb);
+	unsigned long *entries;
+	unsigned int nr_entries;
+	unsigned int i, j;
+
+	for (i = 0; i < sbi->fsck_count; i++) {
+		nr_entries = stack_depot_fetch(sbi->fsck_stack[i], &entries);
+		if (!entries)
+			return 0;
+
+		for (j = 0; j < nr_entries; j++)
+			seq_printf(seq, "%pS\n", (void *)entries[j]);
+
+		seq_putc(seq, '\n');
+	}
+
+	return 0;
+}
+
 static int __maybe_unused victim_bits_seq_show(struct seq_file *seq,
 						void *offset)
 {
@@ -1221,6 +1244,8 @@ int f2fs_register_sysfs(struct f2fs_sb_info *sbi)
 				iostat_info_seq_show, sb);
 		proc_create_single_data("victim_bits", S_IRUGO, sbi->s_proc,
 				victim_bits_seq_show, sb);
+		proc_create_single_data("fsck_stack", S_IRUGO, sbi->s_proc,
+				fsck_stack_seq_show, sb);
 	}
 	return 0;
 put_feature_list_kobj:
@@ -1242,6 +1267,7 @@ void f2fs_unregister_sysfs(struct f2fs_sb_info *sbi)
 		remove_proc_entry("segment_info", sbi->s_proc);
 		remove_proc_entry("segment_bits", sbi->s_proc);
 		remove_proc_entry("victim_bits", sbi->s_proc);
+		remove_proc_entry("fsck_stack", sbi->s_proc);
 		remove_proc_entry(sbi->sb->s_id, f2fs_proc_root);
 	}
 
