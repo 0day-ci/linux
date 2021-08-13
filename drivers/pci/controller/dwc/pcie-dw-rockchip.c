@@ -225,9 +225,8 @@ static int rockchip_pcie_probe(struct platform_device *pdev)
 	/* DON'T MOVE ME: must be enable before PHY init */
 	rockchip->vpcie3v3 = devm_regulator_get_optional(dev, "vpcie3v3");
 	if (IS_ERR(rockchip->vpcie3v3))
-		if (PTR_ERR(rockchip->vpcie3v3) != -ENODEV)
-			return dev_err_probe(dev, PTR_ERR(rockchip->vpcie3v3),
-					"failed to get vpcie3v3 regulator\n");
+		return dev_err_probe(dev, PTR_ERR(rockchip->vpcie3v3),
+				     "failed to get vpcie3v3 regulator\n");
 
 	ret = regulator_enable(rockchip->vpcie3v3);
 	if (ret) {
