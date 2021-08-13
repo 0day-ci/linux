@@ -238,8 +238,11 @@ static void mtk_iommu_tlb_flush_range_sync(unsigned long iova, size_t size,
 
 	for_each_m4u(data, head) {
 		if (has_pm) {
-			if (pm_runtime_get_if_in_use(data->dev) <= 0)
+			ret = pm_runtime_resume_and_get(data->dev);
+			if (ret < 0) {
+				dev_err(data->dev, "tlb flush: pm get fail %d.\n", ret);
 				continue;
+			}
 		}
 
 		spin_lock_irqsave(&data->tlb_lock, flags);
