@@ -11,11 +11,11 @@
 
 extern void loongson3_send_irq_by_ipi(int cpu, int irqs);
 
-unsigned int irq_cpu[16] = {[0 ... 15] = -1};
-unsigned int ht_irq[] = {0, 1, 3, 4, 5, 6, 7, 8, 12, 14, 15};
-unsigned int local_irq = 1<<0 | 1<<1 | 1<<2 | 1<<7 | 1<<8 | 1<<12;
+static unsigned int irq_cpu[16] = {[0 ... 15] = -1};
+static unsigned int ht_irq[] = {0, 1, 3, 4, 5, 6, 7, 8, 12, 14, 15};
+static unsigned int local_irq = 1<<0 | 1<<1 | 1<<2 | 1<<7 | 1<<8 | 1<<12;
 
-int plat_set_irq_affinity(struct irq_data *d, const struct cpumask *affinity,
+static int plat_set_irq_affinity(struct irq_data *d, const struct cpumask *affinity,
 			  bool force)
 {
 	unsigned int cpu;
@@ -151,7 +151,7 @@ static struct irq_chip loongson_irq_chip = {
 	.irq_eoi	= unmask_loongson_irq,
 };
 
-void irq_router_init(void)
+static void irq_router_init(void)
 {
 	int i;
 
