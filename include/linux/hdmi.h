@@ -438,5 +438,6 @@ int hdmi_infoframe_unpack(union hdmi_infoframe *frame,
 			  const void *buffer, size_t size);
 void hdmi_infoframe_log(const char *level, struct device *dev,
 			const union hdmi_infoframe *frame);
+void hdmi_avi_infoframe_set_version(struct hdmi_avi_infoframe *frame);
 
 #endif /* _DRM_HDMI_H */

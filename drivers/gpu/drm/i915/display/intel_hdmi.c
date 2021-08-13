@@ -751,6 +751,7 @@ bool intel_hdmi_compute_avi_infoframe(struct intel_encoder *encoder,
 
 	/* TODO: handle pixel repetition for YCBCR420 outputs */
 
+	hdmi_avi_infoframe_set_version(frame);
 	ret = hdmi_avi_infoframe_check(frame);
 	if (drm_WARN_ON(encoder->base.dev, ret))
 		return false;

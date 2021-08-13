@@ -51,6 +51,20 @@ static void hdmi_infoframe_set_checksum(void *buffer, size_t size)
 }
 
 /**
+ * hdmi_avi_infoframe_set_version() - fill the HDMI AVI infoframe
+ *				      version information
+ * @frame: HDMI AVI infoframe
+ */
+void
+hdmi_avi_infoframe_set_version(struct hdmi_avi_infoframe *frame)
+{
+	if (frame->video_code > 127 ||
+	    frame->colorspace == HDMI_COLORSPACE_IDO_DEFINED)
+		frame->version = 3;
+}
+EXPORT_SYMBOL(hdmi_avi_infoframe_set_version);
+
+/**
  * hdmi_avi_infoframe_init() - initialize an HDMI AVI infoframe
  * @frame: HDMI AVI infoframe
  */
@@ -67,9 +81,16 @@ EXPORT_SYMBOL(hdmi_avi_infoframe_init);
 static int hdmi_avi_infoframe_check_only(const struct hdmi_avi_infoframe *frame)
 {
 	if (frame->type != HDMI_INFOFRAME_TYPE_AVI ||
-	    frame->version != 2 ||
 	    frame->length != HDMI_AVI_INFOFRAME_SIZE)
 		return -EINVAL;
+
+	if (frame->video_code > 127 ||
+	    frame->colorspace == HDMI_COLORSPACE_IDO_DEFINED) {
+		if (frame->version != 3)
+			return -EINVAL;
+	} else if (frame->version != 2) {
+		return -EINVAL;
+	}
 
 	if (frame->picture_aspect > HDMI_PICTURE_ASPECT_16_9)
 		return -EINVAL;
@@ -159,7 +180,7 @@ ssize_t hdmi_avi_infoframe_pack_only(const struct hdmi_avi_infoframe *frame,
 	if (frame->itc)
 		ptr[2] |= BIT(7);
 
-	ptr[3] = frame->video_code & 0x7f;
+	ptr[3] = frame->video_code;
 
 	ptr[4] = ((frame->ycc_quantization_range & 0x3) << 6) |
 		 ((frame->content_type & 0x3) << 4) |
@@ -1583,11 +1604,13 @@ int hdmi_avi_infoframe_unpack_only(struct hdmi_avi_infoframe *frame,
 	frame->quantization_range = (ptr[2] >> 2) & 0x3;
 	frame->nups = ptr[2] & 0x3;
 
-	frame->video_code = ptr[3] & 0x7f;
+	frame->video_code = ptr[3];
 	frame->ycc_quantization_range = (ptr[4] >> 6) & 0x3;
 	frame->content_type = (ptr[4] >> 4) & 0x3;
 
 	frame->pixel_repeat = ptr[4] & 0xf;
+
+	hdmi_avi_infoframe_set_version(frame);
 
 	return 0;
 }
