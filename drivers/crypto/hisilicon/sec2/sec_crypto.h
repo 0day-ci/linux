@@ -8,7 +8,11 @@
 #define SEC_IV_SIZE		24
 #define SEC_MAX_KEY_SIZE	64
 #define SEC_COMM_SCENE		0
+#define SEC_IPSEC_SCENE		1
 #define SEC_MAX_STREAMS		128
+#define SEC_SHA1_ALIGN_SZ	64
+#define SEC_SHA512_ALIGN_SZ	128
+#define SEC_MAX_SG_OF_REMAIN	8
 #define PINGPONG_BUF_NUM	2
 #define SEC_MIN_BLOCK_SZ	1
 
@@ -21,7 +25,9 @@ enum sec_calg {
 enum sec_hash_alg {
 	SEC_A_HMAC_SHA1   = 0x10,
 	SEC_A_HMAC_SHA256 = 0x11,
+	SEC_A_HMAC_MD5    = 0x12,
 	SEC_A_HMAC_SHA512 = 0x15,
+	SEC_A_HMAC_SM3	  = 0x26,
 };
 
 enum sec_mac_len {

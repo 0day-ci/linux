@@ -38,6 +38,28 @@ struct sec_aead_req {
 	struct aead_request *aead_req;
 };
 
+struct sec_ahash_req {
+	struct scatterlist *req_sg;
+	u8 sg_cut_len[SEC_MAX_SG_OF_REMAIN];
+	u32 cut_num;
+	u8 op;
+	u8 done;
+	struct ahash_request *ahash_req;
+	/* Means long hash and ping-pong buffer flag */
+	bool is_stream_mode;
+	u32 req_data_len;
+	/* Currently ping-pong data len */
+	u32 pp_data_len;
+	u64 total_data_len;
+	/* Length of data every bd sent to hardware */
+	u32 block_data_len;
+	int sid;
+
+	struct scatterlist *pp_sg;
+	/* Current pingpong hw sg dma address */
+	dma_addr_t pp_dma;
+};
+
 /* SEC request of Crypto */
 struct sec_req {
 	union {
@@ -49,11 +71,13 @@ struct sec_req {
 
 	/**
 	 * Common parameter of the SEC request.
+	 * ahash, hardware sgl used to hold request's source buffers
 	 */
 	struct hisi_acc_hw_sgl *in;
 	dma_addr_t in_dma;
 	struct sec_cipher_req c_req;
 	struct sec_aead_req aead_req;
+	struct sec_ahash_req hash_req;
 	struct list_head backlog_head;
 
 	int err_type;
@@ -91,8 +115,21 @@ struct sec_auth_ctx {
 	u8 a_key_len;
 	u8 mac_len;
 	u8 a_alg;
+	u32 blk_size;
+	u32 align_sz;
+	dma_addr_t metamac_dma;
+	void *metamac;
 	bool fallback;
+
+	/**
+	 * There are two buffers in the above 'metamac' for each stream.
+	 * -1: no meta-mac (no input hash digest), the 0th buffer is out-mac
+	 * 0: the 0th buffer is meta-mac, the 1th buffer is out-mac
+	 * 1: the 1th buffer is meta-mac, the 0th buffer is out-mac
+	 */
+	char metamac_idx[SEC_MAX_STREAMS];
 	struct crypto_shash *hash_tfm;
+	struct shash_desc *desc;
 	struct crypto_aead *fallback_aead_tfm;
 };
 
@@ -127,7 +164,8 @@ struct sec_qp_ctx {
 
 enum sec_alg_type {
 	SEC_SKCIPHER,
-	SEC_AEAD
+	SEC_AEAD,
+	SEC_AHASH
 };
 
 /* SEC Crypto TFM context which defines queue and cipher .etc relatives */
