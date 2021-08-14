@@ -248,6 +248,42 @@ static ssize_t main_blkaddr_show(struct f2fs_attr *a,
 			(unsigned long long)MAIN_BLKADDR(sbi));
 }
 
+static ssize_t issued_discard_show(struct f2fs_attr *a,
+				struct f2fs_sb_info *sbi, char *buf)
+{
+	struct discard_cmd_control *dcc_info = SM_I(sbi)->dcc_info;
+
+	return snprintf(buf, PAGE_SIZE, "%llu\n",
+			(unsigned long long)atomic_read(&dcc_info->issued_discard));
+}
+
+static ssize_t queued_discard_show(struct f2fs_attr *a,
+				struct f2fs_sb_info *sbi, char *buf)
+{
+	struct discard_cmd_control *dcc_info = SM_I(sbi)->dcc_info;
+
+	return snprintf(buf, PAGE_SIZE, "%llu\n",
+			(unsigned long long)atomic_read(&dcc_info->queued_discard));
+}
+
+static ssize_t discard_cmd_cnt_show(struct f2fs_attr *a,
+				struct f2fs_sb_info *sbi, char *buf)
+{
+	struct discard_cmd_control *dcc_info = SM_I(sbi)->dcc_info;
+
+	return snprintf(buf, PAGE_SIZE, "%llu\n",
+			(unsigned long long)atomic_read(&dcc_info->discard_cmd_cnt));
+}
+
+static ssize_t undiscard_blks_show(struct f2fs_attr *a,
+				struct f2fs_sb_info *sbi, char *buf)
+{
+	struct discard_cmd_control *dcc_info = SM_I(sbi)->dcc_info;
+
+	return snprintf(buf, PAGE_SIZE, "%llu\n",
+			(unsigned long long)dcc_info->undiscard_blks);
+}
+
 static ssize_t f2fs_sbi_show(struct f2fs_attr *a,
 			struct f2fs_sb_info *sbi, char *buf)
 {
@@ -690,6 +726,10 @@ F2FS_GENERAL_RO_ATTR(unusable);
 F2FS_GENERAL_RO_ATTR(encoding);
 F2FS_GENERAL_RO_ATTR(mounted_time_sec);
 F2FS_GENERAL_RO_ATTR(main_blkaddr);
+F2FS_GENERAL_RO_ATTR(issued_discard);
+F2FS_GENERAL_RO_ATTR(queued_discard);
+F2FS_GENERAL_RO_ATTR(discard_cmd_cnt);
+F2FS_GENERAL_RO_ATTR(undiscard_blks);
 #ifdef CONFIG_F2FS_STAT_FS
 F2FS_STAT_ATTR(STAT_INFO, f2fs_stat_info, cp_foreground_calls, cp_count);
 F2FS_STAT_ATTR(STAT_INFO, f2fs_stat_info, cp_background_calls, bg_cp_count);
@@ -750,6 +790,10 @@ static struct attribute *f2fs_attrs[] = {
 	ATTR_LIST(gc_urgent),
 	ATTR_LIST(reclaim_segments),
 	ATTR_LIST(main_blkaddr),
+	ATTR_LIST(issued_discard),
+	ATTR_LIST(queued_discard),
+	ATTR_LIST(discard_cmd_cnt),
+	ATTR_LIST(undiscard_blks),
 	ATTR_LIST(max_small_discards),
 	ATTR_LIST(discard_granularity),
 	ATTR_LIST(batched_trim_sections),
