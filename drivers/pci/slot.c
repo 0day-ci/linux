@@ -323,7 +323,7 @@ void pci_destroy_slot(struct pci_slot *slot)
 }
 EXPORT_SYMBOL_GPL(pci_destroy_slot);
 
-#if defined(CONFIG_HOTPLUG_PCI) || defined(CONFIG_HOTPLUG_PCI_MODULE)
+#if IS_ENABLED(CONFIG_HOTPLUG_PCI)
 #include <linux/pci_hotplug.h>
 /**
  * pci_hp_create_module_link - create symbolic link to hotplug driver module
