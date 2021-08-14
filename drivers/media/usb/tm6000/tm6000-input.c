@@ -346,6 +346,7 @@ static int __tm6000_ir_int_start(struct rc_dev *rc)
 	ir->int_urb->transfer_buffer = kzalloc(size, GFP_ATOMIC);
 	if (!ir->int_urb->transfer_buffer) {
 		usb_free_urb(ir->int_urb);
+		ir->int_urb = NULL;
 		return err;
 	}
 	dprintk(1, "int interval: %d\n", dev->int_in.endp->desc.bInterval);
