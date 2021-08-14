@@ -2434,7 +2434,7 @@ EXPORT_SYMBOL(__set_page_dirty_no_writeback);
 /*
  * Helper function for set_page_dirty family.
  *
- * Caller must hold lock_page_memcg().
+ * Caller must hold lock_page_objcg().
  *
  * NOTE: This relies on being atomic wrt interrupts.
  */
@@ -2468,7 +2468,7 @@ static void folio_account_dirtied(struct folio *folio,
 /*
  * Helper function for deaccounting dirty page without writeback.
  *
- * Caller must hold lock_page_memcg().
+ * Caller must hold lock_page_objcg().
  */
 void folio_account_cleaned(struct folio *folio, struct address_space *mapping,
 			  struct bdi_writeback *wb)
@@ -2489,7 +2489,7 @@ void folio_account_cleaned(struct folio *folio, struct address_space *mapping,
  * If warn is true, then emit a warning if the folio is not uptodate and has
  * not been truncated.
  *
- * The caller must hold lock_page_memcg().
+ * The caller must hold lock_page_objcg().
  */
 void __folio_mark_dirty(struct folio *folio, struct address_space *mapping,
 			     int warn)
