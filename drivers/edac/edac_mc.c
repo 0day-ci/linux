@@ -1033,6 +1033,7 @@ void edac_mc_handle_error(const enum hw_event_mc_err_type type,
 	int i, n_labels = 0;
 	struct edac_raw_error_desc *e = &mci->error_desc;
 	bool any_memory = true;
+	size_t len;
 
 	edac_dbg(3, "MC%d\n", mci->mc_idx);
 
@@ -1087,6 +1088,7 @@ void edac_mc_handle_error(const enum hw_event_mc_err_type type,
 	 */
 	p = e->label;
 	*p = '\0';
+	len = sizeof(e->label);
 
 	mci_for_each_dimm(mci, dimm) {
 		if (top_layer >= 0 && top_layer != dimm->location[0])
@@ -1115,10 +1117,12 @@ void edac_mc_handle_error(const enum hw_event_mc_err_type type,
 			*p = '\0';
 		} else {
 			if (p != e->label) {
-				strcpy(p, OTHER_LABEL);
-				p += strlen(OTHER_LABEL);
+				strscpy(p, OTHER_LABEL, len);
+				len -= strlen(p);
+				p += strlen(p);
 			}
-			strcpy(p, dimm->label);
+			strscpy(p, dimm->label, len);
+			len -= strlen(p);
 			p += strlen(p);
 		}
 
@@ -1141,9 +1145,9 @@ void edac_mc_handle_error(const enum hw_event_mc_err_type type,
 	}
 
 	if (any_memory)
-		strcpy(e->label, "any memory");
+		strscpy(e->label, "any memory", sizeof(e->label));
 	else if (!*e->label)
-		strcpy(e->label, "unknown memory");
+		strscpy(e->label, "unknown memory", sizeof(e->label));
 
 	edac_inc_csrow(e, row, chan);
 
