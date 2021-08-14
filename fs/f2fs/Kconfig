@@ -135,3 +135,13 @@ config F2FS_FS_LZORLE
 	default y
 	help
 	  Support LZO-RLE compress algorithm, if unsure, say Y.
+
+config F2FS_FSCK_STACK_TRACE
+	bool "F2FS fsck stack information record"
+	depends on F2FS_FS
+	depends on STACKDEPOT
+	default y
+	help
+	 Support printing out fsck stack history. With this, you have to
+	 turn on "fsck_stack" sysfs node. Then you can get information
+	 from kernel log.

@@ -306,6 +306,26 @@ static ssize_t f2fs_sbi_show(struct f2fs_attr *a,
 	if (!strcmp(a->attr.name, "compr_new_inode"))
 		return sysfs_emit(buf, "%u\n", sbi->compr_new_inode);
 #endif
+#ifdef CONFIG_F2FS_FSCK_STACK_TRACE
+	if (!strcmp(a->attr.name, "fsck_stack")) {
+		unsigned long *entries;
+		unsigned int nr_entries;
+		unsigned int i;
+		int count;
+
+		count = sysfs_emit(buf, "%u\n", sbi->fsck_stack);
+		if (!sbi->fsck_stack)
+			return count;
+
+		for (i = 0; i < sbi->fsck_count; i++) {
+			nr_entries = stack_depot_fetch(sbi->fsck_stack_history[i], &entries);
+			if (!entries)
+				return count;
+			stack_trace_print(entries, nr_entries, 0);
+		}
+		return count;
+	}
+#endif
 
 	ui = (unsigned int *)(ptr + a->offset);
 
@@ -740,6 +760,10 @@ F2FS_RW_ATTR(ATGC_INFO, atgc_management, atgc_candidate_count, max_candidate_cou
 F2FS_RW_ATTR(ATGC_INFO, atgc_management, atgc_age_weight, age_weight);
 F2FS_RW_ATTR(ATGC_INFO, atgc_management, atgc_age_threshold, age_threshold);
 
+#ifdef CONFIG_F2FS_FSCK_STACK_TRACE
+F2FS_RW_ATTR(F2FS_SBI, f2fs_sb_info, fsck_stack, fsck_stack);
+#endif
+
 #define ATTR_LIST(name) (&f2fs_attr_##name.attr)
 static struct attribute *f2fs_attrs[] = {
 	ATTR_LIST(gc_urgent_sleep_time),
@@ -812,6 +836,9 @@ static struct attribute *f2fs_attrs[] = {
 	ATTR_LIST(atgc_candidate_count),
 	ATTR_LIST(atgc_age_weight),
 	ATTR_LIST(atgc_age_threshold),
+#ifdef CONFIG_F2FS_FSCK_STACK_TRACE
+	ATTR_LIST(fsck_stack),
+#endif
 	NULL,
 };
 ATTRIBUTE_GROUPS(f2fs);
