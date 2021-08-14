@@ -1373,7 +1373,7 @@ static int asoc_mcbsp_probe(struct platform_device *pdev)
 	const struct of_device_id *match;
 	int ret;
 
-	match = of_match_device(omap_mcbsp_of_match, &pdev->dev);
+	match = of_device_get_match_data(&pdev->dev);
 	if (match) {
 		struct device_node *node = pdev->dev.of_node;
 		struct omap_mcbsp_platform_data *pdata_quirk = pdata;
