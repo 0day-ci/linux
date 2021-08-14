@@ -414,8 +414,17 @@ static int can_tdc_fill_info(struct sk_buff *skb, const struct net_device *dev)
 		goto err_cancel;
 
 	if (can_tdc_is_enabled(priv)) {
-		if (priv->ctrlmode & CAN_CTRLMODE_TDC_MANUAL &&
-		    nla_put_u32(skb, IFLA_CAN_TDC_TDCV, tdc->tdcv))
+		u32 tdcv;
+		int err = -EINVAL;
+
+		if (priv->ctrlmode & CAN_CTRLMODE_TDC_MANUAL) {
+			tdcv = tdc->tdcv;
+			err = 0;
+		} else if (priv->ctrlmode & CAN_CTRLMODE_TDC_AUTO &&
+			   priv->do_get_auto_tdcv) {
+			err = priv->do_get_auto_tdcv(dev, &tdcv);
+		}
+		if (!err && nla_put_u32(skb, IFLA_CAN_TDC_TDCV, tdcv))
 			goto err_cancel;
 		if (nla_put_u32(skb, IFLA_CAN_TDC_TDCO, tdc->tdco))
 			goto err_cancel;
