@@ -353,7 +353,7 @@ EXPORT_SYMBOL_GPL(pci_hp_create_module_link);
 
 /**
  * pci_hp_remove_module_link - remove symbolic link to the hotplug driver
- * 	module.
+ * module.
  * @pci_slot: struct pci_slot
  *
  * Helper function for pci_hotplug_core.c to remove symbolic link to
