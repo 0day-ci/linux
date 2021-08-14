@@ -316,6 +316,7 @@ static ssize_t ima_write_policy(struct file *file, const char __user *buf,
 {
 	char *data;
 	ssize_t result;
+	int i;
 
 	if (datalen >= PAGE_SIZE)
 		datalen = PAGE_SIZE - 1;
@@ -329,6 +330,14 @@ static ssize_t ima_write_policy(struct file *file, const char __user *buf,
 	if (IS_ERR(data)) {
 		result = PTR_ERR(data);
 		goto out;
+	}
+
+	for (i = 0; data[i] != '\n' && data[i] != '\0'; i++) {
+		if (iscntrl(data[i])) {
+			pr_err_once("file path with no control characters required\n");
+			result = -EINVAL;
+			goto out_free;
+		}
 	}
 
 	result = mutex_lock_interruptible(&ima_write_mutex);
