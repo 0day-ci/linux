@@ -20,6 +20,7 @@ static ssize_t pci_slot_attr_show(struct kobject *kobj,
 {
 	struct pci_slot *slot = to_pci_slot(kobj);
 	struct pci_slot_attribute *attribute = to_pci_slot_attr(attr);
+
 	return attribute->show ? attribute->show(slot, buf) : -EIO;
 }
 
@@ -28,6 +29,7 @@ static ssize_t pci_slot_attr_store(struct kobject *kobj,
 {
 	struct pci_slot *slot = to_pci_slot(kobj);
 	struct pci_slot_attribute *attribute = to_pci_slot_attr(attr);
+
 	return attribute->store ? attribute->store(slot, buf, len) : -EIO;
 }
 
@@ -123,6 +125,7 @@ static char *make_slot_name(const char *name)
 
 	for (;;) {
 		struct kobject *dup_slot;
+
 		dup_slot = kset_find_obj(pci_slots_kset, new_name);
 		if (!dup_slot)
 			break;
