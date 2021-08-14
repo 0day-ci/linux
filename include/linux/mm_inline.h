@@ -103,7 +103,10 @@ void lruvec_add_folio(struct lruvec *lruvec, struct folio *folio)
 static __always_inline void add_page_to_lru_list(struct page *page,
 				struct lruvec *lruvec)
 {
-	lruvec_add_folio(lruvec, page_folio(page));
+	struct folio *folio = page_folio(page);
+
+	VM_BUG_ON_FOLIO(!folio_matches_lruvec(folio, lruvec), folio);
+	lruvec_add_folio(lruvec, folio);
 }
 
 static __always_inline
@@ -119,7 +122,10 @@ void lruvec_add_folio_tail(struct lruvec *lruvec, struct folio *folio)
 static __always_inline void add_page_to_lru_list_tail(struct page *page,
 				struct lruvec *lruvec)
 {
-	lruvec_add_folio_tail(lruvec, page_folio(page));
+	struct folio *folio = page_folio(page);
+
+	VM_BUG_ON_FOLIO(!folio_matches_lruvec(folio, lruvec), folio);
+	lruvec_add_folio_tail(lruvec, folio);
 }
 
 static __always_inline
@@ -133,6 +139,9 @@ void lruvec_del_folio(struct lruvec *lruvec, struct folio *folio)
 static __always_inline void del_page_from_lru_list(struct page *page,
 				struct lruvec *lruvec)
 {
-	lruvec_del_folio(lruvec, page_folio(page));
+	struct folio *folio = page_folio(page);
+
+	VM_BUG_ON_FOLIO(!folio_matches_lruvec(folio, lruvec), folio);
+	lruvec_del_folio(lruvec, folio);
 }
 #endif
