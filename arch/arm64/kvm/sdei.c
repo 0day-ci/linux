@@ -35,6 +35,25 @@ static struct kvm_sdei_event *kvm_sdei_find_event(struct kvm *kvm,
 	return NULL;
 }
 
+static struct kvm_sdei_vcpu_event *kvm_sdei_find_vcpu_event(struct kvm_vcpu *vcpu,
+							    unsigned long num)
+{
+	struct kvm_sdei_vcpu *vsdei = vcpu->arch.sdei;
+	struct kvm_sdei_vcpu_event *ksve;
+
+	list_for_each_entry(ksve, &vsdei->critical_events, link) {
+		if (ksve->state.num == num)
+			return ksve;
+	}
+
+	list_for_each_entry(ksve, &vsdei->normal_events, link) {
+		if (ksve->state.num == num)
+			return ksve;
+	}
+
+	return NULL;
+}
+
 static void kvm_sdei_remove_events(struct kvm *kvm)
 {
 	struct kvm_sdei_kvm *ksdei = kvm->arch.sdei;
@@ -1094,6 +1113,215 @@ long kvm_sdei_vm_ioctl(struct kvm *kvm, unsigned long arg)
 	}
 
 	spin_unlock(&ksdei->lock);
+out:
+	if (!ret && copy && copy_to_user(argp, cmd, sizeof(*cmd)))
+		ret = -EFAULT;
+
+	kfree(cmd);
+	return ret;
+}
+
+static long kvm_sdei_get_vevent_count(struct kvm_vcpu *vcpu, int *count)
+{
+	struct kvm_sdei_vcpu *vsdei = vcpu->arch.sdei;
+	struct kvm_sdei_vcpu_event *ksve = NULL;
+	int total = 0;
+
+	list_for_each_entry(ksve, &vsdei->critical_events, link) {
+		total++;
+	}
+
+	list_for_each_entry(ksve, &vsdei->normal_events, link) {
+		total++;
+	}
+
+	*count = total;
+	return 0;
+}
+
+static struct kvm_sdei_vcpu_event *next_vcpu_event(struct kvm_vcpu *vcpu,
+						   unsigned long num)
+{
+	struct kvm_sdei_vcpu *vsdei = vcpu->arch.sdei;
+	struct kvm_sdei_event *kse = NULL;
+	struct kvm_sdei_kvm_event *kske = NULL;
+	struct kvm_sdei_vcpu_event *ksve = NULL;
+
+	ksve = kvm_sdei_find_vcpu_event(vcpu, num);
+	if (!ksve)
+		return NULL;
+
+	kske = ksve->kske;
+	kse  = kske->kse;
+	if (kse->state.priority == SDEI_EVENT_PRIORITY_CRITICAL) {
+		if (!list_is_last(&ksve->link, &vsdei->critical_events)) {
+			ksve = list_next_entry(ksve, link);
+			return ksve;
+		}
+
+		ksve = list_first_entry_or_null(&vsdei->normal_events,
+					struct kvm_sdei_vcpu_event, link);
+		return ksve;
+	}
+
+	if (!list_is_last(&ksve->link, &vsdei->normal_events)) {
+		ksve = list_next_entry(ksve, link);
+		return ksve;
+	}
+
+	return NULL;
+}
+
+static long kvm_sdei_get_vevent(struct kvm_vcpu *vcpu,
+				struct kvm_sdei_vcpu_event_state *ksve_state)
+{
+	struct kvm_sdei_vcpu *vsdei = vcpu->arch.sdei;
+	struct kvm_sdei_vcpu_event *ksve = NULL;
+
+	/*
+	 * If the event number is invalid, the first critical or
+	 * normal event is fetched. Otherwise, the next valid event
+	 * is returned.
+	 */
+	if (!kvm_sdei_is_valid_event_num(ksve_state->num)) {
+		ksve = list_first_entry_or_null(&vsdei->critical_events,
+					struct kvm_sdei_vcpu_event, link);
+		if (!ksve) {
+			ksve = list_first_entry_or_null(&vsdei->normal_events,
+					struct kvm_sdei_vcpu_event, link);
+		}
+	} else {
+		ksve = next_vcpu_event(vcpu, ksve_state->num);
+	}
+
+	if (!ksve)
+		return -ENOENT;
+
+	*ksve_state = ksve->state;
+
+	return 0;
+}
+
+static long kvm_sdei_set_vevent(struct kvm_vcpu *vcpu,
+				struct kvm_sdei_vcpu_event_state *ksve_state)
+{
+	struct kvm *kvm = vcpu->kvm;
+	struct kvm_sdei_vcpu *vsdei = vcpu->arch.sdei;
+	struct kvm_sdei_event *kse = NULL;
+	struct kvm_sdei_kvm_event *kske = NULL;
+	struct kvm_sdei_vcpu_event *ksve = NULL;
+
+	if (!kvm_sdei_is_valid_event_num(ksve_state->num))
+		return -EINVAL;
+
+	kske = kvm_sdei_find_kvm_event(kvm, ksve_state->num);
+	if (!kske)
+		return -ENOENT;
+
+	ksve = kvm_sdei_find_vcpu_event(vcpu, ksve_state->num);
+	if (ksve)
+		return -EEXIST;
+
+	ksve = kzalloc(sizeof(*ksve), GFP_KERNEL);
+	if (!ksve)
+		return -ENOMEM;
+
+	kse = kske->kse;
+	ksve->state = *ksve_state;
+	ksve->kske  = kske;
+	ksve->vcpu  = vcpu;
+
+	if (kse->state.priority == SDEI_EVENT_PRIORITY_CRITICAL)
+		list_add_tail(&ksve->link, &vsdei->critical_events);
+	else
+		list_add_tail(&ksve->link, &vsdei->normal_events);
+
+	kvm_make_request(KVM_REQ_SDEI, vcpu);
+
+	return 0;
+}
+
+static long kvm_sdei_set_vcpu_state(struct kvm_vcpu *vcpu,
+				    struct kvm_sdei_vcpu_state *ksv_state)
+{
+	struct kvm_sdei_vcpu *vsdei = vcpu->arch.sdei;
+	struct kvm_sdei_vcpu_event *critical_ksve = NULL;
+	struct kvm_sdei_vcpu_event *normal_ksve = NULL;
+
+	if (kvm_sdei_is_valid_event_num(ksv_state->critical_num)) {
+		critical_ksve = kvm_sdei_find_vcpu_event(vcpu,
+					ksv_state->critical_num);
+		if (!critical_ksve)
+			return -EINVAL;
+	}
+
+	if (kvm_sdei_is_valid_event_num(ksv_state->critical_num)) {
+		normal_ksve = kvm_sdei_find_vcpu_event(vcpu,
+					ksv_state->critical_num);
+		if (!normal_ksve)
+			return -EINVAL;
+	}
+
+	vsdei->state = *ksv_state;
+	vsdei->critical_event = critical_ksve;
+	vsdei->normal_event   = normal_ksve;
+
+	return  0;
+}
+
+long kvm_sdei_vcpu_ioctl(struct kvm_vcpu *vcpu, unsigned long arg)
+{
+	struct kvm *kvm = vcpu->kvm;
+	struct kvm_sdei_kvm *ksdei = kvm->arch.sdei;
+	struct kvm_sdei_vcpu *vsdei = vcpu->arch.sdei;
+	struct kvm_sdei_cmd *cmd = NULL;
+	void __user *argp = (void __user *)arg;
+	bool copy = false;
+	long ret = 0;
+
+	/* Sanity check */
+	if (!(ksdei && vsdei)) {
+		ret = -EPERM;
+		goto out;
+	}
+
+	cmd = kzalloc(sizeof(*cmd), GFP_KERNEL);
+	if (!cmd) {
+		ret = -ENOMEM;
+		goto out;
+	}
+
+	if (copy_from_user(cmd, argp, sizeof(*cmd))) {
+		ret = -EFAULT;
+		goto out;
+	}
+
+	spin_lock(&vsdei->lock);
+
+	switch (cmd->cmd) {
+	case KVM_SDEI_CMD_GET_VEVENT_COUNT:
+		copy = true;
+		ret = kvm_sdei_get_vevent_count(vcpu, &cmd->count);
+		break;
+	case KVM_SDEI_CMD_GET_VEVENT:
+		copy = true;
+		ret = kvm_sdei_get_vevent(vcpu, &cmd->ksve_state);
+		break;
+	case KVM_SDEI_CMD_SET_VEVENT:
+		ret = kvm_sdei_set_vevent(vcpu, &cmd->ksve_state);
+		break;
+	case KVM_SDEI_CMD_GET_VCPU_STATE:
+		copy = true;
+		cmd->ksv_state = vsdei->state;
+		break;
+	case KVM_SDEI_CMD_SET_VCPU_STATE:
+		ret = kvm_sdei_set_vcpu_state(vcpu, &cmd->ksv_state);
+		break;
+	default:
+		ret = -EINVAL;
+	}
+
+	spin_unlock(&vsdei->lock);
 out:
 	if (!ret && copy && copy_to_user(argp, cmd, sizeof(*cmd)))
 		ret = -EFAULT;
