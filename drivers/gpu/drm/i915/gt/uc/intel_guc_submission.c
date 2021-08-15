@@ -360,10 +360,12 @@ static int guc_submission_send_busy_loop(struct intel_guc *guc,
 {
 	int err;
 
-	err = intel_guc_send_busy_loop(guc, action, len, g2h_len_dw, loop);
-
-	if (!err && g2h_len_dw)
+	if (g2h_len_dw)
 		atomic_inc(&guc->outstanding_submission_g2h);
+
+	err = intel_guc_send_busy_loop(guc, action, len, g2h_len_dw, loop);
+	if (err == -EBUSY && g2h_len_dw)
+		atomic_dec(&guc->outstanding_submission_g2h);
 
 	return err;
 }
