@@ -1512,7 +1512,6 @@ struct intel_psr {
 	enum transcoder transcoder;
 	bool active;
 	struct work_struct work;
-	unsigned int busy_frontbuffer_bits;
 	bool sink_psr2_support;
 	bool link_standby;
 	bool colorimetry_support;
@@ -1523,7 +1522,6 @@ struct intel_psr {
 	ktime_t last_entry_attempt;
 	ktime_t last_exit;
 	bool sink_not_reliable;
-	bool irq_aux_error;
 	u16 su_w_granularity;
 	u16 su_y_granularity;
 	u32 dc3co_exitline;
