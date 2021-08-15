@@ -474,8 +474,6 @@ static int ocelot_port_open(struct net_device *dev)
 	phy_attached_info(priv->phy);
 	phy_start(priv->phy);
 
-	ocelot_port_enable(ocelot, port, priv->phy);
-
 	return 0;
 }
 
