@@ -29,20 +29,22 @@
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
-#include <linux/cdev.h>		/* For character device */
-#include <linux/errno.h>	/* For the -ENODEV/... values */
-#include <linux/fs.h>		/* For file operations */
-#include <linux/init.h>		/* For __init/__exit/... */
-#include <linux/hrtimer.h>	/* For hrtimers */
-#include <linux/kernel.h>	/* For printk/panic/... */
-#include <linux/kthread.h>	/* For kthread_work */
-#include <linux/miscdevice.h>	/* For handling misc devices */
-#include <linux/module.h>	/* For module stuff/... */
-#include <linux/mutex.h>	/* For mutexes */
-#include <linux/slab.h>		/* For memory functions */
-#include <linux/types.h>	/* For standard types (like size_t) */
-#include <linux/watchdog.h>	/* For watchdog specific items */
-#include <linux/uaccess.h>	/* For copy_to_user/put_user/... */
+#include <linux/cdev.h>		    /* For character device */
+#include <linux/errno.h>	    /* For the -ENODEV/... values */
+#include <linux/fs.h>		    /* For file operations */
+#include <linux/init.h>		    /* For __init/__exit/... */
+#include <linux/hrtimer.h>	    /* For hrtimers */
+#include <linux/kernel.h>	    /* For printk/panic/... */
+#include <linux/kexec.h>	    /* For checking if crash kernel is loaded */
+#include <linux/kthread.h>	    /* For kthread_work */
+#include <linux/miscdevice.h>	    /* For handling misc devices */
+#include <linux/module.h>	    /* For module stuff/... */
+#include <linux/mutex.h>	    /* For mutexes */
+#include <linux/panic_notifier.h>   /* For panic_notifier_list */
+#include <linux/slab.h>		    /* For memory functions */
+#include <linux/types.h>	    /* For standard types (like size_t) */
+#include <linux/watchdog.h>	    /* For watchdog specific items */
+#include <linux/uaccess.h>	    /* For copy_to_user/put_user/... */
 
 #include "watchdog_core.h"
 #include "watchdog_pretimeout.h"
@@ -56,6 +58,9 @@ static struct kthread_worker *watchdog_kworker;
 
 static bool handle_boot_enabled =
 	IS_ENABLED(CONFIG_WATCHDOG_HANDLE_BOOT_ENABLED);
+
+static unsigned int wdt_panic_timeout =
+	CONFIG_DEFAULT_WATCHDOG_CRASH_KERNEL_TIMEOUT;
 
 static unsigned open_timeout = CONFIG_WATCHDOG_OPEN_TIMEOUT;
 
@@ -818,6 +823,43 @@ out_ioctl:
 	return err;
 }
 
+static int watchdog_panic_notifier(struct notifier_block *nb,
+	unsigned long code, void *data)
+{
+	struct watchdog_device *wdd = container_of(nb, struct watchdog_device, panic_nb);
+	unsigned int timeout = wdt_panic_timeout;
+	int set_timeout_ret, ping_ret;
+
+	if (wdd == NULL || wdt_panic_timeout == 0 || kexec_crash_image == NULL ||
+	    !(watchdog_active(wdd) || watchdog_hw_running(wdd)))
+		return NOTIFY_DONE;
+
+	if (wdd->max_hw_heartbeat_ms && wdd->max_hw_heartbeat_ms < wdt_panic_timeout * 1000)
+		timeout = wdd->max_hw_heartbeat_ms / 1000;
+	else if (watchdog_timeout_invalid(wdd, wdt_panic_timeout))
+		timeout = wdd->max_timeout;
+
+	if (timeout != wdt_panic_timeout)
+		pr_err("watchdog%d: Cannot set specified panic timeout, using %ds.\n",
+			wdd->id, timeout);
+
+	set_timeout_ret = watchdog_set_timeout(wdd, timeout);
+	if (set_timeout_ret)
+		pr_err("watchdog%d: Failed to extend watchdog timeout (%d)\n",
+			wdd->id, set_timeout_ret);
+
+	ping_ret = watchdog_ping(wdd);
+	if (ping_ret)
+		pr_warn("watchdog%d: Failed to ping watchdog (%d)\n",
+			wdd->id, ping_ret);
+
+	if (set_timeout_ret == 0 && ping_ret == 0)
+		pr_info("watchdog%d: Extended watchdog timeout to %d seconds\n",
+			wdd->id, timeout);
+
+	return NOTIFY_DONE;
+}
+
 /*
  *	watchdog_open: open the /dev/watchdog* devices.
  *	@inode: inode of device
@@ -1129,6 +1171,17 @@ int watchdog_dev_register(struct watchdog_device *wdd)
 	if (ret)
 		watchdog_cdev_unregister(wdd);
 
+	if (wdt_panic_timeout) {
+		wdd->panic_nb.priority = INT_MIN; /* Run last */
+		wdd->panic_nb.notifier_call = watchdog_panic_notifier;
+
+		ret = atomic_notifier_chain_register(&panic_notifier_list,
+						     &wdd->panic_nb);
+		if (ret)
+			pr_warn("watchdog%d: Cannot register panic notifier (%d)\n",
+				wdd->id, ret);
+	}
+
 	return ret;
 }
 
@@ -1142,6 +1195,9 @@ int watchdog_dev_register(struct watchdog_device *wdd)
 
 void watchdog_dev_unregister(struct watchdog_device *wdd)
 {
+	if (wdt_panic_timeout)
+		atomic_notifier_chain_unregister(&panic_notifier_list, &wdd->panic_nb);
+
 	watchdog_unregister_pretimeout(wdd);
 	watchdog_cdev_unregister(wdd);
 }
