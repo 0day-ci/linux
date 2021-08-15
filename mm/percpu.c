@@ -489,7 +489,6 @@ static void pcpu_next_fit_region(struct pcpu_chunk *chunk, int alloc_bits,
 	for (pcpu_next_fit_region((chunk), (alloc_bits), (align), &(bit_off), \
 				  &(bits));				      \
 	     (bit_off) < pcpu_chunk_map_bits((chunk));			      \
-	     (bit_off) += (bits),					      \
 	     pcpu_next_fit_region((chunk), (alloc_bits), (align), &(bit_off), \
 				  &(bits)))
 
@@ -1126,7 +1125,6 @@ static int pcpu_find_block_fit(struct pcpu_chunk *chunk, int alloc_bits,
 			break;
 
 		bit_off = next_off;
-		bits = 0;
 	}
 
 	if (bit_off == pcpu_chunk_map_bits(chunk))
