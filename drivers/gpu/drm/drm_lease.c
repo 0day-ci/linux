@@ -723,6 +723,7 @@ int drm_mode_revoke_lease_ioctl(struct drm_device *dev,
 	}
 
 	_drm_lease_revoke(lessee);
+	drm_master_flush(dev);
 
 fail:
 	mutex_unlock(&dev->mode_config.idr_mutex);

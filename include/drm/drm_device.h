@@ -112,6 +112,24 @@ struct drm_device {
 	struct drm_master *master;
 
 	/**
+	 * @master_rwsem:
+	 *
+	 * Synchronizes modesetting rights between multiple users. Users that
+	 * can change the modeset or display state must hold a read lock on
+	 * @master_rwsem, and users that change modesetting rights should flush
+	 * readers before returning to userspace using drm_master_flush().
+	 */
+	struct rw_semaphore master_rwsem;
+
+	/**
+	 * @master_flush_work:
+	 *
+	 * Callback structure used internally to queue work to flush readers of
+	 * master/lease permissions.
+	 */
+	struct callback_head master_flush_work;
+
+	/**
 	 * @driver_features: per-device driver features
 	 *
 	 * Drivers can clear specific flags here to disallow

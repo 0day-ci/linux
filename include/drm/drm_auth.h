@@ -155,6 +155,7 @@ struct drm_master *drm_master_get(struct drm_master *master);
 struct drm_master *drm_file_get_master(struct drm_file *file_priv);
 void drm_master_put(struct drm_master **master);
 bool drm_is_current_master(struct drm_file *fpriv);
+void drm_master_flush(struct drm_device *dev);
 
 struct drm_master *drm_master_create(struct drm_device *dev);
 

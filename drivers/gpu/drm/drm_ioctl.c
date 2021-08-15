@@ -785,9 +785,12 @@ long drm_ioctl_kernel(struct file *file, drm_ioctl_t *func, void *kdata,
 	if (drm_dev_is_unplugged(dev))
 		return -ENODEV;
 
+	if (unlikely(flags & DRM_MASTER))
+		down_read(&dev->master_rwsem);
+
 	retcode = drm_ioctl_permit(flags, file_priv);
 	if (unlikely(retcode))
-		return retcode;
+		goto release_master;
 
 	/* Enforce sane locking for modern driver ioctls. */
 	if (likely(!drm_core_check_feature(dev, DRIVER_LEGACY)) ||
@@ -798,6 +801,10 @@ long drm_ioctl_kernel(struct file *file, drm_ioctl_t *func, void *kdata,
 		retcode = func(dev, kdata, file_priv);
 		mutex_unlock(&drm_global_mutex);
 	}
+
+release_master:
+	if (unlikely(flags & DRM_MASTER))
+		up_read(&dev->master_rwsem);
 	return retcode;
 }
 EXPORT_SYMBOL(drm_ioctl_kernel);

@@ -29,6 +29,7 @@
  */
 
 #include <linux/slab.h>
+#include <linux/task_work.h>
 
 #include <drm/drm_auth.h>
 #include <drm/drm_drv.h>
@@ -282,6 +283,7 @@ int drm_setmaster_ioctl(struct drm_device *dev, void *data,
 	drm_set_master(dev, file_priv, false);
 out_unlock:
 	mutex_unlock(&dev->master_mutex);
+	drm_master_flush(dev);
 	return ret;
 }
 
@@ -321,8 +323,10 @@ int drm_dropmaster_ioctl(struct drm_device *dev, void *data,
 	}
 
 	drm_drop_master(dev, file_priv);
+
 out_unlock:
 	mutex_unlock(&dev->master_mutex);
+	drm_master_flush(dev);
 	return ret;
 }
 
@@ -343,6 +347,8 @@ int drm_master_open(struct drm_file *file_priv)
 		spin_unlock(&file_priv->master_lookup_lock);
 	}
 	mutex_unlock(&dev->master_mutex);
+
+	drm_master_flush(dev);
 
 	return ret;
 }
@@ -450,11 +456,15 @@ EXPORT_SYMBOL(drm_master_put);
 /* Used by drm_client and drm_fb_helper */
 bool drm_master_internal_acquire(struct drm_device *dev)
 {
+	down_read(&dev->master_rwsem);
+
 	mutex_lock(&dev->master_mutex);
 	if (dev->master) {
 		mutex_unlock(&dev->master_mutex);
+		up_read(&dev->master_rwsem);
 		return false;
 	}
+	mutex_unlock(&dev->master_mutex);
 
 	return true;
 }
@@ -463,6 +473,39 @@ EXPORT_SYMBOL(drm_master_internal_acquire);
 /* Used by drm_client and drm_fb_helper */
 void drm_master_internal_release(struct drm_device *dev)
 {
-	mutex_unlock(&dev->master_mutex);
+	up_read(&dev->master_rwsem);
 }
 EXPORT_SYMBOL(drm_master_internal_release);
+
+/* After flushing, all readers that might have seen old master/lease
+ * permissions are guaranteed to have completed.
+ */
+void master_flush(struct callback_head *cb)
+{
+	struct drm_device *dev = container_of(cb, struct drm_device,
+					      master_flush_work);
+
+	down_write(&dev->master_rwsem);
+	up_write(&dev->master_rwsem);
+}
+
+/**
+ * drm_master_flush - queues work to flush readers of master/lease permissions
+ * before returning to userspace
+ * @dev: DRM device
+ *
+ * Queues up work to flush all readers of master/lease permissions. This work
+ * is run before this task returns to user mode. Calling this function when a
+ * task changes modesetting rights ensures that other processes that perform
+ * modesetting do not race with userspace.
+ */
+void drm_master_flush(struct drm_device *dev)
+{
+	init_task_work(&dev->master_flush_work, master_flush);
+	task_work_add(current, &dev->master_flush_work, TWA_RESUME);
+	/* If task_work_add fails, then the task is exiting. In this case, it
+	 * doesn't matter if master_flush is run, so we don't need an
+	 * alternative mechanism for flushing.
+	 */
+}
+EXPORT_SYMBOL(drm_master_flush);
