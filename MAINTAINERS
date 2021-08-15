@@ -1274,6 +1274,7 @@ M:	Alyssa Rosenzweig <alyssa@rosenzweig.io>
 L:	linux-pci@vger.kernel.org
 S:	Maintained
 F:	Documentation/devicetree/bindings/pci/apple,pcie.yaml
+F:	drivers/pci/controller/pcie-apple.c
 
 APPLE SMC DRIVER
 M:	Henrik Rydberg <rydberg@bitmath.org>
