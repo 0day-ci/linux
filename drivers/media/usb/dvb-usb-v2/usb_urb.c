@@ -143,8 +143,11 @@ static int usb_urb_alloc_bulk_urbs(struct usb_data_stream *stream)
 		stream->urb_list[i] = usb_alloc_urb(0, GFP_ATOMIC);
 		if (!stream->urb_list[i]) {
 			dev_dbg(&stream->udev->dev, "%s: failed\n", __func__);
-			for (j = 0; j < i; j++)
+			for (j = 0; j < i; j++) {
 				usb_free_urb(stream->urb_list[j]);
+				stream->urb_list[j] = NULL;
+			}
+			stream->urbs_initialized = 0;
 			return -ENOMEM;
 		}
 		usb_fill_bulk_urb(stream->urb_list[i],
@@ -173,8 +176,11 @@ static int usb_urb_alloc_isoc_urbs(struct usb_data_stream *stream)
 				stream->props.u.isoc.framesperurb, GFP_ATOMIC);
 		if (!stream->urb_list[i]) {
 			dev_dbg(&stream->udev->dev, "%s: failed\n", __func__);
-			for (j = 0; j < i; j++)
+			for (j = 0; j < i; j++) {
 				usb_free_urb(stream->urb_list[j]);
+				stream->urb_list[j] = NULL;
+			}
+			stream->urbs_initialized = 0;
 			return -ENOMEM;
 		}
 
