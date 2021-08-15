@@ -542,8 +542,6 @@ static const struct intel_device_info vlv_info = {
 		BIT(TRANSCODER_C) | BIT(TRANSCODER_EDP), \
 	.display.has_ddi = 1, \
 	.display.has_fpga_dbg = 1, \
-	.display.has_psr = 1, \
-	.display.has_psr_hw_tracking = 1, \
 	.display.has_dp_mst = 1, \
 	.has_rc6p = 0 /* RC6p removed-by HSW */, \
 	HSW_PIPE_OFFSETS, \
