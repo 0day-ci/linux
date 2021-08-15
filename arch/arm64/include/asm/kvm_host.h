@@ -113,6 +113,9 @@ struct kvm_arch {
 	/* Interrupt controller */
 	struct vgic_dist	vgic;
 
+	/* SDEI support */
+	struct kvm_sdei_kvm *sdei;
+
 	/* Mandated version of PSCI */
 	u32 psci_version;
 
@@ -337,6 +340,9 @@ struct kvm_vcpu_arch {
 	 * Anything that is not used directly from assembly code goes
 	 * here.
 	 */
+
+	/* SDEI support */
+	struct kvm_sdei_vcpu *sdei;
 
 	/*
 	 * Guest registers we preserve during guest debugging.
