@@ -23,6 +23,7 @@ struct kvm_sdei_event_state {
 	__u8	type;
 	__u8	signaled;
 	__u8	priority;
+	__u64	notifier;
 };
 
 struct kvm_sdei_kvm_event_state {
