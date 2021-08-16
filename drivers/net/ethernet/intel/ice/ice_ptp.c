@@ -1256,6 +1256,45 @@ exit:
 }
 
 /**
+ * ice_ptp_get_dpll_state - Get state of the DPLL
+ * @info: the driver's PTP info structure
+ * @ds: structure with states that is going to be filled by driver
+ *
+ * Get the synchronization state of Digital Phase Locked Loop from
+ * hardware.
+ * Returns 0 on success, negative otherwise.
+ */
+static int
+ice_ptp_get_dpll_state(struct ptp_clock_info *info, struct ptp_dpll_state *ds)
+{
+	struct ice_pf *pf = ptp_info_to_pf(info);
+	u8 ref_state, eec_mode, state;
+	struct ice_hw *hw = &pf->hw;
+	u64 phase_offset;
+	u16 dpll_state;
+	int ret, i;
+
+	for (i = 0; i < ICE_CGU_DPLL_MAX; i++) {
+		ret = ice_aq_get_cgu_dpll_status(hw, i, &ref_state,
+						 &dpll_state, &phase_offset,
+						 &eec_mode);
+		if (ret)
+			return ret;
+		state = dpll_state >>
+			ICE_AQC_GET_CGU_DPLL_STATUS_STATE_MODE_SHIFT;
+		if (state &  ICE_AQC_GET_CGU_DPLL_STATUS_STATE_LOCK)
+			ds->state[i] = DPLL_STATE_LOCKED;
+		else if (state & ICE_AQC_GET_CGU_DPLL_STATUS_STATE_HO)
+			ds->state[i] = DPLL_STATE_HOLDOVER;
+		else
+			ds->state[i] = DPLL_STATE_FREERUN;
+	}
+	ds->dpll_num = ICE_CGU_DPLL_MAX;
+
+	return ret;
+}
+
+/**
  * ice_ptp_adjtime_nonatomic - Do a non-atomic clock adjustment
  * @info: the driver's PTP info structure
  * @delta: Offset in nanoseconds to adjust the time by
@@ -1613,6 +1652,7 @@ static void ice_ptp_set_caps(struct ice_pf *pf)
 	info->adjfine = ice_ptp_adjfine;
 	info->gettimex64 = ice_ptp_gettimex64;
 	info->settime64 = ice_ptp_settime64;
+	info->get_dpll_state = ice_ptp_get_dpll_state;
 
 	if (ice_is_e810(&pf->hw))
 		ice_ptp_set_funcs_e810(pf, info);
