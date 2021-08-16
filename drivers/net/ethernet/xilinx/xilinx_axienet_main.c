@@ -1407,8 +1407,11 @@ axienet_ethtools_set_pauseparam(struct net_device *ndev,
  *
  * Return: 0 always
  */
-static int axienet_ethtools_get_coalesce(struct net_device *ndev,
-					 struct ethtool_coalesce *ecoalesce)
+static int
+axienet_ethtools_get_coalesce(struct net_device *ndev,
+			      struct ethtool_coalesce *ecoalesce,
+			      struct kernel_ethtool_coalesce *kernel_coal,
+			      struct netlink_ext_ack *extack)
 {
 	u32 regval = 0;
 	struct axienet_local *lp = netdev_priv(ndev);
@@ -1432,8 +1435,11 @@ static int axienet_ethtools_get_coalesce(struct net_device *ndev,
  *
  * Return: 0, on success, Non-zero error value on failure.
  */
-static int axienet_ethtools_set_coalesce(struct net_device *ndev,
-					 struct ethtool_coalesce *ecoalesce)
+static int
+axienet_ethtools_set_coalesce(struct net_device *ndev,
+			      struct ethtool_coalesce *ecoalesce,
+			      struct kernel_ethtool_coalesce *kernel_coal,
+			      struct netlink_ext_ack *extack)
 {
 	struct axienet_local *lp = netdev_priv(ndev);
 
