@@ -43,9 +43,13 @@
 #define YU_GPIO_MODE0			0x0c
 #define YU_GPIO_DATASET			0x14
 #define YU_GPIO_DATACLEAR		0x18
+#define YU_GPIO_CAUSE_FALL_EN		0x48
 #define YU_GPIO_MODE1_CLEAR		0x50
 #define YU_GPIO_MODE0_SET		0x54
 #define YU_GPIO_MODE0_CLEAR		0x58
+#define YU_GPIO_CAUSE_OR_CAUSE_EVTEN0	0x80
+#define YU_GPIO_CAUSE_OR_EVTEN0		0x94
+#define YU_GPIO_CAUSE_OR_CLRCAUSE	0x98
 
 struct mlxbf2_gpio_context_save_regs {
 	u32 gpio_mode0;
@@ -217,6 +221,108 @@ static int mlxbf2_gpio_direction_output(struct gpio_chip *chip,
 
 	return ret;
 }
+
+static void mlxbf2_gpio_irq_enable(struct mlxbf2_gpio_context *gs, int offset)
+{
+	unsigned long flags;
+	u32 val;
+
+	spin_lock_irqsave(&gs->gc.bgpio_lock, flags);
+	val = readl(gs->gpio_io + YU_GPIO_CAUSE_OR_CLRCAUSE);
+	val |= BIT(offset);
+	writel(val, gs->gpio_io + YU_GPIO_CAUSE_OR_CLRCAUSE);
+
+	/* The INT_N interrupt level is active low.
+	 * So enable cause fall bit to detect when GPIO
+	 * state goes low.
+	 */
+	val = readl(gs->gpio_io + YU_GPIO_CAUSE_FALL_EN);
+	val |= BIT(offset);
+	writel(val, gs->gpio_io + YU_GPIO_CAUSE_FALL_EN);
+
+	/* Enable PHY interrupt by setting the priority level */
+	val = readl(gs->gpio_io + YU_GPIO_CAUSE_OR_EVTEN0);
+	val |= BIT(offset);
+	writel(val, gs->gpio_io + YU_GPIO_CAUSE_OR_EVTEN0);
+	spin_unlock_irqrestore(&gs->gc.bgpio_lock, flags);
+}
+
+static void mlxbf2_gpio_irq_disable(struct mlxbf2_gpio_context *gs, int offset)
+{
+	unsigned long flags;
+	u32 val;
+
+	spin_lock_irqsave(&gs->gc.bgpio_lock, flags);
+	val = readl(gs->gpio_io + YU_GPIO_CAUSE_OR_EVTEN0);
+	val &= ~BIT(offset);
+	writel(val, gs->gpio_io + YU_GPIO_CAUSE_OR_EVTEN0);
+	spin_unlock_irqrestore(&gs->gc.bgpio_lock, flags);
+}
+
+static void mlxbf2_gpio_irq_ack(struct mlxbf2_gpio_context *gs, int offset)
+{
+	unsigned long flags;
+	u32 val;
+
+	spin_lock_irqsave(&gs->gc.bgpio_lock, flags);
+	val = readl(gs->gpio_io + YU_GPIO_CAUSE_OR_CLRCAUSE);
+	val |= BIT(offset);
+	writel(val, gs->gpio_io + YU_GPIO_CAUSE_OR_CLRCAUSE);
+	spin_unlock_irqrestore(&gs->gc.bgpio_lock, flags);
+}
+
+static irqreturn_t mlxbf2_gpio_irq_handler(int irq, void *ptr)
+{
+	struct mlxbf2_gpio_context *gs = ptr;
+	struct gpio_chip *gc = &gs->gc;
+	unsigned long pending;
+	u32 level;
+
+	pending = readl(gs->gpio_io + YU_GPIO_CAUSE_OR_CAUSE_EVTEN0);
+	for_each_set_bit(level, &pending, gc->ngpio) {
+		int nested_irq = irq_find_mapping(gc->irq.domain, level);
+
+		handle_nested_irq(nested_irq);
+	}
+
+	return IRQ_RETVAL(pending);
+}
+
+static void mlxbf2_gpio_irq_mask(struct irq_data *irqd)
+{
+	struct gpio_chip *gc = irq_data_get_irq_chip_data(irqd);
+	struct mlxbf2_gpio_context *gs = gpiochip_get_data(gc);
+	int offset = irqd_to_hwirq(irqd) % MLXBF2_GPIO_MAX_PINS_PER_BLOCK;
+
+	mlxbf2_gpio_irq_disable(gs, offset);
+}
+
+static void mlxbf2_gpio_irq_unmask(struct irq_data *irqd)
+{
+	struct gpio_chip *gc = irq_data_get_irq_chip_data(irqd);
+	struct mlxbf2_gpio_context *gs = gpiochip_get_data(gc);
+	int offset = irqd_to_hwirq(irqd) % MLXBF2_GPIO_MAX_PINS_PER_BLOCK;
+
+	mlxbf2_gpio_irq_enable(gs, offset);
+}
+
+static void mlxbf2_gpio_irq_bus_lock(struct irq_data *irqd)
+{
+	mutex_lock(yu_arm_gpio_lock_param.lock);
+}
+
+static void mlxbf2_gpio_irq_bus_sync_unlock(struct irq_data *irqd)
+{
+	mutex_unlock(yu_arm_gpio_lock_param.lock);
+}
+
+static struct irq_chip mlxbf2_gpio_irq_chip = {
+	.name			= "mlxbf2_gpio",
+	.irq_mask		= mlxbf2_gpio_irq_mask,
+	.irq_unmask		= mlxbf2_gpio_irq_unmask,
+	.irq_bus_lock		= mlxbf2_gpio_irq_bus_lock,
+	.irq_bus_sync_unlock	= mlxbf2_gpio_irq_bus_sync_unlock,
+};
 
 /* BlueField-2 GPIO driver initialization routine. */
 static int
