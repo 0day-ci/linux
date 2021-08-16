@@ -32,6 +32,11 @@ enum can_mode {
 	CAN_MODE_SLEEP
 };
 
+enum can_termination_gpio {
+	CAN_TERMINATION_GPIO_DISABLED = 0,
+	CAN_TERMINATION_GPIO_ENABLED,
+};
+
 /*
  * CAN common private data
  */
@@ -55,6 +60,8 @@ struct can_priv {
 	unsigned int termination_const_cnt;
 	const u16 *termination_const;
 	u16 termination;
+	struct gpio_desc *termination_gpio;
+	u16 termination_gpio_ohms[2];
 
 	enum can_state state;
 
