@@ -515,27 +515,6 @@ int nat25_db_handle(struct adapter *priv, struct sk_buff *skb, int method)
 
 			__nat25_db_print(priv);
 			return 0;
-		case NAT25_LOOKUP:
-			DEBUG_INFO("NAT25: Lookup IP, SA =%08x, DA =%08x\n", iph->saddr, iph->daddr);
-			tmp = be32_to_cpu(iph->daddr);
-			__nat25_generate_ipv4_network_addr(networkAddr, &tmp);
-
-			if (!__nat25_db_network_lookup_and_replace(priv, skb, networkAddr)) {
-				if (*((unsigned char *)&iph->daddr + 3) == 0xff) {
-					/*  L2 is unicast but L3 is broadcast, make L2 bacome broadcast */
-					DEBUG_INFO("NAT25: Set DA as boardcast\n");
-					memset(skb->data, 0xff, ETH_ALEN);
-				} else {
-					/*  forward unknow IP packet to upper TCP/IP */
-					DEBUG_INFO("NAT25: Replace DA with BR's MAC\n");
-					if ((*(u32 *)priv->br_mac) == 0 && (*(u16 *)(priv->br_mac+4)) == 0) {
-						printk("Re-init netdev_br_init() due to br_mac == 0!\n");
-						netdev_br_init(priv->pnetdev);
-					}
-					memcpy(skb->data, priv->br_mac, ETH_ALEN);
-				}
-			}
-			return 0;
 		default:
 			return -1;
 		}
@@ -566,20 +545,6 @@ int nat25_db_handle(struct adapter *priv, struct sk_buff *skb, int method)
 			__nat25_generate_ipv4_network_addr(networkAddr, sender);
 			__nat25_db_network_insert(priv, skb->data+ETH_ALEN, networkAddr);
 			__nat25_db_print(priv);
-			return 0;
-		case NAT25_LOOKUP:
-			DEBUG_INFO("NAT25: Lookup ARP\n");
-
-			arp_ptr += arp->ar_hln;
-			sender = (unsigned int *)arp_ptr;
-			arp_ptr += (arp->ar_hln + arp->ar_pln);
-			target = (unsigned int *)arp_ptr;
-			__nat25_generate_ipv4_network_addr(networkAddr, target);
-			__nat25_db_network_lookup_and_replace(priv, skb, networkAddr);
-			/*  change to ARP target mac address to Lookup result */
-			arp_ptr = (unsigned char *)(arp + 1);
-			arp_ptr += (arp->ar_hln + arp->ar_pln);
-			memcpy(arp_ptr, skb->data, ETH_ALEN);
 			return 0;
 		default:
 			return -1;
@@ -687,22 +652,6 @@ int nat25_db_handle(struct adapter *priv, struct sk_buff *skb, int method)
 				__nat25_db_network_insert(priv, skb->data+ETH_ALEN, networkAddr);
 				__nat25_db_print(priv);
 				return 0;
-			case NAT25_LOOKUP:
-				if (!memcmp(GET_MY_HWADDR(priv), ipx->ipx_dest.node, ETH_ALEN)) {
-					DEBUG_INFO("NAT25: Lookup IPX, Modify Destination IPX Node addr\n");
-
-					__nat25_generate_ipx_network_addr_with_socket(networkAddr, &ipx->ipx_dest.net, &ipx->ipx_dest.sock);
-
-					__nat25_db_network_lookup_and_replace(priv, skb, networkAddr);
-
-					/*  replace IPX destination node addr with Lookup destination MAC addr */
-					memcpy(ipx->ipx_dest.node, skb->data, ETH_ALEN);
-				} else {
-					__nat25_generate_ipx_network_addr_with_node(networkAddr, &ipx->ipx_dest.net, ipx->ipx_dest.node);
-
-					__nat25_db_network_lookup_and_replace(priv, skb, networkAddr);
-				}
-				return 0;
 			default:
 				return -1;
 			}
@@ -732,19 +681,6 @@ int nat25_db_handle(struct adapter *priv, struct sk_buff *skb, int method)
 
 				__nat25_db_print(priv);
 				return 0;
-			case NAT25_LOOKUP:
-				DEBUG_INFO("NAT25: Lookup AARP, Source =%d,%d Destination =%d,%d\n",
-					ea->pa_src_net,
-					ea->pa_src_node,
-					ea->pa_dst_net,
-					ea->pa_dst_node);
-
-				__nat25_generate_apple_network_addr(networkAddr, &ea->pa_dst_net, &ea->pa_dst_node);
-
-				__nat25_db_network_lookup_and_replace(priv, skb, networkAddr);
-
-				/*  change to AARP destination mac address to Lookup result */
-				memcpy(ea->hw_dst, skb->data, ETH_ALEN);
 				return 0;
 			default:
 				return -1;
@@ -765,15 +701,6 @@ int nat25_db_handle(struct adapter *priv, struct sk_buff *skb, int method)
 				__nat25_db_network_insert(priv, skb->data+ETH_ALEN, networkAddr);
 
 				__nat25_db_print(priv);
-				return 0;
-			case NAT25_LOOKUP:
-				DEBUG_INFO("NAT25: Lookup DDP, Source =%d,%d Destination =%d,%d\n",
-					ddp->deh_snet,
-					ddp->deh_snode,
-					ddp->deh_dnet,
-					ddp->deh_dnode);
-				__nat25_generate_apple_network_addr(networkAddr, &ddp->deh_dnet, &ddp->deh_dnode);
-				__nat25_db_network_lookup_and_replace(priv, skb, networkAddr);
 				return 0;
 			default:
 				return -1;
@@ -865,70 +792,6 @@ int nat25_db_handle(struct adapter *priv, struct sk_buff *skb, int method)
 					priv->pppoe_connection_in_progress = 0;
 			}
 			return 0;
-		case NAT25_LOOKUP:
-			if (ph->code == PADO_CODE || ph->code == PADS_CODE) {
-				if (priv->ethBrExtInfo.addPPPoETag) {
-					struct pppoe_tag *tag;
-					unsigned char *ptr;
-					unsigned short tagType, tagLen;
-					int offset = 0;
-
-					ptr = __nat25_find_pppoe_tag(ph, ntohs(PTT_RELAY_SID));
-					if (!ptr) {
-						DEBUG_ERR("Fail to find PTT_RELAY_SID in FADO!\n");
-						return -1;
-					}
-
-					tag = (struct pppoe_tag *)ptr;
-					tagType = (unsigned short)((ptr[0] << 8) + ptr[1]);
-					tagLen = (unsigned short)((ptr[2] << 8) + ptr[3]);
-
-					if ((tagType != ntohs(PTT_RELAY_SID)) || (tagLen < (MAGIC_CODE_LEN+RTL_RELAY_TAG_LEN))) {
-						DEBUG_ERR("Invalid PTT_RELAY_SID tag length [%d]!\n", tagLen);
-						return -1;
-					}
-
-					pMagic = (unsigned short *)tag->tag_data;
-					if (ntohs(*pMagic) != MAGIC_CODE) {
-						DEBUG_ERR("Can't find MAGIC_CODE in %s packet!\n",
-							(ph->code == PADO_CODE ? "PADO" : "PADS"));
-						return -1;
-					}
-
-					memcpy(skb->data, tag->tag_data+MAGIC_CODE_LEN, ETH_ALEN);
-
-					if (tagLen > MAGIC_CODE_LEN+RTL_RELAY_TAG_LEN)
-						offset = TAG_HDR_LEN;
-
-					if (skb_pull_and_merge(skb, ptr+offset, TAG_HDR_LEN+MAGIC_CODE_LEN+RTL_RELAY_TAG_LEN-offset) < 0) {
-						DEBUG_ERR("call skb_pull_and_merge() failed in PADO packet!\n");
-						return -1;
-					}
-					ph->length = htons(ntohs(ph->length)-(TAG_HDR_LEN+MAGIC_CODE_LEN+RTL_RELAY_TAG_LEN-offset));
-					if (offset > 0)
-						tag->tag_len = htons(tagLen-MAGIC_CODE_LEN-RTL_RELAY_TAG_LEN);
-
-					DEBUG_INFO("NAT25: Lookup PPPoE, forward %s Packet from %s\n",
-						(ph->code == PADO_CODE ? "PADO" : "PADS"),	skb->dev->name);
-				} else { /*  not add relay tag */
-					if (!priv->pppoe_connection_in_progress) {
-						DEBUG_ERR("Discard PPPoE packet due to no connection in progresss!\n");
-						return -1;
-					}
-					memcpy(skb->data, priv->pppoe_addr, ETH_ALEN);
-					priv->pppoe_connection_in_progress = WAIT_TIME_PPPOE;
-				}
-			} else {
-				if (ph->sid != 0) {
-					DEBUG_INFO("NAT25: Lookup PPPoE, lookup session packet from %s\n", skb->dev->name);
-					__nat25_generate_pppoe_network_addr(networkAddr, skb->data+ETH_ALEN, &ph->sid);
-					__nat25_db_network_lookup_and_replace(priv, skb, networkAddr);
-					__nat25_db_print(priv);
-				} else {
-					return -1;
-				}
-			}
-			return 0;
 		default:
 			return -1;
 		}
@@ -941,8 +804,6 @@ int nat25_db_handle(struct adapter *priv, struct sk_buff *skb, int method)
 			return -1;
 		case NAT25_INSERT:
 			return 0;
-		case NAT25_LOOKUP:
-			return 0;
 		default:
 			return -1;
 		}
@@ -954,8 +815,6 @@ int nat25_db_handle(struct adapter *priv, struct sk_buff *skb, int method)
 		case NAT25_CHECK:
 			return -1;
 		case NAT25_INSERT:
-			return 0;
-		case NAT25_LOOKUP:
 			return 0;
 		default:
 			return -1;
@@ -1002,15 +861,6 @@ int nat25_db_handle(struct adapter *priv, struct sk_buff *skb, int method)
 					}
 				}
 			}
-			return 0;
-		case NAT25_LOOKUP:
-			DEBUG_INFO("NAT25: Lookup IP, SA =%4x:%4x:%4x:%4x:%4x:%4x:%4x:%4x, DA =%4x:%4x:%4x:%4x:%4x:%4x:%4x:%4x\n",
-				   iph->saddr.s6_addr16[0], iph->saddr.s6_addr16[1], iph->saddr.s6_addr16[2], iph->saddr.s6_addr16[3],
-				   iph->saddr.s6_addr16[4], iph->saddr.s6_addr16[5], iph->saddr.s6_addr16[6], iph->saddr.s6_addr16[7],
-				   iph->daddr.s6_addr16[0], iph->daddr.s6_addr16[1], iph->daddr.s6_addr16[2], iph->daddr.s6_addr16[3],
-				   iph->daddr.s6_addr16[4], iph->daddr.s6_addr16[5], iph->daddr.s6_addr16[6], iph->daddr.s6_addr16[7]);
-			__nat25_generate_ipv6_network_addr(networkAddr, (unsigned int *)&iph->daddr);
-			__nat25_db_network_lookup_and_replace(priv, skb, networkAddr);
 			return 0;
 		default:
 			return -1;
