@@ -28,6 +28,7 @@
 static bool st_sensors_new_samples_available(struct iio_dev *indio_dev,
 					     struct st_sensor_data *sdata)
 {
+	struct device *parent = indio_dev->dev.parent;
 	int ret, status;
 
 	/* How would I know if I can't check it? */
@@ -42,7 +43,7 @@ static bool st_sensors_new_samples_available(struct iio_dev *indio_dev,
 			  sdata->sensor_settings->drdy_irq.stat_drdy.addr,
 			  &status);
 	if (ret < 0) {
-		dev_err(sdata->dev, "error checking samples available\n");
+		dev_err(parent, "error checking samples available\n");
 		return false;
 	}
 
@@ -75,6 +76,7 @@ static irqreturn_t st_sensors_irq_thread(int irq, void *p)
 	struct iio_trigger *trig = p;
 	struct iio_dev *indio_dev = iio_trigger_get_drvdata(trig);
 	struct st_sensor_data *sdata = iio_priv(indio_dev);
+	struct device *parent = indio_dev->dev.parent;
 
 	/*
 	 * If this trigger is backed by a hardware interrupt and we have a
@@ -87,7 +89,7 @@ static irqreturn_t st_sensors_irq_thread(int irq, void *p)
 	    st_sensors_new_samples_available(indio_dev, sdata)) {
 		iio_trigger_poll_chained(p);
 	} else {
-		dev_dbg(sdata->dev, "spurious IRQ\n");
+		dev_dbg(parent, "spurious IRQ\n");
 		return IRQ_NONE;
 	}
 
@@ -107,7 +109,7 @@ static irqreturn_t st_sensors_irq_thread(int irq, void *p)
 	 */
 	while (sdata->hw_irq_trigger &&
 	       st_sensors_new_samples_available(indio_dev, sdata)) {
-		dev_dbg(sdata->dev, "more samples came in during polling\n");
+		dev_dbg(parent, "more samples came in during polling\n");
 		sdata->hw_timestamp = iio_get_time_ns(indio_dev);
 		iio_trigger_poll_chained(p);
 	}

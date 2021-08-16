@@ -1186,6 +1186,7 @@ static const struct iio_trigger_ops st_accel_trigger_ops = {
  */
 static int apply_acpi_orientation(struct iio_dev *indio_dev)
 {
+	struct device *parent = indio_dev->dev.parent;
 	struct st_sensor_data *adata = iio_priv(indio_dev);
 	struct acpi_buffer buffer = {ACPI_ALLOCATE_BUFFER, NULL};
 	struct acpi_device *adev;
@@ -1210,7 +1211,7 @@ static int apply_acpi_orientation(struct iio_dev *indio_dev)
 	};
 
 
-	adev = ACPI_COMPANION(adata->dev);
+	adev = ACPI_COMPANION(parent);
 	if (!adev)
 		return 0;
 
@@ -1334,8 +1335,8 @@ EXPORT_SYMBOL(st_accel_get_settings);
 int st_accel_common_probe(struct iio_dev *indio_dev)
 {
 	struct st_sensor_data *adata = iio_priv(indio_dev);
-	struct st_sensors_platform_data *pdata = dev_get_platdata(adata->dev);
 	struct device *parent = indio_dev->dev.parent;
+	struct st_sensors_platform_data *pdata = dev_get_platdata(parent);
 	int err;
 
 	indio_dev->modes = INDIO_DIRECT_MODE;
@@ -1355,7 +1356,7 @@ int st_accel_common_probe(struct iio_dev *indio_dev)
 	 */
 	err = apply_acpi_orientation(indio_dev);
 	if (err) {
-		err = iio_read_mount_matrix(adata->dev, &adata->mount_matrix);
+		err = iio_read_mount_matrix(parent, &adata->mount_matrix);
 		if (err)
 			return err;
 	}
