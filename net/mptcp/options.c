@@ -954,7 +954,7 @@ static bool check_fully_established(struct mptcp_sock *msk, struct sock *ssk,
 		goto fully_established;
 	}
 
-	if (mp_opt->add_addr) {
+	if (mp_opt->add_addr && !mp_opt->echo) {
 		WRITE_ONCE(msk->fully_established, true);
 		return true;
 	}
