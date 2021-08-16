@@ -1584,7 +1584,6 @@ static void f2fs_put_super(struct super_block *sb)
 int f2fs_sync_fs(struct super_block *sb, int sync)
 {
 	struct f2fs_sb_info *sbi = F2FS_SB(sb);
-	int err = 0;
 
 	if (unlikely(f2fs_cp_error(sbi)))
 		return 0;
@@ -1596,10 +1595,7 @@ int f2fs_sync_fs(struct super_block *sb, int sync)
 	if (unlikely(is_sbi_flag_set(sbi, SBI_POR_DOING)))
 		return -EAGAIN;
 
-	if (sync)
-		err = f2fs_issue_checkpoint(sbi);
-
-	return err;
+	return f2fs_issue_checkpoint(sbi);
 }
 
 static int f2fs_freeze(struct super_block *sb)
