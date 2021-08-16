@@ -68,28 +68,31 @@ int rtw_get_bit_value_from_ieee_value(u8 val)
 	return 0;
 }
 
-uint	rtw_is_cckrates_included(u8 *rate)
+static bool rtw_is_cckrate(u8 rate)
 {
-	u32	i = 0;
+	rate &= 0x7f;
+	return rate == 2 || rate == 4 || rate == 11 || rate == 22;
+}
 
-	while (rate[i] != 0) {
-		if  ((((rate[i]) & 0x7f) == 2) || (((rate[i]) & 0x7f) == 4) ||
-		     (((rate[i]) & 0x7f) == 11)  || (((rate[i]) & 0x7f) == 22))
+bool rtw_is_cckrates_included(u8 *rate)
+{
+	u8 r;
+
+	while ((r = *rate++)) {
+		if (rtw_is_cckrate(r))
 			return true;
-		i++;
 	}
+
 	return false;
 }
 
-uint	rtw_is_cckratesonly_included(u8 *rate)
+bool rtw_is_cckratesonly_included(u8 *rate)
 {
-	u32 i = 0;
+	u8 r;
 
-	while (rate[i] != 0) {
-		if  ((((rate[i]) & 0x7f) != 2) && (((rate[i]) & 0x7f) != 4) &&
-		     (((rate[i]) & 0x7f) != 11)  && (((rate[i]) & 0x7f) != 22))
+	while ((r = *rate++)) {
+		if (!rtw_is_cckrate(r))
 			return false;
-		i++;
 	}
 
 	return true;
