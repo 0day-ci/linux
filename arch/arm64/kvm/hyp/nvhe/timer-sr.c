@@ -15,6 +15,11 @@ void __kvm_timer_set_cntvoff(u64 cntvoff)
 	write_sysreg(cntvoff, cntvoff_el2);
 }
 
+void __kvm_timer_set_cntpoff(u64 cntpoff)
+{
+	write_sysreg_s(cntpoff, SYS_CNTPOFF_EL2);
+}
+
 /*
  * Should only be called on non-VHE systems.
  * VHE systems use EL2 timers and configure EL1 timers in kvm_timer_init_vhe().
@@ -26,6 +31,8 @@ void __timer_disable_traps(struct kvm_vcpu *vcpu)
 	/* Allow physical timer/counter access for the host */
 	val = read_sysreg(cnthctl_el2);
 	val |= CNTHCTL_EL1PCTEN | CNTHCTL_EL1PCEN;
+	if (cpus_have_final_cap(ARM64_HAS_ECV2))
+		val &= ~CNTHCTL_ECV;
 	write_sysreg(val, cnthctl_el2);
 }
 
@@ -42,6 +49,8 @@ void __timer_enable_traps(struct kvm_vcpu *vcpu)
 	 * Physical counter access is allowed
 	 */
 	val = read_sysreg(cnthctl_el2);
+	if (cpus_have_final_cap(ARM64_HAS_ECV2))
+		val |= CNTHCTL_ECV;
 	val &= ~CNTHCTL_EL1PCEN;
 	val |= CNTHCTL_EL1PCTEN;
 	write_sysreg(val, cnthctl_el2);

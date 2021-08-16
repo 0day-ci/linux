@@ -68,6 +68,11 @@ static void handle___kvm_timer_set_cntvoff(struct kvm_cpu_context *host_ctxt)
 	__kvm_timer_set_cntvoff(cpu_reg(host_ctxt, 1));
 }
 
+static void handle___kvm_timer_set_cntpoff(struct kvm_cpu_context *host_ctxt)
+{
+	__kvm_timer_set_cntpoff(cpu_reg(host_ctxt, 1));
+}
+
 static void handle___kvm_enable_ssbs(struct kvm_cpu_context *host_ctxt)
 {
 	u64 tmp;
@@ -185,6 +190,7 @@ static const hcall_t host_hcall[] = {
 	HANDLE_FUNC(__pkvm_host_share_hyp),
 	HANDLE_FUNC(__pkvm_create_private_mapping),
 	HANDLE_FUNC(__pkvm_prot_finalize),
+	HANDLE_FUNC(__kvm_timer_set_cntpoff),
 };
 
 static void handle_host_hcall(struct kvm_cpu_context *host_ctxt)
