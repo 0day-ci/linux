@@ -343,3 +343,9 @@ endif # PHYLIB
 config MICREL_KS8995MA
 	tristate "Micrel KS8995MA 5-ports 10/100 managed Ethernet switch"
 	depends on SPI
+
+config QCA808X_PHY
+	tristate "Qualcomm Atheros QCA808X PHYs"
+	depends on REGULATOR
+	help
+	  Currently supports the QCA8081 model
