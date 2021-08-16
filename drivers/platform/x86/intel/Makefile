@@ -23,4 +23,5 @@ obj-$(CONFIG_INTEL_SCU_PCI)			+= scu/
 obj-$(CONFIG_INTEL_SCU_PLATFORM)	+= scu/
 obj-$(CONFIG_INTEL_SCU_WDT)			+= scu/
 obj-$(CONFIG_INTEL_SCU_IPC_UTIL)	+= scu/
+obj-$(CONFIG_INTEL_TELEMETRY)		+= telemetry/
 

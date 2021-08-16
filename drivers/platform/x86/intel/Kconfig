@@ -60,5 +60,6 @@ config INTEL_PUNIT_IPC
 
 source "drivers/platform/x86/intel/pmc/Kconfig"
 source "drivers/platform/x86/intel/scu/Kconfig"
+source "drivers/platform/x86/intel/telemetry/Kconfig"
 
 endif # X86_PLATFORM_DRIVERS_INTEL
