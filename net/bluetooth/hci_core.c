@@ -1343,6 +1343,11 @@ int hci_inquiry(void __user *arg)
 		goto done;
 	}
 
+	if (ir.length > HCI_MAX_TIMEOUT) {
+		err = -EINVAL;
+		goto done;
+	}
+
 	hci_dev_lock(hdev);
 	if (inquiry_cache_age(hdev) > INQUIRY_CACHE_AGE_MAX ||
 	    inquiry_cache_empty(hdev) || ir.flags & IREQ_CACHE_FLUSH) {

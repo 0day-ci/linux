@@ -168,6 +168,7 @@ struct hci_inquiry_req {
 	__u16 dev_id;
 	__u16 flags;
 	__u8  lap[3];
+#define HCI_INQUIRY_MAX_TIMEOUT		30
 	__u8  length;
 	__u8  num_rsp;
 };
