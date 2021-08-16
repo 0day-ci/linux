@@ -4593,12 +4593,14 @@ static int slab_mem_going_offline_callback(void *arg)
 {
 	struct kmem_cache *s;
 
+	cpus_read_lock();
 	mutex_lock(&slab_mutex);
 	list_for_each_entry(s, &slab_caches, list) {
 		flush_all_cpus_locked(s);
 		__kmem_cache_do_shrink(s);
 	}
 	mutex_unlock(&slab_mutex);
+	cpus_read_unlock();
 
 	return 0;
 }
