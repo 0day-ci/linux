@@ -254,6 +254,7 @@ static void guc_mmio_regset_init(struct temp_regset *regset,
 	GUC_MMIO_REG_ADD(regset, RING_MODE_GEN7(base), true);
 	GUC_MMIO_REG_ADD(regset, RING_HWS_PGA(base), false);
 	GUC_MMIO_REG_ADD(regset, RING_IMR(base), false);
+	GUC_MMIO_REG_ADD(regset, RING_CMD_CCTL(base), true);
 
 	for (i = 0, wa = wal->list; i < wal->count; i++, wa++)
 		GUC_MMIO_REG_ADD(regset, wa->reg, wa->masked_reg);
