@@ -129,6 +129,13 @@ struct ptp_system_timestamp {
  *                scheduling time (>=0) or negative value in case further
  *                scheduling is not required.
  *
+ * @get_dpll_state:  Request driver to check and update state of its DPLLs
+ *                   (Digital Phase Locked Loop).
+ *                   Driver returns structure filled with number of
+ *                   available DPLLs and their states.
+ *                   On success function returns 0, or negative on failed
+ *                   attempt.
+ *
  * Drivers should embed their ptp_clock_info within a private
  * structure, obtaining a reference to it using container_of().
  *
@@ -160,6 +167,8 @@ struct ptp_clock_info {
 	int (*verify)(struct ptp_clock_info *ptp, unsigned int pin,
 		      enum ptp_pin_function func, unsigned int chan);
 	long (*do_aux_work)(struct ptp_clock_info *ptp);
+	int (*get_dpll_state)(struct ptp_clock_info *ptp,
+			      struct ptp_dpll_state *ds);
 };
 
 struct ptp_clock;

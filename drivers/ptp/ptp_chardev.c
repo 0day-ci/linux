@@ -106,6 +106,14 @@ int ptp_open(struct posix_clock *pc, fmode_t fmode)
 	return 0;
 }
 
+int ptp_get_dpll_state(struct ptp_clock *ptp, struct ptp_dpll_state *ds)
+{
+	if (!ptp->info->get_dpll_state)
+		return -EOPNOTSUPP;
+
+	return ptp->info->get_dpll_state(ptp->info, ds);
+}
+
 long ptp_ioctl(struct posix_clock *pc, unsigned int cmd, unsigned long arg)
 {
 	struct ptp_clock *ptp = container_of(pc, struct ptp_clock, clock);
@@ -119,6 +127,7 @@ long ptp_ioctl(struct posix_clock *pc, unsigned int cmd, unsigned long arg)
 	struct ptp_clock_caps caps;
 	struct ptp_clock_time *pct;
 	unsigned int i, pin_index;
+	struct ptp_dpll_state ds;
 	struct ptp_pin_desc pd;
 	struct timespec64 ts;
 	int enable, err = 0;
@@ -416,6 +425,12 @@ long ptp_ioctl(struct posix_clock *pc, unsigned int cmd, unsigned long arg)
 			return -ERESTARTSYS;
 		err = ptp_set_pinfunc(ptp, pin_index, pd.func, pd.chan);
 		mutex_unlock(&ptp->pincfg_mux);
+		break;
+
+	case PTP_DPLL_GETSTATE:
+		err = ptp_get_dpll_state(ptp, &ds);
+		if (!err && copy_to_user((void __user *)arg, &ds, sizeof(ds)))
+			err = -EFAULT;
 		break;
 
 	default:

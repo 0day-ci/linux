@@ -117,6 +117,8 @@ ssize_t ptp_read(struct posix_clock *pc,
 __poll_t ptp_poll(struct posix_clock *pc,
 	      struct file *fp, poll_table *wait);
 
+int ptp_get_dpll_state(struct ptp_clock *ptp, struct ptp_dpll_state *ds);
+
 /*
  * see ptp_sysfs.c
  */

@@ -198,6 +198,32 @@ struct ptp_pin_desc {
 	unsigned int rsv[5];
 };
 
+enum dpll_state {
+	DPLL_STATE_MIN = 0,
+	DPLL_STATE_FREERUN = DPLL_STATE_MIN,
+	DPLL_STATE_LOCKACQ = 1,
+	DPLL_STATE_LOCKREC = 2,
+	DPLL_STATE_LOCKED = 3,
+	DPLL_STATE_HOLDOVER = 4,
+	DPLL_STATE_OPEN_LOOP = 5,
+	DPLL_STATE_MAX = DPLL_STATE_OPEN_LOOP,
+};
+
+#define PTP_MAX_DPLL_NUM_PER_DEVICE	8
+
+struct ptp_dpll_state {
+	/*
+	 * Number of available dplls on the device.
+	 */
+	int dpll_num;
+	/*
+	 * State of DPLLs. Values defined in enum dpll_states.
+	 * Indexed by DPLL index on the device.
+	 * Valid indicies < dpll_num
+	 */
+	__u8 state[PTP_MAX_DPLL_NUM_PER_DEVICE];
+};
+
 #define PTP_CLK_MAGIC '='
 
 #define PTP_CLOCK_GETCAPS  _IOR(PTP_CLK_MAGIC, 1, struct ptp_clock_caps)
@@ -223,6 +249,7 @@ struct ptp_pin_desc {
 	_IOWR(PTP_CLK_MAGIC, 17, struct ptp_sys_offset_precise)
 #define PTP_SYS_OFFSET_EXTENDED2 \
 	_IOWR(PTP_CLK_MAGIC, 18, struct ptp_sys_offset_extended)
+#define PTP_DPLL_GETSTATE   _IOR(PTP_CLK_MAGIC, 19, struct ptp_dpll_state)
 
 struct ptp_extts_event {
 	struct ptp_clock_time t; /* Time event occured. */

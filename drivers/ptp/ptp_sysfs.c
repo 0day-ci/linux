@@ -302,6 +302,52 @@ out:
 }
 static DEVICE_ATTR_RW(max_vclocks);
 
+static inline int dpll_state_to_str(enum dpll_state ds, const char **ds_str)
+{
+	const char * const dpll_state_string[] = {
+		"FREERUN",
+		"LOCKACQ",
+		"LOCKREC",
+		"LOCKED",
+		"HOLDOVER",
+		"OPEN_LOOP",
+		"INVALID",
+	};
+	size_t max = sizeof(dpll_state_string) /
+		     sizeof(dpll_state_string[0]);
+
+	if (ds < 0 || ds >= max)
+		return -EINVAL;
+	*ds_str = dpll_state_string[ds];
+
+	return 0;
+}
+
+static ssize_t dpll_state_show(struct device *dev,
+			       struct device_attribute *attr, char *page)
+{
+	struct ptp_clock *ptp = dev_get_drvdata(dev);
+	struct ptp_dpll_state ds;
+	const char *ds_str;
+	ssize_t size = 0;
+	int i, err;
+
+	err = ptp_get_dpll_state(ptp, &ds);
+	if (err)
+		return err;
+
+	for (i = 0; i < ds.dpll_num; i++) {
+		err = dpll_state_to_str(ds.state[i], &ds_str);
+		if (err)
+			return err;
+		size += snprintf(page + size, PAGE_SIZE - 1, "%d %s\n",
+				 i, ds_str);
+	}
+
+	return size;
+}
+static DEVICE_ATTR_RO(dpll_state);
+
 static struct attribute *ptp_attrs[] = {
 	&dev_attr_clock_name.attr,
 
@@ -318,6 +364,8 @@ static struct attribute *ptp_attrs[] = {
 	&dev_attr_pps_enable.attr,
 	&dev_attr_n_vclocks.attr,
 	&dev_attr_max_vclocks.attr,
+
+	&dev_attr_dpll_state.attr,
 	NULL
 };
 
