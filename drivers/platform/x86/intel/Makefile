@@ -12,6 +12,8 @@ obj-$(CONFIG_INTEL_ATOMISP2_PM)		+= atomisp2/
 CFLAGS_hid.o			:= -I./drivers/platform/x86
 intel-hid-y				:= hid.o
 obj-$(CONFIG_INTEL_HID_EVENT)		+= intel-hid.o
+intel_int0002_vgpio-y				:= int0002_vgpio.o
+obj-$(CONFIG_INTEL_INT0002_VGPIO)	+= intel_int0002_vgpio.o
 
 # Intel PMIC / PMC / P-Unit devices
 intel_bxtwc_tmu-y 					:= bxtwc_tmu.o
