@@ -1906,8 +1906,8 @@ static ssize_t rebuild_show(struct device *dev,
 
 	status = myrb_get_rbld_progress(cb, &rbld_buf);
 
-	if (rbld_buf.ldev_num != sdev->id ||
-	    status != MYRB_STATUS_SUCCESS)
+	if (status != MYRB_STATUS_SUCCESS ||
+	    rbld_buf.ldev_num != sdev->id)
 		return snprintf(buf, 32, "not rebuilding\n");
 
 	return snprintf(buf, 32, "rebuilding block %u of %u\n",
