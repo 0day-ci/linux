@@ -406,7 +406,9 @@ static int dev_ifsioc(struct net *net, struct ifreq *ifr, void __user *data,
 		    cmd == SIOCGMIIREG ||
 		    cmd == SIOCSMIIREG ||
 		    cmd == SIOCSHWTSTAMP ||
-		    cmd == SIOCGHWTSTAMP) {
+		    cmd == SIOCGHWTSTAMP ||
+		    cmd == SIOCSSYNCE ||
+		    cmd == SIOCGSYNCE) {
 			err = dev_eth_ioctl(dev, ifr, cmd);
 		} else if (cmd == SIOCBONDENSLAVE ||
 		    cmd == SIOCBONDRELEASE ||
@@ -577,6 +579,7 @@ int dev_ioctl(struct net *net, unsigned int cmd, struct ifreq *ifr,
 	case SIOCBRADDIF:
 	case SIOCBRDELIF:
 	case SIOCSHWTSTAMP:
+	case SIOCSSYNCE:
 		if (!ns_capable(net->user_ns, CAP_NET_ADMIN))
 			return -EPERM;
 		fallthrough;
@@ -605,6 +608,7 @@ int dev_ioctl(struct net *net, unsigned int cmd, struct ifreq *ifr,
 	default:
 		if (cmd == SIOCWANDEV ||
 		    cmd == SIOCGHWTSTAMP ||
+		    cmd == SIOCGSYNCE ||
 		    (cmd >= SIOCDEVPRIVATE &&
 		     cmd <= SIOCDEVPRIVATE + 15)) {
 			dev_load(net, ifr->ifr_name);
