@@ -39,6 +39,9 @@ static inline bool security_ftr_enabled(u64 feature)
 	return !!(powerpc_security_features & feature);
 }
 
+#ifndef CONFIG_PPC_BARRIER_NOSPEC
+DEFINE_STATIC_KEY_FALSE(uaccess_flush_key);
+#endif
 
 // Features indicating support for Spectre/Meltdown mitigations
 
