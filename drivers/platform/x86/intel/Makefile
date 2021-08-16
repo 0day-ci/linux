@@ -31,5 +31,7 @@ intel_ips-y							:= ips.o
 obj-$(CONFIG_INTEL_IPS)				+= intel_ips.o
 intel-rst-y							:= rst.o
 obj-$(CONFIG_INTEL_RST)				+= intel-rst.o
+intel-smartconnect-y				:= smartconnect.o
+obj-$(CONFIG_INTEL_SMARTCONNECT)		+= intel-smartconnect.o
 
 
