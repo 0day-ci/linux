@@ -3,6 +3,7 @@
 
 #include "ice.h"
 #include "ice_lib.h"
+#include <linux/net_synce.h>
 
 #define E810_OUT_PROP_DELAY_NS 1
 
@@ -2204,4 +2205,86 @@ void ice_ptp_release(struct ice_pf *pf)
 	pf->ptp.clock = NULL;
 
 	dev_info(ice_pf_to_dev(pf), "Removed PTP clock\n");
+}
+
+/**
+ * ice_ptp_get_ref_clk - get state of PHY recovered clock pin
+ * @pf:  pointer to pf structure
+ * @ifr: pointer to ioctl data
+ *
+ * Get state of the pin from Firmware and pass it to the user.
+ */
+int ice_ptp_get_ref_clk(struct ice_pf *pf, struct ifreq *ifr)
+{
+	u8 flags = 0, port_num = ICE_AQC_SET_PHY_REC_CLK_OUT_CURR_PORT;
+	struct synce_ref_clk_cfg ref_clk;
+	u32 freq = 0;
+	int ret;
+
+	if (copy_from_user(&ref_clk, ifr->ifr_data, sizeof(ref_clk)))
+		return -EFAULT;
+
+	if (ref_clk.pin_id > ICE_C827_RCLKB_PIN) {
+		ret = -EINVAL;
+		goto out;
+	}
+	ret = ice_aq_get_phy_rec_clk_out(&pf->hw, ref_clk.pin_id,
+					 &port_num, &flags, &freq);
+
+	if (ret) {
+		dev_warn(ice_pf_to_dev(pf),
+			 "Failed to read recover reference clock config on pin %u err %d aq_err %s\n",
+			 ref_clk.pin_id,
+			 ret, ice_aq_str(pf->hw.adminq.sq_last_status));
+		goto out;
+	}
+	ref_clk.enable = !!(flags & ICE_AQC_SET_PHY_REC_CLK_OUT_OUT_EN);
+	dev_dbg(ice_pf_to_dev(pf),
+		"recover reference clock on pin: %u is %s\n",
+		ref_clk.pin_id,
+		ref_clk.enable ? "enabled" : "disabled");
+	ret = copy_to_user(ifr->ifr_data, &ref_clk, sizeof(ref_clk));
+out:
+	return ret;
+}
+
+/**
+ * ice_ptp_set_ref_clk - set state of PHY recovered clock pin
+ * @pf:  pointer to pf structure
+ * @ifr: pointer to ioctl data
+ *
+ * Set state of the pin in the Firmware according to the user input.
+ */
+int ice_ptp_set_ref_clk(struct ice_pf *pf, struct ifreq *ifr)
+{
+	struct synce_ref_clk_cfg ref_clk;
+	u32 freq = 0;
+	int ret;
+
+	if (copy_from_user(&ref_clk, ifr->ifr_data, sizeof(ref_clk)))
+		return -EFAULT;
+
+	if (ref_clk.pin_id > ICE_C827_RCLKB_PIN) {
+		ret = -EINVAL;
+		goto out;
+	}
+	ret = ice_aq_set_phy_rec_clk_out(&pf->hw, ref_clk.pin_id,
+					 ref_clk.enable, &freq);
+
+	if (ret) {
+		dev_warn(ice_pf_to_dev(pf),
+			 "Failed to %s recover reference clock on pin %u err %d aq_err %s\n",
+			 ref_clk.enable ? "enable" : "disable",
+			 ref_clk.pin_id,
+			 ret, ice_aq_str(pf->hw.adminq.sq_last_status));
+		goto out;
+	}
+
+	dev_dbg(ice_pf_to_dev(pf),
+		"%s recover reference clock on pin: %u\n",
+		ref_clk.enable ? "Enabled" : " Disabled",
+		ref_clk.pin_id);
+	ret = copy_to_user(ifr->ifr_data, &ref_clk, sizeof(ref_clk));
+out:
+	return ret;
 }

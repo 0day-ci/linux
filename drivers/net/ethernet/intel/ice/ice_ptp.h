@@ -24,6 +24,12 @@ struct ice_perout_channel {
 	u64 start_time;
 };
 
+enum ice_phy_rclk_pins {
+	ICE_C827_RCLKA_PIN,		/* SCL pin */
+	ICE_C827_RCLKB_PIN,		/* SDA pin */
+	ICE_C827_RCLK_PINS_NUM		/* number of pins */
+};
+
 /* The ice hardware captures Tx hardware timestamps in the PHY. The timestamp
  * is stored in a buffer of registers. Depending on the specific hardware,
  * this buffer might be shared across multiple PHY ports.
@@ -223,4 +229,6 @@ static inline void ice_ptp_release(struct ice_pf *pf) { }
 static inline int ice_ptp_link_change(struct ice_pf *pf, u8 port, bool linkup)
 { return 0; }
 #endif /* IS_ENABLED(CONFIG_PTP_1588_CLOCK) */
+int ice_ptp_get_ref_clk(struct ice_pf *pf, struct ifreq *ifr);
+int ice_ptp_set_ref_clk(struct ice_pf *pf, struct ifreq *ifr);
 #endif /* _ICE_PTP_H_ */

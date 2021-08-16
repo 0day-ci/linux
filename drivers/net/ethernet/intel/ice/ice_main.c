@@ -6675,6 +6675,10 @@ static int ice_eth_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd)
 		return ice_ptp_get_ts_config(pf, ifr);
 	case SIOCSHWTSTAMP:
 		return ice_ptp_set_ts_config(pf, ifr);
+	case SIOCGSYNCE:
+		return ice_ptp_get_ref_clk(pf, ifr);
+	case SIOCSSYNCE:
+		return ice_ptp_set_ref_clk(pf, ifr);
 	default:
 		return -EOPNOTSUPP;
 	}
