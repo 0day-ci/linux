@@ -176,7 +176,6 @@ int misc_register(struct miscdevice *misc)
 	int err = 0;
 	bool is_dynamic = (misc->minor == MISC_DYNAMIC_MINOR);
 
-	INIT_LIST_HEAD(&misc->list);
 
 	mutex_lock(&misc_mtx);
 
@@ -185,7 +184,7 @@ int misc_register(struct miscdevice *misc)
 
 		if (i >= DYNAMIC_MINORS) {
 			err = -EBUSY;
-			goto out;
+			goto err2;
 		}
 		misc->minor = DYNAMIC_MINORS - i - 1;
 		set_bit(i, misc_minors);
@@ -195,7 +194,13 @@ int misc_register(struct miscdevice *misc)
 		list_for_each_entry(c, &misc_list, list) {
 			if (c->minor == misc->minor) {
 				err = -EBUSY;
-				goto out;
+				/*
+				 * if module use same address double register,
+				 * init list will corrupt misc_list
+				 */
+				if (c == misc)
+					goto err1;
+				goto err2;
 			}
 		}
 	}
@@ -214,7 +219,7 @@ int misc_register(struct miscdevice *misc)
 			misc->minor = MISC_DYNAMIC_MINOR;
 		}
 		err = PTR_ERR(misc->this_device);
-		goto out;
+		goto err2;
 	}
 
 	/*
@@ -222,7 +227,11 @@ int misc_register(struct miscdevice *misc)
 	 * earlier defaults
 	 */
 	list_add(&misc->list, &misc_list);
- out:
+	mutex_unlock(&misc_mtx);
+	return 0;
+ err2:
+	INIT_LIST_HEAD(&misc->list);
+ err1:
 	mutex_unlock(&misc_mtx);
 	return err;
 }
