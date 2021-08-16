@@ -25,3 +25,10 @@ obj-$(CONFIG_INTEL_SCU_WDT)			+= scu/
 obj-$(CONFIG_INTEL_SCU_IPC_UTIL)	+= scu/
 obj-$(CONFIG_INTEL_TELEMETRY)		+= telemetry/
 
+# Intel uncore drivers
+CFLAGS_ips.o				:= -I./drivers/platform/x86
+intel_ips-y							:= ips.o
+obj-$(CONFIG_INTEL_IPS)				+= intel_ips.o
+
+
+
