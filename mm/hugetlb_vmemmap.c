@@ -172,16 +172,6 @@
 
 #include "hugetlb_vmemmap.h"
 
-/*
- * There are a lot of struct page structures associated with each HugeTLB page.
- * For tail pages, the value of compound_head is the same. So we can reuse first
- * page of tail page structures. We map the virtual addresses of the remaining
- * pages of tail page structures to the first tail page struct, and then free
- * these page frames. Therefore, we need to reserve two pages as vmemmap areas.
- */
-#define RESERVE_VMEMMAP_NR		2U
-#define RESERVE_VMEMMAP_SIZE		(RESERVE_VMEMMAP_NR << PAGE_SHIFT)
-
 bool hugetlb_free_vmemmap_enabled = IS_ENABLED(CONFIG_HUGETLB_PAGE_FREE_VMEMMAP_DEFAULT_ON);
 
 static int __init early_hugetlb_free_vmemmap_param(char *buf)
@@ -249,6 +239,8 @@ void free_huge_page_vmemmap(struct hstate *h, struct page *head)
 	unsigned long vmemmap_end, vmemmap_reuse;
 
 	if (!free_vmemmap_pages_per_hpage(h))
+		return;
+	if (HPageVmemmapOptimized(head))	/* possible for demote */
 		return;
 
 	vmemmap_addr += RESERVE_VMEMMAP_SIZE;

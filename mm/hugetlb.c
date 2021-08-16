@@ -1265,11 +1265,17 @@ static void __destroy_compound_gigantic_page(struct page *page,
 					unsigned int order, bool demote)
 {
 	int i;
-	int nr_pages = 1 << order;
+	int nr_pages;
 	struct page *p = page + 1;
 
 	atomic_set(compound_mapcount_ptr(page), 0);
 	atomic_set(compound_pincount_ptr(page), 0);
+
+	if (demote && HPageVmemmapOptimized(page)) {
+		clear_compound_head(page);
+		nr_pages = RESERVE_VMEMMAP_SIZE / sizeof(struct page);
+	} else
+		nr_pages = 1 << order;
 
 	for (i = 1; i < nr_pages; i++, p = mem_map_next(p, page, i)) {
 		p->mapping = NULL;
@@ -1527,6 +1533,7 @@ static void __update_and_free_page(struct hstate *h, struct page *page)
 			return;
 		}
 #endif
+		prep_compound_page(page, huge_page_order(h));
 		__free_pages(page, huge_page_order(h));
 	}
 }
@@ -1715,8 +1722,13 @@ static bool __prep_compound_gigantic_page(struct page *page, unsigned int order,
 								bool demote)
 {
 	int i, j;
-	int nr_pages = 1 << order;
+	int nr_pages;
 	struct page *p = page + 1;
+
+	if (demote && HPageVmemmapOptimized(page))
+		nr_pages = RESERVE_VMEMMAP_SIZE / sizeof(struct page);
+	else
+		nr_pages = 1 << order;
 
 	/* we rely on prep_new_huge_page to set the destructor */
 	set_compound_order(page, order);
@@ -1761,6 +1773,7 @@ static bool __prep_compound_gigantic_page(struct page *page, unsigned int order,
 		} else {
 			VM_BUG_ON_PAGE(page_count(p), p);
 		}
+		p->mapping = TAIL_MAPPING;
 		set_page_count(p, 0);
 		set_compound_head(p, page);
 	}
