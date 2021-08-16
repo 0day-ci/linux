@@ -82,13 +82,11 @@ bool rtw_is_cckrates_included(u8 *rate)
 
 uint	rtw_is_cckratesonly_included(u8 *rate)
 {
-	u32 i = 0;
+	u8 r;
 
-	while (rate[i] != 0) {
-		if  ((((rate[i]) & 0x7f) != 2) && (((rate[i]) & 0x7f) != 4) &&
-		     (((rate[i]) & 0x7f) != 11)  && (((rate[i]) & 0x7f) != 22))
+	while ((r = *rate++ & 0x7f)) {
+		if (r != 2 && r != 4 && r != 11 && r != 22)
 			return false;
-		i++;
 	}
 
 	return true;
