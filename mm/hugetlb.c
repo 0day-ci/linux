@@ -3330,13 +3330,14 @@ static int demote_free_huge_page(struct hstate *h, struct page *page)
 	int i, nid = page_to_nid(page);
 	struct hstate *target_hstate;
 	bool cma_page = HPageCma(page);
+	bool vmemmap_optimized = HPageVmemmapOptimized(page);
 
 	target_hstate = size_to_hstate(PAGE_SIZE << h->demote_order);
 
 	remove_hugetlb_page_for_demote(h, page, false);
 	spin_unlock_irq(&hugetlb_lock);
 
-	if (alloc_huge_page_vmemmap(h, page)) {
+	if (demote_huge_page_vmemmap(h, page)) {
 		/* Allocation of vmemmmap failed, we can not demote page */
 		spin_lock_irq(&hugetlb_lock);
 		set_page_refcounted(page);
@@ -3348,16 +3349,36 @@ static int demote_free_huge_page(struct hstate *h, struct page *page)
 	 * Use destroy_compound_gigantic_page_for_demote for all huge page
 	 * sizes as it will not ref count pages.
 	 */
-	destroy_compound_gigantic_page_for_demote(page, huge_page_order(h));
+	if (vmemmap_optimized)
+		/*
+		 * If page is vmemmmap optimized, then demote_huge_page_vmemmap
+		 * added vmammap for each smaller page of target order size.
+		 * We must update/destroy all each of these smaller pages.
+		 */
+		for (i = 0; i < pages_per_huge_page(h);
+					i += pages_per_huge_page(target_hstate))
+			destroy_compound_gigantic_page_for_demote(page + i,
+					huge_page_order(target_hstate));
+	else
+		destroy_compound_gigantic_page_for_demote(page,
+							huge_page_order(h));
 
 	for (i = 0; i < pages_per_huge_page(h);
 				i += pages_per_huge_page(target_hstate)) {
-		if (hstate_is_gigantic(target_hstate))
+		/*
+		 * Use gigantic page prep for vmemmap_optimized pages of
+		 * all sizes as it has special vmemmap logic.  The generic
+		 * prep routine does not and should not know about hugetlb
+		 * vmemmap optimizations.
+		 */
+		if (hstate_is_gigantic(target_hstate) || vmemmap_optimized)
 			prep_compound_gigantic_page_for_demote(page + i,
 							target_hstate->order);
 		else
 			prep_compound_page(page + i, target_hstate->order);
 		set_page_private(page + i, 0);
+		if (vmemmap_optimized)
+			SetHPageVmemmapOptimized(page + i);
 		set_page_refcounted(page + i);
 		prep_new_huge_page(target_hstate, page + i, nid);
 		if (cma_page)
