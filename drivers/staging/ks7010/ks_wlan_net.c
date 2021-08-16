@@ -181,26 +181,26 @@ static int ks_wlan_set_freq(struct net_device *dev,
 
 	/* for SLEEP MODE */
 	/* If setting by frequency, convert to a channel */
-	if ((fwrq->freq.e == 1) &&
-	    (fwrq->freq.m >= 241200000) && (fwrq->freq.m <= 248700000)) {
+	if (fwrq->freq.e == 1 &&
+	    fwrq->freq.m >= 241200000 && fwrq->freq.m <= 248700000) {
 		int f = fwrq->freq.m / 100000;
 		int c = 0;
 
 		while ((c < 14) && (f != frequency_list[c]))
 			c++;
-		/* Hack to fall through... */
+		fallthrough;
 		fwrq->freq.e = 0;
 		fwrq->freq.m = c + 1;
 	}
 	/* Setting by channel number */
-	if ((fwrq->freq.m > 1000) || (fwrq->freq.e > 0))
+	if (fwrq->freq.m > 1000 || fwrq->freq.e > 0)
 		return -EOPNOTSUPP;
 
 	channel = fwrq->freq.m;
 	/* We should do a better check than that,
 	 * based on the card capability !!!
 	 */
-	if ((channel < 1) || (channel > 14)) {
+	if (channel < 1 || channel > 14) {
 		netdev_dbg(dev, "%s: New channel value of %d is invalid!\n",
 			   dev->name, fwrq->freq.m);
 		return -EINVAL;
@@ -664,7 +664,7 @@ static int ks_wlan_set_rts(struct net_device *dev, struct iw_request_info *info,
 	/* for SLEEP MODE */
 	if (vwrq->rts.disabled)
 		rthr = 2347;
-	if ((rthr < 0) || (rthr > 2347))
+	if (rthr < 0 || rthr > 2347)
 		return -EINVAL;
 
 	priv->reg.rts = rthr;
@@ -702,7 +702,7 @@ static int ks_wlan_set_frag(struct net_device *dev,
 	/* for SLEEP MODE */
 	if (vwrq->frag.disabled)
 		fthr = 2346;
-	if ((fthr < 256) || (fthr > 2346))
+	if (fthr < 256 || fthr > 2346)
 		return -EINVAL;
 
 	fthr &= ~0x1;	/* Get an even value - is it really needed ??? */
@@ -781,7 +781,7 @@ static int ks_wlan_set_encode(struct net_device *dev,
 		return -EINVAL;
 
 	/* for SLEEP MODE */
-	if ((index < 0) || (index > 4))
+	if (index < 0 || index > 4)
 		return -EINVAL;
 
 	index = (index == 0) ? priv->reg.wep_index : (index - 1);
@@ -882,7 +882,7 @@ static int ks_wlan_get_encode(struct net_device *dev,
 	}
 
 	/* Which key do we want ? -1 -> tx index */
-	if ((index < 0) || (index >= 4))
+	if (index < 0 || index >= 4)
 		index = priv->reg.wep_index;
 	if (priv->reg.privacy_invoked) {
 		enc->flags &= ~IW_ENCODE_DISABLED;
@@ -1860,7 +1860,7 @@ static int ks_wlan_set_power_mgmt(struct net_device *dev,
 		return -EINVAL;
 
 	if ((*uwrq == POWER_MGMT_SAVE1 || *uwrq == POWER_MGMT_SAVE2) &&
-	    (priv->reg.operation_mode != MODE_INFRASTRUCTURE))
+	    priv->reg.operation_mode != MODE_INFRASTRUCTURE)
 		return -EINVAL;
 
 	priv->reg.power_mgmt = *uwrq;
