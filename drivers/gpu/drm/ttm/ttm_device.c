@@ -69,6 +69,7 @@ static int ttm_global_init(void)
 	unsigned long num_pages, num_dma32;
 	struct sysinfo si;
 	int ret = 0;
+	int tmp;
 
 	mutex_lock(&ttm_global_mutex);
 	if (++ttm_glob_use_count > 1)
@@ -78,9 +79,9 @@ static int ttm_global_init(void)
 
 	ttm_debugfs_root = debugfs_create_dir("ttm", NULL);
 	if (IS_ERR(ttm_debugfs_root)) {
-		ret = PTR_ERR(ttm_debugfs_root);
-		ttm_debugfs_root = NULL;
-		goto out;
+		tmp = PTR_ERR(ttm_debugfs_root);
+		if (tmp != -ENODEV)
+			pr_err("failed to create debugfs: %d", tmp);
 	}
 
 	/* Limit the number of pages in the pool to about 50% of the total
