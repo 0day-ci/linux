@@ -58,4 +58,6 @@ config INTEL_PUNIT_IPC
 	  This driver provides support for Intel P-Unit Mailbox IPC mechanism,
 	  which is used to bridge the communications between kernel and P-Unit.
 
+source "drivers/platform/x86/intel/pmc/Kconfig"
+
 endif # X86_PLATFORM_DRIVERS_INTEL
