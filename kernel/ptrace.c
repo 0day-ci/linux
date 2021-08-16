@@ -1220,11 +1220,6 @@ int ptrace_request(struct task_struct *child, long request,
 	case PTRACE_CONT:
 		return ptrace_resume(child, request, data);
 
-	case PTRACE_KILL:
-		if (child->exit_state)	/* already dead */
-			return 0;
-		return ptrace_resume(child, request, SIGKILL);
-
 #ifdef CONFIG_HAVE_ARCH_TRACEHOOK
 	case PTRACE_GETREGSET:
 	case PTRACE_SETREGSET: {
@@ -1270,6 +1265,20 @@ int ptrace_request(struct task_struct *child, long request,
 	return ret;
 }
 
+static int ptrace_kill(struct task_struct *child)
+{
+	int ret = -ESRCH;
+
+	read_lock(&tasklist_lock);
+	if (child->ptrace && child->parent == current) {
+		if (!child->exit_state)
+			send_sig_info(SIGKILL, SEND_SIG_PRIV, child);
+		ret = 0;
+	}
+	read_unlock(&tasklist_lock);
+	return ret;
+}
+
 #ifndef arch_ptrace_attach
 #define arch_ptrace_attach(child)	do { } while (0)
 #endif
@@ -1304,8 +1313,12 @@ SYSCALL_DEFINE4(ptrace, long, request, long, pid, unsigned long, addr,
 		goto out_put_task_struct;
 	}
 
-	ret = ptrace_check_attach(child, request == PTRACE_KILL ||
-				  request == PTRACE_INTERRUPT);
+	if (request == PTRACE_KILL) {
+		ret = ptrace_kill(child);
+		goto out_put_task_struct;
+	}
+
+	ret = ptrace_check_attach(child, request == PTRACE_INTERRUPT);
 	if (ret < 0)
 		goto out_put_task_struct;
 
@@ -1449,8 +1462,12 @@ COMPAT_SYSCALL_DEFINE4(ptrace, compat_long_t, request, compat_long_t, pid,
 		goto out_put_task_struct;
 	}
 
-	ret = ptrace_check_attach(child, request == PTRACE_KILL ||
-				  request == PTRACE_INTERRUPT);
+	if (request == PTRACE_KILL) {
+		ret = ptrace_kill(child);
+		goto out_put_task_struct;
+	}
+
+	ret = ptrace_check_attach(child, request == PTRACE_INTERRUPT);
 	if (!ret) {
 		ret = compat_arch_ptrace(child, request, addr, data);
 		if (ret || request != PTRACE_DETACH)
