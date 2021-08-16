@@ -199,8 +199,11 @@ static void ipcomp_free_scratches(void)
 	if (!scratches)
 		return;
 
-	for_each_possible_cpu(i)
-		vfree(*per_cpu_ptr(scratches, i));
+	for_each_possible_cpu(i) {
+		void *scratch = *per_cpu_ptr(scratches, i);
+		if (!scratch)
+			vfree(scratch);
+	}
 
 	free_percpu(scratches);
 }
