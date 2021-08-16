@@ -306,6 +306,8 @@ static inline bool lazy_irq_pending_nocheck(void)
 	return __lazy_irq_pending(local_paca->irq_happened);
 }
 
+bool power_pmu_running(void);
+
 /*
  * This is called by asynchronous interrupts to conditionally
  * re-enable hard interrupts after having cleared the source
