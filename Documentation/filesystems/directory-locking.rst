@@ -11,7 +11,7 @@ When taking the i_rwsem on multiple non-directory objects, we
 always acquire the locks in order by increasing address.  We'll call
 that "inode pointer" order in the following.
 
-For our purposes all operations fall in 5 classes:
+For our purposes all operations fall in 6 classes:
 
 1) read access.  Locking rules: caller locks directory we are accessing.
 The lock is taken shared.
@@ -22,26 +22,25 @@ exclusive.
 3) object removal.  Locking rules: caller locks parent, finds victim,
 locks victim and calls the method.  Locks are exclusive.
 
-4) rename() that is _not_ cross-directory.  Locking rules: caller locks
-the parent and finds source and target.  In case of exchange (with
-RENAME_EXCHANGE in flags argument) lock both.  In any case,
-if the target already exists, lock it.  If the source is a non-directory,
-lock it.  If we need to lock both, lock them in inode pointer order.
-Then call the method.  All locks are exclusive.
+4) link creation.  Locking rules: lock parent, check that source is not
+a directory, lock source and call the method.  Locks are exclusive.
+
+5) rename() that is _not_ cross-directory.
+Locking rules:
+
+	* Caller locks the parent and finds source and target.
+	* In case of exchange (with RENAME_EXCHANGE in flags argument)
+	  lock both the source and the target.
+	* If the target exists, lock it,  If the source is a non-directory,
+	  lock it. If we need to lock both, do so in inode pointer order.
+	* Call the method.
+
+All locks are exclusive.
 NB: we might get away with locking the source (and target in exchange
 case) shared.
 
-5) link creation.  Locking rules:
-
-	* lock parent
-	* check that source is not a directory
-	* lock source
-	* call the method.
-
-All locks are exclusive.
-
-6) cross-directory rename.  The trickiest in the whole bunch.  Locking
-rules:
+6) rename() that _is_ cross-directory.  The trickiest in the whole bunch.
+Locking rules:
 
 	* lock the filesystem
 	* lock parents in "ancestors first" order.
