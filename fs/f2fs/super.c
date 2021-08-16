@@ -3614,7 +3614,7 @@ static int init_blkz_info(struct f2fs_sb_info *sbi, int devi)
  */
 static int read_raw_super_block(struct f2fs_sb_info *sbi,
 			struct f2fs_super_block **raw_super,
-			int *valid_super_block, int *recovery)
+			int *valid_super_block, bool *recovery)
 {
 	struct super_block *sb = sbi->sb;
 	int block;
@@ -3632,7 +3632,7 @@ static int read_raw_super_block(struct f2fs_sb_info *sbi,
 			f2fs_err(sbi, "Unable to read %dth superblock",
 				 block + 1);
 			err = -EIO;
-			*recovery = 1;
+			*recovery = true;
 			continue;
 		}
 
@@ -3642,7 +3642,7 @@ static int read_raw_super_block(struct f2fs_sb_info *sbi,
 			f2fs_err(sbi, "Can't find valid F2FS filesystem in %dth superblock",
 				 block + 1);
 			brelse(bh);
-			*recovery = 1;
+			*recovery = true;
 			continue;
 		}
 
@@ -3858,15 +3858,16 @@ static int f2fs_fill_super(struct super_block *sb, void *data, int silent)
 	int err;
 	bool skip_recovery = false, need_fsck = false;
 	char *options = NULL;
-	int recovery, i, valid_super_block;
+	int i, valid_super_block;
 	struct curseg_info *seg_i;
 	int retry_cnt = 1;
+	bool recovery;
 
 try_onemore:
 	err = -EINVAL;
 	raw_super = NULL;
 	valid_super_block = -1;
-	recovery = 0;
+	recovery = false;
 
 	/* allocate memory for f2fs-specific super block info */
 	sbi = kzalloc(sizeof(struct f2fs_sb_info), GFP_KERNEL);
