@@ -59,5 +59,6 @@ config INTEL_PUNIT_IPC
 	  which is used to bridge the communications between kernel and P-Unit.
 
 source "drivers/platform/x86/intel/pmc/Kconfig"
+source "drivers/platform/x86/intel/scu/Kconfig"
 
 endif # X86_PLATFORM_DRIVERS_INTEL

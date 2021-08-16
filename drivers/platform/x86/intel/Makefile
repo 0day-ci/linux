@@ -18,3 +18,9 @@ obj-$(CONFIG_INTEL_MRFLD_PWRBTN)	+= intel_mrfld_pwrbtn.o
 intel_punit_ipc-y			:= punit_ipc.o
 obj-$(CONFIG_INTEL_PUNIT_IPC)		+= intel_punit_ipc.o
 obj-$(CONFIG_INTEL_PMC_CORE)		+= pmc/
+obj-$(CONFIG_INTEL_SCU_IPC)			+= scu/
+obj-$(CONFIG_INTEL_SCU_PCI)			+= scu/
+obj-$(CONFIG_INTEL_SCU_PLATFORM)	+= scu/
+obj-$(CONFIG_INTEL_SCU_WDT)			+= scu/
+obj-$(CONFIG_INTEL_SCU_IPC_UTIL)	+= scu/
+
