@@ -4,7 +4,7 @@
 $id: http://devicetree.org/schemas/display/mediatek/mediatek,dpi.yaml#
 $schema: http://devicetree.org/meta-schemas/core.yaml#
 
-title: mediatek DPI Controller Device Tree Bindings
+title: mediatek DPI/DP_INTF Controller Device Tree Bindings
 
 maintainers:
   - CK Hu <ck.hu@mediatek.com>
@@ -13,7 +13,8 @@ maintainers:
 description: |
   The Mediatek DPI function block is a sink of the display subsystem and
   provides 8-bit RGB/YUV444 or 8/10/10-bit YUV422 pixel data on a parallel
-  output bus.
+  output bus. The Mediatek DP_INTF is a similar function block that is
+  connected to the (embedded) display port function block.
 
 properties:
   compatible:
@@ -23,6 +24,7 @@ properties:
       - mediatek,mt8173-dpi
       - mediatek,mt8183-dpi
       - mediatek,mt8192-dpi
+      - mediatek,mt8195-dpintf
 
   reg:
     maxItems: 1
@@ -37,10 +39,11 @@ properties:
       - description: DPI PLL
 
   clock-names:
-    items:
-      - const: pixel
-      - const: engine
-      - const: pll
+    description:
+      For dpi clocks pixel, engine and pll are required. For dpintf pixel, pll,
+      pll_d2, pll_d4, pll_d8, pll_d16, hf_fmm, hf_fdp are required.
+    minItems: 3
+    maxItems: 8
 
   pinctrl-0: true
   pinctrl-1: true
@@ -63,6 +66,39 @@ required:
   - clocks
   - clock-names
   - port
+
+allOf:
+  - if:
+      properties:
+        compatible:
+          contains:
+            enum:
+              - mediatek,mt8195-dpintf
+    then:
+      properties:
+        clocks:
+          minItems: 8
+          maxItems: 8
+        clock-names:
+          items:
+            - const: pixel
+            - const: pll
+            - const: pll_d2
+            - const: pll_d4
+            - const: pll_d8
+            - const: pll_d16
+            - const: hf_fmm
+            - const: hf_fdp
+    else:
+      properties:
+        clocks:
+          minItems: 3
+          maxItems: 3
+        clock-names:
+          items:
+            - const: pixel
+            - const: engine
+            - const: pll
 
 additionalProperties: false
 
