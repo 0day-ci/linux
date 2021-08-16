@@ -4216,9 +4216,8 @@ void f2fs_flush_sit_entries(struct f2fs_sb_info *sbi, struct cp_control *cpc)
 
 			se = get_seg_entry(sbi, segno);
 #ifdef CONFIG_F2FS_CHECK_FS
-			if (memcmp(se->cur_valid_map, se->cur_valid_map_mir,
-						SIT_VBLOCK_MAP_SIZE))
-				f2fs_bug_on(sbi, 1);
+			f2fs_bug_on(sbi, memcmp(se->cur_valid_map,
+				    se->cur_valid_map_mir, SIT_VBLOCK_MAP_SIZE));
 #endif
 
 			/* add discard candidates */

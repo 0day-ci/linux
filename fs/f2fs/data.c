@@ -464,8 +464,7 @@ static inline void __submit_bio(struct f2fs_sb_info *sbi,
 			zero_user_segment(page, 0, PAGE_SIZE);
 			set_page_private_dummy(page);
 
-			if (bio_add_page(bio, page, PAGE_SIZE, 0) < PAGE_SIZE)
-				f2fs_bug_on(sbi, 1);
+			f2fs_bug_on(sbi, bio_add_page(bio, page, PAGE_SIZE, 0) < PAGE_SIZE);
 		}
 		/*
 		 * In the NODE case, we lose next block address chain. So, we
@@ -727,8 +726,7 @@ static void add_bio_entry(struct f2fs_sb_info *sbi, struct bio *bio,
 	be->bio = bio;
 	bio_get(bio);
 
-	if (bio_add_page(bio, page, PAGE_SIZE, 0) != PAGE_SIZE)
-		f2fs_bug_on(sbi, 1);
+	f2fs_bug_on(sbi, bio_add_page(bio, page, PAGE_SIZE, 0) != PAGE_SIZE);
 
 	down_write(&io->bio_list_lock);
 	list_add_tail(&be->list, &io->bio_list);

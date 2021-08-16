@@ -518,9 +518,8 @@ static inline void get_sit_bitmap(struct f2fs_sb_info *sbi,
 	struct sit_info *sit_i = SIT_I(sbi);
 
 #ifdef CONFIG_F2FS_CHECK_FS
-	if (memcmp(sit_i->sit_bitmap, sit_i->sit_bitmap_mir,
-						sit_i->bitmap_size))
-		f2fs_bug_on(sbi, 1);
+	f2fs_bug_on(sbi, memcmp(sit_i->sit_bitmap, sit_i->sit_bitmap_mir,
+				sit_i->bitmap_size));
 #endif
 	memcpy(dst_addr, sit_i->sit_bitmap, sit_i->bitmap_size);
 }
@@ -762,9 +761,8 @@ static inline pgoff_t current_sit_addr(struct f2fs_sb_info *sbi,
 	check_seg_range(sbi, start);
 
 #ifdef CONFIG_F2FS_CHECK_FS
-	if (f2fs_test_bit(offset, sit_i->sit_bitmap) !=
-			f2fs_test_bit(offset, sit_i->sit_bitmap_mir))
-		f2fs_bug_on(sbi, 1);
+	f2fs_bug_on(sbi, f2fs_test_bit(offset, sit_i->sit_bitmap) !=
+		    f2fs_test_bit(offset, sit_i->sit_bitmap_mir));
 #endif
 
 	/* calculate sit block address */

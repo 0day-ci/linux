@@ -160,8 +160,7 @@ void f2fs_compress_ctx_add_page(struct compress_ctx *cc, struct page *page)
 {
 	unsigned int cluster_ofs;
 
-	if (!f2fs_cluster_can_merge_page(cc, page->index))
-		f2fs_bug_on(F2FS_I_SB(cc->inode), 1);
+	f2fs_bug_on(F2FS_I_SB(cc->inode), !f2fs_cluster_can_merge_page(cc, page->index));
 
 	cluster_ofs = offset_in_cluster(cc, page->index);
 	cc->rpages[cluster_ofs] = page;

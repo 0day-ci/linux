@@ -475,8 +475,7 @@ static void __add_ino_entry(struct f2fs_sb_info *sbi, nid_t ino,
 	e = radix_tree_lookup(&im->ino_root, ino);
 	if (!e) {
 		e = tmp;
-		if (unlikely(radix_tree_insert(&im->ino_root, ino, e)))
-			f2fs_bug_on(sbi, 1);
+		f2fs_bug_on(sbi, radix_tree_insert(&im->ino_root, ino, e));
 
 		memset(e, 0, sizeof(struct ino_entry));
 		e->ino = ino;
@@ -1369,8 +1368,7 @@ static void commit_checkpoint(struct f2fs_sb_info *sbi,
 	memcpy(page_address(page), src, PAGE_SIZE);
 
 	set_page_dirty(page);
-	if (unlikely(!clear_page_dirty_for_io(page)))
-		f2fs_bug_on(sbi, 1);
+	f2fs_bug_on(sbi, !clear_page_dirty_for_io(page));
 
 	/* writeout cp pack 2 page */
 	err = __f2fs_write_meta_page(page, &wbc, FS_CP_META_IO);
