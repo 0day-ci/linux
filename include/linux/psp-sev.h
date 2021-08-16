@@ -581,6 +581,20 @@ int sev_issue_cmd_external_user(struct file *filep, unsigned int id,
 int sev_guest_deactivate(struct sev_data_deactivate *data, int *error);
 
 /**
+ * sev_guest_unbind_asid - perform SEV DEACTIVATE command with lock held
+ *
+ * @handle: handle of the VM to deactivate
+ *
+ * Returns:
+ * 0 if the sev successfully processed the command
+ * -%ENODEV    if the sev device is not available
+ * -%ENOTSUPP  if the sev does not support SEV
+ * -%ETIMEDOUT if the sev command timed out
+ * -%EIO       if the sev returned a non-zero return code
+ */
+int sev_guest_unbind_asid(unsigned int handle);
+
+/**
  * sev_guest_activate - perform SEV ACTIVATE command
  *
  * @activate: sev_data_activate structure to be processed
@@ -612,7 +626,7 @@ int sev_guest_activate(struct sev_data_activate *data, int *error);
 int sev_guest_bind_asid(int asid, unsigned int handle, int *error);
 
 /**
- * sev_guest_df_flush - perform SEV DF_FLUSH command
+ * sev_guest_df_flush - perform SEV DF_FLUSH command with lock held
  *
  * @sev_ret: sev command return code
  *
@@ -655,6 +669,9 @@ sev_guest_deactivate(struct sev_data_deactivate *data, int *error) { return -ENO
 
 static inline int
 sev_guest_decommission(unsigned int handle, int *error) { return -ENODEV; }
+
+static inline int
+sev_guest_unbind_asid(unsigned int handle) { return -ENODEV; }
 
 static inline int
 sev_guest_activate(struct sev_data_activate *data, int *error) { return -ENODEV; }

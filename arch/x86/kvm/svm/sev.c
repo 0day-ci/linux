@@ -57,7 +57,6 @@ module_param_named(sev_es, sev_es_enabled, bool, 0444);
 #endif /* CONFIG_KVM_AMD_SEV */
 
 static u8 sev_enc_bit;
-static DECLARE_RWSEM(sev_deactivate_lock);
 static DEFINE_MUTEX(sev_bitmap_lock);
 unsigned int max_sev_asid;
 static unsigned int min_sev_asid;
@@ -84,20 +83,9 @@ static int sev_flush_asids(int min_asid, int max_asid)
 	if (asid > max_asid)
 		return -EBUSY;
 
-	/*
-	 * DEACTIVATE will clear the WBINVD indicator causing DF_FLUSH to fail,
-	 * so it must be guarded.
-	 */
-	down_write(&sev_deactivate_lock);
-
-	wbinvd_on_all_cpus();
 	ret = sev_guest_df_flush(&error);
-
-	up_write(&sev_deactivate_lock);
-
 	if (ret)
 		pr_err("SEV: DF_FLUSH failed, ret=%d, error=%#x\n", ret, error);
-
 	return ret;
 }
 
@@ -196,23 +184,6 @@ static void sev_asid_free(struct kvm_sev_info *sev)
 	misc_cg_uncharge(type, sev->misc_cg, 1);
 	put_misc_cg(sev->misc_cg);
 	sev->misc_cg = NULL;
-}
-
-static void sev_unbind_asid(struct kvm *kvm, unsigned int handle)
-{
-	struct sev_data_deactivate deactivate;
-
-	if (!handle)
-		return;
-
-	deactivate.handle = handle;
-
-	/* Guard DEACTIVATE against WBINVD/DF_FLUSH used in ASID recycling */
-	down_read(&sev_deactivate_lock);
-	sev_guest_deactivate(&deactivate, NULL);
-	up_read(&sev_deactivate_lock);
-
-	sev_guest_decommission(handle, NULL);
 }
 
 static int sev_guest_init(struct kvm *kvm, struct kvm_sev_cmd *argp)
@@ -329,7 +300,7 @@ static int sev_launch_start(struct kvm *kvm, struct kvm_sev_cmd *argp)
 	/* return handle to userspace */
 	params.handle = start.handle;
 	if (copy_to_user((void __user *)(uintptr_t)argp->data, &params, sizeof(params))) {
-		sev_unbind_asid(kvm, start.handle);
+		sev_guest_unbind_asid(start.handle);
 		ret = -EFAULT;
 		goto e_free_session;
 	}
@@ -1378,7 +1349,7 @@ static int sev_receive_start(struct kvm *kvm, struct kvm_sev_cmd *argp)
 	if (copy_to_user((void __user *)(uintptr_t)argp->data,
 			 &params, sizeof(struct kvm_sev_receive_start))) {
 		ret = -EFAULT;
-		sev_unbind_asid(kvm, start.handle);
+		sev_guest_unbind_asid(start.handle);
 		goto e_free_session;
 	}
 
@@ -1789,7 +1760,7 @@ void sev_vm_destroy(struct kvm *kvm)
 
 	mutex_unlock(&kvm->lock);
 
-	sev_unbind_asid(kvm, sev->handle);
+	sev_guest_unbind_asid(sev->handle);
 	sev_asid_free(sev);
 }
 
