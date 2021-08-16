@@ -53,3 +53,4 @@ obj-$(CONFIG_INTEL_SPEED_SELECT_INTERFACE)	+= speed_select_if/
 
 #WMI drivers
 obj-$(CONFIG_INTEL_WMI_SBL_FW_UPDATE)	+= wmi/
+obj-$(CONFIG_INTEL_WMI_THUNDERBOLT)	+= wmi/
