@@ -3406,6 +3406,12 @@ static bool ieee80211_amsdu_aggregate(struct ieee80211_sub_if_data *sdata,
 
 	head->len += skb->len;
 	head->data_len += skb->len;
+
+	/* frag_list should be updated after pskb_expand_head() */
+	frag_tail = &skb_shinfo(head)->frag_list;
+	while (*frag_tail)
+		frag_tail = &(*frag_tail)->next;
+
 	*frag_tail = skb;
 
 out_recalc:
