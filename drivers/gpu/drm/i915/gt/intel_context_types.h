@@ -156,44 +156,56 @@ struct intel_context {
 	u8 wa_bb_page; /* if set, page num reserved for context workarounds */
 
 	struct {
-		/** lock: protects everything in guc_state */
+		/** @lock: protects everything in guc_state */
 		spinlock_t lock;
 		/**
-		 * sched_state: scheduling state of this context using GuC
+		 * @sched_state: scheduling state of this context using GuC
 		 * submission
 		 */
 		u32 sched_state;
 		/*
-		 * fences: maintains of list of requests that have a submit
-		 * fence related to GuC submission
+		 * @fences: maintains a list of requests are currently being
+		 * fenced until a GuC operation completes
 		 */
 		struct list_head fences;
-		/* GuC context blocked fence */
+		/**
+		 * @blocked_fence: fence used to signal when the blocking of a
+		 * contexts submissions is complete.
+		 */
 		struct i915_sw_fence blocked_fence;
-		/* GuC committed requests */
+		/** @number_committed_requests: number of committed requests */
 		int number_committed_requests;
 	} guc_state;
 
 	struct {
-		/** lock: protects everything in guc_active */
+		/** @lock: protects everything in guc_active */
 		spinlock_t lock;
-		/** requests: active requests on this context */
+		/** @requests: list of active requests on this context */
 		struct list_head requests;
-		/*
-		 * GuC priority management
-		 */
+		/** @guc_prio: the contexts current guc priority */
 		u8 guc_prio;
+		/**
+		 * @guc_prio_count: a counter of the number requests inflight in
+		 * each priority bucket
+		 */
 		u32 guc_prio_count[GUC_CLIENT_PRIORITY_NUM];
 	} guc_active;
 
-	/* GuC LRC descriptor ID */
+	/**
+	 * @guc_id: unique handle which is used to communicate information with
+	 * the GuC about this context, protected by guc->contexts_lock
+	 */
 	u16 guc_id;
 
-	/* GuC LRC descriptor reference count */
+	/**
+	 * @guc_id_ref: the number of references to the guc_id, when
+	 * transitioning in and out of zero protected by guc->contexts_lock
+	 */
 	atomic_t guc_id_ref;
 
-	/*
-	 * GuC ID link - in list when unpinned but guc_id still valid in GuC
+	/**
+	 * @guc_id_link: in guc->guc_id_list when the guc_id has no refs but is
+	 * still valid, protected by guc->contexts_lock
 	 */
 	struct list_head guc_id_link;
 
