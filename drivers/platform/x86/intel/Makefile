@@ -9,6 +9,9 @@ obj-$(CONFIG_INTEL_SKL_INT3472)		+= int3472/
 obj-$(CONFIG_INTEL_PMT_CLASS)		+= pmt/
 obj-$(CONFIG_INTEL_ATOMISP2_LED)	+= atomisp2/
 obj-$(CONFIG_INTEL_ATOMISP2_PM)		+= atomisp2/
+CFLAGS_hid.o			:= -I./drivers/platform/x86
+intel-hid-y				:= hid.o
+obj-$(CONFIG_INTEL_HID_EVENT)		+= intel-hid.o
 
 # Intel PMIC / PMC / P-Unit devices
 intel_bxtwc_tmu-y 					:= bxtwc_tmu.o
