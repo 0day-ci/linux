@@ -10,6 +10,7 @@
 #include <linux/module.h>
 #include <linux/miscdevice.h>
 #include <linux/mutex.h>
+#include <linux/wait.h>
 #include <net/nfc/nci_core.h>
 
 enum virtual_ncidev_mode {
@@ -27,6 +28,7 @@ enum virtual_ncidev_mode {
 				 NFC_PROTO_ISO15693_MASK)
 
 static enum virtual_ncidev_mode state;
+static DECLARE_WAIT_QUEUE_HEAD(wq);
 static struct miscdevice miscdev;
 static struct sk_buff *send_buff;
 static struct nci_dev *ndev;
@@ -61,6 +63,7 @@ static int virtual_nci_send(struct nci_dev *ndev, struct sk_buff *skb)
 	}
 	send_buff = skb_copy(skb, GFP_KERNEL);
 	mutex_unlock(&nci_mutex);
+	wake_up_interruptible(&wq);
 
 	return 0;
 }
@@ -76,12 +79,11 @@ static ssize_t virtual_ncidev_read(struct file *file, char __user *buf,
 {
 	size_t actual_len;
 
-	mutex_lock(&nci_mutex);
-	if (!send_buff) {
-		mutex_unlock(&nci_mutex);
+	wait_event_interruptible(wq, send_buff);
+	if (!send_buff)
 		return 0;
-	}
 
+	mutex_lock(&nci_mutex);
 	actual_len = min_t(size_t, count, send_buff->len);
 
 	if (copy_to_user(buf, send_buff->data, actual_len)) {
