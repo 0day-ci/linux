@@ -177,4 +177,7 @@ config INTEL_UNCORE_FREQ_CONTROL
 	  To compile this driver as a module, choose M here: the module
 	  will be called intel-uncore-frequency.
 
+source "drivers/platform/x86/intel/wmi/Kconfig"
+
+
 endif # X86_PLATFORM_DRIVERS_INTEL
