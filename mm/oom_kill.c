@@ -941,7 +941,6 @@ static void __oom_kill_process(struct task_struct *victim, const char *message)
 	mmdrop(mm);
 	put_task_struct(victim);
 }
-#undef K
 
 /*
  * Kill provided task unless it's secured by setting
@@ -1199,8 +1198,18 @@ SYSCALL_DEFINE2(process_mrelease, int, pidfd, unsigned int, flags)
 		ret = -EINTR;
 		goto drop_mm;
 	}
+	trace_start_task_reaping(task->pid);
 	if (!__oom_reap_task_mm(mm))
 		ret = -EAGAIN;
+	if (!ret) {
+		pr_info("process_mrelease: reaped process %d (%s), now anon-rss:%lukB, file-rss:%lukB, shmem-rss:%lukB oom_score_adj:%d\n",
+			task_pid_nr(task), task->comm,
+			K(get_mm_counter(mm, MM_ANONPAGES)),
+			K(get_mm_counter(mm, MM_FILEPAGES)),
+			K(get_mm_counter(mm, MM_SHMEMPAGES)),
+			task->signal->oom_score_adj);
+	}
+	trace_finish_task_reaping(task->pid);
 	mmap_read_unlock(mm);
 
 drop_mm:
@@ -1208,9 +1217,12 @@ drop_mm:
 put_task:
 	put_task_struct(task);
 put_pid:
+	if (ret && ret != -EAGAIN)
+		trace_skip_task_reaping(pid_vnr(pid));
 	put_pid(pid);
 	return ret;
 #else
 	return -ENOSYS;
 #endif /* CONFIG_MMU */
 }
+#undef K
