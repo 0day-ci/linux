@@ -114,7 +114,17 @@ static int betopff_init(struct hid_device *hid)
 
 static int betop_probe(struct hid_device *hdev, const struct hid_device_id *id)
 {
+	struct hid_input *hidinput;
+	struct input_dev *dev;
 	int ret;
+
+	if (list_empty(&hdev->inputs)) {
+		hid_err(hdev, "no inputs found\n");
+		return -ENODEV;
+	}
+
+	hidinput = list_first_entry(&hdev->inputs, struct hid_input, list);
+	dev = hidinput->input;
 
 	if (id->driver_data)
 		hdev->quirks |= HID_QUIRK_MULTI_INPUT;
