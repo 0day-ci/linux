@@ -70,9 +70,7 @@ obj-$(CONFIG_THINKPAD_LMI)	+= think-lmi.o
 
 # Intel
 obj-$(CONFIG_X86_PLATFORM_DRIVERS_INTEL)		+= intel/
-
 obj-$(CONFIG_INTEL_MENLOW)		+= intel_menlow.o
-obj-$(CONFIG_INTEL_VBTN)		+= intel-vbtn.o
 
 # MSI
 obj-$(CONFIG_MSI_LAPTOP)	+= msi-laptop.o
