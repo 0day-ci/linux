@@ -252,20 +252,6 @@ e_no_asid:
 	return ret;
 }
 
-static int sev_bind_asid(struct kvm *kvm, unsigned int handle, int *error)
-{
-	struct sev_data_activate activate;
-	int asid = sev_get_asid(kvm);
-	int ret;
-
-	/* activate ASID on the given handle */
-	activate.handle = handle;
-	activate.asid   = asid;
-	ret = sev_guest_activate(&activate, error);
-
-	return ret;
-}
-
 static int __sev_issue_cmd(int fd, int id, void *data, int *error)
 {
 	struct fd f;
@@ -336,11 +322,9 @@ static int sev_launch_start(struct kvm *kvm, struct kvm_sev_cmd *argp)
 		goto e_free_session;
 
 	/* Bind ASID to this guest */
-	ret = sev_bind_asid(kvm, start.handle, error);
-	if (ret) {
-		sev_guest_decommission(start.handle, NULL);
+	ret = sev_guest_bind_asid(sev_get_asid(kvm), start.handle, error);
+	if (ret)
 		goto e_free_session;
-	}
 
 	/* return handle to userspace */
 	params.handle = start.handle;
@@ -1385,7 +1369,8 @@ static int sev_receive_start(struct kvm *kvm, struct kvm_sev_cmd *argp)
 		goto e_free_session;
 
 	/* Bind ASID to this guest */
-	ret = sev_bind_asid(kvm, start.handle, error);
+	ret = sev_guest_bind_asid(sev_get_asid(kvm), start.handle, error);
+
 	if (ret)
 		goto e_free_session;
 

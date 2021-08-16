@@ -903,6 +903,21 @@ int sev_guest_activate(struct sev_data_activate *data, int *error)
 }
 EXPORT_SYMBOL_GPL(sev_guest_activate);
 
+int sev_guest_bind_asid(int asid, unsigned int handle, int *error)
+{
+	struct sev_data_activate activate;
+	int ret;
+
+	/* activate ASID on the given handle */
+	activate.handle = handle;
+	activate.asid   = asid;
+	ret = sev_guest_activate(&activate, error);
+	if (ret)
+		sev_guest_decommission(handle, NULL);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(sev_guest_bind_asid);
+
 int sev_guest_decommission(unsigned int handle, int *error)
 {
 	struct sev_data_decommission decommission;

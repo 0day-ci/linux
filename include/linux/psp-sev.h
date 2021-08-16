@@ -596,6 +596,22 @@ int sev_guest_deactivate(struct sev_data_deactivate *data, int *error);
 int sev_guest_activate(struct sev_data_activate *data, int *error);
 
 /**
+ * sev_guest_bind_asid - bind an ASID with VM and does decommission on failure
+ *
+ * @asid: current ASID of the VM
+ * @handle: handle of the VM to retrieve status
+ * @sev_ret: sev command return code
+ *
+ * Returns:
+ * 0 if the sev successfully processed the command
+ * -%ENODEV    if the sev device is not available
+ * -%ENOTSUPP  if the sev does not support SEV
+ * -%ETIMEDOUT if the sev command timed out
+ * -%EIO       if the sev returned a non-zero return code
+ */
+int sev_guest_bind_asid(int asid, unsigned int handle, int *error);
+
+/**
  * sev_guest_df_flush - perform SEV DF_FLUSH command
  *
  * @sev_ret: sev command return code
@@ -642,6 +658,9 @@ sev_guest_decommission(unsigned int handle, int *error) { return -ENODEV; }
 
 static inline int
 sev_guest_activate(struct sev_data_activate *data, int *error) { return -ENODEV; }
+
+static inline int
+sev_guest_bind_asid(int asid, unsigned int handle, int *error) { return -ENODEV; }
 
 static inline int sev_guest_df_flush(int *error) { return -ENODEV; }
 
