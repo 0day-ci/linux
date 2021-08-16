@@ -673,10 +673,15 @@ out:
  */
 static int fault_in_user_writeable(u32 __user *uaddr)
 {
-	struct mm_struct *mm = current->mm;
 	int ret;
+	struct mm_struct *mm = current->mm;
+	struct vm_area_struct *vma;
 
 	mmap_read_lock(mm);
+	vma = find_vma(mm, (unsigned long)uaddr);
+	if (!(vma->vm_flags & VM_READ))
+		ret = -EFAULT;
+
 	ret = fixup_user_fault(mm, (unsigned long)uaddr,
 			       FAULT_FLAG_WRITE, NULL);
 	mmap_read_unlock(mm);
