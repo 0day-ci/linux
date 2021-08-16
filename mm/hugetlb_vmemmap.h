@@ -13,6 +13,7 @@
 #ifdef CONFIG_HUGETLB_PAGE_FREE_VMEMMAP
 int alloc_huge_page_vmemmap(struct hstate *h, struct page *head);
 void free_huge_page_vmemmap(struct hstate *h, struct page *head);
+int demote_huge_page_vmemmap(struct hstate *h, struct page *head);
 void hugetlb_vmemmap_init(struct hstate *h);
 
 /*
@@ -31,6 +32,11 @@ static inline int alloc_huge_page_vmemmap(struct hstate *h, struct page *head)
 
 static inline void free_huge_page_vmemmap(struct hstate *h, struct page *head)
 {
+}
+
+static inline int demote_huge_page_vmemmap(struct hstate *h, struct page *head)
+{
+	return 0;
 }
 
 static inline void hugetlb_vmemmap_init(struct hstate *h)

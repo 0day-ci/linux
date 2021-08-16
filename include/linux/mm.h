@@ -3164,6 +3164,10 @@ int vmemmap_remap_free(unsigned long start, unsigned long end,
 		       unsigned long reuse);
 int vmemmap_remap_alloc(unsigned long start, unsigned long end,
 			unsigned long reuse, gfp_t gfp_mask);
+int vmemmap_remap_demote(unsigned long start, unsigned long end,
+			unsigned long reuse, unsigned long demote_nr_pages,
+			unsigned long demote_mask,
+			unsigned long demote_map_pages, gfp_t gfp_mask);
 
 void *sparse_buffer_alloc(unsigned long size);
 struct page * __populate_section_memmap(unsigned long pfn,
