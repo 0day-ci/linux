@@ -143,6 +143,7 @@ struct ice_ptp {
 	struct ptp_clock_info info;
 	struct ptp_clock *clock;
 	struct hwtstamp_config tstamp_config;
+	struct kobject *phy_kobj;
 };
 
 #define __ptp_port_to_ptp(p) \
