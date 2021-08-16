@@ -80,7 +80,7 @@ bool rtw_is_cckrates_included(u8 *rate)
 	return false;
 }
 
-uint	rtw_is_cckratesonly_included(u8 *rate)
+bool rtw_is_cckratesonly_included(u8 *rate)
 {
 	while (*rate) {
 		u8 r = *rate & 0x7f;
