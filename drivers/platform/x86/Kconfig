@@ -1109,8 +1109,6 @@ config INTEL_IMR
 
 	  If you are running on a Galileo/Quark say Y here.
 
-source "drivers/platform/x86/intel_speed_select_if/Kconfig"
-
 
 endif # X86_PLATFORM_DEVICES
 
