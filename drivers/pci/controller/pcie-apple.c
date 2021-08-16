@@ -126,6 +126,47 @@ static inline void rmwl(u32 clr, u32 set, void __iomem *addr)
 	writel_relaxed((readl_relaxed(addr) & ~clr) | set, addr);
 }
 
+static int apple_pcie_setup_refclk(void __iomem *rc,
+				   void __iomem *port,
+				   unsigned int idx)
+{
+	u32 stat;
+	int res;
+
+	res = readl_relaxed_poll_timeout(rc + CORE_RC_PHYIF_STAT, stat,
+					 stat & CORE_RC_PHYIF_STAT_REFCLK,
+					 100, 50000);
+	if (res < 0)
+		return res;
+
+	rmwl(0, CORE_LANE_CTL_CFGACC, rc + CORE_LANE_CTL(idx));
+	rmwl(0, CORE_LANE_CFG_REFCLK0REQ, rc + CORE_LANE_CFG(idx));
+
+	res = readl_relaxed_poll_timeout(rc + CORE_LANE_CFG(idx), stat,
+					 stat & CORE_LANE_CFG_REFCLK0ACK,
+					 100, 50000);
+	if (res < 0)
+		return res;
+
+	rmwl(0, CORE_LANE_CFG_REFCLK1, rc + CORE_LANE_CFG(idx));
+	res = readl_relaxed_poll_timeout(rc + CORE_LANE_CFG(idx), stat,
+					 stat & CORE_LANE_CFG_REFCLK1,
+					 100, 50000);
+
+	if (res < 0)
+		return res;
+
+	rmwl(CORE_LANE_CTL_CFGACC, 0, rc + CORE_LANE_CTL(idx));
+
+	/* Flush writes before enabling the clocks */
+	dma_wmb();
+
+	rmwl(0, CORE_LANE_CFG_REFCLKEN, rc + CORE_LANE_CFG(idx));
+	rmwl(0, PORT_REFCLK_EN, port + PORT_REFCLK);
+
+	return 0;
+}
+
 static int apple_pcie_setup_port(struct apple_pcie *pcie,
 				 struct gpio_desc *reset,
 				 unsigned int i)
@@ -143,6 +184,12 @@ static int apple_pcie_setup_port(struct apple_pcie *pcie,
 	/* Skip setup if the link was already enabled by the bootloader */
 	if (readl_relaxed(port + PORT_LINKSTS) & PORT_LINKSTS_UP)
 		return 0;
+
+	rmwl(0, PORT_APPCLK_EN, port + PORT_APPCLK);
+
+	ret = apple_pcie_setup_refclk(pcie->rc, port, i);
+	if (ret < 0)
+		return ret;
 
 	rmwl(0, PORT_PERST_OFF, port + PORT_PERST);
 	gpiod_set_value(reset, 1);
