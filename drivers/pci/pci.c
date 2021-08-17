@@ -112,6 +112,8 @@ enum pcie_bus_config_types pcie_bus_config = PCIE_BUS_PEER2PEER;
 enum pcie_bus_config_types pcie_bus_config = PCIE_BUS_DEFAULT;
 #endif
 
+u16 max_pcie_mrrs = 4096; // no limit
+
 /*
  * The default CLS is used if arch didn't set CLS explicitly and not
  * all pci devices agree on the same value.  Arch can override either
@@ -5819,6 +5821,9 @@ int pcie_set_readrq(struct pci_dev *dev, int rq)
 		if (mps < rq)
 			rq = mps;
 	}
+
+	if (rq > max_pcie_mrrs)
+		rq = max_pcie_mrrs;
 
 	v = (ffs(rq) - 8) << 12;
 
