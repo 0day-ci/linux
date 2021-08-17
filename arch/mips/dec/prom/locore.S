@@ -16,6 +16,7 @@
 NESTED(genexcept_early, 0, sp)
 	.set	noat
 	.set	noreorder
+	.set	mips1
 
 	mfc0	k0, CP0_STATUS
 	la	k1, mem_err
