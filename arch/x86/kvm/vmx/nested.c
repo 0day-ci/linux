@@ -6421,8 +6421,7 @@ void nested_vmx_set_vmcs_shadowing_bitmap(void)
  * that madness to get the encoding for comparison.
  */
 #define VMCS12_IDX_TO_ENC(idx) ((u16)(((u16)(idx) >> 6) | ((u16)(idx) << 10)))
-
-static u64 nested_vmx_calc_vmcs_enum_msr(void)
+u64 nested_vmx_calc_vmcs_enum_msr(struct nested_vmx *nvmx)
 {
 	/*
 	 * Note these are the so called "index" of the VMCS field encoding, not
@@ -6440,6 +6439,15 @@ static u64 nested_vmx_calc_vmcs_enum_msr(void)
 	for (i = 0; i < nr_vmcs12_fields; i++) {
 		/* The vmcs12 table is very, very sparsely populated. */
 		if (!vmcs_field_to_offset_table[i])
+			continue;
+
+		if (unlikely(!nvmx->vmcs12_field_existence_bitmap)) {
+			WARN_ON(1);
+			break;
+		}
+
+		if (!test_bit(vmcs_field_to_offset_table[i] / sizeof(u16),
+		    nvmx->vmcs12_field_existence_bitmap))
 			continue;
 
 		idx = vmcs_field_index(VMCS12_IDX_TO_ENC(i));
@@ -6695,7 +6703,8 @@ void nested_vmx_setup_ctls_msrs(struct nested_vmx_msrs *msrs, u32 ept_caps)
 	rdmsrl(MSR_IA32_VMX_CR0_FIXED1, msrs->cr0_fixed1);
 	rdmsrl(MSR_IA32_VMX_CR4_FIXED1, msrs->cr4_fixed1);
 
-	msrs->vmcs_enum = nested_vmx_calc_vmcs_enum_msr();
+	/* In initial setup, simply read HW value for reference */
+	rdmsrl(MSR_IA32_VMX_VMCS_ENUM, msrs->vmcs_enum);
 }
 
 void nested_vmx_hardware_unsetup(void)
