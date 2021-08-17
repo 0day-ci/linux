@@ -20,6 +20,7 @@
 #include <asm/kprobes.h>
 #include <asm/kvm_asm.h>
 #include <asm/kvm_emulate.h>
+#include <asm/kvm_fixed_config.h>
 #include <asm/kvm_hyp.h>
 #include <asm/kvm_mmu.h>
 #include <asm/fpsimd.h>
@@ -195,6 +196,39 @@ exit_handle_fn kvm_get_nvhe_exit_handler(struct kvm_vcpu *vcpu)
 		return NULL;
 }
 
+/*
+ * Some guests (e.g., protected VMs) might not be allowed to run in AArch32. The
+ * check below is based on the one in kvm_arch_vcpu_ioctl_run().
+ * The ARMv8 architecture does not give the hypervisor a mechanism to prevent a
+ * guest from dropping to AArch32 EL0 if implemented by the CPU. If the
+ * hypervisor spots a guest in such a state ensure it is handled, and don't
+ * trust the host to spot or fix it.
+ *
+ * Returns true if the check passed and the guest run loop can continue, or
+ * false if the guest should exit to the host.
+ */
+static bool check_aarch32_guest(struct kvm_vcpu *vcpu, u64 *exit_code)
+{
+	if (kvm_vm_is_protected(kern_hyp_va(vcpu->kvm)) &&
+	    vcpu_mode_is_32bit(vcpu) &&
+	    FIELD_GET(ARM64_FEATURE_MASK(ID_AA64PFR0_EL0),
+					 PVM_ID_AA64PFR0_RESTRICT_UNSIGNED) <
+		ID_AA64PFR0_ELx_32BIT_64BIT) {
+		/*
+		 * As we have caught the guest red-handed, decide that it isn't
+		 * fit for purpose anymore by making the vcpu invalid. The VMM
+		 * can try and fix it by re-initializing the vcpu with
+		 * KVM_ARM_VCPU_INIT, however, this is likely not possible for
+		 * protected VMs.
+		 */
+		vcpu->arch.target = -1;
+		*exit_code = ARM_EXCEPTION_IL;
+		return false;
+	}
+
+	return true;
+}
+
 /* Switch to the guest for legacy non-VHE systems */
 int __kvm_vcpu_run(struct kvm_vcpu *vcpu)
 {
@@ -254,6 +288,9 @@ int __kvm_vcpu_run(struct kvm_vcpu *vcpu)
 	do {
 		/* Jump in the fire! */
 		exit_code = __guest_enter(vcpu);
+
+		if (unlikely(!check_aarch32_guest(vcpu, &exit_code)))
+			break;
 
 		/* And we're baaack! */
 	} while (fixup_guest_exit(vcpu, &exit_code));
