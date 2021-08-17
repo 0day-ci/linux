@@ -409,6 +409,46 @@ static inline bool __hyp_handle_ptrauth(struct kvm_vcpu *vcpu)
 	return true;
 }
 
+typedef int (*exit_handle_fn)(struct kvm_vcpu *);
+
+exit_handle_fn kvm_get_nvhe_exit_handler(struct kvm_vcpu *vcpu);
+
+static exit_handle_fn kvm_get_hyp_exit_handler(struct kvm_vcpu *vcpu)
+{
+	return is_nvhe_hyp_code() ? kvm_get_nvhe_exit_handler(vcpu) : NULL;
+}
+
+/*
+ * Allow the hypervisor to handle the exit with an exit handler if it has one.
+ *
+ * Returns true if the hypervisor handled the exit, and control should go back
+ * to the guest, or false if it hasn't.
+ */
+static bool kvm_hyp_handle_exit(struct kvm_vcpu *vcpu)
+{
+	bool is_handled = false;
+	exit_handle_fn exit_handler = kvm_get_hyp_exit_handler(vcpu);
+
+	if (exit_handler) {
+		/*
+		 * There's limited vcpu context here since it's not synced yet.
+		 * Ensure that relevant vcpu context that might be used by the
+		 * exit_handler is in sync before it's called and if handled.
+		 */
+		*vcpu_pc(vcpu) = read_sysreg_el2(SYS_ELR);
+		*vcpu_cpsr(vcpu) = read_sysreg_el2(SYS_SPSR);
+
+		is_handled = exit_handler(vcpu);
+
+		if (is_handled) {
+			write_sysreg_el2(*vcpu_pc(vcpu), SYS_ELR);
+			write_sysreg_el2(*vcpu_cpsr(vcpu), SYS_SPSR);
+		}
+	}
+
+	return is_handled;
+}
+
 /*
  * Return true when we were able to fixup the guest exit and should return to
  * the guest, false when we should restore the host state and return to the
@@ -496,6 +536,9 @@ static inline bool fixup_guest_exit(struct kvm_vcpu *vcpu, u64 *exit_code)
 			goto guest;
 	}
 
+	/* Check if there's an exit handler and allow it to handle the exit. */
+	if (kvm_hyp_handle_exit(vcpu))
+		goto guest;
 exit:
 	/* Return to the host kernel and handle the exit */
 	return false;
