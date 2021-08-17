@@ -59,8 +59,11 @@
 #define MX6Q_SUSPEND_OCRAM_SIZE		0x1000
 #define MX6_MAX_MMDC_IO_NUM		33
 
+#define GIC_DIST_ENABLE_CLEAR		0x180
+
 static void __iomem *ccm_base;
 static void __iomem *suspend_ocram_base;
+static void __iomem *gic_raw_dist_base;
 static void (*imx6_suspend_in_ocram_fn)(void __iomem *ocram_vbase);
 
 /*
@@ -592,6 +595,7 @@ put_node:
 static void __init imx6_pm_common_init(const struct imx6_pm_socdata
 					*socdata)
 {
+	struct device_node *np;
 	struct regmap *gpr;
 	int ret;
 
@@ -615,10 +619,29 @@ static void __init imx6_pm_common_init(const struct imx6_pm_socdata
 	if (!IS_ERR(gpr))
 		regmap_update_bits(gpr, IOMUXC_GPR1, IMX6Q_GPR1_GINT,
 				   IMX6Q_GPR1_GINT);
+
+	np = of_find_compatible_node(NULL, NULL, "arm,cortex-a9-gic");
+	gic_raw_dist_base = of_iomap(np, 0);
+}
+
+static void imx_gic_mask_all(void)
+{
+	int i;
+
+	if (WARN_ON(!gic_raw_dist_base))
+		return;
+
+	for (i = 0; i < 4; i++)
+		writel_relaxed(~0, gic_raw_dist_base + GIC_DIST_ENABLE_CLEAR + 4 * i);
 }
 
 static void imx6_pm_stby_poweroff(void)
 {
+	/*
+	 * A pending interrupt can prevent power off signal to be activated.
+	 * So, mask all interrupts to avoid it.
+	 */
+	imx_gic_mask_all();
 	imx6_set_lpm(STOP_POWER_OFF);
 	imx6q_suspend_finish(0);
 
