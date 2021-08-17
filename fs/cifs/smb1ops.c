@@ -5,6 +5,7 @@
  *  Copyright (c) 2012, Jeff Layton <jlayton@redhat.com>
  */
 
+#include <ctype.h>
 #include <linux/pagemap.h>
 #include <linux/vfs.h>
 #include "cifsglob.h"
