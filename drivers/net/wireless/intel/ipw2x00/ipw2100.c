@@ -173,11 +173,11 @@ MODULE_VERSION(DRV_VERSION);
 MODULE_AUTHOR(DRV_COPYRIGHT);
 MODULE_LICENSE("GPL");
 
-static int debug = 0;
-static int network_mode = 0;
-static int channel = 0;
-static int associate = 0;
-static int disable = 0;
+static int debug;
+static int network_mode;
+static int channel;
+static int associate;
+static int disable;
 #ifdef CONFIG_PM
 static struct ipw2100_fw ipw2100_firmware;
 #endif
@@ -7197,7 +7197,7 @@ static int ipw2100_wx_set_txpow(struct net_device *dev,
 {
 	struct ipw2100_priv *priv = libipw_priv(dev);
 	int err = 0, value;
-	
+
 	if (ipw_radio_kill_sw(priv, wrqu->txpower.disabled))
 		return -EINPROGRESS;
 
