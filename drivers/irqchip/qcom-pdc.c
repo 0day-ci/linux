@@ -324,8 +324,11 @@ static int qcom_pdc_gpio_alloc(struct irq_domain *domain, unsigned int virq,
 	if (ret)
 		return ret;
 
-	if (hwirq == GPIO_NO_WAKE_IRQ)
+	if (hwirq == GPIO_NO_WAKE_IRQ) {
+		if (domain->parent)
+			irq_domain_disconnect_hierarchy(domain->parent, virq);
 		return 0;
+	}
 
 	parent_hwirq = get_parent_hwirq(hwirq);
 	if (parent_hwirq == PDC_NO_PARENT_IRQ)
