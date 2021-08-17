@@ -1583,12 +1583,20 @@ static bool qca_prevent_wake(struct hci_dev *hdev)
 	return !wakeup;
 }
 
-static int qca_regulator_init(struct hci_uart *hu)
+static int qca_power_on(struct hci_dev *hdev)
 {
+	struct hci_uart *hu = hci_get_drvdata(hdev);
 	enum qca_btsoc_type soc_type = qca_soc_type(hu);
 	struct qca_serdev *qcadev;
+	struct qca_data *qca = hu->priv;
 	int ret;
 	bool sw_ctrl_state;
+
+	/* Non-serdev device usually is powered by external power
+	 * and don't need additional action in driver for power on
+	 */
+	if (!hu->serdev)
+		return 0;
 
 	/* Check for vregs status, may be hci down has turned
 	 * off the voltage regulator.
@@ -1607,6 +1615,18 @@ static int qca_regulator_init(struct hci_uart *hu)
 		}
 	}
 
+	/* For wcn6750 need to enable gpio bt_en */
+	if (qcadev->bt_en) {
+		gpiod_set_value_cansleep(qcadev->bt_en, 0);
+		msleep(50);
+		gpiod_set_value_cansleep(qcadev->bt_en, 1);
+		msleep(150);
+		if (qcadev->sw_ctrl) {
+			sw_ctrl_state = gpiod_get_value_cansleep(qcadev->sw_ctrl);
+			bt_dev_dbg(hu->hdev, "SW_CTRL is %d", sw_ctrl_state);
+		}
+	}
+
 	if (qca_is_wcn399x(soc_type)) {
 		/* Forcefully enable wcn399x to enter in to boot mode. */
 		host_set_baudrate(hu, 2400);
@@ -1615,19 +1635,9 @@ static int qca_regulator_init(struct hci_uart *hu)
 			return ret;
 	}
 
-	/* For wcn6750 need to enable gpio bt_en */
-	if (qcadev->bt_en) {
-		gpiod_set_value_cansleep(qcadev->bt_en, 0);
-		msleep(50);
-		gpiod_set_value_cansleep(qcadev->bt_en, 1);
-		msleep(50);
-		if (qcadev->sw_ctrl) {
-			sw_ctrl_state = gpiod_get_value_cansleep(qcadev->sw_ctrl);
-			bt_dev_dbg(hu->hdev, "SW_CTRL is %d", sw_ctrl_state);
-		}
-	}
-
-	qca_set_speed(hu, QCA_INIT_SPEED);
+	if (qca_is_wcn399x(soc_type) ||
+	    qca_is_wcn6750(soc_type))
+		qca_set_speed(hu, QCA_INIT_SPEED);
 
 	if (qca_is_wcn399x(soc_type)) {
 		ret = qca_send_power_pulse(hu, true);
@@ -1647,38 +1657,12 @@ static int qca_regulator_init(struct hci_uart *hu)
 		return ret;
 	}
 
-	hci_uart_set_flow_control(hu, false);
-
-	return 0;
-}
-
-static int qca_power_on(struct hci_dev *hdev)
-{
-	struct hci_uart *hu = hci_get_drvdata(hdev);
-	enum qca_btsoc_type soc_type = qca_soc_type(hu);
-	struct qca_serdev *qcadev;
-	struct qca_data *qca = hu->priv;
-	int ret = 0;
-
-	/* Non-serdev device usually is powered by external power
-	 * and don't need additional action in driver for power on
-	 */
-	if (!hu->serdev)
-		return 0;
-
 	if (qca_is_wcn399x(soc_type) ||
-	    qca_is_wcn6750(soc_type)) {
-		ret = qca_regulator_init(hu);
-	} else {
-		qcadev = serdev_device_get_drvdata(hu->serdev);
-		if (qcadev->bt_en) {
-			gpiod_set_value_cansleep(qcadev->bt_en, 1);
-			/* Controller needs time to bootup. */
-			msleep(150);
-		}
-	}
+	    qca_is_wcn6750(soc_type))
+		hci_uart_set_flow_control(hu, false);
 
 	clear_bit(QCA_BT_OFF, &qca->flags);
+
 	return ret;
 }
 
