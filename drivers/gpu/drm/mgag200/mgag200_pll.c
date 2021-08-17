@@ -125,6 +125,7 @@ static int mgag200_pixpll_compute_g200se_00(struct mgag200_pll *pixpll, long clo
 
 	m = n = p = s = 0;
 	permitteddelta = clock * 5 / 1000;
+	delta = 0xffffffff;
 
 	for (testp = 8; testp > 0; testp /= 2) {
 		if (clock * testp > vcomax)
