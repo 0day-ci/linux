@@ -2310,8 +2310,8 @@ static size_t order_to_size(unsigned int order)
 }
 
 /* called before freeing request pool in @tags */
-static void blk_mq_clear_rq_mapping(struct blk_mq_tag_set *set,
-		struct blk_mq_tags *tags, unsigned int hctx_idx)
+void blk_mq_clear_rq_mapping(struct blk_mq_tag_set *set,
+			     struct blk_mq_tags *tags, unsigned int hctx_idx)
 {
 	struct blk_mq_tags *drv_tags = set->tags[hctx_idx];
 	struct page *page;
@@ -3627,6 +3627,15 @@ int blk_mq_update_nr_requests(struct request_queue *q, unsigned int nr)
 			if (!ret && blk_mq_is_sbitmap_shared(set->flags))
 				blk_mq_tag_resize_shared_sbitmap(set, nr);
 		} else {
+			/*
+			 * We are about to free requests in 'sched_tags[]',
+			 * however, 'tags[]' may still point to these requests.
+			 * Thus we need to clear rq mapping in 'tags[]' before
+			 * freeing requests in sched_tags[].
+			 */
+			if (nr > hctx->sched_tags->nr_tags)
+				blk_mq_clear_rq_mapping(set, hctx->tags, i);
+
 			ret = blk_mq_tag_update_depth(hctx, &hctx->sched_tags,
 							nr, true);
 			if (blk_mq_is_sbitmap_shared(set->flags)) {

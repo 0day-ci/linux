@@ -662,8 +662,16 @@ void blk_mq_sched_free_requests(struct request_queue *q)
 	int i;
 
 	queue_for_each_hw_ctx(q, hctx, i) {
-		if (hctx->sched_tags)
+		if (hctx->sched_tags) {
+			/*
+			 * We are about to free requests in 'sched_tags[]',
+			 * however, 'tags[]' may still point to these requests.
+			 * Thus we need to clear rq mapping in 'tags[]' before
+			 * freeing requests in sched_tags[].
+			 */
+			blk_mq_clear_rq_mapping(q->tag_set, hctx->tags, i);
 			blk_mq_free_rqs(q->tag_set, hctx->sched_tags, i);
+		}
 	}
 }
 

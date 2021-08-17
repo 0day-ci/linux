@@ -77,6 +77,8 @@ void blk_mq_insert_requests(struct blk_mq_hw_ctx *hctx, struct blk_mq_ctx *ctx,
 blk_status_t blk_mq_request_issue_directly(struct request *rq, bool last);
 void blk_mq_try_issue_list_directly(struct blk_mq_hw_ctx *hctx,
 				    struct list_head *list);
+void blk_mq_clear_rq_mapping(struct blk_mq_tag_set *set,
+			     struct blk_mq_tags *tags, unsigned int hctx_idx);
 
 /*
  * CPU -> queue mappings
