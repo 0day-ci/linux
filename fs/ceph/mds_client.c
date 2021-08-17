@@ -1666,10 +1666,18 @@ static int remove_session_caps_cb(struct inode *inode, struct ceph_cap *cap,
 	spin_unlock(&ci->i_ceph_lock);
 	while (!list_empty(&to_remove)) {
 		struct ceph_cap_flush *cf;
+		struct ceph_cap_snap *capsnap;
 		cf = list_first_entry(&to_remove,
 				      struct ceph_cap_flush, i_list);
 		list_del(&cf->i_list);
-		ceph_free_cap_flush(cf);
+		if (cf->caps) {
+			ceph_free_cap_flush(cf);
+		} else if (READ_ONCE(fsc->mount_state) == CEPH_MOUNT_SHUTDOWN) {
+			capsnap = container_of(cf, struct ceph_cap_snap, cap_flush);
+			list_del(&capsnap->ci_item);
+			ceph_put_snap_context(capsnap->context);
+			ceph_put_cap_snap(capsnap);
+		}
 	}
 
 	wake_up_all(&ci->i_cap_wq);
