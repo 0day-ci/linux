@@ -623,7 +623,7 @@ u8 rtw_set_802_11_add_key(struct adapter *padapter, struct ndis_802_11_key *key)
 		struct ndis_802_11_wep *wep = &padapter->securitypriv.ndiswep;
 
 		wep->Length = len;
-		keyindex = key->KeyIndex&0x7fffffff;
+		keyindex = key->KeyIndex & 0x7fffffff;
 		wep->KeyIndex = keyindex ;
 		wep->KeyLength = key->KeyLength;
 
