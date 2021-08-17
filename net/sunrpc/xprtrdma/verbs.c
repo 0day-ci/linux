@@ -520,12 +520,6 @@ int rpcrdma_xprt_connect(struct rpcrdma_xprt *r_xprt)
 	xprt_clear_connected(xprt);
 	rpcrdma_reset_cwnd(r_xprt);
 
-	/* Bump the ep's reference count while there are
-	 * outstanding Receives.
-	 */
-	rpcrdma_ep_get(ep);
-	rpcrdma_post_recvs(r_xprt, 1, true);
-
 	rc = rdma_connect(ep->re_id, &ep->re_remote_cma);
 	if (rc)
 		goto out;
@@ -538,6 +532,12 @@ int rpcrdma_xprt_connect(struct rpcrdma_xprt *r_xprt)
 		rc = ep->re_connect_status;
 		goto out;
 	}
+
+	/* Bump the ep's reference count while there are
+	 * outstanding Receives.
+	 */
+	rpcrdma_ep_get(ep);
+	rpcrdma_post_recvs(r_xprt, 1, true);
 
 	rc = rpcrdma_sendctxs_create(r_xprt);
 	if (rc) {
