@@ -27,9 +27,18 @@
 #define INTEL_DVSEC_ENTRY_SIZE		4
 
 /* PMT capabilities */
-#define DVSEC_INTEL_ID_TELEMETRY	2
-#define DVSEC_INTEL_ID_WATCHER		3
-#define DVSEC_INTEL_ID_CRASHLOG		4
+#define INTEL_EXT_CAP_ID_TELEMETRY	2
+#define INTEL_EXT_CAP_ID_WATCHER	3
+#define INTEL_EXT_CAP_ID_CRASHLOG	4
+
+#define INTEL_EXT_CAP_PREFIX		"intel_extnd_cap"
+#define FEATURE_ID_NAME_LENGTH		25
+
+static int intel_ext_cap_allow_list[] = {
+	INTEL_EXT_CAP_ID_TELEMETRY,
+	INTEL_EXT_CAP_ID_WATCHER,
+	INTEL_EXT_CAP_ID_CRASHLOG,
+};
 
 struct intel_dvsec_header {
 	u16	length;
@@ -84,42 +93,58 @@ static const struct pmt_platform_info dg1_info = {
 	.capabilities = dg1_capabilities,
 };
 
-static int pmt_add_dev(struct pci_dev *pdev, struct intel_dvsec_header *header,
-		       unsigned long quirks)
+static bool intel_ext_cap_allowed(u16 id)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(intel_ext_cap_allow_list); i++)
+		if (intel_ext_cap_allow_list[i] == id)
+			return true;
+
+	return false;
+}
+
+static bool intel_ext_cap_disabled(u16 id, unsigned long quirks)
+{
+	switch (id) {
+	case INTEL_EXT_CAP_ID_WATCHER:
+		return !!(quirks & PMT_QUIRK_NO_WATCHER);
+
+	case INTEL_EXT_CAP_ID_CRASHLOG:
+		return !!(quirks & PMT_QUIRK_NO_CRASHLOG);
+
+	default:
+		return false;
+	}
+}
+
+static int intel_ext_cap_add_dev(struct pci_dev *pdev, struct intel_dvsec_header *header,
+				 unsigned long quirks)
 {
 	struct device *dev = &pdev->dev;
 	struct resource *res, *tmp;
 	struct mfd_cell *cell;
-	const char *name;
+	char feature_id_name[FEATURE_ID_NAME_LENGTH];
 	int count = header->num_entries;
 	int size = header->entry_size;
 	int id = header->id;
 	int i;
 
-	switch (id) {
-	case DVSEC_INTEL_ID_TELEMETRY:
-		name = "pmt_telemetry";
-		break;
-	case DVSEC_INTEL_ID_WATCHER:
-		if (quirks & PMT_QUIRK_NO_WATCHER) {
-			dev_info(dev, "Watcher not supported\n");
-			return -EINVAL;
-		}
-		name = "pmt_watcher";
-		break;
-	case DVSEC_INTEL_ID_CRASHLOG:
-		if (quirks & PMT_QUIRK_NO_CRASHLOG) {
-			dev_info(dev, "Crashlog not supported\n");
-			return -EINVAL;
-		}
-		name = "pmt_crashlog";
-		break;
-	default:
+	if (!intel_ext_cap_allowed(id))
+		return -EINVAL;
+
+	if (intel_ext_cap_disabled(id, quirks))
+		return -EINVAL;
+
+	snprintf(feature_id_name, sizeof(feature_id_name), "%s_%d", INTEL_EXT_CAP_PREFIX, id);
+
+	if (!header->num_entries) {
+		dev_err(dev, "Invalid 0 entry count for %s header\n", feature_id_name);
 		return -EINVAL;
 	}
 
-	if (!header->num_entries || !header->entry_size) {
-		dev_err(dev, "Invalid count or size for %s header\n", name);
+	if (!header->entry_size) {
+		dev_err(dev, "Invalid 0 entry size for %s header\n", feature_id_name);
 		return -EINVAL;
 	}
 
@@ -135,25 +160,25 @@ static int pmt_add_dev(struct pci_dev *pdev, struct intel_dvsec_header *header,
 		header->offset >>= 3;
 
 	/*
-	 * The PMT DVSEC contains the starting offset and count for a block of
+	 * The DVSEC contains the starting offset and count for a block of
 	 * discovery tables, each providing access to monitoring facilities for
 	 * a section of the device. Create a resource list of these tables to
 	 * provide to the driver.
 	 */
 	for (i = 0, tmp = res; i < count; i++, tmp++) {
 		tmp->start = pdev->resource[header->tbir].start +
-			     header->offset + i * (size << 2);
-		tmp->end = tmp->start + (size << 2) - 1;
+			     header->offset + i * (size * sizeof(u32));
+		tmp->end = tmp->start + (size * sizeof(u32)) - 1;
 		tmp->flags = IORESOURCE_MEM;
 	}
 
 	cell->resources = res;
 	cell->num_resources = count;
-	cell->name = name;
+	cell->name = feature_id_name;
 
-	return devm_mfd_add_devices(dev, PLATFORM_DEVID_AUTO, cell, 1, NULL, 0,
-				    NULL);
+	return devm_mfd_add_devices(dev, PLATFORM_DEVID_AUTO, cell, 1, NULL, 0, NULL);
 }
+
 
 static int pmt_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 {
@@ -176,7 +201,7 @@ static int pmt_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 		header = info->capabilities;
 		while (*header) {
-			ret = pmt_add_dev(pdev, *header, quirks);
+			ret = intel_ext_cap_add_dev(pdev, *header, quirks);
 			if (ret)
 				dev_warn(&pdev->dev,
 					 "Failed to add device for DVSEC id %d\n",
@@ -212,7 +237,7 @@ static int pmt_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 			header.tbir = INTEL_DVSEC_TABLE_BAR(table);
 			header.offset = INTEL_DVSEC_TABLE_OFFSET(table);
 
-			ret = pmt_add_dev(pdev, &header, quirks);
+			ret = intel_ext_cap_add_dev(pdev, &header, quirks);
 			if (ret)
 				continue;
 

@@ -17,7 +17,7 @@
 
 #include "class.h"
 
-#define DRV_NAME		"pmt_crashlog"
+#define DRV_NAME		"intel_extnd_cap_4"
 
 /* Crashlog discovery header types */
 #define CRASH_TYPE_OOBMSM	1
