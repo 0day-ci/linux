@@ -157,12 +157,18 @@ int drm_atomic_helper_dirtyfb(struct drm_framebuffer *fb,
 retry:
 	drm_for_each_plane(plane, fb->dev) {
 		struct drm_plane_state *plane_state;
+		bool match;
 
 		ret = drm_modeset_lock(&plane->mutex, state->acquire_ctx);
 		if (ret)
 			goto out;
 
-		if (plane->state->fb != fb) {
+		match = plane->state->fb == fb;
+		/* Check if objs match to handle dirty buffers of cursors */
+		if (plane->type == DRM_PLANE_TYPE_CURSOR && plane->state->fb)
+			match |= fb->obj[0] == plane->state->fb->obj[0];
+
+		if (!match) {
 			drm_modeset_unlock(&plane->mutex);
 			continue;
 		}
