@@ -286,9 +286,10 @@ void sysfs_remove_group(struct kobject *kobj,
 		kernfs_get(kn);
 	}
 
-	remove_files(kn, grp);
-	if (grp->name)
+	if (grp->name) {
+		remove_files(kn, grp);
 		kernfs_remove(kn);
+	}
 
 	kernfs_put(kn);
 }
