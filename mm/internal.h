@@ -586,8 +586,8 @@ extern u64 hwpoison_filter_memcg;
 extern u32 hwpoison_filter_enable;
 
 extern unsigned long  __must_check vm_mmap_pgoff(struct file *, unsigned long,
-        unsigned long, unsigned long,
-        unsigned long, unsigned long);
+	unsigned long, unsigned long,
+	unsigned long, unsigned long);
 
 extern void set_pageblock_order(void);
 unsigned int reclaim_clean_pages_from_list(struct zone *zone,
@@ -676,11 +676,11 @@ struct migration_target_control {
  */
 #ifdef CONFIG_MMU
 int vmap_pages_range_noflush(unsigned long addr, unsigned long end,
-                pgprot_t prot, struct page **pages, unsigned int page_shift);
+		pgprot_t prot, struct page **pages, unsigned int page_shift);
 #else
 static inline
 int vmap_pages_range_noflush(unsigned long addr, unsigned long end,
-                pgprot_t prot, struct page **pages, unsigned int page_shift)
+		pgprot_t prot, struct page **pages, unsigned int page_shift)
 {
 	return -EINVAL;
 }
