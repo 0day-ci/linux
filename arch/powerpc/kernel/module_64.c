@@ -299,8 +299,16 @@ int module_frob_arch_sections(Elf64_Ehdr *hdr,
 					  sechdrs[i].sh_size);
 
 		/* We don't handle .init for the moment: rename to _init */
-		while ((p = strstr(secstrings + sechdrs[i].sh_name, ".init")))
+		while ((p = strstr(secstrings + sechdrs[i].sh_name, ".init"))) {
+#ifdef CONFIG_CONSTRUCTORS
+			/* find_module_sections() needs .init_array intact */
+			if (strstr(secstrings + sechdrs[i].sh_name,
+				".init_array")) {
+				break;
+			}
+#endif
 			p[0] = '_';
+		}
 
 		if (sechdrs[i].sh_type == SHT_SYMTAB)
 			dedotify((void *)hdr + sechdrs[i].sh_offset,
