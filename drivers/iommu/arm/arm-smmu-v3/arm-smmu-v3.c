@@ -233,11 +233,19 @@ static int queue_remove_raw(struct arm_smmu_queue *q, u64 *ent)
 	return 0;
 }
 
+#define arm_smmu_cmdq_copy_cmd(dst, src)	\
+	do {					\
+		dst[0] = src[0];		\
+		dst[1] = src[1];		\
+	} while (0)
+
 /* High-level queue accessors */
-static int arm_smmu_cmdq_build_cmd(u64 *cmd, struct arm_smmu_cmdq_ent *ent)
+static int arm_smmu_cmdq_build_cmd(u64 *out_cmd, struct arm_smmu_cmdq_ent *ent)
 {
-	memset(cmd, 0, 1 << CMDQ_ENT_SZ_SHIFT);
-	cmd[0] |= FIELD_PREP(CMDQ_0_OP, ent->opcode);
+	register u64 cmd[CMDQ_ENT_DWORDS];
+
+	cmd[0] = FIELD_PREP(CMDQ_0_OP, ent->opcode);
+	cmd[1] = 0;
 
 	switch (ent->opcode) {
 	case CMDQ_OP_TLBI_EL2_ALL:
@@ -309,6 +317,7 @@ static int arm_smmu_cmdq_build_cmd(u64 *cmd, struct arm_smmu_cmdq_ent *ent)
 		case PRI_RESP_SUCC:
 			break;
 		default:
+			arm_smmu_cmdq_copy_cmd(out_cmd, cmd);
 			return -EINVAL;
 		}
 		cmd[1] |= FIELD_PREP(CMDQ_PRI_1_RESP, ent->pri.resp);
@@ -329,8 +338,11 @@ static int arm_smmu_cmdq_build_cmd(u64 *cmd, struct arm_smmu_cmdq_ent *ent)
 		cmd[0] |= FIELD_PREP(CMDQ_SYNC_0_MSIATTR, ARM_SMMU_MEMATTR_OIWB);
 		break;
 	default:
+		arm_smmu_cmdq_copy_cmd(out_cmd, cmd);
 		return -ENOENT;
 	}
+
+	arm_smmu_cmdq_copy_cmd(out_cmd, cmd);
 
 	return 0;
 }
