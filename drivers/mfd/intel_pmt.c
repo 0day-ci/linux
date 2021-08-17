@@ -94,6 +94,11 @@ static const struct pmt_platform_info dg1_info = {
 	.capabilities = dg1_capabilities,
 };
 
+/* DG2 Platform */
+static const struct pmt_platform_info dg2_info = {
+	.quirks = PMT_QUIRK_TABLE_SHIFT
+};
+
 static bool intel_ext_cap_allowed(u16 id)
 {
 	int i;
@@ -334,11 +339,15 @@ static void pmt_pci_remove(struct pci_dev *pdev)
 
 #define PCI_DEVICE_ID_INTEL_PMT_ADL	0x467d
 #define PCI_DEVICE_ID_INTEL_PMT_DG1	0x490e
+#define PCI_DEVICE_ID_INTEL_PMT_DG2_G10	0x4f93
+#define PCI_DEVICE_ID_INTEL_PMT_DG2_G11	0x4f95
 #define PCI_DEVICE_ID_INTEL_PMT_OOBMSM	0x09a7
 #define PCI_DEVICE_ID_INTEL_PMT_TGL	0x9a0d
 static const struct pci_device_id pmt_pci_ids[] = {
 	{ PCI_DEVICE_DATA(INTEL, PMT_ADL, &tgl_info) },
 	{ PCI_DEVICE_DATA(INTEL, PMT_DG1, &dg1_info) },
+	{ PCI_DEVICE_DATA(INTEL, PMT_DG2_G10, &dg2_info) },
+	{ PCI_DEVICE_DATA(INTEL, PMT_DG2_G11, &dg2_info) },
 	{ PCI_DEVICE_DATA(INTEL, PMT_OOBMSM, NULL) },
 	{ PCI_DEVICE_DATA(INTEL, PMT_TGL, &tgl_info) },
 	{ }
