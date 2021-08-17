@@ -633,6 +633,8 @@ static int ses_intf_add(struct device *cdev,
 	int num_enclosures;
 	struct enclosure_device *edev;
 	struct ses_component *scomp = NULL;
+	struct scsi_sense_hdr sshdr;
+	int ret;
 
 	if (!scsi_device_enclosure(sdev)) {
 		/* not an enclosure, but might be in one */
@@ -652,6 +654,10 @@ static int ses_intf_add(struct device *cdev,
 	ses_dev = kzalloc(sizeof(*ses_dev), GFP_KERNEL);
 	hdr_buf = kzalloc(INIT_ALLOC_SIZE, GFP_KERNEL);
 	if (!hdr_buf || !ses_dev)
+		goto err_init_free;
+
+	ret = scsi_test_unit_ready(sdev, SES_TIMEOUT, SES_RETRIES, &sshdr);
+	if (!scsi_status_is_good(ret))
 		goto err_init_free;
 
 	page = 1;
