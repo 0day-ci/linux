@@ -4,6 +4,8 @@
 
 #include <asm/bug.h>
 #include <asm/book3s/32/mmu-hash.h>
+#include <asm/mmu.h>
+#include <asm/synch.h>
 
 #ifndef __ASSEMBLY__
 
@@ -28,6 +30,8 @@ static inline void kuep_lock(void)
 		return;
 
 	update_user_segments(mfsr(0) | SR_NX);
+	if (mmu_has_feature(MMU_FTR_HPTE_TABLE))
+		isync();	/* Context sync required after mtsr() */
 }
 
 static inline void kuep_unlock(void)
@@ -36,6 +40,8 @@ static inline void kuep_unlock(void)
 		return;
 
 	update_user_segments(mfsr(0) & ~SR_NX);
+	if (mmu_has_feature(MMU_FTR_HPTE_TABLE))
+		isync();	/* Context sync required after mtsr() */
 }
 
 #ifdef CONFIG_PPC_KUAP
