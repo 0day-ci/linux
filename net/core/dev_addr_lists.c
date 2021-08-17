@@ -12,6 +12,72 @@
 #include <linux/export.h>
 #include <linux/list.h>
 
+/* Lookup for an address in the list using the rbtree.
+ * The return value is always a valid pointer.
+ * If the address exists, `*ret` is non-null and the address can be retrieved using
+ *
+ *     container_of(*ret, struct netdev_hw_addr, node)
+ *
+ * Otherwise, `ret` can be used with `parent` as an insertion point
+ * when calling `insert_address_to_tree`.
+ *
+ * Must only be called when holding the netdevice's spinlock.
+ *
+ * @ignore_zero_addr_type if true and `addr_type` is zero,
+ *                        disregard addr_type when matching;
+ */
+static struct rb_node **tree_address_lookup(struct netdev_hw_addr_list *list,
+					  const unsigned char *addr,
+					  int addr_len,
+					  unsigned char addr_type,
+					  bool ignore_zero_addr_type,
+					  struct rb_node **parent)
+{
+	struct rb_node **node = &list->tree_root.rb_node, *_parent;
+
+	while (*node)
+	{
+		struct netdev_hw_addr *data = container_of(*node, struct netdev_hw_addr, node);
+		int result;
+
+		result = memcmp(addr, data->addr, addr_len);
+		if (!result && (ignore_zero_addr_type && !addr_type))
+			result = memcmp(&addr_type, &data->type, sizeof(addr_type));
+
+		_parent = *node;
+		if (result < 0)
+			node = &(*node)->rb_left;
+		else if (result > 0)
+			node = &(*node)->rb_right;
+		else
+			break;
+	}
+
+	if (parent)
+		*parent = _parent;
+	return node;
+}
+
+
+static int insert_address_to_tree(struct netdev_hw_addr_list *list,
+				  struct netdev_hw_addr *ha,
+				  int addr_len,
+				  struct rb_node **insertion_point,
+				  struct rb_node *parent)
+{
+	/* Figure out where to put new node */
+	if (!insertion_point || !parent)
+	{
+		insertion_point = tree_address_lookup(list, ha->addr, addr_len, ha->type, false, &parent);
+	}
+
+	/* Add new node and rebalance tree. */
+	rb_link_node(&ha->node, parent, insertion_point);
+	rb_insert_color(&ha->node, &list->tree_root);
+
+	return true;
+}
+
 /*
  * General list handling functions
  */
@@ -19,7 +85,9 @@
 static int __hw_addr_create_ex(struct netdev_hw_addr_list *list,
 			       const unsigned char *addr, int addr_len,
 			       unsigned char addr_type, bool global,
-			       bool sync)
+			       bool sync,
+			       struct rb_node **insertion_point,
+			       struct rb_node *parent)
 {
 	struct netdev_hw_addr *ha;
 	int alloc_size;
@@ -36,6 +104,10 @@ static int __hw_addr_create_ex(struct netdev_hw_addr_list *list,
 	ha->global_use = global;
 	ha->synced = sync ? 1 : 0;
 	ha->sync_cnt = 0;
+
+	/* Insert node to hash table for quicker lookups during modification */
+	insert_address_to_tree(list, ha, addr_len, insertion_point, parent);
+
 	list_add_tail_rcu(&ha->list, &list->list);
 	list->count++;
 
@@ -47,34 +119,36 @@ static int __hw_addr_add_ex(struct netdev_hw_addr_list *list,
 			    unsigned char addr_type, bool global, bool sync,
 			    int sync_count)
 {
+	struct rb_node **ha_node;
+	struct rb_node *insert_parent = NULL;
 	struct netdev_hw_addr *ha;
 
 	if (addr_len > MAX_ADDR_LEN)
 		return -EINVAL;
 
-	list_for_each_entry(ha, &list->list, list) {
-		if (ha->type == addr_type &&
-		    !memcmp(ha->addr, addr, addr_len)) {
-			if (global) {
-				/* check if addr is already used as global */
-				if (ha->global_use)
-					return 0;
-				else
-					ha->global_use = true;
-			}
-			if (sync) {
-				if (ha->synced && sync_count)
-					return -EEXIST;
-				else
-					ha->synced++;
-			}
-			ha->refcount++;
-			return 0;
+	ha_node = tree_address_lookup(list, addr, addr_len, addr_type, false, &insert_parent);
+	if (*ha_node)
+	{
+		ha = container_of(*ha_node, struct netdev_hw_addr, node);
+		if (global) {
+			/* check if addr is already used as global */
+			if (ha->global_use)
+				return 0;
+			else
+				ha->global_use = true;
 		}
+		if (sync) {
+			if (ha->synced && sync_count)
+				return -EEXIST;
+			else
+				ha->synced++;
+		}
+		ha->refcount++;
+		return 0;
 	}
 
 	return __hw_addr_create_ex(list, addr, addr_len, addr_type, global,
-				   sync);
+				   sync, ha_node, insert_parent);
 }
 
 static int __hw_addr_add(struct netdev_hw_addr_list *list,
@@ -103,6 +177,8 @@ static int __hw_addr_del_entry(struct netdev_hw_addr_list *list,
 
 	if (--ha->refcount)
 		return 0;
+
+	rb_erase(&ha->node, &list->tree_root);
 	list_del_rcu(&ha->list);
 	kfree_rcu(ha, rcu_head);
 	list->count--;
@@ -113,14 +189,15 @@ static int __hw_addr_del_ex(struct netdev_hw_addr_list *list,
 			    const unsigned char *addr, int addr_len,
 			    unsigned char addr_type, bool global, bool sync)
 {
+	struct rb_node **ha_node;
 	struct netdev_hw_addr *ha;
 
-	list_for_each_entry(ha, &list->list, list) {
-		if (!memcmp(ha->addr, addr, addr_len) &&
-		    (ha->type == addr_type || !addr_type))
-			return __hw_addr_del_entry(list, ha, global, sync);
-	}
-	return -ENOENT;
+	ha_node = tree_address_lookup(list, addr, addr_len, addr_type, true, NULL);
+	if (*ha_node == NULL)
+		return -ENOENT;
+
+	ha = container_of(*ha_node, struct netdev_hw_addr, node);
+	return __hw_addr_del_entry(list, ha, global, sync);
 }
 
 static int __hw_addr_del(struct netdev_hw_addr_list *list,
@@ -418,6 +495,7 @@ void __hw_addr_init(struct netdev_hw_addr_list *list)
 {
 	INIT_LIST_HEAD(&list->list);
 	list->count = 0;
+	list->tree_root = RB_ROOT;
 }
 EXPORT_SYMBOL(__hw_addr_init);
 
@@ -552,19 +630,20 @@ EXPORT_SYMBOL(dev_addr_del);
  */
 int dev_uc_add_excl(struct net_device *dev, const unsigned char *addr)
 {
-	struct netdev_hw_addr *ha;
+	struct rb_node *insert_parent = NULL;
+	struct rb_node **ha_node = NULL;
 	int err;
 
 	netif_addr_lock_bh(dev);
-	list_for_each_entry(ha, &dev->uc.list, list) {
-		if (!memcmp(ha->addr, addr, dev->addr_len) &&
-		    ha->type == NETDEV_HW_ADDR_T_UNICAST) {
-			err = -EEXIST;
-			goto out;
-		}
+	ha_node = tree_address_lookup(&dev->uc, addr, dev->addr_len, NETDEV_HW_ADDR_T_UNICAST, false, &insert_parent);
+	if (*ha_node)
+	{
+		err = -EEXIST;
+		goto out;
 	}
+
 	err = __hw_addr_create_ex(&dev->uc, addr, dev->addr_len,
-				  NETDEV_HW_ADDR_T_UNICAST, true, false);
+				  NETDEV_HW_ADDR_T_UNICAST, true, false, ha_node, insert_parent);
 	if (!err)
 		__dev_set_rx_mode(dev);
 out:
@@ -745,19 +824,19 @@ EXPORT_SYMBOL(dev_uc_init);
  */
 int dev_mc_add_excl(struct net_device *dev, const unsigned char *addr)
 {
-	struct netdev_hw_addr *ha;
+	struct rb_node **ha_node;
+	struct rb_node *insert_parent = NULL;
 	int err;
 
 	netif_addr_lock_bh(dev);
-	list_for_each_entry(ha, &dev->mc.list, list) {
-		if (!memcmp(ha->addr, addr, dev->addr_len) &&
-		    ha->type == NETDEV_HW_ADDR_T_MULTICAST) {
-			err = -EEXIST;
-			goto out;
-		}
+	ha_node = tree_address_lookup(&dev->mc, addr, dev->addr_len, NETDEV_HW_ADDR_T_MULTICAST, false, &insert_parent);
+	if (*ha_node)
+	{
+		err = -EEXIST;
+		goto out;
 	}
 	err = __hw_addr_create_ex(&dev->mc, addr, dev->addr_len,
-				  NETDEV_HW_ADDR_T_MULTICAST, true, false);
+				  NETDEV_HW_ADDR_T_MULTICAST, true, false, ha_node, insert_parent);
 	if (!err)
 		__dev_set_rx_mode(dev);
 out:

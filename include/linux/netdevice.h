@@ -47,6 +47,7 @@
 #include <uapi/linux/if_bonding.h>
 #include <uapi/linux/pkt_cls.h>
 #include <linux/hashtable.h>
+#include <linux/rbtree.h>
 
 struct netpoll_info;
 struct device;
@@ -218,12 +219,16 @@ struct netdev_hw_addr {
 	int			sync_cnt;
 	int			refcount;
 	int			synced;
+	struct rb_node		node;
 	struct rcu_head		rcu_head;
 };
 
 struct netdev_hw_addr_list {
 	struct list_head	list;
 	int			count;
+
+	/* Auxiliary tree for faster lookup when modifying the structure */
+	struct rb_root		tree_root;
 };
 
 #define netdev_hw_addr_list_count(l) ((l)->count)
