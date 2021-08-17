@@ -18,52 +18,61 @@
 /*
  * Updates the attributes of a page in three steps:
  *
- * 1. invalidate the page table entry
- * 2. flush the TLB
- * 3. install the new entry with the updated attributes
+ * 1. take the page_table_lock
+ * 2. install the new entry with the updated attributes
+ * 3. flush the TLB
  *
- * Invalidating the pte means there are situations where this will not work
- * when in theory it should.
- * For example:
- * - removing write from page whilst it is being executed
- * - setting a page read-only whilst it is being read by another CPU
- *
+ * This sequence is safe against concurrent updates, and also allows updating the
+ * attributes of a page currently being executed or accessed.
  */
 static int change_page_attr(pte_t *ptep, unsigned long addr, void *data)
 {
 	long action = (long)data;
-	pte_t pte;
+	unsigned long set, clear;
 
 	spin_lock(&init_mm.page_table_lock);
 
-	/* invalidate the PTE so it's safe to modify */
-	pte = ptep_get_and_clear(&init_mm, addr, ptep);
-	flush_tlb_kernel_range(addr, addr + PAGE_SIZE);
+	set = clear = 0;
 
 	/* modify the PTE bits as desired, then apply */
 	switch (action) {
 	case SET_MEMORY_RO:
-		pte = pte_wrprotect(pte);
+#ifdef CONFIG_PPC_BOOK3S_64
+		clear = _PAGE_WRITE;
+#elif defined(CONFIG_PPC_8xx)
+		set = _PAGE_RO;
+#else
+		clear = _PAGE_RW;
+#endif
 		break;
 	case SET_MEMORY_RW:
-		pte = pte_mkwrite(pte_mkdirty(pte));
+#ifdef CONFIG_PPC_8xx
+		clear = _PAGE_RO;
+#elif defined(CONFIG_PPC_BOOK3S_64)
+		set = _PAGE_RW | _PAGE_DIRTY | _PAGE_SOFT_DIRTY;
+#else
+		set = _PAGE_RW | _PAGE_DIRTY;
+#endif
 		break;
 	case SET_MEMORY_NX:
-		pte = pte_exprotect(pte);
+		clear = _PAGE_EXEC;
 		break;
 	case SET_MEMORY_X:
-		pte = pte_mkexec(pte);
+		set = _PAGE_EXEC;
 		break;
 	default:
 		WARN_ON_ONCE(1);
 		break;
 	}
 
-	set_pte_at(&init_mm, addr, ptep, pte);
+	pte_update(&init_mm, addr, ptep, clear, set, 0);
 
 	/* See ptesync comment in radix__set_pte_at() */
 	if (radix_enabled())
 		asm volatile("ptesync": : :"memory");
+
+	flush_tlb_kernel_range(addr, addr + PAGE_SIZE);
+
 	spin_unlock(&init_mm.page_table_lock);
 
 	return 0;
