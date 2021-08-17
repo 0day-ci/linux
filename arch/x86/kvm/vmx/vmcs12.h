@@ -188,6 +188,32 @@ struct __packed vmcs12 {
 };
 
 /*
+ * In unit of u16, each vmcs12 field's offset.
+ * Used to index each's position in bitmap
+ */
+#define f_pos(x)	(offsetof(struct vmcs12, x) / sizeof(u16))
+#define VMCS12_FIELD_BITMAP_SIZE	\
+	(sizeof(struct vmcs12) / sizeof(u16) / BITS_PER_BYTE)
+void vmcs12_field_fixed_init(unsigned long *bitmap);
+void vmcs12_field_dynamic_init(struct nested_vmx_msrs *vmx_msrs,
+					unsigned long *bitmap);
+void vmcs12_field_update_by_pinbased_ctrl(u32 old_val, u32 new_val,
+							unsigned long *bitmap);
+void vmcs12_field_update_by_procbased_ctrl(u32 old_val, u32 new_val,
+							unsigned long *bitmap);
+void vmcs12_field_update_by_procbased_ctrl2(u32 old_val, u32 new_val,
+							unsigned long *bitmap);
+void vmcs12_field_update_by_vmentry_ctrl(u32 vm_exit_ctrl, u32 old_val,
+						      u32 new_val,
+						      unsigned long *bitmap);
+void vmcs12_field_update_by_vmexit_ctrl(u32 vm_entry_ctrl, u32 old_val,
+						     u32 new_val,
+						     unsigned long *bitmap);
+void vmcs12_field_update_by_vm_func(u64 old_val, u64 new_val,
+						unsigned long *bitmap);
+
+
+/*
  * VMCS12_REVISION is an arbitrary id that should be changed if the content or
  * layout of struct vmcs12 is changed. MSR_IA32_VMX_BASIC returns this id, and
  * VMPTRLD verifies that the VMCS region that L1 is loading contains this id.

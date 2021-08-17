@@ -141,6 +141,9 @@ struct nested_vmx {
 	 */
 	struct vmcs12 *cached_shadow_vmcs12;
 
+	/* VMCS12 field existence bitmap */
+	unsigned long *vmcs12_field_existence_bitmap;
+
 	/*
 	 * Indicates if the shadow vmcs or enlightened vmcs must be updated
 	 * with the data held by struct vmcs12.

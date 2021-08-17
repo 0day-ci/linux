@@ -153,3 +153,366 @@ const unsigned short vmcs_field_to_offset_table[] = {
 	FIELD(HOST_RIP, host_rip),
 };
 const unsigned int nr_vmcs12_fields = ARRAY_SIZE(vmcs_field_to_offset_table);
+
+#define FIELD_BIT_SET(name, bitmap) set_bit(f_pos(name), bitmap)
+#define FIELD64_BIT_SET(name, bitmap)	\
+	do {set_bit(f_pos(name), bitmap);	\
+	    set_bit(f_pos(name) + (sizeof(u32) / sizeof(u16)), bitmap);\
+	} while (0)
+
+#define FIELD_BIT_CLEAR(name, bitmap) clear_bit(f_pos(name), bitmap)
+#define FIELD64_BIT_CLEAR(name, bitmap)	\
+	do {clear_bit(f_pos(name), bitmap);	\
+	    clear_bit(f_pos(name) + (sizeof(u32) / sizeof(u16)), bitmap);\
+	} while (0)
+
+#define FIELD_BIT_CHANGE(name, bitmap) change_bit(f_pos(name), bitmap)
+#define FIELD64_BIT_CHANGE(name, bitmap)	\
+	do {change_bit(f_pos(name), bitmap);	\
+	    change_bit(f_pos(name) + (sizeof(u32) / sizeof(u16)), bitmap);\
+	} while (0)
+
+/*
+ * Set non-dependent fields to exist
+ */
+void vmcs12_field_fixed_init(unsigned long *bitmap)
+{
+	if (unlikely(bitmap == NULL)) {
+		pr_err_once("%s: NULL bitmap", __func__);
+		return;
+	}
+	FIELD_BIT_SET(guest_es_selector, bitmap);
+	FIELD_BIT_SET(guest_cs_selector, bitmap);
+	FIELD_BIT_SET(guest_ss_selector, bitmap);
+	FIELD_BIT_SET(guest_ds_selector, bitmap);
+	FIELD_BIT_SET(guest_fs_selector, bitmap);
+	FIELD_BIT_SET(guest_gs_selector, bitmap);
+	FIELD_BIT_SET(guest_ldtr_selector, bitmap);
+	FIELD_BIT_SET(guest_tr_selector, bitmap);
+	FIELD_BIT_SET(host_es_selector, bitmap);
+	FIELD_BIT_SET(host_cs_selector, bitmap);
+	FIELD_BIT_SET(host_ss_selector, bitmap);
+	FIELD_BIT_SET(host_ds_selector, bitmap);
+	FIELD_BIT_SET(host_fs_selector, bitmap);
+	FIELD_BIT_SET(host_gs_selector, bitmap);
+	FIELD_BIT_SET(host_tr_selector, bitmap);
+	FIELD64_BIT_SET(io_bitmap_a, bitmap);
+	FIELD64_BIT_SET(io_bitmap_b, bitmap);
+	FIELD64_BIT_SET(vm_exit_msr_store_addr, bitmap);
+	FIELD64_BIT_SET(vm_exit_msr_load_addr, bitmap);
+	FIELD64_BIT_SET(vm_entry_msr_load_addr, bitmap);
+	FIELD64_BIT_SET(tsc_offset, bitmap);
+	FIELD64_BIT_SET(vmcs_link_pointer, bitmap);
+	FIELD64_BIT_SET(guest_ia32_debugctl, bitmap);
+	FIELD_BIT_SET(pin_based_vm_exec_control, bitmap);
+	FIELD_BIT_SET(cpu_based_vm_exec_control, bitmap);
+	FIELD_BIT_SET(exception_bitmap, bitmap);
+	FIELD_BIT_SET(page_fault_error_code_mask, bitmap);
+	FIELD_BIT_SET(page_fault_error_code_match, bitmap);
+	FIELD_BIT_SET(cr3_target_count, bitmap);
+	FIELD_BIT_SET(vm_exit_controls, bitmap);
+	FIELD_BIT_SET(vm_exit_msr_store_count, bitmap);
+	FIELD_BIT_SET(vm_exit_msr_load_count, bitmap);
+	FIELD_BIT_SET(vm_entry_controls, bitmap);
+	FIELD_BIT_SET(vm_entry_msr_load_count, bitmap);
+	FIELD_BIT_SET(vm_entry_intr_info_field, bitmap);
+	FIELD_BIT_SET(vm_entry_exception_error_code, bitmap);
+	FIELD_BIT_SET(vm_entry_instruction_len, bitmap);
+	FIELD_BIT_SET(vm_instruction_error, bitmap);
+	FIELD_BIT_SET(vm_exit_reason, bitmap);
+	FIELD_BIT_SET(vm_exit_intr_info, bitmap);
+	FIELD_BIT_SET(vm_exit_intr_error_code, bitmap);
+	FIELD_BIT_SET(idt_vectoring_info_field, bitmap);
+	FIELD_BIT_SET(idt_vectoring_error_code, bitmap);
+	FIELD_BIT_SET(vm_exit_instruction_len, bitmap);
+	FIELD_BIT_SET(vmx_instruction_info, bitmap);
+	FIELD_BIT_SET(guest_es_limit, bitmap);
+	FIELD_BIT_SET(guest_cs_limit, bitmap);
+	FIELD_BIT_SET(guest_ss_limit, bitmap);
+	FIELD_BIT_SET(guest_ds_limit, bitmap);
+	FIELD_BIT_SET(guest_fs_limit, bitmap);
+	FIELD_BIT_SET(guest_gs_limit, bitmap);
+	FIELD_BIT_SET(guest_ldtr_limit, bitmap);
+	FIELD_BIT_SET(guest_tr_limit, bitmap);
+	FIELD_BIT_SET(guest_gdtr_limit, bitmap);
+	FIELD_BIT_SET(guest_idtr_limit, bitmap);
+	FIELD_BIT_SET(guest_es_ar_bytes, bitmap);
+	FIELD_BIT_SET(guest_cs_ar_bytes, bitmap);
+	FIELD_BIT_SET(guest_ss_ar_bytes, bitmap);
+	FIELD_BIT_SET(guest_ds_ar_bytes, bitmap);
+	FIELD_BIT_SET(guest_fs_ar_bytes, bitmap);
+	FIELD_BIT_SET(guest_gs_ar_bytes, bitmap);
+	FIELD_BIT_SET(guest_ldtr_ar_bytes, bitmap);
+	FIELD_BIT_SET(guest_tr_ar_bytes, bitmap);
+	FIELD_BIT_SET(guest_interruptibility_info, bitmap);
+	FIELD_BIT_SET(guest_activity_state, bitmap);
+	FIELD_BIT_SET(guest_sysenter_cs, bitmap);
+	FIELD_BIT_SET(host_ia32_sysenter_cs, bitmap);
+	FIELD_BIT_SET(cr0_guest_host_mask, bitmap);
+	FIELD_BIT_SET(cr4_guest_host_mask, bitmap);
+	FIELD_BIT_SET(cr0_read_shadow, bitmap);
+	FIELD_BIT_SET(cr4_read_shadow, bitmap);
+	FIELD_BIT_SET(exit_qualification, bitmap);
+	FIELD_BIT_SET(guest_linear_address, bitmap);
+	FIELD_BIT_SET(guest_cr0, bitmap);
+	FIELD_BIT_SET(guest_cr3, bitmap);
+	FIELD_BIT_SET(guest_cr4, bitmap);
+	FIELD_BIT_SET(guest_es_base, bitmap);
+	FIELD_BIT_SET(guest_cs_base, bitmap);
+	FIELD_BIT_SET(guest_ss_base, bitmap);
+	FIELD_BIT_SET(guest_ds_base, bitmap);
+	FIELD_BIT_SET(guest_fs_base, bitmap);
+	FIELD_BIT_SET(guest_gs_base, bitmap);
+	FIELD_BIT_SET(guest_ldtr_base, bitmap);
+	FIELD_BIT_SET(guest_tr_base, bitmap);
+	FIELD_BIT_SET(guest_gdtr_base, bitmap);
+	FIELD_BIT_SET(guest_idtr_base, bitmap);
+	FIELD_BIT_SET(guest_dr7, bitmap);
+	FIELD_BIT_SET(guest_rsp, bitmap);
+	FIELD_BIT_SET(guest_rip, bitmap);
+	FIELD_BIT_SET(guest_rflags, bitmap);
+	FIELD_BIT_SET(guest_pending_dbg_exceptions, bitmap);
+	FIELD_BIT_SET(guest_sysenter_esp, bitmap);
+	FIELD_BIT_SET(guest_sysenter_eip, bitmap);
+	FIELD_BIT_SET(host_cr0, bitmap);
+	FIELD_BIT_SET(host_cr3, bitmap);
+	FIELD_BIT_SET(host_cr4, bitmap);
+	FIELD_BIT_SET(host_fs_base, bitmap);
+	FIELD_BIT_SET(host_gs_base, bitmap);
+	FIELD_BIT_SET(host_tr_base, bitmap);
+	FIELD_BIT_SET(host_gdtr_base, bitmap);
+	FIELD_BIT_SET(host_idtr_base, bitmap);
+	FIELD_BIT_SET(host_ia32_sysenter_esp, bitmap);
+	FIELD_BIT_SET(host_ia32_sysenter_eip, bitmap);
+	FIELD_BIT_SET(host_rsp, bitmap);
+	FIELD_BIT_SET(host_rip, bitmap);
+}
+
+void vmcs12_field_dynamic_init(struct nested_vmx_msrs *vmx_msrs,
+			       unsigned long *bitmap)
+{
+	if (unlikely(bitmap == NULL)) {
+		pr_err_once("%s: NULL bitmap", __func__);
+		return;
+	}
+	vmcs12_field_update_by_pinbased_ctrl(0, vmx_msrs->pinbased_ctls_high,
+					     bitmap);
+
+	vmcs12_field_update_by_procbased_ctrl(0, vmx_msrs->procbased_ctls_high,
+					      bitmap);
+
+	vmcs12_field_update_by_procbased_ctrl2(0, vmx_msrs->secondary_ctls_high,
+					       bitmap);
+
+	vmcs12_field_update_by_vmentry_ctrl(vmx_msrs->exit_ctls_high, 0,
+					    vmx_msrs->entry_ctls_high,
+					    bitmap);
+
+	vmcs12_field_update_by_vmexit_ctrl(vmx_msrs->entry_ctls_high, 0,
+					   vmx_msrs->exit_ctls_high,
+					   bitmap);
+
+	vmcs12_field_update_by_vm_func(0, vmx_msrs->vmfunc_controls, bitmap);
+}
+
+void vmcs12_field_update_by_pinbased_ctrl(u32 old_val, u32 new_val,
+					  unsigned long *bitmap)
+{
+	if (unlikely(bitmap == NULL)) {
+		pr_err_once("%s: NULL bitmap", __func__);
+		return;
+	}
+
+	if (!(old_val ^ new_val))
+		return;
+	if ((old_val ^ new_val) & PIN_BASED_POSTED_INTR) {
+		FIELD_BIT_CHANGE(posted_intr_nv, bitmap);
+		FIELD64_BIT_CHANGE(posted_intr_desc_addr, bitmap);
+	}
+
+	if ((old_val ^ new_val) & PIN_BASED_VMX_PREEMPTION_TIMER)
+		FIELD_BIT_CHANGE(vmx_preemption_timer_value, bitmap);
+}
+
+void vmcs12_field_update_by_procbased_ctrl(u32 old_val, u32 new_val,
+					   unsigned long *bitmap)
+{
+	if (unlikely(bitmap == NULL)) {
+		pr_err_once("%s: NULL bitmap", __func__);
+		return;
+	}
+	if (!(old_val ^ new_val))
+		return;
+
+	if ((old_val ^ new_val) & CPU_BASED_USE_MSR_BITMAPS)
+		FIELD64_BIT_CHANGE(msr_bitmap, bitmap);
+
+	if ((old_val ^ new_val) & CPU_BASED_TPR_SHADOW) {
+		FIELD64_BIT_CHANGE(virtual_apic_page_addr, bitmap);
+		FIELD_BIT_CHANGE(tpr_threshold, bitmap);
+	}
+
+	if ((old_val ^ new_val) &
+	    CPU_BASED_ACTIVATE_SECONDARY_CONTROLS) {
+		FIELD_BIT_CHANGE(secondary_vm_exec_control, bitmap);
+	}
+}
+
+void vmcs12_field_update_by_procbased_ctrl2(u32 old_val, u32 new_val,
+					    unsigned long *bitmap)
+{
+	if (unlikely(bitmap == NULL)) {
+		pr_err_once("%s: NULL bitmap", __func__);
+		return;
+	}
+	if (!(old_val ^ new_val))
+		return;
+
+	if ((old_val ^ new_val) & SECONDARY_EXEC_ENABLE_VPID)
+		FIELD_BIT_CHANGE(virtual_processor_id, bitmap);
+
+	if ((old_val ^ new_val) &
+	    SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY) {
+		FIELD_BIT_CHANGE(guest_intr_status, bitmap);
+		FIELD64_BIT_CHANGE(eoi_exit_bitmap0, bitmap);
+		FIELD64_BIT_CHANGE(eoi_exit_bitmap1, bitmap);
+		FIELD64_BIT_CHANGE(eoi_exit_bitmap2, bitmap);
+		FIELD64_BIT_CHANGE(eoi_exit_bitmap3, bitmap);
+	}
+
+	if ((old_val ^ new_val) & SECONDARY_EXEC_ENABLE_PML) {
+		FIELD_BIT_CHANGE(guest_pml_index, bitmap);
+		FIELD64_BIT_CHANGE(pml_address, bitmap);
+	}
+
+	if ((old_val ^ new_val) & SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES)
+		FIELD64_BIT_CHANGE(apic_access_addr, bitmap);
+
+	if ((old_val ^ new_val) & SECONDARY_EXEC_ENABLE_VMFUNC)
+		FIELD64_BIT_CHANGE(vm_function_control, bitmap);
+
+	if ((old_val ^ new_val) & SECONDARY_EXEC_ENABLE_EPT) {
+		FIELD64_BIT_CHANGE(ept_pointer, bitmap);
+		FIELD64_BIT_CHANGE(guest_physical_address, bitmap);
+		FIELD64_BIT_CHANGE(guest_pdptr0, bitmap);
+		FIELD64_BIT_CHANGE(guest_pdptr1, bitmap);
+		FIELD64_BIT_CHANGE(guest_pdptr2, bitmap);
+		FIELD64_BIT_CHANGE(guest_pdptr3, bitmap);
+	}
+
+	if ((old_val ^ new_val) & SECONDARY_EXEC_SHADOW_VMCS) {
+		FIELD64_BIT_CHANGE(vmread_bitmap, bitmap);
+		FIELD64_BIT_CHANGE(vmwrite_bitmap, bitmap);
+	}
+
+	if ((old_val ^ new_val) & SECONDARY_EXEC_XSAVES)
+		FIELD64_BIT_CHANGE(xss_exit_bitmap, bitmap);
+
+	if ((old_val ^ new_val) & SECONDARY_EXEC_ENCLS_EXITING)
+		FIELD64_BIT_CHANGE(encls_exiting_bitmap, bitmap);
+
+	if ((old_val ^ new_val) & SECONDARY_EXEC_TSC_SCALING)
+		FIELD64_BIT_CHANGE(tsc_multiplier, bitmap);
+
+	if ((old_val ^ new_val) & SECONDARY_EXEC_PAUSE_LOOP_EXITING) {
+		FIELD64_BIT_CHANGE(vmread_bitmap, bitmap);
+		FIELD64_BIT_CHANGE(vmwrite_bitmap, bitmap);
+	}
+}
+
+void vmcs12_field_update_by_vmentry_ctrl(u32 vm_exit_ctrl, u32 old_val,
+					 u32 new_val, unsigned long *bitmap)
+{
+	if (unlikely(bitmap == NULL)) {
+		pr_err_once("%s: NULL bitmap", __func__);
+		return;
+	}
+	if (!(old_val ^ new_val))
+		return;
+
+	if ((old_val ^ new_val) & VM_ENTRY_LOAD_IA32_PAT) {
+		if ((new_val & VM_ENTRY_LOAD_IA32_PAT) ||
+		    (vm_exit_ctrl & VM_EXIT_SAVE_IA32_PAT))
+			FIELD64_BIT_SET(guest_ia32_pat, bitmap);
+		else
+			FIELD64_BIT_CLEAR(guest_ia32_pat, bitmap);
+	}
+
+	if ((old_val ^ new_val) & VM_ENTRY_LOAD_IA32_EFER) {
+		if ((new_val & VM_ENTRY_LOAD_IA32_EFER) ||
+		    (vm_exit_ctrl & VM_EXIT_SAVE_IA32_EFER))
+			FIELD64_BIT_SET(guest_ia32_efer, bitmap);
+		else
+			FIELD64_BIT_CLEAR(guest_ia32_efer, bitmap);
+	}
+
+	if ((old_val ^ new_val) & VM_ENTRY_LOAD_IA32_PERF_GLOBAL_CTRL)
+		FIELD64_BIT_CHANGE(guest_ia32_perf_global_ctrl, bitmap);
+
+	if ((old_val ^ new_val) & VM_ENTRY_LOAD_BNDCFGS) {
+		if ((new_val & VM_ENTRY_LOAD_BNDCFGS) ||
+		    (vm_exit_ctrl & VM_EXIT_CLEAR_BNDCFGS))
+			FIELD64_BIT_SET(guest_bndcfgs, bitmap);
+		else
+			FIELD64_BIT_CLEAR(guest_bndcfgs, bitmap);
+	}
+}
+
+void vmcs12_field_update_by_vmexit_ctrl(u32 vm_entry_ctrl, u32 old_val,
+					u32 new_val, unsigned long *bitmap)
+{
+	if (unlikely(bitmap == NULL)) {
+		pr_err_once("%s: NULL bitmap", __func__);
+		return;
+	}
+	if (!(old_val ^ new_val))
+		return;
+
+	if ((old_val ^ new_val) & VM_EXIT_LOAD_IA32_PAT)
+		FIELD64_BIT_CHANGE(host_ia32_pat, bitmap);
+
+	if ((old_val ^ new_val) & VM_EXIT_LOAD_IA32_EFER)
+		FIELD64_BIT_CHANGE(host_ia32_efer, bitmap);
+
+	if ((old_val ^ new_val) & VM_EXIT_LOAD_IA32_PERF_GLOBAL_CTRL)
+		FIELD64_BIT_CHANGE(host_ia32_perf_global_ctrl, bitmap);
+
+	if ((old_val ^ new_val) & VM_EXIT_SAVE_IA32_PAT) {
+		if ((new_val & VM_EXIT_SAVE_IA32_PAT) ||
+		    (vm_entry_ctrl & VM_ENTRY_LOAD_IA32_PAT))
+			FIELD64_BIT_SET(guest_ia32_pat, bitmap);
+		else
+			FIELD64_BIT_CLEAR(guest_ia32_pat, bitmap);
+	}
+
+	if ((old_val ^ new_val) & VM_EXIT_SAVE_IA32_EFER) {
+		if ((new_val & VM_EXIT_SAVE_IA32_EFER) ||
+		    (vm_entry_ctrl & VM_ENTRY_LOAD_IA32_EFER))
+			FIELD64_BIT_SET(guest_ia32_efer, bitmap);
+		else
+			FIELD64_BIT_CLEAR(guest_ia32_efer, bitmap);
+	}
+
+	if ((old_val ^ new_val) & VM_EXIT_CLEAR_BNDCFGS) {
+		if ((new_val & VM_EXIT_CLEAR_BNDCFGS) ||
+		    (vm_entry_ctrl & VM_ENTRY_LOAD_BNDCFGS))
+			FIELD64_BIT_SET(guest_bndcfgs, bitmap);
+		else
+			FIELD64_BIT_CLEAR(guest_bndcfgs, bitmap);
+	}
+}
+
+void vmcs12_field_update_by_vm_func(u64 old_val, u64 new_val,
+				    unsigned long *bitmap)
+{
+	if (unlikely(bitmap == NULL)) {
+		pr_err_once("%s: NULL bitmap", __func__);
+		return;
+	}
+
+	if (!(old_val ^ new_val))
+		return;
+
+	if ((old_val ^ new_val) & VMFUNC_CONTROL_BIT(EPTP_SWITCHING))
+		FIELD64_BIT_CHANGE(eptp_list_address, bitmap);
+}

@@ -327,6 +327,8 @@ void nested_vmx_free_vcpu(struct kvm_vcpu *vcpu)
 {
 	vcpu_load(vcpu);
 	vmx_leave_nested(vcpu);
+	kfree(to_vmx(vcpu)->nested.vmcs12_field_existence_bitmap);
+	to_vmx(vcpu)->nested.vmcs12_field_existence_bitmap = NULL;
 	vcpu_put(vcpu);
 }
 

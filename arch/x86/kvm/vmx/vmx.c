@@ -6844,8 +6844,17 @@ static int vmx_create_vcpu(struct kvm_vcpu *vcpu)
 			goto free_vmcs;
 	}
 
-	if (nested)
+	if (nested) {
 		memcpy(&vmx->nested.msrs, &vmcs_config.nested, sizeof(vmx->nested.msrs));
+
+		vmx->nested.vmcs12_field_existence_bitmap = (unsigned long *)
+			kzalloc(VMCS12_FIELD_BITMAP_SIZE, GFP_KERNEL_ACCOUNT);
+		if (!vmx->nested.vmcs12_field_existence_bitmap)
+			goto free_vmcs;
+		vmcs12_field_fixed_init(vmx->nested.vmcs12_field_existence_bitmap);
+		vmcs12_field_dynamic_init(&vmx->nested.msrs,
+					  vmx->nested.vmcs12_field_existence_bitmap);
+	}
 	else
 		memset(&vmx->nested.msrs, 0, sizeof(vmx->nested.msrs));
 
@@ -6867,6 +6876,7 @@ static int vmx_create_vcpu(struct kvm_vcpu *vcpu)
 
 	return 0;
 
+	kfree(vmx->nested.cached_shadow_vmcs12);
 free_vmcs:
 	free_loaded_vmcs(vmx->loaded_vmcs);
 free_pml:
