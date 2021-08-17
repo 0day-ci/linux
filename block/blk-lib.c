@@ -151,6 +151,258 @@ int blkdev_issue_discard(struct block_device *bdev, sector_t sector,
 }
 EXPORT_SYMBOL(blkdev_issue_discard);
 
+/*
+ * Wait on and process all in-flight BIOs.  This must only be called once
+ * all bios have been issued so that the refcount can only decrease.
+ * This just waits for all bios to make it through cio_bio_end_io.  IO
+ * errors are propagated through cio->io_error.
+ */
+static int cio_await_completion(struct cio *cio)
+{
+	int ret = 0;
+
+	while (atomic_read(&cio->refcount)) {
+		cio->waiter = current;
+		__set_current_state(TASK_UNINTERRUPTIBLE);
+		blk_io_schedule();
+		/* wake up sets us TASK_RUNNING */
+		cio->waiter = NULL;
+		ret = cio->io_err;
+	}
+	kvfree(cio);
+
+	return ret;
+}
+
+/*
+ * The BIO completion handler simply decrements refcount.
+ * Also wake up process, if this is the last bio to be completed.
+ *
+ * During I/O bi_private points at the cio.
+ */
+static void cio_bio_end_io(struct bio *bio)
+{
+	struct cio *cio = bio->bi_private;
+
+	if (bio->bi_status)
+		cio->io_err = bio->bi_status;
+	kvfree(page_address(bio_first_bvec_all(bio)->bv_page) +
+			bio_first_bvec_all(bio)->bv_offset);
+	bio_put(bio);
+
+	if (atomic_dec_and_test(&cio->refcount) && cio->waiter)
+		wake_up_process(cio->waiter);
+}
+
+int blk_copy_offload_submit_bio(struct block_device *bdev,
+		struct blk_copy_payload *payload, int payload_size,
+		struct cio *cio, gfp_t gfp_mask)
+{
+	struct request_queue *q = bdev_get_queue(bdev);
+	struct bio *bio;
+
+	bio = bio_map_kern(q, payload, payload_size, gfp_mask);
+	if (IS_ERR(bio))
+		return PTR_ERR(bio);
+
+	bio_set_dev(bio, bdev);
+	bio->bi_opf = REQ_OP_COPY | REQ_NOMERGE;
+	bio->bi_iter.bi_sector = payload->dest;
+	bio->bi_end_io = cio_bio_end_io;
+	bio->bi_private = cio;
+	atomic_inc(&cio->refcount);
+	submit_bio(bio);
+
+	return 0;
+}
+
+/* Go through all the enrties inside user provided payload, and determine the
+ * maximum number of entries in a payload, based on device's scc-limits.
+ */
+static inline int blk_max_payload_entries(int nr_srcs, struct range_entry *rlist,
+		int max_nr_srcs, sector_t max_copy_range_sectors, sector_t max_copy_len)
+{
+	sector_t range_len, copy_len = 0, remaining = 0;
+	int ri = 0, pi = 1, max_pi = 0;
+
+	for (ri = 0; ri < nr_srcs; ri++) {
+		for (remaining = rlist[ri].len; remaining > 0; remaining -= range_len) {
+			range_len = min3(remaining, max_copy_range_sectors,
+								max_copy_len - copy_len);
+			pi++;
+			copy_len += range_len;
+
+			if ((pi == max_nr_srcs) || (copy_len == max_copy_len)) {
+				max_pi = max(max_pi, pi);
+				pi = 1;
+				copy_len = 0;
+			}
+		}
+	}
+
+	return max(max_pi, pi);
+}
+
+/*
+ * blk_copy_offload_scc	- Use device's native copy offload feature
+ * Go through user provide payload, prepare new payload based on device's copy offload limits.
+ */
+int blk_copy_offload_scc(struct block_device *src_bdev, int nr_srcs,
+		struct range_entry *rlist, struct block_device *dest_bdev,
+		sector_t dest, gfp_t gfp_mask)
+{
+	struct request_queue *q = bdev_get_queue(dest_bdev);
+	struct cio *cio = NULL;
+	struct blk_copy_payload *payload;
+	sector_t range_len, copy_len = 0, remaining = 0;
+	sector_t src_blk, cdest = dest;
+	sector_t max_copy_range_sectors, max_copy_len;
+	int ri = 0, pi = 0, ret = 0, payload_size, max_pi, max_nr_srcs;
+
+	cio = kzalloc(sizeof(struct cio), GFP_KERNEL);
+	if (!cio)
+		return -ENOMEM;
+	atomic_set(&cio->refcount, 0);
+
+	max_nr_srcs = q->limits.max_copy_nr_ranges;
+	max_copy_range_sectors = q->limits.max_copy_range_sectors;
+	max_copy_len = q->limits.max_copy_sectors;
+
+	max_pi = blk_max_payload_entries(nr_srcs, rlist, max_nr_srcs,
+					max_copy_range_sectors, max_copy_len);
+	payload_size = struct_size(payload, range, max_pi);
+
+	payload = kvmalloc(payload_size, gfp_mask);
+	if (!payload) {
+		ret = -ENOMEM;
+		goto free_cio;
+	}
+	payload->src_bdev = src_bdev;
+
+	for (ri = 0; ri < nr_srcs; ri++) {
+		for (remaining = rlist[ri].len, src_blk = rlist[ri].src; remaining > 0;
+						remaining -= range_len, src_blk += range_len) {
+
+			range_len = min3(remaining, max_copy_range_sectors,
+								max_copy_len - copy_len);
+			payload->range[pi].len = range_len;
+			payload->range[pi].src = src_blk;
+			pi++;
+			copy_len += range_len;
+
+			/* Submit current payload, if crossing device copy limits */
+			if ((pi == max_nr_srcs) || (copy_len == max_copy_len)) {
+				payload->dest = cdest;
+				payload->copy_nr_ranges = pi;
+				ret = blk_copy_offload_submit_bio(dest_bdev, payload,
+								payload_size, cio, gfp_mask);
+				if (ret)
+					goto free_payload;
+
+				/* reset index, length and allocate new payload */
+				pi = 0;
+				cdest += copy_len;
+				copy_len = 0;
+				payload = kvmalloc(payload_size, gfp_mask);
+				if (!payload) {
+					ret = -ENOMEM;
+					goto free_cio;
+				}
+				payload->src_bdev = src_bdev;
+			}
+		}
+	}
+
+	if (pi) {
+		payload->dest = cdest;
+		payload->copy_nr_ranges = pi;
+		ret = blk_copy_offload_submit_bio(dest_bdev, payload, payload_size, cio, gfp_mask);
+		if (ret)
+			goto free_payload;
+	}
+
+	/* Wait for completion of all IO's*/
+	ret = cio_await_completion(cio);
+
+	return ret;
+
+free_payload:
+	kvfree(payload);
+free_cio:
+	cio_await_completion(cio);
+	return ret;
+}
+
+static inline sector_t blk_copy_len(struct range_entry *rlist, int nr_srcs)
+{
+	int i;
+	sector_t len = 0;
+
+	for (i = 0; i < nr_srcs; i++) {
+		if (rlist[i].len)
+			len += rlist[i].len;
+		else
+			return 0;
+	}
+
+	return len;
+}
+
+static inline bool blk_check_offload_scc(struct request_queue *src_q,
+		struct request_queue *dest_q)
+{
+	if (src_q == dest_q && src_q->limits.copy_offload == BLK_COPY_OFFLOAD_SCC)
+		return true;
+
+	return false;
+}
+
+/*
+ * blkdev_issue_copy - queue a copy
+ * @src_bdev:	source block device
+ * @nr_srcs:	number of source ranges to copy
+ * @src_rlist:	array of source ranges
+ * @dest_bdev:	destination block device
+ * @dest:	destination in sector
+ * @gfp_mask:   memory allocation flags (for bio_alloc)
+ * @flags:	BLKDEV_COPY_* flags to control behaviour
+ *
+ * Description:
+ *	Copy source ranges from source block device to destination block device.
+ *	length of a source range cannot be zero.
+ */
+int blkdev_issue_copy(struct block_device *src_bdev, int nr_srcs,
+		struct range_entry *src_rlist, struct block_device *dest_bdev,
+		sector_t dest, gfp_t gfp_mask, int flags)
+{
+	struct request_queue *src_q = bdev_get_queue(src_bdev);
+	struct request_queue *dest_q = bdev_get_queue(dest_bdev);
+	sector_t copy_len;
+	int ret = -EINVAL;
+
+	if (!src_q || !dest_q)
+		return -ENXIO;
+
+	if (!nr_srcs)
+		return -EINVAL;
+
+	if (nr_srcs >= MAX_COPY_NR_RANGE)
+		return -EINVAL;
+
+	copy_len = blk_copy_len(src_rlist, nr_srcs);
+	if (!copy_len && copy_len >= MAX_COPY_TOTAL_LENGTH)
+		return -EINVAL;
+
+	if (bdev_read_only(dest_bdev))
+		return -EPERM;
+
+	if (blk_check_offload_scc(src_q, dest_q))
+		ret = blk_copy_offload_scc(src_bdev, nr_srcs, src_rlist, dest_bdev, dest, gfp_mask);
+
+	return ret;
+}
+EXPORT_SYMBOL(blkdev_issue_copy);
+
 /**
  * __blkdev_issue_write_same - generate number of bios with same page
  * @bdev:	target blockdev

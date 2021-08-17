@@ -347,6 +347,8 @@ enum req_opf {
 	REQ_OP_ZONE_RESET	= 15,
 	/* reset all the zone present on the device */
 	REQ_OP_ZONE_RESET_ALL	= 17,
+	/* copy ranges within device */
+	REQ_OP_COPY		= 19,
 
 	/* Driver private requests */
 	REQ_OP_DRV_IN		= 34,
@@ -470,6 +472,11 @@ static inline bool op_is_discard(unsigned int op)
 	return (op & REQ_OP_MASK) == REQ_OP_DISCARD;
 }
 
+static inline bool op_is_copy(unsigned int op)
+{
+	return (op & REQ_OP_MASK) == REQ_OP_COPY;
+}
+
 /*
  * Check if a bio or request operation is a zone management operation, with
  * the exception of REQ_OP_ZONE_RESET_ALL which is treated as a special case
@@ -527,6 +534,19 @@ struct blk_rq_stat {
 	u64 max;
 	u32 nr_samples;
 	u64 batch;
+};
+
+struct cio {
+	atomic_t refcount;
+	blk_status_t io_err;
+	struct task_struct *waiter;     /* waiting task (NULL if none) */
+};
+
+struct blk_copy_payload {
+	struct block_device	*src_bdev;
+	sector_t		dest;
+	int			copy_nr_ranges;
+	struct range_entry	range[];
 };
 
 #endif /* __LINUX_BLK_TYPES_H */
