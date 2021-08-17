@@ -30,6 +30,10 @@
 
 #include "gud_internal.h"
 
+static int gud_xrgb8888;
+module_param_named(xrgb8888, gud_xrgb8888, int, 0644);
+MODULE_PARM_DESC(xrgb8888, "XRGB8888 emulation format: GUD_PIXEL_FORMAT_* value, 0=auto, -1=disable [default=auto]");
+
 /* Only used internally */
 static const struct drm_format_info gud_drm_format_r1 = {
 	.format = GUD_DRM_FORMAT_R1,
@@ -530,18 +534,21 @@ static int gud_probe(struct usb_interface *intf, const struct usb_device_id *id)
 		case DRM_FORMAT_RGB332:
 			fallthrough;
 		case DRM_FORMAT_RGB888:
-			if (!xrgb8888_emulation_format)
+			if (!gud_xrgb8888 && !xrgb8888_emulation_format)
 				xrgb8888_emulation_format = info;
 			break;
 		case DRM_FORMAT_RGB565:
 			rgb565_supported = true;
-			if (!xrgb8888_emulation_format)
+			if (!gud_xrgb8888 && !xrgb8888_emulation_format)
 				xrgb8888_emulation_format = info;
 			break;
 		case DRM_FORMAT_XRGB8888:
 			xrgb8888_supported = true;
 			break;
 		}
+
+		if (gud_xrgb8888 == formats_dev[i])
+			xrgb8888_emulation_format = info;
 
 		fmt_buf_size = drm_format_info_min_pitch(info, 0, drm->mode_config.max_width) *
 			       drm->mode_config.max_height;
@@ -559,7 +566,7 @@ static int gud_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	}
 
 	/* Prefer speed over color depth */
-	if (rgb565_supported)
+	if (!gud_xrgb8888 && rgb565_supported)
 		drm->mode_config.preferred_depth = 16;
 
 	if (!xrgb8888_supported && xrgb8888_emulation_format) {
