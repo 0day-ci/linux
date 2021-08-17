@@ -19,7 +19,6 @@
 #include "host.h"
 #include "mmc_ops.h"
 
-#define MMC_BKOPS_TIMEOUT_MS		(120 * 1000) /* 120s */
 #define MMC_SANITIZE_TIMEOUT_MS		(240 * 1000) /* 240s */
 
 static const u8 tuning_blk_pattern_4bit[] = {
@@ -955,7 +954,7 @@ void mmc_run_bkops(struct mmc_card *card)
 	 * urgent levels by using an asynchronous background task, when idle.
 	 */
 	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
-			 EXT_CSD_BKOPS_START, 1, MMC_BKOPS_TIMEOUT_MS);
+			 EXT_CSD_BKOPS_START, 1, card->bkops_timeout_ms);
 	/*
 	 * If the BKOPS timed out, the card is probably still busy in the
 	 * R1_STATE_PRG. Rather than continue to wait, let's try to abort

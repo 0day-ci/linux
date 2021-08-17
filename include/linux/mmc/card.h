@@ -294,6 +294,7 @@ struct mmc_card {
 
 	bool			reenable_cmdq;	/* Re-enable Command Queue */
 
+	unsigned int            bkops_timeout_ms;
 	unsigned int		erase_size;	/* erase size in sectors */
  	unsigned int		erase_shift;	/* if erase unit is power 2 */
  	unsigned int		pref_erase;	/* in sectors */
