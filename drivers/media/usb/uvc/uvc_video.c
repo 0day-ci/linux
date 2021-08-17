@@ -490,6 +490,18 @@ uvc_video_clock_decode(struct uvc_streaming *stream, struct uvc_buffer *buf,
 	if (len < header_size)
 		return;
 
+	/*
+	 * Some cameras when there is no camera data in a buffer, do not
+	 * handle properly the pts and scr. This can be due to an borderline
+	 * interpretation of the standard: "STC must be captured when the
+	 * first video data of a video frame is put on the USB bus."
+	 * Due to their internal design, their firmware cannot clear the
+	 * UVC_STREAM_PTS and UVC_STREAM_SCR bits. Which forces us to use the
+	 * length of the buffer to decide if pts and scr are valid or not.
+	 */
+	if (len == header_size)
+		return;
+
 	/* Extract the timestamps:
 	 *
 	 * - store the frame PTS in the buffer structure
