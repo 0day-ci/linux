@@ -14,6 +14,7 @@
 #include <linux/regulator/consumer.h>
 #include <linux/of_address.h>
 #include <linux/iommu.h>
+#include <linux/pwrseq/consumer.h>
 
 #include "ce.h"
 #include "coredump.h"
@@ -42,7 +43,6 @@ static char *const ce_name[] = {
 };
 
 static const char * const ath10k_regulators[] = {
-	"vdd-0.8-cx-mx",
 	"vdd-1.8-xo",
 	"vdd-1.3-rfa",
 	"vdd-3.3-ch0",
@@ -1010,9 +1010,16 @@ static int ath10k_hw_power_on(struct ath10k *ar)
 
 	ath10k_dbg(ar, ATH10K_DBG_SNOC, "soc power on\n");
 
-	ret = regulator_bulk_enable(ar_snoc->num_vregs, ar_snoc->vregs);
+	if (ar_snoc->pwrseq)
+		ret = pwrseq_full_power_on(ar_snoc->pwrseq);
+	else
+		ret = regulator_bulk_enable(ar_snoc->num_vregs, ar_snoc->vregs);
 	if (ret)
 		return ret;
+
+	ret = regulator_enable(ar_snoc->vreg_cx_mx);
+	if (ret)
+		goto vreg_bulk_off;
 
 	ret = clk_bulk_prepare_enable(ar_snoc->num_clks, ar_snoc->clks);
 	if (ret)
@@ -1021,7 +1028,13 @@ static int ath10k_hw_power_on(struct ath10k *ar)
 	return ret;
 
 vreg_off:
-	regulator_bulk_disable(ar_snoc->num_vregs, ar_snoc->vregs);
+	regulator_disable(ar_snoc->vreg_cx_mx);
+vreg_bulk_off:
+	if (ar_snoc->pwrseq)
+		pwrseq_power_off(ar_snoc->pwrseq);
+	else
+		regulator_bulk_disable(ar_snoc->num_vregs, ar_snoc->vregs);
+
 	return ret;
 }
 
@@ -1032,6 +1045,14 @@ static int ath10k_hw_power_off(struct ath10k *ar)
 	ath10k_dbg(ar, ATH10K_DBG_SNOC, "soc power off\n");
 
 	clk_bulk_disable_unprepare(ar_snoc->num_clks, ar_snoc->clks);
+
+	regulator_disable(ar_snoc->vreg_cx_mx);
+
+	if (ar_snoc->pwrseq) {
+		pwrseq_power_off(ar_snoc->pwrseq);
+
+		return 0;
+	}
 
 	return regulator_bulk_disable(ar_snoc->num_vregs, ar_snoc->vregs);
 }
@@ -1691,20 +1712,36 @@ static int ath10k_snoc_probe(struct platform_device *pdev)
 		goto err_release_resource;
 	}
 
-	ar_snoc->num_vregs = ARRAY_SIZE(ath10k_regulators);
-	ar_snoc->vregs = devm_kcalloc(&pdev->dev, ar_snoc->num_vregs,
-				      sizeof(*ar_snoc->vregs), GFP_KERNEL);
-	if (!ar_snoc->vregs) {
-		ret = -ENOMEM;
+	ar_snoc->pwrseq = devm_pwrseq_get_optional(&pdev->dev, "wifi");
+	if (IS_ERR(ar_snoc->pwrseq)) {
+		ret = PTR_ERR(ar_snoc->pwrseq);
+		if (ret != -EPROBE_DEFER)
+			ath10k_warn(ar, "failed to acquire pwrseq: %d\n", ret);
 		goto err_free_irq;
 	}
-	for (i = 0; i < ar_snoc->num_vregs; i++)
-		ar_snoc->vregs[i].supply = ath10k_regulators[i];
 
-	ret = devm_regulator_bulk_get(&pdev->dev, ar_snoc->num_vregs,
-				      ar_snoc->vregs);
-	if (ret < 0)
+	if (!ar_snoc->pwrseq) {
+		ar_snoc->num_vregs = ARRAY_SIZE(ath10k_regulators);
+		ar_snoc->vregs = devm_kcalloc(&pdev->dev, ar_snoc->num_vregs,
+				sizeof(*ar_snoc->vregs), GFP_KERNEL);
+		if (!ar_snoc->vregs) {
+			ret = -ENOMEM;
+			goto err_free_irq;
+		}
+		for (i = 0; i < ar_snoc->num_vregs; i++)
+			ar_snoc->vregs[i].supply = ath10k_regulators[i];
+
+		ret = devm_regulator_bulk_get(&pdev->dev, ar_snoc->num_vregs,
+				ar_snoc->vregs);
+		if (ret < 0)
+			goto err_free_irq;
+	}
+
+	ar_snoc->vreg_cx_mx = devm_regulator_get(&pdev->dev, "vdd-0.8-cx-mx");
+	if (IS_ERR(ar_snoc->vreg_cx_mx)) {
+		ret = PTR_ERR(ar_snoc->vreg_cx_mx);
 		goto err_free_irq;
+	}
 
 	ar_snoc->num_clks = ARRAY_SIZE(ath10k_clocks);
 	ar_snoc->clks = devm_kcalloc(&pdev->dev, ar_snoc->num_clks,
