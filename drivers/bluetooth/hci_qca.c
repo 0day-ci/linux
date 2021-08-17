@@ -1590,7 +1590,6 @@ static int qca_power_on(struct hci_dev *hdev)
 	struct qca_serdev *qcadev;
 	struct qca_data *qca = hu->priv;
 	int ret;
-	bool sw_ctrl_state;
 
 	/* Non-serdev device usually is powered by external power
 	 * and don't need additional action in driver for power on
@@ -1602,29 +1601,15 @@ static int qca_power_on(struct hci_dev *hdev)
 	 * off the voltage regulator.
 	 */
 	qcadev = serdev_device_get_drvdata(hu->serdev);
-	if (!qcadev->vregs_on) {
-		serdev_device_close(hu->serdev);
-		ret = qca_regulator_enable(qcadev);
-		if (ret)
-			return ret;
+	serdev_device_close(hu->serdev);
+	ret = qca_regulator_enable(qcadev);
+	if (ret)
+		return ret;
 
-		ret = serdev_device_open(hu->serdev);
-		if (ret) {
-			bt_dev_err(hu->hdev, "failed to open port");
-			return ret;
-		}
-	}
-
-	/* For wcn6750 need to enable gpio bt_en */
-	if (qcadev->bt_en) {
-		gpiod_set_value_cansleep(qcadev->bt_en, 0);
-		msleep(50);
-		gpiod_set_value_cansleep(qcadev->bt_en, 1);
-		msleep(150);
-		if (qcadev->sw_ctrl) {
-			sw_ctrl_state = gpiod_get_value_cansleep(qcadev->sw_ctrl);
-			bt_dev_dbg(hu->hdev, "SW_CTRL is %d", sw_ctrl_state);
-		}
+	ret = serdev_device_open(hu->serdev);
+	if (ret) {
+		bt_dev_err(hu->hdev, "failed to open port");
+		return ret;
 	}
 
 	if (qca_is_wcn399x(soc_type)) {
@@ -1856,7 +1841,6 @@ static void qca_power_shutdown(struct hci_uart *hu)
 	struct qca_data *qca = hu->priv;
 	unsigned long flags;
 	enum qca_btsoc_type soc_type = qca_soc_type(hu);
-	bool sw_ctrl_state;
 
 	/* From this point we go into power off state. But serial port is
 	 * still open, stop queueing the IBS data and flush all the buffered
@@ -1878,18 +1862,8 @@ static void qca_power_shutdown(struct hci_uart *hu)
 	if (qca_is_wcn399x(soc_type)) {
 		host_set_baudrate(hu, 2400);
 		qca_send_power_pulse(hu, false);
-		qca_regulator_disable(qcadev);
-	} else if (soc_type == QCA_WCN6750) {
-		gpiod_set_value_cansleep(qcadev->bt_en, 0);
-		msleep(100);
-		qca_regulator_disable(qcadev);
-		if (qcadev->sw_ctrl) {
-			sw_ctrl_state = gpiod_get_value_cansleep(qcadev->sw_ctrl);
-			bt_dev_dbg(hu->hdev, "SW_CTRL is %d", sw_ctrl_state);
-		}
-	} else if (qcadev->bt_en) {
-		gpiod_set_value_cansleep(qcadev->bt_en, 0);
 	}
+	qca_regulator_disable(qcadev);
 
 	set_bit(QCA_BT_OFF, &qca->flags);
 }
@@ -1919,20 +1893,39 @@ static int qca_regulator_enable(struct qca_serdev *qcadev)
 	int ret;
 
 	/* Already enabled */
-	if (qcadev->vregs_on)
-		return 0;
+	if (!qcadev->vregs_on) {
+		BT_DBG("enabling %d regulators)", qcadev->num_vregs);
 
-	BT_DBG("enabling %d regulators)", qcadev->num_vregs);
+		ret = regulator_bulk_enable(qcadev->num_vregs, qcadev->vreg_bulk);
+		if (ret)
+			return ret;
 
-	ret = regulator_bulk_enable(qcadev->num_vregs, qcadev->vreg_bulk);
-	if (ret)
-		return ret;
+		qcadev->vregs_on = true;
 
-	qcadev->vregs_on = true;
+		if (qca_is_wcn399x(qcadev->btsoc_type) ||
+		    qca_is_wcn6750(qcadev->btsoc_type)) {
+			ret = clk_prepare_enable(qcadev->susclk);
+			if (ret) {
+				regulator_bulk_disable(qcadev->num_vregs, qcadev->vreg_bulk);
+				return ret;
+			}
+		}
+	}
 
-	ret = clk_prepare_enable(qcadev->susclk);
-	if (ret)
-		qca_regulator_disable(qcadev);
+	/* For wcn6750 need to enable gpio bt_en */
+	if (qcadev->bt_en) {
+		gpiod_set_value_cansleep(qcadev->bt_en, 0);
+		msleep(50);
+		gpiod_set_value_cansleep(qcadev->bt_en, 1);
+		msleep(150);
+	}
+
+	if (qcadev->sw_ctrl) {
+		bool sw_ctrl_state;
+
+		sw_ctrl_state = gpiod_get_value_cansleep(qcadev->sw_ctrl);
+		bt_dev_dbg(qcadev->serdev_hu.hdev, "SW_CTRL is %d", sw_ctrl_state);
+	}
 
 	return ret;
 }
@@ -1942,14 +1935,27 @@ static void qca_regulator_disable(struct qca_serdev *qcadev)
 	if (!qcadev)
 		return;
 
+	if (qcadev->bt_en) {
+		gpiod_set_value_cansleep(qcadev->bt_en, 0);
+		msleep(100);
+	}
+
 	/* Already disabled? */
-	if (!qcadev->vregs_on)
-		return;
+	if (qcadev->vregs_on) {
+		regulator_bulk_disable(qcadev->num_vregs, qcadev->vreg_bulk);
+		qcadev->vregs_on = false;
 
-	regulator_bulk_disable(qcadev->num_vregs, qcadev->vreg_bulk);
-	qcadev->vregs_on = false;
+		if (qca_is_wcn399x(qcadev->btsoc_type) ||
+		    qca_is_wcn6750(qcadev->btsoc_type))
+			clk_disable_unprepare(qcadev->susclk);
+	}
 
-	clk_disable_unprepare(qcadev->susclk);
+	if (qcadev->sw_ctrl) {
+		bool sw_ctrl_state;
+
+		sw_ctrl_state = gpiod_get_value_cansleep(qcadev->sw_ctrl);
+		bt_dev_dbg(qcadev->serdev_hu.hdev, "SW_CTRL is %d", sw_ctrl_state);
+	}
 }
 
 static int qca_init_regulators(struct qca_serdev *qcadev, struct device *dev,
@@ -2018,17 +2024,17 @@ static int qca_serdev_probe(struct serdev_device *serdev)
 		}
 
 		qcadev->vregs_on = false;
-	}
 
-	qcadev->bt_en = devm_gpiod_get_optional(&serdev->dev, "enable",
-			GPIOD_OUT_LOW);
-	if (!qcadev->bt_en) {
-		if (qca_is_wcn6750(data->soc_type)) {
-			dev_err(&serdev->dev, "failed to acquire BT_EN gpio\n");
-			power_ctrl_enabled = false;
-		} else if (!qca_is_wcn399x(data->soc_type)) {
-			dev_warn(&serdev->dev, "failed to acquire enable gpio\n");
-			power_ctrl_enabled = false;
+		qcadev->bt_en = devm_gpiod_get_optional(&serdev->dev, "enable",
+				GPIOD_OUT_LOW);
+		if (!qcadev->bt_en) {
+			if (qca_is_wcn6750(data->soc_type)) {
+				dev_err(&serdev->dev, "failed to acquire BT_EN gpio\n");
+				power_ctrl_enabled = false;
+			} else if (!qca_is_wcn399x(data->soc_type)) {
+				dev_warn(&serdev->dev, "failed to acquire enable gpio\n");
+				power_ctrl_enabled = false;
+			}
 		}
 	}
 
