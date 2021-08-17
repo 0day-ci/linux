@@ -637,8 +637,10 @@ exar_pci_probe(struct pci_dev *pcidev, const struct pci_device_id *ent)
 	pci_set_master(pcidev);
 
 	rc = pci_alloc_irq_vectors(pcidev, 1, 1, PCI_IRQ_ALL_TYPES);
-	if (rc < 0)
+	if (rc < 0) {
+		pci_free_irq_vectors(pcidev);
 		return rc;
+	}
 
 	memset(&uart, 0, sizeof(uart));
 	uart.port.flags = UPF_SHARE_IRQ | UPF_EXAR_EFR | UPF_FIXED_TYPE | UPF_FIXED_PORT;
@@ -687,6 +689,7 @@ static void exar_pci_remove(struct pci_dev *pcidev)
 
 	if (priv->board->exit)
 		priv->board->exit(pcidev);
+	pci_free_irq_vectors(pcidev);
 }
 
 static int __maybe_unused exar_suspend(struct device *dev)
