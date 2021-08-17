@@ -3206,6 +3206,7 @@ void kvm_vcpu_block(struct kvm_vcpu *vcpu)
 	bool waited = false;
 	u64 block_ns;
 
+	++vcpu->stat.generic.halt_block_starts;
 	kvm_arch_vcpu_blocking(vcpu);
 
 	start = cur = poll_end = ktime_get();
@@ -3285,6 +3286,7 @@ out:
 
 	trace_kvm_vcpu_wakeup(block_ns, waited, vcpu_valid_wakeup(vcpu));
 	kvm_arch_vcpu_block_finish(vcpu);
+	++vcpu->stat.generic.halt_block_ends;
 }
 EXPORT_SYMBOL_GPL(kvm_vcpu_block);
 

@@ -1459,7 +1459,9 @@ struct _kvm_stats_desc {
 	STATS_DESC_LOGHIST_TIME_NSEC(VCPU_GENERIC, halt_poll_fail_hist,	       \
 			HALT_POLL_HIST_COUNT),				       \
 	STATS_DESC_LOGHIST_TIME_NSEC(VCPU_GENERIC, halt_wait_hist,	       \
-			HALT_POLL_HIST_COUNT)
+			HALT_POLL_HIST_COUNT),				       \
+	STATS_DESC_COUNTER(VCPU_GENERIC, halt_block_starts),		       \
+	STATS_DESC_COUNTER(VCPU_GENERIC, halt_block_ends)
 
 extern struct dentry *kvm_debugfs_dir;
 
