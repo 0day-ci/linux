@@ -5148,6 +5148,123 @@ static const struct pci_reset_fn_method pci_reset_fn_methods[] = {
 	{ pci_reset_bus_function, .name = "bus" },
 };
 
+static ssize_t reset_method_show(struct device *dev,
+				 struct device_attribute *attr, char *buf)
+{
+	struct pci_dev *pdev = to_pci_dev(dev);
+	ssize_t len = 0;
+	int i, m;
+
+	for (i = 0; i < PCI_NUM_RESET_METHODS; i++) {
+		m = pdev->reset_methods[i];
+		if (!m)
+			break;
+
+		len += sysfs_emit_at(buf, len, "%s%s", len ? " " : "",
+				     pci_reset_fn_methods[m].name);
+	}
+
+	if (len)
+		len += sysfs_emit_at(buf, len, "\n");
+
+	return len;
+}
+
+static ssize_t reset_method_store(struct device *dev,
+				  struct device_attribute *attr,
+				  const char *buf, size_t count)
+{
+	struct pci_dev *pdev = to_pci_dev(dev);
+	int i, m = 0, n = 0;
+	char *name, *options;
+
+	if (count >= (PAGE_SIZE - 1))
+		return -EINVAL;
+
+	if (sysfs_streq(buf, "")) {
+		goto exit;
+	}
+
+	if (sysfs_streq(buf, "default")) {
+		pci_init_reset_methods(pdev);
+		return count;
+	}
+
+	options = kstrndup(buf, count, GFP_KERNEL);
+	if (!options)
+		return -ENOMEM;
+
+	while ((name = strsep(&options, " ")) != NULL) {
+		if (sysfs_streq(name, ""))
+			continue;
+
+		name = strim(name);
+
+		for (m = 1; m < PCI_NUM_RESET_METHODS; m++) {
+			if (sysfs_streq(name, pci_reset_fn_methods[m].name))
+				break;
+		}
+
+		if (m == PCI_NUM_RESET_METHODS) {
+			pci_warn(pdev, "Skip invalid reset method '%s'", name);
+			continue;
+		}
+
+		for (i = 0; i < n; i++) {
+			if (pdev->reset_methods[i] == m)
+				break;
+		}
+
+		if (i < n)
+			continue;
+
+		if (pci_reset_fn_methods[m].reset_fn(pdev, 1)) {
+			pci_warn(pdev, "Unsupported reset method '%s'", name);
+			continue;
+		}
+
+		pdev->reset_methods[n++] = m;
+		BUG_ON(n == PCI_NUM_RESET_METHODS);
+	}
+
+	kfree(options);
+
+exit:
+	/* All the reset methods are invalid */
+	if (n == 0 && m == PCI_NUM_RESET_METHODS)
+		return -EINVAL;
+	pdev->reset_methods[n] = 0;
+	if (pdev->reset_methods[0] == 0) {
+		pci_warn(pdev, "All device reset methods disabled by user");
+	} else if ((pdev->reset_methods[0] != 1) &&
+		   !pci_reset_fn_methods[1].reset_fn(pdev, 1)) {
+		pci_warn(pdev, "Device specific reset disabled/de-prioritized by user");
+	}
+	return count;
+}
+static DEVICE_ATTR_RW(reset_method);
+
+static struct attribute *pci_dev_reset_method_attrs[] = {
+	&dev_attr_reset_method.attr,
+	NULL,
+};
+
+static umode_t pci_dev_reset_method_attr_is_visible(struct kobject *kobj,
+						    struct attribute *a, int n)
+{
+	struct pci_dev *pdev = to_pci_dev(kobj_to_dev(kobj));
+
+	if (!pci_reset_supported(pdev))
+		return 0;
+
+	return a->mode;
+}
+
+const struct attribute_group pci_dev_reset_method_attr_group = {
+	.attrs = pci_dev_reset_method_attrs,
+	.is_visible = pci_dev_reset_method_attr_is_visible,
+};
+
 /**
  * __pci_reset_function_locked - reset a PCI device function while holding
  * the @dev mutex lock.
