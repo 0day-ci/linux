@@ -37,10 +37,10 @@
 #include <linux/smp.h>
 #include <linux/console.h>
 #include <linux/kmsg_dump.h>
+#include <linux/debugfs.h>
 
 #include <asm/emulated_ops.h>
 #include <linux/uaccess.h>
-#include <asm/debugfs.h>
 #include <asm/interrupt.h>
 #include <asm/io.h>
 #include <asm/machdep.h>
@@ -171,7 +171,6 @@ extern void panic_flush_kmsg_start(void)
 
 extern void panic_flush_kmsg_end(void)
 {
-	printk_safe_flush_on_panic();
 	kmsg_dump(KMSG_DUMP_PANIC);
 	bust_spinlocks(0);
 	debug_locks_off();
@@ -1482,8 +1481,13 @@ static void do_program_check(struct pt_regs *regs)
 
 		if (!(regs->msr & MSR_PR) &&  /* not user-mode */
 		    report_bug(bugaddr, regs) == BUG_TRAP_TYPE_WARN) {
-			regs_add_return_ip(regs, 4);
-			return;
+			const struct exception_table_entry *entry;
+
+			entry = search_exception_tables(bugaddr);
+			if (entry) {
+				regs_set_return_ip(regs, extable_fixup(entry) + regs->nip - bugaddr);
+				return;
+			}
 		}
 		_exception(SIGTRAP, regs, TRAP_BRKPT, regs->nip);
 		return;
@@ -2267,7 +2271,7 @@ static int __init ppc_warn_emulated_init(void)
 	struct ppc_emulated_entry *entries = (void *)&ppc_emulated;
 
 	dir = debugfs_create_dir("emulated_instructions",
-				 powerpc_debugfs_root);
+				 arch_debugfs_dir);
 
 	debugfs_create_u32("do_warn", 0644, dir, &ppc_warn_emulated);
 

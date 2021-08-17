@@ -116,7 +116,7 @@ config RESET_LPC18XX
 
 config RESET_MCHP_SPARX5
 	bool "Microchip Sparx5 reset driver"
-	depends on HAS_IOMEM || COMPILE_TEST
+	depends on ARCH_SPARX5 || COMPILE_TEST
 	default y if SPARX5_SWITCH
 	select MFD_SYSCON
 	help
@@ -180,6 +180,13 @@ config RESET_RASPBERRYPI
 	  relevant. This driver provides a reset controller capable of
 	  interfacing with RPi4's co-processor and model these firmware
 	  initialization routines as reset lines.
+
+config RESET_RZG2L_USBPHY_CTRL
+	tristate "Renesas RZ/G2L USBPHY control driver"
+	depends on ARCH_R9A07G044 || COMPILE_TEST
+	help
+	  Support for USBPHY Control found on RZ/G2L family. It mainly
+	  controls reset and power down of the USB/PHY.
 
 config RESET_SCMI
 	tristate "Reset driver controlled via ARM SCMI interface"
