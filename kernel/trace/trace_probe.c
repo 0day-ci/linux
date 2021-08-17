@@ -912,9 +912,10 @@ static int __set_print_fmt(struct trace_probe *tp, char *buf, int len,
 }
 #undef LEN_OR_ZERO
 
-int traceprobe_set_print_fmt(struct trace_probe *tp, bool is_return)
+int traceprobe_set_print_fmt(struct trace_probe *tp, enum probe_print_type ptype)
 {
 	struct trace_event_call *call = trace_probe_event_call(tp);
+	bool is_return = ptype == PROBE_PRINT_RETURN;
 	int len;
 	char *print_fmt;
 
