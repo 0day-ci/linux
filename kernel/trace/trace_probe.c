@@ -319,6 +319,13 @@ static int parse_probe_vars(char *arg, const struct fetch_type *t,
 		code->op = FETCH_OP_ARG;
 		code->param = (unsigned int)param - 1;
 #endif
+	} else if (flags & TPARG_FL_TPOINT) {
+		if (code->data)
+			return -EFAULT;
+		code->data = kstrdup(arg, GFP_KERNEL);
+		if (!code->data)
+			return -ENOMEM;
+		code->op = FETCH_OP_TP_ARG;
 	} else
 		goto inval_var;
 
@@ -646,13 +653,14 @@ static int traceprobe_parse_probe_arg_body(const char *argv, ssize_t *size,
 	    !strcmp(parg->type->name, "ustring")) {
 		if (code->op != FETCH_OP_DEREF && code->op != FETCH_OP_UDEREF &&
 		    code->op != FETCH_OP_IMM && code->op != FETCH_OP_COMM &&
-		    code->op != FETCH_OP_DATA) {
+		    code->op != FETCH_OP_DATA && code->op != FETCH_OP_TP_ARG) {
 			trace_probe_log_err(offset + (t ? (t - arg) : 0),
 					    BAD_STRING);
 			goto fail;
 		}
 		if ((code->op == FETCH_OP_IMM || code->op == FETCH_OP_COMM ||
-		     code->op == FETCH_OP_DATA) || parg->count) {
+		     code->op == FETCH_OP_DATA) || code->op == FETCH_OP_TP_ARG ||
+		     parg->count) {
 			/*
 			 * IMM, DATA and COMM is pointing actual address, those
 			 * must be kept, and if parg->count != 0, this is an
@@ -851,19 +859,26 @@ int traceprobe_update_arg(struct probe_arg *arg)
 /* When len=0, we just calculate the needed length */
 #define LEN_OR_ZERO (len ? len - pos : 0)
 static int __set_print_fmt(struct trace_probe *tp, char *buf, int len,
-			   bool is_return)
+			   enum probe_print_type ptype)
 {
 	struct probe_arg *parg;
 	int i, j;
 	int pos = 0;
 	const char *fmt, *arg;
 
-	if (!is_return) {
+	switch (ptype) {
+	case PROBE_PRINT_NORMAL:
 		fmt = "(%lx)";
 		arg = "REC->" FIELD_STRING_IP;
-	} else {
+		break;
+	case PROBE_PRINT_RETURN:
 		fmt = "(%lx <- %lx)";
 		arg = "REC->" FIELD_STRING_FUNC ", REC->" FIELD_STRING_RETIP;
+		break;
+	case PROBE_PRINT_EVENT:
+		fmt = "(%u)";
+		arg = "REC->" FIELD_STRING_TYPE;
+
 	}
 
 	pos += snprintf(buf + pos, LEN_OR_ZERO, "\"%s", fmt);
@@ -915,18 +930,17 @@ static int __set_print_fmt(struct trace_probe *tp, char *buf, int len,
 int traceprobe_set_print_fmt(struct trace_probe *tp, enum probe_print_type ptype)
 {
 	struct trace_event_call *call = trace_probe_event_call(tp);
-	bool is_return = ptype == PROBE_PRINT_RETURN;
 	int len;
 	char *print_fmt;
 
 	/* First: called with 0 length to calculate the needed length */
-	len = __set_print_fmt(tp, NULL, 0, is_return);
+	len = __set_print_fmt(tp, NULL, 0, ptype);
 	print_fmt = kmalloc(len + 1, GFP_KERNEL);
 	if (!print_fmt)
 		return -ENOMEM;
 
 	/* Second: actually write the @print_fmt */
-	__set_print_fmt(tp, print_fmt, len + 1, is_return);
+	__set_print_fmt(tp, print_fmt, len + 1, ptype);
 	call->print_fmt = print_fmt;
 
 	return 0;
