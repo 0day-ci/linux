@@ -1547,7 +1547,8 @@ static void copy_shadow_to_vmcs12(struct vcpu_vmx *vmx)
 	for (i = 0; i < max_shadow_read_write_fields; i++) {
 		field = shadow_read_write_fields[i];
 		val = __vmcs_readl(field.encoding);
-		vmcs12_write_any(vmcs12, field.encoding, field.offset, val);
+		vmcs12_write_any(vmcs12, field.encoding, field.offset, val,
+				 vmx->nested.vmcs12_field_existence_bitmap);
 	}
 
 	vmcs_clear(shadow_vmcs);
@@ -1580,8 +1581,9 @@ static void copy_vmcs12_to_shadow(struct vcpu_vmx *vmx)
 	for (q = 0; q < ARRAY_SIZE(fields); q++) {
 		for (i = 0; i < max_fields[q]; i++) {
 			field = fields[q][i];
-			val = vmcs12_read_any(vmcs12, field.encoding,
-					      field.offset);
+			vmcs12_read_any(vmcs12, field.encoding,
+					      field.offset, &val,
+					      vmx->nested.vmcs12_field_existence_bitmap);
 			__vmcs_writel(field.encoding, val);
 		}
 	}
@@ -5070,7 +5072,7 @@ static int handle_vmread(struct kvm_vcpu *vcpu)
 	struct vcpu_vmx *vmx = to_vmx(vcpu);
 	struct x86_exception e;
 	unsigned long field;
-	u64 value;
+	unsigned long value;
 	gva_t gva = 0;
 	short offset;
 	int len, r;
@@ -5098,7 +5100,10 @@ static int handle_vmread(struct kvm_vcpu *vcpu)
 		copy_vmcs02_to_vmcs12_rare(vcpu, vmcs12);
 
 	/* Read the field, zero-extended to a u64 value */
-	value = vmcs12_read_any(vmcs12, field, offset);
+	r = vmcs12_read_any(vmcs12, field, offset, &value,
+				vmx->nested.vmcs12_field_existence_bitmap);
+	if (r < 0)
+		return nested_vmx_fail(vcpu, VMXERR_UNSUPPORTED_VMCS_COMPONENT);
 
 	/*
 	 * Now copy part of this value to register or memory, as requested.
@@ -5223,7 +5228,10 @@ static int handle_vmwrite(struct kvm_vcpu *vcpu)
 	if (field >= GUEST_ES_AR_BYTES && field <= GUEST_TR_AR_BYTES)
 		value &= 0x1f0ff;
 
-	vmcs12_write_any(vmcs12, field, offset, value);
+	r = vmcs12_write_any(vmcs12, field, offset, value,
+			 vmx->nested.vmcs12_field_existence_bitmap);
+	if (r < 0)
+		return nested_vmx_fail(vcpu, VMXERR_UNSUPPORTED_VMCS_COMPONENT);
 
 	/*
 	 * Do not track vmcs12 dirty-state if in guest-mode as we actually

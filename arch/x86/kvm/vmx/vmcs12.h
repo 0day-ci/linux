@@ -413,30 +413,50 @@ static inline short vmcs_field_to_offset(unsigned long field)
 
 #undef ROL16
 
-static inline u64 vmcs12_read_any(struct vmcs12 *vmcs12, unsigned long field,
-				  u16 offset)
+static inline int vmcs12_read_any(struct vmcs12 *vmcs12, unsigned long field,
+				  u16 offset, unsigned long *value, unsigned long *bitmap)
 {
 	char *p = (char *)vmcs12 + offset;
+
+	if (unlikely(bitmap == NULL)) {
+		pr_err_once("vmcs12 read: NULL bitmap");
+		return -EINVAL;
+	}
+	if (!test_bit(offset / sizeof(u16), bitmap))
+		return -ENOENT;
 
 	switch (vmcs_field_width(field)) {
 	case VMCS_FIELD_WIDTH_NATURAL_WIDTH:
-		return *((natural_width *)p);
+		*value = *((natural_width *)p);
+		break;
 	case VMCS_FIELD_WIDTH_U16:
-		return *((u16 *)p);
+		*value = *((u16 *)p);
+		break;
 	case VMCS_FIELD_WIDTH_U32:
-		return *((u32 *)p);
+		*value = *((u32 *)p);
+		break;
 	case VMCS_FIELD_WIDTH_U64:
-		return *((u64 *)p);
+		*value = *((u64 *)p);
+		break;
 	default:
 		WARN_ON_ONCE(1);
-		return -1;
+		return -ENOENT;
 	}
+
+	return 0;
 }
 
-static inline void vmcs12_write_any(struct vmcs12 *vmcs12, unsigned long field,
-				    u16 offset, u64 field_value)
+static inline int vmcs12_write_any(struct vmcs12 *vmcs12, unsigned long field,
+				    u16 offset, u64 field_value, unsigned long *bitmap)
 {
 	char *p = (char *)vmcs12 + offset;
+
+	if (unlikely(bitmap == NULL)) {
+		pr_err_once("%s: NULL bitmap", __func__);
+		return -EINVAL;
+	}
+	if (!test_bit(offset / sizeof(u16), bitmap))
+		return -ENOENT;
 
 	switch (vmcs_field_width(field)) {
 	case VMCS_FIELD_WIDTH_U16:
@@ -453,8 +473,11 @@ static inline void vmcs12_write_any(struct vmcs12 *vmcs12, unsigned long field,
 		break;
 	default:
 		WARN_ON_ONCE(1);
-		break;
+		return -ENOENT;
 	}
+
+	return 0;
 }
+
 
 #endif /* __KVM_X86_VMX_VMCS12_H */
