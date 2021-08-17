@@ -2,13 +2,30 @@
 #
 # UTF-8 normalization
 #
+# This config option will be automatically selected when UNICODE_UTF8_DATA
+# is enabled. UNICODE config will provide all the UTF-8 core and normalization
+# functions which will use UTF-8 data tables.
 config UNICODE
 	bool "UTF-8 normalization and casefolding support"
+
+config UNICODE_UTF8_DATA
+	tristate "UTF-8 support for native Case-Insensitive filesystems"
+	select UNICODE
 	help
-	  Say Y here to enable UTF-8 NFD normalization and NFD+CF casefolding
-	  support.
+	  Say M here to enable UTF-8 NFD normalization and NFD+CF casefolding
+	  support as a loadable module or say Y for building it into the kernel.
+	  It is currently supported by EXT4 and F2FS filesystems.
+
+	  utf8data.h_shipped has a large database table which is an
+	  auto-generated decodification trie for the unicode normalization
+	  functions. Enabling UNICODE_UTF8_DATA as M will allow you to avoid
+	  carrying this large table into the kernel and module will only be
+	  loaded with the data tables whenever required by any filesystem.
+	  If your filesystem requires to have the utf8-data during boot time
+	  then you should have it built into the kernel by saying Y here to
+	  avoid any boot failure.
 
 config UNICODE_NORMALIZATION_SELFTEST
 	tristate "Test UTF-8 normalization support"
-	depends on UNICODE
+	depends on UNICODE_UTF8_DATA
 	default n
