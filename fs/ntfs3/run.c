@@ -253,7 +253,7 @@ void run_truncate_head(struct runs_tree *run, CLST vcn)
 	run->count -= index;
 
 	if (!run->count) {
-		ntfs_vfree(run->runs);
+		kvfree(run->runs);
 		run->runs = NULL;
 		run->allocated = 0;
 	}
@@ -292,7 +292,7 @@ void run_truncate(struct runs_tree *run, CLST vcn)
 
 	/* Do not reallocate array 'runs'. Only free if possible */
 	if (!index) {
-		ntfs_vfree(run->runs);
+		kvfree(run->runs);
 		run->runs = NULL;
 		run->allocated = 0;
 	}
@@ -387,7 +387,7 @@ requires_new_range:
 
 			WARN_ON(!is_mft && bytes > NTFS3_RUN_MAX_BYTES);
 
-			new_ptr = ntfs_vmalloc(bytes);
+			new_ptr = kvmalloc(bytes, GFP_KERNEL);
 
 			if (!new_ptr)
 				return false;
@@ -398,7 +398,7 @@ requires_new_range:
 			memcpy(r + 1, run->runs + index,
 			       sizeof(struct ntfs_run) * (run->count - index));
 
-			ntfs_vfree(run->runs);
+			kvfree(run->runs);
 			run->runs = new_ptr;
 			run->allocated = bytes;
 
