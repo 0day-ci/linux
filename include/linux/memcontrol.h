@@ -691,26 +691,25 @@ static inline bool mem_cgroup_below_min(struct mem_cgroup *memcg)
 		page_counter_read(&memcg->memory);
 }
 
-int __mem_cgroup_charge(struct page *page, struct mm_struct *mm,
-			gfp_t gfp_mask);
-static inline int mem_cgroup_charge(struct page *page, struct mm_struct *mm,
-				    gfp_t gfp_mask)
+int __mem_cgroup_charge(struct folio *folio, struct mm_struct *mm, gfp_t gfp);
+static inline int mem_cgroup_charge(struct folio *folio, struct mm_struct *mm,
+				    gfp_t gfp)
 {
 	if (mem_cgroup_disabled())
 		return 0;
-	return __mem_cgroup_charge(page, mm, gfp_mask);
+	return __mem_cgroup_charge(folio, mm, gfp);
 }
 
 int mem_cgroup_swapin_charge_page(struct page *page, struct mm_struct *mm,
 				  gfp_t gfp, swp_entry_t entry);
 void mem_cgroup_swapin_uncharge_swap(swp_entry_t entry);
 
-void __mem_cgroup_uncharge(struct page *page);
-static inline void mem_cgroup_uncharge(struct page *page)
+void __mem_cgroup_uncharge(struct folio *folio);
+static inline void mem_cgroup_uncharge(struct folio *folio)
 {
 	if (mem_cgroup_disabled())
 		return;
-	__mem_cgroup_uncharge(page);
+	__mem_cgroup_uncharge(folio);
 }
 
 void __mem_cgroup_uncharge_list(struct list_head *page_list);
@@ -721,7 +720,7 @@ static inline void mem_cgroup_uncharge_list(struct list_head *page_list)
 	__mem_cgroup_uncharge_list(page_list);
 }
 
-void mem_cgroup_migrate(struct page *oldpage, struct page *newpage);
+void mem_cgroup_migrate(struct folio *old, struct folio *new);
 
 /**
  * mem_cgroup_lruvec - get the lru list vector for a memcg & node
