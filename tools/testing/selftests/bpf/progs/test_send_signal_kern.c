@@ -18,8 +18,7 @@ static __always_inline int bpf_send_signal_test(void *ctx)
 			ret = bpf_send_signal_thread(sig);
 		else
 			ret = bpf_send_signal(sig);
-		if (ret == 0)
-			status = 1;
+		status = (ret == 0) ? 1 : 2;
 	}
 
 	return 0;

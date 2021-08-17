@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 #include <test_progs.h>
+#include <sys/time.h>
+#include <sys/resource.h>
 #include "test_send_signal_kern.skel.h"
 
 int sigusr1_received = 0;
@@ -10,7 +12,7 @@ static void sigusr1_handler(int signum)
 }
 
 static void test_send_signal_common(struct perf_event_attr *attr,
-				    bool signal_thread)
+				    bool signal_thread, bool allow_skip)
 {
 	struct test_send_signal_kern *skel;
 	int pipe_c2p[2], pipe_p2c[2];
@@ -37,11 +39,22 @@ static void test_send_signal_common(struct perf_event_attr *attr,
 	}
 
 	if (pid == 0) {
+		int old_prio;
+
 		/* install signal handler and notify parent */
 		signal(SIGUSR1, sigusr1_handler);
 
 		close(pipe_c2p[0]); /* close read */
 		close(pipe_p2c[1]); /* close write */
+
+		/* boost with a high priority so we got a higher chance
+		 * that if an interrupt happens, the underlying task
+		 * is this process.
+		 */
+		errno = 0;
+		old_prio = getpriority(PRIO_PROCESS, 0);
+		ASSERT_OK(errno, "getpriority");
+		ASSERT_OK(setpriority(PRIO_PROCESS, 0, -20), "setpriority");
 
 		/* notify parent signal handler is installed */
 		ASSERT_EQ(write(pipe_c2p[1], buf, 1), 1, "pipe_write");
@@ -57,6 +70,9 @@ static void test_send_signal_common(struct perf_event_attr *attr,
 
 		/* wait for parent notification and exit */
 		ASSERT_EQ(read(pipe_p2c[0], buf, 1), 1, "pipe_read");
+
+		/* restore the old priority */
+		ASSERT_OK(setpriority(PRIO_PROCESS, 0, old_prio), "setpriority");
 
 		close(pipe_c2p[1]);
 		close(pipe_p2c[0]);
@@ -110,10 +126,15 @@ static void test_send_signal_common(struct perf_event_attr *attr,
 		goto disable_pmu;
 	}
 
-	ASSERT_EQ(buf[0], '2', "incorrect result");
-
 	/* notify child safe to exit */
 	ASSERT_EQ(write(pipe_p2c[1], buf, 1), 1, "pipe_write");
+
+	if (skel->bss->status == 0 && allow_skip) {
+		printf("%s:SKIP\n", __func__);
+		test__skip();
+	} else if (skel->bss->status != 1) {
+		ASSERT_EQ(buf[0], '2', "incorrect result");
+	}
 
 disable_pmu:
 	close(pmu_fd);
@@ -127,7 +148,7 @@ skel_open_load_failure:
 
 static void test_send_signal_tracepoint(bool signal_thread)
 {
-	test_send_signal_common(NULL, signal_thread);
+	test_send_signal_common(NULL, signal_thread, false);
 }
 
 static void test_send_signal_perf(bool signal_thread)
@@ -138,7 +159,7 @@ static void test_send_signal_perf(bool signal_thread)
 		.config = PERF_COUNT_SW_CPU_CLOCK,
 	};
 
-	test_send_signal_common(&attr, signal_thread);
+	test_send_signal_common(&attr, signal_thread, true);
 }
 
 static void test_send_signal_nmi(bool signal_thread)
@@ -167,7 +188,7 @@ static void test_send_signal_nmi(bool signal_thread)
 		close(pmu_fd);
 	}
 
-	test_send_signal_common(&attr, signal_thread);
+	test_send_signal_common(&attr, signal_thread, true);
 }
 
 void test_send_signal(void)
