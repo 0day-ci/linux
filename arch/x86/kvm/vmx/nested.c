@@ -1262,6 +1262,34 @@ vmx_restore_control_msr(struct vcpu_vmx *vmx, u32 msr_index, u64 data)
 
 	*lowp = data;
 	*highp = data >> 32;
+
+	switch (msr_index) {
+	case MSR_IA32_VMX_TRUE_PINBASED_CTLS:
+		vmcs12_field_update_by_pinbased_ctrl(*highp,
+				data >> 32,
+				vmx->nested.vmcs12_field_existence_bitmap);
+		break;
+	case MSR_IA32_VMX_TRUE_PROCBASED_CTLS:
+		vmcs12_field_update_by_procbased_ctrl(*highp,
+				data >> 32,
+				vmx->nested.vmcs12_field_existence_bitmap);
+		break;
+	case MSR_IA32_VMX_PROCBASED_CTLS2:
+		vmcs12_field_update_by_procbased_ctrl2(*highp,
+				data >> 32,
+				vmx->nested.vmcs12_field_existence_bitmap);
+		break;
+	case MSR_IA32_VMX_TRUE_EXIT_CTLS:
+		vmcs12_field_update_by_vmexit_ctrl(vmx->nested.msrs.entry_ctls_high,
+				*highp, data >> 32,
+				vmx->nested.vmcs12_field_existence_bitmap);
+		break;
+	case MSR_IA32_VMX_TRUE_ENTRY_CTLS:
+		vmcs12_field_update_by_vmentry_ctrl(vmx->nested.msrs.exit_ctls_high,
+				*highp, data >> 32,
+				vmx->nested.vmcs12_field_existence_bitmap);
+		break;
+	}
 	return 0;
 }
 
@@ -1403,6 +1431,8 @@ int vmx_set_vmx_msr(struct kvm_vcpu *vcpu, u32 msr_index, u64 data)
 	case MSR_IA32_VMX_VMFUNC:
 		if (data & ~vmx->nested.msrs.vmfunc_controls)
 			return -EINVAL;
+		vmcs12_field_update_by_vm_func(vmx->nested.msrs.vmfunc_controls,
+				data, vmx->nested.vmcs12_field_existence_bitmap);
 		vmx->nested.msrs.vmfunc_controls = data;
 		return 0;
 	default:
