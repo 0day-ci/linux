@@ -19569,6 +19569,8 @@ F:	drivers/staging/media/vxd/common/img_mem_man.h
 F:	drivers/staging/media/vxd/common/img_mem_unified.c
 F:	drivers/staging/media/vxd/common/imgmmu.c
 F:	drivers/staging/media/vxd/common/imgmmu.h
+F:	drivers/staging/media/vxd/decoder/hw_control.c
+F:	drivers/staging/media/vxd/decoder/hw_control.h
 F:	drivers/staging/media/vxd/decoder/img_dec_common.h
 F:	drivers/staging/media/vxd/decoder/vxd_core.c
 F:	drivers/staging/media/vxd/decoder/vxd_dec.c
