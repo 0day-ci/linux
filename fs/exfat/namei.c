@@ -65,11 +65,14 @@ static int exfat_d_revalidate(struct dentry *dentry, unsigned int flags)
 	return ret;
 }
 
-/* returns the length of a struct qstr, ignoring trailing dots */
-static unsigned int exfat_striptail_len(unsigned int len, const char *name)
+/* returns the length of a struct qstr, possibly ignoring trailing dots */
+static unsigned int exfat_striptail_len(struct super_block *sb,
+					unsigned int len, const char *name)
 {
-	while (len && name[len - 1] == '.')
-		len--;
+	if (!EXFAT_SB(sb)->options.keeptail) {
+		while (len && name[len - 1] == '.')
+			len--;
+	}
 	return len;
 }
 
@@ -83,7 +86,7 @@ static int exfat_d_hash(const struct dentry *dentry, struct qstr *qstr)
 	struct super_block *sb = dentry->d_sb;
 	struct nls_table *t = EXFAT_SB(sb)->nls_io;
 	const unsigned char *name = qstr->name;
-	unsigned int len = exfat_striptail_len(qstr->len, qstr->name);
+	unsigned int len = exfat_striptail_len(sb, qstr->len, qstr->name);
 	unsigned long hash = init_name_hash(dentry);
 	int i, charlen;
 	wchar_t c;
@@ -104,8 +107,8 @@ static int exfat_d_cmp(const struct dentry *dentry, unsigned int len,
 {
 	struct super_block *sb = dentry->d_sb;
 	struct nls_table *t = EXFAT_SB(sb)->nls_io;
-	unsigned int alen = exfat_striptail_len(name->len, name->name);
-	unsigned int blen = exfat_striptail_len(len, str);
+	unsigned int alen = exfat_striptail_len(sb, name->len, name->name);
+	unsigned int blen = exfat_striptail_len(sb, len, str);
 	wchar_t c1, c2;
 	int charlen, i;
 
@@ -136,7 +139,7 @@ static int exfat_utf8_d_hash(const struct dentry *dentry, struct qstr *qstr)
 {
 	struct super_block *sb = dentry->d_sb;
 	const unsigned char *name = qstr->name;
-	unsigned int len = exfat_striptail_len(qstr->len, qstr->name);
+	unsigned int len = exfat_striptail_len(sb, qstr->len, qstr->name);
 	unsigned long hash = init_name_hash(dentry);
 	int i, charlen;
 	unicode_t u;
@@ -161,8 +164,8 @@ static int exfat_utf8_d_cmp(const struct dentry *dentry, unsigned int len,
 		const char *str, const struct qstr *name)
 {
 	struct super_block *sb = dentry->d_sb;
-	unsigned int alen = exfat_striptail_len(name->len, name->name);
-	unsigned int blen = exfat_striptail_len(len, str);
+	unsigned int alen = exfat_striptail_len(sb, name->len, name->name);
+	unsigned int blen = exfat_striptail_len(sb, len, str);
 	unicode_t u_a, u_b;
 	int charlen, i;
 
@@ -419,7 +422,7 @@ static int __exfat_resolve_path(struct inode *inode, const unsigned char *path,
 	struct exfat_inode_info *ei = EXFAT_I(inode);
 
 	/* strip all trailing periods */
-	namelen = exfat_striptail_len(strlen(path), path);
+	namelen = exfat_striptail_len(sb, strlen(path), path);
 	if (!namelen)
 		return -ENOENT;
 
