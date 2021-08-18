@@ -6,6 +6,12 @@
 
 #define ocelot_to_felix(o)		container_of((o), struct felix, ocelot)
 
+struct felix_psfp_list {
+	struct list_head stream_list;
+	struct list_head sfi_list;
+	struct list_head sgi_list;
+};
+
 /* Platform-specific information */
 struct felix_info {
 	const struct resource		*target_io_res;
@@ -35,6 +41,8 @@ struct felix_info {
 	 * with the RX timestamp.
 	 */
 	bool				quirk_no_xtr_irq;
+
+	struct felix_psfp_list		*psfp;
 
 	int	(*mdio_bus_alloc)(struct ocelot *ocelot);
 	void	(*mdio_bus_free)(struct ocelot *ocelot);
