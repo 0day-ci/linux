@@ -55,3 +55,9 @@ run_qemu_empty() {
   detect_debug "$1"
   $run -drive index=0,if=floppy
 }
+
+run_qemu_rdonly_fat() {
+  detect_debug "$2"
+  $run -drive file=fat:floppy:"$1",index=0,if=floppy,readonly
+}
+

@@ -1,5 +1,7 @@
 init
 cpio_list
 initrd
+testdir/
 
 empty
+rdonly
