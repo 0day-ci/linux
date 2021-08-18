@@ -600,10 +600,12 @@ static inline struct rdma_hw_stats *rdma_alloc_hw_stats_struct(
 
 /**
  * struct rdma_op_counter
+ * @type - The vendor-specific type of the counter
  * @name - The name of the counter
  * @value - The value of the counter
  */
 struct rdma_op_counter {
+	int type;
 	const char *name;
 	u64 value;
 };
