@@ -142,12 +142,15 @@ fail:
  * inode->i_mutex: don't care
  */
 struct posix_acl *
-ext4_get_acl(struct inode *inode, int type)
+ext4_get_acl(struct inode *inode, int type, int flags)
 {
 	int name_index;
 	char *value = NULL;
 	struct posix_acl *acl;
 	int retval;
+
+	if (flags)
+		return ERR_PTR(-EINVAL);
 
 	switch (type) {
 	case ACL_TYPE_ACCESS:

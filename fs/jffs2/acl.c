@@ -173,11 +173,14 @@ static void *jffs2_acl_to_medium(const struct posix_acl *acl, size_t *size)
 	return ERR_PTR(-EINVAL);
 }
 
-struct posix_acl *jffs2_get_acl(struct inode *inode, int type)
+struct posix_acl *jffs2_get_acl(struct inode *inode, int type, int flags)
 {
 	struct posix_acl *acl;
 	char *value = NULL;
 	int rc, xprefix;
+
+	if (flags)
+		return ERR_PTR(-EINVAL);
 
 	switch (type) {
 	case ACL_TYPE_ACCESS:

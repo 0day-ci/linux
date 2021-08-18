@@ -196,8 +196,11 @@ static struct posix_acl *__f2fs_get_acl(struct inode *inode, int type,
 	return acl;
 }
 
-struct posix_acl *f2fs_get_acl(struct inode *inode, int type)
+struct posix_acl *f2fs_get_acl(struct inode *inode, int type, int flags)
 {
+	if (flags)
+		return ERR_PTR(-EINVAL);
+
 	return __f2fs_get_acl(inode, type, NULL);
 }
 

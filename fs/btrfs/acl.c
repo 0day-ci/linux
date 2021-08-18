@@ -16,12 +16,15 @@
 #include "btrfs_inode.h"
 #include "xattr.h"
 
-struct posix_acl *btrfs_get_acl(struct inode *inode, int type)
+struct posix_acl *btrfs_get_acl(struct inode *inode, int type, int flags)
 {
 	int size;
 	const char *name;
 	char *value = NULL;
 	struct posix_acl *acl;
+
+	if (flags)
+		return ERR_PTR(-EINVAL);
 
 	switch (type) {
 	case ACL_TYPE_ACCESS:
