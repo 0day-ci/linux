@@ -13,6 +13,7 @@
 
 #define TABLE_UPDATE_SLEEP_US 10
 #define TABLE_UPDATE_TIMEOUT_US 100000
+#define OCELOT_RSV_VLAN_RANGE_START 4000
 
 struct ocelot_mact_entry {
 	u8 mac[ETH_ALEN];
@@ -132,6 +133,35 @@ static void ocelot_vcap_enable(struct ocelot *ocelot, int port)
 		       REW_PORT_CFG, port);
 }
 
+static int ocelot_single_vlan_aware_bridge(struct ocelot *ocelot,
+					   struct netlink_ext_ack *extack)
+{
+	struct net_device *bridge = NULL;
+	int port;
+
+	for (port = 0; port < ocelot->num_phys_ports; port++) {
+		struct ocelot_port *ocelot_port = ocelot->ports[port];
+
+		if (!ocelot_port || !ocelot_port->bridge ||
+		    !br_vlan_enabled(ocelot_port->bridge))
+			continue;
+
+		if (!bridge) {
+			bridge = ocelot_port->bridge;
+			continue;
+		}
+
+		if (bridge == ocelot_port->bridge)
+			continue;
+
+		NL_SET_ERR_MSG_MOD(extack,
+				   "Only one VLAN-aware bridge is supported");
+		return -EBUSY;
+	}
+
+	return 0;
+}
+
 static inline u32 ocelot_vlant_read_vlanaccess(struct ocelot *ocelot)
 {
 	return ocelot_read(ocelot, ANA_TABLES_VLANACCESS);
@@ -190,6 +220,39 @@ static void ocelot_port_set_native_vlan(struct ocelot *ocelot, int port,
 		       REW_TAG_CFG, port);
 }
 
+int ocelot_bridge_num_find(struct ocelot *ocelot,
+			   const struct net_device *bridge)
+{
+	int port;
+
+	for (port = 0; port < ocelot->num_phys_ports; port++) {
+		struct ocelot_port *ocelot_port = ocelot->ports[port];
+
+		if (ocelot_port && ocelot_port->bridge == bridge)
+			return ocelot_port->bridge_num;
+	}
+
+	return -1;
+}
+EXPORT_SYMBOL_GPL(ocelot_bridge_num_find);
+
+static u16 ocelot_vlan_unaware_pvid(struct ocelot *ocelot,
+				    const struct net_device *bridge)
+{
+	int bridge_num;
+
+	/* Standalone ports use VID 0 */
+	if (!bridge)
+		return 0;
+
+	bridge_num = ocelot_bridge_num_find(ocelot, bridge);
+	if (WARN_ON(bridge_num < 0))
+		return 0;
+
+	/* VLAN-unaware bridges use a reserved VID going from 4095 downwards */
+	return VLAN_N_VID - bridge_num - 1;
+}
+
 /* Default vlan to clasify for untagged frames (may be zero) */
 static void ocelot_port_set_pvid(struct ocelot *ocelot, int port,
 				 struct ocelot_vlan pvid_vlan)
@@ -200,7 +263,8 @@ static void ocelot_port_set_pvid(struct ocelot *ocelot, int port,
 	ocelot_port->pvid_vlan = pvid_vlan;
 
 	if (!ocelot_port->vlan_aware)
-		pvid_vlan.vid = 0;
+		pvid_vlan.vid = ocelot_vlan_unaware_pvid(ocelot,
+							 ocelot_port->bridge);
 
 	ocelot_rmw_gix(ocelot,
 		       ANA_PORT_VLAN_CFG_VLAN_VID(pvid_vlan.vid),
@@ -249,12 +313,29 @@ static int ocelot_vlan_member_del(struct ocelot *ocelot, int port, u16 vid)
 				      vid);
 }
 
+static int ocelot_add_vlan_unaware_pvid(struct ocelot *ocelot, int port,
+					const struct net_device *bridge)
+{
+	u16 vid = ocelot_vlan_unaware_pvid(ocelot, bridge);
+
+	return ocelot_vlan_member_add(ocelot, port, vid);
+}
+
+static int ocelot_del_vlan_unaware_pvid(struct ocelot *ocelot, int port,
+					const struct net_device *bridge)
+{
+	u16 vid = ocelot_vlan_unaware_pvid(ocelot, bridge);
+
+	return ocelot_vlan_member_del(ocelot, port, vid);
+}
+
 int ocelot_port_vlan_filtering(struct ocelot *ocelot, int port,
 			       bool vlan_aware, struct netlink_ext_ack *extack)
 {
 	struct ocelot_vcap_block *block = &ocelot->block[VCAP_IS1];
 	struct ocelot_port *ocelot_port = ocelot->ports[port];
 	struct ocelot_vcap_filter *filter;
+	int err;
 	u32 val;
 
 	list_for_each_entry(filter, &block->rules, list) {
@@ -265,6 +346,19 @@ int ocelot_port_vlan_filtering(struct ocelot *ocelot, int port,
 			return -EBUSY;
 		}
 	}
+
+	err = ocelot_single_vlan_aware_bridge(ocelot, extack);
+	if (err)
+		return err;
+
+	if (vlan_aware)
+		err = ocelot_del_vlan_unaware_pvid(ocelot, port,
+						   ocelot_port->bridge);
+	else
+		err = ocelot_add_vlan_unaware_pvid(ocelot, port,
+						   ocelot_port->bridge);
+	if (err)
+		return err;
 
 	ocelot_port->vlan_aware = vlan_aware;
 
@@ -295,6 +389,12 @@ int ocelot_vlan_prepare(struct ocelot *ocelot, int port, u16 vid, bool pvid,
 	    ocelot_port->native_vlan.valid) {
 		NL_SET_ERR_MSG_MOD(extack,
 				   "Port already has a native VLAN");
+		return -EBUSY;
+	}
+
+	if (vid > OCELOT_RSV_VLAN_RANGE_START) {
+		NL_SET_ERR_MSG_MOD(extack,
+				   "VLAN range 4000-4095 reserved for VLAN-unaware bridging");
 		return -EBUSY;
 	}
 
@@ -374,9 +474,9 @@ static void ocelot_vlan_init(struct ocelot *ocelot)
 	for (vid = 1; vid < VLAN_N_VID; vid++)
 		ocelot_vlan_member_set(ocelot, 0, vid);
 
-	/* Because VLAN filtering is enabled, we need VID 0 to get untagged
-	 * traffic.  It is added automatically if 8021q module is loaded, but
-	 * we can't rely on it since module may be not loaded.
+	/* We need VID 0 to get traffic on standalone ports.
+	 * It is added automatically if the 8021q module is loaded, but we
+	 * can't rely on that since it might not be.
 	 */
 	ocelot_vlan_member_set(ocelot, all_ports, 0);
 
@@ -965,21 +1065,27 @@ void ocelot_drain_cpu_queue(struct ocelot *ocelot, int grp)
 }
 EXPORT_SYMBOL(ocelot_drain_cpu_queue);
 
-int ocelot_fdb_add(struct ocelot *ocelot, int port,
-		   const unsigned char *addr, u16 vid)
+int ocelot_fdb_add(struct ocelot *ocelot, int port, const unsigned char *addr,
+		   u16 vid, const struct net_device *bridge)
 {
 	int pgid = port;
 
 	if (port == ocelot->npi)
 		pgid = PGID_CPU;
 
+	if (!vid)
+		vid = ocelot_vlan_unaware_pvid(ocelot, bridge);
+
 	return ocelot_mact_learn(ocelot, pgid, addr, vid, ENTRYTYPE_LOCKED);
 }
 EXPORT_SYMBOL(ocelot_fdb_add);
 
-int ocelot_fdb_del(struct ocelot *ocelot, int port,
-		   const unsigned char *addr, u16 vid)
+int ocelot_fdb_del(struct ocelot *ocelot, int port, const unsigned char *addr,
+		   u16 vid, const struct net_device *bridge)
 {
+	if (!vid)
+		vid = ocelot_vlan_unaware_pvid(ocelot, bridge);
+
 	return ocelot_mact_forget(ocelot, addr, vid);
 }
 EXPORT_SYMBOL(ocelot_fdb_del);
@@ -1097,6 +1203,12 @@ int ocelot_fdb_dump(struct ocelot *ocelot, int port,
 				return ret;
 
 			is_static = (entry.type == ENTRYTYPE_LOCKED);
+
+			/* Hide the reserved VLANs used for
+			 * VLAN-unaware bridging.
+			 */
+			if (entry.vid > OCELOT_RSV_VLAN_RANGE_START)
+				entry.vid = 0;
 
 			ret = cb(entry.mac, entry.vid, is_static, data);
 			if (ret)
@@ -1395,6 +1507,28 @@ void ocelot_apply_bridge_fwd_mask(struct ocelot *ocelot)
 }
 EXPORT_SYMBOL(ocelot_apply_bridge_fwd_mask);
 
+void ocelot_port_set_dsa_8021q_cpu(struct ocelot *ocelot, int port)
+{
+	u16 vid;
+
+	ocelot->ports[port]->is_dsa_8021q_cpu = true;
+
+	for (vid = OCELOT_RSV_VLAN_RANGE_START; vid < VLAN_N_VID; vid++)
+		ocelot_vlan_member_add(ocelot, port, vid);
+}
+EXPORT_SYMBOL_GPL(ocelot_port_set_dsa_8021q_cpu);
+
+void ocelot_port_unset_dsa_8021q_cpu(struct ocelot *ocelot, int port)
+{
+	u16 vid;
+
+	ocelot->ports[port]->is_dsa_8021q_cpu = false;
+
+	for (vid = OCELOT_RSV_VLAN_RANGE_START; vid < VLAN_N_VID; vid++)
+		ocelot_vlan_member_del(ocelot, port, vid);
+}
+EXPORT_SYMBOL_GPL(ocelot_port_unset_dsa_8021q_cpu);
+
 void ocelot_bridge_stp_state_set(struct ocelot *ocelot, int port, u8 state)
 {
 	struct ocelot_port *ocelot_port = ocelot->ports[port];
@@ -1535,7 +1669,8 @@ static void ocelot_encode_ports_to_mdb(unsigned char *addr,
 }
 
 int ocelot_port_mdb_add(struct ocelot *ocelot, int port,
-			const struct switchdev_obj_port_mdb *mdb)
+			const struct switchdev_obj_port_mdb *mdb,
+			const struct net_device *bridge)
 {
 	unsigned char addr[ETH_ALEN];
 	struct ocelot_multicast *mc;
@@ -1544,6 +1679,9 @@ int ocelot_port_mdb_add(struct ocelot *ocelot, int port,
 
 	if (port == ocelot->npi)
 		port = ocelot->num_phys_ports;
+
+	if (!vid)
+		vid = ocelot_vlan_unaware_pvid(ocelot, bridge);
 
 	mc = ocelot_multicast_get(ocelot, mdb->addr, vid);
 	if (!mc) {
@@ -1591,7 +1729,8 @@ int ocelot_port_mdb_add(struct ocelot *ocelot, int port,
 EXPORT_SYMBOL(ocelot_port_mdb_add);
 
 int ocelot_port_mdb_del(struct ocelot *ocelot, int port,
-			const struct switchdev_obj_port_mdb *mdb)
+			const struct switchdev_obj_port_mdb *mdb,
+			const struct net_device *bridge)
 {
 	unsigned char addr[ETH_ALEN];
 	struct ocelot_multicast *mc;
@@ -1600,6 +1739,9 @@ int ocelot_port_mdb_del(struct ocelot *ocelot, int port,
 
 	if (port == ocelot->npi)
 		port = ocelot->num_phys_ports;
+
+	if (!vid)
+		vid = ocelot_vlan_unaware_pvid(ocelot, bridge);
 
 	mc = ocelot_multicast_get(ocelot, mdb->addr, vid);
 	if (!mc)
@@ -1634,14 +1776,26 @@ int ocelot_port_mdb_del(struct ocelot *ocelot, int port,
 }
 EXPORT_SYMBOL(ocelot_port_mdb_del);
 
-void ocelot_port_bridge_join(struct ocelot *ocelot, int port,
-			     struct net_device *bridge)
+int ocelot_port_bridge_join(struct ocelot *ocelot, int port,
+			    struct net_device *bridge, int bridge_num,
+			    struct netlink_ext_ack *extack)
 {
 	struct ocelot_port *ocelot_port = ocelot->ports[port];
+	int err;
+
+	err = ocelot_single_vlan_aware_bridge(ocelot, extack);
+	if (err)
+		return err;
 
 	ocelot_port->bridge = bridge;
+	ocelot_port->bridge_num = bridge_num;
 
 	ocelot_apply_bridge_fwd_mask(ocelot);
+
+	if (br_vlan_enabled(bridge))
+		return 0;
+
+	return ocelot_add_vlan_unaware_pvid(ocelot, port, bridge);
 }
 EXPORT_SYMBOL(ocelot_port_bridge_join);
 
@@ -1651,7 +1805,11 @@ void ocelot_port_bridge_leave(struct ocelot *ocelot, int port,
 	struct ocelot_port *ocelot_port = ocelot->ports[port];
 	struct ocelot_vlan pvid = {0}, native_vlan = {0};
 
+	if (!br_vlan_enabled(bridge))
+		ocelot_del_vlan_unaware_pvid(ocelot, port, bridge);
+
 	ocelot_port->bridge = NULL;
+	ocelot_port->bridge_num = -1;
 
 	ocelot_port_set_pvid(ocelot, port, pvid);
 	ocelot_port_set_native_vlan(ocelot, port, native_vlan);

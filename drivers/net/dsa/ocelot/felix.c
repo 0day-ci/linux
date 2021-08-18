@@ -233,7 +233,7 @@ static int felix_tag_8021q_vlan_del(struct dsa_switch *ds, int port, u16 vid)
  */
 static void felix_8021q_cpu_port_init(struct ocelot *ocelot, int port)
 {
-	ocelot->ports[port]->is_dsa_8021q_cpu = true;
+	ocelot_port_set_dsa_8021q_cpu(ocelot, port);
 	ocelot->npi = -1;
 
 	/* Overwrite PGID_CPU with the non-tagging port */
@@ -245,6 +245,7 @@ static void felix_8021q_cpu_port_init(struct ocelot *ocelot, int port)
 static void felix_8021q_cpu_port_deinit(struct ocelot *ocelot, int port)
 {
 	ocelot->ports[port]->is_dsa_8021q_cpu = false;
+	ocelot_port_unset_dsa_8021q_cpu(ocelot, port);
 
 	/* Restore PGID_CPU */
 	ocelot_write_rix(ocelot, BIT(ocelot->num_phys_ports), ANA_PGID_PGID,
@@ -633,7 +634,7 @@ static int felix_fdb_add(struct dsa_switch *ds, int port,
 {
 	struct ocelot *ocelot = ds->priv;
 
-	return ocelot_fdb_add(ocelot, port, addr, vid);
+	return ocelot_fdb_add(ocelot, port, addr, vid, br);
 }
 
 static int felix_fdb_del(struct dsa_switch *ds, int port,
@@ -642,7 +643,7 @@ static int felix_fdb_del(struct dsa_switch *ds, int port,
 {
 	struct ocelot *ocelot = ds->priv;
 
-	return ocelot_fdb_del(ocelot, port, addr, vid);
+	return ocelot_fdb_del(ocelot, port, addr, vid, br);
 }
 
 static int felix_mdb_add(struct dsa_switch *ds, int port,
@@ -651,7 +652,7 @@ static int felix_mdb_add(struct dsa_switch *ds, int port,
 {
 	struct ocelot *ocelot = ds->priv;
 
-	return ocelot_port_mdb_add(ocelot, port, mdb);
+	return ocelot_port_mdb_add(ocelot, port, mdb, br);
 }
 
 static int felix_mdb_del(struct dsa_switch *ds, int port,
@@ -660,7 +661,7 @@ static int felix_mdb_del(struct dsa_switch *ds, int port,
 {
 	struct ocelot *ocelot = ds->priv;
 
-	return ocelot_port_mdb_del(ocelot, port, mdb);
+	return ocelot_port_mdb_del(ocelot, port, mdb, br);
 }
 
 static void felix_bridge_stp_state_set(struct dsa_switch *ds, int port,
@@ -697,9 +698,7 @@ static int felix_bridge_join(struct dsa_switch *ds, int port,
 {
 	struct ocelot *ocelot = ds->priv;
 
-	ocelot_port_bridge_join(ocelot, port, br);
-
-	return 0;
+	return ocelot_port_bridge_join(ocelot, port, br, bridge_num, extack);
 }
 
 static void felix_bridge_leave(struct dsa_switch *ds, int port,
@@ -1128,6 +1127,7 @@ static int felix_setup(struct dsa_switch *ds)
 
 	ds->mtu_enforcement_ingress = true;
 	ds->assisted_learning_on_cpu_port = true;
+	ds->max_num_bridges = ds->num_ports;
 
 	return 0;
 

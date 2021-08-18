@@ -654,10 +654,11 @@ static int ocelot_port_fdb_add(struct ndmsg *ndm, struct nlattr *tb[],
 			       struct netlink_ext_ack *extack)
 {
 	struct ocelot_port_private *priv = netdev_priv(dev);
-	struct ocelot *ocelot = priv->port.ocelot;
+	struct ocelot_port *ocelot_port = &priv->port;
+	struct ocelot *ocelot = ocelot_port->ocelot;
 	int port = priv->chip_port;
 
-	return ocelot_fdb_add(ocelot, port, addr, vid);
+	return ocelot_fdb_add(ocelot, port, addr, vid, ocelot_port->bridge);
 }
 
 static int ocelot_port_fdb_del(struct ndmsg *ndm, struct nlattr *tb[],
@@ -665,10 +666,11 @@ static int ocelot_port_fdb_del(struct ndmsg *ndm, struct nlattr *tb[],
 			       const unsigned char *addr, u16 vid)
 {
 	struct ocelot_port_private *priv = netdev_priv(dev);
-	struct ocelot *ocelot = priv->port.ocelot;
+	struct ocelot_port *ocelot_port = &priv->port;
+	struct ocelot *ocelot = ocelot_port->ocelot;
 	int port = priv->chip_port;
 
-	return ocelot_fdb_del(ocelot, port, addr, vid);
+	return ocelot_fdb_del(ocelot, port, addr, vid, ocelot_port->bridge);
 }
 
 static int ocelot_port_fdb_dump(struct sk_buff *skb,
@@ -967,7 +969,7 @@ static int ocelot_port_obj_add_mdb(struct net_device *dev,
 	struct ocelot *ocelot = ocelot_port->ocelot;
 	int port = priv->chip_port;
 
-	return ocelot_port_mdb_add(ocelot, port, mdb);
+	return ocelot_port_mdb_add(ocelot, port, mdb, ocelot_port->bridge);
 }
 
 static int ocelot_port_obj_del_mdb(struct net_device *dev,
@@ -978,7 +980,7 @@ static int ocelot_port_obj_del_mdb(struct net_device *dev,
 	struct ocelot *ocelot = ocelot_port->ocelot;
 	int port = priv->chip_port;
 
-	return ocelot_port_mdb_del(ocelot, port, mdb);
+	return ocelot_port_mdb_del(ocelot, port, mdb, ocelot_port->bridge);
 }
 
 static int ocelot_port_obj_mrp_add(struct net_device *dev,
@@ -1152,6 +1154,33 @@ static int ocelot_switchdev_unsync(struct ocelot *ocelot, int port)
 	return 0;
 }
 
+static int ocelot_bridge_num_get(struct ocelot *ocelot,
+				 const struct net_device *bridge_dev)
+{
+	int bridge_num = ocelot_bridge_num_find(ocelot, bridge_dev);
+
+	if (bridge_num < 0) {
+		/* First port that offloads this bridge */
+		bridge_num = find_first_zero_bit(&ocelot->bridges,
+						 ocelot->num_phys_ports);
+
+		set_bit(bridge_num, &ocelot->bridges);
+	}
+
+	return bridge_num;
+}
+
+static void ocelot_bridge_num_put(struct ocelot *ocelot,
+				  const struct net_device *bridge_dev,
+				  int bridge_num)
+{
+	/* Check if the bridge is still in use, otherwise it is time
+	 * to clean it up so we can reuse this bridge_num later.
+	 */
+	if (!ocelot_bridge_num_find(ocelot, bridge_dev))
+		clear_bit(bridge_num, &ocelot->bridges);
+}
+
 static int ocelot_netdevice_bridge_join(struct net_device *dev,
 					struct net_device *brport_dev,
 					struct net_device *bridge,
@@ -1161,9 +1190,14 @@ static int ocelot_netdevice_bridge_join(struct net_device *dev,
 	struct ocelot_port *ocelot_port = &priv->port;
 	struct ocelot *ocelot = ocelot_port->ocelot;
 	int port = priv->chip_port;
-	int err;
+	int bridge_num, err;
 
-	ocelot_port_bridge_join(ocelot, port, bridge);
+	bridge_num = ocelot_bridge_num_get(ocelot, bridge);
+
+	err = ocelot_port_bridge_join(ocelot, port, bridge, bridge_num,
+				      extack);
+	if (err)
+		goto err_join;
 
 	err = switchdev_bridge_port_offload(brport_dev, dev, priv,
 					    &ocelot_switchdev_blocking_nb,
@@ -1182,6 +1216,8 @@ err_switchdev_sync:
 					&ocelot_switchdev_blocking_nb);
 err_switchdev_offload:
 	ocelot_port_bridge_leave(ocelot, port, bridge);
+err_join:
+	ocelot_bridge_num_put(ocelot, bridge, bridge_num);
 	return err;
 }
 
@@ -1201,6 +1237,7 @@ static int ocelot_netdevice_bridge_leave(struct net_device *dev,
 	struct ocelot_port_private *priv = netdev_priv(dev);
 	struct ocelot_port *ocelot_port = &priv->port;
 	struct ocelot *ocelot = ocelot_port->ocelot;
+	int bridge_num = ocelot_port->bridge_num;
 	int port = priv->chip_port;
 	int err;
 
@@ -1209,6 +1246,7 @@ static int ocelot_netdevice_bridge_leave(struct net_device *dev,
 		return err;
 
 	ocelot_port_bridge_leave(ocelot, port, bridge);
+	ocelot_bridge_num_put(ocelot, bridge, bridge_num);
 
 	return 0;
 }

@@ -90,6 +90,9 @@ struct ocelot_multicast {
 	struct ocelot_pgid *pgid;
 };
 
+int ocelot_bridge_num_find(struct ocelot *ocelot,
+			   const struct net_device *bridge);
+
 int ocelot_port_fdb_do_dump(const unsigned char *addr, u16 vid,
 			    bool is_static, void *data);
 int ocelot_mact_learn(struct ocelot *ocelot, int port,
