@@ -9,7 +9,7 @@
 #define RPM_BUS_MASTER_REQ	0x73616d62
 #define RPM_BUS_SLAVE_REQ	0x766c7362
 
-#define QCOM_MAX_LINKS 12
+#define QCOM_MAX_LINKS 34
 
 #define to_qcom_provider(_provider) \
 	container_of(_provider, struct qcom_icc_provider, provider)
@@ -19,11 +19,33 @@
  * @provider: generic interconnect provider
  * @bus_clks: the clk_bulk_data table of bus clocks
  * @num_clks: the total number of clk_bulk_data entries
+ * @is_bimc_node: indicates whether to use bimc specific setting
+ * @regmap: regmap for QoS registers read/write access
  */
 struct qcom_icc_provider {
 	struct icc_provider provider;
 	int num_clks;
+	bool is_bimc_node;
+	struct regmap *regmap;
 	struct clk_bulk_data bus_clks[];
+};
+
+/**
+ * struct qcom_icc_qos - Qualcomm specific interconnect QoS parameters
+ * @areq_prio: node requests priority
+ * @prio_level: priority level for bus communication
+ * @limit_commands: activate/deactivate limiter mode during runtime
+ * @ap_owned: indicates if the node is owned by the AP or by the RPM
+ * @qos_mode: default qos mode for this node
+ * @qos_port: qos port number for finding qos registers of this node
+ */
+struct qcom_icc_qos {
+	u32 areq_prio;
+	u32 prio_level;
+	bool limit_commands;
+	bool ap_owned;
+	int qos_mode;
+	int qos_port;
 };
 
 /**
@@ -35,6 +57,7 @@ struct qcom_icc_provider {
  * @buswidth: width of the interconnect between a node and the bus (bytes)
  * @mas_rpm_id:	RPM id for devices that are bus masters
  * @slv_rpm_id:	RPM id for devices that are bus slaves
+ * @qos: NoC QoS setting parameters
  * @rate: current bus clock rate in Hz
  */
 struct qcom_icc_node {
@@ -45,12 +68,16 @@ struct qcom_icc_node {
 	u16 buswidth;
 	int mas_rpm_id;
 	int slv_rpm_id;
+	struct qcom_icc_qos qos;
 	u64 rate;
 };
 
 struct qcom_icc_desc {
 	struct qcom_icc_node **nodes;
 	size_t num_nodes;
+	bool is_bimc_node;
+	bool has_iface_clk;
+	const struct regmap_config *regmap_cfg;
 };
 
 #define DEFINE_QNODE(_name, _id, _buswidth, _mas_rpm_id, _slv_rpm_id,	\
@@ -61,10 +88,36 @@ struct qcom_icc_desc {
 		.buswidth = _buswidth,					\
 		.mas_rpm_id = _mas_rpm_id,				\
 		.slv_rpm_id = _slv_rpm_id,				\
+		.qos.ap_owned = false,					\
+		.qos.qos_mode = -1,					\
+		.qos.areq_prio = 0,					\
+		.qos.prio_level = 01,					\
+		.qos.qos_port = -1,					\
 		.num_links = ARRAY_SIZE(((int[]){ __VA_ARGS__ })),	\
 		.links = { __VA_ARGS__ },				\
 	}
 
+#define DEFINE_QNODE_AP(_name, _id, _buswidth, _mas_rpm_id, _slv_rpm_id, \
+		     _qos_mode, _qos_prio, _qos_port, ...)		\
+		static struct qcom_icc_node _name = {			\
+		.name = #_name,						\
+		.id = _id,						\
+		.buswidth = _buswidth,					\
+		.mas_rpm_id = _mas_rpm_id,				\
+		.slv_rpm_id = _slv_rpm_id,				\
+		.qos.ap_owned = true,					\
+		.qos.qos_mode = _qos_mode,				\
+		.qos.areq_prio = _qos_prio,				\
+		.qos.prio_level = _qos_prio,				\
+		.qos.qos_port = _qos_port,				\
+		.num_links = ARRAY_SIZE(((int[]){ __VA_ARGS__ })),	\
+		.links = { __VA_ARGS__ },				\
+	}
+
+/* Valid for both NoC and BIMC */
+#define NOC_QOS_MODE_FIXED		0x0
+#define NOC_QOS_MODE_LIMITER		0x1
+#define NOC_QOS_MODE_BYPASS		0x2
 
 int qnoc_probe(struct platform_device *pdev);
 int qnoc_remove(struct platform_device *pdev);
