@@ -215,6 +215,15 @@ static struct ctl_table ipv6_table_template[] = {
 		.proc_handler	= proc_doulongvec_minmax,
 		.extra2		= &ioam6_id_wide_max,
 	},
+#if defined(CONFIG_IPV6_MROUTE_MULTIPLE_TABLES) && defined(CONFIG_PROC_FS)
+	{
+		.procname	= "ip6_mr_table_id",
+		.data		= &init_net.ipv6.sysctl_ip6_mr_table_id,
+		.maxlen		= sizeof(init_net.ipv6.sysctl_ip6_mr_table_id),
+		.mode		= 0644,
+		.proc_handler	= proc_douintvec,
+	},
+#endif
 	{ }
 };
 

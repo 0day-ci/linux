@@ -207,6 +207,9 @@ struct netns_ipv4 {
 #else
 	struct list_head	mr_tables;
 	struct fib_rules_ops	*mr_rules_ops;
+#ifdef CONFIG_PROC_FS
+	u32 sysctl_ip_mr_table_id;
+#endif
 #endif
 #endif
 #ifdef CONFIG_IP_ROUTE_MULTIPATH

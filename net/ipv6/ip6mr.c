@@ -408,8 +408,13 @@ static void *ip6mr_vif_seq_start(struct seq_file *seq, loff_t *pos)
 	struct mr_vif_iter *iter = seq->private;
 	struct net *net = seq_file_net(seq);
 	struct mr_table *mrt;
+#ifdef CONFIG_IPV6_MROUTE_MULTIPLE_TABLES
+	u32 mr_table_id = net->ipv6.sysctl_ip6_mr_table_id;
+#else
+	u32 mr_table_id = RT6_TABLE_DFLT;
+#endif
 
-	mrt = ip6mr_get_table(net, RT6_TABLE_DFLT);
+	mrt = ip6mr_get_table(net, mr_table_id);
 	if (!mrt)
 		return ERR_PTR(-ENOENT);
 
@@ -458,8 +463,13 @@ static void *ipmr_mfc_seq_start(struct seq_file *seq, loff_t *pos)
 {
 	struct net *net = seq_file_net(seq);
 	struct mr_table *mrt;
+#ifdef CONFIG_IPV6_MROUTE_MULTIPLE_TABLES
+	u32 mr_table_id = net->ipv6.sysctl_ip6_mr_table_id;
+#else
+	u32 mr_table_id = RT6_TABLE_DFLT;
+#endif
 
-	mrt = ip6mr_get_table(net, RT6_TABLE_DFLT);
+	mrt = ip6mr_get_table(net, mr_table_id);
 	if (!mrt)
 		return ERR_PTR(-ENOENT);
 

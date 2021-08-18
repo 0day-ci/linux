@@ -99,6 +99,9 @@ struct netns_ipv6 {
 #else
 	struct list_head	mr6_tables;
 	struct fib_rules_ops	*mr6_rules_ops;
+#ifdef CONFIG_PROC_FS
+	u32 sysctl_ip6_mr_table_id;
+#endif
 #endif
 #endif
 	atomic_t		dev_addr_genid;

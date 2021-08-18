@@ -1870,6 +1870,9 @@ static __net_init int inet_init_net(struct net *net)
 
 	net->ipv4.sysctl_fib_notify_on_flag_change = 0;
 
+#if defined(CONFIG_IP_MROUTE_MULTIPLE_TABLES) && defined(CONFIG_PROC_FS)
+	net->ipv4.sysctl_ip_mr_table_id = RT_TABLE_DEFAULT;
+#endif
 	return 0;
 }
 

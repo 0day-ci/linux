@@ -2896,8 +2896,13 @@ static void *ipmr_vif_seq_start(struct seq_file *seq, loff_t *pos)
 	struct mr_vif_iter *iter = seq->private;
 	struct net *net = seq_file_net(seq);
 	struct mr_table *mrt;
+#ifdef CONFIG_IP_MROUTE_MULTIPLE_TABLES
+	u32 mr_table_id = net->ipv4.sysctl_ip_mr_table_id;
+#else
+	u32 mr_table_id = RT_TABLE_DEFAULT;
+#endif
 
-	mrt = ipmr_get_table(net, RT_TABLE_DEFAULT);
+	mrt = ipmr_get_table(net, mr_table_id);
 	if (!mrt)
 		return ERR_PTR(-ENOENT);
 
@@ -2947,8 +2952,13 @@ static void *ipmr_mfc_seq_start(struct seq_file *seq, loff_t *pos)
 {
 	struct net *net = seq_file_net(seq);
 	struct mr_table *mrt;
+#ifdef CONFIG_IP_MROUTE_MULTIPLE_TABLES
+	u32 mr_table_id = net->ipv4.sysctl_ip_mr_table_id;
+#else
+	u32 mr_table_id = RT_TABLE_DEFAULT;
+#endif
 
-	mrt = ipmr_get_table(net, RT_TABLE_DEFAULT);
+	mrt = ipmr_get_table(net, mr_table_id);
 	if (!mrt)
 		return ERR_PTR(-ENOENT);
 

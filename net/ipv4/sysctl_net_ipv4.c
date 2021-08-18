@@ -1406,6 +1406,15 @@ static struct ctl_table ipv4_net_table[] = {
 		.extra1		= SYSCTL_ZERO,
 		.extra2		= &two,
 	},
+#if defined(CONFIG_IP_MROUTE_MULTIPLE_TABLES) && defined(CONFIG_PROC_FS)
+	{
+		.procname	= "ip_mr_table_id",
+		.data		= &init_net.ipv4.sysctl_ip_mr_table_id,
+		.maxlen		= sizeof(init_net.ipv4.sysctl_ip_mr_table_id),
+		.mode		= 0644,
+		.proc_handler	= proc_douintvec,
+	},
+#endif
 	{ }
 };
 

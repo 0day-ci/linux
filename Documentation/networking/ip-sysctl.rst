@@ -1382,6 +1382,13 @@ mc_forwarding - BOOLEAN
 	conf/all/mc_forwarding must also be set to TRUE to enable multicast
 	routing	for the interface
 
+ip_mr_table_id - UNSIGNED INTEGER
+	Only valid for kernels built with CONFIG_IP_MROUTE_MULTIPLE_TABLES and
+	CONFIG_PROC_FS enabled. It is used to set the multicast routing table id
+	to display in /proc/net/ip_mr_cache and /proc/net/ip_mr_vif
+
+	Default: 253 (RT_TABLE_DEFAULT)
+
 medium_id - INTEGER
 	Integer value used to differentiate the devices by the medium they
 	are attached to. Two devices can have different id values when
@@ -2191,6 +2198,13 @@ mtu - INTEGER
 	Default Maximum Transfer Unit
 
 	Default: 1280 (IPv6 required minimum)
+
+ip6_mr_table_id - UNSIGNED INTEGER
+	Only valid for kernels built with CONFIG_IPV6_MROUTE_MULTIPLE_TABLES and
+	CONFIG_PROC_FS enabled. It is used to set the multicast routing table id
+	to display in /proc/net/ip6_mr_cache and /proc/net/ip6_mr_vif
+
+	Default: 254 (RT6_TABLE_DFLT)
 
 ip_nonlocal_bind - BOOLEAN
 	If set, allows processes to bind() to non-local IPv6 addresses,

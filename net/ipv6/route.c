@@ -6470,6 +6470,9 @@ static int __net_init ip6_route_net_init(struct net *net)
 
 	net->ipv6.ip6_rt_gc_expire = 30*HZ;
 
+#if defined(CONFIG_IPV6_MROUTE_MULTIPLE_TABLES) && defined(CONFIG_PROC_FS)
+	net->ipv6.sysctl_ip6_mr_table_id = RT6_TABLE_DFLT;
+#endif
 	ret = 0;
 out:
 	return ret;
