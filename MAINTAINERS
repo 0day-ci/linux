@@ -19569,6 +19569,10 @@ F:	drivers/staging/media/vxd/common/img_mem_man.h
 F:	drivers/staging/media/vxd/common/img_mem_unified.c
 F:	drivers/staging/media/vxd/common/imgmmu.c
 F:	drivers/staging/media/vxd/common/imgmmu.h
+F:	drivers/staging/media/vxd/decoder/img_dec_common.h
+F:	drivers/staging/media/vxd/decoder/vxd_pvdec.c
+F:	drivers/staging/media/vxd/decoder/vxd_pvdec_priv.h
+F:	drivers/staging/media/vxd/decoder/vxd_pvdec_regs.h
 
 VIDEO I2C POLLING DRIVER
 M:	Matt Ranostay <matt.ranostay@konsulko.com>
