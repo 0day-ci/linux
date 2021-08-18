@@ -2274,6 +2274,8 @@ int pci_enable_atomic_ops_to_root(struct pci_dev *dev, u32 cap_mask);
 #define PCI_VPD_RO_KEYWORD_MFR_ID	"MN"
 #define PCI_VPD_RO_KEYWORD_VENDOR0	"V0"
 #define PCI_VPD_RO_KEYWORD_CHKSUM	"RV"
+#define PCI_VPD_RO_KEYWORD_ECLEVEL	"EC"
+#define PCI_VPD_RO_KEYWORD_EXTCAP	"CP"
 
 /**
  * pci_vpd_lrdt_size - Extracts the Large Resource Data Type length
