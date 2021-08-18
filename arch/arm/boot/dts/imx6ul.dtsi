@@ -891,7 +891,7 @@
 			};
 
 			usdhc1: mmc@2190000 {
-				compatible = "fsl,imx6ul-usdhc", "fsl,imx6sx-usdhc";
+				compatible = "fsl,imx6sx-usdhc";
 				reg = <0x02190000 0x4000>;
 				interrupts = <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>;
 				clocks = <&clks IMX6UL_CLK_USDHC1>,
@@ -905,7 +905,7 @@
 			};
 
 			usdhc2: mmc@2194000 {
-				compatible = "fsl,imx6ul-usdhc", "fsl,imx6sx-usdhc";
+				compatible = "fsl,imx6sx-usdhc";
 				reg = <0x02194000 0x4000>;
 				interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
 				clocks = <&clks IMX6UL_CLK_USDHC2>,
