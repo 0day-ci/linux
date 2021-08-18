@@ -60,6 +60,7 @@ void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu)
 		u32 val = cpuif->vgic_lr[lr];
 		u32 cpuid, intid = val & GICH_LR_VIRTUALID;
 		struct vgic_irq *irq;
+		bool deactivated;
 
 		/* Extract the source vCPU id from the LR */
 		cpuid = val & GICH_LR_PHYSID_CPUID;
@@ -75,7 +76,8 @@ void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu)
 
 		raw_spin_lock(&irq->irq_lock);
 
-		/* Always preserve the active bit */
+		/* Always preserve the active bit, note deactivation */
+		deactivated = irq->active && !(val & GICH_LR_ACTIVE_BIT);
 		irq->active = !!(val & GICH_LR_ACTIVE_BIT);
 
 		if (irq->active && vgic_irq_is_sgi(intid))
@@ -105,6 +107,12 @@ void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu)
 		 * device state could have changed or we simply need to
 		 * process the still pending interrupt later.
 		 *
+		 * We could also have entered the guest with the interrupt
+		 * active+pending. On the next exit, we need to re-evaluate
+		 * the pending state, as it could otherwise result in a
+		 * spurious interrupt by injecting a now potentially stale
+		 * pending state.
+		 *
 		 * If this causes us to lower the level, we have to also clear
 		 * the physical active state, since we will otherwise never be
 		 * told when the interrupt becomes asserted again.
@@ -115,12 +123,15 @@ void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu)
 		if (vgic_irq_is_mapped_level(irq)) {
 			bool resample = false;
 
-			if (val & GICH_LR_PENDING_BIT) {
-				irq->line_level = vgic_get_phys_line_level(irq);
-				resample = !irq->line_level;
-			} else if (vgic_irq_needs_resampling(irq) &&
-				   !(irq->active || irq->pending_latch)) {
-				resample = true;
+			if (unlikely(vgic_irq_needs_resampling(irq))) {
+				if (!(irq->active || irq->pending_latch))
+					resample = true;
+			} else {
+				if ((val & GICH_LR_PENDING_BIT) ||
+				    (deactivated && irq->line_level)) {
+					irq->line_level = vgic_get_phys_line_level(irq);
+					resample = !irq->line_level;
+				}
 			}
 
 			if (resample)
