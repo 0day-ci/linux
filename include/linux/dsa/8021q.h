@@ -30,18 +30,16 @@ int dsa_tag_8021q_register(struct dsa_switch *ds, __be16 proto);
 
 void dsa_tag_8021q_unregister(struct dsa_switch *ds);
 
+int dsa_tag_8021q_bridge_join(struct dsa_switch *ds, int port,
+			      struct net_device *br, int bridge_num);
+
+void dsa_tag_8021q_bridge_leave(struct dsa_switch *ds, int port,
+				struct net_device *br, int bridge_num);
+
 struct sk_buff *dsa_8021q_xmit(struct sk_buff *skb, struct net_device *netdev,
 			       u16 tpid, u16 tci);
 
 void dsa_8021q_rcv(struct sk_buff *skb, int *source_port, int *switch_id);
-
-int dsa_tag_8021q_bridge_tx_fwd_offload(struct dsa_switch *ds, int port,
-					struct net_device *br,
-					int bridge_num);
-
-void dsa_tag_8021q_bridge_tx_fwd_unoffload(struct dsa_switch *ds, int port,
-					   struct net_device *br,
-					   int bridge_num);
 
 u16 dsa_8021q_bridge_tx_fwd_offload_vid(int bridge_num);
 

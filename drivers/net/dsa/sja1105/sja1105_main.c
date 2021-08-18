@@ -1987,13 +1987,24 @@ static void sja1105_bridge_stp_state_set(struct dsa_switch *ds, int port,
 static int sja1105_bridge_join(struct dsa_switch *ds, int port,
 			       struct net_device *br, int bridge_num)
 {
-	return sja1105_bridge_member(ds, port, br, true);
+	int rc;
+
+	rc = dsa_tag_8021q_bridge_join(ds, port, br, bridge_num);
+	if (rc)
+		return rc;
+
+	rc = sja1105_bridge_member(ds, port, br, true);
+	if (rc)
+		dsa_tag_8021q_bridge_leave(ds, port, br, bridge_num);
+
+	return rc;
 }
 
 static void sja1105_bridge_leave(struct dsa_switch *ds, int port,
 				 struct net_device *br, int bridge_num)
 {
 	sja1105_bridge_member(ds, port, br, false);
+	dsa_tag_8021q_bridge_leave(ds, port, br, bridge_num);
 }
 
 #define BYTES_PER_KBIT (1000LL / 8)
@@ -2915,6 +2926,21 @@ static int sja1105_port_bridge_flags(struct dsa_switch *ds, int port,
 	return 0;
 }
 
+static int sja1105_bridge_tx_fwd_offload(struct dsa_switch *ds, int port,
+					 struct net_device *br,
+					 int bridge_num)
+{
+	/* Nothing to do, tag_8021q took care of everything */
+	return 0;
+}
+
+static void sja1105_bridge_tx_fwd_unoffload(struct dsa_switch *ds, int port,
+					    struct net_device *br,
+					    int bridge_num)
+{
+	/* Nothing to do, tag_8021q took care of everything */
+}
+
 static void sja1105_teardown_ports(struct sja1105_private *priv)
 {
 	struct dsa_switch *ds = priv->ds;
@@ -3144,8 +3170,8 @@ const struct dsa_switch_ops sja1105_switch_ops = {
 	.tag_8021q_vlan_add	= sja1105_dsa_8021q_vlan_add,
 	.tag_8021q_vlan_del	= sja1105_dsa_8021q_vlan_del,
 	.port_prechangeupper	= sja1105_prechangeupper,
-	.port_bridge_tx_fwd_offload = dsa_tag_8021q_bridge_tx_fwd_offload,
-	.port_bridge_tx_fwd_unoffload = dsa_tag_8021q_bridge_tx_fwd_unoffload,
+	.port_bridge_tx_fwd_offload = sja1105_bridge_tx_fwd_offload,
+	.port_bridge_tx_fwd_unoffload = sja1105_bridge_tx_fwd_unoffload,
 };
 EXPORT_SYMBOL_GPL(sja1105_switch_ops);
 

@@ -110,7 +110,7 @@ static int dsa_switch_bridge_join(struct dsa_switch *ds,
 			return err;
 	}
 
-	return dsa_tag_8021q_bridge_join(ds, info);
+	return 0;
 }
 
 static int dsa_switch_bridge_leave(struct dsa_switch *ds,
@@ -162,7 +162,7 @@ static int dsa_switch_bridge_leave(struct dsa_switch *ds,
 			return err;
 	}
 
-	return dsa_tag_8021q_bridge_leave(ds, info);
+	return 0;
 }
 
 /* Matches for all upstream-facing ports (the CPU port and all upstream-facing
