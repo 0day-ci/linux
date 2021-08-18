@@ -797,12 +797,35 @@ static int mlx5_ib_remove_op_stat(struct ib_device *device, u32 port, int type)
 	return 0;
 }
 
+static int mlx5_ib_get_op_stats(struct ib_device *device, u32 port,
+				struct rdma_op_stats *stats)
+{
+	struct mlx5_ib_dev *dev = to_mdev(device);
+	struct mlx5_ib_op_fc *opfcs = dev->port[port - 1].cnts.opfcs;
+	u64 packets, bytes;
+	int i, ret, type;
+
+	for (i = 0; i < stats->num_opcounters; i++) {
+		type = stats->opcounters[i].type;
+		if (opfcs[type].fc) {
+			ret = mlx5_fc_query(dev->mdev, opfcs[type].fc,
+					    &packets, &bytes);
+			if (ret)
+				return ret;
+			stats->opcounters[i].value = packets;
+		}
+	}
+
+	return 0;
+}
+
 static const struct ib_device_ops stats_ops = {
 	.alloc_hw_port_stats = mlx5_ib_alloc_hw_port_stats,
 	.alloc_op_port_stats = mlx5_ib_alloc_op_port_stats,
 	.add_op_stat = mlx5_ib_add_op_stat,
 	.remove_op_stat = mlx5_ib_remove_op_stat,
 	.get_hw_stats = mlx5_ib_get_hw_stats,
+	.get_op_stats = mlx5_ib_get_op_stats,
 	.counter_bind_qp = mlx5_ib_counter_bind_qp,
 	.counter_unbind_qp = mlx5_ib_counter_unbind_qp,
 	.counter_dealloc = mlx5_ib_counter_dealloc,
