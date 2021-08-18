@@ -953,7 +953,6 @@ fail_unmap:
 	dma_buf_unmap_attachment(attach, sgt, DMA_BIDIRECTIONAL);
 fail_detach:
 	dma_buf_detach(dma_buf, attach);
-	dma_buf_put(dma_buf);
 
 	return ERR_PTR(ret);
 }
