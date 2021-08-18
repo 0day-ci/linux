@@ -22,7 +22,9 @@
 #include <linux/random.h>
 #include <linux/highmem.h>
 #include <linux/fips.h>
+#ifdef CRYPTO_ARC4
 #include <crypto/arc4.h>
+#endif
 #include <crypto/aead.h>
 
 int __cifs_calc_signature(struct smb_rqst *rqst,
@@ -682,6 +684,13 @@ setup_ntlmv2_rsp_ret:
 	return rc;
 }
 
+#ifndef CRYPTO_ARC4
+int
+calc_seckey(struct cifs_ses *ses)
+{
+	return -ENODEV;
+}
+#else
 int
 calc_seckey(struct cifs_ses *ses)
 {
@@ -712,6 +721,7 @@ calc_seckey(struct cifs_ses *ses)
 	kfree_sensitive(ctx_arc4);
 	return 0;
 }
+#endif
 
 void
 cifs_crypto_secmech_release(struct TCP_Server_Info *server)

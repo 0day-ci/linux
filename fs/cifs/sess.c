@@ -622,9 +622,10 @@ void build_ntlmssp_negotiate_blob(unsigned char *pbuffer,
 		NTLMSSP_NEGOTIATE_SEAL;
 	if (server->sign)
 		flags |= NTLMSSP_NEGOTIATE_SIGN;
+#ifdef CRYPTO_ARC4		
 	if (!server->session_estab || ses->ntlmssp->sesskey_per_smbsess)
 		flags |= NTLMSSP_NEGOTIATE_KEY_XCH;
-
+#endif
 	sec_blob->NegotiateFlags = cpu_to_le32(flags);
 
 	sec_blob->WorkstationName.BufferOffset = 0;
@@ -690,9 +691,10 @@ int build_ntlmssp_auth_blob(unsigned char **pbuffer,
 		NTLMSSP_NEGOTIATE_SEAL;
 	if (ses->server->sign)
 		flags |= NTLMSSP_NEGOTIATE_SIGN;
+#ifdef CRYPTO_ARC4		
 	if (!ses->server->session_estab || ses->ntlmssp->sesskey_per_smbsess)
 		flags |= NTLMSSP_NEGOTIATE_KEY_XCH;
-
+#endif
 	tmp = *pbuffer + sizeof(AUTHENTICATE_MESSAGE);
 	sec_blob->NegotiateFlags = cpu_to_le32(flags);
 
