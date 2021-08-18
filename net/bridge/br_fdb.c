@@ -752,12 +752,28 @@ static int br_fdb_replay_one(struct net_bridge *br, struct notifier_block *nb,
 	return notifier_to_errno(err);
 }
 
+static int br_fdb_queue_one(struct hlist_head *fdb_list,
+			    const struct net_bridge_fdb_entry *fdb)
+{
+	struct net_bridge_fdb_entry *fdb_new;
+
+	fdb_new = kmemdup(fdb, sizeof(*fdb), GFP_ATOMIC);
+	if (!fdb_new)
+		return -ENOMEM;
+
+	hlist_add_head_rcu(&fdb_new->fdb_node, fdb_list);
+
+	return 0;
+}
+
 int br_fdb_replay(const struct net_device *br_dev, const void *ctx, bool adding,
 		  struct notifier_block *nb)
 {
 	struct net_bridge_fdb_entry *fdb;
+	struct hlist_node *tmp;
 	struct net_bridge *br;
 	unsigned long action;
+	HLIST_HEAD(fdb_list);
 	int err = 0;
 
 	if (!nb)
@@ -770,20 +786,34 @@ int br_fdb_replay(const struct net_device *br_dev, const void *ctx, bool adding,
 
 	br = netdev_priv(br_dev);
 
+	rcu_read_lock();
+
+	hlist_for_each_entry_rcu(fdb, &br->fdb_list, fdb_node) {
+		err = br_fdb_queue_one(&fdb_list, fdb);
+		if (err) {
+			rcu_read_unlock();
+			goto out_free_fdb;
+		}
+	}
+
+	rcu_read_unlock();
+
 	if (adding)
 		action = SWITCHDEV_FDB_ADD_TO_DEVICE;
 	else
 		action = SWITCHDEV_FDB_DEL_TO_DEVICE;
 
-	rcu_read_lock();
-
-	hlist_for_each_entry_rcu(fdb, &br->fdb_list, fdb_node) {
+	hlist_for_each_entry(fdb, &fdb_list, fdb_node) {
 		err = br_fdb_replay_one(br, nb, fdb, action, ctx);
 		if (err)
 			break;
 	}
 
-	rcu_read_unlock();
+out_free_fdb:
+	hlist_for_each_entry_safe(fdb, tmp, &fdb_list, fdb_node) {
+		hlist_del_rcu(&fdb->fdb_node);
+		kfree(fdb);
+	}
 
 	return err;
 }
