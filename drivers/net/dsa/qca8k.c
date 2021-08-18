@@ -1505,7 +1505,8 @@ qca8k_port_stp_state_set(struct dsa_switch *ds, int port, u8 state)
 }
 
 static int
-qca8k_port_bridge_join(struct dsa_switch *ds, int port, struct net_device *br)
+qca8k_port_bridge_join(struct dsa_switch *ds, int port, struct net_device *br,
+		       int bridge_num)
 {
 	struct qca8k_priv *priv = (struct qca8k_priv *)ds->priv;
 	int port_mask = BIT(QCA8K_CPU_PORT);
@@ -1534,7 +1535,8 @@ qca8k_port_bridge_join(struct dsa_switch *ds, int port, struct net_device *br)
 }
 
 static void
-qca8k_port_bridge_leave(struct dsa_switch *ds, int port, struct net_device *br)
+qca8k_port_bridge_leave(struct dsa_switch *ds, int port, struct net_device *br,
+			int bridge_num)
 {
 	struct qca8k_priv *priv = (struct qca8k_priv *)ds->priv;
 	int i;

@@ -368,6 +368,8 @@ int dsa_port_bridge_join(struct dsa_port *dp, struct net_device *br,
 	if (err)
 		return err;
 
+	info.bridge_num = dp->bridge_num;
+
 	brport_dev = dsa_port_to_bridge_port(dp);
 
 	err = dsa_broadcast(DSA_NOTIFIER_BRIDGE_JOIN, &info);
@@ -417,6 +419,7 @@ void dsa_port_bridge_leave(struct dsa_port *dp, struct net_device *br)
 		.sw_index = dp->ds->index,
 		.port = dp->index,
 		.br = br,
+		.bridge_num = dp->bridge_num,
 	};
 	int bridge_num = dp->bridge_num;
 	int err;

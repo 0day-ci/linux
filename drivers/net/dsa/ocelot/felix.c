@@ -695,7 +695,7 @@ static int felix_bridge_flags(struct dsa_switch *ds, int port,
 }
 
 static int felix_bridge_join(struct dsa_switch *ds, int port,
-			     struct net_device *br)
+			     struct net_device *br, int bridge_num)
 {
 	struct ocelot *ocelot = ds->priv;
 
@@ -705,7 +705,7 @@ static int felix_bridge_join(struct dsa_switch *ds, int port,
 }
 
 static void felix_bridge_leave(struct dsa_switch *ds, int port,
-			       struct net_device *br)
+			       struct net_device *br, int bridge_num)
 {
 	struct ocelot *ocelot = ds->priv;
 

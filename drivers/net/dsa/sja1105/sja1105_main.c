@@ -1985,13 +1985,13 @@ static void sja1105_bridge_stp_state_set(struct dsa_switch *ds, int port,
 }
 
 static int sja1105_bridge_join(struct dsa_switch *ds, int port,
-			       struct net_device *br)
+			       struct net_device *br, int bridge_num)
 {
 	return sja1105_bridge_member(ds, port, br, true);
 }
 
 static void sja1105_bridge_leave(struct dsa_switch *ds, int port,
-				 struct net_device *br)
+				 struct net_device *br, int bridge_num)
 {
 	sja1105_bridge_member(ds, port, br, false);
 }
