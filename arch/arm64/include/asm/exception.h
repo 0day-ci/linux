@@ -13,7 +13,7 @@
 
 #include <linux/interrupt.h>
 
-#ifdef CONFIG_FUNCTION_GRAPH_TRACER
+#if defined(CONFIG_FUNCTION_GRAPH_TRACER) || defined(CONFIG_STACKDEPOT)
 #define __exception_irq_entry	__irq_entry
 #else
 #define __exception_irq_entry	__kprobes
