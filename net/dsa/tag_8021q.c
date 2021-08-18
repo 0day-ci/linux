@@ -532,7 +532,40 @@ struct sk_buff *dsa_8021q_xmit(struct sk_buff *skb, struct net_device *netdev,
 }
 EXPORT_SYMBOL_GPL(dsa_8021q_xmit);
 
-void dsa_8021q_rcv(struct sk_buff *skb, int *source_port, int *switch_id)
+struct net_device *dsa_tag_8021q_find_port_by_vbid(struct net_device *master,
+						   int vbid)
+{
+	struct dsa_port *cpu_dp = master->dsa_ptr;
+	struct dsa_switch_tree *dst = cpu_dp->dst;
+	struct dsa_port *dp;
+
+	if (WARN_ON(!vbid))
+		return NULL;
+
+	list_for_each_entry(dp, &dst->ports, list) {
+		if (dp->type != DSA_PORT_TYPE_USER)
+			continue;
+
+		if (!dp->bridge_dev)
+			continue;
+
+		if (dp->stp_state != BR_STATE_LEARNING &&
+		    dp->stp_state != BR_STATE_FORWARDING)
+			continue;
+
+		if (dp->cpu_dp != cpu_dp)
+			continue;
+
+		if (dp->bridge_num + 1 == vbid)
+			return dp->slave;
+	}
+
+	return NULL;
+}
+EXPORT_SYMBOL_GPL(dsa_tag_8021q_find_port_by_vbid);
+
+void dsa_8021q_rcv(struct sk_buff *skb, int *source_port, int *switch_id,
+		   int *vbid)
 {
 	u16 vid, tci;
 
@@ -549,6 +582,10 @@ void dsa_8021q_rcv(struct sk_buff *skb, int *source_port, int *switch_id)
 
 	*source_port = dsa_8021q_rx_source_port(vid);
 	*switch_id = dsa_8021q_rx_switch_id(vid);
+
+	if (vbid)
+		*vbid = dsa_tag_8021q_rx_vbid(vid);
+
 	skb->priority = (tci & VLAN_PRIO_MASK) >> VLAN_PRIO_SHIFT;
 }
 EXPORT_SYMBOL_GPL(dsa_8021q_rcv);
