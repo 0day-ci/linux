@@ -2329,7 +2329,7 @@ static int loop_add(int i)
 	lo = kzalloc(sizeof(*lo), GFP_KERNEL);
 	if (!lo)
 		goto out;
-	lo->lo_state = Lo_unbound;
+	lo->lo_state = Lo_new;
 
 	err = mutex_lock_killable(&loop_ctl_mutex);
 	if (err)
@@ -2343,8 +2343,9 @@ static int loop_add(int i)
 	} else {
 		err = idr_alloc(&loop_index_idr, lo, 0, 0, GFP_KERNEL);
 	}
+	mutex_unlock(&loop_ctl_mutex);
 	if (err < 0)
-		goto out_unlock;
+		goto out_free_dev;
 	i = err;
 
 	err = -ENOMEM;
@@ -2414,15 +2415,22 @@ static int loop_add(int i)
 	disk->event_flags	= DISK_EVENT_FLAG_UEVENT;
 	sprintf(disk->disk_name, "loop%d", i);
 	add_disk(disk);
+
+	err = mutex_lock_killable(&loop_ctl_mutex);
+	if (err)
+		goto out_del_gendisk;
+	lo->lo_state = Lo_unbound;
 	mutex_unlock(&loop_ctl_mutex);
+
 	return i;
 
+out_del_gendisk:
+	del_gendisk(lo->lo_disk);
+	blk_cleanup_disk(lo->lo_disk);
 out_cleanup_tags:
 	blk_mq_free_tag_set(&lo->tag_set);
 out_free_idr:
 	idr_remove(&loop_index_idr, i);
-out_unlock:
-	mutex_unlock(&loop_ctl_mutex);
 out_free_dev:
 	kfree(lo);
 out:
