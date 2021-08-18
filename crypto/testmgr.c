@@ -5154,12 +5154,6 @@ static const struct alg_test_desc alg_test_descs[] = {
 			}
 		}
 	}, {
-		.alg = "md4",
-		.test = alg_test_hash,
-		.suite = {
-			.hash = __VECS(md4_tv_template)
-		}
-	}, {
 		.alg = "md5",
 		.test = alg_test_hash,
 		.suite = {

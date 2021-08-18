@@ -780,12 +780,6 @@ config CRYPTO_POLY1305_MIPS
 	depends on MIPS
 	select CRYPTO_ARCH_HAVE_LIB_POLY1305
 
-config CRYPTO_MD4
-	tristate "MD4 digest algorithm"
-	select CRYPTO_HASH
-	help
-	  MD4 message digest algorithm (RFC1320).
-
 config CRYPTO_MD5
 	tristate "MD5 digest algorithm"
 	select CRYPTO_HASH
