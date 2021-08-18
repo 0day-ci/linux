@@ -684,6 +684,7 @@ void bio_put(struct bio *bio)
 	if (bio_flagged(bio, BIO_PERCPU_CACHE)) {
 		struct bio_alloc_cache *cache;
 
+		WARN_ON_ONCE(!in_task());
 		bio_uninit(bio);
 		cache = per_cpu_ptr(bio->bi_pool->cache, get_cpu());
 		bio_list_add_head(&cache->free_list, bio);

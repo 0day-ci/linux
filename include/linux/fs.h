@@ -321,6 +321,8 @@ enum rw_hint {
 #define IOCB_NOIO		(1 << 20)
 /* can use bio alloc cache */
 #define IOCB_ALLOC_CACHE	(1 << 21)
+/* bio ownership (and put) passed back to caller */
+#define IOCB_PUT_CACHE		(1 << 22)
 
 struct kiocb {
 	struct file		*ki_filp;
