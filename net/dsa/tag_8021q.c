@@ -63,12 +63,12 @@
 #define DSA_8021Q_PORT(x)		(((x) << DSA_8021Q_PORT_SHIFT) & \
 						 DSA_8021Q_PORT_MASK)
 
-u16 dsa_8021q_bridge_tx_fwd_offload_vid(int bridge_num)
+u16 dsa_tag_8021q_bridge_vid(int bridge_num)
 {
 	/* The VBID value of 0 is reserved for precise TX */
 	return DSA_8021Q_RSV | DSA_8021Q_VBID(bridge_num + 1);
 }
-EXPORT_SYMBOL_GPL(dsa_8021q_bridge_tx_fwd_offload_vid);
+EXPORT_SYMBOL_GPL(dsa_tag_8021q_bridge_vid);
 
 /* Returns the VID that will be installed as pvid for this switch port, sent as
  * tagged egress towards the CPU port and decoded by the rcv function.
@@ -313,7 +313,7 @@ int dsa_tag_8021q_bridge_join(struct dsa_switch *ds, int port,
 	 * bridging VLAN
 	 */
 	standalone_vid = dsa_tag_8021q_standalone_vid(dp);
-	bridge_vid = dsa_8021q_bridge_tx_fwd_offload_vid(bridge_num);
+	bridge_vid = dsa_tag_8021q_bridge_vid(bridge_num);
 
 	dsa_port_tag_8021q_vlan_del(dp, standalone_vid, false);
 
@@ -338,7 +338,7 @@ void dsa_tag_8021q_bridge_leave(struct dsa_switch *ds, int port,
 	 * standalone VLAN
 	 */
 	standalone_vid = dsa_tag_8021q_standalone_vid(dp);
-	bridge_vid = dsa_8021q_bridge_tx_fwd_offload_vid(bridge_num);
+	bridge_vid = dsa_tag_8021q_bridge_vid(bridge_num);
 
 	dsa_port_tag_8021q_vlan_del(dp, bridge_vid, true);
 
