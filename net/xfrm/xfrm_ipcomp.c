@@ -223,9 +223,9 @@ static void * __percpu *ipcomp_alloc_scratches(void)
 		void *scratch;
 
 		scratch = vmalloc_node(IPCOMP_SCRATCH_SIZE, cpu_to_node(i));
+		*per_cpu_ptr(scratches, i) = scratch;
 		if (!scratch)
 			return NULL;
-		*per_cpu_ptr(scratches, i) = scratch;
 	}
 
 	return scratches;
