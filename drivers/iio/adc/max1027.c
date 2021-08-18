@@ -335,6 +335,8 @@ static int max1027_read_raw(struct iio_dev *indio_dev,
 
 	switch (mask) {
 	case IIO_CHAN_INFO_RAW:
+		if (iio_buffer_enabled(indio_dev))
+			return -EBUSY;
 		ret = max1027_read_single_value(indio_dev, chan, val);
 		break;
 	case IIO_CHAN_INFO_SCALE:
