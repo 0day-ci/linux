@@ -27,8 +27,9 @@ config SW_SYNC
 	  synchronization.  Useful when there is no hardware primitive backing
 	  the synchronization.
 
-	  WARNING: improper use of this can result in deadlocking kernel
-	  drivers from userspace. Intended for test and debug only.
+	  WARNING: improper use of this can result in deadlocking the kernel
+	  memory management from userspace. Intended for test and debug only.
+	  Use at your own risk.
 
 config UDMABUF
 	bool "userspace dmabuf misc driver"

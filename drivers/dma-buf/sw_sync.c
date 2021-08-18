@@ -286,7 +286,8 @@ unlock:
 /*
  * *WARNING*
  *
- * improper use of this can result in deadlocking kernel drivers from userspace.
+ * improper use of this can result in deadlocking kernel memory management
+ * from userspace.
  */
 
 /* opening sw_sync create a new sync obj */
@@ -294,6 +295,8 @@ static int sw_sync_debugfs_open(struct inode *inode, struct file *file)
 {
 	struct sync_timeline *obj;
 	char task_comm[TASK_COMM_LEN];
+
+	add_taint(TAINT_SOFTLOCKUP, LOCKDEP_STILL_OK);
 
 	get_task_comm(task_comm, current);
 
