@@ -19558,6 +19558,13 @@ W:	https://linuxtv.org
 T:	git git://linuxtv.org/media_tree.git
 F:	drivers/media/test-drivers/vicodec/*
 
+VIDEO DECODER DRIVER FOR TI DRA8XX/J721E
+M:	Prashant Amai <prashanth.ka@pathpartnertech.com>
+M:	Sidraya Jayagond <sidraya.bj@pathpartnertech.com>
+L:	linux-media@vger.kernel.org
+S:	Maintained
+F:	Documentation/devicetree/bindings/media/img,d5520-vxd.yaml
+
 VIDEO I2C POLLING DRIVER
 M:	Matt Ranostay <matt.ranostay@konsulko.com>
 L:	linux-media@vger.kernel.org
