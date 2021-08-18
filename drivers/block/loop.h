@@ -87,12 +87,7 @@ struct loop_func_table {
 			struct page *loop_page, unsigned loop_off,
 			int size, sector_t real_block);
 	int (*init)(struct loop_device *, const struct loop_info64 *); 
-	/* release is called from loop_unregister_transfer or clr_fd */
 	void (*release)(struct loop_device *); 
-	struct module *owner;
 }; 
-
-int loop_register_transfer(struct loop_func_table *funcs);
-int loop_unregister_transfer(int number); 
 
 #endif
