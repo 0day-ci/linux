@@ -2807,7 +2807,7 @@ qla1280_64bit_start_scsi(struct scsi_qla_host *ha, struct srb * sp)
 
 	dprintk(2, "start: cmd=%p sp=%p CDB=%xm, handle %lx\n", cmd, sp,
 		cmd->cmnd[0], (long)CMD_HANDLE(sp->cmd));
-	dprintk(2, "             bus %i, target %i, lun %i\n",
+	dprintk(2, "             bus %i, target %i, lun %lld\n",
 		SCSI_BUS_32(cmd), SCSI_TCN_32(cmd), SCSI_LUN_32(cmd));
 	qla1280_dump_buffer(2, cmd->cmnd, MAX_COMMAND_SIZE);
 
@@ -2879,7 +2879,7 @@ qla1280_64bit_start_scsi(struct scsi_qla_host *ha, struct srb * sp)
 			remseg--;
 		}
 		dprintk(5, "qla1280_64bit_start_scsi: Scatter/gather "
-			"command packet data - b %i, t %i, l %i \n",
+			"command packet data - b %i, t %i, l %lld \n",
 			SCSI_BUS_32(cmd), SCSI_TCN_32(cmd),
 			SCSI_LUN_32(cmd));
 		qla1280_dump_buffer(5, (char *)pkt,
@@ -2937,14 +2937,14 @@ qla1280_64bit_start_scsi(struct scsi_qla_host *ha, struct srb * sp)
 			remseg -= cnt;
 			dprintk(5, "qla1280_64bit_start_scsi: "
 				"continuation packet data - b %i, t "
-				"%i, l %i \n", SCSI_BUS_32(cmd),
+				"%i, l %lld \n", SCSI_BUS_32(cmd),
 				SCSI_TCN_32(cmd), SCSI_LUN_32(cmd));
 			qla1280_dump_buffer(5, (char *)pkt,
 					    REQUEST_ENTRY_SIZE);
 		}
 	} else {	/* No data transfer */
 		dprintk(5, "qla1280_64bit_start_scsi: No data, command "
-			"packet data - b %i, t %i, l %i \n",
+			"packet data - b %i, t %i, l %lld \n",
 			SCSI_BUS_32(cmd), SCSI_TCN_32(cmd), SCSI_LUN_32(cmd));
 		qla1280_dump_buffer(5, (char *)pkt, REQUEST_ENTRY_SIZE);
 	}
@@ -3126,7 +3126,7 @@ qla1280_32bit_start_scsi(struct scsi_qla_host *ha, struct srb * sp)
 			*dword_ptr++ =
 				cpu_to_le32(lower_32_bits(sg_dma_address(s)));
 			*dword_ptr++ = cpu_to_le32(sg_dma_len(s));
-			dprintk(3, "S/G Segment phys_addr=0x%lx, len=0x%x\n",
+			dprintk(3, "S/G Segment phys_addr=0x%x, len=0x%x\n",
 				(lower_32_bits(sg_dma_address(s))),
 				(sg_dma_len(s)));
 			remseg--;
@@ -3182,7 +3182,7 @@ qla1280_32bit_start_scsi(struct scsi_qla_host *ha, struct srb * sp)
 			remseg -= cnt;
 			dprintk(5, "qla1280_32bit_start_scsi: "
 				"continuation packet data - "
-				"scsi(%i:%i:%i)\n", SCSI_BUS_32(cmd),
+				"scsi(%i:%i:%lld)\n", SCSI_BUS_32(cmd),
 				SCSI_TCN_32(cmd), SCSI_LUN_32(cmd));
 			qla1280_dump_buffer(5, (char *)pkt,
 					    REQUEST_ENTRY_SIZE);
@@ -3663,7 +3663,7 @@ qla1280_status_entry(struct scsi_qla_host *ha, struct response *pkt,
 
 			dprintk(2, "qla1280_status_entry: Check "
 				"condition Sense data, b %i, t %i, "
-				"l %i\n", SCSI_BUS_32(cmd), SCSI_TCN_32(cmd),
+				"l %lld\n", SCSI_BUS_32(cmd), SCSI_TCN_32(cmd),
 				SCSI_LUN_32(cmd));
 			if (sense_sz)
 				qla1280_dump_buffer(2,
@@ -3963,7 +3963,7 @@ __qla1280_print_scsi_cmd(struct scsi_cmnd *cmd)
 
 	sp = (struct srb *)CMD_SP(cmd);
 	printk("SCSI Command @= 0x%p, Handle=0x%p\n", cmd, CMD_HANDLE(cmd));
-	printk("  chan=%d, target = 0x%02x, lun = 0x%02x, cmd_len = 0x%02x\n",
+	printk("  chan=%d, target = 0x%02x, lun = 0x%02llx, cmd_len = 0x%02x\n",
 	       SCSI_BUS_32(cmd), SCSI_TCN_32(cmd), SCSI_LUN_32(cmd),
 	       CMD_CDBLEN(cmd));
 	printk(" CDB = ");
@@ -3984,29 +3984,6 @@ __qla1280_print_scsi_cmd(struct scsi_cmnd *cmd)
 	printk("  SP=0x%p\n", CMD_SP(cmd));
 	printk(" underflow size = 0x%x, direction=0x%x\n",
 	       cmd->underflow, cmd->sc_data_direction);
-}
-
-/**************************************************************************
- *   ql1280_dump_device
- *
- **************************************************************************/
-static void
-ql1280_dump_device(struct scsi_qla_host *ha)
-{
-
-	struct scsi_cmnd *cp;
-	struct srb *sp;
-	int i;
-
-	printk(KERN_DEBUG "Outstanding Commands on controller:\n");
-
-	for (i = 0; i < MAX_OUTSTANDING_COMMANDS; i++) {
-		if ((sp = ha->outstanding_cmds[i]) == NULL)
-			continue;
-		if ((cp = sp->cmd) == NULL)
-			continue;
-		qla1280_print_scsi_cmd(1, cp);
-	}
 }
 #endif
 
