@@ -5575,6 +5575,8 @@ again:
 					occ = 1;
 					goto again;
 				}
+			} else if (prio_less(max, p, fi_before)) {
+				max = p;
 			}
 		}
 	}
