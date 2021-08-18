@@ -19593,6 +19593,7 @@ F:	drivers/staging/media/vxd/common/rman_api.c
 F:	drivers/staging/media/vxd/common/rman_api.h
 F:	drivers/staging/media/vxd/common/talmmu_api.c
 F:	drivers/staging/media/vxd/common/talmmu_api.h
+F:	drivers/staging/media/vxd/common/vid_buf.h
 F:	drivers/staging/media/vxd/common/work_queue.c
 F:	drivers/staging/media/vxd/common/work_queue.h
 F:	drivers/staging/media/vxd/decoder/Kconfig
@@ -19668,6 +19669,7 @@ F;	drivers/staging/media/vxd/decoder/vxd_props.h
 F:	drivers/staging/media/vxd/decoder/vxd_pvdec.c
 F:	drivers/staging/media/vxd/decoder/vxd_pvdec_priv.h
 F:	drivers/staging/media/vxd/decoder/vxd_pvdec_regs.h
+F:	drivers/staging/media/vxd/decoder/vxd_v4l2.c
 
 VIDEO I2C POLLING DRIVER
 M:	Matt Ranostay <matt.ranostay@konsulko.com>
