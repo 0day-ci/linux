@@ -739,6 +739,7 @@ int dsa_port_fdb_add(struct dsa_port *dp, const unsigned char *addr,
 		.port = dp->index,
 		.addr = addr,
 		.vid = vid,
+		.br = dp->bridge_dev,
 	};
 
 	return dsa_port_notify(dp, DSA_NOTIFIER_FDB_ADD, &info);
@@ -752,7 +753,7 @@ int dsa_port_fdb_del(struct dsa_port *dp, const unsigned char *addr,
 		.port = dp->index,
 		.addr = addr,
 		.vid = vid,
-
+		.br = dp->bridge_dev,
 	};
 
 	return dsa_port_notify(dp, DSA_NOTIFIER_FDB_DEL, &info);
@@ -766,6 +767,7 @@ int dsa_port_host_fdb_add(struct dsa_port *dp, const unsigned char *addr,
 		.port = dp->index,
 		.addr = addr,
 		.vid = vid,
+		.br = dp->bridge_dev,
 	};
 	struct dsa_port *cpu_dp = dp->cpu_dp;
 	int err;
@@ -785,6 +787,7 @@ int dsa_port_host_fdb_del(struct dsa_port *dp, const unsigned char *addr,
 		.port = dp->index,
 		.addr = addr,
 		.vid = vid,
+		.br = dp->bridge_dev,
 	};
 	struct dsa_port *cpu_dp = dp->cpu_dp;
 	int err;
@@ -814,6 +817,7 @@ int dsa_port_mdb_add(const struct dsa_port *dp,
 		.sw_index = dp->ds->index,
 		.port = dp->index,
 		.mdb = mdb,
+		.br = dp->bridge_dev,
 	};
 
 	return dsa_port_notify(dp, DSA_NOTIFIER_MDB_ADD, &info);
@@ -826,6 +830,7 @@ int dsa_port_mdb_del(const struct dsa_port *dp,
 		.sw_index = dp->ds->index,
 		.port = dp->index,
 		.mdb = mdb,
+		.br = dp->bridge_dev,
 	};
 
 	return dsa_port_notify(dp, DSA_NOTIFIER_MDB_DEL, &info);
@@ -838,6 +843,7 @@ int dsa_port_host_mdb_add(const struct dsa_port *dp,
 		.sw_index = dp->ds->index,
 		.port = dp->index,
 		.mdb = mdb,
+		.br = dp->bridge_dev,
 	};
 	struct dsa_port *cpu_dp = dp->cpu_dp;
 	int err;
@@ -856,6 +862,7 @@ int dsa_port_host_mdb_del(const struct dsa_port *dp,
 		.sw_index = dp->ds->index,
 		.port = dp->index,
 		.mdb = mdb,
+		.br = dp->bridge_dev,
 	};
 	struct dsa_port *cpu_dp = dp->cpu_dp;
 	int err;

@@ -305,6 +305,7 @@ struct dsa_link {
 struct dsa_mac_addr {
 	unsigned char addr[ETH_ALEN];
 	u16 vid;
+	const struct net_device *br;
 	refcount_t refcount;
 	struct list_head list;
 };
@@ -731,9 +732,11 @@ struct dsa_switch_ops {
 	 * Forwarding database
 	 */
 	int	(*port_fdb_add)(struct dsa_switch *ds, int port,
-				const unsigned char *addr, u16 vid);
+				const unsigned char *addr, u16 vid,
+				const struct net_device *br);
 	int	(*port_fdb_del)(struct dsa_switch *ds, int port,
-				const unsigned char *addr, u16 vid);
+				const unsigned char *addr, u16 vid,
+				const struct net_device *br);
 	int	(*port_fdb_dump)(struct dsa_switch *ds, int port,
 				 dsa_fdb_dump_cb_t *cb, void *data);
 
@@ -741,9 +744,11 @@ struct dsa_switch_ops {
 	 * Multicast database
 	 */
 	int	(*port_mdb_add)(struct dsa_switch *ds, int port,
-				const struct switchdev_obj_port_mdb *mdb);
+				const struct switchdev_obj_port_mdb *mdb,
+				const struct net_device *br);
 	int	(*port_mdb_del)(struct dsa_switch *ds, int port,
-				const struct switchdev_obj_port_mdb *mdb);
+				const struct switchdev_obj_port_mdb *mdb,
+				const struct net_device *br);
 	/*
 	 * RXNFC
 	 */

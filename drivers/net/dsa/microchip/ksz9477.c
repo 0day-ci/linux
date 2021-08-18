@@ -583,7 +583,8 @@ static int ksz9477_port_vlan_del(struct dsa_switch *ds, int port,
 }
 
 static int ksz9477_port_fdb_add(struct dsa_switch *ds, int port,
-				const unsigned char *addr, u16 vid)
+				const unsigned char *addr, u16 vid,
+				const struct net_device *br)
 {
 	struct ksz_device *dev = ds->priv;
 	u32 alu_table[4];
@@ -640,7 +641,8 @@ exit:
 }
 
 static int ksz9477_port_fdb_del(struct dsa_switch *ds, int port,
-				const unsigned char *addr, u16 vid)
+				const unsigned char *addr, u16 vid,
+				const struct net_device *br)
 {
 	struct ksz_device *dev = ds->priv;
 	u32 alu_table[4];
@@ -782,7 +784,8 @@ exit:
 }
 
 static int ksz9477_port_mdb_add(struct dsa_switch *ds, int port,
-				const struct switchdev_obj_port_mdb *mdb)
+				const struct switchdev_obj_port_mdb *mdb,
+				const struct net_device *br)
 {
 	struct ksz_device *dev = ds->priv;
 	u32 static_table[4];
@@ -857,7 +860,8 @@ exit:
 }
 
 static int ksz9477_port_mdb_del(struct dsa_switch *ds, int port,
-				const struct switchdev_obj_port_mdb *mdb)
+				const struct switchdev_obj_port_mdb *mdb,
+				const struct net_device *br)
 {
 	struct ksz_device *dev = ds->priv;
 	u32 static_table[4];

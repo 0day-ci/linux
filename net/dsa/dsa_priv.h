@@ -66,6 +66,7 @@ struct dsa_notifier_fdb_info {
 	int port;
 	const unsigned char *addr;
 	u16 vid;
+	const struct net_device *br;
 };
 
 /* DSA_NOTIFIER_MDB_* */
@@ -73,6 +74,7 @@ struct dsa_notifier_mdb_info {
 	const struct switchdev_obj_port_mdb *mdb;
 	int sw_index;
 	int port;
+	const struct net_device *br;
 };
 
 /* DSA_NOTIFIER_LAG_* */
