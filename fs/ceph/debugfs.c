@@ -22,6 +22,12 @@
 #include "mds_client.h"
 #include "metric.h"
 
+#define MNT_DEV_SUPPORT_DIR   "dev_support"
+#define MNT_DEV_V2_FILE  "v2"
+
+static struct dentry *ceph_mnt_dev_support_dir;
+static struct dentry *ceph_mnt_dev_v2_file;
+
 static int mdsmap_show(struct seq_file *s, void *p)
 {
 	int i;
@@ -445,6 +451,20 @@ void ceph_fs_debugfs_init(struct ceph_fs_client *fsc)
 						  &status_fops);
 }
 
+void ceph_fs_debugfs_mnt_dev_init(void)
+{
+	ceph_mnt_dev_support_dir = ceph_debugfs_create_subdir(MNT_DEV_SUPPORT_DIR);
+	ceph_mnt_dev_v2_file = debugfs_create_file(MNT_DEV_V2_FILE,
+						   0400,
+						   ceph_mnt_dev_support_dir,
+						   NULL, NULL);
+}
+
+void ceph_fs_debugfs_mnt_dev_cleanup(void)
+{
+	debugfs_remove(ceph_mnt_dev_v2_file);
+	ceph_debugfs_cleanup_subdir(ceph_mnt_dev_support_dir);
+}
 
 #else  /* CONFIG_DEBUG_FS */
 
@@ -453,6 +473,14 @@ void ceph_fs_debugfs_init(struct ceph_fs_client *fsc)
 }
 
 void ceph_fs_debugfs_cleanup(struct ceph_fs_client *fsc)
+{
+}
+
+void ceph_fs_debugfs_mnt_dev_init(void)
+{
+}
+
+void ceph_fs_debugfs_mnt_dev_cleanup(void)
 {
 }
 
