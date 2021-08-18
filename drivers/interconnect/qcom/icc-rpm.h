@@ -20,6 +20,7 @@
  * @bus_clks: the clk_bulk_data table of bus clocks
  * @num_clks: the total number of clk_bulk_data entries
  * @is_bimc_node: indicates whether to use bimc specific setting
+ * @qos_offset: offset to QoS registers
  * @regmap: regmap for QoS registers read/write access
  */
 struct qcom_icc_provider {
@@ -27,6 +28,7 @@ struct qcom_icc_provider {
 	int num_clks;
 	bool is_bimc_node;
 	struct regmap *regmap;
+	unsigned int qos_offset;
 	struct clk_bulk_data bus_clks[];
 };
 
@@ -78,6 +80,7 @@ struct qcom_icc_desc {
 	bool is_bimc_node;
 	bool has_iface_clk;
 	const struct regmap_config *regmap_cfg;
+	unsigned int qos_offset;
 };
 
 #define DEFINE_QNODE(_name, _id, _buswidth, _mas_rpm_id, _slv_rpm_id,	\
