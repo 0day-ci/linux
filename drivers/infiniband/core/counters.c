@@ -106,6 +106,56 @@ static int __rdma_counter_bind_qp(struct rdma_counter *counter,
 	return ret;
 }
 
+static struct rdma_op_counter *get_opcounter(struct rdma_op_stats *opstats,
+					     const char *name)
+{
+	int i;
+
+	for (i = 0; i < opstats->num_opcounters; i++)
+		if (!strcmp(opstats->opcounters[i].name, name))
+			return opstats->opcounters + i;
+
+	return NULL;
+}
+
+static int rdma_opcounter_set(struct ib_device *dev, u32 port,
+			      const char *name, bool is_add)
+{
+	struct rdma_port_counter *port_counter;
+	struct rdma_op_counter *opc;
+	int ret;
+
+	if (!dev->ops.add_op_stat || !dev->ops.remove_op_stat)
+		return -EOPNOTSUPP;
+
+	port_counter = &dev->port_data[port].port_counter;
+	opc = get_opcounter(port_counter->opstats, name);
+	if (!opc)
+		return -EINVAL;
+
+	mutex_lock(&port_counter->opstats->lock);
+	ret = is_add ? dev->ops.add_op_stat(dev, port, opc->type) :
+		dev->ops.remove_op_stat(dev, port, opc->type);
+	if (ret)
+		goto end;
+
+	opc->enabled = is_add;
+end:
+	mutex_unlock(&port_counter->opstats->lock);
+	return ret;
+}
+
+int rdma_opcounter_add(struct ib_device *dev, u32 port, const char *name)
+{
+	return rdma_opcounter_set(dev, port, name, true);
+}
+
+int rdma_opcounter_remove(struct ib_device *dev, u32 port,
+			  const char *name)
+{
+	return rdma_opcounter_set(dev, port, name, false);
+}
+
 static struct rdma_counter *alloc_and_bind(struct ib_device *dev, u32 port,
 					   struct ib_qp *qp,
 					   enum rdma_nl_counter_mode mode)

@@ -63,5 +63,9 @@ int rdma_counter_unbind_qpn(struct ib_device *dev, u32 port,
 int rdma_counter_get_mode(struct ib_device *dev, u32 port,
 			  enum rdma_nl_counter_mode *mode,
 			  enum rdma_nl_counter_mask *mask);
+int rdma_opcounter_add(struct ib_device *dev, u32 port,
+		       const char *name);
+int rdma_opcounter_remove(struct ib_device *dev, u32 port,
+			  const char *name);
 
 #endif /* _RDMA_COUNTER_H_ */

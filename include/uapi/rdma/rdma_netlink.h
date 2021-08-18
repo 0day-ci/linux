@@ -297,6 +297,10 @@ enum rdma_nldev_command {
 
 	RDMA_NLDEV_CMD_RES_SRQ_GET, /* can dump */
 
+	RDMA_NLDEV_CMD_STAT_ADD_OPCOUNTER,
+
+	RDMA_NLDEV_CMD_STAT_REMOVE_OPCOUNTER,
+
 	RDMA_NLDEV_NUM_OPS
 };
 
@@ -548,6 +552,11 @@ enum rdma_nldev_attr {
 	RDMA_NLDEV_ATTR_MAX_RANGE,		/* u32 */
 
 	RDMA_NLDEV_SYS_ATTR_COPY_ON_FORK,	/* u8 */
+
+	RDMA_NLDEV_ATTR_STAT_OPCOUNTERS,	/* nested table */
+	RDMA_NLDEV_ATTR_STAT_OPCOUNTER_ENTRY,	/* nested table */
+	RDMA_NLDEV_ATTR_STAT_OPCOUNTER_ENTRY_NAME,	/* string */
+	RDMA_NLDEV_ATTR_STAT_OPCOUNTER_ENTRY_VALUE,	/* u64 */
 
 	/*
 	 * Always the end

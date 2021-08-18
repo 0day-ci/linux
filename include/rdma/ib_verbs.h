@@ -600,11 +600,14 @@ static inline struct rdma_hw_stats *rdma_alloc_hw_stats_struct(
 
 /**
  * struct rdma_op_counter
+ * @enabled - To indicate if this counter is currently enabled (as optional
+ *    counters can be dynamically enabled/disabled)
  * @type - The vendor-specific type of the counter
  * @name - The name of the counter
  * @value - The value of the counter
  */
 struct rdma_op_counter {
+	bool enabled;
 	int type;
 	const char *name;
 	u64 value;
@@ -2595,6 +2598,10 @@ struct ib_device_ops {
 	struct rdma_op_stats *(*alloc_op_port_stats)(struct ib_device *device,
 						     u32 port_num);
 
+	int (*add_op_stat)(struct ib_device *device, u32 port,
+			   int optional_stat);
+	int (*remove_op_stat)(struct ib_device *device, u32 port,
+			      int optional_stat);
 	/**
 	 * Allows rdma drivers to add their own restrack attributes.
 	 */

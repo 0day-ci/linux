@@ -154,6 +154,11 @@ static const struct nla_policy nldev_policy[RDMA_NLDEV_ATTR_MAX] = {
 	[RDMA_NLDEV_NET_NS_FD]			= { .type = NLA_U32 },
 	[RDMA_NLDEV_SYS_ATTR_NETNS_MODE]	= { .type = NLA_U8 },
 	[RDMA_NLDEV_SYS_ATTR_COPY_ON_FORK]	= { .type = NLA_U8 },
+	[RDMA_NLDEV_ATTR_STAT_OPCOUNTERS]       = { .type = NLA_NESTED },
+	[RDMA_NLDEV_ATTR_STAT_OPCOUNTER_ENTRY]  = { .type = NLA_NESTED },
+	[RDMA_NLDEV_ATTR_STAT_OPCOUNTER_ENTRY_NAME] = { .type = NLA_NUL_STRING,
+				  .len = RDMA_NLDEV_ATTR_OPCOUNTER_NAME_SIZE },
+	[RDMA_NLDEV_ATTR_STAT_OPCOUNTER_ENTRY_VALUE] = { .type = NLA_U64 },
 };
 
 static int put_driver_name_print_type(struct sk_buff *msg, const char *name,
@@ -1888,6 +1893,86 @@ static int nldev_set_sys_set_doit(struct sk_buff *skb, struct nlmsghdr *nlh,
 	return err;
 }
 
+static int nldev_stat_set_op_stat(struct sk_buff *skb,
+				  struct nlmsghdr *nlh,
+				  struct netlink_ext_ack *extack,
+				  bool cmd_add)
+{
+	char opcounter[RDMA_NLDEV_ATTR_OPCOUNTER_NAME_SIZE] = {};
+	struct nlattr *tb[RDMA_NLDEV_ATTR_MAX];
+	struct ib_device *device;
+	struct sk_buff *msg;
+	u32 index, port;
+	int ret;
+
+	ret = nlmsg_parse(nlh, 0, tb, RDMA_NLDEV_ATTR_MAX - 1,
+			  nldev_policy, extack);
+
+	if (ret || !tb[RDMA_NLDEV_ATTR_STAT_OPCOUNTER_ENTRY_NAME] ||
+	    !tb[RDMA_NLDEV_ATTR_DEV_INDEX] ||
+	    !tb[RDMA_NLDEV_ATTR_PORT_INDEX])
+		return -EINVAL;
+
+	index = nla_get_u32(tb[RDMA_NLDEV_ATTR_DEV_INDEX]);
+	device = ib_device_get_by_index(sock_net(skb->sk), index);
+	if (!device)
+		return -EINVAL;
+
+	port = nla_get_u32(tb[RDMA_NLDEV_ATTR_PORT_INDEX]);
+	if (!rdma_is_port_valid(device, port)) {
+		ret = -EINVAL;
+		goto err;
+	}
+
+	nla_strscpy(opcounter, tb[RDMA_NLDEV_ATTR_STAT_OPCOUNTER_ENTRY_NAME],
+		    sizeof(opcounter));
+
+	msg = nlmsg_new(NLMSG_DEFAULT_SIZE, GFP_KERNEL);
+	if (!msg) {
+		ret = -ENOMEM;
+		goto err;
+	}
+
+	nlh = nlmsg_put(msg, NETLINK_CB(skb).portid, nlh->nlmsg_seq,
+			RDMA_NL_GET_TYPE(RDMA_NL_NLDEV,
+					 (cmd_add ?
+					  RDMA_NLDEV_CMD_STAT_ADD_OPCOUNTER :
+					  RDMA_NLDEV_CMD_STAT_REMOVE_OPCOUNTER)),
+			0, 0);
+
+	if (cmd_add)
+		ret = rdma_opcounter_add(device, port, opcounter);
+	else
+		ret = rdma_opcounter_remove(device, port, opcounter);
+	if (ret)
+		goto err_msg;
+
+	nlmsg_end(msg, nlh);
+	ib_device_put(device);
+	return rdma_nl_unicast(sock_net(skb->sk), msg,
+			       NETLINK_CB(skb).portid);
+
+err_msg:
+	nlmsg_free(msg);
+err:
+	ib_device_put(device);
+	return ret;
+}
+
+static int nldev_stat_add_op_stat_doit(struct sk_buff *skb,
+				       struct nlmsghdr *nlh,
+				       struct netlink_ext_ack *extack)
+{
+	return nldev_stat_set_op_stat(skb, nlh, extack, true);
+}
+
+static int nldev_stat_remove_op_stat_doit(struct sk_buff *skb,
+					  struct nlmsghdr *nlh,
+					  struct netlink_ext_ack *extack)
+{
+	return nldev_stat_set_op_stat(skb, nlh, extack, false);
+}
+
 static int nldev_stat_set_doit(struct sk_buff *skb, struct nlmsghdr *nlh,
 			       struct netlink_ext_ack *extack)
 {
@@ -2340,6 +2425,14 @@ static const struct rdma_nl_cbs nldev_cb_table[RDMA_NLDEV_NUM_OPS] = {
 	[RDMA_NLDEV_CMD_RES_MR_GET_RAW] = {
 		.doit = nldev_res_get_mr_raw_doit,
 		.dump = nldev_res_get_mr_raw_dumpit,
+		.flags = RDMA_NL_ADMIN_PERM,
+	},
+	[RDMA_NLDEV_CMD_STAT_ADD_OPCOUNTER] = {
+		.doit = nldev_stat_add_op_stat_doit,
+		.flags = RDMA_NL_ADMIN_PERM,
+	},
+	[RDMA_NLDEV_CMD_STAT_REMOVE_OPCOUNTER] = {
+		.doit = nldev_stat_remove_op_stat_doit,
 		.flags = RDMA_NL_ADMIN_PERM,
 	},
 };
