@@ -16,6 +16,7 @@ export CFLAGS
 SUB_DIRS = alignment		\
 	   benchmarks		\
 	   cache_shape		\
+	   memmoveloop		\
 	   copyloops		\
 	   dscr			\
 	   mm			\
