@@ -903,9 +903,15 @@ int sev_guest_activate(struct sev_data_activate *data, int *error)
 }
 EXPORT_SYMBOL_GPL(sev_guest_activate);
 
-int sev_guest_decommission(struct sev_data_decommission *data, int *error)
+int sev_guest_decommission(unsigned int handle, int *error)
 {
-	return sev_do_cmd(SEV_CMD_DECOMMISSION, data, error);
+	struct sev_data_decommission decommission;
+
+	if (!handle)
+		return -EINVAL;
+
+	decommission.handle = handle;
+	return sev_do_cmd(SEV_CMD_DECOMMISSION, &decommission, error);
 }
 EXPORT_SYMBOL_GPL(sev_guest_decommission);
 
