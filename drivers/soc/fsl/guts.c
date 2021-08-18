@@ -28,7 +28,6 @@ struct fsl_soc_die_attr {
 static struct guts *guts;
 static struct soc_device_attribute soc_dev_attr;
 static struct soc_device *soc_dev;
-static struct device_node *root;
 
 
 /* SoC die attribute definition for QorIQ platform */
@@ -136,14 +135,23 @@ static u32 fsl_guts_get_svr(void)
 	return svr;
 }
 
+static void fsl_guts_put_root(void *data)
+{
+	struct device_node *root = data;
+
+	of_node_put(root);
+}
+
 static int fsl_guts_probe(struct platform_device *pdev)
 {
 	struct device_node *np = pdev->dev.of_node;
 	struct device *dev = &pdev->dev;
+	struct device_node *root;
 	struct resource *res;
 	const struct fsl_soc_die_attr *soc_die;
 	const char *machine;
 	u32 svr;
+	int ret;
 
 	/* Initialize guts */
 	guts = devm_kzalloc(dev, sizeof(*guts), GFP_KERNEL);
@@ -159,6 +167,10 @@ static int fsl_guts_probe(struct platform_device *pdev)
 
 	/* Register soc device */
 	root = of_find_node_by_path("/");
+	ret = devm_add_action_or_reset(dev, fsl_guts_put_root, root);
+	if (ret)
+		return ret;
+
 	if (of_property_read_string(root, "model", &machine))
 		of_property_read_string_index(root, "compatible", 0, &machine);
 	if (machine)
@@ -197,7 +209,7 @@ static int fsl_guts_probe(struct platform_device *pdev)
 static int fsl_guts_remove(struct platform_device *dev)
 {
 	soc_device_unregister(soc_dev);
-	of_node_put(root);
+
 	return 0;
 }
 
