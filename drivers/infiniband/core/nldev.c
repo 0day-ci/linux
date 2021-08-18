@@ -945,6 +945,30 @@ err:
 }
 EXPORT_SYMBOL(rdma_nl_stat_hwcounter_entry);
 
+static int rdma_nl_stat_opcounter_entry(struct sk_buff *msg, const char *name,
+					u64 value)
+{
+	struct nlattr *entry_attr;
+
+	entry_attr = nla_nest_start(msg, RDMA_NLDEV_ATTR_STAT_OPCOUNTER_ENTRY);
+	if (!entry_attr)
+		return -EMSGSIZE;
+
+	if (nla_put_string(msg, RDMA_NLDEV_ATTR_STAT_OPCOUNTER_ENTRY_NAME,
+			   name))
+		goto err;
+	if (nla_put_u64_64bit(msg, RDMA_NLDEV_ATTR_STAT_OPCOUNTER_ENTRY_VALUE,
+			      value, RDMA_NLDEV_ATTR_PAD))
+		goto err;
+
+	nla_nest_end(msg, entry_attr);
+	return 0;
+
+err:
+	nla_nest_cancel(msg, entry_attr);
+	return -EMSGSIZE;
+}
+
 static int fill_stat_mr_entry(struct sk_buff *msg, bool has_cap_net_admin,
 			      struct rdma_restrack_entry *res, uint32_t port)
 {
@@ -2124,15 +2148,52 @@ err:
 	return ret;
 }
 
+static int stat_get_optional_counter(struct sk_buff *msg,
+				     struct ib_device *device, u32 port)
+{
+	struct rdma_op_stats *opstats;
+	struct nlattr *opstats_table;
+	int i, ret = 0;
+
+	opstats = device->port_data[port].port_counter.opstats;
+	if (!opstats)
+		return 0;
+
+	ret = rdma_opcounter_query_stats(opstats, device, port);
+	if (ret)
+		return ret;
+
+	opstats_table = nla_nest_start(msg, RDMA_NLDEV_ATTR_STAT_OPCOUNTERS);
+	if (!opstats_table)
+		return -EMSGSIZE;
+
+	for (i = 0; i < opstats->num_opcounters; i++) {
+		if (!(opstats->opcounters[i].enabled))
+			continue;
+		ret = rdma_nl_stat_opcounter_entry(msg,
+						   opstats->opcounters[i].name,
+						   opstats->opcounters[i].value);
+		if (ret)
+			goto err;
+	}
+	nla_nest_end(msg, opstats_table);
+
+	return 0;
+
+err:
+	nla_nest_cancel(msg, opstats_table);
+	return ret;
+}
+
 static int stat_get_doit_default_counter(struct sk_buff *skb,
 					 struct nlmsghdr *nlh,
 					 struct netlink_ext_ack *extack,
 					 struct nlattr *tb[])
 {
-	struct rdma_hw_stats *stats;
-	struct nlattr *table_attr;
+	struct rdma_hw_stats *hwstats;
+	struct nlattr *hwstats_table;
 	struct ib_device *device;
-	int ret, num_cnts, i;
+	int ret, num_hwstats, i;
 	struct sk_buff *msg;
 	u32 index, port;
 	u64 v;
@@ -2145,14 +2206,19 @@ static int stat_get_doit_default_counter(struct sk_buff *skb,
 	if (!device)
 		return -EINVAL;
 
+	port = nla_get_u32(tb[RDMA_NLDEV_ATTR_PORT_INDEX]);
+	if (!rdma_is_port_valid(device, port)) {
+		ret = -EINVAL;
+		goto err;
+	}
+
 	if (!device->ops.alloc_hw_port_stats || !device->ops.get_hw_stats) {
 		ret = -EINVAL;
 		goto err;
 	}
 
-	port = nla_get_u32(tb[RDMA_NLDEV_ATTR_PORT_INDEX]);
-	stats = ib_get_hw_stats_port(device, port);
-	if (!stats) {
+	hwstats = ib_get_hw_stats_port(device, port);
+	if (!hwstats) {
 		ret = -EINVAL;
 		goto err;
 	}
@@ -2174,38 +2240,43 @@ static int stat_get_doit_default_counter(struct sk_buff *skb,
 		goto err_msg;
 	}
 
-	mutex_lock(&stats->lock);
+	mutex_lock(&hwstats->lock);
 
-	num_cnts = device->ops.get_hw_stats(device, stats, port, 0);
-	if (num_cnts < 0) {
+	num_hwstats = device->ops.get_hw_stats(device, hwstats, port, 0);
+	if (num_hwstats < 0) {
 		ret = -EINVAL;
-		goto err_stats;
+		goto err_hwstats;
 	}
 
-	table_attr = nla_nest_start(msg, RDMA_NLDEV_ATTR_STAT_HWCOUNTERS);
-	if (!table_attr) {
+	hwstats_table = nla_nest_start(msg, RDMA_NLDEV_ATTR_STAT_HWCOUNTERS);
+	if (!hwstats_table) {
 		ret = -EMSGSIZE;
-		goto err_stats;
+		goto err_hwstats;
 	}
-	for (i = 0; i < num_cnts; i++) {
-		v = stats->value[i] +
+	for (i = 0; i < num_hwstats; i++) {
+		v = hwstats->value[i] +
 			rdma_counter_get_hwstat_value(device, port, i);
-		if (rdma_nl_stat_hwcounter_entry(msg, stats->names[i], v)) {
+		if (rdma_nl_stat_hwcounter_entry(msg, hwstats->names[i], v)) {
 			ret = -EMSGSIZE;
-			goto err_table;
+			goto err_hwstats_table;
 		}
 	}
-	nla_nest_end(msg, table_attr);
+	nla_nest_end(msg, hwstats_table);
 
-	mutex_unlock(&stats->lock);
+	mutex_unlock(&hwstats->lock);
+
+	ret = stat_get_optional_counter(msg, device, port);
+	if (ret)
+		goto err_msg;
+
 	nlmsg_end(msg, nlh);
 	ib_device_put(device);
 	return rdma_nl_unicast(sock_net(skb->sk), msg, NETLINK_CB(skb).portid);
 
-err_table:
-	nla_nest_cancel(msg, table_attr);
-err_stats:
-	mutex_unlock(&stats->lock);
+err_hwstats_table:
+	nla_nest_cancel(msg, hwstats_table);
+err_hwstats:
+	mutex_unlock(&hwstats->lock);
 err_msg:
 	nlmsg_free(msg);
 err:

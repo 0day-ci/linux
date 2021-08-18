@@ -2602,6 +2602,9 @@ struct ib_device_ops {
 			   int optional_stat);
 	int (*remove_op_stat)(struct ib_device *device, u32 port,
 			      int optional_stat);
+	int (*get_op_stats)(struct ib_device *device, u32 port,
+			    struct rdma_op_stats *stats);
+
 	/**
 	 * Allows rdma drivers to add their own restrack attributes.
 	 */

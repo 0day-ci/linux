@@ -459,6 +459,24 @@ u64 rdma_counter_get_hwstat_value(struct ib_device *dev, u32 port, u32 index)
 	return sum;
 }
 
+/*
+ * rdma_opcounter_query_stats - Query the per-port optional counter values
+ */
+int rdma_opcounter_query_stats(struct rdma_op_stats *opstats,
+			       struct ib_device *dev, u32 port)
+{
+	int ret = 0;
+
+	if (!dev->ops.get_op_stats)
+		return -EOPNOTSUPP;
+
+	mutex_lock(&opstats->lock);
+	ret = dev->ops.get_op_stats(dev, port, opstats);
+	mutex_unlock(&opstats->lock);
+
+	return ret;
+}
+
 static struct ib_qp *rdma_counter_get_qp(struct ib_device *dev, u32 qp_num)
 {
 	struct rdma_restrack_entry *res = NULL;

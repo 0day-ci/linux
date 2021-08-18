@@ -67,5 +67,8 @@ int rdma_opcounter_add(struct ib_device *dev, u32 port,
 		       const char *name);
 int rdma_opcounter_remove(struct ib_device *dev, u32 port,
 			  const char *name);
+int rdma_opcounter_query_stats(struct rdma_op_stats *opstats,
+			       struct ib_device *dev, u32 port);
+
 
 #endif /* _RDMA_COUNTER_H_ */
