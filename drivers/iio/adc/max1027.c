@@ -427,19 +427,18 @@ static int max1027_set_cnvst_trigger_state(struct iio_trigger *trig, bool state)
 	return 0;
 }
 
-static irqreturn_t max1027_trigger_handler(int irq, void *private)
+static int max1027_read_scan(struct iio_dev *indio_dev)
 {
-	struct iio_poll_func *pf = private;
-	struct iio_dev *indio_dev = pf->indio_dev;
 	struct max1027_state *st = iio_priv(indio_dev);
 	unsigned int scanned_chans = fls(*indio_dev->active_scan_mask);
 	u16 *buf = st->buffer;
 	unsigned int bit;
-
-	pr_debug("%s(irq=%d, private=0x%p)\n", __func__, irq, private);
+	int ret;
 
 	/* fill buffer with all channel */
-	spi_read(st->spi, st->buffer, scanned_chans * 2);
+	ret = spi_read(st->spi, st->buffer, scanned_chans * 2);
+	if (ret < 0)
+		return ret;
 
 	/* Only keep the channels selected by the user */
 	for_each_set_bit(bit, indio_dev->active_scan_mask,
@@ -450,6 +449,22 @@ static irqreturn_t max1027_trigger_handler(int irq, void *private)
 	}
 
 	iio_push_to_buffers(indio_dev, st->buffer);
+
+	return 0;
+}
+
+static irqreturn_t max1027_trigger_handler(int irq, void *private)
+{
+	struct iio_poll_func *pf = private;
+	struct iio_dev *indio_dev = pf->indio_dev;
+	int ret;
+
+	pr_debug("%s(irq=%d, private=0x%p)\n", __func__, irq, private);
+
+	ret = max1027_read_scan(indio_dev);
+	if (ret)
+		dev_err(&indio_dev->dev,
+			"Cannot read scanned values (%d)\n", ret);
 
 	iio_trigger_notify_done(indio_dev->trig);
 
