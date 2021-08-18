@@ -129,7 +129,7 @@ void dsa_lag_unmap(struct dsa_switch_tree *dst, struct net_device *lag)
 	}
 }
 
-static int dsa_bridge_num_find(const struct net_device *bridge_dev)
+int dsa_bridge_num_find(const struct net_device *bridge_dev)
 {
 	struct dsa_switch_tree *dst;
 	struct dsa_port *dp;
@@ -147,6 +147,7 @@ static int dsa_bridge_num_find(const struct net_device *bridge_dev)
 
 	return -1;
 }
+EXPORT_SYMBOL_GPL(dsa_bridge_num_find);
 
 int dsa_bridge_num_get(const struct net_device *bridge_dev, int max)
 {
