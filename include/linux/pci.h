@@ -2363,6 +2363,27 @@ int pci_vpd_find_tag(const u8 *buf, unsigned int len, u8 rdt);
 int pci_vpd_find_info_keyword(const u8 *buf, unsigned int off,
 			      unsigned int len, const char *kw);
 
+/**
+ * pci_vpd_check_csum - Check VPD checksum
+ * @buf: Pointer to buffered vpd data
+ * @len: VPD size
+ *
+ * Returns 1 if VPD has no checksum, otherwise 0 or an errno
+ */
+int pci_vpd_check_csum(const void *buf, unsigned int len);
+
+/**
+ * pci_vpd_find_ro_info_keyword - Locates an info field keyword in VPD RO section
+ * @buf: Pointer to buffered vpd data
+ * @len: The length of the buffer area in which to search
+ * @kw: The keyword to search for
+ * @size: pointer to field where length of found keyword data is returned
+ *
+ * Returns the index of the information field keyword data or -ENOENT if not found.
+ */
+int pci_vpd_find_ro_info_keyword(const void *buf, unsigned int len,
+				 const char *kw, unsigned int *size);
+
 /* PCI <-> OF binding helpers */
 #ifdef CONFIG_OF
 struct device_node;
