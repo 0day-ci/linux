@@ -472,6 +472,24 @@ static int max1027_read_scan(struct iio_dev *indio_dev)
 	return 0;
 }
 
+static irqreturn_t max1027_eoc_irq_handler(int irq, void *private)
+{
+	struct iio_dev *indio_dev = private;
+	struct max1027_state *st = iio_priv(indio_dev);
+	int ret = 0;
+
+	if (st->cnvst_trigger) {
+		ret = max1027_read_scan(indio_dev);
+		iio_trigger_notify_done(indio_dev->trig);
+	}
+
+	if (ret)
+		dev_err(&indio_dev->dev,
+			"Cannot read scanned values (%d)\n", ret);
+
+	return IRQ_HANDLED;
+}
+
 static irqreturn_t max1027_trigger_handler(int irq, void *private)
 {
 	struct iio_poll_func *pf = private;
@@ -563,11 +581,11 @@ static int max1027_probe(struct spi_device *spi)
 		}
 
 		ret = devm_request_threaded_irq(&spi->dev, spi->irq,
-						iio_trigger_generic_data_rdy_poll,
+						max1027_eoc_irq_handler,
 						NULL,
 						IRQF_TRIGGER_FALLING,
 						spi->dev.driver->name,
-						st->trig);
+						indio_dev);
 		if (ret < 0) {
 			dev_err(&indio_dev->dev, "Failed to allocate IRQ.\n");
 			return ret;
