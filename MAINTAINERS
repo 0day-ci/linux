@@ -19596,6 +19596,8 @@ F:	drivers/staging/media/vxd/common/work_queue.h
 F:	drivers/staging/media/vxd/decoder/bspp.c
 F:	drivers/staging/media/vxd/decoder/bspp.h
 F:	drivers/staging/media/vxd/decoder/bspp_int.h
+F:	drivers/staging/media/vxd/decoder/core.c
+F:	drivers/staging/media/vxd/decoder/core.h
 F:	drivers/staging/media/vxd/decoder/dec_resources.c
 F:	drivers/staging/media/vxd/decoder/dec_resources.h
 F:	drivers/staging/media/vxd/decoder/fw_interface.h
