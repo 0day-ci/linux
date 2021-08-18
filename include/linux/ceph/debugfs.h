@@ -10,5 +10,8 @@ extern void ceph_debugfs_cleanup(void);
 extern void ceph_debugfs_client_init(struct ceph_client *client);
 extern void ceph_debugfs_client_cleanup(struct ceph_client *client);
 
+extern struct dentry *ceph_debugfs_create_subdir(const char *subdir);
+extern void ceph_debugfs_cleanup_subdir(struct dentry *subdir_dentry);
+
 #endif
 

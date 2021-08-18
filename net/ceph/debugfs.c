@@ -404,6 +404,18 @@ void ceph_debugfs_cleanup(void)
 	debugfs_remove(ceph_debugfs_dir);
 }
 
+struct dentry *ceph_debugfs_create_subdir(const char *subdir)
+{
+	return debugfs_create_dir(subdir, ceph_debugfs_dir);
+}
+EXPORT_SYMBOL(ceph_debugfs_create_subdir);
+
+void ceph_debugfs_cleanup_subdir(struct dentry *subdir_dentry)
+{
+	debugfs_remove(subdir_dentry);
+}
+EXPORT_SYMBOL(ceph_debugfs_cleanup_subdir);
+
 void ceph_debugfs_client_init(struct ceph_client *client)
 {
 	char name[80];
@@ -413,7 +425,7 @@ void ceph_debugfs_client_init(struct ceph_client *client)
 
 	dout("ceph_debugfs_client_init %p %s\n", client, name);
 
-	client->debugfs_dir = debugfs_create_dir(name, ceph_debugfs_dir);
+	client->debugfs_dir = ceph_debugfs_create_subdir(name);
 
 	client->monc.debugfs_file = debugfs_create_file("monc",
 						      0400,
@@ -454,7 +466,7 @@ void ceph_debugfs_client_cleanup(struct ceph_client *client)
 	debugfs_remove(client->debugfs_monmap);
 	debugfs_remove(client->osdc.debugfs_file);
 	debugfs_remove(client->monc.debugfs_file);
-	debugfs_remove(client->debugfs_dir);
+	ceph_debugfs_cleanup_subdir(client->debugfs_dir);
 }
 
 #else  /* CONFIG_DEBUG_FS */
@@ -474,5 +486,15 @@ void ceph_debugfs_client_init(struct ceph_client *client)
 void ceph_debugfs_client_cleanup(struct ceph_client *client)
 {
 }
+
+struct dentry *ceph_debugfs_create_subdir(const char *subdir)
+{
+}
+EXPORT_SYMBOL(ceph_debugfs_create_subdir);
+
+void ceph_debugfs_cleanup_subdir(struct dentry *subdir_dentry)
+{
+}
+EXPORT_SYMBOL(ceph_debugfs_cleanup_subdir);
 
 #endif  /* CONFIG_DEBUG_FS */
