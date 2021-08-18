@@ -473,7 +473,7 @@ static inline bool dma_buf_is_dynamic(struct dma_buf *dmabuf)
 static inline bool
 dma_buf_attachment_is_dynamic(struct dma_buf_attachment *attach)
 {
-	return !!attach->importer_ops;
+	return !!attach->importer_ops->move_notify;
 }
 
 struct dma_buf_attachment *dma_buf_attach(struct dma_buf *dmabuf,
