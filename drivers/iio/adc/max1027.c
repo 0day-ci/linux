@@ -235,6 +235,7 @@ struct max1027_state {
 	struct iio_trigger		*trig;
 	__be16				*buffer;
 	struct mutex			lock;
+	bool				data_rdy;
 	bool				cnvst_trigger;
 	u8				reg ____cacheline_aligned;
 };
@@ -243,12 +244,22 @@ static DECLARE_WAIT_QUEUE_HEAD(max1027_queue);
 
 static int max1027_wait_eoc(struct iio_dev *indio_dev)
 {
+	struct max1027_state *st = iio_priv(indio_dev);
 	unsigned int conversion_time = MAX1027_CONVERSION_UDELAY;
+	int ret;
 
-	if (indio_dev->active_scan_mask)
-		conversion_time *= hweight32(*indio_dev->active_scan_mask);
+	if (st->spi->irq) {
+		ret = wait_event_interruptible_timeout(max1027_queue,
+						       st->data_rdy, HZ / 1000);
+		st->data_rdy = false;
+		if (ret == -ERESTARTSYS)
+			return ret;
+	} else {
+		if (indio_dev->active_scan_mask)
+			conversion_time *= hweight32(*indio_dev->active_scan_mask);
 
-	usleep_range(conversion_time, conversion_time * 2);
+		usleep_range(conversion_time, conversion_time * 2);
+	}
 
 	return 0;
 }
@@ -481,6 +492,9 @@ static irqreturn_t max1027_eoc_irq_handler(int irq, void *private)
 	if (st->cnvst_trigger) {
 		ret = max1027_read_scan(indio_dev);
 		iio_trigger_notify_done(indio_dev->trig);
+	} else {
+		st->data_rdy = true;
+		wake_up(&max1027_queue);
 	}
 
 	if (ret)
