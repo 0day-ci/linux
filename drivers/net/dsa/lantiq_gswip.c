@@ -1128,7 +1128,8 @@ static int gswip_vlan_remove(struct gswip_priv *priv,
 }
 
 static int gswip_port_bridge_join(struct dsa_switch *ds, int port,
-				  struct net_device *bridge, int bridge_num)
+				  struct net_device *bridge, int bridge_num,
+				  struct netlink_ext_ack *extack)
 {
 	struct gswip_priv *priv = ds->priv;
 	int err;

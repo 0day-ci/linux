@@ -173,7 +173,8 @@ void ksz_get_ethtool_stats(struct dsa_switch *ds, int port, uint64_t *buf)
 EXPORT_SYMBOL_GPL(ksz_get_ethtool_stats);
 
 int ksz_port_bridge_join(struct dsa_switch *ds, int port,
-			 struct net_device *br, int bridge_num)
+			 struct net_device *br, int bridge_num,
+			 struct netlink_ext_ack *extack)
 {
 	struct ksz_device *dev = ds->priv;
 

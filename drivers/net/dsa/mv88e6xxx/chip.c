@@ -2388,7 +2388,8 @@ static int mv88e6xxx_bridge_map(struct mv88e6xxx_chip *chip,
 
 static int mv88e6xxx_port_bridge_join(struct dsa_switch *ds, int port,
 				      struct net_device *br,
-				      int bridge_num)
+				      int bridge_num,
+				      struct netlink_ext_ack *extack)
 {
 	struct mv88e6xxx_chip *chip = ds->priv;
 	int err;
@@ -2416,7 +2417,8 @@ static void mv88e6xxx_port_bridge_leave(struct dsa_switch *ds, int port,
 static int mv88e6xxx_crosschip_bridge_join(struct dsa_switch *ds,
 					   int tree_index, int sw_index,
 					   int port, struct net_device *br,
-					   int bridge_num)
+					   int bridge_num,
+					   struct netlink_ext_ack *extack)
 {
 	struct mv88e6xxx_chip *chip = ds->priv;
 	int err;

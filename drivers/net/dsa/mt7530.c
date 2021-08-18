@@ -1192,7 +1192,8 @@ mt7530_port_bridge_flags(struct dsa_switch *ds, int port,
 
 static int
 mt7530_port_bridge_join(struct dsa_switch *ds, int port,
-			struct net_device *bridge, int bridge_num)
+			struct net_device *bridge, int bridge_num,
+			struct netlink_ext_ack *extack)
 {
 	struct mt7530_priv *priv = ds->priv;
 	u32 port_bitmap = BIT(MT7530_CPU_PORT);

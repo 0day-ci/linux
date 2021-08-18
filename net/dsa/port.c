@@ -355,6 +355,7 @@ int dsa_port_bridge_join(struct dsa_port *dp, struct net_device *br,
 		.sw_index = dp->ds->index,
 		.port = dp->index,
 		.br = br,
+		.extack = extack,
 	};
 	struct net_device *dev = dp->slave;
 	struct net_device *brport_dev;

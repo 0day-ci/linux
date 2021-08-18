@@ -542,7 +542,8 @@ static int xrs700x_bridge_common(struct dsa_switch *ds, int port,
 }
 
 static int xrs700x_bridge_join(struct dsa_switch *ds, int port,
-			       struct net_device *bridge, int bridge_num)
+			       struct net_device *bridge, int bridge_num,
+			       struct netlink_ext_ack *extack)
 {
 	return xrs700x_bridge_common(ds, port, bridge, true);
 }

@@ -95,7 +95,7 @@ static int dsa_switch_bridge_join(struct dsa_switch *ds,
 	if (dst->index == info->tree_index && ds->index == info->sw_index &&
 	    ds->ops->port_bridge_join) {
 		err = ds->ops->port_bridge_join(ds, info->port, info->br,
-						info->bridge_num);
+						info->bridge_num, info->extack);
 		if (err)
 			return err;
 	}
@@ -105,7 +105,8 @@ static int dsa_switch_bridge_join(struct dsa_switch *ds,
 		err = ds->ops->crosschip_bridge_join(ds, info->tree_index,
 						     info->sw_index,
 						     info->port, info->br,
-						     info->bridge_num);
+						     info->bridge_num,
+						     info->extack);
 		if (err)
 			return err;
 	}

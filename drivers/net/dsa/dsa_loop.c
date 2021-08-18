@@ -168,7 +168,8 @@ static int dsa_loop_phy_write(struct dsa_switch *ds, int port,
 
 static int dsa_loop_port_bridge_join(struct dsa_switch *ds, int port,
 				     struct net_device *bridge,
-				     int bridge_num)
+				     int bridge_num,
+				     struct netlink_ext_ack *extack)
 {
 	dev_dbg(ds->dev, "%s: port: %d, bridge: %s\n",
 		__func__, port, bridge->name);
