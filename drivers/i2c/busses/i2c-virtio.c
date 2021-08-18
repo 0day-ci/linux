@@ -228,6 +228,7 @@ static int virtio_i2c_probe(struct virtio_device *vdev)
 	vi->adap.algo = &virtio_algorithm;
 	vi->adap.quirks = &virtio_i2c_quirks;
 	vi->adap.dev.parent = &vdev->dev;
+	vi->adap.dev.of_node = vdev->dev.of_node;
 	i2c_set_adapdata(&vi->adap, vi);
 
 	/*
