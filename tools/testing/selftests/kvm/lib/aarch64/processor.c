@@ -216,6 +216,7 @@ void aarch64_vcpu_setup(struct kvm_vm *vm, int vcpuid, struct kvm_vcpu_init *ini
 {
 	struct kvm_vcpu_init default_init = { .target = -1, };
 	uint64_t sctlr_el1, tcr_el1;
+	int ret;
 
 	if (!init)
 		init = &default_init;
@@ -226,7 +227,19 @@ void aarch64_vcpu_setup(struct kvm_vm *vm, int vcpuid, struct kvm_vcpu_init *ini
 		init->target = preferred.target;
 	}
 
-	vcpu_ioctl(vm, vcpuid, KVM_ARM_VCPU_INIT, init);
+	ret = _vcpu_ioctl(vm, vcpuid, KVM_ARM_VCPU_INIT, init);
+
+	/*
+	 * Missing kernel feature support should result in skipping the test,
+	 * not failing it.
+	 */
+	if (ret && errno == ENOENT) {
+		print_skip("requested vCPU features not supported; skipping test.");
+		exit(KSFT_SKIP);
+	}
+
+	TEST_ASSERT(!ret, "KVM_ARM_VCPU_INIT failed, rc: %i errno: %i (%s)",
+		    ret, errno, strerror(errno));
 
 	/*
 	 * Enable FP/ASIMD to avoid trapping when accessing Q0-Q15
