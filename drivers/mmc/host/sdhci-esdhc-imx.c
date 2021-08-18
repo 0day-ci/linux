@@ -226,6 +226,7 @@ struct esdhc_platform_data {
 	unsigned int tuning_step;       /* The delay cell steps in tuning procedure */
 	unsigned int tuning_start_tap;	/* The start delay cell point in tuning procedure */
 	unsigned int strobe_dll_delay_target;	/* The delay cell for strobe pad (read clock) */
+	bool broken_auto_tuning;	/* Disable the auto tuning circuit */
 };
 
 struct esdhc_soc_data {
@@ -672,8 +673,10 @@ static void esdhc_writew_le(struct sdhci_host *host, u16 val, int reg)
 			if (val & SDHCI_CTRL_EXEC_TUNING) {
 				v |= ESDHC_MIX_CTRL_EXE_TUNE;
 				m |= ESDHC_MIX_CTRL_FBCLK_SEL;
-				m |= ESDHC_MIX_CTRL_AUTO_TUNE_EN;
-				usdhc_auto_tuning_mode_sel(host);
+				if (!imx_data->boarddata.broken_auto_tuning) {
+					usdhc_auto_tuning_mode_sel(host);
+					m |= ESDHC_MIX_CTRL_AUTO_TUNE_EN;
+				}
 			} else {
 				v &= ~ESDHC_MIX_CTRL_EXE_TUNE;
 			}
@@ -1041,13 +1044,16 @@ static void esdhc_prepare_tuning(struct sdhci_host *host, u32 val)
 
 static void esdhc_post_tuning(struct sdhci_host *host)
 {
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+	struct pltfm_imx_data *imx_data = sdhci_pltfm_priv(pltfm_host);
 	u32 reg;
-
-	usdhc_auto_tuning_mode_sel(host);
 
 	reg = readl(host->ioaddr + ESDHC_MIX_CTRL);
 	reg &= ~ESDHC_MIX_CTRL_EXE_TUNE;
-	reg |= ESDHC_MIX_CTRL_AUTO_TUNE_EN;
+	if (!imx_data->boarddata.broken_auto_tuning) {
+		usdhc_auto_tuning_mode_sel(host);
+		reg |= ESDHC_MIX_CTRL_AUTO_TUNE_EN;
+	}
 	writel(reg, host->ioaddr + ESDHC_MIX_CTRL);
 }
 
@@ -1522,7 +1528,8 @@ sdhci_esdhc_imx_probe_dt(struct platform_device *pdev,
 	of_property_read_u32(np, "fsl,tuning-step", &boarddata->tuning_step);
 	of_property_read_u32(np, "fsl,tuning-start-tap",
 			     &boarddata->tuning_start_tap);
-
+	if (of_property_read_bool(np, "fsl,broken-auto-tuning"))
+		boarddata->broken_auto_tuning = true;
 	of_property_read_u32(np, "fsl,strobe-dll-delay-target",
 				&boarddata->strobe_dll_delay_target);
 	if (of_find_property(np, "no-1-8-v", NULL))
