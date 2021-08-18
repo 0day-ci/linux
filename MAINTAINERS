@@ -19564,8 +19564,12 @@ M:	Sidraya Jayagond <sidraya.bj@pathpartnertech.com>
 L:	linux-media@vger.kernel.org
 S:	Maintained
 F:	Documentation/devicetree/bindings/media/img,d5520-vxd.yaml
+F:	drivers/staging/media/vxd/common/addr_alloc.c
+F:	drivers/staging/media/vxd/common/addr_alloc.h
 F:	drivers/staging/media/vxd/common/dq.c
 F:	drivers/staging/media/vxd/common/dq.h
+F:	drivers/staging/media/vxd/common/hash.c
+F:	drivers/staging/media/vxd/common/hash.h
 F:	drivers/staging/media/vxd/common/idgen_api.c
 F:	drivers/staging/media/vxd/common/idgen_api.h
 F:	drivers/staging/media/vxd/common/img_mem_man.c
@@ -19575,6 +19579,12 @@ F:	drivers/staging/media/vxd/common/imgmmu.c
 F:	drivers/staging/media/vxd/common/imgmmu.h
 F:	drivers/staging/media/vxd/common/lst.c
 F:	drivers/staging/media/vxd/common/lst.h
+F:	drivers/staging/media/vxd/common/pool.c
+F:	drivers/staging/media/vxd/common/pool.h
+F:	drivers/staging/media/vxd/common/ra.c
+F:	drivers/staging/media/vxd/common/ra.h
+F:	drivers/staging/media/vxd/common/talmmu_api.c
+F:	drivers/staging/media/vxd/common/talmmu_api.h
 F:	drivers/staging/media/vxd/common/work_queue.c
 F:	drivers/staging/media/vxd/common/work_queue.h
 F:	drivers/staging/media/vxd/decoder/hw_control.c
