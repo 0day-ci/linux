@@ -93,6 +93,15 @@ properties:
       tuning step can't find the proper delay window within limited tuning retries.
     default: 0
 
+  fsl,broken-auto-tuning:
+    description: |
+      Recommend for SDIO cards that enables SDIO interrupt for SDR104 and SDR50 mode.
+      SDIO interrupt uses DAT[1] to signal the card's interrupt. Auto-tuning circuit
+      will detect this interrupt on DAT[1] when in 4Bit bus mode, and take it just
+      as normal data, wrongly adjust the delay cell. This property is used to disable
+      the auto-tuning function.
+    type: boolean
+
   fsl,strobe-dll-delay-target:
     $ref: /schemas/types.yaml#/definitions/uint32
     description: |
