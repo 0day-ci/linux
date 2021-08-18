@@ -17,15 +17,11 @@
  *
  * | 11  | 10  |  9  |  8  |  7  |  6  |  5  |  4  |  3  |  2  |  1  |  0  |
  * +-----------+-----+-----------------+-----------+-----------------------+
- * |    DIR    | VBID|    SWITCH_ID    |   VBID    |          PORT         |
+ * |    RSV    | VBID|    SWITCH_ID    |   VBID    |          PORT         |
  * +-----------+-----+-----------------+-----------+-----------------------+
  *
- * DIR - VID[11:10]:
- *	Direction flags.
- *	* 1 (0b01) for RX VLAN,
- *	* 2 (0b10) for TX VLAN.
- *	These values make the special VIDs of 0, 1 and 4095 to be left
- *	unused by this coding scheme.
+ * RSV - VID[11:10]:
+ *	Reserved. Must be set to 3 (0b11).
  *
  * SWITCH_ID - VID[8:6]:
  *	Index of switch within DSA tree. Must be between 0 and 7.
@@ -39,12 +35,11 @@
  *	Index of switch port. Must be between 0 and 15.
  */
 
-#define DSA_8021Q_DIR_SHIFT		10
-#define DSA_8021Q_DIR_MASK		GENMASK(11, 10)
-#define DSA_8021Q_DIR(x)		(((x) << DSA_8021Q_DIR_SHIFT) & \
-						 DSA_8021Q_DIR_MASK)
-#define DSA_8021Q_DIR_RX		DSA_8021Q_DIR(1)
-#define DSA_8021Q_DIR_TX		DSA_8021Q_DIR(2)
+#define DSA_8021Q_RSV_VAL		3
+#define DSA_8021Q_RSV_SHIFT		10
+#define DSA_8021Q_RSV_MASK		GENMASK(11, 10)
+#define DSA_8021Q_RSV			((DSA_8021Q_RSV_VAL << DSA_8021Q_RSV_SHIFT) & \
+							       DSA_8021Q_RSV_MASK)
 
 #define DSA_8021Q_SWITCH_ID_SHIFT	6
 #define DSA_8021Q_SWITCH_ID_MASK	GENMASK(8, 6)
@@ -71,29 +66,19 @@
 u16 dsa_8021q_bridge_tx_fwd_offload_vid(int bridge_num)
 {
 	/* The VBID value of 0 is reserved for precise TX */
-	return DSA_8021Q_DIR_TX | DSA_8021Q_VBID(bridge_num + 1);
+	return DSA_8021Q_RSV | DSA_8021Q_VBID(bridge_num + 1);
 }
 EXPORT_SYMBOL_GPL(dsa_8021q_bridge_tx_fwd_offload_vid);
-
-/* Returns the VID to be inserted into the frame from xmit for switch steering
- * instructions on egress. Encodes switch ID and port ID.
- */
-u16 dsa_8021q_tx_vid(struct dsa_switch *ds, int port)
-{
-	return DSA_8021Q_DIR_TX | DSA_8021Q_SWITCH_ID(ds->index) |
-	       DSA_8021Q_PORT(port);
-}
-EXPORT_SYMBOL_GPL(dsa_8021q_tx_vid);
 
 /* Returns the VID that will be installed as pvid for this switch port, sent as
  * tagged egress towards the CPU port and decoded by the rcv function.
  */
-u16 dsa_8021q_rx_vid(struct dsa_switch *ds, int port)
+u16 dsa_tag_8021q_standalone_vid(struct dsa_port *dp)
 {
-	return DSA_8021Q_DIR_RX | DSA_8021Q_SWITCH_ID(ds->index) |
-	       DSA_8021Q_PORT(port);
+	return DSA_8021Q_RSV | DSA_8021Q_SWITCH_ID(dp->ds->index) |
+	       DSA_8021Q_PORT(dp->index);
 }
-EXPORT_SYMBOL_GPL(dsa_8021q_rx_vid);
+EXPORT_SYMBOL_GPL(dsa_tag_8021q_standalone_vid);
 
 /* Returns the decoded switch ID from the RX VID. */
 int dsa_8021q_rx_switch_id(u16 vid)
@@ -118,21 +103,11 @@ static int dsa_tag_8021q_rx_vbid(u16 vid)
 	return (vbid_hi << 2) | vbid_lo;
 }
 
-bool vid_is_dsa_8021q_rxvlan(u16 vid)
-{
-	return (vid & DSA_8021Q_DIR_MASK) == DSA_8021Q_DIR_RX;
-}
-EXPORT_SYMBOL_GPL(vid_is_dsa_8021q_rxvlan);
-
-bool vid_is_dsa_8021q_txvlan(u16 vid)
-{
-	return (vid & DSA_8021Q_DIR_MASK) == DSA_8021Q_DIR_TX;
-}
-EXPORT_SYMBOL_GPL(vid_is_dsa_8021q_txvlan);
-
 bool vid_is_dsa_8021q(u16 vid)
 {
-	return vid_is_dsa_8021q_rxvlan(vid) || vid_is_dsa_8021q_txvlan(vid);
+	u16 rsv = (vid & DSA_8021Q_RSV_MASK) >> DSA_8021Q_RSV_SHIFT;
+
+	return rsv == DSA_8021Q_RSV_VAL;
 }
 EXPORT_SYMBOL_GPL(vid_is_dsa_8021q);
 
@@ -246,18 +221,8 @@ int dsa_switch_tag_8021q_vlan_add(struct dsa_switch *ds,
 			u16 flags = 0;
 
 			if (dsa_is_user_port(ds, port))
-				flags |= BRIDGE_VLAN_INFO_UNTAGGED;
-
-			/* Standalone VLANs are PVIDs */
-			if (vid_is_dsa_8021q_rxvlan(info->vid) &&
-			    dsa_8021q_rx_switch_id(info->vid) == ds->index &&
-			    dsa_8021q_rx_source_port(info->vid) == port)
-				flags |= BRIDGE_VLAN_INFO_PVID;
-
-			/* And bridging VLANs are PVIDs too on user ports */
-			if (dsa_tag_8021q_rx_vbid(info->vid) &&
-			    dsa_is_user_port(ds, port))
-				flags |= BRIDGE_VLAN_INFO_PVID;
+				flags |= BRIDGE_VLAN_INFO_UNTAGGED |
+					 BRIDGE_VLAN_INFO_PVID;
 
 			err = dsa_switch_do_tag_8021q_vlan_add(ds, port,
 							       info->vid,
@@ -347,7 +312,7 @@ int dsa_tag_8021q_bridge_join(struct dsa_switch *ds, int port,
 	/* Delete the standalone VLAN of the port and replace it with a
 	 * bridging VLAN
 	 */
-	standalone_vid = dsa_8021q_rx_vid(ds, port);
+	standalone_vid = dsa_tag_8021q_standalone_vid(dp);
 	bridge_vid = dsa_8021q_bridge_tx_fwd_offload_vid(bridge_num);
 
 	dsa_port_tag_8021q_vlan_del(dp, standalone_vid, false);
@@ -372,7 +337,7 @@ void dsa_tag_8021q_bridge_leave(struct dsa_switch *ds, int port,
 	/* Delete the bridging VLAN of the port and replace it with a
 	 * standalone VLAN
 	 */
-	standalone_vid = dsa_8021q_rx_vid(ds, port);
+	standalone_vid = dsa_tag_8021q_standalone_vid(dp);
 	bridge_vid = dsa_8021q_bridge_tx_fwd_offload_vid(bridge_num);
 
 	dsa_port_tag_8021q_vlan_del(dp, bridge_vid, true);
@@ -387,13 +352,12 @@ void dsa_tag_8021q_bridge_leave(struct dsa_switch *ds, int port,
 }
 EXPORT_SYMBOL_GPL(dsa_tag_8021q_bridge_leave);
 
-/* Set up a port's tag_8021q RX and TX VLAN for standalone mode operation */
+/* Set up a port's standalone tag_8021q VLAN */
 static int dsa_tag_8021q_port_setup(struct dsa_switch *ds, int port)
 {
 	struct dsa_8021q_context *ctx = ds->tag_8021q_ctx;
 	struct dsa_port *dp = dsa_to_port(ds, port);
-	u16 rx_vid = dsa_8021q_rx_vid(ds, port);
-	u16 tx_vid = dsa_8021q_tx_vid(ds, port);
+	u16 vid = dsa_tag_8021q_standalone_vid(dp);
 	struct net_device *master;
 	int err;
 
@@ -405,30 +369,16 @@ static int dsa_tag_8021q_port_setup(struct dsa_switch *ds, int port)
 
 	master = dp->cpu_dp->master;
 
-	/* Add this user port's RX VID to the membership list of all others
-	 * (including itself). This is so that bridging will not be hindered.
-	 * L2 forwarding rules still take precedence when there are no VLAN
-	 * restrictions, so there are no concerns about leaking traffic.
-	 */
-	err = dsa_port_tag_8021q_vlan_add(dp, rx_vid, false);
+	err = dsa_port_tag_8021q_vlan_add(dp, vid, false);
 	if (err) {
 		dev_err(ds->dev,
-			"Failed to apply RX VID %d to port %d: %pe\n",
-			rx_vid, port, ERR_PTR(err));
+			"Failed to apply standalone VID %d to port %d: %pe\n",
+			vid, port, ERR_PTR(err));
 		return err;
 	}
 
-	/* Add @rx_vid to the master's RX filter. */
-	vlan_vid_add(master, ctx->proto, rx_vid);
-
-	/* Finally apply the TX VID on this port and on the CPU port */
-	err = dsa_port_tag_8021q_vlan_add(dp, tx_vid, false);
-	if (err) {
-		dev_err(ds->dev,
-			"Failed to apply TX VID %d on port %d: %pe\n",
-			tx_vid, port, ERR_PTR(err));
-		return err;
-	}
+	/* Add the VLAN to the master's RX filter. */
+	vlan_vid_add(master, ctx->proto, vid);
 
 	return err;
 }
@@ -437,8 +387,7 @@ static void dsa_tag_8021q_port_teardown(struct dsa_switch *ds, int port)
 {
 	struct dsa_8021q_context *ctx = ds->tag_8021q_ctx;
 	struct dsa_port *dp = dsa_to_port(ds, port);
-	u16 rx_vid = dsa_8021q_rx_vid(ds, port);
-	u16 tx_vid = dsa_8021q_tx_vid(ds, port);
+	u16 vid = dsa_tag_8021q_standalone_vid(dp);
 	struct net_device *master;
 
 	/* The CPU port is implicitly configured by
@@ -449,11 +398,9 @@ static void dsa_tag_8021q_port_teardown(struct dsa_switch *ds, int port)
 
 	master = dp->cpu_dp->master;
 
-	dsa_port_tag_8021q_vlan_del(dp, rx_vid, false);
+	dsa_port_tag_8021q_vlan_del(dp, vid, false);
 
-	vlan_vid_del(master, ctx->proto, rx_vid);
-
-	dsa_port_tag_8021q_vlan_del(dp, tx_vid, false);
+	vlan_vid_del(master, ctx->proto, vid);
 }
 
 static int dsa_tag_8021q_setup(struct dsa_switch *ds)
