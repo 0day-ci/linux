@@ -7,6 +7,7 @@ Performance monitor support
 .. toctree::
    :maxdepth: 1
 
+   hisi-pcie-pmu
    hisi-pmu
    imx-ddr
    qcom_l2_pmu
