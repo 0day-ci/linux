@@ -19575,6 +19575,8 @@ F:	drivers/staging/media/vxd/decoder/img_dec_common.h
 F:	drivers/staging/media/vxd/decoder/vxd_core.c
 F:	drivers/staging/media/vxd/decoder/vxd_dec.c
 F:	drivers/staging/media/vxd/decoder/vxd_dec.h
+F:	drivers/staging/media/vxd/decoder/vxd_int.c
+F:	drivers/staging/media/vxd/decoder/vxd_int.h
 F:	drivers/staging/media/vxd/decoder/vxd_pvdec.c
 F:	drivers/staging/media/vxd/decoder/vxd_pvdec_priv.h
 F:	drivers/staging/media/vxd/decoder/vxd_pvdec_regs.h
