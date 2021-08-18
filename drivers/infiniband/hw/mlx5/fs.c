@@ -10,12 +10,14 @@
 #include <rdma/uverbs_std_types.h>
 #include <rdma/mlx5_user_ioctl_cmds.h>
 #include <rdma/mlx5_user_ioctl_verbs.h>
+#include <rdma/ib_hdrs.h>
 #include <rdma/ib_umem.h>
 #include <linux/mlx5/driver.h>
 #include <linux/mlx5/fs.h>
 #include <linux/mlx5/fs_helpers.h>
 #include <linux/mlx5/accel.h>
 #include <linux/mlx5/eswitch.h>
+#include <net/inet_ecn.h>
 #include "mlx5_ib.h"
 #include "counters.h"
 #include "devx.h"
@@ -845,6 +847,115 @@ static struct mlx5_ib_flow_prio *get_flow_table(struct mlx5_ib_dev *dev,
 				 flags);
 
 	return prio;
+}
+
+enum {
+	RDMA_RX_ECN_OPCOUNTER_PRIO,
+	RDMA_RX_CNP_OPCOUNTER_PRIO,
+};
+
+enum {
+	RDMA_TX_CNP_OPCOUNTER_PRIO,
+};
+
+int mlx5_ib_fs_add_op_fc(struct mlx5_ib_dev *dev, struct mlx5_ib_op_fc *opfc,
+			 enum mlx5_ib_optional_counter_type type)
+{
+	enum mlx5_flow_namespace_type fn_type;
+	struct mlx5_flow_act flow_act = {};
+	struct mlx5_flow_destination dst;
+	struct mlx5_flow_namespace *ns;
+	struct mlx5_ib_flow_prio *prio;
+	struct mlx5_flow_spec *spec;
+	int priority, err = 0;
+
+	spec = kvzalloc(sizeof(*spec), GFP_KERNEL);
+	if (!spec)
+		return -ENOMEM;
+
+	switch (type) {
+	case MLX5_IB_OPCOUNTER_CC_RX_CE_PKTS:
+		fn_type = MLX5_FLOW_NAMESPACE_RDMA_RX_COUNTERS;
+		priority = RDMA_RX_ECN_OPCOUNTER_PRIO;
+		spec->match_criteria_enable = MLX5_MATCH_OUTER_HEADERS;
+		MLX5_SET_TO_ONES(fte_match_param, spec->match_criteria,
+				 outer_headers.ip_ecn);
+		MLX5_SET(fte_match_param, spec->match_value,
+			 outer_headers.ip_ecn, INET_ECN_CE);
+		break;
+
+	case MLX5_IB_OPCOUNTER_CC_RX_CNP_PKTS:
+		if (!MLX5_CAP_FLOWTABLE(dev->mdev,
+					ft_field_support_2_nic_receive_rdma.bth_opcode)) {
+			err = -EOPNOTSUPP;
+			goto free;
+		}
+		fn_type = MLX5_FLOW_NAMESPACE_RDMA_RX_COUNTERS;
+		priority = RDMA_RX_CNP_OPCOUNTER_PRIO;
+		spec->match_criteria_enable = MLX5_MATCH_MISC_PARAMETERS;
+		MLX5_SET_TO_ONES(fte_match_param, spec->match_criteria,
+				 misc_parameters.bth_opcode);
+		MLX5_SET(fte_match_param, spec->match_value,
+			 misc_parameters.bth_opcode, IB_BTH_OPCODE_CNP);
+		break;
+
+	case MLX5_IB_OPCOUNTER_CC_TX_CNP_PKTS:
+		if (!MLX5_CAP_FLOWTABLE(dev->mdev,
+					ft_field_support_2_nic_transmit_rdma.bth_opcode)) {
+			err = -EOPNOTSUPP;
+			goto free;
+		}
+		fn_type = MLX5_FLOW_NAMESPACE_RDMA_TX_COUNTERS;
+		priority = RDMA_TX_CNP_OPCOUNTER_PRIO;
+		spec->match_criteria_enable = MLX5_MATCH_MISC_PARAMETERS;
+		MLX5_SET_TO_ONES(fte_match_param, spec->match_criteria,
+				 misc_parameters.bth_opcode);
+		MLX5_SET(fte_match_param, spec->match_value,
+			 misc_parameters.bth_opcode, IB_BTH_OPCODE_CNP);
+		break;
+
+	default:
+		err = -EOPNOTSUPP;
+		goto free;
+	}
+
+	ns = mlx5_get_flow_namespace(dev->mdev, fn_type);
+	if (!ns) {
+		err = -EOPNOTSUPP;
+		goto free;
+	}
+	prio = _get_prio(ns, &opfc->prio, priority, 1, 1, 0);
+	if (IS_ERR(prio)) {
+		err = PTR_ERR(prio);
+		goto free;
+	}
+
+	dst.type = MLX5_FLOW_DESTINATION_TYPE_COUNTER;
+	dst.counter_id = mlx5_fc_id(opfc->fc);
+
+	flow_act.action =
+		MLX5_FLOW_CONTEXT_ACTION_COUNT | MLX5_FLOW_CONTEXT_ACTION_ALLOW;
+
+	opfc->rule =
+		mlx5_add_flow_rules(prio->flow_table, spec, &flow_act, &dst, 1);
+	if (IS_ERR(opfc->rule)) {
+		put_flow_table(dev, prio, false);
+		err = PTR_ERR(opfc->rule);
+		goto free;
+	}
+	prio->refcount++;
+
+free:
+	kfree(spec);
+	return err;
+}
+
+void mlx5_ib_fs_remove_op_fc(struct mlx5_ib_dev *dev,
+			     struct mlx5_ib_op_fc *opfc)
+{
+	mlx5_del_flow_rules(opfc->rule);
+	put_flow_table(dev, &opfc->prio, true);
+	WARN_ON(opfc->prio.flow_table);
 }
 
 static void set_underlay_qp(struct mlx5_ib_dev *dev,

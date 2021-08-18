@@ -805,6 +805,12 @@ enum mlx5_ib_optional_counter_type {
 	MLX5_IB_OPCOUNTER_MAX,
 };
 
+struct mlx5_ib_op_fc {
+	struct mlx5_fc *fc;
+	struct mlx5_ib_flow_prio prio;
+	struct mlx5_flow_handle *rule;
+};
+
 struct mlx5_ib_counters {
 	const char **names;
 	size_t *offsets;
@@ -813,6 +819,12 @@ struct mlx5_ib_counters {
 	u32 num_ext_ppcnt_counters;
 	u16 set_id;
 };
+
+int mlx5_ib_fs_add_op_fc(struct mlx5_ib_dev *dev, struct mlx5_ib_op_fc *opfc,
+			 enum mlx5_ib_optional_counter_type type);
+
+void mlx5_ib_fs_remove_op_fc(struct mlx5_ib_dev *dev,
+			     struct mlx5_ib_op_fc *opfc);
 
 struct mlx5_ib_multiport_info;
 
