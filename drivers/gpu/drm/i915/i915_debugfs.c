@@ -238,6 +238,7 @@ i915_debugfs_describe_obj(struct seq_file *m, struct drm_i915_gem_object *obj)
 static int i915_gem_object_info(struct seq_file *m, void *data)
 {
 	struct drm_i915_private *i915 = node_to_i915(m->private);
+	struct drm_printer p = drm_seq_file_printer(m);
 	struct intel_memory_region *mr;
 	enum intel_region_id id;
 
@@ -245,9 +246,14 @@ static int i915_gem_object_info(struct seq_file *m, void *data)
 		   i915->mm.shrink_count,
 		   atomic_read(&i915->mm.free_count),
 		   i915->mm.shrink_memory);
-	for_each_memory_region(mr, i915, id)
-		seq_printf(m, "%s: total:%pa, available:%pa bytes\n",
-			   mr->name, &mr->total, &mr->avail);
+	for_each_memory_region(mr, i915, id) {
+		seq_printf(m, "%s: ", mr->name);
+		if (mr->region_private)
+			ttm_resource_manager_debug(mr->region_private, &p);
+		else
+			seq_printf(m, "total:%pa, available:%pa bytes\n",
+				   &mr->total, &mr->avail);
+	}
 
 	return 0;
 }
