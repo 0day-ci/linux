@@ -244,4 +244,4 @@ if test -n "$KBUILD_BUILD_TIMESTAMP"; then
 		timestamp="-t $timestamp"
 	fi
 fi
-usr/gen_init_cpio $timestamp $cpio_list > $output
+"$(dirname "$0")"/gen_init_cpio $timestamp $cpio_list > $output
