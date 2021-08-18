@@ -598,6 +598,28 @@ static inline struct rdma_hw_stats *rdma_alloc_hw_stats_struct(
 	return stats;
 }
 
+/**
+ * struct rdma_op_counter
+ * @name - The name of the counter
+ * @value - The value of the counter
+ */
+struct rdma_op_counter {
+	const char *name;
+	u64 value;
+};
+
+/**
+ * struct rdma_op_stats
+ * @lock - Mutex to protect parallel write access to opstats of counters
+ * @num_opcounters - How many optional counters there are
+ * @opcounters - Array of optional counters that are filled in by the drivers
+ */
+struct rdma_op_stats {
+	/* Hold this mutex when accessing optional counter */
+	struct mutex lock;
+	int num_opcounters;
+	struct rdma_op_counter opcounters[];
+};
 
 /* Define bits for the various functionality this port needs to be supported by
  * the core.
@@ -2568,6 +2590,8 @@ struct ib_device_ops {
 	 */
 	int (*get_hw_stats)(struct ib_device *device,
 			    struct rdma_hw_stats *stats, u32 port, int index);
+	struct rdma_op_stats *(*alloc_op_port_stats)(struct ib_device *device,
+						     u32 port_num);
 
 	/**
 	 * Allows rdma drivers to add their own restrack attributes.

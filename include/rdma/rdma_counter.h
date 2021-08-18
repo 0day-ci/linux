@@ -29,6 +29,7 @@ struct rdma_port_counter {
 	struct rdma_counter_mode mode;
 	struct rdma_hw_stats *hstats;
 	unsigned int num_counters;
+	struct rdma_op_stats *opstats;
 	struct mutex lock;
 };
 

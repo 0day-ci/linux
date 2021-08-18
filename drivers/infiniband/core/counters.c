@@ -611,6 +611,15 @@ void rdma_counter_init(struct ib_device *dev)
 		port_counter->hstats = dev->ops.alloc_hw_port_stats(dev, port);
 		if (!port_counter->hstats)
 			goto fail;
+
+		if (dev->ops.alloc_op_port_stats) {
+			port_counter->opstats =
+				dev->ops.alloc_op_port_stats(dev, port);
+			if (!port_counter->opstats)
+				goto fail;
+
+			mutex_init(&port_counter->opstats->lock);
+		}
 	}
 
 	return;
@@ -618,6 +627,11 @@ void rdma_counter_init(struct ib_device *dev)
 fail:
 	for (i = port; i >= rdma_start_port(dev); i--) {
 		port_counter = &dev->port_data[port].port_counter;
+		if (port_counter && port_counter->opstats) {
+			mutex_destroy(&port_counter->opstats->lock);
+			kfree(port_counter->opstats);
+			port_counter->opstats = NULL;
+		}
 		kfree(port_counter->hstats);
 		port_counter->hstats = NULL;
 		mutex_destroy(&port_counter->lock);
@@ -631,6 +645,10 @@ void rdma_counter_release(struct ib_device *dev)
 
 	rdma_for_each_port(dev, port) {
 		port_counter = &dev->port_data[port].port_counter;
+		if (port_counter && port_counter->opstats) {
+			mutex_destroy(&port_counter->opstats->lock);
+			kfree(port_counter->opstats);
+		}
 		kfree(port_counter->hstats);
 		mutex_destroy(&port_counter->lock);
 	}
