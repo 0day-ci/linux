@@ -904,7 +904,7 @@ static void qeth_l2_br2dev_get(void)
 	int rc;
 
 	if (!refcount_inc_not_zero(&qeth_l2_switchdev_notify_refcnt)) {
-		rc = register_switchdev_notifier(&qeth_l2_sw_notifier);
+		rc = register_switchdev_blocking_notifier(&qeth_l2_sw_notifier);
 		if (rc) {
 			QETH_DBF_MESSAGE(2,
 					 "failed to register qeth_l2_sw_notifier: %d\n",
@@ -924,7 +924,7 @@ static void qeth_l2_br2dev_put(void)
 	int rc;
 
 	if (refcount_dec_and_test(&qeth_l2_switchdev_notify_refcnt)) {
-		rc = unregister_switchdev_notifier(&qeth_l2_sw_notifier);
+		rc = unregister_switchdev_blocking_notifier(&qeth_l2_sw_notifier);
 		if (rc) {
 			QETH_DBF_MESSAGE(2,
 					 "failed to unregister qeth_l2_sw_notifier: %d\n",

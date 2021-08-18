@@ -424,9 +424,6 @@ static int am65_cpsw_switchdev_event(struct notifier_block *unused,
 				     unsigned long event, void *ptr)
 {
 	struct net_device *ndev = switchdev_notifier_info_to_dev(ptr);
-	struct am65_cpsw_switchdev_event_work *switchdev_work;
-	struct am65_cpsw_port *port = am65_ndev_to_port(ndev);
-	struct switchdev_notifier_fdb_info *fdb_info = ptr;
 	int err;
 
 	if (event == SWITCHDEV_PORT_ATTR_SET) {
@@ -436,46 +433,48 @@ static int am65_cpsw_switchdev_event(struct notifier_block *unused,
 		return notifier_from_errno(err);
 	}
 
-	if (!am65_cpsw_port_dev_check(ndev))
-		return NOTIFY_DONE;
-
-	switchdev_work = kzalloc(sizeof(*switchdev_work), GFP_ATOMIC);
-	if (WARN_ON(!switchdev_work))
-		return NOTIFY_BAD;
-
-	INIT_WORK(&switchdev_work->work, am65_cpsw_switchdev_event_work);
-	switchdev_work->port = port;
-	switchdev_work->event = event;
-
-	switch (event) {
-	case SWITCHDEV_FDB_ADD_TO_DEVICE:
-	case SWITCHDEV_FDB_DEL_TO_DEVICE:
-		memcpy(&switchdev_work->fdb_info, ptr,
-		       sizeof(switchdev_work->fdb_info));
-		switchdev_work->fdb_info.addr = kzalloc(ETH_ALEN, GFP_ATOMIC);
-		if (!switchdev_work->fdb_info.addr)
-			goto err_addr_alloc;
-		ether_addr_copy((u8 *)switchdev_work->fdb_info.addr,
-				fdb_info->addr);
-		dev_hold(ndev);
-		break;
-	default:
-		kfree(switchdev_work);
-		return NOTIFY_DONE;
-	}
-
-	queue_work(system_long_wq, &switchdev_work->work);
-
 	return NOTIFY_DONE;
-
-err_addr_alloc:
-	kfree(switchdev_work);
-	return NOTIFY_BAD;
 }
 
 static struct notifier_block cpsw_switchdev_notifier = {
 	.notifier_call = am65_cpsw_switchdev_event,
 };
+
+static int am65_cpsw_switchdev_fdb_event(struct net_device *ndev,
+					 unsigned long event,
+					 struct switchdev_notifier_fdb_info *fdb_info)
+{
+	struct am65_cpsw_switchdev_event_work *switchdev_work;
+	struct am65_cpsw_port *port = am65_ndev_to_port(ndev);
+
+	if (!am65_cpsw_port_dev_check(ndev))
+		return 0;
+
+	switchdev_work = kzalloc(sizeof(*switchdev_work), GFP_ATOMIC);
+	if (WARN_ON(!switchdev_work))
+		return -ENOMEM;
+
+	INIT_WORK(&switchdev_work->work, am65_cpsw_switchdev_event_work);
+	switchdev_work->port = port;
+	switchdev_work->event = event;
+
+	memcpy(&switchdev_work->fdb_info, ptr,
+	       sizeof(switchdev_work->fdb_info));
+	switchdev_work->fdb_info.addr = kzalloc(ETH_ALEN, GFP_ATOMIC);
+	if (!switchdev_work->fdb_info.addr)
+		goto err_addr_alloc;
+	ether_addr_copy((u8 *)switchdev_work->fdb_info.addr,
+			fdb_info->addr);
+	dev_hold(ndev);
+
+	queue_work(system_long_wq, &switchdev_work->work);
+
+	return 0;
+
+err_addr_alloc:
+	kfree(switchdev_work);
+	return -ENOMEM;
+}
 
 static int am65_cpsw_switchdev_blocking_event(struct notifier_block *unused,
 					      unsigned long event, void *ptr)
@@ -499,8 +498,10 @@ static int am65_cpsw_switchdev_blocking_event(struct notifier_block *unused,
 						     am65_cpsw_port_dev_check,
 						     am65_cpsw_port_attr_set);
 		return notifier_from_errno(err);
-	default:
-		break;
+	case SWITCHDEV_FDB_ADD_TO_DEVICE:
+	case SWITCHDEV_FDB_DEL_TO_DEVICE:
+		err = am65_cpsw_switchdev_fdb_event(dev, event, ptr);
+		return notifier_from_errno(err);
 	}
 
 	return NOTIFY_DONE;

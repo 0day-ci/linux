@@ -378,6 +378,53 @@ int call_switchdev_blocking_notifiers(unsigned long val, struct net_device *dev,
 }
 EXPORT_SYMBOL_GPL(call_switchdev_blocking_notifiers);
 
+static void switchdev_fdb_add_deferred(struct net_device *dev, const void *data)
+{
+	const struct switchdev_notifier_fdb_info *fdb_info = data;
+	struct switchdev_notifier_fdb_info tmp = *fdb_info;
+	int err;
+
+	ASSERT_RTNL();
+	err = call_switchdev_blocking_notifiers(SWITCHDEV_FDB_ADD_TO_DEVICE,
+						dev, &tmp.info, NULL);
+	err = notifier_to_errno(err);
+	if (err && err != -EOPNOTSUPP)
+		netdev_err(dev, "failed to add FDB entry: %pe\n", ERR_PTR(err));
+}
+
+static void switchdev_fdb_del_deferred(struct net_device *dev, const void *data)
+{
+	const struct switchdev_notifier_fdb_info *fdb_info = data;
+	struct switchdev_notifier_fdb_info tmp = *fdb_info;
+	int err;
+
+	ASSERT_RTNL();
+	err = call_switchdev_blocking_notifiers(SWITCHDEV_FDB_DEL_TO_DEVICE,
+						dev, &tmp.info, NULL);
+	err = notifier_to_errno(err);
+	if (err && err != -EOPNOTSUPP)
+		netdev_err(dev, "failed to delete FDB entry: %pe\n",
+			   ERR_PTR(err));
+}
+
+int
+switchdev_fdb_add_to_device(struct net_device *dev,
+			    const struct switchdev_notifier_fdb_info *fdb_info)
+{
+	return switchdev_deferred_enqueue(dev, fdb_info, sizeof(*fdb_info),
+					  switchdev_fdb_add_deferred);
+}
+EXPORT_SYMBOL_GPL(switchdev_fdb_add_to_device);
+
+int
+switchdev_fdb_del_to_device(struct net_device *dev,
+			    const struct switchdev_notifier_fdb_info *fdb_info)
+{
+	return switchdev_deferred_enqueue(dev, fdb_info, sizeof(*fdb_info),
+					  switchdev_fdb_del_deferred);
+}
+EXPORT_SYMBOL_GPL(switchdev_fdb_del_to_device);
+
 struct switchdev_nested_priv {
 	bool (*check_cb)(const struct net_device *dev);
 	bool (*foreign_dev_check_cb)(const struct net_device *dev,

@@ -845,10 +845,6 @@ static int prestera_switchdev_event(struct notifier_block *unused,
 				    unsigned long event, void *ptr)
 {
 	struct net_device *dev = switchdev_notifier_info_to_dev(ptr);
-	struct switchdev_notifier_fdb_info *fdb_info;
-	struct switchdev_notifier_info *info = ptr;
-	struct prestera_fdb_event_work *swdev_work;
-	struct net_device *upper;
 	int err;
 
 	if (event == SWITCHDEV_PORT_ATTR_SET) {
@@ -858,54 +854,7 @@ static int prestera_switchdev_event(struct notifier_block *unused,
 		return notifier_from_errno(err);
 	}
 
-	if (!prestera_netdev_check(dev))
-		return NOTIFY_DONE;
-
-	upper = netdev_master_upper_dev_get_rcu(dev);
-	if (!upper)
-		return NOTIFY_DONE;
-
-	if (!netif_is_bridge_master(upper))
-		return NOTIFY_DONE;
-
-	swdev_work = kzalloc(sizeof(*swdev_work), GFP_ATOMIC);
-	if (!swdev_work)
-		return NOTIFY_BAD;
-
-	swdev_work->event = event;
-	swdev_work->dev = dev;
-
-	switch (event) {
-	case SWITCHDEV_FDB_ADD_TO_DEVICE:
-	case SWITCHDEV_FDB_DEL_TO_DEVICE:
-		fdb_info = container_of(info,
-					struct switchdev_notifier_fdb_info,
-					info);
-
-		INIT_WORK(&swdev_work->work, prestera_fdb_event_work);
-		memcpy(&swdev_work->fdb_info, ptr,
-		       sizeof(swdev_work->fdb_info));
-
-		swdev_work->fdb_info.addr = kzalloc(ETH_ALEN, GFP_ATOMIC);
-		if (!swdev_work->fdb_info.addr)
-			goto out_bad;
-
-		ether_addr_copy((u8 *)swdev_work->fdb_info.addr,
-				fdb_info->addr);
-		dev_hold(dev);
-		break;
-
-	default:
-		kfree(swdev_work);
-		return NOTIFY_DONE;
-	}
-
-	queue_work(swdev_wq, &swdev_work->work);
 	return NOTIFY_DONE;
-
-out_bad:
-	kfree(swdev_work);
-	return NOTIFY_BAD;
 }
 
 static int
@@ -1101,6 +1050,53 @@ static int prestera_port_obj_del(struct net_device *dev, const void *ctx,
 	}
 }
 
+static int prestera_switchdev_fdb_event(struct net_device *dev,
+					unsigned long event,
+					struct switchdev_notifier_info *info)
+{
+	struct switchdev_notifier_fdb_info *fdb_info;
+	struct prestera_fdb_event_work *swdev_work;
+	struct net_device *upper;
+
+	if (!prestera_netdev_check(dev))
+		return 0;
+
+	upper = netdev_master_upper_dev_get_rcu(dev);
+	if (!upper)
+		return 0;
+
+	if (!netif_is_bridge_master(upper))
+		return 0;
+
+	swdev_work = kzalloc(sizeof(*swdev_work), GFP_ATOMIC);
+	if (!swdev_work)
+		return -ENOMEM;
+
+	swdev_work->event = event;
+	swdev_work->dev = dev;
+
+	fdb_info = container_of(info, struct switchdev_notifier_fdb_info,
+				info);
+
+	INIT_WORK(&swdev_work->work, prestera_fdb_event_work);
+	memcpy(&swdev_work->fdb_info, fdb_info, sizeof(swdev_work->fdb_info));
+
+	swdev_work->fdb_info.addr = kzalloc(ETH_ALEN, GFP_ATOMIC);
+	if (!swdev_work->fdb_info.addr)
+		goto out_bad;
+
+	ether_addr_copy((u8 *)swdev_work->fdb_info.addr,
+			fdb_info->addr);
+	dev_hold(dev);
+
+	queue_work(swdev_wq, &swdev_work->work);
+	return 0;
+
+out_bad:
+	kfree(swdev_work);
+	return -ENOMEM;
+}
+
 static int prestera_switchdev_blk_event(struct notifier_block *unused,
 					unsigned long event, void *ptr)
 {
@@ -1123,8 +1119,12 @@ static int prestera_switchdev_blk_event(struct notifier_block *unused,
 						     prestera_netdev_check,
 						     prestera_port_obj_attr_set);
 		break;
-	default:
-		err = -EOPNOTSUPP;
+	case SWITCHDEV_FDB_ADD_TO_DEVICE:
+	case SWITCHDEV_FDB_DEL_TO_DEVICE:
+		rcu_read_lock();
+		err = prestera_switchdev_fdb_event(dev, event, ptr);
+		rcu_read_unlock();
+		break;
 	}
 
 	return notifier_from_errno(err);

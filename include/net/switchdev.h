@@ -283,6 +283,13 @@ int switchdev_port_obj_add(struct net_device *dev,
 int switchdev_port_obj_del(struct net_device *dev,
 			   const struct switchdev_obj *obj);
 
+int
+switchdev_fdb_add_to_device(struct net_device *dev,
+			    const struct switchdev_notifier_fdb_info *fdb_info);
+int
+switchdev_fdb_del_to_device(struct net_device *dev,
+			    const struct switchdev_notifier_fdb_info *fdb_info);
+
 int register_switchdev_notifier(struct notifier_block *nb);
 int unregister_switchdev_notifier(struct notifier_block *nb);
 int call_switchdev_notifiers(unsigned long val, struct net_device *dev,
@@ -382,6 +389,20 @@ static inline int switchdev_port_obj_add(struct net_device *dev,
 
 static inline int switchdev_port_obj_del(struct net_device *dev,
 					 const struct switchdev_obj *obj)
+{
+	return -EOPNOTSUPP;
+}
+
+static inline int
+switchdev_fdb_add_to_device(struct net_device *dev,
+			    const struct switchdev_notifier_fdb_info *fdb_info)
+{
+	return -EOPNOTSUPP;
+}
+
+static inline int
+switchdev_fdb_del_to_device(struct net_device *dev,
+			    const struct switchdev_notifier_fdb_info *fdb_info)
 {
 	return -EOPNOTSUPP;
 }

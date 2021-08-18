@@ -2254,52 +2254,11 @@ static int dpaa2_switch_port_event(struct notifier_block *nb,
 				   unsigned long event, void *ptr)
 {
 	struct net_device *dev = switchdev_notifier_info_to_dev(ptr);
-	struct ethsw_port_priv *port_priv = netdev_priv(dev);
-	struct ethsw_switchdev_event_work *switchdev_work;
-	struct switchdev_notifier_fdb_info *fdb_info = ptr;
-	struct ethsw_core *ethsw = port_priv->ethsw_data;
 
 	if (event == SWITCHDEV_PORT_ATTR_SET)
 		return dpaa2_switch_port_attr_set_event(dev, ptr);
 
-	if (!dpaa2_switch_port_dev_check(dev))
-		return NOTIFY_DONE;
-
-	switchdev_work = kzalloc(sizeof(*switchdev_work), GFP_ATOMIC);
-	if (!switchdev_work)
-		return NOTIFY_BAD;
-
-	INIT_WORK(&switchdev_work->work, dpaa2_switch_event_work);
-	switchdev_work->dev = dev;
-	switchdev_work->event = event;
-
-	switch (event) {
-	case SWITCHDEV_FDB_ADD_TO_DEVICE:
-	case SWITCHDEV_FDB_DEL_TO_DEVICE:
-		memcpy(&switchdev_work->fdb_info, ptr,
-		       sizeof(switchdev_work->fdb_info));
-		switchdev_work->fdb_info.addr = kzalloc(ETH_ALEN, GFP_ATOMIC);
-		if (!switchdev_work->fdb_info.addr)
-			goto err_addr_alloc;
-
-		ether_addr_copy((u8 *)switchdev_work->fdb_info.addr,
-				fdb_info->addr);
-
-		/* Take a reference on the device to avoid being freed. */
-		dev_hold(dev);
-		break;
-	default:
-		kfree(switchdev_work);
-		return NOTIFY_DONE;
-	}
-
-	queue_work(ethsw->workqueue, &switchdev_work->work);
-
 	return NOTIFY_DONE;
-
-err_addr_alloc:
-	kfree(switchdev_work);
-	return NOTIFY_BAD;
 }
 
 static int dpaa2_switch_port_obj_event(unsigned long event,
@@ -2324,6 +2283,46 @@ static int dpaa2_switch_port_obj_event(unsigned long event,
 	return notifier_from_errno(err);
 }
 
+static int dpaa2_switch_fdb_event(unsigned long event,
+				  struct net_device *dev,
+				  struct switchdev_notifier_fdb_info *fdb_info)
+{
+	struct ethsw_port_priv *port_priv = netdev_priv(dev);
+	struct ethsw_switchdev_event_work *switchdev_work;
+	struct ethsw_core *ethsw = port_priv->ethsw_data;
+
+	if (!dpaa2_switch_port_dev_check(dev))
+		return NOTIFY_DONE;
+
+	switchdev_work = kzalloc(sizeof(*switchdev_work), GFP_ATOMIC);
+	if (!switchdev_work)
+		return NOTIFY_BAD;
+
+	INIT_WORK(&switchdev_work->work, dpaa2_switch_event_work);
+	switchdev_work->dev = dev;
+	switchdev_work->event = event;
+
+	memcpy(&switchdev_work->fdb_info, fdb_info,
+	       sizeof(switchdev_work->fdb_info));
+	switchdev_work->fdb_info.addr = kzalloc(ETH_ALEN, GFP_ATOMIC);
+	if (!switchdev_work->fdb_info.addr)
+		goto err_addr_alloc;
+
+	ether_addr_copy((u8 *)switchdev_work->fdb_info.addr,
+			fdb_info->addr);
+
+	/* Take a reference on the device to avoid being freed. */
+	dev_hold(dev);
+
+	queue_work(ethsw->workqueue, &switchdev_work->work);
+
+	return NOTIFY_DONE;
+
+err_addr_alloc:
+	kfree(switchdev_work);
+	return NOTIFY_BAD;
+}
+
 static int dpaa2_switch_port_blocking_event(struct notifier_block *nb,
 					    unsigned long event, void *ptr)
 {
@@ -2335,6 +2334,9 @@ static int dpaa2_switch_port_blocking_event(struct notifier_block *nb,
 		return dpaa2_switch_port_obj_event(event, dev, ptr);
 	case SWITCHDEV_PORT_ATTR_SET:
 		return dpaa2_switch_port_attr_set_event(dev, ptr);
+	case SWITCHDEV_FDB_ADD_TO_DEVICE:
+	case SWITCHDEV_FDB_DEL_TO_DEVICE:
+		return dpaa2_switch_fdb_event(event, dev, ptr);
 	}
 
 	return NOTIFY_DONE;

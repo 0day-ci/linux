@@ -276,6 +276,55 @@ mlx5_esw_bridge_port_obj_attr_set(struct net_device *dev,
 	return err;
 }
 
+static struct mlx5_bridge_switchdev_fdb_work *
+mlx5_esw_bridge_init_switchdev_fdb_work(struct net_device *dev, bool add,
+					struct switchdev_notifier_fdb_info *fdb_info,
+					struct mlx5_esw_bridge_offloads *br_offloads);
+
+static int
+mlx5_esw_bridge_fdb_event(struct net_device *dev, unsigned long event,
+			  struct switchdev_notifier_info *info,
+			  struct mlx5_esw_bridge_offloads *br_offloads)
+{
+	struct switchdev_notifier_fdb_info *fdb_info;
+	struct mlx5_bridge_switchdev_fdb_work *work;
+	struct mlx5_eswitch *esw = br_offloads->esw;
+	u16 vport_num, esw_owner_vhca_id;
+	struct net_device *upper, *rep;
+
+	upper = netdev_master_upper_dev_get_rcu(dev);
+	if (!upper)
+		return 0;
+	if (!netif_is_bridge_master(upper))
+		return 0;
+
+	rep = mlx5_esw_bridge_rep_vport_num_vhca_id_get(dev, esw,
+							&vport_num,
+							&esw_owner_vhca_id);
+	if (!rep)
+		return 0;
+
+	/* only handle the event on peers */
+	if (mlx5_esw_bridge_is_local(dev, rep, esw))
+		return 0;
+
+	fdb_info = container_of(info, struct switchdev_notifier_fdb_info, info);
+
+	work = mlx5_esw_bridge_init_switchdev_fdb_work(dev,
+						       event == SWITCHDEV_FDB_ADD_TO_DEVICE,
+						       fdb_info,
+						       br_offloads);
+	if (IS_ERR(work)) {
+		WARN_ONCE(1, "Failed to init switchdev work, err=%ld",
+			  PTR_ERR(work));
+		return PTR_ERR(work);
+	}
+
+	queue_work(br_offloads->wq, &work->work);
+
+	return 0;
+}
+
 static int mlx5_esw_bridge_event_blocking(struct notifier_block *nb,
 					  unsigned long event, void *ptr)
 {
@@ -294,6 +343,12 @@ static int mlx5_esw_bridge_event_blocking(struct notifier_block *nb,
 		break;
 	case SWITCHDEV_PORT_ATTR_SET:
 		err = mlx5_esw_bridge_port_obj_attr_set(dev, ptr, br_offloads);
+		break;
+	case SWITCHDEV_FDB_ADD_TO_DEVICE:
+	case SWITCHDEV_FDB_DEL_TO_DEVICE:
+		rcu_read_lock();
+		err = mlx5_esw_bridge_fdb_event(dev, event, ptr, br_offloads);
+		rcu_read_unlock();
 		break;
 	default:
 		err = 0;
@@ -415,9 +470,7 @@ static int mlx5_esw_bridge_switchdev_event(struct notifier_block *nb,
 		/* only handle the event on peers */
 		if (mlx5_esw_bridge_is_local(dev, rep, esw))
 			break;
-		fallthrough;
-	case SWITCHDEV_FDB_ADD_TO_DEVICE:
-	case SWITCHDEV_FDB_DEL_TO_DEVICE:
+
 		fdb_info = container_of(info,
 					struct switchdev_notifier_fdb_info,
 					info);

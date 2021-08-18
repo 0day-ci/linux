@@ -763,6 +763,8 @@ int br_fdb_replay(const struct net_device *br_dev, const void *ctx, bool adding,
 	if (!nb)
 		return 0;
 
+	ASSERT_RTNL();
+
 	if (!netif_is_bridge_master(br_dev))
 		return -EINVAL;
 

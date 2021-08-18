@@ -138,12 +138,10 @@ br_switchdev_fdb_notify(struct net_bridge *br,
 
 	switch (type) {
 	case RTM_DELNEIGH:
-		call_switchdev_notifiers(SWITCHDEV_FDB_DEL_TO_DEVICE,
-					 dev, &info.info, NULL);
+		switchdev_fdb_del_to_device(dev, &info);
 		break;
 	case RTM_NEWNEIGH:
-		call_switchdev_notifiers(SWITCHDEV_FDB_ADD_TO_DEVICE,
-					 dev, &info.info, NULL);
+		switchdev_fdb_add_to_device(dev, &info);
 		break;
 	}
 }
@@ -287,7 +285,7 @@ static int nbp_switchdev_sync_objs(struct net_bridge_port *p, const void *ctx,
 	if (err && err != -EOPNOTSUPP)
 		return err;
 
-	err = br_fdb_replay(br_dev, ctx, true, atomic_nb);
+	err = br_fdb_replay(br_dev, ctx, true, blocking_nb);
 	if (err && err != -EOPNOTSUPP)
 		return err;
 
@@ -306,7 +304,7 @@ static void nbp_switchdev_unsync_objs(struct net_bridge_port *p,
 
 	br_mdb_replay(br_dev, dev, ctx, false, blocking_nb, NULL);
 
-	br_fdb_replay(br_dev, ctx, false, atomic_nb);
+	br_fdb_replay(br_dev, ctx, false, blocking_nb);
 }
 
 /* Let the bridge know that this port is offloaded, so that it can assign a

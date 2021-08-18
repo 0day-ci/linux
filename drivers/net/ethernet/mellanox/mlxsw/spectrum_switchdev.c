@@ -3247,8 +3247,6 @@ static int mlxsw_sp_switchdev_event(struct notifier_block *unused,
 	switchdev_work->event = event;
 
 	switch (event) {
-	case SWITCHDEV_FDB_ADD_TO_DEVICE:
-	case SWITCHDEV_FDB_DEL_TO_DEVICE:
 	case SWITCHDEV_FDB_ADD_TO_BRIDGE:
 	case SWITCHDEV_FDB_DEL_TO_BRIDGE:
 		fdb_info = container_of(info,
@@ -3513,6 +3511,55 @@ mlxsw_sp_switchdev_handle_vxlan_obj_del(struct net_device *vxlan_dev,
 	}
 }
 
+static int mlxsw_sp_switchdev_fdb_event(struct net_device *dev, unsigned long event,
+					struct switchdev_notifier_info *info)
+{
+	struct mlxsw_sp_switchdev_event_work *switchdev_work;
+	struct switchdev_notifier_fdb_info *fdb_info;
+	struct net_device *br_dev;
+
+	/* Tunnel devices are not our uppers, so check their master instead */
+	br_dev = netdev_master_upper_dev_get_rcu(dev);
+	if (!br_dev)
+		return 0;
+	if (!netif_is_bridge_master(br_dev))
+		return 0;
+	if (!mlxsw_sp_port_dev_lower_find_rcu(br_dev))
+		return 0;
+
+	switchdev_work = kzalloc(sizeof(*switchdev_work), GFP_ATOMIC);
+	if (!switchdev_work)
+		return -ENOMEM;
+
+	switchdev_work->dev = dev;
+	switchdev_work->event = event;
+
+	fdb_info = container_of(info, struct switchdev_notifier_fdb_info,
+				info);
+	INIT_WORK(&switchdev_work->work,
+		  mlxsw_sp_switchdev_bridge_fdb_event_work);
+	memcpy(&switchdev_work->fdb_info, fdb_info,
+	       sizeof(switchdev_work->fdb_info));
+	switchdev_work->fdb_info.addr = kzalloc(ETH_ALEN, GFP_ATOMIC);
+	if (!switchdev_work->fdb_info.addr)
+		goto err_addr_alloc;
+	ether_addr_copy((u8 *)switchdev_work->fdb_info.addr,
+			fdb_info->addr);
+	/* Take a reference on the device. This can be either
+	 * upper device containig mlxsw_sp_port or just a
+	 * mlxsw_sp_port
+	 */
+	dev_hold(dev);
+
+	mlxsw_core_schedule_work(&switchdev_work->work);
+
+	return 0;
+
+err_addr_alloc:
+	kfree(switchdev_work);
+	return NOTIFY_BAD;
+}
+
 static int mlxsw_sp_switchdev_blocking_event(struct notifier_block *unused,
 					     unsigned long event, void *ptr)
 {
@@ -3540,6 +3587,12 @@ static int mlxsw_sp_switchdev_blocking_event(struct notifier_block *unused,
 		err = switchdev_handle_port_attr_set(dev, ptr,
 						     mlxsw_sp_port_dev_check,
 						     mlxsw_sp_port_attr_set);
+		return notifier_from_errno(err);
+	case SWITCHDEV_FDB_ADD_TO_DEVICE:
+	case SWITCHDEV_FDB_DEL_TO_DEVICE:
+		rcu_read_lock();
+		err = mlxsw_sp_switchdev_fdb_event(dev, event, ptr);
+		rcu_read_unlock();
 		return notifier_from_errno(err);
 	}
 
