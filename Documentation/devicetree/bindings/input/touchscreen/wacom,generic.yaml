@@ -25,6 +25,24 @@ properties:
   vdd-supply:
     description: Power Supply
 
+  flip-tilt-x:
+    type: boolean
+
+  flip-tilt-y:
+    type: boolean
+
+  flip-pos-x:
+    type: boolean
+
+  flip-pos-y:
+    type: boolean
+
+  flip-distance:
+    type: boolean
+
+  flip-pressure:
+    type: boolean
+
 required:
   - compatible
   - reg
