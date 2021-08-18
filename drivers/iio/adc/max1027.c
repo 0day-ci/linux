@@ -401,7 +401,12 @@ static int max1027_set_cnvst_trigger_state(struct iio_trigger *trig, bool state)
 		if (ret < 0)
 			return ret;
 	} else {
-		/* Start acquisition on conversion register write */
+		/*
+		 * Start acquisition on conversion register write, which
+		 * basically disables triggering conversions upon cnvst changes
+		 * and thus has the effect of disabling the external hardware
+		 * trigger.
+		 */
 		ret = max1027_configure_trigger(indio_dev);
 		if (ret)
 			return ret;
