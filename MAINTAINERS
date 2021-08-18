@@ -19564,6 +19564,7 @@ M:	Sidraya Jayagond <sidraya.bj@pathpartnertech.com>
 L:	linux-media@vger.kernel.org
 S:	Maintained
 F:	Documentation/devicetree/bindings/media/img,d5520-vxd.yaml
+F:	arch/arm64/configs/tisdk_j7-evm_defconfig
 F:	drivers/staging/media/vxd/common/addr_alloc.c
 F:	drivers/staging/media/vxd/common/addr_alloc.h
 F:	drivers/staging/media/vxd/common/dq.c
