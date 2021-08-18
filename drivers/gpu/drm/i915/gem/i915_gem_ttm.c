@@ -909,7 +909,6 @@ int __i915_gem_ttm_object_init(struct intel_memory_region *mem,
 	drm_gem_private_object_init(&i915->drm, &obj->base, size);
 	i915_gem_object_init(obj, &i915_gem_ttm_obj_ops, &lock_class, flags);
 	i915_gem_object_init_memory_region(obj, mem);
-	i915_gem_object_make_unshrinkable(obj);
 	INIT_RADIX_TREE(&obj->ttm.get_io_page.radix, GFP_KERNEL | __GFP_NOWARN);
 	mutex_init(&obj->ttm.get_io_page.lock);
 	bo_type = (obj->flags & I915_BO_ALLOC_USER) ? ttm_bo_type_device :
@@ -932,7 +931,7 @@ int __i915_gem_ttm_object_init(struct intel_memory_region *mem,
 				   page_size >> PAGE_SHIFT,
 				   &ctx, NULL, NULL, i915_ttm_bo_destroy);
 	if (ret)
-		return i915_ttm_err_to_gem(ret);
+		goto err_release_mr;
 
 	obj->ttm.created = true;
 	i915_ttm_adjust_domains_after_move(obj);
@@ -940,6 +939,10 @@ int __i915_gem_ttm_object_init(struct intel_memory_region *mem,
 	i915_gem_object_unlock(obj);
 
 	return 0;
+
+err_release_mr:
+	i915_gem_object_release_memory_region(obj);
+	return i915_ttm_err_to_gem(ret);
 }
 
 static const struct intel_memory_region_ops ttm_system_region_ops = {
