@@ -13,9 +13,9 @@
 };
 
 &usdhc1 {
-	compatible = "fsl,imx8qm-usdhc", "fsl,imx8qxp-usdhc", "fsl,imx7d-usdhc";
+	compatible = "fsl,imx8qxp-usdhc", "fsl,imx7d-usdhc";
 };
 
 &usdhc2 {
-	compatible = "fsl,imx8qm-usdhc", "fsl,imx8qxp-usdhc", "fsl,imx7d-usdhc";
+	compatible = "fsl,imx8qxp-usdhc", "fsl,imx7d-usdhc";
 };
