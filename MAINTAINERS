@@ -19587,6 +19587,8 @@ F:	drivers/staging/media/vxd/common/pool_api.c
 F:	drivers/staging/media/vxd/common/pool_api.h
 F:	drivers/staging/media/vxd/common/ra.c
 F:	drivers/staging/media/vxd/common/ra.h
+F:	drivers/staging/media/vxd/common/rman_api.c
+F:	drivers/staging/media/vxd/common/rman_api.h
 F:	drivers/staging/media/vxd/common/talmmu_api.c
 F:	drivers/staging/media/vxd/common/talmmu_api.h
 F:	drivers/staging/media/vxd/common/work_queue.c
