@@ -1412,7 +1412,7 @@
 			reg = <0 0xaf00000 0 0x20000>;
 			clocks = <&rpmhcc RPMH_CXO_CLK>,
 				 <&gcc GCC_DISP_GPLL0_CLK_SRC>,
-				 <0>, <0>, <0>, <0>, <0>, <0>;
+				 <0>, <0>, <0>, <0>, <&edp_phy 0>, <&edp_phy 1>;
 			clock-names = "bi_tcxo", "gcc_disp_gpll0_clk",
 				      "dsi0_phy_pll_out_byteclk",
 				      "dsi0_phy_pll_out_dsiclk",
@@ -1491,6 +1491,12 @@
 						reg = <0>;
 						dpu_intf1_out: endpoint {
 							remote-endpoint = <&dsi0_in>;
+						};
+					};
+					port@1 {
+						reg = <1>;
+						dpu_intf5_out: endpoint {
+							remote-endpoint = <&edp_in>;
 						};
 					};
 				};
@@ -1608,6 +1614,101 @@
 
 				status = "disabled";
 			};
+
+			msm_edp: edp@aea0000 {
+				status = "disabled";
+				compatible = "qcom,sc7280-edp";
+				reg = <0 0xaea0000 0 0x200>,
+				      <0 0xaea0200 0 0x200>,
+				      <0 0xaea0400 0 0xc00>,
+				      <0 0xaea1000 0 0x400>;
+
+				interrupt-parent = <&mdss>;
+				interrupts = <14 IRQ_TYPE_NONE>;
+
+				clocks = <&rpmhcc RPMH_CXO_CLK>,
+					 <&gcc GCC_EDP_CLKREF_EN>,
+					 <&dispcc DISP_CC_MDSS_AHB_CLK>,
+					 <&dispcc DISP_CC_MDSS_EDP_AUX_CLK>,
+					 <&dispcc DISP_CC_MDSS_EDP_LINK_CLK>,
+					 <&dispcc DISP_CC_MDSS_EDP_LINK_INTF_CLK>,
+					 <&dispcc DISP_CC_MDSS_EDP_PIXEL_CLK>;
+				clock-names = "core_xo", "core_ref",
+					      "core_iface", "core_aux", "ctrl_link",
+					      "ctrl_link_iface", "stream_pixel";
+				#clock-cells = <1>;
+				assigned-clocks = <&dispcc DISP_CC_MDSS_EDP_LINK_CLK_SRC>,
+						  <&dispcc DISP_CC_MDSS_EDP_PIXEL_CLK_SRC>;
+				assigned-clock-parents = <&edp_phy 0>, <&edp_phy 1>;
+
+				phys = <&edp_phy>;
+				phy-names = "dp";
+
+				vdda-1p2-supply = <&vreg_l6b_1p2>;
+				vdda-0p9-supply = <&vreg_l10c_0p8>;
+				operating-points-v2 = <&edp_opp_table>;
+				power-domains = <&rpmhpd SC7280_CX>;
+
+				pinctrl-names = "default";
+				pinctrl-0 = <&edp_hot_plug_det>, <&edp_panel_power_on>;
+
+				panel-bklt-gpio = <&pm8350c_gpios 7 GPIO_ACTIVE_HIGH>;
+				panel-pwm-gpio = <&pm8350c_gpios 8 GPIO_ACTIVE_HIGH>;
+
+				ports {
+					#address-cells = <1>;
+					#size-cells = <0>;
+					port@0 {
+						reg = <0>;
+						edp_in: endpoint {
+							remote-endpoint = <&dpu_intf5_out>;
+						};
+					};
+				};
+
+				edp_opp_table: edp-opp-table {
+					compatible = "operating-points-v2";
+
+					opp-160000000 {
+						opp-hz = /bits/ 64 <160000000>;
+						required-opps = <&rpmhpd_opp_low_svs>;
+					};
+
+					opp-270000000 {
+						opp-hz = /bits/ 64 <270000000>;
+						required-opps = <&rpmhpd_opp_svs>;
+					};
+
+					opp-540000000 {
+						opp-hz = /bits/ 64 <540000000>;
+						required-opps = <&rpmhpd_opp_nom>;
+					};
+
+					opp-810000000 {
+						opp-hz = /bits/ 64 <810000000>;
+						required-opps = <&rpmhpd_opp_nom>;
+					};
+				};
+			};
+
+			edp_phy: phy@aec2000 {
+				status = "disabled";
+				compatible = "qcom,sc7280-edp-phy";
+				reg = <0 0xaec2a00 0 0x19c>,
+				      <0 0xaec2200 0 0xa0>,
+				      <0 0xaec2600 0 0xa0>,
+				      <0 0xaec2000 0 0x1c0>;
+
+				clocks = <&rpmhcc RPMH_CXO_CLK>,
+					 <&gcc GCC_EDP_CLKREF_EN>;
+				clock-names = "aux", "cfg_ahb";
+
+				vdda-pll-supply = <&vreg_l6b_1p2>;
+				vdda-phy-supply = <&vreg_l10c_0p8>;
+
+				#clock-cells = <1>;
+				#phy-cells = <0>;
+			};
 		};
 
 		pdc: interrupt-controller@b220000 {
@@ -1702,6 +1803,30 @@
 			qup_uart5_default: qup-uart5-default {
 				pins = "gpio46", "gpio47";
 				function = "qup13";
+			};
+
+			edp_hot_plug_det: edp-hot-plug-det {
+				pinmux {
+					pins = "gpio60";
+					function = "edp_hot";
+				};
+				pinconf {
+					pins = "gpio60";
+					bias-pull-down;
+					input-enable;
+				};
+			};
+
+			edp_panel_power_on: edp-panel-power-on {
+				pinmux {
+					pins = "gpio80";
+					function = "gpio";
+				};
+				pinconf {
+					pins = "gpio80";
+					bias-disable;
+					output-high;
+				};
 			};
 
 			sdc1_on: sdc1-on {
