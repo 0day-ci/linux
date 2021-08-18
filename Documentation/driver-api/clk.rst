@@ -259,7 +259,9 @@ the disabling means that the driver will remain functional while the issues
 are sorted out.
 
 To bypass this disabling, include "clk_ignore_unused" in the bootargs to the
-kernel.
+kernel. If you pass "clk_ignore_unused=n" (where n is an integer) the first n
+found clocks are not disabled which can be useful for bisecting over the unused
+clks if you don't know yet which of them is reponsible for your problem.
 
 Locking
 =======

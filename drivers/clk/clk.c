@@ -1236,6 +1236,8 @@ static void __init clk_unprepare_unused_subtree(struct clk_core *core)
 	clk_pm_runtime_put(core);
 }
 
+static unsigned clk_unused_keep_on __initdata;
+
 static void __init clk_disable_unused_subtree(struct clk_core *core)
 {
 	struct clk_core *child;
@@ -1266,12 +1268,17 @@ static void __init clk_disable_unused_subtree(struct clk_core *core)
 	 * back to .disable
 	 */
 	if (clk_core_is_enabled(core)) {
-		trace_clk_disable(core);
-		if (core->ops->disable_unused)
-			core->ops->disable_unused(core->hw);
-		else if (core->ops->disable)
-			core->ops->disable(core->hw);
-		trace_clk_disable_complete(core);
+		if (clk_unused_keep_on) {
+			pr_warn("Keep unused clk \"%s\" on\n", core->name);
+			clk_unused_keep_on -= 1;
+		} else {
+			trace_clk_disable(core);
+			if (core->ops->disable_unused)
+				core->ops->disable_unused(core->hw);
+			else if (core->ops->disable)
+				core->ops->disable(core->hw);
+			trace_clk_disable_complete(core);
+		}
 	}
 
 unlock_out:
@@ -1283,9 +1290,17 @@ unprepare_out:
 }
 
 static bool clk_ignore_unused __initdata;
-static int __init clk_ignore_unused_setup(char *__unused)
+static int __init clk_ignore_unused_setup(char *keep)
 {
-	clk_ignore_unused = true;
+	if (*keep == '=') {
+		int ret;
+
+		ret = kstrtouint(keep + 1, 0, &clk_unused_keep_on);
+		if (ret < 0)
+			pr_err("Warning: failed to parse clk_ignore_unused parameter, ignoring");
+	} else {
+		clk_ignore_unused = true;
+	}
 	return 1;
 }
 __setup("clk_ignore_unused", clk_ignore_unused_setup);
@@ -1297,6 +1312,8 @@ static int __init clk_disable_unused(void)
 	if (clk_ignore_unused) {
 		pr_warn("clk: Not disabling unused clocks\n");
 		return 0;
+	} else if (clk_ignore_unused) {
+		pr_warn("clk: Not disabling %u unused clocks\n", clk_ignore_unused);
 	}
 
 	clk_prepare_lock();
