@@ -19645,6 +19645,7 @@ F:	drivers/staging/media/vxd/decoder/translation_api.h
 F:	drivers/staging/media/vxd/decoder/vdec_defs.h
 F:	drivers/staging/media/vxd/decoder/vdec_mmu_wrapper.c
 F:	drivers/staging/media/vxd/decoder/vdec_mmu_wrapper.h
+F:	drivers/staging/media/vxd/decoder/vdecdd_defs.h
 F:	drivers/staging/media/vxd/decoder/vdecdd_utils.c
 F:	drivers/staging/media/vxd/decoder/vdecdd_utils.h
 F:	drivers/staging/media/vxd/decoder/vdecdd_utils_buf.c
