@@ -1948,13 +1948,11 @@ static inline void br_sysfs_delbr(struct net_device *dev) { return; }
 #ifdef CONFIG_NET_SWITCHDEV
 int br_switchdev_port_offload(struct net_bridge_port *p,
 			      struct net_device *dev, const void *ctx,
-			      struct notifier_block *atomic_nb,
 			      struct notifier_block *blocking_nb,
 			      bool tx_fwd_offload,
 			      struct netlink_ext_ack *extack);
 
 void br_switchdev_port_unoffload(struct net_bridge_port *p, const void *ctx,
-				 struct notifier_block *atomic_nb,
 				 struct notifier_block *blocking_nb);
 
 bool br_switchdev_frame_uses_tx_fwd_offload(struct sk_buff *skb);
@@ -1988,7 +1986,6 @@ static inline void br_switchdev_frame_unmark(struct sk_buff *skb)
 static inline int
 br_switchdev_port_offload(struct net_bridge_port *p,
 			  struct net_device *dev, const void *ctx,
-			  struct notifier_block *atomic_nb,
 			  struct notifier_block *blocking_nb,
 			  bool tx_fwd_offload,
 			  struct netlink_ext_ack *extack)
@@ -1998,7 +1995,6 @@ br_switchdev_port_offload(struct net_bridge_port *p,
 
 static inline void
 br_switchdev_port_unoffload(struct net_bridge_port *p, const void *ctx,
-			    struct notifier_block *atomic_nb,
 			    struct notifier_block *blocking_nb)
 {
 }

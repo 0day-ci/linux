@@ -859,7 +859,6 @@ EXPORT_SYMBOL_GPL(switchdev_handle_port_attr_set);
 
 int switchdev_bridge_port_offload(struct net_device *brport_dev,
 				  struct net_device *dev, const void *ctx,
-				  struct notifier_block *atomic_nb,
 				  struct notifier_block *blocking_nb,
 				  bool tx_fwd_offload,
 				  struct netlink_ext_ack *extack)
@@ -868,7 +867,6 @@ int switchdev_bridge_port_offload(struct net_device *brport_dev,
 		.brport = {
 			.dev = dev,
 			.ctx = ctx,
-			.atomic_nb = atomic_nb,
 			.blocking_nb = blocking_nb,
 			.tx_fwd_offload = tx_fwd_offload,
 		},
@@ -886,13 +884,11 @@ EXPORT_SYMBOL_GPL(switchdev_bridge_port_offload);
 
 void switchdev_bridge_port_unoffload(struct net_device *brport_dev,
 				     const void *ctx,
-				     struct notifier_block *atomic_nb,
 				     struct notifier_block *blocking_nb)
 {
 	struct switchdev_notifier_brport_info brport_info = {
 		.brport = {
 			.ctx = ctx,
-			.atomic_nb = atomic_nb,
 			.blocking_nb = blocking_nb,
 		},
 	};

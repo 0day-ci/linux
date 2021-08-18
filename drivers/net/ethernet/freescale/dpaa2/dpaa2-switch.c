@@ -2016,7 +2016,6 @@ static int dpaa2_switch_port_bridge_join(struct net_device *netdev,
 		goto err_egress_flood;
 
 	err = switchdev_bridge_port_offload(netdev, netdev, NULL,
-					    &dpaa2_switch_port_switchdev_nb,
 					    &dpaa2_switch_port_switchdev_blocking_nb,
 					    false, extack);
 	if (err)
@@ -2053,7 +2052,6 @@ static int dpaa2_switch_port_restore_rxvlan(struct net_device *vdev, int vid, vo
 static void dpaa2_switch_port_pre_bridge_leave(struct net_device *netdev)
 {
 	switchdev_bridge_port_unoffload(netdev, NULL,
-					&dpaa2_switch_port_switchdev_nb,
 					&dpaa2_switch_port_switchdev_blocking_nb);
 }
 

@@ -2598,7 +2598,7 @@ static int ofdpa_port_bridge_join(struct ofdpa_port *ofdpa_port,
 	if (err)
 		return err;
 
-	return switchdev_bridge_port_offload(dev, dev, NULL, NULL, NULL,
+	return switchdev_bridge_port_offload(dev, dev, NULL, NULL,
 					     false, extack);
 }
 
@@ -2607,7 +2607,7 @@ static int ofdpa_port_bridge_leave(struct ofdpa_port *ofdpa_port)
 	struct net_device *dev = ofdpa_port->dev;
 	int err;
 
-	switchdev_bridge_port_unoffload(dev, NULL, NULL, NULL);
+	switchdev_bridge_port_unoffload(dev, NULL, NULL);
 
 	err = ofdpa_port_vlan_del(ofdpa_port, OFDPA_UNTAGGED_VID, 0);
 	if (err)

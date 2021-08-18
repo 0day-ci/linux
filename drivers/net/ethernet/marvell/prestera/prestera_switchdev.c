@@ -502,7 +502,7 @@ int prestera_bridge_port_join(struct net_device *br_dev,
 	}
 
 	err = switchdev_bridge_port_offload(br_port->dev, port->dev, NULL,
-					    NULL, NULL, false, extack);
+					    NULL, false, extack);
 	if (err)
 		goto err_switchdev_offload;
 
@@ -516,7 +516,7 @@ int prestera_bridge_port_join(struct net_device *br_dev,
 	return 0;
 
 err_port_join:
-	switchdev_bridge_port_unoffload(br_port->dev, NULL, NULL, NULL);
+	switchdev_bridge_port_unoffload(br_port->dev, NULL, NULL);
 err_switchdev_offload:
 	prestera_bridge_port_put(br_port);
 err_brport_create:
@@ -592,7 +592,7 @@ void prestera_bridge_port_leave(struct net_device *br_dev,
 	else
 		prestera_bridge_1d_port_leave(br_port);
 
-	switchdev_bridge_port_unoffload(br_port->dev, NULL, NULL, NULL);
+	switchdev_bridge_port_unoffload(br_port->dev, NULL, NULL);
 
 	prestera_hw_port_learning_set(port, false);
 	prestera_hw_port_flood_set(port, BR_FLOOD | BR_MCAST_FLOOD, 0);

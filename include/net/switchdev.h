@@ -183,7 +183,6 @@ typedef int switchdev_obj_dump_cb_t(struct switchdev_obj *obj);
 struct switchdev_brport {
 	struct net_device *dev;
 	const void *ctx;
-	struct notifier_block *atomic_nb;
 	struct notifier_block *blocking_nb;
 	bool tx_fwd_offload;
 };
@@ -264,13 +263,11 @@ switchdev_fdb_is_dynamically_learned(const struct switchdev_notifier_fdb_info *f
 
 int switchdev_bridge_port_offload(struct net_device *brport_dev,
 				  struct net_device *dev, const void *ctx,
-				  struct notifier_block *atomic_nb,
 				  struct notifier_block *blocking_nb,
 				  bool tx_fwd_offload,
 				  struct netlink_ext_ack *extack);
 void switchdev_bridge_port_unoffload(struct net_device *brport_dev,
 				     const void *ctx,
-				     struct notifier_block *atomic_nb,
 				     struct notifier_block *blocking_nb);
 
 void switchdev_deferred_process(void);
@@ -353,7 +350,6 @@ int switchdev_handle_port_attr_set(struct net_device *dev,
 static inline int
 switchdev_bridge_port_offload(struct net_device *brport_dev,
 			      struct net_device *dev, const void *ctx,
-			      struct notifier_block *atomic_nb,
 			      struct notifier_block *blocking_nb,
 			      bool tx_fwd_offload,
 			      struct netlink_ext_ack *extack)
@@ -364,7 +360,6 @@ switchdev_bridge_port_offload(struct net_device *brport_dev,
 static inline void
 switchdev_bridge_port_unoffload(struct net_device *brport_dev,
 				const void *ctx,
-				struct notifier_block *atomic_nb,
 				struct notifier_block *blocking_nb)
 {
 }

@@ -380,7 +380,6 @@ int dsa_port_bridge_join(struct dsa_port *dp, struct net_device *br,
 							dp->bridge_num);
 
 	err = switchdev_bridge_port_offload(brport_dev, dev, dp,
-					    &dsa_slave_switchdev_notifier,
 					    &dsa_slave_switchdev_blocking_notifier,
 					    tx_fwd_offload, extack);
 	if (err)
@@ -394,7 +393,6 @@ int dsa_port_bridge_join(struct dsa_port *dp, struct net_device *br,
 
 out_rollback_unoffload:
 	switchdev_bridge_port_unoffload(brport_dev, dp,
-					&dsa_slave_switchdev_notifier,
 					&dsa_slave_switchdev_blocking_notifier);
 out_rollback_unbridge:
 	dsa_broadcast(DSA_NOTIFIER_BRIDGE_LEAVE, &info);
@@ -408,7 +406,6 @@ void dsa_port_pre_bridge_leave(struct dsa_port *dp, struct net_device *br)
 	struct net_device *brport_dev = dsa_port_to_bridge_port(dp);
 
 	switchdev_bridge_port_unoffload(brport_dev, dp,
-					&dsa_slave_switchdev_notifier,
 					&dsa_slave_switchdev_blocking_notifier);
 }
 

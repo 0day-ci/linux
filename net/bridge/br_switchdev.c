@@ -269,7 +269,6 @@ static void nbp_switchdev_del(struct net_bridge_port *p)
 }
 
 static int nbp_switchdev_sync_objs(struct net_bridge_port *p, const void *ctx,
-				   struct notifier_block *atomic_nb,
 				   struct notifier_block *blocking_nb,
 				   struct netlink_ext_ack *extack)
 {
@@ -294,7 +293,6 @@ static int nbp_switchdev_sync_objs(struct net_bridge_port *p, const void *ctx,
 
 static void nbp_switchdev_unsync_objs(struct net_bridge_port *p,
 				      const void *ctx,
-				      struct notifier_block *atomic_nb,
 				      struct notifier_block *blocking_nb)
 {
 	struct net_device *br_dev = p->br->dev;
@@ -312,7 +310,6 @@ static void nbp_switchdev_unsync_objs(struct net_bridge_port *p,
  */
 int br_switchdev_port_offload(struct net_bridge_port *p,
 			      struct net_device *dev, const void *ctx,
-			      struct notifier_block *atomic_nb,
 			      struct notifier_block *blocking_nb,
 			      bool tx_fwd_offload,
 			      struct netlink_ext_ack *extack)
@@ -328,7 +325,7 @@ int br_switchdev_port_offload(struct net_bridge_port *p,
 	if (err)
 		return err;
 
-	err = nbp_switchdev_sync_objs(p, ctx, atomic_nb, blocking_nb, extack);
+	err = nbp_switchdev_sync_objs(p, ctx, blocking_nb, extack);
 	if (err)
 		goto out_switchdev_del;
 
@@ -341,10 +338,9 @@ out_switchdev_del:
 }
 
 void br_switchdev_port_unoffload(struct net_bridge_port *p, const void *ctx,
-				 struct notifier_block *atomic_nb,
 				 struct notifier_block *blocking_nb)
 {
-	nbp_switchdev_unsync_objs(p, ctx, atomic_nb, blocking_nb);
+	nbp_switchdev_unsync_objs(p, ctx, blocking_nb);
 
 	nbp_switchdev_del(p);
 }

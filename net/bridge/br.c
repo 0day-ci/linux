@@ -222,7 +222,7 @@ static int br_switchdev_blocking_event(struct notifier_block *nb,
 		b = &brport_info->brport;
 
 		err = br_switchdev_port_offload(p, b->dev, b->ctx,
-						b->atomic_nb, b->blocking_nb,
+						b->blocking_nb,
 						b->tx_fwd_offload, extack);
 		err = notifier_from_errno(err);
 		break;
@@ -230,8 +230,7 @@ static int br_switchdev_blocking_event(struct notifier_block *nb,
 		brport_info = ptr;
 		b = &brport_info->brport;
 
-		br_switchdev_port_unoffload(p, b->ctx, b->atomic_nb,
-					    b->blocking_nb);
+		br_switchdev_port_unoffload(p, b->ctx, b->blocking_nb);
 		break;
 	}
 
