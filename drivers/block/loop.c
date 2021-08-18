@@ -1169,7 +1169,6 @@ loop_set_status_from_info(struct loop_device *lo,
 	if (!xfer)
 		xfer = &none_funcs;
 	lo->transfer = xfer->transfer;
-	lo->ioctl = xfer->ioctl;
 
 	lo->lo_flags = info->lo_flags;
 
@@ -1383,7 +1382,6 @@ static int __loop_clr_fd(struct loop_device *lo, bool release)
 
 	loop_release_xfer(lo);
 	lo->transfer = NULL;
-	lo->ioctl = NULL;
 	lo->lo_device = NULL;
 	lo->lo_encryption = NULL;
 	lo->lo_offset = 0;
@@ -1809,7 +1807,7 @@ static int lo_simple_ioctl(struct loop_device *lo, unsigned int cmd,
 		err = loop_set_block_size(lo, arg);
 		break;
 	default:
-		err = lo->ioctl ? lo->ioctl(lo, cmd, arg) : -EINVAL;
+		err = -EINVAL;
 	}
 	mutex_unlock(&lo->lo_mutex);
 	return err;
