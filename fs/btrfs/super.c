@@ -2463,7 +2463,9 @@ static int btrfs_unfreeze(struct super_block *sb)
 static int btrfs_show_devname(struct seq_file *m, struct dentry *root)
 {
 	struct btrfs_fs_info *fs_info = btrfs_sb(root->d_sb);
+	struct btrfs_fs_devices *fs_devices = fs_info->fs_devices;
 	struct btrfs_device *dev, *first_dev = NULL;
+	struct btrfs_fs_devices *seed_devices;
 
 	/*
 	 * Lightweight locking of the devices. We should not need
@@ -2473,7 +2475,7 @@ static int btrfs_show_devname(struct seq_file *m, struct dentry *root)
 	 * least until the rcu_read_unlock.
 	 */
 	rcu_read_lock();
-	list_for_each_entry_rcu(dev, &fs_info->fs_devices->devices, dev_list) {
+	list_for_each_entry_rcu(dev, &fs_devices->devices, dev_list) {
 		if (test_bit(BTRFS_DEV_STATE_MISSING, &dev->dev_state))
 			continue;
 		if (!dev->name)
@@ -2484,9 +2486,42 @@ static int btrfs_show_devname(struct seq_file *m, struct dentry *root)
 
 	if (first_dev)
 		seq_escape(m, rcu_str_deref(first_dev->name), " \t\n\\");
-	else
-		WARN_ON(1);
 	rcu_read_unlock();
+
+	if (first_dev)
+		return 0;
+
+	/*
+	 * While the fs is sprouting, above fs_devices->devices could be empty
+	 * if the RCU read happened in the window between when
+	 * fs_devices->devices was spliced into seed_devices->devices in
+	 * btrfs_prepare_sprout() and new device is not added to
+	 * fs_devices->devices in btrfs_init_new_device().
+	 *
+	 * Take device_list_mutex to make sure seed_devices has been added into
+	 * fs_devices->seed_list then we can traverse it.
+	 */
+	mutex_lock(&fs_devices->device_list_mutex);
+	list_for_each_entry(seed_devices, &fs_devices->seed_list, seed_list) {
+		list_for_each_entry(dev, &seed_devices->devices, dev_list) {
+			if (test_bit(BTRFS_DEV_STATE_MISSING, &dev->dev_state))
+				continue;
+			if (!dev->name)
+				continue;
+			if (!first_dev || dev->devid < first_dev->devid)
+				first_dev = dev;
+		}
+	}
+
+	if (first_dev) {
+		rcu_read_lock();
+		seq_escape(m, rcu_str_deref(first_dev->name), " \t\n\\");
+		rcu_read_unlock();
+	} else {
+		WARN_ON(1);
+	}
+	mutex_unlock(&fs_devices->device_list_mutex);
+
 	return 0;
 }
 
