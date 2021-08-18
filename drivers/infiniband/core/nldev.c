@@ -159,6 +159,8 @@ static const struct nla_policy nldev_policy[RDMA_NLDEV_ATTR_MAX] = {
 	[RDMA_NLDEV_ATTR_STAT_OPCOUNTER_ENTRY_NAME] = { .type = NLA_NUL_STRING,
 				  .len = RDMA_NLDEV_ATTR_OPCOUNTER_NAME_SIZE },
 	[RDMA_NLDEV_ATTR_STAT_OPCOUNTER_ENTRY_VALUE] = { .type = NLA_U64 },
+	[RDMA_NLDEV_ATTR_STAT_OP_MODE_LIST]	= { .type = NLA_U8 },
+	[RDMA_NLDEV_ATTR_STAT_OP_MODE_LIST_SUPPORTED] = { .type = NLA_U8 },
 };
 
 static int put_driver_name_print_type(struct sk_buff *msg, const char *name,
@@ -946,7 +948,7 @@ err:
 EXPORT_SYMBOL(rdma_nl_stat_hwcounter_entry);
 
 static int rdma_nl_stat_opcounter_entry(struct sk_buff *msg, const char *name,
-					u64 value)
+					u64 value, bool send_value)
 {
 	struct nlattr *entry_attr;
 
@@ -960,6 +962,12 @@ static int rdma_nl_stat_opcounter_entry(struct sk_buff *msg, const char *name,
 	if (nla_put_u64_64bit(msg, RDMA_NLDEV_ATTR_STAT_OPCOUNTER_ENTRY_VALUE,
 			      value, RDMA_NLDEV_ATTR_PAD))
 		goto err;
+	if (send_value) {
+		if (nla_put_u64_64bit(msg,
+				      RDMA_NLDEV_ATTR_STAT_OPCOUNTER_ENTRY_VALUE,
+				      value, RDMA_NLDEV_ATTR_PAD))
+			goto err;
+	}
 
 	nla_nest_end(msg, entry_attr);
 	return 0;
@@ -2148,6 +2156,79 @@ err:
 	return ret;
 }
 
+static int stat_get_doit_list_opstats(struct sk_buff *skb,
+				      struct nlmsghdr *nlh,
+				      struct netlink_ext_ack *extack,
+				      struct nlattr *tb[], u32 index,
+				      struct ib_device *device, u32 port)
+{
+	struct rdma_op_stats *opstats;
+	struct nlattr *opstats_list;
+	bool list_supported = false;
+	struct sk_buff *msg;
+	int i, ret;
+
+	if (tb[RDMA_NLDEV_ATTR_STAT_OP_MODE_LIST_SUPPORTED])
+		list_supported = true;
+
+	opstats = device->port_data[port].port_counter.opstats;
+	if (!opstats)
+		return -EOPNOTSUPP;
+
+	msg = nlmsg_new(NLMSG_DEFAULT_SIZE, GFP_KERNEL);
+	if (!msg) {
+		ret = -ENOMEM;
+		goto err;
+	}
+
+	nlh = nlmsg_put(msg, NETLINK_CB(skb).portid, nlh->nlmsg_seq,
+			RDMA_NL_GET_TYPE(RDMA_NL_NLDEV,
+					 RDMA_NLDEV_CMD_STAT_GET),
+			0, 0);
+
+	if (fill_nldev_handle(msg, device) ||
+	    nla_put_u32(msg, RDMA_NLDEV_ATTR_PORT_INDEX, port)) {
+		ret = -EMSGSIZE;
+		goto err_msg;
+	}
+
+	opstats_list =
+		nla_nest_start(msg, RDMA_NLDEV_ATTR_STAT_OPCOUNTERS);
+
+	if (!opstats_list) {
+		ret = -EMSGSIZE;
+		goto err_msg;
+	}
+
+	mutex_lock(&opstats->lock);
+
+	for (i = 0; i < opstats->num_opcounters; i++) {
+		if (!opstats->opcounters[i].enabled && !list_supported)
+			continue;
+		ret = rdma_nl_stat_opcounter_entry(msg,
+						   opstats->opcounters[i].name,
+						   0, false);
+		if (ret)
+			goto err_opstats_msg;
+	}
+	nla_nest_end(msg, opstats_list);
+
+	mutex_unlock(&opstats->lock);
+
+	nlmsg_end(msg, nlh);
+	ib_device_put(device);
+	return rdma_nl_unicast(sock_net(skb->sk), msg, NETLINK_CB(skb).portid);
+
+err_opstats_msg:
+	nla_nest_cancel(msg, opstats_list);
+	mutex_unlock(&opstats->lock);
+err_msg:
+	nlmsg_free(msg);
+err:
+	ib_device_put(device);
+	return ret;
+}
+
 static int stat_get_optional_counter(struct sk_buff *msg,
 				     struct ib_device *device, u32 port)
 {
@@ -2172,7 +2253,8 @@ static int stat_get_optional_counter(struct sk_buff *msg,
 			continue;
 		ret = rdma_nl_stat_opcounter_entry(msg,
 						   opstats->opcounters[i].name,
-						   opstats->opcounters[i].value);
+						   opstats->opcounters[i].value,
+						   true);
 		if (ret)
 			goto err;
 	}
@@ -2211,6 +2293,11 @@ static int stat_get_doit_default_counter(struct sk_buff *skb,
 		ret = -EINVAL;
 		goto err;
 	}
+
+	if (tb[RDMA_NLDEV_ATTR_STAT_OP_MODE_LIST] ||
+	    tb[RDMA_NLDEV_ATTR_STAT_OP_MODE_LIST_SUPPORTED])
+		return stat_get_doit_list_opstats(skb, nlh, extack, tb,
+						  index, device, port);
 
 	if (!device->ops.alloc_hw_port_stats || !device->ops.get_hw_stats) {
 		ret = -EINVAL;
