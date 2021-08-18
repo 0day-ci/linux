@@ -182,10 +182,22 @@ struct ehci_regs {
  * its EHCI controller has both TT and LPM support. HOSTPCx are extensions to
  * PORTSCx
  */
-	/* HOSTPC: offset 0x84 */
-	u32		hostpc[HCS_N_PORTS_MAX];
+	union {
+		/* HOSTPC: offset 0x84 */
+		u32	hostpc[HCS_N_PORTS_MAX];
 #define HOSTPC_PHCD	(1<<22)		/* Phy clock disable */
 #define HOSTPC_PSPD	(3<<25)		/* Port speed detection */
+
+		/*
+		 * This was originally documented as:
+		 * "port_status[0x0f] = Broadcom-proprietary USB_EHCI_INSNREG00 @ 0x90"
+		 * but this doesn't make sense: the code was using
+		 * port_status[0x10]. port_status[0x0f] would be reserved4.
+		 * Also, none of these are near 0x90. port_status[0x10] is
+		 * offset 0x84, and port_status[0x0f] would be 0x80.
+		 */
+		u32	brcm_insnreg[3];
+	};
 
 	u32		reserved5[2];
 
