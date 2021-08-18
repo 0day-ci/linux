@@ -2043,10 +2043,30 @@ bool pcie_rp_10bit_tag_cmp_supported(struct pci_dev *dev)
 	return true;
 }
 
+static void pci_configure_10bit_tags(struct pci_dev *dev)
+{
+	/*
+	 * PCIe 5.0 section 9.3.5.10 10-Bit Tag Requester Enable in Device
+	 * Control 2 Register is RsvdP for VF.
+	 */
+	if (dev->is_virtfn)
+		return;
+
+	if (!pcie_rp_10bit_tag_cmp_supported(dev))
+		return;
+
+	if (pci_pcie_type(dev) != PCI_EXP_TYPE_ENDPOINT)
+		return;
+
+	pci_dbg(dev, "enabling 10-Bit Tag Requester\n");
+	pcie_capability_set_word(dev, PCI_EXP_DEVCTL2,
+				PCI_EXP_DEVCTL2_10BIT_TAG_REQ_EN);
+}
+
 int pci_configure_extended_tags(struct pci_dev *dev, void *ign)
 {
 	struct pci_host_bridge *host;
-	u16 ctl;
+	u16 ctl, ctl2;
 	int ret;
 
 	if (!pci_is_pcie(dev))
@@ -2056,6 +2076,10 @@ int pci_configure_extended_tags(struct pci_dev *dev, void *ign)
 		return 0;
 
 	ret = pcie_capability_read_word(dev, PCI_EXP_DEVCTL, &ctl);
+	if (ret)
+		return 0;
+
+	ret = pcie_capability_read_word(dev, PCI_EXP_DEVCTL2, &ctl2);
 	if (ret)
 		return 0;
 
@@ -2073,6 +2097,12 @@ int pci_configure_extended_tags(struct pci_dev *dev, void *ign)
 			pcie_capability_clear_word(dev, PCI_EXP_DEVCTL,
 						   PCI_EXP_DEVCTL_EXT_TAG);
 		}
+
+		if (ctl2 & PCI_EXP_DEVCTL2_10BIT_TAG_REQ_EN) {
+			pci_info(dev, "disabling 10-Bit Tags\n");
+			pcie_capability_clear_word(dev, PCI_EXP_DEVCTL2,
+					PCI_EXP_DEVCTL2_10BIT_TAG_REQ_EN);
+		}
 		return 0;
 	}
 
@@ -2081,6 +2111,20 @@ int pci_configure_extended_tags(struct pci_dev *dev, void *ign)
 		pcie_capability_set_word(dev, PCI_EXP_DEVCTL,
 					 PCI_EXP_DEVCTL_EXT_TAG);
 	}
+
+	if ((pcie_tag_config == PCIE_TAG_PEER2PEER) &&
+	    (ctl2 & PCI_EXP_DEVCTL2_10BIT_TAG_REQ_EN)) {
+		pci_info(dev, "disabling 10-Bit Tags\n");
+		pcie_capability_clear_word(dev, PCI_EXP_DEVCTL2,
+					PCI_EXP_DEVCTL2_10BIT_TAG_REQ_EN);
+		return 0;
+	}
+
+	if (pcie_tag_config != PCIE_TAG_DEFAULT)
+		return 0;
+
+	pci_configure_10bit_tags(dev);
+
 	return 0;
 }
 

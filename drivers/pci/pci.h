@@ -37,6 +37,14 @@ int pci_probe_reset_function(struct pci_dev *dev);
 int pci_bridge_secondary_bus_reset(struct pci_dev *dev);
 int pci_bus_error_reset(struct pci_dev *dev);
 
+enum pcie_tag_config_types {
+	PCIE_TAG_DEFAULT,   /* Enable 10-Bit Tag Requester for devices below
+			       Root Port that support 10-Bit Tag Completer. */
+	PCIE_TAG_PEER2PEER  /* Disable 10-Bit Tag Requester for all devices. */
+};
+
+extern enum pcie_tag_config_types pcie_tag_config;
+
 #define PCI_PM_D2_DELAY         200	/* usec; see PCIe r4.0, sec 5.9.1 */
 #define PCI_PM_D3HOT_WAIT       10	/* msec */
 #define PCI_PM_D3COLD_WAIT      100	/* msec */
