@@ -52,7 +52,7 @@ ice_repr_get_stats64(struct net_device *netdev, struct rtnl_link_stats64 *stats)
 	struct ice_eth_stats *eth_stats;
 	struct ice_vsi *vsi;
 
-	if (ice_check_vf_ready_for_cfg(np->repr->vf))
+	if (ice_is_vf_disabled(np->repr->vf))
 		return;
 	vsi = np->repr->src_vsi;
 
