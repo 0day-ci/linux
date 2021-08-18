@@ -96,6 +96,8 @@ static int pvpanic_pci_probe(struct pci_dev *pdev,
 	pi->capability &= ioread8(base);
 	pi->events = pi->capability;
 
+	dev_set_drvdata(dev, pi);
+
 	return devm_pvpanic_probe(&pdev->dev, pi);
 }
 

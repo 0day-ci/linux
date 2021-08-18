@@ -104,6 +104,8 @@ static int pvpanic_mmio_probe(struct platform_device *pdev)
 	pi->capability &= ioread8(base);
 	pi->events = pi->capability;
 
+	dev_set_drvdata(dev, pi);
+
 	return devm_pvpanic_probe(dev, pi);
 }
 
