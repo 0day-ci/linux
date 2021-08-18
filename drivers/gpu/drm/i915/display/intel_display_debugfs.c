@@ -374,8 +374,6 @@ static int intel_psr_status(struct seq_file *m, struct intel_dp *intel_dp)
 	seq_printf(m, "Source PSR ctl: %s [0x%08x]\n",
 		   enableddisabled(enabled), val);
 	psr_source_status(intel_dp, m);
-	seq_printf(m, "Busy frontbuffer bits: 0x%08x\n",
-		   psr->busy_frontbuffer_bits);
 
 	/*
 	 * SKL+ Perf counter is reset to 0 everytime DC state is entered
