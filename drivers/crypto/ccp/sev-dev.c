@@ -33,6 +33,7 @@
 #define SEV_FW_NAME_SIZE	64
 
 static DEFINE_MUTEX(sev_cmd_mutex);
+static DECLARE_RWSEM(sev_deactivate_lock);
 static struct sev_misc_dev *misc_dev;
 
 static int psp_cmd_timeout = 100;
@@ -932,9 +933,43 @@ EXPORT_SYMBOL_GPL(sev_guest_decommission);
 
 int sev_guest_df_flush(int *error)
 {
-	return sev_do_cmd(SEV_CMD_DF_FLUSH, NULL, error);
+	int ret;
+	/*
+	 * DEACTIVATE will clear the WBINVD indicator causing DF_FLUSH to fail,
+	 * so it must be guarded.
+	 */
+	down_write(&sev_deactivate_lock);
+
+	wbinvd_on_all_cpus();
+
+	ret = sev_do_cmd(SEV_CMD_DF_FLUSH, NULL, error);
+
+	up_write(&sev_deactivate_lock);
+
+	return ret;
 }
 EXPORT_SYMBOL_GPL(sev_guest_df_flush);
+
+int sev_guest_unbind_asid(unsigned int handle)
+{
+	struct sev_data_deactivate deactivate;
+	int ret;
+
+	if (!handle)
+		return -EINVAL;
+
+	deactivate.handle = handle;
+
+	/* Guard DEACTIVATE against WBINVD/DF_FLUSH used in ASID recycling */
+	down_read(&sev_deactivate_lock);
+	ret = sev_guest_deactivate(&deactivate, NULL);
+	up_read(&sev_deactivate_lock);
+
+	sev_guest_decommission(handle, NULL);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(sev_guest_unbind_asid);
 
 static void sev_exit(struct kref *ref)
 {
