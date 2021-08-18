@@ -19592,6 +19592,8 @@ F:	drivers/staging/media/vxd/decoder/hw_control.h
 F:	drivers/staging/media/vxd/decoder/img_dec_common.h
 F:	drivers/staging/media/vxd/decoder/translation_api.c
 F:	drivers/staging/media/vxd/decoder/translation_api.h
+F:	drivers/staging/media/vxd/decoder/vdec_mmu_wrapper.c
+F:	drivers/staging/media/vxd/decoder/vdec_mmu_wrapper.h
 F:	drivers/staging/media/vxd/decoder/vxd_core.c
 F:	drivers/staging/media/vxd/decoder/vxd_dec.c
 F:	drivers/staging/media/vxd/decoder/vxd_dec.h
