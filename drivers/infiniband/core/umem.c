@@ -205,7 +205,7 @@ struct ib_umem *ib_umem_get(struct ib_device *device, unsigned long addr,
 	new_pinned = atomic64_add_return(npages, &mm->pinned_vm);
 	if (new_pinned > lock_limit && !capable(CAP_IPC_LOCK)) {
 		atomic64_sub(npages, &mm->pinned_vm);
-		ret = -ENOMEM;
+		ret = -EPERM;
 		goto out;
 	}
 
