@@ -946,10 +946,7 @@ static void cdns_update_slave_status_work(struct work_struct *work)
  */
 int sdw_cdns_exit_reset(struct sdw_cdns *cdns)
 {
-	/* program maximum length reset to be safe */
-	cdns_updatel(cdns, CDNS_MCP_CONTROL,
-		     CDNS_MCP_CONTROL_RST_DELAY,
-		     CDNS_MCP_CONTROL_RST_DELAY);
+	/* keep reset delay unchanged to 4096 cycles */
 
 	/* use hardware generated reset */
 	cdns_updatel(cdns, CDNS_MCP_CONTROL,
