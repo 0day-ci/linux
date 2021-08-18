@@ -61,3 +61,7 @@ run_qemu_rdonly_fat() {
   $run -drive file=fat:floppy:"$1",index=0,if=floppy,readonly
 }
 
+run_qemu_rdwr_img() {
+  detect_debug "$2"
+  $run -drive file="$1",index=0,if=floppy,format=raw
+}
