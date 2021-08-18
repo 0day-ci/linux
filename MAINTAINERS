@@ -19600,6 +19600,8 @@ F:	drivers/staging/media/vxd/decoder/core.c
 F:	drivers/staging/media/vxd/decoder/core.h
 F:	drivers/staging/media/vxd/decoder/dec_resources.c
 F:	drivers/staging/media/vxd/decoder/dec_resources.h
+F:	drivers/staging/media/vxd/decoder/decoder.c
+F:	drivers/staging/media/vxd/decoder/decoder.h
 F:	drivers/staging/media/vxd/decoder/fw_interface.h
 F:	drivers/staging/media/vxd/decoder/h264_idx.h
 F:	drivers/staging/media/vxd/decoder/h264_secure_parser.c
