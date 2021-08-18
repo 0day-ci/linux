@@ -3061,7 +3061,6 @@ int btrfs_write_dirty_block_groups(struct btrfs_trans_handle *trans)
 			spin_unlock(&cur_trans->dirty_bgs_lock);
 			list_del_init(&cache->io_list);
 			btrfs_wait_cache_io(trans, cache, path);
-			btrfs_put_block_group(cache);
 			spin_lock(&cur_trans->dirty_bgs_lock);
 		}
 
