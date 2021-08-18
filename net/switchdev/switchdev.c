@@ -470,7 +470,7 @@ switchdev_lower_dev_find(struct net_device *dev,
 		.data = &switchdev_priv,
 	};
 
-	netdev_walk_all_lower_dev_rcu(dev, switchdev_lower_dev_walk, &priv);
+	netdev_walk_all_lower_dev(dev, switchdev_lower_dev_walk, &priv);
 
 	return switchdev_priv.lower_dev;
 }
@@ -543,7 +543,7 @@ maybe_bridged_with_us:
 	/* Event is neither on a bridge nor a LAG. Check whether it is on an
 	 * interface that is in a bridge with us.
 	 */
-	br = netdev_master_upper_dev_get_rcu(dev);
+	br = netdev_master_upper_dev_get(dev);
 	if (!br || !netif_is_bridge_master(br))
 		return 0;
 
@@ -568,6 +568,8 @@ int switchdev_handle_fdb_add_to_device(struct net_device *dev,
 				  const struct switchdev_notifier_fdb_info *fdb_info))
 {
 	int err;
+
+	ASSERT_RTNL();
 
 	err = __switchdev_handle_fdb_add_to_device(dev, dev, fdb_info,
 						   check_cb,
@@ -648,7 +650,7 @@ maybe_bridged_with_us:
 	/* Event is neither on a bridge nor a LAG. Check whether it is on an
 	 * interface that is in a bridge with us.
 	 */
-	br = netdev_master_upper_dev_get_rcu(dev);
+	br = netdev_master_upper_dev_get(dev);
 	if (!br || !netif_is_bridge_master(br))
 		return 0;
 
@@ -673,6 +675,8 @@ int switchdev_handle_fdb_del_to_device(struct net_device *dev,
 				  const struct switchdev_notifier_fdb_info *fdb_info))
 {
 	int err;
+
+	ASSERT_RTNL();
 
 	err = __switchdev_handle_fdb_del_to_device(dev, dev, fdb_info,
 						   check_cb,
