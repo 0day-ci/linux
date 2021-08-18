@@ -1615,7 +1615,7 @@ static int remove_session_caps_cb(struct inode *inode, struct ceph_cap *cap,
 	dout("removing cap %p, ci is %p, inode is %p\n",
 	     cap, ci, &ci->vfs_inode);
 	spin_lock(&ci->i_ceph_lock);
-	__ceph_remove_cap(cap, false);
+	__ceph_remove_cap(cap, false, false);
 	if (!ci->i_auth_cap) {
 		struct ceph_cap_flush *cf;
 
@@ -1985,7 +1985,7 @@ static int trim_caps_cb(struct inode *inode, struct ceph_cap *cap, void *arg)
 
 	if (oissued) {
 		/* we aren't the only cap.. just remove us */
-		__ceph_remove_cap(cap, true);
+		__ceph_remove_cap(cap, true, true);
 		(*remaining)--;
 	} else {
 		struct dentry *dentry;

@@ -1132,7 +1132,7 @@ static void drop_inode_snap_realm(struct ceph_inode_info *ci)
  * caller should hold i_ceph_lock.
  * caller will not hold session s_mutex if called from destroy_inode.
  */
-void __ceph_remove_cap(struct ceph_cap *cap, bool queue_release)
+void __ceph_remove_cap(struct ceph_cap *cap, bool queue_release, bool warn)
 {
 	struct ceph_mds_session *session = cap->session;
 	struct ceph_inode_info *ci = cap->ci;
@@ -1152,7 +1152,7 @@ void __ceph_remove_cap(struct ceph_cap *cap, bool queue_release)
 	/* remove from inode's cap rbtree, and clear auth cap */
 	rb_erase(&cap->ci_node, &ci->i_caps);
 	if (ci->i_auth_cap == cap) {
-		WARN_ON_ONCE(!list_empty(&ci->i_dirty_item) &&
+		WARN_ON_ONCE(warn && !list_empty(&ci->i_dirty_item) &&
 			     !mdsc->fsc->blocklisted);
 		ci->i_auth_cap = NULL;
 	}
@@ -1335,7 +1335,7 @@ void __ceph_remove_caps(struct ceph_inode_info *ci)
 	while (p) {
 		struct ceph_cap *cap = rb_entry(p, struct ceph_cap, ci_node);
 		p = rb_next(p);
-		__ceph_remove_cap(cap, true);
+		__ceph_remove_cap(cap, true, true);
 	}
 	spin_unlock(&ci->i_ceph_lock);
 }
@@ -3753,7 +3753,7 @@ retry:
 		goto out_unlock;
 
 	if (target < 0) {
-		__ceph_remove_cap(cap, false);
+		__ceph_remove_cap(cap, false, true);
 		goto out_unlock;
 	}
 
@@ -3788,7 +3788,7 @@ retry:
 				change_auth_cap_ses(ci, tcap->session);
 			}
 		}
-		__ceph_remove_cap(cap, false);
+		__ceph_remove_cap(cap, false, true);
 		goto out_unlock;
 	} else if (tsession) {
 		/* add placeholder for the export tagert */
@@ -3805,7 +3805,7 @@ retry:
 			spin_unlock(&mdsc->cap_dirty_lock);
 		}
 
-		__ceph_remove_cap(cap, false);
+		__ceph_remove_cap(cap, false, true);
 		goto out_unlock;
 	}
 
@@ -3916,7 +3916,8 @@ retry:
 					ocap->mseq, mds, le32_to_cpu(ph->seq),
 					le32_to_cpu(ph->mseq));
 		}
-		__ceph_remove_cap(ocap, (ph->flags & CEPH_CAP_FLAG_RELEASE));
+		__ceph_remove_cap(ocap, (ph->flags & CEPH_CAP_FLAG_RELEASE),
+				  true);
 	}
 
 	*old_issued = issued;
