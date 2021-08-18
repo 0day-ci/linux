@@ -488,7 +488,7 @@ intel_ddi_transcoder_func_reg_val_get(struct intel_encoder *encoder,
 		if (crtc_state->hdmi_high_tmds_clock_ratio)
 			temp |= TRANS_DDI_HIGH_TMDS_CHAR_RATE;
 	} else if (intel_crtc_has_type(crtc_state, INTEL_OUTPUT_ANALOG)) {
-		temp |= TRANS_DDI_MODE_SELECT_FDI;
+		temp |= TRANS_DDI_MODE_SELECT_FDI_OR_128B132B;
 		temp |= (crtc_state->fdi_lanes - 1) << 1;
 	} else if (intel_crtc_has_type(crtc_state, INTEL_OUTPUT_DP_MST)) {
 		temp |= TRANS_DDI_MODE_SELECT_DP_MST;
@@ -678,7 +678,7 @@ bool intel_ddi_connector_get_hw_state(struct intel_connector *intel_connector)
 		ret = false;
 		break;
 
-	case TRANS_DDI_MODE_SELECT_FDI:
+	case TRANS_DDI_MODE_SELECT_FDI_OR_128B132B:
 		ret = type == DRM_MODE_CONNECTOR_VGA;
 		break;
 
@@ -3557,7 +3557,7 @@ static void intel_ddi_read_func_ctl(struct intel_encoder *encoder,
 		pipe_config->output_types |= BIT(INTEL_OUTPUT_HDMI);
 		pipe_config->lane_count = 4;
 		break;
-	case TRANS_DDI_MODE_SELECT_FDI:
+	case TRANS_DDI_MODE_SELECT_FDI_OR_128B132B:
 		pipe_config->output_types |= BIT(INTEL_OUTPUT_ANALOG);
 		break;
 	case TRANS_DDI_MODE_SELECT_DP_SST:
