@@ -1743,7 +1743,16 @@ int __ceph_mark_dirty_caps(struct ceph_inode_info *ci, int mask,
 
 struct ceph_cap_flush *ceph_alloc_cap_flush(void)
 {
-	return kmem_cache_alloc(ceph_cap_flush_cachep, GFP_KERNEL);
+	struct ceph_cap_flush *cf;
+
+	cf = kmem_cache_alloc(ceph_cap_flush_cachep, GFP_KERNEL);
+	/*
+	 * caps == 0 always means for the capsnap
+	 * caps > 0 means dirty caps being flushed
+	 * caps == -1 means preallocated, not used yet
+	 */
+	cf->caps = -1;
+	return cf;
 }
 
 void ceph_free_cap_flush(struct ceph_cap_flush *cf)
@@ -1778,7 +1787,7 @@ static bool __detach_cap_flush_from_mdsc(struct ceph_mds_client *mdsc,
 		prev->wake = true;
 		wake = false;
 	}
-	list_del(&cf->g_list);
+	list_del_init(&cf->g_list);
 	return wake;
 }
 
@@ -1793,7 +1802,7 @@ static bool __detach_cap_flush_from_ci(struct ceph_inode_info *ci,
 		prev->wake = true;
 		wake = false;
 	}
-	list_del(&cf->i_list);
+	list_del_init(&cf->i_list);
 	return wake;
 }
 
@@ -3590,7 +3599,8 @@ out:
 		cf = list_first_entry(&to_remove,
 				      struct ceph_cap_flush, i_list);
 		list_del(&cf->i_list);
-		ceph_free_cap_flush(cf);
+		if (cf->caps)
+			ceph_free_cap_flush(cf);
 	}
 
 	if (wake_ci)
