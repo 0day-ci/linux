@@ -41,6 +41,12 @@ int task_work_add(struct task_struct *task, struct callback_head *work,
 		head = READ_ONCE(task->task_works);
 		if (unlikely(head == &work_exited))
 			return -ESRCH;
+		/*
+		 * TIF_NOTIFY_SIGNAL notifications will interfere with
+		 * a core dump in progress, reject them.
+		 */
+		if (notify == TWA_SIGNAL && (task->flags & PF_SIGNALED))
+			return -ESRCH;
 		work->next = head;
 	} while (cmpxchg(&task->task_works, head, work) != head);
 

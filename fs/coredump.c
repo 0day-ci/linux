@@ -602,6 +602,14 @@ void do_coredump(const kernel_siginfo_t *siginfo)
 		.mm_flags = mm->flags,
 	};
 
+	/*
+	 * task_work_add() will refuse to add work after PF_SIGNALED has
+	 * been set, ensure that we flush any pending TIF_NOTIFY_SIGNAL work
+	 * if any was queued before that.
+	 */
+	if (test_thread_flag(TIF_NOTIFY_SIGNAL))
+		tracehook_notify_signal();
+
 	audit_core_dumps(siginfo->si_signo);
 
 	binfmt = mm->binfmt;
