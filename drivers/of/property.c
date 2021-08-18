@@ -1137,7 +1137,6 @@ static int of_link_to_phandle(struct device_node *con_np,
 	put_device(sup_dev);
 
 	fwnode_link_add(of_fwnode_handle(con_np), of_fwnode_handle(sup_np));
-	of_node_put(sup_np);
 
 	return 0;
 }
