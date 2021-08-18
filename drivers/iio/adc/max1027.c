@@ -413,17 +413,6 @@ static int max1027_debugfs_reg_access(struct iio_dev *indio_dev,
 	return spi_write(st->spi, val, 1);
 }
 
-static int max1027_validate_trigger(struct iio_dev *indio_dev,
-				    struct iio_trigger *trig)
-{
-	struct max1027_state *st = iio_priv(indio_dev);
-
-	if (st->trig != trig)
-		return -EINVAL;
-
-	return 0;
-}
-
 static int max1027_set_cnvst_trigger_state(struct iio_trigger *trig, bool state)
 {
 	struct iio_dev *indio_dev = iio_trigger_get_drvdata(trig);
@@ -512,7 +501,21 @@ static irqreturn_t max1027_trigger_handler(int irq, void *private)
 
 	pr_debug("%s(irq=%d, private=0x%p)\n", __func__, irq, private);
 
+	ret = max1027_configure_trigger(indio_dev);
+	if (ret)
+		goto out;
+
+	ret = max1027_configure_chans_to_scan(indio_dev);
+	if (ret)
+		goto out;
+
+	ret = max1027_wait_eoc(indio_dev);
+	if (ret)
+		goto out;
+
 	ret = max1027_read_scan(indio_dev);
+
+out:
 	if (ret)
 		dev_err(&indio_dev->dev,
 			"Cannot read scanned values (%d)\n", ret);
@@ -529,7 +532,6 @@ static const struct iio_trigger_ops max1027_trigger_ops = {
 
 static const struct iio_info max1027_info = {
 	.read_raw = &max1027_read_raw,
-	.validate_trigger = &max1027_validate_trigger,
 	.debugfs_reg_access = &max1027_debugfs_reg_access,
 };
 
