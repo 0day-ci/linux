@@ -2974,8 +2974,9 @@ nvme_fc_recreate_io_queues(struct nvme_fc_ctrl *ctrl)
 			return -ENODEV;
 		}
 		blk_mq_update_nr_hw_queues(&ctrl->tag_set, nr_io_queues);
-		nvme_unfreeze(&ctrl->ctrl);
 	}
+
+	nvme_unfreeze(&ctrl->ctrl);
 
 	return 0;
 
@@ -3214,6 +3215,9 @@ nvme_fc_delete_association(struct nvme_fc_ctrl *ctrl)
 	set_bit(FCCTRL_TERMIO, &ctrl->flags);
 	ctrl->iocnt = 0;
 	spin_unlock_irqrestore(&ctrl->lock, flags);
+
+	if (ctrl->ctrl.queue_count > 1)
+		nvme_start_freeze(&ctrl->ctrl);
 
 	__nvme_fc_abort_outstanding_ios(ctrl, false);
 
