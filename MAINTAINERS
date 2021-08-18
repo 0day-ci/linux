@@ -19627,6 +19627,8 @@ F:	drivers/staging/media/vxd/decoder/jpegfw_data.h
 F:	drivers/staging/media/vxd/decoder/jpegfw_data_shared.h
 F:	drivers/staging/media/vxd/decoder/mem_io.h
 F:	drivers/staging/media/vxd/decoder/mmu_defs.h
+F:	drivers/staging/media/vxd/decoder/pixel_api.c
+F:	drivers/staging/media/vxd/decoder/pixel_api.h
 F:	drivers/staging/media/vxd/decoder/pvdec_entropy_regs.h
 F:	drivers/staging/media/vxd/decoder/pvdec_int.h
 F:	drivers/staging/media/vxd/decoder/pvdec_vec_be_regs.h
