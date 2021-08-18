@@ -338,13 +338,6 @@ static struct packet_type dsa_pack_type __read_mostly = {
 	.func	= dsa_switch_rcv,
 };
 
-static struct workqueue_struct *dsa_owq;
-
-bool dsa_schedule_work(struct work_struct *work)
-{
-	return queue_work(dsa_owq, work);
-}
-
 int dsa_devlink_param_get(struct devlink *dl, u32 id,
 			  struct devlink_param_gset_ctx *ctx)
 {
@@ -465,11 +458,6 @@ static int __init dsa_init_module(void)
 {
 	int rc;
 
-	dsa_owq = alloc_ordered_workqueue("dsa_ordered",
-					  WQ_MEM_RECLAIM);
-	if (!dsa_owq)
-		return -ENOMEM;
-
 	rc = dsa_slave_register_notifier();
 	if (rc)
 		goto register_notifier_fail;
@@ -482,8 +470,6 @@ static int __init dsa_init_module(void)
 	return 0;
 
 register_notifier_fail:
-	destroy_workqueue(dsa_owq);
-
 	return rc;
 }
 module_init(dsa_init_module);
@@ -494,7 +480,6 @@ static void __exit dsa_cleanup_module(void)
 
 	dsa_slave_unregister_notifier();
 	dev_remove_pack(&dsa_pack_type);
-	destroy_workqueue(dsa_owq);
 }
 module_exit(dsa_cleanup_module);
 

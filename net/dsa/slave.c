@@ -2278,73 +2278,18 @@ static int dsa_slave_netdevice_event(struct notifier_block *nb,
 	return NOTIFY_DONE;
 }
 
-static void
-dsa_fdb_offload_notify(struct dsa_switchdev_event_work *switchdev_work)
+static void dsa_fdb_offload_notify(struct net_device *dev,
+				   const unsigned char *addr,
+				   u16 vid)
 {
 	struct switchdev_notifier_fdb_info info = {};
-	struct dsa_switch *ds = switchdev_work->ds;
-	struct dsa_port *dp;
 
-	if (!dsa_is_user_port(ds, switchdev_work->port))
-		return;
-
-	info.addr = switchdev_work->addr;
-	info.vid = switchdev_work->vid;
+	info.addr = addr;
+	info.vid = vid;
 	info.offloaded = true;
-	dp = dsa_to_port(ds, switchdev_work->port);
-	call_switchdev_notifiers(SWITCHDEV_FDB_OFFLOADED,
-				 dp->slave, &info.info, NULL);
-}
 
-static void dsa_slave_switchdev_event_work(struct work_struct *work)
-{
-	struct dsa_switchdev_event_work *switchdev_work =
-		container_of(work, struct dsa_switchdev_event_work, work);
-	struct dsa_switch *ds = switchdev_work->ds;
-	struct dsa_port *dp;
-	int err;
-
-	dp = dsa_to_port(ds, switchdev_work->port);
-
-	rtnl_lock();
-	switch (switchdev_work->event) {
-	case SWITCHDEV_FDB_ADD_TO_DEVICE:
-		if (switchdev_work->host_addr)
-			err = dsa_port_host_fdb_add(dp, switchdev_work->addr,
-						    switchdev_work->vid);
-		else
-			err = dsa_port_fdb_add(dp, switchdev_work->addr,
-					       switchdev_work->vid);
-		if (err) {
-			dev_err(ds->dev,
-				"port %d failed to add %pM vid %d to fdb: %d\n",
-				dp->index, switchdev_work->addr,
-				switchdev_work->vid, err);
-			break;
-		}
-		dsa_fdb_offload_notify(switchdev_work);
-		break;
-
-	case SWITCHDEV_FDB_DEL_TO_DEVICE:
-		if (switchdev_work->host_addr)
-			err = dsa_port_host_fdb_del(dp, switchdev_work->addr,
-						    switchdev_work->vid);
-		else
-			err = dsa_port_fdb_del(dp, switchdev_work->addr,
-					       switchdev_work->vid);
-		if (err) {
-			dev_err(ds->dev,
-				"port %d failed to delete %pM vid %d from fdb: %d\n",
-				dp->index, switchdev_work->addr,
-				switchdev_work->vid, err);
-		}
-
-		break;
-	}
-	rtnl_unlock();
-
-	dev_put(switchdev_work->dev);
-	kfree(switchdev_work);
+	call_switchdev_notifiers(SWITCHDEV_FDB_OFFLOADED, dev, &info.info,
+				 NULL);
 }
 
 static bool dsa_foreign_dev_check(const struct net_device *dev,
@@ -2369,10 +2314,12 @@ static int dsa_slave_fdb_event(struct net_device *dev,
 			       const struct switchdev_notifier_fdb_info *fdb_info,
 			       unsigned long event)
 {
-	struct dsa_switchdev_event_work *switchdev_work;
 	struct dsa_port *dp = dsa_slave_to_port(dev);
+	const unsigned char *addr = fdb_info->addr;
 	bool host_addr = fdb_info->is_local;
 	struct dsa_switch *ds = dp->ds;
+	u16 vid = fdb_info->vid;
+	int err;
 
 	if (ctx && ctx != dp)
 		return 0;
@@ -2397,30 +2344,29 @@ static int dsa_slave_fdb_event(struct net_device *dev,
 	if (dsa_foreign_dev_check(dev, orig_dev))
 		host_addr = true;
 
-	switchdev_work = kzalloc(sizeof(*switchdev_work), GFP_ATOMIC);
-	if (!switchdev_work)
-		return -ENOMEM;
-
 	netdev_dbg(dev, "%s FDB entry towards %s, addr %pM vid %d%s\n",
 		   event == SWITCHDEV_FDB_ADD_TO_DEVICE ? "Adding" : "Deleting",
-		   orig_dev->name, fdb_info->addr, fdb_info->vid,
-		   host_addr ? " as host address" : "");
+		   orig_dev->name, addr, vid, host_addr ? " as host address" : "");
 
-	INIT_WORK(&switchdev_work->work, dsa_slave_switchdev_event_work);
-	switchdev_work->ds = ds;
-	switchdev_work->port = dp->index;
-	switchdev_work->event = event;
-	switchdev_work->dev = dev;
+	switch (event) {
+	case SWITCHDEV_FDB_ADD_TO_DEVICE:
+		if (host_addr)
+			err = dsa_port_host_fdb_add(dp, addr, vid);
+		else
+			err = dsa_port_fdb_add(dp, addr, vid);
+		if (!err)
+			dsa_fdb_offload_notify(dev, addr, vid);
+		break;
 
-	ether_addr_copy(switchdev_work->addr, fdb_info->addr);
-	switchdev_work->vid = fdb_info->vid;
-	switchdev_work->host_addr = host_addr;
+	case SWITCHDEV_FDB_DEL_TO_DEVICE:
+		if (host_addr)
+			err = dsa_port_host_fdb_del(dp, addr, vid);
+		else
+			err = dsa_port_fdb_del(dp, addr, vid);
+		break;
+	}
 
-	/* Hold a reference for dsa_fdb_offload_notify */
-	dev_hold(dev);
-	dsa_schedule_work(&switchdev_work->work);
-
-	return 0;
+	return err;
 }
 
 static int

@@ -126,20 +126,6 @@ struct dsa_notifier_tag_8021q_vlan_info {
 	u16 vid;
 };
 
-struct dsa_switchdev_event_work {
-	struct dsa_switch *ds;
-	int port;
-	struct net_device *dev;
-	struct work_struct work;
-	unsigned long event;
-	/* Specific for SWITCHDEV_FDB_ADD_TO_DEVICE and
-	 * SWITCHDEV_FDB_DEL_TO_DEVICE
-	 */
-	unsigned char addr[ETH_ALEN];
-	u16 vid;
-	bool host_addr;
-};
-
 /* DSA_NOTIFIER_HSR_* */
 struct dsa_notifier_hsr_info {
 	struct net_device *hsr;
@@ -170,7 +156,6 @@ const struct dsa_device_ops *dsa_tag_driver_get(int tag_protocol);
 void dsa_tag_driver_put(const struct dsa_device_ops *ops);
 const struct dsa_device_ops *dsa_find_tagger_by_name(const char *buf);
 
-bool dsa_schedule_work(struct work_struct *work);
 const char *dsa_tag_protocol_to_str(const struct dsa_device_ops *ops);
 
 static inline int dsa_tag_protocol_overhead(const struct dsa_device_ops *ops)
