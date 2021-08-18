@@ -3832,6 +3832,26 @@ static bool ice_is_legacy_umac_expired(struct ice_time_mac *last_added_umac)
 }
 
 /**
+ * ice_update_legacy_cached_mac - update cached hardware MAC for legacy VF
+ * @vf: VF to update
+ * @vc_ether_addr: structure from VIRTCHNL with MAC to check
+ *
+ * only update cached hardware MAC for legacy VF drivers on delete
+ * because we cannot guarantee order/type of MAC from the VF driver
+ */
+static void
+ice_update_legacy_cached_mac(struct ice_vf *vf,
+			     struct virtchnl_ether_addr *vc_ether_addr)
+{
+	if (!ice_is_vc_addr_legacy(vc_ether_addr) ||
+	    ice_is_legacy_umac_expired(&vf->legacy_last_added_umac))
+		return;
+
+	ether_addr_copy(vf->dev_lan_addr.addr, vf->legacy_last_added_umac.addr);
+	ether_addr_copy(vf->hw_lan_addr.addr, vf->legacy_last_added_umac.addr);
+}
+
+/**
  * ice_vfhw_mac_del - update the VF's cached hardware MAC if allowed
  * @vf: VF to update
  * @vc_ether_addr: structure from VIRTCHNL with MAC to delete
@@ -3852,16 +3872,7 @@ ice_vfhw_mac_del(struct ice_vf *vf, struct virtchnl_ether_addr *vc_ether_addr)
 	 */
 	eth_zero_addr(vf->dev_lan_addr.addr);
 
-	/* only update cached hardware MAC for legacy VF drivers on delete
-	 * because we cannot guarantee order/type of MAC from the VF driver
-	 */
-	if (ice_is_vc_addr_legacy(vc_ether_addr) &&
-	    !ice_is_legacy_umac_expired(&vf->legacy_last_added_umac)) {
-		ether_addr_copy(vf->dev_lan_addr.addr,
-				vf->legacy_last_added_umac.addr);
-		ether_addr_copy(vf->hw_lan_addr.addr,
-				vf->legacy_last_added_umac.addr);
-	}
+	ice_update_legacy_cached_mac(vf, vc_ether_addr);
 }
 
 /**
@@ -4527,10 +4538,16 @@ handle_mac_exit:
  * @msg: virtchannel message
  *
  * Respond with success to not break normal VF flow.
+ * For legacy VF driver try to update cached MAC address.
  */
 static int
 ice_vc_repr_del_mac(struct ice_vf __always_unused *vf, u8 __always_unused *msg)
 {
+	struct virtchnl_ether_addr_list *al =
+		(struct virtchnl_ether_addr_list *)msg;
+
+	ice_update_legacy_cached_mac(vf, &al->list[0]);
+
 	return ice_vc_send_msg_to_vf(vf, VIRTCHNL_OP_DEL_ETH_ADDR,
 				     VIRTCHNL_STATUS_SUCCESS, NULL, 0);
 }
