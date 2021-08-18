@@ -544,7 +544,7 @@ static void mlx5_ib_dealloc_counters(struct mlx5_ib_dev *dev)
 {
 	u32 in[MLX5_ST_SZ_DW(dealloc_q_counter_in)] = {};
 	int num_cnt_ports;
-	int i;
+	int i, j;
 
 	num_cnt_ports = is_mdev_switchdev_mode(dev->mdev) ? 1 : dev->num_ports;
 
@@ -559,6 +559,16 @@ static void mlx5_ib_dealloc_counters(struct mlx5_ib_dev *dev)
 		}
 		kfree(dev->port[i].cnts.names);
 		kfree(dev->port[i].cnts.offsets);
+
+		for (j = 0; j < MLX5_IB_OPCOUNTER_MAX; j++) {
+			if (dev->port[i].cnts.opfcs[j].fc) {
+				mlx5_ib_fs_remove_op_fc(dev,
+							&dev->port[i].cnts.opfcs[j]);
+				mlx5_fc_destroy(dev->mdev,
+						dev->port[i].cnts.opfcs[j].fc);
+				dev->port[i].cnts.opfcs[j].fc = NULL;
+			}
+		}
 	}
 }
 
@@ -738,9 +748,60 @@ void mlx5_ib_counters_clear_description(struct ib_counters *counters)
 	mutex_unlock(&mcounters->mcntrs_mutex);
 }
 
+static int mlx5_ib_add_op_stat(struct ib_device *device, u32 port, int type)
+{
+	struct mlx5_ib_dev *dev = to_mdev(device);
+	struct mlx5_ib_op_fc *opfc;
+	int ret;
+
+	if (mlx5_core_mp_enabled(dev->mdev))
+		return -EOPNOTSUPP;
+
+	if (type >= MLX5_IB_OPCOUNTER_MAX)
+		return -EINVAL;
+
+	opfc = &dev->port[port - 1].cnts.opfcs[type];
+	if (opfc->fc)
+		return -EEXIST;
+
+	opfc->fc = mlx5_fc_create(dev->mdev, false);
+	if (IS_ERR(opfc->fc))
+		return PTR_ERR(opfc->fc);
+
+	ret = mlx5_ib_fs_add_op_fc(dev, opfc, type);
+	if (ret) {
+		mlx5_fc_destroy(dev->mdev, opfc->fc);
+		opfc->fc = NULL;
+		return ret;
+	}
+
+	return ret;
+}
+
+static int mlx5_ib_remove_op_stat(struct ib_device *device, u32 port, int type)
+{
+	struct mlx5_ib_dev *dev = to_mdev(device);
+	struct mlx5_ib_op_fc *opfc;
+
+	if (type >= MLX5_IB_OPCOUNTER_MAX)
+		return -EINVAL;
+
+	opfc = &dev->port[port - 1].cnts.opfcs[type];
+	if (!opfc->fc)
+		return -EINVAL;
+
+	mlx5_ib_fs_remove_op_fc(dev, opfc);
+	mlx5_fc_destroy(dev->mdev, opfc->fc);
+	opfc->fc = NULL;
+
+	return 0;
+}
+
 static const struct ib_device_ops stats_ops = {
 	.alloc_hw_port_stats = mlx5_ib_alloc_hw_port_stats,
 	.alloc_op_port_stats = mlx5_ib_alloc_op_port_stats,
+	.add_op_stat = mlx5_ib_add_op_stat,
+	.remove_op_stat = mlx5_ib_remove_op_stat,
 	.get_hw_stats = mlx5_ib_get_hw_stats,
 	.counter_bind_qp = mlx5_ib_counter_bind_qp,
 	.counter_unbind_qp = mlx5_ib_counter_unbind_qp,
