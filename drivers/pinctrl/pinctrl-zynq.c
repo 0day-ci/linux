@@ -1029,6 +1029,8 @@ static int zynq_pinconf_cfg_get(struct pinctrl_dev *pctldev,
 		break;
 	}
 	case PIN_CONFIG_IOSTANDARD:
+		dev_warn(pctldev->dev, "io-standard is deprecated, please use power-source");
+		fallthrough;
 	case PIN_CONFIG_POWER_SOURCE:
 		arg = zynq_pinconf_iostd_get(reg);
 		break;
@@ -1080,6 +1082,8 @@ static int zynq_pinconf_cfg_set(struct pinctrl_dev *pctldev,
 
 			break;
 		case PIN_CONFIG_IOSTANDARD:
+			dev_warn(pctldev->dev, "io-standard is deprecated, please use power-source");
+			fallthrough;
 		case PIN_CONFIG_POWER_SOURCE:
 			if (arg <= zynq_iostd_min || arg >= zynq_iostd_max) {
 				dev_warn(pctldev->dev,
