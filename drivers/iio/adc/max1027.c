@@ -360,6 +360,9 @@ static int max1027_set_trigger_state(struct iio_trigger *trig, bool state)
 	struct max1027_state *st = iio_priv(indio_dev);
 	int ret;
 
+	if (bitmap_empty(indio_dev->active_scan_mask, indio_dev->masklength))
+		return -EINVAL;
+
 	if (state) {
 		/* Start acquisition on cnvst */
 		st->reg = MAX1027_SETUP_REG | MAX1027_CKS_MODE0 |
@@ -368,9 +371,12 @@ static int max1027_set_trigger_state(struct iio_trigger *trig, bool state)
 		if (ret < 0)
 			return ret;
 
-		/* Scan from 0 to max */
-		st->reg = MAX1027_CONV_REG | MAX1027_CHAN(0) |
-			  MAX1027_SCAN_N_M | MAX1027_TEMP;
+		/*
+		 * Scan from 0 to the highest requested channel. The temperature
+		 * could be avoided but it simplifies a bit the logic.
+		 */
+		st->reg = MAX1027_CONV_REG | MAX1027_SCAN_0_N | MAX1027_TEMP;
+		st->reg |= MAX1027_CHAN(fls(*indio_dev->active_scan_mask) - 2);
 		ret = spi_write(st->spi, &st->reg, 1);
 		if (ret < 0)
 			return ret;
@@ -391,11 +397,22 @@ static irqreturn_t max1027_trigger_handler(int irq, void *private)
 	struct iio_poll_func *pf = private;
 	struct iio_dev *indio_dev = pf->indio_dev;
 	struct max1027_state *st = iio_priv(indio_dev);
+	unsigned int scanned_chans = fls(*indio_dev->active_scan_mask);
+	u16 *buf = st->buffer;
+	unsigned int bit;
 
 	pr_debug("%s(irq=%d, private=0x%p)\n", __func__, irq, private);
 
 	/* fill buffer with all channel */
-	spi_read(st->spi, st->buffer, indio_dev->masklength * 2);
+	spi_read(st->spi, st->buffer, scanned_chans * 2);
+
+	/* Only keep the channels selected by the user */
+	for_each_set_bit(bit, indio_dev->active_scan_mask,
+			 indio_dev->masklength) {
+		if (buf[0] != st->buffer[bit])
+			buf[0] = st->buffer[bit];
+		buf++;
+	}
 
 	iio_push_to_buffers(indio_dev, st->buffer);
 
