@@ -3707,18 +3707,6 @@ static int allegro_probe(struct platform_device *pdev)
 		return PTR_ERR(dev->sram);
 	}
 
-	irq = platform_get_irq(pdev, 0);
-	if (irq < 0)
-		return irq;
-	ret = devm_request_threaded_irq(&pdev->dev, irq,
-					allegro_hardirq,
-					allegro_irq_thread,
-					IRQF_SHARED, dev_name(&pdev->dev), dev);
-	if (ret < 0) {
-		dev_err(&pdev->dev, "failed to request irq: %d\n", ret);
-		return ret;
-	}
-
 	ret = v4l2_device_register(&pdev->dev, &dev->v4l2_dev);
 	if (ret)
 		return ret;
@@ -3729,6 +3717,18 @@ static int allegro_probe(struct platform_device *pdev)
 	if (ret < 0) {
 		v4l2_err(&dev->v4l2_dev,
 			 "failed to request firmware: %d\n", ret);
+		return ret;
+	}
+
+	irq = platform_get_irq(pdev, 0);
+	if (irq < 0)
+		return irq;
+	ret = devm_request_threaded_irq(&pdev->dev, irq,
+					allegro_hardirq,
+					allegro_irq_thread,
+					IRQF_SHARED, dev_name(&pdev->dev), dev);
+	if (ret < 0) {
+		dev_err(&pdev->dev, "failed to request irq: %d\n", ret);
 		return ret;
 	}
 
