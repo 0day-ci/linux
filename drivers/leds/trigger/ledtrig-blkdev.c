@@ -480,3 +480,51 @@ exit_unlock:
 exit_return:
 	return ret;
 }
+
+
+/*
+ *
+ *	sysfs attributes to add & delete devices from LEDs
+ *
+ */
+
+static ssize_t blkdev_add_or_del(struct device *const dev,
+				 struct device_attribute *const attr,
+				 const char *const buf, const size_t count);
+
+static struct device_attribute ledtrig_blkdev_attr_add =
+	__ATTR(add_blkdev, 0200, NULL, blkdev_add_or_del);
+
+static struct device_attribute ledtrig_blkdev_attr_del =
+	__ATTR(delete_blkdev, 0200, NULL, blkdev_add_or_del);
+
+static ssize_t blkdev_add_or_del(struct device *const dev,
+				 struct device_attribute *const attr,
+				 const char *const buf, const size_t count)
+{
+	struct ledtrig_blkdev_led *const led = led_trigger_get_drvdata(dev);
+	const char *const disk_name = blkdev_skip_space(buf);
+	const char *const endp = blkdev_find_space(disk_name);
+	const ptrdiff_t name_len = endp - disk_name;	/* always >= 0 */
+	int ret;
+
+	if (name_len == 0) {
+		pr_info("blkdev LED: empty block device name\n");
+		return -EINVAL;
+	}
+
+	if (attr == &ledtrig_blkdev_attr_del) {
+		blkdev_disk_delete(led, disk_name, name_len);
+	} else {	/* attr == &ledtrig_blkdev_attr_add */
+		ret = blkdev_disk_add(led, disk_name, name_len);
+		if (ret != 0)
+			return ret;
+	}
+
+	/*
+	 * Consume everything up to the next non-whitespace token (or the end
+	 * of the input).  Avoids "empty block device name" error if there is
+	 * whitespace after the last token (e.g. a newline).
+	 */
+	return blkdev_skip_space(endp) - buf;
+}
