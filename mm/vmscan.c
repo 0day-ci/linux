@@ -1814,7 +1814,8 @@ keep:
 	free_unref_page_list(&free_pages);
 
 	list_splice(&ret_pages, page_list);
-	count_vm_events(PGACTIVATE, pgactivate);
+	if (!cgroup_reclaim(sc))
+		count_vm_events(PGACTIVATE, pgactivate);
 
 	return nr_reclaimed;
 }
@@ -2427,7 +2428,8 @@ static void shrink_active_list(unsigned long nr_to_scan,
 	/* Keep all free pages in l_active list */
 	list_splice(&l_inactive, &l_active);
 
-	__count_vm_events(PGDEACTIVATE, nr_deactivate);
+	if (!cgroup_reclaim(sc))
+		__count_vm_events(PGDEACTIVATE, nr_deactivate);
 	__count_memcg_events(lruvec_memcg(lruvec), PGDEACTIVATE, nr_deactivate);
 
 	__mod_node_page_state(pgdat, NR_ISOLATED_ANON + file, -nr_taken);
