@@ -729,3 +729,42 @@ static void blkdev_deactivate(struct led_classdev *const led_dev)
 
 	mutex_unlock(&ledtrig_blkdev_mutex);
 }
+
+
+/*
+ *
+ *	Initialization - register the trigger
+ *
+ */
+
+static struct attribute *ledtrig_blkdev_attrs[] = {
+	&ledtrig_blkdev_attr_add.attr,
+	&ledtrig_blkdev_attr_del.attr,
+	&ledtrig_blkdev_attr_blink_time.attr,
+	&ledtrig_blkdev_attr_interval.attr,
+	&ledtrig_blkdev_attr_mode.attr,
+	NULL
+};
+
+static const struct attribute_group ledtrig_blkdev_attr_group = {
+	.attrs	= ledtrig_blkdev_attrs,
+};
+
+static const struct attribute_group *ledtrig_blkdev_attr_groups[] = {
+	&ledtrig_blkdev_attr_group,
+	NULL
+};
+
+static struct led_trigger ledtrig_blkdev_trigger = {
+	.name		= "blkdev",
+	.activate	= blkdev_activate,
+	.deactivate	= blkdev_deactivate,
+	.groups		= ledtrig_blkdev_attr_groups,
+};
+
+static int __init blkdev_init(void)
+{
+	ledtrig_blkdev_interval = msecs_to_jiffies(LEDTRIG_BLKDEV_INTERVAL);
+	return led_trigger_register(&ledtrig_blkdev_trigger);
+}
+device_initcall(blkdev_init);
