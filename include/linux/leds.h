@@ -615,8 +615,12 @@ static inline void ledtrig_blkdev_disk_init(struct gendisk *const gd)
 {
 	gd->ledtrig = NULL;
 }
+void ledtrig_blkdev_disk_cleanup(struct gendisk *const gd);
 #else	/* CONFIG_LEDS_TRIGGER_BLKDEV */
 static inline void ledtrig_blkdev_disk_init(const struct gendisk *gd)
+{
+}
+static inline void ledtrig_blkdev_disk_cleanup(const struct gendisk *gd)
 {
 }
 #endif	/* CONFIG_LEDS_TRIGGER_BLKDEV */

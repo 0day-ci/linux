@@ -281,3 +281,34 @@ static void blkdev_disk_delete(struct ledtrig_blkdev_led *const led,
 exit_unlock:
 	mutex_unlock(&ledtrig_blkdev_mutex);
 }
+
+
+/*
+ *
+ *	Disassociate all LEDs from a block device (because it's going away)
+ *
+ */
+
+/**
+ * ledtrig_blkdev_disk_cleanup - remove a block device from the blkdev LED
+ * trigger
+ * @disk:	the disk to be removed
+ */
+void ledtrig_blkdev_disk_cleanup(struct gendisk *const gd)
+{
+	struct ledtrig_blkdev_link *link;
+	struct hlist_node *next;
+
+	mutex_lock(&ledtrig_blkdev_mutex);
+
+	if (gd->ledtrig != NULL) {
+
+		hlist_for_each_entry_safe(link, next,
+					  &gd->ledtrig->leds, disk_leds_node) {
+			blkdev_disk_del_locked(link->led, link, gd->ledtrig);
+		}
+	}
+
+	mutex_unlock(&ledtrig_blkdev_mutex);
+}
+EXPORT_SYMBOL_GPL(ledtrig_blkdev_disk_cleanup);
