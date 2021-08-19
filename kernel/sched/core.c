@@ -9057,8 +9057,8 @@ void __init sched_init(void)
 		init_rt_rq(&rq->rt);
 		init_dl_rq(&rq->dl);
 #ifdef CONFIG_FAIR_GROUP_SCHED
-		INIT_LIST_HEAD(&rq->leaf_cfs_rq_list);
-		rq->tmp_alone_branch = &rq->leaf_cfs_rq_list;
+		INIT_LIST_HEAD(&rq->load_cfs_rq_list);
+		rq->tmp_alone_branch = &rq->load_cfs_rq_list;
 		/*
 		 * How much CPU bandwidth does root_task_group get?
 		 *

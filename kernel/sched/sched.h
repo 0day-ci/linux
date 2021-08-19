@@ -589,16 +589,8 @@ struct cfs_rq {
 #ifdef CONFIG_FAIR_GROUP_SCHED
 	struct rq		*rq;	/* CPU runqueue to which this cfs_rq is attached */
 
-	/*
-	 * leaf cfs_rqs are those that hold tasks (lowest schedulable entity in
-	 * a hierarchy). Non-leaf lrqs hold other higher schedulable entities
-	 * (like users, containers etc.)
-	 *
-	 * leaf_cfs_rq_list ties together list of leaf cfs_rq's in a CPU.
-	 * This list is used during load balance.
-	 */
 	int			on_list;
-	struct list_head	leaf_cfs_rq_list;
+	struct list_head	load_cfs_rq_list;
 	struct task_group	*tg;	/* group that "owns" this runqueue */
 
 #ifdef CONFIG_CFS_BANDWIDTH
@@ -952,8 +944,11 @@ struct rq {
 	struct dl_rq		dl;
 
 #ifdef CONFIG_FAIR_GROUP_SCHED
-	/* list of leaf cfs_rq on this CPU: */
-	struct list_head	leaf_cfs_rq_list;
+	/* Bottom up ordered list of cfs_rqs with load (see
+	 * cfs_rq_is_decayed()) on this CPU.
+	 * This list is used during load balance.
+	 */
+	struct list_head	load_cfs_rq_list;
 	struct list_head	*tmp_alone_branch;
 #endif /* CONFIG_FAIR_GROUP_SCHED */
 
