@@ -15,9 +15,11 @@ allOf:
 
 properties:
   compatible:
-    items:
-      - enum:
-          - socionext,uniphier-sd4hc
+    oneOf:
+      - items:
+          - enum:
+              - socionext,uniphier-sd4hc
+          - const: cdns,sd4hc
       - const: cdns,sd4hc
 
   reg:
