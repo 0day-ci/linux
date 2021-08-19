@@ -205,6 +205,46 @@ static void kvm_psci_system_reset(struct kvm_vcpu *vcpu)
 	kvm_prepare_system_event(vcpu, KVM_SYSTEM_EVENT_RESET);
 }
 
+static int kvm_psci_system_suspend(struct kvm_vcpu *vcpu)
+{
+	unsigned long entry_addr, context_id;
+	struct kvm *kvm = vcpu->kvm;
+	unsigned long psci_ret = 0;
+	struct kvm_vcpu *tmp;
+	int ret = 0;
+	int i;
+
+	/*
+	 * The SYSTEM_SUSPEND PSCI call requires that all vCPUs (except the
+	 * calling vCPU) be in an OFF state, as determined by the
+	 * implementation.
+	 *
+	 * See ARM DEN0022D, 5.19 "SYSTEM_SUSPEND" for more details.
+	 */
+	mutex_lock(&kvm->lock);
+	kvm_for_each_vcpu(i, tmp, kvm) {
+		if (tmp != vcpu && !tmp->arch.power_off) {
+			psci_ret = PSCI_RET_DENIED;
+			ret = 1;
+			goto out;
+		}
+	}
+
+	entry_addr = smccc_get_arg1(vcpu);
+	context_id = smccc_get_arg2(vcpu);
+
+	kvm_psci_vcpu_request_reset(vcpu, entry_addr, context_id,
+				    kvm_vcpu_is_be(vcpu));
+
+	memset(&vcpu->run->system_event, 0, sizeof(vcpu->run->system_event));
+	vcpu->run->system_event.type = KVM_SYSTEM_EVENT_SUSPEND;
+	vcpu->run->exit_reason = KVM_EXIT_SYSTEM_EVENT;
+out:
+	mutex_unlock(&kvm->lock);
+	smccc_set_retval(vcpu, psci_ret, 0, 0, 0);
+	return ret;
+}
+
 static void kvm_psci_narrow_to_32bit(struct kvm_vcpu *vcpu)
 {
 	int i;
@@ -224,6 +264,14 @@ static unsigned long kvm_psci_check_allowed_function(struct kvm_vcpu *vcpu, u32 
 	 */
 	if ((fn & PSCI_0_2_64BIT) && vcpu_mode_is_32bit(vcpu))
 		return PSCI_RET_NOT_SUPPORTED;
+
+	switch (fn) {
+	case PSCI_1_0_FN_SYSTEM_SUSPEND:
+	case PSCI_1_0_FN64_SYSTEM_SUSPEND:
+		if (!vcpu->kvm->arch.suspend_enabled)
+			return PSCI_RET_NOT_SUPPORTED;
+		break;
+	}
 
 	return 0;
 }
@@ -318,6 +366,10 @@ static int kvm_psci_1_0_call(struct kvm_vcpu *vcpu)
 	unsigned long val;
 	int ret = 1;
 
+	val = kvm_psci_check_allowed_function(vcpu, psci_fn);
+	if (val)
+		goto out;
+
 	switch(psci_fn) {
 	case PSCI_0_2_FN_PSCI_VERSION:
 		val = KVM_ARM_PSCI_1_0;
@@ -341,6 +393,8 @@ static int kvm_psci_1_0_call(struct kvm_vcpu *vcpu)
 		case PSCI_0_2_FN_SYSTEM_OFF:
 		case PSCI_0_2_FN_SYSTEM_RESET:
 		case PSCI_1_0_FN_PSCI_FEATURES:
+		case PSCI_1_0_FN_SYSTEM_SUSPEND:
+		case PSCI_1_0_FN64_SYSTEM_SUSPEND:
 		case ARM_SMCCC_VERSION_FUNC_ID:
 			val = 0;
 			break;
@@ -349,10 +403,16 @@ static int kvm_psci_1_0_call(struct kvm_vcpu *vcpu)
 			break;
 		}
 		break;
+	case PSCI_1_0_FN_SYSTEM_SUSPEND:
+		kvm_psci_narrow_to_32bit(vcpu);
+		fallthrough;
+	case PSCI_1_0_FN64_SYSTEM_SUSPEND:
+		return kvm_psci_system_suspend(vcpu);
 	default:
 		return kvm_psci_0_2_call(vcpu);
 	}
 
+out:
 	smccc_set_retval(vcpu, val, 0, 0, 0);
 	return ret;
 }

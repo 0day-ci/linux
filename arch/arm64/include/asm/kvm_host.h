@@ -136,6 +136,9 @@ struct kvm_arch {
 
 	/* Memory Tagging Extension enabled for the guest */
 	bool mte_enabled;
+
+	/* PSCI SYSTEM_SUSPEND call enabled for the guest */
+	bool suspend_enabled;
 };
 
 struct kvm_vcpu_fault_info {
