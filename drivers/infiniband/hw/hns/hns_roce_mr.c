@@ -285,6 +285,27 @@ err_alloc_mr:
 	return ERR_PTR(ret);
 }
 
+static void copy_mr(struct hns_roce_mr *dst, struct hns_roce_mr *src)
+{
+	dst->enabled = src->enabled;
+	dst->iova = src->iova;
+	dst->size = src->size;
+	dst->pd = src->pd;
+	dst->access = src->access;
+}
+
+static void store_rereg_mr(struct hns_roce_mr *mr_bak,
+				  struct hns_roce_mr *mr)
+{
+	copy_mr(mr_bak, mr);
+}
+
+static void restore_rereg_mr(struct hns_roce_mr *mr_bak,
+				    struct hns_roce_mr *mr)
+{
+	copy_mr(mr, mr_bak);
+}
+
 struct ib_mr *hns_roce_rereg_user_mr(struct ib_mr *ibmr, int flags, u64 start,
 				     u64 length, u64 virt_addr,
 				     int mr_access_flags, struct ib_pd *pd,
@@ -294,8 +315,11 @@ struct ib_mr *hns_roce_rereg_user_mr(struct ib_mr *ibmr, int flags, u64 start,
 	struct ib_device *ib_dev = &hr_dev->ib_dev;
 	struct hns_roce_mr *mr = to_hr_mr(ibmr);
 	struct hns_roce_cmd_mailbox *mailbox;
+	struct hns_roce_mr mr_bak;
 	unsigned long mtpt_idx;
 	int ret;
+
+	store_rereg_mr(&mr_bak, mr);
 
 	if (!mr->enabled)
 		return ERR_PTR(-EINVAL);
@@ -349,7 +373,11 @@ struct ib_mr *hns_roce_rereg_user_mr(struct ib_mr *ibmr, int flags, u64 start,
 
 	mr->enabled = 1;
 
+	hns_roce_free_cmd_mailbox(hr_dev, mailbox);
+	return NULL;
+
 free_cmd_mbox:
+	restore_rereg_mr(&mr_bak, mr);
 	hns_roce_free_cmd_mailbox(hr_dev, mailbox);
 
 	return ERR_PTR(ret);
