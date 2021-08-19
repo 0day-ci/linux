@@ -621,27 +621,14 @@ static void __init early_reserve_mem_dt(void)
 	}
 }
 
-static void __init early_reserve_mem(void)
+static void __init early_reserve_mem_old(void)
 {
 	__be64 *reserve_map;
 
 	reserve_map = (__be64 *)(((unsigned long)initial_boot_params) +
 			fdt_off_mem_rsvmap(initial_boot_params));
 
-	/* Look for the new "reserved-regions" property in the DT */
-	early_reserve_mem_dt();
-
-#ifdef CONFIG_BLK_DEV_INITRD
-	/* Then reserve the initrd, if any */
-	if (initrd_start && (initrd_end > initrd_start)) {
-		memblock_reserve(ALIGN_DOWN(__pa(initrd_start), PAGE_SIZE),
-			ALIGN(initrd_end, PAGE_SIZE) -
-			ALIGN_DOWN(initrd_start, PAGE_SIZE));
-	}
-#endif /* CONFIG_BLK_DEV_INITRD */
-
-#ifdef CONFIG_PPC32
-	/* 
+	/*
 	 * Handle the case where we might be booting from an old kexec
 	 * image that setup the mem_rsvmap as pairs of 32-bit values
 	 */
@@ -659,9 +646,25 @@ static void __init early_reserve_mem(void)
 			DBG("reserving: %x -> %x\n", base_32, size_32);
 			memblock_reserve(base_32, size_32);
 		}
-		return;
 	}
-#endif
+}
+
+static void __init early_reserve_mem(void)
+{
+	/* Look for the new "reserved-regions" property in the DT */
+	early_reserve_mem_dt();
+
+#ifdef CONFIG_BLK_DEV_INITRD
+	/* Then reserve the initrd, if any */
+	if (initrd_start && (initrd_end > initrd_start)) {
+		memblock_reserve(ALIGN_DOWN(__pa(initrd_start), PAGE_SIZE),
+			ALIGN(initrd_end, PAGE_SIZE) -
+			ALIGN_DOWN(initrd_start, PAGE_SIZE));
+	}
+#endif /* CONFIG_BLK_DEV_INITRD */
+
+	if (IS_ENABLED(CONFIG_PPC32))
+		early_reserve_mem_old();
 }
 
 #ifdef CONFIG_PPC_TRANSACTIONAL_MEM
