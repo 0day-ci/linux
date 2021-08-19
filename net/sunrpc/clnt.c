@@ -535,6 +535,7 @@ struct rpc_clnt *rpc_create(struct rpc_create_args *args)
 		xprt = args->bc_xprt->xpt_bc_xprt;
 		if (xprt) {
 			xprt_get(xprt);
+			xprt_set_connected(xprt);
 			return rpc_create_xprt(args, xprt);
 		}
 	}
