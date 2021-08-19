@@ -134,7 +134,7 @@ static int kvm_handle_guest_debug(struct kvm_vcpu *vcpu)
 	case ESR_ELx_EC_BRK64:
 		break;
 	default:
-		kvm_err("%s: un-handled case esr: %#08x\n",
+		kvm_pr_unimpl("%s: un-handled case esr: %#08x\n",
 			__func__, (unsigned int) esr);
 		ret = -1;
 		break;
