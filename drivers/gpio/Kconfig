@@ -1378,7 +1378,7 @@ config GPIO_TPS65912
 	  This driver supports TPS65912 gpio chip
 
 config GPIO_TPS68470
-	bool "TPS68470 GPIO"
+	tristate "TPS68470 GPIO"
 	depends on INTEL_SKL_INT3472
 	help
 	  Select this option to enable GPIO driver for the TPS68470
