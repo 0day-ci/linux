@@ -200,8 +200,10 @@ int pci_epf_add_vepf(struct pci_epf *epf_pf, struct pci_epf *epf_vf)
 	mutex_lock(&epf_pf->lock);
 	vfunc_no = find_first_zero_bit(&epf_pf->vfunction_num_map,
 				       BITS_PER_LONG);
-	if (vfunc_no >= BITS_PER_LONG)
+	if (vfunc_no >= BITS_PER_LONG) {
+		mutex_unlock(&epf_pf->lock);
 		return -EINVAL;
+	}
 
 	set_bit(vfunc_no, &epf_pf->vfunction_num_map);
 	epf_vf->vfunc_no = vfunc_no;
