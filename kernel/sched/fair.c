@@ -4898,8 +4898,16 @@ void unthrottle_cfs_rq(struct cfs_rq *cfs_rq)
 	/* update hierarchical throttle state */
 	walk_tg_tree_from(cfs_rq->tg, tg_nop, tg_unthrottle_up, (void *)rq);
 
-	if (!cfs_rq->load.weight)
+	if (!cfs_rq->load.weight) {
+		/* Nothing to run but something to decay? Complete the branch */
+		if (cfs_rq->on_list)
+			for_each_sched_entity(se) {
+				if (list_add_leaf_cfs_rq(group_cfs_rq(se)))
+					break;
+			}
+		assert_list_leaf_cfs_rq(rq);
 		return;
+	}
 
 	task_delta = cfs_rq->h_nr_running;
 	idle_task_delta = cfs_rq->idle_h_nr_running;
