@@ -468,7 +468,7 @@ static int tc_pxl_pll_en(struct tc_data *tc, u32 refclk, u32 pixelclock)
 	int div, best_div = 1;
 	int mul, best_mul = 1;
 	int delta, best_delta;
-	int ext_div[] = {1, 2, 3, 5, 7};
+	static const int ext_div[] = {1, 2, 3, 5, 7};
 	int best_pixelclock = 0;
 	int vco_hi = 0;
 	u32 pxl_pllparam;
