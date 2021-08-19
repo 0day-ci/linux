@@ -4367,9 +4367,11 @@ static int __ext4_get_inode_loc(struct super_block *sb, unsigned long ino,
 		}
 		brelse(bitmap_bh);
 		if (i == start + inodes_per_block) {
-			/* all other inodes are free, so skip I/O */
-			memset(bh->b_data, 0, bh->b_size);
-			set_buffer_uptodate(bh);
+			/*
+			 * All other inodes are free, skip I/O. Return
+			 * un-inited buffer (which is postponed until
+			 * before filling inode data) immediately.
+			 */
 			unlock_buffer(bh);
 			goto has_buffer;
 		}
@@ -5029,6 +5031,24 @@ static int ext4_do_update_inode(handle_t *handle,
 	uid_t i_uid;
 	gid_t i_gid;
 	projid_t i_projid;
+
+	/*
+	 * If the buffer is not uptodate, it means all information of inode
+	 * in memory and we got this buffer without reading the block. We
+	 * must be cautious that once we mark the buffer as uptodate, we
+	 * rely on filling in the correct inode data later in this function.
+	 * Otherwise if we getting the left falsepositive buffer when
+	 * creating other inode on the same block, it could corrupt the
+	 * inode data on disk.
+	 */
+	if (!buffer_uptodate(bh)) {
+		lock_buffer(bh);
+		if (!buffer_uptodate(bh)) {
+			memset(bh->b_data, 0, bh->b_size);
+			set_buffer_uptodate(bh);
+		}
+		unlock_buffer(bh);
+	}
 
 	spin_lock(&ei->i_raw_lock);
 
