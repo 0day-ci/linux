@@ -562,7 +562,6 @@ static void sym53c8xx_timer(struct timer_list *t)
  */
 #define SYM_EH_ABORT		0
 #define SYM_EH_DEVICE_RESET	1
-#define SYM_EH_BUS_RESET	2
 
 static int sym_eh_wait_for_commands(struct Scsi_Host *shost)
 {
@@ -621,10 +620,6 @@ static int sym_eh_handler(struct Scsi_Host *shost, int op,
 	case SYM_EH_DEVICE_RESET:
 		sts = sym_reset_scsi_target(np, cmd->device->id);
 		break;
-	case SYM_EH_BUS_RESET:
-		sym_reset_scsi_bus(np, 1);
-		sts = 0;
-		break;
 	default:
 		break;
 	}
@@ -681,10 +676,26 @@ static int sym53c8xx_eh_bus_reset_handler(struct scsi_cmnd *cmd)
 	struct Scsi_Host *shost = cmd->device->host;
 	struct sym_data *sym_data = shost_priv(shost);
 	struct pci_dev *pdev = sym_data->pdev;
+	struct sym_hcb *np = sym_data->ncb;
+	int rval = SUCCESS;
 
 	if (pci_channel_offline(pdev))
 		return FAILED;
-	return sym_eh_handler(shost, SYM_EH_BUS_RESET, "BUS RESET", cmd);
+
+	shost_printk(KERN_WARNING, shost, "BUS RESET operation started\n");
+
+	spin_lock_irq(shost->host_lock);
+	if (sym_reset_scsi_bus(np, 1))
+		rval = FAILED;
+	spin_unlock_irq(shost->host_lock);
+
+	if (rval == SUCCESS)
+		rval = sym_eh_wait_for_commands(shost);
+
+	shost_printk(KERN_WARNING, shost, "BUS RESET operation %s.\n",
+			rval == SUCCESS ? "complete" : "failed");
+
+	return rval;
 }
 
 static int sym53c8xx_eh_host_reset_handler(struct scsi_cmnd *cmd)
