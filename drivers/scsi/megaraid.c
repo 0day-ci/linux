@@ -1887,7 +1887,8 @@ megaraid_reset(struct scsi_cmnd *cmd)
 {
 	adapter_t	*adapter;
 	megacmd_t	mc;
-	int		rval;
+	int		rval = SUCCESS;
+	struct list_head	*pos, *next;
 
 	adapter = (adapter_t *)cmd->device->host->hostdata;
 
@@ -1905,7 +1906,37 @@ megaraid_reset(struct scsi_cmnd *cmd)
 
 	spin_lock_irq(&adapter->lock);
 
-	rval =  megaraid_abort_and_reset(adapter, cmd, SCB_RESET);
+	dev_warn(&adapter->dev->dev, "RESET HBA\n");
+
+	list_for_each_safe(pos, next, &adapter->pending_list) {
+		scb_t *scb = list_entry(pos, scb_t, list);
+
+		scb->state |= SCB_RESET;
+
+		/*
+		 * Check if this command has firmware ownership. If
+		 * yes, we cannot reset this command. Whenever f/w
+		 * completes this command, we will return appropriate
+		 * status from ISR.
+		 */
+		if( scb->state & SCB_ISSUED ) {
+			dev_warn(&adapter->dev->dev,
+				 "RESET[%x], fw owner\n",
+				 scb->idx);
+			rval = FAILED;
+			break;
+		}
+		/*
+		 * Not yet issued! Remove from the pending
+		 * list
+		 */
+		dev_warn(&adapter->dev->dev,
+			 "RESET[%x], driver owner\n", scb->idx);
+		scb->cmd->result = (DID_RESET << 16);
+		list_add_tail(SCSI_LIST(scb->cmd),
+			      &adapter->completed_list);
+		mega_free_scb(adapter, scb);
+	}
 
 	/*
 	 * This is required here to complete any completed requests
