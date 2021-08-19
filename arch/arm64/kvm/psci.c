@@ -64,9 +64,40 @@ static inline bool kvm_psci_valid_affinity(unsigned long affinity)
 	return !(affinity & ~MPIDR_HWID_BITMASK);
 }
 
-static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
+static void kvm_psci_vcpu_request_reset(struct kvm_vcpu *vcpu,
+					unsigned long entry_addr,
+					unsigned long context_id,
+					bool big_endian)
 {
 	struct vcpu_reset_state *reset_state;
+
+	lockdep_assert_held(&vcpu->kvm->lock);
+
+	reset_state = &vcpu->arch.reset_state;
+	reset_state->pc = entry_addr;
+
+	/* Propagate caller endianness */
+	reset_state->be = big_endian;
+
+	/*
+	 * NOTE: We always update r0 (or x0) because for PSCI v0.1
+	 * the general purpose registers are undefined upon CPU_ON.
+	 */
+	reset_state->r0 = context_id;
+
+	WRITE_ONCE(reset_state->reset, true);
+	kvm_make_request(KVM_REQ_VCPU_RESET, vcpu);
+
+	/*
+	 * Make sure the reset request is observed if the change to
+	 * power_state is observed.
+	 */
+	smp_wmb();
+	vcpu->arch.power_off = false;
+}
+
+static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
+{
 	struct kvm *kvm = source_vcpu->kvm;
 	struct kvm_vcpu *vcpu = NULL;
 	unsigned long cpu_id;
@@ -90,29 +121,9 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
 			return PSCI_RET_INVALID_PARAMS;
 	}
 
-	reset_state = &vcpu->arch.reset_state;
-
-	reset_state->pc = smccc_get_arg2(source_vcpu);
-
-	/* Propagate caller endianness */
-	reset_state->be = kvm_vcpu_is_be(source_vcpu);
-
-	/*
-	 * NOTE: We always update r0 (or x0) because for PSCI v0.1
-	 * the general purpose registers are undefined upon CPU_ON.
-	 */
-	reset_state->r0 = smccc_get_arg3(source_vcpu);
-
-	WRITE_ONCE(reset_state->reset, true);
-	kvm_make_request(KVM_REQ_VCPU_RESET, vcpu);
-
-	/*
-	 * Make sure the reset request is observed if the change to
-	 * power_state is observed.
-	 */
-	smp_wmb();
-
-	vcpu->arch.power_off = false;
+	kvm_psci_vcpu_request_reset(vcpu, smccc_get_arg2(source_vcpu),
+				    smccc_get_arg3(source_vcpu),
+				    kvm_vcpu_is_be(source_vcpu));
 	kvm_vcpu_wake_up(vcpu);
 
 	return PSCI_RET_SUCCESS;
