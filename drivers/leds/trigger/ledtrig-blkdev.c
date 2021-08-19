@@ -658,3 +658,49 @@ static ssize_t blkdev_mode_store(struct device *const dev,
 
 static struct device_attribute ledtrig_blkdev_attr_mode =
 	__ATTR(mode, 0644, blkdev_mode_show, blkdev_mode_store);
+
+
+/*
+ *
+ *	Associate an LED with the blkdev trigger
+ *
+ */
+
+static int blkdev_activate(struct led_classdev *const led_dev)
+{
+	struct ledtrig_blkdev_led *led;
+	int ret;
+
+	led = kmalloc(sizeof(*led), GFP_KERNEL);
+	if (led == NULL) {
+		ret = -ENOMEM;
+		goto exit_return;
+	}
+
+	led->led_dev = led_dev;
+	led->blink_msec = LEDTRIG_BLKDEV_BLINK_MSEC;
+	led->mode = LEDTRIG_BLKDEV_MODE_RW;
+	INIT_HLIST_HEAD(&led->disks);
+
+	ret = mutex_lock_interruptible(&ledtrig_blkdev_mutex);
+	if (ret != 0)
+		goto exit_free;
+
+	led->dir = blkdev_mkdir("block_devices", &led_dev->dev->kobj);
+	if (IS_ERR(led->dir)) {
+		ret = PTR_ERR(led->dir);
+		goto exit_unlock;
+	}
+
+	hlist_add_head(&led->leds_node, &ledtrig_blkdev_leds);
+	led_set_trigger_data(led_dev, led);
+	ret = 0;
+
+exit_unlock:
+	mutex_unlock(&ledtrig_blkdev_mutex);
+exit_free:
+	if (ret != 0)
+		kfree(led);
+exit_return:
+	return ret;
+}
