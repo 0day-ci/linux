@@ -1870,7 +1870,7 @@ megaraid_abort(struct scsi_cmnd *cmd)
 
 	adapter = (adapter_t *)cmd->device->host->hostdata;
 
-	rval =  megaraid_abort_and_reset(adapter, cmd, SCB_ABORT);
+	rval =  __megaraid_abort(adapter, cmd);
 
 	/*
 	 * This is required here to complete any completed requests
@@ -1949,22 +1949,20 @@ megaraid_reset(struct scsi_cmnd *cmd)
 }
 
 /**
- * megaraid_abort_and_reset()
+ * __megaraid_abort()
  * @adapter: megaraid soft state
  * @cmd: scsi command to be aborted or reset
- * @aor: abort or reset flag
  *
  * Try to locate the scsi command in the pending queue. If found and is not
  * issued to the controller, abort/reset it. Otherwise return failure
  */
 static int
-megaraid_abort_and_reset(adapter_t *adapter, struct scsi_cmnd *cmd, int aor)
+__megaraid_abort(adapter_t *adapter, struct scsi_cmnd *cmd)
 {
 	struct list_head	*pos, *next;
 	scb_t			*scb;
 
-	dev_warn(&adapter->dev->dev, "%s cmd=%x <c=%d t=%d l=%d>\n",
-	     (aor == SCB_ABORT)? "ABORTING":"RESET",
+	dev_warn(&adapter->dev->dev, "ABORTING cmd=%x <c=%d t=%d l=%d>\n",
 	     cmd->cmnd[0], cmd->device->channel,
 	     cmd->device->id, (u32)cmd->device->lun);
 
@@ -1977,7 +1975,7 @@ megaraid_abort_and_reset(adapter_t *adapter, struct scsi_cmnd *cmd, int aor)
 
 		if (scb->cmd == cmd) { /* Found command */
 
-			scb->state |= aor;
+			scb->state |= SCB_ABORT;
 
 			/*
 			 * Check if this command has firmware ownership. If
@@ -1988,8 +1986,7 @@ megaraid_abort_and_reset(adapter_t *adapter, struct scsi_cmnd *cmd, int aor)
 			if( scb->state & SCB_ISSUED ) {
 
 				dev_warn(&adapter->dev->dev,
-					"%s[%x], fw owner\n",
-					(aor==SCB_ABORT) ? "ABORTING":"RESET",
+					"ABORTING[%x], fw owner\n",
 					scb->idx);
 
 				return FAILED;
@@ -2001,18 +1998,11 @@ megaraid_abort_and_reset(adapter_t *adapter, struct scsi_cmnd *cmd, int aor)
 				 * list
 				 */
 				dev_warn(&adapter->dev->dev,
-					"%s-[%x], driver owner\n",
-					(aor==SCB_ABORT) ? "ABORTING":"RESET",
+					"ABORTING[%x], driver owner\n",
 					scb->idx);
 
 				mega_free_scb(adapter, scb);
-
-				if( aor == SCB_ABORT ) {
-					cmd->result = (DID_ABORT << 16);
-				}
-				else {
-					cmd->result = (DID_RESET << 16);
-				}
+				cmd->result = (DID_ABORT << 16);
 
 				list_add_tail(SCSI_LIST(cmd),
 						&adapter->completed_list);
