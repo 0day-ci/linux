@@ -59,8 +59,7 @@ static void kvm_psci_vcpu_off(struct kvm_vcpu *vcpu)
 	kvm_vcpu_kick(vcpu);
 }
 
-static inline bool kvm_psci_valid_affinity(struct kvm_vcpu *vcpu,
-					   unsigned long affinity)
+static inline bool kvm_psci_valid_affinity(unsigned long affinity)
 {
 	return !(affinity & ~MPIDR_HWID_BITMASK);
 }
@@ -73,7 +72,7 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
 	unsigned long cpu_id;
 
 	cpu_id = smccc_get_arg1(source_vcpu);
-	if (!kvm_psci_valid_affinity(source_vcpu, cpu_id))
+	if (!kvm_psci_valid_affinity(cpu_id))
 		return PSCI_RET_INVALID_PARAMS;
 
 	vcpu = kvm_mpidr_to_vcpu(kvm, cpu_id);
@@ -132,7 +131,7 @@ static unsigned long kvm_psci_vcpu_affinity_info(struct kvm_vcpu *vcpu)
 	target_affinity = smccc_get_arg1(vcpu);
 	lowest_affinity_level = smccc_get_arg2(vcpu);
 
-	if (!kvm_psci_valid_affinity(vcpu, target_affinity))
+	if (!kvm_psci_valid_affinity(target_affinity))
 		return PSCI_RET_INVALID_PARAMS;
 
 	/* Determine target affinity mask */
