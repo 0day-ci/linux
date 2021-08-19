@@ -10,6 +10,8 @@
 
 #include <linux/types.h>
 
+#define __VVAR_PAGES    1
+
 #ifndef CONFIG_GENERIC_TIME_VSYSCALL
 struct vdso_data {
 };
@@ -28,7 +30,5 @@ struct vdso_data {
 	extern const char __vdso_##name[];					\
 	(void __user *)((unsigned long)(base) + __vdso_##name);			\
 })
-
-asmlinkage long sys_riscv_flush_icache(uintptr_t, uintptr_t, uintptr_t);
 
 #endif /* _ASM_RISCV_VDSO_H */
