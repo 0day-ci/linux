@@ -3338,6 +3338,8 @@ int tcp_set_window_clamp(struct sock *sk, int val)
 	} else {
 		tp->window_clamp = val < SOCK_MIN_RCVBUF / 2 ?
 			SOCK_MIN_RCVBUF / 2 : val;
+		tp->rcv_ssthresh = min(tp->rcv_ssthresh,
+				       tp->window_clamp);
 	}
 	return 0;
 }
