@@ -81,6 +81,8 @@ int devm_pvpanic_probe(struct device *dev, struct pvpanic_instance *pi)
 	if (!pi || !pi->base)
 		return -EINVAL;
 
+	dev_set_drvdata(dev, pi);
+
 	spin_lock(&pvpanic_lock);
 	list_add(&pi->list, &pvpanic_list);
 	spin_unlock(&pvpanic_lock);
