@@ -68,7 +68,8 @@
 #define MEI_DEV_ID_BXT_M      0x1A9A  /* Broxton M */
 #define MEI_DEV_ID_APL_I      0x5A9A  /* Apollo Lake I */
 
-#define MEI_DEV_ID_DNV_IE     0x19E5  /* Denverton IE */
+#define MEI_DEV_ID_DNV_IE     0x19E5  /* Denverton for HECI1 - IFSI */
+#define MEI_DEV_ID_DNV_IE_2   0x19E6  /* Denverton 2 for HECI2 - HSM */
 
 #define MEI_DEV_ID_GLK        0x319A  /* Gemini Lake */
 
