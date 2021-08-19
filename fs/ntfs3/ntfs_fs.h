@@ -50,6 +50,7 @@
 
 struct ntfs_mount_options {
 	struct nls_table *nls;
+	char *nls_name;
 
 	kuid_t fs_uid;
 	kgid_t fs_gid;
