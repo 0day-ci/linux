@@ -563,7 +563,27 @@ static void sym53c8xx_timer(struct timer_list *t)
 #define SYM_EH_ABORT		0
 #define SYM_EH_DEVICE_RESET	1
 #define SYM_EH_BUS_RESET	2
-#define SYM_EH_HOST_RESET	3
+
+static int sym_eh_wait_for_commands(struct Scsi_Host *shost)
+{
+	struct sym_data *sym_data = shost_priv(shost);
+	struct sym_hcb *np = sym_data->ncb;
+	int rval = SUCCESS, count = 10; /* 5 seconds */
+
+	/* Wait for any queued commands to complete */
+	spin_lock_irq(shost->host_lock);
+	while (!sym_que_empty(&np->busy_ccbq)) {
+		if (--count == 0) {
+			rval = FAILED;
+			break;
+		}
+		spin_unlock_irq(shost->host_lock);
+		msleep(500);
+		spin_lock_irq(shost->host_lock);
+	}
+	spin_unlock_irq(shost->host_lock);
+	return rval;
+}
 
 /*
  *  Generic method for our eh processing.
@@ -603,11 +623,6 @@ static int sym_eh_handler(struct Scsi_Host *shost, int op,
 		break;
 	case SYM_EH_BUS_RESET:
 		sym_reset_scsi_bus(np, 1);
-		sts = 0;
-		break;
-	case SYM_EH_HOST_RESET:
-		sym_reset_scsi_bus(np, 0);
-		sym_start_up(shost, 1);
 		sts = 0;
 		break;
 	default:
@@ -677,6 +692,10 @@ static int sym53c8xx_eh_host_reset_handler(struct scsi_cmnd *cmd)
 	struct Scsi_Host *shost = cmd->device->host;
 	struct sym_data *sym_data = shost_priv(shost);
 	struct pci_dev *pdev = sym_data->pdev;
+	struct sym_hcb *np = sym_data->ncb;
+	int rval = SUCCESS;
+
+	shost_printk(KERN_WARNING, shost, "HOST RESET operation started\n");
 
 	/* We may be in an error condition because the PCI bus
 	 * went down. In this case, we need to wait until the
@@ -710,7 +729,16 @@ static int sym53c8xx_eh_host_reset_handler(struct scsi_cmnd *cmd)
 			return SCSI_FAILED;
 	}
 
-	return sym_eh_handler(shost, SYM_EH_HOST_RESET, "HOST RESET", cmd);
+	spin_lock_irq(shost->host_lock);
+	sym_reset_scsi_bus(np, 0);
+	sym_start_up(shost, 1);
+	spin_unlock_irq(shost->host_lock);
+
+	rval = sym_eh_wait_for_commands(shost);
+
+	shost_printk(KERN_WARNING, shost, "HOST RESET operation %s.\n",
+		     rval == SUCCESS ? "complete" : "failed");
+	return rval;
 }
 
 /*
