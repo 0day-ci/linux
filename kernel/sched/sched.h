@@ -1385,6 +1385,14 @@ static inline struct cfs_rq *group_cfs_rq(struct sched_entity *grp)
 	return grp->my_q;
 }
 
+/* sched entity representing the cfs_rq, NULL for root */
+static inline struct sched_entity *group_se(struct cfs_rq *cfs_rq)
+{
+	int cpu = cpu_of(rq_of(cfs_rq));
+
+	return cfs_rq->tg->se[cpu];
+}
+
 #else
 
 static inline struct task_struct *task_of(struct sched_entity *se)
