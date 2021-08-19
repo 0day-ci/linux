@@ -198,12 +198,16 @@ int hns_roce_cmd_init(struct hns_roce_dev *hr_dev)
 	if (!hr_dev->cmd.pool)
 		return -ENOMEM;
 
+	init_rwsem(&hr_dev->cmd.mb_rwsem);
+
 	return 0;
 }
 
 void hns_roce_cmd_cleanup(struct hns_roce_dev *hr_dev)
 {
+	down_write(&hr_dev->cmd.mb_rwsem);
 	dma_pool_destroy(hr_dev->cmd.pool);
+	up_write(&hr_dev->cmd.mb_rwsem);
 }
 
 int hns_roce_cmd_use_events(struct hns_roce_dev *hr_dev)
@@ -237,8 +241,10 @@ void hns_roce_cmd_use_polling(struct hns_roce_dev *hr_dev)
 {
 	struct hns_roce_cmdq *hr_cmd = &hr_dev->cmd;
 
+	down_write(&hr_dev->cmd.mb_rwsem);
 	kfree(hr_cmd->context);
 	hr_cmd->use_events = 0;
+	up_write(&hr_dev->cmd.mb_rwsem);
 
 	up(&hr_cmd->poll_sem);
 }
@@ -252,9 +258,12 @@ hns_roce_alloc_cmd_mailbox(struct hns_roce_dev *hr_dev)
 	if (!mailbox)
 		return ERR_PTR(-ENOMEM);
 
+	down_read(&hr_dev->cmd.mb_rwsem);
 	mailbox->buf =
 		dma_pool_alloc(hr_dev->cmd.pool, GFP_KERNEL, &mailbox->dma);
 	if (!mailbox->buf) {
+		up_read(&hr_dev->cmd.mb_rwsem);
+
 		kfree(mailbox);
 		return ERR_PTR(-ENOMEM);
 	}
@@ -269,5 +278,8 @@ void hns_roce_free_cmd_mailbox(struct hns_roce_dev *hr_dev,
 		return;
 
 	dma_pool_free(hr_dev->cmd.pool, mailbox->buf, mailbox->dma);
+
+	up_read(&hr_dev->cmd.mb_rwsem);
+
 	kfree(mailbox);
 }
