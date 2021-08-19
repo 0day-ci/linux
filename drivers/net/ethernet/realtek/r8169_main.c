@@ -623,7 +623,8 @@ struct rtl8169_private {
 	} wk;
 
 	unsigned supports_gmii:1;
-	unsigned aspm_manageable:1;
+	unsigned pcie_aspm_manageable:1;
+	unsigned rtl_aspm_supported:1;
 	unsigned rtl_aspm_enabled:1;
 	struct delayed_work aspm_toggle;
 	atomic_t aspm_packet_count;
@@ -700,6 +701,20 @@ static bool rtl_is_8168evl_up(struct rtl8169_private *tp)
 	return tp->mac_version >= RTL_GIGA_MAC_VER_34 &&
 	       tp->mac_version != RTL_GIGA_MAC_VER_39 &&
 	       tp->mac_version <= RTL_GIGA_MAC_VER_53;
+}
+
+static int rtl_supports_aspm(struct rtl8169_private *tp)
+{
+	switch (tp->mac_version) {
+	case RTL_GIGA_MAC_VER_02 ... RTL_GIGA_MAC_VER_31:
+	case RTL_GIGA_MAC_VER_37:
+	case RTL_GIGA_MAC_VER_39:
+	case RTL_GIGA_MAC_VER_43:
+	case RTL_GIGA_MAC_VER_47:
+		return 0;
+	default:
+		return 1;
+	}
 }
 
 static bool rtl_supports_eee(struct rtl8169_private *tp)
@@ -2669,7 +2684,7 @@ static void rtl_pcie_state_l2l3_disable(struct rtl8169_private *tp)
 
 static void rtl_hw_aspm_clkreq_enable(struct rtl8169_private *tp, bool enable)
 {
-	if (!tp->aspm_manageable && enable)
+	if (!(tp->pcie_aspm_manageable && tp->rtl_aspm_supported) && enable)
 		return;
 
 	tp->rtl_aspm_enabled = enable;
@@ -5319,12 +5334,8 @@ static int rtl_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	if (rc)
 		return rc;
 
-	/* Disable ASPM completely as that cause random device stop working
-	 * problems as well as full system hangs for some PCIe devices users.
-	 */
-	rc = pci_disable_link_state(pdev, PCIE_LINK_STATE_L0S |
-					  PCIE_LINK_STATE_L1);
-	tp->aspm_manageable = !rc;
+	tp->pcie_aspm_manageable = pcie_aspm_supported(pdev);
+	tp->rtl_aspm_supported = rtl_supports_aspm(tp);
 
 	/* enable device (incl. PCI PM wakeup and hotplug setup) */
 	rc = pcim_enable_device(pdev);
