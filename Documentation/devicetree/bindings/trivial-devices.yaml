@@ -159,6 +159,10 @@ properties:
           - maxim,max6625
             # 3-Channel Remote Temperature Sensor
           - maxim,max31730
+            # Intelligent Fan Controller with temperature and remote voltage sensing
+            # Datasheet: https://datasheets.maximintegrated.com/en/ds/MAX31785.pdf
+          - maxim,max31785
+          - maxim,max31785a
             # mCube 3-axis 8-bit digital accelerometer
           - mcube,mc3230
             # Measurement Specialities I2C temperature and humidity sensor
