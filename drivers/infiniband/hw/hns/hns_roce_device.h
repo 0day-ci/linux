@@ -571,6 +571,7 @@ struct hns_roce_cmdq {
 	 * close device, switch into poll mode(non event mode)
 	 */
 	u8			use_events;
+	struct rw_semaphore	mb_rwsem;
 };
 
 struct hns_roce_cmd_mailbox {
