@@ -36,6 +36,8 @@
 #define NUMBER_OF_INTERRUPTS		(NUMBER_OF_CMPLT_QUEUES + \
 						NUMBER_OF_CPU_HW_QUEUES)
 
+#define GAUDI_STREAM_MASTER_ARR_SIZE	8
+
 #if (NUMBER_OF_INTERRUPTS > GAUDI_MSI_ENTRIES)
 #error "Number of MSI interrupts must be smaller or equal to GAUDI_MSI_ENTRIES"
 #endif
@@ -49,6 +51,8 @@
 
 #define DC_POWER_DEFAULT_PCI		60000		/* 60W */
 #define DC_POWER_DEFAULT_PMC		60000		/* 60W */
+
+#define DC_POWER_DEFAULT_PMC_SEC	97000		/* 97W */
 
 #define GAUDI_CPU_TIMEOUT_USEC		30000000	/* 30s */
 
@@ -117,6 +121,7 @@
 	(((mmSYNC_MNGR_E_N_SYNC_MNGR_OBJS_MON_STATUS_511 - \
 	mmSYNC_MNGR_E_N_SYNC_MNGR_OBJS_MON_STATUS_0) + 4) >> 2)
 
+#define MONITOR_MAX_SOBS	8
 
 /* DRAM Memory Map */
 
@@ -199,6 +204,18 @@
 #define HW_CAP_TPC7		BIT(31)
 #define HW_CAP_TPC_MASK		GENMASK(31, 24)
 #define HW_CAP_TPC_SHIFT	24
+
+#define NEXT_SYNC_OBJ_ADDR_INTERVAL \
+	(mmSYNC_MNGR_W_N_SYNC_MNGR_OBJS_SOB_OBJ_0 - \
+	 mmSYNC_MNGR_E_N_SYNC_MNGR_OBJS_SOB_OBJ_0)
+#define NUM_OF_MME_ENGINES			2
+#define NUM_OF_MME_SUB_ENGINES		2
+#define NUM_OF_TPC_ENGINES			8
+#define NUM_OF_DMA_ENGINES			8
+#define NUM_OF_QUEUES				5
+#define NUM_OF_STREAMS				4
+#define NUM_OF_FENCES				4
+
 
 #define GAUDI_CPU_PCI_MSB_ADDR(addr)	(((addr) & GENMASK_ULL(49, 39)) >> 39)
 #define GAUDI_PCI_TO_CPU_ADDR(addr)			\
