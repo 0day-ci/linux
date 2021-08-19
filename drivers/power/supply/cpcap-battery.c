@@ -1035,12 +1035,6 @@ static int cpcap_battery_probe(struct platform_device *pdev)
 	if (!match)
 		return -EINVAL;
 
-	if (!match->data) {
-		dev_err(&pdev->dev, "no configuration data found\n");
-
-		return -ENODEV;
-	}
-
 	ddata = devm_kzalloc(&pdev->dev, sizeof(*ddata), GFP_KERNEL);
 	if (!ddata)
 		return -ENOMEM;
