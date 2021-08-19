@@ -89,6 +89,7 @@
 #define ASPEED_CLK_MAC4RCLK		70
 
 /* Only list resets here that are not part of a gate */
+#define ASPEED_RESET_ESPI		57
 #define ASPEED_RESET_ADC		55
 #define ASPEED_RESET_JTAG_MASTER2	54
 #define ASPEED_RESET_I3C_DMA		39
