@@ -41,7 +41,6 @@ int audit_classify_arch(int arch)
 int audit_classify_syscall(int abi, unsigned syscall)
 {
 #ifdef CONFIG_PPC64
-	extern int ppc32_classify_syscall(unsigned);
 	if (abi == AUDIT_ARCH_PPC)
 		return ppc32_classify_syscall(syscall);
 #endif

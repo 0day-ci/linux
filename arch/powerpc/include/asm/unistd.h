@@ -47,6 +47,9 @@
 #define __ARCH_WANT_SYS_UTIME
 #define __ARCH_WANT_SYS_NEWFSTATAT
 #define __ARCH_WANT_COMPAT_SYS_SENDFILE
+#ifdef CONFIG_AUDIT
+extern int ppc32_classify_syscall(unsigned int syscall);
+#endif
 #endif
 #define __ARCH_WANT_SYS_FORK
 #define __ARCH_WANT_SYS_VFORK
