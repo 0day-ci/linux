@@ -24,6 +24,7 @@
 #include <linux/log2.h>
 #include <linux/pm_runtime.h>
 #include <linux/badblocks.h>
+#include <linux/leds.h>
 
 #include "blk.h"
 
@@ -539,6 +540,7 @@ static void __device_add_disk(struct device *parent, struct gendisk *disk,
 
 	disk_add_events(disk);
 	blk_integrity_add(disk);
+	ledtrig_blkdev_disk_init(disk);
 }
 
 void device_add_disk(struct device *parent, struct gendisk *disk,
@@ -581,6 +583,7 @@ void del_gendisk(struct gendisk *disk)
 	if (WARN_ON_ONCE(!disk->queue))
 		return;
 
+	ledtrig_blkdev_disk_cleanup(disk);
 	blk_integrity_del(disk);
 	disk_del_events(disk);
 
