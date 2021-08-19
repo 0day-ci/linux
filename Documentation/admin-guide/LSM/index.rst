@@ -42,6 +42,7 @@ subdirectories.
 
    apparmor
    LoadPin
+   NAX
    SELinux
    Smack
    tomoyo
