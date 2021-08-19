@@ -4879,6 +4879,7 @@ static int handle_vmon(struct kvm_vcpu *vcpu)
 	const u64 VMXON_NEEDED_FEATURES = FEAT_CTL_LOCKED
 		| FEAT_CTL_VMX_ENABLED_OUTSIDE_SMX;
 
+	++vcpu->stat.vmon_exits;
 	/*
 	 * The Intel VMX Instruction Reference lists a bunch of bits that are
 	 * prerequisite to running VMXON, most notably cr4.VMXE must be set to
@@ -4964,6 +4965,7 @@ static inline void nested_release_vmcs12(struct kvm_vcpu *vcpu)
 /* Emulate the VMXOFF instruction */
 static int handle_vmoff(struct kvm_vcpu *vcpu)
 {
+	++vcpu->stat.vmoff_exits;
 	if (!nested_vmx_check_permission(vcpu))
 		return 1;
 
@@ -4984,6 +4986,7 @@ static int handle_vmclear(struct kvm_vcpu *vcpu)
 	u64 evmcs_gpa;
 	int r;
 
+	++vcpu->stat.vmclear_exits;
 	if (!nested_vmx_check_permission(vcpu))
 		return 1;
 
@@ -5025,6 +5028,7 @@ static int handle_vmclear(struct kvm_vcpu *vcpu)
 /* Emulate the VMLAUNCH instruction */
 static int handle_vmlaunch(struct kvm_vcpu *vcpu)
 {
+	++vcpu->stat.vmlaunch_exits;
 	return nested_vmx_run(vcpu, true);
 }
 
@@ -5032,6 +5036,7 @@ static int handle_vmlaunch(struct kvm_vcpu *vcpu)
 static int handle_vmresume(struct kvm_vcpu *vcpu)
 {
 
+	++vcpu->stat.vmresume_exits;
 	return nested_vmx_run(vcpu, false);
 }
 
@@ -5048,6 +5053,8 @@ static int handle_vmread(struct kvm_vcpu *vcpu)
 	gva_t gva = 0;
 	short offset;
 	int len, r;
+
+	++vcpu->stat.vmread_exits;
 
 	if (!nested_vmx_check_permission(vcpu))
 		return 1;
@@ -5140,6 +5147,8 @@ static int handle_vmwrite(struct kvm_vcpu *vcpu)
 	 * bits into the vmcs12 field.
 	 */
 	u64 value = 0;
+
+	++vcpu->stat.vmwrite_exits;
 
 	if (!nested_vmx_check_permission(vcpu))
 		return 1;
@@ -5245,6 +5254,8 @@ static int handle_vmptrld(struct kvm_vcpu *vcpu)
 	gpa_t vmptr;
 	int r;
 
+	++vcpu->stat.vmptrld_exits;
+
 	if (!nested_vmx_check_permission(vcpu))
 		return 1;
 
@@ -5311,6 +5322,8 @@ static int handle_vmptrst(struct kvm_vcpu *vcpu)
 	gva_t gva;
 	int r;
 
+	++vcpu->stat.vmptrst_exits;
+
 	if (!nested_vmx_check_permission(vcpu))
 		return 1;
 
@@ -5350,6 +5363,8 @@ static int handle_invept(struct kvm_vcpu *vcpu)
 		u64 eptp, gpa;
 	} operand;
 	int i, r;
+
+	++vcpu->stat.invept_exits;
 
 	if (!(vmx->nested.msrs.secondary_ctls_high &
 	      SECONDARY_EXEC_ENABLE_EPT) ||
@@ -5430,6 +5445,8 @@ static int handle_invvpid(struct kvm_vcpu *vcpu)
 	} operand;
 	u16 vpid02;
 	int r;
+
+	++vcpu->stat.invvpid_exits;
 
 	if (!(vmx->nested.msrs.secondary_ctls_high &
 	      SECONDARY_EXEC_ENABLE_VPID) ||

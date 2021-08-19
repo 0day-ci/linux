@@ -1257,6 +1257,17 @@ struct kvm_vcpu_stat {
 	u64 directed_yield_attempted;
 	u64 directed_yield_successful;
 	u64 guest_mode;
+	u64 vmclear_exits;
+	u64 vmlaunch_exits;
+	u64 vmptrld_exits;
+	u64 vmptrst_exits;
+	u64 vmread_exits;
+	u64 vmresume_exits;
+	u64 vmwrite_exits;
+	u64 vmoff_exits;
+	u64 vmon_exits;
+	u64 invept_exits;
+	u64 invvpid_exits;
 };
 
 struct x86_instruction_info;
