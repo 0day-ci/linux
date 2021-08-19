@@ -227,14 +227,18 @@ mptfc_bus_reset(struct scsi_cmnd *SCpnt)
 {
 	struct scsi_device	*sdev = SCpnt->device;
 	struct Scsi_Host	*shost = sdev->host;
-	struct fc_rport		*rport = starget_to_rport(scsi_target(sdev));
 	MPT_SCSI_HOST		*hd = shost_priv(shost);
 	MPT_ADAPTER 		*ioc = hd->ioc;
+	struct mptfc_rport_info	*ri;
 	int rval;
 
-	rval = fc_block_rport(rport);
-	if (rval)
-		return rval;
+	list_for_each_entry(ri, &ioc->fc_rports, list) {
+		rval = fc_block_rport(ri->rport);
+		if (rval)
+			return rval;
+		if (ioc->active == 0)
+			return FAILED;
+	}
 	dfcprintk (ioc, printk(MYIOC_s_DEBUG_FMT
 		"%s.%d: %d:%llu, executing recovery.\n",
 		ioc->name, __func__, ioc->sh->host_no,
