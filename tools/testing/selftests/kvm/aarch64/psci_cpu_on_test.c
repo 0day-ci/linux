@@ -54,7 +54,21 @@ static uint64_t psci_affinity_info(uint64_t target_affinity,
 	return x0;
 }
 
-static void guest_main(uint64_t target_cpu)
+static uint64_t psci_system_suspend(uint64_t entry_addr, uint64_t context_id)
+{
+	register uint64_t x0 asm("x0") = PSCI_1_0_FN64_SYSTEM_SUSPEND;
+	register uint64_t x1 asm("x1") = entry_addr;
+	register uint64_t x2 asm("x2") = context_id;
+
+	asm volatile("hvc #0"
+		     : "=r"(x0)
+		     : "r"(x0), "r"(x1), "r"(x2)
+		     : "memory");
+
+	return x0;
+}
+
+static void guest_test_cpu_on(uint64_t target_cpu)
 {
 	GUEST_ASSERT(!psci_cpu_on(target_cpu, CPU_ON_ENTRY_ADDR, CPU_ON_CONTEXT_ID));
 	uint64_t target_state;
@@ -69,52 +83,96 @@ static void guest_main(uint64_t target_cpu)
 	GUEST_DONE();
 }
 
+static void guest_test_system_suspend(uint64_t target_cpu)
+{
+	psci_system_suspend(CPU_ON_ENTRY_ADDR, CPU_ON_CONTEXT_ID);
+
+	/* should never be reached */
+	GUEST_ASSERT(0);
+}
+
+static void guest_main(uint64_t target_cpu)
+{
+	guest_test_cpu_on(target_cpu);
+	guest_test_system_suspend(target_cpu);
+}
+
 int main(void)
 {
+	struct kvm_mp_state target_mp_state = { .mp_state = KVM_MP_STATE_STOPPED };
 	uint64_t target_mpidr, obs_pc, obs_x0;
+	struct kvm_enable_cap cap = {0};
+	uint32_t vcpu_to_test = -1;
 	struct kvm_vcpu_init init;
 	struct kvm_vm *vm;
 	struct ucall uc;
+	int i;
+
+	if (!kvm_check_cap(KVM_CAP_ARM_SYSTEM_SUSPEND)) {
+		print_skip("KVM_CAP_ARM_SYSTEM_SUSPEND not supported");
+		exit(KSFT_SKIP);
+	}
 
 	vm = vm_create(VM_MODE_DEFAULT, DEFAULT_GUEST_PHY_PAGES, O_RDWR);
 	kvm_vm_elf_load(vm, program_invocation_name);
 	ucall_init(vm, NULL);
 
+	cap.cap = KVM_CAP_ARM_SYSTEM_SUSPEND;
+	vm_enable_cap(vm, &cap);
+
 	vm_ioctl(vm, KVM_ARM_PREFERRED_TARGET, &init);
 	init.features[0] |= (1 << KVM_ARM_VCPU_PSCI_0_2);
 
 	aarch64_vcpu_add_default(vm, VCPU_ID_SOURCE, &init, guest_main);
-
-	/*
-	 * make sure the target is already off when executing the test.
-	 */
-	init.features[0] |= (1 << KVM_ARM_VCPU_POWER_OFF);
 	aarch64_vcpu_add_default(vm, VCPU_ID_TARGET, &init, guest_main);
 
 	get_reg(vm, VCPU_ID_TARGET, ARM64_SYS_REG(MPIDR_EL1), &target_mpidr);
 	vcpu_args_set(vm, VCPU_ID_SOURCE, 1, target_mpidr & MPIDR_HWID_BITMASK);
-	vcpu_run(vm, VCPU_ID_SOURCE);
 
-	switch (get_ucall(vm, VCPU_ID_SOURCE, &uc)) {
-	case UCALL_DONE:
-		break;
-	case UCALL_ABORT:
-		TEST_FAIL("%s at %s:%ld", (const char *)uc.args[0], __FILE__,
-			  uc.args[1]);
-		break;
-	default:
-		TEST_FAIL("Unhandled ucall: %lu", uc.cmd);
+	for (i = 0; i < 2; i++) {
+		struct kvm_run *run = vcpu_state(vm, VCPU_ID_SOURCE);
+
+		/*
+		 * make sure the target is already off when executing the test.
+		 */
+		vcpu_set_mp_state(vm, VCPU_ID_TARGET, &target_mp_state);
+		vcpu_run(vm, VCPU_ID_SOURCE);
+		switch (run->exit_reason) {
+		case KVM_EXIT_MMIO:
+			switch (get_ucall(vm, VCPU_ID_SOURCE, &uc)) {
+			case UCALL_DONE:
+				vcpu_to_test = VCPU_ID_TARGET;
+				break;
+			case UCALL_ABORT:
+				TEST_FAIL("%s at %s:%ld", (const char *)uc.args[0], __FILE__,
+					  uc.args[1]);
+				break;
+			default:
+				TEST_FAIL("Unhandled ucall: %lu", uc.cmd);
+			}
+			break;
+		case KVM_EXIT_SYSTEM_EVENT:
+			TEST_ASSERT(run->system_event.type == KVM_SYSTEM_EVENT_SUSPEND,
+				    "unhandled system event: %u (expected: %u)",
+				    run->system_event.type, KVM_SYSTEM_EVENT_SUSPEND);
+			vcpu_to_test = VCPU_ID_SOURCE;
+			break;
+		default:
+			TEST_FAIL("unhandled exit reason: %u (%s)",
+				  run->exit_reason, exit_reason_str(run->exit_reason));
+		}
+
+		get_reg(vm, vcpu_to_test, ARM64_CORE_REG(regs.pc), &obs_pc);
+		get_reg(vm, vcpu_to_test, ARM64_CORE_REG(regs.regs[0]), &obs_x0);
+
+		TEST_ASSERT(obs_pc == CPU_ON_ENTRY_ADDR,
+			    "unexpected target cpu pc: %lx (expected: %lx)",
+			    obs_pc, CPU_ON_ENTRY_ADDR);
+		TEST_ASSERT(obs_x0 == CPU_ON_CONTEXT_ID,
+			    "unexpected target context id: %lx (expected: %lx)",
+			    obs_x0, CPU_ON_CONTEXT_ID);
+
 	}
-
-	get_reg(vm, VCPU_ID_TARGET, ARM64_CORE_REG(regs.pc), &obs_pc);
-	get_reg(vm, VCPU_ID_TARGET, ARM64_CORE_REG(regs.regs[0]), &obs_x0);
-
-	TEST_ASSERT(obs_pc == CPU_ON_ENTRY_ADDR,
-		    "unexpected target cpu pc: %lx (expected: %lx)",
-		    obs_pc, CPU_ON_ENTRY_ADDR);
-	TEST_ASSERT(obs_x0 == CPU_ON_CONTEXT_ID,
-		    "unexpected target context id: %lx (expected: %lx)",
-		    obs_x0, CPU_ON_CONTEXT_ID);
 
 	kvm_vm_free(vm);
 	return 0;
