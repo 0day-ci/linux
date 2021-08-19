@@ -229,6 +229,7 @@ static LIST_HEAD(ima_default_rules);
 static LIST_HEAD(ima_policy_rules);
 static LIST_HEAD(ima_temp_rules);
 static struct list_head *ima_rules = &ima_default_rules;
+static DECLARE_RWSEM(ima_rules_sem);
 
 static int ima_policy __initdata;
 
@@ -679,6 +680,7 @@ int ima_match_policy(struct user_namespace *mnt_userns, struct inode *inode,
 	if (template_desc && !*template_desc)
 		*template_desc = ima_template_desc_current();
 
+	down_read(&ima_rules_sem);
 	rcu_read_lock();
 	list_for_each_entry_rcu(entry, ima_rules, list) {
 
@@ -718,6 +720,7 @@ int ima_match_policy(struct user_namespace *mnt_userns, struct inode *inode,
 			break;
 	}
 	rcu_read_unlock();
+	up_read(&ima_rules_sem);
 
 	return action;
 }
@@ -970,7 +973,9 @@ void ima_update_policy(void)
 
 	if (ima_rules != policy) {
 		ima_policy_flag = 0;
+		down_write(&ima_rules_sem);
 		ima_rules = policy;
+		up_write(&ima_rules_sem);
 
 		/*
 		 * IMA architecture specific policy rules are specified
