@@ -513,7 +513,7 @@ int nat25_db_handle(struct adapter *priv, struct sk_buff *skb, int method)
 
 						/*  insert the magic_code+client mac in relay tag */
 						pMagic = (unsigned short *)tag->tag_data;
-						*pMagic = htons(MAGIC_CODE);
+						*pMagic = (unsigned short)MAGIC_CODE;
 						memcpy(tag->tag_data+MAGIC_CODE_LEN, skb->data+ETH_ALEN, ETH_ALEN);
 
 						/* Add relay tag */
