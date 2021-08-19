@@ -183,73 +183,63 @@ static struct fc_function_template mptfc_transport_functions = {
 };
 
 static int
-mptfc_block_error_handler(struct scsi_cmnd *SCpnt,
-			  int (*func)(struct scsi_cmnd *SCpnt),
-			  const char *caller)
+mptfc_abort(struct scsi_cmnd *SCpnt)
 {
-	MPT_SCSI_HOST		*hd;
 	struct scsi_device	*sdev = SCpnt->device;
 	struct Scsi_Host	*shost = sdev->host;
 	struct fc_rport		*rport = starget_to_rport(scsi_target(sdev));
-	unsigned long		flags;
-	int			ready;
-	MPT_ADAPTER 		*ioc;
-	int			loops = 40;	/* seconds */
+	MPT_SCSI_HOST		*hd = shost_priv(shost);
+	MPT_ADAPTER 		*ioc = hd->ioc;
+	int rval;
 
-	hd = shost_priv(SCpnt->device->host);
-	ioc = hd->ioc;
-	spin_lock_irqsave(shost->host_lock, flags);
-	while ((ready = fc_remote_port_chkready(rport) >> 16) == DID_IMM_RETRY
-	 || (loops > 0 && ioc->active == 0)) {
-		spin_unlock_irqrestore(shost->host_lock, flags);
-		dfcprintk (ioc, printk(MYIOC_s_DEBUG_FMT
-			"mptfc_block_error_handler.%d: %d:%llu, port status is "
-			"%x, active flag %d, deferring %s recovery.\n",
-			ioc->name, ioc->sh->host_no,
-			SCpnt->device->id, SCpnt->device->lun,
-			ready, ioc->active, caller));
-		msleep(1000);
-		spin_lock_irqsave(shost->host_lock, flags);
-		loops --;
-	}
-	spin_unlock_irqrestore(shost->host_lock, flags);
-
-	if (ready == DID_NO_CONNECT || !SCpnt->device->hostdata
-	 || ioc->active == 0) {
-		dfcprintk (ioc, printk(MYIOC_s_DEBUG_FMT
-			"%s.%d: %d:%llu, failing recovery, "
-			"port state %x, active %d, vdevice %p.\n", caller,
-			ioc->name, ioc->sh->host_no,
-			SCpnt->device->id, SCpnt->device->lun, ready,
-			ioc->active, SCpnt->device->hostdata));
-		return FAILED;
-	}
+	rval = fc_block_rport(rport);
+	if (rval)
+		return rval;
 	dfcprintk (ioc, printk(MYIOC_s_DEBUG_FMT
-		"%s.%d: %d:%llu, executing recovery.\n", caller,
-		ioc->name, ioc->sh->host_no,
-		SCpnt->device->id, SCpnt->device->lun));
-	return (*func)(SCpnt);
-}
-
-static int
-mptfc_abort(struct scsi_cmnd *SCpnt)
-{
-	return
-	    mptfc_block_error_handler(SCpnt, mptscsih_abort, __func__);
+		"%s.%d: %d:%llu, executing recovery.\n",
+		ioc->name, __func__, ioc->sh->host_no,
+		sdev->id, sdev->lun));
+	return mptscsih_abort(SCpnt);
 }
 
 static int
 mptfc_dev_reset(struct scsi_cmnd *SCpnt)
 {
-	return
-	    mptfc_block_error_handler(SCpnt, mptscsih_dev_reset, __func__);
+	struct scsi_device	*sdev = SCpnt->device;
+	struct Scsi_Host	*shost = sdev->host;
+	struct fc_rport		*rport = starget_to_rport(scsi_target(sdev));
+	MPT_SCSI_HOST		*hd = shost_priv(shost);
+	MPT_ADAPTER 		*ioc = hd->ioc;
+	int rval;
+
+	rval = fc_block_rport(rport);
+	if (rval)
+		return rval;
+	dfcprintk (ioc, printk(MYIOC_s_DEBUG_FMT
+		"%s.%d: %d:%llu, executing recovery.\n",
+		ioc->name, __func__, ioc->sh->host_no,
+		sdev->id, sdev->lun));
+	return mptscsih_dev_reset(SCpnt);
 }
 
 static int
 mptfc_bus_reset(struct scsi_cmnd *SCpnt)
 {
-	return
-	    mptfc_block_error_handler(SCpnt, mptscsih_bus_reset, __func__);
+	struct scsi_device	*sdev = SCpnt->device;
+	struct Scsi_Host	*shost = sdev->host;
+	struct fc_rport		*rport = starget_to_rport(scsi_target(sdev));
+	MPT_SCSI_HOST		*hd = shost_priv(shost);
+	MPT_ADAPTER 		*ioc = hd->ioc;
+	int rval;
+
+	rval = fc_block_rport(rport);
+	if (rval)
+		return rval;
+	dfcprintk (ioc, printk(MYIOC_s_DEBUG_FMT
+		"%s.%d: %d:%llu, executing recovery.\n",
+		ioc->name, __func__, ioc->sh->host_no,
+		sdev->id, sdev->lun));
+	return mptscsih_bus_reset(SCpnt);
 }
 
 static void
