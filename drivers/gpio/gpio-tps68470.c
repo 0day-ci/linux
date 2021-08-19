@@ -158,3 +158,4 @@ static struct platform_driver tps68470_gpio_driver = {
 module_platform_driver(tps68470_gpio_driver);
 
 MODULE_LICENSE("GPL");
+MODULE_ALIAS("platform:tps68470-gpio");
