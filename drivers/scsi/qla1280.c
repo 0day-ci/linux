@@ -494,7 +494,7 @@ __setup("qla1280=", qla1280_setup);
 #define CMD_HOST(Cmnd)		Cmnd->device->host
 #define SCSI_BUS_32(Cmnd)	Cmnd->device->channel
 #define SCSI_TCN_32(Cmnd)	Cmnd->device->id
-#define SCSI_LUN_32(Cmnd)	Cmnd->device->lun
+#define SCSI_LUN_32(Cmnd)	((int)Cmnd->device->lun)
 
 
 /*****************************************/
@@ -3126,7 +3126,7 @@ qla1280_32bit_start_scsi(struct scsi_qla_host *ha, struct srb * sp)
 			*dword_ptr++ =
 				cpu_to_le32(lower_32_bits(sg_dma_address(s)));
 			*dword_ptr++ = cpu_to_le32(sg_dma_len(s));
-			dprintk(3, "S/G Segment phys_addr=0x%lx, len=0x%x\n",
+			dprintk(3, "S/G Segment phys_addr=0x%x, len=0x%x\n",
 				(lower_32_bits(sg_dma_address(s))),
 				(sg_dma_len(s)));
 			remseg--;
@@ -3984,29 +3984,6 @@ __qla1280_print_scsi_cmd(struct scsi_cmnd *cmd)
 	printk("  SP=0x%p\n", CMD_SP(cmd));
 	printk(" underflow size = 0x%x, direction=0x%x\n",
 	       cmd->underflow, cmd->sc_data_direction);
-}
-
-/**************************************************************************
- *   ql1280_dump_device
- *
- **************************************************************************/
-static void
-ql1280_dump_device(struct scsi_qla_host *ha)
-{
-
-	struct scsi_cmnd *cp;
-	struct srb *sp;
-	int i;
-
-	printk(KERN_DEBUG "Outstanding Commands on controller:\n");
-
-	for (i = 0; i < MAX_OUTSTANDING_COMMANDS; i++) {
-		if ((sp = ha->outstanding_cmds[i]) == NULL)
-			continue;
-		if ((cp = sp->cmd) == NULL)
-			continue;
-		qla1280_print_scsi_cmd(1, cp);
-	}
 }
 #endif
 
