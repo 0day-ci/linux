@@ -1109,6 +1109,14 @@ static int imx258_identify_module(struct imx258 *imx258)
 
 	ret = imx258_read_reg(imx258, IMX258_REG_CHIP_ID,
 			      IMX258_REG_VALUE_16BIT, &val);
+	if (ret == -EIO && is_acpi_device_node(dev_fwnode(&client->dev))) {
+		/*
+		 * If we get -EIO here and it's an ACPI device, there's a fair
+		 * likelihood it's because the drivers required to power this
+		 * device on have not probed yet. Thus return -EPROBE_DEFER.
+		 */
+		return -EPROBE_DEFER;
+	}
 	if (ret) {
 		dev_err(&client->dev, "failed to read chip id %x\n",
 			IMX258_CHIP_ID);
