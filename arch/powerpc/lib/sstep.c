@@ -3559,7 +3559,7 @@ int emulate_step(struct pt_regs *regs, struct ppc_inst instr)
 
 	case MTMSR:
 		val = regs->gpr[op.reg];
-		if ((val & MSR_RI) == 0)
+		if (cpu_has_msr_ri() && (val & MSR_RI) == 0)
 			/* can't step mtmsr[d] that would clear MSR_RI */
 			return -1;
 		/* here op.val is the mask of bits to change */
