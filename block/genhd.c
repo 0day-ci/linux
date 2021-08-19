@@ -1363,3 +1363,28 @@ int bdev_read_only(struct block_device *bdev)
 	return bdev->bd_read_only || get_disk_ro(bdev->bd_disk);
 }
 EXPORT_SYMBOL(bdev_read_only);
+
+static int match_disk_name(struct device *const dev, const void *const name)
+{
+	return dev->type == &disk_type
+			&& strcmp(name, dev_to_disk(dev)->disk_name) == 0;
+}
+
+/**
+ * get_disk_by_name - get a gendisk by name
+ * @name:	the name of the disk
+ *
+ * Returns a pointer to the gendisk named @name (if it exists), @NULL if not.
+ * Increments the disk's reference count, so caller must call put_device().
+ */
+struct gendisk *get_disk_by_name(const char *const name)
+{
+	struct device *dev;
+
+	dev = class_find_device(&block_class, NULL, name, match_disk_name);
+	if (dev == NULL)
+		return NULL;
+
+	return dev_to_disk(dev);
+}
+EXPORT_SYMBOL_GPL(get_disk_by_name);

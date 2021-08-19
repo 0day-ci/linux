@@ -342,4 +342,14 @@ static inline void printk_all_partitions(void)
 }
 #endif /* CONFIG_BLOCK */
 
+/* for blkdev LED trigger (drivers/leds/trigger/ledtrig-blkdev.c) */
+#ifdef CONFIG_BLOCK
+struct gendisk *get_disk_by_name(const char *name);
+#else
+static inline struct gendisk *get_disk_by_name(const char *name)
+{
+	return NULL;
+}
+#endif
+
 #endif /* _LINUX_GENHD_H */
