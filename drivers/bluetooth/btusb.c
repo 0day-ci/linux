@@ -466,6 +466,11 @@ static const struct usb_device_id blacklist_table[] = {
 	{ }	/* Terminating entry */
 };
 
+static const struct usb_device_id msft_rej_table[] = {
+	{ USB_DEVICE(0x8087, 0x0aaa) },
+	{ }	/* Terminating entry */
+};
+
 /* The Bluetooth USB module build into some devices needs to be reset on resume,
  * this is a problem with the platform (likely shutting off all power) not with
  * the module itself. So we use a DMI list to match known broken platforms.
@@ -2831,6 +2836,7 @@ static int btusb_setup_intel_new(struct hci_dev *hdev)
 	char ddcname[64];
 	int err;
 	struct intel_debug_features features;
+	struct usb_device_id *match;
 
 	BT_DBG("%s", hdev->name);
 
@@ -2908,7 +2914,9 @@ finish:
 	case 0x12:	/* ThP */
 	case 0x13:	/* HrP */
 	case 0x14:	/* CcP */
-		hci_set_msft_opcode(hdev, 0xFC1E);
+		match = usb_match_id(data->intf, msft_rej_table);
+		if (!match)
+			hci_set_msft_opcode(hdev, 0xFC1E);
 		break;
 	}
 
