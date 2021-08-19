@@ -31,10 +31,10 @@ static uint64_t psci_cpu_on(uint64_t target_cpu, uint64_t entry_addr,
 	register uint64_t x2 asm("x2") = entry_addr;
 	register uint64_t x3 asm("x3") = context_id;
 
-	asm("hvc #0"
-	    : "=r"(x0)
-	    : "r"(x0), "r"(x1), "r"(x2), "r"(x3)
-	    : "memory");
+	asm volatile("hvc #0"
+		     : "=r"(x0)
+		     : "r"(x0), "r"(x1), "r"(x2), "r"(x3)
+		     : "memory");
 
 	return x0;
 }
@@ -46,10 +46,10 @@ static uint64_t psci_affinity_info(uint64_t target_affinity,
 	register uint64_t x1 asm("x1") = target_affinity;
 	register uint64_t x2 asm("x2") = lowest_affinity_level;
 
-	asm("hvc #0"
-	    : "=r"(x0)
-	    : "r"(x0), "r"(x1), "r"(x2)
-	    : "memory");
+	asm volatile("hvc #0"
+		     : "=r"(x0)
+		     : "r"(x0), "r"(x1), "r"(x2)
+		     : "memory");
 
 	return x0;
 }
