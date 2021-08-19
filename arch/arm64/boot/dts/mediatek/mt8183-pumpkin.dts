@@ -37,6 +37,42 @@
 			reg = <0 0x50000000 0 0x2900000>;
 			no-map;
 		};
+
+		vdev0vring0: vdev0vring0 {
+			compatible = "shared-dma-pool";
+			size = <0 0x00008000>;
+			no-map;
+		};
+
+		vdev0vring1: vdev0vring1 {
+			compatible = "shared-dma-pool";
+			size = <0 0x00008000>;
+			no-map;
+		};
+
+		vdev0buffer: vdev0buffer {
+			compatible = "shared-dma-pool";
+			size = <0 0x00100000>;
+			no-map;
+		};
+
+		vdev1vring0: vdev1vring0 {
+			compatible = "shared-dma-pool";
+			size = <0 0x00008000>;
+			no-map;
+		};
+
+		vdev1vring1: vdev1vring1 {
+			compatible = "shared-dma-pool";
+			size = <0 0x00008000>;
+			no-map;
+		};
+
+		vdev1buffer: vdev1buffer {
+			compatible = "shared-dma-pool";
+			size = <0 0x00100000>;
+			no-map;
+		};
 	};
 
 	leds {
@@ -380,4 +416,16 @@
 
 &dsi0 {
 	status = "disabled";
+};
+
+&apu0 {
+	memory-region = <&vdev0buffer>, <&vdev0vring0>, <&vdev0vring1>;
+	memory-region-names = "vdev0buffer", "vdev0vring0", "vdev0vring1";
+	status = "okay";
+};
+
+&apu1 {
+	memory-region = <&vdev1buffer>, <&vdev1vring0>, <&vdev1vring1>;
+	memory-region-names = "vdev0buffer", "vdev0vring0", "vdev0vring1";
+	status = "okay";
 };
