@@ -1,0 +1,46 @@
+#! /bin/bash
+# SPDX-License-Identifier: GPL-2.0
+# Copyright (c) 2021 SUSE Linux Products GmbH.  All Rights Reserved.
+#
+# FS QA Test 246
+#
+# Tests rename exchange behavior across subvolumes 
+#
+. ./common/preamble
+_begin_fstest auto quick rename
+
+# Import common functions.
+ . ./common/renameat2
+
+# real QA test starts here
+
+# Modify as appropriate.
+_supported_fs btrfs
+_require_renameat2 exchange
+_require_scratch
+
+_scratch_mkfs >> $seqres.full 2>&1
+_scratch_mount
+
+# Create 2 subvols to use as parents for the rename ops
+$BTRFS_UTIL_PROG subvolume create $SCRATCH_MNT/subvol1 1>/dev/null
+$BTRFS_UTIL_PROG subvolume create $SCRATCH_MNT/subvol2 1>/dev/null
+
+# _rename_tests_source_dest internally expects the flags variable to contain
+# specific options to rename syscall. Ensure cross subvol ops are forbidden
+flags="-x"
+_rename_tests_source_dest $SCRATCH_MNT/subvol1/src $SCRATCH_MNT/subvol2/dst "cross-subvol"
+
+# Prepare a subvolume and a directory whose parents are different subvolumes
+$BTRFS_UTIL_PROG subvolume create $SCRATCH_MNT/subvol1/sub-subvol 1>/dev/null
+mkdir $SCRATCH_MNT/subvol2/dir
+
+# Ensure exchanging a subvol with a dir when both parents are different fails
+$here/src/renameat2 -x $SCRATCH_MNT/subvol1/sub-subvol $SCRATCH_MNT/subvol2/dir
+
+# force transaction commit which runs the tree checker 
+sync
+
+# success, all done
+status=0
+exit
