@@ -169,6 +169,9 @@ struct gendisk {
 #if IS_ENABLED(CONFIG_CDROM)
 	struct cdrom_device_info *cdi;
 #endif
+#ifdef CONFIG_LEDS_TRIGGER_BLKDEV
+	struct ledtrig_blkdev_disk *ledtrig;
+#endif
 	int node_id;
 	struct badblocks *bb;
 	struct lockdep_map lockdep_map;
