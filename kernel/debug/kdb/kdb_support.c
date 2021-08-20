@@ -560,7 +560,7 @@ unsigned long kdb_task_state_string(const char *s)
  */
 char kdb_task_state_char (const struct task_struct *p)
 {
-	unsigned int p_state;
+	int p_state;
 	unsigned long tmp;
 	char state;
 	int cpu;
