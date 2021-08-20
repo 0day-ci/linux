@@ -581,6 +581,9 @@ const char *perf_home_perfconfig(void)
 	static const char *config;
 	static bool failed;
 
+	if (config || failed)
+		return config;
+
 	config = failed ? NULL : home_perfconfig();
 	if (!config)
 		failed = true;
