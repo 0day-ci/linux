@@ -22,7 +22,7 @@ int rescale_process_scale(struct rescale *rescale, int scale_type,
 			  int *val, int *val2)
 {
 	s64 tmp;
-	s32 rem;
+	s32 rem, rem2;
 	u32 mult;
 	u32 neg;
 
@@ -38,8 +38,31 @@ int rescale_process_scale(struct rescale *rescale, int scale_type,
 		tmp = (s64)*val * 1000000000LL;
 		tmp = div_s64(tmp, rescale->denominator);
 		tmp *= rescale->numerator;
-		tmp = div_s64(tmp, 1000000000LL);
+
+		tmp = div_s64_rem(tmp, 1000000000LL, &rem);
 		*val = tmp;
+
+		/*
+		 * For small values, the approximation can be costly,
+		 * change scale type to maintain accuracy.
+		 *
+		 * 100 vs. 10000000 NANO caps the error to about 100 ppm.
+		 */
+		if (scale_type == IIO_VAL_FRACTIONAL)
+			tmp = *val2;
+		else
+			tmp = 1 << *val2;
+
+		 if (abs(rem) > 10000000 && abs(*val / tmp) < 100) {
+			 *val = div_s64_rem(*val, tmp, &rem2);
+
+			 *val2 = div_s64(rem, tmp);
+			 if (rem2)
+				 *val2 += div_s64(rem2 * 1000000000LL, tmp);
+
+			 return IIO_VAL_INT_PLUS_NANO;
+		 }
+
 		return scale_type;
 	case IIO_VAL_INT_PLUS_NANO:
 	case IIO_VAL_INT_PLUS_MICRO:
