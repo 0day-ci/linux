@@ -66,6 +66,8 @@ static struct hstate * __initdata parsed_hstate;
 static unsigned long __initdata default_hstate_max_huge_pages;
 static bool __initdata parsed_valid_hugepagesz = true;
 static bool __initdata parsed_default_hugepagesz;
+static unsigned int default_hugepages_in_node[MAX_NUMNODES] __initdata;
+static int parsed_huge_pages_node __initdata = NUMA_NO_NODE;
 
 /*
  * Protects updates to hugepage_freelists, hugepage_activelist, nr_huge_pages,
@@ -2935,10 +2937,68 @@ static void __init gather_bootmem_prealloc(void)
 	}
 }
 
-static void __init hugetlb_hstate_alloc_pages(struct hstate *h)
+static void __init hugetlb_hstate_alloc_pages_onenode(struct hstate *h, int nid, bool *gns)
+{
+	unsigned long i;
+
+	for (i = 0; i < h->max_huge_pages_node[nid]; i++) {
+		if (hstate_is_gigantic(h)) {
+			struct huge_bootmem_page *m;
+			void *addr;
+
+			addr = memblock_alloc_try_nid_raw(
+					huge_page_size(h), huge_page_size(h),
+					0, MEMBLOCK_ALLOC_ACCESSIBLE, nid);
+			if (!addr)
+				break;
+			m = addr;
+			BUG_ON(!IS_ALIGNED(virt_to_phys(m), huge_page_size(h)));
+			/* Put them into a private list first because mem_map is not up yet */
+			INIT_LIST_HEAD(&m->list);
+			list_add(&m->list, &huge_boot_pages);
+			m->hstate = h;
+			*gns = true;
+		} else {
+			struct page *page;
+
+			gfp_t gfp_mask = htlb_alloc_mask(h) | __GFP_THISNODE;
+
+			page = alloc_fresh_huge_page(h, gfp_mask, nid,
+					&node_states[N_MEMORY], NULL);
+			if (page)
+				put_page(page); /* free it into the hugepage allocator */
+
+		}
+	}
+	if (hstate_is_gigantic(h)) {
+		h->max_huge_pages_node[nid] = 0;
+	}
+}
+
+static void __init hugetlb_hstate_alloc_pages(struct hstate *h, int nid)
 {
 	unsigned long i;
 	nodemask_t *node_alloc_noretry;
+	bool hugetlb_node_set = false;
+	bool gigantic_node_set = false;
+
+	/* do node alloc */
+	for (i = 0; i < nodes_weight(node_states[N_MEMORY]); i++) {
+		if (h->max_huge_pages_node[i] > 0)
+			hugetlb_hstate_alloc_pages_onenode(h, i, &gigantic_node_set);
+		/* use gigantic_node_set to make a distinction
+		 * between node set and whole set in gigantic hstate
+		 */
+		if (gigantic_node_set || h->nr_huge_pages_node[i] > 0)
+			hugetlb_node_set = true;
+	}
+
+	/* nid != NUMA_NO_NODE  prevent more pages are alloced in gigantic hstate
+	 * for exampe:
+	 *     hugepagesz=1G hugepages_node=0 hugepages=4 hugepages_node=1 hugepages=0
+	 */
+	if (hugetlb_node_set || nid != NUMA_NO_NODE)
+		return;
 
 	if (!hstate_is_gigantic(h)) {
 		/*
@@ -2994,7 +3054,7 @@ static void __init hugetlb_init_hstates(void)
 
 		/* oversize hugepages were init'ed in early boot */
 		if (!hstate_is_gigantic(h))
-			hugetlb_hstate_alloc_pages(h);
+			hugetlb_hstate_alloc_pages(h, NUMA_NO_NODE);
 	}
 	VM_BUG_ON(minimum_order == UINT_MAX);
 }
@@ -3673,6 +3733,9 @@ static int __init hugetlb_init(void)
 				default_hstate_max_huge_pages;
 		}
 	}
+	for (i = 0; i < nodes_weight(node_states[N_MEMORY]); i++)
+		if (default_hugepages_in_node[i] > 0)
+			default_hstate.max_huge_pages_node[i] = default_hugepages_in_node[i];
 
 	hugetlb_cma_check();
 	hugetlb_init_hstates();
@@ -3756,9 +3819,16 @@ static int __init hugepages_setup(char *s)
 	 * default_hugepagesz.
 	 */
 	else if (!hugetlb_max_hstate)
-		mhp = &default_hstate_max_huge_pages;
+		if (parsed_huge_pages_node == NUMA_NO_NODE)
+			mhp = &default_hstate_max_huge_pages;
+		else
+			mhp = (unsigned long *)&(default_hugepages_in_node[parsed_huge_pages_node]);
 	else
-		mhp = &parsed_hstate->max_huge_pages;
+		if (parsed_huge_pages_node == NUMA_NO_NODE)
+			mhp = &parsed_hstate->max_huge_pages;
+		else
+			mhp = (unsigned long *)
+				&(parsed_hstate->max_huge_pages_node[parsed_huge_pages_node]);
 
 	if (mhp == last_mhp) {
 		pr_warn("HugeTLB: hugepages= specified twice without interleaving hugepagesz=, ignoring hugepages=%s\n", s);
@@ -3768,19 +3838,46 @@ static int __init hugepages_setup(char *s)
 	if (sscanf(s, "%lu", mhp) <= 0)
 		*mhp = 0;
 
+	if (parsed_huge_pages_node != NUMA_NO_NODE) {
+		if (!hugetlb_max_hstate)
+			default_hstate_max_huge_pages += *mhp;
+		else
+			parsed_hstate->max_huge_pages += *mhp;
+	}
 	/*
 	 * Global state is always initialized later in hugetlb_init.
 	 * But we need to allocate gigantic hstates here early to still
 	 * use the bootmem allocator.
 	 */
 	if (hugetlb_max_hstate && hstate_is_gigantic(parsed_hstate))
-		hugetlb_hstate_alloc_pages(parsed_hstate);
+		hugetlb_hstate_alloc_pages(parsed_hstate, parsed_huge_pages_node);
 
+	parsed_huge_pages_node = NUMA_NO_NODE;
 	last_mhp = mhp;
 
 	return 1;
 }
 __setup("hugepages=", hugepages_setup);
+
+static int __init hugetlb_node_setup(char *s)
+{
+	int ret;
+
+	if (!parsed_valid_hugepagesz) {
+		pr_warn("hugepages_node=%s preceded by an unsupported hugepagesz, ignoring\n", s);
+		parsed_valid_hugepagesz = true;
+		return 1;
+	}
+
+	ret = kstrtoint(s, 0, &parsed_huge_pages_node);
+	if (ret < 0 || parsed_huge_pages_node < 0) {
+		pr_warn("hugepages_node = %d is invalid\n", parsed_huge_pages_node);
+		parsed_huge_pages_node = NUMA_NO_NODE;
+	}
+
+	return 1;
+}
+__setup("hugepages_node=", hugetlb_node_setup);
 
 /*
  * hugepagesz command line processing
@@ -3869,7 +3966,7 @@ static int __init default_hugepagesz_setup(char *s)
 	if (default_hstate_max_huge_pages) {
 		default_hstate.max_huge_pages = default_hstate_max_huge_pages;
 		if (hstate_is_gigantic(&default_hstate))
-			hugetlb_hstate_alloc_pages(&default_hstate);
+			hugetlb_hstate_alloc_pages(&default_hstate, NUMA_NO_NODE);
 		default_hstate_max_huge_pages = 0;
 	}
 

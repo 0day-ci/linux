@@ -1583,6 +1583,12 @@
 			hugepages using the CMA allocator. If enabled, the
 			boot-time allocation of gigantic hugepages is skipped.
 
+	hugepages_node=	[HW] Node number of hugepages to allocate at boot.
+			This is used in conjunction with  hugepages (below),
+			The pair hugepages_node=X hugepages=Y can be specified
+			for number of hugepages in numa node X.
+			Format: <integer>
+
 	hugepages=	[HW] Number of HugeTLB pages to allocate at boot.
 			If this follows hugepagesz (below), it specifies
 			the number of pages of hugepagesz to be allocated.
