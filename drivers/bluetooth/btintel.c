@@ -1037,8 +1037,9 @@ static bool btintel_firmware_version(struct hci_dev *hdev,
 
 			params = (void *)(fw_ptr + sizeof(*cmd));
 
-			bt_dev_info(hdev, "Boot Address: 0x%x",
-				    le32_to_cpu(params->boot_addr));
+			*boot_addr = le32_to_cpu(params->boot_addr);
+
+			bt_dev_info(hdev, "Boot Address: 0x%x", *boot_addr);
 
 			bt_dev_info(hdev, "Firmware Version: %u-%u.%u",
 				    params->fw_build_num, params->fw_build_ww,
@@ -1071,9 +1072,6 @@ int btintel_download_firmware(struct hci_dev *hdev,
 		/* Skip version checking */
 		break;
 	default:
-		/* Skip reading firmware file version in bootloader mode */
-		if (ver->fw_variant == 0x06)
-			break;
 
 		/* Skip download if firmware has the same version */
 		if (btintel_firmware_version(hdev, ver->fw_build_num,
@@ -1114,19 +1112,16 @@ static int btintel_download_fw_tlv(struct hci_dev *hdev,
 	int err;
 	u32 css_header_ver;
 
-	/* Skip reading firmware file version in bootloader mode */
-	if (ver->img_type != 0x01) {
-		/* Skip download if firmware has the same version */
-		if (btintel_firmware_version(hdev, ver->min_fw_build_nn,
-					     ver->min_fw_build_cw,
-					     ver->min_fw_build_yy,
-					     fw, boot_param)) {
-			bt_dev_info(hdev, "Firmware already loaded");
-			/* Return -EALREADY to indicate that firmware has
-			 * already been loaded.
-			 */
-			return -EALREADY;
-		}
+	/* Skip download if firmware has the same version */
+	if (btintel_firmware_version(hdev, ver->min_fw_build_nn,
+				     ver->min_fw_build_cw,
+				     ver->min_fw_build_yy,
+				     fw, boot_param)) {
+		bt_dev_info(hdev, "Firmware already loaded");
+		/* Return -EALREADY to indicate that firmware has
+		 * already been loaded.
+		 */
+		return -EALREADY;
 	}
 
 	/* The firmware variant determines if the device is in bootloader
