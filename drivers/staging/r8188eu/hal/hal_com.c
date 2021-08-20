@@ -319,13 +319,15 @@ s32 c2h_evt_read(struct adapter *adapter, u8 *buf)
 {
 	s32 ret = _FAIL;
 	struct c2h_evt_hdr *c2h_evt;
-	int i;
+	int i, error;
 	u8 trigger;
 
 	if (!buf)
 		goto exit;
 
-	trigger = rtw_read8(adapter, REG_C2HEVT_CLEAR);
+	trigger = rtw_read8(adapter, REG_C2HEVT_CLEAR, &error);
+	if (error)
+		goto exit;
 
 	if (trigger == C2H_EVT_HOST_CLOSE)
 		goto exit; /* Not ready */
@@ -336,13 +338,21 @@ s32 c2h_evt_read(struct adapter *adapter, u8 *buf)
 
 	memset(c2h_evt, 0, 16);
 
-	*buf = rtw_read8(adapter, REG_C2HEVT_MSG_NORMAL);
-	*(buf + 1) = rtw_read8(adapter, REG_C2HEVT_MSG_NORMAL + 1);
+	*buf = rtw_read8(adapter, REG_C2HEVT_MSG_NORMAL, &error);
+	if (error)
+		goto clear_evt;
+
+	*(buf + 1) = rtw_read8(adapter, REG_C2HEVT_MSG_NORMAL + 1, &error);
+	if (error)
+		;
 
 	/* Read the content */
-	for (i = 0; i < c2h_evt->plen; i++)
+	for (i = 0; i < c2h_evt->plen; i++) {
 		c2h_evt->payload[i] = rtw_read8(adapter, REG_C2HEVT_MSG_NORMAL +
-						sizeof(*c2h_evt) + i);
+						sizeof(*c2h_evt) + i, &error);
+		if (error)
+			goto clear_evt;
+	}
 
 	ret = _SUCCESS;
 

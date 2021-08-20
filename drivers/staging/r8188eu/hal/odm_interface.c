@@ -7,19 +7,25 @@
 u8 ODM_Read1Byte(struct odm_dm_struct *pDM_Odm, u32 RegAddr)
 {
 	struct adapter *Adapter = pDM_Odm->Adapter;
-	return rtw_read8(Adapter, RegAddr);
+	int error;
+
+	return rtw_read8(Adapter, RegAddr, &error);
 }
 
 u16 ODM_Read2Byte(struct odm_dm_struct *pDM_Odm, u32 RegAddr)
 {
 	struct adapter *Adapter = pDM_Odm->Adapter;
-	return rtw_read16(Adapter, RegAddr);
+	int error;
+
+	return rtw_read16(Adapter, RegAddr, &error);
 }
 
 u32 ODM_Read4Byte(struct odm_dm_struct *pDM_Odm, u32 RegAddr)
 {
 	struct adapter *Adapter = pDM_Odm->Adapter;
-	return rtw_read32(Adapter, RegAddr);
+	int error;
+
+	return rtw_read32(Adapter, RegAddr, &error);
 }
 
 void ODM_Write1Byte(struct odm_dm_struct *pDM_Odm, u32 RegAddr, u8 Data)

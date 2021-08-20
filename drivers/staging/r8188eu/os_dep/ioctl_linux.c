@@ -2074,6 +2074,7 @@ static int rtw_wx_read32(struct net_device *dev,
 	u32 data32;
 	u32 bytes;
 	u8 *ptmp;
+	int error;
 
 	padapter = (struct adapter *)rtw_netdev_priv(dev);
 	p = &wrqu->data;
@@ -2093,15 +2094,21 @@ static int rtw_wx_read32(struct net_device *dev,
 
 	switch (bytes) {
 	case 1:
-		data32 = rtw_read8(padapter, addr);
+		data32 = rtw_read8(padapter, addr, &error);
+		if (error)
+			goto end;
 		sprintf(extra, "0x%02X", data32);
 		break;
 	case 2:
-		data32 = rtw_read16(padapter, addr);
+		data32 = rtw_read16(padapter, addr, &error);
+		if (error)
+			goto end;
 		sprintf(extra, "0x%04X", data32);
 		break;
 	case 4:
-		data32 = rtw_read32(padapter, addr);
+		data32 = rtw_read32(padapter, addr, &error);
+		if (error)
+			goto end;
 		sprintf(extra, "0x%08X", data32);
 		break;
 	default:
@@ -2110,8 +2117,9 @@ static int rtw_wx_read32(struct net_device *dev,
 	}
 	DBG_88E(KERN_INFO "%s: addr = 0x%08X data =%s\n", __func__, addr, extra);
 
+end:
 	kfree(ptmp);
-	return 0;
+	return error;
 }
 
 static int rtw_wx_write32(struct net_device *dev,
@@ -2251,6 +2259,7 @@ static void rtw_dbg_mode_hdl(struct adapter *padapter, u32 id, u8 *pdata, u32 le
 	u8 path;
 	u8 offset;
 	u32 value;
+	int error;
 
 	DBG_88E("%s\n", __func__);
 
@@ -2262,13 +2271,13 @@ static void rtw_dbg_mode_hdl(struct adapter *padapter, u32 id, u8 *pdata, u32 le
 		RegRWStruct = (struct mp_rw_reg *)pdata;
 		switch (RegRWStruct->width) {
 		case 1:
-			RegRWStruct->value = rtw_read8(padapter, RegRWStruct->offset);
+			RegRWStruct->value = rtw_read8(padapter, RegRWStruct->offset, &error);
 			break;
 		case 2:
-			RegRWStruct->value = rtw_read16(padapter, RegRWStruct->offset);
+			RegRWStruct->value = rtw_read16(padapter, RegRWStruct->offset, &error);
 			break;
 		case 4:
-			RegRWStruct->value = rtw_read32(padapter, RegRWStruct->offset);
+			RegRWStruct->value = rtw_read32(padapter, RegRWStruct->offset, &error);
 			break;
 		default:
 			break;
@@ -3815,12 +3824,20 @@ static int rtw_cta_test_start(struct net_device *dev,
 		padapter->in_cta_test = 0;
 
 	if (padapter->in_cta_test) {
-		u32 v = rtw_read32(padapter, REG_RCR);
+		u32 v = rtw_read32(padapter, REG_RCR, &ret);
+
+		if (ret)
+			return ret;
+
 		v &= ~(RCR_CBSSID_DATA | RCR_CBSSID_BCN);/*  RCR_ADF */
 		rtw_write32(padapter, REG_RCR, v);
 		DBG_88E("enable RCR_ADF\n");
 	} else {
-		u32 v = rtw_read32(padapter, REG_RCR);
+		u32 v = rtw_read32(padapter, REG_RCR, &ret);
+
+		if (ret)
+			return ret;
+
 		v |= RCR_CBSSID_DATA | RCR_CBSSID_BCN;/*  RCR_ADF */
 		rtw_write32(padapter, REG_RCR, v);
 		DBG_88E("disable RCR_ADF\n");
@@ -3890,18 +3907,19 @@ exit:
 static void mac_reg_dump(struct adapter *padapter)
 {
 	int i, j = 1;
+	int error;
 	pr_info("\n ======= MAC REG =======\n");
 	for (i = 0x0; i < 0x300; i += 4) {
 		if (j % 4 == 1)
 			pr_info("0x%02x", i);
-		pr_info(" 0x%08x ", rtw_read32(padapter, i));
+		pr_info(" 0x%08x ", rtw_read32(padapter, i, &error));
 		if ((j++) % 4 == 0)
 			pr_info("\n");
 	}
 	for (i = 0x400; i < 0x800; i += 4) {
 		if (j % 4 == 1)
 			pr_info("0x%02x", i);
-		pr_info(" 0x%08x ", rtw_read32(padapter, i));
+		pr_info(" 0x%08x ", rtw_read32(padapter, i, &error));
 		if ((j++) % 4 == 0)
 			pr_info("\n");
 	}
@@ -3910,12 +3928,13 @@ static void mac_reg_dump(struct adapter *padapter)
 static void bb_reg_dump(struct adapter *padapter)
 {
 	int i, j = 1;
+	int error;
 	pr_info("\n ======= BB REG =======\n");
 	for (i = 0x800; i < 0x1000; i += 4) {
 		if (j % 4 == 1)
 			pr_info("0x%02x", i);
 
-		pr_info(" 0x%08x ", rtw_read32(padapter, i));
+		pr_info(" 0x%08x ", rtw_read32(padapter, i, &error));
 		if ((j++) % 4 == 0)
 			pr_info("\n");
 	}
@@ -3964,6 +3983,8 @@ static int rtw_dbg_port(struct net_device *dev,
 	struct security_priv *psecuritypriv = &padapter->securitypriv;
 	struct wlan_network *cur_network = &pmlmepriv->cur_network;
 	struct sta_priv *pstapriv = &padapter->stapriv;
+	int error;
+	u32 tmp;
 
 	pdata = (u32 *)&wrqu->data;
 
@@ -3978,13 +3999,22 @@ static int rtw_dbg_port(struct net_device *dev,
 	case 0x70:/* read_reg */
 		switch (minor_cmd) {
 		case 1:
-			DBG_88E("rtw_read8(0x%x) = 0x%02x\n", arg, rtw_read8(padapter, arg));
+			tmp = rtw_read8(padapter, arg, &error);
+			if (error)
+				return error;
+			DBG_88E("rtw_read8(0x%x) = 0x%02x\n", arg, (u8) tmp);
 			break;
 		case 2:
-			DBG_88E("rtw_read16(0x%x) = 0x%04x\n", arg, rtw_read16(padapter, arg));
+			tmp = rtw_read16(padapter, arg, &error);
+			if (error)
+				return error;
+			DBG_88E("rtw_read16(0x%x) = 0x%04x\n", arg, (u16) tmp);
 			break;
 		case 4:
-			DBG_88E("rtw_read32(0x%x) = 0x%08x\n", arg, rtw_read32(padapter, arg));
+			tmp = rtw_read32(padapter, arg, &error);
+			if (error)
+				return error;
+			DBG_88E("rtw_read32(0x%x) = 0x%08x\n", arg, tmp);
 			break;
 		}
 		break;
@@ -3992,15 +4022,15 @@ static int rtw_dbg_port(struct net_device *dev,
 		switch (minor_cmd) {
 		case 1:
 			rtw_write8(padapter, arg, extra_arg);
-			DBG_88E("rtw_write8(0x%x) = 0x%02x\n", arg, rtw_read8(padapter, arg));
+			DBG_88E("rtw_write8(0x%x) = 0x%02x\n", arg, rtw_read8(padapter, arg, &error));
 			break;
 		case 2:
 			rtw_write16(padapter, arg, extra_arg);
-			DBG_88E("rtw_write16(0x%x) = 0x%04x\n", arg, rtw_read16(padapter, arg));
+			DBG_88E("rtw_write16(0x%x) = 0x%04x\n", arg, rtw_read16(padapter, arg, &error));
 			break;
 		case 4:
 			rtw_write32(padapter, arg, extra_arg);
-			DBG_88E("rtw_write32(0x%x) = 0x%08x\n", arg, rtw_read32(padapter, arg));
+			DBG_88E("rtw_write32(0x%x) = 0x%08x\n", arg, rtw_read32(padapter, arg, &error));
 			break;
 		}
 		break;
@@ -4096,7 +4126,10 @@ static int rtw_dbg_port(struct net_device *dev,
 			if (_SUCCESS != rtw_IOL_exec_cmds_sync(padapter, xmit_frame, 5000, 0))
 				ret = -EPERM;
 
-			final = rtw_read8(padapter, reg);
+			final = rtw_read8(padapter, reg, &error);
+			if (error)
+				return error;
+
 			if (start_value + write_num - 1 == final)
 				DBG_88E("continuous IOL_CMD_WB_REG to 0x%x %u times Success, start:%u, final:%u\n", reg, write_num, start_value, final);
 			else
@@ -4125,7 +4158,9 @@ static int rtw_dbg_port(struct net_device *dev,
 			if (_SUCCESS != rtw_IOL_exec_cmds_sync(padapter, xmit_frame, 5000, 0))
 				ret = -EPERM;
 
-			final = rtw_read16(padapter, reg);
+			final = rtw_read16(padapter, reg, &error);
+			if (error)
+				return error;
 			if (start_value + write_num - 1 == final)
 				DBG_88E("continuous IOL_CMD_WW_REG to 0x%x %u times Success, start:%u, final:%u\n", reg, write_num, start_value, final);
 			else
@@ -4153,7 +4188,9 @@ static int rtw_dbg_port(struct net_device *dev,
 			if (_SUCCESS != rtw_IOL_exec_cmds_sync(padapter, xmit_frame, 5000, 0))
 				ret = -EPERM;
 
-			final = rtw_read32(padapter, reg);
+			final = rtw_read32(padapter, reg, &error);
+			if (error)
+				return error;
 			if (start_value + write_num - 1 == final)
 				DBG_88E("continuous IOL_CMD_WD_REG to 0x%x %u times Success, start:%u, final:%u\n",
 					reg, write_num, start_value, final);
@@ -4423,39 +4460,39 @@ static int rtw_dbg_port(struct net_device *dev,
 
 		case 0xfd:
 			rtw_write8(padapter, 0xc50, arg);
-			DBG_88E("wr(0xc50) = 0x%x\n", rtw_read8(padapter, 0xc50));
+			DBG_88E("wr(0xc50) = 0x%x\n", rtw_read8(padapter, 0xc50, &error));
 			rtw_write8(padapter, 0xc58, arg);
-			DBG_88E("wr(0xc58) = 0x%x\n", rtw_read8(padapter, 0xc58));
+			DBG_88E("wr(0xc58) = 0x%x\n", rtw_read8(padapter, 0xc58, &error));
 			break;
 		case 0xfe:
-			DBG_88E("rd(0xc50) = 0x%x\n", rtw_read8(padapter, 0xc50));
-			DBG_88E("rd(0xc58) = 0x%x\n", rtw_read8(padapter, 0xc58));
+			DBG_88E("rd(0xc50) = 0x%x\n", rtw_read8(padapter, 0xc50, &error));
+			DBG_88E("rd(0xc58) = 0x%x\n", rtw_read8(padapter, 0xc58, &error));
 			break;
 		case 0xff:
-			DBG_88E("dbg(0x210) = 0x%x\n", rtw_read32(padapter, 0x210));
-			DBG_88E("dbg(0x608) = 0x%x\n", rtw_read32(padapter, 0x608));
-			DBG_88E("dbg(0x280) = 0x%x\n", rtw_read32(padapter, 0x280));
-			DBG_88E("dbg(0x284) = 0x%x\n", rtw_read32(padapter, 0x284));
-			DBG_88E("dbg(0x288) = 0x%x\n", rtw_read32(padapter, 0x288));
+			DBG_88E("dbg(0x210) = 0x%x\n", rtw_read32(padapter, 0x210, &error));
+			DBG_88E("dbg(0x608) = 0x%x\n", rtw_read32(padapter, 0x608, &error));
+			DBG_88E("dbg(0x280) = 0x%x\n", rtw_read32(padapter, 0x280, &error));
+			DBG_88E("dbg(0x284) = 0x%x\n", rtw_read32(padapter, 0x284, &error));
+			DBG_88E("dbg(0x288) = 0x%x\n", rtw_read32(padapter, 0x288, &error));
 
-			DBG_88E("dbg(0x664) = 0x%x\n", rtw_read32(padapter, 0x664));
+			DBG_88E("dbg(0x664) = 0x%x\n", rtw_read32(padapter, 0x664, &error));
 
 			DBG_88E("\n");
 
-			DBG_88E("dbg(0x430) = 0x%x\n", rtw_read32(padapter, 0x430));
-			DBG_88E("dbg(0x438) = 0x%x\n", rtw_read32(padapter, 0x438));
+			DBG_88E("dbg(0x430) = 0x%x\n", rtw_read32(padapter, 0x430, &error));
+			DBG_88E("dbg(0x438) = 0x%x\n", rtw_read32(padapter, 0x438, &error));
 
-			DBG_88E("dbg(0x440) = 0x%x\n", rtw_read32(padapter, 0x440));
+			DBG_88E("dbg(0x440) = 0x%x\n", rtw_read32(padapter, 0x440, &error));
 
-			DBG_88E("dbg(0x458) = 0x%x\n", rtw_read32(padapter, 0x458));
+			DBG_88E("dbg(0x458) = 0x%x\n", rtw_read32(padapter, 0x458, &error));
 
-			DBG_88E("dbg(0x484) = 0x%x\n", rtw_read32(padapter, 0x484));
-			DBG_88E("dbg(0x488) = 0x%x\n", rtw_read32(padapter, 0x488));
+			DBG_88E("dbg(0x484) = 0x%x\n", rtw_read32(padapter, 0x484, &error));
+			DBG_88E("dbg(0x488) = 0x%x\n", rtw_read32(padapter, 0x488, &error));
 
-			DBG_88E("dbg(0x444) = 0x%x\n", rtw_read32(padapter, 0x444));
-			DBG_88E("dbg(0x448) = 0x%x\n", rtw_read32(padapter, 0x448));
-			DBG_88E("dbg(0x44c) = 0x%x\n", rtw_read32(padapter, 0x44c));
-			DBG_88E("dbg(0x450) = 0x%x\n", rtw_read32(padapter, 0x450));
+			DBG_88E("dbg(0x444) = 0x%x\n", rtw_read32(padapter, 0x444, &error));
+			DBG_88E("dbg(0x448) = 0x%x\n", rtw_read32(padapter, 0x448, &error));
+			DBG_88E("dbg(0x44c) = 0x%x\n", rtw_read32(padapter, 0x44c, &error));
+			DBG_88E("dbg(0x450) = 0x%x\n", rtw_read32(padapter, 0x450, &error));
 			break;
 		}
 		break;
@@ -5326,6 +5363,8 @@ static int rtw_mp_read_reg(struct net_device *dev,
 	char data[20], tmp[20];
 	u32 addr;
 	u32 ret, i = 0, j = 0, strtout = 0;
+	int error;
+	u32 tmp_;
 
 	if (!input)
 		return -ENOMEM;
@@ -5361,12 +5400,20 @@ static int rtw_mp_read_reg(struct net_device *dev,
 	switch (width) {
 	case 'b':
 		/*  1 byte */
-		sprintf(extra, "%d\n",  rtw_read8(padapter, addr));
+		tmp_ = rtw_read16(padapter, addr, &error);
+		if (error)
+			return error;
+
+		sprintf(extra, "%d\n", (u8) tmp_);
 		wrqu->length = strlen(extra);
 		break;
 	case 'w':
 		/*  2 bytes */
-		sprintf(data, "%04x\n", rtw_read16(padapter, addr));
+		tmp_ = rtw_read16(padapter, addr, &error);
+		if (error)
+			return error;
+
+		sprintf(data, "%04x\n", (u16) tmp_);
 		for (i = 0; i <= strlen(data); i++) {
 			if (i % 2 == 0) {
 				tmp[j] = ' ';
@@ -5396,8 +5443,12 @@ static int rtw_mp_read_reg(struct net_device *dev,
 		wrqu->length = 6;
 		break;
 	case 'd':
+		tmp_ = rtw_read32(padapter, addr, &error);
+		if (error)
+			return error;
+
 		/*  4 bytes */
-		sprintf(data, "%08x", rtw_read32(padapter, addr));
+		sprintf(data, "%08x", tmp_);
 		/* add read data format blank */
 		for (i = 0; i <= strlen(data); i++) {
 			if (i % 2 == 0) {
@@ -5889,6 +5940,8 @@ static int rtw_mp_arx(struct net_device *dev,
 	u32 cckok = 0, cckcrc = 0, ofdmok = 0, ofdmcrc = 0, htok = 0, htcrc = 0, OFDM_FA = 0, CCK_FA = 0;
 	char	*input = kmalloc(wrqu->length, GFP_KERNEL);
 	struct adapter *padapter = rtw_netdev_priv(dev);
+	u8 tmp;
+	int error;
 
 	if (!input)
 		return -ENOMEM;
@@ -5934,7 +5987,18 @@ static int rtw_mp_arx(struct net_device *dev,
 		OFDM_FA = read_bbreg(padapter, 0xda4, 0x0000FFFF);
 		OFDM_FA = read_bbreg(padapter, 0xda4, 0xFFFF0000);
 		OFDM_FA = read_bbreg(padapter, 0xda8, 0x0000FFFF);
-		CCK_FA = (rtw_read8(padapter, 0xa5b) << 8) | (rtw_read8(padapter, 0xa5c));
+
+		tmp = rtw_read8(padapter, 0xa5b, &error);
+		if (error)
+			return error;
+
+		CCK_FA = (tmp << 8);
+
+		tmp = rtw_read8(padapter, 0xa5c, &error);
+		if (error)
+			return error;
+
+		CCK_FA |= (tmp);
 
 		sprintf(extra, "Phy Received packet OK:%d CRC error:%d FA Counter: %d", cckok + ofdmok + htok, cckcrc + ofdmcrc + htcrc, OFDM_FA + CCK_FA);
 	}
@@ -6097,20 +6161,30 @@ static int rtw_mp_dump(struct net_device *dev,
 	u8 rf_type, path_nums = 0;
 	u32 i, j = 1, path;
 	struct adapter *padapter = rtw_netdev_priv(dev);
+	int error;
+	u32 tmp;
 
 	if (strncmp(extra, "all", 4) == 0) {
 		DBG_88E("\n ======= MAC REG =======\n");
 		for (i = 0x0; i < 0x300; i += 4) {
 			if (j % 4 == 1)
 				DBG_88E("0x%02x", i);
-			DBG_88E(" 0x%08x ", rtw_read32(padapter, i));
+			
+			tmp = rtw_read32(padapter, i, &error);
+			if (!error)
+				DBG_88E(" 0x%08x ", tmp);
+
 			if ((j++) % 4 == 0)
 				DBG_88E("\n");
 		}
 		for (i = 0x400; i < 0x1000; i += 4) {
 			if (j % 4 == 1)
 				DBG_88E("0x%02x", i);
-			DBG_88E(" 0x%08x ", rtw_read32(padapter, i));
+
+			tmp = rtw_read32(padapter, i, &error);
+			if (!error)
+				DBG_88E(" 0x%08x ", tmp);
+
 			if ((j++) % 4 == 0)
 				DBG_88E("\n");
 		}

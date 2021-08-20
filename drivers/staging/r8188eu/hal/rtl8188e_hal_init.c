@@ -13,10 +13,14 @@
 static void iol_mode_enable(struct adapter *padapter, u8 enable)
 {
 	u8 reg_0xf0 = 0;
+	int error;
 
 	if (enable) {
 		/* Enable initial offload */
-		reg_0xf0 = rtw_read8(padapter, REG_SYS_CFG);
+		reg_0xf0 = rtw_read8(padapter, REG_SYS_CFG, &error);
+		if (error)
+			return;
+
 		rtw_write8(padapter, REG_SYS_CFG, reg_0xf0 | SW_OFFLOAD_EN);
 
 		if (!padapter->bFWReady) {
@@ -26,7 +30,10 @@ static void iol_mode_enable(struct adapter *padapter, u8 enable)
 
 	} else {
 		/* disable initial offload */
-		reg_0xf0 = rtw_read8(padapter, REG_SYS_CFG);
+		reg_0xf0 = rtw_read8(padapter, REG_SYS_CFG, &error);
+		if (error)
+			return;
+	
 		rtw_write8(padapter, REG_SYS_CFG, reg_0xf0 & ~SW_OFFLOAD_EN);
 	}
 }
@@ -36,18 +43,28 @@ static s32 iol_execute(struct adapter *padapter, u8 control)
 	s32 status = _FAIL;
 	u8 reg_0x88 = 0;
 	u32 start = 0, passing_time = 0;
+	int error;
 
 	control = control & 0x0f;
-	reg_0x88 = rtw_read8(padapter, REG_HMEBOX_E0);
+	reg_0x88 = rtw_read8(padapter, REG_HMEBOX_E0, &error);
+	if (error)
+		return status;
+
 	rtw_write8(padapter, REG_HMEBOX_E0,  reg_0x88 | control);
 
 	start = jiffies;
-	while ((reg_0x88 = rtw_read8(padapter, REG_HMEBOX_E0)) & control &&
-	       (passing_time = rtw_get_passing_time_ms(start)) < 1000) {
-		;
-	}
 
-	reg_0x88 = rtw_read8(padapter, REG_HMEBOX_E0);
+	do {
+		reg_0x88 = rtw_read8(padapter, REG_HMEBOX_E0, &error);
+		if (error)
+			return status;
+	} while (reg_0x88 & control &&
+	        (passing_time = rtw_get_passing_time_ms(start)) < 1000);
+
+	reg_0x88 = rtw_read8(padapter, REG_HMEBOX_E0, &error);
+	if (error)
+		return status;
+
 	status = (reg_0x88 & control) ? _FAIL : _SUCCESS;
 	if (reg_0x88 & control << 4)
 		status = _FAIL;
@@ -201,11 +218,15 @@ static void efuse_read_phymap_from_txpktbuf(
 	u16 len = 0, count = 0;
 	int i = 0;
 	u16 limit = *size;
+	int error;
 
 	u8 *pos = content;
 
-	if (bcnhead < 0) /* if not valid */
-		bcnhead = rtw_read8(adapter, REG_TDECTRL + 1);
+	if (bcnhead < 0) {	/* if not valid */
+		bcnhead = rtw_read8(adapter, REG_TDECTRL + 1, &error);
+		if (error)
+			return;
+	}
 
 	DBG_88E("%s bcnhead:%d\n", __func__, bcnhead);
 
@@ -218,22 +239,37 @@ static void efuse_read_phymap_from_txpktbuf(
 
 		rtw_write8(adapter, REG_TXPKTBUF_DBG, 0);
 		start = jiffies;
-		while (!(reg_0x143 = rtw_read8(adapter, REG_TXPKTBUF_DBG)) &&
+
+		reg_0x143 = rtw_read8(adapter, REG_TXPKTBUF_DBG, &error);
+		if (error)
+			return;
+
+		while (!reg_0x143 &&
 		       (passing_time = rtw_get_passing_time_ms(start)) < 1000) {
-			DBG_88E("%s polling reg_0x143:0x%02x, reg_0x106:0x%02x\n", __func__, reg_0x143, rtw_read8(adapter, 0x106));
+			DBG_88E("%s polling reg_0x143:0x%02x, reg_0x106:0x%02x\n", __func__, reg_0x143, rtw_read8(adapter, 0x106, &error));
 			rtw_usleep_os(100);
+
+			reg_0x143 = rtw_read8(adapter, REG_TXPKTBUF_DBG, &error);
+			if (error)
+				return;
 		}
 
 		/* data from EEPROM needs to be in LE */
-		lo32 = cpu_to_le32(rtw_read32(adapter, REG_PKTBUF_DBG_DATA_L));
-		hi32 = cpu_to_le32(rtw_read32(adapter, REG_PKTBUF_DBG_DATA_H));
+		lo32 = cpu_to_le32(rtw_read32(adapter, REG_PKTBUF_DBG_DATA_L, &error));
+		if (error)
+			return;
+		hi32 = cpu_to_le32(rtw_read32(adapter, REG_PKTBUF_DBG_DATA_H, &error));
+		if (error)
+			return;
 
 		if (i == 0) {
 			/* Although lenc is only used in a debug statement,
 			 * do not remove it as the rtw_read16() call consumes
 			 * 2 bytes from the EEPROM source.
 			 */
-			u16 lenc = rtw_read16(adapter, REG_PKTBUF_DBG_DATA_L);
+			u16 lenc = rtw_read16(adapter, REG_PKTBUF_DBG_DATA_L, &error);
+			if (error)
+				return;
 
 			len = le32_to_cpu(lo32) & 0x0000ffff;
 
@@ -342,6 +378,8 @@ void rtw_IOL_cmd_tx_pkt_buf_dump(struct adapter *Adapter, int data_len)
 	u32 addr, rstatus, loop = 0;
 	u16 data_cnts = (data_len / 8) + 1;
 	u8 *pbuf = vzalloc(data_len + 10);
+	int error;
+
 	DBG_88E("###### %s ######\n", __func__);
 
 	rtw_write8(Adapter, REG_PKT_BUFF_ACCESS_CTRL, TXPKT_BUF_SELECT);
@@ -351,12 +389,22 @@ void rtw_IOL_cmd_tx_pkt_buf_dump(struct adapter *Adapter, int data_len)
 			rtw_usleep_os(2);
 			loop = 0;
 			do {
-				rstatus = (reg_140 = rtw_read32(Adapter, REG_PKTBUF_DBG_CTRL) & BIT(24));
+				u32 tmp = rtw_read32(Adapter, REG_PKTBUF_DBG_CTRL, &error);
+
+				if (error)
+					break;
+
+				rstatus = (reg_140 = tmp & BIT(24));
 				if (rstatus) {
-					fifo_data = rtw_read32(Adapter, REG_PKTBUF_DBG_DATA_L);
+					fifo_data = rtw_read32(Adapter, REG_PKTBUF_DBG_DATA_L, &error);
+					if (error)
+						break;
+
 					memcpy(pbuf + (addr * 8), &fifo_data, 4);
 
-					fifo_data = rtw_read32(Adapter, REG_PKTBUF_DBG_DATA_H);
+					fifo_data = rtw_read32(Adapter, REG_PKTBUF_DBG_DATA_H, &error);
+					if (error)
+						break;
 					memcpy(pbuf + (addr * 8 + 4), &fifo_data, 4);
 				}
 				rtw_usleep_os(2);
@@ -371,18 +419,25 @@ void rtw_IOL_cmd_tx_pkt_buf_dump(struct adapter *Adapter, int data_len)
 static void _FWDownloadEnable(struct adapter *padapter, bool enable)
 {
 	u8 tmp;
+	int error;
 
 	if (enable) {
 		/*  MCU firmware download enable. */
-		tmp = rtw_read8(padapter, REG_MCUFWDL);
+		tmp = rtw_read8(padapter, REG_MCUFWDL, &error);
+		if (error)
+			return;
 		rtw_write8(padapter, REG_MCUFWDL, tmp | 0x01);
 
 		/*  8051 reset */
-		tmp = rtw_read8(padapter, REG_MCUFWDL + 2);
+		tmp = rtw_read8(padapter, REG_MCUFWDL + 2, &error);
+		if (error)
+			return;
 		rtw_write8(padapter, REG_MCUFWDL + 2, tmp & 0xf7);
 	} else {
 		/*  MCU firmware download disable. */
-		tmp = rtw_read8(padapter, REG_MCUFWDL);
+		tmp = rtw_read8(padapter, REG_MCUFWDL, &error);
+		if (error)
+			return;
 		rtw_write8(padapter, REG_MCUFWDL, tmp & 0xfe);
 
 		/*  Reserved for fw extension. */
@@ -452,8 +507,14 @@ static int _PageWrite(struct adapter *padapter, u32 page, void *buffer, u32 size
 {
 	u8 value8;
 	u8 u8Page = (u8)(page & 0x07);
+	int error;
+	u8 tmp;
 
-	value8 = (rtw_read8(padapter, REG_MCUFWDL + 2) & 0xF8) | u8Page;
+	tmp = rtw_read8(padapter, REG_MCUFWDL + 2, &error);
+	if (error)
+		return _FAIL;
+
+	value8 = (tmp & 0xF8) | u8Page;
 	rtw_write8(padapter, REG_MCUFWDL + 2, value8);
 
 	return _BlockWrite(padapter, buffer, size);
@@ -493,8 +554,12 @@ exit:
 void _8051Reset88E(struct adapter *padapter)
 {
 	u8 u1bTmp;
+	int error;
 
-	u1bTmp = rtw_read8(padapter, REG_SYS_FUNC_EN + 1);
+	u1bTmp = rtw_read8(padapter, REG_SYS_FUNC_EN + 1, &error);
+	if (error)
+		return;
+
 	rtw_write8(padapter, REG_SYS_FUNC_EN + 1, u1bTmp & (~BIT(2)));
 	rtw_write8(padapter, REG_SYS_FUNC_EN + 1, u1bTmp | (BIT(2)));
 	DBG_88E("=====> _8051Reset88E(): 8051 reset success .\n");
@@ -504,10 +569,13 @@ static s32 _FWFreeToGo(struct adapter *padapter)
 {
 	u32	counter = 0;
 	u32	value32;
+	int error;
 
 	/*  polling CheckSum report */
 	do {
-		value32 = rtw_read32(padapter, REG_MCUFWDL);
+		value32 = rtw_read32(padapter, REG_MCUFWDL, &error);
+		if (error)
+			return _FAIL;
 		if (value32 & FWDL_ChkSum_rpt)
 			break;
 	} while (counter++ < POLLING_READY_TIMEOUT_COUNT);
@@ -518,7 +586,10 @@ static s32 _FWFreeToGo(struct adapter *padapter)
 	}
 	DBG_88E("%s: Checksum report OK! REG_MCUFWDL:0x%08x\n", __func__, value32);
 
-	value32 = rtw_read32(padapter, REG_MCUFWDL);
+	value32 = rtw_read32(padapter, REG_MCUFWDL, &error);
+	if (error)
+		return _FAIL;
+
 	value32 |= MCUFWDL_RDY;
 	value32 &= ~WINTINI_RDY;
 	rtw_write32(padapter, REG_MCUFWDL, value32);
@@ -528,7 +599,10 @@ static s32 _FWFreeToGo(struct adapter *padapter)
 	/*  polling for FW ready */
 	counter = 0;
 	do {
-		value32 = rtw_read32(padapter, REG_MCUFWDL);
+		value32 = rtw_read32(padapter, REG_MCUFWDL, &error);
+		if (error)
+			return -FAIL;
+
 		if (value32 & WINTINI_RDY) {
 			DBG_88E("%s: Polling FW ready success!! REG_MCUFWDL:0x%08x\n", __func__, value32);
 			return _SUCCESS;
@@ -591,6 +665,8 @@ s32 rtl8188e_FirmwareDownload(struct adapter *padapter)
 	u8 *pFirmwareBuf;
 	u32 FirmwareLen;
 	static int log_version;
+	int error;
+	u8 tmp;
 
 	if (!dvobj->firmware.szFwBuffer)
 		rtStatus = load_firmware(&dvobj->firmware, device);
@@ -621,7 +697,11 @@ s32 rtl8188e_FirmwareDownload(struct adapter *padapter)
 
 	/*  Suggested by Filen. If 8051 is running in RAM code, driver should inform Fw to reset by itself, */
 	/*  or it will cause download Fw fail. 2010.02.01. by tynli. */
-	if (rtw_read8(padapter, REG_MCUFWDL) & RAM_DL_SEL) { /* 8051 RAM code */
+	tmp = rtw_read8(padapter, REG_MCUFWDL, &error);
+	if (error)
+		return _FAIL;
+
+	if (tmp & RAM_DL_SEL) { /* 8051 RAM code */
 		rtw_write8(padapter, REG_MCUFWDL, 0x00);
 		_8051Reset88E(padapter);
 	}
@@ -629,8 +709,12 @@ s32 rtl8188e_FirmwareDownload(struct adapter *padapter)
 	_FWDownloadEnable(padapter, true);
 	fwdl_start_time = jiffies;
 	while (1) {
+		tmp = rtw_read8(padapter, REG_MCUFWDL, &error);
+		if (error)
+			return _FAIL;
+
 		/* reset the FWDL chksum */
-		rtw_write8(padapter, REG_MCUFWDL, rtw_read8(padapter, REG_MCUFWDL) | FWDL_ChkSum_rpt);
+		rtw_write8(padapter, REG_MCUFWDL, tmp | FWDL_ChkSum_rpt);
 
 		rtStatus = _WriteFW(padapter, pFirmwareBuf, FirmwareLen);
 
@@ -715,25 +799,35 @@ hal_EfusePowerSwitch_RTL8188E(
 {
 	u8 tempval;
 	u16	tmpV16;
+	int error;
 
 	if (PwrState) {
 		rtw_write8(pAdapter, REG_EFUSE_ACCESS, EFUSE_ACCESS_ON);
 
 		/*  1.2V Power: From VDDON with Power Cut(0x0000h[15]), defualt valid */
-		tmpV16 = rtw_read16(pAdapter, REG_SYS_ISO_CTRL);
+		tmpV16 = rtw_read16(pAdapter, REG_SYS_ISO_CTRL, &error);
+		if (error)
+			return;
+
 		if (!(tmpV16 & PWC_EV12V)) {
 			tmpV16 |= PWC_EV12V;
 			rtw_write16(pAdapter, REG_SYS_ISO_CTRL, tmpV16);
 		}
 		/*  Reset: 0x0000h[28], default valid */
-		tmpV16 =  rtw_read16(pAdapter, REG_SYS_FUNC_EN);
+		tmpV16 = rtw_read16(pAdapter, REG_SYS_FUNC_EN, &error);
+		if (error)
+			return;
+
 		if (!(tmpV16 & FEN_ELDR)) {
 			tmpV16 |= FEN_ELDR;
 			rtw_write16(pAdapter, REG_SYS_FUNC_EN, tmpV16);
 		}
 
 		/*  Clock: Gated(0x0008h[5]) 8M(0x0008h[1]) clock from ANA, default valid */
-		tmpV16 = rtw_read16(pAdapter, REG_SYS_CLKR);
+		tmpV16 = rtw_read16(pAdapter, REG_SYS_CLKR, &error);
+		if (error)
+			return;
+
 		if ((!(tmpV16 & LOADER_CLK_EN))  || (!(tmpV16 & ANA8M))) {
 			tmpV16 |= (LOADER_CLK_EN | ANA8M);
 			rtw_write16(pAdapter, REG_SYS_CLKR, tmpV16);
@@ -741,7 +835,9 @@ hal_EfusePowerSwitch_RTL8188E(
 
 		if (bWrite) {
 			/*  Enable LDO 2.5V before read/write action */
-			tempval = rtw_read8(pAdapter, EFUSE_TEST + 3);
+			tempval = rtw_read8(pAdapter, EFUSE_TEST + 3, &error);
+			if (error)
+				return;
 			tempval &= 0x0F;
 			tempval |= (VOLTAGE_V25 << 4);
 			rtw_write8(pAdapter, EFUSE_TEST + 3, (tempval | 0x80));
@@ -751,7 +847,9 @@ hal_EfusePowerSwitch_RTL8188E(
 
 		if (bWrite) {
 			/*  Disable LDO 2.5V after read/write action */
-			tempval = rtw_read8(pAdapter, EFUSE_TEST + 3);
+			tempval = rtw_read8(pAdapter, EFUSE_TEST + 3, &error);
+			if (error)
+				return;
 			rtw_write8(pAdapter, EFUSE_TEST + 3, (tempval & 0x7F));
 		}
 	}
@@ -1692,12 +1790,15 @@ static int rtl8188e_Efuse_PgPacketWrite(struct adapter *pAdapter, u8 offset, u8 
 static struct HAL_VERSION ReadChipVersion8188E(struct adapter *padapter)
 {
 	u32				value32;
-	struct HAL_VERSION		ChipVersion;
+	struct HAL_VERSION		ChipVersion = { };
 	struct hal_data_8188e	*pHalData;
+	int error;
 
 	pHalData = GET_HAL_DATA(padapter);
 
-	value32 = rtw_read32(padapter, REG_SYS_CFG);
+	value32 = rtw_read32(padapter, REG_SYS_CFG, &error);
+	if (error)
+		return ChipVersion;
 	ChipVersion.ICType = CHIP_8188E;
 	ChipVersion.ChipType = ((value32 & RTL_ID) ? TEST_CHIP : NORMAL_CHIP);
 
@@ -1784,12 +1885,23 @@ void rtl8188e_stop_thread(struct adapter *padapter)
 
 static void hal_notch_filter_8188e(struct adapter *adapter, bool enable)
 {
+	int error;
+	u8 tmp;
+
 	if (enable) {
 		DBG_88E("Enable notch filter\n");
-		rtw_write8(adapter, rOFDM0_RxDSP + 1, rtw_read8(adapter, rOFDM0_RxDSP + 1) | BIT(1));
+		tmp = rtw_read8(adapter, rOFDM0_RxDSP + 1, &error);
+		if (error)
+			return;
+
+		rtw_write8(adapter, rOFDM0_RxDSP + 1, tmp | BIT(1));
 	} else {
 		DBG_88E("Disable notch filter\n");
-		rtw_write8(adapter, rOFDM0_RxDSP + 1, rtw_read8(adapter, rOFDM0_RxDSP + 1) & ~BIT(1));
+		tmp = rtw_read8(adapter, rOFDM0_RxDSP + 1, &error);
+		if (error)
+			return;
+
+		rtw_write8(adapter, rOFDM0_RxDSP + 1, TCA_DUMP_FLAGS_TERSE & ~BIT(1));
 	}
 }
 void rtl8188e_set_hal_ops(struct hal_ops *pHalFunc)
@@ -1845,8 +1957,12 @@ u8 GetEEPROMSize8188E(struct adapter *padapter)
 {
 	u8 size = 0;
 	u32	cr;
+	int error;
 
-	cr = rtw_read16(padapter, REG_9346CR);
+	cr = rtw_read16(padapter, REG_9346CR, &error);
+	if (error)
+		return size;
+
 	/*  6: EEPROM used is 93C46, 4: boot from E-Fuse. */
 	size = (cr & BOOT_FROM_EEPROM) ? 6 : 4;
 
@@ -1866,12 +1982,16 @@ static s32 _LLTWrite(struct adapter *padapter, u32 address, u32 data)
 	s32	count = 0;
 	u32	value = _LLT_INIT_ADDR(address) | _LLT_INIT_DATA(data) | _LLT_OP(_LLT_WRITE_ACCESS);
 	u16	LLTReg = REG_LLT_INIT;
+	int error;
 
 	rtw_write32(padapter, LLTReg, value);
 
 	/* polling */
 	do {
-		value = rtw_read32(padapter, LLTReg);
+		value = rtw_read32(padapter, LLTReg, &error);
+		if (error)
+			return _FAIL;
+
 		if (_LLT_NO_ACTIVE == _LLT_OP_VALUE(value))
 			break;
 

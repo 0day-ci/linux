@@ -159,6 +159,7 @@ ReadEFuseByte(
 	u32 value32;
 	u8 readbyte;
 	u16 retry;
+	int error;
 
 	if (pseudo) {
 		Efuse_Read1ByteFromFakeContent(Adapter, _offset, pbuf);
@@ -167,18 +168,27 @@ ReadEFuseByte(
 
 	/* Write Address */
 	rtw_write8(Adapter, EFUSE_CTRL + 1, (_offset & 0xff));
-	readbyte = rtw_read8(Adapter, EFUSE_CTRL + 2);
+	readbyte = rtw_read8(Adapter, EFUSE_CTRL + 2, &error);
+	if (error)
+		return;
 	rtw_write8(Adapter, EFUSE_CTRL + 2, ((_offset >> 8) & 0x03) | (readbyte & 0xfc));
 
 	/* Write bit 32 0 */
-	readbyte = rtw_read8(Adapter, EFUSE_CTRL + 3);
+	readbyte = rtw_read8(Adapter, EFUSE_CTRL + 3, &error);
+	if (error)
+		return;
 	rtw_write8(Adapter, EFUSE_CTRL + 3, (readbyte & 0x7f));
 
 	/* Check bit 32 read-ready */
 	retry = 0;
-	value32 = rtw_read32(Adapter, EFUSE_CTRL);
+	value32 = rtw_read32(Adapter, EFUSE_CTRL, &error);
+	if (error)
+		return;
+
 	while (!(((value32 >> 24) & 0xff) & 0x80)  && (retry < 10000)) {
-		value32 = rtw_read32(Adapter, EFUSE_CTRL);
+		value32 = rtw_read32(Adapter, EFUSE_CTRL, &error);
+		if (error)
+			return;
 		retry++;
 	}
 
@@ -187,7 +197,9 @@ ReadEFuseByte(
 	/*  Designer says that there shall be some delay after ready bit is set, or the */
 	/*  result will always stay on last data we read. */
 	udelay(50);
-	value32 = rtw_read32(Adapter, EFUSE_CTRL);
+	value32 = rtw_read32(Adapter, EFUSE_CTRL, &error);
+	if (error)
+		return;
 
 	*pbuf = (u8)(value32 & 0xff);
 }
@@ -244,6 +256,7 @@ u8 EFUSE_Read1Byte(struct adapter *Adapter, u16 Address)
 	u8 temp = {0x00};
 	u32 k = 0;
 	u16 contentLen = 0;
+	int error;
 
 	EFUSE_GetEfuseDefinition(Adapter, EFUSE_WIFI, TYPE_EFUSE_REAL_CONTENT_LEN, (void *)&contentLen, false);
 
@@ -251,27 +264,41 @@ u8 EFUSE_Read1Byte(struct adapter *Adapter, u16 Address)
 		/* Write E-fuse Register address bit0~7 */
 		temp = Address & 0xFF;
 		rtw_write8(Adapter, EFUSE_CTRL + 1, temp);
-		Bytetemp = rtw_read8(Adapter, EFUSE_CTRL + 2);
+		Bytetemp = rtw_read8(Adapter, EFUSE_CTRL + 2, &error);
+		if (error)
+			return 0xFF;
+
 		/* Write E-fuse Register address bit8~9 */
 		temp = ((Address >> 8) & 0x03) | (Bytetemp & 0xFC);
 		rtw_write8(Adapter, EFUSE_CTRL + 2, temp);
 
 		/* Write 0x30[31]= 0 */
-		Bytetemp = rtw_read8(Adapter, EFUSE_CTRL + 3);
+		Bytetemp = rtw_read8(Adapter, EFUSE_CTRL + 3, &error);
+		if (error)
+			return 0xFF;
+
 		temp = Bytetemp & 0x7F;
 		rtw_write8(Adapter, EFUSE_CTRL + 3, temp);
 
 		/* Wait Write-ready (0x30[31]= 1) */
-		Bytetemp = rtw_read8(Adapter, EFUSE_CTRL + 3);
+		Bytetemp = rtw_read8(Adapter, EFUSE_CTRL + 3, &error);
+		if (error)
+			return 0xFF;
+
 		while (!(Bytetemp & 0x80)) {
-			Bytetemp = rtw_read8(Adapter, EFUSE_CTRL + 3);
+			Bytetemp = rtw_read8(Adapter, EFUSE_CTRL + 3, &error);
+			if (error)
+				return 0xFF;
+
 			k++;
 			if (k == 1000) {
 				k = 0;
 				break;
 			}
 		}
-		data = rtw_read8(Adapter, EFUSE_CTRL);
+		data = rtw_read8(Adapter, EFUSE_CTRL, &error);
+		if (error)
+			return 0xFF;
 		return data;
 	} else {
 		return 0xFF;
@@ -284,6 +311,8 @@ u8 efuse_OneByteRead(struct adapter *pAdapter, u16 addr, u8 *data, bool pseudo)
 {
 	u8 tmpidx = 0;
 	u8 result;
+	u8 tmp;
+	int error;
 
 	if (pseudo) {
 		result = Efuse_Read1ByteFromFakeContent(pAdapter, addr, data);
@@ -292,15 +321,28 @@ u8 efuse_OneByteRead(struct adapter *pAdapter, u16 addr, u8 *data, bool pseudo)
 	/*  -----------------e-fuse reg ctrl --------------------------------- */
 	/* address */
 	rtw_write8(pAdapter, EFUSE_CTRL + 1, (u8)(addr & 0xff));
+	
+	tmp = rtw_read8(pAdapter, EFUSE_CTRL + 2, &error);
+	if (error)
+		return false;
+
 	rtw_write8(pAdapter, EFUSE_CTRL + 2, ((u8)((addr >> 8) & 0x03)) |
-		   (rtw_read8(pAdapter, EFUSE_CTRL + 2) & 0xFC));
+		   (tmp & 0xFC));
 
 	rtw_write8(pAdapter, EFUSE_CTRL + 3,  0x72);/* read cmd */
 
-	while (!(0x80 & rtw_read8(pAdapter, EFUSE_CTRL + 3)) && (tmpidx < 100))
+	tmp = rtw_read8(pAdapter, EFUSE_CTRL + 3, &error);
+	if (error)
+		return false;
+
+	while (!(0x80 & tmp) && (tmpidx < 100))
 		tmpidx++;
 	if (tmpidx < 100) {
-		*data = rtw_read8(pAdapter, EFUSE_CTRL);
+		tmp = rtw_read8(pAdapter, EFUSE_CTRL, &error);\
+		if (error)
+			return false;
+
+		*data = tmp;
 		result = true;
 	} else {
 		*data = 0xff;
@@ -314,6 +356,8 @@ u8 efuse_OneByteWrite(struct adapter *pAdapter, u16 addr, u8 data, bool pseudo)
 {
 	u8 tmpidx = 0;
 	u8 result;
+	u8 tmp;
+	int error;
 
 	if (pseudo) {
 		result = Efuse_Write1ByteToFakeContent(pAdapter, addr, data);
@@ -323,14 +367,23 @@ u8 efuse_OneByteWrite(struct adapter *pAdapter, u16 addr, u8 data, bool pseudo)
 	/*  -----------------e-fuse reg ctrl --------------------------------- */
 	/* address */
 	rtw_write8(pAdapter, EFUSE_CTRL + 1, (u8)(addr & 0xff));
+	
+	tmp = rtw_read8(pAdapter, EFUSE_CTRL + 2, &error);
+	if (error)
+		return false;
+
 	rtw_write8(pAdapter, EFUSE_CTRL + 2,
-		   (rtw_read8(pAdapter, EFUSE_CTRL + 2) & 0xFC) |
+		   (tmp & 0xFC) |
 		   (u8)((addr >> 8) & 0x03));
 	rtw_write8(pAdapter, EFUSE_CTRL, data);/* data */
 
 	rtw_write8(pAdapter, EFUSE_CTRL + 3, 0xF2);/* write cmd */
 
-	while ((0x80 &  rtw_read8(pAdapter, EFUSE_CTRL + 3)) && (tmpidx < 100))
+	tmp = rtw_read8(pAdapter, EFUSE_CTRL + 3, &error);
+	if (error)
+		return false;
+
+	while ((0x80 & tmp) && (tmpidx < 100))
 		tmpidx++;
 
 	if (tmpidx < 100)

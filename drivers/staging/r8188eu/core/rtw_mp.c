@@ -10,16 +10,17 @@
 u32 read_macreg(struct adapter *padapter, u32 addr, u32 sz)
 {
 	u32 val = 0;
+	int error;
 
 	switch (sz) {
 	case 1:
-		val = rtw_read8(padapter, addr);
+		val = rtw_read8(padapter, addr, &error);
 		break;
 	case 2:
-		val = rtw_read16(padapter, addr);
+		val = rtw_read16(padapter, addr, &error);
 		break;
 	case 4:
-		val = rtw_read32(padapter, addr);
+		val = rtw_read32(padapter, addr, &error);
 		break;
 	default:
 		val = 0xffffffff;
@@ -282,10 +283,14 @@ void GetPowerTracking(struct adapter *padapter, u8 *enable)
 static void disable_dm(struct adapter *padapter)
 {
 	u8 v8;
+	int error;
 
 	/* 3 1. disable firmware dynamic mechanism */
 	/*  disable Power Training, Rate Adaptive */
-	v8 = rtw_read8(padapter, REG_BCN_CTRL);
+	v8 = rtw_read8(padapter, REG_BCN_CTRL, &error);
+	if (error)
+		return;
+
 	v8 &= ~EN_BCN_FUNCTION;
 	rtw_write8(padapter, REG_BCN_CTRL, v8);
 
@@ -310,6 +315,7 @@ s32 mp_start_test(struct adapter *padapter)
 	struct mp_priv *pmppriv = &padapter->mppriv;
 	struct mlme_priv *pmlmepriv = &padapter->mlmepriv;
 	struct wlan_network *tgt_network = &pmlmepriv->cur_network;
+	int error;
 
 	padapter->registrypriv.mp_mode = 1;
 	pmppriv->bSetTxPower = 0;		/* for  manually set tx power */
@@ -403,7 +409,11 @@ end_of_mp_start_test:
 
 	if (res == _SUCCESS) {
 		/*  set MSR to WIFI_FW_ADHOC_STATE */
-		val8 = rtw_read8(padapter, MSR) & 0xFC; /*  0x0102 */
+		val8 = rtw_read8(padapter, MSR, &error);
+		if (error)
+			return _FAIL;
+
+		val8 &= 0xFC; /*  0x0102 */
 		val8 |= WIFI_FW_ADHOC_STATE;
 		rtw_write8(padapter, MSR, val8); /*  Link in ad hoc network */
 	}
@@ -795,12 +805,17 @@ static u32 GetPhyRxPktCounts(struct adapter *pAdapter, u32 selbit)
 {
 	/* selection */
 	u32 phyrx_set = 0, count = 0;
+	int error;
 
 	phyrx_set = _RXERR_RPT_SEL(selbit & 0xF);
 	rtw_write32(pAdapter, REG_RXERR_RPT, phyrx_set);
 
 	/* Read packet count */
-	count = rtw_read32(pAdapter, REG_RXERR_RPT) & RXERR_COUNTER_MASK;
+	count = rtw_read32(pAdapter, REG_RXERR_RPT, &error);
+	if (error)
+		return 0;
+
+	count &= RXERR_COUNTER_MASK;
 
 	return count;
 }
@@ -833,8 +848,12 @@ u32 GetPhyRxPktCRC32Error(struct adapter *pAdapter)
 static u32 rtw_GetPSDData(struct adapter *pAdapter, u32 point)
 {
 	int psd_val;
+	int error;
 
-	psd_val = rtw_read32(pAdapter, 0x808);
+	psd_val = rtw_read32(pAdapter, 0x808, &error);
+	if (error)
+		return error;
+
 	psd_val &= 0xFFBFFC00;
 	psd_val |= point;
 
@@ -844,7 +863,9 @@ static u32 rtw_GetPSDData(struct adapter *pAdapter, u32 point)
 
 	rtw_write32(pAdapter, 0x808, psd_val);
 	mdelay(1);
-	psd_val = rtw_read32(pAdapter, 0x8B4);
+	psd_val = rtw_read32(pAdapter, 0x8B4, &error);
+	if (error)
+		return error;
 
 	psd_val &= 0x0000FFFF;
 

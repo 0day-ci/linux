@@ -629,9 +629,10 @@ int rtl8188eu_oid_rt_pro8711_join_bss_hdl(struct oid_par_priv *poid_par_priv)
 int rtl8188eu_oid_rt_pro_read_register_hdl(struct oid_par_priv *poid_par_priv)
 {
 	struct mp_rw_reg *RegRWStruct;
-	u32		offset, width;
+	u32		offset, width, tmp;
 	int status = NDIS_STATUS_SUCCESS;
 	struct adapter *Adapter = (struct adapter *)(poid_par_priv->adapter_context);
+	int error;
 
 	if (poid_par_priv->type_of_oid != QUERY_OID)
 		return NDIS_STATUS_NOT_ACCEPTED;
@@ -647,16 +648,27 @@ int rtl8188eu_oid_rt_pro_read_register_hdl(struct oid_par_priv *poid_par_priv)
 
 	switch (width) {
 	case 1:
-		RegRWStruct->value = rtw_read8(Adapter, offset);
+		tmp = rtw_read8(Adapter, offset, &error);
+		if (error)
+			return NDIS_STATUS_FAILURE;
+
 		break;
 	case 2:
-		RegRWStruct->value = rtw_read16(Adapter, offset);
+		tmp = rtw_read16(Adapter, offset, &error);
+		if (error)
+			return NDIS_STATUS_FAILURE;
+
 		break;
 	default:
 		width = 4;
-		RegRWStruct->value = rtw_read32(Adapter, offset);
+		tmp = rtw_read32(Adapter, offset, &error);
+		if (error)
+			return NDIS_STATUS_FAILURE;
+
 		break;
 	}
+
+	RegRWStruct->value = tmp;
 
 	_irqlevel_changed_(&oldirql, RAISE);
 

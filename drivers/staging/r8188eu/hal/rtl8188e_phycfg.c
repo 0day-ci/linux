@@ -75,8 +75,12 @@ rtl8188e_PHY_QueryBBReg(
 	)
 {
 	u32 ReturnValue = 0, OriginalValue, BitShift;
+	int error;
 
-	OriginalValue = rtw_read32(Adapter, RegAddr);
+	OriginalValue = rtw_read32(Adapter, RegAddr, &error);
+	if (error)
+		return ReturnValue;
+
 	BitShift = phy_CalculateBitShift(BitMask);
 	ReturnValue = (OriginalValue & BitMask) >> BitShift;
 	return ReturnValue;
@@ -103,9 +107,12 @@ rtl8188e_PHY_QueryBBReg(
 void rtl8188e_PHY_SetBBReg(struct adapter *Adapter, u32 RegAddr, u32 BitMask, u32 Data)
 {
 	u32 OriginalValue, BitShift;
+	int error;
 
 	if (BitMask != bMaskDWord) { /* if not "double word" write */
-		OriginalValue = rtw_read32(Adapter, RegAddr);
+		OriginalValue = rtw_read32(Adapter, RegAddr, &error);
+		if (error)
+			return;
 		BitShift = phy_CalculateBitShift(BitMask);
 		Data = ((OriginalValue & (~BitMask)) | (Data << BitShift));
 	}
@@ -577,11 +584,15 @@ PHY_BBConfig8188E(
 	struct hal_data_8188e	*pHalData = GET_HAL_DATA(Adapter);
 	u32 RegVal;
 	u8 CrystalCap;
+	int error;
 
 	phy_InitBBRFRegisterDefinition(Adapter);
 
 	/*  Enable BB and RF */
-	RegVal = rtw_read16(Adapter, REG_SYS_FUNC_EN);
+	RegVal = rtw_read16(Adapter, REG_SYS_FUNC_EN, &error);
+	if (error)
+		return -FAIL;
+
 	rtw_write16(Adapter, REG_SYS_FUNC_EN, (u16)(RegVal | BIT(13) | BIT(0) | BIT(1)));
 
 	/*  20090923 Joseph: Advised by Steven and Jenyu. Power sequence before init RF. */
@@ -960,6 +971,7 @@ _PHY_SetBWMode92C(
 	struct hal_data_8188e *pHalData = GET_HAL_DATA(Adapter);
 	u8 regBwOpMode;
 	u8 regRRSR_RSC;
+	int error;
 
 	if (pHalData->rf_chip == RF_PSEUDO_11N)
 		return;
@@ -975,8 +987,12 @@ _PHY_SetBWMode92C(
 	/* 3<1>Set MAC register */
 	/* 3 */
 
-	regBwOpMode = rtw_read8(Adapter, REG_BWOPMODE);
-	regRRSR_RSC = rtw_read8(Adapter, REG_RRSR + 2);
+	regBwOpMode = rtw_read8(Adapter, REG_BWOPMODE, &error);
+	if (error)
+		return;
+	regRRSR_RSC = rtw_read8(Adapter, REG_RRSR + 2, &error);
+	if (error)
+		return;
 
 	switch (pHalData->CurrentChannelBW) {
 	case HT_CHANNEL_WIDTH_20:
