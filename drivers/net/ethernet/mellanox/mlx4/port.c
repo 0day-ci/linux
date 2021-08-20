@@ -1820,9 +1820,7 @@ int mlx4_SET_MCAST_FLTR_wrapper(struct mlx4_dev *dev, int slave,
 				struct mlx4_cmd_mailbox *outbox,
 				struct mlx4_cmd_info *cmd)
 {
-	int err = 0;
-
-	return err;
+	return 0;
 }
 
 int mlx4_SET_MCAST_FLTR(struct mlx4_dev *dev, u8 port,
@@ -1840,9 +1838,7 @@ int mlx4_SET_VLAN_FLTR_wrapper(struct mlx4_dev *dev, int slave,
 			       struct mlx4_cmd_mailbox *outbox,
 			       struct mlx4_cmd_info *cmd)
 {
-	int err = 0;
-
-	return err;
+	return 0;
 }
 
 int mlx4_DUMP_ETH_STATS_wrapper(struct mlx4_dev *dev, int slave,
