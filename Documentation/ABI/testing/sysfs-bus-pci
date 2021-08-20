@@ -96,6 +96,14 @@ Description:
 		This attribute indicates the mode that the irq vector named by
 		the file is in (msi vs. msix)
 
+What:		/sys/bus/pci/devices/.../irq
+Date:		August 2021
+Contact:	Barry Song <song.bao.hua@hisilicon.com>
+Description:
+		Historically this attribute represent the IRQ line which runs
+		from the PCI device to the Interrupt controller. With MSI and
+		MSI-X, this attribute is the first IRQ number of IRQ vectors.
+
 What:		/sys/bus/pci/devices/.../remove
 Date:		January 2009
 Contact:	Linux PCI developers <linux-pci@vger.kernel.org>
