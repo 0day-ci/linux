@@ -1881,6 +1881,32 @@ static int mt7915_dfs_start_radar_detector(struct mt7915_phy *phy)
 	return 0;
 }
 
+struct mt7915_vif_counts {
+	u32 mesh;
+	u32 adhoc;
+	u32 ap;
+};
+
+static void
+mt7915_vif_counts(void *priv, u8 *mac, struct ieee80211_vif *vif)
+{
+	struct mt7915_vif_counts *counts = priv;
+
+	switch (vif->type) {
+	case NL80211_IFTYPE_ADHOC:
+		counts->adhoc++;
+		break;
+	case NL80211_IFTYPE_MESH_POINT:
+		counts->mesh++;
+		break;
+	case NL80211_IFTYPE_AP:
+		counts->ap++;
+		break;
+	default:
+		break;
+	}
+}
+
 static int
 mt7915_dfs_init_radar_specs(struct mt7915_phy *phy)
 {
@@ -1921,6 +1947,7 @@ int mt7915_dfs_init_radar_detector(struct mt7915_phy *phy)
 	struct mt7915_dev *dev = phy->dev;
 	bool ext_phy = phy != &dev->phy;
 	int err;
+	struct mt7915_vif_counts counts = {0};
 
 	if (dev->mt76.region == NL80211_DFS_UNSET) {
 		phy->dfs_state = -1;
@@ -1945,9 +1972,14 @@ int mt7915_dfs_init_radar_detector(struct mt7915_phy *phy)
 	phy->dfs_state = chandef->chan->dfs_state;
 
 	if (chandef->chan->flags & IEEE80211_CHAN_RADAR) {
-		if (chandef->chan->dfs_state != NL80211_DFS_AVAILABLE)
-			return mt7915_dfs_start_radar_detector(phy);
-
+		if (chandef->chan->dfs_state != NL80211_DFS_AVAILABLE) {
+			ieee80211_iterate_active_interfaces(phy->mt76->hw,
+				IEEE80211_IFACE_ITER_RESUME_ALL,
+				mt7915_vif_counts, &counts);
+			if (counts.ap + counts.adhoc + counts.mesh)
+				mt7915_dfs_start_radar_detector(phy);
+			return 0;
+		}
 		return mt7915_mcu_rdd_cmd(dev, RDD_CAC_END, ext_phy,
 					  MT_RX_SEL0, 0);
 	}
