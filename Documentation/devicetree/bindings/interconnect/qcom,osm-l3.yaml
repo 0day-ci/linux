@@ -18,13 +18,20 @@ properties:
   compatible:
     enum:
       - qcom,sc7180-osm-l3
+      - qcom,sc7280-epss-l3
       - qcom,sc8180x-osm-l3
       - qcom,sdm845-osm-l3
       - qcom,sm8150-osm-l3
       - qcom,sm8250-epss-l3
 
   reg:
-    maxItems: 1
+    minItems: 1
+    maxItems: 4
+    items:
+      - description: OSM clock domain-0 base address and size
+      - description: OSM clock domain-1 base address and size
+      - description: OSM clock domain-2 base address and size
+      - description: OSM clock domain-3 base address and size
 
   clocks:
     items:
