@@ -191,7 +191,11 @@ static void page_pool_dma_sync_for_device(struct page_pool *pool,
 
 static bool page_pool_dma_map(struct page_pool *pool, struct page *page)
 {
+	unsigned long attrs = DMA_ATTR_SKIP_CPU_SYNC;
 	dma_addr_t dma;
+
+	if (pool->p.flags & PP_FLAG_DMA_SYNC_DEV)
+		attrs = 0;
 
 	/* Setup DMA mapping: use 'struct page' area for storing DMA-addr
 	 * since dma_addr_t can be either 32 or 64 bits and does not always fit
@@ -200,14 +204,11 @@ static bool page_pool_dma_map(struct page_pool *pool, struct page *page)
 	 */
 	dma = dma_map_page_attrs(pool->p.dev, page, 0,
 				 (PAGE_SIZE << pool->p.order),
-				 pool->p.dma_dir, DMA_ATTR_SKIP_CPU_SYNC);
-	if (dma_mapping_error(pool->p.dev, dma))
+				 pool->p.dma_dir, attrs);
+	if (unlikely(dma_mapping_error(pool->p.dev, dma)))
 		return false;
 
 	page_pool_set_dma_addr(page, dma);
-
-	if (pool->p.flags & PP_FLAG_DMA_SYNC_DEV)
-		page_pool_dma_sync_for_device(pool, page, pool->p.max_len);
 
 	return true;
 }
