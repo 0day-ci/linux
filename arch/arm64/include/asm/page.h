@@ -8,7 +8,7 @@
 #ifndef __ASM_PAGE_H
 #define __ASM_PAGE_H
 
-#include <asm/page-def.h>
+#include <asm/pgtable-hwdef.h>
 
 #ifndef __ASSEMBLY__
 

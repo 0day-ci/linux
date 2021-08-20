@@ -12,7 +12,7 @@
 
 #include <linux/const.h>
 #include <linux/sizes.h>
-#include <asm/page-def.h>
+#include <asm/pgtable-hwdef.h>
 
 /*
  * Size of the PCI I/O space. This must remain a power of two so that

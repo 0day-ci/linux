@@ -5,6 +5,10 @@
 #ifndef __ASM_PGTABLE_HWDEF_H
 #define __ASM_PGTABLE_HWDEF_H
 
+#define PAGE_SHIFT		CONFIG_ARM64_PAGE_SHIFT
+#define PAGE_SIZE		(_AC(1, UL) << PAGE_SHIFT)
+#define PAGE_MASK		(~(PAGE_SIZE-1))
+
 #include <asm/memory.h>
 
 /*
