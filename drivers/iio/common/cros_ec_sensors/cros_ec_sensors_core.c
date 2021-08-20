@@ -360,8 +360,9 @@ int cros_ec_sensors_core_init(struct platform_device *pdev,
 			 * The only way to get samples in buffer is to set a
 			 * software trigger (systrig, hrtimer).
 			 */
-			ret = devm_iio_triggered_buffer_setup(dev, indio_dev,
-					NULL, trigger_capture, NULL);
+			ret = devm_iio_triggered_buffer_setup_ext(dev,
+					indio_dev, NULL, trigger_capture,
+					IIO_BUFFER_DIRECTION_IN, NULL);
 			if (ret)
 				return ret;
 		}
