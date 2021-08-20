@@ -11,8 +11,9 @@ maintainers:
 
 properties:
   compatible:
-    items:
+    oneOf:
       - const: cdns,dphy
+      - const: cdns,dphy-rx
 
   reg:
     maxItems: 1
