@@ -7910,7 +7910,7 @@ static void __init ncr_getclock (struct ncb *np, int mult)
 	/*
 	**	True with 875 or 895 with clock multiplier selected
 	*/
-	if (mult > 1 && (stest1 & (DBLEN+DBLSEL)) == DBLEN+DBLSEL) {
+	if (mult > 1 && (stest1 & (DBLEN | DBLSEL)) == DBLEN | DBLSEL) {
 		if (bootverbose >= 2)
 			printk ("%s: clock multiplier found\n", ncr_name(np));
 		np->multiplier = mult;
