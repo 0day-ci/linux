@@ -1933,7 +1933,7 @@ static int ufshpb_alloc_region_tbl(struct ufs_hba *hba, struct ufshpb_lu *hpb)
 		if (ufshpb_is_pinned_region(hpb, rgn_idx)) {
 			ret = ufshpb_init_pinned_active_region(hba, hpb, rgn);
 			if (ret)
-				goto release_srgn_table;
+				goto release_current_srgn_table;
 		} else {
 			rgn->rgn_state = HPB_RGN_INACTIVE;
 		}
@@ -1943,6 +1943,9 @@ static int ufshpb_alloc_region_tbl(struct ufs_hba *hba, struct ufshpb_lu *hpb)
 	}
 
 	return 0;
+
+release_current_srgn_table:
+	kvfree(rgn_table[rgn_idx].srgn_tbl);
 
 release_srgn_table:
 	for (i = 0; i < rgn_idx; i++)
