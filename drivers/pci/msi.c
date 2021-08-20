@@ -771,6 +771,7 @@ static int msix_capability_init(struct pci_dev *dev, struct msix_entry *entries,
 	int ret;
 	u16 control;
 	void __iomem *base;
+	struct msi_desc *desc;
 
 	/* Ensure MSI-X is disabled while it is set up */
 	pci_msix_clear_and_set_ctrl(dev, PCI_MSIX_FLAGS_ENABLE, 0);
@@ -814,6 +815,10 @@ static int msix_capability_init(struct pci_dev *dev, struct msix_entry *entries,
 	pci_msix_clear_and_set_ctrl(dev, PCI_MSIX_FLAGS_MASKALL, 0);
 
 	pcibios_free_irq(dev);
+
+	desc = first_pci_msi_entry(dev);
+	dev->irq = desc->irq;
+
 	return 0;
 
 out_avail:
@@ -1024,6 +1029,7 @@ static void pci_msix_shutdown(struct pci_dev *dev)
 	pci_msix_clear_and_set_ctrl(dev, PCI_MSIX_FLAGS_ENABLE, 0);
 	pci_intx_for_msi(dev, 1);
 	dev->msix_enabled = 0;
+	dev->irq = entry->msi_attrib.default_irq;
 	pcibios_alloc_irq(dev);
 }
 
