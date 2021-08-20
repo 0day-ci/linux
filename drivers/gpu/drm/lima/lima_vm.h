@@ -58,7 +58,6 @@ static inline void lima_vm_put(struct lima_vm *vm)
 		kref_put(&vm->refcount, lima_vm_release);
 }
 
-void lima_vm_print(struct lima_vm *vm);
 int lima_vm_map_bo(struct lima_vm *vm, struct lima_bo *bo, int pageoff);
 
 #endif

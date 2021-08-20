@@ -251,35 +251,6 @@ void lima_vm_release(struct kref *kref)
 	kfree(vm);
 }
 
-void lima_vm_print(struct lima_vm *vm)
-{
-	int i, j, k;
-	u32 *pd, *pt;
-
-	if (!vm->pd.cpu)
-		return;
-
-	pd = vm->pd.cpu;
-	for (i = 0; i < LIMA_VM_NUM_BT; i++) {
-		if (!vm->bts[i].cpu)
-			continue;
-
-		pt = vm->bts[i].cpu;
-		for (j = 0; j < LIMA_VM_NUM_PT_PER_BT; j++) {
-			int idx = (i << LIMA_VM_NUM_PT_PER_BT_SHIFT) + j;
-
-			printk(KERN_INFO "lima vm pd %03x:%08x\n", idx, pd[idx]);
-
-			for (k = 0; k < LIMA_PAGE_ENT_NUM; k++) {
-				u32 pte = *pt++;
-
-				if (pte)
-					printk(KERN_INFO "  pt %03x:%08x\n", k, pte);
-			}
-		}
-	}
-}
-
 int lima_vm_map_bo(struct lima_vm *vm, struct lima_bo *bo, int pageoff)
 {
 	struct lima_bo_va *bo_va;
