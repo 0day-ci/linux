@@ -761,7 +761,7 @@ static void waiting_process_next(struct AdapterCtlBlk *acb)
 	struct list_head *dcb_list_head = &acb->dcb_list;
 
 	if (acb->active_dcb
-	    || (acb->acb_flag & (RESET_DETECT + RESET_DONE + RESET_DEV)))
+	    || (acb->acb_flag & (RESET_DETECT | RESET_DONE | RESET_DEV)))
 		return;
 
 	if (timer_pending(&acb->waiting_timer))
@@ -844,7 +844,7 @@ static void send_srb(struct AdapterCtlBlk *acb, struct ScsiReqBlk *srb)
 
 	if (dcb->max_command <= list_size(&dcb->srb_going_list) ||
 	    acb->active_dcb ||
-	    (acb->acb_flag & (RESET_DETECT + RESET_DONE + RESET_DEV))) {
+	    (acb->acb_flag & (RESET_DETECT | RESET_DONE | RESET_DEV))) {
 		list_add_tail(&srb->list, &dcb->srb_waiting_list);
 		waiting_process_next(acb);
 		return;
@@ -1127,7 +1127,7 @@ static void reset_dev_param(struct AdapterCtlBlk *acb)
 	list_for_each_entry(dcb, &acb->dcb_list, list) {
 		u8 period_index;
 
-		dcb->sync_mode &= ~(SYNC_NEGO_DONE + WIDE_NEGO_DONE);
+		dcb->sync_mode &= ~(SYNC_NEGO_DONE | WIDE_NEGO_DONE);
 		dcb->sync_period = 0;
 		dcb->sync_offset = 0;
 
@@ -1685,7 +1685,7 @@ static void msgout_phase0(struct AdapterCtlBlk *acb, struct ScsiReqBlk *srb,
 		u16 *pscsi_status)
 {
 	dprintkdbg(DBG_0, "msgout_phase0: (0x%p)\n", srb->cmd);
-	if (srb->state & (SRB_UNEXPECT_RESEL + SRB_ABORT_SENT))
+	if (srb->state & (SRB_UNEXPECT_RESEL | SRB_ABORT_SENT))
 		*pscsi_status = PH_BUS_FREE;	/*.. initial phase */
 
 	DC395x_write16(acb, TRM_S1040_SCSI_CONTROL, DO_DATALATCH);	/* it's important for atn stop */
@@ -2901,7 +2901,7 @@ static void disconnect(struct AdapterCtlBlk *acb)
 		doing_srb_done(acb, DID_ABORT, srb->cmd, 1);
 		waiting_process_next(acb);
 	} else {
-		if ((srb->state & (SRB_START_ + SRB_MSGOUT))
+		if ((srb->state & (SRB_START_ | SRB_MSGOUT))
 		    || !(srb->
 			 state & (SRB_DISCONNECT | SRB_COMPLETED))) {
 			/*
