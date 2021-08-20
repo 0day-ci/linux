@@ -1,0 +1,113 @@
+# SPDX-License-Identifier: GPL-2.0-only
+config SECURITY_NAX
+	bool "NAX support"
+	depends on SECURITY
+	help
+	  This selects NAX (No Anonymous Execution), which extends DAC
+	  support with additional system-wide security settings beyond
+	  regular Linux discretionary access controls. Currently, the only
+	  available behavior is restricting the execution of anonymous and
+	  modified pages.
+
+	  The module can restrict either privileged or all processes,
+	  depending on the settings. It is possible to configure action,
+	  performed when the violation is detected (log, log + block,
+	  log + kill).
+
+	  Further information can be found in
+	  Documentation/admin-guide/LSM/NAX.rst.
+
+	  If you are unsure how to answer this question, answer N.
+
+choice
+	prompt "NAX violation action mode"
+	default SECURITY_NAX_MODE_LOG
+	depends on SECURITY_NAX
+	help
+	  Select the NAX violation action mode.
+
+	  In the default permissive mode the violations are only logged
+	  (if logging is not suppressed). In the enforcing mode the violations
+	  are prohibited. And in the kill mode the process is terminated.
+
+	  The value can be overridden at boot time with the kernel command-line
+	  parameter "nax_mode=" (0, 1, 2) or "kernel.nax.mode=" (0, 1, 2)
+	  sysctl parameter (if the settings are not locked).
+
+	config SECURITY_NAX_MODE_LOG
+		bool "Permissive mode"
+		help
+		  In this mode violations are only logged (if logging is not
+		  suppressed by the "kernel.nax.quiet" parameter). The
+		  violating system call will not be prohibited.
+	config SECURITY_NAX_MODE_ENFORCING
+		bool "Enforcing mode"
+		help
+		  In this mode violations are prohibited and logged (if
+		  logging is not suppressed by the "kernel.nax.quiet"
+		  parameter). The violating system call will return -EACCES
+		  error.
+	config SECURITY_NAX_MODE_KILL
+		bool "Kill mode"
+		help
+		  In this mode the violating process is terminated on the
+		  first violation system call. The violation event is logged
+		  (if logging is not suppressed by the "kernel.nax.quiet"
+		  parameter).
+endchoice
+
+config SECURITY_NAX_MODE
+	int
+	depends on SECURITY_NAX
+	default 0 if SECURITY_NAX_MODE_LOG
+	default 1 if SECURITY_NAX_MODE_ENFORCING
+	default 2 if SECURITY_NAX_MODE_KILL
+
+config SECURITY_NAX_CHECK_ALL
+	bool "Check all processes"
+	depends on SECURITY_NAX
+	help
+	  If selected, NAX will check all processes. If not selected, NAX
+	  will check only privileged processes (which is determined either
+	  by having zero uid, euid, suid or fsuid; or by possessing
+	  capabilities outside of allowed set).
+
+	  The value can also be overridden at boot time with the kernel
+	  command-line parameter "nax_check_all=" (0, 1) or
+	  "kernel.nax.check_all=" (0, 1) sysctl parameter (if the settings
+	  are not locked).
+
+config SECURITY_NAX_ALLOWED_CAPS
+	hex "Process capabilities ignored by NAX"
+	default 0x0
+	range 0x0 0xffffffffffff
+	depends on SECURITY_NAX
+	help
+	  Hexadecimal number representing the set of capabilities
+	  a non-root process can possess without being considered
+	  "privileged" by NAX LSM.
+
+	  The value can be overridden at boot time with the command-line
+	  parameter "nax_allowed_caps=" or "kernel.nax.allowed_caps=" sysctl
+	  parameter (if the settings are not locked).
+
+config SECURITY_NAX_QUIET
+	bool "Silence NAX messages"
+	depends on SECURITY_NAX
+	help
+	  If selected, NAX will not print violations.
+
+	  The value can be overridden at boot with the command-line
+	  parameter "nax_quiet=" (0, 1) or "kernel.nax.quiet=" (0, 1) sysctl
+	  parameter (if the settings are not locked).
+
+config SECURITY_NAX_LOCKED
+	bool "Lock NAX settings"
+	depends on SECURITY_NAX
+	help
+	  Prevent any update to the settings of the NAX LSM. This applies to
+	  both sysctl writes and the kernel command line.
+
+	  If not selected, it can be enabled at boot time with the kernel
+	  command-line parameter "nax_locked=1" or "kernel.nax_locked=1"
+	  sysctl parameter (if the settings are not locked).
