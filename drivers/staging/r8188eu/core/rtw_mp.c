@@ -7,20 +7,19 @@
 #include "../include/odm_precomp.h"
 #include "../include/rtl8188e_hal.h"
 
-u32 read_macreg(struct adapter *padapter, u32 addr, u32 sz)
+u32 read_macreg(struct adapter *padapter, u32 addr, u32 sz, int *error)
 {
 	u32 val = 0;
-	int error;
 
 	switch (sz) {
 	case 1:
-		val = rtw_read8(padapter, addr, &error);
+		val = rtw_read8(padapter, addr, error);
 		break;
 	case 2:
-		val = rtw_read16(padapter, addr, &error);
+		val = rtw_read16(padapter, addr, error);
 		break;
 	case 4:
-		val = rtw_read32(padapter, addr, &error);
+		val = rtw_read32(padapter, addr, error);
 		break;
 	default:
 		val = 0xffffffff;
