@@ -691,9 +691,8 @@ static inline int scsw_tm_is_valid_pno(union scsw *scsw)
 {
 	return (scsw->tm.fctl != 0) &&
 	       (scsw->tm.stctl & SCSW_STCTL_STATUS_PEND) &&
-	       (!(scsw->tm.stctl & SCSW_STCTL_INTER_STATUS) ||
-		 ((scsw->tm.stctl & SCSW_STCTL_INTER_STATUS) &&
-		  (scsw->tm.actl & SCSW_ACTL_SUSPENDED)));
+		(!(scsw->tm.stctl & SCSW_STCTL_INTER_STATUS) ||
+		(scsw->tm.actl & SCSW_ACTL_SUSPENDED));
 }
 
 /**
