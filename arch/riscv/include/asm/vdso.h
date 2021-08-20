@@ -8,6 +8,8 @@
 #ifndef _ASM_RISCV_VDSO_H
 #define _ASM_RISCV_VDSO_H
 
+#define __VVAR_PAGES    1
+
 #ifndef __ASSEMBLY__
 /*
  * The VDSO symbols are mapped into Linux so we can just use regular symbol
