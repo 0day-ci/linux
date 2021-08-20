@@ -282,9 +282,6 @@ void drm_file_free(struct drm_file *file)
 
 	drm_legacy_ctxbitmap_flush(dev, file);
 
-	if (drm_is_primary_client(file))
-		drm_master_release(file);
-
 	if (dev->driver->postclose)
 		dev->driver->postclose(dev, file);
 
@@ -304,6 +301,9 @@ static void drm_close_helper(struct file *filp)
 	mutex_lock(&dev->filelist_mutex);
 	list_del(&file_priv->lhead);
 	mutex_unlock(&dev->filelist_mutex);
+
+	if (drm_is_primary_client(file_priv))
+		drm_master_release(file_priv);
 
 	drm_file_free(file_priv);
 }
