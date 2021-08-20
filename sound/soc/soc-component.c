@@ -991,6 +991,27 @@ int snd_soc_pcm_component_copy_user(struct snd_pcm_substream *substream,
 	return -EINVAL;
 }
 
+int snd_soc_pcm_component_get_time_info(struct snd_pcm_substream *substream,
+					struct timespec64 *system_ts, struct timespec64 *audio_ts,
+					struct snd_pcm_audio_tstamp_config *audio_tstamp_config,
+					struct snd_pcm_audio_tstamp_report *audio_tstamp_report)
+{
+	struct snd_soc_pcm_runtime *rtd = asoc_substream_to_rtd(substream);
+	struct snd_soc_component *component;
+	int i;
+
+	/* FIXME. it returns 1st get_time_info now */
+	for_each_rtd_components(rtd, i, component) {
+		if (component->driver->get_time_info)
+			return soc_component_ret(component,
+				component->driver->get_time_info(component,
+				substream, system_ts, audio_ts,
+				audio_tstamp_config, audio_tstamp_report));
+	}
+
+	return -EINVAL;
+}
+
 struct page *snd_soc_pcm_component_page(struct snd_pcm_substream *substream,
 					unsigned long offset)
 {
