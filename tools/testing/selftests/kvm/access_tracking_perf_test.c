@@ -231,7 +231,7 @@ static void *vcpu_thread_main(void *arg)
 		case ITERATION_MARK_IDLE:
 			mark_vcpu_memory_idle(vm, vcpu_id);
 			break;
-		};
+		}
 
 		vcpu_last_completed_iteration[vcpu_id] = current_iteration;
 	}
