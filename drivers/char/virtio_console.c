@@ -29,6 +29,8 @@
 
 #define is_rproc_enabled IS_ENABLED(CONFIG_REMOTEPROC)
 
+#define MAX_NR_PORTS	MAX_NR_HVC_CONSOLES
+
 /*
  * This is a global struct for storing common data for all the devices
  * this driver handles.
@@ -2038,6 +2040,9 @@ static int virtcons_probe(struct virtio_device *vdev)
 				 &portdev->max_nr_ports) == 0) {
 		multiport = true;
 	}
+
+	/* limit max_nr_ports to avoid invalid value from untrusted remote host */
+	portdev->max_nr_ports = min_t(u32, portdev->max_nr_ports, MAX_NR_PORTS);
 
 	err = init_vqs(portdev);
 	if (err < 0) {
