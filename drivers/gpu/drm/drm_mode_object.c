@@ -29,6 +29,7 @@
 #include <drm/drm_file.h>
 #include <drm/drm_mode_object.h>
 #include <drm/drm_print.h>
+#include <drm/drm_auth.h>
 
 #include "drm_crtc_internal.h"
 
@@ -138,6 +139,10 @@ struct drm_mode_object *__drm_mode_object_find(struct drm_device *dev,
 					       uint32_t id, uint32_t type)
 {
 	struct drm_mode_object *obj = NULL;
+	struct drm_master *master = NULL;
+
+	if (file_priv)
+		master = drm_file_get_master(file_priv);
 
 	mutex_lock(&dev->mode_config.idr_mutex);
 	obj = idr_find(&dev->mode_config.object_idr, id);
@@ -146,15 +151,18 @@ struct drm_mode_object *__drm_mode_object_find(struct drm_device *dev,
 	if (obj && obj->id != id)
 		obj = NULL;
 
-	if (obj && drm_mode_object_lease_required(obj->type) &&
-	    !_drm_lease_held(file_priv, obj->id))
-		obj = NULL;
+	if (obj && drm_mode_object_lease_required(obj->type)) {
+		if (master && !_drm_lease_held_master(master, obj->id))
+			obj = NULL;
+	}
 
 	if (obj && obj->free_cb) {
 		if (!kref_get_unless_zero(&obj->refcount))
 			obj = NULL;
 	}
 	mutex_unlock(&dev->mode_config.idr_mutex);
+	if (master)
+		drm_master_put(&master);
 
 	return obj;
 }
