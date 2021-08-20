@@ -18,6 +18,7 @@
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <asm/bug.h>
+#include <linux/math64.h>
 
 void perf_evsel__init(struct perf_evsel *evsel, struct perf_event_attr *attr,
 		      int idx)
@@ -307,6 +308,9 @@ int perf_evsel__read(struct perf_evsel *evsel, int cpu, int thread,
 
 	if (readn(FD(evsel, cpu, thread), count->values, size) <= 0)
 		return -errno;
+
+	if (count->ena != count->run)
+		count->val = mul_u64_u64_div64(count->val, count->ena, count->run);
 
 	return 0;
 }
