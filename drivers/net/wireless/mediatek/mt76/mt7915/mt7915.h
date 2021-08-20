@@ -143,8 +143,9 @@ struct mt7915_phy {
 	s16 coverage_class;
 	u8 slottime;
 
-	u8 rdd_state;
-	int dfs_state;
+	u8 rdd_state; /* radar detection started bitfield */
+	enum nl80211_chan_width dfs_ch_width;
+	u32 dfs_center_freq;
 
 	u32 rx_ampdu_ts;
 	u32 ampdu_ref;
@@ -435,6 +436,7 @@ int mt7915_dfs_init_radar_detector(struct mt7915_phy *phy);
 void mt7915_set_stream_he_caps(struct mt7915_phy *phy);
 void mt7915_set_stream_vht_txbf_caps(struct mt7915_phy *phy);
 void mt7915_update_channel(struct mt76_phy *mphy);
+int mt7915_dfs_stop_radar_detector(struct mt7915_phy *phy, bool ext_phy);
 int mt7915_init_debugfs(struct mt7915_dev *dev);
 #ifdef CONFIG_MAC80211_DEBUGFS
 void mt7915_sta_add_debugfs(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
