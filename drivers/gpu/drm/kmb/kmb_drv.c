@@ -514,8 +514,10 @@ static int kmb_probe(struct platform_device *pdev)
 	ret = kmb_dsi_host_bridge_init(get_device(&dsi_pdev->dev));
 
 	if (ret == -EPROBE_DEFER) {
+		put_device(&dsi_pdev->dev);
 		return -EPROBE_DEFER;
 	} else if (ret) {
+		put_device(&dsi_pdev->dev);
 		DRM_ERROR("probe failed to initialize DSI host bridge\n");
 		return ret;
 	}
@@ -523,9 +525,10 @@ static int kmb_probe(struct platform_device *pdev)
 	/* Create DRM device */
 	kmb = devm_drm_dev_alloc(dev, &kmb_driver,
 				 struct kmb_drm_private, drm);
-	if (IS_ERR(kmb))
+	if (IS_ERR(kmb)) {
+		put_device(&dsi_pdev->dev);
 		return PTR_ERR(kmb);
-
+	}
 	dev_set_drvdata(dev, &kmb->drm);
 
 	/* Initialize MIPI DSI */
