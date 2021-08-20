@@ -452,7 +452,7 @@ static struct dentry * configfs_lookup(struct inode *dir,
 				       unsigned int flags)
 {
 	struct configfs_dirent * parent_sd = dentry->d_parent->d_fsdata;
-	struct configfs_dirent * sd;
+	struct configfs_dirent *sd, *tmp;
 	int found = 0;
 	int err;
 
@@ -468,7 +468,7 @@ static struct dentry * configfs_lookup(struct inode *dir,
 	if (!configfs_dirent_is_ready(parent_sd))
 		goto out;
 
-	list_for_each_entry(sd, &parent_sd->s_children, s_sibling) {
+	list_for_each_entry_safe(sd, tmp, &parent_sd->s_children, s_sibling) {
 		if (sd->s_type & CONFIGFS_NOT_PINNED) {
 			const unsigned char * name = configfs_get_name(sd);
 
