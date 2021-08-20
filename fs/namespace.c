@@ -1716,18 +1716,20 @@ static inline bool may_mount(void)
 	return ns_capable(current->nsproxy->mnt_ns->user_ns, CAP_SYS_ADMIN);
 }
 
-#ifdef	CONFIG_MANDATORY_FILE_LOCKING
-static inline bool may_mandlock(void)
+static bool warned_mand;
+static void warn_mand_option(void)
 {
-	return capable(CAP_SYS_ADMIN);
+	if (warned_mand)
+		return;
+
+	warned_mand = true;
+
+	pr_warn("======================================================\n");
+	pr_warn("WARNING: the \"mand\" mount option has been deprecated\n");
+	pr_warn("         and is ignored by this kernel. Remove the\n");
+	pr_warn("         mount option to silence this warning\n");
+	pr_warn("======================================================\n");
 }
-#else
-static inline bool may_mandlock(void)
-{
-	pr_warn("VFS: \"mand\" mount option not supported");
-	return false;
-}
-#endif
 
 static int can_umount(const struct path *path, int flags)
 {
@@ -3266,8 +3268,8 @@ int path_mount(const char *dev_name, struct path *path,
 		return ret;
 	if (!may_mount())
 		return -EPERM;
-	if ((flags & SB_MANDLOCK) && !may_mandlock())
-		return -EPERM;
+	if (flags & SB_MANDLOCK)
+		warn_mand_option();
 
 	/* Default to relatime unless overriden */
 	if (!(flags & MS_NOATIME))
@@ -3650,9 +3652,8 @@ SYSCALL_DEFINE3(fsmount, int, fs_fd, unsigned int, flags,
 	if (fc->phase != FS_CONTEXT_AWAITING_MOUNT)
 		goto err_unlock;
 
-	ret = -EPERM;
-	if ((fc->sb_flags & SB_MANDLOCK) && !may_mandlock())
-		goto err_unlock;
+	if (fc->sb_flags & SB_MANDLOCK)
+		warn_mand_option();
 
 	newmount.mnt = vfs_create_mount(fc);
 	if (IS_ERR(newmount.mnt)) {
