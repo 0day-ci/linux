@@ -192,16 +192,16 @@ Linux it will look something like this::
 
 	chosen {
 		bootargs = "console=ttyS0,115200 loglevel=8";
-		initrd-start = <0xc8000000>;
-		initrd-end = <0xc8200000>;
+		linux,initrd-start = <0xc8000000>;
+		linux,initrd-end = <0xc8200000>;
 	};
 
 The bootargs property contains the kernel arguments, and the initrd-*
 properties define the address and size of an initrd blob.  Note that
-initrd-end is the first address after the initrd image, so this doesn't
-match the usual semantic of struct resource.  The chosen node may also
-optionally contain an arbitrary number of additional properties for
-platform-specific configuration data.
+linux,initrd-end is the first address after the initrd image, so this
+doesn't match the usual semantic of struct resource.  The chosen node
+may also optionally contain an arbitrary number of additional
+properties for platform-specific configuration data.
 
 During early boot, the architecture setup code calls of_scan_flat_dt()
 several times with different helper callbacks to parse device tree
