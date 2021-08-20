@@ -154,7 +154,7 @@ struct hal_ops {
 
 	void	(*intf_chip_configure)(struct adapter *padapter);
 
-	void	(*read_adapter_info)(struct adapter *padapter);
+	int	(*read_adapter_info)(struct adapter *padapter);
 
 	void	(*enable_interrupt)(struct adapter *padapter);
 	void	(*disable_interrupt)(struct adapter *padapter);
@@ -222,7 +222,7 @@ struct hal_ops {
 
 	void (*EfusePowerSwitch)(struct adapter *padapter, u8 bWrite,
 				 u8 PwrState);
-	void (*ReadEFuse)(struct adapter *padapter, u8 efuseType, u16 _offset,
+	int (*ReadEFuse)(struct adapter *padapter, u8 efuseType, u16 _offset,
 			  u16 _size_byte, u8 *pbuf, bool bPseudoTest);
 	void (*EFUSEGetEfuseDefinition)(struct adapter *padapter, u8 efuseType,
 					u8 type, void *pOut, bool bPseudoTest);
@@ -324,7 +324,7 @@ void rtw_hal_set_hwreg(struct adapter *padapter, u8 variable, u8 *val);
 void rtw_hal_get_hwreg(struct adapter *padapter, u8 variable, u8 *val);
 
 void rtw_hal_chip_configure(struct adapter *padapter);
-void rtw_hal_read_chip_info(struct adapter *padapter);
+int rtw_hal_read_chip_info(struct adapter *padapter);
 void rtw_hal_read_chip_version(struct adapter *padapter);
 
 u8 rtw_hal_set_def_var(struct adapter *padapter,

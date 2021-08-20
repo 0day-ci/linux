@@ -149,7 +149,7 @@ Efuse_CalculateWordCnts(u8 word_en)
 /*  */
 /* 	Created by Roger, 2008.10.21. */
 /*  */
-void
+int
 ReadEFuseByte(
 		struct adapter *Adapter,
 		u16 _offset,
@@ -163,32 +163,32 @@ ReadEFuseByte(
 
 	if (pseudo) {
 		Efuse_Read1ByteFromFakeContent(Adapter, _offset, pbuf);
-		return;
+		return 0;
 	}
 
 	/* Write Address */
 	rtw_write8(Adapter, EFUSE_CTRL + 1, (_offset & 0xff));
 	readbyte = rtw_read8(Adapter, EFUSE_CTRL + 2, &error);
 	if (error)
-		return;
+		return error;
 	rtw_write8(Adapter, EFUSE_CTRL + 2, ((_offset >> 8) & 0x03) | (readbyte & 0xfc));
 
 	/* Write bit 32 0 */
 	readbyte = rtw_read8(Adapter, EFUSE_CTRL + 3, &error);
 	if (error)
-		return;
+		return error;
 	rtw_write8(Adapter, EFUSE_CTRL + 3, (readbyte & 0x7f));
 
 	/* Check bit 32 read-ready */
 	retry = 0;
 	value32 = rtw_read32(Adapter, EFUSE_CTRL, &error);
 	if (error)
-		return;
+		return error;
 
 	while (!(((value32 >> 24) & 0xff) & 0x80)  && (retry < 10000)) {
 		value32 = rtw_read32(Adapter, EFUSE_CTRL, &error);
 		if (error)
-			return;
+			return error;
 		retry++;
 	}
 
@@ -199,9 +199,11 @@ ReadEFuseByte(
 	udelay(50);
 	value32 = rtw_read32(Adapter, EFUSE_CTRL, &error);
 	if (error)
-		return;
+		return error;
 
 	*pbuf = (u8)(value32 & 0xff);
+
+	return 0;
 }
 
 /*  */
@@ -222,9 +224,9 @@ ReadEFuseByte(
 /* 					write addr must be after sec5. */
 /*  */
 
-static void efuse_ReadEFuse(struct adapter *Adapter, u8 efuseType, u16 _offset, u16 _size_byte, u8 *pbuf, bool pseudo)
+static int efuse_ReadEFuse(struct adapter *Adapter, u8 efuseType, u16 _offset, u16 _size_byte, u8 *pbuf, bool pseudo)
 {
-	Adapter->HalFunc.ReadEFuse(Adapter, efuseType, _offset, _size_byte, pbuf, pseudo);
+	return Adapter->HalFunc.ReadEFuse(Adapter, efuseType, _offset, _size_byte, pbuf, pseudo);
 }
 
 void EFUSE_GetEfuseDefinition(struct adapter *pAdapter, u8 efuseType, u8 type, void *pOut, bool pseudo
@@ -539,6 +541,7 @@ u8 efuse_GetCurrentSize(struct adapter *padapter, u16 *size)
 u8 rtw_efuse_map_read(struct adapter *padapter, u16 addr, u16 cnts, u8 *data)
 {
 	u16 mapLen = 0;
+	int res;
 
 	EFUSE_GetEfuseDefinition(padapter, EFUSE_WIFI, TYPE_EFUSE_MAP_LEN, (void *)&mapLen, false);
 
@@ -547,7 +550,9 @@ u8 rtw_efuse_map_read(struct adapter *padapter, u16 addr, u16 cnts, u8 *data)
 
 	Efuse_PowerSwitch(padapter, false, true);
 
-	efuse_ReadEFuse(padapter, EFUSE_WIFI, addr, cnts, data, false);
+	res = efuse_ReadEFuse(padapter, EFUSE_WIFI, addr, cnts, data, false);
+	if (res)
+		return _FAIL;
 
 	Efuse_PowerSwitch(padapter, false, false);
 
@@ -557,6 +562,7 @@ u8 rtw_efuse_map_read(struct adapter *padapter, u16 addr, u16 cnts, u8 *data)
 u8 rtw_BT_efuse_map_read(struct adapter *padapter, u16 addr, u16 cnts, u8 *data)
 {
 	u16 mapLen = 0;
+	int res;
 
 	EFUSE_GetEfuseDefinition(padapter, EFUSE_BT, TYPE_EFUSE_MAP_LEN, (void *)&mapLen, false);
 
@@ -565,7 +571,9 @@ u8 rtw_BT_efuse_map_read(struct adapter *padapter, u16 addr, u16 cnts, u8 *data)
 
 	Efuse_PowerSwitch(padapter, false, true);
 
-	efuse_ReadEFuse(padapter, EFUSE_BT, addr, cnts, data, false);
+	res = efuse_ReadEFuse(padapter, EFUSE_BT, addr, cnts, data, false);
+	if (res)
+		return _FAIL;
 
 	Efuse_PowerSwitch(padapter, false, false);
 
@@ -836,17 +844,22 @@ efuse_ShadowRead4Byte(
  * 11/11/2008	MHC		Create Version 0.
  *
  *---------------------------------------------------------------------------*/
-static void Efuse_ReadAllMap(struct adapter *pAdapter, u8 efuseType, u8 *Efuse, bool pseudo)
+static int Efuse_ReadAllMap(struct adapter *pAdapter, u8 efuseType, u8 *Efuse, bool pseudo)
 {
 	u16 mapLen = 0;
+	int res;
 
 	Efuse_PowerSwitch(pAdapter, false, true);
 
 	EFUSE_GetEfuseDefinition(pAdapter, efuseType, TYPE_EFUSE_MAP_LEN, (void *)&mapLen, pseudo);
 
-	efuse_ReadEFuse(pAdapter, efuseType, 0, mapLen, Efuse, pseudo);
+	res = efuse_ReadEFuse(pAdapter, efuseType, 0, mapLen, Efuse, pseudo);
+	if (res)
+		return res;
 
 	Efuse_PowerSwitch(pAdapter, false, false);
+
+	return res;
 }
 
 /*-----------------------------------------------------------------------------
@@ -865,20 +878,23 @@ static void Efuse_ReadAllMap(struct adapter *pAdapter, u8 efuseType, u8 *Efuse, 
  * 11/13/2008	MHC		Create Version 0.
  *
  *---------------------------------------------------------------------------*/
-void EFUSE_ShadowMapUpdate(
+int EFUSE_ShadowMapUpdate(
 	struct adapter *pAdapter,
 	u8 efuseType,
 	bool pseudo)
 {
 	struct eeprom_priv *pEEPROM = GET_EEPROM_EFUSE_PRIV(pAdapter);
 	u16 mapLen = 0;
+	int res = 0;
 
 	EFUSE_GetEfuseDefinition(pAdapter, efuseType, TYPE_EFUSE_MAP_LEN, (void *)&mapLen, pseudo);
 
 	if (pEEPROM->bautoload_fail_flag)
 		memset(pEEPROM->efuse_eeprom_data, 0xFF, mapLen);
 	else
-		Efuse_ReadAllMap(pAdapter, efuseType, pEEPROM->efuse_eeprom_data, pseudo);
+		res = Efuse_ReadAllMap(pAdapter, efuseType, pEEPROM->efuse_eeprom_data, pseudo);
+
+	return res;
 } /*  EFUSE_ShadowMapUpdate */
 
 /*-----------------------------------------------------------------------------

@@ -1275,7 +1275,7 @@ readAdapterInfo_8188EU(
 	_ReadLEDSetting(adapt, eeprom->efuse_eeprom_data, eeprom->bautoload_fail_flag);
 }
 
-static void _ReadPROMContent(
+static int _ReadPROMContent(
 	struct adapter *Adapter
 	)
 {
@@ -1286,7 +1286,7 @@ static void _ReadPROMContent(
 	/* check system boot selection */
 	eeValue = rtw_read8(Adapter, REG_9346CR, &error);
 	if (error)
-		return;
+		return error;
 
 	eeprom->EepromOrEfuse		= (eeValue & BOOT_FROM_EEPROM) ? true : false;
 	eeprom->bautoload_fail_flag	= (eeValue & EEPROM_EN) ? false : true;
@@ -1294,8 +1294,13 @@ static void _ReadPROMContent(
 	DBG_88E("Boot from %s, Autoload %s !\n", (eeprom->EepromOrEfuse ? "EEPROM" : "EFUSE"),
 		(eeprom->bautoload_fail_flag ? "Fail" : "OK"));
 
-	Hal_InitPGData88E(Adapter);
+	error = Hal_InitPGData88E(Adapter);
+	if (error)
+		return error;
+
 	readAdapterInfo_8188EU(Adapter);
+
+	return 0;
 }
 
 static void _ReadRFType(struct adapter *Adapter)
@@ -1308,23 +1313,26 @@ static void _ReadRFType(struct adapter *Adapter)
 static int _ReadAdapterInfo8188EU(struct adapter *Adapter)
 {
 	u32 start = jiffies;
+	int res;
 
 	MSG_88E("====> %s\n", __func__);
 
 	_ReadRFType(Adapter);/* rf_chip -> _InitRFType() */
-	_ReadPROMContent(Adapter);
+	res = _ReadPROMContent(Adapter);
+	if (res)
+		return _FAIL;
 
 	MSG_88E("<==== %s in %d ms\n", __func__, rtw_get_passing_time_ms(start));
 
 	return _SUCCESS;
 }
 
-static void ReadAdapterInfo8188EU(struct adapter *Adapter)
+static int ReadAdapterInfo8188EU(struct adapter *Adapter)
 {
 	/*  Read EEPROM size before call any EEPROM function */
 	Adapter->EepromAddressSize = GetEEPROMSize8188E(Adapter);
 
-	_ReadAdapterInfo8188EU(Adapter);
+	return _ReadAdapterInfo8188EU(Adapter);
 }
 
 #define GPIO_DEBUG_PORT_NUM 0

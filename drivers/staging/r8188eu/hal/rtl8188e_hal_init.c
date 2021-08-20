@@ -864,7 +864,7 @@ rtl8188e_EfusePowerSwitch(
 	hal_EfusePowerSwitch_RTL8188E(pAdapter, bWrite, PwrState);
 }
 
-static void Hal_EfuseReadEFuse88E(struct adapter *Adapter,
+static int Hal_EfuseReadEFuse88E(struct adapter *Adapter,
 	u16			_offset,
 	u16			_size_byte,
 	u8 *pbuf,
@@ -879,6 +879,7 @@ static void Hal_EfuseReadEFuse88E(struct adapter *Adapter,
 	u16	**eFuseWord = NULL;
 	u16	efuse_utilized = 0;
 	u8 u1temp = 0;
+	int error;
 
 	/*  */
 	/*  Do NOT excess total size of EFuse table. Added by Roger, 2008.11.10. */
@@ -909,12 +910,16 @@ static void Hal_EfuseReadEFuse88E(struct adapter *Adapter,
 	/*  1. Read the first byte to check if efuse is empty!!! */
 	/*  */
 	/*  */
-	ReadEFuseByte(Adapter, eFuse_Addr, rtemp8, bPseudoTest);
-	if (*rtemp8 != 0xFF) {
+	error = ReadEFuseByte(Adapter, eFuse_Addr, rtemp8, bPseudoTest);
+	if (error) {
+		DBG_88E("Failed to read EFUSE byte\n");
+		goto exit;
+	} else if (*rtemp8 != 0xFF) {
 		efuse_utilized++;
 		eFuse_Addr++;
 	} else {
 		DBG_88E("EFUSE is empty efuse_Addr-%d efuse_data =%x\n", eFuse_Addr, *rtemp8);
+		error = -ENOENT;
 		goto exit;
 	}
 
@@ -926,11 +931,15 @@ static void Hal_EfuseReadEFuse88E(struct adapter *Adapter,
 		if ((*rtemp8 & 0x1F) == 0x0F) {		/* extended header */
 			u1temp = ((*rtemp8 & 0xE0) >> 5);
 
-			ReadEFuseByte(Adapter, eFuse_Addr, rtemp8, bPseudoTest);
+			error = ReadEFuseByte(Adapter, eFuse_Addr, rtemp8, bPseudoTest);
+			if (error)
+				goto exit;
 
 			if ((*rtemp8 & 0x0F) == 0x0F) {
 				eFuse_Addr++;
-				ReadEFuseByte(Adapter, eFuse_Addr, rtemp8, bPseudoTest);
+				error = ReadEFuseByte(Adapter, eFuse_Addr, rtemp8, bPseudoTest);
+				if (error)
+					goto exit;
 
 				if (*rtemp8 != 0xFF && (eFuse_Addr < EFUSE_REAL_CONTENT_LEN_88E))
 					eFuse_Addr++;
@@ -951,13 +960,19 @@ static void Hal_EfuseReadEFuse88E(struct adapter *Adapter,
 			for (i = 0; i < EFUSE_MAX_WORD_UNIT; i++) {
 				/*  Check word enable condition in the section */
 				if (!(wren & 0x01)) {
-					ReadEFuseByte(Adapter, eFuse_Addr, rtemp8, bPseudoTest);
+					error = ReadEFuseByte(Adapter, eFuse_Addr, rtemp8, bPseudoTest);
+					if (error)
+						goto exit;
+
 					eFuse_Addr++;
 					efuse_utilized++;
 					eFuseWord[offset][i] = (*rtemp8 & 0xff);
 					if (eFuse_Addr >= EFUSE_REAL_CONTENT_LEN_88E)
 						break;
-					ReadEFuseByte(Adapter, eFuse_Addr, rtemp8, bPseudoTest);
+					error = ReadEFuseByte(Adapter, eFuse_Addr, rtemp8, bPseudoTest);
+					if (error)
+						goto exit;
+
 					eFuse_Addr++;
 					efuse_utilized++;
 					eFuseWord[offset][i] |= (((u16)*rtemp8 << 8) & 0xff00);
@@ -969,7 +984,9 @@ static void Hal_EfuseReadEFuse88E(struct adapter *Adapter,
 		}
 
 		/*  Read next PG header */
-		ReadEFuseByte(Adapter, eFuse_Addr, rtemp8, bPseudoTest);
+		error = ReadEFuseByte(Adapter, eFuse_Addr, rtemp8, bPseudoTest);
+		if (error)
+			goto exit;
 
 		if (*rtemp8 != 0xFF && (eFuse_Addr < EFUSE_REAL_CONTENT_LEN_88E)) {
 			efuse_utilized++;
@@ -995,10 +1012,14 @@ static void Hal_EfuseReadEFuse88E(struct adapter *Adapter,
 exit:
 	kfree(efuseTbl);
 	kfree(eFuseWord);
+
+	return error;
 }
 
-static void ReadEFuseByIC(struct adapter *Adapter, u8 efuseType, u16 _offset, u16 _size_byte, u8 *pbuf, bool bPseudoTest)
+static int ReadEFuseByIC(struct adapter *Adapter, u8 efuseType, u16 _offset, u16 _size_byte, u8 *pbuf, bool bPseudoTest)
 {
+	int res = 0;
+
 	if (!bPseudoTest) {
 		int ret = _FAIL;
 		if (rtw_IOL_applied(Adapter)) {
@@ -1012,25 +1033,25 @@ static void ReadEFuseByIC(struct adapter *Adapter, u8 efuseType, u16 _offset, u1
 				goto exit;
 		}
 	}
-	Hal_EfuseReadEFuse88E(Adapter, _offset, _size_byte, pbuf, bPseudoTest);
+	res = Hal_EfuseReadEFuse88E(Adapter, _offset, _size_byte, pbuf, bPseudoTest);
 
 exit:
-	return;
+	return res;
 }
 
-static void ReadEFuse_Pseudo(struct adapter *Adapter, u8 efuseType, u16 _offset, u16 _size_byte, u8 *pbuf, bool bPseudoTest)
+static int ReadEFuse_Pseudo(struct adapter *Adapter, u8 efuseType, u16 _offset, u16 _size_byte, u8 *pbuf, bool bPseudoTest)
 {
-	Hal_EfuseReadEFuse88E(Adapter, _offset, _size_byte, pbuf, bPseudoTest);
+	return Hal_EfuseReadEFuse88E(Adapter, _offset, _size_byte, pbuf, bPseudoTest);
 }
 
-static void rtl8188e_ReadEFuse(struct adapter *Adapter, u8 efuseType,
+static int rtl8188e_ReadEFuse(struct adapter *Adapter, u8 efuseType,
 			       u16 _offset, u16 _size_byte, u8 *pbuf,
 			       bool bPseudoTest)
 {
 	if (bPseudoTest)
-		ReadEFuse_Pseudo(Adapter, efuseType, _offset, _size_byte, pbuf, bPseudoTest);
+		return ReadEFuse_Pseudo(Adapter, efuseType, _offset, _size_byte, pbuf, bPseudoTest);
 	else
-		ReadEFuseByIC(Adapter, efuseType, _offset, _size_byte, pbuf, bPseudoTest);
+		return ReadEFuseByIC(Adapter, efuseType, _offset, _size_byte, pbuf, bPseudoTest);
 }
 
 /* Do not support BT */
@@ -2043,21 +2064,24 @@ s32 InitLLTTable(struct adapter *padapter, u8 txpktbuf_bndy)
 	return status;
 }
 
-void
+int
 Hal_InitPGData88E(struct adapter *padapter)
 {
 	struct eeprom_priv *pEEPROM = GET_EEPROM_EFUSE_PRIV(padapter);
+	int res = 0;
 
 	if (!pEEPROM->bautoload_fail_flag) { /*  autoload OK. */
 		if (!is_boot_from_eeprom(padapter)) {
 			/*  Read EFUSE real map to shadow. */
-			EFUSE_ShadowMapUpdate(padapter, EFUSE_WIFI, false);
+			res = EFUSE_ShadowMapUpdate(padapter, EFUSE_WIFI, false);
 		}
 	} else {/* autoload fail */
 		/* update to default value 0xFF */
 		if (!is_boot_from_eeprom(padapter))
-			EFUSE_ShadowMapUpdate(padapter, EFUSE_WIFI, false);
+			res = EFUSE_ShadowMapUpdate(padapter, EFUSE_WIFI, false);
 	}
+
+	return res;
 }
 
 void

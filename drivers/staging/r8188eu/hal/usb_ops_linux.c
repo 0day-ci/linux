@@ -118,8 +118,14 @@ static u8 usb_read8(struct intf_hdl *pintfhdl, u32 addr, int *error)
 	len = 1;
 
 	res = usbctrl_vendorreq(pintfhdl, wvalue, &data, len, requesttype);
-	if (likely(error))
-		*error = res < 0? res: 0;
+	if (likely(error)) {
+		if (res < 0) {
+			pr_err("r8188eu: Failed to read 8 bytes: %d\n", res);
+			*error = res;
+		} else {
+			*error = 0;
+		}
+	}
 
 	return data;
 
@@ -130,12 +136,25 @@ static u16 usb_read16(struct intf_hdl *pintfhdl, u32 addr, int *error)
 	u8 requesttype;
 	u16 wvalue;
 	u16 len;
-	__le32 data;
+	__le32 data = 0;
+	int res;
+
+	if (unlikely(!error))
+		WARN_ON_ONCE("r8188eu: Reading w/o error checking is bad idea\n");
 
 	requesttype = 0x01;/* read_in */
 	wvalue = (u16)(addr & 0x0000ffff);
 	len = 2;
-	usbctrl_vendorreq(pintfhdl, wvalue, &data, len, requesttype);
+	
+	res = usbctrl_vendorreq(pintfhdl, wvalue, &data, len, requesttype);
+	if (likely(error)) {
+		if (res < 0) {
+			pr_err("r8188eu: Failed to read 8 bytes: %d\n", res);
+			*error = res;
+		} else {
+			*error = 0;
+		}
+	}
 
 	return (u16)(le32_to_cpu(data) & 0xffff);
 }
@@ -145,14 +164,26 @@ static u32 usb_read32(struct intf_hdl *pintfhdl, u32 addr, int *error)
 	u8 requesttype;
 	u16 wvalue;
 	u16 len;
-	__le32 data;
+	__le32 data = 0;
+	int res;
+
+	if (unlikely(!error))
+		WARN_ON_ONCE("r8188eu: Reading w/o error checking is bad idea\n");
 
 	requesttype = 0x01;/* read_in */
 
 	wvalue = (u16)(addr & 0x0000ffff);
 	len = 4;
 
-	usbctrl_vendorreq(pintfhdl, wvalue, &data, len, requesttype);
+	res = usbctrl_vendorreq(pintfhdl, wvalue, &data, len, requesttype);
+	if (likely(error)) {
+		if (res < 0) {
+			pr_err("r8188eu: Failed to read 8 bytes: %d\n", res);
+			*error = res;
+		} else {
+			*error = 0;
+		}
+	}
 
 	return le32_to_cpu(data);
 }
