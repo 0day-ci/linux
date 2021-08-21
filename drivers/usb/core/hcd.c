@@ -2730,16 +2730,16 @@ static int usb_hcd_request_irqs(struct usb_hcd *hcd,
 			return retval;
 		}
 		hcd->irq = irqnum;
-		dev_info(hcd->self.controller, "irq %d, %s 0x%08llx\n", irqnum,
-				(hcd->driver->flags & HCD_MEMORY) ?
-					"io mem" : "io base",
-					(unsigned long long)hcd->rsrc_start);
+		dev_info(hcd->self.controller, "irq %d, io %s 0x%08llx\n",
+				irqnum, (hcd->driver->flags & HCD_MEMORY) ?
+					"mem" : "base",
+				(unsigned long long)hcd->rsrc_start);
 	} else {
 		hcd->irq = 0;
 		if (hcd->rsrc_start)
-			dev_info(hcd->self.controller, "%s 0x%08llx\n",
+			dev_info(hcd->self.controller, "io %s 0x%08llx\n",
 					(hcd->driver->flags & HCD_MEMORY) ?
-					"io mem" : "io base",
+						"mem" : "base",
 					(unsigned long long)hcd->rsrc_start);
 	}
 	return 0;
