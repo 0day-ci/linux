@@ -237,11 +237,26 @@ static void proc_fs_context_free(struct fs_context *fc)
 	kfree(ctx);
 }
 
+static int proc_check_mntpoint(struct fs_context *fc, struct path *path)
+{
+	struct super_block *mnt_sb = path->mnt->mnt_sb;
+	struct proc_fs_info *fs_info;
+
+	if (strcmp(mnt_sb->s_type->name, "proc") == 0) {
+		fs_info = mnt_sb->s_fs_info;
+		if (fs_info->pid_ns == task_active_pid_ns(current) &&
+		    path->mnt->mnt_root == path->dentry)
+			return -EBUSY;
+	}
+	return 0;
+}
+
 static const struct fs_context_operations proc_fs_context_ops = {
 	.free		= proc_fs_context_free,
 	.parse_param	= proc_parse_param,
 	.get_tree	= proc_get_tree,
 	.reconfigure	= proc_reconfigure,
+	.check_mntpoint	= proc_check_mntpoint,
 };
 
 static int proc_init_fs_context(struct fs_context *fc)

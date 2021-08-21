@@ -2878,6 +2878,7 @@ static int do_new_mount_fc(struct fs_context *fc, struct path *mountpoint,
 static int do_new_mount(struct path *path, const char *fstype, int sb_flags,
 			int mnt_flags, const char *name, void *data)
 {
+	int (*check_mntpoint)(struct fs_context *fc, struct path *path);
 	struct file_system_type *type;
 	struct fs_context *fc;
 	const char *subtype = NULL;
@@ -2906,6 +2907,13 @@ static int do_new_mount(struct path *path, const char *fstype, int sb_flags,
 	if (IS_ERR(fc))
 		return PTR_ERR(fc);
 
+	/* check if there is a same super_block mount on path*/
+	check_mntpoint = fc->ops->check_mntpoint;
+	if (check_mntpoint)
+		err = check_mntpoint(fc, path);
+	if (err < 0)
+		goto err_fc;
+
 	if (subtype)
 		err = vfs_parse_fs_string(fc, "subtype",
 					  subtype, strlen(subtype));
@@ -2920,6 +2928,7 @@ static int do_new_mount(struct path *path, const char *fstype, int sb_flags,
 	if (!err)
 		err = do_new_mount_fc(fc, path, mnt_flags);
 
+err_fc:
 	put_fs_context(fc);
 	return err;
 }
