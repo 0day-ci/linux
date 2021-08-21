@@ -4871,6 +4871,28 @@ union bpf_attr {
  * 	Return
  *		Value specified by user at BPF link creation/attachment time
  *		or 0, if it was not specified.
+ *
+ * u64 bpf_trace_vprintk(const char *fmt, u32 fmt_size, const void *data, u32 data_len)
+ *	Description
+ *		Behaves like **bpf_trace_printk**\ () helper, but takes an array of u64
+ *		to format. Supports up to 12 arguments to print in this way.
+ *		The *fmt* and *fmt_size* are for the format string itself. The *data* and
+ *		*data_len* are format string arguments.
+ *
+ *		Each format specifier in **fmt** corresponds to one u64 element
+ *		in the **data** array. For strings and pointers where pointees
+ *		are accessed, only the pointer values are stored in the *data*
+ *		array. The *data_len* is the size of *data* in bytes.
+ *		Formats **%s**, **%p{i,I}{4,6}** requires to read kernel memory.
+ *		Reading kernel memory may fail due to either invalid address or
+ *		valid address but requiring a major memory fault. If reading kernel memory
+ *		fails, the string for **%s** will be an empty string, and the ip
+ *		address for **%p{i,I}{4,6}** will be 0. Not returning error to
+ *		bpf program is consistent with what **bpf_trace_printk**\ () does for now.
+ *
+ *	Return
+ *		The number of bytes written to the buffer, or a negative error
+ *		in case of failure.
  */
 #define __BPF_FUNC_MAPPER(FN)		\
 	FN(unspec),			\
@@ -5048,6 +5070,7 @@ union bpf_attr {
 	FN(timer_cancel),		\
 	FN(get_func_ip),		\
 	FN(get_attach_cookie),		\
+	FN(trace_vprintk),		\
 	/* */
 
 /* integer value in 'imm' field of BPF_CALL instruction selects which helper
