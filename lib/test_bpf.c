@@ -8920,6 +8920,9 @@ done:
 static __init int test_skb_segment(void)
 {
 	int i, err_cnt = 0, pass_cnt = 0;
+	u64 start, finish;
+
+	start = ktime_get_ns();
 
 	for (i = 0; i < ARRAY_SIZE(skb_segment_tests); i++) {
 		const struct skb_segment_test *test = &skb_segment_tests[i];
@@ -8935,8 +8938,10 @@ static __init int test_skb_segment(void)
 		}
 	}
 
-	pr_info("%s: Summary: %d PASSED, %d FAILED\n", __func__,
-		pass_cnt, err_cnt);
+	finish = ktime_get_ns();
+
+	pr_info("%s: Summary: %d PASSED, %d FAILED in %llu nsec\n",
+		__func__, pass_cnt, err_cnt, finish - start);
 	return err_cnt ? -EINVAL : 0;
 }
 
@@ -8944,6 +8949,9 @@ static __init int test_bpf(void)
 {
 	int i, err_cnt = 0, pass_cnt = 0;
 	int jit_cnt = 0, run_cnt = 0;
+	u64 start, finish;
+
+	start = ktime_get_ns();
 
 	for (i = 0; i < ARRAY_SIZE(tests); i++) {
 		struct bpf_prog *fp;
@@ -8983,8 +8991,10 @@ static __init int test_bpf(void)
 		}
 	}
 
-	pr_info("Summary: %d PASSED, %d FAILED, [%d/%d JIT'ed]\n",
-		pass_cnt, err_cnt, jit_cnt, run_cnt);
+	finish = ktime_get_ns();
+
+	pr_info("Summary: %d PASSED, %d FAILED, [%d/%d JIT'ed] in %llu nsec\n",
+		pass_cnt, err_cnt, jit_cnt, run_cnt, finish - start);
 
 	return err_cnt ? -EINVAL : 0;
 }
@@ -9192,6 +9202,9 @@ static __init int test_tail_calls(struct bpf_array *progs)
 {
 	int i, err_cnt = 0, pass_cnt = 0;
 	int jit_cnt = 0, run_cnt = 0;
+	u64 start, finish;
+
+	start = ktime_get_ns();
 
 	for (i = 0; i < ARRAY_SIZE(tail_call_tests); i++) {
 		struct tail_call_test *test = &tail_call_tests[i];
@@ -9222,8 +9235,10 @@ static __init int test_tail_calls(struct bpf_array *progs)
 		}
 	}
 
-	pr_info("%s: Summary: %d PASSED, %d FAILED, [%d/%d JIT'ed]\n",
-		__func__, pass_cnt, err_cnt, jit_cnt, run_cnt);
+	finish = ktime_get_ns();
+
+	pr_info("%s: Summary: %d PASSED, %d FAILED, [%d/%d JIT'ed] in %llu nsec\n",
+		__func__, pass_cnt, err_cnt, jit_cnt, run_cnt, finish - start);
 
 	return err_cnt ? -EINVAL : 0;
 }
