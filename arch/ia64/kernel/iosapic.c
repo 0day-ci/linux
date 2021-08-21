@@ -794,17 +794,13 @@ iosapic_unregister_intr (unsigned int gsi)
 	 */
 	irq = gsi_to_irq(gsi);
 	if (irq < 0) {
-		printk(KERN_ERR "iosapic_unregister_intr(%u) unbalanced\n",
-		       gsi);
-		WARN_ON(1);
+		WARN_ON(1, "iosapic_unregister_intr(%u) unbalanced\n", gsi);
 		return;
 	}
 
 	spin_lock_irqsave(&iosapic_lock, flags);
 	if ((rte = find_rte(irq, gsi)) == NULL) {
-		printk(KERN_ERR "iosapic_unregister_intr(%u) unbalanced\n",
-		       gsi);
-		WARN_ON(1);
+		WARN_ON(1, "iosapic_unregister_intr(%u) unbalanced\n", gsi);
 		goto out;
 	}
 
