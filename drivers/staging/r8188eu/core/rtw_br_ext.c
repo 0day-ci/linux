@@ -641,7 +641,7 @@ struct dhcpMessage {
 	u_int8_t hops;
 	u_int32_t xid;
 	u_int16_t secs;
-	u_int16_t flags;
+	__be16 flags;
 	u_int32_t ciaddr;
 	u_int32_t yiaddr;
 	u_int32_t siaddr;
@@ -674,13 +674,13 @@ void dhcp_flag_bcast(struct adapter *priv, struct sk_buff *skb)
 					u32 cookie = be32_to_cpu(dhcph->cookie);
 
 					if (cookie == DHCP_MAGIC) { /*  match magic word */
-						if (!(dhcph->flags & htons(BROADCAST_FLAG))) {
+						if (!(dhcph->flags & cpu_to_be16(BROADCAST_FLAG))) {
 							/*  if not broadcast */
 							register int sum = 0;
 
 							DEBUG_INFO("DHCP: change flag of DHCP request to broadcast.\n");
 							/*  or BROADCAST flag */
-							dhcph->flags |= htons(BROADCAST_FLAG);
+							dhcph->flags |= cpu_to_be16(BROADCAST_FLAG);
 							/*  recalculate checksum */
 							sum = ~(udph->check) & 0xffff;
 							sum += be16_to_cpu(dhcph->flags);
