@@ -718,8 +718,7 @@ static ssize_t external_mode_show(struct device *dev,
 {
 	struct fsi_master_gpio *master = dev_get_drvdata(dev);
 
-	return snprintf(buf, PAGE_SIZE - 1, "%u\n",
-			master->external_mode ? 1 : 0);
+	return sysfs_emit(buf, "%u\n", master->external_mode ? 1 : 0);
 }
 
 static ssize_t external_mode_store(struct device *dev,
