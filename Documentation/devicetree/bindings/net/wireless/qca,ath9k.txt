@@ -34,6 +34,13 @@ Optional properties:
 			ath9k wireless chip (in this case the calibration /
 			EEPROM data will be loaded from userspace using the
 			kernel firmware loader).
+- nvmem-cells: A phandle pointing to a nvmem-cells node representing registers
+			that has information about the MAC-Address or
+			calibration data.
+			Please refer the for nvmem-cells bindings
+			Documentation/devicetree/bindings/nvmem/nvmem.yaml.
+- nvmem-cell-names: Should be "address" for the MAC address. "calibration"
+			for ART/caldata.
 
 The MAC address will be determined using the optional properties defined in
 net/ethernet.txt.
@@ -44,5 +51,8 @@ In this example, the node is defined as child node of the PCI controller:
 		compatible = "pci168c,002d";
 		reg = <0x7000 0 0 0 0x1000>;
 		qca,no-eeprom;
+
+		nvmem-cells = <&macaddr_art_c>, <&cal_art_1000>;
+		nvmem-cell-names = "mac-address", "calibration";
 	};
 };
