@@ -1747,14 +1747,17 @@ static int sja1105_fdb_del(struct dsa_switch *ds, int port,
 }
 
 static int sja1105_fdb_dump(struct dsa_switch *ds, int port,
-			    dsa_fdb_dump_cb_t *cb, void *data)
+			    dsa_fdb_dump_cb_t *port_cb,
+			    dsa_switch_fdb_dump_cb_t *switch_cb,
+			    void *data)
 {
 	struct sja1105_private *priv = ds->priv;
 	struct device *dev = ds->dev;
-	int i;
+	int i, p;
 
 	for (i = 0; i < SJA1105_MAX_L2_LOOKUP_COUNT; i++) {
 		struct sja1105_l2_lookup_entry l2_lookup = {0};
+		unsigned long destports;
 		u8 macaddr[ETH_ALEN];
 		int rc;
 
@@ -1768,13 +1771,12 @@ static int sja1105_fdb_dump(struct dsa_switch *ds, int port,
 			return rc;
 		}
 
-		/* FDB dump callback is per port. This means we have to
-		 * disregard a valid entry if it's not for this port, even if
-		 * only to revisit it later. This is inefficient because the
-		 * 1024-sized FDB table needs to be traversed 4 times through
-		 * SPI during a 'bridge fdb show' command.
+		destports = l2_lookup.destports;
+
+		/* If the FDB dump callback is per port, ignore the entries
+		 * belonging to a different one.
 		 */
-		if (!(l2_lookup.destports & BIT(port)))
+		if (port >= 0 && !(destports & BIT(port)))
 			continue;
 
 		/* We need to hide the FDB entry for unknown multicast */
@@ -1787,11 +1789,34 @@ static int sja1105_fdb_dump(struct dsa_switch *ds, int port,
 		/* We need to hide the dsa_8021q VLANs from the user. */
 		if (!priv->vlan_aware)
 			l2_lookup.vlanid = 0;
-		rc = cb(macaddr, l2_lookup.vlanid, l2_lookup.lockeds, data);
-		if (rc)
-			return rc;
+
+		if (port_cb) {
+			rc = port_cb(macaddr, l2_lookup.vlanid,
+				     l2_lookup.lockeds, data);
+			if (rc)
+				return rc;
+		} else {
+			for_each_set_bit(p, &destports, ds->num_ports) {
+				rc = switch_cb(ds, p, macaddr, l2_lookup.vlanid,
+					       l2_lookup.lockeds);
+				if (rc)
+					return rc;
+			}
+		}
 	}
 	return 0;
+}
+
+static int sja1105_port_fdb_dump(struct dsa_switch *ds, int port,
+				 dsa_fdb_dump_cb_t *cb, void *data)
+{
+	return sja1105_fdb_dump(ds, port, cb, NULL, data);
+}
+
+static int sja1105_switch_fdb_dump(struct dsa_switch *ds,
+				   dsa_switch_fdb_dump_cb_t *cb)
+{
+	return sja1105_fdb_dump(ds, -1, NULL, cb, NULL);
 }
 
 static void sja1105_fast_age(struct dsa_switch *ds, int port)
@@ -3114,7 +3139,8 @@ const struct dsa_switch_ops sja1105_switch_ops = {
 	.get_sset_count		= sja1105_get_sset_count,
 	.get_ts_info		= sja1105_get_ts_info,
 	.port_disable		= sja1105_port_disable,
-	.port_fdb_dump		= sja1105_fdb_dump,
+	.port_fdb_dump		= sja1105_port_fdb_dump,
+	.switch_fdb_dump	= sja1105_switch_fdb_dump,
 	.port_fdb_add		= sja1105_fdb_add,
 	.port_fdb_del		= sja1105_fdb_del,
 	.port_fast_age		= sja1105_fast_age,
