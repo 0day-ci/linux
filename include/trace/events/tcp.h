@@ -371,6 +371,57 @@ DEFINE_EVENT(tcp_event_skb, tcp_bad_csum,
 	TP_ARGS(skb)
 );
 
+/*
+ * tcp event whit argument sk, skb, reason
+ */
+TRACE_EVENT(tcp_drop_new,
+
+		TP_PROTO(struct sock *sk, struct sk_buff *skb, const char *reason),
+
+		TP_ARGS(sk, skb, reason),
+
+		TP_STRUCT__entry(
+			__field(const void *, skbaddr)
+			__field(const void *, skaddr)
+			__string(reason, reason)
+			__field(int, state)
+			__field(__u16, sport)
+			__field(__u16, dport)
+			__array(__u8, saddr, 4)
+			__array(__u8, daddr, 4)
+			__array(__u8, saddr_v6, 16)
+			__array(__u8, daddr_v6, 16)
+		),
+
+		TP_fast_assign(
+			struct inet_sock *inet = inet_sk(sk);
+			__be32 *p32;
+
+			__assign_str(reason, reason);
+
+			__entry->skbaddr = skb;
+			__entry->skaddr = sk;
+			__entry->state = sk->sk_state;
+
+			__entry->sport = ntohs(inet->inet_sport);
+			__entry->dport = ntohs(inet->inet_dport);
+
+			p32 = (__be32 *) __entry->saddr;
+			*p32 = inet->inet_saddr;
+
+			p32 = (__be32 *) __entry->daddr;
+			*p32 =  inet->inet_daddr;
+
+			TP_STORE_ADDRS(__entry, inet->inet_saddr, inet->inet_daddr,
+				sk->sk_v6_rcv_saddr, sk->sk_v6_daddr);
+		),
+
+		TP_printk("sport=%hu dport=%hu saddr=%pI4 daddr=%pI4 saddrv6=%pI6c daddrv6=%pI6c state=%s reason=%s",
+				__entry->sport, __entry->dport, __entry->saddr, __entry->daddr,
+				__entry->saddr_v6, __entry->daddr_v6,
+				show_tcp_state_name(__entry->state), __get_str(reason))
+);
+
 #endif /* _TRACE_TCP_H */
 
 /* This part must be outside protection */
