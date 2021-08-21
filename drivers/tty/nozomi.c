@@ -517,7 +517,7 @@ static void nozomi_setup_memory(struct nozomi *dc)
 
 	/* Ctrl dl configuration */
 	dc->port[PORT_CTRL].dl_addr[CH_A] =
-				(offset += dc->config_table.dl_app2_len);
+				(offset + dc->config_table.dl_app2_len);
 	dc->port[PORT_CTRL].dl_size[CH_A] =
 				dc->config_table.dl_ctrl_len - buff_offset;
 
