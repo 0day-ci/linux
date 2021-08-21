@@ -4184,6 +4184,7 @@ static int nlmsg_populate_fdb(struct sk_buff *skb,
 			      int *idx,
 			      struct netdev_hw_addr_list *list)
 {
+	struct rtnl_fdb_dump_ctx *ctx = (struct rtnl_fdb_dump_ctx *)cb->ctx;
 	struct netdev_hw_addr *ha;
 	int err;
 	u32 portid, seq;
@@ -4192,7 +4193,7 @@ static int nlmsg_populate_fdb(struct sk_buff *skb,
 	seq = cb->nlh->nlmsg_seq;
 
 	list_for_each_entry(ha, &list->list, list) {
-		if (*idx < cb->args[2])
+		if (*idx < ctx->fidx)
 			goto skip;
 
 		err = nlmsg_populate_fdb_fill(skb, dev, ha->addr, 0,
@@ -4331,6 +4332,7 @@ static int valid_fdb_dump_legacy(const struct nlmsghdr *nlh,
 
 static int rtnl_fdb_dump(struct sk_buff *skb, struct netlink_callback *cb)
 {
+	struct rtnl_fdb_dump_ctx *ctx = (struct rtnl_fdb_dump_ctx *)cb->ctx;
 	struct net_device *dev;
 	struct net_device *br_dev = NULL;
 	const struct net_device_ops *ops = NULL;
@@ -4361,8 +4363,8 @@ static int rtnl_fdb_dump(struct sk_buff *skb, struct netlink_callback *cb)
 		ops = br_dev->netdev_ops;
 	}
 
-	s_h = cb->args[0];
-	s_idx = cb->args[1];
+	s_h = ctx->pos_hash;
+	s_idx = ctx->pos_idx;
 
 	for (h = s_h; h < NETDEV_HASHENTRIES; h++, s_idx = 0) {
 		idx = 0;
@@ -4414,7 +4416,7 @@ static int rtnl_fdb_dump(struct sk_buff *skb, struct netlink_callback *cb)
 			cops = NULL;
 
 			/* reset fdb offset to 0 for rest of the interfaces */
-			cb->args[2] = 0;
+			ctx->fidx = 0;
 			fidx = 0;
 cont:
 			idx++;
@@ -4422,9 +4424,9 @@ cont:
 	}
 
 out:
-	cb->args[0] = h;
-	cb->args[1] = idx;
-	cb->args[2] = fidx;
+	ctx->pos_hash = h;
+	ctx->pos_idx = idx;
+	ctx->fidx = fidx;
 
 	return skb->len;
 }

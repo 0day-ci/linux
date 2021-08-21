@@ -990,10 +990,13 @@ int ocelot_port_fdb_do_dump(const unsigned char *addr, u16 vid,
 	struct ocelot_dump_ctx *dump = data;
 	u32 portid = NETLINK_CB(dump->cb->skb).portid;
 	u32 seq = dump->cb->nlh->nlmsg_seq;
+	struct rtnl_fdb_dump_ctx *ctx;
 	struct nlmsghdr *nlh;
 	struct ndmsg *ndm;
 
-	if (dump->idx < dump->cb->args[2])
+	ctx = (struct rtnl_fdb_dump_ctx *)dump->cb->ctx;
+
+	if (dump->idx < ctx->fidx)
 		goto skip;
 
 	nlh = nlmsg_put(dump->skb, portid, seq, RTM_NEWNEIGH,

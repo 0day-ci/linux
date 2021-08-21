@@ -821,6 +821,7 @@ int br_fdb_dump(struct sk_buff *skb,
 		struct net_device *filter_dev,
 		int *idx)
 {
+	struct rtnl_fdb_dump_ctx *ctx = (struct rtnl_fdb_dump_ctx *)cb->ctx;
 	struct net_bridge *br = netdev_priv(dev);
 	struct net_bridge_fdb_entry *f;
 	int err = 0;
@@ -836,7 +837,7 @@ int br_fdb_dump(struct sk_buff *skb,
 
 	rcu_read_lock();
 	hlist_for_each_entry_rcu(f, &br->fdb_list, fdb_node) {
-		if (*idx < cb->args[2])
+		if (*idx < ctx->fidx)
 			goto skip;
 		if (filter_dev && (!f->dst || f->dst->dev != filter_dev)) {
 			if (filter_dev != dev)

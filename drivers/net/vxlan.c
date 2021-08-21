@@ -1371,6 +1371,7 @@ static int vxlan_fdb_dump(struct sk_buff *skb, struct netlink_callback *cb,
 			  struct net_device *dev,
 			  struct net_device *filter_dev, int *idx)
 {
+	struct rtnl_fdb_dump_ctx *ctx = (struct rtnl_fdb_dump_ctx *)cb->ctx;
 	struct vxlan_dev *vxlan = netdev_priv(dev);
 	unsigned int h;
 	int err = 0;
@@ -1383,7 +1384,7 @@ static int vxlan_fdb_dump(struct sk_buff *skb, struct netlink_callback *cb,
 			struct vxlan_rdst *rd;
 
 			if (rcu_access_pointer(f->nh)) {
-				if (*idx < cb->args[2])
+				if (*idx < ctx->fidx)
 					goto skip_nh;
 				err = vxlan_fdb_info(skb, vxlan, f,
 						     NETLINK_CB(cb->skb).portid,
@@ -1400,7 +1401,7 @@ skip_nh:
 			}
 
 			list_for_each_entry_rcu(rd, &f->remotes, list) {
-				if (*idx < cb->args[2])
+				if (*idx < ctx->fidx)
 					goto skip;
 
 				err = vxlan_fdb_info(skb, vxlan, f,

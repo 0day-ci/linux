@@ -110,6 +110,24 @@ void rtnl_kfree_skbs(struct sk_buff *head, struct sk_buff *tail);
 	WARN_ONCE(!rtnl_is_locked(), \
 		  "RTNL: assertion failed at %s (%d)\n", __FILE__,  __LINE__)
 
+struct rtnl_fdb_dump_ctx {
+	/* Last bucket in the dev_index_head hash list that was checked.
+	 * Used by rtnl_fdb_dump to resume in case the procedure is
+	 * interrupted.
+	 */
+	int pos_hash;
+	/* Last interface within bucket @pos_hash that was checked.
+	 * Used by rtnl_fdb_dump to resume in case the procedure is
+	 * interrupted.
+	 */
+	int pos_idx;
+	/* Last FDB entry number that was dumped for the current interface.
+	 * Updated by implementers of .ndo_fdb_dump and used to resume in case
+	 * the dump procedure is interrupted.
+	 */
+	int fidx;
+};
+
 extern int ndo_dflt_fdb_dump(struct sk_buff *skb,
 			     struct netlink_callback *cb,
 			     struct net_device *dev,
