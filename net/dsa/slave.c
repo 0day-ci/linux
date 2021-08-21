@@ -238,6 +238,7 @@ dsa_slave_fdb_dump(struct sk_buff *skb, struct netlink_callback *cb,
 		   struct net_device *dev, struct net_device *filter_dev,
 		   int *idx)
 {
+	struct rtnl_fdb_dump_ctx *ctx = (struct rtnl_fdb_dump_ctx *)cb->ctx;
 	struct dsa_port *dp = dsa_slave_to_port(dev);
 	struct dsa_slave_dump_ctx dump = {
 		.dev = dev,
@@ -246,6 +247,9 @@ dsa_slave_fdb_dump(struct sk_buff *skb, struct netlink_callback *cb,
 		.idx = *idx,
 	};
 	int err;
+
+	if (ctx->state != RTNL_FDB_DUMP_COMMIT)
+		return 0;
 
 	err = dsa_port_fdb_dump(dp, dsa_slave_port_fdb_do_dump, &dump);
 	*idx = dump.idx;

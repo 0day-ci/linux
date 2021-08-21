@@ -110,6 +110,12 @@ void rtnl_kfree_skbs(struct sk_buff *head, struct sk_buff *tail);
 	WARN_ONCE(!rtnl_is_locked(), \
 		  "RTNL: assertion failed at %s (%d)\n", __FILE__,  __LINE__)
 
+enum rtnl_fdb_dump_state {
+	RTNL_FDB_DUMP_PREPARE,
+	RTNL_FDB_DUMP_COMMIT,
+	RTNL_FDB_DUMP_FINISH,
+};
+
 struct rtnl_fdb_dump_ctx {
 	/* Last bucket in the dev_index_head hash list that was checked.
 	 * Used by rtnl_fdb_dump to resume in case the procedure is
@@ -126,6 +132,7 @@ struct rtnl_fdb_dump_ctx {
 	 * the dump procedure is interrupted.
 	 */
 	int fidx;
+	enum rtnl_fdb_dump_state state;
 };
 
 extern int ndo_dflt_fdb_dump(struct sk_buff *skb,

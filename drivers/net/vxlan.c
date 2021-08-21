@@ -1376,6 +1376,9 @@ static int vxlan_fdb_dump(struct sk_buff *skb, struct netlink_callback *cb,
 	unsigned int h;
 	int err = 0;
 
+	if (ctx->state != RTNL_FDB_DUMP_COMMIT)
+		return 0;
+
 	for (h = 0; h < FDB_HASH_SIZE; ++h) {
 		struct vxlan_fdb *f;
 

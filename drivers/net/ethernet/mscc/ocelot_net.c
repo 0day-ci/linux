@@ -677,6 +677,7 @@ static int ocelot_port_fdb_dump(struct sk_buff *skb,
 				struct net_device *dev,
 				struct net_device *filter_dev, int *idx)
 {
+	struct rtnl_fdb_dump_ctx *ctx = (struct rtnl_fdb_dump_ctx *)cb->ctx;
 	struct ocelot_port_private *priv = netdev_priv(dev);
 	struct ocelot *ocelot = priv->port.ocelot;
 	struct ocelot_dump_ctx dump = {
@@ -687,6 +688,9 @@ static int ocelot_port_fdb_dump(struct sk_buff *skb,
 	};
 	int port = priv->chip_port;
 	int ret;
+
+	if (ctx->state != RTNL_FDB_DUMP_COMMIT)
+		return 0;
 
 	ret = ocelot_fdb_dump(ocelot, port, ocelot_port_fdb_do_dump, &dump);
 

@@ -895,6 +895,7 @@ static int dpaa2_switch_port_fdb_dump(struct sk_buff *skb, struct netlink_callba
 				      struct net_device *net_dev,
 				      struct net_device *filter_dev, int *idx)
 {
+	struct rtnl_fdb_dump_ctx *ctx = (struct rtnl_fdb_dump_ctx *)cb->ctx;
 	struct ethsw_port_priv *port_priv = netdev_priv(net_dev);
 	struct ethsw_dump_ctx dump = {
 		.dev = net_dev,
@@ -903,6 +904,9 @@ static int dpaa2_switch_port_fdb_dump(struct sk_buff *skb, struct netlink_callba
 		.idx = *idx,
 	};
 	int err;
+
+	if (ctx->state != RTNL_FDB_DUMP_COMMIT)
+		return 0;
 
 	err = dpaa2_switch_fdb_iterate(port_priv, dpaa2_switch_fdb_entry_dump, &dump);
 	*idx = dump.idx;

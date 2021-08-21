@@ -4225,7 +4225,11 @@ int ndo_dflt_fdb_dump(struct sk_buff *skb,
 		      struct net_device *filter_dev,
 		      int *idx)
 {
+	struct rtnl_fdb_dump_ctx *ctx = (struct rtnl_fdb_dump_ctx *)cb->ctx;
 	int err;
+
+	if (ctx->state != RTNL_FDB_DUMP_COMMIT)
+		return 0;
 
 	if (dev->type != ARPHRD_ETHER)
 		return -EINVAL;
@@ -4330,30 +4334,40 @@ static int valid_fdb_dump_legacy(const struct nlmsghdr *nlh,
 	return 0;
 }
 
-static int rtnl_fdb_dump(struct sk_buff *skb, struct netlink_callback *cb)
+static void rtnl_fdb_dump_prepare_finish(struct sk_buff *skb,
+					 struct netlink_callback *cb)
 {
-	struct rtnl_fdb_dump_ctx *ctx = (struct rtnl_fdb_dump_ctx *)cb->ctx;
-	struct net_device *dev;
-	struct net_device *br_dev = NULL;
-	const struct net_device_ops *ops = NULL;
-	const struct net_device_ops *cops = NULL;
 	struct net *net = sock_net(skb->sk);
 	struct hlist_head *head;
-	int brport_idx = 0;
-	int br_idx = 0;
-	int h, s_h;
-	int idx = 0, s_idx;
-	int err = 0;
-	int fidx = 0;
+	struct net_device *dev;
+	int h, fidx = 0;
 
-	if (cb->strict_check)
-		err = valid_fdb_dump_strict(cb->nlh, &br_idx, &brport_idx,
-					    cb->extack);
-	else
-		err = valid_fdb_dump_legacy(cb->nlh, &br_idx, &brport_idx,
-					    cb->extack);
-	if (err < 0)
-		return err;
+	for (h = 0; h < NETDEV_HASHENTRIES; h++) {
+		head = &net->dev_index_head[h];
+		hlist_for_each_entry(dev, head, index_hlist) {
+			if (!dev->netdev_ops->ndo_fdb_dump)
+				continue;
+
+			dev->netdev_ops->ndo_fdb_dump(skb, cb, dev,
+						      NULL, &fidx);
+		}
+	}
+}
+
+static int rtnl_fdb_dump_commit(struct sk_buff *skb, struct netlink_callback *cb,
+				int br_idx, int brport_idx)
+{
+	struct rtnl_fdb_dump_ctx *ctx = (struct rtnl_fdb_dump_ctx *)cb->ctx;
+	const struct net_device_ops *cops = NULL;
+	const struct net_device_ops *ops = NULL;
+	struct net *net = sock_net(skb->sk);
+	struct net_device *br_dev = NULL;
+	struct hlist_head *head;
+	struct net_device *dev;
+	int idx = 0, s_idx;
+	int fidx = 0;
+	int err = 0;
+	int h, s_h;
 
 	if (br_idx) {
 		br_dev = __dev_get_by_index(net, br_idx);
@@ -4429,6 +4443,49 @@ out:
 	ctx->fidx = fidx;
 
 	return skb->len;
+}
+
+static int rtnl_fdb_dump(struct sk_buff *skb, struct netlink_callback *cb)
+{
+	struct rtnl_fdb_dump_ctx *ctx = (struct rtnl_fdb_dump_ctx *)cb->ctx;
+	int brport_idx = 0;
+	int br_idx = 0;
+	int err;
+
+	if (cb->strict_check)
+		err = valid_fdb_dump_strict(cb->nlh, &br_idx, &brport_idx,
+					    cb->extack);
+	else
+		err = valid_fdb_dump_legacy(cb->nlh, &br_idx, &brport_idx,
+					    cb->extack);
+	if (err < 0)
+		return err;
+
+	/* user did not specify a bridge or a bridge port */
+	if (!brport_idx && !br_idx) {
+		switch (ctx->state) {
+		case RTNL_FDB_DUMP_PREPARE:
+			rtnl_fdb_dump_prepare_finish(skb, cb);
+			ctx->state = RTNL_FDB_DUMP_COMMIT;
+			fallthrough;
+		case RTNL_FDB_DUMP_COMMIT:
+			err = rtnl_fdb_dump_commit(skb, cb, br_idx, brport_idx);
+			if (err)
+				return err;
+			ctx->state = RTNL_FDB_DUMP_FINISH;
+			fallthrough;
+		case RTNL_FDB_DUMP_FINISH:
+			rtnl_fdb_dump_prepare_finish(skb, cb);
+			break;
+		}
+	} else {
+		ctx->state = RTNL_FDB_DUMP_COMMIT;
+		err = rtnl_fdb_dump_commit(skb, cb, br_idx, brport_idx);
+		if (err)
+			return err;
+	}
+
+	return err;
 }
 
 static int valid_fdb_get_strict(const struct nlmsghdr *nlh,

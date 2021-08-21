@@ -826,6 +826,9 @@ int br_fdb_dump(struct sk_buff *skb,
 	struct net_bridge_fdb_entry *f;
 	int err = 0;
 
+	if (ctx->state != RTNL_FDB_DUMP_COMMIT)
+		return 0;
+
 	if (!(dev->priv_flags & IFF_EBRIDGE))
 		return err;
 
