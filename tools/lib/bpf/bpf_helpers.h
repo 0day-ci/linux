@@ -224,4 +224,22 @@ enum libbpf_tristate {
 		     ___param, sizeof(___param));		\
 })
 
+/*
+ * bpf_vprintk wraps the bpf_trace_printk helper with variadic arguments
+ * instead of an array of u64.
+ */
+#define bpf_vprintk(fmt, args...)				\
+({								\
+	static const char ___fmt[] = fmt;			\
+	unsigned long long ___param[___bpf_narg(args)];		\
+								\
+	_Pragma("GCC diagnostic push")				\
+	_Pragma("GCC diagnostic ignored \"-Wint-conversion\"")	\
+	___bpf_fill(___param, args);				\
+	_Pragma("GCC diagnostic pop")				\
+								\
+	bpf_trace_vprintk(___fmt, sizeof(___fmt),		\
+		     ___param, sizeof(___param));		\
+})
+
 #endif
