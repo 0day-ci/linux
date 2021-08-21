@@ -312,8 +312,17 @@ struct dsa_mac_addr {
 	struct list_head list;
 };
 
+struct dsa_fdb_entry {
+	unsigned char addr[ETH_ALEN];
+	u16 vid;
+	bool is_static;
+	struct net_device *dev;
+	struct list_head list;
+};
+
 struct dsa_switch {
 	bool setup;
+	bool shared_fdb_dump_in_progress;
 
 	struct device *dev;
 
@@ -354,6 +363,9 @@ struct dsa_switch {
 
 	/* Storage for drivers using tag_8021q */
 	struct dsa_8021q_context *tag_8021q_ctx;
+
+	/* Storage for shared FDB dumps */
+	struct list_head	fdb_list;
 
 	/* devlink used to represent this switch device */
 	struct devlink		*devlink;
@@ -565,6 +577,9 @@ struct net_device *dsa_port_to_bridge_port(const struct dsa_port *dp)
 
 typedef int dsa_fdb_dump_cb_t(const unsigned char *addr, u16 vid,
 			      bool is_static, void *data);
+typedef int dsa_switch_fdb_dump_cb_t(struct dsa_switch *ds, int port,
+				     const unsigned char *addr, u16 vid,
+				     bool is_static);
 struct dsa_switch_ops {
 	/*
 	 * Tagging protocol helpers called for the CPU ports and DSA links.
@@ -737,6 +752,8 @@ struct dsa_switch_ops {
 				const unsigned char *addr, u16 vid);
 	int	(*port_fdb_dump)(struct dsa_switch *ds, int port,
 				 dsa_fdb_dump_cb_t *cb, void *data);
+	int	(*switch_fdb_dump)(struct dsa_switch *ds,
+				   dsa_switch_fdb_dump_cb_t *cb);
 
 	/*
 	 * Multicast database

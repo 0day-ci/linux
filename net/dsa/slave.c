@@ -186,23 +186,18 @@ struct dsa_slave_dump_ctx {
 	int idx;
 };
 
-static int
-dsa_slave_port_fdb_do_dump(const unsigned char *addr, u16 vid,
-			   bool is_static, void *data)
+static int dsa_nlmsg_populate_fdb(struct sk_buff *skb,
+				  struct netlink_callback *cb,
+				  struct net_device *dev,
+				  const unsigned char *addr, u16 vid,
+				  bool is_static)
 {
-	struct dsa_slave_dump_ctx *dump = data;
-	u32 portid = NETLINK_CB(dump->cb->skb).portid;
-	u32 seq = dump->cb->nlh->nlmsg_seq;
-	struct rtnl_fdb_dump_ctx *ctx;
+	u32 portid = NETLINK_CB(cb->skb).portid;
+	u32 seq = cb->nlh->nlmsg_seq;
 	struct nlmsghdr *nlh;
 	struct ndmsg *ndm;
 
-	ctx = (struct rtnl_fdb_dump_ctx *)dump->cb->ctx;
-
-	if (dump->idx < ctx->fidx)
-		goto skip;
-
-	nlh = nlmsg_put(dump->skb, portid, seq, RTM_NEWNEIGH,
+	nlh = nlmsg_put(skb, portid, seq, RTM_NEWNEIGH,
 			sizeof(*ndm), NLM_F_MULTI);
 	if (!nlh)
 		return -EMSGSIZE;
@@ -213,32 +208,152 @@ dsa_slave_port_fdb_do_dump(const unsigned char *addr, u16 vid,
 	ndm->ndm_pad2    = 0;
 	ndm->ndm_flags   = NTF_SELF;
 	ndm->ndm_type    = 0;
-	ndm->ndm_ifindex = dump->dev->ifindex;
+	ndm->ndm_ifindex = dev->ifindex;
 	ndm->ndm_state   = is_static ? NUD_NOARP : NUD_REACHABLE;
 
-	if (nla_put(dump->skb, NDA_LLADDR, ETH_ALEN, addr))
+	if (nla_put(skb, NDA_LLADDR, ETH_ALEN, addr))
 		goto nla_put_failure;
 
-	if (vid && nla_put_u16(dump->skb, NDA_VLAN, vid))
+	if (vid && nla_put_u16(skb, NDA_VLAN, vid))
 		goto nla_put_failure;
 
-	nlmsg_end(dump->skb, nlh);
+	nlmsg_end(skb, nlh);
+
+	return 0;
+
+nla_put_failure:
+	nlmsg_cancel(skb, nlh);
+	return -EMSGSIZE;
+}
+
+static int dsa_switch_shared_fdb_save_one(struct dsa_switch *ds, int port,
+					  const unsigned char *addr, u16 vid,
+					  bool is_static)
+{
+	struct dsa_port *dp = dsa_to_port(ds, port);
+	struct dsa_fdb_entry *fdb;
+
+	if (!dsa_port_is_user(dp))
+		return 0;
+
+	/* Will be freed during the finish phase */
+	fdb = kzalloc(sizeof(*fdb), GFP_KERNEL);
+	if (!fdb)
+		return -ENOMEM;
+
+	ether_addr_copy(fdb->addr, addr);
+	fdb->vid = vid;
+	fdb->is_static = is_static;
+	fdb->dev = dp->slave;
+	list_add_tail(&fdb->list, &ds->fdb_list);
+
+	return 0;
+}
+
+/* If the switch does not support shared FDB dump, do nothing and do the work
+ * in the commit phase.
+ */
+static int dsa_shared_fdb_dump_prepare(struct net_device *dev)
+{
+	struct dsa_port *dp = dsa_slave_to_port(dev);
+	struct dsa_switch *ds = dp->ds;
+	int err;
+
+	if (!ds->ops->switch_fdb_dump)
+		return 0;
+
+	if (ds->shared_fdb_dump_in_progress)
+		return 0;
+
+	/* If this switch's FDB has not been dumped before during this
+	 * prepare/commit/finish cycle, dump it now and save the results.
+	 */
+	err = dsa_switch_fdb_dump(ds, dsa_switch_shared_fdb_save_one);
+	if (err)
+		return err;
+
+	ds->shared_fdb_dump_in_progress = true;
+
+	return 0;
+}
+
+static int
+dsa_shared_fdb_dump_commit(struct sk_buff *skb, struct netlink_callback *cb,
+			   struct net_device *dev, int *idx)
+{
+	struct rtnl_fdb_dump_ctx *ctx = (struct rtnl_fdb_dump_ctx *)cb->ctx;
+	struct dsa_port *dp = dsa_slave_to_port(dev);
+	struct dsa_switch *ds = dp->ds;
+	struct dsa_fdb_entry *fdb;
+	int err;
+
+	/* Dump the FDB entries corresponding to the requested port from the
+	 * saved results.
+	 */
+	list_for_each_entry(fdb, &ds->fdb_list, list) {
+		if (fdb->dev != dev)
+			continue;
+
+		if (*idx < ctx->fidx)
+			goto skip;
+
+		err = dsa_nlmsg_populate_fdb(skb, cb, dev, fdb->addr, fdb->vid,
+					     fdb->is_static);
+		if (err)
+			return err;
+
+skip:
+		*idx += 1;
+	}
+
+	return 0;
+}
+
+/* Tear down the context stored during the shared FDB dump */
+static void dsa_shared_fdb_dump_finish(struct net_device *dev)
+{
+	struct dsa_port *dp = dsa_slave_to_port(dev);
+	struct dsa_fdb_entry *fdb, *tmp;
+	struct dsa_switch *ds = dp->ds;
+
+	if (!ds->shared_fdb_dump_in_progress)
+		return;
+
+	list_for_each_entry_safe(fdb, tmp, &ds->fdb_list, list) {
+		list_del(&fdb->list);
+		kfree(fdb);
+	}
+
+	ds->shared_fdb_dump_in_progress = false;
+}
+
+static int
+dsa_slave_port_fdb_do_dump(const unsigned char *addr, u16 vid,
+			   bool is_static, void *data)
+{
+	struct dsa_slave_dump_ctx *dump = data;
+	struct rtnl_fdb_dump_ctx *ctx;
+	int err;
+
+	ctx = (struct rtnl_fdb_dump_ctx *)dump->cb->ctx;
+
+	if (dump->idx < ctx->fidx)
+		goto skip;
+
+	err = dsa_nlmsg_populate_fdb(dump->skb, dump->cb, dump->dev, addr, vid,
+				     is_static);
+	if (err)
+		return err;
 
 skip:
 	dump->idx++;
 	return 0;
-
-nla_put_failure:
-	nlmsg_cancel(dump->skb, nlh);
-	return -EMSGSIZE;
 }
 
 static int
-dsa_slave_fdb_dump(struct sk_buff *skb, struct netlink_callback *cb,
-		   struct net_device *dev, struct net_device *filter_dev,
-		   int *idx)
+dsa_slave_fdb_dump_single(struct sk_buff *skb, struct netlink_callback *cb,
+			  struct net_device *dev, int *idx)
 {
-	struct rtnl_fdb_dump_ctx *ctx = (struct rtnl_fdb_dump_ctx *)cb->ctx;
 	struct dsa_port *dp = dsa_slave_to_port(dev);
 	struct dsa_slave_dump_ctx dump = {
 		.dev = dev,
@@ -248,11 +363,36 @@ dsa_slave_fdb_dump(struct sk_buff *skb, struct netlink_callback *cb,
 	};
 	int err;
 
-	if (ctx->state != RTNL_FDB_DUMP_COMMIT)
-		return 0;
-
 	err = dsa_port_fdb_dump(dp, dsa_slave_port_fdb_do_dump, &dump);
 	*idx = dump.idx;
+
+	return err;
+}
+
+static int
+dsa_slave_fdb_dump(struct sk_buff *skb, struct netlink_callback *cb,
+		   struct net_device *dev, struct net_device *filter_dev,
+		   int *idx)
+{
+	struct rtnl_fdb_dump_ctx *ctx = (struct rtnl_fdb_dump_ctx *)cb->ctx;
+	struct dsa_port *dp = dsa_slave_to_port(dev);
+	struct dsa_switch *ds = dp->ds;
+	int err = 0;
+
+	switch (ctx->state) {
+	case RTNL_FDB_DUMP_PREPARE:
+		err = dsa_shared_fdb_dump_prepare(dev);
+		break;
+	case RTNL_FDB_DUMP_COMMIT:
+		if (ds->shared_fdb_dump_in_progress)
+			err = dsa_shared_fdb_dump_commit(skb, cb, dev, idx);
+		else
+			err = dsa_slave_fdb_dump_single(skb, cb, dev, idx);
+		break;
+	case RTNL_FDB_DUMP_FINISH:
+		dsa_shared_fdb_dump_finish(dev);
+		break;
+	}
 
 	return err;
 }

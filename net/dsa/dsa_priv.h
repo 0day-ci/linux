@@ -533,6 +533,7 @@ static inline void *dsa_etype_header_pos_tx(struct sk_buff *skb)
 /* switch.c */
 int dsa_switch_register_notifier(struct dsa_switch *ds);
 void dsa_switch_unregister_notifier(struct dsa_switch *ds);
+int dsa_switch_fdb_dump(struct dsa_switch *ds, dsa_switch_fdb_dump_cb_t *cb);
 
 /* dsa2.c */
 void dsa_lag_map(struct dsa_switch_tree *dst, struct net_device *lag);

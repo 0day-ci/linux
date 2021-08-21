@@ -655,6 +655,14 @@ dsa_switch_mrp_del_ring_role(struct dsa_switch *ds,
 	return 0;
 }
 
+int dsa_switch_fdb_dump(struct dsa_switch *ds, dsa_switch_fdb_dump_cb_t *cb)
+{
+	if (!ds->ops->switch_fdb_dump)
+		return -EOPNOTSUPP;
+
+	return ds->ops->switch_fdb_dump(ds, cb);
+}
+
 static int dsa_switch_event(struct notifier_block *nb,
 			    unsigned long event, void *info)
 {

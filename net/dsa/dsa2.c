@@ -801,6 +801,8 @@ static int dsa_switch_setup(struct dsa_switch *ds)
 			goto teardown;
 	}
 
+	INIT_LIST_HEAD(&ds->fdb_list);
+
 	ds->setup = true;
 
 	return 0;
