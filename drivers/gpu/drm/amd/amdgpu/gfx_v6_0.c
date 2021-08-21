@@ -2605,7 +2605,7 @@ static void gfx_v6_0_enable_mgcg(struct amdgpu_device *adev, bool enable)
 	u32 data, orig, tmp = 0;
 
 	if (enable && (adev->cg_flags & AMD_CG_SUPPORT_GFX_MGCG)) {
-		orig = data = RREG32(mmCGTS_SM_CTRL_REG);
+		orig = RREG32(mmCGTS_SM_CTRL_REG);
 		data = 0x96940200;
 		if (orig != data)
 			WREG32(mmCGTS_SM_CTRL_REG, data);
@@ -2617,7 +2617,7 @@ static void gfx_v6_0_enable_mgcg(struct amdgpu_device *adev, bool enable)
 				WREG32(mmCP_MEM_SLP_CNTL, data);
 		}
 
-		orig = data = RREG32(mmRLC_CGTT_MGCG_OVERRIDE);
+		orig = RREG32(mmRLC_CGTT_MGCG_OVERRIDE);
 		data &= 0xffffffc0;
 		if (orig != data)
 			WREG32(mmRLC_CGTT_MGCG_OVERRIDE, data);
