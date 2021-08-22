@@ -234,12 +234,17 @@ Raw buffer as a hex string
 ::
 
 	%*ph	00 01 02  ...  3f
+	%*phX	00 01 02  ...  3F
 	%*phC	00:01:02: ... :3f
+	%*phCX	00:01:02: ... :3F
 	%*phD	00-01-02- ... -3f
+	%*phDX	00-01-02- ... -3F
 	%*phN	000102 ... 3f
+	%*phNX	000102 ... 3F
 
 For printing small buffers (up to 64 bytes long) as a hex string with a
-certain separator. For larger buffers consider using
+certain separator. Typical output is lowercase, formats with X are uppercase.
+For larger buffers consider using
 :c:func:`print_hex_dump`.
 
 MAC/FDDI addresses
