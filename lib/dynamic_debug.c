@@ -511,10 +511,11 @@ static int ddebug_exec_query(char *query_string, const char *modname)
 	return nfound;
 }
 
-/* handle multiple queries in query string, continue on error, return
-   last error or number of matching callsites.  Module name is either
-   in param (for boot arg) or perhaps in query string.
-*/
+/*
+ * handle multiple queries in query string, continue on error, return
+ * last error or number of matching callsites.  Module name is either
+ * in param (for boot arg) or perhaps in query string.
+ */
 static int ddebug_exec_queries(char *query, const char *modname)
 {
 	char *split;
@@ -529,7 +530,7 @@ static int ddebug_exec_queries(char *query, const char *modname)
 		if (!query || !*query || *query == '#')
 			continue;
 
-		vpr_info("query %d: \"%s\"\n", i, query);
+		vpr_info("query %d: \"%s\" %s\n", i, query, (modname) ? modname : "");
 
 		rc = ddebug_exec_query(query, modname);
 		if (rc < 0) {
@@ -576,6 +577,71 @@ int dynamic_debug_exec_queries(const char *query, const char *modname)
 	return rc;
 }
 EXPORT_SYMBOL_GPL(dynamic_debug_exec_queries);
+
+#ifdef MODULES
+#define KP_MOD_NAME kp->mod->name
+#else
+#define KP_MOD_NAME NULL /* wildcard */
+#endif
+#define FMT_QUERY_SIZE 128 /* typically need <40 */
+/**
+ * param_set_dyndbg() - drm.debug style bits=>categories setter
+ * @instr: string echo>d to sysfs
+ * @kp:    struct kernel_param* ->data has bitmap
+ * Exported to support DEFINE_DYNAMIC_DEBUG_CATEGORIES
+ */
+int param_set_dyndbg(const char *instr, const struct kernel_param *kp)
+{
+	unsigned long inbits;
+	int rc, i, matches = 0, totct = 0;
+	char query[FMT_QUERY_SIZE];
+	const struct dyndbg_bitdesc *bitmap = kp->data;
+
+	if (!bitmap) {
+		pr_err("set_dyndbg: no bits=>queries map\n");
+		return -EINVAL;
+	}
+	rc = kstrtoul(instr, 0, &inbits);
+	if (rc) {
+		pr_err("set_dyndbg: failed\n");
+		return rc;
+	}
+	vpr_info("set_dyndbg: input 0x%lx\n", inbits);
+
+	for (i = 0; bitmap->prefix; i++, bitmap++) {
+		snprintf(query, FMT_QUERY_SIZE, "format '^%s' %cp", bitmap->prefix,
+			 test_bit(i, &inbits) ? '+' : '-');
+
+		matches = ddebug_exec_queries(query, KP_MOD_NAME);
+
+		v2pr_info("bit-%d: %d matches on '%s'\n", i, matches, query);
+		totct += matches;
+	}
+	vpr_info("total matches: %d\n", totct);
+	return 0;
+}
+EXPORT_SYMBOL(param_set_dyndbg);
+
+/**
+ * param_get_dyndbg() - drm.debug style bitmap to format-prefix categories
+ * @buffer: string returned to user via sysfs
+ * @kp:     struct kernel_param*
+ * Exported to provide required .get interface, not useful.
+ * pr_debugs may be altered after .set via `echo $foo >control`
+ */
+int param_get_dyndbg(char *buffer, const struct kernel_param *kp)
+{
+	return scnprintf(buffer, PAGE_SIZE, "%u\n",
+			 *((unsigned int *)kp->arg));
+}
+EXPORT_SYMBOL(param_get_dyndbg);
+
+const struct kernel_param_ops param_ops_dyndbg = {
+	.set = param_set_dyndbg,
+	.get = param_get_dyndbg,
+};
+/* support DEFINE_DYNAMIC_DEBUG_CATEGORIES users */
+EXPORT_SYMBOL(param_ops_dyndbg);
 
 #define PREFIX_SIZE 64
 
