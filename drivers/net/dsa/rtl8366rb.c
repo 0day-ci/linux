@@ -982,6 +982,13 @@ static int rtl8366rb_setup(struct dsa_switch *ds)
 	return 0;
 }
 
+static void rtl8366rb_teardown(struct dsa_switch *ds)
+{
+	struct realtek_smi *smi = ds->priv;
+
+	realtek_smi_teardown_mdio(smi);
+}
+
 static enum dsa_tag_protocol rtl8366_get_tag_protocol(struct dsa_switch *ds,
 						      int port,
 						      enum dsa_tag_protocol mp)
@@ -1505,6 +1512,7 @@ static int rtl8366rb_detect(struct realtek_smi *smi)
 static const struct dsa_switch_ops rtl8366rb_switch_ops = {
 	.get_tag_protocol = rtl8366_get_tag_protocol,
 	.setup = rtl8366rb_setup,
+	.teardown = rtl8366rb_teardown,
 	.phylink_mac_link_up = rtl8366rb_mac_link_up,
 	.phylink_mac_link_down = rtl8366rb_mac_link_down,
 	.get_strings = rtl8366_get_strings,

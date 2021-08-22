@@ -383,6 +383,12 @@ err_put_node:
 	return ret;
 }
 
+void realtek_smi_teardown_mdio(struct realtek_smi *smi)
+{
+	if (smi->slave_mii_bus)
+		mdiobus_unregister(smi->slave_mii_bus);
+}
+
 static int realtek_smi_probe(struct platform_device *pdev)
 {
 	const struct realtek_smi_variant *var;

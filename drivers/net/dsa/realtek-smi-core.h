@@ -119,6 +119,7 @@ struct realtek_smi_variant {
 int realtek_smi_write_reg_noack(struct realtek_smi *smi, u32 addr,
 				u32 data);
 int realtek_smi_setup_mdio(struct realtek_smi *smi);
+void realtek_smi_teardown_mdio(struct realtek_smi *smi);
 
 /* RTL8366 library helpers */
 int rtl8366_mc_is_used(struct realtek_smi *smi, int mc_index, int *used);
