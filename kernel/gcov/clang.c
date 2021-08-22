@@ -3,16 +3,6 @@
  * Copyright (C) 2019 Google, Inc.
  * modified from kernel/gcov/gcc_4_7.c
  *
- * This software is licensed under the terms of the GNU General Public
- * License version 2, as published by the Free Software Foundation, and
- * may be copied, distributed, and modified under those terms.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- *
  * LLVM uses profiling data that's deliberately similar to GCC, but has a
  * very different way of exporting that data.  LLVM calls llvm_gcov_init() once
  * per module, and provides a couple of callbacks that we can use to ask for
