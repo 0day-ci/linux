@@ -4106,9 +4106,9 @@ unsigned long __weak pci_address_to_pio(phys_addr_t address)
  * @phys_addr: physical address of range to be mapped
  *
  * Remap the memory mapped I/O space described by the @res and the CPU
- * physical address @phys_addr into virtual address space.  Only
- * architectures that have memory mapped IO functions defined (and the
- * PCI_IOBASE value defined) should call this function.
+ * physical address @phys_addr into virtual address space. There
+ * are architectures that don't define PCI_IOBASE but can have not
+ * mapeable IO space. Return zero for those cases.
  */
 int pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr)
 {
@@ -4126,10 +4126,10 @@ int pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr)
 #else
 	/*
 	 * This architecture does not have memory mapped I/O space,
-	 * so this function should never be called
+	 * but can have not mapeable I/O space, so just return ok
+	 * here.
 	 */
-	WARN_ONCE(1, "This architecture does not support memory mapped I/O\n");
-	return -ENODEV;
+	return 0;
 #endif
 }
 EXPORT_SYMBOL(pci_remap_iospace);
