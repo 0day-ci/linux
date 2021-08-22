@@ -26,6 +26,7 @@ EXPR = r"(?:" + OPERATORS + r"|\s|" + SYMBOL + r")+"
 DEFAULT = r"default\s+.*?(?:if\s.+){,1}"
 STMT = r"^\s*(?:if|select|imply|depends\s+on|(?:" + DEFAULT + r"))\s+" + EXPR
 SOURCE_SYMBOL = r"(?:\W|\b)+[D]{,1}CONFIG_(" + SYMBOL + r")"
+IF_LINE = r"^\s*(?:if)\s+" + EXPR
 
 # regex objects
 REGEX_FILE_KCONFIG = re.compile(r".*Kconfig[\.\w+\-]*$")
@@ -35,10 +36,10 @@ REGEX_KCONFIG_DEF = re.compile(DEF)
 REGEX_KCONFIG_EXPR = re.compile(EXPR)
 REGEX_KCONFIG_STMT = re.compile(STMT)
 REGEX_KCONFIG_HELP = re.compile(r"^\s+help\s*$")
+REGEX_KCONFIG_IF_LINE = re.compile(IF_LINE)
 REGEX_FILTER_SYMBOLS = re.compile(r"[A-Za-z0-9]$")
 REGEX_NUMERIC = re.compile(r"0[xX][0-9a-fA-F]+|[0-9]+")
 REGEX_QUOTES = re.compile("(\"(.*?)\")")
-
 
 def parse_options():
     """The user interface of this module."""
@@ -444,6 +445,11 @@ def parse_kconfig_file(kfile):
         line = lines[i]
         line = line.strip('\n')
         line = line.split("#")[0]  # ignore comments
+
+        # 'if EXPR' lines can be after help lines
+        # The if line itself is handled later
+        if REGEX_KCONFIG_IF_LINE.match(line):
+            skip = False
 
         if REGEX_KCONFIG_DEF.match(line):
             symbol_def = REGEX_KCONFIG_DEF.findall(line)
