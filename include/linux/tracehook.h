@@ -204,12 +204,16 @@ static inline void tracehook_notify_resume(struct pt_regs *regs)
  * is currently used by TWA_SIGNAL based task_work, which requires breaking
  * wait loops to ensure that task_work is noticed and run.
  */
-static inline void tracehook_notify_signal(void)
+static inline bool tracehook_notify_signal(void)
 {
+	bool ret;
+
 	clear_thread_flag(TIF_NOTIFY_SIGNAL);
 	smp_mb__after_atomic();
-	if (current->task_works)
+	ret = current->task_works;
+	if (ret)
 		task_work_run();
+	return ret;
 }
 
 /*
