@@ -41,6 +41,7 @@
 #include <linux/fs.h>
 #include <linux/path.h>
 #include <linux/timekeeping.h>
+#include <linux/io_uring.h>
 
 #include <linux/uaccess.h>
 #include <asm/mmu_context.h>
@@ -624,6 +625,8 @@ void do_coredump(const kernel_siginfo_t *siginfo)
 		cred->fsuid = GLOBAL_ROOT_UID;	/* Dump root private */
 		need_suid_safe = true;
 	}
+
+	io_uring_task_cancel();
 
 	retval = coredump_wait(siginfo->si_signo, &core_state);
 	if (retval < 0)
