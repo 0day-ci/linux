@@ -9,7 +9,6 @@
 #include <linux/types.h>
 
 #include "intel_migrate_types.h"
-
 struct dma_fence;
 struct i915_request;
 struct i915_gem_ww_ctx;
