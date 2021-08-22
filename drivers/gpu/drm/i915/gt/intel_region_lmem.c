@@ -195,6 +195,8 @@ static struct intel_memory_region *setup_lmem(struct intel_gt *gt)
 	struct intel_memory_region *mem;
 	resource_size_t io_start;
 	resource_size_t lmem_size;
+	resource_size_t min_page_size = HAS_64K_PAGES(i915) ?
+	   I915_GTT_PAGE_SIZE_64K : I915_GTT_PAGE_SIZE_4K;
 	int err;
 
 	if (!IS_DGFX(i915))
@@ -210,7 +212,7 @@ static struct intel_memory_region *setup_lmem(struct intel_gt *gt)
 	mem = intel_memory_region_create(i915,
 					 0,
 					 lmem_size,
-					 I915_GTT_PAGE_SIZE_4K,
+					 min_page_size,
 					 io_start,
 					 INTEL_MEMORY_LOCAL,
 					 0,

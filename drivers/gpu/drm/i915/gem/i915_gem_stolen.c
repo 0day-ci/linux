@@ -780,6 +780,8 @@ i915_gem_stolen_lmem_setup(struct drm_i915_private *i915, u16 type,
 	struct intel_memory_region *mem;
 	resource_size_t io_start;
 	resource_size_t lmem_size;
+	resource_size_t min_page_size = HAS_64K_PAGES(i915) ?
+	   I915_GTT_PAGE_SIZE_64K : I915_GTT_PAGE_SIZE_4K;
 	u64 lmem_base;
 
 	lmem_base = intel_uncore_read64(uncore, GEN12_DSMBASE);
@@ -790,7 +792,7 @@ i915_gem_stolen_lmem_setup(struct drm_i915_private *i915, u16 type,
 	io_start = pci_resource_start(pdev, 2) + lmem_base;
 
 	mem = intel_memory_region_create(i915, lmem_base, lmem_size,
-					 I915_GTT_PAGE_SIZE_4K, io_start,
+					 min_page_size, io_start,
 					 type, instance,
 					 &i915_region_stolen_lmem_ops);
 	if (IS_ERR(mem))
