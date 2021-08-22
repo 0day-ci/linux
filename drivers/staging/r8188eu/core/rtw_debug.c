@@ -73,8 +73,8 @@ int proc_get_read_reg(char *page, char **start,
 {
 	struct net_device *dev = data;
 	struct adapter *padapter = (struct adapter *)rtw_netdev_priv(dev);
-
-	int len = 0;
+	u32 tmp;
+	int len = 0, error;
 
 	if (proc_get_read_addr == 0xeeeeeeee) {
 		*eof = 1;
@@ -83,7 +83,12 @@ int proc_get_read_reg(char *page, char **start,
 
 	switch (proc_get_read_len) {
 	case 1:
-		len += snprintf(page + len, count - len, "rtw_read8(0x%x)=0x%x\n", proc_get_read_addr, rtw_read8(padapter, proc_get_read_addr));
+		error = rtw_read8(padapter, proc_get_read_addr, (u8 *) &tmp);
+		if (error)
+			return len;
+
+		len += snprintf(page + len, count - len, "rtw_read8(0x%x)=0x%x\n",
+				proc_get_read_addr, (u8) tmp);
 		break;
 	case 2:
 		len += snprintf(page + len, count - len, "rtw_read16(0x%x)=0x%x\n", proc_get_read_addr, rtw_read16(padapter, proc_get_read_addr));

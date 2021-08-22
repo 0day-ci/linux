@@ -14,10 +14,15 @@
 void SwLedOn(struct adapter *padapter, struct LED_871x *pLed)
 {
 	u8	LedCfg;
+	int error;
 
 	if (padapter->bSurpriseRemoved || padapter->bDriverStopped)
 		return;
-	LedCfg = rtw_read8(padapter, REG_LEDCFG2);
+
+	error = rtw_read8(padapter, REG_LEDCFG2, &LedCfg);
+	if (error)
+		return;
+
 	switch (pLed->LedPin) {
 	case LED_PIN_LED0:
 		rtw_write8(padapter, REG_LEDCFG2, (LedCfg & 0xf0) | BIT(5) | BIT(6)); /*  SW control led0 on. */
@@ -37,11 +42,14 @@ void SwLedOff(struct adapter *padapter, struct LED_871x *pLed)
 {
 	u8	LedCfg;
 	struct hal_data_8188e	*pHalData = GET_HAL_DATA(padapter);
+	int error;
 
 	if (padapter->bSurpriseRemoved || padapter->bDriverStopped)
 		goto exit;
 
-	LedCfg = rtw_read8(padapter, REG_LEDCFG2);/* 0x4E */
+	error = rtw_read8(padapter, REG_LEDCFG2, &LedCfg);/* 0x4E */
+	if (error)
+		return;
 
 	switch (pLed->LedPin) {
 	case LED_PIN_LED0:
@@ -49,7 +57,11 @@ void SwLedOff(struct adapter *padapter, struct LED_871x *pLed)
 			/*  Open-drain arrangement for controlling the LED) */
 			LedCfg &= 0x90; /*  Set to software control. */
 			rtw_write8(padapter, REG_LEDCFG2, (LedCfg | BIT(3)));
-			LedCfg = rtw_read8(padapter, REG_MAC_PINMUX_CFG);
+
+			error = rtw_read8(padapter, REG_MAC_PINMUX_CFG, &LedCfg);
+			if (error)
+				return;
+
 			LedCfg &= 0xFE;
 			rtw_write8(padapter, REG_MAC_PINMUX_CFG, LedCfg);
 		} else {

@@ -960,6 +960,7 @@ _PHY_SetBWMode92C(
 	struct hal_data_8188e *pHalData = GET_HAL_DATA(Adapter);
 	u8 regBwOpMode;
 	u8 regRRSR_RSC;
+	int error;
 
 	if (pHalData->rf_chip == RF_PSEUDO_11N)
 		return;
@@ -975,8 +976,13 @@ _PHY_SetBWMode92C(
 	/* 3<1>Set MAC register */
 	/* 3 */
 
-	regBwOpMode = rtw_read8(Adapter, REG_BWOPMODE);
-	regRRSR_RSC = rtw_read8(Adapter, REG_RRSR + 2);
+	error = rtw_read8(Adapter, REG_BWOPMODE, &regBwOpMode);
+	if (error)
+		return;
+
+	error = rtw_read8(Adapter, REG_RRSR + 2, &regRRSR_RSC);
+	if (error)
+		return;
 
 	switch (pHalData->CurrentChannelBW) {
 	case HT_CHANNEL_WIDTH_20:

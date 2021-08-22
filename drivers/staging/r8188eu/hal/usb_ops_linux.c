@@ -101,26 +101,29 @@ exit:
 	return status;
 }
 
-static u8 usb_read8(struct intf_hdl *pintfhdl, u32 addr)
+static int usb_read8(struct intf_hdl *pintfhdl, u32 addr, u8 *data)
 {
 	u8 requesttype;
 	u16 wvalue;
 	u16 len;
-	u8 data = 0;
+	int res;
 
-
+	if (WARN_ON(unlikely(!data)))
+		return -EINVAL;
 
 	requesttype = 0x01;/* read_in */
 
 	wvalue = (u16)(addr & 0x0000ffff);
 	len = 1;
 
-	usbctrl_vendorreq(pintfhdl, wvalue, &data, len, requesttype);
+	res = usbctrl_vendorreq(pintfhdl, wvalue, data, len, requesttype);
+	if (res < 0)
+		dev_err(dvobj_to_dev(pintfhdl->pintf_dev), "Failed to read 8 bytes: %d\n", res);
+	else
+		/* Noone cares about positive return value */
+		res = 0;
 
-
-
-	return data;
-
+	return res;
 }
 
 static u16 usb_read16(struct intf_hdl *pintfhdl, u32 addr)

@@ -35,6 +35,7 @@ u8 HalPwrSeqCmdParsing(struct adapter *padapter, u8 cut_vers, u8 fab_vers,
 	u32 offset = 0;
 	u32 poll_count = 0; /*  polling autoload done. */
 	u32 max_poll_count = 5000;
+	int error;
 
 	do {
 		pwrcfgcmd = pwrseqcmd[aryidx];
@@ -48,7 +49,9 @@ u8 HalPwrSeqCmdParsing(struct adapter *padapter, u8 cut_vers, u8 fab_vers,
 				offset = GET_PWR_CFG_OFFSET(pwrcfgcmd);
 
 				/*  Read the value from system register */
-				value = rtw_read8(padapter, offset);
+				error = rtw_read8(padapter, offset, &value);
+				if (error)
+					return false;
 
 				value &= ~(GET_PWR_CFG_MASK(pwrcfgcmd));
 				value |= (GET_PWR_CFG_VALUE(pwrcfgcmd) & GET_PWR_CFG_MASK(pwrcfgcmd));
@@ -60,7 +63,9 @@ u8 HalPwrSeqCmdParsing(struct adapter *padapter, u8 cut_vers, u8 fab_vers,
 				poll_bit = false;
 				offset = GET_PWR_CFG_OFFSET(pwrcfgcmd);
 				do {
-					value = rtw_read8(padapter, offset);
+					error = rtw_read8(padapter, offset, &value);
+					if (error)
+						return false;
 
 					value &= GET_PWR_CFG_MASK(pwrcfgcmd);
 					if (value == (GET_PWR_CFG_VALUE(pwrcfgcmd) & GET_PWR_CFG_MASK(pwrcfgcmd)))

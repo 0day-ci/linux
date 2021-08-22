@@ -159,6 +159,7 @@ ReadEFuseByte(
 	u32 value32;
 	u8 readbyte;
 	u16 retry;
+	int error;
 
 	if (pseudo) {
 		Efuse_Read1ByteFromFakeContent(Adapter, _offset, pbuf);
@@ -167,11 +168,17 @@ ReadEFuseByte(
 
 	/* Write Address */
 	rtw_write8(Adapter, EFUSE_CTRL + 1, (_offset & 0xff));
-	readbyte = rtw_read8(Adapter, EFUSE_CTRL + 2);
+	error = rtw_read8(Adapter, EFUSE_CTRL + 2, &readbyte);
+	if (error)
+		return;
+
 	rtw_write8(Adapter, EFUSE_CTRL + 2, ((_offset >> 8) & 0x03) | (readbyte & 0xfc));
 
 	/* Write bit 32 0 */
-	readbyte = rtw_read8(Adapter, EFUSE_CTRL + 3);
+	error = rtw_read8(Adapter, EFUSE_CTRL + 3, &readbyte);
+	if (error)
+		return;
+
 	rtw_write8(Adapter, EFUSE_CTRL + 3, (readbyte & 0x7f));
 
 	/* Check bit 32 read-ready */
@@ -244,6 +251,7 @@ u8 EFUSE_Read1Byte(struct adapter *Adapter, u16 Address)
 	u8 temp = {0x00};
 	u32 k = 0;
 	u16 contentLen = 0;
+	int error;
 
 	EFUSE_GetEfuseDefinition(Adapter, EFUSE_WIFI, TYPE_EFUSE_REAL_CONTENT_LEN, (void *)&contentLen, false);
 
@@ -251,27 +259,42 @@ u8 EFUSE_Read1Byte(struct adapter *Adapter, u16 Address)
 		/* Write E-fuse Register address bit0~7 */
 		temp = Address & 0xFF;
 		rtw_write8(Adapter, EFUSE_CTRL + 1, temp);
-		Bytetemp = rtw_read8(Adapter, EFUSE_CTRL + 2);
+		error = rtw_read8(Adapter, EFUSE_CTRL + 2, &Bytetemp);
+		if (error)
+			return 0xFF;
+
 		/* Write E-fuse Register address bit8~9 */
 		temp = ((Address >> 8) & 0x03) | (Bytetemp & 0xFC);
 		rtw_write8(Adapter, EFUSE_CTRL + 2, temp);
 
 		/* Write 0x30[31]= 0 */
-		Bytetemp = rtw_read8(Adapter, EFUSE_CTRL + 3);
+		error = rtw_read8(Adapter, EFUSE_CTRL + 3, &Bytetemp);
+		if (error)
+			return 0xFF;
+
 		temp = Bytetemp & 0x7F;
 		rtw_write8(Adapter, EFUSE_CTRL + 3, temp);
 
 		/* Wait Write-ready (0x30[31]= 1) */
-		Bytetemp = rtw_read8(Adapter, EFUSE_CTRL + 3);
+		error = rtw_read8(Adapter, EFUSE_CTRL + 3, &Bytetemp);
+		if (error)
+			return 0xFF;
+
 		while (!(Bytetemp & 0x80)) {
-			Bytetemp = rtw_read8(Adapter, EFUSE_CTRL + 3);
+			error = rtw_read8(Adapter, EFUSE_CTRL + 3, &Bytetemp);
+			if (error)
+				return 0xFF;
+
 			k++;
 			if (k == 1000) {
 				k = 0;
 				break;
 			}
 		}
-		data = rtw_read8(Adapter, EFUSE_CTRL);
+		error = rtw_read8(Adapter, EFUSE_CTRL, &data);
+		if (error)
+			return 0xFF;
+
 		return data;
 	} else {
 		return 0xFF;
@@ -284,6 +307,8 @@ u8 efuse_OneByteRead(struct adapter *pAdapter, u16 addr, u8 *data, bool pseudo)
 {
 	u8 tmpidx = 0;
 	u8 result;
+	u8 tmp;
+	int error;
 
 	if (pseudo) {
 		result = Efuse_Read1ByteFromFakeContent(pAdapter, addr, data);
@@ -292,16 +317,25 @@ u8 efuse_OneByteRead(struct adapter *pAdapter, u16 addr, u8 *data, bool pseudo)
 	/*  -----------------e-fuse reg ctrl --------------------------------- */
 	/* address */
 	rtw_write8(pAdapter, EFUSE_CTRL + 1, (u8)(addr & 0xff));
-	rtw_write8(pAdapter, EFUSE_CTRL + 2, ((u8)((addr >> 8) & 0x03)) |
-		   (rtw_read8(pAdapter, EFUSE_CTRL + 2) & 0xFC));
+	error = rtw_read8(pAdapter, EFUSE_CTRL + 2, &tmp);
+	if (error)
+		return false;
 
+	rtw_write8(pAdapter, EFUSE_CTRL + 2, ((u8)((addr >> 8) & 0x03)) | (tmp & 0xFC));
 	rtw_write8(pAdapter, EFUSE_CTRL + 3,  0x72);/* read cmd */
 
-	while (!(0x80 & rtw_read8(pAdapter, EFUSE_CTRL + 3)) && (tmpidx < 100))
-		tmpidx++;
+	do {
+		error = rtw_read8(pAdapter, EFUSE_CTRL + 3, &tmp);
+		if (error)
+			return false;
+	} while (!(0x80 & tmp) && (++tmpidx < 100));
+
 	if (tmpidx < 100) {
-		*data = rtw_read8(pAdapter, EFUSE_CTRL);
-		result = true;
+		error = rtw_read8(pAdapter, EFUSE_CTRL, data);
+		if (error)
+			result = false;
+		else
+			result = true;
 	} else {
 		*data = 0xff;
 		result = false;
@@ -314,6 +348,8 @@ u8 efuse_OneByteWrite(struct adapter *pAdapter, u16 addr, u8 data, bool pseudo)
 {
 	u8 tmpidx = 0;
 	u8 result;
+	u8 tmp;
+	int error;
 
 	if (pseudo) {
 		result = Efuse_Write1ByteToFakeContent(pAdapter, addr, data);
@@ -323,15 +359,23 @@ u8 efuse_OneByteWrite(struct adapter *pAdapter, u16 addr, u8 data, bool pseudo)
 	/*  -----------------e-fuse reg ctrl --------------------------------- */
 	/* address */
 	rtw_write8(pAdapter, EFUSE_CTRL + 1, (u8)(addr & 0xff));
+
+	error = rtw_read8(pAdapter, EFUSE_CTRL + 2, &tmp);
+	if (error)
+		return false;
+
 	rtw_write8(pAdapter, EFUSE_CTRL + 2,
-		   (rtw_read8(pAdapter, EFUSE_CTRL + 2) & 0xFC) |
+		   (tmp & 0xFC) |
 		   (u8)((addr >> 8) & 0x03));
 	rtw_write8(pAdapter, EFUSE_CTRL, data);/* data */
 
 	rtw_write8(pAdapter, EFUSE_CTRL + 3, 0xF2);/* write cmd */
 
-	while ((0x80 &  rtw_read8(pAdapter, EFUSE_CTRL + 3)) && (tmpidx < 100))
-		tmpidx++;
+	do {
+		error = rtw_read8(pAdapter, EFUSE_CTRL + 3, &tmp);
+		if (error)
+			return false;
+	} while (!(0x80 & tmp) && (++tmpidx < 100));
 
 	if (tmpidx < 100)
 		result = true;

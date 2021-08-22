@@ -49,13 +49,17 @@ void rtl8188e_sreset_linked_status_check(struct adapter *padapter)
 {
 	u32 rx_dma_status = 0;
 	u8 fw_status = 0;
+	int error;
+
 	rx_dma_status = rtw_read32(padapter, REG_RXDMA_STATUS);
 	if (rx_dma_status != 0x00) {
 		DBG_88E("%s REG_RXDMA_STATUS:0x%08x\n", __func__, rx_dma_status);
 		rtw_write32(padapter, REG_RXDMA_STATUS, rx_dma_status);
 	}
-	fw_status = rtw_read8(padapter, REG_FMETHR);
-	if (fw_status != 0x00) {
+	error = rtw_read8(padapter, REG_FMETHR, &fw_status);
+	if (error) {
+		return;
+	} else if (fw_status != 0x00) {
 		if (fw_status == 1)
 			DBG_88E("%s REG_FW_STATUS (0x%02x), Read_Efuse_Fail !!\n", __func__, fw_status);
 		else if (fw_status == 2)
