@@ -91,7 +91,12 @@ int proc_get_read_reg(char *page, char **start,
 				proc_get_read_addr, (u8) tmp);
 		break;
 	case 2:
-		len += snprintf(page + len, count - len, "rtw_read16(0x%x)=0x%x\n", proc_get_read_addr, rtw_read16(padapter, proc_get_read_addr));
+		error = rtw_read16(padapter, proc_get_read_addr, (u16 *) &tmp);
+		if (error)
+			return len;
+
+		len += snprintf(page + len, count - len, "rtw_read16(0x%x)=0x%x\n",
+				proc_get_read_addr, (u16) tmp);
 		break;
 	case 4:
 		len += snprintf(page + len, count - len, "rtw_read32(0x%x)=0x%x\n", proc_get_read_addr, rtw_read32(padapter, proc_get_read_addr));

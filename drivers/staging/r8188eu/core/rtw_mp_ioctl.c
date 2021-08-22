@@ -653,7 +653,9 @@ int rtl8188eu_oid_rt_pro_read_register_hdl(struct oid_par_priv *poid_par_priv)
 			status = NDIS_STATUS_NOT_ACCEPTED;
 		break;
 	case 2:
-		RegRWStruct->value = rtw_read16(Adapter, offset);
+		error = rtw_read16(Adapter, offset, (u16 *) &RegRWStruct->value);
+		if (error)
+			status = NDIS_STATUS_NOT_ACCEPTED;
 		break;
 	default:
 		width = 4;

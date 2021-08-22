@@ -2101,7 +2101,10 @@ static int rtw_wx_read32(struct net_device *dev,
 		sprintf(extra, "0x%02X", data32);
 		break;
 	case 2:
-		data32 = rtw_read16(padapter, addr);
+		error = rtw_read16(padapter, addr, (u16 *) &data32);
+		if (error)
+			return error;
+
 		sprintf(extra, "0x%04X", data32);
 		break;
 	case 4:
@@ -2271,7 +2274,8 @@ static void rtw_dbg_mode_hdl(struct adapter *padapter, u32 id, u8 *pdata, u32 le
 					 (u8 *) &RegRWStruct->value);
 			break;
 		case 2:
-			RegRWStruct->value = rtw_read16(padapter, RegRWStruct->offset);
+			error = rtw_read16(padapter, RegRWStruct->offset,
+					  (u16 *) &RegRWStruct->value);
 			break;
 		case 4:
 			RegRWStruct->value = rtw_read32(padapter, RegRWStruct->offset);
@@ -3990,7 +3994,8 @@ static int rtw_dbg_port(struct net_device *dev,
 				DBG_88E("rtw_read8(0x%x) = 0x%02x\n", arg, (u8) tmp);
 			break;
 		case 2:
-			DBG_88E("rtw_read16(0x%x) = 0x%04x\n", arg, rtw_read16(padapter, arg));
+			if (!rtw_read16(padapter, arg, (u16 *) &tmp))
+				DBG_88E("rtw_read16(0x%x) = 0x%04x\n", arg, (u16) tmp);
 			break;
 		case 4:
 			DBG_88E("rtw_read32(0x%x) = 0x%08x\n", arg, rtw_read32(padapter, arg));
@@ -4006,8 +4011,12 @@ static int rtw_dbg_port(struct net_device *dev,
 
 			break;
 		case 2:
+			error = rtw_read16(padapter, arg, (u16 *) &tmp);
+			if (error)
+				return error;
+
 			rtw_write16(padapter, arg, extra_arg);
-			DBG_88E("rtw_write16(0x%x) = 0x%04x\n", arg, rtw_read16(padapter, arg));
+			DBG_88E("rtw_write16(0x%x) = 0x%04x\n", arg, (u16) tmp);
 			break;
 		case 4:
 			rtw_write32(padapter, arg, extra_arg);
@@ -4138,7 +4147,10 @@ static int rtw_dbg_port(struct net_device *dev,
 			if (_SUCCESS != rtw_IOL_exec_cmds_sync(padapter, xmit_frame, 5000, 0))
 				ret = -EPERM;
 
-			final = rtw_read16(padapter, reg);
+			error = rtw_read16(padapter, reg, &final);
+			if (error)
+				return error;
+
 			if (start_value + write_num - 1 == final)
 				DBG_88E("continuous IOL_CMD_WW_REG to 0x%x %u times Success, start:%u, final:%u\n", reg, write_num, start_value, final);
 			else
@@ -5387,7 +5399,11 @@ static int rtw_mp_read_reg(struct net_device *dev,
 		break;
 	case 'w':
 		/*  2 bytes */
-		sprintf(data, "%04x\n", rtw_read16(padapter, addr));
+		error = rtw_read16(padapter, addr, (u16 *) &val32);
+		if (error)
+			return error;
+
+		sprintf(data, "%04x\n", (u16) val32);
 		for (i = 0; i <= strlen(data); i++) {
 			if (i % 2 == 0) {
 				tmp[j] = ' ';

@@ -62,7 +62,7 @@ typedef void (*RT_WORKITEM_CALL_BACK)(void *pContext);
 
 int ODM_Read1Byte(struct odm_dm_struct *pDM_Odm, u32 RegAddr, u8 *data);
 
-u16 ODM_Read2Byte(struct odm_dm_struct *pDM_Odm, u32 RegAddr);
+int ODM_Read2Byte(struct odm_dm_struct *pDM_Odm, u32 RegAddr, u16 *data);
 
 u32 ODM_Read4Byte(struct odm_dm_struct *pDM_Odm, u32 RegAddr);
 
