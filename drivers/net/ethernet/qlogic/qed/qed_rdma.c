@@ -643,6 +643,8 @@ static int qed_rdma_start_fw(struct qed_hwfn *p_hwfn,
 				    cnq_id);
 	}
 
+	p_params_header->relaxed_ordering = 1;
+
 	return qed_spq_post(p_hwfn, p_ent, NULL);
 }
 
