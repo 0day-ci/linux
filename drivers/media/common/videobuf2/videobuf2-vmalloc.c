@@ -1,13 +1,10 @@
+// SPDX-License-Identifier: GPL-1.0+
 /*
  * videobuf2-vmalloc.c - vmalloc memory allocator for videobuf2
  *
  * Copyright (C) 2010 Samsung Electronics
  *
  * Author: Pawel Osciak <pawel@osciak.com>
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation.
  */
 
 #include <linux/io.h>

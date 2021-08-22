@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-1.0+
 /*
  * videobuf2-v4l2.c - V4L2 driver helper framework
  *
@@ -8,10 +9,6 @@
  *
  * The vb2_thread implementation was based on code from videobuf-dvb.c:
  *	(c) 2004 Gerd Knorr <kraxel@bytesex.org> [SUSE Labs]
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation.
  */
 
 #include <linux/device.h>
