@@ -6,8 +6,10 @@
 #
 # NOTE: CEC and Remote Controller support should not depend on MEDIA_SUPPORT
 #
+menu "Remote Controller and CEC support"
 source "drivers/media/rc/Kconfig"
 source "drivers/media/cec/Kconfig"
+endmenu
 
 menuconfig MEDIA_SUPPORT
 	tristate "Multimedia support"
