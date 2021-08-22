@@ -64,7 +64,7 @@ int ODM_Read1Byte(struct odm_dm_struct *pDM_Odm, u32 RegAddr, u8 *data);
 
 int ODM_Read2Byte(struct odm_dm_struct *pDM_Odm, u32 RegAddr, u16 *data);
 
-u32 ODM_Read4Byte(struct odm_dm_struct *pDM_Odm, u32 RegAddr);
+int ODM_Read4Byte(struct odm_dm_struct *pDM_Odm, u32 RegAddr, u32 *data);
 
 void ODM_Write1Byte(struct odm_dm_struct *pDM_Odm, u32 RegAddr, u8 Data);
 

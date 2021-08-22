@@ -55,6 +55,7 @@ int ips_leave(struct adapter *padapter)
 	struct mlme_priv *pmlmepriv = &padapter->mlmepriv;
 	int result = _SUCCESS;
 	int keyid;
+	u32 tmp;
 
 	_enter_pwrlock(&pwrpriv->lock);
 
@@ -83,7 +84,9 @@ int ips_leave(struct adapter *padapter)
 			}
 		}
 
-		DBG_88E("==> ips_leave.....LED(0x%08x)...\n", rtw_read32(padapter, 0x4c));
+		if (!rtw_read32(padapter, 0x4c, &tmp))
+			DBG_88E("==> ips_leave.....LED(0x%08x)...\n", tmp);
+
 		pwrpriv->bips_processing = false;
 
 		pwrpriv->bkeepfwalive = false;

@@ -29,13 +29,18 @@ u8 sreset_get_wifi_status(struct adapter *padapter)
 {
 	struct hal_data_8188e	*pHalData = GET_HAL_DATA(padapter);
 	struct sreset_priv *psrtpriv = &pHalData->srestpriv;
-
+	int error;
 	u8 status = WIFI_STATUS_SUCCESS;
 	u32 val32 = 0;
 
 	if (psrtpriv->silent_reset_inprogress)
 		return status;
-	val32 = rtw_read32(padapter, REG_TXDMA_STATUS);
+	error = rtw_read32(padapter, REG_TXDMA_STATUS, &val32);
+	if (error) {
+		psrtpriv->Wifi_Error_Status = WIFI_MAC_TXDMA_ERROR;
+		return WIFI_MAC_TXDMA_ERROR;
+	}
+
 	if (val32 == 0xeaeaeaea) {
 		psrtpriv->Wifi_Error_Status = WIFI_IF_NOT_EXIST;
 	} else if (val32 != 0) {

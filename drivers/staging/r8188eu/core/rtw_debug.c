@@ -99,7 +99,12 @@ int proc_get_read_reg(char *page, char **start,
 				proc_get_read_addr, (u16) tmp);
 		break;
 	case 4:
-		len += snprintf(page + len, count - len, "rtw_read32(0x%x)=0x%x\n", proc_get_read_addr, rtw_read32(padapter, proc_get_read_addr));
+		error = rtw_read32(padapter, proc_get_read_addr, &tmp);
+		if (error)
+			return len;
+
+		len += snprintf(page + len, count - len, "rtw_read32(0x%x)=0x%x\n",
+				proc_get_read_addr, tmp);
 		break;
 	default:
 		len += snprintf(page + len, count - len, "error read length=%d\n", proc_get_read_len);
@@ -315,13 +320,20 @@ int proc_get_mac_reg_dump1(char *page, char **start,
 	struct adapter *padapter = (struct adapter *)rtw_netdev_priv(dev);
 	int len = 0;
 	int i, j = 1;
+	int error;
+	u32 tmp;
 
 	len += snprintf(page + len, count - len, "\n======= MAC REG =======\n");
 
 	for (i = 0x0; i < 0x300; i += 4) {
 		if (j % 4 == 1)
 			len += snprintf(page + len, count - len, "0x%02x", i);
-		len += snprintf(page + len, count - len, " 0x%08x ", rtw_read32(padapter, i));
+
+		error = rtw_read32(padapter, i, &tmp);
+		if (error)
+			return len;
+
+		len += snprintf(page + len, count - len, " 0x%08x ", tmp);
 		if ((j++) % 4 == 0)
 			len += snprintf(page + len, count - len, "\n");
 	}
@@ -338,13 +350,20 @@ int proc_get_mac_reg_dump2(char *page, char **start,
 	struct adapter *padapter = (struct adapter *)rtw_netdev_priv(dev);
 	int len = 0;
 	int i, j = 1;
+	int error;
+	u32 tmp;
 
 	len += snprintf(page + len, count - len, "\n======= MAC REG =======\n");
 	memset(page, 0, count);
 	for (i = 0x300; i < 0x600; i += 4) {
 		if (j % 4 == 1)
 			len += snprintf(page + len, count - len, "0x%02x", i);
-		len += snprintf(page + len, count - len, " 0x%08x ", rtw_read32(padapter, i));
+
+		error = rtw_read32(padapter, i, &tmp);
+		if (error)
+			return len;
+
+		len += snprintf(page + len, count - len, " 0x%08x ", tmp);
 		if ((j++) % 4 == 0)
 			len += snprintf(page + len, count - len, "\n");
 	}
@@ -361,13 +380,20 @@ int proc_get_mac_reg_dump3(char *page, char **start,
 	struct adapter *padapter = (struct adapter *)rtw_netdev_priv(dev);
 	int len = 0;
 	int i, j = 1;
+	int error;
+	u32 tmp;
 
 	len += snprintf(page + len, count - len, "\n======= MAC REG =======\n");
 
 	for (i = 0x600; i < 0x800; i += 4) {
 		if (j % 4 == 1)
 			len += snprintf(page + len, count - len, "0x%02x", i);
-		len += snprintf(page + len, count - len, " 0x%08x ", rtw_read32(padapter, i));
+
+		error = rtw_read32(padapter, i, &tmp);
+		if (error)
+			return error;
+
+		len += snprintf(page + len, count - len, " 0x%08x ", tmp);
 		if ((j++) % 4 == 0)
 			len += snprintf(page + len, count - len, "\n");
 	}
@@ -384,12 +410,19 @@ int proc_get_bb_reg_dump1(char *page, char **start,
 	struct adapter *padapter = (struct adapter *)rtw_netdev_priv(dev);
 	int len = 0;
 	int i, j = 1;
+	int error;
+	u32 tmp;
 
 	len += snprintf(page + len, count - len, "\n======= BB REG =======\n");
 	for (i = 0x800; i < 0xB00; i += 4) {
 		if (j % 4 == 1)
 			len += snprintf(page + len, count - len, "0x%02x", i);
-		len += snprintf(page + len, count - len, " 0x%08x ", rtw_read32(padapter, i));
+
+		error = rtw_read32(padapter, i, &tmp);
+		if (error)
+			return len;
+
+		len += snprintf(page + len, count - len, " 0x%08x ", tmp);
 		if ((j++) % 4 == 0)
 			len += snprintf(page + len, count - len, "\n");
 	}
@@ -405,12 +438,19 @@ int proc_get_bb_reg_dump2(char *page, char **start,
 	struct adapter *padapter = (struct adapter *)rtw_netdev_priv(dev);
 	int len = 0;
 	int i, j = 1;
+	int error;
+	u32 tmp;
 
 	len += snprintf(page + len, count - len, "\n======= BB REG =======\n");
 	for (i = 0xB00; i < 0xE00; i += 4) {
 		if (j % 4 == 1)
 			len += snprintf(page + len, count - len, "0x%02x", i);
-		len += snprintf(page + len, count - len, " 0x%08x ", rtw_read32(padapter, i));
+
+		error = rtw_read32(padapter, i, &tmp);
+		if (error)
+			return len;
+
+		len += snprintf(page + len, count - len, " 0x%08x ", tmp);
 		if ((j++) % 4 == 0)
 			len += snprintf(page + len, count - len, "\n");
 	}
@@ -426,12 +466,19 @@ int proc_get_bb_reg_dump3(char *page, char **start,
 	struct adapter *padapter = (struct adapter *)rtw_netdev_priv(dev);
 	int len = 0;
 	int i, j = 1;
+	int error;
+	u32 tmp;
 
 	len += snprintf(page + len, count - len, "\n======= BB REG =======\n");
 	for (i = 0xE00; i < 0x1000; i += 4) {
 		if (j % 4 == 1)
 			len += snprintf(page + len, count - len, "0x%02x", i);
-		len += snprintf(page + len, count - len, " 0x%08x ", rtw_read32(padapter, i));
+
+		error = rtw_read32(padapter, i, &tmp);
+		if (error)
+			return len;
+
+		len += snprintf(page + len, count - len, " 0x%08x ", tmp);
 		if ((j++) % 4 == 0)
 			len += snprintf(page + len, count - len, "\n");
 	}

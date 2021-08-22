@@ -765,12 +765,17 @@ static u32 GetPhyRxPktCounts(struct adapter *pAdapter, u32 selbit)
 {
 	/* selection */
 	u32 phyrx_set = 0, count = 0;
+	int error;
 
 	phyrx_set = _RXERR_RPT_SEL(selbit & 0xF);
 	rtw_write32(pAdapter, REG_RXERR_RPT, phyrx_set);
 
 	/* Read packet count */
-	count = rtw_read32(pAdapter, REG_RXERR_RPT) & RXERR_COUNTER_MASK;
+	error = rtw_read32(pAdapter, REG_RXERR_RPT, &count);
+	if (error)
+		return count;
+
+	count &= RXERR_COUNTER_MASK;
 
 	return count;
 }
@@ -803,8 +808,12 @@ u32 GetPhyRxPktCRC32Error(struct adapter *pAdapter)
 static u32 rtw_GetPSDData(struct adapter *pAdapter, u32 point)
 {
 	int psd_val;
+	int error;
 
-	psd_val = rtw_read32(pAdapter, 0x808);
+	error = rtw_read32(pAdapter, 0x808, &psd_val);
+	if (error)
+		return 0;
+
 	psd_val &= 0xFFBFFC00;
 	psd_val |= point;
 
@@ -814,7 +823,10 @@ static u32 rtw_GetPSDData(struct adapter *pAdapter, u32 point)
 
 	rtw_write32(pAdapter, 0x808, psd_val);
 	mdelay(1);
-	psd_val = rtw_read32(pAdapter, 0x8B4);
+
+	error = rtw_read32(pAdapter, 0x8B4, &psd_val);
+	if (error)
+		return 0;
 
 	psd_val &= 0x0000FFFF;
 

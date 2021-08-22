@@ -152,21 +152,32 @@ static int usb_read16(struct intf_hdl *pintfhdl, u32 addr, u16 *data)
 	return res;
 }
 
-static u32 usb_read32(struct intf_hdl *pintfhdl, u32 addr)
+static int usb_read32(struct intf_hdl *pintfhdl, u32 addr, u32 *data)
 {
 	u8 requesttype;
 	u16 wvalue;
 	u16 len;
-	__le32 data;
+	int res;
+	__le32 tmp;
+
+	if (WARN_ON(unlikely(!data)))
+		return -EINVAL;
 
 	requesttype = 0x01;/* read_in */
 
 	wvalue = (u16)(addr & 0x0000ffff);
 	len = 4;
 
-	usbctrl_vendorreq(pintfhdl, wvalue, &data, len, requesttype);
+	res = usbctrl_vendorreq(pintfhdl, wvalue, &data, len, requesttype);
+	if (res < 0) {
+		dev_err(dvobj_to_dev(pintfhdl->pintf_dev), "Failed to read 32 bytes: %d\n", res);
+	} else {
+		/* Noone cares about positive return value */
+		*data = le32_to_cpu(tmp);
+		res = 0;
+	}
 
-	return le32_to_cpu(data);
+	return res;
 }
 
 static int usb_write8(struct intf_hdl *pintfhdl, u32 addr, u8 val)
