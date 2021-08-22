@@ -9032,7 +9032,7 @@ static void io_uring_try_cancel_requests(struct io_ring_ctx *ctx,
 		ret |= io_poll_remove_all(ctx, task, cancel_all);
 		ret |= io_kill_timeouts(ctx, task, cancel_all);
 		if (task)
-			ret |= io_run_task_work();
+			ret |= tracehook_notify_signal();
 		if (!ret)
 			break;
 		cond_resched();
