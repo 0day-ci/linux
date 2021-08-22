@@ -83,13 +83,19 @@ static inline const char *trim_prefix(const char *path)
 	return path + skip;
 }
 
-static struct { unsigned flag:8; char opt_char; } opt_array[] = {
+static struct { unsigned flag:12; char opt_char; } opt_array[] = {
 	{ _DPRINTK_FLAGS_PRINT, 'p' },
 	{ _DPRINTK_FLAGS_PRINT_TRACE, 'T' },
 	{ _DPRINTK_FLAGS_INCL_MODNAME, 'm' },
 	{ _DPRINTK_FLAGS_INCL_FUNCNAME, 'f' },
 	{ _DPRINTK_FLAGS_INCL_LINENO, 'l' },
 	{ _DPRINTK_FLAGS_INCL_TID, 't' },
+
+	{ _DPRINTK_FLAGS_ONCE, 'o' },
+	{ _DPRINTK_FLAGS_PRINTED, 'P' },
+	{ _DPRINTK_FLAGS_RATELIMITED, 'r' },
+	{ _DPRINTK_FLAGS_GROUPED, 'g' },
+	{ _DPRINTK_FLAGS_DELETE_SITE, 'D' },
 	{ _DPRINTK_FLAGS_NONE, '_' },
 };
 
@@ -119,6 +125,8 @@ do {								\
 
 #define vpr_info(fmt, ...)	vnpr_info(1, fmt, ##__VA_ARGS__)
 #define v2pr_info(fmt, ...)	vnpr_info(2, fmt, ##__VA_ARGS__)
+#define v3pr_info(fmt, ...)	vnpr_info(3, fmt, ##__VA_ARGS__)
+#define v4pr_info(fmt, ...)	vnpr_info(4, fmt, ##__VA_ARGS__)
 
 static void vpr_info_dq(const struct ddebug_query *query, const char *msg)
 {
@@ -725,6 +733,49 @@ static inline char *dynamic_emit_prefix(struct _ddebug *desc, char *buf)
 	return buf;
 }
 
+struct ddebug_ratelimit {
+	struct hlist_node hnode;
+	struct ratelimit_state rs;
+	u64 key;
+};
+
+/* test print-once or ratelimited conditions */
+#define is_rated(desc) unlikely(desc->flags & _DPRINTK_FLAGS_RATELIMITED)
+#define is_once(desc) unlikely(desc->flags & _DPRINTK_FLAGS_ONCE)
+#define is_onced(desc)						\
+	unlikely((desc->flags & _DPRINTK_FLAGS_ONCE)		\
+		 && (desc->flags & _DPRINTK_FLAGS_PRINTED))
+
+static struct ddebug_ratelimit *ddebug_rl_fetch(struct _ddebug *desc);
+
+static inline bool is_onced_or_limited(struct _ddebug *desc)
+{
+	if (unlikely(desc->flags & _DPRINTK_FLAGS_ONCE &&
+		     desc->flags & _DPRINTK_FLAGS_RATELIMITED))
+		pr_info(" ONCE & RATELIMITED together is nonsense\n");
+
+	if (is_once(desc)) {
+		if (is_onced(desc)) {
+			v4pr_info("already printed once\n");
+			return true;
+		}
+		desc->flags |= _DPRINTK_FLAGS_PRINTED;
+		return false;
+
+	} else if (is_rated(desc)) {
+		/* test rate-limits */
+		bool state = __ratelimit(&ddebug_rl_fetch(desc)->rs);
+
+		v4pr_info("RLstate{%s}=%d on %s.%s.%d\n",
+			  (desc->flags & _DPRINTK_FLAGS_GROUPED
+			   ? "grouped" : "solo"), state,
+			  desc->modname, desc->function, desc->lineno);
+
+		return state;
+	}
+	return false;
+}
+
 void __dynamic_pr_debug(struct _ddebug *descriptor, const char *fmt, ...)
 {
 	va_list args;
@@ -733,6 +784,9 @@ void __dynamic_pr_debug(struct _ddebug *descriptor, const char *fmt, ...)
 
 	BUG_ON(!descriptor);
 	BUG_ON(!fmt);
+
+	if (is_onced_or_limited(descriptor))
+		return;
 
 	va_start(args, fmt);
 
@@ -766,6 +820,9 @@ void __dynamic_dev_dbg(struct _ddebug *descriptor,
 	BUG_ON(!descriptor);
 	BUG_ON(!fmt);
 
+	if (is_onced_or_limited(descriptor))
+		return;
+
 	va_start(args, fmt);
 
 	vaf.fmt = fmt;
@@ -796,6 +853,9 @@ void __dynamic_netdev_dbg(struct _ddebug *descriptor,
 
 	BUG_ON(!descriptor);
 	BUG_ON(!fmt);
+
+	if (is_onced_or_limited(descriptor))
+		return;
 
 	va_start(args, fmt);
 
@@ -832,6 +892,9 @@ void __dynamic_ibdev_dbg(struct _ddebug *descriptor,
 {
 	struct va_format vaf;
 	va_list args;
+
+	if (is_onced_or_limited(descriptor))
+		return;
 
 	va_start(args, fmt);
 
@@ -1307,3 +1370,63 @@ int dynamic_debug_unregister_tracer(const char *query, const char *modname,
 	return ddebug_exec_queries(query, modname, tracer);
 }
 EXPORT_SYMBOL(dynamic_debug_unregister_tracer);
+
+/*
+ * Rate-Limited debug is expected to rarely be needed, so it is
+ * provisioned on-demand when an enabled and rate-limit-flagged
+ * pr_debug is called, by ddebug_rl_fetch().  For now, key is just
+ * descriptor, so is unique per site.
+
+ * Plan: for 'gr' flagged callsites, choose a key that is same across
+ * all prdebugs in a function, to apply a single rate-limit to the
+ * whole function.  This should give nearly identical behavior at much
+ * lower memory cost.
+ */
+static DEFINE_HASHTABLE(ddebug_rl_map, 6);
+
+static struct ddebug_ratelimit *ddebug_rl_find(u64 key)
+{
+	struct ddebug_ratelimit *limiter;
+
+	hash_for_each_possible(ddebug_rl_map, limiter, hnode, key) {
+		if (limiter->key == key)
+			return limiter;
+	}
+	return NULL;
+}
+
+/* Must be called with ddebug_rl_lock locked. */
+static struct ddebug_ratelimit *ddebug_rl_add(u64 key)
+{
+	struct ddebug_ratelimit *limiter;
+
+	limiter = ddebug_rl_find(key);
+	if (limiter)
+		return limiter;
+	limiter = kmalloc(sizeof(*limiter), GFP_ATOMIC);
+	if (!limiter)
+		return ERR_PTR(-ENOMEM);
+
+	limiter->key = key;
+	ratelimit_default_init(&limiter->rs);
+	hash_add(ddebug_rl_map, &limiter->hnode, key);
+
+	v3pr_info("added %llx\n", key);
+	return limiter;
+}
+
+/*
+ * called when enabled callsite has _DPRINTK_FLAGS_RATELIMITED flag
+ * set (echo +pr >control), it hashes on &table-header+index
+ */
+static struct ddebug_ratelimit *ddebug_rl_fetch(struct _ddebug *desc)
+{
+	u64 key = (u64)desc;
+	struct ddebug_ratelimit *ddebug_rl = ddebug_rl_find(key);
+
+	if (ddebug_rl) {
+		v4pr_info("found %llx\n", key);
+		return ddebug_rl;
+	}
+	return ddebug_rl_add(key);
+}

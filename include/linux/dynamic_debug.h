@@ -28,26 +28,33 @@ struct _ddebug {
 	 * writes commands to <debugfs>/dynamic_debug/control
 	 */
 #define _DPRINTK_FLAGS_NONE	0
-#define _DPRINTK_FLAGS_PRINT		(1<<0) /* printk() a message */
+#define _DPRINTK_FLAGS_PRINT		(1<<4) /* printk() a message */
 #define _DPRINTK_FLAGS_PRINT_TRACE	(1<<5) /* call (*tracer) */
 
 #define _DPRINTK_ENABLED (_DPRINTK_FLAGS_PRINT | _DPRINTK_FLAGS_PRINT_TRACE)
 
-#define _DPRINTK_FLAGS_INCL_MODNAME	(1<<1)
-#define _DPRINTK_FLAGS_INCL_FUNCNAME	(1<<2)
-#define _DPRINTK_FLAGS_INCL_LINENO	(1<<3)
-#define _DPRINTK_FLAGS_INCL_TID		(1<<4)
+#define _DPRINTK_FLAGS_INCL_MODNAME	(1<<0)
+#define _DPRINTK_FLAGS_INCL_FUNCNAME	(1<<1)
+#define _DPRINTK_FLAGS_INCL_LINENO	(1<<2)
+#define _DPRINTK_FLAGS_INCL_TID		(1<<3)
 
 #define _DPRINTK_FLAGS_INCL_ANY		\
 	(_DPRINTK_FLAGS_INCL_MODNAME | _DPRINTK_FLAGS_INCL_FUNCNAME |\
 	 _DPRINTK_FLAGS_INCL_LINENO  | _DPRINTK_FLAGS_INCL_TID)
+
+#define _DPRINTK_FLAGS_ONCE		(1<<6) /* print once flag */
+#define _DPRINTK_FLAGS_PRINTED		(1<<7) /* print once state */
+#define _DPRINTK_FLAGS_RATELIMITED	(1<<8)
+#define _DPRINTK_FLAGS_GROUPED		(1<<9) /* manipulate as a group */
+#define _DPRINTK_FLAGS_DELETE_SITE	(1<<10) /* drop site info to save ram */
 
 #if defined DEBUG
 #define _DPRINTK_FLAGS_DEFAULT _DPRINTK_FLAGS_PRINT
 #else
 #define _DPRINTK_FLAGS_DEFAULT 0
 #endif
-	unsigned int flags:8;
+	unsigned int flags:11;
+
 #ifdef CONFIG_JUMP_LABEL
 	union {
 		struct static_key_true dd_key_true;
