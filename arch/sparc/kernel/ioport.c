@@ -369,7 +369,7 @@ void arch_dma_free(struct device *dev, size_t size, void *cpu_addr,
 void arch_sync_dma_for_cpu(phys_addr_t paddr, size_t size,
 		enum dma_data_direction dir)
 {
-	if (dir != PCI_DMA_TODEVICE)
+	if (dir != DMA_TO_DEVICE)
 		dma_make_coherent(paddr, PAGE_ALIGN(size));
 }
 
