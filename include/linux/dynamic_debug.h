@@ -20,6 +20,7 @@ struct _ddebug {
 	const char *function;
 	const char *filename;
 	const char *format;
+	int (*tracer)(const char *fmt, char *prefix, char *label, struct va_format *vaf);
 	unsigned int lineno:18;
 	/*
 	 * The flags field controls the behaviour at the callsite.
@@ -27,7 +28,11 @@ struct _ddebug {
 	 * writes commands to <debugfs>/dynamic_debug/control
 	 */
 #define _DPRINTK_FLAGS_NONE	0
-#define _DPRINTK_FLAGS_PRINT	(1<<0) /* printk() a message using the format */
+#define _DPRINTK_FLAGS_PRINT		(1<<0) /* printk() a message */
+#define _DPRINTK_FLAGS_PRINT_TRACE	(1<<5) /* call (*tracer) */
+
+#define _DPRINTK_ENABLED (_DPRINTK_FLAGS_PRINT | _DPRINTK_FLAGS_PRINT_TRACE)
+
 #define _DPRINTK_FLAGS_INCL_MODNAME	(1<<1)
 #define _DPRINTK_FLAGS_INCL_FUNCNAME	(1<<2)
 #define _DPRINTK_FLAGS_INCL_LINENO	(1<<3)
@@ -276,5 +281,10 @@ extern const struct kernel_param_ops param_ops_dyndbg;
 #define _DD_cat_(pfx)
 #define _DD_cat_help_(pfx)
 #endif
+
+int dynamic_debug_register_tracer(const char *query, const char *mod,
+	int (*tracer)(const char *fmt, char *prefix, char *label, struct va_format *vaf));
+int dynamic_debug_unregister_tracer(const char *query, const char *mod,
+	int (*cookie)(const char *fmt, char *prefix, char *label, struct va_format *vaf));
 
 #endif
