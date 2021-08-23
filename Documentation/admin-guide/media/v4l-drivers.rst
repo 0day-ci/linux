@@ -15,6 +15,7 @@ Video4Linux (V4L) driver-specific documentation
 	cx88
 	davinci-vpbe
 	fimc
+        hantro
 	imx
 	imx7
 	ipu3
