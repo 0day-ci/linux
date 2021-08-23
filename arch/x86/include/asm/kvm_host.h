@@ -1494,6 +1494,7 @@ struct kvm_x86_init_ops {
 	int (*disabled_by_bios)(void);
 	int (*check_processor_compatibility)(void);
 	int (*hardware_setup)(void);
+	int (*intel_pt_enabled)(void);
 
 	struct kvm_x86_ops *runtime_ops;
 };

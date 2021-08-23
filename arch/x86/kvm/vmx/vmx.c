@@ -7891,11 +7891,17 @@ static __init int hardware_setup(void)
 	return r;
 }
 
+static int vmx_intel_pt_enabled(void)
+{
+	return vmx_pt_mode_is_host_guest();
+}
+
 static struct kvm_x86_init_ops vmx_init_ops __initdata = {
 	.cpu_has_kvm_support = cpu_has_kvm_support,
 	.disabled_by_bios = vmx_disabled_by_bios,
 	.check_processor_compatibility = vmx_check_processor_compat,
 	.hardware_setup = hardware_setup,
+	.intel_pt_enabled = vmx_intel_pt_enabled,
 
 	.runtime_ops = &vmx_x86_ops,
 };
