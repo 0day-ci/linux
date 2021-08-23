@@ -47,7 +47,6 @@
 unsigned short ss;
 extern unsigned char breakpoint_insn[];
 sigjmp_buf jmpbuf;
-static unsigned char altstack_data[SIGSTKSZ];
 
 static void enable_watchpoint(void)
 {
@@ -250,7 +249,7 @@ int main()
 	if (sigsetjmp(jmpbuf, 1) == 0) {
 		printf("[RUN]\tMOV SS; SYSENTER\n");
 		stack_t stack = {
-			.ss_sp = altstack_data,
+			.ss_sp = malloc(sizeof(char) * SIGSTKSZ),
 			.ss_size = SIGSTKSZ,
 		};
 		if (sigaltstack(&stack, NULL) != 0)
@@ -282,5 +281,6 @@ int main()
 	}
 
 	printf("[OK]\tI aten't dead\n");
+	free(stack.ss_sp);
 	return 0;
 }
