@@ -489,7 +489,6 @@ static inline u8 *myid(struct eeprom_priv *peepriv)
 }
 
 /*  HCI Related header file */
-#include <sdio_osintf.h>
 #include <sdio_ops.h>
 #include <sdio_hal.h>
 
