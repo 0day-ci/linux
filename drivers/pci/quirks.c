@@ -5749,3 +5749,33 @@ static void apex_pci_fixup_class(struct pci_dev *pdev)
 }
 DECLARE_PCI_FIXUP_CLASS_HEADER(0x1ac1, 0x089a,
 			       PCI_CLASS_NOT_DEFINED, 8, apex_pci_fixup_class);
+
+/*
+ * This is a special card that sits in a x8 pciehp slot but is bifurcated as
+ * a x4x4 and manifests as two slots with respect to PCIe hot plug register
+ * states. However, the hotplug controller treats these slots as a single x8
+ * slot for link and power. Either one of the two slots can be powered down
+ * separately but real power and link will be active till the last of the two
+ * slots is powered down. When the last of the two x4 slots is turned off,
+ * power and link will be turned off for the x8 slot by the HP controller.
+ * This configuration causes some interesting behavior in bringup sequence
+ *
+ * When the second slot is powered off to remove the card, this will cause
+ * the link to go down for both x4 slots. So, the x4 that is already powered
+ * down earlier will see a DLLSC event and attempt to bring itself up (card
+ * present, link change event, link state is down). Special handling is
+ * required in pciehp_handle_presence_or_link_change to prevent this unintended
+ * bring up
+ *
+ */
+static void shared_pcc_and_link_slot(struct pci_dev *pdev)
+{
+	struct pci_dev *parent = pci_upstream_bridge(pdev);
+
+	if (pdev->subsystem_vendor == 0x108e &&
+	    pdev->subsystem_device == 0x487d) {
+		if (parent)
+			parent->shared_pcc_and_link_slot = 1;
+	}
+}
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL, 0x0B60, shared_pcc_and_link_slot);
