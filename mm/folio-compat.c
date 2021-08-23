@@ -123,8 +123,9 @@ struct page *pagecache_get_page(struct address_space *mapping, pgoff_t index,
 	struct folio *folio;
 
 	folio = __filemap_get_folio(mapping, index, fgp_flags, gfp);
-	if ((fgp_flags & FGP_HEAD) || !folio || xa_is_value(folio))
-		return &folio->page;
+	if ((fgp_flags & FGP_HEAD) || xa_is_value(folio))
+		if (folio != NULL)
+			return &folio->page;
 	return folio_file_page(folio, index);
 }
 EXPORT_SYMBOL(pagecache_get_page);
