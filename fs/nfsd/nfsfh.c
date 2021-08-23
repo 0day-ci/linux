@@ -172,7 +172,7 @@ static __be32 nfsd_set_fh_dentry(struct svc_rqst *rqstp, struct svc_fh *fhp)
 
 		if (--data_left < 0)
 			return error;
-		if (fh->fh_auth_type != 0)
+		if ((fh->fh_options & ~NFSD_FH_OPTION_ALL) != 0)
 			return error;
 		len = key_len(fh->fh_fsid_type) / 4;
 		if (len == 0)
@@ -569,6 +569,7 @@ fh_compose(struct svc_fh *fhp, struct svc_export *exp, struct dentry *dentry,
 
 	struct inode * inode = d_inode(dentry);
 	dev_t ex_dev = exp_sb(exp)->s_dev;
+	u8 options = 0;
 
 	dprintk("nfsd: fh_compose(exp %02x:%02x/%ld %pd2, ino=%ld)\n",
 		MAJOR(ex_dev), MINOR(ex_dev),
@@ -584,6 +585,14 @@ fh_compose(struct svc_fh *fhp, struct svc_export *exp, struct dentry *dentry,
 
 	/* If we have a ref_fh, then copy the fh_no_wcc setting from it. */
 	fhp->fh_no_wcc = ref_fh ? ref_fh->fh_no_wcc : false;
+
+	if (ref_fh && ref_fh->fh_export == exp) {
+		options = ref_fh->fh_handle.fh_options;
+	} else {
+		/* Set options as needed */
+		if (exp->ex_path.mnt->mnt_sb->s_magic == BTRFS_SUPER_MAGIC)
+			options |= NFSD_FH_OPTION_INO_UNIQUIFY;
+	}
 
 	if (ref_fh == fhp)
 		fh_put(ref_fh);
@@ -615,7 +624,7 @@ fh_compose(struct svc_fh *fhp, struct svc_export *exp, struct dentry *dentry,
 	} else {
 		fhp->fh_handle.fh_size =
 			key_len(fhp->fh_handle.fh_fsid_type) + 4;
-		fhp->fh_handle.fh_auth_type = 0;
+		fhp->fh_handle.fh_options = options;
 
 		mk_fsid(fhp->fh_handle.fh_fsid_type,
 			fhp->fh_handle.fh_fsid,

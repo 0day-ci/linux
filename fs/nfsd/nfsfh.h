@@ -84,6 +84,28 @@ enum fsid_source {
 };
 extern enum fsid_source fsid_source(const struct svc_fh *fhp);
 
+enum nfsd_fh_options {
+	NFSD_FH_OPTION_INO_UNIQUIFY = 1,	/* BTRFS only */
+
+	NFSD_FH_OPTION_ALL = 1
+};
+
+static inline u64 nfsd_ino_uniquifier(const struct svc_fh *fhp,
+				      const struct kstat *stat)
+{
+	if (fhp->fh_handle.fh_options & NFSD_FH_OPTION_INO_UNIQUIFY)
+		return stat->ino_uniquifier;
+	return 0;
+}
+
+static inline u64 nfsd_uniquify_ino(const struct svc_fh *fhp,
+				    const struct kstat *stat)
+{
+	u64 u = nfsd_ino_uniquifier(fhp, stat);
+	if (u != stat->ino)
+		return stat->ino ^ u;
+	return stat->ino;
+}
 
 /*
  * This might look a little large to "inline" but in all calls except

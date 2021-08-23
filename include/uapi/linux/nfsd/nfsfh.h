@@ -38,11 +38,17 @@ struct nfs_fhbase_old {
  * The file handle starts with a sequence of four-byte words.
  * The first word contains a version number (1) and three descriptor bytes
  * that tell how the remaining 3 variable length fields should be handled.
- * These three bytes are auth_type, fsid_type and fileid_type.
+ * These three bytes are options, fsid_type and fileid_type.
  *
  * All four-byte values are in host-byte-order.
  *
- * The auth_type field is deprecated and must be set to 0.
+ * The options field (previously auth_type) can be used when nfsd behaviour
+ * needs to change in a non-compatible way, usually for some specific
+ * filesystem.  Options should only be set in filehandles for filesystems which
+ * need them.
+ * Current values:
+ *   1  -  BTRFS only.  Cause stat->ino_uniquifier to be used to improve inode
+ *         number uniqueness.
  *
  * The fsid_type identifies how the filesystem (or export point) is
  *    encoded.
@@ -67,7 +73,7 @@ struct nfs_fhbase_new {
 	union {
 		struct {
 			__u8		fb_version_aux;	/* == 1, even => nfs_fhbase_old */
-			__u8		fb_auth_type_aux;
+			__u8		fb_options_aux;
 			__u8		fb_fsid_type_aux;
 			__u8		fb_fileid_type_aux;
 			__u32		fb_auth[1];
@@ -76,7 +82,7 @@ struct nfs_fhbase_new {
 		};
 		struct {
 			__u8		fb_version;	/* == 1, even => nfs_fhbase_old */
-			__u8		fb_auth_type;
+			__u8		fb_options;
 			__u8		fb_fsid_type;
 			__u8		fb_fileid_type;
 			__u32		fb_auth_flex[]; /* flexible-array member */
@@ -106,11 +112,11 @@ struct knfsd_fh {
 
 #define	fh_version		fh_base.fh_new.fb_version
 #define	fh_fsid_type		fh_base.fh_new.fb_fsid_type
-#define	fh_auth_type		fh_base.fh_new.fb_auth_type
+#define	fh_options		fh_base.fh_new.fb_options
 #define	fh_fileid_type		fh_base.fh_new.fb_fileid_type
 #define	fh_fsid			fh_base.fh_new.fb_auth_flex
 
 /* Do not use, provided for userspace compatiblity. */
-#define	fh_auth			fh_base.fh_new.fb_auth
+#define	fh_auth			fh_base.fh_new.fb_options
 
 #endif /* _UAPI_LINUX_NFSD_FH_H */

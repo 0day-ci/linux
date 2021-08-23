@@ -9195,6 +9195,10 @@ static int btrfs_getattr(struct user_namespace *mnt_userns,
 	generic_fillattr(&init_user_ns, inode, stat);
 	stat->dev = BTRFS_I(inode)->root->anon_dev;
 
+	if (BTRFS_I(inode)->root->root_key.objectid != BTRFS_FS_TREE_OBJECTID)
+		stat->ino_uniquifier =
+			swab64(BTRFS_I(inode)->root->root_key.objectid);
+
 	spin_lock(&BTRFS_I(inode)->lock);
 	delalloc_bytes = BTRFS_I(inode)->new_delalloc_bytes;
 	inode_bytes = inode_get_bytes(inode);

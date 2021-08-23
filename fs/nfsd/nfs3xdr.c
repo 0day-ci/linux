@@ -340,6 +340,7 @@ svcxdr_encode_fattr3(struct svc_rqst *rqstp, struct xdr_stream *xdr,
 {
 	struct user_namespace *userns = nfsd_user_namespace(rqstp);
 	__be32 *p;
+	u64 ino;
 	u64 fsid;
 
 	p = xdr_reserve_space(xdr, XDR_UNIT * 21);
@@ -377,7 +378,8 @@ svcxdr_encode_fattr3(struct svc_rqst *rqstp, struct xdr_stream *xdr,
 	p = xdr_encode_hyper(p, fsid);
 
 	/* fileid */
-	p = xdr_encode_hyper(p, stat->ino);
+	ino = nfsd_uniquify_ino(fhp, stat);
+	p = xdr_encode_hyper(p, ino);
 
 	p = encode_nfstime3(p, &stat->atime);
 	p = encode_nfstime3(p, &stat->mtime);
@@ -1151,6 +1153,17 @@ svcxdr_encode_entry3_common(struct nfsd3_readdirres *resp, const char *name,
 	if (xdr_stream_encode_item_present(xdr) < 0)
 		return false;
 	/* fileid */
+	if (!resp->dir_have_uniquifier) {
+		struct kstat stat;
+		if (fh_getattr(&resp->fh, &stat) == nfs_ok)
+			resp->dir_ino_uniquifier =
+				nfsd_ino_uniquifier(&resp->fh, &stat);
+		else
+			resp->dir_ino_uniquifier = 0;
+		resp->dir_have_uniquifier = true;
+	}
+	if (resp->dir_ino_uniquifier != ino)
+		ino ^= resp->dir_ino_uniquifier;
 	if (xdr_stream_encode_u64(xdr, ino) < 0)
 		return false;
 	/* name */
