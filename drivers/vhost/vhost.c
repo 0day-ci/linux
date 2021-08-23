@@ -500,6 +500,7 @@ void vhost_dev_init(struct vhost_dev *dev,
 		vq->indirect = NULL;
 		vq->heads = NULL;
 		vq->dev = dev;
+		vq->weak_barriers = true;
 		mutex_init(&vq->mutex);
 		vhost_vq_reset(dev, vq);
 		if (vq->handle_kick)
@@ -1807,6 +1808,10 @@ long vhost_dev_ioctl(struct vhost_dev *d, unsigned int ioctl, void __user *argp)
 		if (ctx)
 			eventfd_ctx_put(ctx);
 		break;
+	case VHOST_SET_STRONG_BARRIERS:
+		for (i = 0; i < d->nvqs; ++i)
+			d->vqs[i]->weak_barriers = false;
+		break;
 	default:
 		r = -ENOIOCTLCMD;
 		break;
@@ -1933,7 +1938,7 @@ int vhost_log_write(struct vhost_virtqueue *vq, struct vhost_log *log,
 	int i, r;
 
 	/* Make sure data written is seen before log. */
-	smp_wmb();
+	virtio_wmb(vq->weak_barriers);
 
 	if (vq->iotlb) {
 		for (i = 0; i < count; i++) {
@@ -1970,7 +1975,7 @@ static int vhost_update_used_flags(struct vhost_virtqueue *vq)
 		return -EFAULT;
 	if (unlikely(vq->log_used)) {
 		/* Make sure the flag is seen before log. */
-		smp_wmb();
+		virtio_wmb(vq->weak_barriers);
 		/* Log used flag write. */
 		used = &vq->used->flags;
 		log_used(vq, (used - (void __user *)vq->used),
@@ -1988,7 +1993,7 @@ static int vhost_update_avail_event(struct vhost_virtqueue *vq, u16 avail_event)
 	if (unlikely(vq->log_used)) {
 		void __user *used;
 		/* Make sure the event is seen before log. */
-		smp_wmb();
+		virtio_wmb(vq->weak_barriers);
 		/* Log avail event write */
 		used = vhost_avail_event(vq);
 		log_used(vq, (used - (void __user *)vq->used),
@@ -2234,7 +2239,7 @@ int vhost_get_vq_desc(struct vhost_virtqueue *vq,
 		/* Only get avail ring entries after they have been
 		 * exposed by guest.
 		 */
-		smp_rmb();
+		virtio_rmb(vq->weak_barriers);
 	}
 
 	/* Grab the next descriptor number they're advertising, and increment
@@ -2373,7 +2378,7 @@ static int __vhost_add_used_n(struct vhost_virtqueue *vq,
 	}
 	if (unlikely(vq->log_used)) {
 		/* Make sure data is seen before log. */
-		smp_wmb();
+		virtio_wmb(vq->weak_barriers);
 		/* Log used ring entry write. */
 		log_used(vq, ((void __user *)used - (void __user *)vq->used),
 			 count * sizeof *used);
@@ -2408,14 +2413,14 @@ int vhost_add_used_n(struct vhost_virtqueue *vq, struct vring_used_elem *heads,
 	r = __vhost_add_used_n(vq, heads, count);
 
 	/* Make sure buffer is written before we update index. */
-	smp_wmb();
+	virtio_wmb(vq->weak_barriers);
 	if (vhost_put_used_idx(vq)) {
 		vq_err(vq, "Failed to increment used idx");
 		return -EFAULT;
 	}
 	if (unlikely(vq->log_used)) {
 		/* Make sure used idx is seen before log. */
-		smp_wmb();
+		virtio_wmb(vq->weak_barriers);
 		/* Log used index update. */
 		log_used(vq, offsetof(struct vring_used, idx),
 			 sizeof vq->used->idx);
@@ -2434,7 +2439,7 @@ static bool vhost_notify(struct vhost_dev *dev, struct vhost_virtqueue *vq)
 	/* Flush out used index updates. This is paired
 	 * with the barrier that the Guest executes when enabling
 	 * interrupts. */
-	smp_mb();
+	virtio_mb(vq->weak_barriers);
 
 	if (vhost_has_feature(vq, VIRTIO_F_NOTIFY_ON_EMPTY) &&
 	    unlikely(vq->avail_idx == vq->last_avail_idx))
@@ -2536,7 +2541,7 @@ bool vhost_enable_notify(struct vhost_dev *dev, struct vhost_virtqueue *vq)
 	}
 	/* They could have slipped one in as we were doing that: make
 	 * sure it's written, then check again. */
-	smp_mb();
+	virtio_mb(vq->weak_barriers);
 	r = vhost_get_avail_idx(vq, &avail_idx);
 	if (r) {
 		vq_err(vq, "Failed to check avail idx at %p: %d\n",
