@@ -308,9 +308,15 @@ static void device_hard_reset_pending(struct work_struct *work)
 		container_of(work, struct hl_device_reset_work,
 				reset_work.work);
 	struct hl_device *hdev = device_reset_work->hdev;
+	u32 flags;
 	int rc;
 
-	rc = hl_device_reset(hdev, HL_RESET_HARD | HL_RESET_FROM_RESET_THREAD);
+	flags = HL_RESET_HARD | HL_RESET_FROM_RESET_THREAD;
+
+	if (device_reset_work->fw_reset)
+		flags |= HL_RESET_FW;
+
+	rc = hl_device_reset(hdev, flags);
 	if ((rc == -EBUSY) && !hdev->device_fini_pending) {
 		dev_info(hdev->dev,
 			"Could not reset device. will try again in %u seconds",
@@ -699,7 +705,7 @@ static void take_release_locks(struct hl_device *hdev)
 	mutex_unlock(&hdev->fpriv_list_lock);
 }
 
-static void cleanup_resources(struct hl_device *hdev, bool hard_reset)
+static void cleanup_resources(struct hl_device *hdev, bool hard_reset, bool fw_reset)
 {
 	if (hard_reset)
 		device_late_fini(hdev);
@@ -709,7 +715,7 @@ static void cleanup_resources(struct hl_device *hdev, bool hard_reset)
 	 * completions from H/W and we won't have any accesses from the
 	 * H/W to the host machine
 	 */
-	hdev->asic_funcs->halt_engines(hdev, hard_reset);
+	hdev->asic_funcs->halt_engines(hdev, hard_reset, fw_reset);
 
 	/* Go over all the queues, release all CS and their jobs */
 	hl_cs_rollback_all(hdev);
@@ -919,7 +925,7 @@ static void device_disable_open_processes(struct hl_device *hdev)
 int hl_device_reset(struct hl_device *hdev, u32 flags)
 {
 	u64 idle_mask[HL_BUSY_ENGINES_MASK_EXT_SIZE] = {0};
-	bool hard_reset, from_hard_reset_thread, hard_instead_soft = false;
+	bool hard_reset, from_hard_reset_thread, fw_reset, hard_instead_soft = false;
 	int i, rc;
 
 	if (!hdev->init_done) {
@@ -930,6 +936,7 @@ int hl_device_reset(struct hl_device *hdev, u32 flags)
 
 	hard_reset = !!(flags & HL_RESET_HARD);
 	from_hard_reset_thread = !!(flags & HL_RESET_FROM_RESET_THREAD);
+	fw_reset = !!(flags & HL_RESET_FW);
 
 	if (!hard_reset && !hdev->supports_soft_reset) {
 		hard_instead_soft = true;
@@ -981,11 +988,13 @@ do_reset:
 		else
 			hdev->curr_reset_cause = HL_RESET_CAUSE_UNKNOWN;
 
-		/*
-		 * if reset is due to heartbeat, device CPU is no responsive in
-		 * which case no point sending PCI disable message to it
+		/* If reset is due to heartbeat, device CPU is no responsive in
+		 * which case no point sending PCI disable message to it.
+		 *
+		 * If F/W is performing the reset, no need to send it a message to disable
+		 * PCI access
 		 */
-		if (hard_reset && !(flags & HL_RESET_HEARTBEAT)) {
+		if (hard_reset && !(flags & (HL_RESET_HEARTBEAT | HL_RESET_FW))) {
 			/* Disable PCI access from device F/W so he won't send
 			 * us additional interrupts. We disable MSI/MSI-X at
 			 * the halt_engines function and we can't have the F/W
@@ -1015,6 +1024,8 @@ again:
 
 		hdev->process_kill_trial_cnt = 0;
 
+		hdev->device_reset_work.fw_reset = fw_reset;
+
 		/*
 		 * Because the reset function can't run from heartbeat work,
 		 * we need to call the reset function from a dedicated work.
@@ -1025,7 +1036,7 @@ again:
 		return 0;
 	}
 
-	cleanup_resources(hdev, hard_reset);
+	cleanup_resources(hdev, hard_reset, fw_reset);
 
 kill_processes:
 	if (hard_reset) {
@@ -1059,7 +1070,7 @@ kill_processes:
 	}
 
 	/* Reset the H/W. It will be in idle state after this returns */
-	hdev->asic_funcs->hw_fini(hdev, hard_reset);
+	hdev->asic_funcs->hw_fini(hdev, hard_reset, fw_reset);
 
 	if (hard_reset) {
 		hdev->fw_loader.linux_loaded = false;
@@ -1584,7 +1595,7 @@ void hl_device_fini(struct hl_device *hdev)
 
 	hl_hwmon_fini(hdev);
 
-	cleanup_resources(hdev, true);
+	cleanup_resources(hdev, true, false);
 
 	/* Kill processes here after CS rollback. This is because the process
 	 * can't really exit until all its CSs are done, which is what we
@@ -1603,7 +1614,7 @@ void hl_device_fini(struct hl_device *hdev)
 	hl_cb_pool_fini(hdev);
 
 	/* Reset the H/W. It will be in idle state after this returns */
-	hdev->asic_funcs->hw_fini(hdev, true);
+	hdev->asic_funcs->hw_fini(hdev, true, false);
 
 	hdev->fw_loader.linux_loaded = false;
 
