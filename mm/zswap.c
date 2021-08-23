@@ -902,9 +902,14 @@ static int zswap_get_swap_cache_page(swp_entry_t entry,
 				struct page **retpage)
 {
 	bool page_was_allocated;
+	struct swap_info_struct *si;
 
+	si = get_swap_device(entry);
+	if (!si)
+		return ZSWAP_SWAPCACHE_FAIL;
 	*retpage = __read_swap_cache_async(entry, GFP_KERNEL,
 			NULL, 0, &page_was_allocated);
+	put_swap_device(si);
 	if (page_was_allocated)
 		return ZSWAP_SWAPCACHE_NEW;
 	if (!*retpage)

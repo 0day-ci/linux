@@ -1718,6 +1718,7 @@ static int shmem_swapin_page(struct inode *inode, pgoff_t index,
 	struct shmem_inode_info *info = SHMEM_I(inode);
 	struct mm_struct *charge_mm = vma ? vma->vm_mm : NULL;
 	struct page *page;
+	struct swap_info_struct *si;
 	swp_entry_t swap;
 	int error;
 
@@ -1725,6 +1726,9 @@ static int shmem_swapin_page(struct inode *inode, pgoff_t index,
 	swap = radix_to_swp_entry(*pagep);
 	*pagep = NULL;
 
+	si = get_swap_device(swap);
+	if (!si)
+		return -EEXIST;
 	/* Look it up and read it in.. */
 	page = lookup_swap_cache(swap, NULL, 0);
 	if (!page) {
@@ -1784,6 +1788,7 @@ static int shmem_swapin_page(struct inode *inode, pgoff_t index,
 	delete_from_swap_cache(page);
 	set_page_dirty(page);
 	swap_free(swap);
+	put_swap_device(si);
 
 	*pagep = page;
 	return 0;
@@ -1795,6 +1800,7 @@ unlock:
 		unlock_page(page);
 		put_page(page);
 	}
+	put_swap_device(si);
 
 	return error;
 }

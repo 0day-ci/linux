@@ -1012,6 +1012,7 @@ copy_pte_range(struct vm_area_struct *dst_vma, struct vm_area_struct *src_vma,
 	int progress, ret = 0;
 	int rss[NR_MM_COUNTERS];
 	swp_entry_t entry = (swp_entry_t){0};
+	struct swap_info_struct *si;
 	struct page *prealloc = NULL;
 
 again:
@@ -1052,6 +1053,7 @@ again:
 						  addr, rss);
 			if (ret == -EIO) {
 				entry = pte_to_swp_entry(*src_pte);
+				si = get_swap_device(entry);
 				break;
 			} else if (ret == -EBUSY) {
 				break;
@@ -1096,8 +1098,12 @@ again:
 	cond_resched();
 
 	if (ret == -EIO) {
+		int err;
+
 		VM_WARN_ON_ONCE(!entry.val);
-		if (add_swap_count_continuation(entry, GFP_KERNEL) < 0) {
+		err = add_swap_count_continuation(entry, GFP_KERNEL);
+		put_swap_device(si);
+		if (err < 0) {
 			ret = -ENOMEM;
 			goto out;
 		}

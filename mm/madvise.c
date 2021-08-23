@@ -199,6 +199,7 @@ static int swapin_walk_pmd_entry(pmd_t *pmd, unsigned long start,
 		swp_entry_t entry;
 		struct page *page;
 		spinlock_t *ptl;
+		struct swap_info_struct *si;
 
 		orig_pte = pte_offset_map_lock(vma->vm_mm, pmd, start, &ptl);
 		pte = *(orig_pte + ((index - start) / PAGE_SIZE));
@@ -209,11 +210,15 @@ static int swapin_walk_pmd_entry(pmd_t *pmd, unsigned long start,
 		entry = pte_to_swp_entry(pte);
 		if (unlikely(non_swap_entry(entry)))
 			continue;
+		si = get_swap_device(entry);
+		if (!si)
+			continue;
 
 		page = read_swap_cache_async(entry, GFP_HIGHUSER_MOVABLE,
 							vma, index, false);
 		if (page)
 			put_page(page);
+		put_swap_device(si);
 	}
 
 	return 0;
@@ -234,6 +239,7 @@ static void force_shm_swapin_readahead(struct vm_area_struct *vma,
 	rcu_read_lock();
 	xas_for_each(&xas, page, end_index) {
 		swp_entry_t swap;
+		struct swap_info_struct *si;
 
 		if (!xa_is_value(page))
 			continue;
@@ -241,10 +247,14 @@ static void force_shm_swapin_readahead(struct vm_area_struct *vma,
 		rcu_read_unlock();
 
 		swap = radix_to_swp_entry(page);
+		si = get_swap_device(swap);
+		if (!si)
+			continue;
 		page = read_swap_cache_async(swap, GFP_HIGHUSER_MOVABLE,
 							NULL, 0, false);
 		if (page)
 			put_page(page);
+		put_swap_device(si);
 
 		rcu_read_lock();
 	}

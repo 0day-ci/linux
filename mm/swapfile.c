@@ -1472,14 +1472,9 @@ int __swap_count(swp_entry_t entry)
 {
 	struct swap_info_struct *si;
 	pgoff_t offset = swp_offset(entry);
-	int count = 0;
 
-	si = get_swap_device(entry);
-	if (si) {
-		count = swap_count(si->swap_map[offset]);
-		put_swap_device(si);
-	}
-	return count;
+	si = swp_swap_info(entry);
+	return swap_count(si->swap_map[offset]);
 }
 
 static int swap_swapcount(struct swap_info_struct *si, swp_entry_t entry)
@@ -1501,15 +1496,10 @@ static int swap_swapcount(struct swap_info_struct *si, swp_entry_t entry)
  */
 int __swp_swapcount(swp_entry_t entry)
 {
-	int count = 0;
 	struct swap_info_struct *si;
 
-	si = get_swap_device(entry);
-	if (si) {
-		count = swap_swapcount(si, entry);
-		put_swap_device(si);
-	}
-	return count;
+	si = swp_swap_info(entry);
+	return swap_swapcount(si, entry);
 }
 
 /*
@@ -3430,10 +3420,7 @@ static int __swap_duplicate(swp_entry_t entry, unsigned char usage)
 	unsigned char has_cache;
 	int err;
 
-	p = get_swap_device(entry);
-	if (!p)
-		return -EINVAL;
-
+	p = swp_swap_info(entry);
 	offset = swp_offset(entry);
 	ci = lock_cluster_or_swap_info(p, offset);
 
@@ -3479,8 +3466,6 @@ static int __swap_duplicate(swp_entry_t entry, unsigned char usage)
 
 unlock_out:
 	unlock_cluster_or_swap_info(p, ci);
-	if (p)
-		put_swap_device(p);
 	return err;
 }
 
@@ -3581,14 +3566,7 @@ int add_swap_count_continuation(swp_entry_t entry, gfp_t gfp_mask)
 	 */
 	page = alloc_page(gfp_mask | __GFP_HIGHMEM);
 
-	si = get_swap_device(entry);
-	if (!si) {
-		/*
-		 * An acceptable race has occurred since the failing
-		 * __swap_duplicate(): the swap device may be swapoff
-		 */
-		goto outer;
-	}
+	si = swp_swap_info(entry);
 	spin_lock(&si->lock);
 
 	offset = swp_offset(entry);
@@ -3660,8 +3638,6 @@ out_unlock_cont:
 out:
 	unlock_cluster(ci);
 	spin_unlock(&si->lock);
-	put_swap_device(si);
-outer:
 	if (page)
 		__free_page(page);
 	return ret;

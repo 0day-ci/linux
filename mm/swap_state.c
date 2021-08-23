@@ -335,14 +335,8 @@ struct page *lookup_swap_cache(swp_entry_t entry, struct vm_area_struct *vma,
 			       unsigned long addr)
 {
 	struct page *page;
-	struct swap_info_struct *si;
 
-	si = get_swap_device(entry);
-	if (!si)
-		return NULL;
 	page = find_get_page(swap_address_space(entry), swp_offset(entry));
-	put_swap_device(si);
-
 	INC_CACHE_INFO(find_total);
 	if (page) {
 		bool vma_ra = swap_use_vma_readahead();
@@ -418,7 +412,6 @@ struct page *__read_swap_cache_async(swp_entry_t entry, gfp_t gfp_mask,
 			struct vm_area_struct *vma, unsigned long addr,
 			bool *new_page_allocated)
 {
-	struct swap_info_struct *si;
 	struct page *page;
 	void *shadow = NULL;
 
@@ -431,12 +424,8 @@ struct page *__read_swap_cache_async(swp_entry_t entry, gfp_t gfp_mask,
 		 * called after lookup_swap_cache() failed, re-calling
 		 * that would confuse statistics.
 		 */
-		si = get_swap_device(entry);
-		if (!si)
-			return NULL;
 		page = find_get_page(swap_address_space(entry),
 				     swp_offset(entry));
-		put_swap_device(si);
 		if (page)
 			return page;
 
@@ -794,10 +783,12 @@ static struct page *swap_vma_readahead(swp_entry_t fentry, gfp_t gfp_mask,
 	pte_t *pte, pentry;
 	swp_entry_t entry;
 	unsigned int i;
+	unsigned int type, ftype = swp_type(fentry);
 	bool page_allocated;
 	struct vma_swap_readahead ra_info = {
 		.win = 1,
 	};
+	struct swap_info_struct *si = NULL;
 
 	swap_ra_info(vmf, &ra_info);
 	if (ra_info.win == 1)
@@ -814,6 +805,14 @@ static struct page *swap_vma_readahead(swp_entry_t fentry, gfp_t gfp_mask,
 		entry = pte_to_swp_entry(pentry);
 		if (unlikely(non_swap_entry(entry)))
 			continue;
+		type = swp_type(entry);
+		if (type != ftype && (!si || si->type != type)) {
+			if (si)
+				put_swap_device(si);
+			si = get_swap_device(entry);
+			if (!si)
+				continue;
+		}
 		page = __read_swap_cache_async(entry, gfp_mask, vma,
 					       vmf->address, &page_allocated);
 		if (!page)
@@ -827,6 +826,8 @@ static struct page *swap_vma_readahead(swp_entry_t fentry, gfp_t gfp_mask,
 		}
 		put_page(page);
 	}
+	if (si)
+		put_swap_device(si);
 	blk_finish_plug(&plug);
 	lru_add_drain();
 skip:
