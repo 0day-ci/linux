@@ -560,8 +560,7 @@ get_plt (struct module *mod, const struct insn *insn, uint64_t value, int *okp)
 	while (plt->bundle[0][0]) {
 		if (plt_target(plt) == target_ip)
 			goto found;
-		if (++plt >= plt_end)
-			BUG();
+		BUG_ON(++plt >= plt_end);
 	}
 	*plt = ia64_plt_template;
 	if (!patch_plt(mod, plt, target_ip, target_gp)) {
@@ -605,8 +604,7 @@ get_fdesc (struct module *mod, uint64_t value, int *okp)
 	while (fdesc->ip) {
 		if (fdesc->ip == value)
 			return (uint64_t)fdesc;
-		if ((uint64_t) ++fdesc >= mod->arch.opd->sh_addr + mod->arch.opd->sh_size)
-			BUG();
+		BUG_ON((uint64_t) ++fdesc >= mod->arch.opd->sh_addr + mod->arch.opd->sh_size);
 	}
 
 	/* Create new one */
