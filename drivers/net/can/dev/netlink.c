@@ -58,14 +58,20 @@ static int can_changelink(struct net_device *dev, struct nlattr *tb[],
 			  struct nlattr *data[],
 			  struct netlink_ext_ack *extack)
 {
-	struct can_priv *priv = netdev_priv(dev);
+	/* Work on a local copy of priv to prevent inconsistent value
+	 * in case of early return. net/core/rtnetlink.c has a global
+	 * mutex so using a static declaration is race free
+	 */
+	static struct can_priv priv;
 	int err;
 
 	/* We need synchronization with dev->stop() */
 	ASSERT_RTNL();
 
+	memcpy(&priv, netdev_priv(dev), sizeof(priv));
+
 	if (data[IFLA_CAN_BITTIMING]) {
-		struct can_bittiming bt;
+		struct can_bittiming *bt = &priv.bittiming;
 
 		/* Do not allow changing bittiming while running */
 		if (dev->flags & IFF_UP)
@@ -76,28 +82,26 @@ static int can_changelink(struct net_device *dev, struct nlattr *tb[],
 		 * directly via do_set_bitrate(). Bail out if neither
 		 * is given.
 		 */
-		if (!priv->bittiming_const && !priv->do_set_bittiming)
+		if (!priv.bittiming_const && !priv.do_set_bittiming)
 			return -EOPNOTSUPP;
 
-		memcpy(&bt, nla_data(data[IFLA_CAN_BITTIMING]), sizeof(bt));
-		err = can_get_bittiming(dev, &bt,
-					priv->bittiming_const,
-					priv->bitrate_const,
-					priv->bitrate_const_cnt);
+		memcpy(bt, nla_data(data[IFLA_CAN_BITTIMING]), sizeof(*bt));
+		err = can_get_bittiming(dev, bt,
+					priv.bittiming_const,
+					priv.bitrate_const,
+					priv.bitrate_const_cnt);
 		if (err)
 			return err;
 
-		if (priv->bitrate_max && bt.bitrate > priv->bitrate_max) {
+		if (priv.bitrate_max && bt->bitrate > priv.bitrate_max) {
 			netdev_err(dev, "arbitration bitrate surpasses transceiver capabilities of %d bps\n",
-				   priv->bitrate_max);
+				   priv.bitrate_max);
 			return -EINVAL;
 		}
 
-		memcpy(&priv->bittiming, &bt, sizeof(bt));
-
-		if (priv->do_set_bittiming) {
+		if (priv.do_set_bittiming) {
 			/* Finally, set the bit-timing registers */
-			err = priv->do_set_bittiming(dev);
+			err = priv.do_set_bittiming(dev);
 			if (err)
 				return err;
 		}
@@ -112,11 +116,11 @@ static int can_changelink(struct net_device *dev, struct nlattr *tb[],
 		if (dev->flags & IFF_UP)
 			return -EBUSY;
 		cm = nla_data(data[IFLA_CAN_CTRLMODE]);
-		ctrlstatic = priv->ctrlmode_static;
+		ctrlstatic = priv.ctrlmode_static;
 		maskedflags = cm->flags & cm->mask;
 
 		/* check whether provided bits are allowed to be passed */
-		if (maskedflags & ~(priv->ctrlmode_supported | ctrlstatic))
+		if (maskedflags & ~(priv.ctrlmode_supported | ctrlstatic))
 			return -EOPNOTSUPP;
 
 		/* do not check for static fd-non-iso if 'fd' is disabled */
@@ -128,16 +132,16 @@ static int can_changelink(struct net_device *dev, struct nlattr *tb[],
 			return -EOPNOTSUPP;
 
 		/* clear bits to be modified and copy the flag values */
-		priv->ctrlmode &= ~cm->mask;
-		priv->ctrlmode |= maskedflags;
+		priv.ctrlmode &= ~cm->mask;
+		priv.ctrlmode |= maskedflags;
 
 		/* CAN_CTRLMODE_FD can only be set when driver supports FD */
-		if (priv->ctrlmode & CAN_CTRLMODE_FD) {
+		if (priv.ctrlmode & CAN_CTRLMODE_FD) {
 			dev->mtu = CANFD_MTU;
 		} else {
 			dev->mtu = CAN_MTU;
-			memset(&priv->data_bittiming, 0,
-			       sizeof(priv->data_bittiming));
+			memset(&priv.data_bittiming, 0,
+			       sizeof(priv.data_bittiming));
 		}
 	}
 
@@ -145,7 +149,7 @@ static int can_changelink(struct net_device *dev, struct nlattr *tb[],
 		/* Do not allow changing restart delay while running */
 		if (dev->flags & IFF_UP)
 			return -EBUSY;
-		priv->restart_ms = nla_get_u32(data[IFLA_CAN_RESTART_MS]);
+		priv.restart_ms = nla_get_u32(data[IFLA_CAN_RESTART_MS]);
 	}
 
 	if (data[IFLA_CAN_RESTART]) {
@@ -158,7 +162,7 @@ static int can_changelink(struct net_device *dev, struct nlattr *tb[],
 	}
 
 	if (data[IFLA_CAN_DATA_BITTIMING]) {
-		struct can_bittiming dbt;
+		struct can_bittiming *dbt = &priv.data_bittiming;
 
 		/* Do not allow changing bittiming while running */
 		if (dev->flags & IFF_UP)
@@ -169,31 +173,29 @@ static int can_changelink(struct net_device *dev, struct nlattr *tb[],
 		 * directly via do_set_bitrate(). Bail out if neither
 		 * is given.
 		 */
-		if (!priv->data_bittiming_const && !priv->do_set_data_bittiming)
+		if (!priv.data_bittiming_const && !priv.do_set_data_bittiming)
 			return -EOPNOTSUPP;
 
-		memcpy(&dbt, nla_data(data[IFLA_CAN_DATA_BITTIMING]),
-		       sizeof(dbt));
-		err = can_get_bittiming(dev, &dbt,
-					priv->data_bittiming_const,
-					priv->data_bitrate_const,
-					priv->data_bitrate_const_cnt);
+		memcpy(dbt, nla_data(data[IFLA_CAN_DATA_BITTIMING]),
+		       sizeof(*dbt));
+		err = can_get_bittiming(dev, dbt,
+					priv.data_bittiming_const,
+					priv.data_bitrate_const,
+					priv.data_bitrate_const_cnt);
 		if (err)
 			return err;
 
-		if (priv->bitrate_max && dbt.bitrate > priv->bitrate_max) {
+		if (priv.bitrate_max && dbt->bitrate > priv.bitrate_max) {
 			netdev_err(dev, "canfd data bitrate surpasses transceiver capabilities of %d bps\n",
-				   priv->bitrate_max);
+				   priv.bitrate_max);
 			return -EINVAL;
 		}
 
-		memcpy(&priv->data_bittiming, &dbt, sizeof(dbt));
+		can_calc_tdco(&priv.tdc, priv.tdc_const, &priv.data_bittiming);
 
-		can_calc_tdco(dev);
-
-		if (priv->do_set_data_bittiming) {
+		if (priv.do_set_data_bittiming) {
 			/* Finally, set the bit-timing registers */
-			err = priv->do_set_data_bittiming(dev);
+			err = priv.do_set_data_bittiming(dev);
 			if (err)
 				return err;
 		}
@@ -201,27 +203,29 @@ static int can_changelink(struct net_device *dev, struct nlattr *tb[],
 
 	if (data[IFLA_CAN_TERMINATION]) {
 		const u16 termval = nla_get_u16(data[IFLA_CAN_TERMINATION]);
-		const unsigned int num_term = priv->termination_const_cnt;
+		const unsigned int num_term = priv.termination_const_cnt;
 		unsigned int i;
 
-		if (!priv->do_set_termination)
+		if (!priv.do_set_termination)
 			return -EOPNOTSUPP;
 
 		/* check whether given value is supported by the interface */
 		for (i = 0; i < num_term; i++) {
-			if (termval == priv->termination_const[i])
+			if (termval == priv.termination_const[i])
 				break;
 		}
 		if (i >= num_term)
 			return -EINVAL;
 
 		/* Finally, set the termination value */
-		err = priv->do_set_termination(dev, termval);
+		err = priv.do_set_termination(dev, termval);
 		if (err)
 			return err;
 
-		priv->termination = termval;
+		priv.termination = termval;
 	}
+
+	memcpy(netdev_priv(dev), &priv, sizeof(priv));
 
 	return 0;
 }
