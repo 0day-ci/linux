@@ -301,6 +301,24 @@ static u8 intel_dp_phy_preemph_max(struct intel_dp *intel_dp,
 	return preemph_max;
 }
 
+static void intel_dp_128b132b_adjust_train(struct intel_dp *intel_dp,
+					   const struct intel_crtc_state *crtc_state,
+					   const u8 link_status[DP_LINK_STATUS_SIZE])
+{
+	int lane;
+	u8 tx_ffe = 0;
+
+	/*
+	 * FIXME: We'll want independent presets for each lane. See also
+	 * intel_ddi_dp_level() and intel_snps_phy_ddi_vswing_sequence().
+	 */
+	for (lane = 0; lane < crtc_state->lane_count; lane++)
+		tx_ffe = max(tx_ffe, drm_dp_get_adjust_tx_ffe_preset(link_status, lane));
+
+	for (lane = 0; lane < crtc_state->lane_count; lane++)
+		intel_dp->train_set[lane] = tx_ffe;
+}
+
 void
 intel_dp_get_adjust_train(struct intel_dp *intel_dp,
 			  const struct intel_crtc_state *crtc_state,
@@ -312,6 +330,11 @@ intel_dp_get_adjust_train(struct intel_dp *intel_dp,
 	int lane;
 	u8 voltage_max;
 	u8 preemph_max;
+
+	if (intel_dp_is_uhbr(crtc_state)) {
+		intel_dp_128b132b_adjust_train(intel_dp, crtc_state, link_status);
+		return;
+	}
 
 	for (lane = 0; lane < crtc_state->lane_count; lane++) {
 		v = max(v, drm_dp_get_adjust_request_voltage(link_status, lane));
@@ -402,14 +425,21 @@ void intel_dp_set_signal_levels(struct intel_dp *intel_dp,
 	u8 train_set = intel_dp->train_set[0];
 	char phy_name[10];
 
-	drm_dbg_kms(&dev_priv->drm, "Using vswing level %d%s, pre-emphasis level %d%s, at %s\n",
-		    train_set & DP_TRAIN_VOLTAGE_SWING_MASK,
-		    train_set & DP_TRAIN_MAX_SWING_REACHED ? " (max)" : "",
-		    (train_set & DP_TRAIN_PRE_EMPHASIS_MASK) >>
-		    DP_TRAIN_PRE_EMPHASIS_SHIFT,
-		    train_set & DP_TRAIN_MAX_PRE_EMPHASIS_REACHED ?
-		    " (max)" : "",
-		    intel_dp_phy_name(dp_phy, phy_name, sizeof(phy_name)));
+	if (intel_dp_is_uhbr(crtc_state)) {
+		/* FIXME: We'll want independent presets for each lane. */
+		drm_dbg_kms(&dev_priv->drm, "%s: Using 128b/132b TX FFE preset %u\n",
+			    intel_dp_phy_name(dp_phy, phy_name, sizeof(phy_name)),
+			    train_set & DP_TX_FFE_PRESET_VALUE_MASK);
+	} else {
+		drm_dbg_kms(&dev_priv->drm, "%s: Using 8b/10b vswing level %d%s, pre-emphasis level %d%s\n",
+			    intel_dp_phy_name(dp_phy, phy_name, sizeof(phy_name)),
+			    train_set & DP_TRAIN_VOLTAGE_SWING_MASK,
+			    train_set & DP_TRAIN_MAX_SWING_REACHED ? " (max)" : "",
+			    (train_set & DP_TRAIN_PRE_EMPHASIS_MASK) >>
+			    DP_TRAIN_PRE_EMPHASIS_SHIFT,
+			    train_set & DP_TRAIN_MAX_PRE_EMPHASIS_REACHED ?
+			    " (max)" : "");
+	}
 
 	if (intel_dp_phy_is_downstream_of_source(intel_dp, dp_phy))
 		intel_dp->set_signal_levels(intel_dp, crtc_state);
@@ -565,18 +595,21 @@ intel_dp_link_training_clock_recovery(struct intel_dp *intel_dp,
 			return true;
 		}
 
-		if (voltage_tries == 5) {
-			drm_dbg_kms(&i915->drm,
-				    "Same voltage tried 5 times\n");
-			return false;
-		}
+		/* FIXME: 128b/132b needs better abstractions here. */
+		if (!intel_dp_is_uhbr(crtc_state)) {
+			if (voltage_tries == 5) {
+				drm_dbg_kms(&i915->drm,
+					    "Same voltage tried 5 times\n");
+				return false;
+			}
 
-		if (max_vswing_reached) {
-			drm_dbg_kms(&i915->drm, "Max Voltage Swing reached\n");
-			return false;
-		}
+			if (max_vswing_reached) {
+				drm_dbg_kms(&i915->drm, "Max Voltage Swing reached\n");
+				return false;
+			}
 
-		voltage = intel_dp->train_set[0] & DP_TRAIN_VOLTAGE_SWING_MASK;
+			voltage = intel_dp->train_set[0] & DP_TRAIN_VOLTAGE_SWING_MASK;
+		}
 
 		/* Update training set as requested by target */
 		intel_dp_get_adjust_train(intel_dp, crtc_state, dp_phy,
@@ -587,14 +620,17 @@ intel_dp_link_training_clock_recovery(struct intel_dp *intel_dp,
 			return false;
 		}
 
-		if ((intel_dp->train_set[0] & DP_TRAIN_VOLTAGE_SWING_MASK) ==
-		    voltage)
-			++voltage_tries;
-		else
-			voltage_tries = 1;
+		/* FIXME: 128b/132b needs better abstractions here. */
+		if (!intel_dp_is_uhbr(crtc_state)) {
+			if ((intel_dp->train_set[0] & DP_TRAIN_VOLTAGE_SWING_MASK) ==
+			    voltage)
+				++voltage_tries;
+			else
+				voltage_tries = 1;
 
-		if (intel_dp_link_max_vswing_reached(intel_dp, crtc_state))
-			max_vswing_reached = true;
+			if (intel_dp_link_max_vswing_reached(intel_dp, crtc_state))
+				max_vswing_reached = true;
+		}
 
 	}
 	drm_err(&i915->drm,
