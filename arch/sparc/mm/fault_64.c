@@ -280,9 +280,8 @@ asmlinkage void __kprobes do_sparc64_fault(struct pt_regs *regs)
 	si_code = SEGV_MAPERR;
 	address = current_thread_info()->fault_address;
 
-	if ((fault_code & FAULT_CODE_ITLB) &&
-	    (fault_code & FAULT_CODE_DTLB))
-		BUG();
+	BUG_ON((fault_code & FAULT_CODE_ITLB) &&
+		(fault_code & FAULT_CODE_DTLB));
 
 	if (test_thread_flag(TIF_32BIT)) {
 		if (!(regs->tstate & TSTATE_PRIV)) {
