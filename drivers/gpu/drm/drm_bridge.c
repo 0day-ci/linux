@@ -96,6 +96,64 @@
  * documentation of bridge operations for more details).
  */
 
+/**
+ * DOC: special care dsi
+ *
+ * The interaction between the bridges and other frameworks involved in
+ * the probing of the display driver and the bridge driver can be
+ * challenging. Indeed, there's multiple cases that needs to be
+ * considered:
+ *
+ * - The display driver doesn't use the component framework and isn't a
+ *   MIPI-DSI host. In this case, the bridge driver will probe at some
+ *   point and the display driver should try to probe again by returning
+ *   EPROBE_DEFER as long as the bridge driver hasn't probed.
+ *
+ * - The display driver doesn't use the component framework, but is a
+ *   MIPI-DSI host. The bridge device uses the MIPI-DCS commands to be
+ *   controlled. In this case, the bridge device is a child of the
+ *   display device and when it will probe it's assured that the display
+ *   device (and MIPI-DSI host) is present. The display driver will be
+ *   assured that the bridge driver is connected between the
+ *   &mipi_dsi_host_ops.attach and &mipi_dsi_host_ops.detach operations.
+ *   Therefore, it must run mipi_dsi_host_register() in its probe
+ *   function, and then run drm_bridge_attach() in its
+ *   &mipi_dsi_host_ops.attach hook.
+ *
+ * - The display driver uses the component framework and is a MIPI-DSI
+ *   host. The bridge device uses the MIPI-DCS commands to be
+ *   controlled. This is the same situation than above, and can run
+ *   mipi_dsi_host_register() in either its probe or bind hooks.
+ *
+ * - The display driver uses the component framework and is a MIPI-DSI
+ *   host. The bridge device uses a separate bus (such as I2C) to be
+ *   controlled. In this case, there's no correlation between the probe
+ *   of the bridge and display drivers, so care must be taken to avoid
+ *   an endless EPROBE_DEFER loop, with each driver waiting for the
+ *   other to probe.
+ *
+ * The ideal pattern to cover the last item (and all the others in the
+ * display driver case) is to split the operations like this:
+ *
+ * - In the display driver must run mipi_dsi_host_register() and
+ *   component_add in its probe hook. It will make sure that the
+ *   MIPI-DSI host sticks around, and that the driver's bind can be
+ *   called.
+ *
+ * - In its probe hook, the bridge driver must try to find its MIPI-DSI
+ *   host, register as a MIPI-DSI device and attach the MIPI-DSI device
+ *   to its host. The bridge driver is now functional.
+ *
+ * - In its &struct mipi_dsi_host_ops.attach hook, the display driver
+ *   can now add its component. Its bind hook will now be called and
+ *   since the bridge driver is attached and registered, we can now look
+ *   for and attach it.
+ *
+ * At this point, we're now certain that both the display driver and the
+ * bridge driver are functional and we can't have a deadlock-like
+ * situation when probing.
+ */
+
 static DEFINE_MUTEX(bridge_lock);
 static LIST_HEAD(bridge_list);
 
