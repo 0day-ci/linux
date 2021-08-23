@@ -109,7 +109,12 @@
 #ifndef MSR_PMM
 #define MSR_PMM		__MASK(MSR_PMM_LG)	/* Performance monitor */
 #endif
+#if !defined(CONFIG_BOOKE) && !defined(CONFIG_40x)
 #define MSR_RI		__MASK(MSR_RI_LG)	/* Recoverable Exception */
+#elif !defined(__ASSEMBLY__)
+#include <linux/bug.h>
+#define MSR_RI		({BUILD_BUG(); 0; })
+#endif
 #define MSR_LE		__MASK(MSR_LE_LG)	/* Little Endian */
 
 #define MSR_TM		__MASK(MSR_TM_LG)	/* Transactional Mem Available */

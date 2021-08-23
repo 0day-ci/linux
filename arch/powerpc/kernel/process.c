@@ -1420,7 +1420,7 @@ static struct regbit msr_bits[] = {
 	{MSR_IR,	"IR"},
 	{MSR_DR,	"DR"},
 	{MSR_PMM,	"PMM"},
-#ifndef CONFIG_BOOKE
+#if !defined(CONFIG_BOOKE) && !defined(CONFIG_40x)
 	{MSR_RI,	"RI"},
 	{MSR_LE,	"LE"},
 #endif

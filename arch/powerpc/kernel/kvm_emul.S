@@ -56,14 +56,23 @@ kvm_emulate_mtmsrd:
 
 	/* Put MSR & ~(MSR_EE|MSR_RI) in r31 */
 	LL64(r31, KVM_MAGIC_PAGE + KVM_MAGIC_MSR, 0)
+#if !defined(CONFIG_BOOKE) && !defined(CONFIG_40x)
 	lis	r30, (~(MSR_EE | MSR_RI))@h
 	ori	r30, r30, (~(MSR_EE | MSR_RI))@l
+#else
+	lis	r30, (~MSR_EE)@h
+	ori	r30, r30, (~MSR_EE)@l
+#endif
 	and	r31, r31, r30
 
 	/* OR the register's (MSR_EE|MSR_RI) on MSR */
 kvm_emulate_mtmsrd_reg:
 	ori	r30, r0, 0
+#if !defined(CONFIG_BOOKE) && !defined(CONFIG_40x)
 	andi.	r30, r30, (MSR_EE|MSR_RI)
+#else
+	andi.	r30, r30, (MSR_EE)
+#endif
 	or	r31, r31, r30
 
 	/* Put MSR back into magic page */
@@ -112,7 +121,11 @@ kvm_emulate_mtmsrd_len:
 	.long (kvm_emulate_mtmsrd_end - kvm_emulate_mtmsrd) / 4
 
 
+#if !defined(CONFIG_BOOKE) && !defined(CONFIG_40x)
 #define MSR_SAFE_BITS (MSR_EE | MSR_RI)
+#else
+#define MSR_SAFE_BITS (MSR_EE)
+#endif
 #define MSR_CRITICAL_BITS ~MSR_SAFE_BITS
 
 .global kvm_emulate_mtmsr

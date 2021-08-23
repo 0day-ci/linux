@@ -63,7 +63,11 @@
 	mtspr	SPRN_DAR, r11	/* Tag DAR, to be used in DTLB Error */
 	.endif
 #endif
+#ifdef CONFIG_40x
+	LOAD_REG_IMMEDIATE(r11, MSR_KERNEL) /* re-enable MMU */
+#else
 	LOAD_REG_IMMEDIATE(r11, MSR_KERNEL & ~MSR_RI) /* re-enable MMU */
+#endif
 	mtspr	SPRN_SRR1, r11
 	lis	r11, 1f@h
 	ori	r11, r11, 1f@l
