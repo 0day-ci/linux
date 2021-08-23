@@ -49,7 +49,7 @@ static void req_retry(struct rxe_qp *qp)
 	unsigned int cons;
 	unsigned int prod;
 
-	if (qp->is_user) {
+	if (qp->sq.is_user) {
 		cons = consumer_index(q, QUEUE_TYPE_FROM_USER);
 		prod = producer_index(q, QUEUE_TYPE_FROM_USER);
 	} else {
@@ -121,7 +121,7 @@ static struct rxe_send_wqe *req_next_wqe(struct rxe_qp *qp)
 	unsigned int cons;
 	unsigned int prod;
 
-	if (qp->is_user) {
+	if (qp->sq.is_user) {
 		wqe = queue_head(q, QUEUE_TYPE_FROM_USER);
 		cons = consumer_index(q, QUEUE_TYPE_FROM_USER);
 		prod = producer_index(q, QUEUE_TYPE_FROM_USER);

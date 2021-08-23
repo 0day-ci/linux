@@ -420,14 +420,9 @@ static struct ib_qp *rxe_create_qp(struct ib_pd *ibpd,
 		goto err1;
 	}
 
-	if (udata) {
-		if (udata->inlen) {
-			err = -EINVAL;
-			goto err2;
-		}
-		qp->is_user = true;
-	} else {
-		qp->is_user = false;
+	if (udata && udata->inlen) {
+		err = -EINVAL;
+		goto err2;
 	}
 
 	rxe_add_index(qp);
@@ -716,7 +711,7 @@ static int rxe_post_send(struct ib_qp *ibqp, const struct ib_send_wr *wr,
 		return -EINVAL;
 	}
 
-	if (qp->is_user) {
+	if (qp->sq.is_user) {
 		/* Utilize process context to do protocol processing */
 		rxe_run_task(&qp->req.task, 0);
 		return 0;
