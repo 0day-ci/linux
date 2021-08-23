@@ -60,6 +60,7 @@ config PREEMPT_RT
 	bool "Fully Preemptible Kernel (Real-Time)"
 	depends on EXPERT && ARCH_SUPPORTS_RT
 	select PREEMPTION
+	select SOFTIRQ_FORCED_THREADING
 	help
 	  This option turns the kernel into a real-time kernel by replacing
 	  various locking primitives (spinlocks, rwlocks, etc.) with
@@ -118,4 +119,13 @@ config SCHED_CORE
 	  which is the likely usage by Linux distributions, there should
 	  be no measurable impact on performance.
 
+config SOFTIRQ_FORCED_THREADING
+	bool "Balance softirq execute"
+	help
+	 This option will force the softirq to be executed in ksoftirqd,
+	 cancel its execution timing when the interrupt exits, and change
+	 ksoftirqd to a real-time process.
 
+	 In this way, the execution of softirq can be executed more balanced,
+	 and the maximum scheduling delay caused by the execution of softirq
+	 in the RT process can be reduced.

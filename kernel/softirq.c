@@ -29,6 +29,7 @@
 #include <linux/wait_bit.h>
 
 #include <asm/softirq_stack.h>
+#include <uapi/linux/sched/types.h>
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/irq.h>
@@ -417,12 +418,18 @@ static inline bool should_wake_ksoftirqd(void)
 	return true;
 }
 
+#ifdef CONFIG_SOFTIRQ_FORCED_THREADING
+static inline void invoke_softirq(void)
+{
+	wakeup_softirqd();
+}
+#else
 static inline void invoke_softirq(void)
 {
 	if (ksoftirqd_running(local_softirq_pending()))
 		return;
 
-	if (!force_irqthreads || !__this_cpu_read(ksoftirqd)) {
+	if (!__this_cpu_read(ksoftirqd)) {
 #ifdef CONFIG_HAVE_IRQ_EXIT_ON_IRQ_STACK
 		/*
 		 * We can safely execute softirq on the current stack if
@@ -442,6 +449,7 @@ static inline void invoke_softirq(void)
 		wakeup_softirqd();
 	}
 }
+#endif
 
 asmlinkage __visible void do_softirq(void)
 {
@@ -909,6 +917,14 @@ static int ksoftirqd_should_run(unsigned int cpu)
 	return local_softirq_pending();
 }
 
+#ifdef CONFIG_SOFTIRQ_FORCED_THREADING
+static void ksoftirqd_set_sched_params(unsigned int cpu)
+{
+	struct sched_param param = { .sched_priority = 1 };
+	sched_setscheduler(current, SCHED_FIFO, &param);
+}
+#endif
+
 static void run_ksoftirqd(unsigned int cpu)
 {
 	ksoftirqd_run_begin();
@@ -957,6 +973,9 @@ static int takeover_tasklets(unsigned int cpu)
 
 static struct smp_hotplug_thread softirq_threads = {
 	.store			= &ksoftirqd,
+#ifdef CONFIG_SOFTIRQ_FORCED_THREADING
+	.setup			= ksoftirqd_set_sched_params,
+#endif
 	.thread_should_run	= ksoftirqd_should_run,
 	.thread_fn		= run_ksoftirqd,
 	.thread_comm		= "ksoftirqd/%u",
