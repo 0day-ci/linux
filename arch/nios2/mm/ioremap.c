@@ -32,8 +32,7 @@ static inline void remap_area_pte(pte_t *pte, unsigned long address,
 	end = address + size;
 	if (end > PMD_SIZE)
 		end = PMD_SIZE;
-	if (address >= end)
-		BUG();
+	BUG_ON(address >= end);
 	pfn = PFN_DOWN(phys_addr);
 	do {
 		if (!pte_none(*pte)) {
@@ -58,8 +57,7 @@ static inline int remap_area_pmd(pmd_t *pmd, unsigned long address,
 	if (end > PGDIR_SIZE)
 		end = PGDIR_SIZE;
 	phys_addr -= address;
-	if (address >= end)
-		BUG();
+	BUG_ON(address >= end);
 	do {
 		pte_t *pte = pte_alloc_kernel(pmd, address);
 
@@ -83,8 +81,7 @@ static int remap_area_pages(unsigned long address, unsigned long phys_addr,
 	phys_addr -= address;
 	dir = pgd_offset(&init_mm, address);
 	flush_cache_all();
-	if (address >= end)
-		BUG();
+	BUG_ON(address >= end);
 	do {
 		p4d_t *p4d;
 		pud_t *pud;
