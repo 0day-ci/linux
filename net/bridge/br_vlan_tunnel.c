@@ -179,9 +179,7 @@ int br_handle_ingress_vlan_tunnel(struct sk_buff *skb,
 
 	skb_dst_drop(skb);
 
-	__vlan_hwaccel_put_tag(skb, p->br->vlan_proto, vlan->vid);
-
-	return 0;
+	return skb_vlan_push(skb, p->br->vlan_proto, vlan->vid);
 }
 
 int br_handle_egress_vlan_tunnel(struct sk_buff *skb,
