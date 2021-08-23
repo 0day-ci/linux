@@ -1599,9 +1599,11 @@ done:
 
 static void execlists_dequeue_irq(struct intel_engine_cs *engine)
 {
-	local_irq_disable(); /* Suspend interrupts across request submission */
+	if (!IS_ENABLED(CONFIG_PREEMPT_RT))
+		local_irq_disable(); /* Suspend interrupts across request submission */
 	execlists_dequeue(engine);
-	local_irq_enable(); /* flush irq_work (e.g. breadcrumb enabling) */
+	if (!IS_ENABLED(CONFIG_PREEMPT_RT))
+		local_irq_enable(); /* flush irq_work (e.g. breadcrumb enabling) */
 }
 
 static void clear_ports(struct i915_request **ports, int count)
