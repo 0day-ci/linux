@@ -19,6 +19,10 @@
 #include "perf_test_util.h"
 #include "guest_modes.h"
 
+#ifdef __x86_64__
+#include "processor.h"
+#endif
+
 /* How many host loops to run by default (one KVM_GET_DIRTY_LOG for each loop)*/
 #define TEST_HOST_LOOP_N		2UL
 
@@ -166,6 +170,14 @@ static void run_test(enum vm_guest_mode mode, void *arg)
 	vm = perf_test_create_vm(mode, nr_vcpus, guest_percpu_mem_size,
 				 p->slots, p->backing_src);
 
+#ifdef __x86_64__
+	TEST_ASSERT(get_page_stats(X86_PAGE_SIZE_4K) == 0,
+		    "4K page is non zero");
+	TEST_ASSERT(get_page_stats(X86_PAGE_SIZE_2M) == 0,
+		    "2M page is non zero");
+	TEST_ASSERT(get_page_stats(X86_PAGE_SIZE_1G) == 0,
+		    "1G page is non zero");
+#endif
 	perf_test_args.wr_fract = p->wr_fract;
 
 	guest_num_pages = (nr_vcpus * guest_percpu_mem_size) >> vm_get_page_shift(vm);
@@ -211,6 +223,16 @@ static void run_test(enum vm_guest_mode mode, void *arg)
 	pr_info("Populate memory time: %ld.%.9lds\n",
 		ts_diff.tv_sec, ts_diff.tv_nsec);
 
+#ifdef __x86_64__
+	TEST_ASSERT(get_page_stats(X86_PAGE_SIZE_4K) != 0,
+		    "4K page is zero");
+	if (p->backing_src == VM_MEM_SRC_ANONYMOUS_THP)
+		TEST_ASSERT(get_page_stats(X86_PAGE_SIZE_2M) != 0,
+			    "2M page is zero");
+	if (p->backing_src == VM_MEM_SRC_ANONYMOUS_HUGETLB_1GB)
+		TEST_ASSERT(get_page_stats(X86_PAGE_SIZE_1G) != 0,
+			    "1G page is zero");
+#endif
 	/* Enable dirty logging */
 	clock_gettime(CLOCK_MONOTONIC, &start);
 	enable_dirty_logging(vm, p->slots);
@@ -256,6 +278,14 @@ static void run_test(enum vm_guest_mode mode, void *arg)
 				iteration, ts_diff.tv_sec, ts_diff.tv_nsec);
 		}
 	}
+#ifdef __x86_64__
+	TEST_ASSERT(get_page_stats(X86_PAGE_SIZE_4K) != 0,
+		    "4K page is zero after dirty logging");
+	TEST_ASSERT(get_page_stats(X86_PAGE_SIZE_2M) == 0,
+		    "2M page is non-zero after dirty logging");
+	TEST_ASSERT(get_page_stats(X86_PAGE_SIZE_1G) == 0,
+		    "1G page is non-zero after dirty logging");
+#endif
 
 	/* Disable dirty logging */
 	clock_gettime(CLOCK_MONOTONIC, &start);

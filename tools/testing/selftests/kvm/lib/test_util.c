@@ -15,6 +15,13 @@
 #include "linux/kernel.h"
 
 #include "test_util.h"
+#include "processor.h"
+
+static const char * const pagestat_filepaths[] = {
+	"/sys/kernel/debug/kvm/pages_4k",
+	"/sys/kernel/debug/kvm/pages_2m",
+	"/sys/kernel/debug/kvm/pages_1g",
+};
 
 /*
  * Parses "[0-9]+[kmgt]?".
@@ -140,6 +147,28 @@ size_t get_trans_hugepagesz(void)
 
 	return size;
 }
+
+#ifdef __x86_64__
+size_t get_stats_from_file(const char *path)
+{
+	size_t value;
+	FILE *f;
+
+	f = fopen(path, "r");
+	TEST_ASSERT(f != NULL, "Error in opening file: %s\n", path);
+
+	fscanf(f, "%ld", &value);
+	fclose(f);
+
+	return value;
+}
+
+size_t get_page_stats(uint32_t page_level)
+{
+	TEST_ASSERT(page_level <= X86_PAGE_SIZE_1G, "page type error.");
+	return get_stats_from_file(pagestat_filepaths[page_level]);
+}
+#endif
 
 size_t get_def_hugetlb_pagesz(void)
 {

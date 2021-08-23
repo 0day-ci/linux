@@ -96,6 +96,9 @@ struct kvm_vm *perf_test_create_vm(enum vm_guest_mode mode, int vcpus,
 #ifdef __s390x__
 	/* Align to 1M (segment size) */
 	guest_test_phys_mem &= ~((1 << 20) - 1);
+#elif __x86_64__
+	/* Align to 1G (segment size) to allow hugepage mapping. */
+	guest_test_phys_mem &= ~((1 << 30) - 1);
 #endif
 	pr_info("guest physical test memory offset: 0x%lx\n", guest_test_phys_mem);
 
