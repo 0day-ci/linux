@@ -5521,12 +5521,7 @@ static int set_file_basic_info(struct ksmbd_file *fp, char *buf,
 		if (IS_IMMUTABLE(inode) || IS_APPEND(inode))
 			return -EACCES;
 
-		rc = setattr_prepare(user_ns, dentry, &attrs);
-		if (rc)
-			return -EINVAL;
-
 		inode_lock(inode);
-		setattr_copy(user_ns, inode, &attrs);
 		attrs.ia_valid &= ~ATTR_CTIME;
 		rc = notify_change(user_ns, dentry, &attrs, NULL);
 		inode_unlock(inode);
