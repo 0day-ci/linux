@@ -268,7 +268,7 @@ recv_secondary_console_msg(void)
 			memcpy(cp2, cp1, cnt);
 			cp2[cnt] = '\0';
 			
-			while ((cp2 = strchr(cp2, '\r')) != 0) {
+			while ((cp2 = strchr(cp2, '\r'))) {
 				*cp2 = ' ';
 				if (cp2[1] == '\n')
 					cp2[1] = ' ';
