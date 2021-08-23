@@ -312,7 +312,8 @@ static int aspeed_lpc_ctrl_probe(struct platform_device *pdev)
 		lpc_ctrl->scu = syscon_regmap_lookup_by_compatible("aspeed,ast2600-scu");
 		if (IS_ERR(lpc_ctrl->scu)) {
 			dev_err(dev, "couldn't find scu\n");
-			return PTR_ERR(lpc_ctrl->scu);
+			rc = PTR_ERR(lpc_ctrl->scu);
+			goto err;
 		}
 	}
 
