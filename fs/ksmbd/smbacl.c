@@ -1334,25 +1334,27 @@ int set_info_sec(struct ksmbd_conn *conn, struct ksmbd_tree_connect *tcon,
 	newattrs.ia_valid |= ATTR_MODE;
 	newattrs.ia_mode = (inode->i_mode & ~0777) | (fattr.cf_mode & 0777);
 
-	inode_lock(inode);
-	rc = notify_change(user_ns, path->dentry, &newattrs, NULL);
-	inode_unlock(inode);
-	if (rc)
-		goto out;
-
 	ksmbd_vfs_remove_acl_xattrs(user_ns, path->dentry);
 	/* Update posix acls */
 	if (IS_ENABLED(CONFIG_FS_POSIX_ACL) && fattr.cf_dacls) {
 		rc = set_posix_acl(user_ns, inode,
 				   ACL_TYPE_ACCESS, fattr.cf_acls);
+		if (rc < 0)
+			ksmbd_debug(SMB,
+				    "Set posix acl(ACL_TYPE_ACCESS) failed, rc : %d\n",
+				    rc);
 		if (S_ISDIR(inode->i_mode) && fattr.cf_dacls)
 			rc = set_posix_acl(user_ns, inode,
 					   ACL_TYPE_DEFAULT, fattr.cf_dacls);
+		if (rc)
+			ksmbd_debug(SMB,
+				    "Set posix acl(ACL_TYPE_DEFAULT) failed, rc : %d\n",
+				    rc);
 	}
 
 	/* Check it only calling from SD BUFFER context */
 	if (type_check && !(le16_to_cpu(pntsd->type) & DACL_PRESENT))
-		goto out;
+		goto out_change;
 
 	if (test_share_config_flag(tcon->share_conf, KSMBD_SHARE_FLAG_ACL_XATTR)) {
 		/* Update WinACL in xattr */
@@ -1360,6 +1362,11 @@ int set_info_sec(struct ksmbd_conn *conn, struct ksmbd_tree_connect *tcon,
 		ksmbd_vfs_set_sd_xattr(conn, user_ns,
 				       path->dentry, pntsd, ntsd_len);
 	}
+
+out_change:
+	inode_lock(inode);
+	rc = notify_change(user_ns, path->dentry, &newattrs, NULL);
+	inode_unlock(inode);
 
 out:
 	posix_acl_release(fattr.cf_acls);
