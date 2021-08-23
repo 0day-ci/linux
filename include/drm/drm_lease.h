@@ -16,7 +16,9 @@ void drm_lease_destroy(struct drm_master *lessee);
 
 bool drm_lease_held(struct drm_file *file_priv, int id);
 
-bool _drm_lease_held(struct drm_file *file_priv, int id);
+bool _drm_lease_held_master(struct drm_master *master, int id);
+
+bool drm_lease_held_master(struct drm_master *master, int id);
 
 void drm_lease_revoke(struct drm_master *master);
 

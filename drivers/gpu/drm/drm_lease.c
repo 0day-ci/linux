@@ -85,7 +85,7 @@ _drm_find_lessee(struct drm_master *master, int lessee_id)
 	return idr_find(&drm_lease_owner(master)->lessee_idr, lessee_id);
 }
 
-static int _drm_lease_held_master(struct drm_master *master, int id)
+bool _drm_lease_held_master(struct drm_master *master, int id)
 {
 	lockdep_assert_held(&master->dev->mode_config.idr_mutex);
 	if (master->lessor)
@@ -105,20 +105,16 @@ static bool _drm_has_leased(struct drm_master *master, int id)
 	return false;
 }
 
-/* Called with idr_mutex held */
-bool _drm_lease_held(struct drm_file *file_priv, int id)
+bool drm_lease_held_master(struct drm_master *master, int id)
 {
 	bool ret;
-	struct drm_master *master;
 
-	if (!file_priv)
+	if (!master || !master->lessor)
 		return true;
 
-	master = drm_file_get_master(file_priv);
-	if (!master)
-		return true;
+	mutex_lock(&master->dev->mode_config.idr_mutex);
 	ret = _drm_lease_held_master(master, id);
-	drm_master_put(&master);
+	mutex_unlock(&master->dev->mode_config.idr_mutex);
 
 	return ret;
 }
@@ -128,22 +124,11 @@ bool drm_lease_held(struct drm_file *file_priv, int id)
 	struct drm_master *master;
 	bool ret;
 
-	if (!file_priv)
-		return true;
-
 	master = drm_file_get_master(file_priv);
-	if (!master)
-		return true;
-	if (!master->lessor) {
-		ret = true;
-		goto out;
-	}
-	mutex_lock(&master->dev->mode_config.idr_mutex);
-	ret = _drm_lease_held_master(master, id);
-	mutex_unlock(&master->dev->mode_config.idr_mutex);
+	ret = drm_lease_held_master(master, id);
+	if (master)
+		drm_master_put(&master);
 
-out:
-	drm_master_put(&master);
 	return ret;
 }
 
@@ -158,9 +143,6 @@ uint32_t drm_lease_filter_crtcs(struct drm_file *file_priv, uint32_t crtcs_in)
 	struct drm_crtc *crtc;
 	int count_in, count_out;
 	uint32_t crtcs_out = 0;
-
-	if (!file_priv)
-		return crtcs_in;
 
 	master = drm_file_get_master(file_priv);
 	if (!master)
