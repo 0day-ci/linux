@@ -6,7 +6,6 @@
 #include "../include/osdep_service.h"
 #include "../include/drv_types.h"
 #include "../include/if_ether.h"
-#include "../include/ip.h"
 #include "../include/wifi.h"
 #include "../include/mlme_osdep.h"
 #include "../include/xmit_osdep.h"
