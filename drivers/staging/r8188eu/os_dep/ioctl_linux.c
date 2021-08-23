@@ -4348,7 +4348,8 @@ static int rtw_dbg_port(struct net_device *dev,
 				pregpriv->rx_stbc = extra_arg;
 				DBG_88E("set rx_stbc =%d\n", pregpriv->rx_stbc);
 			} else {
-				DBG_88E("get rx_stbc =%d\n", pregpriv->rx_stbc);
+				if (pregpriv)
+					DBG_88E("get rx_stbc =%d\n", pregpriv->rx_stbc);
 			}
 		}
 			break;
@@ -4360,7 +4361,8 @@ static int rtw_dbg_port(struct net_device *dev,
 				pregpriv->ampdu_enable = extra_arg;
 				DBG_88E("set ampdu_enable =%d\n", pregpriv->ampdu_enable);
 			} else {
-				DBG_88E("get ampdu_enable =%d\n", pregpriv->ampdu_enable);
+				if (pregpriv)
+					DBG_88E("get ampdu_enable =%d\n", pregpriv->ampdu_enable);
 			}
 		}
 			break;
