@@ -322,3 +322,29 @@ smartshift_bias
 
 .. kernel-doc:: drivers/gpu/drm/amd/pm/amdgpu_pm.c
    :doc: smartshift_bias
+
+.. _amdgpu-usage-stats:
+
+amdgpu DRM client usage stats implementation
+============================================
+
+The amdgpu driver implements the DRM client usage stats specification as
+documented in :ref:`drm-client-usage-stats`.
+
+Example of the output showing the implemented key value pairs and entirety of
+the currenly possible format options:
+
+::
+
+      pos:    0
+      flags:  0100002
+      mnt_id: 21
+      drm-driver: amdgpu
+      drm-pdev:   0000:00:02.0
+      drm-client-id:      7
+      drm-engine-... TODO
+      drm-memory-... TODO
+
+Possible `drm-engine-` key names are: ``,... TODO.
+
+Possible `drm-memory-` key names are: ``,... TODO.

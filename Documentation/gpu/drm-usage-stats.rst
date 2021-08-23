@@ -69,7 +69,7 @@ scope of each device, in which case `drm-pdev` shall be present as well.
 Userspace should make sure to not double account any usage statistics by using
 the above described criteria in order to associate data to individual clients.
 
-- drm-engine-<str>: <uint> ns
+- drm-engine-<str>: <uint> [ns|%]
 
 GPUs usually contain multiple execution engines. Each shall be given a stable
 and unique name (str), with possible values documented in the driver specific
@@ -83,6 +83,9 @@ implementation easier, but are required to catch up with the previously reported
 larger value within a reasonable period. Upon observing a value lower than what
 was previously read, userspace is expected to stay with that larger previous
 value until a monotonic update is seen.
+
+Where time unit is given as a percentage...[AMD folks to fill the semantics
+and interpretation of that]...
 
 - drm-memory-<str>: <uint> [KiB|MiB]
 
@@ -101,3 +104,5 @@ Driver specific implementations
 ===============================
 
 :ref:`i915-usage-stats`
+
+:ref:`amdgpu-usage-stats`
