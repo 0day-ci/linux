@@ -76,6 +76,7 @@ static inline struct kvm_cpuid_entry2 *cpuid_entry2_find(
 static int kvm_check_cpuid(struct kvm_cpuid_entry2 *entries, int nent)
 {
 	struct kvm_cpuid_entry2 *best;
+	u32 eax, ebx, ecx, edx;
 
 	/*
 	 * The existing code assumes virtual address is 48-bit or 57-bit in the
@@ -86,6 +87,30 @@ static int kvm_check_cpuid(struct kvm_cpuid_entry2 *entries, int nent)
 		int vaddr_bits = (best->eax & 0xff00) >> 8;
 
 		if (vaddr_bits != 48 && vaddr_bits != 57 && vaddr_bits != 0)
+			return -EINVAL;
+	}
+
+	/*
+	 * CPUID 0xD leaves tell Intel PT capabilities, which decides
+	 * pt_desc.ctl_bitmask in later update_intel_pt_cfg().
+	 *
+	 * pt_desc.ctl_bitmask decides the legal value for guest
+	 * MSR_IA32_RTIT_CTL. KVM cannot support PT capabilities beyond native,
+	 * otherwise it will trigger vm-entry failure if guest sets native
+	 * unsupported bits in MSR_IA32_RTIT_CTL.
+	 */
+	best = cpuid_entry2_find(entries, nent, 0xD, 0);
+	if (best) {
+		cpuid_count(0xD, 0, &eax, &ebx, &ecx, &edx);
+		if (best->ebx & ~ebx || best->ecx & ~ecx)
+			return -EINVAL;
+	}
+	best = cpuid_entry2_find(entries, nent, 0xD, 1);
+	if (best) {
+		cpuid_count(0xD, 0, &eax, &ebx, &ecx, &edx);
+		if (((best->eax & 0x7) > (eax & 0x7)) ||
+		    ((best->eax & ~eax) >> 16) ||
+		    (best->ebx & ~ebx))
 			return -EINVAL;
 	}
 
