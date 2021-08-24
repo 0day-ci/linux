@@ -1331,6 +1331,52 @@ static const struct file_operations line_fileops = {
 #endif
 };
 
+static int setup_input(struct linereq *lr, struct gpio_v2_line_config *lc,
+		       u32 line_no, unsigned int offset, u32 lflags)
+{
+	int err, ret;
+
+	/* Only one bias flag can be set. */
+	if (((lflags & GPIO_V2_LINE_FLAG_BIAS_DISABLED) &&
+	     (lflags & (GPIO_V2_LINE_FLAG_BIAS_PULL_DOWN |
+			GPIO_V2_LINE_FLAG_BIAS_PULL_UP))) ||
+	    ((lflags & GPIO_V2_LINE_FLAG_BIAS_PULL_DOWN) &&
+	     (lflags & GPIO_V2_LINE_FLAG_BIAS_PULL_UP)))
+		return -EINVAL;
+
+	if (lflags & GPIO_V2_LINE_FLAG_ACTIVE_LOW)
+		set_bit(FLAG_ACTIVE_LOW, &lr->lines[line_no].desc->flags);
+	if (lflags & GPIO_V2_LINE_FLAG_BIAS_DISABLED)
+		set_bit(FLAG_BIAS_DISABLE, &lr->lines[line_no].desc->flags);
+	if (lflags & GPIO_V2_LINE_FLAG_BIAS_PULL_DOWN)
+		set_bit(FLAG_PULL_DOWN, &lr->lines[line_no].desc->flags);
+	if (lflags & GPIO_V2_LINE_FLAG_BIAS_PULL_UP)
+		set_bit(FLAG_PULL_UP, &lr->lines[line_no].desc->flags);
+
+	err = gpiod_direction_input(lr->lines[line_no].desc);
+	if (err)
+		return err;
+
+	ret = edge_detector_setup(&lr->lines[line_no], lc, line_no,
+				  lflags & GPIO_V2_LINE_EDGE_FLAGS);
+	if (ret < 0) {
+		if (ret != -ENXIO) {
+			if (lr->gdev->chip->setup_poll &&
+			    lr->gdev->chip->setup_poll(lr->gdev->chip, offset,
+						       &lflags) == 0 &&
+			    lr->gdev->chip->do_poll)
+				ret = 0;
+			else
+				return -ENODEV;
+		} else {
+			return -ENODEV;
+		}
+	}
+
+	lr->lines[line_no].eflags = lflags;
+	return ret;
+}
+
 static int linereq_create(struct gpio_device *gdev, void __user *ip)
 {
 	struct gpio_v2_line_request ulr;
@@ -1423,12 +1469,8 @@ static int linereq_create(struct gpio_device *gdev, void __user *ip)
 			if (ret)
 				goto out_free_linereq;
 		} else if (flags & GPIO_V2_LINE_FLAG_INPUT) {
-			ret = gpiod_direction_input(desc);
-			if (ret)
-				goto out_free_linereq;
+			ret = setup_input(lr, lc, i, offset, flags);
 
-			ret = edge_detector_setup(&lr->lines[i], lc, i,
-					flags & GPIO_V2_LINE_EDGE_FLAGS);
 			if (ret)
 				goto out_free_linereq;
 		}
