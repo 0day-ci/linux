@@ -1231,6 +1231,26 @@ int unsynchronized_tsc(void)
 }
 
 /*
+ * Converts the current TSC to the current ART value using conversion
+ * factors discovered by detect_art()
+ */
+u64 read_art_time(void)
+{
+	u64 tsc, tmp, res, rem;
+
+	tsc = read_tsc(NULL) - art_to_tsc_offset;
+	rem = do_div(tsc, art_to_tsc_numerator);
+
+	res = tsc * art_to_tsc_denominator;
+	tmp = rem * art_to_tsc_denominator;
+
+	do_div(tmp, art_to_tsc_numerator);
+
+	return res + tmp;
+}
+EXPORT_SYMBOL(read_art_time);
+
+/*
  * Convert ART to TSC given numerator/denominator found in detect_art()
  */
 struct system_counterval_t convert_art_to_tsc(u64 art)
