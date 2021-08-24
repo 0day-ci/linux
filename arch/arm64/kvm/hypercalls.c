@@ -62,6 +62,7 @@ int kvm_hvc_call_handler(struct kvm_vcpu *vcpu)
 {
 	u32 func_id = smccc_get_function(vcpu);
 	u64 val[4] = {SMCCC_RET_NOT_SUPPORTED};
+	struct kvm *kvm = vcpu->kvm;
 	u32 feature;
 	gpa_t gpa;
 
@@ -128,10 +129,12 @@ int kvm_hvc_call_handler(struct kvm_vcpu *vcpu)
 		break;
 	case ARM_SMCCC_VENDOR_HYP_KVM_FEATURES_FUNC_ID:
 		val[0] = BIT(ARM_SMCCC_KVM_FUNC_FEATURES);
-		val[0] |= BIT(ARM_SMCCC_KVM_FUNC_PTP);
+		if (!kvm->arch.ptp_kvm_disabled)
+			val[0] |= BIT(ARM_SMCCC_KVM_FUNC_PTP);
 		break;
 	case ARM_SMCCC_VENDOR_HYP_KVM_PTP_FUNC_ID:
-		kvm_ptp_get_time(vcpu, val);
+		if (!kvm->arch.ptp_kvm_disabled)
+			kvm_ptp_get_time(vcpu, val);
 		break;
 	case ARM_SMCCC_TRNG_VERSION:
 	case ARM_SMCCC_TRNG_FEATURES:

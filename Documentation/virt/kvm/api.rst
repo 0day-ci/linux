@@ -7241,3 +7241,16 @@ The argument to KVM_ENABLE_CAP is also a bitmask, and must be a subset
 of the result of KVM_CHECK_EXTENSION.  KVM will forward to userspace
 the hypercalls whose corresponding bit is in the argument, and return
 ENOSYS for the others.
+
+8.35 KVM_CAP_DISABLE_PTP_KVM
+----------------------------
+
+:Architectures: arm64
+
+This capability indicates that a VMM may disable the KVM virtual PTP
+service for a guest. KVM_CAP_PTP_KVM introduced support for this
+hypercall interface, but it is unconditionally enabled without any
+opt-out.
+
+When this capability is enabled, KVM will hide the KVM virtual PTP
+service from the guest.

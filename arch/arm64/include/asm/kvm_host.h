@@ -136,6 +136,9 @@ struct kvm_arch {
 
 	/* Memory Tagging Extension enabled for the guest */
 	bool mte_enabled;
+
+	/* PTP KVM hypercall disabled for this guest */
+	bool ptp_kvm_disabled;
 };
 
 struct kvm_vcpu_fault_info {
