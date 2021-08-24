@@ -3277,6 +3277,7 @@ static int hv_pci_bus_exit(struct hv_device *hdev, bool keep_devs)
 	struct hv_pci_dev *hpdev, *tmp;
 	unsigned long flags;
 	int ret;
+	struct list_head removed;
 
 	/*
 	 * After the host sends the RESCIND_CHANNEL message, it doesn't
@@ -3286,9 +3287,18 @@ static int hv_pci_bus_exit(struct hv_device *hdev, bool keep_devs)
 		return 0;
 
 	if (!keep_devs) {
-		/* Delete any children which might still exist. */
+		INIT_LIST_HEAD(&removed);
+
+		/* Move all present children to the list on stack */
 		spin_lock_irqsave(&hbus->device_list_lock, flags);
-		list_for_each_entry_safe(hpdev, tmp, &hbus->children, list_entry) {
+		list_for_each_entry_safe(hpdev, tmp, &hbus->children, list_entry)
+			list_move_tail(&hpdev->list_entry, &removed);
+		spin_unlock_irqrestore(&hbus->device_list_lock, flags);
+
+		/* Remove all children in the list */
+		while (!list_empty(&removed)) {
+			hpdev = list_first_entry(&removed, struct hv_pci_dev,
+						 list_entry);
 			list_del(&hpdev->list_entry);
 			if (hpdev->pci_slot)
 				pci_destroy_slot(hpdev->pci_slot);
@@ -3296,7 +3306,6 @@ static int hv_pci_bus_exit(struct hv_device *hdev, bool keep_devs)
 			put_pcichild(hpdev);
 			put_pcichild(hpdev);
 		}
-		spin_unlock_irqrestore(&hbus->device_list_lock, flags);
 	}
 
 	ret = hv_send_resources_released(hdev);
