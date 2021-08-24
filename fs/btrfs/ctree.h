@@ -2916,6 +2916,31 @@ int btrfs_next_old_leaf(struct btrfs_root *root, struct btrfs_path *path,
 int btrfs_search_backwards(struct btrfs_root *root, struct btrfs_key *key,
 			   struct btrfs_path *path);
 
+int btrfs_valid_slot(struct btrfs_root *root, struct btrfs_key *key,
+		     struct btrfs_path *path);
+
+/* Search in @root for a given @key, and store the slot found in @found_key.
+ * @root: The root node of the tree.
+ * @key: The key we are looking for.
+ * @found_key: Will hold the found item.
+ * @path: Holds the current slot/leaf.
+ * @iter_ret: Contains the returned value from btrfs_search_slot and
+ *            btrfs_valid_slot, whatever is executed later.
+ *
+ * The iter_ret is an output variable that will contain the result of the
+ * btrfs_search_slot if it returns an error, or the value returned from
+ * btrfs_valid_slot otherwise. The return value can be 0 if the something was
+ * found, 1 if there weren't bigger leaves, and <0 if error.
+ */
+#define btrfs_for_each_slot(root, key, found_key, path, iter_ret)		\
+	for (iter_ret = btrfs_search_slot(NULL, root, key, path, 0, 0);		\
+		(								\
+			iter_ret >= 0 &&					\
+			(iter_ret = btrfs_valid_slot(root, found_key, path)) == 0 \
+		);								  \
+		path->slots[0]++						  \
+	)
+
 static inline int btrfs_next_old_item(struct btrfs_root *root,
 				      struct btrfs_path *p, u64 time_seq)
 {
