@@ -4815,7 +4815,8 @@ static void tcpm_state_machine_work(struct kthread_work *work)
 		goto done;
 
 	/* If we were queued due to a delayed state change, update it now */
-	if (port->delayed_state) {
+	if (port->delayed_state != INVALID_STATE &&
+	    ktime_after(ktime_get(), port->delayed_runtime)) {
 		tcpm_log(port, "state change %s -> %s [delayed %ld ms]",
 			 tcpm_states[port->state],
 			 tcpm_states[port->delayed_state], port->delay_ms);
