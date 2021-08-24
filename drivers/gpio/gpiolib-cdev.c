@@ -1227,12 +1227,33 @@ static ssize_t linereq_read(struct file *file,
 			    loff_t *f_ps)
 {
 	struct linereq *lr = file->private_data;
+	struct gpioevent_poll_data poll_data;
 	struct gpio_v2_line_event le;
 	ssize_t bytes_read = 0;
-	int ret;
+	int ret, offset;
 
 	if (count < sizeof(le))
 		return -EINVAL;
+
+	/* Without an IRQ, we can only poll */
+	offset = gpio_chip_hwgpio(lr->gdev->descs);
+	if (lr->lines[offset].irq == 0) {
+		struct gpio_v2_line_event *event;
+
+		if (!(file->f_flags & O_NONBLOCK))
+			return -ENODEV;
+
+		ret = lr->gdev->chip->do_poll(lr->gdev->chip, offset,
+					      lr->lines[offset].eflags, &poll_data);
+		if (ret)
+			return ret;
+		event = kzalloc(sizeof(*event), GFP_KERNEL);
+		event->timestamp_ns = poll_data.timestamp;
+		event->id = poll_data.id;
+		if (copy_to_user(buf, (void *)&event, sizeof(event)))
+			return -EFAULT;
+		return sizeof(event);
+	}
 
 	do {
 		spin_lock(&lr->wait.lock);
@@ -1314,6 +1335,7 @@ static int linereq_create(struct gpio_device *gdev, void __user *ip)
 {
 	struct gpio_v2_line_request ulr;
 	struct gpio_v2_line_config *lc;
+	unsigned int file_flags;
 	struct linereq *lr;
 	struct file *file;
 	u64 flags;
@@ -1411,6 +1433,8 @@ static int linereq_create(struct gpio_device *gdev, void __user *ip)
 				goto out_free_linereq;
 		}
 
+		file_flags = O_RDONLY | O_CLOEXEC;
+
 		blocking_notifier_call_chain(&desc->gdev->notifier,
 					     GPIO_V2_LINE_CHANGED_REQUESTED, desc);
 
@@ -1425,7 +1449,7 @@ static int linereq_create(struct gpio_device *gdev, void __user *ip)
 	}
 
 	file = anon_inode_getfile("gpio-line", &line_fileops, lr,
-				  O_RDONLY | O_CLOEXEC);
+				  file_flags);
 	if (IS_ERR(file)) {
 		ret = PTR_ERR(file);
 		goto out_put_unused_fd;

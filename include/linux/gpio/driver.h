@@ -17,6 +17,7 @@ struct device_node;
 struct seq_file;
 struct gpio_device;
 struct module;
+struct gpioevent_poll_data;
 enum gpiod_flags;
 enum gpio_lookup_flags;
 
@@ -304,6 +305,11 @@ struct gpio_irq_chip {
  * @add_pin_ranges: optional routine to initialize pin ranges, to be used when
  *	requires special mapping of the pins that provides GPIO functionality.
  *	It is called after adding GPIO chip and before adding IRQ chip.
+ * @setup_poll: optional routine for devices that don't support interrupts.
+ *	Takes flags argument as in/out parameter, where caller requests
+ *	event flags and driver returns accepted flags.
+ * @do_poll: optional routine for devices that don't support interrupts.
+ *	Returns event specification in data parameter.
  * @base: identifies the first GPIO number handled by this chip;
  *	or, if negative during registration, requests dynamic ID allocation.
  *	DEPRECATION: providing anything non-negative and nailing the base
@@ -396,6 +402,14 @@ struct gpio_chip {
 
 	int			(*add_pin_ranges)(struct gpio_chip *gc);
 
+	int                     (*setup_poll)(struct gpio_chip *chip,
+					      unsigned int offset,
+					      u32 *eflags);
+
+	int                     (*do_poll)(struct gpio_chip *chip,
+					   unsigned int offset, u32 eflags,
+					   struct gpioevent_poll_data *data);
+
 	int			base;
 	u16			ngpio;
 	const char		*const *names;
@@ -469,6 +483,11 @@ struct gpio_chip {
 	int (*of_xlate)(struct gpio_chip *gc,
 			const struct of_phandle_args *gpiospec, u32 *flags);
 #endif /* CONFIG_OF_GPIO */
+};
+
+struct gpioevent_poll_data {
+	__u64 timestamp;
+	__u32 id;
 };
 
 extern const char *gpiochip_is_requested(struct gpio_chip *gc,
