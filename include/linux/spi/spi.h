@@ -514,6 +514,7 @@ struct spi_controller {
 #define SPI_CONTROLLER_MUST_TX		BIT(4)	/* requires tx */
 
 #define SPI_MASTER_GPIO_SS		BIT(5)	/* GPIO CS must select slave */
+#define SPI_CONTROLLER_CS_PER_TRANSFER	BIT(6)	/* SPI controller can not hold CS between transfers */
 
 	/* flag indicating if the allocation of this struct is devres-managed */
 	bool			devm_allocated;
