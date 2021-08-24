@@ -167,6 +167,10 @@ config CPU_THERMAL
 	  cooling device available, this option allows to use the CPU
 	  as a cooling device.
 
+config CPU_IDLE_THERMAL_CORE
+	bool
+	depends on IDLE_INJECT
+
 if CPU_THERMAL
 
 config CPU_FREQ_THERMAL
@@ -182,7 +186,7 @@ config CPU_FREQ_THERMAL
 
 config CPU_IDLE_THERMAL
 	bool "CPU idle cooling device"
-	depends on IDLE_INJECT
+	select CPU_IDLE_THERMAL_CORE
 	help
 	  This implements the CPU cooling mechanism through
 	  idle injection. This will throttle the CPU by injecting
