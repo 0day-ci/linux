@@ -493,6 +493,7 @@ struct gpio_chip {
 struct gpioevent_poll_data {
 	__u64 timestamp;
 	__u32 id;
+	__u32 event_count;
 };
 
 struct gpio_output_event_data {

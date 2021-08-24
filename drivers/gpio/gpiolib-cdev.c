@@ -518,7 +518,8 @@ struct linereq {
 	 GPIO_V2_LINE_DRIVE_FLAGS | \
 	 GPIO_V2_LINE_EDGE_FLAGS | \
 	 GPIO_V2_LINE_FLAG_EVENT_CLOCK_REALTIME | \
-	 GPIO_V2_LINE_BIAS_FLAGS)
+	 GPIO_V2_LINE_BIAS_FLAGS | \
+	 GPIO_V2_LINE_FLAG_EVENT_COUNT)
 
 static void linereq_put_event(struct linereq *lr,
 			      struct gpio_v2_line_event *le)
@@ -1252,10 +1253,14 @@ static ssize_t linereq_read(struct file *file,
 	struct linereq *lr = file->private_data;
 	struct gpioevent_poll_data poll_data;
 	struct gpio_v2_line_event le;
+	size_t min_userbuf_size;
 	ssize_t bytes_read = 0;
 	int ret, offset;
 
-	if (count < sizeof(le))
+	min_userbuf_size = sizeof(le);
+	min_userbuf_size += lr->lines[0].eflags & GPIO_V2_LINE_FLAG_EVENT_COUNT ?
+					sizeof(struct gpio_v2_line_event_ext) : 0;
+	if (count < min_userbuf_size)
 		return -EINVAL;
 
 	/* Without an IRQ, we can only poll */
@@ -1270,12 +1275,17 @@ static ssize_t linereq_read(struct file *file,
 					      lr->lines[offset].eflags, &poll_data);
 		if (ret)
 			return ret;
-		event = kzalloc(sizeof(*event), GFP_KERNEL);
+		event = kzalloc(min_userbuf_size, GFP_KERNEL);
 		event->timestamp_ns = poll_data.timestamp;
 		event->id = poll_data.id;
-		if (copy_to_user(buf, (void *)&event, sizeof(event)))
-			return -EFAULT;
-		return sizeof(event);
+		if (lr->lines[offset].eflags & GPIO_V2_LINE_FLAG_EVENT_COUNT)
+			event->ext[0].event_count = poll_data.event_count;
+
+		ret = copy_to_user(buf, (void *)event, min_userbuf_size);
+		if (ret)
+			ret = -EFAULT;
+		kfree(event);
+		return ret ? ret : min_userbuf_size;
 	}
 
 	do {
@@ -1396,7 +1406,7 @@ static int setup_input(struct linereq *lr, struct gpio_v2_line_config *lc,
 	ret = edge_detector_setup(&lr->lines[line_no], lc, line_no,
 				  lflags & GPIO_V2_LINE_EDGE_FLAGS);
 	if (ret < 0) {
-		if (ret != -ENXIO) {
+		if (ret == -ENXIO) {
 			if (lr->gdev->chip->setup_poll &&
 			    lr->gdev->chip->setup_poll(lr->gdev->chip, offset,
 						       &lflags) == 0 &&
@@ -1513,7 +1523,7 @@ static int linereq_create(struct gpio_device *gdev, void __user *ip)
 				goto out_free_linereq;
 		}
 
-		file_flags = O_RDONLY | O_CLOEXEC;
+		file_flags = O_CLOEXEC;
 		file_flags |= output ? O_WRONLY : O_RDONLY;
 		file_flags |= (!output && !lr->lines[i].irq) ? O_NONBLOCK : 0;
 
@@ -1524,7 +1534,7 @@ static int linereq_create(struct gpio_device *gdev, void __user *ip)
 			offset);
 	}
 
-	fd = get_unused_fd_flags(O_RDONLY | O_CLOEXEC);
+	fd = get_unused_fd_flags(file_flags);
 	if (fd < 0) {
 		ret = fd;
 		goto out_free_linereq;

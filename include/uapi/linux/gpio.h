@@ -80,6 +80,7 @@ enum gpio_v2_line_flag {
 	GPIO_V2_LINE_FLAG_BIAS_PULL_DOWN	= _BITULL(9),
 	GPIO_V2_LINE_FLAG_BIAS_DISABLED		= _BITULL(10),
 	GPIO_V2_LINE_FLAG_EVENT_CLOCK_REALTIME	= _BITULL(11),
+	GPIO_V2_LINE_FLAG_EVENT_COUNT           = _BITULL(12),
 };
 
 /**
@@ -271,6 +272,15 @@ enum gpio_v2_line_event_id {
 };
 
 /**
+ * struct gpio_v2_line_event_ext - Extended gpio line event
+ * @event_count: count of events
+ */
+struct gpio_v2_line_event_ext {
+	__u32 event_count;
+	__u32 reserved[3];
+};
+
+/**
  * struct gpio_v2_line_event - The actual event being pushed to userspace
  * @timestamp_ns: best estimate of time of event occurrence, in nanoseconds.
  * @id: event identifier with value from &enum gpio_v2_line_event_id
@@ -280,6 +290,7 @@ enum gpio_v2_line_event_id {
  * @line_seqno: the sequence number for this event in the sequence of
  * events on this particular line
  * @padding: reserved for future use
+ * @gpio_v2_line_event_ext: Extended gpio line event
  *
  * By default the @timestamp_ns is read from %CLOCK_MONOTONIC and is
  * intended to allow the accurate measurement of the time between events.
@@ -296,6 +307,7 @@ struct gpio_v2_line_event {
 	__u32 line_seqno;
 	/* Space reserved for future use. */
 	__u32 padding[6];
+	struct gpio_v2_line_event_ext ext[];
 };
 
 /**
