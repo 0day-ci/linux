@@ -374,7 +374,7 @@ static int sidtab_convert_tree(union sidtab_entry_inner *edst,
 			       struct sidtab_convert_params *convert)
 {
 	int rc;
-	u32 i;
+	u32 i = 0;
 
 	if (level != 0) {
 		if (!edst->ptr_inner) {
@@ -383,7 +383,6 @@ static int sidtab_convert_tree(union sidtab_entry_inner *edst,
 			if (!edst->ptr_inner)
 				return -ENOMEM;
 		}
-		i = 0;
 		while (i < SIDTAB_INNER_ENTRIES && *pos < count) {
 			rc = sidtab_convert_tree(&edst->ptr_inner->entries[i],
 						 &esrc->ptr_inner->entries[i],
@@ -400,7 +399,6 @@ static int sidtab_convert_tree(union sidtab_entry_inner *edst,
 			if (!edst->ptr_leaf)
 				return -ENOMEM;
 		}
-		i = 0;
 		while (i < SIDTAB_LEAF_ENTRIES && *pos < count) {
 			rc = convert->func(&esrc->ptr_leaf->entries[i].context,
 					   &edst->ptr_leaf->entries[i].context,
