@@ -234,6 +234,8 @@ static bool intel_is_valid_msr(struct kvm_vcpu *vcpu, u32 msr)
 		break;
 	case MSR_ARCH_LBR_DEPTH:
 	case MSR_ARCH_LBR_CTL:
+		if (is_guest_mode(vcpu))
+			break;
 		if (kvm_cpu_cap_has(X86_FEATURE_ARCH_LBR))
 			ret = guest_cpuid_has(vcpu, X86_FEATURE_ARCH_LBR);
 		break;
