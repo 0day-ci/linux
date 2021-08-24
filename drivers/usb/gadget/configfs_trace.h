@@ -43,6 +43,23 @@ TRACE_EVENT(config_usb_cfg_link,
 		__get_str(cfg_name), __get_str(func_name))
 );
 
+TRACE_EVENT(config_usb_cfg_unlink,
+	TP_PROTO(char *name, char *cfg, char *func),
+	TP_ARGS(name, cfg, func),
+	TP_STRUCT__entry(
+		__string(group_name, name)
+		__string(cfg_name, cfg)
+		__string(func_name, func)
+	),
+	TP_fast_assign(
+		__assign_str(group_name, name);
+		__assign_str(cfg_name, cfg);
+		__assign_str(func_name, func)
+	),
+	TP_printk("gadget:%s cfg:%s unlink func:%s", __get_str(group_name),
+		__get_str(cfg_name), __get_str(func_name))
+);
+
 #endif /* __GADGET_TRACE_H */
 
 /* this part has to be here */
