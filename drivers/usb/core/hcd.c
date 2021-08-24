@@ -2788,13 +2788,14 @@ static void usb_stop_hcd(struct usb_hcd *hcd)
  * @hcd: the usb_hcd structure to initialize
  * @irqnum: Interrupt line to allocate
  * @irqflags: Interrupt type flags
+ * @register_hub: Flag to indicate if roothub has to be registered.
  *
  * Finish the remaining parts of generic HCD initialization: allocate the
  * buffers of consistent memory, register the bus, request the IRQ line,
  * and call the driver's reset() and start() routines.
  */
-int usb_add_hcd(struct usb_hcd *hcd,
-		unsigned int irqnum, unsigned long irqflags)
+int __usb_add_hcd(struct usb_hcd *hcd, unsigned int irqnum, unsigned long irqflags,
+		  bool register_hub)
 {
 	int retval;
 	struct usb_device *rhdev;
@@ -2959,12 +2960,13 @@ int usb_add_hcd(struct usb_hcd *hcd,
 	}
 
 	/* starting here, usbcore will pay attention to this root hub */
-	retval = register_root_hub(hcd);
-	if (retval != 0)
-		goto err_register_root_hub;
-
-	if (hcd->uses_new_polling && HCD_POLL_RH(hcd))
-		usb_hcd_poll_rh_status(hcd);
+	if (register_hub) {
+		retval = register_root_hub(hcd);
+		if (retval != 0)
+			goto err_register_root_hub;
+		if (hcd->uses_new_polling && HCD_POLL_RH(hcd))
+			usb_hcd_poll_rh_status(hcd);
+	}
 
 	return retval;
 
@@ -2988,7 +2990,7 @@ err_usb_phy_roothub_power_on:
 
 	return retval;
 }
-EXPORT_SYMBOL_GPL(usb_add_hcd);
+EXPORT_SYMBOL_GPL(__usb_add_hcd);
 
 /**
  * usb_remove_hcd - shutdown processing for generic HCDs

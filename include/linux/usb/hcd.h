@@ -468,8 +468,8 @@ extern struct usb_hcd *usb_create_shared_hcd(const struct hc_driver *driver,
 extern struct usb_hcd *usb_get_hcd(struct usb_hcd *hcd);
 extern void usb_put_hcd(struct usb_hcd *hcd);
 extern int usb_hcd_is_primary_hcd(struct usb_hcd *hcd);
-extern int usb_add_hcd(struct usb_hcd *hcd,
-		unsigned int irqnum, unsigned long irqflags);
+extern int __usb_add_hcd(struct usb_hcd *hcd, unsigned int irqnum, unsigned long irqflags,
+			 bool register_hub);
 extern void usb_remove_hcd(struct usb_hcd *hcd);
 extern int usb_hcd_find_raw_port_number(struct usb_hcd *hcd, int port1);
 int usb_hcd_setup_local_mem(struct usb_hcd *hcd, phys_addr_t phys_addr,
@@ -477,6 +477,10 @@ int usb_hcd_setup_local_mem(struct usb_hcd *hcd, phys_addr_t phys_addr,
 
 struct platform_device;
 extern void usb_hcd_platform_shutdown(struct platform_device *dev);
+
+#define usb_add_hcd(hcd, irqnum, irqflags) \
+	__usb_add_hcd(hcd, irqnum, irqflags, true)
+
 #ifdef CONFIG_USB_HCD_TEST_MODE
 extern int ehset_single_step_set_feature(struct usb_hcd *hcd, int port);
 #else
