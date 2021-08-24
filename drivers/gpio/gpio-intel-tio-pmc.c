@@ -40,9 +40,13 @@
 #define TGPIOCTL_PM			BIT(4)
 
 #define DRIVER_NAME		"intel-pmc-tio"
-#define GPIO_COUNT		1
+#define GPIO_COUNT		2
 #define INPUT_SNAPSHOT_FREQ	8
 #define INPUT_SNAPSHOT_COUNT	3
+
+#define EDGE_FLAGS \
+	(GPIO_V2_LINE_FLAG_EDGE_RISING | \
+	 GPIO_V2_LINE_FLAG_EDGE_FALLING)
 
 struct intel_pmc_tio_chip {
 	struct gpio_chip gch;
@@ -54,7 +58,9 @@ struct intel_pmc_tio_chip {
 	struct delayed_work input_work;
 	bool input_work_running;
 	bool systime_valid;
+	bool input;
 	bool output_high;
+	bool monitor;
 	unsigned int systime_index;
 	u32 half_period;
 	u32 alignment;
@@ -243,14 +249,25 @@ static int intel_pmc_tio_setup_poll(struct gpio_chip *chip, unsigned int offset,
 {
 	struct intel_pmc_tio_chip *tio;
 
-	if (offset != 0)
+	if (offset > 1)
+		return -EINVAL;
+
+	/* The monitor line inherits the configuration from the output line */
+	if (offset == 1 && (*eflags & EDGE_FLAGS) != EDGE_FLAGS)
 		return -EINVAL;
 
 	tio = gch_to_intel_pmc_tio(chip);
 
 	mutex_lock(&tio->lock);
+	if (!tio->monitor && !tio->input) {
+		mutex_unlock(&tio->lock);
+		return -EINVAL;
+	}
+
 	intel_pmc_tio_start_input_work(tio);
-	intel_pmc_tio_enable_input(tio, *eflags);
+	if (offset == 0)
+		intel_pmc_tio_enable_input(tio, *eflags);
+
 	mutex_unlock(&tio->lock);
 
 	return 0;
@@ -341,6 +358,54 @@ static int intel_pmc_tio_do_poll(struct gpio_chip *chip, unsigned int offset,
 	return err;
 }
 
+static int intel_pcm_tio_get(struct gpio_chip *chip, unsigned int offset)
+{
+	return -EIO;
+}
+
+static int intel_pcm_tio_direction_input(struct gpio_chip *chip, unsigned int offset)
+{
+	struct intel_pmc_tio_chip *tio = gch_to_intel_pmc_tio(chip);
+	int ret = 0;
+
+	mutex_lock(&tio->lock);
+
+	if (offset == 0) {
+		if (!tio->monitor)
+			tio->input = true;
+		else
+			ret = -EBUSY;
+	} else { /* offset = 1 */
+		if (!tio->input)
+			tio->monitor = true;
+		else
+			ret = -EBUSY;
+	}
+
+	if (!ret)
+		tio->last_event_count = 0;
+
+	mutex_unlock(&tio->lock);
+
+	return ret;
+}
+
+static void intel_pmc_tio_gpio_free(struct gpio_chip *chip, unsigned int offset)
+{
+	struct intel_pmc_tio_chip *tio = gch_to_intel_pmc_tio(chip);
+
+	if (offset == 0 && tio->input) {
+		tio->input = false;
+		intel_pmc_tio_disable(tio);
+	}
+
+	if (offset == 1)
+		tio->monitor = false;
+
+	if (!tio->monitor && !tio->input)
+		intel_pmc_tio_stop_input_work(tio);
+}
+
 static int intel_pmc_tio_insert_edge(struct intel_pmc_tio_chip *tio, u32 *ctrl)
 {
 	struct system_counterval_t sys_counter;
@@ -428,6 +493,9 @@ static int intel_pmc_tio_direction_output(struct gpio_chip *chip,
 	struct intel_pmc_tio_chip *tio = gch_to_intel_pmc_tio(chip);
 	int ret;
 
+	if (offset != 0)
+		return -ENODEV;
+
 	mutex_lock(&tio->lock);
 	ret =  _intel_pmc_tio_direction_output(tio, offset, value, 0);
 	mutex_unlock(&tio->lock);
@@ -442,6 +510,9 @@ static int _intel_pmc_tio_generate_output(struct intel_pmc_tio_chip *tio,
 	ktime_t sys_realtime;
 	u64 art_timestamp;
 	int err;
+
+	if (offset != 0)
+		return -ENODEV;
 
 	if (timestamp != 0) {
 		sys_realtime = ns_to_ktime(timestamp);
@@ -667,6 +738,9 @@ static int intel_pmc_tio_probe(struct platform_device *pdev)
 	tio->gch.do_poll = intel_pmc_tio_do_poll;
 	tio->gch.generate_output = intel_pmc_tio_generate_output;
 	tio->gch.direction_output = intel_pmc_tio_direction_output;
+	tio->gch.free = intel_pmc_tio_gpio_free;
+	tio->gch.direction_input = intel_pcm_tio_direction_input;
+	tio->gch.get = intel_pcm_tio_get;
 
 	platform_set_drvdata(pdev, tio);
 	mutex_init(&tio->lock);
@@ -686,7 +760,7 @@ static int intel_pmc_tio_probe(struct platform_device *pdev)
 	tio_pwm->tio = tio;
 	tio_pwm->pch.dev = &pdev->dev;
 	tio_pwm->pch.ops = &intel_pmc_tio_pwm_ops;
-	tio_pwm->pch.npwm = GPIO_COUNT;
+	tio_pwm->pch.npwm = GPIO_COUNT - 1;
 	tio_pwm->pch.base = -1;
 
 	err = pwmchip_add(&tio_pwm->pch);
