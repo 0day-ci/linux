@@ -69,14 +69,32 @@ static void ttm_bo_mem_space_debug(struct ttm_buffer_object *bo,
 	}
 }
 
-static void ttm_bo_del_from_lru(struct ttm_buffer_object *bo)
+static void ttm_bo_del_from_lru_imp(struct ttm_buffer_object *bo, bool final)
 {
 	struct ttm_device *bdev = bo->bdev;
+	struct ttm_resource_manager *man = NULL;
 
-	list_del_init(&bo->lru);
+	if (bo->resource)
+		man = ttm_manager_type(bdev, bo->resource->mem_type);
+
+
+	if (!final && man && man->use_tt)
+		list_move_tail(&bo->lru, &man->pinned);
+	else
+		list_del_init(&bo->lru);
 
 	if (bdev->funcs->del_from_lru_notify)
 		bdev->funcs->del_from_lru_notify(bo);
+}
+
+static inline void ttm_bo_del_from_lru_final(struct ttm_buffer_object *bo)
+{
+	ttm_bo_del_from_lru_imp(bo, true);
+}
+
+static inline void ttm_bo_del_from_lru(struct ttm_buffer_object *bo)
+{
+	ttm_bo_del_from_lru_imp(bo, false);
 }
 
 static void ttm_bo_bulk_move_set_pos(struct ttm_lru_bulk_move_pos *pos,
@@ -456,7 +474,7 @@ static void ttm_bo_release(struct kref *kref)
 	}
 
 	spin_lock(&bo->bdev->lru_lock);
-	ttm_bo_del_from_lru(bo);
+	ttm_bo_del_from_lru_final(bo);
 	list_del(&bo->ddestroy);
 	spin_unlock(&bo->bdev->lru_lock);
 

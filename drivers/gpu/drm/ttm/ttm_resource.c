@@ -85,6 +85,7 @@ void ttm_resource_manager_init(struct ttm_resource_manager *man,
 
 	for (i = 0; i < TTM_MAX_BO_PRIORITY; ++i)
 		INIT_LIST_HEAD(&man->lru[i]);
+	INIT_LIST_HEAD(&man->pinned);
 	man->move = NULL;
 }
 EXPORT_SYMBOL(ttm_resource_manager_init);

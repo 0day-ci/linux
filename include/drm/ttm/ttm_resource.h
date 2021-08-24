@@ -130,6 +130,7 @@ struct ttm_resource_manager {
 	 */
 
 	struct list_head lru[TTM_MAX_BO_PRIORITY];
+	struct list_head pinned;
 
 	/*
 	 * Protected by @move_lock.
