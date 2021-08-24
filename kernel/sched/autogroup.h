@@ -43,7 +43,7 @@ static inline void autogroup_init(struct task_struct *init_task) {  }
 static inline void autogroup_free(struct task_group *tg) { }
 static inline bool task_group_is_autogroup(struct task_group *tg)
 {
-	return 0;
+	return false;
 }
 
 static inline struct task_group *
