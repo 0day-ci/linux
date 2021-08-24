@@ -74,6 +74,7 @@ struct xfs_defer_capture {
 
 	/* Deferred ops state saved from the transaction. */
 	struct list_head	dfc_dfops;
+	struct list_head	dfc_buffers;
 	unsigned int		dfc_tpflags;
 
 	/* Block reservations for the data and rt devices. */
@@ -95,7 +96,8 @@ struct xfs_defer_capture {
  * This doesn't normally happen except log recovery.
  */
 int xfs_defer_ops_capture_and_commit(struct xfs_trans *tp,
-		struct xfs_inode *capture_ip, struct list_head *capture_list);
+		struct xfs_inode *capture_ip, struct list_head *capture_list,
+		struct xfs_buf *bp);
 void xfs_defer_ops_continue(struct xfs_defer_capture *d, struct xfs_trans *tp,
 		struct xfs_inode **captured_ipp);
 void xfs_defer_ops_release(struct xfs_mount *mp, struct xfs_defer_capture *d);

@@ -639,6 +639,7 @@ xfs_defer_ops_capture(
 	dfc = kmem_zalloc(sizeof(*dfc), KM_NOFS);
 	INIT_LIST_HEAD(&dfc->dfc_list);
 	INIT_LIST_HEAD(&dfc->dfc_dfops);
+	INIT_LIST_HEAD(&dfc->dfc_buffers);
 
 	xfs_defer_create_intents(tp);
 
@@ -690,7 +691,8 @@ int
 xfs_defer_ops_capture_and_commit(
 	struct xfs_trans		*tp,
 	struct xfs_inode		*capture_ip,
-	struct list_head		*capture_list)
+	struct list_head		*capture_list,
+	struct xfs_buf			*bp)
 {
 	struct xfs_mount		*mp = tp->t_mountp;
 	struct xfs_defer_capture	*dfc;
@@ -702,6 +704,9 @@ xfs_defer_ops_capture_and_commit(
 	dfc = xfs_defer_ops_capture(tp, capture_ip);
 	if (!dfc)
 		return xfs_trans_commit(tp);
+
+	if (bp && bp->b_transp == tp)
+		list_add_tail(&bp->b_delay, &dfc->dfc_buffers);
 
 	/* Commit the transaction and add the capture structure to the list. */
 	error = xfs_trans_commit(tp);
