@@ -254,8 +254,16 @@ static void efuse_read_phymap_from_txpktbuf(
 
 
 		/* data from EEPROM needs to be in LE */
-		lo32 = cpu_to_le32(rtw_read32(adapter, REG_PKTBUF_DBG_DATA_L));
-		hi32 = cpu_to_le32(rtw_read32(adapter, REG_PKTBUF_DBG_DATA_H));
+		error = rtw_read32(adapter, REG_PKTBUF_DBG_DATA_L, &lo32);
+		if (error)
+			return;
+		lo32 = cpu_to_le32(lo32);
+
+
+		error = rtw_read32(adapter, REG_PKTBUF_DBG_DATA_H, &hi32);
+		if (error)
+			return;
+		hi32 = cpu_to_le32(hi32);
 
 		if (i == 0) {
 			/* Although lenc is only used in a debug statement,
@@ -375,6 +383,8 @@ void rtw_IOL_cmd_tx_pkt_buf_dump(struct adapter *Adapter, int data_len)
 	u32 addr, rstatus, loop = 0;
 	u16 data_cnts = (data_len / 8) + 1;
 	u8 *pbuf = vzalloc(data_len + 10);
+	int error;
+
 	DBG_88E("###### %s ######\n", __func__);
 
 	rtw_write8(Adapter, REG_PKT_BUFF_ACCESS_CTRL, TXPKT_BUF_SELECT);
@@ -384,12 +394,25 @@ void rtw_IOL_cmd_tx_pkt_buf_dump(struct adapter *Adapter, int data_len)
 			rtw_usleep_os(2);
 			loop = 0;
 			do {
-				rstatus = (reg_140 = rtw_read32(Adapter, REG_PKTBUF_DBG_CTRL) & BIT(24));
+				error = rtw_read32(Adapter, REG_PKTBUF_DBG_CTRL, &reg_140);
+				if (error)
+					return;
+
+				reg_140 &= BIT(24);
+				rstatus = reg_140;
 				if (rstatus) {
-					fifo_data = rtw_read32(Adapter, REG_PKTBUF_DBG_DATA_L);
+					error = rtw_read32(Adapter, REG_PKTBUF_DBG_DATA_L,
+							  &fifo_data);
+					if (error)
+						return;
+
 					memcpy(pbuf + (addr * 8), &fifo_data, 4);
 
-					fifo_data = rtw_read32(Adapter, REG_PKTBUF_DBG_DATA_H);
+					error = rtw_read32(Adapter, REG_PKTBUF_DBG_DATA_H,
+							  &fifo_data);
+					if (error)
+						return;
+
 					memcpy(pbuf + (addr * 8 + 4), &fifo_data, 4);
 				}
 				rtw_usleep_os(2);
@@ -557,10 +580,14 @@ static s32 _FWFreeToGo(struct adapter *padapter)
 {
 	u32	counter = 0;
 	u32	value32;
+	int error;
 
 	/*  polling CheckSum report */
 	do {
-		value32 = rtw_read32(padapter, REG_MCUFWDL);
+		error = rtw_read32(padapter, REG_MCUFWDL, &value32);
+		if (error)
+			return _FAIL;
+
 		if (value32 & FWDL_ChkSum_rpt)
 			break;
 	} while (counter++ < POLLING_READY_TIMEOUT_COUNT);
@@ -571,7 +598,10 @@ static s32 _FWFreeToGo(struct adapter *padapter)
 	}
 	DBG_88E("%s: Checksum report OK! REG_MCUFWDL:0x%08x\n", __func__, value32);
 
-	value32 = rtw_read32(padapter, REG_MCUFWDL);
+	error = rtw_read32(padapter, REG_MCUFWDL, &value32);
+	if (error)
+		return _FAIL;
+
 	value32 |= MCUFWDL_RDY;
 	value32 &= ~WINTINI_RDY;
 	rtw_write32(padapter, REG_MCUFWDL, value32);
@@ -581,8 +611,10 @@ static s32 _FWFreeToGo(struct adapter *padapter)
 	/*  polling for FW ready */
 	counter = 0;
 	do {
-		value32 = rtw_read32(padapter, REG_MCUFWDL);
-		if (value32 & WINTINI_RDY) {
+		error = rtw_read32(padapter, REG_MCUFWDL, &value32);
+		if (error) {
+			return _FAIL;
+		} else if (value32 & WINTINI_RDY) {
 			DBG_88E("%s: Polling FW ready success!! REG_MCUFWDL:0x%08x\n", __func__, value32);
 			return _SUCCESS;
 		}
@@ -1765,12 +1797,16 @@ static int rtl8188e_Efuse_PgPacketWrite(struct adapter *pAdapter, u8 offset, u8 
 static struct HAL_VERSION ReadChipVersion8188E(struct adapter *padapter)
 {
 	u32				value32;
-	struct HAL_VERSION		ChipVersion;
+	struct HAL_VERSION		ChipVersion = {};
 	struct hal_data_8188e	*pHalData;
+	int error;
 
 	pHalData = GET_HAL_DATA(padapter);
 
-	value32 = rtw_read32(padapter, REG_SYS_CFG);
+	error = rtw_read32(padapter, REG_SYS_CFG, &value32);
+	if (error)
+		return ChipVersion;
+
 	ChipVersion.ICType = CHIP_8188E;
 	ChipVersion.ChipType = ((value32 & RTL_ID) ? TEST_CHIP : NORMAL_CHIP);
 
@@ -1949,12 +1985,15 @@ static s32 _LLTWrite(struct adapter *padapter, u32 address, u32 data)
 	s32	count = 0;
 	u32	value = _LLT_INIT_ADDR(address) | _LLT_INIT_DATA(data) | _LLT_OP(_LLT_WRITE_ACCESS);
 	u16	LLTReg = REG_LLT_INIT;
+	int error;
 
 	rtw_write32(padapter, LLTReg, value);
 
 	/* polling */
 	do {
-		value = rtw_read32(padapter, LLTReg);
+		error = rtw_read32(padapter, LLTReg, &value);
+		if (error)
+			return _FAIL;
 		if (_LLT_NO_ACTIVE == _LLT_OP_VALUE(value))
 			break;
 

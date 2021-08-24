@@ -16,10 +16,10 @@ int ODM_Read2Byte(struct odm_dm_struct *pDM_Odm, u32 RegAddr, u16 *data)
 	return rtw_read16(Adapter, RegAddr, data);
 }
 
-u32 ODM_Read4Byte(struct odm_dm_struct *pDM_Odm, u32 RegAddr)
+int ODM_Read4Byte(struct odm_dm_struct *pDM_Odm, u32 RegAddr, u32 *data)
 {
 	struct adapter *Adapter = pDM_Odm->Adapter;
-	return rtw_read32(Adapter, RegAddr);
+	return rtw_read32(Adapter, RegAddr, data);
 }
 
 void ODM_Write1Byte(struct odm_dm_struct *pDM_Odm, u32 RegAddr, u8 Data)

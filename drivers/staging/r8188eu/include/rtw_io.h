@@ -87,7 +87,7 @@ struct io_queue;
 struct _io_ops {
 	int (*_read8)(struct intf_hdl *pintfhdl, u32 addr, u8 *data);
 	int (*_read16)(struct intf_hdl *pintfhdl, u32 addr, u16 *data);
-	u32 (*_read32)(struct intf_hdl *pintfhdl, u32 addr);
+	int (*_read32)(struct intf_hdl *pintfhdl, u32 addr, u32 *data);
 	int (*_write8)(struct intf_hdl *pintfhdl, u32 addr, u8 val);
 	int (*_write16)(struct intf_hdl *pintfhdl, u32 addr, u16 val);
 	int (*_write32)(struct intf_hdl *pintfhdl, u32 addr, u32 val);
@@ -250,7 +250,7 @@ void _rtw_attrib_write(struct adapter *adapter, u32 addr, u32 cnt, u8 *pmem);
 
 int __must_check _rtw_read8(struct adapter *adapter, u32 addr, u8 *data);
 int __must_check _rtw_read16(struct adapter *adapter, u32 addr, u16 *data);
-u32 _rtw_read32(struct adapter *adapter, u32 addr);
+int __must_check _rtw_read32(struct adapter *adapter, u32 addr, u32 *data);
 void _rtw_read_mem(struct adapter *adapter, u32 addr, u32 cnt, u8 *pmem);
 void _rtw_read_port(struct adapter *adapter, u32 addr, u32 cnt, u8 *pmem);
 void _rtw_read_port_cancel(struct adapter *adapter);
@@ -272,7 +272,7 @@ void _rtw_write_port_cancel(struct adapter *adapter);
 
 #define rtw_read8(adapter, addr, data) _rtw_read8((adapter), (addr), (data))
 #define rtw_read16(adapter, addr, data) _rtw_read16((adapter), (addr), (data))
-#define rtw_read32(adapter, addr) _rtw_read32((adapter), (addr))
+#define rtw_read32(adapter, addr, data) _rtw_read32((adapter), (addr), (data))
 #define rtw_read_mem(adapter, addr, cnt, mem)				\
 	_rtw_read_mem((adapter), (addr), (cnt), (mem))
 #define rtw_read_port(adapter, addr, cnt, mem)				\
