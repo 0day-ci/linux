@@ -632,6 +632,7 @@ int rtl8188eu_oid_rt_pro_read_register_hdl(struct oid_par_priv *poid_par_priv)
 	u32		offset, width;
 	int status = NDIS_STATUS_SUCCESS;
 	struct adapter *Adapter = (struct adapter *)(poid_par_priv->adapter_context);
+	int error;
 
 	if (poid_par_priv->type_of_oid != QUERY_OID)
 		return NDIS_STATUS_NOT_ACCEPTED;
@@ -647,7 +648,9 @@ int rtl8188eu_oid_rt_pro_read_register_hdl(struct oid_par_priv *poid_par_priv)
 
 	switch (width) {
 	case 1:
-		RegRWStruct->value = rtw_read8(Adapter, offset);
+		error = rtw_read8(Adapter, offset, (u8 *) &RegRWStruct->value);
+		if (error)
+			status = NDIS_STATUS_NOT_ACCEPTED;
 		break;
 	case 2:
 		RegRWStruct->value = rtw_read16(Adapter, offset);

@@ -120,6 +120,7 @@ static void _InitInterrupt(struct adapter *Adapter)
 	u32 imr, imr_ex;
 	u8  usb_opt;
 	struct hal_data_8188e	*haldata = GET_HAL_DATA(Adapter);
+	int error;
 
 	/* HISR write one to clear */
 	rtw_write32(Adapter, REG_HISR_88E, 0xFFFFFFFF);
@@ -135,7 +136,9 @@ static void _InitInterrupt(struct adapter *Adapter)
 	/*  REG_USB_SPECIAL_OPTION - BIT(4) */
 	/*  0; Use interrupt endpoint to upload interrupt pkt */
 	/*  1; Use bulk endpoint to upload interrupt pkt, */
-	usb_opt = rtw_read8(Adapter, REG_USB_SPECIAL_OPTION);
+	error = rtw_read8(Adapter, REG_USB_SPECIAL_OPTION, &usb_opt);
+	if (error)
+		return;
 
 	if (!adapter_to_dvobj(Adapter)->ishighspeed)
 		usb_opt = usb_opt & (~INT_BULK_SEL);
@@ -435,8 +438,12 @@ static void _InitRxSetting(struct adapter *Adapter)
 static void _InitRetryFunction(struct adapter *Adapter)
 {
 	u8 value8;
+	int error;
 
-	value8 = rtw_read8(Adapter, REG_FWHW_TXQ_CTRL);
+	error = rtw_read8(Adapter, REG_FWHW_TXQ_CTRL, &value8);
+	if (error)
+		return;
+
 	value8 |= EN_AMPDU_RTY_NEW;
 	rtw_write8(Adapter, REG_FWHW_TXQ_CTRL, value8);
 
@@ -499,9 +506,15 @@ usb_AggSettingRxUpdate(
 	struct hal_data_8188e	*haldata = GET_HAL_DATA(Adapter);
 	u8 valueDMA;
 	u8 valueUSB;
+	int error;
 
-	valueDMA = rtw_read8(Adapter, REG_TRXDMA_CTRL);
-	valueUSB = rtw_read8(Adapter, REG_USB_SPECIAL_OPTION);
+	error = rtw_read8(Adapter, REG_TRXDMA_CTRL, &valueDMA);
+	if (error)
+		return;
+
+	error = rtw_read8(Adapter, REG_USB_SPECIAL_OPTION, &valueUSB);
+	if (error)
+		return;
 
 	switch (haldata->UsbRxAggMode) {
 	case USB_RX_AGG_DMA:
@@ -589,6 +602,7 @@ static void _InitOperationMode(struct adapter *Adapter)
 static void _InitBeaconParameters(struct adapter *Adapter)
 {
 	struct hal_data_8188e	*haldata = GET_HAL_DATA(Adapter);
+	int error;
 
 	rtw_write16(Adapter, REG_BCN_CTRL, 0x1010);
 
@@ -601,11 +615,25 @@ static void _InitBeaconParameters(struct adapter *Adapter)
 	/*  beacause test chip does not contension before sending beacon. by tynli. 2009.11.03 */
 	rtw_write16(Adapter, REG_BCNTCFG, 0x660F);
 
-	haldata->RegBcnCtrlVal = rtw_read8(Adapter, REG_BCN_CTRL);
-	haldata->RegTxPause = rtw_read8(Adapter, REG_TXPAUSE);
-	haldata->RegFwHwTxQCtrl = rtw_read8(Adapter, REG_FWHW_TXQ_CTRL + 2);
-	haldata->RegReg542 = rtw_read8(Adapter, REG_TBTT_PROHIBIT + 2);
-	haldata->RegCR_1 = rtw_read8(Adapter, REG_CR + 1);
+	error = rtw_read8(Adapter, REG_BCN_CTRL, (u8 *) &haldata->RegBcnCtrlVal);
+	if (error)
+		return;
+
+	error = rtw_read8(Adapter, REG_TXPAUSE, &haldata->RegTxPause);
+	if (error)
+		return;
+
+	error = rtw_read8(Adapter, REG_FWHW_TXQ_CTRL + 2, &haldata->RegFwHwTxQCtrl);
+	if (error)
+		return;
+
+	error = rtw_read8(Adapter, REG_TBTT_PROHIBIT + 2, &haldata->RegReg542);
+	if (error)
+		return;
+
+	error = rtw_read8(Adapter, REG_CR + 1, &haldata->RegCR_1);
+	if (error)
+		return;
 }
 
 static void _BeaconFunctionEnable(struct adapter *Adapter,
@@ -665,14 +693,27 @@ enum rt_rf_power_state RfOnOffDetect(struct adapter *adapt)
 {
 	u8 val8;
 	enum rt_rf_power_state rfpowerstate = rf_off;
+	int error;
 
 	if (adapt->pwrctrlpriv.bHWPowerdown) {
-		val8 = rtw_read8(adapt, REG_HSISR);
+		error = rtw_read8(adapt, REG_HSISR, &val8);
+		if (error)
+			return rfpowerstate;
+
 		DBG_88E("pwrdown, 0x5c(BIT(7))=%02x\n", val8);
 		rfpowerstate = (val8 & BIT(7)) ? rf_off : rf_on;
 	} else { /*  rf on/off */
-		rtw_write8(adapt, REG_MAC_PINMUX_CFG, rtw_read8(adapt, REG_MAC_PINMUX_CFG) & ~(BIT(3)));
-		val8 = rtw_read8(adapt, REG_GPIO_IO_SEL);
+
+		error = rtw_read8(adapt, REG_MAC_PINMUX_CFG, &val8);
+		if (error)
+			return rfpowerstate;
+
+		rtw_write8(adapt, REG_MAC_PINMUX_CFG, val8 & ~(BIT(3)));
+
+		error = rtw_read8(adapt, REG_GPIO_IO_SEL, &val8);
+		if (error)
+			return rfpowerstate;
+
 		DBG_88E("GPIO_IN=%02x\n", val8);
 		rfpowerstate = (val8 & BIT(3)) ? rf_on : rf_off;
 	}
@@ -689,6 +730,7 @@ static u32 rtl8188eu_hal_init(struct adapter *Adapter)
 	struct pwrctrl_priv		*pwrctrlpriv = &Adapter->pwrctrlpriv;
 	struct registry_priv	*pregistrypriv = &Adapter->registrypriv;
 	u32 init_start_time = jiffies;
+	int error;
 
 	#define HAL_INIT_PROFILE_TAG(stage) do {} while (0)
 
@@ -835,7 +877,11 @@ static u32 rtl8188eu_hal_init(struct adapter *Adapter)
 
 	/* Enable TX Report */
 	/* Enable Tx Report Timer */
-	value8 = rtw_read8(Adapter, REG_TX_RPT_CTRL);
+	error = rtw_read8(Adapter, REG_TX_RPT_CTRL, &value8);
+	if (error) {
+		status = _FAIL;
+		goto exit;
+	}
 	rtw_write8(Adapter,  REG_TX_RPT_CTRL, (value8 | BIT(1) | BIT(0)));
 	/* Set MAX RPT MACID */
 	rtw_write8(Adapter,  REG_TX_RPT_CTRL + 1, 2);/* FOR sta mode ,0: bc/mc ,1:AP */
@@ -962,9 +1008,13 @@ static void CardDisableRTL8188EU(struct adapter *Adapter)
 {
 	u8 val8;
 	struct hal_data_8188e	*haldata	= GET_HAL_DATA(Adapter);
+	int error;
 
 	/* Stop Tx Report Timer. 0x4EC[Bit1]=b'0 */
-	val8 = rtw_read8(Adapter, REG_TX_RPT_CTRL);
+	error = rtw_read8(Adapter, REG_TX_RPT_CTRL, &val8);
+	if (error)
+		return;
+
 	rtw_write8(Adapter, REG_TX_RPT_CTRL, val8 & (~BIT(1)));
 
 	/*  stop rx */
@@ -975,10 +1025,15 @@ static void CardDisableRTL8188EU(struct adapter *Adapter)
 
 	/*  2. 0x1F[7:0] = 0		turn off RF */
 
-	val8 = rtw_read8(Adapter, REG_MCUFWDL);
-	if ((val8 & RAM_DL_SEL) && Adapter->bFWReady) { /* 8051 RAM code */
+	error = rtw_read8(Adapter, REG_MCUFWDL, &val8);
+	if (error) {
+		return;
+	} else if ((val8 & RAM_DL_SEL) && Adapter->bFWReady) { /* 8051 RAM code */
 		/*  Reset MCU 0x2[10]=0. */
-		val8 = rtw_read8(Adapter, REG_SYS_FUNC_EN + 1);
+		error = rtw_read8(Adapter, REG_SYS_FUNC_EN + 1, &val8);
+		if (error)
+			return;
+
 		val8 &= ~BIT(2);	/*  0x2[10], FEN_CPUEN */
 		rtw_write8(Adapter, REG_SYS_FUNC_EN + 1, val8);
 	}
@@ -988,26 +1043,43 @@ static void CardDisableRTL8188EU(struct adapter *Adapter)
 
 	/* YJ,add,111212 */
 	/* Disable 32k */
-	val8 = rtw_read8(Adapter, REG_32K_CTRL);
+	error = rtw_read8(Adapter, REG_32K_CTRL, &val8);
+	if (error)
+		return;
 	rtw_write8(Adapter, REG_32K_CTRL, val8 & (~BIT(0)));
 
 	/*  Card disable power action flow */
 	HalPwrSeqCmdParsing(Adapter, PWR_CUT_ALL_MSK, PWR_FAB_ALL_MSK, PWR_INTF_USB_MSK, Rtl8188E_NIC_DISABLE_FLOW);
 
 	/*  Reset MCU IO Wrapper */
-	val8 = rtw_read8(Adapter, REG_RSV_CTRL + 1);
+	error = rtw_read8(Adapter, REG_RSV_CTRL + 1, &val8);
+	if (error)
+		return;
+
 	rtw_write8(Adapter, REG_RSV_CTRL + 1, (val8 & (~BIT(3))));
-	val8 = rtw_read8(Adapter, REG_RSV_CTRL + 1);
+	error = rtw_read8(Adapter, REG_RSV_CTRL + 1, &val8);
+	if (error)
+		return;
 	rtw_write8(Adapter, REG_RSV_CTRL + 1, val8 | BIT(3));
 
 	/* YJ,test add, 111207. For Power Consumption. */
-	val8 = rtw_read8(Adapter, GPIO_IN);
+	error = rtw_read8(Adapter, GPIO_IN, &val8);
+	if (error)
+		return;
+
 	rtw_write8(Adapter, GPIO_OUT, val8);
 	rtw_write8(Adapter, GPIO_IO_SEL, 0xFF);/* Reg0x46 */
 
-	val8 = rtw_read8(Adapter, REG_GPIO_IO_SEL);
+	error = rtw_read8(Adapter, REG_GPIO_IO_SEL, &val8);
+	if (error)
+		return;
+
 	rtw_write8(Adapter, REG_GPIO_IO_SEL, (val8 << 4));
-	val8 = rtw_read8(Adapter, REG_GPIO_IO_SEL + 1);
+
+	error = rtw_read8(Adapter, REG_GPIO_IO_SEL + 1, &val8);
+	if (error)
+		return;
+
 	rtw_write8(Adapter, REG_GPIO_IO_SEL + 1, val8 | 0x0F);/* Reg0x43 */
 	rtw_write32(Adapter, REG_BB_PAD_CTRL, 0x00080808);/* set LNA ,TRSW,EX_PA Pin to output mode */
 	haldata->bMacPwrCtrlOn = false;
@@ -1181,9 +1253,13 @@ static void _ReadPROMContent(
 {
 	struct eeprom_priv *eeprom = GET_EEPROM_EFUSE_PRIV(Adapter);
 	u8 eeValue;
+	int error;
 
 	/* check system boot selection */
-	eeValue = rtw_read8(Adapter, REG_9346CR);
+	error = rtw_read8(Adapter, REG_9346CR, &eeValue);
+	if (error)
+		return;
+
 	eeprom->EepromOrEfuse		= (eeValue & BOOT_FROM_EEPROM) ? true : false;
 	eeprom->bautoload_fail_flag	= (eeValue & EEPROM_EN) ? false : true;
 
@@ -1262,12 +1338,21 @@ static void hw_var_set_opmode(struct adapter *Adapter, u8 variable, u8 *val)
 {
 	u8 val8;
 	u8 mode = *((u8 *)val);
+	int error;
+
+	error = rtw_read8(Adapter, REG_BCN_CTRL, &val8);
+	if (error)
+		return;
 
 	/*  disable Port0 TSF update */
-	rtw_write8(Adapter, REG_BCN_CTRL, rtw_read8(Adapter, REG_BCN_CTRL) | BIT(4));
+	rtw_write8(Adapter, REG_BCN_CTRL, val8 | BIT(4));
 
 	/*  set net_type */
-	val8 = rtw_read8(Adapter, MSR) & 0x0c;
+	error = rtw_read8(Adapter, MSR, &val8);
+	if (error)
+		return;
+
+	val8 &= 0x0c;
 	val8 |= mode;
 	rtw_write8(Adapter, MSR, val8);
 
@@ -1304,14 +1389,20 @@ static void hw_var_set_opmode(struct adapter *Adapter, u8 variable, u8 *val)
 		rtw_write8(Adapter, REG_DUAL_TSF_RST, BIT(0));
 
 		/* BIT(3) - If set 0, hw will clr bcnq when tx becon ok/fail or port 0 */
-		rtw_write8(Adapter, REG_MBID_NUM, rtw_read8(Adapter, REG_MBID_NUM) | BIT(3) | BIT(4));
+		error = rtw_read8(Adapter, REG_MBID_NUM, &val8);
+		if (error)
+			return;
+		rtw_write8(Adapter, REG_MBID_NUM, val8 | BIT(3) | BIT(4));
 
 		/* enable BCN0 Function for if1 */
 		/* don't enable update TSF0 for if1 (due to TSF update when beacon/probe rsp are received) */
 		rtw_write8(Adapter, REG_BCN_CTRL, (DIS_TSF_UDT0_NORMAL_CHIP | EN_BCN_FUNCTION | BIT(1)));
 
 		/* dis BCN1 ATIM  WND if if2 is station */
-		rtw_write8(Adapter, REG_BCN_CTRL_1, rtw_read8(Adapter, REG_BCN_CTRL_1) | BIT(0));
+		error = rtw_read8(Adapter, REG_BCN_CTRL_1, &val8);
+		if (error)
+			return;
+		rtw_write8(Adapter, REG_BCN_CTRL_1, val8 | BIT(0));
 	}
 }
 
@@ -1345,8 +1436,16 @@ static void hw_var_set_bcn_func(struct adapter *Adapter, u8 variable, u8 *val)
 
 	if (*((u8 *)val))
 		rtw_write8(Adapter, bcn_ctrl_reg, (EN_BCN_FUNCTION | EN_TXBCN_RPT));
-	else
-		rtw_write8(Adapter, bcn_ctrl_reg, rtw_read8(Adapter, bcn_ctrl_reg) & (~(EN_BCN_FUNCTION | EN_TXBCN_RPT)));
+	else {
+		u8 tmp;
+		int error;
+
+		error = rtw_read8(Adapter, bcn_ctrl_reg, &tmp);
+		if (error)
+			return;
+
+		rtw_write8(Adapter, bcn_ctrl_reg, tmp & (~(EN_BCN_FUNCTION | EN_TXBCN_RPT)));
+	}
 }
 
 static void SetHwReg8188EU(struct adapter *Adapter, u8 variable, u8 *val)
@@ -1354,13 +1453,19 @@ static void SetHwReg8188EU(struct adapter *Adapter, u8 variable, u8 *val)
 	struct hal_data_8188e	*haldata = GET_HAL_DATA(Adapter);
 	struct dm_priv	*pdmpriv = &haldata->dmpriv;
 	struct odm_dm_struct *podmpriv = &haldata->odmpriv;
+	int error;
+	u8 tmp;
 
 	switch (variable) {
 	case HW_VAR_MEDIA_STATUS:
 		{
 			u8 val8;
 
-			val8 = rtw_read8(Adapter, MSR) & 0x0c;
+			error = rtw_read8(Adapter, MSR, &val8);
+			if (error)
+				return;
+
+			val8 &= 0x0c;
 			val8 |= *((u8 *)val);
 			rtw_write8(Adapter, MSR, val8);
 		}
@@ -1369,7 +1474,11 @@ static void SetHwReg8188EU(struct adapter *Adapter, u8 variable, u8 *val)
 		{
 			u8 val8;
 
-			val8 = rtw_read8(Adapter, MSR) & 0x03;
+			error = rtw_read8(Adapter, MSR, &val8);
+			if (error)
+				return;
+
+			val8 &= 0x03;
 			val8 |= *((u8 *)val) << 2;
 			rtw_write8(Adapter, MSR, val8);
 		}
@@ -1407,7 +1516,12 @@ static void SetHwReg8188EU(struct adapter *Adapter, u8 variable, u8 *val)
 			/*  Set RRSR rate table. */
 			rtw_write8(Adapter, REG_RRSR, BrateCfg & 0xff);
 			rtw_write8(Adapter, REG_RRSR + 1, (BrateCfg >> 8) & 0xff);
-			rtw_write8(Adapter, REG_RRSR + 2, rtw_read8(Adapter, REG_RRSR + 2) & 0xf0);
+
+			error = rtw_read8(Adapter, REG_RRSR + 2, &tmp);
+			if (error)
+				return;
+
+			rtw_write8(Adapter, REG_RRSR + 2, tmp & 0xf0);
 
 			/*  Set RTS initial rate */
 			while (BrateCfg > 0x1) {
@@ -1437,13 +1551,21 @@ static void SetHwReg8188EU(struct adapter *Adapter, u8 variable, u8 *val)
 				StopTxBeacon(Adapter);
 
 			/* disable related TSF function */
-			rtw_write8(Adapter, REG_BCN_CTRL, rtw_read8(Adapter, REG_BCN_CTRL) & (~BIT(3)));
+			error = rtw_read8(Adapter, REG_BCN_CTRL, &tmp);
+			if (error)
+				return;
+
+			rtw_write8(Adapter, REG_BCN_CTRL, tmp & (~BIT(3)));
 
 			rtw_write32(Adapter, REG_TSFTR, tsf);
 			rtw_write32(Adapter, REG_TSFTR + 4, tsf >> 32);
 
 			/* enable related TSF function */
-			rtw_write8(Adapter, REG_BCN_CTRL, rtw_read8(Adapter, REG_BCN_CTRL) | BIT(3));
+			error =  rtw_read8(Adapter, REG_BCN_CTRL, &tmp);
+			if (error)
+				return;
+
+			rtw_write8(Adapter, REG_BCN_CTRL, tmp | BIT(3));
 
 			if (((pmlmeinfo->state & 0x03) == WIFI_FW_ADHOC_STATE) || ((pmlmeinfo->state & 0x03) == WIFI_FW_AP_STATE))
 				ResumeTxBeacon(Adapter);
@@ -1471,22 +1593,34 @@ static void SetHwReg8188EU(struct adapter *Adapter, u8 variable, u8 *val)
 		rtw_write8(Adapter, REG_DUAL_TSF_RST, (BIT(0) | BIT(1)));
 
 		/* disable update TSF */
-		rtw_write8(Adapter, REG_BCN_CTRL, rtw_read8(Adapter, REG_BCN_CTRL) | BIT(4));
+		error = rtw_read8(Adapter, REG_BCN_CTRL, &tmp);
+		if (error)
+			return;
+
+		rtw_write8(Adapter, REG_BCN_CTRL, tmp | BIT(4));
 		break;
 	case HW_VAR_MLME_SITESURVEY:
 		if (*((u8 *)val)) { /* under sitesurvey */
 			/* config RCR to receive different BSSID & not to receive data frame */
 			u32 v = rtw_read32(Adapter, REG_RCR);
+
 			v &= ~(RCR_CBSSID_BCN);
 			rtw_write32(Adapter, REG_RCR, v);
 			/* reject all data frame */
 			rtw_write16(Adapter, REG_RXFLTMAP2, 0x00);
 
 			/* disable update TSF */
-			rtw_write8(Adapter, REG_BCN_CTRL, rtw_read8(Adapter, REG_BCN_CTRL) | BIT(4));
+			error = rtw_read8(Adapter, REG_BCN_CTRL, &tmp);
+			if (error)
+				return;
+			rtw_write8(Adapter, REG_BCN_CTRL, tmp | BIT(4));
 		} else { /* sitesurvey done */
 			struct mlme_ext_priv	*pmlmeext = &Adapter->mlmeextpriv;
 			struct mlme_ext_info	*pmlmeinfo = &pmlmeext->mlmext_info;
+
+			error = rtw_read8(Adapter, REG_BCN_CTRL, &tmp);
+			if (error)
+				return;
 
 			if ((is_client_associated_to_ap(Adapter)) ||
 			    ((pmlmeinfo->state & 0x03) == WIFI_FW_ADHOC_STATE)) {
@@ -1494,12 +1628,13 @@ static void SetHwReg8188EU(struct adapter *Adapter, u8 variable, u8 *val)
 				rtw_write16(Adapter, REG_RXFLTMAP2, 0xFFFF);
 
 				/* enable update TSF */
-				rtw_write8(Adapter, REG_BCN_CTRL, rtw_read8(Adapter, REG_BCN_CTRL) & (~BIT(4)));
+				rtw_write8(Adapter, REG_BCN_CTRL, tmp & (~BIT(4)));
 			} else if ((pmlmeinfo->state & 0x03) == WIFI_FW_AP_STATE) {
 				rtw_write16(Adapter, REG_RXFLTMAP2, 0xFFFF);
 				/* enable update TSF */
-				rtw_write8(Adapter, REG_BCN_CTRL, rtw_read8(Adapter, REG_BCN_CTRL) & (~BIT(4)));
+				rtw_write8(Adapter, REG_BCN_CTRL, tmp & (~BIT(4)));
 			}
+
 			if ((pmlmeinfo->state & 0x03) == WIFI_FW_AP_STATE) {
 				rtw_write32(Adapter, REG_RCR, rtw_read32(Adapter, REG_RCR) | RCR_CBSSID_BCN);
 			} else {
@@ -1517,6 +1652,7 @@ static void SetHwReg8188EU(struct adapter *Adapter, u8 variable, u8 *val)
 		{
 			u8 RetryLimit = 0x30;
 			u8 type = *((u8 *)val);
+			u8 tmp;
 			struct mlme_priv	*pmlmepriv = &Adapter->mlmepriv;
 
 			if (type == 0) { /*  prepare to join */
@@ -1541,7 +1677,11 @@ static void SetHwReg8188EU(struct adapter *Adapter, u8 variable, u8 *val)
 			} else if (type == 2) {
 				/* sta add event call back */
 				/* enable update TSF */
-				rtw_write8(Adapter, REG_BCN_CTRL, rtw_read8(Adapter, REG_BCN_CTRL) & (~BIT(4)));
+				error = rtw_read8(Adapter, REG_BCN_CTRL, &tmp);
+				if (error)
+					return;
+
+				rtw_write8(Adapter, REG_BCN_CTRL, tmp & (~BIT(4)));
 
 				if (check_fwstate(pmlmepriv, WIFI_ADHOC_STATE | WIFI_ADHOC_MASTER_STATE))
 					RetryLimit = 0x7;
@@ -1671,7 +1811,11 @@ static void SetHwReg8188EU(struct adapter *Adapter, u8 variable, u8 *val)
 	case HW_VAR_ACM_CTRL:
 		{
 			u8 acm_ctrl = *((u8 *)val);
-			u8 AcmCtrl = rtw_read8(Adapter, REG_ACMHWCTRL);
+			u8 AcmCtrl;
+
+			error = rtw_read8(Adapter, REG_ACMHWCTRL, &AcmCtrl);
+			if (error)
+				return;
 
 			if (acm_ctrl > 1)
 				AcmCtrl = AcmCtrl | 0x1;
@@ -1699,6 +1843,7 @@ static void SetHwReg8188EU(struct adapter *Adapter, u8 variable, u8 *val)
 		{
 			u8 MinSpacingToSet;
 			u8 SecMinSpace;
+			u8 tmp;
 
 			MinSpacingToSet = *((u8 *)val);
 			if (MinSpacingToSet <= 7) {
@@ -1719,7 +1864,13 @@ static void SetHwReg8188EU(struct adapter *Adapter, u8 variable, u8 *val)
 				}
 				if (MinSpacingToSet < SecMinSpace)
 					MinSpacingToSet = SecMinSpace;
-				rtw_write8(Adapter, REG_AMPDU_MIN_SPACE, (rtw_read8(Adapter, REG_AMPDU_MIN_SPACE) & 0xf8) | MinSpacingToSet);
+
+				error = rtw_read8(Adapter, REG_AMPDU_MIN_SPACE, &tmp);
+				if (error)
+					return;
+
+				rtw_write8(Adapter, REG_AMPDU_MIN_SPACE, (tmp & 0xf8) |
+					  MinSpacingToSet);
 			}
 		}
 		break;
@@ -1868,7 +2019,13 @@ static void SetHwReg8188EU(struct adapter *Adapter, u8 variable, u8 *val)
 		break;
 	case HW_VAR_BCN_VALID:
 		/* BCN_VALID, BIT(16) of REG_TDECTRL = BIT(0) of REG_TDECTRL+2, write 1 to clear, Clear by sw */
-		rtw_write8(Adapter, REG_TDECTRL + 2, rtw_read8(Adapter, REG_TDECTRL + 2) | BIT(0));
+		u8 tmp;
+
+		error = rtw_read8(Adapter, REG_TDECTRL + 2, &tmp);
+		if (error)
+			return;
+
+		rtw_write8(Adapter, REG_TDECTRL + 2, tmp | BIT(0));
 		break;
 	default:
 		break;
@@ -1880,17 +2037,23 @@ static void GetHwReg8188EU(struct adapter *Adapter, u8 variable, u8 *val)
 {
 	struct hal_data_8188e	*haldata = GET_HAL_DATA(Adapter);
 	struct odm_dm_struct *podmpriv = &haldata->odmpriv;
+	int error;
+	u8 tmp;
 
 	switch (variable) {
 	case HW_VAR_BASIC_RATE:
 		*((u16 *)(val)) = haldata->BasicRateSet;
 		fallthrough;
 	case HW_VAR_TXPAUSE:
-		val[0] = rtw_read8(Adapter, REG_TXPAUSE);
+		error = rtw_read8(Adapter, REG_TXPAUSE, val);
 		break;
 	case HW_VAR_BCN_VALID:
 		/* BCN_VALID, BIT(16) of REG_TDECTRL = BIT(0) of REG_TDECTRL+2 */
-		val[0] = (BIT(0) & rtw_read8(Adapter, REG_TDECTRL + 2)) ? true : false;
+		error = rtw_read8(Adapter, REG_TDECTRL + 2, &tmp);
+		if (error)
+			break;
+
+		val[0] = (BIT(0) & tmp) ? true : false;
 		break;
 	case HW_VAR_DM_FLAG:
 		val[0] = podmpriv->SupportAbility;
@@ -2035,6 +2198,7 @@ static u8 SetHalDefVar8188EUsb(struct adapter *Adapter, enum hal_def_variable eV
 {
 	struct hal_data_8188e	*haldata = GET_HAL_DATA(Adapter);
 	u8 bResult = _SUCCESS;
+	int error;
 
 	switch (eVariable) {
 	case HAL_DEF_DBG_DM_FUNC:
@@ -2058,7 +2222,10 @@ static u8 SetHalDefVar8188EUsb(struct adapter *Adapter, enum hal_def_variable eV
 			} else if (dm_func == 6) {/* turn on all dynamic func */
 				if (!(podmpriv->SupportAbility  & DYNAMIC_BB_DIG)) {
 					struct rtw_dig *pDigTable = &podmpriv->DM_DigTable;
-					pDigTable->CurIGValue = rtw_read8(Adapter, 0xc50);
+
+					error = rtw_read8(Adapter, 0xc50, &pDigTable->CurIGValue);
+					if (error)
+						return _FAIL;
 				}
 				podmpriv->SupportAbility = DYNAMIC_ALL_FUNC_ENABLE;
 				DBG_88E("==> Turn on all dynamic function...\n");
@@ -2168,6 +2335,8 @@ static void SetBeaconRelatedRegisters8188EUsb(struct adapter *adapt)
 	struct mlme_ext_priv	*pmlmeext = &adapt->mlmeextpriv;
 	struct mlme_ext_info	*pmlmeinfo = &pmlmeext->mlmext_info;
 	u32 bcn_ctrl_reg			= REG_BCN_CTRL;
+	int error;
+	u8 tmp;
 	/* reset TSF, enable update TSF, correcting TSF On Beacon */
 
 	/* BCN interval */
@@ -2193,7 +2362,11 @@ static void SetBeaconRelatedRegisters8188EUsb(struct adapter *adapt)
 
 	ResumeTxBeacon(adapt);
 
-	rtw_write8(adapt, bcn_ctrl_reg, rtw_read8(adapt, bcn_ctrl_reg) | BIT(1));
+	error = rtw_read8(adapt, bcn_ctrl_reg, &tmp);
+	if (error)
+		return;
+
+	rtw_write8(adapt, bcn_ctrl_reg, tmp | BIT(1));
 }
 
 static void rtl8188eu_init_default_value(struct adapter *adapt)

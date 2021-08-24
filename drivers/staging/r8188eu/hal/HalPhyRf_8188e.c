@@ -660,8 +660,12 @@ static void _PHY_SaveMACRegisters(
 	u32 i;
 	struct hal_data_8188e	*pHalData = GET_HAL_DATA(adapt);
 	struct odm_dm_struct *dm_odm = &pHalData->odmpriv;
+	int error;
+
 	for (i = 0; i < (IQK_MAC_REG_NUM - 1); i++) {
-		MACBackup[i] = ODM_Read1Byte(dm_odm, MACReg[i]);
+		error = ODM_Read1Byte(dm_odm, MACReg[i], (u8 *) &MACBackup[i]);
+		if (error)
+			return;
 	}
 	MACBackup[i] = ODM_Read4Byte(dm_odm, MACReg[i]);
 }
@@ -1010,9 +1014,12 @@ static void phy_LCCalibrate_8188E(struct adapter *adapt, bool is2t)
 	u32 RF_Amode = 0, RF_Bmode = 0, LC_Cal;
 	struct hal_data_8188e	*pHalData = GET_HAL_DATA(adapt);
 	struct odm_dm_struct *dm_odm = &pHalData->odmpriv;
+	int error;
 
 	/* Check continuous TX and Packet TX */
-	tmpreg = ODM_Read1Byte(dm_odm, 0xd03);
+	error = ODM_Read1Byte(dm_odm, 0xd03, &tmpreg);
+	if (error)
+		return;
 
 	if ((tmpreg & 0x70) != 0)			/* Deal with contisuous TX case */
 		ODM_Write1Byte(dm_odm, 0xd03, tmpreg & 0x8F);	/* disable all continuous TX */
@@ -1232,7 +1239,13 @@ static void phy_setrfpathswitch_8188e(struct adapter *adapt, bool main, bool is2
 
 	if (!adapt->hw_init_completed) {
 		u8 u1btmp;
-		u1btmp = ODM_Read1Byte(dm_odm, REG_LEDCFG2) | BIT(7);
+		int error;
+
+		error = ODM_Read1Byte(dm_odm, REG_LEDCFG2, &u1btmp);
+		if (error)
+			return;
+
+		u1btmp |= BIT(7);
 		ODM_Write1Byte(dm_odm, REG_LEDCFG2, u1btmp);
 		ODM_SetBBReg(dm_odm, rFPGA0_XAB_RFParameter, BIT(13), 0x01);
 	}

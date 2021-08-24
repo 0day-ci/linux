@@ -21,12 +21,14 @@ static u8 _is_fw_read_cmd_down(struct adapter *adapt, u8 msgbox_num)
 {
 	u8 read_down = false;
 	int	retry_cnts = 100;
-
+	int error;
 	u8 valid;
 
 	do {
-		valid = rtw_read8(adapt, REG_HMETFR) & BIT(msgbox_num);
-		if (0 == valid)
+		error = rtw_read8(adapt, REG_HMETFR, &valid);
+		if (error)
+			return read_down;
+		else if (!(valid & BIT(msgbox_num)))
 			read_down = true;
 	} while ((!read_down) && (retry_cnts--));
 
@@ -578,8 +580,9 @@ void rtl8188e_set_FwJoinBssReport_cmd(struct adapter *adapt, u8 mstatus)
 	struct mlme_ext_info	*pmlmeinfo = &pmlmeext->mlmext_info;
 	bool	bSendBeacon = false;
 	bool	bcn_valid = false;
-	u8 DLBcnCount = 0;
+	u8 DLBcnCount = 0, val8;
 	u32 poll = 0;
+	int error;
 
 	DBG_88E("%s mstatus(%x)\n", __func__, mstatus);
 
@@ -596,8 +599,15 @@ void rtl8188e_set_FwJoinBssReport_cmd(struct adapter *adapt, u8 mstatus)
 		/*  Disable Hw protection for a time which revserd for Hw sending beacon. */
 		/*  Fix download reserved page packet fail that access collision with the protection time. */
 		/*  2010.05.11. Added by tynli. */
-		rtw_write8(adapt, REG_BCN_CTRL, rtw_read8(adapt, REG_BCN_CTRL) & (~BIT(3)));
-		rtw_write8(adapt, REG_BCN_CTRL, rtw_read8(adapt, REG_BCN_CTRL) | BIT(4));
+		error = rtw_read8(adapt, REG_BCN_CTRL, &val8);
+		if (error)
+			return;
+		rtw_write8(adapt, REG_BCN_CTRL, val8 & (~BIT(3)));
+
+		error = rtw_read8(adapt, REG_BCN_CTRL, &val8);
+		if (error)
+			return;
+		rtw_write8(adapt, REG_BCN_CTRL, val8 | BIT(4));
 
 		if (haldata->RegFwHwTxQCtrl & BIT(6)) {
 			DBG_88E("HalDownloadRSVDPage(): There is an Adapter is sending beacon.\n");
@@ -639,8 +649,15 @@ void rtl8188e_set_FwJoinBssReport_cmd(struct adapter *adapt, u8 mstatus)
 		/*  */
 
 		/*  Enable Bcn */
-		rtw_write8(adapt, REG_BCN_CTRL, rtw_read8(adapt, REG_BCN_CTRL) | BIT(3));
-		rtw_write8(adapt, REG_BCN_CTRL, rtw_read8(adapt, REG_BCN_CTRL) & (~BIT(4)));
+		error = rtw_read8(adapt, REG_BCN_CTRL, &val8);
+		if (error)
+			return;
+		rtw_write8(adapt, REG_BCN_CTRL, val8 | BIT(3));
+
+		error = rtw_read8(adapt, REG_BCN_CTRL, &val8);
+		if (error)
+			return;
+		rtw_write8(adapt, REG_BCN_CTRL, val8 & (~BIT(4)));
 
 		/*  To make sure that if there exists an adapter which would like to send beacon. */
 		/*  If exists, the origianl value of 0x422[6] will be 1, we should check this to */

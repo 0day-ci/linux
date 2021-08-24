@@ -243,10 +243,14 @@ void GetPowerTracking(struct adapter *padapter, u8 *enable)
 static void disable_dm(struct adapter *padapter)
 {
 	u8 v8;
+	int error;
 
 	/* 3 1. disable firmware dynamic mechanism */
 	/*  disable Power Training, Rate Adaptive */
-	v8 = rtw_read8(padapter, REG_BCN_CTRL);
+	error = rtw_read8(padapter, REG_BCN_CTRL, &v8);
+	if (error)
+		return;
+
 	v8 &= ~EN_BCN_FUNCTION;
 	rtw_write8(padapter, REG_BCN_CTRL, v8);
 
@@ -363,8 +367,13 @@ end_of_mp_start_test:
 	spin_unlock_bh(&pmlmepriv->lock);
 
 	if (res == _SUCCESS) {
+		int error;
 		/*  set MSR to WIFI_FW_ADHOC_STATE */
-		val8 = rtw_read8(padapter, MSR) & 0xFC; /*  0x0102 */
+		error = rtw_read8(padapter, MSR, &val8); /*  0x0102 */
+		if (error)
+			return _FAIL;
+
+		val8 &= 0xFC;
 		val8 |= WIFI_FW_ADHOC_STATE;
 		rtw_write8(padapter, MSR, val8); /*  Link in ad hoc network */
 	}

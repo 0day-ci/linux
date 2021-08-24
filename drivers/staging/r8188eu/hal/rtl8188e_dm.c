@@ -16,8 +16,12 @@ static void dm_CheckStatistics(struct adapter *Adapter)
 static void dm_InitGPIOSetting(struct adapter *Adapter)
 {
 	u8	tmp1byte;
+	int error;
 
-	tmp1byte = rtw_read8(Adapter, REG_GPIO_MUXCFG);
+	error = rtw_read8(Adapter, REG_GPIO_MUXCFG, &tmp1byte);
+	if (error)
+		return;
+
 	tmp1byte &= (GPIOSEL_GPIO | ~GPIOSEL_ENBT);
 
 	rtw_write8(Adapter, REG_GPIO_MUXCFG, tmp1byte);
