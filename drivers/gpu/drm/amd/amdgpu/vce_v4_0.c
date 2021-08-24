@@ -550,6 +550,8 @@ static int vce_v4_0_hw_fini(void *handle)
 		DRM_DEBUG("For SRIOV client, shouldn't do anything.\n");
 	}
 
+	cancel_delayed_work_sync(&adev->vce.idle_work);
+
 	return 0;
 }
 
