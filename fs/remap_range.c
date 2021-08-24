@@ -99,8 +99,6 @@ static int generic_remap_checks(struct file *file_in, loff_t pos_in,
 static int remap_verify_area(struct file *file, loff_t pos, loff_t len,
 			     bool write)
 {
-	struct inode *inode = file_inode(file);
-
 	if (unlikely(pos < 0 || len < 0))
 		return -EINVAL;
 
