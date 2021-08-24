@@ -1221,6 +1221,29 @@ static __poll_t linereq_poll(struct file *file,
 	return events;
 }
 
+static ssize_t linereq_write(struct file *filep, const char __user *buf,
+			     size_t count, loff_t *f_ps)
+{
+	struct linereq *lr = filep->private_data;
+	struct gpio_output_event out_event;
+	struct gpio_output_event_data out_data;
+	int offset, err;
+
+	if (count < sizeof(struct gpio_output_event))
+		return -EINVAL;
+
+	if (copy_from_user(&out_event, buf, sizeof(out_event)))
+		return -EFAULT;
+
+	out_data.timestamp = out_event.timestamp;
+	offset = gpio_chip_hwgpio(lr->lines[0].desc);
+	err = lr->gdev->chip->generate_output(lr->gdev->chip, offset, &out_data);
+	if (err)
+		return err;
+
+	return sizeof(struct gpio_output_event);
+}
+
 static ssize_t linereq_read(struct file *file,
 			    char __user *buf,
 			    size_t count,
@@ -1302,6 +1325,8 @@ static void linereq_free(struct linereq *lr)
 
 	for (i = 0; i < lr->num_lines; i++) {
 		edge_detector_stop(&lr->lines[i]);
+		if (lr->lines[i].irq)
+			free_irq(lr->lines[i].irq, lr);
 		if (lr->lines[i].desc)
 			gpiod_free(lr->lines[i].desc);
 	}
@@ -1319,7 +1344,18 @@ static int linereq_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static const struct file_operations line_fileops = {
+static const struct file_operations line_output_fileops = {
+	.release = linereq_release,
+	.write = linereq_write,
+	.owner = THIS_MODULE,
+	.llseek = noop_llseek,
+	.unlocked_ioctl = linereq_ioctl,
+#ifdef CONFIG_COMPAT
+	.compat_ioctl = linereq_ioctl_compat,
+#endif
+};
+
+static const struct file_operations line_input_fileops = {
 	.release = linereq_release,
 	.read = linereq_read,
 	.poll = linereq_poll,
@@ -1382,6 +1418,7 @@ static int linereq_create(struct gpio_device *gdev, void __user *ip)
 	struct gpio_v2_line_request ulr;
 	struct gpio_v2_line_config *lc;
 	unsigned int file_flags;
+	bool output = false;
 	struct linereq *lr;
 	struct file *file;
 	u64 flags;
@@ -1458,11 +1495,12 @@ static int linereq_create(struct gpio_device *gdev, void __user *ip)
 		if (ret < 0)
 			goto out_free_linereq;
 
+		output = flags & GPIO_V2_LINE_FLAG_OUTPUT;
 		/*
 		 * Lines have to be requested explicitly for input
 		 * or output, else the line will be treated "as is".
 		 */
-		if (flags & GPIO_V2_LINE_FLAG_OUTPUT) {
+		if (output) {
 			int val = gpio_v2_line_config_output_value(lc, i);
 
 			ret = gpiod_direction_output(desc, val);
@@ -1476,6 +1514,8 @@ static int linereq_create(struct gpio_device *gdev, void __user *ip)
 		}
 
 		file_flags = O_RDONLY | O_CLOEXEC;
+		file_flags |= output ? O_WRONLY : O_RDONLY;
+		file_flags |= (!output && !lr->lines[i].irq) ? O_NONBLOCK : 0;
 
 		blocking_notifier_call_chain(&desc->gdev->notifier,
 					     GPIO_V2_LINE_CHANGED_REQUESTED, desc);
@@ -1490,7 +1530,10 @@ static int linereq_create(struct gpio_device *gdev, void __user *ip)
 		goto out_free_linereq;
 	}
 
-	file = anon_inode_getfile("gpio-line", &line_fileops, lr,
+	file = anon_inode_getfile("gpio-line",
+				  output ? &line_output_fileops :
+				  &line_input_fileops,
+				  lr,
 				  file_flags);
 	if (IS_ERR(file)) {
 		ret = PTR_ERR(file);

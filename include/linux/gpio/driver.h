@@ -18,6 +18,7 @@ struct seq_file;
 struct gpio_device;
 struct module;
 struct gpioevent_poll_data;
+struct gpio_output_event_data;
 enum gpiod_flags;
 enum gpio_lookup_flags;
 
@@ -310,6 +311,7 @@ struct gpio_irq_chip {
  *	event flags and driver returns accepted flags.
  * @do_poll: optional routine for devices that don't support interrupts.
  *	Returns event specification in data parameter.
+ * @generate_output: generate out event. Takes timestamp as input.
  * @base: identifies the first GPIO number handled by this chip;
  *	or, if negative during registration, requests dynamic ID allocation.
  *	DEPRECATION: providing anything non-negative and nailing the base
@@ -409,6 +411,9 @@ struct gpio_chip {
 	int                     (*do_poll)(struct gpio_chip *chip,
 					   unsigned int offset, u32 eflags,
 					   struct gpioevent_poll_data *data);
+	int                     (*generate_output)(struct gpio_chip *chip,
+						   unsigned int offset,
+						   struct gpio_output_event_data *data);
 
 	int			base;
 	u16			ngpio;
@@ -488,6 +493,10 @@ struct gpio_chip {
 struct gpioevent_poll_data {
 	__u64 timestamp;
 	__u32 id;
+};
+
+struct gpio_output_event_data {
+	__u64 timestamp;
 };
 
 extern const char *gpiochip_is_requested(struct gpio_chip *gc,

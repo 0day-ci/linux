@@ -6,6 +6,7 @@
 
 #include <linux/acpi.h>
 #include <linux/debugfs.h>
+#include <linux/delay.h>
 #include <linux/gpio/driver.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
@@ -48,6 +49,7 @@ struct intel_pmc_tio_chip {
 	struct delayed_work input_work;
 	bool input_work_running;
 	bool systime_valid;
+	bool output_high;
 	unsigned int systime_index;
 	struct system_time_snapshot systime_snapshot[INPUT_SNAPSHOT_COUNT];
 	u64 last_event_count;
@@ -123,6 +125,38 @@ static inline void intel_pmc_tio_writel(struct intel_pmc_tio_chip *tio,
 #define INTEL_PMC_TIO_WR_REG(offset, value)(			\
 		intel_pmc_tio_writel((tio), (offset), (value)))
 
+/* Must hold mutex */
+static u32 intel_pmc_tio_disable(struct intel_pmc_tio_chip *tio)
+{
+	u32 ctrl;
+	u64 art;
+
+	ctrl = INTEL_PMC_TIO_RD_REG(TGPIOCTL);
+	if (!(ctrl & TGPIOCTL_DIR) && ctrl & TGPIOCTL_EN) {
+		/* 'compare' value is invalid */
+		art = read_art_time();
+		--art;
+		INTEL_PMC_TIO_WR_REG(TGPIOCOMPV31_0, art & 0xFFFFFFFF);
+		INTEL_PMC_TIO_WR_REG(TGPIOCOMPV63_32, art >> 32);
+		udelay(1);
+		tio->output_high = (INTEL_PMC_TIO_RD_REG(TGPIOEC31_0) & 0x1);
+	}
+
+	if (ctrl & TGPIOCTL_EN) {
+		ctrl &= ~TGPIOCTL_EN;
+		INTEL_PMC_TIO_WR_REG(TGPIOCTL, ctrl);
+	}
+
+	return ctrl;
+}
+
+static void intel_pmc_tio_enable(struct intel_pmc_tio_chip *tio, u32 ctrl)
+{
+	INTEL_PMC_TIO_WR_REG(TGPIOCTL, ctrl);
+	ctrl |= TGPIOCTL_EN;
+	INTEL_PMC_TIO_WR_REG(TGPIOCTL, ctrl);
+}
+
 static void intel_pmc_tio_enable_input(struct intel_pmc_tio_chip *tio,
 				       u32 eflags)
 {
@@ -131,10 +165,6 @@ static void intel_pmc_tio_enable_input(struct intel_pmc_tio_chip *tio,
 
 	/* Disable */
 	ctrl = INTEL_PMC_TIO_RD_REG(TGPIOCTL);
-	ctrl &= ~TGPIOCTL_EN;
-	INTEL_PMC_TIO_WR_REG(TGPIOCTL, ctrl);
-
-	tio->last_event_count = 0;
 
 	/* Configure Input */
 	ctrl |= TGPIOCTL_DIR;
@@ -150,9 +180,7 @@ static void intel_pmc_tio_enable_input(struct intel_pmc_tio_chip *tio,
 		ctrl |= TGPIOCTL_EP_FALLING_EDGE;
 
 	/* Enable */
-	INTEL_PMC_TIO_WR_REG(TGPIOCTL, ctrl);
-	ctrl |= TGPIOCTL_EN;
-	INTEL_PMC_TIO_WR_REG(TGPIOCTL, ctrl);
+	intel_pmc_tio_enable(tio, ctrl);
 }
 
 static void intel_pmc_tio_input_work(struct work_struct *input_work)
@@ -293,6 +321,115 @@ static int intel_pmc_tio_do_poll(struct gpio_chip *chip, unsigned int offset,
 	return err;
 }
 
+static int intel_pmc_tio_insert_edge(struct intel_pmc_tio_chip *tio, u32 *ctrl)
+{
+	struct system_counterval_t sys_counter;
+	ktime_t trigger;
+	int err;
+	u64 art;
+
+	trigger = ktime_get_real();
+	trigger = ktime_add_ns(trigger, NSEC_PER_SEC / 20);
+
+	err = ktime_convert_real_to_system_counter(trigger, &sys_counter);
+	if (err)
+		return err;
+
+	err = convert_tsc_to_art(&sys_counter, &art);
+	if (err)
+		return err;
+
+	/* In disabled state */
+	*ctrl &= ~(TGPIOCTL_DIR | TGPIOCTL_PM);
+	*ctrl &= ~TGPIOCTL_EP;
+	*ctrl |= TGPIOCTL_EP_TOGGLE_EDGE;
+
+	INTEL_PMC_TIO_WR_REG(TGPIOCOMPV31_0, art & 0xFFFFFFFF);
+	INTEL_PMC_TIO_WR_REG(TGPIOCOMPV63_32, art >> 32);
+
+	intel_pmc_tio_enable(tio, *ctrl);
+
+	/* sleep for 100 milli-second */
+	msleep(2 * (MSEC_PER_SEC / 20));
+
+	*ctrl = intel_pmc_tio_disable(tio);
+
+	return 0;
+}
+
+static int intel_pmc_tio_direction_output(struct gpio_chip *chip, unsigned int offset,
+					  int value)
+{
+	struct intel_pmc_tio_chip *tio;
+	int err = 0;
+	u32 ctrl;
+	u64 art;
+
+	if (value)
+		return -EINVAL;
+
+	tio = gch_to_intel_pmc_tio(chip);
+
+	mutex_lock(&tio->lock);
+	ctrl = intel_pmc_tio_disable(tio);
+
+	/*
+	 * Make sure the output is zero'ed by inserting an edge as needed
+	 * Only need to worry about this when restarting output
+	 */
+	if (tio->output_high) {
+		err = intel_pmc_tio_insert_edge(tio, &ctrl);
+		if (err)
+			goto out;
+		tio->output_high = false;
+	}
+
+	/* Enable the device, be sure that the 'compare(COMPV)' value is invalid */
+	art = read_art_time();
+	--art;
+	INTEL_PMC_TIO_WR_REG(TGPIOCOMPV31_0, art & 0xFFFFFFFF);
+	INTEL_PMC_TIO_WR_REG(TGPIOCOMPV63_32, art >> 32);
+
+	ctrl &= ~(TGPIOCTL_DIR | TGPIOCTL_PM);
+	ctrl &= ~TGPIOCTL_EP;
+	ctrl |= TGPIOCTL_EP_TOGGLE_EDGE;
+
+	intel_pmc_tio_enable(tio, ctrl);
+
+out:
+	mutex_unlock(&tio->lock);
+
+	return err;
+}
+
+static int intel_pmc_tio_generate_output(struct gpio_chip *chip,
+					 unsigned int offset,
+					 struct gpio_output_event_data *data)
+{
+	struct intel_pmc_tio_chip *tio = gch_to_intel_pmc_tio(chip);
+	ktime_t sys_realtime = ns_to_ktime(data->timestamp);
+	struct system_counterval_t sys_counter;
+	u64 art_timestamp;
+	int err;
+
+	err = ktime_convert_real_to_system_counter(sys_realtime, &sys_counter);
+	if (err)
+		return err;
+
+	err = convert_tsc_to_art(&sys_counter, &art_timestamp);
+	if (err)
+		return err;
+
+	mutex_lock(&tio->lock);
+
+	INTEL_PMC_TIO_WR_REG(TGPIOCOMPV63_32, art_timestamp >> 32);
+	INTEL_PMC_TIO_WR_REG(TGPIOCOMPV31_0, art_timestamp);
+
+	mutex_unlock(&tio->lock);
+
+	return 0;
+}
+
 static int intel_pmc_tio_probe(struct platform_device *pdev)
 {
 	struct intel_pmc_tio_chip *tio;
@@ -327,10 +464,13 @@ static int intel_pmc_tio_probe(struct platform_device *pdev)
 	tio->gch.base = -1;
 	tio->gch.setup_poll = intel_pmc_tio_setup_poll;
 	tio->gch.do_poll = intel_pmc_tio_do_poll;
+	tio->gch.generate_output = intel_pmc_tio_generate_output;
+	tio->gch.direction_output = intel_pmc_tio_direction_output;
 
 	platform_set_drvdata(pdev, tio);
 	mutex_init(&tio->lock);
 	INIT_DELAYED_WORK(&tio->input_work, intel_pmc_tio_input_work);
+	tio->output_high = false;
 
 	err = devm_gpiochip_add_data(&pdev->dev, &tio->gch, tio);
 	if (err < 0)

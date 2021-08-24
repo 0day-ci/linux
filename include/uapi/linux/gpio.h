@@ -298,6 +298,14 @@ struct gpio_v2_line_event {
 	__u32 padding[6];
 };
 
+/**
+ * struct gpio_output_event - Output event request
+ * @timestamp: When the time should occur
+ */
+struct gpio_output_event {
+	__u64 timestamp;
+};
+
 /*
  * ABI v1
  *
