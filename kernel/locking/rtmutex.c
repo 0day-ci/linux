@@ -372,24 +372,24 @@ static __always_inline bool __waiter_less(struct rb_node *a, const struct rb_nod
 	struct rt_mutex_waiter *bw = __node_2_waiter(b);
 
 	if (rt_mutex_waiter_less(aw, bw))
-		return 1;
+		return true;
 
 	if (!build_ww_mutex())
-		return 0;
+		return false;
 
 	if (rt_mutex_waiter_less(bw, aw))
-		return 0;
+		return false;
 
 	/* NOTE: relies on waiter->ww_ctx being set before insertion */
 	if (aw->ww_ctx) {
 		if (!bw->ww_ctx)
-			return 1;
+			return true;
 
 		return (signed long)(aw->ww_ctx->stamp -
 				     bw->ww_ctx->stamp) < 0;
 	}
 
-	return 0;
+	return false;
 }
 
 static __always_inline void
