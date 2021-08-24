@@ -63,6 +63,9 @@ static void lock_region(struct panfrost_device *pfdev, u32 as_nr,
 	u8 region_width;
 	u64 region = iova & PAGE_MASK;
 
+	/* After rounding the address down, extend the size to lock the end. */
+	size += (region - iova);
+
 	/* The size is encoded as ceil(log2) minus(1), which may be calculated
 	 * with fls. The size must be clamped to hardware bounds.
 	 */
