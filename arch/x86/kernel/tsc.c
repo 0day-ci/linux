@@ -1231,22 +1231,43 @@ int unsynchronized_tsc(void)
 }
 
 /*
+ * Converts input TSC to the corresponding ART value using conversion
+ * factors discovered by detect_art()
+ */
+int convert_tsc_to_art(const struct system_counterval_t *system_counter, u64 *art)
+{
+	u64 tmp, res, rem;
+
+	if (system_counter->cs != art_related_clocksource)
+		return -EINVAL;
+
+	res = system_counter->cycles - art_to_tsc_offset;
+	rem = do_div(res, art_to_tsc_numerator);
+
+	*art = res * art_to_tsc_denominator;
+	tmp = rem * art_to_tsc_denominator;
+
+	do_div(tmp, art_to_tsc_numerator);
+	*art += tmp;
+
+	return 0;
+}
+EXPORT_SYMBOL(convert_tsc_to_art);
+
+/*
  * Converts the current TSC to the current ART value using conversion
  * factors discovered by detect_art()
  */
 u64 read_art_time(void)
 {
-	u64 tsc, tmp, res, rem;
+	struct system_counterval_t tsc;
+	u64 art = 0;
 
-	tsc = read_tsc(NULL) - art_to_tsc_offset;
-	rem = do_div(tsc, art_to_tsc_numerator);
+	tsc.cs = art_related_clocksource;
+	tsc.cycles = read_tsc(NULL);
+	convert_tsc_to_art(&tsc, &art);
 
-	res = tsc * art_to_tsc_denominator;
-	tmp = rem * art_to_tsc_denominator;
-
-	do_div(tmp, art_to_tsc_numerator);
-
-	return res + tmp;
+	return art;
 }
 EXPORT_SYMBOL(read_art_time);
 

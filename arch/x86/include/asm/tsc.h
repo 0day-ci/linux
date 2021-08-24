@@ -8,6 +8,8 @@
 #include <asm/processor.h>
 #include <asm/cpufeature.h>
 
+struct system_counterval_t;
+
 /*
  * Standard way to access the cycle counter.
  */
@@ -29,6 +31,7 @@ static inline cycles_t get_cycles(void)
 }
 
 extern u64 read_art_time(void);
+extern int convert_tsc_to_art(const struct system_counterval_t *tsc, u64 *art);
 extern struct system_counterval_t convert_art_to_tsc(u64 art);
 extern struct system_counterval_t convert_art_ns_to_tsc(u64 art_ns);
 
