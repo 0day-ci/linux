@@ -109,7 +109,7 @@ static __always_inline bool get_current_context(struct tdescr *td,
 	if (seen_already) {
 		fprintf(stdout,
 			"Unexpected successful sigreturn detected: live_uc is stale !\n");
-		return 0;
+		return false;
 	}
 	seen_already = 1;
 
