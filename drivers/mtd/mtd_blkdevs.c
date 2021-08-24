@@ -358,6 +358,7 @@ int add_mtd_blktrans_dev(struct mtd_blktrans_dev *new)
 	list_add_tail(&new->list, &tr->devs);
  added:
 	mutex_unlock(&blktrans_ref_mutex);
+	mutex_unlock(&mtd_table_mutex);
 
 	mutex_init(&new->lock);
 	kref_init(&new->ref);
@@ -434,6 +435,7 @@ int add_mtd_blktrans_dev(struct mtd_blktrans_dev *new)
 					new->disk_attributes);
 		WARN_ON(ret);
 	}
+	mutex_lock(&mtd_table_mutex);
 	return 0;
 
 out_free_tag_set:
@@ -441,6 +443,7 @@ out_free_tag_set:
 out_kfree_tag_set:
 	kfree(new->tag_set);
 out_list_del:
+	mutex_lock(&mtd_table_mutex);
 	list_del(&new->list);
 	return ret;
 }
