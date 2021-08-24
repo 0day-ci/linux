@@ -193,6 +193,18 @@ config CPU_IDLE_THERMAL
 	  idle cycle.
 endif
 
+config CPU_IDLE_THERMAL_GENERIC
+	tristate "CPU idle cooling device"
+	depends on !CPU_THERMAL
+	select CPU_IDLE_THERMAL_CORE
+	help
+	  This implements the CPU cooling mechanism through
+	  idle injection. This will throttle the CPU by injecting
+	  idle cycle.
+
+	  This driver can also be built as a module. If so, the module will
+          be called cpuidle_cooling_generic.
+
 config DEVFREQ_THERMAL
 	bool "Generic device cooling support"
 	depends on PM_DEVFREQ

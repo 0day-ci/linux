@@ -26,6 +26,8 @@ thermal_sys-$(CONFIG_CPU_FREQ_THERMAL)	+= cpufreq_cooling.o
 thermal_sys-$(CONFIG_CPU_IDLE_THERMAL_CORE)	+= cpuidle_cooling_core.o
 thermal_sys-$(CONFIG_CPU_IDLE_THERMAL)	+= cpuidle_cooling.o
 
+obj-$(CONFIG_CPU_IDLE_THERMAL_GENERIC) += cpuidle_cooling_generic.o
+
 # devfreq cooling
 thermal_sys-$(CONFIG_DEVFREQ_THERMAL) += devfreq_cooling.o
 
