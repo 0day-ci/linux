@@ -112,11 +112,11 @@ bool util_is_printable_string(const void *data, int len)
 
 	/* zero length is not */
 	if (len == 0)
-		return 0;
+		return false;
 
 	/* must terminate with zero */
 	if (s[len - 1] != '\0')
-		return 0;
+		return false;
 
 	se = s + len;
 
@@ -127,12 +127,12 @@ bool util_is_printable_string(const void *data, int len)
 
 		/* not zero, or not done yet */
 		if (*s != '\0' || s == ss)
-			return 0;
+			return false;
 
 		s++;
 	}
 
-	return 1;
+	return true;
 }
 
 /*
