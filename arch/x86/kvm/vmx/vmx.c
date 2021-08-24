@@ -1010,7 +1010,14 @@ static unsigned long segment_base(u16 selector)
 static inline bool pt_can_write_msr(struct vcpu_vmx *vmx)
 {
 	return vmx_pt_mode_is_host_guest() &&
+	       guest_cpuid_has(&vmx->vcpu, X86_FEATURE_INTEL_PT) &&
 	       !(vmx->pt_desc.guest.ctl & RTIT_CTL_TRACEEN);
+}
+
+static inline bool pt_can_read_msr(struct kvm_vcpu *vcpu)
+{
+	return vmx_pt_mode_is_host_guest() &&
+	       guest_cpuid_has(vcpu, X86_FEATURE_INTEL_PT);
 }
 
 static inline bool pt_output_base_valid(struct kvm_vcpu *vcpu, u64 base)
@@ -1849,24 +1856,24 @@ static int vmx_get_msr(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 							&msr_info->data);
 		break;
 	case MSR_IA32_RTIT_CTL:
-		if (!vmx_pt_mode_is_host_guest())
+		if (!pt_can_read_msr(vcpu))
 			return 1;
 		msr_info->data = vmx->pt_desc.guest.ctl;
 		break;
 	case MSR_IA32_RTIT_STATUS:
-		if (!vmx_pt_mode_is_host_guest())
+		if (!pt_can_read_msr(vcpu))
 			return 1;
 		msr_info->data = vmx->pt_desc.guest.status;
 		break;
 	case MSR_IA32_RTIT_CR3_MATCH:
-		if (!vmx_pt_mode_is_host_guest() ||
+		if (!pt_can_read_msr(vcpu) ||
 			!intel_pt_validate_cap(vmx->pt_desc.caps,
 						PT_CAP_cr3_filtering))
 			return 1;
 		msr_info->data = vmx->pt_desc.guest.cr3_match;
 		break;
 	case MSR_IA32_RTIT_OUTPUT_BASE:
-		if (!vmx_pt_mode_is_host_guest() ||
+		if (!pt_can_read_msr(vcpu) ||
 			(!intel_pt_validate_cap(vmx->pt_desc.caps,
 					PT_CAP_topa_output) &&
 			 !intel_pt_validate_cap(vmx->pt_desc.caps,
@@ -1875,7 +1882,7 @@ static int vmx_get_msr(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 		msr_info->data = vmx->pt_desc.guest.output_base;
 		break;
 	case MSR_IA32_RTIT_OUTPUT_MASK:
-		if (!vmx_pt_mode_is_host_guest() ||
+		if (!pt_can_read_msr(vcpu) ||
 			(!intel_pt_validate_cap(vmx->pt_desc.caps,
 					PT_CAP_topa_output) &&
 			 !intel_pt_validate_cap(vmx->pt_desc.caps,
@@ -1885,7 +1892,7 @@ static int vmx_get_msr(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 		break;
 	case MSR_IA32_RTIT_ADDR0_A ... MSR_IA32_RTIT_ADDR3_B:
 		index = msr_info->index - MSR_IA32_RTIT_ADDR0_A;
-		if (!vmx_pt_mode_is_host_guest() ||
+		if (!pt_can_read_msr(vcpu) ||
 			(index >= 2 * intel_pt_validate_cap(vmx->pt_desc.caps,
 					PT_CAP_num_address_ranges)))
 			return 1;
@@ -2154,6 +2161,7 @@ static int vmx_set_msr(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 		return vmx_set_vmx_msr(vcpu, msr_index, data);
 	case MSR_IA32_RTIT_CTL:
 		if (!vmx_pt_mode_is_host_guest() ||
+		    !guest_cpuid_has(vcpu, X86_FEATURE_INTEL_PT) ||
 			vmx_rtit_ctl_check(vcpu, data) ||
 			vmx->nested.vmxon)
 			return 1;
