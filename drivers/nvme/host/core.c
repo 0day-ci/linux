@@ -1260,6 +1260,18 @@ static void nvme_start_keep_alive(struct nvme_ctrl *ctrl)
 	nvme_queue_keep_alive_work(ctrl);
 }
 
+void nvme_update_keep_alive(struct nvme_ctrl *ctrl, unsigned int new_kato)
+{
+	dev_info(ctrl->device,
+		 "keep alive commands interval on the host is updated from %u ms to %u ms\n",
+		 ctrl->kato * 1000 / 2, new_kato * 1000 / 2);
+
+	nvme_stop_keep_alive(ctrl);
+	ctrl->kato = new_kato;
+	nvme_start_keep_alive(ctrl);
+}
+EXPORT_SYMBOL_GPL(nvme_update_keep_alive);
+
 void nvme_stop_keep_alive(struct nvme_ctrl *ctrl)
 {
 	if (unlikely(ctrl->kato == 0))

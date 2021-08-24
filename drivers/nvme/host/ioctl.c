@@ -187,6 +187,22 @@ static bool nvme_validate_passthru_nsid(struct nvme_ctrl *ctrl,
 	return true;
 }
 
+static void nvme_user_cmd_post(struct nvme_passthru_cmd *cmd,
+			       struct nvme_ctrl *ctrl)
+{
+	/*
+	 * Keep alive commands interval on the host should be updated
+	 * when KATO is modified by Set Features commands.
+	 */
+	if (cmd->opcode == nvme_admin_set_features &&
+	    (cmd->cdw10 & 0xFF) == NVME_FEAT_KATO) {
+		/* ms -> s */
+		unsigned int new_kato = DIV_ROUND_UP(cmd->cdw11, 1000);
+
+		nvme_update_keep_alive(ctrl, new_kato);
+	}
+}
+
 static int nvme_user_cmd(struct nvme_ctrl *ctrl, struct nvme_ns *ns,
 			struct nvme_passthru_cmd __user *ucmd)
 {
@@ -230,6 +246,9 @@ static int nvme_user_cmd(struct nvme_ctrl *ctrl, struct nvme_ns *ns,
 		if (put_user(result, &ucmd->result))
 			return -EFAULT;
 	}
+
+	if (!status)
+		nvme_user_cmd_post(&cmd, ctrl);
 
 	return status;
 }
