@@ -1324,6 +1324,14 @@ scripts_unifdef: scripts_basic
 
 install: sub_make_done :=
 
+# Install $(KBUILD_IMAGE) by default.
+# If necessary, override install-image per target.
+install-image = $(KBUILD_IMAGE)
+
+quiet_cmd_install = INSTALL $(INSTALL_PATH)
+      cmd_install = scripts/install.sh $(KERNELRELEASE) $(install-image) \
+			System.map "$(INSTALL_PATH)"
+
 # ---------------------------------------------------------------------------
 # Tools
 
