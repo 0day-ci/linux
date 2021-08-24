@@ -45,18 +45,15 @@ int __must_check _rtw_read8(struct adapter *adapter, u32 addr, u8 *data)
 	return _read8(pintfhdl, addr, data);
 }
 
-u16 _rtw_read16(struct adapter *adapter, u32 addr)
+int __must_check _rtw_read16(struct adapter *adapter, u32 addr, u16 *data)
 {
-	u16 r_val;
 	struct io_priv *pio_priv = &adapter->iopriv;
 	struct	intf_hdl		*pintfhdl = &pio_priv->intf;
-	u16 (*_read16)(struct intf_hdl *pintfhdl, u32 addr);
+	int (*_read16)(struct intf_hdl *pintfhdl, u32 addr, u16 *data);
 
 	_read16 = pintfhdl->io_ops._read16;
 
-	r_val = _read16(pintfhdl, addr);
-
-	return r_val;
+	return _read16(pintfhdl, addr, data);
 }
 
 u32 _rtw_read32(struct adapter *adapter, u32 addr)

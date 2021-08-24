@@ -262,7 +262,11 @@ static void efuse_read_phymap_from_txpktbuf(
 			 * do not remove it as the rtw_read16() call consumes
 			 * 2 bytes from the EEPROM source.
 			 */
-			u16 lenc = rtw_read16(adapter, REG_PKTBUF_DBG_DATA_L);
+			u16 lenc;
+
+			error = rtw_read16(adapter, REG_PKTBUF_DBG_DATA_L, &lenc);
+			if (error)
+				return;
 
 			len = le32_to_cpu(lo32) & 0x0000ffff;
 
@@ -778,21 +782,27 @@ hal_EfusePowerSwitch_RTL8188E(
 		rtw_write8(pAdapter, REG_EFUSE_ACCESS, EFUSE_ACCESS_ON);
 
 		/*  1.2V Power: From VDDON with Power Cut(0x0000h[15]), defualt valid */
-		tmpV16 = rtw_read16(pAdapter, REG_SYS_ISO_CTRL);
-		if (!(tmpV16 & PWC_EV12V)) {
+		error = rtw_read16(pAdapter, REG_SYS_ISO_CTRL, &tmpV16);
+		if (error) {
+			return;
+		} else if (!(tmpV16 & PWC_EV12V)) {
 			tmpV16 |= PWC_EV12V;
 			rtw_write16(pAdapter, REG_SYS_ISO_CTRL, tmpV16);
 		}
 		/*  Reset: 0x0000h[28], default valid */
-		tmpV16 =  rtw_read16(pAdapter, REG_SYS_FUNC_EN);
-		if (!(tmpV16 & FEN_ELDR)) {
+		error = rtw_read16(pAdapter, REG_SYS_FUNC_EN, &tmpV16);
+		if (error) {
+			return;
+		} else if (!(tmpV16 & FEN_ELDR)) {
 			tmpV16 |= FEN_ELDR;
 			rtw_write16(pAdapter, REG_SYS_FUNC_EN, tmpV16);
 		}
 
 		/*  Clock: Gated(0x0008h[5]) 8M(0x0008h[1]) clock from ANA, default valid */
-		tmpV16 = rtw_read16(pAdapter, REG_SYS_CLKR);
-		if ((!(tmpV16 & LOADER_CLK_EN))  || (!(tmpV16 & ANA8M))) {
+		error = rtw_read16(pAdapter, REG_SYS_CLKR, &tmpV16);
+		if (error) {
+			return;
+		} else if ((!(tmpV16 & LOADER_CLK_EN))  || (!(tmpV16 & ANA8M))) {
 			tmpV16 |= (LOADER_CLK_EN | ANA8M);
 			rtw_write16(pAdapter, REG_SYS_CLKR, tmpV16);
 		}
@@ -1915,8 +1925,11 @@ u8 GetEEPROMSize8188E(struct adapter *padapter)
 {
 	u8 size = 0;
 	u32	cr;
+	int error;
 
-	cr = rtw_read16(padapter, REG_9346CR);
+	error = rtw_read16(padapter, REG_9346CR, (u16 *) &cr);
+	if (error)
+		return size;
 	/*  6: EEPROM used is 93C46, 4: boot from E-Fuse. */
 	size = (cr & BOOT_FROM_EEPROM) ? 6 : 4;
 
