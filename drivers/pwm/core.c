@@ -554,7 +554,8 @@ int pwm_apply_state(struct pwm_device *pwm, const struct pwm_state *state)
 
 		trace_pwm_apply(pwm, state);
 
-		pwm->state = *state;
+		if (!test_bit(PWMF_DRIVERMANAGEDSTATE, &pwm->flags))
+			pwm->state = *state;
 
 		/*
 		 * only do this after pwm->state was applied as some

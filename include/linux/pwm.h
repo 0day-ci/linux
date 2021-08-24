@@ -46,6 +46,7 @@ struct pwm_args {
 enum {
 	PWMF_REQUESTED = 1 << 0,
 	PWMF_EXPORTED = 1 << 1,
+	PWMF_DRIVERMANAGEDSTATE = 1 << 2,
 };
 
 /*
