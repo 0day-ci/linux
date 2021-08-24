@@ -9,6 +9,7 @@
 #include "configfs.h"
 #include "u_f.h"
 #include "u_os_desc.h"
+#include "configfs_trace.h"
 
 int check_user_usb_string(const char *name,
 		struct usb_gadget_strings *stringtab_dev)
@@ -269,6 +270,8 @@ static ssize_t gadget_dev_desc_UDC_store(struct config_item *item,
 		return -ENOMEM;
 	if (name[len - 1] == '\n')
 		name[len - 1] = '\0';
+
+	trace_gadget_dev_desc_UDC_store(config_item_name(item), name);
 
 	mutex_lock(&gi->lock);
 
