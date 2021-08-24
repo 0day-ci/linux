@@ -254,6 +254,17 @@ extern atomic_long_t tcp_memory_allocated;
 extern struct percpu_counter tcp_sockets_allocated;
 extern unsigned long tcp_memory_pressure;
 
+enum tcp_drop_reason {
+	TCP_OFO_QUEUE = 1,
+	TCP_DATA_QUEUE_OFO = 2,
+	TCP_DATA_QUEUE = 3,
+	TCP_PRUNE_OFO_QUEUE = 4,
+	TCP_VALIDATE_INCOMING = 5,
+	TCP_RCV_ESTABLISHED = 6,
+	TCP_RCV_SYNSENT_STATE_PROCESS = 7,
+	TCP_RCV_STATE_PROCESS = 8
+};
+
 /* optimized version of sk_under_memory_pressure() for TCP sockets */
 static inline bool tcp_under_memory_pressure(const struct sock *sk)
 {
