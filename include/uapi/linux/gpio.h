@@ -267,6 +267,7 @@ struct gpio_v2_line_info_changed {
 enum gpio_v2_line_event_id {
 	GPIO_V2_LINE_EVENT_RISING_EDGE	= 1,
 	GPIO_V2_LINE_EVENT_FALLING_EDGE	= 2,
+	GPIO_V2_LINE_EVENT_UNKNOWN_EDGE = 3,
 };
 
 /**

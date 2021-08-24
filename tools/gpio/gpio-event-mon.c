@@ -29,7 +29,8 @@ int monitor_device(const char *device_name,
 		   unsigned int *lines,
 		   unsigned int num_lines,
 		   struct gpio_v2_line_config *config,
-		   unsigned int loops)
+		   unsigned int loops,
+		   int verbosity)
 {
 	struct gpio_v2_line_values values;
 	char *chrdev_name;
@@ -62,16 +63,23 @@ int monitor_device(const char *device_name,
 		gpiotools_set_bit(&values.mask, i);
 	ret = gpiotools_get_values(lfd, &values);
 	if (ret < 0) {
-		fprintf(stderr,
-			"Failed to issue GPIO LINE GET VALUES IOCTL (%d)\n",
-			ret);
-		goto exit_line_close;
+		if (errno == EIO) {
+			fprintf(stdout,
+				"Failed to get line values. Function unimplemented, continuing\n");
+		} else {
+			ret = -errno;
+			fprintf(stderr,
+				"Failed to issue GPIO LINE GET VALUES IOCTL (%d)\n",
+				ret);
+			goto exit_line_close;
+		}
 	}
 
 	if (num_lines == 1) {
 		fprintf(stdout, "Monitoring line %d on %s\n", lines[0], device_name);
-		fprintf(stdout, "Initial line value: %d\n",
-			gpiotools_test_bit(values.bits, 0));
+		if (ret != -1)
+			fprintf(stdout, "Initial line value: %d\n",
+				gpiotools_test_bit(values.bits, 0));
 	} else {
 		fprintf(stdout, "Monitoring lines %d", lines[0]);
 		for (i = 1; i < num_lines - 1; i++)
@@ -91,8 +99,9 @@ int monitor_device(const char *device_name,
 
 		ret = read(lfd, &event, sizeof(event));
 		if (ret == -1) {
-			if (errno == -EAGAIN) {
-				fprintf(stderr, "nothing available\n");
+			if (errno == EAGAIN) {
+				if (verbosity >= 2)
+					fprintf(stdout, "nothing available\n");
 				continue;
 			} else {
 				ret = -errno;
@@ -117,8 +126,11 @@ int monitor_device(const char *device_name,
 		case GPIO_V2_LINE_EVENT_FALLING_EDGE:
 			fprintf(stdout, "falling edge");
 			break;
+		case GPIO_V2_LINE_EVENT_UNKNOWN_EDGE:
+			fprintf(stdout, "rising/falling edge");
+			break;
 		default:
-			fprintf(stdout, "unknown event");
+			fprintf(stdout, "unknown event spec: %x", event.id);
 		}
 		fprintf(stdout, "\n");
 
@@ -150,6 +162,7 @@ void print_usage(void)
 		"  -f         Listen for falling edges\n"
 		"  -w         Report the wall-clock time for events\n"
 		"  -b <n>     Debounce the line with period n microseconds\n"
+		"  -v	      Verbosity\n"
 		" [-c <n>]    Do <n> loops (optional, infinite loop if not stated)\n"
 		"  -?         This helptext\n"
 		"\n"
@@ -169,12 +182,13 @@ int main(int argc, char **argv)
 	unsigned int num_lines = 0;
 	unsigned int loops = 0;
 	struct gpio_v2_line_config config;
+	int verbosity = 0;
 	int c, attr, i;
 	unsigned long debounce_period_us = 0;
 
 	memset(&config, 0, sizeof(config));
 	config.flags = GPIO_V2_LINE_FLAG_INPUT;
-	while ((c = getopt(argc, argv, "c:n:o:b:dsrfw?")) != -1) {
+	while ((c = getopt(argc, argv, "c:n:o:b:dsrfwv?")) != -1) {
 		switch (c) {
 		case 'c':
 			loops = strtoul(optarg, NULL, 10);
@@ -208,6 +222,9 @@ int main(int argc, char **argv)
 		case 'w':
 			config.flags |= GPIO_V2_LINE_FLAG_EVENT_CLOCK_REALTIME;
 			break;
+		case 'v':
+			++verbosity;
+			break;
 		case '?':
 			print_usage();
 			return -1;
@@ -232,5 +249,6 @@ int main(int argc, char **argv)
 		       "falling edges\n");
 		config.flags |= EDGE_FLAGS;
 	}
-	return monitor_device(device_name, lines, num_lines, &config, loops);
+	return monitor_device(device_name, lines, num_lines, &config, loops,
+			      verbosity);
 }
