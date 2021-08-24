@@ -9,7 +9,6 @@
  */
 #include "sched.h"
 
-#ifdef CONFIG_SMP
 static int
 select_task_rq_stop(struct task_struct *p, int cpu, int flags)
 {
@@ -21,7 +20,6 @@ balance_stop(struct rq *rq, struct task_struct *prev, struct rq_flags *rf)
 {
 	return sched_stop_runnable(rq);
 }
-#endif /* CONFIG_SMP */
 
 static void
 check_preempt_curr_stop(struct rq *rq, struct task_struct *p, int flags)
@@ -130,12 +128,10 @@ DEFINE_SCHED_CLASS(stop) = {
 	.put_prev_task		= put_prev_task_stop,
 	.set_next_task          = set_next_task_stop,
 
-#ifdef CONFIG_SMP
 	.balance		= balance_stop,
 	.pick_task		= pick_task_stop,
 	.select_task_rq		= select_task_rq_stop,
 	.set_cpus_allowed	= set_cpus_allowed_common,
-#endif
 
 	.task_tick		= task_tick_stop,
 
