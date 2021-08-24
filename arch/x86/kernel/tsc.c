@@ -1329,6 +1329,38 @@ struct system_counterval_t convert_art_ns_to_tsc(u64 art_ns)
 }
 EXPORT_SYMBOL(convert_art_ns_to_tsc);
 
+/*
+ * convert_art_ns_to_art() - Convert ART in nanoseconds to ART
+ * @art_ns: ART (Always Running Timer) in nominal nanoseconds
+ *
+ * Computes the ART cycles given the duration in nominal nanoseconds
+ *
+ * This is valid when CPU feature flag X86_FEATURE_TSC_KNOWN_FREQ is set
+ * indicating the tsc_khz is derived from CPUID[15H]. Drivers should check
+ * that this flag is set before conversion to ART is attempted.
+ *
+ * Return:
+ *	u64 ART value rounded to nearest cycle corresponding to nanosecond
+ *	duration input
+ */
+u64 convert_art_ns_to_art(u64 art_ns)
+{
+	u64 tmp, res, rem;
+	u32 crystal_khz;
+
+	crystal_khz = (tsc_khz * art_to_tsc_denominator) /
+		art_to_tsc_numerator;
+
+	rem = do_div(art_ns, USEC_PER_SEC);
+	res = art_ns * crystal_khz;
+	tmp = rem * crystal_khz;
+
+	rem = do_div(tmp, USEC_PER_SEC);
+	res += rem < USEC_PER_SEC / 2 ? tmp : tmp + 1;
+
+	return res;
+}
+EXPORT_SYMBOL(convert_art_ns_to_art);
 
 static void tsc_refine_calibration_work(struct work_struct *work);
 static DECLARE_DELAYED_WORK(tsc_irqwork, tsc_refine_calibration_work);
