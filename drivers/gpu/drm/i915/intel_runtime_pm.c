@@ -706,27 +706,19 @@ int intel_runtime_pm_suspend(struct intel_runtime_pm *rpm)
 
 	rpm->suspended = true;
 
-	/*
-	 * FIXME: We really should find a document that references the arguments
-	 * used below!
-	 */
-	if (IS_BROADWELL(i915)) {
+	if (GRAPHICS_VER(i915) < 8) {
 		/*
-		 * On Broadwell, if we use PCI_D1 the PCH DDI ports will stop
-		 * being detected, and the call we do at intel_runtime_resume()
-		 * won't be able to restore them. Since PCI_D3hot matches the
-		 * actual specification and appears to be working, use it.
-		 */
-		intel_opregion_notify_adapter(i915, PCI_D3hot);
-	} else {
-		/*
-		 * current versions of firmware which depend on this opregion
-		 * notification have repurposed the D1 definition to mean
+		 * Some older versions of firmware which depend on this opregion
+		 * notification had repurposed the D1 definition to mean
 		 * "runtime suspended" vs. what you would normally expect (D3)
 		 * to distinguish it from notifications that might be sent via
-		 * the suspend path.
+		 * the suspend path. Unfortunately there's no documentation
+		 * available right now to justify this flow. However let's
+		 * keep for historical reasons.
 		 */
 		intel_opregion_notify_adapter(i915, PCI_D1);
+	} else {
+		intel_opregion_notify_adapter(i915, PCI_D3hot);
 	}
 
 	assert_forcewakes_inactive(&i915->uncore);
