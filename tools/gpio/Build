@@ -3,4 +3,5 @@ lsgpio-y += lsgpio.o gpio-utils.o
 gpio-hammer-y += gpio-hammer.o gpio-utils.o
 gpio-event-mon-y += gpio-event-mon.o gpio-utils.o
 gpio-event-gen-y += gpio-event-gen.o gpio-utils.o
+gpio-pwm-mon-y += gpio-pwm-mon.o gpio-utils.o
 gpio-watch-y += gpio-watch.o

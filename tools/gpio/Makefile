@@ -18,7 +18,8 @@ MAKEFLAGS += -r
 
 override CFLAGS += -O2 -Wall -g -D_GNU_SOURCE -I$(OUTPUT)include
 
-ALL_TARGETS := lsgpio gpio-hammer gpio-event-mon gpio-event-gen gpio-watch
+ALL_TARGETS := lsgpio gpio-hammer gpio-event-mon gpio-event-gen gpio-pwm-mon \
+	gpio-watch
 ALL_PROGRAMS := $(patsubst %,$(OUTPUT)%,$(ALL_TARGETS))
 
 all: $(ALL_PROGRAMS)
@@ -74,6 +75,15 @@ $(GPIO_EVENT_GEN_IN): prepare FORCE $(OUTPUT)gpio-utils-in.o
 	$(Q)$(MAKE) $(build)=gpio-event-gen
 $(OUTPUT)gpio-event-gen: $(GPIO_EVENT_GEN_IN)
 	$(QUIET_LINK)$(CC) $(CFLAGS) $(LDFLAGS) $< -o $@
+
+#
+# gpio-pwm-mon
+#
+GPIO_EVENT_MON_IN := $(OUTPUT)gpio-pwm-mon-in.o
+$(GPIO_EVENT_MON_IN): prepare FORCE $(OUTPUT)gpio-utils-in.o
+	$(Q)$(MAKE) $(build)=gpio-pwm-mon
+$(OUTPUT)gpio-pwm-mon: $(GPIO_EVENT_MON_IN)
+	$(QUIET_LINK)$(CC) $(CFLAGS) $(LDFLAGS) -lpthread -pthread $< -o $@
 
 #
 # gpio-watch
