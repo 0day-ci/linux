@@ -325,7 +325,7 @@ static int v9fs_file_lock_dotl(struct file *filp, int cmd, struct file_lock *fl)
 		ret = v9fs_file_getlock(filp, fl);
 	else
 		ret = -EINVAL;
-out_err:
+
 	return ret;
 }
 
