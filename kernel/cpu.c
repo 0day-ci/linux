@@ -521,7 +521,7 @@ static void __cpuhp_kick_ap(struct cpuhp_cpu_state *st)
 	st->result = 0;
 	/*
 	 * Make sure the above stores are visible before should_run becomes
-	 * true. Paired with the mb() above in cpuhp_thread_fun()
+	 * true. Paired with the mb() above in cpuhp_thread_run()
 	 */
 	smp_mb();
 	st->should_run = true;
@@ -723,7 +723,7 @@ static int cpuhp_should_run(unsigned int cpu)
  *
  * When complete or on error, should_run is cleared and the completion is fired.
  */
-static void cpuhp_thread_fun(unsigned int cpu)
+static void cpuhp_thread_run(unsigned int cpu)
 {
 	struct cpuhp_cpu_state *st = this_cpu_ptr(&cpuhp_state);
 	bool bringup = st->bringup;
@@ -863,7 +863,7 @@ static struct smp_hotplug_thread cpuhp_threads = {
 	.store			= &cpuhp_state.thread,
 	.create			= &cpuhp_create,
 	.thread_should_run	= cpuhp_should_run,
-	.thread_fn		= cpuhp_thread_fun,
+	.thread_fn		= cpuhp_thread_run,
 	.thread_comm		= "cpuhp/%u",
 	.selfparking		= true,
 };
