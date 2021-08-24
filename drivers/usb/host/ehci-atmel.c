@@ -20,6 +20,7 @@
 #include <linux/usb/hcd.h>
 
 #include "ehci.h"
+#include "ehci-atmel.h"
 
 #define DRIVER_DESC "EHCI Atmel driver"
 
@@ -85,6 +86,7 @@ static void atmel_stop_ehci(struct platform_device *pdev)
 
 static int ehci_atmel_drv_probe(struct platform_device *pdev)
 {
+	struct device_node *np = pdev->dev.of_node;
 	struct usb_hcd *hcd;
 	const struct hc_driver *driver = &ehci_atmel_hc_driver;
 	struct resource *res;
@@ -149,6 +151,14 @@ static int ehci_atmel_drv_probe(struct platform_device *pdev)
 
 	atmel_start_ehci(pdev);
 
+	if (of_property_read_bool(np, "atmel,enable-hsic")) {
+		u32 tmp;
+
+		tmp = ehci_readl(ehci, hcd->regs + AT91_UHPHS_INSNREG08);
+		tmp |= AT91_UHPHS_HSIC_EN;
+		ehci_writel(ehci, tmp, hcd->regs + AT91_UHPHS_INSNREG08);
+	}
+
 	retval = usb_add_hcd(hcd, irq, IRQF_SHARED);
 	if (retval)
 		goto fail_add_hcd;
@@ -170,9 +180,16 @@ fail_create_hcd:
 static int ehci_atmel_drv_remove(struct platform_device *pdev)
 {
 	struct usb_hcd *hcd = platform_get_drvdata(pdev);
+	struct ehci_hcd *ehci;
+	u32 tmp;
 
 	usb_remove_hcd(hcd);
 	usb_put_hcd(hcd);
+
+	ehci = hcd_to_ehci(hcd);
+	tmp = ehci_readl(ehci, hcd->regs + AT91_UHPHS_INSNREG08);
+	tmp &= ~AT91_UHPHS_HSIC_EN;
+	ehci_writel(ehci, tmp, hcd->regs + AT91_UHPHS_INSNREG08);
 
 	atmel_stop_ehci(pdev);
 
