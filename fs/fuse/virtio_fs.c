@@ -319,9 +319,10 @@ static void virtio_fs_hiprio_done_work(struct work_struct *work)
 	struct virtio_fs_vq *fsvq = container_of(work, struct virtio_fs_vq,
 						 done_work);
 	struct virtqueue *vq = fsvq->vq;
+	unsigned long flags;
 
 	/* Free completed FUSE_FORGET requests */
-	spin_lock(&fsvq->lock);
+	spin_lock_irqsave(&fsvq->lock, flags);
 	do {
 		unsigned int len;
 		void *req;
@@ -333,7 +334,7 @@ static void virtio_fs_hiprio_done_work(struct work_struct *work)
 			dec_in_flight_req(fsvq);
 		}
 	} while (!virtqueue_enable_cb(vq) && likely(!virtqueue_is_broken(vq)));
-	spin_unlock(&fsvq->lock);
+	spin_unlock_irqrestore(&fsvq->lock, flags);
 }
 
 static void virtio_fs_request_dispatch_work(struct work_struct *work)
@@ -601,11 +602,15 @@ static void virtio_fs_requests_done_work(struct work_struct *work)
 	struct virtqueue *vq = fsvq->vq;
 	struct fuse_req *req;
 	struct fuse_req *next;
+	unsigned long flags;
 	unsigned int len;
 	LIST_HEAD(reqs);
 
-	/* Collect completed requests off the virtqueue */
-	spin_lock(&fsvq->lock);
+	/*
+	 * Collect completed requests off the virtqueue with irqs disabled to
+	 * prevent races with vring_interrupt().
+	 */
+	spin_lock_irqsave(&fsvq->lock, flags);
 	do {
 		virtqueue_disable_cb(vq);
 
@@ -615,7 +620,7 @@ static void virtio_fs_requests_done_work(struct work_struct *work)
 			spin_unlock(&fpq->lock);
 		}
 	} while (!virtqueue_enable_cb(vq) && likely(!virtqueue_is_broken(vq)));
-	spin_unlock(&fsvq->lock);
+	spin_unlock_irqrestore(&fsvq->lock, flags);
 
 	/* End requests */
 	list_for_each_entry_safe(req, next, &reqs, list) {
