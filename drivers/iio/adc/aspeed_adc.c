@@ -79,8 +79,14 @@ struct aspeed_adc_model_data {
 	unsigned int vref_fixed;	// mV
 	bool wait_init_sequence;
 	bool need_prescaler;
+	bool bat_sense_sup;
 	u8 scaler_bit_width;
 	unsigned int num_channels;
+};
+
+struct adc_gain {
+	u8 mult;
+	u8 div;
 };
 
 struct aspeed_adc_data {
@@ -96,6 +102,8 @@ struct aspeed_adc_data {
 	int			vref;
 	u32			sample_period_ns;
 	int			cv;
+	bool			battery_sensing;
+	struct adc_gain		battery_mode_gain;
 };
 
 #define ASPEED_CHAN(_idx, _data_reg_addr) {			\
@@ -103,10 +111,10 @@ struct aspeed_adc_data {
 	.indexed = 1,						\
 	.channel = (_idx),					\
 	.address = (_data_reg_addr),				\
-	.info_mask_separate = BIT(IIO_CHAN_INFO_RAW),		\
-	.info_mask_shared_by_type = BIT(IIO_CHAN_INFO_SCALE) |	\
-				BIT(IIO_CHAN_INFO_SAMP_FREQ) |	\
+	.info_mask_separate = BIT(IIO_CHAN_INFO_RAW) |		\
 				BIT(IIO_CHAN_INFO_OFFSET),	\
+	.info_mask_shared_by_type = BIT(IIO_CHAN_INFO_SCALE) |	\
+				BIT(IIO_CHAN_INFO_SAMP_FREQ),	\
 }
 
 static const struct iio_chan_spec aspeed_adc_iio_channels[] = {
@@ -196,14 +204,39 @@ static int aspeed_adc_read_raw(struct iio_dev *indio_dev,
 			       int *val, int *val2, long mask)
 {
 	struct aspeed_adc_data *data = iio_priv(indio_dev);
+	u32 adc_engine_control_reg_val;
 
 	switch (mask) {
 	case IIO_CHAN_INFO_RAW:
-		*val = readw(data->base + chan->address);
+		if (data->battery_sensing && chan->channel == 7) {
+			adc_engine_control_reg_val =
+				readl(data->base + ASPEED_REG_ENGINE_CONTROL);
+			writel(adc_engine_control_reg_val |
+				       FIELD_PREP(ASPEED_ADC_CH7_MODE,
+						  ASPEED_ADC_CH7_BAT) |
+				       ASPEED_ADC_BAT_SENSING_ENABLE,
+			       data->base + ASPEED_REG_ENGINE_CONTROL);
+			/*
+			 * After enable battery sensing mode need to wait some time for adc stable
+			 * Experiment result is 1ms.
+			 */
+			mdelay(1);
+			*val = readw(data->base + chan->address);
+			*val = (*val * data->battery_mode_gain.mult) /
+			       data->battery_mode_gain.div;
+			/* Restore control register value */
+			writel(adc_engine_control_reg_val,
+			       data->base + ASPEED_REG_ENGINE_CONTROL);
+		} else
+			*val = readw(data->base + chan->address);
 		return IIO_VAL_INT;
 
 	case IIO_CHAN_INFO_OFFSET:
-		*val = data->cv;
+		if (data->battery_sensing && chan->channel == 7)
+			*val = (data->cv * data->battery_mode_gain.mult) /
+			       data->battery_mode_gain.div;
+		else
+			*val = data->cv;
 		return IIO_VAL_INT;
 
 	case IIO_CHAN_INFO_SCALE:
@@ -473,6 +506,23 @@ static int aspeed_adc_probe(struct platform_device *pdev)
 	if (ret)
 		return ret;
 
+	if (of_find_property(data->dev->of_node, "aspeed,battery-sensing",
+			     NULL)) {
+		if (data->model_data->bat_sense_sup) {
+			data->battery_sensing = 1;
+			if (readl(data->base + ASPEED_REG_ENGINE_CONTROL) &
+			ASPEED_ADC_BAT_SENSING_DIV) {
+				data->battery_mode_gain.mult = 3;
+				data->battery_mode_gain.div = 1;
+			} else {
+				data->battery_mode_gain.mult = 3;
+				data->battery_mode_gain.div = 2;
+			}
+		} else
+			dev_warn(&pdev->dev,
+				"Failed to enable battey-sensing mode\n");
+	}
+
 	if (data->model_data->wait_init_sequence) {
 		adc_engine_control_reg_val =
 			readl(data->base + ASPEED_REG_ENGINE_CONTROL);
@@ -555,6 +605,7 @@ static const struct aspeed_adc_model_data ast2600_adc0_model_data = {
 	.min_sampling_rate = 10000,
 	.max_sampling_rate = 500000,
 	.wait_init_sequence = true,
+	.bat_sense_sup = true,
 	.scaler_bit_width = 16,
 	.num_channels = 8,
 };
@@ -564,6 +615,7 @@ static const struct aspeed_adc_model_data ast2600_adc1_model_data = {
 	.min_sampling_rate = 10000,
 	.max_sampling_rate = 500000,
 	.wait_init_sequence = true,
+	.bat_sense_sup = true,
 	.scaler_bit_width = 16,
 	.num_channels = 8,
 };
