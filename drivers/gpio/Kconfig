@@ -794,6 +794,17 @@ config GPIO_IDT3243X
 	  To compile this driver as a module, choose M here: the module will
 	  be called gpio-idt3243x.
 
+config GPIO_INTEL_PMC_TIO
+	tristate "Intel PMC Time-Aware GPIO"
+	depends on X86
+	select GPIO_GENERIC
+	help
+	  This driver adds support for Intel PMC Timed-Aware GPIO (TGPIO)
+	  controller. The device clock used to drive TGPIO logic is the
+	  Always Running Timer (ART).
+
+	  Say yes here to build support for PMC TGPIO Driver.
+
 endmenu
 
 menu "Port-mapped I/O GPIO drivers"

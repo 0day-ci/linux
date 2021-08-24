@@ -9311,6 +9311,13 @@ F:	drivers/gpio/gpio-pch.c
 F:	drivers/gpio/gpio-sch.c
 F:	drivers/gpio/gpio-sodaville.c
 
+INTEL GPIO PMC TIO
+M:	Tamal Saha <tamal.saha@intel.com>
+S:	Supported
+F:	drivers/gpio/gpio-intel-tio-pmc.c
+F:	tools/gpio/gpio-event-gen.c
+F:	tools/gpio/gpio-pwm-mon.c
+
 INTEL GVT-g DRIVERS (Intel GPU Virtualization)
 M:	Zhenyu Wang <zhenyuw@linux.intel.com>
 M:	Zhi Wang <zhi.a.wang@intel.com>
