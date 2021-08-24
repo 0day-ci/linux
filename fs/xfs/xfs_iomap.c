@@ -870,6 +870,7 @@ xfs_buffered_write_iomap_begin(
 	struct xfs_bmbt_irec	imap, cmap;
 	struct xfs_iext_cursor	icur, ccur;
 	xfs_fsblock_t		prealloc_blocks = 0;
+	u16			cflags = 0;
 	bool			eof = false, cow_eof = false, shared = false;
 	int			allocfork = XFS_DATA_FORK;
 	int			error = 0;
@@ -1061,6 +1062,7 @@ found_imap:
 found_cow:
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
 	if (imap.br_startoff <= offset_fsb) {
+		cflags = IOMAP_F_SHARED;
 		error = xfs_bmbt_to_iomap(ip, srcmap, &imap, 0);
 		if (error)
 			return error;
@@ -1068,7 +1070,7 @@ found_cow:
 		xfs_trim_extent(&cmap, offset_fsb,
 				imap.br_startoff - offset_fsb);
 	}
-	return xfs_bmbt_to_iomap(ip, iomap, &cmap, IOMAP_F_SHARED);
+	return xfs_bmbt_to_iomap(ip, iomap, &cmap, cflags);
 
 out_unlock:
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
