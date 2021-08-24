@@ -205,6 +205,67 @@ static struct tcp_authopt_key_info *tcp_authopt_key_lookup_exact(const struct so
 	return NULL;
 }
 
+struct tcp_authopt_key_info *tcp_authopt_lookup_send(struct tcp_authopt_info *info,
+						     const struct sock *addr_sk,
+						     int send_id)
+{
+	struct tcp_authopt_key_info *result = NULL;
+	struct tcp_authopt_key_info *key;
+
+	hlist_for_each_entry_rcu(key, &info->head, node, 0) {
+		if (send_id >= 0 && key->send_id != send_id)
+			continue;
+		if (key->flags & TCP_AUTHOPT_KEY_ADDR_BIND) {
+			if (addr_sk->sk_family == AF_INET) {
+				struct sockaddr_in *key_addr = (struct sockaddr_in *)&key->addr;
+				const struct in_addr *daddr =
+					(const struct in_addr *)&addr_sk->sk_daddr;
+
+				if (WARN_ON(key_addr->sin_family != AF_INET))
+					continue;
+				if (memcmp(daddr, &key_addr->sin_addr, sizeof(*daddr)))
+					continue;
+			}
+			if (addr_sk->sk_family == AF_INET6) {
+				struct sockaddr_in6 *key_addr = (struct sockaddr_in6 *)&key->addr;
+				const struct in6_addr *daddr = &addr_sk->sk_v6_daddr;
+
+				if (WARN_ON(key_addr->sin6_family != AF_INET6))
+					continue;
+				if (memcmp(daddr, &key_addr->sin6_addr, sizeof(*daddr)))
+					continue;
+			}
+		}
+		if (result && net_ratelimit())
+			pr_warn("ambiguous tcp authentication keys configured for send\n");
+		result = key;
+	}
+
+	return result;
+}
+
+/**
+ * tcp_authopt_select_key - select key for sending
+ *
+ * addr_sk is the sock used for comparing daddr, it is only different from sk in
+ * the synack case.
+ *
+ * Result is protected by RCU and can't be stored, it may only be passed to
+ * tcp_authopt_hash and only under a single rcu_read_lock.
+ */
+struct tcp_authopt_key_info *tcp_authopt_select_key(const struct sock *sk,
+						    const struct sock *addr_sk,
+						    u8 *rnextkeyid)
+{
+	struct tcp_authopt_info *info;
+
+	info = rcu_dereference(tcp_sk(sk)->authopt_info);
+	if (!info)
+		return NULL;
+
+	return tcp_authopt_lookup_send(info, addr_sk, -1);
+}
+
 static struct tcp_authopt_info *__tcp_authopt_info_get_or_create(struct sock *sk)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
@@ -389,8 +450,61 @@ int tcp_set_authopt_key(struct sock *sk, sockptr_t optval, unsigned int optlen)
 	key_info->alg = alg;
 	key_info->keylen = opt.keylen;
 	memcpy(key_info->key, opt.key, opt.keylen);
+	key_info->maclen = alg->maclen;
 	memcpy(&key_info->addr, &opt.addr, sizeof(key_info->addr));
 	hlist_add_head_rcu(&key_info->node, &info->head);
+
+	return 0;
+}
+
+static int tcp_authopt_clone_keys(struct sock *newsk,
+				  const struct sock *oldsk,
+				  struct tcp_authopt_info *new_info,
+				  struct tcp_authopt_info *old_info)
+{
+	struct tcp_authopt_key_info *old_key;
+	struct tcp_authopt_key_info *new_key;
+
+	hlist_for_each_entry_rcu(old_key, &old_info->head, node, lockdep_sock_is_held(sk)) {
+		new_key = sock_kmalloc(newsk, sizeof(*new_key), GFP_ATOMIC);
+		if (!new_key)
+			return -ENOMEM;
+		memcpy(new_key, old_key, sizeof(*new_key));
+		tcp_authopt_alg_incref(old_key->alg);
+		hlist_add_head_rcu(&new_key->node, &new_info->head);
+	}
+
+	return 0;
+}
+
+/** Called to create accepted sockets.
+ *
+ *  Need to copy authopt info from listen socket.
+ */
+int __tcp_authopt_openreq(struct sock *newsk, const struct sock *oldsk, struct request_sock *req)
+{
+	struct tcp_authopt_info *old_info;
+	struct tcp_authopt_info *new_info;
+	int err;
+
+	old_info = rcu_dereference(tcp_sk(oldsk)->authopt_info);
+	if (!old_info)
+		return 0;
+
+	new_info = kmalloc(sizeof(*new_info), GFP_ATOMIC | __GFP_ZERO);
+	if (!new_info)
+		return -ENOMEM;
+
+	sk_nocaps_add(newsk, NETIF_F_GSO_MASK);
+	new_info->src_isn = tcp_rsk(req)->snt_isn;
+	new_info->dst_isn = tcp_rsk(req)->rcv_isn;
+	INIT_HLIST_HEAD(&new_info->head);
+	err = tcp_authopt_clone_keys(newsk, oldsk, new_info, old_info);
+	if (err) {
+		__tcp_authopt_info_free(newsk, new_info);
+		return err;
+	}
+	rcu_assign_pointer(tcp_sk(newsk)->authopt_info, new_info);
 
 	return 0;
 }
@@ -817,6 +931,12 @@ static int tcp_authopt_hash_packet(struct crypto_shash *tfm,
 	return crypto_shash_final(desc, macbuf);
 }
 
+/**
+ * __tcp_authopt_calc_mac - Compute packet MAC using key
+ *
+ * @macbuf: output buffer. Must be large enough to fit the digestsize of the
+ * 			underlying transform before truncation. Please use TCP_AUTHOPT_MAXMACBUF
+ */
 int __tcp_authopt_calc_mac(struct sock *sk,
 			   struct sk_buff *skb,
 			   struct tcp_authopt_key_info *key,
@@ -860,4 +980,130 @@ int __tcp_authopt_calc_mac(struct sock *sk,
 out:
 	tcp_authopt_put_mac_shash(key, mac_tfm);
 	return err;
+}
+
+/**
+ * tcp_authopt_hash - fill in the mac
+ *
+ * The key must come from tcp_authopt_select_key.
+ */
+int tcp_authopt_hash(char *hash_location,
+		     struct tcp_authopt_key_info *key,
+		     struct sock *sk,
+		     struct sk_buff *skb)
+{
+	/* MAC inside option is truncated to 12 bytes but crypto API needs output
+	 * buffer to be large enough so we use a buffer on the stack.
+	 */
+	u8 macbuf[TCP_AUTHOPT_MAXMACBUF];
+	int err;
+
+	if (WARN_ON(key->maclen > sizeof(macbuf)))
+		return -ENOBUFS;
+
+	err = __tcp_authopt_calc_mac(sk, skb, key, false, macbuf);
+	if (err) {
+		/* If mac calculation fails and caller doesn't handle the error
+		 * try to make it obvious inside the packet.
+		 */
+		memset(hash_location, 0, key->maclen);
+		return err;
+	}
+	memcpy(hash_location, macbuf, key->maclen);
+
+	return 0;
+}
+
+static struct tcp_authopt_key_info *tcp_authopt_lookup_recv(struct sock *sk,
+							    struct sk_buff *skb,
+							    struct tcp_authopt_info *info,
+							    int recv_id)
+{
+	struct tcp_authopt_key_info *result = NULL;
+	struct tcp_authopt_key_info *key;
+
+	/* multiple matches will cause occasional failures */
+	hlist_for_each_entry_rcu(key, &info->head, node, 0) {
+		if (recv_id >= 0 && key->recv_id != recv_id)
+			continue;
+		if (key->flags & TCP_AUTHOPT_KEY_ADDR_BIND) {
+			if (sk->sk_family == AF_INET) {
+				struct sockaddr_in *key_addr = (struct sockaddr_in *)&key->addr;
+				struct iphdr *iph = (struct iphdr *)skb_network_header(skb);
+
+				if (WARN_ON(key_addr->sin_family != AF_INET))
+					continue;
+				if (WARN_ON(iph->version != 4))
+					continue;
+				if (memcmp(&iph->saddr, &key_addr->sin_addr, sizeof(iph->saddr)))
+					continue;
+			}
+			if (sk->sk_family == AF_INET6) {
+				struct sockaddr_in6 *key_addr = (struct sockaddr_in6 *)&key->addr;
+				struct ipv6hdr *iph = (struct ipv6hdr *)skb_network_header(skb);
+
+				if (WARN_ON(key_addr->sin6_family != AF_INET6))
+					continue;
+				if (WARN_ON(iph->version != 6))
+					continue;
+				if (memcmp(&iph->saddr, &key_addr->sin6_addr, sizeof(iph->saddr)))
+					continue;
+			}
+		}
+		if (result && net_ratelimit())
+			pr_warn("ambiguous tcp authentication keys configured for receive\n");
+		result = key;
+	}
+
+	return result;
+}
+
+int __tcp_authopt_inbound_check(struct sock *sk, struct sk_buff *skb, struct tcp_authopt_info *info)
+{
+	struct tcphdr *th = (struct tcphdr *)skb_transport_header(skb);
+	struct tcphdr_authopt *opt;
+	struct tcp_authopt_key_info *key;
+	u8 macbuf[TCP_AUTHOPT_MAXMACBUF];
+	int err;
+
+	opt = (struct tcphdr_authopt *)tcp_authopt_find_option(th);
+	key = tcp_authopt_lookup_recv(sk, skb, info, opt ? opt->keyid : -1);
+
+	/* nothing found or expected */
+	if (!opt && !key)
+		return 0;
+	if (!opt && key) {
+		net_info_ratelimited("TCP Authentication Missing\n");
+		return -EINVAL;
+	}
+	if (opt && !key) {
+		/* RFC5925 Section 7.3:
+		 * A TCP-AO implementation MUST allow for configuration of the behavior
+		 * of segments with TCP-AO but that do not match an MKT. The initial
+		 * default of this configuration SHOULD be to silently accept such
+		 * connections.
+		 */
+		if (info->flags & TCP_AUTHOPT_FLAG_REJECT_UNEXPECTED) {
+			net_info_ratelimited("TCP Authentication Unexpected: Rejected\n");
+			return -EINVAL;
+		} else {
+			net_info_ratelimited("TCP Authentication Unexpected: Accepted\n");
+			return 0;
+		}
+	}
+
+	/* bad inbound key len */
+	if (key->maclen + 4 != opt->len)
+		return -EINVAL;
+
+	err = __tcp_authopt_calc_mac(sk, skb, key, true, macbuf);
+	if (err)
+		return err;
+
+	if (memcmp(macbuf, opt->mac, key->maclen)) {
+		net_info_ratelimited("TCP Authentication Failed\n");
+		return -EINVAL;
+	}
+
+	return 0;
 }

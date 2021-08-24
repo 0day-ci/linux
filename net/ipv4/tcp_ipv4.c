@@ -2062,6 +2062,9 @@ process:
 	if (tcp_v4_inbound_md5_hash(sk, skb, dif, sdif))
 		goto discard_and_relse;
 
+	if (tcp_authopt_inbound_check(sk, skb))
+		goto discard_and_relse;
+
 	nf_reset_ct(skb);
 
 	if (tcp_filter(sk, skb))
