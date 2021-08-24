@@ -33,6 +33,9 @@ int monitor_device(const char *device_name,
 		   int verbosity)
 {
 	struct gpio_v2_line_values values;
+	struct gpio_v2_line_event *event;
+	bool req_event_count;
+	size_t event_size;
 	char *chrdev_name;
 	int cfd, lfd;
 	int ret;
@@ -55,6 +58,10 @@ int monitor_device(const char *device_name,
 		goto exit_device_close;
 	else
 		lfd = ret;
+	req_event_count = config->flags & GPIO_V2_LINE_FLAG_EVENT_COUNT;
+	event_size = sizeof(*event);
+	event_size += req_event_count ? sizeof(event->ext[0]) : 0;
+	event = alloca(event_size);
 
 	/* Read initial states */
 	values.mask = 0;
@@ -111,7 +118,7 @@ int monitor_device(const char *device_name,
 			}
 		}
 
-		if (ret != sizeof(event)) {
+		if (ret != event_size) {
 			fprintf(stderr, "Reading event failed\n");
 			ret = -EIO;
 			break;
@@ -133,6 +140,9 @@ int monitor_device(const char *device_name,
 			fprintf(stdout, "unknown event spec: %x", event.id);
 		}
 		fprintf(stdout, "\n");
+		if (req_event_count)
+			fprintf(stdout, "Event count: %u\n",
+				event.ext[0].event_count);
 
 		i++;
 		if (i == loops)
@@ -163,6 +173,7 @@ void print_usage(void)
 		"  -w         Report the wall-clock time for events\n"
 		"  -b <n>     Debounce the line with period n microseconds\n"
 		"  -v	      Verbosity\n"
+		"  -t         Request event count\n"
 		" [-c <n>]    Do <n> loops (optional, infinite loop if not stated)\n"
 		"  -?         This helptext\n"
 		"\n"
@@ -188,7 +199,7 @@ int main(int argc, char **argv)
 
 	memset(&config, 0, sizeof(config));
 	config.flags = GPIO_V2_LINE_FLAG_INPUT;
-	while ((c = getopt(argc, argv, "c:n:o:b:dsrfwv?")) != -1) {
+	while ((c = getopt(argc, argv, "c:n:o:b:dsrfwvt?")) != -1) {
 		switch (c) {
 		case 'c':
 			loops = strtoul(optarg, NULL, 10);
@@ -224,6 +235,9 @@ int main(int argc, char **argv)
 			break;
 		case 'v':
 			++verbosity;
+			break;
+		case 't':
+			config.flags |= GPIO_V2_LINE_FLAG_EVENT_COUNT;
 			break;
 		case '?':
 			print_usage();
