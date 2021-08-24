@@ -72,6 +72,19 @@ extern u32 GlobalDebugLevel;
 			pr_info(DRIVER_PREFIX __VA_ARGS__);			\
 	} while (0)
 
+#define __DBG_88E_REG(fmt, adap, reg, size)				\
+	do {								\
+		u##size __tmp__;					\
+		if (rtw_read##size((adap), (reg), &__tmp__))		\
+			break;						\
+		if (_drv_err_ <= GlobalDebugLevel)			\
+			pr_info(DRIVER_PREFIX fmt, __tmp__);		\
+	} while (0)
+
+#define DBG_88E_REG8(fmt, adap, reg)	__DBG_88E_REG(fmt, adap, reg, 8)
+#define DBG_88E_REG16(fmt, adap, reg)	__DBG_88E_REG(fmt, adap, reg, 16)
+#define DBG_88E_REG32(fmt, adap, reg)	__DBG_88E_REG(fmt, adap, reg, 32)
+
 int proc_get_drv_version(char *page, char **start,
 			 off_t offset, int count,
 			 int *eof, void *data);
