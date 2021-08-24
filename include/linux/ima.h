@@ -186,7 +186,7 @@ extern int ima_inode_removexattr(struct dentry *dentry, const char *xattr_name);
 #else
 static inline bool is_ima_appraise_enabled(void)
 {
-	return 0;
+	return false;
 }
 
 static inline void ima_inode_post_setattr(struct user_namespace *mnt_userns,
