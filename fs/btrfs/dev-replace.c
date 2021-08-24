@@ -523,63 +523,34 @@ static int mark_block_group_to_copy(struct btrfs_fs_info *fs_info,
 	key.type = BTRFS_DEV_EXTENT_KEY;
 	key.offset = 0;
 
-	ret = btrfs_search_slot(NULL, root, &key, path, 0, 0);
-	if (ret < 0)
-		goto free_path;
-	if (ret > 0) {
-		if (path->slots[0] >=
-		    btrfs_header_nritems(path->nodes[0])) {
-			ret = btrfs_next_leaf(root, path);
-			if (ret < 0)
-				goto free_path;
-			if (ret > 0) {
-				ret = 0;
-				goto free_path;
-			}
-		} else {
-			ret = 0;
-		}
-	}
-
-	while (1) {
+	btrfs_for_each_slot(root, &key, &found_key, path, ret) {
 		struct extent_buffer *leaf = path->nodes[0];
-		int slot = path->slots[0];
 
-		btrfs_item_key_to_cpu(leaf, &found_key, slot);
-
-		if (found_key.objectid != src_dev->devid)
+		if (found_key.objectid != src_dev->devid ||
+		    found_key.type != BTRFS_DEV_EXTENT_KEY ||
+		    found_key.offset < key.offset)
 			break;
 
-		if (found_key.type != BTRFS_DEV_EXTENT_KEY)
-			break;
-
-		if (found_key.offset < key.offset)
-			break;
-
-		dev_extent = btrfs_item_ptr(leaf, slot, struct btrfs_dev_extent);
+		dev_extent = btrfs_item_ptr(leaf, path->slots[0],
+				struct btrfs_dev_extent);
 
 		chunk_offset = btrfs_dev_extent_chunk_offset(leaf, dev_extent);
 
 		cache = btrfs_lookup_block_group(fs_info, chunk_offset);
 		if (!cache)
-			goto skip;
+			continue;
 
 		spin_lock(&cache->lock);
 		cache->to_copy = 1;
 		spin_unlock(&cache->lock);
 
 		btrfs_put_block_group(cache);
-
-skip:
-		ret = btrfs_next_item(root, path);
-		if (ret != 0) {
-			if (ret > 0)
-				ret = 0;
-			break;
-		}
 	}
 
-free_path:
+	/* Reset error if the key wasn't found. */
+	if (ret > 0)
+		ret = 0;
+
 	btrfs_free_path(path);
 unlock:
 	mutex_unlock(&fs_info->chunk_mutex);
