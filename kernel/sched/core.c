@@ -140,10 +140,7 @@ static inline bool __sched_core_less(struct task_struct *a, struct task_struct *
 		return false;
 
 	/* flip prio, so high prio is leftmost */
-	if (prio_less(b, a, task_rq(a)->core->core_forceidle))
-		return true;
-
-	return false;
+	return prio_less(b, a, task_rq(a)->core->core_forceidle);
 }
 
 #define __node_2_sc(node) rb_entry((node), struct task_struct, core_node)
