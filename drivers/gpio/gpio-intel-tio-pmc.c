@@ -60,6 +60,7 @@ struct intel_pmc_tio_get_time_arg {
 	struct intel_pmc_tio_chip *tio;
 	u32 eflags;
 	u32 event_id;
+	u32 event_count;
 	u64 abs_event_count;
 };
 
@@ -276,6 +277,7 @@ static int intel_pmc_tio_get_time(ktime_t *device_time,
 
 	*system_counterval = convert_art_to_tsc(art_timestamp);
 	arg->abs_event_count = abs_event_count;
+	arg->event_count = rel_event_count;
 	arg->event_id = 0;
 	arg->event_id |= (flags & GPIO_V2_LINE_FLAG_EDGE_RISING) ?
 		GPIO_V2_LINE_EVENT_RISING_EDGE : 0;
@@ -310,6 +312,7 @@ static int intel_pmc_tio_do_poll(struct gpio_chip *chip, unsigned int offset,
 			data->timestamp = ktime_to_ns(xtstamp.sys_realtime);
 			data->id = arg.event_id;
 			tio->last_event_count = arg.abs_event_count;
+			data->event_count = arg.event_count;
 		}
 		if (!err || err == -EAGAIN)
 			break;
