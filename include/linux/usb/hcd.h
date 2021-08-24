@@ -493,13 +493,15 @@ static inline int ehset_single_step_set_feature(struct usb_hcd *hcd, int port)
 #ifdef CONFIG_USB_PCI
 struct pci_dev;
 struct pci_device_id;
-extern int usb_hcd_pci_probe(struct pci_dev *dev,
-			     const struct pci_device_id *id,
-			     const struct hc_driver *driver);
+extern int __usb_hcd_pci_probe(struct pci_dev *dev, const struct pci_device_id *id,
+			       const struct hc_driver *driver, bool register_hub);
 extern void usb_hcd_pci_remove(struct pci_dev *dev);
 extern void usb_hcd_pci_shutdown(struct pci_dev *dev);
 
 extern int usb_hcd_amd_remote_wakeup_quirk(struct pci_dev *dev);
+
+#define usb_hcd_pci_probe(dev, id, driver) \
+	__usb_hcd_pci_probe(dev, id, driver, true)
 
 #ifdef CONFIG_PM
 extern const struct dev_pm_ops usb_hcd_pci_pm_ops;

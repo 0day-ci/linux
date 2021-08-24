@@ -160,6 +160,7 @@ static void ehci_wait_for_companions(struct pci_dev *pdev, struct usb_hcd *hcd,
  * @dev: USB Host Controller being probed
  * @id: pci hotplug id connecting controller to HCD framework
  * @driver: USB HC driver handle
+ * @register_hub: Flag to indicate of roothub has to be registered or not
  *
  * Context: task context, might sleep
  *
@@ -171,8 +172,8 @@ static void ehci_wait_for_companions(struct pci_dev *pdev, struct usb_hcd *hcd,
  *
  * Return: 0 if successful.
  */
-int usb_hcd_pci_probe(struct pci_dev *dev, const struct pci_device_id *id,
-		      const struct hc_driver *driver)
+int __usb_hcd_pci_probe(struct pci_dev *dev, const struct pci_device_id *id,
+			const struct hc_driver *driver, bool register_hub)
 {
 	struct usb_hcd		*hcd;
 	int			retval;
@@ -262,7 +263,7 @@ int usb_hcd_pci_probe(struct pci_dev *dev, const struct pci_device_id *id,
 		down_write(&companions_rwsem);
 		dev_set_drvdata(&dev->dev, hcd);
 		for_each_companion(dev, hcd, ehci_pre_add);
-		retval = usb_add_hcd(hcd, hcd_irq, IRQF_SHARED);
+		retval = __usb_add_hcd(hcd, hcd_irq, IRQF_SHARED, register_hub);
 		if (retval != 0)
 			dev_set_drvdata(&dev->dev, NULL);
 		for_each_companion(dev, hcd, ehci_post_add);
@@ -270,7 +271,7 @@ int usb_hcd_pci_probe(struct pci_dev *dev, const struct pci_device_id *id,
 	} else {
 		down_read(&companions_rwsem);
 		dev_set_drvdata(&dev->dev, hcd);
-		retval = usb_add_hcd(hcd, hcd_irq, IRQF_SHARED);
+		retval = __usb_add_hcd(hcd, hcd_irq, IRQF_SHARED, register_hub);
 		if (retval != 0)
 			dev_set_drvdata(&dev->dev, NULL);
 		else
@@ -296,7 +297,7 @@ disable_pci:
 	dev_err(&dev->dev, "init %s fail, %d\n", pci_name(dev), retval);
 	return retval;
 }
-EXPORT_SYMBOL_GPL(usb_hcd_pci_probe);
+EXPORT_SYMBOL_GPL(__usb_hcd_pci_probe);
 
 
 /* may be called without controller electrically present */
