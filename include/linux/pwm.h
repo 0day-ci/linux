@@ -59,6 +59,7 @@ enum {
  *               output but has more freedom regarding signal form.
  *               If supported, the signal can be optimized, for example to
  *               improve EMI by phase shifting individual channels.
+ * @alignment: offset in ns to device clock second
  */
 struct pwm_state {
 	u64 period;
@@ -66,6 +67,7 @@ struct pwm_state {
 	enum pwm_polarity polarity;
 	bool enabled;
 	bool usage_power;
+	u64 alignment;
 };
 
 /**

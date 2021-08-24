@@ -271,6 +271,7 @@ int pwmchip_add(struct pwm_chip *chip)
 		pwm->chip = chip;
 		pwm->pwm = chip->base + i;
 		pwm->hwpwm = i;
+		pwm->state.alignment = 0;
 
 		radix_tree_insert(&pwm_tree, pwm->pwm, pwm);
 	}
@@ -535,7 +536,8 @@ int pwm_apply_state(struct pwm_device *pwm, const struct pwm_state *state)
 	int err;
 
 	if (!pwm || !state || !state->period ||
-	    state->duty_cycle > state->period)
+	    state->duty_cycle > state->period ||
+	    state->alignment >= state->period)
 		return -EINVAL;
 
 	chip = pwm->chip;
@@ -544,7 +546,8 @@ int pwm_apply_state(struct pwm_device *pwm, const struct pwm_state *state)
 	    state->duty_cycle == pwm->state.duty_cycle &&
 	    state->polarity == pwm->state.polarity &&
 	    state->enabled == pwm->state.enabled &&
-	    state->usage_power == pwm->state.usage_power)
+	    state->usage_power == pwm->state.usage_power &&
+	    state->alignment == pwm->state.alignment)
 		return 0;
 
 	if (chip->ops->apply) {

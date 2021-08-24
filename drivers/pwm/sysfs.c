@@ -33,6 +33,41 @@ static struct pwm_device *child_to_pwm_device(struct device *child)
 	return export->pwm;
 }
 
+static ssize_t alignment_show(struct device *child,
+			      struct device_attribute *attr,
+			      char *buf)
+{
+	const struct pwm_device *pwm = child_to_pwm_device(child);
+	struct pwm_state state;
+
+	pwm_get_state(pwm, &state);
+
+	return sprintf(buf, "%llu\n", state.alignment);
+}
+
+static ssize_t alignment_store(struct device *child,
+			       struct device_attribute *attr,
+			       const char *buf, size_t size)
+{
+	struct pwm_export *export = child_to_pwm_export(child);
+	struct pwm_device *pwm = export->pwm;
+	struct pwm_state state;
+	unsigned int val;
+	int ret;
+
+	ret = kstrtouint(buf, 0, &val);
+	if (ret)
+		return ret;
+
+	mutex_lock(&export->lock);
+	pwm_get_state(pwm, &state);
+	state.alignment = val;
+	ret = pwm_apply_state(pwm, &state);
+	mutex_unlock(&export->lock);
+
+	return ret ? : size;
+}
+
 static ssize_t period_show(struct device *child,
 			   struct device_attribute *attr,
 			   char *buf)
@@ -219,6 +254,7 @@ static DEVICE_ATTR_RW(period);
 static DEVICE_ATTR_RW(duty_cycle);
 static DEVICE_ATTR_RW(enable);
 static DEVICE_ATTR_RW(polarity);
+static DEVICE_ATTR_RW(alignment);
 static DEVICE_ATTR_RO(capture);
 
 static struct attribute *pwm_attrs[] = {
@@ -226,6 +262,7 @@ static struct attribute *pwm_attrs[] = {
 	&dev_attr_duty_cycle.attr,
 	&dev_attr_enable.attr,
 	&dev_attr_polarity.attr,
+	&dev_attr_alignment.attr,
 	&dev_attr_capture.attr,
 	NULL
 };
