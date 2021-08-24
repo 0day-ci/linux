@@ -608,7 +608,8 @@ static struct adapter *rtw_usb_if1_init(struct dvobj_priv *dvobj,
 	rtw_hal_chip_configure(padapter);
 
 	/* step read efuse/eeprom data and get mac_addr */
-	rtw_hal_read_chip_info(padapter);
+	if (rtw_hal_read_chip_info(padapter) == _FAIL)
+		goto free_hal_data;
 
 	/* step 5. */
 	if (rtw_init_drv_sw(padapter) == _FAIL)
