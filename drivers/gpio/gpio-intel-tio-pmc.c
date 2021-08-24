@@ -56,11 +56,12 @@ struct intel_pmc_tio_chip {
 	bool systime_valid;
 	bool output_high;
 	unsigned int systime_index;
+	u32 half_period;
+	u32 alignment;
 	struct system_time_snapshot systime_snapshot[INPUT_SNAPSHOT_COUNT];
 	u64 last_event_count;
 	u64 last_art_timestamp;
 	u64 last_art_period;
-	u32 half_period;
 };
 
 struct intel_pmc_tio_pwm {
@@ -550,6 +551,7 @@ static int intel_pmc_tio_pwm_apply(struct pwm_chip *chip,
 		pwm->state.period = state->duty_cycle * 2;
 	}
 
+	pwm->state.alignment = state->alignment;
 	start_output = state->enabled && !pwm->state.enabled;
 	if (start_output || change_period) {
 		art_period = convert_art_ns_to_art(pwm->state.duty_cycle);
@@ -566,8 +568,9 @@ static int intel_pmc_tio_pwm_apply(struct pwm_chip *chip,
 
 		pwm->state.enabled = true;
 		start_time = ktime_get_real_ns();
-		div_u64_rem(start_time, NSEC_PER_SEC, &nsec);
+		div_u64_rem(start_time, pwm->state.period, &nsec);
 		start_time -= nsec;
+		start_time += pwm->state.alignment;
 		start_time += 2 * NSEC_PER_SEC;
 		_intel_pmc_tio_direction_output(tio, pwm->hwpwm, 0, art_period);
 		ret = _intel_pmc_tio_generate_output(tio, pwm->hwpwm,
@@ -602,6 +605,7 @@ static void intel_pmc_tio_pwm_get_state(struct pwm_chip *chip, struct pwm_device
 
 	state->duty_cycle = tio->half_period;
 	state->period = state->duty_cycle * 2;
+	state->alignment = tio->alignment;
 
 	mutex_unlock(&tio->lock);
 }
@@ -612,6 +616,7 @@ static void intel_pmc_tio_pwm_free(struct pwm_chip *chip, struct pwm_device *pwm
 	struct intel_pmc_tio_chip *tio = tio_pwm->tio;
 
 	tio->half_period = pwm->state.duty_cycle;
+	tio->alignment = pwm->state.alignment;
 
 	gpiochip_free_own_desc(tio_pwm->gpiod);
 	tio_pwm->gpiod = NULL;
@@ -689,6 +694,7 @@ static int intel_pmc_tio_probe(struct platform_device *pdev)
 		goto out_recurse_remove_tio_root;
 
 	/* Make sure tio and device state are sync'd to a reasonable value */
+	tio->alignment = 0;
 	tio->half_period = NSEC_PER_SEC / 2;
 
 	return 0;
