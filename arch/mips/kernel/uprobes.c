@@ -75,7 +75,7 @@ bool is_trap_insn(uprobe_opcode_t *insn)
 		case tlt_op:
 		case tltu_op:
 		case tne_op:
-			return 1;
+			return true;
 		}
 		break;
 
@@ -87,12 +87,12 @@ bool is_trap_insn(uprobe_opcode_t *insn)
 		case tlti_op:
 		case tltiu_op:
 		case tnei_op:
-			return 1;
+			return true;
 		}
 		break;
 	}
 
-	return 0;
+	return false;
 }
 
 #define UPROBE_TRAP_NR	ULONG_MAX
@@ -258,5 +258,5 @@ unsigned long uprobe_get_swbp_addr(struct pt_regs *regs)
  */
 bool arch_uprobe_skip_sstep(struct arch_uprobe *auprobe, struct pt_regs *regs)
 {
-	return 0;
+	return false;
 }
