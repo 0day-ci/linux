@@ -4825,6 +4825,10 @@ static void tcpm_state_machine_work(struct kthread_work *work)
 		port->delayed_state = INVALID_STATE;
 	}
 
+	/* If target state is the same as the last entered state, skip it */
+	if (port->enter_state == port->state)
+		goto done;
+
 	/*
 	 * Continue running as long as we have (non-delayed) state changes
 	 * to make.
