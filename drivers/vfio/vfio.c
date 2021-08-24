@@ -68,9 +68,6 @@ struct vfio_unbound_dev {
 	struct list_head		unbound_next;
 };
 
-#define VFIO_MEDIATED	(1 << 0)
-#define VFIO_NOIOMMU	(1 << 1)
-
 struct vfio_group {
 	struct kref			kref;
 	int				minor;
@@ -198,7 +195,7 @@ static long vfio_noiommu_ioctl(void *iommu_data,
 }
 
 static int vfio_noiommu_attach_group(void *iommu_data,
-				     struct iommu_group *iommu_group)
+		struct iommu_group *iommu_group, unsigned int flags)
 {
 	return 0;
 }
@@ -1100,7 +1097,8 @@ static int __vfio_container_attach_groups(struct vfio_container *container,
 	int ret = -ENODEV;
 
 	list_for_each_entry(group, &container->group_list, container_next) {
-		ret = driver->ops->attach_group(data, group->iommu_group);
+		ret = driver->ops->attach_group(data, group->iommu_group,
+						group->flags);
 		if (ret)
 			goto unwind;
 	}
@@ -1358,7 +1356,8 @@ static int vfio_group_set_container(struct vfio_group *group, int container_fd)
 	driver = container->iommu_driver;
 	if (driver) {
 		ret = driver->ops->attach_group(container->iommu_data,
-						group->iommu_group);
+						group->iommu_group,
+						group->flags);
 		if (ret)
 			goto unlock_out;
 	}
