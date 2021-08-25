@@ -560,8 +560,16 @@ void stage2_unmap_vm(struct kvm *kvm)
 	spin_lock(&kvm->mmu_lock);
 
 	slots = kvm_memslots(kvm);
-	kvm_for_each_memslot(memslot, slots)
+	kvm_for_each_memslot(memslot, slots) {
+		if (memslot_is_locked(memslot)) {
+			set_bit(KVM_LOCKED_MEMSLOT_FLUSH_DCACHE,
+				&kvm->arch.mmu_pending_ops);
+			set_bit(KVM_LOCKED_MEMSLOT_INVAL_ICACHE,
+				&kvm->arch.mmu_pending_ops);
+			continue;
+		}
 		stage2_unmap_memslot(kvm, memslot);
+	}
 
 	spin_unlock(&kvm->mmu_lock);
 	mmap_read_unlock(current->mm);
@@ -1280,6 +1288,9 @@ void kvm_mmu_perform_pending_ops(struct kvm *kvm)
 			stage2_flush_memslot(kvm, memslot);
 		}
 	}
+
+	if (test_bit(KVM_LOCKED_MEMSLOT_INVAL_ICACHE, &kvm->arch.mmu_pending_ops))
+		icache_inval_all_pou();
 
 	bitmap_zero(&kvm->arch.mmu_pending_ops, KVM_MAX_MMU_PENDING_OPS);
 
