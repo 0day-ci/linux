@@ -22,7 +22,6 @@ static struct sk_buff *mtk_tag_xmit(struct sk_buff *skb,
 				    struct net_device *dev)
 {
 	struct dsa_port *dp = dsa_slave_to_port(dev);
-	u8 xmit_tpid;
 	u8 *mtk_tag;
 
 	/* Build the special tag after the MAC Source Address. If VLAN header
@@ -31,32 +30,30 @@ static struct sk_buff *mtk_tag_xmit(struct sk_buff *skb,
 	 * the both special and VLAN tag at the same time and then look up VLAN
 	 * table with VID.
 	 */
-	switch (skb->protocol) {
-	case htons(ETH_P_8021Q):
-		xmit_tpid = MTK_HDR_XMIT_TAGGED_TPID_8100;
-		break;
-	case htons(ETH_P_8021AD):
-		xmit_tpid = MTK_HDR_XMIT_TAGGED_TPID_88A8;
-		break;
-	default:
-		xmit_tpid = MTK_HDR_XMIT_UNTAGGED;
-		skb_push(skb, MTK_HDR_LEN);
-		dsa_alloc_etype_header(skb, MTK_HDR_LEN);
-	}
-
+	skb_push(skb, MTK_HDR_LEN);
+	dsa_alloc_etype_header(skb, MTK_HDR_LEN);
 	mtk_tag = dsa_etype_header_pos_tx(skb);
 
-	/* Mark tag attribute on special tag insertion to notify hardware
-	 * whether that's a combined special tag with 802.1Q header.
-	 */
-	mtk_tag[0] = xmit_tpid;
-	mtk_tag[1] = (1 << dp->index) & MTK_HDR_XMIT_DP_BIT_MASK;
+	if (skb_vlan_tag_present(skb)) {
+		switch (skb->vlan_proto) {
+		case htons(ETH_P_8021Q):
+			mtk_tag[0] = MTK_HDR_XMIT_TAGGED_TPID_8100;
+			break;
+		case htons(ETH_P_8021AD):
+			mtk_tag[0] = MTK_HDR_XMIT_TAGGED_TPID_88A8;
+			break;
+		default:
+			return NULL;
+		}
 
-	/* Tag control information is kept for 802.1Q */
-	if (xmit_tpid == MTK_HDR_XMIT_UNTAGGED) {
-		mtk_tag[2] = 0;
-		mtk_tag[3] = 0;
+		((__be16 *)mtk_tag)[1] = htons(skb_vlan_tag_get(skb));
+		__vlan_hwaccel_clear_tag(skb);
+	} else {
+		mtk_tag[0] = MTK_HDR_XMIT_UNTAGGED;
+		((__be16 *)mtk_tag)[1] = 0;
 	}
+
+	mtk_tag[1] = (1 << dp->index) & MTK_HDR_XMIT_DP_BIT_MASK;
 
 	return skb;
 }
@@ -96,6 +93,7 @@ static const struct dsa_device_ops mtk_netdev_ops = {
 	.xmit		= mtk_tag_xmit,
 	.rcv		= mtk_tag_rcv,
 	.needed_headroom = MTK_HDR_LEN,
+	.features	= NETIF_F_HW_VLAN_CTAG_TX | NETIF_F_HW_VLAN_STAG_TX,
 };
 
 MODULE_LICENSE("GPL");
