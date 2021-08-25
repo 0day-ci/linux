@@ -84,6 +84,4 @@ enum intel_pch {
 #define HAS_PCH_NOP(dev_priv)			(INTEL_PCH_TYPE(dev_priv) == PCH_NOP)
 #define HAS_PCH_SPLIT(dev_priv)			(INTEL_PCH_TYPE(dev_priv) != PCH_NONE)
 
-void intel_detect_pch(struct drm_i915_private *dev_priv);
-
 #endif /* __INTEL_PCH__ */

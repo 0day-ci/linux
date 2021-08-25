@@ -4,7 +4,7 @@
  */
 
 #include "i915_drv.h"
-#include "intel_pch.h"
+#include <drm/intel_pch.h>
 
 /* Map PCH device id to PCH type, or PCH_NONE if unknown. */
 static enum intel_pch

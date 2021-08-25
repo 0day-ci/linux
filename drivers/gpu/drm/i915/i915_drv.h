@@ -60,6 +60,7 @@
 #include <drm/drm_connector.h>
 #include <drm/i915_mei_hdcp_interface.h>
 #include <drm/ttm/ttm_device.h>
+#include <drm/intel_pch.h>
 
 #include "i915_params.h"
 #include "i915_reg.h"
@@ -89,7 +90,6 @@
 
 #include "intel_device_info.h"
 #include "intel_memory_region.h"
-#include "intel_pch.h"
 #include "intel_runtime_pm.h"
 #include "intel_step.h"
 #include "intel_uncore.h"
@@ -1335,6 +1335,8 @@ static inline struct drm_i915_private *pdev_to_i915(struct pci_dev *pdev)
 #define IS_GT_STEP(__i915, since, until) \
 	(drm_WARN_ON(&(__i915)->drm, INTEL_GT_STEP(__i915) == STEP_NONE), \
 	 INTEL_GT_STEP(__i915) >= (since) && INTEL_GT_STEP(__i915) < (until))
+
+void intel_detect_pch(struct drm_i915_private *dev_priv);
 
 static __always_inline unsigned int
 __platform_mask_index(const struct intel_runtime_info *info,
