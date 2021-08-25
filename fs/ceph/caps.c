@@ -3593,7 +3593,7 @@ out:
 	while (!list_empty(&to_remove)) {
 		cf = list_first_entry(&to_remove,
 				      struct ceph_cap_flush, i_list);
-		list_del(&cf->i_list);
+		list_del_init(&cf->i_list);
 		if (!cf->is_capsnap)
 			ceph_free_cap_flush(cf);
 	}
