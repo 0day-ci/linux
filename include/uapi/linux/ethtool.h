@@ -516,6 +516,7 @@ struct ethtool_coalesce {
  *	jumbo ring
  * @tx_pending: Current maximum supported number of pending entries
  *	per TX ring
+ * @rx_buf_len: Current supported size of rx ring BD buffer.
  *
  * If the interface does not have separate RX mini and/or jumbo rings,
  * @rx_mini_max_pending and/or @rx_jumbo_max_pending will be 0.
@@ -533,6 +534,7 @@ struct ethtool_ringparam {
 	__u32	rx_mini_pending;
 	__u32	rx_jumbo_pending;
 	__u32	tx_pending;
+	__u32	rx_buf_len;
 };
 
 /**
