@@ -305,6 +305,21 @@ static inline void notify_partition_change(struct cpuset *cs,
 		WRITE_ONCE(cs->prs_err, PERR_NONE);
 }
 
+static inline int cpuset_has_tasks(const struct cpuset *cs)
+{
+	return cs->css.cgroup->nr_populated_csets;
+}
+
+/*
+ * A empty partition (one with no effective cpu) is valid if it has no
+ * associated task and all its cpus have been distributed out to child
+ * partitions.
+ */
+static inline bool valid_empty_partition(const struct cpuset *cs)
+{
+	return !cpuset_has_tasks(cs) && cs->nr_subparts_cpus;
+}
+
 static struct cpuset top_cpuset = {
 	.flags = ((1 << CS_ONLINE) | (1 << CS_CPU_EXCLUSIVE) |
 		  (1 << CS_MEM_EXCLUSIVE)),
@@ -1212,21 +1227,31 @@ static int update_parent_subparts_cpumask(struct cpuset *cpuset, int cmd,
 		return -EBUSY;
 
 	/*
-	 * Enabling partition root is not allowed if not all the CPUs
-	 * can be granted from parent's effective_cpus or at least one
-	 * CPU will be left after that.
-	 */
-	if ((cmd == partcmd_enable) &&
-	   (!cpumask_subset(cpuset->cpus_allowed, parent->effective_cpus) ||
-	     cpumask_equal(cpuset->cpus_allowed, parent->effective_cpus)))
-		return -EINVAL;
-
-	/*
 	 * A cpumask update cannot make parent's effective_cpus become empty.
 	 */
 	adding = deleting = false;
 	old_prs = new_prs = cpuset->partition_root_state;
 	if (cmd == partcmd_enable) {
+		bool parent_is_top_cpuset = !parent_cs(parent);
+		bool no_cpu_in_parent = cpumask_equal(cpuset->cpus_allowed,
+						      parent->effective_cpus);
+		/*
+		 * Enabling partition root is not allowed if not all the CPUs
+		 * can be granted from parent's effective_cpus. If the parent
+		 * is the top cpuset, at least one CPU must be left after that.
+		 */
+		if (!cpumask_subset(cpuset->cpus_allowed, parent->effective_cpus) ||
+		    (parent_is_top_cpuset && no_cpu_in_parent))
+			return -EINVAL;
+
+		/*
+		 * A non-top parent can be left with no CPU as long as there
+		 * is no task directly associated with the parent. For such
+		 * a parent, no new task can be moved into it.
+		 */
+		if (no_cpu_in_parent && cpuset_has_tasks(parent))
+			return -EINVAL;
+
 		cpumask_copy(tmp->addmask, cpuset->cpus_allowed);
 		adding = true;
 	} else if (cmd == partcmd_disable) {
@@ -1257,9 +1282,9 @@ static int update_parent_subparts_cpumask(struct cpuset *cpuset, int cmd,
 					parent->subparts_cpus);
 		/*
 		 * Make partition invalid if parent's effective_cpus could
-		 * become empty.
+		 * become empty and there are tasks in the parent.
 		 */
-		if (adding &&
+		if (adding && cpuset_has_tasks(parent) &&
 		    cpumask_equal(parent->effective_cpus, tmp->addmask)) {
 			if (!deleting)
 				part_error = true;
@@ -1294,7 +1319,9 @@ static int update_parent_subparts_cpumask(struct cpuset *cpuset, int cmd,
 				     parent->effective_cpus);
 		part_error = (is_partition_root(cpuset) &&
 			      !parent->nr_subparts_cpus) ||
-			     cpumask_equal(tmp->addmask, parent->effective_cpus);
+			     (cpumask_equal(tmp->addmask, parent->effective_cpus) &&
+			      cpuset_has_tasks(parent));
+
 		if (is_partition_root(cpuset) && part_error)
 			WRITE_ONCE(cpuset->prs_err, PERR_NOCPUS);
 	}
@@ -1397,9 +1424,15 @@ static void update_cpumasks_hier(struct cpuset *cs, struct tmpmasks *tmp)
 
 		/*
 		 * If it becomes empty, inherit the effective mask of the
-		 * parent, which is guaranteed to have some CPUs.
+		 * parent, which is guaranteed to have some CPUs unless
+		 * it is a partition root that has explicitly distributed
+		 * out all its CPUs.
 		 */
 		if (is_in_v2_mode() && cpumask_empty(tmp->new_cpus)) {
+			if (is_partition_root(cp) &&
+			    cpumask_equal(cp->cpus_allowed, cp->subparts_cpus))
+				goto update_parent_subparts;
+
 			cpumask_copy(tmp->new_cpus, parent->effective_cpus);
 			if (!cp->use_parent_ecpus) {
 				cp->use_parent_ecpus = true;
@@ -1421,6 +1454,7 @@ static void update_cpumasks_hier(struct cpuset *cs, struct tmpmasks *tmp)
 			continue;
 		}
 
+update_parent_subparts:
 		/*
 		 * update_parent_subparts_cpumask() should have been called
 		 * for cs already in update_cpumask(). We should also call
@@ -1497,12 +1531,9 @@ static void update_cpumasks_hier(struct cpuset *cs, struct tmpmasks *tmp)
 			 */
 			cpumask_andnot(cp->effective_cpus, cp->effective_cpus,
 				       cp->subparts_cpus);
-			WARN_ON_ONCE(cpumask_empty(cp->effective_cpus));
 		}
 
-		if (new_prs != old_prs)
-			cp->partition_root_state = new_prs;
-
+		cp->partition_root_state = new_prs;
 		spin_unlock_irq(&callback_lock);
 		notify_partition_change(cp, old_prs, new_prs);
 
@@ -2247,6 +2278,13 @@ static int cpuset_can_attach(struct cgroup_taskset *tset)
 	ret = -ENOSPC;
 	if (!is_in_v2_mode() &&
 	    (cpumask_empty(cs->cpus_allowed) || nodes_empty(cs->mems_allowed)))
+		goto out_unlock;
+
+	/*
+	 * On default hierarchy, task cannot be moved to a cpuset with empty
+	 * effective cpus.
+	 */
+	if (is_in_v2_mode() && cpumask_empty(cs->effective_cpus))
 		goto out_unlock;
 
 	cgroup_taskset_for_each(task, css, tset) {
@@ -3125,7 +3163,8 @@ hotplug_update_tasks(struct cpuset *cs,
 		     struct cpumask *new_cpus, nodemask_t *new_mems,
 		     bool cpus_updated, bool mems_updated)
 {
-	if (cpumask_empty(new_cpus))
+	/* A partition root is allowed to have empty effective cpus */
+	if (cpumask_empty(new_cpus) && !is_partition_root(cs))
 		cpumask_copy(new_cpus, parent_cs(cs)->effective_cpus);
 	if (nodes_empty(*new_mems))
 		*new_mems = parent_cs(cs)->effective_mems;
@@ -3194,22 +3233,25 @@ retry:
 
 	/*
 	 * In the unlikely event that a partition root has empty
-	 * effective_cpus, we will have to force any child partitions,
-	 * if present, to become invalid by setting nr_subparts_cpus to 0
-	 * without causing itself to become invalid.
+	 * effective_cpus with tasks, we will have to force any child
+	 * partitions, if present, to become invalid by setting
+	 * nr_subparts_cpus to 0 without causing itself to become invalid.
 	 */
-	if (is_partition_root(cs) && cs->nr_subparts_cpus &&
-	    cpumask_empty(&new_cpus)) {
+	if (is_partition_root(cs) && cpumask_empty(&new_cpus) &&
+	    !valid_empty_partition(cs)) {
 		cs->nr_subparts_cpus = 0;
 		cpumask_clear(cs->subparts_cpus);
 		compute_effective_cpumask(&new_cpus, cs, parent);
 	}
 
 	/*
-	 * If empty effective_cpus or zero nr_subparts_cpus or its parent
-	 * becomes erroneous, we have to transition it to the erroneous state.
+	 * Force the partition to become invalid if either one of
+	 * the following conditions hold:
+	 * 1) empty effective cpus but not valid empty partition.
+	 * 2) parent is invalid or doesn't grant any cpus to child partitions.
 	 */
-	if (is_partition_root(cs) && (cpumask_empty(&new_cpus) ||
+	if (is_partition_root(cs) &&
+	   ((cpumask_empty(&new_cpus) && !valid_empty_partition(cs)) ||
 	    (parent->partition_root_state == PRS_ERROR) ||
 	    !parent->nr_subparts_cpus)) {
 		int old_prs;
