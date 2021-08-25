@@ -93,7 +93,6 @@ static void frontbuffer_flush(struct drm_i915_private *i915,
 
 	might_sleep();
 	intel_drrs_flush(i915, frontbuffer_bits);
-	intel_psr_flush(i915, frontbuffer_bits, origin);
 	intel_fbc_flush(i915, frontbuffer_bits, origin);
 }
 
@@ -195,7 +194,6 @@ void __intel_fb_invalidate(struct intel_frontbuffer *front,
 	trace_intel_frontbuffer_invalidate(frontbuffer_bits, origin);
 
 	might_sleep();
-	intel_psr_invalidate(i915, frontbuffer_bits, origin);
 	intel_drrs_invalidate(i915, frontbuffer_bits);
 	intel_fbc_invalidate(i915, frontbuffer_bits, origin);
 }
