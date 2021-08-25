@@ -994,9 +994,7 @@ static int pci_register_host_bridge(struct pci_host_bridge *bridge)
 	return 0;
 
 unregister:
-	put_device(&bridge->dev);
-	device_del(&bridge->dev);
-
+	device_unregister(&bridge->dev);
 free:
 	kfree(bus);
 	return err;
