@@ -25,9 +25,16 @@ enum dp_pm_type {
 	DP_MAX_PM
 };
 
-struct dss_io_data {
-	size_t len;
+struct dss_io_region {
 	void __iomem *base;
+	size_t len;
+};
+
+struct dss_io_data {
+	struct dss_io_region ahb;
+	struct dss_io_region aux;
+	struct dss_io_region link;
+	struct dss_io_region p0;
 };
 
 static inline const char *dp_parser_pm_name(enum dp_pm_type module)
