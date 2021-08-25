@@ -318,9 +318,9 @@
 			#size-cells = <0>;
 			reg = <0 0x1100a000 0 0x1000>;
 			interrupts = <GIC_SPI 159 IRQ_TYPE_LEVEL_HIGH 0>;
-			clocks = <&clk26m>,
-				 <&clk26m>,
-				 <&clk26m>;
+			clocks = <&topckgen CLK_TOP_MAINPLL_D5_D4>,
+				 <&topckgen CLK_TOP_SPI_SEL>,
+				 <&infracfg CLK_INFRA_SPI0>;
 			clock-names = "parent-clk", "sel-clk", "spi-clk";
 			status = "disabled";
 		};
@@ -332,9 +332,9 @@
 			#size-cells = <0>;
 			reg = <0 0x11010000 0 0x1000>;
 			interrupts = <GIC_SPI 160 IRQ_TYPE_LEVEL_HIGH 0>;
-			clocks = <&clk26m>,
-				 <&clk26m>,
-				 <&clk26m>;
+			clocks = <&topckgen CLK_TOP_MAINPLL_D5_D4>,
+				 <&topckgen CLK_TOP_SPI_SEL>,
+				 <&infracfg CLK_INFRA_SPI1>;
 			clock-names = "parent-clk", "sel-clk", "spi-clk";
 			status = "disabled";
 		};
@@ -346,9 +346,9 @@
 			#size-cells = <0>;
 			reg = <0 0x11012000 0 0x1000>;
 			interrupts = <GIC_SPI 161 IRQ_TYPE_LEVEL_HIGH 0>;
-			clocks = <&clk26m>,
-				 <&clk26m>,
-				 <&clk26m>;
+			clocks = <&topckgen CLK_TOP_MAINPLL_D5_D4>,
+				 <&topckgen CLK_TOP_SPI_SEL>,
+				 <&infracfg CLK_INFRA_SPI2>;
 			clock-names = "parent-clk", "sel-clk", "spi-clk";
 			status = "disabled";
 		};
@@ -360,9 +360,9 @@
 			#size-cells = <0>;
 			reg = <0 0x11013000 0 0x1000>;
 			interrupts = <GIC_SPI 162 IRQ_TYPE_LEVEL_HIGH 0>;
-			clocks = <&clk26m>,
-				 <&clk26m>,
-				 <&clk26m>;
+			clocks = <&topckgen CLK_TOP_MAINPLL_D5_D4>,
+				 <&topckgen CLK_TOP_SPI_SEL>,
+				 <&infracfg CLK_INFRA_SPI3>;
 			clock-names = "parent-clk", "sel-clk", "spi-clk";
 			status = "disabled";
 		};
@@ -374,9 +374,9 @@
 			#size-cells = <0>;
 			reg = <0 0x11018000 0 0x1000>;
 			interrupts = <GIC_SPI 163 IRQ_TYPE_LEVEL_HIGH 0>;
-			clocks = <&clk26m>,
-				 <&clk26m>,
-				 <&clk26m>;
+			clocks = <&topckgen CLK_TOP_MAINPLL_D5_D4>,
+				 <&topckgen CLK_TOP_SPI_SEL>,
+				 <&infracfg CLK_INFRA_SPI4>;
 			clock-names = "parent-clk", "sel-clk", "spi-clk";
 			status = "disabled";
 		};
@@ -388,9 +388,9 @@
 			#size-cells = <0>;
 			reg = <0 0x11019000 0 0x1000>;
 			interrupts = <GIC_SPI 164 IRQ_TYPE_LEVEL_HIGH 0>;
-			clocks = <&clk26m>,
-				 <&clk26m>,
-				 <&clk26m>;
+			clocks = <&topckgen CLK_TOP_MAINPLL_D5_D4>,
+				 <&topckgen CLK_TOP_SPI_SEL>,
+				 <&infracfg CLK_INFRA_SPI5>;
 			clock-names = "parent-clk", "sel-clk", "spi-clk";
 			status = "disabled";
 		};
@@ -402,9 +402,9 @@
 			#size-cells = <0>;
 			reg = <0 0x1101d000 0 0x1000>;
 			interrupts = <GIC_SPI 165 IRQ_TYPE_LEVEL_HIGH 0>;
-			clocks = <&clk26m>,
-				 <&clk26m>,
-				 <&clk26m>;
+			clocks = <&topckgen CLK_TOP_MAINPLL_D5_D4>,
+				 <&topckgen CLK_TOP_SPI_SEL>,
+				 <&infracfg CLK_INFRA_SPI6>;
 			clock-names = "parent-clk", "sel-clk", "spi-clk";
 			status = "disabled";
 		};
@@ -416,9 +416,9 @@
 			#size-cells = <0>;
 			reg = <0 0x1101e000 0 0x1000>;
 			interrupts = <GIC_SPI 166 IRQ_TYPE_LEVEL_HIGH 0>;
-			clocks = <&clk26m>,
-				 <&clk26m>,
-				 <&clk26m>;
+			clocks = <&topckgen CLK_TOP_MAINPLL_D5_D4>,
+				 <&topckgen CLK_TOP_SPI_SEL>,
+				 <&infracfg CLK_INFRA_SPI7>;
 			clock-names = "parent-clk", "sel-clk", "spi-clk";
 			status = "disabled";
 		};
