@@ -105,22 +105,13 @@ static bool _drm_has_leased(struct drm_master *master, int id)
 	return false;
 }
 
-/* Called with idr_mutex held */
+/* Called with idr_mutex and master_rwsem held */
 bool _drm_lease_held(struct drm_file *file_priv, int id)
 {
-	bool ret;
-	struct drm_master *master;
-
-	if (!file_priv)
+	if (!file_priv || !file_priv->master)
 		return true;
 
-	master = drm_file_get_master(file_priv);
-	if (!master)
-		return true;
-	ret = _drm_lease_held_master(master, id);
-	drm_master_put(&master);
-
-	return ret;
+	return _drm_lease_held_master(file_priv->master, id);
 }
 
 bool drm_lease_held(struct drm_file *file_priv, int id)
@@ -391,9 +382,9 @@ static int fill_object_idr(struct drm_device *dev,
 	/* step one - get references to all the mode objects
 	   and check for validity. */
 	for (o = 0; o < object_count; o++) {
-		objects[o] = drm_mode_object_find(dev, lessor_priv,
-						  object_ids[o],
-						  DRM_MODE_OBJECT_ANY);
+		objects[o] = __drm_mode_object_find(dev, lessor_priv,
+						    object_ids[o],
+						    DRM_MODE_OBJECT_ANY);
 		if (!objects[o]) {
 			ret = -ENOENT;
 			goto out_free_objects;

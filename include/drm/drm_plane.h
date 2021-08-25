@@ -843,6 +843,26 @@ int drm_mode_plane_set_obj_prop(struct drm_plane *plane,
 				       uint64_t value);
 
 /**
+ * __drm_plane_find - find a &drm_plane
+ * @dev: DRM device
+ * @file_priv: drm file to check for lease against.
+ * @id: plane id
+ *
+ * Returns the plane with @id, NULL if it doesn't exist.
+ *
+ * Similar to drm_plane_find(), but called with &drm_device.master_rwsem held.
+ */
+static inline struct drm_plane *__drm_plane_find(struct drm_device *dev,
+						 struct drm_file *file_priv,
+						 uint32_t id)
+{
+	struct drm_mode_object *mo;
+
+	mo = __drm_mode_object_find(dev, file_priv, id, DRM_MODE_OBJECT_PLANE);
+	return mo ? obj_to_plane(mo) : NULL;
+}
+
+/**
  * drm_plane_find - find a &drm_plane
  * @dev: DRM device
  * @file_priv: drm file to check for lease against.
