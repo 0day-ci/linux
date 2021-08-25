@@ -1,0 +1,28 @@
+drm drm-fixes e22ce8eb631bdc47a4a4ea7ecf4e4ba499db4f93
+	Linux 5.14-rc7
+drm-misc drm-misc-fixes fa0b1ef5f7a694f48e00804a391245f3471aa155
+	drm: Copy drm_wait_vblank to user before returning
+drm-intel drm-intel-fixes 6da463bcc215024ebac92d8043d76319a31492f0
+	drm/i915/dp: Drop redundant debug print
+drm drm-next 397ab98e2d69cede84444a28eab77a171983d14e
+	Merge tag 'drm-msm-next-2021-08-12' of https://gitlab.freedesktop.org/drm/msm into drm-next
+drm-misc drm-misc-next-fixes bd7ffbc3ca12629aeb66fb9e28cf42b7f37e3e3b
+	drm/panfrost: Clamp lock region to Bifrost minimum
+drm-intel drm-intel-next-fixes fb43ebc83e069625cfeeb2490efc3ffa0013bfa4
+	drm/i915/selftest: Fix use of err in igt_reset_{fail, nop}_engine()
+drm-misc drm-misc-next 333ba0d9d5d5a2cf1f6bbb754045e4f2cb3ed22d
+	dt-bindings: panel: ili9341: correct indentation
+drm-intel drm-intel-next 76a04cd9af1e0cd9043b3904faa3ee3dc600799e
+	drm/i915: Nuke intel_prepare_shared_dpll()
+drm-intel drm-intel-gt-next 669076334bfa7915e6856cf49c6408a2ec07df7a
+	drm/ttm, drm/i915: Update ttm_move_memcpy for async use
+sound-upstream for-linus 7cf3dead1ad70c72edb03e2d98e1f3dcd332cdb2
+	Linux 5.13
+sound-upstream for-next 7cf3dead1ad70c72edb03e2d98e1f3dcd332cdb2
+	Linux 5.13
+drm-intel topic/core-for-CI 5363e35a435a0699c8b30936b6ca00db8d85c839
+	drm/i915: Add relocation exceptions for two other platforms
+drm topic/nouveau-ampere-modeset 584265dfec70e78ce2085b82ed389f27e06fbca0
+	Merge branch '04.01-ampere-lite' of git://github.com/skeggsb/linux into topic/nouveau-ampere-modeset
+drm-misc topic/i915-ttm cf3e3e86d77970211e0983130e896ae242601003
+	drm/i915: Use ttm mmap handling for ttm bo's.
