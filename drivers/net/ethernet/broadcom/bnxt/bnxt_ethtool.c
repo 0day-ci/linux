@@ -307,6 +307,7 @@ static const char * const bnxt_cmn_sw_stats_str[] = {
 enum {
 	RX_TOTAL_DISCARDS,
 	TX_TOTAL_DISCARDS,
+	RX_NETPOLL_DISCARDS,
 };
 
 static struct {
@@ -315,6 +316,7 @@ static struct {
 } bnxt_sw_func_stats[] = {
 	{0, "rx_total_discard_pkts"},
 	{0, "tx_total_discard_pkts"},
+	{0, "rx_netpoll_discards"},
 };
 
 #define NUM_RING_RX_SW_STATS		ARRAY_SIZE(bnxt_rx_sw_stats_str)
@@ -561,6 +563,8 @@ static void bnxt_get_ethtool_stats(struct net_device *dev,
 
 	for (i = 0; i < BNXT_NUM_SW_FUNC_STATS; i++)
 		bnxt_sw_func_stats[i].counter = 0;
+	bnxt_sw_func_stats[RX_NETPOLL_DISCARDS].counter =
+		bp->sw_stats_prev.rx.rx_netpoll_discards;
 
 	tpa_stats = bnxt_get_num_tpa_ring_stats(bp);
 	for (i = 0; i < bp->cp_nr_rings; i++) {
@@ -603,6 +607,8 @@ skip_tpa_ring_stats:
 			BNXT_GET_RING_STATS64(sw_stats, rx_discard_pkts);
 		bnxt_sw_func_stats[TX_TOTAL_DISCARDS].counter +=
 			BNXT_GET_RING_STATS64(sw_stats, tx_discard_pkts);
+		bnxt_sw_func_stats[RX_NETPOLL_DISCARDS].counter +=
+			cpr->sw_stats.rx.rx_netpoll_discards;
 	}
 
 	for (i = 0; i < BNXT_NUM_SW_FUNC_STATS; i++, j++)
