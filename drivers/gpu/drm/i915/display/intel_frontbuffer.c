@@ -112,6 +112,9 @@ static void frontbuffer_flush(struct drm_i915_private *i915,
 void intel_frontbuffer_flip_prepare(struct drm_i915_private *i915,
 				    unsigned frontbuffer_bits)
 {
+	if (!HAS_FRONTBUFFER_RENDERING(i915))
+		return;
+
 	spin_lock(&i915->fb_tracking.lock);
 	i915->fb_tracking.flip_bits |= frontbuffer_bits;
 	/* Remove stale busy bits due to the old buffer. */
@@ -132,6 +135,12 @@ void intel_frontbuffer_flip_prepare(struct drm_i915_private *i915,
 void intel_frontbuffer_flip_complete(struct drm_i915_private *i915,
 				     unsigned frontbuffer_bits)
 {
+	if (!HAS_FRONTBUFFER_RENDERING(i915)) {
+		drm_WARN_ON_ONCE(&i915->drm, i915->fb_tracking.flip_bits |
+					     i915->fb_tracking.busy_bits);
+		return;
+	}
+
 	spin_lock(&i915->fb_tracking.lock);
 	/* Mask any cancelled flips. */
 	frontbuffer_bits &= i915->fb_tracking.flip_bits;
@@ -156,6 +165,9 @@ void intel_frontbuffer_flip_complete(struct drm_i915_private *i915,
 void intel_frontbuffer_flip(struct drm_i915_private *i915,
 			    unsigned frontbuffer_bits)
 {
+	if (!HAS_FRONTBUFFER_RENDERING(i915))
+		return;
+
 	spin_lock(&i915->fb_tracking.lock);
 	/* Remove stale busy bits due to the old buffer. */
 	i915->fb_tracking.busy_bits &= ~frontbuffer_bits;
@@ -169,6 +181,9 @@ void __intel_fb_invalidate(struct intel_frontbuffer *front,
 			   unsigned int frontbuffer_bits)
 {
 	struct drm_i915_private *i915 = to_i915(front->obj->base.dev);
+
+	if (!HAS_FRONTBUFFER_RENDERING(i915))
+		return;
 
 	if (origin == ORIGIN_CS) {
 		spin_lock(&i915->fb_tracking.lock);
@@ -190,6 +205,9 @@ void __intel_fb_flush(struct intel_frontbuffer *front,
 		      unsigned int frontbuffer_bits)
 {
 	struct drm_i915_private *i915 = to_i915(front->obj->base.dev);
+
+	if (!HAS_FRONTBUFFER_RENDERING(i915))
+		return;
 
 	if (origin == ORIGIN_CS) {
 		spin_lock(&i915->fb_tracking.lock);
