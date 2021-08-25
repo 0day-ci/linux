@@ -1324,6 +1324,11 @@ attribute_group pci_dev_resource##_bar##_wc_attr_group = {		\
 	.bin_attrs = pci_dev_resource##_bar##_wc_attrs,			\
 	.is_bin_visible = pci_dev_resource##_bar##_wc_attr_is_visible,	\
 }
+
+#define pci_dev_resource_group(_bar)		\
+	&pci_dev_resource##_bar##_attr_group,	\
+	&pci_dev_resource##_bar##_wc_attr_group
+
 #else /* !(defined(HAVE_PCI_MMAP) || defined(ARCH_GENERIC_PCI_MMAP_RESOURCE)) */
 int __weak pci_create_resource_files(struct pci_dev *dev) { return 0; }
 void __weak pci_remove_resource_files(struct pci_dev *dev) { return; }
