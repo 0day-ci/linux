@@ -309,7 +309,7 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
 		break;
 	case KVM_CAP_ARM_SPE:
 		kvm_spe_init_supported_cpus();
-		r = 0;
+		r = kvm_supports_spe();
 		break;
 	default:
 		r = 0;
