@@ -577,8 +577,7 @@ int ntfs_sync_mft_mirror(ntfs_volume *vol, const unsigned long mft_no,
 		for (i_bhs = 0; i_bhs < nr_bhs; i_bhs++) {
 			struct buffer_head *tbh = bhs[i_bhs];
 
-			if (!trylock_buffer(tbh))
-				BUG();
+			BUG_ON(!trylock_buffer(tbh));
 			BUG_ON(!buffer_uptodate(tbh));
 			clear_buffer_dirty(tbh);
 			get_bh(tbh);
