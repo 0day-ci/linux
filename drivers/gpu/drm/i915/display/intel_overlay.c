@@ -1120,7 +1120,7 @@ int intel_overlay_put_image_ioctl(struct drm_device *dev, void *data,
 		return ret;
 	}
 
-	drmmode_crtc = drm_crtc_find(dev, file_priv, params->crtc_id);
+	drmmode_crtc = __drm_crtc_find(dev, file_priv, params->crtc_id);
 	if (!drmmode_crtc)
 		return -ENOENT;
 	crtc = to_intel_crtc(drmmode_crtc);
