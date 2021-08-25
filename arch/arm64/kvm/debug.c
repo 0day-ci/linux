@@ -77,23 +77,38 @@ void kvm_arm_init_debug(void)
  *  - Performance monitors (MDCR_EL2_TPM/MDCR_EL2_TPMCR)
  *  - Debug ROM Address (MDCR_EL2_TDRA)
  *  - OS related registers (MDCR_EL2_TDOSA)
- *  - Statistical profiler (MDCR_EL2_TPMS/MDCR_EL2_E2PB)
  *  - Self-hosted Trace Filter controls (MDCR_EL2_TTRF)
  *  - Self-hosted Trace (MDCR_EL2_TTRF/MDCR_EL2_E2TB)
  */
 static void kvm_arm_setup_mdcr_el2(struct kvm_vcpu *vcpu)
 {
 	/*
-	 * This also clears MDCR_EL2_E2PB_MASK and MDCR_EL2_E2TB_MASK
-	 * to disable guest access to the profiling and trace buffers
+	 * This also clears MDCR_EL2_E2TB_MASK to disable guest access to the
+	 * trace buffers.
 	 */
 	vcpu->arch.mdcr_el2 = __this_cpu_read(mdcr_el2) & MDCR_EL2_HPMN_MASK;
 	vcpu->arch.mdcr_el2 |= (MDCR_EL2_TPM |
-				MDCR_EL2_TPMS |
 				MDCR_EL2_TTRF |
 				MDCR_EL2_TPMCR |
 				MDCR_EL2_TDRA |
 				MDCR_EL2_TDOSA);
+
+	if (kvm_supports_spe() && kvm_vcpu_has_spe(vcpu)) {
+		/*
+		 * Use EL1&0 for the profiling buffer translation regime and
+		 * trap accesses to the buffer control registers; leave
+		 * MDCR_EL2.TPMS unset and do not trap accesses to the profiling
+		 * control registers.
+		 */
+		vcpu->arch.mdcr_el2 |= MDCR_EL2_E2PB_EL1_TRAP << MDCR_EL2_E2PB_SHIFT;
+	} else {
+		/*
+		 * Trap accesses to the profiling control registers; leave
+		 * MDCR_EL2.E2PB unset and use the EL2&0 translation regime for
+		 * the profiling buffer.
+		 */
+		vcpu->arch.mdcr_el2 |= MDCR_EL2_TPMS;
+	}
 
 	/* Is the VM being debugged by userspace? */
 	if (vcpu->guest_debug)
