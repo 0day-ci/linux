@@ -112,6 +112,10 @@ struct kvm_arch_memory_slot {
 	u32 flags;
 };
 
+/* kvm->arch.mmu_pending_ops flags */
+#define KVM_LOCKED_MEMSLOT_FLUSH_DCACHE	0
+#define KVM_MAX_MMU_PENDING_OPS		1
+
 struct kvm_arch {
 	struct kvm_s2_mmu mmu;
 
@@ -134,6 +138,9 @@ struct kvm_arch {
 	 * supported.
 	 */
 	bool return_nisv_io_abort_to_user;
+
+	/* Defer MMU operations until a VCPU is run. */
+	unsigned long mmu_pending_ops;
 
 	/*
 	 * VM-wide PMU filter, implemented as a bitmap and big enough for

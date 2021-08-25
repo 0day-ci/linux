@@ -829,6 +829,9 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu)
 	if (unlikely(!kvm_vcpu_initialized(vcpu)))
 		return -ENOEXEC;
 
+	if (unlikely(kvm_mmu_has_pending_ops(vcpu->kvm)))
+		kvm_mmu_perform_pending_ops(vcpu->kvm);
+
 	ret = kvm_vcpu_first_run_init(vcpu);
 	if (ret)
 		return ret;

@@ -1253,6 +1253,41 @@ out_unlock:
 	return ret;
 }
 
+/*
+ * It's safe to do the CMOs when the first VCPU is run because:
+ * - VCPUs cannot run until mmu_cmo_needed is cleared.
+ * - Memslots cannot be modified because we hold the kvm->slots_lock.
+ *
+ * It's safe to periodically release the mmu_lock because:
+ * - VCPUs cannot run.
+ * - Any changes to the stage 2 tables triggered by the MMU notifiers also take
+ *   the mmu_lock, which means accesses will be serialized.
+ * - Stage 2 tables cannot be freed from under us as long as at least one VCPU
+ *   is live, which means that the VM will be live.
+ */
+void kvm_mmu_perform_pending_ops(struct kvm *kvm)
+{
+	struct kvm_memory_slot *memslot;
+
+	mutex_lock(&kvm->slots_lock);
+	if (!kvm_mmu_has_pending_ops(kvm))
+		goto out_unlock;
+
+	if (test_bit(KVM_LOCKED_MEMSLOT_FLUSH_DCACHE, &kvm->arch.mmu_pending_ops)) {
+		kvm_for_each_memslot(memslot, kvm_memslots(kvm)) {
+			if (!memslot_is_locked(memslot))
+				continue;
+			stage2_flush_memslot(kvm, memslot);
+		}
+	}
+
+	bitmap_zero(&kvm->arch.mmu_pending_ops, KVM_MAX_MMU_PENDING_OPS);
+
+out_unlock:
+	mutex_unlock(&kvm->slots_lock);
+	return;
+}
+
 static int try_rlimit_memlock(unsigned long npages)
 {
 	unsigned long lock_limit;
@@ -1293,7 +1328,8 @@ static int lock_memslot(struct kvm *kvm, struct kvm_memory_slot *memslot,
 	struct kvm_memory_slot_page *page_entry;
 	bool writable = flags & KVM_ARM_LOCK_MEM_WRITE;
 	enum kvm_pgtable_prot prot = KVM_PGTABLE_PROT_R;
-	struct kvm_pgtable *pgt = kvm->arch.mmu.pgt;
+	struct kvm_pgtable pgt;
+	struct kvm_pgtable_mm_ops mm_ops;
 	struct vm_area_struct *vma;
 	unsigned long npages = memslot->npages;
 	unsigned int pin_flags = FOLL_LONGTERM;
@@ -1310,6 +1346,16 @@ static int lock_memslot(struct kvm *kvm, struct kvm_memory_slot *memslot,
 		prot |= KVM_PGTABLE_PROT_W;
 		pin_flags |= FOLL_WRITE;
 	}
+
+	/*
+	 * Make a copy of the stage 2 translation table struct to remove the
+	 * dcache callback so we can postpone the cache maintenance operations
+	 * until the first VCPU is run.
+	 */
+	mm_ops = *kvm->arch.mmu.pgt->mm_ops;
+	mm_ops.dcache_clean_inval_poc = NULL;
+	pgt = *kvm->arch.mmu.pgt;
+	pgt.mm_ops = &mm_ops;
 
 	hva = memslot->userspace_addr;
 	ipa = memslot->base_gfn << PAGE_SHIFT;
@@ -1362,13 +1408,13 @@ static int lock_memslot(struct kvm *kvm, struct kvm_memory_slot *memslot,
 			goto out_err;
 		}
 
-		ret = kvm_pgtable_stage2_map(pgt, ipa, PAGE_SIZE,
+		ret = kvm_pgtable_stage2_map(&pgt, ipa, PAGE_SIZE,
 					     page_to_phys(page_entry->page),
 					     prot, &cache);
 		spin_unlock(&kvm->mmu_lock);
 
 		if (ret) {
-			kvm_pgtable_stage2_unmap(pgt, memslot->base_gfn << PAGE_SHIFT,
+			kvm_pgtable_stage2_unmap(&pgt, memslot->base_gfn << PAGE_SHIFT,
 						 i << PAGE_SHIFT);
 			unpin_memslot_pages(memslot, writable);
 			goto out_err;
@@ -1387,7 +1433,7 @@ static int lock_memslot(struct kvm *kvm, struct kvm_memory_slot *memslot,
 	 */
 	ret = account_locked_vm(current->mm, npages, true);
 	if (ret) {
-		kvm_pgtable_stage2_unmap(pgt, memslot->base_gfn << PAGE_SHIFT,
+		kvm_pgtable_stage2_unmap(&pgt, memslot->base_gfn << PAGE_SHIFT,
 					 npages << PAGE_SHIFT);
 		unpin_memslot_pages(memslot, writable);
 		goto out_err;
@@ -1396,6 +1442,8 @@ static int lock_memslot(struct kvm *kvm, struct kvm_memory_slot *memslot,
 	memslot->arch.flags = KVM_MEMSLOT_LOCK_READ;
 	if (writable)
 		memslot->arch.flags |= KVM_MEMSLOT_LOCK_WRITE;
+
+	set_bit(KVM_LOCKED_MEMSLOT_FLUSH_DCACHE, &kvm->arch.mmu_pending_ops);
 
 	kvm_mmu_free_memory_cache(&cache);
 
