@@ -188,6 +188,7 @@ static const char * const bnxt_rx_sw_stats_str[] = {
 	"rx_l4_csum_errors",
 	"rx_resets",
 	"rx_buf_errors",
+	"rx_oom_discards",
 };
 
 static const char * const bnxt_cmn_sw_stats_str[] = {
