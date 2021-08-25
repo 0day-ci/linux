@@ -114,7 +114,6 @@ struct ti_sci_inta_msi_desc {
  * @maskbit:	[PCI MSI/X] Mask-Pending bit supported?
  * @is_64:	[PCI MSI/X] Address size: 0=32bit 1=64bit
  * @entry_nr:	[PCI MSI/X] Entry which is described by this descriptor
- * @default_irq:[PCI MSI/X] The default pre-assigned non-MSI irq
  * @mask_pos:	[PCI MSI]   Mask register position
  * @mask_base:	[PCI MSI-X] Mask register base address
  * @platform:	[platform]  Platform device specific msi descriptor data
@@ -148,7 +147,6 @@ struct msi_desc {
 				u8	is_64		: 1;
 				u8	is_virtual	: 1;
 				u16	entry_nr;
-				unsigned default_irq;
 			} msi_attrib;
 			union {
 				u8	mask_pos;

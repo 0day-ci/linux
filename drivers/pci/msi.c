@@ -422,7 +422,7 @@ static void __pci_restore_msi_state(struct pci_dev *dev)
 	if (!dev->msi_enabled)
 		return;
 
-	entry = irq_get_msi_desc(dev->irq);
+	entry = first_pci_msi_entry(dev);
 
 	pci_intx_for_msi(dev, 0);
 	pci_msi_set_enable(dev, 0);
@@ -591,7 +591,6 @@ msi_setup_entry(struct pci_dev *dev, int nvec, struct irq_affinity *affd)
 	entry->msi_attrib.is_virtual    = 0;
 	entry->msi_attrib.entry_nr	= 0;
 	entry->msi_attrib.maskbit	= !!(control & PCI_MSI_FLAGS_MASKBIT);
-	entry->msi_attrib.default_irq	= dev->irq;	/* Save IOAPIC IRQ */
 	entry->msi_attrib.multi_cap	= (control & PCI_MSI_FLAGS_QMASK) >> 1;
 	entry->msi_attrib.multiple	= ilog2(__roundup_pow_of_two(nvec));
 
@@ -682,7 +681,6 @@ static int msi_capability_init(struct pci_dev *dev, int nvec,
 	dev->msi_enabled = 1;
 
 	pcibios_free_irq(dev);
-	dev->irq = entry->irq;
 	return 0;
 }
 
@@ -742,7 +740,6 @@ static int msix_setup_entries(struct pci_dev *dev, void __iomem *base,
 		entry->msi_attrib.is_virtual =
 			entry->msi_attrib.entry_nr >= vec_count;
 
-		entry->msi_attrib.default_irq	= dev->irq;
 		entry->mask_base		= base;
 
 		addr = pci_msix_desc_addr(entry);
@@ -964,8 +961,6 @@ static void pci_msi_shutdown(struct pci_dev *dev)
 	mask = msi_mask(desc->msi_attrib.multi_cap);
 	msi_mask_irq(desc, mask, 0);
 
-	/* Restore dev->irq to its default pin-assertion IRQ */
-	dev->irq = desc->msi_attrib.default_irq;
 	pcibios_alloc_irq(dev);
 }
 
@@ -1301,12 +1296,15 @@ int pci_irq_vector(struct pci_dev *dev, unsigned int nr)
 
 		if (WARN_ON_ONCE(nr >= entry->nvec_used))
 			return -EINVAL;
+
+		return entry->irq + nr;
 	} else {
 		if (WARN_ON_ONCE(nr > 0))
 			return -EINVAL;
 	}
 
-	return dev->irq + nr;
+	/* legacy INTx */
+	return dev->irq;
 }
 EXPORT_SYMBOL(pci_irq_vector);
 
