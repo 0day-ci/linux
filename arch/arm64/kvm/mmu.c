@@ -566,6 +566,10 @@ void stage2_unmap_vm(struct kvm *kvm)
 				&kvm->arch.mmu_pending_ops);
 			set_bit(KVM_LOCKED_MEMSLOT_INVAL_ICACHE,
 				&kvm->arch.mmu_pending_ops);
+			if (kvm_has_mte(kvm)) {
+				set_bit(KVM_LOCKED_MEMSLOT_SANITISE_TAGS,
+					&kvm->arch.mmu_pending_ops);
+			}
 			continue;
 		}
 		stage2_unmap_memslot(kvm, memslot);
@@ -907,6 +911,58 @@ static int sanitise_mte_tags(struct kvm *kvm, kvm_pfn_t pfn,
 	}
 
 	return 0;
+}
+
+static int sanitise_mte_tags_memslot(struct kvm *kvm,
+				     struct kvm_memory_slot *memslot)
+{
+	unsigned long hva, slot_size, slot_end;
+	struct kvm_memory_slot_page *entry;
+	struct page *page;
+	int ret = 0;
+
+	if (!kvm_has_mte(kvm))
+		return 0;
+
+	hva = memslot->userspace_addr;
+	slot_size = memslot->npages << PAGE_SHIFT;
+	slot_end = hva + slot_size;
+
+	/* First check that the VMAs spanning the memslot are not shared... */
+	do {
+		struct vm_area_struct *vma;
+
+		vma = find_vma_intersection(current->mm, hva, slot_end);
+		/* The VMAs spanning the memslot must be contiguous. */
+		if (!vma) {
+			ret = -EFAULT;
+			goto out;
+		}
+		/*
+		 * VM_SHARED mappings are not allowed with MTE to avoid races
+		 * when updating the PG_mte_tagged page flag, see
+		 * sanitise_mte_tags for more details.
+		 */
+		if (kvm_has_mte(kvm) && vma->vm_flags & VM_SHARED) {
+			ret = -EFAULT;
+			goto out;
+		}
+		hva = min(slot_end, vma->vm_end);
+	} while (hva < slot_end);
+
+	/* ... then clear the tags. */
+	list_for_each_entry(entry, &memslot->arch.pages.list, list) {
+		page = entry->page;
+		if (!test_bit(PG_mte_tagged, &page->flags)) {
+			mte_clear_page_tags(page_address(page));
+			set_bit(PG_mte_tagged, &page->flags);
+		}
+	}
+
+out:
+	mmap_read_unlock(current->mm);
+
+	return ret;
 }
 
 static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
@@ -1273,13 +1329,27 @@ out_unlock:
  * - Stage 2 tables cannot be freed from under us as long as at least one VCPU
  *   is live, which means that the VM will be live.
  */
-void kvm_mmu_perform_pending_ops(struct kvm *kvm)
+int kvm_mmu_perform_pending_ops(struct kvm *kvm)
 {
 	struct kvm_memory_slot *memslot;
+	int ret = 0;
 
 	mutex_lock(&kvm->slots_lock);
 	if (!kvm_mmu_has_pending_ops(kvm))
 		goto out_unlock;
+
+	if (test_bit(KVM_LOCKED_MEMSLOT_SANITISE_TAGS, &kvm->arch.mmu_pending_ops) &&
+	    kvm_has_mte(kvm)) {
+		kvm_for_each_memslot(memslot, kvm_memslots(kvm)) {
+			if (!memslot_is_locked(memslot))
+				continue;
+			mmap_read_lock(current->mm);
+			ret = sanitise_mte_tags_memslot(kvm, memslot);
+			mmap_read_unlock(current->mm);
+			if (ret)
+				goto out_unlock;
+		}
+	}
 
 	if (test_bit(KVM_LOCKED_MEMSLOT_FLUSH_DCACHE, &kvm->arch.mmu_pending_ops)) {
 		kvm_for_each_memslot(memslot, kvm_memslots(kvm)) {
@@ -1296,7 +1366,7 @@ void kvm_mmu_perform_pending_ops(struct kvm *kvm)
 
 out_unlock:
 	mutex_unlock(&kvm->slots_lock);
-	return;
+	return ret;
 }
 
 static int try_rlimit_memlock(unsigned long npages)
@@ -1390,19 +1460,6 @@ static int lock_memslot(struct kvm *kvm, struct kvm_memory_slot *memslot,
 			ret = -ENOMEM;
 			goto out_err;
 		}
-		if (kvm_has_mte(kvm)) {
-			if (vma->vm_flags & VM_SHARED) {
-				ret = -EFAULT;
-			} else {
-				ret = sanitise_mte_tags(kvm,
-					page_to_pfn(page_entry->page),
-					PAGE_SIZE);
-			}
-			if (ret) {
-				mmap_read_unlock(current->mm);
-				goto out_err;
-			}
-		}
 		mmap_read_unlock(current->mm);
 
 		ret = kvm_mmu_topup_memory_cache(&cache, kvm_mmu_cache_min_pages(kvm));
@@ -1455,6 +1512,11 @@ static int lock_memslot(struct kvm *kvm, struct kvm_memory_slot *memslot,
 		memslot->arch.flags |= KVM_MEMSLOT_LOCK_WRITE;
 
 	set_bit(KVM_LOCKED_MEMSLOT_FLUSH_DCACHE, &kvm->arch.mmu_pending_ops);
+	/*
+	 * MTE might be enabled after we lock the memslot, set it here
+	 * unconditionally.
+	 */
+	set_bit(KVM_LOCKED_MEMSLOT_SANITISE_TAGS, &kvm->arch.mmu_pending_ops);
 
 	kvm_mmu_free_memory_cache(&cache);
 

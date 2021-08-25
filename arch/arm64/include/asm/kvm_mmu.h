@@ -222,7 +222,7 @@ int kvm_mmu_unlock_memslot(struct kvm *kvm, u64 slot, u64 flags);
 #define kvm_mmu_has_pending_ops(kvm)	\
 	(!bitmap_empty(&(kvm)->arch.mmu_pending_ops, KVM_MAX_MMU_PENDING_OPS))
 
-void kvm_mmu_perform_pending_ops(struct kvm *kvm);
+int kvm_mmu_perform_pending_ops(struct kvm *kvm);
 
 static inline unsigned int kvm_get_vmid_bits(void)
 {

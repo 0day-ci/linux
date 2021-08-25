@@ -113,9 +113,10 @@ struct kvm_arch_memory_slot {
 };
 
 /* kvm->arch.mmu_pending_ops flags */
-#define KVM_LOCKED_MEMSLOT_FLUSH_DCACHE	0
-#define KVM_LOCKED_MEMSLOT_INVAL_ICACHE	1
-#define KVM_MAX_MMU_PENDING_OPS		2
+#define KVM_LOCKED_MEMSLOT_FLUSH_DCACHE		0
+#define KVM_LOCKED_MEMSLOT_INVAL_ICACHE		1
+#define KVM_LOCKED_MEMSLOT_SANITISE_TAGS	2
+#define KVM_MAX_MMU_PENDING_OPS			3
 
 struct kvm_arch {
 	struct kvm_s2_mmu mmu;
