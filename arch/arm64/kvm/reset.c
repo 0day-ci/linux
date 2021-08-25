@@ -27,6 +27,7 @@
 #include <asm/kvm_asm.h>
 #include <asm/kvm_emulate.h>
 #include <asm/kvm_mmu.h>
+#include <asm/kvm_spe.h>
 #include <asm/virt.h>
 
 /* Maximum phys_shift supported for any VM on this host */
@@ -189,6 +190,21 @@ static bool vcpu_allowed_register_width(struct kvm_vcpu *vcpu)
 	return true;
 }
 
+static int kvm_vcpu_enable_spe(struct kvm_vcpu *vcpu)
+{
+	if (!kvm_supports_spe())
+		return -EINVAL;
+
+	/*
+	 * The Profiling Buffer is disabled if the owning Exception level is
+	 * aarch32.
+	 */
+	if (vcpu_has_feature(vcpu, KVM_ARM_VCPU_EL1_32BIT))
+		return -EINVAL;
+
+	return 0;
+}
+
 /**
  * kvm_reset_vcpu - sets core registers and sys_regs to reset value
  * @vcpu: The VCPU pointer
@@ -243,6 +259,13 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
 	if (!vcpu_allowed_register_width(vcpu)) {
 		ret = -EINVAL;
 		goto out;
+	}
+
+	if (kvm_vcpu_has_spe(vcpu)) {
+		if (kvm_vcpu_enable_spe(vcpu)) {
+			ret = -EINVAL;
+			goto out;
+		}
 	}
 
 	switch (vcpu->arch.target) {
