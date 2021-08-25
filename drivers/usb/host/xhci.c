@@ -644,7 +644,6 @@ int xhci_run(struct usb_hcd *hcd)
 	/* Start the xHCI host controller running only after the USB 2.0 roothub
 	 * is setup.
 	 */
-
 	hcd->uses_new_polling = 1;
 	if (!usb_hcd_is_primary_hcd(hcd))
 		return xhci_run_finished(xhci);
@@ -692,6 +691,7 @@ int xhci_run(struct usb_hcd *hcd)
 		if (ret)
 			xhci_free_command(xhci, command);
 	}
+	set_bit(HCD_FLAG_DEFER_PRI_RH_REGISTER, &hcd->flags);
 	xhci_dbg_trace(xhci, trace_xhci_dbg_init,
 			"Finished xhci_run for USB2 roothub");
 
