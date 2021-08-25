@@ -194,12 +194,16 @@ int __kvm_vcpu_run(struct kvm_vcpu *vcpu)
 
 	__sysreg_save_state_nvhe(host_ctxt);
 	/*
-	 * We must flush and disable the SPE buffer for nVHE, as
-	 * the translation regime(EL1&0) is going to be loaded with
-	 * that of the guest. And we must do this before we change the
-	 * translation regime to EL2 (via MDCR_EL2_E2PB == 0) and
-	 * before we load guest Stage1.
+	 * If the VCPU has the SPE feature bit set, then we save the host's SPE
+	 * context.
+	 *
+	 * Otherwise, we only flush and disable the SPE buffer for nVHE, as the
+	 * translation regime(EL1&0) is going to be loaded with that of the
+	 * guest. And we must do this before we change the translation regime to
+	 * EL2 (via MDCR_EL2_E2PB == 0) and before we load guest Stage1.
 	 */
+	if (kvm_vcpu_has_spe(vcpu))
+		__spe_save_host_state_nvhe(vcpu, host_ctxt);
 	__debug_save_host_buffers_nvhe(vcpu, host_ctxt);
 
 	__kvm_adjust_pc(vcpu);
@@ -218,6 +222,9 @@ int __kvm_vcpu_run(struct kvm_vcpu *vcpu)
 	__load_guest_stage2(kern_hyp_va(vcpu->arch.hw_mmu));
 	__activate_traps(vcpu);
 
+	if (kvm_vcpu_has_spe(vcpu))
+		__spe_restore_guest_state_nvhe(vcpu, guest_ctxt);
+
 	__hyp_vgic_restore_state(vcpu);
 	__timer_enable_traps(vcpu);
 
@@ -232,6 +239,10 @@ int __kvm_vcpu_run(struct kvm_vcpu *vcpu)
 
 	__sysreg_save_state_nvhe(guest_ctxt);
 	__sysreg32_save_state(vcpu);
+
+	if (kvm_vcpu_has_spe(vcpu))
+		__spe_save_guest_state_nvhe(vcpu, guest_ctxt);
+
 	__timer_disable_traps(vcpu);
 	__hyp_vgic_save_state(vcpu);
 
@@ -244,10 +255,14 @@ int __kvm_vcpu_run(struct kvm_vcpu *vcpu)
 		__fpsimd_save_fpexc32(vcpu);
 
 	__debug_switch_to_host(vcpu);
+
 	/*
-	 * This must come after restoring the host sysregs, since a non-VHE
-	 * system may enable SPE here and make use of the TTBRs.
+	 * Restoring the host context must come after restoring the host
+	 * sysregs, since a non-VHE system may enable SPE here and make use of
+	 * the TTBRs.
 	 */
+	if (kvm_vcpu_has_spe(vcpu))
+		__spe_restore_host_state_nvhe(vcpu, host_ctxt);
 	__debug_restore_host_buffers_nvhe(vcpu, host_ctxt);
 
 	if (pmu_switch_needed)
