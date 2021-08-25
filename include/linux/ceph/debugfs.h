@@ -4,6 +4,8 @@
 
 #include <linux/ceph/types.h>
 
+extern struct dentry *ceph_debugfs_dir;
+
 /* debugfs.c */
 extern void ceph_debugfs_init(void);
 extern void ceph_debugfs_cleanup(void);

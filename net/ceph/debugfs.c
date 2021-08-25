@@ -29,7 +29,8 @@
  *      .../bdi         - symlink to ../../bdi/something
  */
 
-static struct dentry *ceph_debugfs_dir;
+struct dentry *ceph_debugfs_dir;
+EXPORT_SYMBOL(ceph_debugfs_dir);
 
 static int monmap_show(struct seq_file *s, void *p)
 {
