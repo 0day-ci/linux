@@ -2181,8 +2181,7 @@ static int dlm_pre_master_reco_lockres(struct dlm_ctxt *dlm,
 		ret = dlm_do_master_requery(dlm, res, nodenum, &master);
 		if (ret < 0) {
 			mlog_errno(ret);
-			if (!dlm_is_host_down(ret))
-				BUG();
+			BUG_ON(!dlm_is_host_down(ret));
 			/* host is down, so answer for that node would be
 			 * DLM_LOCK_RES_OWNER_UNKNOWN.  continue. */
 			ret = 0;
@@ -2238,8 +2237,7 @@ int dlm_drop_lockres_ref(struct dlm_ctxt *dlm, struct dlm_lock_resource *res)
 		mlog(ML_ERROR, "%s: res %.*s, DEREF to node %u got %d\n",
 		     dlm->name, namelen, lockname, res->owner, r);
 		dlm_print_one_lock_resource(res);
-		if (r == -ENOMEM)
-			BUG();
+		BUG_ON(r == -ENOMEM);
 	} else
 		ret = r;
 
