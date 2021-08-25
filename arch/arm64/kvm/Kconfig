@@ -48,7 +48,7 @@ source "virt/kvm/Kconfig"
 
 config KVM_ARM_SPE
 	bool "Virtual Statistical Profiling Extension (SPE) support"
-	depends on ARM_SPE_PMU=y
+	depends on ARM_SPE_PMU=y && !NUMA_BALANCING
 	default y
 	help
 	  Adds support for Statistical Profiling Extension (SPE) in virtual
