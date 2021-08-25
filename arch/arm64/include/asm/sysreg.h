@@ -267,6 +267,8 @@
 #define SYS_PMSCR_EL1_TS_SHIFT		5
 #define SYS_PMSCR_EL1_PCT_SHIFT		6
 
+#define SYS_PMSCR_EL12			sys_reg(3, 5, 9, 9, 0)
+
 #define SYS_PMSCR_EL2			sys_reg(3, 4, 9, 9, 0)
 #define SYS_PMSCR_EL2_E0HSPE_SHIFT	0
 #define SYS_PMSCR_EL2_E2SPE_SHIFT	1

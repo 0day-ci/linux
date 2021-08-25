@@ -106,8 +106,28 @@ static inline void __spe_restore_host_state_nvhe(struct kvm_vcpu *vcpu,
 					struct kvm_cpu_context *host_ctxt) {}
 static inline void __spe_restore_guest_state_nvhe(struct kvm_vcpu *vcpu,
 					struct kvm_cpu_context *guest_ctxt) {}
-#endif
-#endif
+#endif /* CONFIG_KVM_ARM_SPE */
+#else
+#ifdef CONFIG_KVM_ARM_SPE
+void __spe_save_host_state_vhe(struct kvm_vcpu *vcpu,
+			       struct kvm_cpu_context *host_ctxt);
+void __spe_save_guest_state_vhe(struct kvm_vcpu *vcpu,
+				struct kvm_cpu_context *guest_ctxt);
+void __spe_restore_host_state_vhe(struct kvm_vcpu *vcpu,
+				  struct kvm_cpu_context *host_ctxt);
+void __spe_restore_guest_state_vhe(struct kvm_vcpu *vcpu,
+				   struct kvm_cpu_context *guest_ctxt);
+#else
+static inline void __spe_save_host_state_vhe(struct kvm_vcpu *vcpu,
+					struct kvm_cpu_context *host_ctxt) {}
+static inline void __spe_save_guest_state_vhe(struct kvm_vcpu *vcpu,
+					struct kvm_cpu_context *guest_ctxt) {}
+static inline void __spe_restore_host_state_vhe(struct kvm_vcpu *vcpu,
+					struct kvm_cpu_context *host_ctxt) {}
+static inline void __spe_restore_guest_state_vhe(struct kvm_vcpu *vcpu,
+					struct kvm_cpu_context *guest_ctxt) {}
+#endif /* CONFIG_KVM_ARM_SPE */
+#endif /* __KVM_NVHE_HYPERVISOR__ */
 
 void __fpsimd_save_state(struct user_fpsimd_state *fp_regs);
 void __fpsimd_restore_state(struct user_fpsimd_state *fp_regs);
