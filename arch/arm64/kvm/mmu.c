@@ -1244,6 +1244,82 @@ out_unlock:
 	return ret;
 }
 
+int kvm_mmu_lock_memslot(struct kvm *kvm, u64 slot, u64 flags)
+{
+	struct kvm_memory_slot *memslot;
+	struct kvm_vcpu *vcpu;
+	int i, ret;
+
+	if (slot >= KVM_MEM_SLOTS_NUM)
+		return -EINVAL;
+
+	if (!(flags & KVM_ARM_LOCK_MEM_READ))
+		return -EINVAL;
+
+	mutex_lock(&kvm->lock);
+
+	if (!kvm_lock_all_vcpus(kvm)) {
+		ret = -EBUSY;
+		goto out;
+	}
+
+	kvm_for_each_vcpu(i, vcpu, kvm) {
+		if (vcpu->arch.has_run_once) {
+			ret = -EBUSY;
+			goto out_unlock_vcpus;
+		}
+	}
+
+	mutex_lock(&kvm->slots_lock);
+
+	memslot = id_to_memslot(kvm_memslots(kvm), slot);
+	if (!memslot) {
+		ret = -EINVAL;
+		goto out_unlock_slots;
+	}
+	if ((flags & KVM_ARM_LOCK_MEM_WRITE) &&
+	    ((memslot->flags & KVM_MEM_READONLY) || memslot->dirty_bitmap)) {
+		ret = -EPERM;
+		goto out_unlock_slots;
+	}
+
+	ret = -EINVAL;
+
+out_unlock_slots:
+	mutex_unlock(&kvm->slots_lock);
+out_unlock_vcpus:
+	kvm_unlock_all_vcpus(kvm);
+out:
+	mutex_unlock(&kvm->lock);
+	return ret;
+}
+
+int kvm_mmu_unlock_memslot(struct kvm *kvm, u64 slot, u64 flags)
+{
+	struct kvm_memory_slot *memslot;
+	int ret;
+
+	if (flags & KVM_ARM_UNLOCK_MEM_ALL)
+		return -EINVAL;
+
+	if (slot >= KVM_MEM_SLOTS_NUM)
+		return -EINVAL;
+
+	mutex_lock(&kvm->slots_lock);
+
+	memslot = id_to_memslot(kvm_memslots(kvm), slot);
+	if (!memslot) {
+		ret = -EINVAL;
+		goto out_unlock_slots;
+	}
+
+	ret = -EINVAL;
+
+out_unlock_slots:
+	mutex_unlock(&kvm->slots_lock);
+	return ret;
+}
+
 bool kvm_unmap_gfn_range(struct kvm *kvm, struct kvm_gfn_range *range)
 {
 	if (!kvm->arch.mmu.pgt)

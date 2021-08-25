@@ -216,6 +216,9 @@ static inline void __invalidate_icache_guest_page(void *va, size_t size)
 void kvm_set_way_flush(struct kvm_vcpu *vcpu);
 void kvm_toggle_cache(struct kvm_vcpu *vcpu, bool was_enabled);
 
+int kvm_mmu_lock_memslot(struct kvm *kvm, u64 slot, u64 flags);
+int kvm_mmu_unlock_memslot(struct kvm *kvm, u64 slot, u64 flags);
+
 static inline unsigned int kvm_get_vmid_bits(void)
 {
 	int reg = read_sanitised_ftr_reg(SYS_ID_AA64MMFR1_EL1);

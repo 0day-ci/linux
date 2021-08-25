@@ -80,16 +80,43 @@ int kvm_arch_check_processor_compat(void *opaque)
 	return 0;
 }
 
+static int kvm_arm_lock_memslot_supported(void)
+{
+	return 0;
+}
+
+static int kvm_lock_user_memory_region_ioctl(struct kvm *kvm,
+					     struct kvm_enable_cap *cap)
+{
+	u64 slot, flags;
+	u32 action;
+
+	if (cap->args[2] || cap->args[3])
+		return -EINVAL;
+
+	slot = cap->args[0];
+	flags = cap->args[1];
+	action = cap->flags;
+
+	switch (action) {
+	case KVM_ARM_LOCK_USER_MEMORY_REGION_FLAGS_LOCK:
+		return kvm_mmu_lock_memslot(kvm, slot, flags);
+	case KVM_ARM_LOCK_USER_MEMORY_REGION_FLAGS_UNLOCK:
+		return kvm_mmu_unlock_memslot(kvm, slot, flags);
+	default:
+		return -EINVAL;
+	}
+}
+
 int kvm_vm_ioctl_enable_cap(struct kvm *kvm,
 			    struct kvm_enable_cap *cap)
 {
 	int r;
 
-	if (cap->flags)
-		return -EINVAL;
-
 	switch (cap->cap) {
 	case KVM_CAP_ARM_NISV_TO_USER:
+		if (cap->flags)
+			return -EINVAL;
 		r = 0;
 		kvm->arch.return_nisv_io_abort_to_user = true;
 		break;
@@ -98,6 +125,11 @@ int kvm_vm_ioctl_enable_cap(struct kvm *kvm,
 			return -EINVAL;
 		r = 0;
 		kvm->arch.mte_enabled = true;
+		break;
+	case KVM_CAP_ARM_LOCK_USER_MEMORY_REGION:
+		if (!kvm_arm_lock_memslot_supported())
+			return -EINVAL;
+		r = kvm_lock_user_memory_region_ioctl(kvm, cap);
 		break;
 	default:
 		r = -EINVAL;
@@ -165,7 +197,6 @@ vm_fault_t kvm_arch_vcpu_fault(struct kvm_vcpu *vcpu, struct vm_fault *vmf)
 {
 	return VM_FAULT_SIGBUS;
 }
-
 
 /**
  * kvm_arch_destroy_vm - destroy the VM data structure
@@ -273,6 +304,9 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
 	case KVM_CAP_ARM_PTRAUTH_ADDRESS:
 	case KVM_CAP_ARM_PTRAUTH_GENERIC:
 		r = system_has_full_ptr_auth();
+		break;
+	case KVM_CAP_ARM_LOCK_USER_MEMORY_REGION:
+		r = kvm_arm_lock_memslot_supported();
 		break;
 	default:
 		r = 0;

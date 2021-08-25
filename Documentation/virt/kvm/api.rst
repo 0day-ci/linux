@@ -6702,6 +6702,62 @@ MAP_SHARED mmap will result in an -EINVAL return.
 When enabled the VMM may make use of the ``KVM_ARM_MTE_COPY_TAGS`` ioctl to
 perform a bulk copy of tags to/from the guest.
 
+7.29 KVM_CAP_ARM_LOCK_USER_MEMORY_REGION
+----------------------------------------
+
+:Architectures: arm64
+:Target: VM
+:Parameters: flags is one of KVM_ARM_LOCK_USER_MEMORY_REGION_FLAGS_LOCK or
+                     KVM_ARM_LOCK_USER_MEMORY_REGION_FLAGS_UNLOCK
+             args[0] is the slot number
+             args[1] specifies the permisions when the memslot is locked or if
+                     all memslots should be unlocked
+
+The presence of this capability indicates that KVM supports locking the memory
+associated with the memslot, and unlocking a previously locked memslot.
+
+The 'flags' parameter is defined as follows:
+
+7.29.1 KVM_ARM_LOCK_USER_MEMORY_REGION_FLAGS_LOCK
+-------------------------------------------------
+
+:Capability: 'flags' parameter to KVM_CAP_ARM_LOCK_USER_MEMORY_REGION
+:Architectures: arm64
+:Target: VM
+:Parameters: args[0] contains the memory slot number
+             args[1] contains the permissions for the locked memory:
+                     KVM_ARM_LOCK_MEMORY_READ (mandatory) to map it with
+                     read permissions and KVM_ARM_LOCK_MEMORY_WRITE
+                     (optional) with write permissions
+:Returns: 0 on success; negative error code on failure
+
+Enabling this capability causes the memory described by the memslot to be
+pinned in the process address space and the corresponding stage 2 IPA range
+mapped at stage 2. The permissions specified in args[1] apply to both
+mappings. The memory pinned with this capability counts towards the max
+locked memory limit for the current process.
+
+The capability must be enabled before any VCPUs have run. The virtual memory
+range described by the memslot must be mapped in the userspace process without
+any gaps. It is considered an error if write permissions are specified for a
+memslot which logs dirty pages.
+
+7.29.2 KVM_ARM_LOCK_USER_MEMORY_REGION_FLAGS_UNLOCK
+---------------------------------------------------
+
+:Capability: 'flags' parameter to KVM_CAP_ARM_LOCK_USER_MEMORY_REGION
+:Architectures: arm64
+:Target: VM
+:Parameters: args[0] contains the memory slot number
+             args[1] optionally contains the flag KVM_ARM_UNLOCK_MEM_ALL,
+                     which unlocks all previously locked memslots.
+:Returns: 0 on success; negative error code on failure
+
+Enabling this capability causes the memory pinned when locking the memslot
+specified in args[0] to be unpinned, or, optionally, the memory associated
+with all locked memslots, to be unpinned. The IPA range is not unmapped
+from stage 2.
+
 8. Other capabilities.
 ======================
 

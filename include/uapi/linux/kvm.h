@@ -1112,6 +1112,7 @@ struct kvm_ppc_resize_hpt {
 #define KVM_CAP_BINARY_STATS_FD 203
 #define KVM_CAP_EXIT_ON_EMULATION_FAILURE 204
 #define KVM_CAP_ARM_MTE 205
+#define KVM_CAP_ARM_LOCK_USER_MEMORY_REGION 206
 
 #ifdef KVM_CAP_IRQ_ROUTING
 
@@ -1458,6 +1459,13 @@ struct kvm_s390_ucas_mapping {
 #define KVM_SET_PMU_EVENT_FILTER  _IOW(KVMIO,  0xb2, struct kvm_pmu_event_filter)
 #define KVM_PPC_SVM_OFF		  _IO(KVMIO,  0xb3)
 #define KVM_ARM_MTE_COPY_TAGS	  _IOR(KVMIO,  0xb4, struct kvm_arm_copy_mte_tags)
+
+/* Used by KVM_CAP_ARM_LOCK_USER_MEMORY_REGION */
+#define KVM_ARM_LOCK_USER_MEMORY_REGION_FLAGS_LOCK	(1 << 0)
+#define   KVM_ARM_LOCK_MEM_READ				(1 << 0)
+#define   KVM_ARM_LOCK_MEM_WRITE			(1 << 1)
+#define KVM_ARM_LOCK_USER_MEMORY_REGION_FLAGS_UNLOCK	(1 << 1)
+#define   KVM_ARM_UNLOCK_MEM_ALL			(1 << 0)
 
 /* ioctl for vm fd */
 #define KVM_CREATE_DEVICE	  _IOWR(KVMIO,  0xe0, struct kvm_create_device)
