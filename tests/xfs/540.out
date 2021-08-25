@@ -1,0 +1,130 @@
+QA output created by 540
+*** mkfs
+*** mount FS
+*** make test file 1
+Inject error
+Set attribute
+attr_set: Input/output error
+Could not set "attr_name1" for /mnt/scratch/testfile.1
+FS should be shut down, touch will fail
+touch: cannot touch '/mnt/scratch/testfile.1': Input/output error
+Remount to replay log
+FS should be online, touch should succeed
+Verify attr recovery
+# file: SCRATCH_MNT/testfile.1
+user.attr_name1
+
+Inject error
+Set attribute
+attr_set: Input/output error
+Could not set "attr_name2" for /mnt/scratch/testfile.1
+FS should be shut down, touch will fail
+touch: cannot touch '/mnt/scratch/testfile.1': Input/output error
+Remount to replay log
+FS should be online, touch should succeed
+Verify attr recovery
+# file: SCRATCH_MNT/testfile.1
+user.attr_name1
+user.attr_name2
+
+Inject error
+Set attribute
+attr_set: Input/output error
+Could not set "attr_name3" for /mnt/scratch/testfile.1
+FS should be shut down, touch will fail
+touch: cannot touch '/mnt/scratch/testfile.1': Input/output error
+Remount to replay log
+FS should be online, touch should succeed
+Verify attr recovery
+# file: SCRATCH_MNT/testfile.1
+user.attr_name1
+user.attr_name2
+user.attr_name3
+
+Inject error
+Set attribute
+attr_set: Input/output error
+Could not set "attr_name4" for /mnt/scratch/testfile.1
+FS should be shut down, touch will fail
+touch: cannot touch '/mnt/scratch/testfile.1': Input/output error
+Remount to replay log
+FS should be online, touch should succeed
+Verify attr recovery
+# file: SCRATCH_MNT/testfile.1
+user.attr_name1
+user.attr_name2
+user.attr_name3
+user.attr_name4
+
+Inject error
+Set attribute
+attr_set: Input/output error
+Could not set "attr_name5" for /mnt/scratch/testfile.1
+FS should be shut down, touch will fail
+touch: cannot touch '/mnt/scratch/testfile.1': Input/output error
+Remount to replay log
+FS should be online, touch should succeed
+Verify attr recovery
+# file: SCRATCH_MNT/testfile.1
+user.attr_name1
+user.attr_name2
+user.attr_name3
+user.attr_name4
+user.attr_name5
+
+Inject error
+Set attribute
+attr_set: Input/output error
+Could not set "attr_name6" for /mnt/scratch/testfile.1
+FS should be shut down, touch will fail
+touch: cannot touch '/mnt/scratch/testfile.1': Input/output error
+Remount to replay log
+FS should be online, touch should succeed
+Verify attr recovery
+# file: SCRATCH_MNT/testfile.1
+user.attr_name1
+user.attr_name2
+user.attr_name3
+user.attr_name4
+user.attr_name5
+user.attr_name6
+
+Inject error
+Set attribute
+attr_set: Input/output error
+Could not set "attr_name7" for /mnt/scratch/testfile.1
+FS should be shut down, touch will fail
+touch: cannot touch '/mnt/scratch/testfile.1': Input/output error
+Remount to replay log
+FS should be online, touch should succeed
+Verify attr recovery
+# file: SCRATCH_MNT/testfile.1
+user.attr_name1
+user.attr_name2
+user.attr_name3
+user.attr_name4
+user.attr_name5
+user.attr_name6
+user.attr_name7
+
+Inject error
+Set attribute
+attr_set: Input/output error
+Could not set "attr_name8" for /mnt/scratch/testfile.1
+FS should be shut down, touch will fail
+touch: cannot touch '/mnt/scratch/testfile.1': Input/output error
+Remount to replay log
+FS should be online, touch should succeed
+Verify attr recovery
+# file: SCRATCH_MNT/testfile.1
+user.attr_name1
+user.attr_name2
+user.attr_name3
+user.attr_name4
+user.attr_name5
+user.attr_name6
+user.attr_name7
+user.attr_name8
+
+*** done
+*** unmount

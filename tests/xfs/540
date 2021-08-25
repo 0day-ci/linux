@@ -1,0 +1,96 @@
+#! /bin/bash
+# SPDX-License-Identifier: GPL-2.0
+# Copyright (c) 2021, Oracle and/or its affiliates.  All Rights Reserved.
+#
+# FS QA Test 540
+#
+# Log attribute replay test
+#
+. ./common/preamble
+_begin_fstest auto quick attr
+
+# get standard environment, filters and checks
+. ./common/filter
+. ./common/attr
+. ./common/inject
+
+_cleanup()
+{
+	echo "*** unmount"
+	_scratch_unmount 2>/dev/null
+	rm -f $tmp.*
+	echo 0 > /sys/fs/xfs/debug/larp
+}
+
+_test_attr_replay()
+{
+	attr_name=$1
+	attr_value=$2
+	touch $testfile.1
+
+	echo "Inject error"
+	_scratch_inject_error "larp"
+
+	echo "Set attribute"
+	echo "$attr_value" | ${ATTR_PROG} -s "$attr_name" $testfile.1 | \
+			    _filter_scratch
+
+	echo "FS should be shut down, touch will fail"
+	touch $testfile.1
+
+	echo "Remount to replay log"
+	_scratch_inject_logprint >> $seqres.full
+
+	echo "FS should be online, touch should succeed"
+	touch $testfile.1
+
+	echo "Verify attr recovery"
+	_getfattr --absolute-names $testfile.1 | _filter_scratch
+}
+
+
+# real QA test starts here
+_supported_fs xfs
+
+_require_scratch
+_require_attrs
+_require_xfs_io_error_injection "larp"
+_require_xfs_sysfs debug/larp
+
+# turn on log attributes
+echo 1 > /sys/fs/xfs/debug/larp
+
+rm -f $seqres.full
+_scratch_unmount >/dev/null 2>&1
+
+#attributes of increaseing sizes
+attr16="0123456789ABCDEFG"
+attr64="$attr16$attr16$attr16$attr16"
+attr256="$attr64$attr64$attr64$attr64"
+attr1k="$attr256$attr256$attr256$attr256"
+attr4k="$attr1k$attr1k$attr1k$attr1k"
+attr8k="$attr4k$attr4k$attr4k$attr4k"
+attr32k="$attr8k$attr8k$attr8k$attr8k"
+attr64k="$attr32k$attr32k"
+
+echo "*** mkfs"
+_scratch_mkfs_xfs >/dev/null
+
+echo "*** mount FS"
+_scratch_mount
+
+testfile=$SCRATCH_MNT/testfile
+echo "*** make test file 1"
+
+_test_attr_replay "attr_name1" $attr16
+_test_attr_replay "attr_name2" $attr64
+_test_attr_replay "attr_name3" $attr256
+_test_attr_replay "attr_name4" $attr1k
+_test_attr_replay "attr_name5" $attr4k
+_test_attr_replay "attr_name6" $attr8k
+_test_attr_replay "attr_name7" $attr32k
+_test_attr_replay "attr_name8" $attr64k
+
+echo "*** done"
+status=0
+exit
