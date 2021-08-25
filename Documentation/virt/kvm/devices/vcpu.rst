@@ -166,3 +166,22 @@ including the layout of the stolen time structure.
 ===============================
 
 :Architectures: ARM64
+
+4.1 ATTRIBUTE: KVM_ARM_VCPU_SPE_IRQ
+-----------------------------------
+
+:Parameters: in kvm_device_attr.addr the address for the Profiling Buffer
+             management interrupt number as a pointer to an int
+
+Returns:
+
+	 =======  ======================================================
+	 -EBUSY   Interrupt number already set for this VCPU
+	 -EFAULT  Error accessing the buffer management interrupt number
+	 -EINVAL  Invalid interrupt number
+	 -ENXIO   SPE not supported or not properly configured
+	 =======  ======================================================
+
+Specifies the Profiling Buffer management interrupt number. The interrupt number
+must be a PPI and the interrupt number must be the same for each VCPU. SPE
+emulation requires an in-kernel vGIC implementation.

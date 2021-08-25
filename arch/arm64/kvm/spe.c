@@ -43,17 +43,103 @@ int kvm_spe_check_supported_cpus(struct kvm_vcpu *vcpu)
 	return 0;
 }
 
+static bool kvm_vcpu_supports_spe(struct kvm_vcpu *vcpu)
+{
+	if (!kvm_supports_spe())
+		return false;
+
+	if (!kvm_vcpu_has_spe(vcpu))
+		return false;
+
+	if (!irqchip_in_kernel(vcpu->kvm))
+		return false;
+
+	return true;
+}
+
+static bool kvm_spe_irq_is_valid(struct kvm *kvm, int irq)
+{
+	struct kvm_vcpu *vcpu;
+	int i;
+
+	if (!irq_is_ppi(irq))
+		return -EINVAL;
+
+	kvm_for_each_vcpu(i, vcpu, kvm) {
+		if (!vcpu->arch.spe.irq_num)
+			continue;
+
+		if (vcpu->arch.spe.irq_num != irq)
+			return false;
+	}
+
+	return true;
+}
+
 int kvm_spe_set_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr)
 {
+	if (!kvm_vcpu_supports_spe(vcpu))
+		return -ENXIO;
+
+	if (vcpu->arch.spe.initialized)
+		return -EBUSY;
+
+	switch (attr->attr) {
+	case KVM_ARM_VCPU_SPE_IRQ: {
+		int __user *uaddr = (int __user *)(long)attr->addr;
+		int irq;
+
+		if (vcpu->arch.spe.irq_num)
+			return -EBUSY;
+
+		if (get_user(irq, uaddr))
+			return -EFAULT;
+
+		if (!kvm_spe_irq_is_valid(vcpu->kvm, irq))
+			return -EINVAL;
+
+		kvm_debug("Set KVM_ARM_VCPU_SPE_IRQ: %d\n", irq);
+		vcpu->arch.spe.irq_num = irq;
+		return 0;
+	}
+	}
+
 	return -ENXIO;
 }
 
 int kvm_spe_get_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr)
 {
+	if (!kvm_vcpu_supports_spe(vcpu))
+		return -ENXIO;
+
+	switch (attr->attr) {
+	case KVM_ARM_VCPU_SPE_IRQ: {
+		int __user *uaddr = (int __user *)(long)attr->addr;
+		int irq;
+
+		if (!vcpu->arch.spe.irq_num)
+			return -ENXIO;
+
+		irq = vcpu->arch.spe.irq_num;
+		if (put_user(irq, uaddr))
+			return -EFAULT;
+
+		return 0;
+	}
+	}
+
 	return -ENXIO;
 }
 
 int kvm_spe_has_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr)
 {
+	if (!kvm_vcpu_supports_spe(vcpu))
+		return -ENXIO;
+
+	switch(attr->attr) {
+	case KVM_ARM_VCPU_SPE_IRQ:
+		return 0;
+	}
+
 	return -ENXIO;
 }
