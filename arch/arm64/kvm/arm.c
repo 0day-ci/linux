@@ -633,8 +633,11 @@ static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
 	if (!kvm_arm_vcpu_is_finalized(vcpu))
 		return -EPERM;
 
-	if (kvm_vcpu_has_spe(vcpu) && kvm_spe_check_supported_cpus(vcpu))
-		return -EPERM;
+	if (kvm_vcpu_has_spe(vcpu)) {
+		ret = kvm_spe_vcpu_first_run_init(vcpu);
+		if (ret)
+			return ret;
+	}
 
 	vcpu->arch.has_run_once = true;
 

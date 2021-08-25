@@ -185,3 +185,19 @@ Returns:
 Specifies the Profiling Buffer management interrupt number. The interrupt number
 must be a PPI and the interrupt number must be the same for each VCPU. SPE
 emulation requires an in-kernel vGIC implementation.
+
+4.2 ATTRIBUTE: KVM_ARM_VCPU_SPE_INIT
+-----------------------------------
+
+:Parameters: no additional parameter in kvm_device_attr.addr
+
+Returns:
+
+	 =======  ============================================
+	 -EBUSY   SPE already initialized for this VCPU
+	 -ENXIO   SPE not supported or not properly configured
+	 =======  ============================================
+
+Request initialization of the Statistical Profiling Extension for this VCPU.
+Must be done after initializaing the in-kernel irqchip and after setting the
+Profiling Buffer management interrupt number for the VCPU.

@@ -31,7 +31,7 @@ void kvm_spe_vm_init(struct kvm *kvm)
 	kvm_spe_init_supported_cpus();
 }
 
-int kvm_spe_check_supported_cpus(struct kvm_vcpu *vcpu)
+static int kvm_spe_check_supported_cpus(struct kvm_vcpu *vcpu)
 {
 	/* SPE is supported on all CPUs, we don't care about the VCPU mask */
 	if (cpumask_equal(supported_cpus, cpu_possible_mask))
@@ -39,6 +39,20 @@ int kvm_spe_check_supported_cpus(struct kvm_vcpu *vcpu)
 
 	if (!cpumask_subset(&vcpu->arch.supported_cpus, supported_cpus))
 		return -ENOEXEC;
+
+	return 0;
+}
+
+int kvm_spe_vcpu_first_run_init(struct kvm_vcpu *vcpu)
+{
+	int ret;
+
+	ret = kvm_spe_check_supported_cpus(vcpu);
+	if (ret)
+		return ret;
+
+	if (!vcpu->arch.spe.initialized)
+		return -EPERM;
 
 	return 0;
 }
@@ -102,6 +116,18 @@ int kvm_spe_set_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr)
 		vcpu->arch.spe.irq_num = irq;
 		return 0;
 	}
+	case KVM_ARM_VCPU_SPE_INIT:
+		if (!vcpu->arch.spe.irq_num)
+			return -ENXIO;
+
+		if (!vgic_initialized(vcpu->kvm))
+			return -ENXIO;
+
+		if (kvm_vgic_set_owner(vcpu, vcpu->arch.spe.irq_num, &vcpu->arch.spe))
+			return -ENXIO;
+
+		vcpu->arch.spe.initialized = true;
+		return 0;
 	}
 
 	return -ENXIO;
@@ -138,6 +164,7 @@ int kvm_spe_has_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr)
 
 	switch(attr->attr) {
 	case KVM_ARM_VCPU_SPE_IRQ:
+	case KVM_ARM_VCPU_SPE_INIT:
 		return 0;
 	}
 
