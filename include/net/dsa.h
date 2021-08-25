@@ -96,6 +96,8 @@ struct dsa_device_ops {
 	 * its RX filter.
 	 */
 	bool promisc_on_master;
+	/* Additional features to be applied to the slave. */
+	netdev_features_t features;
 };
 
 /* This structure defines the control interfaces that are overlayed by the
