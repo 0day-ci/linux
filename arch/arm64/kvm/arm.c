@@ -108,6 +108,25 @@ static int kvm_lock_user_memory_region_ioctl(struct kvm *kvm,
 	}
 }
 
+static bool kvm_arm_has_locked_memslots(struct kvm *kvm)
+{
+	struct kvm_memslots *slots = kvm_memslots(kvm);
+	struct kvm_memory_slot *memslot;
+	bool has_locked_memslots = false;
+	int idx;
+
+	idx = srcu_read_lock(&kvm->srcu);
+	kvm_for_each_memslot(memslot, slots) {
+		if (memslot->arch.flags & KVM_MEMSLOT_LOCK_MASK) {
+			has_locked_memslots = true;
+			break;
+		}
+	}
+	srcu_read_unlock(&kvm->srcu, idx);
+
+	return has_locked_memslots;
+}
+
 int kvm_vm_ioctl_enable_cap(struct kvm *kvm,
 			    struct kvm_enable_cap *cap)
 {
@@ -123,6 +142,9 @@ int kvm_vm_ioctl_enable_cap(struct kvm *kvm,
 	case KVM_CAP_ARM_MTE:
 		if (!system_supports_mte() || kvm->created_vcpus)
 			return -EINVAL;
+		if (kvm_arm_lock_memslot_supported() &&
+		    kvm_arm_has_locked_memslots(kvm))
+			return -EPERM;
 		r = 0;
 		kvm->arch.mte_enabled = true;
 		break;

@@ -6737,10 +6737,10 @@ mapped at stage 2. The permissions specified in args[1] apply to both
 mappings. The memory pinned with this capability counts towards the max
 locked memory limit for the current process.
 
-The capability must be enabled before any VCPUs have run. The virtual memory
-range described by the memslot must be mapped in the userspace process without
-any gaps. It is considered an error if write permissions are specified for a
-memslot which logs dirty pages.
+The capability must be enabled before any VCPUs have run. The entire virtual
+memory range described by the memslot must be mapped by the userspace process.
+It is considered an error if write permissions are specified for a memslot which
+logs dirty pages.
 
 7.29.2 KVM_ARM_LOCK_USER_MEMORY_REGION_FLAGS_UNLOCK
 ---------------------------------------------------

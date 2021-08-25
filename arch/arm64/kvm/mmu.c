@@ -72,6 +72,11 @@ static bool memslot_is_logging(struct kvm_memory_slot *memslot)
 	return memslot->dirty_bitmap && !(memslot->flags & KVM_MEM_READONLY);
 }
 
+static bool memslot_is_locked(struct kvm_memory_slot *memslot)
+{
+	return memslot->arch.flags & KVM_MEMSLOT_LOCK_MASK;
+}
+
 /**
  * kvm_flush_remote_tlbs() - flush all VM TLB entries for v7/8
  * @kvm:	pointer to kvm structure.
@@ -722,6 +727,10 @@ static bool fault_supports_stage2_huge_mapping(struct kvm_memory_slot *memslot,
 	if (map_size == PAGE_SIZE)
 		return true;
 
+	/* Allow only PAGE_SIZE mappings for locked memslots */
+	if (memslot_is_locked(memslot))
+		return false;
+
 	size = memslot->npages * PAGE_SIZE;
 
 	gpa_start = memslot->base_gfn << PAGE_SHIFT;
@@ -1244,6 +1253,159 @@ out_unlock:
 	return ret;
 }
 
+static int try_rlimit_memlock(unsigned long npages)
+{
+	unsigned long lock_limit;
+	bool has_lock_cap;
+	int ret = 0;
+
+	has_lock_cap = capable(CAP_IPC_LOCK);
+	if (has_lock_cap)
+		goto out;
+
+	lock_limit = rlimit(RLIMIT_MEMLOCK) >> PAGE_SHIFT;
+
+	mmap_read_lock(current->mm);
+	if (npages + current->mm->locked_vm > lock_limit)
+		ret = -ENOMEM;
+	mmap_read_unlock(current->mm);
+
+out:
+	return ret;
+}
+
+static void unpin_memslot_pages(struct kvm_memory_slot *memslot, bool writable)
+{
+	struct kvm_memory_slot_page *entry, *tmp;
+
+	list_for_each_entry_safe(entry, tmp, &memslot->arch.pages.list, list) {
+		if (writable)
+			set_page_dirty_lock(entry->page);
+		unpin_user_page(entry->page);
+		kfree(entry);
+	}
+}
+
+static int lock_memslot(struct kvm *kvm, struct kvm_memory_slot *memslot,
+			u64 flags)
+{
+	struct kvm_mmu_memory_cache cache = { 0, __GFP_ZERO, NULL, };
+	struct kvm_memory_slot_page *page_entry;
+	bool writable = flags & KVM_ARM_LOCK_MEM_WRITE;
+	enum kvm_pgtable_prot prot = KVM_PGTABLE_PROT_R;
+	struct kvm_pgtable *pgt = kvm->arch.mmu.pgt;
+	struct vm_area_struct *vma;
+	unsigned long npages = memslot->npages;
+	unsigned int pin_flags = FOLL_LONGTERM;
+	unsigned long i, hva, ipa, mmu_seq;
+	int ret;
+
+	ret = try_rlimit_memlock(npages);
+	if (ret)
+		return -ENOMEM;
+
+	INIT_LIST_HEAD(&memslot->arch.pages.list);
+
+	if (writable) {
+		prot |= KVM_PGTABLE_PROT_W;
+		pin_flags |= FOLL_WRITE;
+	}
+
+	hva = memslot->userspace_addr;
+	ipa = memslot->base_gfn << PAGE_SHIFT;
+
+	mmu_seq = kvm->mmu_notifier_seq;
+	smp_rmb();
+
+	for (i = 0; i < npages; i++) {
+		page_entry = kzalloc(sizeof(*page_entry), GFP_KERNEL);
+		if (!page_entry) {
+			unpin_memslot_pages(memslot, writable);
+			ret = -ENOMEM;
+			goto out_err;
+		}
+
+		mmap_read_lock(current->mm);
+		ret = pin_user_pages(hva, 1, pin_flags, &page_entry->page, &vma);
+		if (ret != 1) {
+			mmap_read_unlock(current->mm);
+			unpin_memslot_pages(memslot, writable);
+			ret = -ENOMEM;
+			goto out_err;
+		}
+		if (kvm_has_mte(kvm)) {
+			if (vma->vm_flags & VM_SHARED) {
+				ret = -EFAULT;
+			} else {
+				ret = sanitise_mte_tags(kvm,
+					page_to_pfn(page_entry->page),
+					PAGE_SIZE);
+			}
+			if (ret) {
+				mmap_read_unlock(current->mm);
+				goto out_err;
+			}
+		}
+		mmap_read_unlock(current->mm);
+
+		ret = kvm_mmu_topup_memory_cache(&cache, kvm_mmu_cache_min_pages(kvm));
+		if (ret) {
+			unpin_memslot_pages(memslot, writable);
+			goto out_err;
+		}
+
+		spin_lock(&kvm->mmu_lock);
+		if (mmu_notifier_retry(kvm, mmu_seq)) {
+			spin_unlock(&kvm->mmu_lock);
+			unpin_memslot_pages(memslot, writable);
+			ret = -EAGAIN;
+			goto out_err;
+		}
+
+		ret = kvm_pgtable_stage2_map(pgt, ipa, PAGE_SIZE,
+					     page_to_phys(page_entry->page),
+					     prot, &cache);
+		spin_unlock(&kvm->mmu_lock);
+
+		if (ret) {
+			kvm_pgtable_stage2_unmap(pgt, memslot->base_gfn << PAGE_SHIFT,
+						 i << PAGE_SHIFT);
+			unpin_memslot_pages(memslot, writable);
+			goto out_err;
+		}
+		list_add(&page_entry->list, &memslot->arch.pages.list);
+
+		hva += PAGE_SIZE;
+		ipa += PAGE_SIZE;
+	}
+
+
+	/*
+	 * Even though we've checked the limit at the start, we can still exceed
+	 * it if userspace locked other pages in the meantime or if the
+	 * CAP_IPC_LOCK capability has been revoked.
+	 */
+	ret = account_locked_vm(current->mm, npages, true);
+	if (ret) {
+		kvm_pgtable_stage2_unmap(pgt, memslot->base_gfn << PAGE_SHIFT,
+					 npages << PAGE_SHIFT);
+		unpin_memslot_pages(memslot, writable);
+		goto out_err;
+	}
+
+	memslot->arch.flags = KVM_MEMSLOT_LOCK_READ;
+	if (writable)
+		memslot->arch.flags |= KVM_MEMSLOT_LOCK_WRITE;
+
+	kvm_mmu_free_memory_cache(&cache);
+
+	return 0;
+
+out_err:
+	kvm_mmu_free_memory_cache(&cache);
+	return ret;
+}
+
 int kvm_mmu_lock_memslot(struct kvm *kvm, u64 slot, u64 flags)
 {
 	struct kvm_memory_slot *memslot;
@@ -1283,7 +1445,12 @@ int kvm_mmu_lock_memslot(struct kvm *kvm, u64 slot, u64 flags)
 		goto out_unlock_slots;
 	}
 
-	ret = -EINVAL;
+	if (memslot_is_locked(memslot)) {
+		ret = -EBUSY;
+		goto out_unlock_slots;
+	}
+
+	ret = lock_memslot(kvm, memslot, flags);
 
 out_unlock_slots:
 	mutex_unlock(&kvm->slots_lock);
@@ -1294,13 +1461,51 @@ out:
 	return ret;
 }
 
+static int unlock_memslot(struct kvm *kvm, struct kvm_memory_slot *memslot)
+{
+	bool writable = memslot->arch.flags & KVM_MEMSLOT_LOCK_WRITE;
+	unsigned long npages = memslot->npages;
+
+	unpin_memslot_pages(memslot, writable);
+	account_locked_vm(current->mm, npages, false);
+
+	memslot->arch.flags &= ~KVM_MEMSLOT_LOCK_MASK;
+
+	return 0;
+}
+
+static int unlock_all_memslots(struct kvm *kvm)
+{
+	struct kvm_memory_slot *memslot;
+	int err, ret;
+
+	mutex_lock(&kvm->slots_lock);
+
+	ret = 0;
+	kvm_for_each_memslot(memslot, kvm_memslots(kvm)) {
+		if (!memslot_is_locked(memslot))
+			continue;
+		err = unlock_memslot(kvm, memslot);
+		if (err) {
+			kvm_err("error unlocking memslot %u: %d\n",
+				memslot->id, err);
+			/* Continue to try unlocking the rest of the slots */
+			ret = err;
+		}
+	}
+
+	mutex_unlock(&kvm->slots_lock);
+
+	return ret;
+}
+
 int kvm_mmu_unlock_memslot(struct kvm *kvm, u64 slot, u64 flags)
 {
 	struct kvm_memory_slot *memslot;
 	int ret;
 
 	if (flags & KVM_ARM_UNLOCK_MEM_ALL)
-		return -EINVAL;
+		return unlock_all_memslots(kvm);
 
 	if (slot >= KVM_MEM_SLOTS_NUM)
 		return -EINVAL;
@@ -1313,7 +1518,7 @@ int kvm_mmu_unlock_memslot(struct kvm *kvm, u64 slot, u64 flags)
 		goto out_unlock_slots;
 	}
 
-	ret = -EINVAL;
+	ret = unlock_memslot(kvm, memslot);
 
 out_unlock_slots:
 	mutex_unlock(&kvm->slots_lock);

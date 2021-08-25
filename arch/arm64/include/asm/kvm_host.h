@@ -98,7 +98,18 @@ struct kvm_s2_mmu {
 	struct kvm_arch *arch;
 };
 
+#define KVM_MEMSLOT_LOCK_READ		(1 << 0)
+#define KVM_MEMSLOT_LOCK_WRITE		(1 << 1)
+#define KVM_MEMSLOT_LOCK_MASK		0x3
+
+struct kvm_memory_slot_page {
+	struct list_head list;
+	struct page *page;
+};
+
 struct kvm_arch_memory_slot {
+	struct kvm_memory_slot_page pages;
+	u32 flags;
 };
 
 struct kvm_arch {
