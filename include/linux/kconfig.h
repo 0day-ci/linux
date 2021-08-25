@@ -53,6 +53,9 @@
  * IS_MODULE(CONFIG_FOO) evaluates to 1 if CONFIG_FOO is set to 'm', 0
  * otherwise.  CONFIG_FOO=m results in "#define CONFIG_FOO_MODULE 1" in
  * autoconf.h.
+ * CONFIG_FOO_MODULE=y would also result in "#define CONFIG_FOO_MODULE 1",
+ * but Kconfig forbids symbol names that end with '_MODULE', so that would
+ * not happen.
  */
 #define IS_MODULE(option) __is_defined(option##_MODULE)
 

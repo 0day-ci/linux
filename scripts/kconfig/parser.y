@@ -475,6 +475,37 @@ assign_val:
 
 %%
 
+/*
+ * Symbols suffixed with '_MODULE' would cause a macro conflict in autoconf.h,
+ * and also confuse the interaction between syncconfig and fixdep.
+ * Error out if a symbol with the '_MODULE' suffix is found.
+ */
+static int sym_check_name(struct symbol *sym)
+{
+	static const char *suffix = "_MODULE";
+	static const size_t suffix_len = strlen("_MODULE");
+	char *name;
+	size_t len;
+
+	name = sym->name;
+
+	if (!name)
+		return 0;
+
+	len = strlen(name);
+
+	if (len < suffix_len)
+		return 0;
+
+	if (strcmp(name + len - suffix_len, suffix))
+		return 0;
+
+	fprintf(stderr, "error: %s: symbol name must not end with '%s'\n",
+		name, suffix);
+
+	return -1;
+}
+
 void conf_parse(const char *name)
 {
 	struct symbol *sym;
@@ -493,8 +524,15 @@ void conf_parse(const char *name)
 
 	if (yynerrs)
 		exit(1);
-	if (!modules_sym)
+
+	if (modules_sym) {
+		for_all_symbols(i, sym) {
+			if (sym_check_name(sym))
+				yynerrs++;
+		}
+	} else {
 		modules_sym = sym_find( "n" );
+	}
 
 	if (!menu_has_prompt(&rootmenu)) {
 		current_entry = &rootmenu;
