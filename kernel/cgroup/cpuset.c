@@ -78,6 +78,24 @@ struct fmeter {
 	spinlock_t lock;	/* guards read or write of above */
 };
 
+/*
+ * Invalid partition error code
+ */
+enum prs_errcode {
+	PERR_NONE = 0,
+	PERR_INVCPUS,
+	PERR_NOCPUS,
+	PERR_PARENT,
+	PERR_HOTPLUG,
+};
+
+static const char * const perr_strings[] = {
+	[PERR_INVCPUS] = "Invalid change to cpuset.cpus",
+	[PERR_PARENT]  = "Parent is no longer a partition root",
+	[PERR_NOCPUS]  = "Parent unable to distribute cpu downstream",
+	[PERR_HOTPLUG] = "No cpu available due to hotplug",
+};
+
 struct cpuset {
 	struct cgroup_subsys_state css;
 
@@ -163,6 +181,9 @@ struct cpuset {
 
 	/* Handle for cpuset.cpus.partition */
 	struct cgroup_file partition_file;
+
+	/* Invalid partition error code, not lock protected */
+	enum prs_errcode prs_err;
 };
 
 /*
@@ -272,8 +293,13 @@ static inline int is_partition_root(const struct cpuset *cs)
 static inline void notify_partition_change(struct cpuset *cs,
 					   int old_prs, int new_prs)
 {
-	if (old_prs != new_prs)
-		cgroup_file_notify(&cs->partition_file);
+	if (old_prs == new_prs)
+		return;
+	cgroup_file_notify(&cs->partition_file);
+
+	/* Reset prs_err if not invalid */
+	if (new_prs != PRS_ERROR)
+		WRITE_ONCE(cs->prs_err, PERR_NONE);
 }
 
 static struct cpuset top_cpuset = {
@@ -1243,6 +1269,8 @@ static int update_parent_subparts_cpumask(struct cpuset *cpuset, int cmd,
 					      cpu_active_mask))
 				part_error = true;
 			cpumask_copy(tmp->addmask, parent->effective_cpus);
+			if ((READ_ONCE(cpuset->prs_err) == PERR_NONE) && part_error)
+				WRITE_ONCE(cpuset->prs_err, PERR_INVCPUS);
 		}
 	} else {
 		/*
@@ -1264,6 +1292,8 @@ static int update_parent_subparts_cpumask(struct cpuset *cpuset, int cmd,
 		part_error = (is_partition_root(cpuset) &&
 			      !parent->nr_subparts_cpus) ||
 			     cpumask_equal(tmp->addmask, parent->effective_cpus);
+		if (is_partition_root(cpuset) && part_error)
+			WRITE_ONCE(cpuset->prs_err, PERR_NOCPUS);
 	}
 
 	if (cmd == partcmd_update) {
@@ -1427,6 +1457,7 @@ static void update_cpumasks_hier(struct cpuset *cs, struct tmpmasks *tmp)
 				 * When parent is invalid, it has to be too.
 				 */
 				new_prs = PRS_ERROR;
+				WRITE_ONCE(cp->prs_err, PERR_PARENT);
 				break;
 			}
 		}
@@ -2546,6 +2577,7 @@ static s64 cpuset_read_s64(struct cgroup_subsys_state *css, struct cftype *cft)
 static int sched_partition_show(struct seq_file *seq, void *v)
 {
 	struct cpuset *cs = css_cs(seq_css(seq));
+	const char *err;
 
 	switch (cs->partition_root_state) {
 	case PRS_ENABLED:
@@ -2555,7 +2587,11 @@ static int sched_partition_show(struct seq_file *seq, void *v)
 		seq_puts(seq, "member\n");
 		break;
 	case PRS_ERROR:
-		seq_puts(seq, "root invalid\n");
+		err = perr_strings[READ_ONCE(cs->prs_err)];
+		if (err)
+			seq_printf(seq, "root invalid (%s)\n", err);
+		else
+			seq_puts(seq, "root invalid\n");
 		break;
 	}
 	return 0;
@@ -3155,6 +3191,10 @@ retry:
 			spin_lock_irq(&callback_lock);
 			cs->partition_root_state = PRS_ERROR;
 			spin_unlock_irq(&callback_lock);
+			if (parent->partition_root_state == PRS_ERROR)
+				WRITE_ONCE(cs->prs_err, PERR_PARENT);
+			else
+				WRITE_ONCE(cs->prs_err, PERR_HOTPLUG);
 			notify_partition_change(cs, old_prs, PRS_ERROR);
 		}
 		cpuset_force_rebuild();
