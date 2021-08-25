@@ -930,6 +930,7 @@ int cifs_readdir(struct file *file, struct dir_context *ctx)
 	unsigned int max_len;
 	const char *full_path;
 	void *page = alloc_dentry_path();
+	int retry_count = 0;
 
 	xid = get_xid();
 
@@ -944,8 +945,15 @@ int cifs_readdir(struct file *file, struct dir_context *ctx)
 	 * '..'. Otherwise we won't be able to notify VFS in case of failure.
 	 */
 	if (file->private_data == NULL) {
+		again:
 		rc = initiate_cifs_search(xid, file, full_path);
-		cifs_dbg(FYI, "initiate cifs search rc %d\n", rc);
+		if (rc == -EDEADLK && retry_count++ < 5) {
+			/*
+			 * We don't have enough credits to start reading the
+			 * directory so just try again.
+			 */
+			goto again;
+		}
 		if (rc)
 			goto rddir2_exit;
 	}
