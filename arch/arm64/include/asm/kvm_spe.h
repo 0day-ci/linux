@@ -28,6 +28,9 @@ int kvm_spe_vcpu_first_run_init(struct kvm_vcpu *vcpu);
 void kvm_spe_write_sysreg(struct kvm_vcpu *vcpu, int reg, u64 val);
 u64 kvm_spe_read_sysreg(struct kvm_vcpu *vcpu, int reg);
 
+void kvm_spe_vcpu_load(struct kvm_vcpu *vcpu);
+void kvm_spe_vcpu_put(struct kvm_vcpu *vcpu);
+
 int kvm_spe_set_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr);
 int kvm_spe_get_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr);
 int kvm_spe_has_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr);
@@ -44,6 +47,9 @@ static inline int kvm_spe_vcpu_first_run_init(struct kvm_vcpu *vcpu) { return -E
 
 static inline void kvm_spe_write_sysreg(struct kvm_vcpu *vcpu, int reg, u64 val) {}
 static inline u64 kvm_spe_read_sysreg(struct kvm_vcpu *vcpu, int reg) { return 0; }
+
+static inline void kvm_spe_vcpu_load(struct kvm_vcpu *vcpu) {}
+static inline void kvm_spe_vcpu_put(struct kvm_vcpu *vcpu) {}
 
 static inline int kvm_spe_set_attr(struct kvm_vcpu *vcpu,
 				   struct kvm_device_attr *attr)

@@ -67,6 +67,35 @@ u64 kvm_spe_read_sysreg(struct kvm_vcpu *vcpu, int reg)
 	return __vcpu_sys_reg(vcpu, reg);
 }
 
+static unsigned int kvm_spe_get_pmsver(void)
+{
+	u64 dfr0 = read_sysreg(id_aa64dfr0_el1);
+
+	return cpuid_feature_extract_unsigned_field(dfr0, ID_AA64DFR0_PMSVER_SHIFT);
+}
+
+void kvm_spe_vcpu_load(struct kvm_vcpu *vcpu)
+{
+	if (!kvm_vcpu_has_spe(vcpu))
+		return;
+
+	if (kvm_spe_get_pmsver() < ID_AA64DFR0_PMSVER_8_7)
+		return;
+
+	write_sysreg_s(__vcpu_sys_reg(vcpu, PMSNEVFR_EL1), SYS_PMSNEVFR_EL1);
+}
+
+void kvm_spe_vcpu_put(struct kvm_vcpu *vcpu)
+{
+	if (!kvm_vcpu_has_spe(vcpu))
+		return;
+
+	if (kvm_spe_get_pmsver() < ID_AA64DFR0_PMSVER_8_7)
+		return;
+
+	__vcpu_sys_reg(vcpu, PMSNEVFR_EL1) = read_sysreg_s(SYS_PMSNEVFR_EL1);
+}
+
 static bool kvm_vcpu_supports_spe(struct kvm_vcpu *vcpu)
 {
 	if (!kvm_supports_spe())

@@ -466,6 +466,7 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
 	if (vcpu_has_ptrauth(vcpu))
 		vcpu_ptrauth_disable(vcpu);
 	kvm_arch_vcpu_load_debug_state_flags(vcpu);
+	kvm_spe_vcpu_load(vcpu);
 
 	if (!cpumask_empty(&vcpu->arch.supported_cpus) &&
 	    !cpumask_test_cpu(smp_processor_id(), &vcpu->arch.supported_cpus))
@@ -474,6 +475,7 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
 
 void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
 {
+	kvm_spe_vcpu_put(vcpu);
 	kvm_arch_vcpu_put_debug_state_flags(vcpu);
 	kvm_arch_vcpu_put_fp(vcpu);
 	if (has_vhe())

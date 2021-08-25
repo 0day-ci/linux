@@ -239,6 +239,7 @@ enum vcpu_sysreg {
 
        /* Statistical Profiling Extension Registers. */
 	PMSCR_EL1,      /* Statistical Profiling Control Register */
+	PMSNEVFR_EL1,   /* Sampling Inverted Event Filter Register */
 	PMSICR_EL1,     /* Sampling Interval Counter Register */
 	PMSIRR_EL1,     /* Sampling Interval Reload Register */
 	PMSFCR_EL1,     /* Sampling Filter Control Register */
