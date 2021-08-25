@@ -1442,9 +1442,6 @@ static int generic_copy_file_checks(struct file *file_in, loff_t pos_in,
 	if (IS_IMMUTABLE(inode_out))
 		return -EPERM;
 
-	if (IS_SWAPFILE(inode_in) || IS_SWAPFILE(inode_out))
-		return -ETXTBSY;
-
 	/* Ensure offsets don't wrap. */
 	if (pos_in + count < pos_in || pos_out + count < pos_out)
 		return -EOVERFLOW;
@@ -1645,9 +1642,6 @@ ssize_t generic_write_checks(struct kiocb *iocb, struct iov_iter *from)
 	struct inode *inode = file->f_mapping->host;
 	loff_t count;
 	int ret;
-
-	if (IS_SWAPFILE(inode))
-		return -ETXTBSY;
 
 	if (!iov_iter_count(from))
 		return 0;
