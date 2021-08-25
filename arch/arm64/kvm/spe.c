@@ -30,3 +30,15 @@ void kvm_spe_vm_init(struct kvm *kvm)
 	/* Set supported_cpus if it isn't already initialized. */
 	kvm_spe_init_supported_cpus();
 }
+
+int kvm_spe_check_supported_cpus(struct kvm_vcpu *vcpu)
+{
+	/* SPE is supported on all CPUs, we don't care about the VCPU mask */
+	if (cpumask_equal(supported_cpus, cpu_possible_mask))
+		return 0;
+
+	if (!cpumask_subset(&vcpu->arch.supported_cpus, supported_cpus))
+		return -ENOEXEC;
+
+	return 0;
+}
