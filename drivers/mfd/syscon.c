@@ -83,6 +83,22 @@ static struct syscon *of_syscon_register(struct device_node *np, bool check_clk)
 	if (ret)
 		reg_io_width = 4;
 
+	/*
+	 * We might be providing a regmap to e.g. an irqchip driver, and in
+	 * that case, normal spinlocks won't do: the IRQ core holds raw
+	 * spinlocks, so it needs to be raw spinlocks all the way down.
+	 * Detect those drivers here (currently "ls-extirq") and request raw
+	 * spinlocks in the regmap config for them.
+	 */
+	if (of_device_is_compatible(np, "fsl,lx2160a-isc") ||
+	    of_device_is_compatible(np, "fsl,ls2080a-isc") ||
+	    of_device_is_compatible(np, "fsl,ls2080a-isc") ||
+	    of_device_is_compatible(np, "fsl,ls1088a-isc") ||
+	    of_device_is_compatible(np, "fsl,ls1043a-scfg") ||
+	    of_device_is_compatible(np, "fsl,ls1046a-scfg") ||
+	    of_device_is_compatible(np, "fsl,ls1021a-scfg"))
+		syscon_config.use_raw_spinlock = true;
+
 	ret = of_hwspin_lock_get_id(np, 0);
 	if (ret > 0 || (IS_ENABLED(CONFIG_HWSPINLOCK) && ret == 0)) {
 		syscon_config.use_hwlock = true;
