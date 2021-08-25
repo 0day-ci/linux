@@ -81,11 +81,12 @@ static void __debug_restore_trace(u64 trfcr_el1)
 	write_sysreg_s(trfcr_el1, SYS_TRFCR_EL1);
 }
 
-void __debug_save_host_buffers_nvhe(struct kvm_vcpu *vcpu)
+void __debug_save_host_buffers_nvhe(struct kvm_vcpu *vcpu,
+				    struct kvm_cpu_context *host_ctxt)
 {
 	/* Disable and flush SPE data generation */
 	if (vcpu->arch.flags & KVM_ARM64_DEBUG_STATE_SAVE_SPE)
-		__debug_save_spe(&vcpu->arch.host_debug_state.pmscr_el1);
+		__debug_save_spe(__ctxt_sys_reg(host_ctxt, PMSCR_EL1));
 	/* Disable and flush Self-Hosted Trace generation */
 	if (vcpu->arch.flags & KVM_ARM64_DEBUG_STATE_SAVE_TRBE)
 		__debug_save_trace(&vcpu->arch.host_debug_state.trfcr_el1);
@@ -96,10 +97,11 @@ void __debug_switch_to_guest(struct kvm_vcpu *vcpu)
 	__debug_switch_to_guest_common(vcpu);
 }
 
-void __debug_restore_host_buffers_nvhe(struct kvm_vcpu *vcpu)
+void __debug_restore_host_buffers_nvhe(struct kvm_vcpu *vcpu,
+				       struct kvm_cpu_context *host_ctxt)
 {
 	if (vcpu->arch.flags & KVM_ARM64_DEBUG_STATE_SAVE_SPE)
-		__debug_restore_spe(vcpu->arch.host_debug_state.pmscr_el1);
+		__debug_restore_spe(ctxt_sys_reg(host_ctxt, PMSCR_EL1));
 	if (vcpu->arch.flags & KVM_ARM64_DEBUG_STATE_SAVE_TRBE)
 		__debug_restore_trace(vcpu->arch.host_debug_state.trfcr_el1);
 }
