@@ -50,7 +50,6 @@ struct arm_spe_pmu_buf {
 struct arm_spe_pmu {
 	struct pmu				pmu;
 	struct platform_device			*pdev;
-	cpumask_t				supported_cpus;
 	struct hlist_node			hotplug_node;
 
 	int					irq; /* PPI */
@@ -71,6 +70,8 @@ struct arm_spe_pmu {
 	u16					align;
 	struct perf_output_handle __percpu	*handle;
 };
+
+static cpumask_t supported_cpus;
 
 #define to_spe_pmu(p) (container_of(p, struct arm_spe_pmu, pmu))
 
@@ -234,9 +235,7 @@ static const struct attribute_group arm_spe_pmu_format_group = {
 static ssize_t cpumask_show(struct device *dev,
 			    struct device_attribute *attr, char *buf)
 {
-	struct arm_spe_pmu *spe_pmu = dev_get_drvdata(dev);
-
-	return cpumap_print_to_pagebuf(true, buf, &spe_pmu->supported_cpus);
+	return cpumap_print_to_pagebuf(true, buf, &supported_cpus);
 }
 static DEVICE_ATTR_RO(cpumask);
 
@@ -677,7 +676,7 @@ static int arm_spe_pmu_event_init(struct perf_event *event)
 		return -ENOENT;
 
 	if (event->cpu >= 0 &&
-	    !cpumask_test_cpu(event->cpu, &spe_pmu->supported_cpus))
+	    !cpumask_test_cpu(event->cpu, &supported_cpus))
 		return -ENOENT;
 
 	if (arm_spe_event_to_pmsevfr(event) & arm_spe_pmsevfr_res0(spe_pmu->pmsver))
@@ -797,11 +796,10 @@ static void arm_spe_pmu_stop(struct perf_event *event, int flags)
 static int arm_spe_pmu_add(struct perf_event *event, int flags)
 {
 	int ret = 0;
-	struct arm_spe_pmu *spe_pmu = to_spe_pmu(event->pmu);
 	struct hw_perf_event *hwc = &event->hw;
 	int cpu = event->cpu == -1 ? smp_processor_id() : event->cpu;
 
-	if (!cpumask_test_cpu(cpu, &spe_pmu->supported_cpus))
+	if (!cpumask_test_cpu(cpu, &supported_cpus))
 		return -ENOENT;
 
 	hwc->state = PERF_HES_UPTODATE | PERF_HES_STOPPED;
@@ -882,6 +880,13 @@ static void arm_spe_pmu_free_aux(void *aux)
 	vunmap(buf->base);
 	kfree(buf);
 }
+
+#if IS_BUILTIN(CONFIG_ARM_SPE_PMU)
+const cpumask_t *arm_spe_pmu_supported_cpus(void)
+{
+	return &supported_cpus;
+}
+#endif
 
 /* Initialisation and teardown functions */
 static int arm_spe_pmu_perf_init(struct arm_spe_pmu *spe_pmu)
@@ -1039,7 +1044,7 @@ static void __arm_spe_pmu_dev_probe(void *info)
 
 	dev_info(dev,
 		 "probed for CPUs %*pbl [max_record_sz %u, align %u, features 0x%llx]\n",
-		 cpumask_pr_args(&spe_pmu->supported_cpus),
+		 cpumask_pr_args(&supported_cpus),
 		 spe_pmu->max_record_sz, spe_pmu->align, spe_pmu->features);
 
 	spe_pmu->features |= SPE_PMU_FEAT_DEV_PROBED;
@@ -1083,7 +1088,7 @@ static int arm_spe_pmu_cpu_startup(unsigned int cpu, struct hlist_node *node)
 	struct arm_spe_pmu *spe_pmu;
 
 	spe_pmu = hlist_entry_safe(node, struct arm_spe_pmu, hotplug_node);
-	if (!cpumask_test_cpu(cpu, &spe_pmu->supported_cpus))
+	if (!cpumask_test_cpu(cpu, &supported_cpus))
 		return 0;
 
 	__arm_spe_pmu_setup_one(spe_pmu);
@@ -1095,7 +1100,7 @@ static int arm_spe_pmu_cpu_teardown(unsigned int cpu, struct hlist_node *node)
 	struct arm_spe_pmu *spe_pmu;
 
 	spe_pmu = hlist_entry_safe(node, struct arm_spe_pmu, hotplug_node);
-	if (!cpumask_test_cpu(cpu, &spe_pmu->supported_cpus))
+	if (!cpumask_test_cpu(cpu, &supported_cpus))
 		return 0;
 
 	__arm_spe_pmu_stop_one(spe_pmu);
@@ -1105,7 +1110,7 @@ static int arm_spe_pmu_cpu_teardown(unsigned int cpu, struct hlist_node *node)
 static int arm_spe_pmu_dev_init(struct arm_spe_pmu *spe_pmu)
 {
 	int ret;
-	cpumask_t *mask = &spe_pmu->supported_cpus;
+	cpumask_t *mask = &supported_cpus;
 
 	/* Make sure we probe the hardware on a relevant CPU */
 	ret = smp_call_function_any(mask,  __arm_spe_pmu_dev_probe, spe_pmu, 1);
@@ -1151,7 +1156,7 @@ static int arm_spe_pmu_irq_probe(struct arm_spe_pmu *spe_pmu)
 		return -EINVAL;
 	}
 
-	if (irq_get_percpu_devid_partition(irq, &spe_pmu->supported_cpus)) {
+	if (irq_get_percpu_devid_partition(irq, &supported_cpus)) {
 		dev_err(&pdev->dev, "failed to get PPI partition (%d)\n", irq);
 		return -EINVAL;
 	}
@@ -1216,6 +1221,7 @@ out_teardown_dev:
 	arm_spe_pmu_dev_teardown(spe_pmu);
 out_free_handle:
 	free_percpu(spe_pmu->handle);
+	cpumask_clear(&supported_cpus);
 	return ret;
 }
 

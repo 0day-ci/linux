@@ -8,6 +8,7 @@
 #ifndef __ARM_PMU_H__
 #define __ARM_PMU_H__
 
+#include <linux/cpumask.h>
 #include <linux/interrupt.h>
 #include <linux/perf_event.h>
 #include <linux/platform_device.h>
@@ -176,5 +177,11 @@ void armpmu_free_irq(int irq, int cpu);
 #endif /* CONFIG_ARM_PMU */
 
 #define ARMV8_SPE_PDEV_NAME "arm,spe-v1"
+
+#if IS_BUILTIN(CONFIG_ARM_SPE_PMU)
+extern const cpumask_t *arm_spe_pmu_supported_cpus(void);
+#else
+static inline const cpumask_t *arm_spe_pmu_supported_cpus(void) { return NULL; };
+#endif
 
 #endif /* __ARM_PMU_H__ */
