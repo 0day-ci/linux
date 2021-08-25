@@ -301,6 +301,9 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
 	case KVM_CAP_ARM_LOCK_USER_MEMORY_REGION:
 		r = 1;
 		break;
+	case KVM_CAP_ARM_VCPU_SUPPORTED_CPUS:
+		r = 1;
+		break;
 	default:
 		r = 0;
 	}
@@ -456,6 +459,10 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
 	if (vcpu_has_ptrauth(vcpu))
 		vcpu_ptrauth_disable(vcpu);
 	kvm_arch_vcpu_load_debug_state_flags(vcpu);
+
+	if (!cpumask_empty(&vcpu->arch.supported_cpus) &&
+	    !cpumask_test_cpu(smp_processor_id(), &vcpu->arch.supported_cpus))
+		vcpu->arch.cpu_not_supported = true;
 }
 
 void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
@@ -843,6 +850,13 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu)
 		 * non-preemptible context.
 		 */
 		preempt_disable();
+
+		if (unlikely(vcpu->arch.cpu_not_supported)) {
+			vcpu->arch.cpu_not_supported = false;
+			ret = -ENOEXEC;
+			preempt_enable();
+			continue;
+		}
 
 		kvm_pmu_flush_hwstate(vcpu);
 
@@ -1360,6 +1374,23 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
 			return -EFAULT;
 
 		return kvm_arm_vcpu_set_events(vcpu, &events);
+	}
+	case KVM_ARM_VCPU_SUPPORTED_CPUS: {
+		char *cpulist;
+
+		r = -ENOEXEC;
+		if (unlikely(vcpu->arch.has_run_once))
+			break;
+
+		cpulist = strndup_user((const char __user *)argp, PAGE_SIZE);
+		if (IS_ERR(cpulist)) {
+			r = PTR_ERR(cpulist);
+			break;
+		}
+
+		r = cpulist_parse(cpulist, &vcpu->arch.supported_cpus);
+		kfree(cpulist);
+		break;
 	}
 	case KVM_ARM_VCPU_FINALIZE: {
 		int what;

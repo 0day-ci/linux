@@ -1113,6 +1113,7 @@ struct kvm_ppc_resize_hpt {
 #define KVM_CAP_EXIT_ON_EMULATION_FAILURE 204
 #define KVM_CAP_ARM_MTE 205
 #define KVM_CAP_ARM_LOCK_USER_MEMORY_REGION 206
+#define KVM_CAP_ARM_VCPU_SUPPORTED_CPUS 207
 
 #ifdef KVM_CAP_IRQ_ROUTING
 
@@ -1593,6 +1594,9 @@ struct kvm_enc_region {
 /* Available with  KVM_CAP_S390_VCPU_RESETS */
 #define KVM_S390_NORMAL_RESET	_IO(KVMIO,   0xc3)
 #define KVM_S390_CLEAR_RESET	_IO(KVMIO,   0xc4)
+
+/* Available with KVM_CAP_ARM_VCPU_SUPPORTED_CPUS */
+#define KVM_ARM_VCPU_SUPPORTED_CPUS    _IOW(KVMIO, 0xc5, const char *)
 
 struct kvm_s390_pv_sec_parm {
 	__u64 origin;

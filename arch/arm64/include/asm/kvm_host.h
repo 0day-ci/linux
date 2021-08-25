@@ -396,6 +396,9 @@ struct kvm_vcpu_arch {
 	 * see kvm_vcpu_load_sysregs_vhe and kvm_vcpu_put_sysregs_vhe. */
 	bool sysregs_loaded_on_cpu;
 
+	cpumask_t supported_cpus;
+	bool cpu_not_supported;
+
 	/* Guest PV state */
 	struct {
 		u64 last_steal;

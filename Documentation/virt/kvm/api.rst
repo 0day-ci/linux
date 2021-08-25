@@ -396,8 +396,10 @@ Errors:
 
   =======    ==============================================================
   EINTR      an unmasked signal is pending
-  ENOEXEC    the vcpu hasn't been initialized or the guest tried to execute
-             instructions from device memory (arm64)
+  ENOEXEC    the vcpu hasn't been initialized, the guest tried to execute
+             instructions from device memory (arm64) or the vcpu has been
+             scheduled on a cpu not in the list specified by
+             KVM_ARM_VCPU_SUPPORTED_CPUS (arm64).
   ENOSYS     data abort outside memslots with no syndrome info and
              KVM_CAP_ARM_NISV_TO_USER not enabled (arm64)
   EPERM      SVE feature set but not finalized (arm64)
@@ -5312,6 +5314,22 @@ the trailing ``'\0'``, is indicated by ``name_size`` in the header.
 
 The Stats Data block contains an array of 64-bit values in the same order
 as the descriptors in Descriptors block.
+
+4.134 KVM_ARM_VCPU_SUPPORTED_CPUS
+---------------------------------
+
+:Capability: KVM_CAP_ARM_SUPPORTED_CPUS
+:Architectures: arm64
+:Type: vcpu ioctl
+:Parameters: const char * representing a range of supported CPUs
+:Returns: 0 on success, < 0 on error
+
+Specifies a list of physical CPUs on which the VCPU can run. KVM will not make
+any attempts to prevent the VCPU from being scheduled on a CPU which is not
+present in the list; when that happens, KVM_RUN will return -ENOEXEC.
+
+The format for the range of supported CPUs is specified in the comment for
+the function lib/bitmap.c::bitmap_parselist().
 
 5. The kvm_run structure
 ========================
