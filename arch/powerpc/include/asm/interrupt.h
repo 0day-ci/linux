@@ -148,9 +148,21 @@ static inline void interrupt_enter_prepare(struct pt_regs *regs, struct interrup
 #endif
 
 #ifdef CONFIG_PPC64
-	if (irq_soft_mask_set_return(IRQS_ALL_DISABLED) == IRQS_ENABLED)
+	bool trace_enable = false;
+
+	if (IS_ENABLED(CONFIG_TRACE_IRQFLAGS)) {
+		if (irq_soft_mask_set_return(IRQS_DISABLED) == IRQS_ENABLED)
+			trace_enable = true;
+	} else {
+		irq_soft_mask_set(IRQS_DISABLED);
+	}
+	/* If the interrupt was taken with HARD_DIS set, don't enable MSR[EE] */
+	if (local_paca->irq_happened & PACA_IRQ_HARD_DIS)
+		__hard_RI_enable();
+	else
+		__hard_irq_enable();
+	if (trace_enable)
 		trace_hardirqs_off();
-	local_paca->irq_happened |= PACA_IRQ_HARD_DIS;
 
 	if (user_mode(regs)) {
 		CT_WARN_ON(ct_state() != CONTEXT_USER);
@@ -200,13 +212,20 @@ static inline void interrupt_exit_prepare(struct pt_regs *regs, struct interrupt
 
 static inline void interrupt_async_enter_prepare(struct pt_regs *regs, struct interrupt_state *state)
 {
+#ifdef CONFIG_PPC64
+	/* Ensure interrupt_enter_prepare does not enable MSR[EE] */
+	local_paca->irq_happened |= PACA_IRQ_HARD_DIS;
+#endif
+	interrupt_enter_prepare(regs, state);
 #ifdef CONFIG_PPC_BOOK3S_64
+	/*
+	 * MSR[RI] is only enabled after interrupt_enter_prepare, so this
+	 * thread flags access has to come afterward.
+	 */
 	if (cpu_has_feature(CPU_FTR_CTRL) &&
 	    !test_thread_local_flags(_TLF_RUNLATCH))
 		__ppc64_runlatch_on();
 #endif
-
-	interrupt_enter_prepare(regs, state);
 	irq_enter();
 }
 
@@ -272,6 +291,8 @@ static inline void interrupt_nmi_enter_prepare(struct pt_regs *regs, struct inte
 	}
 	if (IS_ENABLED(CONFIG_PPC_IRQ_SOFT_MASK_DEBUG))
 		BUG_ON(!arch_irq_disabled_regs(regs) && !(regs->msr & MSR_EE));
+
+	__hard_RI_enable();
 
 	/* Don't do any per-CPU operations until interrupt state is fixed */
 
@@ -369,6 +390,8 @@ static __always_inline long ____##func(struct pt_regs *regs);		\
 interrupt_handler long func(struct pt_regs *regs)			\
 {									\
 	long ret;							\
+									\
+	__hard_RI_enable();						\
 									\
 	ret = ____##func (regs);					\
 									\
