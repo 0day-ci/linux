@@ -157,6 +157,8 @@ struct kvm_arch {
 
 	/* Memory Tagging Extension enabled for the guest */
 	bool mte_enabled;
+
+	struct kvm_spe spe;
 };
 
 struct kvm_vcpu_fault_info {

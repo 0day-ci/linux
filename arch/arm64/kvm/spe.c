@@ -3,6 +3,7 @@
  * Copyright (C) 2021 - ARM Ltd
  */
 
+#include <linux/capability.h>
 #include <linux/cpumask.h>
 #include <linux/kvm_host.h>
 #include <linux/perf/arm_pmu.h>
@@ -29,6 +30,16 @@ void kvm_spe_vm_init(struct kvm *kvm)
 {
 	/* Set supported_cpus if it isn't already initialized. */
 	kvm_spe_init_supported_cpus();
+
+	/*
+	 * Allow the guest to use the physical timer for timestamps only if the
+	 * VMM is perfmon_capable(), similar to what the SPE driver allows.
+	 *
+	 * CAP_PERFMON can be changed during the lifetime of the VM, so record
+	 * its value when the VM is created to avoid situations where only some
+	 * VCPUs allow physical timer timestamps, while others don't.
+	 */
+	kvm->arch.spe.perfmon_capable = perfmon_capable();
 }
 
 static int kvm_spe_check_supported_cpus(struct kvm_vcpu *vcpu)
@@ -53,6 +64,9 @@ int kvm_spe_vcpu_first_run_init(struct kvm_vcpu *vcpu)
 
 	if (!vcpu->arch.spe.initialized)
 		return -EPERM;
+
+	if (vcpu->kvm->arch.spe.perfmon_capable)
+		__vcpu_sys_reg(vcpu, PMSCR_EL2) = BIT(SYS_PMSCR_EL1_PCT_SHIFT);
 
 	return 0;
 }

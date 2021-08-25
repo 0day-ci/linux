@@ -21,6 +21,10 @@ struct kvm_vcpu_spe {
 	int irq_num;		/* Buffer management interrut number */
 };
 
+struct kvm_spe {
+	bool perfmon_capable;	/* Is the VM perfmon_capable()? */
+};
+
 void kvm_spe_init_supported_cpus(void);
 void kvm_spe_vm_init(struct kvm *kvm);
 int kvm_spe_vcpu_first_run_init(struct kvm_vcpu *vcpu);
@@ -39,6 +43,9 @@ int kvm_spe_has_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr);
 #define kvm_supports_spe()	(false)
 
 struct kvm_vcpu_spe {
+};
+
+struct kvm_spe {
 };
 
 static inline void kvm_spe_init_supported_cpus(void) {}

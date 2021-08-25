@@ -21,7 +21,7 @@ void __spe_save_host_state_vhe(struct kvm_vcpu *vcpu,
 
 	/* Disable profiling while the SPE context is being switched. */
 	pmscr_el2 = read_sysreg_el2(SYS_PMSCR);
-	write_sysreg_el2(0, SYS_PMSCR);
+	write_sysreg_el2(__vcpu_sys_reg(vcpu, PMSCR_EL2), SYS_PMSCR);
 	isb();
 
 	pmblimitr = read_sysreg_s(SYS_PMBLIMITR_EL1);
