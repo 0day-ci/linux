@@ -1070,8 +1070,10 @@ static u64 read_id_reg(const struct kvm_vcpu *vcpu,
 		val = cpuid_feature_cap_perfmon_field(val,
 						      ID_AA64DFR0_PMUVER_SHIFT,
 						      kvm_vcpu_has_pmu(vcpu) ? ID_AA64DFR0_PMUVER_8_4 : 0);
-		/* Hide SPE from guests */
-		val &= ~FEATURE(ID_AA64DFR0_PMSVER);
+		/* Limit guests to SPE for ARMv8.3 */
+		val = cpuid_feature_cap_perfmon_field(val,
+						      ID_AA64DFR0_PMSVER_SHIFT,
+						      kvm_vcpu_has_spe(vcpu) ? ID_AA64DFR0_PMSVER_8_3 : 0);
 		break;
 	case SYS_ID_DFR0_EL1:
 		/* Limit guests to PMUv3 for ARMv8.4 */
