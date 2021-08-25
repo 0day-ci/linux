@@ -219,7 +219,7 @@ static int __mmc_init_request(struct mmc_queue *mq, struct request *req,
 	return 0;
 }
 
-static void mmc_exit_request(struct request_queue *q, struct request *req)
+static void mmc_exit_request(struct request *req)
 {
 	struct mmc_queue_req *mq_rq = req_to_mmc_queue_req(req);
 
@@ -236,9 +236,7 @@ static int mmc_mq_init_request(struct blk_mq_tag_set *set, struct request *req,
 static void mmc_mq_exit_request(struct blk_mq_tag_set *set, struct request *req,
 				unsigned int hctx_idx)
 {
-	struct mmc_queue *mq = set->driver_data;
-
-	mmc_exit_request(mq->queue, req);
+	mmc_exit_request(req);
 }
 
 static blk_status_t mmc_mq_queue_rq(struct blk_mq_hw_ctx *hctx,
