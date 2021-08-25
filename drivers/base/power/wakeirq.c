@@ -216,6 +216,24 @@ err_free:
 EXPORT_SYMBOL_GPL(dev_pm_set_dedicated_wake_irq);
 
 /**
+ * dev_pm_wake_irq_set_late_enabled_status - set status WAKE_IRQ_DEDICATED_LATE_ENABLED
+ * @dev: Device
+ *
+ * Set the status of WAKE_IRQ_DEDICATED_LATE_ENABLED to tell rpm_suspend()
+ * to enable dedicated wake-up interrupt after invoking the runtime_suspend(),
+ *
+ * Should be called after setting dedicated wake-up interrupt.
+ */
+void dev_pm_wake_irq_set_late_enabled_status(struct device *dev)
+{
+	struct wake_irq *wirq = dev->power.wakeirq;
+
+	if (wirq && (wirq->status & WAKE_IRQ_DEDICATED_ALLOCATED))
+		wirq->status |= WAKE_IRQ_DEDICATED_LATE_ENABLED;
+}
+EXPORT_SYMBOL_GPL(dev_pm_wake_irq_set_late_enabled_status);
+
+/**
  * dev_pm_enable_wake_irq - Enable device wake-up interrupt
  * @dev: Device
  *
@@ -285,25 +303,50 @@ void dev_pm_enable_wake_irq_check(struct device *dev,
 	return;
 
 enable:
-	enable_irq(wirq->irq);
+	if (!can_change_status || !(wirq->status & WAKE_IRQ_DEDICATED_LATE_ENABLED))
+		enable_irq(wirq->irq);
 }
 
 /**
  * dev_pm_disable_wake_irq_check - Checks and disables wake-up interrupt
  * @dev: Device
+ * @skip_late_enabled_status: skip checking WAKE_IRQ_DEDICATED_LATE_ENABLED
  *
  * Disables wake-up interrupt conditionally based on status.
  * Should be only called from rpm_suspend() and rpm_resume() path.
  */
-void dev_pm_disable_wake_irq_check(struct device *dev)
+void dev_pm_disable_wake_irq_check(struct device *dev, bool skip_late_enabled_status)
 {
 	struct wake_irq *wirq = dev->power.wakeirq;
 
 	if (!wirq || !(wirq->status & WAKE_IRQ_DEDICATED_MASK))
 		return;
 
-	if (wirq->status & WAKE_IRQ_DEDICATED_MANAGED)
+	if (wirq->status & WAKE_IRQ_DEDICATED_MANAGED &&
+	    (skip_late_enabled_status ||
+	     !(wirq->status & WAKE_IRQ_DEDICATED_LATE_ENABLED)))
 		disable_irq_nosync(wirq->irq);
+}
+
+/**
+ * dev_pm_enable_wake_irq_complete - enable wake irq based on status
+ * @dev: Device
+ *
+ * Enable wake-up interrupt conditionally based on status, mainly for
+ * enabling wake-up interrupt after runtime_suspend() is called.
+ *
+ * Should be only called from rpm_suspend() path.
+ */
+void dev_pm_enable_wake_irq_complete(struct device *dev)
+{
+	struct wake_irq *wirq = dev->power.wakeirq;
+
+	if (!wirq || !(wirq->status & WAKE_IRQ_DEDICATED_MASK))
+		return;
+
+	if (wirq->status & WAKE_IRQ_DEDICATED_MANAGED &&
+	    wirq->status & WAKE_IRQ_DEDICATED_LATE_ENABLED)
+		enable_irq(wirq->irq);
 }
 
 /**

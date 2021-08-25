@@ -22,6 +22,7 @@ extern int dev_pm_set_dedicated_wake_irq(struct device *dev,
 extern void dev_pm_clear_wake_irq(struct device *dev);
 extern void dev_pm_enable_wake_irq(struct device *dev);
 extern void dev_pm_disable_wake_irq(struct device *dev);
+extern void dev_pm_wake_irq_set_late_enabled_status(struct device *dev);
 
 #else	/* !CONFIG_PM */
 
@@ -44,6 +45,10 @@ static inline void dev_pm_enable_wake_irq(struct device *dev)
 }
 
 static inline void dev_pm_disable_wake_irq(struct device *dev)
+{
+}
+
+static inline void dev_pm_wake_irq_set_late_enabled_status(struct device *dev)
 {
 }
 
