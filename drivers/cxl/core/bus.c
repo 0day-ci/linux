@@ -504,10 +504,8 @@ int devm_cxl_add_decoder(struct device *host, struct cxl_decoder *cxld,
 	if (IS_ERR(cxld))
 		return PTR_ERR(cxld);
 
-	if (cxld->interleave_ways < 1) {
-		rc = -EINVAL;
-		goto err;
-	}
+	if (cxld->interleave_ways < 1)
+		return -EINVAL;
 
 	device_lock(&port->dev);
 	if (list_empty(&port->dports))
@@ -525,7 +523,7 @@ int devm_cxl_add_decoder(struct device *host, struct cxl_decoder *cxld,
 	}
 	device_unlock(&port->dev);
 	if (rc)
-		goto err;
+		return rc;
 
 	dev = &cxld->dev;
 	rc = dev_set_name(dev, "decoder%d.%d", port->id, cxld->id);
