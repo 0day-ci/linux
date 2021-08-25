@@ -818,8 +818,7 @@ static void xen_evtchn_close(evtchn_port_t port)
 	struct evtchn_close close;
 
 	close.port = port;
-	if (HYPERVISOR_event_channel_op(EVTCHNOP_close, &close) != 0)
-		BUG();
+	BUG_ON(HYPERVISOR_event_channel_op(EVTCHNOP_close, &close) != 0);
 }
 
 /* Not called for lateeoi events. */
@@ -1270,9 +1269,8 @@ static int bind_ipi_to_irq(unsigned int ipi, unsigned int cpu)
 					      handle_percpu_irq, "ipi");
 
 		bind_ipi.vcpu = xen_vcpu_nr(cpu);
-		if (HYPERVISOR_event_channel_op(EVTCHNOP_bind_ipi,
-						&bind_ipi) != 0)
-			BUG();
+		BUG_ON(HYPERVISOR_event_channel_op(EVTCHNOP_bind_ipi,
+						&bind_ipi) != 0);
 		evtchn = bind_ipi.port;
 
 		ret = xen_irq_info_ipi_setup(cpu, irq, evtchn, ipi);
@@ -1983,9 +1981,8 @@ static void restore_cpu_virqs(unsigned int cpu)
 		/* Get a new binding from Xen. */
 		bind_virq.virq = virq;
 		bind_virq.vcpu = xen_vcpu_nr(cpu);
-		if (HYPERVISOR_event_channel_op(EVTCHNOP_bind_virq,
-						&bind_virq) != 0)
-			BUG();
+		BUG_ON(HYPERVISOR_event_channel_op(EVTCHNOP_bind_virq,
+						&bind_virq) != 0);
 		evtchn = bind_virq.port;
 
 		/* Record the new mapping. */
@@ -2009,9 +2006,8 @@ static void restore_cpu_ipis(unsigned int cpu)
 
 		/* Get a new binding from Xen. */
 		bind_ipi.vcpu = xen_vcpu_nr(cpu);
-		if (HYPERVISOR_event_channel_op(EVTCHNOP_bind_ipi,
-						&bind_ipi) != 0)
-			BUG();
+		BUG_ON(HYPERVISOR_event_channel_op(EVTCHNOP_bind_ipi,
+						&bind_ipi) != 0);
 		evtchn = bind_ipi.port;
 
 		/* Record the new mapping. */
@@ -2063,8 +2059,7 @@ void xen_poll_irq_timeout(int irq, u64 timeout)
 		poll.timeout = timeout;
 		set_xen_guest_handle(poll.ports, &evtchn);
 
-		if (HYPERVISOR_sched_op(SCHEDOP_poll, &poll) != 0)
-			BUG();
+		BUG_ON(HYPERVISOR_sched_op(SCHEDOP_poll, &poll) != 0);
 	}
 }
 EXPORT_SYMBOL(xen_poll_irq_timeout);
