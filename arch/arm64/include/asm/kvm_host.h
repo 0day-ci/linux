@@ -247,6 +247,7 @@ enum vcpu_sysreg {
 	PMSFCR_EL1,     /* Sampling Filter Control Register */
 	PMSEVFR_EL1,    /* Sampling Event Filter Register */
 	PMSLATFR_EL1,   /* Sampling Latency Filter Register */
+	PMSIDR_EL1,	/* Sampling Profiling ID Register */
 	PMBLIMITR_EL1,  /* Profiling Buffer Limit Address Register */
 	PMBPTR_EL1,     /* Profiling Buffer Write Pointer Register */
 	PMBSR_EL1,      /* Profiling Buffer Status/syndrome Register */

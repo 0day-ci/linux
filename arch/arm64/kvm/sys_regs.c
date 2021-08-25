@@ -603,6 +603,18 @@ static unsigned int spe_visibility(const struct kvm_vcpu *vcpu,
 	return REG_HIDDEN;
 }
 
+static void reset_pmsidr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
+{
+	/*
+	 * When SPE is stopped by userspace, the guest reads the in-memory value
+	 * of the register. When SPE is resumed, accesses to the control
+	 * registers are not trapped and the guest reads the hardware
+	 * value. Reset PMSIDR_EL1 to the hardware value to avoid mistmatches
+	 * between the two.
+	 */
+	vcpu_write_sys_reg(vcpu, read_sysreg_s(SYS_PMSIDR_EL1), PMSIDR_EL1);
+}
+
 static bool access_spe_reg(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
 			   const struct sys_reg_desc *r)
 {	int reg = r->reg;
@@ -613,10 +625,14 @@ static bool access_spe_reg(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
 				  *vcpu_pc(vcpu), *vcpu_cpsr(vcpu));
 	}
 
-	if (p->is_write)
+	if (p->is_write) {
+		if (reg == PMSIDR_EL1)
+			return write_to_read_only(vcpu, p, r);
+
 		kvm_spe_write_sysreg(vcpu, reg, val);
-	else
+	} else {
 		p->regval = kvm_spe_read_sysreg(vcpu, reg);
+	}
 
 	return true;
 }
@@ -1568,7 +1584,7 @@ static const struct sys_reg_desc sys_reg_descs[] = {
 	{ SPE_SYS_REG(SYS_PMSFCR_EL1), .reg = PMSFCR_EL1 },
 	{ SPE_SYS_REG(SYS_PMSEVFR_EL1), .reg = PMSEVFR_EL1 },
 	{ SPE_SYS_REG(SYS_PMSLATFR_EL1), .reg = PMSLATFR_EL1 },
-	{ SPE_SYS_REG(SYS_PMSIDR_EL1), .reset = NULL },
+	{ SPE_SYS_REG(SYS_PMSIDR_EL1), .reset = reset_pmsidr, .reg = PMSIDR_EL1 },
 	{ SPE_SYS_REG(SYS_PMBLIMITR_EL1), .reg = PMBLIMITR_EL1 },
 	{ SPE_SYS_REG(SYS_PMBPTR_EL1), .reg = PMBPTR_EL1 },
 	{ SPE_SYS_REG(SYS_PMBSR_EL1), .reg = PMBSR_EL1 },
