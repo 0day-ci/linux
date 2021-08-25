@@ -14,7 +14,7 @@
 #include <asm/kvm_hyp.h>
 #include <asm/kvm_mmu.h>
 
-static void __debug_save_spe(u64 *pmscr_el1)
+void __debug_save_spe(u64 *pmscr_el1)
 {
 	u64 reg;
 
@@ -40,7 +40,7 @@ static void __debug_save_spe(u64 *pmscr_el1)
 	dsb(nsh);
 }
 
-static void __debug_restore_spe(u64 pmscr_el1)
+void __debug_restore_spe(u64 pmscr_el1)
 {
 	if (!pmscr_el1)
 		return;

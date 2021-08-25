@@ -608,7 +608,7 @@ static bool access_spe_reg(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
 {	int reg = r->reg;
 	u64 val = p->regval;
 
-	if (reg < PMBLIMITR_EL1) {
+	if (reg < PMBLIMITR_EL1 && !kvm_spe_profiling_stopped(vcpu)) {
 		print_sys_reg_msg(p, "Unsupported guest SPE register access at: %lx [%08lx]\n",
 				  *vcpu_pc(vcpu), *vcpu_cpsr(vcpu));
 	}

@@ -96,11 +96,18 @@ static void kvm_arm_setup_mdcr_el2(struct kvm_vcpu *vcpu)
 	if (kvm_supports_spe() && kvm_vcpu_has_spe(vcpu)) {
 		/*
 		 * Use EL1&0 for the profiling buffer translation regime and
-		 * trap accesses to the buffer control registers; leave
-		 * MDCR_EL2.TPMS unset and do not trap accesses to the profiling
-		 * control registers.
+		 * trap accesses to the buffer control registers; if profiling
+		 * is stopped, also set MSCR_EL2.TMPS to trap accesses to the
+		 * rest of the registers, otherwise leave it clear.
+		 *
+		 * Leaving MDCR_EL2.E2P unset, like we do when the VCPU does not
+		 * have SPE, means that the PMBIDR_EL1.P (which KVM does not
+		 * trap) will be set and the guest will detect SPE as being
+		 * unavailable.
 		 */
 		vcpu->arch.mdcr_el2 |= MDCR_EL2_E2PB_EL1_TRAP << MDCR_EL2_E2PB_SHIFT;
+		if (kvm_spe_profiling_stopped(vcpu))
+			vcpu->arch.mdcr_el2 |= MDCR_EL2_TPMS;
 	} else {
 		/*
 		 * Trap accesses to the profiling control registers; leave

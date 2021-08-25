@@ -140,6 +140,28 @@ void kvm_spe_sync_hwstate(struct kvm_vcpu *vcpu)
 	kvm_spe_update_irq(vcpu, true);
 }
 
+static bool kvm_spe_buffer_enabled(struct kvm_vcpu *vcpu)
+{
+	return !vcpu->arch.spe.irq_level  &&
+		(__vcpu_sys_reg(vcpu, PMBLIMITR_EL1) & BIT(SYS_PMBLIMITR_EL1_E_SHIFT));
+}
+
+bool kvm_spe_exit_to_user(struct kvm_vcpu *vcpu)
+{
+	u64 pmscr_enabled_mask = BIT(SYS_PMSCR_EL1_E0SPE_SHIFT) |
+				 BIT(SYS_PMSCR_EL1_E1SPE_SHIFT);
+
+	if (!(vcpu->arch.spe.flags & KVM_VCPU_SPE_STOP_USER_EXIT))
+		return false;
+
+	/*
+	 * We don't trap the guest dropping to EL0, so exit even if profiling is
+	 * disabled at EL1, but enabled at EL0.
+	 */
+	return kvm_spe_buffer_enabled(vcpu) &&
+		(__vcpu_sys_reg(vcpu, PMSCR_EL1) & pmscr_enabled_mask);
+}
+
 void kvm_spe_write_sysreg(struct kvm_vcpu *vcpu, int reg, u64 val)
 {
 	__vcpu_sys_reg(vcpu, reg) = val;
@@ -215,6 +237,31 @@ static bool kvm_spe_irq_is_valid(struct kvm *kvm, int irq)
 	return true;
 }
 
+static int kvm_spe_stop_user(struct kvm_vcpu *vcpu, int flags)
+{
+	struct kvm_vcpu_spe *spe = &vcpu->arch.spe;
+
+	if (flags & KVM_ARM_VCPU_SPE_STOP_TRAP) {
+		if (flags & ~KVM_ARM_VCPU_SPE_STOP_TRAP)
+			return -EINVAL;
+		spe->flags = KVM_VCPU_SPE_STOP_USER;
+	}
+
+	if (flags & KVM_ARM_VCPU_SPE_STOP_EXIT) {
+		if (flags & ~KVM_ARM_VCPU_SPE_STOP_EXIT)
+			return -EINVAL;
+		spe->flags = KVM_VCPU_SPE_STOP_USER_EXIT;
+	}
+
+	if (flags & KVM_ARM_VCPU_SPE_RESUME) {
+		if (flags & ~KVM_ARM_VCPU_SPE_RESUME)
+			return -EINVAL;
+		spe->flags = 0;
+	}
+
+	return 0;
+}
+
 int kvm_spe_set_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr)
 {
 	if (!kvm_vcpu_supports_spe(vcpu))
@@ -268,6 +315,8 @@ int kvm_spe_set_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr)
 
 		if (!flags)
 			return -EINVAL;
+
+		return kvm_spe_stop_user(vcpu, flags);
 	}
 	}
 
@@ -289,6 +338,24 @@ int kvm_spe_get_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr)
 
 		irq = vcpu->arch.spe.irq_num;
 		if (put_user(irq, uaddr))
+			return -EFAULT;
+
+		return 0;
+	}
+	case KVM_ARM_VCPU_SPE_STOP: {
+		int __user *uaddr = (int __user *)(long)attr->addr;
+		struct kvm_vcpu_spe *spe = &vcpu->arch.spe;
+		int flag = 0;
+
+		if (!vcpu->arch.spe.initialized)
+			return -EAGAIN;
+
+		if (spe->flags & KVM_VCPU_SPE_STOP_USER)
+			flag = KVM_ARM_VCPU_SPE_STOP_TRAP;
+		else if (spe->flags & KVM_VCPU_SPE_STOP_USER_EXIT)
+			flag = KVM_ARM_VCPU_SPE_STOP_EXIT;
+
+		if (put_user(flag, uaddr))
 			return -EFAULT;
 
 		return 0;

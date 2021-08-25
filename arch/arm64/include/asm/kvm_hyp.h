@@ -86,8 +86,10 @@ void __debug_switch_to_host(struct kvm_vcpu *vcpu);
 #ifdef __KVM_NVHE_HYPERVISOR__
 void __debug_save_host_buffers_nvhe(struct kvm_vcpu *vcpu,
 				    struct kvm_cpu_context *host_ctxt);
+void __debug_save_spe(u64 *pmscr_el1);
 void __debug_restore_host_buffers_nvhe(struct kvm_vcpu *vcpu,
 				       struct kvm_cpu_context *host_ctxt);
+void __debug_restore_spe(u64 pmscr_el1);
 #ifdef CONFIG_KVM_ARM_SPE
 void __spe_save_host_state_nvhe(struct kvm_vcpu *vcpu,
 				struct kvm_cpu_context *host_ctxt);

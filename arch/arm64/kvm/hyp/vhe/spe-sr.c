@@ -10,6 +10,34 @@
 
 #include <hyp/spe-sr.h>
 
+static void __spe_save_host_buffer(u64 *pmscr_el2)
+{
+	u64 pmblimitr;
+
+	/* Disable guest profiling. */
+	write_sysreg_el1(0, SYS_PMSCR);
+
+	pmblimitr = read_sysreg_s(SYS_PMBLIMITR_EL1);
+	if (!(pmblimitr & BIT(SYS_PMBLIMITR_EL1_E_SHIFT))) {
+		*pmscr_el2 = 0;
+		return;
+	}
+
+	*pmscr_el2 = read_sysreg_el2(SYS_PMSCR);
+
+	/* Disable profiling at EL2 so we can drain the buffer. */
+	write_sysreg_el2(0, SYS_PMSCR);
+	isb();
+
+	/*
+	 * We're going to change the buffer owning exception level when we
+	 * activate traps, drain the buffer now.
+	 */
+	psb_csync();
+	dsb(nsh);
+}
+NOKPROBE_SYMBOL(__spe_save_host_buffer);
+
 /*
  * Disable host profiling, drain the buffer and save the host SPE context.
  * Extra care must be taken because profiling might be in progress.
@@ -18,6 +46,11 @@ void __spe_save_host_state_vhe(struct kvm_vcpu *vcpu,
 			       struct kvm_cpu_context *host_ctxt)
 {
 	u64 pmblimitr, pmscr_el2;
+
+	if (kvm_spe_profiling_stopped(vcpu)) {
+		__spe_save_host_buffer(__ctxt_sys_reg(host_ctxt, PMSCR_EL2));
+		return;
+	}
 
 	/* Disable profiling while the SPE context is being switched. */
 	pmscr_el2 = read_sysreg_el2(SYS_PMSCR);
@@ -50,6 +83,9 @@ void __spe_save_guest_state_vhe(struct kvm_vcpu *vcpu,
 {
 	u64 pmblimitr, pmbsr;
 
+	if (kvm_spe_profiling_stopped(vcpu))
+		return;
+
 	/*
 	 * We're at EL2 and the buffer owning regime is EL1, which means that
 	 * profiling is disabled. After we disable traps and restore the host's
@@ -78,6 +114,18 @@ void __spe_save_guest_state_vhe(struct kvm_vcpu *vcpu,
 }
 NOKPROBE_SYMBOL(__spe_save_guest_state_vhe);
 
+static void __spe_restore_host_buffer(u64 pmscr_el2)
+{
+	if (!pmscr_el2)
+		return;
+
+	/* Synchronize MDCR_EL2 write. */
+	isb();
+
+	write_sysreg_el2(pmscr_el2, SYS_PMSCR);
+}
+NOKPROBE_SYMBOL(__spe_restore_host_buffer);
+
 /*
  * Restore the host SPE context. Special care must be taken because we're
  * potentially resuming a profiling session which was stopped when we saved the
@@ -86,6 +134,11 @@ NOKPROBE_SYMBOL(__spe_save_guest_state_vhe);
 void __spe_restore_host_state_vhe(struct kvm_vcpu *vcpu,
 				  struct kvm_cpu_context *host_ctxt)
 {
+	if (kvm_spe_profiling_stopped(vcpu)) {
+		__spe_restore_host_buffer(ctxt_sys_reg(host_ctxt, PMSCR_EL2));
+		return;
+	}
+
 	__spe_restore_common_state(host_ctxt);
 
 	write_sysreg_s(ctxt_sys_reg(host_ctxt, PMBPTR_EL1), SYS_PMBPTR_EL1);
@@ -115,6 +168,9 @@ NOKPROBE_SYMBOL(__spe_restore_host_state_vhe);
 void __spe_restore_guest_state_vhe(struct kvm_vcpu *vcpu,
 				   struct kvm_cpu_context *guest_ctxt)
 {
+	if (kvm_spe_profiling_stopped(vcpu))
+		return;
+
 	__spe_restore_common_state(guest_ctxt);
 
 	/*

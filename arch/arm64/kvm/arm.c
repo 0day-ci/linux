@@ -873,6 +873,15 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu)
 			continue;
 		}
 
+		if (unlikely(kvm_spe_exit_to_user(vcpu))) {
+			run->exit_reason = KVM_EXIT_FAIL_ENTRY;
+			run->fail_entry.hardware_entry_failure_reason
+				= KVM_EXIT_FAIL_ENTRY_SPE;
+			ret = -EAGAIN;
+			preempt_enable();
+			continue;
+		}
+
 		kvm_pmu_flush_hwstate(vcpu);
 
 		local_irq_disable();

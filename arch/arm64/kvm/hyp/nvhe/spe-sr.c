@@ -23,6 +23,11 @@ void __spe_save_host_state_nvhe(struct kvm_vcpu *vcpu,
 {
 	u64 pmblimitr;
 
+	if (kvm_spe_profiling_stopped(vcpu)) {
+		__debug_save_spe(__ctxt_sys_reg(host_ctxt, PMSCR_EL1));
+		return;
+	}
+
 	pmblimitr = read_sysreg_s(SYS_PMBLIMITR_EL1);
 	if (pmblimitr & BIT(SYS_PMBLIMITR_EL1_E_SHIFT)) {
 		psb_csync();
@@ -48,6 +53,13 @@ void __spe_save_guest_state_nvhe(struct kvm_vcpu *vcpu,
 				 struct kvm_cpu_context *guest_ctxt)
 {
 	u64 pmbsr;
+
+	/*
+	 * Profiling is stopped and all register accesses are trapped, nothing
+	 * to save here.
+	 */
+	if (kvm_spe_profiling_stopped(vcpu))
+		return;
 
 	if (read_sysreg_s(SYS_PMBLIMITR_EL1) & BIT(SYS_PMBLIMITR_EL1_E_SHIFT)) {
 		psb_csync();
@@ -82,6 +94,11 @@ void __spe_save_guest_state_nvhe(struct kvm_vcpu *vcpu,
 void __spe_restore_host_state_nvhe(struct kvm_vcpu *vcpu,
 				   struct kvm_cpu_context *host_ctxt)
 {
+	if (kvm_spe_profiling_stopped(vcpu)) {
+		__debug_restore_spe(ctxt_sys_reg(host_ctxt, PMSCR_EL1));
+		return;
+	}
+
 	__spe_restore_common_state(host_ctxt);
 
 	write_sysreg_s(ctxt_sys_reg(host_ctxt, PMBPTR_EL1), SYS_PMBPTR_EL1);
@@ -94,6 +111,13 @@ void __spe_restore_host_state_nvhe(struct kvm_vcpu *vcpu,
 void __spe_restore_guest_state_nvhe(struct kvm_vcpu *vcpu,
 				    struct kvm_cpu_context *guest_ctxt)
 {
+	/*
+	 * Profiling is stopped and all register accesses are trapped, nothing
+	 * to restore here.
+	 */
+	if (kvm_spe_profiling_stopped(vcpu))
+		return;
+
 	__spe_restore_common_state(guest_ctxt);
 
 	write_sysreg_s(ctxt_sys_reg(guest_ctxt, PMBPTR_EL1), SYS_PMBPTR_EL1);

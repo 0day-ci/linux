@@ -376,6 +376,9 @@ struct kvm_arm_copy_mte_tags {
 #define     KVM_ARM_VCPU_SPE_STOP_EXIT		(1 << 1)
 #define     KVM_ARM_VCPU_SPE_RESUME		(1 << 2)
 
+/* run->fail_entry.hardware_entry_failure_reason codes. */
+#define KVM_EXIT_FAIL_ENTRY_SPE		(1 << 0)
+
 /* KVM_IRQ_LINE irq field index values */
 #define KVM_ARM_IRQ_VCPU2_SHIFT		28
 #define KVM_ARM_IRQ_VCPU2_MASK		0xf

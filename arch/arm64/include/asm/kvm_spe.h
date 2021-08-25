@@ -16,12 +16,22 @@ static __always_inline bool kvm_supports_spe(void)
 	return static_branch_likely(&kvm_spe_available);
 }
 
+/* Guest profiling disabled by the user. */
+#define KVM_VCPU_SPE_STOP_USER		(1 << 0)
+/* Stop profiling and exit to userspace when guest starts profiling. */
+#define KVM_VCPU_SPE_STOP_USER_EXIT	(1 << 1)
+
 struct kvm_vcpu_spe {
 	bool initialized;	/* SPE initialized for the VCPU */
 	int irq_num;		/* Buffer management interrut number */
 	bool irq_level;		/* 'true' if the interrupt is asserted at the VGIC */
 	bool hwirq_level;	/* 'true' if the SPE hardware is asserting the interrupt */
+	u64 flags;
 };
+
+#define kvm_spe_profiling_stopped(vcpu)					\
+	(((vcpu)->arch.spe.flags & KVM_VCPU_SPE_STOP_USER) ||		\
+	 ((vcpu)->arch.spe.flags & KVM_VCPU_SPE_STOP_USER_EXIT))	\
 
 struct kvm_spe {
 	bool perfmon_capable;	/* Is the VM perfmon_capable()? */
@@ -31,6 +41,7 @@ void kvm_spe_init_supported_cpus(void);
 void kvm_spe_vm_init(struct kvm *kvm);
 int kvm_spe_vcpu_first_run_init(struct kvm_vcpu *vcpu);
 void kvm_spe_sync_hwstate(struct kvm_vcpu *vcpu);
+bool kvm_spe_exit_to_user(struct kvm_vcpu *vcpu);
 
 void kvm_spe_write_sysreg(struct kvm_vcpu *vcpu, int reg, u64 val);
 u64 kvm_spe_read_sysreg(struct kvm_vcpu *vcpu, int reg);
@@ -48,6 +59,8 @@ int kvm_spe_has_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr);
 struct kvm_vcpu_spe {
 };
 
+#define kvm_spe_profiling_stopped(vcpu)		(false)
+
 struct kvm_spe {
 };
 
@@ -55,6 +68,7 @@ static inline void kvm_spe_init_supported_cpus(void) {}
 static inline void kvm_spe_vm_init(struct kvm *kvm) {}
 static inline int kvm_spe_vcpu_first_run_init(struct kvm_vcpu *vcpu) { return -ENOEXEC; }
 static inline void kvm_spe_sync_hwstate(struct kvm_vcpu *vcpu) {}
+static inline bool kvm_spe_exit_to_user(struct kvm_vcpu *vcpu) { return false; }
 
 static inline void kvm_spe_write_sysreg(struct kvm_vcpu *vcpu, int reg, u64 val) {}
 static inline u64 kvm_spe_read_sysreg(struct kvm_vcpu *vcpu, int reg) { return 0; }
