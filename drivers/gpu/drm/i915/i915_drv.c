@@ -301,6 +301,7 @@ static void sanitize_gpu(struct drm_i915_private *i915)
  */
 static int i915_driver_early_probe(struct drm_i915_private *dev_priv)
 {
+	struct pci_dev *pdev = to_pci_dev(dev_priv->drm.dev);
 	int ret = 0;
 
 	if (i915_inject_probe_failure(dev_priv))
@@ -330,6 +331,13 @@ static int i915_driver_early_probe(struct drm_i915_private *dev_priv)
 	ret = i915_workqueues_init(dev_priv);
 	if (ret < 0)
 		return ret;
+
+	/*
+	 * FIXME: Temporary hammer to avoid freezing the machine on our DGFX
+	 * This should be totally removed when we handle the pci states properly
+	 * on runtime PM and on s2idle cases.
+	 */
+	pci_d3cold_disable(pdev);
 
 	ret = vlv_suspend_init(dev_priv);
 	if (ret < 0)
