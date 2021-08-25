@@ -201,3 +201,39 @@ Returns:
 Request initialization of the Statistical Profiling Extension for this VCPU.
 Must be done after initializaing the in-kernel irqchip and after setting the
 Profiling Buffer management interrupt number for the VCPU.
+
+4.3 ATTRIBUTE: KVM_ARM_VCPU_SPE_STOP
+------------------------------------
+
+:Parameters: in kvm_device_attr.addr the address to the flag that specifies
+             what KVM should do when the guest enables profiling
+
+The flag must be exactly one of:
+
+- KVM_ARM_VCPU_SPE_STOP_TRAP: trap all register accesses and ignore the guest
+  trying to enable profiling.
+- KVM_ARM_VCPU_SPE_STOP_EXIT: exit to userspace when the guest tries to enable
+  profiling.
+- KVM_ARM_VCPU_SPE_RESUME: resume profiling, if it was previously stopped using
+  this attribute.
+
+If KVM detects that a vcpu is trying to run with SPE enabled when
+KVM_ARM_VCPU_STOP_EXIT is set, KVM_RUN will return without entering the guest
+with kvm_run.exit_reason equal to KVM_EXIT_FAIL_ENTRY, and the fail_entry struct
+will be zeroed.
+
+Returns:
+
+	 =======  ============================================
+	 -EAGAIN  SPE not initialized
+	 -EFAULT  Error accessing the flag
+	 -EINVAL  Invalid flag
+	 -ENXIO   SPE not supported or not properly configured
+	 =======  ============================================
+
+Request that KVM disables SPE for the given vcpu. This can be useful for
+migration, which relies on tracking dirty pages by write-protecting memory, but
+breaks SPE in the guest as KVM does not handle buffer stage 2 faults.
+
+The attribute must be set after SPE has been initialized successfully. It can be
+set multiple times, with the latest value overwritting the previous one.

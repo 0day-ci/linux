@@ -220,13 +220,13 @@ int kvm_spe_set_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr)
 	if (!kvm_vcpu_supports_spe(vcpu))
 		return -ENXIO;
 
-	if (vcpu->arch.spe.initialized)
-		return -EBUSY;
-
 	switch (attr->attr) {
 	case KVM_ARM_VCPU_SPE_IRQ: {
 		int __user *uaddr = (int __user *)(long)attr->addr;
 		int irq;
+
+		if (vcpu->arch.spe.initialized)
+			return -EBUSY;
 
 		if (vcpu->arch.spe.irq_num)
 			return -EBUSY;
@@ -248,11 +248,27 @@ int kvm_spe_set_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr)
 		if (!vgic_initialized(vcpu->kvm))
 			return -ENXIO;
 
+		if (vcpu->arch.spe.initialized)
+			return -EBUSY;
+
 		if (kvm_vgic_set_owner(vcpu, vcpu->arch.spe.irq_num, &vcpu->arch.spe))
 			return -ENXIO;
 
 		vcpu->arch.spe.initialized = true;
 		return 0;
+	case KVM_ARM_VCPU_SPE_STOP: {
+		int __user *uaddr = (int __user *)(long)attr->addr;
+		int flags;
+
+		if (!vcpu->arch.spe.initialized)
+			return -EAGAIN;
+
+		if (get_user(flags, uaddr))
+			return -EFAULT;
+
+		if (!flags)
+			return -EINVAL;
+	}
 	}
 
 	return -ENXIO;
@@ -290,6 +306,7 @@ int kvm_spe_has_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr)
 	switch(attr->attr) {
 	case KVM_ARM_VCPU_SPE_IRQ:
 	case KVM_ARM_VCPU_SPE_INIT:
+	case KVM_ARM_VCPU_SPE_STOP:
 		return 0;
 	}
 

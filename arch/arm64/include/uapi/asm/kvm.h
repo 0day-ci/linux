@@ -371,6 +371,10 @@ struct kvm_arm_copy_mte_tags {
 #define KVM_ARM_VCPU_SPE_CTRL		3
 #define   KVM_ARM_VCPU_SPE_IRQ		0
 #define   KVM_ARM_VCPU_SPE_INIT		1
+#define   KVM_ARM_VCPU_SPE_STOP		2
+#define     KVM_ARM_VCPU_SPE_STOP_TRAP		(1 << 0)
+#define     KVM_ARM_VCPU_SPE_STOP_EXIT		(1 << 1)
+#define     KVM_ARM_VCPU_SPE_RESUME		(1 << 2)
 
 /* KVM_IRQ_LINE irq field index values */
 #define KVM_ARM_IRQ_VCPU2_SHIFT		28
