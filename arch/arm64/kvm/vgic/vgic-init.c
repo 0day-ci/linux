@@ -87,7 +87,7 @@ int kvm_vgic_create(struct kvm *kvm, u32 type)
 		return -ENODEV;
 
 	ret = -EBUSY;
-	if (!lock_all_vcpus(kvm))
+	if (!kvm_lock_all_vcpus(kvm))
 		return ret;
 
 	kvm_for_each_vcpu(i, vcpu, kvm) {
@@ -117,7 +117,7 @@ int kvm_vgic_create(struct kvm *kvm, u32 type)
 		INIT_LIST_HEAD(&kvm->arch.vgic.rd_regions);
 
 out_unlock:
-	unlock_all_vcpus(kvm);
+	kvm_unlock_all_vcpus(kvm);
 	return ret;
 }
 
