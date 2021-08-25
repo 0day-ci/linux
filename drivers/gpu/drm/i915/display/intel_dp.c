@@ -141,6 +141,26 @@ static void intel_dp_set_sink_rates(struct intel_dp *intel_dp)
 		intel_dp->sink_rates[i] = dp_rates[i];
 	}
 
+	/*
+	 * Sink rates for 128b/132b. If set, sink should support all 8b/10b
+	 * rates and 10 Gbps.
+	 */
+	if (intel_dp->dpcd[DP_MAIN_LINK_CHANNEL_CODING] & DP_CAP_ANSI_128B132B) {
+		u8 uhbr_rates = 0;
+
+		BUILD_BUG_ON(ARRAY_SIZE(intel_dp->sink_rates) < ARRAY_SIZE(dp_rates) + 3);
+
+		drm_dp_dpcd_readb(&intel_dp->aux,
+				  DP_128B132B_SUPPORTED_LINK_RATES, &uhbr_rates);
+
+		if (uhbr_rates & DP_UHBR10)
+			intel_dp->sink_rates[i++] = 1000000;
+		if (uhbr_rates & DP_UHBR13_5)
+			intel_dp->sink_rates[i++] = 1350000;
+		if (uhbr_rates & DP_UHBR20)
+			intel_dp->sink_rates[i++] = 2000000;
+	}
+
 	intel_dp->num_sink_rates = i;
 }
 
@@ -192,6 +212,10 @@ int intel_dp_max_lane_count(struct intel_dp *intel_dp)
 	return intel_dp->max_link_lane_count;
 }
 
+/*
+ * The required data bandwidth for a mode with given pixel clock and bpp. This
+ * is the required net bandwidth independent of the data bandwidth efficiency.
+ */
 int
 intel_dp_link_required(int pixel_clock, int bpp)
 {
@@ -199,16 +223,52 @@ intel_dp_link_required(int pixel_clock, int bpp)
 	return DIV_ROUND_UP(pixel_clock * bpp, 8);
 }
 
+/*
+ * Given a link rate and lanes, get the data bandwidth.
+ *
+ * Data bandwidth is the actual payload rate, which depends on the data
+ * bandwidth efficiency and the link rate.
+ *
+ * For 8b/10b channel encoding, SST and non-FEC, the data bandwidth efficiency
+ * is 80%. For example, for a 1.62 Gbps link, 1.62*10^9 bps * 0.80 * (1/8) =
+ * 162000 kBps. With 8-bit symbols, we have 162000 kHz symbol clock. Just by
+ * coincidence, the port clock in kHz matches the data bandwidth in kBps, and
+ * they equal the link bit rate in Gbps multiplied by 100000. (Note that this no
+ * longer holds for data bandwidth as soon as FEC or MST is taken into account!)
+ *
+ * For 128b/132b channel encoding, the data bandwidth efficiency is 96.71%. For
+ * example, for a 10 Gbps link, 10*10^9 bps * 0.9671 * (1/8) = 1208875
+ * kBps. With 32-bit symbols, we have 312500 kHz symbol clock. The value 1000000
+ * does not match the symbol clock, the port clock (not even if you think in
+ * terms of a byte clock), nor the data bandwidth. It only matches the link bit
+ * rate in units of 10000 bps.
+ */
 int
-intel_dp_max_data_rate(int max_link_clock, int max_lanes)
+intel_dp_max_data_rate(int max_link_rate, int max_lanes)
 {
-	/* max_link_clock is the link symbol clock (LS_Clk) in kHz and not the
-	 * link rate that is generally expressed in Gbps. Since, 8 bits of data
-	 * is transmitted every LS_Clk per lane, there is no need to account for
-	 * the channel encoding that is done in the PHY layer here.
+	if (max_link_rate >= 1000000) {
+		/*
+		 * UHBR rates always use 128b/132b channel encoding, and have
+		 * 97.71% data bandwidth efficiency. Consider max_link_rate the
+		 * link bit rate in units of 10000 bps.
+		 */
+		int max_link_rate_kbps = max_link_rate * 10;
+
+		max_link_rate_kbps = DIV_ROUND_CLOSEST_ULL(max_link_rate_kbps * 9671, 10000);
+		max_link_rate = max_link_rate_kbps / 8;
+	}
+
+	/*
+	 * Lower than UHBR rates always use 8b/10b channel encoding, and have
+	 * 80% data bandwidth efficiency for SST non-FEC. However, this turns
+	 * out to be a nop by coincidence, and can be skipped:
+	 *
+	 *	int max_link_rate_kbps = max_link_rate * 10;
+	 *	max_link_rate_kbps = DIV_ROUND_CLOSEST_ULL(max_link_rate_kbps * 8, 10);
+	 *	max_link_rate = max_link_rate_kbps / 8;
 	 */
 
-	return max_link_clock * max_lanes;
+	return max_link_rate * max_lanes;
 }
 
 bool intel_dp_can_bigjoiner(struct intel_dp *intel_dp)
@@ -220,6 +280,11 @@ bool intel_dp_can_bigjoiner(struct intel_dp *intel_dp)
 	return DISPLAY_VER(dev_priv) >= 12 ||
 		(DISPLAY_VER(dev_priv) == 11 &&
 		 encoder->port != PORT_A);
+}
+
+static int dg2_max_source_rate(struct intel_dp *intel_dp)
+{
+	return intel_dp_is_edp(intel_dp) ? 810000 : 1350000;
 }
 
 static int icl_max_source_rate(struct intel_dp *intel_dp)
@@ -248,7 +313,8 @@ intel_dp_set_source_rates(struct intel_dp *intel_dp)
 {
 	/* The values must be in increasing order */
 	static const int icl_rates[] = {
-		162000, 216000, 270000, 324000, 432000, 540000, 648000, 810000
+		162000, 216000, 270000, 324000, 432000, 540000, 648000, 810000,
+		1000000, 1350000,
 	};
 	static const int bxt_rates[] = {
 		162000, 216000, 243000, 270000, 324000, 432000, 540000
@@ -275,6 +341,8 @@ intel_dp_set_source_rates(struct intel_dp *intel_dp)
 	if (DISPLAY_VER(dev_priv) >= 11) {
 		source_rates = icl_rates;
 		size = ARRAY_SIZE(icl_rates);
+		if (IS_DG2(dev_priv))
+			max_rate = dg2_max_source_rate(intel_dp);
 		if (IS_JSL_EHL(dev_priv))
 			max_rate = ehl_max_source_rate(intel_dp);
 		else
@@ -1044,7 +1112,8 @@ intel_dp_adjust_compliance_config(struct intel_dp *intel_dp,
 						    intel_dp->num_common_rates,
 						    intel_dp->compliance.test_link_rate);
 			if (index >= 0)
-				limits->min_clock = limits->max_clock = index;
+				limits->min_rate = limits->max_rate =
+					intel_dp->compliance.test_link_rate;
 			limits->min_lane_count = limits->max_lane_count =
 				intel_dp->compliance.test_lane_count;
 		}
@@ -1058,8 +1127,8 @@ intel_dp_compute_link_config_wide(struct intel_dp *intel_dp,
 				  const struct link_config_limits *limits)
 {
 	struct drm_display_mode *adjusted_mode = &pipe_config->hw.adjusted_mode;
-	int bpp, clock, lane_count;
-	int mode_rate, link_clock, link_avail;
+	int bpp, i, lane_count;
+	int mode_rate, link_rate, link_avail;
 
 	for (bpp = limits->max_bpp; bpp >= limits->min_bpp; bpp -= 2 * 3) {
 		int output_bpp = intel_dp_output_bpp(pipe_config->output_format, bpp);
@@ -1067,18 +1136,22 @@ intel_dp_compute_link_config_wide(struct intel_dp *intel_dp,
 		mode_rate = intel_dp_link_required(adjusted_mode->crtc_clock,
 						   output_bpp);
 
-		for (clock = limits->min_clock; clock <= limits->max_clock; clock++) {
+		for (i = 0; i < intel_dp->num_common_rates; i++) {
+			link_rate = intel_dp->common_rates[i];
+			if (link_rate < limits->min_rate ||
+			    link_rate > limits->max_rate)
+				continue;
+
 			for (lane_count = limits->min_lane_count;
 			     lane_count <= limits->max_lane_count;
 			     lane_count <<= 1) {
-				link_clock = intel_dp->common_rates[clock];
-				link_avail = intel_dp_max_data_rate(link_clock,
+				link_avail = intel_dp_max_data_rate(link_rate,
 								    lane_count);
 
 				if (mode_rate <= link_avail) {
 					pipe_config->lane_count = lane_count;
 					pipe_config->pipe_bpp = bpp;
-					pipe_config->port_clock = link_clock;
+					pipe_config->port_clock = link_rate;
 
 					return 0;
 				}
@@ -1212,7 +1285,7 @@ static int intel_dp_dsc_compute_config(struct intel_dp *intel_dp,
 	 * with DSC enabled for the requested mode.
 	 */
 	pipe_config->pipe_bpp = pipe_bpp;
-	pipe_config->port_clock = intel_dp->common_rates[limits->max_clock];
+	pipe_config->port_clock = limits->max_rate;
 	pipe_config->lane_count = limits->max_lane_count;
 
 	if (intel_dp_is_edp(intel_dp)) {
@@ -1321,8 +1394,8 @@ intel_dp_compute_link_config(struct intel_encoder *encoder,
 	/* No common link rates between source and sink */
 	drm_WARN_ON(encoder->base.dev, common_len <= 0);
 
-	limits.min_clock = 0;
-	limits.max_clock = common_len - 1;
+	limits.min_rate = intel_dp->common_rates[0];
+	limits.max_rate = intel_dp->common_rates[common_len - 1];
 
 	limits.min_lane_count = 1;
 	limits.max_lane_count = intel_dp_max_lane_count(intel_dp);
@@ -1340,15 +1413,14 @@ intel_dp_compute_link_config(struct intel_encoder *encoder,
 		 * values correspond to the native resolution of the panel.
 		 */
 		limits.min_lane_count = limits.max_lane_count;
-		limits.min_clock = limits.max_clock;
+		limits.min_rate = limits.max_rate;
 	}
 
 	intel_dp_adjust_compliance_config(intel_dp, pipe_config, &limits);
 
 	drm_dbg_kms(&i915->drm, "DP link computation with max lane count %i "
 		    "max rate %d max bpp %d pixel clock %iKHz\n",
-		    limits.max_lane_count,
-		    intel_dp->common_rates[limits.max_clock],
+		    limits.max_lane_count, limits.max_rate,
 		    limits.max_bpp, adjusted_mode->crtc_clock);
 
 	if ((adjusted_mode->crtc_clock > i915->max_dotclk_freq ||
