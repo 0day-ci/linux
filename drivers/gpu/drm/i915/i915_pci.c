@@ -894,7 +894,7 @@ static const struct intel_device_info rkl_info = {
 	.has_snoop = 1, \
 	.is_dgfx = 1
 
-static const struct intel_device_info dg1_info __maybe_unused = {
+static const struct intel_device_info dg1_info = {
 	GEN12_FEATURES,
 	DGFX_FEATURES,
 	.graphics_rel = 10,
@@ -1115,6 +1115,7 @@ static const struct pci_device_id pciidlist[] = {
 	INTEL_RKL_IDS(&rkl_info),
 	INTEL_ADLS_IDS(&adl_s_info),
 	INTEL_ADLP_IDS(&adl_p_info),
+	INTEL_DG1_IDS(&dg1_info),
 	{0, 0, 0}
 };
 MODULE_DEVICE_TABLE(pci, pciidlist);
