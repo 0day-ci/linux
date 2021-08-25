@@ -89,6 +89,8 @@ NOKPROBE_SYMBOL(__deactivate_traps);
 void activate_traps_vhe_load(struct kvm_vcpu *vcpu)
 {
 	__activate_traps_common(vcpu);
+
+	write_sysreg(vcpu->arch.mdcr_el2, mdcr_el2);
 }
 
 void deactivate_traps_vhe_put(void)
