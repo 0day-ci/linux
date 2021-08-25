@@ -22,6 +22,14 @@
 #include "mds_client.h"
 #include "metric.h"
 
+#define CLIENT_FEATURES_DIR_NAME   "client_features"
+#define MOUNT_DEVICE_V1_SUPPORT_FILE_NAME "v1_mount_syntax"
+#define MOUNT_DEVICE_V2_SUPPORT_FILE_NAME "v2_mount_syntax"
+
+static struct dentry *ceph_client_features_dir;
+static struct dentry *ceph_mount_device_v1_support;
+static struct dentry *ceph_mount_device_v2_support;
+
 static int mdsmap_show(struct seq_file *s, void *p)
 {
 	int i;
@@ -445,6 +453,26 @@ void ceph_fs_debugfs_init(struct ceph_fs_client *fsc)
 						  &status_fops);
 }
 
+void ceph_fs_debugfs_client_features_init(void)
+{
+	ceph_client_features_dir = debugfs_create_dir(CLIENT_FEATURES_DIR_NAME,
+						      ceph_debugfs_dir);
+	ceph_mount_device_v1_support = debugfs_create_file(MOUNT_DEVICE_V1_SUPPORT_FILE_NAME,
+							   0400,
+							   ceph_client_features_dir,
+							   NULL, NULL);
+	ceph_mount_device_v2_support = debugfs_create_file(MOUNT_DEVICE_V2_SUPPORT_FILE_NAME,
+							   0400,
+							   ceph_client_features_dir,
+							   NULL, NULL);
+}
+
+void ceph_fs_debugfs_client_features_cleanup(void)
+{
+	debugfs_remove(ceph_mount_device_v1_support);
+	debugfs_remove(ceph_mount_device_v2_support);
+	debugfs_remove(ceph_client_features_dir);
+}
 
 #else  /* CONFIG_DEBUG_FS */
 
@@ -453,6 +481,14 @@ void ceph_fs_debugfs_init(struct ceph_fs_client *fsc)
 }
 
 void ceph_fs_debugfs_cleanup(struct ceph_fs_client *fsc)
+{
+}
+
+void ceph_fs_debugfs_client_features_init(void)
+{
+}
+
+void ceph_fs_debugfs_client_features_cleanup(void)
 {
 }
 
