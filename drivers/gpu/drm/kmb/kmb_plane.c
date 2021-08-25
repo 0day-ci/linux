@@ -113,7 +113,7 @@ static void kmb_plane_atomic_disable(struct drm_plane *plane,
 				     struct drm_atomic_state *state)
 {
 	struct kmb_plane *kmb_plane = to_kmb_plane(plane);
-	int plane_id = kmb_plane->id;
+	unsigned char plane_id = kmb_plane->id;
 	struct kmb_drm_private *kmb;
 
 	kmb = to_kmb(plane->dev);
@@ -121,21 +121,7 @@ static void kmb_plane_atomic_disable(struct drm_plane *plane,
 	if (WARN_ON(plane_id >= KMB_MAX_PLANES))
 		return;
 
-	switch (plane_id) {
-	case LAYER_0:
-		kmb->plane_status[plane_id].ctrl = LCD_CTRL_VL1_ENABLE;
-		break;
-	case LAYER_1:
-		kmb->plane_status[plane_id].ctrl = LCD_CTRL_VL2_ENABLE;
-		break;
-	case LAYER_2:
-		kmb->plane_status[plane_id].ctrl = LCD_CTRL_GL1_ENABLE;
-		break;
-	case LAYER_3:
-		kmb->plane_status[plane_id].ctrl = LCD_CTRL_GL2_ENABLE;
-		break;
-	}
-
+	kmb->plane_status[plane_id].ctrl = LCD_CTRL_VL1_ENABLE;
 	kmb->plane_status[plane_id].disable = true;
 }
 
