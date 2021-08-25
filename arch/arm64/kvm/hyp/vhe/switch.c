@@ -31,11 +31,28 @@ DEFINE_PER_CPU(struct kvm_host_data, kvm_host_data);
 DEFINE_PER_CPU(struct kvm_cpu_context, kvm_hyp_ctxt);
 DEFINE_PER_CPU(unsigned long, kvm_hyp_vector);
 
+static void __restore_host_mdcr_el2(struct kvm_vcpu *vcpu)
+{
+	u64 mdcr_el2;
+
+	mdcr_el2 = read_sysreg(mdcr_el2);
+	mdcr_el2 &= MDCR_EL2_HPMN_MASK | MDCR_EL2_TPMS;
+	write_sysreg(mdcr_el2, mdcr_el2);
+}
+
+static void __restore_guest_mdcr_el2(struct kvm_vcpu *vcpu)
+{
+	write_sysreg(vcpu->arch.mdcr_el2, mdcr_el2);
+}
+
 static void __activate_traps(struct kvm_vcpu *vcpu)
 {
 	u64 val;
 
 	___activate_traps(vcpu);
+
+	if (kvm_vcpu_has_spe(vcpu))
+		__restore_guest_mdcr_el2(vcpu);
 
 	val = read_sysreg(cpacr_el1);
 	val |= CPACR_EL1_TTA;
@@ -81,7 +98,11 @@ static void __deactivate_traps(struct kvm_vcpu *vcpu)
 	 */
 	asm(ALTERNATIVE("nop", "isb", ARM64_WORKAROUND_SPECULATIVE_AT));
 
+	if (kvm_vcpu_has_spe(vcpu))
+		__restore_host_mdcr_el2(vcpu);
+
 	write_sysreg(CPACR_EL1_DEFAULT, cpacr_el1);
+
 	write_sysreg(vectors, vbar_el1);
 }
 NOKPROBE_SYMBOL(__deactivate_traps);
@@ -90,16 +111,14 @@ void activate_traps_vhe_load(struct kvm_vcpu *vcpu)
 {
 	__activate_traps_common(vcpu);
 
-	write_sysreg(vcpu->arch.mdcr_el2, mdcr_el2);
+	if (!kvm_vcpu_has_spe(vcpu))
+		__restore_guest_mdcr_el2(vcpu);
 }
 
-void deactivate_traps_vhe_put(void)
+void deactivate_traps_vhe_put(struct kvm_vcpu *vcpu)
 {
-	u64 mdcr_el2 = read_sysreg(mdcr_el2);
-
-	mdcr_el2 &= MDCR_EL2_HPMN_MASK | MDCR_EL2_TPMS;
-
-	write_sysreg(mdcr_el2, mdcr_el2);
+	if (!kvm_vcpu_has_spe(vcpu))
+		__restore_host_mdcr_el2(vcpu);
 
 	__deactivate_traps_common();
 }

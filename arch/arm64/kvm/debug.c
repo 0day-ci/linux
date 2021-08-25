@@ -249,9 +249,19 @@ void kvm_arm_setup_debug(struct kvm_vcpu *vcpu)
 		vcpu->arch.flags |= KVM_ARM64_DEBUG_DIRTY;
 
 	/* Write mdcr_el2 changes since vcpu_load on VHE systems */
-	if (has_vhe() && orig_mdcr_el2 != vcpu->arch.mdcr_el2)
-		write_sysreg(vcpu->arch.mdcr_el2, mdcr_el2);
+	if (has_vhe()) {
+		/*
+		 * MDCR_EL2 can modify the SPE buffer owning regime, defer the
+		 * write until the VCPU is run.
+		 */
+		if (kvm_vcpu_has_spe(vcpu))
+			goto out;
 
+		if (orig_mdcr_el2 != vcpu->arch.mdcr_el2)
+			write_sysreg(vcpu->arch.mdcr_el2, mdcr_el2);
+	}
+
+out:
 	trace_kvm_arm_set_dreg32("MDSCR_EL1", vcpu_read_sys_reg(vcpu, MDSCR_EL1));
 }
 
