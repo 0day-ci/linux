@@ -19,6 +19,8 @@ static __always_inline bool kvm_supports_spe(void)
 struct kvm_vcpu_spe {
 	bool initialized;	/* SPE initialized for the VCPU */
 	int irq_num;		/* Buffer management interrut number */
+	bool irq_level;		/* 'true' if the interrupt is asserted at the VGIC */
+	bool hwirq_level;	/* 'true' if the SPE hardware is asserting the interrupt */
 };
 
 struct kvm_spe {
@@ -28,6 +30,7 @@ struct kvm_spe {
 void kvm_spe_init_supported_cpus(void);
 void kvm_spe_vm_init(struct kvm *kvm);
 int kvm_spe_vcpu_first_run_init(struct kvm_vcpu *vcpu);
+void kvm_spe_sync_hwstate(struct kvm_vcpu *vcpu);
 
 void kvm_spe_write_sysreg(struct kvm_vcpu *vcpu, int reg, u64 val);
 u64 kvm_spe_read_sysreg(struct kvm_vcpu *vcpu, int reg);
@@ -51,6 +54,7 @@ struct kvm_spe {
 static inline void kvm_spe_init_supported_cpus(void) {}
 static inline void kvm_spe_vm_init(struct kvm *kvm) {}
 static inline int kvm_spe_vcpu_first_run_init(struct kvm_vcpu *vcpu) { return -ENOEXEC; }
+static inline void kvm_spe_sync_hwstate(struct kvm_vcpu *vcpu) {}
 
 static inline void kvm_spe_write_sysreg(struct kvm_vcpu *vcpu, int reg, u64 val) {}
 static inline u64 kvm_spe_read_sysreg(struct kvm_vcpu *vcpu, int reg) { return 0; }

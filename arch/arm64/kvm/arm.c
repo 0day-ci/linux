@@ -949,6 +949,9 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu)
 		 */
 		kvm_pmu_sync_hwstate(vcpu);
 
+		if (kvm_supports_spe() && kvm_vcpu_has_spe(vcpu))
+			kvm_spe_sync_hwstate(vcpu);
+
 		/*
 		 * Sync the vgic state before syncing the timer state because
 		 * the timer code needs to know if the virtual timer

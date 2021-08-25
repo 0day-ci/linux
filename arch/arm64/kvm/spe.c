@@ -71,9 +71,81 @@ int kvm_spe_vcpu_first_run_init(struct kvm_vcpu *vcpu)
 	return 0;
 }
 
+static void kvm_spe_update_irq(struct kvm_vcpu *vcpu, bool level)
+{
+	struct kvm_vcpu_spe *spe = &vcpu->arch.spe;
+	int ret;
+
+	if (spe->irq_level == level)
+		return;
+
+	spe->irq_level = level;
+	ret = kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id, spe->irq_num,
+				  level, spe);
+	WARN_ON(ret);
+}
+
+static __printf(2, 3)
+void print_buf_warn(struct kvm_vcpu *vcpu, char *fmt, ...)
+{
+	va_list va;
+
+	va_start(va, fmt);
+	kvm_warn_ratelimited("%pV [PMBSR=0x%016llx, PMBPTR=0x%016llx, PMBLIMITR=0x%016llx]\n",
+			    &(struct va_format){ fmt, &va },
+			    __vcpu_sys_reg(vcpu, PMBSR_EL1),
+			    __vcpu_sys_reg(vcpu, PMBPTR_EL1),
+			    __vcpu_sys_reg(vcpu, PMBLIMITR_EL1));
+	va_end(va);
+}
+
+static void kvm_spe_inject_ext_abt(struct kvm_vcpu *vcpu)
+{
+	__vcpu_sys_reg(vcpu, PMBSR_EL1) = BIT(SYS_PMBSR_EL1_EA_SHIFT) |
+					  BIT(SYS_PMBSR_EL1_S_SHIFT);
+	__vcpu_sys_reg(vcpu, PMBSR_EL1) |= SYS_PMBSR_EL1_EC_FAULT_S1;
+	/* Synchronous External Abort, not on translation table walk. */
+	__vcpu_sys_reg(vcpu, PMBSR_EL1) |= 0x10 << SYS_PMBSR_EL1_FAULT_FSC_SHIFT;
+}
+
+void kvm_spe_sync_hwstate(struct kvm_vcpu *vcpu)
+{
+	struct kvm_vcpu_spe *spe = &vcpu->arch.spe;
+	u64 pmbsr, pmbsr_ec;
+
+	if (!spe->hwirq_level)
+		return;
+	spe->hwirq_level = false;
+
+	pmbsr = __vcpu_sys_reg(vcpu, PMBSR_EL1);
+	pmbsr_ec = pmbsr & (SYS_PMBSR_EL1_EC_MASK << SYS_PMBSR_EL1_EC_SHIFT);
+
+	switch (pmbsr_ec) {
+	case SYS_PMBSR_EL1_EC_FAULT_S2:
+		print_buf_warn(vcpu, "SPE stage 2 data abort");
+		kvm_spe_inject_ext_abt(vcpu);
+		break;
+	case SYS_PMBSR_EL1_EC_FAULT_S1:
+	case SYS_PMBSR_EL1_EC_BUF:
+		/*
+		 * These two exception syndromes are entirely up to the guest to
+		 * figure out, leave PMBSR_EL1 unchanged.
+		 */
+		break;
+	default:
+		print_buf_warn(vcpu, "SPE unknown buffer syndrome");
+		kvm_spe_inject_ext_abt(vcpu);
+	}
+
+	kvm_spe_update_irq(vcpu, true);
+}
+
 void kvm_spe_write_sysreg(struct kvm_vcpu *vcpu, int reg, u64 val)
 {
 	__vcpu_sys_reg(vcpu, reg) = val;
+
+	if (reg == PMBSR_EL1)
+		kvm_spe_update_irq(vcpu, val & BIT(SYS_PMBSR_EL1_S_SHIFT));
 }
 
 u64 kvm_spe_read_sysreg(struct kvm_vcpu *vcpu, int reg)

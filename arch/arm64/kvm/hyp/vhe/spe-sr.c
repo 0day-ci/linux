@@ -48,7 +48,7 @@ NOKPROBE_SYMBOL(__spe_save_host_state_vhe);
 void __spe_save_guest_state_vhe(struct kvm_vcpu *vcpu,
 				struct kvm_cpu_context *guest_ctxt)
 {
-	u64 pmblimitr;
+	u64 pmblimitr, pmbsr;
 
 	/*
 	 * We're at EL2 and the buffer owning regime is EL1, which means that
@@ -66,7 +66,11 @@ void __spe_save_guest_state_vhe(struct kvm_vcpu *vcpu,
 	}
 
 	ctxt_sys_reg(guest_ctxt, PMBPTR_EL1) = read_sysreg_s(SYS_PMBPTR_EL1);
-	ctxt_sys_reg(guest_ctxt, PMBSR_EL1) = read_sysreg_s(SYS_PMBSR_EL1);
+	pmbsr = read_sysreg_s(SYS_PMBSR_EL1);
+	if (pmbsr & BIT(SYS_PMBSR_EL1_S_SHIFT)) {
+		ctxt_sys_reg(guest_ctxt, PMBSR_EL1) = pmbsr;
+		vcpu->arch.spe.hwirq_level = true;
+	}
 	/* PMBLIMITR_EL1 is updated only on a trapped write. */
 	ctxt_sys_reg(guest_ctxt, PMSCR_EL1) = read_sysreg_el1(SYS_PMSCR);
 
@@ -120,8 +124,13 @@ void __spe_restore_guest_state_vhe(struct kvm_vcpu *vcpu,
 	 */
 
 	write_sysreg_s(ctxt_sys_reg(guest_ctxt, PMBPTR_EL1), SYS_PMBPTR_EL1);
-	write_sysreg_s(ctxt_sys_reg(guest_ctxt, PMBSR_EL1), SYS_PMBSR_EL1);
-	write_sysreg_s(ctxt_sys_reg(guest_ctxt, PMBLIMITR_EL1), SYS_PMBLIMITR_EL1);
+	/* The buffer management interrupt is virtual. */
+	write_sysreg_s(0, SYS_PMBSR_EL1);
+	/* The buffer is disabled when the interrupt is asserted. */
+	if (vcpu->arch.spe.irq_level)
+		write_sysreg_s(0, SYS_PMBLIMITR_EL1);
+	else
+		write_sysreg_s(ctxt_sys_reg(guest_ctxt, PMBLIMITR_EL1), SYS_PMBLIMITR_EL1);
 	write_sysreg_el1(ctxt_sys_reg(guest_ctxt, PMSCR_EL1), SYS_PMSCR);
 	/* PMSCR_EL2 has been cleared when saving the host state. */
 }
