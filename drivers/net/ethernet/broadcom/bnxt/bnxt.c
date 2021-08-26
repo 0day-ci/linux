@@ -10673,14 +10673,8 @@ bnxt_get_stats64(struct net_device *dev, struct rtnl_link_stats64 *stats)
 	 * we check the BNXT_STATE_OPEN flag.
 	 */
 	smp_mb__after_atomic();
-	if (!test_bit(BNXT_STATE_OPEN, &bp->state)) {
-		clear_bit(BNXT_STATE_READ_STATS, &bp->state);
-		*stats = bp->net_stats_prev;
-		return;
-	}
-
-	bnxt_get_ring_stats(bp, stats);
-	bnxt_add_prev_stats(bp, stats);
+	if (!test_bit(BNXT_STATE_OPEN, &bp->state))
+		goto skip_current;
 
 	if (bp->flags & BNXT_FLAG_PORT_STATS) {
 		u64 *rx = bp->port_stats.sw_stats;
@@ -10704,6 +10698,11 @@ bnxt_get_stats64(struct net_device *dev, struct rtnl_link_stats64 *stats)
 			BNXT_GET_TX_PORT_STATS64(tx, tx_fifo_underruns);
 		stats->tx_errors = BNXT_GET_TX_PORT_STATS64(tx, tx_err);
 	}
+
+	bnxt_get_ring_stats(bp, stats);
+skip_current:
+	bnxt_add_prev_stats(bp, stats);
+
 	clear_bit(BNXT_STATE_READ_STATS, &bp->state);
 }
 
