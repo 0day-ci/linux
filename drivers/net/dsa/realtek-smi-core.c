@@ -394,6 +394,13 @@ static int realtek_smi_probe(struct platform_device *pdev)
 	var = of_device_get_match_data(dev);
 	np = dev->of_node;
 
+	/* This driver assumes the child PHYs would be probed successfully
+	 * before this functions returns. That's not a valid assumption, but
+	 * let fw_devlink know so that this driver continues to function with
+	 * fw_devlink=on.
+	 */
+	np->fwnode.flags |= FWNODE_FLAG_BROKEN_PARENT;
+
 	smi = devm_kzalloc(dev, sizeof(*smi) + var->chip_data_sz, GFP_KERNEL);
 	if (!smi)
 		return -ENOMEM;
