@@ -533,7 +533,7 @@ static int copy_strings(int argc, struct user_arg_ptr argv,
 		if (!valid_arg_len(bprm, len))
 			goto out;
 
-		/* We're going to work our way backwords. */
+		/* We're going to work our way backwards. */
 		pos = bprm->p;
 		str += len;
 		bprm->p -= len;
@@ -600,7 +600,7 @@ out:
 }
 
 /*
- * Copy and argument/environment string from the kernel to the processes stack.
+ * Copy argument/environment strings from the kernel to the processe's stack.
  */
 int copy_string_kernel(const char *arg, struct linux_binprm *bprm)
 {
