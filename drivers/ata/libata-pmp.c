@@ -977,6 +977,7 @@ static int sata_pmp_eh_recover(struct ata_port *ap)
 			ata_link_warn(pmp_link,
 				"failed to disable NOTIFY (err_mask=0x%x)\n",
 				err_mask);
+			rc = -EIO;
 			goto pmp_fail;
 		}
 	}
