@@ -130,8 +130,7 @@ cryptoloop_transfer(struct loop_device *lo, int cmd,
 
 	while (size > 0) {
 		const int sz = min(size, LOOP_IV_SECTOR_SIZE);
-		u32 iv[4] = { 0, };
-		iv[0] = cpu_to_le32(IV & 0xffffffff);
+		__le32 iv[4] = { cpu_to_le32(IV & 0xffffffff), };
 
 		sg_set_page(&sg_in, in_page, sz, in_offs);
 		sg_set_page(&sg_out, out_page, sz, out_offs);
