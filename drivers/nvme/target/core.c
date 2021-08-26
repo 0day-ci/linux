@@ -9,6 +9,7 @@
 #include <linux/rculist.h>
 #include <linux/pci-p2pdma.h>
 #include <linux/scatterlist.h>
+#include "../host/nvme.h"
 
 #define CREATE_TRACE_POINTS
 #include "trace.h"
@@ -1198,10 +1199,13 @@ void nvmet_update_cc(struct nvmet_ctrl *ctrl, u32 new)
 
 static void nvmet_init_cap(struct nvmet_ctrl *ctrl)
 {
+	struct nvme_ctrl *ptctrl = nvmet_passthru_ctrl(ctrl->subsys);
+
 	/* command sets supported: NVMe command set: */
 	ctrl->cap = (1ULL << 37);
 	/* Controller supports one or more I/O Command Sets */
-	ctrl->cap |= (1ULL << 43);
+	if ((ptctrl && nvme_multi_css(ptctrl)) || !ptctrl)
+		ctrl->cap |= (1ULL << 43);
 	/* CC.EN timeout in 500msec units: */
 	ctrl->cap |= (15ULL << 24);
 	/* maximum queue entries supported: */
@@ -1363,8 +1367,6 @@ u16 nvmet_alloc_ctrl(const char *subsysnqn, const char *hostnqn,
 		goto out_put_subsystem;
 	mutex_init(&ctrl->lock);
 
-	nvmet_init_cap(ctrl);
-
 	ctrl->port = req->port;
 
 	INIT_WORK(&ctrl->async_event_work, nvmet_async_event_work);
@@ -1378,6 +1380,7 @@ u16 nvmet_alloc_ctrl(const char *subsysnqn, const char *hostnqn,
 
 	kref_init(&ctrl->ref);
 	ctrl->subsys = subsys;
+	nvmet_init_cap(ctrl);
 	WRITE_ONCE(ctrl->aen_enabled, NVMET_AEN_CFG_OPTIONAL);
 
 	ctrl->changed_ns_list = kmalloc_array(NVME_MAX_CHANGED_NAMESPACES,
