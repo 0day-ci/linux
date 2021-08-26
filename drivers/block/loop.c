@@ -2327,7 +2327,11 @@ static int loop_add(int i)
 	lo = kzalloc(sizeof(*lo), GFP_KERNEL);
 	if (!lo)
 		goto out;
-	lo->lo_state = Lo_unbound;
+	lo->lo_state = Lo_new;
+	atomic_set(&lo->lo_refcnt, 0);
+	mutex_init(&lo->lo_mutex);
+	spin_lock_init(&lo->lo_lock);
+	spin_lock_init(&lo->lo_work_lock);
 
 	err = mutex_lock_killable(&loop_ctl_mutex);
 	if (err)
@@ -2341,9 +2345,11 @@ static int loop_add(int i)
 	} else {
 		err = idr_alloc(&loop_index_idr, lo, 0, 0, GFP_KERNEL);
 	}
-	if (err < 0)
-		goto out_unlock;
 	i = err;
+	lo->lo_number = i;
+	mutex_unlock(&loop_ctl_mutex);
+	if (err < 0)
+		goto out_free_dev;
 
 	err = -ENOMEM;
 	lo->tag_set.ops = &loop_mq_ops;
@@ -2397,11 +2403,6 @@ static int loop_add(int i)
 	if (!part_shift)
 		disk->flags |= GENHD_FL_NO_PART_SCAN;
 	disk->flags |= GENHD_FL_EXT_DEVT;
-	atomic_set(&lo->lo_refcnt, 0);
-	mutex_init(&lo->lo_mutex);
-	lo->lo_number		= i;
-	spin_lock_init(&lo->lo_lock);
-	spin_lock_init(&lo->lo_work_lock);
 	disk->major		= LOOP_MAJOR;
 	disk->first_minor	= i << part_shift;
 	disk->minors		= 1 << part_shift;
@@ -2412,14 +2413,18 @@ static int loop_add(int i)
 	disk->event_flags	= DISK_EVENT_FLAG_UEVENT;
 	sprintf(disk->disk_name, "loop%d", i);
 	add_disk(disk);
-	mutex_unlock(&loop_ctl_mutex);
+
+	mutex_lock(&lo->lo_mutex);
+	lo->lo_state = Lo_unbound;
+	mutex_unlock(&lo->lo_mutex);
+
 	return i;
 
 out_cleanup_tags:
 	blk_mq_free_tag_set(&lo->tag_set);
 out_free_idr:
+	mutex_lock(&loop_ctl_mutex);
 	idr_remove(&loop_index_idr, i);
-out_unlock:
 	mutex_unlock(&loop_ctl_mutex);
 out_free_dev:
 	kfree(lo);
