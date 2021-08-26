@@ -16,6 +16,8 @@
 #include <linux/mutex.h>
 #include <uapi/linux/loop.h>
 
+struct crypto_sync_skcipher;
+
 /* Possible states of device */
 enum {
 	Lo_unbound,
@@ -32,21 +34,17 @@ struct loop_device {
 	loff_t		lo_offset;
 	loff_t		lo_sizelimit;
 	int		lo_flags;
-	int		(*transfer)(struct loop_device *, int cmd,
-				    struct page *raw_page, unsigned raw_off,
-				    struct page *loop_page, unsigned loop_off,
-				    int size, sector_t real_block);
 	char		lo_file_name[LO_NAME_SIZE];
 	char		lo_crypt_name[LO_NAME_SIZE];
 	char		lo_encrypt_key[LO_KEY_SIZE];
 	int		lo_encrypt_key_size;
-	struct loop_func_table *lo_encryption;
+	int		lo_encrypt_type;
+	struct crypto_sync_skcipher *lo_encrypt_tfm; 
 	__u32           lo_init[2];
 	kuid_t		lo_key_owner;	/* Who set the key */
 
 	struct file *	lo_backing_file;
 	struct block_device *lo_device;
-	void		*key_data; 
 
 	gfp_t		old_gfp_mask;
 
@@ -78,16 +76,5 @@ struct loop_cmd {
 	struct cgroup_subsys_state *blkcg_css;
 	struct cgroup_subsys_state *memcg_css;
 };
-
-/* Support for loadable transfer modules */
-struct loop_func_table {
-	int number;	/* filter type */ 
-	int (*transfer)(struct loop_device *lo, int cmd,
-			struct page *raw_page, unsigned raw_off,
-			struct page *loop_page, unsigned loop_off,
-			int size, sector_t real_block);
-	int (*init)(struct loop_device *, const struct loop_info64 *); 
-	void (*release)(struct loop_device *); 
-}; 
 
 #endif
