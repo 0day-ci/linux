@@ -154,12 +154,6 @@ out:
 }
 
 static int
-cryptoloop_ioctl(struct loop_device *lo, int cmd, unsigned long arg)
-{
-	return -EINVAL;
-}
-
-static int
 cryptoloop_release(struct loop_device *lo)
 {
 	struct crypto_sync_skcipher *tfm = lo->key_data;
@@ -175,7 +169,6 @@ cryptoloop_release(struct loop_device *lo)
 static struct loop_func_table cryptoloop_funcs = {
 	.number = LO_CRYPT_CRYPTOAPI,
 	.init = cryptoloop_init,
-	.ioctl = cryptoloop_ioctl,
 	.transfer = cryptoloop_transfer,
 	.release = cryptoloop_release,
 	.owner = THIS_MODULE
