@@ -2466,7 +2466,7 @@ out_unlock_ctrl:
 	return ret;
 }
 
-static int loop_control_get_free(int idx)
+static int loop_control_get_free(void)
 {
 	struct loop_device *lo;
 	int id, ret;
@@ -2494,7 +2494,7 @@ static long loop_control_ioctl(struct file *file, unsigned int cmd,
 	case LOOP_CTL_REMOVE:
 		return loop_control_remove(parm);
 	case LOOP_CTL_GET_FREE:
-		return loop_control_get_free(parm);
+		return loop_control_get_free();
 	default:
 		return -ENOSYS;
 	}
