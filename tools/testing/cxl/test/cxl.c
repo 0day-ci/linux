@@ -472,8 +472,10 @@ static __init int cxl_test_init(void)
 		struct platform_device *pdev;
 
 		pdev = platform_device_alloc("cxl_host_bridge", i);
-		if (!pdev)
+		if (!pdev) {
+			rc = -ENOMEM;
 			goto err_bridge;
+		}
 
 		mock_companion(adev, &pdev->dev);
 		rc = platform_device_add(pdev);
@@ -490,8 +492,10 @@ static __init int cxl_test_init(void)
 		struct platform_device *pdev;
 
 		pdev = platform_device_alloc("cxl_root_port", i);
-		if (!pdev)
+		if (!pdev) {
+			rc = -ENOMEM;
 			goto err_port;
+		}
 		pdev->dev.parent = &bridge->dev;
 
 		rc = platform_device_add(pdev);
@@ -508,8 +512,10 @@ static __init int cxl_test_init(void)
 		struct platform_device *pdev;
 
 		pdev = alloc_memdev(i);
-		if (!pdev)
+		if (!pdev) {
+			rc = -ENOMEM;
 			goto err_mem;
+		}
 		pdev->dev.parent = &port->dev;
 
 		rc = platform_device_add(pdev);
@@ -521,8 +527,10 @@ static __init int cxl_test_init(void)
 	}
 
 	cxl_acpi = platform_device_alloc("cxl_acpi", 0);
-	if (!cxl_acpi)
+	if (!cxl_acpi) {
+		rc = -ENOMEM;
 		goto err_mem;
+	}
 
 	mock_companion(&acpi0017_mock, &cxl_acpi->dev);
 	acpi0017_mock.dev.bus = &platform_bus_type;
