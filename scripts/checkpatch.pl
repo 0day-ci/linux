@@ -6330,7 +6330,7 @@ sub process {
 		}
 
 # check for $InitAttributeData (ie: __initdata) with const
-		if ($line =~ /\bconst\b/ && $line =~ /($InitAttributeData)/) {
+		if ($line =~ /\bconst\b/ && $line !~ /\bconst\b[^\*\(]+\*/ && $line =~ /($InitAttributeData)/) {
 			my $attr = $1;
 			$attr =~ /($InitAttributePrefix)(.*)/;
 			my $attr_prefix = $1;
