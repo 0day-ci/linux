@@ -3500,7 +3500,7 @@ L:	linux-arm-kernel@lists.infradead.org (moderated for non-subscribers)
 S:	Maintained
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/nsaenz/linux-rpi.git
 F:	Documentation/devicetree/bindings/pci/brcm,stb-pcie.yaml
-F:	drivers/pci/controller/pcie-brcmstb.c
+F:	drivers/pci/controller/pcie-brcmstb*
 F:	drivers/staging/vc04_services
 N:	bcm2711
 N:	bcm283*
@@ -3581,7 +3581,7 @@ F:	arch/arm/include/asm/hardware/cache-b15-rac.h
 F:	arch/arm/mach-bcm/*brcmstb*
 F:	arch/arm/mm/cache-b15-rac.c
 F:	drivers/bus/brcmstb_gisb.c
-F:	drivers/pci/controller/pcie-brcmstb.c
+F:	drivers/pci/controller/pcie-brcmstb*
 N:	brcmstb
 
 BROADCOM BDC DRIVER
@@ -3874,7 +3874,7 @@ M:	bcm-kernel-feedback-list@broadcom.com
 L:	linux-pci@vger.kernel.org
 S:	Maintained
 F:	Documentation/devicetree/bindings/pci/brcm,stb-pcie.yaml
-F:	drivers/pci/controller/pcie-brcmstb.c
+F:	drivers/pci/controller/pcie-brcmstb*
 
 BROADCOM SYSTEMPORT ETHERNET DRIVER
 M:	Florian Fainelli <f.fainelli@gmail.com>
