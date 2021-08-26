@@ -117,6 +117,13 @@ struct cpufreq_policy {
 	bool			strict_target;
 
 	/*
+	 * Set if the CPUFREQ_GOV_DYNAMIC_SWITCHING flag is set for the current
+	 * governor and if inefficient frequencies were found in the frequency
+	 * table.
+	 */
+	bool			skip_inefficiencies;
+
+	/*
 	 * Preferred average time interval between consecutive invocations of
 	 * the driver to set the frequency for this policy.  To be set by the
 	 * scaling driver (0, which is the default, means no preference).
@@ -971,25 +978,46 @@ static inline int cpufreq_table_find_index_c(struct cpufreq_policy *policy,
 		return cpufreq_table_find_index_dc(policy, target_freq);
 }
 
+static inline unsigned int
+cpufreq_frequency_find_efficient(struct cpufreq_policy *policy,
+				 unsigned int idx)
+{
+	struct cpufreq_frequency_table *table = policy->freq_table;
+	unsigned int efficient_idx = table[idx].efficient;
+
+	return table[efficient_idx].frequency <= policy->max ? efficient_idx :
+		idx;
+}
+
 static inline int cpufreq_frequency_table_target(struct cpufreq_policy *policy,
 						 unsigned int target_freq,
 						 unsigned int relation)
 {
+	int idx;
+
 	if (unlikely(policy->freq_table_sorted == CPUFREQ_TABLE_UNSORTED))
 		return cpufreq_table_index_unsorted(policy, target_freq,
 						    relation);
 
 	switch (relation) {
 	case CPUFREQ_RELATION_L:
-		return cpufreq_table_find_index_l(policy, target_freq);
+		idx = cpufreq_table_find_index_l(policy, target_freq);
+		break;
 	case CPUFREQ_RELATION_H:
-		return cpufreq_table_find_index_h(policy, target_freq);
+		idx = cpufreq_table_find_index_h(policy, target_freq);
+		break;
 	case CPUFREQ_RELATION_C:
-		return cpufreq_table_find_index_c(policy, target_freq);
+		idx = cpufreq_table_find_index_c(policy, target_freq);
+		break;
 	default:
 		WARN_ON_ONCE(1);
 		return 0;
 	}
+
+	if (policy->skip_inefficiencies)
+		idx = cpufreq_frequency_find_efficient(policy, idx);
+
+	return idx;
 }
 
 static inline int cpufreq_table_count_valid_entries(const struct cpufreq_policy *policy)

@@ -2299,6 +2299,7 @@ __weak struct cpufreq_governor *cpufreq_fallback_governor(void)
 
 static int cpufreq_init_governor(struct cpufreq_policy *policy)
 {
+	struct cpufreq_frequency_table *pos;
 	int ret;
 
 	/* Don't start any governor operations if we are entering suspend */
@@ -2339,6 +2340,16 @@ static int cpufreq_init_governor(struct cpufreq_policy *policy)
 	}
 
 	policy->strict_target = !!(policy->governor->flags & CPUFREQ_GOV_STRICT_TARGET);
+
+	policy->skip_inefficiencies = false;
+	if (policy->governor->flags & CPUFREQ_GOV_DYNAMIC_SWITCHING) {
+		cpufreq_for_each_valid_entry(pos, policy->freq_table) {
+			if (pos->flags & CPUFREQ_INEFFICIENT_FREQ) {
+				policy->skip_inefficiencies = true;
+				break;
+			}
+		}
+	}
 
 	return 0;
 }
