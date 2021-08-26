@@ -469,35 +469,37 @@ out:
 	return err < 0 ? ERR_PTR(err) : data;
 }
 
-static ssize_t auto_update_interval_show(struct device *dev,
-					 struct device_attribute *devattr,
-					 char *buf)
-{
-	struct adt7470_data *data = adt7470_update_device(dev);
-
-	if (IS_ERR(data))
-		return PTR_ERR(data);
-
-	return sprintf(buf, "%d\n", data->auto_update_interval);
-}
-
-static ssize_t auto_update_interval_store(struct device *dev,
-					  struct device_attribute *devattr,
-					  const char *buf, size_t count)
+static int adt7470_chip_read(struct device *dev, u32 attr, long *val)
 {
 	struct adt7470_data *data = dev_get_drvdata(dev);
-	long temp;
 
-	if (kstrtol(buf, 10, &temp))
-		return -EINVAL;
+	switch (attr) {
+	case hwmon_chip_update_interval:
+		*val = data->auto_update_interval;
+		break;
+	default:
+		return -EOPNOTSUPP;
+	}
 
-	temp = clamp_val(temp, 0, 60000);
+	return 0;
+}
 
-	mutex_lock(&data->lock);
-	data->auto_update_interval = temp;
-	mutex_unlock(&data->lock);
+static int adt7470_chip_write(struct device *dev, u32 attr, long val)
+{
+	struct adt7470_data *data = dev_get_drvdata(dev);
 
-	return count;
+	switch (attr) {
+	case hwmon_chip_update_interval:
+		val = clamp_val(val, 0, 60000);
+		mutex_lock(&data->lock);
+		data->auto_update_interval = val;
+		mutex_unlock(&data->lock);
+		break;
+	default:
+		return -EOPNOTSUPP;
+	}
+
+	return 0;
 }
 
 static ssize_t num_temp_sensors_show(struct device *dev,
@@ -1034,7 +1036,6 @@ static ssize_t pwm_auto_temp_store(struct device *dev,
 
 static DEVICE_ATTR_RW(alarm_mask);
 static DEVICE_ATTR_RW(num_temp_sensors);
-static DEVICE_ATTR_RW(auto_update_interval);
 
 static SENSOR_DEVICE_ATTR_RW(force_pwm_max, force_pwm_max, 0);
 
@@ -1066,7 +1067,6 @@ static SENSOR_DEVICE_ATTR_RW(pwm4_auto_channels_temp, pwm_auto_temp, 3);
 static struct attribute *adt7470_attrs[] = {
 	&dev_attr_alarm_mask.attr,
 	&dev_attr_num_temp_sensors.attr,
-	&dev_attr_auto_update_interval.attr,
 	&sensor_dev_attr_force_pwm_max.dev_attr.attr,
 	&sensor_dev_attr_pwm1_auto_point1_pwm.dev_attr.attr,
 	&sensor_dev_attr_pwm2_auto_point1_pwm.dev_attr.attr,
@@ -1097,6 +1097,8 @@ static int adt7470_read(struct device *dev, enum hwmon_sensor_types type, u32 at
 			int channel, long *val)
 {
 	switch (type) {
+	case hwmon_chip:
+		return adt7470_chip_read(dev, attr, val);
 	case hwmon_temp:
 		return adt7470_temp_read(dev, attr, channel, val);
 	case hwmon_fan:
@@ -1112,6 +1114,8 @@ static int adt7470_write(struct device *dev, enum hwmon_sensor_types type, u32 a
 			int channel, long val)
 {
 	switch (type) {
+	case hwmon_chip:
+		return adt7470_chip_write(dev, attr, val);
 	case hwmon_temp:
 		return adt7470_temp_write(dev, attr, channel, val);
 	case hwmon_fan:
@@ -1129,6 +1133,15 @@ static umode_t adt7470_is_visible(const void *_data, enum hwmon_sensor_types typ
 	umode_t mode = 0;
 
 	switch (type) {
+	case hwmon_chip:
+		switch (attr) {
+		case hwmon_chip_update_interval:
+			mode = 0644;
+			break;
+		default:
+			break;
+		}
+		break;
 	case hwmon_temp:
 		switch (attr) {
 		case hwmon_temp:
@@ -1187,6 +1200,7 @@ static const struct hwmon_ops adt7470_hwmon_ops = {
 };
 
 static const struct hwmon_channel_info *adt7470_info[] = {
+	HWMON_CHANNEL_INFO(chip, HWMON_C_UPDATE_INTERVAL),
 	HWMON_CHANNEL_INFO(temp,
 			HWMON_T_INPUT | HWMON_T_MIN | HWMON_T_MAX | HWMON_T_ALARM,
 			HWMON_T_INPUT | HWMON_T_MIN | HWMON_T_MAX | HWMON_T_ALARM,
