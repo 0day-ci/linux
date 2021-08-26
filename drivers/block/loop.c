@@ -1084,20 +1084,18 @@ static void loop_update_rotational(struct loop_device *lo)
 		blk_queue_flag_clear(QUEUE_FLAG_NONROT, q);
 }
 
-static int
+static void
 loop_release_xfer(struct loop_device *lo)
 {
-	int err = 0;
 	struct loop_func_table *xfer = lo->lo_encryption;
 
 	if (xfer) {
 		if (xfer->release)
-			err = xfer->release(lo);
+			xfer->release(lo);
 		lo->transfer = NULL;
 		lo->lo_encryption = NULL;
 		module_put(xfer->owner);
 	}
-	return err;
 }
 
 static int
@@ -1140,9 +1138,7 @@ loop_set_status_from_info(struct loop_device *lo,
 	if ((unsigned int) info->lo_encrypt_key_size > LO_KEY_SIZE)
 		return -EINVAL;
 
-	err = loop_release_xfer(lo);
-	if (err)
-		return err;
+	loop_release_xfer(lo);
 
 	if (info->lo_encrypt_type) {
 		unsigned int type = info->lo_encrypt_type;

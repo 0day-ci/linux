@@ -88,7 +88,7 @@ struct loop_func_table {
 			int size, sector_t real_block);
 	int (*init)(struct loop_device *, const struct loop_info64 *); 
 	/* release is called from loop_unregister_transfer or clr_fd */
-	int (*release)(struct loop_device *); 
+	void (*release)(struct loop_device *); 
 	struct module *owner;
 }; 
 

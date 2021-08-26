@@ -153,17 +153,11 @@ out:
 	return err;
 }
 
-static int
+static void
 cryptoloop_release(struct loop_device *lo)
 {
-	struct crypto_sync_skcipher *tfm = lo->key_data;
-	if (tfm != NULL) {
-		crypto_free_sync_skcipher(tfm);
-		lo->key_data = NULL;
-		return 0;
-	}
-	printk(KERN_ERR "cryptoloop_release(): tfm == NULL?\n");
-	return -EINVAL;
+	crypto_free_sync_skcipher(lo->key_data);
+	lo->key_data = NULL;
 }
 
 static struct loop_func_table cryptoloop_funcs = {
