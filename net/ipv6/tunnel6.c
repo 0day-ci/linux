@@ -17,6 +17,7 @@
 #include <linux/slab.h>
 #include <net/ipv6.h>
 #include <net/protocol.h>
+#include <net/tunnel6_anonymous.h>
 #include <net/xfrm.h>
 
 static struct xfrm6_tunnel __rcu *tunnel6_handlers __read_mostly;
@@ -144,6 +145,12 @@ static int tunnel6_rcv(struct sk_buff *skb)
 	if (!pskb_may_pull(skb, sizeof(struct ipv6hdr)))
 		goto drop;
 
+	/* Anonymous tunnel decapsulation
+	 * has a higher priority (if enabled)
+	 */
+	if (anonymous66_enabled(skb))
+		return anonymous66_decap(skb);
+
 	for_each_tunnel_rcu(tunnel6_handlers, handler)
 		if (!handler->handler(skb))
 			return 0;
@@ -257,8 +264,11 @@ static const struct inet6_protocol tunnelmpls6_protocol = {
 static int __init tunnel6_init(void)
 {
 	if (inet6_add_protocol(&tunnel6_protocol, IPPROTO_IPV6)) {
-		pr_err("%s: can't add protocol\n", __func__);
-		return -EAGAIN;
+		if (tunnel6_anonymous_unregister() ||
+		    inet6_add_protocol(&tunnel6_protocol, IPPROTO_IPV6)) {
+			pr_err("%s: can't add protocol\n", __func__);
+			return -EAGAIN;
+		}
 	}
 	if (inet6_add_protocol(&tunnel46_protocol, IPPROTO_IPIP)) {
 		pr_err("%s: can't add protocol\n", __func__);
@@ -295,6 +305,8 @@ static void __exit tunnel6_fini(void)
 		pr_err("%s: can't remove protocol\n", __func__);
 	if (inet6_del_protocol(&tunnel6_protocol, IPPROTO_IPV6))
 		pr_err("%s: can't remove protocol\n", __func__);
+	else
+		tunnel6_anonymous_register();
 	if (xfrm6_tunnel_mpls_supported() &&
 	    inet6_del_protocol(&tunnelmpls6_protocol, IPPROTO_MPLS))
 		pr_err("%s: can't remove protocol\n", __func__);

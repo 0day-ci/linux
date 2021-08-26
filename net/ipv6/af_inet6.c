@@ -63,6 +63,7 @@
 #include <net/compat.h>
 #include <net/xfrm.h>
 #include <net/ioam6.h>
+#include <net/tunnel6_anonymous.h>
 
 #include <linux/uaccess.h>
 #include <linux/mroute6.h>
@@ -1199,6 +1200,10 @@ static int __init inet6_init(void)
 	if (err)
 		goto ioam6_fail;
 
+	err = tunnel6_anonymous_init();
+	if (err)
+		goto tunnel6_anonymous_fail;
+
 	err = igmp6_late_init();
 	if (err)
 		goto igmp6_late_err;
@@ -1221,6 +1226,8 @@ sysctl_fail:
 	igmp6_late_cleanup();
 #endif
 igmp6_late_err:
+	tunnel6_anonymous_exit();
+tunnel6_anonymous_fail:
 	ioam6_exit();
 ioam6_fail:
 	rpl_exit();

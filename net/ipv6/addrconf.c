@@ -241,6 +241,7 @@ static struct ipv6_devconf ipv6_devconf __read_mostly = {
 	.ioam6_enabled		= 0,
 	.ioam6_id               = IOAM6_DEFAULT_IF_ID,
 	.ioam6_id_wide		= IOAM6_DEFAULT_IF_ID_WIDE,
+	.tunnel66_decap_enabled = 0,
 };
 
 static struct ipv6_devconf ipv6_devconf_dflt __read_mostly = {
@@ -300,6 +301,7 @@ static struct ipv6_devconf ipv6_devconf_dflt __read_mostly = {
 	.ioam6_enabled		= 0,
 	.ioam6_id               = IOAM6_DEFAULT_IF_ID,
 	.ioam6_id_wide		= IOAM6_DEFAULT_IF_ID_WIDE,
+	.tunnel66_decap_enabled = 0,
 };
 
 /* Check if link is ready: is it up and is a valid qdisc available */
@@ -5532,6 +5534,7 @@ static inline void ipv6_store_devconf(struct ipv6_devconf *cnf,
 	array[DEVCONF_IOAM6_ENABLED] = cnf->ioam6_enabled;
 	array[DEVCONF_IOAM6_ID] = cnf->ioam6_id;
 	array[DEVCONF_IOAM6_ID_WIDE] = cnf->ioam6_id_wide;
+	array[DEVCONF_TUNNEL66_DECAP_ENABLED] = cnf->tunnel66_decap_enabled;
 }
 
 static inline size_t inet6_ifla6_size(void)
@@ -6964,6 +6967,15 @@ static const struct ctl_table addrconf_sysctl[] = {
 		.maxlen		= sizeof(u32),
 		.mode		= 0644,
 		.proc_handler	= proc_douintvec,
+	},
+	{
+		.procname	= "tunnel66_decap_enabled",
+		.data		= &ipv6_devconf.tunnel66_decap_enabled,
+		.maxlen	= sizeof(u8),
+		.mode		= 0644,
+		.proc_handler	= proc_dou8vec_minmax,
+		.extra1	= (void *)SYSCTL_ZERO,
+		.extra2	= (void *)SYSCTL_ONE,
 	},
 	{
 		/* sentinel */
