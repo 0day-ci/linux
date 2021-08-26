@@ -72,6 +72,15 @@ static int __engine_unpark(struct intel_wakeref *wf)
 			   READ_ONCE(*ce->timeline->hwsp_seqno));
 	}
 
+	list_for_each_entry(ce, &engine->pinned_contexts_list,
+			    pinned_contexts_link) {
+		if (ce == engine->kernel_context)
+			continue;
+
+		dbg_poison_ce(ce);
+		ce->ops->reset(ce);
+	}
+
 	if (engine->unpark)
 		engine->unpark(engine);
 
