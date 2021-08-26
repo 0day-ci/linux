@@ -84,15 +84,16 @@ xfs_mount_set_dax_mode(
 {
 	switch (mode) {
 	case XFS_DAX_INODE:
+		mp->m_features |= XFS_FEAT_DAX_INODE;
 		mp->m_features &= ~(XFS_FEAT_DAX_ALWAYS | XFS_FEAT_DAX_NEVER);
 		break;
 	case XFS_DAX_ALWAYS:
 		mp->m_features |= XFS_FEAT_DAX_ALWAYS;
-		mp->m_features &= ~XFS_FEAT_DAX_NEVER;
+		mp->m_features &= ~(XFS_FEAT_DAX_NEVER | XFS_FEAT_DAX_INODE);
 		break;
 	case XFS_DAX_NEVER:
 		mp->m_features |= XFS_FEAT_DAX_NEVER;
-		mp->m_features &= ~XFS_FEAT_DAX_ALWAYS;
+		mp->m_features &= ~(XFS_FEAT_DAX_ALWAYS | XFS_FEAT_DAX_INODE);
 		break;
 	}
 }
@@ -189,6 +190,7 @@ xfs_fs_show_options(
 		{ XFS_FEAT_LARGE_IOSIZE,	",largeio" },
 		{ XFS_FEAT_DAX_ALWAYS,		",dax=always" },
 		{ XFS_FEAT_DAX_NEVER,		",dax=never" },
+		{ XFS_FEAT_DAX_INODE,		",dax=inode" },
 		{ 0, NULL }
 	};
 	struct xfs_mount	*mp = XFS_M(root->d_sb);
@@ -1584,7 +1586,7 @@ xfs_fs_fill_super(
 	if (xfs_has_crc(mp))
 		sb->s_flags |= SB_I_VERSION;
 
-	if (xfs_has_dax_always(mp)) {
+	if (xfs_has_dax_always(mp) || xfs_has_dax_inode(mp)) {
 		bool rtdev_is_dax = false, datadev_is_dax;
 
 		xfs_warn(mp,
