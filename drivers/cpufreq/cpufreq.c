@@ -1504,6 +1504,8 @@ static int cpufreq_online(unsigned int cpu)
 		 */
 		if (cpufreq_driver->register_em)
 			cpufreq_driver->register_em(policy);
+
+		cpufreq_table_update_efficiencies(policy);
 	}
 
 	ret = cpufreq_init_policy(policy);
