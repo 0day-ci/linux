@@ -69,7 +69,29 @@ static void ttm_bo_mem_space_debug(struct ttm_buffer_object *bo,
 	}
 }
 
-static void ttm_bo_del_from_lru(struct ttm_buffer_object *bo)
+static inline void ttm_bo_move_to_pinned_or_del(struct ttm_buffer_object *bo)
+{
+	struct ttm_device *bdev = bo->bdev;
+	struct ttm_resource_manager *man = NULL;
+
+	if (bo->resource)
+		man = ttm_manager_type(bdev, bo->resource->mem_type);
+
+	/*
+	 * Some BOs might be in transient state where they don't belong
+	 * to any domain at the moment, simply remove them from whatever
+	 * LRU list they are still hanged on to keep previous functionality
+	 */
+	if (man && man->use_tt)
+		list_move_tail(&bo->lru, &man->pinned);
+	else
+		list_del_init(&bo->lru);
+
+	if (bdev->funcs->del_from_lru_notify)
+		bdev->funcs->del_from_lru_notify(bo);
+}
+
+static inline void ttm_bo_del_from_lru(struct ttm_buffer_object *bo)
 {
 	struct ttm_device *bdev = bo->bdev;
 
@@ -98,7 +120,7 @@ void ttm_bo_move_to_lru_tail(struct ttm_buffer_object *bo,
 		dma_resv_assert_held(bo->base.resv);
 
 	if (bo->pin_count) {
-		ttm_bo_del_from_lru(bo);
+		ttm_bo_move_to_pinned_or_del(bo);
 		return;
 	}
 
@@ -342,7 +364,7 @@ static int ttm_bo_cleanup_refs(struct ttm_buffer_object *bo,
 		return ret;
 	}
 
-	ttm_bo_del_from_lru(bo);
+	ttm_bo_move_to_pinned_or_del(bo);
 	list_del_init(&bo->ddestroy);
 	spin_unlock(&bo->bdev->lru_lock);
 	ttm_bo_cleanup_memtype_use(bo);
@@ -1165,7 +1187,7 @@ int ttm_bo_swapout(struct ttm_buffer_object *bo, struct ttm_operation_ctx *ctx,
 		return 0;
 	}
 
-	ttm_bo_del_from_lru(bo);
+	ttm_bo_move_to_pinned_or_del(bo);
 	/* TODO: Cleanup the locking */
 	spin_unlock(&bo->bdev->lru_lock);
 
