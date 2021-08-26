@@ -2907,10 +2907,8 @@ static int rtw_p2p_get_groupid(struct net_device *dev,
 	struct adapter *padapter = (struct adapter *)rtw_netdev_priv(dev);
 	struct wifidirect_info *pwdinfo = &padapter->wdinfo;
 
-	sprintf(extra, "\n%.2X:%.2X:%.2X:%.2X:%.2X:%.2X %s",
-		pwdinfo->groupid_info.go_device_addr[0], pwdinfo->groupid_info.go_device_addr[1],
-		pwdinfo->groupid_info.go_device_addr[2], pwdinfo->groupid_info.go_device_addr[3],
-		pwdinfo->groupid_info.go_device_addr[4], pwdinfo->groupid_info.go_device_addr[5],
+	sprintf(extra, "\n%pM %s",
+		pwdinfo->groupid_info.go_device_addr,
 		pwdinfo->groupid_info.ssid);
 	wrqu->data.length = strlen(extra);
 	return ret;
@@ -3075,8 +3073,7 @@ static int rtw_p2p_get_go_device_address(struct net_device *dev,
 	if (!blnMatch)
 		sprintf(go_devadd_str, "\n\ndev_add = NULL");
 	else
-		sprintf(go_devadd_str, "\ndev_add =%.2X:%.2X:%.2X:%.2X:%.2X:%.2X",
-			attr_content[0], attr_content[1], attr_content[2], attr_content[3], attr_content[4], attr_content[5]);
+		sprintf(go_devadd_str, "\ndev_add =%6phCX", attr_content);
 
 	if (copy_to_user(wrqu->data.pointer, go_devadd_str, 10 + 17))
 		return -EFAULT;
