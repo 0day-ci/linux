@@ -358,6 +358,11 @@ static int guc_prep_golden_context(struct intel_guc *guc,
 	u8 engine_class, guc_class;
 	struct guc_gt_system_info *info, local_info;
 
+	/* Skip execlist and PPGTT registers + HWSP */
+	const u32 lr_hw_context_size = 80 * sizeof(u32);
+	const u32 skip_size = LRC_PPHWSP_SZ * PAGE_SIZE +
+		lr_hw_context_size;
+
 	/*
 	 * Reserve the memory for the golden contexts and point GuC at it but
 	 * leave it empty for now. The context data will be filled in later
@@ -396,7 +401,18 @@ static int guc_prep_golden_context(struct intel_guc *guc,
 		if (!blob)
 			continue;
 
-		blob->ads.eng_state_size[guc_class] = real_size;
+		/*
+		 * This interface is slightly confusing. We need to pass the
+		 * base address of the golden context and the engine state size
+		 * which is not the size of the whole golden context, it is a
+		 * subset that the GuC uses when doing a watchdog reset. The
+		 * engine state size must match the size of the golden context
+		 * minus the first part of the golden context that the GuC does
+		 * not retore during reset. Currently no real way to verify this
+		 * other than reading the GuC spec / code and ensuring the
+		 * 'skip_size' below matches the value used in the GuC code.
+		 */
+		blob->ads.eng_state_size[guc_class] = real_size - skip_size;
 		blob->ads.golden_context_lrca[guc_class] = addr_ggtt;
 		addr_ggtt += alloc_size;
 	}
@@ -437,8 +453,8 @@ static void guc_init_golden_context(struct intel_guc *guc)
 	u8 *ptr;
 
 	/* Skip execlist and PPGTT registers + HWSP */
-	const u32 lr_hw_context_size = 80 * sizeof(u32);
-	const u32 skip_size = LRC_PPHWSP_SZ * PAGE_SIZE +
+	__maybe_unused const u32 lr_hw_context_size = 80 * sizeof(u32);
+	__maybe_unused const u32 skip_size = LRC_PPHWSP_SZ * PAGE_SIZE +
 		lr_hw_context_size;
 
 	if (!intel_uc_uses_guc_submission(&gt->uc))
@@ -476,12 +492,12 @@ static void guc_init_golden_context(struct intel_guc *guc)
 			continue;
 		}
 
-		GEM_BUG_ON(blob->ads.eng_state_size[guc_class] != real_size);
+		GEM_BUG_ON(blob->ads.eng_state_size[guc_class] !=
+			   real_size - skip_size);
 		GEM_BUG_ON(blob->ads.golden_context_lrca[guc_class] != addr_ggtt);
 		addr_ggtt += alloc_size;
 
-		shmem_read(engine->default_state, skip_size, ptr + skip_size,
-			   real_size - skip_size);
+		shmem_read(engine->default_state, 0, ptr, real_size);
 		ptr += alloc_size;
 	}
 
