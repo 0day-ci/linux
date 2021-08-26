@@ -665,8 +665,10 @@ int drm_mode_setcrtc(struct drm_device *dev, void *data,
 
 	plane = crtc->primary;
 
+	lockdep_assert_held_once(&dev->master_rwsem);
 	/* allow disabling with the primary plane leased */
-	if (crtc_req->mode_valid && !drm_lease_held(file_priv, plane->base.id))
+	if (crtc_req->mode_valid &&
+	    !drm_lease_held_master(file_priv->master, plane->base.id))
 		return -EACCES;
 
 	DRM_MODESET_LOCK_ALL_BEGIN(dev, ctx,
