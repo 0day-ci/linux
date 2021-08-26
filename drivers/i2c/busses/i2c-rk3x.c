@@ -1108,6 +1108,16 @@ static int rk3x_i2c_xfer_common(struct i2c_adapter *adap,
 			val |= REG_CON_EN | REG_CON_STOP;
 			i2c_writel(i2c, val, REG_CON);
 
+			/*
+			 * Sometimes SDA remains stuck low after timeouts.
+			 * Disable and reenable the I2C peripheral to unstick
+			 * SDA.
+			 */
+			val &= ~REG_CON_EN;
+			i2c_writel(i2c, val, REG_CON);
+			val |= REG_CON_EN;
+			i2c_writel(i2c, val, REG_CON);
+
 			i2c->state = STATE_IDLE;
 
 			ret = -ETIMEDOUT;
