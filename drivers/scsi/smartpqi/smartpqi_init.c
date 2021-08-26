@@ -6674,13 +6674,7 @@ static ssize_t pqi_unique_id_show(struct device *dev,
 
 	spin_unlock_irqrestore(&ctrl_info->scsi_device_list_lock, flags);
 
-	return scnprintf(buffer, PAGE_SIZE,
-		"%02X%02X%02X%02X%02X%02X%02X%02X"
-		"%02X%02X%02X%02X%02X%02X%02X%02X\n",
-		unique_id[0], unique_id[1], unique_id[2], unique_id[3],
-		unique_id[4], unique_id[5], unique_id[6], unique_id[7],
-		unique_id[8], unique_id[9], unique_id[10], unique_id[11],
-		unique_id[12], unique_id[13], unique_id[14], unique_id[15]);
+	return scnprintf(buffer, PAGE_SIZE, "%16phNX\n", unique_id);
 }
 
 static ssize_t pqi_lunid_show(struct device *dev,
