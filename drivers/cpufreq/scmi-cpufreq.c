@@ -250,6 +250,7 @@ static void scmi_cpufreq_register_em(struct cpufreq_policy *policy)
 {
 	struct em_data_callback em_cb = EM_DATA_CB(scmi_get_cpu_power);
 	bool power_scale_mw = perf_ops->power_scale_mw_get(ph);
+	struct device *cpu_dev = get_cpu_device(policy->cpu);
 	struct scmi_data *priv = policy->driver_data;
 
 	/*
@@ -262,9 +263,9 @@ static void scmi_cpufreq_register_em(struct cpufreq_policy *policy)
 	if (!priv->nr_opp)
 		return;
 
-	em_dev_register_perf_domain(get_cpu_device(policy->cpu), priv->nr_opp,
-				    &em_cb, priv->opp_shared_cpus,
-				    power_scale_mw);
+	em_dev_register_perf_domain(cpu_dev, priv->nr_opp, &em_cb,
+				    priv->opp_shared_cpus, power_scale_mw);
+	cpufreq_read_inefficiencies_from_em(policy, em_pd_get(cpu_dev));
 }
 
 static struct cpufreq_driver scmi_cpufreq_driver = {
