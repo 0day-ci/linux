@@ -533,6 +533,31 @@ struct i915_request *intel_context_find_active_request(struct intel_context *ce)
 	return active;
 }
 
+bool intel_context_ban(struct intel_context *ce, struct i915_request *rq)
+{
+	bool ret = intel_context_set_banned(ce);
+
+	trace_intel_context_ban(ce);
+
+	if (ce->ops->revoke)
+		ce->ops->revoke(ce, rq,
+				INTEL_CONTEXT_BANNED_PREEMPT_TIMEOUT_MS);
+
+	return ret;
+}
+
+bool intel_context_exit_nonpersistent(struct intel_context *ce,
+				      struct i915_request *rq)
+{
+	bool ret = intel_context_set_exiting(ce);
+
+	if (ce->ops->revoke)
+		ce->ops->revoke(ce, rq,
+				INTEL_CONTEXT_EXITING_PREEMPT_TIMEOUT_MS);
+
+	return ret;
+}
+
 #if IS_ENABLED(CONFIG_DRM_I915_SELFTEST)
 #include "selftest_context.c"
 #endif
