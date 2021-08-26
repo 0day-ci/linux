@@ -29,6 +29,13 @@ int pcibios_alloc_irq(struct pci_dev *dev)
 
 	return 0;
 }
+
+void pcibios_free_irq(struct pci_dev *dev)
+{
+	if (!acpi_disabled)
+		acpi_pci_irq_disable(dev);
+}
+
 #endif
 
 /*
