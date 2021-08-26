@@ -743,13 +743,7 @@ static ssize_t unique_id_show(struct device *dev,
 	}
 	memcpy(sn, hdev->device_id, sizeof(sn));
 	spin_unlock_irqrestore(&h->lock, flags);
-	return snprintf(buf, 16 * 2 + 2,
-			"%02X%02X%02X%02X%02X%02X%02X%02X"
-			"%02X%02X%02X%02X%02X%02X%02X%02X\n",
-			sn[0], sn[1], sn[2], sn[3],
-			sn[4], sn[5], sn[6], sn[7],
-			sn[8], sn[9], sn[10], sn[11],
-			sn[12], sn[13], sn[14], sn[15]);
+	return snprintf(buf, 16 * 2 + 2, "%16phNX\n", sn);
 }
 
 static ssize_t sas_address_show(struct device *dev,
