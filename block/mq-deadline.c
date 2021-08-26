@@ -79,6 +79,7 @@ struct dd_per_prio {
 	struct list_head fifo_list[DD_DIR_COUNT];
 	/* Next request in FIFO order. Read, write or both are NULL. */
 	struct request *next_rq[DD_DIR_COUNT];
+	unsigned int nr_queued;
 };
 
 struct deadline_data {
@@ -277,9 +278,9 @@ deadline_move_request(struct deadline_data *dd, struct dd_per_prio *per_prio,
 }
 
 /* Number of requests queued for a given priority level. */
-static u32 dd_queued(struct deadline_data *dd, enum dd_prio prio)
+static __always_inline u32 dd_queued(struct deadline_data *dd, enum dd_prio prio)
 {
-	return dd_sum(dd, inserted, prio) - dd_sum(dd, completed, prio);
+	return dd->per_prio[prio].nr_queued;
 }
 
 /*
@@ -713,6 +714,8 @@ static void dd_insert_request(struct blk_mq_hw_ctx *hctx, struct request *rq,
 
 	prio = ioprio_class_to_prio[ioprio_class];
 	dd_count(dd, inserted, prio);
+	per_prio = &dd->per_prio[prio];
+	per_prio->nr_queued++;
 
 	if (blk_mq_sched_try_insert_merge(q, rq, &free)) {
 		blk_mq_free_requests(&free);
@@ -721,7 +724,6 @@ static void dd_insert_request(struct blk_mq_hw_ctx *hctx, struct request *rq,
 
 	trace_block_rq_insert(rq);
 
-	per_prio = &dd->per_prio[prio];
 	if (at_head) {
 		list_add(&rq->queuelist, &per_prio->dispatch);
 	} else {
@@ -792,12 +794,14 @@ static void dd_finish_request(struct request *rq)
 	const u8 ioprio_class = dd_rq_ioclass(rq);
 	const enum dd_prio prio = ioprio_class_to_prio[ioprio_class];
 	struct dd_per_prio *per_prio = &dd->per_prio[prio];
+	unsigned long flags;
 
 	dd_count(dd, completed, prio);
+	spin_lock_irqsave(&dd->lock, flags);
+	per_prio->nr_queued--;
+	spin_unlock_irqrestore(&dd->lock, flags);
 
 	if (blk_queue_is_zoned(q)) {
-		unsigned long flags;
-
 		spin_lock_irqsave(&dd->zone_lock, flags);
 		blk_req_zone_write_unlock(rq);
 		if (!list_empty(&per_prio->fifo_list[DD_WRITE]))
