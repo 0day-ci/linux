@@ -2003,6 +2003,7 @@ static int bnxt_force_rx_discard(struct bnxt *bp,
 	struct rx_cmp *rxcmp;
 	u16 cp_cons;
 	u8 cmp_type;
+	int ret;
 
 	cp_cons = RING_CMP(tmp_raw_cons);
 	rxcmp = (struct rx_cmp *)
@@ -2031,7 +2032,10 @@ static int bnxt_force_rx_discard(struct bnxt *bp,
 		tpa_end1->rx_tpa_end_cmp_errors_v2 |=
 			cpu_to_le32(RX_TPA_END_CMP_ERRORS);
 	}
-	return bnxt_rx_pkt(bp, cpr, raw_cons, event);
+	ret = bnxt_rx_pkt(bp, cpr, raw_cons, event);
+	if (ret && ret != -EBUSY)
+		cpr->sw_stats.rx.rx_netpoll_discards += 1;
+	return ret;
 }
 
 u32 bnxt_fw_health_readl(struct bnxt *bp, int reg_idx)
@@ -10441,7 +10445,8 @@ static bool bnxt_drv_busy(struct bnxt *bp)
 }
 
 static void bnxt_get_ring_stats(struct bnxt *bp,
-				struct rtnl_link_stats64 *stats);
+				struct rtnl_link_stats64 *stats,
+				struct bnxt_sw_stats *bsw_stats);
 
 static void __bnxt_close_nic(struct bnxt *bp, bool irq_re_init,
 			     bool link_re_init)
@@ -10470,7 +10475,8 @@ static void __bnxt_close_nic(struct bnxt *bp, bool irq_re_init,
 
 	/* Save ring stats before shutdown */
 	if (bp->bnapi && irq_re_init)
-		bnxt_get_ring_stats(bp, &bp->net_stats_prev);
+		bnxt_get_ring_stats(bp, &bp->net_stats_prev,
+				    &bp->sw_stats_prev);
 	if (irq_re_init) {
 		bnxt_free_irq(bp);
 		bnxt_del_napi(bp);
@@ -10615,7 +10621,8 @@ static int bnxt_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 }
 
 static void bnxt_get_ring_stats(struct bnxt *bp,
-				struct rtnl_link_stats64 *stats)
+				struct rtnl_link_stats64 *stats,
+				struct bnxt_sw_stats *bsw_stats)
 {
 	int i;
 
@@ -10646,11 +10653,15 @@ static void bnxt_get_ring_stats(struct bnxt *bp,
 		stats->multicast += BNXT_GET_RING_STATS64(sw, rx_mcast_pkts);
 
 		stats->tx_dropped += BNXT_GET_RING_STATS64(sw, tx_error_pkts);
+
+		bsw_stats->rx.rx_netpoll_discards +=
+			cpr->sw_stats.rx.rx_netpoll_discards;
 	}
 }
 
 static void bnxt_add_prev_stats(struct bnxt *bp,
-				struct rtnl_link_stats64 *stats)
+				struct rtnl_link_stats64 *stats,
+				struct bnxt_sw_stats *bsw_stats)
 {
 	struct rtnl_link_stats64 *prev_stats = &bp->net_stats_prev;
 
@@ -10661,11 +10672,15 @@ static void bnxt_add_prev_stats(struct bnxt *bp,
 	stats->rx_missed_errors += prev_stats->rx_missed_errors;
 	stats->multicast += prev_stats->multicast;
 	stats->tx_dropped += prev_stats->tx_dropped;
+
+	bsw_stats->rx.rx_netpoll_discards +=
+		bp->sw_stats_prev.rx.rx_netpoll_discards;
 }
 
 static void
 bnxt_get_stats64(struct net_device *dev, struct rtnl_link_stats64 *stats)
 {
+	struct bnxt_sw_stats bsw_stats = {};
 	struct bnxt *bp = netdev_priv(dev);
 
 	set_bit(BNXT_STATE_READ_STATS, &bp->state);
@@ -10699,9 +10714,11 @@ bnxt_get_stats64(struct net_device *dev, struct rtnl_link_stats64 *stats)
 		stats->tx_errors = BNXT_GET_TX_PORT_STATS64(tx, tx_err);
 	}
 
-	bnxt_get_ring_stats(bp, stats);
+	bnxt_get_ring_stats(bp, stats, &bsw_stats);
 skip_current:
-	bnxt_add_prev_stats(bp, stats);
+	bnxt_add_prev_stats(bp, stats, &bsw_stats);
+
+	stats->rx_dropped += bsw_stats.rx.rx_netpoll_discards;
 
 	clear_bit(BNXT_STATE_READ_STATS, &bp->state);
 }

@@ -939,6 +939,7 @@ struct bnxt_rx_sw_stats {
 	u64			rx_l4_csum_errors;
 	u64			rx_resets;
 	u64			rx_buf_errors;
+	u64			rx_netpoll_discards;
 };
 
 struct bnxt_cmn_sw_stats {
@@ -1917,6 +1918,7 @@ struct bnxt {
 	dma_addr_t		hwrm_cmd_kong_resp_dma_addr;
 
 	struct rtnl_link_stats64	net_stats_prev;
+	struct bnxt_sw_stats	sw_stats_prev;
 	struct bnxt_stats_mem	port_stats;
 	struct bnxt_stats_mem	rx_port_stats_ext;
 	struct bnxt_stats_mem	tx_port_stats_ext;
