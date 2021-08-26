@@ -2478,7 +2478,11 @@ static int loop_control_remove(int idx)
 	mutex_unlock(&lo->lo_mutex);
 
 	idr_remove(&loop_index_idr, lo->lo_number);
+	mutex_unlock(&loop_ctl_mutex);
+
 	loop_remove(lo);
+	return 0;
+
 out_unlock_ctrl:
 	mutex_unlock(&loop_ctl_mutex);
 	return ret;
@@ -2609,11 +2613,12 @@ static void __exit loop_exit(void)
 	unregister_blkdev(LOOP_MAJOR, "loop");
 	misc_deregister(&loop_misc);
 
-	mutex_lock(&loop_ctl_mutex);
+	/*
+	 * No need for loop_ctl_mutex given that no new ioctls and thus
+	 * additions and removals can happen in parallel to module unloading.
+	 */
 	idr_for_each_entry(&loop_index_idr, lo, id)
 		loop_remove(lo);
-	mutex_unlock(&loop_ctl_mutex);
-
 	idr_destroy(&loop_index_idr);
 }
 
