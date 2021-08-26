@@ -656,7 +656,7 @@ int drm_mode_setcrtc(struct drm_device *dev, void *data,
 	if (crtc_req->x & 0xffff0000 || crtc_req->y & 0xffff0000)
 		return -ERANGE;
 
-	crtc = drm_crtc_find(dev, file_priv, crtc_req->crtc_id);
+	crtc = __drm_crtc_find(dev, file_priv, crtc_req->crtc_id);
 	if (!crtc) {
 		DRM_DEBUG_KMS("Unknown CRTC ID %d\n", crtc_req->crtc_id);
 		return -ENOENT;
@@ -787,7 +787,8 @@ int drm_mode_setcrtc(struct drm_device *dev, void *data,
 				goto out;
 			}
 
-			connector = drm_connector_lookup(dev, file_priv, out_id);
+			connector = __drm_connector_lookup(dev, file_priv,
+							   out_id);
 			if (!connector) {
 				DRM_DEBUG_KMS("Connector id %d unknown\n",
 						out_id);

@@ -114,6 +114,9 @@ struct drm_object_properties {
 		return "(unknown)";				\
 	}
 
+struct drm_mode_object *__drm_mode_object_find(struct drm_device *dev,
+					       struct drm_file *file_priv,
+					       u32 id, u32 type);
 struct drm_mode_object *drm_mode_object_find(struct drm_device *dev,
 					     struct drm_file *file_priv,
 					     uint32_t id, uint32_t type);

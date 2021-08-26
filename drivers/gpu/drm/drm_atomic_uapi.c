@@ -557,7 +557,7 @@ static int drm_atomic_plane_set_property(struct drm_plane *plane,
 			return -EINVAL;
 
 	} else if (property == config->prop_crtc_id) {
-		struct drm_crtc *crtc = drm_crtc_find(dev, file_priv, val);
+		struct drm_crtc *crtc = __drm_crtc_find(dev, file_priv, val);
 
 		if (val && !crtc)
 			return -EACCES;
@@ -709,7 +709,7 @@ static int drm_atomic_connector_set_property(struct drm_connector *connector,
 	int ret;
 
 	if (property == config->prop_crtc_id) {
-		struct drm_crtc *crtc = drm_crtc_find(dev, file_priv, val);
+		struct drm_crtc *crtc = __drm_crtc_find(dev, file_priv, val);
 
 		if (val && !crtc)
 			return -EACCES;
@@ -1385,7 +1385,8 @@ retry:
 			goto out;
 		}
 
-		obj = drm_mode_object_find(dev, file_priv, obj_id, DRM_MODE_OBJECT_ANY);
+		obj = __drm_mode_object_find(dev, file_priv, obj_id,
+					     DRM_MODE_OBJECT_ANY);
 		if (!obj) {
 			ret = -ENOENT;
 			goto out;
