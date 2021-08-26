@@ -1104,9 +1104,38 @@ void cpufreq_generic_init(struct cpufreq_policy *policy,
 		struct cpufreq_frequency_table *table,
 		unsigned int transition_latency);
 
+static inline void
+cpufreq_read_inefficiencies_from_em(struct cpufreq_policy *policy,
+				    struct em_perf_domain *em_pd)
+{
+	struct em_perf_state *em_table;
+	int i;
+
+	if (!em_pd)
+		return;
+
+	/* Inefficiencies support needs a sorted table */
+	if (!policy->freq_table ||
+	    policy->freq_table_sorted == CPUFREQ_TABLE_UNSORTED)
+		return;
+
+	em_table = em_pd->table;
+
+	for (i = 0; i < em_pd->nr_perf_states; i++) {
+		if (!(em_table[i].flags & EM_PERF_STATE_INEFFICIENT))
+			continue;
+
+		cpufreq_table_set_inefficient(policy,
+					      em_table[i].frequency);
+		em_pd->flags |= EM_PERF_DOMAIN_SKIP_INEFFICIENCIES;
+	}
+}
+
 static inline void cpufreq_register_em_with_opp(struct cpufreq_policy *policy)
 {
-	dev_pm_opp_of_register_em(get_cpu_device(policy->cpu),
-				  policy->related_cpus);
+	struct device *cpu_dev = get_cpu_device(policy->cpu);
+
+	dev_pm_opp_of_register_em(cpu_dev, policy->related_cpus);
+	cpufreq_read_inefficiencies_from_em(policy, em_pd_get(cpu_dev));
 }
 #endif /* _LINUX_CPUFREQ_H */
