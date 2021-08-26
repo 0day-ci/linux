@@ -23,6 +23,11 @@
 #include <linux/stringhash.h>
 #include <linux/printk.h>
 
+#define SIZE 256 /* Run time is cubic in SIZE */
+
+static u32 string_or; /* stores or-ed string output */
+static u32 hash_or[2][33] = { { 0, } }; /* stores or-ed hash output */
+
 /* 32-bit XORSHIFT generator.  Seed must not be zero. */
 static u32 __init __attribute_const__
 xorshift(u32 seed)
@@ -66,7 +71,7 @@ fill_buf(char *buf, size_t len, u32 seed)
  * recompile and re-test the module without rebooting.
  */
 static bool __init
-test_int_hash(unsigned long long h64, u32 hash_or[2][33])
+test_int_hash(unsigned long long h64)
 {
 	int k;
 	u32 h0 = (u32)h64, h1, h2;
@@ -123,17 +128,15 @@ test_int_hash(unsigned long long h64, u32 hash_or[2][33])
 	return true;
 }
 
-#define SIZE 256	/* Run time is cubic in SIZE */
-
 static int __init
 test_hash_init(void)
 {
 	char buf[SIZE+1];
-	u32 string_or = 0, hash_or[2][33] = { { 0, } };
 	unsigned tests = 0;
 	unsigned long long h64 = 0;
 	int i, j;
 
+	string_or = 0;
 	fill_buf(buf, SIZE, 1);
 
 	/* Test every possible non-empty substring in the buffer. */
@@ -161,7 +164,7 @@ test_hash_init(void)
 
 			string_or |= h0;
 			h64 = h64 << 32 | h0;	/* For use with hash_64 */
-			if (!test_int_hash(h64, hash_or))
+			if (!test_int_hash(h64))
 				return -EINVAL;
 			tests++;
 		} /* i */
