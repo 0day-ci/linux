@@ -3671,13 +3671,11 @@ static int ocfs2_downconvert_lock(struct ocfs2_super *osb,
 			     OCFS2_LOCK_ID_MAX_LEN - 1);
 	lockres_clear_pending(lockres, generation, osb);
 	if (ret) {
-		ocfs2_log_dlm_error("ocfs2_dlm_lock", ret, lockres);
+		if (ret != -EBUSY)
+			ocfs2_log_dlm_error("ocfs2_dlm_lock", ret, lockres);
 		ocfs2_recover_from_dlm_error(lockres, 1);
-		goto bail;
 	}
 
-	ret = 0;
-bail:
 	return ret;
 }
 
@@ -3912,6 +3910,13 @@ downconvert:
 	spin_unlock_irqrestore(&lockres->l_lock, flags);
 	ret = ocfs2_downconvert_lock(osb, lockres, new_level, set_lvb,
 				     gen);
+	/* ocfs2_cancel_convert() is in progress, try again later */
+	if (ret == -EBUSY) {
+		ctl->requeue = 1;
+		mlog(ML_BASTS, "lockres %s, ReQ: Downconvert busy\n",
+		     lockres->l_name);
+		ret = 0;
+	}
 
 leave:
 	if (ret)
