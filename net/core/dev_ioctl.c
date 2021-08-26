@@ -368,6 +368,54 @@ void dev_load(struct net *net, const char *name)
 }
 EXPORT_SYMBOL(dev_load);
 
+bool is_dev_ioctl_cmd(unsigned int cmd)
+{
+	switch (cmd) {
+	case SIOCGIFNAME:
+	case SIOCGIFHWADDR:
+	case SIOCGIFFLAGS:
+	case SIOCGIFMETRIC:
+	case SIOCGIFMTU:
+	case SIOCGIFSLAVE:
+	case SIOCGIFMAP:
+	case SIOCGIFINDEX:
+	case SIOCGIFTXQLEN:
+	case SIOCETHTOOL:
+	case SIOCGMIIPHY:
+	case SIOCGMIIREG:
+	case SIOCSIFNAME:
+	case SIOCSIFMAP:
+	case SIOCSIFTXQLEN:
+	case SIOCSIFFLAGS:
+	case SIOCSIFMETRIC:
+	case SIOCSIFMTU:
+	case SIOCSIFHWADDR:
+	case SIOCSIFSLAVE:
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
+	case SIOCSIFHWBROADCAST:
+	case SIOCSMIIREG:
+	case SIOCBONDENSLAVE:
+	case SIOCBONDRELEASE:
+	case SIOCBONDSETHWADDR:
+	case SIOCBONDCHANGEACTIVE:
+	case SIOCBRADDIF:
+	case SIOCBRDELIF:
+	case SIOCSHWTSTAMP:
+	case SIOCBONDSLAVEINFOQUERY:
+	case SIOCBONDINFOQUERY:
+	case SIOCGIFMEM:
+	case SIOCSIFMEM:
+	case SIOCSIFLINK:
+	case SIOCWANDEV:
+	case SIOCGHWTSTAMP:
+		return true;
+
+	default:
+		return cmd >= SIOCDEVPRIVATE && cmd <= SIOCDEVPRIVATE + 15;
+	}
+}
+
 /*
  *	This function handles all "interface"-type I/O control requests. The actual
  *	'doing' part of this is dev_ifsioc above.
@@ -521,16 +569,10 @@ int dev_ioctl(struct net *net, unsigned int cmd, struct ifreq *ifr, bool *need_c
 	 *	Unknown or private ioctl.
 	 */
 	default:
-		if (cmd == SIOCWANDEV ||
-		    cmd == SIOCGHWTSTAMP ||
-		    (cmd >= SIOCDEVPRIVATE &&
-		     cmd <= SIOCDEVPRIVATE + 15)) {
-			dev_load(net, ifr->ifr_name);
-			rtnl_lock();
-			ret = dev_ifsioc(net, ifr, cmd);
-			rtnl_unlock();
-			return ret;
-		}
-		return -ENOTTY;
+		dev_load(net, ifr->ifr_name);
+		rtnl_lock();
+		ret = dev_ifsioc(net, ifr, cmd);
+		rtnl_unlock();
+		return ret;
 	}
 }
