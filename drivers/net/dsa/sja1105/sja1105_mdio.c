@@ -435,13 +435,17 @@ static int sja1105_mdiobus_pcs_register(struct sja1105_private *priv)
 			goto out_pcs_free;
 		}
 
-		xpcs = xpcs_create(mdiodev, priv->phy_mode[port]);
+		xpcs = xpcs_create(mdiodev);
 		if (IS_ERR(xpcs)) {
 			rc = PTR_ERR(xpcs);
 			goto out_pcs_free;
 		}
 
 		priv->xpcs[port] = xpcs;
+
+		rc = xpcs_reset(xpcs, priv->phy_mode[port]);
+		if (rc)
+			goto out_pcs_free;
 	}
 
 	priv->mdio_pcs = bus;

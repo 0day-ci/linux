@@ -252,6 +252,18 @@ static int xpcs_soft_reset(struct dw_xpcs *xpcs,
 	return xpcs_poll_reset(xpcs, dev);
 }
 
+int xpcs_reset(struct dw_xpcs *xpcs, phy_interface_t interface)
+{
+	const struct xpcs_compat *compat;
+
+	compat = xpcs_find_compat(xpcs->id, interface);
+	if (!compat)
+		return -ENODEV;
+
+	return xpcs_soft_reset(xpcs, compat);
+}
+EXPORT_SYMBOL_GPL(xpcs_reset);
+
 #define xpcs_warn(__xpcs, __state, __args...) \
 ({ \
 	if ((__state)->link) \
@@ -1084,12 +1096,11 @@ static const struct phylink_pcs_ops xpcs_phylink_ops = {
 	.pcs_link_up = xpcs_link_up,
 };
 
-struct dw_xpcs *xpcs_create(struct mdio_device *mdiodev,
-			    phy_interface_t interface)
+struct dw_xpcs *xpcs_create(struct mdio_device *mdiodev)
 {
 	struct dw_xpcs *xpcs;
 	u32 xpcs_id;
-	int i, ret;
+	int i;
 
 	xpcs = kzalloc(sizeof(*xpcs), GFP_KERNEL);
 	if (!xpcs)
@@ -1099,37 +1110,27 @@ struct dw_xpcs *xpcs_create(struct mdio_device *mdiodev,
 
 	xpcs_id = xpcs_get_id(xpcs);
 
+	/* If Device ID are all ones, there is no device found */
+	if (xpcs_id == 0xffffffff)
+		goto out;
+
 	for (i = 0; i < ARRAY_SIZE(xpcs_id_list); i++) {
 		const struct xpcs_id *entry = &xpcs_id_list[i];
-		const struct xpcs_compat *compat;
 
 		if ((xpcs_id & entry->mask) != entry->id)
 			continue;
 
 		xpcs->id = entry;
-
-		compat = xpcs_find_compat(entry, interface);
-		if (!compat) {
-			ret = -ENODEV;
-			goto out;
-		}
-
 		xpcs->pcs.ops = &xpcs_phylink_ops;
 		xpcs->pcs.poll = true;
-
-		ret = xpcs_soft_reset(xpcs, compat);
-		if (ret)
-			goto out;
 
 		return xpcs;
 	}
 
-	ret = -ENODEV;
-
 out:
 	kfree(xpcs);
 
-	return ERR_PTR(ret);
+	return ERR_PTR(-ENODEV);
 }
 EXPORT_SYMBOL_GPL(xpcs_create);
 
