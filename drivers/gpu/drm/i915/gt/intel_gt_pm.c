@@ -192,6 +192,9 @@ static void gt_sanitize(struct intel_gt *gt, bool force)
 
 	intel_rps_sanitize(&gt->rps);
 
+	for_each_engine(engine, gt, id)
+		intel_engine_reset_pinned_contexts(engine);
+
 	intel_uncore_forcewake_put(gt->uncore, FORCEWAKE_ALL);
 	intel_runtime_pm_put(gt->uncore->rpm, wakeref);
 }
