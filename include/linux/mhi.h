@@ -613,10 +613,8 @@ int mhi_get_free_desc_count(struct mhi_device *mhi_dev,
 
 /**
  * mhi_prepare_for_power_up - Do pre-initialization before power up.
- *                            This is optional, call this before power up if
- *                            the controller does not want bus framework to
- *                            automatically free any allocated memory during
- *                            shutdown process.
+ *                            Call this before MHI power up sequence to
+ *                            initialize MHI context.
  * @mhi_cntrl: MHI controller
  */
 int mhi_prepare_for_power_up(struct mhi_controller *mhi_cntrl);
