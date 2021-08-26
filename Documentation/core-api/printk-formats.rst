@@ -284,10 +284,16 @@ Raw buffer as a hex string
 
 ::
 
+	The preferred output is lowercase
 	%*ph	00 01 02  ...  3f
 	%*phC	00:01:02: ... :3f
 	%*phD	00-01-02- ... -3f
 	%*phN	000102 ... 3f
+	Formats with X are uppercase, used for backwards compatibility
+	%*phX	00 01 02  ...  3F
+	%*phCX	00:01:02: ... :3F
+	%*phDX	00-01-02- ... -3F
+	%*phNX	000102 ... 3F
 
 For printing small buffers (up to 64 bytes long) as a hex string with a
 certain separator. For larger buffers consider using

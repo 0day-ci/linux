@@ -1147,7 +1147,10 @@ char *hex_string(char *buf, char *end, u8 *addr, struct printf_spec spec,
 {
 	int i, len = 1;		/* if we pass '%ph[CDN]', field width remains
 				   negative value, fallback to the default */
-	char separator;
+	char separator = ' ';
+	int count = 1;
+	bool found = true;
+	char locase = 0x20;	/* ASCII OR'd for lower case see: number() */
 
 	if (spec.field_width == 0)
 		/* nothing to print */
@@ -1156,30 +1159,35 @@ char *hex_string(char *buf, char *end, u8 *addr, struct printf_spec spec,
 	if (check_pointer(&buf, end, addr, spec))
 		return buf;
 
-	switch (fmt[1]) {
-	case 'C':
-		separator = ':';
-		break;
-	case 'D':
-		separator = '-';
-		break;
-	case 'N':
-		separator = 0;
-		break;
-	default:
-		separator = ' ';
-		break;
-	}
+	do {
+		switch (fmt[count++]) {
+		case 'C':
+			separator = ':';
+			break;
+		case 'D':
+			separator = '-';
+			break;
+		case 'N':
+			separator = 0;
+			break;
+		case 'X':
+			locase = 0;
+			break;
+		default:
+			found = false;
+			break;
+		}
+	} while (found);
 
 	if (spec.field_width > 0)
 		len = min_t(int, spec.field_width, 64);
 
 	for (i = 0; i < len; ++i) {
 		if (buf < end)
-			*buf = hex_asc_hi(addr[i]);
+			*buf = hex_asc_upper_hi(addr[i]) | locase;
 		++buf;
 		if (buf < end)
-			*buf = hex_asc_lo(addr[i]);
+			*buf = hex_asc_upper_lo(addr[i]) | locase;
 		++buf;
 
 		if (separator && i != len - 1) {
