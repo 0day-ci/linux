@@ -156,6 +156,8 @@ config BLK_DEV_COW_COMMON
 
 config BLK_DEV_LOOP
 	tristate "Loopback device support"
+	select CRYPTO if CRYPTOLOOP
+	select CRYPTO_CBC if CRYPTOLOOP
 	help
 	  Saying Y here will allow you to use a regular file as a block
 	  device; you can then create a file system on that block device and
@@ -213,9 +215,7 @@ config BLK_DEV_LOOP_MIN_COUNT
 	  dynamically allocated with the /dev/loop-control interface.
 
 config BLK_DEV_CRYPTOLOOP
-	tristate "Cryptoloop Support"
-	select CRYPTO
-	select CRYPTO_CBC
+	bool "Cryptoloop Support"
 	depends on BLK_DEV_LOOP
 	help
 	  Say Y here if you want to be able to use the ciphers that are 
