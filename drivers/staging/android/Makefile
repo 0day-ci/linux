@@ -2,3 +2,4 @@
 ccflags-y += -I$(src)			# needed for trace events
 
 obj-$(CONFIG_ASHMEM)			+= ashmem.o
+obj-$(CONFIG_USERPANIC_CHARDEV)	+= userpanic-dev.o

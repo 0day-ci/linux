@@ -14,6 +14,18 @@ config ASHMEM
 	  It is, in theory, a good memory allocator for low-memory devices,
 	  because it can discard shared memory units when under memory pressure.
 
+config USERPANIC_CHARDEV
+	bool "User-panic device interface"
+	help
+	  Say Y here to use user-panic device for user space processes to
+	  request a system panic with customized panic message.
+
+	  A char device '/dev/userspace_panic' is created by this driver
+	  when selecting 'Y'. User processes can request panic and attach
+	  customized panic message and title by ioctl(CRASH_INFO). Later any
+	  panic handler can collect the panic message to build debugging
+	  reports.
+
 endif # if ANDROID
 
 endmenu
