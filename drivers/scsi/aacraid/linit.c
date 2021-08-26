@@ -587,12 +587,7 @@ static ssize_t aac_show_unique_id(struct device *dev,
 	if (sdev_channel(sdev) == CONTAINER_CHANNEL)
 		memcpy(sn, aac->fsa_dev[sdev_id(sdev)].identifier, sizeof(sn));
 
-	return snprintf(buf, 16 * 2 + 2,
-		"%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X\n",
-		sn[0], sn[1], sn[2], sn[3],
-		sn[4], sn[5], sn[6], sn[7],
-		sn[8], sn[9], sn[10], sn[11],
-		sn[12], sn[13], sn[14], sn[15]);
+	return snprintf(buf, 16 * 2 + 2, "%16phNX\n", sn);
 }
 
 static struct device_attribute aac_unique_id_attr = {
