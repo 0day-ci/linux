@@ -4446,8 +4446,8 @@ static int ext4_fill_raw_inode(struct inode *inode, struct ext4_inode *raw_inode
  * inode.
  */
 static int __ext4_get_inode_loc(struct super_block *sb, unsigned long ino,
-				struct ext4_iloc *iloc, int in_mem,
-				ext4_fsblk_t *ret_block)
+				struct inode *inode, struct ext4_iloc *iloc,
+				int in_mem, ext4_fsblk_t *ret_block)
 {
 	struct ext4_group_desc	*gdp;
 	struct buffer_head	*bh;
@@ -4514,8 +4514,13 @@ static int __ext4_get_inode_loc(struct super_block *sb, unsigned long ino,
 		}
 		brelse(bitmap_bh);
 		if (i == start + inodes_per_block) {
+			struct ext4_inode *raw_inode =
+				(struct ext4_inode *) (bh->b_data + iloc->offset);
+
 			/* all other inodes are free, so skip I/O */
 			memset(bh->b_data, 0, bh->b_size);
+			if (!ext4_test_inode_state(inode, EXT4_STATE_NEW))
+				ext4_fill_raw_inode(inode, raw_inode);
 			set_buffer_uptodate(bh);
 			unlock_buffer(bh);
 			goto has_buffer;
@@ -4576,7 +4581,7 @@ static int __ext4_get_inode_loc_noinmem(struct inode *inode,
 	ext4_fsblk_t err_blk;
 	int ret;
 
-	ret = __ext4_get_inode_loc(inode->i_sb, inode->i_ino, iloc, 0,
+	ret = __ext4_get_inode_loc(inode->i_sb, inode->i_ino, NULL, iloc, 0,
 					&err_blk);
 
 	if (ret == -EIO)
@@ -4592,8 +4597,13 @@ int ext4_get_inode_loc(struct inode *inode, struct ext4_iloc *iloc)
 	int ret;
 
 	/* We have all inode data except xattrs in memory here. */
-	ret = __ext4_get_inode_loc(inode->i_sb, inode->i_ino, iloc,
-		!ext4_test_inode_state(inode, EXT4_STATE_XATTR), &err_blk);
+	if (ext4_test_inode_state(inode, EXT4_STATE_XATTR)) {
+		ret = __ext4_get_inode_loc(inode->i_sb, inode->i_ino, NULL,
+					   iloc, false, &err_blk);
+	} else {
+		ret = __ext4_get_inode_loc(inode->i_sb, inode->i_ino, inode,
+					   iloc, true, &err_blk);
+	}
 
 	if (ret == -EIO)
 		ext4_error_inode_block(inode, err_blk, EIO,
@@ -4606,7 +4616,7 @@ int ext4_get_inode_loc(struct inode *inode, struct ext4_iloc *iloc)
 int ext4_get_fc_inode_loc(struct super_block *sb, unsigned long ino,
 			  struct ext4_iloc *iloc)
 {
-	return __ext4_get_inode_loc(sb, ino, iloc, 0, NULL);
+	return __ext4_get_inode_loc(sb, ino, NULL, iloc, 0, NULL);
 }
 
 static bool ext4_should_enable_dax(struct inode *inode)
