@@ -6113,8 +6113,7 @@ static int btrfs_real_readdir(struct file *file, struct dir_context *ctx)
 	struct list_head ins_list;
 	struct list_head del_list;
 	int ret;
-	struct extent_buffer *leaf;
-	int slot;
+	int iter_ret;
 	char *name_ptr;
 	int name_len;
 	int entries = 0;
@@ -6141,35 +6140,19 @@ again:
 	key.offset = ctx->pos;
 	key.objectid = btrfs_ino(BTRFS_I(inode));
 
-	ret = btrfs_search_slot(NULL, root, &key, path, 0, 0);
-	if (ret < 0)
-		goto err;
-
-	while (1) {
+	btrfs_for_each_slot(root, &key, &found_key, path, iter_ret) {
 		struct dir_entry *entry;
+		struct extent_buffer *leaf = path->nodes[0];
 
-		leaf = path->nodes[0];
-		slot = path->slots[0];
-		if (slot >= btrfs_header_nritems(leaf)) {
-			ret = btrfs_next_leaf(root, path);
-			if (ret < 0)
-				goto err;
-			else if (ret > 0)
-				break;
+		if (found_key.objectid != key.objectid ||
+		    found_key.type != BTRFS_DIR_INDEX_KEY)
+			break;
+
+		if (found_key.offset < ctx->pos ||
+		    btrfs_should_delete_dir_index(&del_list, found_key.offset))
 			continue;
-		}
 
-		btrfs_item_key_to_cpu(leaf, &found_key, slot);
-
-		if (found_key.objectid != key.objectid)
-			break;
-		if (found_key.type != BTRFS_DIR_INDEX_KEY)
-			break;
-		if (found_key.offset < ctx->pos)
-			goto next;
-		if (btrfs_should_delete_dir_index(&del_list, found_key.offset))
-			goto next;
-		di = btrfs_item_ptr(leaf, slot, struct btrfs_dir_item);
+		di = btrfs_item_ptr(leaf, path->slots[0], struct btrfs_dir_item);
 		name_len = btrfs_dir_name_len(leaf, di);
 		if ((total_len + sizeof(struct dir_entry) + name_len) >=
 		    PAGE_SIZE) {
@@ -6196,9 +6179,14 @@ again:
 		entries++;
 		addr += sizeof(struct dir_entry) + name_len;
 		total_len += sizeof(struct dir_entry) + name_len;
-next:
-		path->slots[0]++;
 	}
+
+	/* Error found while searching. */
+	if (iter_ret < 0) {
+		ret = iter_ret;
+		goto err;
+	}
+
 	btrfs_release_path(path);
 
 	ret = btrfs_filldir(private->filldir_buf, entries, ctx);
