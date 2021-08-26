@@ -87,7 +87,7 @@
 #define LOOP_IDLE_WORKER_TIMEOUT (60 * HZ)
 
 static DEFINE_IDR(loop_index_idr);
-static DEFINE_MUTEX(loop_ctl_mutex);
+static DEFINE_SPINLOCK(loop_idr_spinlock);
 static DEFINE_MUTEX(loop_validate_mutex);
 
 /**
@@ -2113,28 +2113,35 @@ int loop_register_transfer(struct loop_func_table *funcs)
 	return 0;
 }
 
-static int unregister_transfer_cb(int id, void *ptr, void *data)
-{
-	struct loop_device *lo = ptr;
-	struct loop_func_table *xfer = data;
-
-	mutex_lock(&lo->lo_mutex);
-	if (lo->lo_encryption == xfer)
-		loop_release_xfer(lo);
-	mutex_unlock(&lo->lo_mutex);
-	return 0;
-}
+static void loop_remove(struct loop_device *lo);
 
 int loop_unregister_transfer(int number)
 {
 	unsigned int n = number;
 	struct loop_func_table *xfer;
+	struct loop_device *lo;
+	int id;
 
 	if (n == 0 || n >= MAX_LO_CRYPT || (xfer = xfer_funcs[n]) == NULL)
 		return -EINVAL;
 
 	xfer_funcs[n] = NULL;
-	idr_for_each(&loop_index_idr, &unregister_transfer_cb, xfer);
+
+	spin_lock(&loop_idr_spinlock);
+	idr_for_each_entry(&loop_index_idr, lo, id) {
+		if (!refcount_inc_not_zero(&lo->idr_visible))
+			continue;
+		spin_unlock(&loop_idr_spinlock);
+		mutex_lock(&lo->lo_mutex);
+		if (lo->lo_encryption == xfer)
+			loop_release_xfer(lo);
+		mutex_unlock(&lo->lo_mutex);
+		if (refcount_dec_and_test(&lo->idr_visible))
+			loop_remove(lo);
+		spin_lock(&loop_idr_spinlock);
+	}
+	spin_unlock(&loop_idr_spinlock);
+
 	return 0;
 }
 
@@ -2313,20 +2320,20 @@ static int loop_add(int i)
 		goto out;
 	lo->lo_state = Lo_unbound;
 
-	err = mutex_lock_killable(&loop_ctl_mutex);
-	if (err)
-		goto out_free_dev;
-
 	/* allocate id, if @id >= 0, we're requesting that specific id */
+	idr_preload(GFP_KERNEL);
+	spin_lock(&loop_idr_spinlock);
 	if (i >= 0) {
-		err = idr_alloc(&loop_index_idr, lo, i, i + 1, GFP_KERNEL);
+		err = idr_alloc(&loop_index_idr, lo, i, i + 1, GFP_ATOMIC);
 		if (err == -ENOSPC)
 			err = -EEXIST;
 	} else {
-		err = idr_alloc(&loop_index_idr, lo, 0, 0, GFP_KERNEL);
+		err = idr_alloc(&loop_index_idr, lo, 0, 0, GFP_ATOMIC);
 	}
+	spin_unlock(&loop_idr_spinlock);
+	idr_preload_end();
 	if (err < 0)
-		goto out_unlock;
+		goto out_free_dev;
 	i = err;
 
 	err = -ENOMEM;
@@ -2392,16 +2399,18 @@ static int loop_add(int i)
 	disk->private_data	= lo;
 	disk->queue		= lo->lo_queue;
 	sprintf(disk->disk_name, "loop%d", i);
+	/* Make this loop device reachable from pathname. */
 	add_disk(disk);
-	mutex_unlock(&loop_ctl_mutex);
+	/* Show this loop device. */
+	refcount_set(&lo->idr_visible, 1);
 	return i;
 
 out_cleanup_tags:
 	blk_mq_free_tag_set(&lo->tag_set);
 out_free_idr:
+	spin_lock(&loop_idr_spinlock);
 	idr_remove(&loop_index_idr, i);
-out_unlock:
-	mutex_unlock(&loop_ctl_mutex);
+	spin_unlock(&loop_idr_spinlock);
 out_free_dev:
 	kfree(lo);
 out:
@@ -2410,9 +2419,14 @@ out:
 
 static void loop_remove(struct loop_device *lo)
 {
+	/* Make this loop device unreachable from pathname. */
 	del_gendisk(lo->lo_disk);
 	blk_cleanup_disk(lo->lo_disk);
 	blk_mq_free_tag_set(&lo->tag_set);
+	spin_lock(&loop_idr_spinlock);
+	idr_remove(&loop_index_idr, lo->lo_number);
+	spin_unlock(&loop_idr_spinlock);
+	/* There is no route which can find this loop device. */
 	mutex_destroy(&lo->lo_mutex);
 	kfree(lo);
 }
@@ -2435,52 +2449,67 @@ static int loop_control_remove(int idx)
 		pr_warn("deleting an unspecified loop device is not supported.\n");
 		return -EINVAL;
 	}
-		
-	ret = mutex_lock_killable(&loop_ctl_mutex);
-	if (ret)
-		return ret;
 
+	/*
+	 * Identify the loop device to remove. Skip the device if it is owned by
+	 * loop_remove()/loop_add() where it is not safe to access lo_mutex.
+	 */
+	spin_lock(&loop_idr_spinlock);
 	lo = idr_find(&loop_index_idr, idx);
-	if (!lo) {
-		ret = -ENODEV;
-		goto out_unlock_ctrl;
+	if (!lo || !refcount_inc_not_zero(&lo->idr_visible)) {
+		spin_unlock(&loop_idr_spinlock);
+		return -ENODEV;
 	}
+	spin_unlock(&loop_idr_spinlock);
 
 	ret = mutex_lock_killable(&lo->lo_mutex);
 	if (ret)
-		goto out_unlock_ctrl;
+		goto out;
 	if (lo->lo_state != Lo_unbound ||
 	    atomic_read(&lo->lo_refcnt) > 0) {
 		mutex_unlock(&lo->lo_mutex);
-		ret = -EBUSY;
-		goto out_unlock_ctrl;
+		if (lo->lo_state == Lo_deleting)
+			ret = -ENODEV;
+		else
+			ret = -EBUSY;
+		goto out;
 	}
+	/* Mark this loop device no longer open()-able. */
 	lo->lo_state = Lo_deleting;
 	mutex_unlock(&lo->lo_mutex);
-
-	idr_remove(&loop_index_idr, lo->lo_number);
-	loop_remove(lo);
-out_unlock_ctrl:
-	mutex_unlock(&loop_ctl_mutex);
+	/* Hide this loop device. */
+	refcount_dec(&lo->idr_visible);
+	/*
+	 * Try to wait for concurrent callers (they should complete shortly due to
+	 * lo->lo_state == Lo_deleting) operating on this loop device, in order to
+	 * help that subsequent loop_add() will not to fail with -EEXIST.
+	 * Note that this is best effort.
+	 */
+	for (ret = 0; refcount_read(&lo->idr_visible) != 1 && ret < HZ; ret++)
+		schedule_timeout_killable(1);
+	ret = 0;
+out:
+	/* Remove this loop device. */
+	if (refcount_dec_and_test(&lo->idr_visible))
+		loop_remove(lo);
 	return ret;
 }
 
 static int loop_control_get_free(int idx)
 {
 	struct loop_device *lo;
-	int id, ret;
+	int id;
 
-	ret = mutex_lock_killable(&loop_ctl_mutex);
-	if (ret)
-		return ret;
+	spin_lock(&loop_idr_spinlock);
 	idr_for_each_entry(&loop_index_idr, lo, id) {
-		if (lo->lo_state == Lo_unbound)
+		if (refcount_read(&lo->idr_visible) &&
+		    lo->lo_state == Lo_unbound)
 			goto found;
 	}
-	mutex_unlock(&loop_ctl_mutex);
+	spin_unlock(&loop_idr_spinlock);
 	return loop_add(-1);
 found:
-	mutex_unlock(&loop_ctl_mutex);
+	spin_unlock(&loop_idr_spinlock);
 	return id;
 }
 
@@ -2590,10 +2619,12 @@ static void __exit loop_exit(void)
 	unregister_blkdev(LOOP_MAJOR, "loop");
 	misc_deregister(&loop_misc);
 
-	mutex_lock(&loop_ctl_mutex);
+	/*
+	 * There is no need to use loop_idr_spinlock here, for nobody else can
+	 * access loop_index_idr when this module is unloading.
+	 */
 	idr_for_each_entry(&loop_index_idr, lo, id)
 		loop_remove(lo);
-	mutex_unlock(&loop_ctl_mutex);
 
 	idr_destroy(&loop_index_idr);
 }
