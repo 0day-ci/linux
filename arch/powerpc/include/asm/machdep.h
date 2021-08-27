@@ -7,6 +7,7 @@
 #include <linux/init.h>
 #include <linux/dma-mapping.h>
 #include <linux/export.h>
+#include <linux/static_call_types.h>
 
 #include <asm/setup.h>
 
@@ -294,6 +295,8 @@ static inline void log_error(char *buf, unsigned int err_type, int fatal)
 #define machine_device_initcall_sync(mach, fn)	__define_machine_initcall(mach, fn, 6s)
 #define machine_late_initcall(mach, fn)		__define_machine_initcall(mach, fn, 7)
 #define machine_late_initcall_sync(mach, fn)	__define_machine_initcall(mach, fn, 7s)
+
+DECLARE_STATIC_CALL(ppc_md_get_irq, *ppc_md.get_irq);
 
 #endif /* __KERNEL__ */
 #endif /* _ASM_POWERPC_MACHDEP_H */

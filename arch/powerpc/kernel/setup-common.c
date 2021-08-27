@@ -33,6 +33,7 @@
 #include <linux/of_platform.h>
 #include <linux/hugetlb.h>
 #include <linux/pgtable.h>
+#include <linux/static_call.h>
 #include <asm/io.h>
 #include <asm/paca.h>
 #include <asm/prom.h>
@@ -80,6 +81,8 @@ struct machdep_calls ppc_md;
 EXPORT_SYMBOL(ppc_md);
 struct machdep_calls *machine_id;
 EXPORT_SYMBOL(machine_id);
+
+DEFINE_STATIC_CALL_NULL(ppc_md_get_irq, *ppc_md.get_irq);
 
 int boot_cpuid = -1;
 EXPORT_SYMBOL_GPL(boot_cpuid);
@@ -613,6 +616,7 @@ void probe_machine(void)
 	     machine_id++) {
 		DBG("  %s ...", machine_id->name);
 		memcpy(&ppc_md, machine_id, sizeof(struct machdep_calls));
+		static_call_update(ppc_md_get_irq, ppc_md.get_irq);
 		if (ppc_md.probe()) {
 			DBG(" match !\n");
 			break;

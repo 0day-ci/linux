@@ -736,7 +736,7 @@ void __do_irq(struct pt_regs *regs)
 	 *
 	 * This will typically lower the interrupt line to the CPU
 	 */
-	irq = ppc_md.get_irq();
+	irq = static_call(ppc_md_get_irq)();
 
 	/* We can hard enable interrupts now to allow perf interrupts */
 	may_hard_irq_enable();
