@@ -88,7 +88,7 @@ static void tpci200_unregister(struct tpci200_board *tpci200)
 {
 	free_irq(tpci200->info->pdev->irq, (void *) tpci200);
 
-	pci_iounmap(tpci200->info->pdev, tpci200->info->interface_regs);
+	iounmap(tpci200->info->interface_regs);
 
 	pci_release_region(tpci200->info->pdev, TPCI200_IP_INTERFACE_BAR);
 	pci_release_region(tpci200->info->pdev, TPCI200_IO_ID_INT_SPACES_BAR);
@@ -347,7 +347,7 @@ static int tpci200_register(struct tpci200_board *tpci200)
 	return 0;
 
 err_interface_regs:
-	pci_iounmap(tpci200->info->pdev, tpci200->info->interface_regs);
+	iounmap(tpci200->info->interface_regs);
 err_mem16_space_bar:
 	pci_release_region(tpci200->info->pdev, TPCI200_MEM16_SPACE_BAR);
 err_mem8_space_bar:
@@ -596,7 +596,7 @@ static int tpci200_pci_probe(struct pci_dev *pdev,
 err_tpci200_install:
 	tpci200_uninstall(tpci200);
 err_cfg_regs:
-	pci_iounmap(tpci200->info->pdev, tpci200->info->cfg_regs);
+	iounmap(tpci200->info->cfg_regs);
 err_request_region:
 	pci_release_region(pdev, TPCI200_CFG_MEM_BAR);
 err_tpci200_info:
@@ -612,7 +612,7 @@ static void __tpci200_pci_remove(struct tpci200_board *tpci200)
 	ipack_bus_unregister(tpci200->info->ipack_bus);
 	tpci200_uninstall(tpci200);
 
-	pci_iounmap(tpci200->info->pdev, tpci200->info->cfg_regs);
+	iounmap(tpci200->info->cfg_regs);
 
 	pci_release_region(tpci200->info->pdev, TPCI200_CFG_MEM_BAR);
 
