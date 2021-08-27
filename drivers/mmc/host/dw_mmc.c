@@ -52,6 +52,7 @@
 
 #define DW_MCI_FREQ_MAX	200000000	/* unit: HZ */
 #define DW_MCI_FREQ_MIN	100000		/* unit: HZ */
+#define DW_MCI_DATA_TMOUT_NS_MAX	587202490
 
 #define IDMAC_INT_CLR		(SDMMC_IDMAC_INT_AI | SDMMC_IDMAC_INT_NI | \
 				 SDMMC_IDMAC_INT_CES | SDMMC_IDMAC_INT_DU | \
@@ -387,6 +388,23 @@ static inline void dw_mci_set_cto(struct dw_mci *host)
 	if (!test_bit(EVENT_CMD_COMPLETE, &host->pending_events))
 		mod_timer(&host->cto_timer,
 			jiffies + msecs_to_jiffies(cto_ms) + 1);
+	spin_unlock_irqrestore(&host->irq_lock, irqflags);
+}
+
+static void dw_mci_set_dto(struct dw_mci *host, u32 timeout_ns)
+{
+	unsigned int dto_ns;
+	unsigned long irqflags;
+
+	if (!timeout_ns || timeout_ns > DW_MCI_DATA_TMOUT_NS_MAX)
+		dto_ns = DW_MCI_DATA_TMOUT_NS_MAX;
+	else
+		dto_ns = timeout_ns;
+
+	spin_lock_irqsave(&host->irq_lock, irqflags);
+	if (!test_bit(EVENT_DATA_COMPLETE, &host->pending_events))
+		mod_timer(&host->dto_timer,
+			  jiffies + nsecs_to_jiffies(dto_ns));
 	spin_unlock_irqrestore(&host->irq_lock, irqflags);
 }
 
@@ -1144,9 +1162,10 @@ static void dw_mci_submit_data(struct dw_mci *host, struct mmc_data *data)
 	host->sg = NULL;
 	host->data = data;
 
-	if (data->flags & MMC_DATA_READ)
+	if (data->flags & MMC_DATA_READ) {
 		host->dir_status = DW_MCI_RECV_STATUS;
-	else
+		dw_mci_set_dto(host, data->timeout_ns);
+	} else
 		host->dir_status = DW_MCI_SEND_STATUS;
 
 	dw_mci_ctrl_thld(host, data);
@@ -1277,6 +1296,36 @@ static void dw_mci_setup_bus(struct dw_mci_slot *slot, bool force_clkinit)
 	mci_writel(host, CTYPE, (slot->ctype << slot->id));
 }
 
+static void dw_mci_set_data_timeout(struct dw_mci *host, u32 timeout_ns)
+{
+	u32 timeout, freq_mhz, tmp, tmout;
+
+	if (!timeout_ns || timeout_ns > DW_MCI_DATA_TMOUT_NS_MAX) {
+		/* Timeout (maximum) */
+		mci_writel(host, TMOUT, 0xFFFFFFFF);
+		return;
+	}
+
+	timeout = timeout_ns / NSEC_PER_USEC;
+	freq_mhz = host->bus_hz / NSEC_PER_MSEC;
+
+	/* TMOUT[7:0] (RESPONSE_TIMEOUT) */
+	tmout = 0xFF;
+
+	/* TMOUT[10:8] (DATA_TIMEOUT) */
+	tmp = ((timeout * freq_mhz) / 0xFFFFFF) + 1;
+	tmout |= (tmp & 0x7) << 8;
+
+	/* TMOUT[31:11] (DATA_TIMEOUT) */
+	tmp = ((tmp - 1) * 0xFFFFFF) / freq_mhz;
+	tmp = (timeout - tmp) * freq_mhz / 8;
+	tmout |= (tmp & 0x1FFFFF) << 11;
+
+	mci_writel(host, TMOUT, tmout);
+	dev_dbg(host->dev, "timeout_ns: %u => TMOUT[31:8]: 0x%08x",
+		timeout_ns, tmout);
+}
+
 static void __dw_mci_start_request(struct dw_mci *host,
 				   struct dw_mci_slot *slot,
 				   struct mmc_command *cmd)
@@ -1297,7 +1346,7 @@ static void __dw_mci_start_request(struct dw_mci *host,
 
 	data = cmd->data;
 	if (data) {
-		mci_writel(host, TMOUT, 0xFFFFFFFF);
+		dw_mci_set_data_timeout(host, data->timeout_ns);
 		mci_writel(host, BYTCNT, data->blksz*data->blocks);
 		mci_writel(host, BLKSIZ, data->blksz);
 	}
@@ -1897,31 +1946,6 @@ static int dw_mci_data_complete(struct dw_mci *host, struct mmc_data *data)
 	return data->error;
 }
 
-static void dw_mci_set_drto(struct dw_mci *host)
-{
-	unsigned int drto_clks;
-	unsigned int drto_div;
-	unsigned int drto_ms;
-	unsigned long irqflags;
-
-	drto_clks = mci_readl(host, TMOUT) >> 8;
-	drto_div = (mci_readl(host, CLKDIV) & 0xff) * 2;
-	if (drto_div == 0)
-		drto_div = 1;
-
-	drto_ms = DIV_ROUND_UP_ULL((u64)MSEC_PER_SEC * drto_clks * drto_div,
-				   host->bus_hz);
-
-	/* add a bit spare time */
-	drto_ms += 10;
-
-	spin_lock_irqsave(&host->irq_lock, irqflags);
-	if (!test_bit(EVENT_DATA_COMPLETE, &host->pending_events))
-		mod_timer(&host->dto_timer,
-			  jiffies + msecs_to_jiffies(drto_ms));
-	spin_unlock_irqrestore(&host->irq_lock, irqflags);
-}
-
 static bool dw_mci_clear_pending_cmd_complete(struct dw_mci *host)
 {
 	if (!test_bit(EVENT_CMD_COMPLETE, &host->pending_events))
@@ -2052,15 +2076,8 @@ static void dw_mci_tasklet_func(struct tasklet_struct *t)
 			}
 
 			if (!test_and_clear_bit(EVENT_XFER_COMPLETE,
-						&host->pending_events)) {
-				/*
-				 * If all data-related interrupts don't come
-				 * within the given time in reading data state.
-				 */
-				if (host->dir_status == DW_MCI_RECV_STATUS)
-					dw_mci_set_drto(host);
+						&host->pending_events))
 				break;
-			}
 
 			set_bit(EVENT_XFER_COMPLETE, &host->completed_events);
 
@@ -2091,16 +2108,8 @@ static void dw_mci_tasklet_func(struct tasklet_struct *t)
 			fallthrough;
 
 		case STATE_DATA_BUSY:
-			if (!dw_mci_clear_pending_data_complete(host)) {
-				/*
-				 * If data error interrupt comes but data over
-				 * interrupt doesn't come within the given time.
-				 * in reading data state.
-				 */
-				if (host->dir_status == DW_MCI_RECV_STATUS)
-					dw_mci_set_drto(host);
+			if (!dw_mci_clear_pending_data_complete(host))
 				break;
-			}
 
 			host->data = NULL;
 			set_bit(EVENT_DATA_COMPLETE, &host->completed_events);
@@ -2649,12 +2658,21 @@ static irqreturn_t dw_mci_interrupt(int irq, void *dev_id)
 		}
 
 		if (pending & DW_MCI_DATA_ERROR_FLAGS) {
+			spin_lock(&host->irq_lock);
+
+			del_timer(&host->dto_timer);
+
 			/* if there is an error report DATA_ERROR */
 			mci_writel(host, RINTSTS, DW_MCI_DATA_ERROR_FLAGS);
 			host->data_status = pending;
 			smp_wmb(); /* drain writebuffer */
 			set_bit(EVENT_DATA_ERROR, &host->pending_events);
+
+			/* In case of error, we cannot expect a DTO */
+			set_bit(EVENT_DATA_COMPLETE, &host->pending_events);
 			tasklet_schedule(&host->tasklet);
+
+			spin_unlock(&host->irq_lock);
 		}
 
 		if (pending & SDMMC_INT_DATA_OVER) {
