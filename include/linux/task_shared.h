@@ -70,6 +70,8 @@ struct task_ushrd_struct {
 		if (shrdp != NULL && shrdp->kaddr != NULL) {		\
 			shrdp->kaddr->ts.run_delay =			\
 				 t->sched_info.run_delay;		\
+			shrdp->kaddr->ts.off_cpu =			\
+				 t->sched_info.off_cpu;			\
 			if (p) {					\
 				shrdp->kaddr->ts.pcount =		\
 					 t->sched_info.pcount;		\

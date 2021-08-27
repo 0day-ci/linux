@@ -311,6 +311,12 @@ struct sched_info {
 	/* When were we last queued to run? */
 	unsigned long long		last_queued;
 
+	/* When did we last leave cpu */
+	unsigned long long		last_depart;
+
+	/* Time spent off cpu */
+	unsigned long long		off_cpu;
+
 #endif /* CONFIG_SCHED_INFO */
 };
 
