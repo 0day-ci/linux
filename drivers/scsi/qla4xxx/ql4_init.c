@@ -47,6 +47,8 @@ static void ql4xxx_set_mac_number(struct scsi_qla_host *ha)
 void qla4xxx_free_ddb(struct scsi_qla_host *ha,
     struct ddb_entry *ddb_entry)
 {
+	if (ddb_entry->fw_ddb_index >= MAX_DDB_ENTRIES)
+		return;
 	/* Remove device pointer from index mapping arrays */
 	ha->fw_ddb_index_map[ddb_entry->fw_ddb_index] =
 		(struct ddb_entry *) INVALID_ENTRY;
