@@ -2367,7 +2367,7 @@ SYSCALL_DEFINE5(prctl, int, option, unsigned long, arg2, unsigned long, arg3,
 		break;
 	case PR_GET_NAME:
 		get_task_comm(comm, me);
-		if (copy_to_user((char __user *)arg2, comm, sizeof(comm)))
+		if (copy_to_user((char __user *)arg2, comm, strlen(comm) + 1))
 			return -EFAULT;
 		break;
 	case PR_GET_ENDIAN:
