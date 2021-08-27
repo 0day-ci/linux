@@ -2742,7 +2742,6 @@ int ni_write_frame(struct ntfs_inode *ni, struct page **pages,
 	}
 
 	mutex_lock(&sbi->compress.mtx_lznt);
-	lznt = NULL;
 	if (!sbi->compress.lznt) {
 		/*
 		 * lznt implements two levels of compression:
@@ -2758,14 +2757,12 @@ int ni_write_frame(struct ntfs_inode *ni, struct page **pages,
 		}
 
 		sbi->compress.lznt = lznt;
-		lznt = NULL;
 	}
 
 	/* compress: frame_mem -> frame_ondisk */
 	compr_size = compress_lznt(frame_mem, frame_size, frame_ondisk,
 				   frame_size, sbi->compress.lznt);
 	mutex_unlock(&sbi->compress.mtx_lznt);
-	ntfs_free(lznt);
 
 	if (compr_size + sbi->cluster_size > frame_size) {
 		/* frame is not compressed */
