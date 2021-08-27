@@ -670,7 +670,7 @@ static int ice_del_tc_fltr(struct ice_vsi *vsi, struct ice_tc_flower_fltr *fltr)
 	err = ice_rem_adv_rule_by_id(&pf->hw, &rule_rem);
 	if (err) {
 		if (err == ICE_ERR_DOES_NOT_EXIST) {
-			NL_SET_ERR_MSG_MOD(fltr->extack, "filter does not exist\n");
+			NL_SET_ERR_MSG_MOD(fltr->extack, "Filter does not exist");
 			return -ENOENT;
 		}
 		NL_SET_ERR_MSG_MOD(fltr->extack, "Failed to delete TC flower filter");
