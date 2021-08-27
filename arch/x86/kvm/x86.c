@@ -277,7 +277,10 @@ const struct _kvm_stats_desc kvm_vcpu_stats_desc[] = {
 	STATS_DESC_COUNTER(VCPU, nested_run),
 	STATS_DESC_COUNTER(VCPU, directed_yield_attempted),
 	STATS_DESC_COUNTER(VCPU, directed_yield_successful),
-	STATS_DESC_ICOUNTER(VCPU, guest_mode)
+	STATS_DESC_ICOUNTER(VCPU, guest_mode),
+	STATS_DESC_LINHIST_COUNTER(VCPU, vmx_all_exits, EXIT_REASON_NUM, 1),
+	STATS_DESC_LINHIST_COUNTER(VCPU, vmx_l2_exits, EXIT_REASON_NUM, 1),
+	STATS_DESC_LINHIST_COUNTER(VCPU, vmx_nested_exits, EXIT_REASON_NUM, 1),
 };
 
 const struct kvm_stats_header kvm_vcpu_stats_header = {

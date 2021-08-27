@@ -34,6 +34,7 @@
 #include <asm/kvm_page_track.h>
 #include <asm/kvm_vcpu_regs.h>
 #include <asm/hyperv-tlfs.h>
+#include <asm/vmx.h>
 
 #define __KVM_HAVE_ARCH_VCPU_DEBUGFS
 
@@ -1257,6 +1258,9 @@ struct kvm_vcpu_stat {
 	u64 directed_yield_attempted;
 	u64 directed_yield_successful;
 	u64 guest_mode;
+	u64 vmx_all_exits[EXIT_REASON_NUM];
+	u64 vmx_l2_exits[EXIT_REASON_NUM];
+	u64 vmx_nested_exits[EXIT_REASON_NUM];
 };
 
 struct x86_instruction_info;

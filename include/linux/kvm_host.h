@@ -1429,6 +1429,10 @@ struct _kvm_stats_desc {
 #define STATS_DESC_PCOUNTER(SCOPE, name)				       \
 	STATS_DESC_PEAK(SCOPE, name, KVM_STATS_UNIT_NONE,		       \
 		KVM_STATS_BASE_POW10, 0)
+/* Linear histogram for counter */
+#define STATS_DESC_LINHIST_COUNTER(SCOPE, name, sz, bsz)		       \
+	STATS_DESC_LINEAR_HIST(SCOPE, name, KVM_STATS_UNIT_NONE,	       \
+		KVM_STATS_BASE_POW10, 0, sz, bsz)
 
 /* Cumulative time in nanosecond */
 #define STATS_DESC_TIME_NSEC(SCOPE, name)				       \
