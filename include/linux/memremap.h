@@ -99,6 +99,10 @@ struct dev_pagemap_ops {
  * @done: completion for @internal_ref
  * @type: memory type: see MEMORY_* in memory_hotplug.h
  * @flags: PGMAP_* flags to specify defailed behavior
+ * @geometry: structural definition of how the vmemmap metadata is populated.
+ *	A zero or 1 defaults to using base pages as the memmap metadata
+ *	representation. A bigger value will set up compound struct pages
+ *	representative of the requested geometry size.
  * @ops: method table
  * @owner: an opaque pointer identifying the entity that manages this
  *	instance.  Used by various helpers to make sure that no
@@ -114,6 +118,7 @@ struct dev_pagemap {
 	struct completion done;
 	enum memory_type type;
 	unsigned int flags;
+	unsigned long geometry;
 	const struct dev_pagemap_ops *ops;
 	void *owner;
 	int nr_range;
@@ -128,6 +133,18 @@ static inline struct vmem_altmap *pgmap_altmap(struct dev_pagemap *pgmap)
 	if (pgmap->flags & PGMAP_ALTMAP_VALID)
 		return &pgmap->altmap;
 	return NULL;
+}
+
+static inline unsigned long pgmap_geometry(struct dev_pagemap *pgmap)
+{
+	if (pgmap && pgmap->geometry)
+		return pgmap->geometry;
+	return 1;
+}
+
+static inline unsigned long pgmap_geometry_order(struct dev_pagemap *pgmap)
+{
+	return order_base_2(pgmap_geometry(pgmap));
 }
 
 #ifdef CONFIG_ZONE_DEVICE
