@@ -116,6 +116,8 @@ static inline int cpuset_do_slab_mem_spread(void)
 
 extern bool current_cpuset_is_being_rebound(void);
 
+extern bool test_cpu_in_current_cpuset(int cpu);
+
 extern void rebuild_sched_domains(void);
 
 extern void cpuset_print_current_mems_allowed(void);
@@ -253,6 +255,11 @@ static inline int cpuset_do_slab_mem_spread(void)
 }
 
 static inline bool current_cpuset_is_being_rebound(void)
+{
+	return false;
+}
+
+static inline bool test_cpu_in_current_cpuset(int cpu)
 {
 	return false;
 }
