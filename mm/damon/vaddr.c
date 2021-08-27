@@ -8,10 +8,12 @@
 #define pr_fmt(fmt) "damon-va: " fmt
 
 #include <linux/damon.h>
+#include <linux/hugetlb.h>
 #include <linux/mm.h>
 #include <linux/mmu_notifier.h>
 #include <linux/highmem.h>
 #include <linux/page_idle.h>
+#include <linux/pagewalk.h>
 #include <linux/random.h>
 #include <linux/sched/mm.h>
 #include <linux/slab.h>
@@ -446,14 +448,69 @@ static void damon_pmdp_mkold(pmd_t *pmd, struct mm_struct *mm,
 #endif /* CONFIG_TRANSPARENT_HUGEPAGE */
 }
 
+struct damon_walk_private {
+	pmd_t *pmd;
+	pte_t *pte;
+	spinlock_t *ptl;
+};
+
+static int damon_pmd_entry(pmd_t *pmd, unsigned long addr, unsigned long next,
+		struct mm_walk *walk)
+{
+	struct damon_walk_private *priv = walk->private;
+
+	if (pmd_huge(*pmd)) {
+		priv->ptl = pmd_lock(walk->mm, pmd);
+		if (pmd_huge(*pmd)) {
+			priv->pmd = pmd;
+			return 0;
+		}
+		spin_unlock(priv->ptl);
+	}
+
+	if (pmd_none(*pmd) || unlikely(pmd_bad(*pmd)))
+		return -EINVAL;
+	priv->pte = pte_offset_map_lock(walk->mm, pmd, addr, &priv->ptl);
+	if (!pte_present(*priv->pte)) {
+		pte_unmap_unlock(priv->pte, priv->ptl);
+		priv->pte = NULL;
+		return -EINVAL;
+	}
+	return 0;
+}
+
+static struct mm_walk_ops damon_walk_ops = {
+	.pmd_entry = damon_pmd_entry,
+};
+
+int damon_follow_pte_pmd(struct mm_struct *mm, unsigned long addr,
+		struct damon_walk_private *private)
+{
+	int rc;
+
+	private->pte = NULL;
+	private->pmd = NULL;
+	rc = walk_page_range(mm, addr, addr + 1, &damon_walk_ops, private);
+	if (!rc && !private->pte && !private->pmd)
+		return -EINVAL;
+	return rc;
+}
+
 static void damon_va_mkold(struct mm_struct *mm, unsigned long addr)
 {
-	pte_t *pte = NULL;
-	pmd_t *pmd = NULL;
+	struct damon_walk_private walk_result;
+	pte_t *pte;
+	pmd_t *pmd;
 	spinlock_t *ptl;
 
-	if (follow_invalidate_pte(mm, addr, NULL, &pte, &pmd, &ptl))
+	mmap_write_lock(mm);
+	if (damon_follow_pte_pmd(mm, addr, &walk_result)) {
+		mmap_write_unlock(mm);
 		return;
+	}
+	pte = walk_result.pte;
+	pmd = walk_result.pmd;
+	ptl = walk_result.ptl;
 
 	if (pte) {
 		damon_ptep_mkold(pte, mm, addr);
@@ -462,6 +519,7 @@ static void damon_va_mkold(struct mm_struct *mm, unsigned long addr)
 		damon_pmdp_mkold(pmd, mm, addr);
 		spin_unlock(ptl);
 	}
+	mmap_write_unlock(mm);
 }
 
 /*
@@ -495,14 +553,21 @@ void damon_va_prepare_access_checks(struct damon_ctx *ctx)
 static bool damon_va_young(struct mm_struct *mm, unsigned long addr,
 			unsigned long *page_sz)
 {
-	pte_t *pte = NULL;
-	pmd_t *pmd = NULL;
+	struct damon_walk_private walk_result;
+	pte_t *pte;
+	pmd_t *pmd;
 	spinlock_t *ptl;
 	struct page *page;
 	bool young = false;
 
-	if (follow_invalidate_pte(mm, addr, NULL, &pte, &pmd, &ptl))
+	mmap_write_lock(mm);
+	if (damon_follow_pte_pmd(mm, addr, &walk_result)) {
+		mmap_write_unlock(mm);
 		return false;
+	}
+	pte = walk_result.pte;
+	pmd = walk_result.pmd;
+	ptl = walk_result.ptl;
 
 	*page_sz = PAGE_SIZE;
 	if (pte) {
@@ -513,7 +578,7 @@ static bool damon_va_young(struct mm_struct *mm, unsigned long addr,
 		if (page)
 			put_page(page);
 		pte_unmap_unlock(pte, ptl);
-		return young;
+		goto out;
 	}
 
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
@@ -528,6 +593,8 @@ static bool damon_va_young(struct mm_struct *mm, unsigned long addr,
 	*page_sz = ((1UL) << HPAGE_PMD_SHIFT);
 #endif	/* CONFIG_TRANSPARENT_HUGEPAGE */
 
+out:
+	mmap_write_unlock(mm);
 	return young;
 }
 
