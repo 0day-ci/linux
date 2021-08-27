@@ -356,15 +356,29 @@ void intel_fb_plane_get_subsampling(int *hsub, int *vsub,
 
 static void intel_fb_plane_dims(const struct intel_framebuffer *fb, int color_plane, int *w, int *h)
 {
+	struct drm_i915_private *i915 = to_i915(fb->base.dev);
 	int main_plane = is_ccs_plane(&fb->base, color_plane) ?
 			 skl_ccs_to_main_plane(&fb->base, color_plane) : 0;
+	unsigned int main_width = fb->base.width;
+	unsigned int main_height = fb->base.height;
 	int main_hsub, main_vsub;
 	int hsub, vsub;
 
+	/*
+	 * On ADL-P the CCS AUX surface layout always aligns with the
+	 * power-of-two aligned main surface stride. The main surface
+	 * stride in the allocated FB object may not be power-of-two
+	 * sized, in which case it is auto-padded to the POT size.
+	 */
+	if (IS_ALDERLAKE_P(i915) && is_ccs_plane(&fb->base, color_plane))
+		main_width = gen12_aligned_scanout_stride(fb, 0) /
+			     fb->base.format->cpp[0];
+
 	intel_fb_plane_get_subsampling(&main_hsub, &main_vsub, &fb->base, main_plane);
 	intel_fb_plane_get_subsampling(&hsub, &vsub, &fb->base, color_plane);
-	*w = fb->base.width / main_hsub / hsub;
-	*h = fb->base.height / main_vsub / vsub;
+
+	*w = main_width / main_hsub / hsub;
+	*h = main_height / main_vsub / vsub;
 }
 
 static u32 intel_adjust_tile_offset(int *x, int *y,
@@ -546,16 +560,7 @@ static int intel_fb_offset_to_xy(int *x, int *y,
 	unsigned int height;
 	u32 alignment;
 
-	/*
-	 * All DPT color planes must be 512*4k aligned (the amount mapped by a
-	 * single DPT page). For ADL_P CCS FBs this only works by requiring
-	 * the allocated offsets to be 2MB aligned.  Once supoort to remap
-	 * such FBs is added we can remove this requirement, as then all the
-	 * planes can be remapped to an aligned offset.
-	 */
-	if (IS_ALDERLAKE_P(i915) && is_ccs_modifier(fb->modifier))
-		alignment = 512 * 4096;
-	else if (DISPLAY_VER(i915) >= 12 &&
+	if (DISPLAY_VER(i915) >= 12 &&
 		 is_semiplanar_uv_plane(fb, color_plane))
 		alignment = intel_tile_row_size(fb, color_plane);
 	else if (fb->modifier != DRM_FORMAT_MOD_LINEAR)
@@ -687,8 +692,7 @@ bool intel_fb_needs_pot_stride_remap(const struct intel_framebuffer *fb)
 {
 	struct drm_i915_private *i915 = to_i915(fb->base.dev);
 
-	return IS_ALDERLAKE_P(i915) && fb->base.modifier != DRM_FORMAT_MOD_LINEAR &&
-	       !is_ccs_modifier(fb->base.modifier);
+	return IS_ALDERLAKE_P(i915) && fb->base.modifier != DRM_FORMAT_MOD_LINEAR;
 }
 
 static int intel_fb_pitch(const struct intel_framebuffer *fb, int color_plane, unsigned int rotation)
@@ -808,14 +812,16 @@ static unsigned int
 plane_view_dst_stride_tiles(const struct intel_framebuffer *fb, int color_plane,
 			    unsigned int pitch_tiles)
 {
-	if (intel_fb_needs_pot_stride_remap(fb))
+	if (intel_fb_needs_pot_stride_remap(fb)) {
+		unsigned int min_stride = is_ccs_plane(&fb->base, color_plane) ? 2 : 8;
 		/*
 		 * ADL_P, the only platform needing a POT stride has a minimum
-		 * of 8 stride tiles.
+		 * of 8 main surface and 2 CCS AUX stride tiles.
 		 */
-		return roundup_pow_of_two(max(pitch_tiles, 8u));
-	else
+		return roundup_pow_of_two(max(pitch_tiles, min_stride));
+	} else {
 		return pitch_tiles;
+	}
 }
 
 static unsigned int
@@ -851,12 +857,21 @@ static u32 calc_plane_remap_info(const struct intel_framebuffer *fb, int color_p
 	unsigned int tile_height = dims->tile_height;
 	unsigned int tile_size = intel_tile_size(i915);
 	struct drm_rect r;
-	u32 size;
+	u32 size = 0;
 
 	assign_chk_ovf(i915, remap_info->offset, obj_offset);
 	assign_chk_ovf(i915, remap_info->src_stride, plane_view_src_stride_tiles(fb, color_plane, dims));
 	assign_chk_ovf(i915, remap_info->width, plane_view_width_tiles(fb, color_plane, dims, x));
 	assign_chk_ovf(i915, remap_info->height, plane_view_height_tiles(fb, color_plane, dims, y));
+
+	if (IS_ALDERLAKE_P(i915)) {
+		unsigned int alignment = SZ_2M / PAGE_SIZE;
+		unsigned int aligned_offset = ALIGN(gtt_offset, alignment);
+
+		view->gtt.remapped.plane_alignment = alignment;
+		size += aligned_offset - gtt_offset;
+		gtt_offset = aligned_offset;
+	}
 
 	if (view->gtt.type == I915_GGTT_VIEW_ROTATED) {
 		check_array_bounds(i915, view->gtt.rotated.plane, color_plane);
@@ -876,7 +891,7 @@ static u32 calc_plane_remap_info(const struct intel_framebuffer *fb, int color_p
 
 		color_plane_info->stride = remap_info->dst_stride * tile_height;
 
-		size = remap_info->dst_stride * remap_info->width;
+		size += remap_info->dst_stride * remap_info->width;
 
 		/* rotate the tile dimensions to match the GTT view */
 		swap(tile_width, tile_height);
@@ -894,7 +909,7 @@ static u32 calc_plane_remap_info(const struct intel_framebuffer *fb, int color_p
 		color_plane_info->stride = remap_info->dst_stride * tile_width *
 					   fb->base.format->cpp[color_plane];
 
-		size = remap_info->dst_stride * remap_info->height;
+		size += remap_info->dst_stride * remap_info->height;
 	}
 
 	/*
@@ -1158,10 +1173,18 @@ intel_fb_stride_alignment(const struct drm_framebuffer *fb, int color_plane)
 	tile_width = intel_tile_width_bytes(fb, color_plane);
 	if (is_ccs_modifier(fb->modifier)) {
 		/*
+		 * On ADL-P the stride must be either 8 tiles or a stride
+		 * that is aligned to 16 tiles, required by the 16 tiles =
+		 * 64 kbyte CCS AUX PTE granularity, allowing CCS FBs to be
+		 * remapped.
+		 */
+		if (IS_ALDERLAKE_P(dev_priv))
+			tile_width *= fb->pitches[0] <= tile_width * 8 ? 8 : 16;
+		/*
 		 * On TGL the surface stride must be 4 tile aligned, mapped by
 		 * one 64 byte cacheline on the CCS AUX surface.
 		 */
-		if (DISPLAY_VER(dev_priv) >= 12)
+		else if (DISPLAY_VER(dev_priv) >= 12)
 			tile_width *= 4;
 		/*
 		 * Display WA #0531: skl,bxt,kbl,glk
@@ -1413,17 +1436,6 @@ int intel_framebuffer_init(struct intel_framebuffer *intel_fb,
 					    fb->pitches[i], ccs_aux_stride);
 				goto err;
 			}
-		}
-
-		/* TODO: Add POT stride remapping support for CCS formats as well. */
-		if (IS_ALDERLAKE_P(dev_priv) &&
-		    mode_cmd->modifier[i] != DRM_FORMAT_MOD_LINEAR &&
-		    !intel_fb_needs_pot_stride_remap(intel_fb) &&
-		    !is_power_of_2(mode_cmd->pitches[i])) {
-			drm_dbg_kms(&dev_priv->drm,
-				    "plane %d pitch (%d) must be power of two for tiled buffers\n",
-				    i, mode_cmd->pitches[i]);
-			goto err;
 		}
 
 		fb->obj[i] = &obj->base;
