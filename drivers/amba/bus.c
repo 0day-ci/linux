@@ -19,6 +19,7 @@
 #include <linux/clk/clk-conf.h>
 #include <linux/platform_device.h>
 #include <linux/reset.h>
+#include <linux/of_irq.h>
 
 #define to_amba_driver(d)	container_of(d, struct amba_driver, drv)
 
@@ -170,6 +171,28 @@ static int amba_uevent(struct device *dev, struct kobj_uevent_env *env)
 	return retval;
 }
 
+static int of_amba_device_decode_irq(struct amba_device *dev)
+{
+	struct device_node *node = dev->dev.of_node;
+	int i, irq;
+
+	if (IS_ENABLED(CONFIG_OF_IRQ) && node) {
+		/* Decode the IRQs and address ranges */
+		for (i = 0; i < AMBA_NR_IRQS; i++) {
+			irq = of_irq_get(node, i);
+			if (irq < 0) {
+				if (irq == -EPROBE_DEFER)
+					return irq;
+				irq = 0;
+			}
+
+			dev->irq[i] = irq;
+		}
+	}
+
+	return 0;
+}
+
 /*
  * These are the device model conversion veneers; they convert the
  * device model structures to our more specific structures.
@@ -182,6 +205,10 @@ static int amba_probe(struct device *dev)
 	int ret;
 
 	do {
+		ret = of_amba_device_decode_irq(pcdev);
+		if (ret)
+			break;
+
 		ret = of_clk_set_defaults(dev->of_node, false);
 		if (ret < 0)
 			break;
