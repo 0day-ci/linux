@@ -5138,7 +5138,13 @@ void scheduler_tick(void)
 	unsigned long thermal_pressure;
 	u64 resched_latency;
 
-	arch_scale_freq_tick();
+	/*
+	 * nohz_full CPUs are capable of disabling the scheduler tick
+	 * indefinitely, potentially overflowing arch_scale_freq_tick()
+	 * calculations once it's re-enabled.
+	 */
+	if (!tick_nohz_full_cpu(smp_processor_id()))
+		arch_scale_freq_tick();
 	sched_clock_tick();
 
 	rq_lock(rq, &rf);
