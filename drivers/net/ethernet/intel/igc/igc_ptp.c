@@ -417,20 +417,14 @@ static int igc_ptp_verify_pin(struct ptp_clock_info *ptp, unsigned int pin,
  * We need to convert the system time value stored in the RX/TXSTMP registers
  * into a hwtstamp which can be used by the upper level timestamping functions.
  **/
-static void igc_ptp_systim_to_hwtstamp(struct igc_adapter *adapter,
-				       struct skb_shared_hwtstamps *hwtstamps,
-				       u64 systim)
+static inline void igc_ptp_systim_to_hwtstamp(struct igc_adapter *adapter,
+					      struct skb_shared_hwtstamps *hwtstamps,
+					      u64 systim)
 {
-	switch (adapter->hw.mac.type) {
-	case igc_i225:
-		memset(hwtstamps, 0, sizeof(*hwtstamps));
-		/* Upper 32 bits contain s, lower 32 bits contain ns. */
+	/* Upper 32 bits contain s, lower 32 bits contain ns. */
+	if (adapter->hw.mac.type == igc_i225)
 		hwtstamps->hwtstamp = ktime_set(systim >> 32,
 						systim & 0xFFFFFFFF);
-		break;
-	default:
-		break;
-	}
 }
 
 /**
@@ -645,7 +639,7 @@ void igc_ptp_tx_hang(struct igc_adapter *adapter)
 static void igc_ptp_tx_hwtstamp(struct igc_adapter *adapter)
 {
 	struct sk_buff *skb = adapter->ptp_tx_skb;
-	struct skb_shared_hwtstamps shhwtstamps;
+	struct skb_shared_hwtstamps shhwtstamps = { 0 };
 	struct igc_hw *hw = &adapter->hw;
 	int adjust = 0;
 	u64 regval;
