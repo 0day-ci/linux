@@ -203,6 +203,8 @@ static unsigned int napi_gen_id = NR_CPUS;
 static DEFINE_READ_MOSTLY_HASHTABLE(napi_hash, 8);
 
 static DECLARE_RWSEM(devnet_rename_sem);
+unsigned int rps_pv_send_ipi __read_mostly;
+static DEFINE_PER_CPU(cpumask_var_t, rps_ipi_mask);
 
 static inline void dev_base_seq_inc(struct net *net)
 {
@@ -4612,9 +4614,9 @@ EXPORT_SYMBOL(rps_may_expire_flow);
 #endif /* CONFIG_RFS_ACCEL */
 
 /* Called from hardirq (IPI) context */
-static void rps_trigger_softirq(void *data)
+static void rps_trigger_softirq(void *data __maybe_unused)
 {
-	struct softnet_data *sd = data;
+	struct softnet_data *sd = this_cpu_ptr(&softnet_data);
 
 	____napi_schedule(sd, &sd->backlog);
 	sd->received_rps++;
@@ -6429,12 +6431,26 @@ EXPORT_SYMBOL(__skb_gro_checksum_complete);
 static void net_rps_send_ipi(struct softnet_data *remsd)
 {
 #ifdef CONFIG_RPS
-	while (remsd) {
-		struct softnet_data *next = remsd->rps_ipi_next;
+	if (!rps_pv_send_ipi) {
+		while (remsd) {
+			struct softnet_data *next = remsd->rps_ipi_next;
 
-		if (cpu_online(remsd->cpu))
-			smp_call_function_single_async(remsd->cpu, &remsd->csd);
-		remsd = next;
+			if (cpu_online(remsd->cpu))
+				smp_call_function_single_async(remsd->cpu, &remsd->csd);
+			remsd = next;
+		}
+	} else {
+		struct cpumask *tmpmask = this_cpu_cpumask_var_ptr(rps_ipi_mask);
+
+		cpumask_clear(tmpmask);
+		while (remsd) {
+			struct softnet_data *next = remsd->rps_ipi_next;
+
+			if (cpu_online(remsd->cpu))
+				cpumask_set_cpu(remsd->cpu, tmpmask);
+			remsd = next;
+		}
+		smp_call_function_many(tmpmask, rps_trigger_softirq, NULL, false);
 	}
 #endif
 }
@@ -11681,6 +11697,8 @@ static int __init net_dev_init(void)
 #ifdef CONFIG_RPS
 		INIT_CSD(&sd->csd, rps_trigger_softirq, sd);
 		sd->cpu = i;
+		zalloc_cpumask_var_node(&per_cpu(rps_ipi_mask, i),
+			GFP_KERNEL, cpu_to_node(i));
 #endif
 
 		init_gro_hash(&sd->backlog);

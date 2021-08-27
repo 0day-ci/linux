@@ -377,6 +377,15 @@ static struct ctl_table net_core_table[] = {
 		.mode		= 0444,
 		.proc_handler	= proc_do_rss_key,
 	},
+	{
+		.procname	= "rps_pv_send_ipi",
+		.data		= &rps_pv_send_ipi,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec_minmax,
+		.extra1		= SYSCTL_ZERO,
+		.extra2		= SYSCTL_ONE,
+	},
 #ifdef CONFIG_BPF_JIT
 	{
 		.procname	= "bpf_jit_enable",
