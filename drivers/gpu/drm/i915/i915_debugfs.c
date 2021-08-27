@@ -135,6 +135,27 @@ static const char *stringify_vma_type(const struct i915_vma *vma)
 	return "ppgtt";
 }
 
+static struct intel_engine_cs *
+last_write_engine(struct drm_i915_private *i915,
+		  struct drm_i915_gem_object *obj)
+{
+	struct intel_engine_cs *engine = NULL;
+	struct dma_fence *fence;
+
+	rcu_read_lock();
+	fence = dma_resv_get_excl_unlocked(obj->base.resv);
+	rcu_read_unlock();
+
+	if (fence &&
+	    !dma_fence_is_signaled(fence) &&
+	    dma_fence_is_i915(fence) &&
+	    to_request(fence)->i915 == i915)
+		engine = to_request(fence)->engine;
+	dma_fence_put(fence);
+
+	return engine;
+}
+
 void
 i915_debugfs_describe_obj(struct seq_file *m, struct drm_i915_gem_object *obj)
 {
@@ -230,7 +251,7 @@ i915_debugfs_describe_obj(struct seq_file *m, struct drm_i915_gem_object *obj)
 	if (i915_gem_object_is_framebuffer(obj))
 		seq_printf(m, " (fb)");
 
-	engine = i915_gem_object_last_write_engine(obj);
+	engine = last_write_engine(dev_priv, obj);
 	if (engine)
 		seq_printf(m, " (%s)", engine->name);
 }

@@ -163,6 +163,7 @@ enum {
  */
 struct i915_request {
 	struct dma_fence fence;
+	struct drm_i915_private *i915;
 	spinlock_t lock;
 
 	/**
