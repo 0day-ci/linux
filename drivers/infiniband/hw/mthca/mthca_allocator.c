@@ -51,6 +51,9 @@ u32 mthca_alloc(struct mthca_alloc *alloc)
 	}
 
 	if (obj < alloc->max) {
+		alloc->last = obj + 1;
+		if (alloc->last == alloc->max)
+			alloc->last = 0;
 		set_bit(obj, alloc->table);
 		obj |= alloc->top;
 	} else
