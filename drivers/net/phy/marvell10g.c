@@ -987,11 +987,17 @@ static int mv3310_get_number_of_ports(struct phy_device *phydev)
 
 static int mv3310_match_phy_device(struct phy_device *phydev)
 {
+	if ((phydev->phy_id & MARVELL_PHY_ID_MASK) != MARVELL_PHY_ID_88X3310)
+		return 0;
+
 	return mv3310_get_number_of_ports(phydev) == 1;
 }
 
 static int mv3340_match_phy_device(struct phy_device *phydev)
 {
+	if ((phydev->phy_id & MARVELL_PHY_ID_MASK) != MARVELL_PHY_ID_88X3310)
+		return 0;
+
 	return mv3310_get_number_of_ports(phydev) == 4;
 }
 
