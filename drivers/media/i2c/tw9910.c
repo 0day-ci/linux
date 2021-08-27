@@ -228,6 +228,7 @@ struct tw9910_scale_ctrl {
 
 struct tw9910_priv {
 	struct v4l2_subdev		subdev;
+	struct media_pad		pad;
 	struct clk			*clk;
 	struct tw9910_video_info	*info;
 	struct gpio_desc		*pdn_gpio;
@@ -948,6 +949,7 @@ static int tw9910_probe(struct i2c_client *client,
 {
 	struct tw9910_priv		*priv;
 	struct i2c_adapter		*adapter = client->adapter;
+	struct v4l2_subdev *sd;
 	int ret;
 
 	if (!i2c_check_functionality(adapter, I2C_FUNC_SMBUS_BYTE_DATA)) {
@@ -973,14 +975,22 @@ static int tw9910_probe(struct i2c_client *client,
 		return -ENODEV;
 	}
 
-	v4l2_i2c_subdev_init(&priv->subdev, client, &tw9910_subdev_ops);
+	sd = &priv->subdev;
+	v4l2_i2c_subdev_init(sd, client, &tw9910_subdev_ops);
+	priv->pad.flags = MEDIA_PAD_FL_SOURCE;
+	sd->flags |= V4L2_SUBDEV_FL_HAS_DEVNODE | V4L2_SUBDEV_FL_HAS_EVENTS;
+	sd->entity.function = MEDIA_ENT_F_ATV_DECODER;
+	ret = media_entity_pads_init(&sd->entity, 1, &priv->pad);
+	if (ret)
+		return ret;
 
 	priv->clk = clk_get(&client->dev, "xti");
 	if (PTR_ERR(priv->clk) == -ENOENT) {
 		priv->clk = NULL;
 	} else if (IS_ERR(priv->clk)) {
 		dev_err(&client->dev, "Unable to get xti clock\n");
-		return PTR_ERR(priv->clk);
+		ret = PTR_ERR(priv->clk);
+		goto media_entity_cleanup;
 	}
 
 	priv->pdn_gpio = gpiod_get_optional(&client->dev, "pdn",
@@ -1006,7 +1016,9 @@ error_gpio_put:
 		gpiod_put(priv->pdn_gpio);
 error_clk_put:
 	clk_put(priv->clk);
-
+	
+media_entity_cleanup:
+	media_entity_cleanup(&sd->entity);
 	return ret;
 }
 
