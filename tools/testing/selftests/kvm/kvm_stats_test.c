@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <sys/stat.h>
 
 #include "test_util.h"
 
@@ -191,6 +192,7 @@ static void vcpu_stats_test(struct kvm_vm *vm, int vcpu_id)
 
 #define DEFAULT_NUM_VM		4
 #define DEFAULT_NUM_VCPU	4
+#define	INT_MAX_LEN		10
 
 /*
  * Usage: kvm_bin_form_stats [#vm] [#vcpu]
@@ -242,8 +244,37 @@ int main(int argc, char *argv[])
 			vcpu_stats_test(vms[i], j);
 	}
 
+	/*
+	 * Check debugfs directory for every VM and VCPU
+	 */
+	struct stat buf;
+	int len;
+	char *vm_dir_path = NULL;
+	char *vcpu_dir_path = NULL;
+
+	len = strlen(KVM_DEBUGFS_PATH) + 2 * INT_MAX_LEN + 3;
+	vm_dir_path = malloc(len);
+	TEST_ASSERT(vm_dir_path, "Allocate memory for VM directory path");
+	vcpu_dir_path = malloc(len + INT_MAX_LEN + 6);
+	TEST_ASSERT(vm_dir_path, "Allocate memory for VCPU directory path");
+	for (i = 0; i < max_vm; ++i) {
+		sprintf(vm_dir_path, "%s/%d-%d", KVM_DEBUGFS_PATH, getpid(),
+			vm_get_fd(vms[i]));
+		stat(vm_dir_path, &buf);
+		TEST_ASSERT(S_ISDIR(buf.st_mode), "VM directory %s does not exist",
+			    vm_dir_path);
+		for (j = 0; j < max_vcpu; ++j) {
+			sprintf(vcpu_dir_path, "%s/vcpu%d", vm_dir_path, j);
+			stat(vcpu_dir_path, &buf);
+			TEST_ASSERT(S_ISDIR(buf.st_mode), "VCPU directory %s does not exist",
+				    vcpu_dir_path);
+		}
+	}
+
 	for (i = 0; i < max_vm; ++i)
 		kvm_vm_free(vms[i]);
 	free(vms);
+	free(vm_dir_path);
+	free(vcpu_dir_path);
 	return 0;
 }
