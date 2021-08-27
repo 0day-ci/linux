@@ -204,6 +204,9 @@ module_param(ple_window_max, uint, 0444);
 int __read_mostly pt_mode = PT_MODE_SYSTEM;
 module_param(pt_mode, int, S_IRUGO);
 
+static bool has_msr_rtit_cr3_match;
+static bool has_msr_rtit_output_x;
+
 static DEFINE_STATIC_KEY_FALSE(vmx_l1d_should_flush);
 static DEFINE_STATIC_KEY_FALSE(vmx_l1d_flush_cond);
 static DEFINE_MUTEX(vmx_l1d_flush_mutex);
@@ -1035,9 +1038,12 @@ static inline void pt_load_msr(struct pt_ctx *ctx, u32 addr_range)
 	u32 i;
 
 	wrmsrl(MSR_IA32_RTIT_STATUS, ctx->status);
-	wrmsrl(MSR_IA32_RTIT_OUTPUT_BASE, ctx->output_base);
-	wrmsrl(MSR_IA32_RTIT_OUTPUT_MASK, ctx->output_mask);
-	wrmsrl(MSR_IA32_RTIT_CR3_MATCH, ctx->cr3_match);
+	if (has_msr_rtit_output_x) {
+		wrmsrl(MSR_IA32_RTIT_OUTPUT_BASE, ctx->output_base);
+		wrmsrl(MSR_IA32_RTIT_OUTPUT_MASK, ctx->output_mask);
+	}
+	if (has_msr_rtit_cr3_match)
+		wrmsrl(MSR_IA32_RTIT_CR3_MATCH, ctx->cr3_match);
 	for (i = 0; i < addr_range; i++) {
 		wrmsrl(MSR_IA32_RTIT_ADDR0_A + i * 2, ctx->addr_a[i]);
 		wrmsrl(MSR_IA32_RTIT_ADDR0_B + i * 2, ctx->addr_b[i]);
@@ -1049,9 +1055,12 @@ static inline void pt_save_msr(struct pt_ctx *ctx, u32 addr_range)
 	u32 i;
 
 	rdmsrl(MSR_IA32_RTIT_STATUS, ctx->status);
-	rdmsrl(MSR_IA32_RTIT_OUTPUT_BASE, ctx->output_base);
-	rdmsrl(MSR_IA32_RTIT_OUTPUT_MASK, ctx->output_mask);
-	rdmsrl(MSR_IA32_RTIT_CR3_MATCH, ctx->cr3_match);
+	if (has_msr_rtit_output_x) {
+		rdmsrl(MSR_IA32_RTIT_OUTPUT_BASE, ctx->output_base);
+		rdmsrl(MSR_IA32_RTIT_OUTPUT_MASK, ctx->output_mask);
+	}
+	if (has_msr_rtit_cr3_match)
+		rdmsrl(MSR_IA32_RTIT_CR3_MATCH, ctx->cr3_match);
 	for (i = 0; i < addr_range; i++) {
 		rdmsrl(MSR_IA32_RTIT_ADDR0_A + i * 2, ctx->addr_a[i]);
 		rdmsrl(MSR_IA32_RTIT_ADDR0_B + i * 2, ctx->addr_b[i]);
@@ -7883,8 +7892,13 @@ static __init int hardware_setup(void)
 
 	if (pt_mode != PT_MODE_SYSTEM && pt_mode != PT_MODE_HOST_GUEST)
 		return -EINVAL;
-	if (!enable_ept || !cpu_has_vmx_intel_pt())
+	if (!enable_ept || !cpu_has_vmx_intel_pt()) {
 		pt_mode = PT_MODE_SYSTEM;
+	} else if (boot_cpu_has(X86_FEATURE_INTEL_PT)) {
+		has_msr_rtit_cr3_match = intel_pt_validate_hw_cap(PT_CAP_cr3_filtering);
+		has_msr_rtit_output_x = intel_pt_validate_hw_cap(PT_CAP_topa_output) ||
+					intel_pt_validate_hw_cap(PT_CAP_single_range_output);
+	}
 
 	setup_default_sgx_lepubkeyhash();
 
