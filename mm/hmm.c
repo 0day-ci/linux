@@ -295,6 +295,12 @@ static int hmm_vma_handle_pte(struct mm_walk *walk, unsigned long addr,
 		goto fault;
 
 	/*
+	 * just bypass devmap pte such as DAX page when all pfn requested
+	 * flags(pfn_req_flags) are fulfilled.
+	 */
+	if (pte_devmap(pte))
+		goto out;
+	/*
 	 * Since each architecture defines a struct page for the zero page, just
 	 * fall through and treat it like a normal page.
 	 */
@@ -307,6 +313,7 @@ static int hmm_vma_handle_pte(struct mm_walk *walk, unsigned long addr,
 		return 0;
 	}
 
+out:
 	*hmm_pfn = pte_pfn(pte) | cpu_flags;
 	return 0;
 
