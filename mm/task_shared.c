@@ -275,6 +275,14 @@ static long task_getshared(u64 opt, u64 flags, void __user *uaddr)
 {
 	struct task_ushrd_struct *ushrd = current->task_ushrd;
 
+	/* Currently only TASK_SCHEDSTAT supported */
+#ifdef CONFIG_SCHED_INFO
+	if (opt != TASK_SCHEDSTAT)
+		return (-EINVAL);
+#else
+	return (-EOPNOTSUPP);
+#endif
+
 	/* We have address, return. */
 	if (ushrd != NULL && ushrd->upg != NULL) {
 		if (copy_to_user(uaddr, &ushrd->uaddr,
@@ -286,6 +294,11 @@ static long task_getshared(u64 opt, u64 flags, void __user *uaddr)
 	task_ushared_alloc();
 	ushrd = current->task_ushrd;
 	if (ushrd != NULL && ushrd->upg != NULL) {
+		if (opt == TASK_SCHEDSTAT) {
+			/* init current values */
+			task_update_exec_runtime(current);
+			task_update_runq_stat(current, 1);
+		}
 		if (copy_to_user(uaddr, &ushrd->uaddr,
 			sizeof(struct task_ushared *)))
 			return (-EFAULT);

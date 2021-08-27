@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 
 #ifdef CONFIG_SCHEDSTATS
+#include <linux/task_shared.h>
 
 /*
  * Expects runqueue lock to be held for atomicity of update
@@ -166,6 +167,7 @@ static inline void sched_info_dequeue(struct rq *rq, struct task_struct *t)
 	delta = rq_clock(rq) - t->sched_info.last_queued;
 	t->sched_info.last_queued = 0;
 	t->sched_info.run_delay += delta;
+	task_update_runq_stat(t, 0);
 
 	rq_sched_info_dequeue(rq, delta);
 }
@@ -188,6 +190,7 @@ static void sched_info_arrive(struct rq *rq, struct task_struct *t)
 	t->sched_info.run_delay += delta;
 	t->sched_info.last_arrival = now;
 	t->sched_info.pcount++;
+	task_update_runq_stat(t, 1);
 
 	rq_sched_info_arrive(rq, delta);
 }
