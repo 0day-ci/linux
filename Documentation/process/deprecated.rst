@@ -60,7 +60,8 @@ smaller allocation being made than the caller was expecting. Using those
 allocations could lead to linear overflows of heap memory and other
 misbehaviors. (One exception to this is literal values where the compiler
 can warn if they might overflow. Though using literals for arguments as
-suggested below is also harmless.)
+suggested below is also harmless. So, the preferred way in these cases is
+to refactor the code to keep the open-coded math idiom out.)
 
 For example, do not use ``count * size`` as an argument, as in::
 
