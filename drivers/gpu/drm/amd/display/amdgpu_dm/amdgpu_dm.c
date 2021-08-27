@@ -2298,6 +2298,7 @@ static int dm_resume(void *handle)
 			dc_sink_release(aconnector->dc_sink);
 		aconnector->dc_sink = NULL;
 		amdgpu_dm_update_connector_after_detect(aconnector);
+		get_mst_link_encoding_cap(aconnector);
 		mutex_unlock(&aconnector->hpd_lock);
 	}
 	drm_connector_list_iter_end(&iter);
@@ -2669,6 +2670,7 @@ static void handle_hpd_irq(void *param)
 		if (aconnector->base.force == DRM_FORCE_UNSPECIFIED)
 			drm_kms_helper_hotplug_event(dev);
 	}
+	get_mst_link_encoding_cap(aconnector);
 	mutex_unlock(&aconnector->hpd_lock);
 
 }
@@ -3840,7 +3842,7 @@ static int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 				amdgpu_dm_set_psr_caps(link);
 		}
 
-
+		get_mst_link_encoding_cap(aconnector);
 	}
 
 	/* Software is initialized. Now we can register interrupt handlers. */

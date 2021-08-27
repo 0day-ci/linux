@@ -439,6 +439,16 @@ static const struct drm_dp_mst_topology_cbs dm_mst_cbs = {
 	.add_connector = dm_dp_add_mst_connector,
 };
 
+void get_mst_link_encoding_cap(struct amdgpu_dm_connector *aconnector)
+{
+	u8 link_encoding_cap;
+
+	if (aconnector->dc_link->type == dc_connection_mst_branch) {
+		link_encoding_cap = dc_link_dp_mst_decide_link_encoding_format(aconnector->dc_link);
+		drm_dp_mst_update_coding_cap(&aconnector->mst_mgr, link_encoding_cap);
+	}
+}
+
 void amdgpu_dm_initialize_dp_connector(struct amdgpu_display_manager *dm,
 				       struct amdgpu_dm_connector *aconnector,
 				       int link_index)
