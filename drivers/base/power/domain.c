@@ -2700,15 +2700,41 @@ static int __genpd_dev_pm_attach(struct device *dev, struct device *base_dev,
 		goto err;
 	} else if (pstate > 0) {
 		ret = dev_pm_genpd_set_performance_state(dev, pstate);
-		if (ret)
+		if (ret) {
+			dev_err(dev, "failed to set required performance state for power-domain %s: %d\n",
+				pd->name, ret);
 			goto err;
+		}
 		dev_gpd_data(dev)->default_pstate = pstate;
 	}
+
+	if (pd->get_performance_state && !dev_gpd_data(dev)->default_pstate) {
+		bool dev_suspended = false;
+
+		ret = pd->get_performance_state(pd, base_dev, &dev_suspended);
+		if (ret < 0) {
+			dev_err(dev, "failed to get performance state for power-domain %s: %d\n",
+				pd->name, ret);
+			goto err;
+		}
+
+		pstate = ret;
+
+		if (dev_suspended) {
+			dev_gpd_data(dev)->rpm_pstate = pstate;
+		} else if (pstate > 0) {
+			ret = dev_pm_genpd_set_performance_state(dev, pstate);
+			if (ret) {
+				dev_err(dev, "failed to set required performance state for power-domain %s: %d\n",
+					pd->name, ret);
+				goto err;
+			}
+		}
+	}
+
 	return 1;
 
 err:
-	dev_err(dev, "failed to set required performance state for power-domain %s: %d\n",
-		pd->name, ret);
 	genpd_remove_device(pd, dev);
 	return ret;
 }
