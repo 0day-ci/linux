@@ -1349,9 +1349,6 @@ static void insert_work(struct pool_workqueue *pwq, struct work_struct *work,
 {
 	struct worker_pool *pool = pwq->pool;
 
-	/* record the work call stack in order to print it in KASAN reports */
-	kasan_record_aux_stack(work);
-
 	/* we own @work, set data and link */
 	set_work_pwq(work, pwq, extra_flags);
 	list_add_tail(&work->entry, head);
@@ -1520,6 +1517,14 @@ retry:
 
 out:
 	raw_spin_unlock(&pwq->pool->lock);
+
+	/*
+	 * record the work call stack in order to print it in KASAN reports
+	 * Do this without pool raw_spinlock hold to avoid nesting raw
+	 * spinlock with page allocation spinlock.
+	 */
+	kasan_record_aux_stack(work);
+
 	rcu_read_unlock();
 }
 
@@ -3041,6 +3046,13 @@ static bool start_flush_work(struct work_struct *work, struct wq_barrier *barr,
 
 	insert_wq_barrier(pwq, barr, work, worker);
 	raw_spin_unlock_irq(&pool->lock);
+
+	/*
+	 * record the work call stack in order to print it in KASAN reports
+	 * Do this without pool raw_spinlock hold to avoid nesting raw
+	 * spinlock with page allocation spinlock.
+	 */
+	kasan_record_aux_stack(work);
 
 	/*
 	 * Force a lock recursion deadlock when using flush_work() inside a
