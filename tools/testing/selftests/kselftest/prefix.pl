@@ -16,7 +16,7 @@ while (1) {
 	my $bytes = sysread(STDIN, $char, 1);
 	exit 0 if ($bytes == 0);
 	if ($needed) {
-		print "# ";
+		print "  ";
 		$needed = 0;
 	}
 	print $char;

@@ -23,7 +23,7 @@ fi
 tap_prefix()
 {
 	if [ ! -x /usr/bin/perl ]; then
-		sed -e 's/^/# /'
+		sed -e 's/^/  /'
 	else
 		"$BASE_DIR"/kselftest/prefix.pl
 	fi
@@ -75,7 +75,8 @@ run_one()
 		echo "not ok $test_num $TEST_HDR_MSG"
 	else
 		cd `dirname $TEST` > /dev/null
-		((((( tap_timeout ./$BASENAME_TEST 2>&1; echo $? >&3) |
+		(echo "  # Subtest: selftests: $DIR: $BASENAME_TEST" &&
+		(((( tap_timeout ./$BASENAME_TEST 2>&1; echo $? >&3) |
 			tap_prefix >&4) 3>&1) |
 			(read xs; exit $xs)) 4>>"$logfile" &&
 		echo "ok $test_num $TEST_HDR_MSG") ||
@@ -83,7 +84,6 @@ run_one()
 		if [ $rc -eq $skip_rc ]; then	\
 			echo "ok $test_num $TEST_HDR_MSG # SKIP"
 		elif [ $rc -eq $timeout_rc ]; then \
-			echo "#"
 			echo "not ok $test_num $TEST_HDR_MSG # TIMEOUT $kselftest_timeout seconds"
 		else
 			echo "not ok $test_num $TEST_HDR_MSG # exit=$rc"
