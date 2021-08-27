@@ -48,7 +48,9 @@ allOf:
 
 properties:
   compatible:
-    const: mediatek,mt8192-pcie
+    enum:
+      - mediatek,mt8192-pcie
+      - mediatek,mt8195-pcie
 
   reg:
     maxItems: 1
