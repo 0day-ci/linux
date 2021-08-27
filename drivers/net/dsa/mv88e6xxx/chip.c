@@ -244,15 +244,18 @@ static const struct irq_domain_ops mv88e6xxx_g1_irq_domain_ops = {
 	.xlate	= irq_domain_xlate_twocell,
 };
 
-/* To be called with reg_lock held */
 static void mv88e6xxx_g1_irq_free_common(struct mv88e6xxx_chip *chip)
 {
 	int irq, virq;
 	u16 mask;
 
+	mv88e6xxx_reg_lock(chip);
+
 	mv88e6xxx_g1_read(chip, MV88E6XXX_G1_CTL1, &mask);
 	mask &= ~GENMASK(chip->g1_irq.nirqs, 0);
 	mv88e6xxx_g1_write(chip, MV88E6XXX_G1_CTL1, mask);
+
+	mv88e6xxx_reg_unlock(chip);
 
 	for (irq = 0; irq < chip->g1_irq.nirqs; irq++) {
 		virq = irq_find_mapping(chip->g1_irq.domain, irq);
@@ -270,9 +273,7 @@ static void mv88e6xxx_g1_irq_free(struct mv88e6xxx_chip *chip)
 	 */
 	free_irq(chip->irq, chip);
 
-	mv88e6xxx_reg_lock(chip);
 	mv88e6xxx_g1_irq_free_common(chip);
-	mv88e6xxx_reg_unlock(chip);
 }
 
 static int mv88e6xxx_g1_irq_setup_common(struct mv88e6xxx_chip *chip)
@@ -293,9 +294,11 @@ static int mv88e6xxx_g1_irq_setup_common(struct mv88e6xxx_chip *chip)
 	chip->g1_irq.chip = mv88e6xxx_g1_irq_chip;
 	chip->g1_irq.masked = ~0;
 
+	mv88e6xxx_reg_lock(chip);
+
 	err = mv88e6xxx_g1_read(chip, MV88E6XXX_G1_CTL1, &mask);
 	if (err)
-		goto out_mapping;
+		goto out_unlock;
 
 	mask &= ~GENMASK(chip->g1_irq.nirqs, 0);
 
@@ -308,13 +311,17 @@ static int mv88e6xxx_g1_irq_setup_common(struct mv88e6xxx_chip *chip)
 	if (err)
 		goto out_disable;
 
+	mv88e6xxx_reg_unlock(chip);
+
 	return 0;
 
 out_disable:
 	mask &= ~GENMASK(chip->g1_irq.nirqs, 0);
 	mv88e6xxx_g1_write(chip, MV88E6XXX_G1_CTL1, mask);
 
-out_mapping:
+out_unlock:
+	mv88e6xxx_reg_unlock(chip);
+
 	for (irq = 0; irq < 16; irq++) {
 		virq = irq_find_mapping(chip->g1_irq.domain, irq);
 		irq_dispose_mapping(virq);
@@ -344,12 +351,10 @@ static int mv88e6xxx_g1_irq_setup(struct mv88e6xxx_chip *chip)
 	snprintf(chip->irq_name, sizeof(chip->irq_name),
 		 "mv88e6xxx-%s", dev_name(chip->dev));
 
-	mv88e6xxx_reg_unlock(chip);
 	err = request_threaded_irq(chip->irq, NULL,
 				   mv88e6xxx_g1_irq_thread_fn,
 				   IRQF_ONESHOT | IRQF_SHARED,
 				   chip->irq_name, chip);
-	mv88e6xxx_reg_lock(chip);
 	if (err)
 		mv88e6xxx_g1_irq_free_common(chip);
 
@@ -393,9 +398,7 @@ static void mv88e6xxx_irq_poll_free(struct mv88e6xxx_chip *chip)
 	kthread_cancel_delayed_work_sync(&chip->irq_poll_work);
 	kthread_destroy_worker(chip->kworker);
 
-	mv88e6xxx_reg_lock(chip);
 	mv88e6xxx_g1_irq_free_common(chip);
-	mv88e6xxx_reg_unlock(chip);
 }
 
 static int mv88e6xxx_port_config_interface(struct mv88e6xxx_chip *chip,
@@ -6286,12 +6289,10 @@ static int mv88e6xxx_probe(struct mdio_device *mdiodev)
 	 * the PHYs will link their interrupts to these interrupt
 	 * controllers
 	 */
-	mv88e6xxx_reg_lock(chip);
 	if (chip->irq > 0)
 		err = mv88e6xxx_g1_irq_setup(chip);
 	else
 		err = mv88e6xxx_irq_poll_setup(chip);
-	mv88e6xxx_reg_unlock(chip);
 
 	if (err)
 		goto out;
