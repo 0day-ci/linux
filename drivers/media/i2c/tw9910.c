@@ -859,7 +859,7 @@ static int tw9910_video_probe(struct i2c_client *client)
 	priv->revision = GET_REV(id);
 	id = GET_ID(id);
 
-	if (id != 0x0b || priv->revision > 0x01) {
+	if ((id != 0x0b && id != 0x00) || priv->revision > 0x01) {
 		dev_err(&client->dev, "Product ID error %x:%x\n",
 			id, priv->revision);
 		ret = -ENODEV;
