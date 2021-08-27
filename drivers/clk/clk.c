@@ -3669,7 +3669,7 @@ struct clk *clk_hw_create_clk(struct device *dev, struct clk_hw *hw,
 	struct clk_core *core;
 
 	/* This is to allow this function to be chained to others */
-	if (IS_ERR_OR_NULL(hw))
+	if (IS_ERR(hw))
 		return ERR_CAST(hw);
 
 	core = hw->core;
