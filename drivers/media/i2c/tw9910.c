@@ -22,6 +22,7 @@
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/of.h>
 #include <linux/slab.h>
 #include <linux/v4l2-mediabus.h>
 #include <linux/videodev2.h>
@@ -928,21 +929,26 @@ static const struct v4l2_subdev_ops tw9910_subdev_ops = {
  * i2c_driver function
  */
 
+static int tw9910_parse_dt(struct i2c_client *client, struct tw9910_priv *priv)
+{
+	priv->info = devm_kzalloc(&client->dev, sizeof(*priv->info), GFP_KERNEL);
+	if (!priv->info)
+		return -ENOMEM;
+
+	/* Use default for now. Will retrieve from dt later */
+	priv->info->mpout = 0;
+	priv->info->buswidth = 8;
+
+	return 0;
+}
+
 static int tw9910_probe(struct i2c_client *client,
 			const struct i2c_device_id *did)
 
 {
 	struct tw9910_priv		*priv;
-	struct tw9910_video_info	*info;
 	struct i2c_adapter		*adapter = client->adapter;
 	int ret;
-
-	if (!client->dev.platform_data) {
-		dev_err(&client->dev, "TW9910: missing platform data!\n");
-		return -EINVAL;
-	}
-
-	info = client->dev.platform_data;
 
 	if (!i2c_check_functionality(adapter, I2C_FUNC_SMBUS_BYTE_DATA)) {
 		dev_err(&client->dev,
@@ -954,7 +960,18 @@ static int tw9910_probe(struct i2c_client *client,
 	if (!priv)
 		return -ENOMEM;
 
-	priv->info = info;
+	if (IS_ENABLED(CONFIG_OF) && client->dev.of_node) {
+		ret = tw9910_parse_dt(client, priv);
+		if (ret < 0) {
+			v4l_err(client, "DT parsing error\n");
+			return ret;
+		}
+	} else if (client->dev.platform_data) {
+		priv->info = client->dev.platform_data;
+	} else {
+		v4l_err(client, "No platform data!\n");
+		return -ENODEV;
+	}
 
 	v4l2_i2c_subdev_init(&priv->subdev, client, &tw9910_subdev_ops);
 
@@ -1007,13 +1024,25 @@ static int tw9910_remove(struct i2c_client *client)
 
 static const struct i2c_device_id tw9910_id[] = {
 	{ "tw9910", 0 },
+	{ "tw9990", 0 },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, tw9910_id);
 
+#ifdef CONFIG_OF
+static const struct of_device_id tw9910_of_id[] = {
+	{ .compatible = "renesas,tw9910", },
+	{ .compatible = "renesas,tw9990", },
+	{ },
+};
+
+MODULE_DEVICE_TABLE(of, tw9910_of_id);
+#endif
+
 static struct i2c_driver tw9910_i2c_driver = {
 	.driver = {
 		.name = "tw9910",
+		.of_match_table = of_match_ptr(tw9910_of_id),
 	},
 	.probe    = tw9910_probe,
 	.remove   = tw9910_remove,
