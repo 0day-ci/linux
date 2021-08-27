@@ -479,7 +479,7 @@ static void i810EmitContextVerified(struct drm_device *dev,
 			OUT_RING(tmp);
 			j++;
 		} else
-			printk("constext state dropped!!!\n");
+			printk("context state dropped!!!\n");
 	}
 
 	if (j & 1)
