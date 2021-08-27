@@ -662,6 +662,15 @@ struct drm_dp_mst_topology_mgr {
 	int pbn_div;
 
 	/**
+	 * @total_avail_slots: available slots for data transmission
+	 */
+	u8 total_avail_slots;
+	/**
+	 * @start_slot: first slot index for data transmission
+	 */
+	u8 start_slot;
+
+	/**
 	 * @funcs: Atomic helper callbacks
 	 */
 	const struct drm_private_state_funcs *funcs;

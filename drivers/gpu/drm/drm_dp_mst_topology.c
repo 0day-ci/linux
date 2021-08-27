@@ -3370,7 +3370,7 @@ int drm_dp_update_payload_part1(struct drm_dp_mst_topology_mgr *mgr)
 	struct drm_dp_payload req_payload;
 	struct drm_dp_mst_port *port;
 	int i, j;
-	int cur_slots = 1;
+	int cur_slots = mgr->start_slot;
 	bool skip;
 
 	mutex_lock(&mgr->payload_lock);
@@ -4323,7 +4323,7 @@ int drm_dp_find_vcpi_slots(struct drm_dp_mst_topology_mgr *mgr,
 	num_slots = DIV_ROUND_UP(pbn, mgr->pbn_div);
 
 	/* max. time slots - one slot for MTP header */
-	if (num_slots > 63)
+	if (num_slots > mgr->total_avail_slots)
 		return -ENOSPC;
 	return num_slots;
 }
@@ -4335,7 +4335,7 @@ static int drm_dp_init_vcpi(struct drm_dp_mst_topology_mgr *mgr,
 	int ret;
 
 	/* max. time slots - one slot for MTP header */
-	if (slots > 63)
+	if (slots > mgr->total_avail_slots)
 		return -ENOSPC;
 
 	vcpi->pbn = pbn;
@@ -4509,6 +4509,17 @@ int drm_dp_atomic_release_vcpi_slots(struct drm_atomic_state *state,
 }
 EXPORT_SYMBOL(drm_dp_atomic_release_vcpi_slots);
 
+void drm_dp_mst_update_encoding_cap(struct drm_dp_mst_topology_mgr *mgr, uint8_t link_encoding_cap)
+{
+	if (link_encoding_cap == DP_CAP_ANSI_128B132B) {
+		mgr->total_avail_slots = 64;
+		mgr->start_slot = 0;
+	}
+	DRM_DEBUG_KMS("%s encoding format determined\n",
+		      (link_encoding_cap == DP_CAP_ANSI_128B132B) ? "128b/132b" : "8b/10b");
+}
+EXPORT_SYMBOL(drm_dp_mst_update_encoding_cap);
+
 /**
  * drm_dp_mst_allocate_vcpi() - Allocate a virtual channel
  * @mgr: manager for this port
@@ -4540,8 +4551,8 @@ bool drm_dp_mst_allocate_vcpi(struct drm_dp_mst_topology_mgr *mgr,
 
 	ret = drm_dp_init_vcpi(mgr, &port->vcpi, pbn, slots);
 	if (ret) {
-		drm_dbg_kms(mgr->dev, "failed to init vcpi slots=%d max=63 ret=%d\n",
-			    DIV_ROUND_UP(pbn, mgr->pbn_div), ret);
+		drm_dbg_kms(mgr->dev, "failed to init vcpi slots=%d max=%d ret=%d\n",
+			    DIV_ROUND_UP(pbn, mgr->pbn_div), mgr->total_avail_slots, ret);
 		drm_dp_mst_topology_put_port(port);
 		goto out;
 	}
@@ -5228,7 +5239,7 @@ drm_dp_mst_atomic_check_vcpi_alloc_limit(struct drm_dp_mst_topology_mgr *mgr,
 					 struct drm_dp_mst_topology_state *mst_state)
 {
 	struct drm_dp_vcpi_allocation *vcpi;
-	int avail_slots = 63, payload_count = 0;
+	int avail_slots = mgr->total_avail_slots, payload_count = 0;
 
 	list_for_each_entry(vcpi, &mst_state->vcpis, next) {
 		/* Releasing VCPI is always OK-even if the port is gone */
@@ -5257,7 +5268,7 @@ drm_dp_mst_atomic_check_vcpi_alloc_limit(struct drm_dp_mst_topology_mgr *mgr,
 		}
 	}
 	drm_dbg_atomic(mgr->dev, "[MST MGR:%p] mst state %p VCPI avail=%d used=%d\n",
-		       mgr, mst_state, avail_slots, 63 - avail_slots);
+		       mgr, mst_state, avail_slots, mgr->total_avail_slots - avail_slots);
 
 	return 0;
 }
@@ -5529,6 +5540,8 @@ int drm_dp_mst_topology_mgr_init(struct drm_dp_mst_topology_mgr *mgr,
 	if (!mgr->proposed_vcpis)
 		return -ENOMEM;
 	set_bit(0, &mgr->payload_mask);
+	mgr->total_avail_slots = 63;
+	mgr->start_slot = 1;
 
 	mst_state = kzalloc(sizeof(*mst_state), GFP_KERNEL);
 	if (mst_state == NULL)
