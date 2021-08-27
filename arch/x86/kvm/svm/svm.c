@@ -3291,6 +3291,7 @@ static int handle_exit(struct kvm_vcpu *vcpu, fastpath_t exit_fastpath)
 	struct vcpu_svm *svm = to_svm(vcpu);
 	struct kvm_run *kvm_run = vcpu->run;
 	u32 exit_code = svm->vmcb->control.exit_code;
+	size_t index;
 
 	trace_kvm_exit(exit_code, vcpu, KVM_ISA_SVM);
 
@@ -3336,6 +3337,26 @@ static int handle_exit(struct kvm_vcpu *vcpu, fastpath_t exit_fastpath)
 
 	if (exit_fastpath != EXIT_FASTPATH_NONE)
 		return 1;
+
+	if (exit_code >= SVM_EXIT_LOW_START &&
+			exit_code < SVM_EXIT_LOW_END) {
+		index = exit_code - SVM_EXIT_LOW_START;
+		++vcpu->stat.svm_exits_low[index];
+	} else if (exit_code >= SVM_EXIT_HIGH_START &&
+			exit_code < SVM_EXIT_HIGH_END) {
+		index = exit_code - SVM_EXIT_HIGH_START;
+		++vcpu->stat.svm_exits_high[index];
+	} else if (exit_code >= SVM_VMGEXIT_START &&
+			exit_code < SVM_VMGEXIT_END) {
+		index = exit_code - SVM_VMGEXIT_START;
+		++vcpu->stat.svm_vmgexits[index];
+	} else if (exit_code == SVM_VMGEXIT_UNSUPPORTED_EVENT) {
+		++vcpu->stat.svm_vmgexit_unsupported_event;
+	} else if (exit_code == SVM_EXIT_SW) {
+		++vcpu->stat.svm_exit_sw;
+	} else if (exit_code == SVM_EXIT_ERR) {
+		++vcpu->stat.svm_exit_err;
+	}
 
 	return svm_invoke_exit_handler(vcpu, exit_code);
 }

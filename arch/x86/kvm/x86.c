@@ -281,6 +281,15 @@ const struct _kvm_stats_desc kvm_vcpu_stats_desc[] = {
 	STATS_DESC_LINHIST_COUNTER(VCPU, vmx_all_exits, EXIT_REASON_NUM, 1),
 	STATS_DESC_LINHIST_COUNTER(VCPU, vmx_l2_exits, EXIT_REASON_NUM, 1),
 	STATS_DESC_LINHIST_COUNTER(VCPU, vmx_nested_exits, EXIT_REASON_NUM, 1),
+	STATS_DESC_LINHIST_COUNTER(VCPU, svm_exits_low,
+			SVM_EXIT_LOW_END - SVM_EXIT_LOW_START, 1),
+	STATS_DESC_LINHIST_COUNTER(VCPU, svm_exits_high,
+			SVM_EXIT_HIGH_END - SVM_EXIT_HIGH_START, 1),
+	STATS_DESC_LINHIST_COUNTER(VCPU, svm_vmgexits,
+			SVM_VMGEXIT_END - SVM_VMGEXIT_START, 1),
+	STATS_DESC_COUNTER(VCPU, svm_vmgexit_unsupported_event),
+	STATS_DESC_COUNTER(VCPU, svm_exit_sw),
+	STATS_DESC_COUNTER(VCPU, svm_exit_err),
 };
 
 const struct kvm_stats_header kvm_vcpu_stats_header = {

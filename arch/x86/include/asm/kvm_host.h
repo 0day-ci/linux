@@ -35,6 +35,7 @@
 #include <asm/kvm_vcpu_regs.h>
 #include <asm/hyperv-tlfs.h>
 #include <asm/vmx.h>
+#include <asm/svm.h>
 
 #define __KVM_HAVE_ARCH_VCPU_DEBUGFS
 
@@ -1261,6 +1262,12 @@ struct kvm_vcpu_stat {
 	u64 vmx_all_exits[EXIT_REASON_NUM];
 	u64 vmx_l2_exits[EXIT_REASON_NUM];
 	u64 vmx_nested_exits[EXIT_REASON_NUM];
+	u64 svm_exits_low[SVM_EXIT_LOW_END - SVM_EXIT_LOW_START];
+	u64 svm_exits_high[SVM_EXIT_HIGH_END - SVM_EXIT_HIGH_START];
+	u64 svm_vmgexits[SVM_VMGEXIT_END - SVM_VMGEXIT_START];
+	u64 svm_vmgexit_unsupported_event;
+	u64 svm_exit_sw;
+	u64 svm_exit_err;
 };
 
 struct x86_instruction_info;
