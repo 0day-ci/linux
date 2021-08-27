@@ -171,7 +171,7 @@ static ssize_t ibm_cffps_debugfs_read(struct file *file, char __user *buf,
 		cmd = CFFPS_SN_CMD;
 		break;
 	case CFFPS_DEBUGFS_MAX_POWER_OUT:
-		rc = i2c_smbus_read_word_swapped(psu->client,
+		rc = i2c_smbus_read_word_data(psu->client,
 						 CFFPS_MAX_POWER_OUT_CMD);
 		if (rc < 0)
 			return rc;
