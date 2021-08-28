@@ -496,10 +496,8 @@ static int rtw_resume(struct usb_interface *pusb_intf)
 	struct pwrctrl_priv *pwrpriv = &padapter->pwrctrlpriv;
 	int ret = 0;
 
-	if (pwrpriv->bInternalAutoSuspend)
-		ret = rtw_resume_process(padapter);
-	else
-		ret = rtw_resume_process(padapter);
+	ret = rtw_resume_process(padapter);
+
 	return ret;
 }
 
