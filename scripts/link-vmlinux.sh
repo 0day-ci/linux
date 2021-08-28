@@ -335,7 +335,8 @@ else
 fi;
 
 # final build of init/
-${MAKE} -f "${srctree}/scripts/Makefile.build" obj=init need-builtin=1
+${MAKE} -f "${srctree}/scripts/Makefile.build" obj=init need-builtin=1 \
+	${CONFIG_STACK_VALIDATION:+objtool-md5sum=$(md5sum tools/objtool/objtool | cut -d ' ' -f1)}
 
 #link vmlinux.o
 modpost_link vmlinux.o

@@ -1858,7 +1858,8 @@ descend: $(build-dirs)
 $(build-dirs): prepare
 	$(Q)$(MAKE) $(build)=$@ \
 	single-build=$(if $(filter-out $@/, $(filter $@/%, $(KBUILD_SINGLE_TARGETS))),1) \
-	need-builtin=1 need-modorder=1
+	need-builtin=1 need-modorder=1 \
+	$(if $(CONFIG_STACK_VALIDATION),objtool-md5sum=$(firstword $(shell md5sum tools/objtool/objtool)))
 
 clean-dirs := $(addprefix _clean_, $(clean-dirs))
 PHONY += $(clean-dirs) clean
