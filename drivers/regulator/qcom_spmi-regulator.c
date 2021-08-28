@@ -99,6 +99,9 @@ enum spmi_regulator_logical_type {
 	SPMI_REGULATOR_LOGICAL_TYPE_ULT_LDO,
 	SPMI_REGULATOR_LOGICAL_TYPE_FTSMPS426,
 	SPMI_REGULATOR_LOGICAL_TYPE_HFS430,
+	SPMI_REGULATOR_LOGICAL_TYPE_FTSMPS3,
+	SPMI_REGULATOR_LOGICAL_TYPE_LDO_510,
+	SPMI_REGULATOR_LOGICAL_TYPE_HFSMPS,
 };
 
 enum spmi_regulator_type {
@@ -164,6 +167,17 @@ enum spmi_regulator_subtype {
 	SPMI_REGULATOR_SUBTYPE_ULT_HF_CTL3	= 0x0f,
 	SPMI_REGULATOR_SUBTYPE_ULT_HF_CTL4	= 0x10,
 	SPMI_REGULATOR_SUBTYPE_HFS430		= 0x0a,
+	SPMI_REGULATOR_SUBTYPE_HFSMPS_510	= 0x0a,
+	SPMI_REGULATOR_SUBTYPE_FTSMPS_510	= 0x0b,
+	SPMI_REGULATOR_SUBTYPE_LV_P150_510	= 0x71,
+	SPMI_REGULATOR_SUBTYPE_LV_P300_510	= 0x72,
+	SPMI_REGULATOR_SUBTYPE_LV_P600_510	= 0x73,
+	SPMI_REGULATOR_SUBTYPE_N300_510		= 0x6a,
+	SPMI_REGULATOR_SUBTYPE_N600_510		= 0x6b,
+	SPMI_REGULATOR_SUBTYPE_N1200_510	= 0x6c,
+	SPMI_REGULATOR_SUBTYPE_MV_P50_510	= 0x7a,
+	SPMI_REGULATOR_SUBTYPE_MV_P150_510	= 0x7b,
+	SPMI_REGULATOR_SUBTYPE_MV_P600_510	= 0x7d,
 };
 
 enum spmi_common_regulator_registers {
@@ -190,6 +204,14 @@ enum spmi_ftsmps426_regulator_registers {
 	SPMI_FTSMPS426_REG_VOLTAGE_ULS_LSB	= 0x68,
 	SPMI_FTSMPS426_REG_VOLTAGE_ULS_MSB	= 0x69,
 };
+
+/*
+ * Third common register layout
+ */
+enum spmi_ftsmps3_regulator_registers {
+	SPMI_FTSMPS3_REG_STEP_CTRL		= 0x3c,
+};
+
 
 enum spmi_vs_registers {
 	SPMI_VS_REG_OCP				= 0x4a,
@@ -258,6 +280,15 @@ enum spmi_common_control_register_index {
 
 #define SPMI_FTSMPS426_MODE_MASK		0x07
 
+/* Third common regulator mode register values */
+#define SPMI_FTSMPS3_MODE_BYPASS_MASK		2
+#define SPMI_FTSMPS3_MODE_RETENTION_MASK	3
+#define SPMI_FTSMPS3_MODE_LPM_MASK		4
+#define SPMI_FTSMPS3_MODE_AUTO_MASK		6
+#define SPMI_FTSMPS3_MODE_HPM_MASK		7
+
+#define SPMI_FTSMPS3_MODE_MASK			0x07
+
 /* Common regulator pull down control register layout */
 #define SPMI_COMMON_PULL_DOWN_ENABLE_MASK	0x80
 
@@ -302,6 +333,9 @@ enum spmi_common_control_register_index {
  */
 #define SPMI_FTSMPS_STEP_MARGIN_NUM	4
 #define SPMI_FTSMPS_STEP_MARGIN_DEN	5
+
+/* slew_rate has units of uV/us. */
+#define SPMI_FTSMPS3_SLEW_RATE_38p4 38400
 
 #define SPMI_FTSMPS426_STEP_CTRL_DELAY_MASK	0x03
 #define SPMI_FTSMPS426_STEP_CTRL_DELAY_SHIFT	0
@@ -544,6 +578,14 @@ static struct spmi_voltage_range hfs430_ranges[] = {
 	SPMI_VOLTAGE_RANGE(0, 320000, 320000, 2040000, 2040000, 8000),
 };
 
+static struct spmi_voltage_range nldo_510_ranges[] = {
+	SPMI_VOLTAGE_RANGE(0, 320000, 320000, 1304000, 1304000, 8000),
+};
+
+static struct spmi_voltage_range ftsmps510_ranges[] = {
+	SPMI_VOLTAGE_RANGE(0, 300000, 300000, 1372000, 1372000, 4000),
+};
+
 static DEFINE_SPMI_SET_POINTS(pldo);
 static DEFINE_SPMI_SET_POINTS(nldo1);
 static DEFINE_SPMI_SET_POINTS(nldo2);
@@ -564,6 +606,8 @@ static DEFINE_SPMI_SET_POINTS(nldo660);
 static DEFINE_SPMI_SET_POINTS(ht_lvpldo);
 static DEFINE_SPMI_SET_POINTS(ht_nldo);
 static DEFINE_SPMI_SET_POINTS(hfs430);
+static DEFINE_SPMI_SET_POINTS(nldo_510);
+static DEFINE_SPMI_SET_POINTS(ftsmps510);
 
 static inline int spmi_vreg_read(struct spmi_regulator *vreg, u16 addr, u8 *buf,
 				 int len)
@@ -1097,6 +1141,33 @@ spmi_regulator_ftsmps426_set_mode(struct regulator_dev *rdev, unsigned int mode)
 }
 
 static int
+spmi_regulator_ftsmps3_set_mode(struct regulator_dev *rdev, unsigned int mode)
+{
+	struct spmi_regulator *vreg = rdev_get_drvdata(rdev);
+	u8 mask = SPMI_FTSMPS3_MODE_MASK;
+	u8 val;
+
+	switch (mode) {
+	case REGULATOR_MODE_NORMAL:
+		val = SPMI_FTSMPS3_MODE_HPM_MASK;
+		break;
+	case REGULATOR_MODE_FAST:
+		val = SPMI_FTSMPS3_MODE_AUTO_MASK;
+		break;
+	case REGULATOR_MODE_IDLE:
+		val = vreg->logical_type ==
+				SPMI_REGULATOR_LOGICAL_TYPE_FTSMPS3 ?
+			SPMI_FTSMPS3_MODE_RETENTION_MASK :
+			SPMI_FTSMPS3_MODE_LPM_MASK;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	return spmi_vreg_update_bits(vreg, SPMI_COMMON_REG_MODE, val, mask);
+}
+
+static int
 spmi_regulator_common_set_load(struct regulator_dev *rdev, int load_uA)
 {
 	struct spmi_regulator *vreg = rdev_get_drvdata(rdev);
@@ -1453,13 +1524,26 @@ static const struct regulator_ops spmi_hfs430_ops = {
 	.get_mode		= spmi_regulator_ftsmps426_get_mode,
 };
 
+static const struct regulator_ops spmi_ftsmps3_ops = {
+	.enable			= regulator_enable_regmap,
+	.disable		= regulator_disable_regmap,
+	.is_enabled		= regulator_is_enabled_regmap,
+	.set_voltage_sel	= spmi_regulator_ftsmps426_set_voltage,
+	.set_voltage_time_sel	= spmi_regulator_set_voltage_time_sel,
+	.get_voltage_sel	= spmi_regulator_ftsmps426_get_voltage,
+	.map_voltage		= spmi_regulator_single_map_voltage,
+	.list_voltage		= spmi_regulator_common_list_voltage,
+	.set_mode		= spmi_regulator_ftsmps3_set_mode,
+	.get_mode		= spmi_regulator_ftsmps426_get_mode,
+};
+
 /* Maximum possible digital major revision value */
 #define INF 0xFF
 
 static const struct spmi_regulator_mapping supported_regulators[] = {
 	/*           type subtype dig_min dig_max ltype ops setpoints hpm_min */
 	SPMI_VREG(BUCK,  GP_CTL,   0, INF, SMPS,   smps,   smps,   100000),
-	SPMI_VREG(BUCK,  HFS430,   0, INF, HFS430, hfs430, hfs430,  10000),
+	SPMI_VREG(BUCK,  HFS430,   0,   3, HFS430, hfs430, hfs430,  10000),
 	SPMI_VREG(LDO,   N300,     0, INF, LDO,    ldo,    nldo1,   10000),
 	SPMI_VREG(LDO,   N600,     0,   0, LDO,    ldo,    nldo2,   10000),
 	SPMI_VREG(LDO,   N1200,    0,   0, LDO,    ldo,    nldo2,   10000),
@@ -1535,6 +1619,17 @@ static const struct spmi_regulator_mapping supported_regulators[] = {
 	SPMI_VREG(ULT_LDO, P300,     0, INF, ULT_LDO, ult_ldo, ult_pldo, 10000),
 	SPMI_VREG(ULT_LDO, P150,     0, INF, ULT_LDO, ult_ldo, ult_pldo, 10000),
 	SPMI_VREG(ULT_LDO, P50,     0, INF, ULT_LDO, ult_ldo, ult_pldo, 5000),
+	SPMI_VREG(LDO, LV_P150_510, 0, INF, LDO_510, ftsmps3, ht_lvpldo, 10000),
+	SPMI_VREG(LDO, LV_P300_510, 0, INF, LDO_510, ftsmps3, ht_lvpldo, 10000),
+	SPMI_VREG(LDO, LV_P600_510, 0, INF, LDO_510, ftsmps3, ht_lvpldo, 10000),
+	SPMI_VREG(LDO, MV_P50_510,  0, INF, LDO_510, ftsmps3, pldo660, 10000),
+	SPMI_VREG(LDO, MV_P150_510, 0, INF, LDO_510, ftsmps3, pldo660, 10000),
+	SPMI_VREG(LDO, MV_P600_510, 0, INF, LDO_510, ftsmps3, pldo660, 10000),
+	SPMI_VREG(LDO, N300_510,    0, INF, LDO_510, ftsmps3, nldo_510, 10000),
+	SPMI_VREG(LDO, N600_510,    0, INF, LDO_510, ftsmps3, nldo_510, 10000),
+	SPMI_VREG(LDO, N1200_510,   0, INF, LDO_510, ftsmps3, nldo_510, 10000),
+	SPMI_VREG(BUCK, HFSMPS_510, 4, INF, HFSMPS,  ftsmps3, hfs430, 100000),
+	SPMI_VREG(FTS, FTSMPS_510,  0, INF, FTSMPS3, ftsmps3, ftsmps510, 100000),
 };
 
 static void spmi_calculate_num_voltages(struct spmi_voltage_set_points *points)
@@ -1678,6 +1773,27 @@ static int spmi_regulator_init_slew_rate_ftsmps426(struct spmi_regulator *vreg,
 
 	/* Ensure that the slew rate is greater than 0 */
 	vreg->slew_rate = max(slew_rate, 1);
+
+	return ret;
+}
+
+static int spmi_regulator_init_slew_rate_ftsmps3(struct spmi_regulator *vreg)
+{
+	int ret;
+	u8 reg = 0;
+	int delay;
+
+	ret = spmi_vreg_read(vreg, SPMI_FTSMPS3_REG_STEP_CTRL, &reg, 1);
+	if (ret) {
+		dev_err(vreg->dev, "spmi read failed, ret=%d\n", ret);
+		return ret;
+	}
+
+	delay = reg & SPMI_FTSMPS426_STEP_CTRL_DELAY_MASK;
+	delay >>= SPMI_FTSMPS426_STEP_CTRL_DELAY_SHIFT;
+
+
+	vreg->slew_rate = SPMI_FTSMPS3_SLEW_RATE_38p4 >> delay;
 
 	return ret;
 }
@@ -1832,6 +1948,11 @@ static int spmi_regulator_of_parse(struct device_node *node,
 		if (ret)
 			return ret;
 		break;
+	case SPMI_REGULATOR_LOGICAL_TYPE_FTSMPS3:
+		ret = spmi_regulator_init_slew_rate_ftsmps3(vreg);
+		if (ret)
+			return ret;
+		break;
 	default:
 		break;
 	}
@@ -1857,6 +1978,41 @@ static int spmi_regulator_of_parse(struct device_node *node,
 
 	return 0;
 }
+
+static const struct spmi_regulator_data pm6125_regulators[] = {
+	{ "s1", 0x1400, "vdd_s1" },
+	{ "s2", 0x1700, "vdd_s2" },
+	{ "s3", 0x1a00, "vdd_s3" },
+	{ "s4", 0x1d00, "vdd_s4" },
+	{ "s5", 0x2000, "vdd_s5" },
+	{ "s6", 0x2300, "vdd_s6" },
+	{ "s7", 0x2600, "vdd_s7" },
+	{ "s8", 0x2900, "vdd_s8" },
+	{ "l1", 0x4000, "vdd_l1" },
+	{ "l2", 0x4100, "vdd_l2" },
+	{ "l3", 0x4200, "vdd_l3" },
+	{ "l4", 0x4300, "vdd_l4" },
+	{ "l5", 0x4400, "vdd_l5" },
+	{ "l6", 0x4500, "vdd_l6" },
+	{ "l7", 0x4600, "vdd_l7" },
+	{ "l8", 0x4700, "vdd_l8" },
+	{ "l9", 0x4800, "vdd_l9" },
+	{ "l10", 0x4900, "vdd_l10" },
+	{ "l11", 0x4a00, "vdd_l11" },
+	{ "l12", 0x4b00, "vdd_l12" },
+	{ "l13", 0x4c00, "vdd_l13" },
+	{ "l14", 0x4d00, "vdd_l14" },
+	{ "l15", 0x4e00, "vdd_l15" },
+	{ "l16", 0x4f00, "vdd_l16" },
+	{ "l17", 0x5000, "vdd_l17" },
+	{ "l18", 0x5100, "vdd_l18" },
+	{ "l19", 0x5200, "vdd_l19" },
+	{ "l20", 0x5300, "vdd_l20" },
+	{ "l21", 0x5400, "vdd_l21" },
+	{ "l22", 0x5500, "vdd_l22" },
+	{ "l23", 0x5600, "vdd_l23" },
+	{ "l24", 0x5700, "vdd_l24" },
+};
 
 static const struct spmi_regulator_data pm8941_regulators[] = {
 	{ "s1", 0x1400, "vdd_s1", },
@@ -2072,7 +2228,6 @@ static const struct spmi_regulator_data pm660l_regulators[] = {
 	{ }
 };
 
-
 static const struct spmi_regulator_data pm8004_regulators[] = {
 	{ "s2", 0x1700, "vdd_s2", },
 	{ "s5", 0x2000, "vdd_s5", },
@@ -2093,6 +2248,7 @@ static const struct spmi_regulator_data pms405_regulators[] = {
 };
 
 static const struct of_device_id qcom_spmi_regulator_match[] = {
+	{ .compatible = "qcom,pm6125-regulators", .data = &pm6125_regulators },
 	{ .compatible = "qcom,pm8004-regulators", .data = &pm8004_regulators },
 	{ .compatible = "qcom,pm8005-regulators", .data = &pm8005_regulators },
 	{ .compatible = "qcom,pm8841-regulators", .data = &pm8841_regulators },
