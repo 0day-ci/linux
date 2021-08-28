@@ -534,13 +534,20 @@ static dma_addr_t __iommu_dma_map(struct device *dev, phys_addr_t phys,
 	struct iommu_dma_cookie *cookie = domain->iova_cookie;
 	struct iova_domain *iovad = &cookie->iovad;
 	size_t iova_off = iova_offset(iovad, phys);
+	size_t size_aligned = iova_align(iovad, size + iova_off);
 	dma_addr_t iova;
 
 	if (static_branch_unlikely(&iommu_deferred_attach_enabled) &&
 	    iommu_deferred_attach(dev, domain))
 		return DMA_MAPPING_ERROR;
 
-	size = iova_align(iovad, size + iova_off);
+	if (IS_ENABLED(CONFIG_SWIOTLB) && dev_is_untrusted(dev)) {
+		if (WARN_ON(iova_off))
+			return DMA_MAPPING_ERROR;
+		if (WARN_ON(size_aligned != size))
+			return DMA_MAPPING_ERROR;
+	}
+	size = size_aligned;
 
 	iova = iommu_dma_alloc_iova(domain, size, dma_mask, dev);
 	if (!iova)
