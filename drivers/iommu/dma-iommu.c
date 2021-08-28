@@ -17,6 +17,7 @@
 #include <linux/iommu.h>
 #include <linux/iova.h>
 #include <linux/irq.h>
+#include <linux/kernel.h>
 #include <linux/mm.h>
 #include <linux/mutex.h>
 #include <linux/pci.h>
@@ -618,6 +619,9 @@ static struct page **__iommu_dma_alloc_pages(struct device *dev,
 {
 	struct page **pages;
 	unsigned int i = 0, nid = dev_to_node(dev);
+	unsigned int j;
+	unsigned long min_order = __fls(order_mask);
+	unsigned int min_order_size = 1U << min_order;
 
 	order_mask &= (2U << MAX_ORDER) - 1;
 	if (!order_mask)
@@ -657,15 +661,37 @@ static struct page **__iommu_dma_alloc_pages(struct device *dev,
 				split_page(page, order);
 			break;
 		}
-		if (!page) {
-			__iommu_dma_free_pages(pages, i);
-			return NULL;
+
+		/*
+		 * If we have no valid page here we might be trying to allocate
+		 * the last block consisting of 1<<order pages (to guarantee
+		 * alignment) but actually need less pages than that.
+		 * In that case we just try to allocate the entire block and
+		 * directly free the spillover pages again.
+		 */
+		if (!page && !order_mask && count < min_order_size) {
+			page = alloc_pages_node(nid, gfp, min_order);
+			if (!page)
+				goto free_pages;
+			split_page(page, min_order);
+
+			for (j = count; j < min_order_size; ++j)
+				__free_page(page + j);
+
+			order_size = count;
 		}
+
+		if (!page)
+			goto free_pages;
 		count -= order_size;
 		while (order_size--)
 			pages[i++] = page++;
 	}
 	return pages;
+
+free_pages:
+	__iommu_dma_free_pages(pages, i);
+	return NULL;
 }
 
 /*
@@ -682,15 +708,26 @@ static struct page **__iommu_dma_alloc_noncontiguous(struct device *dev,
 	bool coherent = dev_is_dma_coherent(dev);
 	int ioprot = dma_info_to_prot(DMA_BIDIRECTIONAL, coherent, attrs);
 	unsigned int count, min_size, alloc_sizes = domain->pgsize_bitmap;
+	struct scatterlist *last_sg;
 	struct page **pages;
 	dma_addr_t iova;
+	phys_addr_t orig_s_phys;
+	size_t orig_s_len, orig_s_off, s_iova_off, iova_size;
 
 	if (static_branch_unlikely(&iommu_deferred_attach_enabled) &&
 	    iommu_deferred_attach(dev, domain))
 		return NULL;
 
 	min_size = alloc_sizes & -alloc_sizes;
-	if (min_size < PAGE_SIZE) {
+	if (iovad->granule > PAGE_SIZE) {
+		if (size < iovad->granule) {
+			/* ensure a single contiguous allocation */
+			min_size = ALIGN(size, PAGE_SIZE*(1U<<get_order(size)));
+			alloc_sizes = min_size;
+		}
+
+		size = PAGE_ALIGN(size);
+	} else if (min_size < PAGE_SIZE) {
 		min_size = PAGE_SIZE;
 		alloc_sizes |= PAGE_SIZE;
 	} else {
@@ -705,12 +742,14 @@ static struct page **__iommu_dma_alloc_noncontiguous(struct device *dev,
 	if (!pages)
 		return NULL;
 
-	size = iova_align(iovad, size);
-	iova = iommu_dma_alloc_iova(domain, size, dev->coherent_dma_mask, dev);
+	iova_size = iova_align(iovad, size);
+	iova = iommu_dma_alloc_iova(domain, iova_size, dev->coherent_dma_mask, dev);
 	if (!iova)
 		goto out_free_pages;
 
-	if (sg_alloc_table_from_pages(sgt, pages, count, 0, size, GFP_KERNEL))
+	last_sg = __sg_alloc_table_from_pages(sgt, pages, count, 0, iova_size,
+					      UINT_MAX, NULL, 0, GFP_KERNEL);
+	if (IS_ERR(last_sg))
 		goto out_free_iova;
 
 	if (!(ioprot & IOMMU_CACHE)) {
@@ -721,18 +760,58 @@ static struct page **__iommu_dma_alloc_noncontiguous(struct device *dev,
 			arch_dma_prep_coherent(sg_page(sg), sg->length);
 	}
 
+	if (iovad->granule > PAGE_SIZE) {
+		if (size < iovad->granule) {
+			/*
+			 * we only have a single sg list entry here that is
+			 * likely not aligned to iovad->granule. adjust the
+			 * entry to represent the encapsulating IOMMU page
+			 * and then later restore everything to its original
+			 * values, similar to the impedance matching done in
+			 * iommu_dma_map_sg.
+			 */
+			orig_s_phys = sg_phys(sgt->sgl);
+			orig_s_len = sgt->sgl->length;
+			orig_s_off = sgt->sgl->offset;
+			s_iova_off = iova_offset(iovad, orig_s_phys);
+
+			sg_set_page(sgt->sgl,
+				phys_to_page(orig_s_phys - s_iova_off),
+				iova_align(iovad, orig_s_len + s_iova_off),
+				sgt->sgl->offset & ~s_iova_off);
+		} else {
+			/*
+			 * convince iommu_map_sg_atomic to map the last block
+			 * even though it may be too small.
+			 */
+			orig_s_len = last_sg->length;
+			last_sg->length = iova_align(iovad, last_sg->length);
+		}
+	}
+
 	if (iommu_map_sg_atomic(domain, iova, sgt->sgl, sgt->orig_nents, ioprot)
-			< size)
+			< iova_size)
 		goto out_free_sg;
 
+	if (iovad->granule > PAGE_SIZE) {
+		if (size < iovad->granule) {
+			sg_set_page(sgt->sgl, phys_to_page(orig_s_phys),
+				orig_s_len, orig_s_off);
+
+			iova += s_iova_off;
+		} else {
+			last_sg->length = orig_s_len;
+		}
+	}
+
 	sgt->sgl->dma_address = iova;
-	sgt->sgl->dma_length = size;
+	sgt->sgl->dma_length = iova_size;
 	return pages;
 
 out_free_sg:
 	sg_free_table(sgt);
 out_free_iova:
-	iommu_dma_free_iova(cookie, iova, size, NULL);
+	iommu_dma_free_iova(cookie, iova, iova_size, NULL);
 out_free_pages:
 	__iommu_dma_free_pages(pages, count);
 	return NULL;
