@@ -13,6 +13,8 @@
 #include <linux/completion.h>
 #include <linux/kobject.h>
 #include <linux/notifier.h>
+#include <linux/of.h>
+#include <linux/of_device.h>
 #include <linux/pm_qos.h>
 #include <linux/spinlock.h>
 #include <linux/sysfs.h>
@@ -1033,6 +1035,43 @@ void arch_set_freq_scale(const struct cpumask *cpus,
 			 unsigned long cur_freq,
 			 unsigned long max_freq)
 {
+}
+#endif
+
+#ifdef CONFIG_CPU_FREQ
+static inline int of_perf_domain_get_sharing_cpumask(int index, const char *list_name,
+						     const char *cell_name,
+						     struct cpumask *cpumask)
+{
+	struct device_node *cpu_np;
+	struct of_phandle_args args;
+	int cpu, ret;
+
+	for_each_possible_cpu(cpu) {
+		cpu_np = of_cpu_device_node_get(cpu);
+		if (!cpu_np)
+			continue;
+
+		ret = of_parse_phandle_with_args(cpu_np, list_name,
+						 cell_name, 0,
+						 &args);
+
+		of_node_put(cpu_np);
+		if (ret < 0)
+			continue;
+
+		if (index == args.args[0])
+			cpumask_set_cpu(cpu, cpumask);
+	}
+
+	return 0;
+}
+#else
+static inline int of_perf_domain_get_sharing_cpumask(int index, const char *list_name,
+						     const char *cell_name,
+						     struct cpumask *cpumask)
+{
+	return 0;
 }
 #endif
 
