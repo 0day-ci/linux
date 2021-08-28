@@ -735,9 +735,15 @@ static void *iommu_dma_alloc_remap(struct device *dev, size_t size,
 		dma_addr_t *dma_handle, gfp_t gfp, pgprot_t prot,
 		unsigned long attrs)
 {
+	struct iommu_domain *domain = iommu_get_dma_domain(dev);
+	struct iommu_dma_cookie *cookie = domain->iova_cookie;
+	struct iova_domain *iovad = &cookie->iovad;
 	struct page **pages;
 	struct sg_table sgt;
 	void *vaddr;
+
+	if (dev_is_untrusted(dev))
+		size = iova_align(iovad, size);
 
 	pages = __iommu_dma_alloc_noncontiguous(dev, size, &sgt, gfp, prot,
 						attrs);
@@ -762,11 +768,17 @@ static struct sg_table *iommu_dma_alloc_noncontiguous(struct device *dev,
 		size_t size, enum dma_data_direction dir, gfp_t gfp,
 		unsigned long attrs)
 {
+	struct iommu_domain *domain = iommu_get_dma_domain(dev);
+	struct iommu_dma_cookie *cookie = domain->iova_cookie;
+	struct iova_domain *iovad = &cookie->iovad;
 	struct dma_sgt_handle *sh;
 
 	sh = kmalloc(sizeof(*sh), gfp);
 	if (!sh)
 		return NULL;
+
+	if (dev_is_untrusted(dev))
+		size = iova_align(iovad, size);
 
 	sh->pages = __iommu_dma_alloc_noncontiguous(dev, size, &sh->sgt, gfp,
 						    PAGE_KERNEL, attrs);
@@ -780,7 +792,14 @@ static struct sg_table *iommu_dma_alloc_noncontiguous(struct device *dev,
 static void iommu_dma_free_noncontiguous(struct device *dev, size_t size,
 		struct sg_table *sgt, enum dma_data_direction dir)
 {
+	struct iommu_domain *domain = iommu_get_dma_domain(dev);
+	struct iommu_dma_cookie *cookie = domain->iova_cookie;
+	struct iova_domain *iovad = &cookie->iovad;
 	struct dma_sgt_handle *sh = sgt_handle(sgt);
+
+
+	if (dev_is_untrusted(dev))
+		size = iova_align(iovad, size);
 
 	__iommu_dma_unmap(dev, sgt->sgl->dma_address, size);
 	__iommu_dma_free_pages(sh->pages, PAGE_ALIGN(size) >> PAGE_SHIFT);
@@ -1127,9 +1146,16 @@ static void iommu_dma_unmap_resource(struct device *dev, dma_addr_t handle,
 
 static void __iommu_dma_free(struct device *dev, size_t size, void *cpu_addr)
 {
+	struct iommu_domain *domain = iommu_get_dma_domain(dev);
+	struct iommu_dma_cookie *cookie = domain->iova_cookie;
+	struct iova_domain *iovad = &cookie->iovad;
 	size_t alloc_size = PAGE_ALIGN(size);
-	int count = alloc_size >> PAGE_SHIFT;
+	int count;
 	struct page *page = NULL, **pages = NULL;
+
+	if (dev_is_untrusted(dev))
+		alloc_size = iova_align(iovad, alloc_size);
+	count = alloc_size >> PAGE_SHIFT;
 
 	/* Non-coherent atomic allocation? Easy */
 	if (IS_ENABLED(CONFIG_DMA_DIRECT_REMAP) &&
@@ -1166,11 +1192,17 @@ static void iommu_dma_free(struct device *dev, size_t size, void *cpu_addr,
 static void *iommu_dma_alloc_pages(struct device *dev, size_t size,
 		struct page **pagep, gfp_t gfp, unsigned long attrs)
 {
+	struct iommu_domain *domain = iommu_get_dma_domain(dev);
+	struct iommu_dma_cookie *cookie = domain->iova_cookie;
+	struct iova_domain *iovad = &cookie->iovad;
 	bool coherent = dev_is_dma_coherent(dev);
 	size_t alloc_size = PAGE_ALIGN(size);
 	int node = dev_to_node(dev);
 	struct page *page = NULL;
 	void *cpu_addr;
+
+	if (dev_is_untrusted(dev))
+		alloc_size = iova_align(iovad, alloc_size);
 
 	page = dma_alloc_contiguous(dev, alloc_size, gfp);
 	if (!page)
@@ -1203,6 +1235,9 @@ out_free_pages:
 static void *iommu_dma_alloc(struct device *dev, size_t size,
 		dma_addr_t *handle, gfp_t gfp, unsigned long attrs)
 {
+	struct iommu_domain *domain = iommu_get_dma_domain(dev);
+	struct iommu_dma_cookie *cookie = domain->iova_cookie;
+	struct iova_domain *iovad = &cookie->iovad;
 	bool coherent = dev_is_dma_coherent(dev);
 	int ioprot = dma_info_to_prot(DMA_BIDIRECTIONAL, coherent, attrs);
 	struct page *page = NULL;
@@ -1215,6 +1250,9 @@ static void *iommu_dma_alloc(struct device *dev, size_t size,
 		return iommu_dma_alloc_remap(dev, size, handle, gfp,
 				dma_pgprot(dev, PAGE_KERNEL, attrs), attrs);
 	}
+
+	if (dev_is_untrusted(dev))
+		size = iova_align(iovad, size);
 
 	if (IS_ENABLED(CONFIG_DMA_DIRECT_REMAP) &&
 	    !gfpflags_allow_blocking(gfp) && !coherent)
