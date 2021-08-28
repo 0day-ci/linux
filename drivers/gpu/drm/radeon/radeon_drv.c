@@ -529,15 +529,14 @@ static long radeon_kms_compat_ioctl(struct file *filp, unsigned int cmd, unsigne
 #endif
 
 static const struct dev_pm_ops radeon_pm_ops = {
+	SET_RUNTIME_PM_OPS(radeon_pmops_runtime_suspend,
+			   radeon_pmops_runtime_resume, radeon_pmops_runtime_idle)
 	.suspend = radeon_pmops_suspend,
 	.resume = radeon_pmops_resume,
 	.freeze = radeon_pmops_freeze,
 	.thaw = radeon_pmops_thaw,
 	.poweroff = radeon_pmops_freeze,
 	.restore = radeon_pmops_resume,
-	.runtime_suspend = radeon_pmops_runtime_suspend,
-	.runtime_resume = radeon_pmops_runtime_resume,
-	.runtime_idle = radeon_pmops_runtime_idle,
 };
 
 static const struct file_operations radeon_driver_kms_fops = {
