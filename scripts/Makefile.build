@@ -224,9 +224,17 @@ cmd_record_mcount = $(if $(findstring $(strip $(CC_FLAGS_FTRACE)),$(_c_flags)),	
 endif # CONFIG_FTRACE_MCOUNT_USE_RECORDMCOUNT
 
 ifdef CONFIG_STACK_VALIDATION
-ifndef CONFIG_LTO_CLANG
 
-objtool := $(objtree)/tools/objtool/objtool
+objtool = $(objtree)/tools/objtool/objtool				\
+	$(if $(CONFIG_UNWINDER_ORC),orc generate,check)			\
+	$(if $(part-of-module), --module)				\
+	$(if $(CONFIG_FRAME_POINTER),, --no-fp)				\
+	$(if $(CONFIG_GCOV_KERNEL)$(CONFIG_LTO_CLANG), --no-unreachable)\
+	$(if $(CONFIG_RETPOLINE), --retpoline)				\
+	$(if $(CONFIG_X86_SMAP), --uaccess)				\
+	$(if $(CONFIG_FTRACE_MCOUNT_USE_OBJTOOL), --mcount)
+
+ifndef CONFIG_LTO_CLANG
 
 # 'OBJECT_FILES_NON_STANDARD := y': skip objtool checking for a directory
 # 'OBJECT_FILES_NON_STANDARD_foo.o := 'y': skip objtool checking for a file
@@ -236,7 +244,7 @@ objtool := $(objtree)/tools/objtool/objtool
 # rebuilding objects.
 cmd_objtool = $(if $(patsubst y%,, \
 	$(OBJECT_FILES_NON_STANDARD_$(basetarget).o)$(OBJECT_FILES_NON_STANDARD)n), \
-	; : $(objtool-md5sum) ; $(objtool) $(objtool_args) $@)
+	; : $(objtool-md5sum) ; $(objtool) $@)
 
 endif # CONFIG_LTO_CLANG
 endif # CONFIG_STACK_VALIDATION
@@ -282,8 +290,9 @@ cmd_cc_lto_link_modules =						\
 ifdef CONFIG_STACK_VALIDATION
 # objtool was skipped for LLVM bitcode, run it now that we have compiled
 # modules into native code
-cmd_cc_lto_link_modules += ;						\
-	$(objtree)/tools/objtool/objtool $(objtool_args) --module $@
+#
+# Repeat --module because $(part-of-module) does not work here.
+cmd_cc_lto_link_modules += ; $(objtool) --module $@
 endif
 
 $(obj)/%.lto.o: $(obj)/%.o FORCE
