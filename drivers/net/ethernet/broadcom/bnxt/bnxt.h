@@ -1881,10 +1881,9 @@ struct bnxt {
 	u16			hwrm_cmd_seq;
 	u16                     hwrm_cmd_kong_seq;
 	u16			hwrm_intr_seq_id;
-	void			*hwrm_short_cmd_req_addr;
-	dma_addr_t		hwrm_short_cmd_req_dma_addr;
 	void			*hwrm_cmd_resp_addr;
 	dma_addr_t		hwrm_cmd_resp_dma_addr;
+	struct dma_pool		*hwrm_dma_pool;
 
 	struct rtnl_link_stats64	net_stats_prev;
 	struct bnxt_stats_mem	port_stats;
