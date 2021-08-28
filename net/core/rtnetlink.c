@@ -5468,6 +5468,81 @@ out:
 	return skb->len;
 }
 
+static int rtnl_fill_synce_state(struct sk_buff *msg, struct net_device *dev,
+				 u32 portid, u32 seq,
+				 struct netlink_callback *cb,
+				 int flags)
+{
+	const struct net_device_ops *ops = dev->netdev_ops;
+	struct if_synce_state_msg *state;
+	struct nlmsghdr *nlh;
+
+	ASSERT_RTNL();
+
+	nlh = nlmsg_put(msg, portid, seq, RTM_GETSYNCESTATE,
+			sizeof(*state), flags);
+	if (!nlh)
+		return -EMSGSIZE;
+
+	state = nlmsg_data(nlh);
+
+	if (ops->ndo_get_synce_state) {
+		enum if_synce_state sync_state;
+		enum if_synce_src src;
+		int err;
+		u8 pin;
+
+		err = ops->ndo_get_synce_state(dev, &sync_state, &src, &pin);
+		if (err)
+			return err;
+
+		memset(state, 0, sizeof(*state));
+
+		state->ifindex = dev->ifindex;
+		state->state = (u8)sync_state;
+		state->pin = pin;
+		state->src = (u8)src;
+
+		return 0;
+	}
+
+	return -EOPNOTSUPP;
+}
+
+static int rtnl_synce_state_get(struct sk_buff *skb, struct nlmsghdr *nlh,
+				struct netlink_ext_ack *extack)
+{
+	struct net *net = sock_net(skb->sk);
+	struct if_synce_state_msg *state;
+	struct net_device *dev = NULL;
+	struct sk_buff *nskb;
+	u32 filter_mask;
+	int err;
+
+	state = nlmsg_data(nlh);
+	if (state->ifindex > 0)
+		dev = __dev_get_by_index(net, state->ifindex);
+	else
+		return -EINVAL;
+
+	nskb = nlmsg_new(NLMSG_DEFAULT_SIZE, GFP_KERNEL);
+	if (!nskb)
+		return -ENOBUFS;
+
+	if (!dev)
+		return -ENODEV;
+
+	err = rtnl_fill_synce_state(nskb, dev,
+				    NETLINK_CB(skb).portid, nlh->nlmsg_seq,
+				    NULL, filter_mask);
+	if (err < 0)
+		kfree_skb(nskb);
+	else
+		err = rtnl_unicast(nskb, net, NETLINK_CB(skb).portid);
+
+	return err;
+}
+
 /* Process one rtnetlink message. */
 
 static int rtnetlink_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh,
@@ -5693,4 +5768,6 @@ void __init rtnetlink_init(void)
 
 	rtnl_register(PF_UNSPEC, RTM_GETSTATS, rtnl_stats_get, rtnl_stats_dump,
 		      0);
+
+	rtnl_register(PF_UNSPEC, RTM_GETSYNCESTATE, rtnl_synce_state_get, NULL, 0);
 }
