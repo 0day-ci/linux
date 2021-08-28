@@ -222,7 +222,7 @@ static int move_mount_set_group_supported(void)
 		      AT_FDCWD, SET_GROUP_TO, MOVE_MOUNT_SET_GROUP);
 	umount2("/tmp", MNT_DETACH);
 
-	return ret < 0 ? false : true;
+	return ret < 0 ? 0 : 1;
 }
 
 FIXTURE(move_mount_set_group) {
