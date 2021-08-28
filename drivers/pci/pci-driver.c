@@ -1331,6 +1331,7 @@ static int pci_pm_runtime_idle(struct device *dev)
 }
 
 static const struct dev_pm_ops pci_dev_pm_ops = {
+	SET_RUNTIME_PM_OPS(pci_pm_runtime_suspend, pci_pm_runtime_resume, pci_pm_runtime_idle)
 	.prepare = pci_pm_prepare,
 	.complete = pci_pm_complete,
 	.suspend = pci_pm_suspend,
@@ -1348,9 +1349,6 @@ static const struct dev_pm_ops pci_dev_pm_ops = {
 	.thaw_noirq = pci_pm_thaw_noirq,
 	.poweroff_noirq = pci_pm_poweroff_noirq,
 	.restore_noirq = pci_pm_restore_noirq,
-	.runtime_suspend = pci_pm_runtime_suspend,
-	.runtime_resume = pci_pm_runtime_resume,
-	.runtime_idle = pci_pm_runtime_idle,
 };
 
 #define PCI_PM_OPS_PTR	(&pci_dev_pm_ops)
