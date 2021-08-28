@@ -92,9 +92,8 @@ static int __maybe_unused tidss_resume(struct device *dev)
 #ifdef CONFIG_PM
 
 static const struct dev_pm_ops tidss_pm_ops = {
-	.runtime_suspend = tidss_pm_runtime_suspend,
-	.runtime_resume = tidss_pm_runtime_resume,
 	SET_SYSTEM_SLEEP_PM_OPS(tidss_suspend, tidss_resume)
+	SET_RUNTIME_PM_OPS(tidss_pm_runtime_suspend, tidss_pm_runtime_resume, NULL)
 };
 
 #endif /* CONFIG_PM */
