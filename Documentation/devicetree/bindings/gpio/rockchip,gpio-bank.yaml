@@ -26,6 +26,8 @@ properties:
 
   gpio-controller: true
 
+  gpio-line-names: true
+
   "#gpio-cells":
     const: 2
 
