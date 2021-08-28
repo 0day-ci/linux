@@ -1261,15 +1261,14 @@ static void nouveau_display_options(void)
 }
 
 static const struct dev_pm_ops nouveau_pm_ops = {
+	SET_RUNTIME_PM_OPS(nouveau_pmops_runtime_suspend,
+			   nouveau_pmops_runtime_resume, nouveau_pmops_runtime_idle)
 	.suspend = nouveau_pmops_suspend,
 	.resume = nouveau_pmops_resume,
 	.freeze = nouveau_pmops_freeze,
 	.thaw = nouveau_pmops_thaw,
 	.poweroff = nouveau_pmops_freeze,
 	.restore = nouveau_pmops_resume,
-	.runtime_suspend = nouveau_pmops_runtime_suspend,
-	.runtime_resume = nouveau_pmops_runtime_resume,
-	.runtime_idle = nouveau_pmops_runtime_idle,
 };
 
 static struct pci_driver
