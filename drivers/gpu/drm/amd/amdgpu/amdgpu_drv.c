@@ -1697,6 +1697,8 @@ out:
 }
 
 static const struct dev_pm_ops amdgpu_pm_ops = {
+	SET_RUNTIME_PM_OPS(amdgpu_pmops_runtime_suspend,
+			   amdgpu_pmops_runtime_resume, amdgpu_pmops_runtime_idle)
 	.prepare = amdgpu_pmops_prepare,
 	.complete = amdgpu_pmops_complete,
 	.suspend = amdgpu_pmops_suspend,
@@ -1705,9 +1707,6 @@ static const struct dev_pm_ops amdgpu_pm_ops = {
 	.thaw = amdgpu_pmops_thaw,
 	.poweroff = amdgpu_pmops_poweroff,
 	.restore = amdgpu_pmops_restore,
-	.runtime_suspend = amdgpu_pmops_runtime_suspend,
-	.runtime_resume = amdgpu_pmops_runtime_resume,
-	.runtime_idle = amdgpu_pmops_runtime_idle,
 };
 
 static int amdgpu_flush(struct file *f, fl_owner_t id)
