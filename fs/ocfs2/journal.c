@@ -974,8 +974,7 @@ void ocfs2_journal_shutdown(struct ocfs2_super *osb)
 		goto done;
 
 	/* need to inc inode use count - jbd2_journal_destroy will iput. */
-	if (!igrab(inode))
-		BUG();
+	BUG_ON(!igrab(inode));
 
 	num_running_trans = atomic_read(&(osb->journal->j_num_trans));
 	trace_ocfs2_journal_shutdown(num_running_trans);
@@ -1656,8 +1655,7 @@ static int ocfs2_replay_journal(struct ocfs2_super *osb,
 	status = jbd2_journal_load(journal);
 	if (status < 0) {
 		mlog_errno(status);
-		if (!igrab(inode))
-			BUG();
+		BUG_ON(!igrab(inode));
 		jbd2_journal_destroy(journal);
 		goto done;
 	}
@@ -1686,8 +1684,7 @@ static int ocfs2_replay_journal(struct ocfs2_super *osb,
 	if (status < 0)
 		mlog_errno(status);
 
-	if (!igrab(inode))
-		BUG();
+	BUG_ON(!igrab(inode));
 
 	jbd2_journal_destroy(journal);
 
