@@ -49,6 +49,10 @@ properties:
     description:
       Protected clock specifier list as per common clock binding.
 
+  qcom,sdcc2-clk-src-40mhz:
+    description: SDCC2_APPS clock source runs at 40MHz.
+    type: boolean
+
 required:
   - compatible
   - reg
