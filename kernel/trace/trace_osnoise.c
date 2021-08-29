@@ -1568,6 +1568,7 @@ static int start_per_cpu_kthreads(struct trace_array *tr)
 		retval = start_kthread(cpu);
 		if (retval) {
 			stop_per_cpu_kthreads();
+			cpus_read_unlock();
 			return retval;
 		}
 	}
