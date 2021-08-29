@@ -25,6 +25,26 @@ properties:
   vdd-supply:
     description: Power Supply
 
+  flip-tilt-x:
+    type: boolean
+    description: Flip the tilt X values read from device
+
+  flip-tilt-y:
+    type: boolean
+    description: Flip the tilt Y values read from device
+
+  flip-pos-x:
+    type: boolean
+    description: Flip the X position values read from device
+
+  flip-pos-y:
+    type: boolean
+    description: Flip the Y position values read from device
+
+  flip-distance:
+    type: boolean
+    description: Flip the distance values read from device
+
 required:
   - compatible
   - reg

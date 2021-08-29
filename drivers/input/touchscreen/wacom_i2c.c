@@ -105,6 +105,12 @@ struct wacom_i2c {
 	u8 data[WACOM_QUERY_SIZE];
 	bool prox;
 	int tool;
+
+	bool flip_tilt_x;
+	bool flip_tilt_y;
+	bool flip_pos_x;
+	bool flip_pos_y;
+	bool flip_distance;
 };
 
 static int wacom_query_device(struct i2c_client *client,
@@ -198,6 +204,25 @@ static int wacom_query_device(struct i2c_client *client,
 	return 0;
 }
 
+static void wacom_of_read(struct wacom_i2c *wac_i2c)
+{
+	if (!IS_ENABLED(CONFIG_OF)) {
+		struct i2c_client *client = wac_i2c->client;
+
+		wac_i2c->flip_tilt_x = of_property_read_bool(client->dev.of_node, "flip-tilt-x");
+		wac_i2c->flip_tilt_y = of_property_read_bool(client->dev.of_node, "flip-tilt-y");
+		wac_i2c->flip_pos_x = of_property_read_bool(client->dev.of_node, "flip-pos-x");
+		wac_i2c->flip_pos_y = of_property_read_bool(client->dev.of_node, "flip-pos-y");
+		wac_i2c->flip_distance = of_property_read_bool(client->dev.of_node, "flip-distance");
+	} else {
+		wac_i2c->flip_tilt_x = false;
+		wac_i2c->flip_tilt_y = false;
+		wac_i2c->flip_pos_x = false;
+		wac_i2c->flip_pos_y = false;
+		wac_i2c->flip_distance = false;
+	}
+}
+
 static irqreturn_t wacom_i2c_irq(int irq, void *dev_id)
 {
 	struct wacom_i2c *wac_i2c = dev_id;
@@ -233,6 +258,13 @@ static irqreturn_t wacom_i2c_irq(int irq, void *dev_id)
 			BTN_TOOL_RUBBER : BTN_TOOL_PEN;
 
 	wac_i2c->prox = data[3] & 0x20;
+
+	// Flip the values based on properties from the device tree
+	distance = wac_i2c->flip_distance ? -distance : distance;
+	x = wac_i2c->flip_pos_x ? (features->x_max - x) : x;
+	y = wac_i2c->flip_pos_y ? (features->y_max - y) : y;
+	tilt_x = wac_i2c->flip_tilt_x ? -tilt_x : tilt_x;
+	tilt_y = wac_i2c->flip_tilt_y ? -tilt_y : tilt_y;
 
 	touchscreen_report_pos(input, &wac_i2c->props, features->x_max,
 			       features->y_max, true);
@@ -360,6 +392,8 @@ static int wacom_i2c_probe(struct i2c_client *client,
 		regulator_put(wac_i2c->vdd);
 		return error;
 	}
+
+	wacom_of_read(wac_i2c);
 
 	return 0;
 }
