@@ -423,9 +423,7 @@ static bool check_should_bypass(struct cached_dev *dc, struct bio *bio)
 	add_sequential(task);
 	i->sequential = 0;
 found:
-	if (i->sequential + bio->bi_iter.bi_size > i->sequential)
-		i->sequential	+= bio->bi_iter.bi_size;
-
+	i->sequential		+= bio->bi_iter.bi_size;
 	i->last			 = bio_end_sector(bio);
 	i->jiffies		 = jiffies + msecs_to_jiffies(5000);
 	task->sequential_io	 = i->sequential;
