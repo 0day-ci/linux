@@ -147,6 +147,8 @@
 #define CDROM_NEXT_WRITABLE	0x5394	/* get next writable block */
 #define CDROM_LAST_WRITTEN	0x5395	/* get last block written on disc */
 
+#define CDROM_TIMED_MEDIA_CHANGE   0x5396  /* get the timestamp of the last media change */
+
 /*******************************************************
  * CDROM IOCTL structures
  *******************************************************/
@@ -293,6 +295,19 @@ struct cdrom_generic_command
 		void		__user *reserved[1];	/* unused, actually */
 		void            __user *unused;
 	};
+};
+
+/* This struct is used by CDROM_TIMED_MEDIA_CHANGE */
+struct cdrom_timed_media_change_info
+{
+	__s64	last_media_change;	/* Timestamp of the last detected media
+					 * change in ms. May be set by caller, updated
+					 * upon successful return of ioctl.
+					 */
+	__u64	has_changed;		/* Set to 1 by ioctl if last detected media
+					 * change was more recent than
+					 * last_media_change set by caller.
+					 */
 };
 
 /*
