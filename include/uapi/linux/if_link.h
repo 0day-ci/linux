@@ -1273,4 +1273,47 @@ enum {
 
 #define IFLA_MCTP_MAX (__IFLA_MCTP_MAX - 1)
 
+/* SyncE section */
+
+enum if_synce_state {
+	IF_SYNCE_STATE_INVALID = 0,
+	IF_SYNCE_STATE_FREERUN,
+	IF_SYNCE_STATE_LOCKACQ,
+	IF_SYNCE_STATE_LOCKREC,
+	IF_SYNCE_STATE_LOCKED,
+	IF_SYNCE_STATE_HOLDOVER,
+	IF_SYNCE_STATE_OPEN_LOOP,
+	__IF_SYNCE_STATE_MAX,
+};
+
+#define IF_SYNCE_STATE_MAX (__IF_SYNCE_STATE_MAX - 1)
+
+enum if_synce_src {
+	IF_SYNCE_SRC_INVALID = 0,
+	IF_SYNCE_SRC_UNKNOWN,
+	IF_SYNCE_SRC_SYNCE,
+	IF_SYNCE_SRC_GNSS,
+	IF_SYNCE_SRC_PTP,
+	IF_SYNCE_SRC_EXT,
+	__IF_SYNCE_SRC_MAX,
+};
+
+#define IF_SYNCE_PIN_UNKNOWN	0xFF
+
+struct if_synce_state_msg {
+	__u32 ifindex;
+	__u8 state;
+	__u8 src;
+	__u8 pin;
+	__u8 pad;
+};
+
+enum {
+	IFLA_SYNCE_UNSPEC,
+	IFLA_SYNCE_STATE,
+	__IFLA_SYNCE_MAX,
+};
+
+#define IFLA_SYNCE_MAX (__IFLA_SYNCE_MAX - 1)
+
 #endif /* _UAPI_LINUX_IF_LINK_H */
