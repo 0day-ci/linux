@@ -29,6 +29,7 @@
 #include <drm/drm_mipi_dsi.h>
 
 #include "intel_atomic.h"
+#include "intel_backlight.h"
 #include "intel_combo_phy.h"
 #include "intel_connector.h"
 #include "intel_crtc.h"
@@ -1287,7 +1288,7 @@ static void gen11_dsi_enable(struct intel_atomic_state *state,
 	gen11_dsi_enable_transcoder(encoder);
 
 	/* step7: enable backlight */
-	intel_panel_enable_backlight(crtc_state, conn_state);
+	intel_backlight_enable(crtc_state, conn_state);
 	intel_dsi_vbt_exec_sequence(intel_dsi, MIPI_SEQ_BACKLIGHT_ON);
 
 	intel_crtc_vblank_on(crtc_state);
@@ -1440,7 +1441,7 @@ static void gen11_dsi_disable(struct intel_atomic_state *state,
 
 	/* step1: turn off backlight */
 	intel_dsi_vbt_exec_sequence(intel_dsi, MIPI_SEQ_BACKLIGHT_OFF);
-	intel_panel_disable_backlight(old_conn_state);
+	intel_backlight_disable(old_conn_state);
 
 	/* step2d,e: disable transcoder and wait */
 	gen11_dsi_disable_transcoder(encoder);
@@ -1651,9 +1652,9 @@ static int gen11_dsi_compute_config(struct intel_encoder *encoder,
 	int ret;
 
 	pipe_config->output_format = INTEL_OUTPUT_FORMAT_RGB;
-	intel_fixed_panel_mode(fixed_mode, adjusted_mode);
+	intel_panel_fixed_mode(fixed_mode, adjusted_mode);
 
-	ret = intel_pch_panel_fitting(pipe_config, conn_state);
+	ret = intel_panel_fitting(pipe_config, conn_state);
 	if (ret)
 		return ret;
 
@@ -2008,7 +2009,7 @@ void icl_dsi_init(struct drm_i915_private *dev_priv)
 	encoder->port = port;
 	encoder->get_config = gen11_dsi_get_config;
 	encoder->sync_state = gen11_dsi_sync_state;
-	encoder->update_pipe = intel_panel_update_backlight;
+	encoder->update_pipe = intel_backlight_update;
 	encoder->compute_config = gen11_dsi_compute_config;
 	encoder->get_hw_state = gen11_dsi_get_hw_state;
 	encoder->initial_fastset_check = gen11_dsi_initial_fastset_check;
@@ -2042,7 +2043,7 @@ void icl_dsi_init(struct drm_i915_private *dev_priv)
 	}
 
 	intel_panel_init(&intel_connector->panel, fixed_mode, NULL);
-	intel_panel_setup_backlight(connector, INVALID_PIPE);
+	intel_backlight_setup(intel_connector, INVALID_PIPE);
 
 	if (dev_priv->vbt.dsi.config->dual_link)
 		intel_dsi->ports = BIT(PORT_A) | BIT(PORT_B);

@@ -352,8 +352,7 @@ struct drm_i915_display_funcs {
 				struct intel_crtc_state *);
 	void (*get_initial_plane_config)(struct intel_crtc *,
 					 struct intel_initial_plane_config *);
-	int (*crtc_compute_clock)(struct intel_crtc *crtc,
-				  struct intel_crtc_state *crtc_state);
+	int (*crtc_compute_clock)(struct intel_crtc_state *crtc_state);
 	void (*crtc_enable)(struct intel_atomic_state *state,
 			    struct intel_crtc *crtc);
 	void (*crtc_disable)(struct intel_atomic_state *state,
@@ -454,7 +453,7 @@ struct intel_fbc {
 		} fb;
 
 		unsigned int fence_y_offset;
-		u16 gen9_wa_cfb_stride;
+		u16 override_cfb_stride;
 		u16 interval;
 		s8 fence_id;
 		bool psr2_active;
@@ -481,7 +480,7 @@ struct intel_fbc {
 
 		int cfb_size;
 		unsigned int fence_y_offset;
-		u16 gen9_wa_cfb_stride;
+		u16 override_cfb_stride;
 		u16 interval;
 		s8 fence_id;
 		bool plane_visible;
@@ -1720,6 +1719,8 @@ IS_SUBPLATFORM(const struct drm_i915_private *i915,
 #define HAS_DISPLAY(dev_priv) (INTEL_INFO(dev_priv)->pipe_mask != 0)
 
 #define HAS_VRR(i915)	(GRAPHICS_VER(i915) >= 12)
+
+#define HAS_ASYNC_FLIPS(i915)		(DISPLAY_VER(i915) >= 5)
 
 /* Only valid when HAS_DISPLAY() is true */
 #define INTEL_DISPLAY_ENABLED(dev_priv) \
