@@ -5974,6 +5974,60 @@ static void ice_napi_disable_all(struct ice_vsi *vsi)
 }
 
 /**
+ * ice_get_synce_state - get state of SyncE DPLL
+ * @netdev: network interface device structure
+ * @state: state of SyncE DPLL
+ * @src: source type driving SyncE DPLL
+ * @pin_idx: index of pin driving SyncE DPLL
+ */
+static int
+ice_get_synce_state(struct net_device *netdev, enum if_synce_state *state,
+		    enum if_synce_src *src, u8 *pin_idx)
+{
+	struct ice_netdev_priv *np = netdev_priv(netdev);
+	struct ice_vsi *vsi = np->vsi;
+	struct ice_pf *pf = vsi->back;
+
+	if (!ice_is_e810t(&pf->hw))
+		return -EOPNOTSUPP;
+
+	if (state)
+		*state = pf->synce_dpll_state;
+	if (pin_idx) {
+		*pin_idx = pf->synce_dpll_pin;
+	if (src)
+		switch (pf->synce_dpll_pin) {
+		case REF0P:
+		case REF0N:
+			*src = IF_SYNCE_SRC_PTP;
+			break;
+		case REF1P:
+		case REF1N:
+		case REF2P:
+		case REF2N:
+			*src = IF_SYNCE_SRC_SYNCE;
+			break;
+		case REF3P:
+		case REF3N:
+			*src = IF_SYNCE_SRC_EXT;
+			break;
+		case REF4P:
+			*src = IF_SYNCE_SRC_GNSS;
+			break;
+		default:
+			*src = IF_SYNCE_SRC_INVALID;
+			break;
+		}
+
+		/* Always report invalid source if state is not Locked */
+		if (pf->synce_dpll_state != IF_SYNCE_STATE_LOCKED)
+			*src = IF_SYNCE_SRC_INVALID;
+	}
+
+	return 0;
+}
+
+/**
  * ice_down - Shutdown the connection
  * @vsi: The VSI being stopped
  */
@@ -7263,4 +7317,5 @@ static const struct net_device_ops ice_netdev_ops = {
 	.ndo_bpf = ice_xdp,
 	.ndo_xdp_xmit = ice_xdp_xmit,
 	.ndo_xsk_wakeup = ice_xsk_wakeup,
+	.ndo_get_synce_state = ice_get_synce_state,
 };
