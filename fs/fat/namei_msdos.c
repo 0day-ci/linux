@@ -9,11 +9,107 @@
 
 #include <linux/module.h>
 #include <linux/iversion.h>
+#include <linux/types.h>
+#include <linux/hashtable.h>
+#include <linux/slab.h>
+#include <linux/mutex.h>
 #include "fat.h"
 
 /* Characters that are undesirable in an MS-DOS file name */
 static unsigned char bad_chars[] = "*?<>|\"";
 static unsigned char bad_if_strict[] = "+=,; ";
+
+
+/**
+ * struct msdos_name_node - A formatted filename cache node
+ * @fname: the formatted filename
+ * @gc: a use counter for removing non-frequently used names
+ * @hash: the key for the item in the hash table
+ * @h_list: the list to the next set of values in this node's bucket
+ */
+struct msdos_name_node {
+	u16 gc;
+	char fname[9];
+	u64 hash;
+	struct hlist_node h_list;
+};
+
+DEFINE_HASHTABLE(msdos_ncache, 6);
+DEFINE_MUTEX(msdos_ncache_mutex); /* protect the name cache */
+
+/**
+ * msdos_fname_hash() - quickly "hash" an msdos filename
+ * @name: the name to hash, assumed to be a maximum of eight characters
+ *
+ * Bitwise-or the characters in an msdos filename into a simple "hash" that can
+ * be used as a fast hash for an msdos filename.
+ */
+static u64 msdos_fname_hash(const unsigned char *name)
+{
+	u64 res = 0;
+	short i;
+
+	for (i = 0; i < 8 && name[i] != '\0'; i++)
+		res |= (u64)(name[i] << (8 * i));
+
+	return res;
+}
+
+/**
+ * find_fname_in_cache() - retrieve a filename from the cache given a hash
+ * @out: the result buffer for the filename
+ * @ihash: the hash to check for
+ */
+static bool find_fname_in_cache(char *out, u64 ihash)
+{
+	struct msdos_name_node *node;
+	bool found = false;
+
+	mutex_lock(&msdos_ncache_mutex);
+	hash_for_each_possible(msdos_ncache, node, h_list, ihash) {
+		if (node->hash == ihash) {
+			strscpy(out, node->fname, 9);
+			found = true;
+			node->gc++;
+			goto out;
+		}
+	}
+
+out:
+	mutex_unlock(&msdos_ncache_mutex);
+	return found;
+}
+
+/**
+ * drop_fname_from_cache() - delete and free a filename from the hash entry
+ * @ihash: the hash to remove from the cache
+ */
+static void drop_fname_from_cache(u64 ihash)
+{
+	struct msdos_name_node *node, *gc;
+
+	gc = NULL;
+
+	mutex_lock(&msdos_ncache_mutex);
+	hash_for_each_possible(msdos_ncache, node, h_list, ihash) {
+		if (unlikely(gc)) {
+			hash_del(&gc->h_list);
+			kfree(gc);
+			gc = NULL;
+		}
+		if (node->hash == ihash) {
+			hash_del(&node->h_list);
+			kfree(node);
+			goto out;
+		}
+		/* if we don't find it, collect unused nodes until we do */
+		if (node->gc < 4)
+			gc = node;
+	}
+
+out:
+	mutex_unlock(&msdos_ncache_mutex);
+}
 
 /***** Formats an MS-DOS file name. Rejects invalid names. */
 static int msdos_format_name(const unsigned char *name, int len,
