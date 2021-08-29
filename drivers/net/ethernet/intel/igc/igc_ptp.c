@@ -860,7 +860,6 @@ static int igc_phc_get_syncdevicetime(ktime_t *device,
 			 * so write the previous error status to clear it.
 			 */
 			wr32(IGC_PTM_STAT, stat);
-			continue;
 		}
 	} while (--count);
 
