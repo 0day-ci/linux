@@ -81,10 +81,25 @@ static void pch_msi_compose_msi_msg(struct irq_data *data,
 	msg->data = data->hwirq;
 }
 
+static int msi_domain_ops_init(struct irq_domain *domain,
+				struct msi_domain_info *info,
+				unsigned int virq, irq_hw_number_t hwirq,
+				msi_alloc_info_t *arg)
+{
+	irq_domain_set_hwirq_and_chip(domain, virq, arg->hwirq, info->chip,
+					info->chip_data);
+	return 0;
+}
+
+static struct msi_domain_ops pch_msi_domain_ops = {
+	.msi_init	= msi_domain_ops_init,
+};
+
 static struct msi_domain_info pch_msi_domain_info = {
 	.flags	= MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS |
 		  MSI_FLAG_MULTI_PCI_MSI | MSI_FLAG_PCI_MSIX,
 	.chip	= &pch_msi_irq_chip,
+	.ops	= &pch_msi_domain_ops,
 };
 
 static struct irq_chip middle_irq_chip = {
@@ -112,8 +127,9 @@ static int pch_msi_middle_domain_alloc(struct irq_domain *domain,
 					   unsigned int virq,
 					   unsigned int nr_irqs, void *args)
 {
-	struct pch_msi_data *priv = domain->host_data;
 	int hwirq, err, i;
+	struct pch_msi_data *priv = domain->host_data;
+	msi_alloc_info_t *info = (msi_alloc_info_t *)args;
 
 	hwirq = pch_msi_allocate_hwirq(priv, nr_irqs);
 	if (hwirq < 0)
@@ -127,6 +143,7 @@ static int pch_msi_middle_domain_alloc(struct irq_domain *domain,
 		irq_domain_set_hwirq_and_chip(domain, virq + i, hwirq + i,
 					      &middle_irq_chip, priv);
 	}
+	info->hwirq = hwirq;
 
 	return 0;
 
