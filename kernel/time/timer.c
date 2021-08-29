@@ -1522,12 +1522,12 @@ static int next_pending_bucket(struct timer_base *base, unsigned offset,
 static unsigned long __next_timer_interrupt(struct timer_base *base)
 {
 	unsigned long clk, next, adj;
-	unsigned lvl, offset = 0;
+	unsigned int lvl;
 
 	next = base->clk + NEXT_TIMER_MAX_DELTA;
 	clk = base->clk;
-	for (lvl = 0; lvl < LVL_DEPTH; lvl++, offset += LVL_SIZE) {
-		int pos = next_pending_bucket(base, offset, clk & LVL_MASK);
+	for (lvl = 0; lvl < LVL_DEPTH; lvl++) {
+		int pos = next_pending_bucket(base, LVL_OFFS(lvl), clk & LVL_MASK);
 		unsigned long lvl_clk = clk & LVL_CLK_MASK;
 
 		if (pos >= 0) {
