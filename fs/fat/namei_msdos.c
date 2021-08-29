@@ -124,6 +124,16 @@ static int msdos_format_name(const unsigned char *name, int len,
 	unsigned char *walk;
 	unsigned char c;
 	int space;
+	u64 hash;
+	struct msdos_name_node *node;
+
+	/* check if the name is already in the cache */
+
+	hash = msdos_fname_hash(name);
+	if (find_fname_in_cache(res, hash))
+		return 0;
+
+	/* The node wasn't in the cache, so format it normally */
 
 	if (name[0] == '.') {	/* dotfile because . and .. already done */
 		if (opts->dotsOK) {
@@ -207,6 +217,18 @@ static int msdos_format_name(const unsigned char *name, int len,
 	}
 	while (walk - res < MSDOS_NAME)
 		*walk++ = ' ';
+
+	/* allocate memory now */
+	node = kmalloc(sizeof(*node), GFP_KERNEL);
+	if (!node)
+		return -ENOMEM;
+
+	/* fill in the name cache */
+	node->hash = hash;
+	strscpy(node->fname, res, 9);
+	mutex_lock(&msdos_ncache_mutex);
+	hash_add(msdos_ncache, &node->h_list, node->hash);
+	mutex_unlock(&msdos_ncache_mutex);
 
 	return 0;
 }
@@ -677,6 +699,7 @@ error_inode:
 		 * shouldn't be serious corruption.
 		 */
 		int err2 = fat_remove_entries(new_dir, &sinfo);
+
 		if (corrupt)
 			corrupt |= err2;
 		sinfo.bh = NULL;
@@ -774,6 +797,18 @@ static int __init init_msdos_fs(void)
 
 static void __exit exit_msdos_fs(void)
 {
+	int bkt;
+	struct msdos_name_node *c, *prev;
+
+	prev = NULL;
+	/* do this one behind to prevent bad memory access */
+	hash_for_each(msdos_ncache, bkt, c, h_list) {
+		kfree(prev);
+		prev = c;
+	}
+
+	kfree(prev);
+
 	unregister_filesystem(&msdos_fs_type);
 }
 
