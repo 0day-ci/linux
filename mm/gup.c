@@ -1097,6 +1097,7 @@ static long __get_user_pages(struct mm_struct *mm,
 	long ret = 0, i = 0;
 	struct vm_area_struct *vma = NULL;
 	struct follow_page_context ctx = { NULL };
+	unsigned long unpresent = 0;
 
 	if (!nr_pages)
 		return 0;
@@ -1180,6 +1181,8 @@ retry:
 			case -EHWPOISON:
 				goto out;
 			case -ENOENT:
+				/* ctx.page_mask is 0 */
+				unpresent += 1;
 				goto next_page;
 			}
 			BUG();
@@ -1214,7 +1217,7 @@ next_page:
 out:
 	if (ctx.pgmap)
 		put_dev_pagemap(ctx.pgmap);
-	return i ? i : ret;
+	return (i - unpresent) ? (i - unpresent) : ret;
 }
 
 static bool vma_permits_fault(struct vm_area_struct *vma,
