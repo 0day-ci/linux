@@ -44,13 +44,13 @@ static int __init vdso_init(void)
 		return -ENOMEM;
 	}
 
+	vdso_pagelist[0] = virt_to_page(vdso_data);
 	for (i = 0; i < vdso_pages; i++) {
 		struct page *pg;
 
 		pg = virt_to_page(vdso_start + (i << PAGE_SHIFT));
-		vdso_pagelist[i] = pg;
+		vdso_pagelist[i + 1] = pg;
 	}
-	vdso_pagelist[i] = virt_to_page(vdso_data);
 
 	return 0;
 }
@@ -77,21 +77,21 @@ int arch_setup_additional_pages(struct linux_binprm *bprm,
 	 * install_special_mapping or the perf counter mmap tracking code
 	 * will fail to recognise it as a vDSO (since arch_vma_name fails).
 	 */
-	mm->context.vdso = (void *)vdso_base;
+	mm->context.vdso = (void *)vdso_base + PAGE_SIZE;
 
-	ret =
-	   install_special_mapping(mm, vdso_base, vdso_pages << PAGE_SHIFT,
-		(VM_READ | VM_EXEC | VM_MAYREAD | VM_MAYWRITE | VM_MAYEXEC),
-		vdso_pagelist);
+	ret = install_special_mapping(mm, vdso_base, PAGE_SIZE,
+		(VM_READ | VM_MAYREAD), &vdso_pagelist[0]);
 
 	if (unlikely(ret)) {
 		mm->context.vdso = NULL;
 		goto end;
 	}
 
-	vdso_base += (vdso_pages << PAGE_SHIFT);
-	ret = install_special_mapping(mm, vdso_base, PAGE_SIZE,
-		(VM_READ | VM_MAYREAD), &vdso_pagelist[vdso_pages]);
+	vdso_base += PAGE_SIZE;
+	ret =
+	   install_special_mapping(mm, vdso_base, vdso_pages << PAGE_SHIFT,
+		(VM_READ | VM_EXEC | VM_MAYREAD | VM_MAYWRITE | VM_MAYEXEC),
+		&vdso_pagelist[1]);
 
 	if (unlikely(ret))
 		mm->context.vdso = NULL;
@@ -105,7 +105,7 @@ const char *arch_vma_name(struct vm_area_struct *vma)
 	if (vma->vm_mm && (vma->vm_start == (long)vma->vm_mm->context.vdso))
 		return "[vdso]";
 	if (vma->vm_mm && (vma->vm_start ==
-			   (long)vma->vm_mm->context.vdso + PAGE_SIZE))
+			   (long)vma->vm_mm->context.vdso - PAGE_SIZE))
 		return "[vdso_data]";
 	return NULL;
 }
