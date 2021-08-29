@@ -430,9 +430,11 @@ static int msdos_rmdir(struct inode *dir, struct dentry *dentry)
 	struct super_block *sb = dir->i_sb;
 	struct inode *inode = d_inode(dentry);
 	struct fat_slot_info sinfo;
+	u64 hash;
 	int err;
 
 	mutex_lock(&MSDOS_SB(sb)->s_lock);
+	hash = msdos_fname_hash(dentry->d_name.name);
 	err = fat_dir_empty(inode);
 	if (err)
 		goto out;
@@ -448,6 +450,7 @@ static int msdos_rmdir(struct inode *dir, struct dentry *dentry)
 	clear_nlink(inode);
 	fat_truncate_time(inode, NULL, S_CTIME);
 	fat_detach(inode);
+	drop_fname_from_cache(hash);
 out:
 	mutex_unlock(&MSDOS_SB(sb)->s_lock);
 	if (!err)
@@ -522,10 +525,12 @@ static int msdos_unlink(struct inode *dir, struct dentry *dentry)
 	struct inode *inode = d_inode(dentry);
 	struct super_block *sb = inode->i_sb;
 	struct fat_slot_info sinfo;
+	u64 hash;
 	int err;
 
 	mutex_lock(&MSDOS_SB(sb)->s_lock);
 	err = msdos_find(dir, dentry->d_name.name, dentry->d_name.len, &sinfo);
+	hash = msdos_fname_hash(dentry->d_name.name);
 	if (err)
 		goto out;
 
@@ -535,6 +540,8 @@ static int msdos_unlink(struct inode *dir, struct dentry *dentry)
 	clear_nlink(inode);
 	fat_truncate_time(inode, NULL, S_CTIME);
 	fat_detach(inode);
+	drop_fname_from_cache(hash);
+
 out:
 	mutex_unlock(&MSDOS_SB(sb)->s_lock);
 	if (!err)
@@ -670,6 +677,8 @@ static int do_msdos_rename(struct inode *old_dir, unsigned char *old_name,
 			drop_nlink(new_inode);
 		fat_truncate_time(new_inode, &ts, S_CTIME);
 	}
+	drop_fname_from_cache(msdos_fname_hash(old_name));
+
 out:
 	brelse(sinfo.bh);
 	brelse(dotdot_bh);
