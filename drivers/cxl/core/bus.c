@@ -494,7 +494,7 @@ EXPORT_SYMBOL_GPL(cxl_decoder_alloc);
 int devm_cxl_add_decoder(struct device *host, struct cxl_decoder *cxld,
 			 int *target_map)
 {
-	struct cxl_port *port = to_cxl_port(cxld->dev.parent);
+	struct cxl_port *port;
 	struct device *dev;
 	int rc = 0, i;
 
@@ -509,6 +509,7 @@ int devm_cxl_add_decoder(struct device *host, struct cxl_decoder *cxld,
 		goto err;
 	}
 
+	port = to_cxl_port(cxld->dev.parent);
 	device_lock(&port->dev);
 	if (list_empty(&port->dports))
 		rc = -EINVAL;
