@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: GPL-2.0-only
+menuconfig PWRSEQ
+	bool "Power Sequencer drivers"
+	help
+	  Provides support for special power sequencing drivers.
+
+	  Say Y here to enable support for such devices
+
+if PWRSEQ
+
+endif
