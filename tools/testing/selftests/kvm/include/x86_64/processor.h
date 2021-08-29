@@ -39,6 +39,13 @@
 #define X86_CR4_SMAP		(1ul << 21)
 #define X86_CR4_PKE		(1ul << 22)
 
+#define X86_PAGE_4K_SHIFT	12
+#define X86_PAGE_4K		(1ul << X86_PAGE_4K_SHIFT)
+#define X86_PAGE_2M_SHIFT	21
+#define X86_PAGE_2M		(1ul << X86_PAGE_2M_SHIFT)
+#define X86_PAGE_1G_SHIFT	30
+#define X86_PAGE_1G		(1ul << X86_PAGE_1G_SHIFT)
+
 /* CPUID.1.ECX */
 #define CPUID_VMX		(1ul << 5)
 #define CPUID_SMX		(1ul << 6)
