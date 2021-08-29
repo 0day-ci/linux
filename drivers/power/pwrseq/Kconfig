@@ -19,6 +19,20 @@ config PWRSEQ_EMMC
 	  This driver can also be built as a module. If so, the module
 	  will be called pwrseq_emmc.
 
+config PWRSEQ_QCA
+	tristate "Power Sequencer for Qualcomm WiFi + BT SoCs"
+	depends on OF
+	help
+	  If you say yes to this option, support will be included for Qualcomm
+	  WCN399x,QCA639x,QCA67xx families of hybrid WiFi and Bluetooth SoCs.
+	  Note, this driver supports only power control for these SoC, you
+	  still have to enable individual Bluetooth and WiFi drivers. This
+	  driver is only necessary on ARM platforms with these chips. PCIe
+	  cards handle power sequencing on their own.
+
+	  Say M here if you want to include support for Qualcomm WiFi+BT SoCs
+	  as a module. This will build a module called "pwrseq_qca".
+
 config PWRSEQ_SD8787
 	tristate "HW reset support for SD8787 BT + Wifi module"
 	depends on OF
