@@ -16,6 +16,7 @@
 #include <linux/of.h>
 #include <asm/unaligned.h>
 
+#define WACOM_DESC_REG	0x01
 #define WACOM_CMD_QUERY0	0x04
 #define WACOM_CMD_QUERY1	0x00
 #define WACOM_CMD_QUERY2	0x33
@@ -24,11 +25,46 @@
 #define WACOM_CMD_THROW1	0x00
 #define WACOM_QUERY_SIZE	19
 
+#define WACOM_MAX_DATA_SIZE_BG9     10
+#define WACOM_MAX_DATA_SIZE_G12     15
+#define WACOM_MAX_DATA_SIZE_AG14    17
+#define WACOM_MAX_DATA_SIZE         22
+
+/* Generation selction */
+/* Before and at G9 generation */
+#define WACOM_BG9	0
+/* G12 generation the IC supports "height"*/
+#define WACOM_G12	1
+/* After and at G14 generation the IC supports "height" and
+ * it is defined as "Z" axis
+ */
+#define WACOM_AG14	2
+
+struct wacom_desc {
+	u16 descLen;
+	u16 version;
+	u16 reportLen;
+	u16 reportReg;
+	u16 inputReg;
+	u16 maxInputLen;
+	u16 outputReg;
+	u16 maxOutputLen;
+	u16 commReg;
+	u16 dataReg;
+	u16 vendorID;
+	u16 productID;
+	u16 fwVersion;
+	u16 misc_high;
+	u16 misc_low;
+};
+
 struct wacom_features {
+	struct wacom_desc desc;
 	int x_max;
 	int y_max;
 	int pressure_max;
 	char fw_version;
+	unsigned char generation;
 };
 
 struct wacom_i2c {
@@ -45,6 +81,7 @@ static int wacom_query_device(struct i2c_client *client,
 			      struct wacom_features *features)
 {
 	int ret;
+	u8 cmd_wac_desc[] = {WACOM_DESC_REG, 0x00};
 	u8 cmd1[] = { WACOM_CMD_QUERY0, WACOM_CMD_QUERY1,
 			WACOM_CMD_QUERY2, WACOM_CMD_QUERY3 };
 	u8 cmd2[] = { WACOM_CMD_THROW0, WACOM_CMD_THROW1 };
@@ -69,6 +106,33 @@ static int wacom_query_device(struct i2c_client *client,
 			.buf = data,
 		},
 	};
+
+	/* Read the description register */
+	ret = i2c_master_send(client, cmd_wac_desc, sizeof(cmd_wac_desc));
+	if (ret < 0)
+		return ret;
+	ret = i2c_master_recv(client, (char *)&features->desc, sizeof(features->desc));
+	if (ret < 0)
+		return ret;
+
+	switch (features->desc.maxInputLen) {
+	case WACOM_MAX_DATA_SIZE_BG9:
+		features->generation = WACOM_BG9;
+		break;
+
+	case WACOM_MAX_DATA_SIZE_G12:
+		features->generation = WACOM_G12;
+		break;
+
+	case WACOM_MAX_DATA_SIZE_AG14:
+		features->generation = WACOM_AG14;
+		break;
+
+	default:
+		/* Cover all generations possible */
+		features->generation = WACOM_AG14;
+		break;
+	}
 
 	ret = i2c_transfer(client->adapter, msgs, ARRAY_SIZE(msgs));
 	if (ret < 0)
