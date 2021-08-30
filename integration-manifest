@@ -1,0 +1,28 @@
+drm drm-fixes 7d2a07b769330c34b4deabeed939325c77a7ec2f
+	Linux 5.14
+drm-misc drm-misc-fixes fa0b1ef5f7a694f48e00804a391245f3471aa155
+	drm: Copy drm_wait_vblank to user before returning
+drm-intel drm-intel-fixes c15fd1de4284426d6543bfc62ae537d488803844
+	drm/i915/dp: Use max params for panels < eDP 1.4
+drm drm-next 8f0284f190e6a0aa09015090568c03f18288231a
+	Merge tag 'amd-drm-next-5.15-2021-08-27' of https://gitlab.freedesktop.org/agd5f/linux into drm-next
+drm-misc drm-misc-next-fixes bd7ffbc3ca12629aeb66fb9e28cf42b7f37e3e3b
+	drm/panfrost: Clamp lock region to Bifrost minimum
+drm-intel drm-intel-next-fixes fb43ebc83e069625cfeeb2490efc3ffa0013bfa4
+	drm/i915/selftest: Fix use of err in igt_reset_{fail, nop}_engine()
+drm-misc drm-misc-next f1b3f696a084534a87619ac1a6aa81e78bf86437
+	drm/msm: Don't break exclusive fence ordering
+drm-intel drm-intel-next 45cbbe50ccb10452c9369c2e58f0fdee90abae0b
+	drm/i915/dg2: UHBR tables added for pll programming
+drm-intel drm-intel-gt-next f123efebe4361b9b16975fcc3dbc0a6331fa6a14
+	drm/i915: Actually delete gpu reloc selftests
+sound-upstream for-linus 7cf3dead1ad70c72edb03e2d98e1f3dcd332cdb2
+	Linux 5.13
+sound-upstream for-next 7cf3dead1ad70c72edb03e2d98e1f3dcd332cdb2
+	Linux 5.13
+drm-intel topic/core-for-CI 5363e35a435a0699c8b30936b6ca00db8d85c839
+	drm/i915: Add relocation exceptions for two other platforms
+drm topic/nouveau-ampere-modeset 584265dfec70e78ce2085b82ed389f27e06fbca0
+	Merge branch '04.01-ampere-lite' of git://github.com/skeggsb/linux into topic/nouveau-ampere-modeset
+drm-misc topic/i915-ttm cf3e3e86d77970211e0983130e896ae242601003
+	drm/i915: Use ttm mmap handling for ttm bo's.
