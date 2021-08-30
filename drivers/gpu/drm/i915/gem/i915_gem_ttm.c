@@ -353,10 +353,14 @@ static void i915_ttm_swap_notify(struct ttm_buffer_object *bo)
 
 static void i915_ttm_delete_mem_notify(struct ttm_buffer_object *bo)
 {
-	struct drm_i915_gem_object *obj = i915_ttm_to_gem(bo);
+	struct drm_i915_gem_object *obj;
 
-	if (likely(obj))
-		i915_ttm_free_cached_io_st(obj);
+	if (bo->destroy != i915_ttm_bo_destroy)
+		return;
+
+	obj = i915_ttm_to_gem(bo);
+
+	i915_ttm_free_cached_io_st(obj);
 }
 
 static struct intel_memory_region *
@@ -426,10 +430,10 @@ i915_ttm_resource_get_st(struct drm_i915_gem_object *obj,
 	return intel_region_ttm_resource_to_st(obj->mm.region, res);
 }
 
-static int i915_ttm_accel_move(struct ttm_buffer_object *bo,
-			       bool clear,
-			       struct ttm_resource *dst_mem,
-			       struct sg_table *dst_st)
+static struct i915_request *i915_ttm_accel_move(struct ttm_buffer_object *bo,
+						bool clear,
+						struct ttm_resource *dst_mem,
+						struct sg_table *dst_st)
 {
 	struct drm_i915_private *i915 = container_of(bo->bdev, typeof(*i915),
 						     bdev);
@@ -437,18 +441,18 @@ static int i915_ttm_accel_move(struct ttm_buffer_object *bo,
 		ttm_manager_type(bo->bdev, bo->resource->mem_type);
 	struct drm_i915_gem_object *obj = i915_ttm_to_gem(bo);
 	struct sg_table *src_st;
-	struct i915_request *rq;
+	struct i915_request *rq = NULL;
 	struct ttm_tt *ttm = bo->ttm;
 	enum i915_cache_level src_level, dst_level;
 	int ret;
 
 	if (!i915->gt.migrate.context)
-		return -EINVAL;
+		return ERR_PTR(-EINVAL);
 
 	dst_level = i915_ttm_cache_level(i915, dst_mem, ttm);
 	if (clear) {
 		if (bo->type == ttm_bo_type_kernel)
-			return -EINVAL;
+			return ERR_PTR(-EINVAL);
 
 		intel_engine_pm_get(i915->gt.migrate.context->engine);
 		ret = intel_context_migrate_clear(i915->gt.migrate.context, NULL,
@@ -456,10 +460,6 @@ static int i915_ttm_accel_move(struct ttm_buffer_object *bo,
 						  gpu_binds_iomem(dst_mem),
 						  0, &rq);
 
-		if (!ret && rq) {
-			i915_request_wait(rq, 0, MAX_SCHEDULE_TIMEOUT);
-			i915_request_put(rq);
-		}
 		intel_engine_pm_put(i915->gt.migrate.context->engine);
 	} else {
 		src_st = src_man->use_tt ? i915_ttm_tt_get_st(ttm) :
@@ -473,49 +473,40 @@ static int i915_ttm_accel_move(struct ttm_buffer_object *bo,
 						 dst_st->sgl, dst_level,
 						 gpu_binds_iomem(dst_mem),
 						 &rq);
-		if (!ret && rq) {
-			i915_request_wait(rq, 0, MAX_SCHEDULE_TIMEOUT);
-			i915_request_put(rq);
-		}
 		intel_engine_pm_put(i915->gt.migrate.context->engine);
 	}
 
-	return ret;
+	return ret ? ERR_PTR(ret) : rq;
 }
 
-static void __i915_ttm_move(struct ttm_buffer_object *bo, bool clear,
+static void i915_ttm_memcpy(struct ttm_buffer_object *bo, bool clear,
 			    struct ttm_resource *dst_mem,
 			    struct sg_table *dst_st)
 {
-	int ret;
+	struct drm_i915_gem_object *obj = i915_ttm_to_gem(bo);
+	struct intel_memory_region *dst_reg, *src_reg;
+	union {
+		struct ttm_kmap_iter_tt tt;
+		struct ttm_kmap_iter_iomap io;
+	} _dst_iter, _src_iter;
+	struct ttm_kmap_iter *dst_iter, *src_iter;
 
-	ret = i915_ttm_accel_move(bo, clear, dst_mem, dst_st);
-	if (ret) {
-		struct drm_i915_gem_object *obj = i915_ttm_to_gem(bo);
-		struct intel_memory_region *dst_reg, *src_reg;
-		union {
-			struct ttm_kmap_iter_tt tt;
-			struct ttm_kmap_iter_iomap io;
-		} _dst_iter, _src_iter;
-		struct ttm_kmap_iter *dst_iter, *src_iter;
+	dst_reg = i915_ttm_region(bo->bdev, dst_mem->mem_type);
+	src_reg = i915_ttm_region(bo->bdev, bo->resource->mem_type);
+	GEM_BUG_ON(!dst_reg || !src_reg);
 
-		dst_reg = i915_ttm_region(bo->bdev, dst_mem->mem_type);
-		src_reg = i915_ttm_region(bo->bdev, bo->resource->mem_type);
-		GEM_BUG_ON(!dst_reg || !src_reg);
+	dst_iter = !cpu_maps_iomem(dst_mem) ?
+		ttm_kmap_iter_tt_init(&_dst_iter.tt, bo->ttm) :
+		ttm_kmap_iter_iomap_init(&_dst_iter.io, &dst_reg->iomap,
+					  dst_st, dst_reg->region.start);
 
-		dst_iter = !cpu_maps_iomem(dst_mem) ?
-			ttm_kmap_iter_tt_init(&_dst_iter.tt, bo->ttm) :
-			ttm_kmap_iter_iomap_init(&_dst_iter.io, &dst_reg->iomap,
-						 dst_st, dst_reg->region.start);
+	src_iter = !cpu_maps_iomem(bo->resource) ?
+		ttm_kmap_iter_tt_init(&_src_iter.tt, bo->ttm) :
+		ttm_kmap_iter_iomap_init(&_src_iter.io, &src_reg->iomap,
+					  obj->ttm.cached_io_st,
+					  src_reg->region.start);
 
-		src_iter = !cpu_maps_iomem(bo->resource) ?
-			ttm_kmap_iter_tt_init(&_src_iter.tt, bo->ttm) :
-			ttm_kmap_iter_iomap_init(&_src_iter.io, &src_reg->iomap,
-						 obj->ttm.cached_io_st,
-						 src_reg->region.start);
-
-		ttm_move_memcpy(clear, dst_mem->num_pages, dst_iter, src_iter);
-	}
+	ttm_move_memcpy(clear, dst_mem->num_pages, dst_iter, src_iter);
 }
 
 static int i915_ttm_move(struct ttm_buffer_object *bo, bool evict,
@@ -530,6 +521,7 @@ static int i915_ttm_move(struct ttm_buffer_object *bo, bool evict,
 	struct sg_table *dst_st;
 	bool clear;
 	int ret;
+	struct i915_request *rq;
 
 	/* Sync for now. We could do the actual copy async. */
 	ret = ttm_bo_wait_ctx(bo, ctx);
@@ -558,10 +550,22 @@ static int i915_ttm_move(struct ttm_buffer_object *bo, bool evict,
 		return PTR_ERR(dst_st);
 
 	clear = !cpu_maps_iomem(bo->resource) && (!ttm || !ttm_tt_is_populated(ttm));
-	if (!(clear && ttm && !(ttm->page_flags & TTM_PAGE_FLAG_ZERO_ALLOC)))
-		__i915_ttm_move(bo, clear, dst_mem, dst_st);
 
-	ttm_bo_move_sync_cleanup(bo, dst_mem);
+	rq = NULL;
+	if (!(clear && ttm && !(ttm->page_flags & TTM_PAGE_FLAG_ZERO_ALLOC)))
+		rq = i915_ttm_accel_move(bo, clear, dst_mem, dst_st);
+
+	if (IS_ERR(rq))
+		i915_ttm_memcpy(bo, clear, dst_mem, dst_st);
+
+	/* Below dst_mem becomes bo->resource. */
+	if (!IS_ERR_OR_NULL(rq)) {
+		ttm_bo_move_accel_cleanup(bo, &rq->fence, evict, true, dst_mem);
+		i915_request_put(rq);
+	} else {
+		ttm_bo_move_sync_cleanup(bo, dst_mem);
+	}
+
 	i915_ttm_adjust_domains_after_move(obj);
 	i915_ttm_free_cached_io_st(obj);
 
