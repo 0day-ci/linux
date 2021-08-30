@@ -143,7 +143,7 @@ static int plantronics_event(struct hid_device *hdev, struct hid_field *field,
 
 static unsigned long plantronics_device_type(struct hid_device *hdev)
 {
-	unsigned i, col_page;
+	unsigned int i, col_page;
 	unsigned long plt_type = hdev->product;
 
 	/* multi-HID interfaces? - plt_type is PID */
