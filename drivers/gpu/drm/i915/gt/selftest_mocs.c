@@ -281,7 +281,7 @@ static int check_mocs_engine(struct live_mocs *arg,
 	offset = i915_ggtt_offset(vma);
 	if (!err)
 		err = read_mocs_table(rq, arg->mocs, &offset);
-	if (!err && ce->engine->class == RENDER_CLASS)
+	if (!err)
 		err = read_l3cc_table(rq, arg->l3cc, &offset);
 	if (!err)
 		err = read_aux_regs(rq, aux, &offset);
@@ -296,7 +296,7 @@ static int check_mocs_engine(struct live_mocs *arg,
 	vaddr = arg->vaddr;
 	if (!err)
 		err = check_mocs_table(ce->engine, arg->mocs, &vaddr);
-	if (!err && ce->engine->class == RENDER_CLASS)
+	if (!err)
 		err = check_l3cc_table(ce->engine, arg->l3cc, &vaddr);
 	if (!err)
 		err = check_aux_regs(ce->engine, aux, &vaddr);
