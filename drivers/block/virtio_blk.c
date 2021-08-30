@@ -24,6 +24,28 @@
 /* The maximum number of sg elements that fit into a virtqueue */
 #define VIRTIO_BLK_MAX_SG_ELEMS 32768
 
+static int virtblk_queue_count_set(const char *val,
+		const struct kernel_param *kp)
+{
+	unsigned int n;
+	int ret;
+
+	ret = kstrtouint(val, 10, &n);
+	if (ret != 0 || n > nr_cpu_ids)
+		return -EINVAL;
+	return param_set_uint(val, kp);
+}
+
+static const struct kernel_param_ops queue_count_ops = {
+	.set = virtblk_queue_count_set,
+	.get = param_get_uint,
+};
+
+static unsigned int num_io_queues;
+module_param_cb(num_io_queues, &queue_count_ops, &num_io_queues, 0644);
+MODULE_PARM_DESC(num_io_queues,
+		 "Number of IO virt queues to use for blk device.");
+
 static int major;
 static DEFINE_IDA(vd_index_ida);
 
@@ -498,7 +520,9 @@ static int init_vq(struct virtio_blk *vblk)
 	if (err)
 		num_vqs = 1;
 
-	num_vqs = min_t(unsigned int, nr_cpu_ids, num_vqs);
+	num_vqs = min_t(unsigned int,
+			min_not_zero(num_io_queues, nr_cpu_ids),
+			num_vqs);
 
 	vblk->vqs = kmalloc_array(num_vqs, sizeof(*vblk->vqs), GFP_KERNEL);
 	if (!vblk->vqs)
