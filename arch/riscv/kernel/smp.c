@@ -183,7 +183,10 @@ void riscv_ipi_setup(void)
 	riscv_ipi_enable();
 }
 
-void riscv_ipi_set_virq_range(int virq, int nr)
+DEFINE_STATIC_KEY_FALSE(riscv_ipi_for_rfence);
+EXPORT_SYMBOL_GPL(riscv_ipi_for_rfence);
+
+void riscv_ipi_set_virq_range(int virq, int nr, bool use_for_rfence)
 {
 	if (WARN_ON(ipi_virq_base))
 		return;
@@ -191,6 +194,10 @@ void riscv_ipi_set_virq_range(int virq, int nr)
 	WARN_ON(nr < IPI_MAX);
 	nr_ipi = min(nr, IPI_MAX);
 	ipi_virq_base = virq;
+	if (use_for_rfence)
+		static_branch_enable(&riscv_ipi_for_rfence);
+	else
+		static_branch_disable(&riscv_ipi_for_rfence);
 }
 EXPORT_SYMBOL_GPL(riscv_ipi_set_virq_range);
 
