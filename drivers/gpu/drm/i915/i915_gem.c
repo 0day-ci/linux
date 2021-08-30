@@ -118,6 +118,8 @@ int i915_gem_object_unbind(struct drm_i915_gem_object *obj,
 	struct i915_vma *vma;
 	int ret;
 
+	assert_object_held(obj);
+
 	if (list_empty(&obj->vma.list))
 		return 0;
 
@@ -936,10 +938,7 @@ new_vma:
 			return ERR_PTR(ret);
 	}
 
-	if (ww)
-		ret = i915_vma_pin_ww(vma, ww, size, alignment, flags | PIN_GLOBAL);
-	else
-		ret = i915_vma_pin(vma, size, alignment, flags | PIN_GLOBAL);
+	ret = i915_vma_pin_ww(vma, ww, size, alignment, flags | PIN_GLOBAL);
 
 	if (ret)
 		return ERR_PTR(ret);
@@ -957,6 +956,28 @@ new_vma:
 	}
 
 	return vma;
+}
+
+struct i915_vma *
+i915_gem_object_ggtt_pin(struct drm_i915_gem_object *obj,
+			 const struct i915_ggtt_view *view,
+			 u64 size, u64 alignment, u64 flags)
+{
+	struct i915_vma *vma = ERR_PTR(-ENODEV);
+	struct i915_gem_ww_ctx ww;
+	int err;
+
+	for_i915_gem_ww(&ww, err, true) {
+		err = i915_gem_object_lock(obj, &ww);
+		if (!err) {
+			vma = i915_gem_object_ggtt_pin_ww(obj, &ww, view, size,
+							  alignment, flags);
+			if (IS_ERR(vma))
+				err = PTR_ERR(vma);
+		}
+	}
+
+	return err ? ERR_PTR(err) : vma;
 }
 
 int

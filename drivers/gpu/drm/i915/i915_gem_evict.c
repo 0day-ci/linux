@@ -58,6 +58,14 @@ mark_free(struct drm_mm_scan *scan,
 	if (i915_vma_is_pinned(vma))
 		return false;
 
+	if (!kref_get_unless_zero(&vma->obj->base.refcount))
+		return false;
+
+	if (!i915_gem_object_trylock(vma->obj)) {
+		i915_vma_put(vma);
+		return false;
+	}
+
 	list_add(&vma->evict_link, unwind);
 	return drm_mm_scan_add_block(scan, &vma->node);
 }
@@ -178,6 +186,8 @@ search_again:
 	list_for_each_entry_safe(vma, next, &eviction_list, evict_link) {
 		ret = drm_mm_scan_remove_block(&scan, &vma->node);
 		BUG_ON(ret);
+		i915_gem_object_unlock(vma->obj);
+		i915_gem_object_put(vma->obj);
 	}
 
 	/*
@@ -222,10 +232,13 @@ found:
 	 * of any of our objects, thus corrupting the list).
 	 */
 	list_for_each_entry_safe(vma, next, &eviction_list, evict_link) {
-		if (drm_mm_scan_remove_block(&scan, &vma->node))
+		if (drm_mm_scan_remove_block(&scan, &vma->node)) {
 			__i915_vma_pin(vma);
-		else
+		} else {
 			list_del(&vma->evict_link);
+			i915_gem_object_unlock(vma->obj);
+			i915_gem_object_put(vma->obj);
+		}
 	}
 
 	/* Unbinding will emit any required flushes */
@@ -234,16 +247,28 @@ found:
 		__i915_vma_unpin(vma);
 		if (ret == 0)
 			ret = __i915_vma_unbind(vma);
+
+		i915_gem_object_unlock(vma->obj);
+		i915_gem_object_put(vma->obj);
 	}
 
 	while (ret == 0 && (node = drm_mm_scan_color_evict(&scan))) {
 		vma = container_of(node, struct i915_vma, node);
 
+
 		/* If we find any non-objects (!vma), we cannot evict them */
-		if (vma->node.color != I915_COLOR_UNEVICTABLE)
-			ret = __i915_vma_unbind(vma);
-		else
-			ret = -ENOSPC; /* XXX search failed, try again? */
+		ret = -ENOSPC;
+
+		if (vma->node.color != I915_COLOR_UNEVICTABLE &&
+		    !kref_get_unless_zero(&vma->obj->base.refcount)) {
+			struct drm_i915_gem_object *obj = vma->obj;
+
+			if (i915_gem_object_trylock(obj)) {
+				ret = __i915_vma_unbind(vma);
+				i915_gem_object_unlock(obj);
+			}
+			i915_gem_object_put(obj);
+		}
 	}
 
 	return ret;
@@ -333,6 +358,17 @@ int i915_gem_evict_for_node(struct i915_address_space *vm,
 			break;
 		}
 
+		if (!kref_get_unless_zero(&vma->obj->base.refcount)) {
+			ret = -ENOSPC;
+			break;
+		}
+
+		if (!i915_gem_object_trylock(vma->obj)) {
+			ret = -ENOSPC;
+			i915_gem_object_put(vma->obj);
+			break;
+		}
+
 		/*
 		 * Never show fear in the face of dragons!
 		 *
@@ -347,9 +383,14 @@ int i915_gem_evict_for_node(struct i915_address_space *vm,
 	}
 
 	list_for_each_entry_safe(vma, next, &eviction_list, evict_link) {
+		struct drm_i915_gem_object *obj = vma->obj;
+
 		__i915_vma_unpin(vma);
 		if (ret == 0)
 			ret = __i915_vma_unbind(vma);
+
+		i915_gem_object_unlock(obj);
+		i915_gem_object_put(obj);
 	}
 
 	return ret;
@@ -388,6 +429,7 @@ int i915_gem_evict_vm(struct i915_address_space *vm)
 	do {
 		struct i915_vma *vma, *vn;
 		LIST_HEAD(eviction_list);
+		bool evicted = false;
 
 		list_for_each_entry(vma, &vm->bound_list, vm_link) {
 			if (i915_vma_is_pinned(vma))
@@ -401,12 +443,32 @@ int i915_gem_evict_vm(struct i915_address_space *vm)
 
 		ret = 0;
 		list_for_each_entry_safe(vma, vn, &eviction_list, evict_link) {
+			struct drm_i915_gem_object *obj = vma->obj;
+
 			__i915_vma_unpin(vma);
+
+			if (!kref_get_unless_zero(&vma->obj->base.refcount))
+				continue;
+
+			if (!i915_gem_object_trylock(vma->obj)) {
+				i915_gem_object_put(vma->obj);
+				continue;
+			}
+
 			if (ret == 0)
 				ret = __i915_vma_unbind(vma);
 			if (ret != -EINTR) /* "Get me out of here!" */
 				ret = 0;
+
+			i915_gem_object_unlock(obj);
+			i915_gem_object_put(obj);
+
+			evicted = true;
 		}
+
+		/* Nothing evicted because objects were dead or locked? */
+		if (!evicted)
+			break;
 	} while (ret == 0);
 
 	return ret;
