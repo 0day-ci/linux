@@ -1210,7 +1210,10 @@
 			interrupt-names = "hs_phy_irq", "dp_hs_phy_irq",
 					  "dm_hs_phy_irq", "ss_phy_irq";
 
-			power-domains = <&gcc GCC_USB30_PRIM_GDSC>;
+			power-domains = <&rpmhpd SC7280_CX>, <&gcc GCC_USB30_PRIM_GDSC>;
+			power-domain-names = "cx", "usb_gdsc";
+
+			required-opps = <&rpmhpd_opp_nom>;
 
 			resets = <&gcc GCC_USB30_PRIM_BCR>;
 
