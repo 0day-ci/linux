@@ -1424,17 +1424,6 @@ static inline void prefetch_buddy(struct page *page)
 	prefetch(buddy);
 }
 
-/*
- * Frees a number of pages from the PCP lists
- * Assumes all pages on list are in same zone, and of same order.
- * count is the number of pages to free.
- *
- * If the zone was previously in an "all pages pinned" state then look to
- * see if this freeing clears that state.
- *
- * And clear the zone's pages_scanned counter, to hold off the "all pages are
- * pinned" detection logic.
- */
 static void free_pcppages_bulk(struct zone *zone, int count,
 					struct per_cpu_pages *pcp)
 {
