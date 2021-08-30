@@ -463,6 +463,7 @@ struct pci_dev {
 
 #ifdef CONFIG_HOTPLUG_PCI_PCIE
 	unsigned int	broken_cmd_compl:1;	/* No compl for some cmds */
+	unsigned int	shared_pcc_and_link_slot:1;
 #endif
 #ifdef CONFIG_PCIE_PTM
 	unsigned int	ptm_root:1;
