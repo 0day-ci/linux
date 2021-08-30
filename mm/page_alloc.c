@@ -5639,7 +5639,7 @@ void * __meminit alloc_pages_exact_nid(int nid, size_t size, gfp_t gfp_mask)
 	if (WARN_ON_ONCE(gfp_mask & __GFP_COMP))
 		gfp_mask &= ~__GFP_COMP;
 
-	p = alloc_pages_node(nid, gfp_mask, order);
+	p = alloc_pages_node(nid, gfp_mask & ~__GFP_HIGHMEM, order);
 	if (!p)
 		return NULL;
 	return make_alloc_exact((unsigned long)page_address(p), order, size);
