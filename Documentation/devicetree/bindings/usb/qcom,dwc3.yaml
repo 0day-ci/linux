@@ -41,7 +41,18 @@ properties:
 
   power-domains:
     description: specifies a phandle to PM domain provider node
-    maxItems: 1
+    minItems: 1
+    items:
+      - description: optional,cx power domain
+      - description: USB gdsc power domain
+
+  power-domain-names:
+     items:
+      - const: cx
+      - const: usb_gdsc
+
+  required-opps:
+    description: specifies the performance state to cx power domain
 
   clocks:
     description:
