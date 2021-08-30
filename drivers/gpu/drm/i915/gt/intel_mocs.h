@@ -33,8 +33,13 @@
 
 struct intel_engine_cs;
 struct intel_gt;
+struct i915_request;
+struct temp_regset;
 
 void intel_mocs_init(struct intel_gt *gt);
 void intel_mocs_init_engine(struct intel_engine_cs *engine);
+int apply_mocs_aux_regs_ctx(struct i915_request *rq);
+void add_aux_mocs_guc_mmio_regset(struct temp_regset *regset,
+				  struct intel_engine_cs *engine);
 
 #endif

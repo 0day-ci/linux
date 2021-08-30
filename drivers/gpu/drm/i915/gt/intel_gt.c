@@ -21,6 +21,7 @@
 #include "intel_uncore.h"
 #include "intel_pm.h"
 #include "shmem_utils.h"
+#include "intel_mocs.h"
 
 void intel_gt_init_early(struct intel_gt *gt, struct drm_i915_private *i915)
 {
@@ -527,6 +528,10 @@ static int __engines_record_defaults(struct intel_gt *gt)
 		}
 
 		err = intel_engine_emit_ctx_wa(rq);
+		if (err)
+			goto err_rq;
+
+		err  = apply_mocs_aux_regs_ctx(rq);
 		if (err)
 			goto err_rq;
 

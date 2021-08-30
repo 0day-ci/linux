@@ -12,6 +12,7 @@
 #include "intel_guc_fwif.h"
 #include "intel_uc.h"
 #include "i915_drv.h"
+#include "gt/intel_mocs.h"
 
 /*
  * The Additional Data Struct (ADS) has pointers for different buffers used by
@@ -187,11 +188,6 @@ static void guc_mapping_table_init(struct intel_gt *gt,
  * inside the ADS.
  */
 #define MAX_MMIO_REGS	128	/* Arbitrary size, increase as needed */
-struct temp_regset {
-	struct guc_mmio_reg *registers;
-	u32 used;
-	u32 size;
-};
 
 static int guc_mmio_reg_cmp(const void *a, const void *b)
 {
@@ -201,8 +197,8 @@ static int guc_mmio_reg_cmp(const void *a, const void *b)
 	return (int)ra->offset - (int)rb->offset;
 }
 
-static void guc_mmio_reg_add(struct temp_regset *regset,
-			     u32 offset, u32 flags)
+void guc_mmio_reg_add(struct temp_regset *regset,
+		      u32 offset, u32 flags)
 {
 	u32 count = regset->used;
 	struct guc_mmio_reg reg = {
@@ -236,11 +232,6 @@ static void guc_mmio_reg_add(struct temp_regset *regset,
 	}
 }
 
-#define GUC_MMIO_REG_ADD(regset, reg, masked) \
-	guc_mmio_reg_add(regset, \
-			 i915_mmio_reg_offset((reg)), \
-			 (masked) ? GUC_REGSET_MASKED : 0)
-
 static void guc_mmio_regset_init(struct temp_regset *regset,
 				 struct intel_engine_cs *engine)
 {
@@ -257,6 +248,8 @@ static void guc_mmio_regset_init(struct temp_regset *regset,
 
 	for (i = 0, wa = wal->list; i < wal->count; i++, wa++)
 		GUC_MMIO_REG_ADD(regset, wa->reg, wa->masked_reg);
+
+	add_aux_mocs_guc_mmio_regset(regset, engine);
 
 	/* Be extra paranoid and include all whitelist registers. */
 	for (i = 0; i < RING_MAX_NONPRIV_SLOTS; i++)
