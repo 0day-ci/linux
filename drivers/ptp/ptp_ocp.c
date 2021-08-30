@@ -131,6 +131,48 @@ struct gpio_reg {
 	u32	__pad1;
 };
 
+struct irig_master_reg {
+	u32	ctrl;
+	u32	status;
+	u32	__pad0;
+	u32	version;
+	u32	adj_sec;
+	u32	mode_ctrl;
+};
+
+#define IRIG_M_CTRL_ENABLE	BIT(0)
+
+struct irig_slave_reg {
+	u32	ctrl;
+	u32	status;
+	u32	__pad0;
+	u32	version;
+	u32	adj_sec;
+	u32	mode_ctrl;
+};
+
+#define IRIG_S_CTRL_ENABLE	BIT(0)
+
+struct dcf_master_reg {
+	u32	ctrl;
+	u32	status;
+	u32	__pad0;
+	u32	version;
+	u32	adj_sec;
+};
+
+#define DCF_M_CTRL_ENABLE	BIT(0)
+
+struct dcf_slave_reg {
+	u32	ctrl;
+	u32	status;
+	u32	__pad0;
+	u32	version;
+	u32	adj_sec;
+};
+
+#define DCF_S_CTRL_ENABLE	BIT(0)
+
 struct ptp_ocp_flash_info {
 	const char *name;
 	int pci_offset;
@@ -167,6 +209,10 @@ struct ptp_ocp {
 	struct pps_reg __iomem	*pps_to_ext;
 	struct pps_reg __iomem	*pps_to_clk;
 	struct gpio_reg __iomem	*sma;
+	struct irig_master_reg	__iomem *irig_out;
+	struct irig_slave_reg	__iomem *irig_in;
+	struct dcf_master_reg	__iomem *dcf_out;
+	struct dcf_slave_reg	__iomem *dcf_in;
 	struct ptp_ocp_ext_src	*pps;
 	struct ptp_ocp_ext_src	*ts0;
 	struct ptp_ocp_ext_src	*ts1;
@@ -286,6 +332,22 @@ static struct ocp_resource ocp_fb_resource[] = {
 	{
 		OCP_MEM_RESOURCE(tod),
 		.offset = 0x01050000, .size = 0x10000,
+	},
+	{
+		OCP_MEM_RESOURCE(irig_in),
+		.offset = 0x01070000, .size = 0x10000,
+	},
+	{
+		OCP_MEM_RESOURCE(irig_out),
+		.offset = 0x01080000, .size = 0x10000,
+	},
+	{
+		OCP_MEM_RESOURCE(dcf_in),
+		.offset = 0x01090000, .size = 0x10000,
+	},
+	{
+		OCP_MEM_RESOURCE(dcf_out),
+		.offset = 0x010A0000, .size = 0x10000,
 	},
 	{
 		OCP_MEM_RESOURCE(image),
@@ -1295,6 +1357,49 @@ sma_show_inputs(u32 val, char *buf)
 	return count;
 }
 
+static void
+ptp_ocp_enable_fpga(u32 __iomem *reg, u32 bit, bool enable)
+{
+	u32 ctrl;
+	bool on;
+
+	ctrl = ioread32(reg);
+	on = ctrl & bit;
+	if (on ^ enable) {
+		ctrl &= ~bit;
+		ctrl |= enable ? bit : 0;
+		iowrite32(ctrl, reg);
+	}
+}
+
+static void
+ptp_ocp_irig_out(struct ptp_ocp *bp, bool enable)
+{
+	return ptp_ocp_enable_fpga(&bp->irig_out->ctrl,
+				   IRIG_M_CTRL_ENABLE, enable);
+}
+
+static void
+ptp_ocp_irig_in(struct ptp_ocp *bp, bool enable)
+{
+	return ptp_ocp_enable_fpga(&bp->irig_in->ctrl,
+				   IRIG_S_CTRL_ENABLE, enable);
+}
+
+static void
+ptp_ocp_dcf_out(struct ptp_ocp *bp, bool enable)
+{
+	return ptp_ocp_enable_fpga(&bp->dcf_out->ctrl,
+				   DCF_M_CTRL_ENABLE, enable);
+}
+
+static void
+ptp_ocp_dcf_in(struct ptp_ocp *bp, bool enable)
+{
+	return ptp_ocp_enable_fpga(&bp->dcf_in->ctrl,
+				   DCF_S_CTRL_ENABLE, enable);
+}
+
 static int
 sma_parse_inputs(const char *buf)
 {
@@ -1317,6 +1422,20 @@ sma_parse_inputs(const char *buf)
 out:
 	argv_free(argv);
 	return ret;
+}
+
+static void
+__handle_signal_outputs(struct ptp_ocp *bp, u32 val)
+{
+	ptp_ocp_irig_out(bp, val & 0x00100010);
+	ptp_ocp_dcf_out(bp, val & 0x00200020);
+}
+
+static void
+__handle_signal_inputs(struct ptp_ocp *bp, u32 val)
+{
+	ptp_ocp_irig_in(bp, val & 0x00100010);
+	ptp_ocp_dcf_in(bp, val & 0x00200020);
 }
 
 static ssize_t
@@ -1355,6 +1474,7 @@ sma2_out_store(struct device *dev, struct device_attribute *attr,
 	spin_lock_irqsave(&bp->lock, flags);
 	gpio = ioread32(&bp->sma->gpio2);
 	gpio = (gpio & 0xffff0000) | val;
+	__handle_signal_outputs(bp, gpio);
 	iowrite32(gpio, &bp->sma->gpio2);
 	spin_unlock_irqrestore(&bp->lock, flags);
 
@@ -1378,6 +1498,7 @@ sma1_out_store(struct device *dev, struct device_attribute *attr,
 	spin_lock_irqsave(&bp->lock, flags);
 	gpio = ioread32(&bp->sma->gpio2);
 	gpio = (gpio & 0xffff) | (val << 16);
+	__handle_signal_outputs(bp, gpio);
 	iowrite32(gpio, &bp->sma->gpio2);
 	spin_unlock_irqrestore(&bp->lock, flags);
 
@@ -1423,6 +1544,7 @@ sma4_in_store(struct device *dev, struct device_attribute *attr,
 	spin_lock_irqsave(&bp->lock, flags);
 	gpio = ioread32(&bp->sma->gpio1);
 	gpio = (gpio & 0xffff0000) | val;
+	__handle_signal_inputs(bp, gpio);
 	iowrite32(gpio, &bp->sma->gpio1);
 	spin_unlock_irqrestore(&bp->lock, flags);
 
@@ -1446,6 +1568,7 @@ sma3_in_store(struct device *dev, struct device_attribute *attr,
 	spin_lock_irqsave(&bp->lock, flags);
 	gpio = ioread32(&bp->sma->gpio1);
 	gpio = (gpio & 0xffff) | (val << 16);
+	__handle_signal_inputs(bp, gpio);
 	iowrite32(gpio, &bp->sma->gpio1);
 	spin_unlock_irqrestore(&bp->lock, flags);
 
