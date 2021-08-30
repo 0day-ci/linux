@@ -238,6 +238,9 @@ static inline void page_pool_set_dma_addr(struct page *page, dma_addr_t addr)
 
 static inline void page_pool_set_frag_count(struct page *page, long nr)
 {
+	if (PAGE_POOL_DMA_USE_PP_FRAG_COUNT)
+		return;
+
 	atomic_long_set(&page->pp_frag_count, nr);
 }
 
@@ -245,6 +248,9 @@ static inline long page_pool_atomic_sub_frag_count_return(struct page *page,
 							  long nr)
 {
 	long ret;
+
+	if (PAGE_POOL_DMA_USE_PP_FRAG_COUNT)
+		return 0;
 
 	/* As suggested by Alexander, atomic_long_read() may cover up the
 	 * reference count errors, so avoid calling atomic_long_read() in
