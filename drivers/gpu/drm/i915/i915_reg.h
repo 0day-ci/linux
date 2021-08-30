@@ -695,7 +695,8 @@ static inline bool i915_mmio_reg_valid(i915_reg_t reg)
 #define  GEN7_OASTATUS2_HEAD_MASK           0xffffffc0
 #define  GEN7_OASTATUS2_MEM_SELECT_GGTT     (1 << 0) /* 0: PPGTT, 1: GGTT */
 
-#define GEN8_OASTATUS _MMIO(0x2b08)
+#define __GEN8_OASTATUS 0x2b08
+#define GEN8_OASTATUS _MMIO(__GEN8_OASTATUS)
 #define  GEN8_OASTATUS_TAIL_POINTER_WRAP    (1 << 17)
 #define  GEN8_OASTATUS_HEAD_POINTER_WRAP    (1 << 16)
 #define  GEN8_OASTATUS_OVERRUN_STATUS	    (1 << 3)
@@ -755,7 +756,8 @@ static inline bool i915_mmio_reg_valid(i915_reg_t reg)
 #define  GEN12_OAG_OA_DEBUG_DISABLE_GO_1_0_REPORTS     (1 << 2)
 #define  GEN12_OAG_OA_DEBUG_DISABLE_CTX_SWITCH_REPORTS (1 << 1)
 
-#define GEN12_OAG_OASTATUS _MMIO(0xdafc)
+#define __GEN12_OAG_OASTATUS 0xdafc
+#define GEN12_OAG_OASTATUS _MMIO(__GEN12_OAG_OASTATUS)
 #define  GEN12_OAG_OASTATUS_COUNTER_OVERFLOW (1 << 2)
 #define  GEN12_OAG_OASTATUS_BUFFER_OVERFLOW  (1 << 1)
 #define  GEN12_OAG_OASTATUS_REPORT_LOST      (1 << 0)
@@ -997,6 +999,16 @@ static inline bool i915_mmio_reg_valid(i915_reg_t reg)
 #define OAREPORTTRIG8_NOA_SELECT_5_SHIFT    20
 #define OAREPORTTRIG8_NOA_SELECT_6_SHIFT    24
 #define OAREPORTTRIG8_NOA_SELECT_7_SHIFT    28
+
+/* Performance counters registers */
+#define __OA_PERF_COUNTER_A(idx)	(0x2800 + 8 * (idx))
+#define OA_PERF_COUNTER_A(idx)		_MMIO(__OA_PERF_COUNTER_A(idx))
+#define OA_PERF_COUNTER_A_UDW(idx)		_MMIO(__OA_PERF_COUNTER_A(idx) + 4)
+
+/* Gen12 Performance counters registers */
+#define __GEN12_OAG_PERF_COUNTER_A(idx)	(0xD980 + 8 * (idx))
+#define GEN12_OAG_PERF_COUNTER_A(idx)	_MMIO(__GEN12_OAG_PERF_COUNTER_A(idx))
+#define GEN12_OAG_PERF_COUNTER_A_UDW(idx) _MMIO(__GEN12_OAG_PERF_COUNTER_A(idx) + 4)
 
 /* Same layout as OASTARTTRIGX */
 #define GEN12_OAG_OASTARTTRIG1 _MMIO(0xd900)
