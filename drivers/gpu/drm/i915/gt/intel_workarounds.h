@@ -36,4 +36,11 @@ void intel_engine_apply_workarounds(struct intel_engine_cs *engine);
 int intel_engine_verify_workarounds(struct intel_engine_cs *engine,
 				    const char *from);
 
+int intel_engine_allow_user_register_access(struct intel_engine_cs *engine,
+					    const i915_reg_t *reg,
+					    unsigned int count);
+void intel_engine_deny_user_register_access(struct intel_engine_cs *engine,
+					    const i915_reg_t *reg,
+					    unsigned int count);
+
 #endif
