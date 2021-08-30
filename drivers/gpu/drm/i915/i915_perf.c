@@ -192,10 +192,12 @@
  */
 
 #include <linux/anon_inodes.h>
+#include <linux/mman.h>
 #include <linux/sizes.h>
 #include <linux/uuid.h>
 
 #include "gem/i915_gem_context.h"
+#include "gem/i915_gem_mman.h"
 #include "gt/intel_engine_pm.h"
 #include "gt/intel_engine_user.h"
 #include "gt/intel_execlists_submission.h"
@@ -3322,6 +3324,44 @@ static long i915_perf_config_locked(struct i915_perf_stream *stream,
 	return ret;
 }
 
+#define I915_PERF_OA_BUFFER_MMAP_OFFSET 1
+
+/**
+ * i915_perf_oa_buffer_info_locked - size and offset of the OA buffer
+ * @stream: i915 perf stream
+ * @cmd: ioctl command
+ * @arg: pointer to oa buffer info filled by this function.
+ */
+static int i915_perf_oa_buffer_info_locked(struct i915_perf_stream *stream,
+					   unsigned int cmd,
+					   unsigned long arg)
+{
+	struct drm_i915_perf_oa_buffer_info info;
+	void __user *output = (void __user *)arg;
+
+	if (i915_perf_stream_paranoid && !perfmon_capable()) {
+		DRM_DEBUG("Insufficient privileges to access OA buffer info\n");
+		return -EACCES;
+	}
+
+	if (_IOC_SIZE(cmd) != sizeof(info))
+		return -EINVAL;
+
+	if (copy_from_user(&info, output, sizeof(info)))
+		return -EFAULT;
+
+	if (info.type || info.flags || info.rsvd)
+		return -EINVAL;
+
+	info.size = stream->oa_buffer.vma->size;
+	info.offset = I915_PERF_OA_BUFFER_MMAP_OFFSET * PAGE_SIZE;
+
+	if (copy_to_user(output, &info, sizeof(info)))
+		return -EFAULT;
+
+	return 0;
+}
+
 /**
  * i915_perf_ioctl_locked - support ioctl() usage with i915 perf stream FDs
  * @stream: An i915 perf stream
@@ -3347,6 +3387,8 @@ static long i915_perf_ioctl_locked(struct i915_perf_stream *stream,
 		return 0;
 	case I915_PERF_IOCTL_CONFIG:
 		return i915_perf_config_locked(stream, arg);
+	case I915_PERF_IOCTL_GET_OA_BUFFER_INFO:
+		return i915_perf_oa_buffer_info_locked(stream, cmd, arg);
 	}
 
 	return -EINVAL;
@@ -3418,6 +3460,14 @@ static int i915_perf_release(struct inode *inode, struct file *file)
 	struct i915_perf_stream *stream = file->private_data;
 	struct i915_perf *perf = stream->perf;
 
+	/*
+	 * User could have multiple vmas from multiple mmaps. We want to zap
+	 * them all here. Note that a fresh fault cannot occur as the mmap holds
+	 * a reference to the stream via the vma->vm_file, so before user's
+	 * munmap, the stream cannot be destroyed.
+	 */
+	unmap_mapping_range(file->f_mapping, 0, -1, 1);
+
 	mutex_lock(&perf->lock);
 	i915_perf_destroy_locked(stream);
 	mutex_unlock(&perf->lock);
@@ -3428,6 +3478,75 @@ static int i915_perf_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
+static vm_fault_t vm_fault_oa(struct vm_fault *vmf)
+{
+	struct vm_area_struct *vma = vmf->vma;
+	struct i915_perf_stream *stream = vma->vm_private_data;
+	int err;
+
+	err = remap_io_sg(vma,
+			  vma->vm_start, vma->vm_end - vma->vm_start,
+			  stream->oa_buffer.vma->pages->sgl, -1);
+
+	return i915_error_to_vmf_fault(err);
+}
+
+static const struct vm_operations_struct vm_ops_oa = {
+	.fault = vm_fault_oa,
+};
+
+static int i915_perf_mmap(struct file *file, struct vm_area_struct *vma)
+{
+	struct i915_perf_stream *stream = file->private_data;
+
+	/* mmap-ing OA buffer to user space MUST absolutely be privileged */
+	if (i915_perf_stream_paranoid && !perfmon_capable()) {
+		DRM_DEBUG("Insufficient privileges to map OA buffer\n");
+		return -EACCES;
+	}
+
+	switch (vma->vm_pgoff) {
+	/*
+	 * A non-zero offset ensures that we are mapping the right object. Also
+	 * leaves room for future objects added to this implementation.
+	 */
+	case I915_PERF_OA_BUFFER_MMAP_OFFSET:
+		if (!(stream->sample_flags & SAMPLE_OA_REPORT))
+			return -EINVAL;
+
+		if (vma->vm_end - vma->vm_start > stream->oa_buffer.vma->size)
+			return -EINVAL;
+
+		/*
+		 * Only support VM_READ. Enforce MAP_PRIVATE by checking for
+		 * VM_MAYSHARE.
+		 */
+		if (vma->vm_flags & (VM_WRITE | VM_EXEC |
+				     VM_SHARED | VM_MAYSHARE))
+			return -EINVAL;
+
+		vma->vm_flags &= ~(VM_MAYWRITE | VM_MAYEXEC);
+
+		/*
+		 * If the privileged parent forks and child drops root
+		 * privilege, we do not want the child to retain access to the
+		 * mapped OA buffer. Explicitly set VM_DONTCOPY to avoid such
+		 * cases.
+		 */
+		vma->vm_flags |= VM_PFNMAP | VM_DONTEXPAND |
+				 VM_DONTDUMP | VM_DONTCOPY;
+		break;
+
+	default:
+		return -EINVAL;
+	}
+
+	vma->vm_page_prot = vm_get_page_prot(vma->vm_flags);
+	vma->vm_private_data = stream;
+	vma->vm_ops = &vm_ops_oa;
+
+	return 0;
+}
 
 static const struct file_operations fops = {
 	.owner		= THIS_MODULE,
@@ -3440,6 +3559,7 @@ static const struct file_operations fops = {
 	 * to handle 32bits compatibility.
 	 */
 	.compat_ioctl   = i915_perf_ioctl,
+	.mmap		= i915_perf_mmap,
 };
 
 
@@ -4639,8 +4759,12 @@ int i915_perf_ioctl_version(void)
 	 *
 	 *    - OA buffer head/tail/status/buffer registers for read only
 	 *    - OA counters A18, A19, A20 for read/write
+	 *
+	 * 8: Added an option to map oa buffer at umd driver level and trigger
+	 *    oa reports within oa buffer from command buffer. See
+	 *    I915_PERF_IOCTL_GET_OA_BUFFER_INFO.
 	 */
-	return 7;
+	return 8;
 }
 
 #if IS_ENABLED(CONFIG_DRM_I915_SELFTEST)
