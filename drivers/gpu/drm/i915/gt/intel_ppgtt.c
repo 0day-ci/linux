@@ -288,16 +288,6 @@ void i915_vm_free_pt_stash(struct i915_address_space *vm,
 	}
 }
 
-int ppgtt_set_pages(struct i915_vma *vma)
-{
-	GEM_BUG_ON(vma->pages);
-
-	vma->pages = vma->obj->mm.pages;
-	vma->page_sizes = vma->obj->mm.page_sizes;
-
-	return 0;
-}
-
 void ppgtt_init(struct i915_ppgtt *ppgtt, struct intel_gt *gt)
 {
 	struct drm_i915_private *i915 = gt->i915;
@@ -312,6 +302,4 @@ void ppgtt_init(struct i915_ppgtt *ppgtt, struct intel_gt *gt)
 
 	ppgtt->vm.vma_ops.bind_vma    = ppgtt_bind_vma;
 	ppgtt->vm.vma_ops.unbind_vma  = ppgtt_unbind_vma;
-	ppgtt->vm.vma_ops.set_pages   = ppgtt_set_pages;
-	ppgtt->vm.vma_ops.clear_pages = clear_pages;
 }
