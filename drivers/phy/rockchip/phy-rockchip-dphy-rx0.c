@@ -138,12 +138,17 @@ static const struct dphy_reg rk3399_grf_dphy_regs[] = {
 	[GRF_DPHY_RX0_TESTDOUT] = PHY_REG(RK3399_GRF_SOC_STATUS1, 8, 0),
 };
 
+struct rk_dphy;
+
 struct rk_dphy_drv_data {
 	const char * const *clks;
 	unsigned int num_clks;
 	const struct hsfreq_range *hsfreq_ranges;
 	unsigned int num_hsfreq_ranges;
 	const struct dphy_reg *regs;
+
+	void (*enable)(struct rk_dphy *priv);
+	void (*disable)(struct rk_dphy *priv);
 };
 
 struct rk_dphy {
@@ -170,7 +175,7 @@ static inline void rk_dphy_write_grf(struct rk_dphy *priv,
 	regmap_write(priv->grf, reg->offset, val);
 }
 
-static void rk_dphy_write(struct rk_dphy *priv, u8 test_code, u8 test_data)
+static void rk_dphy_write_mipi_rx(struct rk_dphy *priv, u8 test_code, u8 test_data)
 {
 	rk_dphy_write_grf(priv, GRF_DPHY_RX0_TESTDIN, test_code);
 	rk_dphy_write_grf(priv, GRF_DPHY_RX0_TESTEN, 1);
@@ -186,7 +191,7 @@ static void rk_dphy_write(struct rk_dphy *priv, u8 test_code, u8 test_data)
 	rk_dphy_write_grf(priv, GRF_DPHY_RX0_TESTCLK, 1);
 }
 
-static void rk_dphy_enable(struct rk_dphy *priv)
+static void rk_dphy_enable_rx(struct rk_dphy *priv)
 {
 	rk_dphy_write_grf(priv, GRF_DPHY_RX0_FORCERXMODE, 0);
 	rk_dphy_write_grf(priv, GRF_DPHY_RX0_FORCETXSTOPMODE, 0);
@@ -206,22 +211,27 @@ static void rk_dphy_enable(struct rk_dphy *priv)
 	usleep_range(100, 150);
 
 	/* set clock lane */
-	/* HS hsfreq_range & lane 0  settle bypass */
-	rk_dphy_write(priv, CLOCK_LANE_HS_RX_CONTROL, 0);
+	/* HS hsfreq_range & lane 0	 settle bypass */
+	rk_dphy_write_mipi_rx(priv, CLOCK_LANE_HS_RX_CONTROL, 0);
 	/* HS RX Control of lane0 */
-	rk_dphy_write(priv, LANE0_HS_RX_CONTROL, priv->hsfreq << 1);
+	rk_dphy_write_mipi_rx(priv, LANE0_HS_RX_CONTROL, priv->hsfreq << 1);
 	/* HS RX Control of lane1 */
-	rk_dphy_write(priv, LANE1_HS_RX_CONTROL, priv->hsfreq << 1);
+	rk_dphy_write_mipi_rx(priv, LANE1_HS_RX_CONTROL, priv->hsfreq << 1);
 	/* HS RX Control of lane2 */
-	rk_dphy_write(priv, LANE2_HS_RX_CONTROL, priv->hsfreq << 1);
+	rk_dphy_write_mipi_rx(priv, LANE2_HS_RX_CONTROL, priv->hsfreq << 1);
 	/* HS RX Control of lane3 */
-	rk_dphy_write(priv, LANE3_HS_RX_CONTROL, priv->hsfreq << 1);
+	rk_dphy_write_mipi_rx(priv, LANE3_HS_RX_CONTROL, priv->hsfreq << 1);
 	/* HS RX Data Lanes Settle State Time Control */
-	rk_dphy_write(priv, LANES_THS_SETTLE_CONTROL,
-		      THS_SETTLE_COUNTER_THRESHOLD);
+	rk_dphy_write_mipi_rx(priv, LANES_THS_SETTLE_CONTROL,
+			  THS_SETTLE_COUNTER_THRESHOLD);
 
 	/* Normal operation */
-	rk_dphy_write(priv, 0x0, 0);
+	rk_dphy_write_mipi_rx(priv, 0x0, 0);
+}
+
+static void rk_dphy_disable_rx(struct rk_dphy *priv)
+{
+	rk_dphy_write_grf(priv, GRF_DPHY_RX0_ENABLE, 0);
 }
 
 static int rk_dphy_configure(struct phy *phy, union phy_configure_opts *opts)
@@ -266,7 +276,7 @@ static int rk_dphy_power_on(struct phy *phy)
 	if (ret)
 		return ret;
 
-	rk_dphy_enable(priv);
+	priv->drv_data->enable(priv);
 
 	return 0;
 }
@@ -275,7 +285,7 @@ static int rk_dphy_power_off(struct phy *phy)
 {
 	struct rk_dphy *priv = phy_get_drvdata(phy);
 
-	rk_dphy_write_grf(priv, GRF_DPHY_RX0_ENABLE, 0);
+	priv->drv_data->disable(priv);
 	clk_bulk_disable(priv->drv_data->num_clks, priv->clks);
 	return 0;
 }
@@ -310,6 +320,8 @@ static const struct rk_dphy_drv_data rk3399_mipidphy_drv_data = {
 	.hsfreq_ranges = rk3399_mipidphy_hsfreq_ranges,
 	.num_hsfreq_ranges = ARRAY_SIZE(rk3399_mipidphy_hsfreq_ranges),
 	.regs = rk3399_grf_dphy_regs,
+	.enable = rk_dphy_enable_rx,
+	.disable = rk_dphy_disable_rx,
 };
 
 static const struct of_device_id rk_dphy_dt_ids[] = {
