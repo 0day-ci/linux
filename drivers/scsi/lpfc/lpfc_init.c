@@ -8254,7 +8254,11 @@ lpfc_sli4_driver_resource_setup(struct lpfc_hba *phba)
 		lpfc_printf_log(phba, KERN_ERR, LOG_TRACE_EVENT,
 				"3331 Failed allocating per cpu cgn stats\n");
 		rc = -ENOMEM;
-		goto out_free_hba_hdwq_info;
+#ifdef CONFIG_SCSI_LPFC_DEBUG_FS
+		goto out_free_hba_hdwq_stat;
+#else
+		goto out_free_hba_idle_stat;
+#endif
 	}
 
 	/*
@@ -8276,12 +8280,12 @@ lpfc_sli4_driver_resource_setup(struct lpfc_hba *phba)
 
 	return 0;
 
-out_free_hba_hdwq_info:
-	free_percpu(phba->sli4_hba.c_stat);
 #ifdef CONFIG_SCSI_LPFC_DEBUG_FS
+out_free_hba_hdwq_stat:
+	free_percpu(phba->sli4_hba.c_stat);
+#endif
 out_free_hba_idle_stat:
 	kfree(phba->sli4_hba.idle_stat);
-#endif
 out_free_hba_eq_info:
 	free_percpu(phba->sli4_hba.eq_info);
 out_free_hba_cpu_map:
