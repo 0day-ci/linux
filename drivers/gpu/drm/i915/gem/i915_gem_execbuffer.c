@@ -255,6 +255,9 @@ struct i915_execbuffer {
 	/** actual size of execobj[] as we may extend it for the cmdparser */
 	unsigned int buffer_count;
 
+	/* Number of objects with EXEC_OBJECT_CAPTURE set */
+	unsigned int capture_count;
+
 	/** list of vma not yet bound during reservation phase */
 	struct list_head unbound;
 
@@ -858,6 +861,9 @@ static int eb_lookup_vmas(struct i915_execbuffer *eb)
 			err = PTR_ERR(vma);
 			goto err;
 		}
+
+		if (eb->exec[i].flags & EXEC_OBJECT_CAPTURE)
+			eb->capture_count++;
 
 		err = eb_validate_vma(eb, &eb->exec[i], vma);
 		if (unlikely(err)) {
@@ -1890,16 +1896,8 @@ static int eb_move_to_gpu(struct i915_execbuffer *eb)
 
 		assert_vma_held(vma);
 
-		if (flags & EXEC_OBJECT_CAPTURE) {
-			struct i915_capture_list *capture;
-
-			capture = kmalloc(sizeof(*capture), GFP_KERNEL);
-			if (capture) {
-				capture->next = eb->request->capture_list;
-				capture->vma = vma;
-				eb->request->capture_list = capture;
-			}
-		}
+		if (flags & EXEC_OBJECT_CAPTURE && eb->request->capture_list)
+			eb->request->capture_list[--eb->capture_count] = vma;
 
 		/*
 		 * If the GPU is not _reading_ through the CPU cache, we need
@@ -2828,6 +2826,7 @@ i915_gem_do_execbuffer(struct drm_device *dev,
 
 	eb.fences = NULL;
 	eb.num_fences = 0;
+	eb.capture_count = 0;
 
 	eb.batch_flags = 0;
 	if (args->flags & I915_EXEC_SECURE) {
@@ -2954,6 +2953,13 @@ i915_gem_do_execbuffer(struct drm_device *dev,
 			err = -ENOMEM;
 			goto err_request;
 		}
+	}
+
+	if (eb.capture_count) {
+		eb.request->capture_list =
+			kvcalloc(eb.capture_count + 1,
+				 sizeof(*eb.request->capture_list),
+				 GFP_KERNEL | __GFP_NOWARN);
 	}
 
 	/*

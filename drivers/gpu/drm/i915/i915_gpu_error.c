@@ -1355,10 +1355,10 @@ capture_user(struct intel_engine_capture_vma *capture,
 	     const struct i915_request *rq,
 	     gfp_t gfp)
 {
-	struct i915_capture_list *c;
+	int i;
 
-	for (c = rq->capture_list; c; c = c->next)
-		capture = capture_vma(capture, c->vma, "user", gfp);
+	for (i = 0; rq->capture_list[i]; i++)
+		capture = capture_vma(capture, rq->capture_list[i], "user", gfp);
 
 	return capture;
 }
@@ -1406,7 +1406,8 @@ intel_engine_coredump_add_request(struct intel_engine_coredump *ee,
 	 * by userspace.
 	 */
 	vma = capture_vma(vma, rq->batch, "batch", gfp);
-	vma = capture_user(vma, rq, gfp);
+	if (rq->capture_list)
+		vma = capture_user(vma, rq, gfp);
 	vma = capture_vma(vma, rq->ring->vma, "ring", gfp);
 	vma = capture_vma(vma, rq->context->state, "HW context", gfp);
 

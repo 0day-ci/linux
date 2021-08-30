@@ -48,11 +48,6 @@ struct drm_i915_gem_object;
 struct drm_printer;
 struct i915_request;
 
-struct i915_capture_list {
-	struct i915_capture_list *next;
-	struct i915_vma *vma;
-};
-
 #define RQ_TRACE(rq, fmt, ...) do {					\
 	const struct i915_request *rq__ = (rq);				\
 	ENGINE_TRACE(rq__->engine, "fence %llx:%lld, current %d " fmt,	\
@@ -271,7 +266,7 @@ struct i915_request {
 	 * active reference - all objects on this list must also be
 	 * on the active_list (of their final request).
 	 */
-	struct i915_capture_list *capture_list;
+	struct i915_vma **capture_list;
 
 	/** Time at which this request was emitted, in jiffies. */
 	unsigned long emitted_jiffies;
