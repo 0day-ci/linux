@@ -24,7 +24,7 @@
 #define DEFER_TIME (msecs_to_jiffies(1000))
 #define DEFER_WARN_INTERVAL (60 * HZ)
 
-#define BIAS_MAX	LONG_MAX
+#define BIAS_MAX	(LONG_MAX / 2)
 
 static int page_pool_init(struct page_pool *pool,
 			  const struct page_pool_params *params)
@@ -741,15 +741,7 @@ bool page_pool_return_skb_page(struct page *page)
 	struct page_pool *pp;
 
 	page = compound_head(page);
-
-	/* page->pp_magic is OR'ed with PP_SIGNATURE after the allocation
-	 * in order to preserve any existing bits, such as bit 0 for the
-	 * head page of compound page and bit 1 for pfmemalloc page, so
-	 * mask those bits for freeing side when doing below checking,
-	 * and page_is_pfmemalloc() is checked in __page_pool_put_page()
-	 * to avoid recycling the pfmemalloc page.
-	 */
-	if (unlikely((page->pp_magic & ~0x3UL) != PP_SIGNATURE))
+	if (!page_pool_is_pp_page(page))
 		return false;
 
 	pp = page->pp;
