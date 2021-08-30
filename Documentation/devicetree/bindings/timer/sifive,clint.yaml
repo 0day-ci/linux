@@ -43,6 +43,12 @@ properties:
 
   interrupts-extended:
     minItems: 1
+    maxItems: 4095
+
+  "#interrupt-cells":
+    const: 0
+
+  interrupt-controller: true
 
 additionalProperties: false
 
@@ -50,15 +56,19 @@ required:
   - compatible
   - reg
   - interrupts-extended
+  - interrupt-controller
+  - "#interrupt-cells"
 
 examples:
   - |
     timer@2000000 {
       compatible = "sifive,fu540-c000-clint", "sifive,clint0";
-      interrupts-extended = <&cpu1intc 3 &cpu1intc 7
-                             &cpu2intc 3 &cpu2intc 7
-                             &cpu3intc 3 &cpu3intc 7
-                             &cpu4intc 3 &cpu4intc 7>;
-       reg = <0x2000000 0x10000>;
+      interrupts-extended = <&cpu1intc 3>, <&cpu1intc 7>,
+                            <&cpu2intc 3>, <&cpu2intc 7>,
+                            <&cpu3intc 3>, <&cpu3intc 7>,
+                            <&cpu4intc 3>, <&cpu4intc 7>;
+      reg = <0x2000000 0x10000>;
+      interrupt-controller;
+      #interrupt-cells = <0>;
     };
 ...

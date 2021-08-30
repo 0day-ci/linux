@@ -168,6 +168,8 @@
 						&cpu2_intc 3 &cpu2_intc 7
 						&cpu3_intc 3 &cpu3_intc 7
 						&cpu4_intc 3 &cpu4_intc 7>;
+			#interrupt-cells = <0>;
+			interrupt-controller;
 		};
 
 		plic: interrupt-controller@c000000 {

@@ -105,6 +105,8 @@
 			reg = <0x2000000 0xC000>;
 			interrupts-extended = <&cpu0_intc 3 &cpu0_intc 7
 					      &cpu1_intc 3 &cpu1_intc 7>;
+			#interrupt-cells = <0>;
+			interrupt-controller;
 		};
 
 		plic0: interrupt-controller@c000000 {
