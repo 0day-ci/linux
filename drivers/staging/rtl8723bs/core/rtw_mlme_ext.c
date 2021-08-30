@@ -5930,8 +5930,7 @@ u8 chk_bmc_sleepq_hdl(struct adapter *padapter, unsigned char *pbuf)
 	if ((pstapriv->tim_bitmap&BIT(0)) && (psta_bmc->sleepq_len > 0)) {
 		msleep(10);/*  10ms, ATIM(HIQ) Windows */
 
-		/* spin_lock_bh(&psta_bmc->sleep_q.lock); */
-		spin_lock_bh(&pxmitpriv->lock);
+		spin_lock_bh(&psta_bmc->sleep_q.lock);
 
 		xmitframe_phead = get_list_head(&psta_bmc->sleep_q);
 		list_for_each_safe(xmitframe_plist, tmp, xmitframe_phead) {
@@ -5954,8 +5953,7 @@ u8 chk_bmc_sleepq_hdl(struct adapter *padapter, unsigned char *pbuf)
 			rtw_hal_xmitframe_enqueue(padapter, pxmitframe);
 		}
 
-		/* spin_unlock_bh(&psta_bmc->sleep_q.lock); */
-		spin_unlock_bh(&pxmitpriv->lock);
+		spin_unlock_bh(&psta_bmc->sleep_q.lock);
 
 		/* check hi queue and bmc_sleepq */
 		rtw_chk_hi_queue_cmd(padapter);
