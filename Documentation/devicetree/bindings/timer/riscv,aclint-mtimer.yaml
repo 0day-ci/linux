@@ -1,0 +1,70 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/timer/riscv,aclint-mtimer.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: RISC-V ACLINT M-level Timer
+
+maintainers:
+  - Anup Patel <anup.patel@wdc.com>
+
+description:
+  RISC-V SOCs include an implementation of the M-level timer (MTIMER) defined
+  in the RISC-V Advanced Core Local Interruptor (ACLINT) specification. The
+  ACLINT MTIMER device is documented in the RISC-V ACLINT specification found
+  at https://github.com/riscv/riscv-aclint/blob/main/riscv-aclint.adoc.
+
+  The ACLINT MTIMER device directly connects to the M-level timer interrupt
+  lines of various HARTs (or CPUs) so the RISC-V per-HART (or per-CPU) local
+  interrupt controller is the parent interrupt controller for the ACLINT
+  MTIMER device.
+
+  The clock frequency of ACLINT is specified via "timebase-frequency" DT
+  property of "/cpus" DT node. The "timebase-frequency" DT property is
+  described in Documentation/devicetree/bindings/riscv/cpus.yaml
+
+properties:
+  compatible:
+    enum:
+      - riscv,aclint-mtimer
+
+    description:
+      Should be "riscv,aclint-mtimer" or "<vendor>,<chip>-aclint-mtimer".
+
+  reg:
+    description: |
+      Specifies base physical address(s) of the MTIME register and MTIMECMPx
+      registers. The 1st region is the MTIME register base and size. The 2nd
+      region is the MTIMECMPx registers base and size.
+    minItems: 2
+    maxItems: 2
+
+  interrupts-extended:
+    minItems: 1
+    maxItems: 4095
+
+  mtimer,no-64bit-mmio:
+    type: boolean
+    description: If present, the timer does not support 64-bit MMIO accesses
+      for both MTIME and MTIMECMP registers.
+
+additionalProperties: false
+
+required:
+  - compatible
+  - reg
+  - interrupts-extended
+
+examples:
+  - |
+    timer@2000000 {
+      compatible = "riscv,aclint-mtimer";
+      reg = <0x2000000 0x8>,
+            <0x2004000 0x7ff8>;
+      interrupts-extended = <&cpu1intc 7>,
+                            <&cpu2intc 7>,
+                            <&cpu3intc 7>,
+                            <&cpu4intc 7>;
+    };
+...
