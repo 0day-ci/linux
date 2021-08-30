@@ -520,6 +520,12 @@ i915_gem_object_last_write_engine(struct drm_i915_gem_object *obj)
 	return engine;
 }
 
+struct dma_fence *
+i915_gem_object_get_moving_fence(struct drm_i915_gem_object *obj);
+
+void  i915_gem_object_set_moving_fence(struct drm_i915_gem_object *obj,
+				       struct dma_fence *fence);
+
 void i915_gem_object_set_cache_coherency(struct drm_i915_gem_object *obj,
 					 unsigned int cache_level);
 void i915_gem_object_flush_if_display(struct drm_i915_gem_object *obj);
