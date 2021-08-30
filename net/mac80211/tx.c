@@ -3380,6 +3380,13 @@ static bool ieee80211_amsdu_aggregate(struct ieee80211_sub_if_data *sdata,
 	if (!ieee80211_amsdu_prepare_head(sdata, fast_tx, head))
 		goto out;
 
+       /* While n == 2, frag_tail should be the address of head's frag_list.
+	* However, head probably re-alloc after ieee80211_amsdu_prepare_head.
+	* So, re-assign frag_tail again to make sure the correctness.
+	*/
+	if (n == 2)
+		frag_tail = &skb_shinfo(head)->frag_list;
+
 	/*
 	 * Pad out the previous subframe to a multiple of 4 by adding the
 	 * padding to the next one, that's being added. Note that head->len
