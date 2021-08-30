@@ -345,6 +345,7 @@ void *i915_gem_object_pin_map(struct drm_i915_gem_object *obj,
 			      enum i915_map_type type)
 {
 	enum i915_map_type has_type;
+	struct dma_fence *moving;
 	bool pinned;
 	void *ptr;
 	int err;
@@ -354,6 +355,15 @@ void *i915_gem_object_pin_map(struct drm_i915_gem_object *obj,
 		return ERR_PTR(-ENXIO);
 
 	assert_object_held(obj);
+
+	moving = i915_gem_object_get_moving_fence(obj);
+	if (moving) {
+		err = dma_fence_wait(moving, true);
+		dma_fence_put(moving);
+
+		if (err)
+			return ERR_PTR(err);
+	}
 
 	pinned = !(type & I915_MAP_OVERRIDE);
 	type &= ~I915_MAP_OVERRIDE;
