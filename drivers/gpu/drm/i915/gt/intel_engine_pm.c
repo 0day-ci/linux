@@ -52,8 +52,6 @@ static int __engine_unpark(struct intel_wakeref *wf)
 	/* Discard stale context state from across idling */
 	ce = engine->kernel_context;
 	if (ce) {
-		GEM_BUG_ON(test_bit(CONTEXT_VALID_BIT, &ce->flags));
-
 		/* Flush all pending HW writes before we touch the context */
 		while (unlikely(intel_context_inflight(ce)))
 			intel_engine_flush_submission(engine);
@@ -68,6 +66,9 @@ static int __engine_unpark(struct intel_wakeref *wf)
 			 ce->timeline->seqno,
 			 READ_ONCE(*ce->timeline->hwsp_seqno),
 			 ce->ring->emit);
+
+		GEM_BUG_ON(test_bit(CONTEXT_VALID_BIT, &ce->flags));
+
 		GEM_BUG_ON(ce->timeline->seqno !=
 			   READ_ONCE(*ce->timeline->hwsp_seqno));
 	}
