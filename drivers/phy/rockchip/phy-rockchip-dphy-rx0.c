@@ -34,6 +34,12 @@
 #define RK3399_GRF_SOC_CON24		0x6260
 #define RK3399_GRF_SOC_CON25		0x6264
 #define RK3399_GRF_SOC_STATUS1		0xe2a4
+#define RK3399_GRF_IO_VSEL			0x0900
+
+#define RK3399_PHY_TEST_CTRL0	0xb4
+#define RK3399_PHY_TEST_CTRL1	0xb8
+#define RK3399_PHY_SHUTDOWNZ	0xa0
+#define RK3399_PHY_RSTZ		0xa0
 
 #define CLOCK_LANE_HS_RX_CONTROL	0x34
 #define LANE0_HS_RX_CONTROL		0x44
@@ -42,6 +48,11 @@
 #define LANE3_HS_RX_CONTROL		0x94
 #define LANES_THS_SETTLE_CONTROL	0x75
 #define THS_SETTLE_COUNTER_THRESHOLD	0x04
+
+#define PHY_TESTEN_ADDR			(0x1 << 16)
+#define PHY_TESTEN_DATA			(0x0 << 16)
+#define PHY_TESTCLK			(0x1 << 1)
+#define PHY_TESTCLR			(0x1 << 0)
 
 struct hsfreq_range {
 	u16 range_h;
@@ -59,12 +70,6 @@ static const struct hsfreq_range rk3399_mipidphy_hsfreq_ranges[] = {
 	{  999, 0x1a }, { 1049, 0x2a }, { 1099, 0x3a }, { 1149, 0x0b },
 	{ 1199, 0x1b }, { 1249, 0x2b }, { 1299, 0x3b }, { 1349, 0x0c },
 	{ 1399, 0x1c }, { 1449, 0x2c }, { 1500, 0x3c }
-};
-
-static const char * const rk3399_mipidphy_clks[] = {
-	"dphy-ref",
-	"dphy-cfg",
-	"grf",
 };
 
 enum dphy_reg_id {
@@ -99,6 +104,14 @@ enum dphy_reg_id {
 	/* below is for rk3399 only */
 	GRF_DPHY_RX0_CLK_INV_SEL,
 	GRF_DPHY_RX1_CLK_INV_SEL,
+	GRF_DPHY_TX1RX1_SRC_SEL,
+};
+
+enum txrx_reg_id {
+	TXRX_PHY_TEST_CTRL0 = 0,
+	TXRX_PHY_TEST_CTRL1,
+	TXRX_PHY_SHUTDOWNZ,
+	TXRX_PHY_RSTZ,
 };
 
 struct dphy_reg {
@@ -127,7 +140,7 @@ static const struct dphy_reg rk3399_grf_dphy_regs[] = {
 	[GRF_DPHY_TX1RX1_FORCETXSTOPMODE] = PHY_REG(RK3399_GRF_SOC_CON23, 4, 8),
 	[GRF_DPHY_TX1RX1_TURNDISABLE] = PHY_REG(RK3399_GRF_SOC_CON23, 4, 12),
 	[GRF_DPHY_TX1RX1_TURNREQUEST] = PHY_REG(RK3399_GRF_SOC_CON24, 4, 0),
-	[GRF_DPHY_RX1_SRC_SEL] = PHY_REG(RK3399_GRF_SOC_CON24, 1, 4),
+	[GRF_DPHY_TX1RX1_SRC_SEL] = PHY_REG(RK3399_GRF_SOC_CON24, 1, 4),
 	[GRF_DPHY_TX1RX1_BASEDIR] = PHY_REG(RK3399_GRF_SOC_CON24, 1, 5),
 	[GRF_DPHY_TX1RX1_ENABLECLK] = PHY_REG(RK3399_GRF_SOC_CON24, 1, 6),
 	[GRF_DPHY_TX1RX1_MASTERSLAVEZ] = PHY_REG(RK3399_GRF_SOC_CON24, 1, 7),
@@ -136,6 +149,21 @@ static const struct dphy_reg rk3399_grf_dphy_regs[] = {
 	[GRF_DPHY_RX0_TESTCLK] = PHY_REG(RK3399_GRF_SOC_CON25, 1, 9),
 	[GRF_DPHY_RX0_TESTCLR] = PHY_REG(RK3399_GRF_SOC_CON25, 1, 10),
 	[GRF_DPHY_RX0_TESTDOUT] = PHY_REG(RK3399_GRF_SOC_STATUS1, 8, 0),
+	[GRF_DVP_V18SEL] = PHY_REG(RK3399_GRF_IO_VSEL, 1, 1),
+};
+
+struct txrx_reg {
+	u32 offset;
+};
+
+#define TXRX_REG(_offset) \
+	{ .offset = _offset, }
+
+static const struct txrx_reg rk3399_txrx_regs[] = {
+	[TXRX_PHY_TEST_CTRL0] = TXRX_REG(RK3399_PHY_TEST_CTRL0),
+	[TXRX_PHY_TEST_CTRL1] = TXRX_REG(RK3399_PHY_TEST_CTRL1),
+	[TXRX_PHY_SHUTDOWNZ] = TXRX_REG(RK3399_PHY_SHUTDOWNZ),
+	[TXRX_PHY_RSTZ] = TXRX_REG(RK3399_PHY_RSTZ),
 };
 
 struct rk_dphy;
@@ -146,15 +174,18 @@ struct rk_dphy_drv_data {
 	const struct hsfreq_range *hsfreq_ranges;
 	unsigned int num_hsfreq_ranges;
 	const struct dphy_reg *regs;
+	const struct txrx_reg *txrx_regs;
 
 	void (*enable)(struct rk_dphy *priv);
 	void (*disable)(struct rk_dphy *priv);
+	void (*individual_init)(struct rk_dphy *priv);
 };
 
 struct rk_dphy {
 	struct device *dev;
 	struct regmap *grf;
 	struct clk_bulk_data *clks;
+	void __iomem *txrx_base_addr;
 
 	const struct rk_dphy_drv_data *drv_data;
 	struct phy_configure_opts_mipi_dphy config;
@@ -232,6 +263,74 @@ static void rk_dphy_enable_rx(struct rk_dphy *priv)
 static void rk_dphy_disable_rx(struct rk_dphy *priv)
 {
 	rk_dphy_write_grf(priv, GRF_DPHY_RX0_ENABLE, 0);
+}
+
+static inline void rk_dphy_write_tx1rx1(struct rk_dphy *priv,
+				  int index, u32 value)
+{
+	const struct txrx_reg *reg = &priv->drv_data->txrx_regs[index];
+
+	if (reg->offset)
+		writel(value, priv->txrx_base_addr + reg->offset);
+}
+
+static void rk_dphy_write_mipi_tx1rx1(struct rk_dphy *priv, unsigned char addr,
+				 unsigned char data)
+{
+	/*
+	 * TESTEN =1,TESTDIN=addr
+	 * TESTCLK=0
+	 * TESTEN =0,TESTDIN=data
+	 * TESTCLK=1
+	 */
+	rk_dphy_write_tx1rx1(priv, TXRX_PHY_TEST_CTRL1, PHY_TESTEN_ADDR | addr);
+	rk_dphy_write_tx1rx1(priv, TXRX_PHY_TEST_CTRL0, 0x00);
+	rk_dphy_write_tx1rx1(priv, TXRX_PHY_TEST_CTRL1, PHY_TESTEN_DATA | data);
+	rk_dphy_write_tx1rx1(priv, TXRX_PHY_TEST_CTRL0, 0x02);
+}
+
+static void rk_dphy_enable_txrx(struct rk_dphy *priv)
+{
+	rk_dphy_write_tx1rx1(priv, TXRX_PHY_TEST_CTRL0, PHY_TESTCLR | PHY_TESTCLK);
+	usleep_range(100, 150);
+
+	rk_dphy_write_grf(priv, GRF_DPHY_TX1RX1_MASTERSLAVEZ, 0);
+	rk_dphy_write_grf(priv, GRF_DPHY_TX1RX1_BASEDIR, 1);
+
+	rk_dphy_write_grf(priv, GRF_DPHY_TX1RX1_FORCERXMODE, 0);
+	rk_dphy_write_grf(priv, GRF_DPHY_TX1RX1_FORCETXSTOPMODE, 0);
+	rk_dphy_write_grf(priv, GRF_DPHY_TX1RX1_TURNREQUEST, 0);
+	rk_dphy_write_grf(priv, GRF_DPHY_TX1RX1_TURNDISABLE, 0xf);
+	usleep_range(100, 150);
+
+	rk_dphy_write_tx1rx1(priv, TXRX_PHY_TEST_CTRL0, PHY_TESTCLK);
+	usleep_range(100, 150);
+
+	rk_dphy_write_mipi_tx1rx1(priv, CLOCK_LANE_HS_RX_CONTROL, 0);
+	rk_dphy_write_mipi_tx1rx1(priv, LANE0_HS_RX_CONTROL, priv->hsfreq << 1);
+	rk_dphy_write_mipi_tx1rx1(priv, LANE1_HS_RX_CONTROL, 0);
+	rk_dphy_write_mipi_tx1rx1(priv, LANE2_HS_RX_CONTROL, 0);
+	rk_dphy_write_mipi_tx1rx1(priv, LANE3_HS_RX_CONTROL, 0);
+
+	rk_dphy_write_grf(priv, GRF_DPHY_TX1RX1_ENABLE, GENMASK(priv->config.lanes - 1, 0));
+	usleep_range(100, 150);
+}
+
+static void rk_dphy_disable_txrx(struct rk_dphy *priv)
+{
+	rk_dphy_write_grf(priv, GRF_DPHY_TX1RX1_ENABLE, 0);
+}
+
+static void rk3399_mipidphy_individual_init(struct rk_dphy *priv)
+{
+	/*
+	 * According to the sequence of RK3399_TXRX_DPHY, the setting of isp0 mipi
+	 * will affect txrx dphy in default state of grf_soc_con24.
+	 */
+	rk_dphy_write_grf(priv, GRF_DPHY_TX1RX1_SRC_SEL, 0);
+	rk_dphy_write_grf(priv, GRF_DPHY_TX1RX1_MASTERSLAVEZ, 0);
+	rk_dphy_write_grf(priv, GRF_DPHY_TX1RX1_BASEDIR, 0);
+	rk_dphy_write_grf(priv, GRF_DVP_V18SEL, 0x1);
 }
 
 static int rk_dphy_configure(struct phy *phy, union phy_configure_opts *opts)
@@ -314,20 +413,50 @@ static const struct phy_ops rk_dphy_ops = {
 	.owner		= THIS_MODULE,
 };
 
-static const struct rk_dphy_drv_data rk3399_mipidphy_drv_data = {
-	.clks = rk3399_mipidphy_clks,
-	.num_clks = ARRAY_SIZE(rk3399_mipidphy_clks),
+static const char * const rk3399_mipidphy_rx_clks[] = {
+	"dphy-ref",
+	"dphy-cfg",
+	"grf",
+};
+
+static const char * const rk3399_mipidphy_txrx_clks[] = {
+	"dphy-ref",
+	"dphy-cfg",
+	"grf",
+	"dsi",
+};
+
+static const struct rk_dphy_drv_data rk3399_mipidphy_rx_drv_data = {
+	.clks = rk3399_mipidphy_rx_clks,
+	.num_clks = ARRAY_SIZE(rk3399_mipidphy_rx_clks),
 	.hsfreq_ranges = rk3399_mipidphy_hsfreq_ranges,
 	.num_hsfreq_ranges = ARRAY_SIZE(rk3399_mipidphy_hsfreq_ranges),
 	.regs = rk3399_grf_dphy_regs,
 	.enable = rk_dphy_enable_rx,
 	.disable = rk_dphy_disable_rx,
+	.individual_init = rk3399_mipidphy_individual_init,
+};
+
+static const struct rk_dphy_drv_data rk3399_mipidphy_txrx_drv_data = {
+	.clks = rk3399_mipidphy_txrx_clks,
+	.num_clks = ARRAY_SIZE(rk3399_mipidphy_txrx_clks),
+	.hsfreq_ranges = rk3399_mipidphy_hsfreq_ranges,
+	.num_hsfreq_ranges = ARRAY_SIZE(rk3399_mipidphy_hsfreq_ranges),
+	.regs = rk3399_grf_dphy_regs,
+	.txrx_regs = rk3399_txrx_regs,
+	.enable = rk_dphy_enable_txrx,
+	.disable = rk_dphy_disable_txrx,
+	.individual_init = rk3399_mipidphy_individual_init,
 };
 
 static const struct of_device_id rk_dphy_dt_ids[] = {
 	{
 		.compatible = "rockchip,rk3399-mipi-dphy-rx0",
-		.data = &rk3399_mipidphy_drv_data,
+		.data = &rk3399_mipidphy_rx_drv_data,
+	},
+	{
+		.compatible = "rockchip,rk3399-mipi-dphy-tx1rx1",
+		.data = &rk3399_mipidphy_txrx_drv_data,
 	},
 	{}
 };
@@ -345,19 +474,10 @@ static int rk_dphy_probe(struct platform_device *pdev)
 	unsigned int i;
 	int ret;
 
-	if (!dev->parent || !dev->parent->of_node)
-		return -ENODEV;
-
 	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
 	if (!priv)
 		return -ENOMEM;
 	priv->dev = dev;
-
-	priv->grf = syscon_node_to_regmap(dev->parent->of_node);
-	if (IS_ERR(priv->grf)) {
-		dev_err(dev, "Can't find GRF syscon\n");
-		return -ENODEV;
-	}
 
 	of_id = of_match_device(rk_dphy_dt_ids, dev);
 	if (!of_id)
@@ -365,6 +485,31 @@ static int rk_dphy_probe(struct platform_device *pdev)
 
 	drv_data = of_id->data;
 	priv->drv_data = drv_data;
+
+	if (!drv_data->txrx_regs) {
+		if (!dev->parent || !dev->parent->of_node)
+			return -ENODEV;
+
+		priv->grf = syscon_node_to_regmap(dev->parent->of_node);
+		if (IS_ERR(priv->grf)) {
+			dev_err(dev, "Can't find GRF syscon\n");
+			return -ENODEV;
+		}
+	} else {
+		priv->grf = syscon_regmap_lookup_by_phandle(dev->of_node,
+							    "rockchip,grf");
+		if (IS_ERR(priv->grf)) {
+			dev_err(dev, "Can't find GRF syscon\n");
+			return -ENODEV;
+		}
+
+		priv->txrx_base_addr = devm_platform_ioremap_resource(pdev, 0);
+		if (IS_ERR(priv->txrx_base_addr)) {
+			dev_err(dev, "Failed to ioremap resource\n");
+			return PTR_ERR(priv->txrx_base_addr);
+		}
+	}
+
 	priv->clks = devm_kcalloc(&pdev->dev, drv_data->num_clks,
 				  sizeof(*priv->clks), GFP_KERNEL);
 	if (!priv->clks)
@@ -383,8 +528,14 @@ static int rk_dphy_probe(struct platform_device *pdev)
 	phy_set_drvdata(phy, priv);
 
 	phy_provider = devm_of_phy_provider_register(dev, of_phy_simple_xlate);
+	if (IS_ERR(phy_provider)) {
+		dev_err(dev, "failed to register phy provider\n");
+		return PTR_ERR(phy_provider);
+	}
 
-	return PTR_ERR_OR_ZERO(phy_provider);
+	drv_data->individual_init(priv);
+
+	return 0;
 }
 
 static struct platform_driver rk_dphy_driver = {
