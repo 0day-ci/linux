@@ -2155,9 +2155,9 @@ static void __intel_pmu_disable_all(void)
 
 static void intel_pmu_disable_all(void)
 {
+	intel_pmu_lbr_disable_all();
 	__intel_pmu_disable_all();
 	intel_pmu_pebs_disable_all();
-	intel_pmu_lbr_disable_all();
 }
 
 static void __intel_pmu_enable_all(int added, bool pmi)
@@ -2184,6 +2184,20 @@ static void intel_pmu_enable_all(int added)
 {
 	intel_pmu_pebs_enable_all();
 	__intel_pmu_enable_all(added, false);
+}
+
+static int
+intel_pmu_snapshot_branch_stack(struct perf_branch_snapshot *br_snapshot)
+{
+	struct cpu_hw_events *cpuc = this_cpu_ptr(&cpu_hw_events);
+
+	intel_pmu_disable_all();
+	intel_pmu_lbr_read();
+	memcpy(br_snapshot->entries, cpuc->lbr_entries,
+	       sizeof(struct perf_branch_entry) * x86_pmu.lbr_nr);
+	br_snapshot->nr = x86_pmu.lbr_nr;
+	intel_pmu_enable_all(0);
+	return 0;
 }
 
 /*
@@ -6283,8 +6297,14 @@ __init int intel_pmu_init(void)
 			x86_pmu.lbr_nr = 0;
 	}
 
-	if (x86_pmu.lbr_nr)
+	if (x86_pmu.lbr_nr) {
 		pr_cont("%d-deep LBR, ", x86_pmu.lbr_nr);
+
+		/* only support branch_stack snapshot for perfmon >= v2 */
+		if (x86_pmu.disable_all == intel_pmu_disable_all)
+			static_call_update(perf_snapshot_branch_stack,
+					   intel_pmu_snapshot_branch_stack);
+	}
 
 	intel_pmu_check_extra_regs(x86_pmu.extra_regs);
 
