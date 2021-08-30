@@ -14,6 +14,7 @@
 
 #include <linux/bitops.h>
 #include <linux/etherdevice.h>
+#include <linux/if_bridge.h>
 #include <linux/interrupt.h>
 #include <linux/irqdomain.h>
 #include <linux/irqchip/chained_irq.h>
@@ -42,9 +43,12 @@
 /* Port Enable Control register */
 #define RTL8366RB_PECR				0x0001
 
-/* Switch Security Control registers */
-#define RTL8366RB_SSCR0				0x0002
-#define RTL8366RB_SSCR1				0x0003
+/* Switch per-port learning disablement register */
+#define RTL8366RB_PORT_LEARNDIS_CTRL		0x0002
+
+/* Security control, actually aging register */
+#define RTL8366RB_SECURITY_CTRL			0x0003
+
 #define RTL8366RB_SSCR2				0x0004
 #define RTL8366RB_SSCR2_DROP_UNKNOWN_DA		BIT(0)
 
@@ -912,12 +916,12 @@ static int rtl8366rb_setup(struct dsa_switch *ds)
 		rb->max_mtu[i] = 1532;
 
 	/* Enable learning for all ports */
-	ret = regmap_write(smi->map, RTL8366RB_SSCR0, 0);
+	ret = regmap_write(smi->map, RTL8366RB_PORT_LEARNDIS_CTRL, 0);
 	if (ret)
 		return ret;
 
 	/* Enable auto ageing for all ports */
-	ret = regmap_write(smi->map, RTL8366RB_SSCR1, 0);
+	ret = regmap_write(smi->map, RTL8366RB_SECURITY_CTRL, 0);
 	if (ret)
 		return ret;
 
@@ -1146,6 +1150,37 @@ rtl8366rb_port_disable(struct dsa_switch *ds, int port)
 		return;
 
 	rb8366rb_set_port_led(smi, port, false);
+}
+
+static int
+rtl8366rb_port_pre_bridge_flags(struct dsa_switch *ds, int port,
+				struct switchdev_brport_flags flags,
+				struct netlink_ext_ack *extack)
+{
+	/* We support enabling/disabling learning */
+	if (flags.mask & ~(BR_LEARNING))
+		return -EINVAL;
+
+	return 0;
+}
+
+static int
+rtl8366rb_port_bridge_flags(struct dsa_switch *ds, int port,
+			    struct switchdev_brport_flags flags,
+			    struct netlink_ext_ack *extack)
+{
+	struct realtek_smi *smi = ds->priv;
+	int ret;
+
+	if (flags.mask & BR_LEARNING) {
+		ret = regmap_update_bits(smi->map, RTL8366RB_PORT_LEARNDIS_CTRL,
+					 BIT(port),
+					 (flags.val & BR_LEARNING) ? 0 : BIT(port));
+		if (ret)
+			return ret;
+	}
+
+	return 0;
 }
 
 static int
@@ -1600,6 +1635,8 @@ static const struct dsa_switch_ops rtl8366rb_switch_ops = {
 	.port_vlan_del = rtl8366_vlan_del,
 	.port_enable = rtl8366rb_port_enable,
 	.port_disable = rtl8366rb_port_disable,
+	.port_pre_bridge_flags = rtl8366rb_port_pre_bridge_flags,
+	.port_bridge_flags = rtl8366rb_port_bridge_flags,
 	.port_change_mtu = rtl8366rb_change_mtu,
 	.port_max_mtu = rtl8366rb_max_mtu,
 };
