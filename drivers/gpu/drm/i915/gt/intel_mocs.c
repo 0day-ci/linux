@@ -386,6 +386,17 @@ add_aux_reg(struct drm_i915_aux_table *aux,
 	return x;
 }
 
+static struct drm_i915_aux_table *
+add_cmd_cctl_override(struct drm_i915_aux_table *aux, u8 idx)
+{
+	return add_aux_reg(aux,
+			   REG_ENGINE,
+			   "CMD_CCTL",
+			   RING_CMD_CCTL(0),
+			   CMD_CCTL_MOCS_OVERRIDE(idx, idx),
+			   CMD_CCTL_WRITE_OVERRIDE_MASK | CMD_CCTL_READ_OVERRIDE_MASK);
+}
+
 static const struct drm_i915_aux_table *
 build_aux_regs(const struct intel_engine_cs *engine,
 	       const struct drm_i915_mocs_table *mocs)
@@ -400,6 +411,7 @@ build_aux_regs(const struct intel_engine_cs *engine,
 		 * UC MOCS index. We need to call add_aux_reg() to add
 		 * a entry in drm_i915_aux_table link list.
 		 */
+		aux = add_cmd_cctl_override(aux, mocs->uc_index);
 	}
 	return aux;
 }
