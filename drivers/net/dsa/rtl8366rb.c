@@ -149,6 +149,11 @@
 
 #define RTL8366RB_VLAN_INGRESS_CTRL2_REG	0x037f
 
+#define RTL8366RB_STORM_BC_CTRL			0x03e0
+#define RTL8366RB_STORM_MC_CTRL			0x03e1
+#define RTL8366RB_STORM_UNDA_CTRL		0x03e2
+#define RTL8366RB_STORM_UNMC_CTRL		0x03e3
+
 /* LED control registers */
 #define RTL8366RB_LED_BLINKRATE_REG		0x0430
 #define RTL8366RB_LED_BLINKRATE_MASK		0x0007
@@ -1158,7 +1163,8 @@ rtl8366rb_port_pre_bridge_flags(struct dsa_switch *ds, int port,
 				struct netlink_ext_ack *extack)
 {
 	/* We support enabling/disabling learning */
-	if (flags.mask & ~(BR_LEARNING))
+	if (flags.mask & ~(BR_LEARNING | BR_BCAST_FLOOD |
+                           BR_MCAST_FLOOD | BR_FLOOD))
 		return -EINVAL;
 
 	return 0;
@@ -1176,6 +1182,36 @@ rtl8366rb_port_bridge_flags(struct dsa_switch *ds, int port,
 		ret = regmap_update_bits(smi->map, RTL8366RB_PORT_LEARNDIS_CTRL,
 					 BIT(port),
 					 (flags.val & BR_LEARNING) ? 0 : BIT(port));
+		if (ret)
+			return ret;
+	}
+
+	if (flags.mask & BR_BCAST_FLOOD) {
+		ret = regmap_update_bits(smi->map, RTL8366RB_STORM_BC_CTRL,
+					 BIT(port),
+					 (flags.val & BR_BCAST_FLOOD) ? BIT(port) : 0);
+		if (ret)
+			return ret;
+	}
+
+	if (flags.mask & BR_MCAST_FLOOD) {
+		ret = regmap_update_bits(smi->map, RTL8366RB_STORM_MC_CTRL,
+					 BIT(port),
+					 (flags.val & BR_MCAST_FLOOD) ? BIT(port) : 0);
+		if (ret)
+			return ret;
+	}
+
+	/* Enable/disable both types of unicast floods */
+	if (flags.mask & BR_FLOOD) {
+		ret = regmap_update_bits(smi->map, RTL8366RB_STORM_UNDA_CTRL,
+					 BIT(port),
+					 (flags.val & BR_FLOOD) ? BIT(port) : 0);
+		if (ret)
+			return ret;
+		ret = regmap_update_bits(smi->map, RTL8366RB_STORM_UNMC_CTRL,
+					 BIT(port),
+					 (flags.val & BR_FLOOD) ? BIT(port) : 0);
 		if (ret)
 			return ret;
 	}
