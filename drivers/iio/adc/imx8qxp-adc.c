@@ -1,6 +1,14 @@
 // SPDX-License-Identifier: GPL-2.0+
 /*
  * NXP i.MX8QXP ADC driver
+ *
+ * Based on the work of Haibo Chen <haibo.chen@nxp.com>
+ * The initial developer of the original code is Haibo Chen.
+ * Portions created by Haibo Chen are Copyright (C) 2018 NXP.
+ * All Rights Reserved.
+ *
+ * Copyright (C) 2018 NXP
+ * Copyright (C) 2021 Cai Huoqing
  */
 
 #include <linux/clk.h>
