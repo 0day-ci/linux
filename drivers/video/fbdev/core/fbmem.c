@@ -1013,6 +1013,10 @@ fb_set_var(struct fb_info *info, struct fb_var_screeninfo *var)
 	if (ret)
 		return ret;
 
+	/* virtual resolution cannot be smaller than visible resolution. */
+	if (var->yres_virtual < var->yres || var->xres_virtual < var->xres)
+		return -EINVAL;
+
 	if ((var->activate & FB_ACTIVATE_MASK) != FB_ACTIVATE_NOW)
 		return 0;
 
