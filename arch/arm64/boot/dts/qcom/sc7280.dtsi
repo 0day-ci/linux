@@ -1573,10 +1573,6 @@
 				data {
 					pins = "sdc2_data";
 				};
-
-				sd-cd {
-					pins = "gpio91";
-				};
 			};
 
 			sdc2_off: sdc2-off {
