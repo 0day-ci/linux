@@ -140,6 +140,7 @@ static inline int kprobe_ftrace(struct kprobe *p)
  */
 struct kretprobe_holder {
 	struct kretprobe	*rp;
+	struct freelist_head    fh;
 	refcount_t		ref;
 };
 
@@ -150,7 +151,6 @@ struct kretprobe {
 	int maxactive;
 	int nmissed;
 	size_t data_size;
-	struct freelist_head freelist;
 	struct kretprobe_holder *rph;
 };
 
