@@ -17,6 +17,7 @@
 #include <linux/of_platform.h>
 #include <linux/platform_device.h>
 #include <linux/phy/phy.h>
+#include <linux/pm_domain.h>
 #include <linux/usb/of.h>
 #include <linux/reset.h>
 #include <linux/iopoll.h>
@@ -89,6 +90,10 @@ struct dwc3_qcom {
 	bool			pm_suspended;
 	struct icc_path		*icc_path_ddr;
 	struct icc_path		*icc_path_apps;
+	/* power domain for cx */
+	struct device		*pd_cx;
+	/* power domain for usb gdsc */
+	struct device		*pd_usb_gdsc;
 };
 
 static inline void dwc3_qcom_setbits(void __iomem *base, u32 offset, u32 val)
@@ -521,6 +526,46 @@ static int dwc3_qcom_setup_irq(struct platform_device *pdev)
 	return 0;
 }
 
+static int dwc3_qcom_attach_pd(struct device *dev)
+{
+	struct dwc3_qcom *qcom = dev_get_drvdata(dev);
+	struct device_link *link;
+
+	/* Do nothing when in a single power domain */
+	if (dev->pm_domain)
+		return 0;
+
+	qcom->pd_cx = dev_pm_domain_attach_by_name(dev, "cx");
+	if (IS_ERR(qcom->pd_cx))
+		return PTR_ERR(qcom->pd_cx);
+	/* Do nothing when power domain missing */
+	if (!qcom->pd_cx)
+		return 0;
+	link = device_link_add(dev, qcom->pd_cx,
+			DL_FLAG_STATELESS |
+			DL_FLAG_PM_RUNTIME |
+			DL_FLAG_RPM_ACTIVE);
+	if (!link) {
+		dev_err(dev, "Failed to add device_link to cx pd.\n");
+		return -EINVAL;
+	}
+
+	qcom->pd_usb_gdsc = dev_pm_domain_attach_by_name(dev, "usb_gdsc");
+	if (IS_ERR(qcom->pd_usb_gdsc))
+		return PTR_ERR(qcom->pd_usb_gdsc);
+
+	link = device_link_add(dev, qcom->pd_usb_gdsc,
+			DL_FLAG_STATELESS |
+			DL_FLAG_PM_RUNTIME |
+			DL_FLAG_RPM_ACTIVE);
+	if (!link) {
+		dev_err(dev, "Failed to add device_link to usb gdsc pd.\n");
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
 static int dwc3_qcom_clk_init(struct dwc3_qcom *qcom, int count)
 {
 	struct device		*dev = qcom->dev;
@@ -834,6 +879,10 @@ static int dwc3_qcom_probe(struct platform_device *pdev)
 
 	/* register extcon to override sw_vbus on Vbus change later */
 	ret = dwc3_qcom_register_extcon(qcom);
+	if (ret)
+		goto interconnect_exit;
+
+	ret = dwc3_qcom_attach_pd(dev);
 	if (ret)
 		goto interconnect_exit;
 
