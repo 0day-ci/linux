@@ -30,7 +30,6 @@
 #define CLINT_TIMER_VAL_OFF	0xbff8
 
 /* CLINT manages IPI and Timer for RISC-V M-mode  */
-static u32 __iomem *clint_ipi_base;
 static u64 __iomem *clint_timer_cmp;
 static u64 __iomem *clint_timer_val;
 static unsigned long clint_timer_freq;
@@ -40,24 +39,6 @@ static unsigned int clint_timer_irq;
 u64 __iomem *clint_time_val;
 EXPORT_SYMBOL(clint_time_val);
 #endif
-
-static void clint_send_ipi(const struct cpumask *target)
-{
-	unsigned int cpu;
-
-	for_each_cpu(cpu, target)
-		writel(1, clint_ipi_base + cpuid_to_hartid_map(cpu));
-}
-
-static void clint_clear_ipi(void)
-{
-	writel(0, clint_ipi_base + cpuid_to_hartid_map(smp_processor_id()));
-}
-
-static struct riscv_ipi_ops clint_ipi_ops = {
-	.ipi_inject = clint_send_ipi,
-	.ipi_clear = clint_clear_ipi,
-};
 
 #ifdef CONFIG_64BIT
 #define clint_get_cycles()	readq_relaxed(clint_timer_val)
@@ -189,7 +170,6 @@ static int __init clint_timer_init_dt(struct device_node *np)
 		return -ENODEV;
 	}
 
-	clint_ipi_base = base + CLINT_IPI_OFF;
 	clint_timer_cmp = base + CLINT_TIMER_CMP_OFF;
 	clint_timer_val = base + CLINT_TIMER_VAL_OFF;
 	clint_timer_freq = riscv_timebase;
@@ -227,9 +207,6 @@ static int __init clint_timer_init_dt(struct device_node *np)
 		pr_err("%pOFP: cpuhp setup state failed [%d]\n", np, rc);
 		goto fail_free_irq;
 	}
-
-	riscv_set_ipi_ops(&clint_ipi_ops);
-	clint_clear_ipi();
 
 	return 0;
 
