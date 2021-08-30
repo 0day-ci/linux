@@ -72,7 +72,6 @@ static unsigned int xprt_rdma_slot_table_entries = RPCRDMA_DEF_SLOT_TABLE;
 unsigned int xprt_rdma_max_inline_read = RPCRDMA_DEF_INLINE;
 unsigned int xprt_rdma_max_inline_write = RPCRDMA_DEF_INLINE;
 unsigned int xprt_rdma_memreg_strategy		= RPCRDMA_FRWR;
-int xprt_rdma_pad_optimize;
 static struct xprt_class xprt_rdma;
 
 #if IS_ENABLED(CONFIG_SUNRPC_DEBUG)
@@ -133,13 +132,6 @@ static struct ctl_table xr_tunables_table[] = {
 		.proc_handler	= proc_dointvec_minmax,
 		.extra1		= &min_memreg,
 		.extra2		= &max_memreg,
-	},
-	{
-		.procname	= "rdma_pad_optimize",
-		.data		= &xprt_rdma_pad_optimize,
-		.maxlen		= sizeof(unsigned int),
-		.mode		= 0644,
-		.proc_handler	= proc_dointvec,
 	},
 	{ },
 };

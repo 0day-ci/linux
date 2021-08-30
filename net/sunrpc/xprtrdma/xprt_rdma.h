@@ -74,7 +74,6 @@ struct rpcrdma_ep {
 	struct ib_pd		*re_pd;
 	unsigned int		re_max_rdma_segs;
 	unsigned int		re_max_fr_depth;
-	bool			re_implicit_roundup;
 	enum ib_mr_type		re_mrtype;
 	struct completion	re_done;
 	unsigned int		re_send_count;
@@ -440,11 +439,6 @@ rpcrdma_portstr(const struct rpcrdma_xprt *r_xprt)
 {
 	return r_xprt->rx_xprt.address_strings[RPC_DISPLAY_PORT];
 }
-
-/* Setting this to 0 ensures interoperability with early servers.
- * Setting this to 1 enhances certain unaligned read/write performance.
- * Default is 0, see sysctl entry and rpc_rdma.c rpcrdma_convert_iovs() */
-extern int xprt_rdma_pad_optimize;
 
 /* This setting controls the hunt for a supported memory
  * registration strategy.
