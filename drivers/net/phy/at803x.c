@@ -70,10 +70,14 @@
 #define AT803X_CDT_STATUS_DELTA_TIME_MASK	GENMASK(7, 0)
 #define AT803X_LED_CONTROL			0x18
 
-#define AT803X_DEVICE_ADDR			0x03
+/* WOL control */
+#define AT803X_PHY_MMD3_WOL_CTRL		0x8012
+#define AT803X_WOL_EN				BIT(5)
+
 #define AT803X_LOC_MAC_ADDR_0_15_OFFSET		0x804C
 #define AT803X_LOC_MAC_ADDR_16_31_OFFSET	0x804B
 #define AT803X_LOC_MAC_ADDR_32_47_OFFSET	0x804A
+
 #define AT803X_REG_CHIP_CONFIG			0x1f
 #define AT803X_BT_BX_REG_SEL			0x8000
 
@@ -328,12 +332,6 @@ static int at803x_set_wol(struct phy_device *phydev,
 	struct net_device *ndev = phydev->attached_dev;
 	const u8 *mac;
 	int ret;
-	u32 value;
-	unsigned int i, offsets[] = {
-		AT803X_LOC_MAC_ADDR_32_47_OFFSET,
-		AT803X_LOC_MAC_ADDR_16_31_OFFSET,
-		AT803X_LOC_MAC_ADDR_0_15_OFFSET,
-	};
 
 	if (!ndev)
 		return -ENODEV;
@@ -344,23 +342,30 @@ static int at803x_set_wol(struct phy_device *phydev,
 		if (!is_valid_ether_addr(mac))
 			return -EINVAL;
 
-		for (i = 0; i < 3; i++)
-			phy_write_mmd(phydev, AT803X_DEVICE_ADDR, offsets[i],
-				      mac[(i * 2) + 1] | (mac[(i * 2)] << 8));
+		phy_write_mmd(phydev, MDIO_MMD_PCS, AT803X_LOC_MAC_ADDR_32_47_OFFSET,
+				mac[1] | (mac[0] << 8));
+		phy_write_mmd(phydev, MDIO_MMD_PCS, AT803X_LOC_MAC_ADDR_16_31_OFFSET,
+				mac[3] | (mac[2] << 8));
+		phy_write_mmd(phydev, MDIO_MMD_PCS, AT803X_LOC_MAC_ADDR_0_15_OFFSET,
+				mac[5] | (mac[4] << 8));
 
-		value = phy_read(phydev, AT803X_INTR_ENABLE);
-		value |= AT803X_INTR_ENABLE_WOL;
-		ret = phy_write(phydev, AT803X_INTR_ENABLE, value);
+		/* clear the pending interrupt */
+		phy_read(phydev, AT803X_INTR_STATUS);
+
+		ret = phy_modify(phydev, AT803X_INTR_ENABLE, 0, AT803X_INTR_ENABLE_WOL);
 		if (ret)
 			return ret;
-		value = phy_read(phydev, AT803X_INTR_STATUS);
+
+		ret = phy_modify_mmd(phydev, MDIO_MMD_PCS, AT803X_PHY_MMD3_WOL_CTRL,
+				0, AT803X_WOL_EN);
+
 	} else {
-		value = phy_read(phydev, AT803X_INTR_ENABLE);
-		value &= (~AT803X_INTR_ENABLE_WOL);
-		ret = phy_write(phydev, AT803X_INTR_ENABLE, value);
+		ret = phy_modify(phydev, AT803X_INTR_ENABLE, AT803X_INTR_ENABLE_WOL, 0);
 		if (ret)
 			return ret;
-		value = phy_read(phydev, AT803X_INTR_STATUS);
+
+		ret = phy_modify_mmd(phydev, MDIO_MMD_PCS, AT803X_PHY_MMD3_WOL_CTRL,
+				AT803X_WOL_EN, 0);
 	}
 
 	return ret;
@@ -369,13 +374,16 @@ static int at803x_set_wol(struct phy_device *phydev,
 static void at803x_get_wol(struct phy_device *phydev,
 			   struct ethtool_wolinfo *wol)
 {
-	u32 value;
+	int ret;
 
 	wol->supported = WAKE_MAGIC;
 	wol->wolopts = 0;
 
-	value = phy_read(phydev, AT803X_INTR_ENABLE);
-	if (value & AT803X_INTR_ENABLE_WOL)
+	ret = phy_read_mmd(phydev, MDIO_MMD_PCS, AT803X_PHY_MMD3_WOL_CTRL);
+	if (ret < 0)
+		return;
+
+	if (ret & AT803X_WOL_EN)
 		wol->wolopts |= WAKE_MAGIC;
 }
 
