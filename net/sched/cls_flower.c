@@ -70,6 +70,7 @@ struct fl_flow_key {
 	} tp_range;
 	struct flow_dissector_key_ct ct;
 	struct flow_dissector_key_hash hash;
+	struct flow_dissector_key_orig_ethtype orig_ethtype;
 } __aligned(BITS_PER_LONG / 8); /* Ensure that we can do comparisons as longs. */
 
 struct fl_flow_mask_range {
@@ -710,6 +711,7 @@ static const struct nla_policy fl_policy[TCA_FLOWER_MAX + 1] = {
 	[TCA_FLOWER_FLAGS]		= { .type = NLA_U32 },
 	[TCA_FLOWER_KEY_HASH]		= { .type = NLA_U32 },
 	[TCA_FLOWER_KEY_HASH_MASK]	= { .type = NLA_U32 },
+	[TCA_FLOWER_KEY_ORIG_ETH_TYPE]	= { .type = NLA_U16 },
 
 };
 
@@ -1696,6 +1698,11 @@ static int fl_set_key(struct net *net, struct nlattr **tb,
 		       &mask->hash.hash, TCA_FLOWER_KEY_HASH_MASK,
 		       sizeof(key->hash.hash));
 
+	fl_set_key_val(tb, &key->orig_ethtype.orig_ethtype,
+		       TCA_FLOWER_KEY_ORIG_ETH_TYPE,
+		       &mask->orig_ethtype.orig_ethtype, TCA_FLOWER_UNSPEC,
+		       sizeof(key->orig_ethtype.orig_ethtype));
+
 	if (tb[TCA_FLOWER_KEY_ENC_OPTS]) {
 		ret = fl_set_enc_opt(tb, key, mask, extack);
 		if (ret)
@@ -1812,6 +1819,8 @@ static void fl_init_dissector(struct flow_dissector *dissector,
 			     FLOW_DISSECTOR_KEY_CT, ct);
 	FL_KEY_SET_IF_MASKED(mask, keys, cnt,
 			     FLOW_DISSECTOR_KEY_HASH, hash);
+	FL_KEY_SET_IF_MASKED(mask, keys, cnt,
+			     FLOW_DISSECTOR_KEY_ORIG_ETH_TYPE, orig_ethtype);
 
 	skb_flow_dissector_init(dissector, keys, cnt);
 }
@@ -3035,6 +3044,12 @@ static int fl_dump_key(struct sk_buff *skb, struct net *net,
 	if (fl_dump_key_val(skb, &key->hash.hash, TCA_FLOWER_KEY_HASH,
 			     &mask->hash.hash, TCA_FLOWER_KEY_HASH_MASK,
 			     sizeof(key->hash.hash)))
+		goto nla_put_failure;
+
+	if (fl_dump_key_val(skb, &key->orig_ethtype.orig_ethtype,
+			    TCA_FLOWER_KEY_ORIG_ETH_TYPE,
+			    &mask->orig_ethtype.orig_ethtype, TCA_FLOWER_UNSPEC,
+			    sizeof(key->orig_ethtype.orig_ethtype)))
 		goto nla_put_failure;
 
 	return 0;

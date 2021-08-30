@@ -584,6 +584,7 @@ enum {
 	TCA_FLOWER_KEY_HASH,		/* u32 */
 	TCA_FLOWER_KEY_HASH_MASK,	/* u32 */
 
+	TCA_FLOWER_KEY_ORIG_ETH_TYPE,	/* be16 */
 	__TCA_FLOWER_MAX,
 };
 

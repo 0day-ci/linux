@@ -251,6 +251,14 @@ struct flow_dissector_key_hash {
 	u32 hash;
 };
 
+/**
+ * struct flow_dissector_key_orig_ethtype:
+ * @orig_ethtype: eth type as it appears in the packet
+ */
+struct flow_dissector_key_orig_ethtype {
+	__be16	orig_ethtype;
+};
+
 enum flow_dissector_key_id {
 	FLOW_DISSECTOR_KEY_CONTROL, /* struct flow_dissector_key_control */
 	FLOW_DISSECTOR_KEY_BASIC, /* struct flow_dissector_key_basic */
@@ -280,6 +288,7 @@ enum flow_dissector_key_id {
 	FLOW_DISSECTOR_KEY_META, /* struct flow_dissector_key_meta */
 	FLOW_DISSECTOR_KEY_CT, /* struct flow_dissector_key_ct */
 	FLOW_DISSECTOR_KEY_HASH, /* struct flow_dissector_key_hash */
+	FLOW_DISSECTOR_KEY_ORIG_ETH_TYPE, /* struct flow_dissector_key_orig_ethtype */
 
 	FLOW_DISSECTOR_KEY_MAX,
 };

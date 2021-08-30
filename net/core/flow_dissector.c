@@ -924,6 +924,7 @@ bool __skb_flow_dissect(const struct net *net,
 	struct flow_dissector_key_vlan *key_vlan;
 	enum flow_dissect_ret fdret;
 	enum flow_dissector_key_id dissector_vlan = FLOW_DISSECTOR_KEY_MAX;
+	__be16 orig_proto = proto;
 	bool mpls_el = false;
 	int mpls_lse = 0;
 	int num_hdrs = 0;
@@ -934,6 +935,7 @@ bool __skb_flow_dissect(const struct net *net,
 		data = skb->data;
 		proto = skb_vlan_tag_present(skb) ?
 			 skb->vlan_proto : skb->protocol;
+		orig_proto = proto;
 		nhoff = skb_network_offset(skb);
 		hlen = skb_headlen(skb);
 #if IS_ENABLED(CONFIG_NET_DSA)
@@ -1030,6 +1032,16 @@ bool __skb_flow_dissect(const struct net *net,
 							  FLOW_DISSECTOR_KEY_ETH_ADDRS,
 							  target_container);
 		memcpy(key_eth_addrs, &eth->h_dest, sizeof(*key_eth_addrs));
+	}
+
+	if (dissector_uses_key(flow_dissector,
+			       FLOW_DISSECTOR_KEY_ORIG_ETH_TYPE)) {
+		struct flow_dissector_key_orig_ethtype *orig_ethtype;
+
+		orig_ethtype = skb_flow_dissector_target(flow_dissector,
+							 FLOW_DISSECTOR_KEY_ORIG_ETH_TYPE,
+							 target_container);
+		orig_ethtype->orig_ethtype = orig_proto;
 	}
 
 proto_again:
