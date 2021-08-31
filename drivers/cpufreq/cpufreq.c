@@ -2295,6 +2295,44 @@ __weak struct cpufreq_governor *cpufreq_fallback_governor(void)
 	return NULL;
 }
 
+static inline bool
+cpufreq_can_skip_inefficiencies(struct cpufreq_policy *policy)
+{
+	struct cpufreq_frequency_table *pos;
+	bool valid = false;
+	int idx;
+
+	if (!(policy->governor->flags & CPUFREQ_GOV_DYNAMIC_SWITCHING))
+		return false;
+
+	if (policy->freq_table_sorted == CPUFREQ_TABLE_UNSORTED)
+		return false;
+
+	/* Is there at least one inefficiency ? */
+	cpufreq_for_each_valid_entry(pos, policy->freq_table) {
+		if (pos->flags & CPUFREQ_INEFFICIENT_FREQ) {
+			valid = true;
+			break;
+		}
+	}
+
+	if (!valid)
+		return false;
+
+	/*
+	 * Has cpufreq_table_update_efficiencies been called? i.e. is the
+	 * highest frequency efficient.
+	 */
+	cpufreq_for_each_valid_entry_idx(pos, policy->freq_table, idx) {
+		valid = !!(idx == pos->efficient);
+		if (policy->freq_table_sorted ==
+					CPUFREQ_TABLE_SORTED_DESCENDING)
+			break;
+	}
+
+	return valid;
+}
+
 static int cpufreq_init_governor(struct cpufreq_policy *policy)
 {
 	int ret;
@@ -2337,6 +2375,7 @@ static int cpufreq_init_governor(struct cpufreq_policy *policy)
 	}
 
 	policy->strict_target = !!(policy->governor->flags & CPUFREQ_GOV_STRICT_TARGET);
+	policy->skip_inefficiencies = cpufreq_can_skip_inefficiencies(policy);
 
 	return 0;
 }
