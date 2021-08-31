@@ -668,6 +668,9 @@ bpf_object__add_programs(struct bpf_object *obj, Elf_Data *sec_data,
 	const char *name;
 	GElf_Sym sym;
 
+	if (!symbols)
+		return -ENOENT;
+
 	progs = obj->programs;
 	nr_progs = obj->nr_programs;
 	nr_syms = symbols->d_size / sizeof(GElf_Sym);
