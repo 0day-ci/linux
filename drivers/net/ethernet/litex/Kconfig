@@ -5,6 +5,7 @@
 config NET_VENDOR_LITEX
 	bool "LiteX devices"
 	default y
+	depends on LITEX || COMPILE_TEST
 	help
 	  If you have a network (Ethernet) card belonging to this class, say Y.
 
