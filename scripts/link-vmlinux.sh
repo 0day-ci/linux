@@ -57,13 +57,8 @@ gen_initcalls()
 gen_symversions()
 {
 	info GEN .tmp_symversions.lds
-	rm -f .tmp_symversions.lds
-
-	for o in ${KBUILD_VMLINUX_OBJS} ${KBUILD_VMLINUX_LIBS}; do
-		if [ -f ${o}.symversions ]; then
-			cat ${o}.symversions >> .tmp_symversions.lds
-		fi
-	done
+	${PERL} scripts/merge-symvers.pl -a ${AR} -o .tmp_symversions.lds \
+		${KBUILD_VMLINUX_OBJS} ${KBUILD_VMLINUX_LIBS}
 }
 
 # Link of vmlinux.o used for section mismatch analysis
