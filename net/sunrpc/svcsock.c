@@ -181,6 +181,12 @@ static void svc_set_cmsg_data(struct svc_rqst *rqstp, struct cmsghdr *cmh)
 	}
 }
 
+static int svc_sock_argument_payload(struct svc_rqst *rqstp,
+				     unsigned int offset, unsigned int length)
+{
+	return 0;
+}
+
 static int svc_sock_result_payload(struct svc_rqst *rqstp, unsigned int offset,
 				   unsigned int length)
 {
@@ -637,6 +643,7 @@ static struct svc_xprt *svc_udp_create(struct svc_serv *serv,
 static const struct svc_xprt_ops svc_udp_ops = {
 	.xpo_create = svc_udp_create,
 	.xpo_recvfrom = svc_udp_recvfrom,
+	.xpo_argument_payload = svc_sock_argument_payload,
 	.xpo_sendto = svc_udp_sendto,
 	.xpo_result_payload = svc_sock_result_payload,
 	.xpo_release_rqst = svc_udp_release_rqst,
@@ -1208,6 +1215,7 @@ static struct svc_xprt *svc_tcp_create(struct svc_serv *serv,
 static const struct svc_xprt_ops svc_tcp_ops = {
 	.xpo_create = svc_tcp_create,
 	.xpo_recvfrom = svc_tcp_recvfrom,
+	.xpo_argument_payload = svc_sock_argument_payload,
 	.xpo_sendto = svc_tcp_sendto,
 	.xpo_result_payload = svc_sock_result_payload,
 	.xpo_release_rqst = svc_tcp_release_rqst,

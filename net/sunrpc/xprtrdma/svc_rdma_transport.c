@@ -79,6 +79,7 @@ static void svc_rdma_kill_temp_xprt(struct svc_xprt *);
 static const struct svc_xprt_ops svc_rdma_ops = {
 	.xpo_create = svc_rdma_create,
 	.xpo_recvfrom = svc_rdma_recvfrom,
+	.xpo_argument_payload = svc_rdma_argument_payload,
 	.xpo_sendto = svc_rdma_sendto,
 	.xpo_result_payload = svc_rdma_result_payload,
 	.xpo_release_rqst = svc_rdma_release_rqst,

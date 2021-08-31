@@ -178,6 +178,8 @@ extern void svc_rdma_recv_ctxt_put(struct svcxprt_rdma *rdma,
 extern void svc_rdma_flush_recv_queues(struct svcxprt_rdma *rdma);
 extern void svc_rdma_release_rqst(struct svc_rqst *rqstp);
 extern int svc_rdma_recvfrom(struct svc_rqst *);
+extern int svc_rdma_argument_payload(struct svc_rqst *rqstp,
+				     unsigned int offset, unsigned int length);
 
 /* svc_rdma_rw.c */
 extern void svc_rdma_destroy_rw_ctxts(struct svcxprt_rdma *rdma);

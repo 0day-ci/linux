@@ -862,3 +862,25 @@ out_drop:
 	svc_rdma_recv_ctxt_put(rdma_xprt, ctxt);
 	return 0;
 }
+
+/**
+ * svc_rdma_argument_payload - special processing for an argument payload
+ * @rqstp: svc_rqst to operate on
+ * @offset: offset of payload in file's page cache
+ * @length: size of payload, in bytes
+ *
+ * Pull an RDMA Read payload chunk into rqstp->rq_arg.
+ *
+ * Return values:
+ *   %0 if successful or nothing needed to be done
+ *   %-EMSGSIZE on XDR buffer overflow
+ *   %-EINVAL if client provided too many segments
+ *   %-ENOMEM if rdma_rw context pool was exhausted
+ *   %-ENOTCONN if posting failed (connection is lost)
+ *   %-EIO if rdma_rw initialization failed (DMA mapping, etc)
+ */
+int svc_rdma_argument_payload(struct svc_rqst *rqstp, unsigned int offset,
+			      unsigned int length)
+{
+	return 0;
+}

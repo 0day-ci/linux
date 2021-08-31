@@ -343,6 +343,8 @@ nfssvc_decode_writeargs(struct svc_rqst *rqstp, __be32 *p)
 		return 0;
 	if (args->len > NFSSVC_MAXBLKSIZE_V2)
 		return 0;
+	if (svc_decode_argument_payload(rqstp, args->offset, args->len) < 0)
+		return 0;
 	if (!xdr_stream_subsegment(xdr, &args->payload, args->len))
 		return 0;
 
@@ -397,6 +399,8 @@ nfssvc_decode_symlinkargs(struct svc_rqst *rqstp, __be32 *p)
 	if (args->tlen == 0)
 		return 0;
 
+	if (svc_decode_argument_payload(rqstp, 0, args->tlen) < 0)
+		return 0;
 	args->first.iov_len = head->iov_len - xdr_stream_pos(xdr);
 	args->first.iov_base = xdr_inline_decode(xdr, args->tlen);
 	if (!args->first.iov_base)

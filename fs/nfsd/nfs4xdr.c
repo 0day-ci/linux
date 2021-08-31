@@ -813,6 +813,9 @@ nfsd4_decode_create(struct nfsd4_compoundargs *argp, struct nfsd4_create *create
 		p = xdr_inline_decode(argp->xdr, create->cr_datalen);
 		if (!p)
 			return nfserr_bad_xdr;
+		if (svc_decode_argument_payload(argp->rqstp, 0,
+						create->cr_datalen) < 0)
+			return nfserr_bad_xdr;
 		create->cr_data = svcxdr_dupstr(argp, p, create->cr_datalen);
 		if (!create->cr_data)
 			return nfserr_jukebox;
@@ -1409,6 +1412,9 @@ nfsd4_decode_write(struct nfsd4_compoundargs *argp, struct nfsd4_write *write)
 	if (write->wr_stable_how > NFS_FILE_SYNC)
 		return nfserr_bad_xdr;
 	if (xdr_stream_decode_u32(argp->xdr, &write->wr_buflen) < 0)
+		return nfserr_bad_xdr;
+	if (svc_decode_argument_payload(argp->rqstp, write->wr_offset,
+					write->wr_buflen) < 0)
 		return nfserr_bad_xdr;
 	if (!xdr_stream_subsegment(argp->xdr, &write->wr_payload, write->wr_buflen))
 		return nfserr_bad_xdr;

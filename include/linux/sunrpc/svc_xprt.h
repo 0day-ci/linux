@@ -20,6 +20,9 @@ struct svc_xprt_ops {
 	struct svc_xprt	*(*xpo_accept)(struct svc_xprt *);
 	int		(*xpo_has_wspace)(struct svc_xprt *);
 	int		(*xpo_recvfrom)(struct svc_rqst *);
+	int		(*xpo_argument_payload)(struct svc_rqst *rqstp,
+						unsigned int offset,
+						unsigned int length);
 	int		(*xpo_sendto)(struct svc_rqst *);
 	int		(*xpo_result_payload)(struct svc_rqst *, unsigned int,
 					      unsigned int);

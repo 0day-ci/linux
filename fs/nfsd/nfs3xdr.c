@@ -642,6 +642,8 @@ nfs3svc_decode_writeargs(struct svc_rqst *rqstp, __be32 *p)
 		args->count = max_blocksize;
 		args->len = max_blocksize;
 	}
+	if (svc_decode_argument_payload(rqstp, args->offset, args->len) < 0)
+		return 0;
 	if (!xdr_stream_subsegment(xdr, &args->payload, args->count))
 		return 0;
 
@@ -704,6 +706,8 @@ nfs3svc_decode_symlinkargs(struct svc_rqst *rqstp, __be32 *p)
 	remaining = head->iov_len + rqstp->rq_arg.page_len + tail->iov_len;
 	remaining -= xdr_stream_pos(xdr);
 	if (remaining < xdr_align_size(args->tlen))
+		return 0;
+	if (svc_decode_argument_payload(rqstp, 0, args->tlen) < 0)
 		return 0;
 
 	args->first.iov_base = xdr->p;

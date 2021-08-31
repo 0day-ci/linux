@@ -1657,6 +1657,26 @@ const char *svc_proc_name(const struct svc_rqst *rqstp)
 
 
 /**
+ * svc_decode_argument_payload - set up pages containing an argument
+ * @rqstp: svc_rqst to operate on
+ * @offset: byte offset of payload in file's page cache
+ * @length: size of payload, in bytes
+ *
+ * This function can modify rqstp->rq_arg.page_base and the content
+ * of rqstp->rq_arg.pages, but no other fields of rq_arg are changed.
+ *
+ * Returns zero on success, or a negative errno if a permanent error
+ * occurred.
+ */
+int svc_decode_argument_payload(struct svc_rqst *rqstp, unsigned int offset,
+				unsigned int length)
+{
+	return rqstp->rq_xprt->xpt_ops->xpo_argument_payload(rqstp, offset,
+							     length);
+}
+EXPORT_SYMBOL_GPL(svc_decode_argument_payload);
+
+/**
  * svc_encode_result_payload - mark a range of bytes as a result payload
  * @rqstp: svc_rqst to operate on
  * @offset: payload's byte offset in rqstp->rq_res
