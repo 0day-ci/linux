@@ -570,7 +570,6 @@ static void rcar_du_shutdown(struct platform_device *pdev)
 static int rcar_du_probe(struct platform_device *pdev)
 {
 	struct rcar_du_device *rcdu;
-	struct resource *mem;
 	int ret;
 
 	/* Allocate and initialize the R-Car device structure. */
@@ -585,8 +584,7 @@ static int rcar_du_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, rcdu);
 
 	/* I/O resources */
-	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	rcdu->mmio = devm_ioremap_resource(&pdev->dev, mem);
+	rcdu->mmio = devm_platform_ioremap_resource(pdev, 0);
 	if (IS_ERR(rcdu->mmio))
 		return PTR_ERR(rcdu->mmio);
 
