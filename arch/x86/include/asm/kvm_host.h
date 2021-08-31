@@ -37,8 +37,8 @@
 
 #define __KVM_HAVE_ARCH_VCPU_DEBUGFS
 
-#define KVM_MAX_VCPUS 288
-#define KVM_SOFT_MAX_VCPUS 240
+#define KVM_MAX_VCPUS 710
+#define KVM_SOFT_MAX_VCPUS 710
 #define KVM_MAX_VCPU_ID 1023
 /* memory slots that are not exposed to userspace */
 #define KVM_PRIVATE_MEM_SLOTS 3
