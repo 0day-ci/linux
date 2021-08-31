@@ -788,6 +788,7 @@ struct kobject *kobject_create(void)
 	kobject_init(kobj, &dynamic_kobj_ktype);
 	return kobj;
 }
+EXPORT_SYMBOL_GPL(kobject_create);
 
 /**
  * kobject_create_and_add() - Create a struct kobject dynamically and
