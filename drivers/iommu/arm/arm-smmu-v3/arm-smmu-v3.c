@@ -2051,7 +2051,7 @@ static void arm_smmu_domain_free(struct iommu_domain *domain)
 		mutex_unlock(&arm_smmu_asid_lock);
 	} else {
 		struct arm_smmu_s2_cfg *cfg = &smmu_domain->s2_cfg;
-		if (cfg->vmid)
+		if (cfg->vmid && !atomic_dec_return(&smmu->vmid_refcnts[cfg->vmid]))
 			arm_smmu_bitmap_free(smmu->vmid_map, cfg->vmid);
 	}
 
@@ -2121,17 +2121,28 @@ static int arm_smmu_domain_finalise_s2(struct arm_smmu_domain *smmu_domain,
 				       struct arm_smmu_master *master,
 				       struct io_pgtable_cfg *pgtbl_cfg)
 {
-	int vmid;
 	struct arm_smmu_device *smmu = smmu_domain->smmu;
 	struct arm_smmu_s2_cfg *cfg = &smmu_domain->s2_cfg;
 	typeof(&pgtbl_cfg->arm_lpae_s2_cfg.vtcr) vtcr;
 
-	vmid = arm_smmu_bitmap_alloc(smmu->vmid_map, smmu->vmid_bits);
-	if (vmid < 0)
-		return vmid;
+	/*
+	 * For a nested case where there are multiple passthrough devices to a
+	 * VM, they share a commond VMID, allocated when the first passthrough
+	 * device is attached to the VM. So the cfg->vmid might be already set
+	 * in arm_smmu_set_nesting_vmid(), reported from the hypervisor. In this
+	 * case, simply reuse the shared VMID and increase its refcount.
+	 */
+	if (!cfg->vmid) {
+		int vmid = arm_smmu_bitmap_alloc(smmu->vmid_map, smmu->vmid_bits);
+
+		if (vmid < 0)
+			return vmid;
+		cfg->vmid = (u16)vmid;
+	}
+
+	atomic_inc(&smmu->vmid_refcnts[cfg->vmid]);
 
 	vtcr = &pgtbl_cfg->arm_lpae_s2_cfg.vtcr;
-	cfg->vmid	= (u16)vmid;
 	cfg->vttbr	= pgtbl_cfg->arm_lpae_s2_cfg.vttbr;
 	cfg->vtcr	= FIELD_PREP(STRTAB_STE_2_VTCR_S2T0SZ, vtcr->tsz) |
 			  FIELD_PREP(STRTAB_STE_2_VTCR_S2SL0, vtcr->sl) |
@@ -2731,6 +2742,44 @@ static int arm_smmu_enable_nesting(struct iommu_domain *domain)
 	return ret;
 }
 
+static int arm_smmu_set_nesting_vmid(struct iommu_domain *domain, u32 vmid)
+{
+	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
+	struct arm_smmu_s2_cfg *s2_cfg = &smmu_domain->s2_cfg;
+	int ret = 0;
+
+	if (vmid == IOMMU_VMID_INVALID)
+		return -EINVAL;
+
+	mutex_lock(&smmu_domain->init_mutex);
+	if (smmu_domain->smmu || smmu_domain->stage != ARM_SMMU_DOMAIN_NESTED)
+		ret = -EPERM;
+	else
+		s2_cfg->vmid = vmid;
+	mutex_unlock(&smmu_domain->init_mutex);
+
+	return ret;
+}
+
+static int arm_smmu_get_nesting_vmid(struct iommu_domain *domain, u32 *vmid)
+{
+	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
+	struct arm_smmu_s2_cfg *s2_cfg = &smmu_domain->s2_cfg;
+	int ret = 0;
+
+	if (!vmid)
+		return -EINVAL;
+
+	mutex_lock(&smmu_domain->init_mutex);
+	if (smmu_domain->smmu || smmu_domain->stage != ARM_SMMU_DOMAIN_NESTED)
+		ret = -EPERM;
+	else
+		*vmid = s2_cfg->vmid;
+	mutex_unlock(&smmu_domain->init_mutex);
+
+	return ret;
+}
+
 static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
 {
 	return iommu_fwspec_add_ids(dev, args->args, 1);
@@ -2845,6 +2894,8 @@ static struct iommu_ops arm_smmu_ops = {
 	.release_device		= arm_smmu_release_device,
 	.device_group		= arm_smmu_device_group,
 	.enable_nesting		= arm_smmu_enable_nesting,
+	.set_nesting_vmid	= arm_smmu_set_nesting_vmid,
+	.get_nesting_vmid	= arm_smmu_get_nesting_vmid,
 	.of_xlate		= arm_smmu_of_xlate,
 	.get_resv_regions	= arm_smmu_get_resv_regions,
 	.put_resv_regions	= generic_iommu_put_resv_regions,
@@ -3530,6 +3581,8 @@ static int arm_smmu_device_hw_probe(struct arm_smmu_device *smmu)
 	/* ASID/VMID sizes */
 	smmu->asid_bits = reg & IDR0_ASID16 ? 16 : 8;
 	smmu->vmid_bits = reg & IDR0_VMID16 ? 16 : 8;
+	smmu->vmid_refcnts = devm_kcalloc(smmu->dev, 1 << smmu->vmid_bits,
+					  sizeof(*smmu->vmid_refcnts), GFP_KERNEL);
 
 	/* IDR1 */
 	reg = readl_relaxed(smmu->base + ARM_SMMU_IDR1);

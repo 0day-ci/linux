@@ -664,6 +664,7 @@ struct arm_smmu_device {
 #define ARM_SMMU_MAX_VMIDS		(1 << 16)
 	unsigned int			vmid_bits;
 	DECLARE_BITMAP(vmid_map, ARM_SMMU_MAX_VMIDS);
+	atomic_t			*vmid_refcnts;
 
 	unsigned int			ssid_bits;
 	unsigned int			sid_bits;
