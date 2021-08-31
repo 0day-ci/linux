@@ -1121,7 +1121,6 @@ void cpufreq_generic_init(struct cpufreq_policy *policy,
 
 static inline void cpufreq_register_em_with_opp(struct cpufreq_policy *policy)
 {
-	dev_pm_opp_of_register_em(get_cpu_device(policy->cpu),
-				  policy->related_cpus);
+	dev_pm_opp_of_register_em(get_cpu_device(policy->cpu), policy->related_cpus);
 }
 #endif /* _LINUX_CPUFREQ_H */
