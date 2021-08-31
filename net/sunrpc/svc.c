@@ -1688,6 +1688,7 @@ unsigned int svc_fill_write_vector(struct svc_rqst *rqstp,
 	struct kvec *vec = rqstp->rq_vec;
 	size_t total = payload->len;
 	unsigned int i;
+	size_t offset;
 
 	/* Some types of transport can present the write payload
 	 * entirely in rq_arg.pages. In this case, @first is empty.
@@ -1700,12 +1701,14 @@ unsigned int svc_fill_write_vector(struct svc_rqst *rqstp,
 		++i;
 	}
 
+	offset = payload->page_base;
 	while (total) {
-		vec[i].iov_base = page_address(*pages);
-		vec[i].iov_len = min_t(size_t, total, PAGE_SIZE);
+		vec[i].iov_base = page_address(*pages) + offset;
+		vec[i].iov_len = min_t(size_t, total, PAGE_SIZE - offset);
 		total -= vec[i].iov_len;
 		++i;
 		++pages;
+		offset = 0;
 	}
 
 	WARN_ON_ONCE(i > ARRAY_SIZE(rqstp->rq_vec));
