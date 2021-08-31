@@ -3844,6 +3844,10 @@ static int arm_smmu_device_probe(struct platform_device *pdev)
 			return ret;
 	}
 
+	smmu = arm_smmu_v3_impl_init(smmu);
+	if (IS_ERR(smmu))
+		return PTR_ERR(smmu);
+
 	/* Set bypass mode according to firmware probing result */
 	bypass = !!ret;
 
