@@ -1719,8 +1719,24 @@ static int fw_devlink_create_devlink(struct device *con,
 	struct device *sup_dev;
 	int ret = 0;
 
+	/*
+	 * If a consumer device is not on a bus (i.e. a driver will never bind
+	 * to it), it doesn't make sense for fw_devlink to create device links
+	 * for it.
+	 */
+	if (con->bus == NULL)
+		return -EINVAL;
+
 	sup_dev = get_dev_from_fwnode(sup_handle);
 	if (sup_dev) {
+		/*
+		 * If a supplier device is not on a bus (i.e. a driver will
+		 * never bind to it), it doesn't make sense for fw_devlink to
+		 * create device links for it.
+		 */
+		if (sup_dev->bus == NULL)
+			return -EINVAL;
+
 		/*
 		 * If it's one of those drivers that don't actually bind to
 		 * their device using driver core, then don't wait on this
