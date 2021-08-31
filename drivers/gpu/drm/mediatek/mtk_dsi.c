@@ -1002,7 +1002,6 @@ static int mtk_dsi_probe(struct platform_device *pdev)
 	struct mtk_dsi *dsi;
 	struct device *dev = &pdev->dev;
 	struct drm_panel *panel;
-	struct resource *regs;
 	int irq_num;
 	int ret;
 
@@ -1058,8 +1057,7 @@ static int mtk_dsi_probe(struct platform_device *pdev)
 		goto err_unregister_host;
 	}
 
-	regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	dsi->regs = devm_ioremap_resource(dev, regs);
+	dsi->regs = devm_platform_ioremap_resource(pdev, 0);
 	if (IS_ERR(dsi->regs)) {
 		ret = PTR_ERR(dsi->regs);
 		dev_err(dev, "Failed to ioremap memory: %d\n", ret);
