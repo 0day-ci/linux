@@ -2032,6 +2032,16 @@ static void arm_smmu_bitmap_free(unsigned long *map, int idx)
 	clear_bit(idx, map);
 }
 
+int arm_smmu_vmid_alloc(struct arm_smmu_device *smmu)
+{
+	return arm_smmu_bitmap_alloc(smmu->vmid_map, smmu->vmid_bits);
+}
+
+void arm_smmu_vmid_free(struct arm_smmu_device *smmu, u16 vmid)
+{
+	arm_smmu_bitmap_free(smmu->vmid_map, vmid);
+}
+
 static void arm_smmu_domain_free(struct iommu_domain *domain)
 {
 	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
