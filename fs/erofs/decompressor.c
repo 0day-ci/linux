@@ -360,8 +360,7 @@ dstmap_out:
 	return ret;
 }
 
-static int z_erofs_shifted_transform(const struct z_erofs_decompress_req *rq,
-				     struct list_head *pagepool)
+static int z_erofs_shifted_transform(const struct z_erofs_decompress_req *rq)
 {
 	const unsigned int nrpages_out =
 		PAGE_ALIGN(rq->pageofs_out + rq->outputsize) >> PAGE_SHIFT;
@@ -403,6 +402,6 @@ int z_erofs_decompress(struct z_erofs_decompress_req *rq,
 		       struct list_head *pagepool)
 {
 	if (rq->alg == Z_EROFS_COMPRESSION_SHIFTED)
-		return z_erofs_shifted_transform(rq, pagepool);
+		return z_erofs_shifted_transform(rq);
 	return z_erofs_decompress_generic(rq, pagepool);
 }
