@@ -1825,6 +1825,62 @@ failure:
 	return error;
 }
 
+static ssize_t qgroup_flags_show(struct kobject *qgroups_kobj,
+				 struct kobj_attribute *a,
+				 char *buf)
+{
+	struct btrfs_fs_info *fs_info = to_fs_info(qgroups_kobj->parent);
+	u64 qgroup_flags;
+	bool first = true;
+	int ret = 0;
+
+	spin_lock(&fs_info->qgroup_lock);
+	qgroup_flags = fs_info->qgroup_flags & BTRFS_QGROUP_STATUS_FLAGS_MASK;
+	spin_unlock(&fs_info->qgroup_lock);
+
+	if (qgroup_flags & BTRFS_QGROUP_STATUS_FLAG_ON) {
+		ret += scnprintf(buf + ret, PAGE_SIZE - ret, "%s%s",
+				(first ? "" : " | "), "ON");
+		first = false;
+	}
+	if (qgroup_flags & BTRFS_QGROUP_STATUS_FLAG_RESCAN) {
+		ret += scnprintf(buf + ret, PAGE_SIZE - ret, "%s%s",
+				(first ? "" : " | "), "RESCAN");
+		first = false;
+	}
+	if (qgroup_flags & BTRFS_QGROUP_STATUS_FLAG_INCONSISTENT) {
+		ret += scnprintf(buf + ret, PAGE_SIZE - ret, "%s%s",
+				(first ? "" : " | "), "INCONSISTENT");
+		first = false;
+	}
+	ret += scnprintf(buf + ret, PAGE_SIZE - ret, "\n");
+	return ret;
+}
+
+BTRFS_ATTR(qgroups, qgroup_flags, qgroup_flags_show);
+
+/*
+ * Qgroups global info
+ *
+ * Path: /sys/fs/btrfs/<uuid>/qgroups/
+ */
+static struct attribute *qgroups_attrs[] = {
+	BTRFS_ATTR_PTR(qgroups, qgroup_flags),
+	NULL
+};
+ATTRIBUTE_GROUPS(qgroups);
+
+static void qgroups_release(struct kobject *kobj)
+{
+	kfree(kobj);
+}
+
+static struct kobj_type qgroups_ktype = {
+	.sysfs_ops = &kobj_sysfs_ops,
+	.default_groups = qgroups_groups,
+	.release = qgroups_release,
+};
+
 static inline struct btrfs_fs_info *qgroup_kobj_to_fs_info(struct kobject *kobj)
 {
 	return to_fs_info(kobj->parent->parent);
@@ -1950,11 +2006,14 @@ int btrfs_sysfs_add_qgroups(struct btrfs_fs_info *fs_info)
 	if (fs_info->qgroups_kobj)
 		return 0;
 
-	fs_info->qgroups_kobj = kobject_create_and_add("qgroups", fsid_kobj);
-	if (!fs_info->qgroups_kobj) {
-		ret = -ENOMEM;
+	fs_info->qgroups_kobj = kmalloc(sizeof(struct kobject), GFP_KERNEL);
+	if (!fs_info->qgroups_kobj)
+		return -ENOMEM;
+
+	ret = kobject_init_and_add(fs_info->qgroups_kobj, &qgroups_ktype,
+				   fsid_kobj, "qgroups");
+	if (ret < 0)
 		goto out;
-	}
 	rbtree_postorder_for_each_entry_safe(qgroup, next,
 					     &fs_info->qgroup_tree, node) {
 		ret = btrfs_sysfs_add_one_qgroup(fs_info, qgroup);
