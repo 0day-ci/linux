@@ -96,6 +96,53 @@ int ocelot_mact_forget(struct ocelot *ocelot,
 }
 EXPORT_SYMBOL(ocelot_mact_forget);
 
+int ocelot_mact_lookup(struct ocelot *ocelot, const unsigned char mac[ETH_ALEN],
+		       unsigned int vid, int *row, int *col)
+{
+	int val;
+
+	ocelot_mact_select(ocelot, mac, vid);
+
+	/* Issue a read command with MACACCESS_VALID=1. */
+	ocelot_write(ocelot, ANA_TABLES_MACACCESS_VALID |
+		     ANA_TABLES_MACACCESS_MAC_TABLE_CMD(MACACCESS_CMD_READ),
+		     ANA_TABLES_MACACCESS);
+
+	if (ocelot_mact_wait_for_completion(ocelot))
+		return -ETIMEDOUT;
+
+	/* Read back the entry flags */
+	val = ocelot_read(ocelot, ANA_TABLES_MACACCESS);
+	if (!(val & ANA_TABLES_MACACCESS_VALID))
+		return -ENOENT;
+
+	ocelot_field_read(ocelot, ANA_TABLES_MACTINDX_M_INDEX, row);
+	ocelot_field_read(ocelot, ANA_TABLES_MACTINDX_BUCKET, col);
+
+	return 0;
+}
+EXPORT_SYMBOL(ocelot_mact_lookup);
+
+/* Like ocelot_mact_learn, except at a specific row and col. */
+void ocelot_mact_write(struct ocelot *ocelot, int port,
+		       const struct ocelot_mact_entry *entry,
+		       int row, int col)
+{
+	ocelot_mact_select(ocelot, entry->mac, entry->vid);
+
+	ocelot_field_write(ocelot, ANA_TABLES_MACTINDX_M_INDEX, row);
+	ocelot_field_write(ocelot, ANA_TABLES_MACTINDX_BUCKET, col);
+
+	ocelot_write(ocelot, ANA_TABLES_MACACCESS_VALID |
+		     ANA_TABLES_MACACCESS_ENTRYTYPE(entry->type) |
+		     ANA_TABLES_MACACCESS_DEST_IDX(port) |
+		     ANA_TABLES_MACACCESS_MAC_TABLE_CMD(MACACCESS_CMD_WRITE),
+		     ANA_TABLES_MACACCESS);
+
+	ocelot_mact_wait_for_completion(ocelot);
+}
+EXPORT_SYMBOL(ocelot_mact_write);
+
 static void ocelot_mact_init(struct ocelot *ocelot)
 {
 	/* Configure the learning mode entries attributes:
