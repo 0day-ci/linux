@@ -177,6 +177,10 @@ struct bt_codecs {
 #define CODING_FORMAT_TRANSPARENT	0x03
 #define CODING_FORMAT_MSBC		0x05
 
+/* Audio data transport path used for SCO */
+#define BT_SCO_HCI_PATH 0x00
+#define BT_SCO_PCM_PATH 0x01
+
 __printf(1, 2)
 void bt_info(const char *fmt, ...);
 __printf(1, 2)

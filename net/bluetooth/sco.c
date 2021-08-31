@@ -506,7 +506,7 @@ static struct sock *sco_sock_alloc(struct net *net, struct socket *sock,
 	sco_pi(sk)->codec.id = CODING_FORMAT_CVSD;
 	sco_pi(sk)->codec.cid = 0xffff;
 	sco_pi(sk)->codec.vid = 0xffff;
-	sco_pi(sk)->codec.data_path = 0x00;
+	sco_pi(sk)->codec.data_path = BT_SCO_HCI_PATH;
 
 	bt_sock_link(&sco_sk_list, sk);
 	return sk;

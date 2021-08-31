@@ -2215,7 +2215,7 @@ error:
 static int btintel_get_data_path_id(struct hci_dev *hdev, __u8 *data_path_id)
 {
 	/* Intel uses 1 as data path id for all the usecases */
-	*data_path_id = 1;
+	*data_path_id = BT_SCO_PCM_PATH;
 	return 0;
 }
 
