@@ -665,8 +665,9 @@ config ARCH_STACKWALK
        bool
 
 config STACKDEPOT
-	bool
+	def_bool n
 	select STACKTRACE
+	prompt "Enable stackdepot support"
 
 config STACK_HASH_ORDER
 	int "stack depot hash size (12 => 4KB, 20 => 1024KB)"
