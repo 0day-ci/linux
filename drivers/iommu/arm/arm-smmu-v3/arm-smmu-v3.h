@@ -817,6 +817,8 @@ static inline void arm_smmu_sva_notifier_synchronize(void) {}
 struct arm_smmu_impl {
 	int (*device_reset)(struct arm_smmu_device *smmu);
 	struct arm_smmu_cmdq *(*get_cmdq)(struct arm_smmu_device *smmu, u64 *cmds, int n);
+	int (*attach_dev)(struct arm_smmu_domain *smmu_domain, struct device *dev);
+	void (*detach_dev)(struct arm_smmu_domain *smmu_domain, struct device *dev);
 };
 
 struct arm_smmu_device *arm_smmu_v3_impl_init(struct arm_smmu_device *smmu);

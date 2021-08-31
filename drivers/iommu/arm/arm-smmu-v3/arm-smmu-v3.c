@@ -2389,6 +2389,9 @@ static void arm_smmu_detach_dev(struct arm_smmu_master *master, struct device *d
 	if (!smmu_domain)
 		return;
 
+	if (master->smmu->impl && master->smmu->impl->detach_dev)
+		master->smmu->impl->detach_dev(smmu_domain, dev);
+
 	arm_smmu_disable_ats(master);
 
 	spin_lock_irqsave(&smmu_domain->devices_lock, flags);
@@ -2470,6 +2473,9 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
 	spin_unlock_irqrestore(&smmu_domain->devices_lock, flags);
 
 	arm_smmu_enable_ats(master);
+
+	if (smmu->impl && smmu->impl->attach_dev)
+		ret = smmu->impl->attach_dev(smmu_domain, dev);
 
 out_unlock:
 	mutex_unlock(&smmu_domain->init_mutex);
