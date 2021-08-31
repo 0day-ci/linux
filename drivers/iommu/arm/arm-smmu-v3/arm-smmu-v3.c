@@ -2377,7 +2377,7 @@ static void arm_smmu_disable_pasid(struct arm_smmu_master *master)
 	pci_disable_pasid(pdev);
 }
 
-static void arm_smmu_detach_dev(struct arm_smmu_master *master)
+static void arm_smmu_detach_dev(struct arm_smmu_master *master, struct device *dev)
 {
 	unsigned long flags;
 	struct arm_smmu_domain *smmu_domain = master->domain;
@@ -2421,7 +2421,7 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
 		return -EBUSY;
 	}
 
-	arm_smmu_detach_dev(master);
+	arm_smmu_detach_dev(master, dev);
 
 	mutex_lock(&smmu_domain->init_mutex);
 
@@ -2713,7 +2713,7 @@ static void arm_smmu_release_device(struct device *dev)
 	master = dev_iommu_priv_get(dev);
 	if (WARN_ON(arm_smmu_master_sva_enabled(master)))
 		iopf_queue_remove_device(master->smmu->evtq.iopf, dev);
-	arm_smmu_detach_dev(master);
+	arm_smmu_detach_dev(master, dev);
 	arm_smmu_disable_pasid(master);
 	arm_smmu_remove_master(master);
 	kfree(master);
