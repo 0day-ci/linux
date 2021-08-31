@@ -3283,8 +3283,6 @@ int t4_get_scfg_version(struct adapter *adapter, u32 *vers)
  */
 int t4_get_version_info(struct adapter *adapter)
 {
-	int ret = 0;
-
 	#define FIRST_RET(__getvinfo) \
 	do { \
 		int __ret = __getvinfo; \
@@ -3300,7 +3298,7 @@ int t4_get_version_info(struct adapter *adapter)
 	FIRST_RET(t4_get_vpd_version(adapter, &adapter->params.vpd_vers));
 
 	#undef FIRST_RET
-	return ret;
+	return 0;
 }
 
 /**
