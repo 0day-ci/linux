@@ -151,6 +151,12 @@ struct drm_device {
 	 * Lock for &drm_device.master, &drm_file.was_master,
 	 * &drm_file.is_master, &drm_file.master, &drm_master.unique,
 	 * &drm_master.unique_len, and &drm_master.magic_map.
+	 *
+	 * Additionally, synchronizes access rights to exclusive resources like
+	 * modesetting access between multiple users. For example, users that
+	 * can change the modeset or display state must hold a read lock on
+	 * @master_rwsem, and users that change modesetting rights should hold
+	 * a write lock.
 	 */
 	struct rw_semaphore master_rwsem;
 
