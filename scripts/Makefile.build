@@ -88,9 +88,7 @@ endif
 
 targets-for-modules := $(patsubst %.o, %.mod, $(filter %.o, $(obj-m)))
 
-ifdef CONFIG_LTO_CLANG
-targets-for-modules += $(patsubst %.o, %.lto.o, $(filter %.o, $(obj-m)))
-endif
+targets-for-modules += $(patsubst %.o, %.prelink.o, $(filter %.o, $(obj-m)))
 
 ifdef need-modorder
 targets-for-modules += $(obj)/modules.order
@@ -243,8 +241,11 @@ endif # CONFIG_STACK_VALIDATION
 
 ifdef CONFIG_LTO_CLANG
 
-# Skip objtool for LLVM bitcode
+# Skip objtool LLVM bitcode
 $(obj)/%o: objtool-enabled :=
+
+# Run objtool now that we have compiled modules into native code
+$(obj)/%.prelink.o: objtool-enabled := y
 
 else
 
@@ -254,6 +255,8 @@ else
 
 $(obj)/%o: objtool-enabled = $(if $(filter-out y%, \
 	$(OBJECT_FILES_NON_STANDARD_$(basetarget).o)$(OBJECT_FILES_NON_STANDARD)n),y)
+
+$(obj)/%.prelink.o: objtool-enabled :=
 
 endif
 
@@ -287,32 +290,12 @@ $(obj)/%.o: $(src)/%.c $(recordmcount_source) FORCE
 	$(call if_changed_rule,cc_o_c)
 	$(call cmd,force_checksrc)
 
-ifdef CONFIG_LTO_CLANG
-# Module .o files may contain LLVM bitcode, compile them into native code
-# before ELF processing
-quiet_cmd_cc_lto_link_modules = LTO [M] $@
-cmd_cc_lto_link_modules =						\
-	$(LD) $(ld_flags) -r -o $@					\
-		$(shell [ -s $(@:.lto.o=.o.symversions) ] &&		\
-			echo -T $(@:.lto.o=.o.symversions))		\
-		--whole-archive $(filter-out FORCE,$^)			\
-		$(cmd_objtool)
-
-# objtool was skipped for LLVM bitcode, run it now that we have compiled
-# modules into native code
-$(obj)/%.lto.o: objtool-enabled = y
-$(obj)/%.lto.o: part-of-module := y
-
-$(obj)/%.lto.o: $(obj)/%.o FORCE
-	$(call if_changed,cc_lto_link_modules)
-endif
-
 cmd_mod = { \
 	echo $(if $($*-objs)$($*-y)$($*-m), $(addprefix $(obj)/, $($*-objs) $($*-y) $($*-m)), $(@:.mod=.o)); \
 	$(undefined_syms) echo; \
 	} > $@
 
-$(obj)/%.mod: $(obj)/%$(mod-prelink-ext).o FORCE
+$(obj)/%.mod: $(obj)/%.prelink.o FORCE
 	$(call if_changed,mod)
 
 quiet_cmd_cc_lst_c = MKLST   $@
@@ -416,17 +399,6 @@ $(obj)/%.asn1.c $(obj)/%.asn1.h: $(src)/%.asn1 $(objtree)/scripts/asn1_compiler
 $(subdir-builtin): $(obj)/%/built-in.a: $(obj)/% ;
 $(subdir-modorder): $(obj)/%/modules.order: $(obj)/% ;
 
-# combine symversions for later processing
-ifeq ($(CONFIG_LTO_CLANG) $(CONFIG_MODVERSIONS),y y)
-      cmd_update_lto_symversions =					\
-	rm -f $@.symversions						\
-	$(foreach n, $(filter-out FORCE,$^),				\
-		$(if $(shell test -s $(n).symversions && echo y),	\
-			; cat $(n).symversions >> $@.symversions))
-else
-      cmd_update_lto_symversions = echo >/dev/null
-endif
-
 #
 # Rule to compile a set of .o files into one .a file (without symbol table)
 #
@@ -446,10 +418,10 @@ $(obj)/built-in.a: $(real-obj-y) FORCE
 # modules.order unless contained modules are updated.
 
 cmd_modules_order = { $(foreach m, $(real-prereqs), \
-	$(if $(filter %/modules.order, $m), cat $m, echo $(patsubst %.o,%.ko,$m));) :; } \
+	$(if $(filter %/modules.order, $m), cat $m, echo $(patsubst %.a,%.ko,$m));) :; } \
 	| $(AWK) '!x[$$0]++' - > $@
 
-$(obj)/modules.order: $(obj-m) FORCE
+$(obj)/modules.order: $(modules) FORCE
 	$(call if_changed,modules_order)
 
 #
@@ -458,26 +430,44 @@ $(obj)/modules.order: $(obj-m) FORCE
 $(obj)/lib.a: $(lib-y) FORCE
 	$(call if_changed,ar)
 
-# NOTE:
-# Do not replace $(filter %.o,^) with $(real-prereqs). When a single object
-# module is turned into a multi object module, $^ will contain header file
-# dependencies recorded in the .*.cmd file.
-ifdef CONFIG_LTO_CLANG
-quiet_cmd_link_multi-m = AR [M]  $@
-cmd_link_multi-m =						\
-	$(cmd_update_lto_symversions);				\
-	rm -f $@; 						\
-	$(AR) cDPrsT $@ $(filter %.o,$^)
-else
-quiet_cmd_link_multi-m = LD [M]  $@
-      cmd_link_multi-m = $(LD) $(ld_flags) -r -o $@ $(filter %.o,$^)
+#
+# Rule to prelink modules
+#
+
+ifeq ($(CONFIG_LTO_CLANG) $(CONFIG_MODVERSIONS),y y)
+
+cmd_merge_symver = $(PERL) scripts/merge-symvers.pl -a $(AR) -o $@ $<
+
+$(obj)/%.prelink.symversions: $(obj)/%.a FORCE
+	$(call if_changed,merge_symver)
+
+targets += $(patsubst %.a, %.prelink.symversions, $(modules))
+
+$(obj)/%.prelink.o: ld_flags += --script=$(filter %.symversions,$^)
+module-symver = $(obj)/%.prelink.symversions
+
 endif
 
-$(multi-obj-m): FORCE
-	$(call if_changed,link_multi-m)
-$(call multi_depend, $(multi-obj-m), .o, -objs -y -m)
+quiet_cmd_ld_o_a = LD [M]  $@
+      cmd_ld_o_a = $(LD) $(ld_flags) -r -o $@ --whole-archive $< $(cmd_objtool)
 
-targets += $(multi-obj-m)
+$(obj)/%.prelink.o: part-of-module := y
+
+$(obj)/%.prelink.o: $(obj)/%.a $(module-symver) FORCE
+	$(call if_changed,ld_o_a)
+
+quiet_cmd_ar_module = AR [M]  $@
+      cmd_ar_module = rm -f $@; $(AR) cDPrST $@ $(real-prereqs)
+
+$(modules-single): %.a: %.o FORCE
+	$(call if_changed,ar_module)
+
+$(modules-multi): FORCE
+	$(call if_changed,ar_module)
+$(call multi_depend, $(modules-multi), .a, -objs -y -m)
+
+targets += $(modules-single) $(modules-multi)
+
 targets := $(filter-out $(PHONY), $(targets))
 
 # Add intermediate targets:

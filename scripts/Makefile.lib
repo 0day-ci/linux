@@ -106,6 +106,10 @@ multi-dtb-y	:= $(addprefix $(obj)/, $(multi-dtb-y))
 real-dtb-y	:= $(addprefix $(obj)/, $(real-dtb-y))
 subdir-ym	:= $(addprefix $(obj)/,$(subdir-ym))
 
+modules		:= $(patsubst %.o, %.a, $(obj-m))
+modules-multi	:= $(sort $(patsubst %.o, %.a, $(multi-obj-m)))
+modules-single	:= $(sort $(filter-out $(modules-multi), $(filter %.a, $(modules))))
+
 # Finds the multi-part object the current object will be linked into.
 # If the object belongs to two or more multi-part objects, list them all.
 modname-multi = $(sort $(foreach m,$(multi-obj-ym),\
@@ -224,13 +228,6 @@ DTC_INCLUDE    := $(srctree)/scripts/dtc/include-prefixes
 dtc_cpp_flags  = -Wp,-MMD,$(depfile).pre.tmp -nostdinc                    \
 		 $(addprefix -I,$(DTC_INCLUDE))                          \
 		 -undef -D__DTS__
-
-ifeq ($(CONFIG_LTO_CLANG),y)
-# With CONFIG_LTO_CLANG, .o files in modules might be LLVM bitcode, so we
-# need to run LTO to compile them into native code (.lto.o) before further
-# processing.
-mod-prelink-ext := .lto
-endif
 
 # Useful for describing the dependency of composite objects
 # Usage:
