@@ -335,8 +335,11 @@ static int arm_smmu_cmdq_build_cmd(u64 *cmd, struct arm_smmu_cmdq_ent *ent)
 	return 0;
 }
 
-static struct arm_smmu_cmdq *arm_smmu_get_cmdq(struct arm_smmu_device *smmu)
+static struct arm_smmu_cmdq *arm_smmu_get_cmdq(struct arm_smmu_device *smmu, u64 *cmds, int n)
 {
+	if (smmu->impl && smmu->impl->get_cmdq)
+		return smmu->impl->get_cmdq(smmu, cmds, n);
+
 	return &smmu->cmdq;
 }
 
@@ -742,7 +745,7 @@ static int arm_smmu_cmdq_issue_cmdlist(struct arm_smmu_device *smmu,
 	u32 prod;
 	unsigned long flags;
 	bool owner;
-	struct arm_smmu_cmdq *cmdq = arm_smmu_get_cmdq(smmu);
+	struct arm_smmu_cmdq *cmdq = arm_smmu_get_cmdq(smmu, cmds, n);
 	struct arm_smmu_ll_queue llq, head;
 	int ret = 0;
 
@@ -3485,6 +3488,14 @@ static int arm_smmu_device_reset(struct arm_smmu_device *smmu, bool bypass)
 	if (ret) {
 		dev_err(smmu->dev, "failed to enable SMMU interface\n");
 		return ret;
+	}
+
+	if (smmu->impl && smmu->impl->device_reset) {
+		ret = smmu->impl->device_reset(smmu);
+		if (ret) {
+			dev_err(smmu->dev, "failed at implementation specific device_reset\n");
+			return ret;
+		}
 	}
 
 	return 0;

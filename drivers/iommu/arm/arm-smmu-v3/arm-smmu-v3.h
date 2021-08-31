@@ -647,6 +647,8 @@ struct arm_smmu_device {
 #define ARM_SMMU_OPT_MSIPOLL		(1 << 2)
 	u32				options;
 
+	const struct arm_smmu_impl	*impl;
+
 	struct arm_smmu_cmdq		cmdq;
 	struct arm_smmu_evtq		evtq;
 	struct arm_smmu_priq		priq;
@@ -812,6 +814,12 @@ static inline void arm_smmu_sva_notifier_synchronize(void) {}
 #endif /* CONFIG_ARM_SMMU_V3_SVA */
 
 /* Implementation details */
+struct arm_smmu_impl {
+	int (*device_reset)(struct arm_smmu_device *smmu);
+	struct arm_smmu_cmdq *(*get_cmdq)(struct arm_smmu_device *smmu, u64 *cmds, int n);
+};
+
 struct arm_smmu_device *arm_smmu_v3_impl_init(struct arm_smmu_device *smmu);
+struct arm_smmu_device *nvidia_smmu_v3_impl_init(struct arm_smmu_device *smmu);
 
 #endif /* _ARM_SMMU_V3_H */
