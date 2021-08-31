@@ -15,8 +15,65 @@
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <linux/gpio.h>
+#include <linux/const.h>
+#include <linux/ioctl.h>
+#include <linux/types.h>
 
 #define CONSUMER	"gpio-mockup-cdev"
+
+#define GPIO_V2_LINE_NUM_ATTRS_MAX 10
+#define GPIO_V2_LINES_MAX 64
+#define GPIO_MAX_NAME_SIZE 32
+
+#define GPIOHANDLE_REQUEST_BIAS_PULL_UP	(1UL << 5)
+#define GPIOHANDLE_REQUEST_BIAS_DISABLE	(1UL << 7)
+#define GPIOHANDLE_REQUEST_BIAS_PULL_DOWN	(1UL << 6)
+#define GPIO_V2_LINE_GET_VALUES_IOCTL _IOWR(0xB4, 0x0E, struct gpio_v2_line_values)
+#define GPIO_V2_GET_LINE_IOCTL _IOWR(0xB4, 0x07, struct gpio_v2_line_request)
+
+enum gpio_v2_line_flag {
+	GPIO_V2_LINE_FLAG_ACTIVE_LOW = _BITULL(1),
+	GPIO_V2_LINE_FLAG_INPUT	= _BITULL(2),
+	GPIO_V2_LINE_FLAG_OUTPUT = _BITULL(3),
+	GPIO_V2_LINE_FLAG_BIAS_PULL_UP = _BITULL(8),
+	GPIO_V2_LINE_FLAG_BIAS_PULL_DOWN = _BITULL(9),
+	GPIO_V2_LINE_FLAG_BIAS_DISABLED	= _BITULL(10),
+};
+enum gpio_v2_line_attr_id {
+	GPIO_V2_LINE_ATTR_ID_OUTPUT_VALUES = 2,
+};
+struct gpio_v2_line_values {
+	__aligned_u64 bits;
+	__aligned_u64 mask;
+};
+struct gpio_v2_line_attribute {
+	__u32 id;
+	__u32 padding;
+	union {
+		__aligned_u64 flags;
+		__aligned_u64 values;
+		__u32 debounce_period_us;
+	};
+};
+struct gpio_v2_line_config_attribute {
+	struct gpio_v2_line_attribute attr;
+	__aligned_u64 mask;
+};
+struct gpio_v2_line_config {
+	__aligned_u64 flags;
+	__u32 num_attrs;
+	__u32 padding[5];
+	struct gpio_v2_line_config_attribute attrs[GPIO_V2_LINE_NUM_ATTRS_MAX];
+};
+struct gpio_v2_line_request {
+	__u32 offsets[GPIO_V2_LINES_MAX];
+	char consumer[GPIO_MAX_NAME_SIZE];
+	struct gpio_v2_line_config config;
+	__u32 num_lines;
+	__u32 event_buffer_size;
+	__u32 padding[5];
+	__s32 fd;
+};
 
 static int request_line_v2(int cfd, unsigned int offset,
 			   uint64_t flags, unsigned int val)
