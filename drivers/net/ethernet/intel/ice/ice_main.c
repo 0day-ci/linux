@@ -5974,6 +5974,62 @@ static void ice_napi_disable_all(struct ice_vsi *vsi)
 }
 
 /**
+ * ice_get_eec_state - get state of SyncE DPLL
+ * @netdev: network interface device structure
+ * @state: state of SyncE DPLL
+ * @src: source type driving SyncE DPLL
+ * @pin_idx: index of pin driving SyncE DPLL
+ */
+static int
+ice_get_eec_state(struct net_device *netdev, struct if_eec_state_msg *state,
+		  struct netlink_ext_ack *extack)
+{
+	struct ice_netdev_priv *np = netdev_priv(netdev);
+	struct ice_vsi *vsi = np->vsi;
+	struct ice_pf *pf = vsi->back;
+
+	if (!ice_is_e810t(&pf->hw))
+		return -EOPNOTSUPP;
+
+	state->state = pf->synce_dpll_state;
+	state->flags |= EEC_FLAG_STATE_VAL;
+
+	/* Don't report source and pin if we are not locked */
+	if (pf->synce_dpll_state != IF_EEC_STATE_LOCKED)
+		return 0;
+
+
+	state->pin = pf->synce_dpll_pin;
+	state->flags |= EEC_FLAG_PIN_VAL;
+
+	switch (pf->synce_dpll_pin) {
+	case REF0P:
+	case REF0N:
+		state->src = IF_EEC_SRC_PTP;
+		break;
+	case REF1P:
+	case REF1N:
+	case REF2P:
+	case REF2N:
+		state->src = IF_EEC_SRC_SYNCE;
+		break;
+	case REF3P:
+	case REF3N:
+		state->src = IF_EEC_SRC_EXT;
+		break;
+	case REF4P:
+		state->src = IF_EEC_SRC_GNSS;
+		break;
+	default:
+		state->src = IF_EEC_SRC_UNKNOWN;
+		break;
+	}
+	state->flags |= EEC_FLAG_SRC_VAL;
+
+	return 0;
+}
+
+/**
  * ice_down - Shutdown the connection
  * @vsi: The VSI being stopped
  */
@@ -7263,4 +7319,5 @@ static const struct net_device_ops ice_netdev_ops = {
 	.ndo_bpf = ice_xdp,
 	.ndo_xdp_xmit = ice_xdp_xmit,
 	.ndo_xsk_wakeup = ice_xsk_wakeup,
+	.ndo_get_eec_state = ice_get_eec_state,
 };

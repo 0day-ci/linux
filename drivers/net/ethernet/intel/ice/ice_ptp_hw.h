@@ -30,6 +30,8 @@ int ice_clear_phy_tstamp(struct ice_hw *hw, u8 block, u8 idx);
 
 /* E810 family functions */
 int ice_ptp_init_phy_e810(struct ice_hw *hw);
+enum if_eec_state
+ice_get_dpll_state(struct ice_hw *hw, u8 dpll_idx, u8 *pin);
 
 #define PFTSYN_SEM_BYTES	4
 
@@ -75,5 +77,25 @@ int ice_ptp_init_phy_e810(struct ice_hw *hw);
 
 #define LOW_TX_MEMORY_BANK_START	0x03090000
 #define HIGH_TX_MEMORY_BANK_START	0x03090004
+
+enum ice_e810t_cgu_dpll {
+	ICE_CGU_DPLL_SYNCE,
+	ICE_CGU_DPLL_PTP,
+	ICE_CGU_DPLL_MAX
+};
+
+enum ice_e810t_cgu_pins {
+	REF0P,
+	REF0N,
+	REF1P,
+	REF1N,
+	REF2P,
+	REF2N,
+	REF3P,
+	REF3N,
+	REF4P,
+	REF4N,
+	NUM_E810T_CGU_PINS
+};
 
 #endif /* _ICE_PTP_HW_H_ */
