@@ -664,7 +664,29 @@ static ssize_t boot_vga_show(struct device *dev, struct device_attribute *attr,
 			  !!(pdev->resource[PCI_ROM_RESOURCE].flags &
 			     IORESOURCE_ROM_SHADOW));
 }
-static DEVICE_ATTR_RO(boot_vga);
+
+static ssize_t boot_vga_store(struct device *dev, struct device_attribute *attr,
+			      const char *buf, size_t count)
+{
+	unsigned long val;
+	struct pci_dev *pdev = to_pci_dev(dev);
+	struct pci_dev *vga_dev = vga_default_device();
+
+	if (kstrtoul(buf, 0, &val) < 0)
+		return -EINVAL;
+
+	if (val != 1)
+		return -EINVAL;
+
+	if (!capable(CAP_SYS_ADMIN))
+		return -EPERM;
+
+	if (pdev != vga_dev)
+		vga_set_default_device(pdev);
+
+	return count;
+}
+static DEVICE_ATTR_RW(boot_vga);
 
 static ssize_t pci_read_config(struct file *filp, struct kobject *kobj,
 			       struct bin_attribute *bin_attr, char *buf,
