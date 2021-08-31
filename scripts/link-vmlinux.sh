@@ -52,8 +52,7 @@ gen_initcalls()
 		> .tmp_initcalls.lds
 }
 
-# If CONFIG_LTO_CLANG is selected, collect generated symbol versions into
-# .tmp_symversions.lds
+# Collect generated symbol versions into .tmp_symversions.lds
 gen_symversions()
 {
 	info GEN .tmp_symversions.lds
@@ -75,14 +74,13 @@ modpost_link()
 		${KBUILD_VMLINUX_LIBS}				\
 		--end-group"
 
+	if [ -n "${CONFIG_MODVERSIONS}" ]; then
+		lds="${lds} -T .tmp_symversions.lds"
+	fi
+
 	if [ -n "${CONFIG_LTO_CLANG}" ]; then
 		gen_initcalls
-		lds="-T .tmp_initcalls.lds"
-
-		if [ -n "${CONFIG_MODVERSIONS}" ]; then
-			gen_symversions
-			lds="${lds} -T .tmp_symversions.lds"
-		fi
+		lds="${lds} -T .tmp_initcalls.lds"
 
 		# This might take a while, so indicate that we're doing
 		# an LTO link
@@ -178,6 +176,10 @@ vmlinux_link()
 	fi
 
 	ldflags="${ldflags} ${wl}--script=${objtree}/${KBUILD_LDS}"
+
+	if [ -n "${CONFIG_MODVERSIONS}" ]; then
+		ldflags="${ldflags} ${wl}--script=.tmp_symversions.lds"
+	fi
 
 	# The kallsyms linking does not need debug symbols included.
 	if [ "$output" != "${output#.tmp_vmlinux.kallsyms}" ] ; then
@@ -331,6 +333,10 @@ fi;
 
 # final build of init/
 ${MAKE} -f "${srctree}/scripts/Makefile.build" obj=init need-builtin=1
+
+if [ -n "${CONFIG_MODVERSIONS}" ]; then
+	gen_symversions
+fi
 
 #link vmlinux.o
 modpost_link vmlinux.o
