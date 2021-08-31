@@ -61,20 +61,40 @@ struct ipu3_uapi_grid_config {
 	__u16 y_end;
 } __packed;
 
+/**
+ * struct ipu3_uapi_awb_raw_buffer - Memory layout for each cell in AWB
+ *
+ * @Gr_avg:	Green average for red lines in the cell.
+ * @R_avg:	Red average in the cell.
+ * @B_avg:	Blue average in the cell.
+ * @Gb_avg:	Green average for blue lines in the cell.
+ * @sat_ratio:  Saturation ratio in the cell.
+ * @padding0:   Unused byte for padding.
+ * @padding1:   Unused byte for padding.
+ * @padding2:   Unused byte for padding.
+ */
+struct ipu3_uapi_awb_raw_buffer {
+    unsigned char Gr_avg;
+    unsigned char R_avg;
+    unsigned char B_avg;
+    unsigned char Gb_avg;
+    unsigned char sat_ratio;
+    unsigned char padding0;
+    unsigned char padding1;
+    unsigned char padding2;
+} __packed;
+
 /*
  * The grid based data is divided into "slices" called set, each slice of setX
  * refers to ipu3_uapi_grid_config width * height_per_slice.
  */
 #define IPU3_UAPI_AWB_MAX_SETS				60
-/* Based on grid size 80 * 60 and cell size 16 x 16 */
-#define IPU3_UAPI_AWB_SET_SIZE				1280
-#define IPU3_UAPI_AWB_MD_ITEM_SIZE			8
-#define IPU3_UAPI_AWB_SPARE_FOR_BUBBLES \
-	(IPU3_UAPI_MAX_BUBBLE_SIZE * IPU3_UAPI_MAX_STRIPES * \
-	 IPU3_UAPI_AWB_MD_ITEM_SIZE)
+#define AWB_PUBLIC_NUM_OF_ITEMS_IN_SET			160
+/* Based on max grid height + Spare for bubbles */
+#define AWB_PUBLIC_NUM_OF_SETS_IN_BUFFER IPU3_UAPI_AWB_MAX_SETS + \
+	(IPU3_UAPI_MAX_BUBBLE_SIZE * IPU3_UAPI_MAX_STRIPES)
 #define IPU3_UAPI_AWB_MAX_BUFFER_SIZE \
-	(IPU3_UAPI_AWB_MAX_SETS * \
-	 (IPU3_UAPI_AWB_SET_SIZE + IPU3_UAPI_AWB_SPARE_FOR_BUBBLES))
+        AWB_PUBLIC_NUM_OF_SETS_IN_BUFFER * AWB_PUBLIC_NUM_OF_ITEMS_IN_SET
 
 /**
  * struct ipu3_uapi_awb_raw_buffer - AWB raw buffer
@@ -83,7 +103,7 @@ struct ipu3_uapi_grid_config {
  *		the average values for each color channel.
  */
 struct ipu3_uapi_awb_raw_buffer {
-	__u8 meta_data[IPU3_UAPI_AWB_MAX_BUFFER_SIZE]
+	struct ipu3_uapi_awb_raw_buffer meta_data[IPU3_UAPI_AWB_MAX_BUFFER_SIZE]
 		__attribute__((aligned(32)));
 } __packed;
 
