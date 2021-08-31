@@ -1216,6 +1216,32 @@ struct vfio_iommu_type1_dirty_bitmap_get {
 
 #define VFIO_IOMMU_DIRTY_PAGES             _IO(VFIO_TYPE, VFIO_BASE + 17)
 
+/**
+ * VFIO_IOMMU_GET_VMID - _IOWR(VFIO_TYPE, VFIO_BASE + 22, __u32 *vmid)
+ * VFIO_IOMMU_SET_VMID - _IOWR(VFIO_TYPE, VFIO_BASE + 23, __u32 vmid)
+ *
+ * IOCTLs are used for VMID alignment between Kernel and User Space hypervisor.
+ * In a virtualization use case, a guest owns the first stage translation, and
+ * the hypervisor owns the second stage translation. VMID is an Virtual Machine
+ * Identifier that is to tag TLB entries of a VM. If a VM has multiple physical
+ * devices being assigned to it, while these devices are under different IOMMU
+ * domains, the VMIDs in the second stage configurations of these IOMMU domains
+ * could be aligned to a unified VMID value. This could be achieved by using
+ * these two IOCTLs.
+ *
+ * Caller should get VMID upon its initial value when the first physical device
+ * is assigned to the VM.
+ *
+ * Caller then should set VMID to share the same VMID value with other physical
+ * devices being assigned to the same VM.
+ *
+ */
+#define VFIO_IOMMU_VMID_INVALID		(-1U)
+
+#define VFIO_IOMMU_GET_VMID		_IO(VFIO_TYPE, VFIO_BASE + 22)
+
+#define VFIO_IOMMU_SET_VMID		_IO(VFIO_TYPE, VFIO_BASE + 23)
+
 /* -------- Additional API for SPAPR TCE (Server POWERPC) IOMMU -------- */
 
 /*

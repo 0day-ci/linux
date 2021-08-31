@@ -59,6 +59,7 @@ struct vfio_container {
 	struct rw_semaphore		group_lock;
 	struct vfio_iommu_driver	*iommu_driver;
 	void				*iommu_data;
+	u32				vmid;
 	bool				noiommu;
 };
 
@@ -1104,6 +1105,16 @@ static long vfio_fops_unl_ioctl(struct file *filep,
 	case VFIO_SET_IOMMU:
 		ret = vfio_ioctl_set_iommu(container, arg);
 		break;
+	case VFIO_IOMMU_GET_VMID:
+		ret = copy_to_user((void __user *)arg, &container->vmid,
+				   sizeof(u32)) ? -EFAULT : 0;
+		break;
+	case VFIO_IOMMU_SET_VMID:
+		if ((u32)arg == VFIO_IOMMU_VMID_INVALID)
+			return -EINVAL;
+		container->vmid = (u32)arg;
+		ret = 0;
+		break;
 	default:
 		driver = container->iommu_driver;
 		data = container->iommu_data;
@@ -1126,6 +1137,8 @@ static int vfio_fops_open(struct inode *inode, struct file *filep)
 	INIT_LIST_HEAD(&container->group_list);
 	init_rwsem(&container->group_lock);
 	kref_init(&container->kref);
+
+	container->vmid = VFIO_IOMMU_VMID_INVALID;
 
 	filep->private_data = container;
 
