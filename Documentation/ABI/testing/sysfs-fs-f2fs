@@ -512,3 +512,27 @@ Date:		July 2021
 Contact:	"Daeho Jeong" <daehojeong@google.com>
 Description:	You can	control the multiplier value of	bdi device readahead window size
 		between 2 (default) and 256 for POSIX_FADV_SEQUENTIAL advise option.
+
+What:		/sys/fs/f2fs/<disk>/fragment_chunk_size
+Date:		August 2021
+Contact:	"Daeho Jeong" <daehojeong@google.com>
+Description:	With "mode=fragment:fixed_block" and "mode=fragment:rand_block" mount options,
+		we can scatter block allocation. Using this node, in "fragment:fixed_block"
+		mode, f2fs will allocate <fragment_chunk_size> blocks in a chunk and make
+		a hole in the length of	<fragment_hole_size> by turns in a newly allocated
+		free segment. Plus, in "fragment:rand_block" mode, f2fs will allocate
+		1..<fragment_chunk_size> blocks in a chunk and make a hole in the length of
+		1..<fragment_hole_size> by turns. This value can be set between 1..512 and
+		the default value is 4.
+
+What:		/sys/fs/f2fs/<disk>/fragment_hole_size
+Date:		August 2021
+Contact:	"Daeho Jeong" <daehojeong@google.com>
+Description:	With "mode=fragment:fixed_block" and "mode=fragment:rand_block" mount options,
+		we can scatter block allocation. Using this node, in "fragment:fixed_block"
+		mode, f2fs will allocate <fragment_chunk_size> blocks in a chunk and make
+		a hole in the length of	<fragment_hole_size> by turns in a newly allocated
+		free segment. Plus, in "fragment:rand_block" mode, f2fs will allocate
+		1..<fragment_chunk_size> blocks in a chunk and make a hole in the length of
+		1..<fragment_hole_size> by turns. This value can be set between 1..512 and
+		the default value is 4.
