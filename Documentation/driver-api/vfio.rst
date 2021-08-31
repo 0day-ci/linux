@@ -239,6 +239,40 @@ group and can access them as follows::
 	/* Gratuitous device reset and go... */
 	ioctl(device, VFIO_DEVICE_RESET);
 
+IOMMU Virtual Machine Identifier (VMID)
+------------------------
+In case of virtualization, each VM is assigned a Virtual Machine Identifier
+(VMID). This VMID is used to tag translation lookaside buffer (TLB) entries,
+to identify which VM each entry belongs to. This tagging allows translations
+for multiple different VMs to be present in the TLBs at the same time.
+
+The IOMMU Kernel driver is responsible for allocating a VMID. However, only
+a hypervisor knows what physical devices get assigned to the same VM. Thus,
+when the first physical device gets assigned to the VM, once the hypervisor
+finishes its IOCTL call of VFIO_SET_IOMMU, it should call the following:
+
+struct vm {
+	int iommu_type;
+	uint32_t vmid;	/* initial value is VFIO_IOMMU_VMID_INVALID */
+} vm0;
+
+	/* ... */
+	ioctl(container->fd, VFIO_SET_IOMMU, vm0->iommu_type);
+	/* ... */
+	if (vm0->vmid == VFIO_IOMMU_VMID_INVALID)
+		ioctl(container->fd, VFIO_IOMMU_GET_VMID, &vm0->vmid);
+
+This VMID would be the shared value, across the entire VM, between all the
+physical devices that are assigned to it. So, when other physical devices
+get assigned to the VM, before the hypervisor runs into the IOCTL call of
+VFIO_IOMMU_SET_VMID, it should call the following:
+
+	/* ... */
+	ioctl(container->fd, VFIO_SET_IOMMU, vm0->iommu_type);
+	/* ... */
+	if (vm0->vmid != VFIO_IOMMU_VMID_INVALID)
+		ioctl(container->fd, VFIO_IOMMU_SET_VMID, vmid);
+
 VFIO User API
 -------------------------------------------------------------------------------
 
