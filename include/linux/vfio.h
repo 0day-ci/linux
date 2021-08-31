@@ -108,6 +108,8 @@ struct vfio_iommu_driver_ops {
 						   struct iommu_group *group);
 	void		(*notify)(void *iommu_data,
 				  enum vfio_iommu_notify_type event);
+	int		(*set_vmid)(void *iommu_data, u32 vmid);
+	int		(*get_vmid)(void *iommu_data, u32 *vmid);
 };
 
 extern int vfio_register_iommu_driver(const struct vfio_iommu_driver_ops *ops);

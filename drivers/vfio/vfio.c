@@ -994,9 +994,21 @@ static int __vfio_container_attach_groups(struct vfio_container *container,
 	int ret = -ENODEV;
 
 	list_for_each_entry(group, &container->group_list, container_next) {
+		if (driver->ops->set_vmid && container->vmid != VFIO_IOMMU_VMID_INVALID) {
+			ret = driver->ops->set_vmid(data, container->vmid);
+			if (ret)
+				goto unwind;
+		}
+
 		ret = driver->ops->attach_group(data, group->iommu_group);
 		if (ret)
 			goto unwind;
+
+		if (driver->ops->get_vmid && container->vmid == VFIO_IOMMU_VMID_INVALID) {
+			ret = driver->ops->get_vmid(data, &container->vmid);
+			if (ret)
+				goto unwind;
+		}
 	}
 
 	return ret;
