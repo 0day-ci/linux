@@ -380,11 +380,8 @@ $(subdir-modorder): $(obj)/%/modules.order: $(obj)/% ;
 # Rule to compile a set of .o files into one .a file (without symbol table)
 #
 
-quiet_cmd_ar_builtin = AR      $@
-      cmd_ar_builtin = rm -f $@; $(AR) cDPrST $@ $(real-prereqs)
-
 $(obj)/built-in.a: $(real-obj-y) FORCE
-	$(call if_changed,ar_builtin)
+	$(call if_changed,ar_thin)
 
 #
 # Rule to create modules.order file
@@ -438,14 +435,11 @@ $(obj)/%.prelink.o: part-of-module := y
 $(obj)/%.prelink.o: $(obj)/%.a $(module-symver) FORCE
 	$(call if_changed_rule,ld_o_a)
 
-quiet_cmd_ar_module = AR [M]  $@
-      cmd_ar_module = rm -f $@; $(AR) cDPrST $@ $(real-prereqs)
-
 $(modules-single): %.a: %.o FORCE
-	$(call if_changed,ar_module)
+	$(call if_changed,ar_thin)
 
 $(modules-multi): FORCE
-	$(call if_changed,ar_module)
+	$(call if_changed,ar_thin)
 $(call multi_depend, $(modules-multi), .a, -objs -y -m)
 
 targets += $(modules-single) $(modules-multi)

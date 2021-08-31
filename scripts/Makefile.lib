@@ -198,7 +198,7 @@ _cpp_flags += -I $(srctree)/$(src) -I $(objtree)/$(obj)
 endif
 endif
 
-part-of-module = $(if $(filter $(basename $@).o, $(real-obj-m)),y)
+part-of-module = $(if $(filter $(basename $@).o, $(real-obj-m) $(obj-m)),y)
 quiet_modtag = $(if $(part-of-module),[M],   )
 
 modkern_cflags =                                          \
@@ -275,6 +275,9 @@ quiet_cmd_ld = LD      $@
 
 quiet_cmd_ar = AR      $@
       cmd_ar = rm -f $@; $(AR) cDPrsT $@ $(real-prereqs)
+
+quiet_cmd_ar_thin = AR $(quiet_modtag)  $@
+      cmd_ar_thin = rm -f $@; $(AR) cDPrST $@ $(real-prereqs)
 
 # Objcopy
 # ---------------------------------------------------------------------------
