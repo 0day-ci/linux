@@ -74,6 +74,7 @@ struct vfio_iommu {
 	uint64_t		pgsize_bitmap;
 	uint64_t		num_non_pinned_groups;
 	wait_queue_head_t	vaddr_wait;
+	uint32_t		vmid;
 	bool			v2;
 	bool			nesting;
 	bool			dirty_page_tracking;
@@ -2674,6 +2675,7 @@ static void *vfio_iommu_type1_open(unsigned long arg)
 	iommu->dma_list = RB_ROOT;
 	iommu->dma_avail = dma_entry_limit;
 	iommu->container_open = true;
+	iommu->vmid = VFIO_IOMMU_VMID_INVALID;
 	mutex_init(&iommu->lock);
 	BLOCKING_INIT_NOTIFIER_HEAD(&iommu->notifier);
 	init_waitqueue_head(&iommu->vaddr_wait);
@@ -3255,6 +3257,27 @@ static void vfio_iommu_type1_notify(void *iommu_data,
 	wake_up_all(&iommu->vaddr_wait);
 }
 
+static int vfio_iommu_type1_get_vmid(void *iommu_data, u32 *vmid)
+{
+	struct vfio_iommu *iommu = iommu_data;
+
+	*vmid = iommu->vmid;
+
+	return 0;
+}
+
+static int vfio_iommu_type1_set_vmid(void *iommu_data, u32 vmid)
+{
+	struct vfio_iommu *iommu = iommu_data;
+
+	if (vmid == VFIO_IOMMU_VMID_INVALID)
+		return -EINVAL;
+
+	iommu->vmid = vmid;
+
+	return 0;
+}
+
 static const struct vfio_iommu_driver_ops vfio_iommu_driver_ops_type1 = {
 	.name			= "vfio-iommu-type1",
 	.owner			= THIS_MODULE,
@@ -3270,6 +3293,8 @@ static const struct vfio_iommu_driver_ops vfio_iommu_driver_ops_type1 = {
 	.dma_rw			= vfio_iommu_type1_dma_rw,
 	.group_iommu_domain	= vfio_iommu_type1_group_iommu_domain,
 	.notify			= vfio_iommu_type1_notify,
+	.set_vmid		= vfio_iommu_type1_set_vmid,
+	.get_vmid		= vfio_iommu_type1_get_vmid,
 };
 
 static int __init vfio_iommu_type1_init(void)
