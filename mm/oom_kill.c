@@ -247,6 +247,7 @@ long oom_badness(struct task_struct *p, unsigned long totalpages)
 static const char * const oom_constraint_text[] = {
 	[CONSTRAINT_NONE] = "CONSTRAINT_NONE",
 	[CONSTRAINT_CPUSET] = "CONSTRAINT_CPUSET",
+	[CONSTRAINT_CPUSET_NONE] = "CONSTRAINT_CPUSET_NONE",
 	[CONSTRAINT_MEMORY_POLICY] = "CONSTRAINT_MEMORY_POLICY",
 	[CONSTRAINT_MEMCG] = "CONSTRAINT_MEMCG",
 };
@@ -275,6 +276,14 @@ static enum oom_constraint constrained_alloc(struct oom_control *oc)
 
 	if (!oc->zonelist)
 		return CONSTRAINT_NONE;
+
+	if (cpusets_enabled() && (oc->gfp_mask & __GFP_HARDWALL)) {
+		z = first_zones_zonelist(oc->zonelist,
+			highest_zoneidx, &cpuset_current_mems_allowed);
+		if (!z->zone)
+			return CONSTRAINT_CPUSET_NONE;
+	}
+
 	/*
 	 * Reach here only when __GFP_NOFAIL is used. So, we should avoid
 	 * to kill current.We have to random task kill in this case.
@@ -1093,7 +1102,9 @@ bool out_of_memory(struct oom_control *oc)
 		oc->nodemask = NULL;
 	check_panic_on_oom(oc);
 
-	if (!is_memcg_oom(oc) && sysctl_oom_kill_allocating_task &&
+	if (!is_memcg_oom(oc) &&
+	    (sysctl_oom_kill_allocating_task ||
+	       oc->constraint == CONSTRAINT_CPUSET_NONE) &&
 	    current->mm && !oom_unkillable_task(current) &&
 	    oom_cpuset_eligible(current, oc) &&
 	    current->signal->oom_score_adj != OOM_SCORE_ADJ_MIN) {

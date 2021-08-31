@@ -18,6 +18,7 @@ struct task_struct;
 enum oom_constraint {
 	CONSTRAINT_NONE,
 	CONSTRAINT_CPUSET,
+	CONSTRAINT_CPUSET_NONE,	/* no available zone from cpuset's mem nodes */
 	CONSTRAINT_MEMORY_POLICY,
 	CONSTRAINT_MEMCG,
 };
