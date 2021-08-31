@@ -42,7 +42,7 @@ int aa_new_mount(struct aa_label *label, const char *dev_name,
 		 const struct path *path, const char *type, unsigned long flags,
 		 void *data);
 
-int aa_umount(struct aa_label *label, struct vfsmount *mnt, int flags);
+int aa_umount(struct aa_label *label, struct vfsmount *mnt);
 
 int aa_pivotroot(struct aa_label *label, const struct path *old_path,
 		 const struct path *new_path);

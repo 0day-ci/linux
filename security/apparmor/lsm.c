@@ -574,7 +574,7 @@ static int apparmor_sb_umount(struct vfsmount *mnt, int flags)
 
 	label = __begin_current_label_crit_section();
 	if (!unconfined(label))
-		error = aa_umount(label, mnt, flags);
+		error = aa_umount(label, mnt);
 	__end_current_label_crit_section(label);
 
 	return error;

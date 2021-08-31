@@ -610,7 +610,7 @@ audit:
 			   AA_MAY_UMOUNT, &perms, info, error);
 }
 
-int aa_umount(struct aa_label *label, struct vfsmount *mnt, int flags)
+int aa_umount(struct aa_label *label, struct vfsmount *mnt)
 {
 	struct aa_profile *profile;
 	char *buffer = NULL;
