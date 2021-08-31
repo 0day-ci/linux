@@ -307,12 +307,14 @@ static int bq32k_remove(struct i2c_client *client)
 
 static const struct i2c_device_id bq32k_id[] = {
 	{ "bq32000", 0 },
+	{ "bq32002", 0 },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, bq32k_id);
 
 static const __maybe_unused struct of_device_id bq32k_of_match[] = {
 	{ .compatible = "ti,bq32000" },
+	{ .compatible = "ti,bq32002" },
 	{ }
 };
 MODULE_DEVICE_TABLE(of, bq32k_of_match);
