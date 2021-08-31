@@ -114,6 +114,11 @@ static enum drm_mode_status dp_connector_mode_valid(
 	return dp_display_validate_mode(dp_disp, mode->clock);
 }
 
+static struct drm_encoder *dp_connector_best_encoder(struct drm_connector *connector)
+{
+	return to_dp_connector(connector)->dp_display->encoder;
+}
+
 static const struct drm_connector_funcs dp_connector_funcs = {
 	.detect = dp_connector_detect,
 	.fill_modes = drm_helper_probe_single_connector_modes,
@@ -126,6 +131,7 @@ static const struct drm_connector_funcs dp_connector_funcs = {
 static const struct drm_connector_helper_funcs dp_connector_helper_funcs = {
 	.get_modes = dp_connector_get_modes,
 	.mode_valid = dp_connector_mode_valid,
+	.best_encoder = dp_connector_best_encoder,
 };
 
 /* connector initialization */
