@@ -664,13 +664,15 @@ struct governor_attr {
 #define CPUFREQ_ENTRY_INVALID	~0u
 #define CPUFREQ_TABLE_END	~1u
 /* Special Values of .flags field */
-#define CPUFREQ_BOOST_FREQ	(1 << 0)
+#define CPUFREQ_BOOST_FREQ	 (1 << 0)
+#define CPUFREQ_INEFFICIENT_FREQ (1 << 1)
 
 struct cpufreq_frequency_table {
 	unsigned int	flags;
 	unsigned int	driver_data; /* driver specific data, not used by core */
 	unsigned int	frequency; /* kHz - doesn't need to be in ascending
 				    * order */
+	unsigned int	efficient; /* idx of an efficient frequency */
 };
 
 #if defined(CONFIG_CPU_FREQ) && defined(CONFIG_PM_OPP)
@@ -762,6 +764,7 @@ int cpufreq_boost_trigger_state(int state);
 int cpufreq_boost_enabled(void);
 int cpufreq_enable_boost_support(void);
 bool policy_has_boost_freq(struct cpufreq_policy *policy);
+int cpufreq_table_update_efficiencies(struct cpufreq_policy *policy);
 
 /* Find lowest freq at or above target in a table in ascending order */
 static inline int cpufreq_table_find_index_al(struct cpufreq_policy *policy,
@@ -1003,6 +1006,29 @@ static inline int cpufreq_table_count_valid_entries(const struct cpufreq_policy 
 
 	return count;
 }
+
+/**
+ * cpufreq_table_set_inefficient() - Mark a frequency as inefficient
+ *
+ * @policy:	the &struct cpufreq_policy containing the inefficient frequency
+ * @frequency:	the inefficient frequency
+ *
+ * Once inefficiencies marked, the efficient resolution must be updated with the
+ * function cpufreq_table_update_efficiencies().
+ */
+static inline void
+cpufreq_table_set_inefficient(const struct cpufreq_policy *policy,
+			      unsigned int frequency)
+{
+	struct cpufreq_frequency_table *pos;
+
+	cpufreq_for_each_valid_entry(pos, policy->freq_table) {
+		if (pos->frequency == frequency) {
+			pos->flags |= CPUFREQ_INEFFICIENT_FREQ;
+			break;
+		}
+	}
+}
 #else
 static inline int cpufreq_boost_trigger_state(int state)
 {
@@ -1021,6 +1047,16 @@ static inline int cpufreq_enable_boost_support(void)
 static inline bool policy_has_boost_freq(struct cpufreq_policy *policy)
 {
 	return false;
+}
+
+static inline void
+cpufreq_table_set_inefficient(const struct cpufreq_policy *policy,
+			      unsigned int frequency) {}
+
+static inline int
+cpufreq_table_update_efficiencies(struct cpufreq_policy *policy)
+{
+	return -EINVAL;
 }
 #endif
 
