@@ -2322,11 +2322,23 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
 		ret = iommu_enable_nesting(domain->domain);
 		if (ret)
 			goto out_domain;
+
+		if (iommu->vmid != VFIO_IOMMU_VMID_INVALID) {
+			ret = iommu_set_nesting_vmid(domain->domain, iommu->vmid);
+			if (ret)
+				goto out_domain;
+		}
 	}
 
 	ret = vfio_iommu_attach_group(domain, group);
 	if (ret)
 		goto out_domain;
+
+	if (iommu->nesting && iommu->vmid == VFIO_IOMMU_VMID_INVALID) {
+		ret = iommu_get_nesting_vmid(domain->domain, &iommu->vmid);
+		if (ret)
+			goto out_domain;
+	}
 
 	/* Get aperture info */
 	geo = &domain->domain->geometry;
