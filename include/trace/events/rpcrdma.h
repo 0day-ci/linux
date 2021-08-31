@@ -2048,6 +2048,32 @@ TRACE_EVENT(svcrdma_sq_post_err,
 	)
 );
 
+TRACE_EVENT(svcrdma_arg_payload,
+	TP_PROTO(
+		const struct svc_rqst *rqstp,
+		unsigned int offset,
+		unsigned int length
+	),
+
+	TP_ARGS(rqstp, offset, length),
+
+	TP_STRUCT__entry(
+		__field(u32, xid)
+		__field(u32, offset)
+		__field(u32, length)
+	),
+
+	TP_fast_assign(
+		__entry->xid = __be32_to_cpu(rqstp->rq_xid);
+		__entry->offset = offset_in_page(offset);
+		__entry->length = length;
+	),
+
+	TP_printk("xid=0x%08x offset=%u length=%u",
+		__entry->xid, __entry->offset, __entry->length
+	)
+);
+
 #endif /* _TRACE_RPCRDMA_H */
 
 #include <trace/define_trace.h>

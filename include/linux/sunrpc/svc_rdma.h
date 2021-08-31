@@ -192,6 +192,12 @@ extern int svc_rdma_send_reply_chunk(struct svcxprt_rdma *rdma,
 extern int svc_rdma_process_read_list(struct svcxprt_rdma *rdma,
 				      struct svc_rqst *rqstp,
 				      struct svc_rdma_recv_ctxt *head);
+extern void svc_rdma_prepare_read_chunk(struct svc_rqst *rqstp,
+					struct svc_rdma_recv_ctxt *head);
+extern int svc_rdma_pull_read_chunk(struct svcxprt_rdma *rdma,
+				    struct svc_rqst *rqstp,
+				    struct svc_rdma_recv_ctxt *ctxt,
+				    unsigned int offset, unsigned int length);
 
 /* svc_rdma_sendto.c */
 extern void svc_rdma_send_ctxts_destroy(struct svcxprt_rdma *rdma);

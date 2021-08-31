@@ -833,12 +833,13 @@ int svc_rdma_recvfrom(struct svc_rqst *rqstp)
 
 	svc_rdma_get_inv_rkey(rdma_xprt, ctxt);
 
-	if (!pcl_is_empty(&ctxt->rc_read_pcl) ||
-	    !pcl_is_empty(&ctxt->rc_call_pcl)) {
+	if (!pcl_is_empty(&ctxt->rc_call_pcl) ||
+	    ctxt->rc_read_pcl.cl_count > 1) {
 		ret = svc_rdma_process_read_list(rdma_xprt, rqstp, ctxt);
 		if (ret < 0)
 			goto out_readfail;
-	}
+	} else if (ctxt->rc_read_pcl.cl_count == 1)
+		svc_rdma_prepare_read_chunk(rqstp, ctxt);
 
 	rqstp->rq_xprt_ctxt = ctxt;
 	rqstp->rq_prot = IPPROTO_MAX;
@@ -882,5 +883,13 @@ out_drop:
 int svc_rdma_argument_payload(struct svc_rqst *rqstp, unsigned int offset,
 			      unsigned int length)
 {
-	return 0;
+	struct svc_rdma_recv_ctxt *ctxt = rqstp->rq_xprt_ctxt;
+	struct svc_xprt *xprt = rqstp->rq_xprt;
+	struct svcxprt_rdma *rdma =
+		container_of(xprt, struct svcxprt_rdma, sc_xprt);
+
+	if (!pcl_is_empty(&ctxt->rc_call_pcl) ||
+	    ctxt->rc_read_pcl.cl_count != 1)
+		return 0;
+	return svc_rdma_pull_read_chunk(rdma, rqstp, ctxt, offset, length);
 }
