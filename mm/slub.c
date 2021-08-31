@@ -264,8 +264,8 @@ static inline bool kmem_cache_has_cpu_partial(struct kmem_cache *s)
 #define TRACK_ADDRS_COUNT 16
 struct track {
 	unsigned long addr;	/* Called from address */
-#ifdef CONFIG_STACKTRACE
-	unsigned long addrs[TRACK_ADDRS_COUNT];	/* Called from address */
+#ifdef CONFIG_STACKDEPOT
+	depot_stack_handle_t stack;
 #endif
 	int cpu;		/* Was running on cpu */
 	int pid;		/* Pid context */
@@ -668,6 +668,27 @@ static inline unsigned int get_info_end(struct kmem_cache *s)
 		return s->inuse;
 }
 
+#ifdef CONFIG_STACKDEPOT
+static depot_stack_handle_t slub_debug_save_stack(gfp_t flags)
+{
+	unsigned long entries[TRACK_ADDRS_COUNT];
+	unsigned int nr_entries;
+
+	nr_entries = stack_trace_save(entries, ARRAY_SIZE(entries), 4);
+	nr_entries = filter_irq_stacks(entries, nr_entries);
+	return stack_depot_save(entries, nr_entries, flags);
+}
+
+static void print_stack(depot_stack_handle_t stack)
+{
+	unsigned long *entries;
+	unsigned int nr_entries;
+
+	nr_entries = stack_depot_fetch(stack, &entries);
+	stack_trace_print(entries, nr_entries, 0);
+}
+#endif
+
 static struct track *get_track(struct kmem_cache *s, void *object,
 	enum track_item alloc)
 {
@@ -679,21 +700,13 @@ static struct track *get_track(struct kmem_cache *s, void *object,
 }
 
 static void set_track(struct kmem_cache *s, void *object,
-			enum track_item alloc, unsigned long addr)
+			enum track_item alloc, unsigned long addr, gfp_t flags)
 {
 	struct track *p = get_track(s, object, alloc);
 
 	if (addr) {
-#ifdef CONFIG_STACKTRACE
-		unsigned int nr_entries;
-
-		metadata_access_enable();
-		nr_entries = stack_trace_save(kasan_reset_tag(p->addrs),
-					      TRACK_ADDRS_COUNT, 3);
-		metadata_access_disable();
-
-		if (nr_entries < TRACK_ADDRS_COUNT)
-			p->addrs[nr_entries] = 0;
+#ifdef CONFIG_STACKDEPOT
+		p->stack = slub_debug_save_stack(flags);
 #endif
 		p->addr = addr;
 		p->cpu = smp_processor_id();
@@ -709,9 +722,10 @@ static void init_tracking(struct kmem_cache *s, void *object)
 	if (!(s->flags & SLAB_STORE_USER))
 		return;
 
-	set_track(s, object, TRACK_FREE, 0UL);
-	set_track(s, object, TRACK_ALLOC, 0UL);
+	set_track(s, object, TRACK_FREE, 0UL, 0U);
+	set_track(s, object, TRACK_ALLOC, 0UL, 0U);
 }
+
 
 static void print_track(const char *s, struct track *t, unsigned long pr_time)
 {
@@ -720,15 +734,11 @@ static void print_track(const char *s, struct track *t, unsigned long pr_time)
 
 	pr_err("%s in %pS age=%lu cpu=%u pid=%d\n",
 	       s, (void *)t->addr, pr_time - t->when, t->cpu, t->pid);
-#ifdef CONFIG_STACKTRACE
-	{
-		int i;
-		for (i = 0; i < TRACK_ADDRS_COUNT; i++)
-			if (t->addrs[i])
-				pr_err("\t%pS\n", (void *)t->addrs[i]);
-			else
-				break;
-	}
+#ifdef CONFIG_STACKDEPOT
+	if (t->stack)
+		print_stack(t->stack);
+	else
+		pr_err("(stack is not available)\n");
 #endif
 }
 
@@ -1261,7 +1271,8 @@ static inline int alloc_consistency_checks(struct kmem_cache *s,
 
 static noinline int alloc_debug_processing(struct kmem_cache *s,
 					struct page *page,
-					void *object, unsigned long addr)
+					void *object, unsigned long addr,
+					gfp_t flags)
 {
 	if (s->flags & SLAB_CONSISTENCY_CHECKS) {
 		if (!alloc_consistency_checks(s, page, object))
@@ -1270,7 +1281,7 @@ static noinline int alloc_debug_processing(struct kmem_cache *s,
 
 	/* Success perform special debug activities for allocs */
 	if (s->flags & SLAB_STORE_USER)
-		set_track(s, object, TRACK_ALLOC, addr);
+		set_track(s, object, TRACK_ALLOC, addr, flags);
 	trace(s, page, object, 1);
 	init_object(s, object, SLUB_RED_ACTIVE);
 	return 1;
@@ -1350,7 +1361,7 @@ next_object:
 	}
 
 	if (s->flags & SLAB_STORE_USER)
-		set_track(s, object, TRACK_FREE, addr);
+		set_track(s, object, TRACK_FREE, addr, GFP_NOWAIT);
 	trace(s, page, object, 0);
 	/* Freepointer not overwritten by init_object(), SLAB_POISON moved it */
 	init_object(s, object, SLUB_RED_INACTIVE);
@@ -2987,7 +2998,7 @@ new_objects:
 check_new_page:
 
 	if (kmem_cache_debug(s)) {
-		if (!alloc_debug_processing(s, page, freelist, addr)) {
+		if (!alloc_debug_processing(s, page, freelist, addr, gfpflags)) {
 			/* Slab failed checks. Next slab needed */
 			goto new_slab;
 		} else {
@@ -4275,6 +4286,8 @@ void kmem_obj_info(struct kmem_obj_info *kpp, void *object, struct page *page)
 	void *objp0;
 	struct kmem_cache *s = page->slab_cache;
 	struct track __maybe_unused *trackp;
+	unsigned long __maybe_unused *entries;
+	unsigned int __maybe_unused nr_entries;
 
 	kpp->kp_ptr = object;
 	kpp->kp_page = page;
@@ -4297,19 +4310,15 @@ void kmem_obj_info(struct kmem_obj_info *kpp, void *object, struct page *page)
 	objp = fixup_red_left(s, objp);
 	trackp = get_track(s, objp, TRACK_ALLOC);
 	kpp->kp_ret = (void *)trackp->addr;
-#ifdef CONFIG_STACKTRACE
-	for (i = 0; i < KS_ADDRS_COUNT && i < TRACK_ADDRS_COUNT; i++) {
-		kpp->kp_stack[i] = (void *)trackp->addrs[i];
-		if (!kpp->kp_stack[i])
-			break;
-	}
+#ifdef CONFIG_STACKDEPOT
+	nr_entries = stack_depot_fetch(trackp->stack, &entries);
+	for (i = 0; i < nr_entries; i++)
+		kpp->kp_stack[i] = (void *)entries[i];
 
 	trackp = get_track(s, objp, TRACK_FREE);
-	for (i = 0; i < KS_ADDRS_COUNT && i < TRACK_ADDRS_COUNT; i++) {
-		kpp->kp_free_stack[i] = (void *)trackp->addrs[i];
-		if (!kpp->kp_free_stack[i])
-			break;
-	}
+	nr_entries = stack_depot_fetch(trackp->stack, &entries);
+	for (i = 0; i < nr_entries; i++)
+		kpp->kp_free_stack[i] = (void *)entries[i];
 #endif
 #endif
 }
