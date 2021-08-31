@@ -8,10 +8,12 @@
 #define pr_fmt(fmt) "damon-va: " fmt
 
 #include <linux/damon.h>
+#include <linux/hugetlb.h>
 #include <linux/mm.h>
 #include <linux/mmu_notifier.h>
 #include <linux/highmem.h>
 #include <linux/page_idle.h>
+#include <linux/pagewalk.h>
 #include <linux/random.h>
 #include <linux/sched/mm.h>
 #include <linux/slab.h>
@@ -446,22 +448,42 @@ static void damon_pmdp_mkold(pmd_t *pmd, struct mm_struct *mm,
 #endif /* CONFIG_TRANSPARENT_HUGEPAGE */
 }
 
-static void damon_va_mkold(struct mm_struct *mm, unsigned long addr)
+static int damon_mkold_pmd_entry(pmd_t *pmd, unsigned long addr,
+		unsigned long next, struct mm_walk *walk)
 {
-	pte_t *pte = NULL;
-	pmd_t *pmd = NULL;
+	pte_t *pte;
 	spinlock_t *ptl;
 
-	if (follow_invalidate_pte(mm, addr, NULL, &pte, &pmd, &ptl))
-		return;
-
-	if (pte) {
-		damon_ptep_mkold(pte, mm, addr);
-		pte_unmap_unlock(pte, ptl);
-	} else {
-		damon_pmdp_mkold(pmd, mm, addr);
+	if (pmd_huge(*pmd)) {
+		ptl = pmd_lock(walk->mm, pmd);
+		if (pmd_huge(*pmd)) {
+			damon_pmdp_mkold(pmd, walk->mm, addr);
+			spin_unlock(ptl);
+			return 0;
+		}
 		spin_unlock(ptl);
 	}
+
+	if (pmd_none(*pmd) || unlikely(pmd_bad(*pmd)))
+		return 0;
+	pte = pte_offset_map_lock(walk->mm, pmd, addr, &ptl);
+	if (!pte_present(*pte))
+		goto out;
+	damon_ptep_mkold(pte, walk->mm, addr);
+out:
+	pte_unmap_unlock(pte, ptl);
+	return 0;
+}
+
+static struct mm_walk_ops damon_mkold_ops = {
+	.pmd_entry = damon_mkold_pmd_entry,
+};
+
+static void damon_va_mkold(struct mm_struct *mm, unsigned long addr)
+{
+	mmap_read_lock(mm);
+	walk_page_range(mm, addr, addr + 1, &damon_mkold_ops, NULL);
+	mmap_read_unlock(mm);
 }
 
 /*
@@ -492,43 +514,79 @@ void damon_va_prepare_access_checks(struct damon_ctx *ctx)
 	}
 }
 
-static bool damon_va_young(struct mm_struct *mm, unsigned long addr,
-			unsigned long *page_sz)
+struct damon_young_walk_private {
+	unsigned long *page_sz;
+	bool young;
+};
+
+static int damon_young_pmd_entry(pmd_t *pmd, unsigned long addr,
+		unsigned long next, struct mm_walk *walk)
 {
-	pte_t *pte = NULL;
-	pmd_t *pmd = NULL;
+	pte_t *pte;
 	spinlock_t *ptl;
 	struct page *page;
-	bool young = false;
-
-	if (follow_invalidate_pte(mm, addr, NULL, &pte, &pmd, &ptl))
-		return false;
-
-	*page_sz = PAGE_SIZE;
-	if (pte) {
-		page = damon_get_page(pte_pfn(*pte));
-		if (page && (pte_young(*pte) || !page_is_idle(page) ||
-					mmu_notifier_test_young(mm, addr)))
-			young = true;
-		if (page)
-			put_page(page);
-		pte_unmap_unlock(pte, ptl);
-		return young;
-	}
+	struct damon_young_walk_private *priv = walk->private;
 
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
-	page = damon_get_page(pmd_pfn(*pmd));
-	if (page && (pmd_young(*pmd) || !page_is_idle(page) ||
-			mmu_notifier_test_young(mm, addr)))
-		young = true;
-	if (page)
+	if (pmd_huge(*pmd)) {
+		ptl = pmd_lock(walk->mm, pmd);
+		if (!pmd_huge(*pmd)) {
+			spin_unlock(ptl);
+			goto regular_page;
+		}
+		page = damon_get_page(pmd_pfn(*pmd));
+		if (!page)
+			goto huge_out;
+		if (pmd_young(*pmd) || !page_is_idle(page) ||
+					mmu_notifier_test_young(walk->mm,
+						addr)) {
+			*priv->page_sz = ((1UL) << HPAGE_PMD_SHIFT);
+			priv->young = true;
+		}
 		put_page(page);
+huge_out:
+		spin_unlock(ptl);
+		return 0;
+	}
 
-	spin_unlock(ptl);
-	*page_sz = ((1UL) << HPAGE_PMD_SHIFT);
+regular_page:
 #endif	/* CONFIG_TRANSPARENT_HUGEPAGE */
 
-	return young;
+	if (pmd_none(*pmd) || unlikely(pmd_bad(*pmd)))
+		return -EINVAL;
+	pte = pte_offset_map_lock(walk->mm, pmd, addr, &ptl);
+	if (!pte_present(*pte))
+		goto out;
+	page = damon_get_page(pte_pfn(*pte));
+	if (!page)
+		goto out;
+	if (pte_young(*pte) || !page_is_idle(page) ||
+			mmu_notifier_test_young(walk->mm, addr)) {
+		*priv->page_sz = PAGE_SIZE;
+		priv->young = true;
+	}
+	put_page(page);
+out:
+	pte_unmap_unlock(pte, ptl);
+	return 0;
+}
+
+static struct mm_walk_ops damon_young_ops = {
+	.pmd_entry = damon_young_pmd_entry,
+};
+
+static bool damon_va_young(struct mm_struct *mm, unsigned long addr,
+		unsigned long *page_sz)
+{
+	struct damon_young_walk_private arg = {
+		.page_sz = page_sz,
+		.young = false,
+	};
+
+	mmap_read_lock(mm);
+	walk_page_range(mm, addr, addr + 1, &damon_young_ops, &arg);
+	mmap_read_unlock(mm);
+	return arg.young;
 }
 
 /*
