@@ -451,10 +451,15 @@ endif
 quiet_cmd_ld_o_a = LD [M]  $@
       cmd_ld_o_a = $(LD) $(ld_flags) -r -o $@ --whole-archive $< $(cmd_objtool)
 
+define rule_ld_o_a
+	$(call cmd_and_savecmd,ld_o_a)
+	$(call cmd,gen_objtooldep)
+endef
+
 $(obj)/%.prelink.o: part-of-module := y
 
 $(obj)/%.prelink.o: $(obj)/%.a $(module-symver) FORCE
-	$(call if_changed,ld_o_a)
+	$(call if_changed_rule,ld_o_a)
 
 quiet_cmd_ar_module = AR [M]  $@
       cmd_ar_module = rm -f $@; $(AR) cDPrST $@ $(real-prereqs)
