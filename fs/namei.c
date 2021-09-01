@@ -2551,17 +2551,22 @@ static int filename_parentat(int dfd, struct filename *name,
 /* does lookup, returns the object with parent locked */
 struct dentry *kern_path_locked(const char *name, struct path *path)
 {
+	struct filename *filename;
 	struct dentry *d;
 	struct qstr last;
 	int type, error;
 
-	error = filename_parentat(AT_FDCWD, getname_kernel(name), 0, path,
+	filename = getname_kernel(name);
+	error = __filename_parentat(AT_FDCWD, filename, 0, path,
 				    &last, &type);
-	if (error)
-		return ERR_PTR(error);
+	if (error) {
+		d = ERR_PTR(error);
+		goto out;
+	}
 	if (unlikely(type != LAST_NORM)) {
 		path_put(path);
-		return ERR_PTR(-EINVAL);
+		d = ERR_PTR(-EINVAL);
+		goto out;
 	}
 	inode_lock_nested(path->dentry->d_inode, I_MUTEX_PARENT);
 	d = __lookup_hash(&last, path->dentry, 0);
@@ -2569,6 +2574,8 @@ struct dentry *kern_path_locked(const char *name, struct path *path)
 		inode_unlock(path->dentry->d_inode);
 		path_put(path);
 	}
+out:
+	putname(filename);
 	return d;
 }
 
