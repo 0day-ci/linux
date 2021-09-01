@@ -549,22 +549,52 @@ struct rfcomm_dlc *rfcomm_dlc_exists(bdaddr_t *src, bdaddr_t *dst, u8 channel)
 	return dlc;
 }
 
-int rfcomm_dlc_send(struct rfcomm_dlc *d, struct sk_buff *skb)
+static int rfcomm_dlc_send_frag(struct rfcomm_dlc *d, struct sk_buff *frag)
 {
-	int len = skb->len;
-
-	if (d->state != BT_CONNECTED)
-		return -ENOTCONN;
+	int len = frag->len;
 
 	BT_DBG("dlc %p mtu %d len %d", d, d->mtu, len);
 
 	if (len > d->mtu)
 		return -EINVAL;
 
-	rfcomm_make_uih(skb, d->addr);
-	skb_queue_tail(&d->tx_queue, skb);
+	rfcomm_make_uih(frag, d->addr);
+	__skb_queue_tail(&d->tx_queue, frag);
 
-	if (!test_bit(RFCOMM_TX_THROTTLED, &d->flags))
+	return len;
+}
+
+int rfcomm_dlc_send(struct rfcomm_dlc *d, struct sk_buff *skb)
+{
+	struct sk_buff *frag;
+	int len;
+
+	if (d->state != BT_CONNECTED)
+		return -ENOTCONN;
+
+	/* Queue all fragments atomically. */
+	spin_lock_bh(&d->tx_queue.lock);
+
+	len = rfcomm_dlc_send_frag(d, skb);
+	if (len < 0)
+		goto unlock;
+
+	skb_walk_frags(skb, frag) {
+		int ret;
+
+		ret = rfcomm_dlc_send_frag(d, frag);
+		if (ret < 0)
+			break;
+
+		len += ret;
+	}
+
+	skb_shinfo(skb)->frag_list = NULL;
+
+unlock:
+	spin_unlock_bh(&d->tx_queue.lock);
+
+	if (len > 0 && !test_bit(RFCOMM_TX_THROTTLED, &d->flags))
 		rfcomm_schedule();
 	return len;
 }
