@@ -13,6 +13,18 @@
 
 DEFINE_PER_CPU(int, bpf_testmod_ksym_percpu) = 123;
 
+noinline int bpf_testmod_loop_test(int n)
+{
+	int i, sum = 0;
+
+	/* the primary goal of this test is to test LBR. Create a lot of
+	 * branches in the function, so we can catch it easily.
+	 */
+	for (i = 0; i < n; i++)
+		sum += i;
+	return sum;
+}
+
 noinline ssize_t
 bpf_testmod_test_read(struct file *file, struct kobject *kobj,
 		      struct bin_attribute *bin_attr,
@@ -24,6 +36,7 @@ bpf_testmod_test_read(struct file *file, struct kobject *kobj,
 		.len = len,
 	};
 
+	bpf_testmod_loop_test(101);
 	trace_bpf_testmod_test_read(current, &ctx);
 
 	return -EIO; /* always fail */
@@ -71,4 +84,3 @@ module_exit(bpf_testmod_exit);
 MODULE_AUTHOR("Andrii Nakryiko");
 MODULE_DESCRIPTION("BPF selftests module");
 MODULE_LICENSE("Dual BSD/GPL");
-
