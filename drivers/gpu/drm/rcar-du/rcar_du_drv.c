@@ -36,7 +36,8 @@
 
 static const struct rcar_du_device_info rzg1_du_r8a7743_info = {
 	.gen = 2,
-	.features = RCAR_DU_FEATURE_CRTC_IRQ_CLOCK
+	.features = RCAR_DU_FEATURE_CRTC_IRQ
+		  | RCAR_DU_FEATURE_CRTC_CLOCK
 		  | RCAR_DU_FEATURE_INTERLACED
 		  | RCAR_DU_FEATURE_TVM_SYNC,
 	.channels_mask = BIT(1) | BIT(0),
@@ -58,7 +59,8 @@ static const struct rcar_du_device_info rzg1_du_r8a7743_info = {
 
 static const struct rcar_du_device_info rzg1_du_r8a7745_info = {
 	.gen = 2,
-	.features = RCAR_DU_FEATURE_CRTC_IRQ_CLOCK
+	.features = RCAR_DU_FEATURE_CRTC_IRQ
+		  | RCAR_DU_FEATURE_CRTC_CLOCK
 		  | RCAR_DU_FEATURE_INTERLACED
 		  | RCAR_DU_FEATURE_TVM_SYNC,
 	.channels_mask = BIT(1) | BIT(0),
@@ -79,7 +81,8 @@ static const struct rcar_du_device_info rzg1_du_r8a7745_info = {
 
 static const struct rcar_du_device_info rzg1_du_r8a77470_info = {
 	.gen = 2,
-	.features = RCAR_DU_FEATURE_CRTC_IRQ_CLOCK
+	.features = RCAR_DU_FEATURE_CRTC_IRQ
+		  | RCAR_DU_FEATURE_CRTC_CLOCK
 		  | RCAR_DU_FEATURE_INTERLACED
 		  | RCAR_DU_FEATURE_TVM_SYNC,
 	.channels_mask = BIT(1) | BIT(0),
@@ -105,7 +108,8 @@ static const struct rcar_du_device_info rzg1_du_r8a77470_info = {
 
 static const struct rcar_du_device_info rcar_du_r8a774a1_info = {
 	.gen = 3,
-	.features = RCAR_DU_FEATURE_CRTC_IRQ_CLOCK
+	.features = RCAR_DU_FEATURE_CRTC_IRQ
+		  | RCAR_DU_FEATURE_CRTC_CLOCK
 		  | RCAR_DU_FEATURE_VSP1_SOURCE
 		  | RCAR_DU_FEATURE_INTERLACED
 		  | RCAR_DU_FEATURE_TVM_SYNC,
@@ -134,7 +138,8 @@ static const struct rcar_du_device_info rcar_du_r8a774a1_info = {
 
 static const struct rcar_du_device_info rcar_du_r8a774b1_info = {
 	.gen = 3,
-	.features = RCAR_DU_FEATURE_CRTC_IRQ_CLOCK
+	.features = RCAR_DU_FEATURE_CRTC_IRQ
+		  | RCAR_DU_FEATURE_CRTC_CLOCK
 		  | RCAR_DU_FEATURE_VSP1_SOURCE
 		  | RCAR_DU_FEATURE_INTERLACED
 		  | RCAR_DU_FEATURE_TVM_SYNC,
@@ -163,7 +168,8 @@ static const struct rcar_du_device_info rcar_du_r8a774b1_info = {
 
 static const struct rcar_du_device_info rcar_du_r8a774c0_info = {
 	.gen = 3,
-	.features = RCAR_DU_FEATURE_CRTC_IRQ_CLOCK
+	.features = RCAR_DU_FEATURE_CRTC_IRQ
+		  | RCAR_DU_FEATURE_CRTC_CLOCK
 		  | RCAR_DU_FEATURE_VSP1_SOURCE,
 	.channels_mask = BIT(1) | BIT(0),
 	.routes = {
@@ -189,7 +195,8 @@ static const struct rcar_du_device_info rcar_du_r8a774c0_info = {
 
 static const struct rcar_du_device_info rcar_du_r8a774e1_info = {
 	.gen = 3,
-	.features = RCAR_DU_FEATURE_CRTC_IRQ_CLOCK
+	.features = RCAR_DU_FEATURE_CRTC_IRQ
+		  | RCAR_DU_FEATURE_CRTC_CLOCK
 		  | RCAR_DU_FEATURE_VSP1_SOURCE
 		  | RCAR_DU_FEATURE_INTERLACED
 		  | RCAR_DU_FEATURE_TVM_SYNC,
@@ -239,7 +246,8 @@ static const struct rcar_du_device_info rcar_du_r8a7779_info = {
 
 static const struct rcar_du_device_info rcar_du_r8a7790_info = {
 	.gen = 2,
-	.features = RCAR_DU_FEATURE_CRTC_IRQ_CLOCK
+	.features = RCAR_DU_FEATURE_CRTC_IRQ
+		  | RCAR_DU_FEATURE_CRTC_CLOCK
 		  | RCAR_DU_FEATURE_INTERLACED
 		  | RCAR_DU_FEATURE_TVM_SYNC,
 	.quirks = RCAR_DU_QUIRK_ALIGN_128B,
@@ -269,7 +277,8 @@ static const struct rcar_du_device_info rcar_du_r8a7790_info = {
 /* M2-W (r8a7791) and M2-N (r8a7793) are identical */
 static const struct rcar_du_device_info rcar_du_r8a7791_info = {
 	.gen = 2,
-	.features = RCAR_DU_FEATURE_CRTC_IRQ_CLOCK
+	.features = RCAR_DU_FEATURE_CRTC_IRQ
+		  | RCAR_DU_FEATURE_CRTC_CLOCK
 		  | RCAR_DU_FEATURE_INTERLACED
 		  | RCAR_DU_FEATURE_TVM_SYNC,
 	.channels_mask = BIT(1) | BIT(0),
@@ -292,7 +301,8 @@ static const struct rcar_du_device_info rcar_du_r8a7791_info = {
 
 static const struct rcar_du_device_info rcar_du_r8a7792_info = {
 	.gen = 2,
-	.features = RCAR_DU_FEATURE_CRTC_IRQ_CLOCK
+	.features = RCAR_DU_FEATURE_CRTC_IRQ
+		  | RCAR_DU_FEATURE_CRTC_CLOCK
 		  | RCAR_DU_FEATURE_INTERLACED
 		  | RCAR_DU_FEATURE_TVM_SYNC,
 	.channels_mask = BIT(1) | BIT(0),
@@ -311,7 +321,8 @@ static const struct rcar_du_device_info rcar_du_r8a7792_info = {
 
 static const struct rcar_du_device_info rcar_du_r8a7794_info = {
 	.gen = 2,
-	.features = RCAR_DU_FEATURE_CRTC_IRQ_CLOCK
+	.features = RCAR_DU_FEATURE_CRTC_IRQ
+		  | RCAR_DU_FEATURE_CRTC_CLOCK
 		  | RCAR_DU_FEATURE_INTERLACED
 		  | RCAR_DU_FEATURE_TVM_SYNC,
 	.channels_mask = BIT(1) | BIT(0),
@@ -333,7 +344,8 @@ static const struct rcar_du_device_info rcar_du_r8a7794_info = {
 
 static const struct rcar_du_device_info rcar_du_r8a7795_info = {
 	.gen = 3,
-	.features = RCAR_DU_FEATURE_CRTC_IRQ_CLOCK
+	.features = RCAR_DU_FEATURE_CRTC_IRQ
+		  | RCAR_DU_FEATURE_CRTC_CLOCK
 		  | RCAR_DU_FEATURE_VSP1_SOURCE
 		  | RCAR_DU_FEATURE_INTERLACED
 		  | RCAR_DU_FEATURE_TVM_SYNC,
@@ -366,7 +378,8 @@ static const struct rcar_du_device_info rcar_du_r8a7795_info = {
 
 static const struct rcar_du_device_info rcar_du_r8a7796_info = {
 	.gen = 3,
-	.features = RCAR_DU_FEATURE_CRTC_IRQ_CLOCK
+	.features = RCAR_DU_FEATURE_CRTC_IRQ
+		  | RCAR_DU_FEATURE_CRTC_CLOCK
 		  | RCAR_DU_FEATURE_VSP1_SOURCE
 		  | RCAR_DU_FEATURE_INTERLACED
 		  | RCAR_DU_FEATURE_TVM_SYNC,
@@ -395,7 +408,8 @@ static const struct rcar_du_device_info rcar_du_r8a7796_info = {
 
 static const struct rcar_du_device_info rcar_du_r8a77965_info = {
 	.gen = 3,
-	.features = RCAR_DU_FEATURE_CRTC_IRQ_CLOCK
+	.features = RCAR_DU_FEATURE_CRTC_IRQ
+		  | RCAR_DU_FEATURE_CRTC_CLOCK
 		  | RCAR_DU_FEATURE_VSP1_SOURCE
 		  | RCAR_DU_FEATURE_INTERLACED
 		  | RCAR_DU_FEATURE_TVM_SYNC,
@@ -424,7 +438,8 @@ static const struct rcar_du_device_info rcar_du_r8a77965_info = {
 
 static const struct rcar_du_device_info rcar_du_r8a77970_info = {
 	.gen = 3,
-	.features = RCAR_DU_FEATURE_CRTC_IRQ_CLOCK
+	.features = RCAR_DU_FEATURE_CRTC_IRQ
+		  | RCAR_DU_FEATURE_CRTC_CLOCK
 		  | RCAR_DU_FEATURE_VSP1_SOURCE
 		  | RCAR_DU_FEATURE_INTERLACED
 		  | RCAR_DU_FEATURE_TVM_SYNC,
@@ -448,7 +463,8 @@ static const struct rcar_du_device_info rcar_du_r8a77970_info = {
 
 static const struct rcar_du_device_info rcar_du_r8a7799x_info = {
 	.gen = 3,
-	.features = RCAR_DU_FEATURE_CRTC_IRQ_CLOCK
+	.features = RCAR_DU_FEATURE_CRTC_IRQ
+		  | RCAR_DU_FEATURE_CRTC_CLOCK
 		  | RCAR_DU_FEATURE_VSP1_SOURCE,
 	.channels_mask = BIT(1) | BIT(0),
 	.routes = {
