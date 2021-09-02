@@ -4,8 +4,8 @@
 
 #include "omap36xx.dtsi"
 #include "logicpd-torpedo-som.dtsi"
-#include "omap-gpmc-smsc9221.dtsi"
 #include "logicpd-torpedo-baseboard.dtsi"
+#include "omap-gpmc-smsc9221.dtsi"
 
 / {
 	model = "LogicPD Zoom DM3730 Torpedo + Wireless Development Kit";

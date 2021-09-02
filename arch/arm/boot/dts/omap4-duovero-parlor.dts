@@ -131,12 +131,10 @@
 	status = "disabled";
 };
 
-#include "omap-gpmc-smsc911x.dtsi"
-
 &gpmc {
 	ranges = <5 0 0x2c000000 0x1000000>;			/* CS5 */
 
-	ethernet@gpmc {
+	gpmc_ethernet: ethernet@5,0 {
 		reg = <5 0 0xff>;
 		interrupt-parent = <&gpio2>;
 		interrupts = <12 IRQ_TYPE_LEVEL_LOW>;		/* gpio_44 */
@@ -169,6 +167,8 @@
 		gpmc,sync-clk-ps = <20000>;
 	};
 };
+
+#include "omap-gpmc-smsc911x.dtsi"
 
 &dss {
 	status = "okay";

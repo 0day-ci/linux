@@ -65,7 +65,7 @@
 		  1 0 0x2c000000 0x1000000	/* CS1: 16MB for LAN9221 */
 		  2 0 0x10000000 0x2000000>;    /* CS2: 32MB for NOR */
 
-	ethernet@gpmc {
+	gpmc_ethernet: ethernet@1,0 {
 		pinctrl-names = "default";
 		pinctrl-0 = <&lan9221_pins>;
 		interrupt-parent = <&gpio5>;

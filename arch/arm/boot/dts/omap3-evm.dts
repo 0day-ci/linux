@@ -7,6 +7,7 @@
 #include "omap34xx.dtsi"
 #include "omap3-evm-common.dtsi"
 #include "omap3-evm-processor-common.dtsi"
+#include "omap-gpmc-smsc911x.dtsi"
 
 / {
 	model = "TI OMAP35XX EVM (TMDSEVM3530)";

@@ -47,13 +47,11 @@
 	};
 };
 
-#include "omap-gpmc-smsc911x.dtsi"
-
 &gpmc {
 	ranges = <5 0 0x2c000000 0x01000000>, /* CM-T3x30 SMSC9x Eth */
 		 <0 0 0x00000000 0x01000000>; /* CM-T3x NAND */
 
-	smsc1: ethernet@gpmc {
+	gpmc_ethernet: ethernet@5,0 {
 		compatible = "smsc,lan9221", "smsc,lan9115";
 		pinctrl-names = "default";
 		pinctrl-0 = <&smsc1_pins>;
@@ -62,6 +60,8 @@
 		reg = <5 0 0xff>;
 	};
 };
+
+#include "omap-gpmc-smsc911x.dtsi"
 
 &i2c1 {
 	twl: twl@48 {

@@ -9,10 +9,8 @@
 
 #include "omap3-overo-common-peripherals.dtsi"
 
-#include "omap-gpmc-smsc9221.dtsi"
-
 &gpmc {
-	smsc1: ethernet@gpmc {
+	gpmc_ethernet: ethernet@5,0 {
 		reg = <5 0 0xff>;
 		interrupt-parent = <&gpio6>;
 		interrupts = <16 IRQ_TYPE_LEVEL_LOW>;	/* GPIO 176 */
@@ -22,7 +20,7 @@
 		compatible = "smsc,lan9221","smsc,lan9115";
 		bank-width = <2>;
 
-		gpmc,mux-add-data;
+		gpmc,mux-add-data = <0>;
 		gpmc,cs-on-ns = <0>;
 		gpmc,cs-rd-off-ns = <42>;
 		gpmc,cs-wr-off-ns = <36>;
@@ -53,6 +51,8 @@
 		interrupts = <1 IRQ_TYPE_LEVEL_LOW>;	/* GPIO 65 */
 	};
 };
+
+#include "omap-gpmc-smsc9221.dtsi"
 
 &lis33de {
 	status = "disabled";

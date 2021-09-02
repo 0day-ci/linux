@@ -3,8 +3,6 @@
  * Common features on the Zoom debug board
  */
 
-#include "omap-gpmc-smsc911x.dtsi"
-
 &gpmc {
 	ranges = <3 0 0x10000000 0x1000000>,	/* CS3: 16MB for UART */
 		 <7 0 0x2c000000 0x01000000>;
@@ -27,8 +25,8 @@
 		gpmc,mux-add-data = <0>;
 		gpmc,device-width = <1>;
 		gpmc,wait-pin = <1>;
-		gpmc,cycle2cycle-samecsen = <1>;
-		gpmc,cycle2cycle-diffcsen = <1>;
+		gpmc,cycle2cycle-samecsen;
+		gpmc,cycle2cycle-diffcsen;
 		gpmc,cs-on-ns = <5>;
 		gpmc,cs-rd-off-ns = <155>;
 		gpmc,cs-wr-off-ns = <155>;
@@ -50,7 +48,7 @@
 		gpmc,wr-data-mux-bus-ns = <45>;
 		gpmc,wr-access-ns = <145>;
 	};
-	uart@3,1 {
+	uart@3,100 {
 		compatible = "ns16550a";
 		reg = <3 0x100 8>;	/* CS3, offset 0x100, IO size 8 */
 		bank-width = <2>;
@@ -61,7 +59,7 @@
 		clock-frequency = <1843200>;
 		current-speed = <115200>;
 	};
-	uart@3,2 {
+	uart@3,200 {
 		compatible = "ns16550a";
 		reg = <3 0x200 8>;	/* CS3, offset 0x200, IO size 8 */
 		bank-width = <2>;
@@ -72,7 +70,7 @@
 		clock-frequency = <1843200>;
 		current-speed = <115200>;
 	};
-	uart@3,3 {
+	uart@3,300 {
 		compatible = "ns16550a";
 		reg = <3 0x300 8>;	/* CS3, offset 0x300, IO size 8 */
 		bank-width = <2>;
@@ -84,9 +82,11 @@
 		current-speed = <115200>;
 	};
 
-	ethernet@gpmc {
+	gpmc_ethernet: ethernet@7,0 {
 		reg = <7 0 0xff>;
 		interrupt-parent = <&gpio5>;
 		interrupts = <30 IRQ_TYPE_LEVEL_LOW>;	/* gpio158 */
 	};
 };
+
+#include "omap-gpmc-smsc911x.dtsi"
