@@ -142,7 +142,7 @@ static inline enum comp_state get_wqe(struct rxe_qp *qp,
 	/* we come here whether or not we found a response packet to see if
 	 * there are any posted WQEs
 	 */
-	if (qp->is_user)
+	if (qp->sq.is_user)
 		wqe = queue_head(qp->sq.queue, QUEUE_TYPE_FROM_USER);
 	else
 		wqe = queue_head(qp->sq.queue, QUEUE_TYPE_KERNEL);
@@ -385,7 +385,7 @@ static void make_send_cqe(struct rxe_qp *qp, struct rxe_send_wqe *wqe,
 {
 	memset(cqe, 0, sizeof(*cqe));
 
-	if (!qp->is_user) {
+	if (!qp->sq.is_user) {
 		struct ib_wc		*wc	= &cqe->ibwc;
 
 		wc->wr_id		= wqe->wr.wr_id;
@@ -432,7 +432,7 @@ static void do_complete(struct rxe_qp *qp, struct rxe_send_wqe *wqe)
 	if (post)
 		make_send_cqe(qp, wqe, &cqe);
 
-	if (qp->is_user)
+	if (qp->sq.is_user)
 		advance_consumer(qp->sq.queue, QUEUE_TYPE_FROM_USER);
 	else
 		advance_consumer(qp->sq.queue, QUEUE_TYPE_KERNEL);
