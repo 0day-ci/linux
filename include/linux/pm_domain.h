@@ -131,6 +131,8 @@ struct generic_pm_domain {
 	struct opp_table *opp_table;	/* OPP table of the genpd */
 	unsigned int (*opp_to_performance_state)(struct generic_pm_domain *genpd,
 						 struct dev_pm_opp *opp);
+	int (*dev_get_performance_state)(struct generic_pm_domain *genpd,
+					 struct device *dev);
 	int (*set_performance_state)(struct generic_pm_domain *genpd,
 				     unsigned int state);
 	struct gpd_dev_ops dev_ops;
