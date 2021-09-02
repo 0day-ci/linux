@@ -715,10 +715,7 @@ static int mtk_pcie_parse_port(struct mtk_pcie_port *port)
 	struct resource *regs;
 	int ret;
 
-	regs = platform_get_resource_byname(pdev, IORESOURCE_MEM, "pcie-mac");
-	if (!regs)
-		return -EINVAL;
-	port->base = devm_ioremap_resource(dev, regs);
+	port->base = devm_platform_get_and_ioremap_resource_byname(pdev, "pcie-mac", &regs);
 	if (IS_ERR(port->base)) {
 		dev_err(dev, "failed to map register base\n");
 		return PTR_ERR(port->base);
