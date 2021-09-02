@@ -1,0 +1,15 @@
+What:		/sys/bus/platform/drivers/aspeed-uart-routing/*/uart*
+Date:		September 2021
+Contact:	Chia-Wei Wang <chiawei_wang@aspeedtech.com>
+Description:	Selects the RX source of the UARTx device. The current
+		selection will be marked with the '[]' brackets.
+Users:		OpenBMC.  Proposed changes should be mailed to
+		openbmc@lists.ozlabs.org
+
+What:		/sys/bus/platform/drivers/aspeed-uart-routing/*/io*
+Date:		September 2021
+Contact:	Chia-Wei Wang <chiawei_wang@aspeedtech.com>
+Description:	Selects the RX source of IOx pins. The current selection
+		will be marked with the '[]' brackets.
+Users:		OpenBMC.  Proposed changes should be mailed to
+		openbmc@lists.ozlabs.org
