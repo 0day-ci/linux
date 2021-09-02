@@ -3382,6 +3382,13 @@ static int sd_probe(struct device *dev)
 		goto out_free_index;
 	}
 
+	gd->major = sd_major((index & 0xf0) >> 4);
+	gd->first_minor = ((index & 0xf) << 4) | (index & 0xfff00);
+
+	gd->fops = &sd_fops;
+	gd->private_data = &sdkp->driver;
+	gd->queue = sdp->request_queue;
+
 	sdkp->device = sdp;
 	sdkp->driver = &sd_template;
 	sdkp->disk = gd;
@@ -3409,13 +3416,6 @@ static int sd_probe(struct device *dev)
 
 	get_device(dev);
 	dev_set_drvdata(dev, sdkp);
-
-	gd->major = sd_major((index & 0xf0) >> 4);
-	gd->first_minor = ((index & 0xf) << 4) | (index & 0xfff00);
-
-	gd->fops = &sd_fops;
-	gd->private_data = &sdkp->driver;
-	gd->queue = sdkp->device->request_queue;
 
 	/* defaults, until the device tells us otherwise */
 	sdp->sector_size = 512;
