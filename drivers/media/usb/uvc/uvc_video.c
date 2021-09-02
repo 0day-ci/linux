@@ -1614,6 +1614,33 @@ static void uvc_video_complete(struct urb *urb)
 	queue_work(stream->async_wq, &uvc_urb->work);
 }
 
+static void uvc_free_urb_cop(struct uvc_streaming *stream)
+{
+	for_each_uvc_urb(uvc_urb, stream) {
+		if (uvc_urb->copy_operations) {
+			kfree(uvc_urb->copy_operations);
+			uvc_urb->copy_operations = NULL;
+		}
+	}
+}
+
+static int uvc_alloc_urb_cop(struct uvc_streaming *stream, gfp_t gfp_flags)
+{
+	int max_packet = stream->urb_max_packets;
+
+	for_each_uvc_urb(uvc_urb, stream) {
+		uvc_urb->copy_operations
+				= kcalloc(max_packet, sizeof(struct uvc_copy_op), gfp_flags);
+		if (uvc_urb->copy_operations == NULL)
+			goto error;
+	}
+	return 0;
+error:
+	uvc_free_urb_cop(stream);
+
+	return -ENOMEM;
+}
+
 /*
  * Free transfer buffers.
  */
@@ -1687,8 +1714,8 @@ static int uvc_alloc_urb_buffers(struct uvc_streaming *stream,
 	 * payloads across multiple URBs.
 	 */
 	npackets = DIV_ROUND_UP(size, psize);
-	if (npackets > UVC_MAX_PACKETS)
-		npackets = UVC_MAX_PACKETS;
+	if (npackets > stream->urb_max_packets)
+		npackets = stream->urb_max_packets;
 
 	/* Retry allocations until one succeed. */
 	for (; npackets > 1; npackets /= 2) {
@@ -1744,8 +1771,10 @@ static void uvc_video_stop_transfer(struct uvc_streaming *stream,
 		uvc_urb->urb = NULL;
 	}
 
-	if (free_buffers)
+	if (free_buffers) {
 		uvc_free_urb_buffers(stream);
+		uvc_free_urb_cop(stream);
+	}
 }
 
 /*
@@ -1790,9 +1819,17 @@ static int uvc_init_video_isoc(struct uvc_streaming *stream,
 	psize = uvc_endpoint_max_bpi(stream->dev->udev, ep);
 	size = stream->ctrl.dwMaxVideoFrameSize;
 
+	stream->urb_max_packets = UVC_MAX_PACKETS;
+
 	npackets = uvc_alloc_urb_buffers(stream, size, psize, gfp_flags);
 	if (npackets == 0)
 		return -ENOMEM;
+
+	if (uvc_alloc_urb_cop(stream, gfp_flags) != 0) {
+		uvc_dbg(stream->dev, VIDEO,
+				"Failed to init URBs copy operations.\n");
+		return -ENOMEM;
+	}
 
 	size = npackets * psize;
 
@@ -1842,10 +1879,17 @@ static int uvc_init_video_bulk(struct uvc_streaming *stream,
 	psize = usb_endpoint_maxp(&ep->desc);
 	size = stream->ctrl.dwMaxPayloadTransferSize;
 	stream->bulk.max_payload_size = size;
+	stream->urb_max_packets = DIV_ROUND_UP(size, psize);
 
 	npackets = uvc_alloc_urb_buffers(stream, size, psize, gfp_flags);
 	if (npackets == 0)
 		return -ENOMEM;
+
+	if (uvc_alloc_urb_cop(stream, gfp_flags) != 0) {
+		uvc_dbg(stream->dev, VIDEO,
+				"Failed to init URBs copy operations.\n");
+		return -ENOMEM;
+	}
 
 	size = npackets * psize;
 
@@ -2146,6 +2190,8 @@ int uvc_video_init(struct uvc_streaming *stream)
 			return -EINVAL;
 		}
 	}
+
+	stream->urb_max_packets = UVC_MAX_PACKETS;
 
 	/* Prepare asynchronous work items. */
 	for_each_uvc_urb(uvc_urb, stream)
