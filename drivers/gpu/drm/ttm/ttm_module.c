@@ -53,6 +53,9 @@ pgprot_t ttm_prot_from_caching(enum ttm_caching caching, pgprot_t tmp)
 	if (caching == ttm_cached)
 		return tmp;
 
+#ifdef CONFIG_UML
+	tmp = pgprot_noncached(tmp);
+#else
 #if defined(__i386__) || defined(__x86_64__)
 	if (caching == ttm_write_combined)
 		tmp = pgprot_writecombine(tmp);
@@ -68,6 +71,7 @@ pgprot_t ttm_prot_from_caching(enum ttm_caching caching, pgprot_t tmp)
 #endif
 #if defined(__sparc__)
 	tmp = pgprot_noncached(tmp);
+#endif
 #endif
 	return tmp;
 }
