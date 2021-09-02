@@ -415,17 +415,6 @@ static int max1027_debugfs_reg_access(struct iio_dev *indio_dev,
 	return spi_write(st->spi, val, 1);
 }
 
-static int max1027_validate_trigger(struct iio_dev *indio_dev,
-				    struct iio_trigger *trig)
-{
-	struct max1027_state *st = iio_priv(indio_dev);
-
-	if (st->trig != trig)
-		return -EINVAL;
-
-	return 0;
-}
-
 static int max1027_set_cnvst_trigger_state(struct iio_trigger *trig, bool state)
 {
 	struct iio_dev *indio_dev = iio_trigger_get_drvdata(trig);
@@ -470,6 +459,13 @@ static int max1027_read_scan(struct iio_dev *indio_dev)
 	return 0;
 }
 
+static bool max1027_own_trigger_enabled(struct iio_dev *indio_dev)
+{
+	int ret = iio_trigger_validate_own_device(indio_dev->trig, indio_dev);
+
+	return ret ? false : true;
+}
+
 static irqreturn_t max1027_threaded_handler(int irq, void *private)
 {
 	struct iio_poll_func *pf = private;
@@ -488,7 +484,47 @@ static irqreturn_t max1027_threaded_handler(int irq, void *private)
 		return IRQ_HANDLED;
 	}
 
+	/* From that point on, buffers are enabled */
+
+	/*
+	 * The cnvst HW trigger is not in use:
+	 * we need to handle an external trigger request.
+	 */
+	if (!max1027_own_trigger_enabled(indio_dev)) {
+		if (irq != st->spi->irq) {
+			/*
+			 * First, the IRQ number will be the one allocated for
+			 * this poll function by the IIO core, it means that
+			 * this is an external trigger request, we need to start
+			 * a conversion.
+			 */
+			ret = max1027_configure_chans_and_start(indio_dev);
+			if (ret)
+				goto out;
+
+			ret = max1027_wait_eoc(indio_dev);
+			if (ret)
+				goto out;
+		} else {
+			/*
+			 * The pollfunc that has been called "manually" by the
+			 * IIO core now expects the EOC signaling (this is the
+			 * device IRQ firing), we need to call complete().
+			 */
+			complete(&st->complete);
+			return IRQ_HANDLED;
+		}
+	}
+
+	/*
+	 * We end here under two situations:
+	 * - an external trigger is in use and the *_wait_eoc() call succeeded,
+	 *   the data is ready and may be retrieved.
+	 * - the cnvst HW trigger is in use (the handler actually starts here),
+	 *   the data is also ready.
+	 */
 	ret = max1027_read_scan(indio_dev);
+out:
 	if (ret)
 		dev_err(&indio_dev->dev,
 			"Cannot read scanned values (%d)\n", ret);
@@ -505,7 +541,6 @@ static const struct iio_trigger_ops max1027_trigger_ops = {
 
 static const struct iio_info max1027_info = {
 	.read_raw = &max1027_read_raw,
-	.validate_trigger = &max1027_validate_trigger,
 	.debugfs_reg_access = &max1027_debugfs_reg_access,
 };
 
