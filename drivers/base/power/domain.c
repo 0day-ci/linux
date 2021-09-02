@@ -2640,6 +2640,17 @@ static void genpd_dev_pm_sync(struct device *dev)
 	genpd_queue_power_off_work(pd);
 }
 
+static int genpd_get_default_performance_state(struct device *dev,
+					       unsigned int index)
+{
+	int pstate = of_get_required_opp_performance_state(dev->of_node, index);
+
+	if (pstate == -ENODEV || pstate == -EOPNOTSUPP)
+		return 0;
+
+	return pstate;
+}
+
 static int __genpd_dev_pm_attach(struct device *dev, struct device *base_dev,
 				 unsigned int index, bool power_on)
 {
@@ -2690,8 +2701,8 @@ static int __genpd_dev_pm_attach(struct device *dev, struct device *base_dev,
 	}
 
 	/* Set the default performance state */
-	pstate = of_get_required_opp_performance_state(dev->of_node, index);
-	if (pstate < 0 && pstate != -ENODEV && pstate != -EOPNOTSUPP) {
+	pstate = genpd_get_default_performance_state(dev, index);
+	if (pstate < 0) {
 		ret = pstate;
 		goto err;
 	} else if (pstate > 0) {
