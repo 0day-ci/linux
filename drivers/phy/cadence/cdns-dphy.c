@@ -72,9 +72,13 @@ enum cdns_dphy_clk_lane_cfg {
 };
 
 struct cdns_dphy;
-struct cdns_dphy_ops {
+
+struct cdns_dphy_common_ops {
 	int (*probe)(struct cdns_dphy *dphy);
 	void (*remove)(struct cdns_dphy *dphy);
+};
+
+struct cdns_dphy_tx_ops {
 	void (*set_psm_div)(struct cdns_dphy *dphy, u8 div);
 	void (*set_clk_lane_cfg)(struct cdns_dphy *dphy,
 				 enum cdns_dphy_clk_lane_cfg cfg);
@@ -83,12 +87,21 @@ struct cdns_dphy_ops {
 	unsigned long (*get_wakeup_time_ns)(struct cdns_dphy *dphy);
 };
 
+struct cdns_dphy_info {
+	const struct phy_ops *phy_ops;
+	const struct cdns_dphy_common_ops *common_ops;
+
+	/* Only set when DPHY is to be used in Tx mode. */
+	const struct cdns_dphy_tx_ops *tx_ops;
+};
+
 struct cdns_dphy {
 	struct cdns_dphy_cfg cfg;
 	void __iomem *regs;
+	struct device *dev;
 	struct clk *psm_clk;
 	struct clk *pll_ref_clk;
-	const struct cdns_dphy_ops *ops;
+	const struct cdns_dphy_info *info;
 	struct phy *phy;
 };
 
@@ -135,6 +148,7 @@ static int cdns_dsi_get_dphy_pll_cfg(struct cdns_dphy *dphy,
 
 static int cdns_dphy_setup_psm(struct cdns_dphy *dphy)
 {
+	const struct cdns_dphy_tx_ops *ops = dphy->info->tx_ops;
 	unsigned long psm_clk_hz = clk_get_rate(dphy->psm_clk);
 	unsigned long psm_div;
 
@@ -142,8 +156,8 @@ static int cdns_dphy_setup_psm(struct cdns_dphy *dphy)
 		return -EINVAL;
 
 	psm_div = DIV_ROUND_CLOSEST(psm_clk_hz, 1000000);
-	if (dphy->ops->set_psm_div)
-		dphy->ops->set_psm_div(dphy, psm_div);
+	if (ops && ops->set_psm_div)
+		ops->set_psm_div(dphy, psm_div);
 
 	return 0;
 }
@@ -151,20 +165,31 @@ static int cdns_dphy_setup_psm(struct cdns_dphy *dphy)
 static void cdns_dphy_set_clk_lane_cfg(struct cdns_dphy *dphy,
 				       enum cdns_dphy_clk_lane_cfg cfg)
 {
-	if (dphy->ops->set_clk_lane_cfg)
-		dphy->ops->set_clk_lane_cfg(dphy, cfg);
+	const struct cdns_dphy_tx_ops *ops = dphy->info->tx_ops;
+
+	if (ops && ops->set_clk_lane_cfg)
+		ops->set_clk_lane_cfg(dphy, cfg);
 }
 
 static void cdns_dphy_set_pll_cfg(struct cdns_dphy *dphy,
 				  const struct cdns_dphy_cfg *cfg)
 {
-	if (dphy->ops->set_pll_cfg)
-		dphy->ops->set_pll_cfg(dphy, cfg);
+	const struct cdns_dphy_tx_ops *ops = dphy->info->tx_ops;
+
+	if (ops && ops->set_pll_cfg)
+		ops->set_pll_cfg(dphy, cfg);
 }
 
 static unsigned long cdns_dphy_get_wakeup_time_ns(struct cdns_dphy *dphy)
 {
-	return dphy->ops->get_wakeup_time_ns(dphy);
+	const struct cdns_dphy_tx_ops *ops = dphy->info->tx_ops;
+
+	if (!ops || !ops->get_wakeup_time_ns) {
+		dev_err(dphy->dev, "get_wakeup_time_ns() is required\n");
+		return 0;
+	}
+
+	return ops->get_wakeup_time_ns(dphy);
 }
 
 static unsigned long cdns_dphy_ref_get_wakeup_time_ns(struct cdns_dphy *dphy)
@@ -199,20 +224,9 @@ static void cdns_dphy_ref_set_psm_div(struct cdns_dphy *dphy, u8 div)
 	       dphy->regs + DPHY_PSM_CFG);
 }
 
-/*
- * This is the reference implementation of DPHY hooks. Specific integration of
- * this IP may have to re-implement some of them depending on how they decided
- * to wire things in the SoC.
- */
-static const struct cdns_dphy_ops ref_dphy_ops = {
-	.get_wakeup_time_ns = cdns_dphy_ref_get_wakeup_time_ns,
-	.set_pll_cfg = cdns_dphy_ref_set_pll_cfg,
-	.set_psm_div = cdns_dphy_ref_set_psm_div,
-};
-
-static int cdns_dphy_config_from_opts(struct phy *phy,
-				      struct phy_configure_opts_mipi_dphy *opts,
-				      struct cdns_dphy_cfg *cfg)
+static int cdns_dphy_tx_config_from_opts(struct phy *phy,
+					 struct phy_configure_opts_mipi_dphy *opts,
+					 struct cdns_dphy_cfg *cfg)
 {
 	struct cdns_dphy *dphy = phy_get_drvdata(phy);
 	unsigned int dsi_hfp_ext = 0;
@@ -232,24 +246,14 @@ static int cdns_dphy_config_from_opts(struct phy *phy,
 	return 0;
 }
 
-static int cdns_dphy_validate(struct phy *phy, enum phy_mode mode, int submode,
-			      union phy_configure_opts *opts)
-{
-	struct cdns_dphy_cfg cfg = { 0 };
-
-	if (mode != PHY_MODE_MIPI_DPHY)
-		return -EINVAL;
-
-	return cdns_dphy_config_from_opts(phy, &opts->mipi_dphy, &cfg);
-}
-
-static int cdns_dphy_configure(struct phy *phy, union phy_configure_opts *opts)
+static int cdns_dphy_tx_configure(struct phy *phy,
+				  union phy_configure_opts *opts)
 {
 	struct cdns_dphy *dphy = phy_get_drvdata(phy);
 	struct cdns_dphy_cfg cfg = { 0 };
 	int ret;
 
-	ret = cdns_dphy_config_from_opts(phy, &opts->mipi_dphy, &cfg);
+	ret = cdns_dphy_tx_config_from_opts(dphy->phy, &opts->mipi_dphy, &cfg);
 	if (ret)
 		return ret;
 
@@ -279,7 +283,19 @@ static int cdns_dphy_configure(struct phy *phy, union phy_configure_opts *opts)
 	return 0;
 }
 
-static int cdns_dphy_power_on(struct phy *phy)
+static int cdns_dphy_tx_validate(struct phy *phy, enum phy_mode mode,
+				 int submode, union phy_configure_opts *opts)
+{
+	struct cdns_dphy *dphy = phy_get_drvdata(phy);
+	struct cdns_dphy_cfg cfg = { 0 };
+
+	if (mode != PHY_MODE_MIPI_DPHY)
+		return -EINVAL;
+
+	return cdns_dphy_tx_config_from_opts(dphy->phy, &opts->mipi_dphy, &cfg);
+}
+
+static int cdns_dphy_tx_power_on(struct phy *phy)
 {
 	struct cdns_dphy *dphy = phy_get_drvdata(phy);
 
@@ -293,7 +309,7 @@ static int cdns_dphy_power_on(struct phy *phy)
 	return 0;
 }
 
-static int cdns_dphy_power_off(struct phy *phy)
+static int cdns_dphy_tx_power_off(struct phy *phy)
 {
 	struct cdns_dphy *dphy = phy_get_drvdata(phy);
 
@@ -303,16 +319,51 @@ static int cdns_dphy_power_off(struct phy *phy)
 	return 0;
 }
 
-static const struct phy_ops cdns_dphy_ops = {
-	.configure	= cdns_dphy_configure,
-	.validate	= cdns_dphy_validate,
-	.power_on	= cdns_dphy_power_on,
-	.power_off	= cdns_dphy_power_off,
+static int cdns_dphy_tx_probe(struct cdns_dphy *dphy)
+{
+	dphy->psm_clk = devm_clk_get(dphy->dev, "psm");
+	if (IS_ERR(dphy->psm_clk))
+		return PTR_ERR(dphy->psm_clk);
+
+	dphy->pll_ref_clk = devm_clk_get(dphy->dev, "pll_ref");
+	if (IS_ERR(dphy->pll_ref_clk))
+		return PTR_ERR(dphy->pll_ref_clk);
+
+	return 0;
+}
+
+/*
+ * This is the reference implementation of DPHY hooks. Specific integration of
+ * this IP may have to re-implement some of them depending on how they decided
+ * to wire things in the SoC.
+ */
+static const struct cdns_dphy_tx_ops tx_ref_dphy_ops = {
+	.get_wakeup_time_ns = cdns_dphy_ref_get_wakeup_time_ns,
+	.set_pll_cfg = cdns_dphy_ref_set_pll_cfg,
+	.set_psm_div = cdns_dphy_ref_set_psm_div,
+};
+
+static const struct cdns_dphy_common_ops tx_ref_common_ops = {
+	.probe = cdns_dphy_tx_probe,
+};
+
+static const struct phy_ops tx_ref_phy_ops = {
+	.power_on = cdns_dphy_tx_power_on,
+	.power_off = cdns_dphy_tx_power_off,
+	.validate = cdns_dphy_tx_validate,
+	.configure = cdns_dphy_tx_configure,
+};
+
+static const struct cdns_dphy_info tx_ref_info = {
+	.phy_ops = &tx_ref_phy_ops,
+	.common_ops = &tx_ref_common_ops,
+	.tx_ops = &tx_ref_dphy_ops,
 };
 
 static int cdns_dphy_probe(struct platform_device *pdev)
 {
 	struct phy_provider *phy_provider;
+	const struct cdns_dphy_info *info;
 	struct cdns_dphy *dphy;
 	int ret;
 
@@ -320,34 +371,29 @@ static int cdns_dphy_probe(struct platform_device *pdev)
 	if (!dphy)
 		return -ENOMEM;
 	dev_set_drvdata(&pdev->dev, dphy);
+	dphy->dev = &pdev->dev;
 
-	dphy->ops = of_device_get_match_data(&pdev->dev);
-	if (!dphy->ops)
+	info = of_device_get_match_data(&pdev->dev);
+	if (!info)
 		return -EINVAL;
+
+	dphy->info = info;
 
 	dphy->regs = devm_platform_ioremap_resource(pdev, 0);
 	if (IS_ERR(dphy->regs))
 		return PTR_ERR(dphy->regs);
 
-	dphy->psm_clk = devm_clk_get(&pdev->dev, "psm");
-	if (IS_ERR(dphy->psm_clk))
-		return PTR_ERR(dphy->psm_clk);
-
-	dphy->pll_ref_clk = devm_clk_get(&pdev->dev, "pll_ref");
-	if (IS_ERR(dphy->pll_ref_clk))
-		return PTR_ERR(dphy->pll_ref_clk);
-
-	if (dphy->ops->probe) {
-		ret = dphy->ops->probe(dphy);
+	if (info->common_ops && info->common_ops->probe) {
+		ret = info->common_ops->probe(dphy);
 		if (ret)
 			return ret;
 	}
 
-	dphy->phy = devm_phy_create(&pdev->dev, NULL, &cdns_dphy_ops);
+	dphy->phy = devm_phy_create(&pdev->dev, NULL, info->phy_ops);
 	if (IS_ERR(dphy->phy)) {
 		dev_err(&pdev->dev, "failed to create PHY\n");
-		if (dphy->ops->remove)
-			dphy->ops->remove(dphy);
+		if (info->common_ops && info->common_ops->remove)
+			info->common_ops->remove(dphy);
 		return PTR_ERR(dphy->phy);
 	}
 
@@ -361,15 +407,16 @@ static int cdns_dphy_probe(struct platform_device *pdev)
 static int cdns_dphy_remove(struct platform_device *pdev)
 {
 	struct cdns_dphy *dphy = dev_get_drvdata(&pdev->dev);
+	const struct cdns_dphy_info *info = dphy->info;
 
-	if (dphy->ops->remove)
-		dphy->ops->remove(dphy);
+	if (info->common_ops && info->common_ops->remove)
+		info->common_ops->remove(dphy);
 
 	return 0;
 }
 
 static const struct of_device_id cdns_dphy_of_match[] = {
-	{ .compatible = "cdns,dphy", .data = &ref_dphy_ops },
+	{ .compatible = "cdns,dphy", .data = &tx_ref_info },
 	{ /* sentinel */ },
 };
 MODULE_DEVICE_TABLE(of, cdns_dphy_of_match);
