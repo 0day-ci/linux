@@ -1640,6 +1640,30 @@ void intel_engine_apply_whitelist(struct intel_engine_cs *engine)
 				   i915_mmio_reg_offset(RING_NOPID(base)));
 }
 
+/*
+ * engine_fake_wa_init(), a place holder to program the registers
+ * which are not part of a workaround.
+ * Adding programming of those register inside workaround will
+ * allow utilizing wa framework to proper application and verification.
+ */
+static void
+engine_fake_wa_init(struct intel_engine_cs *engine, struct i915_wa_list *wal)
+{
+	u8 mocs;
+
+	if (GRAPHICS_VER(engine->i915) >= 12) {
+	/*
+	 * RING_CMD_CCTL are need to be programed to un-cached
+	 * for memory writes and reads outputted by Command
+	 * Streamers on Gen12 onward platforms.
+	 */
+		mocs = engine->gt->mocs.uc_index;
+		wa_masked_field_set(wal,
+				    RING_CMD_CCTL(engine->mmio_base),
+				    CMD_CCTL_MOCS_MASK,
+				    CMD_CCTL_MOCS_OVERRIDE(mocs, mocs));
+	}
+}
 static void
 rcs_engine_wa_init(struct intel_engine_cs *engine, struct i915_wa_list *wal)
 {
@@ -2079,6 +2103,8 @@ engine_init_workarounds(struct intel_engine_cs *engine, struct i915_wa_list *wal
 {
 	if (I915_SELFTEST_ONLY(GRAPHICS_VER(engine->i915) < 4))
 		return;
+
+	engine_fake_wa_init(engine, wal);
 
 	if (engine->class == RENDER_CLASS)
 		rcs_engine_wa_init(engine, wal);
