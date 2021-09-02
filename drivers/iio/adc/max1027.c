@@ -257,15 +257,27 @@ struct max1027_state {
 	struct iio_trigger		*trig;
 	__be16				*buffer;
 	struct mutex			lock;
+	struct completion		complete;
 
 	u8				reg ____cacheline_aligned;
 };
 
 static int max1027_wait_eoc(struct iio_dev *indio_dev)
 {
+	struct max1027_state *st = iio_priv(indio_dev);
 	unsigned int conversion_time = MAX1027_CONVERSION_UDELAY;
+	int ret;
 
-	usleep_range(conversion_time, conversion_time * 2);
+	if (st->spi->irq) {
+		ret = wait_for_completion_timeout(&st->complete,
+						  msecs_to_jiffies(1000));
+		if (!ret)
+			return ret;
+
+		reinit_completion(&st->complete);
+	} else {
+		usleep_range(conversion_time, conversion_time * 2);
+	}
 
 	return 0;
 }
@@ -458,11 +470,23 @@ static int max1027_read_scan(struct iio_dev *indio_dev)
 	return 0;
 }
 
-static irqreturn_t max1027_trigger_handler(int irq, void *private)
+static irqreturn_t max1027_threaded_handler(int irq, void *private)
 {
 	struct iio_poll_func *pf = private;
 	struct iio_dev *indio_dev = pf->indio_dev;
+	struct max1027_state *st = iio_priv(indio_dev);
 	int ret;
+
+	/*
+	 * When buffers are disabled, no trigger is in use but if we are here it
+	 * means that the device IRQ is enabled:
+	 * this is a single read EOC interrupt, we only need to call complete()
+	 * and return.
+	 */
+	if (!iio_buffer_enabled(indio_dev)) {
+		complete(&st->complete);
+		return IRQ_HANDLED;
+	}
 
 	ret = max1027_read_scan(indio_dev);
 	if (ret)
@@ -502,6 +526,7 @@ static int max1027_probe(struct spi_device *spi)
 	st->info = &max1027_chip_info_tbl[spi_get_device_id(spi)->driver_data];
 
 	mutex_init(&st->lock);
+	init_completion(&st->complete);
 
 	indio_dev->name = spi_get_device_id(spi)->name;
 	indio_dev->info = &max1027_info;
@@ -517,7 +542,7 @@ static int max1027_probe(struct spi_device *spi)
 	if (spi->irq) {
 		ret = devm_iio_triggered_buffer_setup(&spi->dev, indio_dev,
 						      &iio_pollfunc_store_time,
-						      &max1027_trigger_handler,
+						      &max1027_threaded_handler,
 						      NULL);
 		if (ret < 0) {
 			dev_err(&indio_dev->dev, "Failed to setup buffer\n");
