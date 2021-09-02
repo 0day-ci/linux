@@ -1719,6 +1719,14 @@ static int fw_devlink_create_devlink(struct device *con,
 	struct device *sup_dev;
 	int ret = 0;
 
+	/*
+	 * If the consumer or supplier is a device that'll never be probed,
+	 * don't create devices link for it.
+	 */
+	if (con->fwnode->flags & FWNODE_FLAG_NEVER_PROBES ||
+	    sup_handle->flags & FWNODE_FLAG_NEVER_PROBES)
+		return -EINVAL;
+
 	sup_dev = get_dev_from_fwnode(sup_handle);
 	if (sup_dev) {
 		/*

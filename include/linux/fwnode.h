@@ -19,13 +19,15 @@ struct device;
 /*
  * fwnode link flags
  *
- * LINKS_ADDED:	The fwnode has already be parsed to add fwnode links.
- * NOT_DEVICE:	The fwnode will never be populated as a struct device.
- * INITIALIZED: The hardware corresponding to fwnode has been initialized.
+ * LINKS_ADDED:	 The fwnode has already be parsed to add fwnode links.
+ * NOT_DEVICE:	 The fwnode will never be populated as a struct device.
+ * INITIALIZED:  The hardware corresponding to fwnode has been initialized.
+ * NEVER_PROBES: The device that corresponds to this fwnode will never probe.
  */
 #define FWNODE_FLAG_LINKS_ADDED		BIT(0)
 #define FWNODE_FLAG_NOT_DEVICE		BIT(1)
 #define FWNODE_FLAG_INITIALIZED		BIT(2)
+#define FWNODE_FLAG_NEVER_PROBES	BIT(3)
 
 struct fwnode_handle {
 	struct fwnode_handle *secondary;
