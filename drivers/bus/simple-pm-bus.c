@@ -19,6 +19,13 @@ static int simple_pm_bus_probe(struct platform_device *pdev)
 	const struct of_dev_auxdata *lookup = dev_get_platdata(&pdev->dev);
 	struct device_node *np = pdev->dev.of_node;
 
+	/*
+	 * These are transparent bus devices (not simple-pm-bus matches) that
+	 * get populated automatically.  So, don't need to do anything more.
+	 */
+	if (pdev->driver_override)
+		return 0;
+
 	dev_dbg(&pdev->dev, "%s\n", __func__);
 
 	pm_runtime_enable(&pdev->dev);
