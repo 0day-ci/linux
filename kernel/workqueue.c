@@ -1349,8 +1349,16 @@ static void insert_work(struct pool_workqueue *pwq, struct work_struct *work,
 {
 	struct worker_pool *pool = pwq->pool;
 
-	/* record the work call stack in order to print it in KASAN reports */
+	/*
+	 * record the work call stack in order to print it in KASAN reports
+	 * Doing this when CONFIG_PROVE_RAW_LOCK_NESTING is enabled results
+	 * in nesting raw spinlock with page allocation spinlock.
+	 *
+	 * Avoid recording when CONFIG_PROVE_RAW_LOCK_NESTING is enabled.
+	 */
+#if !defined(CONFIG_PROVE_RAW_LOCK_NESTING)
 	kasan_record_aux_stack(work);
+#endif
 
 	/* we own @work, set data and link */
 	set_work_pwq(work, pwq, extra_flags);
