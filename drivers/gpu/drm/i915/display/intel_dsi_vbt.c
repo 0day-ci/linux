@@ -511,7 +511,7 @@ static const u8 *mipi_exec_spi(struct intel_dsi *intel_dsi, const u8 *data)
 static const u8 *mipi_exec_pmic(struct intel_dsi *intel_dsi, const u8 *data)
 {
 	struct drm_i915_private *i915 = to_i915(intel_dsi->base.base.dev);
-#ifdef CONFIG_PMIC_OPREGION
+#ifdef CONFIG_INTEL_PMIC_OPREGION
 	u32 value, mask, reg_address;
 	u16 i2c_address;
 	int ret;
@@ -529,7 +529,7 @@ static const u8 *mipi_exec_pmic(struct intel_dsi *intel_dsi, const u8 *data)
 		drm_err(&i915->drm, "%s failed, error: %d\n", __func__, ret);
 #else
 	drm_err(&i915->drm,
-		"Your hardware requires CONFIG_PMIC_OPREGION and it is not set\n");
+		"Your hardware requires CONFIG_INTEL_PMIC_OPREGION and it is not set\n");
 #endif
 
 	return data + 15;
