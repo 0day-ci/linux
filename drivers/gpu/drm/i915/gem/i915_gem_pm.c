@@ -5,6 +5,7 @@
  */
 
 #include "gem/i915_gem_pm.h"
+#include "gem/i915_gem_ttm_pm.h"
 #include "gt/intel_gt.h"
 #include "gt/intel_gt_pm.h"
 #include "gt/intel_gt_requests.h"
@@ -37,6 +38,32 @@ void i915_gem_suspend(struct drm_i915_private *i915)
 	intel_gt_suspend_prepare(&i915->gt);
 
 	i915_gem_drain_freed_objects(i915);
+}
+
+int i915_gem_backup_suspend(struct drm_i915_private *i915)
+{
+	struct intel_memory_region *mr;
+	int ret = 0, id;
+
+	for_each_memory_region(mr, i915, id) {
+		if (mr->type == INTEL_MEMORY_LOCAL) {
+			ret = i915_ttm_backup_region(mr);
+			if (ret)
+				break;
+		}
+	}
+
+	if (!ret) {
+		i915_gem_suspend(i915);
+		return 0;
+	}
+
+	for_each_memory_region(mr, i915, id) {
+		if (mr->type == INTEL_MEMORY_LOCAL)
+			i915_ttm_recover_region(mr);
+	}
+
+	return ret;
 }
 
 void i915_gem_suspend_late(struct drm_i915_private *i915)
@@ -128,7 +155,18 @@ int i915_gem_freeze_late(struct drm_i915_private *i915)
 
 void i915_gem_resume(struct drm_i915_private *i915)
 {
+	int ret, id;
+	struct intel_memory_region *mr;
+
 	GEM_TRACE("%s\n", dev_name(i915->drm.dev));
+
+	for_each_memory_region(mr, i915, id) {
+		if (mr->type == INTEL_MEMORY_LOCAL) {
+			ret = i915_ttm_restore_region(mr, true);
+			if (ret)
+				WARN_ON(ret);
+		}
+	}
 
 	/*
 	 * As we didn't flush the kernel context before suspend, we cannot
@@ -136,4 +174,12 @@ void i915_gem_resume(struct drm_i915_private *i915)
 	 * it and start again.
 	 */
 	intel_gt_resume(&i915->gt);
+
+	for_each_memory_region(mr, i915, id) {
+		if (mr->type == INTEL_MEMORY_LOCAL) {
+			ret = i915_ttm_restore_region(mr, false);
+			if (ret)
+				WARN_ON(ret);
+		}
+	}
 }

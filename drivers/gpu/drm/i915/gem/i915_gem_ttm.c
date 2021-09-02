@@ -10,10 +10,11 @@
 #include "intel_memory_region.h"
 #include "intel_region_ttm.h"
 
+#include "gem/i915_gem_mman.h"
 #include "gem/i915_gem_object.h"
 #include "gem/i915_gem_region.h"
 #include "gem/i915_gem_ttm.h"
-#include "gem/i915_gem_mman.h"
+#include "gem/i915_gem_ttm_pm.h"
 
 #include "gt/intel_migrate.h"
 #include "gt/intel_engine_pm.h"
@@ -63,6 +64,20 @@ static struct ttm_placement i915_sys_placement = {
 	.num_busy_placement = 1,
 	.busy_placement = &sys_placement_flags,
 };
+
+/**
+ * i915_ttm_sys_placement - Return the struct ttm_placement to be
+ * used for an object in system memory.
+ *
+ * Rather than making the struct extern, use this
+ * function.
+ *
+ * Return: A pointer to a static variable for sys placement.
+ */
+struct ttm_placement *i915_ttm_sys_placement(void)
+{
+	return &i915_sys_placement;
+}
 
 static int i915_ttm_err_to_gem(int err)
 {
@@ -890,6 +905,7 @@ void i915_ttm_bo_destroy(struct ttm_buffer_object *bo)
 {
 	struct drm_i915_gem_object *obj = i915_ttm_to_gem(bo);
 
+	i915_ttm_backup_free(obj);
 	i915_gem_object_release_memory_region(obj);
 	mutex_destroy(&obj->ttm.get_io_page.lock);
 	if (obj->ttm.created)

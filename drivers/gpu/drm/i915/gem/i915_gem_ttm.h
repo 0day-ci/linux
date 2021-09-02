@@ -50,4 +50,8 @@ int __i915_gem_ttm_object_init(struct intel_memory_region *mem,
 int i915_gem_obj_copy_ttm(struct drm_i915_gem_object *dst,
 			  struct drm_i915_gem_object *src,
 			  bool allow_accel, bool intr);
+
+/* Internal I915 TTM functions below. */
+struct ttm_placement *i915_ttm_sys_placement(void);
+
 #endif
