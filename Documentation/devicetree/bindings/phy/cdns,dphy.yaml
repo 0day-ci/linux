@@ -33,9 +33,18 @@ properties:
 required:
   - compatible
   - reg
-  - clocks
-  - clock-names
   - "#phy-cells"
+
+allOf:
+  - if:
+      properties:
+        compatible:
+          contains:
+            const: cdns,dphy
+    then:
+      required:
+        - clocks
+        - clock-names
 
 additionalProperties: false
 
