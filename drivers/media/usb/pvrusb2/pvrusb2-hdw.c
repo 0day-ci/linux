@@ -1727,7 +1727,8 @@ int pvr2_hdw_set_streaming(struct pvr2_hdw *hdw,int enable_flag)
 				   enable_flag ? "enable" : "disable");
 		}
 		pvr2_hdw_state_sched(hdw);
-	} while (0); LOCK_GIVE(hdw->big_lock);
+	} while (0);
+	LOCK_GIVE(hdw->big_lock);
 	if ((ret = pvr2_hdw_wait(hdw,0)) < 0) return ret;
 	if (enable_flag) {
 		while ((st = hdw->master_state) != PVR2_STATE_RUN) {
