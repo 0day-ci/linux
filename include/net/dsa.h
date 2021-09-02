@@ -846,6 +846,12 @@ struct dsa_switch_ops {
 						   enum devlink_sb_pool_type pool_type,
 						   u32 *p_cur, u32 *p_max);
 
+	/* Hook for drivers to tear down their port devlink regions when a
+	 * port failed to register and its devlink port must be torn down and
+	 * reinitialized by DSA as unused.
+	 */
+	int	(*port_reinit_as_unused)(struct dsa_switch *ds, int port);
+
 	/*
 	 * MTU change functionality. Switches can also adjust their MRU through
 	 * this method. By MTU, one understands the SDU (L2 payload) length.
@@ -960,6 +966,9 @@ static inline int dsa_devlink_port_to_port(struct devlink_port *port)
 {
 	return port->index;
 }
+
+int dsa_port_devlink_setup(struct dsa_port *dp);
+void dsa_port_devlink_teardown(struct dsa_port *dp);
 
 struct dsa_switch_driver {
 	struct list_head	list;

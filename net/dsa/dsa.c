@@ -440,6 +440,12 @@ dsa_devlink_port_region_create(struct dsa_switch *ds,
 {
 	struct dsa_port *dp = dsa_to_port(ds, port);
 
+	/* Make sure drivers provide the method for cleaning this up when the
+	 * port might need to be torn down at runtime.
+	 */
+	if (WARN_ON(!ds->ops->port_reinit_as_unused))
+		return NULL;
+
 	return devlink_port_region_create(&dp->devlink_port, ops,
 					  region_max_snapshots,
 					  region_size);

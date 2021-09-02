@@ -488,7 +488,7 @@ static int dsa_port_setup(struct dsa_port *dp)
 	return 0;
 }
 
-static int dsa_port_devlink_setup(struct dsa_port *dp)
+int dsa_port_devlink_setup(struct dsa_port *dp)
 {
 	struct devlink_port *dlp = &dp->devlink_port;
 	struct dsa_switch_tree *dst = dp->ds->dst;
@@ -529,6 +529,7 @@ static int dsa_port_devlink_setup(struct dsa_port *dp)
 
 	return err;
 }
+EXPORT_SYMBOL_GPL(dsa_port_devlink_setup);
 
 static void dsa_port_teardown(struct dsa_port *dp)
 {
@@ -572,13 +573,26 @@ static void dsa_port_teardown(struct dsa_port *dp)
 	dp->setup = false;
 }
 
-static void dsa_port_devlink_teardown(struct dsa_port *dp)
+void dsa_port_devlink_teardown(struct dsa_port *dp)
 {
 	struct devlink_port *dlp = &dp->devlink_port;
 
 	if (dp->devlink_port_setup)
 		devlink_port_unregister(dlp);
 	dp->devlink_port_setup = false;
+}
+EXPORT_SYMBOL_GPL(dsa_port_devlink_teardown);
+
+static int dsa_port_reinit_as_unused(struct dsa_port *dp)
+{
+	struct dsa_switch *ds = dp->ds;
+
+	if (ds->ops->port_reinit_as_unused)
+		return ds->ops->port_reinit_as_unused(ds, dp->index);
+
+	dsa_port_devlink_teardown(dp);
+	dp->type = DSA_PORT_TYPE_UNUSED;
+	return dsa_port_devlink_setup(dp);
 }
 
 static int dsa_devlink_info_get(struct devlink *dl,
@@ -911,9 +925,7 @@ static int dsa_tree_setup_switches(struct dsa_switch_tree *dst)
 	list_for_each_entry(dp, &dst->ports, list) {
 		err = dsa_port_setup(dp);
 		if (err) {
-			dsa_port_devlink_teardown(dp);
-			dp->type = DSA_PORT_TYPE_UNUSED;
-			err = dsa_port_devlink_setup(dp);
+			err = dsa_port_reinit_as_unused(dp);
 			if (err)
 				goto teardown;
 			continue;

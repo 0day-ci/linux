@@ -792,3 +792,19 @@ int mv88e6xxx_devlink_info_get(struct dsa_switch *ds,
 					      DEVLINK_INFO_VERSION_GENERIC_ASIC_ID,
 					      chip->info->name);
 }
+
+int mv88e6xxx_port_reinit_as_unused(struct dsa_switch *ds, int port)
+{
+	struct dsa_port *dp = dsa_to_port(ds, port);
+	struct mv88e6xxx_chip *chip = ds->priv;
+	int err;
+
+	mv88e6xxx_teardown_devlink_regions_port(chip, port);
+	dsa_port_devlink_teardown(dp);
+	dp->type = DSA_PORT_TYPE_UNUSED;
+	err = dsa_port_devlink_setup(dp);
+	if (err)
+		return err;
+
+	return mv88e6xxx_setup_devlink_regions_port(ds, chip, port);
+}

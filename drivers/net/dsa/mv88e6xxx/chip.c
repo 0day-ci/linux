@@ -6173,6 +6173,7 @@ static const struct dsa_switch_ops mv88e6xxx_switch_ops = {
 	.crosschip_lag_leave	= mv88e6xxx_crosschip_lag_leave,
 	.port_bridge_tx_fwd_offload = mv88e6xxx_bridge_tx_fwd_offload,
 	.port_bridge_tx_fwd_unoffload = mv88e6xxx_bridge_tx_fwd_unoffload,
+	.port_reinit_as_unused	= mv88e6xxx_port_reinit_as_unused,
 };
 
 static int mv88e6xxx_register_switch(struct mv88e6xxx_chip *chip)
