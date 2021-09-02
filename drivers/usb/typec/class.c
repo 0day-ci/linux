@@ -845,10 +845,26 @@ EXPORT_SYMBOL_GPL(typec_register_partner);
  */
 void typec_unregister_partner(struct typec_partner *partner)
 {
-	if (!IS_ERR_OR_NULL(partner))
+	if (!IS_ERR_OR_NULL(partner)) {
+		power_supply_unregister(partner->psy);
 		device_unregister(&partner->dev);
+	}
 }
 EXPORT_SYMBOL_GPL(typec_unregister_partner);
+
+int typec_partner_register_psy(struct typec_partner *partner, const struct power_supply_desc *desc,
+			       const struct power_supply_config *cfg)
+{
+	partner->psy = power_supply_register(&partner->dev, desc, cfg);
+	if (IS_ERR(partner->psy)) {
+		dev_err(&partner->dev, "failed to register partner power supply (%ld)\n",
+				PTR_ERR(partner->psy));
+		return PTR_ERR(partner->psy);
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(typec_partner_register_psy);
 
 /* ------------------------------------------------------------------------- */
 /* Type-C Cable Plugs */

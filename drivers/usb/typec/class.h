@@ -4,6 +4,7 @@
 #define __USB_TYPEC_CLASS__
 
 #include <linux/device.h>
+#include <linux/power_supply.h>
 #include <linux/usb/typec.h>
 
 struct typec_mux;
@@ -33,6 +34,7 @@ struct typec_partner {
 	int				num_altmodes;
 	u16				pd_revision; /* 0300H = "3.0" */
 	enum usb_pd_svdm_ver		svdm_version;
+	struct power_supply		*psy;
 };
 
 struct typec_port {

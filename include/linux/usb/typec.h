@@ -22,6 +22,9 @@ struct typec_altmode_ops;
 struct fwnode_handle;
 struct device;
 
+struct power_supply_desc;
+struct power_supply_config;
+
 enum typec_port_type {
 	TYPEC_PORT_SRC,
 	TYPEC_PORT_SNK,
@@ -132,6 +135,8 @@ int typec_partner_set_num_altmodes(struct typec_partner *partner, int num_altmod
 struct typec_altmode
 *typec_partner_register_altmode(struct typec_partner *partner,
 				const struct typec_altmode_desc *desc);
+int typec_partner_register_psy(struct typec_partner *partner, const struct power_supply_desc *desc,
+			       const struct power_supply_config *cfg);
 int typec_plug_set_num_altmodes(struct typec_plug *plug, int num_altmodes);
 struct typec_altmode
 *typec_plug_register_altmode(struct typec_plug *plug,
