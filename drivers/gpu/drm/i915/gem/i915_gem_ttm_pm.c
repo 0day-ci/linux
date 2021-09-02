@@ -43,6 +43,9 @@ static int i915_ttm_backup(struct i915_gem_apply_to_region *apply,
 	if (i915_gem_object_evictable(obj))
 		return ttm_bo_validate(bo, i915_ttm_sys_placement(), &ctx);
 
+	if (obj->flags & I915_BO_ALLOC_PM_VOLATILE)
+		return 0;
+
 	sys_region = i915->mm.regions[INTEL_REGION_SMEM];
 	backup = i915_gem_object_create_region(sys_region,
 					       obj->base.size,
