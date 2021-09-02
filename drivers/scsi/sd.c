@@ -1437,6 +1437,16 @@ static int sd_open(struct block_device *bdev, fmode_t mode)
 	if (!scsi_block_when_processing_errors(sdev))
 		goto error_out;
 
+	/*
+	 * Checking for changes to the device must not race with the device
+	 * or its parent host being removed, so lock until sd_open returns.
+	 */
+	mutex_lock(&sdev->host->scan_mutex);
+	if (sdev->sdev_state != SDEV_RUNNING) {
+		retval = -ERESTARTSYS;
+		goto unlock_scan_error_out;
+	}
+
 	if (sd_need_revalidate(bdev, sdkp))
 		sd_revalidate_disk(bdev->bd_disk);
 
@@ -1445,7 +1455,7 @@ static int sd_open(struct block_device *bdev, fmode_t mode)
 	 */
 	retval = -ENOMEDIUM;
 	if (sdev->removable && !sdkp->media_present && !(mode & FMODE_NDELAY))
-		goto error_out;
+		goto unlock_scan_error_out;
 
 	/*
 	 * If the device has the write protect tab set, have the open fail
@@ -1453,7 +1463,7 @@ static int sd_open(struct block_device *bdev, fmode_t mode)
 	 */
 	retval = -EROFS;
 	if (sdkp->write_prot && (mode & FMODE_WRITE))
-		goto error_out;
+		goto unlock_scan_error_out;
 
 	/*
 	 * It is possible that the disk changing stuff resulted in
@@ -1463,14 +1473,18 @@ static int sd_open(struct block_device *bdev, fmode_t mode)
 	 */
 	retval = -ENXIO;
 	if (!scsi_device_online(sdev))
-		goto error_out;
+		goto unlock_scan_error_out;
 
 	if ((atomic_inc_return(&sdkp->openers) == 1) && sdev->removable) {
 		if (scsi_block_when_processing_errors(sdev))
 			scsi_set_medium_removal(sdev, SCSI_REMOVAL_PREVENT);
 	}
 
+	mutex_unlock(&sdev->host->scan_mutex);
 	return 0;
+
+unlock_scan_error_out:
+	mutex_unlock(&sdev->host->scan_mutex);
 
 error_out:
 	scsi_disk_put(sdkp);
