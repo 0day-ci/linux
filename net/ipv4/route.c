@@ -603,9 +603,11 @@ static void fnhe_remove_oldest(struct fnhe_hash_bucket *hash)
 			oldest_p = fnhe_p;
 		}
 	}
-	fnhe_flush_routes(oldest);
-	*oldest_p = oldest->fnhe_next;
-	kfree_rcu(oldest, rcu);
+	if (oldest) {
+		fnhe_flush_routes(oldest);
+		*oldest_p = oldest->fnhe_next;
+		kfree_rcu(oldest, rcu);
+	}
 }
 
 static u32 fnhe_hashfun(__be32 daddr)
