@@ -98,6 +98,48 @@ static void of_device_make_bus_id(struct device *dev)
 }
 
 /**
+ * of_match_only_simple_bus - Check if a device node is only a simple bus
+ * @np: device node to check
+ *
+ * A simple bus in this context is defined as a transparent bus whose child
+ * devices are automatically populated but has no hardware specific
+ * functionality.
+ *
+ * Returns true if the device node is only a simple bus and can never match
+ * with any other specific driver.  Otherwise, returns false.
+ */
+static bool of_match_only_simple_bus(struct device_node *np)
+{
+	/* List of buses that don't have an explicit driver. */
+	static const char * const of_simple_bus_table[] = {
+		"simple-bus",
+		"simple-mfd",
+		"isa",
+		"arm,amba-bus",
+	};
+	const char *cp;
+	struct property *prop;
+	int i;
+
+	prop = of_find_property(np, "compatible", NULL);
+	for (cp = of_prop_next_string(prop, NULL); cp;
+	     cp = of_prop_next_string(prop, cp)) {
+		bool match = false;
+		const char *bus = of_simple_bus_table[i];
+
+		for (i = 0; i < ARRAY_SIZE(of_simple_bus_table); i++)
+			if (!of_compat_cmp(cp, bus, strlen(bus))) {
+				match = true;
+				break;
+			}
+		if (!match)
+			return false;
+	}
+
+	return true;
+}
+
+/**
  * of_device_alloc - Allocate and initialize an of_device
  * @np: device node to assign to device
  * @bus_id: Name to assign to the device.  May be null to use default name.
@@ -142,6 +184,9 @@ struct platform_device *of_device_alloc(struct device_node *np,
 	dev->dev.of_node = of_node_get(np);
 	dev->dev.fwnode = &np->fwnode;
 	dev->dev.parent = parent ? : &platform_bus;
+
+	if (of_match_only_simple_bus(np))
+		dev->driver_override = "simple-pm-bus";
 
 	if (bus_id)
 		dev_set_name(&dev->dev, "%s", bus_id);
