@@ -297,6 +297,14 @@ config LEDS_SUNFIRE
 	  This option enables support for the Left, Middle, and Right
 	  LEDs on the I/O and CPU boards of SunFire UltraSPARC servers.
 
+config LEDS_SUNXI
+	tristate "LED support for Allwinner sunxi LED controller"
+	depends on LEDS_CLASS
+	depends on ARCH_SUNXI || COMPILE_TEST
+	help
+	  This option enables support for the LED controller provided in
+	  some Allwinner sunxi SoCs.
+
 config LEDS_IPAQ_MICRO
 	tristate "LED Support for the Compaq iPAQ h3xxx"
 	depends on LEDS_CLASS
