@@ -439,9 +439,7 @@ static int max1027_probe(struct spi_device *spi)
 	indio_dev->num_channels = st->info->num_channels;
 	indio_dev->available_scan_masks = st->info->available_scan_masks;
 
-	st->buffer = devm_kmalloc_array(&indio_dev->dev,
-					indio_dev->num_channels, 2,
-					GFP_KERNEL);
+	st->buffer = kmalloc_array(indio_dev->num_channels, 2, GFP_KERNEL);
 	if (!st->buffer)
 		return -ENOMEM;
 
@@ -452,7 +450,7 @@ static int max1027_probe(struct spi_device *spi)
 						      NULL);
 		if (ret < 0) {
 			dev_err(&indio_dev->dev, "Failed to setup buffer\n");
-			return ret;
+			goto free_buffer;
 		}
 
 		st->trig = devm_iio_trigger_alloc(&spi->dev, "%s-trigger",
@@ -461,7 +459,7 @@ static int max1027_probe(struct spi_device *spi)
 			ret = -ENOMEM;
 			dev_err(&indio_dev->dev,
 				"Failed to allocate iio trigger\n");
-			return ret;
+			goto free_buffer;
 		}
 
 		st->trig->ops = &max1027_trigger_ops;
@@ -471,7 +469,7 @@ static int max1027_probe(struct spi_device *spi)
 		if (ret < 0) {
 			dev_err(&indio_dev->dev,
 				"Failed to register iio trigger\n");
-			return ret;
+			goto free_buffer;
 		}
 
 		ret = devm_request_threaded_irq(&spi->dev, spi->irq,
@@ -482,7 +480,7 @@ static int max1027_probe(struct spi_device *spi)
 						st->trig);
 		if (ret < 0) {
 			dev_err(&indio_dev->dev, "Failed to allocate IRQ.\n");
-			return ret;
+			goto free_buffer;
 		}
 	}
 
@@ -491,7 +489,7 @@ static int max1027_probe(struct spi_device *spi)
 	ret = spi_write(st->spi, &st->reg, 1);
 	if (ret < 0) {
 		dev_err(&indio_dev->dev, "Failed to reset the ADC\n");
-		return ret;
+		goto free_buffer;
 	}
 
 	/* Disable averaging */
@@ -499,10 +497,15 @@ static int max1027_probe(struct spi_device *spi)
 	ret = spi_write(st->spi, &st->reg, 1);
 	if (ret < 0) {
 		dev_err(&indio_dev->dev, "Failed to configure averaging register\n");
-		return ret;
+		goto free_buffer;
 	}
 
 	return devm_iio_device_register(&spi->dev, indio_dev);
+
+free_buffer:
+	kfree(st->buffer);
+
+	return ret;
 }
 
 static struct spi_driver max1027_driver = {
