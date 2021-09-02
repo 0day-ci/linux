@@ -85,7 +85,7 @@ int smb3_encryption_required(const struct cifs_tcon *tcon)
 }
 
 static void
-smb2_hdr_assemble(struct smb2_sync_hdr *shdr, __le16 smb2_cmd,
+smb2_hdr_assemble(struct smb2_hdr *shdr, __le16 smb2_cmd,
 		  const struct cifs_tcon *tcon,
 		  struct TCP_Server_Info *server)
 {
@@ -342,10 +342,10 @@ fill_small_buf(__le16 smb2_command, struct cifs_tcon *tcon,
 	 */
 	memset(buf, 0, 256);
 
-	smb2_hdr_assemble(&spdu->sync_hdr, smb2_command, tcon, server);
+	smb2_hdr_assemble(&spdu->hdr, smb2_command, tcon, server);
 	spdu->StructureSize2 = cpu_to_le16(parmsize);
 
-	*total_len = parmsize + sizeof(struct smb2_sync_hdr);
+	*total_len = parmsize + sizeof(struct smb2_hdr);
 }
 
 /*
@@ -368,7 +368,7 @@ static int __smb2_plain_req_init(__le16 smb2_command, struct cifs_tcon *tcon,
 	}
 
 	fill_small_buf(smb2_command, tcon, server,
-		       (struct smb2_sync_hdr *)(*request_buf),
+		       (struct smb2_hdr *)(*request_buf),
 		       total_len);
 
 	if (tcon != NULL) {
@@ -858,7 +858,7 @@ SMB2_negotiate(const unsigned int xid, struct cifs_ses *ses)
 	if (rc)
 		return rc;
 
-	req->sync_hdr.SessionId = 0;
+	req->hdr.SessionId = 0;
 
 	memset(server->preauth_sha_hash, 0, SMB2_PREAUTH_HASH_SIZE);
 	memset(ses->preauth_sha_hash, 0, SMB2_PREAUTH_HASH_SIZE);
@@ -1019,7 +1019,7 @@ SMB2_negotiate(const unsigned int xid, struct cifs_ses *ses)
 		server->cipher_type = SMB2_ENCRYPTION_AES128_CCM;
 
 	security_blob = smb2_get_data_area_len(&blob_offset, &blob_length,
-					       (struct smb2_sync_hdr *)rsp);
+					       (struct smb2_hdr *)rsp);
 	/*
 	 * See MS-SMB2 section 2.2.4: if no blob, client picks default which
 	 * for us will be
@@ -1251,13 +1251,13 @@ SMB2_sess_alloc_buffer(struct SMB2_sess_data *sess_data)
 		return rc;
 
 	if (sess_data->ses->binding) {
-		req->sync_hdr.SessionId = sess_data->ses->Suid;
-		req->sync_hdr.Flags |= SMB2_FLAGS_SIGNED;
+		req->hdr.SessionId = sess_data->ses->Suid;
+		req->hdr.Flags |= SMB2_FLAGS_SIGNED;
 		req->PreviousSessionId = 0;
 		req->Flags = SMB2_SESSION_REQ_FLAG_BINDING;
 	} else {
 		/* First session, not a reauthenticate */
-		req->sync_hdr.SessionId = 0;
+		req->hdr.SessionId = 0;
 		/*
 		 * if reconnect, we need to send previous sess id
 		 * otherwise it is 0
@@ -1267,7 +1267,7 @@ SMB2_sess_alloc_buffer(struct SMB2_sess_data *sess_data)
 	}
 
 	/* enough to enable echos and oplocks and one max size write */
-	req->sync_hdr.CreditRequest = cpu_to_le16(130);
+	req->hdr.CreditRequest = cpu_to_le16(130);
 
 	/* only one of SMB2 signing flags may be set in SMB2 request */
 	if (server->sign)
@@ -1426,7 +1426,7 @@ SMB2_auth_kerberos(struct SMB2_sess_data *sess_data)
 	rsp = (struct smb2_sess_setup_rsp *)sess_data->iov[0].iov_base;
 	/* keep session id and flags if binding */
 	if (!ses->binding) {
-		ses->Suid = rsp->sync_hdr.SessionId;
+		ses->Suid = rsp->hdr.SessionId;
 		ses->session_flags = le16_to_cpu(rsp->SessionFlags);
 	}
 
@@ -1502,7 +1502,7 @@ SMB2_sess_auth_rawntlmssp_negotiate(struct SMB2_sess_data *sess_data)
 
 	/* If true, rc here is expected and not an error */
 	if (sess_data->buf0_type != CIFS_NO_BUFFER &&
-		rsp->sync_hdr.Status == STATUS_MORE_PROCESSING_REQUIRED)
+		rsp->hdr.Status == STATUS_MORE_PROCESSING_REQUIRED)
 		rc = 0;
 
 	if (rc)
@@ -1524,7 +1524,7 @@ SMB2_sess_auth_rawntlmssp_negotiate(struct SMB2_sess_data *sess_data)
 
 	/* keep existing ses id and flags if binding */
 	if (!ses->binding) {
-		ses->Suid = rsp->sync_hdr.SessionId;
+		ses->Suid = rsp->hdr.SessionId;
 		ses->session_flags = le16_to_cpu(rsp->SessionFlags);
 	}
 
@@ -1559,7 +1559,7 @@ SMB2_sess_auth_rawntlmssp_authenticate(struct SMB2_sess_data *sess_data)
 		goto out;
 
 	req = (struct smb2_sess_setup_req *) sess_data->iov[0].iov_base;
-	req->sync_hdr.SessionId = ses->Suid;
+	req->hdr.SessionId = ses->Suid;
 
 	rc = build_ntlmssp_auth_blob(&ntlmssp_blob, &blob_length, ses,
 					sess_data->nls_cp);
@@ -1585,7 +1585,7 @@ SMB2_sess_auth_rawntlmssp_authenticate(struct SMB2_sess_data *sess_data)
 
 	/* keep existing ses id and flags if binding */
 	if (!ses->binding) {
-		ses->Suid = rsp->sync_hdr.SessionId;
+		ses->Suid = rsp->hdr.SessionId;
 		ses->session_flags = le16_to_cpu(rsp->SessionFlags);
 	}
 
@@ -1716,12 +1716,12 @@ SMB2_logoff(const unsigned int xid, struct cifs_ses *ses)
 		return rc;
 
 	 /* since no tcon, smb2_init can not do this, so do here */
-	req->sync_hdr.SessionId = ses->Suid;
+	req->hdr.SessionId = ses->Suid;
 
 	if (ses->session_flags & SMB2_SESSION_FLAG_ENCRYPT_DATA)
 		flags |= CIFS_TRANSFORM_REQ;
 	else if (server->sign)
-		req->sync_hdr.Flags |= SMB2_FLAGS_SIGNED;
+		req->hdr.Flags |= SMB2_FLAGS_SIGNED;
 
 	flags |= CIFS_NO_RSP_BUF;
 
@@ -1829,14 +1829,14 @@ SMB2_tcon(const unsigned int xid, struct cifs_ses *ses, const char *tree,
 	    !(ses->session_flags &
 		    (SMB2_SESSION_FLAG_IS_GUEST|SMB2_SESSION_FLAG_IS_NULL)) &&
 	    ((ses->user_name != NULL) || (ses->sectype == Kerberos)))
-		req->sync_hdr.Flags |= SMB2_FLAGS_SIGNED;
+		req->hdr.Flags |= SMB2_FLAGS_SIGNED;
 
 	memset(&rqst, 0, sizeof(struct smb_rqst));
 	rqst.rq_iov = iov;
 	rqst.rq_nvec = 2;
 
 	/* Need 64 for max size write so ask for more in case not there yet */
-	req->sync_hdr.CreditRequest = cpu_to_le16(64);
+	req->hdr.CreditRequest = cpu_to_le16(64);
 
 	rc = cifs_send_recv(xid, ses, server,
 			    &rqst, &resp_buftype, flags, &rsp_iov);
@@ -1872,7 +1872,7 @@ SMB2_tcon(const unsigned int xid, struct cifs_ses *ses, const char *tree,
 	tcon->maximal_access = le32_to_cpu(rsp->MaximalAccess);
 	tcon->tidStatus = CifsGood;
 	tcon->need_reconnect = false;
-	tcon->tid = rsp->sync_hdr.TreeId;
+	tcon->tid = rsp->hdr.TreeId;
 	strlcpy(tcon->treeName, tree, sizeof(tcon->treeName));
 
 	if ((rsp->Capabilities & SMB2_SHARE_CAP_DFS) &&
@@ -1893,7 +1893,7 @@ tcon_exit:
 	return rc;
 
 tcon_error_exit:
-	if (rsp && rsp->sync_hdr.Status == STATUS_BAD_NETWORK_NAME) {
+	if (rsp && rsp->hdr.Status == STATUS_BAD_NETWORK_NAME) {
 		cifs_tcon_dbg(VFS, "BAD_NETWORK_NAME: %s\n", tree);
 	}
 	goto tcon_exit;
@@ -2609,7 +2609,7 @@ int smb311_posix_mkdir(const unsigned int xid, struct inode *inode,
 	if (tcon->share_flags & SHI1005_FLAGS_DFS) {
 		int name_len;
 
-		req->sync_hdr.Flags |= SMB2_FLAGS_DFS_OPERATIONS;
+		req->hdr.Flags |= SMB2_FLAGS_DFS_OPERATIONS;
 		rc = alloc_path_with_tree_prefix(&copy_path, &copy_size,
 						 &name_len,
 						 tcon->treeName, utf16_path);
@@ -2741,7 +2741,7 @@ SMB2_open_init(struct cifs_tcon *tcon, struct TCP_Server_Info *server,
 	if (tcon->share_flags & SHI1005_FLAGS_DFS) {
 		int name_len;
 
-		req->sync_hdr.Flags |= SMB2_FLAGS_DFS_OPERATIONS;
+		req->hdr.Flags |= SMB2_FLAGS_DFS_OPERATIONS;
 		rc = alloc_path_with_tree_prefix(&copy_path, &copy_size,
 						 &name_len,
 						 tcon->treeName, path);
@@ -2953,7 +2953,7 @@ SMB2_open(const unsigned int xid, struct cifs_open_parms *oparms, __le16 *path,
 	oparms->fid->volatile_fid = rsp->VolatileFileId;
 	oparms->fid->access = oparms->desired_access;
 #ifdef CONFIG_CIFS_DEBUG2
-	oparms->fid->mid = le64_to_cpu(rsp->sync_hdr.MessageId);
+	oparms->fid->mid = le64_to_cpu(rsp->hdr.MessageId);
 #endif /* CIFS_DEBUG2 */
 
 	if (buf) {
@@ -3053,7 +3053,7 @@ SMB2_ioctl_init(struct cifs_tcon *tcon, struct TCP_Server_Info *server,
 	 * response size smaller.
 	 */
 	req->MaxOutputResponse = cpu_to_le32(max_response_size);
-	req->sync_hdr.CreditCharge =
+	req->hdr.CreditCharge =
 		cpu_to_le16(DIV_ROUND_UP(max(indatalen, max_response_size),
 					 SMB2_MAX_BUFFER_SIZE));
 	if (is_fsctl)
@@ -3063,7 +3063,7 @@ SMB2_ioctl_init(struct cifs_tcon *tcon, struct TCP_Server_Info *server,
 
 	/* validate negotiate request must be signed - see MS-SMB2 3.2.5.5 */
 	if (opcode == FSCTL_VALIDATE_NEGOTIATE_INFO)
-		req->sync_hdr.Flags |= SMB2_FLAGS_SIGNED;
+		req->hdr.Flags |= SMB2_FLAGS_SIGNED;
 
 	return 0;
 }
@@ -3688,7 +3688,7 @@ smb2_echo_callback(struct mid_q_entry *mid)
 
 	if (mid->mid_state == MID_RESPONSE_RECEIVED
 	    || mid->mid_state == MID_RESPONSE_MALFORMED) {
-		credits.value = le16_to_cpu(rsp->sync_hdr.CreditRequest);
+		credits.value = le16_to_cpu(rsp->hdr.CreditRequest);
 		credits.instance = server->reconnect_instance;
 	}
 
@@ -3788,7 +3788,7 @@ SMB2_echo(struct TCP_Server_Info *server)
 	if (rc)
 		return rc;
 
-	req->sync_hdr.CreditRequest = cpu_to_le16(1);
+	req->hdr.CreditRequest = cpu_to_le16(1);
 
 	iov[0].iov_len = total_len;
 	iov[0].iov_base = (char *)req;
@@ -3892,7 +3892,7 @@ smb2_new_read_req(void **buf, unsigned int *total_len,
 {
 	int rc = -EACCES;
 	struct smb2_read_plain_req *req = NULL;
-	struct smb2_sync_hdr *shdr;
+	struct smb2_hdr *shdr;
 	struct TCP_Server_Info *server = io_parms->server;
 
 	rc = smb2_plain_req_init(SMB2_READ, io_parms->tcon, server,
@@ -3903,7 +3903,7 @@ smb2_new_read_req(void **buf, unsigned int *total_len,
 	if (server == NULL)
 		return -ECONNABORTED;
 
-	shdr = &req->sync_hdr;
+	shdr = &req->hdr;
 	shdr->ProcessId = cpu_to_le32(io_parms->pid);
 
 	req->PersistentFileId = io_parms->persistent_fid;
@@ -3986,8 +3986,8 @@ smb2_readv_callback(struct mid_q_entry *mid)
 	struct cifs_readdata *rdata = mid->callback_data;
 	struct cifs_tcon *tcon = tlink_tcon(rdata->cfile->tlink);
 	struct TCP_Server_Info *server = rdata->server;
-	struct smb2_sync_hdr *shdr =
-				(struct smb2_sync_hdr *)rdata->iov[0].iov_base;
+	struct smb2_hdr *shdr =
+				(struct smb2_hdr *)rdata->iov[0].iov_base;
 	struct cifs_credits credits = { .value = 0, .instance = 0 };
 	struct smb_rqst rqst = { .rq_iov = &rdata->iov[1],
 				 .rq_nvec = 1,
@@ -4073,7 +4073,7 @@ smb2_async_readv(struct cifs_readdata *rdata)
 {
 	int rc, flags = 0;
 	char *buf;
-	struct smb2_sync_hdr *shdr;
+	struct smb2_hdr *shdr;
 	struct cifs_io_parms io_parms;
 	struct smb_rqst rqst = { .rq_iov = rdata->iov,
 				 .rq_nvec = 1 };
@@ -4106,7 +4106,7 @@ smb2_async_readv(struct cifs_readdata *rdata)
 	rdata->iov[0].iov_base = buf;
 	rdata->iov[0].iov_len = total_len;
 
-	shdr = (struct smb2_sync_hdr *)buf;
+	shdr = (struct smb2_hdr *)buf;
 
 	if (rdata->credits.value > 0) {
 		shdr->CreditCharge = cpu_to_le16(DIV_ROUND_UP(rdata->bytes,
@@ -4239,7 +4239,7 @@ smb2_writev_callback(struct mid_q_entry *mid)
 
 	switch (mid->mid_state) {
 	case MID_RESPONSE_RECEIVED:
-		credits.value = le16_to_cpu(rsp->sync_hdr.CreditRequest);
+		credits.value = le16_to_cpu(rsp->hdr.CreditRequest);
 		credits.instance = server->reconnect_instance;
 		wdata->result = smb2_check_receive(mid, server, 0);
 		if (wdata->result != 0)
@@ -4265,7 +4265,7 @@ smb2_writev_callback(struct mid_q_entry *mid)
 		wdata->result = -EAGAIN;
 		break;
 	case MID_RESPONSE_MALFORMED:
-		credits.value = le16_to_cpu(rsp->sync_hdr.CreditRequest);
+		credits.value = le16_to_cpu(rsp->hdr.CreditRequest);
 		credits.instance = server->reconnect_instance;
 		fallthrough;
 	default:
@@ -4312,7 +4312,7 @@ smb2_async_writev(struct cifs_writedata *wdata,
 {
 	int rc = -EACCES, flags = 0;
 	struct smb2_write_req *req = NULL;
-	struct smb2_sync_hdr *shdr;
+	struct smb2_hdr *shdr;
 	struct cifs_tcon *tcon = tlink_tcon(wdata->cfile->tlink);
 	struct TCP_Server_Info *server = wdata->server;
 	struct kvec iov[1];
@@ -4330,7 +4330,7 @@ smb2_async_writev(struct cifs_writedata *wdata,
 	if (smb3_encryption_required(tcon))
 		flags |= CIFS_TRANSFORM_REQ;
 
-	shdr = (struct smb2_sync_hdr *)req;
+	shdr = (struct smb2_hdr *)req;
 	shdr->ProcessId = cpu_to_le32(wdata->cfile->pid);
 
 	req->PersistentFileId = wdata->cfile->fid.persistent_fid;
@@ -4482,7 +4482,7 @@ SMB2_write(const unsigned int xid, struct cifs_io_parms *io_parms,
 	if (smb3_encryption_required(io_parms->tcon))
 		flags |= CIFS_TRANSFORM_REQ;
 
-	req->sync_hdr.ProcessId = cpu_to_le32(io_parms->pid);
+	req->hdr.ProcessId = cpu_to_le32(io_parms->pid);
 
 	req->PersistentFileId = io_parms->persistent_fid;
 	req->VolatileFileId = io_parms->volatile_fid;
@@ -4867,7 +4867,7 @@ SMB2_query_directory(const unsigned int xid, struct cifs_tcon *tcon,
 
 	if (rc) {
 		if (rc == -ENODATA &&
-		    rsp->sync_hdr.Status == STATUS_NO_MORE_FILES) {
+		    rsp->hdr.Status == STATUS_NO_MORE_FILES) {
 			trace_smb3_query_dir_done(xid, persistent_fid,
 				tcon->tid, tcon->ses->Suid, index, 0);
 			srch_inf->endOfSearch = true;
@@ -4915,7 +4915,7 @@ SMB2_set_info_init(struct cifs_tcon *tcon, struct TCP_Server_Info *server,
 	if (rc)
 		return rc;
 
-	req->sync_hdr.ProcessId = cpu_to_le32(pid);
+	req->hdr.ProcessId = cpu_to_le32(pid);
 	req->InfoType = info_type;
 	req->FileInfoClass = info_class;
 	req->PersistentFileId = persistent_fid;
@@ -5075,7 +5075,7 @@ SMB2_oplock_break(const unsigned int xid, struct cifs_tcon *tcon,
 	req->VolatileFid = volatile_fid;
 	req->PersistentFid = persistent_fid;
 	req->OplockLevel = oplock_level;
-	req->sync_hdr.CreditRequest = cpu_to_le16(1);
+	req->hdr.CreditRequest = cpu_to_le16(1);
 
 	flags |= CIFS_NO_RSP_BUF;
 
@@ -5377,7 +5377,7 @@ smb2_lockv(const unsigned int xid, struct cifs_tcon *tcon,
 	if (smb3_encryption_required(tcon))
 		flags |= CIFS_TRANSFORM_REQ;
 
-	req->sync_hdr.ProcessId = cpu_to_le32(pid);
+	req->hdr.ProcessId = cpu_to_le32(pid);
 	req->LockCount = cpu_to_le16(num_lock);
 
 	req->PersistentFileId = persist_fid;
@@ -5453,7 +5453,7 @@ SMB2_lease_break(const unsigned int xid, struct cifs_tcon *tcon,
 	if (smb3_encryption_required(tcon))
 		flags |= CIFS_TRANSFORM_REQ;
 
-	req->sync_hdr.CreditRequest = cpu_to_le16(1);
+	req->hdr.CreditRequest = cpu_to_le16(1);
 	req->StructureSize = cpu_to_le16(36);
 	total_len += 12;
 
