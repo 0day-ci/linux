@@ -224,7 +224,7 @@ static int ufshcd_reset_and_restore(struct ufs_hba *hba);
 static int ufshcd_eh_host_reset_handler(struct scsi_cmnd *cmd);
 static int ufshcd_clear_tm_cmd(struct ufs_hba *hba, int tag);
 static void ufshcd_hba_exit(struct ufs_hba *hba);
-static int ufshcd_clear_ua_wluns(struct ufs_hba *hba);
+static int ufshcd_clear_ua_wluns(struct ufs_hba *hba, bool nowait);
 static int ufshcd_probe_hba(struct ufs_hba *hba, bool async);
 static int ufshcd_setup_clocks(struct ufs_hba *hba, bool on);
 static int ufshcd_uic_hibern8_enter(struct ufs_hba *hba);
@@ -4110,7 +4110,7 @@ int ufshcd_link_recovery(struct ufs_hba *hba)
 		dev_err(hba->dev, "%s: link recovery failed, err %d",
 			__func__, ret);
 	else
-		ufshcd_clear_ua_wluns(hba);
+		ufshcd_clear_ua_wluns(hba, false);
 
 	return ret;
 }
@@ -5974,7 +5974,7 @@ static void ufshcd_err_handling_unprepare(struct ufs_hba *hba)
 	ufshcd_release(hba);
 	if (ufshcd_is_clkscaling_supported(hba))
 		ufshcd_clk_scaling_suspend(hba, false);
-	ufshcd_clear_ua_wluns(hba);
+	ufshcd_clear_ua_wluns(hba, true);
 	ufshcd_rpm_put(hba);
 }
 
@@ -7907,7 +7907,7 @@ static int ufshcd_add_lus(struct ufs_hba *hba)
 	if (ret)
 		goto out;
 
-	ufshcd_clear_ua_wluns(hba);
+	ufshcd_clear_ua_wluns(hba, false);
 
 	/* Initialize devfreq after UFS device is detected */
 	if (ufshcd_is_clkscaling_supported(hba)) {
@@ -7943,7 +7943,8 @@ static void ufshcd_request_sense_done(struct request *rq, blk_status_t error)
 }
 
 static int
-ufshcd_request_sense_async(struct ufs_hba *hba, struct scsi_device *sdev)
+ufshcd_request_sense_async(struct ufs_hba *hba, struct scsi_device *sdev,
+			   bool nowait)
 {
 	/*
 	 * Some UFS devices clear unit attention condition only if the sense
@@ -7951,6 +7952,7 @@ ufshcd_request_sense_async(struct ufs_hba *hba, struct scsi_device *sdev)
 	 */
 	static const u8 cmd[6] = {REQUEST_SENSE, 0, 0, 0, UFS_SENSE_SIZE, 0};
 	struct scsi_request *rq;
+	blk_mq_req_flags_t flags;
 	struct request *req;
 	char *buffer;
 	int ret;
@@ -7959,8 +7961,8 @@ ufshcd_request_sense_async(struct ufs_hba *hba, struct scsi_device *sdev)
 	if (!buffer)
 		return -ENOMEM;
 
-	req = blk_get_request(sdev->request_queue, REQ_OP_DRV_IN,
-			      /*flags=*/BLK_MQ_REQ_PM);
+	flags = BLK_MQ_REQ_PM | (nowait ? BLK_MQ_REQ_NOWAIT : 0);
+	req = blk_get_request(sdev->request_queue, REQ_OP_DRV_IN, flags);
 	if (IS_ERR(req)) {
 		ret = PTR_ERR(req);
 		goto out_free;
@@ -7990,7 +7992,7 @@ out_free:
 	return ret;
 }
 
-static int ufshcd_clear_ua_wlun(struct ufs_hba *hba, u8 wlun)
+static int ufshcd_clear_ua_wlun(struct ufs_hba *hba, u8 wlun, bool nowait)
 {
 	struct scsi_device *sdp;
 	unsigned long flags;
@@ -8016,7 +8018,10 @@ static int ufshcd_clear_ua_wlun(struct ufs_hba *hba, u8 wlun)
 	if (ret)
 		goto out_err;
 
-	ret = ufshcd_request_sense_async(hba, sdp);
+	ret = ufshcd_request_sense_async(hba, sdp, nowait);
+	if (nowait && ret && wlun == UFS_UPIU_RPMB_WLUN &&
+	    pm_runtime_suspended(&sdp->sdev_gendev))
+		ret = 0; /* RPMB runtime resume will clear UAC */
 	scsi_device_put(sdp);
 out_err:
 	if (ret)
@@ -8025,16 +8030,16 @@ out_err:
 	return ret;
 }
 
-static int ufshcd_clear_ua_wluns(struct ufs_hba *hba)
+static int ufshcd_clear_ua_wluns(struct ufs_hba *hba, bool nowait)
 {
 	int ret = 0;
 
 	if (!hba->wlun_dev_clr_ua)
 		goto out;
 
-	ret = ufshcd_clear_ua_wlun(hba, UFS_UPIU_UFS_DEVICE_WLUN);
+	ret = ufshcd_clear_ua_wlun(hba, UFS_UPIU_UFS_DEVICE_WLUN, nowait);
 	if (!ret)
-		ret = ufshcd_clear_ua_wlun(hba, UFS_UPIU_RPMB_WLUN);
+		ret = ufshcd_clear_ua_wlun(hba, UFS_UPIU_RPMB_WLUN, nowait);
 	if (!ret)
 		hba->wlun_dev_clr_ua = false;
 out:
@@ -8656,7 +8661,7 @@ static int ufshcd_set_dev_pwr_mode(struct ufs_hba *hba,
 	 */
 	hba->host->eh_noresume = 1;
 	if (hba->wlun_dev_clr_ua)
-		ufshcd_clear_ua_wlun(hba, UFS_UPIU_UFS_DEVICE_WLUN);
+		ufshcd_clear_ua_wlun(hba, UFS_UPIU_UFS_DEVICE_WLUN, false);
 
 	cmd[4] = pwr_mode << 4;
 
@@ -9824,7 +9829,7 @@ static inline int ufshcd_clear_rpmb_uac(struct ufs_hba *hba)
 
 	if (!hba->wlun_rpmb_clr_ua)
 		return 0;
-	ret = ufshcd_clear_ua_wlun(hba, UFS_UPIU_RPMB_WLUN);
+	ret = ufshcd_clear_ua_wlun(hba, UFS_UPIU_RPMB_WLUN, false);
 	if (!ret)
 		hba->wlun_rpmb_clr_ua = 0;
 	return ret;
