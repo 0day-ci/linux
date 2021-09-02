@@ -149,7 +149,8 @@ static int i915_ttm_restore(struct i915_gem_apply_to_region *apply,
 	if (!obj->ttm.backup)
 		return 0;
 
-	if (pm_apply->early_restore && (obj->flags & I915_BO_ALLOC_USER))
+	if (pm_apply->early_restore && ((obj->flags & I915_BO_ALLOC_USER) ||
+					!(obj->flags & I915_BO_ALLOC_PM_EARLY)))
 		return 0;
 
 	err = i915_gem_object_lock(backup, apply->ww);
