@@ -392,6 +392,22 @@ static int of_platform_bus_create(struct device_node *bus,
 	if (!dev || !of_match_node(matches, bus))
 		return 0;
 
+	/*
+	 * If the bus node has only one compatible string value and it has
+	 * matched as a bus node, it's never going to get probed by a device
+	 * driver. So flag it as such so that fw_devlink knows not to create
+	 * device links with this device.
+	 *
+	 * This doesn't catch all devices that'll never probe, but this is good
+	 * enough for now.
+	 *
+	 * This doesn't really work for PPC because of how it uses
+	 * of_platform_bus_probe() to add normal devices. So ignore PPC cases.
+	 */
+	if (!IS_ENABLED(CONFIG_PPC) &&
+	    of_property_count_strings(bus, "compatible") == 1)
+		bus->fwnode.flags |= FWNODE_FLAG_NOT_DEVICE;
+
 	for_each_child_of_node(bus, child) {
 		pr_debug("   create child: %pOF\n", child);
 		rc = of_platform_bus_create(child, matches, lookup, &dev->dev, strict);
