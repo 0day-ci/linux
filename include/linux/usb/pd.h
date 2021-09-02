@@ -201,7 +201,13 @@ struct pd_message {
 } __packed;
 
 /* PDO: Power Data Object */
-#define PDO_MAX_OBJECTS		7
+
+/*
+ * The EPR (Extended Power Range) structure is a superset of the SPR (Standard Power Range)
+ * capabilities structure, so set the max number of PDOs to 13 instead of 7. On SPR-only systems,
+ * objects 8 through 13 will just be empty.
+ */
+#define PDO_MAX_OBJECTS		13
 
 enum pd_pdo_type {
 	PDO_TYPE_FIXED = 0,
