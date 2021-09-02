@@ -155,3 +155,25 @@ lpc_reset: reset-controller@98 {
         reg = <0x98 0x4>;
         #reset-cells = <1>;
 };
+
+UART routing control
+--------------------
+
+The UART routing control manages the RX muxes among the UART controllers
+and the I/O pins. This is typicall used for the Serial-Over-Lan (SOL)
+service.
+
+Required properties:
+
+ - compatible:		One of:
+			"aspeed,ast2500-uart-routing";
+			"aspeed,ast2600-uart-routing";
+
+ - reg:			offset and length of the IP in the LPC memory region
+
+Example:
+
+uart_routing: uart-routing@98 {
+	compatible = "aspeed,ast2600-uart-routing";
+	reg = <0x98 0x8>;
+};
