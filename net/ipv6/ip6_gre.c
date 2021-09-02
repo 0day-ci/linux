@@ -629,8 +629,11 @@ drop:
 
 static int gre_handle_offloads(struct sk_buff *skb, bool csum)
 {
-	if (csum && skb_checksum_start(skb) < skb->data)
+	/* Local checksum offload requires csum offload of the inner packet */
+	if (csum && skb->ip_summed == CHECKSUM_PARTIAL &&
+	    skb_checksum_start(skb) < skb->data)
 		return -EINVAL;
+
 	return iptunnel_handle_offloads(skb,
 					csum ? SKB_GSO_GRE_CSUM : SKB_GSO_GRE);
 }
