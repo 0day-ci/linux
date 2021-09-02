@@ -677,14 +677,11 @@ static int c8sectpfe_probe(struct platform_device *pdev)
 
 	fei->dev = dev;
 
-	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "c8sectpfe");
-	fei->io = devm_ioremap_resource(dev, res);
+	fei->io = devm_platform_get_and_ioremap_resource_byname(pdev, "c8sectpfe", &res);
 	if (IS_ERR(fei->io))
 		return PTR_ERR(fei->io);
 
-	res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
-					"c8sectpfe-ram");
-	fei->sram = devm_ioremap_resource(dev, res);
+	fei->sram = devm_platform_get_and_ioremap_resource_byname(pdev, "c8sectpfe-ram", &res);
 	if (IS_ERR(fei->sram))
 		return PTR_ERR(fei->sram);
 
