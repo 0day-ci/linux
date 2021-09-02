@@ -723,7 +723,7 @@ static inline struct gadget_info *os_desc_item_to_gadget_info(
 static ssize_t os_desc_use_show(struct config_item *item, char *page)
 {
 	return sprintf(page, "%d\n",
-			os_desc_item_to_gadget_info(item)->use_os_desc);
+			os_desc_item_to_gadget_info(item)->cdev.use_os_string);
 }
 
 static ssize_t os_desc_use_store(struct config_item *item, const char *page,
@@ -736,7 +736,7 @@ static ssize_t os_desc_use_store(struct config_item *item, const char *page,
 	mutex_lock(&gi->lock);
 	ret = strtobool(page, &use);
 	if (!ret) {
-		gi->use_os_desc = use;
+		gi->cdev.use_os_string = use;
 		ret = len;
 	}
 	mutex_unlock(&gi->lock);
@@ -747,7 +747,7 @@ static ssize_t os_desc_use_store(struct config_item *item, const char *page,
 static ssize_t os_desc_b_vendor_code_show(struct config_item *item, char *page)
 {
 	return sprintf(page, "0x%02x\n",
-			os_desc_item_to_gadget_info(item)->b_vendor_code);
+			os_desc_item_to_gadget_info(item)->cdev.b_vendor_code);
 }
 
 static ssize_t os_desc_b_vendor_code_store(struct config_item *item,
@@ -760,7 +760,7 @@ static ssize_t os_desc_b_vendor_code_store(struct config_item *item,
 	mutex_lock(&gi->lock);
 	ret = kstrtou8(page, 0, &b_vendor_code);
 	if (!ret) {
-		gi->b_vendor_code = b_vendor_code;
+		gi->cdev.b_vendor_code = b_vendor_code;
 		ret = len;
 	}
 	mutex_unlock(&gi->lock);
@@ -773,7 +773,7 @@ static ssize_t os_desc_qw_sign_show(struct config_item *item, char *page)
 	struct gadget_info *gi = os_desc_item_to_gadget_info(item);
 	int res;
 
-	res = utf16s_to_utf8s((wchar_t *) gi->qw_sign, OS_STRING_QW_SIGN_LEN,
+	res = utf16s_to_utf8s((wchar_t *) gi->cdev.qw_sign, OS_STRING_QW_SIGN_LEN,
 			      UTF16_LITTLE_ENDIAN, page, PAGE_SIZE - 1);
 	page[res++] = '\n';
 
@@ -792,7 +792,7 @@ static ssize_t os_desc_qw_sign_store(struct config_item *item, const char *page,
 
 	mutex_lock(&gi->lock);
 	res = utf8s_to_utf16s(page, l,
-			      UTF16_LITTLE_ENDIAN, (wchar_t *) gi->qw_sign,
+			      UTF16_LITTLE_ENDIAN, (wchar_t *) gi->cdev.qw_sign,
 			      OS_STRING_QW_SIGN_LEN);
 	if (res > 0)
 		res = len;
@@ -1281,12 +1281,6 @@ static int configfs_composite_bind(struct usb_gadget *gadget,
 		gi->cdev.desc.iManufacturer = s[USB_GADGET_MANUFACTURER_IDX].id;
 		gi->cdev.desc.iProduct = s[USB_GADGET_PRODUCT_IDX].id;
 		gi->cdev.desc.iSerialNumber = s[USB_GADGET_SERIAL_IDX].id;
-	}
-
-	if (gi->use_os_desc) {
-		cdev->use_os_string = true;
-		cdev->b_vendor_code = gi->b_vendor_code;
-		memcpy(cdev->qw_sign, gi->qw_sign, OS_STRING_QW_SIGN_LEN);
 	}
 
 	if (gadget_is_otg(gadget) && !otg_desc[0]) {
