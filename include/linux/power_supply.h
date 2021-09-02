@@ -17,6 +17,7 @@
 #include <linux/leds.h>
 #include <linux/spinlock.h>
 #include <linux/notifier.h>
+#include <linux/usb/pd.h>
 
 /*
  * All voltages, currents, charges, energies, time and temperatures in uV,
@@ -171,6 +172,9 @@ enum power_supply_property {
 	POWER_SUPPLY_PROP_MODEL_NAME,
 	POWER_SUPPLY_PROP_MANUFACTURER,
 	POWER_SUPPLY_PROP_SERIAL_NUMBER,
+	/* Array properties */
+	POWER_SUPPLY_PROP_SINK_CAP_PDOS,
+	POWER_SUPPLY_PROP_SOURCE_CAP_PDOS,
 };
 
 enum power_supply_type {
@@ -209,6 +213,7 @@ enum power_supply_notifier_events {
 union power_supply_propval {
 	int intval;
 	const char *strval;
+	u32 pdos[PDO_MAX_OBJECTS];
 };
 
 struct device_node;

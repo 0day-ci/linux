@@ -562,6 +562,36 @@ Description:
 			      "Unknown", "SDP", "DCP", "CDP", "ACA", "C", "PD",
 			      "PD_DRP", "PD_PPS", "BrickID"
 
+What:		/sys/class/power_supply/<supply_name>/source_cap_pdos
+Date:		September 2021
+Contact:	linux-pm@vger.kernel.org
+Description:
+		Reports the Source Capabilities Power Data Objects (PDO) reported by the USB
+		PD-capable power source. 13 PDOs are listed. PDOs 1-7 represent the Source Caps
+		for devices which only support Standard Power Range (SPR), whereas PDOs 8-13
+		are for Extended Power Range (EPR) capable sources.
+		NOTE: The EPR Source Caps message is a superset of the Source Cap message, so on
+		SPR-only sources, PDOs 8-13 will be 0.
+
+		Access: Read-Only
+
+		Valid values: Represented as a list of 13 32-bit PDO objects in hexadecimal format.
+
+What:		/sys/class/power_supply/<supply_name>/sink_cap_pdos
+Date:		September 2021
+Contact:	linux-pm@vger.kernel.org
+Description:
+		Reports the Sink Capabilities Power Data Objects (PDO) reported by the USB
+		PD-capable power source. 13 PDOs are listed. PDOs 1-7 represent the Sink Caps
+		for devices which only support Standard Power Range (SPR), whereas PDOs 8-13
+		are for Extended Power Range (EPR) capable sinks.
+		NOTE: The EPR Sink Caps message is a superset of the Sink Cap message, so on
+		SPR-only sinks, PDOs 8-13 will be 0.
+
+		Access: Read-Only
+
+		Valid values: Represented as a list of 13 32-bit PDO objects in hexadecimal format.
+
 **Device Specific Properties**
 
 What:		/sys/class/power/ds2760-battery.*/charge_now

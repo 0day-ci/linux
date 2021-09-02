@@ -211,6 +211,9 @@ static struct power_supply_attr power_supply_attrs[] = {
 	POWER_SUPPLY_ATTR(MODEL_NAME),
 	POWER_SUPPLY_ATTR(MANUFACTURER),
 	POWER_SUPPLY_ATTR(SERIAL_NUMBER),
+	/* Array properties */
+	POWER_SUPPLY_ATTR(SINK_CAP_PDOS),
+	POWER_SUPPLY_ATTR(SOURCE_CAP_PDOS),
 };
 
 static struct attribute *
@@ -267,7 +270,11 @@ static ssize_t power_supply_show_property(struct device *dev,
 	struct power_supply *psy = dev_get_drvdata(dev);
 	struct power_supply_attr *ps_attr = to_ps_attr(attr);
 	enum power_supply_property psp = dev_attr_psp(attr);
-	union power_supply_propval value;
+	union power_supply_propval value = {
+		.pdos = {0}
+	};
+	size_t count;
+	int i;
 
 	if (psp == POWER_SUPPLY_PROP_TYPE) {
 		value.intval = psy->desc->type;
@@ -298,6 +305,15 @@ static ssize_t power_supply_show_property(struct device *dev,
 		break;
 	case POWER_SUPPLY_PROP_MODEL_NAME ... POWER_SUPPLY_PROP_SERIAL_NUMBER:
 		ret = sprintf(buf, "%s\n", value.strval);
+		break;
+	case POWER_SUPPLY_PROP_SINK_CAP_PDOS:
+	case POWER_SUPPLY_PROP_SOURCE_CAP_PDOS:
+		ret = 0;
+		for (i = 0; i < PDO_MAX_OBJECTS; i++) {
+			count = sprintf(buf, "0x%08x\n", value.pdos[i]);
+			buf += count;
+			ret += count;
+		}
 		break;
 	default:
 		ret = sprintf(buf, "%d\n", value.intval);
