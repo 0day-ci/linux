@@ -11,6 +11,7 @@
 #include "glob.h"
 #include "nterr.h"
 #include "smb2pdu.h"
+#include "../cifs_common/smb2pdu.h"
 
 /* ksmbd's Specific ERRNO */
 #define ESHARE			50000
