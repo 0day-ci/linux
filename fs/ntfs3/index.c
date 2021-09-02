@@ -8,6 +8,7 @@
 #include <linux/blkdev.h>
 #include <linux/buffer_head.h>
 #include <linux/fs.h>
+#include <linux/kernel.h>
 #include <linux/nls.h>
 
 #include "debug.h"
@@ -680,8 +681,9 @@ static struct NTFS_DE *hdr_find_e(const struct ntfs_index *indx,
 #ifdef NTFS3_INDEX_BINARY_SEARCH
 	struct NTFS_DE *found = NULL;
 	int min_idx = 0, mid_idx, max_idx = 0;
+	int table_size = 8;
 	int diff2;
-	u16 offs[64];
+	u16 offs[128];
 
 	if (end > 0x10000)
 		goto next;
@@ -701,7 +703,7 @@ fill_table:
 		off += e_size;
 
 		max_idx++;
-		if (max_idx < ARRAY_SIZE(offs))
+		if (max_idx < table_size)
 			goto fill_table;
 
 		max_idx--;
@@ -719,6 +721,7 @@ binary_search:
 				return NULL;
 
 			max_idx = 0;
+			table_size = min(table_size * 2, 128);
 			goto fill_table;
 		}
 	} else if (diff2 < 0) {
