@@ -226,7 +226,6 @@ static int dp83811_config_intr(struct phy_device *phydev)
 				DP83811_POLARITY_INT_EN |
 				DP83811_SLEEP_MODE_INT_EN |
 				DP83811_OVERTEMP_INT_EN |
-				DP83811_OVERVOLTAGE_INT_EN |
 				DP83811_UNDERVOLTAGE_INT_EN);
 
 		err = phy_write(phydev, MII_DP83811_INT_STAT2, misr_status);
