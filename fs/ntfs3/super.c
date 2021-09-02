@@ -23,12 +23,10 @@
  *
  */
 
-#include <linux/backing-dev.h>
 #include <linux/blkdev.h>
 #include <linux/buffer_head.h>
 #include <linux/exportfs.h>
 #include <linux/fs.h>
-#include <linux/iversion.h>
 #include <linux/log2.h>
 #include <linux/module.h>
 #include <linux/nls.h>
