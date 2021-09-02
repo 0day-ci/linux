@@ -1665,6 +1665,8 @@ static int genpd_remove_device(struct generic_pm_domain *genpd,
 		goto out;
 	}
 
+	genpd_set_performance_state(dev, 0);
+
 	genpd->device_count--;
 	genpd->max_off_time_changed = true;
 
@@ -2604,12 +2606,6 @@ static void genpd_dev_pm_detach(struct device *dev, bool power_off)
 
 	dev_dbg(dev, "removing from PM domain %s\n", pd->name);
 
-	/* Drop the default performance state */
-	if (dev_gpd_data(dev)->default_pstate) {
-		dev_pm_genpd_set_performance_state(dev, 0);
-		dev_gpd_data(dev)->default_pstate = 0;
-	}
-
 	for (i = 1; i < GENPD_RETRY_MAX_MS; i <<= 1) {
 		ret = genpd_remove_device(pd, dev);
 		if (ret != -EAGAIN)
@@ -2702,7 +2698,6 @@ static int __genpd_dev_pm_attach(struct device *dev, struct device *base_dev,
 		ret = dev_pm_genpd_set_performance_state(dev, pstate);
 		if (ret)
 			goto err;
-		dev_gpd_data(dev)->default_pstate = pstate;
 	}
 	return 1;
 
