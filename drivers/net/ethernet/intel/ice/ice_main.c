@@ -5979,6 +5979,34 @@ static void ice_napi_disable_all(struct ice_vsi *vsi)
 }
 
 /**
+ * ice_get_eec_state - get state of SyncE DPLL
+ * @netdev: network interface device structure
+ * @state: state of SyncE DPLL
+ * @sync_src: port is a source of the sync signal
+ */
+static int
+ice_get_eec_state(struct net_device *netdev, enum if_eec_state *state,
+		  u32 *eec_flags, struct netlink_ext_ack *extack)
+{
+	struct ice_netdev_priv *np = netdev_priv(netdev);
+	struct ice_vsi *vsi = np->vsi;
+	struct ice_pf *pf = vsi->back;
+
+	if (!ice_is_e810t(&pf->hw))
+		return -EOPNOTSUPP;
+
+	*state = pf->synce_dpll_state;
+
+	*eec_flags = 0;
+	if (pf->synce_dpll_pin == REF1P || pf->synce_dpll_pin == REF1N) {
+		/* Add check if the current PF drives the EEC clock */
+		*eec_flags |= EEC_SRC_PORT;
+	}
+
+	return 0;
+}
+
+/**
  * ice_down - Shutdown the connection
  * @vsi: The VSI being stopped
  */
@@ -7268,4 +7296,5 @@ static const struct net_device_ops ice_netdev_ops = {
 	.ndo_bpf = ice_xdp,
 	.ndo_xdp_xmit = ice_xdp_xmit,
 	.ndo_xsk_wakeup = ice_xsk_wakeup,
+	.ndo_get_eec_state = ice_get_eec_state,
 };
