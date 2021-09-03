@@ -409,3 +409,59 @@ exit_unlock:
 exit_return:
 	return ret;
 }
+
+
+/*
+ *
+ *	Disassociate a block device from an LED
+ *
+ */
+
+static void blkdev_disk_del_locked(struct ledtrig_blkdev_led *const led,
+				   struct ledtrig_blkdev_link *const link,
+				   struct ledtrig_blkdev_disk *const disk)
+{
+	--ledtrig_blkdev_count;
+
+	if (ledtrig_blkdev_count == 0)
+		WARN_ON(!cancel_delayed_work_sync(&ledtrig_blkdev_work));
+
+	sysfs_remove_link(led->dir, disk->gd->disk_name);
+	sysfs_remove_link(disk->dir, led->led_dev->name);
+	kobject_put(disk->dir);
+
+	hlist_del(&link->led_disks_node);
+	hlist_del(&link->disk_leds_node);
+	kfree(link);
+
+	if (hlist_empty(&disk->leds)) {
+		disk->gd->ledtrig = NULL;
+		kfree(disk);
+	}
+
+	put_disk(disk->gd);
+}
+
+static void blkdev_disk_delete(struct ledtrig_blkdev_led *const led,
+			       const char *const disk_name,
+			       const size_t name_len)
+{
+	struct ledtrig_blkdev_link *link;
+
+	mutex_lock(&ledtrig_blkdev_mutex);
+
+	hlist_for_each_entry(link, &led->disks, led_disks_node) {
+
+		if (ledtrig_blkdev_streq(link->disk->gd->disk_name,
+						disk_name, name_len)) {
+			blkdev_disk_del_locked(led, link, link->disk);
+			goto exit_unlock;
+		}
+	}
+
+	pr_info("blkdev LED: %.*s not associated with LED %s\n",
+		(int)name_len, disk_name, led->led_dev->name);
+
+exit_unlock:
+	mutex_unlock(&ledtrig_blkdev_mutex);
+}
