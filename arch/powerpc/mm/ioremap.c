@@ -46,6 +46,10 @@ void __iomem *ioremap_prot(phys_addr_t addr, unsigned long size, unsigned long f
 	pte_t pte = __pte(flags);
 	void *caller = __builtin_return_address(0);
 
+	/* The caller should set base page flags properly */
+	if (WARN_ON((flags & _PAGE_PRESENT) == 0))
+		return NULL;
+
 	/* writeable implies dirty for kernel addresses */
 	if (pte_write(pte))
 		pte = pte_mkdirty(pte);
