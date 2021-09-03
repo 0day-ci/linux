@@ -6,6 +6,7 @@
  *	Copyright 2021 Ian Pilcher <arequipeno@gmail.com>
  */
 
+#include <linux/ctype.h>
 #include <linux/module.h>
 
 #include "ledtrig-blkdev.h"
@@ -66,3 +67,46 @@ static unsigned int ledtrig_blkdev_count;
 
 /* How often to check for drive activity - in jiffies */
 static unsigned int ledtrig_blkdev_interval;
+
+
+/*
+ *
+ *	Miscellaneous helper functions
+ *
+ */
+
+/*
+ * Returns a pointer to the first non-whitespace character in s
+ * (or a pointer to the terminating null).
+ */
+static const char *blkdev_skip_space(const char *s)
+{
+	while (*s != 0 && isspace(*s))
+		++s;
+
+	return s;
+}
+
+/*
+ * Returns a pointer to the first whitespace character in s (or a pointer to the
+ * terminating null), which is effectively a pointer to the position *after* the
+ * last character in the non-whitespace token at the beginning of s.  (s is
+ * expected to be the result of a previous call to blkdev_skip_space()).
+ */
+static const char *blkdev_find_space(const char *s)
+{
+	while (*s != 0 && !isspace(*s))
+		++s;
+
+	return s;
+}
+
+static bool blkdev_read_mode(const enum ledtrig_blkdev_mode mode)
+{
+	return mode != LEDTRIG_BLKDEV_MODE_WO;
+}
+
+static bool blkdev_write_mode(const enum ledtrig_blkdev_mode mode)
+{
+	return mode != LEDTRIG_BLKDEV_MODE_RO;
+}
