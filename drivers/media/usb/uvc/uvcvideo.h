@@ -561,7 +561,7 @@ struct uvc_urb {
 	struct sg_table *sgt;
 
 	unsigned int async_operations;
-	struct uvc_copy_op copy_operations[UVC_MAX_PACKETS];
+	struct uvc_copy_op *copy_operations;
 	struct work_struct work;
 };
 
@@ -616,6 +616,7 @@ struct uvc_streaming {
 
 	struct uvc_urb uvc_urb[UVC_URBS];
 	unsigned int urb_size;
+	unsigned int urb_max_packets;
 
 	u32 sequence;
 	u8 last_fid;
