@@ -752,19 +752,19 @@ static void pata_macio_reset_hw(struct pata_macio_priv *priv, int resume)
 		 * (timing related ?). Until I can put my hand on one of these
 		 * units, I keep the old way
 		 */
-		ppc_md.feature_call(PMAC_FTR_IDE_ENABLE, priv->node, 0, 1);
+		ppc_md_call(feature_call)(PMAC_FTR_IDE_ENABLE, priv->node, 0, 1);
 	} else {
 		int rc;
 
  		/* Reset and enable controller */
-		rc = ppc_md.feature_call(PMAC_FTR_IDE_RESET,
+		rc = ppc_md_call(feature_call)(PMAC_FTR_IDE_RESET,
 					 priv->node, priv->aapl_bus_id, 1);
-		ppc_md.feature_call(PMAC_FTR_IDE_ENABLE,
+		ppc_md_call(feature_call)(PMAC_FTR_IDE_ENABLE,
 				    priv->node, priv->aapl_bus_id, 1);
 		msleep(10);
 		/* Only bother waiting if there's a reset control */
 		if (rc == 0) {
-			ppc_md.feature_call(PMAC_FTR_IDE_RESET,
+			ppc_md_call(feature_call)(PMAC_FTR_IDE_RESET,
 					    priv->node, priv->aapl_bus_id, 0);
 			msleep(IDE_WAKEUP_DELAY_MS);
 		}
@@ -889,7 +889,7 @@ static int pata_macio_do_suspend(struct pata_macio_priv *priv, pm_message_t mesg
 	}
 
 	/* Disable the bus on older machines and the cell on kauai */
-	ppc_md.feature_call(PMAC_FTR_IDE_ENABLE, priv->node,
+	ppc_md_call(feature_call)(PMAC_FTR_IDE_ENABLE, priv->node,
 			    priv->aapl_bus_id, 0);
 
 	return 0;

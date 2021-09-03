@@ -42,8 +42,8 @@
 #define HAVE_ARCH_PCI_GET_LEGACY_IDE_IRQ
 static inline int pci_get_legacy_ide_irq(struct pci_dev *dev, int channel)
 {
-	if (ppc_md.pci_get_legacy_ide_irq)
-		return ppc_md.pci_get_legacy_ide_irq(dev, channel);
+	if (ppc_md_has(pci_get_legacy_ide_irq))
+		return ppc_md_call(pci_get_legacy_ide_irq)(dev, channel);
 	return channel ? 15 : 14;
 }
 

@@ -396,7 +396,7 @@ static void setup_pci_atmu(struct pci_controller *hose)
 			 * install our own dma_set_mask handler to fixup dma_ops
 			 * and dma_offset
 			 */
-			ppc_md.dma_set_mask = fsl_pci_dma_set_mask;
+			ppc_md_update(dma_set_mask, fsl_pci_dma_set_mask);
 
 			pr_info("%pOF: Setup 64-bit PCI DMA window\n", hose->dn);
 		}
@@ -692,8 +692,8 @@ static int mpc83xx_pcie_exclude_device(struct pci_bus *bus, unsigned int devfn)
 			return PCIBIOS_DEVICE_NOT_FOUND;
 	}
 
-	if (ppc_md.pci_exclude_device) {
-		if (ppc_md.pci_exclude_device(hose, bus->number, devfn))
+	if (ppc_md_has(pci_exclude_device)) {
+		if (ppc_md_call(pci_exclude_device)(hose, bus->number, devfn))
 			return PCIBIOS_DEVICE_NOT_FOUND;
 	}
 

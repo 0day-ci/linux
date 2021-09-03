@@ -1701,7 +1701,7 @@ static int __init eeh_powernv_init(void)
 	 * size needs to be set before calling eeh_init().
 	 */
 	eeh_set_pe_aux_size(max_diag_size);
-	ppc_md.pcibios_bus_add_device = pnv_pcibios_bus_add_device;
+	ppc_md_update(pcibios_bus_add_device, pnv_pcibios_bus_add_device);
 
 	ret = eeh_init(&pnv_eeh_ops);
 	if (!ret)

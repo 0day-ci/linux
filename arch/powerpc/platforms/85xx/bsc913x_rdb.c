@@ -32,8 +32,7 @@ void __init bsc913x_rdb_pic_init(void)
  */
 static void __init bsc913x_rdb_setup_arch(void)
 {
-	if (ppc_md.progress)
-		ppc_md.progress("bsc913x_rdb_setup_arch()", 0);
+	ppc_md_call_cond(progress)("bsc913x_rdb_setup_arch()", 0);
 
 	pr_info("bsc913x board from Freescale Semiconductor\n");
 }

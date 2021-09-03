@@ -36,8 +36,7 @@ void __init bsc913x_qds_pic_init(void)
  */
 static void __init bsc913x_qds_setup_arch(void)
 {
-	if (ppc_md.progress)
-		ppc_md.progress("bsc913x_qds_setup_arch()", 0);
+	ppc_md_call_cond(progress)("bsc913x_qds_setup_arch()", 0);
 
 #if defined(CONFIG_SMP)
 	mpc85xx_smp_init();

@@ -35,8 +35,8 @@ int set_dawr(int nr, struct arch_hw_breakpoint *brk)
 	mrd = ((brk->hw_len + 7) >> 3) - 1;
 	dawrx |= (mrd & 0x3f) << (63 - 53);
 
-	if (ppc_md.set_dawr)
-		return ppc_md.set_dawr(nr, dawr, dawrx);
+	if (ppc_md_has(set_dawr))
+		return ppc_md_call(set_dawr)(nr, dawr, dawrx);
 
 	if (nr == 0) {
 		mtspr(SPRN_DAWR0, dawr);

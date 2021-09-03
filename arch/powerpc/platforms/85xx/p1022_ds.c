@@ -470,8 +470,7 @@ early_param("video", early_video_setup);
  */
 static void __init p1022_ds_setup_arch(void)
 {
-	if (ppc_md.progress)
-		ppc_md.progress("p1022_ds_setup_arch()", 0);
+	ppc_md_call_cond(progress)("p1022_ds_setup_arch()", 0);
 
 #if defined(CONFIG_FB_FSL_DIU) || defined(CONFIG_FB_FSL_DIU_MODULE)
 	diu_ops.set_monitor_port	= p1022ds_set_monitor_port;

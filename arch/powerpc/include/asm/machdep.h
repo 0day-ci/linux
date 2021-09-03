@@ -237,8 +237,7 @@ extern struct machdep_calls *machine_id;
 
 static inline void log_error(char *buf, unsigned int err_type, int fatal)
 {
-	if (ppc_md.log_error)
-		ppc_md.log_error(buf, err_type, fatal);
+	ppc_md_call_cond(log_error)(buf, err_type, fatal);
 }
 
 #define __define_machine_initcall(mach, fn, id) \

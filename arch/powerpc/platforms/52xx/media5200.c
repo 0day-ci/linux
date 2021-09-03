@@ -192,8 +192,7 @@ static void __init media5200_setup_arch(void)
 	struct mpc52xx_gpio __iomem *gpio;
 	u32 port_config;
 
-	if (ppc_md.progress)
-		ppc_md.progress("media5200_setup_arch()", 0);
+	ppc_md_call_cond(progress)("media5200_setup_arch()", 0);
 
 	/* Map important registers from the internal memory map */
 	mpc52xx_map_common_devices();

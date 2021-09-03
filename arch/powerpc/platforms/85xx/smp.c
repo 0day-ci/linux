@@ -380,8 +380,7 @@ void mpc85xx_smp_kexec_cpu_down(int crash_shutdown, int secondary)
 
 static void mpc85xx_smp_kexec_down(void *arg)
 {
-	if (ppc_md.kexec_cpu_down)
-		ppc_md.kexec_cpu_down(0,1);
+	ppc_md_call_cond(kexec_cpu_down)(0,1);
 }
 #else
 void mpc85xx_smp_kexec_cpu_down(int crash_shutdown, int secondary)
@@ -513,7 +512,7 @@ void __init mpc85xx_smp_init(void)
 	smp_ops = &smp_85xx_ops;
 
 #ifdef CONFIG_KEXEC_CORE
-	ppc_md.kexec_cpu_down = mpc85xx_smp_kexec_cpu_down;
-	ppc_md.machine_kexec = mpc85xx_smp_machine_kexec;
+	ppc_md_update(kexec_cpu_down, mpc85xx_smp_kexec_cpu_down);
+	ppc_md_update(machine_kexec, mpc85xx_smp_machine_kexec);
 #endif
 }

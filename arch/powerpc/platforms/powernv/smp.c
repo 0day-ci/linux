@@ -428,7 +428,7 @@ static struct smp_ops_t pnv_smp_ops = {
 void __init pnv_smp_init(void)
 {
 	if (opal_check_token(OPAL_SIGNAL_SYSTEM_RESET)) {
-		ppc_md.system_reset_exception = pnv_system_reset_exception;
+		ppc_md_update(system_reset_exception, pnv_system_reset_exception);
 		pnv_smp_ops.cause_nmi_ipi = pnv_cause_nmi_ipi;
 	}
 	smp_ops = &pnv_smp_ops;

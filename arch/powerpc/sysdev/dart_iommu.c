@@ -433,7 +433,7 @@ static int __init iommu_init_late_dart(void)
 	if (!dart_tablebase)
 		return 0;
 
-	ppc_md.iommu_restore = iommu_dart_restore;
+	ppc_md_update(iommu_restore, iommu_dart_restore);
 
 	return 0;
 }

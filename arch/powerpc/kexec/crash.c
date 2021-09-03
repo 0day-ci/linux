@@ -90,8 +90,7 @@ void crash_ipi_callback(struct pt_regs *regs)
 	while (!time_to_dump)
 		cpu_relax();
 
-	if (ppc_md.kexec_cpu_down)
-		ppc_md.kexec_cpu_down(1, 1);
+	ppc_md_call_cond(kexec_cpu_down)(1, 1);
 
 #ifdef CONFIG_PPC64
 	kexec_smp_wait();
@@ -373,6 +372,5 @@ void default_machine_crash_shutdown(struct pt_regs *regs)
 	crash_shutdown_cpu = -1;
 	__debugger_fault_handler = old_handler;
 
-	if (ppc_md.kexec_cpu_down)
-		ppc_md.kexec_cpu_down(1, 0);
+	ppc_md_call_cond(kexec_cpu_down)(1, 0);
 }

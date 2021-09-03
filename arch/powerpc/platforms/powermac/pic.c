@@ -286,7 +286,7 @@ static void __init pmac_pic_probe_oldstyle(void)
 	struct resource r;
 
 	/* Set our get_irq function */
-	ppc_md.get_irq = pmac_pic_get_irq;
+	ppc_md_update(get_irq, pmac_pic_get_irq);
 
 	/*
 	 * Find the interrupt controller type & node
@@ -497,7 +497,7 @@ static int __init pmac_pic_probe_mpic(void)
 		return -ENODEV;
 
 	/* Set master handler */
-	ppc_md.get_irq = mpic_get_irq;
+	ppc_md_update(get_irq, mpic_get_irq);
 
 	/* Setup master */
 	mpic1 = pmac_setup_one_mpic(master, 1);

@@ -366,7 +366,7 @@ void __init iic_init_IRQ(void)
 		panic("IIC: Failed to initialize !\n");
 
 	/* Set master interrupt handling function */
-	ppc_md.get_irq = iic_get_irq;
+	ppc_md_update(get_irq, iic_get_irq);
 
 	/* Enable on current CPU */
 	iic_setup_cpu();

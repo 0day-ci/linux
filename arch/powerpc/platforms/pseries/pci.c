@@ -229,8 +229,8 @@ void __init pSeries_final_fixup(void)
 	eeh_show_enabled();
 
 #ifdef CONFIG_PCI_IOV
-	ppc_md.pcibios_sriov_enable = pseries_pcibios_sriov_enable;
-	ppc_md.pcibios_sriov_disable = pseries_pcibios_sriov_disable;
+	ppc_md_update(pcibios_sriov_enable, pseries_pcibios_sriov_enable);
+	ppc_md_update(pcibios_sriov_disable, pseries_pcibios_sriov_disable);
 #endif
 }
 

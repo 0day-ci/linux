@@ -72,7 +72,7 @@ void __init pq2_init_pci(void)
 {
 	struct device_node *np;
 
-	ppc_md.pci_exclude_device = pq2_pci_exclude_device;
+	ppc_md_update(pci_exclude_device, pq2_pci_exclude_device);
 
 	for_each_compatible_node(np, NULL, "fsl,pq2-pci")
 		pq2_pci_add_bridge(np);

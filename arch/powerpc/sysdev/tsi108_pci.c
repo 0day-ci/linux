@@ -51,8 +51,8 @@ tsi108_direct_write_config(struct pci_bus *bus, unsigned int devfunc,
 	volatile unsigned char *cfg_addr;
 	struct pci_controller *hose = pci_bus_to_host(bus);
 
-	if (ppc_md.pci_exclude_device)
-		if (ppc_md.pci_exclude_device(hose, bus->number, devfunc))
+	if (ppc_md_has(pci_exclude_device))
+		if (ppc_md_call(pci_exclude_device)(hose, bus->number, devfunc))
 			return PCIBIOS_DEVICE_NOT_FOUND;
 
 	cfg_addr = (unsigned char *)(tsi_mk_config_addr(bus->number,
@@ -136,8 +136,8 @@ tsi108_direct_read_config(struct pci_bus *bus, unsigned int devfn, int offset,
 	struct pci_controller *hose = pci_bus_to_host(bus);
 	u32 temp;
 
-	if (ppc_md.pci_exclude_device)
-		if (ppc_md.pci_exclude_device(hose, bus->number, devfn))
+	if (ppc_md_has(pci_exclude_device))
+		if (ppc_md_call(pci_exclude_device)(hose, bus->number, devfn))
 			return PCIBIOS_DEVICE_NOT_FOUND;
 
 	cfg_addr = (unsigned char *)(tsi_mk_config_addr(bus->number,

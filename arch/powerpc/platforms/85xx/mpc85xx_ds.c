@@ -135,7 +135,7 @@ static void __init mpc85xx_ds_uli_init(void)
 		node = pci_with_uli;
 
 		if (pci_with_uli == fsl_pci_primary) {
-			ppc_md.pci_exclude_device = mpc85xx_exclude_device;
+			ppc_md_update(pci_exclude_device, mpc85xx_exclude_device);
 			break;
 		}
 	}
@@ -147,8 +147,7 @@ static void __init mpc85xx_ds_uli_init(void)
  */
 static void __init mpc85xx_ds_setup_arch(void)
 {
-	if (ppc_md.progress)
-		ppc_md.progress("mpc85xx_ds_setup_arch()", 0);
+	ppc_md_call_cond(progress)("mpc85xx_ds_setup_arch()", 0);
 
 	swiotlb_detect_4g();
 	fsl_pci_assign_primary();

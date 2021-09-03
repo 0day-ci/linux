@@ -3160,7 +3160,7 @@ static void __init pnv_pci_init_ioda_phb(struct device_node *np,
 	 * for the P2P bridge bars so that each PCI bus (excluding
 	 * the child P2P bridges) can form individual PE.
 	 */
-	ppc_md.pcibios_fixup = pnv_pci_ioda_fixup;
+	ppc_md_update(pcibios_fixup, pnv_pci_ioda_fixup);
 
 	switch (phb->type) {
 	case PNV_PHB_NPU_OCAPI:
@@ -3170,13 +3170,13 @@ static void __init pnv_pci_init_ioda_phb(struct device_node *np,
 		hose->controller_ops = pnv_pci_ioda_controller_ops;
 	}
 
-	ppc_md.pcibios_default_alignment = pnv_pci_default_alignment;
+	ppc_md_update(pcibios_default_alignment, pnv_pci_default_alignment);
 
 #ifdef CONFIG_PCI_IOV
-	ppc_md.pcibios_fixup_sriov = pnv_pci_ioda_fixup_iov;
-	ppc_md.pcibios_iov_resource_alignment = pnv_pci_iov_resource_alignment;
-	ppc_md.pcibios_sriov_enable = pnv_pcibios_sriov_enable;
-	ppc_md.pcibios_sriov_disable = pnv_pcibios_sriov_disable;
+	ppc_md_update(pcibios_fixup_sriov, pnv_pci_ioda_fixup_iov);
+	ppc_md_update(pcibios_iov_resource_alignment, pnv_pci_iov_resource_alignment);
+	ppc_md_update(pcibios_sriov_enable, pnv_pcibios_sriov_enable);
+	ppc_md_update(pcibios_sriov_disable, pnv_pcibios_sriov_disable);
 #endif
 
 	pci_add_flags(PCI_REASSIGN_ALL_RSRC);

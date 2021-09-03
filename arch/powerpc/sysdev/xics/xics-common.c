@@ -520,7 +520,7 @@ void __init xics_init(void)
 	}
 
 	/* Copy get_irq callback over to ppc_md */
-	ppc_md.get_irq = icp_ops->get_irq;
+	ppc_md_update(get_irq, icp_ops->get_irq);
 
 	/* Patch up IPI chip EOI */
 	xics_ipi_chip.irq_eoi = icp_ops->eoi;

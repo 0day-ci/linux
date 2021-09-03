@@ -153,8 +153,7 @@ static void kexec_smp_down(void *arg)
 	 * Now every CPU has IRQs off, we can clear out any pending
 	 * IPIs and be sure that no more will come in after this.
 	 */
-	if (ppc_md.kexec_cpu_down)
-		ppc_md.kexec_cpu_down(0, 1);
+	ppc_md_call_cond(kexec_cpu_down)(0, 1);
 
 	reset_sprs();
 
@@ -244,8 +243,7 @@ static void kexec_prepare_cpus(void)
 	kexec_prepare_cpus_wait(KEXEC_STATE_REAL_MODE);
 
 	/* after we tell the others to go down */
-	if (ppc_md.kexec_cpu_down)
-		ppc_md.kexec_cpu_down(0, 0);
+	ppc_md_call_cond(kexec_cpu_down)(0, 0);
 
 	put_cpu();
 }
@@ -264,8 +262,7 @@ static void kexec_prepare_cpus(void)
 	 * UP to an SMP kernel.
 	 */
 	smp_release_cpus();
-	if (ppc_md.kexec_cpu_down)
-		ppc_md.kexec_cpu_down(0, 0);
+	ppc_md_call_cond(kexec_cpu_down)(0, 0);
 	local_irq_disable();
 	hard_irq_disable();
 }

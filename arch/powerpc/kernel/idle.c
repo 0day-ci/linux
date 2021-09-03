@@ -35,7 +35,7 @@ EXPORT_SYMBOL(cpuidle_disable);
 
 static int __init powersave_off(char *arg)
 {
-	ppc_md.power_save = NULL;
+	ppc_md_update(power_save, NULL);
 	cpuidle_disable = IDLE_POWERSAVE_OFF;
 	return 0;
 }
@@ -45,8 +45,8 @@ void arch_cpu_idle(void)
 {
 	ppc64_runlatch_off();
 
-	if (ppc_md.power_save) {
-		ppc_md.power_save();
+	if (ppc_md_has(power_save)) {
+		ppc_md_call(power_save)();
 		/*
 		 * Some power_save functions return with
 		 * interrupts enabled, some don't.

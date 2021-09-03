@@ -154,8 +154,7 @@ static const struct of_device_id mvme5100_of_bus_ids[] __initconst = {
  */
 static void __init mvme5100_setup_arch(void)
 {
-	if (ppc_md.progress)
-		ppc_md.progress("mvme5100_setup_arch()", 0);
+	ppc_md_call_cond(progress)("mvme5100_setup_arch()", 0);
 
 	restart = ioremap(BOARD_MODRST_REG, 4);
 }

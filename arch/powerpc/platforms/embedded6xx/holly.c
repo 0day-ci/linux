@@ -112,8 +112,7 @@ static void __init holly_init_pci(void)
 {
 	struct device_node *np;
 
-	if (ppc_md.progress)
-		ppc_md.progress("holly_setup_arch():set_bridge", 0);
+	ppc_md_call_cond(progress)("holly_setup_arch():set_bridge", 0);
 
 	/* setup PCI host bridge */
 	holly_remap_bridge();
@@ -122,9 +121,8 @@ static void __init holly_init_pci(void)
 	if (np)
 		tsi108_setup_pci(np, HOLLY_PCI_CFG_PHYS, 1);
 
-	ppc_md.pci_exclude_device = holly_exclude_device;
-	if (ppc_md.progress)
-		ppc_md.progress("tsi108: resources set", 0x100);
+	ppc_md_update(pci_exclude_device, holly_exclude_device);
+	ppc_md_call_cond(progress)("tsi108: resources set", 0x100);
 }
 
 static void __init holly_setup_arch(void)

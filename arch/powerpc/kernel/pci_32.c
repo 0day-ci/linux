@@ -264,12 +264,10 @@ static int __init pcibios_init(void)
 	pcibios_resource_survey();
 
 	/* Call machine dependent fixup */
-	if (ppc_md.pcibios_fixup)
-		ppc_md.pcibios_fixup();
+	ppc_md_call_cond(pcibios_fixup)();
 
 	/* Call machine dependent post-init code */
-	if (ppc_md.pcibios_after_init)
-		ppc_md.pcibios_after_init();
+	ppc_md_call_cond(pcibios_after_init)();
 
 	return 0;
 }

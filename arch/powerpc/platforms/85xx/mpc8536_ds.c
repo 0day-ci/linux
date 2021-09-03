@@ -41,8 +41,7 @@ void __init mpc8536_ds_pic_init(void)
  */
 static void __init mpc8536_ds_setup_arch(void)
 {
-	if (ppc_md.progress)
-		ppc_md.progress("mpc8536_ds_setup_arch()", 0);
+	ppc_md_call_cond(progress)("mpc8536_ds_setup_arch()", 0);
 
 	fsl_pci_assign_primary();
 

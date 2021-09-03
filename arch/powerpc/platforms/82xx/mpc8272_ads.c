@@ -134,8 +134,7 @@ static void __init mpc8272_ads_setup_arch(void)
 	struct device_node *np;
 	__be32 __iomem *bcsr;
 
-	if (ppc_md.progress)
-		ppc_md.progress("mpc8272_ads_setup_arch()", 0);
+	ppc_md_call_cond(progress)("mpc8272_ads_setup_arch()", 0);
 
 	cpm2_reset();
 
@@ -172,8 +171,7 @@ static void __init mpc8272_ads_setup_arch(void)
 
 	init_ioports();
 
-	if (ppc_md.progress)
-		ppc_md.progress("mpc8272_ads_setup_arch(), finish", 0);
+	ppc_md_call_cond(progress)("mpc8272_ads_setup_arch(), finish", 0);
 }
 
 static const struct of_device_id of_bus_ids[] __initconst = {

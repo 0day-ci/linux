@@ -55,8 +55,7 @@ static void __init tqm85xx_pic_init(void)
  */
 static void __init tqm85xx_setup_arch(void)
 {
-	if (ppc_md.progress)
-		ppc_md.progress("tqm85xx_setup_arch()", 0);
+	ppc_md_call_cond(progress)("tqm85xx_setup_arch()", 0);
 
 #ifdef CONFIG_CPM2
 	cpm2_reset();

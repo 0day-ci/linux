@@ -109,8 +109,7 @@ void __init p1022_rdk_pic_init(void)
  */
 static void __init p1022_rdk_setup_arch(void)
 {
-	if (ppc_md.progress)
-		ppc_md.progress("p1022_rdk_setup_arch()", 0);
+	ppc_md_call_cond(progress)("p1022_rdk_setup_arch()", 0);
 
 #if defined(CONFIG_FB_FSL_DIU) || defined(CONFIG_FB_FSL_DIU_MODULE)
 	diu_ops.set_pixel_clock		= p1022rdk_set_pixel_clock;

@@ -122,8 +122,7 @@ static void __init init_ioports(void)
 
 static void __init mpc85xx_ads_setup_arch(void)
 {
-	if (ppc_md.progress)
-		ppc_md.progress("mpc85xx_ads_setup_arch()", 0);
+	ppc_md_call_cond(progress)("mpc85xx_ads_setup_arch()", 0);
 
 #ifdef CONFIG_CPM2
 	cpm2_reset();

@@ -132,8 +132,7 @@ void machine_shutdown(void)
 	 */
 	fadump_cleanup();
 
-	if (ppc_md.machine_shutdown)
-		ppc_md.machine_shutdown();
+	ppc_md_call_cond(machine_shutdown)();
 }
 
 static void machine_hang(void)
@@ -147,8 +146,7 @@ static void machine_hang(void)
 void machine_restart(char *cmd)
 {
 	machine_shutdown();
-	if (ppc_md.restart)
-		ppc_md.restart(cmd);
+	ppc_md_call_cond(restart)(cmd);
 
 	smp_send_stop();
 
@@ -176,8 +174,7 @@ EXPORT_SYMBOL_GPL(pm_power_off);
 void machine_halt(void)
 {
 	machine_shutdown();
-	if (ppc_md.halt)
-		ppc_md.halt();
+	ppc_md_call_cond(halt)();
 
 	smp_send_stop();
 	machine_hang();
@@ -210,8 +207,7 @@ static void show_cpuinfo_summary(struct seq_file *m)
 		seq_printf(m, "model\t\t: %s\n", model);
 	of_node_put(root);
 
-	if (ppc_md.show_cpuinfo != NULL)
-		ppc_md.show_cpuinfo(m);
+	ppc_md_call_cond(show_cpuinfo)(m);
 
 	/* Display the amount of memory */
 	if (IS_ENABLED(CONFIG_PPC32))
@@ -265,12 +261,12 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 
 	/*
 	 * Platforms that have variable clock rates, should implement
-	 * the method ppc_md.get_proc_freq() that reports the clock
+	 * the method ppc_md_call(get_proc_freq)() that reports the clock
 	 * rate of a given cpu. The rest can use ppc_proc_freq to
 	 * report the clock rate that is same across all cpus.
 	 */
-	if (ppc_md.get_proc_freq)
-		proc_freq = ppc_md.get_proc_freq(cpu_id);
+	if (ppc_md_has(get_proc_freq))
+		proc_freq = ppc_md_call(get_proc_freq)(cpu_id);
 	else
 		proc_freq = ppc_proc_freq;
 
@@ -694,8 +690,7 @@ static int ppc_panic_event(struct notifier_block *this,
 	 * firmware-assisted dump and let firmware handle everything else.
 	 */
 	crash_fadump(NULL, ptr);
-	if (ppc_md.panic)
-		ppc_md.panic(ptr);  /* May not return */
+	ppc_md_call_cond(panic)(ptr);  /* May not return */
 	return NOTIFY_DONE;
 }
 
@@ -727,7 +722,7 @@ void __init setup_panic(void)
 					       &kernel_offset_notifier);
 
 	/* PPC64 always does a hard irq disable in its panic handler */
-	if (!IS_ENABLED(CONFIG_PPC64) && !ppc_md.panic)
+	if (!IS_ENABLED(CONFIG_PPC64) && !ppc_md_has(panic))
 		return;
 	atomic_notifier_chain_register(&panic_notifier_list, &ppc_panic_block);
 }
@@ -924,8 +919,7 @@ void __init setup_arch(char **cmdline_p)
 
 	early_memtest(min_low_pfn << PAGE_SHIFT, max_low_pfn << PAGE_SHIFT);
 
-	if (ppc_md.setup_arch)
-		ppc_md.setup_arch();
+	ppc_md_call_cond(setup_arch)();
 
 	setup_barrier_nospec();
 	setup_spectre_v2();

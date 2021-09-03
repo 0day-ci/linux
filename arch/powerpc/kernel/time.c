@@ -634,8 +634,7 @@ void timer_broadcast_interrupt(void)
 /* Overrides the weak version in kernel/power/main.c */
 void arch_suspend_disable_irqs(void)
 {
-	if (ppc_md.suspend_disable_irqs)
-		ppc_md.suspend_disable_irqs();
+	ppc_md_call_cond(suspend_disable_irqs)();
 
 	/* Disable the decrementer, so that it doesn't interfere
 	 * with suspending.
@@ -651,8 +650,7 @@ void arch_suspend_enable_irqs(void)
 {
 	local_irq_enable();
 
-	if (ppc_md.suspend_enable_irqs)
-		ppc_md.suspend_enable_irqs();
+	ppc_md_call_cond(suspend_enable_irqs)();
 }
 #endif
 
@@ -772,12 +770,12 @@ int update_persistent_clock64(struct timespec64 now)
 {
 	struct rtc_time tm;
 
-	if (!ppc_md.set_rtc_time)
+	if (!ppc_md_has(set_rtc_time))
 		return -ENODEV;
 
 	rtc_time64_to_tm(now.tv_sec + 1 + timezone_offset, &tm);
 
-	return ppc_md.set_rtc_time(&tm);
+	return ppc_md_call(set_rtc_time)(&tm);
 }
 
 static void __read_persistent_clock(struct timespec64 *ts)
@@ -789,20 +787,20 @@ static void __read_persistent_clock(struct timespec64 *ts)
 	/* XXX this is a litle fragile but will work okay in the short term */
 	if (first) {
 		first = 0;
-		if (ppc_md.time_init)
-			timezone_offset = ppc_md.time_init();
+		if (ppc_md_has(time_init))
+			timezone_offset = ppc_md_call(time_init)();
 
 		/* get_boot_time() isn't guaranteed to be safe to call late */
-		if (ppc_md.get_boot_time) {
-			ts->tv_sec = ppc_md.get_boot_time() - timezone_offset;
+		if (ppc_md_has(get_boot_time)) {
+			ts->tv_sec = ppc_md_call(get_boot_time)() - timezone_offset;
 			return;
 		}
 	}
-	if (!ppc_md.get_rtc_time) {
+	if (!ppc_md_has(get_rtc_time)) {
 		ts->tv_sec = 0;
 		return;
 	}
-	ppc_md.get_rtc_time(&tm);
+	ppc_md_call(get_rtc_time)(&tm);
 
 	ts->tv_sec = rtc_tm_to_time64(&tm);
 }
@@ -946,7 +944,7 @@ void __init time_init(void)
 	unsigned shift;
 
 	/* Normal PowerPC with timebase register */
-	ppc_md.calibrate_decr();
+	ppc_md_call(calibrate_decr)();
 	printk(KERN_DEBUG "time_init: decrementer frequency = %lu.%.6lu MHz\n",
 	       ppc_tb_freq / 1000000, ppc_tb_freq % 1000000);
 	printk(KERN_DEBUG "time_init: processor frequency   = %lu.%.6lu MHz\n",
@@ -1050,16 +1048,16 @@ void calibrate_delay(void)
 #if IS_ENABLED(CONFIG_RTC_DRV_GENERIC)
 static int rtc_generic_get_time(struct device *dev, struct rtc_time *tm)
 {
-	ppc_md.get_rtc_time(tm);
+	ppc_md_call(get_rtc_time)(tm);
 	return 0;
 }
 
 static int rtc_generic_set_time(struct device *dev, struct rtc_time *tm)
 {
-	if (!ppc_md.set_rtc_time)
+	if (!ppc_md_has(set_rtc_time))
 		return -EOPNOTSUPP;
 
-	if (ppc_md.set_rtc_time(tm) < 0)
+	if (ppc_md_call(set_rtc_time)(tm) < 0)
 		return -EOPNOTSUPP;
 
 	return 0;
@@ -1074,7 +1072,7 @@ static int __init rtc_init(void)
 {
 	struct platform_device *pdev;
 
-	if (!ppc_md.get_rtc_time)
+	if (!ppc_md_has(get_rtc_time))
 		return -ENODEV;
 
 	pdev = platform_device_register_data(NULL, "rtc-generic", -1,

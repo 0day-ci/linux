@@ -69,8 +69,8 @@ static int __init pasemi_idle_init(void)
 	current_mode = 0;
 #endif
 
-	ppc_md.system_reset_exception = pasemi_system_reset_exception;
-	ppc_md.power_save = modes[current_mode].entry;
+	ppc_md_update(system_reset_exception, pasemi_system_reset_exception);
+	ppc_md_update(power_save, modes[current_mode].entry);
 	pr_info("Using PA6T idle loop (%s)\n", modes[current_mode].name);
 
 	return 0;

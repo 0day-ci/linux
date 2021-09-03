@@ -456,8 +456,8 @@ DEFINE_INTERRUPT_HANDLER_NMI(system_reset_exception)
 	__this_cpu_inc(irq_stat.sreset_irqs);
 
 	/* See if any machine dependent calls */
-	if (ppc_md.system_reset_exception) {
-		if (ppc_md.system_reset_exception(regs))
+	if (ppc_md_has(system_reset_exception)) {
+		if (ppc_md_call(system_reset_exception)(regs))
 			goto out;
 	}
 
@@ -822,8 +822,8 @@ DEFINE_INTERRUPT_HANDLER_NMI(machine_check_exception)
 	 * that assumes the board gets a first chance, so let's keep it
 	 * that way for now and fix things later. --BenH.
 	 */
-	if (ppc_md.machine_check_exception)
-		recover = ppc_md.machine_check_exception(regs);
+	if (ppc_md_has(machine_check_exception))
+		recover = ppc_md_call(machine_check_exception)(regs);
 	else if (cur_cpu_spec->machine_check)
 		recover = cur_cpu_spec->machine_check(regs);
 
@@ -1057,8 +1057,7 @@ DEFINE_INTERRUPT_HANDLER_ASYNC(handle_hmi_exception)
 	}
 #endif /* CONFIG_VSX */
 
-	if (ppc_md.handle_hmi_exception)
-		ppc_md.handle_hmi_exception(regs);
+	ppc_md_call_cond(handle_hmi_exception)(regs);
 
 	set_irq_regs(old_regs);
 }

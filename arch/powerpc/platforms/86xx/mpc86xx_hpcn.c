@@ -57,11 +57,10 @@ static int mpc86xx_exclude_device(struct pci_controller *hose,
 static void __init
 mpc86xx_hpcn_setup_arch(void)
 {
-	if (ppc_md.progress)
-		ppc_md.progress("mpc86xx_hpcn_setup_arch()", 0);
+	ppc_md_call_cond(progress)("mpc86xx_hpcn_setup_arch()", 0);
 
 #ifdef CONFIG_PCI
-	ppc_md.pci_exclude_device = mpc86xx_exclude_device;
+	ppc_md_update(pci_exclude_device, mpc86xx_exclude_device);
 #endif
 
 	printk("MPC86xx HPCN board from Freescale Semiconductor\n");

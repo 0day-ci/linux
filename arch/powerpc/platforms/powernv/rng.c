@@ -90,7 +90,7 @@ static int initialise_darn(void)
 
 	for (i = 0; i < 10; i++) {
 		if (powernv_get_random_darn(&val)) {
-			ppc_md.get_random_seed = powernv_get_random_darn;
+			ppc_md_update(get_random_seed, powernv_get_random_darn);
 			return 0;
 		}
 	}
@@ -161,7 +161,7 @@ static __init int rng_create(struct device_node *dn)
 
 	pr_info_once("Registering arch random hook.\n");
 
-	ppc_md.get_random_seed = powernv_get_random_long;
+	ppc_md_update(get_random_seed, powernv_get_random_long);
 
 	return 0;
 }

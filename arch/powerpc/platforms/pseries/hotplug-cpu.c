@@ -995,8 +995,8 @@ static int __init pseries_cpu_hotplug_init(void)
 	unsigned int node;
 
 #ifdef CONFIG_ARCH_CPU_PROBE_RELEASE
-	ppc_md.cpu_probe = dlpar_cpu_probe;
-	ppc_md.cpu_release = dlpar_cpu_release;
+	ppc_md_update(cpu_probe, dlpar_cpu_probe);
+	ppc_md_update(cpu_release, dlpar_cpu_release);
 #endif /* CONFIG_ARCH_CPU_PROBE_RELEASE */
 
 	rtas_stop_self_token = rtas_token("stop-self");

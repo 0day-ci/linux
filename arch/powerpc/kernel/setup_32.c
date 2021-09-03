@@ -126,13 +126,11 @@ __setup("l3cr=", ppc_setup_l3cr);
 static int __init ppc_init(void)
 {
 	/* clear the progress line */
-	if (ppc_md.progress)
-		ppc_md.progress("             ", 0xffff);
+	ppc_md_call_cond(progress)("             ", 0xffff);
 
 	/* call platform init */
-	if (ppc_md.init != NULL) {
-		ppc_md.init();
-	}
+	ppc_md_call_cond(init)();
+
 	return 0;
 }
 arch_initcall(ppc_init);
@@ -203,13 +201,13 @@ void __init setup_power_save(void)
 #ifdef CONFIG_PPC_BOOK3S_32
 	if (cpu_has_feature(CPU_FTR_CAN_DOZE) ||
 	    cpu_has_feature(CPU_FTR_CAN_NAP))
-		ppc_md.power_save = ppc6xx_idle;
+		ppc_md_update(power_save, ppc6xx_idle);
 #endif
 
 #ifdef CONFIG_E500
 	if (cpu_has_feature(CPU_FTR_CAN_DOZE) ||
 	    cpu_has_feature(CPU_FTR_CAN_NAP))
-		ppc_md.power_save = e500_idle;
+		ppc_md_update(power_save, e500_idle);
 #endif
 }
 

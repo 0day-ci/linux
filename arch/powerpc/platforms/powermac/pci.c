@@ -933,7 +933,7 @@ void __init pmac_pci_init(void)
 	if (ht && pmac_add_bridge(ht) != 0)
 		of_node_put(ht);
 
-	ppc_md.pcibios_root_bridge_prepare = pmac_pci_root_bridge_prepare;
+	ppc_md_update(pcibios_root_bridge_prepare, pmac_pci_root_bridge_prepare);
 	/* pmac_check_ht_link(); */
 
 #else /* CONFIG_PPC64 */

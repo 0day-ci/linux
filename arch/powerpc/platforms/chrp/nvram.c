@@ -85,9 +85,9 @@ void __init chrp_nvram_init(void)
 	printk(KERN_INFO "CHRP nvram contains %u bytes\n", nvram_size);
 	of_node_put(nvram);
 
-	ppc_md.nvram_read_val  = chrp_nvram_read_val;
-	ppc_md.nvram_write_val = chrp_nvram_write_val;
-	ppc_md.nvram_size      = chrp_nvram_size;
+	ppc_md_update(nvram_read_val, chrp_nvram_read_val);
+	ppc_md_update(nvram_write_val, chrp_nvram_write_val);
+	ppc_md_update(nvram_size, chrp_nvram_size);
 
 	return;
 }

@@ -34,8 +34,8 @@ EXPORT_SYMBOL(empty_zero_page);
 pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
 			      unsigned long size, pgprot_t vma_prot)
 {
-	if (ppc_md.phys_mem_access_prot)
-		return ppc_md.phys_mem_access_prot(file, pfn, size, vma_prot);
+	if (ppc_md_has(phys_mem_access_prot))
+		return ppc_md_call(phys_mem_access_prot)(file, pfn, size, vma_prot);
 
 	if (!page_is_ram(pfn))
 		vma_prot = pgprot_noncached(vma_prot);
@@ -311,7 +311,7 @@ void __init mem_init(void)
 
 void free_initmem(void)
 {
-	ppc_md.progress = ppc_printk_progress;
+	ppc_md_update(progress, ppc_printk_progress);
 	mark_initmem_nx();
 	init_mem_is_free = true;
 	free_initmem_default(POISON_FREE_INITMEM);

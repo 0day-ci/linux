@@ -312,7 +312,7 @@ static void __init chrp_setup_arch(void)
 		_chrp_type = _CHRP_briq;
 		/* Map the SPOR register on briq and change the restart hook */
 		briq_SPOR = ioremap(0xff0000e8, 4);
-		ppc_md.restart = briq_restart;
+		ppc_md_update(restart, briq_restart);
 	} else {
 		/* Let's assume it is an IBM chrp if all else fails */
 		_chrp_type = _CHRP_IBM;
@@ -322,13 +322,13 @@ static void __init chrp_setup_arch(void)
 
 	rtas_initialize();
 	if (rtas_token("display-character") >= 0)
-		ppc_md.progress = rtas_progress;
+		ppc_md_update(progress, rtas_progress);
 
 	/* use RTAS time-of-day routines if available */
 	if (rtas_token("get-time-of-day") != RTAS_UNKNOWN_SERVICE) {
-		ppc_md.get_boot_time	= rtas_get_boot_time;
-		ppc_md.get_rtc_time	= rtas_get_rtc_time;
-		ppc_md.set_rtc_time	= rtas_set_rtc_time;
+		ppc_md_update(get_boot_time, rtas_get_boot_time);
+		ppc_md_update(get_rtc_time, rtas_get_rtc_time);
+		ppc_md_update(set_rtc_time, rtas_set_rtc_time);
 	}
 
 	/* On pegasos, enable the L2 cache if not already done by OF */
@@ -343,7 +343,7 @@ static void __init chrp_setup_arch(void)
 	 * Print the banner, then scroll down so boot progress
 	 * can be printed.  -- Cort
 	 */
-	if (ppc_md.progress) ppc_md.progress("Linux/PPC "UTS_RELEASE"\n", 0x0);
+	ppc_md_call_cond(progress)("Linux/PPC "UTS_RELEASE"\n", 0x0);
 }
 
 static void chrp_8259_cascade(struct irq_desc *desc)
@@ -433,7 +433,7 @@ static void __init chrp_find_openpic(void)
 	}
 
 	mpic_init(chrp_mpic);
-	ppc_md.get_irq = mpic_get_irq;
+	ppc_md_update(get_irq, mpic_get_irq);
  bail:
 	of_node_put(root);
 	of_node_put(np);
@@ -482,8 +482,8 @@ static void __init chrp_find_8259(void)
 		       " address, polling\n");
 
 	i8259_init(pic, chrp_int_ack);
-	if (ppc_md.get_irq == NULL) {
-		ppc_md.get_irq = i8259_irq;
+	if (!ppc_md_has(get_irq)) {
+		ppc_md_update(get_irq, i8259_irq);
 		irq_set_default_host(i8259_get_host());
 	}
 	if (chrp_mpic != NULL) {
@@ -513,7 +513,7 @@ static void __init chrp_init_IRQ(void)
 #endif /* CONFIG_SMP */
 
 	if (_chrp_type == _CHRP_Pegasos)
-		ppc_md.get_irq        = i8259_irq;
+		ppc_md_update(get_irq, i8259_irq);
 
 #if defined(CONFIG_VT) && defined(CONFIG_INPUT_ADBHID) && defined(CONFIG_XMON)
 	/* see if there is a keyboard in the device tree
@@ -544,8 +544,7 @@ chrp_init2(void)
 	request_region(0x80,0x10,"dma page reg");
 	request_region(0xc0,0x20,"dma2");
 
-	if (ppc_md.progress)
-		ppc_md.progress("  Have fun!    ", 0x7777);
+	ppc_md_call_cond(progress)("  Have fun!    ", 0x7777);
 }
 
 static int __init chrp_probe(void)

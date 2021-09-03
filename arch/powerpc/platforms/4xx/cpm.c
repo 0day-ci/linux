@@ -251,7 +251,7 @@ static int __init cpm_init(void)
 
 	if (!cpm.powersave_off) {
 		cpm_idle_config(CPM_IDLE_WAIT);
-		ppc_md.power_save = &cpm_idle;
+		ppc_md_update(power_save, &cpm_idle);
 	}
 
 	np = of_find_compatible_node(NULL, NULL, "ibm,cpm");

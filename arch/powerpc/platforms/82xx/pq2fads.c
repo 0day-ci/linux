@@ -117,8 +117,7 @@ static void __init pq2fads_setup_arch(void)
 	struct device_node *np;
 	__be32 __iomem *bcsr;
 
-	if (ppc_md.progress)
-		ppc_md.progress("pq2fads_setup_arch()", 0);
+	ppc_md_call_cond(progress)("pq2fads_setup_arch()", 0);
 
 	cpm2_reset();
 
@@ -150,8 +149,7 @@ static void __init pq2fads_setup_arch(void)
 	/* Enable external IRQs */
 	clrbits32(&cpm2_immr->im_siu_conf.siu_82xx.sc_siumcr, 0x0c000000);
 
-	if (ppc_md.progress)
-		ppc_md.progress("pq2fads_setup_arch(), finish", 0);
+	ppc_md_call_cond(progress)("pq2fads_setup_arch(), finish", 0);
 }
 
 /*

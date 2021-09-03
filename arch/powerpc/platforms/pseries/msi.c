@@ -695,8 +695,8 @@ static int rtas_msi_init(void)
 
 	pr_debug("rtas_msi: Registering RTAS MSI callbacks.\n");
 
-	WARN_ON(ppc_md.pci_irq_fixup);
-	ppc_md.pci_irq_fixup = rtas_msi_pci_irq_fixup;
+	WARN_ON(ppc_md_has(pci_irq_fixup));
+	ppc_md_update(pci_irq_fixup, rtas_msi_pci_irq_fixup);
 
 	return 0;
 }

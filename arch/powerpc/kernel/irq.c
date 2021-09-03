@@ -736,7 +736,7 @@ void __do_irq(struct pt_regs *regs)
 	 *
 	 * This will typically lower the interrupt line to the CPU
 	 */
-	irq = ppc_md.get_irq();
+	irq = ppc_md_call(get_irq)();
 
 	/* We can hard enable interrupts now to allow perf interrupts */
 	may_hard_irq_enable();
@@ -796,8 +796,7 @@ void __init init_IRQ(void)
 	if (IS_ENABLED(CONFIG_VMAP_STACK))
 		vmap_irqstack_init();
 
-	if (ppc_md.init_IRQ)
-		ppc_md.init_IRQ();
+	ppc_md_call_cond(init_IRQ)();
 }
 
 #if defined(CONFIG_BOOKE) || defined(CONFIG_40x)

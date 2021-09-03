@@ -2346,8 +2346,8 @@ static int register_pmu_pm_ops(void)
 {
 	if (pmu_kind == PMU_OHARE_BASED)
 		powerbook_sleep_init_3400();
-	ppc_md.suspend_disable_irqs = pmac_suspend_disable_irqs;
-	ppc_md.suspend_enable_irqs = pmac_suspend_enable_irqs;
+	ppc_md_update(suspend_disable_irqs, pmac_suspend_disable_irqs);
+	ppc_md_update(suspend_enable_irqs, pmac_suspend_enable_irqs);
 	suspend_set_ops(&pmu_pm_ops);
 
 	return 0;

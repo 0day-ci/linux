@@ -915,8 +915,8 @@ void __init setup_per_cpu_areas(void)
 #ifdef CONFIG_MEMORY_HOTPLUG_SPARSE
 unsigned long memory_block_size_bytes(void)
 {
-	if (ppc_md.memory_block_size)
-		return ppc_md.memory_block_size();
+	if (ppc_md_has(memory_block_size))
+		return ppc_md_call(memory_block_size)();
 
 	return MIN_MEMORY_BLOCK_SIZE;
 }

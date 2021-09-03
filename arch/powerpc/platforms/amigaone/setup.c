@@ -66,8 +66,7 @@ static int __init amigaone_add_bridge(struct device_node *dev)
 
 void __init amigaone_setup_arch(void)
 {
-	if (ppc_md.progress)
-		ppc_md.progress("Linux/PPC "UTS_RELEASE"\n", 0);
+	ppc_md_call_cond(progress)("Linux/PPC "UTS_RELEASE"\n", 0);
 }
 
 static void __init amigaone_discover_phbs(void)
@@ -107,7 +106,7 @@ void __init amigaone_init_IRQ(void)
 		       " address, polling\n");
 
 	i8259_init(pic, int_ack);
-	ppc_md.get_irq = i8259_irq;
+	ppc_md_update(get_irq, i8259_irq);
 	irq_set_default_host(i8259_get_host());
 }
 

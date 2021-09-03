@@ -45,8 +45,7 @@ static void __init twr_p1025_pic_init(void)
  */
 static void __init twr_p1025_setup_arch(void)
 {
-	if (ppc_md.progress)
-		ppc_md.progress("twr_p1025_setup_arch()", 0);
+	ppc_md_call_cond(progress)("twr_p1025_setup_arch()", 0);
 
 	mpc85xx_smp_init();
 

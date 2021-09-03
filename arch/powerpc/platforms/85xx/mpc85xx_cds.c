@@ -317,8 +317,7 @@ static void __init mpc85xx_cds_setup_arch(void)
 	struct device_node *np;
 	int cds_pci_slot;
 
-	if (ppc_md.progress)
-		ppc_md.progress("mpc85xx_cds_setup_arch()", 0);
+	ppc_md_call_cond(progress)("mpc85xx_cds_setup_arch()", 0);
 
 	np = of_find_compatible_node(NULL, NULL, "fsl,mpc8548cds-fpga");
 	if (!np) {
@@ -333,17 +332,17 @@ static void __init mpc85xx_cds_setup_arch(void)
 		return;
 	}
 
-	if (ppc_md.progress) {
+	if (ppc_md_has(progress)) {
 		char buf[40];
 		cds_pci_slot = ((in_8(&cadmus->cm_csr) >> 6) & 0x3) + 1;
 		snprintf(buf, 40, "CDS Version = 0x%x in slot %d\n",
 				in_8(&cadmus->cm_ver), cds_pci_slot);
-		ppc_md.progress(buf, 0);
+		ppc_md_call(progress)(buf, 0);
 	}
 
 #ifdef CONFIG_PCI
-	ppc_md.pci_irq_fixup = mpc85xx_cds_pci_irq_fixup;
-	ppc_md.pci_exclude_device = mpc85xx_exclude_device;
+	ppc_md_update(pci_irq_fixup, mpc85xx_cds_pci_irq_fixup);
+	ppc_md_update(pci_exclude_device, mpc85xx_exclude_device);
 #endif
 
 	mpc85xx_cds_pci_assign_primary();

@@ -62,16 +62,15 @@ static void __init mpc7448_hpc2_setup_pci(void)
 {
 #ifdef CONFIG_PCI
 	struct device_node *np;
-	if (ppc_md.progress)
-		ppc_md.progress("mpc7448_hpc2_setup_pci():set_bridge", 0);
+
+	ppc_md_call_cond(progress)("mpc7448_hpc2_setup_pci():set_bridge", 0);
 
 	/* setup PCI host bridge */
 	for_each_compatible_node(np, "pci", "tsi108-pci")
 		tsi108_setup_pci(np, MPC7448HPC2_PCI_CFG_PHYS, 0);
 
-	ppc_md.pci_exclude_device = mpc7448_hpc2_exclude_device;
-	if (ppc_md.progress)
-		ppc_md.progress("tsi108: resources set", 0x100);
+	ppc_md_update(pci_exclude_device, mpc7448_hpc2_exclude_device);
+	ppc_md_call_cond(progress)("tsi108: resources set", 0x100);
 #endif
 }
 

@@ -295,8 +295,7 @@ long kvmppc_realmode_hmi_handler(void)
 	 * subcore on this core have completed guest->host partition
 	 * switch. Now it is safe to call HMI handler.
 	 */
-	if (ppc_md.hmi_exception_early)
-		ppc_md.hmi_exception_early(NULL);
+	ppc_md_call_cond(hmi_exception_early)(NULL);
 
 	/*
 	 * Check if this thread is responsible to resync TB.

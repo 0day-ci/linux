@@ -106,8 +106,8 @@ void __init opal_nvram_init(void)
 	pr_info("OPAL nvram setup, %u bytes\n", nvram_size);
 	of_node_put(np);
 
-	ppc_md.nvram_read = opal_nvram_read;
-	ppc_md.nvram_write = opal_nvram_write;
-	ppc_md.nvram_size = opal_nvram_size;
+	ppc_md_update(nvram_read, opal_nvram_read);
+	ppc_md_update(nvram_write, opal_nvram_write);
+	ppc_md_update(nvram_size, opal_nvram_size);
 }
 

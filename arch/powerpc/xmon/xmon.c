@@ -1239,9 +1239,9 @@ static void bootcmds(void)
 	cmd = inchar();
 	if (cmd == 'r') {
 		getstring(tmp, 64);
-		ppc_md.restart(tmp);
+		ppc_md_call(restart)(tmp);
 	} else if (cmd == 'h') {
-		ppc_md.halt();
+		ppc_md_call(halt)();
 	} else if (cmd == 'p') {
 		if (pm_power_off)
 			pm_power_off();

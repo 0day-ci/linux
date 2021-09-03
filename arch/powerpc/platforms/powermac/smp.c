@@ -246,7 +246,7 @@ static void __init psurge_quad_init(void)
 {
 	int procbits;
 
-	if (ppc_md.progress) ppc_md.progress("psurge_quad_init", 0x351);
+	ppc_md_call_cond(progress)("psurge_quad_init", 0x351);
 	procbits = ~PSURGE_QUAD_IN(PSURGE_QUAD_WHICH_CPU);
 	if (psurge_type == PSURGE_QUAD_ICEGRASS)
 		PSURGE_QUAD_BIS(PSURGE_QUAD_RESET_CTL, procbits);
@@ -325,7 +325,7 @@ static void __init smp_psurge_probe(void)
 	for (i = 1; i < ncpus ; ++i)
 		set_cpu_present(i, true);
 
-	if (ppc_md.progress) ppc_md.progress("smp_psurge_probe - done", 0x352);
+	ppc_md_call_cond(progress)("smp_psurge_probe - done", 0x352);
 }
 
 static int __init smp_psurge_kick_cpu(int nr)
@@ -345,7 +345,7 @@ static int __init smp_psurge_kick_cpu(int nr)
 		asm volatile("dcbf 0,%0" : : "r" (a) : "memory");
 	asm volatile("sync");
 
-	if (ppc_md.progress) ppc_md.progress("smp_psurge_kick_cpu", 0x353);
+	ppc_md_call_cond(progress)("smp_psurge_kick_cpu", 0x353);
 
 	/* This is going to freeze the timeebase, we disable interrupts */
 	local_irq_save(flags);
@@ -392,7 +392,7 @@ static int __init smp_psurge_kick_cpu(int nr)
 	if (psurge_type == PSURGE_DUAL)
 		psurge_set_ipi(1);
 
-	if (ppc_md.progress) ppc_md.progress("smp_psurge_kick_cpu - done", 0x354);
+	ppc_md_call_cond(progress)("smp_psurge_kick_cpu - done", 0x354);
 
 	return 0;
 }
@@ -762,7 +762,7 @@ static void __init smp_core99_probe(void)
 	struct device_node *cpus;
 	int ncpus = 0;
 
-	if (ppc_md.progress) ppc_md.progress("smp_core99_probe", 0x345);
+	ppc_md_call_cond(progress)("smp_core99_probe", 0x345);
 
 	/* Count CPUs in the device-tree */
 	for_each_node_by_type(cpus, "cpu")
@@ -799,8 +799,7 @@ static int smp_core99_kick_cpu(int nr)
 	if (nr < 0 || nr > 3)
 		return -ENOENT;
 
-	if (ppc_md.progress)
-		ppc_md.progress("smp_core99_kick_cpu", 0x346);
+	ppc_md_call_cond(progress)("smp_core99_kick_cpu", 0x346);
 
 	local_irq_save(flags);
 
@@ -827,7 +826,7 @@ static int smp_core99_kick_cpu(int nr)
 	patch_instruction(vector, ppc_inst(save_vector));
 
 	local_irq_restore(flags);
-	if (ppc_md.progress) ppc_md.progress("smp_core99_kick_cpu done", 0x347);
+	ppc_md_call_cond(progress)("smp_core99_kick_cpu done", 0x347);
 
 	return 0;
 }
@@ -897,8 +896,7 @@ static void __init smp_core99_bringup_done(void)
 				  smp_core99_cpu_online, NULL);
 #endif
 
-	if (ppc_md.progress)
-		ppc_md.progress("smp_core99_bringup_done", 0x349);
+	ppc_md_call_cond(progress)("smp_core99_bringup_done", 0x349);
 }
 #endif /* CONFIG_PPC64 */
 

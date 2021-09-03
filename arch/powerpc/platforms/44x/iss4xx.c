@@ -61,7 +61,7 @@ static void __init iss4xx_init_irq(void)
 	/* Check type and do appropriate initialization */
 	if (of_device_is_compatible(np, "ibm,uic")) {
 		uic_init_tree();
-		ppc_md.get_irq = uic_get_irq;
+		ppc_md_update(get_irq, uic_get_irq);
 #ifdef CONFIG_MPIC
 	} else if (of_device_is_compatible(np, "chrp,open-pic")) {
 		/* The MPIC driver will get everything it needs from the
@@ -70,7 +70,7 @@ static void __init iss4xx_init_irq(void)
 		struct mpic *mpic = mpic_alloc(np, 0, MPIC_NO_RESET, 0, 0, " MPIC     ");
 		BUG_ON(mpic == NULL);
 		mpic_init(mpic);
-		ppc_md.get_irq = mpic_get_irq;
+		ppc_md_update(get_irq, mpic_get_irq);
 #endif
 	} else
 		panic("Unrecognized top level interrupt controller");

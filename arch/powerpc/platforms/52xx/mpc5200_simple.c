@@ -32,8 +32,7 @@
  */
 static void __init mpc5200_simple_setup_arch(void)
 {
-	if (ppc_md.progress)
-		ppc_md.progress("mpc5200_simple_setup_arch()", 0);
+	ppc_md_call_cond(progress)("mpc5200_simple_setup_arch()", 0);
 
 	/* Map important registers from the internal memory map */
 	mpc52xx_map_common_devices();

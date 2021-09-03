@@ -1244,7 +1244,7 @@ static void __init pnv_arch300_idle_init(void)
 	if (unlikely(!default_stop_found)) {
 		pr_warn("cpuidle-powernv: No suitable default stop state found. Disabling platform idle.\n");
 	} else {
-		ppc_md.power_save = arch300_idle;
+		ppc_md_update(power_save, arch300_idle);
 		pr_info("cpuidle-powernv: Default stop: psscr = 0x%016llx,mask=0x%016llx\n",
 			pnv_default_stop_val, pnv_default_stop_mask);
 	}
@@ -1478,7 +1478,7 @@ static int __init pnv_init_idle_states(void)
 		update_subcore_sibling_mask();
 
 		if (supported_cpuidle_states & OPAL_PM_NAP_ENABLED) {
-			ppc_md.power_save = power7_idle;
+			ppc_md_update(power_save, power7_idle);
 			power7_offline_type = PNV_THREAD_NAP;
 		}
 

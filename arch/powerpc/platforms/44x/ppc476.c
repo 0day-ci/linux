@@ -89,7 +89,7 @@ static void __noreturn avr_reset_system(char *cmd)
 static int avr_probe(struct i2c_client *client)
 {
 	avr_i2c_client = client;
-	ppc_md.restart = avr_reset_system;
+	ppc_md_update(restart, avr_reset_system);
 	pm_power_off = avr_power_off_system;
 	return 0;
 }
@@ -137,7 +137,7 @@ static void __init ppc47x_init_irq(void)
 			mpic_alloc(np, 0, MPIC_NO_RESET, 0, 0, " MPIC     ");
 		BUG_ON(mpic == NULL);
 		mpic_init(mpic);
-		ppc_md.get_irq = mpic_get_irq;
+		ppc_md_update(get_irq, mpic_get_irq);
 	} else
 		panic("Unrecognized top level interrupt controller");
 }
@@ -275,7 +275,7 @@ static int __init ppc47x_probe(void)
 		return 1;
 
 	if (of_machine_is_compatible("ibm,currituck")) {
-		ppc_md.pci_irq_fixup = ppc47x_pci_irq_fixup;
+		ppc_md_update(pci_irq_fixup, ppc47x_pci_irq_fixup);
 		return 1;
 	}
 

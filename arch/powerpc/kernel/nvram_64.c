@@ -197,13 +197,13 @@ int nvram_write_os_partition(struct nvram_os_partition *part,
 
 	tmp_index = part->index;
 
-	rc = ppc_md.nvram_write((char *)&info, sizeof(info), &tmp_index);
+	rc = ppc_md_call(nvram_write)((char *)&info, sizeof(info), &tmp_index);
 	if (rc <= 0) {
 		pr_err("%s: Failed nvram_write (%d)\n", __func__, rc);
 		return rc;
 	}
 
-	rc = ppc_md.nvram_write(buff, length, &tmp_index);
+	rc = ppc_md_call(nvram_write)(buff, length, &tmp_index);
 	if (rc <= 0) {
 		pr_err("%s: Failed nvram_write (%d)\n", __func__, rc);
 		return rc;
@@ -233,14 +233,14 @@ int nvram_read_partition(struct nvram_os_partition *part, char *buff,
 	tmp_index = part->index;
 
 	if (part->os_partition) {
-		rc = ppc_md.nvram_read((char *)&info, sizeof(info), &tmp_index);
+		rc = ppc_md_call(nvram_read)((char *)&info, sizeof(info), &tmp_index);
 		if (rc <= 0) {
 			pr_err("%s: Failed nvram_read (%d)\n", __func__, rc);
 			return rc;
 		}
 	}
 
-	rc = ppc_md.nvram_read(buff, length, &tmp_index);
+	rc = ppc_md_call(nvram_read)(buff, length, &tmp_index);
 	if (rc <= 0) {
 		pr_err("%s: Failed nvram_read (%d)\n", __func__, rc);
 		return rc;
@@ -731,7 +731,7 @@ static int __init nvram_write_header(struct nvram_partition * part)
 	phead.length = cpu_to_be16(phead.length);
 
 	tmp_index = part->index;
-	rc = ppc_md.nvram_write((char *)&phead, NVRAM_HEADER_LEN, &tmp_index);
+	rc = ppc_md_call(nvram_write)((char *)&phead, NVRAM_HEADER_LEN, &tmp_index);
 
 	return rc;
 }
@@ -930,7 +930,7 @@ loff_t __init nvram_create_partition(const char *name, int sig,
 	for (tmp_index = new_part->index + NVRAM_HEADER_LEN;
 	     tmp_index <  ((size - 1) * NVRAM_BLOCK_LEN);
 	     tmp_index += NVRAM_BLOCK_LEN) {
-		rc = ppc_md.nvram_write(nv_init_vals, NVRAM_BLOCK_LEN, &tmp_index);
+		rc = ppc_md_call(nvram_write)(nv_init_vals, NVRAM_BLOCK_LEN, &tmp_index);
 		if (rc <= 0) {
 			pr_err("%s: nvram_write failed (%d)\n",
 			       __func__, rc);
@@ -991,9 +991,9 @@ int __init nvram_scan_partitions(void)
 	int total_size;
 	int err;
 
-	if (ppc_md.nvram_size == NULL || ppc_md.nvram_size() <= 0)
+	if (!ppc_md_has(nvram_size) || ppc_md_call(nvram_size)() <= 0)
 		return -ENODEV;
-	total_size = ppc_md.nvram_size();
+	total_size = ppc_md_call(nvram_size)();
 	
 	header = kmalloc(NVRAM_HEADER_LEN, GFP_KERNEL);
 	if (!header) {
@@ -1003,7 +1003,7 @@ int __init nvram_scan_partitions(void)
 
 	while (cur_index < total_size) {
 
-		err = ppc_md.nvram_read(header, NVRAM_HEADER_LEN, &cur_index);
+		err = ppc_md_call(nvram_read)(header, NVRAM_HEADER_LEN, &cur_index);
 		if (err != NVRAM_HEADER_LEN) {
 			printk(KERN_ERR "nvram_scan_partitions: Error parsing "
 			       "nvram partitions\n");

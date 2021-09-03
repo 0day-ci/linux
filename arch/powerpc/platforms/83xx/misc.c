@@ -121,8 +121,7 @@ void __init mpc83xx_setup_pci(void)
 
 void __init mpc83xx_setup_arch(void)
 {
-	if (ppc_md.progress)
-		ppc_md.progress("mpc83xx_setup_arch()", 0);
+	ppc_md_call_cond(progress)("mpc83xx_setup_arch()", 0);
 
 	if (!__map_without_bats) {
 		phys_addr_t immrbase = get_immrbase();

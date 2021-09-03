@@ -36,7 +36,7 @@ static __init int rng_init(void)
 
 	for (i = 0; i < 10; i++) {
 		if (microwatt_get_random_darn(&val)) {
-			ppc_md.get_random_seed = microwatt_get_random_darn;
+			ppc_md_update(get_random_seed, microwatt_get_random_darn);
 			return 0;
 		}
 	}

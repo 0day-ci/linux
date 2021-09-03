@@ -143,8 +143,7 @@ static void wii_power_off(void)
 
 static void __noreturn wii_halt(void)
 {
-	if (ppc_md.restart)
-		ppc_md.restart(NULL);
+	ppc_md_call_cond(restart)(NULL);
 	wii_spin();
 }
 

@@ -1635,7 +1635,7 @@ bool __init xive_core_init(struct device_node *np, const struct xive_ops *ops,
 	xive_ops = ops;
 	xive_irq_priority = max_prio;
 
-	ppc_md.get_irq = xive_get_irq;
+	ppc_md_update(get_irq, xive_get_irq);
 	__xive_enabled = true;
 
 	pr_devel("Initializing host..\n");

@@ -37,7 +37,7 @@ static int of_pci_phb_probe(struct platform_device *dev)
 	struct pci_controller *phb;
 
 	/* Check if we can do that ... */
-	if (ppc_md.pci_setup_phb == NULL)
+	if (!ppc_md_has(pci_setup_phb))
 		return -ENODEV;
 
 	pr_info("Setting up PCI bus %pOF\n", dev->dev.of_node);
@@ -51,7 +51,7 @@ static int of_pci_phb_probe(struct platform_device *dev)
 	phb->parent = &dev->dev;
 
 	/* Setup the PHB using arch provided callback */
-	if (ppc_md.pci_setup_phb(phb)) {
+	if (ppc_md_call(pci_setup_phb)(phb)) {
 		pcibios_free_controller(phb);
 		return -ENODEV;
 	}

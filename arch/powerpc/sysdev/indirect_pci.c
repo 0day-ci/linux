@@ -31,8 +31,8 @@ int __indirect_read_config(struct pci_controller *hose,
 			return PCIBIOS_DEVICE_NOT_FOUND;
 	}
 
-	if (ppc_md.pci_exclude_device)
-		if (ppc_md.pci_exclude_device(hose, bus_number, devfn))
+	if (ppc_md_has(pci_exclude_device))
+		if (ppc_md_call(pci_exclude_device)(hose, bus_number, devfn))
 			return PCIBIOS_DEVICE_NOT_FOUND;
 
 	if (hose->indirect_type & PPC_INDIRECT_TYPE_SET_CFG_TYPE)
@@ -97,8 +97,8 @@ int indirect_write_config(struct pci_bus *bus, unsigned int devfn,
 			return PCIBIOS_DEVICE_NOT_FOUND;
 	}
 
-	if (ppc_md.pci_exclude_device)
-		if (ppc_md.pci_exclude_device(hose, bus->number, devfn))
+	if (ppc_md_has(pci_exclude_device))
+		if (ppc_md_call(pci_exclude_device)(hose, bus->number, devfn))
 			return PCIBIOS_DEVICE_NOT_FOUND;
 
 	if (hose->indirect_type & PPC_INDIRECT_TYPE_SET_CFG_TYPE)

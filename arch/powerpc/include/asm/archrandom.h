@@ -18,8 +18,8 @@ static inline bool __must_check arch_get_random_int(unsigned int *v)
 
 static inline bool __must_check arch_get_random_seed_long(unsigned long *v)
 {
-	if (ppc_md.get_random_seed)
-		return ppc_md.get_random_seed(v);
+	if (ppc_md_has(get_random_seed))
+		return ppc_md_call(get_random_seed)(v);
 
 	return false;
 }

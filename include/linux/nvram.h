@@ -46,8 +46,8 @@ extern const struct nvram_ops arch_nvram_ops;
 static inline ssize_t nvram_get_size(void)
 {
 #ifdef CONFIG_PPC
-	if (ppc_md.nvram_size)
-		return ppc_md.nvram_size();
+	if (ppc_md_has(nvram_size))
+		return ppc_md_call(nvram_size)();
 #else
 	if (arch_nvram_ops.get_size)
 		return arch_nvram_ops.get_size();
@@ -58,8 +58,8 @@ static inline ssize_t nvram_get_size(void)
 static inline unsigned char nvram_read_byte(int addr)
 {
 #ifdef CONFIG_PPC
-	if (ppc_md.nvram_read_val)
-		return ppc_md.nvram_read_val(addr);
+	if (ppc_md_has(nvram_read_val))
+		return ppc_md_call(nvram_read_val)(addr);
 #else
 	if (arch_nvram_ops.read_byte)
 		return arch_nvram_ops.read_byte(addr);
@@ -70,8 +70,7 @@ static inline unsigned char nvram_read_byte(int addr)
 static inline void nvram_write_byte(unsigned char val, int addr)
 {
 #ifdef CONFIG_PPC
-	if (ppc_md.nvram_write_val)
-		ppc_md.nvram_write_val(addr, val);
+	ppc_md_call_cond(nvram_write_val)(addr, val);
 #else
 	if (arch_nvram_ops.write_byte)
 		arch_nvram_ops.write_byte(val, addr);
@@ -109,8 +108,8 @@ static inline ssize_t nvram_write_bytes(char *buf, size_t count, loff_t *ppos)
 static inline ssize_t nvram_read(char *buf, size_t count, loff_t *ppos)
 {
 #ifdef CONFIG_PPC
-	if (ppc_md.nvram_read)
-		return ppc_md.nvram_read(buf, count, ppos);
+	if (ppc_md_has(nvram_read))
+		return ppc_md_call(nvram_read)(buf, count, ppos);
 #else
 	if (arch_nvram_ops.read)
 		return arch_nvram_ops.read(buf, count, ppos);
@@ -121,8 +120,8 @@ static inline ssize_t nvram_read(char *buf, size_t count, loff_t *ppos)
 static inline ssize_t nvram_write(char *buf, size_t count, loff_t *ppos)
 {
 #ifdef CONFIG_PPC
-	if (ppc_md.nvram_write)
-		return ppc_md.nvram_write(buf, count, ppos);
+	if (ppc_md_has(nvram_write))
+		return ppc_md_call(nvram_write)(buf, count, ppos);
 #else
 	if (arch_nvram_ops.write)
 		return arch_nvram_ops.write(buf, count, ppos);

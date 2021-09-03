@@ -164,9 +164,9 @@ static void __init maple_use_rtas_reboot_and_halt_if_present(void)
 {
 	if (rtas_service_present("system-reboot") &&
 	    rtas_service_present("power-off")) {
-		ppc_md.restart = rtas_restart;
+		ppc_md_update(restart, rtas_restart);
 		pm_power_off = rtas_power_off;
-		ppc_md.halt = rtas_halt;
+		ppc_md_update(halt, rtas_halt);
 	}
 }
 
@@ -260,7 +260,7 @@ static void __init maple_init_IRQ(void)
 
 	/* All ISUs are setup, complete initialization */
 	mpic_init(mpic);
-	ppc_md.get_irq = mpic_get_irq;
+	ppc_md_update(get_irq, mpic_get_irq);
 	of_node_put(mpic_node);
 	of_node_put(root);
 }

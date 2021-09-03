@@ -32,7 +32,7 @@ int __init ppc44x_idle_init(void)
 	if (!mode_spin) {
 		/* If we are not setting spin mode 
                    then we set to wait mode */
-		ppc_md.power_save = &ppc44x_idle;
+		ppc_md_update(power_save, &ppc44x_idle);
 	}
 
 	return 0;
@@ -45,7 +45,7 @@ static int __init idle_param(char *p)
 
 	if (!strcmp("spin", p)) {
 		mode_spin = 1;
-		ppc_md.power_save = NULL;
+		ppc_md_update(power_save, NULL);
 	}
 
 	return 0;

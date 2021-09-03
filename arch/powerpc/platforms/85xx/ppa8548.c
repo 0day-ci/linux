@@ -37,8 +37,7 @@ static void __init ppa8548_pic_init(void)
  */
 static void __init ppa8548_setup_arch(void)
 {
-	if (ppc_md.progress)
-		ppc_md.progress("ppa8548_setup_arch()", 0);
+	ppc_md_call_cond(progress)("ppa8548_setup_arch()", 0);
 }
 
 static void ppa8548_show_cpuinfo(struct seq_file *m)

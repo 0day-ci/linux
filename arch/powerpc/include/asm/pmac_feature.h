@@ -146,9 +146,9 @@ struct device_node;
 static inline long pmac_call_feature(int selector, struct device_node* node,
 					long param, long value)
 {
-	if (!ppc_md.feature_call || !machine_is(powermac))
+	if (!ppc_md_has(feature_call) || !machine_is(powermac))
 		return -ENODEV;
-	return ppc_md.feature_call(selector, node, param, value);
+	return ppc_md_call(feature_call)(selector, node, param, value);
 }
 
 /* PMAC_FTR_SERIAL_ENABLE	(struct device_node* node, int param, int value)

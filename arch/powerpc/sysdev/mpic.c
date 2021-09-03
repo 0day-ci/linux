@@ -1406,7 +1406,7 @@ struct mpic * __init mpic_alloc(struct device_node *node,
 	 * fsl_version will be zero if MPIC_FSL is not set.
 	 */
 	if (fsl_version < 0x400 && (flags & MPIC_ENABLE_COREINT))
-		ppc_md.get_irq = mpic_get_irq;
+		ppc_md_update(get_irq, mpic_get_irq);
 
 	/* Reset */
 

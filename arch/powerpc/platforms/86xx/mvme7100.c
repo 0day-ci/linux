@@ -42,8 +42,7 @@ static void __init mvme7100_setup_arch(void)
 	void __iomem *mvme7100_regs = NULL;
 	u8 reg;
 
-	if (ppc_md.progress)
-		ppc_md.progress("mvme7100_setup_arch()", 0);
+	ppc_md_call_cond(progress)("mvme7100_setup_arch()", 0);
 
 #ifdef CONFIG_SMP
 	mpc86xx_smp_init();

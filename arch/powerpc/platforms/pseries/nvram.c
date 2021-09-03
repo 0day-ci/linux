@@ -170,7 +170,7 @@ int nvram_clear_error_log(void)
 
 	tmp_index = rtas_log_partition.index;
 	
-	rc = ppc_md.nvram_write((char *)&clear_word, sizeof(int), &tmp_index);
+	rc = ppc_md_call(nvram_write)((char *)&clear_word, sizeof(int), &tmp_index);
 	if (rc <= 0) {
 		printk(KERN_ERR "nvram_clear_error_log: Failed nvram_write (%d)\n", rc);
 		return rc;
@@ -232,9 +232,9 @@ int __init pSeries_nvram_init(void)
 	printk(KERN_INFO "PPC64 nvram contains %d bytes\n", nvram_size);
 	of_node_put(nvram);
 
-	ppc_md.nvram_read	= pSeries_nvram_read;
-	ppc_md.nvram_write	= pSeries_nvram_write;
-	ppc_md.nvram_size	= pSeries_nvram_get_size;
+	ppc_md_update(nvram_read, pSeries_nvram_read);
+	ppc_md_update(nvram_write, pSeries_nvram_write);
+	ppc_md_update(nvram_size, pSeries_nvram_get_size);
 
 	return 0;
 }

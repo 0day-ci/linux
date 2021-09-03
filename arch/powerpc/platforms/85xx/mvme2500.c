@@ -35,8 +35,7 @@ void __init mvme2500_pic_init(void)
  */
 static void __init mvme2500_setup_arch(void)
 {
-	if (ppc_md.progress)
-		ppc_md.progress("mvme2500_setup_arch()", 0);
+	ppc_md_call_cond(progress)("mvme2500_setup_arch()", 0);
 	fsl_pci_assign_primary();
 	pr_info("MVME2500 board from Artesyn\n");
 }

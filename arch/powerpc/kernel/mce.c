@@ -595,8 +595,8 @@ DEFINE_INTERRUPT_HANDLER_NMI(machine_check_early)
 	/*
 	 * See if platform is capable of handling machine check.
 	 */
-	if (ppc_md.machine_check_early)
-		handled = ppc_md.machine_check_early(regs);
+	if (ppc_md_has(machine_check_early))
+		handled = ppc_md_call(machine_check_early)(regs);
 
 	return handled;
 }
@@ -721,8 +721,7 @@ DEFINE_INTERRUPT_HANDLER_NMI(hmi_exception_realmode)
 
 	wait_for_subcore_guest_exit();
 
-	if (ppc_md.hmi_exception_early)
-		ppc_md.hmi_exception_early(regs);
+	ppc_md_call_cond(hmi_exception_early)(regs);
 
 	wait_for_tb_resync();
 

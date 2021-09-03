@@ -685,8 +685,8 @@ static long mce_handle_ue_error(struct pt_regs *regs,
 	 * different way and hence we can recover from this MC.
 	 */
 
-	if (ppc_md.mce_check_early_recovery) {
-		if (ppc_md.mce_check_early_recovery(regs))
+	if (ppc_md_has(mce_check_early_recovery)) {
+		if (ppc_md_call(mce_check_early_recovery)(regs))
 			return 1;
 	}
 

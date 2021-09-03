@@ -41,8 +41,7 @@ static void __init mpc85xx_rdb_setup_arch(void)
 {
 	struct device_node *np;
 
-	if (ppc_md.progress)
-		ppc_md.progress("p1023_rdb_setup_arch()", 0);
+	ppc_md_call_cond(progress)("p1023_rdb_setup_arch()", 0);
 
 	/* Map BCSR area */
 	np = of_find_node_by_name(NULL, "bcsr");

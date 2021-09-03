@@ -814,8 +814,8 @@ static inline int set_dabr(struct arch_hw_breakpoint *brk)
 	dabr = brk->address | (brk->type & HW_BRK_TYPE_DABR);
 	dabrx = ((brk->type >> 3) & 0x7);
 
-	if (ppc_md.set_dabr)
-		return ppc_md.set_dabr(dabr, dabrx);
+	if (ppc_md_has(set_dabr))
+		return ppc_md_call(set_dabr)(dabr, dabrx);
 
 	if (IS_ENABLED(CONFIG_PPC_ADV_DEBUG_REGS)) {
 		mtspr(SPRN_DAC1, dabr);

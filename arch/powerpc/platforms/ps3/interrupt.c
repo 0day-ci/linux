@@ -766,7 +766,7 @@ void __init ps3_init_IRQ(void)
 				ps3_result(result));
 	}
 
-	ppc_md.get_irq = ps3_get_irq;
+	ppc_md_update(get_irq, ps3_get_irq);
 }
 
 void ps3_shutdown_IRQ(int cpu)

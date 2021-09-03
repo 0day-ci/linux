@@ -623,7 +623,7 @@ void __init maple_pci_init(void)
 	if (ht && maple_add_bridge(ht) != 0)
 		of_node_put(ht);
 
-	ppc_md.pcibios_root_bridge_prepare = maple_pci_root_bridge_prepare;
+	ppc_md_update(pcibios_root_bridge_prepare, maple_pci_root_bridge_prepare);
 
 	/* Tell pci.c to not change any resource allocations.  */
 	pci_add_flags(PCI_PROBE_ONLY);

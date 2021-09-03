@@ -562,7 +562,7 @@ void __init radix__early_init_devtree(void)
 
 	/*
 	 * Max mapping size used when mapping pages. We don't use
-	 * ppc_md.memory_block_size() here because this get called
+	 * ppc_md_call(memory_block_size)() here because this get called
 	 * early and we don't have machine probe called yet. Also
 	 * the pseries implementation only check for ibm,lmb-size.
 	 * All hypervisor supporting radix do expose that device

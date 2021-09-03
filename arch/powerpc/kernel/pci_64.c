@@ -46,7 +46,7 @@ static int __init pcibios_init(void)
 	/* For now, override phys_mem_access_prot. If we need it,g
 	 * later, we may move that initialization to each ppc_md
 	 */
-	ppc_md.phys_mem_access_prot = pci_phys_mem_access_prot;
+	ppc_md_update(phys_mem_access_prot, pci_phys_mem_access_prot);
 
 	/* On ppc64, we always enable PCI domains and we keep domain 0
 	 * backward compatible in /proc for video cards
@@ -65,8 +65,7 @@ static int __init pcibios_init(void)
 		pci_bus_add_devices(hose->bus);
 
 	/* Call machine dependent fixup */
-	if (ppc_md.pcibios_fixup)
-		ppc_md.pcibios_fixup();
+	ppc_md_call_cond(pcibios_fixup)();
 
 	printk(KERN_DEBUG "PCI: Probing PCI hardware done\n");
 

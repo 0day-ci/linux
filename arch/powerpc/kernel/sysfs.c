@@ -543,8 +543,7 @@ void ppc_enable_pmcs(void)
 
 	__this_cpu_write(pmcs_enabled, 1);
 
-	if (ppc_md.enable_pmcs)
-		ppc_md.enable_pmcs();
+	ppc_md_call_cond(enable_pmcs)();
 }
 EXPORT_SYMBOL(ppc_enable_pmcs);
 
@@ -1023,16 +1022,16 @@ static int unregister_cpu_online(unsigned int cpu)
 #ifdef CONFIG_ARCH_CPU_PROBE_RELEASE
 ssize_t arch_cpu_probe(const char *buf, size_t count)
 {
-	if (ppc_md.cpu_probe)
-		return ppc_md.cpu_probe(buf, count);
+	if (ppc_md_has(cpu_probe))
+		return ppc_md_call(cpu_probe)(buf, count);
 
 	return -EINVAL;
 }
 
 ssize_t arch_cpu_release(const char *buf, size_t count)
 {
-	if (ppc_md.cpu_release)
-		return ppc_md.cpu_release(buf, count);
+	if (ppc_md_has(cpu_release))
+		return ppc_md_call(cpu_release)(buf, count);
 
 	return -EINVAL;
 }

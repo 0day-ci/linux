@@ -275,8 +275,7 @@ static void __init mpc86xx_hpcd_setup_arch(void)
 	struct resource r;
 	unsigned char *pixis;
 
-	if (ppc_md.progress)
-		ppc_md.progress("mpc86xx_hpcd_setup_arch()", 0);
+	ppc_md_call_cond(progress)("mpc86xx_hpcd_setup_arch()", 0);
 
 	fsl_pci_assign_primary();
 

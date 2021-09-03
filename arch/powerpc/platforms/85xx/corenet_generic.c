@@ -157,12 +157,12 @@ static int __init corenet_generic_probe(void)
 	for (i = 0; boards[i]; i++) {
 		snprintf(hv_compat, sizeof(hv_compat), "%s-hv", boards[i]);
 		if (of_machine_is_compatible(hv_compat)) {
-			ppc_md.init_IRQ = ehv_pic_init;
+			ppc_md_update(init_IRQ, ehv_pic_init);
 
-			ppc_md.get_irq = ehv_pic_get_irq;
-			ppc_md.restart = fsl_hv_restart;
+			ppc_md_update(get_irq, ehv_pic_get_irq);
+			ppc_md_update(restart, fsl_hv_restart);
 			pm_power_off = fsl_hv_halt;
-			ppc_md.halt = fsl_hv_halt;
+			ppc_md_update(halt, fsl_hv_halt);
 #ifdef CONFIG_SMP
 			/*
 			 * Disable the timebase sync operations because we

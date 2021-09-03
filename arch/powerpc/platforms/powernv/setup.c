@@ -227,7 +227,7 @@ static void __init pnv_init_IRQ(void)
 	if (!xive_native_init())
 		xics_init();
 
-	WARN_ON(!ppc_md.get_irq);
+	WARN_ON(!ppc_md_has(get_irq));
 }
 
 static void pnv_show_cpuinfo(struct seq_file *m)
@@ -457,18 +457,18 @@ static unsigned long pnv_memory_block_size(void)
 
 static void __init pnv_setup_machdep_opal(void)
 {
-	ppc_md.get_boot_time = opal_get_boot_time;
-	ppc_md.restart = pnv_restart;
+	ppc_md_update(get_boot_time, opal_get_boot_time);
+	ppc_md_update(restart, pnv_restart);
 	pm_power_off = pnv_power_off;
-	ppc_md.halt = pnv_halt;
+	ppc_md_update(halt, pnv_halt);
 	/* ppc_md.system_reset_exception gets filled in by pnv_smp_init() */
-	ppc_md.machine_check_exception = opal_machine_check;
-	ppc_md.mce_check_early_recovery = opal_mce_check_early_recovery;
+	ppc_md_update(machine_check_exception, opal_machine_check);
+	ppc_md_update(mce_check_early_recovery, opal_mce_check_early_recovery);
 	if (opal_check_token(OPAL_HANDLE_HMI2))
-		ppc_md.hmi_exception_early = opal_hmi_exception_early2;
+		ppc_md_update(hmi_exception_early, opal_hmi_exception_early2);
 	else
-		ppc_md.hmi_exception_early = opal_hmi_exception_early;
-	ppc_md.handle_hmi_exception = opal_handle_hmi_exception;
+		ppc_md_update(hmi_exception_early, opal_hmi_exception_early);
+	ppc_md_update(handle_hmi_exception, opal_handle_hmi_exception);
 }
 
 static int __init pnv_probe(void)

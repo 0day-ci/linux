@@ -341,7 +341,7 @@ void __init cbe_ras_init(void)
 	 * Install machine check handler. Leave setting of precise mode to
 	 * what the firmware did for now
 	 */
-	ppc_md.machine_check_exception = cbe_machine_check_handler;
+	ppc_md_update(machine_check_exception, cbe_machine_check_handler);
 	mb();
 
 	/*

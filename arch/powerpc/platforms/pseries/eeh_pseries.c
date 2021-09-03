@@ -862,7 +862,7 @@ static int __init eeh_pseries_init(void)
 	eeh_add_flag(EEH_PROBE_MODE_DEVTREE | EEH_ENABLE_IO_FOR_LOG);
 
 	/* Set EEH machine dependent code */
-	ppc_md.pcibios_bus_add_device = pseries_pcibios_bus_add_device;
+	ppc_md_update(pcibios_bus_add_device, pseries_pcibios_bus_add_device);
 
 	if (is_kdump_kernel() || reset_devices) {
 		pr_info("Issue PHB reset ...\n");

@@ -459,7 +459,7 @@ void pseries_little_endian_exceptions(void)
 		mdelay(get_longbusy_msecs(rc));
 	}
 	if (rc) {
-		ppc_md.progress("H_SET_MODE LE exception fail", 0);
+		ppc_md_call(progress)("H_SET_MODE LE exception fail", 0);
 		panic("Could not enable little endian exceptions");
 	}
 }
@@ -820,22 +820,19 @@ static void __init pSeries_setup_arch(void)
 			pv_spinlocks_init();
 		}
 
-		ppc_md.power_save = pseries_lpar_idle;
-		ppc_md.enable_pmcs = pseries_lpar_enable_pmcs;
+		ppc_md_update(power_save, pseries_lpar_idle);
+		ppc_md_update(enable_pmcs, pseries_lpar_enable_pmcs);
 #ifdef CONFIG_PCI_IOV
-		ppc_md.pcibios_fixup_resources =
-			pseries_pci_fixup_resources;
-		ppc_md.pcibios_fixup_sriov =
-			pseries_pci_fixup_iov_resources;
-		ppc_md.pcibios_iov_resource_alignment =
-			pseries_pci_iov_resource_alignment;
+		ppc_md_update(pcibios_fixup_resources, pseries_pci_fixup_resources);
+		ppc_md_update(pcibios_fixup_sriov, pseries_pci_fixup_iov_resources);
+		ppc_md_update(pcibios_iov_resource_alignment, pseries_pci_iov_resource_alignment);
 #endif
 	} else {
 		/* No special idle routine */
-		ppc_md.enable_pmcs = power4_enable_pmcs;
+		ppc_md_update(enable_pmcs, power4_enable_pmcs);
 	}
 
-	ppc_md.pcibios_root_bridge_prepare = pseries_root_bridge_prepare;
+	ppc_md_update(pcibios_root_bridge_prepare, pseries_root_bridge_prepare);
 
 	if (swiotlb_force == SWIOTLB_FORCE)
 		ppc_swiotlb_enable = 1;
@@ -851,11 +848,11 @@ static int __init pSeries_init_panel(void)
 {
 	/* Manually leave the kernel version on the panel. */
 #ifdef __BIG_ENDIAN__
-	ppc_md.progress("Linux ppc64\n", 0);
+	ppc_md_call(progress)("Linux ppc64\n", 0);
 #else
-	ppc_md.progress("Linux ppc64le\n", 0);
+	ppc_md_call(progress)("Linux ppc64le\n", 0);
 #endif
-	ppc_md.progress(init_utsname()->version, 0);
+	ppc_md_call(progress)(init_utsname()->version, 0);
 
 	return 0;
 }
@@ -990,12 +987,12 @@ static void __init pseries_init(void)
 		hvc_vio_init_early();
 #endif
 	if (firmware_has_feature(FW_FEATURE_XDABR))
-		ppc_md.set_dabr = pseries_set_xdabr;
+		ppc_md_update(set_dabr, pseries_set_xdabr);
 	else if (firmware_has_feature(FW_FEATURE_DABR))
-		ppc_md.set_dabr = pseries_set_dabr;
+		ppc_md_update(set_dabr, pseries_set_dabr);
 
 	if (firmware_has_feature(FW_FEATURE_SET_MODE))
-		ppc_md.set_dawr = pseries_set_dawr;
+		ppc_md_update(set_dawr, pseries_set_dawr);
 
 	pSeries_cmo_feature_init();
 	iommu_init_early_pSeries();

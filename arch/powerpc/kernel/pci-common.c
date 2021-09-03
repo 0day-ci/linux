@@ -229,8 +229,8 @@ void pcibios_reset_secondary_bus(struct pci_dev *dev)
 
 resource_size_t pcibios_default_alignment(void)
 {
-	if (ppc_md.pcibios_default_alignment)
-		return ppc_md.pcibios_default_alignment();
+	if (ppc_md_has(pcibios_default_alignment))
+		return ppc_md_call(pcibios_default_alignment)();
 
 	return 0;
 }
@@ -238,24 +238,24 @@ resource_size_t pcibios_default_alignment(void)
 #ifdef CONFIG_PCI_IOV
 resource_size_t pcibios_iov_resource_alignment(struct pci_dev *pdev, int resno)
 {
-	if (ppc_md.pcibios_iov_resource_alignment)
-		return ppc_md.pcibios_iov_resource_alignment(pdev, resno);
+	if (ppc_md_has(pcibios_iov_resource_alignment))
+		return ppc_md_call(pcibios_iov_resource_alignment)(pdev, resno);
 
 	return pci_iov_resource_size(pdev, resno);
 }
 
 int pcibios_sriov_enable(struct pci_dev *pdev, u16 num_vfs)
 {
-	if (ppc_md.pcibios_sriov_enable)
-		return ppc_md.pcibios_sriov_enable(pdev, num_vfs);
+	if (ppc_md_has(pcibios_sriov_enable))
+		return ppc_md_call(pcibios_sriov_enable)(pdev, num_vfs);
 
 	return 0;
 }
 
 int pcibios_sriov_disable(struct pci_dev *pdev)
 {
-	if (ppc_md.pcibios_sriov_disable)
-		return ppc_md.pcibios_sriov_disable(pdev);
+	if (ppc_md_has(pcibios_sriov_disable))
+		return ppc_md_call(pcibios_sriov_disable)(pdev);
 
 	return 0;
 }
@@ -850,8 +850,8 @@ int pci_proc_domain(struct pci_bus *bus)
 
 int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
 {
-	if (ppc_md.pcibios_root_bridge_prepare)
-		return ppc_md.pcibios_root_bridge_prepare(bridge);
+	if (ppc_md_has(pcibios_root_bridge_prepare))
+		return ppc_md_call(pcibios_root_bridge_prepare)(bridge);
 
 	return 0;
 }
@@ -901,8 +901,7 @@ static void pcibios_fixup_resources(struct pci_dev *dev)
 	}
 
 	/* Call machine specific resource fixup */
-	if (ppc_md.pcibios_fixup_resources)
-		ppc_md.pcibios_fixup_resources(dev);
+	ppc_md_call_cond(pcibios_fixup_resources)(dev);
 }
 DECLARE_PCI_FIXUP_HEADER(PCI_ANY_ID, PCI_ANY_ID, pcibios_fixup_resources);
 
@@ -1024,8 +1023,7 @@ void pcibios_setup_bus_self(struct pci_bus *bus)
 	/* Platform specific bus fixups. This is currently only used
 	 * by fsl_pci and I'm hoping to get rid of it at some point
 	 */
-	if (ppc_md.pcibios_fixup_bus)
-		ppc_md.pcibios_fixup_bus(bus);
+	ppc_md_call_cond(pcibios_fixup_bus)(bus);
 
 	/* Setup bus DMA mappings */
 	phb = pci_bus_to_host(bus);
@@ -1052,11 +1050,9 @@ void pcibios_bus_add_device(struct pci_dev *dev)
 
 	/* Read default IRQs and fixup if necessary */
 	pci_read_irq_line(dev);
-	if (ppc_md.pci_irq_fixup)
-		ppc_md.pci_irq_fixup(dev);
+	ppc_md_call_cond(pci_irq_fixup)(dev);
 
-	if (ppc_md.pcibios_bus_add_device)
-		ppc_md.pcibios_bus_add_device(dev);
+	ppc_md_call_cond(pcibios_bus_add_device)(dev);
 }
 
 int pcibios_add_device(struct pci_dev *dev)
@@ -1064,8 +1060,7 @@ int pcibios_add_device(struct pci_dev *dev)
 	struct irq_domain *d;
 
 #ifdef CONFIG_PCI_IOV
-	if (ppc_md.pcibios_fixup_sriov)
-		ppc_md.pcibios_fixup_sriov(dev);
+	ppc_md_call_cond(pcibios_fixup_sriov)(dev);
 #endif /* CONFIG_PCI_IOV */
 
 	d = dev_get_msi_domain(&dev->bus->dev);
@@ -1673,8 +1668,7 @@ void pcibios_scan_phb(struct pci_controller *hose)
 	/* Platform gets a chance to do some global fixups before
 	 * we proceed to resource allocation
 	 */
-	if (ppc_md.pcibios_fixup_phb)
-		ppc_md.pcibios_fixup_phb(hose);
+	ppc_md_call_cond(pcibios_fixup_phb)(hose);
 
 	/* Configure PCI Express settings */
 	if (bus && !pci_has_flag(PCI_PROBE_ONLY)) {
@@ -1709,8 +1703,7 @@ DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_FREESCALE, PCI_ANY_ID, fixup_hide_host_re
 
 static int __init discover_phbs(void)
 {
-	if (ppc_md.discover_phbs)
-		ppc_md.discover_phbs();
+	ppc_md_call_cond(discover_phbs)();
 
 	return 0;
 }

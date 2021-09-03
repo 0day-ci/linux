@@ -110,8 +110,8 @@ mpc52xx_pci_read_config(struct pci_bus *bus, unsigned int devfn,
 	struct pci_controller *hose = pci_bus_to_host(bus);
 	u32 value;
 
-	if (ppc_md.pci_exclude_device)
-		if (ppc_md.pci_exclude_device(hose, bus->number, devfn))
+	if (ppc_md_has(pci_exclude_device))
+		if (ppc_md_call(pci_exclude_device)(hose, bus->number, devfn))
 			return PCIBIOS_DEVICE_NOT_FOUND;
 
 	out_be32(hose->cfg_addr,
@@ -167,8 +167,8 @@ mpc52xx_pci_write_config(struct pci_bus *bus, unsigned int devfn,
 	struct pci_controller *hose = pci_bus_to_host(bus);
 	u32 value, mask;
 
-	if (ppc_md.pci_exclude_device)
-		if (ppc_md.pci_exclude_device(hose, bus->number, devfn))
+	if (ppc_md_has(pci_exclude_device))
+		if (ppc_md_call(pci_exclude_device)(hose, bus->number, devfn))
 			return PCIBIOS_DEVICE_NOT_FOUND;
 
 	out_be32(hose->cfg_addr,
@@ -387,7 +387,7 @@ mpc52xx_add_bridge(struct device_node *node)
 
 	/* There are some PCI quirks on the 52xx, register the hook to
 	 * fix them. */
-	ppc_md.pcibios_fixup_resources = mpc52xx_pci_fixup_resources;
+	ppc_md_update(pcibios_fixup_resources, mpc52xx_pci_fixup_resources);
 
 	/* Alloc and initialize the pci controller.  Values in the device
 	 * tree are needed to configure the 52xx PCI controller.  Rather

@@ -103,8 +103,7 @@ static void __init ge_imp3a_setup_arch(void)
 {
 	struct device_node *regs;
 
-	if (ppc_md.progress)
-		ppc_md.progress("ge_imp3a_setup_arch()", 0);
+	ppc_md_call_cond(progress)("ge_imp3a_setup_arch()", 0);
 
 	mpc85xx_smp_init();
 

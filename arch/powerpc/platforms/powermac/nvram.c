@@ -449,7 +449,7 @@ static void __init lookup_partitions(void)
 		buffer[16] = 0;
 		do {
 			for (i=0;i<16;i++)
-				buffer[i] = ppc_md.nvram_read_val(offset+i);
+				buffer[i] = ppc_md_call(nvram_read_val)(offset+i);
 			if (!strcmp(hdr->name, "common"))
 				nvram_partitions[pmac_nvram_OF] = offset + 0x10;
 			if (!strcmp(hdr->name, "APL,MacOS75")) {
@@ -533,13 +533,13 @@ static int __init core99_nvram_setup(struct device_node *dp, unsigned long addr)
 	for (i=0; i<NVRAM_SIZE; i++)
 		nvram_image[i] = nvram_data[i + core99_bank*NVRAM_SIZE];
 
-	ppc_md.nvram_read_val	= core99_nvram_read_byte;
-	ppc_md.nvram_write_val	= core99_nvram_write_byte;
-	ppc_md.nvram_read	= core99_nvram_read;
-	ppc_md.nvram_write	= core99_nvram_write;
-	ppc_md.nvram_size	= core99_nvram_size;
-	ppc_md.nvram_sync	= core99_nvram_sync;
-	ppc_md.machine_shutdown	= core99_nvram_sync;
+	ppc_md_update(nvram_read_val, core99_nvram_read_byte);
+	ppc_md_update(nvram_write_val, core99_nvram_write_byte);
+	ppc_md_update(nvram_read, core99_nvram_read);
+	ppc_md_update(nvram_write, core99_nvram_write);
+	ppc_md_update(nvram_size, core99_nvram_size);
+	ppc_md_update(nvram_sync, core99_nvram_sync);
+	ppc_md_update(machine_shutdown, core99_nvram_sync);
 	/* 
 	 * Maybe we could be smarter here though making an exclusive list
 	 * of known flash chips is a bit nasty as older OF didn't provide us
@@ -592,27 +592,27 @@ int __init pmac_nvram_init(void)
 	if (machine_is(chrp) && nvram_naddrs == 1) {
 		nvram_data = ioremap(r1.start, s1);
 		nvram_mult = 1;
-		ppc_md.nvram_read_val	= direct_nvram_read_byte;
-		ppc_md.nvram_write_val	= direct_nvram_write_byte;
-		ppc_md.nvram_size	= ppc32_nvram_size;
+		ppc_md_update(nvram_read_val, direct_nvram_read_byte);
+		ppc_md_update(nvram_write_val, direct_nvram_write_byte);
+		ppc_md_update(nvram_size, ppc32_nvram_size);
 	} else if (nvram_naddrs == 1) {
 		nvram_data = ioremap(r1.start, s1);
 		nvram_mult = (s1 + NVRAM_SIZE - 1) / NVRAM_SIZE;
-		ppc_md.nvram_read_val	= direct_nvram_read_byte;
-		ppc_md.nvram_write_val	= direct_nvram_write_byte;
-		ppc_md.nvram_size	= ppc32_nvram_size;
+		ppc_md_update(nvram_read_val, direct_nvram_read_byte);
+		ppc_md_update(nvram_write_val, direct_nvram_write_byte);
+		ppc_md_update(nvram_size, ppc32_nvram_size);
 	} else if (nvram_naddrs == 2) {
 		nvram_addr = ioremap(r1.start, s1);
 		nvram_data = ioremap(r2.start, s2);
-		ppc_md.nvram_read_val	= indirect_nvram_read_byte;
-		ppc_md.nvram_write_val	= indirect_nvram_write_byte;
-		ppc_md.nvram_size	= ppc32_nvram_size;
+		ppc_md_update(nvram_read_val, indirect_nvram_read_byte);
+		ppc_md_update(nvram_write_val, indirect_nvram_write_byte);
+		ppc_md_update(nvram_size, ppc32_nvram_size);
 	} else if (nvram_naddrs == 0 && sys_ctrler == SYS_CTRLER_PMU) {
 #ifdef CONFIG_ADB_PMU
 		nvram_naddrs = -1;
-		ppc_md.nvram_read_val	= pmu_nvram_read_byte;
-		ppc_md.nvram_write_val	= pmu_nvram_write_byte;
-		ppc_md.nvram_size	= ppc32_nvram_size;
+		ppc_md_update(nvram_read_val, pmu_nvram_read_byte);
+		ppc_md_update(nvram_write_val, pmu_nvram_write_byte);
+		ppc_md_update(nvram_size, ppc32_nvram_size);
 #endif /* CONFIG_ADB_PMU */
 	} else {
 		printk(KERN_ERR "Incompatible type of NVRAM\n");
@@ -638,7 +638,7 @@ u8 pmac_xpram_read(int xpaddr)
 	if (offset < 0 || xpaddr < 0 || xpaddr > 0x100)
 		return 0xff;
 
-	return ppc_md.nvram_read_val(xpaddr + offset);
+	return ppc_md_call(nvram_read_val)(xpaddr + offset);
 }
 
 void pmac_xpram_write(int xpaddr, u8 data)
@@ -648,7 +648,7 @@ void pmac_xpram_write(int xpaddr, u8 data)
 	if (offset < 0 || xpaddr < 0 || xpaddr > 0x100)
 		return;
 
-	ppc_md.nvram_write_val(xpaddr + offset, data);
+	ppc_md_call(nvram_write_val)(xpaddr + offset, data);
 }
 
 EXPORT_SYMBOL(pmac_get_partition);

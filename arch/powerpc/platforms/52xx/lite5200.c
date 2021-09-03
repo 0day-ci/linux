@@ -147,8 +147,7 @@ static void lite5200_resume_finish(void __iomem *mbar)
 
 static void __init lite5200_setup_arch(void)
 {
-	if (ppc_md.progress)
-		ppc_md.progress("lite5200_setup_arch()", 0);
+	ppc_md_call_cond(progress)("lite5200_setup_arch()", 0);
 
 	/* Map important registers from the internal memory map */
 	mpc52xx_map_common_devices();

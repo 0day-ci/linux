@@ -310,9 +310,9 @@ static long nvram_misc_ioctl(struct file *file, unsigned int cmd,
 		break;
 #ifdef CONFIG_PPC32
 	case IOC_NVRAM_SYNC:
-		if (ppc_md.nvram_sync != NULL) {
+		if (ppc_md_has(nvram_sync)) {
 			mutex_lock(&nvram_mutex);
-			ppc_md.nvram_sync();
+			ppc_md_call(nvram_sync)();
 			mutex_unlock(&nvram_mutex);
 		}
 		ret = 0;

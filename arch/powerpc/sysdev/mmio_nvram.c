@@ -133,11 +133,11 @@ int __init mmio_nvram_init(void)
 	printk(KERN_INFO "mmio NVRAM, %luk at 0x%lx mapped to %p\n",
 	       mmio_nvram_len >> 10, nvram_addr, mmio_nvram_start);
 
-	ppc_md.nvram_read_val	= mmio_nvram_read_val;
-	ppc_md.nvram_write_val	= mmio_nvram_write_val;
-	ppc_md.nvram_read	= mmio_nvram_read;
-	ppc_md.nvram_write	= mmio_nvram_write;
-	ppc_md.nvram_size	= mmio_nvram_get_size;
+	ppc_md_update(nvram_read_val, mmio_nvram_read_val);
+	ppc_md_update(nvram_write_val, mmio_nvram_write_val);
+	ppc_md_update(nvram_read, mmio_nvram_read);
+	ppc_md_update(nvram_write, mmio_nvram_write);
+	ppc_md_update(nvram_size, mmio_nvram_get_size);
 
 out:
 	of_node_put(nvram_node);

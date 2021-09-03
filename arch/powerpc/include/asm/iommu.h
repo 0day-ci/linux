@@ -282,8 +282,7 @@ extern void iommu_init_early_pasemi(void);
 #if defined(CONFIG_PPC64) && defined(CONFIG_PM)
 static inline void iommu_restore(void)
 {
-	if (ppc_md.iommu_restore)
-		ppc_md.iommu_restore();
+	ppc_md_call_cond(iommu_restore)();
 }
 #endif
 

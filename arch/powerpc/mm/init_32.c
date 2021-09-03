@@ -114,8 +114,7 @@ static void __init MMU_setup(void)
  */
 void __init MMU_init(void)
 {
-	if (ppc_md.progress)
-		ppc_md.progress("MMU:enter", 0x111);
+	ppc_md_call_cond(progress)("MMU:enter", 0x111);
 
 	/* parse args from command line */
 	MMU_setup();
@@ -153,20 +152,17 @@ void __init MMU_init(void)
 	}
 
 	/* Initialize the MMU hardware */
-	if (ppc_md.progress)
-		ppc_md.progress("MMU:hw init", 0x300);
+	ppc_md_call_cond(progress)("MMU:hw init", 0x300);
 	MMU_init_hw();
 
 	/* Map in all of RAM starting at KERNELBASE */
-	if (ppc_md.progress)
-		ppc_md.progress("MMU:mapin", 0x301);
+	ppc_md_call_cond(progress)("MMU:mapin", 0x301);
 	mapin_ram();
 
 	/* Initialize early top-down ioremap allocator */
 	ioremap_bot = IOREMAP_TOP;
 
-	if (ppc_md.progress)
-		ppc_md.progress("MMU:exit", 0x211);
+	ppc_md_call_cond(progress)("MMU:exit", 0x211);
 
 	/* From now on, btext is no longer BAT mapped if it was at all */
 #ifdef CONFIG_BOOTX_TEXT
