@@ -18,7 +18,6 @@
 #include <linux/wait.h>
 #include <linux/unistd.h>
 #include <linux/stddef.h>
-#include <linux/personality.h>
 #include <linux/compat.h>
 #include <linux/binfmts.h>
 #include <linux/syscalls.h>

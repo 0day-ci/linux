@@ -30,7 +30,6 @@
 #include <linux/export.h>
 #include <linux/kallsyms.h>
 #include <linux/ptrace.h>
-#include <linux/personality.h>
 #include <linux/percpu.h>
 #include <linux/prctl.h>
 #include <linux/ftrace.h>

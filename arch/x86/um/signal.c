@@ -5,7 +5,6 @@
  */
 
 
-#include <linux/personality.h>
 #include <linux/ptrace.h>
 #include <linux/kernel.h>
 #include <asm/unistd.h>

@@ -32,7 +32,6 @@
 #include <linux/mm.h>
 #include <linux/uio.h>
 #include <linux/poll.h>
-#include <linux/personality.h>
 #include <linux/stat.h>
 #include <linux/rwsem.h>
 #include <linux/compat.h>

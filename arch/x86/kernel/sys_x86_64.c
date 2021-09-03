@@ -14,7 +14,6 @@
 #include <linux/mman.h>
 #include <linux/file.h>
 #include <linux/utsname.h>
-#include <linux/personality.h>
 #include <linux/random.h>
 #include <linux/uaccess.h>
 #include <linux/elf.h>
