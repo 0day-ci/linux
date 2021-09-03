@@ -33,3 +33,46 @@ void ledtrig_blkdev_disk_cleanup(struct gendisk *const gd)
 
 	mutex_unlock(&ledtrig_blkdev_mutex);
 }
+
+
+/*
+ *
+ *	ledtrig_blkdev_get_disk() - get a gendisk by name
+ *
+ *	Must be built in for access to block_class and disk_type
+ *	Caller must call put_disk()
+ *
+ */
+
+/* Non-null-terminated character sequence of known length */
+struct ledtrig_blkdev_gdname {
+	const char	*buf;
+	size_t		len;
+};
+
+/* Match function for ledtrig_blkdev_get_disk() */
+static int blkdev_match_gdname(struct device *const dev, const void *const data)
+{
+	const struct ledtrig_blkdev_gdname *const gdname = data;
+
+	if (dev->type != &disk_type)
+		return 0;
+
+	return ledtrig_blkdev_streq(dev_to_disk(dev)->disk_name,
+				    gdname->buf, gdname->len);
+}
+
+struct gendisk *ledtrig_blkdev_get_disk(const char *const name,
+					const size_t len)
+{
+	const struct ledtrig_blkdev_gdname gdname = { .buf = name, .len = len };
+	struct device *dev;
+
+	dev = class_find_device(&block_class, NULL,
+				&gdname, blkdev_match_gdname);
+	if (dev == NULL)
+		return NULL;
+
+	return dev_to_disk(dev);
+}
+EXPORT_SYMBOL_NS_GPL(ledtrig_blkdev_get_disk, LEDTRIG_BLKDEV);
