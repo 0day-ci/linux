@@ -20,9 +20,6 @@ struct gadget_info {
 
 	struct usb_composite_driver composite;
 	struct usb_composite_dev cdev;
-	bool use_os_desc;
-	char b_vendor_code;
-	char qw_sign[OS_STRING_QW_SIGN_LEN];
 	spinlock_t spinlock;
 	bool unbind;
 };
