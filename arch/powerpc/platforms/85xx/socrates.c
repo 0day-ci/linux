@@ -74,18 +74,19 @@ machine_arch_initcall(socrates, mpc85xx_common_publish_devices);
  */
 static int __init socrates_probe(void)
 {
-	if (of_machine_is_compatible("abb,socrates"))
-		return 1;
+	if (!of_machine_is_compatible("abb,socrates"))
+		return 0;
 
-	return 0;
+	ppc_md_update(setup_arch, socrates_setup_arch);
+	ppc_md_update(init_IRQ, socrates_pic_init);
+	ppc_md_update(get_irq, mpic_get_irq);
+	ppc_md_update(calibrate_decr, generic_calibrate_decr);
+	ppc_md_update(progress, udbg_progress);
+
+	return 1;
 }
 
 define_machine(socrates) {
 	.name			= "Socrates",
 	.probe			= socrates_probe,
-	.setup_arch		= socrates_setup_arch,
-	.init_IRQ		= socrates_pic_init,
-	.get_irq		= mpic_get_irq,
-	.calibrate_decr		= generic_calibrate_decr,
-	.progress		= udbg_progress,
 };

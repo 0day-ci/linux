@@ -271,23 +271,23 @@ static void ppc47x_pci_irq_fixup(struct pci_dev *dev)
  */
 static int __init ppc47x_probe(void)
 {
-	if (of_machine_is_compatible("ibm,akebono"))
-		return 1;
+	if (!of_machine_is_compatible("ibm,akebono") &&
+	    !of_machine_is_compatible("ibm,currituck"))
+		return 0;
 
-	if (of_machine_is_compatible("ibm,currituck")) {
+	ppc_md_update(progress, udbg_progress);
+	ppc_md_update(init_IRQ, ppc47x_init_irq);
+	ppc_md_update(setup_arch, ppc47x_setup_arch);
+	ppc_md_update(restart, ppc4xx_reset_system);
+	ppc_md_update(calibrate_decr, generic_calibrate_decr);
+
+	if (of_machine_is_compatible("ibm,currituck"))
 		ppc_md_update(pci_irq_fixup, ppc47x_pci_irq_fixup);
-		return 1;
-	}
 
-	return 0;
+	return 1;
 }
 
 define_machine(ppc47x) {
 	.name			= "PowerPC 47x",
 	.probe			= ppc47x_probe,
-	.progress		= udbg_progress,
-	.init_IRQ		= ppc47x_init_irq,
-	.setup_arch		= ppc47x_setup_arch,
-	.restart		= ppc4xx_reset_system,
-	.calibrate_decr		= generic_calibrate_decr,
 };

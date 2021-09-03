@@ -147,6 +147,15 @@ static int __init linkstation_probe(void)
 	if (!of_machine_is_compatible("linkstation"))
 		return 0;
 
+	ppc_md_update(setup_arch , linkstation_setup_arch);
+	ppc_md_update(discover_phbs, linkstation_setup_pci);
+	ppc_md_update(init_IRQ, linkstation_init_IRQ);
+	ppc_md_update(show_cpuinfo, linkstation_show_cpuinfo);
+	ppc_md_update(get_irq, mpic_get_irq);
+	ppc_md_update(restart, linkstation_restart);
+	ppc_md_update(halt, linkstation_halt);
+	ppc_md_update(calibrate_decr, generic_calibrate_decr);
+
 	pm_power_off = linkstation_power_off;
 
 	return 1;
@@ -155,12 +164,4 @@ static int __init linkstation_probe(void)
 define_machine(linkstation){
 	.name 			= "Buffalo Linkstation",
 	.probe 			= linkstation_probe,
-	.setup_arch 		= linkstation_setup_arch,
-	.discover_phbs		= linkstation_setup_pci,
-	.init_IRQ 		= linkstation_init_IRQ,
-	.show_cpuinfo 		= linkstation_show_cpuinfo,
-	.get_irq 		= mpic_get_irq,
-	.restart 		= linkstation_restart,
-	.halt	 		= linkstation_halt,
-	.calibrate_decr 	= generic_calibrate_decr,
 };

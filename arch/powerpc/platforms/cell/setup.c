@@ -249,6 +249,18 @@ static int __init cell_probe(void)
 	    !of_machine_is_compatible("IBM,CPBW-1.0"))
 		return 0;
 
+	ppc_md_update(setup_arch, cell_setup_arch);
+	ppc_md_update(show_cpuinfo, cell_show_cpuinfo);
+	ppc_md_update(restart, rtas_restart);
+	ppc_md_update(halt, rtas_halt);
+	ppc_md_update(get_boot_time, rtas_get_boot_time);
+	ppc_md_update(get_rtc_time, rtas_get_rtc_time);
+	ppc_md_update(set_rtc_time, rtas_set_rtc_time);
+	ppc_md_update(calibrate_decr, generic_calibrate_decr);
+	ppc_md_update(progress, cell_progress);
+	ppc_md_update(init_IRQ, cell_init_irq);
+	ppc_md_update(pci_setup_phb, cell_setup_phb);
+
 	pm_power_off = rtas_power_off;
 
 	return 1;
@@ -257,17 +269,6 @@ static int __init cell_probe(void)
 define_machine(cell) {
 	.name			= "Cell",
 	.probe			= cell_probe,
-	.setup_arch		= cell_setup_arch,
-	.show_cpuinfo		= cell_show_cpuinfo,
-	.restart		= rtas_restart,
-	.halt			= rtas_halt,
-	.get_boot_time		= rtas_get_boot_time,
-	.get_rtc_time		= rtas_get_rtc_time,
-	.set_rtc_time		= rtas_set_rtc_time,
-	.calibrate_decr		= generic_calibrate_decr,
-	.progress		= cell_progress,
-	.init_IRQ       	= cell_init_irq,
-	.pci_setup_phb		= cell_setup_phb,
 };
 
 struct pci_controller_ops cell_pci_controller_ops;

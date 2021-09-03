@@ -43,17 +43,18 @@ static int __init warp_probe(void)
 	if (!of_machine_is_compatible("pika,warp"))
 		return 0;
 
+	ppc_md_update(progress, udbg_progress);
+	ppc_md_update(init_IRQ, uic_init_tree);
+	ppc_md_update(get_irq, uic_get_irq);
+	ppc_md_update(restart, ppc4xx_reset_system);
+	ppc_md_update(calibrate_decr, generic_calibrate_decr);
+
 	return 1;
 }
 
 define_machine(warp) {
 	.name		= "Warp",
 	.probe 		= warp_probe,
-	.progress 	= udbg_progress,
-	.init_IRQ 	= uic_init_tree,
-	.get_irq 	= uic_get_irq,
-	.restart	= ppc4xx_reset_system,
-	.calibrate_decr = generic_calibrate_decr,
 };
 
 

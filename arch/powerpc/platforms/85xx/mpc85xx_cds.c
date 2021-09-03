@@ -373,7 +373,21 @@ static void mpc85xx_cds_show_cpuinfo(struct seq_file *m)
  */
 static int __init mpc85xx_cds_probe(void)
 {
-	return of_machine_is_compatible("MPC85xxCDS");
+	if (!of_machine_is_compatible("MPC85xxCDS"))
+		return 0;
+
+	ppc_md_update(setup_arch, mpc85xx_cds_setup_arch);
+	ppc_md_update(init_IRQ, mpc85xx_cds_pic_init);
+	ppc_md_update(show_cpuinfo, mpc85xx_cds_show_cpuinfo);
+	ppc_md_update(get_irq, mpic_get_irq);
+#ifdef CONFIG_PCI
+	ppc_md_update(pcibios_fixup_bus, mpc85xx_cds_fixup_bus);
+	ppc_md_update(pcibios_fixup_phb, fsl_pcibios_fixup_phb);
+#endif
+	ppc_md_update(calibrate_decr, generic_calibrate_decr);
+	ppc_md_update(progress, udbg_progress);
+
+	return 1;
 }
 
 machine_arch_initcall(mpc85xx_cds, mpc85xx_common_publish_devices);
@@ -381,14 +395,4 @@ machine_arch_initcall(mpc85xx_cds, mpc85xx_common_publish_devices);
 define_machine(mpc85xx_cds) {
 	.name		= "MPC85xx CDS",
 	.probe		= mpc85xx_cds_probe,
-	.setup_arch	= mpc85xx_cds_setup_arch,
-	.init_IRQ	= mpc85xx_cds_pic_init,
-	.show_cpuinfo	= mpc85xx_cds_show_cpuinfo,
-	.get_irq	= mpic_get_irq,
-#ifdef CONFIG_PCI
-	.pcibios_fixup_bus	= mpc85xx_cds_fixup_bus,
-	.pcibios_fixup_phb      = fsl_pcibios_fixup_phb,
-#endif
-	.calibrate_decr = generic_calibrate_decr,
-	.progress	= udbg_progress,
 };

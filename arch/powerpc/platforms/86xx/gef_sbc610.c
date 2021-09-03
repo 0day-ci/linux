@@ -162,10 +162,21 @@ DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_NEC, PCI_DEVICE_ID_NEC_USB,
  */
 static int __init gef_sbc610_probe(void)
 {
-	if (of_machine_is_compatible("gef,sbc610"))
-		return 1;
+	if (!of_machine_is_compatible("gef,sbc610"))
+		return 0;
 
-	return 0;
+	ppc_md_update(setup_arch, gef_sbc610_setup_arch);
+	ppc_md_update(init_IRQ, gef_sbc610_init_irq);
+	ppc_md_update(show_cpuinfo, gef_sbc610_show_cpuinfo);
+	ppc_md_update(get_irq, mpic_get_irq);
+	ppc_md_update(time_init, mpc86xx_time_init);
+	ppc_md_update(calibrate_decr, generic_calibrate_decr);
+	ppc_md_update(progress, udbg_progress);
+#ifdef CONFIG_PCI
+	ppc_md_update(pcibios_fixup_bus, fsl_pcibios_fixup_bus);
+#endif
+
+	return 1;
 }
 
 machine_arch_initcall(gef_sbc610, mpc86xx_common_publish_devices);
@@ -173,14 +184,4 @@ machine_arch_initcall(gef_sbc610, mpc86xx_common_publish_devices);
 define_machine(gef_sbc610) {
 	.name			= "GE SBC610",
 	.probe			= gef_sbc610_probe,
-	.setup_arch		= gef_sbc610_setup_arch,
-	.init_IRQ		= gef_sbc610_init_irq,
-	.show_cpuinfo		= gef_sbc610_show_cpuinfo,
-	.get_irq		= mpic_get_irq,
-	.time_init		= mpc86xx_time_init,
-	.calibrate_decr		= generic_calibrate_decr,
-	.progress		= udbg_progress,
-#ifdef CONFIG_PCI
-	.pcibios_fixup_bus	= fsl_pcibios_fixup_bus,
-#endif
 };

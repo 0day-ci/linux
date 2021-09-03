@@ -157,7 +157,18 @@ static void __init pq2fads_setup_arch(void)
  */
 static int __init pq2fads_probe(void)
 {
-	return of_machine_is_compatible("fsl,pq2fads");
+	if (!of_machine_is_compatible("fsl,pq2fads"))
+		return 0;
+
+	ppc_md_update(setup_arch, pq2fads_setup_arch);
+	ppc_md_update(discover_phbs, pq2_init_pci);
+	ppc_md_update(init_IRQ, pq2fads_pic_init);
+	ppc_md_update(get_irq, cpm2_get_irq);
+	ppc_md_update(calibrate_decr, generic_calibrate_decr);
+	ppc_md_update(restart, pq2_restart);
+	ppc_md_update(progress, udbg_progress);
+
+	return 1;
 }
 
 static const struct of_device_id of_bus_ids[] __initconst = {
@@ -179,11 +190,4 @@ define_machine(pq2fads)
 {
 	.name = "Freescale PQ2FADS",
 	.probe = pq2fads_probe,
-	.setup_arch = pq2fads_setup_arch,
-	.discover_phbs = pq2_init_pci,
-	.init_IRQ = pq2fads_pic_init,
-	.get_irq = cpm2_get_irq,
-	.calibrate_decr = generic_calibrate_decr,
-	.restart = pq2_restart,
-	.progress = udbg_progress,
 };

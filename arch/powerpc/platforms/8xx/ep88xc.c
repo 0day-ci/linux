@@ -143,7 +143,17 @@ static void __init ep88xc_setup_arch(void)
 
 static int __init ep88xc_probe(void)
 {
-	return of_machine_is_compatible("fsl,ep88xc");
+	if (!of_machine_is_compatible("fsl,ep88xc"))
+		return 0;
+
+	ppc_md_update(setup_arch, ep88xc_setup_arch);
+	ppc_md_update(init_IRQ, mpc8xx_pics_init);
+	ppc_md_update(get_irq, mpc8xx_get_irq);
+	ppc_md_update(restart, mpc8xx_restart);
+	ppc_md_update(calibrate_decr, mpc8xx_calibrate_decr);
+	ppc_md_update(progress, udbg_progress);
+
+	return 1;
 }
 
 static const struct of_device_id of_bus_ids[] __initconst = {
@@ -165,10 +175,4 @@ machine_device_initcall(ep88xc, declare_of_platform_devices);
 define_machine(ep88xc) {
 	.name = "Embedded Planet EP88xC",
 	.probe = ep88xc_probe,
-	.setup_arch = ep88xc_setup_arch,
-	.init_IRQ = mpc8xx_pics_init,
-	.get_irq	= mpc8xx_get_irq,
-	.restart = mpc8xx_restart,
-	.calibrate_decr = mpc8xx_calibrate_decr,
-	.progress = udbg_progress,
 };

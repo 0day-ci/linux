@@ -111,6 +111,13 @@ static int __init pdm360ng_probe(void)
 	if (!of_machine_is_compatible("ifm,pdm360ng"))
 		return 0;
 
+	ppc_md_update(setup_arch, mpc512x_setup_arch);
+	ppc_md_update(init, pdm360ng_init);
+	ppc_md_update(init_IRQ, mpc512x_init_IRQ);
+	ppc_md_update(get_irq, ipic_get_irq);
+	ppc_md_update(calibrate_decr, generic_calibrate_decr);
+	ppc_md_update(restart, mpc512x_restart);
+
 	mpc512x_init_early();
 
 	return 1;
@@ -119,10 +126,4 @@ static int __init pdm360ng_probe(void)
 define_machine(pdm360ng) {
 	.name			= "PDM360NG",
 	.probe			= pdm360ng_probe,
-	.setup_arch		= mpc512x_setup_arch,
-	.init			= pdm360ng_init,
-	.init_IRQ		= mpc512x_init_IRQ,
-	.get_irq		= ipic_get_irq,
-	.calibrate_decr		= generic_calibrate_decr,
-	.restart		= mpc512x_restart,
 };

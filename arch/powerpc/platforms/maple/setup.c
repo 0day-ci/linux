@@ -280,6 +280,20 @@ static int __init maple_probe(void)
 	    !of_machine_is_compatible("Momentum,Apache"))
 		return 0;
 
+	ppc_md_update(setup_arch, maple_setup_arch);
+	ppc_md_update(discover_phbs, maple_pci_init);
+	ppc_md_update(init_IRQ, maple_init_IRQ);
+	ppc_md_update(pci_irq_fixup, maple_pci_irq_fixup);
+	ppc_md_update(pci_get_legacy_ide_irq, maple_pci_get_legacy_ide_irq);
+	ppc_md_update(restart, maple_restart);
+	ppc_md_update(halt, maple_halt);
+	ppc_md_update(get_boot_time, maple_get_boot_time);
+	ppc_md_update(set_rtc_time, maple_set_rtc_time);
+	ppc_md_update(get_rtc_time, maple_get_rtc_time);
+	ppc_md_update(calibrate_decr, generic_calibrate_decr);
+	ppc_md_update(progress, maple_progress);
+	ppc_md_update(power_save, power4_idle);
+
 	pm_power_off = maple_power_off;
 
 	iommu_init_early_dart(&maple_pci_controller_ops);
@@ -347,17 +361,4 @@ machine_device_initcall(maple, maple_cpc925_edac_setup);
 define_machine(maple) {
 	.name			= "Maple",
 	.probe			= maple_probe,
-	.setup_arch		= maple_setup_arch,
-	.discover_phbs		= maple_pci_init,
-	.init_IRQ		= maple_init_IRQ,
-	.pci_irq_fixup		= maple_pci_irq_fixup,
-	.pci_get_legacy_ide_irq	= maple_pci_get_legacy_ide_irq,
-	.restart		= maple_restart,
-	.halt			= maple_halt,
-	.get_boot_time		= maple_get_boot_time,
-	.set_rtc_time		= maple_set_rtc_time,
-	.get_rtc_time		= maple_get_rtc_time,
-	.calibrate_decr		= generic_calibrate_decr,
-	.progress		= maple_progress,
-	.power_save		= power4_idle,
 };

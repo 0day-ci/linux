@@ -132,19 +132,23 @@ machine_arch_initcall(p1022_rdk, mpc85xx_common_publish_devices);
  */
 static int __init p1022_rdk_probe(void)
 {
-	return of_machine_is_compatible("fsl,p1022rdk");
+	if (!of_machine_is_compatible("fsl,p1022rdk"))
+		return 0;
+
+	ppc_md_update(setup_arch, p1022_rdk_setup_arch);
+	ppc_md_update(init_IRQ, p1022_rdk_pic_init);
+#ifdef CONFIG_PCI
+	ppc_md_update(pcibios_fixup_bus, fsl_pcibios_fixup_bus);
+	ppc_md_update(pcibios_fixup_phb, fsl_pcibios_fixup_phb);
+#endif
+	ppc_md_update(get_irq, mpic_get_irq);
+	ppc_md_update(calibrate_decr, generic_calibrate_decr);
+	ppc_md_update(progress, udbg_progress);
+		
+	return 1;
 }
 
 define_machine(p1022_rdk) {
 	.name			= "P1022 RDK",
 	.probe			= p1022_rdk_probe,
-	.setup_arch		= p1022_rdk_setup_arch,
-	.init_IRQ		= p1022_rdk_pic_init,
-#ifdef CONFIG_PCI
-	.pcibios_fixup_bus	= fsl_pcibios_fixup_bus,
-	.pcibios_fixup_phb      = fsl_pcibios_fixup_phb,
-#endif
-	.get_irq		= mpic_get_irq,
-	.calibrate_decr		= generic_calibrate_decr,
-	.progress		= udbg_progress,
 };

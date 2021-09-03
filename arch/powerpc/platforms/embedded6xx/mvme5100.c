@@ -190,7 +190,19 @@ static void __noreturn mvme5100_restart(char *cmd)
  */
 static int __init mvme5100_probe(void)
 {
-	return of_machine_is_compatible("MVME5100");
+	if (!of_machine_is_compatible("MVME5100"))
+		return 0;
+
+	ppc_md_update(setup_arch, mvme5100_setup_arch);
+	ppc_md_update(discover_phbs, mvme5100_setup_pci);
+	ppc_md_update(init_IRQ, mvme5100_pic_init);
+	ppc_md_update(show_cpuinfo, mvme5100_show_cpuinfo);
+	ppc_md_update(get_irq, mpic_get_irq);
+	ppc_md_update(restart, mvme5100_restart);
+	ppc_md_update(calibrate_decr, generic_calibrate_decr);
+	ppc_md_update(progress, udbg_progress);
+
+	return 1;
 }
 
 static int __init probe_of_platform_devices(void)
@@ -205,12 +217,4 @@ machine_device_initcall(mvme5100, probe_of_platform_devices);
 define_machine(mvme5100) {
 	.name			= "MVME5100",
 	.probe			= mvme5100_probe,
-	.setup_arch		= mvme5100_setup_arch,
-	.discover_phbs		= mvme5100_setup_pci,
-	.init_IRQ		= mvme5100_pic_init,
-	.show_cpuinfo		= mvme5100_show_cpuinfo,
-	.get_irq		= mpic_get_irq,
-	.restart		= mvme5100_restart,
-	.calibrate_decr		= generic_calibrate_decr,
-	.progress		= udbg_progress,
 };

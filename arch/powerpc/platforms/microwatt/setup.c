@@ -23,7 +23,14 @@ static void __init microwatt_init_IRQ(void)
 
 static int __init microwatt_probe(void)
 {
-	return of_machine_is_compatible("microwatt-soc");
+	if (!of_machine_is_compatible("microwatt-soc"))
+		return 0;
+
+	ppc_md_update(init_IRQ, microwatt_init_IRQ);
+	ppc_md_update(progress, udbg_progress);
+	ppc_md_update(calibrate_decr, generic_calibrate_decr);
+
+	return 1;
 }
 
 static int __init microwatt_populate(void)
@@ -35,7 +42,4 @@ machine_arch_initcall(microwatt, microwatt_populate);
 define_machine(microwatt) {
 	.name			= "microwatt",
 	.probe			= microwatt_probe,
-	.init_IRQ		= microwatt_init_IRQ,
-	.progress		= udbg_progress,
-	.calibrate_decr		= generic_calibrate_decr,
 };

@@ -57,19 +57,23 @@ machine_arch_initcall(mpc8536_ds, mpc85xx_common_publish_devices);
  */
 static int __init mpc8536_ds_probe(void)
 {
-	return of_machine_is_compatible("fsl,mpc8536ds");
+	if (!of_machine_is_compatible("fsl,mpc8536ds"))
+		return 0;
+
+	ppc_md_update(setup_arch, mpc8536_ds_setup_arch);
+	ppc_md_update(init_IRQ, mpc8536_ds_pic_init);
+#ifdef CONFIG_PCI
+	ppc_md_update(pcibios_fixup_bus, fsl_pcibios_fixup_bus);
+	ppc_md_update(pcibios_fixup_phb, fsl_pcibios_fixup_phb);
+#endif
+	ppc_md_update(get_irq, mpic_get_irq);
+	ppc_md_update(calibrate_decr, generic_calibrate_decr);
+	ppc_md_update(progress, udbg_progress);
+
+	return 1;
 }
 
 define_machine(mpc8536_ds) {
 	.name			= "MPC8536 DS",
 	.probe			= mpc8536_ds_probe,
-	.setup_arch		= mpc8536_ds_setup_arch,
-	.init_IRQ		= mpc8536_ds_pic_init,
-#ifdef CONFIG_PCI
-	.pcibios_fixup_bus	= fsl_pcibios_fixup_bus,
-	.pcibios_fixup_phb      = fsl_pcibios_fixup_phb,
-#endif
-	.get_irq		= mpic_get_irq,
-	.calibrate_decr		= generic_calibrate_decr,
-	.progress		= udbg_progress,
 };

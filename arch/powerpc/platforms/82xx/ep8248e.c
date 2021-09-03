@@ -305,17 +305,21 @@ machine_device_initcall(ep8248e, declare_of_platform_devices);
  */
 static int __init ep8248e_probe(void)
 {
-	return of_machine_is_compatible("fsl,ep8248e");
+	if (!of_machine_is_compatible("fsl,ep8248e"))
+		return 0;
+
+	ppc_md_update(setup_arch, ep8248e_setup_arch);
+	ppc_md_update(init_IRQ, ep8248e_pic_init);
+	ppc_md_update(get_irq, cpm2_get_irq);
+	ppc_md_update(calibrate_decr, generic_calibrate_decr);
+	ppc_md_update(restart, pq2_restart);
+	ppc_md_update(progress, udbg_progress);
+
+	return 1;
 }
 
 define_machine(ep8248e)
 {
 	.name = "Embedded Planet EP8248E",
 	.probe = ep8248e_probe,
-	.setup_arch = ep8248e_setup_arch,
-	.init_IRQ = ep8248e_pic_init,
-	.get_irq = cpm2_get_irq,
-	.calibrate_decr = generic_calibrate_decr,
-	.restart = pq2_restart,
-	.progress = udbg_progress,
 };

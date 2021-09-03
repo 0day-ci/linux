@@ -136,62 +136,63 @@ machine_arch_initcall(xes_mpc8572, mpc85xx_common_publish_devices);
 machine_arch_initcall(xes_mpc8548, mpc85xx_common_publish_devices);
 machine_arch_initcall(xes_mpc8540, mpc85xx_common_publish_devices);
 
+static void __init xes_mpc85xx_populate(void)
+{
+	ppc_md_update(setup_arch, xes_mpc85xx_setup_arch);
+	ppc_md_update(init_IRQ, xes_mpc85xx_pic_init);
+#ifdef CONFIG_PCI
+	ppc_md_update(pcibios_fixup_bus, fsl_pcibios_fixup_bus);
+	ppc_md_update(pcibios_fixup_phb, fsl_pcibios_fixup_phb);
+#endif
+	ppc_md_update(get_irq, mpic_get_irq);
+	ppc_md_update(calibrate_decr, generic_calibrate_decr);
+	ppc_md_update(progress, udbg_progress);
+}
+
 /*
  * Called very early, device-tree isn't unflattened
  */
 static int __init xes_mpc8572_probe(void)
 {
-	return of_machine_is_compatible("xes,MPC8572");
+	if (!of_machine_is_compatible("xes,MPC8572"))
+		return 0;
+
+	xes_mpc85xx_populate();
+
+	return 1;
 }
 
 static int __init xes_mpc8548_probe(void)
 {
-	return of_machine_is_compatible("xes,MPC8548");
+	if (!of_machine_is_compatible("xes,MPC8548"))
+		return 0;
+
+	xes_mpc85xx_populate();
+
+	return 1;
 }
 
 static int __init xes_mpc8540_probe(void)
 {
-	return of_machine_is_compatible("xes,MPC8540");
+	if (!of_machine_is_compatible("xes,MPC8540"))
+		return 0;
+
+	xes_mpc85xx_populate();
+
+	return 1;
 }
 
 define_machine(xes_mpc8572) {
 	.name			= "X-ES MPC8572",
 	.probe			= xes_mpc8572_probe,
-	.setup_arch		= xes_mpc85xx_setup_arch,
-	.init_IRQ		= xes_mpc85xx_pic_init,
-#ifdef CONFIG_PCI
-	.pcibios_fixup_bus	= fsl_pcibios_fixup_bus,
-	.pcibios_fixup_phb      = fsl_pcibios_fixup_phb,
-#endif
-	.get_irq		= mpic_get_irq,
-	.calibrate_decr		= generic_calibrate_decr,
-	.progress		= udbg_progress,
 };
 
 define_machine(xes_mpc8548) {
 	.name			= "X-ES MPC8548",
 	.probe			= xes_mpc8548_probe,
-	.setup_arch		= xes_mpc85xx_setup_arch,
-	.init_IRQ		= xes_mpc85xx_pic_init,
-#ifdef CONFIG_PCI
-	.pcibios_fixup_bus	= fsl_pcibios_fixup_bus,
-	.pcibios_fixup_phb      = fsl_pcibios_fixup_phb,
-#endif
-	.get_irq		= mpic_get_irq,
-	.calibrate_decr		= generic_calibrate_decr,
-	.progress		= udbg_progress,
 };
 
 define_machine(xes_mpc8540) {
 	.name			= "X-ES MPC8540",
 	.probe			= xes_mpc8540_probe,
-	.setup_arch		= xes_mpc85xx_setup_arch,
-	.init_IRQ		= xes_mpc85xx_pic_init,
-#ifdef CONFIG_PCI
-	.pcibios_fixup_bus	= fsl_pcibios_fixup_bus,
-	.pcibios_fixup_phb      = fsl_pcibios_fixup_phb,
-#endif
-	.get_irq		= mpic_get_irq,
-	.calibrate_decr		= generic_calibrate_decr,
-	.progress		= udbg_progress,
 };

@@ -47,19 +47,23 @@ machine_arch_initcall(mvme2500, mpc85xx_common_publish_devices);
  */
 static int __init mvme2500_probe(void)
 {
-	return of_machine_is_compatible("artesyn,MVME2500");
+	if (!of_machine_is_compatible("artesyn,MVME2500"))
+		return 0;
+
+	ppc_md_update(setup_arch, mvme2500_setup_arch);
+	ppc_md_update(init_IRQ, mvme2500_pic_init);
+#ifdef CONFIG_PCI
+	ppc_md_update(pcibios_fixup_bus, fsl_pcibios_fixup_bus);
+	ppc_md_update(pcibios_fixup_phb, fsl_pcibios_fixup_phb);
+#endif
+	ppc_md_update(get_irq, mpic_get_irq);
+	ppc_md_update(calibrate_decr, generic_calibrate_decr);
+	ppc_md_update(progress, udbg_progress);
+
+	return 1;
 }
 
 define_machine(mvme2500) {
 	.name			= "MVME2500",
 	.probe			= mvme2500_probe,
-	.setup_arch		= mvme2500_setup_arch,
-	.init_IRQ		= mvme2500_pic_init,
-#ifdef CONFIG_PCI
-	.pcibios_fixup_bus	= fsl_pcibios_fixup_bus,
-	.pcibios_fixup_phb      = fsl_pcibios_fixup_phb,
-#endif
-	.get_irq		= mpic_get_irq,
-	.calibrate_decr		= generic_calibrate_decr,
-	.progress		= udbg_progress,
 };

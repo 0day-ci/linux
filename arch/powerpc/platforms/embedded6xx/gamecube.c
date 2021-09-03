@@ -54,6 +54,14 @@ static int __init gamecube_probe(void)
 	if (!of_machine_is_compatible("nintendo,gamecube"))
 		return 0;
 
+	ppc_md_update(restart, gamecube_restart);
+	ppc_md_update(halt, gamecube_halt);
+	ppc_md_update(init_IRQ, flipper_pic_probe);
+	ppc_md_update(get_irq, flipper_pic_get_irq);
+	ppc_md_update(calibrate_decr, generic_calibrate_decr);
+	ppc_md_update(progress, udbg_progress);
+	ppc_md_update(machine_shutdown, gamecube_shutdown);
+
 	pm_power_off = gamecube_power_off;
 
 	ug_udbg_init();
@@ -69,13 +77,6 @@ static void gamecube_shutdown(void)
 define_machine(gamecube) {
 	.name			= "gamecube",
 	.probe			= gamecube_probe,
-	.restart		= gamecube_restart,
-	.halt			= gamecube_halt,
-	.init_IRQ		= flipper_pic_probe,
-	.get_irq		= flipper_pic_get_irq,
-	.calibrate_decr		= generic_calibrate_decr,
-	.progress		= udbg_progress,
-	.machine_shutdown	= gamecube_shutdown,
 };
 
 

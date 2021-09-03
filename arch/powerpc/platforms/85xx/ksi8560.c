@@ -175,16 +175,20 @@ machine_device_initcall(ksi8560, mpc85xx_common_publish_devices);
  */
 static int __init ksi8560_probe(void)
 {
-	return of_machine_is_compatible("emerson,KSI8560");
+	if (!of_machine_is_compatible("emerson,KSI8560"))
+		return 0;
+
+	ppc_md_update(setup_arch, ksi8560_setup_arch);
+	ppc_md_update(init_IRQ, ksi8560_pic_init);
+	ppc_md_update(show_cpuinfo, ksi8560_show_cpuinfo);
+	ppc_md_update(get_irq, mpic_get_irq);
+	ppc_md_update(restart, machine_restart);
+	ppc_md_update(calibrate_decr, generic_calibrate_decr);
+
+	return 1;
 }
 
 define_machine(ksi8560) {
 	.name			= "KSI8560",
 	.probe			= ksi8560_probe,
-	.setup_arch		= ksi8560_setup_arch,
-	.init_IRQ		= ksi8560_pic_init,
-	.show_cpuinfo		= ksi8560_show_cpuinfo,
-	.get_irq		= mpic_get_irq,
-	.restart		= machine_restart,
-	.calibrate_decr		= generic_calibrate_decr,
 };

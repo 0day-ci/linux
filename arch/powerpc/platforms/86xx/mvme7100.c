@@ -77,7 +77,20 @@ static int __init mvme7100_probe(void)
 {
 	unsigned long root = of_get_flat_dt_root();
 
-	return of_flat_dt_is_compatible(root, "artesyn,MVME7100");
+	if (!of_flat_dt_is_compatible(root, "artesyn,MVME7100"))
+		return 0;
+
+	ppc_md_update(setup_arch, mvme7100_setup_arch);
+	ppc_md_update(init_IRQ, mpc86xx_init_irq);
+	ppc_md_update(get_irq, mpic_get_irq);
+	ppc_md_update(time_init, mpc86xx_time_init);
+	ppc_md_update(calibrate_decr, generic_calibrate_decr);
+	ppc_md_update(progress, udbg_progress);
+#ifdef CONFIG_PCI
+	ppc_md_update(pcibios_fixup_bus, fsl_pcibios_fixup_bus);
+#endif
+
+	return 1;
 }
 
 static void mvme7100_usb_host_fixup(struct pci_dev *pdev)
@@ -102,13 +115,4 @@ machine_arch_initcall(mvme7100, mpc86xx_common_publish_devices);
 define_machine(mvme7100) {
 	.name			= "MVME7100",
 	.probe			= mvme7100_probe,
-	.setup_arch		= mvme7100_setup_arch,
-	.init_IRQ		= mpc86xx_init_irq,
-	.get_irq		= mpic_get_irq,
-	.time_init		= mpc86xx_time_init,
-	.calibrate_decr		= generic_calibrate_decr,
-	.progress		= udbg_progress,
-#ifdef CONFIG_PCI
-	.pcibios_fixup_bus	= fsl_pcibios_fixup_bus,
-#endif
 };

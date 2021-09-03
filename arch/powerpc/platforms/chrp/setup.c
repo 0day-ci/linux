@@ -556,6 +556,19 @@ static int __init chrp_probe(void)
  	if (strcmp(dtype, "chrp"))
 		return 0;
 
+	ppc_md_update(setup_arch, chrp_setup_arch);
+	ppc_md_update(discover_phbs, chrp_find_bridges);
+	ppc_md_update(init, chrp_init2);
+	ppc_md_update(show_cpuinfo, chrp_show_cpuinfo);
+	ppc_md_update(init_IRQ, chrp_init_IRQ);
+	ppc_md_update(restart, rtas_restart);
+	ppc_md_update(halt, rtas_halt);
+	ppc_md_update(time_init, chrp_time_init);
+	ppc_md_update(set_rtc_time, chrp_set_rtc_time);
+	ppc_md_update(get_rtc_time, chrp_get_rtc_time);
+	ppc_md_update(calibrate_decr, generic_calibrate_decr);
+	ppc_md_update(phys_mem_access_prot, pci_phys_mem_access_prot);
+
 	DMA_MODE_READ = 0x44;
 	DMA_MODE_WRITE = 0x48;
 
@@ -569,16 +582,4 @@ static int __init chrp_probe(void)
 define_machine(chrp) {
 	.name			= "CHRP",
 	.probe			= chrp_probe,
-	.setup_arch		= chrp_setup_arch,
-	.discover_phbs		= chrp_find_bridges,
-	.init			= chrp_init2,
-	.show_cpuinfo		= chrp_show_cpuinfo,
-	.init_IRQ		= chrp_init_IRQ,
-	.restart		= rtas_restart,
-	.halt			= rtas_halt,
-	.time_init		= chrp_time_init,
-	.set_rtc_time		= chrp_set_rtc_time,
-	.get_rtc_time		= chrp_get_rtc_time,
-	.calibrate_decr		= generic_calibrate_decr,
-	.phys_mem_access_prot	= pci_phys_mem_access_prot,
 };

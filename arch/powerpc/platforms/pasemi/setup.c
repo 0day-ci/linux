@@ -424,6 +424,16 @@ static int __init pas_probe(void)
 	    !of_machine_is_compatible("pasemi,pwrficient"))
 		return 0;
 
+	ppc_md_update(setup_arch, pas_setup_arch);
+	ppc_md_update(discover_phbs, pas_pci_init);
+	ppc_md_update(init_IRQ, pas_init_IRQ);
+	ppc_md_update(get_irq, mpic_get_irq);
+	ppc_md_update(restart, pas_restart);
+	ppc_md_update(get_boot_time, pas_get_boot_time);
+	ppc_md_update(calibrate_decr, generic_calibrate_decr);
+	ppc_md_update(progress, pas_progress);
+	ppc_md_update(machine_check_exception , pas_machine_check_handler);
+
 #ifdef CONFIG_PPC_PASEMI_NEMO
 	/*
 	 * Check for the Nemo motherboard here, if we are running on one
@@ -443,13 +453,4 @@ static int __init pas_probe(void)
 define_machine(pasemi) {
 	.name			= "PA Semi PWRficient",
 	.probe			= pas_probe,
-	.setup_arch		= pas_setup_arch,
-	.discover_phbs		= pas_pci_init,
-	.init_IRQ		= pas_init_IRQ,
-	.get_irq		= mpic_get_irq,
-	.restart		= pas_restart,
-	.get_boot_time		= pas_get_boot_time,
-	.calibrate_decr		= generic_calibrate_decr,
-	.progress		= pas_progress,
-	.machine_check_exception = pas_machine_check_handler,
 };

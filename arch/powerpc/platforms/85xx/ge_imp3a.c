@@ -192,7 +192,21 @@ static void ge_imp3a_show_cpuinfo(struct seq_file *m)
  */
 static int __init ge_imp3a_probe(void)
 {
-	return of_machine_is_compatible("ge,IMP3A");
+	if (!of_machine_is_compatible("ge,IMP3A"))
+		return 0;
+
+	ppc_md_update(setup_arch, ge_imp3a_setup_arch);
+	ppc_md_update(init_IRQ, ge_imp3a_pic_init);
+	ppc_md_update(show_cpuinfo, ge_imp3a_show_cpuinfo);
+#ifdef CONFIG_PCI
+	ppc_md_update(pcibios_fixup_bus, fsl_pcibios_fixup_bus);
+	ppc_md_update(pcibios_fixup_phb, fsl_pcibios_fixup_phb);
+#endif
+	ppc_md_update(get_irq, mpic_get_irq);
+	ppc_md_update(calibrate_decr, generic_calibrate_decr);
+	ppc_md_update(progress, udbg_progress);
+
+	return 1;
 }
 
 machine_arch_initcall(ge_imp3a, mpc85xx_common_publish_devices);
@@ -200,14 +214,4 @@ machine_arch_initcall(ge_imp3a, mpc85xx_common_publish_devices);
 define_machine(ge_imp3a) {
 	.name			= "GE_IMP3A",
 	.probe			= ge_imp3a_probe,
-	.setup_arch		= ge_imp3a_setup_arch,
-	.init_IRQ		= ge_imp3a_pic_init,
-	.show_cpuinfo		= ge_imp3a_show_cpuinfo,
-#ifdef CONFIG_PCI
-	.pcibios_fixup_bus	= fsl_pcibios_fixup_bus,
-	.pcibios_fixup_phb      = fsl_pcibios_fixup_phb,
-#endif
-	.get_irq		= mpic_get_irq,
-	.calibrate_decr		= generic_calibrate_decr,
-	.progress		= udbg_progress,
 };

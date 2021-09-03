@@ -88,16 +88,20 @@ machine_arch_initcall(stx_gp3, mpc85xx_common_publish_devices);
  */
 static int __init stx_gp3_probe(void)
 {
-	return of_machine_is_compatible("stx,gp3-8560");
+	if (!of_machine_is_compatible("stx,gp3-8560"))
+		return 0;
+
+	ppc_md_update(setup_arch, stx_gp3_setup_arch);
+	ppc_md_update(init_IRQ, stx_gp3_pic_init);
+	ppc_md_update(show_cpuinfo, stx_gp3_show_cpuinfo);
+	ppc_md_update(get_irq, mpic_get_irq);
+	ppc_md_update(calibrate_decr, generic_calibrate_decr);
+	ppc_md_update(progress, udbg_progress);
+
+	return 1;
 }
 
 define_machine(stx_gp3) {
 	.name			= "STX GP3",
 	.probe			= stx_gp3_probe,
-	.setup_arch		= stx_gp3_setup_arch,
-	.init_IRQ		= stx_gp3_pic_init,
-	.show_cpuinfo		= stx_gp3_show_cpuinfo,
-	.get_irq		= mpic_get_irq,
-	.calibrate_decr		= generic_calibrate_decr,
-	.progress		= udbg_progress,
 };

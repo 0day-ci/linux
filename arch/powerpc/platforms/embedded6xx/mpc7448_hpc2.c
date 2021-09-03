@@ -162,6 +162,17 @@ static int __init mpc7448_hpc2_probe(void)
 {
 	if (!of_machine_is_compatible("mpc74xx"))
 		return 0;
+
+	ppc_md_update(setup_arch, mpc7448_hpc2_setup_arch);
+	ppc_md_update(discover_phbs, mpc7448_hpc2_setup_pci);
+	ppc_md_update(init_IRQ, mpc7448_hpc2_init_IRQ);
+	ppc_md_update(show_cpuinfo, mpc7448_hpc2_show_cpuinfo);
+	ppc_md_update(get_irq, mpic_get_irq);
+	ppc_md_update(restart, mpc7448_hpc2_restart);
+	ppc_md_update(calibrate_decr, generic_calibrate_decr);
+	ppc_md_update(machine_check_exception, mpc7448_machine_check_exception);
+	ppc_md_update(progress, udbg_progress);
+
 	return 1;
 }
 
@@ -182,13 +193,4 @@ static int mpc7448_machine_check_exception(struct pt_regs *regs)
 define_machine(mpc7448_hpc2){
 	.name 			= "MPC7448 HPC2",
 	.probe 			= mpc7448_hpc2_probe,
-	.setup_arch 		= mpc7448_hpc2_setup_arch,
-	.discover_phbs		= mpc7448_hpc2_setup_pci,
-	.init_IRQ 		= mpc7448_hpc2_init_IRQ,
-	.show_cpuinfo 		= mpc7448_hpc2_show_cpuinfo,
-	.get_irq 		= mpic_get_irq,
-	.restart 		= mpc7448_hpc2_restart,
-	.calibrate_decr 	= generic_calibrate_decr,
-	.machine_check_exception= mpc7448_machine_check_exception,
-	.progress 		= udbg_progress,
 };

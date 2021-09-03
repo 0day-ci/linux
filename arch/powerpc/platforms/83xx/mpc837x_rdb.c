@@ -66,18 +66,22 @@ static const char * const board[] __initconst = {
  */
 static int __init mpc837x_rdb_probe(void)
 {
-	return of_device_compatible_match(of_root, board);
+	if (!of_device_compatible_match(of_root, board))
+		return 0;
+
+	ppc_md_update(setup_arch, mpc837x_rdb_setup_arch);
+	ppc_md_update(discover_phbs, mpc83xx_setup_pci);
+	ppc_md_update(init_IRQ, mpc83xx_ipic_init_IRQ);
+	ppc_md_update(get_irq, ipic_get_irq);
+	ppc_md_update(restart, mpc83xx_restart);
+	ppc_md_update(time_init, mpc83xx_time_init);
+	ppc_md_update(calibrate_decr, generic_calibrate_decr);
+	ppc_md_update(progress, udbg_progress);
+
+	return 1;
 }
 
 define_machine(mpc837x_rdb) {
 	.name			= "MPC837x RDB/WLAN",
 	.probe			= mpc837x_rdb_probe,
-	.setup_arch		= mpc837x_rdb_setup_arch,
-	.discover_phbs  	= mpc83xx_setup_pci,
-	.init_IRQ		= mpc83xx_ipic_init_IRQ,
-	.get_irq		= ipic_get_irq,
-	.restart		= mpc83xx_restart,
-	.time_init		= mpc83xx_time_init,
-	.calibrate_decr		= generic_calibrate_decr,
-	.progress		= udbg_progress,
 };

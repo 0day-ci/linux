@@ -119,203 +119,168 @@ machine_arch_initcall(p1021_rdb_pc, mpc85xx_common_publish_devices);
 machine_arch_initcall(p1025_rdb, mpc85xx_common_publish_devices);
 machine_arch_initcall(p1024_rdb, mpc85xx_common_publish_devices);
 
+static void __init mpc85xx_rdb_populate(void)
+{
+	ppc_md_update(setup_arch, mpc85xx_rdb_setup_arch);
+	ppc_md_update(init_IRQ, mpc85xx_rdb_pic_init);
+#ifdef CONFIG_PCI
+	ppc_md_update(pcibios_fixup_bus, fsl_pcibios_fixup_bus);
+	ppc_md_update(pcibios_fixup_phb, fsl_pcibios_fixup_phb);
+#endif
+	ppc_md_update(get_irq, mpic_get_irq);
+	ppc_md_update(calibrate_decr, generic_calibrate_decr);
+	ppc_md_update(progress, udbg_progress);
+}
+
 /*
  * Called very early, device-tree isn't unflattened
  */
 static int __init p2020_rdb_probe(void)
 {
-	if (of_machine_is_compatible("fsl,P2020RDB"))
-		return 1;
-	return 0;
+	if (!of_machine_is_compatible("fsl,P2020RDB"))
+		return 0;
+
+	mpc85xx_rdb_populate();
+
+	return 1;
 }
 
 static int __init p1020_rdb_probe(void)
 {
-	if (of_machine_is_compatible("fsl,P1020RDB"))
-		return 1;
-	return 0;
+	if (!of_machine_is_compatible("fsl,P1020RDB"))
+		return 0;
+
+	mpc85xx_rdb_populate();
+
+	return 1;
 }
 
 static int __init p1020_rdb_pc_probe(void)
 {
-	return of_machine_is_compatible("fsl,P1020RDB-PC");
+	if (!of_machine_is_compatible("fsl,P1020RDB-PC"))
+		return 0;
+
+	mpc85xx_rdb_populate();
+
+	return 1;
 }
 
 static int __init p1020_rdb_pd_probe(void)
 {
-	return of_machine_is_compatible("fsl,P1020RDB-PD");
+	if (!of_machine_is_compatible("fsl,P1020RDB-PD"))
+		return 0;
+
+	mpc85xx_rdb_populate();
+
+	return 1;
 }
 
 static int __init p1021_rdb_pc_probe(void)
 {
-	if (of_machine_is_compatible("fsl,P1021RDB-PC"))
-		return 1;
-	return 0;
+	if (!of_machine_is_compatible("fsl,P1021RDB-PC"))
+		return 0;
+
+	mpc85xx_rdb_populate();
+
+	return 1;
 }
 
 static int __init p2020_rdb_pc_probe(void)
 {
-	if (of_machine_is_compatible("fsl,P2020RDB-PC"))
-		return 1;
-	return 0;
+	if (!of_machine_is_compatible("fsl,P2020RDB-PC"))
+		return 0;
+
+	mpc85xx_rdb_populate();
+
+	return 1;
 }
 
 static int __init p1025_rdb_probe(void)
 {
-	return of_machine_is_compatible("fsl,P1025RDB");
+	if (!of_machine_is_compatible("fsl,P1025RDB"))
+		return 0;
+
+	mpc85xx_rdb_populate();
+
+	return 1;
 }
 
 static int __init p1020_mbg_pc_probe(void)
 {
-	return of_machine_is_compatible("fsl,P1020MBG-PC");
+	if (!of_machine_is_compatible("fsl,P1020MBG-PC"))
+		return 0;
+
+	mpc85xx_rdb_populate();
+
+	return 1;
 }
 
 static int __init p1020_utm_pc_probe(void)
 {
-	return of_machine_is_compatible("fsl,P1020UTM-PC");
+	if (!of_machine_is_compatible("fsl,P1020UTM-PC"))
+		return 0;
+
+	mpc85xx_rdb_populate();
+
+	return 1;
 }
 
 static int __init p1024_rdb_probe(void)
 {
-	return of_machine_is_compatible("fsl,P1024RDB");
+	if (!of_machine_is_compatible("fsl,P1024RDB"))
+		return 0;
+
+	mpc85xx_rdb_populate();
+
+	return 1;
 }
 
 define_machine(p2020_rdb) {
 	.name			= "P2020 RDB",
 	.probe			= p2020_rdb_probe,
-	.setup_arch		= mpc85xx_rdb_setup_arch,
-	.init_IRQ		= mpc85xx_rdb_pic_init,
-#ifdef CONFIG_PCI
-	.pcibios_fixup_bus	= fsl_pcibios_fixup_bus,
-	.pcibios_fixup_phb      = fsl_pcibios_fixup_phb,
-#endif
-	.get_irq		= mpic_get_irq,
-	.calibrate_decr		= generic_calibrate_decr,
-	.progress		= udbg_progress,
 };
 
 define_machine(p1020_rdb) {
 	.name			= "P1020 RDB",
 	.probe			= p1020_rdb_probe,
-	.setup_arch		= mpc85xx_rdb_setup_arch,
-	.init_IRQ		= mpc85xx_rdb_pic_init,
-#ifdef CONFIG_PCI
-	.pcibios_fixup_bus	= fsl_pcibios_fixup_bus,
-	.pcibios_fixup_phb      = fsl_pcibios_fixup_phb,
-#endif
-	.get_irq		= mpic_get_irq,
-	.calibrate_decr		= generic_calibrate_decr,
-	.progress		= udbg_progress,
 };
 
 define_machine(p1021_rdb_pc) {
 	.name			= "P1021 RDB-PC",
 	.probe			= p1021_rdb_pc_probe,
-	.setup_arch		= mpc85xx_rdb_setup_arch,
-	.init_IRQ		= mpc85xx_rdb_pic_init,
-#ifdef CONFIG_PCI
-	.pcibios_fixup_bus	= fsl_pcibios_fixup_bus,
-	.pcibios_fixup_phb      = fsl_pcibios_fixup_phb,
-#endif
-	.get_irq		= mpic_get_irq,
-	.calibrate_decr		= generic_calibrate_decr,
-	.progress		= udbg_progress,
 };
 
 define_machine(p2020_rdb_pc) {
 	.name			= "P2020RDB-PC",
 	.probe			= p2020_rdb_pc_probe,
-	.setup_arch		= mpc85xx_rdb_setup_arch,
-	.init_IRQ		= mpc85xx_rdb_pic_init,
-#ifdef CONFIG_PCI
-	.pcibios_fixup_bus	= fsl_pcibios_fixup_bus,
-	.pcibios_fixup_phb      = fsl_pcibios_fixup_phb,
-#endif
-	.get_irq		= mpic_get_irq,
-	.calibrate_decr		= generic_calibrate_decr,
-	.progress		= udbg_progress,
 };
 
 define_machine(p1025_rdb) {
 	.name			= "P1025 RDB",
 	.probe			= p1025_rdb_probe,
-	.setup_arch		= mpc85xx_rdb_setup_arch,
-	.init_IRQ		= mpc85xx_rdb_pic_init,
-#ifdef CONFIG_PCI
-	.pcibios_fixup_bus	= fsl_pcibios_fixup_bus,
-	.pcibios_fixup_phb      = fsl_pcibios_fixup_phb,
-#endif
-	.get_irq		= mpic_get_irq,
-	.calibrate_decr		= generic_calibrate_decr,
-	.progress		= udbg_progress,
 };
 
 define_machine(p1020_mbg_pc) {
 	.name			= "P1020 MBG-PC",
 	.probe			= p1020_mbg_pc_probe,
-	.setup_arch		= mpc85xx_rdb_setup_arch,
-	.init_IRQ		= mpc85xx_rdb_pic_init,
-#ifdef CONFIG_PCI
-	.pcibios_fixup_bus	= fsl_pcibios_fixup_bus,
-	.pcibios_fixup_phb      = fsl_pcibios_fixup_phb,
-#endif
-	.get_irq		= mpic_get_irq,
-	.calibrate_decr		= generic_calibrate_decr,
-	.progress		= udbg_progress,
 };
 
 define_machine(p1020_utm_pc) {
 	.name			= "P1020 UTM-PC",
 	.probe			= p1020_utm_pc_probe,
-	.setup_arch		= mpc85xx_rdb_setup_arch,
-	.init_IRQ		= mpc85xx_rdb_pic_init,
-#ifdef CONFIG_PCI
-	.pcibios_fixup_bus	= fsl_pcibios_fixup_bus,
-	.pcibios_fixup_phb      = fsl_pcibios_fixup_phb,
-#endif
-	.get_irq		= mpic_get_irq,
-	.calibrate_decr		= generic_calibrate_decr,
-	.progress		= udbg_progress,
 };
 
 define_machine(p1020_rdb_pc) {
 	.name			= "P1020RDB-PC",
 	.probe			= p1020_rdb_pc_probe,
-	.setup_arch		= mpc85xx_rdb_setup_arch,
-	.init_IRQ		= mpc85xx_rdb_pic_init,
-#ifdef CONFIG_PCI
-	.pcibios_fixup_bus	= fsl_pcibios_fixup_bus,
-	.pcibios_fixup_phb      = fsl_pcibios_fixup_phb,
-#endif
-	.get_irq		= mpic_get_irq,
-	.calibrate_decr		= generic_calibrate_decr,
-	.progress		= udbg_progress,
 };
 
 define_machine(p1020_rdb_pd) {
 	.name			= "P1020RDB-PD",
 	.probe			= p1020_rdb_pd_probe,
-	.setup_arch		= mpc85xx_rdb_setup_arch,
-	.init_IRQ		= mpc85xx_rdb_pic_init,
-#ifdef CONFIG_PCI
-	.pcibios_fixup_bus	= fsl_pcibios_fixup_bus,
-	.pcibios_fixup_phb      = fsl_pcibios_fixup_phb,
-#endif
-	.get_irq		= mpic_get_irq,
-	.calibrate_decr		= generic_calibrate_decr,
-	.progress		= udbg_progress,
 };
 
 define_machine(p1024_rdb) {
 	.name			= "P1024 RDB",
 	.probe			= p1024_rdb_probe,
-	.setup_arch		= mpc85xx_rdb_setup_arch,
-	.init_IRQ		= mpc85xx_rdb_pic_init,
-#ifdef CONFIG_PCI
-	.pcibios_fixup_bus	= fsl_pcibios_fixup_bus,
-	.pcibios_fixup_phb      = fsl_pcibios_fixup_phb,
-#endif
-	.get_irq		= mpic_get_irq,
-	.calibrate_decr		= generic_calibrate_decr,
-	.progress		= udbg_progress,
 };

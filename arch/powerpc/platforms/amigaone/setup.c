@@ -141,30 +141,30 @@ void __noreturn amigaone_restart(char *cmd)
 
 static int __init amigaone_probe(void)
 {
-	if (of_machine_is_compatible("eyetech,amigaone")) {
-		/*
-		 * Coherent memory access cause complete system lockup! Thus
-		 * disable this CPU feature, even if the CPU needs it.
-		 */
-		cur_cpu_spec->cpu_features &= ~CPU_FTR_NEED_COHERENT;
+	if (!of_machine_is_compatible("eyetech,amigaone"))
+		return 0;
 
-		DMA_MODE_READ = 0x44;
-		DMA_MODE_WRITE = 0x48;
+	ppc_md_update(setup_arch, amigaone_setup_arch);
+	ppc_md_update(discover_phbs, amigaone_discover_phbs);
+	ppc_md_update(show_cpuinfo, amigaone_show_cpuinfo);
+	ppc_md_update(init_IRQ, amigaone_init_IRQ);
+	ppc_md_update(restart, amigaone_restart);
+	ppc_md_update(calibrate_decr, generic_calibrate_decr);
+	ppc_md_update(progress, udbg_progress);
 
-		return 1;
-	}
+	/*
+	 * Coherent memory access cause complete system lockup! Thus
+	 * disable this CPU feature, even if the CPU needs it.
+	 */
+	cur_cpu_spec->cpu_features &= ~CPU_FTR_NEED_COHERENT;
 
-	return 0;
+	DMA_MODE_READ = 0x44;
+	DMA_MODE_WRITE = 0x48;
+
+	return 1;
 }
 
 define_machine(amigaone) {
 	.name			= "AmigaOne",
 	.probe			= amigaone_probe,
-	.setup_arch		= amigaone_setup_arch,
-	.discover_phbs		= amigaone_discover_phbs,
-	.show_cpuinfo		= amigaone_show_cpuinfo,
-	.init_IRQ		= amigaone_init_IRQ,
-	.restart		= amigaone_restart,
-	.calibrate_decr		= generic_calibrate_decr,
-	.progress		= udbg_progress,
 };

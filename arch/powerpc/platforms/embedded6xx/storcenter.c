@@ -113,16 +113,20 @@ static void __noreturn storcenter_restart(char *cmd)
 
 static int __init storcenter_probe(void)
 {
-	return of_machine_is_compatible("iomega,storcenter");
+	if (!of_machine_is_compatible("iomega,storcenter"))
+		return 0;
+
+	ppc_md_update(setup_arch, storcenter_setup_arch);
+	ppc_md_update(discover_phbs, storcenter_setup_pci);
+	ppc_md_update(init_IRQ, storcenter_init_IRQ);
+	ppc_md_update(get_irq, mpic_get_irq);
+	ppc_md_update(restart, storcenter_restart);
+	ppc_md_update(calibrate_decr, generic_calibrate_decr);
+
+	return 1;
 }
 
 define_machine(storcenter){
 	.name 			= "IOMEGA StorCenter",
 	.probe 			= storcenter_probe,
-	.setup_arch 		= storcenter_setup_arch,
-	.discover_phbs 		= storcenter_setup_pci,
-	.init_IRQ 		= storcenter_init_IRQ,
-	.get_irq 		= mpic_get_irq,
-	.restart 		= storcenter_restart,
-	.calibrate_decr 	= generic_calibrate_decr,
 };

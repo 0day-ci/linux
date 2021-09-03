@@ -1040,6 +1040,31 @@ static int __init pSeries_probe(void)
 	    of_machine_is_compatible("IBM,CBEA"))
 		return 0;
 
+	ppc_md_update(setup_arch, pSeries_setup_arch);
+	ppc_md_update(init_IRQ, pseries_init_irq);
+	ppc_md_update(show_cpuinfo, pSeries_show_cpuinfo);
+	ppc_md_update(log_error, pSeries_log_error);
+	ppc_md_update(discover_phbs, pSeries_discover_phbs);
+	ppc_md_update(pcibios_fixup, pSeries_final_fixup);
+	ppc_md_update(restart, rtas_restart);
+	ppc_md_update(halt, rtas_halt);
+	ppc_md_update(panic, pseries_panic);
+	ppc_md_update(get_boot_time, rtas_get_boot_time);
+	ppc_md_update(get_rtc_time, rtas_get_rtc_time);
+	ppc_md_update(set_rtc_time, rtas_set_rtc_time);
+	ppc_md_update(calibrate_decr, generic_calibrate_decr);
+	ppc_md_update(progress, rtas_progress);
+	ppc_md_update(system_reset_exception , pSeries_system_reset_exception);
+	ppc_md_update(machine_check_early, pseries_machine_check_realmode);
+	ppc_md_update(machine_check_exception , pSeries_machine_check_exception);
+#ifdef CONFIG_KEXEC_CORE
+	ppc_md_update(machine_kexec, pSeries_machine_kexec);
+	ppc_md_update(kexec_cpu_down, pseries_kexec_cpu_down);
+#endif
+#ifdef CONFIG_MEMORY_HOTPLUG_SPARSE
+	ppc_md_update(memory_block_size, pseries_memory_block_size);
+#endif
+
 	pm_power_off = pseries_power_off;
 
 	pr_debug("Machine is%s LPAR !\n",
@@ -1064,28 +1089,4 @@ struct pci_controller_ops pseries_pci_controller_ops = {
 define_machine(pseries) {
 	.name			= "pSeries",
 	.probe			= pSeries_probe,
-	.setup_arch		= pSeries_setup_arch,
-	.init_IRQ		= pseries_init_irq,
-	.show_cpuinfo		= pSeries_show_cpuinfo,
-	.log_error		= pSeries_log_error,
-	.discover_phbs		= pSeries_discover_phbs,
-	.pcibios_fixup		= pSeries_final_fixup,
-	.restart		= rtas_restart,
-	.halt			= rtas_halt,
-	.panic			= pseries_panic,
-	.get_boot_time		= rtas_get_boot_time,
-	.get_rtc_time		= rtas_get_rtc_time,
-	.set_rtc_time		= rtas_set_rtc_time,
-	.calibrate_decr		= generic_calibrate_decr,
-	.progress		= rtas_progress,
-	.system_reset_exception = pSeries_system_reset_exception,
-	.machine_check_early	= pseries_machine_check_realmode,
-	.machine_check_exception = pSeries_machine_check_exception,
-#ifdef CONFIG_KEXEC_CORE
-	.machine_kexec          = pSeries_machine_kexec,
-	.kexec_cpu_down         = pseries_kexec_cpu_down,
-#endif
-#ifdef CONFIG_MEMORY_HOTPLUG_SPARSE
-	.memory_block_size	= pseries_memory_block_size,
-#endif
 };

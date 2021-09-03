@@ -341,58 +341,69 @@ static void __init mpc85xx_mds_pic_init(void)
 
 static int __init mpc85xx_mds_probe(void)
 {
-	return of_machine_is_compatible("MPC85xxMDS");
+	if (!of_machine_is_compatible("MPC85xxMDS"))
+		return 0;
+
+	ppc_md_update(setup_arch, mpc85xx_mds_setup_arch);
+	ppc_md_update(init_IRQ, mpc85xx_mds_pic_init);
+	ppc_md_update(get_irq, mpic_get_irq);
+	ppc_md_update(calibrate_decr, generic_calibrate_decr);
+	ppc_md_update(progress, udbg_progress);
+	#ifdef CONFIG_PCI
+	ppc_md_update(pcibios_fixup_bus, fsl_pcibios_fixup_bus);
+	ppc_md_update(pcibios_fixup_phb, fsl_pcibios_fixup_phb);
+	#endif
+
+	return 1;
 }
 
 define_machine(mpc8568_mds) {
 	.name		= "MPC8568 MDS",
 	.probe		= mpc85xx_mds_probe,
-	.setup_arch	= mpc85xx_mds_setup_arch,
-	.init_IRQ	= mpc85xx_mds_pic_init,
-	.get_irq	= mpic_get_irq,
-	.calibrate_decr	= generic_calibrate_decr,
-	.progress	= udbg_progress,
-#ifdef CONFIG_PCI
-	.pcibios_fixup_bus	= fsl_pcibios_fixup_bus,
-	.pcibios_fixup_phb      = fsl_pcibios_fixup_phb,
-#endif
 };
 
 static int __init mpc8569_mds_probe(void)
 {
-	return of_machine_is_compatible("fsl,MPC8569EMDS");
+	if (!of_machine_is_compatible("fsl,MPC8569EMDS"))
+		return 0;
+
+	ppc_md_update(setup_arch, mpc85xx_mds_setup_arch);
+	ppc_md_update(init_IRQ, mpc85xx_mds_pic_init);
+	ppc_md_update(get_irq, mpic_get_irq);
+	ppc_md_update(calibrate_decr, generic_calibrate_decr);
+	ppc_md_update(progress, udbg_progress);
+#ifdef CONFIG_PCI
+	ppc_md_update(pcibios_fixup_bus, fsl_pcibios_fixup_bus);
+	ppc_md_update(pcibios_fixup_phb, fsl_pcibios_fixup_phb);
+#endif
+
+	return 1;
 }
 
 define_machine(mpc8569_mds) {
 	.name		= "MPC8569 MDS",
 	.probe		= mpc8569_mds_probe,
-	.setup_arch	= mpc85xx_mds_setup_arch,
-	.init_IRQ	= mpc85xx_mds_pic_init,
-	.get_irq	= mpic_get_irq,
-	.calibrate_decr	= generic_calibrate_decr,
-	.progress	= udbg_progress,
-#ifdef CONFIG_PCI
-	.pcibios_fixup_bus	= fsl_pcibios_fixup_bus,
-	.pcibios_fixup_phb      = fsl_pcibios_fixup_phb,
-#endif
 };
 
 static int __init p1021_mds_probe(void)
 {
-	return of_machine_is_compatible("fsl,P1021MDS");
+	if (!of_machine_is_compatible("fsl,P1021MDS"))
+		return 0;
 
+	ppc_md_update(setup_arch, mpc85xx_mds_setup_arch);
+	ppc_md_update(init_IRQ, mpc85xx_mds_pic_init);
+	ppc_md_update(get_irq, mpic_get_irq);
+	ppc_md_update(calibrate_decr, generic_calibrate_decr);
+	ppc_md_update(progress, udbg_progress);
+#ifdef CONFIG_PCI
+	ppc_md_update(pcibios_fixup_bus, fsl_pcibios_fixup_bus);
+	ppc_md_update(pcibios_fixup_phb, fsl_pcibios_fixup_phb);
+#endif
+
+	return 1;
 }
 
 define_machine(p1021_mds) {
 	.name		= "P1021 MDS",
 	.probe		= p1021_mds_probe,
-	.setup_arch	= mpc85xx_mds_setup_arch,
-	.init_IRQ	= mpc85xx_mds_pic_init,
-	.get_irq	= mpic_get_irq,
-	.calibrate_decr	= generic_calibrate_decr,
-	.progress	= udbg_progress,
-#ifdef CONFIG_PCI
-	.pcibios_fixup_bus	= fsl_pcibios_fixup_bus,
-	.pcibios_fixup_phb      = fsl_pcibios_fixup_phb,
-#endif
 };

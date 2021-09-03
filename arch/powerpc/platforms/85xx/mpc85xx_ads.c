@@ -155,16 +155,20 @@ machine_arch_initcall(mpc85xx_ads, mpc85xx_common_publish_devices);
  */
 static int __init mpc85xx_ads_probe(void)
 {
-	return of_machine_is_compatible("MPC85xxADS");
+	if (!of_machine_is_compatible("MPC85xxADS"))
+		return 0;
+
+	ppc_md_update(setup_arch, mpc85xx_ads_setup_arch);
+	ppc_md_update(init_IRQ, mpc85xx_ads_pic_init);
+	ppc_md_update(show_cpuinfo, mpc85xx_ads_show_cpuinfo);
+	ppc_md_update(get_irq, mpic_get_irq);
+	ppc_md_update(calibrate_decr, generic_calibrate_decr);
+	ppc_md_update(progress, udbg_progress);
+
+	return 1;
 }
 
 define_machine(mpc85xx_ads) {
 	.name			= "MPC85xx ADS",
 	.probe			= mpc85xx_ads_probe,
-	.setup_arch		= mpc85xx_ads_setup_arch,
-	.init_IRQ		= mpc85xx_ads_pic_init,
-	.show_cpuinfo		= mpc85xx_ads_show_cpuinfo,
-	.get_irq		= mpic_get_irq,
-	.calibrate_decr		= generic_calibrate_decr,
-	.progress		= udbg_progress,
 };

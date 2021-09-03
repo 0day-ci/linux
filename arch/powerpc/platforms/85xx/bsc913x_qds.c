@@ -55,18 +55,22 @@ machine_arch_initcall(bsc9132_qds, mpc85xx_common_publish_devices);
 
 static int __init bsc9132_qds_probe(void)
 {
-	return of_machine_is_compatible("fsl,bsc9132qds");
+	if (!of_machine_is_compatible("fsl,bsc9132qds"))
+		return 0;
+
+	ppc_md_update(setup_arch, bsc913x_qds_setup_arch);
+	ppc_md_update(init_IRQ, bsc913x_qds_pic_init);
+#ifdef CONFIG_PCI
+	ppc_md_update(pcibios_fixup_bus, fsl_pcibios_fixup_bus);
+#endif
+	ppc_md_update(get_irq, mpic_get_irq);
+	ppc_md_update(calibrate_decr, generic_calibrate_decr);
+	ppc_md_update(progress, udbg_progress);
+
+	return 1;
 }
 
 define_machine(bsc9132_qds) {
 	.name			= "BSC9132 QDS",
 	.probe			= bsc9132_qds_probe,
-	.setup_arch		= bsc913x_qds_setup_arch,
-	.init_IRQ		= bsc913x_qds_pic_init,
-#ifdef CONFIG_PCI
-	.pcibios_fixup_bus	= fsl_pcibios_fixup_bus,
-#endif
-	.get_irq		= mpic_get_irq,
-	.calibrate_decr		= generic_calibrate_decr,
-	.progress		= udbg_progress,
 };

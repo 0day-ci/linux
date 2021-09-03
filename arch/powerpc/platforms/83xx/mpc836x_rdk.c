@@ -34,18 +34,22 @@ static void __init mpc836x_rdk_setup_arch(void)
  */
 static int __init mpc836x_rdk_probe(void)
 {
-	return of_machine_is_compatible("fsl,mpc8360rdk");
+	if (!of_machine_is_compatible("fsl,mpc8360rdk"))
+		return 0;
+
+	ppc_md_update(setup_arch, mpc836x_rdk_setup_arch);
+	ppc_md_update(discover_phbs, mpc83xx_setup_pci);
+	ppc_md_update(init_IRQ, mpc83xx_ipic_init_IRQ);
+	ppc_md_update(get_irq, ipic_get_irq);
+	ppc_md_update(restart, mpc83xx_restart);
+	ppc_md_update(time_init, mpc83xx_time_init);
+	ppc_md_update(calibrate_decr, generic_calibrate_decr);
+	ppc_md_update(progress, udbg_progress);
+
+	return 1;
 }
 
 define_machine(mpc836x_rdk) {
 	.name		= "MPC836x RDK",
 	.probe		= mpc836x_rdk_probe,
-	.setup_arch	= mpc836x_rdk_setup_arch,
-	.discover_phbs  = mpc83xx_setup_pci,
-	.init_IRQ	= mpc83xx_ipic_init_IRQ,
-	.get_irq	= ipic_get_irq,
-	.restart	= mpc83xx_restart,
-	.time_init	= mpc83xx_time_init,
-	.calibrate_decr	= generic_calibrate_decr,
-	.progress	= udbg_progress,
 };

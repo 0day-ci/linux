@@ -245,6 +245,12 @@ static int __init fsp2_probe(void)
 	if (!of_flat_dt_is_compatible(root, "ibm,fsp2"))
 		return 0;
 
+	ppc_md_update(progress, udbg_progress);
+	ppc_md_update(init_IRQ, fsp2_irq_init);
+	ppc_md_update(get_irq, uic_get_irq);
+	ppc_md_update(restart, ppc4xx_reset_system);
+	ppc_md_update(calibrate_decr, generic_calibrate_decr);
+
 	/* Clear BC_ERR and mask snoopable request plb errors. */
 	val = mfdcr(DCRN_PLB6_CR0);
 	val |= 0x20000000;
@@ -307,9 +313,4 @@ static void __init fsp2_irq_init(void)
 define_machine(fsp2) {
 	.name			= "FSP-2",
 	.probe			= fsp2_probe,
-	.progress		= udbg_progress,
-	.init_IRQ		= fsp2_irq_init,
-	.get_irq		= uic_get_irq,
-	.restart		= ppc4xx_reset_system,
-	.calibrate_decr		= generic_calibrate_decr,
 };

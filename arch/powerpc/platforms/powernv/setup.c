@@ -471,10 +471,56 @@ static void __init pnv_setup_machdep_opal(void)
 	ppc_md_update(handle_hmi_exception, opal_handle_hmi_exception);
 }
 
+/*
+ * Returns the cpu frequency for 'cpu' in Hz. This is used by
+ * /proc/cpuinfo
+ */
+static unsigned long pnv_get_proc_freq(unsigned int cpu)
+{
+	unsigned long ret_freq;
+
+	ret_freq = cpufreq_get(cpu) * 1000ul;
+
+	/*
+	 * If the backend cpufreq driver does not exist,
+         * then fallback to old way of reporting the clockrate.
+	 */
+	if (!ret_freq)
+		ret_freq = ppc_proc_freq;
+	return ret_freq;
+}
+
+static long pnv_machine_check_early(struct pt_regs *regs)
+{
+	long handled = 0;
+
+	if (cur_cpu_spec && cur_cpu_spec->machine_check_early)
+		handled = cur_cpu_spec->machine_check_early(regs);
+
+	return handled;
+}
+
 static int __init pnv_probe(void)
 {
 	if (!of_machine_is_compatible("ibm,powernv"))
 		return 0;
+
+	ppc_md_update(setup_arch, pnv_setup_arch);
+	ppc_md_update(init_IRQ, pnv_init_IRQ);
+	ppc_md_update(show_cpuinfo, pnv_show_cpuinfo);
+	ppc_md_update(get_proc_freq, pnv_get_proc_freq);
+	ppc_md_update(discover_phbs, pnv_pci_init);
+	ppc_md_update(progress, pnv_progress);
+	ppc_md_update(machine_shutdown, pnv_shutdown);
+	ppc_md_update(power_save, NULL);
+	ppc_md_update(calibrate_decr, generic_calibrate_decr);
+	ppc_md_update(machine_check_early, pnv_machine_check_early);
+#ifdef CONFIG_KEXEC_CORE
+	ppc_md_update(kexec_cpu_down, pnv_kexec_cpu_down);
+#endif
+#ifdef CONFIG_MEMORY_HOTPLUG_SPARSE
+	ppc_md_update(memory_block_size, pnv_memory_block_size);
+#endif
 
 	if (firmware_has_feature(FW_FEATURE_OPAL))
 		pnv_setup_machdep_opal();
@@ -508,52 +554,7 @@ void __init pnv_tm_init(void)
 }
 #endif /* CONFIG_PPC_TRANSACTIONAL_MEM */
 
-/*
- * Returns the cpu frequency for 'cpu' in Hz. This is used by
- * /proc/cpuinfo
- */
-static unsigned long pnv_get_proc_freq(unsigned int cpu)
-{
-	unsigned long ret_freq;
-
-	ret_freq = cpufreq_get(cpu) * 1000ul;
-
-	/*
-	 * If the backend cpufreq driver does not exist,
-         * then fallback to old way of reporting the clockrate.
-	 */
-	if (!ret_freq)
-		ret_freq = ppc_proc_freq;
-	return ret_freq;
-}
-
-static long pnv_machine_check_early(struct pt_regs *regs)
-{
-	long handled = 0;
-
-	if (cur_cpu_spec && cur_cpu_spec->machine_check_early)
-		handled = cur_cpu_spec->machine_check_early(regs);
-
-	return handled;
-}
-
 define_machine(powernv) {
 	.name			= "PowerNV",
 	.probe			= pnv_probe,
-	.setup_arch		= pnv_setup_arch,
-	.init_IRQ		= pnv_init_IRQ,
-	.show_cpuinfo		= pnv_show_cpuinfo,
-	.get_proc_freq          = pnv_get_proc_freq,
-	.discover_phbs		= pnv_pci_init,
-	.progress		= pnv_progress,
-	.machine_shutdown	= pnv_shutdown,
-	.power_save             = NULL,
-	.calibrate_decr		= generic_calibrate_decr,
-	.machine_check_early	= pnv_machine_check_early,
-#ifdef CONFIG_KEXEC_CORE
-	.kexec_cpu_down		= pnv_kexec_cpu_down,
-#endif
-#ifdef CONFIG_MEMORY_HOTPLUG_SPARSE
-	.memory_block_size	= pnv_memory_block_size,
-#endif
 };

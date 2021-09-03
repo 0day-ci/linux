@@ -45,6 +45,12 @@ static int __init sam440ep_probe(void)
 	if (!of_machine_is_compatible("acube,sam440ep"))
 		return 0;
 
+	ppc_md_update(progress, udbg_progress);
+	ppc_md_update(init_IRQ, uic_init_tree);
+	ppc_md_update(get_irq, uic_get_irq);
+	ppc_md_update(restart, ppc4xx_reset_system);
+	ppc_md_update(calibrate_decr, generic_calibrate_decr);
+
 	pci_set_flags(PCI_REASSIGN_ALL_RSRC);
 
 	return 1;
@@ -53,11 +59,6 @@ static int __init sam440ep_probe(void)
 define_machine(sam440ep) {
 	.name 			= "Sam440ep",
 	.probe 			= sam440ep_probe,
-	.progress 		= udbg_progress,
-	.init_IRQ 		= uic_init_tree,
-	.get_irq 		= uic_get_irq,
-	.restart		= ppc4xx_reset_system,
-	.calibrate_decr 	= generic_calibrate_decr,
 };
 
 static struct i2c_board_info sam440ep_rtc_info = {

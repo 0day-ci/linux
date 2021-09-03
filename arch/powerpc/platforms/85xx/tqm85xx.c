@@ -117,16 +117,20 @@ static const char * const board[] __initconst = {
  */
 static int __init tqm85xx_probe(void)
 {
-	return of_device_compatible_match(of_root, board);
+	if (!of_device_compatible_match(of_root, board))
+		return 0;
+
+	ppc_md_update(setup_arch, tqm85xx_setup_arch);
+	ppc_md_update(init_IRQ, tqm85xx_pic_init);
+	ppc_md_update(show_cpuinfo, tqm85xx_show_cpuinfo);
+	ppc_md_update(get_irq, mpic_get_irq);
+	ppc_md_update(calibrate_decr, generic_calibrate_decr);
+	ppc_md_update(progress, udbg_progress);
+
+	return 1;
 }
 
 define_machine(tqm85xx) {
 	.name			= "TQM85xx",
 	.probe			= tqm85xx_probe,
-	.setup_arch		= tqm85xx_setup_arch,
-	.init_IRQ		= tqm85xx_pic_init,
-	.show_cpuinfo		= tqm85xx_show_cpuinfo,
-	.get_irq		= mpic_get_irq,
-	.calibrate_decr		= generic_calibrate_decr,
-	.progress		= udbg_progress,
 };

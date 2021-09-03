@@ -260,21 +260,6 @@ void __init ps3_early_mm_init(void)
 	ps3_hpte_init(htab_size);
 }
 
-static int __init ps3_probe(void)
-{
-	DBG(" -> %s:%d\n", __func__, __LINE__);
-
-	if (!of_machine_is_compatible("sony,ps3"))
-		return 0;
-
-	ps3_os_area_save_params();
-
-	pm_power_off = ps3_power_off;
-
-	DBG(" <- %s:%d\n", __func__, __LINE__);
-	return 1;
-}
-
 #if defined(CONFIG_KEXEC_CORE)
 static void ps3_kexec_cpu_down(int crash_shutdown, int secondary)
 {
@@ -289,19 +274,35 @@ static void ps3_kexec_cpu_down(int crash_shutdown, int secondary)
 }
 #endif
 
+static int __init ps3_probe(void)
+{
+	DBG(" -> %s:%d\n", __func__, __LINE__);
+
+	if (!of_machine_is_compatible("sony,ps3"))
+		return 0;
+
+	ppc_md_update(setup_arch, ps3_setup_arch);
+	ppc_md_update(init_IRQ, ps3_init_IRQ);
+	ppc_md_update(panic, ps3_panic);
+	ppc_md_update(get_boot_time, ps3_get_boot_time);
+	ppc_md_update(set_dabr, ps3_set_dabr);
+	ppc_md_update(calibrate_decr, ps3_calibrate_decr);
+	ppc_md_update(progress, ps3_progress);
+	ppc_md_update(restart, ps3_restart);
+	ppc_md_update(halt, ps3_halt);
+#if defined(CONFIG_KEXEC_CORE)
+	ppc_md_update(kexec_cpu_down, ps3_kexec_cpu_down);
+#endif
+
+	ps3_os_area_save_params();
+
+	pm_power_off = ps3_power_off;
+
+	DBG(" <- %s:%d\n", __func__, __LINE__);
+	return 1;
+}
+
 define_machine(ps3) {
 	.name				= "PS3",
 	.probe				= ps3_probe,
-	.setup_arch			= ps3_setup_arch,
-	.init_IRQ			= ps3_init_IRQ,
-	.panic				= ps3_panic,
-	.get_boot_time			= ps3_get_boot_time,
-	.set_dabr			= ps3_set_dabr,
-	.calibrate_decr			= ps3_calibrate_decr,
-	.progress			= ps3_progress,
-	.restart			= ps3_restart,
-	.halt				= ps3_halt,
-#if defined(CONFIG_KEXEC_CORE)
-	.kexec_cpu_down			= ps3_kexec_cpu_down,
-#endif
 };

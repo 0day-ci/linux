@@ -580,6 +580,30 @@ static int __init pmac_probe(void)
 	    !of_machine_is_compatible("MacRISC"))
 		return 0;
 
+	ppc_md_update(setup_arch, pmac_setup_arch);
+	ppc_md_update(discover_phbs, pmac_pci_init);
+	ppc_md_update(show_cpuinfo, pmac_show_cpuinfo);
+	ppc_md_update(init_IRQ, pmac_pic_init);
+	ppc_md_update(get_irq, NULL);/* changed later */
+	ppc_md_update(pci_irq_fixup, pmac_pci_irq_fixup);
+	ppc_md_update(restart, pmac_restart);
+	ppc_md_update(halt, pmac_halt);
+	ppc_md_update(time_init, pmac_time_init);
+	ppc_md_update(get_boot_time, pmac_get_boot_time);
+	ppc_md_update(set_rtc_time, pmac_set_rtc_time);
+	ppc_md_update(get_rtc_time, pmac_get_rtc_time);
+	ppc_md_update(calibrate_decr, pmac_calibrate_decr);
+	ppc_md_update(feature_call, pmac_do_feature_call);
+	ppc_md_update(progress, udbg_progress);
+#ifdef CONFIG_PPC64
+	ppc_md_update(power_save, power4_idle);
+	ppc_md_update(enable_pmcs, power4_enable_pmcs);
+#endif /* CONFIG_PPC64 */
+#ifdef CONFIG_PPC32
+	ppc_md_update(pcibios_after_init, pmac_pcibios_after_init);
+	ppc_md_update(phys_mem_access_prot, pci_phys_mem_access_prot);
+#endif
+
 #ifdef CONFIG_PPC32
 	/* isa_io_base gets set in pmac_pci_init */
 	DMA_MODE_READ = 1;
@@ -596,27 +620,4 @@ static int __init pmac_probe(void)
 define_machine(powermac) {
 	.name			= "PowerMac",
 	.probe			= pmac_probe,
-	.setup_arch		= pmac_setup_arch,
-	.discover_phbs		= pmac_pci_init,
-	.show_cpuinfo		= pmac_show_cpuinfo,
-	.init_IRQ		= pmac_pic_init,
-	.get_irq		= NULL,	/* changed later */
-	.pci_irq_fixup		= pmac_pci_irq_fixup,
-	.restart		= pmac_restart,
-	.halt			= pmac_halt,
-	.time_init		= pmac_time_init,
-	.get_boot_time		= pmac_get_boot_time,
-	.set_rtc_time		= pmac_set_rtc_time,
-	.get_rtc_time		= pmac_get_rtc_time,
-	.calibrate_decr		= pmac_calibrate_decr,
-	.feature_call		= pmac_do_feature_call,
-	.progress		= udbg_progress,
-#ifdef CONFIG_PPC64
-	.power_save		= power4_idle,
-	.enable_pmcs		= power4_enable_pmcs,
-#endif /* CONFIG_PPC64 */
-#ifdef CONFIG_PPC32
-	.pcibios_after_init	= pmac_pcibios_after_init,
-	.phys_mem_access_prot	= pci_phys_mem_access_prot,
-#endif
 };

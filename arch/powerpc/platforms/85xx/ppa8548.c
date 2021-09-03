@@ -76,16 +76,20 @@ machine_device_initcall(ppa8548, declare_of_platform_devices);
  */
 static int __init ppa8548_probe(void)
 {
-	return of_machine_is_compatible("ppa8548");
+	if (!of_machine_is_compatible("ppa8548"))
+		return 0;
+
+	ppc_md_update(setup_arch, ppa8548_setup_arch);
+	ppc_md_update(init_IRQ, ppa8548_pic_init);
+	ppc_md_update(show_cpuinfo, ppa8548_show_cpuinfo);
+	ppc_md_update(get_irq, mpic_get_irq);
+	ppc_md_update(calibrate_decr, generic_calibrate_decr);
+	ppc_md_update(progress, udbg_progress);
+
+	return 1;
 }
 
 define_machine(ppa8548) {
 	.name		= "ppa8548",
 	.probe		= ppa8548_probe,
-	.setup_arch	= ppa8548_setup_arch,
-	.init_IRQ	= ppa8548_pic_init,
-	.show_cpuinfo	= ppa8548_show_cpuinfo,
-	.get_irq	= mpic_get_irq,
-	.calibrate_decr = generic_calibrate_decr,
-	.progress	= udbg_progress,
 };

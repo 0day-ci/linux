@@ -119,7 +119,19 @@ static void __init tqm8xx_setup_arch(void)
 
 static int __init tqm8xx_probe(void)
 {
-	return of_machine_is_compatible("tqc,tqm8xx");
+	if (!of_machine_is_compatible("tqc,tqm8xx"))
+		return 0;
+
+	ppc_md_update(setup_arch, tqm8xx_setup_arch);
+	ppc_md_update(init_IRQ, mpc8xx_pics_init);
+	ppc_md_update(get_irq, mpc8xx_get_irq);
+	ppc_md_update(restart, mpc8xx_restart);
+	ppc_md_update(calibrate_decr, mpc8xx_calibrate_decr);
+	ppc_md_update(set_rtc_time, mpc8xx_set_rtc_time);
+	ppc_md_update(get_rtc_time, mpc8xx_get_rtc_time);
+	ppc_md_update(progress, udbg_progress);
+
+	return 1;
 }
 
 static const struct of_device_id of_bus_ids[] __initconst = {
@@ -141,12 +153,4 @@ machine_device_initcall(tqm8xx, declare_of_platform_devices);
 define_machine(tqm8xx) {
 	.name			= "TQM8xx",
 	.probe			= tqm8xx_probe,
-	.setup_arch		= tqm8xx_setup_arch,
-	.init_IRQ		= mpc8xx_pics_init,
-	.get_irq		= mpc8xx_get_irq,
-	.restart		= mpc8xx_restart,
-	.calibrate_decr		= mpc8xx_calibrate_decr,
-	.set_rtc_time		= mpc8xx_set_rtc_time,
-	.get_rtc_time		= mpc8xx_get_rtc_time,
-	.progress		= udbg_progress,
 };

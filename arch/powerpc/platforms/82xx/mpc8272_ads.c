@@ -194,18 +194,22 @@ machine_device_initcall(mpc8272_ads, declare_of_platform_devices);
  */
 static int __init mpc8272_ads_probe(void)
 {
-	return of_machine_is_compatible("fsl,mpc8272ads");
+	if (!of_machine_is_compatible("fsl,mpc8272ads"))
+		return 0;
+
+	ppc_md_update(setup_arch, mpc8272_ads_setup_arch);
+	ppc_md_update(discover_phbs, pq2_init_pci);
+	ppc_md_update(init_IRQ, mpc8272_ads_pic_init);
+	ppc_md_update(get_irq, cpm2_get_irq);
+	ppc_md_update(calibrate_decr, generic_calibrate_decr);
+	ppc_md_update(restart, pq2_restart);
+	ppc_md_update(progress, udbg_progress);
+
+	return 1;
 }
 
 define_machine(mpc8272_ads)
 {
 	.name = "Freescale MPC8272 ADS",
 	.probe = mpc8272_ads_probe,
-	.setup_arch = mpc8272_ads_setup_arch,
-	.discover_phbs = pq2_init_pci,
-	.init_IRQ = mpc8272_ads_pic_init,
-	.get_irq = cpm2_get_irq,
-	.calibrate_decr = generic_calibrate_decr,
-	.restart = pq2_restart,
-	.progress = udbg_progress,
 };

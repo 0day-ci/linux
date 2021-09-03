@@ -118,7 +118,19 @@ static void __init mpc86xads_setup_arch(void)
 
 static int __init mpc86xads_probe(void)
 {
-	return of_machine_is_compatible("fsl,mpc866ads");
+	if (!of_machine_is_compatible("fsl,mpc866ads"))
+		return 0;
+
+	ppc_md_update(setup_arch, mpc86xads_setup_arch);
+	ppc_md_update(init_IRQ, mpc8xx_pics_init);
+	ppc_md_update(get_irq, mpc8xx_get_irq);
+	ppc_md_update(restart, mpc8xx_restart);
+	ppc_md_update(calibrate_decr, mpc8xx_calibrate_decr);
+	ppc_md_update(set_rtc_time, mpc8xx_set_rtc_time);
+	ppc_md_update(get_rtc_time, mpc8xx_get_rtc_time);
+	ppc_md_update(progress, udbg_progress);
+
+	return 1;
 }
 
 static const struct of_device_id of_bus_ids[] __initconst = {
@@ -139,12 +151,4 @@ machine_device_initcall(mpc86x_ads, declare_of_platform_devices);
 define_machine(mpc86x_ads) {
 	.name			= "MPC86x ADS",
 	.probe			= mpc86xads_probe,
-	.setup_arch		= mpc86xads_setup_arch,
-	.init_IRQ		= mpc8xx_pics_init,
-	.get_irq		= mpc8xx_get_irq,
-	.restart		= mpc8xx_restart,
-	.calibrate_decr		= mpc8xx_calibrate_decr,
-	.set_rtc_time		= mpc8xx_set_rtc_time,
-	.get_rtc_time		= mpc8xx_get_rtc_time,
-	.progress		= udbg_progress,
 };

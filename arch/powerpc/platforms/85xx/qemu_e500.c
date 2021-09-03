@@ -50,7 +50,20 @@ static void __init qemu_e500_setup_arch(void)
  */
 static int __init qemu_e500_probe(void)
 {
-	return !!of_machine_is_compatible("fsl,qemu-e500");
+	if (!of_machine_is_compatible("fsl,qemu-e500"))
+		return 0;
+
+	ppc_md_update(setup_arch, qemu_e500_setup_arch);
+	ppc_md_update(init_IRQ, qemu_e500_pic_init);
+#ifdef CONFIG_PCI
+	ppc_md_update(pcibios_fixup_bus, fsl_pcibios_fixup_bus);
+	ppc_md_update(pcibios_fixup_phb, fsl_pcibios_fixup_phb);
+#endif
+	ppc_md_update(get_irq, mpic_get_coreint_irq);
+	ppc_md_update(calibrate_decr, generic_calibrate_decr);
+	ppc_md_update(progress, udbg_progress);
+
+	return 1;
 }
 
 machine_arch_initcall(qemu_e500, mpc85xx_common_publish_devices);
@@ -58,13 +71,4 @@ machine_arch_initcall(qemu_e500, mpc85xx_common_publish_devices);
 define_machine(qemu_e500) {
 	.name			= "QEMU e500",
 	.probe			= qemu_e500_probe,
-	.setup_arch		= qemu_e500_setup_arch,
-	.init_IRQ		= qemu_e500_pic_init,
-#ifdef CONFIG_PCI
-	.pcibios_fixup_bus	= fsl_pcibios_fixup_bus,
-	.pcibios_fixup_phb      = fsl_pcibios_fixup_phb,
-#endif
-	.get_irq		= mpic_get_coreint_irq,
-	.calibrate_decr		= generic_calibrate_decr,
-	.progress		= udbg_progress,
 };
