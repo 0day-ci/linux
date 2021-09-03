@@ -557,3 +557,66 @@ static ssize_t blkdev_add_or_del(struct device *const dev,
 	 */
 	return blkdev_skip_space(endp) - buf;
 }
+
+
+/*
+ *
+ *	blink_time & interval device attributes
+ *
+ */
+
+static ssize_t blkdev_time_show(struct device *const dev,
+				      struct device_attribute *const attr,
+				      char *const buf);
+
+static ssize_t blkdev_time_store(struct device *const dev,
+				 struct device_attribute *const attr,
+				 const char *const buf, const size_t count);
+
+static struct device_attribute ledtrig_blkdev_attr_blink_time =
+	__ATTR(blink_time, 0644, blkdev_time_show, blkdev_time_store);
+
+static struct device_attribute ledtrig_blkdev_attr_interval =
+	__ATTR(interval, 0644, blkdev_time_show, blkdev_time_store);
+
+static ssize_t blkdev_time_show(struct device *const dev,
+				struct device_attribute *const attr,
+				char *const buf)
+{
+	const struct ledtrig_blkdev_led *const led =
+						led_trigger_get_drvdata(dev);
+	unsigned int value;
+
+	if (attr == &ledtrig_blkdev_attr_blink_time)
+		value = READ_ONCE(led->blink_msec);
+	else	// attr == &ledtrig_blkdev_attr_interval
+		value = jiffies_to_msecs(READ_ONCE(ledtrig_blkdev_interval));
+
+	return sprintf(buf, "%u\n", value);
+}
+
+static ssize_t blkdev_time_store(struct device *const dev,
+				 struct device_attribute *const attr,
+				 const char *const buf, const size_t count)
+{
+	struct ledtrig_blkdev_led *const led = led_trigger_get_drvdata(dev);
+	unsigned int value;
+	int ret;
+
+	ret = kstrtouint(buf, 0, &value);
+	if (ret != 0)
+		return ret;
+
+	if (value < LEDTRIG_BLKDEV_MIN_TIME) {
+		pr_info("blkdev LED: attempt to set time < %s milliseconds\n",
+			__stringify(LEDTRIG_BLKDEV_MIN_TIME));
+		return -ERANGE;
+	}
+
+	if (attr == &ledtrig_blkdev_attr_blink_time)
+		WRITE_ONCE(led->blink_msec, value);
+	else	// attr == &ledtrig_blkdev_attr_interval
+		WRITE_ONCE(ledtrig_blkdev_interval, msecs_to_jiffies(value));
+
+	return count;
+}
