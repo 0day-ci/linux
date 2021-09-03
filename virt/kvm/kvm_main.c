@@ -954,6 +954,9 @@ static int kvm_create_vm_debugfs(struct kvm *kvm, int fd)
 				    kvm->debugfs_dentry, stat_data,
 				    &stat_fops_per_vm);
 	}
+#ifdef __KVM_HAVE_ARCH_KVM_DEBUGFS
+	kvm_arch_create_kvm_debugfs(kvm);
+#endif
 	return 0;
 }
 

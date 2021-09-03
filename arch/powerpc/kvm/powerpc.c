@@ -2505,3 +2505,15 @@ int kvm_arch_init(void *opaque)
 }
 
 EXPORT_TRACEPOINT_SYMBOL_GPL(kvm_ppc_instr);
+
+void kvm_arch_create_vcpu_debugfs(struct kvm_vcpu *vcpu, struct dentry *debugfs_dentry)
+{
+	if (vcpu->kvm->arch.kvm_ops->create_vcpu_debugfs)
+		vcpu->kvm->arch.kvm_ops->create_vcpu_debugfs(vcpu, debugfs_dentry);
+}
+
+void kvm_arch_create_kvm_debugfs(struct kvm *kvm)
+{
+	if (kvm->arch.kvm_ops->create_kvm_debugfs)
+		kvm->arch.kvm_ops->create_kvm_debugfs(kvm);
+}
