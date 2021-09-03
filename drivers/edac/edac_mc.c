@@ -1033,6 +1033,8 @@ void edac_mc_handle_error(const enum hw_event_mc_err_type type,
 	int i, n_labels = 0;
 	struct edac_raw_error_desc *e = &mci->error_desc;
 	bool any_memory = true;
+	const char *prefix = "";
+	int n = 0;
 
 	edac_dbg(3, "MC%d\n", mci->mc_idx);
 
@@ -1114,12 +1116,9 @@ void edac_mc_handle_error(const enum hw_event_mc_err_type type,
 			p = e->label;
 			*p = '\0';
 		} else {
-			if (p != e->label) {
-				strcpy(p, OTHER_LABEL);
-				p += strlen(OTHER_LABEL);
-			}
-			strcpy(p, dimm->label);
-			p += strlen(p);
+			n += scnprintf(e->label + n, sizeof(e->label) - n,
+				       "%s%s", prefix, dimm->label);
+			prefix = OTHER_LABEL;
 		}
 
 		/*
@@ -1141,9 +1140,9 @@ void edac_mc_handle_error(const enum hw_event_mc_err_type type,
 	}
 
 	if (any_memory)
-		strcpy(e->label, "any memory");
+		strscpy(e->label, "any memory", sizeof(e->label));
 	else if (!*e->label)
-		strcpy(e->label, "unknown memory");
+		strscpy(e->label, "unknown memory", sizeof(e->label));
 
 	edac_inc_csrow(e, row, chan);
 
