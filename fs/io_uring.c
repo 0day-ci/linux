@@ -10525,7 +10525,7 @@ static int io_register_iowq_max_workers(struct io_ring_ctx *ctx,
 					void __user *arg)
 {
 	struct io_sq_data *sqd = NULL;
-	struct io_uring_task *tctx;
+	struct io_uring_task *tctx = NULL;
 	__u32 new_count[2];
 	int i, ret;
 
