@@ -59,7 +59,7 @@ void ext2_error(struct super_block *sb, const char *function,
 		sbi->s_mount_state |= EXT2_ERROR_FS;
 		es->s_state |= cpu_to_le16(EXT2_ERROR_FS);
 		spin_unlock(&sbi->s_lock);
-		ext2_sync_super(sb, es, 1);
+		ext2_sync_super(sb, es, 0);
 	}
 
 	va_start(args, fmt);
