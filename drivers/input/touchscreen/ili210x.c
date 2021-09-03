@@ -19,10 +19,14 @@
 #define ILI251X_DATA_SIZE1	31
 #define ILI251X_DATA_SIZE2	20
 
+#define ILI_NAME_LEN		27
+#define ILITEK_TS_NAME "Ilitek ILI%x%x Touchscreen"
+
 /* Touchscreen commands */
 #define REG_TOUCHDATA		0x10
 #define REG_PANEL_INFO		0x20
 #define REG_CALIBRATE		0xcc
+#define REG_TS_MODEL		0x61
 
 struct ili2xxx_chip {
 	int (*read_reg)(struct i2c_client *client, u8 reg,
@@ -394,6 +398,8 @@ static int ili210x_i2c_probe(struct i2c_client *client,
 	struct input_dev *input;
 	int error;
 	unsigned int max_xy;
+	unsigned char buf[2];
+	char *model_name;
 
 	dev_dbg(dev, "Probing for ILI210X I2C Touschreen driver");
 
@@ -440,7 +446,10 @@ static int ili210x_i2c_probe(struct i2c_client *client,
 	i2c_set_clientdata(client, priv);
 
 	/* Setup input device */
-	input->name = "ILI210x Touchscreen";
+	input->name = ILITEK_TS_NAME;
+	model_name = (char *)input->name;
+	priv->chip->read_reg(priv->client, REG_TS_MODEL, buf, 2);
+	snprintf(model_name, ILI_NAME_LEN, input->name, buf[1], buf[0]);
 	input->id.bustype = BUS_I2C;
 
 	/* Multi touch */
