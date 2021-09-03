@@ -1545,6 +1545,7 @@ static void nvme_tcp_restore_sock_calls(struct nvme_tcp_queue *queue)
 
 static void __nvme_tcp_stop_queue(struct nvme_tcp_queue *queue)
 {
+	sock_reset_linger(queue->sock->sk);
 	kernel_sock_shutdown(queue->sock, SHUT_RDWR);
 	nvme_tcp_restore_sock_calls(queue);
 	cancel_work_sync(&queue->io_work);

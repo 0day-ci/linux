@@ -755,6 +755,14 @@ void sock_no_linger(struct sock *sk)
 }
 EXPORT_SYMBOL(sock_no_linger);
 
+void sock_reset_linger(struct sock *sk)
+{
+	lock_sock(sk);
+	sock_reset_flag(sk, SOCK_LINGER);
+	release_sock(sk);
+}
+EXPORT_SYMBOL_GPL(sock_reset_linger);
+
 void sock_set_priority(struct sock *sk, u32 priority)
 {
 	lock_sock(sk);
