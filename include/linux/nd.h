@@ -66,6 +66,9 @@ struct nvdimm_pmu {
 	struct cpumask arch_cpumask;
 };
 
+int register_nvdimm_pmu(struct nvdimm_pmu *nvdimm, struct platform_device *pdev);
+void unregister_nvdimm_pmu(struct nvdimm_pmu *nd_pmu);
+
 struct nd_device_driver {
 	struct device_driver drv;
 	unsigned long type;
