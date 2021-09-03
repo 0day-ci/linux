@@ -620,3 +620,70 @@ static ssize_t blkdev_time_store(struct device *const dev,
 
 	return count;
 }
+
+
+/*
+ *
+ *	LED mode device attribute
+ *
+ */
+
+static const struct {
+	const char	*name;
+	const char	*show;
+} blkdev_modes[] = {
+	[LEDTRIG_BLKDEV_MODE_RO] = {
+		.name	= "read",
+		.show	= "[read] write rw\n",
+	},
+	[LEDTRIG_BLKDEV_MODE_WO] = {
+		.name	= "write",
+		.show	= "read [write] rw\n",
+	},
+	[LEDTRIG_BLKDEV_MODE_RW] = {
+		.name	= "rw",
+		.show	= "read write [rw]\n",
+	},
+};
+
+static ssize_t blkdev_mode_show(struct device *const dev,
+				struct device_attribute *const attr,
+				char *const buf)
+{
+	const struct ledtrig_blkdev_led *const led =
+					led_trigger_get_drvdata(dev);
+
+	return sprintf(buf, blkdev_modes[READ_ONCE(led->mode)].show);
+}
+
+static ssize_t blkdev_mode_store(struct device *const dev,
+				 struct device_attribute *const attr,
+				 const char *const buf, const size_t count)
+{
+	struct ledtrig_blkdev_led *const led = led_trigger_get_drvdata(dev);
+	const char *const mode_name = blkdev_skip_space(buf);
+	const char *const endp = blkdev_find_space(mode_name);
+	const ptrdiff_t name_len = endp - mode_name;	/* always >= 0 */
+	enum ledtrig_blkdev_mode mode;
+
+	if (name_len == 0) {
+		pr_info("blkdev LED: empty mode\n");
+		return -EINVAL;
+	}
+
+	for (mode = LEDTRIG_BLKDEV_MODE_RO;
+				mode <= LEDTRIG_BLKDEV_MODE_RW; ++mode) {
+
+		if (ledtrig_blkdev_streq(blkdev_modes[mode].name,
+						mode_name, name_len)) {
+			WRITE_ONCE(led->mode, mode);
+			return count;
+		}
+	}
+
+	pr_info("blkdev LED: invalid mode (%.*s)\n", (int)name_len, mode_name);
+	return -EINVAL;
+}
+
+static struct device_attribute ledtrig_blkdev_attr_mode =
+	__ATTR(mode, 0644, blkdev_mode_show, blkdev_mode_store);
