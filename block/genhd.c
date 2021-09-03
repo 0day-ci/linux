@@ -24,6 +24,7 @@
 #include <linux/log2.h>
 #include <linux/pm_runtime.h>
 #include <linux/badblocks.h>
+#include <linux/leds.h>
 
 #include "blk.h"
 
@@ -390,6 +391,8 @@ int device_add_disk(struct device *parent, struct gendisk *disk,
 	struct device *ddev = disk_to_dev(disk);
 	int ret;
 
+	ledtrig_blkdev_disk_init(disk);
+
 	/*
 	 * The disk queue should now be all set with enough information about
 	 * the device for the elevator code to pick an adequate default
@@ -559,6 +562,7 @@ void del_gendisk(struct gendisk *disk)
 	if (WARN_ON_ONCE(!disk_live(disk) && !(disk->flags & GENHD_FL_HIDDEN)))
 		return;
 
+	ledtrig_blkdev_disk_cleanup(disk);
 	blk_integrity_del(disk);
 	disk_del_events(disk);
 
