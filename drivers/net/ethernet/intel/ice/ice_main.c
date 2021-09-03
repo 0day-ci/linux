@@ -6466,7 +6466,9 @@ static void ice_rebuild(struct ice_pf *pf, enum ice_reset_req reset_type)
 	/* if we get here, reset flow is successful */
 	clear_bit(ICE_RESET_FAILED, pf->state);
 
-	ice_plug_aux_dev(pf);
+	if (ice_is_aux_ena(pf))
+		ice_plug_aux_dev(pf);
+
 	return;
 
 err_vsi_rebuild:
