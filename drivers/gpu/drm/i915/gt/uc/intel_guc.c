@@ -422,13 +422,14 @@ retry:
 	/*
 	 * No GuC command should ever take longer than 10ms.
 	 * Fast commands should still complete in 10us.
+	 * Except for the hwconfig table query, which takes ~50ms.
 	 */
 	ret = __intel_wait_for_register_fw(uncore,
 					   guc_send_reg(guc, 0),
 					   GUC_HXG_MSG_0_ORIGIN,
 					   FIELD_PREP(GUC_HXG_MSG_0_ORIGIN,
 						      GUC_HXG_ORIGIN_GUC),
-					   10, 10, &header);
+					   10, 100, &header);
 	if (unlikely(ret)) {
 timeout:
 		drm_err(&i915->drm, "mmio request %#x: no reply %x\n",
