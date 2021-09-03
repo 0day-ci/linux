@@ -203,6 +203,11 @@ struct machdep_calls {
 #endif
 };
 
+#define ppc_md_call(func)		ppc_md.func
+#define ppc_md_has(func)		(ppc_md.func)
+#define ppc_md_call_cond(func)		if (ppc_md_has(func)) ppc_md_call(func)
+#define ppc_md_update(func, f)		ppc_md.func = f
+
 extern void e500_idle(void);
 extern void power4_idle(void);
 extern void ppc6xx_idle(void);
