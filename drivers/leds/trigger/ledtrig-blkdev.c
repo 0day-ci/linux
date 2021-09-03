@@ -687,3 +687,81 @@ static ssize_t blkdev_mode_store(struct device *const dev,
 
 static struct device_attribute ledtrig_blkdev_attr_mode =
 	__ATTR(mode, 0644, blkdev_mode_show, blkdev_mode_store);
+
+
+/*
+ *
+ *	Initialization - register the trigger
+ *
+ */
+
+static struct attribute *ledtrig_blkdev_attrs[] = {
+	&ledtrig_blkdev_attr_add.attr,
+	&ledtrig_blkdev_attr_del.attr,
+	&ledtrig_blkdev_attr_blink_time.attr,
+	&ledtrig_blkdev_attr_interval.attr,
+	&ledtrig_blkdev_attr_mode.attr,
+	NULL
+};
+
+static const struct attribute_group ledtrig_blkdev_attr_group = {
+	.attrs	= ledtrig_blkdev_attrs,
+};
+
+static const struct attribute_group *ledtrig_blkdev_attr_groups[] = {
+	&ledtrig_blkdev_attr_group,
+	NULL
+};
+
+static struct led_trigger ledtrig_blkdev_trigger = {
+	.name		= "blkdev",
+	.activate	= blkdev_activate,
+	.deactivate	= blkdev_deactivate,
+	.groups		= ledtrig_blkdev_attr_groups,
+};
+
+static int __init blkdev_init(void)
+{
+	int ret;
+
+	ret = mutex_lock_interruptible(&ledtrig_blkdev_mutex);
+	if (ret != 0)
+		return ret;
+
+	ledtrig_blkdev_interval = msecs_to_jiffies(LEDTRIG_BLKDEV_INTERVAL);
+	__ledtrig_blkdev_disk_cleanup = blkdev_disk_cleanup;
+
+	/*
+	 * Can't call led_trigger_register() with ledtrig_blkdev_mutex locked.
+	 * If an LED has blkdev as its default_trigger, blkdev_activate() will
+	 * be called for that LED, and it will try to lock the mutex, which will
+	 * hang.
+	 */
+	mutex_unlock(&ledtrig_blkdev_mutex);
+
+	ret = led_trigger_register(&ledtrig_blkdev_trigger);
+	if (ret != 0) {
+		mutex_lock(&ledtrig_blkdev_mutex);
+		__ledtrig_blkdev_disk_cleanup = NULL;
+		mutex_unlock(&ledtrig_blkdev_mutex);
+	}
+
+	return ret;
+}
+module_init(blkdev_init);
+
+static void __exit blkdev_exit(void)
+{
+	mutex_lock(&ledtrig_blkdev_mutex);
+
+	/*
+	 * It's OK to call led_trigger_unregister() with the mutex locked,
+	 * because the module can only be unloaded when no LEDs are using
+	 * the blkdev trigger, so blkdev_deactivate() won't be called.
+	 */
+	led_trigger_unregister(&ledtrig_blkdev_trigger);
+	__ledtrig_blkdev_disk_cleanup = NULL;
+
+	mutex_unlock(&ledtrig_blkdev_mutex);
+}
+module_exit(blkdev_exit);
