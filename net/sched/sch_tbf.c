@@ -387,8 +387,7 @@ static int tbf_change(struct Qdisc *sch, struct nlattr *opt,
 			prate64 = nla_get_u64(tb[TCA_TBF_PRATE64]);
 		psched_ratecfg_precompute(&peak, &qopt->peakrate, prate64);
 		if (peak.rate_bytes_ps <= rate.rate_bytes_ps) {
-			pr_warn_ratelimited("sch_tbf: peakrate %llu is lower than or equals to rate %llu !\n",
-					peak.rate_bytes_ps, rate.rate_bytes_ps);
+			NL_SET_ERR_MSG(extack, "peakrate is lower than or equals to rate");
 			err = -EINVAL;
 			goto done;
 		}
@@ -405,9 +404,7 @@ static int tbf_change(struct Qdisc *sch, struct nlattr *opt,
 	}
 
 	if (max_size < psched_mtu(qdisc_dev(sch)))
-		pr_warn_ratelimited("sch_tbf: burst %llu is lower than device %s mtu (%u) !\n",
-				    max_size, qdisc_dev(sch)->name,
-				    psched_mtu(qdisc_dev(sch)));
+		NL_SET_ERR_MSG(extack, "burst is lower than device mtu");
 
 	if (!max_size) {
 		err = -EINVAL;
