@@ -482,3 +482,30 @@ static void blkdev_disk_cleanup(struct gendisk *const gd)
 				  &gd->ledtrig->leds, disk_leds_node)
 		blkdev_disk_del_locked(link->led, link, gd->ledtrig);
 }
+
+
+/*
+ *
+ *	Disassociate an LED from the trigger
+ *
+ */
+
+static void blkdev_deactivate(struct led_classdev *const led_dev)
+{
+	struct ledtrig_blkdev_led *const led = led_get_trigger_data(led_dev);
+	struct ledtrig_blkdev_link *link;
+	struct hlist_node *next;
+
+	mutex_lock(&ledtrig_blkdev_mutex);
+
+	hlist_for_each_entry_safe(link, next, &led->disks, led_disks_node)
+		blkdev_disk_del_locked(led, link, link->disk);
+
+	hlist_del(&led->leds_node);
+	kobject_put(led->dir);
+	kfree(led);
+
+	mutex_unlock(&ledtrig_blkdev_mutex);
+
+	module_put(THIS_MODULE);
+}
