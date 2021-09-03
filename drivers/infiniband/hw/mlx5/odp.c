@@ -1828,7 +1828,7 @@ int mlx5_ib_advise_mr_prefetch(struct ib_pd *pd,
 
 	if (!init_prefetch_work(pd, advice, pf_flags, work, sg_list, num_sge)) {
 		destroy_prefetch_work(work);
-		return -EINVAL;
+		return -ENOENT;
 	}
 	queue_work(system_unbound_wq, &work->work);
 	return 0;
