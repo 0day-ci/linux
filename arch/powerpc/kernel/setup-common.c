@@ -8,6 +8,8 @@
 
 #undef DEBUG
 
+#define GENERATING_PPC_MD_STATIC_CALLS_DEFINITIONS
+
 #include <linux/export.h>
 #include <linux/panic_notifier.h>
 #include <linux/string.h>
