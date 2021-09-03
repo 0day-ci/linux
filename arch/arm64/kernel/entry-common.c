@@ -607,11 +607,14 @@ static void noinstr el0_fpac(struct pt_regs *regs, unsigned long esr)
 asmlinkage void noinstr el0t_64_sync_handler(struct pt_regs *regs)
 {
 	unsigned long esr = read_sysreg(esr_el1);
+	unsigned long ec = ESR_ELx_EC(esr);
 
-	switch (ESR_ELx_EC(esr)) {
-	case ESR_ELx_EC_SVC64:
+	if (likely(ec == ESR_ELx_EC_SVC64)) {
 		el0_svc(regs);
-		break;
+		return;
+	}
+
+	switch (ec) {
 	case ESR_ELx_EC_DABT_LOW:
 		el0_da(regs, esr);
 		break;
@@ -730,11 +733,14 @@ static void noinstr el0_svc_compat(struct pt_regs *regs)
 asmlinkage void noinstr el0t_32_sync_handler(struct pt_regs *regs)
 {
 	unsigned long esr = read_sysreg(esr_el1);
+	unsigned long ec = ESR_ELx_EC(esr);
 
-	switch (ESR_ELx_EC(esr)) {
-	case ESR_ELx_EC_SVC32:
+	if (likely(ec == ESR_ELx_EC_SVC32)) {
 		el0_svc_compat(regs);
-		break;
+		return;
+	}
+
+	switch (ec) {
 	case ESR_ELx_EC_DABT_LOW:
 		el0_da(regs, esr);
 		break;
