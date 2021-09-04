@@ -202,14 +202,7 @@ int start_isolate_page_range(unsigned long start_pfn, unsigned long end_pfn,
 	}
 	return 0;
 undo:
-	for (pfn = start_pfn;
-	     pfn < undo_pfn;
-	     pfn += pageblock_nr_pages) {
-		struct page *page = pfn_to_online_page(pfn);
-		if (!page)
-			continue;
-		unset_migratetype_isolate(page, migratetype);
-	}
+	undo_isolate_page_range(start_pfn, undo_pfn, migratetype);
 
 	return -EBUSY;
 }
