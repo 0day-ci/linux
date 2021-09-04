@@ -1457,7 +1457,8 @@ static ssize_t metrics_cpu_kcycles_used_show(struct device *fbdev,
 static ssize_t edid_show(
 			struct file *filp,
 			struct kobject *kobj, struct bin_attribute *a,
-			 char *buf, loff_t off, size_t count) {
+			 char *buf, loff_t off, size_t count)
+{
 	struct device *fbdev = kobj_to_dev(kobj);
 	struct fb_info *fb_info = dev_get_drvdata(fbdev);
 	struct dlfb_data *dlfb = fb_info->par;
