@@ -529,6 +529,10 @@ static int start_transfer(struct fsg_dev *fsg, struct usb_ep *ep,
 		/* We can't do much more than wait for a reset */
 		req->status = rc;
 
+		if (rc==-ESHUTDOWN) {
+			fsg->common->running = 0;
+		}
+
 		/*
 		 * Note: currently the net2280 driver fails zero-length
 		 * submissions if DMA is enabled.
