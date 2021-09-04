@@ -174,8 +174,8 @@ static int get_ranges(unsigned char *pst)
 	unsigned int speed;
 	u8 fid, vid;
 
-	powernow_table = kzalloc((sizeof(*powernow_table) *
-				(number_scales + 1)), GFP_KERNEL);
+	powernow_table = kcalloc(number_scales + 1, sizeof(*powernow_table),
+				 GFP_KERNEL);
 	if (!powernow_table)
 		return -ENOMEM;
 
