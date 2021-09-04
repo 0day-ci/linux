@@ -16,6 +16,7 @@
 #include <linux/ioport.h>
 #include <linux/slab.h>
 #include <linux/irq.h>
+#include <linux/dmi.h>
 
 #ifdef CONFIG_X86
 #define valid_IRQ(i) (((i) != 0) && ((i) != 2))
@@ -423,6 +424,49 @@ static void acpi_dev_get_irqresource(struct resource *res, u32 gsi,
 	}
 }
 
+static const struct dmi_system_id medion_laptop[] = {
+	{
+		.ident = "MEDION P15651",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "MEDION"),
+			DMI_MATCH(DMI_BOARD_NAME, "M15T"),
+		},
+	},
+	{ }
+};
+
+struct irq_override_cmp {
+	const struct dmi_system_id *system;
+	unsigned char irq;
+	unsigned char triggering;
+	unsigned char polarity;
+	unsigned char shareable;
+};
+
+static const struct irq_override_cmp skip_override_table[] = {
+	{ medion_laptop, 1, ACPI_LEVEL_SENSITIVE, ACPI_ACTIVE_LOW, 0 },
+};
+
+static bool acpi_dev_legacy_irq_override(u32 gsi, u8 triggering, u8 polarity,
+					 u8 shareable)
+{
+	int i;
+	const struct irq_override_cmp *en;
+
+	for (i = 0; i < ARRAY_SIZE(skip_override_table); i++) {
+		en = &skip_override_table[i];
+
+		if (dmi_check_system(en->system) &&
+		    en->irq == gsi &&
+		    en->triggering == triggering &&
+		    en->polarity == polarity &&
+		    en->shareable == shareable)
+			return false;
+	}
+
+	return true;
+}
+
 /**
  * acpi_dev_resource_interrupt - Extract ACPI interrupt resource information.
  * @ares: Input ACPI resource object.
@@ -447,6 +491,7 @@ bool acpi_dev_resource_interrupt(struct acpi_resource *ares, int index,
 {
 	struct acpi_resource_irq *irq;
 	struct acpi_resource_extended_irq *ext_irq;
+	bool is_legacy;
 
 	switch (ares->type) {
 	case ACPI_RESOURCE_TYPE_IRQ:
@@ -459,9 +504,14 @@ bool acpi_dev_resource_interrupt(struct acpi_resource *ares, int index,
 			irqresource_disabled(res, 0);
 			return false;
 		}
+
+		is_legacy = acpi_dev_legacy_irq_override(irq->interrupts[index],
+							 irq->triggering, irq->polarity,
+							 irq->shareable);
+
 		acpi_dev_get_irqresource(res, irq->interrupts[index],
 					 irq->triggering, irq->polarity,
-					 irq->shareable, true);
+					 irq->shareable, is_legacy);
 		break;
 	case ACPI_RESOURCE_TYPE_EXTENDED_IRQ:
 		ext_irq = &ares->data.extended_irq;
