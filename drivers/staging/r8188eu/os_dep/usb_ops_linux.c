@@ -31,24 +31,14 @@ struct zero_bulkout_context {
 	void *padapter;
 };
 
-void usb_read_mem(struct intf_hdl *pintfhdl, u32 addr, u32 cnt, u8 *rmem)
-{
-}
-
-void usb_write_mem(struct intf_hdl *pintfhdl, u32 addr, u32 cnt, u8 *wmem)
-{
-}
-
-void usb_read_port_cancel(struct intf_hdl *pintfhdl)
+void rtw_read_port_cancel(struct adapter *adapter)
 {
 	int i;
-	struct recv_buf *precvbuf;
-	struct adapter	*padapter = pintfhdl->padapter;
-	precvbuf = (struct recv_buf *)padapter->recvpriv.precv_buf;
+	struct recv_buf *precvbuf = (struct recv_buf *) adapter->recvpriv.precv_buf;
 
 	DBG_88E("%s\n", __func__);
 
-	padapter->bReadPortCancel = true;
+	adapter->bReadPortCancel = true;
 
 	for (i = 0; i < NR_RECVBUFF; i++) {
 		precvbuf->reuse = true;
@@ -134,22 +124,21 @@ check_completion:
 
 }
 
-u32 usb_write_port(struct intf_hdl *pintfhdl, u32 addr, u32 cnt, u8 *wmem)
+u32 rtw_write_port(struct adapter *adapter, u32 addr, u32 cnt, u8 *wmem)
 {
 	unsigned long irqL;
 	unsigned int pipe;
 	int status;
 	u32 ret = _FAIL;
 	struct urb *purb = NULL;
-	struct adapter *padapter = (struct adapter *)pintfhdl->padapter;
-	struct dvobj_priv	*pdvobj = adapter_to_dvobj(padapter);
-	struct xmit_priv	*pxmitpriv = &padapter->xmitpriv;
+	struct dvobj_priv	*pdvobj = adapter_to_dvobj(adapter);
+	struct xmit_priv	*pxmitpriv = &adapter->xmitpriv;
 	struct xmit_buf *pxmitbuf = (struct xmit_buf *)wmem;
 	struct xmit_frame *pxmitframe = (struct xmit_frame *)pxmitbuf->priv_data;
 	struct usb_device *pusbd = pdvobj->pusbdev;
 
-	if ((padapter->bDriverStopped) || (padapter->bSurpriseRemoved) ||
-	    (padapter->pwrctrlpriv.pnp_bstop_trx)) {
+	if ((adapter->bDriverStopped) || (adapter->bSurpriseRemoved) ||
+	    (adapter->pwrctrlpriv.pnp_bstop_trx)) {
 		rtw_sctx_done_err(&pxmitbuf->sctx, RTW_SCTX_DONE_TX_DENY);
 		goto exit;
 	}
@@ -196,7 +185,7 @@ u32 usb_write_port(struct intf_hdl *pintfhdl, u32 addr, u32 cnt, u8 *wmem)
 
 	status = usb_submit_urb(purb, GFP_ATOMIC);
 	if (!status) {
-		struct hal_data_8188e	*haldata = GET_HAL_DATA(padapter);
+		struct hal_data_8188e	*haldata = GET_HAL_DATA(adapter);
 
 		haldata->srestpriv.last_tx_time = jiffies;
 	} else {
@@ -205,7 +194,7 @@ u32 usb_write_port(struct intf_hdl *pintfhdl, u32 addr, u32 cnt, u8 *wmem)
 
 		switch (status) {
 		case -ENODEV:
-			padapter->bDriverStopped = true;
+			adapter->bDriverStopped = true;
 			break;
 		default:
 			break;
@@ -224,15 +213,14 @@ exit:
 	return ret;
 }
 
-void usb_write_port_cancel(struct intf_hdl *pintfhdl)
+void rtw_write_port_cancel(struct adapter *adapter)
 {
 	int i, j;
-	struct adapter	*padapter = pintfhdl->padapter;
-	struct xmit_buf *pxmitbuf = (struct xmit_buf *)padapter->xmitpriv.pxmitbuf;
+	struct xmit_buf *pxmitbuf = (struct xmit_buf *) adapter->xmitpriv.pxmitbuf;
 
 	DBG_88E("%s\n", __func__);
 
-	padapter->bWritePortCancel = true;
+	adapter->bWritePortCancel = true;
 
 	for (i = 0; i < NR_XMITBUFF; i++) {
 		for (j = 0; j < 8; j++) {
@@ -242,7 +230,7 @@ void usb_write_port_cancel(struct intf_hdl *pintfhdl)
 		pxmitbuf++;
 	}
 
-	pxmitbuf = (struct xmit_buf *)padapter->xmitpriv.pxmit_extbuf;
+	pxmitbuf = (struct xmit_buf *) adapter->xmitpriv.pxmit_extbuf;
 	for (i = 0; i < NR_XMIT_EXTBUFF; i++) {
 		for (j = 0; j < 8; j++) {
 			if (pxmitbuf->pxmit_urb[j])
