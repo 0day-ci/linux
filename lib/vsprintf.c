@@ -509,59 +509,38 @@ char *number(char *buf, char *end, unsigned long long num,
 	/* leading space padding */
 	field_width -= precision;
 	if (!(spec.flags & (ZEROPAD | LEFT))) {
-		while (--field_width >= 0) {
-			if (buf < end)
-				*buf = ' ';
-			++buf;
-		}
+		while (--field_width >= 0)
+			buf = sputchar(buf, end, ' ');
 	}
 	/* sign */
-	if (sign) {
-		if (buf < end)
-			*buf = sign;
-		++buf;
-	}
+	if (sign)
+		buf = sputchar(buf, end, sign);
+
 	/* "0x" / "0" prefix */
 	if (need_pfx) {
-		if (spec.base == 16 || !is_zero) {
-			if (buf < end)
-				*buf = '0';
-			++buf;
-		}
-		if (spec.base == 16) {
-			if (buf < end)
-				*buf = ('X' | locase);
-			++buf;
-		}
+		if (spec.base == 16 || !is_zero)
+			buf = sputchar(buf, end, '0');
+		if (spec.base == 16)
+			buf = sputchar(buf, end, 'X' | locase);
 	}
 	/* zero or space padding */
 	if (!(spec.flags & LEFT)) {
 		char c = ' ' + (spec.flags & ZEROPAD);
 
-		while (--field_width >= 0) {
-			if (buf < end)
-				*buf = c;
-			++buf;
-		}
+		while (--field_width >= 0)
+			buf = sputchar(buf, end, c);
 	}
 	/* hmm even more zero padding? */
-	while (i <= --precision) {
-		if (buf < end)
-			*buf = '0';
-		++buf;
-	}
+	while (i <= --precision)
+		buf = sputchar(buf, end, '0');
+
 	/* actual digits of result */
-	while (--i >= 0) {
-		if (buf < end)
-			*buf = tmp[i];
-		++buf;
-	}
+	while (--i >= 0)
+		buf = sputchar(buf, end, tmp[i]);
+
 	/* trailing space padding */
-	while (--field_width >= 0) {
-		if (buf < end)
-			*buf = ' ';
-		++buf;
-	}
+	while (--field_width >= 0)
+		buf = sputchar(buf, end, ' ');
 
 	return buf;
 }
@@ -619,11 +598,9 @@ char *widen_string(char *buf, int n, char *end, struct printf_spec spec)
 		move_right(buf - n, end, n, spaces);
 		return buf + spaces;
 	}
-	while (spaces--) {
-		if (buf < end)
-			*buf = ' ';
-		++buf;
-	}
+	while (spaces--)
+		buf = sputchar(buf, end, ' ');
+
 	return buf;
 }
 
@@ -638,9 +615,7 @@ static char *string_nocheck(char *buf, char *end, const char *s,
 		char c = *s++;
 		if (!c)
 			break;
-		if (buf < end)
-			*buf = c;
-		++buf;
+		buf = sputchar(buf, end, c);
 		++len;
 	}
 	return widen_string(buf, len, end, spec);
@@ -931,7 +906,7 @@ char *dentry_name(char *buf, char *end, const struct dentry *d, struct printf_sp
 		}
 	}
 	s = array[--i];
-	for (n = 0; n != spec.precision; n++, buf++) {
+	for (n = 0; n != spec.precision; n++) {
 		char c = *s++;
 		if (!c) {
 			if (!i)
@@ -939,8 +914,7 @@ char *dentry_name(char *buf, char *end, const struct dentry *d, struct printf_sp
 			c = '/';
 			s = array[--i];
 		}
-		if (buf < end)
-			*buf = c;
+		buf = sputchar(buf, end, c);
 	}
 	rcu_read_unlock();
 	return widen_string(buf, n, end, spec);
@@ -968,11 +942,9 @@ char *bdev_name(char *buf, char *end, struct block_device *bdev,
 	hd = bdev->bd_disk;
 	buf = string(buf, end, hd->disk_name, spec);
 	if (bdev->bd_partno) {
-		if (isdigit(hd->disk_name[strlen(hd->disk_name)-1])) {
-			if (buf < end)
-				*buf = 'p';
-			buf++;
-		}
+		if (isdigit(hd->disk_name[strlen(hd->disk_name)-1]))
+			buf = sputchar(buf, end, 'p');
+
 		buf = number(buf, end, bdev->bd_partno, spec);
 	}
 	return buf;
@@ -1175,18 +1147,10 @@ char *hex_string(char *buf, char *end, u8 *addr, struct printf_spec spec,
 		len = min_t(int, spec.field_width, 64);
 
 	for (i = 0; i < len; ++i) {
-		if (buf < end)
-			*buf = hex_asc_hi(addr[i]);
-		++buf;
-		if (buf < end)
-			*buf = hex_asc_lo(addr[i]);
-		++buf;
-
-		if (separator && i != len - 1) {
-			if (buf < end)
-				*buf = separator;
-			++buf;
-		}
+		buf = sputchar(buf, end, hex_asc_hi(addr[i]));
+		buf = sputchar(buf, end, hex_asc_lo(addr[i]));
+		if (separator && i != len - 1)
+			buf = sputchar(buf, end, separator);
 	}
 
 	return buf;
@@ -1221,11 +1185,9 @@ char *bitmap_string(char *buf, char *end, unsigned long *bitmap,
 		bit = i % BITS_PER_LONG;
 		val = (bitmap[word] >> bit) & chunkmask;
 
-		if (!first) {
-			if (buf < end)
-				*buf = ',';
-			buf++;
-		}
+		if (!first)
+			buf = sputchar(buf, end, ',');
+
 		first = false;
 
 		spec.field_width = DIV_ROUND_UP(chunksz, 4);
@@ -1248,20 +1210,17 @@ char *bitmap_list_string(char *buf, char *end, unsigned long *bitmap,
 		return buf;
 
 	for_each_set_bitrange(rbot, rtop, bitmap, nr_bits) {
-		if (!first) {
-			if (buf < end)
-				*buf = ',';
-			buf++;
-		}
+		if (!first)
+			buf = sputchar(buf, end, ',');
+
 		first = false;
 
 		buf = number(buf, end, rbot, default_dec_spec);
 		if (rtop == rbot + 1)
 			continue;
 
-		if (buf < end)
-			*buf = '-';
-		buf = number(buf + 1, end, rtop - 1, default_dec_spec);
+		buf = sputchar(buf, end, '-');
+		buf = number(buf, end, rtop - 1, default_dec_spec);
 	}
 	return buf;
 }
@@ -1822,14 +1781,9 @@ char *date_str(char *buf, char *end, const struct rtc_time *tm, bool r)
 	int mon = tm->tm_mon + (r ? 0 : 1);
 
 	buf = number(buf, end, year, default_dec04_spec);
-	if (buf < end)
-		*buf = '-';
-	buf++;
-
+	buf = sputchar(buf, end, '-');
 	buf = number(buf, end, mon, default_dec02_spec);
-	if (buf < end)
-		*buf = '-';
-	buf++;
+	buf = sputchar(buf, end, '-');
 
 	return number(buf, end, tm->tm_mday, default_dec02_spec);
 }
@@ -1838,14 +1792,9 @@ static noinline_for_stack
 char *time_str(char *buf, char *end, const struct rtc_time *tm, bool r)
 {
 	buf = number(buf, end, tm->tm_hour, default_dec02_spec);
-	if (buf < end)
-		*buf = ':';
-	buf++;
-
+	buf = sputchar(buf, end, ':');
 	buf = number(buf, end, tm->tm_min, default_dec02_spec);
-	if (buf < end)
-		*buf = ':';
-	buf++;
+	buf = sputchar(buf, end, ':');
 
 	return number(buf, end, tm->tm_sec, default_dec02_spec);
 }
@@ -1889,11 +1838,8 @@ char *rtc_str(char *buf, char *end, const struct rtc_time *tm,
 
 	if (have_d)
 		buf = date_str(buf, end, tm, raw);
-	if (have_d && have_t) {
-		if (buf < end)
-			*buf = iso8601_separator ? 'T' : ' ';
-		buf++;
-	}
+	if (have_d && have_t)
+		buf = sputchar(buf, end, iso8601_separator ? 'T' : ' ');
 	if (have_t)
 		buf = time_str(buf, end, tm, raw);
 
@@ -1972,11 +1918,8 @@ char *format_flags(char *buf, char *end, unsigned long flags,
 		buf = string(buf, end, names->name, default_str_spec);
 
 		flags &= ~mask;
-		if (flags) {
-			if (buf < end)
-				*buf = '|';
-			buf++;
-		}
+		if (flags)
+			buf = sputchar(buf, end, '|');
 	}
 
 	if (flags)
@@ -2026,16 +1969,11 @@ char *format_page_flags(char *buf, char *end, unsigned long flags)
 			continue;
 
 		/* Format: Flag Name + '=' (equals sign) + Number + '|' (separator) */
-		if (append) {
-			if (buf < end)
-				*buf = '|';
-			buf++;
-		}
+		if (append)
+			buf = sputchar(buf, end, '|');
 
 		buf = string(buf, end, pff[i].name, default_str_spec);
-		if (buf < end)
-			*buf = '=';
-		buf++;
+		buf = sputchar(buf, end, '=');
 		buf = number(buf, end, (flags >> pff[i].shift) & pff[i].mask,
 			     *pff[i].spec);
 
@@ -2125,11 +2063,8 @@ char *device_node_string(char *buf, char *end, struct device_node *dn,
 
 	for (pass = false; strspn(fmt,"fnpPFcC"); fmt++, pass = true) {
 		int precision;
-		if (pass) {
-			if (buf < end)
-				*buf = ':';
-			buf++;
-		}
+		if (pass)
+			buf = sputchar(buf, end, ':');
 
 		switch (*fmt) {
 		case 'f':	/* full_name */
@@ -2773,25 +2708,14 @@ int vsnprintf(char *buf, size_t size, const char *fmt, va_list args)
 			break;
 
 		case FORMAT_TYPE_CHAR: {
-			char c;
-
 			if (!(spec.flags & LEFT)) {
-				while (--spec.field_width > 0) {
-					if (str < end)
-						*str = ' ';
-					++str;
+				while (--spec.field_width > 0)
+					str = sputchar(str, end, ' ');
+			}
+			str = sputchar(str, end, (unsigned char) va_arg(args, int));
 
-				}
-			}
-			c = (unsigned char) va_arg(args, int);
-			if (str < end)
-				*str = c;
-			++str;
-			while (--spec.field_width > 0) {
-				if (str < end)
-					*str = ' ';
-				++str;
-			}
+			while (--spec.field_width > 0)
+				str = sputchar(str, end, ' ');
 			break;
 		}
 
@@ -2807,9 +2731,7 @@ int vsnprintf(char *buf, size_t size, const char *fmt, va_list args)
 			break;
 
 		case FORMAT_TYPE_PERCENT_CHAR:
-			if (str < end)
-				*str = '%';
-			++str;
+			str = sputchar(str, end, '%');
 			break;
 
 		case FORMAT_TYPE_INVALID:
@@ -3251,21 +3173,15 @@ int bstr_printf(char *buf, size_t size, const char *fmt, const u32 *bin_buf)
 			char c;
 
 			if (!(spec.flags & LEFT)) {
-				while (--spec.field_width > 0) {
-					if (str < end)
-						*str = ' ';
-					++str;
-				}
+				while (--spec.field_width > 0)
+					str = sputchar(str, end, ' ');
 			}
+
 			c = (unsigned char) get_arg(char);
-			if (str < end)
-				*str = c;
-			++str;
-			while (--spec.field_width > 0) {
-				if (str < end)
-					*str = ' ';
-				++str;
-			}
+			str = sputchar(str, end, c);
+
+			while (--spec.field_width > 0)
+				str = sputchar(str, end, ' ');
 			break;
 		}
 
@@ -3312,9 +3228,7 @@ int bstr_printf(char *buf, size_t size, const char *fmt, const u32 *bin_buf)
 		}
 
 		case FORMAT_TYPE_PERCENT_CHAR:
-			if (str < end)
-				*str = '%';
-			++str;
+			str = sputchar(str, end, '%');
 			break;
 
 		case FORMAT_TYPE_INVALID:

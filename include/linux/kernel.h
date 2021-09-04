@@ -283,6 +283,14 @@ extern char *bin2hex(char *dst, const void *src, size_t count);
 
 bool mac_pton(const char *s, u8 *mac);
 
+static inline char *sputchar(char *buf, const char *end, char c)
+{
+	if (buf < end)
+		*buf = c;
+
+	return buf + 1;
+}
+
 /*
  * General tracing related utility functions - trace_printk(),
  * tracing_on/tracing_off and tracing_start()/tracing_stop

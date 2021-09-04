@@ -335,12 +335,8 @@ static bool escape_space(unsigned char c, char **dst, char *end)
 		return false;
 	}
 
-	if (out < end)
-		*out = '\\';
-	++out;
-	if (out < end)
-		*out = to;
-	++out;
+	out = sputchar(out, end, '\\');
+	out = sputchar(out, end, to);
 
 	*dst = out;
 	return true;
@@ -368,12 +364,8 @@ static bool escape_special(unsigned char c, char **dst, char *end)
 		return false;
 	}
 
-	if (out < end)
-		*out = '\\';
-	++out;
-	if (out < end)
-		*out = to;
-	++out;
+	out = sputchar(out, end, '\\');
+	out = sputchar(out, end, to);
 
 	*dst = out;
 	return true;
@@ -386,12 +378,8 @@ static bool escape_null(unsigned char c, char **dst, char *end)
 	if (c)
 		return false;
 
-	if (out < end)
-		*out = '\\';
-	++out;
-	if (out < end)
-		*out = '0';
-	++out;
+	out = sputchar(out, end, '\\');
+	out = sputchar(out, end, '0');
 
 	*dst = out;
 	return true;
@@ -401,18 +389,10 @@ static bool escape_octal(unsigned char c, char **dst, char *end)
 {
 	char *out = *dst;
 
-	if (out < end)
-		*out = '\\';
-	++out;
-	if (out < end)
-		*out = ((c >> 6) & 0x07) + '0';
-	++out;
-	if (out < end)
-		*out = ((c >> 3) & 0x07) + '0';
-	++out;
-	if (out < end)
-		*out = ((c >> 0) & 0x07) + '0';
-	++out;
+	out = sputchar(out, end, '\\');
+	out = sputchar(out, end, ((c >> 6) & 0x07) + '0');
+	out = sputchar(out, end, ((c >> 3) & 0x07) + '0');
+	out = sputchar(out, end, ((c >> 0) & 0x07) + '0');
 
 	*dst = out;
 	return true;
@@ -422,18 +402,10 @@ static bool escape_hex(unsigned char c, char **dst, char *end)
 {
 	char *out = *dst;
 
-	if (out < end)
-		*out = '\\';
-	++out;
-	if (out < end)
-		*out = 'x';
-	++out;
-	if (out < end)
-		*out = hex_asc_hi(c);
-	++out;
-	if (out < end)
-		*out = hex_asc_lo(c);
-	++out;
+	out = sputchar(out, end, '\\');
+	out = sputchar(out, end, 'x');
+	out = sputchar(out, end, hex_asc_hi(c));
+	out = sputchar(out, end, hex_asc_lo(c));
 
 	*dst = out;
 	return true;
