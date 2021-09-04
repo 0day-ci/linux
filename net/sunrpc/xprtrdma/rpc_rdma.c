@@ -255,21 +255,9 @@ rpcrdma_convert_iovs(struct rpcrdma_xprt *r_xprt, struct xdr_buf *xdrbuf,
 		page_base = 0;
 	}
 
-	if (type == rpcrdma_readch)
-		goto out;
-
-	/* When encoding a Write chunk, some servers need to see an
-	 * extra segment for non-XDR-aligned Write chunks. The upper
-	 * layer provides space in the tail iovec that may be used
-	 * for this purpose.
-	 */
-	if (type == rpcrdma_writech && r_xprt->rx_ep->re_implicit_roundup)
-		goto out;
-
-	if (xdrbuf->tail[0].iov_len)
+	if (pos == 0 && xdrbuf->tail[0].iov_len)
 		rpcrdma_convert_kvec(&xdrbuf->tail[0], seg, &n);
 
-out:
 	if (unlikely(n > RPCRDMA_MAX_SEGS))
 		return -EIO;
 	return n;
@@ -405,6 +393,7 @@ static int rpcrdma_encode_write_list(struct rpcrdma_xprt *r_xprt,
 				     enum rpcrdma_chunktype wtype)
 {
 	struct xdr_stream *xdr = &req->rl_stream;
+	struct rpcrdma_ep *ep = r_xprt->rx_ep;
 	struct rpcrdma_mr_seg *seg;
 	struct rpcrdma_mr *mr;
 	int nsegs, nchunks;
@@ -442,6 +431,27 @@ static int rpcrdma_encode_write_list(struct rpcrdma_xprt *r_xprt,
 		nchunks++;
 		nsegs -= mr->mr_nents;
 	} while (nsegs);
+
+	/* The pad MR is already registered, and is not chained on
+	 * rl_registered. Thus the Reply handler does not invalidate it.
+	 *
+	 * To avoid accidental remote invalidation of this MR, it is
+	 * not used when remote invalidation is enabled. Servers that
+	 * support remote invalidation are known not to write into
+	 * Write chunk pad segments.
+	 */
+	if (ep->re_implicit_roundup &&
+	    xdr_pad_size(rqst->rq_rcv_buf.page_len)) {
+		if (encode_rdma_segment(xdr, ep->re_write_pad_mr) < 0)
+			return -EMSGSIZE;
+
+		trace_xprtrdma_chunk_wp(rqst->rq_task, ep->re_write_pad_mr,
+					nsegs);
+		r_xprt->rx_stats.write_chunk_count++;
+		r_xprt->rx_stats.total_rdma_request += mr->mr_length;
+		nchunks++;
+		nsegs -= mr->mr_nents;
+	}
 
 	/* Update count of segments in this Write chunk */
 	*segcount = cpu_to_be32(nchunks);
