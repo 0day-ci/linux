@@ -688,6 +688,9 @@ asmlinkage long
 compat_sys_get_robust_list(int pid, compat_uptr_t __user *head_ptr,
 			   compat_size_t __user *len_ptr);
 
+asmlinkage long sys_futex_waitv(struct futex_waitv *waiters,
+				compat_uint_t nr_futexes, compat_uint_t flags,
+				struct __kernel_timespec __user *timo);
 /* kernel/itimer.c */
 asmlinkage long compat_sys_getitimer(int which,
 				     struct old_itimerval32 __user *it);
