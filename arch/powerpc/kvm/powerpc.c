@@ -763,7 +763,6 @@ int kvm_arch_vcpu_create(struct kvm_vcpu *vcpu)
 		goto out_vcpu_uninit;
 
 	vcpu->arch.waitp = &vcpu->wait;
-	kvmppc_create_vcpu_debugfs(vcpu, vcpu->vcpu_id);
 	return 0;
 
 out_vcpu_uninit:
@@ -779,8 +778,6 @@ void kvm_arch_vcpu_destroy(struct kvm_vcpu *vcpu)
 {
 	/* Make sure we're not using the vcpu anymore */
 	hrtimer_cancel(&vcpu->arch.dec_timer);
-
-	kvmppc_remove_vcpu_debugfs(vcpu);
 
 	switch (vcpu->arch.irq_type) {
 	case KVMPPC_IRQ_MPIC:
@@ -2505,3 +2502,15 @@ int kvm_arch_init(void *opaque)
 }
 
 EXPORT_TRACEPOINT_SYMBOL_GPL(kvm_ppc_instr);
+
+void kvm_arch_create_vcpu_debugfs(struct kvm_vcpu *vcpu, struct dentry *debugfs_dentry)
+{
+	if (vcpu->kvm->arch.kvm_ops->create_vcpu_debugfs)
+		vcpu->kvm->arch.kvm_ops->create_vcpu_debugfs(vcpu, debugfs_dentry);
+}
+
+void kvm_arch_create_vm_debugfs(struct kvm *kvm)
+{
+	if (kvm->arch.kvm_ops->create_vm_debugfs)
+		kvm->arch.kvm_ops->create_vm_debugfs(kvm);
+}
