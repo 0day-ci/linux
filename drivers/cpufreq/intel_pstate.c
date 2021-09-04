@@ -298,6 +298,8 @@ static bool hwp_boost __read_mostly;
 
 static struct cpufreq_driver *intel_pstate_driver __read_mostly;
 
+static cpumask_t hwp_intr_enable_mask;
+
 #ifdef CONFIG_ACPI
 static bool acpi_ppc;
 #endif
@@ -1067,10 +1069,14 @@ skip_epp:
 	wrmsrl_on_cpu(cpu, MSR_HWP_REQUEST, value);
 }
 
+static void intel_pstate_disable_hwp_interrupt(struct cpudata *cpudata);
+
 static void intel_pstate_hwp_offline(struct cpudata *cpu)
 {
 	u64 value = READ_ONCE(cpu->hwp_req_cached);
 	int min_perf;
+
+	intel_pstate_disable_hwp_interrupt(cpu);
 
 	if (boot_cpu_has(X86_FEATURE_HWP_EPP)) {
 		/*
@@ -1645,12 +1651,26 @@ void notify_hwp_interrupt(void)
 	if (!hwp_active || !boot_cpu_has(X86_FEATURE_HWP_NOTIFY))
 		return;
 
-	rdmsrl(MSR_HWP_STATUS, value);
+	rdmsrl_safe(MSR_HWP_STATUS, &value);
 	if (!(value & 0x01))
 		return;
 
+	if (!cpumask_test_cpu(this_cpu, &hwp_intr_enable_mask)) {
+		wrmsrl_safe(MSR_HWP_STATUS, 0);
+		return;
+	}
+
 	cpudata = all_cpu_data[this_cpu];
 	schedule_delayed_work_on(this_cpu, &cpudata->hwp_notify_work, msecs_to_jiffies(10));
+}
+
+static void intel_pstate_disable_hwp_interrupt(struct cpudata *cpudata)
+{
+
+	if (cpumask_test_and_clear_cpu(cpudata->cpu, &hwp_intr_enable_mask)) {
+		wrmsrl_on_cpu(cpudata->cpu, MSR_HWP_INTERRUPT, 0x00);
+		cancel_delayed_work_sync(&cpudata->hwp_notify_work);
+	}
 }
 
 static void intel_pstate_enable_hwp_interrupt(struct cpudata *cpudata)
@@ -1659,6 +1679,7 @@ static void intel_pstate_enable_hwp_interrupt(struct cpudata *cpudata)
 	if (boot_cpu_has(X86_FEATURE_HWP_NOTIFY)) {
 		INIT_DELAYED_WORK(&cpudata->hwp_notify_work, intel_pstate_notify_work);
 		wrmsrl_on_cpu(cpudata->cpu, MSR_HWP_INTERRUPT, 0x01);
+		cpumask_set_cpu(cpudata->cpu, &hwp_intr_enable_mask);
 	}
 }
 
