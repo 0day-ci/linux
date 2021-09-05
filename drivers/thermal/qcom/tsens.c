@@ -599,6 +599,7 @@ int get_temp_tsens_valid(const struct tsens_sensor *s, int *temp)
 	int hw_id = s->hw_id;
 	u32 temp_idx = LAST_TEMP_0 + hw_id;
 	u32 valid_idx = VALID_0 + hw_id;
+	unsigned long timeout;
 	u32 valid;
 	int ret;
 
@@ -607,13 +608,21 @@ int get_temp_tsens_valid(const struct tsens_sensor *s, int *temp)
 		ret = regmap_field_read(priv->rf[valid_idx], &valid);
 		if (ret)
 			return ret;
-		while (!valid) {
-			/* Valid bit is 0 for 6 AHB clock cycles.
-			 * At 19.2MHz, 1 AHB clock is ~60ns.
-			 * We should enter this loop very, very rarely.
-			 */
-			ndelay(400);
-			ret = regmap_field_read(priv->rf[valid_idx], &valid);
+
+		if (!valid) {
+			timeout = jiffies + msecs_to_jiffies(20);
+
+			do {
+				/* Valid bit is 0 for 6 AHB clock cycles.
+				 * At 19.2MHz, 1 AHB clock is ~60ns.
+				 * We should enter this loop very, very rarely.
+				 */
+				ndelay(400);
+				ret = regmap_field_read(priv->rf[valid_idx], &valid);
+				if (valid || ret)
+					break;
+			} while (!(ret = time_after_eq(jiffies, timeout)));
+
 			if (ret)
 				return ret;
 		}
