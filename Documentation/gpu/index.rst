@@ -10,6 +10,7 @@ Linux GPU Driver Developer's Guide
    drm-kms
    drm-kms-helpers
    drm-uapi
+   exchanging-pixel-buffers
    driver-uapi
    drm-client
    drivers
