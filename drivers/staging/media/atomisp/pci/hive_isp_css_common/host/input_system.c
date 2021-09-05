@@ -1644,8 +1644,9 @@ static input_system_err_t input_system_configure_channel_sensor(
 	case INPUT_SYSTEM_XMEM_CAPTURE:
 	case INPUT_SYSTEM_XMEM_ACQUIRE:
 	default:
-		return INPUT_SYSTEM_ERR_PARAMETER_NOT_SUPPORTED;
+		break;
 	}
+	return INPUT_SYSTEM_ERR_PARAMETER_NOT_SUPPORTED;
 }
 
 // Test flags and set structure.
