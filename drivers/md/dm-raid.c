@@ -3249,14 +3249,12 @@ size_check:
 	rs->md.in_sync = 0; /* Assume already marked dirty */
 	if (r) {
 		ti->error = "Failed to run raid array";
-		mddev_unlock(&rs->md);
-		goto bad;
+		goto bad_unlock;
 	}
 
 	r = md_start(&rs->md);
 	if (r) {
 		ti->error = "Failed to start raid array";
-		mddev_unlock(&rs->md);
 		goto bad_md_start;
 	}
 
@@ -3265,7 +3263,6 @@ size_check:
 		r = r5c_journal_mode_set(&rs->md, rs->journal_dev.mode);
 		if (r) {
 			ti->error = "Failed to set raid4/5/6 journal mode";
-			mddev_unlock(&rs->md);
 			goto bad_journal_mode_set;
 		}
 	}
@@ -3304,10 +3301,12 @@ size_check:
 	mddev_unlock(&rs->md);
 	return 0;
 
+bad_unlock:
 bad_md_start:
 bad_journal_mode_set:
 bad_stripe_cache:
 bad_check_reshape:
+	mddev_unlock(&rs->md);
 	md_stop(&rs->md);
 bad:
 	raid_set_free(rs);
