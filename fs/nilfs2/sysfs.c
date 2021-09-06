@@ -1024,6 +1024,7 @@ delete_mounted_snapshots_group:
 
 cleanup_dev_kobject:
 	kobject_del(&nilfs->ns_dev_kobj);
+	kobject_put(&nilfs->ns_dev_kobj);
 
 free_dev_subgroups:
 	kfree(nilfs->ns_dev_subgroups);
