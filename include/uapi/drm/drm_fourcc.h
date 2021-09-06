@@ -522,8 +522,16 @@ extern "C" {
  * The main surface is Y-tiled and at plane index 0, the CCS is linear and
  * at index 1. A 64B CCS cache line corresponds to an area of 4x1 tiles in
  * main surface. In other words, 4 bits in CCS map to a main surface cache
- * line pair. The main surface pitch is required to be a multiple of four
- * Y-tile widths.
+ * line pair.
+ *
+ * The pitch of the main surface is required to be either 8 or a multiple of
+ * 16 Y-tile widths on Alderlake-P and a multiple of 4 Y-tile widths on other
+ * platforms.
+ *
+ * The pitch of the CCS surface must be calculated using the
+ *    ccs_surface_pitch=main_surface_pitch_in_bytes / 512 * 64.
+ * formula. On Alderlake-P this pitch must be rounded up to be power-of-two
+ * sized.
  */
 #define I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS fourcc_mod_code(INTEL, 6)
 
@@ -533,10 +541,12 @@ extern "C" {
  * The main surface is Y-tiled and at plane index 0, the CCS is linear and
  * at index 1. A 64B CCS cache line corresponds to an area of 4x1 tiles in
  * main surface. In other words, 4 bits in CCS map to a main surface cache
- * line pair. The main surface pitch is required to be a multiple of four
- * Y-tile widths. For semi-planar formats like NV12, CCS planes follow the
+ * line pair.  For semi-planar formats like NV12, CCS planes follow the
  * Y and UV planes i.e., planes 0 and 1 are used for Y and UV surfaces,
  * planes 2 and 3 for the respective CCS.
+ *
+ * About the requirement on the main and CCS surface pitches see the
+ * description for I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS.
  */
 #define I915_FORMAT_MOD_Y_TILED_GEN12_MC_CCS fourcc_mod_code(INTEL, 7)
 
@@ -554,8 +564,10 @@ extern "C" {
  * Clear Color value when applicable. The Converted Clear Color values are
  * consumed by the DE. The last 64 bits are used to store Color Discard Enable
  * and Depth Clear Value Valid which are ignored by the DE. A CCS cache line
- * corresponds to an area of 4x1 tiles in the main surface. The main surface
- * pitch is required to be a multiple of 4 tile widths.
+ * corresponds to an area of 4x1 tiles in the main surface.
+ *
+ * About the requirement on the main and CCS surface pitches see the
+ * description for I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS.
  */
 #define I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC fourcc_mod_code(INTEL, 8)
 
