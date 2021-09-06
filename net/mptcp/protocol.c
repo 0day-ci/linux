@@ -1098,8 +1098,10 @@ static void __mptcp_clean_una(struct sock *sk)
 	}
 
 	/* all retransmitted data acked, recovery completed */
-	if (unlikely(msk->recovery) && after64(msk->snd_una, msk->recovery_snd_nxt))
+	if (unlikely(msk->recovery) && after64(msk->snd_una, msk->recovery_snd_nxt)) {
 		msk->recovery = false;
+		WRITE_ONCE(msk->noncontiguous, false);
+	}
 
 out:
 	if (cleaned && tcp_under_memory_pressure(sk))
@@ -2502,8 +2504,10 @@ static void mptcp_worker(struct work_struct *work)
 	if (test_and_clear_bit(MPTCP_WORK_CLOSE_SUBFLOW, &msk->flags))
 		__mptcp_close_subflow(msk);
 
-	if (test_and_clear_bit(MPTCP_WORK_RTX, &msk->flags))
+	if (test_and_clear_bit(MPTCP_WORK_RTX, &msk->flags)) {
+		WRITE_ONCE(msk->noncontiguous, true);
 		__mptcp_retrans(sk);
+	}
 
 unlock:
 	release_sock(sk);
@@ -2872,6 +2876,7 @@ struct sock *mptcp_sk_clone(const struct sock *sk,
 	WRITE_ONCE(msk->fully_established, false);
 	if (mp_opt->suboptions & OPTION_MPTCP_CSUMREQD)
 		WRITE_ONCE(msk->csum_enabled, true);
+	WRITE_ONCE(msk->noncontiguous, false);
 
 	msk->write_seq = subflow_req->idsn + 1;
 	msk->snd_nxt = msk->write_seq;
@@ -3040,8 +3045,10 @@ static void mptcp_release_cb(struct sock *sk)
 		spin_unlock_bh(&sk->sk_lock.slock);
 		if (flags & BIT(MPTCP_PUSH_PENDING))
 			__mptcp_push_pending(sk, 0);
-		if (flags & BIT(MPTCP_RETRANSMIT))
+		if (flags & BIT(MPTCP_RETRANSMIT)) {
+			WRITE_ONCE(mptcp_sk(sk)->noncontiguous, true);
 			__mptcp_retrans(sk);
+		}
 
 		cond_resched();
 		spin_lock_bh(&sk->sk_lock.slock);
