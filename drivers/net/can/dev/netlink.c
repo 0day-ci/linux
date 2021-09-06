@@ -190,7 +190,7 @@ static int can_changelink(struct net_device *dev, struct nlattr *tb[],
 			return -EINVAL;
 		}
 
-		can_calc_tdco(dev);
+		can_calc_tdco(&priv->tdc, priv->tdc_const, &priv->data_bittiming);
 
 		if (priv->do_set_data_bittiming) {
 			/* Finally, set the bit-timing registers */
