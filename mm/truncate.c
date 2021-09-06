@@ -319,7 +319,8 @@ void truncate_inode_pages_range(struct address_space *mapping,
 	index = start;
 	while (index < end && find_lock_entries(mapping, index, end - 1,
 			&pvec, indices)) {
-		index = indices[pagevec_count(&pvec) - 1] + 1;
+		index = indices[pagevec_count(&pvec) - 1] +
+			thp_nr_pages(pvec.pages[pagevec_count(&pvec) - 1]);
 		truncate_exceptional_pvec_entries(mapping, &pvec, indices);
 		for (i = 0; i < pagevec_count(&pvec); i++)
 			truncate_cleanup_page(pvec.pages[i]);
@@ -390,6 +391,20 @@ void truncate_inode_pages_range(struct address_space *mapping,
 
 			if (xa_is_value(page))
 				continue;
+
+			/*
+			 * Already truncated? We can find and get subpage
+			 * of file THP, of which the head page is truncated.
+			 *
+			 * In addition, another race will be avoided, where
+			 * collapse_file rolls back when writer truncates the
+			 * page cache.
+			 */
+			if (page_mapping(page) != mapping) {
+				/* Restart to make sure all gone */
+				index = start - 1;
+				continue;
+			}
 
 			lock_page(page);
 			WARN_ON(page_to_index(page) != index);

@@ -2093,7 +2093,6 @@ unsigned find_lock_entries(struct address_space *mapping, pgoff_t start,
 		if (!xa_is_value(page)) {
 			if (page->index < start)
 				goto put;
-			VM_BUG_ON_PAGE(page->index != xas.xa_index, page);
 			if (page->index + thp_nr_pages(page) - 1 > end)
 				goto put;
 			if (!trylock_page(page))
@@ -2102,6 +2101,12 @@ unsigned find_lock_entries(struct address_space *mapping, pgoff_t start,
 				goto unlock;
 			VM_BUG_ON_PAGE(!thp_contains(page, xas.xa_index),
 					page);
+			/*
+			 * We can find and get head page of file THP with
+			 * non-head index. The head page should have already
+			 * be truncated with page->mapping reset to NULL.
+			 */
+			VM_BUG_ON_PAGE(page->index != xas.xa_index, page);
 		}
 		indices[pvec->nr] = xas.xa_index;
 		if (!pagevec_add(pvec, page))
