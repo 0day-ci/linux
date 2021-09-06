@@ -3556,10 +3556,17 @@ int __cold open_ctree(struct super_block *sb, struct btrfs_fs_devices *fs_device
 		goto fail_sysfs;
 	}
 
-	if (!sb_rdonly(sb) && !btrfs_check_rw_degradable(fs_info, NULL)) {
-		btrfs_warn(fs_info,
+	if (!sb_rdonly(sb)) {
+		bool can_mount;
+
+		set_bit(BTRFS_FS_MOUNT_RW_CHECK, &fs_info->flags);
+		can_mount = btrfs_check_rw_degradable(fs_info, NULL);
+		clear_bit(BTRFS_FS_MOUNT_RW_CHECK, &fs_info->flags);
+		if (!can_mount) {
+			btrfs_warn(fs_info,
 		"writable mount is not allowed due to too many missing devices");
-		goto fail_sysfs;
+			goto fail_sysfs;
+		}
 	}
 
 	fs_info->cleaner_kthread = kthread_run(cleaner_kthread, tree_root,

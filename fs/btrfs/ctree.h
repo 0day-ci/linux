@@ -598,6 +598,9 @@ enum {
 	BTRFS_FS_32BIT_ERROR,
 	BTRFS_FS_32BIT_WARN,
 #endif
+
+	/* Used to signal we are checking if we can mount a fs in rw mode. */
+	BTRFS_FS_MOUNT_RW_CHECK,
 };
 
 /*
