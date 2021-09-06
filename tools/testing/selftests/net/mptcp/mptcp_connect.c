@@ -1010,7 +1010,6 @@ static void parse_opts(int argc, char **argv)
 		case 'j':
 			cfg_join = true;
 			cfg_mode = CFG_MODE_POLL;
-			cfg_wait = 400000;
 			break;
 		case 'r':
 			cfg_remove = true;
