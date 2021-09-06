@@ -5,7 +5,7 @@
  *  Copyright (C) 1995-2005 Russell King
  *
  * This handles the mini data cache, as found on SA11x0 and XScale
- * processors.  When we copy a user page page, we map it in such a way
+ * processors.  When we copy a user page, we map it in such a way
  * that accesses to this page will not touch the main data cache, but
  * will be cached in the mini data cache.  This prevents us thrashing
  * the main data cache on page faults.
