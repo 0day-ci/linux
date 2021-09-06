@@ -85,6 +85,8 @@ struct led_classdev {
 #define LED_BRIGHT_HW_CHANGED	BIT(21)
 #define LED_RETAIN_AT_SHUTDOWN	BIT(22)
 #define LED_INIT_DEFAULT_TRIGGER BIT(23)
+#define LED_PANIC_INDICATOR_ON	BIT(24)
+#define LED_PANIC_INDICATOR_OFF	BIT(25)
 
 	/* set_brightness_work / blink_timer flags, atomic, private. */
 	unsigned long		work_flags;
@@ -521,6 +523,8 @@ struct gpio_led {
 	unsigned	active_low : 1;
 	unsigned	retain_state_suspended : 1;
 	unsigned	panic_indicator : 1;
+	unsigned	panic_indicator_on : 1;
+	unsigned	panic_indicator_off : 1;
 	unsigned	default_state : 2;
 	unsigned	retain_state_shutdown : 1;
 	/* default_state should be one of LEDS_GPIO_DEFSTATE_(ON|OFF|KEEP) */
