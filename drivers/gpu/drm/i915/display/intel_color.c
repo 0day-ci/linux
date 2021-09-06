@@ -2118,6 +2118,83 @@ static void icl_read_luts(struct intel_crtc_state *crtc_state)
 	}
 }
 
+static void icl_load_plane_csc_matrix(const struct drm_plane_state *state)
+{
+	struct drm_i915_private *dev_priv = to_i915(state->plane->dev);
+	enum pipe pipe = to_intel_plane(state->plane)->pipe;
+	enum plane_id plane = to_intel_plane(state->plane)->id;
+	struct drm_color_ctm *ctm;
+	const u64 *input;
+	u16 coeffs[9] = {};
+	u16 postoff = 0;
+	int i;
+
+	if (!icl_is_hdr_plane(dev_priv, plane) || !state->ctm)
+		return;
+
+	ctm = state->ctm->data;
+	input = ctm->matrix;
+
+	/*
+	 * Convert fixed point S31.32 input to format supported by the
+	 * hardware.
+	 */
+	for (i = 0; i < ARRAY_SIZE(coeffs); i++) {
+		u64 abs_coeff = ((1ULL << 63) - 1) & input[i];
+
+		/*
+		 * Clamp input value to min/max supported by
+		 * hardware.
+		 */
+		abs_coeff = clamp_val(abs_coeff, 0, CTM_COEFF_4_0 - 1);
+
+		/* sign bit */
+		if (CTM_COEFF_NEGATIVE(input[i]))
+			coeffs[i] |= 1 << 15;
+
+		if (abs_coeff < CTM_COEFF_0_125)
+			coeffs[i] |= (3 << 12) |
+				ILK_CSC_COEFF_FP(abs_coeff, 12);
+		else if (abs_coeff < CTM_COEFF_0_25)
+			coeffs[i] |= (2 << 12) |
+				ILK_CSC_COEFF_FP(abs_coeff, 11);
+		else if (abs_coeff < CTM_COEFF_0_5)
+			coeffs[i] |= (1 << 12) |
+				ILK_CSC_COEFF_FP(abs_coeff, 10);
+		else if (abs_coeff < CTM_COEFF_1_0)
+			coeffs[i] |= ILK_CSC_COEFF_FP(abs_coeff, 9);
+		else if (abs_coeff < CTM_COEFF_2_0)
+			coeffs[i] |= (7 << 12) |
+				ILK_CSC_COEFF_FP(abs_coeff, 8);
+		else
+			coeffs[i] |= (6 << 12) |
+				ILK_CSC_COEFF_FP(abs_coeff, 7);
+	}
+
+	intel_de_write(dev_priv, PLANE_CSC_COEFF(pipe, plane, 0),
+		       coeffs[0] << 16 | coeffs[1]);
+	intel_de_write(dev_priv, PLANE_CSC_COEFF(pipe, plane, 1),
+		       coeffs[2] << 16);
+
+	intel_de_write(dev_priv, PLANE_CSC_COEFF(pipe, plane, 2),
+		       coeffs[3] << 16 | coeffs[4]);
+	intel_de_write(dev_priv, PLANE_CSC_COEFF(pipe, plane, 3),
+		       coeffs[5] << 16);
+
+	intel_de_write(dev_priv, PLANE_CSC_COEFF(pipe, plane, 4),
+		       coeffs[6] << 16 | coeffs[7]);
+	intel_de_write(dev_priv, PLANE_CSC_COEFF(pipe, plane, 5),
+		       coeffs[8] << 16);
+
+	intel_de_write(dev_priv, PLANE_CSC_PREOFF(pipe, plane, 0), 0);
+	intel_de_write(dev_priv, PLANE_CSC_PREOFF(pipe, plane, 1), 0);
+	intel_de_write(dev_priv, PLANE_CSC_PREOFF(pipe, plane, 2), 0);
+
+	intel_de_write(dev_priv, PLANE_CSC_POSTOFF(pipe, plane, 0), postoff);
+	intel_de_write(dev_priv, PLANE_CSC_POSTOFF(pipe, plane, 1), postoff);
+	intel_de_write(dev_priv, PLANE_CSC_POSTOFF(pipe, plane, 2), postoff);
+}
+
  /* FIXME input bpc? */
 static const struct drm_color_lut_range d13_degamma_hdr[] = {
 	/* segment 1 */
@@ -2342,7 +2419,12 @@ int intel_plane_color_init(struct drm_plane *plane)
 									   LUT_TYPE_DEGAMMA);
 
 		dev_priv->display.load_plane_luts = d13_plane_load_luts;
+		dev_priv->display.load_plane_csc_matrix = icl_load_plane_csc_matrix;
+
 		drm_plane_attach_degamma_properties(plane);
+
+		if (icl_is_hdr_plane(dev_priv, to_intel_plane(plane)->id))
+			drm_plane_attach_ctm_property(plane);
 	}
 
 	return ret;
