@@ -77,6 +77,7 @@ struct arch {
 	bool		sorted_instructions;
 	bool		initialized;
 	void		*priv;
+	char		*vendor;
 	unsigned int	model;
 	unsigned int	family;
 	int		(*init)(struct arch *arch, char *cpuid);

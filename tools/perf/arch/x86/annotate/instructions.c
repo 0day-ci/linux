@@ -144,8 +144,31 @@ static struct ins x86__instructions[] = {
 	{ .name = "xorps",	.ops = &mov_ops, },
 };
 
-static bool x86__ins_is_fused(struct arch *arch, const char *ins1,
+static bool amd__ins_is_fused(struct arch *arch, const char *ins1,
 			      const char *ins2)
+{
+	if (strstr(ins2, "jmp"))
+		return false;
+
+	/* Family >= 15h supports cmp/test + branch fusion */
+	if (arch->family >= 0x15 && (strstarts(ins1, "test") ||
+	    (strstarts(ins1, "cmp") && !strstr(ins1, "xchg")))) {
+		return true;
+	}
+
+	/* Family >= 19h supports some ALU + branch fusion */
+	if (arch->family >= 0x19 && (strstarts(ins1, "add") ||
+	    strstarts(ins1, "sub") || strstarts(ins1, "and") ||
+	    strstarts(ins1, "inc") || strstarts(ins1, "dec") ||
+	    strstarts(ins1, "or") || strstarts(ins1, "xor"))) {
+		return true;
+	}
+
+	return false;
+}
+
+static bool intel__ins_is_fused(struct arch *arch, const char *ins1,
+				const char *ins2)
 {
 	if (arch->family != 6 || arch->model < 0x1e || strstr(ins2, "jmp"))
 		return false;
@@ -172,6 +195,15 @@ static bool x86__ins_is_fused(struct arch *arch, const char *ins1,
 	return false;
 }
 
+static bool x86__ins_is_fused(struct arch *arch, const char *ins1,
+			      const char *ins2)
+{
+	if (strstarts(arch->vendor, "AuthenticAMD"))
+		return amd__ins_is_fused(arch, ins1, ins2);
+
+	return intel__ins_is_fused(arch, ins1, ins2);
+}
+
 static int x86__cpuid_parse(struct arch *arch, char *cpuid)
 {
 	unsigned int family, model, stepping;
@@ -184,6 +216,9 @@ static int x86__cpuid_parse(struct arch *arch, char *cpuid)
 	if (ret == 3) {
 		arch->family = family;
 		arch->model = model;
+		arch->vendor = strndup(cpuid, 12);
+		if (!arch->vendor)
+			return -1;
 		return 0;
 	}
 
