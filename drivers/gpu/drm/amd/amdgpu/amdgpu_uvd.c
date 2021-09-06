@@ -1178,7 +1178,11 @@ int amdgpu_uvd_get_create_msg(struct amdgpu_ring *ring, uint32_t handle,
 	int r, i;
 
 	r = amdgpu_bo_create_reserved(adev, 1024, PAGE_SIZE,
+#ifdef CONFIG_X86_64
+				      AMDGPU_GEM_DOMAIN_VRAM,
+#else
 				      AMDGPU_GEM_DOMAIN_GTT,
+#endif
 				      &bo, NULL, (void **)&msg);
 	if (r)
 		return r;
@@ -1210,7 +1214,11 @@ int amdgpu_uvd_get_destroy_msg(struct amdgpu_ring *ring, uint32_t handle,
 	int r, i;
 
 	r = amdgpu_bo_create_reserved(adev, 1024, PAGE_SIZE,
+#ifdef CONFIG_X86_64
+				      AMDGPU_GEM_DOMAIN_VRAM,
+#else
 				      AMDGPU_GEM_DOMAIN_GTT,
+#endif
 				      &bo, NULL, (void **)&msg);
 	if (r)
 		return r;
