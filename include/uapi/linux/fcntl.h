@@ -111,4 +111,6 @@
 
 #define AT_RECURSIVE		0x8000	/* Apply to the entire subtree */
 
+#define AT_NUMA_REPLICATION	0x10000	/* Support NUMA replication for the ELF program */
+
 #endif /* _UAPI_LINUX_FCNTL_H */

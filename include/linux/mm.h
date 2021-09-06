@@ -3328,6 +3328,8 @@ unsigned long wp_shared_mapping_range(struct address_space *mapping,
 #endif
 
 extern int sysctl_nr_trim_pages;
+int do_mprotect_pkey(unsigned long start, size_t len,
+			unsigned long prot, int pkey);
 
 #ifdef CONFIG_PRINTK
 void mem_dump_obj(void *object);

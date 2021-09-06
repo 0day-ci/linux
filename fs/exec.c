@@ -902,7 +902,7 @@ static struct file *do_open_execat(int fd, struct filename *name, int flags)
 		.lookup_flags = LOOKUP_FOLLOW,
 	};
 
-	if ((flags & ~(AT_SYMLINK_NOFOLLOW | AT_EMPTY_PATH)) != 0)
+	if ((flags & ~(AT_SYMLINK_NOFOLLOW | AT_EMPTY_PATH | AT_NUMA_REPLICATION)) != 0)
 		return ERR_PTR(-EINVAL);
 	if (flags & AT_SYMLINK_NOFOLLOW)
 		open_exec_flags.lookup_flags &= ~LOOKUP_FOLLOW;
@@ -1829,6 +1829,9 @@ static int bprm_execve(struct linux_binprm *bprm,
 	retval = security_bprm_creds_for_exec(bprm);
 	if (retval)
 		goto out;
+
+	/* Do we support NUMA replication for this program? */
+	bprm->support_numa_replication = flags & AT_NUMA_REPLICATION;
 
 	retval = exec_binprm(bprm);
 	if (retval < 0)
