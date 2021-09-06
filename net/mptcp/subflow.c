@@ -968,6 +968,7 @@ static enum mapping_status get_mapping_status(struct sock *ssk,
 	data_len = mpext->data_len;
 	if (data_len == 0) {
 		MPTCP_INC_STATS(sock_net(ssk), MPTCP_MIB_INFINITEMAPRX);
+		subflow->infinite_mapping_rcv = 1;
 		return MAPPING_INVALID;
 	}
 
@@ -1181,7 +1182,7 @@ fallback:
 
 	if (subflow->mp_join ||
 	    (subflow->fully_established &&
-	     !subflow->infinite_mapping_snd)) {
+	     !(subflow->infinite_mapping_snd || subflow->infinite_mapping_rcv))) {
 		/* fatal protocol error, close the socket.
 		 * subflow_error_report() will introduce the appropriate barriers
 		 */
@@ -1201,6 +1202,7 @@ fallback:
 	subflow->map_data_len = skb->len;
 	subflow->map_subflow_seq = tcp_sk(ssk)->copied_seq - subflow->ssn_offset;
 	WRITE_ONCE(subflow->data_avail, MPTCP_SUBFLOW_DATA_AVAIL);
+	subflow->infinite_mapping_rcv = 0;
 	return true;
 }
 
