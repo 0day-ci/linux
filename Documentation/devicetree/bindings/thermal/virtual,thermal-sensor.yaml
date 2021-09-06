@@ -1,0 +1,67 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+# Copyright 2021 BayLibre
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/thermal/thermal-sensor.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Virtual thermal sensor binding
+
+description: |
+  The virtual thermal sensor devices provide temperature sensing capabilities
+  based on hardware thermal sensors. Basically, this could be used to get the
+  maximum, minimum or average temperature of the hardware thermal sensors.
+properties:
+  "#thermal-sensor-cells":
+    description:
+      Used to uniquely identify a thermal sensor instance within an IC. Will be
+      0 on sensor nodes with only a single sensor and at least 1 on nodes
+      containing several internal sensors.
+    enum: [0, 1]
+
+  type:
+    $ref: /schemas/types.yaml#/definitions/uint32
+    description:
+      Used to select the operations to perform on the sensors to get the virtual
+      sensor temperature.
+    enum:
+      - VIRTUAL_SENSOR_MIN
+      - VIRTUAL_SENSOR_MAX
+      - VIRTUAL_SENSOR_AVG
+
+  thermal-sensors:
+    $ref: /schemas/types.yaml#/definitions/phandle-array
+    description:
+      The thermal sensor phandle and sensor specifier used to monitor this
+      thermal zone.
+
+required:
+  - "#thermal-sensor-cells"
+  - type
+  - thermal-sensors
+
+additionalProperties: true
+
+examples:
+  - |
+    #include <dt-bindings/thermal/thermal.h>
+    #include <dt-bindings/thermal/virtual-sensor.h>
+    #include <dt-bindings/interrupt-controller/arm-gic.h>
+    #include <dt-bindings/clock/mt8192-clk.h>
+
+    lvts: lvts@1100b000 {
+        compatible = "mediatek,mt6873-lvts";
+        reg = <0x1100b000 0x1000>;
+        clocks = <&infracfg CLK_INFRA_THERM>;
+        clock-names = "lvts_clk";
+        #thermal-sensor-cells = <0>;
+        interrupts = <GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>;
+    };
+
+    soc_max_sensor: soc_max_sensor {
+      compatible = "virtual,thermal-sensor";
+      #thermal-sensor-cells = <1>;
+      type = <VIRTUAL_SENSOR_MAX>;
+      thermal-sensors = <&lvts 0>, <&lvts 1>;
+    };
+...
