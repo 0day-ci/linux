@@ -58,14 +58,19 @@ static int can_changelink(struct net_device *dev, struct nlattr *tb[],
 			  struct nlattr *data[],
 			  struct netlink_ext_ack *extack)
 {
-	struct can_priv *priv = netdev_priv(dev);
+	/* Work on a local copy of priv to prevent inconsistent value
+	 * in case of early return.
+	 */
+	static struct can_priv *priv;
 	int err;
 
 	/* We need synchronization with dev->stop() */
 	ASSERT_RTNL();
 
+	priv = kmemdup(netdev_priv(dev), sizeof(*priv), GFP_KERNEL);
+
 	if (data[IFLA_CAN_BITTIMING]) {
-		struct can_bittiming bt;
+		struct can_bittiming *bt = &priv->bittiming;
 
 		/* Do not allow changing bittiming while running */
 		if (dev->flags & IFF_UP)
@@ -79,21 +84,19 @@ static int can_changelink(struct net_device *dev, struct nlattr *tb[],
 		if (!priv->bittiming_const && !priv->do_set_bittiming)
 			return -EOPNOTSUPP;
 
-		memcpy(&bt, nla_data(data[IFLA_CAN_BITTIMING]), sizeof(bt));
-		err = can_get_bittiming(dev, &bt,
+		memcpy(bt, nla_data(data[IFLA_CAN_BITTIMING]), sizeof(*bt));
+		err = can_get_bittiming(dev, bt,
 					priv->bittiming_const,
 					priv->bitrate_const,
 					priv->bitrate_const_cnt);
 		if (err)
 			return err;
 
-		if (priv->bitrate_max && bt.bitrate > priv->bitrate_max) {
+		if (priv->bitrate_max && bt->bitrate > priv->bitrate_max) {
 			netdev_err(dev, "arbitration bitrate surpasses transceiver capabilities of %d bps\n",
 				   priv->bitrate_max);
 			return -EINVAL;
 		}
-
-		memcpy(&priv->bittiming, &bt, sizeof(bt));
 
 		if (priv->do_set_bittiming) {
 			/* Finally, set the bit-timing registers */
@@ -158,7 +161,7 @@ static int can_changelink(struct net_device *dev, struct nlattr *tb[],
 	}
 
 	if (data[IFLA_CAN_DATA_BITTIMING]) {
-		struct can_bittiming dbt;
+		struct can_bittiming *dbt = &priv->data_bittiming;
 
 		/* Do not allow changing bittiming while running */
 		if (dev->flags & IFF_UP)
@@ -172,22 +175,20 @@ static int can_changelink(struct net_device *dev, struct nlattr *tb[],
 		if (!priv->data_bittiming_const && !priv->do_set_data_bittiming)
 			return -EOPNOTSUPP;
 
-		memcpy(&dbt, nla_data(data[IFLA_CAN_DATA_BITTIMING]),
-		       sizeof(dbt));
-		err = can_get_bittiming(dev, &dbt,
+		memcpy(dbt, nla_data(data[IFLA_CAN_DATA_BITTIMING]),
+		       sizeof(*dbt));
+		err = can_get_bittiming(dev, dbt,
 					priv->data_bittiming_const,
 					priv->data_bitrate_const,
 					priv->data_bitrate_const_cnt);
 		if (err)
 			return err;
 
-		if (priv->bitrate_max && dbt.bitrate > priv->bitrate_max) {
+		if (priv->bitrate_max && dbt->bitrate > priv->bitrate_max) {
 			netdev_err(dev, "canfd data bitrate surpasses transceiver capabilities of %d bps\n",
 				   priv->bitrate_max);
 			return -EINVAL;
 		}
-
-		memcpy(&priv->data_bittiming, &dbt, sizeof(dbt));
 
 		can_calc_tdco(dev);
 
@@ -222,6 +223,9 @@ static int can_changelink(struct net_device *dev, struct nlattr *tb[],
 
 		priv->termination = termval;
 	}
+
+	memcpy(netdev_priv(dev), priv, sizeof(*priv));
+	kfree(priv);
 
 	return 0;
 }
