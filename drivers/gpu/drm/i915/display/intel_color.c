@@ -25,6 +25,7 @@
 #include "intel_color.h"
 #include "intel_de.h"
 #include "intel_display_types.h"
+#include <drm/drm_plane.h>
 
 #define CTM_COEFF_SIGN	(1ULL << 63)
 
@@ -2093,7 +2094,6 @@ static void icl_read_luts(struct intel_crtc_state *crtc_state)
 }
 
  /* FIXME input bpc? */
-__maybe_unused
 static const struct drm_color_lut_range d13_degamma_hdr[] = {
 	/* segment 1 */
 	{
@@ -2143,6 +2143,26 @@ static const struct drm_color_lut_range d13_degamma_hdr[] = {
 		.min = 0, .max = (1 << 27) - 1,
 	},
 };
+
+int intel_plane_color_init(struct drm_plane *plane)
+{
+	struct drm_i915_private *dev_priv = to_i915(plane->dev);
+	int ret = 0;
+
+	if (DISPLAY_VER(dev_priv) >= 13) {
+		drm_plane_create_color_mgmt_properties(plane->dev, plane, 2);
+		ret = drm_plane_color_add_gamma_degamma_mode_range(plane, "no degamma",
+								   NULL, 0,
+								   LUT_TYPE_DEGAMMA);
+		ret = drm_plane_color_add_gamma_degamma_mode_range(plane, "plane degamma",
+								   d13_degamma_hdr,
+								   sizeof(d13_degamma_hdr),
+								   LUT_TYPE_DEGAMMA);
+		drm_plane_attach_degamma_properties(plane);
+	}
+
+	return ret;
+}
 
 void intel_color_init(struct intel_crtc *crtc)
 {

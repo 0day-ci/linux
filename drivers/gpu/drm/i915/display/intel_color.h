@@ -10,6 +10,7 @@
 
 struct intel_crtc_state;
 struct intel_crtc;
+struct drm_plane;
 struct drm_property_blob;
 
 void intel_color_init(struct intel_crtc *crtc);
@@ -21,5 +22,6 @@ int intel_color_get_gamma_bit_precision(const struct intel_crtc_state *crtc_stat
 bool intel_color_lut_equal(struct drm_property_blob *blob1,
 			   struct drm_property_blob *blob2,
 			   u32 gamma_mode, u32 bit_precision);
+int intel_plane_color_init(struct drm_plane *plane);
 
 #endif /* __INTEL_COLOR_H__ */
