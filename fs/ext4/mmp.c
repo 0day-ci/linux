@@ -205,6 +205,14 @@ static int kmmpd(void *data)
 			schedule_timeout_interruptible(mmp_update_interval *
 						       HZ - diff);
 			diff = jiffies - last_update_time;
+			/* If 'diff' little 'than mmp_update_interval * HZ', it
+			 * means someone call ext4_stop_mmpd to stop kmmpd
+			 * kthread. We don't need to update mmp_check_interval
+			 * any more, as 'diff' is not exact value.
+			 */
+			if (unlikely(diff < mmp_update_interval * HZ &&
+			    kthread_should_stop()))
+				break;
 		}
 
 		/*
