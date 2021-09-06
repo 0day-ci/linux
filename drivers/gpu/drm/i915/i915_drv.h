@@ -825,6 +825,11 @@ struct i915_selftest_stash {
 	struct ida mock_region_instances;
 };
 
+struct drm_i915_display {
+	/* Display functions */
+	struct drm_i915_display_funcs funcs;
+};
+
 struct drm_i915_private {
 	struct drm_device drm;
 
@@ -837,6 +842,9 @@ struct drm_i915_private {
 	const struct intel_device_info __info; /* Use INTEL_INFO() to access. */
 	struct intel_runtime_info __runtime; /* Use RUNTIME_INFO() to access. */
 	struct intel_driver_caps caps;
+
+	struct drm_i915_display _display;
+	struct drm_i915_display *display;
 
 	/**
 	 * Data Stolen Memory - aka "i915 stolen memory" gives us the start and
@@ -970,9 +978,6 @@ struct drm_i915_private {
 	struct workqueue_struct *modeset_wq;
 	/* unbound hipri wq for page flips/plane updates */
 	struct workqueue_struct *flip_wq;
-
-	/* Display functions */
-	struct drm_i915_display_funcs display;
 
 	/* PCH chipset type */
 	enum intel_pch pch_type;
