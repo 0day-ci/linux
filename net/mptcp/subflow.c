@@ -1179,7 +1179,9 @@ fallback:
 		return true;
 	}
 
-	if (subflow->mp_join || subflow->fully_established) {
+	if (subflow->mp_join ||
+	    (subflow->fully_established &&
+	     !subflow->infinite_mapping_snd)) {
 		/* fatal protocol error, close the socket.
 		 * subflow_error_report() will introduce the appropriate barriers
 		 */
