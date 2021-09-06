@@ -10,6 +10,7 @@
 #include <linux/freezer.h>
 #include <linux/kthread.h>
 #include <linux/slab.h>
+#include <linux/backing-dev.h>
 #include <net/sock.h>
 #include <linux/sunrpc/addr.h>
 #include <linux/sunrpc/stats.h>
@@ -682,12 +683,10 @@ static int svc_alloc_arg(struct svc_rqst *rqstp)
 			/* Made progress, don't sleep yet */
 			continue;
 
-		set_current_state(TASK_INTERRUPTIBLE);
-		if (signalled() || kthread_should_stop()) {
-			set_current_state(TASK_RUNNING);
+		if (signalled() || kthread_should_stop())
 			return -EINTR;
-		}
-		schedule_timeout(msecs_to_jiffies(500));
+
+		congestion_wait(BLK_RW_ASYNC, msecs_to_jiffies(500));
 	}
 	rqstp->rq_page_end = &rqstp->rq_pages[pages];
 	rqstp->rq_pages[pages] = NULL; /* this might be seen in nfsd_splice_actor() */
