@@ -125,7 +125,19 @@ properties:
   panic-indicator:
     description:
       This property specifies that the LED should be used, if at all possible,
-      as a panic indicator.
+      using blink as a panic indicator.
+    type: boolean
+
+  panic-indicator-on:
+    description:
+      This property specifies that the LED should be used, if at all possible,
+      using led on as a panic indicator.
+    type: boolean
+
+  panic-indicator-off:
+    description:
+      This property specifies that the LED should be used, if at all possible,
+      using led off as a panic indicator.
     type: boolean
 
   retain-state-shutdown:
