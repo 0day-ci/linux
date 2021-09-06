@@ -19168,6 +19168,7 @@ F:	scripts/unifdef.c
 
 UNIFORM CDROM DRIVER
 M:	Phillip Potter <phil@philpotter.co.uk>
+L:	linux-block@vger.kernel.org
 S:	Maintained
 F:	Documentation/cdrom/
 F:	drivers/cdrom/cdrom.c
