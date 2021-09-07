@@ -1456,7 +1456,7 @@ static int igt_tmpfs_fallback(void *arg)
 	struct i915_gem_context *ctx = arg;
 	struct drm_i915_private *i915 = ctx->i915;
 	struct vfsmount *gemfs = i915->mm.gemfs;
-	struct i915_address_space *vm = i915_gem_context_get_vm_rcu(ctx);
+	struct i915_address_space *vm = i915_gem_context_get_eb_vm(ctx);
 	struct drm_i915_gem_object *obj;
 	struct i915_vma *vma;
 	u32 *vaddr;
@@ -1512,7 +1512,7 @@ static int igt_shrink_thp(void *arg)
 {
 	struct i915_gem_context *ctx = arg;
 	struct drm_i915_private *i915 = ctx->i915;
-	struct i915_address_space *vm = i915_gem_context_get_vm_rcu(ctx);
+	struct i915_address_space *vm = i915_gem_context_get_eb_vm(ctx);
 	struct drm_i915_gem_object *obj;
 	struct i915_gem_engines_iter it;
 	struct intel_context *ce;
@@ -1688,11 +1688,9 @@ int i915_gem_huge_page_live_selftests(struct drm_i915_private *i915)
 		goto out_file;
 	}
 
-	mutex_lock(&ctx->mutex);
-	vm = i915_gem_context_vm(ctx);
+	vm = ctx->vm;
 	if (vm)
 		WRITE_ONCE(vm->scrub_64K, true);
-	mutex_unlock(&ctx->mutex);
 
 	err = i915_subtests(tests, ctx);
 
