@@ -6,7 +6,6 @@
 
 #include <dt-bindings/input/input.h>
 #include "omap34xx.dtsi"
-#include "omap-gpmc-smsc911x.dtsi"
 
 / {
 	model = "TI OMAP3430 LDP (Zoom1 Labrador)";
@@ -148,12 +147,14 @@
 		};
 	};
 
-	ethernet@gpmc {
+	gpmc_ethernet: ethernet@1,0 {
 		interrupt-parent = <&gpio5>;
 		interrupts = <24 IRQ_TYPE_LEVEL_LOW>;
 		reg = <1 0 0xff>;
 	};
 };
+
+#include "omap-gpmc-smsc911x.dtsi"
 
 &i2c1 {
 	clock-frequency = <2600000>;

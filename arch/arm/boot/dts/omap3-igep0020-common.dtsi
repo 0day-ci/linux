@@ -7,7 +7,6 @@
  */
 
 #include "omap3-igep.dtsi"
-#include "omap-gpmc-smsc9221.dtsi"
 
 / {
 
@@ -217,7 +216,7 @@
 	ranges = <0 0 0x30000000 0x01000000>,	/* CS0: 16MB for NAND */
 		 <5 0 0x2c000000 0x01000000>;	/* CS5: 16MB for ethernet */
 
-	ethernet@gpmc {
+	gpmc_ethernet: ethernet@5,0 {
 		pinctrl-names = "default";
 		pinctrl-0 = <&smsc9221_pins>;
 		reg = <5 0 0xff>;
@@ -225,6 +224,8 @@
 		interrupts = <16 IRQ_TYPE_LEVEL_LOW>;
 	};
 };
+
+#include "omap-gpmc-smsc9221.dtsi"
 
 &uart2 {
 	pinctrl-names = "default";

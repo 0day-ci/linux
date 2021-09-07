@@ -217,8 +217,11 @@
 	ranges = <0 0 0x30000000 0x1000000>,	/* CS0: 16MB for NAND */
 		 <5 0 0x2c000000 0x01000000>;	/* CS5: 16MB for LAN9220 */
 
-	ethernet@gpmc {
+	gpmc_ethernet: ethernet@5,0 {
 		pinctrl-names = "default";
 		pinctrl-0 = <&smsc911x_pins>;
+		interrupt-parent = <&gpio6>;
+		interrupts = <16 8>;
+		reg = <5 0 0xff>;
 	};
 };
