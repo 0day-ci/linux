@@ -207,6 +207,13 @@ struct mptcp_pm_data {
 };
 
 #define MPTCP_SCHED_NAME_MAX 16
+struct mptcp_sched_ops {
+	struct list_head list;
+
+	struct sock *	(*get_subflow)(struct mptcp_sock *msk);
+	char		name[MPTCP_SCHED_NAME_MAX];
+	struct module	*owner;
+};
 
 struct mptcp_data_frag {
 	struct list_head list;
@@ -264,6 +271,7 @@ struct mptcp_sock {
 	struct socket	*subflow; /* outgoing connect/listener/!mp_capable */
 	struct sock	*first;
 	struct mptcp_pm_data	pm;
+	struct mptcp_sched_ops	*sched;
 	struct {
 		u32	space;	/* bytes copied in last measurement window */
 		u32	copied; /* bytes copied in this measurement window */

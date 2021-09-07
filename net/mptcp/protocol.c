@@ -1515,6 +1515,58 @@ static struct sock *mptcp_subflow_get_send(struct mptcp_sock *msk)
 	return NULL;
 }
 
+static struct mptcp_sched_ops mptcp_sched_default = {
+	.get_subflow	= mptcp_subflow_get_send,
+	.name		= "default",
+	.owner		= THIS_MODULE,
+};
+
+static DEFINE_SPINLOCK(mptcp_sched_list_lock);
+static LIST_HEAD(mptcp_sched_list);
+
+static struct mptcp_sched_ops *mptcp_sched_find(const char *name)
+{
+	struct mptcp_sched_ops *ops;
+
+	list_for_each_entry_rcu(ops, &mptcp_sched_list, list) {
+		if (!strcmp(ops->name, name))
+			return ops;
+	}
+
+	return NULL;
+}
+
+static int mptcp_register_scheduler(struct mptcp_sched_ops *sched)
+{
+	int ret = 0;
+
+	if (!sched->get_subflow)
+		return -EINVAL;
+
+	spin_lock(&mptcp_sched_list_lock);
+	if (mptcp_sched_find(sched->name)) {
+		pr_debug("%s already registered", sched->name);
+		ret = -EEXIST;
+	} else {
+		list_add_tail_rcu(&sched->list, &mptcp_sched_list);
+		pr_debug("%s registered", sched->name);
+	}
+	spin_unlock(&mptcp_sched_list_lock);
+	return 0;
+}
+
+static void mptcp_sched_data_init(struct mptcp_sock *msk)
+{
+	struct net *net = sock_net((struct sock *)msk);
+
+	msk->sched = mptcp_sched_find(mptcp_get_scheduler(net));
+}
+
+static void mptcp_sched_init(void)
+{
+	mptcp_register_scheduler(&mptcp_sched_default);
+}
+
 static void mptcp_push_release(struct sock *sk, struct sock *ssk,
 			       struct mptcp_sendmsg_info *info)
 {
@@ -1567,7 +1619,7 @@ void __mptcp_push_pending(struct sock *sk, unsigned int flags)
 
 			prev_ssk = ssk;
 			mptcp_flush_join_list(msk);
-			ssk = mptcp_subflow_get_send(msk);
+			ssk = msk->sched->get_subflow(msk);
 
 			/* First check. If the ssk has changed since
 			 * the last round, release prev_ssk
@@ -1634,7 +1686,7 @@ static void __mptcp_subflow_push_pending(struct sock *sk, struct sock *ssk)
 			 * check for a different subflow usage only after
 			 * spooling the first chunk of data
 			 */
-			xmit_ssk = first ? ssk : mptcp_subflow_get_send(mptcp_sk(sk));
+			xmit_ssk = first ? ssk : mptcp_sk(sk)->sched->get_subflow(mptcp_sk(sk));
 			if (!xmit_ssk)
 				goto out;
 			if (xmit_ssk != ssk) {
@@ -2534,6 +2586,7 @@ static int __mptcp_init_sock(struct sock *sk)
 	msk->recovery = false;
 
 	mptcp_pm_data_init(msk);
+	mptcp_sched_data_init(msk);
 
 	/* re-use the csk retrans timer for MPTCP-level retrans */
 	timer_setup(&msk->sk.icsk_retransmit_timer, mptcp_retransmit_timer, 0);
@@ -3005,7 +3058,7 @@ void __mptcp_check_push(struct sock *sk, struct sock *ssk)
 		return;
 
 	if (!sock_owned_by_user(sk)) {
-		struct sock *xmit_ssk = mptcp_subflow_get_send(mptcp_sk(sk));
+		struct sock *xmit_ssk = mptcp_sk(sk)->sched->get_subflow(mptcp_sk(sk));
 
 		if (xmit_ssk == ssk)
 			__mptcp_subflow_push_pending(sk, ssk);
@@ -3569,6 +3622,7 @@ void __init mptcp_proto_init(void)
 
 	mptcp_subflow_init();
 	mptcp_pm_init();
+	mptcp_sched_init();
 	mptcp_token_init();
 
 	if (proto_register(&mptcp_prot, MPTCP_USE_SLAB) != 0)
