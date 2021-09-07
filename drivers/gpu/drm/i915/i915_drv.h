@@ -872,6 +872,9 @@ struct drm_i915_display {
 
 	struct intel_crtc *plane_to_crtc_mapping[I915_MAX_PIPES];
 	struct intel_crtc *pipe_to_crtc_mapping[I915_MAX_PIPES];
+
+	struct drm_property *broadcast_rgb_property;
+	struct drm_property *force_audio_property;
 };
 
 struct drm_i915_private {
@@ -1055,9 +1058,6 @@ struct drm_i915_private {
 	/* list of fbdev register on this device */
 	struct intel_fbdev *fbdev;
 	struct work_struct fbdev_suspend_work;
-
-	struct drm_property *broadcast_rgb_property;
-	struct drm_property *force_audio_property;
 
 	/* hda/i915 audio component */
 	struct i915_audio_component *audio_component;
