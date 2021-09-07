@@ -75,7 +75,6 @@ struct edac_device_ctl_info *edac_device_alloc_ctl_info(
 	 * provide if we could simply hardcode everything into a single struct.
 	 */
 	p = NULL;
-	dev_ctl = edac_align_ptr(&p, sizeof(*dev_ctl), 1);
 
 	/* Calc the 'end' offset past end of ONE ctl_info structure
 	 * which will become the start of the 'instance' array
