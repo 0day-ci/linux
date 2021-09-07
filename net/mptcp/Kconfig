@@ -23,6 +23,13 @@ config MPTCP_IPV6
 	depends on IPV6=y
 	default y
 
+config MPTCP_ROUNDROBIN
+	tristate "MPTCP Round-Robin"
+	default n
+	help
+	  This is a very simple round-robin scheduler. Probably has bad performance
+	  but might be interesting for researchers.
+
 config MPTCP_KUNIT_TEST
 	tristate "This builds the MPTCP KUnit tests" if !KUNIT_ALL_TESTS
 	depends on KUNIT

@@ -1521,6 +1521,29 @@ static struct mptcp_sched_ops mptcp_sched_default = {
 	.owner		= THIS_MODULE,
 };
 
+#if IS_ENABLED(CONFIG_MPTCP_ROUNDROBIN)
+static struct sock *rr_get_subflow(struct mptcp_sock *msk)
+{
+	struct mptcp_subflow_context *subflow;
+	struct sock *ssk;
+
+	mptcp_for_each_subflow(msk, subflow) {
+		ssk = mptcp_subflow_tcp_sock(subflow);
+		if (ssk != msk->last_snd) {
+			pr_debug("msk=%p ssk=%p last_snd=%p", msk, ssk, msk->last_snd);
+			msk->last_snd = ssk;
+		}
+	}
+	return msk->last_snd;
+}
+
+static struct mptcp_sched_ops mptcp_sched_rr = {
+	.get_subflow	= rr_get_subflow,
+	.name		= "roundrobin",
+	.owner		= THIS_MODULE,
+};
+#endif
+
 static DEFINE_SPINLOCK(mptcp_sched_list_lock);
 static LIST_HEAD(mptcp_sched_list);
 
@@ -1565,6 +1588,9 @@ static void mptcp_sched_data_init(struct mptcp_sock *msk)
 static void mptcp_sched_init(void)
 {
 	mptcp_register_scheduler(&mptcp_sched_default);
+#if IS_ENABLED(CONFIG_MPTCP_ROUNDROBIN)
+	mptcp_register_scheduler(&mptcp_sched_rr);
+#endif
 }
 
 static void mptcp_push_release(struct sock *sk, struct sock *ssk,
