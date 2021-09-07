@@ -873,6 +873,24 @@ struct drm_i915_display {
 	struct intel_crtc *plane_to_crtc_mapping[I915_MAX_PIPES];
 	struct intel_crtc *pipe_to_crtc_mapping[I915_MAX_PIPES];
 
+	/* hda/i915 audio component */
+	struct i915_audio_component *audio_component;
+	bool audio_component_registered;
+	/**
+	 * av_mutex - mutex for audio/video sync
+	 *
+	 */
+	struct mutex av_mutex;
+	int audio_power_refcount;
+	u32 audio_freq_cntrl;
+	/* Used to save the pipe-to-encoder mapping for audio */
+	struct intel_encoder *av_enc_map[I915_MAX_PIPES];
+	/* necessary resource sharing with HDMI LPE audio driver. */
+	struct {
+		struct platform_device *platdev;
+		int	irq;
+	} lpe_audio;
+
 	struct drm_property *broadcast_rgb_property;
 	struct drm_property *force_audio_property;
 };
@@ -1059,17 +1077,6 @@ struct drm_i915_private {
 	struct intel_fbdev *fbdev;
 	struct work_struct fbdev_suspend_work;
 
-	/* hda/i915 audio component */
-	struct i915_audio_component *audio_component;
-	bool audio_component_registered;
-	/**
-	 * av_mutex - mutex for audio/video sync
-	 *
-	 */
-	struct mutex av_mutex;
-	int audio_power_refcount;
-	u32 audio_freq_cntrl;
-
 	u32 fdi_rx_config;
 
 	/* Shadow for DISPLAY_PHY_CONTROL which can't be safely read */
@@ -1201,15 +1208,6 @@ struct drm_i915_private {
 	bool chv_phy_assert[2];
 
 	bool ipc_enabled;
-
-	/* Used to save the pipe-to-encoder mapping for audio */
-	struct intel_encoder *av_enc_map[I915_MAX_PIPES];
-
-	/* necessary resource sharing with HDMI LPE audio driver. */
-	struct {
-		struct platform_device *platdev;
-		int	irq;
-	} lpe_audio;
 
 	struct i915_pmu pmu;
 
