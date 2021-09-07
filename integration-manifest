@@ -1,0 +1,28 @@
+drm drm-fixes 7d2a07b769330c34b4deabeed939325c77a7ec2f
+	Linux 5.14
+drm-misc drm-misc-fixes c8704b7ec182f9293e6a994310c7d4203428cdfb
+	drm/kmb: Enable alpha blended second plane
+drm-intel drm-intel-fixes 7d2a07b769330c34b4deabeed939325c77a7ec2f
+	Linux 5.14
+drm drm-next 1645cca9da91a85167394a34fcfe1cb5dd336d7f
+	drm/i915: use linux/stddef.h due to "isystem: trim/fixup stdarg.h and other headers"
+drm-misc drm-misc-next-fixes 87fd9ef47597b2fcee3264eb5f288410b9f376d5
+	dma-buf: DMABUF_SYSFS_STATS should depend on DMA_SHARED_BUFFER
+drm-intel drm-intel-next-fixes fb43ebc83e069625cfeeb2490efc3ffa0013bfa4
+	drm/i915/selftest: Fix use of err in igt_reset_{fail, nop}_engine()
+drm-misc drm-misc-next d4c16733e7960aa50d6d3bc4a03ee1578baaa47b
+	drm/sched: Fix drm_sched_fence_free() so it can be passed an uninitialized fence
+drm-intel drm-intel-next 5a449e5864ef7d05be7054299fce223856ba98a9
+	drm/i915/bios: get rid of vbt ddi_port_info
+drm-intel drm-intel-gt-next f5392e5f8ef300c5d8fb97fb441aad217e44f394
+	drm/i915/adl_s: Remove require_force_probe protection
+sound-upstream for-linus 7cf3dead1ad70c72edb03e2d98e1f3dcd332cdb2
+	Linux 5.13
+sound-upstream for-next 7cf3dead1ad70c72edb03e2d98e1f3dcd332cdb2
+	Linux 5.13
+drm-intel topic/core-for-CI 5363e35a435a0699c8b30936b6ca00db8d85c839
+	drm/i915: Add relocation exceptions for two other platforms
+drm topic/nouveau-ampere-modeset 584265dfec70e78ce2085b82ed389f27e06fbca0
+	Merge branch '04.01-ampere-lite' of git://github.com/skeggsb/linux into topic/nouveau-ampere-modeset
+drm-misc topic/i915-ttm cf3e3e86d77970211e0983130e896ae242601003
+	drm/i915: Use ttm mmap handling for ttm bo's.
