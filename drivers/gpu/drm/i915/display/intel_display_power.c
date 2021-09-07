@@ -1531,7 +1531,7 @@ static void assert_chv_phy_status(struct drm_i915_private *dev_priv)
 		lookup_power_well(dev_priv, VLV_DISP_PW_DPIO_CMN_BC);
 	struct i915_power_well *cmn_d =
 		lookup_power_well(dev_priv, CHV_DISP_PW_DPIO_CMN_D);
-	u32 phy_control = dev_priv->chv_phy_control;
+	u32 phy_control = dev_priv->display->chv_phy_control;
 	u32 phy_status = 0;
 	u32 phy_status_mask = 0xffffffff;
 
@@ -1542,7 +1542,7 @@ static void assert_chv_phy_status(struct drm_i915_private *dev_priv)
 	 * reset (ie. the power well has been disabled at
 	 * least once).
 	 */
-	if (!dev_priv->chv_phy_assert[DPIO_PHY0])
+	if (!dev_priv->display->chv_phy_assert[DPIO_PHY0])
 		phy_status_mask &= ~(PHY_STATUS_CMN_LDO(DPIO_PHY0, DPIO_CH0) |
 				     PHY_STATUS_SPLINE_LDO(DPIO_PHY0, DPIO_CH0, 0) |
 				     PHY_STATUS_SPLINE_LDO(DPIO_PHY0, DPIO_CH0, 1) |
@@ -1550,7 +1550,7 @@ static void assert_chv_phy_status(struct drm_i915_private *dev_priv)
 				     PHY_STATUS_SPLINE_LDO(DPIO_PHY0, DPIO_CH1, 0) |
 				     PHY_STATUS_SPLINE_LDO(DPIO_PHY0, DPIO_CH1, 1));
 
-	if (!dev_priv->chv_phy_assert[DPIO_PHY1])
+	if (!dev_priv->display->chv_phy_assert[DPIO_PHY1])
 		phy_status_mask &= ~(PHY_STATUS_CMN_LDO(DPIO_PHY1, DPIO_CH0) |
 				     PHY_STATUS_SPLINE_LDO(DPIO_PHY1, DPIO_CH0, 0) |
 				     PHY_STATUS_SPLINE_LDO(DPIO_PHY1, DPIO_CH0, 1));
@@ -1626,7 +1626,7 @@ static void assert_chv_phy_status(struct drm_i915_private *dev_priv)
 		drm_err(&dev_priv->drm,
 			"Unexpected PHY_STATUS 0x%08x, expected 0x%08x (PHY_CONTROL=0x%08x)\n",
 			intel_de_read(dev_priv, DISPLAY_PHY_STATUS) & phy_status_mask,
-			phy_status, dev_priv->chv_phy_control);
+			phy_status, dev_priv->display->chv_phy_control);
 }
 
 #undef BITS_SET
@@ -1685,13 +1685,13 @@ static void chv_dpio_cmn_power_well_enable(struct drm_i915_private *dev_priv,
 
 	vlv_dpio_put(dev_priv);
 
-	dev_priv->chv_phy_control |= PHY_COM_LANE_RESET_DEASSERT(phy);
+	dev_priv->display->chv_phy_control |= PHY_COM_LANE_RESET_DEASSERT(phy);
 	intel_de_write(dev_priv, DISPLAY_PHY_CONTROL,
-		       dev_priv->chv_phy_control);
+		       dev_priv->display->chv_phy_control);
 
 	drm_dbg_kms(&dev_priv->drm,
 		    "Enabled DPIO PHY%d (PHY_CONTROL=0x%08x)\n",
-		    phy, dev_priv->chv_phy_control);
+		    phy, dev_priv->display->chv_phy_control);
 
 	assert_chv_phy_status(dev_priv);
 }
@@ -1714,18 +1714,18 @@ static void chv_dpio_cmn_power_well_disable(struct drm_i915_private *dev_priv,
 		assert_pll_disabled(dev_priv, PIPE_C);
 	}
 
-	dev_priv->chv_phy_control &= ~PHY_COM_LANE_RESET_DEASSERT(phy);
+	dev_priv->display->chv_phy_control &= ~PHY_COM_LANE_RESET_DEASSERT(phy);
 	intel_de_write(dev_priv, DISPLAY_PHY_CONTROL,
-		       dev_priv->chv_phy_control);
+		       dev_priv->display->chv_phy_control);
 
 	vlv_set_power_well(dev_priv, power_well, false);
 
 	drm_dbg_kms(&dev_priv->drm,
 		    "Disabled DPIO PHY%d (PHY_CONTROL=0x%08x)\n",
-		    phy, dev_priv->chv_phy_control);
+		    phy, dev_priv->display->chv_phy_control);
 
 	/* PHY is fully reset now, so we can enable the PHY state asserts */
-	dev_priv->chv_phy_assert[phy] = true;
+	dev_priv->display->chv_phy_assert[phy] = true;
 
 	assert_chv_phy_status(dev_priv);
 }
@@ -1743,7 +1743,7 @@ static void assert_chv_phy_powergate(struct drm_i915_private *dev_priv, enum dpi
 	 * reset (ie. the power well has been disabled at
 	 * least once).
 	 */
-	if (!dev_priv->chv_phy_assert[phy])
+	if (!dev_priv->display->chv_phy_assert[phy])
 		return;
 
 	if (ch == DPIO_CH0)
@@ -1802,22 +1802,22 @@ bool chv_phy_powergate_ch(struct drm_i915_private *dev_priv, enum dpio_phy phy,
 
 	mutex_lock(&power_domains->lock);
 
-	was_override = dev_priv->chv_phy_control & PHY_CH_POWER_DOWN_OVRD_EN(phy, ch);
+	was_override = dev_priv->display->chv_phy_control & PHY_CH_POWER_DOWN_OVRD_EN(phy, ch);
 
 	if (override == was_override)
 		goto out;
 
 	if (override)
-		dev_priv->chv_phy_control |= PHY_CH_POWER_DOWN_OVRD_EN(phy, ch);
+		dev_priv->display->chv_phy_control |= PHY_CH_POWER_DOWN_OVRD_EN(phy, ch);
 	else
-		dev_priv->chv_phy_control &= ~PHY_CH_POWER_DOWN_OVRD_EN(phy, ch);
+		dev_priv->display->chv_phy_control &= ~PHY_CH_POWER_DOWN_OVRD_EN(phy, ch);
 
 	intel_de_write(dev_priv, DISPLAY_PHY_CONTROL,
-		       dev_priv->chv_phy_control);
+		       dev_priv->display->chv_phy_control);
 
 	drm_dbg_kms(&dev_priv->drm,
 		    "Power gating DPIO PHY%d CH%d (DPIO_PHY_CONTROL=0x%08x)\n",
-		    phy, ch, dev_priv->chv_phy_control);
+		    phy, ch, dev_priv->display->chv_phy_control);
 
 	assert_chv_phy_status(dev_priv);
 
@@ -1837,20 +1837,20 @@ void chv_phy_powergate_lanes(struct intel_encoder *encoder,
 
 	mutex_lock(&power_domains->lock);
 
-	dev_priv->chv_phy_control &= ~PHY_CH_POWER_DOWN_OVRD(0xf, phy, ch);
-	dev_priv->chv_phy_control |= PHY_CH_POWER_DOWN_OVRD(mask, phy, ch);
+	dev_priv->display->chv_phy_control &= ~PHY_CH_POWER_DOWN_OVRD(0xf, phy, ch);
+	dev_priv->display->chv_phy_control |= PHY_CH_POWER_DOWN_OVRD(mask, phy, ch);
 
 	if (override)
-		dev_priv->chv_phy_control |= PHY_CH_POWER_DOWN_OVRD_EN(phy, ch);
+		dev_priv->display->chv_phy_control |= PHY_CH_POWER_DOWN_OVRD_EN(phy, ch);
 	else
-		dev_priv->chv_phy_control &= ~PHY_CH_POWER_DOWN_OVRD_EN(phy, ch);
+		dev_priv->display->chv_phy_control &= ~PHY_CH_POWER_DOWN_OVRD_EN(phy, ch);
 
 	intel_de_write(dev_priv, DISPLAY_PHY_CONTROL,
-		       dev_priv->chv_phy_control);
+		       dev_priv->display->chv_phy_control);
 
 	drm_dbg_kms(&dev_priv->drm,
 		    "Power gating DPIO PHY%d CH%d lanes 0x%x (PHY_CONTROL=0x%08x)\n",
-		    phy, ch, mask, dev_priv->chv_phy_control);
+		    phy, ch, mask, dev_priv->display->chv_phy_control);
 
 	assert_chv_phy_status(dev_priv);
 
@@ -1928,7 +1928,7 @@ static void chv_pipe_power_well_sync_hw(struct drm_i915_private *dev_priv,
 					struct i915_power_well *power_well)
 {
 	intel_de_write(dev_priv, DISPLAY_PHY_CONTROL,
-		       dev_priv->chv_phy_control);
+		       dev_priv->display->chv_phy_control);
 }
 
 static void chv_pipe_power_well_enable(struct drm_i915_private *dev_priv,
@@ -5885,7 +5885,7 @@ static void chv_phy_control_init(struct drm_i915_private *dev_priv)
 	 * power well state and lane status to reconstruct the
 	 * expected initial value.
 	 */
-	dev_priv->chv_phy_control =
+	dev_priv->display->chv_phy_control =
 		PHY_LDO_SEQ_DELAY(PHY_LDO_DELAY_600NS, DPIO_PHY0) |
 		PHY_LDO_SEQ_DELAY(PHY_LDO_DELAY_600NS, DPIO_PHY1) |
 		PHY_CH_POWER_MODE(PHY_CH_DEEP_PSR, DPIO_PHY0, DPIO_CH0) |
@@ -5907,27 +5907,27 @@ static void chv_phy_control_init(struct drm_i915_private *dev_priv)
 		if (mask == 0xf)
 			mask = 0x0;
 		else
-			dev_priv->chv_phy_control |=
+			dev_priv->display->chv_phy_control |=
 				PHY_CH_POWER_DOWN_OVRD_EN(DPIO_PHY0, DPIO_CH0);
 
-		dev_priv->chv_phy_control |=
+		dev_priv->display->chv_phy_control |=
 			PHY_CH_POWER_DOWN_OVRD(mask, DPIO_PHY0, DPIO_CH0);
 
 		mask = (status & DPLL_PORTC_READY_MASK) >> 4;
 		if (mask == 0xf)
 			mask = 0x0;
 		else
-			dev_priv->chv_phy_control |=
+			dev_priv->display->chv_phy_control |=
 				PHY_CH_POWER_DOWN_OVRD_EN(DPIO_PHY0, DPIO_CH1);
 
-		dev_priv->chv_phy_control |=
+		dev_priv->display->chv_phy_control |=
 			PHY_CH_POWER_DOWN_OVRD(mask, DPIO_PHY0, DPIO_CH1);
 
-		dev_priv->chv_phy_control |= PHY_COM_LANE_RESET_DEASSERT(DPIO_PHY0);
+		dev_priv->display->chv_phy_control |= PHY_COM_LANE_RESET_DEASSERT(DPIO_PHY0);
 
-		dev_priv->chv_phy_assert[DPIO_PHY0] = false;
+		dev_priv->display->chv_phy_assert[DPIO_PHY0] = false;
 	} else {
-		dev_priv->chv_phy_assert[DPIO_PHY0] = true;
+		dev_priv->display->chv_phy_assert[DPIO_PHY0] = true;
 	}
 
 	if (cmn_d->desc->ops->is_enabled(dev_priv, cmn_d)) {
@@ -5939,21 +5939,21 @@ static void chv_phy_control_init(struct drm_i915_private *dev_priv)
 		if (mask == 0xf)
 			mask = 0x0;
 		else
-			dev_priv->chv_phy_control |=
+			dev_priv->display->chv_phy_control |=
 				PHY_CH_POWER_DOWN_OVRD_EN(DPIO_PHY1, DPIO_CH0);
 
-		dev_priv->chv_phy_control |=
+		dev_priv->display->chv_phy_control |=
 			PHY_CH_POWER_DOWN_OVRD(mask, DPIO_PHY1, DPIO_CH0);
 
-		dev_priv->chv_phy_control |= PHY_COM_LANE_RESET_DEASSERT(DPIO_PHY1);
+		dev_priv->display->chv_phy_control |= PHY_COM_LANE_RESET_DEASSERT(DPIO_PHY1);
 
-		dev_priv->chv_phy_assert[DPIO_PHY1] = false;
+		dev_priv->display->chv_phy_assert[DPIO_PHY1] = false;
 	} else {
-		dev_priv->chv_phy_assert[DPIO_PHY1] = true;
+		dev_priv->display->chv_phy_assert[DPIO_PHY1] = true;
 	}
 
 	drm_dbg_kms(&dev_priv->drm, "Initial PHY_CONTROL=0x%08x\n",
-		    dev_priv->chv_phy_control);
+		    dev_priv->display->chv_phy_control);
 
 	/* Defer application of initial phy_control to enabling the powerwell */
 }

@@ -925,6 +925,27 @@ struct drm_i915_display {
 		struct llist_head free_list;
 		struct work_struct free_work;
 	} atomic_helper;
+
+	/*
+	 * HTI (aka HDPORT) state read during initial hw readout.  Most
+	 * platforms don't have HTI, so this will just stay 0.  Those that do
+	 * will use this later to figure out which PLLs and PHYs are unavailable
+	 * for driver usage.
+	 */
+	u32 hti_state;
+
+	/* Shadow for DISPLAY_PHY_CONTROL which can't be safely read */
+	u32 chv_phy_control;
+	/*
+	 * Shadows for CHV DPLL_MD regs to keep the state
+	 * checker somewhat working in the presence hardware
+	 * crappiness (can't read out DPLL_MD for pipes B & C).
+	 */
+	u32 chv_dpll_md[I915_MAX_PIPES];
+	/* perform PHY state sanity checks? */
+	bool chv_phy_assert[2];
+
+	u32 bxt_phy_grc;
 };
 
 struct drm_i915_private {
@@ -1072,14 +1093,6 @@ struct drm_i915_private {
 	struct intel_l3_parity l3_parity;
 
 	/*
-	 * HTI (aka HDPORT) state read during initial hw readout.  Most
-	 * platforms don't have HTI, so this will just stay 0.  Those that do
-	 * will use this later to figure out which PLLs and PHYs are unavailable
-	 * for driver usage.
-	 */
-	u32 hti_state;
-
-	/*
 	 * edram size in MB.
 	 * Cannot be determined by PCIID. You must always read a register.
 	 */
@@ -1092,16 +1105,6 @@ struct drm_i915_private {
 	struct drm_i915_gem_object *vlv_pctx;
 
 	u32 fdi_rx_config;
-
-	/* Shadow for DISPLAY_PHY_CONTROL which can't be safely read */
-	u32 chv_phy_control;
-	/*
-	 * Shadows for CHV DPLL_MD regs to keep the state
-	 * checker somewhat working in the presence hardware
-	 * crappiness (can't read out DPLL_MD for pipes B & C).
-	 */
-	u32 chv_dpll_md[I915_MAX_PIPES];
-	u32 bxt_phy_grc;
 
 	u32 suspend_count;
 	bool power_domains_suspended;
@@ -1210,9 +1213,6 @@ struct drm_i915_private {
 	u8 vblank_enabled;
 
 	bool irq_enabled;
-
-	/* perform PHY state sanity checks? */
-	bool chv_phy_assert[2];
 
 	bool ipc_enabled;
 

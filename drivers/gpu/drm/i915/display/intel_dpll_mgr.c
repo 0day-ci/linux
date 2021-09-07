@@ -3110,10 +3110,10 @@ static void icl_update_active_dpll(struct intel_atomic_state *state,
 
 static u32 intel_get_hti_plls(struct drm_i915_private *i915)
 {
-	if (!(i915->hti_state & HDPORT_ENABLED))
+	if (!(i915->display->hti_state & HDPORT_ENABLED))
 		return 0;
 
-	return REG_FIELD_GET(HDPORT_DPLL_USED_MASK, i915->hti_state);
+	return REG_FIELD_GET(HDPORT_DPLL_USED_MASK, i915->display->hti_state);
 }
 
 static bool icl_get_combo_phy_dpll(struct intel_atomic_state *state,
