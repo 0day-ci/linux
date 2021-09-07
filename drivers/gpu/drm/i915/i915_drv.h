@@ -869,6 +869,9 @@ struct drm_i915_display {
 	struct intel_dmc dmc;
 	struct i915_drrs drrs;
 	struct intel_fbc fbc;
+
+	struct intel_crtc *plane_to_crtc_mapping[I915_MAX_PIPES];
+	struct intel_crtc *pipe_to_crtc_mapping[I915_MAX_PIPES];
 };
 
 struct drm_i915_private {
@@ -994,9 +997,6 @@ struct drm_i915_private {
 	struct i915_gem_mm mm;
 
 	/* Kernel Modesetting */
-
-	struct intel_crtc *plane_to_crtc_mapping[I915_MAX_PIPES];
-	struct intel_crtc *pipe_to_crtc_mapping[I915_MAX_PIPES];
 
 	/**
 	 * dpll and cdclk state is protected by connection_mutex

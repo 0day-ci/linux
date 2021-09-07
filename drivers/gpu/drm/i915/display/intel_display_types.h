@@ -1754,9 +1754,9 @@ vlv_pipe_to_channel(enum pipe pipe)
 static inline bool intel_pipe_valid(struct drm_i915_private *i915, enum pipe pipe)
 {
 	return (pipe >= 0 &&
-		pipe < ARRAY_SIZE(i915->pipe_to_crtc_mapping) &&
+		pipe < ARRAY_SIZE(i915->display->pipe_to_crtc_mapping) &&
 		INTEL_INFO(i915)->pipe_mask & BIT(pipe) &&
-		i915->pipe_to_crtc_mapping[pipe]);
+		i915->display->pipe_to_crtc_mapping[pipe]);
 }
 
 static inline struct intel_crtc *
@@ -1771,13 +1771,13 @@ intel_get_crtc_for_pipe(struct drm_i915_private *dev_priv, enum pipe pipe)
 	/* pipe_to_crtc_mapping may have hole on any of 3 display pipe system */
 	drm_WARN_ON(&dev_priv->drm,
 		    !(INTEL_INFO(dev_priv)->pipe_mask & BIT(pipe)));
-	return dev_priv->pipe_to_crtc_mapping[pipe];
+	return dev_priv->display->pipe_to_crtc_mapping[pipe];
 }
 
 static inline struct intel_crtc *
 intel_get_crtc_for_plane(struct drm_i915_private *dev_priv, enum i9xx_plane_id plane)
 {
-	return dev_priv->plane_to_crtc_mapping[plane];
+	return dev_priv->display->plane_to_crtc_mapping[plane];
 }
 
 struct intel_load_detect_pipe {

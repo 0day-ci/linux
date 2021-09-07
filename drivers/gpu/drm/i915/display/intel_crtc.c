@@ -323,16 +323,16 @@ int intel_crtc_init(struct drm_i915_private *dev_priv, enum pipe pipe)
 	if (ret)
 		goto fail;
 
-	BUG_ON(pipe >= ARRAY_SIZE(dev_priv->pipe_to_crtc_mapping) ||
-	       dev_priv->pipe_to_crtc_mapping[pipe] != NULL);
-	dev_priv->pipe_to_crtc_mapping[pipe] = crtc;
+	BUG_ON(pipe >= ARRAY_SIZE(dev_priv->display->pipe_to_crtc_mapping) ||
+	       dev_priv->display->pipe_to_crtc_mapping[pipe] != NULL);
+	dev_priv->display->pipe_to_crtc_mapping[pipe] = crtc;
 
 	if (DISPLAY_VER(dev_priv) < 9) {
 		enum i9xx_plane_id i9xx_plane = primary->i9xx_plane;
 
-		BUG_ON(i9xx_plane >= ARRAY_SIZE(dev_priv->plane_to_crtc_mapping) ||
-		       dev_priv->plane_to_crtc_mapping[i9xx_plane] != NULL);
-		dev_priv->plane_to_crtc_mapping[i9xx_plane] = crtc;
+		BUG_ON(i9xx_plane >= ARRAY_SIZE(dev_priv->display->plane_to_crtc_mapping) ||
+		       dev_priv->display->plane_to_crtc_mapping[i9xx_plane] != NULL);
+		dev_priv->display->plane_to_crtc_mapping[i9xx_plane] = crtc;
 	}
 
 	if (DISPLAY_VER(dev_priv) >= 11)
