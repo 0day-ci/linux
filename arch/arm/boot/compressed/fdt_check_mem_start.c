@@ -64,7 +64,7 @@ uint32_t fdt_check_mem_start(uint32_t mem_start, const void *fdt)
 	uint32_t addr_cells, size_cells, base;
 	uint32_t fdt_mem_start = 0xffffffff;
 	const fdt32_t *reg, *endp;
-	uint64_t size, end;
+	uint64_t rsvaddr, size, end;
 	const char *type;
 	int offset, len;
 
@@ -73,6 +73,19 @@ uint32_t fdt_check_mem_start(uint32_t mem_start, const void *fdt)
 
 	if (fdt_magic(fdt) != FDT_MAGIC)
 		return mem_start;
+
+	for (offset = fdt_off_mem_rsvmap(fdt); ; offset += 16) {
+		rsvaddr = get_val(fdt + offset, 2);
+		size = get_val(fdt + offset + 8, 2);
+
+		if (!rsvaddr && !size)
+			break;
+
+		end = rsvaddr + size;
+		if (mem_start >= rsvaddr && mem_start <= end)
+			/* Relocate past reserved block */
+			mem_start = round_up(end, SZ_2M);
+	}
 
 	/* There may be multiple cells on LPAE platforms */
 	addr_cells = get_cells(fdt, "#address-cells");
