@@ -2350,6 +2350,29 @@ static bool guc_sched_engine_disabled(struct i915_sched_engine *sched_engine)
 	return !sched_engine->tasklet.callback;
 }
 
+static int gen12_rcs_resume(struct intel_engine_cs *engine)
+{
+	int ret;
+
+	ret = guc_resume(engine);
+	if (ret)
+		return ret;
+
+	/*
+	 * Multi Context programming.
+	 * just need to program this register once no matter how many CCS
+	 * engines there are. Since some of the CCS engines might be fused off,
+	 * we can't do this as part of the init of a specific CCS and we do
+	 * it during RCS init instead. RCS and all CCS engines are reset
+	 * together, so post-reset re-init is covered as well.
+	 */
+	if (CCS_MASK(engine->gt))
+		intel_uncore_write(engine->uncore, GEN12_RCU_MODE,
+			   _MASKED_BIT_ENABLE(GEN12_RCU_MODE_CCS_ENABLE));
+
+	return 0;
+}
+
 static void guc_set_default_submission(struct intel_engine_cs *engine)
 {
 	engine->submit_request = guc_submit_request;
@@ -2464,6 +2487,9 @@ static void rcs_submission_override(struct intel_engine_cs *engine)
 		engine->emit_fini_breadcrumb = gen8_emit_fini_breadcrumb_rcs;
 		break;
 	}
+
+	if (engine->class == RENDER_CLASS)
+		engine->resume = gen12_rcs_resume;
 }
 
 static inline void guc_default_irqs(struct intel_engine_cs *engine)
