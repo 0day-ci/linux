@@ -1225,7 +1225,7 @@ void intel_psr_enable(struct intel_dp *intel_dp,
 	if (!crtc_state->has_psr)
 		return;
 
-	drm_WARN_ON(&dev_priv->drm, dev_priv->drrs.dp);
+	drm_WARN_ON(&dev_priv->drm, dev_priv->display->drrs.dp);
 
 	mutex_lock(&intel_dp->psr.lock);
 	intel_psr_enable_locked(intel_dp, crtc_state, conn_state);

@@ -867,6 +867,7 @@ struct drm_i915_display {
 	wait_queue_head_t gmbus_wait_queue;
 
 	struct intel_dmc dmc;
+	struct i915_drrs drrs;
 };
 
 struct drm_i915_private {
@@ -942,7 +943,6 @@ struct drm_i915_private {
 
 	struct i915_hotplug hotplug;
 	struct intel_fbc fbc;
-	struct i915_drrs drrs;
 	struct intel_opregion opregion;
 	struct intel_vbt_data vbt;
 

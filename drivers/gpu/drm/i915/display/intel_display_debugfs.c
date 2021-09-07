@@ -1234,7 +1234,7 @@ static void drrs_status_per_crtc(struct seq_file *m,
 				 struct intel_crtc *crtc)
 {
 	struct drm_i915_private *dev_priv = to_i915(dev);
-	struct i915_drrs *drrs = &dev_priv->drrs;
+	struct i915_drrs *drrs = &dev_priv->display->drrs;
 	int vrefresh = 0;
 	struct drm_connector *connector;
 	struct drm_connector_list_iter conn_iter;
