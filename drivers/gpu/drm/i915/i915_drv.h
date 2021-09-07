@@ -908,6 +908,8 @@ struct drm_i915_display {
 	/* list of fbdev register on this device */
 	struct intel_fbdev *fbdev;
 	struct work_struct fbdev_suspend_work;
+
+	struct i915_frontbuffer_tracking fb_tracking;
 };
 
 struct drm_i915_private {
@@ -1052,8 +1054,6 @@ struct drm_i915_private {
 	struct list_head global_obj_list;
 
 	struct i915_wa_list gt_wa_list;
-
-	struct i915_frontbuffer_tracking fb_tracking;
 
 	struct intel_atomic_helper {
 		struct llist_head free_list;
