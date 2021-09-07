@@ -1112,6 +1112,44 @@ __ww_mutex_lock(struct mutex *lock, unsigned int state, unsigned int subclass,
 	return __mutex_lock_common(lock, state, subclass, nest_lock, ip, ww_ctx, true);
 }
 
+/**
+ * ww_mutex_trylock - tries to acquire the w/w mutex with optional acquire context
+ * @lock: mutex to lock
+ * @ctx: optional w/w acquire context
+ *
+ * Trylocks a mutex with the optional acquire context; no deadlock detection is
+ * possible. Returns 1 if the mutex has been acquired successfully, 0 otherwise.
+ *
+ * Unlike ww_mutex_lock, no deadlock handling is performed. However, if a @ctx is
+ * specified, -EALREADY and -EDEADLK handling may happen in calls to ww_mutex_lock.
+ *
+ * A mutex acquired with this function must be released with ww_mutex_unlock.
+ */
+int __sched
+ww_mutex_trylock(struct ww_mutex *ww, struct ww_acquire_ctx *ctx)
+{
+	bool locked;
+
+	if (!ctx)
+		return mutex_trylock(&ww->base);
+
+#ifdef CONFIG_DEBUG_MUTEXES
+	DEBUG_LOCKS_WARN_ON(ww->base.magic != &ww->base);
+#endif
+
+	preempt_disable();
+	locked = __mutex_trylock(&ww->base);
+
+	if (locked) {
+		ww_mutex_set_context_fastpath(ww, ctx);
+		mutex_acquire_nest(&ww->base.dep_map, 0, 1, &ctx->dep_map, _RET_IP_);
+	}
+	preempt_enable();
+
+	return locked;
+}
+EXPORT_SYMBOL(ww_mutex_trylock);
+
 #ifdef CONFIG_DEBUG_LOCK_ALLOC
 void __sched
 mutex_lock_nested(struct mutex *lock, unsigned int subclass)
