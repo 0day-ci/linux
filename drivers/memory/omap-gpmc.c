@@ -2171,10 +2171,8 @@ static int gpmc_probe_generic_child(struct platform_device *pdev,
 		}
 	}
 
-	if (of_device_is_compatible(child, "ti,omap2-nand")) {
-		/* NAND specific setup */
-		val = 8;
-		of_property_read_u32(child, "nand-bus-width", &val);
+	/* DT node can have "nand-bus-width" or "bank-width" or "gpmc,device-width" */
+	if (!of_property_read_u32(child, "nand-bus-width", &val)) {
 		switch (val) {
 		case 8:
 			gpmc_s.device_width = GPMC_DEVWIDTH_8BIT;
@@ -2183,24 +2181,37 @@ static int gpmc_probe_generic_child(struct platform_device *pdev,
 			gpmc_s.device_width = GPMC_DEVWIDTH_16BIT;
 			break;
 		default:
-			dev_err(&pdev->dev, "%pOFn: invalid 'nand-bus-width'\n",
-				child);
+			dev_err(&pdev->dev,
+				"%pOFn: invalid 'nand-bus-width':%d\n", child, val);
 			ret = -EINVAL;
 			goto err;
 		}
+	} else if (!of_property_read_u32(child, "bank-width", &val)) {
+		if (val != 1 && val != 2) {
+			dev_err(&pdev->dev,
+				"%pOFn: invalid 'bank-width':%d\n", child, val);
+			ret = -EINVAL;
+			goto err;
+		}
+		gpmc_s.device_width = val;
+	} else if (!of_property_read_u32(child, "gpmc,device-width", &val)) {
+		if (val != 1 && val != 2) {
+			dev_err(&pdev->dev,
+				"%pOFn: invalid 'gpmc,device-width':%d\n", child, val);
+			ret = -EINVAL;
+			goto err;
+		}
+		gpmc_s.device_width = val;
+	} else {
+		/* default to 8-bit */
+		gpmc_s.device_width = GPMC_DEVWIDTH_8BIT;
+	}
 
+	if (of_device_is_compatible(child, "ti,omap2-nand")) {
+		/* NAND specific setup */
 		/* disable write protect */
 		gpmc_configure(GPMC_CONFIG_WP, 0);
 		gpmc_s.device_nand = true;
-	} else {
-		ret = of_property_read_u32(child, "bank-width",
-					   &gpmc_s.device_width);
-		if (ret < 0 && !gpmc_s.device_width) {
-			dev_err(&pdev->dev,
-				"%pOF has no 'gpmc,device-width' property\n",
-				child);
-			goto err;
-		}
 	}
 
 	/* Reserve wait pin if it is required and valid */
