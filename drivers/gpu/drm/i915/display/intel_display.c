@@ -10438,12 +10438,12 @@ static int intel_atomic_commit(struct drm_device *dev,
 
 	i915_sw_fence_commit(&state->commit_ready);
 	if (nonblock && state->modeset) {
-		queue_work(dev_priv->modeset_wq, &state->base.commit_work);
+		queue_work(dev_priv->display->modeset_wq, &state->base.commit_work);
 	} else if (nonblock) {
-		queue_work(dev_priv->flip_wq, &state->base.commit_work);
+		queue_work(dev_priv->display->flip_wq, &state->base.commit_work);
 	} else {
 		if (state->modeset)
-			flush_workqueue(dev_priv->modeset_wq);
+			flush_workqueue(dev_priv->display->modeset_wq);
 		intel_atomic_commit_tail(state);
 	}
 
@@ -11569,8 +11569,8 @@ int intel_modeset_init_noirq(struct drm_i915_private *i915)
 
 	intel_dmc_ucode_init(i915);
 
-	i915->modeset_wq = alloc_ordered_workqueue("i915_modeset", 0);
-	i915->flip_wq = alloc_workqueue("i915_flip", WQ_HIGHPRI |
+	i915->display->modeset_wq = alloc_ordered_workqueue("i915_modeset", 0);
+	i915->display->flip_wq = alloc_workqueue("i915_flip", WQ_HIGHPRI |
 					WQ_UNBOUND, WQ_UNBOUND_MAX_ACTIVE);
 
 	i915->display->framestart_delay = 1; /* 1-4 */
@@ -12627,8 +12627,8 @@ void intel_modeset_driver_remove(struct drm_i915_private *i915)
 	if (!HAS_DISPLAY(i915))
 		return;
 
-	flush_workqueue(i915->flip_wq);
-	flush_workqueue(i915->modeset_wq);
+	flush_workqueue(i915->display->flip_wq);
+	flush_workqueue(i915->display->modeset_wq);
 
 	flush_work(&i915->display->atomic_helper.free_work);
 	drm_WARN_ON(&i915->drm, !llist_empty(&i915->display->atomic_helper.free_list));
@@ -12671,8 +12671,8 @@ void intel_modeset_driver_remove_noirq(struct drm_i915_private *i915)
 
 	intel_gmbus_teardown(i915);
 
-	destroy_workqueue(i915->flip_wq);
-	destroy_workqueue(i915->modeset_wq);
+	destroy_workqueue(i915->display->flip_wq);
+	destroy_workqueue(i915->display->modeset_wq);
 
 	intel_fbc_cleanup_cfb(i915);
 }

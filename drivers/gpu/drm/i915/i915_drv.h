@@ -967,6 +967,11 @@ struct drm_i915_display {
 	} dpll;
 
 	u32 fdi_rx_config;
+
+	/* ordered wq for modesets */
+	struct workqueue_struct *modeset_wq;
+	/* unbound hipri wq for page flips/plane updates */
+	struct workqueue_struct *flip_wq;
 };
 
 struct drm_i915_private {
@@ -1068,11 +1073,6 @@ struct drm_i915_private {
 	 * result in deadlocks.
 	 */
 	struct workqueue_struct *wq;
-
-	/* ordered wq for modesets */
-	struct workqueue_struct *modeset_wq;
-	/* unbound hipri wq for page flips/plane updates */
-	struct workqueue_struct *flip_wq;
 
 	/* PCH chipset type */
 	enum intel_pch pch_type;
