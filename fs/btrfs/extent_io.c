@@ -241,7 +241,7 @@ int __init extent_io_init(void)
 		return -ENOMEM;
 
 	if (bioset_init(&btrfs_bioset, BIO_POOL_SIZE,
-			offsetof(struct btrfs_io_bio, bio),
+			offsetof(struct btrfs_logical_bio, bio),
 			BIOSET_NEED_BVECS))
 		goto free_buffer_cache;
 
@@ -2299,7 +2299,7 @@ int repair_io_failure(struct btrfs_fs_info *fs_info, u64 ino, u64 start,
 	if (btrfs_is_zoned(fs_info))
 		return btrfs_repair_one_zone(fs_info, logical);
 
-	bio = btrfs_bio_alloc_iovecs(1);
+	bio = btrfs_logical_bio_alloc_iovecs(1);
 	bio->bi_iter.bi_size = 0;
 	map_length = length;
 
@@ -2618,10 +2618,11 @@ int btrfs_repair_one_sector(struct inode *inode,
 	struct btrfs_fs_info *fs_info = btrfs_sb(inode->i_sb);
 	struct extent_io_tree *tree = &BTRFS_I(inode)->io_tree;
 	struct extent_io_tree *failure_tree = &BTRFS_I(inode)->io_failure_tree;
-	struct btrfs_io_bio *failed_io_bio = btrfs_io_bio(failed_bio);
+	struct btrfs_logical_bio *failed_logical_bio =
+						btrfs_logical_bio(failed_bio);
 	const int icsum = bio_offset >> fs_info->sectorsize_bits;
 	struct bio *repair_bio;
-	struct btrfs_io_bio *repair_io_bio;
+	struct btrfs_logical_bio *repair_logical_bio;
 	blk_status_t status;
 
 	btrfs_debug(fs_info,
@@ -2639,24 +2640,24 @@ int btrfs_repair_one_sector(struct inode *inode,
 		return -EIO;
 	}
 
-	repair_bio = btrfs_bio_alloc_iovecs(1);
-	repair_io_bio = btrfs_io_bio(repair_bio);
+	repair_bio = btrfs_logical_bio_alloc_iovecs(1);
+	repair_logical_bio = btrfs_logical_bio(repair_bio);
 	repair_bio->bi_opf = REQ_OP_READ;
 	repair_bio->bi_end_io = failed_bio->bi_end_io;
 	repair_bio->bi_iter.bi_sector = failrec->logical >> 9;
 	repair_bio->bi_private = failed_bio->bi_private;
 
-	if (failed_io_bio->csum) {
+	if (failed_logical_bio->csum) {
 		const u32 csum_size = fs_info->csum_size;
 
-		repair_io_bio->csum = repair_io_bio->csum_inline;
-		memcpy(repair_io_bio->csum,
-		       failed_io_bio->csum + csum_size * icsum, csum_size);
+		repair_logical_bio->csum = repair_logical_bio->csum_inline;
+		memcpy(repair_logical_bio->csum,
+		       failed_logical_bio->csum + csum_size * icsum, csum_size);
 	}
 
 	bio_add_page(repair_bio, page, failrec->len, pgoff);
-	repair_io_bio->logical = failrec->start;
-	repair_io_bio->iter = repair_bio->bi_iter;
+	repair_logical_bio->logical = failrec->start;
+	repair_logical_bio->iter = repair_bio->bi_iter;
 
 	btrfs_debug(btrfs_sb(inode->i_sb),
 		    "repair read error: submitting new read to mirror %d",
@@ -2976,7 +2977,7 @@ static struct extent_buffer *find_extent_buffer_readpage(
 static void end_bio_extent_readpage(struct bio *bio)
 {
 	struct bio_vec *bvec;
-	struct btrfs_io_bio *io_bio = btrfs_io_bio(bio);
+	struct btrfs_logical_bio *logical_bio = btrfs_logical_bio(bio);
 	struct extent_io_tree *tree, *failure_tree;
 	struct processed_extent processed = { 0 };
 	/*
@@ -3003,7 +3004,7 @@ static void end_bio_extent_readpage(struct bio *bio)
 		btrfs_debug(fs_info,
 			"end_bio_extent_readpage: bi_sector=%llu, err=%d, mirror=%u",
 			bio->bi_iter.bi_sector, bio->bi_status,
-			io_bio->mirror_num);
+			logical_bio->mirror_num);
 		tree = &BTRFS_I(inode)->io_tree;
 		failure_tree = &BTRFS_I(inode)->io_failure_tree;
 
@@ -3028,14 +3029,14 @@ static void end_bio_extent_readpage(struct bio *bio)
 		end = start + bvec->bv_len - 1;
 		len = bvec->bv_len;
 
-		mirror = io_bio->mirror_num;
+		mirror = logical_bio->mirror_num;
 		if (likely(uptodate)) {
 			if (is_data_inode(inode)) {
-				error_bitmap = btrfs_verify_data_csum(io_bio,
+				error_bitmap = btrfs_verify_data_csum(logical_bio,
 						bio_offset, page, start, end);
 				ret = error_bitmap;
 			} else {
-				ret = btrfs_validate_metadata_buffer(io_bio,
+				ret = btrfs_validate_metadata_buffer(logical_bio,
 					page, start, end, mirror);
 			}
 			if (ret)
@@ -3106,7 +3107,7 @@ readpage_ok:
 	}
 	/* Release the last extent */
 	endio_readpage_release_extent(&processed, NULL, 0, 0, false);
-	btrfs_io_bio_free_csum(io_bio);
+	btrfs_logical_bio_free_csum(logical_bio);
 	bio_put(bio);
 }
 
@@ -3115,53 +3116,54 @@ readpage_ok:
  * new bio by bio_alloc_bioset as it does not initialize the bytes outside of
  * 'bio' because use of __GFP_ZERO is not supported.
  */
-static inline void btrfs_io_bio_init(struct btrfs_io_bio *btrfs_bio)
+static inline void btrfs_logical_bio_init(struct btrfs_logical_bio *btrfs_bio)
 {
-	memset(btrfs_bio, 0, offsetof(struct btrfs_io_bio, bio));
+	memset(btrfs_bio, 0, offsetof(struct btrfs_logical_bio, bio));
 }
 
 /*
  * The following helpers allocate a bio. As it's backed by a bioset, it'll
- * never fail.  We're returning a bio right now but you can call btrfs_io_bio
- * for the appropriate container_of magic
+ * never fail.  We're returning a bio right now but you can call
+ * btrfs_logical_bio for the appropriate container_of magic
  */
-struct bio *btrfs_bio_alloc(u64 first_byte)
+struct bio *btrfs_logical_bio_alloc(u64 first_byte)
 {
 	struct bio *bio;
 
 	bio = bio_alloc_bioset(GFP_NOFS, BIO_MAX_VECS, &btrfs_bioset);
 	bio->bi_iter.bi_sector = first_byte >> 9;
-	btrfs_io_bio_init(btrfs_io_bio(bio));
+	btrfs_logical_bio_init(btrfs_logical_bio(bio));
 	return bio;
 }
 
-struct bio *btrfs_bio_clone(struct bio *bio)
+struct bio *btrfs_logical_bio_clone(struct bio *bio)
 {
-	struct btrfs_io_bio *btrfs_bio;
+	struct btrfs_logical_bio *btrfs_bio;
 	struct bio *new;
 
 	/* Bio allocation backed by a bioset does not fail */
 	new = bio_clone_fast(bio, GFP_NOFS, &btrfs_bioset);
-	btrfs_bio = btrfs_io_bio(new);
-	btrfs_io_bio_init(btrfs_bio);
+	btrfs_bio = btrfs_logical_bio(new);
+	btrfs_logical_bio_init(btrfs_bio);
 	btrfs_bio->iter = bio->bi_iter;
 	return new;
 }
 
-struct bio *btrfs_bio_alloc_iovecs(unsigned int nr_iovecs)
+struct bio *btrfs_logical_bio_alloc_iovecs(unsigned int nr_iovecs)
 {
 	struct bio *bio;
 
 	/* Bio allocation backed by a bioset does not fail */
 	bio = bio_alloc_bioset(GFP_NOFS, nr_iovecs, &btrfs_bioset);
-	btrfs_io_bio_init(btrfs_io_bio(bio));
+	btrfs_logical_bio_init(btrfs_logical_bio(bio));
 	return bio;
 }
 
-struct bio *btrfs_bio_clone_partial(struct bio *orig, u64 offset, u64 size)
+struct bio *btrfs_logical_bio_clone_partial(struct bio *orig, u64 offset,
+					    u64 size)
 {
 	struct bio *bio;
-	struct btrfs_io_bio *btrfs_bio;
+	struct btrfs_logical_bio *logical_bio;
 
 	ASSERT(offset <= UINT_MAX && size <= UINT_MAX);
 
@@ -3169,11 +3171,11 @@ struct bio *btrfs_bio_clone_partial(struct bio *orig, u64 offset, u64 size)
 	bio = bio_clone_fast(orig, GFP_NOFS, &btrfs_bioset);
 	ASSERT(bio);
 
-	btrfs_bio = btrfs_io_bio(bio);
-	btrfs_io_bio_init(btrfs_bio);
+	logical_bio = btrfs_logical_bio(bio);
+	btrfs_logical_bio_init(logical_bio);
 
 	bio_trim(bio, offset >> 9, size >> 9);
-	btrfs_bio->iter = bio->bi_iter;
+	logical_bio->iter = bio->bi_iter;
 	return bio;
 }
 
@@ -3312,9 +3314,9 @@ static int alloc_new_bio(struct btrfs_inode *inode,
 	 * passed in, no matter if we have added any range into previous bio.
 	 */
 	if (bio_flags & EXTENT_BIO_COMPRESSED)
-		bio = btrfs_bio_alloc(disk_bytenr);
+		bio = btrfs_logical_bio_alloc(disk_bytenr);
 	else
-		bio = btrfs_bio_alloc(disk_bytenr + offset);
+		bio = btrfs_logical_bio_alloc(disk_bytenr + offset);
 	bio_ctrl->bio = bio;
 	bio_ctrl->bio_flags = bio_flags;
 	bio->bi_end_io = end_io_func;
@@ -3341,7 +3343,7 @@ static int alloc_new_bio(struct btrfs_inode *inode,
 			goto error;
 		}
 
-		btrfs_io_bio(bio)->device = device;
+		btrfs_logical_bio(bio)->device = device;
 	}
 	return 0;
 error:

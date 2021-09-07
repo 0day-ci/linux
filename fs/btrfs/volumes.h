@@ -300,38 +300,62 @@ struct btrfs_fs_devices {
 				/ sizeof(struct btrfs_stripe) + 1)
 
 /*
- * we need the mirror number and stripe index to be passed around
- * the call chain while we are processing end_io (especially errors).
- * Really, what we need is a btrfs_bio structure that has this info
- * and is properly sized with its stripe array, but we're not there
- * quite yet.  We have our own btrfs bioset, and all of the bios
- * we allocate are actually btrfs_io_bios.  We'll cram as much of
- * struct btrfs_bio as we can into this over time.
++ * Extra info for read/write bio of btrfs logical address.
++ *
++ * bio->bi_iter.bi_sector will be btrfs logical address, and
++ * btrfs_map_bio() will convert the logical bio to real bio to each device.
++ *
++ * Currently one logical bio can *NOT* cross stripe boundary, thus it relies on
++ * submit_extent_page() to split the io range into different logical bios.
++ *
++ * TODO: Make btrfs_map_bio() to split the bio.
  */
-struct btrfs_io_bio {
+struct btrfs_logical_bio {
+	/*
+	 * Specify which copy to read (before bio submitted), or which
+	 * copy is read from disk (at endio time).
+	 *
+	 * 0 means choose any copy. Will be affected by balance policy and
+	 * device missing status.
+	 * 1 is the first copy and etc.
+	 *
+	 * At endio time, mirror_num should not be zero.
+	 *
+	 * Normally for write, @mirror_num should always be 0. Only read time
+	 * repair utilize non-zero mirror num at write time.
+	 */
 	unsigned int mirror_num;
 	struct btrfs_device *device;
+
+	/* This is for direct IO to grab its logical bytenr */
 	u64 logical;
+
+	/*
+	 * For data read, csum will be used to verify the result.
+	 * For data write, csum will be inserted into csum tree.
+	 *
+	 * For metadata or data without csum, it will NULL.
+	 */
 	u8 *csum;
 	u8 csum_inline[BTRFS_BIO_INLINE_CSUM_SIZE];
 	struct bvec_iter iter;
 	/*
 	 * This member must come last, bio_alloc_bioset will allocate enough
-	 * bytes for entire btrfs_io_bio but relies on bio being last.
+	 * bytes for entire btrfs_logical_bio but relies on bio being last.
 	 */
 	struct bio bio;
 };
 
-static inline struct btrfs_io_bio *btrfs_io_bio(struct bio *bio)
+static inline struct btrfs_logical_bio *btrfs_logical_bio(struct bio *bio)
 {
-	return container_of(bio, struct btrfs_io_bio, bio);
+	return container_of(bio, struct btrfs_logical_bio, bio);
 }
 
-static inline void btrfs_io_bio_free_csum(struct btrfs_io_bio *io_bio)
+static inline void btrfs_logical_bio_free_csum(struct btrfs_logical_bio *logical)
 {
-	if (io_bio->csum != io_bio->csum_inline) {
-		kfree(io_bio->csum);
-		io_bio->csum = NULL;
+	if (logical->csum != logical->csum_inline) {
+		kfree(logical->csum);
+		logical->csum = NULL;
 	}
 }
 

@@ -1423,7 +1423,7 @@ static void scrub_recheck_block_on_raid56(struct btrfs_fs_info *fs_info,
 	if (!first_page->dev->bdev)
 		goto out;
 
-	bio = btrfs_bio_alloc_iovecs(BIO_MAX_VECS);
+	bio = btrfs_logical_bio_alloc_iovecs(BIO_MAX_VECS);
 	bio_set_dev(bio, first_page->dev->bdev);
 
 	for (page_num = 0; page_num < sblock->page_count; page_num++) {
@@ -1480,7 +1480,7 @@ static void scrub_recheck_block(struct btrfs_fs_info *fs_info,
 		}
 
 		WARN_ON(!spage->page);
-		bio = btrfs_bio_alloc_iovecs(1);
+		bio = btrfs_logical_bio_alloc_iovecs(1);
 		bio_set_dev(bio, spage->dev->bdev);
 
 		bio_add_page(bio, spage->page, fs_info->sectorsize, 0);
@@ -1562,7 +1562,7 @@ static int scrub_repair_page_from_good_copy(struct scrub_block *sblock_bad,
 			return -EIO;
 		}
 
-		bio = btrfs_bio_alloc_iovecs(1);
+		bio = btrfs_logical_bio_alloc_iovecs(1);
 		bio_set_dev(bio, spage_bad->dev->bdev);
 		bio->bi_iter.bi_sector = spage_bad->physical >> 9;
 		bio->bi_opf = REQ_OP_WRITE;
@@ -1676,7 +1676,7 @@ again:
 		sbio->dev = sctx->wr_tgtdev;
 		bio = sbio->bio;
 		if (!bio) {
-			bio = btrfs_bio_alloc_iovecs(sctx->pages_per_wr_bio);
+			bio = btrfs_logical_bio_alloc_iovecs(sctx->pages_per_wr_bio);
 			sbio->bio = bio;
 		}
 
@@ -2102,7 +2102,7 @@ again:
 		sbio->dev = spage->dev;
 		bio = sbio->bio;
 		if (!bio) {
-			bio = btrfs_bio_alloc_iovecs(sctx->pages_per_rd_bio);
+			bio = btrfs_logical_bio_alloc_iovecs(sctx->pages_per_rd_bio);
 			sbio->bio = bio;
 		}
 
@@ -2226,7 +2226,7 @@ static void scrub_missing_raid56_pages(struct scrub_block *sblock)
 		goto bbio_out;
 	}
 
-	bio = btrfs_bio_alloc_iovecs(0);
+	bio = btrfs_logical_bio_alloc_iovecs(0);
 	bio->bi_iter.bi_sector = logical >> 9;
 	bio->bi_private = sblock;
 	bio->bi_end_io = scrub_missing_raid56_end_io;
@@ -2842,7 +2842,7 @@ static void scrub_parity_check_and_repair(struct scrub_parity *sparity)
 	if (ret || !bbio || !bbio->raid_map)
 		goto bbio_out;
 
-	bio = btrfs_bio_alloc_iovecs(0);
+	bio = btrfs_logical_bio_alloc_iovecs(0);
 	bio->bi_iter.bi_sector = sparity->logic_start >> 9;
 	bio->bi_private = sparity;
 	bio->bi_end_io = scrub_parity_bio_endio;
