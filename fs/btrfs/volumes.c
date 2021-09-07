@@ -7353,13 +7353,10 @@ out_short_read:
 /*
  * Check if all chunks in the fs are OK for read-write degraded mount
  *
- * If the @failing_dev is specified, it's accounted as missing.
- *
  * Return true if all chunks meet the minimal RW mount requirements.
  * Return false if any chunk doesn't meet the minimal RW mount requirements.
  */
-bool btrfs_check_rw_degradable(struct btrfs_fs_info *fs_info,
-			       struct btrfs_device *failing_dev, bool mounting_fs)
+bool btrfs_check_rw_degradable(struct btrfs_fs_info *fs_info, bool mounting_fs)
 {
 	struct extent_map_tree *map_tree = &fs_info->mapping_tree;
 	struct extent_map *em;
@@ -7406,13 +7403,10 @@ bool btrfs_check_rw_degradable(struct btrfs_fs_info *fs_info,
 			} else if (!dev || !dev->bdev ||
 			    test_bit(BTRFS_DEV_STATE_MISSING, &dev->dev_state)) {
 				missing++;
-			} else if (failing_dev && failing_dev == dev) {
-				missing++;
 			}
 		}
 		if (missing > max_tolerated) {
-			if (!failing_dev)
-				btrfs_warn(fs_info,
+			btrfs_warn(fs_info,
 	"chunk %llu missing %d devices, max tolerance is %d for writable mount",
 				   em->start, missing, max_tolerated);
 			free_extent_map(em);

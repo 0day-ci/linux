@@ -2017,7 +2017,7 @@ static int btrfs_remount(struct super_block *sb, int *flags, char *data)
 			goto restore;
 		}
 
-		if (!btrfs_check_rw_degradable(fs_info, NULL, true)) {
+		if (!btrfs_check_rw_degradable(fs_info, true)) {
 			btrfs_warn(fs_info,
 		"too many missing devices, writable remount is not allowed");
 			ret = -EACCES;
