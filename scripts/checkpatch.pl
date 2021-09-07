@@ -145,11 +145,6 @@ EOM
 	exit($exitcode);
 }
 
-sub uniq {
-	my %seen;
-	return grep { !$seen{$_}++ } @_;
-}
-
 sub list_types {
 	my ($exitcode) = @_;
 
