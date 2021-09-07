@@ -294,20 +294,11 @@ static int twl_pwmled_probe(struct platform_device *pdev)
 
 	mutex_init(&twl->mutex);
 
-	ret = pwmchip_add(&twl->chip);
+	ret = devm_pwmchip_add(&pdev->dev, &twl->chip);
 	if (ret < 0)
 		return ret;
 
-	platform_set_drvdata(pdev, twl);
-
 	return 0;
-}
-
-static int twl_pwmled_remove(struct platform_device *pdev)
-{
-	struct twl_pwmled_chip *twl = platform_get_drvdata(pdev);
-
-	return pwmchip_remove(&twl->chip);
 }
 
 #ifdef CONFIG_OF
@@ -325,7 +316,6 @@ static struct platform_driver twl_pwmled_driver = {
 		.of_match_table = of_match_ptr(twl_pwmled_of_match),
 	},
 	.probe = twl_pwmled_probe,
-	.remove = twl_pwmled_remove,
 };
 module_platform_driver(twl_pwmled_driver);
 
