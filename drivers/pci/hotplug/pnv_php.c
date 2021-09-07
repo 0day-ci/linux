@@ -158,7 +158,6 @@ static void pnv_php_detach_device_nodes(struct device_node *parent)
 	for_each_child_of_node(parent, dn) {
 		pnv_php_detach_device_nodes(dn);
 
-		of_node_put(dn);
 		of_detach_node(dn);
 	}
 }
