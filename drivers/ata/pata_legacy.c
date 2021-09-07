@@ -815,7 +815,7 @@ static void winbond_set_piomode(struct ata_port *ap, struct ata_device *adev)
 	struct legacy_data *ld_winbond = ap->host->private_data;
 	int active, recovery;
 	u8 reg;
-	int timing = 0x88 + (ap->port_no * 4) + (adev->devno * 2);
+	int timing;
 
 	reg = winbond_readcfg(ld_winbond->timing, 0x81);
 
