@@ -88,6 +88,7 @@ static const struct of_device_id __maybe_unused tmp421_of_match[] = {
 MODULE_DEVICE_TABLE(of, tmp421_of_match);
 
 struct tmp421_channel {
+	const char *label;
 	s16 temp;
 };
 
@@ -177,6 +178,16 @@ static int tmp421_read(struct device *dev, enum hwmon_sensor_types type,
 
 }
 
+static int tmp421_read_string(struct device *dev, enum hwmon_sensor_types type,
+			     u32 attr, int channel, const char **str)
+{
+	struct tmp421_data *data = dev_get_drvdata(dev);
+
+	*str = data->channel[channel].label;
+
+	return 0;
+}
+
 static umode_t tmp421_is_visible(const void *data, enum hwmon_sensor_types type,
 				 u32 attr, int channel)
 {
@@ -186,6 +197,8 @@ static umode_t tmp421_is_visible(const void *data, enum hwmon_sensor_types type,
 			return 0;
 		return 0444;
 	case hwmon_temp_input:
+		return 0444;
+	case hwmon_temp_label:
 		return 0444;
 	default:
 		return 0;
@@ -279,9 +292,45 @@ static int tmp421_detect(struct i2c_client *client,
 	return 0;
 }
 
+void tmp421_probe_child_from_dt(struct i2c_client *client,
+				struct device_node *child,
+				struct tmp421_data *data)
+
+{
+	struct device *dev = &client->dev;
+	u32 i;
+	int err;
+
+	err = of_property_read_u32(child, "reg", &i);
+	if (err) {
+		dev_err(dev, "missing reg property of %pOFn\n", child);
+		return;
+	} else if (i > MAX_CHANNELS) {
+		dev_err(dev, "invalid reg %d of %pOFn\n", i, child);
+		return;
+	}
+
+	of_property_read_string(child, "label", &data->channel[i].label);
+	if (data->channel[i].label)
+		data->temp_config[i] |= HWMON_T_LABEL;
+
+}
+
+void tmp421_probe_from_dt(struct i2c_client *client, struct tmp421_data *data)
+{
+	struct device *dev = &client->dev;
+	const struct device_node *np = dev->of_node;
+	struct device_node *child;
+
+	for_each_child_of_node(np, child) {
+		tmp421_probe_child_from_dt(client, child, data);
+	}
+}
+
 static const struct hwmon_ops tmp421_ops = {
 	.is_visible = tmp421_is_visible,
 	.read = tmp421_read,
+	.read_string = tmp421_read_string,
 };
 
 static int tmp421_probe(struct i2c_client *client)
@@ -309,6 +358,8 @@ static int tmp421_probe(struct i2c_client *client)
 
 	for (i = 0; i < data->channels; i++)
 		data->temp_config[i] = HWMON_T_INPUT | HWMON_T_FAULT;
+
+	tmp421_probe_from_dt(client, data);
 
 	data->chip.ops = &tmp421_ops;
 	data->chip.info = data->info;
