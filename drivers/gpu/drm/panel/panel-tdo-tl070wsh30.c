@@ -59,8 +59,7 @@ static int tdo_tl070wsh30_panel_prepare(struct drm_panel *panel)
 	err = mipi_dsi_dcs_exit_sleep_mode(tdo_tl070wsh30->link);
 	if (err < 0) {
 		dev_err(panel->dev, "failed to exit sleep mode: %d\n", err);
-		regulator_disable(tdo_tl070wsh30->supply);
-		return err;
+		goto err_disable_reg;
 	}
 
 	msleep(200);
@@ -68,8 +67,7 @@ static int tdo_tl070wsh30_panel_prepare(struct drm_panel *panel)
 	err = mipi_dsi_dcs_set_display_on(tdo_tl070wsh30->link);
 	if (err < 0) {
 		dev_err(panel->dev, "failed to set display on: %d\n", err);
-		regulator_disable(tdo_tl070wsh30->supply);
-		return err;
+		goto err_disable_reg;
 	}
 
 	msleep(20);
@@ -77,6 +75,9 @@ static int tdo_tl070wsh30_panel_prepare(struct drm_panel *panel)
 	tdo_tl070wsh30->prepared = true;
 
 	return 0;
+err_disable_reg:
+	regulator_disable(tdo_tl070wsh30->supply);
+	return err;
 }
 
 static int tdo_tl070wsh30_panel_unprepare(struct drm_panel *panel)
