@@ -946,6 +946,25 @@ struct drm_i915_display {
 	bool chv_phy_assert[2];
 
 	u32 bxt_phy_grc;
+
+	/**
+	 * dpll and cdclk state is protected by connection_mutex
+	 * dpll.lock serializes intel_{prepare,enable,disable}_shared_dpll.
+	 * Must be global rather than per dpll, because on some platforms plls
+	 * share registers.
+	 */
+	struct {
+		struct mutex lock;
+
+		int num_shared_dpll;
+		struct intel_shared_dpll shared_dplls[I915_NUM_PLLS];
+		const struct intel_dpll_mgr *mgr;
+
+		struct {
+			int nssc;
+			int ssc;
+		} ref_clks;
+	} dpll;
 };
 
 struct drm_i915_private {
@@ -1062,27 +1081,6 @@ struct drm_i915_private {
 	struct i915_ggtt ggtt; /* VM representing the global address space */
 
 	struct i915_gem_mm mm;
-
-	/* Kernel Modesetting */
-
-	/**
-	 * dpll and cdclk state is protected by connection_mutex
-	 * dpll.lock serializes intel_{prepare,enable,disable}_shared_dpll.
-	 * Must be global rather than per dpll, because on some platforms plls
-	 * share registers.
-	 */
-	struct {
-		struct mutex lock;
-
-		int num_shared_dpll;
-		struct intel_shared_dpll shared_dplls[I915_NUM_PLLS];
-		const struct intel_dpll_mgr *mgr;
-
-		struct {
-			int nssc;
-			int ssc;
-		} ref_clks;
-	} dpll;
 
 	struct list_head global_obj_list;
 
