@@ -2299,7 +2299,7 @@ int repair_io_failure(struct btrfs_fs_info *fs_info, u64 ino, u64 start,
 	if (btrfs_is_zoned(fs_info))
 		return btrfs_repair_one_zone(fs_info, logical);
 
-	bio = btrfs_io_bio_alloc(1);
+	bio = btrfs_bio_alloc_iovecs(1);
 	bio->bi_iter.bi_size = 0;
 	map_length = length;
 
@@ -2639,7 +2639,7 @@ int btrfs_repair_one_sector(struct inode *inode,
 		return -EIO;
 	}
 
-	repair_bio = btrfs_io_bio_alloc(1);
+	repair_bio = btrfs_bio_alloc_iovecs(1);
 	repair_io_bio = btrfs_io_bio(repair_bio);
 	repair_bio->bi_opf = REQ_OP_READ;
 	repair_bio->bi_end_io = failed_bio->bi_end_io;
@@ -3148,7 +3148,7 @@ struct bio *btrfs_bio_clone(struct bio *bio)
 	return new;
 }
 
-struct bio *btrfs_io_bio_alloc(unsigned int nr_iovecs)
+struct bio *btrfs_bio_alloc_iovecs(unsigned int nr_iovecs)
 {
 	struct bio *bio;
 
