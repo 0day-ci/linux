@@ -17,6 +17,10 @@
 #include <net/netfilter/nf_conntrack_helper.h>
 #include <net/netfilter/nf_conntrack_expect.h>
 #include <linux/netfilter/nf_conntrack_ftp.h>
+void nf_nat_l4proto_unique_tuple(struct nf_conntrack_tuple *tuple,
+				 const struct nf_nat_range2 *range,
+				 enum nf_nat_manip_type maniptype,
+				 const struct nf_conn *ct);
 
 #define NAT_HELPER_NAME "ftp"
 
@@ -72,8 +76,14 @@ static unsigned int nf_nat_ftp(struct sk_buff *skb,
 	u_int16_t port;
 	int dir = CTINFO2DIR(ctinfo);
 	struct nf_conn *ct = exp->master;
+	struct nf_conn_nat *nat = nfct_nat(ct);
+	struct nf_nat_range2 range = {};
 	char buffer[sizeof("|1||65535|") + INET6_ADDRSTRLEN];
 	unsigned int buflen;
+	int ret;
+
+	if (WARN_ON_ONCE(!nat))
+		return NF_DROP;
 
 	pr_debug("type %i, off %u len %u\n", type, matchoff, matchlen);
 
@@ -86,21 +96,33 @@ static unsigned int nf_nat_ftp(struct sk_buff *skb,
 	 * this one. */
 	exp->expectfn = nf_nat_follow_master;
 
-	/* Try to get same port: if not, try to change it. */
-	for (port = ntohs(exp->saved_proto.tcp.port); port != 0; port++) {
-		int ret;
-
-		exp->tuple.dst.u.tcp.port = htons(port);
-		ret = nf_ct_expect_related(exp, 0);
-		if (ret == 0)
-			break;
-		else if (ret != -EBUSY) {
-			port = 0;
-			break;
-		}
+	if (htons(nat->range_info.min_proto.all) == 0 ||
+	    htons(nat->range_info.max_proto.all) == 0) {
+		range.min_proto.all = htons(1);
+		range.max_proto.all = htons(65535);
+	} else {
+		range.min_proto     = nat->range_info.min_proto;
+		range.max_proto     = nat->range_info.max_proto;
 	}
+	range.flags                 = NF_NAT_RANGE_PROTO_SPECIFIED;
 
-	if (port == 0) {
+	/* Try to get same port if it matches NAT rule: if not, try to change it. */
+	ret = -1;
+	port = ntohs(exp->tuple.dst.u.tcp.port);
+	if (port != 0 && ntohs(range.min_proto.all) <= port &&
+	    port <= ntohs(range.max_proto.all)) {
+		ret = nf_ct_expect_related(exp, 0);
+	}
+	if (ret != 0 || port == 0) {
+		if (!dir) {
+			nf_nat_l4proto_unique_tuple(&exp->tuple, &range,
+						    NF_NAT_MANIP_DST,
+						    ct);
+		}
+		port = ntohs(exp->tuple.dst.u.tcp.port);
+		ret = nf_ct_expect_related(exp, 0);
+	}
+	if (ret != 0 || port == 0) {
 		nf_ct_helper_log(skb, ct, "all ports in use");
 		return NF_DROP;
 	}
