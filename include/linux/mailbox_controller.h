@@ -42,6 +42,11 @@ struct mbox_chan;
  *		  Used only if txdone_poll:=true && txdone_irq:=false
  * @peek_data: Atomic check for any received data. Return true if controller
  *		  has some data to push to the client. False otherwise.
+ * @request_irq: If the controller sets 'txdone_fifo', the API calls this
+ *		 to enable the 'ready to submit' interrupt whenever a previous
+ *		 call to send_data was not successful. This interrupt must fire
+ *		 only once and must call mbox_chan_txfifo_ready when new
+ *		 messages can be accepted into the hardware FIFO again.
  */
 struct mbox_chan_ops {
 	int (*send_data)(struct mbox_chan *chan, void *data);
@@ -50,6 +55,7 @@ struct mbox_chan_ops {
 	void (*shutdown)(struct mbox_chan *chan);
 	bool (*last_tx_done)(struct mbox_chan *chan);
 	bool (*peek_data)(struct mbox_chan *chan);
+	void (*request_irq)(struct mbox_chan *chan);
 };
 
 /**
@@ -61,6 +67,11 @@ struct mbox_chan_ops {
  * @txdone_irq:		Indicates if the controller can report to API when
  *			the last transmitted data was read by the remote.
  *			Eg, if it has some TX ACK irq.
+ * @txdone_fifo:	Indicates if the controller has a hardware FIFO which
+ *			can directly accept multiple messages without delay.
+ *			In case the FIFO cannot accept a message ops->send_data
+ *			returns -EBUSY and ops->request_irq is used to request
+ *			an interrupt once the FIFO has space for new messages.
  * @txdone_poll:	If the controller can read but not report the TX
  *			done. Ex, some register shows the TX status but
  *			no interrupt rises. Ignored if 'txdone_irq' is set.
@@ -77,6 +88,7 @@ struct mbox_controller {
 	struct mbox_chan *chans;
 	int num_chans;
 	bool txdone_irq;
+	bool txdone_fifo;
 	bool txdone_poll;
 	unsigned txpoll_period;
 	struct mbox_chan *(*of_xlate)(struct mbox_controller *mbox,
@@ -108,6 +120,7 @@ struct mbox_controller {
  * @cl:			Pointer to the current owner of this channel
  * @tx_complete:	Transmission completion
  * @active_req:		Currently active request hook
+ * @irq_pending:	Set if the API is waiting for an interrupt to continue
  * @msg_count:		No. of mssg currently queued
  * @msg_free:		Index of next available mssg slot
  * @msg_data:		Hook for data packet
@@ -120,6 +133,7 @@ struct mbox_chan {
 	struct mbox_client *cl;
 	struct completion tx_complete;
 	void *active_req;
+	bool irq_pending;
 	unsigned msg_count, msg_free;
 	void *msg_data[MBOX_TX_QUEUE_LEN];
 	spinlock_t lock; /* Serialise access to the channel */
@@ -130,6 +144,7 @@ int mbox_controller_register(struct mbox_controller *mbox); /* can sleep */
 void mbox_controller_unregister(struct mbox_controller *mbox); /* can sleep */
 void mbox_chan_received_data(struct mbox_chan *chan, void *data); /* atomic */
 void mbox_chan_txdone(struct mbox_chan *chan, int r); /* atomic */
+void mbox_chan_txfifo_ready(struct mbox_chan *chan); /* atomic */
 
 int devm_mbox_controller_register(struct device *dev,
 				  struct mbox_controller *mbox);

@@ -50,6 +50,15 @@ static int add_to_rbuf(struct mbox_chan *chan, void *mssg)
 	return idx;
 }
 
+static void complete_msg(struct mbox_chan *chan, void *msg, int r)
+{
+	if (chan->cl->tx_done)
+		chan->cl->tx_done(chan->cl, msg, r);
+
+	if (r != -ETIME && chan->cl->tx_block)
+		complete(&chan->tx_complete);
+}
+
 static void msg_submit(struct mbox_chan *chan)
 {
 	unsigned count, idx;
@@ -59,7 +68,7 @@ static void msg_submit(struct mbox_chan *chan)
 
 	spin_lock_irqsave(&chan->lock, flags);
 
-	if (!chan->msg_count || chan->active_req)
+	if (!chan->msg_count || chan->active_req || chan->irq_pending)
 		goto exit;
 
 	count = chan->msg_count;
@@ -75,15 +84,30 @@ static void msg_submit(struct mbox_chan *chan)
 		chan->cl->tx_prepare(chan->cl, data);
 	/* Try to submit a message to the MBOX controller */
 	err = chan->mbox->ops->send_data(chan, data);
-	if (!err) {
-		chan->active_req = data;
+	if (err) {
+		/* HW FIFO is full and we need to wait for an irq to continue */
+		if (chan->txdone_method & TXDONE_BY_FIFO) {
+			chan->irq_pending = true;
+			chan->mbox->ops->request_irq(chan);
+		}
+	} else {
+		/* controllers with a FIFO have already accepted the message */
+		if (!(chan->txdone_method & TXDONE_BY_FIFO))
+			chan->active_req = data;
 		chan->msg_count--;
 	}
 exit:
 	spin_unlock_irqrestore(&chan->lock, flags);
 
+	if (err)
+		return;
+
+	/* controllers with a FIFO have already accepted the message */
+	if (chan->txdone_method & TXDONE_BY_FIFO)
+		complete_msg(chan, data, 0);
+
 	/* kick start the timer immediately to avoid delays */
-	if (!err && (chan->txdone_method & TXDONE_BY_POLL)) {
+	if (chan->txdone_method & TXDONE_BY_POLL) {
 		/* but only if not already active */
 		if (!hrtimer_active(&chan->mbox->poll_hrt))
 			hrtimer_start(&chan->mbox->poll_hrt, 0, HRTIMER_MODE_REL);
@@ -107,11 +131,7 @@ static void tx_tick(struct mbox_chan *chan, int r)
 		return;
 
 	/* Notify the client */
-	if (chan->cl->tx_done)
-		chan->cl->tx_done(chan->cl, mssg, r);
-
-	if (r != -ETIME && chan->cl->tx_block)
-		complete(&chan->tx_complete);
+	complete_msg(chan, mssg, r);
 }
 
 static enum hrtimer_restart txdone_hrtimer(struct hrtimer *hrtimer)
@@ -178,6 +198,31 @@ void mbox_chan_txdone(struct mbox_chan *chan, int r)
 	tx_tick(chan, r);
 }
 EXPORT_SYMBOL_GPL(mbox_chan_txdone);
+
+/**
+ * mbox_chan_txfifo_ready - A way for controller driver to notify the
+ *			    framework that there is space in the FIFO
+ *			    to accept messages again.
+ * @chan: Pointer to the mailbox chan on which there is FIFO space available
+ *
+ * The controller that has IRQ for TX ACK calls this atomic API
+ * to notify that there is space in the hardware FIFO again.
+ * It works only if txdone_fifo is set by the controller.
+ * This must be called from within the IRQ handler.
+ */
+void mbox_chan_txfifo_ready(struct mbox_chan *chan)
+{
+	if (unlikely(!(chan->txdone_method & TXDONE_BY_FIFO))) {
+		dev_err(chan->mbox->dev,
+		       "Controller can't run the TX FIFO ticker\n");
+		return;
+	}
+
+	WRITE_ONCE(chan->irq_pending, false);
+	while (!READ_ONCE(chan->irq_pending) && READ_ONCE(chan->msg_count))
+		msg_submit(chan);
+}
+EXPORT_SYMBOL_GPL(mbox_chan_txfifo_ready);
 
 /**
  * mbox_client_txdone - The way for a client to run the TX state machine.
@@ -376,6 +421,7 @@ struct mbox_chan *mbox_request_channel(struct mbox_client *cl, int index)
 	chan->msg_free = 0;
 	chan->msg_count = 0;
 	chan->active_req = NULL;
+	chan->irq_pending = false;
 	chan->cl = cl;
 	init_completion(&chan->tx_complete);
 
@@ -485,6 +531,8 @@ int mbox_controller_register(struct mbox_controller *mbox)
 
 	if (mbox->txdone_irq)
 		txdone = TXDONE_BY_IRQ;
+	else if (mbox->txdone_fifo)
+		txdone = TXDONE_BY_FIFO;
 	else if (mbox->txdone_poll)
 		txdone = TXDONE_BY_POLL;
 	else /* It has to be ACK then */
