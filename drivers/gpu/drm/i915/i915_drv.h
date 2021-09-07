@@ -972,6 +972,12 @@ struct drm_i915_display {
 	struct workqueue_struct *modeset_wq;
 	/* unbound hipri wq for page flips/plane updates */
 	struct workqueue_struct *flip_wq;
+
+	/* backlight registers and fields in struct intel_panel */
+	struct mutex backlight_lock;
+
+	/* protects panel power sequencer state */
+	struct mutex pps_mutex;
 };
 
 struct drm_i915_private {
@@ -1049,12 +1055,6 @@ struct drm_i915_private {
 	struct intel_vbt_data vbt;
 
 	bool preserve_bios_swizzle;
-
-	/* backlight registers and fields in struct intel_panel */
-	struct mutex backlight_lock;
-
-	/* protects panel power sequencer state */
-	struct mutex pps_mutex;
 
 	unsigned int fsb_freq, mem_freq, is_ddr3;
 

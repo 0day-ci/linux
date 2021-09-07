@@ -315,14 +315,14 @@ static int i915_driver_early_probe(struct drm_i915_private *dev_priv)
 
 	spin_lock_init(&dev_priv->irq_lock);
 	spin_lock_init(&dev_priv->gpu_error.lock);
-	mutex_init(&dev_priv->backlight_lock);
+	mutex_init(&dev_priv->display->backlight_lock);
 
 	mutex_init(&dev_priv->sb_lock);
 	cpu_latency_qos_add_request(&dev_priv->sb_qos, PM_QOS_DEFAULT_VALUE);
 
 	mutex_init(&dev_priv->display->av_mutex);
 	mutex_init(&dev_priv->wm.wm_mutex);
-	mutex_init(&dev_priv->pps_mutex);
+	mutex_init(&dev_priv->display->pps_mutex);
 	mutex_init(&dev_priv->display->hdcp_comp_mutex);
 
 	i915_memcpy_init_early(dev_priv);
