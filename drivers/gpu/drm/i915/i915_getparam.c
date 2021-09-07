@@ -34,7 +34,7 @@ int i915_getparam_ioctl(struct drm_device *dev, void *data,
 		value = i915->ggtt.num_fences;
 		break;
 	case I915_PARAM_HAS_OVERLAY:
-		value = !!i915->overlay;
+		value = !!i915->display->overlay;
 		break;
 	case I915_PARAM_HAS_BSD:
 		value = !!intel_engine_lookup_user(i915,

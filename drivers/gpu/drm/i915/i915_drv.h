@@ -901,6 +901,9 @@ struct drm_i915_display {
 	struct mutex hdcp_comp_mutex;
 
 	struct i915_hotplug hotplug;
+
+	/* overlay */
+	struct intel_overlay *overlay;
 };
 
 struct drm_i915_private {
@@ -978,9 +981,6 @@ struct drm_i915_private {
 	struct intel_vbt_data vbt;
 
 	bool preserve_bios_swizzle;
-
-	/* overlay */
-	struct intel_overlay *overlay;
 
 	/* backlight registers and fields in struct intel_panel */
 	struct mutex backlight_lock;
