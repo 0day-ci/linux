@@ -649,6 +649,7 @@ EXPORT_SYMBOL(mmc_wait_for_cmd);
 void mmc_set_data_timeout(struct mmc_data *data, const struct mmc_card *card)
 {
 	unsigned int mult;
+	struct mmc_host *host = card->host;
 
 	/*
 	 * SDIO cards only define an upper 1 s limit on access.
@@ -658,6 +659,13 @@ void mmc_set_data_timeout(struct mmc_data *data, const struct mmc_card *card)
 		data->timeout_clks = 0;
 		return;
 	}
+
+	/*
+	 * In case CQE is enabled, the timeout will be set a maximum timeout in
+	 * sdhci_cqe_enable(), so, no need to go through the below algorithm.
+	 */
+	if (host->cqe_enabled)
+		return;
 
 	/*
 	 * SD cards use a 100 multiplier rather than 10
