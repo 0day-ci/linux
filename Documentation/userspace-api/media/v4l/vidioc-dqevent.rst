@@ -182,6 +182,18 @@ call.
 	the regions changes. This event has a struct
 	:c:type:`v4l2_event_motion_det`
 	associated with it.
+    * - ``V4L2_EVENT_CODEC_ERROR``
+      - 7
+      - This event is triggered when some error occurs inside the codec engine,
+	usually it can be replaced by a POLLERR event, but in some cases, the POLLERR
+	may cause the application to exit, but this event can allow the application to
+	handle the codec error without exiting.
+    * - ``V4L2_EVENT_SKIP``
+      - 8
+      - This event is triggered when one frame is decoded, but it won't be outputed
+	to the display. So the application can't get this frame, and the input frame count
+	is dismatch with the output frame count. And this evevt is telling the client to
+	handle this case.
     * - ``V4L2_EVENT_PRIVATE_START``
       - 0x08000000
       - Base event number for driver-private events.
