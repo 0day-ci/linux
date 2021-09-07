@@ -840,6 +840,13 @@ struct drm_i915_display {
 		struct intel_global_obj obj;
 	} cdclk;
 	unsigned int max_cdclk_freq;
+
+	unsigned int skl_preferred_vco_freq;
+
+	unsigned int max_dotclk_freq;
+	unsigned int hpll_freq;
+	unsigned int fdi_pll_freq;
+	unsigned int czclk_freq;
 };
 
 struct drm_i915_private {
@@ -952,12 +959,6 @@ struct drm_i915_private {
 	struct mutex pps_mutex;
 
 	unsigned int fsb_freq, mem_freq, is_ddr3;
-	unsigned int skl_preferred_vco_freq;
-
-	unsigned int max_dotclk_freq;
-	unsigned int hpll_freq;
-	unsigned int fdi_pll_freq;
-	unsigned int czclk_freq;
 
 	struct {
 		/* The current hardware dbuf configuration */

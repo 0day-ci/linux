@@ -342,7 +342,7 @@ intel_crt_mode_valid(struct drm_connector *connector,
 {
 	struct drm_device *dev = connector->dev;
 	struct drm_i915_private *dev_priv = to_i915(dev);
-	int max_dotclk = dev_priv->max_dotclk_freq;
+	int max_dotclk = dev_priv->display->max_dotclk_freq;
 	int max_clock;
 
 	if (mode->flags & DRM_MODE_FLAG_DBLSCAN)

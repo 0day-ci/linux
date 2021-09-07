@@ -757,7 +757,7 @@ u64 intel_rc6_residency_ns(struct intel_rc6 *rc6, const i915_reg_t reg)
 	/* On VLV and CHV, residency time is in CZ units rather than 1.28us */
 	if (IS_VALLEYVIEW(i915) || IS_CHERRYVIEW(i915)) {
 		mul = 1000000;
-		div = i915->czclk_freq;
+		div = i915->display->czclk_freq;
 		overflow_hw = BIT_ULL(40);
 		time_hw = vlv_residency_raw(uncore, reg);
 	} else {

@@ -815,7 +815,7 @@ intel_dp_mode_valid(struct drm_connector *connector,
 	struct drm_i915_private *dev_priv = to_i915(connector->dev);
 	int target_clock = mode->clock;
 	int max_rate, mode_rate, max_lanes, max_link_clock;
-	int max_dotclk = dev_priv->max_dotclk_freq;
+	int max_dotclk = dev_priv->display->max_dotclk_freq;
 	u16 dsc_max_output_bpp = 0;
 	u8 dsc_slice_count = 0;
 	enum drm_mode_status status;
@@ -1457,7 +1457,7 @@ intel_dp_compute_link_config(struct intel_encoder *encoder,
 		    limits.max_lane_count, limits.max_rate,
 		    limits.max_bpp, adjusted_mode->crtc_clock);
 
-	if ((adjusted_mode->crtc_clock > i915->max_dotclk_freq ||
+	if ((adjusted_mode->crtc_clock > i915->display->max_dotclk_freq ||
 	     adjusted_mode->crtc_hdisplay > 5120) &&
 	    intel_dp_can_bigjoiner(intel_dp))
 		pipe_config->bigjoiner = true;

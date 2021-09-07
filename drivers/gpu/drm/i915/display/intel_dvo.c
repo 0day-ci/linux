@@ -226,7 +226,7 @@ intel_dvo_mode_valid(struct drm_connector *connector,
 	struct intel_dvo *intel_dvo = intel_attached_dvo(to_intel_connector(connector));
 	const struct drm_display_mode *fixed_mode =
 		to_intel_connector(connector)->panel.fixed_mode;
-	int max_dotclk = to_i915(connector->dev)->max_dotclk_freq;
+	int max_dotclk = to_i915(connector->dev)->display->max_dotclk_freq;
 	int target_clock = mode->clock;
 
 	if (mode->flags & DRM_MODE_FLAG_DBLSCAN)

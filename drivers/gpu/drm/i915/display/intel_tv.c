@@ -956,7 +956,7 @@ intel_tv_mode_valid(struct drm_connector *connector,
 		    struct drm_display_mode *mode)
 {
 	const struct tv_mode *tv_mode = intel_tv_mode_find(connector->state);
-	int max_dotclk = to_i915(connector->dev)->max_dotclk_freq;
+	int max_dotclk = to_i915(connector->dev)->display->max_dotclk_freq;
 
 	if (mode->flags & DRM_MODE_FLAG_DBLSCAN)
 		return MODE_NO_DBLESCAN;

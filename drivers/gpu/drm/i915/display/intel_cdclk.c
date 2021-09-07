@@ -434,7 +434,7 @@ static void hsw_get_cdclk(struct drm_i915_private *dev_priv,
 
 static int vlv_calc_cdclk(struct drm_i915_private *dev_priv, int min_cdclk)
 {
-	int freq_320 = (dev_priv->hpll_freq <<  1) % 320000 != 0 ?
+	int freq_320 = (dev_priv->display->hpll_freq <<  1) % 320000 != 0 ?
 		333333 : 320000;
 
 	/*
@@ -467,7 +467,7 @@ static u8 vlv_calc_voltage_level(struct drm_i915_private *dev_priv, int cdclk)
 		 * hardware has shown that we just need to write the desired
 		 * CCK divider into the Punit register.
 		 */
-		return DIV_ROUND_CLOSEST(dev_priv->hpll_freq << 1, cdclk) - 1;
+		return DIV_ROUND_CLOSEST(dev_priv->display->hpll_freq << 1, cdclk) - 1;
 	}
 }
 
@@ -506,7 +506,7 @@ static void vlv_program_pfi_credits(struct drm_i915_private *dev_priv)
 	else
 		default_credits = PFI_CREDIT(8);
 
-	if (dev_priv->display->cdclk.hw.cdclk >= dev_priv->czclk_freq) {
+	if (dev_priv->display->cdclk.hw.cdclk >= dev_priv->display->czclk_freq) {
 		/* CHV suggested value is 31 or 63 */
 		if (IS_CHERRYVIEW(dev_priv))
 			credits = PFI_CREDIT_63;
@@ -581,7 +581,7 @@ static void vlv_set_cdclk(struct drm_i915_private *dev_priv,
 	if (cdclk == 400000) {
 		u32 divider;
 
-		divider = DIV_ROUND_CLOSEST(dev_priv->hpll_freq << 1,
+		divider = DIV_ROUND_CLOSEST(dev_priv->display->hpll_freq << 1,
 					    cdclk) - 1;
 
 		/* adjust cdclk divider */
@@ -942,9 +942,9 @@ static int skl_cdclk_decimal(int cdclk)
 static void skl_set_preferred_cdclk_vco(struct drm_i915_private *dev_priv,
 					int vco)
 {
-	bool changed = dev_priv->skl_preferred_vco_freq != vco;
+	bool changed = dev_priv->display->skl_preferred_vco_freq != vco;
 
-	dev_priv->skl_preferred_vco_freq = vco;
+	dev_priv->display->skl_preferred_vco_freq = vco;
 
 	if (changed)
 		intel_update_max_cdclk(dev_priv);
@@ -1151,7 +1151,7 @@ static void skl_cdclk_init_hw(struct drm_i915_private *dev_priv)
 		 * Use the current vco as our initial
 		 * guess as to what the preferred vco is.
 		 */
-		if (dev_priv->skl_preferred_vco_freq == 0)
+		if (dev_priv->display->skl_preferred_vco_freq == 0)
 			skl_set_preferred_cdclk_vco(dev_priv,
 						    dev_priv->display->cdclk.hw.vco);
 		return;
@@ -1159,7 +1159,7 @@ static void skl_cdclk_init_hw(struct drm_i915_private *dev_priv)
 
 	cdclk_config = dev_priv->display->cdclk.hw;
 
-	cdclk_config.vco = dev_priv->skl_preferred_vco_freq;
+	cdclk_config.vco = dev_priv->display->skl_preferred_vco_freq;
 	if (cdclk_config.vco == 0)
 		cdclk_config.vco = 8100000;
 	cdclk_config.cdclk = skl_calc_cdclk(0, cdclk_config.vco);
@@ -2331,7 +2331,7 @@ static int skl_dpll0_vco(struct intel_cdclk_state *cdclk_state)
 
 	vco = cdclk_state->logical.vco;
 	if (!vco)
-		vco = dev_priv->skl_preferred_vco_freq;
+		vco = dev_priv->display->skl_preferred_vco_freq;
 
 	for_each_new_intel_crtc_in_state(state, crtc, crtc_state, i) {
 		if (!crtc_state->hw.enable)
@@ -2636,7 +2636,7 @@ void intel_update_max_cdclk(struct drm_i915_private *dev_priv)
 		u32 limit = intel_de_read(dev_priv, SKL_DFSM) & SKL_DFSM_CDCLK_LIMIT_MASK;
 		int max_cdclk, vco;
 
-		vco = dev_priv->skl_preferred_vco_freq;
+		vco = dev_priv->display->skl_preferred_vco_freq;
 		drm_WARN_ON(&dev_priv->drm, vco != 8100000 && vco != 8640000);
 
 		/*
@@ -2678,13 +2678,13 @@ void intel_update_max_cdclk(struct drm_i915_private *dev_priv)
 		dev_priv->display->max_cdclk_freq = dev_priv->display->cdclk.hw.cdclk;
 	}
 
-	dev_priv->max_dotclk_freq = intel_compute_max_dotclk(dev_priv);
+	dev_priv->display->max_dotclk_freq = intel_compute_max_dotclk(dev_priv);
 
 	drm_dbg(&dev_priv->drm, "Max CD clock rate: %d kHz\n",
 		dev_priv->display->max_cdclk_freq);
 
 	drm_dbg(&dev_priv->drm, "Max dotclock rate: %d kHz\n",
-		dev_priv->max_dotclk_freq);
+		dev_priv->display->max_dotclk_freq);
 }
 
 /**

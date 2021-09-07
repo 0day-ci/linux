@@ -104,14 +104,14 @@ void intel_fdi_pll_freq_update(struct drm_i915_private *i915)
 		u32 fdi_pll_clk =
 			intel_de_read(i915, FDI_PLL_BIOS_0) & FDI_PLL_FB_CLOCK_MASK;
 
-		i915->fdi_pll_freq = (fdi_pll_clk + 2) * 10000;
+		i915->display->fdi_pll_freq = (fdi_pll_clk + 2) * 10000;
 	} else if (IS_SANDYBRIDGE(i915) || IS_IVYBRIDGE(i915)) {
-		i915->fdi_pll_freq = 270000;
+		i915->display->fdi_pll_freq = 270000;
 	} else {
 		return;
 	}
 
-	drm_dbg(&i915->drm, "FDI PLL freq=%d\n", i915->fdi_pll_freq);
+	drm_dbg(&i915->drm, "FDI PLL freq=%d\n", i915->display->fdi_pll_freq);
 }
 
 int intel_fdi_link_freq(struct drm_i915_private *i915,
@@ -120,7 +120,7 @@ int intel_fdi_link_freq(struct drm_i915_private *i915,
 	if (HAS_DDI(i915))
 		return pipe_config->port_clock; /* SPLL */
 	else
-		return i915->fdi_pll_freq;
+		return i915->display->fdi_pll_freq;
 }
 
 int ilk_fdi_compute_config(struct intel_crtc *crtc,

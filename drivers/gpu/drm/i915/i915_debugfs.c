@@ -575,7 +575,7 @@ static int i915_frequency_info(struct seq_file *m, void *unused)
 
 	seq_printf(m, "Current CD clock frequency: %d kHz\n", dev_priv->display->cdclk.hw.cdclk);
 	seq_printf(m, "Max CD clock frequency: %d kHz\n", dev_priv->display->max_cdclk_freq);
-	seq_printf(m, "Max pixel clock frequency: %d kHz\n", dev_priv->max_dotclk_freq);
+	seq_printf(m, "Max pixel clock frequency: %d kHz\n", dev_priv->display->max_dotclk_freq);
 
 	intel_runtime_pm_put(&dev_priv->runtime_pm, wakeref);
 	return 0;

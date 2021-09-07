@@ -160,10 +160,10 @@ int vlv_get_cck_clock_hpll(struct drm_i915_private *dev_priv,
 
 	vlv_cck_get(dev_priv);
 
-	if (dev_priv->hpll_freq == 0)
-		dev_priv->hpll_freq = vlv_get_hpll_vco(dev_priv);
+	if (dev_priv->display->hpll_freq == 0)
+		dev_priv->display->hpll_freq = vlv_get_hpll_vco(dev_priv);
 
-	hpll = vlv_get_cck_clock(dev_priv, name, reg, dev_priv->hpll_freq);
+	hpll = vlv_get_cck_clock(dev_priv, name, reg, dev_priv->display->hpll_freq);
 
 	vlv_cck_put(dev_priv);
 
@@ -175,11 +175,11 @@ static void intel_update_czclk(struct drm_i915_private *dev_priv)
 	if (!(IS_VALLEYVIEW(dev_priv) || IS_CHERRYVIEW(dev_priv)))
 		return;
 
-	dev_priv->czclk_freq = vlv_get_cck_clock_hpll(dev_priv, "czclk",
+	dev_priv->display->czclk_freq = vlv_get_cck_clock_hpll(dev_priv, "czclk",
 						      CCK_CZ_CLOCK_CONTROL);
 
 	drm_dbg(&dev_priv->drm, "CZ clock rate: %d kHz\n",
-		dev_priv->czclk_freq);
+		dev_priv->display->czclk_freq);
 }
 
 /* WA Display #0827: Gen9:all */
@@ -4006,7 +4006,7 @@ static int intel_crtc_compute_config(struct intel_crtc *crtc,
 {
 	struct drm_i915_private *dev_priv = to_i915(crtc->base.dev);
 	struct drm_display_mode *pipe_mode = &pipe_config->hw.pipe_mode;
-	int clock_limit = dev_priv->max_dotclk_freq;
+	int clock_limit = dev_priv->display->max_dotclk_freq;
 
 	drm_mode_copy(pipe_mode, &pipe_config->hw.adjusted_mode);
 
@@ -4046,7 +4046,7 @@ static int intel_crtc_compute_config(struct intel_crtc *crtc,
 		 */
 		if (intel_crtc_supports_double_wide(crtc) &&
 		    pipe_mode->crtc_clock > clock_limit) {
-			clock_limit = dev_priv->max_dotclk_freq;
+			clock_limit = dev_priv->display->max_dotclk_freq;
 			pipe_config->double_wide = true;
 		}
 	}

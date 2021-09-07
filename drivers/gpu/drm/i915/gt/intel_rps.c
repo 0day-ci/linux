@@ -1510,7 +1510,7 @@ static void vlv_init_gpll_ref_freq(struct intel_rps *rps)
 	rps->gpll_ref_freq =
 		vlv_get_cck_clock(i915, "GPLL ref",
 				  CCK_GPLL_CLOCK_CONTROL,
-				  i915->czclk_freq);
+				  i915->display->czclk_freq);
 
 	drm_dbg(&i915->drm, "GPLL reference freq: %d kHz\n",
 		rps->gpll_ref_freq);
@@ -1642,7 +1642,7 @@ static u32 vlv_wa_c0_ei(struct intel_rps *rps, u32 pm_iir)
 
 		time = ktime_us_delta(now.ktime, prev->ktime);
 
-		time *= rps_to_i915(rps)->czclk_freq;
+		time *= rps_to_i915(rps)->display->czclk_freq;
 
 		/* Workload can be split between render + media,
 		 * e.g. SwapBuffers being blitted in X after being rendered in

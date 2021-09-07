@@ -388,7 +388,7 @@ intel_lvds_mode_valid(struct drm_connector *connector,
 {
 	struct intel_connector *intel_connector = to_intel_connector(connector);
 	struct drm_display_mode *fixed_mode = intel_connector->panel.fixed_mode;
-	int max_pixclk = to_i915(connector->dev)->max_dotclk_freq;
+	int max_pixclk = to_i915(connector->dev)->display->max_dotclk_freq;
 
 	if (mode->flags & DRM_MODE_FLAG_DBLSCAN)
 		return MODE_NO_DBLESCAN;
