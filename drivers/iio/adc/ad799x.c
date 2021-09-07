@@ -891,20 +891,23 @@ static int __maybe_unused ad799x_resume(struct device *dev)
 	}
 	ret = regulator_enable(st->vref);
 	if (ret) {
-		regulator_disable(st->reg);
 		dev_err(dev, "Unable to enable vref regulator\n");
-		return ret;
+		goto error_disable_reg;
 	}
 
 	/* resync config */
 	ret = ad799x_update_config(st, st->config);
-	if (ret) {
-		regulator_disable(st->vref);
-		regulator_disable(st->reg);
-		return ret;
-	}
+	if (ret)
+		goto error_disable_vref;
 
 	return 0;
+
+error_disable_vref:
+	regulator_disable(st->vref);
+error_disable_reg:
+	regulator_disable(st->vref);
+
+	return ret;
 }
 
 static SIMPLE_DEV_PM_OPS(ad799x_pm_ops, ad799x_suspend, ad799x_resume);
