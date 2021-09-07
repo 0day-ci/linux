@@ -791,7 +791,7 @@ intel_primary_plane_create(struct drm_i915_private *dev_priv, enum pipe pipe)
 
 	plane->has_fbc = i9xx_plane_has_fbc(dev_priv, plane->i9xx_plane);
 	if (plane->has_fbc) {
-		struct intel_fbc *fbc = &dev_priv->fbc;
+		struct intel_fbc *fbc = &dev_priv->display->fbc;
 
 		fbc->possible_framebuffer_bits |= plane->frontbuffer_bit;
 	}

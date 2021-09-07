@@ -43,7 +43,7 @@ static int i915_frontbuffer_tracking(struct seq_file *m, void *unused)
 static int i915_fbc_status(struct seq_file *m, void *unused)
 {
 	struct drm_i915_private *dev_priv = node_to_i915(m->private);
-	struct intel_fbc *fbc = &dev_priv->fbc;
+	struct intel_fbc *fbc = &dev_priv->display->fbc;
 	intel_wakeref_t wakeref;
 
 	if (!HAS_FBC(dev_priv))
@@ -88,7 +88,7 @@ static int i915_fbc_false_color_get(void *data, u64 *val)
 	if (DISPLAY_VER(dev_priv) < 7 || !HAS_FBC(dev_priv))
 		return -ENODEV;
 
-	*val = dev_priv->fbc.false_color;
+	*val = dev_priv->display->fbc.false_color;
 
 	return 0;
 }
@@ -101,15 +101,15 @@ static int i915_fbc_false_color_set(void *data, u64 val)
 	if (DISPLAY_VER(dev_priv) < 7 || !HAS_FBC(dev_priv))
 		return -ENODEV;
 
-	mutex_lock(&dev_priv->fbc.lock);
+	mutex_lock(&dev_priv->display->fbc.lock);
 
 	reg = intel_de_read(dev_priv, ILK_DPFC_CONTROL);
-	dev_priv->fbc.false_color = val;
+	dev_priv->display->fbc.false_color = val;
 
 	intel_de_write(dev_priv, ILK_DPFC_CONTROL,
 		       val ? (reg | FBC_CTL_FALSE_COLOR) : (reg & ~FBC_CTL_FALSE_COLOR));
 
-	mutex_unlock(&dev_priv->fbc.lock);
+	mutex_unlock(&dev_priv->display->fbc.lock);
 	return 0;
 }
 

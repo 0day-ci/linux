@@ -2067,7 +2067,7 @@ skl_universal_plane_create(struct drm_i915_private *dev_priv,
 
 	plane->has_fbc = skl_plane_has_fbc(dev_priv, pipe, plane_id);
 	if (plane->has_fbc) {
-		struct intel_fbc *fbc = &dev_priv->fbc;
+		struct intel_fbc *fbc = &dev_priv->display->fbc;
 
 		fbc->possible_framebuffer_bits |= plane->frontbuffer_bit;
 	}

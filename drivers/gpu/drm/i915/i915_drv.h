@@ -868,6 +868,7 @@ struct drm_i915_display {
 
 	struct intel_dmc dmc;
 	struct i915_drrs drrs;
+	struct intel_fbc fbc;
 };
 
 struct drm_i915_private {
@@ -942,7 +943,6 @@ struct drm_i915_private {
 	u32 pipestat_irq_mask[I915_MAX_PIPES];
 
 	struct i915_hotplug hotplug;
-	struct intel_fbc fbc;
 	struct intel_opregion opregion;
 	struct intel_vbt_data vbt;
 
