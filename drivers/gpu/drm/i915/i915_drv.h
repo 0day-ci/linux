@@ -848,6 +848,13 @@ struct drm_i915_display {
 	unsigned int fdi_pll_freq;
 	unsigned int czclk_freq;
 
+	u8 framestart_delay;
+
+	/* Window2 specifies time required to program DSB (Window2) in number of scan lines */
+	u8 window2_delay;
+
+	u8 pch_ssc_use;
+
 	/**
 	 * Base address of where the gmbus and gpio blocks are located (either
 	 * on PCH or on SoC for platforms without PCH).
@@ -1198,13 +1205,6 @@ struct drm_i915_private {
 		 */
 		struct file *mmap_singleton;
 	} gem;
-
-	u8 framestart_delay;
-
-	/* Window2 specifies time required to program DSB (Window2) in number of scan lines */
-	u8 window2_delay;
-
-	u8 pch_ssc_use;
 
 	/* For i915gm/i945gm vblank irq workaround */
 	u8 vblank_enabled;

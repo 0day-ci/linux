@@ -574,7 +574,7 @@ static void hsw_ddi_wrpll_disable(struct drm_i915_private *dev_priv,
 	 * Try to set up the PCH reference clock once all DPLLs
 	 * that depend on it have been shut down.
 	 */
-	if (dev_priv->pch_ssc_use & BIT(id))
+	if (dev_priv->display->pch_ssc_use & BIT(id))
 		intel_init_pch_refclk(dev_priv);
 }
 
@@ -592,7 +592,7 @@ static void hsw_ddi_spll_disable(struct drm_i915_private *dev_priv,
 	 * Try to set up the PCH reference clock once all DPLLs
 	 * that depend on it have been shut down.
 	 */
-	if (dev_priv->pch_ssc_use & BIT(id))
+	if (dev_priv->display->pch_ssc_use & BIT(id))
 		intel_init_pch_refclk(dev_priv);
 }
 

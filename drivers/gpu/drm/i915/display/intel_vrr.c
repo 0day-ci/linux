@@ -69,9 +69,9 @@ static int intel_vrr_vblank_exit_length(const struct intel_crtc_state *crtc_stat
 
 	/* The hw imposes the extra scanline before frame start */
 	if (DISPLAY_VER(i915) >= 13)
-		return crtc_state->vrr.guardband + i915->framestart_delay + 1;
+		return crtc_state->vrr.guardband + i915->display->framestart_delay + 1;
 	else
-		return crtc_state->vrr.pipeline_full + i915->framestart_delay + 1;
+		return crtc_state->vrr.pipeline_full + i915->display->framestart_delay + 1;
 }
 
 int intel_vrr_vmin_vblank_start(const struct intel_crtc_state *crtc_state)
@@ -135,7 +135,7 @@ intel_vrr_compute_config(struct intel_crtc_state *crtc_state,
 	if (DISPLAY_VER(i915) >= 13)
 		crtc_state->vrr.guardband =
 			crtc_state->vrr.vmin - adjusted_mode->crtc_vdisplay -
-			i915->window2_delay;
+			i915->display->window2_delay;
 	else
 		/*
 		 * FIXME: s/4/framestart_delay+1/ to get consistent
