@@ -1278,28 +1278,41 @@ MODULE_LICENSE ("GPL");
 
 #ifdef CONFIG_USB_EHCI_SH
 #include "ehci-sh.c"
-#define PLATFORM_DRIVER		ehci_hcd_sh_driver
 #endif
 
 #ifdef CONFIG_PPC_PS3
 #include "ehci-ps3.c"
-#define	PS3_SYSTEM_BUS_DRIVER	ps3_ehci_driver
 #endif
 
 #ifdef CONFIG_USB_EHCI_HCD_PPC_OF
 #include "ehci-ppc-of.c"
-#define OF_PLATFORM_DRIVER	ehci_hcd_ppc_of_driver
 #endif
 
 #ifdef CONFIG_XPS_USB_HCD_XILINX
 #include "ehci-xilinx-of.c"
-#define XILINX_OF_PLATFORM_DRIVER	ehci_hcd_xilinx_of_driver
 #endif
 
 #ifdef CONFIG_SPARC_LEON
 #include "ehci-grlib.c"
-#define PLATFORM_DRIVER		ehci_grlib_driver
 #endif
+
+static struct platform_driver * const platform_drivers[] = {
+#ifdef CONFIG_USB_EHCI_SH
+	&ehci_hcd_sh_driver,
+#endif
+#ifdef CONFIG_PPC_PS3
+	&ps3_ehci_driver,
+#endif
+#ifdef CONFIG_USB_EHCI_HCD_PPC_OF
+	&ehci_hcd_ppc_of_driver,
+#endif
+#ifdef CONFIG_XPS_USB_HCD_XILINX
+	&ehci_hcd_xilinx_of_driver,
+#endif
+#ifdef CONFIG_SPARC_LEON
+	&ehci_grlib_driver,
+#endif
+};
 
 static int __init ehci_hcd_init(void)
 {
@@ -1324,47 +1337,12 @@ static int __init ehci_hcd_init(void)
 	ehci_debug_root = debugfs_create_dir("ehci", usb_debug_root);
 #endif
 
-#ifdef PLATFORM_DRIVER
-	retval = platform_driver_register(&PLATFORM_DRIVER);
+	retval = platform_register_drivers(platform_drivers, ARRAY_SIZE(platform_drivers));
 	if (retval < 0)
 		goto clean0;
-#endif
+	return 0;
 
-#ifdef PS3_SYSTEM_BUS_DRIVER
-	retval = ps3_ehci_driver_register(&PS3_SYSTEM_BUS_DRIVER);
-	if (retval < 0)
-		goto clean2;
-#endif
-
-#ifdef OF_PLATFORM_DRIVER
-	retval = platform_driver_register(&OF_PLATFORM_DRIVER);
-	if (retval < 0)
-		goto clean3;
-#endif
-
-#ifdef XILINX_OF_PLATFORM_DRIVER
-	retval = platform_driver_register(&XILINX_OF_PLATFORM_DRIVER);
-	if (retval < 0)
-		goto clean4;
-#endif
-	return retval;
-
-#ifdef XILINX_OF_PLATFORM_DRIVER
-	/* platform_driver_unregister(&XILINX_OF_PLATFORM_DRIVER); */
-clean4:
-#endif
-#ifdef OF_PLATFORM_DRIVER
-	platform_driver_unregister(&OF_PLATFORM_DRIVER);
-clean3:
-#endif
-#ifdef PS3_SYSTEM_BUS_DRIVER
-	ps3_ehci_driver_unregister(&PS3_SYSTEM_BUS_DRIVER);
-clean2:
-#endif
-#ifdef PLATFORM_DRIVER
-	platform_driver_unregister(&PLATFORM_DRIVER);
 clean0:
-#endif
 #ifdef CONFIG_DYNAMIC_DEBUG
 	debugfs_remove(ehci_debug_root);
 	ehci_debug_root = NULL;
@@ -1376,18 +1354,7 @@ module_init(ehci_hcd_init);
 
 static void __exit ehci_hcd_cleanup(void)
 {
-#ifdef XILINX_OF_PLATFORM_DRIVER
-	platform_driver_unregister(&XILINX_OF_PLATFORM_DRIVER);
-#endif
-#ifdef OF_PLATFORM_DRIVER
-	platform_driver_unregister(&OF_PLATFORM_DRIVER);
-#endif
-#ifdef PLATFORM_DRIVER
-	platform_driver_unregister(&PLATFORM_DRIVER);
-#endif
-#ifdef PS3_SYSTEM_BUS_DRIVER
-	ps3_ehci_driver_unregister(&PS3_SYSTEM_BUS_DRIVER);
-#endif
+	platform_unregister_drivers(platform_drivers, ARRAY_SIZE(platform_drivers));
 #ifdef CONFIG_DYNAMIC_DEBUG
 	debugfs_remove(ehci_debug_root);
 #endif
