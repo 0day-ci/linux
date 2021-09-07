@@ -1455,7 +1455,7 @@ static int btrfsic_map_block(struct btrfsic_state *state, u64 bytenr, u32 len,
 	struct btrfs_fs_info *fs_info = state->fs_info;
 	int ret;
 	u64 length;
-	struct btrfs_bio *multi = NULL;
+	struct btrfs_physical_bio *multi = NULL;
 	struct btrfs_device *device;
 
 	length = len;

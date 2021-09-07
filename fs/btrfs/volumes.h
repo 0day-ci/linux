@@ -365,7 +365,10 @@ struct btrfs_bio_stripe {
 	u64 length; /* only used for discard mappings */
 };
 
-struct btrfs_bio {
+/*
+ * Records the physical mapping info and extra members to submit real device IO.
+ */
+struct btrfs_physical_bio {
 	refcount_t refs;
 	atomic_t stripes_pending;
 	struct btrfs_fs_info *fs_info;
@@ -461,14 +464,14 @@ static inline enum btrfs_map_op btrfs_op(struct bio *bio)
 	}
 }
 
-void btrfs_get_bbio(struct btrfs_bio *bbio);
-void btrfs_put_bbio(struct btrfs_bio *bbio);
+void btrfs_get_physical_bio(struct btrfs_physical_bio *pbio);
+void btrfs_put_physical_bio(struct btrfs_physical_bio *pbio);
 int btrfs_map_block(struct btrfs_fs_info *fs_info, enum btrfs_map_op op,
 		    u64 logical, u64 *length,
-		    struct btrfs_bio **bbio_ret, int mirror_num);
+		    struct btrfs_physical_bio **pbio_ret, int mirror_num);
 int btrfs_map_sblock(struct btrfs_fs_info *fs_info, enum btrfs_map_op op,
 		     u64 logical, u64 *length,
-		     struct btrfs_bio **bbio_ret);
+		     struct btrfs_physical_bio **pbio_ret);
 int btrfs_get_io_geometry(struct btrfs_fs_info *fs_info, struct extent_map *map,
 			  enum btrfs_map_op op, u64 logical,
 			  struct btrfs_io_geometry *io_geom);
