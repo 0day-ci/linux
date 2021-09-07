@@ -1661,7 +1661,7 @@ static bool gpu_reset_clobbers_display(struct drm_i915_private *dev_priv)
 void intel_display_prepare_reset(struct drm_i915_private *dev_priv)
 {
 	struct drm_device *dev = &dev_priv->drm;
-	struct drm_modeset_acquire_ctx *ctx = &dev_priv->reset_ctx;
+	struct drm_modeset_acquire_ctx *ctx = &dev_priv->display->reset_ctx;
 	struct drm_atomic_state *state;
 	int ret;
 
@@ -1717,14 +1717,14 @@ void intel_display_prepare_reset(struct drm_i915_private *dev_priv)
 		return;
 	}
 
-	dev_priv->modeset_restore_state = state;
+	dev_priv->display->modeset_restore_state = state;
 	state->acquire_ctx = ctx;
 }
 
 void intel_display_finish_reset(struct drm_i915_private *dev_priv)
 {
 	struct drm_device *dev = &dev_priv->drm;
-	struct drm_modeset_acquire_ctx *ctx = &dev_priv->reset_ctx;
+	struct drm_modeset_acquire_ctx *ctx = &dev_priv->display->reset_ctx;
 	struct drm_atomic_state *state;
 	int ret;
 
@@ -1735,7 +1735,7 @@ void intel_display_finish_reset(struct drm_i915_private *dev_priv)
 	if (!test_bit(I915_RESET_MODESET, &dev_priv->gt.reset.flags))
 		return;
 
-	state = fetch_and_zero(&dev_priv->modeset_restore_state);
+	state = fetch_and_zero(&dev_priv->display->modeset_restore_state);
 	if (!state)
 		goto unlock;
 
@@ -3753,7 +3753,7 @@ int intel_display_suspend(struct drm_device *dev)
 		drm_err(&dev_priv->drm, "Suspending crtc's failed with %i\n",
 			ret);
 	else
-		dev_priv->modeset_restore_state = state;
+		dev_priv->display->modeset_restore_state = state;
 	return ret;
 }
 
@@ -10033,7 +10033,7 @@ static void intel_atomic_helper_free_state(struct drm_i915_private *dev_priv)
 	struct intel_atomic_state *state, *next;
 	struct llist_node *freed;
 
-	freed = llist_del_all(&dev_priv->atomic_helper.free_list);
+	freed = llist_del_all(&dev_priv->display->atomic_helper.free_list);
 	llist_for_each_entry_safe(state, next, freed, freed)
 		drm_atomic_state_put(&state->base);
 }
@@ -10041,7 +10041,7 @@ static void intel_atomic_helper_free_state(struct drm_i915_private *dev_priv)
 static void intel_atomic_helper_free_state_worker(struct work_struct *work)
 {
 	struct drm_i915_private *dev_priv =
-		container_of(work, typeof(*dev_priv), atomic_helper.free_work);
+		container_of(work, typeof(*dev_priv), _display.atomic_helper.free_work);
 
 	intel_atomic_helper_free_state(dev_priv);
 }
@@ -10335,7 +10335,7 @@ intel_atomic_commit_ready(struct i915_sw_fence *fence,
 	case FENCE_FREE:
 		{
 			struct intel_atomic_helper *helper =
-				&to_i915(state->base.dev)->atomic_helper;
+				&to_i915(state->base.dev)->display->atomic_helper;
 
 			if (llist_add(&state->freed, &helper->free_list))
 				schedule_work(&helper->free_work);
@@ -11591,8 +11591,8 @@ int intel_modeset_init_noirq(struct drm_i915_private *i915)
 	if (ret)
 		goto cleanup_vga_client_pw_domain_dmc;
 
-	init_llist_head(&i915->atomic_helper.free_list);
-	INIT_WORK(&i915->atomic_helper.free_work,
+	init_llist_head(&i915->display->atomic_helper.free_list);
+	INIT_WORK(&i915->display->atomic_helper.free_work,
 		  intel_atomic_helper_free_state_worker);
 
 	intel_init_quirks(i915);
@@ -12568,14 +12568,14 @@ intel_modeset_setup_hw_state(struct drm_device *dev,
 void intel_display_resume(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = to_i915(dev);
-	struct drm_atomic_state *state = dev_priv->modeset_restore_state;
+	struct drm_atomic_state *state = dev_priv->display->modeset_restore_state;
 	struct drm_modeset_acquire_ctx ctx;
 	int ret;
 
 	if (!HAS_DISPLAY(dev_priv))
 		return;
 
-	dev_priv->modeset_restore_state = NULL;
+	dev_priv->display->modeset_restore_state = NULL;
 	if (state)
 		state->acquire_ctx = &ctx;
 
@@ -12630,8 +12630,8 @@ void intel_modeset_driver_remove(struct drm_i915_private *i915)
 	flush_workqueue(i915->flip_wq);
 	flush_workqueue(i915->modeset_wq);
 
-	flush_work(&i915->atomic_helper.free_work);
-	drm_WARN_ON(&i915->drm, !llist_empty(&i915->atomic_helper.free_list));
+	flush_work(&i915->display->atomic_helper.free_work);
+	drm_WARN_ON(&i915->drm, !llist_empty(&i915->display->atomic_helper.free_list));
 }
 
 /* part #2: call after irq uninstall */

@@ -917,6 +917,14 @@ struct drm_i915_display {
 	struct work_struct fbdev_suspend_work;
 
 	struct i915_frontbuffer_tracking fb_tracking;
+
+	struct drm_atomic_state *modeset_restore_state;
+	struct drm_modeset_acquire_ctx reset_ctx;
+
+	struct intel_atomic_helper {
+		struct llist_head free_list;
+		struct work_struct free_work;
+	} atomic_helper;
 };
 
 struct drm_i915_private {
@@ -1030,9 +1038,6 @@ struct drm_i915_private {
 
 	unsigned long quirks;
 
-	struct drm_atomic_state *modeset_restore_state;
-	struct drm_modeset_acquire_ctx reset_ctx;
-
 	struct i915_ggtt ggtt; /* VM representing the global address space */
 
 	struct i915_gem_mm mm;
@@ -1061,11 +1066,6 @@ struct drm_i915_private {
 	struct list_head global_obj_list;
 
 	struct i915_wa_list gt_wa_list;
-
-	struct intel_atomic_helper {
-		struct llist_head free_list;
-		struct work_struct free_work;
-	} atomic_helper;
 
 	bool mchbar_need_disable;
 
