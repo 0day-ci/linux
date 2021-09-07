@@ -906,22 +906,6 @@ static struct platform_driver ne_driver = {
 	},
 };
 
-static void __init ne_add_devices(void)
-{
-	int this_dev;
-	struct platform_device *pdev;
-
-	for (this_dev = 0; this_dev < MAX_NE_CARDS; this_dev++) {
-		if (pdev_ne[this_dev])
-			continue;
-		pdev = platform_device_register_simple(
-			DRV_NAME, this_dev, NULL, 0);
-		if (IS_ERR(pdev))
-			continue;
-		pdev_ne[this_dev] = pdev;
-	}
-}
-
 #ifdef MODULE
 static int __init ne_init(void)
 {
@@ -953,6 +937,22 @@ static int __init ne_init(void)
 module_init(ne_init);
 
 #ifdef CONFIG_NETDEV_LEGACY_INIT
+static void __init ne_add_devices(void)
+{
+	int this_dev;
+	struct platform_device *pdev;
+
+	for (this_dev = 0; this_dev < MAX_NE_CARDS; this_dev++) {
+		if (pdev_ne[this_dev])
+			continue;
+		pdev = platform_device_register_simple(
+			DRV_NAME, this_dev, NULL, 0);
+		if (IS_ERR(pdev))
+			continue;
+		pdev_ne[this_dev] = pdev;
+	}
+}
+
 struct net_device * __init ne_probe(int unit)
 {
 	int this_dev;
