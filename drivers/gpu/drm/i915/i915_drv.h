@@ -965,6 +965,8 @@ struct drm_i915_display {
 			int ssc;
 		} ref_clks;
 	} dpll;
+
+	u32 fdi_rx_config;
 };
 
 struct drm_i915_private {
@@ -1101,8 +1103,6 @@ struct drm_i915_private {
 	struct i915_gpu_error gpu_error;
 
 	struct drm_i915_gem_object *vlv_pctx;
-
-	u32 fdi_rx_config;
 
 	u32 suspend_count;
 	bool power_domains_suspended;

@@ -1111,7 +1111,7 @@ void intel_crt_init(struct drm_i915_private *dev_priv)
 		u32 fdi_config = FDI_RX_POLARITY_REVERSED_LPT |
 				 FDI_RX_LINK_REVERSAL_OVERRIDE;
 
-		dev_priv->fdi_rx_config = intel_de_read(dev_priv,
+		dev_priv->display->fdi_rx_config = intel_de_read(dev_priv,
 							FDI_RX_CTL(PIPE_A)) & fdi_config;
 	}
 
