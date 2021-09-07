@@ -10,6 +10,7 @@
 #include <linux/buffer_head.h>
 #include <linux/fs.h>
 #include <linux/hash.h>
+#include <linux/kernel.h>
 #include <linux/nls.h>
 #include <linux/ratelimit.h>
 #include <linux/slab.h>
@@ -1966,7 +1967,7 @@ int attr_punch_hole(struct ntfs_inode *ni, u64 vbo, u64 bytes, u32 *frame_size)
 			return 0;
 
 		from = vbo;
-		to = (vbo + bytes) < data_size ? (vbo + bytes) : data_size;
+		to = min_t(u64, vbo + bytes, data_size);
 		memset(Add2Ptr(resident_data(attr_b), from), 0, to - from);
 		return 0;
 	}
