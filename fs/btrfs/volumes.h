@@ -570,7 +570,8 @@ void btrfs_commit_device_sizes(struct btrfs_transaction *trans);
 
 struct list_head * __attribute_const__ btrfs_get_fs_uuids(void);
 bool btrfs_check_rw_degradable(struct btrfs_fs_info *fs_info,
-					struct btrfs_device *failing_dev);
+			       struct btrfs_device *failing_dev,
+			       bool mounting_fs);
 void btrfs_scratch_superblocks(struct btrfs_fs_info *fs_info,
 			       struct block_device *bdev,
 			       const char *device_path);

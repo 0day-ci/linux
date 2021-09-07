@@ -3556,7 +3556,7 @@ int __cold open_ctree(struct super_block *sb, struct btrfs_fs_devices *fs_device
 		goto fail_sysfs;
 	}
 
-	if (!sb_rdonly(sb) && !btrfs_check_rw_degradable(fs_info, NULL)) {
+	if (!sb_rdonly(sb) && !btrfs_check_rw_degradable(fs_info, NULL, true)) {
 		btrfs_warn(fs_info,
 		"writable mount is not allowed due to too many missing devices");
 		goto fail_sysfs;
@@ -4003,7 +4003,7 @@ static blk_status_t wait_dev_flush(struct btrfs_device *device)
 
 static int check_barrier_error(struct btrfs_fs_info *fs_info)
 {
-	if (!btrfs_check_rw_degradable(fs_info, NULL))
+	if (!btrfs_check_rw_degradable(fs_info, NULL, false))
 		return -EIO;
 	return 0;
 }

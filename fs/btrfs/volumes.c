@@ -7359,7 +7359,7 @@ out_short_read:
  * Return false if any chunk doesn't meet the minimal RW mount requirements.
  */
 bool btrfs_check_rw_degradable(struct btrfs_fs_info *fs_info,
-					struct btrfs_device *failing_dev)
+			       struct btrfs_device *failing_dev, bool mounting_fs)
 {
 	struct extent_map_tree *map_tree = &fs_info->mapping_tree;
 	struct extent_map *em;
@@ -7387,12 +7387,28 @@ bool btrfs_check_rw_degradable(struct btrfs_fs_info *fs_info,
 		for (i = 0; i < map->num_stripes; i++) {
 			struct btrfs_device *dev = map->stripes[i].dev;
 
-			if (!dev || !dev->bdev ||
-			    test_bit(BTRFS_DEV_STATE_MISSING, &dev->dev_state) ||
-			    dev->last_flush_error)
+			if (dev && dev->last_flush_error) {
+				/*
+				 * If we had a flush error from a previous mount,
+				 * don't treat it as an error and clear the error
+				 * status. Such an error may be transient, and
+				 * just because it happened in a previous mount,
+				 * it does not mean it will happen again if we
+				 * mount the fs again. If it turns out the error
+				 * happens again after mounting, then we will
+				 * deal with it, abort the running transaction
+				 * and set the fs state to BTRFS_FS_STATE_ERROR.
+				 */
+				if (mounting_fs)
+					dev->last_flush_error = 0;
+				else
+					missing++;
+			} else if (!dev || !dev->bdev ||
+			    test_bit(BTRFS_DEV_STATE_MISSING, &dev->dev_state)) {
 				missing++;
-			else if (failing_dev && failing_dev == dev)
+			} else if (failing_dev && failing_dev == dev) {
 				missing++;
+			}
 		}
 		if (missing > max_tolerated) {
 			if (!failing_dev)
