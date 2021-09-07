@@ -1402,9 +1402,9 @@ void intel_pps_unlock_regs_wa(struct drm_i915_private *dev_priv)
 void intel_pps_setup(struct drm_i915_private *i915)
 {
 	if (HAS_PCH_SPLIT(i915) || IS_GEMINILAKE(i915) || IS_BROXTON(i915))
-		i915->pps_mmio_base = PCH_PPS_BASE;
+		i915->display->pps_mmio_base = PCH_PPS_BASE;
 	else if (IS_VALLEYVIEW(i915) || IS_CHERRYVIEW(i915))
-		i915->pps_mmio_base = VLV_PPS_BASE;
+		i915->display->pps_mmio_base = VLV_PPS_BASE;
 	else
-		i915->pps_mmio_base = PPS_BASE;
+		i915->display->pps_mmio_base = PPS_BASE;
 }
