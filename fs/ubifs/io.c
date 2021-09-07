@@ -238,6 +238,8 @@ int ubifs_check_node(const struct ubifs_info *c, const void *buf, int len,
 		if (!quiet)
 			ubifs_err(c, "bad magic %#08x, expected %#08x",
 				  magic, UBIFS_NODE_MAGIC);
+		if (c->stats)
+			c->stats->magic_errors++;
 		err = -EUCLEAN;
 		goto out;
 	}
@@ -246,6 +248,8 @@ int ubifs_check_node(const struct ubifs_info *c, const void *buf, int len,
 	if (type < 0 || type >= UBIFS_NODE_TYPES_CNT) {
 		if (!quiet)
 			ubifs_err(c, "bad node type %d", type);
+		if (c->stats)
+			c->stats->node_errors++;
 		goto out;
 	}
 
@@ -270,6 +274,8 @@ int ubifs_check_node(const struct ubifs_info *c, const void *buf, int len,
 		if (!quiet)
 			ubifs_err(c, "bad CRC: calculated %#08x, read %#08x",
 				  crc, node_crc);
+		if (c->stats)
+			c->stats->crc_errors++;
 		err = -EUCLEAN;
 		goto out;
 	}
