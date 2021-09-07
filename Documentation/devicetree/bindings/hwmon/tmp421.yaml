@@ -24,11 +24,48 @@ properties:
   reg:
     maxItems: 1
 
+  '#address-cells':
+    const: 1
+
+  '#size-cells':
+    const: 0
+
 required:
   - compatible
   - reg
 
 additionalProperties: false
+
+patternProperties:
+  "^input@([0-4])$":
+    type: object
+    description: |
+      Represents channels of the device and their specific configuration.
+
+    properties:
+      reg:
+        description: |
+          The channel number. 0 is local channel, 1-4 are remote channels
+        items:
+          minimum: 0
+          maximum: 4
+
+      label:
+        description: |
+          A descriptive name for this channel, like "ambient" or "psu".
+
+      n-factor:
+        description: |
+          The value (two's complement) to be programmed in the channel specific N correction register.
+          For remote channels only.
+        items:
+          minimum: 0
+          maximum: 1
+
+    required:
+      - reg
+
+    additionalProperties: false
 
 examples:
   - |
@@ -39,5 +76,34 @@ examples:
       sensor@4c {
         compatible = "ti,tmp422";
         reg = <0x4c>;
+      };
+    };
+  - |
+    i2c {
+      #address-cells = <1>;
+      #size-cells = <0>;
+
+      sensor@4c {
+        compatible = "ti,tmp422";
+        reg = <0x4c>;
+        #address-cells = <1>;
+        #size-cells = <0>;
+
+        input@0 {
+          reg = <0x0>;
+          n-factor = <0x1>;
+          label = "local";
+        };
+
+        input@1 {
+          reg = <0x1>;
+          n-factor = <0x0>;
+          label = "somelabel";
+        };
+
+        input@2 {
+          reg = <0x2>;
+          status = "disabled";
+        };
       };
     };
