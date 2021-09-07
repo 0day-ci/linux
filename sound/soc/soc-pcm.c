@@ -1993,17 +1993,63 @@ out:
 	return ret;
 }
 
+struct dpcm_be_list {
+	unsigned int num;
+	struct snd_soc_pcm_runtime *be[];
+};
+
+static int dpcm_create_be_list(struct snd_soc_pcm_runtime *fe, int stream,
+		struct dpcm_be_list **be_list)
+{
+	struct snd_soc_dpcm *dpcm;
+	struct dpcm_be_list *be;
+	int size = 0;
+	int ret = 0;
+	unsigned long flags;
+
+	spin_lock_irqsave(&fe->card->dpcm_lock, flags);
+
+	for_each_dpcm_be(fe, stream, dpcm)
+		size++;
+
+	be = kzalloc(struct_size(be, be, size), GFP_ATOMIC);
+	if (!be) {
+		ret = -ENOMEM;
+	} else {
+		unsigned int i = 0;
+
+		for_each_dpcm_be(fe, stream, dpcm)
+			be->be[i++] = dpcm->be;
+
+		*be_list = be;
+	}
+
+	spin_unlock_irqrestore(&fe->card->dpcm_lock, flags);
+
+	return ret;
+}
+
+static void dpcm_free_be_list(struct dpcm_be_list *be_list)
+{
+	kfree(be_list);
+}
+
 int dpcm_be_dai_trigger(struct snd_soc_pcm_runtime *fe, int stream,
 			       int cmd)
 {
 	struct snd_soc_pcm_runtime *be;
-	struct snd_soc_dpcm *dpcm;
+	struct dpcm_be_list *be_list;
 	int ret = 0;
+	int i;
 
-	for_each_dpcm_be(fe, stream, dpcm) {
+	ret = dpcm_create_be_list(fe, stream, &be_list);
+	if (ret < 0)
+		return ret;
+
+	for(i = 0; i < be_list->num; i++) {
 		struct snd_pcm_substream *be_substream;
 
-		be = dpcm->be;
+		be = be_list->be[i];
 		be_substream = snd_soc_dpcm_get_substream(be, stream);
 
 		/* is this op for this BE ? */
@@ -2092,6 +2138,7 @@ end:
 	if (ret < 0)
 		dev_err(fe->dev, "ASoC: %s() failed at %s (%d)\n",
 			__func__, be->dai_link->name, ret);
+	dpcm_free_be_list(be_list);
 	return ret;
 }
 EXPORT_SYMBOL_GPL(dpcm_be_dai_trigger);
