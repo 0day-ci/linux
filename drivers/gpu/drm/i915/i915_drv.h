@@ -893,6 +893,12 @@ struct drm_i915_display {
 
 	struct drm_property *broadcast_rgb_property;
 	struct drm_property *force_audio_property;
+
+	struct i915_hdcp_comp_master *hdcp_master;
+	bool hdcp_comp_added;
+
+	/* Mutex to protect the above hdcp component related values. */
+	struct mutex hdcp_comp_mutex;
 };
 
 struct drm_i915_private {
@@ -1210,12 +1216,6 @@ struct drm_i915_private {
 	bool ipc_enabled;
 
 	struct i915_pmu pmu;
-
-	struct i915_hdcp_comp_master *hdcp_master;
-	bool hdcp_comp_added;
-
-	/* Mutex to protect the above hdcp component related values. */
-	struct mutex hdcp_comp_mutex;
 
 	/* The TTM device structure. */
 	struct ttm_device bdev;
