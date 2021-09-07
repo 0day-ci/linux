@@ -87,6 +87,10 @@ static const struct of_device_id __maybe_unused tmp421_of_match[] = {
 };
 MODULE_DEVICE_TABLE(of, tmp421_of_match);
 
+struct tmp421_channel {
+	s16 temp;
+};
+
 struct tmp421_data {
 	struct i2c_client *client;
 	struct mutex update_lock;
@@ -98,7 +102,7 @@ struct tmp421_data {
 	unsigned long last_updated;
 	unsigned long channels;
 	u8 config;
-	s16 temp[MAX_CHANNELS];
+	struct tmp421_channel channel[MAX_CHANNELS];
 };
 
 static int temp_from_s16(s16 reg)
@@ -134,9 +138,9 @@ static struct tmp421_data *tmp421_update_device(struct device *dev)
 			TMP421_CONFIG_REG_1);
 
 		for (i = 0; i < data->channels; i++) {
-			data->temp[i] = i2c_smbus_read_byte_data(client,
+			data->channel[i].temp = i2c_smbus_read_byte_data(client,
 				TMP421_TEMP_MSB[i]) << 8;
-			data->temp[i] |= i2c_smbus_read_byte_data(client,
+			data->channel[i].temp |= i2c_smbus_read_byte_data(client,
 				TMP421_TEMP_LSB[i]);
 		}
 		data->last_updated = jiffies;
@@ -156,16 +160,16 @@ static int tmp421_read(struct device *dev, enum hwmon_sensor_types type,
 	switch (attr) {
 	case hwmon_temp_input:
 		if (tmp421->config & TMP421_CONFIG_RANGE)
-			*val = temp_from_u16(tmp421->temp[channel]);
+			*val = temp_from_u16(tmp421->channel[channel].temp);
 		else
-			*val = temp_from_s16(tmp421->temp[channel]);
+			*val = temp_from_s16(tmp421->channel[channel].temp);
 		return 0;
 	case hwmon_temp_fault:
 		/*
 		 * The OPEN bit signals a fault. This is bit 0 of the temperature
 		 * register (low byte).
 		 */
-		*val = tmp421->temp[channel] & 0x01;
+		*val = tmp421->channel[channel].temp & 0x01;
 		return 0;
 	default:
 		return -EOPNOTSUPP;
