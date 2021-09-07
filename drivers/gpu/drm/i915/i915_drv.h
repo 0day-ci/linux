@@ -826,8 +826,20 @@ struct i915_selftest_stash {
 };
 
 struct drm_i915_display {
+	struct drm_device *drm;
 	/* Display functions */
 	struct drm_i915_display_funcs funcs;
+
+	struct {
+		/* The current hardware cdclk configuration */
+		struct intel_cdclk_config hw;
+
+		/* cdclk, divider, and ratio table from bspec */
+		const struct intel_cdclk_vals *table;
+
+		struct intel_global_obj obj;
+	} cdclk;
+	unsigned int max_cdclk_freq;
 };
 
 struct drm_i915_private {
@@ -941,22 +953,11 @@ struct drm_i915_private {
 
 	unsigned int fsb_freq, mem_freq, is_ddr3;
 	unsigned int skl_preferred_vco_freq;
-	unsigned int max_cdclk_freq;
 
 	unsigned int max_dotclk_freq;
 	unsigned int hpll_freq;
 	unsigned int fdi_pll_freq;
 	unsigned int czclk_freq;
-
-	struct {
-		/* The current hardware cdclk configuration */
-		struct intel_cdclk_config hw;
-
-		/* cdclk, divider, and ratio table from bspec */
-		const struct intel_cdclk_vals *table;
-
-		struct intel_global_obj obj;
-	} cdclk;
 
 	struct {
 		/* The current hardware dbuf configuration */

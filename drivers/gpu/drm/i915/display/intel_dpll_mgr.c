@@ -1782,7 +1782,7 @@ static int skl_ddi_pll_get_freq(struct drm_i915_private *i915,
 static void skl_update_dpll_ref_clks(struct drm_i915_private *i915)
 {
 	/* No SSC ref */
-	i915->dpll.ref_clks.nssc = i915->cdclk.hw.ref;
+	i915->dpll.ref_clks.nssc = i915->display->cdclk.hw.ref;
 }
 
 static void skl_dump_hw_state(struct drm_i915_private *dev_priv,
@@ -3867,7 +3867,7 @@ static void mg_pll_disable(struct drm_i915_private *dev_priv,
 static void icl_update_dpll_ref_clks(struct drm_i915_private *i915)
 {
 	/* No SSC ref */
-	i915->dpll.ref_clks.nssc = i915->cdclk.hw.ref;
+	i915->dpll.ref_clks.nssc = i915->display->cdclk.hw.ref;
 }
 
 static void icl_dump_hw_state(struct drm_i915_private *dev_priv,

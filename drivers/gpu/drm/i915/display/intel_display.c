@@ -3658,7 +3658,7 @@ static void intel_crtc_disable_noatomic(struct intel_crtc *crtc,
 	struct intel_bw_state *bw_state =
 		to_intel_bw_state(dev_priv->bw_obj.state);
 	struct intel_cdclk_state *cdclk_state =
-		to_intel_cdclk_state(dev_priv->cdclk.obj.state);
+		to_intel_cdclk_state(dev_priv->display->cdclk.obj.state);
 	struct intel_dbuf_state *dbuf_state =
 		to_intel_dbuf_state(dev_priv->dbuf.obj.state);
 	struct intel_crtc_state *crtc_state =
@@ -3827,7 +3827,7 @@ bool hsw_crtc_state_ips_capable(const struct intel_crtc_state *crtc_state)
 	 * Should measure whether using a lower cdclk w/o IPS
 	 */
 	if (IS_BROADWELL(dev_priv) &&
-	    crtc_state->pixel_rate > dev_priv->max_cdclk_freq * 95 / 100)
+	    crtc_state->pixel_rate > dev_priv->display->max_cdclk_freq * 95 / 100)
 		return false;
 
 	return true;
@@ -4038,7 +4038,7 @@ static int intel_crtc_compute_config(struct intel_crtc *crtc,
 	intel_mode_from_crtc_timings(pipe_mode, pipe_mode);
 
 	if (DISPLAY_VER(dev_priv) < 4) {
-		clock_limit = dev_priv->max_cdclk_freq * 9 / 10;
+		clock_limit = dev_priv->display->max_cdclk_freq * 9 / 10;
 
 		/*
 		 * Enable double wide mode when the dot clock
@@ -11266,11 +11266,11 @@ void intel_modeset_init_hw(struct drm_i915_private *i915)
 	if (!HAS_DISPLAY(i915))
 		return;
 
-	cdclk_state = to_intel_cdclk_state(i915->cdclk.obj.state);
+	cdclk_state = to_intel_cdclk_state(i915->display->cdclk.obj.state);
 
 	intel_update_cdclk(i915);
-	intel_dump_cdclk_config(&i915->cdclk.hw, "Current CDCLK");
-	cdclk_state->logical = cdclk_state->actual = i915->cdclk.hw;
+	intel_dump_cdclk_config(&i915->display->cdclk.hw, "Current CDCLK");
+	cdclk_state->logical = cdclk_state->actual = i915->display->cdclk.hw;
 }
 
 static int sanitize_watermarks_add_affected(struct drm_atomic_state *state)
@@ -11652,7 +11652,7 @@ int intel_modeset_init_nogem(struct drm_i915_private *i915)
 
 	intel_hdcp_component_init(i915);
 
-	if (i915->max_cdclk_freq == 0)
+	if (i915->display->max_cdclk_freq == 0)
 		intel_update_max_cdclk(i915);
 
 	/*
@@ -12146,7 +12146,7 @@ static void intel_modeset_readout_hw_state(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = to_i915(dev);
 	struct intel_cdclk_state *cdclk_state =
-		to_intel_cdclk_state(dev_priv->cdclk.obj.state);
+		to_intel_cdclk_state(dev_priv->display->cdclk.obj.state);
 	struct intel_dbuf_state *dbuf_state =
 		to_intel_dbuf_state(dev_priv->dbuf.obj.state);
 	enum pipe pipe;
