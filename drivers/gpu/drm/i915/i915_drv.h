@@ -904,6 +904,10 @@ struct drm_i915_display {
 
 	/* overlay */
 	struct intel_overlay *overlay;
+
+	/* list of fbdev register on this device */
+	struct intel_fbdev *fbdev;
+	struct work_struct fbdev_suspend_work;
 };
 
 struct drm_i915_private {
@@ -1079,10 +1083,6 @@ struct drm_i915_private {
 	struct i915_gpu_error gpu_error;
 
 	struct drm_i915_gem_object *vlv_pctx;
-
-	/* list of fbdev register on this device */
-	struct intel_fbdev *fbdev;
-	struct work_struct fbdev_suspend_work;
 
 	u32 fdi_rx_config;
 
