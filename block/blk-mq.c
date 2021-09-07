@@ -328,7 +328,12 @@ static struct request *blk_mq_rq_ctx_init(struct blk_mq_alloc_data *data,
 	data->ctx->rq_dispatched[op_is_sync(data->cmd_flags)]++;
 	refcount_set(&rq->ref, 1);
 
-	if (!op_is_flush(data->cmd_flags)) {
+	/*
+	 * Flush/passthrough requests are special and go directly to the
+	 * dispatch list, bypassing the scheduler.
+	 */
+	if (!op_is_flush(data->cmd_flags) &&
+	    !blk_op_is_passthrough(data->cmd_flags)) {
 		struct elevator_queue *e = data->q->elevator;
 
 		rq->elv.icq = NULL;
