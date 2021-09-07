@@ -899,6 +899,8 @@ struct drm_i915_display {
 
 	/* Mutex to protect the above hdcp component related values. */
 	struct mutex hdcp_comp_mutex;
+
+	struct i915_hotplug hotplug;
 };
 
 struct drm_i915_private {
@@ -972,7 +974,6 @@ struct drm_i915_private {
 	};
 	u32 pipestat_irq_mask[I915_MAX_PIPES];
 
-	struct i915_hotplug hotplug;
 	struct intel_opregion opregion;
 	struct intel_vbt_data vbt;
 
