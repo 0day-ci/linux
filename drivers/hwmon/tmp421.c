@@ -89,6 +89,7 @@ MODULE_DEVICE_TABLE(of, tmp421_of_match);
 
 struct tmp421_channel {
 	const char *label;
+	bool disabled;
 	s16 temp;
 };
 
@@ -125,9 +126,8 @@ static int temp_from_u16(u16 reg)
 	return (temp * 1000 + 128) / 256;
 }
 
-static struct tmp421_data *tmp421_update_device(struct device *dev)
+static void tmp421_update_device(struct tmp421_data *data)
 {
-	struct tmp421_data *data = dev_get_drvdata(dev);
 	struct i2c_client *client = data->client;
 	int i;
 
@@ -149,14 +149,17 @@ static struct tmp421_data *tmp421_update_device(struct device *dev)
 	}
 
 	mutex_unlock(&data->update_lock);
-
-	return data;
 }
 
 static int tmp421_read(struct device *dev, enum hwmon_sensor_types type,
 		       u32 attr, int channel, long *val)
 {
-	struct tmp421_data *tmp421 = tmp421_update_device(dev);
+	struct tmp421_data *tmp421 = dev_get_drvdata(dev);
+
+	if (tmp421->channel[channel].disabled)
+		return -ENODATA;
+
+	tmp421_update_device(tmp421);
 
 	switch (attr) {
 	case hwmon_temp_input:
@@ -314,6 +317,10 @@ void tmp421_probe_child_from_dt(struct i2c_client *client,
 	if (data->channel[i].label)
 		data->temp_config[i] |= HWMON_T_LABEL;
 
+	if (!of_device_is_available(child)) {
+		data->channel[i].disabled = true;
+		return;
+	}
 }
 
 void tmp421_probe_from_dt(struct i2c_client *client, struct tmp421_data *data)
