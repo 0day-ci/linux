@@ -15,6 +15,7 @@ timeout_test=$((timeout_poll * 2 + 1))
 mptcp_connect=""
 capture=0
 checksum=0
+roundrobin=0
 do_all_tests=1
 
 TEST_COUNT=0
@@ -54,6 +55,9 @@ init()
 		ip netns exec $netns sysctl -q net.ipv4.conf.default.rp_filter=0
 		if [ $checksum -eq 1 ]; then
 			ip netns exec $netns sysctl -q net.mptcp.checksum_enabled=1
+		fi
+		if [ $roundrobin -eq 1 ]; then
+			ip netns exec $netns sysctl -q net.mptcp.scheduler="roundrobin"
 		fi
 	done
 
@@ -1854,9 +1858,12 @@ for arg in "$@"; do
 	if [[ "${arg}" =~ ^"-"[0-9a-zA-Z]*"C"[0-9a-zA-Z]*$ ]]; then
 		checksum=1
 	fi
+	if [[ "${arg}" =~ ^"-"[0-9a-zA-Z]*"R"[0-9a-zA-Z]*$ ]]; then
+		roundrobin=1
+	fi
 
-	# exception for the capture/checksum options, the rest means: a part of the tests
-	if [ "${arg}" != "-c" ] && [ "${arg}" != "-C" ]; then
+	# exception for the capture/checksum/roundrobin options, the rest means: a part of the tests
+	if [ "${arg}" != "-c" ] && [ "${arg}" != "-C" ] && [ "${arg}" != "-R" ]; then
 		do_all_tests=0
 	fi
 done
