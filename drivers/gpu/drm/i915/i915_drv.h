@@ -854,6 +854,9 @@ struct drm_i915_display {
 	 */
 	u32 gpio_mmio_base;
 
+	/* MMIO base address for MIPI regs */
+	u32 mipi_mmio_base;
+
 	struct intel_gmbus gmbus[GMBUS_NUM_PINS];
 
 	/** gmbus_mutex protects against concurrent usage of the single hw gmbus
@@ -912,9 +915,6 @@ struct drm_i915_private {
 	struct intel_gvt *gvt;
 
 	struct intel_wopcm wopcm;
-
-	/* MMIO base address for MIPI regs */
-	u32 mipi_mmio_base;
 
 	u32 pps_mmio_base;
 
