@@ -42,7 +42,6 @@
 #include <linux/init.h>
 
 #include <asm/io.h>
-#include <asm/vga.h>
 
 static DEFINE_SPINLOCK(mda_lock);
 
