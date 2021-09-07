@@ -860,6 +860,8 @@ struct drm_i915_display {
 	 * controller on different i2c buses. */
 	struct mutex gmbus_mutex;
 	wait_queue_head_t gmbus_wait_queue;
+
+	struct intel_dmc dmc;
 };
 
 struct drm_i915_private {
@@ -910,8 +912,6 @@ struct drm_i915_private {
 	struct intel_gvt *gvt;
 
 	struct intel_wopcm wopcm;
-
-	struct intel_dmc dmc;
 
 	/* MMIO base address for MIPI regs */
 	u32 mipi_mmio_base;

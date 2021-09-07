@@ -539,7 +539,7 @@ static int i915_dmc_info(struct seq_file *m, void *unused)
 	if (!HAS_DMC(dev_priv))
 		return -ENODEV;
 
-	dmc = &dev_priv->dmc;
+	dmc = &dev_priv->display->dmc;
 
 	wakeref = intel_runtime_pm_get(&dev_priv->runtime_pm);
 
