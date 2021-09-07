@@ -33,6 +33,8 @@ enum chips { tmp421, tmp422, tmp423, tmp441, tmp442 };
 /* The TMP421 registers */
 #define TMP421_STATUS_REG			0x08
 #define TMP421_CONFIG_REG_1			0x09
+#define TMP421_CONFIG_REG_2			0x0A
+#define TMP421_CONFIG_REG_REN(x)		(BIT(3 + (x)))
 #define TMP421_CONVERSION_RATE_REG		0x0B
 #define TMP421_N_FACTOR_REG_1			0x21
 #define TMP421_MANUFACTURER_ID_REG		0xFE
@@ -351,6 +353,25 @@ void tmp421_probe_from_dt(struct i2c_client *client, struct tmp421_data *data)
 	}
 }
 
+void tmp421_disable_channels(struct i2c_client *client, uint8_t mask)
+{
+	int err;
+	int cfg = i2c_smbus_read_byte_data(client, TMP421_CONFIG_REG_2);
+
+	if (cfg < 0) {
+		dev_err(&client->dev,
+			"error reading register, can't disable channels\n");
+		return;
+	}
+
+	cfg &= ~mask;
+
+	err = i2c_smbus_write_byte_data(client, TMP421_CONFIG_REG_2, cfg);
+	if (err < 0)
+		dev_err(&client->dev,
+			"error writing register, can't disable channels\n");
+}
+
 static const struct hwmon_ops tmp421_ops = {
 	.is_visible = tmp421_is_visible,
 	.read = tmp421_read,
@@ -363,6 +384,7 @@ static int tmp421_probe(struct i2c_client *client)
 	struct device *hwmon_dev;
 	struct tmp421_data *data;
 	int i, err;
+	u8 disable = 0;
 
 	data = devm_kzalloc(dev, sizeof(struct tmp421_data), GFP_KERNEL);
 	if (!data)
@@ -380,10 +402,17 @@ static int tmp421_probe(struct i2c_client *client)
 	if (err)
 		return err;
 
-	for (i = 0; i < data->channels; i++)
-		data->temp_config[i] = HWMON_T_INPUT | HWMON_T_FAULT;
-
 	tmp421_probe_from_dt(client, data);
+
+	for (i = 0; i < data->channels; i++) {
+		data->temp_config[i] |= HWMON_T_INPUT | HWMON_T_FAULT;
+		if (data->channel[i].disabled)
+			disable |= TMP421_CONFIG_REG_REN(i);
+
+	}
+
+	if (disable)
+		tmp421_disable_channels(client, disable);
 
 	data->chip.ops = &tmp421_ops;
 	data->chip.info = data->info;
