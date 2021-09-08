@@ -999,7 +999,7 @@ struct drm_i915_private {
 	struct drm_i915_display_funcs display;
 
 	/* Display internal color functions */
-	struct drm_i915_display_color_funcs color_funcs;
+	const struct drm_i915_display_color_funcs *color_funcs;
 
 	/* Display internal audio functions */
 	struct drm_i915_display_audio_funcs audio_funcs;
