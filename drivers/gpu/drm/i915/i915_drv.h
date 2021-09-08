@@ -993,7 +993,7 @@ struct drm_i915_private {
 	const struct drm_i915_fdi_link_train_funcs *fdi_funcs;
 
 	/* display pll funcs */
-	struct drm_i915_dpll_funcs dpll_funcs;
+	const struct drm_i915_dpll_funcs *dpll_funcs;
 
 	/* Display functions */
 	struct drm_i915_display_funcs display;
