@@ -1058,6 +1058,7 @@ void intel_psr_get_config(struct intel_encoder *encoder,
 	 */
 	pipe_config->has_psr = true;
 	pipe_config->has_psr2 = intel_dp->psr.psr2_enabled;
+	pipe_config->has_panel_replay = intel_dp->psr.pr_enabled;
 	pipe_config->infoframes.enable |= intel_hdmi_infoframe_enable(DP_SDP_VSC);
 
 	if (!intel_dp->psr.psr2_enabled)
