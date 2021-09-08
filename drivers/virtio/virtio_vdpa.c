@@ -146,6 +146,7 @@ virtio_vdpa_setup_vq(struct virtio_device *vdev, unsigned int index,
 	struct vdpa_vq_state state = {0};
 	unsigned long flags;
 	u32 align, num;
+	bool may_reduce_num = true;
 	int err;
 
 	if (!name)
@@ -171,8 +172,10 @@ virtio_vdpa_setup_vq(struct virtio_device *vdev, unsigned int index,
 
 	/* Create the vring */
 	align = ops->get_vq_align(vdpa);
+	if (ops->get_vq_num_unchangeable)
+		may_reduce_num = !ops->get_vq_num_unchangeable(vdpa);
 	vq = vring_create_virtqueue(index, num, align, vdev,
-				    true, true, ctx,
+				    true, may_reduce_num, ctx,
 				    virtio_vdpa_notify, callback, name);
 	if (!vq) {
 		err = -ENOMEM;

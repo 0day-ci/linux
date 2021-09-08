@@ -356,6 +356,22 @@ static long vhost_vdpa_get_iova_range(struct vhost_vdpa *v, u32 __user *argp)
 	return 0;
 }
 
+static long vhost_vdpa_get_vring_num_unchangeable(struct vhost_vdpa *v,
+						  u32 __user *argp)
+{
+	struct vdpa_device *vdpa = v->vdpa;
+	const struct vdpa_config_ops *ops = vdpa->config;
+	bool unchangeable = false;
+
+	if (ops->get_vq_num_unchangeable)
+		unchangeable = ops->get_vq_num_unchangeable(vdpa);
+
+	if (copy_to_user(argp, &unchangeable, sizeof(unchangeable)))
+		return -EFAULT;
+
+	return 0;
+}
+
 static long vhost_vdpa_vring_ioctl(struct vhost_vdpa *v, unsigned int cmd,
 				   void __user *argp)
 {
@@ -492,6 +508,9 @@ static long vhost_vdpa_unlocked_ioctl(struct file *filep,
 		break;
 	case VHOST_VDPA_GET_IOVA_RANGE:
 		r = vhost_vdpa_get_iova_range(v, argp);
+		break;
+	case VHOST_VDPA_GET_VRING_NUM_UNCHANGEABLE:
+		r = vhost_vdpa_get_vring_num_unchangeable(v, argp);
 		break;
 	default:
 		r = vhost_dev_ioctl(&v->vdev, cmd, argp);
