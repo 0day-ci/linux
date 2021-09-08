@@ -7,6 +7,7 @@
 #include <dt-bindings/gpio/gpio.h>
 #include <dt-bindings/input/input.h>
 #include <dt-bindings/interrupt-controller/arm-gic.h>
+#include <dt-bindings/nvmem/nvmem.h>
 #include <dt-bindings/thermal/thermal.h>
 
 #include "imx8mp-pinfunc.h"
@@ -358,6 +359,12 @@
 
 				eth_mac1: mac-address@90 {
 					reg = <0x90 6>;
+					cell-type = <NVMEM_CELL_TYPE_MAC_ADDRESS>;
+				};
+
+				eth_mac2: mac-address@96 {
+					reg = <0x96 6>;
+					cell-type = <NVMEM_CELL_TYPE_MAC_ADDRESS>;
 				};
 			};
 
@@ -836,6 +843,8 @@
 							 <&clk IMX8MP_SYS_PLL2_100M>,
 							 <&clk IMX8MP_SYS_PLL2_125M>;
 				assigned-clock-rates = <0>, <100000000>, <125000000>;
+				nvmem-cells = <&eth_mac2>;
+				nvmem-cell-names = "mac-address";
 				intf_mode = <&gpr 0x4>;
 				status = "disabled";
 			};

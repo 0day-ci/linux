@@ -7,6 +7,7 @@
 #include <dt-bindings/gpio/gpio.h>
 #include <dt-bindings/input/input.h>
 #include <dt-bindings/interrupt-controller/arm-gic.h>
+#include <dt-bindings/nvmem/nvmem.h>
 #include <dt-bindings/thermal/thermal.h>
 
 #include "imx8mn-pinfunc.h"
@@ -544,6 +545,7 @@
 
 				fec_mac_address: mac-address@90 {
 					reg = <0x90 6>;
+					cell-type = <NVMEM_CELL_TYPE_MAC_ADDRESS>;
 				};
 			};
 
