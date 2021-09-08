@@ -245,6 +245,7 @@ static void kill_css(struct cgroup_subsys_state *css);
 static int cgroup_addrm_files(struct cgroup_subsys_state *css,
 			      struct cgroup *cgrp, struct cftype cfts[],
 			      bool is_add);
+static void cgroup_supply_work(struct work_struct *work);
 
 /**
  * cgroup_ssid_enabled - cgroup subsys enabled test by subsys ID
@@ -1925,6 +1926,7 @@ static void init_cgroup_housekeeping(struct cgroup *cgrp)
 	INIT_LIST_HEAD(&cgrp->cset_links);
 	INIT_LIST_HEAD(&cgrp->pidlists);
 	mutex_init(&cgrp->pidlist_mutex);
+	spin_lock_init(&cgrp->lock);
 	cgrp->self.cgroup = cgrp;
 	cgrp->self.flags |= CSS_ONLINE;
 	cgrp->dom_cgrp = cgrp;
@@ -1938,6 +1940,7 @@ static void init_cgroup_housekeeping(struct cgroup *cgrp)
 
 	init_waitqueue_head(&cgrp->offline_waitq);
 	INIT_WORK(&cgrp->release_agent_work, cgroup1_release_agent);
+	INIT_DELAYED_WORK(&cgrp->supply_pool_work, cgroup_supply_work);
 }
 
 void init_cgroup_root(struct cgroup_fs_context *ctx)
@@ -5419,14 +5422,112 @@ fail:
 	return ret;
 }
 
+extern struct kernfs_node *kernfs_get_active(struct kernfs_node *kn);
+extern void kernfs_put_active(struct kernfs_node *kn);
+
+unsigned int cgroup_supply_delay_time;
+
+/* supply pool_amount to 2*pool_size */
+static void cgroup_supply_work(struct work_struct *work)
+{
+	char name[NAME_MAX + 1];
+	struct cgroup *parent = container_of((struct delayed_work *)work,
+				struct cgroup, supply_pool_work);
+	struct kernfs_node *parent_kn = parent->kn;
+
+	while (atomic64_read(&parent->pool_amount) < 2 * parent->pool_size) {
+		sprintf(name, "pool-%llu", atomic64_add_return(1, &parent->pool_index));
+		kernfs_get_active(parent_kn);
+		if (!cgroup_mkdir(parent_kn, name, 0xffff))
+			atomic64_add(1, &parent->pool_amount);
+		kernfs_put_active(parent_kn);
+	}
+}
+
+static int cgroup_mkdir_fast_path(struct kernfs_node *parent_kn, const char *name)
+{
+	struct cgroup *parent;
+	struct rb_root *hidden_root;
+	int ret;
+
+	parent = parent_kn->priv;
+
+	if (!cgroup_tryget(parent))
+		return -ENODEV;
+
+	/*
+	 * acquire spinlock outside kernfs_rename because choosing kernfs node
+	 * and renaming need to be atomic.
+	 */
+	spin_lock(&parent->lock);
+
+	/* if pool is disabled or empty, return and take the slowpath */
+	if (!parent->enable_pool) {
+		ret = 1;
+		goto out_unlock;
+	}
+
+	hidden_root = &parent->hidden_place->kn->dir.children;
+	if (!hidden_root->rb_node) {
+		ret = 1;
+		goto out_unlock;
+	}
+
+#define rb_to_kn(X) rb_entry((X), struct kernfs_node, rb)
+	ret = kernfs_rename(rb_to_kn(rb_first(hidden_root)), parent_kn, name);
+	if (ret)
+		goto out_unlock;
+
+	/* supply pool if pool_amount is less than pool_size */
+	if (atomic64_sub_return(1, &parent->pool_amount) < parent->pool_size)
+		schedule_delayed_work(&parent->supply_pool_work,
+				msecs_to_jiffies(cgroup_supply_delay_time));
+
+out_unlock:
+	spin_unlock(&parent->lock);
+	cgroup_put(parent);
+	return ret;
+}
+
+/* hide cgroup which belongs to pool */
+static void cgroup_hide(struct cgroup *parent, struct cgroup *cgrp, const char *name)
+{
+	/*
+	 * if cgroup_hide is called by cgroup_supply_work, pool is enabled,
+	 * it needs to acquire spinlock to protect kernfs_rename
+	 */
+	if (parent->enable_pool)
+		spin_lock(&parent->lock);
+	kernfs_get_active(parent->hidden_place->kn);
+	BUG_ON(kernfs_rename(cgrp->kn, parent->hidden_place->kn, name));
+	kernfs_put_active(parent->hidden_place->kn);
+	if (parent->enable_pool) {
+		spin_unlock(&parent->lock);
+		kernfs_set_pinned(cgrp->kn, &parent->lock);
+	}
+}
+
 int cgroup_mkdir(struct kernfs_node *parent_kn, const char *name, umode_t mode)
 {
 	struct cgroup *parent, *cgrp;
-	int ret;
+	struct kernfs_node *kn;
+	int ret = 1;
+	bool hide = false;
 
 	/* do not accept '\n' to prevent making /proc/<pid>/cgroup unparsable */
 	if (strchr(name, '\n'))
 		return -EINVAL;
+
+	/* 0xffff means cgroup is created for pool, set to default mode 0x1ed */
+	if (mode == 0xffff) {
+		hide = true;
+		mode = 0x1ed;
+	}
+
+	if (!hide)
+		ret = cgroup_mkdir_fast_path(parent_kn, name);
+	if (ret <= 0)
+		return ret;
 
 	parent = cgroup_kn_lock_live(parent_kn, false);
 	if (!parent)
@@ -5465,6 +5566,9 @@ int cgroup_mkdir(struct kernfs_node *parent_kn, const char *name, umode_t mode)
 
 	/* let's create and online css's */
 	kernfs_activate(cgrp->kn);
+
+	if (hide)
+		cgroup_hide(parent, cgrp, name);
 
 	ret = 0;
 	goto out_unlock;
@@ -5658,10 +5762,17 @@ int cgroup_rmdir(struct kernfs_node *kn)
 	if (!cgrp)
 		return 0;
 
+	/* it may creating cgroup in pool */
+	if (cgrp->pool_size) {
+		ret = -EBUSY;
+		goto out_unlock;
+	}
+
 	ret = cgroup_destroy_locked(cgrp);
 	if (!ret)
 		TRACE_CGROUP_PATH(rmdir, cgrp);
 
+out_unlock:
 	cgroup_kn_unlock(kn);
 	return ret;
 }

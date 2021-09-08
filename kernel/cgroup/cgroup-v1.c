@@ -609,6 +609,136 @@ static int cgroup_clone_children_write(struct cgroup_subsys_state *css,
 	return 0;
 }
 
+/*
+ * kernfs_open_file->mutex can't avoid competition if writing to pool_size
+ * of parent cgroup and child cgroup at the same time. use cgroup_pool_mutex
+ * to serialize any write operation to pool_size.
+ */
+DEFINE_MUTEX(cgroup_pool_mutex);
+
+static u64 cgroup_pool_size_read(struct cgroup_subsys_state *css,
+				 struct cftype *cft)
+{
+	/* kernfs r/w access is serialized by kernfs_open_file->mutex */
+	return css->cgroup->pool_size;
+}
+
+extern struct kernfs_node *kernfs_get_active(struct kernfs_node *kn);
+extern void kernfs_put_active(struct kernfs_node *kn);
+
+static ssize_t cgroup_pool_size_write(struct kernfs_open_file *of,
+				  char *buf, size_t nbytes, loff_t off)
+{
+	char name[NAME_MAX + 1];
+	struct cgroup *cgrp;
+	ssize_t ret = -EPERM;
+	u64 val;
+	int i;
+
+	cgrp = of->kn->parent->priv;
+
+	if (kstrtoull(buf, 0, &val))
+		return -EINVAL;
+
+	if (!cgroup_tryget(cgrp))
+		return -ENODEV;
+
+	kernfs_break_active_protection(of->kn);
+	mutex_lock(&cgroup_pool_mutex);
+	mutex_lock(&cgroup_mutex);
+	spin_lock(&cgrp->lock);
+
+	/*
+	 * only non-zero -> zero or zero -> non-zero settings are invalid.
+	 */
+	if ((cgrp->pool_size && val) || (!cgrp->pool_size && !val))
+		goto out_fail;
+
+	if (cgroup_is_dead(cgrp)) {
+		ret = -ENODEV;
+		goto out_fail;
+	}
+
+	cgrp->pool_size = val;
+	spin_unlock(&cgrp->lock);
+	mutex_unlock(&cgroup_mutex);
+
+	if (val) {
+		/* create kernfs root to hide cgroup which belongs to pool */
+		cgrp->hidden_place = kernfs_create_root(NULL, 0, NULL);
+
+		/*
+		 * names of cgroups in pool obey the rule of pool-*, it may
+		 * fail if cgroup has the same name already exists, if failed,
+		 * try again with different name.
+		 *
+		 * cgroup_mkdir called here is under context of writing
+		 * pool_size, so we need to call kernfs_get_active to simulate
+		 * kernfs mkdir context.
+		 *
+		 * normally, the mode of 0xffff is intercepted at the VFS layer
+		 * because it is invalid. use 0xffff to tell cgroup_mkdir it is
+		 * create a cgroup for cgroup pool.
+		 */
+		for (i = 0; i < val * 2;) {
+			sprintf(name, "pool-%llu", atomic64_add_return(1, &cgrp->pool_index));
+			kernfs_get_active(cgrp->kn);
+			if (!cgroup_mkdir(cgrp->kn, name, 0xffff))
+				i++;
+			kernfs_put_active(cgrp->kn);
+		}
+		atomic64_set(&cgrp->pool_amount, val * 2);
+
+		/* set kernfs node pinned after generating pool */
+		mutex_lock(&cgroup_mutex);
+		spin_lock(&cgrp->lock);
+		cgrp->enable_pool = true;
+		kernfs_set_pinned(cgrp->kn, &cgrp->lock);
+		kernfs_set_pinned(cgrp->hidden_place->kn, &cgrp->lock);
+		spin_unlock(&cgrp->lock);
+		mutex_unlock(&cgroup_mutex);
+	} else {
+		struct kernfs_node *child, *n;
+		struct rb_root *hidden_root = &cgrp->hidden_place->kn->dir.children;
+
+		/* clear kernfs node pinned before removing pool */
+		mutex_lock(&cgroup_mutex);
+		spin_lock(&cgrp->lock);
+		cgrp->enable_pool = false;
+		kernfs_clear_pinned(cgrp->kn);
+		kernfs_clear_pinned(cgrp->hidden_place->kn);
+		spin_unlock(&cgrp->lock);
+		mutex_unlock(&cgroup_mutex);
+
+		/* pool is disabled, cancel supply work */
+		cancel_delayed_work_sync(&cgrp->supply_pool_work);
+
+		/* traverse cgroup in pool and remove them */
+		while (hidden_root->rb_node) {
+			rbtree_postorder_for_each_entry_safe(child, n, hidden_root, rb) {
+				kernfs_get_active(child);
+				ret = cgroup_rmdir(child);
+				kernfs_put_active(child);
+			}
+		}
+		kernfs_destroy_root(cgrp->hidden_place);
+		atomic64_set(&cgrp->pool_amount, 0);
+	}
+
+
+	ret = nbytes;
+	goto out_success;
+
+out_fail:
+	spin_unlock(&cgrp->lock);
+	mutex_unlock(&cgroup_mutex);
+out_success:
+	mutex_unlock(&cgroup_pool_mutex);
+	kernfs_unbreak_active_protection(of->kn);
+	cgroup_put(cgrp);
+	return ret;
+}
+
 /* cgroup core interface files for the legacy hierarchies */
 struct cftype cgroup1_base_files[] = {
 	{
@@ -650,6 +780,11 @@ struct cftype cgroup1_base_files[] = {
 		.seq_show = cgroup_release_agent_show,
 		.write = cgroup_release_agent_write,
 		.max_write_len = PATH_MAX - 1,
+	},
+	{
+		.name = "pool_size",
+		.read_u64 = cgroup_pool_size_read,
+		.write = cgroup_pool_size_write,
 	},
 	{ }	/* terminate */
 };
@@ -845,9 +980,13 @@ static int cgroup1_rename(struct kernfs_node *kn, struct kernfs_node *new_parent
 
 	mutex_lock(&cgroup_mutex);
 
+	if (kn->parent->pinned)
+		spin_lock(kn->parent->lock);
 	ret = kernfs_rename(kn, new_parent, new_name_str);
 	if (!ret)
 		TRACE_CGROUP_PATH(rename, cgrp);
+	if (kn->parent->pinned)
+		spin_unlock(kn->parent->lock);
 
 	mutex_unlock(&cgroup_mutex);
 

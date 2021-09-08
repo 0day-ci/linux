@@ -486,6 +486,22 @@ struct cgroup {
 	/* Used to store internal freezer state */
 	struct cgroup_freezer_state freezer;
 
+	/*
+	 * cgroup pool related members. lock protects cgroup's kernfs node in
+	 * pool. pool_index records index of cgroup which put into pool next.
+	 * pool_amount records how many cgroups pool remains. pool_size is set
+	 * by user, supply pool util pool_amount reach 2*pool_size if
+	 * pool_amount is less than pool_size to retain enough cgroup in pool to
+	 * guarantee cgroup_mkdir take the fast path.
+	 */
+	spinlock_t lock;
+	atomic64_t pool_index;
+	atomic64_t pool_amount;
+	u64 pool_size;
+	bool enable_pool;
+	struct kernfs_root *hidden_place;
+	struct delayed_work supply_pool_work;
+
 	/* ids of the ancestors at each level including self */
 	u64 ancestor_ids[];
 };
