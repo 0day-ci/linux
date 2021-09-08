@@ -143,6 +143,7 @@ struct imx6_pcie {
 #define PHY_RX_OVRD_IN_LO_RX_DATA_EN		BIT(5)
 #define PHY_RX_OVRD_IN_LO_RX_PLL_EN		BIT(3)
 
+static int imx6_pcie_cmp_enabled;
 static int imx6_pcie_clk_enable(struct imx6_pcie *imx6_pcie);
 static void imx6_pcie_clk_disable(struct imx6_pcie *imx6_pcie);
 
@@ -748,10 +749,12 @@ static int imx6_pcie_start_link(struct dw_pcie *pci)
 	 * started in Gen2 mode, there is a possibility the devices on the
 	 * bus will not be detected at all.  This happens with PCIe switches.
 	 */
-	tmp = dw_pcie_readl_dbi(pci, offset + PCI_EXP_LNKCAP);
-	tmp &= ~PCI_EXP_LNKCAP_SLS;
-	tmp |= PCI_EXP_LNKCAP_SLS_2_5GB;
-	dw_pcie_writel_dbi(pci, offset + PCI_EXP_LNKCAP, tmp);
+	if (!imx6_pcie_cmp_enabled) {
+		tmp = dw_pcie_readl_dbi(pci, offset + PCI_EXP_LNKCAP);
+		tmp &= ~PCI_EXP_LNKCAP_SLS;
+		tmp |= PCI_EXP_LNKCAP_SLS_2_5GB;
+		dw_pcie_writel_dbi(pci, offset + PCI_EXP_LNKCAP, tmp);
+	}
 
 	/* Start LTSSM. */
 	imx6_pcie_ltssm_enable(dev);
@@ -812,9 +815,12 @@ err_reset_phy:
 		dw_pcie_readl_dbi(pci, PCIE_PORT_DEBUG0),
 		dw_pcie_readl_dbi(pci, PCIE_PORT_DEBUG1));
 	imx6_pcie_reset_phy(imx6_pcie);
-	imx6_pcie_clk_disable(imx6_pcie);
-	if (imx6_pcie->vpcie && regulator_is_enabled(imx6_pcie->vpcie) > 0)
-		regulator_disable(imx6_pcie->vpcie);
+	if (!imx6_pcie_cmp_enabled) {
+		imx6_pcie_clk_disable(imx6_pcie);
+		if (imx6_pcie->vpcie
+		    && regulator_is_enabled(imx6_pcie->vpcie) > 0)
+			regulator_disable(imx6_pcie->vpcie);
+	}
 	return ret;
 }
 
@@ -1010,6 +1016,17 @@ static const struct dev_pm_ops imx6_pcie_pm_ops = {
 				      imx6_pcie_resume_noirq)
 };
 
+static int __init imx6_pcie_compliance_test_enable(char *str)
+{
+	if (!strcmp(str, "yes")) {
+		pr_info("Enable the i.MX PCIe TX/CLK compliance tests mode.\n");
+		imx6_pcie_cmp_enabled = 1;
+	}
+	return 1;
+}
+
+__setup("pcie_cmp_enabled=", imx6_pcie_compliance_test_enable);
+
 static int imx6_pcie_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
@@ -1187,8 +1204,16 @@ static int imx6_pcie_probe(struct platform_device *pdev)
 		return ret;
 
 	ret = dw_pcie_host_init(&pci->pp);
-	if (ret < 0)
+	if (ret < 0) {
+		if (imx6_pcie_cmp_enabled) {
+			/* The PCIE clocks and powers wouldn't be turned off */
+			dev_info(dev, "To do the compliance tests.\n");
+			ret = 0;
+		} else {
+			dev_err(dev, "Unable to add pcie port.\n");
+		}
 		return ret;
+	}
 
 	if (pci_msi_enabled()) {
 		u8 offset = dw_pcie_find_capability(pci, PCI_CAP_ID_MSI);
