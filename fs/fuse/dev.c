@@ -2239,7 +2239,7 @@ static int fuse_device_clone(struct fuse_conn *fc, struct file *new)
 static long fuse_dev_ioctl(struct file *file, unsigned int cmd,
 			   unsigned long arg)
 {
-	int res;
+	int res = 0;
 	int oldfd;
 	struct fuse_dev *fud = NULL;
 
@@ -2268,6 +2268,35 @@ static long fuse_dev_ioctl(struct file *file, unsigned int cmd,
 			}
 		}
 		break;
+
+	case FUSE_DEV_IOC_RECOVERY:
+	{
+		struct fuse_iqueue *fiq;
+		struct fuse_pqueue *fpq;
+		struct fuse_req *req, *next;
+		LIST_HEAD(recovery);
+		unsigned int i;
+
+		fud = fuse_get_dev(file);
+		fiq = &fud->fc->iq;
+		fpq = &fud->pq;
+
+		spin_lock(&fpq->lock);
+		for (i = 0; i < FUSE_PQ_HASH_SIZE; i++)
+			list_splice_tail_init(&fpq->processing[i],
+					      &recovery);
+		spin_unlock(&fpq->lock);
+
+		list_for_each_entry_safe(req, next, &recovery, list) {
+			clear_bit(FR_SENT, &req->flags);
+			set_bit(FR_PENDING, &req->flags);
+		}
+
+		spin_lock(&fiq->lock);
+		list_splice(&recovery, &fiq->pending);
+		spin_unlock(&fiq->lock);
+		break;
+	}
 	default:
 		res = -ENOTTY;
 		break;
