@@ -162,8 +162,8 @@ static void intel_modeset_setup_hw_state(struct drm_device *dev,
  */
 static void intel_update_watermarks(struct drm_i915_private *dev_priv)
 {
-	if (dev_priv->wm_disp.update_wm)
-		dev_priv->wm_disp.update_wm(dev_priv);
+	if (dev_priv->wm_disp && dev_priv->wm_disp->update_wm)
+		dev_priv->wm_disp->update_wm(dev_priv);
 }
 
 /* returns HPLL frequency in kHz */
@@ -2568,8 +2568,8 @@ static void intel_pre_plane_update(struct intel_atomic_state *state,
 		 * we'll continue to update watermarks the old way, if flags tell
 		 * us to.
 		 */
-		if (dev_priv->wm_disp.initial_watermarks)
-			dev_priv->wm_disp.initial_watermarks(state, crtc);
+		if (dev_priv->wm_disp->initial_watermarks)
+			dev_priv->wm_disp->initial_watermarks(state, crtc);
 		else if (new_crtc_state->update_wm_pre)
 			intel_update_watermarks(dev_priv);
 	}
@@ -2943,8 +2943,8 @@ static void ilk_crtc_enable(struct intel_atomic_state *state,
 	/* update DSPCNTR to configure gamma for pipe bottom color */
 	intel_disable_primary_plane(new_crtc_state);
 
-	if (dev_priv->wm_disp.initial_watermarks)
-		dev_priv->wm_disp.initial_watermarks(state, crtc);
+	if (dev_priv->wm_disp->initial_watermarks)
+		dev_priv->wm_disp->initial_watermarks(state, crtc);
 	intel_enable_pipe(new_crtc_state);
 
 	if (new_crtc_state->has_pch_encoder)
@@ -3154,8 +3154,8 @@ static void hsw_crtc_enable(struct intel_atomic_state *state,
 	if (DISPLAY_VER(dev_priv) >= 11)
 		icl_set_pipe_chicken(new_crtc_state);
 
-	if (dev_priv->wm_disp.initial_watermarks)
-		dev_priv->wm_disp.initial_watermarks(state, crtc);
+	if (dev_priv->wm_disp && dev_priv->wm_disp->initial_watermarks)
+		dev_priv->wm_disp->initial_watermarks(state, crtc);
 
 	if (DISPLAY_VER(dev_priv) >= 11) {
 		const struct intel_dbuf_state *dbuf_state =
@@ -3572,7 +3572,7 @@ static void valleyview_crtc_enable(struct intel_atomic_state *state,
 	/* update DSPCNTR to configure gamma for pipe bottom color */
 	intel_disable_primary_plane(new_crtc_state);
 
-	dev_priv->wm_disp.initial_watermarks(state, crtc);
+	dev_priv->wm_disp->initial_watermarks(state, crtc);
 	intel_enable_pipe(new_crtc_state);
 
 	intel_crtc_vblank_on(new_crtc_state);
@@ -3615,8 +3615,8 @@ static void i9xx_crtc_enable(struct intel_atomic_state *state,
 	/* update DSPCNTR to configure gamma for pipe bottom color */
 	intel_disable_primary_plane(new_crtc_state);
 
-	if (dev_priv->wm_disp.initial_watermarks)
-		dev_priv->wm_disp.initial_watermarks(state, crtc);
+	if (dev_priv->wm_disp && dev_priv->wm_disp->initial_watermarks)
+		dev_priv->wm_disp->initial_watermarks(state, crtc);
 	else
 		intel_update_watermarks(dev_priv);
 	intel_enable_pipe(new_crtc_state);
@@ -3684,7 +3684,7 @@ static void i9xx_crtc_disable(struct intel_atomic_state *state,
 	if (DISPLAY_VER(dev_priv) != 2)
 		intel_set_cpu_fifo_underrun_reporting(dev_priv, pipe, false);
 
-	if (!dev_priv->wm_disp.initial_watermarks)
+	if (dev_priv->wm_disp && !dev_priv->wm_disp->initial_watermarks)
 		intel_update_watermarks(dev_priv);
 
 	/* clock the pipe down to 640x480@60 to potentially save power */
@@ -6792,8 +6792,8 @@ static int intel_crtc_atomic_check(struct intel_atomic_state *state,
 			return ret;
 	}
 
-	if (dev_priv->wm_disp.compute_pipe_wm) {
-		ret = dev_priv->wm_disp.compute_pipe_wm(state, crtc);
+	if (dev_priv->wm_disp && dev_priv->wm_disp->compute_pipe_wm) {
+		ret = dev_priv->wm_disp->compute_pipe_wm(state, crtc);
 		if (ret) {
 			drm_dbg_kms(&dev_priv->drm,
 				    "Target pipe watermarks are invalid\n");
@@ -6802,9 +6802,9 @@ static int intel_crtc_atomic_check(struct intel_atomic_state *state,
 
 	}
 
-	if (dev_priv->wm_disp.compute_intermediate_wm) {
+	if (dev_priv->wm_disp && dev_priv->wm_disp->compute_intermediate_wm) {
 		if (drm_WARN_ON(&dev_priv->drm,
-				!dev_priv->wm_disp.compute_pipe_wm))
+				!dev_priv->wm_disp->compute_pipe_wm))
 			return 0;
 
 		/*
@@ -6812,7 +6812,7 @@ static int intel_crtc_atomic_check(struct intel_atomic_state *state,
 		 * old state and the new state.  We can program these
 		 * immediately.
 		 */
-		ret = dev_priv->wm_disp.compute_intermediate_wm(state, crtc);
+		ret = dev_priv->wm_disp->compute_intermediate_wm(state, crtc);
 		if (ret) {
 			drm_dbg_kms(&dev_priv->drm,
 				    "No valid intermediate pipe watermarks are possible\n");
@@ -8921,8 +8921,8 @@ static int calc_watermark_data(struct intel_atomic_state *state)
 	struct drm_i915_private *dev_priv = to_i915(dev);
 
 	/* Is there platform-specific watermark information to calculate? */
-	if (dev_priv->wm_disp.compute_global_watermarks)
-		return dev_priv->wm_disp.compute_global_watermarks(state);
+	if (dev_priv->wm_disp && dev_priv->wm_disp->compute_global_watermarks)
+		return dev_priv->wm_disp->compute_global_watermarks(state);
 
 	return 0;
 }
@@ -9747,8 +9747,8 @@ static void commit_pipe_pre_planes(struct intel_atomic_state *state,
 		intel_psr2_program_trans_man_trk_ctl(new_crtc_state);
 	}
 
-	if (dev_priv->wm_disp.atomic_update_watermarks)
-		dev_priv->wm_disp.atomic_update_watermarks(state, crtc);
+	if (dev_priv->wm_disp && dev_priv->wm_disp->atomic_update_watermarks)
+		dev_priv->wm_disp->atomic_update_watermarks(state, crtc);
 }
 
 static void commit_pipe_post_planes(struct intel_atomic_state *state,
@@ -9876,8 +9876,8 @@ static void intel_old_crtc_state_disables(struct intel_atomic_state *state,
 	/* FIXME unify this for all platforms */
 	if (!new_crtc_state->hw.active &&
 	    !HAS_GMCH(dev_priv) &&
-	    dev_priv->wm_disp.initial_watermarks)
-		dev_priv->wm_disp.initial_watermarks(state, crtc);
+	    dev_priv->wm_disp && dev_priv->wm_disp->initial_watermarks)
+		dev_priv->wm_disp->initial_watermarks(state, crtc);
 }
 
 static void intel_commit_modeset_disables(struct intel_atomic_state *state)
@@ -10299,8 +10299,8 @@ static void intel_atomic_commit_tail(struct intel_atomic_state *state)
 		if (DISPLAY_VER(dev_priv) == 2 && planes_enabling(old_crtc_state, new_crtc_state))
 			intel_set_cpu_fifo_underrun_reporting(dev_priv, crtc->pipe, true);
 
-		if (dev_priv->wm_disp.optimize_watermarks)
-			dev_priv->wm_disp.optimize_watermarks(state, crtc);
+		if (dev_priv->wm_disp && dev_priv->wm_disp->optimize_watermarks)
+			dev_priv->wm_disp->optimize_watermarks(state, crtc);
 	}
 
 	intel_dbuf_post_plane_update(state);
@@ -11389,7 +11389,9 @@ static void sanitize_watermarks(struct drm_i915_private *dev_priv)
 	int i;
 
 	/* Only supported on platforms that use atomic watermark design */
-	if (!dev_priv->wm_disp.optimize_watermarks)
+	if (!dev_priv->wm_disp)
+		return;
+	if (!dev_priv->wm_disp->optimize_watermarks)
 		return;
 
 	state = drm_atomic_state_alloc(&dev_priv->drm);
@@ -11422,7 +11424,7 @@ retry:
 	/* Write calculated watermark values back */
 	for_each_new_intel_crtc_in_state(intel_state, crtc, crtc_state, i) {
 		crtc_state->wm.need_postvbl_update = true;
-		dev_priv->wm_disp.optimize_watermarks(intel_state, crtc);
+		dev_priv->wm_disp->optimize_watermarks(intel_state, crtc);
 
 		to_intel_crtc_state(crtc->base.state)->wm = crtc_state->wm;
 	}
