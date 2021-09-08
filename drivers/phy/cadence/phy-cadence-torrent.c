@@ -266,6 +266,29 @@ static const struct reg_field phy_pipe_cmn_ctrl1_0 = REG_FIELD(PHY_PIPE_CMN_CTRL
 static const struct reg_field cmn_cdiag_refclk_ovrd_4 =
 				REG_FIELD(CMN_CDIAG_REFCLK_OVRD, 4, 4);
 
+#define REFCLK_OUT_NUM_CMN_CONFIG	4
+
+enum cdns_torrent_refclk_out_cmn {
+	CMN_CDIAG_REFCLK_DRV0_CTRL_1,
+	CMN_CDIAG_REFCLK_DRV0_CTRL_4,
+	CMN_CDIAG_REFCLK_DRV0_CTRL_5,
+	CMN_CDIAG_REFCLK_DRV0_CTRL_6,
+};
+
+static const struct reg_field refclk_out_cmn_cfg[] = {
+	[CMN_CDIAG_REFCLK_DRV0_CTRL_1]	= REG_FIELD(CMN_CDIAG_REFCLK_DRV0_CTRL, 1, 1),
+	[CMN_CDIAG_REFCLK_DRV0_CTRL_4]	= REG_FIELD(CMN_CDIAG_REFCLK_DRV0_CTRL, 4, 4),
+	[CMN_CDIAG_REFCLK_DRV0_CTRL_5]  = REG_FIELD(CMN_CDIAG_REFCLK_DRV0_CTRL, 5, 5),
+	[CMN_CDIAG_REFCLK_DRV0_CTRL_6]	= REG_FIELD(CMN_CDIAG_REFCLK_DRV0_CTRL, 6, 6),
+};
+
+static const int refclk_driver_parent_index[] = {
+	CDNS_TORRENT_DERIVED_REFCLK,
+	CDNS_TORRENT_RECEIVED_REFCLK
+};
+
+static u32 cdns_torrent_refclk_driver_mux_table[] = { 1, 0 };
+
 enum cdns_torrent_phy_type {
 	TYPE_NONE,
 	TYPE_DP,
@@ -333,6 +356,15 @@ enum phy_powerstate {
 	POWERSTATE_A2 = 2,
 	POWERSTATE_A3 = 3,
 };
+
+struct cdns_torrent_refclk_driver {
+	struct clk_hw		hw;
+	struct regmap_field	*cmn_fields[REFCLK_OUT_NUM_CMN_CONFIG];
+	struct clk_init_data	clk_data;
+};
+
+#define to_cdns_torrent_refclk_driver(_hw)	\
+			container_of(_hw, struct cdns_torrent_refclk_driver, hw)
 
 struct cdns_torrent_derived_refclk {
 	struct clk_hw		hw;
@@ -1780,6 +1812,128 @@ static int cdns_torrent_received_refclk_register(struct cdns_torrent_phy *cdns_p
 	return 0;
 }
 
+static int cdns_torrent_refclk_driver_enable(struct clk_hw *hw)
+{
+	struct cdns_torrent_refclk_driver *refclk_driver = to_cdns_torrent_refclk_driver(hw);
+
+	regmap_field_write(refclk_driver->cmn_fields[CMN_CDIAG_REFCLK_DRV0_CTRL_6], 0);
+	regmap_field_write(refclk_driver->cmn_fields[CMN_CDIAG_REFCLK_DRV0_CTRL_5], 1);
+	regmap_field_write(refclk_driver->cmn_fields[CMN_CDIAG_REFCLK_DRV0_CTRL_1], 0);
+
+	return 0;
+}
+
+static void cdns_torrent_refclk_driver_disable(struct clk_hw *hw)
+{
+	struct cdns_torrent_refclk_driver *refclk_driver = to_cdns_torrent_refclk_driver(hw);
+
+	regmap_field_write(refclk_driver->cmn_fields[CMN_CDIAG_REFCLK_DRV0_CTRL_1], 1);
+}
+
+static int cdns_torrent_refclk_driver_is_enabled(struct clk_hw *hw)
+{
+	struct cdns_torrent_refclk_driver *refclk_driver = to_cdns_torrent_refclk_driver(hw);
+	int val;
+
+	regmap_field_read(refclk_driver->cmn_fields[CMN_CDIAG_REFCLK_DRV0_CTRL_1], &val);
+
+	return !val;
+}
+
+static u8 cdns_torrent_refclk_driver_get_parent(struct clk_hw *hw)
+{
+	struct cdns_torrent_refclk_driver *refclk_driver = to_cdns_torrent_refclk_driver(hw);
+	unsigned int val;
+
+	regmap_field_read(refclk_driver->cmn_fields[CMN_CDIAG_REFCLK_DRV0_CTRL_4], &val);
+	return clk_mux_val_to_index(hw, cdns_torrent_refclk_driver_mux_table, 0, val);
+}
+
+static int cdns_torrent_refclk_driver_set_parent(struct clk_hw *hw, u8 index)
+{
+	struct cdns_torrent_refclk_driver *refclk_driver = to_cdns_torrent_refclk_driver(hw);
+	unsigned int val;
+
+	val = cdns_torrent_refclk_driver_mux_table[index];
+	return regmap_field_write(refclk_driver->cmn_fields[CMN_CDIAG_REFCLK_DRV0_CTRL_4], val);
+}
+
+static const struct clk_ops cdns_torrent_refclk_driver_ops = {
+	.enable = cdns_torrent_refclk_driver_enable,
+	.disable = cdns_torrent_refclk_driver_disable,
+	.is_enabled = cdns_torrent_refclk_driver_is_enabled,
+	.set_parent = cdns_torrent_refclk_driver_set_parent,
+	.get_parent = cdns_torrent_refclk_driver_get_parent,
+};
+
+static int cdns_torrent_refclk_driver_register(struct cdns_torrent_phy *cdns_phy)
+{
+	struct cdns_torrent_refclk_driver *refclk_driver;
+	struct device *dev = cdns_phy->dev;
+	struct regmap_field *field;
+	struct clk_init_data *init;
+	const char **parent_names;
+	unsigned int num_parents;
+	struct regmap *regmap;
+	char clk_name[100];
+	struct clk_hw *hw;
+	int i, ret;
+
+	refclk_driver = devm_kzalloc(dev, sizeof(*refclk_driver), GFP_KERNEL);
+	if (!refclk_driver)
+		return -ENOMEM;
+
+	num_parents = ARRAY_SIZE(refclk_driver_parent_index);
+	parent_names = devm_kzalloc(dev, (sizeof(char *) * num_parents), GFP_KERNEL);
+	if (!parent_names)
+		return -ENOMEM;
+
+	for (i = 0; i < num_parents; i++) {
+		hw = cdns_phy->clk_hw_data->hws[refclk_driver_parent_index[i]];
+		if (IS_ERR_OR_NULL(hw)) {
+			dev_err(dev, "No parent clock for refclk driver clock\n");
+			return IS_ERR(hw) ? PTR_ERR(hw) : -ENOENT;
+		}
+		parent_names[i] = clk_hw_get_name(hw);
+	}
+
+	snprintf(clk_name, sizeof(clk_name), "%s_%s", dev_name(dev),
+		 clk_names[CDNS_TORRENT_REFCLK_DRIVER]);
+
+	init = &refclk_driver->clk_data;
+
+	init->ops = &cdns_torrent_refclk_driver_ops;
+	init->flags = CLK_SET_RATE_NO_REPARENT;
+	init->parent_names = parent_names;
+	init->num_parents = num_parents;
+	init->name = clk_name;
+
+	regmap = cdns_phy->regmap_common_cdb;
+
+	for (i = 0; i < REFCLK_OUT_NUM_CMN_CONFIG; i++) {
+		field = devm_regmap_field_alloc(dev, regmap, refclk_out_cmn_cfg[i]);
+		if (IS_ERR(field)) {
+			dev_err(dev, "Refclk driver CMN reg field init failed\n");
+			return PTR_ERR(field);
+		}
+		refclk_driver->cmn_fields[i] = field;
+	}
+
+	/* Enable Derived reference clock as default */
+	regmap_field_write(refclk_driver->cmn_fields[CMN_CDIAG_REFCLK_DRV0_CTRL_4], 1);
+
+	refclk_driver->hw.init = init;
+
+	hw = &refclk_driver->hw;
+	ret = devm_clk_hw_register(dev, hw);
+	if (ret)
+		return ret;
+
+	cdns_phy->clk_hw_data->hws[CDNS_TORRENT_REFCLK_DRIVER] = hw;
+
+	return 0;
+}
+
 static struct regmap *cdns_regmap_init(struct device *dev, void __iomem *base,
 				       u32 block_offset,
 				       u8 reg_offset_shift,
@@ -2288,6 +2442,12 @@ static int cdns_torrent_clk_register(struct cdns_torrent_phy *cdns_phy)
 	ret = cdns_torrent_received_refclk_register(cdns_phy);
 	if (ret) {
 		dev_err(dev, "failed to register received refclk\n");
+		return ret;
+	}
+
+	ret = cdns_torrent_refclk_driver_register(cdns_phy);
+	if (ret) {
+		dev_err(dev, "failed to register refclk driver\n");
 		return ret;
 	}
 
