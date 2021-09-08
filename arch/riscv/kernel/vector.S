@@ -27,8 +27,7 @@
 #define x_vl     t2
 #define x_vcsr   t3
 #define incr     t4
-#define m_one    t5
-#define status   t6
+#define status   t5
 
 ENTRY(__vstate_save)
 	li      status, SR_VS
@@ -38,8 +37,7 @@ ENTRY(__vstate_save)
 	csrr    x_vtype, CSR_VTYPE
 	csrr    x_vl, CSR_VL
 	csrr    x_vcsr, CSR_VCSR
-	li      m_one, -1
-	vsetvli incr, m_one, e8, m8
+	vsetvli incr, x0, e8, m8
 	vse8.v   v0, (datap)
 	add     datap, datap, incr
 	vse8.v   v8, (datap)
@@ -61,8 +59,7 @@ ENTRY(__vstate_restore)
 	li      status, SR_VS
 	csrs    CSR_STATUS, status
 
-	li      m_one, -1
-	vsetvli incr, m_one, e8, m8
+	vsetvli incr, x0, e8, m8
 	vle8.v   v0, (datap)
 	add     datap, datap, incr
 	vle8.v   v8, (datap)
