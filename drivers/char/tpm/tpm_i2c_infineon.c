@@ -638,6 +638,8 @@ static int tpm_tis_i2c_init(struct device *dev)
 		goto out_release;
 	}
 
+	le32_to_cpus(&vendor);
+
 	if (vendor == TPM_TIS_I2C_DID_VID_9645) {
 		tpm_dev.chip_type = SLB9645;
 	} else if (vendor == TPM_TIS_I2C_DID_VID_9635) {
