@@ -9,6 +9,19 @@
 #include <asm/asm.h>
 #include <linux/atomic.h>
 
+#ifdef CONFIG_UMCG
+
+struct task_struct;
+
+/*
+ * umcg_wq_worker_[sleeping|running] are called in core.c by
+ * sched_submit_work() and sched_update_worker().
+ */
+void umcg_wq_worker_sleeping(struct task_struct *tsk);
+void umcg_wq_worker_running(struct task_struct *tsk);
+
+#endif  /* CONFIG_UMCG */
+
 /* TODO: move atomic operations below into arch/ headers */
 static inline int __try_cmpxchg_user_32(u32 *uval, u32 __user *uaddr,
 						u32 oldval, u32 newval)
