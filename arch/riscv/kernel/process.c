@@ -97,7 +97,16 @@ void start_thread(struct pt_regs *regs, unsigned long pc,
 	}
 
 	if (has_vector) {
+		struct __riscv_v_state *vstate = &(current->thread.vstate);
+
+		/* Enable vector and allocate memory for vector registers. */
+		if (!vstate->datap) {
+			vstate->datap = kzalloc(riscv_vsize, GFP_KERNEL);
+			if (WARN_ON(!vstate->datap))
+				return;
+		}
 		regs->status |= SR_VS_INITIAL;
+
 		/*
 		 * Restore the initial value to the vector register
 		 * before starting the user program.
@@ -121,9 +130,11 @@ void flush_thread(void)
 	memset(&current->thread.fstate, 0, sizeof(current->thread.fstate));
 #endif
 #ifdef CONFIG_VECTOR
-	/* Reset vector state */
+	/* Reset vector state and keep datap pointer. */
 	vstate_off(current, task_pt_regs(current));
-	memset(&current->thread.vstate, 0, sizeof(current->thread.vstate));
+	memset(&current->thread.vstate, 0, RISCV_V_STATE_DATAP);
+	if (current->thread.vstate.datap)
+		memset(current->thread.vstate.datap, 0, riscv_vsize);
 #endif
 }
 

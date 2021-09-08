@@ -103,12 +103,6 @@ static inline void vstate_restore(struct task_struct *task,
 {
 	if ((regs->status & SR_VS) != SR_VS_OFF) {
 		struct __riscv_v_state *vstate = &(task->thread.vstate);
-
-		/* Allocate space for vector registers. */
-		if (!vstate->datap) {
-			vstate->datap = kzalloc(riscv_vsize, GFP_ATOMIC);
-			vstate->size = riscv_vsize;
-		}
 		__vstate_restore(vstate, vstate->datap);
 		__vstate_clean(regs);
 	}
@@ -127,6 +121,7 @@ static inline void __switch_to_vector(struct task_struct *prev,
 
 #else
 #define has_vector false
+#define riscv_vsize (0)
 #define vstate_save(task, regs) do { } while (0)
 #define vstate_restore(task, regs) do { } while (0)
 #define __switch_to_vector(__prev, __next) do { } while (0)
