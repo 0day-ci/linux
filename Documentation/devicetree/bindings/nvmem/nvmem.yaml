@@ -60,6 +60,11 @@ patternProperties:
             - minimum: 1
               description:
                 Size in bit within the address range specified by reg.
+      cell-type:
+        $ref: /schemas/types.yaml#/definitions/uint32
+        maxItems: 1
+        description:
+          Type of nvmem, Use defines in dt-bindings/nvmem/nvmem.h.
 
     required:
       - reg
@@ -69,6 +74,7 @@ additionalProperties: true
 examples:
   - |
       #include <dt-bindings/gpio/gpio.h>
+      #include <dt-bindings/nvmem/nvmem.h>
 
       qfprom: eeprom@700000 {
           #address-cells = <1>;
@@ -97,6 +103,11 @@ examples:
           speed_bin: speed-bin@c{
               reg = <0xc 0x1>;
               bits = <2 3>;
+          };
+
+          mac_addr: mac-addr@90{
+              reg = <0x90 0x6>;
+              cell-type = <NVMEM_CELL_TYPE_MAC_ADDRESS>;
           };
       };
 
