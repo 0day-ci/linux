@@ -285,6 +285,49 @@ static void test_vcpus_then_vgic(void)
 	vm_gic_destroy(&v);
 }
 
+static void test_redist_above_vm_pa_bits(enum vm_guest_mode mode)
+{
+	struct vm_gic v;
+	int ret, i;
+	uint32_t vcpuids[] = { 1, 2, 3, 4, };
+	int pa_bits = vm_guest_mode_params[mode].pa_bits;
+	uint64_t addr, psize = 1ULL << pa_bits;
+
+	/* Add vcpu 1 */
+	v.vm = vm_create_with_vcpus(mode, 1, DEFAULT_GUEST_PHY_PAGES,
+				    0, 0, guest_code, vcpuids);
+	v.gic_fd = kvm_create_device(v.vm, KVM_DEV_TYPE_ARM_VGIC_V3, false);
+
+	/* Set space for half a redist, we have 1 vcpu, so this fails. */
+	addr = psize - 0x10000;
+	ret = _kvm_device_access(v.gic_fd, KVM_DEV_ARM_VGIC_GRP_ADDR,
+				 KVM_VGIC_V3_ADDR_TYPE_REDIST, &addr, true);
+	TEST_ASSERT(ret && errno == EINVAL, "not enough space for one redist");
+
+	/* Set space for 3 redists, we have 1 vcpu, so this succeeds. */
+	addr = psize - (3 * 2 * 0x10000);
+	kvm_device_access(v.gic_fd, KVM_DEV_ARM_VGIC_GRP_ADDR,
+				 KVM_VGIC_V3_ADDR_TYPE_REDIST, &addr, true);
+
+	addr = 0x00000;
+	kvm_device_access(v.gic_fd, KVM_DEV_ARM_VGIC_GRP_ADDR,
+			KVM_VGIC_V3_ADDR_TYPE_DIST, &addr, true);
+
+	/* Add three vcpus (2, 3, 4). */
+	for (i = 1; i < 4; ++i)
+		vm_vcpu_add_default(v.vm, vcpuids[i], guest_code);
+
+	kvm_device_access(v.gic_fd, KVM_DEV_ARM_VGIC_GRP_CTRL,
+			  KVM_DEV_ARM_VGIC_CTRL_INIT, NULL, true);
+
+	/* Attempt to run a vcpu without enough redist space. */
+	ret = run_vcpu(v.vm, vcpuids[3]);
+	TEST_ASSERT(ret && errno == EINVAL,
+			"redist base+size above IPA detected on 1st vcpu run");
+
+	vm_gic_destroy(&v);
+}
+
 static void test_new_redist_regions(void)
 {
 	void *dummy = NULL;
@@ -542,6 +585,7 @@ int main(int ac, char **av)
 	test_kvm_device();
 	test_vcpus_then_vgic();
 	test_vgic_then_vcpus();
+	test_redist_above_vm_pa_bits(VM_MODE_DEFAULT);
 	test_new_redist_regions();
 	test_typer_accesses();
 	test_last_bit_redist_regions();
