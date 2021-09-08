@@ -52,6 +52,7 @@ struct nvmem_cell {
 	int			bytes;
 	int			bit_offset;
 	int			nbits;
+	u32			type;
 	struct device_node	*np;
 	struct nvmem_device	*nvmem;
 	struct list_head	node;
@@ -725,6 +726,8 @@ static int nvmem_add_cells_from_of(struct nvmem_device *nvmem)
 			of_node_put(child);
 			return -EINVAL;
 		}
+
+		of_property_read_u32(child, "cell-type", &cell->type);
 
 		cell->np = of_node_get(child);
 		nvmem_cell_add(cell);
