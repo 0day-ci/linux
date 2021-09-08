@@ -18,6 +18,7 @@ my $enable_lineno = 0;
 my $show_warnings = 1;
 my $prefix="Documentation/ABI";
 my $sysfs_prefix="/sys";
+my $search_string;
 
 #
 # If true, assumes that the description is formatted with ReST
@@ -31,6 +32,7 @@ GetOptions(
 	"dir=s" => \$prefix,
 	'help|?' => \$help,
 	"show-hints" => \$hint,
+	"search-string=s" => \$search_string,
 	man => \$man
 ) or pod2usage(2);
 
@@ -578,6 +580,7 @@ sub check_undefined_symbols {
 		my $defined = 0;
 		my $exact = 0;
 		my $whats = "";
+		my $found_string;
 
 		my $leave = $file;
 		$leave =~ s,.*/,,;
@@ -585,6 +588,11 @@ sub check_undefined_symbols {
 		my $path = $file;
 		$path =~ s,(.*/).*,$1,;
 
+		if ($search_string) {
+			$found_string = 1 if ($file =~ m#$search_string#);
+		}
+
+		print "--> $file\n" if ($found_string && $hint);
 		if (defined($leaf{$leave})) {
 			my $what = $leaf{$leave};
 			$whats .= " $what" if (!($whats =~ m/$what/));
@@ -610,6 +618,7 @@ sub check_undefined_symbols {
 				if (substr($file, 0, $len) eq $new) {
 					my $newf = $a . substr($file, $len);
 
+					print "    $newf\n" if ($found_string && $hint);
 					foreach my $w (split / /, $what) {
 						if ($newf =~ m#^$w$#) {
 							$exact = 1;
@@ -632,10 +641,10 @@ sub check_undefined_symbols {
 		next if ($file =~ m#/parameters/#);
 
 		if ($hint && $defined) {
-			print "$leave at $path might be one of:$whats\n";
+			print "$leave at $path might be one of:$whats\n"  if (!$search_string || $found_string);
 			next;
 		}
-		print "$file not found.\n";
+		print "$file not found.\n" if (!$search_string || $found_string);
 	}
 }
 
@@ -685,6 +694,10 @@ sub undefined_symbols {
 		$what =~ s/$escape_symbols/\\$1/g;
 		$what =~ s/\\([\[\]\(\)\|])/$1/g;
 		$what =~ s/(\d+)\\(-\d+)/$1$2/g;
+
+		if ($search_string) {
+			print "What: $what\n" if ($what =~ m#$search_string#);
+		}
 
 		$leave =~ s/[\(\)]//g;
 
@@ -748,6 +761,7 @@ abi_book.pl - parse the Linux ABI files and produce a ReST book.
 
 B<abi_book.pl> [--debug] [--enable-lineno] [--man] [--help]
 	       [--(no-)rst-source] [--dir=<dir>] [--show-hints]
+	       [--search-string <regex>]
 	       <COMAND> [<ARGUMENT>]
 
 Where <COMMAND> can be:
@@ -793,6 +807,11 @@ times, to increase verbosity.
 =item B<--show-hints>
 
 Show hints about possible definitions for the missing ABI symbols.
+Used only when B<undefined>.
+
+=item B<--search-string> [regex string]
+
+Show only occurences that match a search string.
 Used only when B<undefined>.
 
 =item B<--help>
