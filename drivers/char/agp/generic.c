@@ -127,6 +127,9 @@ struct agp_memory *agp_create_memory(int scratch_pages)
 {
 	struct agp_memory *new;
 
+	if (scratch_pages > INT_MAX / PAGE_SIZE)
+		return NULL;
+
 	new = kzalloc(sizeof(struct agp_memory), GFP_KERNEL);
 	if (new == NULL)
 		return NULL;
@@ -228,7 +231,8 @@ struct agp_memory *agp_allocate_memory(struct agp_bridge_data *bridge,
 
 	cur_memory = atomic_read(&bridge->current_memory_agp);
 	if ((cur_memory + page_count > bridge->max_memory_agp) ||
-	    (cur_memory + page_count < page_count))
+	    (cur_memory + page_count < page_count) ||
+	    (page_count > INT_MAX - ENTRIES_PER_PAGE - 1))
 		return NULL;
 
 	if (type >= AGP_USER_TYPES) {
