@@ -732,14 +732,16 @@ EXPORT_SYMBOL_GPL(sysfs_change_owner);
 int sysfs_emit(char *buf, const char *fmt, ...)
 {
 	va_list args;
-	int len;
+	int len, offset;
 
-	if (WARN(!buf || offset_in_page(buf),
+	offset = offset_in_page(buf);
+
+	if (WARN(!buf,
 		 "invalid sysfs_emit: buf:%p\n", buf))
 		return 0;
 
 	va_start(args, fmt);
-	len = vscnprintf(buf, PAGE_SIZE, fmt, args);
+	len = vscnprintf(buf, PAGE_SIZE - offset, fmt, args);
 	va_end(args);
 
 	return len;
@@ -760,14 +762,16 @@ EXPORT_SYMBOL_GPL(sysfs_emit);
 int sysfs_emit_at(char *buf, int at, const char *fmt, ...)
 {
 	va_list args;
-	int len;
+	int len, offset;
 
-	if (WARN(!buf || offset_in_page(buf) || at < 0 || at >= PAGE_SIZE,
+	offset = offset_in_page(buf);
+
+	if (WARN(!buf || at < 0 || at + offset >= PAGE_SIZE,
 		 "invalid sysfs_emit_at: buf:%p at:%d\n", buf, at))
 		return 0;
 
 	va_start(args, fmt);
-	len = vscnprintf(buf + at, PAGE_SIZE - at, fmt, args);
+	len = vscnprintf(buf + at, PAGE_SIZE - at - offset, fmt, args);
 	va_end(args);
 
 	return len;
