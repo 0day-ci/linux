@@ -138,7 +138,7 @@ struct intel_uncore {
 
 	struct notifier_block pmic_bus_access_nb;
 	const struct intel_uncore_fw_get *fw_get_funcs;
-	struct intel_uncore_funcs funcs;
+	const struct intel_uncore_funcs *funcs;
 
 	unsigned int fifo_count;
 
@@ -312,14 +312,14 @@ __raw_write(64, q)
 static inline u##x__ intel_uncore_##name__(struct intel_uncore *uncore, \
 					   i915_reg_t reg) \
 { \
-	return uncore->funcs.mmio_read##s__(uncore, reg, (trace__)); \
+	return uncore->funcs->mmio_read##s__(uncore, reg, (trace__)); \
 }
 
 #define __uncore_write(name__, x__, s__, trace__) \
 static inline void intel_uncore_##name__(struct intel_uncore *uncore, \
 					 i915_reg_t reg, u##x__ val) \
 { \
-	uncore->funcs.mmio_write##s__(uncore, reg, val, (trace__)); \
+	uncore->funcs->mmio_write##s__(uncore, reg, val, (trace__)); \
 }
 
 __uncore_read(read8, 8, b, true)
@@ -338,7 +338,7 @@ __uncore_write(write_notrace, 32, l, false)
  * an arbitrary delay between them. This can cause the hardware to
  * act upon the intermediate value, possibly leading to corruption and
  * machine death. For this reason we do not support intel_uncore_write64,
- * or uncore->funcs.mmio_writeq.
+ * or uncore->funcs->mmio_writeq.
  *
  * When reading a 64-bit value as two 32-bit values, the delay may cause
  * the two reads to mismatch, e.g. a timestamp overflowing. Also note that
