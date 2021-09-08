@@ -93,6 +93,9 @@ properties:
 
       - items:
           - enum:
+              - asus,nexus4-mako
+              - asus,nexus7-flo
+              - sony,xperia-yuga
               - qcom,apq8064-cm-qs600
               - qcom,apq8064-ifc6410
           - const: qcom,apq8064
@@ -123,6 +126,7 @@ properties:
           - enum:
               - fairphone,fp2
               - lge,hammerhead
+              - samsung,klte
               - sony,xperia-amami
               - sony,xperia-castor
               - sony,xperia-honami
