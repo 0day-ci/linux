@@ -45,9 +45,35 @@ additionalProperties: false
 
 examples:
   - |
+    #include <dt-bindings/gpio/gpio.h>
+
     npe: npe@c8006000 {
          compatible = "intel,ixp4xx-network-processing-engine";
          reg = <0xc8006000 0x1000>, <0xc8007000 0x1000>, <0xc8008000 0x1000>;
+         #address-cells = <1>;
+         #size-cells = <0>;
+
+         hss@0 {
+             compatible = "intel,ixp4xx-hss";
+             reg = <0>;
+             intel,npe-handle = <&npe 0>;
+             queue-chl-rxtrig = <&qmgr 12>;
+             queue-pkt-rx = <&qmgr 13>;
+             queue-pkt-tx0 = <&qmgr 14>;
+             queue-pkt-tx1 = <&qmgr 15>;
+             queue-pkt-tx2 = <&qmgr 16>;
+             queue-pkt-tx3 = <&qmgr 17>;
+             queue-pkt-rxfree0 = <&qmgr 18>;
+             queue-pkt-rxfree1 = <&qmgr 19>;
+             queue-pkt-rxfree2 = <&qmgr 20>;
+             queue-pkt-rxfree3 = <&qmgr 21>;
+             queue-pkt-txdone = <&qmgr 22>;
+             cts-gpios = <&gpio0 10 GPIO_ACTIVE_LOW>;
+             rts-gpios = <&gpio0 14 GPIO_ACTIVE_LOW>;
+             dcd-gpios = <&gpio0 6 GPIO_ACTIVE_LOW>;
+             dtr-gpios = <&gpio_74 2 GPIO_ACTIVE_LOW>;
+             clk-internal-gpios = <&gpio_74 0 GPIO_ACTIVE_HIGH>;
+         };
 
          crypto {
              compatible = "intel,ixp4xx-crypto";
