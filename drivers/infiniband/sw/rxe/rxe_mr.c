@@ -103,15 +103,59 @@ void rxe_mr_init_dma(struct rxe_pd *pd, int access, struct rxe_mr *mr)
 	mr->type = RXE_MR_TYPE_DMA;
 }
 
+/* generate a rxe memory map data structure from ib_umem */
+static int rxe_mr_gen_map(struct rxe_mr *mr, struct ib_umem *umem)
+{
+	int err;
+	int num_buf;
+	struct rxe_map **map;
+	struct rxe_phys_buf *buf = NULL;
+	struct sg_page_iter sg_iter;
+	void *vaddr;
+
+	num_buf = 0;
+	map = mr->map;
+	if (mr->length > 0) {
+		buf = map[0]->buf;
+
+		for_each_sg_page(umem->sg_head.sgl, &sg_iter, umem->nmap, 0) {
+			if (num_buf >= RXE_BUF_PER_MAP) {
+				map++;
+				buf = map[0]->buf;
+				num_buf = 0;
+			}
+
+			vaddr = page_address(sg_page_iter_page(&sg_iter));
+			if (!vaddr) {
+				pr_warn("%s: Unable to get virtual address", __func__);
+				err = -ENOMEM;
+				goto err1;
+			}
+
+			buf->addr = (uintptr_t)vaddr;
+			buf->size = PAGE_SIZE;
+			num_buf++;
+			buf++;
+		}
+	}
+
+	mr->umem = umem;
+	mr->offset = ib_umem_offset(umem);
+	mr->state = RXE_MR_STATE_VALID;
+	mr->type = RXE_MR_TYPE_MR;
+
+	return 0;
+
+err1:
+	ib_umem_release(umem);
+	return err;
+}
+
 int rxe_mr_init_user(struct rxe_pd *pd, u64 start, u64 length, u64 iova,
 		     int access, struct rxe_mr *mr)
 {
-	struct rxe_map		**map;
-	struct rxe_phys_buf	*buf = NULL;
 	struct ib_umem		*umem;
-	struct sg_page_iter	sg_iter;
-	int			num_buf;
-	void			*vaddr;
+	int num_buf;
 	int err;
 	int i;
 
@@ -138,43 +182,18 @@ int rxe_mr_init_user(struct rxe_pd *pd, u64 start, u64 length, u64 iova,
 	mr->page_shift = PAGE_SHIFT;
 	mr->page_mask = PAGE_SIZE - 1;
 
-	num_buf			= 0;
-	map = mr->map;
-	if (length > 0) {
-		buf = map[0]->buf;
+	mr->length = length;
 
-		for_each_sg_page(umem->sg_head.sgl, &sg_iter, umem->nmap, 0) {
-			if (num_buf >= RXE_BUF_PER_MAP) {
-				map++;
-				buf = map[0]->buf;
-				num_buf = 0;
-			}
-
-			vaddr = page_address(sg_page_iter_page(&sg_iter));
-			if (!vaddr) {
-				pr_warn("%s: Unable to get virtual address\n",
-						__func__);
-				err = -ENOMEM;
-				goto err_cleanup_map;
-			}
-
-			buf->addr = (uintptr_t)vaddr;
-			buf->size = PAGE_SIZE;
-			num_buf++;
-			buf++;
-
-		}
+	err = rxe_mr_gen_map(mr, umem);
+	if (err) {
+		pr_warn("%s: Failed to map pages", __func__);
+		goto err_cleanup_map;
 	}
 
 	mr->ibmr.pd = &pd->ibpd;
-	mr->umem = umem;
 	mr->access = access;
-	mr->length = length;
 	mr->iova = iova;
 	mr->va = start;
-	mr->offset = ib_umem_offset(umem);
-	mr->state = RXE_MR_STATE_VALID;
-	mr->type = RXE_MR_TYPE_MR;
 
 	return 0;
 
