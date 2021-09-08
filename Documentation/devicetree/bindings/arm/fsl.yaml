@@ -614,7 +614,8 @@ properties:
       - description: i.MX6ULZ based Boards
         items:
           - enum:
-              - fsl,imx6ulz-14x14-evk     # i.MX6 ULZ 14x14 EVK Board
+              - fsl,imx6ulz-14x14-evk         # i.MX6 ULZ 14x14 EVK Board
+              - inversepath,imx6ulz-usbarmory # F-Secure USB armory Mk II
           - const: fsl,imx6ull # This seems odd. Should be last?
           - const: fsl,imx6ulz
 
