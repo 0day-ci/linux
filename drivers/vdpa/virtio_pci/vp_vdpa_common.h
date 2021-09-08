@@ -10,6 +10,7 @@
 #include <linux/virtio_ring.h>
 #include <linux/virtio_pci.h>
 #include <linux/virtio_pci_modern.h>
+#include <linux/virtio_pci_legacy.h>
 
 #define VP_VDPA_DRIVER_NAME "vp_vdpa"
 #define VP_VDPA_NAME_SIZE 256
@@ -26,6 +27,7 @@ struct vp_vdpa {
 	struct vdpa_device vdpa;
 	struct pci_dev *pci_dev;
 	struct virtio_pci_modern_device mdev;
+	struct virtio_pci_legacy_device ldev;
 	struct vp_vring *vring;
 	struct vdpa_callback config_cb;
 	char msix_name[VP_VDPA_NAME_SIZE];
@@ -52,5 +54,14 @@ void vp_vdpa_set_config_cb(struct vdpa_device *vdpa, struct vdpa_callback *cb);
 void vp_vdpa_free_irq_vectors(void *data);
 
 struct vp_vdpa *vp_vdpa_modern_probe(struct pci_dev *pdev);
+
+#if IS_ENABLED(CONFIG_VP_VDPA_LEGACY)
+struct vp_vdpa *vp_vdpa_legacy_probe(struct pci_dev *pdev);
+#else
+static inline struct vp_vdpa *vp_vdpa_legacy_probe(struct pci_dev *pdev)
+{
+	return ERR_PTR(-ENODEV);
+}
+#endif
 
 #endif

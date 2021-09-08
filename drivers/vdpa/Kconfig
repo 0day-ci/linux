@@ -78,4 +78,11 @@ config VP_VDPA
 	help
 	  This kernel module bridges virtio PCI device to vDPA bus.
 
+config VP_VDPA_LEGACY
+	bool "Support legacy virtio pci device"
+	depends on VP_VDPA
+	select VIRTIO_PCI_LIB_LEGACY
+	help
+	  This option enables bridges legacy virito PCI device to vDPA bus.
+
 endif # VDPA

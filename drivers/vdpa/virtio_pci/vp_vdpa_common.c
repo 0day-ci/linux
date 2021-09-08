@@ -8,6 +8,7 @@
  * Based on virtio_pci_modern.c.
  */
 
+#include "linux/err.h"
 #include <linux/irqreturn.h>
 #include <linux/interrupt.h>
 #include "vp_vdpa_common.h"
@@ -172,6 +173,10 @@ static int vp_vdpa_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		return ret;
 
 	vp_vdpa = vp_vdpa_modern_probe(pdev);
+	if (PTR_ERR(vp_vdpa) == -ENODEV) {
+		dev_info(&pdev->dev, "Tring legacy driver");
+		vp_vdpa = vp_vdpa_legacy_probe(pdev);
+	}
 	if (IS_ERR(vp_vdpa))
 		return PTR_ERR(vp_vdpa);
 
