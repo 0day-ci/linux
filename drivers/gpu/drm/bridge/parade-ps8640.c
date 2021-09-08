@@ -9,14 +9,35 @@
 #include <linux/i2c.h>
 #include <linux/module.h>
 #include <linux/of_graph.h>
+#include <linux/pm_runtime.h>
 #include <linux/regmap.h>
 #include <linux/regulator/consumer.h>
 
 #include <drm/drm_bridge.h>
+#include <drm/drm_dp_helper.h>
 #include <drm/drm_mipi_dsi.h>
 #include <drm/drm_of.h>
 #include <drm/drm_panel.h>
 #include <drm/drm_print.h>
+
+#define PAGE0_AUXCH_CFG3	0x76
+#define  AUXCH_CFG3_RESET	0xff
+#define PAGE0_AUX_ADDR_7_0	0x7d
+#define PAGE0_AUX_ADDR_15_8	0x7e
+#define PAGE0_AUX_ADDR_23_16	0x7f
+#define  AUX_ADDR_19_16_MASK	GENMASK(3, 0)
+#define  AUX_CMD_MASK		GENMASK(7, 4)
+#define PAGE0_AUX_LENGTH	0x80
+#define  AUX_LENGTH_MASK	GENMASK(3, 0)
+#define PAGE0_AUX_WDATA		0x81
+#define PAGE0_AUX_RDATA		0x82
+#define PAGE0_AUX_CTRL		0x83
+#define  AUX_START		0x01
+#define PAGE0_AUX_STATUS	0x84
+#define  AUX_STATUS_MASK	GENMASK(7, 5)
+#define  AUX_STATUS_TIMEOUT	(0x7 << 5)
+#define  AUX_STATUS_DEFER	(0x2 << 5)
+#define  AUX_STATUS_NACK	(0x1 << 5)
 
 #define PAGE2_GPIO_H		0xa7
 #define  PS_GPIO9		BIT(1)
@@ -63,6 +84,7 @@ enum ps8640_vdo_control {
 struct ps8640 {
 	struct drm_bridge bridge;
 	struct drm_bridge *panel_bridge;
+	struct drm_dp_aux aux;
 	struct mipi_dsi_device *dsi;
 	struct i2c_client *page[MAX_DEVS];
 	struct regmap	*regmap[MAX_DEVS];
@@ -91,6 +113,102 @@ static const struct regmap_config ps8640_regmap_config = {
 static inline struct ps8640 *bridge_to_ps8640(struct drm_bridge *e)
 {
 	return container_of(e, struct ps8640, bridge);
+}
+
+static inline struct ps8640 *aux_to_ps8640(struct drm_dp_aux *aux)
+{
+	return container_of(aux, struct ps8640, aux);
+}
+
+static ssize_t ps8640_aux_transfer(struct drm_dp_aux *aux,
+				   struct drm_dp_aux_msg *msg)
+{
+	struct ps8640 *ps_bridge = aux_to_ps8640(aux);
+	struct i2c_client *client = ps_bridge->page[PAGE0_DP_CNTL];
+	struct regmap *map = ps_bridge->regmap[PAGE0_DP_CNTL];
+	unsigned int len = msg->size;
+	unsigned int data;
+	int ret;
+	u8 request = msg->request &
+		     ~(DP_AUX_I2C_MOT | DP_AUX_I2C_WRITE_STATUS_UPDATE);
+	u8 *buf = msg->buffer;
+	bool is_native_aux = false;
+
+	if (len > DP_AUX_MAX_PAYLOAD_BYTES)
+		return -EINVAL;
+
+	pm_runtime_get_sync(&client->dev);
+
+	switch (request) {
+	case DP_AUX_NATIVE_WRITE:
+	case DP_AUX_NATIVE_READ:
+		is_native_aux = true;
+	case DP_AUX_I2C_WRITE:
+	case DP_AUX_I2C_READ:
+		regmap_write(map, PAGE0_AUXCH_CFG3, AUXCH_CFG3_RESET);
+		break;
+	default:
+		ret = -EINVAL;
+		goto exit;
+	}
+
+	/* Assume it's good */
+	msg->reply = 0;
+
+	data = ((request << 4) & AUX_CMD_MASK) |
+	       ((msg->address >> 16) & AUX_ADDR_19_16_MASK);
+	regmap_write(map, PAGE0_AUX_ADDR_23_16, data);
+	data = (msg->address >> 8) & 0xff;
+	regmap_write(map, PAGE0_AUX_ADDR_15_8, data);
+	data = msg->address & 0xff;
+	regmap_write(map, PAGE0_AUX_ADDR_7_0, msg->address & 0xff);
+
+	data = (len - 1) & AUX_LENGTH_MASK;
+	regmap_write(map, PAGE0_AUX_LENGTH, data);
+
+	if (request == DP_AUX_NATIVE_WRITE || request == DP_AUX_I2C_WRITE) {
+		ret = regmap_noinc_write(map, PAGE0_AUX_WDATA, buf, len);
+		if (ret < 0) {
+			DRM_ERROR("failed to write PAGE0_AUX_WDATA");
+			goto exit;
+		}
+	}
+
+	regmap_write(map, PAGE0_AUX_CTRL, AUX_START);
+
+	regmap_read(map, PAGE0_AUX_STATUS, &data);
+	switch (data & AUX_STATUS_MASK) {
+	case AUX_STATUS_DEFER:
+		if (is_native_aux)
+			msg->reply |= DP_AUX_NATIVE_REPLY_DEFER;
+		else
+			msg->reply |= DP_AUX_I2C_REPLY_DEFER;
+		goto exit;
+	case AUX_STATUS_NACK:
+		if (is_native_aux)
+			msg->reply |= DP_AUX_NATIVE_REPLY_NACK;
+		else
+			msg->reply |= DP_AUX_I2C_REPLY_NACK;
+		goto exit;
+	case AUX_STATUS_TIMEOUT:
+		ret = -ETIMEDOUT;
+		goto exit;
+	}
+
+	if (request == DP_AUX_NATIVE_READ || request == DP_AUX_I2C_READ) {
+		ret = regmap_noinc_read(map, PAGE0_AUX_RDATA, buf, len);
+		if (ret < 0)
+			DRM_ERROR("failed to read PAGE0_AUX_RDATA");
+	}
+
+exit:
+	pm_runtime_mark_last_busy(&client->dev);
+	pm_runtime_put_autosuspend(&client->dev);
+
+	if (ret)
+		return ret;
+
+	return len;
 }
 
 static int ps8640_bridge_vdo_control(struct ps8640 *ps_bridge,
@@ -386,6 +504,11 @@ static int ps8640_probe(struct i2c_client *client)
 	}
 
 	i2c_set_clientdata(client, ps_bridge);
+
+	ps_bridge->aux.name = "parade-ps8640-aux";
+	ps_bridge->aux.dev = dev;
+	ps_bridge->aux.transfer = ps8640_aux_transfer;
+	drm_dp_aux_init(&ps_bridge->aux);
 
 	drm_bridge_add(&ps_bridge->bridge);
 
