@@ -637,7 +637,7 @@
 		};
 
 		usb3: usb3@8af8800 {
-			compatible = "qcom,dwc3";
+			compatible = "qcom,ipq4019-dwc3", "qcom,dwc3";
 			reg = <0x8af8800 0x100>;
 			#address-cells = <1>;
 			#size-cells = <1>;
@@ -648,7 +648,7 @@
 			ranges;
 			status = "disabled";
 
-			dwc3@8a00000 {
+			usb@8a00000 {
 				compatible = "snps,dwc3";
 				reg = <0x8a00000 0xf8000>;
 				interrupts = <GIC_SPI 132 IRQ_TYPE_LEVEL_HIGH>;
@@ -669,7 +669,7 @@
 		};
 
 		usb2: usb2@60f8800 {
-			compatible = "qcom,dwc3";
+			compatible = "qcom,ipq4019-dwc3", "qcom,dwc3";
 			reg = <0x60f8800 0x100>;
 			#address-cells = <1>;
 			#size-cells = <1>;
@@ -680,7 +680,7 @@
 			ranges;
 			status = "disabled";
 
-			dwc3@6000000 {
+			usb@6000000 {
 				compatible = "snps,dwc3";
 				reg = <0x6000000 0xf8000>;
 				interrupts = <GIC_SPI 136 IRQ_TYPE_LEVEL_HIGH>;
