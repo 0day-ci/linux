@@ -46,6 +46,15 @@ struct misc_res {
  */
 struct misc_cg {
 	struct cgroup_subsys_state css;
+
+	/* misc.events */
+	atomic_long_t events[MISC_CG_RES_TYPES];
+	struct cgroup_file events_file;
+
+	/* misc.events.local */
+	atomic_long_t events_local[MISC_CG_RES_TYPES];
+	struct cgroup_file events_local_file;
+
 	struct misc_res res[MISC_CG_RES_TYPES];
 };
 
