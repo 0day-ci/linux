@@ -1445,7 +1445,7 @@ void intel_psr2_program_plane_sel_fetch(struct intel_plane *plane,
 
 	val = plane_state ? plane_state->ctl : 0;
 	val &= plane->id == PLANE_CURSOR ? val : PLANE_SEL_FETCH_CTL_ENABLE;
-	intel_de_write_fw(dev_priv, PLANE_SEL_FETCH_CTL(pipe, plane->id), val);
+	intel_de_write_fw(dev_priv, PLANE_SEL_FETCH_CTL(dev_priv, pipe, plane->id), val);
 	if (!val || plane->id == PLANE_CURSOR)
 		return;
 
@@ -1453,19 +1453,19 @@ void intel_psr2_program_plane_sel_fetch(struct intel_plane *plane,
 
 	val = (clip->y1 + plane_state->uapi.dst.y1) << 16;
 	val |= plane_state->uapi.dst.x1;
-	intel_de_write_fw(dev_priv, PLANE_SEL_FETCH_POS(pipe, plane->id), val);
+	intel_de_write_fw(dev_priv, PLANE_SEL_FETCH_POS(dev_priv, pipe, plane->id), val);
 
 	/* TODO: consider auxiliary surfaces */
 	x = plane_state->uapi.src.x1 >> 16;
 	y = (plane_state->uapi.src.y1 >> 16) + clip->y1;
 	val = y << 16 | x;
-	intel_de_write_fw(dev_priv, PLANE_SEL_FETCH_OFFSET(pipe, plane->id),
+	intel_de_write_fw(dev_priv, PLANE_SEL_FETCH_OFFSET(dev_priv, pipe, plane->id),
 			  val);
 
 	/* Sizes are 0 based */
 	val = (drm_rect_height(clip) - 1) << 16;
 	val |= (drm_rect_width(&plane_state->uapi.src) >> 16) - 1;
-	intel_de_write_fw(dev_priv, PLANE_SEL_FETCH_SIZE(pipe, plane->id), val);
+	intel_de_write_fw(dev_priv, PLANE_SEL_FETCH_SIZE(dev_priv, pipe, plane->id), val);
 }
 
 void intel_psr2_program_trans_man_trk_ctl(const struct intel_crtc_state *crtc_state)

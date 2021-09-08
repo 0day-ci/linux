@@ -7471,6 +7471,7 @@ enum {
 #define _SEL_FETCH_PLANE_BASE_7_A		0x70960
 #define _SEL_FETCH_PLANE_BASE_CUR_A		0x70880
 #define _SEL_FETCH_PLANE_BASE_1_B		0x70990
+#define _DG2_SEL_FETCH_PLANE_BASE_1_B		0x71890
 
 #define _SEL_FETCH_PLANE_BASE_A(plane) _PICK(plane, \
 					     _SEL_FETCH_PLANE_BASE_1_A, \
@@ -7481,31 +7482,34 @@ enum {
 					     _SEL_FETCH_PLANE_BASE_6_A, \
 					     _SEL_FETCH_PLANE_BASE_7_A, \
 					     _SEL_FETCH_PLANE_BASE_CUR_A)
-#define _SEL_FETCH_PLANE_BASE_1(pipe) _PIPE(pipe, _SEL_FETCH_PLANE_BASE_1_A, _SEL_FETCH_PLANE_BASE_1_B)
-#define _SEL_FETCH_PLANE_BASE(pipe, plane) (_SEL_FETCH_PLANE_BASE_1(pipe) - \
-					    _SEL_FETCH_PLANE_BASE_1_A + \
-					    _SEL_FETCH_PLANE_BASE_A(plane))
+#define _SEL_FETCH_PLANE_BASE_1(dev_priv, pipe) _PIPE(pipe, _SEL_FETCH_PLANE_BASE_1_A, \
+						      DISPLAY_VER(dev_priv) > 12 ? \
+						      _DG2_SEL_FETCH_PLANE_BASE_1_B : \
+						      _SEL_FETCH_PLANE_BASE_1_B)
+#define _SEL_FETCH_PLANE_BASE(dev_priv, pipe, plane) (_SEL_FETCH_PLANE_BASE_1(dev_priv, pipe) - \
+						      _SEL_FETCH_PLANE_BASE_1_A + \
+						      _SEL_FETCH_PLANE_BASE_A(plane))
 
 #define _SEL_FETCH_PLANE_CTL_1_A		0x70890
-#define PLANE_SEL_FETCH_CTL(pipe, plane) _MMIO(_SEL_FETCH_PLANE_BASE(pipe, plane) + \
+#define PLANE_SEL_FETCH_CTL(dev_priv, pipe, plane) _MMIO(_SEL_FETCH_PLANE_BASE(dev_priv, pipe, plane) + \
 					       _SEL_FETCH_PLANE_CTL_1_A - \
 					       _SEL_FETCH_PLANE_BASE_1_A)
 #define PLANE_SEL_FETCH_CTL_ENABLE		REG_BIT(31)
 
 #define _SEL_FETCH_PLANE_POS_1_A		0x70894
-#define PLANE_SEL_FETCH_POS(pipe, plane) _MMIO(_SEL_FETCH_PLANE_BASE(pipe, plane) + \
-					       _SEL_FETCH_PLANE_POS_1_A - \
-					       _SEL_FETCH_PLANE_BASE_1_A)
+#define PLANE_SEL_FETCH_POS(dev_priv, pipe, plane) _MMIO(_SEL_FETCH_PLANE_BASE(dev_priv, pipe, plane) + \
+							 _SEL_FETCH_PLANE_POS_1_A - \
+							 _SEL_FETCH_PLANE_BASE_1_A)
 
 #define _SEL_FETCH_PLANE_SIZE_1_A		0x70898
-#define PLANE_SEL_FETCH_SIZE(pipe, plane) _MMIO(_SEL_FETCH_PLANE_BASE(pipe, plane) + \
-						_SEL_FETCH_PLANE_SIZE_1_A - \
-						_SEL_FETCH_PLANE_BASE_1_A)
+#define PLANE_SEL_FETCH_SIZE(dev_priv, pipe, plane) _MMIO(_SEL_FETCH_PLANE_BASE(dev_priv, pipe, plane) + \
+							  _SEL_FETCH_PLANE_SIZE_1_A - \
+							  _SEL_FETCH_PLANE_BASE_1_A)
 
 #define _SEL_FETCH_PLANE_OFFSET_1_A		0x7089C
-#define PLANE_SEL_FETCH_OFFSET(pipe, plane) _MMIO(_SEL_FETCH_PLANE_BASE(pipe, plane) + \
-						  _SEL_FETCH_PLANE_OFFSET_1_A - \
-						  _SEL_FETCH_PLANE_BASE_1_A)
+#define PLANE_SEL_FETCH_OFFSET(dev_priv, pipe, plane) _MMIO(_SEL_FETCH_PLANE_BASE(dev_priv, pipe, plane) + \
+							    _SEL_FETCH_PLANE_OFFSET_1_A - \
+							    _SEL_FETCH_PLANE_BASE_1_A)
 
 /* SKL new cursor registers */
 #define _CUR_BUF_CFG_A				0x7017c
