@@ -388,6 +388,11 @@ struct drm_i915_irq_funcs {
 	void (*hpd_irq_setup)(struct drm_i915_private *dev_priv);
 };
 
+struct drm_i915_fdi_link_train_funcs {
+	void (*fdi_link_train)(struct intel_crtc *crtc,
+			       const struct intel_crtc_state *crtc_state);
+};
+
 struct drm_i915_display_funcs {
 	/* Returns the active state of the crtc, and if the crtc is active,
 	 * fills out the pipe-config with the hw state. */
@@ -402,9 +407,6 @@ struct drm_i915_display_funcs {
 			     struct intel_crtc *crtc);
 	void (*commit_modeset_enables)(struct intel_atomic_state *state);
 	void (*commit_modeset_disables)(struct intel_atomic_state *state);
-
-	void (*fdi_link_train)(struct intel_crtc *crtc,
-			       const struct intel_crtc_state *crtc_state);
 
 	/* clock updates for mode set */
 	/* cursor updates */
@@ -983,6 +985,9 @@ struct drm_i915_private {
 
 	/* irq display functions */
 	struct drm_i915_irq_funcs irq_funcs;
+
+	/* fdi display functions */
+	struct drm_i915_fdi_link_train_funcs fdi_funcs;
 
 	/* Display functions */
 	struct drm_i915_display_funcs display;
