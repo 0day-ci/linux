@@ -442,6 +442,7 @@ ENTRY(reset_regs)
 
 	li	t1, SR_VS
 	csrs	CSR_STATUS, t1
+	vsetvli t1, x0, e8, m1
 	vmv.v.i v0, 0
 	vmv.v.i v1, 0
 	vmv.v.i v2, 0
