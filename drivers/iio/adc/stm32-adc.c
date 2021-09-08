@@ -21,6 +21,7 @@
 #include <linux/io.h>
 #include <linux/iopoll.h>
 #include <linux/module.h>
+#include <linux/nvmem-consumer.h>
 #include <linux/platform_device.h>
 #include <linux/pm_runtime.h>
 #include <linux/of.h>
@@ -42,6 +43,7 @@
 #define STM32_ADC_TIMEOUT	(msecs_to_jiffies(STM32_ADC_TIMEOUT_US / 1000))
 #define STM32_ADC_HW_STOP_DELAY_MS	100
 #define STM32_ADC_CHAN_NONE		-1
+#define STM32_ADC_VREFINT_VOLTAGE	3300
 
 #define STM32_DMA_BUFFER_SIZE		PAGE_SIZE
 
@@ -79,6 +81,7 @@ enum stm32_adc_extsel {
 };
 
 enum stm32_adc_int_ch {
+	STM32_ADC_INT_CH_NONE = -1,
 	STM32_ADC_INT_CH_VDDCORE,
 	STM32_ADC_INT_CH_VREFINT,
 	STM32_ADC_INT_CH_VBAT,
@@ -138,6 +141,16 @@ struct stm32_adc_regs {
 };
 
 /**
+ * struct stm32_adc_vrefint - stm32 ADC internal reference voltage data
+ * @vrefint_cal:	vrefint calibration value from nvmem
+ * @vrefint_data:	vrefint actual value
+ */
+struct stm32_adc_vrefint {
+	u32 vrefint_cal;
+	u32 vrefint_data;
+};
+
+/**
  * struct stm32_adc_regspec - stm32 registers definition
  * @dr:			data register offset
  * @ier_eoc:		interrupt enable register & eocie bitfield
@@ -186,6 +199,7 @@ struct stm32_adc;
  * @unprepare:		optional unprepare routine (disable, power-down)
  * @irq_clear:		routine to clear irqs
  * @smp_cycles:		programmable sampling time (ADC clock cycles)
+ * @ts_vrefint_ns:	vrefint minimum sampling time in ns
  */
 struct stm32_adc_cfg {
 	const struct stm32_adc_regspec	*regs;
@@ -199,6 +213,7 @@ struct stm32_adc_cfg {
 	void (*unprepare)(struct iio_dev *);
 	void (*irq_clear)(struct iio_dev *indio_dev, u32 msk);
 	const unsigned int *smp_cycles;
+	const unsigned int ts_vrefint_ns;
 };
 
 /**
@@ -223,6 +238,7 @@ struct stm32_adc_cfg {
  * @pcsel:		bitmask to preselect channels on some devices
  * @smpr_val:		sampling time settings (e.g. smpr1 / smpr2)
  * @cal:		optional calibration data on some devices
+ * @vrefint:		internal reference voltage data
  * @chan_name:		channel name array
  * @num_diff:		number of differential channels
  * @int_ch:		internal channel indexes array
@@ -248,6 +264,7 @@ struct stm32_adc {
 	u32			pcsel;
 	u32			smpr_val[2];
 	struct stm32_adc_calib	cal;
+	struct stm32_adc_vrefint vrefint;
 	char			chan_name[STM32_ADC_CH_MAX][STM32_ADC_CH_SZ];
 	u32			num_diff;
 	int			int_ch[STM32_ADC_INT_CH_NB];
@@ -1331,15 +1348,35 @@ static int stm32_adc_read_raw(struct iio_dev *indio_dev,
 			ret = stm32_adc_single_conv(indio_dev, chan, val);
 		else
 			ret = -EINVAL;
+
+		/* If channel mask corresponds to vrefint, store data */
+		if (adc->int_ch[STM32_ADC_INT_CH_VREFINT] == chan->channel)
+			adc->vrefint.vrefint_data = *val;
+
 		iio_device_release_direct_mode(indio_dev);
 		return ret;
 
 	case IIO_CHAN_INFO_SCALE:
 		if (chan->differential) {
-			*val = adc->common->vref_mv * 2;
+			if (adc->vrefint.vrefint_data &&
+			    adc->vrefint.vrefint_cal) {
+				*val = STM32_ADC_VREFINT_VOLTAGE * 2 *
+				       adc->vrefint.vrefint_cal /
+				       adc->vrefint.vrefint_data;
+			} else {
+				*val = adc->common->vref_mv * 2;
+			}
 			*val2 = chan->scan_type.realbits;
 		} else {
-			*val = adc->common->vref_mv;
+			/* Use vrefint data if available */
+			if (adc->vrefint.vrefint_data &&
+			    adc->vrefint.vrefint_cal) {
+				*val = STM32_ADC_VREFINT_VOLTAGE *
+				       adc->vrefint.vrefint_cal /
+				       adc->vrefint.vrefint_data;
+			} else {
+				*val = adc->common->vref_mv;
+			}
 			*val2 = chan->scan_type.realbits;
 		}
 		return IIO_VAL_FRACTIONAL_LOG2;
@@ -1907,6 +1944,35 @@ static int stm32_adc_legacy_chan_init(struct iio_dev *indio_dev,
 	return scan_index;
 }
 
+static int stm32_adc_get_int_ch(struct iio_dev *indio_dev, const char *ch_name,
+				int chan)
+{
+	struct stm32_adc *adc = iio_priv(indio_dev);
+	u16 vrefint;
+	int i, ret;
+
+	for (i = 0; i < STM32_ADC_INT_CH_NB; i++) {
+		if (!strncmp(stm32_adc_ic[i].name, ch_name, STM32_ADC_CH_SZ)) {
+			adc->int_ch[i] = chan;
+			/* If channel is vrefint get calibration data. */
+			if (stm32_adc_ic[i].idx == STM32_ADC_INT_CH_VREFINT) {
+				ret = nvmem_cell_read_u16(&indio_dev->dev, "vrefint", &vrefint);
+				if (ret && ret != -ENOENT && ret != -EOPNOTSUPP) {
+					dev_err(&indio_dev->dev, "nvmem access error %d\n", ret);
+					return ret;
+				}
+				if (ret == -ENOENT)
+					dev_dbg(&indio_dev->dev,
+						"vrefint calibration not found\n");
+				else
+					adc->vrefint.vrefint_cal = vrefint;
+			}
+		}
+	}
+
+	return 0;
+}
+
 static int stm32_adc_generic_chan_init(struct iio_dev *indio_dev,
 				       struct stm32_adc *adc,
 				       struct iio_chan_spec *channels)
@@ -1938,10 +2004,9 @@ static int stm32_adc_generic_chan_init(struct iio_dev *indio_dev,
 				return -EINVAL;
 			}
 			strncpy(adc->chan_name[val], name, STM32_ADC_CH_SZ);
-			for (i = 0; i < STM32_ADC_INT_CH_NB; i++) {
-				if (!strncmp(stm32_adc_ic[i].name, name, STM32_ADC_CH_SZ))
-					adc->int_ch[i] = val;
-			}
+			ret = stm32_adc_get_int_ch(indio_dev, name, val);
+			if (ret)
+				goto err;
 		} else if (ret != -EINVAL) {
 			dev_err(&indio_dev->dev, "Invalid label %d\n", ret);
 			goto err;
@@ -2044,6 +2109,16 @@ static int stm32_adc_chan_of_init(struct iio_dev *indio_dev, bool timestamping)
 		 */
 		of_property_read_u32_index(node, "st,min-sample-time-nsecs",
 					   i, &smp);
+
+		/*
+		 * For vrefint channel, ensure that the sampling time cannot
+		 * be lower than the one specified in the datasheet
+		 */
+		if (channels[i].channel == adc->int_ch[STM32_ADC_INT_CH_VREFINT] &&
+		    smp < adc->cfg->ts_vrefint_ns) {
+			smp = adc->cfg->ts_vrefint_ns;
+		}
+
 		/* Prepare sampling time settings */
 		stm32_adc_smpr_init(adc, channels[i].channel, smp);
 	}
@@ -2350,6 +2425,7 @@ static const struct stm32_adc_cfg stm32mp1_adc_cfg = {
 	.unprepare = stm32h7_adc_unprepare,
 	.smp_cycles = stm32h7_adc_smp_cycles,
 	.irq_clear = stm32h7_adc_irq_clear,
+	.ts_vrefint_ns = 4300,
 };
 
 static const struct of_device_id stm32_adc_of_match[] = {
