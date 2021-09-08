@@ -55,6 +55,9 @@ struct misc_cg {
 	atomic_long_t events_local[MISC_CG_RES_TYPES];
 	struct cgroup_file events_local_file;
 
+	/* misc.failcnt for v1 only */
+	atomic_long_t nr_failed[MISC_CG_RES_TYPES];
+
 	struct misc_res res[MISC_CG_RES_TYPES];
 };
 
