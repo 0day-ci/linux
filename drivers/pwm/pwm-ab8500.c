@@ -113,11 +113,8 @@ static int ab8500_pwm_probe(struct platform_device *pdev)
 static int ab8500_pwm_remove(struct platform_device *pdev)
 {
 	struct ab8500_pwm_chip *ab8500 = platform_get_drvdata(pdev);
-	int err;
 
-	err = pwmchip_remove(&ab8500->chip);
-	if (err < 0)
-		return err;
+	pwmchip_remove(&ab8500->chip);
 
 	dev_dbg(&pdev->dev, "pwm driver removed\n");
 
