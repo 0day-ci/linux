@@ -987,7 +987,7 @@ struct drm_i915_private {
 	struct drm_i915_wm_disp_funcs wm_disp;
 
 	/* irq display functions */
-	struct drm_i915_irq_funcs irq_funcs;
+	const struct drm_i915_irq_funcs *irq_funcs;
 
 	/* fdi display functions */
 	const struct drm_i915_fdi_link_train_funcs *fdi_funcs;
