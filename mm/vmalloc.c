@@ -1153,7 +1153,8 @@ is_within_this_va(struct vmap_area *va, unsigned long size,
 /*
  * Find the first free block(lowest start address) in the tree,
  * that will accomplish the request corresponding to passing
- * parameters.
+ * parameters. Note that with an alignment > 1, this function
+ * can be imprecise and skip applicable free blocks.
  */
 static __always_inline struct vmap_area *
 find_vmap_lowest_match(unsigned long size,
@@ -1396,7 +1397,15 @@ __alloc_vmap_area(unsigned long size, unsigned long align,
 	enum fit_type type;
 	int ret;
 
-	va = find_vmap_lowest_match(size, align, vstart);
+	/*
+	 * For exact allocations, ignore the alignment, such that
+	 * find_vmap_lowest_match() won't search for a bigger free area just
+	 * able to align later and consequently fail the search.
+	 */
+	if (vend - vstart == size && IS_ALIGNED(vstart, align))
+		va = find_vmap_lowest_match(size, 1, vstart);
+	else
+		va = find_vmap_lowest_match(size, align, vstart);
 	if (unlikely(!va))
 		return vend;
 
