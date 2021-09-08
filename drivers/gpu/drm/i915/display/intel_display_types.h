@@ -1066,6 +1066,7 @@ struct intel_crtc_state {
 	bool req_psr2_sdp_prior_scanline;
 	u32 dc3co_exitline;
 	u16 su_y_granularity;
+	bool has_panel_replay;
 
 	/*
 	 * Frequence the dpll for the port should run at. Differs from the
@@ -1526,6 +1527,8 @@ struct intel_psr {
 	bool irq_aux_error;
 	u16 su_w_granularity;
 	u16 su_y_granularity;
+	bool sink_pr_support;
+	bool pr_enabled;
 	u32 dc3co_exitline;
 	u32 dc3co_exit_delay;
 	struct delayed_work dc3co_work;
@@ -1552,6 +1555,7 @@ struct intel_dp {
 	u8 lttpr_phy_caps[DP_MAX_LTTPR_COUNT][DP_LTTPR_PHY_CAP_SIZE];
 	u8 fec_capable;
 	u8 pcon_dsc_dpcd[DP_PCON_DSC_ENCODER_CAP_SIZE];
+	u8 pr_dpcd;
 	/* source rates */
 	int num_source_rates;
 	const int *source_rates;
