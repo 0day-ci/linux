@@ -4,6 +4,8 @@
  * Copyright (c) 2015 System Fabric Works, Inc. All rights reserved.
  */
 
+#include <linux/dma-buf.h>
+
 #include "rxe.h"
 #include "rxe_loc.h"
 
@@ -204,6 +206,105 @@ err_cleanup_map:
 err_release_umem:
 	ib_umem_release(umem);
 err_out:
+	return err;
+}
+
+static int rxe_map_dmabuf_mr(struct rxe_mr *mr)
+{
+	struct ib_umem_dmabuf *umem_dmabuf = to_ib_umem_dmabuf(mr->umem);
+	struct ib_umem *umem = mr->umem;
+	int err;
+
+	err = ib_umem_dmabuf_map_pages(umem_dmabuf);
+	if (err)
+		goto err1;
+
+	err = rxe_mr_gen_map(mr, umem);
+	if (err)
+		goto err2;
+
+	return ib_umem_num_pages(umem);
+
+err2:
+	ib_umem_dmabuf_unmap_pages(umem_dmabuf);
+err1:
+	return err;
+}
+
+/* A function called from the dma-buf exporter when the mapped pages
+ * become invalid.
+ */
+static void rxe_ib_dmabuf_invalidate_cb(struct dma_buf_attachment *attach)
+{
+	int err;
+	struct ib_umem_dmabuf *umem_dmabuf = attach->importer_priv;
+	struct rxe_mr *mr = umem_dmabuf->private;
+
+	ib_umem_dmabuf_unmap_pages(umem_dmabuf);
+
+	/* all of memory region is immediately mapped again */
+	err = rxe_map_dmabuf_mr(mr);
+	if (err)
+		pr_err("%s: failed to map the dma-buf region", __func__);
+}
+
+static struct dma_buf_attach_ops rxe_ib_dmabuf_attach_ops = {
+	.move_notify = rxe_ib_dmabuf_invalidate_cb,
+};
+
+/* initialize a umem and map all the areas of dma-buf. */
+int rxe_mr_dmabuf_init_user(struct rxe_pd *pd, int fd, u64 start, u64 length,
+			    u64 iova, int access, struct rxe_mr *mr)
+{
+	struct ib_umem_dmabuf *umem_dmabuf;
+	int num_buf;
+	int err;
+
+	umem_dmabuf = ib_umem_dmabuf_get(pd->ibpd.device, start, length, fd,
+					 access, &rxe_ib_dmabuf_attach_ops);
+	if (IS_ERR(umem_dmabuf)) {
+		err = PTR_ERR(umem_dmabuf);
+		pr_err("%s: failed to get umem_dmabuf (%d)", __func__, err);
+		goto err1;
+	}
+
+	umem_dmabuf->private = mr;
+
+	mr->umem = &umem_dmabuf->umem;
+	mr->umem->iova = iova;
+	num_buf = ib_umem_num_pages(mr->umem);
+
+	rxe_mr_init(access, mr);
+
+	err = rxe_mr_alloc(mr, num_buf);
+	if (err)
+		goto err1;
+
+	mr->page_shift = PAGE_SHIFT;
+	mr->page_mask = PAGE_SIZE - 1;
+
+	mr->ibmr.pd = &pd->ibpd;
+	mr->access = access;
+	mr->length = length;
+	mr->iova = iova;
+	mr->va = start;
+	mr->offset = ib_umem_offset(mr->umem);
+	mr->state = RXE_MR_STATE_VALID;
+	mr->type = RXE_MR_TYPE_MR;
+
+	err = rxe_map_dmabuf_mr(mr);
+	if (err) {
+		pr_err("%s: failed to map the dma-buf region", __func__);
+		goto err2;
+	}
+
+	return 0;
+
+err2:
+	for (i = 0; i < mr->num_map; i++)
+		kfree(mr->map[i]);
+	kfree(mr->map);
+err1:
 	return err;
 }
 
