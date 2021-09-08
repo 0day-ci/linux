@@ -23,7 +23,7 @@ __ro_after_init DEFINE_STATIC_KEY_FALSE(cpu_hwcap_fpu);
 #endif
 #ifdef CONFIG_VECTOR
 #include <asm/vector.h>
-bool has_vector __read_mostly;
+__ro_after_init DEFINE_STATIC_KEY_FALSE(cpu_hwcap_vector);
 unsigned long riscv_vsize __read_mostly;
 #endif
 
@@ -157,7 +157,7 @@ void __init riscv_fill_hwcap(void)
 
 #ifdef CONFIG_VECTOR
 	if (elf_hwcap & COMPAT_HWCAP_ISA_V) {
-		has_vector = true;
+		static_branch_enable(&cpu_hwcap_vector);
 		/* There are 32 vector registers with vlenb length. */
 		rvv_enable();
 		riscv_vsize = csr_read(CSR_VLENB) * 32;

@@ -110,7 +110,7 @@ static void vector_flush_cpu_state(void)
  */
 void kernel_rvv_begin(void)
 {
-	if (WARN_ON(!has_vector))
+	if (WARN_ON(!has_vector()))
 		return;
 
 	WARN_ON(!may_use_vector());
@@ -140,7 +140,7 @@ EXPORT_SYMBOL(kernel_rvv_begin);
  */
 void kernel_rvv_end(void)
 {
-	if (WARN_ON(!has_vector))
+	if (WARN_ON(!has_vector()))
 		return;
 
 	/* Invalidate vector regs */

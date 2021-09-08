@@ -96,7 +96,7 @@ void start_thread(struct pt_regs *regs, unsigned long pc,
 		fstate_restore(current, regs);
 	}
 
-	if (has_vector) {
+	if (has_vector()) {
 		struct __riscv_v_state *vstate = &(current->thread.vstate);
 
 		/* Enable vector and allocate memory for vector registers. */
@@ -141,11 +141,11 @@ void flush_thread(void)
 int arch_dup_task_struct(struct task_struct *dst, struct task_struct *src)
 {
 	fstate_save(src, task_pt_regs(src));
-	if (has_vector)
+	if (has_vector())
 		/* To make sure every dirty vector context is saved. */
 		vstate_save(src, task_pt_regs(src));
 	*dst = *src;
-	if (has_vector) {
+	if (has_vector()) {
 		/* Copy vector context to the forked task from parent. */
 		if ((task_pt_regs(src)->status & SR_VS) != SR_VS_OFF) {
 			dst->thread.vstate.datap = kzalloc(riscv_vsize, GFP_KERNEL);
@@ -164,7 +164,7 @@ int arch_dup_task_struct(struct task_struct *dst, struct task_struct *src)
 void arch_release_task_struct(struct task_struct *tsk)
 {
 	/* Free the vector context of datap. */
-	if (has_vector)
+	if (has_vector())
 		kfree(tsk->thread.vstate.datap);
 }
 

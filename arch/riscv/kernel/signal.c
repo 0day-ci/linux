@@ -192,7 +192,7 @@ static long restore_sigcontext(struct pt_regs *regs,
 				goto invalid;
 			goto done;
 		case RVV_MAGIC:
-			if (!has_vector)
+			if (!has_vector())
 				goto invalid;
 			if (size != rvv_sc_size)
 				goto invalid;
@@ -221,7 +221,7 @@ static size_t cal_rt_frame_size(void)
 
 	frame_size = sizeof(*frame);
 
-	if (has_vector)
+	if (has_vector())
 		total_context_size += rvv_sc_size;
 	/* Preserved a __riscv_ctx_hdr for END signal context header. */
 	total_context_size += sizeof(struct __riscv_ctx_hdr);
@@ -288,7 +288,7 @@ static long setup_sigcontext(struct rt_sigframe __user *frame,
 	if (has_fpu())
 		err |= save_fp_state(regs, &sc->sc_fpregs);
 	/* Save the vector state. */
-	if (has_vector)
+	if (has_vector())
 		err |= save_v_state(regs, &sc_reserved_free_ptr);
 
 	/* Put END __riscv_ctx_hdr at the end. */

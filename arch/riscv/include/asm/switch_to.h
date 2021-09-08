@@ -71,7 +71,11 @@ static __always_inline bool has_fpu(void) { return false; }
 #endif
 
 #ifdef CONFIG_VECTOR
-extern bool has_vector;
+extern struct static_key_false cpu_hwcap_vector;
+static __always_inline bool has_vector(void)
+{
+	return static_branch_likely(&cpu_hwcap_vector);
+}
 extern unsigned long riscv_vsize;
 extern void __vstate_save(struct __riscv_v_state *save_to, void *datap);
 extern void __vstate_restore(struct __riscv_v_state *restore_from, void *datap);
@@ -120,7 +124,7 @@ static inline void __switch_to_vector(struct task_struct *prev,
 }
 
 #else
-#define has_vector false
+static __always_inline bool has_vector(void) { return false; }
 #define riscv_vsize (0)
 #define vstate_save(task, regs) do { } while (0)
 #define vstate_restore(task, regs) do { } while (0)
@@ -136,7 +140,7 @@ do {							\
 	struct task_struct *__next = (next);		\
 	if (has_fpu())					\
 		__switch_to_fpu(__prev, __next);	\
-	if (has_vector)					\
+	if (has_vector())					\
 		__switch_to_vector(__prev, __next);	\
 	((last) = __switch_to(__prev, __next));		\
 } while (0)
