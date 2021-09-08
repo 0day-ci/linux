@@ -161,6 +161,13 @@ struct kernfs_node {
 	unsigned short		flags;
 	umode_t			mode;
 	struct kernfs_iattrs	*iattr;
+
+	/*
+	 * If pinned is true, use lock to protect remove, rename this kernfs
+	 * node or create child kernfs node.
+	 */
+	bool			pinned;
+	spinlock_t		*lock;
 };
 
 /*
@@ -415,6 +422,11 @@ void kernfs_init(void);
 
 struct kernfs_node *kernfs_find_and_get_node_by_id(struct kernfs_root *root,
 						   u64 id);
+
+void kernfs_set_pinned(struct kernfs_node *kn, spinlock_t *lock);
+void kernfs_clear_pinned(struct kernfs_node *kn);
+void kernfs_lock(struct kernfs_node *kn);
+void kernfs_unlock(struct kernfs_node *kn);
 #else	/* CONFIG_KERNFS */
 
 static inline enum kernfs_node_type kernfs_type(struct kernfs_node *kn)
@@ -528,6 +540,8 @@ static inline void kernfs_kill_sb(struct super_block *sb) { }
 
 static inline void kernfs_init(void) { }
 
+inline void kernfs_set_pinned(struct kernfs_node *kn, spinlock_t *lock) {}
+inline void kernfs_clear_pinned(struct kernfs_node *kn) {}
 #endif	/* CONFIG_KERNFS */
 
 /**

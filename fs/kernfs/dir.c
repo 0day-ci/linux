@@ -26,7 +26,6 @@ static DEFINE_SPINLOCK(kernfs_idr_lock);	/* root->ino_idr */
 
 static bool kernfs_active(struct kernfs_node *kn)
 {
-	lockdep_assert_held(&kernfs_rwsem);
 	return atomic_read(&kn->active) >= 0;
 }
 
@@ -461,10 +460,9 @@ static void kernfs_drain(struct kernfs_node *kn)
 {
 	struct kernfs_root *root = kernfs_root(kn);
 
-	lockdep_assert_held_write(&kernfs_rwsem);
 	WARN_ON_ONCE(kernfs_active(kn));
 
-	up_write(&kernfs_rwsem);
+	kernfs_unlock(kn);
 
 	if (kernfs_lockdep(kn)) {
 		rwsem_acquire(&kn->dep_map, 0, 0, _RET_IP_);
@@ -483,7 +481,7 @@ static void kernfs_drain(struct kernfs_node *kn)
 
 	kernfs_drain_open_files(kn);
 
-	down_write(&kernfs_rwsem);
+	kernfs_lock(kn);
 }
 
 /**
@@ -722,7 +720,7 @@ int kernfs_add_one(struct kernfs_node *kn)
 	bool has_ns;
 	int ret;
 
-	down_write(&kernfs_rwsem);
+	kernfs_lock(parent);
 
 	ret = -EINVAL;
 	has_ns = kernfs_ns_enabled(parent);
@@ -753,7 +751,7 @@ int kernfs_add_one(struct kernfs_node *kn)
 		ps_iattr->ia_mtime = ps_iattr->ia_ctime;
 	}
 
-	up_write(&kernfs_rwsem);
+	kernfs_unlock(parent);
 
 	/*
 	 * Activate the new node unless CREATE_DEACTIVATED is requested.
@@ -767,7 +765,7 @@ int kernfs_add_one(struct kernfs_node *kn)
 	return 0;
 
 out_unlock:
-	up_write(&kernfs_rwsem);
+	kernfs_unlock(parent);
 	return ret;
 }
 
@@ -787,8 +785,6 @@ static struct kernfs_node *kernfs_find_ns(struct kernfs_node *parent,
 	struct rb_node *node = parent->dir.children.rb_node;
 	bool has_ns = kernfs_ns_enabled(parent);
 	unsigned int hash;
-
-	lockdep_assert_held(&kernfs_rwsem);
 
 	if (has_ns != (bool)ns) {
 		WARN(1, KERN_WARNING "kernfs: ns %s in '%s' for '%s'\n",
@@ -1242,8 +1238,6 @@ static struct kernfs_node *kernfs_next_descendant_post(struct kernfs_node *pos,
 {
 	struct rb_node *rbn;
 
-	lockdep_assert_held_write(&kernfs_rwsem);
-
 	/* if first iteration, visit leftmost descendant which may be root */
 	if (!pos)
 		return kernfs_leftmost_descendant(root);
@@ -1298,8 +1292,6 @@ void kernfs_activate(struct kernfs_node *kn)
 static void __kernfs_remove(struct kernfs_node *kn)
 {
 	struct kernfs_node *pos;
-
-	lockdep_assert_held_write(&kernfs_rwsem);
 
 	/*
 	 * Short-circuit if non-root @kn has already finished removal.
@@ -1369,9 +1361,9 @@ static void __kernfs_remove(struct kernfs_node *kn)
  */
 void kernfs_remove(struct kernfs_node *kn)
 {
-	down_write(&kernfs_rwsem);
+	kernfs_lock(kn);
 	__kernfs_remove(kn);
-	up_write(&kernfs_rwsem);
+	kernfs_unlock(kn);
 }
 
 /**
@@ -1525,13 +1517,13 @@ int kernfs_remove_by_name_ns(struct kernfs_node *parent, const char *name,
 		return -ENOENT;
 	}
 
-	down_write(&kernfs_rwsem);
+	kernfs_lock(parent);
 
 	kn = kernfs_find_ns(parent, name, ns);
 	if (kn)
 		__kernfs_remove(kn);
 
-	up_write(&kernfs_rwsem);
+	kernfs_unlock(parent);
 
 	if (kn)
 		return 0;
@@ -1557,7 +1549,9 @@ int kernfs_rename_ns(struct kernfs_node *kn, struct kernfs_node *new_parent,
 	if (!kn->parent)
 		return -EINVAL;
 
-	down_write(&kernfs_rwsem);
+	/* if parent is pinned, parent->lock protects rename */
+	if (!kn->parent->pinned)
+		down_write(&kernfs_rwsem);
 
 	error = -ENOENT;
 	if (!kernfs_active(kn) || !kernfs_active(new_parent) ||
@@ -1576,7 +1570,8 @@ int kernfs_rename_ns(struct kernfs_node *kn, struct kernfs_node *new_parent,
 	/* rename kernfs_node */
 	if (strcmp(kn->name, new_name) != 0) {
 		error = -ENOMEM;
-		new_name = kstrdup_const(new_name, GFP_KERNEL);
+		/* use GFP_ATOMIC to avoid sleep */
+		new_name = kstrdup_const(new_name, GFP_ATOMIC);
 		if (!new_name)
 			goto out;
 	} else {
@@ -1611,8 +1606,47 @@ int kernfs_rename_ns(struct kernfs_node *kn, struct kernfs_node *new_parent,
 
 	error = 0;
  out:
-	up_write(&kernfs_rwsem);
+	if (!kn->parent->pinned)
+		up_write(&kernfs_rwsem);
 	return error;
+}
+
+/* Traverse all descendants and set pinned */
+void kernfs_set_pinned(struct kernfs_node *kn, spinlock_t *lock)
+{
+	struct kernfs_node *pos = NULL;
+
+	while ((pos = kernfs_next_descendant_post(pos, kn))) {
+		pos->pinned = true;
+		pos->lock = lock;
+	}
+}
+
+/* Traverse all descendants and clear pinned */
+void kernfs_clear_pinned(struct kernfs_node *kn)
+{
+	struct kernfs_node *pos = NULL;
+
+	while ((pos = kernfs_next_descendant_post(pos, kn))) {
+		pos->pinned = false;
+		pos->lock = NULL;
+	}
+}
+
+void kernfs_lock(struct kernfs_node *kn)
+{
+	if (!kn->pinned)
+		down_write(&kernfs_rwsem);
+	else
+		spin_lock(kn->lock);
+}
+
+void kernfs_unlock(struct kernfs_node *kn)
+{
+	if (!kn->pinned)
+		up_write(&kernfs_rwsem);
+	else
+		spin_unlock(kn->lock);
 }
 
 /* Relationship between mode and the DT_xxx types */
