@@ -1,0 +1,28 @@
+drm drm-fixes 7d2a07b769330c34b4deabeed939325c77a7ec2f
+	Linux 5.14
+drm-misc drm-misc-fixes c8704b7ec182f9293e6a994310c7d4203428cdfb
+	drm/kmb: Enable alpha blended second plane
+drm-intel drm-intel-fixes 7d2a07b769330c34b4deabeed939325c77a7ec2f
+	Linux 5.14
+drm drm-next 1645cca9da91a85167394a34fcfe1cb5dd336d7f
+	drm/i915: use linux/stddef.h due to "isystem: trim/fixup stdarg.h and other headers"
+drm-misc drm-misc-next-fixes 87fd9ef47597b2fcee3264eb5f288410b9f376d5
+	dma-buf: DMABUF_SYSFS_STATS should depend on DMA_SHARED_BUFFER
+drm-intel drm-intel-next-fixes fb43ebc83e069625cfeeb2490efc3ffa0013bfa4
+	drm/i915/selftest: Fix use of err in igt_reset_{fail, nop}_engine()
+drm-misc drm-misc-next c5baa944875e92ec1fdb2551817e7796e6f7c883
+	drm/mcde: Make use of the helper function devm_platform_ioremap_resource()
+drm-intel drm-intel-next 0f3692b5e4c4d3baeb202d8e8d8846dafb525851
+	drm/i915/display: Prepare DRRS for frontbuffer rendering drop
+drm-intel drm-intel-gt-next 3f027d61663fc20622a9563ab1463fab17672289
+	drm/i915/gt: Add separate MOCS table for Gen12 devices other than TGL/RKL
+sound-upstream for-linus 7cf3dead1ad70c72edb03e2d98e1f3dcd332cdb2
+	Linux 5.13
+sound-upstream for-next 7cf3dead1ad70c72edb03e2d98e1f3dcd332cdb2
+	Linux 5.13
+drm-intel topic/core-for-CI 5363e35a435a0699c8b30936b6ca00db8d85c839
+	drm/i915: Add relocation exceptions for two other platforms
+drm topic/nouveau-ampere-modeset 584265dfec70e78ce2085b82ed389f27e06fbca0
+	Merge branch '04.01-ampere-lite' of git://github.com/skeggsb/linux into topic/nouveau-ampere-modeset
+drm-misc topic/i915-ttm cf3e3e86d77970211e0983130e896ae242601003
+	drm/i915: Use ttm mmap handling for ttm bo's.
