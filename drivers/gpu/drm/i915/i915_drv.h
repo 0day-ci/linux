@@ -1005,7 +1005,7 @@ struct drm_i915_private {
 	const struct drm_i915_display_audio_funcs *audio_funcs;
 
 	/* Display CDCLK functions */
-	struct drm_i915_display_cdclk_funcs cdclk_funcs;
+	const struct drm_i915_display_cdclk_funcs *cdclk_funcs;
 
 	/* PCH chipset type */
 	enum intel_pch pch_type;
