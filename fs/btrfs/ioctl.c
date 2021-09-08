@@ -1983,9 +1983,11 @@ static noinline int btrfs_ioctl_subvol_setflags(struct file *file,
 	struct inode *inode = file_inode(file);
 	struct btrfs_fs_info *fs_info = btrfs_sb(inode->i_sb);
 	struct btrfs_root *root = BTRFS_I(inode)->root;
+	struct btrfs_root_item *root_item = &root->root_item;
 	struct btrfs_trans_handle *trans;
 	u64 root_flags;
 	u64 flags;
+	bool clear_received_state = false;
 	int ret = 0;
 
 	if (!inode_owner_or_capable(file_mnt_user_ns(file), inode))
@@ -2016,9 +2018,9 @@ static noinline int btrfs_ioctl_subvol_setflags(struct file *file,
 	if (!!(flags & BTRFS_SUBVOL_RDONLY) == btrfs_root_readonly(root))
 		goto out_drop_sem;
 
-	root_flags = btrfs_root_flags(&root->root_item);
+	root_flags = btrfs_root_flags(root_item);
 	if (flags & BTRFS_SUBVOL_RDONLY) {
-		btrfs_set_root_flags(&root->root_item,
+		btrfs_set_root_flags(root_item,
 				     root_flags | BTRFS_ROOT_SUBVOL_RDONLY);
 	} else {
 		/*
@@ -2027,9 +2029,10 @@ static noinline int btrfs_ioctl_subvol_setflags(struct file *file,
 		 */
 		spin_lock(&root->root_item_lock);
 		if (root->send_in_progress == 0) {
-			btrfs_set_root_flags(&root->root_item,
+			btrfs_set_root_flags(root_item,
 				     root_flags & ~BTRFS_ROOT_SUBVOL_RDONLY);
 			spin_unlock(&root->root_item_lock);
+			clear_received_state = true;
 		} else {
 			spin_unlock(&root->root_item_lock);
 			btrfs_warn(fs_info,
@@ -2040,14 +2043,40 @@ static noinline int btrfs_ioctl_subvol_setflags(struct file *file,
 		}
 	}
 
-	trans = btrfs_start_transaction(root, 1);
+	/*
+	 * 1 item for updating the uuid root in the root tree
+	 * 1 item for actually removing the uuid record in the uuid tree
+	 */
+	trans = btrfs_start_transaction(root, 2);
 	if (IS_ERR(trans)) {
 		ret = PTR_ERR(trans);
 		goto out_reset;
 	}
 
-	ret = btrfs_update_root(trans, fs_info->tree_root,
-				&root->root_key, &root->root_item);
+	if (clear_received_state &&
+	    !btrfs_is_empty_uuid(root_item->received_uuid)) {
+
+		ret = btrfs_uuid_tree_remove(trans, root_item->received_uuid,
+					     BTRFS_UUID_KEY_RECEIVED_SUBVOL,
+					     root->root_key.objectid);
+
+		if (ret && ret != -ENOENT) {
+			btrfs_abort_transaction(trans, ret);
+			btrfs_end_transaction(trans);
+			goto out_reset;
+		}
+
+		memset(root_item->received_uuid, 0, BTRFS_UUID_SIZE);
+		btrfs_set_root_stransid(root_item, 0);
+		btrfs_set_root_rtransid(root_item, 0);
+		btrfs_set_stack_timespec_sec(&root_item->stime, 0);
+		btrfs_set_stack_timespec_nsec(&root_item->stime, 0);
+		btrfs_set_stack_timespec_sec(&root_item->rtime, 0);
+		btrfs_set_stack_timespec_nsec(&root_item->rtime, 0);
+	}
+
+	ret = btrfs_update_root(trans, fs_info->tree_root, &root->root_key,
+				root_item);
 	if (ret < 0) {
 		btrfs_end_transaction(trans);
 		goto out_reset;
