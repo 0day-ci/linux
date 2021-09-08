@@ -1816,12 +1816,18 @@ static inline bool can_do_mlock(void) { return false; }
 extern int user_shm_lock(size_t, struct ucounts *);
 extern void user_shm_unlock(size_t, struct ucounts *);
 
+typedef unsigned int __bitwise zap_flags_t;
+
+/* Whether to skip zapping swap entries */
+#define  ZAP_FLAG_SKIP_SWAP  ((__force zap_flags_t) BIT(0))
+
 /*
  * Parameter block passed down to zap_pte_range in exceptional cases.
  */
 struct zap_details {
 	struct address_space *zap_mapping;	/* Check page->mapping if set */
 	struct page *single_page;		/* Locked page to be unmapped */
+	zap_flags_t zap_flags;			/* Extra flags for zapping */
 };
 
 /*
@@ -1836,6 +1842,16 @@ zap_skip_check_mapping(struct zap_details *details, struct page *page)
 
 	return details->zap_mapping &&
 	    (details->zap_mapping != page_rmapping(page));
+}
+
+/* Return true if skip swap entries, false otherwise */
+static inline bool
+zap_skip_swap(struct zap_details *details)
+{
+	if (!details)
+		return false;
+
+	return details->zap_flags & ZAP_FLAG_SKIP_SWAP;
 }
 
 struct page *vm_normal_page(struct vm_area_struct *vma, unsigned long addr,
