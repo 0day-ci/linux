@@ -974,7 +974,7 @@ struct drm_i915_private {
 	struct workqueue_struct *flip_wq;
 
 	/* pm private clock gating functions */
-	struct drm_i915_cg_funcs cg_funcs;
+	const struct drm_i915_cg_funcs *cg_funcs;
 
 	/* pm display functions */
 	struct drm_i915_wm_disp_funcs wm_disp;
