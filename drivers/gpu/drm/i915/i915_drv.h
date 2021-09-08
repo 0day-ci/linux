@@ -1002,7 +1002,7 @@ struct drm_i915_private {
 	const struct drm_i915_display_color_funcs *color_funcs;
 
 	/* Display internal audio functions */
-	struct drm_i915_display_audio_funcs audio_funcs;
+	const struct drm_i915_display_audio_funcs *audio_funcs;
 
 	/* Display CDCLK functions */
 	struct drm_i915_display_cdclk_funcs cdclk_funcs;
