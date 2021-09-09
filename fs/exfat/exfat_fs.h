@@ -204,6 +204,7 @@ struct exfat_mount_options {
 	/* on error: continue, panic, remount-ro */
 	enum exfat_error_mode errors;
 	unsigned utf8:1, /* Use of UTF-8 character set */
+		 tz_set:1, /* Filesystem timestamps' offset set */
 		 discard:1; /* Issue discard requests on deletions */
 	int time_offset; /* Offset of timestamps from UTC (in minutes) */
 };

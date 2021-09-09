@@ -173,7 +173,7 @@ static int exfat_show_options(struct seq_file *m, struct dentry *root)
 		seq_puts(m, ",errors=remount-ro");
 	if (opts->discard)
 		seq_puts(m, ",discard");
-	if (opts->time_offset)
+	if (opts->tz_set)
 		seq_printf(m, ",time_offset=%d", opts->time_offset);
 	return 0;
 }
@@ -303,6 +303,7 @@ static int exfat_parse_param(struct fs_context *fc, struct fs_parameter *param)
 		 */
 		if (result.int_32 < -24 * 60 || result.int_32 > 24 * 60)
 			return -EINVAL;
+		opts->tz_set = 1;
 		opts->time_offset = result.int_32;
 		break;
 	case Opt_utf8:
