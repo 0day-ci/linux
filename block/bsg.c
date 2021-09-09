@@ -165,13 +165,20 @@ static const struct file_operations bsg_fops = {
 	.llseek		=	default_llseek,
 };
 
+static void bsg_device_release(struct device *dev)
+{
+	struct bsg_device *bd = container_of(dev, struct bsg_device, device);
+
+	ida_simple_remove(&bsg_minor_ida, MINOR(bd->device.devt));
+	kfree(bd);
+}
+
 void bsg_unregister_queue(struct bsg_device *bd)
 {
 	if (bd->queue->kobj.sd)
 		sysfs_remove_link(&bd->queue->kobj, "bsg");
 	cdev_device_del(&bd->cdev, &bd->device);
-	ida_simple_remove(&bsg_minor_ida, MINOR(bd->device.devt));
-	kfree(bd);
+	put_device(&bd->device);
 }
 EXPORT_SYMBOL_GPL(bsg_unregister_queue);
 
@@ -198,6 +205,7 @@ struct bsg_device *bsg_register_queue(struct request_queue *q,
 	bd->device.devt = MKDEV(bsg_major, ret);
 	bd->device.class = bsg_class;
 	bd->device.parent = parent;
+	bd->device.release = bsg_device_release;
 	dev_set_name(&bd->device, "%s", name);
 	device_initialize(&bd->device);
 
@@ -218,6 +226,7 @@ struct bsg_device *bsg_register_queue(struct request_queue *q,
 out_device_del:
 	cdev_device_del(&bd->cdev, &bd->device);
 out_ida_remove:
+	put_device(&bd->device);
 	ida_simple_remove(&bsg_minor_ida, MINOR(bd->device.devt));
 out_kfree:
 	kfree(bd);
