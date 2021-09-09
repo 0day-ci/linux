@@ -30,11 +30,47 @@ enum btf_endianness {
 	BTF_BIG_ENDIAN = 1,
 };
 
+/**
+ * @brief **btf__free** frees all data of the BTF representation
+ * @param btf
+ * @return void
+ */
 LIBBPF_API void btf__free(struct btf *btf);
 
+/**
+ * @brief **btf__new** creates a representation of a BTF section
+ * (struct btf) from the raw bytes of that section
+ * @param data raw bytes
+ * @param size length of raw bytes
+ * @return struct btf*
+ */
 LIBBPF_API struct btf *btf__new(const void *data, __u32 size);
+
+/**
+ * @brief **btf__new_split** creates a representation of a BTF section
+ * (struct btf) from a combination of raw bytes and a btf struct
+ * where the btf struct provides a basic set of types and strings,
+ * while the raw data adds its own new types and strings
+ * @param data raw bytes
+ * @param size length of raw bytes
+ * @param base_btf the base btf representation
+ * @return struct btf*
+ */
 LIBBPF_API struct btf *btf__new_split(const void *data, __u32 size, struct btf *base_btf);
+
+/**
+ * @brief **btf__new_empty** creates an unpopulated representation of
+ * a BTF section
+ * @return struct btf*
+ */
 LIBBPF_API struct btf *btf__new_empty(void);
+
+/**
+ * @brief **btf__new_empty_split** creates an unpopulated
+ * representation of a BTF section except with a base BTF
+ * ontop of which split BTF should be based
+ * @return struct btf*q
+ */
 LIBBPF_API struct btf *btf__new_empty_split(struct btf *base_btf);
 
 LIBBPF_API struct btf *btf__parse(const char *path, struct btf_ext **btf_ext);
