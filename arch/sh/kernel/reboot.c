@@ -83,6 +83,7 @@ void machine_restart(char *cmd)
 {
 	machine_ops.restart(cmd);
 }
+EXPORT_SYMBOL_GPL(machine_restart);
 
 void machine_halt(void)
 {

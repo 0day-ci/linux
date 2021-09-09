@@ -91,7 +91,7 @@ void machine_restart(char *cmd)
 	while (1) ;
 }
 
-EXPORT_SYMBOL(machine_restart);
+EXPORT_SYMBOL_GPL(machine_restart);
 
 void show_regs(struct pt_regs *regs)
 {

@@ -61,6 +61,7 @@ void machine_restart(char *cmd)
 	pr_emerg("Reboot failed -- System halted\n");
 	while (1);
 }
+EXPORT_SYMBOL_GPL(machine_restart);
 
 /*
  * Similar to machine_power_off, but don't shut off power.  Add code
