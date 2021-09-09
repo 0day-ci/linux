@@ -572,6 +572,8 @@ struct mm_struct {
 #ifdef CONFIG_IOMMU_SUPPORT
 		u32 pasid;
 #endif
+		/* user shared pages */
+		void *usharedpg;
 	} __randomize_layout;
 
 	/*
