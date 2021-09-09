@@ -658,8 +658,9 @@ static const struct pldmfw_ops ice_fwu_ops = {
  *
  * Returns: zero on success, or a negative error code on failure.
  */
-int ice_cancel_pending_update(struct ice_pf *pf, const char *component,
-			      struct netlink_ext_ack *extack)
+static int
+ice_cancel_pending_update(struct ice_pf *pf, const char *component,
+			  struct netlink_ext_ack *extack)
 {
 	struct devlink *devlink = priv_to_devlink(pf);
 	struct device *dev = ice_pf_to_dev(pf);
@@ -667,7 +668,6 @@ int ice_cancel_pending_update(struct ice_pf *pf, const char *component,
 	struct ice_hw *hw = &pf->hw;
 	enum ice_status status;
 	u8 pending = 0;
-	int err;
 
 	dev_caps = kzalloc(sizeof(*dev_caps), GFP_KERNEL);
 	if (!dev_caps)
@@ -727,28 +727,14 @@ int ice_cancel_pending_update(struct ice_pf *pf, const char *component,
 					   "Canceling previous pending update",
 					   component, 0, 0);
 
-	status = ice_acquire_nvm(hw, ICE_RES_WRITE);
-	if (status) {
-		dev_err(dev, "Failed to acquire device flash lock, err %s aq_err %s\n",
-			ice_stat_str(status),
-			ice_aq_str(hw->adminq.sq_last_status));
-		NL_SET_ERR_MSG_MOD(extack, "Failed to acquire device flash lock");
-		return -EIO;
-	}
-
 	pending |= ICE_AQC_NVM_REVERT_LAST_ACTIV;
-	err = ice_switch_flash_banks(pf, pending, extack);
-
-	ice_release_nvm(hw);
-
-	return err;
+	return ice_switch_flash_banks(pf, pending, extack);
 }
 
 /**
  * ice_flash_pldm_image - Write a PLDM-formatted firmware image to the device
- * @pf: private device driver structure
- * @fw: firmware object pointing to the relevant firmware file
- * @preservation: preservation level to request from firmware
+ * @devlink: pointer to devlink associated with the device to update
+ * @params: devlink flash update parameters
  * @extack: netlink extended ACK structure
  *
  * Parse the data for a given firmware file, verifying that it is a valid PLDM
@@ -761,24 +747,42 @@ int ice_cancel_pending_update(struct ice_pf *pf, const char *component,
  *
  * Returns: zero on success or a negative error code on failure.
  */
-int ice_flash_pldm_image(struct ice_pf *pf, const struct firmware *fw,
-			 u8 preservation, struct netlink_ext_ack *extack)
+int ice_flash_pldm_image(struct devlink *devlink,
+			 struct devlink_flash_update_params *params,
+			 struct netlink_ext_ack *extack)
 {
+	struct ice_pf *pf = devlink_priv(devlink);
 	struct device *dev = ice_pf_to_dev(pf);
 	struct ice_hw *hw = &pf->hw;
 	struct ice_fwu_priv priv;
 	enum ice_status status;
+	u8 preservation;
 	int err;
 
-	switch (preservation) {
-	case ICE_AQC_NVM_PRESERVE_ALL:
-	case ICE_AQC_NVM_PRESERVE_SELECTED:
-	case ICE_AQC_NVM_NO_PRESERVATION:
-	case ICE_AQC_NVM_FACTORY_DEFAULT:
+	switch (params->overwrite_mask) {
+	case 0:
+		/* preserve all settings and identifiers */
+		preservation = ICE_AQC_NVM_PRESERVE_ALL;
+		break;
+	case DEVLINK_FLASH_OVERWRITE_SETTINGS:
+		/* overwrite settings, but preserve vital information such as
+		 * device identifiers.
+		 */
+		preservation = ICE_AQC_NVM_PRESERVE_SELECTED;
+		break;
+	case (DEVLINK_FLASH_OVERWRITE_SETTINGS |
+	      DEVLINK_FLASH_OVERWRITE_IDENTIFIERS):
+		/* overwrite both settings and identifiers, preserve nothing */
+		preservation = ICE_AQC_NVM_NO_PRESERVATION;
 		break;
 	default:
-		WARN(1, "Unexpected preservation level request %u", preservation);
-		return -EINVAL;
+		NL_SET_ERR_MSG_MOD(extack, "Requested overwrite mask is not supported");
+		return -EOPNOTSUPP;
+	}
+
+	if (!hw->dev_caps.common_cap.nvm_unified_update) {
+		NL_SET_ERR_MSG_MOD(extack, "Current firmware does not support unified update");
+		return -EOPNOTSUPP;
 	}
 
 	memset(&priv, 0, sizeof(priv));
@@ -789,6 +793,8 @@ int ice_flash_pldm_image(struct ice_pf *pf, const struct firmware *fw,
 	priv.pf = pf;
 	priv.activate_flags = preservation;
 
+	devlink_flash_update_status_notify(devlink, "Preparing to flash", NULL, 0, 0);
+
 	status = ice_acquire_nvm(hw, ICE_RES_WRITE);
 	if (status) {
 		dev_err(dev, "Failed to acquire device flash lock, err %s aq_err %s\n",
@@ -798,7 +804,11 @@ int ice_flash_pldm_image(struct ice_pf *pf, const struct firmware *fw,
 		return -EIO;
 	}
 
-	err = pldmfw_flash_image(&priv.context, fw);
+	err = ice_cancel_pending_update(pf, NULL, extack);
+	if (err)
+		goto out_release_nvm;
+
+	err = pldmfw_flash_image(&priv.context, params->fw);
 	if (err == -ENOENT) {
 		dev_err(dev, "Firmware image has no record matching this device\n");
 		NL_SET_ERR_MSG_MOD(extack, "Firmware image has no record matching this device");
@@ -810,6 +820,7 @@ int ice_flash_pldm_image(struct ice_pf *pf, const struct firmware *fw,
 		dev_err(dev, "Failed to flash PLDM image, err %d", err);
 	}
 
+out_release_nvm:
 	ice_release_nvm(hw);
 
 	return err;
