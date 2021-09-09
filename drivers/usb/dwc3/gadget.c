@@ -4188,9 +4188,10 @@ out:
 
 static void dwc_gadget_release(struct device *dev)
 {
-	struct usb_gadget *gadget = container_of(dev, struct usb_gadget, dev);
+	struct dwc3 *dwc = dev_get_platdata(dev);
 
-	kfree(gadget);
+	kfree(dwc->gadget);
+	dwc->gadget = NULL;
 }
 
 /**
