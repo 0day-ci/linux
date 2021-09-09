@@ -594,6 +594,7 @@ static void vm_vcpu_rm(struct kvm_vm *vm, struct vcpu *vcpu)
 
 	list_del(&vcpu->list);
 	free(vcpu);
+	vm->nr_vcpus--;
 }
 
 void kvm_vm_release(struct kvm_vm *vmp)
@@ -1143,6 +1144,7 @@ void vm_vcpu_add(struct kvm_vm *vm, uint32_t vcpuid)
 
 	/* Add to linked-list of VCPUs. */
 	list_add(&vcpu->list, &vm->vcpus);
+	vm->nr_vcpus++;
 }
 
 /*
@@ -2342,4 +2344,9 @@ int vcpu_get_stats_fd(struct kvm_vm *vm, uint32_t vcpuid)
 	struct vcpu *vcpu = vcpu_find(vm, vcpuid);
 
 	return ioctl(vcpu->fd, KVM_GET_STATS_FD, NULL);
+}
+
+int vm_get_nr_vcpus(struct kvm_vm *vm)
+{
+	return vm->nr_vcpus;
 }
