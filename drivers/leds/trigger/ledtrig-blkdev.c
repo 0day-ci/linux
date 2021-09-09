@@ -437,6 +437,23 @@ static DEVICE_ATTR_WO(unlink_device);
 
 /*
  *
+ *	Disassociate all LEDs from a block device (because it's going away)
+ *
+ */
+
+static void blkdev_disk_cleanup(struct gendisk *const gd)
+{
+	struct ledtrig_blkdev_link *link;
+	struct hlist_node *next;
+
+	hlist_for_each_entry_safe(link, next,
+					&gd->ledtrig->leds, disk_leds_node)
+		blkdev_disk_unlink_locked(link->led, link, gd->ledtrig);
+}
+
+
+/*
+ *
  *	Disassociate an LED from the trigger
  *
  */
@@ -615,9 +632,55 @@ static const struct attribute_group *ledtrig_blkdev_attr_groups[] = {
 	NULL
 };
 
-struct led_trigger ledtrig_blkdev_trigger = {
+static struct led_trigger ledtrig_blkdev_trigger = {
 	.name		= "blkdev",
 	.activate	= blkdev_activate,
 	.deactivate	= blkdev_deactivate,
 	.groups		= ledtrig_blkdev_attr_groups,
 };
+
+static int __init blkdev_init(void)
+{
+	int ret;
+
+	ret = mutex_lock_interruptible(&ledtrig_blkdev_mutex);
+	if (ret != 0)
+		return ret;
+
+	ledtrig_blkdev_interval = msecs_to_jiffies(LEDTRIG_BLKDEV_INTERVAL);
+	__ledtrig_blkdev_disk_cleanup = blkdev_disk_cleanup;
+
+	/*
+	 * Can't call led_trigger_register() with ledtrig_blkdev_mutex locked.
+	 * If an LED has blkdev as its default_trigger, blkdev_activate() will
+	 * be called for that LED, and it will try to lock the mutex, which will
+	 * hang.
+	 */
+	mutex_unlock(&ledtrig_blkdev_mutex);
+
+	ret = led_trigger_register(&ledtrig_blkdev_trigger);
+	if (ret != 0) {
+		mutex_lock(&ledtrig_blkdev_mutex);
+		__ledtrig_blkdev_disk_cleanup = NULL;
+		mutex_unlock(&ledtrig_blkdev_mutex);
+	}
+
+	return ret;
+}
+module_init(blkdev_init);
+
+static void __exit blkdev_exit(void)
+{
+	mutex_lock(&ledtrig_blkdev_mutex);
+
+	/*
+	 * It's OK to call led_trigger_unregister() with the mutex locked,
+	 * because the module can only be unloaded when no LEDs are using
+	 * the blkdev trigger, so blkdev_deactivate() won't be called.
+	 */
+	led_trigger_unregister(&ledtrig_blkdev_trigger);
+	__ledtrig_blkdev_disk_cleanup = NULL;
+
+	mutex_unlock(&ledtrig_blkdev_mutex);
+}
+module_exit(blkdev_exit);
