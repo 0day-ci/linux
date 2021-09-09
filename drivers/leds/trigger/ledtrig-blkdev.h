@@ -12,4 +12,7 @@
 extern struct mutex ledtrig_blkdev_mutex;
 extern void (*__ledtrig_blkdev_disk_cleanup)(struct gendisk *gd);
 
+/* Caller must call put_disk() */
+struct gendisk *ledtrig_blkdev_get_disk(const char *const name);
+
 #endif	/* __LEDTRIG_BLKDEV_H */
