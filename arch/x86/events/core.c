@@ -681,11 +681,16 @@ void x86_pmu_disable_all(void)
 
 		if (!test_bit(idx, cpuc->active_mask))
 			continue;
+
+		if (is_amd_brs(hwc))
+			amd_brs_disable();
+
 		rdmsrl(x86_pmu_config_addr(idx), val);
 		if (!(val & ARCH_PERFMON_EVENTSEL_ENABLE))
 			continue;
 		val &= ~ARCH_PERFMON_EVENTSEL_ENABLE;
 		wrmsrl(x86_pmu_config_addr(idx), val);
+
 		if (is_counter_pair(hwc))
 			wrmsrl(x86_pmu_config_addr(idx + 1), 0);
 	}
@@ -1334,6 +1339,10 @@ static void x86_pmu_enable(struct pmu *pmu)
 			if (hwc->state & PERF_HES_ARCH)
 				continue;
 
+			/*
+			 * if cpuc->enabled = 0, then no wrmsr as
+			 * per x86_pmu_enable_event()
+			 */
 			x86_pmu_start(event, PERF_EF_RELOAD);
 		}
 		cpuc->n_added = 0;
@@ -1700,10 +1709,14 @@ int x86_pmu_handle_irq(struct pt_regs *regs)
 		 * event overflow
 		 */
 		handled++;
-		perf_sample_data_init(&data, 0, event->hw.last_period);
 
 		if (!x86_perf_event_set_period(event))
 			continue;
+
+		perf_sample_data_init(&data, 0, event->hw.last_period);
+
+		if (has_branch_stack(event))
+			data.br_stack = &cpuc->lbr_stack;
 
 		if (perf_event_overflow(event, &data, regs))
 			x86_pmu_stop(event, 0);
