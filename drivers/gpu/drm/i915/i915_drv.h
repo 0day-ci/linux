@@ -1699,6 +1699,8 @@ IS_SUBPLATFORM(const struct drm_i915_private *i915,
 
 #define HAS_ASYNC_FLIPS(i915)		(DISPLAY_VER(i915) >= 5)
 
+#define HAS_FRONTBUFFER_RENDERING(i915)	(DISPLAY_VER(i915) < 9)
+
 /* Only valid when HAS_DISPLAY() is true */
 #define INTEL_DISPLAY_ENABLED(dev_priv) \
 	(drm_WARN_ON(&(dev_priv)->drm, !HAS_DISPLAY(dev_priv)), !(dev_priv)->params.disable_display)
