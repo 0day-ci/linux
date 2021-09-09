@@ -2398,7 +2398,7 @@ int iscsi_eh_device_reset(struct scsi_cmnd *sc)
 {
 	struct iscsi_cls_session *cls_session;
 	struct iscsi_session *session;
-	struct iscsi_conn *conn;
+	struct iscsi_conn *conn = NULL;
 	struct iscsi_tm *hdr;
 	int rc = FAILED;
 
@@ -2417,6 +2417,7 @@ int iscsi_eh_device_reset(struct scsi_cmnd *sc)
 	if (!session->leadconn || session->state != ISCSI_STATE_LOGGED_IN)
 		goto unlock;
 	conn = session->leadconn;
+	iscsi_get_conn(conn->cls_conn);
 
 	/* only have one tmf outstanding at a time */
 	if (session->tmf_state != TMF_INITIAL)
@@ -2463,6 +2464,8 @@ unlock:
 done:
 	ISCSI_DBG_EH(session, "dev reset result = %s\n",
 		     rc == SUCCESS ? "SUCCESS" : "FAILED");
+	if (conn)
+		iscsi_put_conn(conn->cls_conn);
 	mutex_unlock(&session->eh_mutex);
 	return rc;
 }
@@ -2560,7 +2563,7 @@ static int iscsi_eh_target_reset(struct scsi_cmnd *sc)
 {
 	struct iscsi_cls_session *cls_session;
 	struct iscsi_session *session;
-	struct iscsi_conn *conn;
+	struct iscsi_conn *conn = NULL;
 	struct iscsi_tm *hdr;
 	int rc = FAILED;
 
@@ -2579,6 +2582,7 @@ static int iscsi_eh_target_reset(struct scsi_cmnd *sc)
 	if (!session->leadconn || session->state != ISCSI_STATE_LOGGED_IN)
 		goto unlock;
 	conn = session->leadconn;
+	iscsi_get_conn(conn->cls_conn);
 
 	/* only have one tmf outstanding at a time */
 	if (session->tmf_state != TMF_INITIAL)
@@ -2625,6 +2629,8 @@ unlock:
 done:
 	ISCSI_DBG_EH(session, "tgt %s reset result = %s\n", session->targetname,
 		     rc == SUCCESS ? "SUCCESS" : "FAILED");
+	if (conn)
+		iscsi_put_conn(conn->cls_conn);
 	mutex_unlock(&session->eh_mutex);
 	return rc;
 }
