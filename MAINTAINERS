@@ -5173,10 +5173,8 @@ S:	Maintained
 F:	drivers/scsi/am53c974.c
 
 DC395x SCSI driver
-M:	Oliver Neukum <oliver@neukum.org>
 M:	Ali Akcaagac <aliakc@web.de>
 M:	Jamie Lenehan <lenehan@twibble.org>
-L:	dc395x@twibble.org
 S:	Maintained
 W:	http://twibble.org/dist/dc395x/
 W:	http://lists.twibble.org/mailman/listinfo/dc395x/
