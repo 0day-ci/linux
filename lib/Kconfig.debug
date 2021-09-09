@@ -359,6 +359,8 @@ endif # DEBUG_INFO
 config FRAME_WARN
 	int "Warn for stack frames larger than"
 	range 0 8192
+	default 4096 if 64BIT && (KASAN_GENERIC || KASAN_SW_TAGS)
+	default 2048 if !64BIT && (KASAN_GENERIC || KASAN_SW_TAGS)
 	default 2048 if GCC_PLUGIN_LATENT_ENTROPY
 	default 1536 if (!64BIT && PARISC)
 	default 1024 if (!64BIT && !PARISC)
