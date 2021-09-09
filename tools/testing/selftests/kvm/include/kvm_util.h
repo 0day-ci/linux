@@ -400,5 +400,6 @@ uint64_t get_ucall(struct kvm_vm *vm, uint32_t vcpu_id, struct ucall *uc);
 int vm_get_stats_fd(struct kvm_vm *vm);
 int vcpu_get_stats_fd(struct kvm_vm *vm, uint32_t vcpuid);
 int vm_get_nr_vcpus(struct kvm_vm *vm);
+enum vm_guest_mode vm_get_mode(struct kvm_vm *vm);
 
 #endif /* SELFTEST_KVM_UTIL_H */

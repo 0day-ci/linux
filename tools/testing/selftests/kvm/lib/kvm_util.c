@@ -2350,3 +2350,8 @@ int vm_get_nr_vcpus(struct kvm_vm *vm)
 {
 	return vm->nr_vcpus;
 }
+
+enum vm_guest_mode vm_get_mode(struct kvm_vm *vm)
+{
+	return vm->mode;
+}
