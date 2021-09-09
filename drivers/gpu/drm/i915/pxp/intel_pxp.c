@@ -7,6 +7,7 @@
 #include "intel_pxp_irq.h"
 #include "intel_pxp_session.h"
 #include "intel_pxp_tee.h"
+#include "gem/i915_gem_context.h"
 #include "gt/intel_context.h"
 #include "i915_drv.h"
 
@@ -166,3 +167,79 @@ void intel_pxp_fini_hw(struct intel_pxp *pxp)
 
 	intel_pxp_irq_disable(pxp);
 }
+
+int intel_pxp_key_check(struct intel_pxp *pxp, struct drm_i915_gem_object *obj)
+{
+	if (!intel_pxp_is_active(pxp))
+		return -ENODEV;
+
+	if (!i915_gem_object_is_protected(obj))
+		return -EINVAL;
+
+	GEM_BUG_ON(!pxp->key_instance);
+
+	/*
+	 * If this is the first time we're using this object, it's not
+	 * encrypted yet; it will be encrypted with the current key, so mark it
+	 * as such. If the object is already encrypted, check instead if the
+	 * used key is still valid.
+	 */
+	if (!obj->pxp_key_instance)
+		obj->pxp_key_instance = pxp->key_instance;
+	else if (obj->pxp_key_instance != pxp->key_instance)
+		return -ENOEXEC;
+
+	return 0;
+}
+
+void intel_pxp_invalidate(struct intel_pxp *pxp)
+{
+	struct drm_i915_private *i915 = pxp_to_gt(pxp)->i915;
+	struct i915_gem_context *ctx, *cn;
+
+	/* ban all contexts marked as protected */
+	spin_lock_irq(&i915->gem.contexts.lock);
+	list_for_each_entry_safe(ctx, cn, &i915->gem.contexts.list, link) {
+		struct i915_gem_engines_iter it;
+		struct intel_context *ce;
+
+		if (!kref_get_unless_zero(&ctx->ref))
+			continue;
+
+		if (likely(!i915_gem_context_uses_protected_content(ctx))) {
+			i915_gem_context_put(ctx);
+			continue;
+		}
+
+		spin_unlock_irq(&i915->gem.contexts.lock);
+
+		/*
+		 * By the time we get here, the HW keys are already long gone,
+		 * so any batch using them that's already on the engines is very
+		 * likely a lost cause (and it has probably already hung the
+		 * engine). Therefore, we skip attempting to pull the running
+		 * context out of the HW and we prioritize bringing the session
+		 * back as soon as possible.
+		 */
+		for_each_gem_engine(ce, i915_gem_context_lock_engines(ctx), it)
+			intel_context_ban(ce, NULL);
+		i915_gem_context_unlock_engines(ctx);
+
+		/*
+		 * The context has been killed, no need to keep the wakeref.
+		 * This is safe from races because the only other place this
+		 * is touched is context_close and we're holding a ctx ref
+		 */
+		if (ctx->pxp_wakeref) {
+			intel_runtime_pm_put(&i915->runtime_pm,
+					     ctx->pxp_wakeref);
+			ctx->pxp_wakeref = 0;
+		}
+
+		spin_lock_irq(&i915->gem.contexts.lock);
+		list_safe_reset_next(ctx, cn, link);
+		i915_gem_context_put(ctx);
+	}
+	spin_unlock_irq(&i915->gem.contexts.lock);
+}
+
