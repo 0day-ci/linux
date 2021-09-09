@@ -166,6 +166,62 @@ exit_reschedule:
 
 /*
  *
+ *	Associate an LED with the blkdev trigger
+ *
+ */
+
+static int blkdev_activate(struct led_classdev *const led_dev)
+{
+	struct ledtrig_blkdev_led *led;
+	int ret;
+
+	/* Don't allow module to be removed while any LEDs are linked */
+	if (WARN_ON(!try_module_get(THIS_MODULE))) {
+		ret = -ENODEV;		/* Shouldn't ever happen */
+		goto exit_return;
+	}
+
+	led = kmalloc(sizeof(*led), GFP_KERNEL);
+	if (led == NULL) {
+		ret = -ENOMEM;
+		goto exit_put_module;
+	}
+
+	led->led_dev = led_dev;
+	led->blink_msec = LEDTRIG_BLKDEV_BLINK_MSEC;
+	led->mode = LEDTRIG_BLKDEV_MODE_RW;
+	INIT_HLIST_HEAD(&led->disks);
+
+	ret = mutex_lock_interruptible(&ledtrig_blkdev_mutex);
+	if (ret != 0)
+		goto exit_free;
+
+	led->dir = kobject_create_and_add("linked_devices",
+					  &led_dev->dev->kobj);
+	if (led->dir == NULL) {
+		ret = -ENOMEM;
+		goto exit_unlock;
+	}
+
+	hlist_add_head(&led->leds_node, &ledtrig_blkdev_leds);
+	led_set_trigger_data(led_dev, led);
+	ret = 0;
+
+exit_unlock:
+	mutex_unlock(&ledtrig_blkdev_mutex);
+exit_free:
+	if (ret != 0)
+		kfree(led);
+exit_put_module:
+	if (ret != 0)
+		module_put(THIS_MODULE);
+exit_return:
+	return ret;
+}
+
+
+/*
+ *
  *	Initialization - register the trigger
  *
  */
@@ -185,5 +241,6 @@ static const struct attribute_group *ledtrig_blkdev_attr_groups[] = {
 
 struct led_trigger ledtrig_blkdev_trigger = {
 	.name		= "blkdev",
+	.activate	= blkdev_activate,
 	.groups		= ledtrig_blkdev_attr_groups,
 };
