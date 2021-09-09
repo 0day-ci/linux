@@ -1286,7 +1286,7 @@ load_root:
 	sb->s_root = d_make_root(inode);
 
 	if (!sb->s_root) {
-		err = -EINVAL;
+		err = -ENOMEM;
 		goto out;
 	}
 
