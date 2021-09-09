@@ -437,6 +437,33 @@ static DEVICE_ATTR_WO(unlink_device);
 
 /*
  *
+ *	Disassociate an LED from the trigger
+ *
+ */
+
+static void blkdev_deactivate(struct led_classdev *const led_dev)
+{
+	struct ledtrig_blkdev_led *const led = led_get_trigger_data(led_dev);
+	struct ledtrig_blkdev_link *link;
+	struct hlist_node *next;
+
+	mutex_lock(&ledtrig_blkdev_mutex);
+
+	hlist_for_each_entry_safe(link, next, &led->disks, led_disks_node)
+		blkdev_disk_unlink_locked(led, link, link->disk);
+
+	hlist_del(&led->leds_node);
+	kobject_put(led->dir);
+	kfree(led);
+
+	mutex_unlock(&ledtrig_blkdev_mutex);
+
+	module_put(THIS_MODULE);
+}
+
+
+/*
+ *
  *	Initialization - register the trigger
  *
  */
@@ -459,5 +486,6 @@ static const struct attribute_group *ledtrig_blkdev_attr_groups[] = {
 struct led_trigger ledtrig_blkdev_trigger = {
 	.name		= "blkdev",
 	.activate	= blkdev_activate,
+	.deactivate	= blkdev_deactivate,
 	.groups		= ledtrig_blkdev_attr_groups,
 };
