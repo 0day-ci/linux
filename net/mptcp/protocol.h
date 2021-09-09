@@ -213,6 +213,7 @@ struct mptcp_data_frag {
 	u16 offset;
 	u16 overhead;
 	u16 already_sent;
+	u16 resend_count;
 	struct page *page;
 };
 
@@ -249,6 +250,7 @@ struct mptcp_sock {
 	bool		rcv_fastclose;
 	bool		use_64bit_ack; /* Set when we received a 64-bit DSN */
 	bool		csum_enabled;
+	bool		noncontiguous;
 	spinlock_t	join_list_lock;
 	struct work_struct work;
 	struct sk_buff  *ooo_last_skb;

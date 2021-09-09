@@ -1095,6 +1095,9 @@ static void __mptcp_clean_una(struct sock *sk)
 
 		dfrag_uncharge(sk, delta);
 		cleaned = true;
+
+		if (dfrag->resend_count == 0)
+			WRITE_ONCE(msk->noncontiguous, false);
 	}
 
 	/* all retransmitted data acked, recovery completed */
@@ -1171,6 +1174,7 @@ mptcp_carve_data_frag(const struct mptcp_sock *msk, struct page_frag *pfrag,
 	dfrag->overhead = offset - orig_offset + sizeof(struct mptcp_data_frag);
 	dfrag->offset = offset + sizeof(struct mptcp_data_frag);
 	dfrag->already_sent = 0;
+	dfrag->resend_count = 0;
 	dfrag->page = pfrag->page;
 
 	return dfrag;
@@ -2454,6 +2458,8 @@ static void __mptcp_retrans(struct sock *sk)
 		dfrag->already_sent = max(dfrag->already_sent, info.sent);
 		tcp_push(ssk, 0, info.mss_now, tcp_sk(ssk)->nonagle,
 			 info.size_goal);
+		dfrag->resend_count++;
+		WRITE_ONCE(msk->noncontiguous, true);
 	}
 
 	release_sock(ssk);
@@ -2872,6 +2878,7 @@ struct sock *mptcp_sk_clone(const struct sock *sk,
 	WRITE_ONCE(msk->fully_established, false);
 	if (mp_opt->suboptions & OPTION_MPTCP_CSUMREQD)
 		WRITE_ONCE(msk->csum_enabled, true);
+	WRITE_ONCE(msk->noncontiguous, false);
 
 	msk->write_seq = subflow_req->idsn + 1;
 	msk->snd_nxt = msk->write_seq;
