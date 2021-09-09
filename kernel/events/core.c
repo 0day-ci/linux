@@ -3522,6 +3522,64 @@ void perf_sched_cb_inc(struct pmu *pmu)
 }
 
 /*
+ * The perf_lopwr_cb() is invoked from the idle task. As such it
+ * cannot grab a mutex that may end up sleeping. The idle task cannot
+ * sleep by construction. Therefore we create a spinlock and a new
+ * list of PMUs to invoke on idle. The list is protected by a spinlock
+ * Normally we would use the pmus_lock and iterate over each PMUs. But
+ * mutex is not possible and we need to iterate only over the PMU which
+ * do require a idle callback.
+ */
+static DEFINE_SPINLOCK(lopwr_cb_lock);
+static LIST_HEAD(lopwr_cb_pmus);
+static DEFINE_PER_CPU(int, lopwr_nr_active);
+
+void perf_lopwr_active_inc(void)
+{
+	__this_cpu_inc(lopwr_nr_active);
+}
+
+void perf_lopwr_active_dec(void)
+{
+	__this_cpu_dec(lopwr_nr_active);
+}
+
+/*
+ * lopwr_in = true means going to low power state
+ * lopwr_in = false means returning from low power state
+ */
+void perf_lopwr_cb(bool lopwr_in)
+{
+	struct pmu *pmu;
+	unsigned long flags;
+
+	if (!__this_cpu_read(lopwr_nr_active))
+		return;
+
+	spin_lock_irqsave(&lopwr_cb_lock, flags);
+
+	list_for_each_entry(pmu, &lopwr_cb_pmus, lopwr_entry) {
+		if (pmu->lopwr_cb)
+			pmu->lopwr_cb(lopwr_in);
+	}
+
+	spin_unlock_irqrestore(&lopwr_cb_lock, flags);
+}
+EXPORT_SYMBOL_GPL(perf_lopwr_cb);
+
+void perf_register_lopwr_cb(struct pmu *pmu, void (*func)(bool))
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&lopwr_cb_lock, flags);
+
+	pmu->lopwr_cb   = func;
+	list_add_tail(&pmu->lopwr_entry, &lopwr_cb_pmus);
+
+	spin_unlock_irqrestore(&lopwr_cb_lock, flags);
+}
+
+/*
  * This function provides the context switch callback to the lower code
  * layer. It is invoked ONLY when the context switch callback is enabled.
  *

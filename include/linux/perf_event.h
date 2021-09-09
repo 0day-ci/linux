@@ -300,6 +300,7 @@ struct pmu {
 	/* number of address filters this PMU can do */
 	unsigned int			nr_addr_filters;
 
+	struct list_head		lopwr_entry;
 	/*
 	 * Fully disable/enable this PMU, can be used to protect from the PMI
 	 * as well as for lazy/batch writing of the MSRs.
@@ -429,6 +430,8 @@ struct pmu {
 	 */
 	void (*sched_task)		(struct perf_event_context *ctx,
 					bool sched_in);
+
+	void (*lopwr_cb)		(bool lopwr_in);
 
 	/*
 	 * Kmem cache of PMU specific data
@@ -1429,6 +1432,11 @@ extern void perf_event_task_tick(void);
 extern int perf_event_account_interrupt(struct perf_event *event);
 extern int perf_event_period(struct perf_event *event, u64 value);
 extern u64 perf_event_pause(struct perf_event *event, bool reset);
+extern void perf_lopwr_cb(bool lopwr_in);
+extern void perf_lopwr_active_inc(void);
+extern void perf_lopwr_active_dec(void);
+extern void perf_register_lopwr_cb(struct pmu *pmu, void (*lowpwr_cb)(bool));
+
 #else /* !CONFIG_PERF_EVENTS: */
 static inline void *
 perf_aux_output_begin(struct perf_output_handle *handle,

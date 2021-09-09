@@ -179,6 +179,7 @@ static void cpuidle_idle_call(void)
 	 */
 	if (need_resched()) {
 		local_irq_enable();
+		perf_lopwr_cb(false);
 		return;
 	}
 
@@ -191,7 +192,14 @@ static void cpuidle_idle_call(void)
 	if (cpuidle_not_available(drv, dev)) {
 		tick_nohz_idle_stop_tick();
 
+		if (!cpu_idle_force_poll)
+			perf_lopwr_cb(true);
+
 		default_idle_call();
+
+		if (!cpu_idle_force_poll)
+			perf_lopwr_cb(false);
+
 		goto exit_idle;
 	}
 
@@ -249,8 +257,10 @@ exit_idle:
 	/*
 	 * It is up to the idle functions to reenable local interrupts
 	 */
-	if (WARN_ON_ONCE(irqs_disabled()))
+	if (WARN_ON_ONCE(irqs_disabled())) {
 		local_irq_enable();
+		perf_lopwr_cb(false);
+	}
 }
 
 /*
@@ -279,8 +289,11 @@ static void do_idle(void)
 	__current_set_polling();
 	tick_nohz_idle_enter();
 
+
 	while (!need_resched()) {
 		rmb();
+
+		perf_lopwr_cb(true);
 
 		local_irq_disable();
 
