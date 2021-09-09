@@ -226,6 +226,16 @@ config DRM_PANEL_SAMSUNG_LD9040
 	depends on OF && SPI
 	select VIDEOMODE_HELPERS
 
+config DRM_PANEL_LGPHILIPS_SW43101
+	tristate "LG.Philips SW43101 DSI video mode panel"
+	depends on OF
+	depends on DRM_MIPI_DSI
+	depends on BACKLIGHT_CLASS_DEVICE
+	help
+	  Say Y here if you want to enable support for the LG.Philips SW43101 FHD
+	  (1080x1920) OLED DSI video mode panel found on the Xiaomi Mi Note 2.
+	  To compile this driver as a module, choose M here.
+
 config DRM_PANEL_LG_LB035Q02
 	tristate "LG LB035Q024573 RGB panel"
 	depends on GPIOLIB && OF && SPI
