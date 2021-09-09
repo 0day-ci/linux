@@ -179,7 +179,6 @@ static void cpuidle_idle_call(void)
 	 */
 	if (need_resched()) {
 		local_irq_enable();
-		perf_lopwr_cb(false);
 		return;
 	}
 
@@ -230,6 +229,9 @@ static void cpuidle_idle_call(void)
 		tick_nohz_idle_stop_tick();
 
 		next_state = cpuidle_find_deepest_state(drv, dev, max_latency_ns);
+		if (!cpu_idle_force_poll)
+			perf_lopwr_cb(true);
+
 		call_cpuidle(drv, dev, next_state);
 	} else {
 		bool stop_tick = true;
@@ -244,12 +246,17 @@ static void cpuidle_idle_call(void)
 		else
 			tick_nohz_idle_retain_tick();
 
+		if (!cpu_idle_force_poll)
+			perf_lopwr_cb(true);
+
 		entered_state = call_cpuidle(drv, dev, next_state);
 		/*
 		 * Give the governor an opportunity to reflect on the outcome
 		 */
 		cpuidle_reflect(dev, entered_state);
 	}
+	if (!cpu_idle_force_poll)
+		perf_lopwr_cb(false);
 
 exit_idle:
 	__current_set_polling();
@@ -259,7 +266,6 @@ exit_idle:
 	 */
 	if (WARN_ON_ONCE(irqs_disabled())) {
 		local_irq_enable();
-		perf_lopwr_cb(false);
 	}
 }
 
@@ -292,8 +298,6 @@ static void do_idle(void)
 
 	while (!need_resched()) {
 		rmb();
-
-		perf_lopwr_cb(true);
 
 		local_irq_disable();
 

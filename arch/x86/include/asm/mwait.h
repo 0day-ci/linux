@@ -4,6 +4,7 @@
 
 #include <linux/sched.h>
 #include <linux/sched/idle.h>
+#include <linux/perf_event.h>
 
 #include <asm/cpufeature.h>
 #include <asm/nospec-branch.h>
@@ -114,8 +115,11 @@ static inline void mwait_idle_with_hints(unsigned long eax, unsigned long ecx)
 		}
 
 		__monitor((void *)&current_thread_info()->flags, 0, 0);
-		if (!need_resched())
+		if (!need_resched()) {
+			perf_lopwr_cb(true);
 			__mwait(eax, ecx);
+			perf_lopwr_cb(false);
+		}
 	}
 	current_clr_polling();
 }
