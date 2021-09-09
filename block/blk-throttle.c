@@ -302,9 +302,6 @@ static uint64_t tg_bps_limit(struct throtl_grp *tg, int rw)
 	struct throtl_data *td;
 	uint64_t ret;
 
-	if (cgroup_subsys_on_dfl(io_cgrp_subsys) && !blkg->parent)
-		return U64_MAX;
-
 	td = tg->td;
 	ret = tg->bps[rw][td->limit_index];
 	if (ret == 0 && td->limit_index == LIMIT_LOW) {
@@ -331,9 +328,6 @@ static unsigned int tg_iops_limit(struct throtl_grp *tg, int rw)
 	struct blkcg_gq *blkg = tg_to_blkg(tg);
 	struct throtl_data *td;
 	unsigned int ret;
-
-	if (cgroup_subsys_on_dfl(io_cgrp_subsys) && !blkg->parent)
-		return UINT_MAX;
 
 	td = tg->td;
 	ret = tg->iops[rw][td->limit_index];
@@ -1430,9 +1424,8 @@ static void tg_conf_updated(struct throtl_grp *tg, bool global)
 		struct throtl_grp *parent_tg;
 
 		tg_update_has_rules(this_tg);
-		/* ignore root/second level */
-		if (!cgroup_subsys_on_dfl(io_cgrp_subsys) || !blkg->parent ||
-		    !blkg->parent->parent)
+		/* ignore root level */
+		if (!cgroup_subsys_on_dfl(io_cgrp_subsys) || !blkg->parent)
 			continue;
 		parent_tg = blkg_to_tg(blkg->parent);
 		/*
@@ -1771,7 +1764,6 @@ static struct cftype throtl_files[] = {
 #ifdef CONFIG_BLK_DEV_THROTTLING_LOW
 	{
 		.name = "low",
-		.flags = CFTYPE_NOT_ON_ROOT,
 		.seq_show = tg_print_limit,
 		.write = tg_set_limit,
 		.private = LIMIT_LOW,
@@ -1779,7 +1771,6 @@ static struct cftype throtl_files[] = {
 #endif
 	{
 		.name = "max",
-		.flags = CFTYPE_NOT_ON_ROOT,
 		.seq_show = tg_print_limit,
 		.write = tg_set_limit,
 		.private = LIMIT_MAX,
