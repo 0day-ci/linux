@@ -1184,12 +1184,16 @@ static int __init amd_core_pmu_init(void)
 		 * invoked on context-switch in via sched_task_in(), so enable only when necessary
 		 */
 		if (!amd_brs_init()) {
+			struct pmu *pmu = x86_get_pmu(smp_processor_id());
 			x86_pmu.get_event_constraints = amd_get_event_constraints_f19h;
 			x86_pmu.sched_task = amd_pmu_sched_task;
 			/*
 			 * The put_event_constraints callback is shared with
 			 * Fam17h, set above
 			 */
+
+			/* branch sampling must be stopped when entering low power */
+			perf_register_lopwr_cb(pmu, amd_pmu_brs_lopwr_cb);
 		}
 	}
 

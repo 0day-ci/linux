@@ -1242,6 +1242,7 @@ static inline void amd_pmu_brs_del(struct perf_event *event)
 }
 
 void amd_pmu_brs_sched_task(struct perf_event_context *ctx, bool sched_in);
+void amd_pmu_brs_lopwr_cb(bool lopwr_in);
 
 /*
  * check if BRS is activated on the CPU

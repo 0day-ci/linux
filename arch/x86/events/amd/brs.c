@@ -146,6 +146,7 @@ void amd_brs_enable(void)
 
 	/* Set enable bit */
 	set_debug_extn_cfg(cfg.val);
+	perf_lopwr_active_inc();
 }
 
 void amd_brs_disable(void)
@@ -175,6 +176,7 @@ void amd_brs_disable(void)
 		cfg.brsmen = 0;
 		set_debug_extn_cfg(cfg.val);
 	}
+	perf_lopwr_active_dec();
 }
 
 static bool amd_brs_match_plm(struct perf_event *event, u64 to)
@@ -290,6 +292,29 @@ static void amd_brs_poison_buffer(void)
 
 	/* Poison target of entry */
 	wrmsrl(brs_to(idx), BRS_POISON);
+}
+
+/*
+ * called indirectly with irqs masked from mwait_idle_*()
+ */
+void amd_pmu_brs_lopwr_cb(bool lopwr_in)
+{
+	struct cpu_hw_events *cpuc = this_cpu_ptr(&cpu_hw_events);
+	union amd_debug_extn_cfg cfg;
+
+	/*
+	 * on mwait in, we may end up in non C0 state.
+	 * we must disable branch sampling to avoid holding the NMI
+	 * for too long. We disable it in hardware but we
+	 * keep the state in cpuc, so we can re-enable.
+	 *
+	 * The hardware will deliver the NMI if needed when brsmen cleared
+	 */
+	if (cpuc->brs_active) {
+		cfg.val = get_debug_extn_cfg();
+		cfg.brsmen = !lopwr_in;
+		set_debug_extn_cfg(cfg.val);
+	}
 }
 
 /*
