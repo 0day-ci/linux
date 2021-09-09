@@ -2295,6 +2295,7 @@ queue_exit:
 	blk_queue_exit(q);
 	return BLK_QC_T_NONE;
 }
+EXPORT_SYMBOL_GPL(blk_mq_submit_bio);
 
 static size_t order_to_size(unsigned int order)
 {
