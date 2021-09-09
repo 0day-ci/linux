@@ -118,6 +118,7 @@ int sja1105_xfer_buf(const struct sja1105_private *priv,
 {
 	return sja1105_xfer(priv, rw, reg_addr, buf, len, NULL);
 }
+EXPORT_SYMBOL_GPL(sja1105_xfer_buf);
 
 /* If @rw is:
  * - SPI_WRITE: creates and sends an SPI write message at absolute
@@ -172,6 +173,7 @@ int sja1105_xfer_u32(const struct sja1105_private *priv,
 
 	return rc;
 }
+EXPORT_SYMBOL_GPL(sja1105_xfer_u32);
 
 static int sja1105et_reset_cmd(struct dsa_switch *ds)
 {
@@ -601,6 +603,7 @@ const struct sja1105_info sja1105e_info = {
 	.supports_rgmii		= {true, true, true, true, true},
 	.name			= "SJA1105E",
 };
+EXPORT_SYMBOL_GPL(sja1105e_info);
 
 const struct sja1105_info sja1105t_info = {
 	.device_id		= SJA1105T_DEVICE_ID,
@@ -633,6 +636,7 @@ const struct sja1105_info sja1105t_info = {
 	.supports_rgmii		= {true, true, true, true, true},
 	.name			= "SJA1105T",
 };
+EXPORT_SYMBOL_GPL(sja1105t_info);
 
 const struct sja1105_info sja1105p_info = {
 	.device_id		= SJA1105PR_DEVICE_ID,
@@ -666,6 +670,7 @@ const struct sja1105_info sja1105p_info = {
 	.supports_rgmii		= {true, true, true, true, true},
 	.name			= "SJA1105P",
 };
+EXPORT_SYMBOL_GPL(sja1105p_info);
 
 const struct sja1105_info sja1105q_info = {
 	.device_id		= SJA1105QS_DEVICE_ID,
@@ -699,6 +704,7 @@ const struct sja1105_info sja1105q_info = {
 	.supports_rgmii		= {true, true, true, true, true},
 	.name			= "SJA1105Q",
 };
+EXPORT_SYMBOL_GPL(sja1105q_info);
 
 const struct sja1105_info sja1105r_info = {
 	.device_id		= SJA1105PR_DEVICE_ID,
@@ -735,6 +741,7 @@ const struct sja1105_info sja1105r_info = {
 	.supports_sgmii		= {false, false, false, false, true},
 	.name			= "SJA1105R",
 };
+EXPORT_SYMBOL_GPL(sja1105r_info);
 
 const struct sja1105_info sja1105s_info = {
 	.device_id		= SJA1105QS_DEVICE_ID,
@@ -771,6 +778,7 @@ const struct sja1105_info sja1105s_info = {
 	.supports_sgmii		= {false, false, false, false, true},
 	.name			= "SJA1105S",
 };
+EXPORT_SYMBOL_GPL(sja1105s_info);
 
 const struct sja1105_info sja1110a_info = {
 	.device_id		= SJA1110_DEVICE_ID,
@@ -821,6 +829,7 @@ const struct sja1105_info sja1110a_info = {
 				   SJA1105_PHY_BASE_T1},
 	.name			= "SJA1110A",
 };
+EXPORT_SYMBOL_GPL(sja1110a_info);
 
 const struct sja1105_info sja1110b_info = {
 	.device_id		= SJA1110_DEVICE_ID,
@@ -871,6 +880,7 @@ const struct sja1105_info sja1110b_info = {
 				   SJA1105_NO_PHY},
 	.name			= "SJA1110B",
 };
+EXPORT_SYMBOL_GPL(sja1110b_info);
 
 const struct sja1105_info sja1110c_info = {
 	.device_id		= SJA1110_DEVICE_ID,
@@ -921,6 +931,7 @@ const struct sja1105_info sja1110c_info = {
 				   SJA1105_NO_PHY},
 	.name			= "SJA1110C",
 };
+EXPORT_SYMBOL_GPL(sja1110c_info);
 
 const struct sja1105_info sja1110d_info = {
 	.device_id		= SJA1110_DEVICE_ID,
@@ -971,3 +982,4 @@ const struct sja1105_info sja1110d_info = {
 				   SJA1105_NO_PHY},
 	.name			= "SJA1110D",
 };
+EXPORT_SYMBOL_GPL(sja1110d_info);

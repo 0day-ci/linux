@@ -52,6 +52,7 @@ void sja1105_unpack(const void *buf, u64 *val, int start, int end, size_t len)
 		       start, end);
 	dump_stack();
 }
+EXPORT_SYMBOL_GPL(sja1105_unpack);
 
 void sja1105_packing(void *buf, u64 *val, int start, int end,
 		     size_t len, enum packing_op op)

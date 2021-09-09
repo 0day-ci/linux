@@ -23,6 +23,10 @@ tristate "NXP SJA1105 Ethernet switch family support"
 	    - SJA1110C (Gen. 3, SGMII, TT-Ethernet, 100base-TX PHY, 7 ports)
 	    - SJA1110D (Gen. 3, SGMII, TT-Ethernet, no 100base-TX PHY, 7 ports)
 
+config NET_DSA_SJA1105_PROBE
+tristate "Actual driver that probes the hardware"
+	depends on NET_DSA_SJA1105
+
 config NET_DSA_SJA1105_PTP
 	bool "Support for the PTP clock on the NXP SJA1105 Ethernet switch"
 	depends on NET_DSA_SJA1105

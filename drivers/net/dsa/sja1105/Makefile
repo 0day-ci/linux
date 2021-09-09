@@ -23,3 +23,5 @@ endif
 ifdef CONFIG_NET_DSA_SJA1105_VL
 sja1105-objs += sja1105_vl.o
 endif
+
+obj-$(CONFIG_NET_DSA_SJA1105_PROBE) += sja1105_probe.o
