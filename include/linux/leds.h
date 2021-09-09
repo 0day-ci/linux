@@ -613,6 +613,7 @@ static inline void ledtrig_audio_set(enum led_audio type,
  */
 static inline void ledtrig_blkdev_disk_init(struct gendisk *const gd)
 {
+	gd->ledtrig = NULL;
 }
 void ledtrig_blkdev_disk_cleanup(struct gendisk *const gd);
 #else	/* IS_ENABLED(CONFIG_LEDS_TRIGGER_BLKDEV) */

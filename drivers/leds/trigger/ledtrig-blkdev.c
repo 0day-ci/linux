@@ -6,6 +6,7 @@
  *	Copyright 2021 Ian Pilcher <arequipeno@gmail.com>
  */
 
+#include <linux/leds.h>
 #include <linux/module.h>
 
 #include "ledtrig-blkdev.h"
