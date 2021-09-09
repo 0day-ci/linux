@@ -13,8 +13,16 @@
 #include "processor.h"
 
 #define DEFAULT_ARM64_GUEST_STACK_VADDR_MIN	0xac0000
+#define VM_VCPUID_MAP_INVAL			-1
 
 static vm_vaddr_t exception_handlers;
+
+struct vm_vcpuid_map {
+	uint64_t mpidr;
+	int vcpuid;
+};
+
+static struct vm_vcpuid_map vcpuid_map[KVM_MAX_VCPUS];
 
 static uint64_t page_align(struct kvm_vm *vm, uint64_t v)
 {
@@ -425,4 +433,42 @@ void vm_install_exception_handler(struct kvm_vm *vm, int vector,
 	assert(!VECTOR_IS_SYNC(vector));
 	assert(vector < VECTOR_NUM);
 	handlers->exception_handlers[vector][0] = handler;
+}
+
+void vm_vcpuid_map_init(struct kvm_vm *vm)
+{
+	int i = 0;
+	struct vcpu *vcpu;
+	struct vm_vcpuid_map *map;
+
+	list_for_each_entry(vcpu, &vm->vcpus, list) {
+		map = &vcpuid_map[i++];
+		map->vcpuid = vcpu->id;
+		get_reg(vm, vcpu->id,
+			ARM64_SYS_KVM_REG(SYS_MPIDR_EL1), &map->mpidr);
+		map->mpidr &= MPIDR_HWID_BITMASK;
+	}
+
+	if (i < KVM_MAX_VCPUS)
+		vcpuid_map[i].vcpuid = VM_VCPUID_MAP_INVAL;
+
+	sync_global_to_guest(vm, vcpuid_map);
+}
+
+int get_vcpuid(void)
+{
+	int i, vcpuid;
+	uint64_t mpidr = read_sysreg(mpidr_el1) & MPIDR_HWID_BITMASK;
+
+	for (i = 0; i < KVM_MAX_VCPUS; i++) {
+		vcpuid = vcpuid_map[i].vcpuid;
+		GUEST_ASSERT_1(vcpuid != VM_VCPUID_MAP_INVAL, mpidr);
+
+		if (mpidr == vcpuid_map[i].mpidr)
+			return vcpuid;
+	}
+
+	/* We should not be reaching here */
+	GUEST_ASSERT_1(0, mpidr);
+	return -1;
 }

@@ -133,6 +133,7 @@ void vm_install_exception_handler(struct kvm_vm *vm,
 		int vector, handler_fn handler);
 void vm_install_sync_handler(struct kvm_vm *vm,
 		int vector, int ec, handler_fn handler);
+void vm_vcpuid_map_init(struct kvm_vm *vm);
 
 static inline void cpu_relax(void)
 {
@@ -193,5 +194,7 @@ static inline void local_irq_disable(void)
 {
 	asm volatile("msr daifset, #3" : : : "memory");
 }
+
+int get_vcpuid(void);
 
 #endif /* SELFTEST_KVM_PROCESSOR_H */
