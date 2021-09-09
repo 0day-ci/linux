@@ -28,6 +28,17 @@ struct bench_futex_parameters {
 };
 
 /**
+ * Some newer 32-bit architectures (such as RISC-V 32-bit) don't have
+ * the SYS_futex syscall and instead only have the SYS_futex_time64 call.
+ * Let's ensure that those still compile and run by just using the
+ * SYS_futex_time64 syscall. On these systems `struct timespec` will use a
+ * 64-bit time_t so the SYS_futex_time64 call will work.
+ */
+#if !defined(SYS_futex) && defined(SYS_futex_time64)
+ #define SYS_futex SYS_futex_time64
+#endif
+
+/**
  * futex() - SYS_futex syscall wrapper
  * @uaddr:	address of first futex
  * @op:		futex op code
