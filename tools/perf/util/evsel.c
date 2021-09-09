@@ -2824,6 +2824,14 @@ int evsel__open_strerror(struct evsel *evsel, struct target *target,
 			return scnprintf(msg, size, "The 'aux_output' feature is not supported, update the kernel.");
 		if (is_amd && (evsel->core.attr.precise_ip || !strncmp(evsel->pmu_name, "ibs", 3)) && (evsel->core.attr.exclude_kernel))
 			return scnprintf(msg, size, "AMD IBS can't exclude kernel events.  Try running at a higher privilege level.");
+
+		if (is_amd && ((evsel->core.attr.config & 0xff) == 0xc4) && (evsel->core.attr.sample_type & PERF_SAMPLE_BRANCH_STACK)) {
+			if (evsel->core.attr.freq)
+				return scnprintf(msg, size, "AMD Branch Sampling does not support frequency mode sampling, must pass a fixed sampling period via -c option or cpu/branch-brs,period=xxxx/.");
+			/* another reason is that the period is too small */
+			return scnprintf(msg, size, "AMD Branch Sampling does not support sampling period smaller than what is reported in /sys/devices/cpu/caps/branches.");
+		}
+
 		break;
 	case ENODATA:
 		return scnprintf(msg, size, "Cannot collect data source with the load latency event alone. "
