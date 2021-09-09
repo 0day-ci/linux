@@ -71,6 +71,9 @@ static unsigned int ledtrig_blkdev_interval;
 static void blkdev_process(struct work_struct *const work);
 static DECLARE_DELAYED_WORK(ledtrig_blkdev_work, blkdev_process);
 
+/* Total number of device-to-LED associations */
+static unsigned int ledtrig_blkdev_count;
+
 
 /*
  *
@@ -222,11 +225,168 @@ exit_return:
 
 /*
  *
+ *	link_device sysfs attribute - assocate a block device with this LED
+ *
+ */
+
+/* Gets or allocs & initializes the blkdev disk for a gendisk */
+static int blkdev_get_disk(struct gendisk *const gd)
+{
+	struct ledtrig_blkdev_disk *disk;
+	struct kobject *dir;
+
+	if (gd->ledtrig != NULL) {
+		kobject_get(gd->ledtrig->dir);
+		return 0;
+	}
+
+	disk = kmalloc(sizeof(*disk), GFP_KERNEL);
+	if (disk == NULL)
+		return -ENOMEM;
+
+	dir = kobject_create_and_add("linked_leds", &disk_to_dev(gd)->kobj);
+	if (dir == NULL) {
+		kfree(disk);
+		return -ENOMEM;
+	}
+
+	INIT_HLIST_HEAD(&disk->leds);
+	disk->gd = gd;
+	disk->dir = dir;
+	disk->read_ios = 0;
+	disk->write_ios = 0;
+
+	gd->ledtrig = disk;
+
+	return 0;
+}
+
+static void blkdev_put_disk(struct ledtrig_blkdev_disk *const disk)
+{
+	kobject_put(disk->dir);
+
+	if (hlist_empty(&disk->leds)) {
+		disk->gd->ledtrig = NULL;
+		kfree(disk);
+	}
+}
+
+static int blkdev_disk_link_locked(struct ledtrig_blkdev_led *const led,
+				   struct gendisk *const gd)
+{
+	struct ledtrig_blkdev_link *link;
+	struct ledtrig_blkdev_disk *disk;
+	unsigned long delay;
+	int ret;
+
+	link = kmalloc(sizeof(*link), GFP_KERNEL);
+	if (link == NULL) {
+		ret = -ENOMEM;
+		goto error_return;
+	}
+
+	ret = blkdev_get_disk(gd);
+	if (ret != 0)
+		goto error_free_link;
+
+	disk = gd->ledtrig;
+
+	ret = sysfs_create_link(disk->dir, &led->led_dev->dev->kobj,
+				led->led_dev->name);
+	if (ret != 0)
+		goto error_put_disk;
+
+	ret = sysfs_create_link(led->dir, &disk_to_dev(gd)->kobj,
+				gd->disk_name);
+	if (ret != 0)
+		goto error_remove_link;
+
+	link->disk = disk;
+	link->led = led;
+	hlist_add_head(&link->led_disks_node, &led->disks);
+	hlist_add_head(&link->disk_leds_node, &disk->leds);
+
+	if (ledtrig_blkdev_count == 0) {
+		delay = READ_ONCE(ledtrig_blkdev_interval);
+		WARN_ON(!schedule_delayed_work(&ledtrig_blkdev_work, delay));
+	}
+
+	++ledtrig_blkdev_count;
+
+	return 0;
+
+error_remove_link:
+	sysfs_remove_link(disk->dir, led->led_dev->name);
+error_put_disk:
+	blkdev_put_disk(disk);
+error_free_link:
+	kfree(link);
+error_return:
+	return ret;
+}
+
+static bool blkdev_already_linked(const struct ledtrig_blkdev_led *const led,
+				  const struct gendisk *const gd)
+{
+	const struct ledtrig_blkdev_link *link;
+
+	if (gd->ledtrig == NULL)
+		return false;
+
+	hlist_for_each_entry(link, &gd->ledtrig->leds, disk_leds_node) {
+
+		if (link->led == led)
+			return true;
+	}
+
+	return false;
+}
+
+static ssize_t link_device_store(struct device *const dev,
+				 struct device_attribute *const attr,
+				 const char *const buf, const size_t count)
+{
+	struct ledtrig_blkdev_led *const led = led_trigger_get_drvdata(dev);
+	struct gendisk *gd;
+	int ret;
+
+	ret = mutex_lock_interruptible(&ledtrig_blkdev_mutex);
+	if (ret != 0)
+		goto exit_return;
+
+	gd = ledtrig_blkdev_get_disk(buf);
+	if (gd == NULL) {
+		ret = -ENODEV;
+		goto exit_unlock;
+	}
+
+	if (blkdev_already_linked(led, gd)) {
+		ret = -EEXIST;
+		goto exit_put_disk;
+	}
+
+	ret = blkdev_disk_link_locked(led, gd);
+
+exit_put_disk:
+	if (ret != 0)
+		put_disk(gd);
+exit_unlock:
+	mutex_unlock(&ledtrig_blkdev_mutex);
+exit_return:
+	return (ret == 0) ? count : ret;
+}
+
+static DEVICE_ATTR_WO(link_device);
+
+
+/*
+ *
  *	Initialization - register the trigger
  *
  */
 
 static struct attribute *ledtrig_blkdev_attrs[] = {
+	&dev_attr_link_device.attr,
 	NULL
 };
 
