@@ -33,6 +33,7 @@ static void fpga_image_prog_complete(struct fpga_image_load *imgld)
 {
 	mutex_lock(&imgld->lock);
 	imgld->progress = FPGA_IMAGE_PROG_IDLE;
+	eventfd_signal(imgld->finished, 1);
 	complete_all(&imgld->update_done);
 	mutex_unlock(&imgld->lock);
 }
@@ -92,6 +93,8 @@ idle_exit:
 	imgld->data = NULL;
 	put_device(&imgld->dev);
 	fpga_image_prog_complete(imgld);
+	eventfd_ctx_put(imgld->finished);
+	imgld->finished = NULL;
 }
 
 static int fpga_image_load_ioctl_write(struct fpga_image_load *imgld,
@@ -99,6 +102,7 @@ static int fpga_image_load_ioctl_write(struct fpga_image_load *imgld,
 {
 	struct fpga_image_write wb;
 	unsigned long minsz;
+	int ret;
 	u8 *buf;
 
 	if (imgld->driver_unload || imgld->progress != FPGA_IMAGE_PROG_IDLE)
@@ -115,13 +119,23 @@ static int fpga_image_load_ioctl_write(struct fpga_image_load *imgld,
 	if (wb.size & 0x3)
 		return -EINVAL;
 
+	if (wb.evtfd < 0)
+		return -EINVAL;
+
 	buf = vzalloc(wb.size);
 	if (!buf)
 		return -ENOMEM;
 
 	if (copy_from_user(buf, u64_to_user_ptr(wb.buf), wb.size)) {
-		vfree(buf);
-		return -EFAULT;
+		ret = -EFAULT;
+		goto exit_free;
+	}
+
+	imgld->finished = eventfd_ctx_fdget(wb.evtfd);
+	if (IS_ERR(imgld->finished)) {
+		ret = PTR_ERR(imgld->finished);
+		imgld->finished = NULL;
+		goto exit_free;
 	}
 
 	imgld->data = buf;
@@ -130,8 +144,11 @@ static int fpga_image_load_ioctl_write(struct fpga_image_load *imgld,
 	imgld->progress = FPGA_IMAGE_PROG_STARTING;
 	reinit_completion(&imgld->update_done);
 	schedule_work(&imgld->work);
-
 	return 0;
+
+exit_free:
+	vfree(buf);
+	return ret;
 }
 
 static long fpga_image_load_ioctl(struct file *filp, unsigned int cmd,

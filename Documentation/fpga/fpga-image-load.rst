@@ -28,4 +28,6 @@ Start an image load with the provided image buffer. This IOCTL returns
 immediately after starting a kernel worker thread to process the image load
 which could take as long a 40 minutes depending on the actual device being
 updated. This is an exclusive operation; an attempt to start concurrent image
-load for the same device will fail with EBUSY.
+load for the same device will fail with EBUSY. An eventfd file descriptor
+parameter is provided to this IOCTL, and it will be signalled at the
+completion of the image load.

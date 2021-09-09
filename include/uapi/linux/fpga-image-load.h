@@ -52,6 +52,7 @@ struct fpga_image_write {
 	/* Input */
 	__u32 flags;		/* Zero for now */
 	__u32 size;		/* Data size (in bytes) to be written */
+	__s32 evtfd;		/* File descriptor for completion signal */
 	__u64 buf;		/* User space address of source data */
 };
 
