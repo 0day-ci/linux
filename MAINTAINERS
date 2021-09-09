@@ -5896,6 +5896,7 @@ F:	include/uapi/drm/i810_drm.h
 DRM DRIVER FOR LG.PHILIPS SW43101 PANEL
 M:	Yassine Oudjana <y.oudjana@protonmail.com>
 S:	Maintained
+F:	Documentation/devicetree/bindings/display/panel/lgphilips,sw43101.yaml
 F:	drivers/gpu/drm/panel/panel-lgphilips-sw43101.c
 
 DRM DRIVER FOR LVDS PANELS
