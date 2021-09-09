@@ -2309,6 +2309,10 @@ static void blk_mq_clear_rq_mapping(struct blk_mq_tag_set *set,
 	struct page *page;
 	unsigned long flags;
 
+	/* If the hctx is unmapped, drv_tags may be NULL */
+	if (!drv_tags)
+		return;
+
 	list_for_each_entry(page, &tags->page_list, lru) {
 		unsigned long start = (unsigned long)page_address(page);
 		unsigned long end = start + order_to_size(page->private);
