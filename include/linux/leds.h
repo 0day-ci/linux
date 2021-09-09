@@ -10,6 +10,7 @@
 
 #include <dt-bindings/leds/common.h>
 #include <linux/device.h>
+#include <linux/genhd.h>
 #include <linux/kernfs.h>
 #include <linux/list.h>
 #include <linux/mutex.h>
@@ -604,5 +605,23 @@ static inline void ledtrig_audio_set(enum led_audio type,
 {
 }
 #endif
+
+#if IS_ENABLED(CONFIG_LEDS_TRIGGER_BLKDEV)
+/**
+ * ledtrig_blkdev_disk_init - initialize the ledtrig field of a new gendisk
+ * @gd:	the gendisk to be initialized
+ */
+static inline void ledtrig_blkdev_disk_init(struct gendisk *const gd)
+{
+}
+void ledtrig_blkdev_disk_cleanup(struct gendisk *const gd);
+#else	/* IS_ENABLED(CONFIG_LEDS_TRIGGER_BLKDEV) */
+static inline void ledtrig_blkdev_disk_init(const struct gendisk *gd)
+{
+}
+static inline void ledtrig_blkdev_disk_cleanup(const struct gendisk *gd)
+{
+}
+#endif	/* IS_ENABLED(CONFIG_LEDS_TRIGGER_BLKDEV) */
 
 #endif		/* __LINUX_LEDS_H_INCLUDED */
