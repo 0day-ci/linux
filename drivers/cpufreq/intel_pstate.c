@@ -3221,7 +3221,7 @@ static int __init intel_pstate_init(void)
 		 */
 		if ((!no_hwp && boot_cpu_has(X86_FEATURE_HWP_EPP)) ||
 		    intel_pstate_hwp_is_enabled()) {
-			hwp_active++;
+			hwp_active = 1;
 			hwp_mode_bdw = id->driver_data;
 			intel_pstate.attr = hwp_cpufreq_attrs;
 			intel_cpufreq.attr = hwp_cpufreq_attrs;
@@ -3304,17 +3304,27 @@ device_initcall(intel_pstate_init);
 
 static int __init intel_pstate_setup(char *str)
 {
+	/*
+	 * If BIOS is forcing HWP, then parameter
+	 * overrides might be needed. Only print
+	 * the message once, and regardless of
+	 * any overrides.
+	 */
+	if(!hwp_active && boot_cpu_has(X86_FEATURE_HWP))
+		if(intel_pstate_hwp_is_enabled()){
+			pr_info("HWP enabled by BIOS\n");
+			hwp_active = 1;
+		}
 	if (!str)
 		return -EINVAL;
 
-	if (!strcmp(str, "disable"))
+	if (!strcmp(str, "disable") && !hwp_active)
 		no_load = 1;
-	else if (!strcmp(str, "active"))
+	if (!strcmp(str, "active"))
 		default_driver = &intel_pstate;
-	else if (!strcmp(str, "passive"))
+	if (!strcmp(str, "passive"))
 		default_driver = &intel_cpufreq;
-
-	if (!strcmp(str, "no_hwp")) {
+	if (!strcmp(str, "no_hwp") && !hwp_active) {
 		pr_info("HWP disabled\n");
 		no_hwp = 1;
 	}
