@@ -381,12 +381,69 @@ static DEVICE_ATTR_WO(link_device);
 
 /*
  *
+ *	unlink_device sysfs attribute - disassociate a device from this LED
+ *
+ */
+
+static void blkdev_disk_unlink_locked(struct ledtrig_blkdev_led *const led,
+				      struct ledtrig_blkdev_link *const link,
+				      struct ledtrig_blkdev_disk *const disk)
+{
+	--ledtrig_blkdev_count;
+
+	if (ledtrig_blkdev_count == 0)
+		WARN_ON(!cancel_delayed_work_sync(&ledtrig_blkdev_work));
+
+	sysfs_remove_link(led->dir, disk->gd->disk_name);
+	sysfs_remove_link(disk->dir, led->led_dev->name);
+	kobject_put(disk->dir);
+
+	hlist_del(&link->led_disks_node);
+	hlist_del(&link->disk_leds_node);
+	kfree(link);
+
+	if (hlist_empty(&disk->leds)) {
+		disk->gd->ledtrig = NULL;
+		kfree(disk);
+	}
+
+	put_disk(disk->gd);
+}
+
+static ssize_t unlink_device_store(struct device *const dev,
+				   struct device_attribute *const attr,
+				   const char *const buf, const size_t count)
+{
+	struct ledtrig_blkdev_led *const led = led_trigger_get_drvdata(dev);
+	struct ledtrig_blkdev_link *link;
+
+	mutex_lock(&ledtrig_blkdev_mutex);
+
+	hlist_for_each_entry(link, &led->disks, led_disks_node) {
+
+		if (sysfs_streq(link->disk->gd->disk_name, buf)) {
+			blkdev_disk_unlink_locked(led, link, link->disk);
+			break;
+		}
+	}
+
+	mutex_unlock(&ledtrig_blkdev_mutex);
+
+	return count;
+}
+
+static DEVICE_ATTR_WO(unlink_device);
+
+
+/*
+ *
  *	Initialization - register the trigger
  *
  */
 
 static struct attribute *ledtrig_blkdev_attrs[] = {
 	&dev_attr_link_device.attr,
+	&dev_attr_unlink_device.attr,
 	NULL
 };
 
