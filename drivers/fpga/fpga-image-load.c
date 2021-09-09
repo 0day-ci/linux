@@ -46,6 +46,24 @@ static void fpga_image_dev_error(struct fpga_image_load *imgld,
 	imgld->lops->cancel(imgld);
 }
 
+static int fpga_image_prog_transition(struct fpga_image_load *imgld,
+				      enum fpga_image_prog new_progress)
+{
+	int ret = 0;
+
+	mutex_lock(&imgld->lock);
+	if (imgld->request_cancel) {
+		imgld->err_progress = imgld->progress;
+		imgld->err_code = FPGA_IMAGE_ERR_CANCELED;
+		imgld->lops->cancel(imgld);
+		ret = -ECANCELED;
+	} else {
+		imgld->progress = new_progress;
+	}
+	mutex_unlock(&imgld->lock);
+	return ret;
+}
+
 static void fpga_image_prog_complete(struct fpga_image_load *imgld)
 {
 	mutex_lock(&imgld->lock);
@@ -77,8 +95,10 @@ static void fpga_image_do_load(struct work_struct *work)
 		goto modput_exit;
 	}
 
-	fpga_image_update_progress(imgld, FPGA_IMAGE_PROG_WRITING);
-	while (imgld->remaining_size) {
+	if (fpga_image_prog_transition(imgld, FPGA_IMAGE_PROG_WRITING))
+		goto done;
+
+	while (imgld->remaining_size && !imgld->request_cancel) {
 		ret = imgld->lops->write_blk(imgld, offset);
 		if (ret != FPGA_IMAGE_ERR_NONE) {
 			fpga_image_dev_error(imgld, ret);
@@ -88,7 +108,9 @@ static void fpga_image_do_load(struct work_struct *work)
 		offset = size - imgld->remaining_size;
 	}
 
-	fpga_image_update_progress(imgld, FPGA_IMAGE_PROG_PROGRAMMING);
+	if (fpga_image_prog_transition(imgld, FPGA_IMAGE_PROG_PROGRAMMING))
+		goto done;
+
 	ret = imgld->lops->poll_complete(imgld);
 	if (ret != FPGA_IMAGE_ERR_NONE)
 		fpga_image_dev_error(imgld, ret);
@@ -159,6 +181,7 @@ static int fpga_image_load_ioctl_write(struct fpga_image_load *imgld,
 	imgld->remaining_size = wb.size;
 	imgld->err_code = FPGA_IMAGE_ERR_NONE;
 	imgld->progress = FPGA_IMAGE_PROG_STARTING;
+	imgld->request_cancel = false;
 	reinit_completion(&imgld->update_done);
 	schedule_work(&imgld->work);
 	return 0;
@@ -189,7 +212,7 @@ static long fpga_image_load_ioctl(struct file *filp, unsigned int cmd,
 				  unsigned long arg)
 {
 	struct fpga_image_load *imgld = filp->private_data;
-	int ret = -ENOTTY;
+	int ret = 0;
 
 	mutex_lock(&imgld->lock);
 
@@ -199,6 +222,17 @@ static long fpga_image_load_ioctl(struct file *filp, unsigned int cmd,
 		break;
 	case FPGA_IMAGE_LOAD_STATUS:
 		ret = fpga_image_load_ioctl_status(imgld, arg);
+		break;
+	case FPGA_IMAGE_LOAD_CANCEL:
+		if (imgld->progress == FPGA_IMAGE_PROG_PROGRAMMING)
+			ret = -EBUSY;
+		else if (imgld->progress == FPGA_IMAGE_PROG_IDLE)
+			ret = -ENODEV;
+		else
+			imgld->request_cancel = true;
+		break;
+	default:
+		ret = -ENOTTY;
 		break;
 	}
 
@@ -373,6 +407,9 @@ void fpga_image_load_unregister(struct fpga_image_load *imgld)
 		mutex_unlock(&imgld->lock);
 		goto unregister;
 	}
+
+	if (imgld->progress != FPGA_IMAGE_PROG_PROGRAMMING)
+		imgld->request_cancel = true;
 
 	mutex_unlock(&imgld->lock);
 	wait_for_completion(&imgld->update_done);

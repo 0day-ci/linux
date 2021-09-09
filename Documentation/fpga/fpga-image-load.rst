@@ -37,3 +37,9 @@ FPGA_IMAGE_LOAD_STATUS:
 Collect status for an on-going image upload. The status returned includes
 how much data remains to be transferred, the progress of the image load,
 and error information in the case of a failure.
+
+FPGA_IMAGE_LOAD_CANCEL:
+
+Request that a on-going image upload be cancelled. This IOCTL may return
+EBUSY if it cannot be cancelled by software or ENODEV if there is no update
+in progress.

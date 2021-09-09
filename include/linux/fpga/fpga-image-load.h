@@ -52,6 +52,7 @@ struct fpga_image_load {
 	enum fpga_image_prog progress;
 	enum fpga_image_prog err_progress;	/* progress at time of failure */
 	enum fpga_image_err err_code;		/* image load error code */
+	bool request_cancel;
 	bool driver_unload;
 	struct eventfd_ctx *finished;
 	void *priv;
