@@ -8,6 +8,7 @@
 
 #include <linux/leds.h>
 #include <linux/module.h>
+#include <linux/part_stat.h>
 
 #include "ledtrig-blkdev.h"
 
@@ -59,6 +60,108 @@ struct ledtrig_blkdev_led {
 	struct hlist_node		leds_node;
 	enum ledtrig_blkdev_mode	mode;
 };
+
+/* All LEDs associated with the trigger */
+static HLIST_HEAD(ledtrig_blkdev_leds);
+
+/* How often to check for drive activity - in jiffies */
+static unsigned int ledtrig_blkdev_interval;
+
+/* Delayed work used to periodically check for activity & blink LEDs */
+static void blkdev_process(struct work_struct *const work);
+static DECLARE_DELAYED_WORK(ledtrig_blkdev_work, blkdev_process);
+
+
+/*
+ *
+ *	Periodically check for device acitivity and blink LEDs
+ *
+ */
+
+static void blkdev_blink(const struct ledtrig_blkdev_led *const led)
+{
+	unsigned long delay_on = READ_ONCE(led->blink_msec);
+	unsigned long delay_off = 1;	/* 0 leaves LED turned on */
+
+	led_blink_set_oneshot(led->led_dev, &delay_on, &delay_off, 0);
+}
+
+static void blkdev_update_disk(struct ledtrig_blkdev_disk *const disk,
+			       const unsigned int generation)
+{
+	const struct block_device *const part0 = disk->gd->part0;
+	const unsigned long read_ios = part_stat_read(part0, ios[STAT_READ]);
+	const unsigned long write_ios = part_stat_read(part0, ios[STAT_WRITE])
+				+ part_stat_read(part0, ios[STAT_DISCARD])
+				+ part_stat_read(part0, ios[STAT_FLUSH]);
+
+	if (disk->read_ios != read_ios) {
+		disk->read_act = true;
+		disk->read_ios = read_ios;
+	} else {
+		disk->read_act = false;
+	}
+
+	if (disk->write_ios != write_ios) {
+		disk->write_act = true;
+		disk->write_ios = write_ios;
+	} else {
+		disk->write_act = false;
+	}
+
+	disk->generation = generation;
+}
+
+static bool blkdev_read_mode(const enum ledtrig_blkdev_mode mode)
+{
+	return mode != LEDTRIG_BLKDEV_MODE_WO;
+}
+
+static bool blkdev_write_mode(const enum ledtrig_blkdev_mode mode)
+{
+	return mode != LEDTRIG_BLKDEV_MODE_RO;
+}
+
+static void blkdev_process(struct work_struct *const work)
+{
+	static unsigned int generation;
+
+	struct ledtrig_blkdev_led *led;
+	struct ledtrig_blkdev_link *link;
+	unsigned long delay;
+
+	if (!mutex_trylock(&ledtrig_blkdev_mutex))
+		goto exit_reschedule;
+
+	hlist_for_each_entry(led, &ledtrig_blkdev_leds, leds_node) {
+
+		hlist_for_each_entry(link, &led->disks, led_disks_node) {
+
+			struct ledtrig_blkdev_disk *const disk = link->disk;
+
+			if (disk->generation != generation)
+				blkdev_update_disk(disk, generation);
+
+			if (disk->read_act && blkdev_read_mode(led->mode)) {
+				blkdev_blink(led);
+				break;
+			}
+
+			if (disk->write_act && blkdev_write_mode(led->mode)) {
+				blkdev_blink(led);
+				break;
+			}
+		}
+	}
+
+	++generation;
+
+	mutex_unlock(&ledtrig_blkdev_mutex);
+
+exit_reschedule:
+	delay = READ_ONCE(ledtrig_blkdev_interval);
+	WARN_ON_ONCE(!schedule_delayed_work(&ledtrig_blkdev_work, delay));
+}
 
 
 /*
