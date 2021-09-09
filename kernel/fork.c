@@ -97,6 +97,7 @@
 #include <linux/scs.h>
 #include <linux/io_uring.h>
 #include <linux/bpf.h>
+#include <linux/task_shared.h>
 
 #include <asm/pgalloc.h>
 #include <linux/uaccess.h>
@@ -903,6 +904,9 @@ static struct task_struct *dup_task_struct(struct task_struct *orig, int node)
 	if (err)
 		goto free_stack;
 
+	/* task's ushared struct not inherited across fork */
+	tsk->task_ushrd =  NULL;
+
 #ifdef CONFIG_SECCOMP
 	/*
 	 * We must handle setting up seccomp filters once we're under
@@ -1049,6 +1053,7 @@ static struct mm_struct *mm_init(struct mm_struct *mm, struct task_struct *p,
 #if defined(CONFIG_TRANSPARENT_HUGEPAGE) && !USE_SPLIT_PMD_PTLOCKS
 	mm->pmd_huge_pte = NULL;
 #endif
+	mm->usharedpg = NULL;
 	mm_init_uprobes_state(mm);
 
 	if (current->mm) {
@@ -1099,6 +1104,7 @@ static inline void __mmput(struct mm_struct *mm)
 	ksm_exit(mm);
 	khugepaged_exit(mm); /* must run before exit_mmap */
 	exit_mmap(mm);
+	mm_ushared_clear(mm);
 	mm_put_huge_zero_page(mm);
 	set_mm_exe_file(mm, NULL);
 	if (!list_empty(&mm->mmlist)) {
@@ -1308,6 +1314,7 @@ static int wait_for_vfork_done(struct task_struct *child,
 static void mm_release(struct task_struct *tsk, struct mm_struct *mm)
 {
 	uprobe_free_utask(tsk);
+	task_ushared_free(tsk);
 
 	/* Get rid of any cached register state */
 	deactivate_mm(tsk, mm);
