@@ -7348,6 +7348,7 @@ FPGA SECURITY MANAGER DRIVERS
 M:	Russ Weight <russell.h.weight@intel.com>
 L:	linux-fpga@vger.kernel.org
 S:	Maintained
+F:	Documentation/ABI/testing/sysfs-class-fpga-image-load
 F:	Documentation/fpga/fpga-image-load.rst
 F:	drivers/fpga/fpga-image-load.c
 F:	include/linux/fpga/fpga-image-load.h

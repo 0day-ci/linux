@@ -1,0 +1,7 @@
+What: 		/sys/class/fpga_image_load/fpga_imageX/status
+Date:		Aug 2021
+KernelVersion:	5.15
+Contact:	Russ Weight <russell.h.weight@intel.com>
+Description:	Read-only. Returns a string describing the current status
+		of an FPGA image upload. The string will be one of the
+		following: idle, starting, preparing, writing, programming.

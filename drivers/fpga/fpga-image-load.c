@@ -236,6 +236,38 @@ static const struct file_operations fpga_image_load_fops = {
 	.unlocked_ioctl = fpga_image_load_ioctl,
 };
 
+static const char * const image_load_prog_str[] = {
+	[FPGA_IMAGE_PROG_IDLE]	      = "idle",
+	[FPGA_IMAGE_PROG_STARTING]    = "starting",
+	[FPGA_IMAGE_PROG_PREPARING]   = "preparing",
+	[FPGA_IMAGE_PROG_WRITING]     = "writing",
+	[FPGA_IMAGE_PROG_PROGRAMMING] = "programming"
+};
+
+static ssize_t
+status_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	struct fpga_image_load *imgld = to_image_load(dev);
+	const char *status = "unknown-status";
+	enum fpga_image_prog progress;
+
+	progress = imgld->progress;
+	if (progress < FPGA_IMAGE_PROG_MAX)
+		status = image_load_prog_str[progress];
+	else
+		dev_err(dev, "Invalid status during secure update: %d\n",
+			progress);
+
+	return sysfs_emit(buf, "%s\n", status);
+}
+static DEVICE_ATTR_RO(status);
+
+static struct attribute *fpga_image_load_attrs[] = {
+	&dev_attr_status.attr,
+	NULL,
+};
+ATTRIBUTE_GROUPS(fpga_image_load);
+
 /**
  * fpga_image_load_register - create and register an FPGA Image Load Device
  *
@@ -373,6 +405,7 @@ static int __init fpga_image_load_class_init(void)
 	if (ret)
 		goto exit_destroy_class;
 
+	fpga_image_load_class->dev_groups = fpga_image_load_groups;
 	fpga_image_load_class->dev_release = fpga_image_load_dev_release;
 
 	return 0;
