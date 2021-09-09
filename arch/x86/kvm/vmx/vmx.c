@@ -6883,6 +6883,7 @@ static int vmx_create_vcpu(struct kvm_vcpu *vcpu)
 
 	vcpu_setup_sgx_lepubkeyhash(vcpu);
 
+	vmx->nested.vmxon_ptr = -1ull;
 	vmx->nested.posted_intr_nv = -1;
 	vmx->nested.current_vmptr = -1ull;
 	vmx->nested.hv_evmcs_vmptr = EVMPTR_INVALID;

@@ -289,6 +289,7 @@ static void free_nested(struct kvm_vcpu *vcpu)
 	kvm_clear_request(KVM_REQ_GET_NESTED_STATE_PAGES, vcpu);
 
 	vmx->nested.vmxon = false;
+	vmx->nested.vmxon_ptr = -1ull;
 	vmx->nested.smm.vmxon = false;
 	free_vpid(vmx->nested.vpid02);
 	vmx->nested.posted_intr_nv = -1;
