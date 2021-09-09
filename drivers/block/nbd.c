@@ -729,12 +729,13 @@ static struct nbd_cmd *nbd_read_stat(struct nbd_device *nbd, int index)
 	tag = nbd_handle_to_tag(handle);
 	hwq = blk_mq_unique_tag_to_hwq(tag);
 	if (hwq < nbd->tag_set.nr_hw_queues)
-		req = blk_mq_tag_to_rq(nbd->tag_set.tags[hwq],
-				       blk_mq_unique_tag_to_tag(tag));
+		req = blk_mq_find_and_get_req(nbd->tag_set.tags[hwq],
+					      blk_mq_unique_tag_to_tag(tag));
 	if (!req || !blk_mq_request_started(req)) {
 		dev_err(disk_to_dev(nbd->disk), "Unexpected reply (%d) %p\n",
 			tag, req);
-		return ERR_PTR(-ENOENT);
+		ret = -ENOENT;
+		goto put_req;
 	}
 	trace_nbd_header_received(req, handle);
 	cmd = blk_mq_rq_to_pdu(req);
@@ -806,6 +807,14 @@ static struct nbd_cmd *nbd_read_stat(struct nbd_device *nbd, int index)
 out:
 	trace_nbd_payload_received(req, handle);
 	mutex_unlock(&cmd->lock);
+put_req:
+	/*
+	 * It's safe to drop refcnt here because request completion won't
+	 * concurent, thus if nbd_read_stat() successd, the request refcnt
+	 * won't drop to zero here.
+	 */
+	if (req)
+		blk_mq_put_rq_ref(req);
 	return ret ? ERR_PTR(ret) : cmd;
 }
 
