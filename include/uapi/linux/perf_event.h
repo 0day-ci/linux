@@ -1329,13 +1329,18 @@ union perf_mem_data_src {
 struct perf_branch_entry {
 	__u64	from;
 	__u64	to;
-	__u64	mispred:1,  /* target mispredicted */
-		predicted:1,/* target predicted */
-		in_tx:1,    /* in transaction */
-		abort:1,    /* transaction abort */
-		cycles:16,  /* cycle count to last branch */
-		type:4,     /* branch type */
-		reserved:40;
+	union {
+		__u64	val;	    /* to make it easier to clear all fields */
+		struct {
+			__u64	mispred:1,  /* target mispredicted */
+				predicted:1,/* target predicted */
+				in_tx:1,    /* in transaction */
+				abort:1,    /* transaction abort */
+				cycles:16,  /* cycle count to last branch */
+				type:4,     /* branch type */
+				reserved:40;
+		};
+	};
 };
 
 union perf_sample_weight {
