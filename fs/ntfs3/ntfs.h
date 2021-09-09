@@ -21,7 +21,8 @@
 #define NTFS_NAME_LEN 255
 
 /* ntfs.sys used 500 maximum links on-disk struct allows up to 0xffff. */
-#define NTFS_LINK_MAX 0x400
+/* xfstest 041 creates 3003 hardlinks. */
+#define NTFS_LINK_MAX 4000
 //#define NTFS_LINK_MAX 0xffff
 
 /*
