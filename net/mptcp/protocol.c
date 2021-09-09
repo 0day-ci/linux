@@ -1280,6 +1280,8 @@ static void mptcp_update_data_checksum(struct sk_buff *skb, int added)
 
 static void mptcp_update_infinite_mapping(struct mptcp_sock *msk, struct mptcp_ext *mpext)
 {
+	struct sock *sk = (struct sock *)msk;
+
 	if (!mpext)
 		return;
 
@@ -1288,6 +1290,7 @@ static void mptcp_update_infinite_mapping(struct mptcp_sock *msk, struct mptcp_e
 	mpext->data_len = 0;
 	mpext->csum = 0;
 
+	MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_INFINITEMAPTX);
 	WRITE_ONCE(msk->snd_infinite_mapping_enable, false);
 	pr_infinite(msk);
 	__mptcp_do_infinite(msk);
