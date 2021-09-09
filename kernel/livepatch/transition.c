@@ -308,6 +308,8 @@ static bool klp_try_switch_task(struct task_struct *task)
 	rq = task_rq_lock(task, &flags);
 
 	if (task_running(rq, task) && task != current) {
+		if (is_idle_task(task))
+			resched_curr(rq);
 		snprintf(err_buf, STACK_ERR_BUF_SIZE,
 			 "%s: %s:%d is running\n", __func__, task->comm,
 			 task->pid);
