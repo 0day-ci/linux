@@ -308,6 +308,7 @@ static bool __mptcp_move_skb(struct mptcp_sock *msk, struct sock *ssk,
 
 	if (MPTCP_SKB_CB(skb)->map_seq == msk->ack_seq) {
 		/* in sequence */
+		WRITE_ONCE(msk->start_seq, msk->ack_seq);
 		WRITE_ONCE(msk->ack_seq, msk->ack_seq + copy_len);
 		tail = skb_peek_tail(&sk->sk_receive_queue);
 		if (tail && mptcp_try_coalesce(sk, tail, skb))
@@ -523,6 +524,7 @@ static bool mptcp_check_data_fin(struct sock *sk)
 	 */
 
 	if (mptcp_pending_data_fin(sk, &rcv_data_fin_seq)) {
+		WRITE_ONCE(msk->start_seq, msk->ack_seq);
 		WRITE_ONCE(msk->ack_seq, msk->ack_seq + 1);
 		WRITE_ONCE(msk->rcv_data_fin, 0);
 
@@ -2894,6 +2896,7 @@ struct sock *mptcp_sk_clone(const struct sock *sk,
 		WRITE_ONCE(msk->ack_seq, ack_seq);
 		WRITE_ONCE(msk->rcv_wnd_sent, ack_seq);
 	}
+	WRITE_ONCE(msk->start_seq, 0);
 
 #if !IS_ENABLED(CONFIG_KASAN)
 	sock_reset_flag(nsk, SOCK_RCU_FREE);
@@ -3141,6 +3144,7 @@ void mptcp_finish_connect(struct sock *ssk)
 	WRITE_ONCE(msk->rcv_wnd_sent, ack_seq);
 	WRITE_ONCE(msk->can_ack, 1);
 	WRITE_ONCE(msk->snd_una, msk->write_seq);
+	WRITE_ONCE(msk->start_seq, 0);
 
 	mptcp_pm_new_connection(msk, ssk, 0);
 
