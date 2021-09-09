@@ -123,6 +123,7 @@
 #define MPTCP_RETRANSMIT	9
 #define MPTCP_WORK_SYNC_SETSOCKOPT 10
 #define MPTCP_CONNECTED		11
+#define MPTCP_INFINITE_DONE	12
 
 static inline bool before64(__u64 seq1, __u64 seq2)
 {
@@ -869,6 +870,38 @@ static inline void mptcp_do_fallback(struct sock *sk)
 }
 
 #define pr_fallback(a) pr_debug("%s:fallback to TCP (msk=%p)", __func__, a)
+
+static inline bool __mptcp_check_infinite(const struct mptcp_sock *msk)
+{
+	return test_bit(MPTCP_INFINITE_DONE, &msk->flags);
+}
+
+static inline bool mptcp_check_infinite(const struct sock *sk)
+{
+	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
+	struct mptcp_sock *msk = mptcp_sk(subflow->conn);
+
+	return __mptcp_check_infinite(msk);
+}
+
+static inline void __mptcp_do_infinite(struct mptcp_sock *msk)
+{
+	if (test_bit(MPTCP_INFINITE_DONE, &msk->flags)) {
+		pr_debug("Infinite mapping already done (msk=%p)", msk);
+		return;
+	}
+	set_bit(MPTCP_INFINITE_DONE, &msk->flags);
+}
+
+static inline void mptcp_do_infinite(struct sock *sk)
+{
+	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
+	struct mptcp_sock *msk = mptcp_sk(subflow->conn);
+
+	__mptcp_do_infinite(msk);
+}
+
+#define pr_infinite(a) pr_debug("%s:infinite mapping (msk=%p)", __func__, a)
 
 static inline bool subflow_simultaneous_connect(struct sock *sk)
 {
