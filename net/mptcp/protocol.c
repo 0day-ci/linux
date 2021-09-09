@@ -1278,6 +1278,21 @@ static void mptcp_update_data_checksum(struct sk_buff *skb, int added)
 	mpext->csum = csum_fold(csum_block_add(csum, skb_checksum(skb, offset, added, 0), offset));
 }
 
+static void mptcp_update_infinite_mapping(struct mptcp_sock *msk, struct mptcp_ext *mpext)
+{
+	if (!mpext)
+		return;
+
+	mpext->data_seq = READ_ONCE(msk->start_seq);
+	mpext->subflow_seq = 0;
+	mpext->data_len = 0;
+	mpext->csum = 0;
+
+	WRITE_ONCE(msk->snd_infinite_mapping_enable, false);
+	pr_infinite(msk);
+	__mptcp_do_infinite(msk);
+}
+
 static int mptcp_sendmsg_frag(struct sock *sk, struct sock *ssk,
 			      struct mptcp_data_frag *dfrag,
 			      struct mptcp_sendmsg_info *info)
@@ -1410,6 +1425,8 @@ alloc_skb:
 out:
 	if (READ_ONCE(msk->csum_enabled))
 		mptcp_update_data_checksum(skb, copy);
+	if (READ_ONCE(msk->snd_infinite_mapping_enable))
+		mptcp_update_infinite_mapping(msk, mpext);
 	mptcp_subflow_ctx(ssk)->rel_write_seq += copy;
 	return copy;
 }
@@ -2881,6 +2898,7 @@ struct sock *mptcp_sk_clone(const struct sock *sk,
 	if (mp_opt->suboptions & OPTION_MPTCP_CSUMREQD)
 		WRITE_ONCE(msk->csum_enabled, true);
 	WRITE_ONCE(msk->noncontiguous, false);
+	WRITE_ONCE(msk->snd_infinite_mapping_enable, false);
 
 	msk->write_seq = subflow_req->idsn + 1;
 	msk->snd_nxt = msk->write_seq;
