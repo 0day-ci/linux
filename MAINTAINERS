@@ -7351,6 +7351,7 @@ S:	Maintained
 F:	Documentation/fpga/fpga-image-load.rst
 F:	drivers/fpga/fpga-image-load.c
 F:	include/linux/fpga/fpga-image-load.h
+F:	include/uapi/linux/fpga-image-load.h
 
 FPU EMULATOR
 M:	Bill Metzenthen <billm@melbpc.org.au>
