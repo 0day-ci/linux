@@ -782,13 +782,13 @@ mpt3sas_transport_port_add(struct MPT3SAS_ADAPTER *ioc, u16 handle,
 	if (!sas_node->parent_dev) {
 		ioc_err(ioc, "failure at %s:%d/%s()!\n",
 			__FILE__, __LINE__, __func__);
-		goto out_fail;
+		goto out_device_put;
 	}
 	port = sas_port_alloc_num(sas_node->parent_dev);
 	if ((sas_port_add(port))) {
 		ioc_err(ioc, "failure at %s:%d/%s()!\n",
 			__FILE__, __LINE__, __func__);
-		goto out_fail;
+		goto out_device_put;
 	}
 
 	list_for_each_entry(mpt3sas_phy, &mpt3sas_port->phy_list,
@@ -855,6 +855,11 @@ mpt3sas_transport_port_add(struct MPT3SAS_ADAPTER *ioc, u16 handle,
 		    rphy_to_expander_device(rphy), hba_port->port_id);
 	return mpt3sas_port;
 
+ out_device_put:
+	if (mpt3sas_port->remote_identify.device_type == SAS_END_DEVICE) {
+		sas_device->pend_sas_rphy_add = 0;
+		sas_device_put(sas_device);
+	}
  out_fail:
 	list_for_each_entry_safe(mpt3sas_phy, next, &mpt3sas_port->phy_list,
 	    port_siblings)
