@@ -27,6 +27,20 @@
 #define ID_AA64DFR0_EL1         3, 0,  0, 5, 0
 
 /*
+ * ARM64_SYS_KVM_REG(sys_reg_id): Helper macro to convert
+ * SYS_* register definitions in sysreg.h to use in KVM
+ * calls such as get_reg() and set_reg().
+ */
+#define ARM64_SYS_KVM_REG(sys_reg_id)			\
+({							\
+	ARM64_SYS_REG(sys_reg_Op0(sys_reg_id),		\
+			sys_reg_Op1(sys_reg_id),	\
+			sys_reg_CRn(sys_reg_id),	\
+			sys_reg_CRm(sys_reg_id),	\
+			sys_reg_Op2(sys_reg_id));	\
+})
+
+/*
  * Default MAIR
  *                  index   attribute
  * DEVICE_nGnRnE      0     0000:0000
