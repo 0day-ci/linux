@@ -432,6 +432,13 @@ struct ice_agg_node {
 	u8 valid;
 };
 
+enum ice_fw_activate {
+	ICE_FW_ACTIVATE_UNKNOWN = 0, /* Unknown activation requirement */
+	ICE_FW_ACTIVATE_ON_POR, /* Activate by power on */
+	ICE_FW_ACTIVATE_ON_PCIR, /* Activate by PCI reset */
+	ICE_FW_ACTIVATE_ON_EMPR, /* Activate by EMP reset */
+};
+
 struct ice_pf {
 	struct pci_dev *pdev;
 
@@ -486,6 +493,7 @@ struct ice_pf {
 	spinlock_t aq_wait_lock;
 	struct hlist_head aq_wait_list;
 	wait_queue_head_t aq_wait_queue;
+	enum ice_fw_activate fw_reset_req;
 
 	wait_queue_head_t reset_wait_queue;
 
