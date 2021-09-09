@@ -6,7 +6,7 @@
 #ifndef __INTEL_PSR_H__
 #define __INTEL_PSR_H__
 
-#include "intel_frontbuffer.h"
+#include <linux/types.h>
 
 struct drm_connector;
 struct drm_connector_state;
@@ -29,12 +29,6 @@ void intel_psr_update(struct intel_dp *intel_dp,
 		      const struct intel_crtc_state *crtc_state,
 		      const struct drm_connector_state *conn_state);
 int intel_psr_debug_set(struct intel_dp *intel_dp, u64 value);
-void intel_psr_invalidate(struct drm_i915_private *dev_priv,
-			  unsigned frontbuffer_bits,
-			  enum fb_op_origin origin);
-void intel_psr_flush(struct drm_i915_private *dev_priv,
-		     unsigned frontbuffer_bits,
-		     enum fb_op_origin origin);
 void intel_psr_init(struct intel_dp *intel_dp);
 void intel_psr_compute_config(struct intel_dp *intel_dp,
 			      struct intel_crtc_state *crtc_state);
