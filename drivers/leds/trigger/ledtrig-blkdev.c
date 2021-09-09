@@ -59,3 +59,28 @@ struct ledtrig_blkdev_led {
 	struct hlist_node		leds_node;
 	enum ledtrig_blkdev_mode	mode;
 };
+
+
+/*
+ *
+ *	Initialization - register the trigger
+ *
+ */
+
+static struct attribute *ledtrig_blkdev_attrs[] = {
+	NULL
+};
+
+static const struct attribute_group ledtrig_blkdev_attr_group = {
+	.attrs	= ledtrig_blkdev_attrs,
+};
+
+static const struct attribute_group *ledtrig_blkdev_attr_groups[] = {
+	&ledtrig_blkdev_attr_group,
+	NULL
+};
+
+struct led_trigger ledtrig_blkdev_trigger = {
+	.name		= "blkdev",
+	.groups		= ledtrig_blkdev_attr_groups,
+};
