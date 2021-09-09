@@ -446,6 +446,19 @@ int ksz_switch_register(struct ksz_device *dev,
 }
 EXPORT_SYMBOL(ksz_switch_register);
 
+void ksz_switch_shutdown(struct ksz_device *dev)
+{
+	struct dsa_switch *ds = dev->ds;
+
+	/* timer started */
+	if (dev->mib_read_interval) {
+		cancel_delayed_work_sync(&dev->mib_read);
+		dev->mib_read_interval = 0;
+	}
+	dsa_tree_shutdown(ds->dst);
+}
+EXPORT_SYMBOL(ksz_switch_shutdown);
+
 void ksz_switch_remove(struct ksz_device *dev)
 {
 	/* timer started */
