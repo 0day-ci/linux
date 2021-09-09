@@ -243,4 +243,14 @@ config FPGA_MGR_VERSAL_FPGA
 	  configure the programmable logic(PL).
 
 	  To compile this as a module, choose M here.
+
+config FPGA_IMAGE_LOAD
+	tristate "FPGA Image Load Driver"
+	help
+	  The FPGA Image Load class driver presents a common user API for
+	  uploading an image file to an FPGA device. The image file is
+	  expected to be self-describing. It is up to the device driver
+	  and/or the device itself to authenticate and disposition the
+	  image data.
+
 endif # FPGA

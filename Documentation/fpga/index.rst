@@ -8,6 +8,7 @@ fpga
     :maxdepth: 1
 
     dfl
+    fpga-image-load
 
 .. only::  subproject and html
 
