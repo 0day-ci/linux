@@ -229,6 +229,16 @@ static int ksz9477_reset_switch(struct ksz_device *dev)
 	return 0;
 }
 
+static int ksz9477_shutdown(struct ksz_device *dev)
+{
+	int ret;
+
+	ret = ksz9477_reset_switch(dev);
+	ksz_switch_shutdown(dev);
+
+	return ret;
+}
+
 static void ksz9477_r_mib_cnt(struct ksz_device *dev, int port, u16 addr,
 			      u64 *cnt)
 {
@@ -1601,7 +1611,7 @@ static const struct ksz_dev_ops ksz9477_dev_ops = {
 	.r_mib_pkt = ksz9477_r_mib_pkt,
 	.freeze_mib = ksz9477_freeze_mib,
 	.port_init_cnt = ksz9477_port_init_cnt,
-	.shutdown = ksz9477_reset_switch,
+	.shutdown = ksz9477_shutdown,
 	.detect = ksz9477_switch_detect,
 	.init = ksz9477_switch_init,
 	.exit = ksz9477_switch_exit,
