@@ -372,8 +372,109 @@ out_free_ctx:
 	return err;
 }
 
+/**
+ * ice_devlink_reload_down - Start reload
+ * @devlink: pointer to the devlink instance to reload
+ * @netns_change: if true, the network namespace is changing
+ * @action: the action to perform. Must be DEVLINK_RELOAD_ACTION_FW_ACTIVATE
+ * @limit: limits on what reload should do, such as not resetting
+ * @extack: netlink extended ACK structure
+ *
+ * Command issued by devlink core to perform a reload. This driver only
+ * supports firmware activation.
+ */
+static int
+ice_devlink_reload_down(struct devlink *devlink, bool netns_change,
+			enum devlink_reload_action action,
+			enum devlink_reload_limit limit,
+			struct netlink_ext_ack *extack)
+{
+	struct ice_pf *pf = devlink_priv(devlink);
+	struct device *dev = ice_pf_to_dev(pf);
+	struct ice_hw *hw = &pf->hw;
+	enum ice_status status;
+	u8 pending;
+	int err;
+
+	err = ice_get_pending_updates(pf, &pending, extack);
+	if (err)
+		return err;
+
+	if (!pending) {
+		NL_SET_ERR_MSG_MOD(extack, "No pending firmware update");
+		return -ECANCELED;
+	}
+
+	switch (pf->fw_reset_req) {
+	case ICE_FW_ACTIVATE_ON_POR:
+		NL_SET_ERR_MSG_MOD(extack, "Firmware activation requires power on");
+		return -ECANCELED;
+	case ICE_FW_ACTIVATE_ON_PCIR:
+		NL_SET_ERR_MSG_MOD(extack, "Firmware activation requires cold PCI reset\n");
+		return -ECANCELED;
+	case ICE_FW_ACTIVATE_UNKNOWN:
+		dev_dbg(dev, "Firmware activation requirement unknown, assuming EMP reset is sufficient\n");
+		fallthrough;
+	case ICE_FW_ACTIVATE_ON_EMPR:
+		dev_dbg(dev, "Issuing device EMP reset to activate firmware\n");
+
+		status = ice_aq_nvm_update_empr(hw);
+		if (status) {
+			dev_err(dev, "Failed to trigger EMP device reset to reload firmware, err %s aq_err %s\n",
+				ice_stat_str(status),
+				ice_aq_str(hw->adminq.sq_last_status));
+			NL_SET_ERR_MSG_MOD(extack, "Failed to trigger EMP device reset to reload firmware");
+			return -EIO;
+		}
+
+		break;
+	}
+
+	return 0;
+}
+
+/**
+ * ice_devlink_reload_up - Finish reload
+ * @devlink: pointer to the devlink instance reloading
+ * @action: the action requested
+ * @limit: limits imposed by userspace, such as not resetting
+ * @actions_performed: on return, indicate what actions actually performed
+ * @extack: netlink extended ACK structure
+ *
+ * Complete a reload, such as waiting for the driver to come back up. The ice
+ * driver only supports firmware activation, which requires a device reset.
+ */
+static int
+ice_devlink_reload_up(struct devlink *devlink,
+		      enum devlink_reload_action action,
+		      enum devlink_reload_limit limit,
+		      u32 *actions_performed,
+		      struct netlink_ext_ack *extack)
+{
+	struct ice_pf *pf = devlink_priv(devlink);
+	int err;
+
+	*actions_performed = BIT(DEVLINK_RELOAD_ACTION_FW_ACTIVATE);
+
+	err = ice_wait_for_reset(pf, 20 * HZ);
+	if (err) {
+		NL_SET_ERR_MSG_MOD(extack, "Device still resetting");
+		return err;
+	}
+
+	/* After a device reset is complete, we no longer know the activation
+	 * requirement.
+	 */
+	pf->fw_reset_req = ICE_FW_ACTIVATE_UNKNOWN;
+
+	return 0;
+}
+
 static const struct devlink_ops ice_devlink_ops = {
 	.supported_flash_update_params = DEVLINK_SUPPORT_FLASH_UPDATE_OVERWRITE_MASK,
+	.reload_actions = BIT(DEVLINK_RELOAD_ACTION_FW_ACTIVATE),
+	.reload_down = ice_devlink_reload_down,
+	.reload_up = ice_devlink_reload_up,
 	.eswitch_mode_get = ice_eswitch_mode_get,
 	.eswitch_mode_set = ice_eswitch_mode_set,
 	.info_get = ice_devlink_info_get,
@@ -533,6 +634,8 @@ int ice_devlink_register(struct ice_pf *pf)
 		return err;
 	}
 
+	devlink_reload_enable(devlink);
+
 	return 0;
 }
 
@@ -545,6 +648,8 @@ int ice_devlink_register(struct ice_pf *pf)
 void ice_devlink_unregister(struct ice_pf *pf)
 {
 	struct devlink *devlink = priv_to_devlink(pf);
+
+	devlink_reload_disable(devlink);
 
 	devlink_params_unregister(devlink, ice_devlink_params,
 				  ARRAY_SIZE(ice_devlink_params));
