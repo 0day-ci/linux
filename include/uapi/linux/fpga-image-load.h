@@ -38,6 +38,7 @@ enum fpga_image_err {
 };
 
 #define FPGA_IMAGE_LOAD_WRITE	_IOW(FPGA_IMAGE_LOAD_MAGIC, 0, struct fpga_image_write)
+#define FPGA_IMAGE_LOAD_STATUS	_IOR(FPGA_IMAGE_LOAD_MAGIC, 1, struct fpga_image_status)
 
 /**
  * FPGA_IMAGE_LOAD_WRITE - _IOW(FPGA_IMAGE_LOAD_MAGIC, 0,
@@ -54,6 +55,23 @@ struct fpga_image_write {
 	__u32 size;		/* Data size (in bytes) to be written */
 	__s32 evtfd;		/* File descriptor for completion signal */
 	__u64 buf;		/* User space address of source data */
+};
+
+/**
+ * FPGA_IMAGE_LOAD_STATUS - _IOR(FPGA_IMAGE_LOAD_MAGIC, 1,
+ *				 struct fpga_image_status)
+ *
+ * Request status information for an ongoing update.
+ * data buffer, size, and an eventfd file descriptor.
+ *
+ * Return: 0 on success, -errno on failure.
+ */
+struct fpga_image_status {
+	/* Output */
+	__u32 remaining_size;			/* size remaining to transfer */
+	enum fpga_image_prog progress;		/* current progress of image load */
+	enum fpga_image_prog err_progress;	/* progress at time of error */
+	enum fpga_image_err err_code;		/* error code */
 };
 
 #endif /* _UAPI_LINUX_FPGA_IMAGE_LOAD_H */

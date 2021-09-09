@@ -22,10 +22,27 @@ static dev_t fpga_image_devt;
 
 #define to_image_load(d) container_of(d, struct fpga_image_load, dev)
 
+static void fpga_image_update_progress(struct fpga_image_load *imgld,
+				       enum fpga_image_prog new_progress)
+{
+	mutex_lock(&imgld->lock);
+	imgld->progress = new_progress;
+	mutex_unlock(&imgld->lock);
+}
+
+static void fpga_image_set_error(struct fpga_image_load *imgld,
+				 enum fpga_image_err err_code)
+{
+	mutex_lock(&imgld->lock);
+	imgld->err_progress = imgld->progress;
+	imgld->err_code = err_code;
+	mutex_unlock(&imgld->lock);
+}
+
 static void fpga_image_dev_error(struct fpga_image_load *imgld,
 				 enum fpga_image_err err_code)
 {
-	imgld->err_code = err_code;
+	fpga_image_set_error(imgld, err_code);
 	imgld->lops->cancel(imgld);
 }
 
@@ -49,18 +66,18 @@ static void fpga_image_do_load(struct work_struct *work)
 
 	get_device(&imgld->dev);
 	if (!try_module_get(imgld->dev.parent->driver->owner)) {
-		imgld->err_code = FPGA_IMAGE_ERR_BUSY;
+		fpga_image_set_error(imgld, FPGA_IMAGE_ERR_BUSY);
 		goto idle_exit;
 	}
 
-	imgld->progress = FPGA_IMAGE_PROG_PREPARING;
+	fpga_image_update_progress(imgld, FPGA_IMAGE_PROG_PREPARING);
 	ret = imgld->lops->prepare(imgld);
 	if (ret != FPGA_IMAGE_ERR_NONE) {
 		fpga_image_dev_error(imgld, ret);
 		goto modput_exit;
 	}
 
-	imgld->progress = FPGA_IMAGE_PROG_WRITING;
+	fpga_image_update_progress(imgld, FPGA_IMAGE_PROG_WRITING);
 	while (imgld->remaining_size) {
 		ret = imgld->lops->write_blk(imgld, offset);
 		if (ret != FPGA_IMAGE_ERR_NONE) {
@@ -71,7 +88,7 @@ static void fpga_image_do_load(struct work_struct *work)
 		offset = size - imgld->remaining_size;
 	}
 
-	imgld->progress = FPGA_IMAGE_PROG_PROGRAMMING;
+	fpga_image_update_progress(imgld, FPGA_IMAGE_PROG_PROGRAMMING);
 	ret = imgld->lops->poll_complete(imgld);
 	if (ret != FPGA_IMAGE_ERR_NONE)
 		fpga_image_dev_error(imgld, ret);
@@ -151,19 +168,41 @@ exit_free:
 	return ret;
 }
 
+static int fpga_image_load_ioctl_status(struct fpga_image_load *imgld,
+					unsigned long arg)
+{
+	struct fpga_image_status status;
+
+	memset(&status, 0, sizeof(status));
+	status.progress = imgld->progress;
+	status.remaining_size = imgld->remaining_size;
+	status.err_progress = imgld->err_progress;
+	status.err_code = imgld->err_code;
+
+	if (copy_to_user((void __user *)arg, &status, sizeof(status)))
+		return -EFAULT;
+
+	return 0;
+}
+
 static long fpga_image_load_ioctl(struct file *filp, unsigned int cmd,
 				  unsigned long arg)
 {
 	struct fpga_image_load *imgld = filp->private_data;
 	int ret = -ENOTTY;
 
+	mutex_lock(&imgld->lock);
+
 	switch (cmd) {
 	case FPGA_IMAGE_LOAD_WRITE:
-		mutex_lock(&imgld->lock);
 		ret = fpga_image_load_ioctl_write(imgld, arg);
-		mutex_unlock(&imgld->lock);
+		break;
+	case FPGA_IMAGE_LOAD_STATUS:
+		ret = fpga_image_load_ioctl_status(imgld, arg);
 		break;
 	}
+
+	mutex_unlock(&imgld->lock);
 
 	return ret;
 }
