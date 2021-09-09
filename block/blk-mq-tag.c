@@ -200,8 +200,8 @@ struct bt_iter_data {
 	bool reserved;
 };
 
-static struct request *blk_mq_find_and_get_req(struct blk_mq_tags *tags,
-		unsigned int bitnr)
+struct request *blk_mq_find_and_get_req(struct blk_mq_tags *tags,
+					unsigned int bitnr)
 {
 	struct request *rq;
 	unsigned long flags;
@@ -213,6 +213,7 @@ static struct request *blk_mq_find_and_get_req(struct blk_mq_tags *tags,
 	spin_unlock_irqrestore(&tags->lock, flags);
 	return rq;
 }
+EXPORT_SYMBOL(blk_mq_find_and_get_req);
 
 static bool bt_iter(struct sbitmap *bitmap, unsigned int bitnr, void *data)
 {

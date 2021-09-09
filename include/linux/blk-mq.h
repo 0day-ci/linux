@@ -637,4 +637,7 @@ blk_qc_t blk_mq_submit_bio(struct bio *bio);
 void blk_mq_hctx_set_fq_lock_class(struct blk_mq_hw_ctx *hctx,
 		struct lock_class_key *key);
 
+void blk_mq_put_rq_ref(struct request *rq);
+struct request *blk_mq_find_and_get_req(struct blk_mq_tags *tags,
+					unsigned int bitnr);
 #endif
