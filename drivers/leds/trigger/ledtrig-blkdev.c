@@ -464,6 +464,135 @@ static void blkdev_deactivate(struct led_classdev *const led_dev)
 
 /*
  *
+ *	blink_time sysfs attribute
+ *
+ */
+
+static ssize_t blink_time_show(struct device *const dev,
+			       struct device_attribute *const attr,
+			       char *const buf)
+{
+	const struct ledtrig_blkdev_led *const led =
+					led_trigger_get_drvdata(dev);
+
+	return sprintf(buf, "%u\n", READ_ONCE(led->blink_msec));
+}
+
+static ssize_t blink_time_store(struct device *const dev,
+				struct device_attribute *const attr,
+				const char *const buf, const size_t count)
+{
+	struct ledtrig_blkdev_led *const led = led_trigger_get_drvdata(dev);
+	unsigned int value;
+	int ret;
+
+	ret = kstrtouint(buf, 0, &value);
+	if (ret != 0)
+		return ret;
+
+	if (value < LEDTRIG_BLKDEV_MIN_BLINK)
+		return -ERANGE;
+
+	WRITE_ONCE(led->blink_msec, value);
+	return count;
+}
+
+static DEVICE_ATTR_RW(blink_time);
+
+
+/*
+ *
+ *	interval sysfs attribute - affects all LEDS
+ *
+ */
+
+static ssize_t interval_show(struct device *const dev,
+			     struct device_attribute *const attr,
+			     char *const buf)
+{
+	return sprintf(buf, "%u\n",
+		       jiffies_to_msecs(READ_ONCE(ledtrig_blkdev_interval)));
+}
+
+static ssize_t interval_store(struct device *const dev,
+			      struct device_attribute *const attr,
+			      const char *const buf, const size_t count)
+{
+	unsigned int value;
+	int ret;
+
+	ret = kstrtouint(buf, 0, &value);
+	if (ret != 0)
+		return ret;
+
+	if (value < LEDTRIG_BLKDEV_MIN_INT)
+		return -ERANGE;
+
+	WRITE_ONCE(ledtrig_blkdev_interval, msecs_to_jiffies(value));
+
+	return count;
+}
+
+static DEVICE_ATTR_RW(interval);
+
+
+/*
+ *
+ *	mode sysfs attribute - blink for reads, writes, or both
+ *
+ */
+
+static const struct {
+	const char	*name;
+	const char	*show;
+} blkdev_modes[] = {
+	[LEDTRIG_BLKDEV_MODE_RO] = {
+		.name	= "read",
+		.show	= "[read] write rw\n",
+	},
+	[LEDTRIG_BLKDEV_MODE_WO] = {
+		.name	= "write",
+		.show	= "read [write] rw\n",
+	},
+	[LEDTRIG_BLKDEV_MODE_RW] = {
+		.name	= "rw",
+		.show	= "read write [rw]\n",
+	},
+};
+
+static ssize_t mode_show(struct device *const dev,
+			 struct device_attribute *const attr, char *const buf)
+{
+	const struct ledtrig_blkdev_led *const led =
+					led_trigger_get_drvdata(dev);
+
+	return sprintf(buf, blkdev_modes[READ_ONCE(led->mode)].show);
+}
+
+static ssize_t mode_store(struct device *const dev,
+			  struct device_attribute *const attr,
+			  const char *const buf, const size_t count)
+{
+	struct ledtrig_blkdev_led *const led = led_trigger_get_drvdata(dev);
+	enum ledtrig_blkdev_mode mode;
+
+	for (mode = LEDTRIG_BLKDEV_MODE_RO;
+				mode <= LEDTRIG_BLKDEV_MODE_RW; ++mode) {
+
+		if (sysfs_streq(blkdev_modes[mode].name, buf)) {
+			WRITE_ONCE(led->mode, mode);
+			return count;
+		}
+	}
+
+	return -EINVAL;
+}
+
+static DEVICE_ATTR_RW(mode);
+
+
+/*
+ *
  *	Initialization - register the trigger
  *
  */
@@ -471,6 +600,9 @@ static void blkdev_deactivate(struct led_classdev *const led_dev)
 static struct attribute *ledtrig_blkdev_attrs[] = {
 	&dev_attr_link_device.attr,
 	&dev_attr_unlink_device.attr,
+	&dev_attr_blink_time.attr,
+	&dev_attr_interval.attr,
+	&dev_attr_mode.attr,
 	NULL
 };
 
