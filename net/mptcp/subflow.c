@@ -798,6 +798,7 @@ enum mapping_status {
 	MAPPING_INVALID,
 	MAPPING_EMPTY,
 	MAPPING_DATA_FIN,
+	MAPPING_INFINITE,
 	MAPPING_DUMMY
 };
 
@@ -937,6 +938,9 @@ static enum mapping_status get_mapping_status(struct sock *ssk,
 	skb = skb_peek(&ssk->sk_receive_queue);
 	if (!skb)
 		return MAPPING_EMPTY;
+
+	if (mptcp_check_infinite(ssk))
+		return MAPPING_INFINITE;
 
 	if (mptcp_check_fallback(ssk))
 		return MAPPING_DUMMY;
@@ -1121,6 +1125,9 @@ static bool subflow_check_data_avail(struct sock *ssk)
 
 		status = get_mapping_status(ssk, msk);
 		trace_subflow_check_data_avail(status, skb_peek(&ssk->sk_receive_queue));
+		if (unlikely(status == MAPPING_INFINITE))
+			goto infinite;
+
 		if (unlikely(status == MAPPING_INVALID))
 			goto fallback;
 
@@ -1192,6 +1199,7 @@ fallback:
 		return false;
 	}
 
+infinite:
 	__mptcp_do_fallback(msk);
 	skb = skb_peek(&ssk->sk_receive_queue);
 	subflow->map_valid = 1;
