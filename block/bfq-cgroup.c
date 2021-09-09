@@ -1025,21 +1025,25 @@ static int bfq_io_set_weight_legacy(struct cgroup_subsys_state *css,
 	struct blkcg *blkcg = css_to_blkcg(css);
 	struct bfq_group_data *bfqgd = blkcg_to_bfqgd(blkcg);
 	struct blkcg_gq *blkg;
+	struct bfq_group *bfqg;
 	int ret = -ERANGE;
 
 	if (val < BFQ_MIN_WEIGHT || val > BFQ_MAX_WEIGHT)
 		return ret;
 
 	ret = 0;
-	spin_lock_irq(&blkcg->lock);
 	bfqgd->weight = (unsigned short)val;
-	hlist_for_each_entry(blkg, &blkcg->blkg_list, blkcg_node) {
-		struct bfq_group *bfqg = blkg_to_bfqg(blkg);
+
+	rcu_read_lock();
+	hlist_for_each_entry_rcu(blkg, &blkcg->blkg_list, blkcg_node) {
+		spin_lock_irq(&blkg->q->queue_lock);
+		bfqg = blkg_to_bfqg(blkg);
 
 		if (bfqg)
 			bfq_group_set_weight(bfqg, val, 0);
+		spin_unlock_irq(&blkg->q->queue_lock);
 	}
-	spin_unlock_irq(&blkcg->lock);
+	rcu_read_unlock();
 
 	return ret;
 }
