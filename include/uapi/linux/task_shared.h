@@ -18,5 +18,6 @@ struct task_schedstat {
 	volatile u64	sum_exec_runtime;
 	volatile u64	run_delay;
 	volatile u64	pcount;
+	volatile u64	off_cpu;
 };
 #endif
