@@ -1066,6 +1066,14 @@ static void dsa_tree_teardown(struct dsa_switch_tree *dst)
 	dst->setup = false;
 }
 
+void dsa_tree_shutdown(struct dsa_switch_tree *dst)
+{
+	mutex_lock(&dsa2_mutex);
+	dsa_tree_teardown(dst);
+	mutex_unlock(&dsa2_mutex);
+}
+EXPORT_SYMBOL_GPL(dsa_tree_shutdown);
+
 /* Since the dsa/tagging sysfs device attribute is per master, the assumption
  * is that all DSA switches within a tree share the same tagger, otherwise
  * they would have formed disjoint trees (different "dsa,member" values).
