@@ -972,7 +972,9 @@ static enum mapping_status get_mapping_status(struct sock *ssk,
 	data_len = mpext->data_len;
 	if (data_len == 0) {
 		MPTCP_INC_STATS(sock_net(ssk), MPTCP_MIB_INFINITEMAPRX);
-		return MAPPING_INVALID;
+		pr_infinite(msk);
+		__mptcp_do_infinite(msk);
+		return MAPPING_INFINITE;
 	}
 
 	if (mpext->data_fin == 1) {
