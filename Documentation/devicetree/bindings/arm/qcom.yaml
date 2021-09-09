@@ -162,6 +162,9 @@ properties:
           - const: qcom,ipq4019
 
       - items:
+          - const: qcom,ipq4019
+
+      - items:
           - enum:
               - qcom,ipq8064-ap148
           - const: qcom,ipq8064
