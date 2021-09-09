@@ -594,6 +594,45 @@ static void gen8_engine_reset_cancel(struct intel_engine_cs *engine)
 			      _MASKED_BIT_DISABLE(RESET_CTL_REQUEST_RESET));
 }
 
+enum pcie_reset_type {
+	PCIE_RESET_TYPE_FLR,
+	PCIE_RESET_TYPE_SBR
+};
+
+static int gen12_pcie_reset(struct drm_i915_private *i915,
+			    enum pcie_reset_type type)
+{
+	struct pci_dev *pdev = to_pci_dev(i915->drm.dev);
+	int ret;
+
+	ret = pci_save_state(pdev);
+	if (!ret)
+		goto out;
+
+	switch (type) {
+	case PCIE_RESET_TYPE_FLR:
+		ret = pcie_has_flr(pdev);
+		if (ret)
+			goto out;
+		ret = pcie_flr(pdev);
+		break;
+	case PCIE_RESET_TYPE_SBR:
+		if (!IS_DGFX(i915))
+			return -ENODEV;
+		ret = pci_bridge_secondary_bus_reset(pdev->bus->self);
+		break;
+	default:
+		goto out;
+	}
+	if (ret)
+		goto out;
+
+	pci_restore_state(pdev);
+
+out:
+	return ret;
+}
+
 static int gen8_reset_engines(struct intel_gt *gt,
 			      intel_engine_mask_t engine_mask,
 			      unsigned int retry)
@@ -627,6 +666,19 @@ static int gen8_reset_engines(struct intel_gt *gt,
 		ret = gen11_reset_engines(gt, engine_mask, retry);
 	else
 		ret = gen6_reset_engines(gt, engine_mask, retry);
+
+	if (ret && engine_mask == ALL_ENGINES) {
+		/*
+		 * If the full GT reset fails, try the bigger hammer with
+		 * FLR and SBR if available. Capability checks happen
+		 * in the called functions.
+		 */
+		if (ret)
+			ret = gen12_pcie_reset(gt->i915, PCIE_RESET_TYPE_FLR);
+
+		if (ret)
+			ret = gen12_pcie_reset(gt->i915, PCIE_RESET_TYPE_SBR);
+	}
 
 skip_reset:
 	for_each_engine_masked(engine, gt, engine_mask, tmp)
