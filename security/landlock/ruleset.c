@@ -68,7 +68,7 @@ static void build_check_rule(void)
 
 static struct landlock_rule *create_rule(
 		struct landlock_object *const object,
-		const struct landlock_layer (*const layers)[],
+		struct landlock_layer (*layers)[],
 		const u32 num_layers,
 		const struct landlock_layer *const new_layer)
 {
@@ -143,7 +143,7 @@ static void build_check_ruleset(void)
  */
 static int insert_rule(struct landlock_ruleset *const ruleset,
 		struct landlock_object *const object,
-		const struct landlock_layer (*const layers)[],
+		struct landlock_layer (*layers)[],
 		size_t num_layers)
 {
 	struct rb_node **walker_node;
