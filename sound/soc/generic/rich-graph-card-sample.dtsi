@@ -1,0 +1,69 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * rich-graph-card-sample.dtsi
+ *
+ * Copyright (C) 2020 Renesas Electronics Corp.
+ * Copyright (C) 2020 Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+ *
+ * This sample indicates how to use rich-graph-card and its
+ * custom driver. "rich-custom-card-sample" is the custome driver
+ * which is using rich-graph-card.
+ *
+ * You can easily use this sample by adding below line on your DT file,
+ * and add new CONFIG to your .config.
+ *
+ *	#include "../../../../../sound/soc/generic/rich-graph-card-sample.dtsi"
+ *
+ *	CONFIG_SND_RICH_GRAPH_CARD
+ *	CONFIG_SND_RICH_CUSTOM_CARD_SAMPLE
+ *	CONFIG_SND_TEST_COMPONENT
+ */
+/ {
+	/*
+	 * @ : used at links
+	 *
+	 * [Normal]
+	 *	cpu0 <-@-----------------> codec0
+	 */
+	rich-graph-card-sample {
+		/*
+		 * You can use rich-graph-card directly by using
+		 *
+		 * compatible = "rich-graph-card";
+		 */
+		compatible = "rich-custom-card-sample";
+
+		links = <&cpu0			/* normal: cpu side only */
+		>;
+	};
+
+	test_cpu {
+		/*
+		 * update compatible to indicate more detail behaviour
+		 * if you want. see test-compatible for more detail.
+		 *
+		 *	- compatible = "test-cpu";
+		 *	+ compatible = "test-cpu-nv";
+		 */
+		compatible = "test-cpu";
+		ports {
+			bitclock-master;
+			frame-master;
+			cpu0: port@0 { cpu0_ep: endpoint { remote-endpoint = <&codec0_ep>; }; };
+		};
+	};
+
+	test_codec {
+		/*
+		 * update compatible to indicate more detail behaviour
+		 * if you want. see test-compatible for more detail.
+		 *
+		 *	- compatible = "test-codec";
+		 *	+ compatible = "test-codec-nv";
+		 */
+		compatible = "test-codec";
+		ports {
+			port@0  { codec0_ep:  endpoint { remote-endpoint = <&cpu0_ep>; }; };
+		};
+	};
+};
