@@ -52,6 +52,24 @@ static const u8 REG_VOLTAGE_LIMIT_MSB_SHIFT[2][5] = {
 #define REG_VERSION_ID		0xff
 
 /*
+ * Sensor modes according to 7.2.32 Mode Selection Register
+ */
+#define RTD_MODE_CLOSED		0x0
+#define RTD_MODE_CURRENT	0x1
+#define RTD_MODE_THERMISTOR	0x2
+#define RTD_MODE_VOLTAGE	0x3
+#define RTD_MODE_UNDEFINED	0xf
+
+#define MODE_BITS_MASK		0x3
+
+/*
+ * Bit offsets for sensors modes in REG_MODE
+ */
+#define MODE_OFFSET_RTD1	0
+#define MODE_OFFSET_RTD2	2
+#define MODE_OFFSET_RTD3	4
+
+/*
  * Data structures and manipulation thereof
  */
 
@@ -1038,7 +1056,9 @@ static const struct regmap_config nct7802_regmap_config = {
 	.volatile_reg = nct7802_regmap_is_volatile,
 };
 
-static int nct7802_init_chip(struct nct7802_data *data)
+static int nct7802_init_chip(struct nct7802_data *data,
+	unsigned char rtd1_mode, unsigned char rtd2_mode,
+	unsigned char rtd3_mode)
 {
 	int err;
 
@@ -1052,8 +1072,45 @@ static int nct7802_init_chip(struct nct7802_data *data)
 	if (err)
 		return err;
 
+	/* Configure sensor modes */
+	if ((rtd1_mode & MODE_BITS_MASK) == rtd1_mode) {
+		err = regmap_update_bits(data->regmap, REG_MODE,
+			MODE_BITS_MASK << MODE_OFFSET_RTD1,
+			rtd1_mode << MODE_OFFSET_RTD1);
+		if (err)
+			return err;
+	}
+	if ((rtd2_mode & MODE_BITS_MASK) == rtd2_mode) {
+		err = regmap_update_bits(data->regmap, REG_MODE,
+			MODE_BITS_MASK << MODE_OFFSET_RTD2,
+			rtd2_mode << MODE_OFFSET_RTD2);
+		if (err)
+			return err;
+	}
+	if ((rtd3_mode & MODE_BITS_MASK) == rtd3_mode) {
+		err = regmap_update_bits(data->regmap, REG_MODE,
+			MODE_BITS_MASK << MODE_OFFSET_RTD3,
+			rtd3_mode << MODE_OFFSET_RTD3);
+		if (err)
+			return err;
+	}
+
 	/* Enable Vcore and VCC voltage monitoring */
 	return regmap_update_bits(data->regmap, REG_VMON_ENABLE, 0x03, 0x03);
+}
+
+static unsigned char rtd_mode_from_string(const char *value)
+{
+	if (!strcmp(value, "closed"))
+		return RTD_MODE_CLOSED;
+	if (!strcmp(value, "current"))
+		return RTD_MODE_CURRENT;
+	if (!strcmp(value, "thermistor"))
+		return RTD_MODE_THERMISTOR;
+	if (!strcmp(value, "voltage"))
+		return RTD_MODE_VOLTAGE;
+
+	return RTD_MODE_UNDEFINED;
 }
 
 static int nct7802_probe(struct i2c_client *client)
@@ -1061,6 +1118,11 @@ static int nct7802_probe(struct i2c_client *client)
 	struct device *dev = &client->dev;
 	struct nct7802_data *data;
 	struct device *hwmon_dev;
+	int rtd_mode_count;
+	unsigned char rtd1_mode = RTD_MODE_UNDEFINED;
+	unsigned char rtd2_mode = RTD_MODE_UNDEFINED;
+	unsigned char rtd3_mode = RTD_MODE_UNDEFINED;
+	const char *prop_value;
 	int ret;
 
 	data = devm_kzalloc(dev, sizeof(*data), GFP_KERNEL);
@@ -1074,7 +1136,25 @@ static int nct7802_probe(struct i2c_client *client)
 	mutex_init(&data->access_lock);
 	mutex_init(&data->in_alarm_lock);
 
-	ret = nct7802_init_chip(data);
+	if (dev->of_node) {
+		rtd_mode_count = of_property_count_strings(dev->of_node,
+			"nuvoton,rtd-modes");
+
+		if (rtd_mode_count > 0)
+			if (!of_property_read_string_index(dev->of_node,
+				"nuvoton,rtd-modes", 0, &prop_value))
+				rtd1_mode = rtd_mode_from_string(prop_value);
+		if (rtd_mode_count > 1)
+			if (!of_property_read_string_index(dev->of_node,
+				"nuvoton,rtd-modes", 1, &prop_value))
+				rtd2_mode = rtd_mode_from_string(prop_value);
+		if (rtd_mode_count > 2)
+			if (!of_property_read_string_index(dev->of_node,
+				"nuvoton,rtd-modes", 2, &prop_value))
+				rtd3_mode = rtd_mode_from_string(prop_value);
+	}
+
+	ret = nct7802_init_chip(data, rtd1_mode, rtd2_mode, rtd3_mode);
 	if (ret < 0)
 		return ret;
 
@@ -1094,10 +1174,20 @@ static const struct i2c_device_id nct7802_idtable[] = {
 };
 MODULE_DEVICE_TABLE(i2c, nct7802_idtable);
 
+static const struct of_device_id __maybe_unused nct7802_of_match[] = {
+	{
+		.compatible = "nuvoton,nct7802",
+		.data = 0
+	},
+	{ },
+};
+MODULE_DEVICE_TABLE(of, nct7802_of_match);
+
 static struct i2c_driver nct7802_driver = {
 	.class = I2C_CLASS_HWMON,
 	.driver = {
 		.name = DRVNAME,
+		.of_match_table = of_match_ptr(nct7802_of_match),
 	},
 	.detect = nct7802_detect,
 	.probe_new = nct7802_probe,
