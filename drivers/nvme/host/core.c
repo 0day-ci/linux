@@ -1775,6 +1775,14 @@ static void nvme_set_queue_limits(struct nvme_ctrl *ctrl,
 	blk_queue_write_cache(q, vwc, vwc);
 }
 
+static void nvme_integrity_cleanup(struct gendisk *disk)
+{
+	if (nvme_integrity_registered(disk)) {
+		blk_flush_integrity();
+		blk_integrity_unregister(disk);
+	}
+}
+
 static void nvme_update_disk_info(struct gendisk *disk,
 		struct nvme_ns *ns, struct nvme_id_ns *id)
 {
@@ -1791,7 +1799,7 @@ static void nvme_update_disk_info(struct gendisk *disk,
 		bs = (1 << 9);
 	}
 
-	blk_integrity_unregister(disk);
+	nvme_integrity_cleanup(disk);
 
 	atomic_bs = phys_bs = bs;
 	nvme_setup_streams_ns(ns->ctrl, ns, &phys_bs, &io_opt);

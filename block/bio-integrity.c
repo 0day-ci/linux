@@ -21,6 +21,7 @@ void blk_flush_integrity(void)
 {
 	flush_workqueue(kintegrityd_wq);
 }
+EXPORT_SYMBOL(blk_flush_integrity);
 
 static void __bio_integrity_free(struct bio_set *bs,
 				 struct bio_integrity_payload *bip)

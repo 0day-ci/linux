@@ -93,7 +93,6 @@ static inline bool bvec_gap_to_prev(struct request_queue *q,
 }
 
 #ifdef CONFIG_BLK_DEV_INTEGRITY
-void blk_flush_integrity(void);
 bool __bio_integrity_endio(struct bio *);
 void bio_integrity_free(struct bio *bio);
 static inline bool bio_integrity_endio(struct bio *bio)
@@ -152,9 +151,6 @@ static inline bool integrity_req_gap_front_merge(struct request *req,
 	return false;
 }
 
-static inline void blk_flush_integrity(void)
-{
-}
 static inline bool bio_integrity_endio(struct bio *bio)
 {
 	return true;

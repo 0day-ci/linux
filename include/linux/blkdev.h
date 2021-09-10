@@ -1658,6 +1658,7 @@ struct blk_integrity_profile {
 	const char			*name;
 };
 
+extern void blk_flush_integrity(void);
 extern void blk_integrity_register(struct gendisk *, struct blk_integrity *);
 extern void blk_integrity_unregister(struct gendisk *);
 extern int blk_integrity_compare(struct gendisk *, struct gendisk *);
@@ -1775,6 +1776,9 @@ blk_integrity_queue_supports_integrity(struct request_queue *q)
 static inline int blk_integrity_compare(struct gendisk *a, struct gendisk *b)
 {
 	return 0;
+}
+static inline void blk_flush_integrity(void)
+{
 }
 static inline void blk_integrity_register(struct gendisk *d,
 					 struct blk_integrity *b)
