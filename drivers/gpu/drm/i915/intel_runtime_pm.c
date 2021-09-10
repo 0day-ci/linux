@@ -32,6 +32,11 @@
 
 #include "i915_drv.h"
 #include "i915_trace.h"
+#include "gt/intel_gt.h"
+#include "gt/intel_gt_pm.h"
+#include "intel_pm.h"
+#include "vlv_suspend.h"
+#include "display/intel_hotplug.h"
 
 /**
  * DOC: runtime pm
@@ -651,4 +656,144 @@ void intel_runtime_pm_init_early(struct intel_runtime_pm *rpm)
 	rpm->available = HAS_RUNTIME_PM(i915);
 
 	init_intel_runtime_pm_wakeref(rpm);
+}
+
+int intel_runtime_pm_suspend(struct device *kdev)
+{
+	struct drm_i915_private *i915 = kdev_to_i915(kdev);
+	struct intel_runtime_pm *rpm = &i915->runtime_pm;
+	int ret;
+
+	if (drm_WARN_ON_ONCE(&i915->drm, !HAS_RUNTIME_PM(i915)))
+		return -ENODEV;
+
+	drm_dbg_kms(&i915->drm, "Suspending device\n");
+
+	disable_rpm_wakeref_asserts(rpm);
+
+	/*
+	 * We are safe here against re-faults, since the fault handler takes
+	 * an RPM reference.
+	 */
+	i915_gem_runtime_suspend(i915);
+
+	intel_gt_runtime_suspend(&i915->gt);
+
+	intel_runtime_pm_disable_interrupts(i915);
+
+	intel_uncore_suspend(&i915->uncore);
+
+	intel_display_power_suspend(i915);
+
+	ret = vlv_suspend_complete(i915);
+	if (ret) {
+		drm_err(&i915->drm,
+			"Runtime suspend failed, disabling it (%d)\n", ret);
+		intel_uncore_runtime_resume(&i915->uncore);
+
+		intel_runtime_pm_enable_interrupts(i915);
+
+		intel_gt_runtime_resume(&i915->gt);
+
+		enable_rpm_wakeref_asserts(rpm);
+
+		return ret;
+	}
+
+	enable_rpm_wakeref_asserts(rpm);
+	intel_runtime_pm_driver_release(rpm);
+
+	if (intel_uncore_arm_unclaimed_mmio_detection(&i915->uncore))
+		drm_err(&i915->drm,
+			"Unclaimed access detected prior to suspending\n");
+
+	rpm->suspended = true;
+
+	/*
+	 * FIXME: We really should find a document that references the arguments
+	 * used below!
+	 */
+	if (IS_BROADWELL(i915)) {
+		/*
+		 * On Broadwell, if we use PCI_D1 the PCH DDI ports will stop
+		 * being detected, and the call we do at intel_runtime_resume()
+		 * won't be able to restore them. Since PCI_D3hot matches the
+		 * actual specification and appears to be working, use it.
+		 */
+		intel_opregion_notify_adapter(i915, PCI_D3hot);
+	} else {
+		/*
+		 * current versions of firmware which depend on this opregion
+		 * notification have repurposed the D1 definition to mean
+		 * "runtime suspended" vs. what you would normally expect (D3)
+		 * to distinguish it from notifications that might be sent via
+		 * the suspend path.
+		 */
+		intel_opregion_notify_adapter(i915, PCI_D1);
+	}
+
+	assert_forcewakes_inactive(&i915->uncore);
+
+	if (!IS_VALLEYVIEW(i915) && !IS_CHERRYVIEW(i915))
+		intel_hpd_poll_enable(i915);
+
+	drm_dbg_kms(&i915->drm, "Device suspended\n");
+	return 0;
+}
+
+int intel_runtime_pm_resume(struct device *kdev)
+{
+	struct drm_i915_private *i915 = kdev_to_i915(kdev);
+	struct intel_runtime_pm *rpm = &i915->runtime_pm;
+	int ret;
+
+	if (drm_WARN_ON_ONCE(&i915->drm, !HAS_RUNTIME_PM(i915)))
+		return -ENODEV;
+
+	drm_dbg_kms(&i915->drm, "Resuming device\n");
+
+	drm_WARN_ON_ONCE(&i915->drm, atomic_read(&rpm->wakeref_count));
+	disable_rpm_wakeref_asserts(rpm);
+
+	intel_opregion_notify_adapter(i915, PCI_D0);
+	rpm->suspended = false;
+	if (intel_uncore_unclaimed_mmio(&i915->uncore))
+		drm_dbg(&i915->drm,
+			"Unclaimed access during suspend, bios?\n");
+
+	intel_display_power_resume(i915);
+
+	ret = vlv_resume_prepare(i915, true);
+
+	intel_uncore_runtime_resume(&i915->uncore);
+
+	intel_runtime_pm_enable_interrupts(i915);
+
+	/*
+	 * No point of rolling back things in case of an error, as the best
+	 * we can do is to hope that things will still work (and disable RPM).
+	 */
+	intel_gt_runtime_resume(&i915->gt);
+
+	/*
+	 * On VLV/CHV display interrupts are part of the display
+	 * power well, so hpd is reinitialized from there. For
+	 * everyone else do it here.
+	 */
+	if (!IS_VALLEYVIEW(i915) && !IS_CHERRYVIEW(i915)) {
+		intel_hpd_init(i915);
+		intel_hpd_poll_disable(i915);
+	}
+
+	intel_enable_ipc(i915);
+
+	enable_rpm_wakeref_asserts(rpm);
+
+	if (ret)
+		drm_err(&i915->drm,
+			"Runtime resume failed, disabling it (%d)\n", ret);
+	else
+		drm_dbg_kms(&i915->drm, "Device resumed\n");
+
+	return ret;
 }

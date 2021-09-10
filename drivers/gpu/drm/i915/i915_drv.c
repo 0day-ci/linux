@@ -64,7 +64,6 @@
 #include "gem/i915_gem_mman.h"
 #include "gem/i915_gem_pm.h"
 #include "gt/intel_gt.h"
-#include "gt/intel_gt_pm.h"
 #include "gt/intel_rc6.h"
 
 #include "i915_debugfs.h"
@@ -1517,146 +1516,6 @@ static int i915_pm_restore(struct device *kdev)
 	return i915_pm_resume(kdev);
 }
 
-static int intel_runtime_suspend(struct device *kdev)
-{
-	struct drm_i915_private *dev_priv = kdev_to_i915(kdev);
-	struct intel_runtime_pm *rpm = &dev_priv->runtime_pm;
-	int ret;
-
-	if (drm_WARN_ON_ONCE(&dev_priv->drm, !HAS_RUNTIME_PM(dev_priv)))
-		return -ENODEV;
-
-	drm_dbg_kms(&dev_priv->drm, "Suspending device\n");
-
-	disable_rpm_wakeref_asserts(rpm);
-
-	/*
-	 * We are safe here against re-faults, since the fault handler takes
-	 * an RPM reference.
-	 */
-	i915_gem_runtime_suspend(dev_priv);
-
-	intel_gt_runtime_suspend(&dev_priv->gt);
-
-	intel_runtime_pm_disable_interrupts(dev_priv);
-
-	intel_uncore_suspend(&dev_priv->uncore);
-
-	intel_display_power_suspend(dev_priv);
-
-	ret = vlv_suspend_complete(dev_priv);
-	if (ret) {
-		drm_err(&dev_priv->drm,
-			"Runtime suspend failed, disabling it (%d)\n", ret);
-		intel_uncore_runtime_resume(&dev_priv->uncore);
-
-		intel_runtime_pm_enable_interrupts(dev_priv);
-
-		intel_gt_runtime_resume(&dev_priv->gt);
-
-		enable_rpm_wakeref_asserts(rpm);
-
-		return ret;
-	}
-
-	enable_rpm_wakeref_asserts(rpm);
-	intel_runtime_pm_driver_release(rpm);
-
-	if (intel_uncore_arm_unclaimed_mmio_detection(&dev_priv->uncore))
-		drm_err(&dev_priv->drm,
-			"Unclaimed access detected prior to suspending\n");
-
-	rpm->suspended = true;
-
-	/*
-	 * FIXME: We really should find a document that references the arguments
-	 * used below!
-	 */
-	if (IS_BROADWELL(dev_priv)) {
-		/*
-		 * On Broadwell, if we use PCI_D1 the PCH DDI ports will stop
-		 * being detected, and the call we do at intel_runtime_resume()
-		 * won't be able to restore them. Since PCI_D3hot matches the
-		 * actual specification and appears to be working, use it.
-		 */
-		intel_opregion_notify_adapter(dev_priv, PCI_D3hot);
-	} else {
-		/*
-		 * current versions of firmware which depend on this opregion
-		 * notification have repurposed the D1 definition to mean
-		 * "runtime suspended" vs. what you would normally expect (D3)
-		 * to distinguish it from notifications that might be sent via
-		 * the suspend path.
-		 */
-		intel_opregion_notify_adapter(dev_priv, PCI_D1);
-	}
-
-	assert_forcewakes_inactive(&dev_priv->uncore);
-
-	if (!IS_VALLEYVIEW(dev_priv) && !IS_CHERRYVIEW(dev_priv))
-		intel_hpd_poll_enable(dev_priv);
-
-	drm_dbg_kms(&dev_priv->drm, "Device suspended\n");
-	return 0;
-}
-
-static int intel_runtime_resume(struct device *kdev)
-{
-	struct drm_i915_private *dev_priv = kdev_to_i915(kdev);
-	struct intel_runtime_pm *rpm = &dev_priv->runtime_pm;
-	int ret;
-
-	if (drm_WARN_ON_ONCE(&dev_priv->drm, !HAS_RUNTIME_PM(dev_priv)))
-		return -ENODEV;
-
-	drm_dbg_kms(&dev_priv->drm, "Resuming device\n");
-
-	drm_WARN_ON_ONCE(&dev_priv->drm, atomic_read(&rpm->wakeref_count));
-	disable_rpm_wakeref_asserts(rpm);
-
-	intel_opregion_notify_adapter(dev_priv, PCI_D0);
-	rpm->suspended = false;
-	if (intel_uncore_unclaimed_mmio(&dev_priv->uncore))
-		drm_dbg(&dev_priv->drm,
-			"Unclaimed access during suspend, bios?\n");
-
-	intel_display_power_resume(dev_priv);
-
-	ret = vlv_resume_prepare(dev_priv, true);
-
-	intel_uncore_runtime_resume(&dev_priv->uncore);
-
-	intel_runtime_pm_enable_interrupts(dev_priv);
-
-	/*
-	 * No point of rolling back things in case of an error, as the best
-	 * we can do is to hope that things will still work (and disable RPM).
-	 */
-	intel_gt_runtime_resume(&dev_priv->gt);
-
-	/*
-	 * On VLV/CHV display interrupts are part of the display
-	 * power well, so hpd is reinitialized from there. For
-	 * everyone else do it here.
-	 */
-	if (!IS_VALLEYVIEW(dev_priv) && !IS_CHERRYVIEW(dev_priv)) {
-		intel_hpd_init(dev_priv);
-		intel_hpd_poll_disable(dev_priv);
-	}
-
-	intel_enable_ipc(dev_priv);
-
-	enable_rpm_wakeref_asserts(rpm);
-
-	if (ret)
-		drm_err(&dev_priv->drm,
-			"Runtime resume failed, disabling it (%d)\n", ret);
-	else
-		drm_dbg_kms(&dev_priv->drm, "Device resumed\n");
-
-	return ret;
-}
-
 const struct dev_pm_ops i915_pm_ops = {
 	/*
 	 * S0ix (via system suspend) and S3 event handlers [PMSG_SUSPEND,
@@ -1693,8 +1552,8 @@ const struct dev_pm_ops i915_pm_ops = {
 	.restore = i915_pm_restore,
 
 	/* S0ix (via runtime suspend) event handlers */
-	.runtime_suspend = intel_runtime_suspend,
-	.runtime_resume = intel_runtime_resume,
+	.runtime_suspend = intel_runtime_pm_suspend,
+	.runtime_resume = intel_runtime_pm_resume,
 };
 
 static const struct file_operations i915_driver_fops = {
