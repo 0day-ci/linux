@@ -936,6 +936,60 @@ void intel_init_audio_hooks(struct drm_i915_private *dev_priv)
 	}
 }
 
+struct aud_ts_cdclk_m_n {
+	u8 m;
+	u16 n;
+};
+
+void intel_audio_cdclk_change_pre(struct drm_i915_private *dev_priv)
+{
+	u32 tmp;
+
+	if (DISPLAY_VER(dev_priv) >= 13) {
+		tmp = intel_de_read(dev_priv, AUD_TS_CDCLK_M);
+		tmp &= ~AUD_TS_CDCLK_M_EN;
+		intel_de_write(dev_priv, AUD_TS_CDCLK_M, tmp);
+	}
+}
+
+static int get_aud_ts_cdclk_m_n(int refclk, int cdclk, struct aud_ts_cdclk_m_n *aud_ts)
+{
+	if (!aud_ts)
+		return -EINVAL;
+
+	if (refclk == 24000)
+		aud_ts->m = 12;
+	else
+		aud_ts->m = 15;
+
+	aud_ts->n = cdclk * aud_ts->m / 24000;
+
+	return 0;
+}
+
+void intel_audio_cdclk_change_post(struct drm_i915_private *dev_priv)
+{
+	struct aud_ts_cdclk_m_n aud_ts;
+	int res;
+
+	if (DISPLAY_VER(dev_priv) >= 13) {
+		res = get_aud_ts_cdclk_m_n(dev_priv->cdclk.hw.ref,
+					   dev_priv->cdclk.hw.cdclk,
+					   &aud_ts);
+
+		if (!res) {
+			intel_de_write(dev_priv, AUD_TS_CDCLK_N, aud_ts.n);
+			intel_de_write(dev_priv, AUD_TS_CDCLK_M, aud_ts.m | AUD_TS_CDCLK_M_EN);
+			drm_dbg(&dev_priv->drm, "aud_ts_cdclk set to M=%u, N=%u\n",
+				aud_ts.m, aud_ts.n);
+		} else {
+			drm_err(&dev_priv->drm,
+				"failed to find aud_ts_cdclk values for refclk %u cdclk %u\n",
+				dev_priv->cdclk.hw.ref, dev_priv->cdclk.hw.cdclk);
+		}
+	}
+}
+
 static int glk_force_audio_cdclk_commit(struct intel_atomic_state *state,
 					struct intel_crtc *crtc,
 					bool enable)
