@@ -1051,6 +1051,10 @@ static int pci_mmap_resource(struct kobject *kobj, struct bin_attribute *attr,
 	if (ret)
 		return ret;
 
+	if (!(res->flags & IORESOURCE_MEM ||
+	    ((res->flags & IORESOURCE_IO) && arch_can_pci_mmap_io())))
+		return -EIO;
+
 	if (res->flags & IORESOURCE_MEM && iomem_is_exclusive(res->start))
 		return -EINVAL;
 
