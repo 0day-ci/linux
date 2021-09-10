@@ -1237,6 +1237,30 @@ static int pci_create_resource_files(struct pci_dev *pdev)
 	}
 	return 0;
 }
+
+static umode_t pci_dev_resource_attr_is_visible(struct kobject *kobj,
+						struct bin_attribute *a,
+						int bar, bool write_combine)
+{
+	struct pci_dev *pdev = to_pci_dev(kobj_to_dev(kobj));
+	resource_size_t resource_size = pci_resource_len(pdev, bar);
+	bool prefetch;
+
+	if (!resource_size)
+		return 0;
+
+	prefetch = (pci_resource_flags(pdev, bar) &
+		    (IORESOURCE_MEM | IORESOURCE_PREFETCH)) ==
+			(IORESOURCE_MEM | IORESOURCE_PREFETCH);
+
+	if (write_combine && !(prefetch && arch_can_pci_mmap_wc()))
+		return 0;
+
+	a->size = resource_size;
+
+	return a->attr.mode;
+};
+
 #else /* !(defined(HAVE_PCI_MMAP) || defined(ARCH_GENERIC_PCI_MMAP_RESOURCE)) */
 int __weak pci_create_resource_files(struct pci_dev *dev) { return 0; }
 void __weak pci_remove_resource_files(struct pci_dev *dev) { return; }
