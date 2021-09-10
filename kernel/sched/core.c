@@ -10490,7 +10490,7 @@ static ssize_t cpu_max_write(struct kernfs_open_file *of,
 {
 	struct task_group *tg = css_tg(of_css(of));
 	u64 period = tg_get_cfs_period(tg);
-	u64 burst = tg_get_cfs_burst(tg);
+	u64 burst = (u64)tg_get_cfs_burst(tg) * NSEC_PER_USEC;
 	u64 quota;
 	int ret;
 
