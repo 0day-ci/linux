@@ -513,6 +513,8 @@ patternProperties:
     description: International Business Machines (IBM)
   "^icplus,.*":
     description: IC Plus Corp.
+  "^wirelesstag,.*":
+    description: Wireless Tag (qiming yunduan)
   "^idt,.*":
     description: Integrated Device Technologies, Inc.
   "^ifi,.*":
