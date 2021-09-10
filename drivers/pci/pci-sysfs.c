@@ -1261,6 +1261,67 @@ static umode_t pci_dev_resource_attr_is_visible(struct kobject *kobj,
 	return a->attr.mode;
 };
 
+#define pci_dev_bin_attribute(_name, _mmap, _bar)		\
+struct bin_attribute pci_dev_##_name##_attr = {			\
+	.attr = { .name = __stringify(_name), .mode = 0600 },	\
+	.read = pci_read_resource_io,				\
+	.write = pci_write_resource_io,				\
+	.mmap = _mmap,						\
+	.private = (void *)(unsigned long)_bar,			\
+	.f_mapping = iomem_get_mapping,				\
+}
+
+#define pci_dev_resource_attr(_bar)					\
+static pci_dev_bin_attribute(resource##_bar,				\
+			     pci_mmap_resource_uc,			\
+			     _bar);					\
+									\
+static struct bin_attribute *pci_dev_resource##_bar##_attrs[] = {	\
+	&pci_dev_resource##_bar##_attr,					\
+	NULL,								\
+};									\
+									\
+static umode_t								\
+pci_dev_resource##_bar##_attr_is_visible(struct kobject *kobj,		\
+					 struct bin_attribute *a,	\
+					 int n)				\
+{									\
+	return pci_dev_resource_attr_is_visible(kobj, a, _bar, false);	\
+};									\
+									\
+static const struct							\
+attribute_group pci_dev_resource##_bar##_attr_group = {			\
+	.bin_attrs = pci_dev_resource##_bar##_attrs,			\
+	.is_bin_visible = pci_dev_resource##_bar##_attr_is_visible,	\
+};									\
+									\
+static pci_dev_bin_attribute(resource##_bar##_wc,			\
+			     pci_mmap_resource_wc,			\
+			     _bar);					\
+									\
+static struct bin_attribute *pci_dev_resource##_bar##_wc_attrs[] = {	\
+	&pci_dev_resource##_bar##_wc_attr,				\
+	NULL,								\
+};									\
+									\
+static umode_t								\
+pci_dev_resource##_bar##_wc_attr_is_visible(struct kobject *kobj,	\
+					    struct bin_attribute *a,	\
+					    int n)			\
+{									\
+	return pci_dev_resource_attr_is_visible(kobj, a, _bar, true);	\
+};									\
+									\
+static const struct							\
+attribute_group pci_dev_resource##_bar##_wc_attr_group = {		\
+	.bin_attrs = pci_dev_resource##_bar##_wc_attrs,			\
+	.is_bin_visible = pci_dev_resource##_bar##_wc_attr_is_visible,	\
+}
+
+#define pci_dev_resource_group(_bar)		\
+	&pci_dev_resource##_bar##_attr_group,	\
+	&pci_dev_resource##_bar##_wc_attr_group
+
 #else /* !(defined(HAVE_PCI_MMAP) || defined(ARCH_GENERIC_PCI_MMAP_RESOURCE)) */
 int __weak pci_create_resource_files(struct pci_dev *dev) { return 0; }
 void __weak pci_remove_resource_files(struct pci_dev *dev) { return; }
