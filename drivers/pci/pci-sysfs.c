@@ -1013,7 +1013,7 @@ int pci_mmap_fits(struct pci_dev *pdev, int resno, struct vm_area_struct *vma,
 	unsigned long nr, start, size;
 	resource_size_t pci_start = 0, pci_end;
 
-	if (pci_resource_len(pdev, resno) == 0)
+	if (!pci_resource_len(pdev, resno))
 		return 0;
 	nr = vma_pages(vma);
 	start = vma->vm_pgoff;
@@ -1055,13 +1055,13 @@ static int pci_mmap_resource(struct kobject *kobj, struct bin_attribute *attr,
 	    ((res->flags & IORESOURCE_IO) && arch_can_pci_mmap_io())))
 		return -EIO;
 
-	if (res->flags & IORESOURCE_MEM && iomem_is_exclusive(res->start))
+	if ((res->flags & IORESOURCE_MEM) && iomem_is_exclusive(res->start))
 		return -EINVAL;
 
 	if (!pci_mmap_fits(pdev, bar, vma, PCI_MMAP_SYSFS))
 		return -EINVAL;
 
-	mmap_type = res->flags & IORESOURCE_MEM ? pci_mmap_mem : pci_mmap_io;
+	mmap_type = (res->flags & IORESOURCE_MEM) ? pci_mmap_mem : pci_mmap_io;
 
 	return pci_mmap_resource_range(pdev, bar, vma, mmap_type, write_combine);
 }
