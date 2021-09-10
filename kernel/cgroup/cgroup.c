@@ -3140,7 +3140,16 @@ static void cgroup_apply_control_disable(struct cgroup *cgrp)
 			if (!css)
 				continue;
 
-			WARN_ON_ONCE(percpu_ref_is_dying(&css->refcnt));
+			/*
+			 * A kill_css() might have been called previously, but
+			 * the css may still linger for a while before being
+			 * removed. Skip it in this case.
+			 */
+			if (percpu_ref_is_dying(&css->refcnt)) {
+				WARN_ON_ONCE(css->parent &&
+					cgroup_ss_mask(dsct) & (1 << ss->id));
+				continue;
+			}
 
 			if (css->parent &&
 			    !(cgroup_ss_mask(dsct) & (1 << ss->id))) {
