@@ -26,6 +26,12 @@ config SND_RICH_GRAPH_CARD
 	  This option enables generic rich graph card support
 	  with OF-graph DT bindings.
 
+config SND_RICH_CUSTOM_CARD_SAMPLE
+	tristate "ASoC Audio Rich Graph Card base custom card sample support"
+	depends on SND_RICH_GRAPH_CARD
+	help
+	  This option enables Audio Rich Graph Card base custom card support
+
 config SND_TEST_COMPONENT
 	tristate "ASoC Test component sound support"
 	depends on OF
