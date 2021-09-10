@@ -2,9 +2,11 @@
 snd-soc-simple-card-utils-objs	:= simple-card-utils.o
 snd-soc-simple-card-objs	:= simple-card.o
 snd-soc-audio-graph-card-objs	:= audio-graph-card.o
+snd-soc-rich-graph-card-objs	:= rich-graph-card.o
 snd-soc-test-component-objs	:= test-component.o
 
 obj-$(CONFIG_SND_SIMPLE_CARD_UTILS)	+= snd-soc-simple-card-utils.o
 obj-$(CONFIG_SND_SIMPLE_CARD)		+= snd-soc-simple-card.o
 obj-$(CONFIG_SND_AUDIO_GRAPH_CARD)	+= snd-soc-audio-graph-card.o
+obj-$(CONFIG_SND_RICH_GRAPH_CARD)	+= snd-soc-rich-graph-card.o
 obj-$(CONFIG_SND_TEST_COMPONENT)	+= snd-soc-test-component.o
