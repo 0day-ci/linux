@@ -1349,6 +1349,18 @@ void dso__set_build_id(struct dso *dso, struct build_id *bid)
 
 bool dso__build_id_equal(const struct dso *dso, struct build_id *bid)
 {
+	static const char zeros[BUILD_ID_SIZE];
+
+	if (dso->bid.size > bid->size && dso->bid.size == BUILD_ID_SIZE) {
+		/*
+		 * For the backward compatibility, it allows a build-id has
+		 * trailing zeros.
+		 */
+		return !memcmp(dso->bid.data, bid->data, bid->size) &&
+			!memcmp(&dso->bid.data[bid->size], zeros,
+				dso->bid.size - bid->size);
+	}
+
 	return dso->bid.size == bid->size &&
 	       memcmp(dso->bid.data, bid->data, dso->bid.size) == 0;
 }
