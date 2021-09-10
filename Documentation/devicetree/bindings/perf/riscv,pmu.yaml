@@ -1,0 +1,51 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/pmu/riscv,pmu.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: RISC-V PMU
+
+maintainers:
+  - Atish Patra <atish.patra@wdc.com>
+
+description:
+  The "Sscofpmf" extension allows the RISC-V PMU counters to overflow and
+  generate a local interrupt so that event sampling can be done from user-space.
+  The above said ISA extension is an optional extension to maintain backward
+  compatibility and will be included in privilege specification v1.12 . That's
+  why the interrupt property is marked as optional. The platforms with sscofpmf
+  extension should add this property to enable event sampling.
+  The device tree node with the compatible string is mandatory for any platform
+  that wants to use pmu counter start/stop methods using SBI PMU extension.
+
+properties:
+  compatible:
+    enum:
+      - riscv,pmu
+
+    description:
+      Should be "riscv,pmu".
+
+  interrupts-extended:
+    minItems: 1
+    maxItems: 4095
+
+additionalProperties: false
+
+required:
+  - None
+optional:
+  - compatible
+  - interrupts-extended
+
+examples:
+  - |
+    pmu {
+      compatible = "riscv,pmu";
+      interrupts-extended = <&cpu0intc 13>,
+                            <&cpu1intc 13>,
+                            <&cpu2intc 13>,
+                            <&cpu3intc 13>;
+    };
+...
