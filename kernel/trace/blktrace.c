@@ -1821,8 +1821,17 @@ static ssize_t sysfs_blk_trace_attr_store(struct device *dev,
 		}
 		if (value)
 			ret = blk_trace_setup_queue(q, bdev);
-		else
-			ret = blk_trace_remove_queue(q);
+		else {
+			/*
+			 * Don't remove blk_trace under running state, in
+			 * case triggering use-after-free in function
+			 * __blk_add_trace().
+			 */
+			if (bt->trace_state != Blktrace_running)
+				ret = blk_trace_remove_queue(q);
+			else
+				ret = -EBUSY;
+		}
 		goto out_unlock_bdev;
 	}
 
