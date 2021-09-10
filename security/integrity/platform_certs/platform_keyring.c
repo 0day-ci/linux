@@ -12,7 +12,11 @@
 #include <linux/cred.h>
 #include <linux/err.h>
 #include <linux/slab.h>
+#include <keys/system_keyring.h>
 #include "../integrity.h"
+
+extern __initconst const u8 platform_certificate_list[];
+extern __initconst const unsigned long platform_certificate_list_size;
 
 /**
  * add_to_platform_keyring - Add to platform keyring without validation.
@@ -36,6 +40,28 @@ void __init add_to_platform_keyring(const char *source, const void *data,
 	if (rc)
 		pr_info("Error adding keys to platform keyring %s\n", source);
 }
+
+static __init int load_builtin_platform_cert(void)
+{
+	const u8 *p;
+	unsigned long size;
+	int rc;
+	struct key *keyring;
+
+	p = platform_certificate_list;
+	size = platform_certificate_list_size;
+
+	keyring = integrity_keyring_from_id(INTEGRITY_KEYRING_PLATFORM);
+	if (IS_ERR(keyring))
+		return PTR_ERR(keyring);
+
+	rc = load_certificate_list(p, size, keyring);
+	if (rc)
+		pr_info("Error adding keys to platform keyring %d\n", rc);
+
+	return rc;
+}
+late_initcall(load_builtin_platform_cert);
 
 /*
  * Create the trusted keyrings.
