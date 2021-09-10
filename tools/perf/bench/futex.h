@@ -27,6 +27,12 @@ struct bench_futex_parameters {
 	unsigned int nrequeue;
 };
 
+/* A version of 'struct timespec' with 32-bit time_t and nanoseconds.  */
+struct __timespec32 {
+	__kernel_long_t tv_sec;
+	__kernel_long_t tv_nsec;
+};
+
 /**
  * futex_syscall() - SYS_futex syscall wrapper
  * @uaddr:	address of first futex
@@ -49,14 +55,49 @@ static inline int
 futex_syscall(u_int32_t *uaddr, int op, u_int32_t val, struct timespec *timeout,
 	u_int32_t *uaddr2, int val3, int opflags)
 {
-	return syscall(SYS_futex, uaddr, op | opflags, val, ts32, uaddr2, val3);
+#if defined(SYS_futex_time64)
+	if (sizeof(*timeout) != sizeof(struct __timespec32)) {
+		int ret =  syscall(SYS_futex_time64, uaddr, op | opflags, val, timeout,
+				   uaddr2, val3);
+	if (ret == 0 || errno != ENOSYS)
+		return ret;
+	}
+#endif
+
+#if defined(SYS_futex)
+	if (sizeof(*timeout) == sizeof(struct __timespec32))
+		return syscall(SYS_futex, uaddr, op | opflags, val, timeout, uaddr2, val3);
+
+	if (timeout && timeout->tv_sec == (long)timeout->tv_sec) {
+		struct __timespec32 ts32;
+
+		ts32.tv_sec = (__kernel_long_t) timeout->tv_sec;
+		ts32.tv_nsec = (__kernel_long_t) timeout->tv_nsec;
+
+		return syscall(SYS_futex, uaddr, op | opflags, val, ts32, uaddr2, val3);
+	} else if (!timeout) {
+		return syscall(SYS_futex, uaddr, op | opflags, val, NULL, uaddr2, val3);
+	}
+#endif
+
+	errno = ENOSYS;
+	return -1;
 }
 
 static inline int
 futex_syscall_nr_requeue(u_int32_t *uaddr, int op, u_int32_t val, int nr_requeue,
 	u_int32_t *uaddr2, int val3, int opflags)
 {
+#if defined(SYS_futex_time64)
+	int ret =  syscall(SYS_futex_time64, uaddr, op | opflags, val, nr_requeue,
+			   uaddr2, val3);
+	if (ret == 0 || errno != ENOSYS)
+		return ret;
+#endif
+
+#if defined(SYS_futex)
 	return syscall(SYS_futex, uaddr, op | opflags, val, nr_requeue, uaddr2, val3);
+#endif
 }
 
 /**
