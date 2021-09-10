@@ -474,13 +474,19 @@ static void tpm_del_char_device(struct tpm_chip *chip)
 
 	/* Make the driver uncallable. */
 	down_write(&chip->ops_sem);
-	if (chip->flags & TPM_CHIP_FLAG_TPM2) {
-		if (!tpm_chip_start(chip)) {
-			tpm2_shutdown(chip, TPM2_SU_CLEAR);
-			tpm_chip_stop(chip);
+	/* Check if chip->ops is still valid since in case of a shutdown
+	 * tpm_class_shutdown() has already sent the TPM2_Shutdown command
+	 * and set chip->ops to NULL.
+	 */
+	if (chip->ops) {
+		if (chip->flags & TPM_CHIP_FLAG_TPM2) {
+			if (!tpm_chip_start(chip)) {
+				tpm2_shutdown(chip, TPM2_SU_CLEAR);
+				tpm_chip_stop(chip);
+			}
 		}
+		chip->ops = NULL;
 	}
-	chip->ops = NULL;
 	up_write(&chip->ops_sem);
 }
 
