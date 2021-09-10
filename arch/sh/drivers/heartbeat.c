@@ -30,7 +30,7 @@
 static unsigned char default_bit_pos[] = { 0, 1, 2, 3, 4, 5, 6, 7 };
 
 static inline void heartbeat_toggle_bit(struct heartbeat_data *hd,
-					unsigned bit, unsigned int inverted)
+					unsigned int bit, unsigned int inverted)
 {
 	unsigned int new;
 
@@ -59,7 +59,7 @@ static inline void heartbeat_toggle_bit(struct heartbeat_data *hd,
 static void heartbeat_timer(struct timer_list *t)
 {
 	struct heartbeat_data *hd = from_timer(hd, t, timer);
-	static unsigned bit = 0, up = 1;
+	static unsigned int bit = 0, up = 1;
 
 	heartbeat_toggle_bit(hd, bit, hd->flags & HEARTBEAT_INVERTED);
 

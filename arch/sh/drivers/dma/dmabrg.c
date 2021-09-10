@@ -122,7 +122,7 @@ static void dmabrg_enable_irq(unsigned int dmairq)
 	__raw_writel(dcr, DMABRGCR);
 }
 
-int dmabrg_request_irq(unsigned int dmairq, void(*handler)(void*),
+int dmabrg_request_irq(unsigned int dmairq, void(*handler)(void *),
 		       void *data)
 {
 	if ((dmairq > 9) || !handler)

@@ -80,7 +80,7 @@ static ssize_t dma_store_config(struct device *dev,
 	struct dma_channel *channel = to_dma_channel(dev);
 	unsigned long config;
 
-	config = simple_strtoul(buf, NULL, 0);
+	config = kstrtoul(buf, NULL, 0);
 	dma_configure_channel(channel->vchan, config);
 
 	return count;
