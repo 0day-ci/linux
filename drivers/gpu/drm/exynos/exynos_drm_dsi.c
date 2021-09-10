@@ -1529,6 +1529,7 @@ static const struct drm_encoder_helper_funcs exynos_dsi_encoder_helper_funcs = {
 
 MODULE_DEVICE_TABLE(of, exynos_dsi_of_match);
 
+static const struct component_ops exynos_dsi_component_ops;
 static int exynos_dsi_host_attach(struct mipi_dsi_host *host,
 				  struct mipi_dsi_device *device)
 {
@@ -1536,6 +1537,7 @@ static int exynos_dsi_host_attach(struct mipi_dsi_host *host,
 	struct drm_encoder *encoder = &dsi->encoder;
 	struct drm_device *drm = encoder->dev;
 	struct drm_bridge *out_bridge;
+	struct device *dev = host->dev;
 
 	out_bridge  = of_drm_find_bridge(device->dev.of_node);
 	if (out_bridge) {
@@ -1585,7 +1587,7 @@ static int exynos_dsi_host_attach(struct mipi_dsi_host *host,
 	if (drm->mode_config.poll_enabled)
 		drm_kms_helper_hotplug_event(drm);
 
-	return 0;
+	return component_add(dev, &exynos_dsi_component_ops);
 }
 
 static int exynos_dsi_host_detach(struct mipi_dsi_host *host,
@@ -1593,6 +1595,9 @@ static int exynos_dsi_host_detach(struct mipi_dsi_host *host,
 {
 	struct exynos_dsi *dsi = host_to_dsi(host);
 	struct drm_device *drm = dsi->encoder.dev;
+	struct device *dev = host->dev;
+
+	component_del(dev, &exynos_dsi_component_ops);
 
 	if (dsi->panel) {
 		mutex_lock(&drm->mode_config.mutex);
@@ -1716,7 +1721,7 @@ static int exynos_dsi_bind(struct device *dev, struct device *master,
 		of_node_put(in_bridge_node);
 	}
 
-	return mipi_dsi_host_register(&dsi->dsi_host);
+	return 0;
 }
 
 static void exynos_dsi_unbind(struct device *dev, struct device *master,
@@ -1726,8 +1731,6 @@ static void exynos_dsi_unbind(struct device *dev, struct device *master,
 	struct drm_encoder *encoder = &dsi->encoder;
 
 	exynos_dsi_disable(encoder);
-
-	mipi_dsi_host_unregister(&dsi->dsi_host);
 }
 
 static const struct component_ops exynos_dsi_component_ops = {
@@ -1821,7 +1824,7 @@ static int exynos_dsi_probe(struct platform_device *pdev)
 
 	pm_runtime_enable(dev);
 
-	ret = component_add(dev, &exynos_dsi_component_ops);
+	ret = mipi_dsi_host_register(&dsi->dsi_host);
 	if (ret)
 		goto err_disable_runtime;
 
@@ -1835,9 +1838,11 @@ err_disable_runtime:
 
 static int exynos_dsi_remove(struct platform_device *pdev)
 {
-	pm_runtime_disable(&pdev->dev);
+	struct exynos_dsi *dsi = platform_get_drvdata(pdev);
 
-	component_del(&pdev->dev, &exynos_dsi_component_ops);
+	mipi_dsi_host_unregister(&dsi->dsi_host);
+
+	pm_runtime_disable(&pdev->dev);
 
 	return 0;
 }
