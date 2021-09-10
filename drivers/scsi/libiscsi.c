@@ -2531,8 +2531,8 @@ failed:
 	spin_lock_bh(&session->frwd_lock);
 	if (session->state == ISCSI_STATE_LOGGED_IN) {
 		ISCSI_DBG_EH(session,
-			     "session reset succeeded for %s,%s\n",
-			     session->targetname, conn->persistent_address);
+			     "session reset succeeded for %s\n",
+			     session->targetname);
 	} else
 		goto failed;
 	spin_unlock_bh(&session->frwd_lock);
