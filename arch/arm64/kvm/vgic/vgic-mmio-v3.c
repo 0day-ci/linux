@@ -796,7 +796,9 @@ static int vgic_v3_alloc_redist_region(struct kvm *kvm, uint32_t index,
 	struct vgic_dist *d = &kvm->arch.vgic;
 	struct vgic_redist_region *rdreg;
 	struct list_head *rd_regions = &d->rd_regions;
-	size_t size = count * KVM_VGIC_V3_REDIST_SIZE;
+	int nr_vcpus = atomic_read(&kvm->online_vcpus);
+	size_t size = count ? count * KVM_VGIC_V3_REDIST_SIZE :
+			nr_vcpus * KVM_VGIC_V3_REDIST_SIZE;
 	int ret;
 
 	/* cross the end of memory ? */
@@ -833,6 +835,9 @@ static int vgic_v3_alloc_redist_region(struct kvm *kvm, uint32_t index,
 	/* collision with any other rdist region? */
 	if (vgic_v3_rdist_overlap(kvm, base, size))
 		return -EINVAL;
+
+	if (base + size > kvm_phys_size(kvm))
+		return -E2BIG;
 
 	rdreg = kzalloc(sizeof(*rdreg), GFP_KERNEL);
 	if (!rdreg)
