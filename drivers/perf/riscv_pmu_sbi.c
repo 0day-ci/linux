@@ -11,6 +11,9 @@
 #include <linux/mod_devicetable.h>
 #include <linux/perf/riscv_pmu.h>
 #include <linux/platform_device.h>
+#include <linux/irq.h>
+#include <linux/irqdomain.h>
+#include <linux/of_irq.h>
 
 #include <asm/sbi.h>
 
@@ -444,24 +447,194 @@ static int pmu_sbi_get_ctrinfo(int nctr)
 	return 0;
 }
 
+static inline void pmu_sbi_stop_all(struct riscv_pmu *pmu)
+{
+	/**
+	 * No need to check the error because we are disabling all the counters
+	 * which may include counters that are not enabled yet.
+	 */
+	sbi_ecall(SBI_EXT_PMU, SBI_EXT_PMU_COUNTER_STOP,
+		  0, GENMASK_ULL(pmu->num_counters - 1, 0), 0, 0, 0, 0);
+}
+
+static inline void pmu_sbi_start_all(struct riscv_pmu *pmu, uint64_t *ival)
+{
+	int lidx;
+	struct cpu_hw_events *hwc = this_cpu_ptr(pmu->hw_events);
+
+	/* Start all the enabled counters */
+	for_each_set_bit(lidx, hwc->used_event_ctrs, RISCV_MAX_COUNTERS)
+		sbi_ecall(SBI_EXT_PMU, SBI_EXT_PMU_COUNTER_START, lidx, 1, 1,
+			  ival[lidx], ival[lidx] >> 32, 0);
+}
+
+static irqreturn_t pmu_sbi_ovf_handler(int irq, void *dev)
+{
+	struct perf_sample_data data;
+	struct pt_regs *regs;
+	struct hw_perf_event *hw_evt;
+	union sbi_pmu_ctr_info *info;
+	int lidx, hidx, fidx;
+	struct riscv_pmu *pmu;
+	struct perf_event *event;
+	struct cpu_hw_events *hwc = dev;
+	unsigned long overflow = csr_read(CSR_SSCOUNTOVF);
+	uint64_t ival[RISCV_MAX_COUNTERS] = {0};
+
+	/* No overflow bit is set */
+	if (!overflow) {
+		csr_clear(CSR_SIP, SIP_LCOFIP);
+		return IRQ_NONE;
+	}
+
+	fidx = find_first_bit(hwc->used_event_ctrs, RISCV_MAX_COUNTERS);
+	event = hwc->events[fidx];
+	if (!event) {
+		csr_clear(CSR_SIP, SIP_LCOFIP);
+		pr_warn("None of the counters are enabled\n");
+		return IRQ_NONE;
+	}
+
+	pmu = to_riscv_pmu(event->pmu);
+	pmu_sbi_stop_all(pmu);
+
+	/**
+	 * Overflow interrupt pending bit should only be cleared after stopping
+	 * all the counters to avoid any race condition.
+	 */
+	regs = get_irq_regs();
+	csr_clear(CSR_SIP, SIP_LCOFIP);
+
+	for_each_set_bit(lidx, hwc->used_event_ctrs, RISCV_MAX_COUNTERS) {
+		struct perf_event *event = hwc->events[lidx];
+
+		if (!event)
+			continue;
+		info = &pmu_ctr_list[lidx];
+		/* Firmware counter don't support overflow yet */
+		if (!info || info->type == SBI_PMU_CTR_TYPE_FW)
+			continue;
+
+		/* compute hardware counter index */
+		hidx = info->csr - CSR_CYCLE;
+		/* check if the corresponding bit is set in sscountovf */
+		if (!(overflow & (1 << hidx)))
+			continue;
+
+		hw_evt = &event->hw;
+		riscv_pmu_event_update(event);
+		perf_sample_data_init(&data, 0, hw_evt->last_period);
+		if (!riscv_pmu_event_set_period(event, &ival[lidx]))
+			continue;
+
+		/*
+		 * Perf event overflow will queue the processing of the event as
+		 * an irq_work which will be taken care of in the handling of
+		 * IPI_IRQ_WORK.
+		 */
+		if (perf_event_overflow(event, &data, regs))
+			pmu_sbi_ctr_stop(event, 0);
+	}
+	pmu_sbi_start_all(pmu, ival);
+
+	return IRQ_HANDLED;
+}
+
 static int pmu_sbi_starting_cpu(unsigned int cpu, struct hlist_node *node)
 {
 	struct riscv_pmu *pmu = hlist_entry_safe(node, struct riscv_pmu, node);
+	struct cpu_hw_events __percpu *hw_events = pmu->hw_events;
+	int pmu_irq;
 
 	/* Enable the access for TIME csr only from the user mode now */
 	csr_write(CSR_SCOUNTEREN, 0x2);
 
 	/* Stop all the counters so that they can be enabled from perf */
-	sbi_ecall(SBI_EXT_PMU, SBI_EXT_PMU_COUNTER_STOP,
-		  0, GENMASK_ULL(pmu->num_counters - 1, 0), 0, 0, 0, 0);
-
+	pmu_sbi_stop_all(pmu);
+	pmu_irq = per_cpu(hw_events->irq, cpu);
+	if (pmu_irq) {
+		csr_clear(CSR_IP, BIT(RV_IRQ_PMU));
+		csr_set(CSR_IE, BIT(RV_IRQ_PMU));
+		enable_percpu_irq(pmu_irq, IRQ_TYPE_NONE);
+	}
 	return 0;
 }
 
 static int pmu_sbi_dying_cpu(unsigned int cpu, struct hlist_node *node)
 {
+	struct riscv_pmu *pmu = hlist_entry_safe(node, struct riscv_pmu, node);
+	struct cpu_hw_events __percpu *hw_events = pmu->hw_events;
+	int pmu_irq;
+
+	pmu_irq = per_cpu(hw_events->irq, cpu);
+	if (pmu_irq) {
+		disable_percpu_irq(pmu_irq);
+		csr_clear(CSR_IE, BIT(RV_IRQ_PMU));
+	}
 	/* Disable all counters access for user mode now */
 	csr_write(CSR_SCOUNTEREN, 0x0);
+
+	return 0;
+}
+
+static int pmu_sbi_setup_irqs(struct riscv_pmu *pmu, struct platform_device *pdev)
+{
+	int i = 0, num_irqs, ret;
+	struct cpu_hw_events __percpu *hw_events = pmu->hw_events;
+	struct device *dev = &pdev->dev;
+	struct device_node *node = dev->of_node;
+
+	num_irqs = of_irq_count(node);
+
+	if (num_irqs <= 0) {
+		dev_warn(dev, "no irqs for PMU, sampling events not supported\n");
+		return -EPERM;
+	}
+
+	for (i = 0; i < num_irqs; i++) {
+		struct of_phandle_args parent;
+		irq_hw_number_t pmu_irq = 0;
+		int cpu, hartid;
+
+		if (of_irq_parse_one(node, i, &parent)) {
+			pr_err("%pOFP: failed to parse parent for irq %d.\n", node, i);
+			continue;
+		}
+
+		if (parent.args[0] != RV_IRQ_PMU) {
+			pr_err("%pOFP: invalid irq %d for hwirq %d.\n", node, i, parent.args[0]);
+			continue;
+		}
+
+		hartid = riscv_of_parent_hartid(parent.np);
+		if (hartid < 0) {
+			pr_warn("failed to parse hart ID for irq %d.\n", i);
+			continue;
+		}
+
+		cpu = riscv_hartid_to_cpuid(hartid);
+		if (cpu < 0) {
+			pr_warn("Invalid cpuid for irq %d\n", i);
+			continue;
+		}
+		if (!pmu_irq && irq_find_host(parent.np)) {
+			pmu_irq = irq_of_parse_and_map(node, i);
+			pr_err("%s: found irq %lu\n", __func__, pmu_irq);
+			if (pmu_irq)
+				ret = request_percpu_irq(pmu_irq, pmu_sbi_ovf_handler,
+							 "riscv-pmu", hw_events);
+			if (ret) {
+				pr_err("registering percpu irq failed [%d]\n", ret);
+				return ret;
+			}
+			if (per_cpu(hw_events->irq, cpu)) {
+				pr_warn("PMU irq already set!!");
+				return -EINVAL;
+			}
+			per_cpu(hw_events->irq, cpu) = pmu_irq;
+			per_cpu(hw_events->sscof_ext_present, cpu) = true;
+		}
+	}
 
 	return 0;
 }
@@ -470,7 +643,7 @@ static int pmu_sbi_device_probe(struct platform_device *pdev)
 {
 	struct riscv_pmu *pmu = NULL;
 	int num_counters;
-	int ret;
+	int ret = -ENODEV;
 
 	pr_info("SBI PMU extension is available\n");
 	/* Notify legacy implementation that SBI pmu is available*/
@@ -482,13 +655,19 @@ static int pmu_sbi_device_probe(struct platform_device *pdev)
 	num_counters = pmu_sbi_find_num_ctrs();
 	if (num_counters < 0) {
 		pr_err("SBI PMU extension doesn't provide any counters\n");
-		return -ENODEV;
+		goto out_free;
 	}
 
 	/* cache all the information about counters now */
 	if (pmu_sbi_get_ctrinfo(num_counters))
-		return -ENODEV;
+		goto out_free;
 
+	ret = pmu_sbi_setup_irqs(pmu, pdev);
+	if (ret < 0) {
+		pr_info("Perf sampling/filtering is not supported as sscof extension is not available\n");
+		pmu->pmu.capabilities |= PERF_PMU_CAP_NO_INTERRUPT;
+		pmu->pmu.capabilities |= PERF_PMU_CAP_NO_EXCLUDE;
+	}
 	pmu->num_counters = num_counters;
 	pmu->ctr_start = pmu_sbi_ctr_start;
 	pmu->ctr_stop = pmu_sbi_ctr_stop;
@@ -509,19 +688,27 @@ static int pmu_sbi_device_probe(struct platform_device *pdev)
 	}
 
 	return 0;
+
+out_free:
+	kfree(pmu);
+	return ret;
 }
+
+static const struct of_device_id riscv_pmu_of_device_ids[] = {
+	{.compatible = "riscv,pmu", .data = NULL},
+};
 
 static struct platform_driver pmu_sbi_driver = {
 	.probe		= pmu_sbi_device_probe,
 	.driver		= {
 		.name	= RISCV_PMU_PDEV_NAME,
+		.of_match_table = riscv_pmu_of_device_ids,
 	},
 };
 
 static int __init pmu_sbi_devinit(void)
 {
 	int ret;
-	struct platform_device *pdev;
 
 	if (((sbi_major_version() == 0) && (sbi_minor_version() < 3)) ||
 		sbi_probe_extension(SBI_EXT_PMU) <= 0) {
@@ -538,14 +725,6 @@ static int __init pmu_sbi_devinit(void)
 	}
 
 	ret = platform_driver_register(&pmu_sbi_driver);
-	if (ret)
-		return ret;
-
-	pdev = platform_device_register_simple(RISCV_PMU_PDEV_NAME, -1, NULL, 0);
-	if (IS_ERR(pdev)) {
-		platform_driver_unregister(&pmu_sbi_driver);
-		return PTR_ERR(pdev);
-	}
 
 	return ret;
 }
