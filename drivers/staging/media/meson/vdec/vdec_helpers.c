@@ -357,7 +357,7 @@ void amvdec_dst_buf_done_offset(struct amvdec_session *sess,
 	struct device *dev = sess->core->dev_dec;
 	struct amvdec_timestamp *match = NULL;
 	struct amvdec_timestamp *tmp, *n;
-	struct v4l2_timecode timecode = { 0 };
+	struct v4l2_timecode timecode = { };
 	u64 timestamp = 0;
 	u32 vbuf_flags = 0;
 	unsigned long flags;

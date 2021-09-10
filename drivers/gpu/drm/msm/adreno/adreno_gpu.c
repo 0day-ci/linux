@@ -925,7 +925,7 @@ int adreno_gpu_init(struct drm_device *drm, struct platform_device *pdev,
 {
 	struct device *dev = &pdev->dev;
 	struct adreno_platform_config *config = dev->platform_data;
-	struct msm_gpu_config adreno_gpu_config  = { 0 };
+	struct msm_gpu_config adreno_gpu_config  = { };
 	struct msm_gpu *gpu = &adreno_gpu->base;
 
 	adreno_gpu->funcs = funcs;

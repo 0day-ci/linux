@@ -34,7 +34,7 @@ static ssize_t store_bridge_parm(struct device *d,
 					    struct netlink_ext_ack *extack))
 {
 	struct net_bridge *br = to_bridge(d);
-	struct netlink_ext_ack extack = {0};
+	struct netlink_ext_ack extack = {};
 	unsigned long val;
 	char *endp;
 	int err;

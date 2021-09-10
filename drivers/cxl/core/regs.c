@@ -37,7 +37,7 @@ void cxl_probe_component_regs(struct device *dev, void __iomem *base,
 	int cap, cap_count;
 	u64 cap_array;
 
-	*map = (struct cxl_component_reg_map) { 0 };
+	*map = (struct cxl_component_reg_map) { };
 
 	/*
 	 * CXL.cache and CXL.mem registers are at offset 0x1000 as defined in
@@ -106,7 +106,7 @@ void cxl_probe_device_regs(struct device *dev, void __iomem *base,
 	int cap, cap_count;
 	u64 cap_array;
 
-	*map = (struct cxl_device_reg_map){ 0 };
+	*map = (struct cxl_device_reg_map){ };
 
 	cap_array = readq(base + CXLDEV_CAP_ARRAY_OFFSET);
 	if (FIELD_GET(CXLDEV_CAP_ARRAY_ID_MASK, cap_array) !=

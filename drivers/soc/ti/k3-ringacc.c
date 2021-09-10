@@ -449,7 +449,7 @@ EXPORT_SYMBOL_GPL(k3_ringacc_request_rings_pair);
 
 static void k3_ringacc_ring_reset_sci(struct k3_ring *ring)
 {
-	struct ti_sci_msg_rm_ring_cfg ring_cfg = { 0 };
+	struct ti_sci_msg_rm_ring_cfg ring_cfg = { };
 	struct k3_ringacc *ringacc = ring->parent;
 	int ret;
 
@@ -478,7 +478,7 @@ EXPORT_SYMBOL_GPL(k3_ringacc_ring_reset);
 static void k3_ringacc_ring_reconfig_qmode_sci(struct k3_ring *ring,
 					       enum k3_ring_mode mode)
 {
-	struct ti_sci_msg_rm_ring_cfg ring_cfg = { 0 };
+	struct ti_sci_msg_rm_ring_cfg ring_cfg = { };
 	struct k3_ringacc *ringacc = ring->parent;
 	int ret;
 
@@ -554,7 +554,7 @@ EXPORT_SYMBOL_GPL(k3_ringacc_ring_reset_dma);
 
 static void k3_ringacc_ring_free_sci(struct k3_ring *ring)
 {
-	struct ti_sci_msg_rm_ring_cfg ring_cfg = { 0 };
+	struct ti_sci_msg_rm_ring_cfg ring_cfg = { };
 	struct k3_ringacc *ringacc = ring->parent;
 	int ret;
 
@@ -656,7 +656,7 @@ EXPORT_SYMBOL_GPL(k3_ringacc_get_ring_irq_num);
 
 static int k3_ringacc_ring_cfg_sci(struct k3_ring *ring)
 {
-	struct ti_sci_msg_rm_ring_cfg ring_cfg = { 0 };
+	struct ti_sci_msg_rm_ring_cfg ring_cfg = { };
 	struct k3_ringacc *ringacc = ring->parent;
 	int ret;
 

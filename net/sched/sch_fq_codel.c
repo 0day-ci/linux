@@ -624,7 +624,7 @@ static int fq_codel_dump_class_stats(struct Qdisc *sch, unsigned long cl,
 {
 	struct fq_codel_sched_data *q = qdisc_priv(sch);
 	u32 idx = cl - 1;
-	struct gnet_stats_queue qs = { 0 };
+	struct gnet_stats_queue qs = { };
 	struct tc_fq_codel_xstats xstats;
 
 	if (idx < q->flows_cnt) {

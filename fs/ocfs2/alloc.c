@@ -4707,7 +4707,7 @@ int ocfs2_insert_extent(handle_t *handle,
 	int status;
 	int free_records;
 	struct buffer_head *last_eb_bh = NULL;
-	struct ocfs2_insert_type insert = {0, };
+	struct ocfs2_insert_type insert = {};
 	struct ocfs2_extent_rec rec;
 
 	trace_ocfs2_insert_extent_start(

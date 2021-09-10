@@ -72,7 +72,7 @@ int main(int argc, char **argv)
 	const char *file = "test_tcpnotify_kern.o";
 	struct bpf_map *perf_map, *global_map;
 	struct perf_buffer_opts pb_opts = {};
-	struct tcpnotify_globals g = {0};
+	struct tcpnotify_globals g = {};
 	struct perf_buffer *pb = NULL;
 	const char *cg_path = "/foo";
 	int prog_fd, rv, cg_fd = -1;

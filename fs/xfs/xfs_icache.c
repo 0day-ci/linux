@@ -1537,7 +1537,7 @@ xfs_blockgc_free_dquots(
 	struct xfs_dquot	*pdqp,
 	unsigned int		iwalk_flags)
 {
-	struct xfs_icwalk	icw = {0};
+	struct xfs_icwalk	icw = {};
 	bool			do_work = false;
 
 	if (!udqp && !gdqp && !pdqp)

@@ -1190,7 +1190,7 @@ fwnode_graph_get_endpoint_by_id(const struct fwnode_handle *fwnode,
 	bool enabled_only = !(flags & FWNODE_GRAPH_DEVICE_DISABLED);
 
 	while ((ep = fwnode_graph_get_next_endpoint(fwnode, ep))) {
-		struct fwnode_endpoint fwnode_ep = { 0 };
+		struct fwnode_endpoint fwnode_ep = { };
 		int ret;
 
 		if (enabled_only) {

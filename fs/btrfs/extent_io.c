@@ -2978,7 +2978,7 @@ static void end_bio_extent_readpage(struct bio *bio)
 	struct bio_vec *bvec;
 	struct btrfs_io_bio *io_bio = btrfs_io_bio(bio);
 	struct extent_io_tree *tree, *failure_tree;
-	struct processed_extent processed = { 0 };
+	struct processed_extent processed = { };
 	/*
 	 * The offset to the beginning of a bio, since one bio can never be
 	 * larger than UINT_MAX, u32 here is enough.
@@ -5139,7 +5139,7 @@ int extent_writepages(struct address_space *mapping,
 
 void extent_readahead(struct readahead_control *rac)
 {
-	struct btrfs_bio_ctrl bio_ctrl = { 0 };
+	struct btrfs_bio_ctrl bio_ctrl = { };
 	struct page *pagepool[16];
 	struct extent_map *em_cached = NULL;
 	u64 prev_em_start = (u64)-1;
@@ -5480,7 +5480,7 @@ int extent_fiemap(struct btrfs_inode *inode, struct fiemap_extent_info *fieinfo,
 	struct extent_state *cached_state = NULL;
 	struct btrfs_path *path;
 	struct btrfs_root *root = inode->root;
-	struct fiemap_cache cache = { 0 };
+	struct fiemap_cache cache = { };
 	struct ulist *roots;
 	struct ulist *tmp_ulist;
 	int end = 0;
@@ -6453,7 +6453,7 @@ static int read_extent_buffer_subpage(struct extent_buffer *eb, int wait,
 	struct btrfs_fs_info *fs_info = eb->fs_info;
 	struct extent_io_tree *io_tree;
 	struct page *page = eb->pages[0];
-	struct btrfs_bio_ctrl bio_ctrl = { 0 };
+	struct btrfs_bio_ctrl bio_ctrl = { };
 	int ret = 0;
 
 	ASSERT(!test_bit(EXTENT_BUFFER_UNMAPPED, &eb->bflags));
@@ -6525,7 +6525,7 @@ int read_extent_buffer_pages(struct extent_buffer *eb, int wait, int mirror_num)
 	int all_uptodate = 1;
 	int num_pages;
 	unsigned long num_reads = 0;
-	struct btrfs_bio_ctrl bio_ctrl = { 0 };
+	struct btrfs_bio_ctrl bio_ctrl = { };
 
 	if (test_bit(EXTENT_BUFFER_UPTODATE, &eb->bflags))
 		return 0;

@@ -237,7 +237,7 @@ static int child_fdinfo_nspid_test(void *args)
 static void test_pidfd_fdinfo_nspid(void)
 {
 	struct child a, b;
-	struct error err = {0, };
+	struct error err = {};
 	const char *test_name = "pidfd check for NSpid in fdinfo";
 
 	/* Create a new child in a new pid and mount namespace */
@@ -270,7 +270,7 @@ static void test_pidfd_fdinfo_nspid(void)
 static void test_pidfd_dead_fdinfo(void)
 {
 	struct child a;
-	struct error err = {0, };
+	struct error err = {};
 	const char *test_name = "pidfd check fdinfo for dead process";
 
 	/* Create a new child in a new pid and mount namespace */

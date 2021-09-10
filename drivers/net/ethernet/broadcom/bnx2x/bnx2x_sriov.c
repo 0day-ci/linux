@@ -85,7 +85,7 @@ static void bnx2x_vf_igu_ack_sb(struct bnx2x *bp, struct bnx2x_virtf *vf,
 	u32 igu_addr_ctl = IGU_REG_COMMAND_REG_CTRL;
 	u32 func_encode = vf->abs_vfid;
 	u32 addr_encode = IGU_CMD_E2_PROD_UPD_BASE + igu_sb_id;
-	struct igu_regular cmd_data = {0};
+	struct igu_regular cmd_data = {};
 
 	cmd_data.sb_id_and_flags =
 			((index << IGU_REGULAR_SB_INDEX_SHIFT) |
@@ -2078,7 +2078,7 @@ int bnx2x_vf_acquire(struct bnx2x *bp, struct bnx2x_virtf *vf,
 
 int bnx2x_vf_init(struct bnx2x *bp, struct bnx2x_virtf *vf, dma_addr_t *sb_map)
 {
-	struct bnx2x_func_init_params func_init = {0};
+	struct bnx2x_func_init_params func_init = {};
 	int i;
 
 	/* the sb resources are initialized at this point, do the

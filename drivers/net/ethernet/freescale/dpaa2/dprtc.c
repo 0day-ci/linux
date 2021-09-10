@@ -32,7 +32,7 @@ int dprtc_open(struct fsl_mc_io *mc_io,
 	       u16 *token)
 {
 	struct dprtc_cmd_open *cmd_params;
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	int err;
 
 	cmd.header = mc_encode_cmd_header(DPRTC_CMDID_OPEN,
@@ -65,7 +65,7 @@ int dprtc_close(struct fsl_mc_io *mc_io,
 		u32 cmd_flags,
 		u16 token)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 
 	cmd.header = mc_encode_cmd_header(DPRTC_CMDID_CLOSE, cmd_flags,
 					  token);
@@ -95,7 +95,7 @@ int dprtc_set_irq_enable(struct fsl_mc_io *mc_io,
 			 u8 en)
 {
 	struct dprtc_cmd_set_irq_enable *cmd_params;
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 
 	cmd.header = mc_encode_cmd_header(DPRTC_CMDID_SET_IRQ_ENABLE,
 					  cmd_flags,
@@ -125,7 +125,7 @@ int dprtc_get_irq_enable(struct fsl_mc_io *mc_io,
 {
 	struct dprtc_rsp_get_irq_enable *rsp_params;
 	struct dprtc_cmd_get_irq *cmd_params;
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	int err;
 
 	cmd.header = mc_encode_cmd_header(DPRTC_CMDID_GET_IRQ_ENABLE,
@@ -167,7 +167,7 @@ int dprtc_set_irq_mask(struct fsl_mc_io *mc_io,
 		       u32 mask)
 {
 	struct dprtc_cmd_set_irq_mask *cmd_params;
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 
 	cmd.header = mc_encode_cmd_header(DPRTC_CMDID_SET_IRQ_MASK,
 					  cmd_flags,
@@ -200,7 +200,7 @@ int dprtc_get_irq_mask(struct fsl_mc_io *mc_io,
 {
 	struct dprtc_rsp_get_irq_mask *rsp_params;
 	struct dprtc_cmd_get_irq *cmd_params;
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	int err;
 
 	cmd.header = mc_encode_cmd_header(DPRTC_CMDID_GET_IRQ_MASK,
@@ -240,7 +240,7 @@ int dprtc_get_irq_status(struct fsl_mc_io *mc_io,
 {
 	struct dprtc_cmd_get_irq_status *cmd_params;
 	struct dprtc_rsp_get_irq_status *rsp_params;
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	int err;
 
 	cmd.header = mc_encode_cmd_header(DPRTC_CMDID_GET_IRQ_STATUS,
@@ -280,7 +280,7 @@ int dprtc_clear_irq_status(struct fsl_mc_io *mc_io,
 			   u32 status)
 {
 	struct dprtc_cmd_clear_irq_status *cmd_params;
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 
 	cmd.header = mc_encode_cmd_header(DPRTC_CMDID_CLEAR_IRQ_STATUS,
 					  cmd_flags,

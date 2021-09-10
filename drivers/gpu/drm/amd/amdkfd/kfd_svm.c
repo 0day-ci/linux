@@ -2716,7 +2716,7 @@ svm_range_add(struct kfd_process *p, uint64_t start, uint64_t size,
 {
 	uint64_t last = start + size - 1UL;
 	struct svm_range_list *svms;
-	struct svm_range new = {0};
+	struct svm_range new = {};
 	struct svm_range *prange;
 	unsigned long left = 0;
 	int r = 0;

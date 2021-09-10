@@ -5849,7 +5849,7 @@ static int bond_check_params(struct bond_params *params)
 		 * packets_per_slave is 0 or 1, just initialize it
 		 */
 		params->reciprocal_packets_per_slave =
-			(struct reciprocal_value) { 0 };
+			(struct reciprocal_value) { };
 	}
 
 	if (primary)

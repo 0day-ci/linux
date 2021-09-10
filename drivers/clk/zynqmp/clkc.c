@@ -200,7 +200,7 @@ static int zynqmp_get_clock_type(u32 clk_id, u32 *type)
  */
 static int zynqmp_pm_clock_get_num_clocks(u32 *nclocks)
 {
-	struct zynqmp_pm_query_data qdata = {0};
+	struct zynqmp_pm_query_data qdata = {};
 	u32 ret_payload[PAYLOAD_ARG_CNT];
 	int ret;
 
@@ -225,7 +225,7 @@ static int zynqmp_pm_clock_get_num_clocks(u32 *nclocks)
 static int zynqmp_pm_clock_get_name(u32 clock_id,
 				    struct name_resp *response)
 {
-	struct zynqmp_pm_query_data qdata = {0};
+	struct zynqmp_pm_query_data qdata = {};
 	u32 ret_payload[PAYLOAD_ARG_CNT];
 
 	qdata.qid = PM_QID_CLOCK_GET_NAME;
@@ -257,7 +257,7 @@ static int zynqmp_pm_clock_get_name(u32 clock_id,
 static int zynqmp_pm_clock_get_topology(u32 clock_id, u32 index,
 					struct topology_resp *response)
 {
-	struct zynqmp_pm_query_data qdata = {0};
+	struct zynqmp_pm_query_data qdata = {};
 	u32 ret_payload[PAYLOAD_ARG_CNT];
 	int ret;
 
@@ -309,7 +309,7 @@ struct clk_hw *zynqmp_clk_register_fixed_factor(const char *name, u32 clk_id,
 {
 	u32 mult, div;
 	struct clk_hw *hw;
-	struct zynqmp_pm_query_data qdata = {0};
+	struct zynqmp_pm_query_data qdata = {};
 	u32 ret_payload[PAYLOAD_ARG_CNT];
 	int ret;
 	unsigned long flag;
@@ -354,7 +354,7 @@ struct clk_hw *zynqmp_clk_register_fixed_factor(const char *name, u32 clk_id,
 static int zynqmp_pm_clock_get_parents(u32 clock_id, u32 index,
 				       struct parents_resp *response)
 {
-	struct zynqmp_pm_query_data qdata = {0};
+	struct zynqmp_pm_query_data qdata = {};
 	u32 ret_payload[PAYLOAD_ARG_CNT];
 	int ret;
 
@@ -380,7 +380,7 @@ static int zynqmp_pm_clock_get_parents(u32 clock_id, u32 index,
 static int zynqmp_pm_clock_get_attributes(u32 clock_id,
 					  struct attr_resp *response)
 {
-	struct zynqmp_pm_query_data qdata = {0};
+	struct zynqmp_pm_query_data qdata = {};
 	u32 ret_payload[PAYLOAD_ARG_CNT];
 	int ret;
 

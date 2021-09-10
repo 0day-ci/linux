@@ -431,7 +431,7 @@ static void adm8211_interrupt_rci(struct ieee80211_hw *dev)
 				     RDES1_CONTROL_RER : 0));
 
 		if (skb) {
-			struct ieee80211_rx_status rx_status = {0};
+			struct ieee80211_rx_status rx_status = {};
 
 			if (priv->pdev->revision < ADM8211_REV_CA)
 				rx_status.signal = rssi;

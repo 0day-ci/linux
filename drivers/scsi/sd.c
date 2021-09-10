@@ -1649,7 +1649,7 @@ static unsigned int sd_check_events(struct gendisk *disk, unsigned int clearing)
 	 * sd_revalidate() is called.
 	 */
 	if (scsi_block_when_processing_errors(sdp)) {
-		struct scsi_sense_hdr sshdr = { 0, };
+		struct scsi_sense_hdr sshdr = { };
 
 		retval = scsi_test_unit_ready(sdp, SD_TIMEOUT, sdkp->max_retries,
 					      &sshdr);

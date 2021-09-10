@@ -2314,7 +2314,7 @@ static int ci_load_smc_ucode(struct pp_hwmgr *hwmgr)
 	uint8_t *src;
 	uint32_t data;
 
-	struct cgs_firmware_info info = {0};
+	struct cgs_firmware_info info = {};
 
 	cgs_get_firmware_info(hwmgr->device, CGS_UCODE_ID_SMU, &info);
 

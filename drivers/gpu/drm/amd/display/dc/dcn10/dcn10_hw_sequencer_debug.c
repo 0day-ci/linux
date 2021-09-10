@@ -340,7 +340,7 @@ static unsigned int dcn10_get_cm_states(struct dc *dc, char *pBuf, unsigned int 
 
 	for (i = 0; i < pool->pipe_count; i++) {
 		struct dpp *dpp = pool->dpps[i];
-		struct dcn_dpp_state s = {0};
+		struct dcn_dpp_state s = {};
 
 		dpp->funcs->dpp_read_state(dpp, &s);
 
@@ -392,7 +392,7 @@ static unsigned int dcn10_get_mpcc_states(struct dc *dc, char *pBuf, unsigned in
 	pBuf += chars_printed;
 
 	for (i = 0; i < pool->pipe_count; i++) {
-		struct mpcc_state s = {0};
+		struct mpcc_state s = {};
 
 		pool->mpc->funcs->read_mpcc_state(pool->mpc, i, &s);
 
@@ -425,7 +425,7 @@ static unsigned int dcn10_get_otg_states(struct dc *dc, char *pBuf, unsigned int
 
 	for (i = 0; i < pool->timing_generator_count; i++) {
 		struct timing_generator *tg = pool->timing_generators[i];
-		struct dcn_otg_state s = {0};
+		struct dcn_otg_state s = {};
 		int pix_clk = 0;
 
 		optc1_read_otg_state(DCN10TG_FROM_TG(tg), &s);
@@ -492,7 +492,7 @@ static void dcn10_clear_otpc_underflow(struct dc *dc)
 
 	for (i = 0; i < pool->timing_generator_count; i++) {
 		struct timing_generator *tg = pool->timing_generators[i];
-		struct dcn_otg_state s = {0};
+		struct dcn_otg_state s = {};
 
 		optc1_read_otg_state(DCN10TG_FROM_TG(tg), &s);
 

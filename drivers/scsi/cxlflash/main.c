@@ -2371,7 +2371,7 @@ int cxlflash_afu_sync(struct afu *afu, ctx_hndl_t ctx, res_hndl_t res, u8 mode)
 {
 	struct cxlflash_cfg *cfg = afu->parent;
 	struct device *dev = &cfg->dev->dev;
-	struct sisl_ioarcb rcb = { 0 };
+	struct sisl_ioarcb rcb = { };
 
 	dev_dbg(dev, "%s: afu=%p ctx=%u res=%u mode=%u\n",
 		__func__, afu, ctx, res, mode);

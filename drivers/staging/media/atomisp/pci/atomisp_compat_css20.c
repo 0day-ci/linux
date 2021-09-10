@@ -1028,7 +1028,7 @@ int atomisp_q_video_buffer_to_css(struct atomisp_sub_device *asd,
 				  enum ia_css_pipe_id css_pipe_id)
 {
 	struct atomisp_stream_env *stream_env = &asd->stream_env[stream_id];
-	struct ia_css_buffer css_buf = {0};
+	struct ia_css_buffer css_buf = {};
 	int err;
 
 	css_buf.type = css_buf_type;
@@ -1048,7 +1048,7 @@ int atomisp_q_metadata_buffer_to_css(struct atomisp_sub_device *asd,
 				     enum ia_css_pipe_id css_pipe_id)
 {
 	struct atomisp_stream_env *stream_env = &asd->stream_env[stream_id];
-	struct ia_css_buffer buffer = {0};
+	struct ia_css_buffer buffer = {};
 	struct atomisp_device *isp = asd->isp;
 
 	buffer.type = IA_CSS_BUFFER_TYPE_METADATA;
@@ -1068,7 +1068,7 @@ int atomisp_q_s3a_buffer_to_css(struct atomisp_sub_device *asd,
 				enum ia_css_pipe_id css_pipe_id)
 {
 	struct atomisp_stream_env *stream_env = &asd->stream_env[stream_id];
-	struct ia_css_buffer buffer = {0};
+	struct ia_css_buffer buffer = {};
 	struct atomisp_device *isp = asd->isp;
 
 	buffer.type = IA_CSS_BUFFER_TYPE_3A_STATISTICS;
@@ -1089,7 +1089,7 @@ int atomisp_q_dis_buffer_to_css(struct atomisp_sub_device *asd,
 				enum ia_css_pipe_id css_pipe_id)
 {
 	struct atomisp_stream_env *stream_env = &asd->stream_env[stream_id];
-	struct ia_css_buffer buffer = {0};
+	struct ia_css_buffer buffer = {};
 	struct atomisp_device *isp = asd->isp;
 
 	buffer.type = IA_CSS_BUFFER_TYPE_DIS_STATISTICS;

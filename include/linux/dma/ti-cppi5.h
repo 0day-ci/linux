@@ -519,7 +519,7 @@ cppi5_hdesc_get_next_hbdesc(struct cppi5_host_desc_t *desc)
 
 static inline void cppi5_hdesc_reset_hbdesc(struct cppi5_host_desc_t *desc)
 {
-	desc->hdr = (struct cppi5_desc_hdr_t) { 0 };
+	desc->hdr = (struct cppi5_desc_hdr_t) { };
 	desc->next_desc = 0;
 }
 

@@ -198,7 +198,7 @@ static enum bp_result bios_parser_get_src_obj(struct dc_bios *dcb,
 	struct bios_parser *bp = BP_FROM_DCB(dcb);
 	unsigned int i;
 	enum bp_result  bp_result = BP_RESULT_BADINPUT;
-	struct graphics_object_id obj_id = {0};
+	struct graphics_object_id obj_id = {};
 	struct object_info_table *tbl = &bp->object_info_tbl;
 
 	if (!src_object_id)
@@ -256,7 +256,7 @@ static struct atom_display_object_path_v2 *get_bios_object(
 		struct graphics_object_id id)
 {
 	unsigned int i;
-	struct graphics_object_id obj_id = {0};
+	struct graphics_object_id obj_id = {};
 
 	switch (id.type) {
 	case OBJECT_TYPE_ENCODER:
@@ -294,7 +294,7 @@ static enum bp_result bios_parser_get_i2c_info(struct dc_bios *dcb,
 	struct atom_display_object_path_v2 *object;
 	struct atom_common_record_header *header;
 	struct atom_i2c_record *record;
-	struct atom_i2c_record dummy_record = {0};
+	struct atom_i2c_record dummy_record = {};
 	struct bios_parser *bp = BP_FROM_DCB(dcb);
 
 	if (!info)
@@ -2601,7 +2601,7 @@ static uint16_t bios_parser_pack_data_tables(
 	struct atom_common_table_header *data_tbl_header = NULL;
 	struct atom_master_list_of_data_tables_v2_1 *data_tbl_list = NULL;
 	struct atom_master_data_table_v2_1 *packed_master_data_tbl = NULL;
-	struct atom_data_revision tbl_rev = {0};
+	struct atom_data_revision tbl_rev = {};
 	uint16_t *rom_header_offset = NULL;
 	const uint8_t *bios = bp->base.bios;
 	uint8_t *bios_dst = (uint8_t *)dst;
@@ -2841,7 +2841,7 @@ static bool bios_parser2_construct(
 	uint16_t *rom_header_offset = NULL;
 	struct atom_rom_header_v2_2 *rom_header = NULL;
 	struct display_object_info_table_v1_4 *object_info_tbl;
-	struct atom_data_revision tbl_rev = {0};
+	struct atom_data_revision tbl_rev = {};
 
 	if (!init)
 		return false;

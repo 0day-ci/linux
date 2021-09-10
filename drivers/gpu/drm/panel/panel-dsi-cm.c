@@ -551,7 +551,7 @@ static int dsicm_probe(struct mipi_dsi_device *dsi)
 		       DRM_MODE_CONNECTOR_DSI);
 
 	if (ddata->use_dsi_backlight) {
-		struct backlight_properties props = { 0 };
+		struct backlight_properties props = { };
 		props.max_brightness = 255;
 		props.type = BACKLIGHT_RAW;
 

@@ -51,7 +51,7 @@ int set_dawr(int nr, struct arch_hw_breakpoint *brk)
 
 static void disable_dawrs_cb(void *info)
 {
-	struct arch_hw_breakpoint null_brk = {0};
+	struct arch_hw_breakpoint null_brk = {};
 	int i;
 
 	for (i = 0; i < nr_wp_slots(); i++)
@@ -62,7 +62,7 @@ static ssize_t dawr_write_file_bool(struct file *file,
 				    const char __user *user_buf,
 				    size_t count, loff_t *ppos)
 {
-	struct arch_hw_breakpoint null_brk = {0};
+	struct arch_hw_breakpoint null_brk = {};
 	size_t rc;
 
 	/* Send error to user if they hypervisor won't allow us to write DAWR */

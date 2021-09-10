@@ -55,8 +55,8 @@ static int eeprom_fallback(struct eeprom_req_info *request,
 			   struct genl_info *info)
 {
 	struct net_device *dev = reply->base.dev;
-	struct ethtool_modinfo modinfo = {0};
-	struct ethtool_eeprom eeprom = {0};
+	struct ethtool_modinfo modinfo = {};
+	struct ethtool_eeprom eeprom = {};
 	u8 *data;
 	int err;
 
@@ -107,7 +107,7 @@ static int eeprom_prepare_data(const struct ethnl_req_info *req_base,
 {
 	struct eeprom_reply_data *reply = MODULE_EEPROM_REPDATA(reply_base);
 	struct eeprom_req_info *request = MODULE_EEPROM_REQINFO(req_base);
-	struct ethtool_module_eeprom page_data = {0};
+	struct ethtool_module_eeprom page_data = {};
 	struct net_device *dev = reply_base->dev;
 	int ret;
 

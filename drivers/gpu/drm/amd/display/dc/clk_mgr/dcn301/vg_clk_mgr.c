@@ -115,7 +115,7 @@ void vg_update_clocks(struct clk_mgr *clk_mgr_base,
 			display_count = vg_get_active_display_cnt_wa(dc, context);
 			/* if we can go lower, go lower */
 			if (display_count == 0 && !IS_DIAG_DC(dc->ctx->dce_environment)) {
-				union display_idle_optimization_u idle_info = { 0 };
+				union display_idle_optimization_u idle_info = { };
 
 				idle_info.idle_info.df_request_disabled = 1;
 				idle_info.idle_info.phy_ref_clk_off = 1;
@@ -128,7 +128,7 @@ void vg_update_clocks(struct clk_mgr *clk_mgr_base,
 	} else {
 		/* check that we're not already in D0 */
 		if (clk_mgr_base->clks.pwr_state != DCN_PWR_STATE_MISSION_MODE) {
-			union display_idle_optimization_u idle_info = { 0 };
+			union display_idle_optimization_u idle_info = { };
 
 			dcn301_smu_set_display_idle_optimization(clk_mgr, idle_info.data);
 			/* update power state */
@@ -237,7 +237,7 @@ static void vg_dump_clk_registers_internal(struct dcn301_clk_internal *internal,
 static void vg_dump_clk_registers(struct clk_state_registers_and_bypass *regs_and_bypass,
 		struct clk_mgr *clk_mgr_base, struct clk_log_info *log_info)
 {
-	struct dcn301_clk_internal internal = {0};
+	struct dcn301_clk_internal internal = {};
 	char *bypass_clks[5] = {"0x0 DFS", "0x1 REFCLK", "0x2 ERROR", "0x3 400 FCH", "0x4 600 FCH"};
 	unsigned int chars_printed = 0;
 	unsigned int remaining_buffer = log_info->bufSize;
@@ -371,8 +371,8 @@ static void vg_dump_clk_registers(struct clk_state_registers_and_bypass *regs_an
 void vg_get_clk_states(struct clk_mgr *clk_mgr_base, struct clk_states *s)
 {
 
-	struct clk_state_registers_and_bypass sb = { 0 };
-	struct clk_log_info log_info = { 0 };
+	struct clk_state_registers_and_bypass sb = { };
+	struct clk_log_info log_info = { };
 
 	vg_dump_clk_registers(&sb, clk_mgr_base, &log_info);
 
@@ -704,7 +704,7 @@ static struct vg_dpm_clocks dummy_clocks = {
 		}
 };
 
-static struct watermarks dummy_wms = { 0 };
+static struct watermarks dummy_wms = { };
 
 static void vg_get_dpm_table_from_smu(struct clk_mgr_internal *clk_mgr,
 		struct smu_dpm_clks *smu_dpm_clks)
@@ -732,7 +732,7 @@ void vg_clk_mgr_construct(
 		struct pp_smu_funcs *pp_smu,
 		struct dccg *dccg)
 {
-	struct smu_dpm_clks smu_dpm_clks = { 0 };
+	struct smu_dpm_clks smu_dpm_clks = { };
 
 	clk_mgr->base.base.ctx = ctx;
 	clk_mgr->base.base.funcs = &vg_funcs;
@@ -776,7 +776,7 @@ void vg_clk_mgr_construct(
 		vg_funcs.update_clocks = dcn2_update_clocks_fpga;
 		clk_mgr->base.base.dentist_vco_freq_khz = 3600000;
 	} else {
-		struct clk_log_info log_info = {0};
+		struct clk_log_info log_info = {};
 
 		clk_mgr->base.smu_ver = dcn301_smu_get_smu_version(&clk_mgr->base);
 

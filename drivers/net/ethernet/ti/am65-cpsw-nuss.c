@@ -1554,7 +1554,7 @@ void am65_cpsw_nuss_remove_tx_chns(struct am65_cpsw_common *common)
 static int am65_cpsw_nuss_init_tx_chns(struct am65_cpsw_common *common)
 {
 	u32  max_desc_num = ALIGN(AM65_CPSW_MAX_TX_DESC, MAX_SKB_FRAGS);
-	struct k3_udma_glue_tx_channel_cfg tx_cfg = { 0 };
+	struct k3_udma_glue_tx_channel_cfg tx_cfg = { };
 	struct device *dev = common->dev;
 	struct k3_ring_cfg ring_cfg = {
 		.elm_size = K3_RINGACC_RING_ELSIZE_8,
@@ -1644,7 +1644,7 @@ static void am65_cpsw_nuss_free_rx_chns(void *data)
 static int am65_cpsw_nuss_init_rx_chns(struct am65_cpsw_common *common)
 {
 	struct am65_cpsw_rx_chn *rx_chn = &common->rx_chns;
-	struct k3_udma_glue_rx_channel_cfg rx_cfg = { 0 };
+	struct k3_udma_glue_rx_channel_cfg rx_cfg = { };
 	u32  max_desc_num = AM65_CPSW_MAX_RX_DESC;
 	struct device *dev = common->dev;
 	u32 hdesc_size;
@@ -2633,7 +2633,7 @@ static void am65_cpsw_nuss_apply_socinfo(struct am65_cpsw_common *common)
 
 static int am65_cpsw_nuss_probe(struct platform_device *pdev)
 {
-	struct cpsw_ale_params ale_params = { 0 };
+	struct cpsw_ale_params ale_params = { };
 	const struct of_device_id *of_id;
 	struct device *dev = &pdev->dev;
 	struct am65_cpsw_common *common;

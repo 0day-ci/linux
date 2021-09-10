@@ -219,7 +219,7 @@ static int ocelot_setup_tc_cls_matchall(struct ocelot_port_private *priv,
 {
 	struct netlink_ext_ack *extack = f->common.extack;
 	struct ocelot *ocelot = priv->port.ocelot;
-	struct ocelot_policer pol = { 0 };
+	struct ocelot_policer pol = { };
 	struct flow_action_entry *action;
 	int port = priv->chip_port;
 	int err;
@@ -1095,7 +1095,7 @@ static int ocelot_port_obj_del(struct net_device *dev, const void *ctx,
 static void ocelot_inherit_brport_flags(struct ocelot *ocelot, int port,
 					struct net_device *brport_dev)
 {
-	struct switchdev_brport_flags flags = {0};
+	struct switchdev_brport_flags flags = {};
 	int flag;
 
 	flags.mask = BR_LEARNING | BR_FLOOD | BR_MCAST_FLOOD | BR_BCAST_FLOOD;

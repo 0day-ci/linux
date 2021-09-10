@@ -1653,7 +1653,7 @@ static ssize_t tun_get_user(struct tun_struct *tun, struct tun_file *tfile,
 	struct sk_buff *skb;
 	size_t total_len = iov_iter_count(from);
 	size_t len = total_len, align = tun->align, linear;
-	struct virtio_net_hdr gso = { 0 };
+	struct virtio_net_hdr gso = { };
 	int good_linear;
 	int copylen;
 	bool zerocopy = false;
@@ -1950,7 +1950,7 @@ static ssize_t tun_put_user_xdp(struct tun_struct *tun,
 	size_t ret;
 
 	if (tun->flags & IFF_VNET_HDR) {
-		struct virtio_net_hdr gso = { 0 };
+		struct virtio_net_hdr gso = { };
 
 		vnet_hdr_sz = READ_ONCE(tun->vnet_hdr_sz);
 		if (unlikely(iov_iter_count(iter) < vnet_hdr_sz))

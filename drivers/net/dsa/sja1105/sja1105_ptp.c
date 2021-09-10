@@ -396,7 +396,7 @@ static long sja1105_rxtstamp_work(struct ptp_clock_info *ptp)
 			continue;
 		}
 
-		*shwt = (struct skb_shared_hwtstamps) {0};
+		*shwt = (struct skb_shared_hwtstamps) {};
 
 		ts = SJA1105_SKB_CB(skb)->tstamp;
 		ts = sja1105_tstamp_reconstruct(ds, ticks, ts);
@@ -435,7 +435,7 @@ bool sja1110_rxtstamp(struct dsa_switch *ds, int port, struct sk_buff *skb)
 	struct skb_shared_hwtstamps *shwt = skb_hwtstamps(skb);
 	u64 ts = SJA1105_SKB_CB(skb)->tstamp;
 
-	*shwt = (struct skb_shared_hwtstamps) {0};
+	*shwt = (struct skb_shared_hwtstamps) {};
 
 	shwt->hwtstamp = ns_to_ktime(sja1105_ticks_to_ns(ts));
 
@@ -458,7 +458,7 @@ void sja1110_process_meta_tstamp(struct dsa_switch *ds, int port, u8 ts_id,
 	struct sja1105_private *priv = ds->priv;
 	struct sja1105_ptp_data *ptp_data = &priv->ptp_data;
 	struct sk_buff *skb, *skb_tmp, *skb_match = NULL;
-	struct skb_shared_hwtstamps shwt = {0};
+	struct skb_shared_hwtstamps shwt = {};
 
 	/* We don't care about RX timestamps on the CPU port */
 	if (dir == SJA1110_META_TSTAMP_RX)
@@ -989,7 +989,7 @@ void sja1105_ptp_txtstamp_skb(struct dsa_switch *ds, int port,
 {
 	struct sja1105_private *priv = ds->priv;
 	struct sja1105_ptp_data *ptp_data = &priv->ptp_data;
-	struct skb_shared_hwtstamps shwt = {0};
+	struct skb_shared_hwtstamps shwt = {};
 	u64 ticks, ts;
 	int rc;
 

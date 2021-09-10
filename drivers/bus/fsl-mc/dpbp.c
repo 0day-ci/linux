@@ -30,7 +30,7 @@ int dpbp_open(struct fsl_mc_io *mc_io,
 	      int dpbp_id,
 	      u16 *token)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	struct dpbp_cmd_open *cmd_params;
 	int err;
 
@@ -67,7 +67,7 @@ int dpbp_close(struct fsl_mc_io *mc_io,
 	       u32 cmd_flags,
 	       u16 token)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 
 	/* prepare command */
 	cmd.header = mc_encode_cmd_header(DPBP_CMDID_CLOSE, cmd_flags,
@@ -90,7 +90,7 @@ int dpbp_enable(struct fsl_mc_io *mc_io,
 		u32 cmd_flags,
 		u16 token)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 
 	/* prepare command */
 	cmd.header = mc_encode_cmd_header(DPBP_CMDID_ENABLE, cmd_flags,
@@ -113,7 +113,7 @@ int dpbp_disable(struct fsl_mc_io *mc_io,
 		 u32 cmd_flags,
 		 u16 token)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 
 	/* prepare command */
 	cmd.header = mc_encode_cmd_header(DPBP_CMDID_DISABLE,
@@ -136,7 +136,7 @@ int dpbp_reset(struct fsl_mc_io *mc_io,
 	       u32 cmd_flags,
 	       u16 token)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 
 	/* prepare command */
 	cmd.header = mc_encode_cmd_header(DPBP_CMDID_RESET,
@@ -162,7 +162,7 @@ int dpbp_get_attributes(struct fsl_mc_io *mc_io,
 			u16 token,
 			struct dpbp_attr *attr)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	struct dpbp_rsp_get_attributes *rsp_params;
 	int err;
 

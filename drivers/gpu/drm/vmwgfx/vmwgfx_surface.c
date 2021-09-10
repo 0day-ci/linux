@@ -1454,7 +1454,7 @@ vmw_gb_surface_define_internal(struct drm_device *dev,
 	struct ttm_object_file *tfile = vmw_fpriv(file_priv)->tfile;
 	struct vmw_private *dev_priv = vmw_priv(dev);
 	struct vmw_user_surface *user_srf;
-	struct vmw_surface_metadata metadata = {0};
+	struct vmw_surface_metadata metadata = {};
 	struct vmw_surface *srf;
 	struct vmw_resource *res;
 	struct vmw_resource *tmp;

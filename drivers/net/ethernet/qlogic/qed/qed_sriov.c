@@ -1888,7 +1888,7 @@ static void qed_iov_vf_mbx_start_vport(struct qed_hwfn *p_hwfn,
 				       struct qed_ptt *p_ptt,
 				       struct qed_vf_info *vf)
 {
-	struct qed_sp_vport_start_params params = { 0 };
+	struct qed_sp_vport_start_params params = { };
 	struct qed_iov_vf_mbx *mbx = &vf->vf_mbx;
 	struct vfpf_vport_start_tlv *start;
 	u8 status = PFVF_STATUS_SUCCESS;

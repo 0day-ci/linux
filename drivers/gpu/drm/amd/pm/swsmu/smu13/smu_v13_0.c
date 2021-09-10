@@ -481,7 +481,7 @@ static int smu_v13_0_atom_get_smu_clockinfo(struct amdgpu_device *adev,
 					    uint8_t syspll_id,
 					    uint32_t *clk_freq)
 {
-	struct atom_get_smu_clock_info_parameters_v3_1 input = {0};
+	struct atom_get_smu_clock_info_parameters_v3_1 input = {};
 	struct atom_get_smu_clock_info_output_parameters_v3_1 *output;
 	int ret, index;
 

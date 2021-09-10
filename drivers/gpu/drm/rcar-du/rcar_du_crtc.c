@@ -220,7 +220,7 @@ static void rcar_du_crtc_set_display_timing(struct rcar_du_crtc *rcrtc)
 
 	if (rcdu->info->dpll_mask & (1 << rcrtc->index)) {
 		unsigned long target = mode_clock;
-		struct dpll_info dpll = { 0 };
+		struct dpll_info dpll = { };
 		unsigned long extclk;
 		u32 dpllcr;
 		u32 div = 0;

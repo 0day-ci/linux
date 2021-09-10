@@ -514,7 +514,7 @@ static irqreturn_t rx_irq(int irq, void *data)
 static int rx_request_irq(struct hinic_rxq *rxq)
 {
 	struct hinic_dev *nic_dev = netdev_priv(rxq->netdev);
-	struct hinic_msix_config interrupt_info = {0};
+	struct hinic_msix_config interrupt_info = {};
 	struct hinic_intr_coal_info *intr_coal = NULL;
 	struct hinic_hwdev *hwdev = nic_dev->hwdev;
 	struct hinic_rq *rq = rxq->rq;

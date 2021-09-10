@@ -216,7 +216,7 @@ void *kexec_file_add_components(struct kimage *image,
 				int (*add_kernel)(struct kimage *image,
 						  struct s390_load_data *data))
 {
-	struct s390_load_data data = {0};
+	struct s390_load_data data = {};
 	int ret;
 
 	data.report = ipl_report_init(&ipl_block);

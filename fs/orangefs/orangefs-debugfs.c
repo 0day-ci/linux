@@ -904,7 +904,7 @@ static void do_k_mask(int i, char *unchecked_keyword, __u64 **sane_mask)
 
 int orangefs_debugfs_new_client_mask(void __user *arg)
 {
-	struct dev_mask2_info_s mask2_info = {0};
+	struct dev_mask2_info_s mask2_info = {};
 	int ret;
 
 	ret = copy_from_user(&mask2_info,
@@ -981,7 +981,7 @@ int orangefs_debugfs_new_client_string(void __user *arg)
 
 int orangefs_debugfs_new_debug(void __user *arg)
 {
-	struct dev_mask_info_s mask_info = {0};
+	struct dev_mask_info_s mask_info = {};
 	int ret;
 
 	ret = copy_from_user(&mask_info,

@@ -302,7 +302,7 @@ static void csi2ipu_gasket_init(struct csi2_dev *csi2)
 
 static int csi2_get_active_lanes(struct csi2_dev *csi2, unsigned int *lanes)
 {
-	struct v4l2_mbus_config mbus_config = { 0 };
+	struct v4l2_mbus_config mbus_config = { };
 	unsigned int num_lanes = UINT_MAX;
 	int ret;
 

@@ -1117,7 +1117,7 @@ int pci_alloc_irq_vectors_affinity(struct pci_dev *dev, unsigned int min_vecs,
 				   unsigned int max_vecs, unsigned int flags,
 				   struct irq_affinity *affd)
 {
-	struct irq_affinity msi_default_affd = {0};
+	struct irq_affinity msi_default_affd = {};
 	int nvecs = -ENOSPC;
 
 	if (flags & PCI_IRQ_AFFINITY) {

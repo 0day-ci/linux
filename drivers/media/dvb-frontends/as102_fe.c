@@ -55,7 +55,7 @@ static int as102_fe_set_frontend(struct dvb_frontend *fe)
 {
 	struct as102_state *state = fe->demodulator_priv;
 	struct dtv_frontend_properties *c = &fe->dtv_property_cache;
-	struct as10x_tune_args tune_args = { 0 };
+	struct as10x_tune_args tune_args = { };
 
 	/* set frequency */
 	tune_args.freq = c->frequency / 1000;
@@ -186,7 +186,7 @@ static int as102_fe_get_frontend(struct dvb_frontend *fe,
 {
 	struct as102_state *state = fe->demodulator_priv;
 	int ret = 0;
-	struct as10x_tps tps = { 0 };
+	struct as10x_tps tps = { };
 
 	/* send abilis command: GET_TPS */
 	ret = state->ops->get_tps(state->priv, &tps);
@@ -302,7 +302,7 @@ static int as102_fe_read_status(struct dvb_frontend *fe, enum fe_status *status)
 {
 	int ret = 0;
 	struct as102_state *state = fe->demodulator_priv;
-	struct as10x_tune_status tstate = { 0 };
+	struct as10x_tune_status tstate = { };
 
 	/* send abilis command: GET_TUNE_STATUS */
 	ret = state->ops->get_status(state->priv, &tstate);

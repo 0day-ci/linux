@@ -557,7 +557,7 @@ qtnf_event_handle_external_auth(struct qtnf_vif *vif,
 				const struct qlink_event_external_auth *ev,
 				u16 len)
 {
-	struct cfg80211_external_auth_params auth = {0};
+	struct cfg80211_external_auth_params auth = {};
 	struct wiphy *wiphy = priv_to_wiphy(vif->mac);
 	int ret;
 

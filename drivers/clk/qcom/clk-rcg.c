@@ -293,7 +293,7 @@ static int clk_dyn_rcg_set_parent(struct clk_hw *hw, u8 index)
 	struct clk_dyn_rcg *rcg = to_clk_dyn_rcg(hw);
 	u32 ns, md, reg;
 	int bank;
-	struct freq_tbl f = { 0 };
+	struct freq_tbl f = { };
 	bool banked_mn = !!rcg->mn[1].width;
 	bool banked_p = !!rcg->p[1].pre_div_width;
 
@@ -550,7 +550,7 @@ static int clk_rcg_bypass2_set_rate(struct clk_hw *hw, unsigned long rate,
 				unsigned long parent_rate)
 {
 	struct clk_rcg *rcg = to_clk_rcg(hw);
-	struct freq_tbl f = { 0 };
+	struct freq_tbl f = { };
 	u32 ns, src;
 	int i, ret, num_parents = clk_hw_get_num_parents(hw);
 
@@ -621,7 +621,7 @@ static int clk_rcg_pixel_set_rate(struct clk_hw *hw, unsigned long rate,
 	int delta = 100000;
 	const struct frac_entry *frac = pixel_table;
 	unsigned long request;
-	struct freq_tbl f = { 0 };
+	struct freq_tbl f = { };
 	u32 ns, src;
 	int i, ret, num_parents = clk_hw_get_num_parents(hw);
 
@@ -692,7 +692,7 @@ static int clk_rcg_esc_set_rate(struct clk_hw *hw, unsigned long rate,
 				unsigned long parent_rate)
 {
 	struct clk_rcg *rcg = to_clk_rcg(hw);
-	struct freq_tbl f = { 0 };
+	struct freq_tbl f = { };
 	int pre_div_max = BIT(rcg->p.pre_div_width);
 	int div;
 	u32 ns;

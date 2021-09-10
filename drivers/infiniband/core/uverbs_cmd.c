@@ -3585,7 +3585,7 @@ static int ib_uverbs_ex_query_device(struct uverbs_attr_bundle *attrs)
 {
 	struct ib_uverbs_ex_query_device_resp resp = {};
 	struct ib_uverbs_ex_query_device  cmd;
-	struct ib_device_attr attr = {0};
+	struct ib_device_attr attr = {};
 	struct ib_ucontext *ucontext;
 	struct ib_device *ib_dev;
 	int err;

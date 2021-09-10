@@ -414,8 +414,8 @@ static struct spi_board_info m10_n3000_info = {
 
 static int create_altera_spi_controller(struct n3000_nios *nn)
 {
-	struct altera_spi_platform_data pdata = { 0 };
-	struct platform_device_info pdevinfo = { 0 };
+	struct altera_spi_platform_data pdata = { };
+	struct platform_device_info pdevinfo = { };
 	void __iomem *base = nn->base;
 	u64 v;
 

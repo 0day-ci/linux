@@ -277,7 +277,7 @@ void dcn20_init_blank(
 {
 	struct dce_hwseq *hws = dc->hwseq;
 	enum dc_color_space color_space;
-	struct tg_color black_color = {0};
+	struct tg_color black_color = {};
 	struct output_pixel_processor *opp = NULL;
 	struct output_pixel_processor *bottom_opp = NULL;
 	uint32_t num_opps, opp_id_src0, opp_id_src1;
@@ -642,7 +642,7 @@ enum dc_status dcn20_enable_stream_timing(
 {
 	struct dce_hwseq *hws = dc->hwseq;
 	struct dc_stream_state *stream = pipe_ctx->stream;
-	struct drr_params params = {0};
+	struct drr_params params = {};
 	unsigned int event_triggers = 0;
 	struct pipe_ctx *odm_pipe;
 	int opp_cnt = 1;
@@ -990,7 +990,7 @@ void dcn20_blank_pixel_data(
 		struct pipe_ctx *pipe_ctx,
 		bool blank)
 {
-	struct tg_color black_color = {0};
+	struct tg_color black_color = {};
 	struct stream_resource *stream_res = &pipe_ctx->stream_res;
 	struct dc_stream_state *stream = pipe_ctx->stream;
 	enum dc_color_space color_space = stream->output_color_space;
@@ -1227,8 +1227,8 @@ void dcn20_pipe_control_lock(
 	    dcn20_setup_gsl_group_as_lock(dc, pipe, false);
 
 	if (pipe->stream && should_use_dmub_lock(pipe->stream->link)) {
-		union dmub_hw_lock_flags hw_locks = { 0 };
-		struct dmub_hw_lock_inst_flags inst_flags = { 0 };
+		union dmub_hw_lock_flags hw_locks = { };
+		struct dmub_hw_lock_inst_flags inst_flags = { };
 
 		hw_locks.bits.lock_pipe = 1;
 		inst_flags.otg_inst =  pipe->stream_res.tg->inst;
@@ -1439,7 +1439,7 @@ static void dcn20_update_dchubp_dpp(
 			plane_state->update_flags.bits.input_csc_change ||
 			plane_state->update_flags.bits.color_space_change ||
 			plane_state->update_flags.bits.coeff_reduction_change) {
-		struct dc_bias_and_scale bns_params = {0};
+		struct dc_bias_and_scale bns_params = {};
 
 		// program the input csc
 		dpp->funcs->dpp_setup(dpp,
@@ -2003,7 +2003,7 @@ void dcn20_enable_stream_gating(struct dc *dc, struct pipe_ctx *pipe_ctx)
 
 void dcn20_set_dmdata_attributes(struct pipe_ctx *pipe_ctx)
 {
-	struct dc_dmdata_attributes attr = { 0 };
+	struct dc_dmdata_attributes attr = { };
 	struct hubp *hubp = pipe_ctx->plane_res.hubp;
 
 	attr.dmdata_mode = DMDATA_HW_MODE;

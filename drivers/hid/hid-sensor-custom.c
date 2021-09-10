@@ -768,8 +768,8 @@ static int get_luid_table_index(unsigned char *usage_str)
 
 static int get_known_custom_sensor_index(struct hid_sensor_hub_device *hsdev)
 {
-	struct hid_sensor_hub_attribute_info sensor_manufacturer = { 0 };
-	struct hid_sensor_hub_attribute_info sensor_luid_info = { 0 };
+	struct hid_sensor_hub_attribute_info sensor_manufacturer = { };
+	struct hid_sensor_hub_attribute_info sensor_luid_info = { };
 	int report_size;
 	int ret;
 	static u16 w_buf[HID_CUSTOM_MAX_FEATURE_BYTES];

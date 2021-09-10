@@ -271,7 +271,7 @@ static const struct clk_ops zynqmp_clk_divider_ro_ops = {
  */
 static u32 zynqmp_clk_get_max_divisor(u32 clk_id, u32 type)
 {
-	struct zynqmp_pm_query_data qdata = {0};
+	struct zynqmp_pm_query_data qdata = {};
 	u32 ret_payload[PAYLOAD_ARG_CNT];
 	int ret;
 

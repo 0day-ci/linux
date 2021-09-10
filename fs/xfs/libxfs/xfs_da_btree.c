@@ -427,7 +427,7 @@ xfs_da3_node_create(
 	struct xfs_da_intnode	*node;
 	struct xfs_trans	*tp = args->trans;
 	struct xfs_mount	*mp = tp->t_mountp;
-	struct xfs_da3_icnode_hdr ichdr = {0};
+	struct xfs_da3_icnode_hdr ichdr = {};
 	struct xfs_buf		*bp;
 	int			error;
 	struct xfs_inode	*dp = args->dp;

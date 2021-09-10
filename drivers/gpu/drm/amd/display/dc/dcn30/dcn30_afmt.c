@@ -82,7 +82,7 @@ static void afmt3_setup_hdmi_audio(
 static union audio_cea_channels speakers_to_channels(
 	struct audio_speaker_flags speaker_flags)
 {
-	union audio_cea_channels cea_channels = {0};
+	union audio_cea_channels cea_channels = {};
 
 	/* these are one to one */
 	cea_channels.channels.FL = speaker_flags.FL_FR;

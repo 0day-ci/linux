@@ -250,7 +250,7 @@ static const struct backlight_ops bl_ops = {
 static void register_chip_backlight(struct fbtft_par *par)
 {
 	struct backlight_device *bd;
-	struct backlight_properties bl_props = { 0, };
+	struct backlight_properties bl_props = { };
 
 	bl_props.type = BACKLIGHT_RAW;
 	bl_props.power = FB_BLANK_POWERDOWN;

@@ -645,7 +645,7 @@ void __init do_device_inventory(void)
 
 #if defined(CONFIG_FW_CFG_SYSFS)
 	if (running_on_qemu) {
-		struct resource res[3] = {0,};
+		struct resource res[3] = {};
 		unsigned int base;
 
 		base = ((unsigned long long) PAGE0->pad0[2] << 32)

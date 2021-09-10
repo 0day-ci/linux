@@ -276,7 +276,7 @@ __weak void arch_unregister_hw_breakpoint(struct perf_event *bp)
  */
 static int __reserve_bp_slot(struct perf_event *bp, u64 bp_type)
 {
-	struct bp_busy_slots slots = {0};
+	struct bp_busy_slots slots = {};
 	enum bp_type_idx type;
 	int weight;
 	int ret;

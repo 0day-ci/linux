@@ -491,7 +491,7 @@ void enc3_stream_encoder_dvi_set_stream_attribute(
 	struct dcn10_stream_encoder *enc1 = DCN10STRENC_FROM_STRENC(enc);
 
 	if (!enc->ctx->dc->debug.avoid_vbios_exec_table) {
-		struct bp_encoder_control cntl = {0};
+		struct bp_encoder_control cntl = {};
 
 		cntl.action = ENCODER_CONTROL_SETUP;
 		cntl.engine_id = enc1->base.id;
@@ -538,7 +538,7 @@ static void enc3_stream_encoder_hdmi_set_stream_attribute(
 	struct dcn10_stream_encoder *enc1 = DCN10STRENC_FROM_STRENC(enc);
 
 	if (!enc->ctx->dc->debug.avoid_vbios_exec_table) {
-		struct bp_encoder_control cntl = {0};
+		struct bp_encoder_control cntl = {};
 
 		cntl.action = ENCODER_CONTROL_SETUP;
 		cntl.engine_id = enc1->base.id;
@@ -715,7 +715,7 @@ static void enc3_se_setup_hdmi_audio(
 {
 	struct dcn10_stream_encoder *enc1 = DCN10STRENC_FROM_STRENC(enc);
 
-	struct audio_clock_info audio_clock_info = {0};
+	struct audio_clock_info audio_clock_info = {};
 
 	/* Setup audio in AFMT - program AFMT block associated with DIO */
 	ASSERT (enc->afmt);

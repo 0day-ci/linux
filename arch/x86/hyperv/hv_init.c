@@ -44,7 +44,7 @@ EXPORT_SYMBOL_GPL(hv_vp_assist_page);
 
 static int hv_cpu_init(unsigned int cpu)
 {
-	union hv_vp_assist_msr_contents msr = { 0 };
+	union hv_vp_assist_msr_contents msr = { };
 	struct hv_vp_assist_page **hvp = &hv_vp_assist_page[smp_processor_id()];
 	int ret;
 
@@ -181,7 +181,7 @@ static int hv_cpu_die(unsigned int cpu)
 	hv_common_cpu_die(cpu);
 
 	if (hv_vp_assist_page && hv_vp_assist_page[cpu]) {
-		union hv_vp_assist_msr_contents msr = { 0 };
+		union hv_vp_assist_msr_contents msr = { };
 		if (hv_root_partition) {
 			/*
 			 * For root partition the VP assist page is mapped to

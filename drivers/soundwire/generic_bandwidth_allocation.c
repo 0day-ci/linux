@@ -90,7 +90,7 @@ static void sdw_compute_master_ports(struct sdw_master_runtime *m_rt,
 				     struct sdw_group_params *params,
 				     int port_bo, int hstop)
 {
-	struct sdw_transport_data t_data = {0};
+	struct sdw_transport_data t_data = {};
 	struct sdw_port_runtime *p_rt;
 	struct sdw_bus *bus = m_rt->bus;
 	struct sdw_bus_params *b_params = &bus->params;

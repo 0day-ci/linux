@@ -5523,7 +5523,7 @@ static void gfx_v9_ring_emit_sb(struct amdgpu_ring *ring)
 
 static void gfx_v9_0_ring_emit_ce_meta(struct amdgpu_ring *ring)
 {
-	struct v9_ce_ib_state ce_payload = {0};
+	struct v9_ce_ib_state ce_payload = {};
 	uint64_t csa_addr;
 	int cnt;
 
@@ -5542,7 +5542,7 @@ static void gfx_v9_0_ring_emit_ce_meta(struct amdgpu_ring *ring)
 
 static void gfx_v9_0_ring_emit_de_meta(struct amdgpu_ring *ring)
 {
-	struct v9_de_ib_state de_payload = {0};
+	struct v9_de_ib_state de_payload = {};
 	uint64_t csa_addr, gds_addr;
 	int cnt;
 
@@ -6411,7 +6411,7 @@ static int gfx_v9_0_ras_error_inject(struct amdgpu_device *adev,
 {
 	struct ras_inject_if *info = (struct ras_inject_if *)inject_if;
 	int ret;
-	struct ta_ras_trigger_error_input block_info = { 0 };
+	struct ta_ras_trigger_error_input block_info = { };
 
 	if (!amdgpu_ras_is_supported(adev, AMDGPU_RAS_BLOCK__GFX))
 		return -EINVAL;

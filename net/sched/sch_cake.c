@@ -2987,7 +2987,7 @@ static int cake_dump_class_stats(struct Qdisc *sch, unsigned long cl,
 {
 	struct cake_sched_data *q = qdisc_priv(sch);
 	const struct cake_flow *flow = NULL;
-	struct gnet_stats_queue qs = { 0 };
+	struct gnet_stats_queue qs = { };
 	struct nlattr *stats;
 	u32 idx = cl - 1;
 

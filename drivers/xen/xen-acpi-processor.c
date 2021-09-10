@@ -329,7 +329,7 @@ read_acpi_id(acpi_handle handle, u32 lvl, void *context, void **rv)
 	acpi_status status;
 	acpi_object_type acpi_type;
 	unsigned long long tmp;
-	union acpi_object object = { 0 };
+	union acpi_object object = { };
 	struct acpi_buffer buffer = { sizeof(union acpi_object), &object };
 	acpi_io_address pblk = 0;
 

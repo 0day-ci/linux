@@ -786,7 +786,7 @@ done:
 
 static void test_syn_recv_insert_delete(int family, int sotype, int mapfd)
 {
-	struct connect_accept_ctx ctx = { 0 };
+	struct connect_accept_ctx ctx = { };
 	struct sockaddr_storage addr;
 	socklen_t len;
 	u32 zero = 0;
@@ -849,7 +849,7 @@ static void *listen_thread(void *arg)
 
 static void test_race_insert_listen(int family, int socktype, int mapfd)
 {
-	struct connect_accept_ctx ctx = { 0 };
+	struct connect_accept_ctx ctx = { };
 	const u32 zero = 0;
 	const int one = 1;
 	pthread_t t;

@@ -157,7 +157,7 @@ int qos_policer_conf_set(struct ocelot *ocelot, int port, u32 pol_ix,
 int ocelot_port_policer_add(struct ocelot *ocelot, int port,
 			    struct ocelot_policer *pol)
 {
-	struct qos_policer_conf pp = { 0 };
+	struct qos_policer_conf pp = { };
 	int err;
 
 	if (!pol)
@@ -187,7 +187,7 @@ EXPORT_SYMBOL(ocelot_port_policer_add);
 
 int ocelot_port_policer_del(struct ocelot *ocelot, int port)
 {
-	struct qos_policer_conf pp = { 0 };
+	struct qos_policer_conf pp = { };
 	int err;
 
 	dev_dbg(ocelot->dev, "%s: port %u\n", __func__, port);

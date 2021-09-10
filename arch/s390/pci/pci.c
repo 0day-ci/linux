@@ -112,7 +112,7 @@ int zpci_register_ioat(struct zpci_dev *zdev, u8 dmaas,
 		       u64 base, u64 limit, u64 iota)
 {
 	u64 req = ZPCI_CREATE_REQ(zdev->fh, dmaas, ZPCI_MOD_FC_REG_IOAT);
-	struct zpci_fib fib = {0};
+	struct zpci_fib fib = {};
 	u8 cc, status;
 
 	WARN_ON_ONCE(iota & 0x3fff);
@@ -129,7 +129,7 @@ int zpci_register_ioat(struct zpci_dev *zdev, u8 dmaas,
 int zpci_unregister_ioat(struct zpci_dev *zdev, u8 dmaas)
 {
 	u64 req = ZPCI_CREATE_REQ(zdev->fh, dmaas, ZPCI_MOD_FC_DEREG_IOAT);
-	struct zpci_fib fib = {0};
+	struct zpci_fib fib = {};
 	u8 cc, status;
 
 	cc = zpci_mod_fc(req, &fib, &status);
@@ -142,7 +142,7 @@ int zpci_unregister_ioat(struct zpci_dev *zdev, u8 dmaas)
 int zpci_fmb_enable_device(struct zpci_dev *zdev)
 {
 	u64 req = ZPCI_CREATE_REQ(zdev->fh, 0, ZPCI_MOD_FC_SET_MEASURE);
-	struct zpci_fib fib = {0};
+	struct zpci_fib fib = {};
 	u8 cc, status;
 
 	if (zdev->fmb || sizeof(*zdev->fmb) < zdev->fmb_length)
@@ -171,7 +171,7 @@ int zpci_fmb_enable_device(struct zpci_dev *zdev)
 int zpci_fmb_disable_device(struct zpci_dev *zdev)
 {
 	u64 req = ZPCI_CREATE_REQ(zdev->fh, 0, ZPCI_MOD_FC_SET_MEASURE);
-	struct zpci_fib fib = {0};
+	struct zpci_fib fib = {};
 	u8 cc, status;
 
 	if (!zdev->fmb)

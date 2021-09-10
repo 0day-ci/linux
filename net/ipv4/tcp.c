@@ -1747,12 +1747,12 @@ void tcp_update_recv_tstamps(struct sk_buff *skb,
 	if (skb->tstamp)
 		tss->ts[0] = ktime_to_timespec64(skb->tstamp);
 	else
-		tss->ts[0] = (struct timespec64) {0};
+		tss->ts[0] = (struct timespec64) {};
 
 	if (skb_hwtstamps(skb)->hwtstamp)
 		tss->ts[2] = ktime_to_timespec64(skb_hwtstamps(skb)->hwtstamp);
 	else
-		tss->ts[2] = (struct timespec64) {0};
+		tss->ts[2] = (struct timespec64) {};
 }
 
 #ifdef CONFIG_MMU
@@ -2244,18 +2244,18 @@ void tcp_recv_timestamp(struct msghdr *msg, const struct sock *sk,
 		if (sk->sk_tsflags & SOF_TIMESTAMPING_SOFTWARE)
 			has_timestamping = true;
 		else
-			tss->ts[0] = (struct timespec64) {0};
+			tss->ts[0] = (struct timespec64) {};
 	}
 
 	if (tss->ts[2].tv_sec || tss->ts[2].tv_nsec) {
 		if (sk->sk_tsflags & SOF_TIMESTAMPING_RAW_HARDWARE)
 			has_timestamping = true;
 		else
-			tss->ts[2] = (struct timespec64) {0};
+			tss->ts[2] = (struct timespec64) {};
 	}
 
 	if (has_timestamping) {
-		tss->ts[1] = (struct timespec64) {0};
+		tss->ts[1] = (struct timespec64) {};
 		if (sock_flag(sk, SOCK_TSTAMP_NEW))
 			put_cmsg_scm_timestamping64(msg, tss);
 		else

@@ -628,7 +628,7 @@ int rvu_mbox_handler_nix_bp_enable(struct rvu *rvu,
 static void nix_setup_lso_tso_l3(struct rvu *rvu, int blkaddr,
 				 u64 format, bool v4, u64 *fidx)
 {
-	struct nix_lso_format field = {0};
+	struct nix_lso_format field = {};
 
 	/* IP's Length field */
 	field.layer = NIX_TXLAYER_OL3;
@@ -657,7 +657,7 @@ static void nix_setup_lso_tso_l3(struct rvu *rvu, int blkaddr,
 static void nix_setup_lso_tso_l4(struct rvu *rvu, int blkaddr,
 				 u64 format, u64 *fidx)
 {
-	struct nix_lso_format field = {0};
+	struct nix_lso_format field = {};
 
 	/* TCP's sequence number field */
 	field.layer = NIX_TXLAYER_OL4;

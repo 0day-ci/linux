@@ -139,7 +139,7 @@ static int _omap4_clkctrl_clk_enable(struct clk_hw *hw)
 	struct clk_hw_omap *clk = to_clk_hw_omap(hw);
 	u32 val;
 	int ret;
-	union omap4_timeout timeout = { 0 };
+	union omap4_timeout timeout = { };
 
 	if (clk->clkdm) {
 		ret = ti_clk_ll_ops->clkdm_clk_enable(clk->clkdm, hw->clk);
@@ -180,7 +180,7 @@ static void _omap4_clkctrl_clk_disable(struct clk_hw *hw)
 {
 	struct clk_hw_omap *clk = to_clk_hw_omap(hw);
 	u32 val;
-	union omap4_timeout timeout = { 0 };
+	union omap4_timeout timeout = { };
 
 	if (!clk->enable_bit)
 		goto exit;

@@ -343,7 +343,7 @@ static noinline int cow_file_range_inline(struct btrfs_inode *inode, u64 start,
 					  int compress_type,
 					  struct page **compressed_pages)
 {
-	struct btrfs_drop_extents_args drop_args = { 0 };
+	struct btrfs_drop_extents_args drop_args = { };
 	struct btrfs_root *root = inode->root;
 	struct btrfs_fs_info *fs_info = root->fs_info;
 	struct btrfs_trans_handle *trans;
@@ -2844,7 +2844,7 @@ static int insert_reserved_file_extent(struct btrfs_trans_handle *trans,
 	u64 disk_bytenr = btrfs_stack_file_extent_disk_bytenr(stack_fi);
 	u64 num_bytes = btrfs_stack_file_extent_num_bytes(stack_fi);
 	u64 ram_bytes = btrfs_stack_file_extent_ram_bytes(stack_fi);
-	struct btrfs_drop_extents_args drop_args = { 0 };
+	struct btrfs_drop_extents_args drop_args = { };
 	int ret;
 
 	path = btrfs_alloc_path();
@@ -4901,7 +4901,7 @@ delete:
 
 		if (found_extent &&
 		    root->root_key.objectid != BTRFS_TREE_LOG_OBJECTID) {
-			struct btrfs_ref ref = { 0 };
+			struct btrfs_ref ref = { };
 
 			bytes_deleted += extent_num_bytes;
 
@@ -5136,7 +5136,7 @@ static int maybe_insert_hole(struct btrfs_root *root, struct btrfs_inode *inode,
 {
 	struct btrfs_fs_info *fs_info = root->fs_info;
 	struct btrfs_trans_handle *trans;
-	struct btrfs_drop_extents_args drop_args = { 0 };
+	struct btrfs_drop_extents_args drop_args = { };
 	int ret;
 
 	/*
@@ -8408,7 +8408,7 @@ int btrfs_readpage(struct file *file, struct page *page)
 	struct btrfs_inode *inode = BTRFS_I(page->mapping->host);
 	u64 start = page_offset(page);
 	u64 end = start + PAGE_SIZE - 1;
-	struct btrfs_bio_ctrl bio_ctrl = { 0 };
+	struct btrfs_bio_ctrl bio_ctrl = { };
 	int ret;
 
 	btrfs_lock_and_flush_ordered_range(inode, start, end, NULL);

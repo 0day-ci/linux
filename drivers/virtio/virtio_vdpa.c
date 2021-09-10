@@ -143,7 +143,7 @@ virtio_vdpa_setup_vq(struct virtio_device *vdev, unsigned int index,
 	struct virtqueue *vq;
 	u64 desc_addr, driver_addr, device_addr;
 	/* Assume split virtqueue, switch to packed if necessary */
-	struct vdpa_vq_state state = {0};
+	struct vdpa_vq_state state = {};
 	unsigned long flags;
 	u32 align, num;
 	int err;

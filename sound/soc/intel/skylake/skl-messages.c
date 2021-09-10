@@ -38,7 +38,7 @@ static int skl_free_dma_buf(struct device *dev, struct snd_dma_buffer *dmab)
 
 void skl_dsp_set_astate_cfg(struct skl_dev *skl, u32 cnt, void *data)
 {
-	struct skl_ipc_large_config_msg	msg = {0};
+	struct skl_ipc_large_config_msg	msg = {};
 
 	msg.large_param_id = SKL_ASTATE_PARAM_ID;
 	msg.param_data_size = (cnt * sizeof(struct skl_astate_param) +
@@ -567,8 +567,8 @@ static void skl_copy_copier_caps(struct skl_module_cfg *mconfig,
 static u32 skl_get_node_id(struct skl_dev *skl,
 			struct skl_module_cfg *mconfig)
 {
-	union skl_connector_node_id node_id = {0};
-	union skl_ssp_dma_node ssp_node  = {0};
+	union skl_connector_node_id node_id = {};
+	union skl_ssp_dma_node ssp_node  = {};
 	struct skl_pipe_params *params = mconfig->pipe->p_params;
 
 	switch (mconfig->dev_type) {
@@ -690,7 +690,7 @@ int skl_dsp_set_dma_control(struct skl_dev *skl, u32 *caps,
 				u32 caps_size, u32 node_id)
 {
 	struct skl_dma_control *dma_ctrl;
-	struct skl_ipc_large_config_msg msg = {0};
+	struct skl_ipc_large_config_msg msg = {};
 	int err = 0;
 
 

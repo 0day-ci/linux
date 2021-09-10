@@ -1343,7 +1343,7 @@ static void process_agg_start(struct ieee80211_hw *hw,
 			      struct ieee80211_hdr *hdr, u16 tid)
 {
 	struct rtl_priv *rtlpriv = rtl_priv(hw);
-	struct ieee80211_rx_status rx_status = { 0 };
+	struct ieee80211_rx_status rx_status = { };
 	struct sk_buff *skb_delba = NULL;
 
 	skb_delba = rtl_make_del_ba(hw, hdr->addr2, hdr->addr3, tid);

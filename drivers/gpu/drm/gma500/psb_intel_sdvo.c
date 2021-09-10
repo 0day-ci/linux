@@ -582,7 +582,7 @@ psb_intel_sdvo_get_value(struct psb_intel_sdvo *psb_intel_sdvo, u8 cmd, void *va
 
 static bool psb_intel_sdvo_set_target_input(struct psb_intel_sdvo *psb_intel_sdvo)
 {
-	struct psb_intel_sdvo_set_target_input_args targets = {0};
+	struct psb_intel_sdvo_set_target_input_args targets = {};
 	return psb_intel_sdvo_set_value(psb_intel_sdvo,
 				    SDVO_CMD_SET_TARGET_INPUT,
 				    &targets, sizeof(targets));

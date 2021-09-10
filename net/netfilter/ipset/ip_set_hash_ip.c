@@ -81,7 +81,7 @@ hash_ip4_kadt(struct ip_set *set, const struct sk_buff *skb,
 {
 	const struct hash_ip4 *h = set->data;
 	ipset_adtfn adtfn = set->variant->adt[adt];
-	struct hash_ip4_elem e = { 0 };
+	struct hash_ip4_elem e = { };
 	struct ip_set_ext ext = IP_SET_INIT_KEXT(skb, opt, set);
 	__be32 ip;
 
@@ -100,7 +100,7 @@ hash_ip4_uadt(struct ip_set *set, struct nlattr *tb[],
 {
 	const struct hash_ip4 *h = set->data;
 	ipset_adtfn adtfn = set->variant->adt[adt];
-	struct hash_ip4_elem e = { 0 };
+	struct hash_ip4_elem e = { };
 	struct ip_set_ext ext = IP_SET_INIT_UEXT(set);
 	u32 ip = 0, ip_to = 0, hosts;
 	int ret = 0;

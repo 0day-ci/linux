@@ -492,7 +492,7 @@ void
 bfa_fcb_pbc_vport_create(struct bfad_s *bfad, struct bfi_pbc_vport_s pbc_vport)
 {
 
-	struct bfa_lport_cfg_s port_cfg = {0};
+	struct bfa_lport_cfg_s port_cfg = {};
 	struct bfad_vport_s   *vport;
 	int rc;
 

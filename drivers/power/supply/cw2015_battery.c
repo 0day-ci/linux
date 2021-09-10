@@ -643,7 +643,7 @@ static int cw_bat_probe(struct i2c_client *client)
 {
 	int ret;
 	struct cw_battery *cw_bat;
-	struct power_supply_config psy_cfg = { 0 };
+	struct power_supply_config psy_cfg = { };
 
 	cw_bat = devm_kzalloc(&client->dev, sizeof(*cw_bat), GFP_KERNEL);
 	if (!cw_bat)

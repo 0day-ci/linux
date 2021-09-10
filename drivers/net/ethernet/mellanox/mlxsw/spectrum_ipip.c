@@ -120,7 +120,7 @@ mlxsw_sp_ipip_netdev_daddr(enum mlxsw_sp_l3proto proto,
 
 bool mlxsw_sp_l3addr_is_zero(union mlxsw_sp_l3addr addr)
 {
-	union mlxsw_sp_l3addr naddr = {0};
+	union mlxsw_sp_l3addr naddr = {};
 
 	return !memcmp(&addr, &naddr, sizeof(naddr));
 }

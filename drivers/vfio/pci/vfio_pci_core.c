@@ -928,7 +928,7 @@ long vfio_pci_core_ioctl(struct vfio_device *core_vdev, unsigned int cmd,
 
 	} else if (cmd == VFIO_DEVICE_GET_PCI_HOT_RESET_INFO) {
 		struct vfio_pci_hot_reset_info hdr;
-		struct vfio_pci_fill_info fill = { 0 };
+		struct vfio_pci_fill_info fill = { };
 		struct vfio_pci_dependent_device *devices = NULL;
 		bool slot = false;
 		int ret = 0;

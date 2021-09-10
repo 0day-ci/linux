@@ -358,7 +358,7 @@ static void *binder_version_thread(void *data)
 {
 	struct __test_metadata *_metadata = _thread_metadata;
 	int fd = PTR_TO_INT(data);
-	struct binder_version version = { 0 };
+	struct binder_version version = { };
 	int ret;
 
 	ret = ioctl(fd, BINDER_VERSION, &version);

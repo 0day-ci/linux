@@ -4177,7 +4177,7 @@ static void maybe_kick_acquire(struct rbd_device *rbd_dev)
 static void rbd_handle_acquired_lock(struct rbd_device *rbd_dev, u8 struct_v,
 				     void **p)
 {
-	struct rbd_client_id cid = { 0 };
+	struct rbd_client_id cid = { };
 
 	if (struct_v >= 2) {
 		cid.gid = ceph_decode_64(p);
@@ -4206,7 +4206,7 @@ static void rbd_handle_acquired_lock(struct rbd_device *rbd_dev, u8 struct_v,
 static void rbd_handle_released_lock(struct rbd_device *rbd_dev, u8 struct_v,
 				     void **p)
 {
-	struct rbd_client_id cid = { 0 };
+	struct rbd_client_id cid = { };
 
 	if (struct_v >= 2) {
 		cid.gid = ceph_decode_64(p);
@@ -4241,7 +4241,7 @@ static int rbd_handle_request_lock(struct rbd_device *rbd_dev, u8 struct_v,
 				   void **p)
 {
 	struct rbd_client_id my_cid = rbd_get_cid(rbd_dev);
-	struct rbd_client_id cid = { 0 };
+	struct rbd_client_id cid = { };
 	int result = 1;
 
 	if (struct_v >= 2) {
@@ -5709,7 +5709,7 @@ static int get_parent_info(struct rbd_device *rbd_dev,
 static int rbd_dev_v2_parent_info(struct rbd_device *rbd_dev)
 {
 	struct rbd_spec *parent_spec;
-	struct parent_image_info pii = { 0 };
+	struct parent_image_info pii = { };
 	int ret;
 
 	parent_spec = rbd_spec_alloc();
@@ -6418,7 +6418,7 @@ static int rbd_add_parse_args(const char *buf,
 	const char *mon_addrs;
 	char *snap_name;
 	size_t mon_addrs_size;
-	struct rbd_parse_opts_ctx pctx = { 0 };
+	struct rbd_parse_opts_ctx pctx = { };
 	int ret;
 
 	/* The first four tokens are required */

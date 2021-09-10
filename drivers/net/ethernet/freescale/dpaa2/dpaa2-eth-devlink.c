@@ -152,7 +152,7 @@ static int dpaa2_eth_dl_trap_group_action_set(struct devlink *devlink,
 	struct dpaa2_eth_priv *priv = dl_priv->dpaa2_priv;
 	struct net_device *net_dev = priv->net_dev;
 	struct device *dev = net_dev->dev.parent;
-	struct dpni_error_cfg err_cfg = {0};
+	struct dpni_error_cfg err_cfg = {};
 	int err;
 
 	if (group->id != DEVLINK_TRAP_GROUP_GENERIC_ID_PARSER_ERROR_DROPS)

@@ -49,7 +49,7 @@ static int prestera_flower_parse_meta(struct prestera_acl_rule *rule,
 				      struct prestera_flow_block *block)
 {
 	struct flow_rule *f_rule = flow_cls_offload_flow_rule(f);
-	struct prestera_acl_rule_match_entry m_entry = {0};
+	struct prestera_acl_rule_match_entry m_entry = {};
 	struct net_device *ingress_dev;
 	struct flow_match_meta match;
 	struct prestera_port *port;

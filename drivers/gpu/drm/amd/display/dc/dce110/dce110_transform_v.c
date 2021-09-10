@@ -528,8 +528,8 @@ static void dce110_xfmv_set_scaler(
 	bool is_scaling_required = false;
 	bool filter_updated = false;
 	const uint16_t *coeffs_v, *coeffs_h, *coeffs_h_c, *coeffs_v_c;
-	struct rect luma_viewport = {0};
-	struct rect chroma_viewport = {0};
+	struct rect luma_viewport = {};
+	struct rect chroma_viewport = {};
 
 	dce110_xfmv_power_up_line_buffer(xfm);
 	/* 1. Calculate viewport, viewport programming should happen after init
@@ -547,7 +547,7 @@ static void dce110_xfmv_set_scaler(
 	if (is_scaling_required) {
 		/* 4. Calculate and program ratio, filter initialization */
 
-		struct sclv_ratios_inits inits = { 0 };
+		struct sclv_ratios_inits inits = { };
 
 		calculate_inits(
 			xfm_dce,

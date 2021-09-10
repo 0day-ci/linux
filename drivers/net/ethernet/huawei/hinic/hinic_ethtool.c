@@ -258,9 +258,9 @@ static int hinic_get_link_ksettings(struct net_device *netdev,
 				    *link_ksettings)
 {
 	struct hinic_dev *nic_dev = netdev_priv(netdev);
-	struct hinic_link_mode_cmd link_mode = { 0 };
-	struct hinic_pause_config pause_info = { 0 };
-	struct cmd_link_settings settings = { 0 };
+	struct hinic_link_mode_cmd link_mode = { };
+	struct hinic_pause_config pause_info = { };
+	struct cmd_link_settings settings = { };
 	enum hinic_port_link_state link_state;
 	struct hinic_port_cap port_cap;
 	int err;
@@ -367,7 +367,7 @@ static bool hinic_is_support_speed(enum hinic_link_mode supported_link,
 
 static bool hinic_is_speed_legal(struct hinic_dev *nic_dev, u32 speed)
 {
-	struct hinic_link_mode_cmd link_mode = { 0 };
+	struct hinic_link_mode_cmd link_mode = { };
 	struct net_device *netdev = nic_dev->netdev;
 	enum nic_speed_level speed_level = 0;
 	int err;
@@ -394,7 +394,7 @@ static bool hinic_is_speed_legal(struct hinic_dev *nic_dev, u32 speed)
 static int get_link_settings_type(struct hinic_dev *nic_dev,
 				  u8 autoneg, u32 speed, u32 *set_settings)
 {
-	struct hinic_port_cap port_cap = { 0 };
+	struct hinic_port_cap port_cap = { };
 	int err;
 
 	err = hinic_port_get_cap(nic_dev, &port_cap);
@@ -460,7 +460,7 @@ static int set_link_settings_separate_cmd(struct hinic_dev *nic_dev,
 static int hinic_set_settings_to_hw(struct hinic_dev *nic_dev,
 				    u32 set_settings, u8 autoneg, u32 speed)
 {
-	struct hinic_link_ksettings_info settings = {0};
+	struct hinic_link_ksettings_info settings = {};
 	char set_link_str[SET_LINK_STR_MAX_LEN] = {0};
 	const char *autoneg_str;
 	struct net_device *netdev = nic_dev->netdev;
@@ -678,7 +678,7 @@ static int set_queue_coalesce(struct hinic_dev *nic_dev, u16 q_id,
 			      bool set_rx_coal)
 {
 	struct hinic_intr_coal_info *intr_coal = NULL;
-	struct hinic_msix_config interrupt_info = {0};
+	struct hinic_msix_config interrupt_info = {};
 	struct net_device *netdev = nic_dev->netdev;
 	u16 msix_idx;
 	int err;
@@ -745,8 +745,8 @@ static int __hinic_set_coalesce(struct net_device *netdev,
 				struct ethtool_coalesce *coal, u16 queue)
 {
 	struct hinic_dev *nic_dev = netdev_priv(netdev);
-	struct hinic_intr_coal_info rx_intr_coal = {0};
-	struct hinic_intr_coal_info tx_intr_coal = {0};
+	struct hinic_intr_coal_info rx_intr_coal = {};
+	struct hinic_intr_coal_info tx_intr_coal = {};
 	bool set_rx_coal = false;
 	bool set_tx_coal = false;
 	int err;
@@ -826,7 +826,7 @@ static void hinic_get_pauseparam(struct net_device *netdev,
 				 struct ethtool_pauseparam *pause)
 {
 	struct hinic_dev *nic_dev = netdev_priv(netdev);
-	struct hinic_pause_config pause_info = {0};
+	struct hinic_pause_config pause_info = {};
 	struct hinic_nic_cfg *nic_cfg;
 	int err;
 
@@ -849,8 +849,8 @@ static int hinic_set_pauseparam(struct net_device *netdev,
 				struct ethtool_pauseparam *pause)
 {
 	struct hinic_dev *nic_dev = netdev_priv(netdev);
-	struct hinic_pause_config pause_info = {0};
-	struct hinic_port_cap port_cap = {0};
+	struct hinic_pause_config pause_info = {};
+	struct hinic_port_cap port_cap = {};
 	int err;
 
 	err = hinic_port_get_cap(nic_dev, &port_cap);
@@ -921,7 +921,7 @@ static int hinic_set_channels(struct net_device *netdev,
 static int hinic_get_rss_hash_opts(struct hinic_dev *nic_dev,
 				   struct ethtool_rxnfc *cmd)
 {
-	struct hinic_rss_type rss_type = { 0 };
+	struct hinic_rss_type rss_type = { };
 	int err;
 
 	cmd->data = 0;
@@ -1402,7 +1402,7 @@ static void hinic_get_ethtool_stats(struct net_device *netdev,
 				    struct ethtool_stats *stats, u64 *data)
 {
 	struct hinic_dev *nic_dev = netdev_priv(netdev);
-	struct hinic_vport_stats vport_stats = {0};
+	struct hinic_vport_stats vport_stats = {};
 	struct hinic_phy_port_stats *port_stats;
 	u16 i = 0, j = 0;
 	char *p;

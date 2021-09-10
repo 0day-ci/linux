@@ -1119,7 +1119,7 @@ sja1105_static_config_check_valid(const struct sja1105_static_config *config,
 void
 sja1105_static_config_pack(void *buf, struct sja1105_static_config *config)
 {
-	struct sja1105_table_header header = {0};
+	struct sja1105_table_header header = {};
 	enum sja1105_blk_idx i;
 	char *p = buf;
 	int j;
@@ -1889,7 +1889,7 @@ int sja1105_static_config_init(struct sja1105_static_config *config,
 {
 	enum sja1105_blk_idx i;
 
-	*config = (struct sja1105_static_config) {0};
+	*config = (struct sja1105_static_config) {};
 
 	/* Transfer static_ops array from priv into per-table ops
 	 * for handier access

@@ -1069,7 +1069,7 @@ static struct sk_buff *rtw_get_rsvd_page_skb(struct ieee80211_hw *hw,
 static void rtw_fill_rsvd_page_desc(struct rtw_dev *rtwdev, struct sk_buff *skb,
 				    enum rtw_rsvd_packet_type type)
 {
-	struct rtw_tx_pkt_info pkt_info = {0};
+	struct rtw_tx_pkt_info pkt_info = {};
 	struct rtw_chip_info *chip = rtwdev->chip;
 	u8 *pkt_desc;
 

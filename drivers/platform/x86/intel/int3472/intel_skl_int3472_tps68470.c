@@ -75,7 +75,7 @@ static int tps68470_chip_init(struct device *dev, struct regmap *regmap)
  */
 static int skl_int3472_tps68470_calc_type(struct acpi_device *adev)
 {
-	struct int3472_cldb cldb = { 0 };
+	struct int3472_cldb cldb = { };
 	int ret;
 
 	/*

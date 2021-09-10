@@ -1658,7 +1658,7 @@ static void dpaa2_eth_disable_ch_napi(struct dpaa2_eth_priv *priv)
 void dpaa2_eth_set_rx_taildrop(struct dpaa2_eth_priv *priv,
 			       bool tx_pause, bool pfc)
 {
-	struct dpni_taildrop td = {0};
+	struct dpni_taildrop td = {};
 	struct dpaa2_eth_fq *fq;
 	int i, err;
 
@@ -1720,7 +1720,7 @@ set_cgtd:
 
 static int dpaa2_eth_link_state_update(struct dpaa2_eth_priv *priv)
 {
-	struct dpni_link_state state = {0};
+	struct dpni_link_state state = {};
 	bool tx_pause;
 	int err;
 
@@ -2277,7 +2277,7 @@ out:
 
 static int dpaa2_eth_update_rx_buffer_headroom(struct dpaa2_eth_priv *priv, bool has_xdp)
 {
-	struct dpni_buffer_layout buf_layout = {0};
+	struct dpni_buffer_layout buf_layout = {};
 	int err;
 
 	err = dpni_get_buffer_layout(priv->mc_io, 0, priv->mc_token,
@@ -2538,8 +2538,8 @@ static int dpaa2_eth_setup_tbf(struct net_device *net_dev, struct tc_tbf_qopt_of
 {
 	struct tc_tbf_qopt_offload_replace_params *cfg = &p->replace_params;
 	struct dpaa2_eth_priv *priv = netdev_priv(net_dev);
-	struct dpni_tx_shaping_cfg tx_cr_shaper = { 0 };
-	struct dpni_tx_shaping_cfg tx_er_shaper = { 0 };
+	struct dpni_tx_shaping_cfg tx_cr_shaper = { };
+	struct dpni_tx_shaping_cfg tx_er_shaper = { };
 	int err;
 
 	if (p->command == TC_TBF_STATS)
@@ -2992,7 +2992,7 @@ static void dpaa2_eth_free_dpbp(struct dpaa2_eth_priv *priv)
 static int dpaa2_eth_set_buffer_layout(struct dpaa2_eth_priv *priv)
 {
 	struct device *dev = priv->net_dev->dev.parent;
-	struct dpni_buffer_layout buf_layout = {0};
+	struct dpni_buffer_layout buf_layout = {};
 	u16 rx_buf_align;
 	int err;
 
@@ -3121,7 +3121,7 @@ static void dpaa2_eth_set_enqueue_mode(struct dpaa2_eth_priv *priv)
 static int dpaa2_eth_set_pause(struct dpaa2_eth_priv *priv)
 {
 	struct device *dev = priv->net_dev->dev.parent;
-	struct dpni_link_cfg link_cfg = {0};
+	struct dpni_link_cfg link_cfg = {};
 	int err;
 
 	/* Get the default link options so we don't override other flags */
@@ -3147,7 +3147,7 @@ static int dpaa2_eth_set_pause(struct dpaa2_eth_priv *priv)
 
 static void dpaa2_eth_update_tx_fqids(struct dpaa2_eth_priv *priv)
 {
-	struct dpni_queue_id qid = {0};
+	struct dpni_queue_id qid = {};
 	struct dpaa2_eth_fq *fq;
 	struct dpni_queue queue;
 	int i, j, err;
@@ -3190,8 +3190,8 @@ out_err:
 static int dpaa2_eth_set_vlan_qos(struct dpaa2_eth_priv *priv)
 {
 	struct device *dev = priv->net_dev->dev.parent;
-	struct dpkg_profile_cfg kg_cfg = {0};
-	struct dpni_qos_tbl_cfg qos_cfg = {0};
+	struct dpkg_profile_cfg kg_cfg = {};
+	struct dpni_qos_tbl_cfg qos_cfg = {};
 	struct dpni_rule_cfg key_params;
 	void *dma_mem, *key, *mask;
 	u8 key_size = 2;	/* VLAN TCI field */

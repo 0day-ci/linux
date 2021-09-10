@@ -625,7 +625,7 @@ int mlxsw_sp_nve_flood_ip_add(struct mlxsw_sp *mlxsw_sp,
 			      enum mlxsw_sp_l3proto proto,
 			      union mlxsw_sp_l3addr *addr)
 {
-	struct mlxsw_sp_nve_mc_list_key key = { 0 };
+	struct mlxsw_sp_nve_mc_list_key key = { };
 	struct mlxsw_sp_nve_mc_list *mc_list;
 	int err;
 
@@ -656,7 +656,7 @@ void mlxsw_sp_nve_flood_ip_del(struct mlxsw_sp *mlxsw_sp,
 			       enum mlxsw_sp_l3proto proto,
 			       union mlxsw_sp_l3addr *addr)
 {
-	struct mlxsw_sp_nve_mc_list_key key = { 0 };
+	struct mlxsw_sp_nve_mc_list_key key = { };
 	struct mlxsw_sp_nve_mc_list *mc_list;
 
 	key.fid_index = mlxsw_sp_fid_index(fid);
@@ -693,7 +693,7 @@ static void mlxsw_sp_nve_flood_ip_flush(struct mlxsw_sp *mlxsw_sp,
 					struct mlxsw_sp_fid *fid)
 {
 	struct mlxsw_sp_nve_mc_record *mc_record, *tmp;
-	struct mlxsw_sp_nve_mc_list_key key = { 0 };
+	struct mlxsw_sp_nve_mc_list_key key = { };
 	struct mlxsw_sp_nve_mc_list *mc_list;
 
 	if (!mlxsw_sp_fid_nve_flood_index_is_set(fid))

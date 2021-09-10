@@ -99,7 +99,7 @@ void dcn30_link_encoder_construct(
 	const struct dcn10_link_enc_shift *link_shift,
 	const struct dcn10_link_enc_mask *link_mask)
 {
-	struct bp_encoder_cap_info bp_cap_info = {0};
+	struct bp_encoder_cap_info bp_cap_info = {};
 	const struct dc_vbios_funcs *bp_funcs = init_data->ctx->dc_bios->funcs;
 	enum bp_result result = BP_RESULT_OK;
 	struct dcn10_link_encoder *enc10 = &enc20->enc10;

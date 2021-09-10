@@ -87,7 +87,7 @@ static int process_api_request(u32 pm_id, u64 *pm_api_arg, u32 *pm_api_ret)
 {
 	u32 pm_api_version;
 	int ret;
-	struct zynqmp_pm_query_data qdata = {0};
+	struct zynqmp_pm_query_data qdata = {};
 
 	switch (pm_id) {
 	case PM_GET_API_VERSION:

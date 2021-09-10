@@ -632,7 +632,7 @@ static void dm_dmub_outbox1_low_irq(void *interrupt_params)
 	struct common_irq_params *irq_params = interrupt_params;
 	struct amdgpu_device *adev = irq_params->adev;
 	struct amdgpu_display_manager *dm = &adev->dm;
-	struct dmcub_trace_buf_entry entry = { 0 };
+	struct dmcub_trace_buf_entry entry = { };
 	uint32_t count = 0;
 
 	if (dc_enable_dmub_notifications(adev->dm.dc)) {
@@ -2033,8 +2033,8 @@ amdgpu_dm_find_first_crtc_matching_connector(struct drm_atomic_state *state,
 
 static void emulated_link_detect(struct dc_link *link)
 {
-	struct dc_sink_init_data sink_init_data = { 0 };
-	struct display_sink_capability sink_caps = { 0 };
+	struct dc_sink_init_data sink_init_data = { };
+	struct display_sink_capability sink_caps = { };
 	enum dc_edid_status edid_status;
 	struct dc_context *dc_ctx = link->ctx;
 	struct dc_sink *sink = NULL;
@@ -2868,7 +2868,7 @@ static void register_hpd_handlers(struct amdgpu_device *adev)
 	struct drm_connector *connector;
 	struct amdgpu_dm_connector *aconnector;
 	const struct dc_link *dc_link;
-	struct dc_interrupt_params int_params = {0};
+	struct dc_interrupt_params int_params = {};
 
 	int_params.requested_polarity = INTERRUPT_POLARITY_DEFAULT;
 	int_params.current_polarity = INTERRUPT_POLARITY_DEFAULT;
@@ -2907,7 +2907,7 @@ static int dce60_register_irq_handlers(struct amdgpu_device *adev)
 {
 	struct dc *dc = adev->dm.dc;
 	struct common_irq_params *c_irq_params;
-	struct dc_interrupt_params int_params = {0};
+	struct dc_interrupt_params int_params = {};
 	int r;
 	int i;
 	unsigned client_id = AMDGPU_IRQ_CLIENTID_LEGACY;
@@ -2989,7 +2989,7 @@ static int dce110_register_irq_handlers(struct amdgpu_device *adev)
 {
 	struct dc *dc = adev->dm.dc;
 	struct common_irq_params *c_irq_params;
-	struct dc_interrupt_params int_params = {0};
+	struct dc_interrupt_params int_params = {};
 	int r;
 	int i;
 	unsigned client_id = AMDGPU_IRQ_CLIENTID_LEGACY;
@@ -3095,7 +3095,7 @@ static int dcn10_register_irq_handlers(struct amdgpu_device *adev)
 {
 	struct dc *dc = adev->dm.dc;
 	struct common_irq_params *c_irq_params;
-	struct dc_interrupt_params int_params = {0};
+	struct dc_interrupt_params int_params = {};
 	int r;
 	int i;
 #if defined(CONFIG_DRM_AMD_SECURE_DISPLAY)
@@ -3248,7 +3248,7 @@ static int register_outbox_irq_handlers(struct amdgpu_device *adev)
 {
 	struct dc *dc = adev->dm.dc;
 	struct common_irq_params *c_irq_params;
-	struct dc_interrupt_params int_params = {0};
+	struct dc_interrupt_params int_params = {};
 	int r, i;
 
 	int_params.requested_polarity = INTERRUPT_POLARITY_DEFAULT;
@@ -3601,7 +3601,7 @@ static void
 amdgpu_dm_register_backlight_device(struct amdgpu_display_manager *dm)
 {
 	char bl_name[16];
-	struct backlight_properties props = { 0 };
+	struct backlight_properties props = { };
 
 	amdgpu_dm_update_backlight_caps(dm, dm->num_of_edps);
 	dm->brightness[dm->num_of_edps] = AMDGPU_MAX_BL_LEVEL;
@@ -5116,8 +5116,8 @@ static void update_stream_scaling_settings(const struct drm_display_mode *mode,
 {
 	enum amdgpu_rmx_type rmx_type;
 
-	struct rect src = { 0 }; /* viewport in composition space*/
-	struct rect dst = { 0 }; /* stream addressable area */
+	struct rect src = { }; /* viewport in composition space*/
+	struct rect dst = { }; /* stream addressable area */
 
 	/* no mode. nothing to be done */
 	if (!mode)
@@ -5496,7 +5496,7 @@ decide_crtc_timing_for_drm_display_mode(struct drm_display_mode *drm_mode,
 static struct dc_sink *
 create_fake_sink(struct amdgpu_dm_connector *aconnector)
 {
-	struct dc_sink_init_data sink_init_data = { 0 };
+	struct dc_sink_init_data sink_init_data = { };
 	struct dc_sink *sink = NULL;
 	sink_init_data.link = aconnector->dc_link;
 	sink_init_data.sink_signal = aconnector->dc_link->connector_signal;
@@ -8155,7 +8155,7 @@ static void handle_cursor_update(struct drm_plane *plane,
 	struct dm_crtc_state *crtc_state = crtc ? to_dm_crtc_state(crtc->state) : NULL;
 	struct amdgpu_crtc *amdgpu_crtc = to_amdgpu_crtc(crtc);
 	uint64_t address = afb ? afb->address : 0;
-	struct dc_cursor_position position = {0};
+	struct dc_cursor_position position = {};
 	struct dc_cursor_attributes attributes;
 	int ret;
 
@@ -8236,7 +8236,7 @@ static void update_freesync_state_on_stream(
 	u32 flip_timestamp_in_us)
 {
 	struct mod_vrr_params vrr_params;
-	struct dc_info_packet vrr_infopacket = {0};
+	struct dc_info_packet vrr_infopacket = {};
 	struct amdgpu_device *adev = dm->adev;
 	struct amdgpu_crtc *acrtc = to_amdgpu_crtc(new_crtc_state->base.crtc);
 	unsigned long flags;
@@ -9412,7 +9412,7 @@ static void get_freesync_config_for_crtc(
 	struct dm_crtc_state *new_crtc_state,
 	struct dm_connector_state *new_con_state)
 {
-	struct mod_freesync_config config = {0};
+	struct mod_freesync_config config = {};
 	struct amdgpu_dm_connector *aconnector =
 			to_amdgpu_dm_connector(new_con_state->base.connector);
 	struct drm_display_mode *mode = &new_crtc_state->base.mode;
@@ -10760,7 +10760,7 @@ void amdgpu_dm_update_freesync_caps(struct drm_connector *connector,
 	struct drm_device *dev = connector->dev;
 	struct amdgpu_device *adev = drm_to_adev(dev);
 	bool freesync_capable = false;
-	struct amdgpu_hdmi_vsdb_info vsdb_info = {0};
+	struct amdgpu_hdmi_vsdb_info vsdb_info = {};
 
 	if (!connector->state) {
 		DRM_ERROR("%s - Connector has no state", __func__);

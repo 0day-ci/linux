@@ -1491,7 +1491,7 @@ static const struct {
 static void a5xx_gpu_state_get_hlsq_regs(struct msm_gpu *gpu,
 		struct a5xx_gpu_state *a5xx_state)
 {
-	struct a5xx_crashdumper dumper = { 0 };
+	struct a5xx_crashdumper dumper = { };
 	u32 offset, count = 0;
 	u64 *ptr;
 	int i;

@@ -1930,7 +1930,7 @@ lpfc_handle_eratt_s4(struct lpfc_hba *phba)
 	uint32_t event_data;
 	struct Scsi_Host *shost;
 	uint32_t if_type;
-	struct lpfc_register portstat_reg = {0};
+	struct lpfc_register portstat_reg = {};
 	uint32_t reg_err1, reg_err2;
 	uint32_t uerrlo_reg, uemasklo_reg;
 	uint32_t smphr_port_status = 0, pci_rd_rc1, pci_rd_rc2;

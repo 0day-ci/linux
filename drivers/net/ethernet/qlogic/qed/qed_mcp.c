@@ -3911,7 +3911,7 @@ int qed_mcp_set_capabilities(struct qed_hwfn *p_hwfn, struct qed_ptt *p_ptt)
 
 int qed_mcp_get_engine_config(struct qed_hwfn *p_hwfn, struct qed_ptt *p_ptt)
 {
-	struct qed_mcp_mb_params mb_params = {0};
+	struct qed_mcp_mb_params mb_params = {};
 	struct qed_dev *cdev = p_hwfn->cdev;
 	u8 fir_valid, l2_valid;
 	int rc;
@@ -3950,7 +3950,7 @@ int qed_mcp_get_engine_config(struct qed_hwfn *p_hwfn, struct qed_ptt *p_ptt)
 
 int qed_mcp_get_ppfid_bitmap(struct qed_hwfn *p_hwfn, struct qed_ptt *p_ptt)
 {
-	struct qed_mcp_mb_params mb_params = {0};
+	struct qed_mcp_mb_params mb_params = {};
 	struct qed_dev *cdev = p_hwfn->cdev;
 	int rc;
 

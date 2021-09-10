@@ -667,7 +667,7 @@ void
 ice_fdir_get_prgm_desc(struct ice_hw *hw, struct ice_fdir_fltr *input,
 		       struct ice_fltr_desc *fdesc, bool add)
 {
-	struct ice_fd_fltr_desc_ctx fdir_fltr_ctx = { 0 };
+	struct ice_fd_fltr_desc_ctx fdir_fltr_ctx = { };
 
 	/* set default context info */
 	ice_set_dflt_val_fd_desc(&fdir_fltr_ctx);

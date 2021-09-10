@@ -83,7 +83,7 @@ int __init omap2_clk_setup_ll_ops(void)
  */
 void __init ti_clk_init_features(void)
 {
-	struct ti_clk_features features = { 0 };
+	struct ti_clk_features features = { };
 	/* Fint setup for DPLLs */
 	if (cpu_is_omap3430()) {
 		features.fint_min = OMAP3430_DPLL_FINT_BAND1_MIN;

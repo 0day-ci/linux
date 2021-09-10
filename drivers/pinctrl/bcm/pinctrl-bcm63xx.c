@@ -46,7 +46,7 @@ static int bcm63xx_gpio_probe(struct device *dev, struct device_node *node,
 			      const struct bcm63xx_pinctrl_soc *soc,
 			      struct bcm63xx_pinctrl *pc)
 {
-	struct gpio_regmap_config grc = {0};
+	struct gpio_regmap_config grc = {};
 
 	grc.parent = dev;
 	grc.fwnode = &node->fwnode;

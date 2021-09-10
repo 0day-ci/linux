@@ -37,7 +37,7 @@ int dpio_open(struct fsl_mc_io *mc_io,
 	      int dpio_id,
 	      u16 *token)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	struct dpio_cmd_open *dpio_cmd;
 	int err;
 
@@ -70,7 +70,7 @@ int dpio_close(struct fsl_mc_io *mc_io,
 	       u32 cmd_flags,
 	       u16 token)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 
 	/* prepare command */
 	cmd.header = mc_encode_cmd_header(DPIO_CMDID_CLOSE,
@@ -92,7 +92,7 @@ int dpio_enable(struct fsl_mc_io *mc_io,
 		u32 cmd_flags,
 		u16 token)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 
 	/* prepare command */
 	cmd.header = mc_encode_cmd_header(DPIO_CMDID_ENABLE,
@@ -114,7 +114,7 @@ int dpio_disable(struct fsl_mc_io *mc_io,
 		 u32 cmd_flags,
 		 u16 token)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 
 	/* prepare command */
 	cmd.header = mc_encode_cmd_header(DPIO_CMDID_DISABLE,
@@ -138,7 +138,7 @@ int dpio_get_attributes(struct fsl_mc_io *mc_io,
 			u16 token,
 			struct dpio_attr *attr)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	struct dpio_rsp_get_attr *dpio_rsp;
 	int err;
 
@@ -171,7 +171,7 @@ int dpio_set_stashing_destination(struct fsl_mc_io *mc_io,
 				  u16 token,
 				  u8 sdest)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	struct dpio_stashing_dest *dpio_cmd;
 
 	cmd.header = mc_encode_cmd_header(DPIO_CMDID_SET_STASHING_DEST,
@@ -196,7 +196,7 @@ int dpio_get_api_version(struct fsl_mc_io *mc_io,
 			 u16 *major_ver,
 			 u16 *minor_ver)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	int err;
 
 	/* prepare command */
@@ -225,7 +225,7 @@ int dpio_reset(struct fsl_mc_io *mc_io,
 	       u32 cmd_flags,
 	       u16 token)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 
 	/* prepare command */
 	cmd.header = mc_encode_cmd_header(DPIO_CMDID_RESET,

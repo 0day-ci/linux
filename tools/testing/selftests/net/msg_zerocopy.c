@@ -482,7 +482,7 @@ static void do_tx(int domain, int type, int protocol)
 {
 	struct iovec iov[3] = { {0} };
 	struct sockaddr_ll laddr;
-	struct msghdr msg = {0};
+	struct msghdr msg = {};
 	struct ethhdr eth;
 	union {
 		struct ipv6hdr ip6h;

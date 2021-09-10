@@ -291,7 +291,7 @@ long kvmhv_enter_nested_guest(struct kvm_vcpu *vcpu)
 	long int err, r;
 	struct kvm_nested_guest *l2;
 	struct pt_regs l2_regs, saved_l1_regs;
-	struct hv_guest_state l2_hv = {0}, saved_l1_hv;
+	struct hv_guest_state l2_hv = {}, saved_l1_hv;
 	struct kvmppc_vcore *vc = vcpu->arch.vcore;
 	u64 hv_ptr, regs_ptr;
 	u64 hdec_exp, lpcr;

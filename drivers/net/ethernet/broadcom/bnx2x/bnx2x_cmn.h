@@ -507,7 +507,7 @@ static inline void bnx2x_update_rx_prod(struct bnx2x *bp,
 					u16 bd_prod, u16 rx_comp_prod,
 					u16 rx_sge_prod)
 {
-	struct ustorm_eth_rx_producers rx_prods = {0};
+	struct ustorm_eth_rx_producers rx_prods = {};
 	u32 i;
 
 	/* Update producers */
@@ -637,7 +637,7 @@ static inline void bnx2x_igu_ack_sb_gen(struct bnx2x *bp, u8 igu_sb_id,
 					u8 segment, u16 index, u8 op,
 					u8 update, u32 igu_addr)
 {
-	struct igu_regular cmd_data = {0};
+	struct igu_regular cmd_data = {};
 
 	cmd_data.sb_id_and_flags =
 			((index << IGU_REGULAR_SB_INDEX_SHIFT) |

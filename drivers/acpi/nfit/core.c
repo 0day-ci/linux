@@ -1792,7 +1792,7 @@ static bool acpi_nvdimm_has_method(struct acpi_device *adev, char *method)
 __weak void nfit_intel_shutdown_status(struct nfit_mem *nfit_mem)
 {
 	struct device *dev = &nfit_mem->adev->dev;
-	struct nd_intel_smart smart = { 0 };
+	struct nd_intel_smart smart = { };
 	union acpi_object in_buf = {
 		.buffer.type = ACPI_TYPE_BUFFER,
 		.buffer.length = 0,

@@ -57,7 +57,7 @@ void icmpv6_ndo_send(struct sk_buff *skb_in, u8 type, u8 code, __u32 info);
 #else
 static inline void icmpv6_ndo_send(struct sk_buff *skb_in, u8 type, u8 code, __u32 info)
 {
-	struct inet6_skb_parm parm = { 0 };
+	struct inet6_skb_parm parm = { };
 	__icmpv6_send(skb_in, type, code, info, &parm);
 }
 #endif

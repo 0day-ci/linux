@@ -3295,7 +3295,7 @@ static int tipc_getsockopt(struct socket *sock, int lvl, int opt,
 static int tipc_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 {
 	struct net *net = sock_net(sock->sk);
-	struct tipc_sioc_nodeid_req nr = {0};
+	struct tipc_sioc_nodeid_req nr = {};
 	struct tipc_sioc_ln_req lnr;
 	void __user *argp = (void __user *)arg;
 

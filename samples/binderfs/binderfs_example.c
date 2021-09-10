@@ -18,7 +18,7 @@
 int main(int argc, char *argv[])
 {
 	int fd, ret, saved_errno;
-	struct binderfs_device device = { 0 };
+	struct binderfs_device device = { };
 
 	ret = unshare(CLONE_NEWNS);
 	if (ret < 0) {

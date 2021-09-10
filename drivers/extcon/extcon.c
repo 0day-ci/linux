@@ -620,7 +620,7 @@ int extcon_get_property(struct extcon_dev *edev, unsigned int id,
 	unsigned long flags;
 	int index, ret = 0;
 
-	*prop_val = (union extcon_property_value){0};
+	*prop_val = (union extcon_property_value){};
 
 	if (!edev)
 		return -EINVAL;

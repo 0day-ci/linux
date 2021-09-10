@@ -4420,7 +4420,7 @@ int ath11k_debugfs_htt_stats_req(struct ath11k *ar)
 	u8 type = stats_req->type;
 	u64 cookie = 0;
 	int ret, pdev_id = ar->pdev->pdev_id;
-	struct htt_ext_stats_cfg_params cfg_params = { 0 };
+	struct htt_ext_stats_cfg_params cfg_params = { };
 
 	init_completion(&stats_req->cmpln);
 
@@ -4558,7 +4558,7 @@ static ssize_t ath11k_write_htt_stats_reset(struct file *file,
 {
 	struct ath11k *ar = file->private_data;
 	u8 type;
-	struct htt_ext_stats_cfg_params cfg_params = { 0 };
+	struct htt_ext_stats_cfg_params cfg_params = { };
 	int ret;
 
 	ret = kstrtou8_from_user(user_buf, count, 0, &type);

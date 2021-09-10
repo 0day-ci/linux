@@ -1809,7 +1809,7 @@ void cw1200_bss_info_changed(struct ieee80211_hw *dev,
 	/* TODO: BSS_CHANGED_TXPOWER */
 
 	if (changed & BSS_CHANGED_ARP_FILTER) {
-		struct wsm_mib_arp_ipv4_filter filter = {0};
+		struct wsm_mib_arp_ipv4_filter filter = {};
 		int i;
 
 		pr_debug("[STA] BSS_CHANGED_ARP_FILTER cnt: %d\n",

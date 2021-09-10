@@ -83,7 +83,7 @@ void *gup_thread(void *data)
 
 int main(int argc, char **argv)
 {
-	struct gup_test gup = { 0 };
+	struct gup_test gup = { };
 	int filed, i, opt, nr_pages = 1, thp = -1, write = 1, nthreads = 1, ret;
 	int flags = MAP_PRIVATE, touch = 0;
 	char *file = "/dev/zero";

@@ -153,7 +153,7 @@ err:
 
 static int run_bpf_prog(char *prog, int cg_id)
 {
-	struct hbm_queue_stats qstats = {0};
+	struct hbm_queue_stats qstats = {};
 	char cg_dir[100], cg_pin_path[100];
 	struct bpf_link *link = NULL;
 	int key = 0;

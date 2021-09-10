@@ -1090,7 +1090,7 @@ void fm10k_update_rx_drop_en(struct fm10k_intfc *interface)
  **/
 static void fm10k_configure_dglort(struct fm10k_intfc *interface)
 {
-	struct fm10k_dglort_cfg dglort = { 0 };
+	struct fm10k_dglort_cfg dglort = { };
 	struct fm10k_hw *hw = &interface->hw;
 	int i;
 	u32 mrqc;
@@ -1303,7 +1303,7 @@ static void fm10k_handle_fault(struct fm10k_intfc *interface, int type,
 static void fm10k_report_fault(struct fm10k_intfc *interface, u32 eicr)
 {
 	struct fm10k_hw *hw = &interface->hw;
-	struct fm10k_fault fault = { 0 };
+	struct fm10k_fault fault = { };
 	int type, err;
 
 	for (eicr &= FM10K_EICR_FAULT_MASK, type = FM10K_PCA_FAULT;

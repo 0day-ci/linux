@@ -208,7 +208,7 @@ static bool create_links(
 		num_virtual_links);
 
 	for (i = 0; i < connectors_num; i++) {
-		struct link_init_data link_init_params = {0};
+		struct link_init_data link_init_params = {};
 		struct dc_link *link;
 
 		DC_LOG_DC("BIOS object table - printing link object info for connector number: %d, link_index: %d", i, dc->link_count);
@@ -231,7 +231,7 @@ static bool create_links(
 
 	for (i = 0; i < num_virtual_links; i++) {
 		struct dc_link *link = kzalloc(sizeof(*link), GFP_KERNEL);
-		struct encoder_init_data enc_init = {0};
+		struct encoder_init_data enc_init = {};
 
 		if (link == NULL) {
 			BREAK_TO_DEBUGGER();
@@ -1358,7 +1358,7 @@ bool dc_validate_seamless_boot_timing(const struct dc *dc,
 	struct timing_generator *tg;
 	struct stream_encoder *se = NULL;
 
-	struct dc_crtc_timing hw_crtc_timing = {0};
+	struct dc_crtc_timing hw_crtc_timing = {};
 
 	struct dc_link *link = sink->link;
 	unsigned int i, enc_inst, tg_inst = 0;
@@ -2705,8 +2705,8 @@ static void commit_planes_for_stream(struct dc *dc,
 	if ((update_type != UPDATE_TYPE_FAST) && stream->update_flags.bits.dsc_changed)
 		if (top_pipe_to_program->stream_res.tg->funcs->lock_doublebuffer_enable) {
 			if (should_use_dmub_lock(stream->link)) {
-				union dmub_hw_lock_flags hw_locks = { 0 };
-				struct dmub_hw_lock_inst_flags inst_flags = { 0 };
+				union dmub_hw_lock_flags hw_locks = { };
+				struct dmub_hw_lock_inst_flags inst_flags = { };
 
 				hw_locks.bits.lock_dig = 1;
 				inst_flags.dig_inst = top_pipe_to_program->stream_res.tg->inst;
@@ -2891,8 +2891,8 @@ static void commit_planes_for_stream(struct dc *dc,
 					CRTC_STATE_VACTIVE);
 
 			if (stream && should_use_dmub_lock(stream->link)) {
-				union dmub_hw_lock_flags hw_locks = { 0 };
-				struct dmub_hw_lock_inst_flags inst_flags = { 0 };
+				union dmub_hw_lock_flags hw_locks = { };
+				struct dmub_hw_lock_inst_flags inst_flags = { };
 
 				hw_locks.bits.lock_dig = 1;
 				inst_flags.dig_inst = top_pipe_to_program->stream_res.tg->inst;
@@ -3450,7 +3450,7 @@ bool dc_process_dmub_aux_transfer_async(struct dc *dc,
 				struct aux_payload *payload)
 {
 	uint8_t action;
-	union dmub_rb_cmd cmd = {0};
+	union dmub_rb_cmd cmd = {};
 	struct dc_dmub_srv *dmub_srv = dc->ctx->dmub_srv;
 
 	ASSERT(payload->length <= 16);

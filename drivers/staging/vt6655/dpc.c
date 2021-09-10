@@ -25,7 +25,7 @@ static bool vnt_rx_data(struct vnt_private *priv, struct sk_buff *skb,
 {
 	struct ieee80211_hw *hw = priv->hw;
 	struct ieee80211_supported_band *sband;
-	struct ieee80211_rx_status rx_status = { 0 };
+	struct ieee80211_rx_status rx_status = { };
 	struct ieee80211_hdr *hdr;
 	__le16 fc;
 	u8 *rsr, *new_rsr, *rssi;

@@ -582,7 +582,7 @@ static int sja1105_tas_check_running(struct sja1105_private *priv)
 {
 	struct sja1105_tas_data *tas_data = &priv->tas_data;
 	struct dsa_switch *ds = priv->ds;
-	struct sja1105_ptp_cmd cmd = {0};
+	struct sja1105_ptp_cmd cmd = {};
 	int rc;
 
 	rc = sja1105_ptp_commit(ds, &cmd, SPI_READ);

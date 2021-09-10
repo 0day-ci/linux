@@ -1387,7 +1387,7 @@ EXPORT_SYMBOL(tcf_block_put_ext);
 
 void tcf_block_put(struct tcf_block *block)
 {
-	struct tcf_block_ext_info ei = {0, };
+	struct tcf_block_ext_info ei = {};
 
 	if (!block)
 		return;

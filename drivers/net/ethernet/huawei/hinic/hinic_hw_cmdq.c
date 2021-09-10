@@ -853,7 +853,7 @@ err_init_cmdq:
 
 static int hinic_set_cmdq_depth(struct hinic_hwdev *hwdev, u16 cmdq_depth)
 {
-	struct hinic_cmd_hw_ioctxt hw_ioctxt = { 0 };
+	struct hinic_cmd_hw_ioctxt hw_ioctxt = { };
 	struct hinic_pfhwdev *pfhwdev;
 
 	pfhwdev = container_of(hwdev, struct hinic_pfhwdev, hwdev);

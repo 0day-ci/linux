@@ -430,7 +430,7 @@ static void dce_transform_set_scaler(
 
 	if (is_scaling_required) {
 		/* 3. Calculate and program ratio, filter initialization */
-		struct scl_ratios_inits inits = { 0 };
+		struct scl_ratios_inits inits = { };
 
 		calculate_inits(xfm_dce, data, &inits);
 
@@ -513,7 +513,7 @@ static void dce60_transform_set_scaler(
 
 	if (is_scaling_required) {
 		/* 3. Calculate and program ratio, DCE6 filter initialization */
-		struct sclh_ratios_inits inits = { 0 };
+		struct sclh_ratios_inits inits = { };
 
 		/* DCE6 has specific calculate_inits() function */
 		dce60_calculate_inits(xfm_dce, data, &inits);

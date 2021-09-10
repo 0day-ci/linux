@@ -1456,7 +1456,7 @@ static void at91_adc_dma_init(struct platform_device *pdev)
 {
 	struct iio_dev *indio_dev = platform_get_drvdata(pdev);
 	struct at91_adc_state *st = iio_priv(indio_dev);
-	struct dma_slave_config config = {0};
+	struct dma_slave_config config = {};
 	/*
 	 * We make the buffer double the size of the fifo,
 	 * such that DMA uses one half of the buffer (full fifo size)

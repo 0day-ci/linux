@@ -802,7 +802,7 @@ static int hellcreek_fdb_get(struct hellcreek *hellcreek,
 	 * enter new entries anywhere.
 	 */
 	for (i = 0; i < hellcreek->fdb_entries; ++i) {
-		struct hellcreek_fdb_entry tmp = { 0 };
+		struct hellcreek_fdb_entry tmp = { };
 
 		/* Read entry */
 		hellcreek_populate_fdb_entry(hellcreek, &tmp, i);
@@ -825,7 +825,7 @@ static int hellcreek_fdb_get(struct hellcreek *hellcreek,
 static int hellcreek_fdb_add(struct dsa_switch *ds, int port,
 			     const unsigned char *addr, u16 vid)
 {
-	struct hellcreek_fdb_entry entry = { 0 };
+	struct hellcreek_fdb_entry entry = { };
 	struct hellcreek *hellcreek = ds->priv;
 	int ret;
 
@@ -870,7 +870,7 @@ out:
 static int hellcreek_fdb_del(struct dsa_switch *ds, int port,
 			     const unsigned char *addr, u16 vid)
 {
-	struct hellcreek_fdb_entry entry = { 0 };
+	struct hellcreek_fdb_entry entry = { };
 	struct hellcreek *hellcreek = ds->priv;
 	int ret;
 
@@ -928,7 +928,7 @@ static int hellcreek_fdb_dump(struct dsa_switch *ds, int port,
 
 	/* Read table */
 	for (i = 0; i < hellcreek->fdb_entries; ++i) {
-		struct hellcreek_fdb_entry entry = { 0 };
+		struct hellcreek_fdb_entry entry = { };
 
 		/* Read entry */
 		hellcreek_populate_fdb_entry(hellcreek, &entry, i);

@@ -211,7 +211,7 @@ int atomisp_acc_load_to_pipe(struct atomisp_sub_device *asd,
 int atomisp_acc_load(struct atomisp_sub_device *asd,
 		     struct atomisp_acc_fw_load *user_fw)
 {
-	struct atomisp_acc_fw_load_to_pipe ltp = {0};
+	struct atomisp_acc_fw_load_to_pipe ltp = {};
 	int r;
 
 	ltp.flags = ATOMISP_ACC_FW_LOAD_FL_ACC;
@@ -323,7 +323,7 @@ int atomisp_acc_wait(struct atomisp_sub_device *asd, unsigned int *handle)
 
 void atomisp_acc_done(struct atomisp_sub_device *asd, unsigned int handle)
 {
-	struct v4l2_event event = { 0 };
+	struct v4l2_event event = { };
 
 	event.type = V4L2_EVENT_ATOMISP_ACC_COMPLETE;
 	event.u.frame_sync.frame_sequence = atomic_read(&asd->sequence);

@@ -2733,7 +2733,7 @@ xfs_ialloc_count_inodes(
 	xfs_agino_t			*count,
 	xfs_agino_t			*freecount)
 {
-	struct xfs_ialloc_count_inodes	ci = {0};
+	struct xfs_ialloc_count_inodes	ci = {};
 	int				error;
 
 	ASSERT(cur->bc_btnum == XFS_BTNUM_INO);

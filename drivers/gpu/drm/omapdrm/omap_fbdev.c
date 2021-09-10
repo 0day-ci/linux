@@ -96,7 +96,7 @@ static int omap_fbdev_create(struct drm_fb_helper *helper,
 	struct drm_framebuffer *fb = NULL;
 	union omap_gem_size gsize;
 	struct fb_info *fbi = NULL;
-	struct drm_mode_fb_cmd2 mode_cmd = {0};
+	struct drm_mode_fb_cmd2 mode_cmd = {};
 	dma_addr_t dma_addr;
 	int ret;
 

@@ -1175,7 +1175,7 @@ static int do_run(int argc, char **argv)
 {
 	char *data_fname_in = NULL, *data_fname_out = NULL;
 	char *ctx_fname_in = NULL, *ctx_fname_out = NULL;
-	struct bpf_prog_test_run_attr test_attr = {0};
+	struct bpf_prog_test_run_attr test_attr = {};
 	const unsigned int default_size = SZ_32K;
 	void *data_in = NULL, *data_out = NULL;
 	void *ctx_in = NULL, *ctx_out = NULL;
@@ -1375,7 +1375,7 @@ static int load_with_options(int argc, char **argv, bool first_prog_only)
 	DECLARE_LIBBPF_OPTS(bpf_object_open_opts, open_opts,
 		.relaxed_maps = relaxed_maps,
 	);
-	struct bpf_object_load_attr load_attr = { 0 };
+	struct bpf_object_load_attr load_attr = { };
 	enum bpf_attach_type expected_attach_type;
 	struct map_replace *map_replace = NULL;
 	struct bpf_program *prog = NULL, *pos;

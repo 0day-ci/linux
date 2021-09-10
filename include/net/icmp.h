@@ -48,7 +48,7 @@ void icmp_ndo_send(struct sk_buff *skb_in, int type, int code, __be32 info);
 #else
 static inline void icmp_ndo_send(struct sk_buff *skb_in, int type, int code, __be32 info)
 {
-	struct ip_options opts = { 0 };
+	struct ip_options opts = { };
 	__icmp_send(skb_in, type, code, info, &opts);
 }
 #endif

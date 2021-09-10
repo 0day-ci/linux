@@ -552,7 +552,7 @@ static struct drm_syncobj **msm_parse_deps(struct msm_gem_submit *submit,
                                            struct msm_ringbuffer *ring)
 {
 	struct drm_syncobj **syncobjs = NULL;
-	struct drm_msm_gem_submit_syncobj syncobj_desc = {0};
+	struct drm_msm_gem_submit_syncobj syncobj_desc = {};
 	int ret = 0;
 	uint32_t i, j;
 
@@ -631,7 +631,7 @@ static struct msm_submit_post_dep *msm_parse_post_deps(struct drm_device *dev,
                                                        size_t syncobj_stride)
 {
 	struct msm_submit_post_dep *post_deps;
-	struct drm_msm_gem_submit_syncobj syncobj_desc = {0};
+	struct drm_msm_gem_submit_syncobj syncobj_desc = {};
 	int ret = 0;
 	uint32_t i, j;
 

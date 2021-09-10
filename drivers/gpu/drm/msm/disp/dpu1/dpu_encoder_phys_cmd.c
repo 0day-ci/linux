@@ -60,7 +60,7 @@ static void _dpu_encoder_phys_cmd_update_intf_cfg(
 	struct dpu_encoder_phys_cmd *cmd_enc =
 			to_dpu_encoder_phys_cmd(phys_enc);
 	struct dpu_hw_ctl *ctl;
-	struct dpu_hw_intf_cfg intf_cfg = { 0 };
+	struct dpu_hw_intf_cfg intf_cfg = { };
 
 	ctl = phys_enc->hw_ctl;
 	if (!ctl->ops.setup_intf_cfg)
@@ -324,7 +324,7 @@ static void dpu_encoder_phys_cmd_tearcheck_config(
 {
 	struct dpu_encoder_phys_cmd *cmd_enc =
 		to_dpu_encoder_phys_cmd(phys_enc);
-	struct dpu_hw_tear_check tc_cfg = { 0 };
+	struct dpu_hw_tear_check tc_cfg = { };
 	struct drm_display_mode *mode;
 	bool tc_enable = true;
 	u32 vsync_hz;

@@ -150,7 +150,7 @@ int orc_create(struct objtool_file *file)
 	/* Build a deduplicated list of ORC entries: */
 	INIT_LIST_HEAD(&orc_list);
 	for_each_sec(file, sec) {
-		struct orc_entry orc, prev_orc = {0};
+		struct orc_entry orc, prev_orc = {};
 		struct instruction *insn;
 		bool empty = true;
 

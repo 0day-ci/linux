@@ -441,7 +441,7 @@ int zfcp_qdio_open(struct zfcp_qdio *qdio)
 	struct qdio_buffer **input_sbals[1] = {qdio->res_q};
 	struct qdio_buffer **output_sbals[1] = {qdio->req_q};
 	struct qdio_buffer_element *sbale;
-	struct qdio_initialize init_data = {0};
+	struct qdio_initialize init_data = {};
 	struct zfcp_adapter *adapter = qdio->adapter;
 	struct ccw_device *cdev = adapter->ccw_device;
 	struct qdio_ssqd_desc ssqd;

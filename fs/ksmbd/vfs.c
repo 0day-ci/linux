@@ -1431,8 +1431,8 @@ int ksmbd_vfs_set_sd_xattr(struct ksmbd_conn *conn,
 			   struct smb_ntsd *pntsd, int len)
 {
 	int rc;
-	struct ndr sd_ndr = {0}, acl_ndr = {0};
-	struct xattr_ntacl acl = {0};
+	struct ndr sd_ndr = {}, acl_ndr = {};
+	struct xattr_ntacl acl = {};
 	struct xattr_smb_acl *smb_acl, *def_smb_acl = NULL;
 	struct inode *inode = d_inode(dentry);
 
@@ -1507,7 +1507,7 @@ int ksmbd_vfs_get_sd_xattr(struct ksmbd_conn *conn,
 	int rc;
 	struct ndr n;
 	struct inode *inode = d_inode(dentry);
-	struct ndr acl_ndr = {0};
+	struct ndr acl_ndr = {};
 	struct xattr_ntacl acl;
 	struct xattr_smb_acl *smb_acl = NULL, *def_smb_acl = NULL;
 	__u8 cmp_hash[XATTR_SD_HASH_SIZE] = {0};

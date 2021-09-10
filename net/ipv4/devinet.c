@@ -156,7 +156,7 @@ struct net_device *__ip_dev_find(struct net *net, __be32 addr, bool devref)
 	ifa = inet_lookup_ifaddr_rcu(net, addr);
 	if (!ifa) {
 		struct flowi4 fl4 = { .daddr = addr };
-		struct fib_result res = { 0 };
+		struct fib_result res = { };
 		struct fib_table *local;
 
 		/* Fallback to FIB local table so that communication

@@ -248,7 +248,7 @@ static int dce_set_clock(
 	int requested_clk_khz)
 {
 	struct dce_clk_mgr *clk_mgr_dce = TO_DCE_CLK_MGR(clk_mgr);
-	struct bp_pixel_clock_parameters pxl_clk_params = { 0 };
+	struct bp_pixel_clock_parameters pxl_clk_params = { };
 	struct dc_bios *bp = clk_mgr->ctx->dc_bios;
 	int actual_clock = requested_clk_khz;
 	struct dmcu *dmcu = clk_mgr_dce->base.ctx->dc->res_pool->dmcu;
@@ -753,7 +753,7 @@ static void dce12_update_clocks(struct clk_mgr *clk_mgr,
 			bool safe_to_lower)
 {
 	struct dce_clk_mgr *clk_mgr_dce = TO_DCE_CLK_MGR(clk_mgr);
-	struct dm_pp_clock_for_voltage_req clock_voltage_req = {0};
+	struct dm_pp_clock_for_voltage_req clock_voltage_req = {};
 	int max_pix_clk = get_max_pixel_clock_for_all_paths(context);
 	int patched_disp_clk = context->bw_ctx.bw.dce.dispclk_khz;
 
@@ -814,7 +814,7 @@ static void dce_clk_mgr_construct(
 	const struct clk_mgr_mask *clk_mask)
 {
 	struct clk_mgr *base = &clk_mgr_dce->base;
-	struct dm_pp_static_clock_info static_clk_info = {0};
+	struct dm_pp_static_clock_info static_clk_info = {};
 
 	base->ctx = ctx;
 	base->funcs = &dce_funcs;

@@ -974,7 +974,7 @@ done:
 static void tegra_i2c_config_fifo_trig(struct tegra_i2c_dev *i2c_dev,
 				       size_t len)
 {
-	struct dma_slave_config slv_config = {0};
+	struct dma_slave_config slv_config = {};
 	u32 val, reg, dma_burst, reg_offset;
 	struct dma_chan *chan;
 	int err;

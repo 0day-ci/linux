@@ -826,7 +826,7 @@ static int etm_probe(struct amba_device *adev, const struct amba_id *id)
 	struct coresight_platform_data *pdata = NULL;
 	struct etm_drvdata *drvdata;
 	struct resource *res = &adev->res;
-	struct coresight_desc desc = { 0 };
+	struct coresight_desc desc = { };
 
 	drvdata = devm_kzalloc(dev, sizeof(*drvdata), GFP_KERNEL);
 	if (!drvdata)

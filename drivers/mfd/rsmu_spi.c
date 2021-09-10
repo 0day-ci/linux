@@ -26,7 +26,7 @@
 static int rsmu_read_device(struct rsmu_ddata *rsmu, u8 reg, u8 *buf, u16 bytes)
 {
 	struct spi_device *client = to_spi_device(rsmu->dev);
-	struct spi_transfer xfer = {0};
+	struct spi_transfer xfer = {};
 	struct spi_message msg;
 	u8 cmd[256] = {0};
 	u8 rsp[256] = {0};
@@ -64,7 +64,7 @@ static int rsmu_read_device(struct rsmu_ddata *rsmu, u8 reg, u8 *buf, u16 bytes)
 static int rsmu_write_device(struct rsmu_ddata *rsmu, u8 reg, u8 *buf, u16 bytes)
 {
 	struct spi_device *client = to_spi_device(rsmu->dev);
-	struct spi_transfer xfer = {0};
+	struct spi_transfer xfer = {};
 	struct spi_message msg;
 	u8 cmd[256] = {0};
 

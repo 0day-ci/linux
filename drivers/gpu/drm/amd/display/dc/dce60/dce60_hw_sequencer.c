@@ -142,7 +142,7 @@ static void dce60_enable_fbc(
 
 static void dce60_set_default_colors(struct pipe_ctx *pipe_ctx)
 {
-	struct default_adjustment default_adjust = { 0 };
+	struct default_adjustment default_adjust = { };
 
 	default_adjust.force_hw_default = false;
 	default_adjust.in_color_space = pipe_ctx->plane_state->color_space;
@@ -232,7 +232,7 @@ static void dce60_get_surface_visual_confirm_color(const struct pipe_ctx *pipe_c
 static void dce60_program_scaler(const struct dc *dc,
 		const struct pipe_ctx *pipe_ctx)
 {
-	struct tg_color color = {0};
+	struct tg_color color = {};
 
 	/* DCE6 skips DCN TOFPGA check for transform_set_pixel_storage_depth == NULL */
 

@@ -779,7 +779,7 @@ static const struct sunxi_mc_smp_data sunxi_mc_smp_data[] __initconst = {
 
 static int __init sunxi_mc_smp_init(void)
 {
-	struct sunxi_mc_smp_nodes nodes = { 0 };
+	struct sunxi_mc_smp_nodes nodes = { };
 	struct device_node *node;
 	struct resource res;
 	void __iomem *addr;

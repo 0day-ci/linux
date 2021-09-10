@@ -397,7 +397,7 @@ static int qcom_set_laddr(struct slim_controller *sctrl,
 		u8 instance;
 		u8 laddr;
 	} __packed p;
-	struct slim_val_inf msg = {0};
+	struct slim_val_inf msg = {};
 	DEFINE_SLIM_EDEST_TXN(txn, SLIM_MSG_MC_ASSIGN_LOGICAL_ADDRESS,
 			      10, laddr, &msg);
 	int ret;

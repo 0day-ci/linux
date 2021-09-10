@@ -51,7 +51,7 @@ static const char * const rds_tcp_stat_names[] = {
 unsigned int rds_tcp_stats_info_copy(struct rds_info_iterator *iter,
 				     unsigned int avail)
 {
-	struct rds_tcp_statistics stats = {0, };
+	struct rds_tcp_statistics stats = {};
 	uint64_t *src;
 	uint64_t *sum;
 	size_t i;

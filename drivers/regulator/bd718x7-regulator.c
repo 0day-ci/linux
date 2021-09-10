@@ -1700,7 +1700,7 @@ err_out:
 static int bd718xx_probe(struct platform_device *pdev)
 {
 	struct regmap *regmap;
-	struct regulator_config config = { 0 };
+	struct regulator_config config = { };
 	int i, j, err, omit_enable;
 	bool use_snvs;
 	struct bd718xx_regulator_data *reg_data;

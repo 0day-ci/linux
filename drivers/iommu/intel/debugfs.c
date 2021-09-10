@@ -222,7 +222,7 @@ static void ctx_tbl_walk(struct seq_file *m, struct intel_iommu *iommu, u16 bus)
 	u64 pasid_dir_ptr;
 
 	for (devfn = 0; devfn < 256; devfn++) {
-		struct tbl_walk tbl_wlk = {0};
+		struct tbl_walk tbl_wlk = {};
 
 		/*
 		 * Scalable mode root entry points to upper scalable mode

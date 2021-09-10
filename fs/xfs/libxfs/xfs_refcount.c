@@ -799,8 +799,8 @@ xfs_refcount_merge_extents(
 	int			flags,
 	bool			*shape_changed)
 {
-	struct xfs_refcount_irec	left = {0}, cleft = {0};
-	struct xfs_refcount_irec	cright = {0}, right = {0};
+	struct xfs_refcount_irec	left = {}, cleft = {};
+	struct xfs_refcount_irec	cright = {}, right = {};
 	int				error;
 	unsigned long long		ulen;
 	bool				cequal;

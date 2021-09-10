@@ -538,7 +538,7 @@ static void set_ctrl1(struct hinic_eq *eq)
 
 static int set_ceq_ctrl_reg(struct hinic_eq *eq)
 {
-	struct hinic_ceq_ctrl_reg ceq_ctrl = {0};
+	struct hinic_ceq_ctrl_reg ceq_ctrl = {};
 	struct hinic_hwdev *hwdev = eq->hwdev;
 	u16 out_size = sizeof(ceq_ctrl);
 	u16 in_size = sizeof(ceq_ctrl);

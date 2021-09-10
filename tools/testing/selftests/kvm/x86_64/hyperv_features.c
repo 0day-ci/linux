@@ -180,7 +180,7 @@ static void guest_test_msrs_access(struct kvm_vm *vm, struct msr_data *msr,
 	struct kvm_cpuid_entry2 dbg = {
 		.function = HYPERV_CPUID_SYNDBG_PLATFORM_CAPABILITIES
 	};
-	struct kvm_enable_cap cap = {0};
+	struct kvm_enable_cap cap = {};
 
 	run = vcpu_state(vm, VCPU_ID);
 

@@ -48,7 +48,7 @@ static int sd_zbc_parse_report(struct scsi_disk *sdkp, u8 *buf,
 			       unsigned int idx, report_zones_cb cb, void *data)
 {
 	struct scsi_device *sdp = sdkp->device;
-	struct blk_zone zone = { 0 };
+	struct blk_zone zone = { };
 	int ret;
 
 	zone.type = buf[0] & 0x0f;

@@ -171,7 +171,7 @@ STATIC int
 xchk_quota_data_fork(
 	struct xfs_scrub	*sc)
 {
-	struct xfs_bmbt_irec	irec = { 0 };
+	struct xfs_bmbt_irec	irec = { };
 	struct xfs_iext_cursor	icur;
 	struct xfs_quotainfo	*qi = sc->mp->m_quotainfo;
 	struct xfs_ifork	*ifp;

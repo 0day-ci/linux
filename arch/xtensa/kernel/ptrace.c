@@ -71,7 +71,7 @@ static int gpr_set(struct task_struct *target,
 		   const void *kbuf, const void __user *ubuf)
 {
 	int ret;
-	struct user_pt_regs newregs = {0};
+	struct user_pt_regs newregs = {};
 	struct pt_regs *regs;
 	const u32 ps_mask = PS_CALLINC_MASK | PS_OWB_MASK;
 

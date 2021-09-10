@@ -1447,7 +1447,7 @@ static int ap_get_compatible_type(ap_qid_t qid, int rawtype, unsigned int func)
 	 */
 	if (ap_qact_available()) {
 		struct ap_queue_status status;
-		union ap_qact_ap_info apinfo = {0};
+		union ap_qact_ap_info apinfo = {};
 
 		apinfo.mode = (func >> 26) & 0x07;
 		apinfo.cat = AP_DEVICE_TYPE_CEX7;

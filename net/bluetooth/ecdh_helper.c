@@ -124,7 +124,7 @@ int set_ecdh_privkey(struct crypto_kpp *tfm, const u8 private_key[32])
 	u8 *buf, *tmp = NULL;
 	unsigned int buf_len;
 	int err;
-	struct ecdh p = {0};
+	struct ecdh p = {};
 
 	if (private_key) {
 		tmp = kmalloc(32, GFP_KERNEL);

@@ -896,7 +896,7 @@ static int rtw_pci_write_data_rsvd_page(struct rtw_dev *rtwdev, u8 *buf,
 					u32 size)
 {
 	struct sk_buff *skb;
-	struct rtw_tx_pkt_info pkt_info = {0};
+	struct rtw_tx_pkt_info pkt_info = {};
 	u8 reg_bcn_work;
 	int ret;
 
@@ -921,7 +921,7 @@ static int rtw_pci_write_data_rsvd_page(struct rtw_dev *rtwdev, u8 *buf,
 static int rtw_pci_write_data_h2c(struct rtw_dev *rtwdev, u8 *buf, u32 size)
 {
 	struct sk_buff *skb;
-	struct rtw_tx_pkt_info pkt_info = {0};
+	struct rtw_tx_pkt_info pkt_info = {};
 	int ret;
 
 	skb = rtw_tx_write_data_h2c_get(rtwdev, &pkt_info, buf, size);

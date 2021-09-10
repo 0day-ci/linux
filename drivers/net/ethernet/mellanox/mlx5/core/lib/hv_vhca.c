@@ -342,7 +342,7 @@ int mlx5_hv_vhca_agent_write(struct mlx5_hv_vhca_agent *agent,
 	int err;
 
 	while (len) {
-		struct mlx5_hv_vhca_data_block data_block = {0};
+		struct mlx5_hv_vhca_data_block data_block = {};
 		int bytes;
 
 		bytes = mlx5_hv_vhca_data_block_prepare(agent, &data_block,

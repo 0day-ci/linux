@@ -864,8 +864,8 @@ static int sfq_dump_class_stats(struct Qdisc *sch, unsigned long cl,
 {
 	struct sfq_sched_data *q = qdisc_priv(sch);
 	sfq_index idx = q->ht[cl - 1];
-	struct gnet_stats_queue qs = { 0 };
-	struct tc_sfq_xstats xstats = { 0 };
+	struct gnet_stats_queue qs = { };
+	struct tc_sfq_xstats xstats = { };
 
 	if (idx != SFQ_EMPTY_SLOT) {
 		const struct sfq_slot *slot = &q->slots[idx];

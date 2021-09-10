@@ -245,7 +245,7 @@ static int xenvif_count_requests(struct xenvif_queue *queue,
 		return 0;
 
 	do {
-		struct xen_netif_tx_request dropped_tx = { 0 };
+		struct xen_netif_tx_request dropped_tx = { };
 
 		if (slots >= work_to_do) {
 			netdev_err(queue->vif->dev,

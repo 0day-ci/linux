@@ -406,7 +406,7 @@ out:
 
 static int gb_sdio_command(struct gb_sdio_host *host, struct mmc_command *cmd)
 {
-	struct gb_sdio_command_request request = {0};
+	struct gb_sdio_command_request request = {};
 	struct gb_sdio_command_response response;
 	struct mmc_data *data = host->mrq->data;
 	unsigned int timeout_ms;

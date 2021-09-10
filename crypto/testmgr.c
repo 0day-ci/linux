@@ -1645,7 +1645,7 @@ static int test_hash_vs_generic_impl(const char *generic_driver,
 	struct crypto_shash *generic_tfm = NULL;
 	struct shash_desc *generic_desc = NULL;
 	unsigned int i;
-	struct hash_testvec vec = { 0 };
+	struct hash_testvec vec = { };
 	char vec_name[64];
 	struct testvec_config *cfg;
 	char cfgname[TESTVEC_CONFIG_NAMELEN];
@@ -2963,7 +2963,7 @@ static int test_skcipher_vs_generic_impl(const char *generic_driver,
 	struct crypto_skcipher *generic_tfm = NULL;
 	struct skcipher_request *generic_req = NULL;
 	unsigned int i;
-	struct cipher_testvec vec = { 0 };
+	struct cipher_testvec vec = { };
 	char vec_name[64];
 	struct testvec_config *cfg;
 	char cfgname[TESTVEC_CONFIG_NAMELEN];

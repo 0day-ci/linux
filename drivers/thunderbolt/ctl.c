@@ -232,7 +232,7 @@ static struct tb_cfg_result decode_error(const struct ctl_pkg *response)
 {
 	struct cfg_error_pkg *pkg = response->buffer;
 	struct tb_ctl *ctl = response->ctl;
-	struct tb_cfg_result res = { 0 };
+	struct tb_cfg_result res = { };
 	res.response_route = tb_cfg_get_route(&pkg->header);
 	res.response_port = 0;
 	res.err = check_header(response, sizeof(*pkg), TB_CFG_PKG_ERROR,
@@ -258,7 +258,7 @@ static struct tb_cfg_result parse_header(const struct ctl_pkg *pkg, u32 len,
 					 enum tb_cfg_pkg_type type, u64 route)
 {
 	struct tb_cfg_header *header = pkg->buffer;
-	struct tb_cfg_result res = { 0 };
+	struct tb_cfg_result res = { };
 
 	if (pkg->frame.eof == TB_CFG_PKG_ERROR)
 		return decode_error(pkg);
@@ -592,7 +592,7 @@ struct tb_cfg_result tb_cfg_request_sync(struct tb_ctl *ctl,
 					 int timeout_msec)
 {
 	unsigned long timeout = msecs_to_jiffies(timeout_msec);
-	struct tb_cfg_result res = { 0 };
+	struct tb_cfg_result res = { };
 	DECLARE_COMPLETION_ONSTACK(done);
 	int ret;
 
@@ -815,7 +815,7 @@ static bool tb_cfg_copy(struct tb_cfg_request *req, const struct ctl_pkg *pkg)
 struct tb_cfg_result tb_cfg_reset(struct tb_ctl *ctl, u64 route)
 {
 	struct cfg_reset_pkg request = { .header = tb_cfg_make_header(route) };
-	struct tb_cfg_result res = { 0 };
+	struct tb_cfg_result res = { };
 	struct tb_cfg_header reply;
 	struct tb_cfg_request *req;
 
@@ -858,7 +858,7 @@ struct tb_cfg_result tb_cfg_read_raw(struct tb_ctl *ctl, void *buffer,
 		u64 route, u32 port, enum tb_cfg_space space,
 		u32 offset, u32 length, int timeout_msec)
 {
-	struct tb_cfg_result res = { 0 };
+	struct tb_cfg_result res = { };
 	struct cfg_read_pkg request = {
 		.header = tb_cfg_make_header(route),
 		.addr = {
@@ -929,7 +929,7 @@ struct tb_cfg_result tb_cfg_write_raw(struct tb_ctl *ctl, const void *buffer,
 		u64 route, u32 port, enum tb_cfg_space space,
 		u32 offset, u32 length, int timeout_msec)
 {
-	struct tb_cfg_result res = { 0 };
+	struct tb_cfg_result res = { };
 	struct cfg_write_pkg request = {
 		.header = tb_cfg_make_header(route),
 		.addr = {

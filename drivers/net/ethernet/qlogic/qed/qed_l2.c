@@ -2305,7 +2305,7 @@ static int qed_start_vport(struct qed_dev *cdev,
 	int rc, i;
 
 	for_each_hwfn(cdev, i) {
-		struct qed_sp_vport_start_params start = { 0 };
+		struct qed_sp_vport_start_params start = { };
 		struct qed_hwfn *p_hwfn = &cdev->hwfns[i];
 
 		start.tpa_mode = params->gro_enable ? QED_TPA_MODE_GRO :

@@ -773,7 +773,7 @@ u16 qedf_get_sqe_idx(struct qedf_rport *fcport)
 
 void qedf_ring_doorbell(struct qedf_rport *fcport)
 {
-	struct fcoe_db_data dbell = { 0 };
+	struct fcoe_db_data dbell = { };
 
 	dbell.agg_flags = 0;
 

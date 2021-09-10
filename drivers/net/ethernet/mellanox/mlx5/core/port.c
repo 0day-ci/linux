@@ -392,7 +392,7 @@ static int mlx5_query_mcia(struct mlx5_core_dev *dev,
 int mlx5_query_module_eeprom(struct mlx5_core_dev *dev,
 			     u16 offset, u16 size, u8 *data)
 {
-	struct mlx5_module_eeprom_query_params query = {0};
+	struct mlx5_module_eeprom_query_params query = {};
 	u8 module_id;
 	int err;
 

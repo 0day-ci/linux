@@ -80,7 +80,7 @@ DEFINE_MUTEX(arm_smmu_asid_lock);
  * Special value used by SVA when a process dies, to quiesce a CD without
  * disabling it.
  */
-struct arm_smmu_ctx_desc quiet_cd = { 0 };
+struct arm_smmu_ctx_desc quiet_cd = { };
 
 static struct arm_smmu_option_prop arm_smmu_options[] = {
 	{ ARM_SMMU_OPT_SKIP_PREFETCH, "hisilicon,broken-prefetch-cmd" },
@@ -903,7 +903,7 @@ static int arm_smmu_page_response(struct device *dev,
 				  struct iommu_fault_event *unused,
 				  struct iommu_page_response *resp)
 {
-	struct arm_smmu_cmdq_ent cmd = {0};
+	struct arm_smmu_cmdq_ent cmd = {};
 	struct arm_smmu_master *master = dev_iommu_priv_get(dev);
 	int sid = master->streams[0].id;
 

@@ -2756,7 +2756,7 @@ void ufshpb_init_hpb_lu(struct ufs_hba *hba, struct scsi_device *sdev)
 {
 	struct ufshpb_lu *hpb;
 	int ret;
-	struct ufshpb_lu_info hpb_lu_info = { 0 };
+	struct ufshpb_lu_info hpb_lu_info = { };
 	int lun = sdev->lun;
 
 	if (lun >= hba->dev_info.max_lu_supported)

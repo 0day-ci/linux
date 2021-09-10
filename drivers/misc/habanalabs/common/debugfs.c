@@ -397,7 +397,7 @@ static int mmu_show(struct seq_file *s, void *data)
 	struct hl_dbg_device_entry *dev_entry = entry->dev_entry;
 	struct hl_device *hdev = dev_entry->hdev;
 	struct hl_ctx *ctx;
-	struct hl_mmu_hop_info hops_info = {0};
+	struct hl_mmu_hop_info hops_info = {};
 	u64 virt_addr = dev_entry->mmu_addr, phys_addr;
 	int i;
 

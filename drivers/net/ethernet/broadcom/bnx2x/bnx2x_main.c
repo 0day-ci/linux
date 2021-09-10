@@ -3065,7 +3065,7 @@ static void storm_memset_func_cfg(struct bnx2x *bp,
 void bnx2x_func_init(struct bnx2x *bp, struct bnx2x_func_init_params *p)
 {
 	if (CHIP_IS_E1x(bp)) {
-		struct tstorm_eth_function_common_config tcfg = {0};
+		struct tstorm_eth_function_common_config tcfg = {};
 
 		storm_memset_func_cfg(bp, &tcfg, p->func_id);
 	}
@@ -3289,7 +3289,7 @@ static void bnx2x_pf_tx_q_prep(struct bnx2x *bp,
 
 static void bnx2x_pf_init(struct bnx2x *bp)
 {
-	struct bnx2x_func_init_params func_init = {0};
+	struct bnx2x_func_init_params func_init = {};
 	struct event_ring_data eq_data = { {0} };
 
 	if (!CHIP_IS_E1x(bp)) {
@@ -14578,7 +14578,7 @@ static int bnx2x_cnic_ctl_send_bh(struct bnx2x *bp, struct cnic_ctl_info *ctl)
  */
 int bnx2x_cnic_notify(struct bnx2x *bp, int cmd)
 {
-	struct cnic_ctl_info ctl = {0};
+	struct cnic_ctl_info ctl = {};
 
 	ctl.cmd = cmd;
 
@@ -14587,7 +14587,7 @@ int bnx2x_cnic_notify(struct bnx2x *bp, int cmd)
 
 static void bnx2x_cnic_cfc_comp(struct bnx2x *bp, int cid, u8 err)
 {
-	struct cnic_ctl_info ctl = {0};
+	struct cnic_ctl_info ctl = {};
 
 	/* first we tell CNIC and only then we count this as a completion */
 	ctl.cmd = CNIC_CTL_COMPLETION_CMD;

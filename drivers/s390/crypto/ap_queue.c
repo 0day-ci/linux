@@ -30,7 +30,7 @@ static void __ap_flush_queue(struct ap_queue *aq);
 static int ap_queue_enable_irq(struct ap_queue *aq, void *ind)
 {
 	struct ap_queue_status status;
-	struct ap_qirq_ctrl qirqctrl = { 0 };
+	struct ap_qirq_ctrl qirqctrl = { };
 
 	qirqctrl.ir = 1;
 	qirqctrl.isc = AP_ISC;

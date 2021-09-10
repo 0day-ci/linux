@@ -2866,7 +2866,7 @@ int ubifs_tnc_remove_ino(struct ubifs_info *c, ino_t inum)
 {
 	union ubifs_key key1, key2;
 	struct ubifs_dent_node *xent, *pxent = NULL;
-	struct fscrypt_name nm = {0};
+	struct fscrypt_name nm = {};
 
 	dbg_tnc("ino %lu", (unsigned long)inum);
 

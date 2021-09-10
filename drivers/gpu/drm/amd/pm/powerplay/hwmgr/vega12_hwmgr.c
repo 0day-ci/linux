@@ -1586,7 +1586,7 @@ static int vega12_notify_smc_display_config_after_ps_adjustment(
 {
 	struct vega12_hwmgr *data =
 			(struct vega12_hwmgr *)(hwmgr->backend);
-	struct PP_Clocks min_clocks = {0};
+	struct PP_Clocks min_clocks = {};
 	struct pp_display_clock_request clock_req;
 
 	if ((hwmgr->display_config->num_display > 1) &&

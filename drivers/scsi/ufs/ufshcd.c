@@ -3695,7 +3695,7 @@ static void ufshcd_host_memory_configure(struct ufs_hba *hba)
  */
 static int ufshcd_dme_link_startup(struct ufs_hba *hba)
 {
-	struct uic_command uic_cmd = {0};
+	struct uic_command uic_cmd = {};
 	int ret;
 
 	uic_cmd.command = UIC_CMD_DME_LINK_STARTUP;
@@ -3717,7 +3717,7 @@ static int ufshcd_dme_link_startup(struct ufs_hba *hba)
  */
 static int ufshcd_dme_reset(struct ufs_hba *hba)
 {
-	struct uic_command uic_cmd = {0};
+	struct uic_command uic_cmd = {};
 	int ret;
 
 	uic_cmd.command = UIC_CMD_DME_RESET;
@@ -3756,7 +3756,7 @@ EXPORT_SYMBOL_GPL(ufshcd_dme_configure_adapt);
  */
 static int ufshcd_dme_enable(struct ufs_hba *hba)
 {
-	struct uic_command uic_cmd = {0};
+	struct uic_command uic_cmd = {};
 	int ret;
 
 	uic_cmd.command = UIC_CMD_DME_ENABLE;
@@ -3813,7 +3813,7 @@ static inline void ufshcd_add_delay_before_dme_cmd(struct ufs_hba *hba)
 int ufshcd_dme_set_attr(struct ufs_hba *hba, u32 attr_sel,
 			u8 attr_set, u32 mib_val, u8 peer)
 {
-	struct uic_command uic_cmd = {0};
+	struct uic_command uic_cmd = {};
 	static const char *const action[] = {
 		"dme-set",
 		"dme-peer-set"
@@ -3857,7 +3857,7 @@ EXPORT_SYMBOL_GPL(ufshcd_dme_set_attr);
 int ufshcd_dme_get_attr(struct ufs_hba *hba, u32 attr_sel,
 			u32 *mib_val, u8 peer)
 {
-	struct uic_command uic_cmd = {0};
+	struct uic_command uic_cmd = {};
 	static const char *const action[] = {
 		"dme-get",
 		"dme-peer-get"
@@ -4061,7 +4061,7 @@ out_unlock:
  */
 static int ufshcd_uic_change_pwr_mode(struct ufs_hba *hba, u8 mode)
 {
-	struct uic_command uic_cmd = {0};
+	struct uic_command uic_cmd = {};
 	int ret;
 
 	if (hba->quirks & UFSHCD_QUIRK_BROKEN_PA_RXHSUNTERMCAP) {
@@ -4119,7 +4119,7 @@ EXPORT_SYMBOL_GPL(ufshcd_link_recovery);
 static int ufshcd_uic_hibern8_enter(struct ufs_hba *hba)
 {
 	int ret;
-	struct uic_command uic_cmd = {0};
+	struct uic_command uic_cmd = {};
 	ktime_t start = ktime_get();
 
 	ufshcd_vops_hibern8_notify(hba, UIC_CMD_DME_HIBER_ENTER, PRE_CHANGE);
@@ -4141,7 +4141,7 @@ static int ufshcd_uic_hibern8_enter(struct ufs_hba *hba)
 
 int ufshcd_uic_hibern8_exit(struct ufs_hba *hba)
 {
-	struct uic_command uic_cmd = {0};
+	struct uic_command uic_cmd = {};
 	int ret;
 	ktime_t start = ktime_get();
 
@@ -4379,7 +4379,7 @@ static int ufshcd_change_power_mode(struct ufs_hba *hba,
 int ufshcd_config_pwr_mode(struct ufs_hba *hba,
 		struct ufs_pa_layer_attr *desired_pwr_mode)
 {
-	struct ufs_pa_layer_attr final_params = { 0 };
+	struct ufs_pa_layer_attr final_params = { };
 	int ret;
 
 	ret = ufshcd_vops_pwr_change_notify(hba, PRE_CHANGE,

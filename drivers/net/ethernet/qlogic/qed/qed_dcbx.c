@@ -328,7 +328,7 @@ qed_dcbx_process_mib_info(struct qed_hwfn *p_hwfn, struct qed_ptt *p_ptt)
 {
 	struct dcbx_app_priority_feature *p_app;
 	struct dcbx_app_priority_entry *p_tbl;
-	struct qed_dcbx_results data = { 0 };
+	struct qed_dcbx_results data = { };
 	struct dcbx_ets_feature *p_ets;
 	struct qed_hw_info *p_info;
 	u32 pri_tc_tbl, flags;

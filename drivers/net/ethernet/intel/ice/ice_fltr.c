@@ -132,7 +132,7 @@ int
 ice_fltr_add_mac_to_list(struct ice_vsi *vsi, struct list_head *list,
 			 const u8 *mac, enum ice_sw_fwd_act_type action)
 {
-	struct ice_fltr_info info = { 0 };
+	struct ice_fltr_info info = { };
 
 	info.flag = ICE_FLTR_TX;
 	info.src_id = ICE_SRC_ID_VSI;
@@ -157,7 +157,7 @@ static int
 ice_fltr_add_vlan_to_list(struct ice_vsi *vsi, struct list_head *list,
 			  u16 vlan_id, enum ice_sw_fwd_act_type action)
 {
-	struct ice_fltr_info info = { 0 };
+	struct ice_fltr_info info = { };
 
 	info.flag = ICE_FLTR_TX;
 	info.src_id = ICE_SRC_ID_VSI;
@@ -183,7 +183,7 @@ ice_fltr_add_eth_to_list(struct ice_vsi *vsi, struct list_head *list,
 			 u16 ethertype, u16 flag,
 			 enum ice_sw_fwd_act_type action)
 {
-	struct ice_fltr_info info = { 0 };
+	struct ice_fltr_info info = { };
 
 	info.flag = flag;
 	info.lkup_type = ICE_SW_LKUP_ETHERTYPE;

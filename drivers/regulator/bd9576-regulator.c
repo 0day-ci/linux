@@ -900,7 +900,7 @@ static int bd957x_probe(struct platform_device *pdev)
 	bool vout_mode, ddr_sel, may_have_irqs = false;
 	struct regmap *regmap;
 	struct bd957x_data *ic_data;
-	struct regulator_config config = { 0 };
+	struct regulator_config config = { };
 	/* All regulators are related to UVD and thermal IRQs... */
 	struct regulator_dev *rdevs[BD9576_NUM_REGULATORS];
 	/* ...But VoutS1 is not flagged by OVD IRQ */

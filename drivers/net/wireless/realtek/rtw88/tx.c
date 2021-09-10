@@ -483,7 +483,7 @@ void rtw_tx(struct rtw_dev *rtwdev,
 	    struct ieee80211_tx_control *control,
 	    struct sk_buff *skb)
 {
-	struct rtw_tx_pkt_info pkt_info = {0};
+	struct rtw_tx_pkt_info pkt_info = {};
 	int ret;
 
 	rtw_tx_pkt_info_update(rtwdev, &pkt_info, control->sta, skb);
@@ -538,7 +538,7 @@ static int rtw_txq_push_skb(struct rtw_dev *rtwdev,
 			    struct sk_buff *skb)
 {
 	struct ieee80211_txq *txq = rtwtxq_to_txq(rtwtxq);
-	struct rtw_tx_pkt_info pkt_info = {0};
+	struct rtw_tx_pkt_info pkt_info = {};
 	int ret;
 
 	rtw_txq_check_agg(rtwdev, rtwtxq, skb);

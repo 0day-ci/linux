@@ -115,7 +115,7 @@ int ath11k_dbring_wmi_cfg_setup(struct ath11k *ar,
 				struct ath11k_dbring *ring,
 				enum wmi_direct_buffer_module id)
 {
-	struct ath11k_wmi_pdev_dma_ring_cfg_req_cmd param = {0};
+	struct ath11k_wmi_pdev_dma_ring_cfg_req_cmd param = {};
 	int ret;
 
 	if (id >= WMI_DIRECT_BUF_MAX)

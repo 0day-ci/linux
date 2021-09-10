@@ -237,7 +237,7 @@ void dcn31_smu_set_display_idle_optimization(struct clk_mgr_internal *clk_mgr, u
 
 void dcn31_smu_enable_phy_refclk_pwrdwn(struct clk_mgr_internal *clk_mgr, bool enable)
 {
-	union display_idle_optimization_u idle_info = { 0 };
+	union display_idle_optimization_u idle_info = { };
 
 	if (!clk_mgr->smu_present)
 		return;

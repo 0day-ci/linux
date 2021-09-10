@@ -192,7 +192,7 @@ static void *dpaa2_iova_to_virt(struct iommu_domain *domain,
 static int dpaa2_switch_add_vlan(struct ethsw_port_priv *port_priv, u16 vid)
 {
 	struct ethsw_core *ethsw = port_priv->ethsw_data;
-	struct dpsw_vlan_cfg vcfg = {0};
+	struct dpsw_vlan_cfg vcfg = {};
 	int err;
 
 	vcfg.fdb_id = dpaa2_switch_port_get_fdb_id(port_priv);
@@ -230,7 +230,7 @@ static int dpaa2_switch_port_set_pvid(struct ethsw_port_priv *port_priv, u16 pvi
 {
 	struct ethsw_core *ethsw = port_priv->ethsw_data;
 	struct net_device *netdev = port_priv->netdev;
-	struct dpsw_tci_cfg tci_cfg = { 0 };
+	struct dpsw_tci_cfg tci_cfg = { };
 	bool up;
 	int err, ret;
 
@@ -286,7 +286,7 @@ static int dpaa2_switch_port_add_vlan(struct ethsw_port_priv *port_priv,
 {
 	struct ethsw_core *ethsw = port_priv->ethsw_data;
 	struct net_device *netdev = port_priv->netdev;
-	struct dpsw_vlan_if_cfg vcfg = {0};
+	struct dpsw_vlan_if_cfg vcfg = {};
 	int err;
 
 	if (port_priv->vlans[vid]) {
@@ -350,7 +350,7 @@ static enum dpsw_stp_state br_stp_state_to_dpsw(u8 state)
 
 static int dpaa2_switch_port_set_stp_state(struct ethsw_port_priv *port_priv, u8 state)
 {
-	struct dpsw_stp_cfg stp_cfg = {0};
+	struct dpsw_stp_cfg stp_cfg = {};
 	int err;
 	u16 vid;
 
@@ -403,7 +403,7 @@ static int dpaa2_switch_dellink(struct ethsw_core *ethsw, u16 vid)
 static int dpaa2_switch_port_fdb_add_uc(struct ethsw_port_priv *port_priv,
 					const unsigned char *addr)
 {
-	struct dpsw_fdb_unicast_cfg entry = {0};
+	struct dpsw_fdb_unicast_cfg entry = {};
 	u16 fdb_id;
 	int err;
 
@@ -424,7 +424,7 @@ static int dpaa2_switch_port_fdb_add_uc(struct ethsw_port_priv *port_priv,
 static int dpaa2_switch_port_fdb_del_uc(struct ethsw_port_priv *port_priv,
 					const unsigned char *addr)
 {
-	struct dpsw_fdb_unicast_cfg entry = {0};
+	struct dpsw_fdb_unicast_cfg entry = {};
 	u16 fdb_id;
 	int err;
 
@@ -446,7 +446,7 @@ static int dpaa2_switch_port_fdb_del_uc(struct ethsw_port_priv *port_priv,
 static int dpaa2_switch_port_fdb_add_mc(struct ethsw_port_priv *port_priv,
 					const unsigned char *addr)
 {
-	struct dpsw_fdb_multicast_cfg entry = {0};
+	struct dpsw_fdb_multicast_cfg entry = {};
 	u16 fdb_id;
 	int err;
 
@@ -469,7 +469,7 @@ static int dpaa2_switch_port_fdb_add_mc(struct ethsw_port_priv *port_priv,
 static int dpaa2_switch_port_fdb_del_mc(struct ethsw_port_priv *port_priv,
 					const unsigned char *addr)
 {
-	struct dpsw_fdb_multicast_cfg entry = {0};
+	struct dpsw_fdb_multicast_cfg entry = {};
 	u16 fdb_id;
 	int err;
 
@@ -2618,7 +2618,7 @@ static void dpaa2_switch_drain_bp(struct ethsw_core *ethsw)
 
 static int dpaa2_switch_setup_dpbp(struct ethsw_core *ethsw)
 {
-	struct dpsw_ctrl_if_pools_cfg dpsw_ctrl_if_pools_cfg = { 0 };
+	struct dpsw_ctrl_if_pools_cfg dpsw_ctrl_if_pools_cfg = { };
 	struct device *dev = ethsw->dev;
 	struct fsl_mc_device *dpbp_dev;
 	struct dpbp_attr dpbp_attrs;
@@ -2941,8 +2941,8 @@ static int dpaa2_switch_init(struct fsl_mc_device *sw_dev)
 {
 	struct device *dev = &sw_dev->dev;
 	struct ethsw_core *ethsw = dev_get_drvdata(dev);
-	struct dpsw_vlan_if_cfg vcfg = {0};
-	struct dpsw_tci_cfg tci_cfg = {0};
+	struct dpsw_vlan_if_cfg vcfg = {};
+	struct dpsw_tci_cfg tci_cfg = {};
 	struct dpsw_stp_cfg stp_cfg;
 	int err;
 	u16 i;
@@ -3077,7 +3077,7 @@ err_close:
 static int dpaa2_switch_port_trap_mac_addr(struct ethsw_port_priv *port_priv,
 					   const char *mac)
 {
-	struct dpaa2_switch_acl_entry acl_entry = {0};
+	struct dpaa2_switch_acl_entry acl_entry = {};
 
 	/* Match on the destination MAC address */
 	ether_addr_copy(acl_entry.key.match.l2_dest_mac, mac);
@@ -3101,7 +3101,7 @@ static int dpaa2_switch_port_init(struct ethsw_port_priv *port_priv, u16 port)
 	struct net_device *netdev = port_priv->netdev;
 	struct ethsw_core *ethsw = port_priv->ethsw_data;
 	struct dpaa2_switch_filter_block *filter_block;
-	struct dpsw_fdb_cfg fdb_cfg = {0};
+	struct dpsw_fdb_cfg fdb_cfg = {};
 	struct dpsw_if_attr dpsw_if_attr;
 	struct dpaa2_switch_fdb *fdb;
 	struct dpsw_acl_cfg acl_cfg;

@@ -217,7 +217,7 @@ static int tegra_fbdev_probe(struct drm_fb_helper *helper,
 	struct tegra_fbdev *fbdev = to_tegra_fbdev(helper);
 	struct tegra_drm *tegra = helper->dev->dev_private;
 	struct drm_device *drm = helper->dev;
-	struct drm_mode_fb_cmd2 cmd = { 0 };
+	struct drm_mode_fb_cmd2 cmd = { };
 	unsigned int bytes_per_pixel;
 	struct drm_framebuffer *fb;
 	unsigned long offset;

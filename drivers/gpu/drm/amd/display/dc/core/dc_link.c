@@ -821,8 +821,8 @@ static bool wait_for_entering_dp_alt_mode(struct dc_link *link)
 static bool dc_link_detect_helper(struct dc_link *link,
 				  enum dc_detect_reason reason)
 {
-	struct dc_sink_init_data sink_init_data = { 0 };
-	struct display_sink_capability sink_caps = { 0 };
+	struct dc_sink_init_data sink_init_data = { };
+	struct display_sink_capability sink_caps = { };
 	uint32_t i;
 	bool converter_disable_audio = false;
 	struct audio_support *aud_support = &link->dc->res_pool->audio_support;
@@ -1384,12 +1384,12 @@ static bool dc_link_construct(struct dc_link *link,
 	uint8_t i;
 	struct ddc_service_init_data ddc_service_init_data = { { 0 } };
 	struct dc_context *dc_ctx = init_params->ctx;
-	struct encoder_init_data enc_init_data = { 0 };
-	struct panel_cntl_init_data panel_cntl_init_data = { 0 };
+	struct encoder_init_data enc_init_data = { };
+	struct panel_cntl_init_data panel_cntl_init_data = { };
 	struct integrated_info *info;
 	struct dc_bios *bios = init_params->dc->ctx->dc_bios;
 	const struct dc_vbios_funcs *bp_funcs = bios->funcs;
-	struct bp_disp_connector_caps_info disp_connect_caps_info = { 0 };
+	struct bp_disp_connector_caps_info disp_connect_caps_info = { };
 
 	DC_LOGGER_INIT(dc_ctx->logger);
 
@@ -1721,7 +1721,7 @@ static enum dc_status enable_link_dp(struct dc_state *state,
 	enum dc_status status;
 	bool skip_video_pattern;
 	struct dc_link *link = stream->link;
-	struct dc_link_settings link_settings = {0};
+	struct dc_link_settings link_settings = {};
 	bool fec_enable;
 	int i;
 	bool apply_seamless_boot_optimization = false;
@@ -1932,8 +1932,8 @@ static bool get_ext_hdmi_settings(struct pipe_ctx *pipe_ctx,
 static bool i2c_write(struct pipe_ctx *pipe_ctx,
 		uint8_t address, uint8_t *buffer, uint32_t length)
 {
-	struct i2c_command cmd = {0};
-	struct i2c_payload payload = {0};
+	struct i2c_command cmd = {};
+	struct i2c_payload payload = {};
 
 	memset(&payload, 0, sizeof(payload));
 	memset(&cmd, 0, sizeof(cmd));
@@ -2314,7 +2314,7 @@ static void enable_link_hdmi(struct pipe_ctx *pipe_ctx)
 	struct dc_link *link = stream->link;
 	enum dc_color_depth display_color_depth;
 	enum engine_id eng_id;
-	struct ext_hdmi_settings settings = {0};
+	struct ext_hdmi_settings settings = {};
 	bool is_over_340mhz = false;
 	bool is_vga_mode = (stream->timing.h_addressable == 640)
 			&& (stream->timing.v_addressable == 480);
@@ -3026,7 +3026,7 @@ enum dc_status dc_link_allocate_mst_payload(struct pipe_ctx *pipe_ctx)
 	struct dc_link *link = stream->link;
 	struct link_encoder *link_encoder = link->link_enc;
 	struct stream_encoder *stream_encoder = pipe_ctx->stream_res.stream_enc;
-	struct dp_mst_stream_allocation_table proposed_table = {0};
+	struct dp_mst_stream_allocation_table proposed_table = {};
 	struct fixed31_32 avg_time_slots_per_mtp;
 	struct fixed31_32 pbn;
 	struct fixed31_32 pbn_per_slot;
@@ -3113,7 +3113,7 @@ static enum dc_status deallocate_mst_payload(struct pipe_ctx *pipe_ctx)
 	struct dc_link *link = stream->link;
 	struct link_encoder *link_encoder = link->link_enc;
 	struct stream_encoder *stream_encoder = pipe_ctx->stream_res.stream_enc;
-	struct dp_mst_stream_allocation_table proposed_table = {0};
+	struct dp_mst_stream_allocation_table proposed_table = {};
 	struct fixed31_32 avg_time_slots_per_mtp = dc_fixpt_from_int(0);
 	uint8_t i;
 	bool mst_mode = (link->type == dc_connection_mst_branch);
@@ -3191,7 +3191,7 @@ static void update_psp_stream_config(struct pipe_ctx *pipe_ctx, bool dpms_off)
 {
 	struct cp_psp *cp_psp = &pipe_ctx->stream->ctx->cp_psp;
 	if (cp_psp && cp_psp->funcs.update_stream_config) {
-		struct cp_psp_stream_config config = {0};
+		struct cp_psp_stream_config config = {};
 		enum dp_panel_mode panel_mode =
 				dp_get_panel_mode(pipe_ctx->stream->link);
 
@@ -3428,7 +3428,7 @@ void core_link_disable_stream(struct pipe_ctx *pipe_ctx)
 		deallocate_mst_payload(pipe_ctx);
 
 	if (dc_is_hdmi_signal(pipe_ctx->stream->signal)) {
-		struct ext_hdmi_settings settings = {0};
+		struct ext_hdmi_settings settings = {};
 		enum engine_id eng_id = pipe_ctx->stream_res.stream_enc->id;
 
 		unsigned short masked_chip_caps = link->chip_caps &

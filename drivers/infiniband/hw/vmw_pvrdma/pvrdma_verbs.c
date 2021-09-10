@@ -433,7 +433,7 @@ int pvrdma_alloc_pd(struct ib_pd *ibpd, struct ib_udata *udata)
 	union pvrdma_cmd_resp rsp = {};
 	struct pvrdma_cmd_create_pd *cmd = &req.create_pd;
 	struct pvrdma_cmd_create_pd_resp *resp = &rsp.create_pd_resp;
-	struct pvrdma_alloc_pd_resp pd_resp = {0};
+	struct pvrdma_alloc_pd_resp pd_resp = {};
 	int ret;
 	struct pvrdma_ucontext *context = rdma_udata_to_drv_context(
 		udata, struct pvrdma_ucontext, ibucontext);

@@ -181,7 +181,7 @@ static int dsa_port_inherit_brport_flags(struct dsa_port *dp,
 	int flag, err;
 
 	for_each_set_bit(flag, &mask, 32) {
-		struct switchdev_brport_flags flags = {0};
+		struct switchdev_brport_flags flags = {};
 
 		flags.mask = BIT(flag);
 
@@ -204,7 +204,7 @@ static void dsa_port_clear_brport_flags(struct dsa_port *dp)
 	int flag, err;
 
 	for_each_set_bit(flag, &mask, 32) {
-		struct switchdev_brport_flags flags = {0};
+		struct switchdev_brport_flags flags = {};
 
 		flags.mask = BIT(flag);
 		flags.val = val & BIT(flag);

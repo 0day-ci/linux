@@ -141,7 +141,7 @@ static int dpaa2_eth_set_pauseparam(struct net_device *net_dev,
 				    struct ethtool_pauseparam *pause)
 {
 	struct dpaa2_eth_priv *priv = netdev_priv(net_dev);
-	struct dpni_link_cfg cfg = {0};
+	struct dpni_link_cfg cfg = {};
 	int err;
 
 	if (!dpaa2_eth_has_pause_support(priv)) {
@@ -543,8 +543,8 @@ static int dpaa2_eth_do_cls_rule(struct net_device *net_dev,
 {
 	struct dpaa2_eth_priv *priv = netdev_priv(net_dev);
 	struct device *dev = net_dev->dev.parent;
-	struct dpni_rule_cfg rule_cfg = { 0 };
-	struct dpni_fs_action_cfg fs_act = { 0 };
+	struct dpni_rule_cfg rule_cfg = { };
+	struct dpni_fs_action_cfg fs_act = { };
 	dma_addr_t key_iova;
 	u64 fields = 0;
 	void *key_buf;

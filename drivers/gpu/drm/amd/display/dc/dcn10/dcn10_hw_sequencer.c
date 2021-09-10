@@ -292,7 +292,7 @@ void dcn10_log_hw_state(struct dc *dc,
 			"C31 C32   C33 C34\n");
 	for (i = 0; i < pool->pipe_count; i++) {
 		struct dpp *dpp = pool->dpps[i];
-		struct dcn_dpp_state s = {0};
+		struct dcn_dpp_state s = {};
 
 		dpp->funcs->dpp_read_state(dpp, &s);
 
@@ -333,7 +333,7 @@ void dcn10_log_hw_state(struct dc *dc,
 
 	DTN_INFO("MPCC:  OPP  DPP  MPCCBOT  MODE  ALPHA_MODE  PREMULT  OVERLAP_ONLY  IDLE\n");
 	for (i = 0; i < pool->pipe_count; i++) {
-		struct mpcc_state s = {0};
+		struct mpcc_state s = {};
 
 		pool->mpc->funcs->read_mpcc_state(pool->mpc, i, &s);
 		if (s.opp_id != 0xf)
@@ -348,7 +348,7 @@ void dcn10_log_hw_state(struct dc *dc,
 
 	for (i = 0; i < pool->timing_generator_count; i++) {
 		struct timing_generator *tg = pool->timing_generators[i];
-		struct dcn_otg_state s = {0};
+		struct dcn_otg_state s = {};
 		/* Read shared OTG state registers for all DCNx */
 		optc1_read_otg_state(DCN10TG_FROM_TG(tg), &s);
 
@@ -402,7 +402,7 @@ void dcn10_log_hw_state(struct dc *dc,
 	DTN_INFO("DSC: CLOCK_EN  SLICE_WIDTH  Bytes_pp\n");
 	for (i = 0; i < pool->res_cap->num_dsc; i++) {
 		struct display_stream_compressor *dsc = pool->dscs[i];
-		struct dcn_dsc_state s = {0};
+		struct dcn_dsc_state s = {};
 
 		dsc->funcs->dsc_read_state(dsc, &s);
 		DTN_INFO("[%d]: %-9d %-12d %-10d\n",
@@ -418,7 +418,7 @@ void dcn10_log_hw_state(struct dc *dc,
 			"  VBID6_LINE_REFERENCE  VBID6_LINE_NUM  SEC_GSP7_ENABLE  SEC_STREAM_ENABLE\n");
 	for (i = 0; i < pool->stream_enc_count; i++) {
 		struct stream_encoder *enc = pool->stream_enc[i];
-		struct enc_state s = {0};
+		struct enc_state s = {};
 
 		if (enc->funcs->enc_read_state) {
 			enc->funcs->enc_read_state(enc, &s);
@@ -439,7 +439,7 @@ void dcn10_log_hw_state(struct dc *dc,
 	for (i = 0; i < dc->link_count; i++) {
 		struct link_encoder *lenc = dc->links[i]->link_enc;
 
-		struct link_enc_state s = {0};
+		struct link_enc_state s = {};
 
 		if (lenc->funcs->read_state) {
 			lenc->funcs->read_state(lenc, &s);
@@ -811,7 +811,7 @@ enum dc_status dcn10_enable_stream_timing(
 {
 	struct dc_stream_state *stream = pipe_ctx->stream;
 	enum dc_color_space color_space;
-	struct tg_color black_color = {0};
+	struct tg_color black_color = {};
 
 	/* by upper caller loop, pipe0 is parent pipe and be called first.
 	 * back end is set up by for pipe0. Other children pipe share back end
@@ -1847,8 +1847,8 @@ void dcn10_cursor_lock(struct dc *dc, struct pipe_ctx *pipe, bool lock)
 		delay_cursor_until_vupdate(dc, pipe);
 
 	if (pipe->stream && should_use_dmub_lock(pipe->stream->link)) {
-		union dmub_hw_lock_flags hw_locks = { 0 };
-		struct dmub_hw_lock_inst_flags inst_flags = { 0 };
+		union dmub_hw_lock_flags hw_locks = { };
+		struct dmub_hw_lock_inst_flags inst_flags = { };
 
 		hw_locks.bits.lock_cursor = 1;
 		inst_flags.opp_inst = pipe->stream_res.opp->inst;
@@ -1986,7 +1986,7 @@ int dcn10_align_pixel_clocks(
 {
 	struct dc_context *dc_ctx = dc->ctx;
 	int i, master = -1, embedded = -1;
-	struct dc_crtc_timing hw_crtc_timing[MAX_PIPES] = {0};
+	struct dc_crtc_timing hw_crtc_timing[MAX_PIPES] = {};
 	uint64_t phase[MAX_PIPES];
 	uint64_t modulo[MAX_PIPES];
 	unsigned int pclk;
@@ -2411,7 +2411,7 @@ void dcn10_program_output_csc(struct dc *dc,
 
 static void dcn10_update_dpp(struct dpp *dpp, struct dc_plane_state *plane_state)
 {
-	struct dc_bias_and_scale bns_params = {0};
+	struct dc_bias_and_scale bns_params = {};
 
 	// program the input csc
 	dpp->funcs->dpp_setup(dpp,
@@ -2699,7 +2699,7 @@ void dcn10_blank_pixel_data(
 		bool blank)
 {
 	enum dc_color_space color_space;
-	struct tg_color black_color = {0};
+	struct tg_color black_color = {};
 	struct stream_resource *stream_res = &pipe_ctx->stream_res;
 	struct dc_stream_state *stream = pipe_ctx->stream;
 
@@ -2957,7 +2957,7 @@ void dcn10_set_drr(struct pipe_ctx **pipe_ctx,
 		int num_pipes, struct dc_crtc_timing_adjust adjust)
 {
 	int i = 0;
-	struct drr_params params = {0};
+	struct drr_params params = {};
 	// DRR set trigger event mapped to OTG_TRIG_A (bit 11) for manual control flow
 	unsigned int event_triggers = 0x800;
 	// Note DRR trigger events are generated regardless of whether num frames met.
@@ -3051,7 +3051,7 @@ static void dcn10_config_stereo_parameters(
 
 void dcn10_setup_stereo(struct pipe_ctx *pipe_ctx, struct dc *dc)
 {
-	struct crtc_stereo_flags flags = { 0 };
+	struct crtc_stereo_flags flags = { };
 	struct dc_stream_state *stream = pipe_ctx->stream;
 
 	dcn10_config_stereo_parameters(stream, &flags);
@@ -3430,7 +3430,7 @@ void dcn10_set_cursor_sdr_white_level(struct pipe_ctx *pipe_ctx)
 {
 	uint32_t sdr_white_level = pipe_ctx->stream->cursor_attributes.sdr_white_level;
 	struct fixed31_32 multiplier;
-	struct dpp_cursor_attributes opt_attr = { 0 };
+	struct dpp_cursor_attributes opt_attr = { };
 	uint32_t hw_scale = 0x3c00; // 1.0 default multiplier
 	struct custom_float_format fmt;
 
@@ -3638,7 +3638,7 @@ enum dc_status dcn10_set_clock(struct dc *dc,
 			uint32_t stepping)
 {
 	struct dc_state *context = dc->current_state;
-	struct dc_clock_config clock_cfg = {0};
+	struct dc_clock_config clock_cfg = {};
 	struct dc_clocks *current_clocks = &context->bw_ctx.bw.dcn.clk;
 
 	if (!dc->clk_mgr || !dc->clk_mgr->funcs->get_clock)

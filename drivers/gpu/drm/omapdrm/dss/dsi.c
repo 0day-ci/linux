@@ -3631,7 +3631,7 @@ static void print_dispc_vm(const char *str, const struct videomode *vm)
 static void print_dsi_dispc_vm(const char *str,
 		const struct omap_dss_dsi_videomode_timings *t)
 {
-	struct videomode vm = { 0 };
+	struct videomode vm = { };
 	unsigned long byteclk = t->hsclk / 4;
 	unsigned long pck;
 	u64 dsi_tput;

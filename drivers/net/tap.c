@@ -626,7 +626,7 @@ static ssize_t tap_get_user(struct tap_queue *q, void *msg_control,
 	unsigned long total_len = iov_iter_count(from);
 	unsigned long len = total_len;
 	int err;
-	struct virtio_net_hdr vnet_hdr = { 0 };
+	struct virtio_net_hdr vnet_hdr = { };
 	int vnet_hdr_len = 0;
 	int copylen = 0;
 	int depth;

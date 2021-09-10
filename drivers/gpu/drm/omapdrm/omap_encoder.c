@@ -78,7 +78,7 @@ static void omap_encoder_mode_set(struct drm_encoder *encoder,
 	struct drm_device *dev = encoder->dev;
 	struct drm_connector *connector;
 	struct drm_bridge *bridge;
-	struct videomode vm = { 0 };
+	struct videomode vm = { };
 	u32 bus_flags;
 
 	list_for_each_entry(connector, &dev->mode_config.connector_list, head) {

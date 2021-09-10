@@ -84,7 +84,7 @@ static const char *const rds_ib_stat_names[] = {
 unsigned int rds_ib_stats_info_copy(struct rds_info_iterator *iter,
 				    unsigned int avail)
 {
-	struct rds_ib_statistics stats = {0, };
+	struct rds_ib_statistics stats = {};
 	uint64_t *src;
 	uint64_t *sum;
 	size_t i;

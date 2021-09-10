@@ -9924,7 +9924,7 @@ struct perf_buffer *perf_buffer__new(int map_fd, size_t page_cnt,
 				     const struct perf_buffer_opts *opts)
 {
 	struct perf_buffer_params p = {};
-	struct perf_event_attr attr = { 0, };
+	struct perf_event_attr attr = { };
 
 	attr.config = PERF_COUNT_SW_BPF_OUTPUT;
 	attr.type = PERF_TYPE_SOFTWARE;

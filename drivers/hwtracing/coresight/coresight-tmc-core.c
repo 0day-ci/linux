@@ -441,7 +441,7 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
 	struct coresight_platform_data *pdata = NULL;
 	struct tmc_drvdata *drvdata;
 	struct resource *res = &adev->res;
-	struct coresight_desc desc = { 0 };
+	struct coresight_desc desc = { };
 	struct coresight_dev_list *dev_list = NULL;
 
 	ret = -ENOMEM;

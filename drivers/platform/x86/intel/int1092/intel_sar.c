@@ -89,7 +89,7 @@ static acpi_status parse_package(struct wwan_sar_context *context, union acpi_ob
 		return AE_ERROR;
 
 	for (itr = 0; itr < data->total_dev_mode; itr++) {
-		struct wwan_device_mode_info temp = { 0 };
+		struct wwan_device_mode_info temp = { };
 
 		num = &item->package.elements[itr + 1];
 		if (num->type != ACPI_TYPE_PACKAGE || num->package.count < TOTAL_DATA)

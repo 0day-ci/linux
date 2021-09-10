@@ -5136,7 +5136,7 @@ static void kv_restore_regs_for_reset(struct radeon_device *rdev,
 static void cik_gpu_pci_config_reset(struct radeon_device *rdev)
 {
 	struct evergreen_mc_save save;
-	struct kv_reset_save_regs kv_save = { 0 };
+	struct kv_reset_save_regs kv_save = { };
 	u32 tmp, i;
 
 	dev_info(rdev->dev, "GPU pci config reset\n");

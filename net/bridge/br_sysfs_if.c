@@ -59,7 +59,7 @@ static BRPORT_ATTR(_name, 0644,					\
 static int store_flag(struct net_bridge_port *p, unsigned long v,
 		      unsigned long mask)
 {
-	struct netlink_ext_ack extack = {0};
+	struct netlink_ext_ack extack = {};
 	unsigned long flags = p->flags;
 	int err;
 

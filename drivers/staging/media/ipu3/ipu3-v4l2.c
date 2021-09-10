@@ -1113,8 +1113,8 @@ static int imgu_v4l2_node_setup(struct imgu_device *imgu, unsigned int pipe,
 {
 	int r;
 	u32 flags;
-	struct v4l2_mbus_framefmt def_bus_fmt = { 0 };
-	struct v4l2_pix_format_mplane def_pix_fmt = { 0 };
+	struct v4l2_mbus_framefmt def_bus_fmt = { };
+	struct v4l2_pix_format_mplane def_pix_fmt = { };
 	struct device *dev = &imgu->pci_dev->dev;
 	struct imgu_media_pipe *imgu_pipe = &imgu->imgu_pipe[pipe];
 	struct v4l2_subdev *sd = &imgu_pipe->imgu_sd.subdev;

@@ -72,7 +72,7 @@ static inline uint32_t get_reg_field_value_ex(uint32_t reg_value, uint32_t mask,
 void dmub_reg_update(struct dmub_srv *srv, uint32_t addr, int n, uint8_t shift1,
 		     uint32_t mask1, uint32_t field_value1, ...)
 {
-	struct dmub_reg_value_masks field_value_mask = { 0 };
+	struct dmub_reg_value_masks field_value_mask = { };
 	uint32_t reg_val;
 	va_list ap;
 
@@ -89,7 +89,7 @@ void dmub_reg_update(struct dmub_srv *srv, uint32_t addr, int n, uint8_t shift1,
 void dmub_reg_set(struct dmub_srv *srv, uint32_t addr, uint32_t reg_val, int n,
 		  uint8_t shift1, uint32_t mask1, uint32_t field_value1, ...)
 {
-	struct dmub_reg_value_masks field_value_mask = { 0 };
+	struct dmub_reg_value_masks field_value_mask = { };
 	va_list ap;
 
 	va_start(ap, field_value1);

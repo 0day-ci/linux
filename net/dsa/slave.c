@@ -1362,7 +1362,7 @@ static int dsa_slave_vlan_rx_add_vid(struct net_device *dev, __be16 proto,
 		/* This API only allows programming tagged, non-PVID VIDs */
 		.flags = 0,
 	};
-	struct netlink_ext_ack extack = {0};
+	struct netlink_ext_ack extack = {};
 	int ret;
 
 	/* User port... */

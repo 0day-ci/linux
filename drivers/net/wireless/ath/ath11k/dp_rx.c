@@ -695,7 +695,7 @@ static void ath11k_dp_reo_cmd_free(struct ath11k_dp *dp, void *ctx,
 static void ath11k_dp_reo_cache_flush(struct ath11k_base *ab,
 				      struct dp_rx_tid *rx_tid)
 {
-	struct ath11k_hal_reo_cmd cmd = {0};
+	struct ath11k_hal_reo_cmd cmd = {};
 	unsigned long tot_desc_sz, desc_sz;
 	int ret;
 
@@ -785,7 +785,7 @@ free_desc:
 void ath11k_peer_rx_tid_delete(struct ath11k *ar,
 			       struct ath11k_peer *peer, u8 tid)
 {
-	struct ath11k_hal_reo_cmd cmd = {0};
+	struct ath11k_hal_reo_cmd cmd = {};
 	struct dp_rx_tid *rx_tid = &peer->rx_tid[tid];
 	int ret;
 
@@ -905,7 +905,7 @@ static int ath11k_peer_rx_tid_reo_update(struct ath11k *ar,
 					 u32 ba_win_sz, u16 ssn,
 					 bool update_ssn)
 {
-	struct ath11k_hal_reo_cmd cmd = {0};
+	struct ath11k_hal_reo_cmd cmd = {};
 	int ret;
 
 	cmd.addr_lo = lower_32_bits(rx_tid->paddr);
@@ -1129,7 +1129,7 @@ int ath11k_dp_peer_rx_pn_replay_config(struct ath11k_vif *arvif,
 {
 	struct ath11k *ar = arvif->ar;
 	struct ath11k_base *ab = ar->ab;
-	struct ath11k_hal_reo_cmd cmd = {0};
+	struct ath11k_hal_reo_cmd cmd = {};
 	struct ath11k_peer *peer;
 	struct dp_rx_tid *rx_tid;
 	u8 tid;
@@ -2438,7 +2438,7 @@ static int ath11k_dp_rx_process_msdu(struct ath11k *ar,
 	struct ath11k_base *ab = ar->ab;
 	struct hal_rx_desc *rx_desc, *lrx_desc;
 	struct rx_attention *rx_attention;
-	struct ieee80211_rx_status rx_status = {0};
+	struct ieee80211_rx_status rx_status = {};
 	struct ieee80211_rx_status *status;
 	struct ath11k_skb_rxcb *rxcb;
 	struct ieee80211_hdr *hdr;
@@ -3940,7 +3940,7 @@ static void ath11k_dp_rx_wbm_err(struct ath11k *ar,
 				 struct sk_buff_head *msdu_list)
 {
 	struct ath11k_skb_rxcb *rxcb = ATH11K_SKB_RXCB(msdu);
-	struct ieee80211_rx_status rxs = {0};
+	struct ieee80211_rx_status rxs = {};
 	struct ieee80211_rx_status *status;
 	bool drop = true;
 

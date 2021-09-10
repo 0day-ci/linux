@@ -1370,7 +1370,7 @@ static netdev_tx_t be_xmit(struct sk_buff *skb, struct net_device *netdev)
 	struct be_adapter *adapter = netdev_priv(netdev);
 	u16 q_idx = skb_get_queue_mapping(skb);
 	struct be_tx_obj *txo = &adapter->tx_obj[q_idx];
-	struct be_wrb_params wrb_params = { 0 };
+	struct be_wrb_params wrb_params = { };
 	bool flush = !netdev_xmit_more();
 	u16 wrb_cnt;
 
@@ -4042,7 +4042,7 @@ static void be_calculate_vf_res(struct be_adapter *adapter, u16 num_vfs,
 {
 	struct be_resources res = adapter->pool_res;
 	u32 vf_if_cap_flags = res.vf_if_cap_flags;
-	struct be_resources res_mod = {0};
+	struct be_resources res_mod = {};
 	u16 num_vf_qs = 1;
 
 	/* Distribute the queue resources among the PF and it's VFs */
@@ -4130,7 +4130,7 @@ static void be_if_destroy(struct be_adapter *adapter)
 static int be_clear(struct be_adapter *adapter)
 {
 	struct pci_dev *pdev = adapter->pdev;
-	struct  be_resources vft_res = {0};
+	struct  be_resources vft_res = {};
 
 	be_cancel_worker(adapter);
 
@@ -4165,7 +4165,7 @@ static int be_clear(struct be_adapter *adapter)
 
 static int be_vfs_if_create(struct be_adapter *adapter)
 {
-	struct be_resources res = {0};
+	struct be_resources res = {};
 	u32 cap_flags, en_flags, vf;
 	struct be_vf_cfg *vf_cfg;
 	int status;
@@ -4365,7 +4365,7 @@ static void BEx_get_resources(struct be_adapter *adapter,
 	     !(adapter->function_caps & BE_FUNCTION_CAPS_RSS))) {
 		res->max_tx_qs = 1;
 	} else if (adapter->function_caps & BE_FUNCTION_CAPS_SUPER_NIC) {
-		struct be_resources super_nic_res = {0};
+		struct be_resources super_nic_res = {};
 
 		/* On a SuperNIC profile, the driver needs to use the
 		 * GET_PROFILE_CONFIG cmd to query the per-function TXQ limits
@@ -4420,7 +4420,7 @@ static void be_setup_init(struct be_adapter *adapter)
  */
 static void be_calculate_pf_pool_rss_tables(struct be_adapter *adapter)
 {
-	struct be_port_resources port_res = {0};
+	struct be_port_resources port_res = {};
 	u8 rss_tables_on_port;
 	u16 max_vfs = be_max_vfs(adapter);
 
@@ -4438,7 +4438,7 @@ static void be_calculate_pf_pool_rss_tables(struct be_adapter *adapter)
 
 static int be_get_sriov_config(struct be_adapter *adapter)
 {
-	struct be_resources res = {0};
+	struct be_resources res = {};
 	int max_vfs, old_vfs;
 
 	be_cmd_get_profile_config(adapter, &res, NULL, ACTIVE_PROFILE_TYPE,
@@ -4478,7 +4478,7 @@ static int be_get_sriov_config(struct be_adapter *adapter)
 static void be_alloc_sriov_res(struct be_adapter *adapter)
 {
 	int old_vfs = pci_num_vf(adapter->pdev);
-	struct  be_resources vft_res = {0};
+	struct  be_resources vft_res = {};
 	int status;
 
 	be_get_sriov_config(adapter);
@@ -4504,7 +4504,7 @@ static void be_alloc_sriov_res(struct be_adapter *adapter)
 static int be_get_resources(struct be_adapter *adapter)
 {
 	struct device *dev = &adapter->pdev->dev;
-	struct be_resources res = {0};
+	struct be_resources res = {};
 	int status;
 
 	/* For Lancer, SH etc read per-function resource limits from FW.
@@ -6040,7 +6040,7 @@ err:
 static int be_pci_sriov_configure(struct pci_dev *pdev, int num_vfs)
 {
 	struct be_adapter *adapter = pci_get_drvdata(pdev);
-	struct be_resources vft_res = {0};
+	struct be_resources vft_res = {};
 	int status;
 
 	if (!num_vfs)

@@ -553,7 +553,7 @@ void dcn3_clk_mgr_construct(
 		clk_mgr->base.dentist_vco_freq_khz = 3650000;
 
 	} else {
-		struct clk_state_registers_and_bypass s = { 0 };
+		struct clk_state_registers_and_bypass s = { };
 
 		/* integer part is now VCO frequency in kHz */
 		clk_mgr->base.dentist_vco_freq_khz = dcn30_get_vco_frequency_from_reg(clk_mgr);

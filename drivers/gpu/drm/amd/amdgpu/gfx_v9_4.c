@@ -976,7 +976,7 @@ static int gfx_v9_4_ras_error_inject(struct amdgpu_device *adev,
 {
 	struct ras_inject_if *info = (struct ras_inject_if *)inject_if;
 	int ret;
-	struct ta_ras_trigger_error_input block_info = { 0 };
+	struct ta_ras_trigger_error_input block_info = { };
 
 	if (!amdgpu_ras_is_supported(adev, AMDGPU_RAS_BLOCK__GFX))
 		return -EINVAL;

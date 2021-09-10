@@ -1358,7 +1358,7 @@ static void __update_discard_tree_range(struct f2fs_sb_info *sbi,
 	struct discard_cmd_control *dcc = SM_I(sbi)->dcc_info;
 	struct discard_cmd *prev_dc = NULL, *next_dc = NULL;
 	struct discard_cmd *dc;
-	struct discard_info di = {0};
+	struct discard_info di = {};
 	struct rb_node **insert_p = NULL, *insert_parent = NULL;
 	struct request_queue *q = bdev_get_queue(bdev);
 	unsigned int max_discard_blocks =

@@ -593,7 +593,7 @@ vc4_rcl_render_config_surface_setup(struct vc4_exec_info *exec,
 
 int vc4_get_rcl(struct drm_device *dev, struct vc4_exec_info *exec)
 {
-	struct vc4_rcl_setup setup = {0};
+	struct vc4_rcl_setup setup = {};
 	struct drm_vc4_submit_cl *args = exec->args;
 	bool has_bin = args->bin_cl_size != 0;
 	int ret;

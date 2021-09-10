@@ -304,8 +304,8 @@ static void test_seqpacket_msg_bounds_server(const struct test_opts *opts)
 {
 	int fd;
 	char buf[16];
-	struct msghdr msg = {0};
-	struct iovec iov = {0};
+	struct msghdr msg = {};
+	struct iovec iov = {};
 
 	fd = vsock_seqpacket_accept(VMADDR_CID_ANY, 1234, NULL);
 	if (fd < 0) {
@@ -354,8 +354,8 @@ static void test_seqpacket_msg_trunc_server(const struct test_opts *opts)
 {
 	int fd;
 	char buf[MESSAGE_TRUNC_SZ / 2];
-	struct msghdr msg = {0};
-	struct iovec iov = {0};
+	struct msghdr msg = {};
+	struct iovec iov = {};
 
 	fd = vsock_seqpacket_accept(VMADDR_CID_ANY, 1234, NULL);
 	if (fd < 0) {

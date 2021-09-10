@@ -31,7 +31,7 @@ bool dce_i2c_submit_command(
 	struct i2c_command *cmd)
 {
 	struct dce_i2c_hw *dce_i2c_hw;
-	struct dce_i2c_sw dce_i2c_sw = {0};
+	struct dce_i2c_sw dce_i2c_sw = {};
 
 	if (!ddc) {
 		BREAK_TO_DEBUGGER();

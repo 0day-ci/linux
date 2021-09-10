@@ -7922,7 +7922,7 @@ static int adjust_reg_min_max_vals(struct bpf_verifier_env *env,
 	struct bpf_verifier_state *vstate = env->cur_state;
 	struct bpf_func_state *state = vstate->frame[vstate->curframe];
 	struct bpf_reg_state *regs = state->regs, *dst_reg, *src_reg;
-	struct bpf_reg_state *ptr_reg = NULL, off_reg = {0};
+	struct bpf_reg_state *ptr_reg = NULL, off_reg = {};
 	u8 opcode = BPF_OP(insn->code);
 	int err;
 

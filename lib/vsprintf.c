@@ -2728,7 +2728,7 @@ int vsnprintf(char *buf, size_t size, const char *fmt, va_list args)
 {
 	unsigned long long num;
 	char *str, *end;
-	struct printf_spec spec = {0};
+	struct printf_spec spec = {};
 
 	/* Reject out-of-range values early.  Large positive sizes are
 	   used for unknown buffer sizes. */
@@ -3029,7 +3029,7 @@ EXPORT_SYMBOL(sprintf);
  */
 int vbin_printf(u32 *bin_buf, size_t size, const char *fmt, va_list args)
 {
-	struct printf_spec spec = {0};
+	struct printf_spec spec = {};
 	char *str, *end;
 	int width;
 
@@ -3188,7 +3188,7 @@ EXPORT_SYMBOL_GPL(vbin_printf);
  */
 int bstr_printf(char *buf, size_t size, const char *fmt, const u32 *bin_buf)
 {
-	struct printf_spec spec = {0};
+	struct printf_spec spec = {};
 	char *str, *end;
 	const char *args = (const char *)bin_buf;
 

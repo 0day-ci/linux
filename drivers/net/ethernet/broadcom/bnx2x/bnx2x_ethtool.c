@@ -965,7 +965,7 @@ static void bnx2x_get_regs(struct net_device *dev,
 {
 	u32 *p = _p;
 	struct bnx2x *bp = netdev_priv(dev);
-	struct dump_header dump_hdr = {0};
+	struct dump_header dump_hdr = {};
 
 	regs->version = 2;
 	memset(p, 0, regs->len);
@@ -1060,7 +1060,7 @@ static int bnx2x_get_dump_data(struct net_device *dev,
 {
 	u32 *p = buffer;
 	struct bnx2x *bp = netdev_priv(dev);
-	struct dump_header dump_hdr = {0};
+	struct dump_header dump_hdr = {};
 
 	/* Disable parity attentions as long as following dump may
 	 * cause false alarms by reading never written registers. We

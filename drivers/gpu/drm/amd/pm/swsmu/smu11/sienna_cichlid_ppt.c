@@ -1565,7 +1565,7 @@ static int sienna_cichlid_set_power_profile_mode(struct smu_context *smu, long *
 
 static int sienna_cichlid_notify_smc_display_config(struct smu_context *smu)
 {
-	struct smu_clocks min_clocks = {0};
+	struct smu_clocks min_clocks = {};
 	struct pp_display_clock_request clock_req;
 	int ret = 0;
 

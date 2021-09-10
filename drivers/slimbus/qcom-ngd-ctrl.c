@@ -933,10 +933,10 @@ static int qcom_slim_ngd_enable_stream(struct slim_stream_runtime *rt)
 {
 	struct slim_device *sdev = rt->dev;
 	struct slim_controller *ctrl = sdev->ctrl;
-	struct slim_val_inf msg =  {0};
+	struct slim_val_inf msg =  {};
 	u8 wbuf[SLIM_MSGQ_BUF_LEN];
 	u8 rbuf[SLIM_MSGQ_BUF_LEN];
-	struct slim_msg_txn txn = {0,};
+	struct slim_msg_txn txn = {};
 	int i, ret;
 
 	txn.mt = SLIM_MSG_MT_DEST_REFERRED_USER;
@@ -1019,7 +1019,7 @@ static int qcom_slim_ngd_enable_stream(struct slim_stream_runtime *rt)
 static int qcom_slim_ngd_get_laddr(struct slim_controller *ctrl,
 				   struct slim_eaddr *ea, u8 *laddr)
 {
-	struct slim_val_inf msg =  {0};
+	struct slim_val_inf msg =  {};
 	u8 failed_ea[6] = {0, 0, 0, 0, 0, 0};
 	struct slim_msg_txn txn;
 	u8 wbuf[10] = {0};
@@ -1171,7 +1171,7 @@ static void qcom_slim_ngd_master_worker(struct work_struct *work)
 {
 	struct qcom_slim_ngd_ctrl *ctrl;
 	struct slim_msg_txn txn;
-	struct slim_val_inf msg = {0};
+	struct slim_val_inf msg = {};
 	int retries = 0;
 	u8 wbuf[8];
 	int ret = 0;

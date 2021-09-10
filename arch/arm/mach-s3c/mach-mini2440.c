@@ -704,7 +704,7 @@ static void __init mini2440_parse_features(
 
 static void __init mini2440_init(void)
 {
-	struct mini2440_features_t features = { 0 };
+	struct mini2440_features_t features = { };
 	int i;
 
 	pr_info("MINI2440: Option string mini2440=%s\n",

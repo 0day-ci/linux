@@ -723,7 +723,7 @@ EXPORT_SYMBOL_GPL(fscrypt_set_context);
 int fscrypt_set_test_dummy_encryption(struct super_block *sb, const char *arg,
 				      struct fscrypt_dummy_policy *dummy_policy)
 {
-	struct fscrypt_key_specifier key_spec = { 0 };
+	struct fscrypt_key_specifier key_spec = { };
 	int version;
 	union fscrypt_policy *policy = NULL;
 	int err;

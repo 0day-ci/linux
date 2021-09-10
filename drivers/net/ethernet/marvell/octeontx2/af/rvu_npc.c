@@ -595,8 +595,8 @@ void rvu_npc_install_ucast_entry(struct rvu *rvu, u16 pcifunc,
 				 int nixlf, u64 chan, u8 *mac_addr)
 {
 	struct rvu_pfvf *pfvf = rvu_get_pfvf(rvu, pcifunc);
-	struct npc_install_flow_req req = { 0 };
-	struct npc_install_flow_rsp rsp = { 0 };
+	struct npc_install_flow_req req = { };
+	struct npc_install_flow_rsp rsp = { };
 	struct npc_mcam *mcam = &rvu->hw->mcam;
 	struct nix_rx_action action;
 	int blkaddr, index;
@@ -645,8 +645,8 @@ void rvu_npc_install_promisc_entry(struct rvu *rvu, u16 pcifunc,
 				   int nixlf, u64 chan, u8 chan_cnt)
 {
 	struct rvu_pfvf *pfvf = rvu_get_pfvf(rvu, pcifunc);
-	struct npc_install_flow_req req = { 0 };
-	struct npc_install_flow_rsp rsp = { 0 };
+	struct npc_install_flow_req req = { };
+	struct npc_install_flow_rsp rsp = { };
 	struct npc_mcam *mcam = &rvu->hw->mcam;
 	struct rvu_hwinfo *hw = rvu->hw;
 	int blkaddr, ucast_idx, index;
@@ -748,8 +748,8 @@ void rvu_npc_install_bcast_match_entry(struct rvu *rvu, u16 pcifunc,
 				       int nixlf, u64 chan)
 {
 	struct rvu_pfvf *pfvf;
-	struct npc_install_flow_req req = { 0 };
-	struct npc_install_flow_rsp rsp = { 0 };
+	struct npc_install_flow_req req = { };
+	struct npc_install_flow_rsp rsp = { };
 	struct npc_mcam *mcam = &rvu->hw->mcam;
 	struct rvu_hwinfo *hw = rvu->hw;
 	int blkaddr, index;
@@ -819,8 +819,8 @@ void rvu_npc_enable_bcast_entry(struct rvu *rvu, u16 pcifunc, int nixlf,
 void rvu_npc_install_allmulti_entry(struct rvu *rvu, u16 pcifunc, int nixlf,
 				    u64 chan)
 {
-	struct npc_install_flow_req req = { 0 };
-	struct npc_install_flow_rsp rsp = { 0 };
+	struct npc_install_flow_req req = { };
+	struct npc_install_flow_rsp rsp = { };
 	struct npc_mcam *mcam = &rvu->hw->mcam;
 	struct rvu_hwinfo *hw = rvu->hw;
 	int blkaddr, ucast_idx, index;
@@ -1327,8 +1327,8 @@ static void npc_config_kpuaction(struct rvu *rvu, int blkaddr,
 				 const struct npc_kpu_profile_action *kpuaction,
 				 int kpu, int entry, bool pkind)
 {
-	struct npc_kpu_action0 action0 = {0};
-	struct npc_kpu_action1 action1 = {0};
+	struct npc_kpu_action0 action0 = {};
+	struct npc_kpu_action1 action1 = {};
 	u64 reg;
 
 	action1.errlev = kpuaction->errlev;
@@ -1369,8 +1369,8 @@ static void npc_config_kpucam(struct rvu *rvu, int blkaddr,
 			      const struct npc_kpu_profile_cam *kpucam,
 			      int kpu, int entry)
 {
-	struct npc_kpu_cam cam0 = {0};
-	struct npc_kpu_cam cam1 = {0};
+	struct npc_kpu_cam cam0 = {};
+	struct npc_kpu_cam cam1 = {};
 
 	cam1.state = kpucam->state & kpucam->state_mask;
 	cam1.dp0_data = kpucam->dp0 & kpucam->dp0_mask;

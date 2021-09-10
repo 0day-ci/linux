@@ -30,7 +30,7 @@ int dpcon_open(struct fsl_mc_io *mc_io,
 	       int dpcon_id,
 	       u16 *token)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	struct dpcon_cmd_open *dpcon_cmd;
 	int err;
 
@@ -68,7 +68,7 @@ int dpcon_close(struct fsl_mc_io *mc_io,
 		u32 cmd_flags,
 		u16 token)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 
 	/* prepare command */
 	cmd.header = mc_encode_cmd_header(DPCON_CMDID_CLOSE,
@@ -92,7 +92,7 @@ int dpcon_enable(struct fsl_mc_io *mc_io,
 		 u32 cmd_flags,
 		 u16 token)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 
 	/* prepare command */
 	cmd.header = mc_encode_cmd_header(DPCON_CMDID_ENABLE,
@@ -116,7 +116,7 @@ int dpcon_disable(struct fsl_mc_io *mc_io,
 		  u32 cmd_flags,
 		  u16 token)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 
 	/* prepare command */
 	cmd.header = mc_encode_cmd_header(DPCON_CMDID_DISABLE,
@@ -140,7 +140,7 @@ int dpcon_reset(struct fsl_mc_io *mc_io,
 		u32 cmd_flags,
 		u16 token)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 
 	/* prepare command */
 	cmd.header = mc_encode_cmd_header(DPCON_CMDID_RESET,
@@ -165,7 +165,7 @@ int dpcon_get_attributes(struct fsl_mc_io *mc_io,
 			 u16 token,
 			 struct dpcon_attr *attr)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	struct dpcon_rsp_get_attr *dpcon_rsp;
 	int err;
 
@@ -203,7 +203,7 @@ int dpcon_set_notification(struct fsl_mc_io *mc_io,
 			   u16 token,
 			   struct dpcon_notification_cfg *cfg)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	struct dpcon_cmd_set_notification *dpcon_cmd;
 
 	/* prepare command */

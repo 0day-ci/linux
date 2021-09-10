@@ -447,7 +447,7 @@ static int red_dump_stats(struct Qdisc *sch, struct gnet_dump *d)
 {
 	struct red_sched_data *q = qdisc_priv(sch);
 	struct net_device *dev = qdisc_dev(sch);
-	struct tc_red_xstats st = {0};
+	struct tc_red_xstats st = {};
 
 	if (sch->flags & TCQ_F_OFFLOADED) {
 		struct tc_red_qopt_offload hw_stats_request = {

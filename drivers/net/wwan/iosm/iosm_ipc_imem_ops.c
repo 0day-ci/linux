@@ -85,7 +85,7 @@ out:
 void ipc_imem_wwan_channel_init(struct iosm_imem *ipc_imem,
 				enum ipc_mux_protocol mux_type)
 {
-	struct ipc_chnl_cfg chnl_cfg = { 0 };
+	struct ipc_chnl_cfg chnl_cfg = { };
 
 	ipc_imem->cp_version = ipc_mmio_get_cp_version(ipc_imem->mmio);
 

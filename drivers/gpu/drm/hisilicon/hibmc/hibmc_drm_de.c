@@ -232,7 +232,7 @@ hibmc_crtc_mode_valid(struct drm_crtc *crtc,
 static u32 format_pll_reg(void)
 {
 	u32 pllreg = 0;
-	struct hibmc_display_panel_pll pll = {0};
+	struct hibmc_display_panel_pll pll = {};
 
 	/*
 	 * Note that all PLL's have the same format. Here,

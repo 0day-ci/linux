@@ -284,7 +284,7 @@ dce110_set_input_transfer_func(struct dc *dc, struct pipe_ctx *pipe_ctx,
 {
 	struct input_pixel_processor *ipp = pipe_ctx->plane_res.ipp;
 	const struct dc_transfer_func *tf = NULL;
-	struct ipp_prescale_params prescale_params = { 0 };
+	struct ipp_prescale_params prescale_params = { };
 	bool result = true;
 
 	if (ipp == NULL)
@@ -801,7 +801,7 @@ void dce110_edp_power_control(
 		bool power_up)
 {
 	struct dc_context *ctx = link->ctx;
-	struct bp_transmitter_control cntl = { 0 };
+	struct bp_transmitter_control cntl = { };
 	enum bp_result bp_result;
 	uint8_t panel_instance;
 
@@ -971,7 +971,7 @@ void dce110_edp_backlight_control(
 		bool enable)
 {
 	struct dc_context *ctx = link->ctx;
-	struct bp_transmitter_control cntl = { 0 };
+	struct bp_transmitter_control cntl = { };
 	uint8_t panel_instance;
 
 	if (dal_graphics_object_id_get_connector_id(link->link_enc->connector)
@@ -1337,7 +1337,7 @@ static void build_audio_output(
 static void program_scaler(const struct dc *dc,
 		const struct pipe_ctx *pipe_ctx)
 {
-	struct tg_color color = {0};
+	struct tg_color color = {};
 
 #if defined(CONFIG_DRM_AMD_DC_DCN)
 	/* TOFPGA */
@@ -1383,7 +1383,7 @@ static enum dc_status dce110_enable_stream_timing(
 	struct dc_stream_state *stream = pipe_ctx->stream;
 	struct pipe_ctx *pipe_ctx_old = &dc->current_state->res_ctx.
 			pipe_ctx[pipe_ctx->pipe_idx];
-	struct tg_color black_color = {0};
+	struct tg_color black_color = {};
 
 	if (!pipe_ctx_old->stream) {
 
@@ -1436,7 +1436,7 @@ static enum dc_status apply_single_controller_ctx_to_hw(
 		struct dc *dc)
 {
 	struct dc_stream_state *stream = pipe_ctx->stream;
-	struct drr_params params = {0};
+	struct drr_params params = {};
 	unsigned int event_triggers = 0;
 	struct pipe_ctx *odm_pipe = pipe_ctx->next_odm_pipe;
 	struct dce_hwseq *hws = dc->hwseq;
@@ -1848,7 +1848,7 @@ static void set_drr(struct pipe_ctx **pipe_ctx,
 		int num_pipes, struct dc_crtc_timing_adjust adjust)
 {
 	int i = 0;
-	struct drr_params params = {0};
+	struct drr_params params = {};
 	// DRR should set trigger event to monitor surface update event
 	unsigned int event_triggers = 0x80;
 	// Note DRR trigger events are generated regardless of whether num frames met.
@@ -2259,7 +2259,7 @@ enum dc_status dce110_apply_ctx_to_hw(
  ******************************************************************************/
 static void set_default_colors(struct pipe_ctx *pipe_ctx)
 {
-	struct default_adjustment default_adjust = { 0 };
+	struct default_adjustment default_adjust = { };
 
 	default_adjust.force_hw_default = false;
 	default_adjust.in_color_space = pipe_ctx->plane_state->color_space;
@@ -2433,7 +2433,7 @@ static void dce110_enable_timing_synchronization(
 		struct pipe_ctx *grouped_pipes[])
 {
 	struct dc_context *dc_ctx = dc->ctx;
-	struct dcp_gsl_params gsl_params = { 0 };
+	struct dcp_gsl_params gsl_params = { };
 	int i;
 
 	DC_SYNC_INFO("GSL: Setting-up...\n");
@@ -2478,7 +2478,7 @@ static void dce110_enable_per_frame_crtc_position_reset(
 		struct pipe_ctx *grouped_pipes[])
 {
 	struct dc_context *dc_ctx = dc->ctx;
-	struct dcp_gsl_params gsl_params = { 0 };
+	struct dcp_gsl_params gsl_params = { };
 	int i;
 
 	gsl_params.gsl_group = 0;

@@ -2045,7 +2045,7 @@ static s32 mlxbf_i2c_smbus_xfer(struct i2c_adapter *adap, u16 addr,
 				u8 command, int size,
 				union i2c_smbus_data *data)
 {
-	struct mlxbf_i2c_smbus_request request = { 0 };
+	struct mlxbf_i2c_smbus_request request = { };
 	struct mlxbf_i2c_priv *priv;
 	bool read, pec;
 	u8 byte_cnt;

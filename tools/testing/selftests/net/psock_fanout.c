@@ -62,7 +62,7 @@ static uint32_t cfg_max_num_members;
  * @return -1 if mode is bad, a valid socket otherwise */
 static int sock_fanout_open(uint16_t typeflags, uint16_t group_id)
 {
-	struct sockaddr_ll addr = {0};
+	struct sockaddr_ll addr = {};
 	struct fanout_args args;
 	int fd, val, err;
 

@@ -68,7 +68,7 @@ static inline u64 mc_enc(int lsoffset, int width, u64 val)
 int dpdmai_open(struct fsl_mc_io *mc_io, u32 cmd_flags,
 		int dpdmai_id, u16 *token)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	__le64 *cmd_dpdmai_id;
 	int err;
 
@@ -104,7 +104,7 @@ EXPORT_SYMBOL_GPL(dpdmai_open);
  */
 int dpdmai_close(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 
 	/* prepare command */
 	cmd.header = mc_encode_cmd_header(DPDMAI_CMDID_CLOSE,
@@ -140,7 +140,7 @@ EXPORT_SYMBOL_GPL(dpdmai_close);
 int dpdmai_create(struct fsl_mc_io *mc_io, u32 cmd_flags,
 		  const struct dpdmai_cfg *cfg, u16 *token)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	int err;
 
 	/* prepare command */
@@ -169,7 +169,7 @@ int dpdmai_create(struct fsl_mc_io *mc_io, u32 cmd_flags,
  */
 int dpdmai_destroy(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 
 	/* prepare command */
 	cmd.header = mc_encode_cmd_header(DPDMAI_CMDID_DESTROY,
@@ -190,7 +190,7 @@ EXPORT_SYMBOL_GPL(dpdmai_destroy);
  */
 int dpdmai_enable(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 
 	/* prepare command */
 	cmd.header = mc_encode_cmd_header(DPDMAI_CMDID_ENABLE,
@@ -211,7 +211,7 @@ EXPORT_SYMBOL_GPL(dpdmai_enable);
  */
 int dpdmai_disable(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 
 	/* prepare command */
 	cmd.header = mc_encode_cmd_header(DPDMAI_CMDID_DISABLE,
@@ -232,7 +232,7 @@ EXPORT_SYMBOL_GPL(dpdmai_disable);
  */
 int dpdmai_reset(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 
 	/* prepare command */
 	cmd.header = mc_encode_cmd_header(DPDMAI_CMDID_RESET,
@@ -256,7 +256,7 @@ int dpdmai_get_attributes(struct fsl_mc_io *mc_io, u32 cmd_flags,
 			  u16 token, struct dpdmai_attr *attr)
 {
 	struct dpdmai_rsp_get_attributes *rsp_params;
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	int err;
 
 	/* prepare command */
@@ -294,7 +294,7 @@ int dpdmai_set_rx_queue(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 			u8 priority, const struct dpdmai_rx_queue_cfg *cfg)
 {
 	struct dpdmai_cmd_queue *cmd_params;
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 
 	/* prepare command */
 	cmd.header = mc_encode_cmd_header(DPDMAI_CMDID_SET_RX_QUEUE,
@@ -328,7 +328,7 @@ int dpdmai_get_rx_queue(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 			u8 priority, struct dpdmai_rx_queue_attr *attr)
 {
 	struct dpdmai_cmd_queue *cmd_params;
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	int err;
 
 	/* prepare command */
@@ -370,7 +370,7 @@ int dpdmai_get_tx_queue(struct fsl_mc_io *mc_io, u32 cmd_flags,
 {
 	struct dpdmai_rsp_get_tx_queue *rsp_params;
 	struct dpdmai_cmd_queue *cmd_params;
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	int err;
 
 	/* prepare command */

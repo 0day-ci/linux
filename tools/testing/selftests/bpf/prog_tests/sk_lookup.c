@@ -146,7 +146,7 @@ static int make_socket(int sotype, const char *ip, int port,
 static int make_server(int sotype, const char *ip, int port,
 		       struct bpf_program *reuseport_prog)
 {
-	struct sockaddr_storage addr = {0};
+	struct sockaddr_storage addr = {};
 	const int one = 1;
 	int err, fd = -1;
 
@@ -222,7 +222,7 @@ fail:
 
 static int make_client(int sotype, const char *ip, int port)
 {
-	struct sockaddr_storage addr = {0};
+	struct sockaddr_storage addr = {};
 	int err, fd;
 
 	fd = make_socket(sotype, ip, port, &addr);
@@ -357,11 +357,11 @@ static void v4_to_v6(struct sockaddr_storage *ss)
 static int udp_recv_send(int server_fd)
 {
 	char cmsg_buf[CMSG_SPACE(sizeof(struct sockaddr_storage))];
-	struct sockaddr_storage _src_addr = { 0 };
+	struct sockaddr_storage _src_addr = { };
 	struct sockaddr_storage *src_addr = &_src_addr;
 	struct sockaddr_storage *dst_addr = NULL;
-	struct msghdr msg = { 0 };
-	struct iovec iov = { 0 };
+	struct msghdr msg = { };
+	struct iovec iov = { };
 	struct cmsghdr *cm;
 	char buf[1];
 	int ret, fd;
@@ -948,7 +948,7 @@ static void test_drop_on_lookup(struct test_sk_lookup *skel)
 
 static void drop_on_reuseport(const struct test *t)
 {
-	struct sockaddr_storage dst = { 0 };
+	struct sockaddr_storage dst = { };
 	int client, server1, server2, err;
 	struct bpf_link *lookup_link;
 	ssize_t n;

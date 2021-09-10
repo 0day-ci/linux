@@ -38,8 +38,8 @@ static uint32_t cfg_label	= 1;
 static void do_send(int fd, bool with_flowlabel, uint32_t flowlabel)
 {
 	char control[CMSG_SPACE(sizeof(flowlabel))] = {0};
-	struct msghdr msg = {0};
-	struct iovec iov = {0};
+	struct msghdr msg = {};
+	struct iovec iov = {};
 	int ret;
 
 	iov.iov_base = (char *)cfg_data;
@@ -75,8 +75,8 @@ static void do_recv(int fd, bool with_flowlabel, uint32_t expect)
 {
 	char control[CMSG_SPACE(sizeof(expect))];
 	char data[sizeof(cfg_data)];
-	struct msghdr msg = {0};
-	struct iovec iov = {0};
+	struct msghdr msg = {};
+	struct iovec iov = {};
 	struct cmsghdr *cm;
 	uint32_t flowlabel;
 	int ret;

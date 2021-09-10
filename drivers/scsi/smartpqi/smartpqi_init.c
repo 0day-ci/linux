@@ -2727,7 +2727,7 @@ static int pqi_raid_bypass_submit_scsi_cmd(struct pqi_ctrl_info *ctrl_info,
 	u32 next_bypass_group;
 	struct pqi_encryption_info *encryption_info_ptr;
 	struct pqi_encryption_info encryption_info;
-	struct pqi_scsi_dev_raid_map_data rmd = { 0 };
+	struct pqi_scsi_dev_raid_map_data rmd = { };
 
 	rc = pqi_get_aio_lba_and_block_count(scmd, &rmd);
 	if (rc)

@@ -2085,7 +2085,7 @@ static int iommu_check_cache_invl_data(struct iommu_cache_invalidate_info *info)
 int iommu_uapi_cache_invalidate(struct iommu_domain *domain, struct device *dev,
 				void __user *uinfo)
 {
-	struct iommu_cache_invalidate_info inv_info = { 0 };
+	struct iommu_cache_invalidate_info inv_info = { };
 	u32 minsz;
 	int ret;
 
@@ -2195,7 +2195,7 @@ static int iommu_sva_prepare_bind_data(void __user *udata,
 int iommu_uapi_sva_bind_gpasid(struct iommu_domain *domain, struct device *dev,
 			       void __user *udata)
 {
-	struct iommu_gpasid_bind_data data = { 0 };
+	struct iommu_gpasid_bind_data data = { };
 	int ret;
 
 	if (unlikely(!domain->ops->sva_bind_gpasid))
@@ -2222,7 +2222,7 @@ EXPORT_SYMBOL_GPL(iommu_sva_unbind_gpasid);
 int iommu_uapi_sva_unbind_gpasid(struct iommu_domain *domain, struct device *dev,
 				 void __user *udata)
 {
-	struct iommu_gpasid_bind_data data = { 0 };
+	struct iommu_gpasid_bind_data data = { };
 	int ret;
 
 	if (unlikely(!domain->ops->sva_bind_gpasid))

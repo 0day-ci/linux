@@ -321,9 +321,9 @@ static int aq_mdo_dev_stop(struct macsec_context *ctx)
 static int aq_set_txsc(struct aq_nic_s *nic, const int txsc_idx)
 {
 	struct aq_macsec_txsc *aq_txsc = &nic->macsec_cfg->aq_txsc[txsc_idx];
-	struct aq_mss_egress_class_record tx_class_rec = { 0 };
+	struct aq_mss_egress_class_record tx_class_rec = { };
 	const struct macsec_secy *secy = aq_txsc->sw_secy;
-	struct aq_mss_egress_sc_record sc_rec = { 0 };
+	struct aq_mss_egress_sc_record sc_rec = { };
 	unsigned int sc_idx = aq_txsc->hw_sc_idx;
 	struct aq_hw_s *hw = nic->aq_hw;
 	int ret = 0;
@@ -505,8 +505,8 @@ static int aq_clear_txsc(struct aq_nic_s *nic, const int txsc_idx,
 			 enum aq_clear_type clear_type)
 {
 	struct aq_macsec_txsc *tx_sc = &nic->macsec_cfg->aq_txsc[txsc_idx];
-	struct aq_mss_egress_class_record tx_class_rec = { 0 };
-	struct aq_mss_egress_sc_record sc_rec = { 0 };
+	struct aq_mss_egress_class_record tx_class_rec = { };
+	struct aq_mss_egress_sc_record sc_rec = { };
 	struct aq_hw_s *hw = nic->aq_hw;
 	int ret = 0;
 	int sa_num;
@@ -1505,8 +1505,8 @@ void aq_macsec_free(struct aq_nic_s *nic)
 int aq_macsec_enable(struct aq_nic_s *nic)
 {
 	u32 ctl_ether_types[1] = { ETH_P_PAE };
-	struct macsec_msg_fw_response resp = { 0 };
-	struct macsec_msg_fw_request msg = { 0 };
+	struct macsec_msg_fw_response resp = { };
+	struct macsec_msg_fw_request msg = { };
 	struct aq_hw_s *hw = nic->aq_hw;
 	int num_ctl_ether_types = 0;
 	int index = 0, tbl_idx;
@@ -1518,7 +1518,7 @@ int aq_macsec_enable(struct aq_nic_s *nic)
 	rtnl_lock();
 
 	if (nic->aq_fw_ops->send_macsec_req) {
-		struct macsec_cfg_request cfg = { 0 };
+		struct macsec_cfg_request cfg = { };
 
 		cfg.enabled = 1;
 		cfg.egress_threshold = 0xffffffff;

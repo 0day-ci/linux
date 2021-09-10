@@ -1548,7 +1548,7 @@ static void o2net_start_connect(struct work_struct *work)
 	struct o2net_sock_container *sc = NULL;
 	struct o2nm_node *node = NULL, *mynode = NULL;
 	struct socket *sock = NULL;
-	struct sockaddr_in myaddr = {0, }, remoteaddr = {0, };
+	struct sockaddr_in myaddr = {}, remoteaddr = {};
 	int ret = 0, stop;
 	unsigned int timeout;
 	unsigned int nofs_flag;

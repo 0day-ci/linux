@@ -4648,7 +4648,7 @@ static int sock_has_perm(struct sock *sk, u32 perms)
 {
 	struct sk_security_struct *sksec = sk->sk_security;
 	struct common_audit_data ad;
-	struct lsm_network_audit net = {0,};
+	struct lsm_network_audit net = {};
 
 	if (sksec->sid == SECINITSID_KERNEL)
 		return 0;
@@ -4748,7 +4748,7 @@ static int selinux_socket_bind(struct socket *sock, struct sockaddr *address, in
 	if (family == PF_INET || family == PF_INET6) {
 		char *addrp;
 		struct common_audit_data ad;
-		struct lsm_network_audit net = {0,};
+		struct lsm_network_audit net = {};
 		struct sockaddr_in *addr4 = NULL;
 		struct sockaddr_in6 *addr6 = NULL;
 		u16 family_sa;
@@ -4893,7 +4893,7 @@ static int selinux_socket_connect_helper(struct socket *sock,
 	    sksec->sclass == SECCLASS_DCCP_SOCKET ||
 	    sksec->sclass == SECCLASS_SCTP_SOCKET) {
 		struct common_audit_data ad;
-		struct lsm_network_audit net = {0,};
+		struct lsm_network_audit net = {};
 		struct sockaddr_in *addr4 = NULL;
 		struct sockaddr_in6 *addr6 = NULL;
 		unsigned short snum;
@@ -5053,7 +5053,7 @@ static int selinux_socket_unix_stream_connect(struct sock *sock,
 	struct sk_security_struct *sksec_other = other->sk_security;
 	struct sk_security_struct *sksec_new = newsk->sk_security;
 	struct common_audit_data ad;
-	struct lsm_network_audit net = {0,};
+	struct lsm_network_audit net = {};
 	int err;
 
 	ad.type = LSM_AUDIT_DATA_NET;
@@ -5086,7 +5086,7 @@ static int selinux_socket_unix_may_send(struct socket *sock,
 	struct sk_security_struct *ssec = sock->sk->sk_security;
 	struct sk_security_struct *osec = other->sk->sk_security;
 	struct common_audit_data ad;
-	struct lsm_network_audit net = {0,};
+	struct lsm_network_audit net = {};
 
 	ad.type = LSM_AUDIT_DATA_NET;
 	ad.u.net = &net;
@@ -5129,7 +5129,7 @@ static int selinux_sock_rcv_skb_compat(struct sock *sk, struct sk_buff *skb,
 	struct sk_security_struct *sksec = sk->sk_security;
 	u32 sk_sid = sksec->sid;
 	struct common_audit_data ad;
-	struct lsm_network_audit net = {0,};
+	struct lsm_network_audit net = {};
 	char *addrp;
 
 	ad.type = LSM_AUDIT_DATA_NET;
@@ -5163,7 +5163,7 @@ static int selinux_socket_sock_rcv_skb(struct sock *sk, struct sk_buff *skb)
 	u16 family = sk->sk_family;
 	u32 sk_sid = sksec->sid;
 	struct common_audit_data ad;
-	struct lsm_network_audit net = {0,};
+	struct lsm_network_audit net = {};
 	char *addrp;
 	u8 secmark_active;
 	u8 peerlbl_active;
@@ -5361,7 +5361,7 @@ static int selinux_sctp_assoc_request(struct sctp_endpoint *ep,
 {
 	struct sk_security_struct *sksec = ep->base.sk->sk_security;
 	struct common_audit_data ad;
-	struct lsm_network_audit net = {0,};
+	struct lsm_network_audit net = {};
 	u8 peerlbl_active;
 	u32 peer_sid = SECINITSID_UNLABELED;
 	u32 conn_sid;
@@ -5696,7 +5696,7 @@ static unsigned int selinux_ip_forward(struct sk_buff *skb,
 	char *addrp;
 	u32 peer_sid;
 	struct common_audit_data ad;
-	struct lsm_network_audit net = {0,};
+	struct lsm_network_audit net = {};
 	u8 secmark_active;
 	u8 netlbl_active;
 	u8 peerlbl_active;
@@ -5827,7 +5827,7 @@ static unsigned int selinux_ip_postroute_compat(struct sk_buff *skb,
 	struct sock *sk = skb_to_full_sk(skb);
 	struct sk_security_struct *sksec;
 	struct common_audit_data ad;
-	struct lsm_network_audit net = {0,};
+	struct lsm_network_audit net = {};
 	char *addrp;
 	u8 proto;
 
@@ -5863,7 +5863,7 @@ static unsigned int selinux_ip_postroute(struct sk_buff *skb,
 	int ifindex = outdev->ifindex;
 	struct sock *sk;
 	struct common_audit_data ad;
-	struct lsm_network_audit net = {0,};
+	struct lsm_network_audit net = {};
 	char *addrp;
 	u8 secmark_active;
 	u8 peerlbl_active;

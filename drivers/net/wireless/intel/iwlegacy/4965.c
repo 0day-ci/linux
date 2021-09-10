@@ -1240,7 +1240,7 @@ il4965_fill_txpower_tbl(struct il_priv *il, u8 band, u16 channel, u8 is_ht40,
 static int
 il4965_send_tx_power(struct il_priv *il)
 {
-	struct il4965_txpowertable_cmd cmd = { 0 };
+	struct il4965_txpowertable_cmd cmd = { };
 	int ret;
 	u8 band = 0;
 	bool is_ht40 = false;

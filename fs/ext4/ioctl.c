@@ -626,7 +626,7 @@ static int ext4_ioc_getfsmap(struct super_block *sb,
 			     struct fsmap_head __user *arg)
 {
 	struct getfsmap_info info = { NULL };
-	struct ext4_fsmap_head xhead = {0};
+	struct ext4_fsmap_head xhead = {};
 	struct fsmap_head head;
 	bool aborted = false;
 	int error;
@@ -775,7 +775,7 @@ static int ext4_ioctl_get_es_cache(struct file *filp, unsigned long arg)
 {
 	struct fiemap fiemap;
 	struct fiemap __user *ufiemap = (struct fiemap __user *) arg;
-	struct fiemap_extent_info fieinfo = { 0, };
+	struct fiemap_extent_info fieinfo = { };
 	struct inode *inode = file_inode(filp);
 	int error;
 

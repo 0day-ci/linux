@@ -101,7 +101,7 @@ out_destroy_skel:
 
 static void test_perf_branches_hw(void)
 {
-	struct perf_event_attr attr = {0};
+	struct perf_event_attr attr = {};
 	int duration = 0;
 	int pfd;
 
@@ -142,7 +142,7 @@ static void test_perf_branches_hw(void)
  */
 static void test_perf_branches_no_hw(void)
 {
-	struct perf_event_attr attr = {0};
+	struct perf_event_attr attr = {};
 	int duration = 0;
 	int pfd;
 

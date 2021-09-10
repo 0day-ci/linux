@@ -146,7 +146,7 @@ static int ccu_pll_clk_register(struct ccu_pll_data *data)
 
 	for (idx = 0; idx < CCU_PLL_NUM; ++idx) {
 		const struct ccu_pll_info *info = &pll_info[idx];
-		struct ccu_pll_init_data init = {0};
+		struct ccu_pll_init_data init = {};
 
 		init.id = info->id;
 		init.name = info->name;

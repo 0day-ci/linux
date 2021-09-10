@@ -907,7 +907,7 @@ void cxgb4_write_partial_sgl(const struct sk_buff *skb, struct sge_txq *q,
 			     struct ulptx_sgl *sgl, u64 *end,
 			     const dma_addr_t *addr, u32 start, u32 len)
 {
-	struct ulptx_sge_pair buf[MAX_SKB_FRAGS / 2 + 1] = {0}, *to;
+	struct ulptx_sge_pair buf[MAX_SKB_FRAGS / 2 + 1] = {}, *to;
 	u32 frag_size, skb_linear_data_len = skb_headlen(skb);
 	struct skb_shared_info *si = skb_shinfo(skb);
 	u8 i = 0, frag_idx = 0, nfrags = 0;

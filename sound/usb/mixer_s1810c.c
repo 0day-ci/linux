@@ -135,7 +135,7 @@ static int
 snd_s1810c_send_ctl_packet(struct usb_device *dev, u32 a,
 			   u32 b, u32 c, u32 d, u32 e)
 {
-	struct s1810c_ctl_packet pkt = { 0 };
+	struct s1810c_ctl_packet pkt = { };
 	int ret = 0;
 
 	pkt.fixed1 = SC1810C_CMD_F1;

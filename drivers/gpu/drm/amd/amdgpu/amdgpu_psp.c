@@ -191,8 +191,8 @@ static bool psp_get_runtime_db_entry(struct amdgpu_device *adev,
 				     void *db_entry)
 {
 	uint64_t db_header_pos, db_dir_pos;
-	struct psp_runtime_data_header db_header = {0};
-	struct psp_runtime_data_directory db_dir = {0};
+	struct psp_runtime_data_header db_header = {};
+	struct psp_runtime_data_directory db_dir = {};
 	bool ret = false;
 	int i;
 
@@ -2911,7 +2911,7 @@ int psp_rlc_autoload_start(struct psp_context *psp)
 int psp_update_vcn_sram(struct amdgpu_device *adev, int inst_idx,
 			uint64_t cmd_gpu_addr, int cmd_size)
 {
-	struct amdgpu_firmware_info ucode = {0};
+	struct amdgpu_firmware_info ucode = {};
 
 	ucode.ucode_id = inst_idx ? AMDGPU_UCODE_ID_VCN1_RAM :
 		AMDGPU_UCODE_ID_VCN0_RAM;

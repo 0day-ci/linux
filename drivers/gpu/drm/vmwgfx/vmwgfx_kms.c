@@ -1150,7 +1150,7 @@ static int vmw_create_bo_proxy(struct drm_device *dev,
 			       struct vmw_buffer_object *bo_mob,
 			       struct vmw_surface **srf_out)
 {
-	struct vmw_surface_metadata metadata = {0};
+	struct vmw_surface_metadata metadata = {};
 	uint32_t format;
 	struct vmw_resource *res;
 	unsigned int bytes_pp;
@@ -1452,7 +1452,7 @@ static int vmw_kms_check_display_memory(struct drm_device *dev,
 					struct drm_rect *rects)
 {
 	struct vmw_private *dev_priv = vmw_priv(dev);
-	struct drm_rect bounding_box = {0};
+	struct drm_rect bounding_box = {};
 	u64 total_pixels = 0, pixel_mem, bb_mem;
 	int i;
 

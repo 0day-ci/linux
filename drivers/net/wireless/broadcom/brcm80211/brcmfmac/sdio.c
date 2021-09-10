@@ -2191,7 +2191,7 @@ brcmf_sdio_txpkt_prep(struct brcmf_sdio *bus, struct sk_buff_head *pktq,
 	struct sk_buff *pkt_next;
 	u8 txseq;
 	int ret;
-	struct brcmf_sdio_hdrinfo hd_info = {0};
+	struct brcmf_sdio_hdrinfo hd_info = {};
 
 	txseq = bus->tx_seq;
 	total_len = 0;
@@ -2397,7 +2397,7 @@ static int brcmf_sdio_tx_ctrlframe(struct brcmf_sdio *bus, u8 *frame, u16 len)
 	u8 doff;
 	u16 pad;
 	uint retries = 0;
-	struct brcmf_sdio_hdrinfo hd_info = {0};
+	struct brcmf_sdio_hdrinfo hd_info = {};
 	int ret;
 
 	brcmf_dbg(SDIO, "Enter\n");

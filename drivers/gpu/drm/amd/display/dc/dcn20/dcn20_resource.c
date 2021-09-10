@@ -450,7 +450,7 @@ static struct _vcs_dpi_soc_bounding_box_st dcn2_0_nv14_soc = {
 	.use_urgent_burst_bw = 0
 };
 
-static struct _vcs_dpi_soc_bounding_box_st dcn2_0_nv12_soc = { 0 };
+static struct _vcs_dpi_soc_bounding_box_st dcn2_0_nv12_soc = { };
 
 #ifndef mmDP0_DP_DPHY_INTERNAL_CTRL
 	#define mmDP0_DP_DPHY_INTERNAL_CTRL		0x210f
@@ -2015,7 +2015,7 @@ int dcn20_populate_dml_pipes_from_context(
 		unsigned int v_total;
 		unsigned int front_porch;
 		int output_bpc;
-		struct audio_check aud_check = {0};
+		struct audio_check aud_check = {};
 
 		if (!res_ctx->pipe_ctx[i].stream)
 			continue;
@@ -3644,7 +3644,7 @@ static bool init_soc_bounding_box(struct dc *dc,
 	DC_LOGGER_INIT(dc->ctx->logger);
 
 	if (pool->base.pp_smu) {
-		struct pp_smu_nv_clock_table max_clocks = {0};
+		struct pp_smu_nv_clock_table max_clocks = {};
 		unsigned int uclk_states[8] = {0};
 		unsigned int num_states = 0;
 		enum pp_smu_status status;
@@ -3689,7 +3689,7 @@ static bool dcn20_resource_construct(
 	int i;
 	struct dc_context *ctx = dc->ctx;
 	struct irq_service_init_data init_data;
-	struct ddc_service_init_data ddc_init_data = {0};
+	struct ddc_service_init_data ddc_init_data = {};
 	struct _vcs_dpi_soc_bounding_box_st *loaded_bb =
 			get_asic_rev_soc_bb(ctx->asic_id.hw_internal_rev);
 	struct _vcs_dpi_ip_params_st *loaded_ip =
@@ -3863,7 +3863,7 @@ static bool dcn20_resource_construct(
 	dml_init_instance(&dc->dml, loaded_bb, loaded_ip, dml_project_version);
 
 	if (!dc->debug.disable_pplib_wm_range) {
-		struct pp_smu_wm_range_sets ranges = {0};
+		struct pp_smu_wm_range_sets ranges = {};
 		int i = 0;
 
 		ranges.num_reader_wm_sets = 0;

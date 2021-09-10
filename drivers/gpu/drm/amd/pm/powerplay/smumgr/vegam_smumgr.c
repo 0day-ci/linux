@@ -1566,7 +1566,7 @@ static int vegam_populate_avfs_parameters(struct pp_hwmgr *hwmgr)
 
 	SMU75_Discrete_DpmTable  *table = &(smu_data->smc_state_table);
 	int result = 0;
-	struct pp_atom_ctrl__avfs_parameters avfs_params = {0};
+	struct pp_atom_ctrl__avfs_parameters avfs_params = {};
 	AVFS_meanNsigma_t AVFS_meanNsigma = { {0} };
 	AVFS_Sclk_Offset_t AVFS_SclkOffset = { {0} };
 	uint32_t tmp, i;

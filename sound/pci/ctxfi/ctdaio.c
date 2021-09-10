@@ -450,7 +450,7 @@ static int dao_rsc_uninit(struct dao *dao)
 static int dao_rsc_reinit(struct dao *dao, const struct dao_desc *desc)
 {
 	struct daio_mgr *mgr = dao->mgr;
-	struct daio_desc dsc = {0};
+	struct daio_desc dsc = {};
 
 	dsc.type = dao->daio.type;
 	dsc.msr = desc->msr;

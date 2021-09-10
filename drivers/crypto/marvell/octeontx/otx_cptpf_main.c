@@ -41,7 +41,7 @@ static void otx_cpt_reset(struct otx_cpt_device *cpt)
 
 static void otx_cpt_find_max_enabled_cores(struct otx_cpt_device *cpt)
 {
-	union otx_cptx_pf_constants pf_cnsts = {0};
+	union otx_cptx_pf_constants pf_cnsts = {};
 
 	pf_cnsts.u = readq(cpt->reg_base + OTX_CPT_PF_CONSTANTS);
 	cpt->eng_grps.avail.max_se_cnt = pf_cnsts.s.se;
@@ -50,7 +50,7 @@ static void otx_cpt_find_max_enabled_cores(struct otx_cpt_device *cpt)
 
 static u32 otx_cpt_check_bist_status(struct otx_cpt_device *cpt)
 {
-	union otx_cptx_pf_bist_status bist_sts = {0};
+	union otx_cptx_pf_bist_status bist_sts = {};
 
 	bist_sts.u = readq(cpt->reg_base + OTX_CPT_PF_BIST_STATUS);
 	return bist_sts.u;
@@ -58,7 +58,7 @@ static u32 otx_cpt_check_bist_status(struct otx_cpt_device *cpt)
 
 static u64 otx_cpt_check_exe_bist_status(struct otx_cpt_device *cpt)
 {
-	union otx_cptx_pf_exe_bist_status bist_sts = {0};
+	union otx_cptx_pf_exe_bist_status bist_sts = {};
 
 	bist_sts.u = readq(cpt->reg_base + OTX_CPT_PF_EXE_BIST_STATUS);
 	return bist_sts.u;

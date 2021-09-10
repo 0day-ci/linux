@@ -22,7 +22,7 @@
 #include "dfs_debug.h"
 #include "../dfs_pattern_detector.h"
 
-static struct ath_dfs_pool_stats dfs_pool_stats = { 0 };
+static struct ath_dfs_pool_stats dfs_pool_stats = { };
 
 #define ATH9K_DFS_STAT(s, p) \
 	len += scnprintf(buf + len, size - len, "%28s : %10u\n", s, \

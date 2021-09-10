@@ -421,7 +421,7 @@ out:
 static int mlx5_fpga_ipsec_set_caps(struct mlx5_core_dev *mdev, u32 flags)
 {
 	struct mlx5_fpga_ipsec_cmd_context *context;
-	struct mlx5_ifc_fpga_ipsec_cmd_cap cmd = {0};
+	struct mlx5_ifc_fpga_ipsec_cmd_cap cmd = {};
 	int err;
 
 	cmd.cmd = htonl(MLX5_FPGA_IPSEC_CMD_OP_SET_CAP);
@@ -1265,7 +1265,7 @@ const struct mlx5_flow_cmds *mlx5_fs_cmd_get_default_ipsec_fpga_cmds(enum fs_flo
 
 static int mlx5_fpga_ipsec_init(struct mlx5_core_dev *mdev)
 {
-	struct mlx5_fpga_conn_attr init_attr = {0};
+	struct mlx5_fpga_conn_attr init_attr = {};
 	struct mlx5_fpga_device *fdev = mdev->fpga;
 	struct mlx5_fpga_conn *conn;
 	int err;

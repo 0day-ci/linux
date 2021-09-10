@@ -1358,7 +1358,7 @@ int be_cmd_mccq_create(struct be_adapter *adapter,
 
 int be_cmd_txq_create(struct be_adapter *adapter, struct be_tx_obj *txo)
 {
-	struct be_mcc_wrb wrb = {0};
+	struct be_mcc_wrb wrb = {};
 	struct be_cmd_req_eth_tx_create *req;
 	struct be_queue_info *txq = &txo->q;
 	struct be_queue_info *cq = &txo->cq;
@@ -1534,7 +1534,7 @@ err:
 int be_cmd_if_create(struct be_adapter *adapter, u32 cap_flags, u32 en_flags,
 		     u32 *if_handle, u32 domain)
 {
-	struct be_mcc_wrb wrb = {0};
+	struct be_mcc_wrb wrb = {};
 	struct be_cmd_req_if_create *req;
 	int status;
 
@@ -1563,7 +1563,7 @@ int be_cmd_if_create(struct be_adapter *adapter, u32 cap_flags, u32 en_flags,
 /* Uses MCCQ if available else MBOX */
 int be_cmd_if_destroy(struct be_adapter *adapter, int interface_id, u32 domain)
 {
-	struct be_mcc_wrb wrb = {0};
+	struct be_mcc_wrb wrb = {};
 	struct be_cmd_req_if_destroy *req;
 	int status;
 
@@ -1768,7 +1768,7 @@ err:
 /* Uses synchronous mcc */
 int be_cmd_get_fat_dump_len(struct be_adapter *adapter, u32 *dump_size)
 {
-	struct be_mcc_wrb wrb = {0};
+	struct be_mcc_wrb wrb = {};
 	struct be_cmd_req_get_fat *req;
 	int status;
 
@@ -4441,7 +4441,7 @@ int be_cmd_get_profile_config(struct be_adapter *adapter,
 	struct be_pcie_res_desc *pcie;
 	struct be_port_res_desc *port;
 	struct be_nic_res_desc *nic;
-	struct be_mcc_wrb wrb = {0};
+	struct be_mcc_wrb wrb = {};
 	struct be_dma_mem cmd;
 	u16 desc_count;
 	int status;
@@ -4529,7 +4529,7 @@ static int be_cmd_set_profile_config(struct be_adapter *adapter, void *desc,
 				     int size, int count, u8 version, u8 domain)
 {
 	struct be_cmd_req_set_profile_config *req;
-	struct be_mcc_wrb wrb = {0};
+	struct be_mcc_wrb wrb = {};
 	struct be_dma_mem cmd;
 	int status;
 

@@ -576,7 +576,7 @@ static void s3c_hsudc_process_req_status(struct s3c_hsudc *hsudc,
 static void s3c_hsudc_process_setup(struct s3c_hsudc *hsudc)
 {
 	struct s3c_hsudc_ep *hsep = &hsudc->ep[0];
-	struct usb_ctrlrequest ctrl = {0};
+	struct usb_ctrlrequest ctrl = {};
 	int ret;
 
 	s3c_hsudc_nuke_ep(hsep, -EPROTO);

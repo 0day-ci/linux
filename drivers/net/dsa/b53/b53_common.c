@@ -738,7 +738,7 @@ static bool b53_vlan_port_needs_forced_tagged(struct dsa_switch *ds, int port)
 int b53_configure_vlan(struct dsa_switch *ds)
 {
 	struct b53_device *dev = ds->priv;
-	struct b53_vlan vl = { 0 };
+	struct b53_vlan vl = { };
 	struct b53_vlan *v;
 	int i, def_vid;
 	u16 vid;

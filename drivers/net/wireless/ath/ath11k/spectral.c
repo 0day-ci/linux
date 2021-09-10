@@ -203,7 +203,7 @@ static int ath11k_spectral_scan_trigger(struct ath11k *ar)
 static int ath11k_spectral_scan_config(struct ath11k *ar,
 				       enum ath11k_spectral_mode mode)
 {
-	struct ath11k_wmi_vdev_spectral_conf_param param = { 0 };
+	struct ath11k_wmi_vdev_spectral_conf_param param = { };
 	struct ath11k_vif *arvif;
 	int ret, count;
 

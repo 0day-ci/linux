@@ -693,7 +693,7 @@ snd_compr_set_metadata(struct snd_compr_stream *stream, unsigned long arg)
 static inline int
 snd_compr_tstamp(struct snd_compr_stream *stream, unsigned long arg)
 {
-	struct snd_compr_tstamp tstamp = {0};
+	struct snd_compr_tstamp tstamp = {};
 	int ret;
 
 	ret = snd_compr_update_tstamp(stream, &tstamp);

@@ -154,7 +154,7 @@ static void dcn31_update_clocks(struct clk_mgr *clk_mgr_base,
 			display_count = dcn31_get_active_display_cnt_wa(dc, context);
 			/* if we can go lower, go lower */
 			if (display_count == 0) {
-				union display_idle_optimization_u idle_info = { 0 };
+				union display_idle_optimization_u idle_info = { };
 				idle_info.idle_info.df_request_disabled = 1;
 				idle_info.idle_info.phy_ref_clk_off = 1;
 				dcn31_smu_set_display_idle_optimization(clk_mgr, idle_info.data);
@@ -176,7 +176,7 @@ static void dcn31_update_clocks(struct clk_mgr *clk_mgr_base,
 
 		/* check that we're not already in D0 */
 		if (clk_mgr_base->clks.pwr_state != DCN_PWR_STATE_MISSION_MODE) {
-			union display_idle_optimization_u idle_info = { 0 };
+			union display_idle_optimization_u idle_info = { };
 			dcn31_smu_set_display_idle_optimization(clk_mgr, idle_info.data);
 			/* update power state */
 			clk_mgr_base->clks.pwr_state = DCN_PWR_STATE_MISSION_MODE;
@@ -399,7 +399,7 @@ static struct wm_table lpddr5_wm_table = {
 
 static DpmClocks_t dummy_clocks;
 
-static struct dcn31_watermarks dummy_wms = { 0 };
+static struct dcn31_watermarks dummy_wms = { };
 
 static void dcn31_build_watermark_ranges(struct clk_bw_params *bw_params, struct dcn31_watermarks *table)
 {
@@ -619,7 +619,7 @@ void dcn31_clk_mgr_construct(
 		struct pp_smu_funcs *pp_smu,
 		struct dccg *dccg)
 {
-	struct dcn31_smu_dpm_clks smu_dpm_clks = { 0 };
+	struct dcn31_smu_dpm_clks smu_dpm_clks = { };
 
 	clk_mgr->base.base.ctx = ctx;
 	clk_mgr->base.base.funcs = &dcn31_funcs;
@@ -662,7 +662,7 @@ void dcn31_clk_mgr_construct(
 	if (IS_FPGA_MAXIMUS_DC(ctx->dce_environment)) {
 		clk_mgr->base.base.funcs = &dcn3_fpga_funcs;
 	} else {
-		struct clk_log_info log_info = {0};
+		struct clk_log_info log_info = {};
 
 		clk_mgr->base.smu_ver = dcn31_smu_get_smu_version(&clk_mgr->base);
 

@@ -556,7 +556,7 @@ static int mce_handle_err_virtmode(struct pt_regs *regs,
 				   struct pseries_mc_errorlog *mce_log,
 				   int disposition)
 {
-	struct mce_error_info mce_err = { 0 };
+	struct mce_error_info mce_err = { };
 	int initiator = rtas_error_initiator(errp);
 	int severity = rtas_error_severity(errp);
 	unsigned long eaddr = 0, paddr = 0;

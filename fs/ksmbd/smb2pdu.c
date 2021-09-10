@@ -2279,7 +2279,7 @@ static int smb2_create_truncate(struct path *path)
 static void smb2_new_xattrs(struct ksmbd_tree_connect *tcon, struct path *path,
 			    struct ksmbd_file *fp)
 {
-	struct xattr_dos_attrib da = {0};
+	struct xattr_dos_attrib da = {};
 	int rc;
 
 	if (!test_share_config_flag(tcon->share_conf,
@@ -5490,7 +5490,7 @@ static int set_file_basic_info(struct ksmbd_file *fp, char *buf,
 
 	if (test_share_config_flag(share, KSMBD_SHARE_FLAG_STORE_DOS_ATTRS) &&
 	    (file_info->CreationTime || file_info->Attributes)) {
-		struct xattr_dos_attrib da = {0};
+		struct xattr_dos_attrib da = {};
 
 		da.version = 4;
 		da.itime = fp->itime;

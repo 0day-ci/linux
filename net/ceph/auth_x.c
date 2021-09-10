@@ -171,7 +171,7 @@ static int process_one_ticket(struct ceph_auth_client *ac,
 	struct timespec64 validity;
 	void *tp, *tpend;
 	void **ptp;
-	struct ceph_crypto_key new_session_key = { 0 };
+	struct ceph_crypto_key new_session_key = { };
 	struct ceph_buffer *new_ticket_blob;
 	time64_t new_expires, new_renew_after;
 	u64 new_secret_id;

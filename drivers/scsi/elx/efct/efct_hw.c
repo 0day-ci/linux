@@ -81,7 +81,7 @@ __efct_read_topology_cb(struct efct_hw *hw, int status, u8 *mqe, void *arg)
 	struct sli4_cmd_read_topology *read_topo =
 				(struct sli4_cmd_read_topology *)mqe;
 	u8 speed;
-	struct efc_domain_record drec = {0};
+	struct efc_domain_record drec = {};
 	struct efct *efct = hw->os;
 
 	if (status || le16_to_cpu(read_topo->hdr.status)) {
@@ -178,7 +178,7 @@ efct_hw_cb_link(void *ctx, void *e)
 		efct->efcport->link_status = EFC_LINK_STATUS_UP;
 
 		if (event->topology == SLI4_LINK_TOPO_NON_FC_AL) {
-			struct efc_domain_record drec = {0};
+			struct efc_domain_record drec = {};
 
 			efc_log_info(hw->os, "Link Up, NPORT, speed is %d\n",
 				     event->speed);

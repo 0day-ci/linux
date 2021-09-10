@@ -2183,7 +2183,7 @@ ice_tstamp(struct ice_ring *tx_ring, struct sk_buff *skb,
 static netdev_tx_t
 ice_xmit_frame_ring(struct sk_buff *skb, struct ice_ring *tx_ring)
 {
-	struct ice_tx_offload_params offload = { 0 };
+	struct ice_tx_offload_params offload = { };
 	struct ice_vsi *vsi = tx_ring->vsi;
 	struct ice_tx_buf *first;
 	struct ethhdr *eth;

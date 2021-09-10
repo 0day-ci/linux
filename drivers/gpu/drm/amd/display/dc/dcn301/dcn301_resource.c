@@ -1507,7 +1507,7 @@ static bool init_soc_bounding_box(struct dc *dc,
 	dcn20_patch_bounding_box(dc, loaded_bb);
 
 	if (dc->ctx->dc_bios->funcs->get_soc_bb_info) {
-		struct bp_soc_bb_info bb_info = {0};
+		struct bp_soc_bb_info bb_info = {};
 
 		if (dc->ctx->dc_bios->funcs->get_soc_bb_info(dc->ctx->dc_bios, &bb_info) == BP_RESULT_OK) {
 			if (bb_info.dram_clock_change_latency_100ns > 0)
@@ -1528,7 +1528,7 @@ static void set_wm_ranges(
 		struct pp_smu_funcs *pp_smu,
 		struct _vcs_dpi_soc_bounding_box_st *loaded_bb)
 {
-	struct pp_smu_wm_range_sets ranges = {0};
+	struct pp_smu_wm_range_sets ranges = {};
 	int i;
 
 	ranges.num_reader_wm_sets = 0;

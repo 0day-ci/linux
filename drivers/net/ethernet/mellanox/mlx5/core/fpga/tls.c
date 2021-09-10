@@ -446,7 +446,7 @@ out:
 int mlx5_fpga_tls_init(struct mlx5_core_dev *mdev)
 {
 	struct mlx5_fpga_device *fdev = mdev->fpga;
-	struct mlx5_fpga_conn_attr init_attr = {0};
+	struct mlx5_fpga_conn_attr init_attr = {};
 	struct mlx5_fpga_conn *conn;
 	struct mlx5_fpga_tls *tls;
 	int err = 0;

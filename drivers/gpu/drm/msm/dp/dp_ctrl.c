@@ -1229,7 +1229,7 @@ static int dp_ctrl_link_train(struct dp_ctrl_private *ctrl,
 {
 	int ret = 0;
 	u8 encoding = DP_SET_ANSI_8B10B;
-	struct dp_link_info link_info = {0};
+	struct dp_link_info link_info = {};
 
 	dp_ctrl_config_ctrl(ctrl);
 

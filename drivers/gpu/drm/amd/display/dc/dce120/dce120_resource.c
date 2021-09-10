@@ -912,9 +912,9 @@ static const struct resource_funcs dce120_res_pool_funcs = {
 
 static void bw_calcs_data_update_from_pplib(struct dc *dc)
 {
-	struct dm_pp_clock_levels_with_latency eng_clks = {0};
-	struct dm_pp_clock_levels_with_latency mem_clks = {0};
-	struct dm_pp_wm_sets_with_clock_ranges clk_ranges = {0};
+	struct dm_pp_clock_levels_with_latency eng_clks = {};
+	struct dm_pp_clock_levels_with_latency mem_clks = {};
+	struct dm_pp_wm_sets_with_clock_ranges clk_ranges = {};
 	int i;
 	unsigned int clk;
 	unsigned int latency;

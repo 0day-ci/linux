@@ -2909,7 +2909,7 @@ static void rtw8822c_do_lck(struct rtw_dev *rtwdev)
 
 static void rtw8822c_do_iqk(struct rtw_dev *rtwdev)
 {
-	struct rtw_iqk_para para = {0};
+	struct rtw_iqk_para para = {};
 	u8 iqk_chk;
 	int ret;
 
@@ -3669,7 +3669,7 @@ static u8 (*dpk_state[])(struct rtw_dev *rtwdev,
 static u8 rtw8822c_dpk_pas_agc(struct rtw_dev *rtwdev, u8 path,
 			       bool gain_only, bool loss_only)
 {
-	struct rtw8822c_dpk_data data = {0};
+	struct rtw8822c_dpk_data data = {};
 	u8 (*func)(struct rtw_dev *rtwdev, struct rtw8822c_dpk_data *data);
 	u8 state = RTW_DPK_GAIN_CHECK;
 

@@ -380,7 +380,7 @@ int hinic_port_set_tso(struct hinic_dev *nic_dev, enum hinic_tso_state state)
 {
 	struct hinic_hwdev *hwdev = nic_dev->hwdev;
 	struct hinic_hwif *hwif = hwdev->hwif;
-	struct hinic_tso_config tso_cfg = {0};
+	struct hinic_tso_config tso_cfg = {};
 	struct pci_dev *pdev = hwif->pdev;
 	u16 out_size = sizeof(tso_cfg);
 	int err;
@@ -403,7 +403,7 @@ int hinic_port_set_tso(struct hinic_dev *nic_dev, enum hinic_tso_state state)
 
 int hinic_set_rx_csum_offload(struct hinic_dev *nic_dev, u32 en)
 {
-	struct hinic_checksum_offload rx_csum_cfg = {0};
+	struct hinic_checksum_offload rx_csum_cfg = {};
 	struct hinic_hwdev *hwdev = nic_dev->hwdev;
 	u16 out_size = sizeof(rx_csum_cfg);
 	struct hinic_hwif *hwif;
@@ -466,7 +466,7 @@ int hinic_set_max_qnum(struct hinic_dev *nic_dev, u8 num_rqs)
 {
 	struct hinic_hwdev *hwdev = nic_dev->hwdev;
 	struct hinic_hwif *hwif = hwdev->hwif;
-	struct hinic_rq_num rq_num = { 0 };
+	struct hinic_rq_num rq_num = { };
 	struct pci_dev *pdev = hwif->pdev;
 	u16 out_size = sizeof(rq_num);
 	int err;
@@ -492,7 +492,7 @@ static int hinic_set_rx_lro(struct hinic_dev *nic_dev, u8 ipv4_en, u8 ipv6_en,
 			    u8 max_wqe_num)
 {
 	struct hinic_hwdev *hwdev = nic_dev->hwdev;
-	struct hinic_lro_config lro_cfg = { 0 };
+	struct hinic_lro_config lro_cfg = { };
 	struct hinic_hwif *hwif = hwdev->hwif;
 	struct pci_dev *pdev = hwif->pdev;
 	u16 out_size = sizeof(lro_cfg);
@@ -519,7 +519,7 @@ static int hinic_set_rx_lro(struct hinic_dev *nic_dev, u8 ipv4_en, u8 ipv6_en,
 static int hinic_set_rx_lro_timer(struct hinic_dev *nic_dev, u32 timer_value)
 {
 	struct hinic_hwdev *hwdev = nic_dev->hwdev;
-	struct hinic_lro_timer lro_timer = { 0 };
+	struct hinic_lro_timer lro_timer = { };
 	struct hinic_hwif *hwif = hwdev->hwif;
 	struct pci_dev *pdev = hwif->pdev;
 	u16 out_size = sizeof(lro_timer);
@@ -653,7 +653,7 @@ free_buf:
 int hinic_rss_get_indir_tbl(struct hinic_dev *nic_dev, u32 tmpl_idx,
 			    u32 *indir_table)
 {
-	struct hinic_rss_indir_table rss_cfg = { 0 };
+	struct hinic_rss_indir_table rss_cfg = { };
 	struct hinic_hwdev *hwdev = nic_dev->hwdev;
 	struct hinic_hwif *hwif = hwdev->hwif;
 	struct pci_dev *pdev = hwif->pdev;
@@ -743,7 +743,7 @@ int hinic_set_rss_type(struct hinic_dev *nic_dev, u32 tmpl_idx,
 int hinic_get_rss_type(struct hinic_dev *nic_dev, u32 tmpl_idx,
 		       struct hinic_rss_type *rss_type)
 {
-	struct hinic_rss_context_table ctx_tbl = { 0 };
+	struct hinic_rss_context_table ctx_tbl = { };
 	struct hinic_hwdev *hwdev = nic_dev->hwdev;
 	u16 out_size = sizeof(ctx_tbl);
 	struct hinic_hwif *hwif;
@@ -786,7 +786,7 @@ int hinic_rss_set_template_tbl(struct hinic_dev *nic_dev, u32 template_id,
 {
 	struct hinic_hwdev *hwdev = nic_dev->hwdev;
 	struct hinic_hwif *hwif = hwdev->hwif;
-	struct hinic_rss_key rss_key = { 0 };
+	struct hinic_rss_key rss_key = { };
 	struct pci_dev *pdev = hwif->pdev;
 	u16 out_size = sizeof(rss_key);
 	int err;
@@ -811,7 +811,7 @@ int hinic_rss_set_template_tbl(struct hinic_dev *nic_dev, u32 template_id,
 int hinic_rss_get_template_tbl(struct hinic_dev *nic_dev, u32 tmpl_idx,
 			       u8 *temp)
 {
-	struct hinic_rss_template_key temp_key = { 0 };
+	struct hinic_rss_template_key temp_key = { };
 	struct hinic_hwdev *hwdev = nic_dev->hwdev;
 	u16 out_size = sizeof(temp_key);
 	struct hinic_hwif *hwif;
@@ -844,7 +844,7 @@ int hinic_rss_get_template_tbl(struct hinic_dev *nic_dev, u32 tmpl_idx,
 int hinic_rss_set_hash_engine(struct hinic_dev *nic_dev, u8 template_id,
 			      u8 type)
 {
-	struct hinic_rss_engine_type rss_engine = { 0 };
+	struct hinic_rss_engine_type rss_engine = { };
 	struct hinic_hwdev *hwdev = nic_dev->hwdev;
 	struct hinic_hwif *hwif = hwdev->hwif;
 	struct pci_dev *pdev = hwif->pdev;
@@ -870,7 +870,7 @@ int hinic_rss_set_hash_engine(struct hinic_dev *nic_dev, u8 template_id,
 
 int hinic_rss_get_hash_engine(struct hinic_dev *nic_dev, u8 tmpl_idx, u8 *type)
 {
-	struct hinic_rss_engine_type hash_type = { 0 };
+	struct hinic_rss_engine_type hash_type = { };
 	struct hinic_hwdev *hwdev = nic_dev->hwdev;
 	u16 out_size = sizeof(hash_type);
 	struct hinic_hwif *hwif;
@@ -902,7 +902,7 @@ int hinic_rss_get_hash_engine(struct hinic_dev *nic_dev, u8 tmpl_idx, u8 *type)
 int hinic_rss_cfg(struct hinic_dev *nic_dev, u8 rss_en, u8 template_id)
 {
 	struct hinic_hwdev *hwdev = nic_dev->hwdev;
-	struct hinic_rss_config rss_cfg = { 0 };
+	struct hinic_rss_config rss_cfg = { };
 	struct hinic_hwif *hwif = hwdev->hwif;
 	struct pci_dev *pdev = hwif->pdev;
 	u16 out_size = sizeof(rss_cfg);
@@ -928,7 +928,7 @@ int hinic_rss_cfg(struct hinic_dev *nic_dev, u8 rss_en, u8 template_id)
 
 int hinic_rss_template_alloc(struct hinic_dev *nic_dev, u8 *tmpl_idx)
 {
-	struct hinic_rss_template_mgmt template_mgmt = { 0 };
+	struct hinic_rss_template_mgmt template_mgmt = { };
 	struct hinic_hwdev *hwdev = nic_dev->hwdev;
 	struct hinic_hwif *hwif = hwdev->hwif;
 	u16 out_size = sizeof(template_mgmt);
@@ -954,7 +954,7 @@ int hinic_rss_template_alloc(struct hinic_dev *nic_dev, u8 *tmpl_idx)
 
 int hinic_rss_template_free(struct hinic_dev *nic_dev, u8 tmpl_idx)
 {
-	struct hinic_rss_template_mgmt template_mgmt = { 0 };
+	struct hinic_rss_template_mgmt template_mgmt = { };
 	struct hinic_hwdev *hwdev = nic_dev->hwdev;
 	struct hinic_hwif *hwif = hwdev->hwif;
 	u16 out_size = sizeof(template_mgmt);
@@ -980,8 +980,8 @@ int hinic_rss_template_free(struct hinic_dev *nic_dev, u8 tmpl_idx)
 int hinic_get_vport_stats(struct hinic_dev *nic_dev,
 			  struct hinic_vport_stats *stats)
 {
-	struct hinic_cmd_vport_stats vport_stats = { 0 };
-	struct hinic_port_stats_info stats_info = { 0 };
+	struct hinic_cmd_vport_stats vport_stats = { };
+	struct hinic_port_stats_info stats_info = { };
 	struct hinic_hwdev *hwdev = nic_dev->hwdev;
 	struct hinic_hwif *hwif = hwdev->hwif;
 	u16 out_size = sizeof(vport_stats);
@@ -1009,7 +1009,7 @@ int hinic_get_vport_stats(struct hinic_dev *nic_dev,
 int hinic_get_phy_port_stats(struct hinic_dev *nic_dev,
 			     struct hinic_phy_port_stats *stats)
 {
-	struct hinic_port_stats_info stats_info = { 0 };
+	struct hinic_port_stats_info stats_info = { };
 	struct hinic_hwdev *hwdev = nic_dev->hwdev;
 	struct hinic_hwif *hwif = hwdev->hwif;
 	struct hinic_port_stats *port_stats;
@@ -1046,7 +1046,7 @@ out:
 int hinic_get_mgmt_version(struct hinic_dev *nic_dev, u8 *mgmt_ver)
 {
 	struct hinic_hwdev *hwdev = nic_dev->hwdev;
-	struct hinic_version_info up_ver = {0};
+	struct hinic_version_info up_ver = {};
 	u16 out_size = sizeof(up_ver);
 	struct hinic_hwif *hwif;
 	struct pci_dev *pdev;
@@ -1100,7 +1100,7 @@ int hinic_get_link_mode(struct hinic_hwdev *hwdev,
 
 int hinic_set_autoneg(struct hinic_hwdev *hwdev, bool enable)
 {
-	struct hinic_set_autoneg_cmd autoneg = {0};
+	struct hinic_set_autoneg_cmd autoneg = {};
 	u16 out_size = sizeof(autoneg);
 	int err;
 
@@ -1125,7 +1125,7 @@ int hinic_set_autoneg(struct hinic_hwdev *hwdev, bool enable)
 
 int hinic_set_speed(struct hinic_hwdev *hwdev, enum nic_speed_level speed)
 {
-	struct hinic_speed_cmd speed_info = {0};
+	struct hinic_speed_cmd speed_info = {};
 	u16 out_size = sizeof(speed_info);
 	int err;
 
@@ -1210,7 +1210,7 @@ int hinic_set_hw_pause_info(struct hinic_hwdev *hwdev,
 int hinic_dcb_set_pfc(struct hinic_hwdev *hwdev, u8 pfc_en, u8 pfc_bitmap)
 {
 	struct hinic_nic_cfg *nic_cfg = &hwdev->func_to_io.nic_cfg;
-	struct hinic_set_pfc pfc = {0};
+	struct hinic_set_pfc pfc = {};
 	u16 out_size = sizeof(pfc);
 	int err;
 
@@ -1244,7 +1244,7 @@ int hinic_dcb_set_pfc(struct hinic_hwdev *hwdev, u8 pfc_en, u8 pfc_bitmap)
 
 int hinic_set_loopback_mode(struct hinic_hwdev *hwdev, u32 mode, u32 enable)
 {
-	struct hinic_port_loopback lb = {0};
+	struct hinic_port_loopback lb = {};
 	u16 out_size = sizeof(lb);
 	int err;
 
@@ -1273,7 +1273,7 @@ static int _set_led_status(struct hinic_hwdev *hwdev, u8 port,
 			   enum hinic_led_type type,
 			   enum hinic_led_mode mode, u8 reset)
 {
-	struct hinic_led_info led_info = {0};
+	struct hinic_led_info led_info = {};
 	u16 out_size = sizeof(led_info);
 	struct hinic_pfhwdev *pfhwdev;
 	int err;
@@ -1326,7 +1326,7 @@ int hinic_reset_led_status(struct hinic_hwdev *hwdev, u8 port)
 
 static bool hinic_if_sfp_absent(struct hinic_hwdev *hwdev)
 {
-	struct hinic_cmd_get_light_module_abs sfp_abs = {0};
+	struct hinic_cmd_get_light_module_abs sfp_abs = {};
 	u16 out_size = sizeof(sfp_abs);
 	u8 port_id = hwdev->port_id;
 	int err;
@@ -1347,7 +1347,7 @@ static bool hinic_if_sfp_absent(struct hinic_hwdev *hwdev)
 
 int hinic_get_sfp_eeprom(struct hinic_hwdev *hwdev, u8 *data, u16 *len)
 {
-	struct hinic_cmd_get_std_sfp_info sfp_info = {0};
+	struct hinic_cmd_get_std_sfp_info sfp_info = {};
 	u16 out_size = sizeof(sfp_info);
 	u8 port_id;
 	int err;

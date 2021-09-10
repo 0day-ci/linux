@@ -328,7 +328,7 @@ static void rtl8187_rx_cb(struct urb *urb)
 	struct rtl8187_rx_info *info = (struct rtl8187_rx_info *)skb->cb;
 	struct ieee80211_hw *dev = info->dev;
 	struct rtl8187_priv *priv = dev->priv;
-	struct ieee80211_rx_status rx_status = { 0 };
+	struct ieee80211_rx_status rx_status = { };
 	int rate, signal;
 	u32 flags;
 	unsigned long f;

@@ -179,7 +179,7 @@ static const u32 t6_hma_ireg_array[][IREG_NUM_ELEM] = {
 
 u32 cudbg_get_entity_length(struct adapter *adap, u32 entity)
 {
-	struct cudbg_tcam tcam_region = { 0 };
+	struct cudbg_tcam tcam_region = { };
 	u32 value, n = 0, len = 0;
 
 	switch (entity) {
@@ -425,7 +425,7 @@ static int cudbg_do_compression(struct cudbg_init *pdbg_init,
 				struct cudbg_buffer *pin_buff,
 				struct cudbg_buffer *dbg_buff)
 {
-	struct cudbg_buffer temp_in_buff = { 0 };
+	struct cudbg_buffer temp_in_buff = { };
 	int bytes_left, bytes_read, bytes;
 	u32 offset = dbg_buff->offset;
 	int rc;
@@ -815,7 +815,7 @@ int cudbg_collect_reg_dump(struct cudbg_init *pdbg_init,
 			   struct cudbg_error *cudbg_err)
 {
 	struct adapter *padap = pdbg_init->adap;
-	struct cudbg_buffer temp_buff = { 0 };
+	struct cudbg_buffer temp_buff = { };
 	u32 buf_size = 0;
 	int rc = 0;
 
@@ -836,7 +836,7 @@ int cudbg_collect_fw_devlog(struct cudbg_init *pdbg_init,
 			    struct cudbg_error *cudbg_err)
 {
 	struct adapter *padap = pdbg_init->adap;
-	struct cudbg_buffer temp_buff = { 0 };
+	struct cudbg_buffer temp_buff = { };
 	struct devlog_params *dparams;
 	int rc = 0;
 
@@ -874,7 +874,7 @@ int cudbg_collect_cim_la(struct cudbg_init *pdbg_init,
 			 struct cudbg_error *cudbg_err)
 {
 	struct adapter *padap = pdbg_init->adap;
-	struct cudbg_buffer temp_buff = { 0 };
+	struct cudbg_buffer temp_buff = { };
 	int size, rc;
 	u32 cfg = 0;
 
@@ -915,7 +915,7 @@ int cudbg_collect_cim_ma_la(struct cudbg_init *pdbg_init,
 			    struct cudbg_error *cudbg_err)
 {
 	struct adapter *padap = pdbg_init->adap;
-	struct cudbg_buffer temp_buff = { 0 };
+	struct cudbg_buffer temp_buff = { };
 	int size, rc;
 
 	size = 2 * CIM_MALA_SIZE * 5 * sizeof(u32);
@@ -935,7 +935,7 @@ int cudbg_collect_cim_qcfg(struct cudbg_init *pdbg_init,
 			   struct cudbg_error *cudbg_err)
 {
 	struct adapter *padap = pdbg_init->adap;
-	struct cudbg_buffer temp_buff = { 0 };
+	struct cudbg_buffer temp_buff = { };
 	struct cudbg_cim_qcfg *cim_qcfg_data;
 	int rc;
 
@@ -973,7 +973,7 @@ static int cudbg_read_cim_ibq(struct cudbg_init *pdbg_init,
 			      struct cudbg_error *cudbg_err, int qid)
 {
 	struct adapter *padap = pdbg_init->adap;
-	struct cudbg_buffer temp_buff = { 0 };
+	struct cudbg_buffer temp_buff = { };
 	int no_of_read_words, rc = 0;
 	u32 qsize;
 
@@ -1057,7 +1057,7 @@ static int cudbg_read_cim_obq(struct cudbg_init *pdbg_init,
 			      struct cudbg_error *cudbg_err, int qid)
 {
 	struct adapter *padap = pdbg_init->adap;
-	struct cudbg_buffer temp_buff = { 0 };
+	struct cudbg_buffer temp_buff = { };
 	int no_of_read_words, rc = 0;
 	u32 qsize;
 
@@ -1257,7 +1257,7 @@ static int cudbg_get_payload_range(struct adapter *padap, u8 mem_type,
 				   const char *region_name,
 				   struct cudbg_region_info *payload)
 {
-	struct cudbg_mem_desc mem_desc = { 0 };
+	struct cudbg_mem_desc mem_desc = { };
 	struct cudbg_meminfo meminfo;
 	int rc;
 
@@ -1371,7 +1371,7 @@ static int cudbg_read_fw_mem(struct cudbg_init *pdbg_init,
 						    "Rx payload:" };
 	unsigned long bytes, bytes_left, bytes_read = 0;
 	struct adapter *padap = pdbg_init->adap;
-	struct cudbg_buffer temp_buff = { 0 };
+	struct cudbg_buffer temp_buff = { };
 	struct cudbg_region_info payload[2];
 	u32 yield_count = 0;
 	int rc = 0;
@@ -1546,7 +1546,7 @@ int cudbg_collect_rss(struct cudbg_init *pdbg_init,
 		      struct cudbg_error *cudbg_err)
 {
 	struct adapter *padap = pdbg_init->adap;
-	struct cudbg_buffer temp_buff = { 0 };
+	struct cudbg_buffer temp_buff = { };
 	int rc, nentries;
 
 	nentries = t4_chip_rss_size(padap);
@@ -1569,7 +1569,7 @@ int cudbg_collect_rss_vf_config(struct cudbg_init *pdbg_init,
 				struct cudbg_error *cudbg_err)
 {
 	struct adapter *padap = pdbg_init->adap;
-	struct cudbg_buffer temp_buff = { 0 };
+	struct cudbg_buffer temp_buff = { };
 	struct cudbg_rss_vf_conf *vfconf;
 	int vf, rc, vf_count;
 
@@ -1592,7 +1592,7 @@ int cudbg_collect_path_mtu(struct cudbg_init *pdbg_init,
 			   struct cudbg_error *cudbg_err)
 {
 	struct adapter *padap = pdbg_init->adap;
-	struct cudbg_buffer temp_buff = { 0 };
+	struct cudbg_buffer temp_buff = { };
 	int rc;
 
 	rc = cudbg_get_buff(pdbg_init, dbg_buff, NMTUS * sizeof(u16),
@@ -1609,7 +1609,7 @@ int cudbg_collect_pm_stats(struct cudbg_init *pdbg_init,
 			   struct cudbg_error *cudbg_err)
 {
 	struct adapter *padap = pdbg_init->adap;
-	struct cudbg_buffer temp_buff = { 0 };
+	struct cudbg_buffer temp_buff = { };
 	struct cudbg_pm_stats *pm_stats_buff;
 	int rc;
 
@@ -1629,7 +1629,7 @@ int cudbg_collect_hw_sched(struct cudbg_init *pdbg_init,
 			   struct cudbg_error *cudbg_err)
 {
 	struct adapter *padap = pdbg_init->adap;
-	struct cudbg_buffer temp_buff = { 0 };
+	struct cudbg_buffer temp_buff = { };
 	struct cudbg_hw_sched *hw_sched_buff;
 	int i, rc = 0;
 
@@ -1657,7 +1657,7 @@ int cudbg_collect_tp_indirect(struct cudbg_init *pdbg_init,
 			      struct cudbg_error *cudbg_err)
 {
 	struct adapter *padap = pdbg_init->adap;
-	struct cudbg_buffer temp_buff = { 0 };
+	struct cudbg_buffer temp_buff = { };
 	struct ireg_buf *ch_tp_pio;
 	int i, rc, n = 0;
 	u32 size;
@@ -1791,7 +1791,7 @@ int cudbg_collect_sge_indirect(struct cudbg_init *pdbg_init,
 			       struct cudbg_error *cudbg_err)
 {
 	struct adapter *padap = pdbg_init->adap;
-	struct cudbg_buffer temp_buff = { 0 };
+	struct cudbg_buffer temp_buff = { };
 	struct sge_qbase_reg_field *sge_qbase;
 	struct ireg_buf *ch_sge_dbg;
 	u8 padap_running = 0;
@@ -1864,7 +1864,7 @@ int cudbg_collect_ulprx_la(struct cudbg_init *pdbg_init,
 			   struct cudbg_error *cudbg_err)
 {
 	struct adapter *padap = pdbg_init->adap;
-	struct cudbg_buffer temp_buff = { 0 };
+	struct cudbg_buffer temp_buff = { };
 	struct cudbg_ulprx_la *ulprx_la_buff;
 	int rc;
 
@@ -1884,7 +1884,7 @@ int cudbg_collect_tp_la(struct cudbg_init *pdbg_init,
 			struct cudbg_error *cudbg_err)
 {
 	struct adapter *padap = pdbg_init->adap;
-	struct cudbg_buffer temp_buff = { 0 };
+	struct cudbg_buffer temp_buff = { };
 	struct cudbg_tp_la *tp_la_buff;
 	int size, rc;
 
@@ -1904,7 +1904,7 @@ int cudbg_collect_meminfo(struct cudbg_init *pdbg_init,
 			  struct cudbg_error *cudbg_err)
 {
 	struct adapter *padap = pdbg_init->adap;
-	struct cudbg_buffer temp_buff = { 0 };
+	struct cudbg_buffer temp_buff = { };
 	struct cudbg_meminfo *meminfo_buff;
 	struct cudbg_ver_hdr *ver_hdr;
 	int rc;
@@ -1939,7 +1939,7 @@ int cudbg_collect_cim_pif_la(struct cudbg_init *pdbg_init,
 {
 	struct cudbg_cim_pif_la *cim_pif_la_buff;
 	struct adapter *padap = pdbg_init->adap;
-	struct cudbg_buffer temp_buff = { 0 };
+	struct cudbg_buffer temp_buff = { };
 	int size, rc;
 
 	size = sizeof(struct cudbg_cim_pif_la) +
@@ -1961,7 +1961,7 @@ int cudbg_collect_clk_info(struct cudbg_init *pdbg_init,
 			   struct cudbg_error *cudbg_err)
 {
 	struct adapter *padap = pdbg_init->adap;
-	struct cudbg_buffer temp_buff = { 0 };
+	struct cudbg_buffer temp_buff = { };
 	struct cudbg_clk_info *clk_info_buff;
 	u64 tp_tick_us;
 	int rc;
@@ -2009,7 +2009,7 @@ int cudbg_collect_pcie_indirect(struct cudbg_init *pdbg_init,
 				struct cudbg_error *cudbg_err)
 {
 	struct adapter *padap = pdbg_init->adap;
-	struct cudbg_buffer temp_buff = { 0 };
+	struct cudbg_buffer temp_buff = { };
 	struct ireg_buf *ch_pcie;
 	int i, rc, n;
 	u32 size;
@@ -2065,7 +2065,7 @@ int cudbg_collect_pm_indirect(struct cudbg_init *pdbg_init,
 			      struct cudbg_error *cudbg_err)
 {
 	struct adapter *padap = pdbg_init->adap;
-	struct cudbg_buffer temp_buff = { 0 };
+	struct cudbg_buffer temp_buff = { };
 	struct ireg_buf *ch_pm;
 	int i, rc, n;
 	u32 size;
@@ -2122,7 +2122,7 @@ int cudbg_collect_tid(struct cudbg_init *pdbg_init,
 {
 	struct adapter *padap = pdbg_init->adap;
 	struct cudbg_tid_info_region_rev1 *tid1;
-	struct cudbg_buffer temp_buff = { 0 };
+	struct cudbg_buffer temp_buff = { };
 	struct cudbg_tid_info_region *tid;
 	u32 para[2], val[2];
 	int rc;
@@ -2213,7 +2213,7 @@ int cudbg_collect_pcie_config(struct cudbg_init *pdbg_init,
 			      struct cudbg_error *cudbg_err)
 {
 	struct adapter *padap = pdbg_init->adap;
-	struct cudbg_buffer temp_buff = { 0 };
+	struct cudbg_buffer temp_buff = { };
 	u32 size, *value, j;
 	int i, rc, n;
 
@@ -2394,7 +2394,7 @@ int cudbg_collect_dump_context(struct cudbg_init *pdbg_init,
 	struct adapter *padap = pdbg_init->adap;
 	u32 j, size, max_ctx_size, max_ctx_qid;
 	u8 mem_type[CTXT_INGRESS + 1] = { 0 };
-	struct cudbg_buffer temp_buff = { 0 };
+	struct cudbg_buffer temp_buff = { };
 	struct cudbg_ch_cntxt *buff;
 	u8 *ctx_buf;
 	u8 i, k;
@@ -2662,7 +2662,7 @@ int cudbg_collect_mps_tcam(struct cudbg_init *pdbg_init,
 			   struct cudbg_error *cudbg_err)
 {
 	struct adapter *padap = pdbg_init->adap;
-	struct cudbg_buffer temp_buff = { 0 };
+	struct cudbg_buffer temp_buff = { };
 	u32 size = 0, i, n, total_size = 0;
 	struct cudbg_mps_tcam *tcam;
 	int rc;
@@ -2699,10 +2699,10 @@ int cudbg_collect_vpd_data(struct cudbg_init *pdbg_init,
 			   struct cudbg_error *cudbg_err)
 {
 	struct adapter *padap = pdbg_init->adap;
-	struct cudbg_buffer temp_buff = { 0 };
+	struct cudbg_buffer temp_buff = { };
 	char vpd_str[CUDBG_VPD_VER_LEN + 1];
 	struct cudbg_vpd_data *vpd_data;
-	struct vpd_params vpd = { 0 };
+	struct vpd_params vpd = { };
 	u32 vpd_vers, fw_vers;
 	int rc;
 
@@ -2891,8 +2891,8 @@ int cudbg_collect_le_tcam(struct cudbg_init *pdbg_init,
 			  struct cudbg_error *cudbg_err)
 {
 	struct adapter *padap = pdbg_init->adap;
-	struct cudbg_buffer temp_buff = { 0 };
-	struct cudbg_tcam tcam_region = { 0 };
+	struct cudbg_buffer temp_buff = { };
+	struct cudbg_tcam tcam_region = { };
 	struct cudbg_tid_data *tid_data;
 	u32 bytes = 0;
 	int rc, size;
@@ -2946,7 +2946,7 @@ int cudbg_collect_cctrl(struct cudbg_init *pdbg_init,
 			struct cudbg_error *cudbg_err)
 {
 	struct adapter *padap = pdbg_init->adap;
-	struct cudbg_buffer temp_buff = { 0 };
+	struct cudbg_buffer temp_buff = { };
 	u32 size;
 	int rc;
 
@@ -2964,7 +2964,7 @@ int cudbg_collect_ma_indirect(struct cudbg_init *pdbg_init,
 			      struct cudbg_error *cudbg_err)
 {
 	struct adapter *padap = pdbg_init->adap;
-	struct cudbg_buffer temp_buff = { 0 };
+	struct cudbg_buffer temp_buff = { };
 	struct ireg_buf *ma_indr;
 	int i, rc, n;
 	u32 size, j;
@@ -3018,7 +3018,7 @@ int cudbg_collect_ulptx_la(struct cudbg_init *pdbg_init,
 			   struct cudbg_error *cudbg_err)
 {
 	struct adapter *padap = pdbg_init->adap;
-	struct cudbg_buffer temp_buff = { 0 };
+	struct cudbg_buffer temp_buff = { };
 	struct cudbg_ulptx_la *ulptx_la_buff;
 	struct cudbg_ver_hdr *ver_hdr;
 	u32 i, j;
@@ -3080,7 +3080,7 @@ int cudbg_collect_up_cim_indirect(struct cudbg_init *pdbg_init,
 				  struct cudbg_error *cudbg_err)
 {
 	struct adapter *padap = pdbg_init->adap;
-	struct cudbg_buffer temp_buff = { 0 };
+	struct cudbg_buffer temp_buff = { };
 	u32 local_offset, local_range;
 	struct ireg_buf *up_cim;
 	u32 size, j, iter;
@@ -3161,7 +3161,7 @@ int cudbg_collect_pbt_tables(struct cudbg_init *pdbg_init,
 			     struct cudbg_error *cudbg_err)
 {
 	struct adapter *padap = pdbg_init->adap;
-	struct cudbg_buffer temp_buff = { 0 };
+	struct cudbg_buffer temp_buff = { };
 	struct cudbg_pbt_tables *pbt;
 	int i, rc;
 	u32 addr;
@@ -3230,7 +3230,7 @@ int cudbg_collect_mbox_log(struct cudbg_init *pdbg_init,
 {
 	struct adapter *padap = pdbg_init->adap;
 	struct cudbg_mbox_log *mboxlog = NULL;
-	struct cudbg_buffer temp_buff = { 0 };
+	struct cudbg_buffer temp_buff = { };
 	struct mbox_cmd_log *log = NULL;
 	struct mbox_cmd *entry;
 	unsigned int entry_idx;
@@ -3273,7 +3273,7 @@ int cudbg_collect_hma_indirect(struct cudbg_init *pdbg_init,
 			       struct cudbg_error *cudbg_err)
 {
 	struct adapter *padap = pdbg_init->adap;
-	struct cudbg_buffer temp_buff = { 0 };
+	struct cudbg_buffer temp_buff = { };
 	struct ireg_buf *hma_indr;
 	int i, rc, n;
 	u32 size;
@@ -3364,7 +3364,7 @@ int cudbg_collect_qdesc(struct cudbg_init *pdbg_init,
 {
 	u32 num_queues = 0, tot_entries = 0, size = 0;
 	struct adapter *padap = pdbg_init->adap;
-	struct cudbg_buffer temp_buff = { 0 };
+	struct cudbg_buffer temp_buff = { };
 	struct cudbg_qdesc_entry *qdesc_entry;
 	struct cudbg_qdesc_info *qdesc_info;
 	struct cudbg_ver_hdr *ver_hdr;
@@ -3567,7 +3567,7 @@ int cudbg_collect_flash(struct cudbg_init *pdbg_init,
 {
 	struct adapter *padap = pdbg_init->adap;
 	u32 count = padap->params.sf_size, n;
-	struct cudbg_buffer temp_buff = {0};
+	struct cudbg_buffer temp_buff = {};
 	u32 addr, i;
 	int rc;
 

@@ -893,7 +893,7 @@ static void rvu_mcam_add_rule(struct npc_mcam *mcam,
 static void rvu_mcam_remove_counter_from_rule(struct rvu *rvu, u16 pcifunc,
 					      struct rvu_npc_mcam_rule *rule)
 {
-	struct npc_mcam_oper_counter_req free_req = { 0 };
+	struct npc_mcam_oper_counter_req free_req = { };
 	struct msg_rsp free_rsp;
 
 	if (!rule->has_cntr)
@@ -910,8 +910,8 @@ static void rvu_mcam_add_counter_to_rule(struct rvu *rvu, u16 pcifunc,
 					 struct rvu_npc_mcam_rule *rule,
 					 struct npc_install_flow_rsp *rsp)
 {
-	struct npc_mcam_alloc_counter_req cntr_req = { 0 };
-	struct npc_mcam_alloc_counter_rsp cntr_rsp = { 0 };
+	struct npc_mcam_alloc_counter_req cntr_req = { };
+	struct npc_mcam_alloc_counter_rsp cntr_rsp = { };
 	int err;
 
 	cntr_req.hdr.pcifunc = pcifunc;
@@ -1016,9 +1016,9 @@ static int npc_install_flow(struct rvu *rvu, int blkaddr, u16 target,
 {
 	struct rvu_npc_mcam_rule *def_ucast_rule = pfvf->def_ucast_rule;
 	u64 features, installed_features, missing_features = 0;
-	struct npc_mcam_write_entry_req write_req = { 0 };
+	struct npc_mcam_write_entry_req write_req = { };
 	struct npc_mcam *mcam = &rvu->hw->mcam;
-	struct rvu_npc_mcam_rule dummy = { 0 };
+	struct rvu_npc_mcam_rule dummy = { };
 	struct rvu_npc_mcam_rule *rule;
 	u16 owner = req->hdr.pcifunc;
 	struct msg_rsp write_rsp;
@@ -1251,7 +1251,7 @@ int rvu_mbox_handler_npc_install_flow(struct rvu *rvu,
 static int npc_delete_flow(struct rvu *rvu, struct rvu_npc_mcam_rule *rule,
 			   u16 pcifunc)
 {
-	struct npc_mcam_ena_dis_entry_req dis_req = { 0 };
+	struct npc_mcam_ena_dis_entry_req dis_req = { };
 	struct msg_rsp dis_rsp;
 
 	if (rule->default_rule)
@@ -1316,7 +1316,7 @@ static int npc_update_dmac_value(struct rvu *rvu, int npcblkaddr,
 				 struct rvu_npc_mcam_rule *rule,
 				 struct rvu_pfvf *pfvf)
 {
-	struct npc_mcam_write_entry_req write_req = { 0 };
+	struct npc_mcam_write_entry_req write_req = { };
 	struct mcam_entry *entry = &write_req.entry_data;
 	struct npc_mcam *mcam = &rvu->hw->mcam;
 	struct msg_rsp rsp;

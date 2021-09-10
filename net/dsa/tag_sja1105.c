@@ -473,7 +473,7 @@ static struct sk_buff *sja1105_rcv(struct sk_buff *skb,
 				   struct net_device *netdev)
 {
 	int source_port = -1, switch_id = -1;
-	struct sja1105_meta meta = {0};
+	struct sja1105_meta meta = {};
 	struct ethhdr *hdr;
 	bool is_link_local;
 	bool is_meta;

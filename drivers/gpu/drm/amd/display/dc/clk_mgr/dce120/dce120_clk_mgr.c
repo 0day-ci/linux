@@ -86,7 +86,7 @@ static void dce12_update_clocks(struct clk_mgr *clk_mgr_base,
 			bool safe_to_lower)
 {
 	struct clk_mgr_internal *clk_mgr_dce = TO_CLK_MGR_INTERNAL(clk_mgr_base);
-	struct dm_pp_clock_for_voltage_req clock_voltage_req = {0};
+	struct dm_pp_clock_for_voltage_req clock_voltage_req = {};
 	int max_pix_clk = dce_get_max_pixel_clock_for_all_paths(context);
 	int patched_disp_clk = context->bw_ctx.bw.dce.dispclk_khz;
 

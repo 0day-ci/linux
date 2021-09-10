@@ -601,7 +601,7 @@ int sun6i_video_init(struct sun6i_video *video, struct sun6i_csi *csi,
 {
 	struct video_device *vdev = &video->vdev;
 	struct vb2_queue *vidq = &video->vb2_vidq;
-	struct v4l2_format fmt = { 0 };
+	struct v4l2_format fmt = { };
 	int ret;
 
 	video->csi = csi;

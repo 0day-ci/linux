@@ -1874,7 +1874,7 @@ static struct msdc_delay_phase get_best_delay(struct msdc_host *host, u32 delay)
 	int start = 0, len = 0;
 	int start_final = 0, len_final = 0;
 	u8 final_phase = 0xff;
-	struct msdc_delay_phase delay_phase = { 0, };
+	struct msdc_delay_phase delay_phase = { };
 
 	if (delay == 0) {
 		dev_err(host->dev, "phase error: [map:%x]\n", delay);
@@ -1935,7 +1935,7 @@ static int msdc_tune_response(struct mmc_host *mmc, u32 opcode)
 {
 	struct msdc_host *host = mmc_priv(mmc);
 	u32 rise_delay = 0, fall_delay = 0;
-	struct msdc_delay_phase final_rise_delay, final_fall_delay = { 0,};
+	struct msdc_delay_phase final_rise_delay, final_fall_delay = { };
 	struct msdc_delay_phase internal_delay_phase;
 	u8 final_delay, final_maxlen;
 	u32 internal_delay = 0;
@@ -2029,7 +2029,7 @@ static int hs400_tune_response(struct mmc_host *mmc, u32 opcode)
 {
 	struct msdc_host *host = mmc_priv(mmc);
 	u32 cmd_delay = 0;
-	struct msdc_delay_phase final_cmd_delay = { 0,};
+	struct msdc_delay_phase final_cmd_delay = { };
 	u8 final_delay;
 	int cmd_err;
 	int i, j;
@@ -2079,7 +2079,7 @@ static int msdc_tune_data(struct mmc_host *mmc, u32 opcode)
 {
 	struct msdc_host *host = mmc_priv(mmc);
 	u32 rise_delay = 0, fall_delay = 0;
-	struct msdc_delay_phase final_rise_delay, final_fall_delay = { 0,};
+	struct msdc_delay_phase final_rise_delay, final_fall_delay = { };
 	u8 final_delay, final_maxlen;
 	int i, ret;
 
@@ -2134,7 +2134,7 @@ static int msdc_tune_together(struct mmc_host *mmc, u32 opcode)
 {
 	struct msdc_host *host = mmc_priv(mmc);
 	u32 rise_delay = 0, fall_delay = 0;
-	struct msdc_delay_phase final_rise_delay, final_fall_delay = { 0,};
+	struct msdc_delay_phase final_rise_delay, final_fall_delay = { };
 	u8 final_delay, final_maxlen;
 	int i, ret;
 

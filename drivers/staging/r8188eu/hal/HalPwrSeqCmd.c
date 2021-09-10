@@ -28,7 +28,7 @@ Major Change History:
 u8 HalPwrSeqCmdParsing(struct adapter *padapter, u8 cut_vers, u8 fab_vers,
 		       u8 ifacetype, struct wl_pwr_cfg pwrseqcmd[])
 {
-	struct wl_pwr_cfg pwrcfgcmd = {0};
+	struct wl_pwr_cfg pwrcfgcmd = {};
 	u8 poll_bit = false;
 	u32 aryidx = 0;
 	u8 value = 0;

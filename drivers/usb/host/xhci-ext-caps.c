@@ -31,7 +31,7 @@ static int xhci_create_intel_xhci_sw_pdev(struct xhci_hcd *xhci, u32 cap_offset)
 	struct device *dev = hcd->self.controller;
 	struct platform_device *pdev;
 	struct pci_dev *pci = to_pci_dev(dev);
-	struct resource	res = { 0, };
+	struct resource	res = { };
 	int ret;
 
 	pdev = platform_device_alloc(USB_SW_DRV_NAME, PLATFORM_DEVID_NONE);

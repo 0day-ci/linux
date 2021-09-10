@@ -163,7 +163,7 @@ static int hdmi_power_on_full(struct omap_dss_device *dssdev)
 	int r;
 	struct omap_video_timings *p;
 	struct omap_overlay_manager *mgr = hdmi.output.manager;
-	struct dss_pll_clock_info hdmi_cinfo = { 0 };
+	struct dss_pll_clock_info hdmi_cinfo = { };
 
 	r = hdmi_power_on_core(dssdev);
 	if (r)

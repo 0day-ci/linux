@@ -422,7 +422,7 @@ static inline struct imx412 *to_imx412(struct v4l2_subdev *subdev)
 static int imx412_read_reg(struct imx412 *imx412, u16 reg, u32 len, u32 *val)
 {
 	struct i2c_client *client = v4l2_get_subdevdata(&imx412->sd);
-	struct i2c_msg msgs[2] = {0};
+	struct i2c_msg msgs[2] = {};
 	u8 addr_buf[2] = {0};
 	u8 data_buf[4] = {0};
 	int ret;
@@ -773,7 +773,7 @@ static int imx412_init_pad_cfg(struct v4l2_subdev *sd,
 			       struct v4l2_subdev_state *sd_state)
 {
 	struct imx412 *imx412 = to_imx412(sd);
-	struct v4l2_subdev_format fmt = { 0 };
+	struct v4l2_subdev_format fmt = { };
 
 	fmt.which = sd_state ? V4L2_SUBDEV_FORMAT_TRY : V4L2_SUBDEV_FORMAT_ACTIVE;
 	imx412_fill_pad_format(imx412, &supported_mode, &fmt);

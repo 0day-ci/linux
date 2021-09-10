@@ -311,7 +311,7 @@ static int vega10_odn_initial_default_setting(struct pp_hwmgr *hwmgr)
 	struct phm_ppt_v1_voltage_lookup_table *vddc_lookup_table;
 	struct phm_ppt_v1_clock_voltage_dependency_table *dep_table[3];
 	struct phm_ppt_v1_clock_voltage_dependency_table *od_table[3];
-	struct pp_atomfwctrl_avfs_parameters avfs_params = {0};
+	struct pp_atomfwctrl_avfs_parameters avfs_params = {};
 	uint32_t i;
 	int result;
 
@@ -2167,7 +2167,7 @@ static int vega10_populate_avfs_parameters(struct pp_hwmgr *hwmgr)
 			(struct phm_ppt_v2_information *)(hwmgr->pptable);
 	struct phm_ppt_v1_clock_voltage_dependency_table *dep_table =
 			table_info->vdd_dep_on_sclk;
-	struct pp_atomfwctrl_avfs_parameters avfs_params = {0};
+	struct pp_atomfwctrl_avfs_parameters avfs_params = {};
 	int result = 0;
 	uint32_t i;
 
@@ -2398,7 +2398,7 @@ static int vega10_populate_gpio_parameters(struct pp_hwmgr *hwmgr)
 {
 	struct vega10_hwmgr *data = hwmgr->backend;
 	PPTable_t *pp_table = &(data->smc_state_table.pp_table);
-	struct pp_atomfwctrl_gpio_parameters gpio_params = {0};
+	struct pp_atomfwctrl_gpio_parameters gpio_params = {};
 	int result;
 
 	result = pp_atomfwctrl_get_gpio_information(hwmgr, &gpio_params);
@@ -3241,7 +3241,7 @@ static int vega10_apply_state_adjust_rules(struct pp_hwmgr *hwmgr,
 				cast_phw_vega10_power_state(&request_ps->hardware);
 	uint32_t sclk;
 	uint32_t mclk;
-	struct PP_Clocks minimum_clocks = {0};
+	struct PP_Clocks minimum_clocks = {};
 	bool disable_mclk_switching;
 	bool disable_mclk_switching_for_frame_lock;
 	bool disable_mclk_switching_for_vr;
@@ -4044,7 +4044,7 @@ static int vega10_notify_smc_display_config_after_ps_adjustment(
 			(struct phm_ppt_v2_information *)hwmgr->pptable;
 	struct phm_ppt_v1_clock_voltage_dependency_table *mclk_table = table_info->vdd_dep_on_mclk;
 	uint32_t idx;
-	struct PP_Clocks min_clocks = {0};
+	struct PP_Clocks min_clocks = {};
 	uint32_t i;
 	struct pp_display_clock_request clock_req;
 

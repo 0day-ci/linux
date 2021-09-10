@@ -1324,7 +1324,7 @@ static void hwi_complete_cmd(struct beiscsi_conn *beiscsi_conn,
 {
 	struct iscsi_conn *conn = beiscsi_conn->conn;
 	struct iscsi_session *session = conn->session;
-	struct common_sol_cqe csol_cqe = {0};
+	struct common_sol_cqe csol_cqe = {};
 	struct hwi_wrb_context *pwrb_context;
 	struct hwi_controller *phwi_ctrlr;
 	struct wrb_handle *pwrb_handle;

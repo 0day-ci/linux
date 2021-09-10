@@ -401,7 +401,7 @@ ssize_t ubifs_listxattr(struct dentry *dentry, char *buffer, size_t size)
 	struct ubifs_inode *host_ui = ubifs_inode(host);
 	struct ubifs_dent_node *xent, *pxent = NULL;
 	int err, len, written = 0;
-	struct fscrypt_name nm = {0};
+	struct fscrypt_name nm = {};
 
 	dbg_gen("ino %lu ('%pd'), buffer size %zd", host->i_ino,
 		dentry, size);
@@ -505,7 +505,7 @@ int ubifs_purge_xattrs(struct inode *host)
 	struct ubifs_info *c = host->i_sb->s_fs_info;
 	struct ubifs_dent_node *xent, *pxent = NULL;
 	struct inode *xino;
-	struct fscrypt_name nm = {0};
+	struct fscrypt_name nm = {};
 	int err;
 
 	if (ubifs_inode(host)->xattr_cnt <= ubifs_xattr_max_cnt(c))

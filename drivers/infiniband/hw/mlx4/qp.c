@@ -3334,7 +3334,7 @@ static void set_tunnel_datagram_seg(struct mlx4_ib_dev *dev,
 				    enum mlx4_ib_qp_type qpt)
 {
 	union mlx4_ext_av *av = &to_mah(wr->ah)->av;
-	struct mlx4_av sqp_av = {0};
+	struct mlx4_av sqp_av = {};
 	int port = *((u8 *) &av->ib.port_pd) & 0x3;
 
 	/* force loopback */

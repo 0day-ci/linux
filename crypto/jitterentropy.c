@@ -704,7 +704,7 @@ int jent_entropy_init(void)
 	int time_backwards = 0;
 	int count_mod = 0;
 	int count_stuck = 0;
-	struct rand_data ec = { 0 };
+	struct rand_data ec = { };
 
 	/* Required for RCT */
 	ec.osr = 1;

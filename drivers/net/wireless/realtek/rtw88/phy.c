@@ -981,7 +981,7 @@ void rtw_phy_setup_phy_cond(struct rtw_dev *rtwdev, u32 pkg)
 {
 	struct rtw_hal *hal = &rtwdev->hal;
 	struct rtw_efuse *efuse = &rtwdev->efuse;
-	struct rtw_phy_cond cond = {0};
+	struct rtw_phy_cond cond = {};
 
 	cond.cut = hal->cut_version ? hal->cut_version : 15;
 	cond.pkg = pkg ? pkg : 15;
@@ -1030,7 +1030,7 @@ void rtw_parse_tbl_phy_cond(struct rtw_dev *rtwdev, const struct rtw_table *tbl)
 {
 	const union phy_table_tile *p = tbl->data;
 	const union phy_table_tile *end = p + tbl->size / 2;
-	struct rtw_phy_cond pos_cond = {0};
+	struct rtw_phy_cond pos_cond = {};
 	bool is_matched = true, is_skipped = false;
 
 	BUILD_BUG_ON(sizeof(union phy_table_tile) != sizeof(struct phy_cfg_pair));
@@ -1988,7 +1988,7 @@ u8
 rtw_phy_get_tx_power_index(struct rtw_dev *rtwdev, u8 rf_path, u8 rate,
 			   enum rtw_bandwidth bandwidth, u8 channel, u8 regd)
 {
-	struct rtw_power_params pwr_param = {0};
+	struct rtw_power_params pwr_param = {};
 	u8 tx_power;
 	s8 offset;
 

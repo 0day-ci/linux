@@ -422,7 +422,7 @@ static int __hwrm_send(struct bnxt *bp, struct bnxt_hwrm_ctx *ctx)
 	enum bnxt_hwrm_chnl dst = BNXT_HWRM_CHNL_CHIMP;
 	u32 bar_offset = BNXT_GRCPF_REG_CHIMP_COMM;
 	struct bnxt_hwrm_wait_token *token = NULL;
-	struct hwrm_short_input short_input = {0};
+	struct hwrm_short_input short_input = {};
 	u16 max_req_len = BNXT_HWRM_MAX_REQ_LEN;
 	unsigned int i, timeout, tmo_count;
 	u32 *data = (u32 *)ctx->req;

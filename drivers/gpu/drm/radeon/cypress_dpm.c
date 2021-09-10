@@ -1070,7 +1070,7 @@ static int cypress_initialize_mc_reg_table(struct radeon_device *rdev)
 {
 	struct rv7xx_power_info *pi = rv770_get_pi(rdev);
 	u8 module_index = rv770_get_memory_module_index(rdev);
-	struct atom_memory_clock_range_table range_table = { 0 };
+	struct atom_memory_clock_range_table range_table = { };
 	int ret;
 
 	ret = radeon_atom_get_mclk_range_table(rdev,

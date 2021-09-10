@@ -496,7 +496,7 @@ static void hdmi_core_csc_config(struct hdmi_core_data *core,
 
 static void hdmi_core_configure_range(struct hdmi_core_data *core)
 {
-	struct csc_table csc_coeff = { 0 };
+	struct csc_table csc_coeff = { };
 
 	/* support limited range with 24 bit color depth for now */
 	csc_coeff = csc_table_deepcolor[0];

@@ -397,7 +397,7 @@ enum ice_status
 ice_aq_get_link_info(struct ice_port_info *pi, bool ena_lse,
 		     struct ice_link_status *link, struct ice_sq_cd *cd)
 {
-	struct ice_aqc_get_link_status_data link_data = { 0 };
+	struct ice_aqc_get_link_status_data link_data = { };
 	struct ice_aqc_get_link_status *resp;
 	struct ice_link_status *li_old, *li;
 	enum ice_media_type *hw_media_type;
@@ -1330,8 +1330,8 @@ ice_sbq_send_cmd(struct ice_hw *hw, struct ice_sbq_cmd_desc *desc,
  */
 int ice_sbq_rw_reg(struct ice_hw *hw, struct ice_sbq_msg_input *in)
 {
-	struct ice_sbq_cmd_desc desc = {0};
-	struct ice_sbq_msg_req msg = {0};
+	struct ice_sbq_cmd_desc desc = {};
+	struct ice_sbq_msg_req msg = {};
 	u16 msg_len;
 	int status;
 
@@ -3069,7 +3069,7 @@ ice_cfg_phy_fc(struct ice_port_info *pi, struct ice_aqc_set_phy_cfg_data *cfg,
 enum ice_status
 ice_set_fc(struct ice_port_info *pi, u8 *aq_failures, bool ena_auto_link_update)
 {
-	struct ice_aqc_set_phy_cfg_data cfg = { 0 };
+	struct ice_aqc_set_phy_cfg_data cfg = { };
 	struct ice_aqc_get_phy_caps_data *pcaps;
 	enum ice_status status;
 	struct ice_hw *hw;
@@ -4139,7 +4139,7 @@ ice_ena_vsi_txq(struct ice_port_info *pi, u16 vsi_handle, u8 tc, u16 q_handle,
 		u8 num_qgrps, struct ice_aqc_add_tx_qgrp *buf, u16 buf_size,
 		struct ice_sq_cd *cd)
 {
-	struct ice_aqc_txsched_elem_data node = { 0 };
+	struct ice_aqc_txsched_elem_data node = { };
 	struct ice_sched_node *parent;
 	struct ice_q_ctx *q_ctx;
 	enum ice_status status;
@@ -4397,7 +4397,7 @@ int
 ice_ena_vsi_rdma_qset(struct ice_port_info *pi, u16 vsi_handle, u8 tc,
 		      u16 *rdma_qset, u16 num_qsets, u32 *qset_teid)
 {
-	struct ice_aqc_txsched_elem_data node = { 0 };
+	struct ice_aqc_txsched_elem_data node = { };
 	struct ice_aqc_add_rdma_qset_data *buf;
 	struct ice_sched_node *parent;
 	enum ice_status status;

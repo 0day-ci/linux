@@ -209,7 +209,7 @@ static void qedr_iw_disconnect_worker(struct work_struct *work)
 {
 	struct qedr_discon_work *dwork =
 	    container_of(work, struct qedr_discon_work, work);
-	struct qed_rdma_modify_qp_in_params qp_params = { 0 };
+	struct qed_rdma_modify_qp_in_params qp_params = { };
 	struct qedr_iw_ep *ep = dwork->ep;
 	struct qedr_dev *dev = ep->dev;
 	struct qedr_qp *qp = ep->qp;

@@ -292,7 +292,7 @@ xrep_alloc_ag_block(
 	xfs_fsblock_t			*fsbno,
 	enum xfs_ag_resv_type		resv)
 {
-	struct xfs_alloc_arg		args = {0};
+	struct xfs_alloc_arg		args = {};
 	xfs_agblock_t			bno;
 	int				error;
 
@@ -477,7 +477,7 @@ xrep_fix_freelist(
 	struct xfs_scrub	*sc,
 	bool			can_shrink)
 {
-	struct xfs_alloc_arg	args = {0};
+	struct xfs_alloc_arg	args = {};
 
 	args.mp = sc->mp;
 	args.tp = sc->tp;

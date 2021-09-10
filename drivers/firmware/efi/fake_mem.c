@@ -36,7 +36,7 @@ static int __init cmp_fake_mem(const void *x1, const void *x2)
 
 static void __init efi_fake_range(struct efi_mem_range *efi_range)
 {
-	struct efi_memory_map_data data = { 0 };
+	struct efi_memory_map_data data = { };
 	int new_nr_map = efi.memmap.nr_map;
 	efi_memory_desc_t *md;
 	void *new_memmap;

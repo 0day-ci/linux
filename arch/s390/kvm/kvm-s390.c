@@ -1151,7 +1151,7 @@ static int kvm_s390_set_tod_high(struct kvm *kvm, struct kvm_device_attr *attr)
 
 static int kvm_s390_set_tod_low(struct kvm *kvm, struct kvm_device_attr *attr)
 {
-	struct kvm_s390_vm_tod_clock gtod = { 0 };
+	struct kvm_s390_vm_tod_clock gtod = { };
 
 	if (copy_from_user(&gtod.tod, (void __user *)attr->addr,
 			   sizeof(gtod.tod)))

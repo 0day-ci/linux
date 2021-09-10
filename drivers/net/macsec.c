@@ -3022,12 +3022,12 @@ static noinline_for_stack int
 dump_secy(struct macsec_secy *secy, struct net_device *dev,
 	  struct sk_buff *skb, struct netlink_callback *cb)
 {
-	struct macsec_tx_sc_stats tx_sc_stats = {0, };
-	struct macsec_tx_sa_stats tx_sa_stats = {0, };
-	struct macsec_rx_sc_stats rx_sc_stats = {0, };
-	struct macsec_rx_sa_stats rx_sa_stats = {0, };
+	struct macsec_tx_sc_stats tx_sc_stats = {};
+	struct macsec_tx_sa_stats tx_sa_stats = {};
+	struct macsec_rx_sc_stats rx_sc_stats = {};
+	struct macsec_rx_sa_stats rx_sa_stats = {};
 	struct macsec_dev *macsec = netdev_priv(dev);
-	struct macsec_dev_stats dev_stats = {0, };
+	struct macsec_dev_stats dev_stats = {};
 	struct macsec_tx_sc *tx_sc = &secy->tx_sc;
 	struct nlattr *txsa_list, *rxsc_list;
 	struct macsec_rx_sc *rx_sc;

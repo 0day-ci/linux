@@ -88,7 +88,7 @@ static int sl28cpld_gpio_irq_init(struct platform_device *pdev,
 
 static int sl28cpld_gpio_probe(struct platform_device *pdev)
 {
-	struct gpio_regmap_config config = {0};
+	struct gpio_regmap_config config = {};
 	enum sl28cpld_gpio_type type;
 	struct regmap *regmap;
 	u32 base;

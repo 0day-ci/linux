@@ -93,7 +93,7 @@ extern void ptrace_triggered(struct perf_event *bp,
 static inline void hw_breakpoint_disable(void)
 {
 	int i;
-	struct arch_hw_breakpoint null_brk = {0};
+	struct arch_hw_breakpoint null_brk = {};
 
 	if (!ppc_breakpoint_available())
 		return;

@@ -1757,7 +1757,7 @@ static int bq27xxx_battery_read_health(struct bq27xxx_device_info *di)
 
 void bq27xxx_battery_update(struct bq27xxx_device_info *di)
 {
-	struct bq27xxx_reg_cache cache = {0, };
+	struct bq27xxx_reg_cache cache = {};
 	bool has_ci_flag = di->opts & BQ27XXX_O_HAS_CI;
 	bool has_singe_flag = di->opts & BQ27XXX_O_ZERO;
 

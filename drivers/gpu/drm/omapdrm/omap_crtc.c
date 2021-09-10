@@ -502,7 +502,7 @@ static enum drm_mode_status omap_crtc_mode_valid(struct drm_crtc *crtc,
 {
 	struct omap_drm_private *priv = crtc->dev->dev_private;
 	struct omap_crtc *omap_crtc = to_omap_crtc(crtc);
-	struct videomode vm = {0};
+	struct videomode vm = {};
 	int r;
 
 	drm_display_mode_to_videomode(mode, &vm);

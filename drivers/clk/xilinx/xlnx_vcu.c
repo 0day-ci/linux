@@ -521,7 +521,7 @@ static void xvcu_clk_hw_unregister_leaf(struct clk_hw *hw)
 static int xvcu_register_clock_provider(struct xvcu_device *xvcu)
 {
 	struct device *dev = xvcu->dev;
-	struct clk_parent_data parent_data[2] = { 0 };
+	struct clk_parent_data parent_data[2] = { };
 	struct clk_hw_onecell_data *data;
 	struct clk_hw **hws;
 	struct clk_hw *hw;

@@ -302,7 +302,7 @@ bad_state:
  */
 static bool rxrpc_receiving_reply(struct rxrpc_call *call)
 {
-	struct rxrpc_ack_summary summary = { 0 };
+	struct rxrpc_ack_summary summary = { };
 	unsigned long now, timo;
 	rxrpc_seq_t top = READ_ONCE(call->tx_top);
 
@@ -841,7 +841,7 @@ static bool rxrpc_is_ack_valid(struct rxrpc_call *call,
  */
 static void rxrpc_input_ack(struct rxrpc_call *call, struct sk_buff *skb)
 {
-	struct rxrpc_ack_summary summary = { 0 };
+	struct rxrpc_ack_summary summary = { };
 	struct rxrpc_skb_priv *sp = rxrpc_skb(skb);
 	union {
 		struct rxrpc_ackpacket ack;
@@ -995,7 +995,7 @@ out:
  */
 static void rxrpc_input_ackall(struct rxrpc_call *call, struct sk_buff *skb)
 {
-	struct rxrpc_ack_summary summary = { 0 };
+	struct rxrpc_ack_summary summary = { };
 	struct rxrpc_skb_priv *sp = rxrpc_skb(skb);
 
 	_proto("Rx ACKALL %%%u", sp->hdr.serial);

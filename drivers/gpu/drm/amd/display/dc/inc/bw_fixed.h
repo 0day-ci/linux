@@ -86,7 +86,7 @@ struct bw_fixed bw_frc_to_fixed(int64_t num, int64_t denum);
 
 static inline struct bw_fixed fixed31_32_to_bw_fixed(int64_t raw)
 {
-	struct bw_fixed result = { 0 };
+	struct bw_fixed result = { };
 
 	if (raw < 0) {
 		raw = -raw;

@@ -2021,7 +2021,7 @@ static uint32_t get_src_obj_list(struct bios_parser *bp, ATOM_OBJECT *object,
 static struct device_id device_type_from_device_id(uint16_t device_id)
 {
 
-	struct device_id result_device_id = {0};
+	struct device_id result_device_id = {};
 
 	switch (device_id) {
 	case ATOM_DEVICE_LCD1_SUPPORT:
@@ -2844,7 +2844,7 @@ static bool bios_parser_construct(
 	uint16_t *rom_header_offset = NULL;
 	ATOM_ROM_HEADER *rom_header = NULL;
 	ATOM_OBJECT_HEADER *object_info_tbl;
-	struct atom_data_revision tbl_rev = {0};
+	struct atom_data_revision tbl_rev = {};
 
 	if (!init)
 		return false;

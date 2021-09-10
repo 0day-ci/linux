@@ -3124,7 +3124,7 @@ static int btrfs_ioctl_defrag(struct file *file, void __user *argp)
 {
 	struct inode *inode = file_inode(file);
 	struct btrfs_root *root = BTRFS_I(inode)->root;
-	struct btrfs_ioctl_defrag_range_args range = {0};
+	struct btrfs_ioctl_defrag_range_args range = {};
 	int ret;
 
 	ret = mnt_want_write_file(file);
@@ -4429,7 +4429,7 @@ drop_write:
 static long btrfs_ioctl_quota_rescan_status(struct btrfs_fs_info *fs_info,
 						void __user *arg)
 {
-	struct btrfs_ioctl_quota_rescan_args qsa = {0};
+	struct btrfs_ioctl_quota_rescan_args qsa = {};
 	int ret = 0;
 
 	if (!capable(CAP_SYS_ADMIN))

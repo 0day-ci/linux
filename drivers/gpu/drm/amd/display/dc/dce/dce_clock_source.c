@@ -399,7 +399,7 @@ static bool pll_adjust_pix_clk(
 	uint32_t actual_pix_clk_100hz = 0;
 	uint32_t requested_clk_100hz = 0;
 	struct bp_adjust_pixel_clock_parameters bp_adjust_pixel_clock_params = {
-							0 };
+	};
 	enum bp_result bp_result;
 	switch (pix_clk_params->signal_type) {
 	case SIGNAL_TYPE_HDMI_TYPE_A: {
@@ -629,7 +629,7 @@ static uint32_t dce112_get_pix_clk_dividers(
 static bool disable_spread_spectrum(struct dce110_clk_src *clk_src)
 {
 	enum bp_result result;
-	struct bp_spread_spectrum_parameters bp_ss_params = {0};
+	struct bp_spread_spectrum_parameters bp_ss_params = {};
 
 	bp_ss_params.pll_id = clk_src->base.id;
 
@@ -711,7 +711,7 @@ static bool enable_spread_spectrum(
 		struct dce110_clk_src *clk_src,
 		enum signal_type signal, struct pll_settings *pll_settings)
 {
-	struct bp_spread_spectrum_parameters bp_params = {0};
+	struct bp_spread_spectrum_parameters bp_params = {};
 	struct delta_sigma_data d_s_data;
 	const struct spread_spectrum_data *ss_data = NULL;
 
@@ -843,7 +843,7 @@ static bool dce110_program_pix_clk(
 		struct pll_settings *pll_settings)
 {
 	struct dce110_clk_src *clk_src = TO_DCE110_CLK_SRC(clock_source);
-	struct bp_pixel_clock_parameters bp_pc_params = {0};
+	struct bp_pixel_clock_parameters bp_pc_params = {};
 
 	/* First disable SS
 	 * ATOMBIOS will enable by default SS on PLL for DP,
@@ -916,7 +916,7 @@ static bool dce112_program_pix_clk(
 		struct pll_settings *pll_settings)
 {
 	struct dce110_clk_src *clk_src = TO_DCE110_CLK_SRC(clock_source);
-	struct bp_pixel_clock_parameters bp_pc_params = {0};
+	struct bp_pixel_clock_parameters bp_pc_params = {};
 
 #if defined(CONFIG_DRM_AMD_DC_DCN)
 	if (IS_FPGA_MAXIMUS_DC(clock_source->ctx->dce_environment)) {
@@ -977,7 +977,7 @@ static bool dce110_clock_source_power_down(
 {
 	struct dce110_clk_src *dce110_clk_src = TO_DCE110_CLK_SRC(clk_src);
 	enum bp_result bp_result;
-	struct bp_pixel_clock_parameters bp_pixel_clock_params = {0};
+	struct bp_pixel_clock_parameters bp_pixel_clock_params = {};
 
 	if (clk_src->dp_clk_src)
 		return true;

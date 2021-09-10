@@ -90,7 +90,7 @@ get_tuple(struct __sk_buff *skb, bool *ipv4, bool *tcp)
 static inline int
 handle_udp(struct __sk_buff *skb, struct bpf_sock_tuple *tuple, bool ipv4)
 {
-	struct bpf_sock_tuple ln = {0};
+	struct bpf_sock_tuple ln = {};
 	struct bpf_sock *sk;
 	const int zero = 0;
 	size_t tuple_len;
@@ -122,7 +122,7 @@ assign:
 static inline int
 handle_tcp(struct __sk_buff *skb, struct bpf_sock_tuple *tuple, bool ipv4)
 {
-	struct bpf_sock_tuple ln = {0};
+	struct bpf_sock_tuple ln = {};
 	struct bpf_sock *sk;
 	const int zero = 0;
 	size_t tuple_len;
@@ -162,7 +162,7 @@ assign:
 SEC("classifier/sk_assign_test")
 int bpf_sk_assign_test(struct __sk_buff *skb)
 {
-	struct bpf_sock_tuple *tuple, ln = {0};
+	struct bpf_sock_tuple *tuple, ln = {};
 	bool ipv4 = false;
 	bool tcp = false;
 	int tuple_len;

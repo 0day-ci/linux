@@ -84,7 +84,7 @@ int kvm_s390_handle_e3(struct kvm_vcpu *vcpu)
 /* Handle SCK (SET CLOCK) interception */
 static int handle_set_clock(struct kvm_vcpu *vcpu)
 {
-	struct kvm_s390_vm_tod_clock gtod = { 0 };
+	struct kvm_s390_vm_tod_clock gtod = { };
 	int rc;
 	u8 ar;
 	u64 op2;

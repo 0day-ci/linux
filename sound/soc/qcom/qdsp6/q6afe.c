@@ -1108,7 +1108,7 @@ int q6afe_set_lpass_clock(struct device *dev, int clk_id, int attri,
 			  int clk_root, unsigned int freq)
 {
 	struct q6afe *afe = dev_get_drvdata(dev->parent);
-	struct afe_clk_set cset = {0,};
+	struct afe_clk_set cset = {};
 
 	cset.clk_set_minor_version = AFE_API_VERSION_CLOCK_SET;
 	cset.clk_id = clk_id;
@@ -1127,9 +1127,9 @@ int q6afe_port_set_sysclk(struct q6afe_port *port, int clk_id,
 			  int clk_src, int clk_root,
 			  unsigned int freq, int dir)
 {
-	struct afe_clk_cfg ccfg = {0,};
-	struct afe_clk_set cset = {0,};
-	struct afe_digital_clk_cfg dcfg = {0,};
+	struct afe_clk_cfg ccfg = {};
+	struct afe_clk_set cset = {};
+	struct afe_digital_clk_cfg dcfg = {};
 	int ret;
 
 	switch (clk_id) {

@@ -775,7 +775,7 @@ int isst_send_mbox_command(unsigned int cpu, unsigned char command,
 {
 	const char *pathname = "/dev/isst_interface";
 	int fd, retry;
-	struct isst_if_mbox_cmds mbox_cmds = { 0 };
+	struct isst_if_mbox_cmds mbox_cmds = { };
 
 	debug_printf(
 		"mbox_send: cpu:%d command:%x sub_command:%x parameter:%x req_data:%x\n",

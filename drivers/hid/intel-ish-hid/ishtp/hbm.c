@@ -127,7 +127,7 @@ int ishtp_hbm_start_wait(struct ishtp_device *dev)
 int ishtp_hbm_start_req(struct ishtp_device *dev)
 {
 	struct ishtp_msg_hdr hdr;
-	struct hbm_host_version_request start_req = { 0 };
+	struct hbm_host_version_request start_req = { };
 
 	ishtp_hbm_hdr(&hdr, sizeof(start_req));
 
@@ -164,7 +164,7 @@ int ishtp_hbm_start_req(struct ishtp_device *dev)
 void ishtp_hbm_enum_clients_req(struct ishtp_device *dev)
 {
 	struct ishtp_msg_hdr hdr;
-	struct hbm_host_enum_request enum_req = { 0 };
+	struct hbm_host_enum_request enum_req = { };
 
 	/* enumerate clients */
 	ishtp_hbm_hdr(&hdr, sizeof(enum_req));
@@ -189,7 +189,7 @@ void ishtp_hbm_enum_clients_req(struct ishtp_device *dev)
 static int ishtp_hbm_prop_req(struct ishtp_device *dev)
 {
 	struct ishtp_msg_hdr hdr;
-	struct hbm_props_request prop_req = { 0 };
+	struct hbm_props_request prop_req = { };
 	unsigned long next_client_index;
 	uint8_t client_num;
 
@@ -239,7 +239,7 @@ static int ishtp_hbm_prop_req(struct ishtp_device *dev)
 static void ishtp_hbm_stop_req(struct ishtp_device *dev)
 {
 	struct ishtp_msg_hdr hdr;
-	struct hbm_host_stop_request stop_req = { 0 } ;
+	struct hbm_host_stop_request stop_req = { } ;
 
 	ishtp_hbm_hdr(&hdr, sizeof(stop_req));
 

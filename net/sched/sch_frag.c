@@ -90,7 +90,7 @@ static int sch_fragment(struct net *net, struct sk_buff *skb,
 	}
 
 	if (skb_protocol(skb, true) == htons(ETH_P_IP)) {
-		struct rtable sch_frag_rt = { 0 };
+		struct rtable sch_frag_rt = { };
 		unsigned long orig_dst;
 
 		sch_frag_prepare_frag(skb, xmit);

@@ -658,7 +658,7 @@ static int zynqmp_dp_update_vs_emph(struct zynqmp_dp *dp)
 
 	for (i = 0; i < dp->mode.lane_cnt; i++) {
 		u32 reg = ZYNQMP_DP_SUB_TX_PHY_PRECURSOR_LANE_0 + i * 4;
-		union phy_configure_opts opts = { 0 };
+		union phy_configure_opts opts = { };
 		u8 train = dp->train_set[i];
 
 		opts.dp.voltage[0] = (train & DP_TRAIN_VOLTAGE_SWING_MASK)

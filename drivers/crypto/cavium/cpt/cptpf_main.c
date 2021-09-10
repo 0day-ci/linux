@@ -349,7 +349,7 @@ static void cpt_reset(struct cpt_device *cpt)
 
 static void cpt_find_max_enabled_cores(struct cpt_device *cpt)
 {
-	union cptx_pf_constants pf_cnsts = {0};
+	union cptx_pf_constants pf_cnsts = {};
 
 	pf_cnsts.u = cpt_read_csr64(cpt->reg_base, CPTX_PF_CONSTANTS(0));
 	cpt->max_se_cores = pf_cnsts.s.se;
@@ -358,7 +358,7 @@ static void cpt_find_max_enabled_cores(struct cpt_device *cpt)
 
 static u32 cpt_check_bist_status(struct cpt_device *cpt)
 {
-	union cptx_pf_bist_status bist_sts = {0};
+	union cptx_pf_bist_status bist_sts = {};
 
 	bist_sts.u = cpt_read_csr64(cpt->reg_base,
 				    CPTX_PF_BIST_STATUS(0));
@@ -368,7 +368,7 @@ static u32 cpt_check_bist_status(struct cpt_device *cpt)
 
 static u64 cpt_check_exe_bist_status(struct cpt_device *cpt)
 {
-	union cptx_pf_exe_bist_status bist_sts = {0};
+	union cptx_pf_exe_bist_status bist_sts = {};
 
 	bist_sts.u = cpt_read_csr64(cpt->reg_base,
 				    CPTX_PF_EXE_BIST_STATUS(0));

@@ -8602,7 +8602,7 @@ netdev_tx_t ixgbe_xmit_frame_ring(struct sk_buff *skb,
 	u32 tx_flags = 0;
 	unsigned short f;
 	u16 count = TXD_USE_COUNT(skb_headlen(skb));
-	struct ixgbe_ipsec_tx_data ipsec_tx = { 0 };
+	struct ixgbe_ipsec_tx_data ipsec_tx = { };
 	__be16 protocol = skb->protocol;
 	u8 hdr_len = 0;
 

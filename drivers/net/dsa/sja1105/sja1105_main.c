@@ -1475,7 +1475,7 @@ static int sja1105et_is_fdb_entry_in_bin(struct sja1105_private *priv, int bin,
 	int way;
 
 	for (way = 0; way < SJA1105ET_FDB_BIN_SIZE; way++) {
-		struct sja1105_l2_lookup_entry l2_lookup = {0};
+		struct sja1105_l2_lookup_entry l2_lookup = {};
 		int index = sja1105et_fdb_index(bin, way);
 
 		/* Skip unused entries, optionally marking them
@@ -1502,7 +1502,7 @@ static int sja1105et_is_fdb_entry_in_bin(struct sja1105_private *priv, int bin,
 int sja1105et_fdb_add(struct dsa_switch *ds, int port,
 		      const unsigned char *addr, u16 vid)
 {
-	struct sja1105_l2_lookup_entry l2_lookup = {0}, tmp;
+	struct sja1105_l2_lookup_entry l2_lookup = {}, tmp;
 	struct sja1105_private *priv = ds->priv;
 	struct device *dev = ds->dev;
 	int last_unused = -1;
@@ -1587,7 +1587,7 @@ int sja1105et_fdb_add(struct dsa_switch *ds, int port,
 int sja1105et_fdb_del(struct dsa_switch *ds, int port,
 		      const unsigned char *addr, u16 vid)
 {
-	struct sja1105_l2_lookup_entry l2_lookup = {0};
+	struct sja1105_l2_lookup_entry l2_lookup = {};
 	struct sja1105_private *priv = ds->priv;
 	int index, bin, way, rc;
 	bool keep;
@@ -1622,7 +1622,7 @@ int sja1105et_fdb_del(struct dsa_switch *ds, int port,
 int sja1105pqrs_fdb_add(struct dsa_switch *ds, int port,
 			const unsigned char *addr, u16 vid)
 {
-	struct sja1105_l2_lookup_entry l2_lookup = {0}, tmp;
+	struct sja1105_l2_lookup_entry l2_lookup = {}, tmp;
 	struct sja1105_private *priv = ds->priv;
 	int rc, i;
 
@@ -1713,7 +1713,7 @@ skip_finding_an_index:
 int sja1105pqrs_fdb_del(struct dsa_switch *ds, int port,
 			const unsigned char *addr, u16 vid)
 {
-	struct sja1105_l2_lookup_entry l2_lookup = {0};
+	struct sja1105_l2_lookup_entry l2_lookup = {};
 	struct sja1105_private *priv = ds->priv;
 	bool keep;
 	int rc;
@@ -1771,7 +1771,7 @@ static int sja1105_fdb_dump(struct dsa_switch *ds, int port,
 	int i;
 
 	for (i = 0; i < SJA1105_MAX_L2_LOOKUP_COUNT; i++) {
-		struct sja1105_l2_lookup_entry l2_lookup = {0};
+		struct sja1105_l2_lookup_entry l2_lookup = {};
 		u8 macaddr[ETH_ALEN];
 		int rc;
 
@@ -1817,7 +1817,7 @@ static void sja1105_fast_age(struct dsa_switch *ds, int port)
 	int i;
 
 	for (i = 0; i < SJA1105_MAX_L2_LOOKUP_COUNT; i++) {
-		struct sja1105_l2_lookup_entry l2_lookup = {0};
+		struct sja1105_l2_lookup_entry l2_lookup = {};
 		u8 macaddr[ETH_ALEN];
 		int rc;
 
@@ -2548,7 +2548,7 @@ static void sja1105_port_disable(struct dsa_switch *ds, int port)
 static int sja1105_mgmt_xmit(struct dsa_switch *ds, int port, int slot,
 			     struct sk_buff *skb, bool takets)
 {
-	struct sja1105_mgmt_entry mgmt_route = {0};
+	struct sja1105_mgmt_entry mgmt_route = {};
 	struct sja1105_private *priv = ds->priv;
 	struct ethhdr *hdr;
 	int timeout = 10;

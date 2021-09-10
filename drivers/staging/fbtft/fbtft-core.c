@@ -170,7 +170,7 @@ static const struct backlight_ops fbtft_bl_ops = {
 void fbtft_register_backlight(struct fbtft_par *par)
 {
 	struct backlight_device *bd;
-	struct backlight_properties bl_props = { 0, };
+	struct backlight_properties bl_props = { };
 
 	if (!par->gpio.led[0]) {
 		fbtft_par_dbg(DEBUG_BACKLIGHT, par,

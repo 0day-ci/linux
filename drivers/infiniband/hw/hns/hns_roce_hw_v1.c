@@ -775,7 +775,7 @@ static int hns_roce_v1_rsv_lp_qp(struct hns_roce_dev *hr_dev)
 	struct ib_device *ibdev = &hr_dev->ib_dev;
 	struct device *dev = &hr_dev->pdev->dev;
 	struct ib_cq_init_attr cq_init_attr;
-	struct ib_qp_attr attr = { 0 };
+	struct ib_qp_attr attr = { };
 	struct hns_roce_qp *hr_qp;
 	struct ib_cq *cq;
 	struct ib_pd *pd;

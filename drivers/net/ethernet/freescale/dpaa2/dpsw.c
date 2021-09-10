@@ -38,7 +38,7 @@ static void build_if_id_bitmap(__le64 *bmap, const u16 *id, const u16 num_ifs)
  */
 int dpsw_open(struct fsl_mc_io *mc_io, u32 cmd_flags, int dpsw_id, u16 *token)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	struct dpsw_cmd_open *cmd_params;
 	int err;
 
@@ -73,7 +73,7 @@ int dpsw_open(struct fsl_mc_io *mc_io, u32 cmd_flags, int dpsw_id, u16 *token)
  */
 int dpsw_close(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 
 	/* prepare command */
 	cmd.header = mc_encode_cmd_header(DPSW_CMDID_CLOSE,
@@ -94,7 +94,7 @@ int dpsw_close(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token)
  */
 int dpsw_enable(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 
 	/* prepare command */
 	cmd.header = mc_encode_cmd_header(DPSW_CMDID_ENABLE,
@@ -115,7 +115,7 @@ int dpsw_enable(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token)
  */
 int dpsw_disable(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 
 	/* prepare command */
 	cmd.header = mc_encode_cmd_header(DPSW_CMDID_DISABLE,
@@ -136,7 +136,7 @@ int dpsw_disable(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token)
  */
 int dpsw_reset(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 
 	/* prepare command */
 	cmd.header = mc_encode_cmd_header(DPSW_CMDID_RESET,
@@ -165,7 +165,7 @@ int dpsw_reset(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token)
 int dpsw_set_irq_enable(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 			u8 irq_index, u8 en)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	struct dpsw_cmd_set_irq_enable *cmd_params;
 
 	/* prepare command */
@@ -199,7 +199,7 @@ int dpsw_set_irq_enable(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 int dpsw_set_irq_mask(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 		      u8 irq_index, u32 mask)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	struct dpsw_cmd_set_irq_mask *cmd_params;
 
 	/* prepare command */
@@ -229,7 +229,7 @@ int dpsw_set_irq_mask(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 int dpsw_get_irq_status(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 			u8 irq_index, u32 *status)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	struct dpsw_cmd_get_irq_status *cmd_params;
 	struct dpsw_rsp_get_irq_status *rsp_params;
 	int err;
@@ -269,7 +269,7 @@ int dpsw_get_irq_status(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 int dpsw_clear_irq_status(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 			  u8 irq_index, u32 status)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	struct dpsw_cmd_clear_irq_status *cmd_params;
 
 	/* prepare command */
@@ -296,7 +296,7 @@ int dpsw_clear_irq_status(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 int dpsw_get_attributes(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 			struct dpsw_attr *attr)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	struct dpsw_rsp_get_attr *rsp_params;
 	int err;
 
@@ -343,7 +343,7 @@ int dpsw_get_attributes(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 int dpsw_if_set_link_cfg(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token, u16 if_id,
 			 struct dpsw_link_cfg *cfg)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	struct dpsw_cmd_if_set_link_cfg *cmd_params;
 
 	/* prepare command */
@@ -372,7 +372,7 @@ int dpsw_if_set_link_cfg(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token, u16 
 int dpsw_if_get_link_state(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 			   u16 if_id, struct dpsw_link_state *state)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	struct dpsw_cmd_if_get_link_state *cmd_params;
 	struct dpsw_rsp_if_get_link_state *rsp_params;
 	int err;
@@ -411,7 +411,7 @@ int dpsw_if_get_link_state(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 int dpsw_if_set_tci(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token, u16 if_id,
 		    const struct dpsw_tci_cfg *cfg)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	struct dpsw_cmd_if_set_tci *cmd_params;
 	u16 tmp_conf = 0;
 
@@ -443,7 +443,7 @@ int dpsw_if_set_tci(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token, u16 if_id
 int dpsw_if_get_tci(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token, u16 if_id,
 		    struct dpsw_tci_cfg *cfg)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	struct dpsw_cmd_if_get_tci *cmd_params;
 	struct dpsw_rsp_if_get_tci *rsp_params;
 	int err;
@@ -485,7 +485,7 @@ int dpsw_if_get_tci(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token, u16 if_id
 int dpsw_if_set_stp(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token, u16 if_id,
 		    const struct dpsw_stp_cfg *cfg)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	struct dpsw_cmd_if_set_stp *cmd_params;
 
 	/* prepare command */
@@ -515,7 +515,7 @@ int dpsw_if_set_stp(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token, u16 if_id
 int dpsw_if_get_counter(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 			u16 if_id, enum dpsw_counter type, u64 *counter)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	struct dpsw_cmd_if_get_counter *cmd_params;
 	struct dpsw_rsp_if_get_counter *rsp_params;
 	int err;
@@ -551,7 +551,7 @@ int dpsw_if_get_counter(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
  */
 int dpsw_if_enable(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token, u16 if_id)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	struct dpsw_cmd_if *cmd_params;
 
 	/* prepare command */
@@ -576,7 +576,7 @@ int dpsw_if_enable(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token, u16 if_id)
  */
 int dpsw_if_disable(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token, u16 if_id)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	struct dpsw_cmd_if *cmd_params;
 
 	/* prepare command */
@@ -604,7 +604,7 @@ int dpsw_if_get_attributes(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 			   u16 if_id, struct dpsw_if_attr *attr)
 {
 	struct dpsw_rsp_if_get_attr *rsp_params;
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	struct dpsw_cmd_if *cmd_params;
 	int err;
 
@@ -644,7 +644,7 @@ int dpsw_if_get_attributes(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 int dpsw_if_set_max_frame_length(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 				 u16 if_id, u16 frame_length)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	struct dpsw_cmd_if_set_max_frame_length *cmd_params;
 
 	/* prepare command */
@@ -679,7 +679,7 @@ int dpsw_if_set_max_frame_length(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 tok
 int dpsw_vlan_add(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 		  u16 vlan_id, const struct dpsw_vlan_cfg *cfg)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	struct dpsw_vlan_add *cmd_params;
 
 	/* prepare command */
@@ -713,7 +713,7 @@ int dpsw_vlan_add_if(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 		     u16 vlan_id, const struct dpsw_vlan_if_cfg *cfg)
 {
 	struct dpsw_cmd_vlan_add_if *cmd_params;
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 
 	/* prepare command */
 	cmd.header = mc_encode_cmd_header(DPSW_CMDID_VLAN_ADD_IF,
@@ -749,7 +749,7 @@ int dpsw_vlan_add_if(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 int dpsw_vlan_add_if_untagged(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 			      u16 vlan_id, const struct dpsw_vlan_if_cfg *cfg)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	struct dpsw_cmd_vlan_manage_if *cmd_params;
 
 	/* prepare command */
@@ -780,7 +780,7 @@ int dpsw_vlan_add_if_untagged(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 int dpsw_vlan_remove_if(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 			u16 vlan_id, const struct dpsw_vlan_if_cfg *cfg)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	struct dpsw_cmd_vlan_manage_if *cmd_params;
 
 	/* prepare command */
@@ -813,7 +813,7 @@ int dpsw_vlan_remove_if(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 int dpsw_vlan_remove_if_untagged(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 				 u16 vlan_id, const struct dpsw_vlan_if_cfg *cfg)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	struct dpsw_cmd_vlan_manage_if *cmd_params;
 
 	/* prepare command */
@@ -840,7 +840,7 @@ int dpsw_vlan_remove_if_untagged(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 tok
 int dpsw_vlan_remove(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 		     u16 vlan_id)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	struct dpsw_cmd_vlan_remove *cmd_params;
 
 	/* prepare command */
@@ -870,7 +870,7 @@ int dpsw_fdb_add(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token, u16 *fdb_id,
 {
 	struct dpsw_cmd_fdb_add *cmd_params;
 	struct dpsw_rsp_fdb_add *rsp_params;
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	int err;
 
 	cmd.header = mc_encode_cmd_header(DPSW_CMDID_FDB_ADD,
@@ -902,7 +902,7 @@ int dpsw_fdb_add(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token, u16 *fdb_id,
 int dpsw_fdb_remove(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token, u16 fdb_id)
 {
 	struct dpsw_cmd_fdb_remove *cmd_params;
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 
 	/* prepare command */
 	cmd.header = mc_encode_cmd_header(DPSW_CMDID_FDB_REMOVE,
@@ -927,7 +927,7 @@ int dpsw_fdb_remove(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token, u16 fdb_i
 int dpsw_fdb_add_unicast(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 			 u16 fdb_id, const struct dpsw_fdb_unicast_cfg *cfg)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	struct dpsw_cmd_fdb_unicast_op *cmd_params;
 	int i;
 
@@ -969,7 +969,7 @@ int dpsw_fdb_dump(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token, u16 fdb_id,
 {
 	struct dpsw_cmd_fdb_dump *cmd_params;
 	struct dpsw_rsp_fdb_dump *rsp_params;
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	int err;
 
 	/* prepare command */
@@ -1005,7 +1005,7 @@ int dpsw_fdb_dump(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token, u16 fdb_id,
 int dpsw_fdb_remove_unicast(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 			    u16 fdb_id, const struct dpsw_fdb_unicast_cfg *cfg)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	struct dpsw_cmd_fdb_unicast_op *cmd_params;
 	int i;
 
@@ -1044,7 +1044,7 @@ int dpsw_fdb_remove_unicast(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 int dpsw_fdb_add_multicast(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 			   u16 fdb_id, const struct dpsw_fdb_multicast_cfg *cfg)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	struct dpsw_cmd_fdb_multicast_op *cmd_params;
 	int i;
 
@@ -1083,7 +1083,7 @@ int dpsw_fdb_add_multicast(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 int dpsw_fdb_remove_multicast(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 			      u16 fdb_id, const struct dpsw_fdb_multicast_cfg *cfg)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	struct dpsw_cmd_fdb_multicast_op *cmd_params;
 	int i;
 
@@ -1116,7 +1116,7 @@ int dpsw_ctrl_if_get_attributes(struct fsl_mc_io *mc_io, u32 cmd_flags,
 				u16 token, struct dpsw_ctrl_if_attr *attr)
 {
 	struct dpsw_rsp_ctrl_if_get_attr *rsp_params;
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	int err;
 
 	cmd.header = mc_encode_cmd_header(DPSW_CMDID_CTRL_IF_GET_ATTR,
@@ -1147,7 +1147,7 @@ int dpsw_ctrl_if_set_pools(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 			   const struct dpsw_ctrl_if_pools_cfg *cfg)
 {
 	struct dpsw_cmd_ctrl_if_set_pools *cmd_params;
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	int i;
 
 	cmd.header = mc_encode_cmd_header(DPSW_CMDID_CTRL_IF_SET_POOLS,
@@ -1180,7 +1180,7 @@ int dpsw_ctrl_if_set_queue(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 			   const struct dpsw_ctrl_if_queue_cfg *cfg)
 {
 	struct dpsw_cmd_ctrl_if_set_queue *cmd_params;
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 
 	cmd.header = mc_encode_cmd_header(DPSW_CMDID_CTRL_IF_SET_QUEUE,
 					  cmd_flags,
@@ -1210,7 +1210,7 @@ int dpsw_ctrl_if_set_queue(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 int dpsw_get_api_version(struct fsl_mc_io *mc_io, u32 cmd_flags,
 			 u16 *major_ver, u16 *minor_ver)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	struct dpsw_rsp_get_api_version *rsp_params;
 	int err;
 
@@ -1243,7 +1243,7 @@ int dpsw_if_get_port_mac_addr(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 			      u16 if_id, u8 mac_addr[6])
 {
 	struct dpsw_rsp_if_get_mac_addr *rsp_params;
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	struct dpsw_cmd_if *cmd_params;
 	int err, i;
 
@@ -1277,7 +1277,7 @@ int dpsw_if_get_port_mac_addr(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
  */
 int dpsw_ctrl_if_enable(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 
 	cmd.header = mc_encode_cmd_header(DPSW_CMDID_CTRL_IF_ENABLE, cmd_flags,
 					  token);
@@ -1295,7 +1295,7 @@ int dpsw_ctrl_if_enable(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token)
  */
 int dpsw_ctrl_if_disable(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 
 	cmd.header = mc_encode_cmd_header(DPSW_CMDID_CTRL_IF_DISABLE,
 					  cmd_flags,
@@ -1317,7 +1317,7 @@ int dpsw_set_egress_flood(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 			  const struct dpsw_egress_flood_cfg *cfg)
 {
 	struct dpsw_cmd_set_egress_flood *cmd_params;
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 
 	cmd.header = mc_encode_cmd_header(DPSW_CMDID_SET_EGRESS_FLOOD, cmd_flags, token);
 	cmd_params = (struct dpsw_cmd_set_egress_flood *)cmd.params;
@@ -1343,7 +1343,7 @@ int dpsw_if_set_learning_mode(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 			      u16 if_id, enum dpsw_learning_mode mode)
 {
 	struct dpsw_cmd_if_set_learning_mode *cmd_params;
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 
 	cmd.header = mc_encode_cmd_header(DPSW_CMDID_IF_SET_LEARNING_MODE,
 					  cmd_flags,
@@ -1373,7 +1373,7 @@ int dpsw_acl_add(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token, u16 *acl_id,
 {
 	struct dpsw_cmd_acl_add *cmd_params;
 	struct dpsw_rsp_acl_add *rsp_params;
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	int err;
 
 	cmd.header = mc_encode_cmd_header(DPSW_CMDID_ACL_ADD, cmd_flags, token);
@@ -1403,7 +1403,7 @@ int dpsw_acl_remove(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 		    u16 acl_id)
 {
 	struct dpsw_cmd_acl_remove *cmd_params;
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 
 	cmd.header = mc_encode_cmd_header(DPSW_CMDID_ACL_REMOVE, cmd_flags,
 					  token);
@@ -1427,7 +1427,7 @@ int dpsw_acl_add_if(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 		    u16 acl_id, const struct dpsw_acl_if_cfg *cfg)
 {
 	struct dpsw_cmd_acl_if *cmd_params;
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 
 	cmd.header = mc_encode_cmd_header(DPSW_CMDID_ACL_ADD_IF, cmd_flags,
 					  token);
@@ -1453,7 +1453,7 @@ int dpsw_acl_remove_if(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 		       u16 acl_id, const struct dpsw_acl_if_cfg *cfg)
 {
 	struct dpsw_cmd_acl_if *cmd_params;
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 
 	/* prepare command */
 	cmd.header = mc_encode_cmd_header(DPSW_CMDID_ACL_REMOVE_IF, cmd_flags,
@@ -1529,7 +1529,7 @@ int dpsw_acl_add_entry(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 		       u16 acl_id, const struct dpsw_acl_entry_cfg *cfg)
 {
 	struct dpsw_cmd_acl_entry *cmd_params;
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 
 	cmd.header = mc_encode_cmd_header(DPSW_CMDID_ACL_ADD_ENTRY, cmd_flags,
 					  token);
@@ -1561,7 +1561,7 @@ int dpsw_acl_remove_entry(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 			  u16 acl_id, const struct dpsw_acl_entry_cfg *cfg)
 {
 	struct dpsw_cmd_acl_entry *cmd_params;
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 
 	/* prepare command */
 	cmd.header = mc_encode_cmd_header(DPSW_CMDID_ACL_REMOVE_ENTRY,
@@ -1595,7 +1595,7 @@ int dpsw_set_reflection_if(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 			   u16 if_id)
 {
 	struct dpsw_cmd_set_reflection_if *cmd_params;
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 
 	cmd.header = mc_encode_cmd_header(DPSW_CMDID_SET_REFLECTION_IF,
 					  cmd_flags,
@@ -1620,7 +1620,7 @@ int dpsw_if_add_reflection(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 			   u16 if_id, const struct dpsw_reflection_cfg *cfg)
 {
 	struct dpsw_cmd_if_reflection *cmd_params;
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 
 	cmd.header = mc_encode_cmd_header(DPSW_CMDID_IF_ADD_REFLECTION,
 					  cmd_flags,
@@ -1647,7 +1647,7 @@ int dpsw_if_remove_reflection(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 			      u16 if_id, const struct dpsw_reflection_cfg *cfg)
 {
 	struct dpsw_cmd_if_reflection *cmd_params;
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 
 	cmd.header = mc_encode_cmd_header(DPSW_CMDID_IF_REMOVE_REFLECTION,
 					  cmd_flags,

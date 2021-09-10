@@ -2936,7 +2936,7 @@ static int vfio_iommu_type1_unmap_dma(struct vfio_iommu *iommu,
 				      unsigned long arg)
 {
 	struct vfio_iommu_type1_dma_unmap unmap;
-	struct vfio_bitmap bitmap = { 0 };
+	struct vfio_bitmap bitmap = { };
 	uint32_t mask = VFIO_DMA_UNMAP_FLAG_GET_DIRTY_BITMAP |
 			VFIO_DMA_UNMAP_FLAG_VADDR |
 			VFIO_DMA_UNMAP_FLAG_ALL;

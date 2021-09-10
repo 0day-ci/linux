@@ -777,7 +777,7 @@ static int omap_dmm_remove(struct platform_device *dev)
 static int omap_dmm_probe(struct platform_device *dev)
 {
 	int ret = -EFAULT, i;
-	struct tcm_area area = {0};
+	struct tcm_area area = {};
 	u32 hwinfo, pat_geom;
 	struct resource *mem;
 

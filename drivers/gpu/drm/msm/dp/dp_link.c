@@ -992,10 +992,10 @@ static bool dp_link_is_audio_pattern_requested(struct dp_link_private *link)
 
 static void dp_link_reset_data(struct dp_link_private *link)
 {
-	link->request = (const struct dp_link_request){ 0 };
-	link->dp_link.test_video = (const struct dp_link_test_video){ 0 };
+	link->request = (const struct dp_link_request){ };
+	link->dp_link.test_video = (const struct dp_link_test_video){ };
 	link->dp_link.test_video.test_bit_depth = DP_TEST_BIT_DEPTH_UNKNOWN;
-	link->dp_link.test_audio = (const struct dp_link_test_audio){ 0 };
+	link->dp_link.test_audio = (const struct dp_link_test_audio){ };
 	link->dp_link.phy_params.phy_test_pattern_sel = 0;
 	link->dp_link.sink_request = 0;
 	link->dp_link.test_response = 0;

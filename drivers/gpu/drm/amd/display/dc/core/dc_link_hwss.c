@@ -302,7 +302,7 @@ void dp_set_hw_test_pattern(
 	uint8_t *custom_pattern,
 	uint32_t custom_pattern_size)
 {
-	struct encoder_set_dp_phy_pattern_param pattern_param = {0};
+	struct encoder_set_dp_phy_pattern_param pattern_param = {};
 	struct link_encoder *encoder;
 
 	/* Access link encoder based on whether it is statically

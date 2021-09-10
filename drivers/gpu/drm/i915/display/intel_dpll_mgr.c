@@ -1572,7 +1572,7 @@ static bool skl_ddi_hdmi_pll_dividers(struct intel_crtc_state *crtc_state)
 {
 	struct drm_i915_private *i915 = to_i915(crtc_state->uapi.crtc->dev);
 	u32 ctrl1, cfgcr1, cfgcr2;
-	struct skl_wrpll_params wrpll_params = { 0, };
+	struct skl_wrpll_params wrpll_params = { };
 
 	/*
 	 * See comment in intel_dpll_hw_state to understand why we always use 0

@@ -628,7 +628,7 @@ int kvm_pv_send_ipi(struct kvm *kvm, unsigned long ipi_bitmap_low,
 		    unsigned long icr, int op_64_bit)
 {
 	struct kvm_apic_map *map;
-	struct kvm_lapic_irq irq = {0};
+	struct kvm_lapic_irq irq = {};
 	int cluster_size = op_64_bit ? 64 : 32;
 	int count;
 

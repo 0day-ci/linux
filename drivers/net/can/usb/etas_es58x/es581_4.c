@@ -392,7 +392,7 @@ static int es581_4_tx_can_msg(struct es58x_priv *priv,
 
 static int es581_4_set_bittiming(struct es58x_priv *priv)
 {
-	struct es581_4_tx_conf_msg tx_conf_msg = { 0 };
+	struct es581_4_tx_conf_msg tx_conf_msg = { };
 	struct can_bittiming *bt = &priv->can.bittiming;
 
 	tx_conf_msg.bitrate = cpu_to_le32(bt->bitrate);

@@ -417,7 +417,7 @@ static int __apply_microcode_amd(struct microcode_amd *mc)
 static bool
 apply_microcode_early_amd(u32 cpuid_1_eax, void *ucode, size_t size, bool save_patch)
 {
-	struct cont_desc desc = { 0 };
+	struct cont_desc desc = { };
 	u8 (*patch)[PATCH_MAX_SIZE];
 	struct microcode_amd *mc;
 	u32 rev, dummy, *new_rev;
@@ -542,7 +542,7 @@ load_microcode_amd(bool save, u8 family, const u8 *data, size_t size);
 
 int __init save_microcode_in_initrd_amd(unsigned int cpuid_1_eax)
 {
-	struct cont_desc desc = { 0 };
+	struct cont_desc desc = { };
 	enum ucode_state ret;
 	struct cpio_data cp;
 

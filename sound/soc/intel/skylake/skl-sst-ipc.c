@@ -491,7 +491,7 @@ irqreturn_t skl_dsp_irq_thread_handler(int irq, void *context)
 	struct sst_dsp *dsp = context;
 	struct skl_dev *skl = dsp->thread_context;
 	struct sst_generic_ipc *ipc = &skl->ipc;
-	struct skl_ipc_header header = {0};
+	struct skl_ipc_header header = {};
 	u32 hipcie, hipct, hipcte;
 	int ipc_irq = 0;
 
@@ -635,8 +635,8 @@ void skl_ipc_free(struct sst_generic_ipc *ipc)
 int skl_ipc_create_pipeline(struct sst_generic_ipc *ipc,
 		u16 ppl_mem_size, u8 ppl_type, u8 instance_id, u8 lp_mode)
 {
-	struct skl_ipc_header header = {0};
-	struct sst_ipc_message request = {0};
+	struct skl_ipc_header header = {};
+	struct sst_ipc_message request = {};
 	int ret;
 
 	header.primary = IPC_MSG_TARGET(IPC_FW_GEN_MSG);
@@ -662,8 +662,8 @@ EXPORT_SYMBOL_GPL(skl_ipc_create_pipeline);
 
 int skl_ipc_delete_pipeline(struct sst_generic_ipc *ipc, u8 instance_id)
 {
-	struct skl_ipc_header header = {0};
-	struct sst_ipc_message request = {0};
+	struct skl_ipc_header header = {};
+	struct sst_ipc_message request = {};
 	int ret;
 
 	header.primary = IPC_MSG_TARGET(IPC_FW_GEN_MSG);
@@ -686,8 +686,8 @@ EXPORT_SYMBOL_GPL(skl_ipc_delete_pipeline);
 int skl_ipc_set_pipeline_state(struct sst_generic_ipc *ipc,
 		u8 instance_id, enum skl_ipc_pipeline_state state)
 {
-	struct skl_ipc_header header = {0};
-	struct sst_ipc_message request = {0};
+	struct skl_ipc_header header = {};
+	struct sst_ipc_message request = {};
 	int ret;
 
 	header.primary = IPC_MSG_TARGET(IPC_FW_GEN_MSG);
@@ -710,8 +710,8 @@ EXPORT_SYMBOL_GPL(skl_ipc_set_pipeline_state);
 int
 skl_ipc_save_pipeline(struct sst_generic_ipc *ipc, u8 instance_id, int dma_id)
 {
-	struct skl_ipc_header header = {0};
-	struct sst_ipc_message request = {0};
+	struct skl_ipc_header header = {};
+	struct sst_ipc_message request = {};
 	int ret;
 
 	header.primary = IPC_MSG_TARGET(IPC_FW_GEN_MSG);
@@ -735,8 +735,8 @@ EXPORT_SYMBOL_GPL(skl_ipc_save_pipeline);
 
 int skl_ipc_restore_pipeline(struct sst_generic_ipc *ipc, u8 instance_id)
 {
-	struct skl_ipc_header header = {0};
-	struct sst_ipc_message request = {0};
+	struct skl_ipc_header header = {};
+	struct sst_ipc_message request = {};
 	int ret;
 
 	header.primary = IPC_MSG_TARGET(IPC_FW_GEN_MSG);
@@ -759,7 +759,7 @@ EXPORT_SYMBOL_GPL(skl_ipc_restore_pipeline);
 int skl_ipc_set_dx(struct sst_generic_ipc *ipc, u8 instance_id,
 		u16 module_id, struct skl_ipc_dxstate_info *dx)
 {
-	struct skl_ipc_header header = {0};
+	struct skl_ipc_header header = {};
 	struct sst_ipc_message request;
 	int ret;
 
@@ -788,7 +788,7 @@ EXPORT_SYMBOL_GPL(skl_ipc_set_dx);
 int skl_ipc_init_instance(struct sst_generic_ipc *ipc,
 		struct skl_ipc_init_instance_msg *msg, void *param_data)
 {
-	struct skl_ipc_header header = {0};
+	struct skl_ipc_header header = {};
 	struct sst_ipc_message request;
 	int ret;
 	u32 *buffer = (u32 *)param_data;
@@ -829,8 +829,8 @@ EXPORT_SYMBOL_GPL(skl_ipc_init_instance);
 int skl_ipc_bind_unbind(struct sst_generic_ipc *ipc,
 		struct skl_ipc_bind_unbind_msg *msg)
 {
-	struct skl_ipc_header header = {0};
-	struct sst_ipc_message request = {0};
+	struct skl_ipc_header header = {};
+	struct sst_ipc_message request = {};
 	u8 bind_unbind = msg->bind ? IPC_MOD_BIND : IPC_MOD_UNBIND;
 	int ret;
 
@@ -867,7 +867,7 @@ EXPORT_SYMBOL_GPL(skl_ipc_bind_unbind);
 int skl_ipc_load_modules(struct sst_generic_ipc *ipc,
 				u8 module_cnt, void *data)
 {
-	struct skl_ipc_header header = {0};
+	struct skl_ipc_header header = {};
 	struct sst_ipc_message request;
 	int ret;
 
@@ -891,7 +891,7 @@ EXPORT_SYMBOL_GPL(skl_ipc_load_modules);
 int skl_ipc_unload_modules(struct sst_generic_ipc *ipc, u8 module_cnt,
 							void *data)
 {
-	struct skl_ipc_header header = {0};
+	struct skl_ipc_header header = {};
 	struct sst_ipc_message request;
 	int ret;
 
@@ -915,7 +915,7 @@ EXPORT_SYMBOL_GPL(skl_ipc_unload_modules);
 int skl_ipc_set_large_config(struct sst_generic_ipc *ipc,
 		struct skl_ipc_large_config_msg *msg, u32 *param)
 {
-	struct skl_ipc_header header = {0};
+	struct skl_ipc_header header = {};
 	struct sst_ipc_message request;
 	int ret = 0;
 	size_t sz_remaining, tx_size, data_offset;
@@ -972,8 +972,8 @@ int skl_ipc_get_large_config(struct sst_generic_ipc *ipc,
 		struct skl_ipc_large_config_msg *msg,
 		u32 **payload, size_t *bytes)
 {
-	struct skl_ipc_header header = {0};
-	struct sst_ipc_message request, reply = {0};
+	struct skl_ipc_header header = {};
+	struct sst_ipc_message request, reply = {};
 	unsigned int *buf;
 	int ret;
 
@@ -1015,8 +1015,8 @@ EXPORT_SYMBOL_GPL(skl_ipc_get_large_config);
 int skl_sst_ipc_load_library(struct sst_generic_ipc *ipc,
 				u8 dma_id, u8 table_id, bool wait)
 {
-	struct skl_ipc_header header = {0};
-	struct sst_ipc_message request = {0};
+	struct skl_ipc_header header = {};
+	struct sst_ipc_message request = {};
 	int ret = 0;
 
 	header.primary = IPC_MSG_TARGET(IPC_FW_GEN_MSG);
@@ -1040,8 +1040,8 @@ EXPORT_SYMBOL_GPL(skl_sst_ipc_load_library);
 
 int skl_ipc_set_d0ix(struct sst_generic_ipc *ipc, struct skl_ipc_d0ix_msg *msg)
 {
-	struct skl_ipc_header header = {0};
-	struct sst_ipc_message request = {0};
+	struct skl_ipc_header header = {};
+	struct sst_ipc_message request = {};
 	int ret;
 
 	header.primary = IPC_MSG_TARGET(IPC_MOD_MSG);

@@ -290,7 +290,7 @@ static inline struct ov9282 *to_ov9282(struct v4l2_subdev *subdev)
 static int ov9282_read_reg(struct ov9282 *ov9282, u16 reg, u32 len, u32 *val)
 {
 	struct i2c_client *client = v4l2_get_subdevdata(&ov9282->sd);
-	struct i2c_msg msgs[2] = {0};
+	struct i2c_msg msgs[2] = {};
 	u8 addr_buf[2] = {0};
 	u8 data_buf[4] = {0};
 	int ret;
@@ -640,7 +640,7 @@ static int ov9282_init_pad_cfg(struct v4l2_subdev *sd,
 			       struct v4l2_subdev_state *sd_state)
 {
 	struct ov9282 *ov9282 = to_ov9282(sd);
-	struct v4l2_subdev_format fmt = { 0 };
+	struct v4l2_subdev_format fmt = { };
 
 	fmt.which = sd_state ? V4L2_SUBDEV_FORMAT_TRY : V4L2_SUBDEV_FORMAT_ACTIVE;
 	ov9282_fill_pad_format(ov9282, &supported_mode, &fmt);

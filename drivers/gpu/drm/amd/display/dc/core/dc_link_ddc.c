@@ -578,7 +578,7 @@ bool dal_ddc_service_query_ddc_data(
 			success = dal_ddc_submit_aux_command(ddc, &payload);
 		}
 	} else {
-		struct i2c_command command = {0};
+		struct i2c_command command = {};
 		struct i2c_payloads payloads;
 
 		if (!dal_ddc_i2c_payloads_create(ddc->ctx, &payloads, payloads_num))

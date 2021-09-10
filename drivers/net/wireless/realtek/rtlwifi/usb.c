@@ -424,7 +424,7 @@ static void _rtl_usb_rx_process_agg(struct ieee80211_hw *hw,
 	struct ieee80211_hdr *hdr;
 	bool unicast = false;
 	__le16 fc;
-	struct ieee80211_rx_status rx_status = {0};
+	struct ieee80211_rx_status rx_status = {};
 	struct rtl_stats stats = {
 		.signal = 0,
 		.rate = 0,
@@ -466,7 +466,7 @@ static void _rtl_usb_rx_process_noagg(struct ieee80211_hw *hw,
 	struct ieee80211_hdr *hdr;
 	bool unicast = false;
 	__le16 fc;
-	struct ieee80211_rx_status rx_status = {0};
+	struct ieee80211_rx_status rx_status = {};
 	struct rtl_stats stats = {
 		.signal = 0,
 		.rate = 0,

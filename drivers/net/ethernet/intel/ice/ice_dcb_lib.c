@@ -271,7 +271,7 @@ int ice_dcb_bwchk(struct ice_pf *pf, struct ice_dcbx_cfg *dcbcfg)
  */
 int ice_pf_dcb_cfg(struct ice_pf *pf, struct ice_dcbx_cfg *new_cfg, bool locked)
 {
-	struct ice_aqc_port_ets_elem buf = { 0 };
+	struct ice_aqc_port_ets_elem buf = { };
 	struct ice_dcbx_cfg *old_cfg, *curr_cfg;
 	struct device *dev = ice_pf_to_dev(pf);
 	int ret = ICE_DCB_NO_HW_CHG;
@@ -445,7 +445,7 @@ ice_dcb_need_recfg(struct ice_pf *pf, struct ice_dcbx_cfg *old_cfg,
  */
 void ice_dcb_rebuild(struct ice_pf *pf)
 {
-	struct ice_aqc_port_ets_elem buf = { 0 };
+	struct ice_aqc_port_ets_elem buf = { };
 	struct device *dev = ice_pf_to_dev(pf);
 	struct ice_dcbx_cfg *err_cfg;
 	enum ice_status ret;
@@ -546,7 +546,7 @@ static int ice_dcb_init_cfg(struct ice_pf *pf, bool locked)
  */
 static int ice_dcb_sw_dflt_cfg(struct ice_pf *pf, bool ets_willing, bool locked)
 {
-	struct ice_aqc_port_ets_elem buf = { 0 };
+	struct ice_aqc_port_ets_elem buf = { };
 	struct ice_dcbx_cfg *dcbcfg;
 	struct ice_port_info *pi;
 	struct ice_hw *hw;
@@ -845,7 +845,7 @@ void
 ice_dcb_process_lldp_set_mib_change(struct ice_pf *pf,
 				    struct ice_rq_event_info *event)
 {
-	struct ice_aqc_port_ets_elem buf = { 0 };
+	struct ice_aqc_port_ets_elem buf = { };
 	struct device *dev = ice_pf_to_dev(pf);
 	struct ice_aqc_lldp_get_mib *mib;
 	struct ice_dcbx_cfg tmp_dcbx_cfg;

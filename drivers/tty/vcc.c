@@ -471,7 +471,7 @@ static struct vio_version vcc_versions[] = {
 	{ .major = 1, .minor = 0 },
 };
 
-static struct tty_port_operations vcc_port_ops = { 0 };
+static struct tty_port_operations vcc_port_ops = { };
 
 static ssize_t domain_show(struct device *dev,
 			   struct device_attribute *attr,

@@ -281,7 +281,7 @@ static bool mlxbf_bootctl_guid_match(const guid_t *guid,
 
 static int mlxbf_bootctl_probe(struct platform_device *pdev)
 {
-	struct arm_smccc_res res = { 0 };
+	struct arm_smccc_res res = { };
 	guid_t guid;
 	int ret;
 

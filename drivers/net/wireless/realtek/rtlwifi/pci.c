@@ -721,7 +721,7 @@ static void _rtl_pci_rx_interrupt(struct ieee80211_hw *hw)
 	struct rtl_priv *rtlpriv = rtl_priv(hw);
 	struct rtl_pci *rtlpci = rtl_pcidev(rtl_pcipriv(hw));
 	int rxring_idx = RTL_PCI_RX_MPDU_QUEUE;
-	struct ieee80211_rx_status rx_status = { 0 };
+	struct ieee80211_rx_status rx_status = { };
 	unsigned int count = rtlpci->rxringcount;
 	u8 own;
 	u8 tmp_one;
@@ -905,7 +905,7 @@ static irqreturn_t _rtl_pci_interrupt(int irq, void *dev_id)
 	struct rtl_priv *rtlpriv = rtl_priv(hw);
 	struct rtl_hal *rtlhal = rtl_hal(rtl_priv(hw));
 	unsigned long flags;
-	struct rtl_int intvec = {0};
+	struct rtl_int intvec = {};
 
 	irqreturn_t ret = IRQ_HANDLED;
 

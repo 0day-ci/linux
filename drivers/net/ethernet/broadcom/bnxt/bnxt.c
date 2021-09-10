@@ -3067,7 +3067,7 @@ static void bnxt_free_rx_rings(struct bnxt *bp)
 static int bnxt_alloc_rx_page_pool(struct bnxt *bp,
 				   struct bnxt_rx_ring_info *rxr)
 {
-	struct page_pool_params pp = { 0 };
+	struct page_pool_params pp = { };
 
 	pp.pool_size = bp->rx_ring_size;
 	pp.nid = dev_to_node(&bp->pdev->dev);

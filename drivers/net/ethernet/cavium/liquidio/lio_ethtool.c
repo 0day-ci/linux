@@ -2421,7 +2421,7 @@ static int lio_set_intr_coalesce(struct net_device *netdev,
 	struct lio *lio = GET_LIO(netdev);
 	int ret;
 	struct octeon_device *oct = lio->oct_dev;
-	struct oct_intrmod_cfg intrmod = {0};
+	struct oct_intrmod_cfg intrmod = {};
 	u32 j, q_no;
 	int db_max, db_min;
 

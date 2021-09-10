@@ -1347,7 +1347,7 @@ static void *fm10k_dfwd_add_station(struct net_device *dev,
 	struct fm10k_intfc *interface = netdev_priv(dev);
 	struct fm10k_l2_accel *l2_accel = interface->l2_accel;
 	struct fm10k_l2_accel *old_l2_accel = NULL;
-	struct fm10k_dglort_cfg dglort = { 0 };
+	struct fm10k_dglort_cfg dglort = { };
 	struct fm10k_hw *hw = &interface->hw;
 	int size, i;
 	u16 vid, glort;
@@ -1445,7 +1445,7 @@ static void fm10k_dfwd_del_station(struct net_device *dev, void *priv)
 {
 	struct fm10k_intfc *interface = netdev_priv(dev);
 	struct fm10k_l2_accel *l2_accel = READ_ONCE(interface->l2_accel);
-	struct fm10k_dglort_cfg dglort = { 0 };
+	struct fm10k_dglort_cfg dglort = { };
 	struct fm10k_hw *hw = &interface->hw;
 	struct net_device *sdev = priv;
 	u16 vid, glort;

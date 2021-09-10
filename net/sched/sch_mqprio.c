@@ -385,7 +385,7 @@ static int mqprio_dump(struct Qdisc *sch, struct sk_buff *skb)
 	struct net_device *dev = qdisc_dev(sch);
 	struct mqprio_sched *priv = qdisc_priv(sch);
 	struct nlattr *nla = (struct nlattr *)skb_tail_pointer(skb);
-	struct tc_mqprio_qopt opt = { 0 };
+	struct tc_mqprio_qopt opt = { };
 	struct Qdisc *qdisc;
 	unsigned int ntx, tc;
 
@@ -513,8 +513,8 @@ static int mqprio_dump_class_stats(struct Qdisc *sch, unsigned long cl,
 	if (cl >= TC_H_MIN_PRIORITY) {
 		int i;
 		__u32 qlen = 0;
-		struct gnet_stats_queue qstats = {0};
-		struct gnet_stats_basic_packed bstats = {0};
+		struct gnet_stats_queue qstats = {};
+		struct gnet_stats_basic_packed bstats = {};
 		struct net_device *dev = qdisc_dev(sch);
 		struct netdev_tc_txq tc = dev->tc_to_txq[cl & TC_BITMASK];
 

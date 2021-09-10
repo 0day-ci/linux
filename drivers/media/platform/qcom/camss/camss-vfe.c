@@ -1080,7 +1080,7 @@ static int vfe_set_format(struct v4l2_subdev *sd,
 	*format = fmt->format;
 
 	if (fmt->pad == MSM_VFE_PAD_SINK) {
-		struct v4l2_subdev_selection sel = { 0 };
+		struct v4l2_subdev_selection sel = { };
 		int ret;
 
 		/* Propagate the format from sink to source */
@@ -1121,7 +1121,7 @@ static int vfe_get_selection(struct v4l2_subdev *sd,
 			     struct v4l2_subdev_selection *sel)
 {
 	struct vfe_line *line = v4l2_get_subdevdata(sd);
-	struct v4l2_subdev_format fmt = { 0 };
+	struct v4l2_subdev_format fmt = { };
 	struct v4l2_rect *rect;
 	int ret;
 
@@ -1199,7 +1199,7 @@ static int vfe_set_selection(struct v4l2_subdev *sd,
 
 	if (sel->target == V4L2_SEL_TGT_COMPOSE &&
 		sel->pad == MSM_VFE_PAD_SINK) {
-		struct v4l2_subdev_selection crop = { 0 };
+		struct v4l2_subdev_selection crop = { };
 
 		rect = __vfe_get_compose(line, sd_state, sel->which);
 		if (rect == NULL)
@@ -1216,7 +1216,7 @@ static int vfe_set_selection(struct v4l2_subdev *sd,
 		ret = vfe_set_selection(sd, sd_state, &crop);
 	} else if (sel->target == V4L2_SEL_TGT_CROP &&
 		sel->pad == MSM_VFE_PAD_SRC) {
-		struct v4l2_subdev_format fmt = { 0 };
+		struct v4l2_subdev_format fmt = { };
 
 		rect = __vfe_get_crop(line, sd_state, sel->which);
 		if (rect == NULL)

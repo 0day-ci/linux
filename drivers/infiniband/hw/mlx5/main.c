@@ -2934,7 +2934,7 @@ static int mlx5_port_immutable(struct ib_device *ibdev, u32 port_num,
 	struct ib_port_attr attr;
 	struct mlx5_ib_dev *dev = to_mdev(ibdev);
 	enum rdma_link_layer ll = mlx5_ib_port_link_layer(ibdev, port_num);
-	struct mlx5_hca_vport_context rep = {0};
+	struct mlx5_hca_vport_context rep = {};
 	int err;
 
 	err = ib_query_port(ibdev, port_num, &attr);

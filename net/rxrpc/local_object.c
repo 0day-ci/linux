@@ -109,7 +109,7 @@ static int rxrpc_open_socket(struct rxrpc_local *local, struct net *net)
 {
 	struct udp_tunnel_sock_cfg tuncfg = {NULL};
 	struct sockaddr_rxrpc *srx = &local->srx;
-	struct udp_port_cfg udp_conf = {0};
+	struct udp_port_cfg udp_conf = {};
 	struct sock *usk;
 	int ret;
 

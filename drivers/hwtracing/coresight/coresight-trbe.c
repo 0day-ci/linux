@@ -863,7 +863,7 @@ static void arm_trbe_register_coresight_cpu(struct trbe_drvdata *drvdata, int cp
 {
 	struct trbe_cpudata *cpudata = per_cpu_ptr(drvdata->cpudata, cpu);
 	struct coresight_device *trbe_csdev = coresight_get_percpu_sink(cpu);
-	struct coresight_desc desc = { 0 };
+	struct coresight_desc desc = { };
 	struct device *dev;
 
 	if (WARN_ON(trbe_csdev))

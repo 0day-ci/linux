@@ -848,7 +848,7 @@ qed_llh_access_filter(struct qed_hwfn *p_hwfn,
 		      u8 filter_idx,
 		      struct qed_llh_filter_details *p_details)
 {
-	struct qed_dmae_params params = {0};
+	struct qed_dmae_params params = {};
 	u32 addr;
 	u8 pfid;
 	int rc;
@@ -944,7 +944,7 @@ static int
 qed_llh_remove_filter(struct qed_hwfn *p_hwfn,
 		      struct qed_ptt *p_ptt, u8 abs_ppfid, u8 filter_idx)
 {
-	struct qed_llh_filter_details filter_details = {0};
+	struct qed_llh_filter_details filter_details = {};
 
 	return qed_llh_access_filter(p_hwfn, p_ptt, abs_ppfid, filter_idx,
 				     &filter_details);

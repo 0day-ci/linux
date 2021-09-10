@@ -96,7 +96,7 @@ static int handle_uffd_page_request(int uffd_mode, int uffd, uint64_t addr)
 			return r;
 		}
 	} else if (uffd_mode == UFFDIO_REGISTER_MODE_MINOR) {
-		struct uffdio_continue cont = {0};
+		struct uffdio_continue cont = {};
 
 		cont.range.start = addr;
 		cont.range.len = demand_paging_size;

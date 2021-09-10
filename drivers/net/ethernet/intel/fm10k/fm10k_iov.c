@@ -327,7 +327,7 @@ int fm10k_iov_resume(struct pci_dev *pdev)
 {
 	struct fm10k_intfc *interface = pci_get_drvdata(pdev);
 	struct fm10k_iov_data *iov_data = interface->iov_data;
-	struct fm10k_dglort_cfg dglort = { 0 };
+	struct fm10k_dglort_cfg dglort = { };
 	struct fm10k_hw *hw = &interface->hw;
 	int num_vfs, i;
 

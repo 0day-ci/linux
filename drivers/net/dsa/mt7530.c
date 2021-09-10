@@ -1382,7 +1382,7 @@ mt7530_port_fdb_dump(struct dsa_switch *ds, int port,
 		     dsa_fdb_dump_cb_t *cb, void *data)
 {
 	struct mt7530_priv *priv = ds->priv;
-	struct mt7530_fdb _fdb = { 0 };
+	struct mt7530_fdb _fdb = { };
 	int cnt = MT7530_NUM_FDB_RECORDS;
 	int ret = 0;
 	u32 rsp = 0;

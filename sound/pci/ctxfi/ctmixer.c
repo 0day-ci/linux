@@ -837,10 +837,10 @@ static int ct_mixer_get_resources(struct ct_mixer *mixer)
 {
 	struct sum_mgr *sum_mgr;
 	struct sum *sum;
-	struct sum_desc sum_desc = {0};
+	struct sum_desc sum_desc = {};
 	struct amixer_mgr *amixer_mgr;
 	struct amixer *amixer;
-	struct amixer_desc am_desc = {0};
+	struct amixer_desc am_desc = {};
 	int err;
 	int i;
 

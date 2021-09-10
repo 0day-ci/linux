@@ -917,7 +917,7 @@ static int dpu_crtc_atomic_check(struct drm_crtc *crtc,
 	int multirect_count = 0;
 	const struct drm_plane_state *pipe_staged[SSPP_MAX];
 	int left_zpos_cnt = 0, right_zpos_cnt = 0;
-	struct drm_rect crtc_rect = { 0 };
+	struct drm_rect crtc_rect = { };
 
 	pstates = kzalloc(sizeof(*pstates) * DPU_STAGE_MAX * 4, GFP_KERNEL);
 

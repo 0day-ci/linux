@@ -289,7 +289,7 @@ static int smu7_populate_single_firmware_entry(struct pp_hwmgr *hwmgr,
 						struct SMU_Entry *entry)
 {
 	int result = 0;
-	struct cgs_firmware_info info = {0};
+	struct cgs_firmware_info info = {};
 
 	result = cgs_get_firmware_info(hwmgr->device,
 				smu7_convert_fw_type_to_cgs(fw_type),
@@ -473,7 +473,7 @@ int smu7_upload_smu_firmware_image(struct pp_hwmgr *hwmgr)
 	int result = 0;
 	struct smu7_smumgr *smu_data = (struct smu7_smumgr *)(hwmgr->smu_backend);
 
-	struct cgs_firmware_info info = {0};
+	struct cgs_firmware_info info = {};
 
 	if (smu_data->security_hard_key == 1)
 		cgs_get_firmware_info(hwmgr->device,

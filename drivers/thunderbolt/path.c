@@ -511,7 +511,7 @@ int tb_path_activate(struct tb_path *path)
 
 	/* Activate hops. */
 	for (i = path->path_length - 1; i >= 0; i--) {
-		struct tb_regs_hop hop = { 0 };
+		struct tb_regs_hop hop = { };
 
 		/* If it is left active deactivate it first */
 		__tb_path_deactivate_hop(path->hops[i].in_port,

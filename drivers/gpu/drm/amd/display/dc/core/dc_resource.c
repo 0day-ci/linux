@@ -305,7 +305,7 @@ bool resource_construct(
 	const struct resource_caps *caps = pool->res_cap;
 	int i;
 	unsigned int num_audio = caps->num_audio;
-	struct resource_straps straps = {0};
+	struct resource_straps straps = {};
 
 	if (create_funcs->read_dce_straps)
 		create_funcs->read_dce_straps(dc->ctx, &straps);
@@ -1962,7 +1962,7 @@ static int acquire_resource_from_hw_enabled_state(
 
 			// Read DPP->MPCC->OPP Pipe from HW State
 			if (pool->mpc->funcs->read_mpcc_state) {
-				struct mpcc_state s = {0};
+				struct mpcc_state s = {};
 
 				pool->mpc->funcs->read_mpcc_state(pool->mpc, pipe_ctx->plane_res.mpcc_inst, &s);
 
@@ -2240,7 +2240,7 @@ static void set_avi_info_frame(
 	uint8_t *check_sum = NULL;
 	uint8_t byte_index = 0;
 	union hdmi_info_packet hdmi_info;
-	union display_content_support support = {0};
+	union display_content_support support = {};
 	unsigned int vic = pipe_ctx->stream->timing.vic;
 	enum dc_timing_3d_format format;
 

@@ -859,7 +859,7 @@ static int sctp_udp_rcv(struct sock *sk, struct sk_buff *skb)
 int sctp_udp_sock_start(struct net *net)
 {
 	struct udp_tunnel_sock_cfg tuncfg = {NULL};
-	struct udp_port_cfg udp_conf = {0};
+	struct udp_port_cfg udp_conf = {};
 	struct socket *sock;
 	int err;
 

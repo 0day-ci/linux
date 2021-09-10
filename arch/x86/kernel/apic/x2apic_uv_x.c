@@ -1681,7 +1681,7 @@ static __init int uv_system_init_hubless(void)
 
 static void __init uv_system_init_hub(void)
 {
-	struct uv_hub_info_s hub_info = {0};
+	struct uv_hub_info_s hub_info = {};
 	int bytes, cpu, nodeid;
 	unsigned short min_pnode = 9999, max_pnode = 0;
 	char *hub = is_uv5_hub() ? "UV500" :

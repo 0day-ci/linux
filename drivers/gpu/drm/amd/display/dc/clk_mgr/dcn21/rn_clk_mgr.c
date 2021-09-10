@@ -299,7 +299,7 @@ static void rn_dump_clk_registers_internal(struct rn_clk_internal *internal, str
 static void rn_dump_clk_registers(struct clk_state_registers_and_bypass *regs_and_bypass,
 		struct clk_mgr *clk_mgr_base, struct clk_log_info *log_info)
 {
-	struct rn_clk_internal internal = {0};
+	struct rn_clk_internal internal = {};
 	char *bypass_clks[5] = {"0x0 DFS", "0x1 REFCLK", "0x2 ERROR", "0x3 400 FCH", "0x4 600 FCH"};
 	unsigned int chars_printed = 0;
 	unsigned int remaining_buffer = log_info->bufSize;
@@ -432,8 +432,8 @@ static void rn_dump_clk_registers(struct clk_state_registers_and_bypass *regs_an
 /* This function produce translated logical clk state values*/
 void rn_get_clk_states(struct clk_mgr *clk_mgr_base, struct clk_states *s)
 {
-	struct clk_state_registers_and_bypass sb = { 0 };
-	struct clk_log_info log_info = { 0 };
+	struct clk_state_registers_and_bypass sb = { };
+	struct clk_log_info log_info = { };
 
 	rn_dump_clk_registers(&sb, clk_mgr_base, &log_info);
 
@@ -931,7 +931,7 @@ void rn_clk_mgr_construct(
 		struct dccg *dccg)
 {
 	struct dc_debug_options *debug = &ctx->dc->debug;
-	struct dpm_clocks clock_table = { 0 };
+	struct dpm_clocks clock_table = { };
 	enum pp_smu_status status = 0;
 	int is_green_sardine = 0;
 
@@ -958,7 +958,7 @@ void rn_clk_mgr_construct(
 		dcn21_funcs.update_clocks = dcn2_update_clocks_fpga;
 		clk_mgr->base.dentist_vco_freq_khz = 3600000;
 	} else {
-		struct clk_log_info log_info = {0};
+		struct clk_log_info log_info = {};
 
 		clk_mgr->periodic_retraining_disabled = rn_vbios_smu_is_periodic_retraining_disabled(clk_mgr);
 

@@ -158,7 +158,7 @@ int ubifs_add_orphan(struct ubifs_info *c, ino_t inum)
 	ino_t xattr_inum;
 	union ubifs_key key;
 	struct ubifs_dent_node *xent, *pxent = NULL;
-	struct fscrypt_name nm = {0};
+	struct fscrypt_name nm = {};
 	struct ubifs_orphan *xattr_orphan;
 	struct ubifs_orphan *orphan;
 

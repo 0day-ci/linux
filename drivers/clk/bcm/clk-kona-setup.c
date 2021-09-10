@@ -801,7 +801,7 @@ of_clk_kona_onecell_get(struct of_phandle_args *clkspec, void *data)
 void __init kona_dt_ccu_setup(struct ccu_data *ccu,
 			struct device_node *node)
 {
-	struct resource res = { 0 };
+	struct resource res = { };
 	resource_size_t range;
 	unsigned int i;
 	int ret;

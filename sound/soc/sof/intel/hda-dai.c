@@ -206,7 +206,7 @@ static int hda_link_hw_params(struct snd_pcm_substream *substream,
 	struct snd_soc_pcm_runtime *rtd = asoc_substream_to_rtd(substream);
 	struct snd_soc_dai *codec_dai = asoc_rtd_to_codec(rtd, 0);
 	struct sof_intel_hda_stream *hda_stream;
-	struct hda_pipe_params p_params = {0};
+	struct hda_pipe_params p_params = {};
 	struct hdac_ext_link *link;
 	int stream_tag;
 	int ret;

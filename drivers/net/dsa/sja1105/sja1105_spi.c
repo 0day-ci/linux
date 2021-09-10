@@ -37,7 +37,7 @@ static int sja1105_xfer(const struct sja1105_private *priv,
 {
 	u8 hdr_buf[SJA1105_SIZE_SPI_MSG_HEADER] = {0};
 	struct spi_device *spi = priv->spidev;
-	struct spi_transfer xfers[2] = {0};
+	struct spi_transfer xfers[2] = {};
 	struct spi_transfer *chunk_xfer;
 	struct spi_transfer *hdr_xfer;
 	struct sja1105_chunk chunk;

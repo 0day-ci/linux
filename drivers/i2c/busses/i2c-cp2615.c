@@ -216,7 +216,7 @@ cp2615_i2c_master_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
 	struct usb_interface *usbif = adap->algo_data;
 	int i = 0, ret = 0;
 	struct i2c_msg *msg;
-	struct cp2615_i2c_transfer i2c_w = {0};
+	struct cp2615_i2c_transfer i2c_w = {};
 
 	dev_dbg(&usbif->dev, "Doing %d I2C transactions\n", num);
 

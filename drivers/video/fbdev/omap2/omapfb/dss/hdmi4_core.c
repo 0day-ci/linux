@@ -303,7 +303,7 @@ void hdmi4_configure(struct hdmi_core_data *core,
 	struct hdmi_video_format video_format;
 	/* HDMI core */
 	struct hdmi_core_video_config v_core_cfg;
-	struct hdmi_core_packet_enable_repeat repeat_cfg = { 0 };
+	struct hdmi_core_packet_enable_repeat repeat_cfg = { };
 
 	hdmi_core_init(&v_core_cfg);
 

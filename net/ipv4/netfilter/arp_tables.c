@@ -520,7 +520,7 @@ static int translate_table(struct net *net,
 			   void *entry0,
 			   const struct arpt_replace *repl)
 {
-	struct xt_percpu_counter_alloc_state alloc_state = { 0 };
+	struct xt_percpu_counter_alloc_state alloc_state = { };
 	struct arpt_entry *iter;
 	unsigned int *offsets;
 	unsigned int i;
@@ -1505,7 +1505,7 @@ int arpt_register_table(struct net *net,
 	unsigned int num_ops;
 	int ret, i;
 	struct xt_table_info *newinfo;
-	struct xt_table_info bootstrap = {0};
+	struct xt_table_info bootstrap = {};
 	void *loc_cpu_entry;
 	struct xt_table *new_table;
 

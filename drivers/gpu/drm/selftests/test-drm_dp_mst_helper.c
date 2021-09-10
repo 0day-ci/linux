@@ -176,7 +176,7 @@ out:
 
 int igt_dp_mst_sideband_msg_req_decode(void *unused)
 {
-	struct drm_dp_sideband_msg_req_body in = { 0 };
+	struct drm_dp_sideband_msg_req_body in = { };
 	u8 data[] = { 0xff, 0x0, 0xdd };
 	int i;
 

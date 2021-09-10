@@ -195,7 +195,7 @@ static int __set_legacy_tf(struct dc_transfer_func *func,
 			   bool has_rom)
 {
 	struct dc_gamma *gamma = NULL;
-	struct calculate_buffer cal_buffer = {0};
+	struct calculate_buffer cal_buffer = {};
 	bool res;
 
 	ASSERT(lut && lut_size == MAX_COLOR_LEGACY_LUT_ENTRIES);
@@ -224,7 +224,7 @@ static int __set_output_tf(struct dc_transfer_func *func,
 			   bool has_rom)
 {
 	struct dc_gamma *gamma = NULL;
-	struct calculate_buffer cal_buffer = {0};
+	struct calculate_buffer cal_buffer = {};
 	bool res;
 
 	ASSERT(lut && lut_size == MAX_COLOR_LUT_ENTRIES);

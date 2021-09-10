@@ -408,7 +408,7 @@ static int mlx5e_alloc_rq(struct mlx5e_params *params,
 			  struct mlx5e_rq_param *rqp,
 			  int node, struct mlx5e_rq *rq)
 {
-	struct page_pool_params pp_params = { 0 };
+	struct page_pool_params pp_params = { };
 	struct mlx5_core_dev *mdev = rq->mdev;
 	void *rqc = rqp->rqc;
 	void *rqc_wq = MLX5_ADDR_OF(rqc, rqc, wq);
@@ -1273,7 +1273,7 @@ int mlx5e_create_sq_rdy(struct mlx5_core_dev *mdev,
 			u16 qos_queue_group_id,
 			u32 *sqn)
 {
-	struct mlx5e_modify_sq_param msp = {0};
+	struct mlx5e_modify_sq_param msp = {};
 	int err;
 
 	err = mlx5e_create_sq(mdev, param, csp, sqn);
@@ -1378,7 +1378,7 @@ void mlx5e_deactivate_txqsq(struct mlx5e_txqsq *sq)
 void mlx5e_close_txqsq(struct mlx5e_txqsq *sq)
 {
 	struct mlx5_core_dev *mdev = sq->mdev;
-	struct mlx5_rate_limit rl = {0};
+	struct mlx5_rate_limit rl = {};
 
 	cancel_work_sync(&sq->dim.work);
 	cancel_work_sync(&sq->recover_work);
@@ -1742,8 +1742,8 @@ static int mlx5e_set_sq_maxrate(struct net_device *dev,
 {
 	struct mlx5e_priv *priv = netdev_priv(dev);
 	struct mlx5_core_dev *mdev = priv->mdev;
-	struct mlx5e_modify_sq_param msp = {0};
-	struct mlx5_rate_limit rl = {0};
+	struct mlx5e_modify_sq_param msp = {};
+	struct mlx5_rate_limit rl = {};
 	u16 rl_index = 0;
 	int err;
 

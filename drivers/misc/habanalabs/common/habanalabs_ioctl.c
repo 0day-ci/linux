@@ -28,7 +28,7 @@ static u32 hl_debug_struct_size[HL_DEBUG_OP_TIMESTAMP + 1] = {
 
 static int device_status_info(struct hl_device *hdev, struct hl_info_args *args)
 {
-	struct hl_info_device_status dev_stat = {0};
+	struct hl_info_device_status dev_stat = {};
 	u32 size = args->return_size;
 	void __user *out = (void __user *) (uintptr_t) args->return_pointer;
 
@@ -43,7 +43,7 @@ static int device_status_info(struct hl_device *hdev, struct hl_info_args *args)
 
 static int hw_ip_info(struct hl_device *hdev, struct hl_info_args *args)
 {
-	struct hl_info_hw_ip_info hw_ip = {0};
+	struct hl_info_hw_ip_info hw_ip = {};
 	u32 size = args->return_size;
 	void __user *out = (void __user *) (uintptr_t) args->return_pointer;
 	struct asic_fixed_properties *prop = &hdev->asic_prop;
@@ -118,7 +118,7 @@ static int hw_events_info(struct hl_device *hdev, bool aggregate,
 static int dram_usage_info(struct hl_fpriv *hpriv, struct hl_info_args *args)
 {
 	struct hl_device *hdev = hpriv->hdev;
-	struct hl_info_dram_usage dram_usage = {0};
+	struct hl_info_dram_usage dram_usage = {};
 	u32 max_size = args->return_size;
 	void __user *out = (void __user *) (uintptr_t) args->return_pointer;
 	struct asic_fixed_properties *prop = &hdev->asic_prop;
@@ -141,7 +141,7 @@ static int dram_usage_info(struct hl_fpriv *hpriv, struct hl_info_args *args)
 
 static int hw_idle(struct hl_device *hdev, struct hl_info_args *args)
 {
-	struct hl_info_hw_idle hw_idle = {0};
+	struct hl_info_hw_idle hw_idle = {};
 	u32 max_size = args->return_size;
 	void __user *out = (void __user *) (uintptr_t) args->return_pointer;
 
@@ -225,7 +225,7 @@ out:
 
 static int device_utilization(struct hl_device *hdev, struct hl_info_args *args)
 {
-	struct hl_info_device_utilization device_util = {0};
+	struct hl_info_device_utilization device_util = {};
 	u32 max_size = args->return_size;
 	void __user *out = (void __user *) (uintptr_t) args->return_pointer;
 	int rc;
@@ -243,7 +243,7 @@ static int device_utilization(struct hl_device *hdev, struct hl_info_args *args)
 
 static int get_clk_rate(struct hl_device *hdev, struct hl_info_args *args)
 {
-	struct hl_info_clk_rate clk_rate = {0};
+	struct hl_info_clk_rate clk_rate = {};
 	u32 max_size = args->return_size;
 	void __user *out = (void __user *) (uintptr_t) args->return_pointer;
 	int rc;
@@ -262,7 +262,7 @@ static int get_clk_rate(struct hl_device *hdev, struct hl_info_args *args)
 
 static int get_reset_count(struct hl_device *hdev, struct hl_info_args *args)
 {
-	struct hl_info_reset_count reset_count = {0};
+	struct hl_info_reset_count reset_count = {};
 	u32 max_size = args->return_size;
 	void __user *out = (void __user *) (uintptr_t) args->return_pointer;
 
@@ -278,7 +278,7 @@ static int get_reset_count(struct hl_device *hdev, struct hl_info_args *args)
 
 static int time_sync_info(struct hl_device *hdev, struct hl_info_args *args)
 {
-	struct hl_info_time_sync time_sync = {0};
+	struct hl_info_time_sync time_sync = {};
 	u32 max_size = args->return_size;
 	void __user *out = (void __user *) (uintptr_t) args->return_pointer;
 
@@ -295,7 +295,7 @@ static int time_sync_info(struct hl_device *hdev, struct hl_info_args *args)
 static int pci_counters_info(struct hl_fpriv *hpriv, struct hl_info_args *args)
 {
 	struct hl_device *hdev = hpriv->hdev;
-	struct hl_info_pci_counters pci_counters = {0};
+	struct hl_info_pci_counters pci_counters = {};
 	u32 max_size = args->return_size;
 	void __user *out = (void __user *) (uintptr_t) args->return_pointer;
 	int rc;
@@ -314,7 +314,7 @@ static int pci_counters_info(struct hl_fpriv *hpriv, struct hl_info_args *args)
 static int clk_throttle_info(struct hl_fpriv *hpriv, struct hl_info_args *args)
 {
 	struct hl_device *hdev = hpriv->hdev;
-	struct hl_info_clk_throttle clk_throttle = {0};
+	struct hl_info_clk_throttle clk_throttle = {};
 	u32 max_size = args->return_size;
 	void __user *out = (void __user *) (uintptr_t) args->return_pointer;
 
@@ -330,7 +330,7 @@ static int clk_throttle_info(struct hl_fpriv *hpriv, struct hl_info_args *args)
 static int cs_counters_info(struct hl_fpriv *hpriv, struct hl_info_args *args)
 {
 	void __user *out = (void __user *) (uintptr_t) args->return_pointer;
-	struct hl_info_cs_counters cs_counters = {0};
+	struct hl_info_cs_counters cs_counters = {};
 	struct hl_device *hdev = hpriv->hdev;
 	struct hl_cs_counters_atomic *cntr;
 	u32 max_size = args->return_size;
@@ -382,7 +382,7 @@ static int sync_manager_info(struct hl_fpriv *hpriv, struct hl_info_args *args)
 {
 	struct hl_device *hdev = hpriv->hdev;
 	struct asic_fixed_properties *prop = &hdev->asic_prop;
-	struct hl_info_sync_manager sm_info = {0};
+	struct hl_info_sync_manager sm_info = {};
 	u32 max_size = args->return_size;
 	void __user *out = (void __user *) (uintptr_t) args->return_pointer;
 
@@ -407,7 +407,7 @@ static int total_energy_consumption_info(struct hl_fpriv *hpriv,
 			struct hl_info_args *args)
 {
 	struct hl_device *hdev = hpriv->hdev;
-	struct hl_info_energy total_energy = {0};
+	struct hl_info_energy total_energy = {};
 	u32 max_size = args->return_size;
 	void __user *out = (void __user *) (uintptr_t) args->return_pointer;
 	int rc;
@@ -447,7 +447,7 @@ static int power_info(struct hl_fpriv *hpriv, struct hl_info_args *args)
 {
 	struct hl_device *hdev = hpriv->hdev;
 	u32 max_size = args->return_size;
-	struct hl_power_info power_info = {0};
+	struct hl_power_info power_info = {};
 	void __user *out = (void __user *) (uintptr_t) args->return_pointer;
 	int rc;
 
@@ -466,7 +466,7 @@ static int open_stats_info(struct hl_fpriv *hpriv, struct hl_info_args *args)
 {
 	struct hl_device *hdev = hpriv->hdev;
 	u32 max_size = args->return_size;
-	struct hl_open_stats_info open_stats_info = {0};
+	struct hl_open_stats_info open_stats_info = {};
 	void __user *out = (void __user *) (uintptr_t) args->return_pointer;
 
 	if ((!max_size) || (!out))

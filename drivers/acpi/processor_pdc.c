@@ -23,7 +23,7 @@ static bool __init processor_physically_present(acpi_handle handle)
 	acpi_status status;
 	acpi_object_type acpi_type;
 	unsigned long long tmp;
-	union acpi_object object = { 0 };
+	union acpi_object object = { };
 	struct acpi_buffer buffer = { sizeof(union acpi_object), &object };
 
 	status = acpi_get_type(handle, &acpi_type);

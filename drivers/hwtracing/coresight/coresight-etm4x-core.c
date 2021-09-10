@@ -1878,8 +1878,8 @@ static int etm4_probe(struct device *dev, void __iomem *base, u32 etm_pid)
 	int ret;
 	struct coresight_platform_data *pdata = NULL;
 	struct etmv4_drvdata *drvdata;
-	struct coresight_desc desc = { 0 };
-	struct etm4_init_arg init_arg = { 0 };
+	struct coresight_desc desc = { };
+	struct etm4_init_arg init_arg = { };
 	u8 major, minor;
 	char *type_name;
 

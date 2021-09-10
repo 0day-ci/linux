@@ -764,7 +764,7 @@ static int venus_interface_queues_init(struct venus_hfi_device *hdev)
 	struct hfi_queue_table_header *tbl_hdr;
 	struct iface_queue *queue;
 	struct hfi_sfr *sfr;
-	struct mem_desc desc = {0};
+	struct mem_desc desc = {};
 	unsigned int offset;
 	unsigned int i;
 	int ret;

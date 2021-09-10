@@ -519,7 +519,7 @@ err_alloc_rcv_mbox_msg:
 static int set_vf_mbox_random_id(struct hinic_hwdev *hwdev, u16 func_id)
 {
 	struct hinic_mbox_func_to_func *func_to_func = hwdev->func_to_func;
-	struct hinic_set_random_id rand_info = {0};
+	struct hinic_set_random_id rand_info = {};
 	u16 out_size = sizeof(rand_info);
 	struct hinic_pfhwdev *pfhwdev;
 	int ret;
@@ -909,7 +909,7 @@ response_for_recv_func_mbox(struct hinic_mbox_func_to_func *func_to_func,
 			    struct hinic_recv_mbox *recv_mbox, int err,
 			    u16 out_size, u16 src_func_idx)
 {
-	struct mbox_msg_info msg_info = {0};
+	struct mbox_msg_info msg_info = {};
 
 	if (recv_mbox->ack_type == MBOX_ACK) {
 		msg_info.msg_id = recv_mbox->msg_info.msg_id;
@@ -1007,7 +1007,7 @@ int hinic_mbox_to_func(struct hinic_mbox_func_to_func *func_to_func,
 		       u16 *out_size, u32 timeout)
 {
 	struct hinic_recv_mbox *mbox_for_resp;
-	struct mbox_msg_info msg_info = {0};
+	struct mbox_msg_info msg_info = {};
 	unsigned long timeo;
 	int err;
 

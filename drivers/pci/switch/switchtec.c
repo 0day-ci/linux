@@ -603,7 +603,7 @@ static __poll_t switchtec_dev_poll(struct file *filp, poll_table *wait)
 static int ioctl_flash_info(struct switchtec_dev *stdev,
 			    struct switchtec_ioctl_flash_info __user *uinfo)
 {
-	struct switchtec_ioctl_flash_info info = {0};
+	struct switchtec_ioctl_flash_info info = {};
 	struct flash_info_regs __iomem *fi = stdev->mmio_flash_info;
 
 	if (stdev->gen == SWITCHTEC_GEN3) {
@@ -807,7 +807,7 @@ static int ioctl_flash_part_info(struct switchtec_dev *stdev,
 		struct switchtec_ioctl_flash_part_info __user *uinfo)
 {
 	int ret;
-	struct switchtec_ioctl_flash_part_info info = {0};
+	struct switchtec_ioctl_flash_part_info info = {};
 
 	if (copy_from_user(&info, uinfo, sizeof(info)))
 		return -EFAULT;

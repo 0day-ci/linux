@@ -2339,7 +2339,7 @@ static int vega20_notify_smc_display_config_after_ps_adjustment(
 			(struct vega20_hwmgr *)(hwmgr->backend);
 	struct vega20_single_dpm_table *dpm_table =
 			&data->dpm_table.mem_table;
-	struct PP_Clocks min_clocks = {0};
+	struct PP_Clocks min_clocks = {};
 	struct pp_display_clock_request clock_req;
 	int ret = 0;
 

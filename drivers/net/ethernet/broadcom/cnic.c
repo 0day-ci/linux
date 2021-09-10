@@ -5178,7 +5178,7 @@ static void cnic_init_rings(struct cnic_dev *dev)
 		u32 cl_qzone_id;
 		struct client_init_ramrod_data *data;
 		union l5cm_specific_data l5_data;
-		struct ustorm_eth_rx_producers rx_prods = {0};
+		struct ustorm_eth_rx_producers rx_prods = {};
 		u32 off, i, *cid_ptr;
 
 		rx_prods.bd_prod = 0;

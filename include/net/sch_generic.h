@@ -967,7 +967,7 @@ static inline int qdisc_qstats_copy(struct gnet_dump *d, struct Qdisc *sch)
 static inline void qdisc_qstats_qlen_backlog(struct Qdisc *sch,  __u32 *qlen,
 					     __u32 *backlog)
 {
-	struct gnet_stats_queue qstats = { 0 };
+	struct gnet_stats_queue qstats = { };
 	__u32 len = qdisc_qlen_sum(sch);
 
 	__gnet_stats_copy_queue(&qstats, sch->cpu_qstats, &sch->qstats, len);

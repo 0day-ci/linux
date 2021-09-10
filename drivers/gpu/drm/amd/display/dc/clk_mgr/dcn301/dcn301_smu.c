@@ -210,7 +210,7 @@ void dcn301_smu_set_display_idle_optimization(struct clk_mgr_internal *clk_mgr, 
 
 void dcn301_smu_enable_phy_refclk_pwrdwn(struct clk_mgr_internal *clk_mgr, bool enable)
 {
-	union display_idle_optimization_u idle_info = { 0 };
+	union display_idle_optimization_u idle_info = { };
 
 	if (enable) {
 		idle_info.idle_info.df_request_disabled = 1;

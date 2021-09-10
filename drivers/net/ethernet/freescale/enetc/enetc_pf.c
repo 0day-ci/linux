@@ -1133,7 +1133,7 @@ static void enetc_phylink_destroy(struct enetc_ndev_priv *priv)
  */
 static int enetc_init_port_rfs_memory(struct enetc_si *si)
 {
-	struct enetc_cmd_rfse rfse = {0};
+	struct enetc_cmd_rfse rfse = {};
 	struct enetc_hw *hw = &si->hw;
 	int num_rfs, i, err = 0;
 	u32 val;

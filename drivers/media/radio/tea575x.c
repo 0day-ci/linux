@@ -272,7 +272,7 @@ static int vidioc_enum_freq_bands(struct file *file, void *priv,
 
 int snd_tea575x_g_tuner(struct snd_tea575x *tea, struct v4l2_tuner *v)
 {
-	struct v4l2_frequency_band band_fm = { 0, };
+	struct v4l2_frequency_band band_fm = { };
 
 	if (v->index > 0)
 		return -EINVAL;

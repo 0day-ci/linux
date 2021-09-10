@@ -215,7 +215,7 @@ static int __sbi_send_ipi_v02(const unsigned long *hart_mask)
 {
 	unsigned long hartid, hmask_val, hbase;
 	struct cpumask tmask;
-	struct sbiret ret = {0};
+	struct sbiret ret = {};
 	int result;
 
 	if (!hart_mask || !(*hart_mask)) {
@@ -260,7 +260,7 @@ static int __sbi_rfence_v02_call(unsigned long fid, unsigned long hmask_val,
 				 unsigned long size, unsigned long arg4,
 				 unsigned long arg5)
 {
-	struct sbiret ret = {0};
+	struct sbiret ret = {};
 	int ext = SBI_EXT_RFENCE;
 	int result = 0;
 

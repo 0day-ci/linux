@@ -199,7 +199,7 @@ EXPORT_SYMBOL(fiemap_prep);
 static int ioctl_fiemap(struct file *filp, struct fiemap __user *ufiemap)
 {
 	struct fiemap fiemap;
-	struct fiemap_extent_info fieinfo = { 0, };
+	struct fiemap_extent_info fieinfo = { };
 	struct inode *inode = file_inode(filp);
 	int error;
 

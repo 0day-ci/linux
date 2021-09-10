@@ -161,7 +161,7 @@ gt215_link_train(struct gt215_ram *ram)
 	struct nvkm_clk *clk = device->clk;
 	u32 *result, r1700;
 	int ret, i;
-	struct nvbios_M0205T M0205T = { 0 };
+	struct nvbios_M0205T M0205T = { };
 	u8 ver, hdr, cnt, len, snr, ssz;
 	unsigned int clk_current;
 	unsigned long flags;

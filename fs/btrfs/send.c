@@ -1307,7 +1307,7 @@ static int find_extent_clone(struct send_ctx *sctx,
 	u64 flags = 0;
 	struct btrfs_file_extent_item *fi;
 	struct extent_buffer *eb = path->nodes[0];
-	struct backref_ctx backref_ctx = {0};
+	struct backref_ctx backref_ctx = {};
 	struct clone_root *cur_clone_root;
 	struct btrfs_key found_key;
 	struct btrfs_path *tmp_path;

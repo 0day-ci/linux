@@ -713,8 +713,8 @@ static u8 ixgbe_dcbnl_getdcbx(struct net_device *dev)
 static u8 ixgbe_dcbnl_setdcbx(struct net_device *dev, u8 mode)
 {
 	struct ixgbe_adapter *adapter = netdev_priv(dev);
-	struct ieee_ets ets = {0};
-	struct ieee_pfc pfc = {0};
+	struct ieee_ets ets = {};
+	struct ieee_pfc pfc = {};
 	int err = 0;
 
 	/* no support for LLD_MANAGED modes or CEE+IEEE */

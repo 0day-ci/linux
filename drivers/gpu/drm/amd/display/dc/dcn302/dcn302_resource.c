@@ -1104,7 +1104,7 @@ static bool init_soc_bounding_box(struct dc *dc,  struct resource_pool *pool)
 	dcn20_patch_bounding_box(dc, loaded_bb);
 
 	if (dc->ctx->dc_bios->funcs->get_soc_bb_info) {
-		struct bp_soc_bb_info bb_info = { 0 };
+		struct bp_soc_bb_info bb_info = { };
 
 		if (dc->ctx->dc_bios->funcs->get_soc_bb_info(
 			    dc->ctx->dc_bios, &bb_info) == BP_RESULT_OK) {

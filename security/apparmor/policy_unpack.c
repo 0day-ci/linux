@@ -677,7 +677,7 @@ static struct aa_profile *unpack_profile(struct aa_ext *e, char **ns_name)
 	const char *tmpname, *tmpns = NULL, *name = NULL;
 	const char *info = "failed to unpack profile";
 	size_t ns_len;
-	struct rhashtable_params params = { 0 };
+	struct rhashtable_params params = { };
 	char *key = NULL;
 	struct aa_data *data;
 	int i, error = -EPROTO;

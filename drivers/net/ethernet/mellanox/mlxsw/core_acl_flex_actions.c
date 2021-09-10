@@ -600,7 +600,7 @@ static void mlxsw_afa_fwd_entry_destroy(struct mlxsw_afa *mlxsw_afa,
 static struct mlxsw_afa_fwd_entry *
 mlxsw_afa_fwd_entry_get(struct mlxsw_afa *mlxsw_afa, u8 local_port)
 {
-	struct mlxsw_afa_fwd_entry_ht_key ht_key = {0};
+	struct mlxsw_afa_fwd_entry_ht_key ht_key = {};
 	struct mlxsw_afa_fwd_entry *fwd_entry;
 
 	ht_key.local_port = local_port;

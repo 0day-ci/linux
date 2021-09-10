@@ -118,7 +118,7 @@ void cpu_panic(void)
 	panic("SMP bolixed\n");
 }
 
-struct linux_prom_registers smp_penguin_ctable = { 0 };
+struct linux_prom_registers smp_penguin_ctable = { };
 
 void smp_send_reschedule(int cpu)
 {

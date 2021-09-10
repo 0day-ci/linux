@@ -188,7 +188,7 @@ static int l2tp_nl_cmd_tunnel_create(struct sk_buff *skb, struct genl_info *info
 	int proto_version;
 	int fd = -1;
 	int ret = 0;
-	struct l2tp_tunnel_cfg cfg = { 0, };
+	struct l2tp_tunnel_cfg cfg = { };
 	struct l2tp_tunnel *tunnel;
 	struct net *net = genl_info_net(info);
 	struct nlattr **attrs = info->attrs;
@@ -526,7 +526,7 @@ static int l2tp_nl_cmd_session_create(struct sk_buff *skb, struct genl_info *inf
 	int ret = 0;
 	struct l2tp_tunnel *tunnel;
 	struct l2tp_session *session;
-	struct l2tp_session_cfg cfg = { 0, };
+	struct l2tp_session_cfg cfg = { };
 	struct net *net = genl_info_net(info);
 
 	if (!info->attrs[L2TP_ATTR_CONN_ID]) {

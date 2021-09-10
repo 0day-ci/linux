@@ -107,7 +107,7 @@ int  xdp_prognum0(struct xdp_md *ctx)
 {
 	void *data_end = (void *)(long)ctx->data_end;
 	void *data     = (void *)(long)ctx->data;
-	struct parse_pkt pkt = { 0 };
+	struct parse_pkt pkt = { };
 
 	if (!parse_eth_frame(data, data_end, &pkt))
 		return XDP_ABORTED;
@@ -149,7 +149,7 @@ int  xdp_prognum1(struct xdp_md *ctx)
 {
 	void *data_end = (void *)(long)ctx->data_end;
 	void *data     = (void *)(long)ctx->data;
-	struct parse_pkt pkt = { 0 };
+	struct parse_pkt pkt = { };
 
 	if (!parse_eth_frame(data, data_end, &pkt))
 		return XDP_ABORTED;
@@ -183,7 +183,7 @@ int  xdp_prognum2(struct xdp_md *ctx)
 {
 	void *data_end = (void *)(long)ctx->data_end;
 	void *data     = (void *)(long)ctx->data;
-	struct parse_pkt pkt = { 0 };
+	struct parse_pkt pkt = { };
 	char *dest;
 
 	if (!parse_eth_frame(data, data_end, &pkt))
@@ -243,7 +243,7 @@ int  xdp_prognum3(struct xdp_md *ctx)
 	void *data_end = (void *)(long)ctx->data_end;
 	void *data     = (void *)(long)ctx->data;
 	struct ethhdr *orig_eth = data;
-	struct parse_pkt pkt = { 0 };
+	struct parse_pkt pkt = { };
 
 	if (!parse_eth_frame(orig_eth, data_end, &pkt))
 		return XDP_ABORTED;

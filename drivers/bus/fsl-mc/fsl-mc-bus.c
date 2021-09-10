@@ -530,7 +530,7 @@ static int mc_get_version(struct fsl_mc_io *mc_io,
 			  u32 cmd_flags,
 			  struct fsl_mc_version *mc_ver_info)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	struct dpmng_rsp_get_version *rsp_params;
 	int err;
 

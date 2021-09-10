@@ -64,7 +64,7 @@ struct fixed31_32 {
  * Useful constants
  */
 
-static const struct fixed31_32 dc_fixpt_zero = { 0 };
+static const struct fixed31_32 dc_fixpt_zero = { };
 static const struct fixed31_32 dc_fixpt_epsilon = { 1LL };
 static const struct fixed31_32 dc_fixpt_half = { 0x80000000LL };
 static const struct fixed31_32 dc_fixpt_one = { 0x100000000LL };

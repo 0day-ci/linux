@@ -821,7 +821,7 @@ struct tcp_server_args {
 static int tcp_server(const char *cgroup, void *arg)
 {
 	struct tcp_server_args *srv_args = arg;
-	struct sockaddr_in6 saddr = { 0 };
+	struct sockaddr_in6 saddr = { };
 	socklen_t slen = sizeof(saddr);
 	int sk, client_sk, ctl_fd, yes = 1, ret = -1;
 

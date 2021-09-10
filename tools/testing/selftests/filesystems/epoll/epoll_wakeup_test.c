@@ -473,7 +473,7 @@ TEST(epoll9)
 {
 	pthread_t emitter;
 	struct epoll_event e;
-	struct epoll_mtcontext ctx = { 0 };
+	struct epoll_mtcontext ctx = { };
 
 	signal(SIGUSR1, signal_handler);
 
@@ -516,7 +516,7 @@ TEST(epoll10)
 {
 	pthread_t emitter;
 	struct epoll_event e;
-	struct epoll_mtcontext ctx = { 0 };
+	struct epoll_mtcontext ctx = { };
 
 	signal(SIGUSR1, signal_handler);
 
@@ -559,7 +559,7 @@ TEST(epoll11)
 {
 	pthread_t emitter;
 	struct epoll_event events[2];
-	struct epoll_mtcontext ctx = { 0 };
+	struct epoll_mtcontext ctx = { };
 
 	signal(SIGUSR1, signal_handler);
 
@@ -608,7 +608,7 @@ TEST(epoll12)
 {
 	pthread_t emitter;
 	struct epoll_event events[2];
-	struct epoll_mtcontext ctx = { 0 };
+	struct epoll_mtcontext ctx = { };
 
 	signal(SIGUSR1, signal_handler);
 
@@ -657,7 +657,7 @@ TEST(epoll13)
 {
 	pthread_t emitter;
 	struct epoll_event e;
-	struct epoll_mtcontext ctx = { 0 };
+	struct epoll_mtcontext ctx = { };
 
 	signal(SIGUSR1, signal_handler);
 
@@ -700,7 +700,7 @@ TEST(epoll14)
 {
 	pthread_t emitter;
 	struct epoll_event e;
-	struct epoll_mtcontext ctx = { 0 };
+	struct epoll_mtcontext ctx = { };
 
 	signal(SIGUSR1, signal_handler);
 
@@ -743,7 +743,7 @@ TEST(epoll15)
 {
 	pthread_t emitter;
 	struct epoll_event events[2];
-	struct epoll_mtcontext ctx = { 0 };
+	struct epoll_mtcontext ctx = { };
 
 	signal(SIGUSR1, signal_handler);
 
@@ -792,7 +792,7 @@ TEST(epoll16)
 {
 	pthread_t emitter;
 	struct epoll_event events[2];
-	struct epoll_mtcontext ctx = { 0 };
+	struct epoll_mtcontext ctx = { };
 
 	signal(SIGUSR1, signal_handler);
 
@@ -1195,7 +1195,7 @@ TEST(epoll25)
 {
 	pthread_t emitter;
 	struct epoll_event e;
-	struct epoll_mtcontext ctx = { 0 };
+	struct epoll_mtcontext ctx = { };
 
 	signal(SIGUSR1, signal_handler);
 
@@ -1247,7 +1247,7 @@ TEST(epoll26)
 {
 	pthread_t emitter;
 	struct epoll_event e;
-	struct epoll_mtcontext ctx = { 0 };
+	struct epoll_mtcontext ctx = { };
 
 	signal(SIGUSR1, signal_handler);
 
@@ -1299,7 +1299,7 @@ TEST(epoll27)
 {
 	pthread_t emitter;
 	struct epoll_event e;
-	struct epoll_mtcontext ctx = { 0 };
+	struct epoll_mtcontext ctx = { };
 
 	signal(SIGUSR1, signal_handler);
 
@@ -1351,7 +1351,7 @@ TEST(epoll28)
 {
 	pthread_t emitter;
 	struct epoll_event e;
-	struct epoll_mtcontext ctx = { 0 };
+	struct epoll_mtcontext ctx = { };
 
 	signal(SIGUSR1, signal_handler);
 
@@ -1403,7 +1403,7 @@ TEST(epoll29)
 {
 	pthread_t emitter;
 	struct epoll_event e;
-	struct epoll_mtcontext ctx = { 0 };
+	struct epoll_mtcontext ctx = { };
 
 	signal(SIGUSR1, signal_handler);
 
@@ -1454,7 +1454,7 @@ TEST(epoll30)
 {
 	pthread_t emitter;
 	struct epoll_event e;
-	struct epoll_mtcontext ctx = { 0 };
+	struct epoll_mtcontext ctx = { };
 
 	signal(SIGUSR1, signal_handler);
 
@@ -1505,7 +1505,7 @@ TEST(epoll31)
 {
 	pthread_t emitter;
 	struct epoll_event e;
-	struct epoll_mtcontext ctx = { 0 };
+	struct epoll_mtcontext ctx = { };
 
 	signal(SIGUSR1, signal_handler);
 
@@ -1556,7 +1556,7 @@ TEST(epoll32)
 {
 	pthread_t emitter;
 	struct epoll_event e;
-	struct epoll_mtcontext ctx = { 0 };
+	struct epoll_mtcontext ctx = { };
 
 	signal(SIGUSR1, signal_handler);
 
@@ -1607,7 +1607,7 @@ TEST(epoll33)
 {
 	pthread_t emitter;
 	struct epoll_event e;
-	struct epoll_mtcontext ctx = { 0 };
+	struct epoll_mtcontext ctx = { };
 
 	signal(SIGUSR1, signal_handler);
 
@@ -1659,7 +1659,7 @@ TEST(epoll34)
 {
 	pthread_t emitter;
 	struct epoll_event e;
-	struct epoll_mtcontext ctx = { 0 };
+	struct epoll_mtcontext ctx = { };
 
 	signal(SIGUSR1, signal_handler);
 
@@ -1711,7 +1711,7 @@ TEST(epoll35)
 {
 	pthread_t emitter;
 	struct epoll_event e;
-	struct epoll_mtcontext ctx = { 0 };
+	struct epoll_mtcontext ctx = { };
 
 	signal(SIGUSR1, signal_handler);
 
@@ -1763,7 +1763,7 @@ TEST(epoll36)
 {
 	pthread_t emitter;
 	struct epoll_event e;
-	struct epoll_mtcontext ctx = { 0 };
+	struct epoll_mtcontext ctx = { };
 
 	signal(SIGUSR1, signal_handler);
 
@@ -1816,7 +1816,7 @@ TEST(epoll37)
 	pthread_t emitter;
 	struct pollfd pfd;
 	struct epoll_event e;
-	struct epoll_mtcontext ctx = { 0 };
+	struct epoll_mtcontext ctx = { };
 
 	signal(SIGUSR1, signal_handler);
 
@@ -1873,7 +1873,7 @@ TEST(epoll38)
 	pthread_t emitter;
 	struct pollfd pfd;
 	struct epoll_event e;
-	struct epoll_mtcontext ctx = { 0 };
+	struct epoll_mtcontext ctx = { };
 
 	signal(SIGUSR1, signal_handler);
 
@@ -1930,7 +1930,7 @@ TEST(epoll39)
 	pthread_t emitter;
 	struct pollfd pfd;
 	struct epoll_event e;
-	struct epoll_mtcontext ctx = { 0 };
+	struct epoll_mtcontext ctx = { };
 
 	signal(SIGUSR1, signal_handler);
 
@@ -1987,7 +1987,7 @@ TEST(epoll40)
 	pthread_t emitter;
 	struct pollfd pfd;
 	struct epoll_event e;
-	struct epoll_mtcontext ctx = { 0 };
+	struct epoll_mtcontext ctx = { };
 
 	signal(SIGUSR1, signal_handler);
 
@@ -2043,7 +2043,7 @@ TEST(epoll41)
 {
 	pthread_t emitter;
 	struct epoll_event e;
-	struct epoll_mtcontext ctx = { 0 };
+	struct epoll_mtcontext ctx = { };
 
 	signal(SIGUSR1, signal_handler);
 
@@ -2095,7 +2095,7 @@ TEST(epoll42)
 {
 	pthread_t emitter;
 	struct epoll_event e;
-	struct epoll_mtcontext ctx = { 0 };
+	struct epoll_mtcontext ctx = { };
 
 	signal(SIGUSR1, signal_handler);
 
@@ -2147,7 +2147,7 @@ TEST(epoll43)
 {
 	pthread_t emitter;
 	struct epoll_event e;
-	struct epoll_mtcontext ctx = { 0 };
+	struct epoll_mtcontext ctx = { };
 
 	signal(SIGUSR1, signal_handler);
 
@@ -2199,7 +2199,7 @@ TEST(epoll44)
 {
 	pthread_t emitter;
 	struct epoll_event e;
-	struct epoll_mtcontext ctx = { 0 };
+	struct epoll_mtcontext ctx = { };
 
 	signal(SIGUSR1, signal_handler);
 
@@ -2252,7 +2252,7 @@ TEST(epoll45)
 	pthread_t emitter;
 	struct pollfd pfd;
 	struct epoll_event e;
-	struct epoll_mtcontext ctx = { 0 };
+	struct epoll_mtcontext ctx = { };
 
 	signal(SIGUSR1, signal_handler);
 
@@ -2308,7 +2308,7 @@ TEST(epoll46)
 {
 	pthread_t emitter;
 	struct epoll_event e;
-	struct epoll_mtcontext ctx = { 0 };
+	struct epoll_mtcontext ctx = { };
 
 	signal(SIGUSR1, signal_handler);
 
@@ -2361,7 +2361,7 @@ TEST(epoll47)
 	pthread_t emitter;
 	struct pollfd pfd;
 	struct epoll_event e;
-	struct epoll_mtcontext ctx = { 0 };
+	struct epoll_mtcontext ctx = { };
 
 	signal(SIGUSR1, signal_handler);
 
@@ -2417,7 +2417,7 @@ TEST(epoll48)
 {
 	pthread_t emitter;
 	struct epoll_event e;
-	struct epoll_mtcontext ctx = { 0 };
+	struct epoll_mtcontext ctx = { };
 
 	signal(SIGUSR1, signal_handler);
 
@@ -2701,7 +2701,7 @@ TEST(epoll53)
 {
 	pthread_t emitter;
 	struct epoll_event e;
-	struct epoll_mtcontext ctx = { 0 };
+	struct epoll_mtcontext ctx = { };
 
 	signal(SIGUSR1, signal_handler);
 
@@ -2766,7 +2766,7 @@ TEST(epoll54)
 {
 	pthread_t emitter;
 	struct epoll_event e;
-	struct epoll_mtcontext ctx = { 0 };
+	struct epoll_mtcontext ctx = { };
 
 	signal(SIGUSR1, signal_handler);
 
@@ -2831,7 +2831,7 @@ TEST(epoll55)
 {
 	pthread_t emitter;
 	struct epoll_event e;
-	struct epoll_mtcontext ctx = { 0 };
+	struct epoll_mtcontext ctx = { };
 
 	signal(SIGUSR1, signal_handler);
 
@@ -2896,7 +2896,7 @@ TEST(epoll56)
 {
 	pthread_t emitter;
 	struct epoll_event e;
-	struct epoll_mtcontext ctx = { 0 };
+	struct epoll_mtcontext ctx = { };
 
 	signal(SIGUSR1, signal_handler);
 
@@ -2962,7 +2962,7 @@ TEST(epoll57)
 	pthread_t emitter;
 	struct pollfd pfd;
 	struct epoll_event e;
-	struct epoll_mtcontext ctx = { 0 };
+	struct epoll_mtcontext ctx = { };
 
 	signal(SIGUSR1, signal_handler);
 
@@ -3032,7 +3032,7 @@ TEST(epoll58)
 	pthread_t emitter;
 	struct pollfd pfd;
 	struct epoll_event e;
-	struct epoll_mtcontext ctx = { 0 };
+	struct epoll_mtcontext ctx = { };
 
 	signal(SIGUSR1, signal_handler);
 
@@ -3120,7 +3120,7 @@ TEST(epoll59)
 	pthread_t emitter;
 	struct pollfd pfd;
 	struct epoll_event e;
-	struct epoll_mtcontext ctx = { 0 };
+	struct epoll_mtcontext ctx = { };
 	int i, ret;
 
 	signal(SIGUSR1, signal_handler);
@@ -3228,7 +3228,7 @@ static inline int count_waiters(struct epoll60_ctx *ctx)
 
 TEST(epoll60)
 {
-	struct epoll60_ctx ctx = { 0 };
+	struct epoll60_ctx ctx = { };
 	pthread_t waiters[ARRAY_SIZE(ctx.evfd)];
 	struct epoll_event e;
 	int i, n, ret;
@@ -3460,7 +3460,7 @@ TEST(epoll64)
 {
 	pthread_t waiter[2];
 	struct epoll_event e;
-	struct epoll_mtcontext ctx = { 0 };
+	struct epoll_mtcontext ctx = { };
 
 	signal(SIGUSR1, signal_handler);
 

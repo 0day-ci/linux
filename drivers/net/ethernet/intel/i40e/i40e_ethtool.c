@@ -3243,7 +3243,7 @@ static int i40e_get_ethtool_fdir_entry(struct i40e_pf *pf,
 {
 	struct ethtool_rx_flow_spec *fsp =
 			(struct ethtool_rx_flow_spec *)&cmd->fs;
-	struct i40e_rx_flow_userdef userdef = {0};
+	struct i40e_rx_flow_userdef userdef = {};
 	struct i40e_fdir_filter *rule = NULL;
 	struct hlist_node *node2;
 	u64 input_set;

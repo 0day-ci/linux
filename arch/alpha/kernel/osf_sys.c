@@ -276,7 +276,7 @@ struct osf_statfs64 {
 static int
 linux_to_osf_stat(struct kstat *lstat, struct osf_stat __user *osf_stat)
 {
-	struct osf_stat tmp = { 0 };
+	struct osf_stat tmp = { };
 
 	tmp.st_dev	= lstat->dev;
 	tmp.st_mode	= lstat->mode;
@@ -324,7 +324,7 @@ static int
 linux_to_osf_statfs64(struct kstatfs *linux_stat, struct osf_statfs64 __user *osf_stat,
 		      unsigned long bufsiz)
 {
-	struct osf_statfs64 tmp_stat = { 0 };
+	struct osf_statfs64 tmp_stat = { };
 
 	tmp_stat.f_type = linux_stat->f_type;
 	tmp_stat.f_fsize = linux_stat->f_frsize;

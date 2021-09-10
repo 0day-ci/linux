@@ -1371,7 +1371,7 @@ static int dlfb_setup_modes(struct dlfb_data *dlfb,
 	/* If everything else has failed, fall back to safe default mode */
 	if (default_vmode == NULL) {
 
-		struct fb_videomode fb_vmode = {0};
+		struct fb_videomode fb_vmode = {};
 
 		/*
 		 * Add the standard VESA modes to our modelist

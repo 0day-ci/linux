@@ -494,14 +494,14 @@ int kunit_run_tests(struct kunit_suite *suite)
 {
 	char param_desc[KUNIT_PARAM_DESC_SIZE];
 	struct kunit_case *test_case;
-	struct kunit_result_stats suite_stats = { 0 };
-	struct kunit_result_stats total_stats = { 0 };
+	struct kunit_result_stats suite_stats = { };
+	struct kunit_result_stats total_stats = { };
 
 	kunit_print_subtest_start(suite);
 
 	kunit_suite_for_each_test_case(suite, test_case) {
 		struct kunit test = { .param_value = NULL, .param_index = 0 };
-		struct kunit_result_stats param_stats = { 0 };
+		struct kunit_result_stats param_stats = { };
 		test_case->status = KUNIT_SKIPPED;
 
 		if (test_case->generate_params) {

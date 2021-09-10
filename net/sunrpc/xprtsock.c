@@ -625,7 +625,7 @@ out:
 static ssize_t
 xs_read_stream(struct sock_xprt *transport, int flags)
 {
-	struct msghdr msg = { 0 };
+	struct msghdr msg = { };
 	size_t want, read = 0;
 	ssize_t ret = 0;
 

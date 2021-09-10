@@ -2341,7 +2341,7 @@ static int uvc_register_chains(struct uvc_device *dev)
  * USB probe, disconnect, suspend and resume
  */
 
-static const struct uvc_device_info uvc_quirk_none = { 0 };
+static const struct uvc_device_info uvc_quirk_none = { };
 
 static int uvc_probe(struct usb_interface *intf,
 		     const struct usb_device_id *id)

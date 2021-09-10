@@ -155,7 +155,7 @@ static ssize_t show_feedback_ctrs(struct kobject *kobj,
 		struct kobj_attribute *attr, char *buf)
 {
 	struct cpc_desc *cpc_ptr = to_cpc_desc(kobj);
-	struct cppc_perf_fb_ctrs fb_ctrs = {0};
+	struct cppc_perf_fb_ctrs fb_ctrs = {};
 	int ret;
 
 	ret = cppc_get_perf_ctrs(cpc_ptr->cpu_id, &fb_ctrs);

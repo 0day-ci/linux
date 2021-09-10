@@ -1869,7 +1869,7 @@ static int taprio_dump(struct Qdisc *sch, struct sk_buff *skb)
 	struct taprio_sched *q = qdisc_priv(sch);
 	struct net_device *dev = qdisc_dev(sch);
 	struct sched_gate_list *oper, *admin;
-	struct tc_mqprio_qopt opt = { 0 };
+	struct tc_mqprio_qopt opt = { };
 	struct nlattr *nest, *sched_nest;
 	unsigned int i;
 

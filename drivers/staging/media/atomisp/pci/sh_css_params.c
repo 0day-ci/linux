@@ -3663,7 +3663,7 @@ sh_css_params_write_to_ddr_internal(
 
 			/* Generate default DVS unity table on start up*/
 			if (!params->pipe_dvs_6axis_config[pipe_id]) {
-				struct ia_css_resolution dvs_offset = {0};
+				struct ia_css_resolution dvs_offset = {};
 
 				if (!IS_ISP2401) {
 					dvs_offset.width = (PIX_SHIFT_FILTER_RUN_IN_X + binary->dvs_envelope.width) / 2;

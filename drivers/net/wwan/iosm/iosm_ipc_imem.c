@@ -520,7 +520,7 @@ static int ipc_imem_send_mdm_rdy_cb(struct iosm_imem *ipc_imem, int arg,
  */
 static void ipc_imem_run_state_worker(struct work_struct *instance)
 {
-	struct ipc_chnl_cfg chnl_cfg_port = { 0 };
+	struct ipc_chnl_cfg chnl_cfg_port = { };
 	struct ipc_mux_config mux_cfg;
 	struct iosm_imem *ipc_imem;
 	u8 ctrl_chl_idx = 0;

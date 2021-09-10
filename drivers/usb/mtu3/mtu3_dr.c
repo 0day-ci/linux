@@ -278,7 +278,7 @@ static enum usb_role ssusb_role_sw_get(struct usb_role_switch *sw)
 
 static int ssusb_role_sw_register(struct otg_switch_mtk *otg_sx)
 {
-	struct usb_role_switch_desc role_sx_desc = { 0 };
+	struct usb_role_switch_desc role_sx_desc = { };
 	struct ssusb_mtk *ssusb = otg_sx_to_ssusb(otg_sx);
 	struct device *dev = ssusb->dev;
 	enum usb_dr_mode mode;

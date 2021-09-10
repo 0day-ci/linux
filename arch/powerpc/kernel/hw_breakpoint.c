@@ -100,7 +100,7 @@ int arch_install_hw_breakpoint(struct perf_event *bp)
  */
 void arch_uninstall_hw_breakpoint(struct perf_event *bp)
 {
-	struct arch_hw_breakpoint null_brk = {0};
+	struct arch_hw_breakpoint null_brk = {};
 	struct perf_event **slot;
 	int i;
 

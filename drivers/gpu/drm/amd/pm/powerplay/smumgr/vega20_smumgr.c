@@ -422,7 +422,7 @@ static int vega20_smu_init(struct pp_hwmgr *hwmgr)
 	int ret = 0;
 	struct amdgpu_device *adev = hwmgr->adev;
 
-	struct cgs_firmware_info info = {0};
+	struct cgs_firmware_info info = {};
 
 	ret = cgs_get_firmware_info(hwmgr->device,
 				smu7_convert_fw_type_to_cgs(UCODE_ID_SMU),

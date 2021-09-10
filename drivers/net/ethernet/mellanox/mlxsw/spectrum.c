@@ -1172,7 +1172,7 @@ static int mlxsw_sp_port_hwtstamp_get(struct mlxsw_sp_port *mlxsw_sp_port,
 
 static inline void mlxsw_sp_port_ptp_clear(struct mlxsw_sp_port *mlxsw_sp_port)
 {
-	struct hwtstamp_config config = {0};
+	struct hwtstamp_config config = {};
 
 	mlxsw_sp_port->mlxsw_sp->ptp_ops->hwtstamp_set(mlxsw_sp_port, &config);
 }

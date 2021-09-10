@@ -1957,7 +1957,7 @@ static int __alloc_dma_rx_desc_resources(struct stmmac_priv *priv, u32 queue)
 	struct stmmac_rx_queue *rx_q = &priv->rx_queue[queue];
 	struct stmmac_channel *ch = &priv->channel[queue];
 	bool xdp_prog = stmmac_xdp_is_enabled(priv);
-	struct page_pool_params pp_params = { 0 };
+	struct page_pool_params pp_params = { };
 	unsigned int num_pages;
 	unsigned int napi_id;
 	int ret;

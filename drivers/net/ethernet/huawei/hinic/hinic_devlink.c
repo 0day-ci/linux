@@ -104,7 +104,7 @@ static bool check_image_integrity(struct hinic_devlink_priv *priv,
 static int check_image_device_type(struct hinic_devlink_priv *priv,
 				   u32 image_device_type)
 {
-	struct hinic_comm_board_info board_info = {0};
+	struct hinic_comm_board_info board_info = {};
 
 	if (hinic_get_board_info(priv->hwdev, &board_info)) {
 		dev_err(&priv->hwdev->hwif->pdev->dev, "Get board info failed\n");

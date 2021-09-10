@@ -457,7 +457,7 @@ static int bnxt_re_net_ring_free(struct bnxt_re_dev *rdev,
 				 u16 fw_ring_id, int type)
 {
 	struct bnxt_en_dev *en_dev = rdev->en_dev;
-	struct hwrm_ring_free_input req = {0};
+	struct hwrm_ring_free_input req = {};
 	struct hwrm_ring_free_output resp;
 	struct bnxt_fw_msg fw_msg;
 	int rc = -EINVAL;
@@ -487,7 +487,7 @@ static int bnxt_re_net_ring_alloc(struct bnxt_re_dev *rdev,
 				  u16 *fw_ring_id)
 {
 	struct bnxt_en_dev *en_dev = rdev->en_dev;
-	struct hwrm_ring_alloc_input req = {0};
+	struct hwrm_ring_alloc_input req = {};
 	struct hwrm_ring_alloc_output resp;
 	struct bnxt_fw_msg fw_msg;
 	int rc = -EINVAL;
@@ -523,7 +523,7 @@ static int bnxt_re_net_stats_ctx_free(struct bnxt_re_dev *rdev,
 				      u32 fw_stats_ctx_id)
 {
 	struct bnxt_en_dev *en_dev = rdev->en_dev;
-	struct hwrm_stat_ctx_free_input req = {0};
+	struct hwrm_stat_ctx_free_input req = {};
 	struct bnxt_fw_msg fw_msg;
 	int rc = -EINVAL;
 
@@ -552,8 +552,8 @@ static int bnxt_re_net_stats_ctx_alloc(struct bnxt_re_dev *rdev,
 				       u32 *fw_stats_ctx_id)
 {
 	struct bnxt_qplib_chip_ctx *chip_ctx = rdev->chip_ctx;
-	struct hwrm_stat_ctx_alloc_output resp = {0};
-	struct hwrm_stat_ctx_alloc_input req = {0};
+	struct hwrm_stat_ctx_alloc_output resp = {};
+	struct hwrm_stat_ctx_alloc_input req = {};
 	struct bnxt_en_dev *en_dev = rdev->en_dev;
 	struct bnxt_fw_msg fw_msg;
 	int rc = -EINVAL;
@@ -1091,7 +1091,7 @@ static void bnxt_re_dispatch_event(struct ib_device *ibdev, struct ib_qp *qp,
 static int bnxt_re_query_hwrm_pri2cos(struct bnxt_re_dev *rdev, u8 dir,
 				      u64 *cid_map)
 {
-	struct hwrm_queue_pri2cos_qcfg_input req = {0};
+	struct hwrm_queue_pri2cos_qcfg_input req = {};
 	struct bnxt *bp = netdev_priv(rdev->netdev);
 	struct hwrm_queue_pri2cos_qcfg_output resp;
 	struct bnxt_en_dev *en_dev = rdev->en_dev;
@@ -1283,8 +1283,8 @@ static int bnxt_re_setup_qos(struct bnxt_re_dev *rdev)
 static void bnxt_re_query_hwrm_intf_version(struct bnxt_re_dev *rdev)
 {
 	struct bnxt_en_dev *en_dev = rdev->en_dev;
-	struct hwrm_ver_get_output resp = {0};
-	struct hwrm_ver_get_input req = {0};
+	struct hwrm_ver_get_output resp = {};
+	struct hwrm_ver_get_input req = {};
 	struct bnxt_fw_msg fw_msg;
 	int rc = 0;
 

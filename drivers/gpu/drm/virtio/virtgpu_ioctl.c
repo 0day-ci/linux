@@ -245,7 +245,7 @@ static int virtio_gpu_resource_create_ioctl(struct drm_device *dev, void *data,
 	struct virtio_gpu_object *qobj;
 	struct drm_gem_object *obj;
 	uint32_t handle = 0;
-	struct virtio_gpu_object_params params = { 0 };
+	struct virtio_gpu_object_params params = { };
 
 	if (vgdev->has_virgl_3d) {
 		virtio_gpu_create_context(dev, file);
@@ -600,7 +600,7 @@ static int virtio_gpu_resource_create_blob_ioctl(struct drm_device *dev,
 	bool host3d_blob = false;
 	struct drm_gem_object *obj;
 	struct virtio_gpu_object *bo;
-	struct virtio_gpu_object_params params = { 0 };
+	struct virtio_gpu_object_params params = { };
 	struct virtio_gpu_device *vgdev = dev->dev_private;
 	struct virtio_gpu_fpriv *vfpriv = file->driver_priv;
 	struct drm_virtgpu_resource_create_blob *rc_blob = data;

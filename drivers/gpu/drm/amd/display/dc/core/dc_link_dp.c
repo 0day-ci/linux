@@ -2021,7 +2021,7 @@ bool dc_link_dp_get_max_link_enc_cap(const struct dc_link *link, struct dc_link_
 
 static struct dc_link_settings get_max_link_cap(struct dc_link *link)
 {
-	struct dc_link_settings max_link_cap = {0};
+	struct dc_link_settings max_link_cap = {};
 
 	/* get max link encoder capability */
 	link->link_enc->funcs->get_max_link_cap(link->link_enc, &max_link_cap);
@@ -2176,10 +2176,10 @@ bool dp_verify_link_cap(
 	struct dc_link_settings *known_limit_link_setting,
 	int *fail_count)
 {
-	struct dc_link_settings max_link_cap = {0};
-	struct dc_link_settings cur_link_setting = {0};
+	struct dc_link_settings max_link_cap = {};
+	struct dc_link_settings cur_link_setting = {};
 	struct dc_link_settings *cur = &cur_link_setting;
-	struct dc_link_settings initial_link_settings = {0};
+	struct dc_link_settings initial_link_settings = {};
 	bool success;
 	bool skip_link_training;
 	bool skip_video_pattern;
@@ -2327,7 +2327,7 @@ bool dp_verify_link_cap_with_retries(
 bool dp_verify_mst_link_cap(
 	struct dc_link *link)
 {
-	struct dc_link_settings max_link_cap = {0};
+	struct dc_link_settings max_link_cap = {};
 
 	max_link_cap = get_max_link_cap(link);
 	link->verified_link_cap = get_common_supported_link_settings(
@@ -2341,7 +2341,7 @@ static struct dc_link_settings get_common_supported_link_settings(
 		struct dc_link_settings link_setting_a,
 		struct dc_link_settings link_setting_b)
 {
-	struct dc_link_settings link_settings = {0};
+	struct dc_link_settings link_settings = {};
 
 	link_settings.lane_count =
 		(link_setting_a.lane_count <=
@@ -2802,7 +2802,7 @@ static bool handle_hpd_irq_psr_sink(struct dc_link *link)
 
 static void dp_test_send_link_training(struct dc_link *link)
 {
-	struct dc_link_settings link_settings = {0};
+	struct dc_link_settings link_settings = {};
 
 	core_link_read_dpcd(
 			link,
@@ -3074,9 +3074,9 @@ static void dp_test_send_link_test_pattern(struct dc_link *link)
 
 static void dp_test_get_audio_test_data(struct dc_link *link, bool disable_video)
 {
-	union audio_test_mode            dpcd_test_mode = {0};
-	struct audio_test_pattern_type   dpcd_pattern_type = {0};
-	union audio_test_pattern_period  dpcd_pattern_period[AUDIO_CHANNELS_COUNT] = {0};
+	union audio_test_mode            dpcd_test_mode = {};
+	struct audio_test_pattern_type   dpcd_pattern_type = {};
+	union audio_test_pattern_period  dpcd_pattern_period[AUDIO_CHANNELS_COUNT] = {};
 	enum dp_test_pattern test_pattern = DP_TEST_PATTERN_AUDIO_OPERATOR_DEFINED;
 
 	struct pipe_ctx *pipes = link->dc->current_state->res_ctx.pipe_ctx;
@@ -3687,7 +3687,7 @@ static bool retrieve_link_cap(struct dc_link *link)
 	struct dp_device_vendor_id sink_id;
 	union down_stream_port_count down_strm_port_count;
 	union edp_configuration_cap edp_config_cap;
-	union dp_downstream_port_present ds_port = { 0 };
+	union dp_downstream_port_present ds_port = { };
 	enum dc_status status = DC_ERROR_UNEXPECTED;
 	uint32_t read_dpcd_retry_cnt = 3;
 	int i;
@@ -3930,7 +3930,7 @@ bool dp_overwrite_extended_receiver_cap(struct dc_link *link)
 	uint8_t dpcd_data[16];
 	uint32_t read_dpcd_retry_cnt = 3;
 	enum dc_status status = DC_ERROR_UNEXPECTED;
-	union dp_downstream_port_present ds_port = { 0 };
+	union dp_downstream_port_present ds_port = { };
 	union down_stream_port_count down_strm_port_count;
 	union edp_configuration_cap edp_config_cap;
 
@@ -4454,8 +4454,8 @@ bool dc_link_dp_set_test_pattern(
 
 		if (pipe_ctx->stream_res.tg->funcs->lock_doublebuffer_enable) {
 			if (pipe_ctx->stream && should_use_dmub_lock(pipe_ctx->stream->link)) {
-				union dmub_hw_lock_flags hw_locks = { 0 };
-				struct dmub_hw_lock_inst_flags inst_flags = { 0 };
+				union dmub_hw_lock_flags hw_locks = { };
+				struct dmub_hw_lock_inst_flags inst_flags = { };
 
 				hw_locks.bits.lock_dig = 1;
 				inst_flags.dig_inst = pipe_ctx->stream_res.tg->inst;
@@ -4498,8 +4498,8 @@ bool dc_link_dp_set_test_pattern(
 
 		if (pipe_ctx->stream_res.tg->funcs->lock_doublebuffer_disable) {
 			if (pipe_ctx->stream && should_use_dmub_lock(pipe_ctx->stream->link)) {
-				union dmub_hw_lock_flags hw_locks = { 0 };
-				struct dmub_hw_lock_inst_flags inst_flags = { 0 };
+				union dmub_hw_lock_flags hw_locks = { };
+				struct dmub_hw_lock_inst_flags inst_flags = { };
 
 				hw_locks.bits.lock_dig = 1;
 				inst_flags.dig_inst = pipe_ctx->stream_res.tg->inst;
@@ -4731,8 +4731,8 @@ void dpcd_set_source_specific_data(struct dc_link *link)
 {
 	if (!link->dc->vendor_signature.is_valid) {
 		enum dc_status __maybe_unused result_write_min_hblank = DC_NOT_SUPPORTED;
-		struct dpcd_amd_signature amd_signature = {0};
-		struct dpcd_amd_device_id amd_device_id = {0};
+		struct dpcd_amd_signature amd_signature = {};
+		struct dpcd_amd_device_id amd_device_id = {};
 
 		amd_device_id.device_id_byte1 =
 				(uint8_t)(link->ctx->asic_id.chip_id);

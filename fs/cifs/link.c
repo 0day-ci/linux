@@ -297,7 +297,7 @@ cifs_query_mf_symlink(unsigned int xid, struct cifs_tcon *tcon,
 	int oplock = 0;
 	struct cifs_fid fid;
 	struct cifs_open_parms oparms;
-	struct cifs_io_parms io_parms = {0};
+	struct cifs_io_parms io_parms = {};
 	int buf_type = CIFS_NO_BUFFER;
 	FILE_ALL_INFO file_info;
 
@@ -341,7 +341,7 @@ cifs_create_mf_symlink(unsigned int xid, struct cifs_tcon *tcon,
 	int oplock = 0;
 	struct cifs_fid fid;
 	struct cifs_open_parms oparms;
-	struct cifs_io_parms io_parms = {0};
+	struct cifs_io_parms io_parms = {};
 
 	oparms.tcon = tcon;
 	oparms.cifs_sb = cifs_sb;
@@ -378,7 +378,7 @@ smb3_query_mf_symlink(unsigned int xid, struct cifs_tcon *tcon,
 	int rc;
 	struct cifs_fid fid;
 	struct cifs_open_parms oparms;
-	struct cifs_io_parms io_parms = {0};
+	struct cifs_io_parms io_parms = {};
 	int buf_type = CIFS_NO_BUFFER;
 	__le16 *utf16_path;
 	__u8 oplock = SMB2_OPLOCK_LEVEL_NONE;
@@ -439,7 +439,7 @@ smb3_create_mf_symlink(unsigned int xid, struct cifs_tcon *tcon,
 	int rc;
 	struct cifs_fid fid;
 	struct cifs_open_parms oparms;
-	struct cifs_io_parms io_parms = {0};
+	struct cifs_io_parms io_parms = {};
 	__le16 *utf16_path;
 	__u8 oplock = SMB2_OPLOCK_LEVEL_NONE;
 	struct kvec iov[2];

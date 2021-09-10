@@ -105,7 +105,7 @@ static int exynos_drm_fbdev_create(struct drm_fb_helper *helper,
 	struct exynos_drm_fbdev *exynos_fbdev = to_exynos_fbdev(helper);
 	struct exynos_drm_gem *exynos_gem;
 	struct drm_device *dev = helper->dev;
-	struct drm_mode_fb_cmd2 mode_cmd = { 0 };
+	struct drm_mode_fb_cmd2 mode_cmd = { };
 	unsigned long size;
 	int ret;
 

@@ -978,7 +978,7 @@ static void load_bitmaps(struct mddev *mddev, int total_slots)
 static void resync_bitmap(struct mddev *mddev)
 {
 	struct md_cluster_info *cinfo = mddev->cluster_info;
-	struct cluster_msg cmsg = {0};
+	struct cluster_msg cmsg = {};
 	int err;
 
 	cmsg.type = cpu_to_le32(BITMAP_NEEDS_SYNC);
@@ -1107,7 +1107,7 @@ static void metadata_update_cancel(struct mddev *mddev)
 static int update_bitmap_size(struct mddev *mddev, sector_t size)
 {
 	struct md_cluster_info *cinfo = mddev->cluster_info;
-	struct cluster_msg cmsg = {0};
+	struct cluster_msg cmsg = {};
 	int ret;
 
 	cmsg.type = cpu_to_le32(BITMAP_RESIZE);
@@ -1335,7 +1335,7 @@ static int resync_info_update(struct mddev *mddev, sector_t lo, sector_t hi)
 {
 	struct md_cluster_info *cinfo = mddev->cluster_info;
 	struct resync_info ri;
-	struct cluster_msg cmsg = {0};
+	struct cluster_msg cmsg = {};
 
 	/* do not send zero again, if we have sent before */
 	if (hi == 0) {
@@ -1470,7 +1470,7 @@ static int new_disk_ack(struct mddev *mddev, bool ack)
 
 static int remove_disk(struct mddev *mddev, struct md_rdev *rdev)
 {
-	struct cluster_msg cmsg = {0};
+	struct cluster_msg cmsg = {};
 	struct md_cluster_info *cinfo = mddev->cluster_info;
 	cmsg.type = cpu_to_le32(REMOVE);
 	cmsg.raid_slot = cpu_to_le32(rdev->desc_nr);
@@ -1533,7 +1533,7 @@ static int gather_bitmaps(struct md_rdev *rdev)
 {
 	int sn, err;
 	sector_t lo, hi;
-	struct cluster_msg cmsg = {0};
+	struct cluster_msg cmsg = {};
 	struct mddev *mddev = rdev->mddev;
 	struct md_cluster_info *cinfo = mddev->cluster_info;
 

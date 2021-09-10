@@ -27,7 +27,7 @@ MODULE_PARM_DESC(set_vf_link_state, "Set vf link state, 0 represents link auto, 
 static int hinic_set_mac(struct hinic_hwdev *hwdev, const u8 *mac_addr,
 			 u16 vlan_id, u16 func_id)
 {
-	struct hinic_port_mac_cmd mac_info = {0};
+	struct hinic_port_mac_cmd mac_info = {};
 	u16 out_size = sizeof(mac_info);
 	int err;
 
@@ -51,7 +51,7 @@ static void hinic_notify_vf_link_status(struct hinic_hwdev *hwdev, u16 vf_id,
 					u8 link_status)
 {
 	struct vf_data_storage *vf_infos = hwdev->func_to_io.vf_infos;
-	struct hinic_port_link_status link = {0};
+	struct hinic_port_link_status link = {};
 	u16 out_size = sizeof(link);
 	int err;
 
@@ -100,7 +100,7 @@ static u16 hinic_vf_info_vlanprio(struct hinic_hwdev *hwdev, int vf_id)
 static int hinic_set_vf_vlan(struct hinic_hwdev *hwdev, bool add, u16 vid,
 			     u8 qos, int vf_id)
 {
-	struct hinic_vf_vlan_config vf_vlan = {0};
+	struct hinic_vf_vlan_config vf_vlan = {};
 	u16 out_size = sizeof(vf_vlan);
 	int err;
 	u8 cmd;
@@ -133,7 +133,7 @@ static int hinic_set_vf_tx_rate_max_min(struct hinic_hwdev *hwdev, u16 vf_id,
 					u32 max_rate, u32 min_rate)
 {
 	struct hinic_func_to_io *nic_io = &hwdev->func_to_io;
-	struct hinic_tx_rate_cfg_max_min rate_cfg = {0};
+	struct hinic_tx_rate_cfg_max_min rate_cfg = {};
 	u16 out_size = sizeof(rate_cfg);
 	int err;
 
@@ -163,7 +163,7 @@ static int hinic_set_vf_rate_limit(struct hinic_hwdev *hwdev, u16 vf_id,
 				   u32 tx_rate)
 {
 	struct hinic_func_to_io *nic_io = &hwdev->func_to_io;
-	struct hinic_tx_rate_cfg rate_cfg = {0};
+	struct hinic_tx_rate_cfg rate_cfg = {};
 	u16 out_size = sizeof(rate_cfg);
 	int err;
 
@@ -515,7 +515,7 @@ static int hinic_check_mac_info(u8 status, u16 vlan_id)
 static int hinic_update_mac(struct hinic_hwdev *hwdev, u8 *old_mac,
 			    u8 *new_mac, u16 vlan_id, u16 func_id)
 {
-	struct hinic_port_mac_update mac_info = {0};
+	struct hinic_port_mac_update mac_info = {};
 	u16 out_size = sizeof(mac_info);
 	int err;
 
@@ -841,7 +841,7 @@ int hinic_ndo_set_vf_bw(struct net_device *netdev,
 		SPEED_25000, SPEED_40000, SPEED_100000
 	};
 	struct hinic_dev *nic_dev = netdev_priv(netdev);
-	struct hinic_port_cap port_cap = { 0 };
+	struct hinic_port_cap port_cap = { };
 	enum hinic_port_link_state link_state;
 	int err;
 
@@ -902,7 +902,7 @@ int hinic_ndo_set_vf_bw(struct net_device *netdev,
 static int hinic_set_vf_spoofchk(struct hinic_hwdev *hwdev, u16 vf_id,
 				 bool spoofchk)
 {
-	struct hinic_spoofchk_set spoofchk_cfg = {0};
+	struct hinic_spoofchk_set spoofchk_cfg = {};
 	struct vf_data_storage *vf_infos = NULL;
 	u16 out_size = sizeof(spoofchk_cfg);
 	int err;
@@ -1156,7 +1156,7 @@ static int hinic_deinit_vf_hw(struct hinic_sriov_info *sriov_info,
 
 int hinic_vf_func_init(struct hinic_hwdev *hwdev)
 {
-	struct hinic_register_vf register_info = {0};
+	struct hinic_register_vf register_info = {};
 	u16 out_size = sizeof(register_info);
 	struct hinic_func_to_io *nic_io;
 	int err = 0;
@@ -1224,7 +1224,7 @@ out_free_nic_io:
 
 void hinic_vf_func_free(struct hinic_hwdev *hwdev)
 {
-	struct hinic_register_vf unregister = {0};
+	struct hinic_register_vf unregister = {};
 	u16 out_size = sizeof(unregister);
 	int err;
 

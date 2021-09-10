@@ -277,7 +277,7 @@ static inline struct imx335 *to_imx335(struct v4l2_subdev *subdev)
 static int imx335_read_reg(struct imx335 *imx335, u16 reg, u32 len, u32 *val)
 {
 	struct i2c_client *client = v4l2_get_subdevdata(&imx335->sd);
-	struct i2c_msg msgs[2] = {0};
+	struct i2c_msg msgs[2] = {};
 	u8 addr_buf[2] = {0};
 	u8 data_buf[4] = {0};
 	int ret;
@@ -630,7 +630,7 @@ static int imx335_init_pad_cfg(struct v4l2_subdev *sd,
 			       struct v4l2_subdev_state *sd_state)
 {
 	struct imx335 *imx335 = to_imx335(sd);
-	struct v4l2_subdev_format fmt = { 0 };
+	struct v4l2_subdev_format fmt = { };
 
 	fmt.which = sd_state ? V4L2_SUBDEV_FORMAT_TRY : V4L2_SUBDEV_FORMAT_ACTIVE;
 	imx335_fill_pad_format(imx335, &supported_mode, &fmt);

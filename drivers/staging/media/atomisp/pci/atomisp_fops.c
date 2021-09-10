@@ -898,7 +898,7 @@ static int atomisp_release(struct file *file)
 	bool acc_node;
 	struct v4l2_requestbuffers req;
 	struct v4l2_subdev_fh fh;
-	struct v4l2_rect clear_compose = {0};
+	struct v4l2_rect clear_compose = {};
 	int ret = 0;
 
 	v4l2_fh_init(&fh.vfh, vdev);
@@ -961,7 +961,7 @@ static int atomisp_release(struct file *file)
 	 * get released.
 	 */
 	if (!isp->sw_contex.file_input && asd->fmt_auto->val) {
-		struct v4l2_mbus_framefmt isp_sink_fmt = { 0 };
+		struct v4l2_mbus_framefmt isp_sink_fmt = { };
 
 		atomisp_subdev_set_ffmt(&asd->subdev, fh.state,
 					V4L2_SUBDEV_FORMAT_ACTIVE,
@@ -973,7 +973,7 @@ subdev_uninit:
 
 	/* clear the sink pad for file input */
 	if (isp->sw_contex.file_input && asd->fmt_auto->val) {
-		struct v4l2_mbus_framefmt isp_sink_fmt = { 0 };
+		struct v4l2_mbus_framefmt isp_sink_fmt = { };
 
 		atomisp_subdev_set_ffmt(&asd->subdev, fh.state,
 					V4L2_SUBDEV_FORMAT_ACTIVE,

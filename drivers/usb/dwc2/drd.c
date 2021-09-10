@@ -119,7 +119,7 @@ static int dwc2_drd_role_sw_set(struct usb_role_switch *sw, enum usb_role role)
 
 int dwc2_drd_init(struct dwc2_hsotg *hsotg)
 {
-	struct usb_role_switch_desc role_sw_desc = {0};
+	struct usb_role_switch_desc role_sw_desc = {};
 	struct usb_role_switch *role_sw;
 	int ret;
 

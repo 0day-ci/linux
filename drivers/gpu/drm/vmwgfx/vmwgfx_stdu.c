@@ -1072,7 +1072,7 @@ vmw_stdu_primary_plane_prepare_fb(struct drm_plane *plane,
 		new_content_type = SEPARATE_SURFACE;
 
 	if (new_content_type != SAME_AS_DISPLAY) {
-		struct vmw_surface_metadata metadata = {0};
+		struct vmw_surface_metadata metadata = {};
 
 		/*
 		 * If content buffer is a buffer object, then we have to

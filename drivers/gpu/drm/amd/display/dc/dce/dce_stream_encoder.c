@@ -555,7 +555,7 @@ static void dce110_stream_encoder_hdmi_set_stream_attribute(
 	bool enable_audio)
 {
 	struct dce110_stream_encoder *enc110 = DCE110STRENC_FROM_STRENC(enc);
-	struct bp_encoder_control cntl = {0};
+	struct bp_encoder_control cntl = {};
 
 	cntl.action = ENCODER_CONTROL_SETUP;
 	cntl.engine_id = enc110->base.id;
@@ -669,7 +669,7 @@ static void dce110_stream_encoder_dvi_set_stream_attribute(
 	bool is_dual_link)
 {
 	struct dce110_stream_encoder *enc110 = DCE110STRENC_FROM_STRENC(enc);
-	struct bp_encoder_control cntl = {0};
+	struct bp_encoder_control cntl = {};
 
 	cntl.action = ENCODER_CONTROL_SETUP;
 	cntl.engine_id = enc110->base.id;
@@ -694,7 +694,7 @@ static void dce110_stream_encoder_lvds_set_stream_attribute(
 	struct dc_crtc_timing *crtc_timing)
 {
 	struct dce110_stream_encoder *enc110 = DCE110STRENC_FROM_STRENC(enc);
-	struct bp_encoder_control cntl = {0};
+	struct bp_encoder_control cntl = {};
 
 	cntl.action = ENCODER_CONTROL_SETUP;
 	cntl.engine_id = enc110->base.id;
@@ -1134,7 +1134,7 @@ static const struct audio_clock_info audio_clock_info_table_48bpc[14] = {
 static union audio_cea_channels speakers_to_channels(
 	struct audio_speaker_flags speaker_flags)
 {
-	union audio_cea_channels cea_channels = {0};
+	union audio_cea_channels cea_channels = {};
 
 	/* these are one to one */
 	cea_channels.channels.FL = speaker_flags.FL_FR;
@@ -1276,7 +1276,7 @@ static void dce110_se_setup_hdmi_audio(
 {
 	struct dce110_stream_encoder *enc110 = DCE110STRENC_FROM_STRENC(enc);
 
-	struct audio_clock_info audio_clock_info = {0};
+	struct audio_clock_info audio_clock_info = {};
 	uint32_t max_packets_per_line;
 
 	/* For now still do calculation, although this field is ignored when

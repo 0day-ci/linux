@@ -1604,7 +1604,7 @@ static int vidioc_s_std(struct file *file, void *priv, v4l2_std_id norm)
 static int vidioc_g_parm(struct file *file, void *priv,
 			 struct v4l2_streamparm *p)
 {
-	struct v4l2_subdev_frame_interval ival = { 0 };
+	struct v4l2_subdev_frame_interval ival = { };
 	struct em28xx      *dev  = video_drvdata(file);
 	struct em28xx_v4l2 *v4l2 = dev->v4l2;
 	int rc = 0;

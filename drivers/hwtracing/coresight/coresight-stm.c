@@ -863,7 +863,7 @@ static int stm_probe(struct amba_device *adev, const struct amba_id *id)
 	struct resource *res = &adev->res;
 	struct resource ch_res;
 	size_t bitmap_size;
-	struct coresight_desc desc = { 0 };
+	struct coresight_desc desc = { };
 
 	desc.name = coresight_alloc_device_name(&stm_devs, dev);
 	if (!desc.name)

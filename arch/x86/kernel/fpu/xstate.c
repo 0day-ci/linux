@@ -1052,7 +1052,7 @@ void copy_xstate_to_uabi_buf(struct membuf to, struct task_struct *tsk,
 			membuf_zero(&to, xstate_offsets[i] - zerofrom);
 
 		if (i == XFEATURE_PKRU) {
-			struct pkru_state pkru = {0};
+			struct pkru_state pkru = {};
 			/*
 			 * PKRU is not necessarily up to date in the
 			 * thread's XSAVE buffer.  Fill this part from the

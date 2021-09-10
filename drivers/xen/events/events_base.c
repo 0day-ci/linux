@@ -1706,7 +1706,7 @@ static void __xen_evtchn_do_upcall(void)
 {
 	struct vcpu_info *vcpu_info = __this_cpu_read(xen_vcpu);
 	int cpu = smp_processor_id();
-	struct evtchn_loop_ctrl ctrl = { 0 };
+	struct evtchn_loop_ctrl ctrl = { };
 
 	read_lock(&evtchn_rwlock);
 

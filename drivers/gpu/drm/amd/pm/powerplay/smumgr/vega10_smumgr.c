@@ -206,7 +206,7 @@ static int vega10_smu_init(struct pp_hwmgr *hwmgr)
 	struct vega10_smumgr *priv;
 	unsigned long tools_size;
 	int ret;
-	struct cgs_firmware_info info = {0};
+	struct cgs_firmware_info info = {};
 
 	ret = cgs_get_firmware_info(hwmgr->device,
 					CGS_UCODE_ID_SMU,

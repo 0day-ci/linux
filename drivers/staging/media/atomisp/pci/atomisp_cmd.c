@@ -110,7 +110,7 @@ struct atomisp_acc_pipe *atomisp_to_acc_pipe(struct video_device *dev)
 
 static unsigned short atomisp_get_sensor_fps(struct atomisp_sub_device *asd)
 {
-	struct v4l2_subdev_frame_interval fi = { 0 };
+	struct v4l2_subdev_frame_interval fi = { };
 	struct atomisp_device *isp = asd->isp;
 
 	unsigned short fps = 0;
@@ -398,7 +398,7 @@ void atomisp_msi_irq_uninit(struct atomisp_device *isp)
 
 static void atomisp_sof_event(struct atomisp_sub_device *asd)
 {
-	struct v4l2_event event = {0};
+	struct v4l2_event event = {};
 
 	event.type = V4L2_EVENT_FRAME_SYNC;
 	event.u.frame_sync.frame_sequence = atomic_read(&asd->sof_count);
@@ -408,7 +408,7 @@ static void atomisp_sof_event(struct atomisp_sub_device *asd)
 
 void atomisp_eof_event(struct atomisp_sub_device *asd, uint8_t exp_id)
 {
-	struct v4l2_event event = {0};
+	struct v4l2_event event = {};
 
 	event.type = V4L2_EVENT_FRAME_END;
 	event.u.frame_sync.frame_sequence = exp_id;
@@ -419,7 +419,7 @@ void atomisp_eof_event(struct atomisp_sub_device *asd, uint8_t exp_id)
 static void atomisp_3a_stats_ready_event(struct atomisp_sub_device *asd,
 	uint8_t exp_id)
 {
-	struct v4l2_event event = {0};
+	struct v4l2_event event = {};
 
 	event.type = V4L2_EVENT_ATOMISP_3A_STATS_READY;
 	event.u.frame_sync.frame_sequence = exp_id;
@@ -430,7 +430,7 @@ static void atomisp_3a_stats_ready_event(struct atomisp_sub_device *asd,
 static void atomisp_metadata_ready_event(struct atomisp_sub_device *asd,
 	enum atomisp_metadata_type md_type)
 {
-	struct v4l2_event event = {0};
+	struct v4l2_event event = {};
 
 	event.type = V4L2_EVENT_ATOMISP_METADATA_READY;
 	event.u.data[0] = md_type;
@@ -440,7 +440,7 @@ static void atomisp_metadata_ready_event(struct atomisp_sub_device *asd,
 
 static void atomisp_reset_event(struct atomisp_sub_device *asd)
 {
-	struct v4l2_event event = {0};
+	struct v4l2_event event = {};
 
 	event.type = V4L2_EVENT_ATOMISP_CSS_RESET;
 
@@ -1269,7 +1269,7 @@ void atomisp_delayed_init_work(struct work_struct *work)
 	 * to SOC camera, use yuvpp pipe and no support continuous mode.
 	 */
 	if (!ATOMISP_USE_YUVPP(asd)) {
-		struct v4l2_event event = {0};
+		struct v4l2_event event = {};
 		struct ia_css_stream *stream;
 
 		stream = asd->stream_env[ATOMISP_INPUT_STREAM_GENERAL].stream;
@@ -2399,7 +2399,7 @@ static void atomisp_curr_user_grid_info(struct atomisp_sub_device *asd,
 int atomisp_compare_grid(struct atomisp_sub_device *asd,
 			 struct atomisp_grid_info *atomgrid)
 {
-	struct atomisp_grid_info tmp = {0};
+	struct atomisp_grid_info tmp = {};
 
 	atomisp_curr_user_grid_info(asd, &tmp);
 	return memcmp(atomgrid, &tmp, sizeof(tmp));
@@ -2417,7 +2417,7 @@ int atomisp_gdc_cac_table(struct atomisp_sub_device *asd, int flag,
 
 	if (flag == 0) {
 		/* Get gdc table from current setup */
-		struct ia_css_morph_table tab = {0};
+		struct ia_css_morph_table tab = {};
 
 		atomisp_css_get_morph_table(asd, &tab);
 
@@ -5240,8 +5240,8 @@ static int atomisp_set_fmt_to_isp(struct video_device *vdev,
 	 */
 	if (asd->fmt_auto->val ||
 	    asd->vfpp->val != ATOMISP_VFPP_ENABLE) {
-		struct v4l2_rect vf_size = {0};
-		struct v4l2_mbus_framefmt vf_ffmt = {0};
+		struct v4l2_rect vf_size = {};
+		struct v4l2_mbus_framefmt vf_ffmt = {};
 
 		if (pix->width < 640 || pix->height < 480) {
 			vf_size.width = pix->width;
@@ -5596,7 +5596,7 @@ int atomisp_set_fmt(struct video_device *vdev, struct v4l2_format *f)
 	unsigned int padding_w = pad_w, padding_h = pad_h;
 	bool res_overflow = false, crop_needs_override = false;
 	struct v4l2_mbus_framefmt *isp_sink_fmt;
-	struct v4l2_mbus_framefmt isp_source_fmt = {0};
+	struct v4l2_mbus_framefmt isp_source_fmt = {};
 	struct v4l2_rect isp_sink_crop;
 	u16 source_pad = atomisp_subdev_source_pad(vdev);
 	struct v4l2_subdev_fh fh;
@@ -5629,7 +5629,7 @@ int atomisp_set_fmt(struct video_device *vdev, struct v4l2_format *f)
 	     && asd->run_mode->val == ATOMISP_RUN_MODE_VIDEO)) {
 		if (asd->fmt_auto->val) {
 			struct v4l2_rect *capture_comp;
-			struct v4l2_rect r = {0};
+			struct v4l2_rect r = {};
 
 			r.width = f->fmt.pix.width;
 			r.height = f->fmt.pix.height;
@@ -5914,7 +5914,7 @@ int atomisp_set_fmt(struct video_device *vdev, struct v4l2_format *f)
 					     source_pad, V4L2_SEL_TGT_COMPOSE,
 					     0, &isp_sink_crop);
 	} else if (IS_MOFD) {
-		struct v4l2_rect main_compose = {0};
+		struct v4l2_rect main_compose = {};
 
 		main_compose.width = isp_sink_crop.width;
 		main_compose.height =
@@ -5934,8 +5934,8 @@ int atomisp_set_fmt(struct video_device *vdev, struct v4l2_format *f)
 					     V4L2_SEL_TGT_COMPOSE, 0,
 					     &main_compose);
 	} else {
-		struct v4l2_rect sink_crop = {0};
-		struct v4l2_rect main_compose = {0};
+		struct v4l2_rect sink_crop = {};
+		struct v4l2_rect main_compose = {};
 
 		main_compose.width = f->fmt.pix.width;
 		main_compose.height = f->fmt.pix.height;
@@ -6029,7 +6029,7 @@ int atomisp_set_fmt_file(struct video_device *vdev, struct v4l2_format *f)
 	struct atomisp_device *isp = video_get_drvdata(vdev);
 	struct atomisp_video_pipe *pipe = atomisp_to_video_pipe(vdev);
 	struct atomisp_sub_device *asd = pipe->asd;
-	struct v4l2_mbus_framefmt ffmt = {0};
+	struct v4l2_mbus_framefmt ffmt = {};
 	const struct atomisp_format_bridge *format_bridge;
 	struct v4l2_subdev_fh fh;
 	int ret;
@@ -6287,7 +6287,7 @@ int atomisp_s_ae_window(struct atomisp_sub_device *asd,
 {
 	struct atomisp_device *isp = asd->isp;
 	/* Coverity CID 298071 - initialzize struct */
-	struct v4l2_subdev_selection sel = { 0 };
+	struct v4l2_subdev_selection sel = { };
 
 	sel.r.left = arg->x_left;
 	sel.r.top = arg->y_top;

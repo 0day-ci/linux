@@ -84,7 +84,7 @@ static bool l2tp_udp_mt(const struct sk_buff *skb, struct xt_action_param *par, 
 	union l2tp_val *lh;
 	union l2tp_val lhbuf;
 	u16 flags;
-	struct l2tp_data data = { 0, };
+	struct l2tp_data data = { };
 
 	if (par->fragoff != 0)
 		return false;
@@ -141,7 +141,7 @@ static bool l2tp_ip_mt(const struct sk_buff *skb, struct xt_action_param *par, u
 	const struct xt_l2tp_info *info = par->matchinfo;
 	union l2tp_val *lh;
 	union l2tp_val lhbuf;
-	struct l2tp_data data = { 0, };
+	struct l2tp_data data = { };
 
 	/* For IP encap, the L2TP sid is the first 32-bits. */
 	lh = skb_header_pointer(skb, thoff, sizeof(lhbuf), &lhbuf);

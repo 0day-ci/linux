@@ -310,7 +310,7 @@ struct psy_am_i_supplied_data {
 
 static int __power_supply_am_i_supplied(struct device *dev, void *_data)
 {
-	union power_supply_propval ret = {0,};
+	union power_supply_propval ret = {};
 	struct power_supply *epsy = dev_get_drvdata(dev);
 	struct psy_am_i_supplied_data *data = _data;
 
@@ -343,7 +343,7 @@ EXPORT_SYMBOL_GPL(power_supply_am_i_supplied);
 
 static int __power_supply_is_system_supplied(struct device *dev, void *data)
 {
-	union power_supply_propval ret = {0,};
+	union power_supply_propval ret = {};
 	struct power_supply *psy = dev_get_drvdata(dev);
 	unsigned int *count = data;
 
@@ -378,7 +378,7 @@ EXPORT_SYMBOL_GPL(power_supply_is_system_supplied);
 static int __power_supply_get_supplier_max_current(struct device *dev,
 						   void *data)
 {
-	union power_supply_propval ret = {0,};
+	union power_supply_propval ret = {};
 	struct power_supply *epsy = dev_get_drvdata(dev);
 	struct power_supply *psy = data;
 
@@ -393,7 +393,7 @@ static int __power_supply_get_supplier_max_current(struct device *dev,
 
 int power_supply_set_input_current_limit_from_supplier(struct power_supply *psy)
 {
-	union power_supply_propval val = {0,};
+	union power_supply_propval val = {};
 	int curr;
 
 	if (!psy->desc->set_property)

@@ -38,7 +38,7 @@ static int disconnect(int fd)
 /* Disconnect (unhash) a kTLS socket after removing it from sockmap. */
 static void test_sockmap_ktls_disconnect_after_delete(int family, int map)
 {
-	struct sockaddr_storage addr = {0};
+	struct sockaddr_storage addr = {};
 	socklen_t len = sizeof(addr);
 	int err, cli, srv, zero = 0;
 

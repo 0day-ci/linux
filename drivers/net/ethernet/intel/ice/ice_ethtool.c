@@ -948,7 +948,7 @@ ice_set_phys_id(struct net_device *netdev, enum ethtool_phys_id_state state)
 static int ice_set_fec_cfg(struct net_device *netdev, enum ice_fec_mode req_fec)
 {
 	struct ice_netdev_priv *np = netdev_priv(netdev);
-	struct ice_aqc_set_phy_cfg_data config = { 0 };
+	struct ice_aqc_set_phy_cfg_data config = { };
 	struct ice_vsi *vsi = np->vsi;
 	struct ice_port_info *pi;
 

@@ -4637,7 +4637,7 @@ static int qeth_snmp_command(struct qeth_card *card, char __user *udata)
 	struct qeth_snmp_ureq __user *ureq;
 	struct qeth_cmd_buffer *iob;
 	unsigned int req_len;
-	struct qeth_arp_query_info qinfo = {0, };
+	struct qeth_arp_query_info qinfo = {};
 	int rc = 0;
 
 	QETH_CARD_TEXT(card, 3, "snmpcmd");

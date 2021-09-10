@@ -1080,7 +1080,7 @@ int replace_file_extents(struct btrfs_trans_handle *trans,
 
 	nritems = btrfs_header_nritems(leaf);
 	for (i = 0; i < nritems; i++) {
-		struct btrfs_ref ref = { 0 };
+		struct btrfs_ref ref = { };
 
 		cond_resched();
 		btrfs_item_key_to_cpu(leaf, &key, i);
@@ -1201,7 +1201,7 @@ int replace_path(struct btrfs_trans_handle *trans, struct reloc_control *rc,
 	struct btrfs_fs_info *fs_info = dest->fs_info;
 	struct extent_buffer *eb;
 	struct extent_buffer *parent;
-	struct btrfs_ref ref = { 0 };
+	struct btrfs_ref ref = { };
 	struct btrfs_key key;
 	u64 old_bytenr;
 	u64 new_bytenr;
@@ -2375,7 +2375,7 @@ static int do_relocation(struct btrfs_trans_handle *trans,
 	path->lowest_level = node->level + 1;
 	rc->backref_cache.path[node->level] = node;
 	list_for_each_entry(edge, &node->upper, list[LOWER]) {
-		struct btrfs_ref ref = { 0 };
+		struct btrfs_ref ref = { };
 
 		cond_resched();
 

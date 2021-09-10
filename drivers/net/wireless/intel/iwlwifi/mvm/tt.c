@@ -554,7 +554,7 @@ static int compare_temps(const void *a, const void *b)
 
 int iwl_mvm_send_temp_report_ths_cmd(struct iwl_mvm *mvm)
 {
-	struct temp_report_ths_cmd cmd = {0};
+	struct temp_report_ths_cmd cmd = {};
 	int ret;
 #ifdef CONFIG_THERMAL
 	int i, j, idx = 0;

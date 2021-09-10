@@ -2144,7 +2144,7 @@ static int qede_start_queues(struct qede_dev *edev, bool clear_stats)
 	struct qed_dev_info *qed_info = &edev->dev_info.common;
 	struct qed_update_vport_params *vport_update_params;
 	struct qed_queue_start_common_params q_params;
-	struct qed_start_vport_params start = {0};
+	struct qed_start_vport_params start = {};
 	int rc, i;
 
 	if (!edev->num_queues) {

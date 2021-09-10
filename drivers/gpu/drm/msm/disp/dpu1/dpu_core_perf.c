@@ -209,7 +209,7 @@ int dpu_core_perf_crtc_check(struct drm_crtc *crtc,
 static int _dpu_core_perf_crtc_update_bus(struct dpu_kms *kms,
 		struct drm_crtc *crtc)
 {
-	struct dpu_core_perf_params perf = { 0 };
+	struct dpu_core_perf_params perf = { };
 	enum dpu_crtc_client_type curr_client_type
 					= dpu_crtc_get_client_type(crtc);
 	struct drm_crtc *tmp_crtc;

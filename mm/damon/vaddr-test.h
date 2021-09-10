@@ -72,7 +72,7 @@ static void __link_vmas(struct vm_area_struct *vmas, ssize_t nr_vmas)
  */
 static void damon_test_three_regions_in_vmas(struct kunit *test)
 {
-	struct damon_addr_range regions[3] = {0,};
+	struct damon_addr_range regions[3] = {};
 	/* 10-20-25, 200-210-220, 300-305, 307-330 */
 	struct vm_area_struct vmas[] = {
 		(struct vm_area_struct) {.vm_start = 10, .vm_end = 20},

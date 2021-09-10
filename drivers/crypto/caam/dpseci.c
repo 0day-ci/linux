@@ -27,7 +27,7 @@
 int dpseci_open(struct fsl_mc_io *mc_io, u32 cmd_flags, int dpseci_id,
 		u16 *token)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	struct dpseci_cmd_open *cmd_params;
 	int err;
 
@@ -58,7 +58,7 @@ int dpseci_open(struct fsl_mc_io *mc_io, u32 cmd_flags, int dpseci_id,
  */
 int dpseci_close(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 
 	cmd.header = mc_encode_cmd_header(DPSECI_CMDID_CLOSE,
 					  cmd_flags,
@@ -76,7 +76,7 @@ int dpseci_close(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token)
  */
 int dpseci_enable(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 
 	cmd.header = mc_encode_cmd_header(DPSECI_CMDID_ENABLE,
 					  cmd_flags,
@@ -94,7 +94,7 @@ int dpseci_enable(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token)
  */
 int dpseci_disable(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 
 	cmd.header = mc_encode_cmd_header(DPSECI_CMDID_DISABLE,
 					  cmd_flags,
@@ -113,7 +113,7 @@ int dpseci_disable(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token)
  */
 int dpseci_reset(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 
 	cmd.header = mc_encode_cmd_header(DPSECI_CMDID_RESET,
 					  cmd_flags,
@@ -133,7 +133,7 @@ int dpseci_reset(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token)
 int dpseci_is_enabled(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 		      int *en)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	struct dpseci_rsp_is_enabled *rsp_params;
 	int err;
 
@@ -162,7 +162,7 @@ int dpseci_is_enabled(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 int dpseci_get_attributes(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 			  struct dpseci_attr *attr)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	struct dpseci_rsp_get_attributes *rsp_params;
 	int err;
 
@@ -197,7 +197,7 @@ int dpseci_get_attributes(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 int dpseci_set_rx_queue(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 			u8 queue, const struct dpseci_rx_queue_cfg *cfg)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	struct dpseci_cmd_queue *cmd_params;
 
 	cmd.header = mc_encode_cmd_header(DPSECI_CMDID_SET_RX_QUEUE,
@@ -231,7 +231,7 @@ int dpseci_set_rx_queue(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 int dpseci_get_rx_queue(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 			u8 queue, struct dpseci_rx_queue_attr *attr)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	struct dpseci_cmd_queue *cmd_params;
 	int err;
 
@@ -271,7 +271,7 @@ int dpseci_get_rx_queue(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 int dpseci_get_tx_queue(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 			u8 queue, struct dpseci_tx_queue_attr *attr)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	struct dpseci_cmd_queue *cmd_params;
 	struct dpseci_rsp_get_tx_queue *rsp_params;
 	int err;
@@ -304,7 +304,7 @@ int dpseci_get_tx_queue(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 int dpseci_get_sec_attr(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 			struct dpseci_sec_attr *attr)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	struct dpseci_rsp_get_sec_attr *rsp_params;
 	int err;
 
@@ -351,7 +351,7 @@ int dpseci_get_sec_attr(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 int dpseci_get_api_version(struct fsl_mc_io *mc_io, u32 cmd_flags,
 			   u16 *major_ver, u16 *minor_ver)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	struct dpseci_rsp_get_api_version *rsp_params;
 	int err;
 
@@ -381,7 +381,7 @@ int dpseci_get_api_version(struct fsl_mc_io *mc_io, u32 cmd_flags,
 int dpseci_set_congestion_notification(struct fsl_mc_io *mc_io, u32 cmd_flags,
 	u16 token, const struct dpseci_congestion_notification_cfg *cfg)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	struct dpseci_cmd_congestion_notification *cmd_params;
 
 	cmd.header = mc_encode_cmd_header(
@@ -416,7 +416,7 @@ int dpseci_set_congestion_notification(struct fsl_mc_io *mc_io, u32 cmd_flags,
 int dpseci_get_congestion_notification(struct fsl_mc_io *mc_io, u32 cmd_flags,
 	u16 token, struct dpseci_congestion_notification_cfg *cfg)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	struct dpseci_cmd_congestion_notification *rsp_params;
 	int err;
 

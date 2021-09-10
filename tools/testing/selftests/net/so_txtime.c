@@ -73,8 +73,8 @@ static uint64_t gettime_ns(clockid_t clock)
 static void do_send_one(int fdt, struct timed_send *ts)
 {
 	char control[CMSG_SPACE(sizeof(uint64_t))];
-	struct msghdr msg = {0};
-	struct iovec iov = {0};
+	struct msghdr msg = {};
+	struct iovec iov = {};
 	struct cmsghdr *cm;
 	uint64_t tdeliver;
 	int ret;
@@ -156,8 +156,8 @@ static int do_recv_errqueue_timeout(int fdt)
 		  sizeof(struct udphdr) + 1];
 	struct sock_extended_err *err;
 	int ret, num_tstamp = 0;
-	struct msghdr msg = {0};
-	struct iovec iov = {0};
+	struct msghdr msg = {};
+	struct iovec iov = {};
 	struct cmsghdr *cm;
 	int64_t tstamp = 0;
 
@@ -263,7 +263,7 @@ static void start_time_wait(void)
 static void setsockopt_txtime(int fd)
 {
 	struct sock_txtime so_txtime_val = { .clockid = cfg_clockid };
-	struct sock_txtime so_txtime_val_read = { 0 };
+	struct sock_txtime so_txtime_val_read = { };
 	socklen_t vallen = sizeof(so_txtime_val);
 
 	so_txtime_val.flags = SOF_TXTIME_REPORT_ERRORS;

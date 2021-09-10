@@ -194,7 +194,7 @@ static long copy_from_iova(struct device *mdev,
 			   void *to, u64 iova,
 			   unsigned long n)
 {
-	struct pfn_array pa = {0};
+	struct pfn_array pa = {};
 	u64 from;
 	int i, ret;
 	unsigned long l, m;

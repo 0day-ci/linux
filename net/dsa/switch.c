@@ -117,7 +117,7 @@ static int dsa_switch_bridge_leave(struct dsa_switch *ds,
 				   struct dsa_notifier_bridge_info *info)
 {
 	struct dsa_switch_tree *dst = ds->dst;
-	struct netlink_ext_ack extack = {0};
+	struct netlink_ext_ack extack = {};
 	bool change_vlan_filtering = false;
 	bool vlan_filtering;
 	int err, port;

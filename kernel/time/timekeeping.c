@@ -1622,11 +1622,11 @@ void __init timekeeping_init(void)
 		persistent_clock_exists = true;
 	} else if (timespec64_to_ns(&wall_time) != 0) {
 		pr_warn("Persistent clock returned invalid value");
-		wall_time = (struct timespec64){0};
+		wall_time = (struct timespec64){};
 	}
 
 	if (timespec64_compare(&wall_time, &boot_offset) < 0)
-		boot_offset = (struct timespec64){0};
+		boot_offset = (struct timespec64){};
 
 	/*
 	 * We want set wall_to_mono, so the following is true:

@@ -51,7 +51,7 @@ EXPORT_SYMBOL(__icmpv6_send);
 #include <net/netfilter/nf_conntrack.h>
 void icmpv6_ndo_send(struct sk_buff *skb_in, u8 type, u8 code, __u32 info)
 {
-	struct inet6_skb_parm parm = { 0 };
+	struct inet6_skb_parm parm = { };
 	struct sk_buff *cloned_skb = NULL;
 	enum ip_conntrack_info ctinfo;
 	struct in6_addr orig_ip;

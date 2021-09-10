@@ -1735,7 +1735,7 @@ static bool init_soc_bounding_box(struct dc *dc,
 	dcn20_patch_bounding_box(dc, loaded_bb);
 
 	if (dc->ctx->dc_bios->funcs->get_soc_bb_info) {
-		struct bp_soc_bb_info bb_info = {0};
+		struct bp_soc_bb_info bb_info = {};
 
 		if (dc->ctx->dc_bios->funcs->get_soc_bb_info(dc->ctx->dc_bios, &bb_info) == BP_RESULT_OK) {
 			if (bb_info.dram_clock_change_latency_100ns > 0)
@@ -2555,7 +2555,7 @@ static bool dcn30_resource_construct(
 	int i;
 	struct dc_context *ctx = dc->ctx;
 	struct irq_service_init_data init_data;
-	struct ddc_service_init_data ddc_init_data = {0};
+	struct ddc_service_init_data ddc_init_data = {};
 	uint32_t pipe_fuses = read_pipe_fuses(ctx);
 	uint32_t num_pipes = 0;
 

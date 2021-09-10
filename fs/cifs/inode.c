@@ -440,7 +440,7 @@ cifs_sfu_type(struct cifs_fattr *fattr, const char *path,
 	struct cifs_tcon *tcon;
 	struct cifs_fid fid;
 	struct cifs_open_parms oparms;
-	struct cifs_io_parms io_parms = {0};
+	struct cifs_io_parms io_parms = {};
 	char buf[24];
 	unsigned int bytes_read;
 	char *pbuf;
@@ -815,7 +815,7 @@ cifs_backup_query_path_info(int xid,
 			    FILE_ALL_INFO **data)
 {
 	struct cifs_sb_info *cifs_sb = CIFS_SB(sb);
-	struct cifs_search_info info = {0};
+	struct cifs_search_info info = {};
 	u16 flags;
 	int rc;
 
@@ -921,7 +921,7 @@ cifs_get_inode_info(struct inode **inode,
 	struct tcon_link *tlink;
 	struct cifs_sb_info *cifs_sb = CIFS_SB(sb);
 	bool adjust_tz = false;
-	struct cifs_fattr fattr = {0};
+	struct cifs_fattr fattr = {};
 	bool is_reparse_point = false;
 	FILE_ALL_INFO *data = in_data;
 	FILE_ALL_INFO *tmp_data = NULL;
@@ -1110,7 +1110,7 @@ smb311_posix_get_inode_info(struct inode **inode,
 	struct tcon_link *tlink;
 	struct cifs_sb_info *cifs_sb = CIFS_SB(sb);
 	bool adjust_tz = false;
-	struct cifs_fattr fattr = {0};
+	struct cifs_fattr fattr = {};
 	bool symlink = false;
 	struct smb311_posix_qinfo *data = NULL;
 	int rc = 0;

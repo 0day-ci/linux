@@ -467,7 +467,7 @@ nomem:
 static int do_chtls_getsockopt(struct sock *sk, char __user *optval,
 			       int __user *optlen)
 {
-	struct tls_crypto_info crypto_info = { 0 };
+	struct tls_crypto_info crypto_info = { };
 
 	crypto_info.version = TLS_1_2_VERSION;
 	if (copy_to_user(optval, &crypto_info, sizeof(struct tls_crypto_info)))

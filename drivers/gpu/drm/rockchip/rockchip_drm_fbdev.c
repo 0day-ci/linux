@@ -40,7 +40,7 @@ static int rockchip_drm_fbdev_create(struct drm_fb_helper *helper,
 				     struct drm_fb_helper_surface_size *sizes)
 {
 	struct rockchip_drm_private *private = to_drm_private(helper);
-	struct drm_mode_fb_cmd2 mode_cmd = { 0 };
+	struct drm_mode_fb_cmd2 mode_cmd = { };
 	struct drm_device *dev = helper->dev;
 	struct rockchip_gem_object *rk_obj;
 	struct drm_framebuffer *fb;

@@ -2766,7 +2766,7 @@ static void dwc3_gadget_set_ssp_rate(struct usb_gadget *g,
 static int dwc3_gadget_vbus_draw(struct usb_gadget *g, unsigned int mA)
 {
 	struct dwc3		*dwc = gadget_to_dwc(g);
-	union power_supply_propval	val = {0};
+	union power_supply_propval	val = {};
 	int				ret;
 
 	if (dwc->usb2_phy)

@@ -961,8 +961,8 @@ static void netdev_features_init(struct net_device *netdev)
 static void hinic_refresh_nic_cfg(struct hinic_dev *nic_dev)
 {
 	struct hinic_nic_cfg *nic_cfg = &nic_dev->hwdev->func_to_io.nic_cfg;
-	struct hinic_pause_config pause_info = {0};
-	struct hinic_port_cap port_cap = {0};
+	struct hinic_pause_config pause_info = {};
+	struct hinic_port_cap port_cap = {};
 
 	if (hinic_port_get_cap(nic_dev, &port_cap))
 		return;

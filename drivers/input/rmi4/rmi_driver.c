@@ -189,7 +189,7 @@ static irqreturn_t rmi_irq_fn(int irq, void *dev_id)
 {
 	struct rmi_device *rmi_dev = dev_id;
 	struct rmi_driver_data *drvdata = dev_get_drvdata(&rmi_dev->dev);
-	struct rmi4_attn_data attn_data = {0};
+	struct rmi4_attn_data attn_data = {};
 	int ret, count;
 
 	count = kfifo_get(&drvdata->attn_fifo, &attn_data);
@@ -912,7 +912,7 @@ void rmi_disable_irq(struct rmi_device *rmi_dev, bool enable_wake)
 {
 	struct rmi_device_platform_data *pdata = rmi_get_platform_data(rmi_dev);
 	struct rmi_driver_data *data = dev_get_drvdata(&rmi_dev->dev);
-	struct rmi4_attn_data attn_data = {0};
+	struct rmi4_attn_data attn_data = {};
 	int irq = pdata->irq;
 	int retval, count;
 

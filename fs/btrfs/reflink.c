@@ -175,7 +175,7 @@ static int clone_copy_inline_extent(struct inode *dst,
 	const u64 aligned_end = ALIGN(new_key->offset + datal,
 				      fs_info->sectorsize);
 	struct btrfs_trans_handle *trans = NULL;
-	struct btrfs_drop_extents_args drop_args = { 0 };
+	struct btrfs_drop_extents_args drop_args = { };
 	int ret;
 	struct btrfs_key key;
 

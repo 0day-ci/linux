@@ -35,7 +35,7 @@ static void cleanup(int sig)
 
 static int get_stats(int fd, __u16 count, __u32 raddr)
 {
-	struct pinginfo pinginfo = { 0 };
+	struct pinginfo pinginfo = { };
 	char inaddrbuf[INET_ADDRSTRLEN];
 	struct in_addr inaddr;
 	__u16 i;
@@ -90,7 +90,7 @@ int main(int argc, char **argv)
 	struct addrinfo *a, hints = { .ai_family = AF_INET };
 	struct rlimit r = {RLIM_INFINITY, RLIM_INFINITY};
 	__u16 count = XDPING_DEFAULT_COUNT;
-	struct pinginfo pinginfo = { 0 };
+	struct pinginfo pinginfo = { };
 	const char *optstr = "c:I:NsS";
 	struct bpf_program *main_prog;
 	int prog_fd = -1, map_fd = -1;

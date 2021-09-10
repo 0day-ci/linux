@@ -1193,7 +1193,7 @@ int sja1105_dynamic_config_read(struct sja1105_private *priv,
 				int index, void *entry)
 {
 	const struct sja1105_dynamic_table_ops *ops;
-	struct sja1105_dyn_cmd cmd = {0};
+	struct sja1105_dyn_cmd cmd = {};
 	/* SPI payload buffer */
 	u8 packed_buf[SJA1105_MAX_DYN_CMD_SIZE] = {0};
 	int retries = 3;
@@ -1251,7 +1251,7 @@ int sja1105_dynamic_config_read(struct sja1105_private *priv,
 		if (rc < 0)
 			return rc;
 
-		cmd = (struct sja1105_dyn_cmd) {0};
+		cmd = (struct sja1105_dyn_cmd) {};
 		ops->cmd_packing(packed_buf, &cmd, UNPACK);
 
 		if (!cmd.valident && !(ops->access & OP_VALID_ANYWAY))
@@ -1275,7 +1275,7 @@ int sja1105_dynamic_config_write(struct sja1105_private *priv,
 				 int index, void *entry, bool keep)
 {
 	const struct sja1105_dynamic_table_ops *ops;
-	struct sja1105_dyn_cmd cmd = {0};
+	struct sja1105_dyn_cmd cmd = {};
 	/* SPI payload buffer */
 	u8 packed_buf[SJA1105_MAX_DYN_CMD_SIZE] = {0};
 	int rc;
@@ -1321,7 +1321,7 @@ int sja1105_dynamic_config_write(struct sja1105_private *priv,
 	if (rc < 0)
 		return rc;
 
-	cmd = (struct sja1105_dyn_cmd) {0};
+	cmd = (struct sja1105_dyn_cmd) {};
 	ops->cmd_packing(packed_buf, &cmd, UNPACK);
 	if (cmd.errors)
 		return -EINVAL;

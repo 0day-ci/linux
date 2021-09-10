@@ -1811,7 +1811,7 @@ static void prepare_tuning_algo_parameters(struct dvb_frontend *fe)
 {
 	struct dtv_frontend_properties *c = &fe->dtv_property_cache;
 	struct dvb_frontend_private *fepriv = fe->frontend_priv;
-	struct dvb_frontend_tune_settings fetunesettings = { 0 };
+	struct dvb_frontend_tune_settings fetunesettings = { };
 
 	/* get frontend-specific tuning settings */
 	if (fe->ops.get_tune_settings && (fe->ops.get_tune_settings(fe, &fetunesettings) == 0)) {

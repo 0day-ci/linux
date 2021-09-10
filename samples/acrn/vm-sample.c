@@ -47,8 +47,8 @@ void vm_exit(int sig)
 int main(int argc, char **argv)
 {
 	int vcpu_id, ret;
-	struct acrn_vm_creation create_vm = {0};
-	struct acrn_vm_memmap ram_map = {0};
+	struct acrn_vm_creation create_vm = {};
+	struct acrn_vm_memmap ram_map = {};
 	struct acrn_vcpu_regs regs;
 	struct acrn_io_request *io_req;
 	struct acrn_ioreq_notify __attribute__((aligned(8))) notify;

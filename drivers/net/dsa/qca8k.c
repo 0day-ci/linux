@@ -1643,7 +1643,7 @@ qca8k_port_fdb_dump(struct dsa_switch *ds, int port,
 		    dsa_fdb_dump_cb_t *cb, void *data)
 {
 	struct qca8k_priv *priv = (struct qca8k_priv *)ds->priv;
-	struct qca8k_fdb _fdb = { 0 };
+	struct qca8k_fdb _fdb = { };
 	int cnt = QCA8K_NUM_FDB_RECORDS;
 	bool is_static;
 	int ret = 0;

@@ -662,7 +662,7 @@ static int pppol2tp_connect(struct socket *sock, struct sockaddr *uservaddr,
 	struct l2tp_connect_info info;
 	struct l2tp_tunnel *tunnel;
 	struct pppol2tp_session *ps;
-	struct l2tp_session_cfg cfg = { 0, };
+	struct l2tp_session_cfg cfg = { };
 	bool drop_refcnt = false;
 	bool drop_tunnel = false;
 	bool new_session = false;

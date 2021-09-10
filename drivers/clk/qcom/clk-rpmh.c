@@ -154,7 +154,7 @@ static int clk_rpmh_send(struct clk_rpmh *c, enum rpmh_state state,
 
 static int clk_rpmh_send_aggregate_command(struct clk_rpmh *c)
 {
-	struct tcs_cmd cmd = { 0 };
+	struct tcs_cmd cmd = { };
 	u32 cmd_state, on_val;
 	enum rpmh_state state = RPMH_SLEEP_STATE;
 	int ret;
@@ -257,7 +257,7 @@ static const struct clk_ops clk_rpmh_ops = {
 
 static int clk_rpmh_bcm_send_cmd(struct clk_rpmh *c, bool enable)
 {
-	struct tcs_cmd cmd = { 0 };
+	struct tcs_cmd cmd = { };
 	u32 cmd_state;
 	int ret = 0;
 

@@ -212,7 +212,7 @@ aspeed_sdhci_phases_to_taps(struct device *dev, unsigned long rate,
 static void
 aspeed_sdhci_configure_phase(struct sdhci_host *host, unsigned long rate)
 {
-	struct aspeed_sdhci_tap_param _taps = {0}, *taps = &_taps;
+	struct aspeed_sdhci_tap_param _taps = {}, *taps = &_taps;
 	struct mmc_clk_phase *params;
 	struct aspeed_sdhci *sdhci;
 	struct device *dev;

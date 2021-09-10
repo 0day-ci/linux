@@ -270,7 +270,7 @@ static int qed_sp_nvmetcp_conn_offload(struct qed_hwfn *p_hwfn,
 {
 	struct nvmetcp_spe_conn_offload *p_ramrod = NULL;
 	struct tcp_offload_params_opt2 *p_tcp = NULL;
-	struct qed_sp_init_data init_data = { 0 };
+	struct qed_sp_init_data init_data = { };
 	struct qed_spq_entry *p_ent = NULL;
 	dma_addr_t r2tq_pbl_addr;
 	dma_addr_t xhq_pbl_addr;

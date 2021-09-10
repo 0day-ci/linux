@@ -1051,7 +1051,7 @@ out:
 static int measure_l2_residency(void *_plr)
 {
 	struct pseudo_lock_region *plr = _plr;
-	struct residency_counts counts = {0};
+	struct residency_counts counts = {};
 
 	/*
 	 * Non-architectural event for the Goldmont Microarchitecture
@@ -1089,7 +1089,7 @@ out:
 static int measure_l3_residency(void *_plr)
 {
 	struct pseudo_lock_region *plr = _plr;
-	struct residency_counts counts = {0};
+	struct residency_counts counts = {};
 
 	/*
 	 * On Broadwell Microarchitecture the MEM_LOAD_UOPS_RETIRED event

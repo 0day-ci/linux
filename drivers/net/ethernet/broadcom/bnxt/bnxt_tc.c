@@ -1305,7 +1305,7 @@ static int bnxt_tc_get_decap_handle(struct bnxt *bp, struct bnxt_tc_flow *flow,
 	struct bnxt_tc_info *tc_info = bp->tc_info;
 	struct bnxt_tc_l2_key l2_info = { {0} };
 	struct bnxt_tc_tunnel_node *decap_node;
-	struct ip_tunnel_key tun_key = { 0 };
+	struct ip_tunnel_key tun_key = { };
 	struct bnxt_tc_l2_key *decap_l2_info;
 	__le32 ref_decap_handle;
 	int rc;

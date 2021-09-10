@@ -457,7 +457,7 @@ int main(int argc, char **argv)
 	__u32 info_len = sizeof(info);
 	int prog_fd, map_fd, opt, err;
 	bool use_separators = true;
-	struct config cfg = { 0 };
+	struct config cfg = { };
 	struct bpf_object *obj;
 	struct bpf_map *map;
 	char filename[256];

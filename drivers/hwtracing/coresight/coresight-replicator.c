@@ -223,7 +223,7 @@ static int replicator_probe(struct device *dev, struct resource *res)
 	int ret = 0;
 	struct coresight_platform_data *pdata = NULL;
 	struct replicator_drvdata *drvdata;
-	struct coresight_desc desc = { 0 };
+	struct coresight_desc desc = { };
 	void __iomem *base;
 
 	if (is_of_node(dev_fwnode(dev)) &&

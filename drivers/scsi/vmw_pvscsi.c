@@ -258,7 +258,7 @@ static void pvscsi_write_cmd_desc(const struct pvscsi_adapter *adapter,
 static void pvscsi_abort_cmd(const struct pvscsi_adapter *adapter,
 			     const struct pvscsi_ctx *ctx)
 {
-	struct PVSCSICmdDescAbortCmd cmd = { 0 };
+	struct PVSCSICmdDescAbortCmd cmd = { };
 
 	cmd.target = ctx->cmd->device->id;
 	cmd.context = pvscsi_map_context(adapter, ctx);
@@ -314,7 +314,7 @@ static void ll_bus_reset(const struct pvscsi_adapter *adapter)
 
 static void ll_device_reset(const struct pvscsi_adapter *adapter, u32 target)
 {
-	struct PVSCSICmdDescResetDevice cmd = { 0 };
+	struct PVSCSICmdDescResetDevice cmd = { };
 
 	dev_dbg(pvscsi_dev(adapter), "Resetting device: target=%u\n", target);
 
@@ -485,7 +485,7 @@ static int pvscsi_allocate_rings(struct pvscsi_adapter *adapter)
 
 static void pvscsi_setup_all_rings(const struct pvscsi_adapter *adapter)
 {
-	struct PVSCSICmdDescSetupRings cmd = { 0 };
+	struct PVSCSICmdDescSetupRings cmd = { };
 	dma_addr_t base;
 	unsigned i;
 
@@ -513,7 +513,7 @@ static void pvscsi_setup_all_rings(const struct pvscsi_adapter *adapter)
 			      &cmd, sizeof(cmd));
 
 	if (adapter->use_msg) {
-		struct PVSCSICmdDescSetupMsgRing cmd_msg = { 0 };
+		struct PVSCSICmdDescSetupMsgRing cmd_msg = { };
 
 		cmd_msg.numPages = adapter->msg_pages;
 
@@ -1160,7 +1160,7 @@ static bool pvscsi_setup_req_threshold(struct pvscsi_adapter *adapter,
 		printk(KERN_INFO "vmw_pvscsi: device does not support req_threshold\n");
 		return false;
 	} else {
-		struct PVSCSICmdDescSetupReqCall cmd_msg = { 0 };
+		struct PVSCSICmdDescSetupReqCall cmd_msg = { };
 		cmd_msg.enable = enable;
 		printk(KERN_INFO
 		       "vmw_pvscsi: %sabling reqCallThreshold\n",

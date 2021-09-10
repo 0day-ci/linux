@@ -1449,7 +1449,7 @@ out_free_id:
 static int nvme_features(struct nvme_ctrl *dev, u8 op, unsigned int fid,
 		unsigned int dword11, void *buffer, size_t buflen, u32 *result)
 {
-	union nvme_result res = { 0 };
+	union nvme_result res = { };
 	struct nvme_command c = { };
 	int ret;
 

@@ -672,7 +672,7 @@ static int clk_byte2_set_rate(struct clk_hw *hw, unsigned long rate,
 			 unsigned long parent_rate)
 {
 	struct clk_rcg2 *rcg = to_clk_rcg2(hw);
-	struct freq_tbl f = { 0 };
+	struct freq_tbl f = { };
 	unsigned long div;
 	int i, num_parents = clk_hw_get_num_parents(hw);
 	u32 mask = BIT(rcg->hid_width) - 1;
@@ -750,7 +750,7 @@ static int clk_pixel_set_rate(struct clk_hw *hw, unsigned long rate,
 		unsigned long parent_rate)
 {
 	struct clk_rcg2 *rcg = to_clk_rcg2(hw);
-	struct freq_tbl f = { 0 };
+	struct freq_tbl f = { };
 	const struct frac_entry *frac = frac_table_pixel;
 	unsigned long request;
 	int delta = 100000;
@@ -1232,7 +1232,7 @@ static int clk_rcg2_dp_set_rate(struct clk_hw *hw, unsigned long rate,
 			unsigned long parent_rate)
 {
 	struct clk_rcg2 *rcg = to_clk_rcg2(hw);
-	struct freq_tbl f = { 0 };
+	struct freq_tbl f = { };
 	u32 mask = BIT(rcg->hid_width) - 1;
 	u32 hid_div, cfg;
 	int i, num_parents = clk_hw_get_num_parents(hw);

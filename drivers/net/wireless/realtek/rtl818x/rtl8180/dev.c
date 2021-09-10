@@ -254,7 +254,7 @@ static void rtl8180_handle_rx(struct ieee80211_hw *dev)
 				      RTL818X_RX_DESC_FLAG_RX_ERR)))
 			goto done;
 		else {
-			struct ieee80211_rx_status rx_status = {0};
+			struct ieee80211_rx_status rx_status = {};
 			struct sk_buff *new_skb = dev_alloc_skb(MAX_RX_SIZE);
 
 			if (unlikely(!new_skb))

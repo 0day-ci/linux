@@ -241,8 +241,8 @@ static int atc_pcm_playback_prepare(struct ct_atc *atc, struct ct_atc_pcm *apcm)
 {
 	struct src_mgr *src_mgr = atc->rsc_mgrs[SRC];
 	struct amixer_mgr *amixer_mgr = atc->rsc_mgrs[AMIXER];
-	struct src_desc desc = {0};
-	struct amixer_desc mix_dsc = {0};
+	struct src_desc desc = {};
+	struct amixer_desc mix_dsc = {};
 	struct src *src;
 	struct amixer *amixer;
 	int err;
@@ -503,12 +503,12 @@ atc_pcm_capture_get_resources(struct ct_atc *atc, struct ct_atc_pcm *apcm)
 	struct srcimp_mgr *srcimp_mgr = atc->rsc_mgrs[SRCIMP];
 	struct amixer_mgr *amixer_mgr = atc->rsc_mgrs[AMIXER];
 	struct sum_mgr *sum_mgr = atc->rsc_mgrs[SUM];
-	struct src_desc src_dsc = {0};
+	struct src_desc src_dsc = {};
 	struct src *src;
-	struct srcimp_desc srcimp_dsc = {0};
+	struct srcimp_desc srcimp_dsc = {};
 	struct srcimp *srcimp;
-	struct amixer_desc mix_dsc = {0};
-	struct sum_desc sum_dsc = {0};
+	struct amixer_desc mix_dsc = {};
+	struct sum_desc sum_dsc = {};
 	unsigned int pitch;
 	int multi, err, i;
 	int n_srcimp, n_amixer, n_srcc, n_sum;
@@ -784,8 +784,8 @@ static int spdif_passthru_playback_get_resources(struct ct_atc *atc,
 {
 	struct src_mgr *src_mgr = atc->rsc_mgrs[SRC];
 	struct amixer_mgr *amixer_mgr = atc->rsc_mgrs[AMIXER];
-	struct src_desc desc = {0};
-	struct amixer_desc mix_dsc = {0};
+	struct src_desc desc = {};
+	struct amixer_desc mix_dsc = {};
 	struct src *src;
 	int err;
 	int n_amixer = apcm->substream->runtime->channels, i;
@@ -1109,7 +1109,7 @@ static int atc_spdif_out_set_status(struct ct_atc *atc, unsigned int status)
 
 static int atc_spdif_out_passthru(struct ct_atc *atc, unsigned char state)
 {
-	struct dao_desc da_dsc = {0};
+	struct dao_desc da_dsc = {};
 	struct dao *dao;
 	int err;
 	struct ct_mixer *mixer = atc->mixer;
@@ -1326,7 +1326,7 @@ int ct_atc_create_alsa_devs(struct ct_atc *atc)
 static int atc_create_hw_devs(struct ct_atc *atc)
 {
 	struct hw *hw;
-	struct card_conf info = {0};
+	struct card_conf info = {};
 	int i, err;
 
 	err = create_hw_obj(atc->pci, atc->chip_type, atc->model, &hw);
@@ -1362,13 +1362,13 @@ static int atc_create_hw_devs(struct ct_atc *atc)
 
 static int atc_get_resources(struct ct_atc *atc)
 {
-	struct daio_desc da_desc = {0};
+	struct daio_desc da_desc = {};
 	struct daio_mgr *daio_mgr;
-	struct src_desc src_dsc = {0};
+	struct src_desc src_dsc = {};
 	struct src_mgr *src_mgr;
-	struct srcimp_desc srcimp_dsc = {0};
+	struct srcimp_desc srcimp_dsc = {};
 	struct srcimp_mgr *srcimp_mgr;
-	struct sum_desc sum_dsc = {0};
+	struct sum_desc sum_dsc = {};
 	struct sum_mgr *sum_mgr;
 	int err, i, num_srcs, num_daios;
 
@@ -1559,7 +1559,7 @@ static int atc_suspend(struct ct_atc *atc)
 static int atc_hw_resume(struct ct_atc *atc)
 {
 	struct hw *hw = atc->hw;
-	struct card_conf info = {0};
+	struct card_conf info = {};
 
 	/* Re-initialize card hardware. */
 	info.rsr = atc->rsr;

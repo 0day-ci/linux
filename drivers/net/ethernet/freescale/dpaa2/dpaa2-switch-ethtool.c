@@ -59,7 +59,7 @@ dpaa2_switch_get_link_ksettings(struct net_device *netdev,
 				struct ethtool_link_ksettings *link_ksettings)
 {
 	struct ethsw_port_priv *port_priv = netdev_priv(netdev);
-	struct dpsw_link_state state = {0};
+	struct dpsw_link_state state = {};
 	int err = 0;
 
 	if (dpaa2_switch_port_is_type_phy(port_priv))
@@ -95,7 +95,7 @@ dpaa2_switch_set_link_ksettings(struct net_device *netdev,
 {
 	struct ethsw_port_priv *port_priv = netdev_priv(netdev);
 	struct ethsw_core *ethsw = port_priv->ethsw_data;
-	struct dpsw_link_cfg cfg = {0};
+	struct dpsw_link_cfg cfg = {};
 	bool if_running;
 	int err = 0, ret;
 

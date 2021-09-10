@@ -181,7 +181,7 @@ static enum usb_role musb_usb_role_sx_get(struct usb_role_switch *sw)
 
 static int mtk_otg_switch_init(struct mtk_glue *glue)
 {
-	struct usb_role_switch_desc role_sx_desc = { 0 };
+	struct usb_role_switch_desc role_sx_desc = { };
 
 	role_sx_desc.set = musb_usb_role_sx_set;
 	role_sx_desc.get = musb_usb_role_sx_get;

@@ -81,7 +81,7 @@ int
 xfs_log_calc_minimum_size(
 	struct xfs_mount	*mp)
 {
-	struct xfs_trans_res	tres = {0};
+	struct xfs_trans_res	tres = {};
 	int			max_logres;
 	int			min_logblks = 0;
 	int			lsunit = 0;

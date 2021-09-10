@@ -78,7 +78,7 @@ static struct devlink_dpipe_headers mlxsw_sp_dpipe_headers = {
 static int mlxsw_sp_dpipe_table_erif_actions_dump(void *priv,
 						  struct sk_buff *skb)
 {
-	struct devlink_dpipe_action action = {0};
+	struct devlink_dpipe_action action = {};
 	int err;
 
 	action.type = DEVLINK_DPIPE_ACTION_TYPE_FIELD_MODIFY;
@@ -99,7 +99,7 @@ static int mlxsw_sp_dpipe_table_erif_actions_dump(void *priv,
 static int mlxsw_sp_dpipe_table_erif_matches_dump(void *priv,
 						  struct sk_buff *skb)
 {
-	struct devlink_dpipe_match match = {0};
+	struct devlink_dpipe_match match = {};
 
 	match.type = DEVLINK_DPIPE_MATCH_TYPE_FIELD_EXACT;
 	match.header = &mlxsw_sp_dpipe_header_metadata;
@@ -193,9 +193,9 @@ mlxsw_sp_dpipe_table_erif_entries_dump(void *priv, bool counters_enabled,
 				       struct devlink_dpipe_dump_ctx *dump_ctx)
 {
 	struct devlink_dpipe_value match_value, action_value;
-	struct devlink_dpipe_action action = {0};
-	struct devlink_dpipe_match match = {0};
-	struct devlink_dpipe_entry entry = {0};
+	struct devlink_dpipe_action action = {};
+	struct devlink_dpipe_match match = {};
+	struct devlink_dpipe_entry entry = {};
 	struct mlxsw_sp *mlxsw_sp = priv;
 	unsigned int rif_count;
 	int i, j;
@@ -310,7 +310,7 @@ static void mlxsw_sp_dpipe_erif_table_fini(struct mlxsw_sp *mlxsw_sp)
 
 static int mlxsw_sp_dpipe_table_host_matches_dump(struct sk_buff *skb, int type)
 {
-	struct devlink_dpipe_match match = {0};
+	struct devlink_dpipe_match match = {};
 	int err;
 
 	match.type = DEVLINK_DPIPE_MATCH_TYPE_FIELD_EXACT;
@@ -349,7 +349,7 @@ mlxsw_sp_dpipe_table_host4_matches_dump(void *priv, struct sk_buff *skb)
 static int
 mlxsw_sp_dpipe_table_host_actions_dump(void *priv, struct sk_buff *skb)
 {
-	struct devlink_dpipe_action action = {0};
+	struct devlink_dpipe_action action = {};
 
 	action.type = DEVLINK_DPIPE_ACTION_TYPE_FIELD_MODIFY;
 	action.header = &devlink_dpipe_header_ethernet;
@@ -621,8 +621,8 @@ mlxsw_sp_dpipe_table_host_entries_dump(struct mlxsw_sp *mlxsw_sp,
 	struct devlink_dpipe_value match_values[MLXSW_SP_DPIPE_TABLE_HOST_MATCH_COUNT];
 	struct devlink_dpipe_match matches[MLXSW_SP_DPIPE_TABLE_HOST_MATCH_COUNT];
 	struct devlink_dpipe_value action_value;
-	struct devlink_dpipe_action action = {0};
-	struct devlink_dpipe_entry entry = {0};
+	struct devlink_dpipe_action action = {};
+	struct devlink_dpipe_entry entry = {};
 	int err;
 
 	memset(matches, 0, MLXSW_SP_DPIPE_TABLE_HOST_MATCH_COUNT *
@@ -859,7 +859,7 @@ static void mlxsw_sp_dpipe_host6_table_fini(struct mlxsw_sp *mlxsw_sp)
 static int mlxsw_sp_dpipe_table_adj_matches_dump(void *priv,
 						 struct sk_buff *skb)
 {
-	struct devlink_dpipe_match match = {0};
+	struct devlink_dpipe_match match = {};
 	int err;
 
 	match.type = DEVLINK_DPIPE_MATCH_TYPE_FIELD_EXACT;
@@ -888,7 +888,7 @@ static int mlxsw_sp_dpipe_table_adj_matches_dump(void *priv,
 static int mlxsw_sp_dpipe_table_adj_actions_dump(void *priv,
 						 struct sk_buff *skb)
 {
-	struct devlink_dpipe_action action = {0};
+	struct devlink_dpipe_action action = {};
 	int err;
 
 	action.type = DEVLINK_DPIPE_ACTION_TYPE_FIELD_MODIFY;
@@ -1149,7 +1149,7 @@ mlxsw_sp_dpipe_table_adj_entries_dump(void *priv, bool counters_enabled,
 	struct devlink_dpipe_value match_values[MLXSW_SP_DPIPE_TABLE_ADJ_MATCH_COUNT];
 	struct devlink_dpipe_action actions[MLXSW_SP_DPIPE_TABLE_ADJ_ACTION_COUNT];
 	struct devlink_dpipe_match matches[MLXSW_SP_DPIPE_TABLE_ADJ_MATCH_COUNT];
-	struct devlink_dpipe_entry entry = {0};
+	struct devlink_dpipe_entry entry = {};
 	struct mlxsw_sp *mlxsw_sp = priv;
 	int err;
 

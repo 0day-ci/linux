@@ -300,7 +300,7 @@ static int skl_pcm_hw_params(struct snd_pcm_substream *substream,
 	struct hdac_bus *bus = dev_get_drvdata(dai->dev);
 	struct hdac_ext_stream *stream = get_hdac_ext_stream(substream);
 	struct snd_pcm_runtime *runtime = substream->runtime;
-	struct skl_pipe_params p_params = {0};
+	struct skl_pipe_params p_params = {};
 	struct skl_module_cfg *m_cfg;
 	int ret, dma_id;
 
@@ -402,7 +402,7 @@ static int skl_be_hw_params(struct snd_pcm_substream *substream,
 				struct snd_pcm_hw_params *params,
 				struct snd_soc_dai *dai)
 {
-	struct skl_pipe_params p_params = {0};
+	struct skl_pipe_params p_params = {};
 
 	p_params.s_fmt = snd_pcm_format_width(params_format(params));
 	p_params.ch = params_channels(params);
@@ -545,7 +545,7 @@ static int skl_link_hw_params(struct snd_pcm_substream *substream,
 	struct hdac_ext_stream *link_dev;
 	struct snd_soc_pcm_runtime *rtd = asoc_substream_to_rtd(substream);
 	struct snd_soc_dai *codec_dai = asoc_rtd_to_codec(rtd, 0);
-	struct skl_pipe_params p_params = {0};
+	struct skl_pipe_params p_params = {};
 	struct hdac_ext_link *link;
 	int stream_tag;
 

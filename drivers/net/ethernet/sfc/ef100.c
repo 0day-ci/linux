@@ -450,7 +450,7 @@ static void ef100_pci_remove(struct pci_dev *pci_dev)
 static int ef100_pci_probe(struct pci_dev *pci_dev,
 			   const struct pci_device_id *entry)
 {
-	struct ef100_func_ctl_window fcw = { 0 };
+	struct ef100_func_ctl_window fcw = { };
 	struct net_device *net_dev;
 	struct efx_nic *efx;
 	int rc;

@@ -211,7 +211,7 @@ static void flush_errqueue_recv(int fd)
 	char control[CMSG_SPACE(sizeof(struct scm_timestamping)) +
 		     CMSG_SPACE(sizeof(struct sock_extended_err)) +
 		     CMSG_SPACE(sizeof(struct sockaddr_in6))] = {0};
-	struct msghdr msg = {0};
+	struct msghdr msg = {};
 	struct cmsghdr *cmsg;
 	int ret;
 
@@ -238,7 +238,7 @@ static void flush_errqueue_recv(int fd)
 static void flush_errqueue(int fd, const bool do_poll)
 {
 	if (do_poll) {
-		struct pollfd fds = {0};
+		struct pollfd fds = {};
 		int ret;
 
 		fds.fd = fd;
@@ -319,7 +319,7 @@ static int send_udp_sendmmsg(int fd, char *data)
 	memset(mmsgs, 0, sizeof(mmsgs));
 
 	if (cfg_tx_tstamp) {
-		struct msghdr msg = {0};
+		struct msghdr msg = {};
 		struct cmsghdr *cmsg;
 
 		msg.msg_control = control;
@@ -374,8 +374,8 @@ static int send_udp_segment(int fd, char *data)
 {
 	char control[CMSG_SPACE(sizeof(cfg_gso_size)) +
 		     CMSG_SPACE(sizeof(cfg_tx_ts))] = {0};
-	struct msghdr msg = {0};
-	struct iovec iov = {0};
+	struct msghdr msg = {};
+	struct iovec iov = {};
 	size_t msg_controllen;
 	struct cmsghdr *cmsg;
 	int ret;

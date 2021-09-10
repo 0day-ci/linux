@@ -92,7 +92,7 @@ int __scm_smc_call(struct device *dev, const struct qcom_scm_desc *desc,
 	u32 qcom_smccc_convention = (qcom_convention == SMC_CONVENTION_ARM_32) ?
 				    ARM_SMCCC_SMC_32 : ARM_SMCCC_SMC_64;
 	struct arm_smccc_res smc_res;
-	struct arm_smccc_args smc = {0};
+	struct arm_smccc_args smc = {};
 
 	smc.args[0] = ARM_SMCCC_CALL_VAL(
 		smccc_call_type,

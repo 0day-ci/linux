@@ -2394,7 +2394,7 @@ static int __btrfs_mod_ref(struct btrfs_trans_handle *trans,
 	u32 nritems;
 	struct btrfs_key key;
 	struct btrfs_file_extent_item *fi;
-	struct btrfs_ref generic_ref = { 0 };
+	struct btrfs_ref generic_ref = { };
 	bool for_reloc = btrfs_header_flag(buf, BTRFS_HEADER_FLAG_RELOC);
 	int i;
 	int action;
@@ -3283,7 +3283,7 @@ void btrfs_free_tree_block(struct btrfs_trans_handle *trans,
 			   u64 parent, int last_ref)
 {
 	struct btrfs_fs_info *fs_info = root->fs_info;
-	struct btrfs_ref generic_ref = { 0 };
+	struct btrfs_ref generic_ref = { };
 	int ret;
 
 	btrfs_init_generic_ref(&generic_ref, BTRFS_DROP_DELAYED_REF,
@@ -4125,7 +4125,7 @@ static noinline int find_free_extent(struct btrfs_root *root,
 	int ret = 0;
 	int cache_block_group_error = 0;
 	struct btrfs_block_group *block_group = NULL;
-	struct find_free_extent_ctl ffe_ctl = {0};
+	struct find_free_extent_ctl ffe_ctl = {};
 	struct btrfs_space_info *space_info;
 	bool full_search = false;
 	bool for_treelog = (root->root_key.objectid == BTRFS_TREE_LOG_OBJECTID);
@@ -4649,7 +4649,7 @@ int btrfs_alloc_reserved_file_extent(struct btrfs_trans_handle *trans,
 				     u64 offset, u64 ram_bytes,
 				     struct btrfs_key *ins)
 {
-	struct btrfs_ref generic_ref = { 0 };
+	struct btrfs_ref generic_ref = { };
 
 	BUG_ON(root->root_key.objectid == BTRFS_TREE_LOG_OBJECTID);
 
@@ -4790,7 +4790,7 @@ struct extent_buffer *btrfs_alloc_tree_block(struct btrfs_trans_handle *trans,
 	struct btrfs_block_rsv *block_rsv;
 	struct extent_buffer *buf;
 	struct btrfs_delayed_extent_op *extent_op;
-	struct btrfs_ref generic_ref = { 0 };
+	struct btrfs_ref generic_ref = { };
 	u64 flags = 0;
 	int ret;
 	u32 blocksize = fs_info->nodesize;
@@ -5093,7 +5093,7 @@ static noinline int do_walk_down(struct btrfs_trans_handle *trans,
 	u64 parent;
 	struct btrfs_key key;
 	struct btrfs_key first_key;
-	struct btrfs_ref ref = { 0 };
+	struct btrfs_ref ref = { };
 	struct extent_buffer *next;
 	int level = wc->level;
 	int reada = 0;

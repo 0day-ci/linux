@@ -166,7 +166,7 @@ static u32 put_ta_refcount(u32 ta_handle)
 
 int handle_unload_ta(u32 ta_handle)
 {
-	struct tee_cmd_unload_ta cmd = {0};
+	struct tee_cmd_unload_ta cmd = {};
 	u32 status, count;
 	int ret;
 
@@ -202,7 +202,7 @@ unlock:
 
 int handle_close_session(u32 ta_handle, u32 info)
 {
-	struct tee_cmd_close_session cmd = {0};
+	struct tee_cmd_close_session cmd = {};
 	u32 status;
 	int ret;
 
@@ -224,7 +224,7 @@ int handle_close_session(u32 ta_handle, u32 info)
 
 void handle_unmap_shmem(u32 buf_id)
 {
-	struct tee_cmd_unmap_shared_mem cmd = {0};
+	struct tee_cmd_unmap_shared_mem cmd = {};
 	u32 status;
 	int ret;
 
@@ -240,7 +240,7 @@ void handle_unmap_shmem(u32 buf_id)
 int handle_invoke_cmd(struct tee_ioctl_invoke_arg *arg, u32 sinfo,
 		      struct tee_param *p)
 {
-	struct tee_cmd_invoke_cmd cmd = {0};
+	struct tee_cmd_invoke_cmd cmd = {};
 	int ret;
 
 	if (!arg || (!p && arg->num_params))
@@ -351,7 +351,7 @@ free_cmd:
 int handle_open_session(struct tee_ioctl_open_session_arg *arg, u32 *info,
 			struct tee_param *p)
 {
-	struct tee_cmd_open_session cmd = {0};
+	struct tee_cmd_open_session cmd = {};
 	int ret;
 
 	if (!arg || !info || (!p && arg->num_params))

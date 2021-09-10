@@ -530,7 +530,7 @@ static void rht_format1(struct sisl_rht_entry *rhte, u64 lun_id, u32 perm,
 	 * LUN) using the synchronization sequence defined in the
 	 * SISLite specification.
 	 */
-	struct sisl_rht_entry_f1 dummy = { 0 };
+	struct sisl_rht_entry_f1 dummy = { };
 	struct sisl_rht_entry_f1 *rhte_f1 = (struct sisl_rht_entry_f1 *)rhte;
 
 	memset(rhte_f1, 0, sizeof(*rhte_f1));
@@ -1775,7 +1775,7 @@ static int process_sense(struct scsi_device *sdev,
 	struct llun_info *lli = sdev->hostdata;
 	struct glun_info *gli = lli->parent;
 	u64 prev_lba = gli->max_lba;
-	struct scsi_sense_hdr sshdr = { 0 };
+	struct scsi_sense_hdr sshdr = { };
 	int rc = 0;
 
 	rc = scsi_normalize_sense((const u8 *)&verify->sense_data,

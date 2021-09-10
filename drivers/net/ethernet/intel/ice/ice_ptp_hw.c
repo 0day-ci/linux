@@ -67,7 +67,7 @@ u8 ice_get_ptp_src_clock_index(struct ice_hw *hw)
  */
 static int ice_read_phy_reg_e810(struct ice_hw *hw, u32 addr, u32 *val)
 {
-	struct ice_sbq_msg_input msg = {0};
+	struct ice_sbq_msg_input msg = {};
 	int status;
 
 	msg.msg_addr_low = lower_16_bits(addr);
@@ -97,7 +97,7 @@ static int ice_read_phy_reg_e810(struct ice_hw *hw, u32 addr, u32 *val)
  */
 static int ice_write_phy_reg_e810(struct ice_hw *hw, u32 addr, u32 val)
 {
-	struct ice_sbq_msg_input msg = {0};
+	struct ice_sbq_msg_input msg = {};
 	int status;
 
 	msg.msg_addr_low = lower_16_bits(addr);

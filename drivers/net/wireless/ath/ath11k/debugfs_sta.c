@@ -769,7 +769,7 @@ ath11k_write_htt_peer_stats_reset(struct file *file,
 	struct ieee80211_sta *sta = file->private_data;
 	struct ath11k_sta *arsta = (struct ath11k_sta *)sta->drv_priv;
 	struct ath11k *ar = arsta->arvif->ar;
-	struct htt_ext_stats_cfg_params cfg_params = { 0 };
+	struct htt_ext_stats_cfg_params cfg_params = { };
 	int ret;
 	u8 type;
 

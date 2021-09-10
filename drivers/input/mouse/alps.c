@@ -393,8 +393,8 @@ static int alps_process_bitmap(struct alps_data *priv,
 			       struct alps_fields *fields)
 {
 	int i, fingers_x = 0, fingers_y = 0, fingers, closest;
-	struct alps_bitmap_point x_low = {0,}, x_high = {0,};
-	struct alps_bitmap_point y_low = {0,}, y_high = {0,};
+	struct alps_bitmap_point x_low = {}, x_high = {};
+	struct alps_bitmap_point y_low = {}, y_high = {};
 	struct input_mt_pos corner[4];
 
 	if (!fields->x_map || !fields->y_map)

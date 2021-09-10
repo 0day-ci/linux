@@ -2957,7 +2957,7 @@ static bool mlx4_valid_vf_state_change(struct mlx4_dev *dev, int port,
 				       struct mlx4_vport_state *vf_admin,
 				       int vlan, int qos)
 {
-	struct mlx4_vport_state dummy_admin = {0};
+	struct mlx4_vport_state dummy_admin = {};
 
 	if (!mlx4_is_vf_vst_and_prio_qos(dev, port, vf_admin) ||
 	    !vf_admin->tx_rate)

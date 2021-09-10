@@ -4457,7 +4457,7 @@ int ieee80211_max_num_channels(struct ieee80211_local *local)
 	struct ieee80211_chanctx *ctx;
 	u32 max_num_different_channels = 1;
 	int err;
-	struct iface_combination_params params = {0};
+	struct iface_combination_params params = {};
 
 	lockdep_assert_held(&local->chanctx_mtx);
 

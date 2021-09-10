@@ -215,8 +215,8 @@ static void do_verify_udp(const char *data, int len)
 static int recv_msg(int fd, char *buf, int len, int *gso_size)
 {
 	char control[CMSG_SPACE(sizeof(uint16_t))] = {0};
-	struct msghdr msg = {0};
-	struct iovec iov = {0};
+	struct msghdr msg = {};
+	struct iovec iov = {};
 	struct cmsghdr *cmsg;
 	uint16_t *gsosizeptr;
 	int ret;

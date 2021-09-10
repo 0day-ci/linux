@@ -492,7 +492,7 @@ void hinic_io_destroy_qps(struct hinic_func_to_io *func_to_io, int num_qps)
 int hinic_set_wq_page_size(struct hinic_hwdev *hwdev, u16 func_idx,
 			   u32 page_size)
 {
-	struct hinic_wq_page_size page_size_info = {0};
+	struct hinic_wq_page_size page_size_info = {};
 	u16 out_size = sizeof(page_size_info);
 	struct hinic_pfhwdev *pfhwdev;
 	int err;

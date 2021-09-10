@@ -590,7 +590,7 @@ static void cptpf_check_block_implemented(struct otx2_cptpf_dev *cptpf)
 
 static int cptpf_device_init(struct otx2_cptpf_dev *cptpf)
 {
-	union otx2_cptx_af_constants1 af_cnsts1 = {0};
+	union otx2_cptx_af_constants1 af_cnsts1 = {};
 	int ret = 0;
 
 	/* check if 'implemented' bit is set for block BLKADDR_CPT1 */

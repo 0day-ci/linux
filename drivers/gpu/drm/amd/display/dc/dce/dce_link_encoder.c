@@ -815,7 +815,7 @@ void dce110_link_encoder_construct(
 	const struct dce110_link_enc_aux_registers *aux_regs,
 	const struct dce110_link_enc_hpd_registers *hpd_regs)
 {
-	struct bp_encoder_cap_info bp_cap_info = {0};
+	struct bp_encoder_cap_info bp_cap_info = {};
 	const struct dc_vbios_funcs *bp_funcs = init_data->ctx->dc_bios->funcs;
 	enum bp_result result = BP_RESULT_OK;
 
@@ -963,7 +963,7 @@ void dce110_link_encoder_hw_init(
 	struct link_encoder *enc)
 {
 	struct dce110_link_encoder *enc110 = TO_DCE110_LINK_ENC(enc);
-	struct bp_transmitter_control cntl = { 0 };
+	struct bp_transmitter_control cntl = { };
 	enum bp_result result;
 
 	cntl.action = TRANSMITTER_CONTROL_INIT;
@@ -1056,7 +1056,7 @@ void dce110_link_encoder_enable_tmds_output(
 	uint32_t pixel_clock)
 {
 	struct dce110_link_encoder *enc110 = TO_DCE110_LINK_ENC(enc);
-	struct bp_transmitter_control cntl = { 0 };
+	struct bp_transmitter_control cntl = { };
 	enum bp_result result;
 
 	/* Enable the PHY */
@@ -1092,7 +1092,7 @@ void dce110_link_encoder_enable_lvds_output(
 	uint32_t pixel_clock)
 {
 	struct dce110_link_encoder *enc110 = TO_DCE110_LINK_ENC(enc);
-	struct bp_transmitter_control cntl = { 0 };
+	struct bp_transmitter_control cntl = { };
 	enum bp_result result;
 
 	/* Enable the PHY */
@@ -1124,7 +1124,7 @@ void dce110_link_encoder_enable_dp_output(
 	enum clock_source_id clock_source)
 {
 	struct dce110_link_encoder *enc110 = TO_DCE110_LINK_ENC(enc);
-	struct bp_transmitter_control cntl = { 0 };
+	struct bp_transmitter_control cntl = { };
 	enum bp_result result;
 
 	/* Enable the PHY */
@@ -1163,7 +1163,7 @@ void dce110_link_encoder_enable_dp_mst_output(
 	enum clock_source_id clock_source)
 {
 	struct dce110_link_encoder *enc110 = TO_DCE110_LINK_ENC(enc);
-	struct bp_transmitter_control cntl = { 0 };
+	struct bp_transmitter_control cntl = { };
 	enum bp_result result;
 
 	/* Enable the PHY */
@@ -1203,7 +1203,7 @@ static void dce60_link_encoder_enable_dp_output(
 	enum clock_source_id clock_source)
 {
 	struct dce110_link_encoder *enc110 = TO_DCE110_LINK_ENC(enc);
-	struct bp_transmitter_control cntl = { 0 };
+	struct bp_transmitter_control cntl = { };
 	enum bp_result result;
 
 	/* Enable the PHY */
@@ -1242,7 +1242,7 @@ static void dce60_link_encoder_enable_dp_mst_output(
 	enum clock_source_id clock_source)
 {
 	struct dce110_link_encoder *enc110 = TO_DCE110_LINK_ENC(enc);
-	struct bp_transmitter_control cntl = { 0 };
+	struct bp_transmitter_control cntl = { };
 	enum bp_result result;
 
 	/* Enable the PHY */
@@ -1284,7 +1284,7 @@ void dce110_link_encoder_disable_output(
 	enum signal_type signal)
 {
 	struct dce110_link_encoder *enc110 = TO_DCE110_LINK_ENC(enc);
-	struct bp_transmitter_control cntl = { 0 };
+	struct bp_transmitter_control cntl = { };
 	enum bp_result result;
 
 	if (!dce110_is_dig_enabled(enc)) {
@@ -1329,7 +1329,7 @@ void dce110_link_encoder_dp_set_lane_settings(
 	struct dce110_link_encoder *enc110 = TO_DCE110_LINK_ENC(enc);
 	union dpcd_training_lane_set training_lane_set = { { 0 } };
 	int32_t lane = 0;
-	struct bp_transmitter_control cntl = { 0 };
+	struct bp_transmitter_control cntl = { };
 
 	if (!link_settings) {
 		BREAK_TO_DEBUGGER();
@@ -1715,7 +1715,7 @@ void dce60_link_encoder_construct(
 	const struct dce110_link_enc_aux_registers *aux_regs,
 	const struct dce110_link_enc_hpd_registers *hpd_regs)
 {
-	struct bp_encoder_cap_info bp_cap_info = {0};
+	struct bp_encoder_cap_info bp_cap_info = {};
 	const struct dc_vbios_funcs *bp_funcs = init_data->ctx->dc_bios->funcs;
 	enum bp_result result = BP_RESULT_OK;
 

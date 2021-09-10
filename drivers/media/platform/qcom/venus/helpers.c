@@ -244,7 +244,7 @@ fail:
 
 static int intbufs_unset_buffers(struct venus_inst *inst)
 {
-	struct hfi_buffer_desc bd = {0};
+	struct hfi_buffer_desc bd = {};
 	struct intbuf *buf, *n;
 	int ret = 0;
 
@@ -1224,7 +1224,7 @@ EXPORT_SYMBOL_GPL(venus_helper_set_color_format);
 int venus_helper_set_multistream(struct venus_inst *inst, bool out_en,
 				 bool out2_en)
 {
-	struct hfi_multi_stream multi = {0};
+	struct hfi_multi_stream multi = {};
 	u32 ptype = HFI_PROPERTY_PARAM_VDEC_MULTI_STREAM;
 	int ret;
 

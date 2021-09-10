@@ -811,7 +811,7 @@ static int __ccs_data_parse(struct bin_container *bin,
 		dev_dbg(dev, "Parsing CCS static data version %u\n", version);
 
 	if (!bin->base)
-		*ccsdata = (struct ccs_data_container){ 0 };
+		*ccsdata = (struct ccs_data_container){ };
 
 	while (block < endp) {
 		const struct __ccs_data_block *next_block;
@@ -932,7 +932,7 @@ static int __ccs_data_parse(struct bin_container *bin,
 int ccs_data_parse(struct ccs_data_container *ccsdata, const void *data,
 		   size_t len, struct device *dev, bool verbose)
 {
-	struct bin_container bin = { 0 };
+	struct bin_container bin = { };
 	int rval;
 
 	rval = __ccs_data_parse(&bin, ccsdata, data, len, dev, verbose);

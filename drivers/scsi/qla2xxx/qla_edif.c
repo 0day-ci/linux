@@ -716,7 +716,7 @@ qla_edif_app_authok(scsi_qla_host_t *vha, struct bsg_job *bsg_job)
 {
 	int32_t			rval = 0;
 	struct auth_complete_cmd appplogiok;
-	struct app_plogi_reply	appplogireply = {0};
+	struct app_plogi_reply	appplogireply = {};
 	struct fc_bsg_reply	*bsg_reply = bsg_job->reply;
 	fc_port_t		*fcport = NULL;
 	port_id_t		portid = {0};

@@ -1155,7 +1155,7 @@ static void hid_remove_all_dquirks(__u16 bus)
  */
 int hid_quirks_init(char **quirks_param, __u16 bus, int count)
 {
-	struct hid_device_id id = { 0 };
+	struct hid_device_id id = { };
 	int n = 0, m;
 	unsigned short int vendor, product;
 	u32 quirks;

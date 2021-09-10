@@ -414,7 +414,7 @@ static bool ice_is_vf_link_up(struct ice_vf *vf)
  */
 static void ice_vc_notify_vf_link_state(struct ice_vf *vf)
 {
-	struct virtchnl_pf_event pfe = { 0 };
+	struct virtchnl_pf_event pfe = { };
 	struct ice_hw *hw = &vf->pf->hw;
 
 	pfe.event = VIRTCHNL_EVENT_LINK_CHANGE;
@@ -3107,7 +3107,7 @@ static int ice_vc_get_stats_msg(struct ice_vf *vf, u8 *msg)
 	enum virtchnl_status_code v_ret = VIRTCHNL_STATUS_SUCCESS;
 	struct virtchnl_queue_select *vqs =
 		(struct virtchnl_queue_select *)msg;
-	struct ice_eth_stats stats = { 0 };
+	struct ice_eth_stats stats = { };
 	struct ice_vsi *vsi;
 
 	if (!test_bit(ICE_VF_STATE_ACTIVE, vf->vf_states)) {
@@ -3330,7 +3330,7 @@ static int ice_vc_dis_qs_msg(struct ice_vf *vf, u8 *msg)
 
 		for_each_set_bit(vf_q_id, &q_map, ICE_MAX_RSS_QS_PER_VF) {
 			struct ice_ring *ring = vsi->tx_rings[vf_q_id];
-			struct ice_txq_meta txq_meta = { 0 };
+			struct ice_txq_meta txq_meta = { };
 
 			if (!ice_vc_isvalid_q_id(vf, vqs->vsi_id, vf_q_id)) {
 				v_ret = VIRTCHNL_STATUS_ERR_PARAM;

@@ -391,7 +391,7 @@ static int sja1105_rgmii_cfg_pad_tx_config(struct sja1105_private *priv,
 					   int port)
 {
 	const struct sja1105_regs *regs = priv->info->regs;
-	struct sja1105_cfg_pad_mii pad_mii_tx = {0};
+	struct sja1105_cfg_pad_mii pad_mii_tx = {};
 	u8 packed_buf[SJA1105_SIZE_CGU_CMD] = {0};
 
 	if (regs->pad_mii_tx[port] == SJA1105_RSV_ADDR)
@@ -420,7 +420,7 @@ static int sja1105_rgmii_cfg_pad_tx_config(struct sja1105_private *priv,
 static int sja1105_cfg_pad_rx_config(struct sja1105_private *priv, int port)
 {
 	const struct sja1105_regs *regs = priv->info->regs;
-	struct sja1105_cfg_pad_mii pad_mii_rx = {0};
+	struct sja1105_cfg_pad_mii pad_mii_rx = {};
 	u8 packed_buf[SJA1105_SIZE_CGU_CMD] = {0};
 
 	if (regs->pad_mii_rx[port] == SJA1105_RSV_ADDR)
@@ -520,7 +520,7 @@ int sja1105pqrs_setup_rgmii_delay(const void *ctx, int port)
 {
 	const struct sja1105_private *priv = ctx;
 	const struct sja1105_regs *regs = priv->info->regs;
-	struct sja1105_cfg_pad_mii_id pad_mii_id = {0};
+	struct sja1105_cfg_pad_mii_id pad_mii_id = {};
 	u8 packed_buf[SJA1105_SIZE_CGU_CMD] = {0};
 	int rc;
 
@@ -560,7 +560,7 @@ int sja1110_setup_rgmii_delay(const void *ctx, int port)
 {
 	const struct sja1105_private *priv = ctx;
 	const struct sja1105_regs *regs = priv->info->regs;
-	struct sja1105_cfg_pad_mii_id pad_mii_id = {0};
+	struct sja1105_cfg_pad_mii_id pad_mii_id = {};
 	u8 packed_buf[SJA1105_SIZE_CGU_CMD] = {0};
 
 	pad_mii_id.rxc_pd = 1;
@@ -690,7 +690,7 @@ static int sja1105_cgu_rmii_pll_config(struct sja1105_private *priv)
 {
 	const struct sja1105_regs *regs = priv->info->regs;
 	u8 packed_buf[SJA1105_SIZE_CGU_CMD] = {0};
-	struct sja1105_cgu_pll_ctrl pll = {0};
+	struct sja1105_cgu_pll_ctrl pll = {};
 	struct device *dev = priv->ds->dev;
 	int rc;
 

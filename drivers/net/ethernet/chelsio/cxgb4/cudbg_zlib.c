@@ -28,7 +28,7 @@ int cudbg_compress_buff(struct cudbg_init *pdbg_init,
 			struct cudbg_buffer *pin_buff,
 			struct cudbg_buffer *pout_buff)
 {
-	struct cudbg_buffer temp_buff = { 0 };
+	struct cudbg_buffer temp_buff = { };
 	struct z_stream_s compress_stream;
 	struct cudbg_compress_hdr *c_hdr;
 	int rc;

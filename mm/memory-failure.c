@@ -1867,7 +1867,7 @@ EXPORT_SYMBOL_GPL(memory_failure_queue);
 static void memory_failure_work_func(struct work_struct *work)
 {
 	struct memory_failure_cpu *mf_cpu;
-	struct memory_failure_entry entry = { 0, };
+	struct memory_failure_entry entry = { };
 	unsigned long proc_flags;
 	int gotten;
 

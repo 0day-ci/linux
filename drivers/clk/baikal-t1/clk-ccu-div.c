@@ -378,7 +378,7 @@ static int ccu_div_clk_register(struct ccu_div_data *data)
 
 	for (idx = 0; idx < data->divs_num; ++idx) {
 		const struct ccu_div_info *info = &data->divs_info[idx];
-		struct ccu_div_init_data init = {0};
+		struct ccu_div_init_data init = {};
 
 		init.id = info->id;
 		init.name = info->name;

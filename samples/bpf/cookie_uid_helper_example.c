@@ -212,8 +212,8 @@ static void print_table(void)
 
 static void udp_client(void)
 {
-	struct sockaddr_in si_other = {0};
-	struct sockaddr_in si_me = {0};
+	struct sockaddr_in si_other = {};
+	struct sockaddr_in si_me = {};
 	struct stats dataEntry;
 	int s_rcv, s_send, i, recv_len;
 	char message = 'a';

@@ -70,7 +70,7 @@ static void bnx2x_write_data(struct bnx2x *bp, u32 *buff,
 
 static void bnx2x_pfc_set(struct bnx2x *bp)
 {
-	struct bnx2x_nig_brb_pfc_port_params pfc_params = {0};
+	struct bnx2x_nig_brb_pfc_port_params pfc_params = {};
 	u32 pri_bit, val = 0;
 	int i;
 
@@ -115,7 +115,7 @@ static void bnx2x_pfc_set(struct bnx2x *bp)
 
 static void bnx2x_pfc_clear(struct bnx2x *bp)
 {
-	struct bnx2x_nig_brb_pfc_port_params nig_params = {0};
+	struct bnx2x_nig_brb_pfc_port_params nig_params = {};
 	nig_params.pause_enable = 1;
 	bnx2x_acquire_phy_lock(bp);
 	bp->link_params.feature_config_flags &= ~FEATURE_CONFIG_PFC_ENABLED;
@@ -567,7 +567,7 @@ static void bnx2x_dcbx_2cos_limit_update_ets_config(struct bnx2x *bp)
 static void bnx2x_dcbx_update_ets_config(struct bnx2x *bp)
 {
 	struct bnx2x_dcbx_pg_params *ets = &(bp->dcbx_port_params.ets);
-	struct bnx2x_ets_params ets_params = { 0 };
+	struct bnx2x_ets_params ets_params = { };
 	u8 i;
 
 	ets_params.num_of_cos = ets->num_of_cos;
@@ -623,7 +623,7 @@ static void bnx2x_dcbx_update_ets_params(struct bnx2x *bp)
 #ifdef BCM_DCBNL
 static int bnx2x_dcbx_read_shmem_remote_mib(struct bnx2x *bp)
 {
-	struct lldp_remote_mib remote_mib = {0};
+	struct lldp_remote_mib remote_mib = {};
 	u32 dcbx_remote_mib_offset = SHMEM2_RD(bp, dcbx_remote_mib_offset);
 	int rc;
 
@@ -652,7 +652,7 @@ static int bnx2x_dcbx_read_shmem_remote_mib(struct bnx2x *bp)
 
 static int bnx2x_dcbx_read_shmem_neg_results(struct bnx2x *bp)
 {
-	struct lldp_local_mib local_mib = {0};
+	struct lldp_local_mib local_mib = {};
 	u32 dcbx_neg_res_offset = SHMEM2_RD(bp, dcbx_neg_res_offset);
 	int rc;
 

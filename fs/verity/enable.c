@@ -49,7 +49,7 @@ static int build_merkle_tree_level(struct file *filp, unsigned int level,
 {
 	struct inode *inode = file_inode(filp);
 	const struct fsverity_operations *vops = inode->i_sb->s_vop;
-	struct file_ra_state ra = { 0 };
+	struct file_ra_state ra = { };
 	unsigned int pending_size = 0;
 	u64 dst_block_num;
 	u64 i;

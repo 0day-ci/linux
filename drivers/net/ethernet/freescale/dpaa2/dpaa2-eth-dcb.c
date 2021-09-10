@@ -24,7 +24,7 @@ static inline bool dpaa2_eth_is_prio_enabled(u8 pfc_en, u8 tc)
 
 static int dpaa2_eth_set_pfc_cn(struct dpaa2_eth_priv *priv, u8 pfc_en)
 {
-	struct dpni_congestion_notification_cfg cfg = {0};
+	struct dpni_congestion_notification_cfg cfg = {};
 	int i, err;
 
 	cfg.notification_mode = DPNI_CONG_OPT_FLOW_CONTROL;
@@ -62,7 +62,7 @@ static int dpaa2_eth_dcbnl_ieee_setpfc(struct net_device *net_dev,
 				       struct ieee_pfc *pfc)
 {
 	struct dpaa2_eth_priv *priv = netdev_priv(net_dev);
-	struct dpni_link_cfg link_cfg = {0};
+	struct dpni_link_cfg link_cfg = {};
 	bool tx_pause;
 	int err;
 

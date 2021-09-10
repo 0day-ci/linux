@@ -498,7 +498,7 @@ static int ubifs_readdir(struct file *file, struct dir_context *ctx)
 {
 	int fstr_real_len = 0, err = 0;
 	struct fscrypt_name nm;
-	struct fscrypt_str fstr = {0};
+	struct fscrypt_str fstr = {};
 	union ubifs_key key;
 	struct ubifs_dent_node *dent;
 	struct inode *dir = file_inode(file);
@@ -849,7 +849,7 @@ out_fname:
 int ubifs_check_dir_empty(struct inode *dir)
 {
 	struct ubifs_info *c = dir->i_sb->s_fs_info;
-	struct fscrypt_name nm = { 0 };
+	struct fscrypt_name nm = { };
 	struct ubifs_dent_node *dent;
 	union ubifs_key key;
 	int err;

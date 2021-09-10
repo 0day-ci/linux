@@ -626,7 +626,7 @@ void do_send_trap(struct pt_regs *regs, unsigned long address,
 
 static void do_break_handler(struct pt_regs *regs)
 {
-	struct arch_hw_breakpoint null_brk = {0};
+	struct arch_hw_breakpoint null_brk = {};
 	struct arch_hw_breakpoint *info;
 	struct ppc_inst instr = ppc_inst(0);
 	int type = 0;
@@ -770,7 +770,7 @@ static void set_breakpoint(int i, struct arch_hw_breakpoint *brk)
 static void set_debug_reg_defaults(struct thread_struct *thread)
 {
 	int i;
-	struct arch_hw_breakpoint null_brk = {0};
+	struct arch_hw_breakpoint null_brk = {};
 
 	for (i = 0; i < nr_wp_slots(); i++) {
 		thread->hw_brk[i] = null_brk;

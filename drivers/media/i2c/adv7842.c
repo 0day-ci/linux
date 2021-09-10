@@ -1533,7 +1533,7 @@ static int adv7842_query_dv_timings(struct v4l2_subdev *sd,
 {
 	struct adv7842_state *state = to_state(sd);
 	struct v4l2_bt_timings *bt = &timings->bt;
-	struct stdi_readback stdi = { 0 };
+	struct stdi_readback stdi = { };
 
 	v4l2_dbg(1, debug, sd, "%s:\n", __func__);
 

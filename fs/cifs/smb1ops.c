@@ -920,7 +920,7 @@ cifs_unix_dfs_readlink(const unsigned int xid, struct cifs_tcon *tcon,
 {
 #ifdef CONFIG_CIFS_DFS_UPCALL
 	int rc;
-	struct dfs_info3_param referral = {0};
+	struct dfs_info3_param referral = {};
 
 	rc = get_dfs_path(xid, tcon->ses, searchName, nls_codepage, &referral,
 			  0);

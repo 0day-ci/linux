@@ -176,7 +176,7 @@ static int smu8_load_mec_firmware(struct pp_hwmgr *hwmgr)
 	uint32_t reg_data;
 	uint32_t tmp;
 	int ret = 0;
-	struct cgs_firmware_info info = {0};
+	struct cgs_firmware_info info = {};
 
 	if (hwmgr == NULL || hwmgr->device == NULL)
 		return -EINVAL;
@@ -550,7 +550,7 @@ static int smu8_smu_populate_firmware_entries(struct pp_hwmgr *hwmgr)
 	uint32_t i;
 	int ret;
 	enum cgs_ucode_id ucode_id;
-	struct cgs_firmware_info info = {0};
+	struct cgs_firmware_info info = {};
 
 	smu8_smu->driver_buffer_length = 0;
 

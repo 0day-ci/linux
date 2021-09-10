@@ -338,7 +338,7 @@ iwl_mvm_tdls_config_channel_switch(struct iwl_mvm *mvm,
 	struct iwl_mvm_sta *mvmsta;
 	struct ieee80211_tx_info *info;
 	struct ieee80211_hdr *hdr;
-	struct iwl_tdls_channel_switch_cmd cmd = {0};
+	struct iwl_tdls_channel_switch_cmd cmd = {};
 	struct iwl_tdls_channel_switch_cmd_tail *tail =
 		iwl_mvm_chan_info_cmd_tail(mvm, &cmd.ci);
 	u16 len = sizeof(cmd) - iwl_mvm_chan_info_padding(mvm);

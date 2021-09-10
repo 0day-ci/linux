@@ -63,7 +63,7 @@ int virtio_gpu_mode_dumb_create(struct drm_file *file_priv,
 				struct drm_mode_create_dumb *args)
 {
 	struct drm_gem_object *gobj;
-	struct virtio_gpu_object_params params = { 0 };
+	struct virtio_gpu_object_params params = { };
 	struct virtio_gpu_device *vgdev = dev->dev_private;
 	int ret;
 	uint32_t pitch;

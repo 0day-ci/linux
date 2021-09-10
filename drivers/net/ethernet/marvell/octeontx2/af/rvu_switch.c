@@ -11,8 +11,8 @@
 static int rvu_switch_install_rx_rule(struct rvu *rvu, u16 pcifunc,
 				      u16 chan_mask)
 {
-	struct npc_install_flow_req req = { 0 };
-	struct npc_install_flow_rsp rsp = { 0 };
+	struct npc_install_flow_req req = { };
+	struct npc_install_flow_rsp rsp = { };
 	struct rvu_pfvf *pfvf;
 
 	pfvf = rvu_get_pfvf(rvu, pcifunc);
@@ -39,8 +39,8 @@ static int rvu_switch_install_rx_rule(struct rvu *rvu, u16 pcifunc,
 
 static int rvu_switch_install_tx_rule(struct rvu *rvu, u16 pcifunc, u16 entry)
 {
-	struct npc_install_flow_req req = { 0 };
-	struct npc_install_flow_rsp rsp = { 0 };
+	struct npc_install_flow_req req = { };
+	struct npc_install_flow_rsp rsp = { };
 	struct rvu_pfvf *pfvf;
 	u8 lbkid;
 
@@ -142,10 +142,10 @@ static int rvu_switch_install_rules(struct rvu *rvu)
 
 void rvu_switch_enable(struct rvu *rvu)
 {
-	struct npc_mcam_alloc_entry_req alloc_req = { 0 };
-	struct npc_mcam_alloc_entry_rsp alloc_rsp = { 0 };
-	struct npc_delete_flow_req uninstall_req = { 0 };
-	struct npc_mcam_free_entry_req free_req = { 0 };
+	struct npc_mcam_alloc_entry_req alloc_req = { };
+	struct npc_mcam_alloc_entry_rsp alloc_rsp = { };
+	struct npc_delete_flow_req uninstall_req = { };
+	struct npc_mcam_free_entry_req free_req = { };
 	struct rvu_switch *rswitch = &rvu->rswitch;
 	struct msg_rsp rsp;
 	int ret;
@@ -195,8 +195,8 @@ exit:
 
 void rvu_switch_disable(struct rvu *rvu)
 {
-	struct npc_delete_flow_req uninstall_req = { 0 };
-	struct npc_mcam_free_entry_req free_req = { 0 };
+	struct npc_delete_flow_req uninstall_req = { };
+	struct npc_mcam_free_entry_req free_req = { };
 	struct rvu_switch *rswitch = &rvu->rswitch;
 	struct rvu_hwinfo *hw = rvu->hw;
 	int pf, vf, numvfs;

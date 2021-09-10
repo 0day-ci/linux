@@ -196,7 +196,7 @@ static u32 programmable_fetch_get_num_lines(
 static void programmable_fetch_config(struct dpu_encoder_phys *phys_enc,
 				      const struct intf_timing_params *timing)
 {
-	struct intf_prog_fetch f = { 0 };
+	struct intf_prog_fetch f = { };
 	u32 vfp_fetch_lines = 0;
 	u32 horiz_total = 0;
 	u32 vert_total = 0;
@@ -242,11 +242,11 @@ static void dpu_encoder_phys_vid_setup_timing_engine(
 		struct dpu_encoder_phys *phys_enc)
 {
 	struct drm_display_mode mode;
-	struct intf_timing_params timing_params = { 0 };
+	struct intf_timing_params timing_params = { };
 	const struct dpu_format *fmt = NULL;
 	u32 fmt_fourcc = DRM_FORMAT_RGB888;
 	unsigned long lock_flags;
-	struct dpu_hw_intf_cfg intf_cfg = { 0 };
+	struct dpu_hw_intf_cfg intf_cfg = { };
 
 	if (!phys_enc->hw_ctl->ops.setup_intf_cfg) {
 		DPU_ERROR("invalid encoder %d\n", phys_enc != NULL);
@@ -650,7 +650,7 @@ static int dpu_encoder_phys_vid_get_line_count(
 static int dpu_encoder_phys_vid_get_frame_count(
 		struct dpu_encoder_phys *phys_enc)
 {
-	struct intf_status s = {0};
+	struct intf_status s = {};
 	u32 fetch_start = 0;
 	struct drm_display_mode mode = phys_enc->cached_mode;
 

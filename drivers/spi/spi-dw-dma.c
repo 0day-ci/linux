@@ -73,7 +73,7 @@ static void dw_spi_dma_maxburst_init(struct dw_spi *dws)
 
 static void dw_spi_dma_sg_burst_init(struct dw_spi *dws)
 {
-	struct dma_slave_caps tx = {0}, rx = {0};
+	struct dma_slave_caps tx = {}, rx = {};
 
 	dma_get_slave_caps(dws->txchan, &tx);
 	dma_get_slave_caps(dws->rxchan, &rx);

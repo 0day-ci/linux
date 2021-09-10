@@ -1524,7 +1524,7 @@ static int skl_tplg_mic_control_set(struct snd_kcontrol *kcontrol,
 {
 	struct snd_soc_dapm_widget *w = snd_soc_dapm_kcontrol_widget(kcontrol);
 	struct skl_module_cfg *mconfig = w->priv;
-	struct skl_mic_sel_config mic_cfg = {0};
+	struct skl_mic_sel_config mic_cfg = {};
 	struct soc_enum *ec = (struct soc_enum *)kcontrol->private_value;
 	u32 ch_type = *((u32 *)ec->dobj.private);
 	const int *list;

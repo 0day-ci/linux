@@ -484,7 +484,7 @@ static struct pinctrl_desc zynqmp_desc = {
 
 static int zynqmp_pinctrl_get_function_groups(u32 fid, u32 index, u16 *groups)
 {
-	struct zynqmp_pm_query_data qdata = {0};
+	struct zynqmp_pm_query_data qdata = {};
 	u32 payload[PAYLOAD_ARG_CNT];
 	int ret;
 
@@ -503,7 +503,7 @@ static int zynqmp_pinctrl_get_function_groups(u32 fid, u32 index, u16 *groups)
 
 static int zynqmp_pinctrl_get_func_num_groups(u32 fid, unsigned int *ngroups)
 {
-	struct zynqmp_pm_query_data qdata = {0};
+	struct zynqmp_pm_query_data qdata = {};
 	u32 payload[PAYLOAD_ARG_CNT];
 	int ret;
 
@@ -587,7 +587,7 @@ done:
 
 static void zynqmp_pinctrl_get_function_name(u32 fid, char *name)
 {
-	struct zynqmp_pm_query_data qdata = {0};
+	struct zynqmp_pm_query_data qdata = {};
 	u32 payload[PAYLOAD_ARG_CNT];
 
 	qdata.qid = PM_QID_PINCTRL_GET_FUNCTION_NAME;
@@ -604,7 +604,7 @@ static void zynqmp_pinctrl_get_function_name(u32 fid, char *name)
 
 static int zynqmp_pinctrl_get_num_functions(unsigned int *nfuncs)
 {
-	struct zynqmp_pm_query_data qdata = {0};
+	struct zynqmp_pm_query_data qdata = {};
 	u32 payload[PAYLOAD_ARG_CNT];
 	int ret;
 
@@ -621,7 +621,7 @@ static int zynqmp_pinctrl_get_num_functions(unsigned int *nfuncs)
 
 static int zynqmp_pinctrl_get_pin_groups(u32 pin, u32 index, u16 *groups)
 {
-	struct zynqmp_pm_query_data qdata = {0};
+	struct zynqmp_pm_query_data qdata = {};
 	u32 payload[PAYLOAD_ARG_CNT];
 	int ret;
 
@@ -777,7 +777,7 @@ static int zynqmp_pinctrl_prepare_function_info(struct device *dev,
 
 static int zynqmp_pinctrl_get_num_pins(unsigned int *npins)
 {
-	struct zynqmp_pm_query_data qdata = {0};
+	struct zynqmp_pm_query_data qdata = {};
 	u32 payload[PAYLOAD_ARG_CNT];
 	int ret;
 

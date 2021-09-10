@@ -216,7 +216,7 @@ static inline int acpi_processor_hotadd_init(struct acpi_processor *pr)
 
 static int acpi_processor_get_info(struct acpi_device *device)
 {
-	union acpi_object object = { 0 };
+	union acpi_object object = { };
 	struct acpi_buffer buffer = { sizeof(union acpi_object), &object };
 	struct acpi_processor *pr = acpi_driver_data(device);
 	int device_declaration = 0;
@@ -621,7 +621,7 @@ static acpi_status __init acpi_processor_ids_walk(acpi_handle handle,
 	acpi_status status;
 	acpi_object_type acpi_type;
 	unsigned long long uid;
-	union acpi_object object = { 0 };
+	union acpi_object object = { };
 	struct acpi_buffer buffer = { sizeof(union acpi_object), &object };
 
 	status = acpi_get_type(handle, &acpi_type);

@@ -314,7 +314,7 @@ static irqreturn_t cnl_dsp_irq_thread_handler(int irq, void *context)
 	struct sst_dsp *dsp = context;
 	struct skl_dev *cnl = dsp->thread_context;
 	struct sst_generic_ipc *ipc = &cnl->ipc;
-	struct skl_ipc_header header = {0};
+	struct skl_ipc_header header = {};
 	u32 hipcida, hipctdr, hipctdd;
 	int ipc_irq = 0;
 

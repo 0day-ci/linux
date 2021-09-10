@@ -1396,7 +1396,7 @@ static int qeth_l3_query_arp_cache_info(struct qeth_card *card,
 
 static int qeth_l3_arp_query(struct qeth_card *card, char __user *udata)
 {
-	struct qeth_arp_query_info qinfo = {0, };
+	struct qeth_arp_query_info qinfo = {};
 	int rc;
 
 	QETH_CARD_TEXT(card, 3, "arpquery");

@@ -192,7 +192,7 @@ static int acpi_processor_get_performance_control(struct acpi_processor *pr)
 	acpi_status status = 0;
 	struct acpi_buffer buffer = { ACPI_ALLOCATE_BUFFER, NULL };
 	union acpi_object *pct = NULL;
-	union acpi_object obj = { 0 };
+	union acpi_object obj = { };
 
 	status = acpi_evaluate_object(pr->handle, "_PCT", NULL, &buffer);
 	if (ACPI_FAILURE(status)) {

@@ -323,7 +323,7 @@ int mv88e6xxx_g1_atu_flush(struct mv88e6xxx_chip *chip, u16 fid, bool all)
 static int mv88e6xxx_g1_atu_move(struct mv88e6xxx_chip *chip, u16 fid,
 				 int from_port, int to_port, bool all)
 {
-	struct mv88e6xxx_atu_entry entry = { 0 };
+	struct mv88e6xxx_atu_entry entry = { };
 	unsigned long mask;
 	int shift;
 

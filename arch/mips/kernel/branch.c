@@ -265,7 +265,7 @@ int __microMIPS_compute_return_epc(struct pt_regs *regs)
 	u16 halfword;
 	unsigned int word;
 	unsigned long contpc;
-	struct mm_decoded_insn mminsn = { 0 };
+	struct mm_decoded_insn mminsn = { };
 
 	mminsn.micro_mips_mode = 1;
 

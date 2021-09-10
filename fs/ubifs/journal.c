@@ -877,7 +877,7 @@ int ubifs_jnl_write_inode(struct ubifs_info *c, const struct inode *inode)
 
 	if (kill_xattrs) {
 		union ubifs_key key;
-		struct fscrypt_name nm = {0};
+		struct fscrypt_name nm = {};
 		struct inode *xino;
 		struct ubifs_dent_node *xent, *pxent = NULL;
 

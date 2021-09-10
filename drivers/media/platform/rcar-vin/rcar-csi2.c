@@ -494,7 +494,7 @@ static int rcsi2_calc_mbps(struct rcar_csi2 *priv, unsigned int bpp,
 static int rcsi2_get_active_lanes(struct rcar_csi2 *priv,
 				  unsigned int *lanes)
 {
-	struct v4l2_mbus_config mbus_config = { 0 };
+	struct v4l2_mbus_config mbus_config = { };
 	unsigned int num_lanes = UINT_MAX;
 	int ret;
 

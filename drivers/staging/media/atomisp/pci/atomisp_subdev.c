@@ -318,7 +318,7 @@ static void isp_subdev_propagate(struct v4l2_subdev *sd,
 
 	switch (pad) {
 	case ATOMISP_SUBDEV_PAD_SINK: {
-		struct v4l2_rect r = {0};
+		struct v4l2_rect r = {};
 
 		/* Only crop target supported on sink pad. */
 		r.width = ffmt[pad]->width;
@@ -579,7 +579,7 @@ static int isp_subdev_set_selection(struct v4l2_subdev *sd,
 
 static int atomisp_get_sensor_bin_factor(struct atomisp_sub_device *asd)
 {
-	struct v4l2_control ctrl = {0};
+	struct v4l2_control ctrl = {};
 	struct atomisp_device *isp = asd->isp;
 	int hbin, vbin;
 	int ret;

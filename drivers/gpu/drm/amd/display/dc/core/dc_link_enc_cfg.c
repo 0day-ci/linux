@@ -42,7 +42,7 @@ static bool is_dig_link_enc_stream(struct dc_stream_state *stream)
 				((uint32_t)stream->signal & link_enc->output_signals)) {
 			if (dc_is_dp_signal(stream->signal)) {
 				/* DIGs do not support DP2.0 streams with 128b/132b encoding. */
-				struct dc_link_settings link_settings = {0};
+				struct dc_link_settings link_settings = {};
 
 				decide_link_settings(stream, &link_settings);
 				if ((link_settings.link_rate >= LINK_RATE_LOW) &&

@@ -1319,7 +1319,7 @@ bool optc1_is_stereo_left_eye(struct timing_generator *optc)
 bool optc1_get_hw_timing(struct timing_generator *tg,
 		struct dc_crtc_timing *hw_crtc_timing)
 {
-	struct dcn_otg_state s = {0};
+	struct dcn_otg_state s = {};
 
 	if (tg == NULL || hw_crtc_timing == NULL)
 		return false;

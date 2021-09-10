@@ -1314,7 +1314,7 @@ static int l2tp_tunnel_sock_create(struct net *net,
 	case L2TP_ENCAPTYPE_IP:
 #if IS_ENABLED(CONFIG_IPV6)
 		if (cfg->local_ip6 && cfg->peer_ip6) {
-			struct sockaddr_l2tpip6 ip6_addr = {0};
+			struct sockaddr_l2tpip6 ip6_addr = {};
 
 			err = sock_create_kern(net, AF_INET6, SOCK_DGRAM,
 					       IPPROTO_L2TP, &sock);
@@ -1342,7 +1342,7 @@ static int l2tp_tunnel_sock_create(struct net *net,
 		} else
 #endif
 		{
-			struct sockaddr_l2tpip ip_addr = {0};
+			struct sockaddr_l2tpip ip_addr = {};
 
 			err = sock_create_kern(net, AF_INET, SOCK_DGRAM,
 					       IPPROTO_L2TP, &sock);

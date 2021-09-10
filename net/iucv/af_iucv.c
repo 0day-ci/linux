@@ -904,7 +904,7 @@ static int iucv_sock_sendmsg(struct socket *sock, struct msghdr *msg,
 	size_t headroom = 0;
 	size_t linear;
 	struct sk_buff *skb;
-	struct iucv_message txmsg = {0};
+	struct iucv_message txmsg = {};
 	struct cmsghdr *cmsg;
 	int cmsg_done;
 	long timeo;

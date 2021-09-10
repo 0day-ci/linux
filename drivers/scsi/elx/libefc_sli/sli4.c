@@ -584,7 +584,7 @@ sli_fc_rq_set_alloc(struct sli4 *sli4, u32 num_rq_pairs,
 		    u32 payload_buffer_size)
 {
 	u32 i;
-	struct efc_dma dma = {0};
+	struct efc_dma dma = {};
 	struct sli4_rsp_cmn_create_queue_set *rsp = NULL;
 	void __iomem *db_regaddr = NULL;
 	u32 num_rqs = num_rq_pairs * 2;
@@ -918,7 +918,7 @@ sli_cq_alloc_set(struct sli4 *sli4, struct sli4_queue *qs[],
 		 u32 num_cqs, u32 n_entries, struct sli4_queue *eqs[])
 {
 	u32 i;
-	struct efc_dma dma = {0};
+	struct efc_dma dma = {};
 	struct sli4_rsp_cmn_create_queue_set *res;
 	void __iomem *db_regaddr;
 
@@ -2499,7 +2499,7 @@ int
 sli_fc_process_link_attention(struct sli4 *sli4, void *acqe)
 {
 	struct sli4_link_attention *link_attn = acqe;
-	struct sli4_link_event event = { 0 };
+	struct sli4_link_event event = { };
 
 	efc_log_info(sli4, "link=%d attn_type=%#x top=%#x speed=%#x pfault=%#x\n",
 		     link_attn->link_number, link_attn->attn_type,

@@ -252,7 +252,7 @@ int main(void)
 
 		/* Reset kvmclock triggering TSC page update */
 		if (stage == 7 || stage == 8 || stage == 10) {
-			struct kvm_clock_data clock = {0};
+			struct kvm_clock_data clock = {};
 
 			vm_ioctl(vm, KVM_SET_CLOCK, &clock);
 		}

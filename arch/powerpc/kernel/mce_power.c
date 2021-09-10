@@ -698,7 +698,7 @@ static long mce_handle_error(struct pt_regs *regs,
 		const struct mce_derror_table dtable[],
 		const struct mce_ierror_table itable[])
 {
-	struct mce_error_info mce_err = { 0 };
+	struct mce_error_info mce_err = { };
 	uint64_t addr, phys_addr = ULONG_MAX;
 	long handled;
 

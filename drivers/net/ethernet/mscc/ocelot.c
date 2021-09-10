@@ -344,14 +344,14 @@ int ocelot_vlan_del(struct ocelot *ocelot, int port, u16 vid)
 
 	/* Ingress */
 	if (ocelot_port->pvid_vlan.vid == vid) {
-		struct ocelot_vlan pvid_vlan = {0};
+		struct ocelot_vlan pvid_vlan = {};
 
 		ocelot_port_set_pvid(ocelot, port, pvid_vlan);
 	}
 
 	/* Egress */
 	if (ocelot_port->native_vlan.vid == vid) {
-		struct ocelot_vlan native_vlan = {0};
+		struct ocelot_vlan native_vlan = {};
 
 		ocelot_port_set_native_vlan(ocelot, port, native_vlan);
 	}
@@ -1650,7 +1650,7 @@ void ocelot_port_bridge_leave(struct ocelot *ocelot, int port,
 			      struct net_device *bridge)
 {
 	struct ocelot_port *ocelot_port = ocelot->ports[port];
-	struct ocelot_vlan pvid = {0}, native_vlan = {0};
+	struct ocelot_vlan pvid = {}, native_vlan = {};
 
 	ocelot_port->bridge = NULL;
 

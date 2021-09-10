@@ -107,7 +107,7 @@ static int lima_ioctl_gem_submit(struct drm_device *dev, void *data, struct drm_
 	struct lima_sched_pipe *pipe;
 	struct lima_sched_task *task;
 	struct lima_ctx *ctx;
-	struct lima_submit submit = {0};
+	struct lima_submit submit = {};
 	size_t size;
 	int err = 0;
 

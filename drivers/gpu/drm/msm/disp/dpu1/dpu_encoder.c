@@ -216,7 +216,7 @@ static u32 dither_matrix[DITHER_MATRIX_SZ] = {
 
 static void _dpu_encoder_setup_dither(struct dpu_hw_pingpong *hw_pp, unsigned bpc)
 {
-	struct dpu_hw_dither_cfg dither_cfg = { 0 };
+	struct dpu_hw_dither_cfg dither_cfg = { };
 
 	if (!hw_pp->ops.setup_dither)
 		return;
@@ -485,7 +485,7 @@ void dpu_encoder_helper_split_config(
 		enum dpu_intf interface)
 {
 	struct dpu_encoder_virt *dpu_enc;
-	struct split_pipe_cfg cfg = { 0 };
+	struct split_pipe_cfg cfg = { };
 	struct dpu_hw_mdp *hw_mdptop;
 	struct msm_display_info *disp_info;
 
@@ -534,7 +534,7 @@ static struct msm_display_topology dpu_encoder_get_topology(
 			struct dpu_kms *dpu_kms,
 			struct drm_display_mode *mode)
 {
-	struct msm_display_topology topology = {0};
+	struct msm_display_topology topology = {};
 	int i, intf_count = 0;
 
 	for (i = 0; i < MAX_PHYS_ENCODERS_PER_VIRTUAL; i++)
@@ -648,7 +648,7 @@ static int dpu_encoder_virt_atomic_check(
 static void _dpu_encoder_update_vsync_source(struct dpu_encoder_virt *dpu_enc,
 			struct msm_display_info *disp_info)
 {
-	struct dpu_vsync_source_cfg vsync_cfg = { 0 };
+	struct dpu_vsync_source_cfg vsync_cfg = { };
 	struct msm_drm_private *priv;
 	struct dpu_kms *dpu_kms;
 	struct dpu_hw_mdp *hw_mdptop;

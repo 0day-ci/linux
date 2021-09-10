@@ -320,7 +320,7 @@ static int mixel_dphy_set_pll_params(struct phy *phy)
 static int mixel_dphy_configure(struct phy *phy, union phy_configure_opts *opts)
 {
 	struct mixel_dphy_priv *priv = phy_get_drvdata(phy);
-	struct mixel_dphy_cfg cfg = { 0 };
+	struct mixel_dphy_cfg cfg = { };
 	int ret;
 
 	ret = mixel_dphy_config_from_opts(phy, &opts->mipi_dphy, &cfg);
@@ -348,7 +348,7 @@ static int mixel_dphy_configure(struct phy *phy, union phy_configure_opts *opts)
 static int mixel_dphy_validate(struct phy *phy, enum phy_mode mode, int submode,
 			       union phy_configure_opts *opts)
 {
-	struct mixel_dphy_cfg cfg = { 0 };
+	struct mixel_dphy_cfg cfg = { };
 
 	if (mode != PHY_MODE_MIPI_DPHY)
 		return -EINVAL;

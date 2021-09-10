@@ -269,7 +269,7 @@ static u32 nvmet_format_ana_group(struct nvmet_req *req, u32 grpid,
 
 static void nvmet_execute_get_log_page_ana(struct nvmet_req *req)
 {
-	struct nvme_ana_rsp_hdr hdr = { 0, };
+	struct nvme_ana_rsp_hdr hdr = { };
 	struct nvme_ana_group_desc *desc;
 	size_t offset = sizeof(struct nvme_ana_rsp_hdr); /* start beyond hdr */
 	size_t len;

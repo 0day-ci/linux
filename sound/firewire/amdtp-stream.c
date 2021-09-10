@@ -160,7 +160,7 @@ static int apply_constraint_to_size(struct snd_pcm_hw_params *params,
 	struct snd_interval *s = hw_param_interval(params, rule->var);
 	const struct snd_interval *r =
 		hw_param_interval_c(params, SNDRV_PCM_HW_PARAM_RATE);
-	struct snd_interval t = {0};
+	struct snd_interval t = {};
 	unsigned int step = 0;
 	int i;
 
@@ -1232,7 +1232,7 @@ static void process_tx_packets(struct fw_iso_context *context, u32 tstamp, size_
 	}
 
 	for (i = 0; i < packets; ++i) {
-		struct fw_iso_packet params = {0};
+		struct fw_iso_packet params = {};
 
 		if (queue_in_packet(s, &params) < 0) {
 			cancel_stream(s);
@@ -1260,7 +1260,7 @@ static void drop_tx_packets(struct fw_iso_context *context, u32 tstamp, size_t h
 	s->next_cycle = increment_ohci_cycle_count(cycle, 1);
 
 	for (i = 0; i < packets; ++i) {
-		struct fw_iso_packet params = {0};
+		struct fw_iso_packet params = {};
 
 		if (queue_in_packet(s, &params) < 0) {
 			cancel_stream(s);

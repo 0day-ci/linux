@@ -4664,7 +4664,7 @@ static void paging32_init_context(struct kvm_mmu *context)
 static union kvm_mmu_extended_role kvm_calc_mmu_role_ext(struct kvm_vcpu *vcpu,
 							 struct kvm_mmu_role_regs *regs)
 {
-	union kvm_mmu_extended_role ext = {0};
+	union kvm_mmu_extended_role ext = {};
 
 	if (____is_cr0_pg(regs)) {
 		ext.cr0_pg = 1;
@@ -4687,7 +4687,7 @@ static union kvm_mmu_role kvm_calc_mmu_role_common(struct kvm_vcpu *vcpu,
 						   struct kvm_mmu_role_regs *regs,
 						   bool base_only)
 {
-	union kvm_mmu_role role = {0};
+	union kvm_mmu_role role = {};
 
 	role.base.access = ACC_ALL;
 	if (____is_cr0_pg(regs)) {
@@ -4865,7 +4865,7 @@ static union kvm_mmu_role
 kvm_calc_shadow_ept_root_page_role(struct kvm_vcpu *vcpu, bool accessed_dirty,
 				   bool execonly, u8 level)
 {
-	union kvm_mmu_role role = {0};
+	union kvm_mmu_role role = {};
 
 	/* SMM flag is inherited from root_mmu */
 	role.base.smm = vcpu->arch.root_mmu.mmu_role.base.smm;

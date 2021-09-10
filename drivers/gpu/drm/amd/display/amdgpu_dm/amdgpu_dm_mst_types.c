@@ -466,7 +466,7 @@ void amdgpu_dm_initialize_dp_connector(struct amdgpu_display_manager *dm,
 				       struct amdgpu_dm_connector *aconnector,
 				       int link_index)
 {
-	struct dc_link_settings max_link_enc_cap = {0};
+	struct dc_link_settings max_link_enc_cap = {};
 
 	aconnector->dm_dp_aux.aux.name =
 		kasprintf(GFP_KERNEL, "AMDGPU DM aux hw bus %d",
@@ -764,7 +764,7 @@ static bool compute_mst_dsc_configs_for_link(struct drm_atomic_state *state,
 
 	/* Set up params */
 	for (i = 0; i < dc_state->stream_count; i++) {
-		struct dc_dsc_policy dsc_policy = {0};
+		struct dc_dsc_policy dsc_policy = {};
 
 		stream = dc_state->streams[i];
 

@@ -291,7 +291,7 @@ static long afu_ioctl_process_element(struct cxl_context *ctx,
 static long afu_ioctl_get_afu_id(struct cxl_context *ctx,
 				 struct cxl_afu_id __user *upafuid)
 {
-	struct cxl_afu_id afuid = { 0 };
+	struct cxl_afu_id afuid = { };
 
 	afuid.card_id = ctx->afu->adapter->adapter_num;
 	afuid.afu_offset = ctx->afu->slice;

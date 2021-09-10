@@ -712,7 +712,7 @@ static int uclogic_params_huion_init(struct uclogic_params *params,
 	__u8 bInterfaceNumber = iface->cur_altsetting->desc.bInterfaceNumber;
 	bool found;
 	/* The resulting parameters (noop) */
-	struct uclogic_params p = {0, };
+	struct uclogic_params p = {};
 	static const char transition_ver[] = "HUION_T153_160607";
 	char *ver_ptr = NULL;
 	const size_t ver_len = sizeof(transition_ver) + 1;
@@ -840,7 +840,7 @@ int uclogic_params_init(struct uclogic_params *params,
 	__u8 bInterfaceNumber = iface->cur_altsetting->desc.bInterfaceNumber;
 	bool found;
 	/* The resulting parameters (noop) */
-	struct uclogic_params p = {0, };
+	struct uclogic_params p = {};
 
 	/* Check arguments */
 	if (params == NULL || hdev == NULL ||

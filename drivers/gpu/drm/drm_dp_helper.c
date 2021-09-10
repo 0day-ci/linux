@@ -3530,7 +3530,7 @@ static const struct backlight_ops dp_aux_bl_ops = {
 int drm_panel_dp_aux_backlight(struct drm_panel *panel, struct drm_dp_aux *aux)
 {
 	struct dp_aux_backlight *bl;
-	struct backlight_properties props = { 0 };
+	struct backlight_properties props = { };
 	u16 current_level;
 	u8 current_mode;
 	u8 edp_dpcd[EDP_DISPLAY_CTL_CAP_SIZE];

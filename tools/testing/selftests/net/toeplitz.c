@@ -252,7 +252,7 @@ static void process_rings(void)
 
 static char *setup_ring(int fd)
 {
-	struct tpacket_req3 req3 = {0};
+	struct tpacket_req3 req3 = {};
 	void *ring;
 
 	req3.tp_retire_blk_tov = cfg_timeout_msec;
@@ -336,7 +336,7 @@ static int create_ring(char **ring)
 		.type_flags = PACKET_FANOUT_CPU,
 		.max_num_members = RSS_MAX_CPUS
 	};
-	struct sockaddr_ll ll = { 0 };
+	struct sockaddr_ll ll = { };
 	int fd, val;
 
 	fd = socket(PF_PACKET, SOCK_DGRAM, 0);

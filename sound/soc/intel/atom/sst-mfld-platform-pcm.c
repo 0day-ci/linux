@@ -225,8 +225,8 @@ static int sst_platform_alloc_stream(struct snd_pcm_substream *substream,
 	struct sst_runtime_stream *stream =
 			substream->runtime->private_data;
 	struct snd_sst_stream_params param = {{{0,},},};
-	struct snd_sst_params str_params = {0};
-	struct snd_sst_alloc_params_ext alloc_params = {0};
+	struct snd_sst_params str_params = {};
+	struct snd_sst_alloc_params_ext alloc_params = {};
 	int ret_val = 0;
 	struct sst_data *ctx = snd_soc_dai_get_drvdata(dai);
 

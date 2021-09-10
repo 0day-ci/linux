@@ -3808,7 +3808,7 @@ static bool hwsim_known_ciphers(const u32 *ciphers, int n_ciphers)
 
 static int hwsim_new_radio_nl(struct sk_buff *msg, struct genl_info *info)
 {
-	struct hwsim_new_radio_params param = { 0 };
+	struct hwsim_new_radio_params param = { };
 	const char *hwname = NULL;
 	int ret;
 
@@ -4497,7 +4497,7 @@ static int __init init_mac80211_hwsim(void)
 	hwsim_init_s1g_channels(hwsim_channels_s1g);
 
 	for (i = 0; i < radios; i++) {
-		struct hwsim_new_radio_params param = { 0 };
+		struct hwsim_new_radio_params param = { };
 
 		param.channels = channels;
 

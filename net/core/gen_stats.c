@@ -164,7 +164,7 @@ ___gnet_stats_copy_basic(const seqcount_t *running,
 			 struct gnet_stats_basic_packed *b,
 			 int type)
 {
-	struct gnet_stats_basic_packed bstats = {0};
+	struct gnet_stats_basic_packed bstats = {};
 
 	__gnet_stats_copy_basic(running, &bstats, cpu, b);
 
@@ -337,7 +337,7 @@ gnet_stats_copy_queue(struct gnet_dump *d,
 		      struct gnet_stats_queue __percpu *cpu_q,
 		      struct gnet_stats_queue *q, __u32 qlen)
 {
-	struct gnet_stats_queue qstats = {0};
+	struct gnet_stats_queue qstats = {};
 
 	__gnet_stats_copy_queue(&qstats, cpu_q, q, qlen);
 

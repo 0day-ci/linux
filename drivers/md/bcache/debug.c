@@ -109,7 +109,7 @@ void bch_data_verify(struct cached_dev *dc, struct bio *bio)
 {
 	struct bio *check;
 	struct bio_vec bv, cbv;
-	struct bvec_iter iter, citer = { 0 };
+	struct bvec_iter iter, citer = { };
 
 	check = bio_kmalloc(GFP_NOIO, bio_segments(bio));
 	if (!check)

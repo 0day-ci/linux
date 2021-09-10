@@ -4923,7 +4923,7 @@ static int dpaa2_dpseci_poll(struct napi_struct *napi, int budget)
 static int dpaa2_dpseci_congestion_setup(struct dpaa2_caam_priv *priv,
 					 u16 token)
 {
-	struct dpseci_congestion_notification_cfg cong_notif_cfg = { 0 };
+	struct dpseci_congestion_notification_cfg cong_notif_cfg = { };
 	struct device *dev = priv->dev;
 	int err;
 

@@ -295,7 +295,7 @@ struct bpf_counter_ops bpf_program_profiler_ops = {
 
 static bool bperf_attr_map_compatible(int attr_map_fd)
 {
-	struct bpf_map_info map_info = {0};
+	struct bpf_map_info map_info = {};
 	__u32 map_info_len = sizeof(map_info);
 	int err;
 

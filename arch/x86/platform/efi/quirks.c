@@ -244,7 +244,7 @@ EXPORT_SYMBOL_GPL(efi_query_variable_store);
  */
 void __init efi_arch_mem_reserve(phys_addr_t addr, u64 size)
 {
-	struct efi_memory_map_data data = { 0 };
+	struct efi_memory_map_data data = { };
 	struct efi_mem_range mr;
 	efi_memory_desc_t md;
 	int num_entries;
@@ -397,7 +397,7 @@ static void __init efi_unmap_pages(efi_memory_desc_t *md)
 
 void __init efi_free_boot_services(void)
 {
-	struct efi_memory_map_data data = { 0 };
+	struct efi_memory_map_data data = { };
 	efi_memory_desc_t *md;
 	int num_entries = 0;
 	void *new, *new_md;

@@ -143,7 +143,7 @@ int vcpu_enable_cap(struct kvm_vm *vm, uint32_t vcpu_id,
 
 void vm_enable_dirty_ring(struct kvm_vm *vm, uint32_t ring_size)
 {
-	struct kvm_enable_cap cap = { 0 };
+	struct kvm_enable_cap cap = { };
 
 	cap.cap = KVM_CAP_DIRTY_LOG_RING;
 	cap.args[0] = ring_size;

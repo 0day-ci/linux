@@ -106,7 +106,7 @@ static void cxgb4_cudbg_collect_entity(struct cudbg_init *pdbg_init,
 				       const struct cxgb4_collect_entity *e_arr,
 				       u32 arr_size, void *buf, u32 *tot_size)
 {
-	struct cudbg_error cudbg_err = { 0 };
+	struct cudbg_error cudbg_err = { };
 	struct cudbg_entity_hdr *entity_hdr;
 	u32 i, total_size = 0;
 	int ret;
@@ -163,7 +163,7 @@ static void cudbg_free_compress_buff(struct cudbg_init *pdbg_init)
 int cxgb4_cudbg_collect(struct adapter *adap, void *buf, u32 *buf_size,
 			u32 flag)
 {
-	struct cudbg_buffer dbg_buff = { 0 };
+	struct cudbg_buffer dbg_buff = { };
 	u32 size, min_size, total_size = 0;
 	struct cudbg_init cudbg_init;
 	struct cudbg_hdr *cudbg_hdr;

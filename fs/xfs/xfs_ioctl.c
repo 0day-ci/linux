@@ -1519,7 +1519,7 @@ xfs_ioc_getbmap(
 	unsigned int		cmd,
 	void			__user *arg)
 {
-	struct getbmapx		bmx = { 0 };
+	struct getbmapx		bmx = { };
 	struct kgetbmap		*buf;
 	size_t			recsize;
 	int			error, i;
@@ -1577,7 +1577,7 @@ xfs_ioc_getfsmap(
 	struct xfs_inode	*ip,
 	struct fsmap_head	__user *arg)
 {
-	struct xfs_fsmap_head	xhead = {0};
+	struct xfs_fsmap_head	xhead = {};
 	struct fsmap_head	head;
 	struct fsmap		*recs;
 	unsigned int		count;

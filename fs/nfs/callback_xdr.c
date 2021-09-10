@@ -924,7 +924,7 @@ encode_hdr:
  */
 static __be32 nfs4_callback_compound(struct svc_rqst *rqstp)
 {
-	struct cb_compound_hdr_arg hdr_arg = { 0 };
+	struct cb_compound_hdr_arg hdr_arg = { };
 	struct cb_compound_hdr_res hdr_res = { NULL };
 	struct cb_process_state cps = {
 		.drc_status = 0,

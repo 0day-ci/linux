@@ -80,7 +80,7 @@ static int uevent_listener(unsigned long post_flags, bool expect_uevent,
 	socklen_t sk_addr_len;
 	int fret = -1, rcv_buf_sz = __UEVENT_BUFFER_SIZE;
 	uint64_t sync_add = 1;
-	struct sockaddr_nl sk_addr = { 0 }, rcv_addr = { 0 };
+	struct sockaddr_nl sk_addr = { }, rcv_addr = { };
 	char buf[__UEVENT_BUFFER_SIZE] = { 0 };
 	struct iovec iov = { buf, __UEVENT_BUFFER_SIZE };
 	char control[CMSG_SPACE(sizeof(struct ucred))];

@@ -1344,7 +1344,7 @@ static int bond_option_pps_set(struct bonding *bond,
 		 * packets_per_slave is 0 or 1, just initialize it
 		 */
 		bond->params.reciprocal_packets_per_slave =
-			(struct reciprocal_value) { 0 };
+			(struct reciprocal_value) { };
 	}
 
 	return 0;

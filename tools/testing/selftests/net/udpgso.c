@@ -452,8 +452,8 @@ static bool send_one(int fd, int len, int gso_len,
 		     struct sockaddr *addr, socklen_t alen)
 {
 	char control[CMSG_SPACE(sizeof(uint16_t))] = {0};
-	struct msghdr msg = {0};
-	struct iovec iov = {0};
+	struct msghdr msg = {};
+	struct iovec iov = {};
 	struct cmsghdr *cm;
 
 	iov.iov_base = buf;
@@ -618,7 +618,7 @@ static void run_test(struct sockaddr *addr, socklen_t alen)
 
 static void run_test_v4(void)
 {
-	struct sockaddr_in addr = {0};
+	struct sockaddr_in addr = {};
 
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons(cfg_port);
@@ -629,7 +629,7 @@ static void run_test_v4(void)
 
 static void run_test_v6(void)
 {
-	struct sockaddr_in6 addr = {0};
+	struct sockaddr_in6 addr = {};
 
 	addr.sin6_family = AF_INET6;
 	addr.sin6_port = htons(cfg_port);

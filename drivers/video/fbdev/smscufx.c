@@ -612,7 +612,7 @@ static void ufx_calc_pll_values(const u32 clk_pixel_pll, struct pll_values *asic
 /* sets analog bit PLL configuration values */
 static int ufx_config_pix_clk(struct ufx_data *dev, u32 pixclock)
 {
-	struct pll_values asic_pll = {0};
+	struct pll_values asic_pll = {};
 	u32 value, clk_pixel, clk_pixel_pll;
 	int status;
 
@@ -1554,7 +1554,7 @@ static int ufx_setup_modes(struct ufx_data *dev, struct fb_info *info,
 	/* If everything else has failed, fall back to safe default mode */
 	if (default_vmode == NULL) {
 
-		struct fb_videomode fb_vmode = {0};
+		struct fb_videomode fb_vmode = {};
 
 		/* Add the standard VESA modes to our modelist
 		 * Since we don't have EDID, there may be modes that

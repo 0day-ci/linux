@@ -235,7 +235,7 @@ static int cdns_dphy_config_from_opts(struct phy *phy,
 static int cdns_dphy_validate(struct phy *phy, enum phy_mode mode, int submode,
 			      union phy_configure_opts *opts)
 {
-	struct cdns_dphy_cfg cfg = { 0 };
+	struct cdns_dphy_cfg cfg = { };
 
 	if (mode != PHY_MODE_MIPI_DPHY)
 		return -EINVAL;
@@ -246,7 +246,7 @@ static int cdns_dphy_validate(struct phy *phy, enum phy_mode mode, int submode,
 static int cdns_dphy_configure(struct phy *phy, union phy_configure_opts *opts)
 {
 	struct cdns_dphy *dphy = phy_get_drvdata(phy);
-	struct cdns_dphy_cfg cfg = { 0 };
+	struct cdns_dphy_cfg cfg = { };
 	int ret;
 
 	ret = cdns_dphy_config_from_opts(phy, &opts->mipi_dphy, &cfg);

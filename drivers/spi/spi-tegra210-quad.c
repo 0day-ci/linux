@@ -563,7 +563,7 @@ static void tegra_qspi_dma_unmap_xfer(struct tegra_qspi *tqspi, struct spi_trans
 
 static int tegra_qspi_start_dma_based_transfer(struct tegra_qspi *tqspi, struct spi_transfer *t)
 {
-	struct dma_slave_config dma_sconfig = { 0 };
+	struct dma_slave_config dma_sconfig = { };
 	unsigned int len;
 	u8 dma_burst;
 	int ret = 0;

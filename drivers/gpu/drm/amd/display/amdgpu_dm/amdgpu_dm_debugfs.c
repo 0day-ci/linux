@@ -1295,7 +1295,7 @@ static ssize_t dp_dsc_clock_en_read(struct file *f, char __user *buf,
 	char *rd_buf_ptr = NULL;
 	struct amdgpu_dm_connector *aconnector = file_inode(f)->i_private;
 	struct display_stream_compressor *dsc;
-	struct dcn_dsc_state dsc_state = {0};
+	struct dcn_dsc_state dsc_state = {};
 	const uint32_t rd_buf_size = 10;
 	struct pipe_ctx *pipe_ctx;
 	ssize_t result = 0;
@@ -1482,7 +1482,7 @@ static ssize_t dp_dsc_slice_width_read(struct file *f, char __user *buf,
 	char *rd_buf_ptr = NULL;
 	struct amdgpu_dm_connector *aconnector = file_inode(f)->i_private;
 	struct display_stream_compressor *dsc;
-	struct dcn_dsc_state dsc_state = {0};
+	struct dcn_dsc_state dsc_state = {};
 	const uint32_t rd_buf_size = 100;
 	struct pipe_ctx *pipe_ctx;
 	ssize_t result = 0;
@@ -1667,7 +1667,7 @@ static ssize_t dp_dsc_slice_height_read(struct file *f, char __user *buf,
 	char *rd_buf_ptr = NULL;
 	struct amdgpu_dm_connector *aconnector = file_inode(f)->i_private;
 	struct display_stream_compressor *dsc;
-	struct dcn_dsc_state dsc_state = {0};
+	struct dcn_dsc_state dsc_state = {};
 	const uint32_t rd_buf_size = 100;
 	struct pipe_ctx *pipe_ctx;
 	ssize_t result = 0;
@@ -1848,7 +1848,7 @@ static ssize_t dp_dsc_bits_per_pixel_read(struct file *f, char __user *buf,
 	char *rd_buf_ptr = NULL;
 	struct amdgpu_dm_connector *aconnector = file_inode(f)->i_private;
 	struct display_stream_compressor *dsc;
-	struct dcn_dsc_state dsc_state = {0};
+	struct dcn_dsc_state dsc_state = {};
 	const uint32_t rd_buf_size = 100;
 	struct pipe_ctx *pipe_ctx;
 	ssize_t result = 0;
@@ -2024,7 +2024,7 @@ static ssize_t dp_dsc_pic_width_read(struct file *f, char __user *buf,
 	char *rd_buf_ptr = NULL;
 	struct amdgpu_dm_connector *aconnector = file_inode(f)->i_private;
 	struct display_stream_compressor *dsc;
-	struct dcn_dsc_state dsc_state = {0};
+	struct dcn_dsc_state dsc_state = {};
 	const uint32_t rd_buf_size = 100;
 	struct pipe_ctx *pipe_ctx;
 	ssize_t result = 0;
@@ -2081,7 +2081,7 @@ static ssize_t dp_dsc_pic_height_read(struct file *f, char __user *buf,
 	char *rd_buf_ptr = NULL;
 	struct amdgpu_dm_connector *aconnector = file_inode(f)->i_private;
 	struct display_stream_compressor *dsc;
-	struct dcn_dsc_state dsc_state = {0};
+	struct dcn_dsc_state dsc_state = {};
 	const uint32_t rd_buf_size = 100;
 	struct pipe_ctx *pipe_ctx;
 	ssize_t result = 0;
@@ -2153,7 +2153,7 @@ static ssize_t dp_dsc_chunk_size_read(struct file *f, char __user *buf,
 	char *rd_buf_ptr = NULL;
 	struct amdgpu_dm_connector *aconnector = file_inode(f)->i_private;
 	struct display_stream_compressor *dsc;
-	struct dcn_dsc_state dsc_state = {0};
+	struct dcn_dsc_state dsc_state = {};
 	const uint32_t rd_buf_size = 100;
 	struct pipe_ctx *pipe_ctx;
 	ssize_t result = 0;
@@ -2225,7 +2225,7 @@ static ssize_t dp_dsc_slice_bpg_offset_read(struct file *f, char __user *buf,
 	char *rd_buf_ptr = NULL;
 	struct amdgpu_dm_connector *aconnector = file_inode(f)->i_private;
 	struct display_stream_compressor *dsc;
-	struct dcn_dsc_state dsc_state = {0};
+	struct dcn_dsc_state dsc_state = {};
 	const uint32_t rd_buf_size = 100;
 	struct pipe_ctx *pipe_ctx;
 	ssize_t result = 0;
@@ -2982,7 +2982,7 @@ static ssize_t dtn_log_read(
 {
 	struct amdgpu_device *adev = file_inode(f)->i_private;
 	struct dc *dc = adev->dm.dc;
-	struct dc_log_buffer_ctx log_ctx = { 0 };
+	struct dc_log_buffer_ctx log_ctx = { };
 	ssize_t result = 0;
 
 	if (!buf || !size)

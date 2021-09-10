@@ -734,7 +734,7 @@ ice_ptp_gpio_enable_e810(struct ptp_clock_info *info,
 			 struct ptp_clock_request *rq, int on)
 {
 	struct ice_pf *pf = ptp_info_to_pf(info);
-	struct ice_perout_channel clk_cfg = {0};
+	struct ice_perout_channel clk_cfg = {};
 	unsigned int chan;
 	u32 gpio_pin;
 	int err;

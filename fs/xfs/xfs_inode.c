@@ -2621,7 +2621,7 @@ xfs_ifree(
 {
 	struct xfs_mount	*mp = ip->i_mount;
 	struct xfs_perag	*pag;
-	struct xfs_icluster	xic = { 0 };
+	struct xfs_icluster	xic = { };
 	struct xfs_inode_log_item *iip = ip->i_itemp;
 	int			error;
 

@@ -330,7 +330,7 @@ static int tipc_udp_rcast_add(struct tipc_bearer *b,
 
 static int tipc_udp_rcast_disc(struct tipc_bearer *b, struct sk_buff *skb)
 {
-	struct udp_media_addr src = {0};
+	struct udp_media_addr src = {};
 	struct udp_media_addr *dst;
 
 	dst = (struct udp_media_addr *)&b->bcast_addr.value;
@@ -623,7 +623,7 @@ static int tipc_parse_udp_addr(struct nlattr *nla, struct udp_media_addr *addr,
 int tipc_udp_nl_bearer_add(struct tipc_bearer *b, struct nlattr *attr)
 {
 	int err;
-	struct udp_media_addr addr = {0};
+	struct udp_media_addr addr = {};
 	struct nlattr *opts[TIPC_NLA_UDP_MAX + 1];
 	struct udp_media_addr *dst;
 
@@ -663,9 +663,9 @@ static int tipc_udp_enable(struct net *net, struct tipc_bearer *b,
 {
 	int err = -EINVAL;
 	struct udp_bearer *ub;
-	struct udp_media_addr remote = {0};
-	struct udp_media_addr local = {0};
-	struct udp_port_cfg udp_conf = {0};
+	struct udp_media_addr remote = {};
+	struct udp_media_addr local = {};
+	struct udp_port_cfg udp_conf = {};
 	struct udp_tunnel_sock_cfg tuncfg = {NULL};
 	struct nlattr *opts[TIPC_NLA_UDP_MAX + 1];
 	u8 node_id[NODE_ID_LEN] = {0,};

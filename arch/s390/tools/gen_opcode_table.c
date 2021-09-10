@@ -317,7 +317,7 @@ static void print_opcode_table_offsets(struct gen_opcode *desc)
 
 int main(int argc, char **argv)
 {
-	struct gen_opcode _desc = { 0 };
+	struct gen_opcode _desc = { };
 	struct gen_opcode *desc = &_desc;
 
 	read_instructions(desc);

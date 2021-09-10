@@ -128,7 +128,7 @@ static void swap_ranges(struct damon_addr_range *r1,
 static int __damon_va_three_regions(struct vm_area_struct *vma,
 				       struct damon_addr_range regions[3])
 {
-	struct damon_addr_range gap = {0}, first_gap = {0}, second_gap = {0};
+	struct damon_addr_range gap = {}, first_gap = {}, second_gap = {};
 	struct vm_area_struct *last_vma = NULL;
 	unsigned long start = 0;
 	struct rb_root rbroot;

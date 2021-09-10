@@ -289,7 +289,7 @@ static int rave_sp_eeprom_probe(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 	struct rave_sp *sp = dev_get_drvdata(dev->parent);
 	struct device_node *np = dev->of_node;
-	struct nvmem_config config = { 0 };
+	struct nvmem_config config = { };
 	struct rave_sp_eeprom *eeprom;
 	struct nvmem_device *nvmem;
 	u32 reg[2], size;

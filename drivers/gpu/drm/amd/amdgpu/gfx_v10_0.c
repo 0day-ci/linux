@@ -8857,7 +8857,7 @@ static int gfx_v10_0_ring_preempt_ib(struct amdgpu_ring *ring)
 static void gfx_v10_0_ring_emit_ce_meta(struct amdgpu_ring *ring, bool resume)
 {
 	struct amdgpu_device *adev = ring->adev;
-	struct v10_ce_ib_state ce_payload = {0};
+	struct v10_ce_ib_state ce_payload = {};
 	uint64_t csa_addr;
 	int cnt;
 
@@ -8887,7 +8887,7 @@ static void gfx_v10_0_ring_emit_ce_meta(struct amdgpu_ring *ring, bool resume)
 static void gfx_v10_0_ring_emit_de_meta(struct amdgpu_ring *ring, bool resume)
 {
 	struct amdgpu_device *adev = ring->adev;
-	struct v10_de_ib_state de_payload = {0};
+	struct v10_de_ib_state de_payload = {};
 	uint64_t csa_addr, gds_addr;
 	int cnt;
 

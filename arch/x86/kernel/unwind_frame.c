@@ -33,7 +33,7 @@ static void unwind_dump(struct unwind_state *state)
 	static bool dumped_before = false;
 	bool prev_zero, zero = false;
 	unsigned long word, *sp;
-	struct stack_info stack_info = {0};
+	struct stack_info stack_info = {};
 	unsigned long visit_mask = 0;
 
 	if (dumped_before)

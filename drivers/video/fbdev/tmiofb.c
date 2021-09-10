@@ -506,7 +506,7 @@ static int tmiofb_ioctl(struct fb_info *fbi,
 {
 	switch (cmd) {
 	case FBIOGET_VBLANK: {
-		struct fb_vblank vblank = {0};
+		struct fb_vblank vblank = {};
 		void __user *argp = (void __user *) arg;
 
 		tmiofb_vblank(fbi, &vblank);

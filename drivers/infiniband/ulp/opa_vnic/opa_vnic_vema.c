@@ -970,7 +970,7 @@ static int vema_register(struct opa_vnic_ctrl_port *cport)
  */
 static void opa_vnic_ctrl_config_dev(struct opa_vnic_ctrl_port *cport, bool en)
 {
-	struct ib_port_modify pm = { 0 };
+	struct ib_port_modify pm = { };
 	int i;
 
 	if (en)

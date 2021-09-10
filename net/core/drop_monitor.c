@@ -376,7 +376,7 @@ static int
 net_dm_hw_summary_report_fill(struct sk_buff *msg,
 			      const struct net_dm_hw_entries *hw_entries)
 {
-	struct net_dm_alert_msg anc_hdr = { 0 };
+	struct net_dm_alert_msg anc_hdr = { };
 	void *hdr;
 	int rc;
 

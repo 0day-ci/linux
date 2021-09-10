@@ -457,8 +457,8 @@ static u8 mlx4_en_dcbnl_getdcbx(struct net_device *dev)
 static u8 mlx4_en_dcbnl_setdcbx(struct net_device *dev, u8 mode)
 {
 	struct mlx4_en_priv *priv = netdev_priv(dev);
-	struct ieee_ets ets = {0};
-	struct ieee_pfc pfc = {0};
+	struct ieee_ets ets = {};
+	struct ieee_pfc pfc = {};
 
 	if (mode == priv->dcbx_cap)
 		return 0;

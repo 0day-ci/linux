@@ -928,7 +928,7 @@ mlx5_eswitch_add_send_to_vport_rule(struct mlx5_eswitch *on_esw,
 				    struct mlx5_eswitch_rep *rep,
 				    u32 sqn)
 {
-	struct mlx5_flow_act flow_act = {0};
+	struct mlx5_flow_act flow_act = {};
 	struct mlx5_flow_destination dest = {};
 	struct mlx5_flow_handle *flow_rule;
 	struct mlx5_flow_spec *spec;
@@ -999,7 +999,7 @@ static int
 mlx5_eswitch_add_send_to_vport_meta_rules(struct mlx5_eswitch *esw)
 {
 	struct mlx5_flow_destination dest = {};
-	struct mlx5_flow_act flow_act = {0};
+	struct mlx5_flow_act flow_act = {};
 	int num_vfs, rule_idx = 0, err = 0;
 	struct mlx5_flow_handle *flow_rule;
 	struct mlx5_flow_handle **flows;
@@ -1171,7 +1171,7 @@ static int esw_add_fdb_peer_miss_rules(struct mlx5_eswitch *esw,
 				       struct mlx5_core_dev *peer_dev)
 {
 	struct mlx5_flow_destination dest = {};
-	struct mlx5_flow_act flow_act = {0};
+	struct mlx5_flow_act flow_act = {};
 	struct mlx5_flow_handle **flows;
 	/* total vports is the same for both e-switches */
 	int nvports = esw->total_vports;
@@ -1291,7 +1291,7 @@ static void esw_del_fdb_peer_miss_rules(struct mlx5_eswitch *esw)
 
 static int esw_add_fdb_miss_rule(struct mlx5_eswitch *esw)
 {
-	struct mlx5_flow_act flow_act = {0};
+	struct mlx5_flow_act flow_act = {};
 	struct mlx5_flow_destination dest = {};
 	struct mlx5_flow_handle *flow_rule = NULL;
 	struct mlx5_flow_spec *spec;
@@ -1922,7 +1922,7 @@ struct mlx5_flow_handle *
 mlx5_eswitch_create_vport_rx_rule(struct mlx5_eswitch *esw, u16 vport,
 				  struct mlx5_flow_destination *dest)
 {
-	struct mlx5_flow_act flow_act = {0};
+	struct mlx5_flow_act flow_act = {};
 	struct mlx5_flow_handle *flow_rule;
 	struct mlx5_flow_spec *spec;
 	void *misc;

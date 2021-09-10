@@ -408,7 +408,7 @@ static void run_test(struct sockaddr *addr, socklen_t alen, bool ipv6)
 
 static void run_test_v4(void)
 {
-	struct sockaddr_in addr = {0};
+	struct sockaddr_in addr = {};
 
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons(cfg_port);
@@ -419,7 +419,7 @@ static void run_test_v4(void)
 
 static void run_test_v6(void)
 {
-	struct sockaddr_in6 addr = {0};
+	struct sockaddr_in6 addr = {};
 
 	addr.sin6_family = AF_INET6;
 	addr.sin6_port = htons(cfg_port);

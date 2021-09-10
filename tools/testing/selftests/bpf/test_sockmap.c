@@ -552,7 +552,7 @@ static int msg_loop(int fd, int iov_count, int iov_length, int cnt,
 		    struct msg_stats *s, bool tx,
 		    struct sockmap_options *opt)
 {
-	struct msghdr msg = {0}, msg_peek = {0};
+	struct msghdr msg = {}, msg_peek = {};
 	int err, i, flags = MSG_NOSIGNAL;
 	bool drop = opt->drop_expected;
 	bool data = opt->data_test;
@@ -714,7 +714,7 @@ static int sendmsg_test(struct sockmap_options *opt)
 {
 	float sent_Bps = 0, recvd_Bps = 0;
 	int rx_fd, txpid, rxpid, err = 0;
-	struct msg_stats s = {0};
+	struct msg_stats s = {};
 	int iov_count = opt->iov_count;
 	int iov_buf = opt->iov_length;
 	int rx_status, tx_status;
@@ -1888,7 +1888,7 @@ static int test_selftest(int cg_fd, struct sockmap_options *opt)
 int main(int argc, char **argv)
 {
 	int iov_count = 1, length = 1024, rate = 1;
-	struct sockmap_options options = {0};
+	struct sockmap_options options = {};
 	int opt, longindex, err, cg_fd = 0;
 	char *bpf_file = BPF_SOCKMAP_FILENAME;
 	int test = SELFTESTS;

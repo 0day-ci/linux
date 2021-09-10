@@ -1049,7 +1049,7 @@ marvel_machine_check(unsigned long vector, unsigned long la_ptr)
 	struct el_subpacket *el_ptr = (struct el_subpacket *)la_ptr;
 	int (*process_frame)(struct ev7_lf_subpackets *, int) = NULL;
 	struct ev7_lf_subpackets subpacket_collection = { NULL, };
-	struct ev7_pal_io_subpacket scratch_io_packet = { 0, };
+	struct ev7_pal_io_subpacket scratch_io_packet = { };
 	struct ev7_lf_subpackets *lf_subpackets = NULL;
 	int disposition = MCHK_DISPOSITION_UNKNOWN_ERROR;
 	char *saved_err_prefix = err_print_prefix;

@@ -346,7 +346,7 @@ static int collect_cpu_info_early(struct ucode_cpu_info *uci)
 {
 	unsigned int val[2];
 	unsigned int family, model;
-	struct cpu_signature csig = { 0 };
+	struct cpu_signature csig = { };
 	unsigned int eax, ebx, ecx, edx;
 
 	memset(uci, 0, sizeof(*uci));

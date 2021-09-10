@@ -4109,7 +4109,7 @@ static int ixgbevf_xmit_frame_ring(struct sk_buff *skb,
 	int tso;
 	u32 tx_flags = 0;
 	u16 count = TXD_USE_COUNT(skb_headlen(skb));
-	struct ixgbevf_ipsec_tx_data ipsec_tx = { 0 };
+	struct ixgbevf_ipsec_tx_data ipsec_tx = { };
 #if PAGE_SIZE > IXGBE_MAX_DATA_PER_TXD
 	unsigned short f;
 #endif

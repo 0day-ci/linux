@@ -188,7 +188,7 @@ static int smu10_construct_boot_state(struct pp_hwmgr *hwmgr)
 
 static int smu10_set_clock_limit(struct pp_hwmgr *hwmgr, const void *input)
 {
-	struct PP_Clocks clocks = {0};
+	struct PP_Clocks clocks = {};
 	struct pp_display_clock_request clock_req;
 
 	clocks.dcefClock = hwmgr->display_config->min_dcef_set_clk;

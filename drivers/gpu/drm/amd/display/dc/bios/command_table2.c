@@ -135,7 +135,7 @@ static enum bp_result encoder_control_digx_v1_5(
 	struct bp_encoder_control *cntl)
 {
 	enum bp_result result = BP_RESULT_FAILURE;
-	struct dig_encoder_stream_setup_parameters_v1_5 params = {0};
+	struct dig_encoder_stream_setup_parameters_v1_5 params = {};
 
 	params.digid = (uint8_t)(cntl->engine_id);
 	params.action = bp->cmd_helper->encoder_action_to_atom(cntl->action);
@@ -338,7 +338,7 @@ static enum bp_result transmitter_control_v1_7(
 {
 	enum bp_result result = BP_RESULT_FAILURE;
 	const struct command_table_helper *cmd = bp->cmd_helper;
-	struct dmub_dig_transmitter_control_data_v1_7 dig_v1_7 = {0};
+	struct dmub_dig_transmitter_control_data_v1_7 dig_v1_7 = {};
 
 	dig_v1_7.phyid = cmd->phy_id_to_atom(cntl->transmitter);
 	dig_v1_7.action = (uint8_t)cntl->action;
@@ -568,7 +568,7 @@ static enum bp_result set_crtc_using_dtd_timing_v3(
 	struct bp_hw_crtc_timing_parameters *bp_params)
 {
 	enum bp_result result = BP_RESULT_FAILURE;
-	struct set_crtc_using_dtd_timing_parameters params = {0};
+	struct set_crtc_using_dtd_timing_parameters params = {};
 	uint8_t atom_controller_id;
 
 	if (bp->cmd_helper->controller_id_to_atom(
@@ -687,7 +687,7 @@ static enum bp_result enable_crtc_v1(
 	bool enable)
 {
 	bool result = BP_RESULT_FAILURE;
-	struct enable_crtc_parameters params = {0};
+	struct enable_crtc_parameters params = {};
 	uint8_t id;
 
 	if (bp->cmd_helper->controller_id_to_atom(controller_id, &id))
@@ -955,7 +955,7 @@ static void init_get_smu_clock_info(struct bios_parser *bp)
 
 static unsigned int get_smu_clock_info_v3_1(struct bios_parser *bp, uint8_t id)
 {
-	struct atom_get_smu_clock_info_parameters_v3_1 smu_input = {0};
+	struct atom_get_smu_clock_info_parameters_v3_1 smu_input = {};
 	struct atom_get_smu_clock_info_output_parameters_v3_1 smu_output;
 
 	smu_input.command = GET_SMU_CLOCK_INFO_V3_1_GET_PLLVCO_FREQ;

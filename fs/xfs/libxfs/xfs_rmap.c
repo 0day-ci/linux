@@ -2730,7 +2730,7 @@ xfs_rmap_has_other_keys(
 	const struct xfs_owner_info	*oinfo,
 	bool				*has_rmap)
 {
-	struct xfs_rmap_irec		low = {0};
+	struct xfs_rmap_irec		low = {};
 	struct xfs_rmap_irec		high;
 	struct xfs_rmap_key_state	rks;
 	int				error;

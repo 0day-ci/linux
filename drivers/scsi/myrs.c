@@ -817,7 +817,7 @@ static void myrs_log_event(struct myrs_hba *cs, struct myrs_event *ev)
 	unsigned char ev_type, *ev_msg;
 	struct Scsi_Host *shost = cs->host;
 	struct scsi_device *sdev;
-	struct scsi_sense_hdr sshdr = {0};
+	struct scsi_sense_hdr sshdr = {};
 	unsigned char sense_info[4];
 	unsigned char cmd_specific[4];
 

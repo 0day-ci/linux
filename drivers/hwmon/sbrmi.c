@@ -192,7 +192,7 @@ static int sbrmi_read(struct device *dev, enum hwmon_sensor_types type,
 		      u32 attr, int channel, long *val)
 {
 	struct sbrmi_data *data = dev_get_drvdata(dev);
-	struct sbrmi_mailbox_msg msg = { 0 };
+	struct sbrmi_mailbox_msg msg = { };
 	int ret;
 
 	if (type != hwmon_power)
@@ -226,7 +226,7 @@ static int sbrmi_write(struct device *dev, enum hwmon_sensor_types type,
 		       u32 attr, int channel, long val)
 {
 	struct sbrmi_data *data = dev_get_drvdata(dev);
-	struct sbrmi_mailbox_msg msg = { 0 };
+	struct sbrmi_mailbox_msg msg = { };
 
 	if (type != hwmon_power && attr != hwmon_power_cap)
 		return -EINVAL;
@@ -284,7 +284,7 @@ static const struct hwmon_chip_info sbrmi_chip_info = {
 
 static int sbrmi_get_max_pwr_limit(struct sbrmi_data *data)
 {
-	struct sbrmi_mailbox_msg msg = { 0 };
+	struct sbrmi_mailbox_msg msg = { };
 	int ret;
 
 	msg.cmd = SBRMI_READ_PKG_MAX_PWR_LIMIT;

@@ -130,7 +130,7 @@ static void *cxlflash_fops_get_context(struct file *file)
 
 static int cxlflash_start_work(void *ctx_cookie, u64 irqs)
 {
-	struct cxl_ioctl_start_work work = { 0 };
+	struct cxl_ioctl_start_work work = { };
 
 	work.num_interrupts = irqs;
 	work.flags = CXL_START_WORK_NUM_IRQS;

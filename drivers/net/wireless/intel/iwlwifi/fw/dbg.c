@@ -2655,7 +2655,7 @@ IWL_EXPORT_SYMBOL(iwl_fw_start_dbg_conf);
  */
 static void iwl_fw_dbg_collect_sync(struct iwl_fw_runtime *fwrt, u8 wk_idx)
 {
-	struct iwl_fw_dbg_params params = {0};
+	struct iwl_fw_dbg_params params = {};
 	struct iwl_fwrt_dump_data *dump_data =
 		&fwrt->dump.wks[wk_idx].dump_data;
 

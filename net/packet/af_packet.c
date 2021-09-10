@@ -2883,7 +2883,7 @@ static int packet_snd(struct socket *sock, struct msghdr *msg, size_t len)
 	unsigned char *addr = NULL;
 	int err, reserve = 0;
 	struct sockcm_cookie sockc;
-	struct virtio_net_hdr vnet_hdr = { 0 };
+	struct virtio_net_hdr vnet_hdr = { };
 	int offset = 0;
 	struct packet_sock *po = pkt_sk(sk);
 	bool has_vnet_hdr = false;
@@ -3891,7 +3891,7 @@ packet_setsockopt(struct socket *sock, int level, int optname, sockptr_t optval,
 	}
 	case PACKET_FANOUT:
 	{
-		struct fanout_args args = { 0 };
+		struct fanout_args args = { };
 
 		if (optlen != sizeof(int) && optlen != sizeof(args))
 			return -EINVAL;

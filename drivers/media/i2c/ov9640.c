@@ -504,7 +504,7 @@ static int ov9640_s_fmt(struct v4l2_subdev *sd,
 			struct v4l2_mbus_framefmt *mf)
 {
 	struct i2c_client *client = v4l2_get_subdevdata(sd);
-	struct ov9640_reg_alt alts = {0};
+	struct ov9640_reg_alt alts = {};
 	int ret;
 
 	ov9640_alter_regs(mf->code, &alts);

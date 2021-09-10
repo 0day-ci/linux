@@ -1750,7 +1750,7 @@ iwl_dbgfs_ltr_config_write(struct iwl_mvm *mvm,
 			   char *buf, size_t count, loff_t *ppos)
 {
 	int ret;
-	struct iwl_ltr_config_cmd ltr_config = {0};
+	struct iwl_ltr_config_cmd ltr_config = {};
 
 	if (!iwl_mvm_firmware_running(mvm))
 		return -EIO;

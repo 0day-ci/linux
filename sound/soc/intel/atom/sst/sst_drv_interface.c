@@ -242,7 +242,7 @@ static int sst_cdev_ack(struct device *dev, unsigned int str_id,
 		unsigned long bytes)
 {
 	struct stream_info *stream;
-	struct snd_sst_tstamp fw_tstamp = {0,};
+	struct snd_sst_tstamp fw_tstamp = {};
 	int offset;
 	void __iomem *addr;
 	struct intel_sst_drv *ctx = dev_get_drvdata(dev);
@@ -344,7 +344,7 @@ static int sst_cdev_stream_partial_drain(struct device *dev,
 static int sst_cdev_tstamp(struct device *dev, unsigned int str_id,
 		struct snd_compr_tstamp *tstamp)
 {
-	struct snd_sst_tstamp fw_tstamp = {0,};
+	struct snd_sst_tstamp fw_tstamp = {};
 	struct stream_info *stream;
 	struct intel_sst_drv *ctx = dev_get_drvdata(dev);
 	void __iomem *addr;

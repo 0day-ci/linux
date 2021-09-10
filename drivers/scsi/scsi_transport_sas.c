@@ -465,7 +465,7 @@ store_sas_phy_##field(struct device *dev, 				\
 	struct Scsi_Host *shost = dev_to_shost(phy->dev.parent);	\
 	struct sas_internal *i = to_sas_internal(shost->transportt);	\
 	u32 value;							\
-	struct sas_phy_linkrates rates = {0};				\
+	struct sas_phy_linkrates rates = {};				\
 	int error;							\
 									\
 	error = set_sas_linkspeed_names(&value, buf);			\

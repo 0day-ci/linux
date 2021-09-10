@@ -1092,7 +1092,7 @@ static int userfaultfd_events_test(void)
 	int err, features;
 	pid_t pid;
 	char c;
-	struct uffd_stats stats = { 0 };
+	struct uffd_stats stats = { };
 
 	printf("testing events (fork, remap, remove): ");
 	fflush(stdout);
@@ -1147,7 +1147,7 @@ static int userfaultfd_sig_test(void)
 	int err, features;
 	pid_t pid;
 	char c;
-	struct uffd_stats stats = { 0 };
+	struct uffd_stats stats = { };
 
 	printf("testing signal delivery: ");
 	fflush(stdout);
@@ -1208,7 +1208,7 @@ static int userfaultfd_minor_test(void)
 	uint8_t expected_byte;
 	void *expected_page;
 	char c;
-	struct uffd_stats stats = { 0 };
+	struct uffd_stats stats = { };
 	uint64_t req_features, features_out;
 
 	if (!test_uffdio_minor)

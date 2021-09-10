@@ -187,7 +187,7 @@ static int a6xx_hfi_send_msg(struct a6xx_gmu *gmu, int id,
 
 static int a6xx_hfi_send_gmu_init(struct a6xx_gmu *gmu, int boot_state)
 {
-	struct a6xx_hfi_msg_gmu_init_cmd msg = { 0 };
+	struct a6xx_hfi_msg_gmu_init_cmd msg = { };
 
 	msg.dbg_buffer_addr = (u32) gmu->debug.iova;
 	msg.dbg_buffer_size = (u32) gmu->debug.size;
@@ -199,7 +199,7 @@ static int a6xx_hfi_send_gmu_init(struct a6xx_gmu *gmu, int boot_state)
 
 static int a6xx_hfi_get_fw_version(struct a6xx_gmu *gmu, u32 *version)
 {
-	struct a6xx_hfi_msg_fw_version msg = { 0 };
+	struct a6xx_hfi_msg_fw_version msg = { };
 
 	/* Currently supporting version 1.1 */
 	msg.supported_version = (1 << 28) | (1 << 16);
@@ -210,7 +210,7 @@ static int a6xx_hfi_get_fw_version(struct a6xx_gmu *gmu, u32 *version)
 
 static int a6xx_hfi_send_perf_table_v1(struct a6xx_gmu *gmu)
 {
-	struct a6xx_hfi_msg_perf_table_v1 msg = { 0 };
+	struct a6xx_hfi_msg_perf_table_v1 msg = { };
 	int i;
 
 	msg.num_gpu_levels = gmu->nr_gpu_freqs;
@@ -232,7 +232,7 @@ static int a6xx_hfi_send_perf_table_v1(struct a6xx_gmu *gmu)
 
 static int a6xx_hfi_send_perf_table(struct a6xx_gmu *gmu)
 {
-	struct a6xx_hfi_msg_perf_table msg = { 0 };
+	struct a6xx_hfi_msg_perf_table msg = { };
 	int i;
 
 	msg.num_gpu_levels = gmu->nr_gpu_freqs;
@@ -452,7 +452,7 @@ static void a6xx_build_bw_table(struct a6xx_hfi_msg_bw_table *msg)
 
 static int a6xx_hfi_send_bw_table(struct a6xx_gmu *gmu)
 {
-	struct a6xx_hfi_msg_bw_table msg = { 0 };
+	struct a6xx_hfi_msg_bw_table msg = { };
 	struct a6xx_gpu *a6xx_gpu = container_of(gmu, struct a6xx_gpu, gmu);
 	struct adreno_gpu *adreno_gpu = &a6xx_gpu->base;
 
@@ -475,7 +475,7 @@ static int a6xx_hfi_send_bw_table(struct a6xx_gmu *gmu)
 
 static int a6xx_hfi_send_test(struct a6xx_gmu *gmu)
 {
-	struct a6xx_hfi_msg_test msg = { 0 };
+	struct a6xx_hfi_msg_test msg = { };
 
 	return a6xx_hfi_send_msg(gmu, HFI_H2F_MSG_TEST, &msg, sizeof(msg),
 		NULL, 0);
@@ -483,7 +483,7 @@ static int a6xx_hfi_send_test(struct a6xx_gmu *gmu)
 
 static int a6xx_hfi_send_start(struct a6xx_gmu *gmu)
 {
-	struct a6xx_hfi_msg_start msg = { 0 };
+	struct a6xx_hfi_msg_start msg = { };
 
 	return a6xx_hfi_send_msg(gmu, HFI_H2F_MSG_START, &msg, sizeof(msg),
 		NULL, 0);
@@ -491,7 +491,7 @@ static int a6xx_hfi_send_start(struct a6xx_gmu *gmu)
 
 static int a6xx_hfi_send_core_fw_start(struct a6xx_gmu *gmu)
 {
-	struct a6xx_hfi_msg_core_fw_start msg = { 0 };
+	struct a6xx_hfi_msg_core_fw_start msg = { };
 
 	return a6xx_hfi_send_msg(gmu, HFI_H2F_MSG_CORE_FW_START, &msg,
 		sizeof(msg), NULL, 0);
@@ -499,7 +499,7 @@ static int a6xx_hfi_send_core_fw_start(struct a6xx_gmu *gmu)
 
 int a6xx_hfi_set_freq(struct a6xx_gmu *gmu, int index)
 {
-	struct a6xx_hfi_gx_bw_perf_vote_cmd msg = { 0 };
+	struct a6xx_hfi_gx_bw_perf_vote_cmd msg = { };
 
 	msg.ack_type = 1; /* blocking */
 	msg.freq = index;
@@ -511,7 +511,7 @@ int a6xx_hfi_set_freq(struct a6xx_gmu *gmu, int index)
 
 int a6xx_hfi_send_prep_slumber(struct a6xx_gmu *gmu)
 {
-	struct a6xx_hfi_prep_slumber_cmd msg = { 0 };
+	struct a6xx_hfi_prep_slumber_cmd msg = { };
 
 	/* TODO: should freq and bw fields be non-zero ? */
 

@@ -1105,7 +1105,7 @@ static int pp_get_display_power_level(void *handle,
 static int pp_get_current_clocks(void *handle,
 		struct amd_pp_clock_info *clocks)
 {
-	struct amd_pp_simple_clock_info simple_clocks = { 0 };
+	struct amd_pp_simple_clock_info simple_clocks = { };
 	struct pp_clock_info hw_clocks;
 	struct pp_hwmgr *hwmgr = handle;
 	int ret = 0;

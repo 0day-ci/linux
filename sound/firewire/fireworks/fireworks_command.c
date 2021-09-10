@@ -293,7 +293,7 @@ static int
 command_set_clock(struct snd_efw *efw,
 		  unsigned int source, unsigned int rate)
 {
-	struct efc_clock clock = {0};
+	struct efc_clock clock = {};
 	int err;
 
 	/* check arguments */
@@ -343,7 +343,7 @@ int snd_efw_command_get_clock_source(struct snd_efw *efw,
 				     enum snd_efw_clock_source *source)
 {
 	int err;
-	struct efc_clock clock = {0};
+	struct efc_clock clock = {};
 
 	err = command_get_clock(efw, &clock);
 	if (err >= 0)
@@ -355,7 +355,7 @@ int snd_efw_command_get_clock_source(struct snd_efw *efw,
 int snd_efw_command_get_sampling_rate(struct snd_efw *efw, unsigned int *rate)
 {
 	int err;
-	struct efc_clock clock = {0};
+	struct efc_clock clock = {};
 
 	err = command_get_clock(efw, &clock);
 	if (err >= 0)

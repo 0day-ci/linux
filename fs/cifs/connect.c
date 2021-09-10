@@ -3046,7 +3046,7 @@ expand_dfs_referral(const unsigned int xid, struct cifs_ses *ses,
 		    char *ref_path)
 {
 	int rc;
-	struct dfs_info3_param referral = {0};
+	struct dfs_info3_param referral = {};
 	char *full_path = NULL, *mdata = NULL;
 
 	if (cifs_sb->mnt_cifs_flags & CIFS_MOUNT_NO_DFS)
@@ -3155,7 +3155,7 @@ static int do_dfs_failover(const char *path, const char *full_path, struct cifs_
 		goto out;
 
 	for (;;) {
-		struct dfs_info3_param ref = {0};
+		struct dfs_info3_param ref = {};
 		char *fake_devname = NULL, *mdata = NULL;
 
 		/* Get next DFS target server - if any */
@@ -3425,7 +3425,7 @@ static int is_referral_server(const char *ref_path, struct cifs_sb_info *cifs_sb
 			      struct cifs_tcon *tcon, bool *ref_server)
 {
 	int rc;
-	struct dfs_info3_param ref = {0};
+	struct dfs_info3_param ref = {};
 
 	cifs_dbg(FYI, "%s: ref_path=%s\n", __func__, ref_path);
 
@@ -3463,7 +3463,7 @@ int cifs_mount(struct cifs_sb_info *cifs_sb, struct smb3_fs_context *ctx)
 	struct cifs_ses *ses = NULL, *root_ses = NULL;
 	struct cifs_tcon *tcon = NULL;
 	int count = 0;
-	uuid_t mount_id = {0};
+	uuid_t mount_id = {};
 	char *ref_path = NULL, *full_path = NULL;
 	char *oldmnt = NULL;
 	bool ref_server = false;
@@ -4146,7 +4146,7 @@ int cifs_tree_connect(const unsigned int xid, struct cifs_tcon *tcon, const stru
 	const char *dfs_host;
 	size_t dfs_host_len;
 	char *share = NULL, *prefix = NULL;
-	struct dfs_info3_param ref = {0};
+	struct dfs_info3_param ref = {};
 	bool isroot;
 
 	tree = kzalloc(MAX_TREE_SIZE, GFP_KERNEL);

@@ -144,7 +144,7 @@ static void guest_main(void)
 
 static void clear_kvm_cpuid_features(struct kvm_cpuid2 *cpuid)
 {
-	struct kvm_cpuid_entry2 ent = {0};
+	struct kvm_cpuid_entry2 ent = {};
 
 	ent.function = KVM_CPUID_FEATURES;
 	TEST_ASSERT(set_cpuid(cpuid, &ent),
@@ -206,7 +206,7 @@ static void enter_guest(struct kvm_vm *vm)
 
 int main(void)
 {
-	struct kvm_enable_cap cap = {0};
+	struct kvm_enable_cap cap = {};
 	struct kvm_cpuid2 *best;
 	struct kvm_vm *vm;
 

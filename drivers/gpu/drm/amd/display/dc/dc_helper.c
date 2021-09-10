@@ -245,7 +245,7 @@ uint32_t generic_reg_update_ex(const struct dc_context *ctx,
 		uint8_t shift1, uint32_t mask1, uint32_t field_value1,
 		...)
 {
-	struct dc_reg_value_masks field_value_mask = {0};
+	struct dc_reg_value_masks field_value_mask = {};
 	uint32_t reg_val;
 	va_list ap;
 
@@ -273,7 +273,7 @@ uint32_t generic_reg_set_ex(const struct dc_context *ctx,
 		uint8_t shift1, uint32_t mask1, uint32_t field_value1,
 		...)
 {
-	struct dc_reg_value_masks field_value_mask = {0};
+	struct dc_reg_value_masks field_value_mask = {};
 	va_list ap;
 
 	va_start(ap, field_value1);

@@ -1549,7 +1549,7 @@ static void at76_rx_tasklet(struct tasklet_struct *t)
 	struct at76_priv *priv = from_tasklet(priv, t, rx_tasklet);
 	struct urb *urb = priv->rx_urb;
 	struct at76_rx_buffer *buf;
-	struct ieee80211_rx_status rx_status = { 0 };
+	struct ieee80211_rx_status rx_status = { };
 
 	if (priv->device_unplugged) {
 		at76_dbg(DBG_DEVSTART, "device unplugged");

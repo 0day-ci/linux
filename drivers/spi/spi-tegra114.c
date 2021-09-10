@@ -539,7 +539,7 @@ static int tegra_spi_start_dma_based_transfer(
 	unsigned int len;
 	int ret = 0;
 	u8 dma_burst;
-	struct dma_slave_config dma_sconfig = {0};
+	struct dma_slave_config dma_sconfig = {};
 
 	val = SPI_DMA_BLK_SET(tspi->curr_dma_words - 1);
 	tegra_spi_writel(tspi, val, SPI_DMA_BLK);

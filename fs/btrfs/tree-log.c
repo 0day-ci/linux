@@ -617,7 +617,7 @@ static noinline int replay_one_extent(struct btrfs_trans_handle *trans,
 				      struct extent_buffer *eb, int slot,
 				      struct btrfs_key *key)
 {
-	struct btrfs_drop_extents_args drop_args = { 0 };
+	struct btrfs_drop_extents_args drop_args = { };
 	struct btrfs_fs_info *fs_info = root->fs_info;
 	int found_type;
 	u64 extent_end;
@@ -742,7 +742,7 @@ static noinline int replay_one_extent(struct btrfs_trans_handle *trans,
 			goto out;
 
 		if (ins.objectid > 0) {
-			struct btrfs_ref ref = { 0 };
+			struct btrfs_ref ref = { };
 			u64 csum_start;
 			u64 csum_end;
 			LIST_HEAD(ordered_sums);
@@ -2626,7 +2626,7 @@ static int replay_one_buffer(struct btrfs_root *log, struct extent_buffer *eb,
 			 * those prealloc extents just after replaying them.
 			 */
 			if (S_ISREG(mode)) {
-				struct btrfs_drop_extents_args drop_args = { 0 };
+				struct btrfs_drop_extents_args drop_args = { };
 				struct inode *inode;
 				u64 from;
 
@@ -4326,7 +4326,7 @@ static int log_one_extent(struct btrfs_trans_handle *trans,
 			  struct btrfs_path *path,
 			  struct btrfs_log_ctx *ctx)
 {
-	struct btrfs_drop_extents_args drop_args = { 0 };
+	struct btrfs_drop_extents_args drop_args = { };
 	struct btrfs_root *log = root->log_root;
 	struct btrfs_file_extent_item *fi;
 	struct extent_buffer *leaf;

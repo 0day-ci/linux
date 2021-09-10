@@ -184,7 +184,7 @@ static int iceland_upload_smc_firmware_data(struct pp_hwmgr *hwmgr,
 static int iceland_smu_upload_firmware_image(struct pp_hwmgr *hwmgr)
 {
 	uint32_t val;
-	struct cgs_firmware_info info = {0};
+	struct cgs_firmware_info info = {};
 
 	if (hwmgr == NULL || hwmgr->device == NULL)
 		return -EINVAL;

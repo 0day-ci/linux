@@ -53,7 +53,7 @@ int
 machine_kexec_prepare(struct kimage *image)
 {
 	struct kimage_arch *internal = &image->arch;
-	struct fdt_header fdt = {0};
+	struct fdt_header fdt = {};
 	void *control_code_buffer = NULL;
 	unsigned int control_code_buffer_sz = 0;
 	int i = 0;

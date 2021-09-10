@@ -823,7 +823,7 @@ static void free_pfhwdev(struct hinic_pfhwdev *pfhwdev)
 
 static int hinic_l2nic_reset(struct hinic_hwdev *hwdev)
 {
-	struct hinic_cmd_l2nic_reset l2nic_reset = {0};
+	struct hinic_cmd_l2nic_reset l2nic_reset = {};
 	u16 out_size = sizeof(l2nic_reset);
 	struct hinic_pfhwdev *pfhwdev;
 	int err;

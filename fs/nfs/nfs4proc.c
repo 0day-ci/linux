@@ -6060,7 +6060,7 @@ static int _nfs4_do_set_security_label(struct inode *inode,
 		struct nfs4_label *olabel)
 {
 
-	struct iattr sattr = {0};
+	struct iattr sattr = {};
 	struct nfs_server *server = NFS_SERVER(inode);
 	const u32 bitmask[3] = { 0, 0, FATTR4_WORD2_SECURITY_LABEL };
 	struct nfs_setattrargs arg = {

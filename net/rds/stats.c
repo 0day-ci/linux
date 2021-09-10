@@ -112,7 +112,7 @@ static void rds_stats_info(struct socket *sock, unsigned int len,
 			   struct rds_info_iterator *iter,
 			   struct rds_info_lengths *lens)
 {
-	struct rds_statistics stats = {0, };
+	struct rds_statistics stats = {};
 	uint64_t *src;
 	uint64_t *sum;
 	size_t i;

@@ -313,7 +313,7 @@ static bool arm_spe__is_memory_event(enum arm_spe_sample_type type)
 
 static u64 arm_spe__synth_data_source(const struct arm_spe_record *record)
 {
-	union perf_mem_data_src	data_src = { 0 };
+	union perf_mem_data_src	data_src = { };
 
 	if (record->op == ARM_SPE_LD)
 		data_src.mem_op = PERF_MEM_OP_LOAD;

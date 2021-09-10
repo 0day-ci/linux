@@ -382,7 +382,7 @@ static int vidi_bind(struct device *dev, struct device *master, void *data)
 	struct drm_device *drm_dev = data;
 	struct drm_encoder *encoder = &ctx->encoder;
 	struct exynos_drm_plane *exynos_plane;
-	struct exynos_drm_plane_config plane_config = { 0 };
+	struct exynos_drm_plane_config plane_config = { };
 	unsigned int i;
 	int ret;
 

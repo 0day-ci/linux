@@ -136,7 +136,7 @@ int scm_legacy_call(struct device *dev, const struct qcom_scm_desc *desc,
 	unsigned int i;
 	struct scm_legacy_command *cmd;
 	struct scm_legacy_response *rsp;
-	struct arm_smccc_args smc = {0};
+	struct arm_smccc_args smc = {};
 	struct arm_smccc_res smc_res;
 	const size_t cmd_len = arglen * sizeof(__le32);
 	const size_t resp_len = MAX_QCOM_SCM_RETS * sizeof(__le32);

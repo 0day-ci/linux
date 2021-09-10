@@ -396,7 +396,7 @@ static int es58x_fd_enable_channel(struct es58x_priv *priv)
 {
 	struct es58x_device *es58x_dev = priv->es58x_dev;
 	struct net_device *netdev = es58x_dev->netdev[priv->channel_idx];
-	struct es58x_fd_tx_conf_msg tx_conf_msg = { 0 };
+	struct es58x_fd_tx_conf_msg tx_conf_msg = { };
 	u32 ctrlmode;
 	size_t conf_len = 0;
 

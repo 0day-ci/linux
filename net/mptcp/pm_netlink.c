@@ -431,7 +431,7 @@ static unsigned int fill_remote_addresses_vec(struct mptcp_sock *msk, bool fullm
 {
 	struct sock *sk = (struct sock *)msk, *ssk;
 	struct mptcp_subflow_context *subflow;
-	struct mptcp_addr_info remote = { 0 };
+	struct mptcp_addr_info remote = { };
 	unsigned int subflows_max;
 	int i = 0;
 

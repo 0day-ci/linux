@@ -101,7 +101,7 @@ static int cppc_perf_from_fbctrs(struct cppc_cpudata *cpu_data,
 static void cppc_scale_freq_workfn(struct kthread_work *work)
 {
 	struct cppc_freq_invariance *cppc_fi;
-	struct cppc_perf_fb_ctrs fb_ctrs = {0};
+	struct cppc_perf_fb_ctrs fb_ctrs = {};
 	struct cppc_cpudata *cpu_data;
 	unsigned long local_freq_scale;
 	u64 perf;
@@ -614,7 +614,7 @@ static int cppc_perf_from_fbctrs(struct cppc_cpudata *cpu_data,
 
 static unsigned int cppc_cpufreq_get_rate(unsigned int cpu)
 {
-	struct cppc_perf_fb_ctrs fb_ctrs_t0 = {0}, fb_ctrs_t1 = {0};
+	struct cppc_perf_fb_ctrs fb_ctrs_t0 = {}, fb_ctrs_t1 = {};
 	struct cpufreq_policy *policy = cpufreq_cpu_get(cpu);
 	struct cppc_cpudata *cpu_data = policy->driver_data;
 	u64 delivered_perf;

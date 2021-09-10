@@ -263,7 +263,7 @@ bool dcn30_mmhubbub_warmup(
 {
 	struct dwbc *dwb;
 	struct mcif_wb *mcif_wb;
-	struct mcif_warmup_params warmup_params = {0};
+	struct mcif_warmup_params warmup_params = {};
 	unsigned int  i, i_buf;
 	/*make sure there is no active DWB eanbled */
 	for (i = 0; i < num_dwb; i++) {

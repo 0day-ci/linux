@@ -29,7 +29,7 @@ int dpmac_open(struct fsl_mc_io *mc_io,
 	       u16 *token)
 {
 	struct dpmac_cmd_open *cmd_params;
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	int err;
 
 	/* prepare command */
@@ -65,7 +65,7 @@ int dpmac_close(struct fsl_mc_io *mc_io,
 		u32 cmd_flags,
 		u16 token)
 {
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 
 	/* prepare command */
 	cmd.header = mc_encode_cmd_header(DPMAC_CMDID_CLOSE, cmd_flags,
@@ -91,7 +91,7 @@ int dpmac_get_attributes(struct fsl_mc_io *mc_io,
 			 struct dpmac_attr *attr)
 {
 	struct dpmac_rsp_get_attributes *rsp_params;
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	int err;
 
 	/* prepare command */
@@ -129,7 +129,7 @@ int dpmac_set_link_state(struct fsl_mc_io *mc_io,
 			 struct dpmac_link_state *link_state)
 {
 	struct dpmac_cmd_set_link_state *cmd_params;
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 
 	/* prepare command */
 	cmd.header = mc_encode_cmd_header(DPMAC_CMDID_SET_LINK_STATE,
@@ -163,7 +163,7 @@ int dpmac_get_counter(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
 {
 	struct dpmac_cmd_get_counter *dpmac_cmd;
 	struct dpmac_rsp_get_counter *dpmac_rsp;
-	struct fsl_mc_command cmd = { 0 };
+	struct fsl_mc_command cmd = { };
 	int err = 0;
 
 	cmd.header = mc_encode_cmd_header(DPMAC_CMDID_GET_COUNTER,

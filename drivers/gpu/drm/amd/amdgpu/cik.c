@@ -1338,7 +1338,7 @@ static void kv_restore_regs_for_reset(struct amdgpu_device *adev,
  */
 static int cik_asic_pci_config_reset(struct amdgpu_device *adev)
 {
-	struct kv_reset_save_regs kv_save = { 0 };
+	struct kv_reset_save_regs kv_save = { };
 	u32 i;
 	int r = -EINVAL;
 

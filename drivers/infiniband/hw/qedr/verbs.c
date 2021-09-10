@@ -2463,7 +2463,7 @@ int qedr_modify_qp(struct ib_qp *ibqp, struct ib_qp_attr *attr,
 		   int attr_mask, struct ib_udata *udata)
 {
 	struct qedr_qp *qp = get_qedr_qp(ibqp);
-	struct qed_rdma_modify_qp_in_params qp_params = { 0 };
+	struct qed_rdma_modify_qp_in_params qp_params = { };
 	struct qedr_dev *dev = get_qedr_dev(&qp->dev->ibdev);
 	const struct ib_global_route *grh = rdma_ah_read_grh(&attr->ah_attr);
 	enum ib_qp_state old_qp_state, new_qp_state;

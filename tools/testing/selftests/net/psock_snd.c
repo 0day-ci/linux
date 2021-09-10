@@ -169,7 +169,7 @@ static int build_packet(int payload_len)
 
 static void do_bind(int fd)
 {
-	struct sockaddr_ll laddr = {0};
+	struct sockaddr_ll laddr = {};
 
 	laddr.sll_family = AF_PACKET;
 	laddr.sll_protocol = htons(ETH_P_IP);
@@ -197,7 +197,7 @@ static void do_send(int fd, char *buf, int len)
 	if (cfg_use_bind) {
 		ret = write(fd, buf, len);
 	} else {
-		struct sockaddr_ll laddr = {0};
+		struct sockaddr_ll laddr = {};
 
 		laddr.sll_protocol = htons(ETH_P_IP);
 		laddr.sll_ifindex = if_nametoindex(cfg_ifname);
@@ -251,7 +251,7 @@ static int do_tx(void)
 static int setup_rx(void)
 {
 	struct timeval tv = { .tv_usec = 100 * 1000 };
-	struct sockaddr_in raddr = {0};
+	struct sockaddr_in raddr = {};
 	int fd;
 
 	fd = socket(PF_INET, SOCK_DGRAM, 0);

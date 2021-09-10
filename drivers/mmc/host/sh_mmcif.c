@@ -402,7 +402,7 @@ static int sh_mmcif_dma_slave_config(struct sh_mmcif_host *host,
 				     enum dma_transfer_direction direction)
 {
 	struct resource *res;
-	struct dma_slave_config cfg = { 0, };
+	struct dma_slave_config cfg = { };
 
 	res = platform_get_resource(host->pd, IORESOURCE_MEM, 0);
 	cfg.direction = direction;

@@ -187,7 +187,7 @@ static void show_trace_log_lvl(struct task_struct *task, struct pt_regs *regs,
 			unsigned long *stack, const char *log_lvl)
 {
 	struct unwind_state state;
-	struct stack_info stack_info = {0};
+	struct stack_info stack_info = {};
 	unsigned long visit_mask = 0;
 	int graph_idx = 0;
 	bool partial = false;

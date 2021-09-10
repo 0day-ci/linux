@@ -23,7 +23,7 @@ static void event_seq_changed(struct venus_core *core, struct venus_inst *inst,
 			      struct hfi_msg_event_notify_pkt *pkt)
 {
 	enum hfi_version ver = core->res->hfi_version;
-	struct hfi_event_data event = {0};
+	struct hfi_event_data event = {};
 	int num_properties_changed;
 	struct hfi_framesize *frame_sz;
 	struct hfi_profile_level *profile_level;
@@ -124,7 +124,7 @@ static void event_release_buffer_ref(struct venus_core *core,
 				     struct venus_inst *inst,
 				     struct hfi_msg_event_notify_pkt *pkt)
 {
-	struct hfi_event_data event = {0};
+	struct hfi_event_data event = {};
 	struct hfi_msg_event_release_buffer_ref_pkt *data;
 
 	data = (struct hfi_msg_event_release_buffer_ref_pkt *)

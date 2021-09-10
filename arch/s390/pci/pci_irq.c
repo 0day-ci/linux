@@ -39,7 +39,7 @@ static struct airq_iv **zpci_ibv;
 static int zpci_set_airq(struct zpci_dev *zdev)
 {
 	u64 req = ZPCI_CREATE_REQ(zdev->fh, 0, ZPCI_MOD_FC_REG_INT);
-	struct zpci_fib fib = {0};
+	struct zpci_fib fib = {};
 	u8 status;
 
 	fib.fmt0.isc = PCI_ISC;
@@ -57,7 +57,7 @@ static int zpci_set_airq(struct zpci_dev *zdev)
 static int zpci_clear_airq(struct zpci_dev *zdev)
 {
 	u64 req = ZPCI_CREATE_REQ(zdev->fh, 0, ZPCI_MOD_FC_DEREG_INT);
-	struct zpci_fib fib = {0};
+	struct zpci_fib fib = {};
 	u8 cc, status;
 
 	cc = zpci_mod_fc(req, &fib, &status);
@@ -72,7 +72,7 @@ static int zpci_clear_airq(struct zpci_dev *zdev)
 static int zpci_set_directed_irq(struct zpci_dev *zdev)
 {
 	u64 req = ZPCI_CREATE_REQ(zdev->fh, 0, ZPCI_MOD_FC_REG_INT_D);
-	struct zpci_fib fib = {0};
+	struct zpci_fib fib = {};
 	u8 status;
 
 	fib.fmt = 1;
@@ -86,7 +86,7 @@ static int zpci_set_directed_irq(struct zpci_dev *zdev)
 static int zpci_clear_directed_irq(struct zpci_dev *zdev)
 {
 	u64 req = ZPCI_CREATE_REQ(zdev->fh, 0, ZPCI_MOD_FC_DEREG_INT_D);
-	struct zpci_fib fib = {0};
+	struct zpci_fib fib = {};
 	u8 cc, status;
 
 	fib.fmt = 1;

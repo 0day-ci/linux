@@ -44,7 +44,7 @@ void wil_pmc_alloc(struct wil6210_priv *wil,
 	struct pmc_ctx *pmc = &wil->pmc;
 	struct device *dev = wil_to_dev(wil);
 	struct wil6210_vif *vif = ndev_to_vif(wil->main_ndev);
-	struct wmi_pmc_cmd pmc_cmd = {0};
+	struct wmi_pmc_cmd pmc_cmd = {};
 	int last_cmd_err = -ENOMEM;
 
 	mutex_lock(&pmc->lock);
@@ -228,7 +228,7 @@ void wil_pmc_free(struct wil6210_priv *wil, int send_pmc_cmd)
 	struct pmc_ctx *pmc = &wil->pmc;
 	struct device *dev = wil_to_dev(wil);
 	struct wil6210_vif *vif = ndev_to_vif(wil->main_ndev);
-	struct wmi_pmc_cmd pmc_cmd = {0};
+	struct wmi_pmc_cmd pmc_cmd = {};
 
 	mutex_lock(&pmc->lock);
 

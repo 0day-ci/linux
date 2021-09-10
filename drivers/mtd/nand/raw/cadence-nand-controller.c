@@ -1020,7 +1020,7 @@ static u32
 cadence_nand_cdma_send_and_wait(struct cdns_nand_ctrl *cdns_ctrl,
 				u8 thread)
 {
-	struct cadence_nand_irq_status irq_mask, irq_status = {0};
+	struct cadence_nand_irq_status irq_mask, irq_status = {};
 	int status;
 
 	irq_mask.trd_status = BIT(thread);

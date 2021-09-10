@@ -629,7 +629,7 @@ out:
 
 static bool rtw_coex_get_bt_scan_type(struct rtw_dev *rtwdev, u8 *scan_type)
 {
-	struct rtw_coex_info_req req = {0};
+	struct rtw_coex_info_req req = {};
 	struct sk_buff *skb;
 	u8 *payload;
 
@@ -647,7 +647,7 @@ static bool rtw_coex_get_bt_scan_type(struct rtw_dev *rtwdev, u8 *scan_type)
 static bool rtw_coex_set_lna_constrain_level(struct rtw_dev *rtwdev,
 					     u8 lna_constrain_level)
 {
-	struct rtw_coex_info_req req = {0};
+	struct rtw_coex_info_req req = {};
 	struct sk_buff *skb;
 
 	req.op_code = BT_MP_INFO_OP_LNA_CONSTRAINT;
@@ -3499,7 +3499,7 @@ static void rtw_coex_set_coexinfo_hw(struct rtw_dev *rtwdev, struct seq_file *m)
 static bool rtw_coex_get_bt_reg(struct rtw_dev *rtwdev,
 				u8 type, u16 addr, u16 *val)
 {
-	struct rtw_coex_info_req req = {0};
+	struct rtw_coex_info_req req = {};
 	struct sk_buff *skb;
 	__le16 le_addr;
 	u8 *payload;
@@ -3525,7 +3525,7 @@ static bool rtw_coex_get_bt_reg(struct rtw_dev *rtwdev,
 static bool rtw_coex_get_bt_patch_version(struct rtw_dev *rtwdev,
 					  u32 *patch_version)
 {
-	struct rtw_coex_info_req req = {0};
+	struct rtw_coex_info_req req = {};
 	struct sk_buff *skb;
 	u8 *payload;
 
@@ -3544,7 +3544,7 @@ static bool rtw_coex_get_bt_patch_version(struct rtw_dev *rtwdev,
 static bool rtw_coex_get_bt_supported_version(struct rtw_dev *rtwdev,
 					      u32 *supported_version)
 {
-	struct rtw_coex_info_req req = {0};
+	struct rtw_coex_info_req req = {};
 	struct sk_buff *skb;
 	u8 *payload;
 
@@ -3563,7 +3563,7 @@ static bool rtw_coex_get_bt_supported_version(struct rtw_dev *rtwdev,
 static bool rtw_coex_get_bt_supported_feature(struct rtw_dev *rtwdev,
 					      u32 *supported_feature)
 {
-	struct rtw_coex_info_req req = {0};
+	struct rtw_coex_info_req req = {};
 	struct sk_buff *skb;
 	u8 *payload;
 

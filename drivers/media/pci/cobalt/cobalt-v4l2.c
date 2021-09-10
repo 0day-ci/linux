@@ -906,7 +906,7 @@ static int cobalt_s_fmt_vid_out(struct file *file, void *priv_fh,
 {
 	struct cobalt_stream *s = video_drvdata(file);
 	struct v4l2_pix_format *pix = &f->fmt.pix;
-	struct v4l2_subdev_format sd_fmt = { 0 };
+	struct v4l2_subdev_format sd_fmt = { };
 	u32 code;
 
 	if (cobalt_try_fmt_vid_out(file, priv_fh, f))

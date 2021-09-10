@@ -957,7 +957,7 @@ static int dpu_plane_atomic_check(struct drm_plane *plane,
 	struct dpu_plane_state *pstate = to_dpu_plane_state(new_plane_state);
 	const struct drm_crtc_state *crtc_state = NULL;
 	const struct dpu_format *fmt;
-	struct drm_rect src, dst, fb_rect = { 0 };
+	struct drm_rect src, dst, fb_rect = { };
 	uint32_t min_src_size, max_linewidth;
 
 	if (new_plane_state->crtc)

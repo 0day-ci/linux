@@ -884,7 +884,7 @@ static noinline_for_stack int btrfsic_process_metablock(
 		struct btrfsic_block_data_ctx *const first_block_ctx,
 		int first_limit_nesting, int force_iodone_flag)
 {
-	struct btrfsic_stack_frame initial_stack_frame = { 0 };
+	struct btrfsic_stack_frame initial_stack_frame = { };
 	struct btrfsic_stack_frame *sf;
 	struct btrfsic_stack_frame *next_stack;
 	struct btrfs_header *const first_hdr =
@@ -2107,7 +2107,7 @@ static int btrfsic_process_written_superblock(
 		int num_copies;
 		int mirror_num;
 		const char *additional_string = NULL;
-		struct btrfs_disk_key tmp_disk_key = {0};
+		struct btrfs_disk_key tmp_disk_key = {};
 
 		btrfs_set_disk_key_objectid(&tmp_disk_key,
 					    BTRFS_ROOT_ITEM_KEY);

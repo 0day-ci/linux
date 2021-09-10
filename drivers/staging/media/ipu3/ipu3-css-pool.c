@@ -88,7 +88,7 @@ void imgu_css_pool_put(struct imgu_css_pool *pool)
 const struct imgu_css_map *
 imgu_css_pool_last(struct imgu_css_pool *pool, unsigned int n)
 {
-	static const struct imgu_css_map null_map = { 0 };
+	static const struct imgu_css_map null_map = { };
 	int i = (pool->last + IPU3_CSS_POOL_SIZE - n) % IPU3_CSS_POOL_SIZE;
 
 	WARN_ON(n >= IPU3_CSS_POOL_SIZE);

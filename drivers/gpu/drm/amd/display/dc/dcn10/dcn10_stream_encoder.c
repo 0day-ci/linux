@@ -494,7 +494,7 @@ void enc1_stream_encoder_hdmi_set_stream_attribute(
 	bool enable_audio)
 {
 	struct dcn10_stream_encoder *enc1 = DCN10STRENC_FROM_STRENC(enc);
-	struct bp_encoder_control cntl = {0};
+	struct bp_encoder_control cntl = {};
 
 	cntl.action = ENCODER_CONTROL_SETUP;
 	cntl.engine_id = enc1->base.id;
@@ -611,7 +611,7 @@ void enc1_stream_encoder_dvi_set_stream_attribute(
 	bool is_dual_link)
 {
 	struct dcn10_stream_encoder *enc1 = DCN10STRENC_FROM_STRENC(enc);
-	struct bp_encoder_control cntl = {0};
+	struct bp_encoder_control cntl = {};
 
 	cntl.action = ENCODER_CONTROL_SETUP;
 	cntl.engine_id = enc1->base.id;
@@ -1103,7 +1103,7 @@ static const struct audio_clock_info audio_clock_info_table_48bpc[14] = {
 static union audio_cea_channels speakers_to_channels(
 	struct audio_speaker_flags speaker_flags)
 {
-	union audio_cea_channels cea_channels = {0};
+	union audio_cea_channels cea_channels = {};
 
 	/* these are one to one */
 	cea_channels.channels.FL = speaker_flags.FL_FR;
@@ -1224,7 +1224,7 @@ static void enc1_se_setup_hdmi_audio(
 {
 	struct dcn10_stream_encoder *enc1 = DCN10STRENC_FROM_STRENC(enc);
 
-	struct audio_clock_info audio_clock_info = {0};
+	struct audio_clock_info audio_clock_info = {};
 
 	/* HDMI_AUDIO_PACKET_CONTROL */
 	REG_UPDATE(HDMI_AUDIO_PACKET_CONTROL,

@@ -2814,7 +2814,7 @@ static int wtp_raw_event(struct hid_device *hdev, u8 *data, int size)
 static int wtp_get_config(struct hidpp_device *hidpp)
 {
 	struct wtp_data *wd = hidpp->private_data;
-	struct hidpp_touchpad_raw_info raw_info = {0};
+	struct hidpp_touchpad_raw_info raw_info = {};
 	u8 feature_type;
 	int ret;
 

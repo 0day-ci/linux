@@ -693,7 +693,7 @@ int btrfs_drop_extents(struct btrfs_trans_handle *trans,
 	struct btrfs_fs_info *fs_info = root->fs_info;
 	struct extent_buffer *leaf;
 	struct btrfs_file_extent_item *fi;
-	struct btrfs_ref ref = { 0 };
+	struct btrfs_ref ref = { };
 	struct btrfs_key key;
 	struct btrfs_key new_key;
 	u64 ino = btrfs_ino(inode);
@@ -1084,7 +1084,7 @@ int btrfs_mark_extent_written(struct btrfs_trans_handle *trans,
 	struct extent_buffer *leaf;
 	struct btrfs_path *path;
 	struct btrfs_file_extent_item *fi;
-	struct btrfs_ref ref = { 0 };
+	struct btrfs_ref ref = { };
 	struct btrfs_key key;
 	struct btrfs_key new_key;
 	u64 bytenr;
@@ -2558,7 +2558,7 @@ static int btrfs_insert_replace_extent(struct btrfs_trans_handle *trans,
 	struct extent_buffer *leaf;
 	struct btrfs_key key;
 	int slot;
-	struct btrfs_ref ref = { 0 };
+	struct btrfs_ref ref = { };
 	int ret;
 
 	if (replace_len == 0)
@@ -2645,7 +2645,7 @@ int btrfs_replace_file_extents(struct btrfs_inode *inode,
 			       struct btrfs_replace_extent_info *extent_info,
 			       struct btrfs_trans_handle **trans_out)
 {
-	struct btrfs_drop_extents_args drop_args = { 0 };
+	struct btrfs_drop_extents_args drop_args = { };
 	struct btrfs_root *root = inode->root;
 	struct btrfs_fs_info *fs_info = root->fs_info;
 	u64 min_size = btrfs_calc_insert_metadata_size(fs_info, 1);

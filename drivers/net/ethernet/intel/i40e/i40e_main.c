@@ -5252,8 +5252,8 @@ static u8 i40e_pf_get_tc_map(struct i40e_pf *pf)
  **/
 static int i40e_vsi_get_bw_info(struct i40e_vsi *vsi)
 {
-	struct i40e_aqc_query_vsi_ets_sla_config_resp bw_ets_config = {0};
-	struct i40e_aqc_query_vsi_bw_config_resp bw_config = {0};
+	struct i40e_aqc_query_vsi_ets_sla_config_resp bw_ets_config = {};
+	struct i40e_aqc_query_vsi_bw_config_resp bw_config = {};
 	struct i40e_pf *pf = vsi->back;
 	struct i40e_hw *hw = &pf->hw;
 	i40e_status ret;
@@ -5460,7 +5460,7 @@ static int i40e_vsi_config_tc(struct i40e_vsi *vsi, u8 enabled_tc)
 
 	ret = i40e_vsi_configure_bw_alloc(vsi, enabled_tc, bw_share);
 	if (ret) {
-		struct i40e_aqc_query_vsi_bw_config_resp bw_config = {0};
+		struct i40e_aqc_query_vsi_bw_config_resp bw_config = {};
 
 		dev_info(&pf->pdev->dev,
 			 "Failed configuring TC map %d for VSI %d\n",
@@ -6382,7 +6382,7 @@ err_free:
  **/
 int i40e_veb_config_tc(struct i40e_veb *veb, u8 enabled_tc)
 {
-	struct i40e_aqc_configure_switching_comp_bw_config_data bw_data = {0};
+	struct i40e_aqc_configure_switching_comp_bw_config_data bw_data = {};
 	struct i40e_pf *pf = veb->pf;
 	int ret = 0;
 	int i;
@@ -7104,7 +7104,7 @@ static void i40e_vsi_reinit_locked(struct i40e_vsi *vsi)
 static i40e_status i40e_force_link_state(struct i40e_pf *pf, bool is_up)
 {
 	struct i40e_aq_get_phy_abilities_resp abilities;
-	struct i40e_aq_set_phy_config config = {0};
+	struct i40e_aq_set_phy_config config = {};
 	bool non_zero_phy_type = is_up;
 	struct i40e_hw *hw = &pf->hw;
 	i40e_status err;

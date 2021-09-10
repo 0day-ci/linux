@@ -861,7 +861,7 @@ static void get_rate(struct netem_sched_data *q, const struct nlattr *attr)
 	if (q->cell_size)
 		q->cell_size_reciprocal = reciprocal_value(q->cell_size);
 	else
-		q->cell_size_reciprocal = (struct reciprocal_value) { 0 };
+		q->cell_size_reciprocal = (struct reciprocal_value) { };
 }
 
 static int get_loss_clg(struct netem_sched_data *q, const struct nlattr *attr)

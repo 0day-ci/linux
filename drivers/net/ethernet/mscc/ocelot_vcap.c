@@ -752,7 +752,7 @@ static void is1_entry_set(struct ocelot *ocelot, int ix,
 					     dport);
 		} else {
 			/* IPv4 "other" frame */
-			struct ocelot_vcap_u16 etype = {0};
+			struct ocelot_vcap_u16 etype = {};
 
 			/* Overloaded field */
 			etype.value[0] = proto.value[0];
@@ -890,7 +890,7 @@ static void vcap_entry_set(struct ocelot *ocelot, int ix,
 static int ocelot_vcap_policer_add(struct ocelot *ocelot, u32 pol_ix,
 				   struct ocelot_policer *pol)
 {
-	struct qos_policer_conf pp = { 0 };
+	struct qos_policer_conf pp = { };
 
 	if (!pol)
 		return -EINVAL;
@@ -907,7 +907,7 @@ static void ocelot_vcap_policer_del(struct ocelot *ocelot,
 				    u32 pol_ix)
 {
 	struct ocelot_vcap_filter *filter;
-	struct qos_policer_conf pp = {0};
+	struct qos_policer_conf pp = {};
 	int index = -1;
 
 	if (pol_ix < block->pol_lpr)

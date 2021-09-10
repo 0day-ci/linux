@@ -335,7 +335,7 @@ union dmub_fw_boot_status dmub_dcn31_get_fw_boot_status(struct dmub_srv *dmub)
 
 void dmub_dcn31_enable_dmub_boot_options(struct dmub_srv *dmub, const struct dmub_srv_hw_params *params)
 {
-	union dmub_fw_boot_options boot_options = {0};
+	union dmub_fw_boot_options boot_options = {};
 
 	boot_options.bits.z10_disable = params->disable_z10;
 

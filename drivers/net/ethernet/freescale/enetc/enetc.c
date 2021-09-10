@@ -1075,7 +1075,7 @@ static int enetc_xdp_frame_to_xdp_tx_swbd(struct enetc_bdr *tx_ring,
 int enetc_xdp_xmit(struct net_device *ndev, int num_frames,
 		   struct xdp_frame **frames, u32 flags)
 {
-	struct enetc_tx_swbd xdp_redirect_arr[ENETC_MAX_SKB_FRAGS] = {0};
+	struct enetc_tx_swbd xdp_redirect_arr[ENETC_MAX_SKB_FRAGS] = {};
 	struct enetc_ndev_priv *priv = netdev_priv(ndev);
 	struct enetc_bdr *tx_ring;
 	int xdp_tx_bd_cnt, i, k;
@@ -1242,7 +1242,7 @@ static int enetc_clean_rx_ring_xdp(struct enetc_bdr *rx_ring,
 				   struct bpf_prog *prog)
 {
 	int xdp_tx_bd_cnt, xdp_tx_frm_cnt = 0, xdp_redirect_frm_cnt = 0;
-	struct enetc_tx_swbd xdp_tx_arr[ENETC_MAX_SKB_FRAGS] = {0};
+	struct enetc_tx_swbd xdp_tx_arr[ENETC_MAX_SKB_FRAGS] = {};
 	struct enetc_ndev_priv *priv = netdev_priv(rx_ring->ndev);
 	int rx_frm_cnt = 0, rx_byte_cnt = 0;
 	struct enetc_bdr *tx_ring;

@@ -90,8 +90,8 @@ static void set_keys(int fd, uint32_t *keys)
 
 static void build_rcv_fd(int family, int proto, int *rcv_fds)
 {
-	struct sockaddr_in  addr4 = {0};
-	struct sockaddr_in6 addr6 = {0};
+	struct sockaddr_in  addr4 = {};
+	struct sockaddr_in6 addr6 = {};
 	struct sockaddr *addr;
 	int opt = 1, i, sz;
 	int qlen = 100;
@@ -142,10 +142,10 @@ static void build_rcv_fd(int family, int proto, int *rcv_fds)
 
 static int connect_and_send(int family, int proto)
 {
-	struct sockaddr_in  saddr4 = {0};
-	struct sockaddr_in  daddr4 = {0};
-	struct sockaddr_in6 saddr6 = {0};
-	struct sockaddr_in6 daddr6 = {0};
+	struct sockaddr_in  saddr4 = {};
+	struct sockaddr_in  daddr4 = {};
+	struct sockaddr_in6 saddr6 = {};
+	struct sockaddr_in6 daddr6 = {};
 	struct sockaddr *saddr, *daddr;
 	int fd, sz, ret;
 	char data[1];

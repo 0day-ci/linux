@@ -1986,10 +1986,10 @@ static int hw_card_init(struct hw *hw, struct card_conf *info)
 	int err;
 	unsigned int gctl;
 	u32 data;
-	struct dac_conf dac_info = {0};
-	struct adc_conf adc_info = {0};
-	struct daio_conf daio_info = {0};
-	struct trn_conf trn_info = {0};
+	struct dac_conf dac_info = {};
+	struct adc_conf adc_info = {};
+	struct daio_conf daio_info = {};
+	struct trn_conf trn_info = {};
 
 	/* Get PCI io port base address and do Hendrix switch if needed. */
 	err = hw_card_start(hw);

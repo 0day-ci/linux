@@ -611,8 +611,8 @@ static int gswip_pce_table_entry_write(struct gswip_priv *priv,
  */
 static int gswip_add_single_port_br(struct gswip_priv *priv, int port, bool add)
 {
-	struct gswip_pce_table_entry vlan_active = {0,};
-	struct gswip_pce_table_entry vlan_mapping = {0,};
+	struct gswip_pce_table_entry vlan_active = {};
+	struct gswip_pce_table_entry vlan_mapping = {};
 	unsigned int cpu_port = priv->hw_info->cpu_port;
 	unsigned int max_ports = priv->hw_info->max_ports;
 	int err;
@@ -879,7 +879,7 @@ static int gswip_vlan_active_create(struct gswip_priv *priv,
 				    struct net_device *bridge,
 				    int fid, u16 vid)
 {
-	struct gswip_pce_table_entry vlan_active = {0,};
+	struct gswip_pce_table_entry vlan_active = {};
 	unsigned int max_ports = priv->hw_info->max_ports;
 	int idx = -1;
 	int err;
@@ -920,7 +920,7 @@ static int gswip_vlan_active_create(struct gswip_priv *priv,
 
 static int gswip_vlan_active_remove(struct gswip_priv *priv, int idx)
 {
-	struct gswip_pce_table_entry vlan_active = {0,};
+	struct gswip_pce_table_entry vlan_active = {};
 	int err;
 
 	vlan_active.index = idx;
@@ -937,7 +937,7 @@ static int gswip_vlan_active_remove(struct gswip_priv *priv, int idx)
 static int gswip_vlan_add_unaware(struct gswip_priv *priv,
 				  struct net_device *bridge, int port)
 {
-	struct gswip_pce_table_entry vlan_mapping = {0,};
+	struct gswip_pce_table_entry vlan_mapping = {};
 	unsigned int max_ports = priv->hw_info->max_ports;
 	unsigned int cpu_port = priv->hw_info->cpu_port;
 	bool active_vlan_created = false;
@@ -999,7 +999,7 @@ static int gswip_vlan_add_aware(struct gswip_priv *priv,
 				u16 vid, bool untagged,
 				bool pvid)
 {
-	struct gswip_pce_table_entry vlan_mapping = {0,};
+	struct gswip_pce_table_entry vlan_mapping = {};
 	unsigned int max_ports = priv->hw_info->max_ports;
 	unsigned int cpu_port = priv->hw_info->cpu_port;
 	bool active_vlan_created = false;
@@ -1074,7 +1074,7 @@ static int gswip_vlan_remove(struct gswip_priv *priv,
 			     struct net_device *bridge, int port,
 			     u16 vid, bool pvid, bool vlan_aware)
 {
-	struct gswip_pce_table_entry vlan_mapping = {0,};
+	struct gswip_pce_table_entry vlan_mapping = {};
 	unsigned int max_ports = priv->hw_info->max_ports;
 	unsigned int cpu_port = priv->hw_info->cpu_port;
 	int idx = -1;
@@ -1255,7 +1255,7 @@ static int gswip_port_vlan_del(struct dsa_switch *ds, int port,
 static void gswip_port_fast_age(struct dsa_switch *ds, int port)
 {
 	struct gswip_priv *priv = ds->priv;
-	struct gswip_pce_table_entry mac_bridge = {0,};
+	struct gswip_pce_table_entry mac_bridge = {};
 	int i;
 	int err;
 
@@ -1325,7 +1325,7 @@ static int gswip_port_fdb(struct dsa_switch *ds, int port,
 {
 	struct gswip_priv *priv = ds->priv;
 	struct net_device *bridge = dsa_to_port(ds, port)->bridge_dev;
-	struct gswip_pce_table_entry mac_bridge = {0,};
+	struct gswip_pce_table_entry mac_bridge = {};
 	unsigned int cpu_port = priv->hw_info->cpu_port;
 	int fid = -1;
 	int i;
@@ -1379,7 +1379,7 @@ static int gswip_port_fdb_dump(struct dsa_switch *ds, int port,
 			       dsa_fdb_dump_cb_t *cb, void *data)
 {
 	struct gswip_priv *priv = ds->priv;
-	struct gswip_pce_table_entry mac_bridge = {0,};
+	struct gswip_pce_table_entry mac_bridge = {};
 	unsigned char addr[6];
 	int i;
 	int err;

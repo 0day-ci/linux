@@ -1042,7 +1042,7 @@ static int verity_parse_opt_args(struct dm_arg_set *as, struct dm_verity *v,
 static int verity_ctr(struct dm_target *ti, unsigned argc, char **argv)
 {
 	struct dm_verity *v;
-	struct dm_verity_sig_opts verify_args = {0};
+	struct dm_verity_sig_opts verify_args = {};
 	struct dm_arg_set as;
 	unsigned int num;
 	unsigned long long num_ll;

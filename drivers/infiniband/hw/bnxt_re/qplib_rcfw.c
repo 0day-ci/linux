@@ -780,7 +780,7 @@ static void bnxt_qplib_start_rcfw(struct bnxt_qplib_rcfw *rcfw)
 	struct bnxt_qplib_cmdq_ctx *cmdq;
 	struct bnxt_qplib_creq_ctx *creq;
 	struct bnxt_qplib_cmdq_mbox *mbox;
-	struct cmdq_init init = {0};
+	struct cmdq_init init = {};
 
 	cmdq = &rcfw->cmdq;
 	creq = &rcfw->creq;

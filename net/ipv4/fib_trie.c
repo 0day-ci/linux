@@ -2576,7 +2576,7 @@ static void trie_show_stats(struct seq_file *seq, struct trie_stat *stat)
 static void trie_show_usage(struct seq_file *seq,
 			    const struct trie_use_stats __percpu *stats)
 {
-	struct trie_use_stats s = { 0 };
+	struct trie_use_stats s = { };
 	int cpu;
 
 	/* loop through all of the CPUs and gather up the stats */

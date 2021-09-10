@@ -946,7 +946,7 @@ badkey:
 static int sa_aes_cbc_setkey(struct crypto_skcipher *tfm, const u8 *key,
 			     unsigned int keylen)
 {
-	struct algo_data ad = { 0 };
+	struct algo_data ad = { };
 	/* Convert the key size (16/24/32) to the key size index (0/1/2) */
 	int key_idx = (keylen >> 3) - 2;
 
@@ -966,7 +966,7 @@ static int sa_aes_cbc_setkey(struct crypto_skcipher *tfm, const u8 *key,
 static int sa_aes_ecb_setkey(struct crypto_skcipher *tfm, const u8 *key,
 			     unsigned int keylen)
 {
-	struct algo_data ad = { 0 };
+	struct algo_data ad = { };
 	/* Convert the key size (16/24/32) to the key size index (0/1/2) */
 	int key_idx = (keylen >> 3) - 2;
 
@@ -984,7 +984,7 @@ static int sa_aes_ecb_setkey(struct crypto_skcipher *tfm, const u8 *key,
 static int sa_3des_cbc_setkey(struct crypto_skcipher *tfm, const u8 *key,
 			      unsigned int keylen)
 {
-	struct algo_data ad = { 0 };
+	struct algo_data ad = { };
 
 	ad.mci_enc = mci_cbc_3des_enc_array;
 	ad.mci_dec = mci_cbc_3des_dec_array;
@@ -998,7 +998,7 @@ static int sa_3des_cbc_setkey(struct crypto_skcipher *tfm, const u8 *key,
 static int sa_3des_ecb_setkey(struct crypto_skcipher *tfm, const u8 *key,
 			      unsigned int keylen)
 {
-	struct algo_data ad = { 0 };
+	struct algo_data ad = { };
 
 	ad.mci_enc = mci_ecb_3des_enc_array;
 	ad.mci_dec = mci_ecb_3des_dec_array;
@@ -1298,7 +1298,7 @@ static int sa_cipher_run(struct skcipher_request *req, u8 *iv, int enc)
 	struct sa_tfm_ctx *ctx =
 	    crypto_skcipher_ctx(crypto_skcipher_reqtfm(req));
 	struct crypto_alg *alg = req->base.tfm->__crt_alg;
-	struct sa_req sa_req = { 0 };
+	struct sa_req sa_req = { };
 
 	if (!req->cryptlen)
 		return 0;
@@ -1402,7 +1402,7 @@ static int sa_sha_run(struct ahash_request *req)
 {
 	struct sa_tfm_ctx *ctx = crypto_ahash_ctx(crypto_ahash_reqtfm(req));
 	struct sa_sha_req_ctx *rctx = ahash_request_ctx(req);
-	struct sa_req sa_req = { 0 };
+	struct sa_req sa_req = { };
 	size_t auth_len;
 
 	auth_len = req->nbytes;
@@ -1625,7 +1625,7 @@ static int sa_sha_export(struct ahash_request *req, void *out)
 
 static int sa_sha1_cra_init(struct crypto_tfm *tfm)
 {
-	struct algo_data ad = { 0 };
+	struct algo_data ad = { };
 	struct sa_tfm_ctx *ctx = crypto_tfm_ctx(tfm);
 
 	sa_sha_cra_init_alg(tfm, "sha1");
@@ -1641,7 +1641,7 @@ static int sa_sha1_cra_init(struct crypto_tfm *tfm)
 
 static int sa_sha256_cra_init(struct crypto_tfm *tfm)
 {
-	struct algo_data ad = { 0 };
+	struct algo_data ad = { };
 	struct sa_tfm_ctx *ctx = crypto_tfm_ctx(tfm);
 
 	sa_sha_cra_init_alg(tfm, "sha256");
@@ -1657,7 +1657,7 @@ static int sa_sha256_cra_init(struct crypto_tfm *tfm)
 
 static int sa_sha512_cra_init(struct crypto_tfm *tfm)
 {
-	struct algo_data ad = { 0 };
+	struct algo_data ad = { };
 	struct sa_tfm_ctx *ctx = crypto_tfm_ctx(tfm);
 
 	sa_sha_cra_init_alg(tfm, "sha512");
@@ -1883,7 +1883,7 @@ static int sa_aead_setauthsize(struct crypto_aead *tfm, unsigned int authsize)
 static int sa_aead_cbc_sha1_setkey(struct crypto_aead *authenc,
 				   const u8 *key, unsigned int keylen)
 {
-	struct algo_data ad = { 0 };
+	struct algo_data ad = { };
 
 	ad.ealg_id = SA_EALG_ID_AES_CBC;
 	ad.aalg_id = SA_AALG_ID_HMAC_SHA1;
@@ -1896,7 +1896,7 @@ static int sa_aead_cbc_sha1_setkey(struct crypto_aead *authenc,
 static int sa_aead_cbc_sha256_setkey(struct crypto_aead *authenc,
 				     const u8 *key, unsigned int keylen)
 {
-	struct algo_data ad = { 0 };
+	struct algo_data ad = { };
 
 	ad.ealg_id = SA_EALG_ID_AES_CBC;
 	ad.aalg_id = SA_AALG_ID_HMAC_SHA2_256;
@@ -1910,7 +1910,7 @@ static int sa_aead_run(struct aead_request *req, u8 *iv, int enc)
 {
 	struct crypto_aead *tfm = crypto_aead_reqtfm(req);
 	struct sa_tfm_ctx *ctx = crypto_aead_ctx(tfm);
-	struct sa_req sa_req = { 0 };
+	struct sa_req sa_req = { };
 	size_t auth_size, enc_size;
 
 	enc_size = req->cryptlen;

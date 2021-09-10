@@ -51,7 +51,7 @@ enum dmub_status dmub_srv_stat_get_notification(struct dmub_srv *dmub,
 	 * we shall not modify any dmub variables, only dmub->outbox1_rb
 	 * is exempted as it is exclusively accessed by this function
 	 */
-	union dmub_rb_out_cmd cmd = {0};
+	union dmub_rb_out_cmd cmd = {};
 
 	if (!dmub->hw_init) {
 		notify->type = DMUB_NOTIFICATION_NO_DATA;

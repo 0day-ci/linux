@@ -761,7 +761,7 @@ static int atomisp_enum_fmt_cap(struct file *file, void *fh,
 	struct video_device *vdev = video_devdata(file);
 	struct atomisp_device *isp = video_get_drvdata(vdev);
 	struct atomisp_sub_device *asd = atomisp_to_video_pipe(vdev)->asd;
-	struct v4l2_subdev_mbus_code_enum code = { 0 };
+	struct v4l2_subdev_mbus_code_enum code = { };
 	unsigned int i, fi = 0;
 	int rval;
 
@@ -1589,7 +1589,7 @@ static void __wdt_on_master_slave_sensor_pipe(struct atomisp_video_pipe *pipe,
 
 static void atomisp_pause_buffer_event(struct atomisp_device *isp)
 {
-	struct v4l2_event event = {0};
+	struct v4l2_event event = {};
 	int i;
 
 	event.type = V4L2_EVENT_ATOMISP_PAUSE_BUFFER;
@@ -2623,7 +2623,7 @@ static int atomisp_s_parm(struct file *file, void *fh,
 	asd->high_speed_mode = false;
 	switch (parm->parm.capture.capturemode) {
 	case CI_MODE_NONE: {
-		struct v4l2_subdev_frame_interval fi = {0};
+		struct v4l2_subdev_frame_interval fi = {};
 
 		fi.interval = parm->parm.capture.timeperframe;
 

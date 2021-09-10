@@ -231,7 +231,7 @@ int dce_set_clock(
 	int requested_clk_khz)
 {
 	struct clk_mgr_internal *clk_mgr_dce = TO_CLK_MGR_INTERNAL(clk_mgr_base);
-	struct bp_pixel_clock_parameters pxl_clk_params = { 0 };
+	struct bp_pixel_clock_parameters pxl_clk_params = { };
 	struct dc_bios *bp = clk_mgr_base->ctx->dc_bios;
 	int actual_clock = requested_clk_khz;
 	struct dmcu *dmcu = clk_mgr_dce->base.ctx->dc->res_pool->dmcu;
@@ -436,7 +436,7 @@ void dce_clk_mgr_construct(
 		struct clk_mgr_internal *clk_mgr)
 {
 	struct clk_mgr *base = &clk_mgr->base;
-	struct dm_pp_static_clock_info static_clk_info = {0};
+	struct dm_pp_static_clock_info static_clk_info = {};
 
 	memcpy(clk_mgr->max_clks_by_state,
 		dce80_max_clks_by_state,
