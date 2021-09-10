@@ -290,6 +290,7 @@ ttm_manager_type(struct ttm_device *bdev, int mem_type)
 static inline void ttm_set_driver_manager(struct ttm_device *bdev, int type,
 					  struct ttm_resource_manager *manager)
 {
+	WARN_ON(type >= TTM_NUM_MEM_TYPES);
 	bdev->man_drv[type] = manager;
 }
 
