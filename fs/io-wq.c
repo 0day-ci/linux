@@ -725,6 +725,7 @@ static void io_workqueue_create(struct work_struct *work)
 	if (!io_queue_worker_create(worker, acct, create_worker_cont)) {
 		clear_bit_unlock(0, &worker->create_state);
 		io_worker_release(worker);
+		kfree(worker);
 	}
 }
 
@@ -759,6 +760,7 @@ fail:
 	if (!IS_ERR(tsk)) {
 		io_init_new_worker(wqe, worker, tsk);
 	} else if (!io_should_retry_thread(PTR_ERR(tsk))) {
+		kfree(worker);
 		goto fail;
 	} else {
 		INIT_WORK(&worker->work, io_workqueue_create);
