@@ -1064,6 +1064,10 @@ gen6_reg_write_fw_domains(struct intel_uncore *uncore, i915_reg_t reg)
 	__fwd; \
 })
 
+static const struct intel_forcewake_range __gen6_fw_ranges[] = {
+	GEN_FW_RANGE(0x0, 0x3ffff, FORCEWAKE_RENDER),
+};
+
 /* *Must* be sorted by offset ranges! See intel_fw_table_check(). */
 static const struct intel_forcewake_range __chv_fw_ranges[] = {
 	GEN_FW_RANGE(0x2000, 0x3fff, FORCEWAKE_RENDER),
@@ -1623,7 +1627,6 @@ __gen_read(func, 64)
 
 __gen_reg_read_funcs(gen11_fwtable);
 __gen_reg_read_funcs(fwtable);
-__gen_reg_read_funcs(gen6);
 
 #undef __gen_reg_read_funcs
 #undef GEN6_READ_FOOTER
@@ -2111,15 +2114,17 @@ static int uncore_forcewake_init(struct intel_uncore *uncore)
 		ASSIGN_WRITE_MMIO_VFUNCS(uncore, fwtable);
 		ASSIGN_READ_MMIO_VFUNCS(uncore, fwtable);
 	} else if (GRAPHICS_VER(i915) == 8) {
+		ASSIGN_FW_DOMAINS_TABLE(uncore, __gen6_fw_ranges);
 		ASSIGN_WRITE_MMIO_VFUNCS(uncore, gen8);
-		ASSIGN_READ_MMIO_VFUNCS(uncore, gen6);
+		ASSIGN_READ_MMIO_VFUNCS(uncore, fwtable);
 	} else if (IS_VALLEYVIEW(i915)) {
 		ASSIGN_FW_DOMAINS_TABLE(uncore, __vlv_fw_ranges);
 		ASSIGN_WRITE_MMIO_VFUNCS(uncore, gen6);
 		ASSIGN_READ_MMIO_VFUNCS(uncore, fwtable);
 	} else if (IS_GRAPHICS_VER(i915, 6, 7)) {
+		ASSIGN_FW_DOMAINS_TABLE(uncore, __gen6_fw_ranges);
 		ASSIGN_WRITE_MMIO_VFUNCS(uncore, gen6);
-		ASSIGN_READ_MMIO_VFUNCS(uncore, gen6);
+		ASSIGN_READ_MMIO_VFUNCS(uncore, fwtable);
 	}
 
 	uncore->pmic_bus_access_nb.notifier_call = i915_pmic_bus_access_notifier;
