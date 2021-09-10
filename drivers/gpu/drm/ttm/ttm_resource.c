@@ -57,13 +57,17 @@ int ttm_resource_alloc(struct ttm_buffer_object *bo,
 void ttm_resource_free(struct ttm_buffer_object *bo, struct ttm_resource **res)
 {
 	struct ttm_resource_manager *man;
+	struct ttm_resource *resource = *res;
 
-	if (!*res)
+	if (!resource)
 		return;
 
-	man = ttm_manager_type(bo->bdev, (*res)->mem_type);
-	man->func->free(man, *res);
 	*res = NULL;
+	if (resource->priv)
+		resource->priv->ops.destroy(resource->priv);
+
+	man = ttm_manager_type(bo->bdev, resource->mem_type);
+	man->func->free(man, resource);
 }
 EXPORT_SYMBOL(ttm_resource_free);
 

@@ -44,6 +44,7 @@ struct dma_buf_map;
 struct io_mapping;
 struct sg_table;
 struct scatterlist;
+struct ttm_resource_private;
 
 struct ttm_resource_manager_func {
 	/**
@@ -154,6 +155,32 @@ struct ttm_bus_placement {
 };
 
 /**
+ * struct ttm_resource_private_ops - Operations for a struct
+ * ttm_resource_private
+ *
+ * Not much benefit to keep this as a separate struct with only a single member,
+ * but keeping a separate ops struct is the norm.
+ */
+struct ttm_resource_private_ops {
+	/**
+	 * destroy() - Callback to destroy the private data
+	 * @priv - The private data to destroy
+	 */
+	void (*destroy) (struct ttm_resource_private *priv);
+};
+
+/**
+ * struct ttm_resource_private - TTM driver private data
+ * @ops: Pointer to struct ttm_resource_private_ops with associated operations
+ *
+ * Intended to be subclassed to hold, for example cached data sharing the
+ * lifetime with a struct ttm_resource.
+ */
+struct ttm_resource_private {
+	const struct ttm_resource_private_ops ops;
+};
+
+/**
  * struct ttm_resource
  *
  * @start: Start of the allocation.
@@ -171,6 +198,7 @@ struct ttm_resource {
 	uint32_t mem_type;
 	uint32_t placement;
 	struct ttm_bus_placement bus;
+	struct ttm_resource_private *priv;
 };
 
 /**
