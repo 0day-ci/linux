@@ -47,20 +47,7 @@ static int dev_dax_kmem_probe(struct dev_dax *dev_dax)
 	unsigned long total_len = 0;
 	struct dax_kmem_data *data;
 	int i, rc, mapped = 0;
-	int numa_node;
-
-	/*
-	 * Ensure good NUMA information for the persistent memory.
-	 * Without this check, there is a risk that slow memory
-	 * could be mixed in a node with faster memory, causing
-	 * unavoidable performance issues.
-	 */
-	numa_node = dev_dax->target_node;
-	if (numa_node < 0) {
-		dev_warn(dev, "rejecting DAX region with invalid node: %d\n",
-				numa_node);
-		return -EINVAL;
-	}
+	int numa_node = dev_dax->target_node;
 
 	for (i = 0; i < dev_dax->nr_range; i++) {
 		struct range range;
@@ -71,6 +58,22 @@ static int dev_dax_kmem_probe(struct dev_dax *dev_dax)
 					i, range.start, range.end);
 			continue;
 		}
+
+		/*
+		 * Ensure good NUMA information for the persistent memory.
+		 * Without this check, there is a risk but not fatal that slow
+		 * memory could be mixed in a node with faster memory, causing
+		 * unavoidable performance issues. Warn this and use fallback
+		 * node id.
+		 */
+		if (numa_node < 0) {
+			int new_node = memory_add_physaddr_to_nid(range.start);
+
+			dev_info(dev, "changing nid from %d to %d for DAX region [%#llx-%#llx]\n",
+				 numa_node, new_node, range.start, range.end);
+			numa_node = new_node;
+		}
+
 		total_len += range_len(&range);
 	}
 
