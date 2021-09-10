@@ -558,14 +558,16 @@ static int sdei_api_event_register(u32 event_num, unsigned long entry_point,
 static void _local_event_register(void *data)
 {
 	int err;
+	u64 mpidr;
 	struct sdei_registered_event *reg;
 	struct sdei_crosscall_args *arg = data;
 
 	WARN_ON(preemptible());
 
+	mpidr = read_cpuid_mpidr();
 	reg = per_cpu_ptr(arg->event->private_registered, smp_processor_id());
 	err = sdei_api_event_register(arg->event->event_num, sdei_entry_point,
-				      reg, 0, 0);
+				      reg, SDEI_EVENT_REGISTER_RM_PE, mpidr);
 
 	sdei_cross_call_return(arg, err);
 }
