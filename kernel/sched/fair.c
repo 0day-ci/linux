@@ -4644,14 +4644,19 @@ static inline bool cfs_bandwidth_used(void)
 	return static_key_false(&__cfs_bandwidth_used);
 }
 
-void cfs_bandwidth_usage_inc(void)
+void cfs_bandwidth_usage_inc_cpuslocked(void)
 {
 	static_key_slow_inc_cpuslocked(&__cfs_bandwidth_used);
 }
 
-void cfs_bandwidth_usage_dec(void)
+void cfs_bandwidth_usage_dec_cpuslocked(void)
 {
 	static_key_slow_dec_cpuslocked(&__cfs_bandwidth_used);
+}
+
+static void cfs_bandwidth_usage_dec(void)
+{
+	static_key_slow_dec(&__cfs_bandwidth_used);
 }
 #else /* CONFIG_JUMP_LABEL */
 static bool cfs_bandwidth_used(void)
@@ -4659,8 +4664,10 @@ static bool cfs_bandwidth_used(void)
 	return true;
 }
 
-void cfs_bandwidth_usage_inc(void) {}
-void cfs_bandwidth_usage_dec(void) {}
+void cfs_bandwidth_usage_inc_cpuslocked(void) {}
+void cfs_bandwidth_usage_dec_cpuslocked(void) {}
+
+static void cfs_bandwidth_usage_dec(void) {}
 #endif /* CONFIG_JUMP_LABEL */
 
 /*
@@ -5396,6 +5403,9 @@ static void destroy_cfs_bandwidth(struct cfs_bandwidth *cfs_b)
 	/* init_cfs_bandwidth() was not called */
 	if (!cfs_b->throttled_cfs_rq.next)
 		return;
+
+	if (cfs_b->quota != RUNTIME_INF)
+		cfs_bandwidth_usage_dec();
 
 	hrtimer_cancel(&cfs_b->period_timer);
 	hrtimer_cancel(&cfs_b->slack_timer);

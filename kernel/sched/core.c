@@ -9993,7 +9993,7 @@ static int tg_set_cfs_bandwidth(struct task_group *tg, u64 period, u64 quota,
 	 * before making related changes, and on->off must occur afterwards
 	 */
 	if (runtime_enabled && !runtime_was_enabled)
-		cfs_bandwidth_usage_inc();
+		cfs_bandwidth_usage_inc_cpuslocked();
 	raw_spin_lock_irq(&cfs_b->lock);
 	cfs_b->period = ns_to_ktime(period);
 	cfs_b->quota = quota;
@@ -10021,7 +10021,7 @@ static int tg_set_cfs_bandwidth(struct task_group *tg, u64 period, u64 quota,
 		rq_unlock_irq(rq, &rf);
 	}
 	if (runtime_was_enabled && !runtime_enabled)
-		cfs_bandwidth_usage_dec();
+		cfs_bandwidth_usage_dec_cpuslocked();
 out_unlock:
 	mutex_unlock(&cfs_constraints_mutex);
 	cpus_read_unlock();
