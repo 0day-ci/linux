@@ -117,9 +117,9 @@ static void r871x_internal_cmd_hdl(struct _adapter *padapter, u8 *pbuf)
 	kfree(pdrvcmd->pbuf);
 }
 
-static u8 read_macreg_hdl(struct _adapter *padapter, u8 *pbuf)
+static u8 common_read_write_hdl(struct _adapter *padapter, u8 *pbuf)
 {
-	void (*pcmd_callback)(struct _adapter *dev, struct cmd_obj	*pcmd);
+	void (*pcmd_callback)(struct _adapter *dev, struct cmd_obj *pcmd);
 	struct cmd_obj *pcmd  = (struct cmd_obj *)pbuf;
 
 	/*  invoke cmd->callback function */
@@ -129,20 +129,17 @@ static u8 read_macreg_hdl(struct _adapter *padapter, u8 *pbuf)
 	else
 		pcmd_callback(padapter, pcmd);
 	return H2C_SUCCESS;
+
+}
+
+static u8 read_macreg_hdl(struct _adapter *padapter, u8 *pbuf)
+{
+	return common_read_write_hdl(padapter, pbuf);
 }
 
 static u8 write_macreg_hdl(struct _adapter *padapter, u8 *pbuf)
 {
-	void (*pcmd_callback)(struct _adapter *dev, struct cmd_obj	*pcmd);
-	struct cmd_obj *pcmd  = (struct cmd_obj *)pbuf;
-
-	/*  invoke cmd->callback function */
-	pcmd_callback = cmd_callback[pcmd->cmdcode].callback;
-	if (!pcmd_callback)
-		r8712_free_cmd_obj(pcmd);
-	else
-		pcmd_callback(padapter, pcmd);
-	return H2C_SUCCESS;
+	return common_read_write_hdl(padapter, pbuf);
 }
 
 static u8 read_bbreg_hdl(struct _adapter *padapter, u8 *pbuf)
@@ -155,15 +152,7 @@ static u8 read_bbreg_hdl(struct _adapter *padapter, u8 *pbuf)
 
 static u8 write_bbreg_hdl(struct _adapter *padapter, u8 *pbuf)
 {
-	void (*pcmd_callback)(struct _adapter *dev, struct cmd_obj *pcmd);
-	struct cmd_obj *pcmd  = (struct cmd_obj *)pbuf;
-
-	pcmd_callback = cmd_callback[pcmd->cmdcode].callback;
-	if (!pcmd_callback)
-		r8712_free_cmd_obj(pcmd);
-	else
-		pcmd_callback(padapter, pcmd);
-	return H2C_SUCCESS;
+	return common_read_write_hdl(padapter, pbuf);
 }
 
 static u8 read_rfreg_hdl(struct _adapter *padapter, u8 *pbuf)
@@ -184,15 +173,7 @@ static u8 read_rfreg_hdl(struct _adapter *padapter, u8 *pbuf)
 
 static u8 write_rfreg_hdl(struct _adapter *padapter, u8 *pbuf)
 {
-	void (*pcmd_callback)(struct _adapter *dev, struct cmd_obj *pcmd);
-	struct cmd_obj *pcmd  = (struct cmd_obj *)pbuf;
-
-	pcmd_callback = cmd_callback[pcmd->cmdcode].callback;
-	if (!pcmd_callback)
-		r8712_free_cmd_obj(pcmd);
-	else
-		pcmd_callback(padapter, pcmd);
-	return H2C_SUCCESS;
+	return common_read_write_hdl(padapter, pbuf);
 }
 
 static u8 sys_suspend_hdl(struct _adapter *padapter, u8 *pbuf)
