@@ -87,9 +87,16 @@ static int ses_recv_diag(struct scsi_device *sdev, int page_code,
 		0
 	};
 	unsigned char recv_page_code;
+	struct scsi_sense_hdr sshdr;
+	int retries = SES_RETRIES;
 
-	ret =  scsi_execute_req(sdev, cmd, DMA_FROM_DEVICE, buf, bufflen,
-				NULL, SES_TIMEOUT, SES_RETRIES, NULL);
+	do {
+		ret =  scsi_execute_req(sdev, cmd, DMA_FROM_DEVICE, buf,
+			bufflen, &sshdr, NULL, SES_TIMEOUT, SES_RETRIES, NULL);
+
+	} while (scsi_sense_valid(&sshdr) &&
+                 sshdr.sense_key == UNIT_ATTENTION && --retries);
+
 	if (unlikely(ret))
 		return ret;
 
