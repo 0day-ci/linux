@@ -1847,6 +1847,34 @@ therefore the load of x must execute before the load of y.  Thus we
 cannot have r1 = 1 and r2 = 0 at the end (this is an instance of the
 MP pattern).
 
+This requirement also applies to a lock-release and a lock-acquire
+on different locks, as long as the lock-acquire is po-after the
+lock-release. Note that "po-after" means the lock-acquire and the
+lock-release are on the same cpu. An example simliar to the above:
+
+	int x, y;
+	spinlock_t s;
+	spinlock_t t;
+
+	P0()
+	{
+		int r1, r2;
+
+		spin_lock(&s);
+		r1 = READ_ONCE(x);
+		spin_unlock(&s);
+		spin_lock(&t);
+		r2 = READ_ONCE(y);
+		spin_unlock(&t);
+	}
+
+	P1()
+	{
+		WRITE_ONCE(y, 1);
+		smp_wmb();
+		WRITE_ONCE(x, 1);
+	}
+
 This requirement does not apply to ordinary release and acquire
 fences, only to lock-related operations.  For instance, suppose P0()
 in the example had been written as:
