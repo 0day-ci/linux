@@ -629,6 +629,8 @@ patternProperties:
     description: Lenovo Group Ltd.
   "^lg,.*":
     description: LG Corporation
+  "^lge,.*":
+    description: LG Electronics Inc.
   "^lgphilips,.*":
     description: LG Display
   "^libretech,.*":
