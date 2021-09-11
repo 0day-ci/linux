@@ -70,4 +70,19 @@ config SOC_CANAAN_K210_DTB_SOURCE
 
 endif
 
+config SOC_SUNXI
+	bool "Allwinner SoCs"
+	depends on MMU
+	select DWMAC_GENERIC
+	select ERRATA_THEAD
+	select RISCV_DMA_NONCOHERENT
+	select RISCV_ERRATA_ALTERNATIVE
+	select SERIAL_8250
+	select SERIAL_8250_CONSOLE
+	select SERIAL_8250_DW
+	select SIFIVE_PLIC
+	select STMMAC_ETH
+	help
+	  This enables support for Allwinner SoC platforms like the D1.
+
 endmenu
