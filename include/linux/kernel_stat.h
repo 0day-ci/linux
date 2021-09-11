@@ -36,7 +36,7 @@ struct kernel_cpustat {
 };
 
 struct kernel_stat {
-	unsigned long irqs_sum;
+	unsigned int irqs_sum;
 	unsigned int softirqs[NR_SOFTIRQS];
 };
 
