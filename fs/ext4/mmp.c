@@ -218,6 +218,7 @@ static int kmmpd(void *data)
 				ext4_error_err(sb, -retval,
 					       "error reading MMP data: %d",
 					       retval);
+				EXT4_SB(sb)->s_mmp_bh = NULL;
 				goto wait_to_exit;
 			}
 
