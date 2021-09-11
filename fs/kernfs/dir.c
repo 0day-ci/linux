@@ -17,6 +17,8 @@
 
 #include "kernfs-internal.h"
 
+static void kernfs_activate_locked(struct kernfs_node *kn, bool invalidate);
+
 DECLARE_RWSEM(kernfs_rwsem);
 static DEFINE_SPINLOCK(kernfs_rename_lock);	/* kn->parent and ->name */
 static char kernfs_pr_cont_buf[PATH_MAX];	/* protected by rename_lock */
@@ -753,8 +755,6 @@ int kernfs_add_one(struct kernfs_node *kn)
 		ps_iattr->ia_mtime = ps_iattr->ia_ctime;
 	}
 
-	up_write(&kernfs_rwsem);
-
 	/*
 	 * Activate the new node unless CREATE_DEACTIVATED is requested.
 	 * If not activated here, the kernfs user is responsible for
@@ -763,8 +763,7 @@ int kernfs_add_one(struct kernfs_node *kn)
 	 * trigger deactivation.
 	 */
 	if (!(kernfs_root(kn)->flags & KERNFS_ROOT_CREATE_DEACTIVATED))
-		kernfs_activate(kn);
-	return 0;
+		kernfs_activate_locked(kn, false);
 
 out_unlock:
 	up_write(&kernfs_rwsem);
@@ -942,8 +941,11 @@ struct kernfs_root *kernfs_create_root(struct kernfs_syscall_ops *scops,
 	root->kn = kn;
 	init_waitqueue_head(&root->deactivate_waitq);
 
-	if (!(root->flags & KERNFS_ROOT_CREATE_DEACTIVATED))
-		kernfs_activate(kn);
+	if (!(root->flags & KERNFS_ROOT_CREATE_DEACTIVATED)) {
+		down_write(&kernfs_rwsem);
+		kernfs_activate_locked(kn, false);
+		up_write(&kernfs_rwsem);
+	}
 
 	return root;
 }
@@ -1262,8 +1264,11 @@ static struct kernfs_node *kernfs_next_descendant_post(struct kernfs_node *pos,
 }
 
 /**
- * kernfs_activate - activate a node which started deactivated
+ * kernfs_activate_locked - activate a node which started deactivated
  * @kn: kernfs_node whose subtree is to be activated
+ * @invalidate: whether or not to increase the revision of parent node
+ *              for each newly-activated child node. The increase will
+ *              invalidate negative dentries created under the parent node.
  *
  * If the root has KERNFS_ROOT_CREATE_DEACTIVATED set, a newly created node
  * needs to be explicitly activated.  A node which hasn't been activated
@@ -1271,14 +1276,14 @@ static struct kernfs_node *kernfs_next_descendant_post(struct kernfs_node *pos,
  * removal.  This is useful to construct atomic init sequences where
  * creation of multiple nodes should either succeed or fail atomically.
  *
+ * The caller must have acquired kernfs_rwsem.
+ *
  * The caller is responsible for ensuring that this function is not called
  * after kernfs_remove*() is invoked on @kn.
  */
-void kernfs_activate(struct kernfs_node *kn)
+static void kernfs_activate_locked(struct kernfs_node *kn, bool invalidate)
 {
 	struct kernfs_node *pos;
-
-	down_write(&kernfs_rwsem);
 
 	pos = NULL;
 	while ((pos = kernfs_next_descendant_post(pos, kn))) {
@@ -1290,8 +1295,35 @@ void kernfs_activate(struct kernfs_node *kn)
 
 		atomic_sub(KN_DEACTIVATED_BIAS, &pos->active);
 		pos->flags |= KERNFS_ACTIVATED;
-	}
 
+		/*
+		 * Invalidate the negative dentry created after pos is
+		 * inserted into sibling rbtree but before it is
+		 * activated.
+		 */
+		if (invalidate && pos->parent)
+			kernfs_inc_rev(pos->parent);
+	}
+}
+
+/**
+ * kernfs_activate - activate a node which started deactivated
+ * @kn: kernfs_node whose subtree is to be activated
+ *
+ * Currently it is only used by kernfs root which has
+ * FS_ROOT_CREATE_DEACTIVATED set. Because the addition and the activation
+ * of children nodes are not atomic (not always hold kernfs_rwsem),
+ * negative dentry may be created for one child node after its addition
+ * but before its activation, so passing invalidate as true to
+ * @kernfs_activate_locked() to invalidate these negative dentries.
+ *
+ * The caller is responsible for ensuring that this function is not called
+ * after kernfs_remove*() is invoked on @kn.
+ */
+void kernfs_activate(struct kernfs_node *kn)
+{
+	down_write(&kernfs_rwsem);
+	kernfs_activate_locked(kn, true);
 	up_write(&kernfs_rwsem);
 }
 
