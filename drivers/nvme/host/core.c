@@ -1791,7 +1791,8 @@ static void nvme_update_disk_info(struct gendisk *disk,
 		bs = (1 << 9);
 	}
 
-	blk_integrity_unregister(disk);
+	if (blk_get_integrity(disk))
+		blk_integrity_unregister(disk);
 
 	atomic_bs = phys_bs = bs;
 	nvme_setup_streams_ns(ns->ctrl, ns, &phys_bs, &io_opt);
