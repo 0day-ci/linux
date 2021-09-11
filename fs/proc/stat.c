@@ -111,7 +111,7 @@ static int show_stat(struct seq_file *p, void *v)
 	u64 user, nice, system, idle, iowait, irq, softirq, steal;
 	u64 guest, guest_nice;
 	unsigned int sum = 0;
-	u64 sum_softirq = 0;
+	unsigned int sum_softirq = 0;
 	unsigned int per_softirq_sums[NR_SOFTIRQS] = {0};
 	struct timespec64 boottime;
 
@@ -208,7 +208,7 @@ static int show_stat(struct seq_file *p, void *v)
 		nr_running(),
 		nr_iowait());
 
-	seq_put_decimal_ull(p, "softirq ", (unsigned long long)sum_softirq);
+	seq_put_decimal_ull(p, "softirq ", sum_softirq);
 
 	for (i = 0; i < NR_SOFTIRQS; i++)
 		seq_put_decimal_ull(p, " ", per_softirq_sums[i]);
