@@ -3126,6 +3126,38 @@
 
 	n2=		[NET] SDL Inc. RISCom/N2 synchronous serial card
 
+	nax_allowed_caps= [NAX] Hexadecimal number representing the set of
+			capabilities a non-root process can possess without
+			being considered "privileged" by NAX LSM.
+
+			For the meaning of the capabilities bits and their
+			value, please check include/uapi/linux/capability.h
+			and capabilities(7) manual page.
+
+			For example, `CAP_SYS_PTRACE` has a number 19.
+			Therefore, to add it to allowed capabilities list,
+			we need to set 19'th bit (2^19 or 1 << 19) or 80000
+			in hexadecimal form. Capabilities can be bitwise ORed.
+
+	nax_check_all=	[NAX] NAX LSM processes checking mode:
+			0 - Check only privileged processes (default).
+			1 - Check all processes.
+
+	nax_locked=	[NAX] NAX LSM settings' locking mode:
+			0 - Changing NAX sysctl parameters is allowed.
+			1 - Changing NAX sysctl parameters is forbidden until
+			    reboot.
+
+	nax_mode=	[NAX] NAX LSM violation reaction mode:
+			0 - Only log errors (when not in quiet mode; default).
+			1 - Forbid unsafe pages mappings (and log when
+			    enabled).
+			2 - Kill the violating process (and log when enabled).
+
+	nax_quiet=	[NAX] NAX LSM log verbosity:
+			0 - Log messages to syslog.
+			1 - Be quiet.
+
 	netdev=		[NET] Network devices parameters
 			Format: <irq>,<io>,<mem_start>,<mem_end>,<name>
 			Note that mem_start is often overloaded to mean
