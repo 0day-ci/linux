@@ -57,7 +57,7 @@ extern void ack_bad_irq(unsigned int irq);
 extern unsigned int arch_irq_stat_cpu(unsigned int cpu);
 #define arch_irq_stat_cpu	arch_irq_stat_cpu
 
-extern u64 arch_irq_stat(void);
+extern unsigned int arch_irq_stat(void);
 #define arch_irq_stat		arch_irq_stat
 
 

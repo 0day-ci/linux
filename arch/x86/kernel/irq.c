@@ -218,9 +218,9 @@ unsigned int arch_irq_stat_cpu(unsigned int cpu)
 	return sum;
 }
 
-u64 arch_irq_stat(void)
+unsigned int arch_irq_stat(void)
 {
-	u64 sum = atomic_read(&irq_err_count);
+	unsigned int sum = atomic_read(&irq_err_count);
 	return sum;
 }
 
