@@ -3712,6 +3712,14 @@ int pci_enable_atomic_ops_to_root(struct pci_dev *dev, u32 cap_mask)
 	struct pci_dev *bridge;
 	u32 cap, ctl2;
 
+	/*
+	 * As per PCIe r5.0, sec 9.3.5.10, the AtomicOp Requester Enable
+	 * bit in the Device Control 2 register is reserved in VFs and the PF
+	 * value applies to all associated VFs. Return -EINVAL if called for VFs.
+	 */
+	if (dev->is_virtfn)
+		return -EINVAL;
+
 	if (!pci_is_pcie(dev))
 		return -EINVAL;
 
