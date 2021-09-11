@@ -244,47 +244,18 @@ static void bio_free(struct bio *bio)
 }
 
 /*
- * Users of this function have their own bio allocation. Subsequently,
- * they must remember to pair any call to bio_init() with bio_uninit()
- * when IO has completed, or when the bio is released.
+ * Users of this function must pair any call to bio_init() with a call to
+ * bio_uninit() after IO has completed or when the bio is released.
  */
 void bio_init(struct bio *bio, struct bio_vec *table,
 	      unsigned short max_vecs)
 {
-	bio->bi_next = NULL;
-	bio->bi_bdev = NULL;
-	bio->bi_opf = 0;
-	bio->bi_flags = 0;
-	bio->bi_ioprio = 0;
-	bio->bi_write_hint = 0;
-	bio->bi_status = 0;
-	bio->bi_iter.bi_sector = 0;
-	bio->bi_iter.bi_size = 0;
-	bio->bi_iter.bi_idx = 0;
-	bio->bi_iter.bi_bvec_done = 0;
-	bio->bi_end_io = NULL;
-	bio->bi_private = NULL;
-#ifdef CONFIG_BLK_CGROUP
-	bio->bi_blkg = NULL;
-	bio->bi_issue.value = 0;
-#ifdef CONFIG_BLK_CGROUP_IOCOST
-	bio->bi_iocost_cost = 0;
-#endif
-#endif
-#ifdef CONFIG_BLK_INLINE_ENCRYPTION
-	bio->bi_crypt_context = NULL;
-#endif
-#ifdef CONFIG_BLK_DEV_INTEGRITY
-	bio->bi_integrity = NULL;
-#endif
-	bio->bi_vcnt = 0;
-
-	atomic_set(&bio->__bi_remaining, 1);
-	atomic_set(&bio->__bi_cnt, 1);
-
-	bio->bi_max_vecs = max_vecs;
-	bio->bi_io_vec = table;
-	bio->bi_pool = NULL;
+	*bio = (struct bio) {
+		.__bi_remaining	= ATOMIC_INIT(1),
+		.__bi_cnt	= ATOMIC_INIT(1),
+		.bi_max_vecs	= max_vecs,
+		.bi_io_vec	= table,
+	};
 }
 EXPORT_SYMBOL(bio_init);
 
