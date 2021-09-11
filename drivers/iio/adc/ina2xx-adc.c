@@ -777,6 +777,7 @@ static int ina2xx_capture_thread(void *data)
 	int ret;
 	struct timespec64 next, now, delta;
 	s64 delay_us;
+	s64 delta_ns;
 
 	/*
 	 * Poll a bit faster than the chip internal Fs, in case
@@ -818,7 +819,8 @@ static int ina2xx_capture_thread(void *data)
 		do {
 			timespec64_add_ns(&next, 1000 * sampling_us);
 			delta = timespec64_sub(next, now);
-			delay_us = div_s64(timespec64_to_ns(&delta), 1000);
+			delta_ns = (((s64)delta.tv_sec) * NSEC_PER_SEC)+delta.tv_nsec;
+			delay_us = div_s64(delta_ns, 1000);
 		} while (delay_us <= 0);
 
 		usleep_range(delay_us, (delay_us * 3) >> 1);
