@@ -2366,13 +2366,17 @@ static int register_cache(struct cache_sb *sb, struct cache_sb_disk *sb_disk,
 		 * explicitly call blkdev_put() here.
 		 */
 		blkdev_put(bdev, FMODE_READ|FMODE_WRITE|FMODE_EXCL);
+		if (ca->sb_disk)
+			put_page(virt_to_page(ca->sb_disk));
 		if (ret == -ENOMEM)
 			err = "cache_alloc(): -ENOMEM";
 		else if (ret == -EPERM)
 			err = "cache_alloc(): cache device is too small";
 		else
 			err = "cache_alloc(): unknown error";
-		goto err;
+		pr_notice("error %s: %s\n", ca->cache_dev_name, err);
+		kfree(ca);
+		return ret;
 	}
 
 	if (kobject_add(&ca->kobj, bdev_kobj(bdev), "bcache")) {
@@ -2393,11 +2397,9 @@ static int register_cache(struct cache_sb *sb, struct cache_sb_disk *sb_disk,
 	pr_info("registered cache device %s\n", ca->cache_dev_name);
 
 out:
-	kobject_put(&ca->kobj);
-
-err:
 	if (err)
 		pr_notice("error %s: %s\n", ca->cache_dev_name, err);
+	kobject_put(&ca->kobj);
 
 	return ret;
 }
