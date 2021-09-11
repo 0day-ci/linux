@@ -6,12 +6,56 @@
 
 static int loongson_get_modes(struct drm_connector *connector)
 {
-	int count;
+	struct drm_device *dev = connector->dev;
+	struct loongson_connector *lconnector =
+				to_loongson_connector(connector);
+	struct i2c_adapter *adapter = lconnector->i2c->adapter;
+	struct edid *edid = NULL;
+	u32 ret;
 
-	count = drm_add_modes_noedid(connector, 1920, 1080);
-	drm_set_preferred_mode(connector, 1024, 768);
+	edid = drm_get_edid(connector, adapter);
+	if (edid) {
+		drm_connector_update_edid_property(connector, edid);
+		ret = drm_add_edid_modes(connector, edid);
+	} else {
+		drm_warn(dev, "Failed to read EDID\n");
+		ret = drm_add_modes_noedid(connector, 1920, 1080);
+		drm_set_preferred_mode(connector, 1024, 768);
+	}
 
-	return count;
+	return ret;
+}
+
+static bool is_connected(struct loongson_connector *lconnector)
+{
+	struct i2c_adapter *adapter = lconnector->i2c->adapter;
+	unsigned char start = 0x0;
+	struct i2c_msg msgs = {
+		.addr = DDC_ADDR,
+		.flags = 0,
+		.len = 1,
+		.buf = &start,
+	};
+
+	if (!lconnector->i2c)
+		return false;
+
+	if (i2c_transfer(adapter, &msgs, 1) != 1)
+		return false;
+
+	return true;
+}
+
+static enum drm_connector_status
+loongson_detect(struct drm_connector *connector, bool force)
+{
+	struct loongson_connector *lconnector =
+				to_loongson_connector(connector);
+
+	if (is_connected(lconnector))
+		return connector_status_connected;
+
+	return connector_status_disconnected;
 }
 
 static const struct drm_connector_helper_funcs loongson_connector_helper = {
@@ -19,6 +63,7 @@ static const struct drm_connector_helper_funcs loongson_connector_helper = {
 };
 
 static const struct drm_connector_funcs loongson_connector_funcs = {
+	.detect = loongson_detect,
 	.fill_modes = drm_helper_probe_single_connector_modes,
 	.destroy = drm_connector_cleanup,
 	.reset = drm_atomic_helper_connector_reset,
@@ -38,6 +83,12 @@ int loongson_connector_init(struct loongson_device *ldev, int index)
 
 	lconnector->ldev = ldev;
 	lconnector->id = index;
+	lconnector->i2c_id = index;
+
+	lconnector->i2c = &ldev->i2c_bus[lconnector->i2c_id];
+	if (!lconnector->i2c)
+		drm_err(dev, "connector-%d match i2c-%d err\n", index,
+			lconnector->i2c_id);
 
 	ldev->mode_info[index].connector = lconnector;
 	connector = &lconnector->base;

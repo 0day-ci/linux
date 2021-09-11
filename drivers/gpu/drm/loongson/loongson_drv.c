@@ -17,9 +17,10 @@
 
 /* Interface history:
  * 0.1 - original.
+ * 0.2 - add i2c and connector detect.
  */
 #define DRIVER_MAJOR 0
-#define DRIVER_MINOR 1
+#define DRIVER_MINOR 2
 
 static const struct drm_mode_config_funcs loongson_mode_funcs = {
 	.fb_create = drm_gem_fb_create,
@@ -83,15 +84,22 @@ static int loongson_device_init(struct drm_device *dev)
 
 	ldev->num_crtc = 2;
 
-	drm_info(dev, "DC mmio base 0x%llx size 0x%llx io 0x%llx\n",
-		 mmio_base, mmio_size, *(u64 *)ldev->io);
+	ret = loongson_dc_gpio_init(ldev);
+	if (ret)
+		return ret;
+
+	ret = loongson_i2c_init(ldev);
+	if (ret)
+		return ret;
+
+	drm_info(dev, "DC mmio base 0x%llx size 0x%llx\n", mmio_base, mmio_size);
 	drm_info(dev, "GPU vram start = 0x%x size = 0x%x\n",
 		 ldev->vram_start, ldev->vram_size);
 
 	return 0;
 }
 
-int loongson_modeset_init(struct loongson_device *ldev)
+static int loongson_modeset_init(struct loongson_device *ldev)
 {
 	struct drm_encoder *encoder;
 	struct drm_connector *connector;
