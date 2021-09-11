@@ -645,9 +645,9 @@ int arch_show_interrupts(struct seq_file *p, int prec)
 /*
  * /proc/stat helpers
  */
-u64 arch_irq_stat_cpu(unsigned int cpu)
+unsigned int arch_irq_stat_cpu(unsigned int cpu)
 {
-	u64 sum = per_cpu(irq_stat, cpu).timer_irqs_event;
+	unsigned int sum = per_cpu(irq_stat, cpu).timer_irqs_event;
 
 	sum += per_cpu(irq_stat, cpu).broadcast_irqs_event;
 	sum += per_cpu(irq_stat, cpu).pmu_irqs;
