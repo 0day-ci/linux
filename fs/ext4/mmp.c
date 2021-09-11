@@ -152,6 +152,7 @@ static int kmmpd(void *data)
 	int mmp_update_interval = le16_to_cpu(es->s_mmp_update_interval);
 	unsigned mmp_check_interval;
 	unsigned long last_update_time;
+	unsigned long last_check_time;
 	unsigned long diff;
 	int retval = 0;
 
@@ -170,6 +171,7 @@ static int kmmpd(void *data)
 
 	memcpy(mmp->mmp_nodename, init_utsname()->nodename,
 	       sizeof(mmp->mmp_nodename));
+	last_check_time = jiffies;
 
 	while (!kthread_should_stop() && !sb_rdonly(sb)) {
 		if (!ext4_has_feature_mmp(sb)) {
@@ -198,17 +200,18 @@ static int kmmpd(void *data)
 		}
 
 		diff = jiffies - last_update_time;
-		if (diff < mmp_update_interval * HZ)
+		if (diff < mmp_update_interval * HZ) {
 			schedule_timeout_interruptible(mmp_update_interval *
 						       HZ - diff);
+			diff = jiffies - last_update_time;
+		}
 
 		/*
 		 * We need to make sure that more than mmp_check_interval
-		 * seconds have not passed since writing. If that has happened
-		 * we need to check if the MMP block is as we left it.
+		 * seconds have not passed since check. If that has happened
+		 * we need to check if the MMP block is as we write it.
 		 */
-		diff = jiffies - last_update_time;
-		if (diff > mmp_check_interval * HZ) {
+		if (jiffies - last_check_time > mmp_check_interval * HZ) {
 			struct buffer_head *bh_check = NULL;
 			struct mmp_struct *mmp_check;
 
@@ -234,6 +237,7 @@ static int kmmpd(void *data)
 				goto wait_to_exit;
 			}
 			put_bh(bh_check);
+			last_check_time = jiffies;
 		}
 
 		 /*
