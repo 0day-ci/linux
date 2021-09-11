@@ -140,6 +140,7 @@ struct qcom_iris *qcom_iris_probe(struct device *parent, bool *use_48mhz_xo)
 	ret = device_add(&iris->dev);
 	if (ret) {
 		put_device(&iris->dev);
+		of_node_put(of_node);
 		return ERR_PTR(ret);
 	}
 
@@ -192,10 +193,12 @@ struct qcom_iris *qcom_iris_probe(struct device *parent, bool *use_48mhz_xo)
 
 	*use_48mhz_xo = data->use_48mhz_xo;
 
+	of_node_put(of_node);
 	return iris;
 
 err_device_del:
 	device_del(&iris->dev);
+	of_node_put(of_node);
 
 	return ERR_PTR(ret);
 }
