@@ -41,4 +41,15 @@ config ERRATA_SIFIVE_CIP_1200
 
 	  If you don't know what to do here, say "Y".
 
+config ERRATA_THEAD
+	bool "T-HEAD errata"
+	depends on RISCV_ERRATA_ALTERNATIVE
+	default y
+	help
+	  All T-HEAD errata Kconfig depend on this Kconfig. Disabling
+	  this Kconfig will disable all T-HEAD errata. Please say "Y"
+	  here if your platform uses T-HEAD CPU cores.
+
+	  Otherwise, please say "N" here to avoid unnecessary overhead.
+
 endmenu

@@ -72,3 +72,21 @@ void __init apply_boot_alternatives(void)
 			  cpu_mfr_info.arch_id, cpu_mfr_info.imp_id);
 }
 
+/*
+ * This is called very early form setup_vm in the boot process.
+ */
+void __init apply_errata_setup_vm(void)
+{
+	riscv_fill_cpu_mfr_info();
+
+	switch (cpu_mfr_info.vendor_id) {
+#ifdef CONFIG_ERRATA_THEAD
+	case THEAD_VENDOR_ID:
+		thead_errata_setup_vm(cpu_mfr_info.arch_id,
+				      cpu_mfr_info.imp_id);
+		break;
+#endif
+	default:
+		break;
+	}
+}
