@@ -4326,10 +4326,17 @@ int sysctl_schedstats(struct ctl_table *table, int write, void *buffer,
 /*
  * fork()/clone()-time setup:
  */
-int sched_fork(unsigned long clone_flags, struct task_struct *p)
+int sched_fork(unsigned long clone_flags, struct task_struct *p,
+		struct kernel_clone_args *kargs)
 {
 	unsigned long flags;
+#ifdef CONFIG_CGROUP_SCHED
+	struct task_group *tg;
 
+	tg = container_of(kargs->cset->subsys[cpu_cgrp_id],
+			  struct task_group, css);
+	p->sched_task_group = autogroup_task_group(p, tg);
+#endif
 	__sched_fork(clone_flags, p);
 	/*
 	 * We mark the process as NEW here. This guarantees that

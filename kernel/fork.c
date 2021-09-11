@@ -2160,11 +2160,6 @@ static __latent_entropy struct task_struct *copy_process(
 	p->bpf_ctx = NULL;
 #endif
 
-	/* Perform scheduler related setup. Assign this task to a CPU. */
-	retval = sched_fork(clone_flags, p);
-	if (retval)
-		goto bad_fork_cleanup_policy;
-
 	retval = perf_event_init_task(p, clone_flags);
 	if (retval)
 		goto bad_fork_cleanup_policy;
@@ -2295,6 +2290,11 @@ static __latent_entropy struct task_struct *copy_process(
 	if (retval)
 		goto bad_fork_put_pidfd;
 
+	/* Perform scheduler related setup. Assign this task to a CPU. */
+	retval = sched_fork(clone_flags, p, args);
+	if (retval)
+		goto bad_fork_cancel_cgroup;
+
 	/*
 	 * From this point on we must avoid any synchronous user-space
 	 * communication until we take the tasklist-lock. In particular, we do
@@ -2343,13 +2343,13 @@ static __latent_entropy struct task_struct *copy_process(
 	/* Don't start children in a dying pid namespace */
 	if (unlikely(!(ns_of_pid(pid)->pid_allocated & PIDNS_ADDING))) {
 		retval = -ENOMEM;
-		goto bad_fork_cancel_cgroup;
+		goto bad_fork_clean_sched;
 	}
 
 	/* Let kill terminate clone/fork in the middle */
 	if (fatal_signal_pending(current)) {
 		retval = -EINTR;
-		goto bad_fork_cancel_cgroup;
+		goto bad_fork_clean_sched;
 	}
 
 	/* past the last point of failure */
@@ -2416,10 +2416,11 @@ static __latent_entropy struct task_struct *copy_process(
 
 	return p;
 
-bad_fork_cancel_cgroup:
+bad_fork_clean_sched:
 	sched_core_free(p);
 	spin_unlock(&current->sighand->siglock);
 	write_unlock_irq(&tasklist_lock);
+bad_fork_cancel_cgroup:
 	cgroup_cancel_fork(p, args);
 bad_fork_put_pidfd:
 	if (clone_flags & CLONE_PIDFD) {
