@@ -188,9 +188,9 @@ int arch_show_interrupts(struct seq_file *p, int prec)
 /*
  * /proc/stat helpers
  */
-u64 arch_irq_stat_cpu(unsigned int cpu)
+unsigned int arch_irq_stat_cpu(unsigned int cpu)
 {
-	u64 sum = irq_stats(cpu)->__nmi_count;
+	unsigned int sum = irq_stats(cpu)->__nmi_count;
 
 #ifdef CONFIG_X86_LOCAL_APIC
 	sum += irq_stats(cpu)->apic_timer_irqs;
