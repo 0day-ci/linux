@@ -10,5 +10,6 @@ loongson-y := loongson_connector.o \
 	loongson_drv.o \
 	loongson_encoder.o \
 	loongson_i2c.o \
+	loongson_irq.o \
 	loongson_plane.o
 obj-$(CONFIG_DRM_LOONGSON) += loongson.o
