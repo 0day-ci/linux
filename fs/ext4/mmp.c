@@ -123,6 +123,21 @@ void __dump_mmp_msg(struct super_block *sb, struct mmp_struct *mmp,
 }
 
 /*
+ * Get a random new sequence number but make sure it is not greater than
+ * EXT4_MMP_SEQ_MAX.
+ */
+static unsigned int mmp_new_seq(void)
+{
+	u32 new_seq;
+
+	do {
+		new_seq = prandom_u32();
+	} while (new_seq > EXT4_MMP_SEQ_MAX);
+
+	return new_seq;
+}
+
+/*
  * kmmpd will update the MMP sequence every s_mmp_update_interval seconds
  */
 static int kmmpd(void *data)
@@ -132,7 +147,7 @@ static int kmmpd(void *data)
 	struct buffer_head *bh = EXT4_SB(sb)->s_mmp_bh;
 	struct mmp_struct *mmp;
 	ext4_fsblk_t mmp_block;
-	u32 seq = 0;
+	u32 seq = mmp_new_seq();
 	unsigned long failed_writes = 0;
 	int mmp_update_interval = le16_to_cpu(es->s_mmp_update_interval);
 	unsigned mmp_check_interval;
@@ -256,21 +271,6 @@ void ext4_stop_mmpd(struct ext4_sb_info *sbi)
 		brelse(sbi->s_mmp_bh);
 		sbi->s_mmp_tsk = NULL;
 	}
-}
-
-/*
- * Get a random new sequence number but make sure it is not greater than
- * EXT4_MMP_SEQ_MAX.
- */
-static unsigned int mmp_new_seq(void)
-{
-	u32 new_seq;
-
-	do {
-		new_seq = prandom_u32();
-	} while (new_seq > EXT4_MMP_SEQ_MAX);
-
-	return new_seq;
 }
 
 /*
