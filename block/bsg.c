@@ -219,6 +219,7 @@ out_device_del:
 	cdev_device_del(&bd->cdev, &bd->device);
 out_ida_remove:
 	ida_simple_remove(&bsg_minor_ida, MINOR(bd->device.devt));
+	put_device(&bd->device);
 out_kfree:
 	kfree(bd);
 	return ERR_PTR(ret);
