@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
+config DRM_LOONGSON
+	tristate "DRM support for LS7A bridge chipset"
+	depends on DRM && PCI
+	depends on CPU_LOONGSON64 || COMPILE_TEST
+	select DRM_KMS_HELPER
+	select DRM_VRAM_HELPER
+	help
+	  The loongson 7A bridge chip (LS7A) is a special chipset for
+	  loongson CPU. LS7A internal integrated display controllers,
+	  support two display channels.
+	  If compiled as a module it will be called loongson.

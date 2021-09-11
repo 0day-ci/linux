@@ -369,6 +369,8 @@ source "drivers/gpu/drm/vboxvideo/Kconfig"
 
 source "drivers/gpu/drm/lima/Kconfig"
 
+source "drivers/gpu/drm/loongson/Kconfig"
+
 source "drivers/gpu/drm/panfrost/Kconfig"
 
 source "drivers/gpu/drm/aspeed/Kconfig"
