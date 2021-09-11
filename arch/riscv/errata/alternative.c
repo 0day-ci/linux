@@ -47,6 +47,11 @@ static void __init init_alternative(void)
 		vendor_patch_func = sifive_errata_patch_func;
 		break;
 #endif
+#ifdef CONFIG_ERRATA_THEAD
+	case THEAD_VENDOR_ID:
+		vendor_patch_func = thead_errata_patch_func;
+		break;
+#endif
 	default:
 		vendor_patch_func = NULL;
 	}

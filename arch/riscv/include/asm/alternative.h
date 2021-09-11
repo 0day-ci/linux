@@ -35,6 +35,8 @@ struct errata_checkfunc_id {
 
 void sifive_errata_patch_func(struct alt_entry *begin, struct alt_entry *end,
 			      unsigned long archid, unsigned long impid);
+void thead_errata_patch_func(struct alt_entry *begin, struct alt_entry *end,
+			      unsigned long archid, unsigned long impid);
 
 void thead_errata_setup_vm(unsigned long archid, unsigned long impid);
 #endif
