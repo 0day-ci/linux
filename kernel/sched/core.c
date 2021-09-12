@@ -4261,6 +4261,41 @@ int sysctl_schedstats(struct ctl_table *table, int write, void *buffer,
 #endif /* CONFIG_PROC_SYSCTL */
 #endif /* CONFIG_SCHEDSTATS */
 
+DEFINE_STATIC_KEY_FALSE(child_runs_first);
+
+static void set_child_runs_first(bool enabled)
+{
+	if (enabled) {
+		static_branch_enable(&child_runs_first);
+		sysctl_sched_child_runs_first = 1;
+	} else {
+		static_branch_disable(&child_runs_first);
+		sysctl_sched_child_runs_first = 0;
+	}
+}
+
+#ifdef CONFIG_PROC_SYSCTL
+int sysctl_child_runs_first(struct ctl_table *table, int write,
+		void *buffer, size_t *lenp, loff_t *ppos)
+{
+	struct ctl_table t;
+	int err;
+	int state = static_branch_likely(&child_runs_first);
+
+	if (write && !capable(CAP_SYS_ADMIN))
+		return -EPERM;
+
+	t = *table;
+	t.data = &state;
+	err = proc_dointvec_minmax(&t, write, buffer, lenp, ppos);
+	if (err < 0)
+		return err;
+	if (write)
+		set_child_runs_first(state);
+	return err;
+}
+#endif /* CONFIG_PROC_SYSCTL */
+
 /*
  * fork()/clone()-time setup:
  */

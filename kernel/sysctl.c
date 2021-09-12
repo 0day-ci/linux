@@ -1732,10 +1732,12 @@ int proc_do_static_key(struct ctl_table *table, int write,
 static struct ctl_table kern_table[] = {
 	{
 		.procname	= "sched_child_runs_first",
-		.data		= &sysctl_sched_child_runs_first,
+		.data		= NULL,
 		.maxlen		= sizeof(unsigned int),
 		.mode		= 0644,
-		.proc_handler	= proc_dointvec,
+		.proc_handler	= sysctl_child_runs_first,
+		.extra1		= SYSCTL_ZERO,
+		.extra2		= SYSCTL_ONE,
 	},
 #ifdef CONFIG_SCHEDSTATS
 	{

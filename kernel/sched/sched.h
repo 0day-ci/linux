@@ -2006,6 +2006,7 @@ static const_debug __maybe_unused unsigned int sysctl_sched_features =
 
 extern struct static_key_false sched_numa_balancing;
 extern struct static_key_false sched_schedstats;
+DECLARE_STATIC_KEY_FALSE(child_runs_first);
 
 static inline u64 global_rt_period(void)
 {
