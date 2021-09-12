@@ -55,7 +55,7 @@ $(OUTDIR)/aicdb.h:
 	 elif [ -e "/usr/include/db_185.h" ]; then		\
 		echo "#include <db_185.h>" > $@;		\
 	 else							\
-		echo "*** Install db development libraries";	\
+		echo "*** Install BerkeleyDB development libraries (usually libdb5.3-dev)";\
 	 fi
 
 clean:
