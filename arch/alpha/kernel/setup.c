@@ -490,7 +490,7 @@ setup_arch(char **cmdline_p)
 	/* Hack for Jensen... since we're restricted to 8 or 16 chars for
 	   boot flags depending on the boot mode, we need some shorthand.
 	   This should do for installation.  */
-	if (strcmp(COMMAND_LINE, "INSTALL") == 0) {
+	if (strcmp(absolute_pointer(COMMAND_LINE), "INSTALL") == 0) {
 		strlcpy(command_line, "root=/dev/fd0 load_ramdisk=1", sizeof command_line);
 	} else {
 		strlcpy(command_line, COMMAND_LINE, sizeof command_line);
