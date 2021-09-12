@@ -324,6 +324,14 @@ enum {
 	IORING_REGISTER_LAST
 };
 
+/* io-wq worker limit categories */
+enum {
+	IO_WQ_ACCT_BOUND,
+	IO_WQ_ACCT_UNBOUND,
+
+	IO_WQ_ACCT_NR /* Non-UAPI */
+};
+
 /* deprecated, see struct io_uring_rsrc_update */
 struct io_uring_files_update {
 	__u32 offset;
