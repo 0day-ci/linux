@@ -45,6 +45,7 @@
 #include <sys/types.h>
 
 #include "aicdb.h"
+#include <ctype.h>
 #include <fcntl.h>
 #include <inttypes.h>
 #include <regex.h>
