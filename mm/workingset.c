@@ -288,6 +288,7 @@ void workingset_refault(struct page *page, void *shadow)
 	struct lruvec *eviction_lruvec;
 	unsigned long refault_distance;
 	unsigned long workingset_size;
+	unsigned long file_lru_size;
 	struct pglist_data *pgdat;
 	struct mem_cgroup *memcg;
 	unsigned long eviction;
@@ -349,6 +350,11 @@ void workingset_refault(struct page *page, void *shadow)
 	 */
 	memcg = page_memcg(page);
 	lruvec = mem_cgroup_lruvec(memcg, pgdat);
+
+	file_lru_size = lruvec_page_state(eviction_lruvec, NR_ACTIVE_FILE) +
+			lruvec_page_state(eviction_lruvec, NR_INACTIVE_FILE);
+	if (refault_distance > file_lru_size)
+		goto out;
 
 	inc_lruvec_state(lruvec, WORKINGSET_REFAULT_BASE + file);
 
