@@ -377,6 +377,8 @@ enum {
 	MASK_EE_PERFORMANCE_THROTTLING	= BIT(6),
 };
 
+#define MASK_EE_URGENT_TEMP (MASK_EE_TOO_HIGH_TEMP | MASK_EE_TOO_LOW_TEMP)
+
 /* Background operation status */
 enum bkops_status {
 	BKOPS_STATUS_NO_OP               = 0x0,
