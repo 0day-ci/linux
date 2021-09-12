@@ -263,7 +263,8 @@ static int get_attention_status(struct hotplug_slot *hotplug_slot, u8 *value)
 {
 	int rc = -ENODEV;
 	struct slot *pslot;
-	struct slot myslot;
+	u8 attention;
+	u8 ext_attention;
 
 	debug("get_attention_status - Entry hotplug_slot[%lx] pvalue[%lx]\n",
 					(ulong) hotplug_slot, (ulong) value);
@@ -271,14 +272,12 @@ static int get_attention_status(struct hotplug_slot *hotplug_slot, u8 *value)
 	ibmphp_lock_operations();
 	if (hotplug_slot) {
 		pslot = to_slot(hotplug_slot);
-		memcpy(&myslot, pslot, sizeof(struct slot));
-		rc = ibmphp_hpc_readslot(pslot, READ_SLOTSTATUS,
-					 &myslot.status);
+		rc = ibmphp_hpc_readslot(pslot, READ_SLOTSTATUS, &attention);
 		if (!rc)
 			rc = ibmphp_hpc_readslot(pslot, READ_EXTSLOTSTATUS,
-						 &myslot.ext_status);
+						 &ext_attention);
 		if (!rc)
-			*value = SLOT_ATTN(myslot.status, myslot.ext_status);
+			*value = SLOT_ATTN(attention, ext_attention);
 	}
 
 	ibmphp_unlock_operations();
@@ -290,18 +289,16 @@ static int get_latch_status(struct hotplug_slot *hotplug_slot, u8 *value)
 {
 	int rc = -ENODEV;
 	struct slot *pslot;
-	struct slot myslot;
+	u8 latch;
 
 	debug("get_latch_status - Entry hotplug_slot[%lx] pvalue[%lx]\n",
 					(ulong) hotplug_slot, (ulong) value);
 	ibmphp_lock_operations();
 	if (hotplug_slot) {
 		pslot = to_slot(hotplug_slot);
-		memcpy(&myslot, pslot, sizeof(struct slot));
-		rc = ibmphp_hpc_readslot(pslot, READ_SLOTSTATUS,
-					 &myslot.status);
+		rc = ibmphp_hpc_readslot(pslot, READ_SLOTSTATUS, &latch);
 		if (!rc)
-			*value = SLOT_LATCH(myslot.status);
+			*value = SLOT_LATCH(latch);
 	}
 
 	ibmphp_unlock_operations();
@@ -315,18 +312,16 @@ static int get_power_status(struct hotplug_slot *hotplug_slot, u8 *value)
 {
 	int rc = -ENODEV;
 	struct slot *pslot;
-	struct slot myslot;
+	u8 power;
 
 	debug("get_power_status - Entry hotplug_slot[%lx] pvalue[%lx]\n",
 					(ulong) hotplug_slot, (ulong) value);
 	ibmphp_lock_operations();
 	if (hotplug_slot) {
 		pslot = to_slot(hotplug_slot);
-		memcpy(&myslot, pslot, sizeof(struct slot));
-		rc = ibmphp_hpc_readslot(pslot, READ_SLOTSTATUS,
-					 &myslot.status);
+		rc = ibmphp_hpc_readslot(pslot, READ_SLOTSTATUS, &power);
 		if (!rc)
-			*value = SLOT_PWRGD(myslot.status);
+			*value = SLOT_PWRGD(power);
 	}
 
 	ibmphp_unlock_operations();
@@ -335,23 +330,20 @@ static int get_power_status(struct hotplug_slot *hotplug_slot, u8 *value)
 	return rc;
 }
 
-static int get_adapter_present(struct hotplug_slot *hotplug_slot, u8 *value)
+static int get_adapter_status(struct hotplug_slot *hotplug_slot, u8 *value)
 {
 	int rc = -ENODEV;
 	struct slot *pslot;
 	u8 present;
-	struct slot myslot;
 
 	debug("get_adapter_status - Entry hotplug_slot[%lx] pvalue[%lx]\n",
 					(ulong) hotplug_slot, (ulong) value);
 	ibmphp_lock_operations();
 	if (hotplug_slot) {
 		pslot = to_slot(hotplug_slot);
-		memcpy(&myslot, pslot, sizeof(struct slot));
-		rc = ibmphp_hpc_readslot(pslot, READ_SLOTSTATUS,
-					 &myslot.status);
+		rc = ibmphp_hpc_readslot(pslot, READ_SLOTSTATUS, &present);
 		if (!rc) {
-			present = SLOT_PRESENT(myslot.status);
+			present = SLOT_PRESENT(present);
 			if (present == HPC_SLOT_EMPTY)
 				*value = 0;
 			else
@@ -360,7 +352,7 @@ static int get_adapter_present(struct hotplug_slot *hotplug_slot, u8 *value)
 	}
 
 	ibmphp_unlock_operations();
-	debug("get_adapter_present - Exit rc[%d] value[%x]\n", rc, *value);
+	debug("get_adapter_status - Exit rc[%d] value[%x]\n", rc, *value);
 	return rc;
 }
 
@@ -1230,7 +1222,7 @@ const struct hotplug_slot_ops ibmphp_hotplug_slot_ops = {
 	.get_power_status =		get_power_status,
 	.get_attention_status =		get_attention_status,
 	.get_latch_status =		get_latch_status,
-	.get_adapter_status =		get_adapter_present,
+	.get_adapter_status =		get_adapter_status,
 /*	.get_max_adapter_speed =	get_max_adapter_speed,
 	.get_bus_name_status =		get_bus_name,
 */
