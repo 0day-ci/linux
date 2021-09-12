@@ -69,6 +69,7 @@ $(OUTDIR)/aicasm_gram.c $(OUTDIR)/aicasm_gram.h: aicasm_gram.y
 	$(YACC) $(YFLAGS) -b $(<:.y=) $<
 	mv $(<:.y=).tab.c $(OUTDIR)/$(<:.y=.c)
 	mv $(<:.y=).tab.h $(OUTDIR)/$(<:.y=.h)
+	sed -i 's/\.tab\././' $(OUTDIR)/$(<:.y=.c)
 
 # Create a dependency chain in generated files
 # to avoid concurrent invocations of the single
@@ -78,6 +79,7 @@ $(OUTDIR)/aicasm_macro_gram.c $(OUTDIR)/aicasm_macro_gram.h: aicasm_macro_gram.y
 	$(YACC) $(YFLAGS) -b $(<:.y=) -p mm $<
 	mv $(<:.y=).tab.c $(OUTDIR)/$(<:.y=.c)
 	mv $(<:.y=).tab.h $(OUTDIR)/$(<:.y=.h)
+	sed -i 's/\.tab\././' $(OUTDIR)/$(<:.y=.c)
 
 $(OUTDIR)/aicasm_scan.c: aicasm_scan.l
 	$(LEX) $(LFLAGS) -o $@ $<
