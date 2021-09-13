@@ -222,31 +222,35 @@ static int icl_sagv_max_dclk(const struct intel_qgv_info *qi)
 
 struct intel_sa_info {
 	u16 displayrtids;
-	u8 deburst, deprogbwlimit;
+	u8 deburst, deprogbwlimit, derating;
 };
 
 static const struct intel_sa_info icl_sa_info = {
 	.deburst = 8,
 	.deprogbwlimit = 25, /* GB/s */
 	.displayrtids = 128,
+	.derating = 10,
 };
 
 static const struct intel_sa_info tgl_sa_info = {
 	.deburst = 16,
 	.deprogbwlimit = 34, /* GB/s */
 	.displayrtids = 256,
+	.derating = 10,
 };
 
 static const struct intel_sa_info rkl_sa_info = {
 	.deburst = 16,
 	.deprogbwlimit = 20, /* GB/s */
 	.displayrtids = 128,
+	.derating = 10,
 };
 
 static const struct intel_sa_info adls_sa_info = {
 	.deburst = 16,
 	.deprogbwlimit = 38, /* GB/s */
 	.displayrtids = 256,
+	.derating = 20,
 };
 
 static int icl_get_bw_info(struct drm_i915_private *dev_priv, const struct intel_sa_info *sa)
@@ -302,7 +306,7 @@ static int icl_get_bw_info(struct drm_i915_private *dev_priv, const struct intel
 			bw = icl_calc_bw(sp->dclk, clpchgroup * 32 * num_channels, ct);
 
 			bi->deratedbw[j] = min(maxdebw,
-					       bw * 9 / 10); /* 90% */
+					       bw * (100 - sa->derating) / 100);
 
 			drm_dbg_kms(&dev_priv->drm,
 				    "BW%d / QGV %d: num_planes=%d deratedbw=%u\n",
