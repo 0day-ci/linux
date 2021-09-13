@@ -611,7 +611,7 @@ static const struct tpm_class_ops tpm_tis_i2c = {
 
 static int tpm_tis_i2c_init(struct device *dev)
 {
-	u32 vendor;
+	__le32 vendor;
 	int rc = 0;
 	struct tpm_chip *chip;
 
