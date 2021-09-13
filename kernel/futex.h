@@ -137,4 +137,19 @@ futex_init_timeout(u32 cmd, u32 op, struct timespec64 *ts, ktime_t *t)
 	return 0;
 }
 
+/**
+ * struct futex_vector - Auxiliary struct for futex_waitv()
+ * @w: Userspace provided data
+ * @q: Kernel side data
+ *
+ * Struct used to build an array with all data need for futex_waitv()
+ */
+struct futex_vector {
+	struct futex_waitv w;
+	struct futex_q q;
+};
+
+int futex_wait_multiple(struct futex_vector *vs, unsigned int count,
+			struct hrtimer_sleeper *to);
+
 #endif
