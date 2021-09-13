@@ -949,6 +949,7 @@ enum bpf_prog_type {
 	BPF_PROG_TYPE_LSM,
 	BPF_PROG_TYPE_SK_LOOKUP,
 	BPF_PROG_TYPE_SYSCALL, /* a program that can execute syscalls */
+	BPF_PROG_TYPE_SCHED_QDISC,
 };
 
 enum bpf_attach_type {
@@ -6256,6 +6257,25 @@ enum {
 	BTF_F_NONAME	=	(1ULL << 1),
 	BTF_F_PTR_RAW	=	(1ULL << 2),
 	BTF_F_ZERO	=	(1ULL << 3),
+};
+
+struct sch_bpf_ctx {
+	/* Input */
+	struct __sk_buff *skb;
+	__u32 nr_flows;
+	__u32 handle;
+
+	/* Output */
+	__u64 rank;
+	__u64 delay;
+	__u32 classid;
+};
+
+enum {
+	SCH_BPF_OK,
+	SCH_BPF_REQUEUE,
+	SCH_BPF_DROP,
+	SCH_BPF_THROTTLE,
 };
 
 #endif /* _UAPI__LINUX_BPF_H__ */
