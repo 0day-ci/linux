@@ -64,28 +64,16 @@ void __i915_gem_object_set_pages(struct drm_i915_gem_object *obj,
 		GEM_BUG_ON(i915_gem_object_has_tiling_quirk(obj));
 		i915_gem_object_set_tiling_quirk(obj);
 		GEM_BUG_ON(!list_empty(&obj->mm.link));
-		atomic_inc(&obj->mm.shrink_pin);
 		shrinkable = false;
 	}
 
 	if (shrinkable) {
-		struct list_head *list;
-		unsigned long flags;
-
 		assert_object_held(obj);
-		spin_lock_irqsave(&i915->mm.obj_lock, flags);
-
-		i915->mm.shrink_count++;
-		i915->mm.shrink_memory += obj->base.size;
 
 		if (obj->mm.madv != I915_MADV_WILLNEED)
-			list = &i915->mm.purge_list;
+			i915_gem_object_make_purgeable(obj);
 		else
-			list = &i915->mm.shrink_list;
-		list_add_tail(&obj->mm.link, list);
-
-		atomic_set(&obj->mm.shrink_pin, 0);
-		spin_unlock_irqrestore(&i915->mm.obj_lock, flags);
+			i915_gem_object_make_shrinkable(obj);
 	}
 }
 

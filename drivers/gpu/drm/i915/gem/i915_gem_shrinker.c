@@ -455,23 +455,26 @@ void i915_gem_shrinker_taints_mutex(struct drm_i915_private *i915,
 
 #define obj_to_i915(obj__) to_i915((obj__)->base.dev)
 
+/**
+ * i915_gem_object_make_unshrinkable - Hide the object from the shrinker. By
+ * default all object types that support shrinking(see IS_SHRINKABLE), will also
+ * make the object visible to the shrinker after allocating the system memory
+ * pages.
+ * @obj: The GEM object.
+ *
+ * This is typically used for special kernel internal objects that can't be
+ * easily processed by the shrinker, like if they are perma-pinned.
+ */
 void i915_gem_object_make_unshrinkable(struct drm_i915_gem_object *obj)
 {
 	struct drm_i915_private *i915 = obj_to_i915(obj);
 	unsigned long flags;
 
-	/*
-	 * We can only be called while the pages are pinned or when
-	 * the pages are released. If pinned, we should only be called
-	 * from a single caller under controlled conditions; and on release
-	 * only one caller may release us. Neither the two may cross.
-	 */
-	if (atomic_add_unless(&obj->mm.shrink_pin, 1, 0))
+	if (!i915_gem_object_is_shrinkable(obj))
 		return;
 
 	spin_lock_irqsave(&i915->mm.obj_lock, flags);
-	if (!atomic_fetch_inc(&obj->mm.shrink_pin) &&
-	    !list_empty(&obj->mm.link)) {
+	if (!list_empty(&obj->mm.link)) {
 		list_del_init(&obj->mm.link);
 		i915->mm.shrink_count--;
 		i915->mm.shrink_memory -= obj->base.size;
@@ -489,28 +492,45 @@ static void __i915_gem_object_make_shrinkable(struct drm_i915_gem_object *obj,
 	if (!i915_gem_object_is_shrinkable(obj))
 		return;
 
-	if (atomic_add_unless(&obj->mm.shrink_pin, -1, 1))
-		return;
-
 	spin_lock_irqsave(&i915->mm.obj_lock, flags);
-	GEM_BUG_ON(!kref_read(&obj->base.refcount));
-	if (atomic_dec_and_test(&obj->mm.shrink_pin)) {
-		GEM_BUG_ON(!list_empty(&obj->mm.link));
 
-		list_add_tail(&obj->mm.link, head);
+	GEM_BUG_ON(!kref_read(&obj->base.refcount));
+
+	if (list_empty(&obj->mm.link)) {
 		i915->mm.shrink_count++;
 		i915->mm.shrink_memory += obj->base.size;
-
+		list_add_tail(&obj->mm.link, head);
+	} else {
+		list_move_tail(&obj->mm.link, head);
 	}
+
 	spin_unlock_irqrestore(&i915->mm.obj_lock, flags);
 }
 
+
+/**
+ * i915_gem_object_make_shrinkable - Move the object to the tail of the
+ * shrinkable list. Objects on this list might be swapped out. Used with
+ * WILLNEED objects.
+ * @obj: The GEM object.
+ *
+ * Should only be called on objects which have backing pages.
+ */
 void i915_gem_object_make_shrinkable(struct drm_i915_gem_object *obj)
 {
 	__i915_gem_object_make_shrinkable(obj,
 					  &obj_to_i915(obj)->mm.shrink_list);
 }
 
+/**
+ * i915_gem_object_make_purgeable - Move the object to the tail of the purgeable
+ * list. Used with DONTNEED objects. Unlike with shrinkable objects, the
+ * shrinker will attempt to discard the backing pages, instead of trying to swap
+ * them out.
+ * @obj: The GEM object.
+ *
+ * Should only be called on objects which have backing pages.
+ */
 void i915_gem_object_make_purgeable(struct drm_i915_gem_object *obj)
 {
 	__i915_gem_object_make_shrinkable(obj,
