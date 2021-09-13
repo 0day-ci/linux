@@ -15,19 +15,614 @@
 #include <linux/math64.h>
 #include <linux/module.h>
 
+#include <linux/vm_sockets.h>
+#include <linux/net.h>
+#include <linux/skbuff.h>
+
+/* Ports must be in host byte order */
+#define HV_WIFI_REQUEST_PORT 12345
+#define HV_WIFI_NOTIFICATION_PORT 12346
+
+enum hv_wifi_operation {
+	WIFI_INVALID = 0,
+	WIFI_OP_SCAN_REQUEST = 1,
+	WIFI_OP_SCAN_RESPONSE,
+	WIFI_OP_CONNECT_REQUEST,
+	WIFI_OP_CONNECT_RESPONSE,
+	WIFI_OP_DISCONNECT_REQUEST,
+	WIFI_OP_DISCONNECT_RESPONSE,
+	WIFI_NOTIF_DISCONNECTED,
+	WIFI_NOTIF_SIGNAL_QUALITY,
+	WIFI_OP_MAX
+};
+
+struct hv_wifi_hdr {
+	/* An enum hv_wifi_operation value */
+	u8 operation;
+	u32 size;
+} __packed;
+
+struct hv_wifi_bss {
+	u8 bssid[ETH_ALEN];
+	u16 capabilities;
+	u32 rssi;
+	u16 beacon_interval;
+	u32 channel_center_freq;
+	u32 ie_size;
+	u32 ie_offset;
+} __packed;
+
+struct hv_wifi_scan_response {
+	u8 num_bss;
+	u32 total_size;
+	struct hv_wifi_bss bss[];
+} __packed;
+
+struct hv_wifi_connect_request {
+	u8 ssid_len;
+	u8 ssid[IEEE80211_MAX_SSID_LEN];
+	u8 bssid[ETH_ALEN];
+	u8 auth_type;
+	u8 wpa_versions;
+	u8 num_akm_suites;
+	u32 akm_suites[NL80211_MAX_NR_AKM_SUITES];
+	u8 num_pairwise_cipher_suites;
+	u32 pairwise_cipher_suites[NL80211_MAX_NR_CIPHER_SUITES];
+	u8 group_cipher_suite;
+	u8 key_len;
+	u8 key[];
+} __packed;
+
+struct hv_wifi_connect_response {
+	u16 result_code;
+	u8 bssid[ETH_ALEN];
+	u32 session_id;
+} __packed;
+
+struct hv_wifi_disconnect_request {
+	u32 session_id;
+} __packed;
+
+struct hv_wifi_disconnect_notif {
+	u32 session_id;
+} __packed;
+
+struct hv_wifi_signal_quality_notif {
+	s8 signal;
+} __packed;
+
+struct hv_wifi_msg {
+	struct hv_wifi_hdr hdr;
+	u8 *body;
+};
+
+static int build_scan_request_msg(struct hv_wifi_msg *message)
+{
+	message->hdr.operation = WIFI_OP_SCAN_REQUEST;
+	message->hdr.size = 0;
+	return 0;
+}
+
+static int build_connect_request_message(struct hv_wifi_msg *message,
+					 const struct hv_wifi_connect_request *connection_params)
+{
+	message->hdr.operation = WIFI_OP_CONNECT_REQUEST;
+	message->hdr.size = sizeof(struct hv_wifi_connect_request) +
+			    connection_params->key_len;
+
+	message->body = kzalloc(message->hdr.size, GFP_KERNEL);
+	if (!message->body)
+		return -ENOMEM;
+
+	memcpy(message->body, connection_params, message->hdr.size);
+	return 0;
+}
+
+static int build_disconnect_request_message(struct hv_wifi_msg *message,
+					    u32 session_id)
+{
+	struct hv_wifi_disconnect_request *disconnect_request = NULL;
+
+	message->hdr.operation = WIFI_OP_DISCONNECT_REQUEST;
+	message->hdr.size = sizeof(struct hv_wifi_disconnect_request);
+
+	message->body = kzalloc(message->hdr.size, GFP_KERNEL);
+	if (!message->body)
+		return -ENOMEM;
+
+	disconnect_request = (struct hv_wifi_disconnect_request *)message->body;
+	disconnect_request->session_id = session_id;
+
+	return 0;
+}
+
+static int receive_bytes(struct socket *socket, size_t expected_size,
+			 u8 *buffer)
+{
+	int return_code = 0;
+	size_t total_received = 0;
+	struct msghdr msg_header = {0};
+	struct kvec iv = { .iov_len = expected_size, .iov_base = buffer };
+
+	while (total_received < expected_size) {
+		return_code = kernel_recvmsg(socket, &msg_header, &iv, 1,
+					     expected_size - total_received, 0);
+		if (return_code <= 0) {
+			printk(KERN_ERR "Failed to receive a message, error %d",
+			       return_code);
+			return return_code;
+		}
+
+		printk(KERN_DEBUG "Received %d bytes", return_code);
+		total_received += return_code;
+		if (total_received > expected_size)
+			return -EINVAL;
+
+		iv.iov_len = expected_size - total_received;
+		iv.iov_base = (u8 *)buffer + total_received;
+		return_code = 0;
+	}
+
+	return 0;
+}
+
+static int receive_hv_wifi_message(struct socket *socket,
+				   struct hv_wifi_msg *message)
+{
+	int error = 0;
+
+	error = receive_bytes(socket, sizeof(message->hdr), (u8 *)&message->hdr);
+	if (error < 0)
+		return error;
+
+	printk(KERN_DEBUG "Receiving a message (Operation: %d, %d bytes)",
+	       message->hdr.operation, message->hdr.size);
+
+	kfree(message->body);
+	message->body = NULL;
+
+	if (message->hdr.size > 0) {
+		message->body = kzalloc(message->hdr.size, GFP_KERNEL);
+		if (!message->body)
+			return -ENOMEM;
+
+		error = receive_bytes(socket, message->hdr.size, message->body);
+		if (error < 0)
+			goto out_free;
+	}
+
+	return 0;
+
+out_free:
+	kfree(message->body);
+	message->body = NULL;
+	return error;
+}
+
+static int send_bytes(struct socket *socket, size_t message_size, u8 *buffer)
+{
+	int return_code = 0;
+	size_t total_sent = 0;
+	struct msghdr msg_header = {0};
+	struct kvec iv = { .iov_len = message_size, .iov_base = buffer };
+
+	while (total_sent < message_size) {
+		return_code = kernel_sendmsg(socket, &msg_header, &iv, 1,
+					     message_size - total_sent);
+
+		if (return_code <= 0) {
+			printk(KERN_ERR "Failed to send a message, error %d",
+			       return_code);
+			return return_code;
+		}
+
+		printk(KERN_DEBUG "Sent %d bytes", return_code);
+		total_sent += return_code;
+		if (total_sent > message_size)
+			return -EINVAL;
+
+		iv.iov_len = message_size - total_sent;
+		iv.iov_base = (u8 *)buffer + total_sent;
+		return_code = 0;
+	}
+
+	return 0;
+}
+
+static int send_hv_wifi_message(struct socket *socket,
+				struct hv_wifi_msg *message)
+{
+	int error = 0;
+
+	if (!message->body && message->hdr.size != 0)
+		return -EINVAL;
+
+	printk(KERN_DEBUG "Sending a message (Operation: %d, %d bytes)",
+	       message->hdr.operation, message->hdr.size);
+
+	error = send_bytes(socket, sizeof(message->hdr), (u8 *)&message->hdr);
+	if (error < 0)
+		return error;
+
+	error = send_bytes(socket, message->hdr.size, message->body);
+	if (error < 0)
+		return error;
+
+	return 0;
+}
+
+static int query_host(struct hv_wifi_msg *message, unsigned int port)
+{
+	int error = 0;
+	struct socket *socket = NULL;
+	struct sockaddr_vm addr = {
+		.svm_family = AF_VSOCK,
+		.svm_port = port,
+		.svm_cid = VMADDR_CID_HOST,
+	};
+
+	error = sock_create_kern(&init_net, AF_VSOCK, SOCK_STREAM, 0, &socket);
+	if (error != 0) {
+		printk(KERN_ERR "Failed to create a socket, error %d", error);
+		return error;
+	}
+
+	error = kernel_connect(socket, (struct sockaddr *)&addr,
+			       sizeof(addr), 0);
+	if (error != 0) {
+		printk(KERN_ERR "Failed to connect to the host, error %d",
+		       error);
+		goto out_sock_release;
+	}
+
+	error = send_hv_wifi_message(socket, message);
+	if (error < 0) {
+		printk(KERN_ERR "Failed to send message, error %d", error);
+		goto out_sock_release;
+	} else {
+		printk(KERN_DEBUG "Sent message");
+	}
+
+	error = receive_hv_wifi_message(socket, message);
+	if (error < 0) {
+		printk(KERN_ERR "Failed to receive an answer, error %d", error);
+		goto out_sock_release;
+	} else {
+		printk(KERN_INFO "Received an answer");
+		error = 0;
+	}
+
+out_sock_release:
+	sock_release(socket);
+	return error;
+}
+
+static struct hv_wifi_msg scan_command(unsigned int port)
+{
+	int error = 0;
+	struct hv_wifi_msg message = {0};
+
+	printk(KERN_DEBUG "Sending SCAN request to host");
+
+	error = build_scan_request_msg(&message);
+	if (error != 0) {
+		printk(KERN_ERR "Failed to build a scan request");
+		goto error;
+	}
+
+	error = query_host(&message, port);
+	if (error != 0) {
+		printk(KERN_ERR "Query host failed");
+		goto error;
+	}
+
+	return message;
+
+error:
+	kfree(message.body);
+	message.body = NULL;
+	message.hdr.size = 0;
+	message.hdr.operation = WIFI_INVALID;
+	return message;
+}
+
+static struct hv_wifi_msg connect_command(unsigned int port,
+					  const struct hv_wifi_connect_request *connection_params)
+{
+	int error = 0;
+	struct hv_wifi_msg message = {0};
+
+	printk(KERN_DEBUG "Sending CONNECT request to host");
+
+	error = build_connect_request_message(&message, connection_params);
+
+	if (error != 0) {
+		printk(KERN_ERR "Failed to build a connect request message");
+		goto error;
+	}
+
+	error = query_host(&message, port);
+	if (error != 0) {
+		printk(KERN_ERR "Query host failed");
+		goto error;
+	}
+
+	return message;
+
+error:
+	kfree(message.body);
+	message.body = NULL;
+	message.hdr.size = 0;
+	message.hdr.operation = WIFI_INVALID;
+	return message;
+}
+
+static struct hv_wifi_msg disconnect_command(unsigned int port, u32 session_id)
+{
+	int error = 0;
+	struct hv_wifi_msg message = {0};
+
+	printk(KERN_DEBUG "Sending DISCONNECT request to host");
+
+	error = build_disconnect_request_message(&message, session_id);
+
+	if (error != 0) {
+		printk(KERN_ERR "Failed to build a connect request message");
+		goto error;
+	}
+
+	error = query_host(&message, port);
+	if (error != 0) {
+		printk(KERN_ERR "Query host failed");
+		goto error;
+	}
+
+	return message;
+
+error:
+	kfree(message.body);
+	message.body = NULL;
+	message.hdr.size = 0;
+	message.hdr.operation = WIFI_INVALID;
+	return message;
+}
+
+struct connection_state {
+	u32 tx_packets;
+	u32 tx_failed;
+	/* Protected by `virt_wifi_connection_lock` */
+	u8 bssid[ETH_ALEN];
+	/* Protected by `virt_wifi_connection_lock` */
+	bool is_connected;
+	/* Protected by `virt_wifi_connection_lock` */
+	s8 signal;
+	/* Protected by `virt_wifi_connection_lock` */
+	u32 session_id;
+};
+
+DEFINE_RWLOCK(virt_wifi_connection_lock);
+
+struct virt_wifi_netdev_priv {
+	struct work_struct connect;
+	struct work_struct disconnect;
+	struct net_device *lowerdev;
+	struct net_device *upperdev;
+	struct socket *notification_socket;
+	struct delayed_work notifications_work;
+	/* Protected by rtnl lock */
+	bool is_up;
+	/* Protected by rtnl lock */
+	bool being_deleted;
+	struct connection_state connection;
+	/* Not protected, but access are sequential */
+	struct hv_wifi_connect_request *connect_req_ctx;
+	unsigned int request_port;
+	unsigned int notification_port;
+};
+
+static void virt_wifi_disconnect_finalize(struct net_device *netdev,
+					  u16 reason_code);
+
+static void handle_disconnected_notification(struct virt_wifi_netdev_priv *priv,
+					     struct hv_wifi_msg message)
+{
+	struct hv_wifi_disconnect_notif *disconnect_notif = NULL;
+	u32 session_id = 0;
+
+	if (message.hdr.size != sizeof(struct hv_wifi_disconnect_notif))
+		printk(KERN_WARNING "Unexpected size for a disconnect notification: %d bytes\n",
+		       message.hdr.size);
+
+	disconnect_notif = (struct hv_wifi_disconnect_notif *)message.body;
+
+	read_lock(&virt_wifi_connection_lock);
+	session_id = priv->connection.session_id;
+	read_unlock(&virt_wifi_connection_lock);
+
+	if (disconnect_notif->session_id < session_id) {
+		printk(KERN_WARNING "Ignoring an outdated disconnection notification. "
+		       "Notification session: %d, current session: %d\n",
+		       disconnect_notif->session_id, session_id);
+		return;
+	}
+
+	virt_wifi_disconnect_finalize(priv->upperdev, WLAN_REASON_UNSPECIFIED);
+}
+
+static void handle_signal_quality_notification(
+	struct virt_wifi_netdev_priv *priv, struct hv_wifi_msg message)
+{
+	struct hv_wifi_signal_quality_notif *signal_notif = NULL;
+
+	if (message.hdr.size != sizeof(struct hv_wifi_signal_quality_notif) ||
+	    !message.body) {
+		printk(KERN_ERR "Invalid size for a signal quality notification: %d bytes\n",
+		       message.hdr.size);
+		return;
+	}
+	signal_notif = (struct hv_wifi_signal_quality_notif *)message.body;
+
+	write_lock(&virt_wifi_connection_lock);
+	priv->connection.signal = signal_notif->signal;
+	write_unlock(&virt_wifi_connection_lock);
+}
+
+static void receive_notification(struct virt_wifi_netdev_priv *priv,
+				 struct socket *socket)
+{
+	int error = 0;
+	struct hv_wifi_msg message = {0};
+
+	error = receive_hv_wifi_message(socket, &message);
+	if (error < 0) {
+		printk(KERN_ERR "Failed to receive a notification, error %d\n",
+		       error);
+		goto out_free;
+	}
+
+	printk(KERN_DEBUG "Got a notification, type %d\n",
+	       message.hdr.operation);
+
+	// Dispatch the notification
+	if (message.hdr.operation == WIFI_NOTIF_DISCONNECTED)
+		handle_disconnected_notification(priv, message);
+	else if (message.hdr.operation == WIFI_NOTIF_SIGNAL_QUALITY)
+		handle_signal_quality_notification(priv, message);
+	else
+		printk(KERN_ERR "Received an unknown notification\n");
+
+out_free:
+	kfree(message.body);
+}
+
+static void poll_notifications(struct work_struct *work)
+{
+	int error = 0;
+	struct socket *connect_socket = NULL;
+	struct virt_wifi_netdev_priv *priv = container_of(work,
+		struct virt_wifi_netdev_priv, notifications_work.work);
+
+	for (;;) {
+		error = kernel_accept(priv->notification_socket,
+				      &connect_socket, SOCK_NONBLOCK);
+		if (error == -EWOULDBLOCK) {
+			// We are done processing incoming notifications
+			break;
+		} else if (error != 0) {
+			printk(KERN_ERR "Failed to accept a connection, error %d",
+			       error);
+			break;
+		}
+
+		receive_notification(priv, connect_socket);
+
+		kernel_sock_shutdown(connect_socket, SHUT_RDWR);
+		sock_release(connect_socket);
+		connect_socket = NULL;
+	}
+
+	// Re-arm the notification work
+	// schedule_delayed_work(&priv->notifications_work, 2 * HZ);
+	queue_delayed_work(system_long_wq, &priv->notifications_work, 2 * HZ);
+}
+
+static int setup_notification_channel(struct virt_wifi_netdev_priv *netdev_priv,
+				      unsigned int port)
+{
+	int error = 0;
+	struct sockaddr_vm addr = {
+		.svm_family = AF_VSOCK,
+		.svm_port = port,
+		.svm_cid = VMADDR_CID_ANY
+	};
+
+	error = sock_create_kern(&init_net, AF_VSOCK, SOCK_STREAM, 0,
+				 &netdev_priv->notification_socket);
+	if (error != 0) {
+		printk(KERN_ERR "Failed to create a socket, error %d", error);
+		return error;
+	}
+
+	error = kernel_bind(netdev_priv->notification_socket,
+			    (struct sockaddr *)&addr, sizeof(addr));
+	if (error != 0) {
+		printk(KERN_ERR "Failed to bind a socket, error %d", error);
+		goto out_release_sock;
+	}
+
+	error = kernel_listen(netdev_priv->notification_socket, INT_MAX);
+	if (error != 0) {
+		printk(KERN_ERR "Failed to listen on a socket, error %d",
+		       error);
+		goto out_release_sock;
+	}
+
+	// Start the notification handling thread
+	INIT_DELAYED_WORK(&netdev_priv->notifications_work, poll_notifications);
+	if (!schedule_delayed_work(&netdev_priv->notifications_work, 2 * HZ)) {
+		printk(KERN_ERR "Failed to start the notification work");
+		error = -EINVAL;
+		goto out_release_sock;
+	}
+
+	return 0;
+
+out_release_sock:
+	sock_release(netdev_priv->notification_socket);
+	return error;
+}
+
+static void stop_notification_channel(struct virt_wifi_netdev_priv *netdev_priv)
+{
+	printk(KERN_DEBUG "Waiting for notification work completion...");
+	cancel_delayed_work_sync(&netdev_priv->notifications_work);
+
+	sock_release(netdev_priv->notification_socket);
+	netdev_priv->notification_socket = NULL;
+}
+
 static struct wiphy *common_wiphy;
 
 struct virt_wifi_wiphy_priv {
-	struct delayed_work scan_result;
+	struct work_struct scan_result;
+	/* Not protected but access are sequentials */
 	struct cfg80211_scan_request *scan_request;
+	/* Protected by rtnl lock */
 	bool being_deleted;
 };
 
-static struct ieee80211_channel channel_2ghz = {
-	.band = NL80211_BAND_2GHZ,
-	.center_freq = 2432,
-	.hw_value = 2432,
-	.max_power = 20,
+u32 cipher_suites[] = {
+	WLAN_CIPHER_SUITE_CCMP,
+	WLAN_CIPHER_SUITE_GCMP,
+	WLAN_CIPHER_SUITE_CCMP_256,
+	WLAN_CIPHER_SUITE_GCMP_256,
+	WLAN_CIPHER_SUITE_AES_CMAC,
+	WLAN_CIPHER_SUITE_BIP_GMAC_128,
+	WLAN_CIPHER_SUITE_BIP_CMAC_256,
+	WLAN_CIPHER_SUITE_BIP_GMAC_256
+};
+
+u32 akm_suites[] = {
+	WLAN_AKM_SUITE_PSK,
+	WLAN_AKM_SUITE_SAE
+};
+
+static struct ieee80211_channel channels_2ghz[] = {
+	{ .band = NL80211_BAND_2GHZ, .center_freq = 2412, .max_power = 20, },
+	{ .band = NL80211_BAND_2GHZ, .center_freq = 2417, .max_power = 20, },
+	{ .band = NL80211_BAND_2GHZ, .center_freq = 2422, .max_power = 20, },
+	{ .band = NL80211_BAND_2GHZ, .center_freq = 2427, .max_power = 20, },
+	{ .band = NL80211_BAND_2GHZ, .center_freq = 2432, .max_power = 20, },
+	{ .band = NL80211_BAND_2GHZ, .center_freq = 2437, .max_power = 20, },
+	{ .band = NL80211_BAND_2GHZ, .center_freq = 2442, .max_power = 20, },
+	{ .band = NL80211_BAND_2GHZ, .center_freq = 2447, .max_power = 20, },
+	{ .band = NL80211_BAND_2GHZ, .center_freq = 2452, .max_power = 20, },
+	{ .band = NL80211_BAND_2GHZ, .center_freq = 2457, .max_power = 20, },
+	{ .band = NL80211_BAND_2GHZ, .center_freq = 2462, .max_power = 20, },
+	{ .band = NL80211_BAND_2GHZ, .center_freq = 2467, .max_power = 20, },
+	{ .band = NL80211_BAND_2GHZ, .center_freq = 2472, .max_power = 20, },
+	{ .band = NL80211_BAND_2GHZ, .center_freq = 2477, .max_power = 20, },
+	{ .band = NL80211_BAND_2GHZ, .center_freq = 2484, .max_power = 20, },
 };
 
 static struct ieee80211_rate bitrates_2ghz[] = {
@@ -41,10 +636,10 @@ static struct ieee80211_rate bitrates_2ghz[] = {
 };
 
 static struct ieee80211_supported_band band_2ghz = {
-	.channels = &channel_2ghz,
+	.channels = channels_2ghz,
 	.bitrates = bitrates_2ghz,
 	.band = NL80211_BAND_2GHZ,
-	.n_channels = 1,
+	.n_channels = ARRAY_SIZE(channels_2ghz),
 	.n_bitrates = ARRAY_SIZE(bitrates_2ghz),
 	.ht_cap = {
 		.ht_supported = true,
@@ -62,11 +657,63 @@ static struct ieee80211_supported_band band_2ghz = {
 	},
 };
 
-static struct ieee80211_channel channel_5ghz = {
-	.band = NL80211_BAND_5GHZ,
-	.center_freq = 5240,
-	.hw_value = 5240,
-	.max_power = 20,
+static struct ieee80211_channel channels_5ghz[] = {
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5160, .max_power = 20, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5170, .max_power = 20, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5180, .max_power = 20, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5190, .max_power = 20, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5200, .max_power = 20, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5210, .max_power = 20, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5220, .max_power = 20, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5230, .max_power = 20, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5240, .max_power = 20, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5250, .max_power = 20, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5260, .max_power = 20, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5270, .max_power = 20, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5280, .max_power = 20, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5290, .max_power = 20, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5300, .max_power = 20, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5310, .max_power = 20, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5320, .max_power = 20, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5340, .max_power = 20, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5480, .max_power = 20, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5500, .max_power = 20, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5510, .max_power = 20, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5520, .max_power = 20, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5530, .max_power = 20, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5540, .max_power = 20, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5550, .max_power = 20, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5560, .max_power = 20, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5570, .max_power = 20, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5580, .max_power = 20, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5590, .max_power = 20, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5600, .max_power = 20, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5610, .max_power = 20, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5620, .max_power = 20, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5630, .max_power = 20, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5640, .max_power = 20, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5660, .max_power = 20, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5670, .max_power = 20, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5680, .max_power = 20, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5690, .max_power = 20, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5700, .max_power = 20, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5710, .max_power = 20, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5720, .max_power = 20, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5745, .max_power = 20, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5755, .max_power = 20, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5765, .max_power = 20, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5775, .max_power = 20, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5785, .max_power = 20, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5795, .max_power = 20, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5805, .max_power = 20, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5815, .max_power = 20, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5825, .max_power = 20, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5835, .max_power = 20, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5845, .max_power = 20, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5855, .max_power = 20, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5865, .max_power = 20, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5875, .max_power = 20, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5885, .max_power = 20, },
 };
 
 static struct ieee80211_rate bitrates_5ghz[] = {
@@ -94,10 +741,10 @@ static struct ieee80211_rate bitrates_5ghz[] = {
 		    IEEE80211_VHT_MCS_SUPPORT_0_9 << 14)
 
 static struct ieee80211_supported_band band_5ghz = {
-	.channels = &channel_5ghz,
+	.channels = channels_5ghz,
 	.bitrates = bitrates_5ghz,
 	.band = NL80211_BAND_5GHZ,
-	.n_channels = 1,
+	.n_channels = ARRAY_SIZE(channels_5ghz),
 	.n_bitrates = ARRAY_SIZE(bitrates_5ghz),
 	.ht_cap = {
 		.ht_supported = true,
@@ -133,32 +780,6 @@ static struct ieee80211_supported_band band_5ghz = {
 	},
 };
 
-/* Assigned at module init. Guaranteed locally-administered and unicast. */
-static u8 fake_router_bssid[ETH_ALEN] __ro_after_init = {};
-
-static void virt_wifi_inform_bss(struct wiphy *wiphy)
-{
-	u64 tsf = div_u64(ktime_get_boottime_ns(), 1000);
-	struct cfg80211_bss *informed_bss;
-	static const struct {
-		u8 tag;
-		u8 len;
-		u8 ssid[8];
-	} __packed ssid = {
-		.tag = WLAN_EID_SSID,
-		.len = 8,
-		.ssid = "VirtWifi",
-	};
-
-	informed_bss = cfg80211_inform_bss(wiphy, &channel_5ghz,
-					   CFG80211_BSS_FTYPE_PRESP,
-					   fake_router_bssid, tsf,
-					   WLAN_CAPABILITY_ESS, 0,
-					   (void *)&ssid, sizeof(ssid),
-					   DBM_TO_MBM(-50), GFP_KERNEL);
-	cfg80211_put_bss(wiphy, informed_bss);
-}
-
 /* Called with the rtnl lock held. */
 static int virt_wifi_scan(struct wiphy *wiphy,
 			  struct cfg80211_scan_request *request)
@@ -171,25 +792,88 @@ static int virt_wifi_scan(struct wiphy *wiphy,
 		return -EBUSY;
 
 	priv->scan_request = request;
-	schedule_delayed_work(&priv->scan_result, HZ * 2);
+	if (!queue_work(system_long_wq, &priv->scan_result))
+		return -EBUSY;
 
 	return 0;
+}
+
+static int report_scanned_network(struct wiphy *wiphy, struct hv_wifi_bss *bss)
+{
+	struct cfg80211_bss *informed_bss = NULL;
+	const u64 tsf = div_u64(ktime_get_boottime_ns(), 1000);
+	struct ieee80211_channel *channel = NULL;
+
+	channel = ieee80211_get_channel_khz(wiphy, bss->channel_center_freq);
+	if (!channel) {
+		printk(KERN_ERR "Unsupported frequency: %d, ignoring scan result\n",
+		       bss->channel_center_freq);
+		return -EINVAL;
+	}
+
+	informed_bss = cfg80211_inform_bss(wiphy, channel,
+		CFG80211_BSS_FTYPE_PRESP, bss->bssid, tsf, bss->capabilities,
+		bss->beacon_interval, (u8 *)bss + bss->ie_offset, bss->ie_size,
+		bss->rssi * 100, /* rssi expected in mBm */
+		GFP_KERNEL);
+
+	cfg80211_put_bss(wiphy, informed_bss);
+	return 0;
+}
+
+static bool is_bss_valid(const struct hv_wifi_bss *bss,
+			 const struct hv_wifi_msg *message)
+{
+	// Check the bss and its IEs are contained in the message body
+	return (u8 *)bss >= message->body &&
+	       (u8 *)bss + bss->ie_offset + bss->ie_size <=
+			(u8 *)message->body + message->hdr.size;
 }
 
 /* Acquires and releases the rdev BSS lock. */
 static void virt_wifi_scan_result(struct work_struct *work)
 {
-	struct virt_wifi_wiphy_priv *priv =
-		container_of(work, struct virt_wifi_wiphy_priv,
-			     scan_result.work);
-	struct wiphy *wiphy = priv_to_wiphy(priv);
+	struct virt_wifi_wiphy_priv *w_priv =
+		container_of(work, struct virt_wifi_wiphy_priv, scan_result);
+	struct wiphy *wiphy = priv_to_wiphy(w_priv);
+	struct virt_wifi_netdev_priv *n_priv =
+				netdev_priv(w_priv->scan_request->wdev->netdev);
 	struct cfg80211_scan_info scan_info = { .aborted = false };
+	struct hv_wifi_msg message = {0};
+	struct hv_wifi_scan_response *scan_response = NULL;
+	struct hv_wifi_bss *bss = NULL;
+	int i = 0;
 
-	virt_wifi_inform_bss(wiphy);
+	message = scan_command(n_priv->request_port);
+	if (message.hdr.operation != WIFI_OP_SCAN_RESPONSE) {
+		printk(KERN_DEBUG "%s: no scan response (%d)\n", __func__,
+		       message.hdr.operation);
+		goto complete_scan;
+	}
+
+	scan_response = (struct hv_wifi_scan_response *)message.body;
+
+	printk(KERN_DEBUG "%s: number of scan results: %u\n", __func__,
+	       scan_response->num_bss);
+
+	for (i = 0; i < scan_response->num_bss; i++) {
+		bss = &scan_response->bss[i];
+		if (!is_bss_valid(bss, &message)) {
+			printk(KERN_ERR "Ignoring an invalid scan result");
+			printk(KERN_DEBUG "Invalid scan result: Index <%d>, IEs offset <%d>, IEs size <%d>",
+			       i, bss->ie_offset, bss->ie_size);
+			continue;
+		}
+
+		report_scanned_network(wiphy, &scan_response->bss[i]);
+	}
+
+complete_scan:
 
 	/* Schedules work which acquires and releases the rtnl lock. */
-	cfg80211_scan_done(priv->scan_request, &scan_info);
-	priv->scan_request = NULL;
+	cfg80211_scan_done(w_priv->scan_request, &scan_info);
+	w_priv->scan_request = NULL;
+	kfree(message.body);
 }
 
 /* May acquire and release the rdev BSS lock. */
@@ -197,7 +881,7 @@ static void virt_wifi_cancel_scan(struct wiphy *wiphy)
 {
 	struct virt_wifi_wiphy_priv *priv = wiphy_priv(wiphy);
 
-	cancel_delayed_work_sync(&priv->scan_result);
+	cancel_work_sync(&priv->scan_result);
 	/* Clean up dangling callbacks if necessary. */
 	if (priv->scan_request) {
 		struct cfg80211_scan_info scan_info = { .aborted = true };
@@ -207,88 +891,230 @@ static void virt_wifi_cancel_scan(struct wiphy *wiphy)
 	}
 }
 
-struct virt_wifi_netdev_priv {
-	struct delayed_work connect;
-	struct net_device *lowerdev;
-	struct net_device *upperdev;
-	u32 tx_packets;
-	u32 tx_failed;
-	u8 connect_requested_bss[ETH_ALEN];
-	bool is_up;
-	bool is_connected;
-	bool being_deleted;
-};
+static int build_connect_request_context(struct cfg80211_connect_params *sme,
+					 struct hv_wifi_connect_request **connect_req_ctx)
+{
+	struct hv_wifi_connect_request *context = NULL;
+	u8 key_len = 0;
+	const u8 *key = NULL;
+
+	/* Determine which key to use and its length */
+	if (sme->crypto.psk) {
+		printk(KERN_DEBUG "PSK present in connnect request");
+		key = sme->crypto.psk;
+		key_len = WLAN_PMK_LEN;
+	} else if (sme->crypto.sae_pwd && sme->crypto.sae_pwd_len) {
+		printk(KERN_DEBUG "SAE password present in connnect request");
+		key = sme->crypto.sae_pwd;
+		key_len = sme->crypto.sae_pwd_len;
+	} else if (sme->key && sme->key_len > 0) {
+		printk(KERN_DEBUG "WEP present in connnect request");
+		key = sme->key;
+		key_len = sme->key_len;
+	} else {
+		printk(KERN_DEBUG "No key provided in connect request");
+	}
+
+	context = kzalloc(sizeof(*context) + key_len, GFP_KERNEL);
+	if (!context)
+		return -ENOMEM;
+
+	/* Get SSID */
+	memcpy(context->ssid, sme->ssid, sme->ssid_len);
+	context->ssid_len = sme->ssid_len;
+
+	/* Get requested BSS if any */
+	if (sme->bssid)
+		/* Can't use ether_addr_copy: dest bssid not aligned to u16 */
+		memcpy(context->bssid, sme->bssid, ETH_ALEN);
+	else
+		eth_zero_addr(context->bssid);
+
+	/* Get security params */
+	context->auth_type = sme->auth_type;
+	context->wpa_versions = (u8)sme->crypto.wpa_versions;
+
+	context->num_akm_suites = sme->crypto.n_akm_suites;
+	memcpy(context->akm_suites, sme->crypto.akm_suites,
+	       sme->crypto.n_akm_suites * sizeof(sme->crypto.akm_suites[0]));
+
+	context->num_pairwise_cipher_suites = sme->crypto.n_ciphers_pairwise;
+	memcpy(context->pairwise_cipher_suites, sme->crypto.ciphers_pairwise,
+	       sme->crypto.n_ciphers_pairwise * sizeof(sme->crypto.ciphers_pairwise[0]));
+
+	context->group_cipher_suite = sme->crypto.cipher_group;
+	context->key_len = key_len;
+	memcpy(context->key, key, key_len);
+
+	*connect_req_ctx = context;
+	return 0;
+}
 
 /* Called with the rtnl lock held. */
+/* Acquires and releases virt_wifi_connection_lock. */
 static int virt_wifi_connect(struct wiphy *wiphy, struct net_device *netdev,
 			     struct cfg80211_connect_params *sme)
 {
+	int error = 0;
 	struct virt_wifi_netdev_priv *priv = netdev_priv(netdev);
-	bool could_schedule;
+
+	wiphy_debug(wiphy, "connect\n");
 
 	if (priv->being_deleted || !priv->is_up)
 		return -EBUSY;
 
-	could_schedule = schedule_delayed_work(&priv->connect, HZ * 2);
-	if (!could_schedule)
+	kfree(priv->connect_req_ctx);
+	priv->connect_req_ctx = NULL;
+	error = build_connect_request_context(sme, &priv->connect_req_ctx);
+	if (error < 0)
+		return error;
+
+	/* Set the bssid for the canceling the connection if needed */
+	write_lock(&virt_wifi_connection_lock);
+	if (sme->bssid)
+		ether_addr_copy(priv->connection.bssid, sme->bssid);
+	else
+		eth_zero_addr(priv->connection.bssid);
+	write_unlock(&virt_wifi_connection_lock);
+
+	if (!queue_work(system_long_wq, &priv->connect))
 		return -EBUSY;
-
-	if (sme->bssid) {
-		ether_addr_copy(priv->connect_requested_bss, sme->bssid);
-	} else {
-		virt_wifi_inform_bss(wiphy);
-		eth_zero_addr(priv->connect_requested_bss);
-	}
-
-	wiphy_debug(wiphy, "connect\n");
 
 	return 0;
 }
 
 /* Acquires and releases the rdev event lock. */
+/* Acquires and releases virt_wifi_connection_lock. */
 static void virt_wifi_connect_complete(struct work_struct *work)
 {
 	struct virt_wifi_netdev_priv *priv =
-		container_of(work, struct virt_wifi_netdev_priv, connect.work);
-	u8 *requested_bss = priv->connect_requested_bss;
-	bool right_addr = ether_addr_equal(requested_bss, fake_router_bssid);
-	u16 status = WLAN_STATUS_SUCCESS;
+		container_of(work, struct virt_wifi_netdev_priv, connect);
+	u16 status = WLAN_STATUS_UNSPECIFIED_FAILURE;
+	struct hv_wifi_connect_response *connect_response = NULL;
+	struct hv_wifi_msg message = {0};
+	u8 connected_bssid[ETH_ALEN];
 
-	if (is_zero_ether_addr(requested_bss))
-		requested_bss = NULL;
+	if (!priv->connect_req_ctx) {
+		printk(KERN_ERR "%s: No connection parameters when completing a connection request\n",
+		       __func__);
+		return;
+	}
 
-	if (!priv->is_up || (requested_bss && !right_addr))
-		status = WLAN_STATUS_UNSPECIFIED_FAILURE;
-	else
-		priv->is_connected = true;
+	message = connect_command(priv->request_port, priv->connect_req_ctx);
+
+	if (message.hdr.operation != WIFI_OP_CONNECT_RESPONSE) {
+		printk(KERN_ERR "%s: No connect response (%d)\n",
+		       __func__, message.hdr.operation);
+		goto complete_connect;
+	}
+
+	if (!priv->is_up)
+		goto complete_connect;
+
+	connect_response = (struct hv_wifi_connect_response *)message.body;
+	status = connect_response->result_code;
+
+	if (status == WLAN_STATUS_SUCCESS) {
+		/* Set the current connection information */
+		write_lock(&virt_wifi_connection_lock);
+		priv->connection.is_connected = true;
+		/* Can't use ether_addr_copy: dest bssid not aligned to u16 */
+		memcpy(priv->connection.bssid, connect_response->bssid,
+		       sizeof(priv->connection.bssid));
+		priv->connection.signal = -50;
+		priv->connection.session_id = connect_response->session_id;
+		write_unlock(&virt_wifi_connection_lock);
+
+		priv->connection.tx_failed = 0;
+		priv->connection.tx_packets = 0;
+
+		netif_carrier_on(priv->upperdev);
+	}
+
+complete_connect:
+	write_lock(&virt_wifi_connection_lock);
+	ether_addr_copy(connected_bssid, priv->connection.bssid);
+	write_unlock(&virt_wifi_connection_lock);
 
 	/* Schedules an event that acquires the rtnl lock. */
-	cfg80211_connect_result(priv->upperdev, requested_bss, NULL, 0, NULL, 0,
-				status, GFP_KERNEL);
-	netif_carrier_on(priv->upperdev);
+	cfg80211_connect_result(priv->upperdev, connected_bssid, NULL, 0, NULL,
+				0, status, GFP_KERNEL);
+
+	kfree(priv->connect_req_ctx);
+	priv->connect_req_ctx = NULL;
+
+	kfree(message.body);
 }
 
 /* May acquire and release the rdev event lock. */
+/* May acquire and release virt_wifi_connection_lock */
 static void virt_wifi_cancel_connect(struct net_device *netdev)
 {
+	u8 bssid[ETH_ALEN] = {0};
 	struct virt_wifi_netdev_priv *priv = netdev_priv(netdev);
 
 	/* If there is work pending, clean up dangling callbacks. */
-	if (cancel_delayed_work_sync(&priv->connect)) {
+	if (cancel_work_sync(&priv->connect)) {
+		read_lock(&virt_wifi_connection_lock);
+		ether_addr_copy(bssid, priv->connection.bssid);
+		read_unlock(&virt_wifi_connection_lock);
+
 		/* Schedules an event that acquires the rtnl lock. */
-		cfg80211_connect_result(priv->upperdev,
-					priv->connect_requested_bss, NULL, 0,
-					NULL, 0,
+		cfg80211_connect_result(priv->upperdev, bssid, NULL, 0, NULL, 0,
 					WLAN_STATUS_UNSPECIFIED_FAILURE,
 					GFP_KERNEL);
 	}
 }
 
-/* Called with the rtnl lock held. Acquires the rdev event lock. */
+/* Subcall acquires the rdev event lock. */
+/* Acquires and releases virt_wifi_connection_lock */
+static void virt_wifi_disconnect_finalize(struct net_device *netdev,
+					  u16 reason_code)
+{
+	struct virt_wifi_netdev_priv *priv = netdev_priv(netdev);
+
+	cfg80211_disconnected(netdev, reason_code, NULL, 0, true, GFP_KERNEL);
+
+	write_lock(&virt_wifi_connection_lock);
+	priv->connection.is_connected = false;
+	write_unlock(&virt_wifi_connection_lock);
+
+	netif_carrier_off(netdev);
+}
+
+/* Subcall acquires the rdev event lock. */
+/* Subcall acquires and releases virt_wifi_connection_lock */
+static void virt_wifi_disconnect_complete(struct work_struct *work)
+{
+	struct virt_wifi_netdev_priv *priv =
+		container_of(work, struct virt_wifi_netdev_priv, disconnect);
+	struct hv_wifi_msg message = {0};
+	u32 session_id = 0;
+
+	read_lock(&virt_wifi_connection_lock);
+	session_id = priv->connection.session_id;
+	read_unlock(&virt_wifi_connection_lock);
+
+	message = disconnect_command(priv->request_port, session_id);
+
+	/* Still complete the disconnection on error */
+	if (message.hdr.operation != WIFI_OP_DISCONNECT_RESPONSE)
+		printk(KERN_ERR "Expected WIFI_OP_DISCONNECT_RESPONSE, got: %d",
+		       message.hdr.operation);
+
+	virt_wifi_disconnect_finalize(priv->upperdev, WLAN_REASON_UNSPECIFIED);
+
+	kfree(message.body);
+}
+
+/* Called with the rtnl lock held. */
+/* Subcall acquires and releases the rdev event lock. */
+/* Subcall acquires and releases virt_wifi_connection_lock. */
 static int virt_wifi_disconnect(struct wiphy *wiphy, struct net_device *netdev,
 				u16 reason_code)
 {
 	struct virt_wifi_netdev_priv *priv = netdev_priv(netdev);
+	bool is_connected = false;
 
 	if (priv->being_deleted)
 		return -EBUSY;
@@ -296,51 +1122,78 @@ static int virt_wifi_disconnect(struct wiphy *wiphy, struct net_device *netdev,
 	wiphy_debug(wiphy, "disconnect\n");
 	virt_wifi_cancel_connect(netdev);
 
-	cfg80211_disconnected(netdev, reason_code, NULL, 0, true, GFP_KERNEL);
-	priv->is_connected = false;
-	netif_carrier_off(netdev);
+	read_lock(&virt_wifi_connection_lock);
+	is_connected = priv->connection.is_connected;
+	read_unlock(&virt_wifi_connection_lock);
+
+	if (!is_connected) {
+		virt_wifi_disconnect_finalize(netdev, reason_code);
+	} else {
+		if (!queue_work(system_long_wq, &priv->disconnect))
+			return -EBUSY;
+	}
 
 	return 0;
 }
 
 /* Called with the rtnl lock held. */
+/* Acquires and releases virt_wifi_connection_lock. */
 static int virt_wifi_get_station(struct wiphy *wiphy, struct net_device *dev,
 				 const u8 *mac, struct station_info *sinfo)
 {
+	int error = 0;
 	struct virt_wifi_netdev_priv *priv = netdev_priv(dev);
 
 	wiphy_debug(wiphy, "get_station\n");
 
-	if (!priv->is_connected || !ether_addr_equal(mac, fake_router_bssid))
-		return -ENOENT;
+	read_lock(&virt_wifi_connection_lock);
+
+	if (!priv->connection.is_connected) {
+		error = -ENOENT;
+		goto out_unlock;
+	}
+
+	if (!ether_addr_equal(mac, priv->connection.bssid)) {
+		error = -ENOENT;
+		goto out_unlock;
+	}
 
 	sinfo->filled = BIT_ULL(NL80211_STA_INFO_TX_PACKETS) |
 		BIT_ULL(NL80211_STA_INFO_TX_FAILED) |
 		BIT_ULL(NL80211_STA_INFO_SIGNAL) |
 		BIT_ULL(NL80211_STA_INFO_TX_BITRATE);
-	sinfo->tx_packets = priv->tx_packets;
-	sinfo->tx_failed = priv->tx_failed;
+	sinfo->tx_packets = priv->connection.tx_packets;
+	sinfo->tx_failed = priv->connection.tx_failed;
 	/* For CFG80211_SIGNAL_TYPE_MBM, value is expressed in _dBm_ */
-	sinfo->signal = -50;
+	sinfo->signal = priv->connection.signal;
 	sinfo->txrate = (struct rate_info) {
 		.legacy = 10, /* units are 100kbit/s */
 	};
-	return 0;
+
+out_unlock:
+	read_unlock(&virt_wifi_connection_lock);
+	return error;
 }
 
 /* Called with the rtnl lock held. */
+/* Acquires and releases virt_wifi_connection_lock. */
 static int virt_wifi_dump_station(struct wiphy *wiphy, struct net_device *dev,
 				  int idx, u8 *mac, struct station_info *sinfo)
 {
 	struct virt_wifi_netdev_priv *priv = netdev_priv(dev);
+	bool is_connected = false;
 
 	wiphy_debug(wiphy, "dump_station\n");
 
-	if (idx != 0 || !priv->is_connected)
+	read_lock(&virt_wifi_connection_lock);
+	is_connected = priv->connection.is_connected;
+	ether_addr_copy(mac, priv->connection.bssid);
+	read_unlock(&virt_wifi_connection_lock);
+
+	if (idx != 0 || !is_connected)
 		return -ENOENT;
 
-	ether_addr_copy(mac, fake_router_bssid);
-	return virt_wifi_get_station(wiphy, dev, fake_router_bssid, sinfo);
+	return virt_wifi_get_station(wiphy, dev, mac, sinfo);
 }
 
 static const struct cfg80211_ops virt_wifi_cfg80211_ops = {
@@ -375,10 +1228,23 @@ static struct wiphy *virt_wifi_make_wiphy(void)
 
 	wiphy->interface_modes = BIT(NL80211_IFTYPE_STATION);
 
+	// Set security capabilities
+	wiphy->akm_suites = akm_suites;
+	wiphy->n_akm_suites = ARRAY_SIZE(akm_suites);
+	wiphy->cipher_suites = cipher_suites;
+	wiphy->n_cipher_suites = ARRAY_SIZE(cipher_suites);
+
+	// Offload handshakes (the host take care of it)
+	wiphy_ext_feature_set(wiphy, NL80211_EXT_FEATURE_4WAY_HANDSHAKE_STA_PSK);
+
+	// TODO guhetier: Enable or remove depending on if we can get SAE offload
+	// wiphy->features |= NL80211_FEATURE_SAE;
+	// wiphy_ext_feature_set(wiphy, NL80211_EXT_FEATURE_SAE_OFFLOAD);
+
 	priv = wiphy_priv(wiphy);
 	priv->being_deleted = false;
 	priv->scan_request = NULL;
-	INIT_DELAYED_WORK(&priv->scan_result, virt_wifi_scan_result);
+	INIT_WORK(&priv->scan_result, virt_wifi_scan_result);
 
 	err = wiphy_register(wiphy);
 	if (err < 0) {
@@ -408,16 +1274,23 @@ static void virt_wifi_destroy_wiphy(struct wiphy *wiphy)
 }
 
 /* Enters and exits a RCU-bh critical section. */
+/* Aquires and releases virt_wifi_connection_lock. */
 static netdev_tx_t virt_wifi_start_xmit(struct sk_buff *skb,
 					struct net_device *dev)
 {
+	bool is_connected = false;
 	struct virt_wifi_netdev_priv *priv = netdev_priv(dev);
 
-	priv->tx_packets++;
-	if (!priv->is_connected) {
-		priv->tx_failed++;
+	read_lock(&virt_wifi_connection_lock);
+	is_connected = priv->connection.is_connected;
+	read_unlock(&virt_wifi_connection_lock);
+
+	priv->connection.tx_packets++;
+	if (!is_connected)
+		priv->connection.tx_failed++;
+
+	if (!is_connected)
 		return NET_XMIT_DROP;
-	}
 
 	skb->dev = priv->lowerdev;
 	return dev_queue_xmit(skb);
@@ -478,17 +1351,23 @@ static void virt_wifi_setup(struct net_device *dev)
 {
 	ether_setup(dev);
 	dev->netdev_ops = &virt_wifi_ops;
-	dev->needs_free_netdev  = true;
+	dev->needs_free_netdev = true;
 }
 
-/* Called in a RCU read critical section from netif_receive_skb */
+/* Called in a RCU read critical section from netif_receive_skb. */
+/* Aquires and releases virt_wifi_connection_lock. */
 static rx_handler_result_t virt_wifi_rx_handler(struct sk_buff **pskb)
 {
+	bool is_connected = false;
 	struct sk_buff *skb = *pskb;
 	struct virt_wifi_netdev_priv *priv =
 		rcu_dereference(skb->dev->rx_handler_data);
 
-	if (!priv->is_connected)
+	read_lock(&virt_wifi_connection_lock);
+	is_connected = priv->connection.is_connected;
+	read_unlock(&virt_wifi_connection_lock);
+
+	if (!is_connected)
 		return RX_HANDLER_PASS;
 
 	/* GFP_ATOMIC because this is a packet interrupt handler. */
@@ -566,12 +1445,34 @@ static int virt_wifi_newlink(struct net *src_net, struct net_device *dev,
 
 	dev->priv_destructor = virt_wifi_net_device_destructor;
 	priv->being_deleted = false;
-	priv->is_connected = false;
 	priv->is_up = false;
-	INIT_DELAYED_WORK(&priv->connect, virt_wifi_connect_complete);
+	priv->connect_req_ctx = NULL;
+	INIT_WORK(&priv->connect, virt_wifi_connect_complete);
+	INIT_WORK(&priv->disconnect, virt_wifi_disconnect_complete);
+
+	write_lock(&virt_wifi_connection_lock);
+	priv->connection.is_connected = false;
+	eth_zero_addr(priv->connection.bssid);
+	priv->connection.signal = 0;
+	write_unlock(&virt_wifi_connection_lock);
+
+	priv->connection.tx_packets = 0;
+	priv->connection.tx_failed = 0;
+
+	priv->request_port = HV_WIFI_REQUEST_PORT;
+	priv->notification_port = HV_WIFI_NOTIFICATION_PORT;
+
+	err = setup_notification_channel(priv, priv->notification_port);
+	if (err) {
+		dev_err(&priv->lowerdev->dev,
+			"can't start the notification channel: %d\n", err);
+		goto unregister_netdev;
+	}
+
 	__module_get(THIS_MODULE);
 
 	return 0;
+
 unregister_netdev:
 	unregister_netdevice(dev);
 free_wireless_dev:
@@ -594,12 +1495,20 @@ static void virt_wifi_dellink(struct net_device *dev,
 
 	priv->being_deleted = true;
 	virt_wifi_cancel_connect(dev);
+
+	kfree(priv->connect_req_ctx);
+	priv->connect_req_ctx = NULL;
+
 	netif_carrier_off(dev);
+
+	// Stop handling notifications
+	stop_notification_channel(priv);
 
 	netdev_rx_handler_unregister(priv->lowerdev);
 	netdev_upper_dev_unlink(priv->lowerdev, dev);
 
 	unregister_netdevice_queue(dev, head);
+
 	module_put(THIS_MODULE);
 
 	/* Deleting the wiphy is handled in the module destructor. */
@@ -654,8 +1563,7 @@ static int __init virt_wifi_init_module(void)
 {
 	int err;
 
-	/* Guaranteed to be locallly-administered and not multicast. */
-	eth_random_addr(fake_router_bssid);
+	printk(KERN_DEBUG "%s:\n", __func__);
 
 	err = register_netdevice_notifier(&virt_wifi_notifier);
 	if (err)
@@ -682,6 +1590,8 @@ notifier:
 /* Acquires and releases the rtnl lock. */
 static void __exit virt_wifi_cleanup_module(void)
 {
+	printk(KERN_DEBUG "%s:\n", __func__);
+
 	/* Will delete any devices that depend on the wiphy. */
 	rtnl_link_unregister(&virt_wifi_link_ops);
 	virt_wifi_destroy_wiphy(common_wiphy);
