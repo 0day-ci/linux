@@ -135,6 +135,9 @@ int copy_thread(unsigned long clone_flags, unsigned long usp,
 		status |= ST0_EXL;
 #endif
 		childregs->cp0_status = status;
+
+		if (p->flags & PF_IO_WORKER)
+			clear_tsk_thread_flag(p, TIF_USEDFPU);
 		return 0;
 	}
 
