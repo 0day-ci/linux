@@ -3,6 +3,7 @@
 #define __TIMER_OF_H__
 
 #include <linux/clockchips.h>
+#include <linux/platform_device.h>
 
 #define TIMER_OF_BASE	0x1
 #define TIMER_OF_CLOCK	0x2
@@ -71,4 +72,18 @@ extern int timer_of_init(struct device_node *np,
 
 extern void timer_of_cleanup(struct timer_of *to);
 
+extern int platform_timer_probe(struct platform_device *pdev);
+
+#define TIMER_PLATFORM_DECLEAR(desc, drv_name, table)		\
+MODULE_DEVICE_TABLE(of, table);					\
+static struct platform_driver drv_name##_driver = {		\
+	.probe  = platform_timer_probe,				\
+	.driver = {						\
+		.name = #drv_name,				\
+		.of_match_table = table,			\
+	},							\
+};								\
+builtin_platform_driver(drv_name##_driver);			\
+MODULE_DESCRIPTION(desc);					\
+MODULE_LICENSE("GPL")
 #endif
