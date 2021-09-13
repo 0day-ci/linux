@@ -12,6 +12,9 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/mount.h>
+#include <pthread.h>
+#include <asm/barrier.h>
+#include <linux/compiler.h>
 
 #include "fs.h"
 #include "debug-internal.h"
@@ -92,6 +95,7 @@ struct fs {
 	bool			 found;
 	bool			 checked;
 	long			 magic;
+	pthread_mutex_t		 lock;
 };
 
 enum {
@@ -113,43 +117,69 @@ static struct fs fs__entries[] = {
 		.mounts	= sysfs__fs_known_mountpoints,
 		.magic	= SYSFS_MAGIC,
 		.checked = false,
+		.lock = PTHREAD_MUTEX_INITIALIZER,
 	},
 	[FS__PROCFS] = {
 		.name	= "proc",
 		.mounts	= procfs__known_mountpoints,
 		.magic	= PROC_SUPER_MAGIC,
 		.checked = false,
+		.lock = PTHREAD_MUTEX_INITIALIZER,
 	},
 	[FS__DEBUGFS] = {
 		.name	= "debugfs",
 		.mounts	= debugfs__known_mountpoints,
 		.magic	= DEBUGFS_MAGIC,
 		.checked = false,
+		.lock = PTHREAD_MUTEX_INITIALIZER,
 	},
 	[FS__TRACEFS] = {
 		.name	= "tracefs",
 		.mounts	= tracefs__known_mountpoints,
 		.magic	= TRACEFS_MAGIC,
 		.checked = false,
+		.lock = PTHREAD_MUTEX_INITIALIZER,
 	},
 	[FS__HUGETLBFS] = {
 		.name	= "hugetlbfs",
 		.mounts = hugetlbfs__known_mountpoints,
 		.magic	= HUGETLBFS_MAGIC,
 		.checked = false,
+		.lock = PTHREAD_MUTEX_INITIALIZER,
 	},
 	[FS__BPF_FS] = {
 		.name	= "bpf",
 		.mounts = bpf_fs__known_mountpoints,
 		.magic	= BPF_FS_MAGIC,
 		.checked = false,
+		.lock = PTHREAD_MUTEX_INITIALIZER,
 	},
 };
+
+static void fs_fill_path(struct fs *fs, const char *path, size_t len)
+{
+	if (len >= sizeof(fs->path))
+		len = sizeof(fs->path) - 1;
+
+	pthread_mutex_lock(&fs->lock);
+	if (fs->found) {
+		pthread_mutex_unlock(&fs->lock);
+		return;
+	}
+	strncpy(fs->path, path, len);
+	fs->path[len] = '\0';
+	/* Make sure the path is filled before fs->found is set */
+	smp_wmb();
+	fs->found = true;
+	pthread_mutex_unlock(&fs->lock);
+}
+
 
 static bool fs__read_mounts(struct fs *fs)
 {
 	bool found = false;
 	char type[100];
+	char path[PATH_MAX];
 	FILE *fp;
 
 	fp = fopen("/proc/mounts", "r");
@@ -158,15 +188,17 @@ static bool fs__read_mounts(struct fs *fs)
 
 	while (!found &&
 	       fscanf(fp, "%*s %" STR(PATH_MAX) "s %99s %*s %*d %*d\n",
-		      fs->path, type) == 2) {
+		      path, type) == 2) {
 
-		if (strcmp(type, fs->name) == 0)
+		if (strcmp(type, fs->name) == 0) {
+			fs_fill_path(fs, path, sizeof(path) - 1);
 			found = true;
+		}
 	}
 
 	fclose(fp);
 	fs->checked = true;
-	return fs->found = found;
+	return found;
 }
 
 static int fs__valid_mount(const char *fs, long magic)
@@ -188,8 +220,7 @@ static bool fs__check_mounts(struct fs *fs)
 	ptr = fs->mounts;
 	while (*ptr) {
 		if (fs__valid_mount(*ptr, fs->magic) == 0) {
-			fs->found = true;
-			strcpy(fs->path, *ptr);
+			fs_fill_path(fs, *ptr, strlen(*ptr));
 			return true;
 		}
 		ptr++;
@@ -227,10 +258,7 @@ static bool fs__env_override(struct fs *fs)
 	if (!override_path)
 		return false;
 
-	fs->found = true;
-	fs->checked = true;
-	strncpy(fs->path, override_path, sizeof(fs->path) - 1);
-	fs->path[sizeof(fs->path) - 1] = '\0';
+	fs_fill_path(fs, override_path, sizeof(fs->path) - 1);
 	return true;
 }
 
@@ -252,8 +280,11 @@ static const char *fs__mountpoint(int idx)
 {
 	struct fs *fs = &fs__entries[idx];
 
-	if (fs->found)
+	if (READ_ONCE(fs->found)) {
+		/* Make sure the path is filled completely */
+		smp_rmb();
 		return (const char *)fs->path;
+	}
 
 	/* the mount point was already checked for the mount point
 	 * but and did not exist, so return NULL to avoid scanning again.
