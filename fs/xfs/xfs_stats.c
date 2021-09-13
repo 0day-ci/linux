@@ -16,10 +16,9 @@ static int counter_val(struct xfsstats __percpu *stats, int idx)
 	return val;
 }
 
-int xfs_stats_format(struct xfsstats __percpu *stats, char *buf)
+void xfs_stats_format(struct xfsstats __percpu *stats, struct seq_file *sf)
 {
 	int		i, j;
-	int		len = 0;
 	uint64_t	xs_xstrat_bytes = 0;
 	uint64_t	xs_write_bytes = 0;
 	uint64_t	xs_read_bytes = 0;
@@ -58,13 +57,12 @@ int xfs_stats_format(struct xfsstats __percpu *stats, char *buf)
 	/* Loop over all stats groups */
 
 	for (i = j = 0; i < ARRAY_SIZE(xstats); i++) {
-		len += scnprintf(buf + len, PATH_MAX - len, "%s",
-				xstats[i].desc);
+		seq_printf(sf, "%s", xstats[i].desc);
+
 		/* inner loop does each group */
 		for (; j < xstats[i].endpoint; j++)
-			len += scnprintf(buf + len, PATH_MAX - len, " %u",
-					counter_val(stats, j));
-		len += scnprintf(buf + len, PATH_MAX - len, "\n");
+			seq_printf(sf, " %u", counter_val(stats, j));
+		seq_printf(sf, "\n");
 	}
 	/* extra precision counters */
 	for_each_possible_cpu(i) {
@@ -74,18 +72,14 @@ int xfs_stats_format(struct xfsstats __percpu *stats, char *buf)
 		defer_relog += per_cpu_ptr(stats, i)->s.defer_relog;
 	}
 
-	len += scnprintf(buf + len, PATH_MAX-len, "xpc %Lu %Lu %Lu\n",
+	seq_printf(sf, "xpc %Lu %Lu %Lu\n",
 			xs_xstrat_bytes, xs_write_bytes, xs_read_bytes);
-	len += scnprintf(buf + len, PATH_MAX-len, "defer_relog %llu\n",
-			defer_relog);
-	len += scnprintf(buf + len, PATH_MAX-len, "debug %u\n",
+	seq_printf(sf, "defer_relog %llu\n", defer_relog);
 #if defined(DEBUG)
-		1);
+	seq_printf(sf, "debug 1\n");
 #else
-		0);
+	seq_printf(sf, "debug 0\n");
 #endif
-
-	return len;
 }
 
 void xfs_stats_clearall(struct xfsstats __percpu *stats)

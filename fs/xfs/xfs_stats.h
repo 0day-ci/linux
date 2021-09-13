@@ -156,7 +156,7 @@ struct xfsstats {
 	(offsetof(struct __xfsstats, member) / (int)sizeof(uint32_t))
 
 
-int xfs_stats_format(struct xfsstats __percpu *stats, char *buf);
+void xfs_stats_format(struct xfsstats __percpu *stats, struct seq_file *sf);
 void xfs_stats_clearall(struct xfsstats __percpu *stats);
 extern struct xstats xfsstats;
 

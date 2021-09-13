@@ -16,7 +16,7 @@
 
 struct xfs_sysfs_attr {
 	struct attribute attr;
-	ssize_t (*show)(struct kobject *kobject, char *buf);
+	void (*show)(struct kobject *kobject, struct seq_file *sf);
 	ssize_t (*store)(struct kobject *kobject, const char *buf,
 			 size_t count);
 };
@@ -36,15 +36,17 @@ to_attr(struct attribute *attr)
 
 #define ATTR_LIST(name) &xfs_sysfs_attr_##name.attr
 
-STATIC ssize_t
-xfs_sysfs_object_show(
+STATIC int
+xfs_sysfs_object_seq_show(
 	struct kobject		*kobject,
 	struct attribute	*attr,
-	char			*buf)
+	struct seq_file		*sf)
 {
 	struct xfs_sysfs_attr *xfs_attr = to_attr(attr);
 
-	return xfs_attr->show ? xfs_attr->show(kobject, buf) : 0;
+	if (xfs_attr->show)
+		xfs_attr->show(kobject, sf);
+	return 0;
 }
 
 STATIC ssize_t
@@ -60,8 +62,8 @@ xfs_sysfs_object_store(
 }
 
 static const struct sysfs_ops xfs_sysfs_ops = {
-	.show = xfs_sysfs_object_show,
-	.store = xfs_sysfs_object_store,
+	.seq_show	= xfs_sysfs_object_seq_show,
+	.store		= xfs_sysfs_object_store,
 };
 
 static struct attribute *xfs_mp_attrs[] = {
@@ -100,12 +102,12 @@ bug_on_assert_store(
 	return count;
 }
 
-STATIC ssize_t
+STATIC void
 bug_on_assert_show(
 	struct kobject		*kobject,
-	char			*buf)
+	struct seq_file		*sf)
 {
-	return snprintf(buf, PAGE_SIZE, "%d\n", xfs_globals.bug_on_assert ? 1 : 0);
+	seq_printf(sf, "%d\n", xfs_globals.bug_on_assert ? 1 : 0);
 }
 XFS_SYSFS_ATTR_RW(bug_on_assert);
 
@@ -130,12 +132,12 @@ log_recovery_delay_store(
 	return count;
 }
 
-STATIC ssize_t
+STATIC void
 log_recovery_delay_show(
 	struct kobject	*kobject,
-	char		*buf)
+	struct seq_file	*sf)
 {
-	return snprintf(buf, PAGE_SIZE, "%d\n", xfs_globals.log_recovery_delay);
+	seq_printf(sf, "%d\n", xfs_globals.log_recovery_delay);
 }
 XFS_SYSFS_ATTR_RW(log_recovery_delay);
 
@@ -160,12 +162,12 @@ mount_delay_store(
 	return count;
 }
 
-STATIC ssize_t
+STATIC void
 mount_delay_show(
 	struct kobject	*kobject,
-	char		*buf)
+	struct seq_file	*sf)
 {
-	return snprintf(buf, PAGE_SIZE, "%d\n", xfs_globals.mount_delay);
+	seq_printf(sf, "%d\n", xfs_globals.mount_delay);
 }
 XFS_SYSFS_ATTR_RW(mount_delay);
 
@@ -183,12 +185,12 @@ always_cow_store(
 	return count;
 }
 
-static ssize_t
+static void
 always_cow_show(
 	struct kobject	*kobject,
-	char		*buf)
+	struct seq_file	*sf)
 {
-	return snprintf(buf, PAGE_SIZE, "%d\n", xfs_globals.always_cow);
+	seq_printf(sf, "%d\n", xfs_globals.always_cow);
 }
 XFS_SYSFS_ATTR_RW(always_cow);
 
@@ -219,12 +221,12 @@ pwork_threads_store(
 	return count;
 }
 
-STATIC ssize_t
+STATIC void
 pwork_threads_show(
 	struct kobject	*kobject,
-	char		*buf)
+	struct seq_file	*sf)
 {
-	return snprintf(buf, PAGE_SIZE, "%d\n", xfs_globals.pwork_threads);
+	 seq_printf(sf, "%d\n", xfs_globals.pwork_threads);
 }
 XFS_SYSFS_ATTR_RW(pwork_threads);
 #endif /* DEBUG */
@@ -258,14 +260,12 @@ to_xstats(struct kobject *kobject)
 	return container_of(kobj, struct xstats, xs_kobj);
 }
 
-STATIC ssize_t
+STATIC void
 stats_show(
 	struct kobject	*kobject,
-	char		*buf)
+	struct seq_file	*sf)
 {
-	struct xstats	*stats = to_xstats(kobject);
-
-	return xfs_stats_format(stats->xs_stats, buf);
+	return xfs_stats_format(to_xstats(kobject)->xs_stats, sf);
 }
 XFS_SYSFS_ATTR_RO(stats);
 
@@ -313,10 +313,10 @@ to_xlog(struct kobject *kobject)
 	return container_of(kobj, struct xlog, l_kobj);
 }
 
-STATIC ssize_t
+STATIC void
 log_head_lsn_show(
 	struct kobject	*kobject,
-	char		*buf)
+	struct seq_file	*sf)
 {
 	int cycle;
 	int block;
@@ -327,28 +327,28 @@ log_head_lsn_show(
 	block = log->l_curr_block;
 	spin_unlock(&log->l_icloglock);
 
-	return snprintf(buf, PAGE_SIZE, "%d:%d\n", cycle, block);
+	seq_printf(sf, "%d:%d\n", cycle, block);
 }
 XFS_SYSFS_ATTR_RO(log_head_lsn);
 
-STATIC ssize_t
+STATIC void
 log_tail_lsn_show(
 	struct kobject	*kobject,
-	char		*buf)
+	struct seq_file	*sf)
 {
 	int cycle;
 	int block;
 	struct xlog *log = to_xlog(kobject);
 
 	xlog_crack_atomic_lsn(&log->l_tail_lsn, &cycle, &block);
-	return snprintf(buf, PAGE_SIZE, "%d:%d\n", cycle, block);
+	seq_printf(sf, "%d:%d\n", cycle, block);
 }
 XFS_SYSFS_ATTR_RO(log_tail_lsn);
 
-STATIC ssize_t
+STATIC void
 reserve_grant_head_show(
 	struct kobject	*kobject,
-	char		*buf)
+	struct seq_file	*sf)
 
 {
 	int cycle;
@@ -356,21 +356,21 @@ reserve_grant_head_show(
 	struct xlog *log = to_xlog(kobject);
 
 	xlog_crack_grant_head(&log->l_reserve_head.grant, &cycle, &bytes);
-	return snprintf(buf, PAGE_SIZE, "%d:%d\n", cycle, bytes);
+	seq_printf(sf, "%d:%d\n", cycle, bytes);
 }
 XFS_SYSFS_ATTR_RO(reserve_grant_head);
 
-STATIC ssize_t
+STATIC void
 write_grant_head_show(
 	struct kobject	*kobject,
-	char		*buf)
+	struct seq_file	*sf)
 {
 	int cycle;
 	int bytes;
 	struct xlog *log = to_xlog(kobject);
 
 	xlog_crack_grant_head(&log->l_write_head.grant, &cycle, &bytes);
-	return snprintf(buf, PAGE_SIZE, "%d:%d\n", cycle, bytes);
+	seq_printf(sf, "%d:%d\n", cycle, bytes);
 }
 XFS_SYSFS_ATTR_RO(write_grant_head);
 
@@ -412,10 +412,10 @@ err_to_mp(struct kobject *kobject)
 	return container_of(kobj, struct xfs_mount, m_error_kobj);
 }
 
-static ssize_t
+static void
 max_retries_show(
 	struct kobject	*kobject,
-	char		*buf)
+	struct seq_file	*sf)
 {
 	int		retries;
 	struct xfs_error_cfg *cfg = to_error_cfg(kobject);
@@ -425,7 +425,7 @@ max_retries_show(
 	else
 		retries = cfg->max_retries;
 
-	return snprintf(buf, PAGE_SIZE, "%d\n", retries);
+	seq_printf(sf, "%d\n", retries);
 }
 
 static ssize_t
@@ -453,10 +453,10 @@ max_retries_store(
 }
 XFS_SYSFS_ATTR_RW(max_retries);
 
-static ssize_t
+static void
 retry_timeout_seconds_show(
 	struct kobject	*kobject,
-	char		*buf)
+	struct seq_file	*sf)
 {
 	int		timeout;
 	struct xfs_error_cfg *cfg = to_error_cfg(kobject);
@@ -466,7 +466,7 @@ retry_timeout_seconds_show(
 	else
 		timeout = jiffies_to_msecs(cfg->retry_timeout) / MSEC_PER_SEC;
 
-	return snprintf(buf, PAGE_SIZE, "%d\n", timeout);
+	seq_printf(sf, "%d\n", timeout);
 }
 
 static ssize_t
@@ -497,14 +497,14 @@ retry_timeout_seconds_store(
 }
 XFS_SYSFS_ATTR_RW(retry_timeout_seconds);
 
-static ssize_t
+static void
 fail_at_unmount_show(
 	struct kobject	*kobject,
-	char		*buf)
+	struct seq_file	*sf)
 {
 	struct xfs_mount	*mp = err_to_mp(kobject);
 
-	return snprintf(buf, PAGE_SIZE, "%d\n", mp->m_fail_unmount);
+	seq_printf(sf, "%d\n", mp->m_fail_unmount);
 }
 
 static ssize_t
