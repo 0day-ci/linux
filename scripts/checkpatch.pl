@@ -434,6 +434,8 @@ if ($tree) {
 		print "Must be run from the top-level dir. of a kernel tree\n";
 		exit(2);
 	}
+
+	$gitroot = "$root/$gitroot";
 }
 
 my $emitted_corrupt = 0;
@@ -1131,7 +1133,7 @@ sub seed_camelcase_includes {
 	}
 
 	if (-e "$gitroot") {
-		$files = `${git_command} ls-files "include/*.h"`;
+		$files = `${git_command} ls-files "$root/include/*.h"`;
 		@include_files = split('\n', $files);
 	}
 
