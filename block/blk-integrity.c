@@ -214,19 +214,20 @@ bool blk_integrity_merge_bio(struct request_queue *q, struct request *req,
 
 struct integrity_sysfs_entry {
 	struct attribute attr;
-	ssize_t (*show)(struct blk_integrity *, char *);
+	void (*show)(struct blk_integrity *bi, struct seq_file *sf);
 	ssize_t (*store)(struct blk_integrity *, const char *, size_t);
 };
 
-static ssize_t integrity_attr_show(struct kobject *kobj, struct attribute *attr,
-				   char *page)
+static int integrity_attr_seq_show(struct kobject *kobj,
+		struct attribute *attr, struct seq_file *sf)
 {
 	struct gendisk *disk = container_of(kobj, struct gendisk, integrity_kobj);
 	struct blk_integrity *bi = &disk->queue->integrity;
 	struct integrity_sysfs_entry *entry =
 		container_of(attr, struct integrity_sysfs_entry, attr);
 
-	return entry->show(bi, page);
+	entry->show(bi, sf);
+	return 0;
 }
 
 static ssize_t integrity_attr_store(struct kobject *kobj,
@@ -245,23 +246,24 @@ static ssize_t integrity_attr_store(struct kobject *kobj,
 	return ret;
 }
 
-static ssize_t integrity_format_show(struct blk_integrity *bi, char *page)
+static void integrity_format_show(struct blk_integrity *bi, struct seq_file *sf)
 {
 	if (bi->profile && bi->profile->name)
-		return sprintf(page, "%s\n", bi->profile->name);
+		seq_printf(sf, "%s\n", bi->profile->name);
 	else
-		return sprintf(page, "none\n");
+		seq_printf(sf, "none\n");
 }
 
-static ssize_t integrity_tag_size_show(struct blk_integrity *bi, char *page)
+static void integrity_tag_size_show(struct blk_integrity *bi,
+		struct seq_file *sf)
 {
-	return sprintf(page, "%u\n", bi->tag_size);
+	seq_printf(sf, "%u\n", bi->tag_size);
 }
 
-static ssize_t integrity_interval_show(struct blk_integrity *bi, char *page)
+static void integrity_interval_show(struct blk_integrity *bi,
+		struct seq_file *sf)
 {
-	return sprintf(page, "%u\n",
-		       bi->interval_exp ? 1 << bi->interval_exp : 0);
+	seq_printf(sf, "%u\n", bi->interval_exp ? 1 << bi->interval_exp : 0);
 }
 
 static ssize_t integrity_verify_store(struct blk_integrity *bi,
@@ -278,9 +280,9 @@ static ssize_t integrity_verify_store(struct blk_integrity *bi,
 	return count;
 }
 
-static ssize_t integrity_verify_show(struct blk_integrity *bi, char *page)
+static void integrity_verify_show(struct blk_integrity *bi, struct seq_file *sf)
 {
-	return sprintf(page, "%d\n", (bi->flags & BLK_INTEGRITY_VERIFY) != 0);
+	seq_printf(sf, "%d\n", (bi->flags & BLK_INTEGRITY_VERIFY) != 0);
 }
 
 static ssize_t integrity_generate_store(struct blk_integrity *bi,
@@ -297,15 +299,15 @@ static ssize_t integrity_generate_store(struct blk_integrity *bi,
 	return count;
 }
 
-static ssize_t integrity_generate_show(struct blk_integrity *bi, char *page)
+static void integrity_generate_show(struct blk_integrity *bi,
+		struct seq_file *sf)
 {
-	return sprintf(page, "%d\n", (bi->flags & BLK_INTEGRITY_GENERATE) != 0);
+	seq_printf(sf, "%d\n", (bi->flags & BLK_INTEGRITY_GENERATE) != 0);
 }
 
-static ssize_t integrity_device_show(struct blk_integrity *bi, char *page)
+static void integrity_device_show(struct blk_integrity *bi, struct seq_file *sf)
 {
-	return sprintf(page, "%u\n",
-		       (bi->flags & BLK_INTEGRITY_DEVICE_CAPABLE) != 0);
+	seq_printf(sf, "%u\n", (bi->flags & BLK_INTEGRITY_DEVICE_CAPABLE) != 0);
 }
 
 static struct integrity_sysfs_entry integrity_format_entry = {
@@ -352,8 +354,8 @@ static struct attribute *integrity_attrs[] = {
 ATTRIBUTE_GROUPS(integrity);
 
 static const struct sysfs_ops integrity_ops = {
-	.show	= &integrity_attr_show,
-	.store	= &integrity_attr_store,
+	.seq_show	= &integrity_attr_seq_show,
+	.store		= &integrity_attr_store,
 };
 
 static struct kobj_type integrity_ktype = {
