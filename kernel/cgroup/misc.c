@@ -26,6 +26,10 @@ static const char *const misc_res_name[] = {
 #endif
 };
 
+static const char *const misc_event_name[] = {
+	"max"
+};
+
 /* Root misc cgroup */
 static struct misc_cg root_cg;
 
@@ -140,7 +144,7 @@ static void misc_cg_cancel_charge(enum misc_res_type type, struct misc_cg *cg,
 int misc_cg_try_charge(enum misc_res_type type, struct misc_cg *cg,
 		       unsigned long amount)
 {
-	struct misc_cg *i, *j;
+	struct misc_cg *i, *j, *k;
 	int ret;
 	struct misc_res *res;
 	int new_usage;
@@ -171,6 +175,14 @@ int misc_cg_try_charge(enum misc_res_type type, struct misc_cg *cg,
 	return 0;
 
 err_charge:
+	atomic_long_inc(&i->res[type].events_local[MISC_CG_EVENT_MAX]);
+	cgroup_file_notify(&i->events_local_file);
+
+	for (k = i; k; k = parent_misc(k)) {
+		atomic_long_inc(&k->res[type].events[MISC_CG_EVENT_MAX]);
+		cgroup_file_notify(&k->events_file);
+	}
+
 	for (j = cg; j != i; j = parent_misc(j))
 		misc_cg_cancel_charge(type, j, amount);
 	misc_cg_cancel_charge(type, i, amount);
@@ -335,6 +347,38 @@ static int misc_cg_capacity_show(struct seq_file *sf, void *v)
 	return 0;
 }
 
+static int misc_events_show(struct seq_file *sf, void *v)
+{
+	struct misc_cg *cg = css_misc(seq_css(sf));
+	unsigned long events, i, j;
+
+	for (i = 0; i < MISC_CG_RES_TYPES; i++) {
+		for (j = 0; j < MISC_CG_EVENT_TYPES; j++) {
+			events = atomic_long_read(&cg->res[i].events[j]);
+			if (READ_ONCE(misc_res_capacity[i]) || events)
+				seq_printf(sf, "%s.%s %lu\n", misc_res_name[i],
+					   misc_event_name[j], events);
+		}
+	}
+	return 0;
+}
+
+static int misc_events_local_show(struct seq_file *sf, void *v)
+{
+	struct misc_cg *cg = css_misc(seq_css(sf));
+	unsigned long events, i, j;
+
+	for (i = 0; i < MISC_CG_RES_TYPES; i++) {
+		for (j = 0; j < MISC_CG_EVENT_TYPES; j++) {
+			events = atomic_long_read(&cg->res[i].events_local[j]);
+			if (READ_ONCE(misc_res_capacity[i]) || events)
+				seq_printf(sf, "%s.%s %lu\n", misc_res_name[i],
+					   misc_event_name[j], events);
+		}
+	}
+	return 0;
+}
+
 /* Misc cgroup interface files */
 static struct cftype misc_cg_files[] = {
 	{
@@ -352,6 +396,18 @@ static struct cftype misc_cg_files[] = {
 		.name = "capacity",
 		.seq_show = misc_cg_capacity_show,
 		.flags = CFTYPE_ONLY_ON_ROOT,
+	},
+	{
+		.name = "events",
+		.flags = CFTYPE_NOT_ON_ROOT,
+		.file_offset = offsetof(struct misc_cg, events_file),
+		.seq_show = misc_events_show,
+	},
+	{
+		.name = "events.local",
+		.flags = CFTYPE_NOT_ON_ROOT,
+		.file_offset = offsetof(struct misc_cg, events_local_file),
+		.seq_show = misc_events_local_show,
 	},
 	{}
 };

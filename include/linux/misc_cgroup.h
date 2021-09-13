@@ -21,6 +21,11 @@ enum misc_res_type {
 	MISC_CG_RES_TYPES
 };
 
+enum misc_event_type {
+	MISC_CG_EVENT_MAX,
+	MISC_CG_EVENT_TYPES
+};
+
 struct misc_cg;
 
 #ifdef CONFIG_CGROUP_MISC
@@ -36,6 +41,8 @@ struct misc_cg;
 struct misc_res {
 	unsigned long max;
 	atomic_long_t usage;
+	atomic_long_t events[MISC_CG_EVENT_TYPES];
+	atomic_long_t events_local[MISC_CG_EVENT_TYPES];
 	bool failed;
 };
 
@@ -46,6 +53,12 @@ struct misc_res {
  */
 struct misc_cg {
 	struct cgroup_subsys_state css;
+
+	/* misc.events */
+	struct cgroup_file events_file;
+	/* misc.events.local */
+	struct cgroup_file events_local_file;
+
 	struct misc_res res[MISC_CG_RES_TYPES];
 };
 
