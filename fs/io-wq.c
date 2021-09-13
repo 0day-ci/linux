@@ -14,6 +14,7 @@
 #include <linux/rculist_nulls.h>
 #include <linux/cpu.h>
 #include <linux/tracehook.h>
+#include <uapi/linux/io_uring.h>
 
 #include "io-wq.h"
 
@@ -78,9 +79,7 @@ struct io_wqe_acct {
 };
 
 enum {
-	IO_WQ_ACCT_BOUND,
-	IO_WQ_ACCT_UNBOUND,
-	IO_WQ_ACCT_NR,
+	IO_WQ_ACCT_NR = __IO_WQ_ACCT_MAX
 };
 
 /*
