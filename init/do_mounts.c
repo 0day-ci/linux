@@ -348,7 +348,6 @@ static int __init split_fs_names(char *page, char *names)
 		if (p[-1] == ',')
 			p[-1] = '\0';
 	}
-	*p = '\0';
 
 	for (p = page; *p; p += strlen(p)+1)
 		count++;
