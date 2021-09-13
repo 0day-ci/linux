@@ -1566,5 +1566,207 @@
 			interrupt-parent = <&gic>;
 			interrupts = <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>;
 		};
+
+		pl301_main: pl301@0 {
+			compatible = "fsl,imx8m-nic";
+			clocks = <&clk IMX8MQ_CLK_MAIN_AXI>;
+			operating-points-v2 = <&pl301_main_opp_table>;
+			#interconnect-cells = <0>;
+			fsl,icc-id = <IMX8MQ_ICN_MAIN>;
+
+			pl301_main_opp_table: opp-table {
+				compatible = "operating-points-v2";
+
+				opp-25M {
+					opp-hz = /bits/ 64 <25000000>;
+				};
+				opp-133M {
+					opp-hz = /bits/ 64 <133333333>;
+				};
+				opp-333M {
+					opp-hz = /bits/ 64 <333333333>;
+				};
+			};
+		};
+
+		pl301_enet: pl301@1 {
+			compatible = "fsl,imx8m-nic";
+			clocks = <&clk IMX8MQ_CLK_ENET_AXI>;
+			operating-points-v2 = <&pl301_enet_opp_table>;
+			#interconnect-cells = <0>;
+			fsl,icc-id = <IMX8MQ_ICN_ENET>;
+
+			pl301_enet_opp_table: opp-table {
+				compatible = "operating-points-v2";
+
+				opp-25M {
+					opp-hz = /bits/ 64 <25000000>;
+				};
+				opp-266M {
+					opp-hz = /bits/ 64 <266666666>;
+				};
+			};
+		};
+
+		pl301_gpu: pl301@2 {
+			compatible = "fsl,imx8m-nic";
+			clocks = <&clk IMX8MQ_CLK_GPU_AXI>;
+			operating-points-v2 = <&pl301_gpu_opp_table>;
+			#interconnect-cells = <0>;
+			fsl,icc-id = <IMX8MQ_ICN_GPU>;
+
+			pl301_gpu_opp_table: opp-table {
+				compatible = "operating-points-v2";
+
+				opp-25M {
+					opp-hz = /bits/ 64 <25000000>;
+				};
+				opp-800M {
+					opp-hz = /bits/ 64 <800000000>;
+				};
+			};
+		};
+
+		pl301_dc: pl301@3 {
+			compatible = "fsl,imx8m-nic";
+			clocks = <&clk IMX8MQ_CLK_DISP_AXI>;
+			operating-points-v2 = <&pl301_dc_opp_table>;
+			#interconnect-cells = <0>;
+			fsl,icc-id = <IMX8MQ_ICN_DCSS>;
+
+			pl301_dc_opp_table: opp-table {
+				compatible = "operating-points-v2";
+
+				opp-25M {
+					opp-hz = /bits/ 64 <25000000>;
+				};
+				opp-800M {
+					opp-hz = /bits/ 64 <800000000>;
+				};
+			};
+		};
+
+		/* PL301_DISPLAY (IPs other than DCSS, inside SUPERMIX) */
+		pl301_display: pl301@4 {
+			compatible = "fsl,imx8m-nic";
+			/* FIXME: don't know which clock yet */
+			clocks = <&clk IMX8MQ_CLK_DUMMY>;
+			operating-points-v2 = <&pl301_display_opp_table>;
+			#interconnect-cells = <0>;
+			fsl,icc-id = <IMX8MQ_ICN_DISPLAY>;
+
+			pl301_display_opp_table: opp-table {
+				compatible = "operating-points-v2";
+
+				opp-25M {
+					opp-hz = /bits/ 64 <25000000>;
+				};
+				opp-333M {
+					opp-hz = /bits/ 64 <333333333>;
+				};
+			};
+		};
+
+		pl301_audio: pl301@5 {
+			compatible = "fsl,imx8m-nic";
+			clocks = <&clk IMX8MQ_CLK_AUDIO_AHB>;
+			operating-points-v2 = <&pl301_audio_opp_table>;
+			#interconnect-cells = <0>;
+			fsl,icc-id = <IMX8MQ_ICN_AUDIO>;
+
+			pl301_audio_opp_table: opp-table {
+				compatible = "operating-points-v2";
+
+				opp-25M {
+					opp-hz = /bits/ 64 <25000000>;
+				};
+				opp-500M {
+					opp-hz = /bits/ 64 <500000000>;
+				};
+			};
+		};
+
+		pl301_video: pl301@6 {
+			compatible = "fsl,imx8m-nic";
+			clocks = <&clk IMX8MQ_CLK_VPU_BUS>;
+			operating-points-v2 = <&pl301_video_opp_table>;
+			#interconnect-cells = <0>;
+			fsl,icc-id = <IMX8MQ_ICN_VIDEO>;
+
+			pl301_video_opp_table: opp-table {
+				compatible = "operating-points-v2";
+
+				opp-25M {
+					opp-hz = /bits/ 64 <25000000>;
+				};
+				opp-500M {
+					opp-hz = /bits/ 64 <500000000>;
+				};
+			};
+		};
+
+		pl301_usb: pl301@7 {
+			compatible = "fsl,imx8m-nic";
+			clocks = <&clk IMX8MQ_CLK_USB_BUS>;
+			operating-points-v2 = <&pl301_usb_opp_table>;
+			#interconnect-cells = <0>;
+			fsl,icc-id = <IMX8MQ_ICN_USB>;
+
+			pl301_usb_opp_table: opp-table {
+				compatible = "operating-points-v2";
+
+				opp-25M {
+					opp-hz = /bits/ 64 <25000000>;
+				};
+				opp-128M {
+					opp-hz = /bits/ 64 <128000000>;
+				};
+				opp-500M {
+					opp-hz = /bits/ 64 <500000000>;
+				};
+			};
+		};
+
+		pl301_wakeup: pl301@8 {
+			compatible = "fsl,imx8m-nic";
+			/* FIXME: don't know which clock yet */
+			clocks = <&clk IMX8MQ_CLK_DUMMY>;
+			operating-points-v2 = <&pl301_wakeup_opp_table>;
+			#interconnect-cells = <0>;
+			fsl,icc-id = <IMX8MQ_ICN_WAKEUP>;
+
+			pl301_wakeup_opp_table: opp-table {
+				compatible = "operating-points-v2";
+
+				opp-25M {
+					opp-hz = /bits/ 64 <25000000>;
+				};
+				opp-133M {
+					opp-hz = /bits/ 64 <133333333>;
+				};
+			};
+		};
+
+		pl301_per_m: pl301@9 {
+			compatible = "fsl,imx8m-nic";
+			clocks = <&clk IMX8MQ_CLK_NAND_USDHC_BUS>;
+			operating-points-v2 = <&pl301_per_m_opp_table>;
+			#interconnect-cells = <0>;
+			fsl,icc-id = <IMX8MQ_ICN_PER_M>;
+
+			pl301_per_m_opp_table: opp-table {
+				compatible = "operating-points-v2";
+
+				opp-25M {
+					opp-hz = /bits/ 64 <25000000>;
+				};
+				opp-133M {
+					opp-hz = /bits/ 64 <133333333>;
+				};
+				opp-266M {
+					opp-hz = /bits/ 64 <266666666>;
+				};
+			};
+		};
 	};
 };
