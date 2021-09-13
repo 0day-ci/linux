@@ -143,6 +143,8 @@
 #define RTL8366RB_PHY_NO_OFFSET			9
 #define RTL8366RB_PHY_NO_MASK			(0x1f << 9)
 
+/* VLAN Ingress Control Register */
+#define RTL8366RB_VLAN_INGRESS_CTRL1_REG	0x037E
 #define RTL8366RB_VLAN_INGRESS_CTRL2_REG	0x037f
 
 /* LED control registers */
@@ -933,11 +935,13 @@ static int rtl8366rb_setup(struct dsa_switch *ds)
 	if (ret)
 		return ret;
 
-	/* Discard VLAN tagged packets if the port is not a member of
-	 * the VLAN with which the packets is associated.
-	 */
+	/* Accept all packets by default, we enable filtering on-demand */
+	ret = regmap_write(smi->map, RTL8366RB_VLAN_INGRESS_CTRL1_REG,
+			   0);
+	if (ret)
+		return ret;
 	ret = regmap_write(smi->map, RTL8366RB_VLAN_INGRESS_CTRL2_REG,
-			   RTL8366RB_PORT_ALL);
+			   0);
 	if (ret)
 		return ret;
 
@@ -1209,6 +1213,26 @@ rtl8366rb_port_bridge_leave(struct dsa_switch *ds, int port,
 			   RTL8366RB_PORT_ISO_PORTS(port_bitmap), 0);
 }
 
+static int rtl8366rb_vlan_filtering(struct dsa_switch *ds, int port,
+				    bool vlan_filtering,
+				    struct netlink_ext_ack *extack)
+{
+	struct realtek_smi *smi = ds->priv;
+	int ret;
+
+	dev_dbg(smi->dev, "port %d: %s VLAN filtering\n", port,
+		vlan_filtering ? "enable" : "disable");
+
+	/* Any incoming frames without VID (untagged) will be dropped */
+	ret = regmap_update_bits(smi->map, RTL8366RB_VLAN_INGRESS_CTRL1_REG,
+				 BIT(port), vlan_filtering ? BIT(port) : 0);
+	if (ret)
+		return ret;
+	/* If the port is not in the member set, the frame will be dropped */
+	return regmap_update_bits(smi->map, RTL8366RB_VLAN_INGRESS_CTRL2_REG,
+				  BIT(port), vlan_filtering ? BIT(port) : 0);
+}
+
 static int rtl8366rb_change_mtu(struct dsa_switch *ds, int port, int new_mtu)
 {
 	struct realtek_smi *smi = ds->priv;
@@ -1437,7 +1461,7 @@ static bool rtl8366rb_is_vlan_valid(struct realtek_smi *smi, unsigned int vlan)
 	if (smi->vlan4k_enabled)
 		max = RTL8366RB_NUM_VIDS - 1;
 
-	if (vlan == 0 || vlan > max)
+	if (vlan > max)
 		return false;
 
 	return true;
@@ -1594,7 +1618,7 @@ static const struct dsa_switch_ops rtl8366rb_switch_ops = {
 	.get_sset_count = rtl8366_get_sset_count,
 	.port_bridge_join = rtl8366rb_port_bridge_join,
 	.port_bridge_leave = rtl8366rb_port_bridge_leave,
-	.port_vlan_filtering = rtl8366_vlan_filtering,
+	.port_vlan_filtering = rtl8366rb_vlan_filtering,
 	.port_vlan_add = rtl8366_vlan_add,
 	.port_vlan_del = rtl8366_vlan_del,
 	.port_enable = rtl8366rb_port_enable,
