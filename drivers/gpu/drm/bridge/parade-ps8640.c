@@ -13,10 +13,31 @@
 #include <linux/regulator/consumer.h>
 
 #include <drm/drm_bridge.h>
+#include <drm/drm_dp_helper.h>
 #include <drm/drm_mipi_dsi.h>
 #include <drm/drm_of.h>
 #include <drm/drm_panel.h>
 #include <drm/drm_print.h>
+
+#define PAGE0_AUXCH_CFG3	0x76
+#define  AUXCH_CFG3_RESET	0xff
+#define PAGE0_AUX_ADDR_7_0	0x7d
+#define PAGE0_AUX_ADDR_15_8	0x7e
+#define PAGE0_AUX_ADDR_23_16	0x7f
+#define  AUX_ADDR_19_16_MASK	GENMASK(3, 0)
+#define  AUX_CMD_MASK		GENMASK(7, 4)
+#define PAGE0_AUX_LENGTH	0x80
+#define  AUX_LENGTH_MASK	GENMASK(3, 0)
+#define  AUX_NO_PAYLOAD		BIT(7)
+#define PAGE0_AUX_WDATA		0x81
+#define PAGE0_AUX_RDATA		0x82
+#define PAGE0_AUX_CTRL		0x83
+#define  AUX_SEND		BIT(0)
+#define PAGE0_AUX_STATUS	0x84
+#define  AUX_STATUS_MASK	GENMASK(7, 5)
+#define  AUX_STATUS_TIMEOUT	(0x7 << 5)
+#define  AUX_STATUS_DEFER	(0x2 << 5)
+#define  AUX_STATUS_NACK	(0x1 << 5)
 
 #define PAGE2_GPIO_H		0xa7
 #define  PS_GPIO9		BIT(1)
@@ -68,6 +89,7 @@ enum ps8640_vdo_control {
 struct ps8640 {
 	struct drm_bridge bridge;
 	struct drm_bridge *panel_bridge;
+	struct drm_dp_aux aux;
 	struct mipi_dsi_device *dsi;
 	struct i2c_client *page[MAX_DEVS];
 	struct regmap	*regmap[MAX_DEVS];
@@ -115,6 +137,114 @@ static const struct regmap_config ps8640_regmap_config[] = {
 static inline struct ps8640 *bridge_to_ps8640(struct drm_bridge *e)
 {
 	return container_of(e, struct ps8640, bridge);
+}
+
+static inline struct ps8640 *aux_to_ps8640(struct drm_dp_aux *aux)
+{
+	return container_of(aux, struct ps8640, aux);
+}
+
+static ssize_t ps8640_aux_transfer(struct drm_dp_aux *aux,
+				   struct drm_dp_aux_msg *msg)
+{
+	struct ps8640 *ps_bridge = aux_to_ps8640(aux);
+	struct regmap *map = ps_bridge->regmap[PAGE0_DP_CNTL];
+	unsigned int len = msg->size;
+	unsigned int data;
+	int ret;
+	u8 request = msg->request &
+		     ~(DP_AUX_I2C_MOT | DP_AUX_I2C_WRITE_STATUS_UPDATE);
+	u8 *buf = msg->buffer;
+	u8 addr_len[PAGE0_AUX_LENGTH + 1 - PAGE0_AUX_ADDR_7_0];
+	u8 i;
+	bool is_native_aux = false;
+
+	if (len > DP_AUX_MAX_PAYLOAD_BYTES)
+		return -EINVAL;
+
+	switch (request) {
+	case DP_AUX_NATIVE_WRITE:
+	case DP_AUX_NATIVE_READ:
+		is_native_aux = true;
+	case DP_AUX_I2C_WRITE:
+	case DP_AUX_I2C_READ:
+		ret = regmap_write(map, PAGE0_AUXCH_CFG3, AUXCH_CFG3_RESET);
+		break;
+	default:
+		ret = -EINVAL;
+		goto exit;
+	}
+
+	/* Assume it's good */
+	msg->reply = 0;
+
+	addr_len[0] = msg->address & 0xff;
+	addr_len[1] = (msg->address >> 8) & 0xff;
+	addr_len[2] = ((request << 4) & AUX_CMD_MASK) |
+		((msg->address >> 16) & AUX_ADDR_19_16_MASK);
+	addr_len[3] = (len == 0) ? AUX_NO_PAYLOAD :
+			((len - 1) & AUX_LENGTH_MASK);
+
+	regmap_bulk_write(map, PAGE0_AUX_ADDR_7_0, addr_len,
+			  ARRAY_SIZE(addr_len));
+
+	if (len && (request == DP_AUX_NATIVE_WRITE ||
+		    request == DP_AUX_I2C_WRITE)) {
+		/* Write to the internal FIFO buffer */
+		for (i = 0; i < len; i++) {
+			ret = regmap_write(map, PAGE0_AUX_WDATA, buf[i]);
+			if (ret < 0) {
+				DRM_ERROR("failed to write PAGE0_AUX_WDATA\n");
+				goto exit;
+			}
+		}
+	}
+
+	regmap_write(map, PAGE0_AUX_CTRL, AUX_SEND);
+
+	/* Zero delay loop because i2c transactions are slow already */
+	ret = regmap_read_poll_timeout(map, PAGE0_AUX_CTRL, data,
+				       !(data & AUX_SEND), 0, 50 * 1000);
+	if (ret)
+		goto exit;
+
+	regmap_read(map, PAGE0_AUX_STATUS, &data);
+	switch (data & AUX_STATUS_MASK) {
+	case AUX_STATUS_DEFER:
+		if (is_native_aux)
+			msg->reply |= DP_AUX_NATIVE_REPLY_DEFER;
+		else
+			msg->reply |= DP_AUX_I2C_REPLY_DEFER;
+		ret = -EBUSY;
+		goto exit;
+	case AUX_STATUS_NACK:
+		if (is_native_aux)
+			msg->reply |= DP_AUX_NATIVE_REPLY_NACK;
+		else
+			msg->reply |= DP_AUX_I2C_REPLY_NACK;
+		ret = -EBUSY;
+		goto exit;
+	case AUX_STATUS_TIMEOUT:
+		ret = -ETIMEDOUT;
+		goto exit;
+	}
+
+	if (len && (request == DP_AUX_NATIVE_READ ||
+		    request == DP_AUX_I2C_READ)) {
+		/* Read from the internal FIFO buffer */
+		for (i = 0; i < len; i++) {
+			ret = regmap_read(map, PAGE0_AUX_WDATA, &data);
+			buf[i] = data;
+			if (ret < 0)
+				DRM_ERROR("failed to read PAGE0_AUX_RDATA\n");
+		}
+	}
+
+exit:
+	if (ret)
+		return ret;
+
+	return len;
 }
 
 static int ps8640_bridge_vdo_control(struct ps8640 *ps_bridge,
@@ -286,16 +416,30 @@ static int ps8640_bridge_attach(struct drm_bridge *bridge,
 	dsi->format = MIPI_DSI_FMT_RGB888;
 	dsi->lanes = NUM_MIPI_LANES;
 	ret = mipi_dsi_attach(dsi);
-	if (ret)
-		goto err_dsi_attach;
+	if (ret) {
+		dev_err(dev, "failed to attach dsi device: %d\n", ret);
+		goto exit;
+	}
+
+	ret = drm_dp_aux_register(&ps_bridge->aux);
+	if (ret) {
+		dev_err(dev, "failed to register DP AUX channel: %d\n", ret);
+		goto exit;
+	}
 
 	/* Attach the panel-bridge to the dsi bridge */
 	return drm_bridge_attach(bridge->encoder, ps_bridge->panel_bridge,
 				 &ps_bridge->bridge, flags);
 
-err_dsi_attach:
+exit:
 	mipi_dsi_device_unregister(dsi);
 	return ret;
+}
+
+
+static void ps8640_bridge_detach(struct drm_bridge *bridge)
+{
+	drm_dp_aux_unregister(&bridge_to_ps8640(bridge)->aux);
 }
 
 static struct edid *ps8640_bridge_get_edid(struct drm_bridge *bridge,
@@ -334,6 +478,7 @@ static struct edid *ps8640_bridge_get_edid(struct drm_bridge *bridge,
 
 static const struct drm_bridge_funcs ps8640_bridge_funcs = {
 	.attach = ps8640_bridge_attach,
+	.detach = ps8640_bridge_detach,
 	.get_edid = ps8640_bridge_get_edid,
 	.post_disable = ps8640_post_disable,
 	.pre_enable = ps8640_pre_enable,
@@ -411,6 +556,11 @@ static int ps8640_probe(struct i2c_client *client)
 	}
 
 	i2c_set_clientdata(client, ps_bridge);
+
+	ps_bridge->aux.name = "parade-ps8640-aux";
+	ps_bridge->aux.dev = dev;
+	ps_bridge->aux.transfer = ps8640_aux_transfer;
+	drm_dp_aux_init(&ps_bridge->aux);
 
 	drm_bridge_add(&ps_bridge->bridge);
 
