@@ -356,6 +356,7 @@ struct ufs_hba_variant_ops {
 			       const union ufs_crypto_cfg_entry *cfg, int slot);
 	void	(*event_notify)(struct ufs_hba *hba,
 				enum ufs_event_type evt, void *data);
+	irqreturn_t	(*intr)(struct ufs_hba *hba);
 };
 
 /* clock gating state  */

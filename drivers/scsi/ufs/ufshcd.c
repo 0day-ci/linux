@@ -218,6 +218,13 @@ static struct ufs_dev_fix ufs_fixups[] = {
 	END_FIX
 };
 
+static inline irqreturn_t
+ufshcd_vendor_isr_def(struct ufs_hba *hba)
+{
+	return IRQ_NONE;
+}
+DEFINE_STATIC_CALL(vendor_isr, ufshcd_vendor_isr_def);
+
 static irqreturn_t ufshcd_tmc_handler(struct ufs_hba *hba);
 static void ufshcd_async_scan(void *data, async_cookie_t cookie);
 static int ufshcd_reset_and_restore(struct ufs_hba *hba);
@@ -6445,7 +6452,9 @@ static irqreturn_t ufshcd_tmc_handler(struct ufs_hba *hba)
  */
 static irqreturn_t ufshcd_sl_intr(struct ufs_hba *hba, u32 intr_status)
 {
-	irqreturn_t retval = IRQ_NONE;
+	irqreturn_t retval;
+
+	retval = static_call(vendor_isr)(hba);
 
 	if (intr_status & UFSHCD_UIC_MASK)
 		retval |= ufshcd_uic_cmd_compl(hba, intr_status);
@@ -8533,6 +8542,9 @@ static int ufshcd_variant_hba_init(struct ufs_hba *hba)
 	if (err)
 		dev_err(hba->dev, "%s: variant %s init failed err %d\n",
 			__func__, ufshcd_get_var_name(hba), err);
+
+	if (hba->vops->intr)
+		static_call_update(vendor_isr, *hba->vops->intr);
 out:
 	return err;
 }
