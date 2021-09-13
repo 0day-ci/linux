@@ -68,6 +68,7 @@
 #include "intel_tc.h"
 #include "intel_vdsc.h"
 #include "intel_vrr.h"
+#include "intel_cdclk.h"
 
 #define DP_DPRX_ESI_LEN 14
 
@@ -1184,10 +1185,13 @@ static int intel_dp_dsc_compute_config(struct intel_dp *intel_dp,
 				       struct drm_connector_state *conn_state,
 				       struct link_config_limits *limits)
 {
+	struct intel_cdclk_state *cdclk_state;
 	struct intel_digital_port *dig_port = dp_to_dig_port(intel_dp);
 	struct drm_i915_private *dev_priv = to_i915(dig_port->base.base.dev);
 	const struct drm_display_mode *adjusted_mode =
 		&pipe_config->hw.adjusted_mode;
+	struct intel_atomic_state *state =
+				to_intel_atomic_state(pipe_config->uapi.state);
 	int pipe_bpp;
 	int ret;
 
@@ -1266,12 +1270,16 @@ static int intel_dp_dsc_compute_config(struct intel_dp *intel_dp,
 		}
 	}
 
+	cdclk_state = intel_atomic_get_cdclk_state(state);
+	if (IS_ERR(cdclk_state))
+		return PTR_ERR(cdclk_state);
+
 	/*
 	 * VDSC engine operates at 1 Pixel per clock, so if peak pixel rate
-	 * is greater than the maximum Cdclock and if slice count is even
+	 * is greater than the current Cdclock and if slice count is even
 	 * then we need to use 2 VDSC instances.
 	 */
-	if (adjusted_mode->crtc_clock > dev_priv->max_cdclk_freq ||
+	if (adjusted_mode->crtc_clock > cdclk_state->actual.cdclk ||
 	    pipe_config->bigjoiner) {
 		if (pipe_config->dsc.slice_count < 2) {
 			drm_dbg_kms(&dev_priv->drm,
