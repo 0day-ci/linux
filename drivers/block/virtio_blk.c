@@ -495,7 +495,8 @@ static int init_vq(struct virtio_blk *vblk)
 	err = virtio_cread_feature(vdev, VIRTIO_BLK_F_MQ,
 				   struct virtio_blk_config, num_queues,
 				   &num_vqs);
-	if (err)
+	/* We need at least on virtqueue */
+	if (err || !num_vqs)
 		num_vqs = 1;
 
 	num_vqs = min_t(unsigned int, nr_cpu_ids, num_vqs);
