@@ -2690,7 +2690,7 @@ static int ath10k_core_copy_target_iram(struct ath10k *ar)
 	int i, ret;
 	u32 len, remaining_len;
 
-	hw_mem = ath10k_coredump_get_mem_layout(ar);
+	hw_mem = ath10k_coredump_get_hw_mem_layout(ar);
 	if (!hw_mem)
 		return -ENOMEM;
 
