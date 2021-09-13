@@ -45,6 +45,9 @@ static int sysfs_kf_seq_show(struct seq_file *sf, void *v)
 	ssize_t count;
 	char *buf;
 
+	if (ops->seq_show)
+		return ops->seq_show(kobj, of->kn->priv, sf);
+
 	if (WARN_ON_ONCE(!ops->show))
 		return -EINVAL;
 
@@ -268,6 +271,10 @@ int sysfs_add_file_mode_ns(struct kernfs_node *parent,
 		return -EINVAL;
 
 	if (mode & SYSFS_PREALLOC) {
+		if (WARN(sysfs_ops->seq_show, KERN_ERR
+				"seq_show not supported on prealloc file: %s\n",
+				kobject_name(kobj)))
+			return -EINVAL;
 		if (sysfs_ops->show && sysfs_ops->store)
 			ops = &sysfs_prealloc_kfops_rw;
 		else if (sysfs_ops->show)
@@ -275,12 +282,14 @@ int sysfs_add_file_mode_ns(struct kernfs_node *parent,
 		else if (sysfs_ops->store)
 			ops = &sysfs_prealloc_kfops_wo;
 	} else {
-		if (sysfs_ops->show && sysfs_ops->store)
-			ops = &sysfs_file_kfops_rw;
-		else if (sysfs_ops->show)
-			ops = &sysfs_file_kfops_ro;
-		else if (sysfs_ops->store)
+		if (sysfs_ops->seq_show || sysfs_ops->show) {
+			if (sysfs_ops->store)
+				ops = &sysfs_file_kfops_rw;
+			else
+				ops = &sysfs_file_kfops_ro;
+		} else if (sysfs_ops->store) {
 			ops = &sysfs_file_kfops_wo;
+		}
 	}
 
 	if (!ops)
