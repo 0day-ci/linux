@@ -173,13 +173,27 @@ static unsigned int rti_wdt_get_timeleft_ms(struct watchdog_device *wdd)
 	return timer_counter;
 }
 
+static int rti_wdt_set_timeout(struct watchdog_device *wdd,
+			       unsigned int timeout)
+{
+	/*
+	 * Updating the timeout after start is actually not supported, but
+	 * let's ignore requests for the already configured value. Helps
+	 * existing userspace such as systemd.
+	 */
+	if (timeout != heartbeat)
+		return -EOPNOTSUPP;
+
+	return 0;
+}
+
 static unsigned int rti_wdt_get_timeleft(struct watchdog_device *wdd)
 {
 	return rti_wdt_get_timeleft_ms(wdd) / 1000;
 }
 
 static const struct watchdog_info rti_wdt_info = {
-	.options = WDIOF_KEEPALIVEPING,
+	.options = WDIOF_KEEPALIVEPING | WDIOF_SETTIMEOUT,
 	.identity = "K3 RTI Watchdog",
 };
 
@@ -187,6 +201,7 @@ static const struct watchdog_ops rti_wdt_ops = {
 	.owner		= THIS_MODULE,
 	.start		= rti_wdt_start,
 	.ping		= rti_wdt_ping,
+	.set_timeout	= rti_wdt_set_timeout,
 	.get_timeleft	= rti_wdt_get_timeleft,
 };
 
