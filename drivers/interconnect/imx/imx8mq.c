@@ -6,6 +6,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/of_device.h>
 #include <linux/platform_device.h>
 #include <linux/interconnect-provider.h>
 #include <dt-bindings/interconnect/imx8mq.h>
@@ -88,12 +89,18 @@ static int imx8mq_icc_remove(struct platform_device *pdev)
 	return imx_icc_unregister(pdev);
 }
 
+static const struct of_device_id imx8mq_icc_of_match[] = {
+	{ .compatible = "fsl,imx8mq-icc" },
+	{ /* sentinel */ },
+};
+
 static struct platform_driver imx8mq_icc_driver = {
 	.probe = imx8mq_icc_probe,
 	.remove = imx8mq_icc_remove,
 	.driver = {
 		.name = "imx8mq-interconnect",
 		.sync_state = icc_sync_state,
+		.of_match_table = of_match_ptr(imx8mq_icc_of_match),
 	},
 };
 
