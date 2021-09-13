@@ -20,11 +20,19 @@ static const struct dp_regulator_cfg sdm845_dp_reg_cfg = {
 };
 
 static int msm_dss_ioremap(struct platform_device *pdev,
-				struct dss_io_data *io_data)
+				struct dss_io_data *io_data, const char *name,
+				int fallback_idx)
 {
 	struct resource *res = NULL;
 
-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, name);
+
+	/* Support dts which do not have named resources */
+	if (!res) {
+		if (fallback_idx >= 0)
+			res = platform_get_resource(pdev, IORESOURCE_MEM,
+						    fallback_idx);
+	}
 	if (!res) {
 		DRM_ERROR("%pS->%s: msm_dss_get_res failed\n",
 			__builtin_return_address(0), __func__);
@@ -55,6 +63,8 @@ static void dp_parser_unmap_io_resources(struct dp_parser *parser)
 {
 	struct dp_io *io = &parser->io;
 
+	msm_dss_iounmap(&io->hdcp_tz);
+	msm_dss_iounmap(&io->hdcp_key);
 	msm_dss_iounmap(&io->dp_controller);
 }
 
@@ -64,10 +74,24 @@ static int dp_parser_ctrl_res(struct dp_parser *parser)
 	struct platform_device *pdev = parser->pdev;
 	struct dp_io *io = &parser->io;
 
-	rc = msm_dss_ioremap(pdev, &io->dp_controller);
+	rc = msm_dss_ioremap(pdev, &io->dp_controller, "dp_controller", 0);
 	if (rc) {
 		DRM_ERROR("unable to remap dp io resources, rc=%d\n", rc);
 		goto err;
+	}
+
+	rc = msm_dss_ioremap(pdev, &io->hdcp_key, "hdcp_key", -1);
+	if (rc) {
+		DRM_INFO("unable to remap dp hdcp resources, rc=%d\n", rc);
+		io->hdcp_key.base = NULL;
+		io->hdcp_key.len = 0;
+	}
+
+	rc = msm_dss_ioremap(pdev, &io->hdcp_tz, "hdcp_tz", -1);
+	if (rc) {
+		DRM_INFO("unable to remap dp hdcp resources, rc=%d\n", rc);
+		io->hdcp_tz.base = NULL;
+		io->hdcp_tz.len = 0;
 	}
 
 	io->phy = devm_phy_get(&pdev->dev, "dp");
