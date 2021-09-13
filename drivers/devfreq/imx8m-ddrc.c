@@ -321,38 +321,9 @@ static int imx8m_ddrc_init_freq_info(struct device *dev)
 		if (freq->dram_core_parent_index == 2 &&
 				freq->dram_alt_parent_index == 0)
 			return -ENODEV;
-	}
 
-	return 0;
-}
-
-static int imx8m_ddrc_check_opps(struct device *dev)
-{
-	struct imx8m_ddrc *priv = dev_get_drvdata(dev);
-	struct imx8m_ddrc_freq *freq_info;
-	struct dev_pm_opp *opp;
-	unsigned long freq;
-	int i, opp_count;
-
-	/* Enumerate DT OPPs and disable those not supported by firmware */
-	opp_count = dev_pm_opp_get_opp_count(dev);
-	if (opp_count < 0)
-		return opp_count;
-	for (i = 0, freq = 0; i < opp_count; ++i, ++freq) {
-		opp = dev_pm_opp_find_freq_ceil(dev, &freq);
-		if (IS_ERR(opp)) {
-			dev_err(dev, "Failed enumerating OPPs: %ld\n",
-				PTR_ERR(opp));
-			return PTR_ERR(opp);
-		}
-		dev_pm_opp_put(opp);
-
-		freq_info = imx8m_ddrc_find_freq(priv, freq);
-		if (!freq_info) {
-			dev_info(dev, "Disable unsupported OPP %luHz %luMT/s\n",
-					freq, DIV_ROUND_CLOSEST(freq, 250000));
-			dev_pm_opp_disable(dev, freq);
-		}
+		if (dev_pm_opp_add(dev, freq->rate * 250000, 0))
+			return -ENODEV;
 	}
 
 	return 0;
@@ -360,7 +331,6 @@ static int imx8m_ddrc_check_opps(struct device *dev)
 
 static void imx8m_ddrc_exit(struct device *dev)
 {
-	dev_pm_opp_of_remove_table(dev);
 }
 
 static int imx8m_ddrc_probe(struct platform_device *pdev)
@@ -407,16 +377,7 @@ static int imx8m_ddrc_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	ret = dev_pm_opp_of_add_table(dev);
-	if (ret < 0) {
-		dev_err(dev, "failed to get OPP table\n");
-		return ret;
-	}
-
-	ret = imx8m_ddrc_check_opps(dev);
-	if (ret < 0)
-		goto err;
-
+	priv->profile.polling_ms = 1000;
 	priv->profile.target = imx8m_ddrc_target;
 	priv->profile.exit = imx8m_ddrc_exit;
 	priv->profile.get_cur_freq = imx8m_ddrc_get_cur_freq;
@@ -427,13 +388,8 @@ static int imx8m_ddrc_probe(struct platform_device *pdev)
 	if (IS_ERR(priv->devfreq)) {
 		ret = PTR_ERR(priv->devfreq);
 		dev_err(dev, "failed to add devfreq device: %d\n", ret);
-		goto err;
 	}
 
-	return 0;
-
-err:
-	dev_pm_opp_of_remove_table(dev);
 	return ret;
 }
 
