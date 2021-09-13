@@ -30,8 +30,12 @@ void vp_disable_vectors(struct virtio_device *vdev)
 	struct virtio_pci_device *vp_dev = to_vp_device(vdev);
 	int i;
 
-	if (vp_dev->intx_enabled)
+	if (vp_dev->intx_enabled) {
+		vp_dev->intx_soft_enabled = false;
+		/* ensure the vp_interrupt see this intx_soft_enabled value */
+		smp_wmb();
 		synchronize_irq(vp_dev->pci_dev->irq);
+	}
 
 	for (i = 0; i < vp_dev->msix_vectors; ++i)
 		disable_irq(pci_irq_vector(vp_dev->pci_dev, i));
@@ -43,8 +47,12 @@ void vp_enable_vectors(struct virtio_device *vdev)
 	struct virtio_pci_device *vp_dev = to_vp_device(vdev);
 	int i;
 
-	if (vp_dev->intx_enabled)
+	if (vp_dev->intx_enabled) {
+		vp_dev->intx_soft_enabled = true;
+		/* ensure the vp_interrupt see this intx_soft_enabled value */
+		smp_wmb();
 		return;
+	}
 
 	for (i = 0; i < vp_dev->msix_vectors; ++i)
 		enable_irq(pci_irq_vector(vp_dev->pci_dev, i));
@@ -96,6 +104,12 @@ static irqreturn_t vp_interrupt(int irq, void *opaque)
 {
 	struct virtio_pci_device *vp_dev = opaque;
 	u8 isr;
+
+	if (!vp_dev->intx_soft_enabled)
+		return IRQ_NONE;
+
+	/* read intx_soft_enabled before read others */
+	smp_rmb();
 
 	/* reading the ISR has the effect of also clearing it so it's very
 	 * important to save off the value. */
