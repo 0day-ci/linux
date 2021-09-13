@@ -1135,6 +1135,38 @@ static int setup_out_fence(struct drm_out_fence_state *fence_state,
 	return 0;
 }
 
+static struct dma_fence *crtc_create_out_fence(struct drm_crtc *crtc,
+				struct drm_out_fence_state **fence_state,
+				s32 __user *fence_ptr,
+				unsigned int *num_fences)
+{
+	struct dma_fence *fence;
+	struct drm_out_fence_state *f;
+	int ret;
+
+	f = krealloc(*fence_state, sizeof(**fence_state) *
+		     (*num_fences + 1), GFP_KERNEL);
+	if (!f)
+		return ERR_PTR(-ENOMEM);
+
+	memset(&f[*num_fences], 0, sizeof(*f));
+
+	f[*num_fences].out_fence_ptr = fence_ptr;
+	*fence_state = f;
+
+	fence = drm_crtc_create_fence(crtc);
+	if (!fence)
+		return ERR_PTR(-ENOMEM);
+
+	ret = setup_out_fence(&f[(*num_fences)++], fence);
+	if (ret) {
+		dma_fence_put(fence);
+		return ERR_PTR(ret);
+	}
+
+	return fence;
+}
+
 static int prepare_signaling(struct drm_device *dev,
 				  struct drm_atomic_state *state,
 				  struct drm_mode_atomic *arg,
@@ -1152,6 +1184,7 @@ static int prepare_signaling(struct drm_device *dev,
 		return 0;
 
 	for_each_new_crtc_in_state(state, crtc, crtc_state, i) {
+		struct dma_fence *fence;
 		s32 __user *fence_ptr;
 
 		fence_ptr = get_out_fence_for_crtc(crtc_state->state, crtc);
@@ -1182,28 +1215,12 @@ static int prepare_signaling(struct drm_device *dev,
 		}
 
 		if (fence_ptr) {
-			struct dma_fence *fence;
-			struct drm_out_fence_state *f;
+			fence = crtc_create_out_fence(crtc, fence_state,
+						      fence_ptr, num_fences);
+			if (IS_ERR(fence))
+				return PTR_ERR(fence);
 
-			f = krealloc(*fence_state, sizeof(**fence_state) *
-				     (*num_fences + 1), GFP_KERNEL);
-			if (!f)
-				return -ENOMEM;
 
-			memset(&f[*num_fences], 0, sizeof(*f));
-
-			f[*num_fences].out_fence_ptr = fence_ptr;
-			*fence_state = f;
-
-			fence = drm_crtc_create_fence(crtc);
-			if (!fence)
-				return -ENOMEM;
-
-			ret = setup_out_fence(&f[(*num_fences)++], fence);
-			if (ret) {
-				dma_fence_put(fence);
-				return ret;
-			}
 
 			crtc_state->event->base.fence = fence;
 		}
