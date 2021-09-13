@@ -127,6 +127,8 @@ static const struct ttm_resource_manager_func ttm_range_manager_func = {
 	.debug = ttm_range_man_debug
 };
 
+#undef ttm_range_man_init
+#undef ttm_range_man_fini
 /**
  * ttm_range_man_init
  *

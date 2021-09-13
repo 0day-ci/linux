@@ -38,5 +38,15 @@ int ttm_range_man_init(struct ttm_device *bdev,
 		       unsigned long p_size);
 int ttm_range_man_fini(struct ttm_device *bdev,
 		       unsigned type);
+#define ttm_range_man_init(bdev, type, use_tt, size) ({	\
+	BUILD_BUG_ON(__builtin_constant_p(type)		\
+			&& type >= TTM_NUM_MEM_TYPES);	\
+	ttm_range_man_init(bdev, type, use_tt, size);	\
+})
+#define ttm_range_man_fini(bdev, type) ({		\
+	BUILD_BUG_ON(__builtin_constant_p(type)		\
+			&& type >= TTM_NUM_MEM_TYPES);	\
+	ttm_range_man_fini(bdev, type);			\
+})
 
 #endif
