@@ -1141,7 +1141,7 @@ struct psi_trigger *psi_trigger_create(struct psi_group *group,
 	t->group = group;
 	t->state = state;
 	t->threshold = threshold_us * NSEC_PER_USEC;
-	t->win.size = window_us * NSEC_PER_USEC;
+	t->win.size = (u64)window_us * NSEC_PER_USEC;
 	window_reset(&t->win, 0, 0, 0);
 
 	t->event = 0;
