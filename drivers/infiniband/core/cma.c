@@ -1746,16 +1746,11 @@ static void cma_cancel_route(struct rdma_id_private *id_priv)
 	}
 }
 
-static void cma_cancel_listens(struct rdma_id_private *id_priv)
+static void _cma_cancel_listens(struct rdma_id_private *id_priv)
 {
 	struct rdma_id_private *dev_id_priv;
 
-	/*
-	 * Remove from listen_any_list to prevent added devices from spawning
-	 * additional listen requests.
-	 */
-	mutex_lock(&lock);
-	list_del(&id_priv->list);
+	lockdep_assert_held(&lock);
 
 	while (!list_empty(&id_priv->listen_list)) {
 		dev_id_priv = list_entry(id_priv->listen_list.next,
@@ -1768,6 +1763,18 @@ static void cma_cancel_listens(struct rdma_id_private *id_priv)
 		rdma_destroy_id(&dev_id_priv->id);
 		mutex_lock(&lock);
 	}
+}
+
+static void cma_cancel_listens(struct rdma_id_private *id_priv)
+{
+	/*
+	 * Remove from listen_any_list to prevent added devices from spawning
+	 * additional listen requests.
+	 */
+	mutex_lock(&lock);
+	list_del(&id_priv->list);
+
+	_cma_cancel_listens(id_priv);
 	mutex_unlock(&lock);
 }
 
@@ -2575,6 +2582,7 @@ static int cma_listen_on_all(struct rdma_id_private *id_priv)
 
 err_listen:
 	list_del(&id_priv->list);
+	_cma_cancel_listens(id_priv);
 	mutex_unlock(&lock);
 	if (to_destroy)
 		rdma_destroy_id(&to_destroy->id);
