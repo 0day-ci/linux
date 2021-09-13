@@ -601,6 +601,27 @@ void del_gendisk(struct gendisk *disk)
 }
 EXPORT_SYMBOL(del_gendisk);
 
+/**
+ * invalidate_gendisk - invalidate the gendisk
+ * @disk: the struct gendisk to invalidate
+ *
+ * A helper to invalidates the gendisk. It will clean the gendisk's associated
+ * buffer/page caches and reset its internal states so that the gendisk
+ * can be reused by the drivers.
+ *
+ * Context: can sleep
+ */
+
+void invalidate_gendisk(struct gendisk *disk)
+{
+	struct block_device *bdev = disk->part0;
+
+	invalidate_bdev(bdev);
+	bdev->bd_inode->i_mapping->wb_err = 0;
+	set_capacity(disk, 0);
+}
+EXPORT_SYMBOL(invalidate_gendisk);
+
 /* sysfs access to bad-blocks list. */
 static ssize_t disk_badblocks_show(struct device *dev,
 					struct device_attribute *attr,

@@ -221,6 +221,7 @@ static inline int add_disk(struct gendisk *disk)
 	return device_add_disk(NULL, disk, NULL);
 }
 extern void del_gendisk(struct gendisk *gp);
+extern void invalidate_gendisk(struct gendisk *gp);
 
 void set_disk_ro(struct gendisk *disk, bool read_only);
 
