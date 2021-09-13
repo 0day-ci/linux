@@ -710,9 +710,9 @@ static long restore_tm_user_regs(struct pt_regs *regs, struct mcontext __user *s
 }
 #endif
 
-#ifdef CONFIG_PPC64
+#ifndef CONFIG_PPC64
 
-#define copy_siginfo_to_user	copy_siginfo_to_user32
+#define unsafe_copy_siginfo_to_user32	unsafe_copy_siginfo_to_user
 
 #endif /* CONFIG_PPC64 */
 
@@ -779,14 +779,12 @@ int handle_rt_signal32(struct ksignal *ksig, sigset_t *oldset,
 		asm("dcbst %y0; sync; icbi %y0; sync" :: "Z" (mctx->mc_pad[0]));
 	}
 	unsafe_put_sigset_t(&frame->uc.uc_sigmask, oldset, failed);
+	unsafe_copy_siginfo_to_user32(&frame->info, &ksig->info, failed);
 
 	/* create a stack frame for the caller of the handler */
 	unsafe_put_user(regs->gpr[1], newsp, failed);
 
 	user_access_end();
-
-	if (copy_siginfo_to_user(&frame->info, &ksig->info))
-		goto badframe;
 
 	regs->link = tramp;
 
