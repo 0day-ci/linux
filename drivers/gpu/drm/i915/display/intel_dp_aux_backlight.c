@@ -212,6 +212,10 @@ intel_dp_aux_hdr_enable_backlight(const struct intel_crtc_state *crtc_state,
 
 	ctrl = old_ctrl;
 	if (panel->backlight.edp.intel.sdr_uses_aux) {
+		/* Wait 100ms to ensure that panel is ready otherwise it may not
+		 * set chosen backlight level
+		 */
+		msleep(100);
 		ctrl |= INTEL_EDP_HDR_TCON_BRIGHTNESS_AUX_ENABLE;
 		intel_dp_aux_hdr_set_aux_backlight(conn_state, level);
 	} else {
