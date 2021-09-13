@@ -27,6 +27,7 @@
 #include <drm/drm_damage_helper.h>
 #include <drm/drm_fourcc.h>
 #include <drm/drm_plane_helper.h>
+#include <drm/drm_vblank.h>
 
 #include "virtgpu_drv.h"
 
@@ -163,6 +164,60 @@ static void virtio_gpu_resource_flush(struct drm_plane *plane,
 	}
 }
 
+static void virtio_gpu_set_scanout_blob(struct drm_plane *plane,
+					struct virtio_gpu_output *output)
+{
+	struct drm_device *dev = plane->dev;
+	struct virtio_gpu_device *vgdev = dev->dev_private;
+	struct virtio_gpu_framebuffer *vgfb;
+	struct virtio_gpu_object *bo;
+
+	vgfb = to_virtio_gpu_framebuffer(plane->state->fb);
+	bo = gem_to_virtio_gpu_obj(vgfb->base.obj[0]);
+	if (bo->guest_blob && vgdev->ddev->mode_config.release_fence) {
+		struct drm_crtc_state *crtc_state;
+		struct drm_pending_event *e;
+		struct virtio_gpu_object_array *objs;
+		struct virtio_gpu_fence *fence;
+
+		crtc_state = output->crtc.state;
+		if (!crtc_state || !crtc_state->event)
+			return;
+
+		e = &crtc_state->event->base;
+		if (!e->release_fence)
+			return;
+
+		fence = virtio_gpu_fence_alloc(vgdev);
+		if (!fence)
+			return;
+
+		objs = virtio_gpu_array_alloc(1);
+		if (!objs)
+			return;
+
+		fence->release_fence = e->release_fence;
+		virtio_gpu_array_add_obj(objs, vgfb->base.obj[0]);
+		virtio_gpu_array_lock_resv(objs);
+		virtio_gpu_cmd_set_scanout_blob(vgdev, output->index, bo,
+						plane->state->fb,
+						plane->state->src_w >> 16,
+						plane->state->src_h >> 16,
+						plane->state->src_x >> 16,
+						plane->state->src_y >> 16,
+						objs, fence);
+	} else {
+		virtio_gpu_cmd_set_scanout_blob(vgdev, output->index, bo,
+						plane->state->fb,
+						plane->state->src_w >> 16,
+						plane->state->src_h >> 16,
+						plane->state->src_x >> 16,
+						plane->state->src_y >> 16,
+						NULL, NULL);
+	}
+}
+
+
 static void virtio_gpu_primary_plane_update(struct drm_plane *plane,
 					    struct drm_atomic_state *state)
 {
@@ -215,13 +270,7 @@ static void virtio_gpu_primary_plane_update(struct drm_plane *plane,
 			  plane->state->src_y >> 16);
 
 		if (bo->host3d_blob || bo->guest_blob) {
-			virtio_gpu_cmd_set_scanout_blob
-						(vgdev, output->index, bo,
-						 plane->state->fb,
-						 plane->state->src_w >> 16,
-						 plane->state->src_h >> 16,
-						 plane->state->src_x >> 16,
-						 plane->state->src_y >> 16);
+			virtio_gpu_set_scanout_blob(plane, output);
 		} else {
 			virtio_gpu_cmd_set_scanout(vgdev, output->index,
 						   bo->hw_res_handle,
