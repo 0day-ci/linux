@@ -3065,3 +3065,5 @@ extern int sched_dynamic_mode(const char *str);
 extern void sched_dynamic_update(int mode);
 #endif
 
+extern bool sched_rt_bandwidth_account(struct rt_rq *rt_rq);
+
