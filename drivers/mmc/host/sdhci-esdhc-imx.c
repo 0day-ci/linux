@@ -9,6 +9,7 @@
  */
 
 #include <linux/bitfield.h>
+#include <linux/interconnect.h>
 #include <linux/io.h>
 #include <linux/iopoll.h>
 #include <linux/delay.h>
@@ -287,6 +288,9 @@ struct pltfm_imx_data {
 	struct clk *clk_ahb;
 	struct clk *clk_per;
 	unsigned int actual_clock;
+	struct icc_path *bus_path;
+	unsigned int bus_rate;
+
 	enum {
 		NO_CMD_PENDING,      /* no multiblock command pending */
 		MULTIBLK_IN_PROCESS, /* exact multiblock cmd in process */
@@ -1519,6 +1523,19 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
 	if (imx_data->socdata->flags & ESDHC_FLAG_PMQOS)
 		cpu_latency_qos_add_request(&imx_data->pm_qos_req, 0);
 
+	imx_data->bus_path = devm_of_icc_get(&pdev->dev, "path");
+	if (IS_ERR(imx_data->bus_path)) {
+		err = PTR_ERR(imx_data->bus_path);
+		goto free_sdhci;
+	} else if (imx_data->bus_path) {
+		if (of_property_read_u32(pdev->dev.of_node, "fsl,icc-rate", &imx_data->bus_rate)) {
+			dev_err(&pdev->dev, "icc-rate missing\n");
+			return -EINVAL;
+		}
+
+		err = icc_set_bw(imx_data->bus_path, 0, imx_data->bus_rate);
+	}
+
 	imx_data->clk_ipg = devm_clk_get(&pdev->dev, "ipg");
 	if (IS_ERR(imx_data->clk_ipg)) {
 		err = PTR_ERR(imx_data->clk_ipg);
@@ -1708,13 +1725,19 @@ static int sdhci_esdhc_suspend(struct device *dev)
 
 	ret = mmc_gpio_set_cd_wake(host->mmc, true);
 
+	icc_disable(imx_data->bus_path);
+
 	return ret;
 }
 
 static int sdhci_esdhc_resume(struct device *dev)
 {
 	struct sdhci_host *host = dev_get_drvdata(dev);
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+	struct pltfm_imx_data *imx_data = sdhci_pltfm_priv(pltfm_host);
 	int ret;
+
+	icc_enable(imx_data->bus_path);
 
 	ret = pinctrl_pm_select_default_state(dev);
 	if (ret)
@@ -1767,6 +1790,8 @@ static int sdhci_esdhc_runtime_suspend(struct device *dev)
 	if (imx_data->socdata->flags & ESDHC_FLAG_PMQOS)
 		cpu_latency_qos_remove_request(&imx_data->pm_qos_req);
 
+	icc_disable(imx_data->bus_path);
+
 	return ret;
 }
 
@@ -1776,6 +1801,8 @@ static int sdhci_esdhc_runtime_resume(struct device *dev)
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
 	struct pltfm_imx_data *imx_data = sdhci_pltfm_priv(pltfm_host);
 	int err;
+
+	icc_enable(imx_data->bus_path);
 
 	if (imx_data->socdata->flags & ESDHC_FLAG_PMQOS)
 		cpu_latency_qos_add_request(&imx_data->pm_qos_req, 0);
