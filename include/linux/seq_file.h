@@ -59,6 +59,10 @@ static inline bool seq_has_overflowed(struct seq_file *m)
  *
  * Return the number of bytes available in the buffer, or zero if
  * there's no space.
+ *
+ * DOT NOT USE IN NEW CODE! This function pokes a hole into the whole seq_file
+ * abstraction.  The only remaining user outside of seq_file.c is sysfs, which
+ * is gradually moving away from using seq_get_buf directly.
  */
 static inline size_t seq_get_buf(struct seq_file *m, char **bufp)
 {
