@@ -308,6 +308,11 @@ int rtl8366_vlan_add(struct dsa_switch *ds, int port,
 		return -EINVAL;
 	}
 
+	/* Note that VLAN 0 shall always be treated as untagged */
+	if (vlan->vid == 0)
+		untagged = true;
+
+
 	/* Enable VLAN in the hardware
 	 * FIXME: what's with this 4k business?
 	 * Just rtl8366_enable_vlan() seems inconclusive.
