@@ -2310,6 +2310,25 @@ Miscellaneous controller provides 3 interface files. If two misc resources (res_
         Limits can be set higher than the capacity value in the misc.capacity
         file.
 
+  misc.events
+	A read-only flat-keyed file which exists on non-root cgroups.
+	The following entries are defined.  Unless specified otherwise,
+	a value change in this file generates a file modified event.
+
+	Note that all fields in this file are hierarchical and the
+	file modified event can be generated due to an event down the
+	hierarchy. For the local events at the cgroup level see
+	misc.events.local.
+
+	  max
+		The number of times the cgroup's resource usage was
+		about to go over the max boundary.
+
+  misc.events.local
+	Similar to misc.events but the fields in the file are local
+	to the cgroup i.e. not hierarchical. The file modified event
+	generated on this file reflects only the local events.
+
 Migration and Ownership
 ~~~~~~~~~~~~~~~~~~~~~~~
 
