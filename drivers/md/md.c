@@ -3583,6 +3583,35 @@ ppl_size_store(struct md_rdev *rdev, const char *buf, size_t len)
 static struct rdev_sysfs_entry rdev_ppl_size =
 __ATTR(ppl_size, S_IRUGO|S_IWUSR, ppl_size_show, ppl_size_store);
 
+static ssize_t
+fail_fast_show(struct md_rdev *rdev, char *page)
+{
+	return sprintf(page, "%d\n", test_bit(FailFast, &rdev->flags));
+}
+
+static ssize_t
+fail_fast_store(struct md_rdev *rdev, const char *buf, size_t len)
+{
+	int ret;
+	bool bit;
+
+	ret = kstrtobool(buf, &bit);
+	if (ret)
+		return ret;
+
+	if (test_bit(FailFast, &rdev->flags) && !bit) {
+		clear_bit(FailFast, &rdev->flags);
+		md_update_sb(rdev->mddev, 1);
+	} else if (!test_bit(FailFast, &rdev->flags) && bit) {
+		set_bit(FailFast, &rdev->flags);
+		md_update_sb(rdev->mddev, 1);
+	}
+	return len;
+}
+
+static struct rdev_sysfs_entry rdev_fail_fast =
+__ATTR(fail_fast, 0644, fail_fast_show, fail_fast_store);
+
 static struct attribute *rdev_default_attrs[] = {
 	&rdev_state.attr,
 	&rdev_errors.attr,
@@ -3595,6 +3624,7 @@ static struct attribute *rdev_default_attrs[] = {
 	&rdev_unack_bad_blocks.attr,
 	&rdev_ppl_sector.attr,
 	&rdev_ppl_size.attr,
+	&rdev_fail_fast.attr,
 	NULL,
 };
 static ssize_t
