@@ -114,7 +114,7 @@ my %VCS_cmds;
 
 my %VCS_cmds_git = (
     "execute_cmd" => \&git_execute_cmd,
-    "available" => '(which("git") ne "") && (-e ".git")',
+    "available" => '(which("git") ne "") && (-e "${lk_path}.git")',
     "find_signers_cmd" =>
 	"git log --no-color --follow --since=\$email_git_since " .
 	    '--numstat --no-merges ' .
@@ -154,7 +154,7 @@ my %VCS_cmds_git = (
 
 my %VCS_cmds_hg = (
     "execute_cmd" => \&hg_execute_cmd,
-    "available" => '(which("hg") ne "") && (-d ".hg")',
+    "available" => '(which("hg") ne "") && (-d "${lk_path}.hg")',
     "find_signers_cmd" =>
 	"hg log --date=\$email_hg_since " .
 	    "--template='HgCommit: {node}\\n" .
@@ -331,6 +331,10 @@ if ($email &&
      $email_list + $email_subscriber_list +
      $email_git + $email_git_penguin_chiefs + $email_git_blame) == 0) {
     die "$P: Please select at least 1 email option\n";
+}
+
+if ($0 =~ m@(.*)/scripts/[^/]*$@ && top_of_kernel_tree($1)) {
+    $lk_path = "$1/";
 }
 
 if ($tree && !top_of_kernel_tree($lk_path)) {
