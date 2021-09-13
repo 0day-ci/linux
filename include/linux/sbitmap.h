@@ -407,6 +407,14 @@ static inline void sbitmap_queue_free(struct sbitmap_queue *sbq)
 }
 
 /**
+ * sbitmap_queue_update_wake_batch() - Recalucate wake batch.
+ * @sbq: Bitmap queue.
+ * @depth: New number of queue depth.
+ */
+void sbitmap_queue_update_wake_batch(struct sbitmap_queue *sbq,
+				     unsigned int depth);
+
+/**
  * sbitmap_queue_resize() - Resize a &struct sbitmap_queue.
  * @sbq: Bitmap queue to resize.
  * @depth: New number of bits to resize to.
