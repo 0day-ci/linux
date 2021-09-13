@@ -294,10 +294,12 @@ u32 rtw_free_stainfo(struct adapter *padapter, struct sta_info *psta)
 
 	/* list_del_init(&psta->wakeup_list); */
 
-	spin_lock_bh(&pxmitpriv->lock);
-
 	rtw_free_xmitframe_queue(pxmitpriv, &psta->sleep_q);
+	spin_lock_bh(&psta->sleep_q.lock);
 	psta->sleepq_len = 0;
+	spin_unlock_bh(&psta->sleep_q.lock);
+
+	spin_lock_bh(&pxmitpriv->lock);
 
 	/* vo */
 	/* spin_lock_bh(&(pxmitpriv->vo_pending.lock)); */
