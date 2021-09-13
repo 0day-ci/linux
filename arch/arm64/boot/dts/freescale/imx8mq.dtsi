@@ -1768,5 +1768,10 @@
 				};
 			};
 		};
+
+		icc: interconnect@0 {
+			compatible = "fsl,imx8mq-icc", "fsl,imx8m-icc";
+			#interconnect-cells = <1>;
+		};
 	};
 };
