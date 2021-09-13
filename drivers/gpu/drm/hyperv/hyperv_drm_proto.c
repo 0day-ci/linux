@@ -299,6 +299,40 @@ int hyperv_update_situation(struct hv_device *hdev, u8 active, u32 bpp,
 	return 0;
 }
 
+/* Send mouse pointer info to host */
+int hyperv_send_ptr(struct hv_device *hdev)
+{
+	struct synthvid_msg msg;
+
+	memset(&msg, 0, sizeof(struct synthvid_msg));
+	msg.vid_hdr.type = SYNTHVID_POINTER_POSITION;
+	msg.vid_hdr.size = sizeof(struct synthvid_msg_hdr) +
+		sizeof(struct synthvid_pointer_position);
+	msg.ptr_pos.is_visible = 1;
+	msg.ptr_pos.video_output = 0;
+	msg.ptr_pos.image_x = 0;
+	msg.ptr_pos.image_y = 0;
+	hyperv_sendpacket(hdev, &msg);
+
+	memset(&msg, 0, sizeof(struct synthvid_msg));
+	msg.vid_hdr.type = SYNTHVID_POINTER_SHAPE;
+	msg.vid_hdr.size = sizeof(struct synthvid_msg_hdr) +
+		sizeof(struct synthvid_pointer_shape);
+	msg.ptr_shape.part_idx = SYNTHVID_CURSOR_COMPLETE;
+	msg.ptr_shape.is_argb = 1;
+	msg.ptr_shape.width = 1;
+	msg.ptr_shape.height = 1;
+	msg.ptr_shape.hot_x = 0;
+	msg.ptr_shape.hot_y = 0;
+	msg.ptr_shape.data[0] = 0;
+	msg.ptr_shape.data[1] = 1;
+	msg.ptr_shape.data[2] = 1;
+	msg.ptr_shape.data[3] = 1;
+	hyperv_sendpacket(hdev, &msg);
+
+	return 0;
+}
+
 int hyperv_update_dirt(struct hv_device *hdev, struct drm_rect *rect)
 {
 	struct hyperv_drm_device *hv = hv_get_drvdata(hdev);
@@ -392,8 +426,11 @@ static void hyperv_receive_sub(struct hv_device *hdev)
 		return;
 	}
 
-	if (msg->vid_hdr.type == SYNTHVID_FEATURE_CHANGE)
+	if (msg->vid_hdr.type == SYNTHVID_FEATURE_CHANGE) {
 		hv->dirt_needed = msg->feature_chg.is_dirt_needed;
+		if (hv->dirt_needed)
+			hyperv_send_ptr(hv->hdev);
+	}
 }
 
 static void hyperv_receive(void *ctx)
