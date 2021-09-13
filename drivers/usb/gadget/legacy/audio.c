@@ -49,6 +49,11 @@ MODULE_PARM_DESC(c_srate, "Capture Sampling Rate");
 static int c_ssize = UAC2_DEF_CSSIZE;
 module_param(c_ssize, uint, S_IRUGO);
 MODULE_PARM_DESC(c_ssize, "Capture Sample Size(bytes)");
+
+/* Capture Default ASYNC */
+static int c_sync = UAC2_DEF_CSYNC;
+module_param(c_sync, uint, S_IRUGO);
+MODULE_PARM_DESC(c_sync, "Capture Sync Type");
 #else
 #ifndef CONFIG_GADGET_UAC1_LEGACY
 #include "u_uac1.h"
@@ -268,6 +273,8 @@ static int audio_bind(struct usb_composite_dev *cdev)
 	uac2_opts->c_chmask = c_chmask;
 	uac2_opts->c_srate = c_srate;
 	uac2_opts->c_ssize = c_ssize;
+	if (c_sync == USB_ENDPOINT_SYNC_ADAPTIVE)
+		uac2_opts->c_sync = c_sync;
 	uac2_opts->req_number = UAC2_DEF_REQ_NUM;
 #else
 #ifndef CONFIG_GADGET_UAC1_LEGACY
