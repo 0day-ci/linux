@@ -43,7 +43,6 @@ struct misc_res {
 	atomic_long_t usage;
 	atomic_long_t events[MISC_CG_EVENT_TYPES];
 	atomic_long_t events_local[MISC_CG_EVENT_TYPES];
-	bool failed;
 };
 
 /**
