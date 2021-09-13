@@ -104,22 +104,22 @@ xfs_errortag_attr_store(
 	return count;
 }
 
-STATIC ssize_t
-xfs_errortag_attr_show(
+STATIC int
+xfs_errortag_attr_seq_show(
 	struct kobject		*kobject,
 	struct attribute	*attr,
-	char			*buf)
+	struct seq_file		*sf)
 {
 	struct xfs_mount	*mp = to_mp(kobject);
 	struct xfs_errortag_attr *xfs_attr = to_attr(attr);
 
-	return snprintf(buf, PAGE_SIZE, "%u\n",
-			xfs_errortag_get(mp, xfs_attr->tag));
+	seq_printf(sf, "%u\n", xfs_errortag_get(mp, xfs_attr->tag));
+	return 0;
 }
 
 static const struct sysfs_ops xfs_errortag_sysfs_ops = {
-	.show = xfs_errortag_attr_show,
-	.store = xfs_errortag_attr_store,
+	.seq_show	= xfs_errortag_attr_seq_show,
+	.store		= xfs_errortag_attr_store,
 };
 
 #define XFS_ERRORTAG_ATTR_RW(_name, _tag) \
