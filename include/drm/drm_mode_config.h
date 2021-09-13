@@ -937,6 +937,14 @@ struct drm_mode_config {
 	bool normalize_zpos;
 
 	/**
+	 * @release_fence:
+	 *
+	 * If this option is set, it means there would be an additional signalling
+	 * mechanism for a page flip completion.
+	 */
+	bool release_fence;
+
+	/**
 	 * @modifiers_property: Plane property to list support modifier/format
 	 * combination.
 	 */

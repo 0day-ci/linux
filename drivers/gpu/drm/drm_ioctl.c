@@ -302,6 +302,9 @@ static int drm_getcap(struct drm_device *dev, void *data, struct drm_file *file_
 	case DRM_CAP_CRTC_IN_VBLANK_EVENT:
 		req->value = 1;
 		break;
+	case DRM_CAP_RELEASE_FENCE:
+		req->value = dev->mode_config.release_fence;
+		break;
 	default:
 		return -EINVAL;
 	}
