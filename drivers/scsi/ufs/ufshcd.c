@@ -5294,8 +5294,11 @@ static void __ufshcd_transfer_req_compl(struct ufs_hba *hba,
 			if (unlikely(ufshcd_should_inform_monitor(hba, lrbp)))
 				ufshcd_update_monitor(hba, lrbp);
 			ufshcd_add_command_trace(hba, index, UFS_CMD_COMP);
-			result = retry_requests ? DID_BUS_BUSY << 16 :
-				ufshcd_transfer_rsp_status(hba, lrbp);
+			if (hba->force_requeue)
+				result = DID_REQUEUE << 16;
+			else
+				result = retry_requests ? DID_BUS_BUSY << 16 :
+					ufshcd_transfer_rsp_status(hba, lrbp);
 			scsi_dma_unmap(cmd);
 			cmd->result = result;
 			/* Mark completed command as NULL in LRB */
@@ -6200,6 +6203,7 @@ do_reset:
 	/* Fatal errors need reset */
 	if (needs_reset) {
 		hba->force_reset = false;
+		hba->force_requeue = false;
 		spin_unlock_irqrestore(hba->host->host_lock, flags);
 		err = ufshcd_reset_and_restore(hba);
 		if (err)

@@ -855,6 +855,7 @@ struct ufs_hba {
 	bool force_reset;
 	bool force_pmc;
 	bool silence_err_logs;
+	bool force_requeue;
 
 	/* Device management request data */
 	struct ufs_dev_cmd dev_cmd;
