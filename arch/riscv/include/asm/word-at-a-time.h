@@ -11,6 +11,8 @@
 
 #include <linux/kernel.h>
 
+#include <asm/asm.h>
+
 struct word_at_a_time {
 	const unsigned long one_bits, high_bits;
 };
@@ -44,5 +46,39 @@ static inline unsigned long find_zero(unsigned long mask)
 
 /* The mask we created is directly usable as a bytemask */
 #define zero_bytemask(mask) (mask)
+
+/*
+ * Load an unaligned word from kernel space.
+ *
+ * In the (very unlikely) case of the word being a page-crosser
+ * and the next page not being mapped, take the exception and
+ * return zeroes in the non-existing part.
+ */
+static inline unsigned long load_unaligned_zeropad(const void *addr)
+{
+	unsigned long ret, tmp;
+
+	/* Load word from unaligned pointer addr */
+	asm(
+	"1:	" REG_L " %0, %3\n"
+	"2:\n"
+	"	.section .fixup,\"ax\"\n"
+	"	.balign 2\n"
+	"3:	andi	%1, %2, ~0x7\n"
+	"	" REG_L " %0, (%1)\n"
+	"	andi	%1, %2, 0x7\n"
+	"	slli	%1, %1, 0x3\n"
+	"	srl	%0, %0, %1\n"
+	"	jump	2b, %1\n"
+	"	.previous\n"
+	"	.section __ex_table,\"a\"\n"
+	"	.balign	" RISCV_SZPTR "\n"
+	"	" RISCV_PTR "	1b, 3b\n"
+	"	.previous"
+	: "=&r" (ret), "=&r" (tmp)
+	: "r" (addr), "m" (*(unsigned long *)addr));
+
+	return ret;
+}
 
 #endif /* _ASM_RISCV_WORD_AT_A_TIME_H */
