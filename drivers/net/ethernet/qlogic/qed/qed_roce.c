@@ -71,6 +71,13 @@ void qed_roce_stop(struct qed_hwfn *p_hwfn)
 	struct qed_bmap *rcid_map = &p_hwfn->p_rdma_info->real_cid_map;
 	int wait_count = 0;
 
+	/* If the HW device is during recovery, all resources are immediately
+	 * reset without receiving a per-cid indication from HW. In this case
+	 * we don't expect the cid bitmap to be cleared.
+	 */
+	if (p_hwfn->cdev->recov_in_prog)
+		return;
+
 	/* when destroying a_RoCE QP the control is returned to the user after
 	 * the synchronous part. The asynchronous part may take a little longer.
 	 * We delay for a short while if an async destroy QP is still expected.

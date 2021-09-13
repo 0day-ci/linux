@@ -1323,6 +1323,13 @@ static int qed_iwarp_wait_for_all_cids(struct qed_hwfn *p_hwfn)
 	int rc;
 	int i;
 
+	/* If the HW device is during recovery, all resources are immediately
+	 * reset without receiving a per-cid indication from HW. In this case
+	 * we don't expect the cid_map to be cleared.
+	 */
+	if (p_hwfn->cdev->recov_in_prog)
+		return 0;
+
 	rc = qed_iwarp_wait_cid_map_cleared(p_hwfn,
 					    &p_hwfn->p_rdma_info->tcp_cid_map);
 	if (rc)
