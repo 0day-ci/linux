@@ -47,29 +47,27 @@ static void blk_mq_hw_sysfs_release(struct kobject *kobj)
 
 struct blk_mq_hw_ctx_sysfs_entry {
 	struct attribute attr;
-	ssize_t (*show)(struct blk_mq_hw_ctx *, char *);
-	ssize_t (*store)(struct blk_mq_hw_ctx *, const char *, size_t);
+	void (*show)(struct blk_mq_hw_ctx *hctx, struct seq_file *sf);
+	ssize_t (*store)(struct blk_mq_hw_ctx *hctx, const char *buf,
+			size_t size);
 };
 
-static ssize_t blk_mq_hw_sysfs_show(struct kobject *kobj,
-				    struct attribute *attr, char *page)
+static int blk_mq_hw_sysfs_seq_show(struct kobject *kobj,
+		struct attribute *attr, struct seq_file *sf)
 {
-	struct blk_mq_hw_ctx_sysfs_entry *entry;
-	struct blk_mq_hw_ctx *hctx;
-	struct request_queue *q;
-	ssize_t res;
-
-	entry = container_of(attr, struct blk_mq_hw_ctx_sysfs_entry, attr);
-	hctx = container_of(kobj, struct blk_mq_hw_ctx, kobj);
-	q = hctx->queue;
+	struct blk_mq_hw_ctx_sysfs_entry *entry =
+		container_of(attr, struct blk_mq_hw_ctx_sysfs_entry, attr);
+	struct blk_mq_hw_ctx *hctx =
+		container_of(kobj, struct blk_mq_hw_ctx, kobj);
+	struct request_queue *q = hctx->queue;
 
 	if (!entry->show)
 		return -EIO;
 
 	mutex_lock(&q->sysfs_lock);
-	res = entry->show(hctx, page);
+	entry->show(hctx, sf);
 	mutex_unlock(&q->sysfs_lock);
-	return res;
+	return 0;
 }
 
 static ssize_t blk_mq_hw_sysfs_store(struct kobject *kobj,
@@ -94,39 +92,33 @@ static ssize_t blk_mq_hw_sysfs_store(struct kobject *kobj,
 	return res;
 }
 
-static ssize_t blk_mq_hw_sysfs_nr_tags_show(struct blk_mq_hw_ctx *hctx,
-					    char *page)
+static void blk_mq_hw_sysfs_nr_tags_show(struct blk_mq_hw_ctx *hctx,
+		struct seq_file *sf)
 {
-	return sprintf(page, "%u\n", hctx->tags->nr_tags);
+	seq_printf(sf, "%u\n", hctx->tags->nr_tags);
 }
 
-static ssize_t blk_mq_hw_sysfs_nr_reserved_tags_show(struct blk_mq_hw_ctx *hctx,
-						     char *page)
+static void blk_mq_hw_sysfs_nr_reserved_tags_show(struct blk_mq_hw_ctx *hctx,
+		struct seq_file *sf)
 {
-	return sprintf(page, "%u\n", hctx->tags->nr_reserved_tags);
+	seq_printf(sf, "%u\n", hctx->tags->nr_reserved_tags);
 }
 
-static ssize_t blk_mq_hw_sysfs_cpus_show(struct blk_mq_hw_ctx *hctx, char *page)
+static void blk_mq_hw_sysfs_cpus_show(struct blk_mq_hw_ctx *hctx,
+		struct seq_file *sf)
 {
-	const size_t size = PAGE_SIZE - 1;
-	unsigned int i, first = 1;
-	int ret = 0, pos = 0;
+	bool first = true;
+	unsigned int i;
 
 	for_each_cpu(i, hctx->cpumask) {
 		if (first)
-			ret = snprintf(pos + page, size - pos, "%u", i);
+			seq_printf(sf, "%u", i);
 		else
-			ret = snprintf(pos + page, size - pos, ", %u", i);
-
-		if (ret >= size - pos)
-			break;
-
-		first = 0;
-		pos += ret;
+			seq_printf(sf, ", %u", i);
+		first = false;
 	}
 
-	ret = snprintf(pos + page, size + 1 - pos, "\n");
-	return pos + ret;
+	seq_printf(sf, "\n");
 }
 
 static struct blk_mq_hw_ctx_sysfs_entry blk_mq_hw_sysfs_nr_tags = {
@@ -151,8 +143,8 @@ static struct attribute *default_hw_ctx_attrs[] = {
 ATTRIBUTE_GROUPS(default_hw_ctx);
 
 static const struct sysfs_ops blk_mq_hw_sysfs_ops = {
-	.show	= blk_mq_hw_sysfs_show,
-	.store	= blk_mq_hw_sysfs_store,
+	.seq_show	= blk_mq_hw_sysfs_seq_show,
+	.store		= blk_mq_hw_sysfs_store,
 };
 
 static struct kobj_type blk_mq_ktype = {
