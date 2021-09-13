@@ -1552,10 +1552,12 @@
 			compatible = "fsl,imx8mq-ddrc", "fsl,imx8m-ddrc";
 			reg = <0x3d400000 0x400000>;
 			clock-names = "core", "pll", "alt", "apb";
+			fsl,icc-id = <IMX8MQ_ICS_DRAM>;
 			clocks = <&clk IMX8MQ_CLK_DRAM_CORE>,
 				 <&clk IMX8MQ_DRAM_PLL_OUT>,
 				 <&clk IMX8MQ_CLK_DRAM_ALT>,
 				 <&clk IMX8MQ_CLK_DRAM_APB>;
+			#interconnect-cells = <0>;
 		};
 
 		ddr-pmu@3d800000 {
