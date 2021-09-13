@@ -50,11 +50,17 @@ Optional child node properties:
   divider.
 - silabs,pll-master: boolean, multisynth can change pll frequency.
 - silabs,pll-reset: boolean, clock output can reset its pll.
-- silabs,disable-state : clock output disable state, shall be
+- silabs,disable-state: clock output disable state, shall be
   0 = clock output is driven LOW when disabled
   1 = clock output is driven HIGH when disabled
   2 = clock output is FLOATING (HIGH-Z) when disabled
   3 = clock output is NEVER disabled
+- clock-frequency: integer in Hz, output frequency to generate (2500-200000000)
+  This defines the output frequency set during boot. It can be reprogrammed
+  duing runtime through the common clock framework.
+- clock-phase: integer, phase shift in degrees (0-359), using the multisynth
+  initial phase offset register (depends on the clock source / output ratio)
+  and the clock output inverter (180 deg. only).
 
 ==Example==
 
@@ -111,7 +117,7 @@ i2c-master-node {
 			silabs,drive-strength = <4>;
 			silabs,multisynth-source = <1>;
 			silabs,clock-source = <0>;
-			pll-master;
+			silabs,pll-master;
 		};
 
 		/*
