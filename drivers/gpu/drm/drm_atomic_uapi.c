@@ -367,6 +367,23 @@ static s32 __user *get_out_fence_for_crtc(struct drm_atomic_state *state,
 	return fence_ptr;
 }
 
+static void set_release_fence_for_crtc(struct drm_atomic_state *state,
+				   struct drm_crtc *crtc, s32 __user *fence_ptr)
+{
+	state->crtcs[drm_crtc_index(crtc)].release_fence_ptr = fence_ptr;
+}
+
+static s32 __user *get_release_fence_for_crtc(struct drm_atomic_state *state,
+					      struct drm_crtc *crtc)
+{
+	s32 __user *fence_ptr;
+
+	fence_ptr = state->crtcs[drm_crtc_index(crtc)].release_fence_ptr;
+	state->crtcs[drm_crtc_index(crtc)].release_fence_ptr = NULL;
+
+	return fence_ptr;
+}
+
 static int set_out_fence_for_connector(struct drm_atomic_state *state,
 					struct drm_connector *connector,
 					s32 __user *fence_ptr)
@@ -482,6 +499,16 @@ static int drm_atomic_crtc_set_property(struct drm_crtc *crtc,
 			return -EFAULT;
 
 		set_out_fence_for_crtc(state->state, crtc, fence_ptr);
+	} else if (property == config->prop_release_fence_ptr) {
+		s32 __user *fence_ptr = u64_to_user_ptr(val);
+
+		if (!fence_ptr)
+			return 0;
+
+		if (put_user(-1, fence_ptr))
+			return -EFAULT;
+
+		set_release_fence_for_crtc(state->state, crtc, fence_ptr);
 	} else if (property == crtc->scaling_filter_property) {
 		state->scaling_filter = val;
 	} else if (crtc->funcs->atomic_set_property) {
@@ -518,6 +545,8 @@ drm_atomic_crtc_get_property(struct drm_crtc *crtc,
 	else if (property == config->gamma_lut_property)
 		*val = (state->gamma_lut) ? state->gamma_lut->base.id : 0;
 	else if (property == config->prop_out_fence_ptr)
+		*val = 0;
+	else if (property == config->prop_release_fence_ptr)
 		*val = 0;
 	else if (property == crtc->scaling_filter_property)
 		*val = state->scaling_filter;
@@ -1185,7 +1214,7 @@ static int prepare_signaling(struct drm_device *dev,
 
 	for_each_new_crtc_in_state(state, crtc, crtc_state, i) {
 		struct dma_fence *fence;
-		s32 __user *fence_ptr;
+		s32 __user *fence_ptr, *rel_fence_ptr;
 
 		fence_ptr = get_out_fence_for_crtc(crtc_state->state, crtc);
 
@@ -1220,9 +1249,19 @@ static int prepare_signaling(struct drm_device *dev,
 			if (IS_ERR(fence))
 				return PTR_ERR(fence);
 
-
-
 			crtc_state->event->base.fence = fence;
+		}
+
+		rel_fence_ptr = get_release_fence_for_crtc(crtc_state->state,
+							   crtc);
+		if (rel_fence_ptr) {
+			fence = crtc_create_out_fence(crtc, fence_state,
+						      rel_fence_ptr,
+						      num_fences);
+			if (IS_ERR(fence))
+				return PTR_ERR(fence);
+
+			crtc_state->event->base.release_fence = fence;
 		}
 
 		c++;

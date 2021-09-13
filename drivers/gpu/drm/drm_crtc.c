@@ -313,6 +313,8 @@ static int __drm_crtc_init_with_planes(struct drm_device *dev, struct drm_crtc *
 		drm_object_attach_property(&crtc->base,
 					   config->prop_out_fence_ptr, 0);
 		drm_object_attach_property(&crtc->base,
+					   config->prop_release_fence_ptr, 0);
+		drm_object_attach_property(&crtc->base,
 					   config->prop_vrr_enabled, 0);
 	}
 

@@ -177,6 +177,7 @@ struct __drm_crtcs_state {
 	struct drm_crtc_commit *commit;
 
 	s32 __user *out_fence_ptr;
+	s32 __user *release_fence_ptr;
 	u64 last_vblank_count;
 };
 

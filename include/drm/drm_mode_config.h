@@ -644,6 +644,13 @@ struct drm_mode_config {
 	 */
 	struct drm_property *prop_out_fence_ptr;
 	/**
+	 * @prop_release_fence_ptr: Sync File fd pointer that is used as an
+	 * additional flip completion signalling mechanism. Userspace should
+	 * provide a pointer to a value of type s32, and then cast that pointer
+	 * to u64.
+	 */
+	struct drm_property *prop_release_fence_ptr;
+	/**
 	 * @prop_crtc_id: Default atomic plane property to specify the
 	 * &drm_crtc.
 	 */

@@ -125,6 +125,15 @@ struct drm_pending_event {
 	struct dma_fence *fence;
 
 	/**
+	 * @release_fence:
+	 *
+	 * Optional DMA fence that will be signalled by the drm driver to
+	 * indicate that all references on FBs associated with a page flip
+	 * can be dropped.
+	 */
+	struct dma_fence *release_fence;
+
+	/**
 	 * @file_priv:
 	 *
 	 * &struct drm_file where @event should be delivered to. Only set when
