@@ -2496,11 +2496,12 @@ void blk_throtl_register_queue(struct request_queue *q)
 }
 
 #ifdef CONFIG_BLK_DEV_THROTTLING_LOW
-ssize_t blk_throtl_sample_time_show(struct request_queue *q, char *page)
+int blk_throtl_sample_time_show(struct request_queue *q, struct seq_file *sf)
 {
 	if (!q->td)
 		return -EINVAL;
-	return sprintf(page, "%u\n", jiffies_to_msecs(q->td->throtl_slice));
+	seq_printf(sf, "%u\n", jiffies_to_msecs(q->td->throtl_slice));
+	return 0;
 }
 
 ssize_t blk_throtl_sample_time_store(struct request_queue *q,

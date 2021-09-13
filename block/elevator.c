@@ -782,39 +782,40 @@ ssize_t elv_iosched_store(struct request_queue *q, const char *name,
 	return ret;
 }
 
-ssize_t elv_iosched_show(struct request_queue *q, char *name)
+int elv_iosched_show(struct request_queue *q, struct seq_file *sf)
 {
 	struct elevator_queue *e = q->elevator;
 	struct elevator_type *elv = NULL;
 	struct elevator_type *__e;
-	int len = 0;
 
-	if (!queue_is_mq(q))
-		return sprintf(name, "none\n");
+	if (!queue_is_mq(q)) {
+		seq_printf(sf, "none\n");
+		return 0;
+	}
 
 	if (!q->elevator)
-		len += sprintf(name+len, "[none] ");
+		seq_printf(sf, "[none] ");
 	else
 		elv = e->type;
 
 	spin_lock(&elv_list_lock);
 	list_for_each_entry(__e, &elv_list, list) {
 		if (elv && elevator_match(elv, __e->elevator_name, 0)) {
-			len += sprintf(name+len, "[%s] ", elv->elevator_name);
+			seq_printf(sf, "[%s] ", elv->elevator_name);
 			continue;
 		}
 		if (elv_support_iosched(q) &&
 		    elevator_match(__e, __e->elevator_name,
 				   q->required_elevator_features))
-			len += sprintf(name+len, "%s ", __e->elevator_name);
+			seq_printf(sf, "%s ", __e->elevator_name);
 	}
 	spin_unlock(&elv_list_lock);
 
 	if (q->elevator)
-		len += sprintf(name+len, "none");
+		seq_printf(sf, "none");
 
-	len += sprintf(len+name, "\n");
-	return len;
+	seq_printf(sf, "\n");
+	return 0;
 }
 
 struct request *elv_rb_former_request(struct request_queue *q,

@@ -132,7 +132,7 @@ extern void elv_unregister(struct elevator_type *);
 /*
  * io scheduler sysfs switching
  */
-extern ssize_t elv_iosched_show(struct request_queue *, char *);
+int elv_iosched_show(struct request_queue *q, struct seq_file *sf);
 extern ssize_t elv_iosched_store(struct request_queue *, const char *, size_t);
 
 extern bool elv_bio_merge_ok(struct request *, struct bio *);
