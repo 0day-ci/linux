@@ -69,6 +69,7 @@
 struct vring_desc_state_split {
 	void *data;			/* Data for callback. */
 	struct vring_desc *indir_desc;	/* Indirect descriptor, if any. */
+	u64 buflen;			/* In buffer length */
 };
 
 struct vring_desc_state_packed {
@@ -76,6 +77,7 @@ struct vring_desc_state_packed {
 	struct vring_packed_desc *indir_desc; /* Indirect descriptor, if any. */
 	u16 num;			/* Descriptor list length. */
 	u16 last;			/* The last desc state in a list. */
+	u64 buflen;			/* In buffer length */
 };
 
 struct vring_desc_extra {
@@ -490,6 +492,7 @@ static inline int virtqueue_add_split(struct virtqueue *_vq,
 	unsigned int i, n, avail, descs_used, prev, err_idx;
 	int head;
 	bool indirect;
+	u64 buflen = 0;
 
 	START_USE(vq);
 
@@ -571,6 +574,7 @@ static inline int virtqueue_add_split(struct virtqueue *_vq,
 						     VRING_DESC_F_NEXT |
 						     VRING_DESC_F_WRITE,
 						     indirect);
+			buflen += sg->length;
 		}
 	}
 	/* Last one doesn't continue. */
@@ -605,6 +609,7 @@ static inline int virtqueue_add_split(struct virtqueue *_vq,
 
 	/* Store token and indirect buffer state. */
 	vq->split.desc_state[head].data = data;
+	vq->split.desc_state[head].buflen = buflen;
 	if (indirect)
 		vq->split.desc_state[head].indir_desc = desc;
 	else
@@ -782,6 +787,11 @@ static void *virtqueue_get_buf_ctx_split(struct virtqueue *_vq,
 	}
 	if (unlikely(!vq->split.desc_state[i].data)) {
 		BAD_RING(vq, "id %u is not a head!\n", i);
+		return NULL;
+	}
+	if (unlikely(*len > vq->split.desc_state[i].buflen)) {
+		BAD_RING(vq, "used len %d is larger than in buflen %lld\n",
+			*len, vq->split.desc_state[i].buflen);
 		return NULL;
 	}
 
@@ -1062,6 +1072,7 @@ static int virtqueue_add_indirect_packed(struct vring_virtqueue *vq,
 	unsigned int i, n, err_idx;
 	u16 head, id;
 	dma_addr_t addr;
+	u64 buflen = 0;
 
 	head = vq->packed.next_avail_idx;
 	desc = alloc_indirect_packed(total_sg, gfp);
@@ -1089,6 +1100,8 @@ static int virtqueue_add_indirect_packed(struct vring_virtqueue *vq,
 			desc[i].addr = cpu_to_le64(addr);
 			desc[i].len = cpu_to_le32(sg->length);
 			i++;
+			if (n >= out_sgs)
+				buflen += sg->length;
 		}
 	}
 
@@ -1141,6 +1154,7 @@ static int virtqueue_add_indirect_packed(struct vring_virtqueue *vq,
 	vq->packed.desc_state[id].data = data;
 	vq->packed.desc_state[id].indir_desc = desc;
 	vq->packed.desc_state[id].last = id;
+	vq->packed.desc_state[id].buflen = buflen;
 
 	vq->num_added += 1;
 
@@ -1176,6 +1190,7 @@ static inline int virtqueue_add_packed(struct virtqueue *_vq,
 	unsigned int i, n, c, descs_used, err_idx;
 	__le16 head_flags, flags;
 	u16 head, id, prev, curr, avail_used_flags;
+	u64 buflen = 0;
 
 	START_USE(vq);
 
@@ -1250,6 +1265,8 @@ static inline int virtqueue_add_packed(struct virtqueue *_vq,
 					1 << VRING_PACKED_DESC_F_AVAIL |
 					1 << VRING_PACKED_DESC_F_USED;
 			}
+			if (n >= out_sgs)
+				buflen += sg->length;
 		}
 	}
 
@@ -1268,6 +1285,7 @@ static inline int virtqueue_add_packed(struct virtqueue *_vq,
 	vq->packed.desc_state[id].data = data;
 	vq->packed.desc_state[id].indir_desc = ctx;
 	vq->packed.desc_state[id].last = prev;
+	vq->packed.desc_state[id].buflen = buflen;
 
 	/*
 	 * A driver MUST NOT make the first descriptor in the list
@@ -1453,6 +1471,11 @@ static void *virtqueue_get_buf_ctx_packed(struct virtqueue *_vq,
 	}
 	if (unlikely(!vq->packed.desc_state[id].data)) {
 		BAD_RING(vq, "id %u is not a head!\n", id);
+		return NULL;
+	}
+	if (unlikely(*len > vq->packed.desc_state[id].buflen)) {
+		BAD_RING(vq, "used len %d is larger than in buflen %lld\n",
+			*len, vq->packed.desc_state[id].buflen);
 		return NULL;
 	}
 
