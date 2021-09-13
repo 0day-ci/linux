@@ -139,6 +139,7 @@ struct virtio_gpu_fence {
 	uint64_t fence_id;
 	struct virtio_gpu_fence_driver *drv;
 	struct list_head node;
+	struct dma_fence *release_fence;
 };
 
 struct virtio_gpu_vbuffer {

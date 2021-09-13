@@ -60,6 +60,8 @@
  */
 #define VIRTIO_GPU_F_RESOURCE_BLOB       3
 
+#define VIRTIO_GPU_F_RELEASE_FENCE	 4
+
 enum virtio_gpu_ctrl_type {
 	VIRTIO_GPU_UNDEFINED = 0,
 
