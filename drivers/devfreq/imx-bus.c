@@ -87,7 +87,7 @@ static int imx_bus_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	struct imx_bus *priv;
-	const char *gov = DEVFREQ_GOV_USERSPACE;
+	const char *gov = DEVFREQ_GOV_POWERSAVE;
 	int ret;
 
 	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
