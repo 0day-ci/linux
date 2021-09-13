@@ -313,13 +313,15 @@ int rtl8366_vlan_add(struct dsa_switch *ds, int port,
 		untagged = true;
 
 
-	/* Enable VLAN in the hardware
-	 * FIXME: what's with this 4k business?
-	 * Just rtl8366_enable_vlan() seems inconclusive.
+	/* Enable VLAN in the hardware, do NOT enable VLAN4K, because the
+	 * 4K VLAN will activate a 4096 entries VID table, but has the side
+	 * effect that every processed frame MUST have a VID, meaning non-VLAN
+	 * traffic will now work at all. So we will let the 16 VLAN entries
+	 * suffice.
 	 */
-	ret = rtl8366_enable_vlan4k(smi, true);
+	ret = rtl8366_enable_vlan(smi, true);
 	if (ret) {
-		NL_SET_ERR_MSG_MOD(extack, "Failed to enable VLAN 4K");
+		NL_SET_ERR_MSG_MOD(extack, "Failed to enable VLAN");
 		return ret;
 	}
 
