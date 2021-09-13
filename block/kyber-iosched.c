@@ -12,6 +12,7 @@
 #include <linux/elevator.h>
 #include <linux/module.h>
 #include <linux/sbitmap.h>
+#include <linux/seq_file.h>
 
 #include <trace/events/block.h>
 
@@ -857,12 +858,12 @@ static bool kyber_has_work(struct blk_mq_hw_ctx *hctx)
 }
 
 #define KYBER_LAT_SHOW_STORE(domain, name)				\
-static ssize_t kyber_##name##_lat_show(struct elevator_queue *e,	\
-				       char *page)			\
+static void kyber_##name##_lat_show(struct elevator_queue *e,		\
+		struct seq_file *sf)					\
 {									\
 	struct kyber_queue_data *kqd = e->elevator_data;		\
 									\
-	return sprintf(page, "%llu\n", kqd->latency_targets[domain]);	\
+	seq_printf(sf, "%llu\n", kqd->latency_targets[domain]);		\
 }									\
 									\
 static ssize_t kyber_##name##_lat_store(struct elevator_queue *e,	\

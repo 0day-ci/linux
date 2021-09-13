@@ -442,21 +442,24 @@ struct request *elv_former_request(struct request_queue *q, struct request *rq)
 
 #define to_elv(atr) container_of((atr), struct elv_fs_entry, attr)
 
-static ssize_t
-elv_attr_show(struct kobject *kobj, struct attribute *attr, char *page)
+static int elv_attr_seq_show(struct kobject *kobj, struct attribute *attr,
+		struct seq_file *sf)
 {
 	struct elv_fs_entry *entry = to_elv(attr);
-	struct elevator_queue *e;
-	ssize_t error;
+	struct elevator_queue *e =
+		container_of(kobj, struct elevator_queue, kobj);
 
 	if (!entry->show)
 		return -EIO;
 
-	e = container_of(kobj, struct elevator_queue, kobj);
 	mutex_lock(&e->sysfs_lock);
-	error = e->type ? entry->show(e, page) : -ENOENT;
+	if (!e->type) {
+		mutex_unlock(&e->sysfs_lock);
+		return -ENOENT;
+	}
+	entry->show(e, sf);
 	mutex_unlock(&e->sysfs_lock);
-	return error;
+	return 0;
 }
 
 static ssize_t
@@ -478,8 +481,8 @@ elv_attr_store(struct kobject *kobj, struct attribute *attr,
 }
 
 static const struct sysfs_ops elv_sysfs_ops = {
-	.show	= elv_attr_show,
-	.store	= elv_attr_store,
+	.seq_show	= elv_attr_seq_show,
+	.store		= elv_attr_store,
 };
 
 static struct kobj_type elv_ktype = {

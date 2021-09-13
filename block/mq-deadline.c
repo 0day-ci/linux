@@ -17,6 +17,7 @@
 #include <linux/compiler.h>
 #include <linux/rbtree.h>
 #include <linux/sbitmap.h>
+#include <linux/seq_file.h>
 
 #include <trace/events/block.h>
 
@@ -800,11 +801,11 @@ static bool dd_has_work(struct blk_mq_hw_ctx *hctx)
  * sysfs parts below
  */
 #define SHOW_INT(__FUNC, __VAR)						\
-static ssize_t __FUNC(struct elevator_queue *e, char *page)		\
+static void __FUNC(struct elevator_queue *e, struct seq_file *sf)	\
 {									\
 	struct deadline_data *dd = e->elevator_data;			\
 									\
-	return sysfs_emit(page, "%d\n", __VAR);				\
+	seq_printf(sf, "%d\n", __VAR);					\
 }
 #define SHOW_JIFFIES(__FUNC, __VAR) SHOW_INT(__FUNC, jiffies_to_msecs(__VAR))
 SHOW_JIFFIES(deadline_read_expire_show, dd->fifo_expire[DD_READ]);

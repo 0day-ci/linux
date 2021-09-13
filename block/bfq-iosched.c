@@ -7092,9 +7092,9 @@ static int __init bfq_slab_setup(void)
 	return 0;
 }
 
-static ssize_t bfq_var_show(unsigned int var, char *page)
+static void bfq_var_show(unsigned int var, struct seq_file *sf)
 {
-	return sprintf(page, "%u\n", var);
+	seq_printf(sf, "%u\n", var);
 }
 
 static int bfq_var_store(unsigned long *var, const char *page)
@@ -7109,7 +7109,7 @@ static int bfq_var_store(unsigned long *var, const char *page)
 }
 
 #define SHOW_FUNCTION(__FUNC, __VAR, __CONV)				\
-static ssize_t __FUNC(struct elevator_queue *e, char *page)		\
+static void  __FUNC(struct elevator_queue *e, struct seq_file *sf)	\
 {									\
 	struct bfq_data *bfqd = e->elevator_data;			\
 	u64 __data = __VAR;						\
@@ -7117,7 +7117,7 @@ static ssize_t __FUNC(struct elevator_queue *e, char *page)		\
 		__data = jiffies_to_msecs(__data);			\
 	else if (__CONV == 2)						\
 		__data = div_u64(__data, NSEC_PER_MSEC);		\
-	return bfq_var_show(__data, (page));				\
+	bfq_var_show(__data, (sf));					\
 }
 SHOW_FUNCTION(bfq_fifo_expire_sync_show, bfqd->bfq_fifo_expire[1], 2);
 SHOW_FUNCTION(bfq_fifo_expire_async_show, bfqd->bfq_fifo_expire[0], 2);
@@ -7131,12 +7131,12 @@ SHOW_FUNCTION(bfq_low_latency_show, bfqd->low_latency, 0);
 #undef SHOW_FUNCTION
 
 #define USEC_SHOW_FUNCTION(__FUNC, __VAR)				\
-static ssize_t __FUNC(struct elevator_queue *e, char *page)		\
+static void __FUNC(struct elevator_queue *e, struct seq_file *sf)	\
 {									\
 	struct bfq_data *bfqd = e->elevator_data;			\
 	u64 __data = __VAR;						\
 	__data = div_u64(__data, NSEC_PER_USEC);			\
-	return bfq_var_show(__data, (page));				\
+	bfq_var_show(__data, (sf));					\
 }
 USEC_SHOW_FUNCTION(bfq_slice_idle_us_show, bfqd->bfq_slice_idle);
 #undef USEC_SHOW_FUNCTION
