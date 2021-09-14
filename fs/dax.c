@@ -1156,8 +1156,17 @@ dax_iomap_actor(struct inode *inode, loff_t pos, loff_t length, void *data,
 		if (ret)
 			break;
 
+		/*
+		 * If WRITE operation encounters media error in a page aligned
+		 * range, try to clear the error, then resume, for just once.
+		 */
 		map_len = dax_direct_access(dax_dev, pgoff, PHYS_PFN(size),
 				&kaddr, NULL);
+		if ((map_len == -EIO) && (iov_iter_rw(iter) == WRITE)) {
+			if (dax_clear_poison(dax_dev, pgoff, PHYS_PFN(size)) == 0)
+				map_len = dax_direct_access(dax_dev, pgoff,
+						PHYS_PFN(size), &kaddr, NULL);
+		}
 		if (map_len < 0) {
 			ret = map_len;
 			break;
