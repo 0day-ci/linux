@@ -542,7 +542,7 @@ sclp_vt220_receiver_fn(struct evbuf_header *evbuf)
 		buffer++;
 		count--;
 		sclp_vt220_handle_input(buffer, count);
-		tty_flip_buffer_push(&sclp_vt220_port);
+		tty_schedule_flip(&sclp_vt220_port);
 		break;
 	}
 }

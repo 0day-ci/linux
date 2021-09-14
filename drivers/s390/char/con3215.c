@@ -399,7 +399,7 @@ static void raw3215_irq(struct ccw_device *cdev, unsigned long intparm,
 			case CTRLCHAR_CTRL:
 				tty_insert_flip_char(&raw->port, cchar,
 						TTY_NORMAL);
-				tty_flip_buffer_push(&raw->port);
+				tty_schedule_flip(&raw->port);
 				break;
 
 			case CTRLCHAR_NONE:
@@ -413,7 +413,7 @@ static void raw3215_irq(struct ccw_device *cdev, unsigned long intparm,
 					count -= 2;
 				tty_insert_flip_string(&raw->port, raw->inbuf,
 						count);
-				tty_flip_buffer_push(&raw->port);
+				tty_schedule_flip(&raw->port);
 				break;
 			}
 		} else if (req->type == RAW3215_WRITE) {
