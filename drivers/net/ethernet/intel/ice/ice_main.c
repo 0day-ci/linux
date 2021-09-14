@@ -3164,6 +3164,9 @@ static void ice_set_netdev_features(struct net_device *netdev)
 
 	/* enable features */
 	netdev->features |= netdev->hw_features;
+
+	netdev->hw_features |= NETIF_F_HW_TC;
+
 	/* encap and VLAN devices inherit default, csumo and tso features */
 	netdev->hw_enc_features |= dflt_features | csumo_features |
 				   tso_features;
