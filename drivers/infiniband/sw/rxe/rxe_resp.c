@@ -429,7 +429,7 @@ static enum resp_states check_rkey(struct rxe_qp *qp,
 	enum resp_states state;
 	int access;
 
-	if (pkt->mask & (RXE_READ_MASK | RXE_WRITE_MASK)) {
+	if (pkt->mask & RXE_READ_OR_WRITE_MASK) {
 		if (pkt->mask & RXE_RETH_MASK) {
 			qp->resp.va = reth_va(pkt);
 			qp->resp.offset = 0;
@@ -450,7 +450,7 @@ static enum resp_states check_rkey(struct rxe_qp *qp,
 	}
 
 	/* A zero-byte op is not required to set an addr or rkey. */
-	if ((pkt->mask & (RXE_READ_MASK | RXE_WRITE_OR_SEND)) &&
+	if ((pkt->mask & RXE_READ_OR_WRITE_MASK) &&
 	    (pkt->mask & RXE_RETH_MASK) &&
 	    reth_len(pkt) == 0) {
 		return RESPST_EXECUTE;
