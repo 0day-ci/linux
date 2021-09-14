@@ -240,6 +240,20 @@ static int mwifiex_write_reg(struct mwifiex_adapter *adapter, int reg, u32 data)
 	return 0;
 }
 
+/*
+ * This function does a non-posted write into a PCIE card register, ensuring
+ * it's completion before returning.
+ */
+static int mwifiex_write_reg_np(struct mwifiex_adapter *adapter, int reg, u32 data)
+{
+	struct pcie_service_card *card = adapter->card;
+
+	iowrite32(data, card->pci_mmap1 + reg);
+	ioread32(card->pci_mmap1 + reg);
+
+	return 0;
+}
+
 /* This function reads data from PCIE card register.
  */
 static int mwifiex_read_reg(struct mwifiex_adapter *adapter, int reg, u32 *data)
@@ -1482,9 +1496,15 @@ mwifiex_pcie_send_data(struct mwifiex_adapter *adapter, struct sk_buff *skb,
 						reg->tx_rollover_ind);
 
 		rx_val = card->rxbd_rdptr & reg->rx_wrap_mask;
-		/* Write the TX ring write pointer in to reg->tx_wrptr */
-		if (mwifiex_write_reg(adapter, reg->tx_wrptr,
-				      card->txbd_wrptr | rx_val)) {
+		/* Write the TX ring write pointer in to reg->tx_wrptr.
+		 * The firmware (latest version 15.68.19.p21) of the 88W8897
+		 * pcie+usb card seems to crash when getting the TX ready
+		 * interrupt but the TX ring write pointer points to an outdated
+		 * address, so it's important we do a non-posted write here to
+		 * force the completion of the write.
+		 */
+		if (mwifiex_write_reg_np(adapter, reg->tx_wrptr,
+				        card->txbd_wrptr | rx_val)) {
 			mwifiex_dbg(adapter, ERROR,
 				    "SEND DATA: failed to write reg->tx_wrptr\n");
 			ret = -1;
