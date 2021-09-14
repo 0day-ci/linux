@@ -598,22 +598,29 @@ static int sev_es_sync_vmsa(struct vcpu_svm *svm)
 static int sev_launch_update_vmsa(struct kvm *kvm, struct kvm_sev_cmd *argp)
 {
 	struct kvm_sev_info *sev = &to_kvm_svm(kvm)->sev_info;
-	struct sev_data_launch_update_vmsa vmsa;
+	struct sev_data_launch_update_vmsa vmsa = {0};
 	struct kvm_vcpu *vcpu;
 	int i, ret;
 
 	if (!sev_es_guest(kvm))
 		return -ENOTTY;
 
-	vmsa.reserved = 0;
-
 	kvm_for_each_vcpu(i, vcpu, kvm) {
 		struct vcpu_svm *svm = to_svm(vcpu);
+
+		ret = mutex_lock_killable(&vcpu->mutex);
+		if (ret)
+			goto out_unlock;
+
+		/* Skip to the next vCPU if this one has already be updated. */
+		ret = sev_es_sync_vmsa(svm);
+		if (svm->vcpu.arch.guest_state_protected)
+			goto unlock;
 
 		/* Perform some pre-encryption checks against the VMSA */
 		ret = sev_es_sync_vmsa(svm);
 		if (ret)
-			return ret;
+			goto out_unlock;
 
 		/*
 		 * The LAUNCH_UPDATE_VMSA command will perform in-place
@@ -629,12 +636,19 @@ static int sev_launch_update_vmsa(struct kvm *kvm, struct kvm_sev_cmd *argp)
 		ret = sev_issue_cmd(kvm, SEV_CMD_LAUNCH_UPDATE_VMSA, &vmsa,
 				    &argp->error);
 		if (ret)
-			return ret;
+			goto out_unlock;
 
 		svm->vcpu.arch.guest_state_protected = true;
+
+unlock:
+		mutex_unlock(&vcpu->mutex);
 	}
 
 	return 0;
+
+out_unlock:
+	mutex_unlock(&vcpu->mutex);
+	return ret;
 }
 
 static int sev_launch_measure(struct kvm *kvm, struct kvm_sev_cmd *argp)
