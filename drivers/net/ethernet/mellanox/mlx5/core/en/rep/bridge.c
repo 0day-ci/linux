@@ -137,7 +137,6 @@ static int mlx5_esw_bridge_port_changeupper(struct notifier_block *nb, void *ptr
 	u16 vport_num, esw_owner_vhca_id;
 	struct netlink_ext_ack *extack;
 	int ifindex = upper->ifindex;
-	int err;
 
 	if (!netif_is_bridge_master(upper))
 		return 0;
@@ -148,20 +147,29 @@ static int mlx5_esw_bridge_port_changeupper(struct notifier_block *nb, void *ptr
 
 	extack = netdev_notifier_info_to_extack(&info->info);
 
-	if (mlx5_esw_bridge_is_local(dev, rep, esw))
-		err = info->linking ?
-			mlx5_esw_bridge_vport_link(ifindex, vport_num, esw_owner_vhca_id,
-						   br_offloads, extack) :
-			mlx5_esw_bridge_vport_unlink(ifindex, vport_num, esw_owner_vhca_id,
-						     br_offloads, extack);
-	else if (mlx5_esw_bridge_dev_same_hw(rep, esw))
-		err = info->linking ?
-			mlx5_esw_bridge_vport_peer_link(ifindex, vport_num, esw_owner_vhca_id,
-							br_offloads, extack) :
-			mlx5_esw_bridge_vport_peer_unlink(ifindex, vport_num, esw_owner_vhca_id,
+	if (mlx5_esw_bridge_is_local(dev, rep, esw)) {
+		if (info->linking)
+			return mlx5_esw_bridge_vport_link(ifindex, vport_num,
+							  esw_owner_vhca_id,
 							  br_offloads, extack);
 
-	return err;
+		return mlx5_esw_bridge_vport_unlink(ifindex, vport_num,
+						    esw_owner_vhca_id,
+						    br_offloads, extack);
+	}
+
+	if (mlx5_esw_bridge_dev_same_hw(rep, esw)) {
+		if (info->linking)
+			return mlx5_esw_bridge_vport_peer_link(
+				ifindex, vport_num, esw_owner_vhca_id,
+				br_offloads, extack);
+		return mlx5_esw_bridge_vport_peer_unlink(ifindex, vport_num,
+							 esw_owner_vhca_id,
+							 br_offloads, extack);
+	}
+
+	WARN_ON(true);
+	return -EINVAL;
 }
 
 static int mlx5_esw_bridge_switchdev_port_event(struct notifier_block *nb,
@@ -244,7 +252,7 @@ mlx5_esw_bridge_port_obj_attr_set(struct net_device *dev,
 	struct netlink_ext_ack *extack = switchdev_notifier_info_to_extack(&port_attr_info->info);
 	const struct switchdev_attr *attr = port_attr_info->attr;
 	u16 vport_num, esw_owner_vhca_id;
-	int err;
+	int err = 0;
 
 	if (!mlx5_esw_bridge_lower_rep_vport_num_vhca_id_get(dev, br_offloads->esw, &vport_num,
 							     &esw_owner_vhca_id))
