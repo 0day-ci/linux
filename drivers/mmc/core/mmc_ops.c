@@ -705,26 +705,11 @@ EXPORT_SYMBOL_GPL(mmc_send_tuning);
 
 int mmc_send_abort_tuning(struct mmc_host *host, u32 opcode)
 {
-	struct mmc_command cmd = {};
+	if (host->bus_ops->send_abort_tuning)
+		return host->bus_ops->send_abort_tuning(host);
 
-	/*
-	 * eMMC specification specifies that CMD12 can be used to stop a tuning
-	 * command, but SD specification does not, so do nothing unless it is
-	 * eMMC.
-	 */
-	if (opcode != MMC_SEND_TUNING_BLOCK_HS200)
-		return 0;
+	return 0;
 
-	cmd.opcode = MMC_STOP_TRANSMISSION;
-	cmd.flags = MMC_RSP_SPI_R1 | MMC_RSP_R1 | MMC_CMD_AC;
-
-	/*
-	 * For drivers that override R1 to R1b, set an arbitrary timeout based
-	 * on the tuning timeout i.e. 150ms.
-	 */
-	cmd.busy_timeout = 150;
-
-	return mmc_wait_for_cmd(host, &cmd, 0);
 }
 EXPORT_SYMBOL_GPL(mmc_send_abort_tuning);
 

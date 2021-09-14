@@ -1784,6 +1784,11 @@ static int mmc_sd_hw_reset(struct mmc_host *host)
 	return mmc_sd_init_card(host, host->card->ocr, host->card);
 }
 
+static int sd_send_abort_tuning(struct mmc_host *host)
+{
+	return mmc_send_stop(host, 150, 0);
+}
+
 static const struct mmc_bus_ops mmc_sd_ops = {
 	.remove = mmc_sd_remove,
 	.detect = mmc_sd_detect,
@@ -1796,6 +1801,7 @@ static const struct mmc_bus_ops mmc_sd_ops = {
 	.hw_reset = mmc_sd_hw_reset,
 	.cache_enabled = sd_cache_enabled,
 	.flush_cache = sd_flush_cache,
+	.send_abort_tuning = sd_send_abort_tuning,
 };
 
 /*

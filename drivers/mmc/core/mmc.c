@@ -2227,6 +2227,11 @@ static int _mmc_hw_reset(struct mmc_host *host)
 	return mmc_init_card(host, card->ocr, card);
 }
 
+static int _mmc_send_abort_tuning(struct mmc_host *host)
+{
+	return mmc_send_stop(host, 150, 0);
+}
+
 static const struct mmc_bus_ops mmc_ops = {
 	.remove = mmc_remove,
 	.detect = mmc_detect,
@@ -2239,6 +2244,7 @@ static const struct mmc_bus_ops mmc_ops = {
 	.hw_reset = _mmc_hw_reset,
 	.cache_enabled = _mmc_cache_enabled,
 	.flush_cache = _mmc_flush_cache,
+	.send_abort_tuning = _mmc_send_abort_tuning,
 };
 
 /*
