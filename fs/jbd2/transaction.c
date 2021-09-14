@@ -476,9 +476,9 @@ repeat:
 }
 
 /* Allocate a new handle.  This should probably be in a slab... */
-static handle_t *new_handle(int nblocks)
+static handle_t *new_handle(int nblocks, gfp_t gfp)
 {
-	handle_t *handle = jbd2_alloc_handle(GFP_NOFS);
+	handle_t *handle = jbd2_alloc_handle(gfp);
 	if (!handle)
 		return NULL;
 	handle->h_total_credits = nblocks;
@@ -505,13 +505,13 @@ handle_t *jbd2__journal_start(journal_t *journal, int nblocks, int rsv_blocks,
 
 	nblocks += DIV_ROUND_UP(revoke_records,
 				journal->j_revoke_records_per_block);
-	handle = new_handle(nblocks);
+	handle = new_handle(nblocks, gfp_mask);
 	if (!handle)
 		return ERR_PTR(-ENOMEM);
 	if (rsv_blocks) {
 		handle_t *rsv_handle;
 
-		rsv_handle = new_handle(rsv_blocks);
+		rsv_handle = new_handle(rsv_blocks, gfp_mask);
 		if (!rsv_handle) {
 			jbd2_free_handle(handle);
 			return ERR_PTR(-ENOMEM);

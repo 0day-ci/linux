@@ -92,6 +92,12 @@ handle_t *__ext4_journal_start_sb(struct super_block *sb, unsigned int line,
 {
 	journal_t *journal;
 	int err;
+	gfp_t gfp_mask = GFP_NOFS;
+
+	if (type & EXT4_EX_NOFAIL) {
+		gfp_mask |= __GFP_NOFAIL;
+		type &= ~EXT4_EX_NOFAIL;
+	}
 
 	trace_ext4_journal_start(sb, blocks, rsv_blocks, revoke_creds,
 				 _RET_IP_);
@@ -103,7 +109,7 @@ handle_t *__ext4_journal_start_sb(struct super_block *sb, unsigned int line,
 	if (!journal || (EXT4_SB(sb)->s_mount_state & EXT4_FC_REPLAY))
 		return ext4_get_nojournal();
 	return jbd2__journal_start(journal, blocks, rsv_blocks, revoke_creds,
-				   GFP_NOFS, type, line);
+				   gfp_mask, type, line);
 }
 
 int __ext4_journal_stop(const char *where, unsigned int line, handle_t *handle)
