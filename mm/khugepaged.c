@@ -1808,6 +1808,12 @@ static void collapse_file(struct mm_struct *mm,
 			goto out_unlock;
 		}
 
+		/* The hwpoisoned page is off LRU but in page cache */
+		if (!PageLRU(page)) {
+			result = SCAN_PAGE_LRU;
+			goto out_unlock;
+		}
+
 		if (isolate_lru_page(page)) {
 			result = SCAN_DEL_PAGE_LRU;
 			goto out_unlock;
