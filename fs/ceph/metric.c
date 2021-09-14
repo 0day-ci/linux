@@ -8,6 +8,13 @@
 #include "metric.h"
 #include "mds_client.h"
 
+static void to_ceph_timespec(struct ceph_timespec *ts, ktime_t val)
+{
+	struct timespec64 t = ktime_to_timespec64(val);
+	ts->tv_sec = cpu_to_le32(t.tv_sec);
+	ts->tv_nsec = cpu_to_le32(t.tv_nsec);
+}
+
 static bool ceph_mdsc_send_metrics(struct ceph_mds_client *mdsc,
 				   struct ceph_mds_session *s)
 {
@@ -26,7 +33,6 @@ static bool ceph_mdsc_send_metrics(struct ceph_mds_client *mdsc,
 	u64 nr_caps = atomic64_read(&m->total_caps);
 	u32 header_len = sizeof(struct ceph_metric_header);
 	struct ceph_msg *msg;
-	struct timespec64 ts;
 	s64 sum;
 	s32 items = 0;
 	s32 len;
@@ -59,37 +65,34 @@ static bool ceph_mdsc_send_metrics(struct ceph_mds_client *mdsc,
 	/* encode the read latency metric */
 	read = (struct ceph_metric_read_latency *)(cap + 1);
 	read->header.type = cpu_to_le32(CLIENT_METRIC_TYPE_READ_LATENCY);
-	read->header.ver = 1;
+	read->header.ver = 2;
 	read->header.compat = 1;
 	read->header.data_len = cpu_to_le32(sizeof(*read) - header_len);
-	sum = m->read_latency_sum;
-	jiffies_to_timespec64(sum, &ts);
-	read->lat.tv_sec = cpu_to_le32(ts.tv_sec);
-	read->lat.tv_nsec = cpu_to_le32(ts.tv_nsec);
+	to_ceph_timespec(&read->lat, m->read_latency_sum);
+	to_ceph_timespec(&read->avg, m->avg_read_latency);
+	to_ceph_timespec(&read->stdev, m->read_latency_stdev);
 	items++;
 
 	/* encode the write latency metric */
 	write = (struct ceph_metric_write_latency *)(read + 1);
 	write->header.type = cpu_to_le32(CLIENT_METRIC_TYPE_WRITE_LATENCY);
-	write->header.ver = 1;
+	write->header.ver = 2;
 	write->header.compat = 1;
 	write->header.data_len = cpu_to_le32(sizeof(*write) - header_len);
-	sum = m->write_latency_sum;
-	jiffies_to_timespec64(sum, &ts);
-	write->lat.tv_sec = cpu_to_le32(ts.tv_sec);
-	write->lat.tv_nsec = cpu_to_le32(ts.tv_nsec);
+	to_ceph_timespec(&write->lat, m->write_latency_sum);
+	to_ceph_timespec(&write->avg, m->avg_write_latency);
+	to_ceph_timespec(&write->stdev, m->write_latency_stdev);
 	items++;
 
 	/* encode the metadata latency metric */
 	meta = (struct ceph_metric_metadata_latency *)(write + 1);
 	meta->header.type = cpu_to_le32(CLIENT_METRIC_TYPE_METADATA_LATENCY);
-	meta->header.ver = 1;
+	meta->header.ver = 2;
 	meta->header.compat = 1;
 	meta->header.data_len = cpu_to_le32(sizeof(*meta) - header_len);
-	sum = m->metadata_latency_sum;
-	jiffies_to_timespec64(sum, &ts);
-	meta->lat.tv_sec = cpu_to_le32(ts.tv_sec);
-	meta->lat.tv_nsec = cpu_to_le32(ts.tv_nsec);
+	to_ceph_timespec(&meta->lat, m->metadata_latency_sum);
+	to_ceph_timespec(&meta->avg, m->avg_metadata_latency);
+	to_ceph_timespec(&meta->stdev, m->metadata_latency_stdev);
 	items++;
 
 	/* encode the dentry lease metric */
