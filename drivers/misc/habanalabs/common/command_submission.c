@@ -1288,6 +1288,12 @@ static int cs_ioctl_default(struct hl_fpriv *hpriv, void __user *chunks,
 	if (rc)
 		goto free_cs_object;
 
+	/* If this is a staged submission we must return the staged sequence
+	 * rather than the internal CS sequence
+	 */
+	if (cs->staged_cs)
+		*cs_seq = cs->staged_sequence;
+
 	/* Validate ALL the CS chunks before submitting the CS */
 	for (i = 0 ; i < num_chunks ; i++) {
 		struct hl_cs_chunk *chunk = &cs_chunk_array[i];
