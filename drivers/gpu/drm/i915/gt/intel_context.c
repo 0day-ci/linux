@@ -111,11 +111,6 @@ static int __context_pin_state(struct i915_vma *vma, struct i915_gem_ww_ctx *ww)
 	if (err)
 		goto err_unpin;
 
-	/*
-	 * And mark it as a globally pinned object to let the shrinker know
-	 * it cannot reclaim the object until we release it.
-	 */
-	i915_vma_make_unshrinkable(vma);
 	vma->obj->mm.dirty = true;
 
 	return 0;
@@ -127,7 +122,6 @@ err_unpin:
 
 static void __context_unpin_state(struct i915_vma *vma)
 {
-	i915_vma_make_shrinkable(vma);
 	i915_active_release(&vma->active);
 	__i915_vma_unpin(vma);
 }
@@ -179,7 +173,6 @@ static int intel_context_pre_pin(struct intel_context *ce,
 	err = __context_pin_state(ce->state, ww);
 	if (err)
 		goto err_timeline;
-
 
 	return 0;
 
@@ -338,6 +331,8 @@ static void __intel_context_retire(struct i915_active *active)
 
 	set_bit(CONTEXT_VALID_BIT, &ce->flags);
 	intel_context_post_unpin(ce);
+	if (ce->state)
+		i915_vma_make_shrinkable(ce->state);
 	intel_context_put(ce);
 }
 
