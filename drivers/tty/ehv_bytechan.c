@@ -393,7 +393,7 @@ static irqreturn_t ehv_bc_tty_rx_isr(int irq, void *data)
 	}
 
 	/* Tell the tty layer that we're done. */
-	tty_flip_buffer_push(&bc->port);
+	tty_schedule_flip(&bc->port);
 
 	return IRQ_HANDLED;
 }

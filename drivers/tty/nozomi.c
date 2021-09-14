@@ -1222,7 +1222,7 @@ exit_handler:
 
 	for (a = 0; a < NOZOMI_MAX_PORTS; a++)
 		if (test_and_clear_bit(a, &dc->flip))
-			tty_flip_buffer_push(&dc->port[a].port);
+			tty_schedule_flip(&dc->port[a].port);
 
 	return IRQ_HANDLED;
 none:

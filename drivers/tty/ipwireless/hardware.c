@@ -719,7 +719,7 @@ static void ipw_receive_data_work(struct work_struct *work_rx)
 		/*
 		 * Note: ipwireless_network_packet_received must be called in a
 		 * process context (i.e. via schedule_work) because the tty
-		 * output code can sleep in the tty_flip_buffer_push call.
+		 * output code can sleep in the tty_schedule_flip call.
 		 */
 		if (packet->protocol == TL_PROTOCOLID_COM_DATA) {
 			if (hw->network != NULL) {

@@ -613,7 +613,7 @@ static void mips_ejtag_fdc_handle(struct mips_ejtag_fdc_tty *priv)
 							TTY_NORMAL);
 		}
 		if (flipped)
-			tty_flip_buffer_push(&dport->port);
+			tty_schedule_flip(&dport->port);
 
 		raw_spin_unlock(&dport->rx_lock);
 	}

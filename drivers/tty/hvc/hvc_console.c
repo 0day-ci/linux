@@ -752,7 +752,7 @@ static int __hvc_poll(struct hvc_struct *hp, bool may_sleep)
 		   a minimum for performance. */
 		timeout = MIN_TIMEOUT;
 
-		tty_flip_buffer_push(&hp->port);
+		tty_schedule_flip(&hp->port);
 	}
 	tty_kref_put(tty);
 

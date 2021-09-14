@@ -1637,7 +1637,7 @@ static u8 mxser_receive_chars(struct tty_struct *tty,
 	if (!mxser_receive_chars_new(tty, port, status))
 		status = mxser_receive_chars_old(tty, port, status);
 
-	tty_flip_buffer_push(&port->port);
+	tty_schedule_flip(&port->port);
 
 	return status;
 }

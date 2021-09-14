@@ -1820,7 +1820,7 @@ static void rx_async(struct slgt_info *info)
 	}
 
 	if (chars)
-		tty_flip_buffer_push(&info->port);
+		tty_schedule_flip(&info->port);
 }
 
 /*

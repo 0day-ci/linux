@@ -1179,7 +1179,7 @@ static void gsm_control_rls(struct gsm_mux *gsm, const u8 *data, int clen)
 	if (bits & 8)
 		tty_insert_flip_char(port, 0, TTY_FRAME);
 
-	tty_flip_buffer_push(port);
+	tty_schedule_flip(port);
 
 	gsm_control_reply(gsm, CMD_RLS, data, clen);
 }
@@ -1615,7 +1615,7 @@ static void gsm_dlci_data(struct gsm_dlci *dlci, const u8 *data, int clen)
 	case 1:		/* Line state will go via DLCI 0 controls only */
 	default:
 		tty_insert_flip_string(port, data, len);
-		tty_flip_buffer_push(port);
+		tty_schedule_flip(port);
 	}
 }
 

@@ -297,7 +297,7 @@ static int vcc_rx(struct tty_struct *tty, char *buf, int size)
 
 	len = tty_insert_flip_string(tty->port, buf, size);
 	if (len)
-		tty_flip_buffer_push(tty->port);
+		tty_schedule_flip(tty->port);
 
 	return len;
 }

@@ -582,7 +582,7 @@ static int hvcs_io(struct hvcs_struct *hvcsd)
 	spin_unlock_irqrestore(&hvcsd->lock, flags);
 	/* This is synch -- FIXME :js: it is not! */
 	if(got)
-		tty_flip_buffer_push(&hvcsd->port);
+		tty_schedule_flip(&hvcsd->port);
 
 	if (!got) {
 		/* Do this _after_ the flip_buffer_push */

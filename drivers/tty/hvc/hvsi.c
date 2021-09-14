@@ -454,7 +454,7 @@ static int hvsi_load_chunk(struct hvsi_struct *hp, struct tty_struct *tty,
 	compact_inbuf(hp, packet);
 
 	if (flip)
-		tty_flip_buffer_push(&hp->port);
+		tty_schedule_flip(&hp->port);
 
 	return 1;
 }
@@ -500,7 +500,7 @@ static irqreturn_t hvsi_interrupt(int irq, void *arg)
 		/* we weren't hung up and we weren't throttled, so we can
 		 * deliver the rest now */
 		hvsi_send_overflow(hp);
-		tty_flip_buffer_push(&hp->port);
+		tty_schedule_flip(&hp->port);
 	}
 	spin_unlock_irqrestore(&hp->lock, flags);
 
@@ -982,7 +982,7 @@ static void hvsi_unthrottle(struct tty_struct *tty)
 	spin_lock_irqsave(&hp->lock, flags);
 	if (hp->n_throttle) {
 		hvsi_send_overflow(hp);
-		tty_flip_buffer_push(&hp->port);
+		tty_schedule_flip(&hp->port);
 	}
 	spin_unlock_irqrestore(&hp->lock, flags);
 

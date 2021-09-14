@@ -123,7 +123,7 @@ static int pty_write(struct tty_struct *tty, const unsigned char *buf, int c)
 		spin_unlock_irqrestore(&to->port->lock, flags);
 		/* And shovel */
 		if (c)
-			tty_flip_buffer_push(to->port);
+			tty_schedule_flip(to->port);
 	}
 	return c;
 }

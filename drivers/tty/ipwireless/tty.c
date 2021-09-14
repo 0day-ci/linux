@@ -171,7 +171,7 @@ void ipwireless_tty_received(struct ipw_tty *tty, unsigned char *data,
 				length - work);
 
 	if (work)
-		tty_flip_buffer_push(&tty->port);
+		tty_schedule_flip(&tty->port);
 }
 
 static void ipw_write_packet_sent_callback(void *callback_data,
