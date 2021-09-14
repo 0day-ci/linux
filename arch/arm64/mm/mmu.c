@@ -1628,6 +1628,18 @@ static int __init prevent_bootmem_remove_init(void)
 	if (!IS_ENABLED(CONFIG_MEMORY_HOTREMOVE))
 		return ret;
 
+	if (has_mem_limit_reduced()) {
+		/*
+		 * Physical memory limit has been reduced via the 'mem=' kernel
+		 * command line option. Memory beyond reduced limit could now be
+		 * removed and reassigned (guest ?) transparently to the kernel.
+		 * This might cause subsequent kexec kernel to crash or at least
+		 * corrupt the memory when accessing UEFI memory map enumerated
+		 * boot memory which might have been repurposed.
+		 */
+		pr_warn("Memory limit reduced, kexec might be problematic\n");
+	}
+
 	validate_bootmem_online();
 	ret = register_memory_notifier(&prevent_bootmem_remove_nb);
 	if (ret)

@@ -239,6 +239,11 @@ EXPORT_SYMBOL(pfn_is_map_memory);
 
 static phys_addr_t memory_limit = PHYS_ADDR_MAX;
 
+bool has_mem_limit_reduced(void)
+{
+	return memory_limit != PHYS_ADDR_MAX;
+}
+
 /*
  * Limit the memory size that was specified via FDT.
  */
@@ -348,7 +353,7 @@ void __init arm64_memblock_init(void)
 	 * high up in memory, add back the kernel region that must be accessible
 	 * via the linear mapping.
 	 */
-	if (memory_limit != PHYS_ADDR_MAX) {
+	if (has_mem_limit_reduced()) {
 		memblock_mem_limit_remove_map(memory_limit);
 		memblock_add(__pa_symbol(_text), (u64)(_end - _text));
 	}
@@ -526,7 +531,7 @@ void free_initmem(void)
 
 void dump_mem_limit(void)
 {
-	if (memory_limit != PHYS_ADDR_MAX) {
+	if (has_mem_limit_reduced()) {
 		pr_emerg("Memory Limit: %llu MB\n", memory_limit >> 20);
 	} else {
 		pr_emerg("Memory Limit: none\n");
