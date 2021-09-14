@@ -294,6 +294,22 @@ static int pmem_dax_zero_page_range(struct dax_device *dax_dev, pgoff_t pgoff,
 				   PAGE_SIZE));
 }
 
+static int pmem_dax_clear_poison(struct dax_device *dax_dev, pgoff_t pgoff,
+					size_t nr_pages)
+{
+	unsigned int len = PFN_PHYS(nr_pages);
+	sector_t sector = PFN_PHYS(pgoff) >> SECTOR_SHIFT;
+	struct pmem_device *pmem = dax_get_private(dax_dev);
+	phys_addr_t pmem_off = sector * 512 + pmem->data_offset;
+	blk_status_t ret;
+
+	if (!is_bad_pmem(&pmem->bb, sector, len))
+		return 0;
+
+	ret = pmem_clear_poison(pmem, pmem_off, len);
+	return (ret == BLK_STS_OK) ? 0 : -EIO;
+}
+
 static long pmem_dax_direct_access(struct dax_device *dax_dev,
 		pgoff_t pgoff, long nr_pages, void **kaddr, pfn_t *pfn)
 {
@@ -326,6 +342,7 @@ static const struct dax_operations pmem_dax_ops = {
 	.copy_from_iter = pmem_copy_from_iter,
 	.copy_to_iter = pmem_copy_to_iter,
 	.zero_page_range = pmem_dax_zero_page_range,
+	.clear_poison = pmem_dax_clear_poison,
 };
 
 static const struct attribute_group *pmem_attribute_groups[] = {
