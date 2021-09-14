@@ -956,6 +956,29 @@ static void device_links_missing_supplier(struct device *dev)
 }
 
 /**
+ * dev_set_def_probe_reason - Set the deferred probe reason for a device
+ * @dev: the pointer to the struct device
+ * @fmt: printf-style format string
+ * @...: arguments as specified in the format string
+ *
+ * This is a more caller-friendly version of device_set_deferred_probe_reason()
+ * that takes variable argument inputs similar to dev_info().
+ */
+static void dev_set_def_probe_reason(const struct device *dev, const char *fmt, ...)
+{
+	struct va_format vaf;
+	va_list args;
+
+	va_start(args, fmt);
+	vaf.fmt = fmt;
+	vaf.va = &args;
+
+	device_set_deferred_probe_reason(dev, &vaf);
+
+	va_end(args);
+}
+
+/**
  * device_links_check_suppliers - Check presence of supplier drivers.
  * @dev: Consumer device.
  *
@@ -975,6 +998,7 @@ int device_links_check_suppliers(struct device *dev)
 {
 	struct device_link *link;
 	int ret = 0;
+	struct fwnode_handle *sup_fw;
 
 	/*
 	 * Device waiting for supplier to become available is not allowed to
@@ -983,10 +1007,13 @@ int device_links_check_suppliers(struct device *dev)
 	mutex_lock(&fwnode_link_lock);
 	if (dev->fwnode && !list_empty(&dev->fwnode->suppliers) &&
 	    !fw_devlink_is_permissive()) {
+		sup_fw = list_first_entry(&dev->fwnode->suppliers,
+					  struct fwnode_link,
+					  c_hook)->supplier;
 		dev_dbg(dev, "probe deferral - wait for supplier %pfwP\n",
-			list_first_entry(&dev->fwnode->suppliers,
-			struct fwnode_link,
-			c_hook)->supplier);
+			sup_fw);
+		dev_set_def_probe_reason(dev,
+			"wait for supplier %pfwP\n", sup_fw);
 		mutex_unlock(&fwnode_link_lock);
 		return -EPROBE_DEFER;
 	}
@@ -1002,6 +1029,9 @@ int device_links_check_suppliers(struct device *dev)
 		    !(link->flags & DL_FLAG_SYNC_STATE_ONLY)) {
 			device_links_missing_supplier(dev);
 			dev_dbg(dev, "probe deferral - supplier %s not ready\n",
+				dev_name(link->supplier));
+			dev_set_def_probe_reason(dev,
+				"supplier %s not ready\n",
 				dev_name(link->supplier));
 			ret = -EPROBE_DEFER;
 			break;
