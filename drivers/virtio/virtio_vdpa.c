@@ -7,6 +7,7 @@
  *
  */
 
+#include "linux/virtio_config.h"
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/device.h>
@@ -145,6 +146,7 @@ virtio_vdpa_setup_vq(struct virtio_device *vdev, unsigned int index,
 	/* Assume split virtqueue, switch to packed if necessary */
 	struct vdpa_vq_state state = {0};
 	unsigned long flags;
+	bool may_reduce_num = false;
 	u32 align, num;
 	int err;
 
@@ -169,10 +171,13 @@ virtio_vdpa_setup_vq(struct virtio_device *vdev, unsigned int index,
 		goto error_new_virtqueue;
 	}
 
+	if (ops->get_features(vdpa) & BIT_ULL(VIRTIO_F_VERSION_1))
+		may_reduce_num = true;
+
 	/* Create the vring */
 	align = ops->get_vq_align(vdpa);
 	vq = vring_create_virtqueue(index, num, align, vdev,
-				    true, true, ctx,
+				    true, may_reduce_num, ctx,
 				    virtio_vdpa_notify, callback, name);
 	if (!vq) {
 		err = -ENOMEM;

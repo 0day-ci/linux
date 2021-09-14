@@ -12,6 +12,7 @@
 #include <linux/slab.h>
 #include <linux/vdpa.h>
 #include <uapi/linux/vdpa.h>
+#include <uapi/linux/virtio_config.h>
 #include <net/genetlink.h>
 #include <linux/mod_devicetable.h>
 
@@ -494,6 +495,7 @@ vdpa_dev_fill(struct vdpa_device *vdev, struct sk_buff *msg, u32 portid, u32 seq
 	u16 max_vq_size;
 	u32 device_id;
 	u32 vendor_id;
+	u64 features;
 	void *hdr;
 	int err;
 
@@ -508,6 +510,7 @@ vdpa_dev_fill(struct vdpa_device *vdev, struct sk_buff *msg, u32 portid, u32 seq
 	device_id = vdev->config->get_device_id(vdev);
 	vendor_id = vdev->config->get_vendor_id(vdev);
 	max_vq_size = vdev->config->get_vq_num_max(vdev);
+	features = vdev->config->get_features(vdev);
 
 	err = -EMSGSIZE;
 	if (nla_put_string(msg, VDPA_ATTR_DEV_NAME, dev_name(&vdev->dev)))
@@ -519,6 +522,9 @@ vdpa_dev_fill(struct vdpa_device *vdev, struct sk_buff *msg, u32 portid, u32 seq
 	if (nla_put_u32(msg, VDPA_ATTR_DEV_MAX_VQS, vdev->nvqs))
 		goto msg_err;
 	if (nla_put_u16(msg, VDPA_ATTR_DEV_MAX_VQ_SIZE, max_vq_size))
+		goto msg_err;
+	if (features & BIT_ULL(VIRTIO_F_VERSION_1) &&
+	    nla_put_flag(msg, VDPA_ATTR_DEV_VERSION_1))
 		goto msg_err;
 
 	genlmsg_end(msg, hdr);
