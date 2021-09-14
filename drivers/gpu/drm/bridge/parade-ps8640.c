@@ -332,8 +332,10 @@ static int ps8640_probe(struct i2c_client *client)
 		return -ENODEV;
 
 	ps_bridge->panel_bridge = devm_drm_panel_bridge_add(dev, panel);
-	if (IS_ERR(ps_bridge->panel_bridge))
-		return PTR_ERR(ps_bridge->panel_bridge);
+	if (IS_ERR(ps_bridge->panel_bridge)) {
+		return dev_err_probe(dev, PTR_ERR(ps_bridge->panel_bridge),
+				     "Error creating bridge device\n");
+	}
 
 	ps_bridge->supplies[0].supply = "vdd33";
 	ps_bridge->supplies[1].supply = "vdd12";
@@ -344,16 +346,20 @@ static int ps8640_probe(struct i2c_client *client)
 
 	ps_bridge->gpio_powerdown = devm_gpiod_get(&client->dev, "powerdown",
 						   GPIOD_OUT_HIGH);
-	if (IS_ERR(ps_bridge->gpio_powerdown))
-		return PTR_ERR(ps_bridge->gpio_powerdown);
+	if (IS_ERR(ps_bridge->gpio_powerdown)) {
+		return dev_err_probe(dev, PTR_ERR(ps_bridge->gpio_powerdown),
+				     "Error getting gpio_powerdown\n");
+	}
 
 	/*
 	 * Assert the reset to avoid the bridge being initialized prematurely
 	 */
 	ps_bridge->gpio_reset = devm_gpiod_get(&client->dev, "reset",
 					       GPIOD_OUT_HIGH);
-	if (IS_ERR(ps_bridge->gpio_reset))
-		return PTR_ERR(ps_bridge->gpio_reset);
+	if (IS_ERR(ps_bridge->gpio_reset)) {
+		return dev_err_probe(dev, PTR_ERR(ps_bridge->gpio_reset),
+				     "Error getting gpio_reset\n");
+	}
 
 	ps_bridge->bridge.funcs = &ps8640_bridge_funcs;
 	ps_bridge->bridge.of_node = dev->of_node;
@@ -367,9 +373,9 @@ static int ps8640_probe(struct i2c_client *client)
 							     client->adapter,
 							     client->addr + i);
 		if (IS_ERR(ps_bridge->page[i])) {
-			dev_err(dev, "failed i2c dummy device, address %02x\n",
+			return dev_err_probe(dev, PTR_ERR(ps_bridge->page[i]),
+				"Error initting i2c dummy dev, address %02x\n",
 				client->addr + i);
-			return PTR_ERR(ps_bridge->page[i]);
 		}
 	}
 
