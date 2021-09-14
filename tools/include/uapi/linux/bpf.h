@@ -906,6 +906,7 @@ enum bpf_map_type {
 	BPF_MAP_TYPE_RINGBUF,
 	BPF_MAP_TYPE_INODE_STORAGE,
 	BPF_MAP_TYPE_TASK_STORAGE,
+	BPF_MAP_TYPE_BLOOM_FILTER,
 };
 
 /* Note that tracing related programs such as
@@ -1210,6 +1211,15 @@ enum {
 
 /* Create a map that is suitable to be an inner map with dynamic max entries */
 	BPF_F_INNER_MAP		= (1U << 12),
+
+/* For bloom filter maps, the next 4 bits represent how many hashes to use.
+ * The maximum number of hash functions supported is 15. If this is not set,
+ * the default number of hash functions used will be 5.
+ */
+	BPF_F_BLOOM_FILTER_HASH_BIT_1 = (1U << 13),
+	BPF_F_BLOOM_FILTER_HASH_BIT_2 = (1U << 14),
+	BPF_F_BLOOM_FILTER_HASH_BIT_3 = (1U << 15),
+	BPF_F_BLOOM_FILTER_HASH_BIT_4 = (1U << 16),
 };
 
 /* Flags for BPF_PROG_QUERY. */
