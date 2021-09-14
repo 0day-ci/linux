@@ -19,4 +19,12 @@
 		reg = <0x204000 0x200>;
 		status = "disabled";
 	};
+
+	gpi: interrupt-controller@207a00 {
+		compatible = "sstar,ssd20xd-gpi";
+		reg = <0x207a00 0x200>;
+		#interrupt-cells = <2>;
+		interrupt-controller;
+		interrupts-extended = <&intc_irq GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
+	};
 };
