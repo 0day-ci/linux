@@ -176,6 +176,9 @@ struct vc4_hdmi {
 
 	struct reset_control *reset;
 
+	struct clk_request *bvb_req;
+	struct clk_request *hsm_req;
+
 	struct debugfs_regset32 hdmi_regset;
 	struct debugfs_regset32 hd_regset;
 };
