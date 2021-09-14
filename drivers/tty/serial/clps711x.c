@@ -136,7 +136,7 @@ static irqreturn_t uart_clps711x_int_rx(int irq, void *dev_id)
 		uart_insert_char(port, status, UARTDR_OVERR, ch, flg);
 	}
 
-	tty_flip_buffer_push(&port->state->port);
+	tty_schedule_flip(&port->state->port);
 
 	return IRQ_HANDLED;
 }

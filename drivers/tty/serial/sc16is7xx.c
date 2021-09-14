@@ -627,7 +627,7 @@ static void sc16is7xx_handle_rx(struct uart_port *port, unsigned int rxlen,
 		rxlen -= bytes_read;
 	}
 
-	tty_flip_buffer_push(&port->state->port);
+	tty_schedule_flip(&port->state->port);
 }
 
 static void sc16is7xx_handle_tx(struct uart_port *port)

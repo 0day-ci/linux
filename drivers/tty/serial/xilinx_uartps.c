@@ -302,7 +302,7 @@ static void cdns_uart_handle_rx(void *dev_id, unsigned int isrstatus)
 		isrstatus = 0;
 	}
 
-	tty_flip_buffer_push(&port->state->port);
+	tty_schedule_flip(&port->state->port);
 }
 
 /**

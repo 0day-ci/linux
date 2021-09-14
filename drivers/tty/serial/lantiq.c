@@ -172,7 +172,7 @@ lqasc_rx_chars(struct uart_port *port)
 		ch = readb(port->membase + LTQ_ASC_RBUF);
 		rsr = (__raw_readl(port->membase + LTQ_ASC_STATE)
 			& ASCSTATE_ANY) | UART_DUMMY_UER_RX;
-		tty_flip_buffer_push(tport);
+		tty_schedule_flip(tport);
 		port->icount.rx++;
 
 		/*
@@ -216,7 +216,7 @@ lqasc_rx_chars(struct uart_port *port)
 	}
 
 	if (ch != 0)
-		tty_flip_buffer_push(tport);
+		tty_schedule_flip(tport);
 
 	return 0;
 }

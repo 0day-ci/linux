@@ -247,7 +247,7 @@ static void owl_uart_receive_chars(struct uart_port *port)
 		stat = owl_uart_read(port, OWL_UART_STAT);
 	}
 
-	tty_flip_buffer_push(&port->state->port);
+	tty_schedule_flip(&port->state->port);
 }
 
 static irqreturn_t owl_uart_irq(int irq, void *dev_id)

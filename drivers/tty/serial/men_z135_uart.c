@@ -281,7 +281,7 @@ static void men_z135_handle_rx(struct men_z135_port *uart)
 
 	port->icount.rx += copied;
 
-	tty_flip_buffer_push(tport);
+	tty_schedule_flip(tport);
 
 }
 

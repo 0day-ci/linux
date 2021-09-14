@@ -941,7 +941,7 @@ out:
 
 	uart_unlock_and_check_sysrq(&sport->port);
 
-	tty_flip_buffer_push(port);
+	tty_schedule_flip(port);
 }
 
 static void lpuart32_txint(struct lpuart_port *sport)
@@ -1023,7 +1023,7 @@ static void lpuart32_rxint(struct lpuart_port *sport)
 out:
 	uart_unlock_and_check_sysrq(&sport->port);
 
-	tty_flip_buffer_push(port);
+	tty_schedule_flip(port);
 }
 
 static irqreturn_t lpuart_int(int irq, void *dev_id)
@@ -1233,7 +1233,7 @@ exit:
 
 	spin_unlock_irqrestore(&sport->port.lock, flags);
 
-	tty_flip_buffer_push(port);
+	tty_schedule_flip(port);
 	mod_timer(&sport->lpuart_timer, jiffies + sport->dma_rx_timeout);
 }
 

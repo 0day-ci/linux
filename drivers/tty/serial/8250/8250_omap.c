@@ -861,7 +861,7 @@ static void __dma_rx_do_complete(struct uart_8250_port *p)
 	p->port.icount.buf_overrun += count - ret;
 out:
 
-	tty_flip_buffer_push(tty_port);
+	tty_schedule_flip(tty_port);
 }
 
 static void __dma_rx_complete(void *param)

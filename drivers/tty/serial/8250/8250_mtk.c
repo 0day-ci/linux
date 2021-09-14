@@ -120,7 +120,7 @@ static void mtk8250_dma_rx_complete(void *param)
 
 	up->port.icount.rx += copied;
 
-	tty_flip_buffer_push(tty_port);
+	tty_schedule_flip(tty_port);
 
 	mtk8250_rx_dma(up);
 

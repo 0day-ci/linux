@@ -552,7 +552,7 @@ static irqreturn_t sunzilog_interrupt(int irq, void *dev_id)
 		spin_unlock(&up->port.lock);
 
 		if (port)
-			tty_flip_buffer_push(port);
+			tty_schedule_flip(port);
 
 		/* Channel B */
 		up = up->next;
@@ -575,7 +575,7 @@ static irqreturn_t sunzilog_interrupt(int irq, void *dev_id)
 		spin_unlock(&up->port.lock);
 
 		if (port)
-			tty_flip_buffer_push(port);
+			tty_schedule_flip(port);
 
 		up = up->next;
 	}

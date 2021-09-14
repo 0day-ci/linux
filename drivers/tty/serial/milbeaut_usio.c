@@ -202,7 +202,7 @@ static void mlb_usio_rx_chars(struct uart_port *port)
 		port->membase + MLB_USIO_REG_FCR);
 	}
 
-	tty_flip_buffer_push(ttyport);
+	tty_schedule_flip(ttyport);
 }
 
 static irqreturn_t mlb_usio_rx_irq(int irq, void *dev_id)

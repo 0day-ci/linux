@@ -225,7 +225,7 @@ static irqreturn_t sunhv_interrupt(int irq, void *dev_id)
 	spin_unlock_irqrestore(&port->lock, flags);
 
 	if (tport)
-		tty_flip_buffer_push(tport);
+		tty_schedule_flip(tport);
 
 	return IRQ_HANDLED;
 }

@@ -588,7 +588,7 @@ done:
 	spin_unlock_irqrestore(&port->lock, flags);
 
 	if (count)
-		tty_flip_buffer_push(tport);
+		tty_schedule_flip(tport);
 }
 
 static void msm_start_rx_dma(struct msm_port *msm_port)
@@ -757,7 +757,7 @@ static void msm_handle_rx_dm(struct uart_port *port, unsigned int misr)
 		count -= r_count;
 	}
 
-	tty_flip_buffer_push(tport);
+	tty_schedule_flip(tport);
 
 	if (misr & (UART_IMR_RXSTALE))
 		msm_write(port, UART_CR_CMD_RESET_STALE_INT, UART_CR);
@@ -817,7 +817,7 @@ static void msm_handle_rx(struct uart_port *port)
 			tty_insert_flip_char(tport, c, flag);
 	}
 
-	tty_flip_buffer_push(tport);
+	tty_schedule_flip(tport);
 }
 
 static void msm_handle_tx_pio(struct uart_port *port, unsigned int tx_count)

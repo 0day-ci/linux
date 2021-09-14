@@ -291,7 +291,7 @@ ignore_char:
 		status = readl(port->membase + UART_STAT);
 	} while (status & (STAT_RX_RDY(port) | STAT_BRK_DET));
 
-	tty_flip_buffer_push(tport);
+	tty_schedule_flip(tport);
 }
 
 static void mvebu_uart_tx_chars(struct uart_port *port, unsigned int status)

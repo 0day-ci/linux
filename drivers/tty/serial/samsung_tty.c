@@ -627,7 +627,7 @@ static void s3c24xx_serial_rx_dma_complete(void *args)
 		s3c24xx_uart_copy_rx_to_tty(ourport, t, received);
 
 	if (tty) {
-		tty_flip_buffer_push(t);
+		tty_schedule_flip(t);
 		tty_kref_put(tty);
 	}
 
@@ -746,7 +746,7 @@ static irqreturn_t s3c24xx_serial_rx_chars_dma(void *dev_id)
 	s3c24xx_serial_rx_drain_fifo(ourport);
 
 	if (tty) {
-		tty_flip_buffer_push(t);
+		tty_schedule_flip(t);
 		tty_kref_put(tty);
 	}
 
@@ -842,7 +842,7 @@ static void s3c24xx_serial_rx_drain_fifo(struct s3c24xx_uart_port *ourport)
 				 ch, flag);
 	}
 
-	tty_flip_buffer_push(&port->state->port);
+	tty_schedule_flip(&port->state->port);
 }
 
 static irqreturn_t s3c24xx_serial_rx_chars_pio(void *dev_id)

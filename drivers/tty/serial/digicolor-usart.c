@@ -175,7 +175,7 @@ static void digicolor_uart_rx(struct uart_port *port)
 
 	spin_unlock_irqrestore(&port->lock, flags);
 
-	tty_flip_buffer_push(&port->state->port);
+	tty_schedule_flip(&port->state->port);
 }
 
 static void digicolor_uart_tx(struct uart_port *port)

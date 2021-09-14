@@ -268,7 +268,7 @@ static void pic32_uart_do_rx(struct uart_port *port)
 
 	spin_unlock(&port->lock);
 
-	tty_flip_buffer_push(tty);
+	tty_schedule_flip(tty);
 }
 
 /* fill tx fifo with chars to send, stop when fifo is about to be full

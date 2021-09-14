@@ -146,7 +146,7 @@ static irqreturn_t serial21285_rx_chars(int irq, void *dev_id)
 
 		status = *CSR_UARTFLG;
 	}
-	tty_flip_buffer_push(&port->state->port);
+	tty_schedule_flip(&port->state->port);
 
 	return IRQ_HANDLED;
 }

@@ -448,7 +448,7 @@ static void __ssp_receive_chars(struct sifive_serial_port *ssp)
 		uart_insert_char(&ssp->port, 0, 0, ch, TTY_NORMAL);
 	}
 
-	tty_flip_buffer_push(&ssp->port.state->port);
+	tty_schedule_flip(&ssp->port.state->port);
 }
 
 /**

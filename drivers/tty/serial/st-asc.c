@@ -350,7 +350,7 @@ static void asc_receive_chars(struct uart_port *port)
 	}
 
 	/* Tell the rest of the system the news. New characters! */
-	tty_flip_buffer_push(tport);
+	tty_schedule_flip(tport);
 }
 
 static irqreturn_t asc_interrupt(int irq, void *ptr)

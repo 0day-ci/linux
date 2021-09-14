@@ -452,7 +452,7 @@ static irqreturn_t ip22zilog_interrupt(int irq, void *dev_id)
 		spin_unlock(&up->port.lock);
 
 		if (push)
-			tty_flip_buffer_push(&up->port.state->port);
+			tty_schedule_flip(&up->port.state->port);
 
 		/* Channel B */
 		up = up->next;
@@ -475,7 +475,7 @@ static irqreturn_t ip22zilog_interrupt(int irq, void *dev_id)
 		spin_unlock(&up->port.lock);
 
 		if (push)
-			tty_flip_buffer_push(&up->port.state->port);
+			tty_schedule_flip(&up->port.state->port);
 
 		up = up->next;
 	}

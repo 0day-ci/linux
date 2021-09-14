@@ -3109,7 +3109,7 @@ EXPORT_SYMBOL_GPL(uart_handle_cts_change);
 /**
  * uart_insert_char - push a char to the uart layer
  *
- * User is responsible to call tty_flip_buffer_push when they are done with
+ * User is responsible to call tty_schedule_flip when they are done with
  * insertion.
  *
  * @port: corresponding port

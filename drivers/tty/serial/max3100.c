@@ -305,7 +305,7 @@ static void max3100_work(struct work_struct *w)
 		}
 
 		if (rxchars > 16) {
-			tty_flip_buffer_push(&s->port.state->port);
+			tty_schedule_flip(&s->port.state->port);
 			rxchars = 0;
 		}
 		if (uart_circ_chars_pending(xmit) < WAKEUP_CHARS)
@@ -318,7 +318,7 @@ static void max3100_work(struct work_struct *w)
 		   !uart_tx_stopped(&s->port))));
 
 	if (rxchars > 0)
-		tty_flip_buffer_push(&s->port.state->port);
+		tty_schedule_flip(&s->port.state->port);
 }
 
 static irqreturn_t max3100_irq(int irqno, void *dev_id)

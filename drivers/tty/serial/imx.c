@@ -844,7 +844,7 @@ static irqreturn_t __imx_uart_rxint(int irq, void *dev_id)
 	}
 
 out:
-	tty_flip_buffer_push(port);
+	tty_schedule_flip(port);
 
 	return IRQ_HANDLED;
 }
@@ -1180,7 +1180,7 @@ static void imx_uart_dma_rx_callback(void *data)
 	}
 
 	if (w_bytes) {
-		tty_flip_buffer_push(port);
+		tty_schedule_flip(port);
 		dev_dbg(sport->port.dev, "We get %d bytes.\n", w_bytes);
 	}
 }
@@ -1236,7 +1236,7 @@ static void imx_uart_clear_rx_errors(struct imx_port *sport)
 		uart_handle_break(&sport->port);
 		if (tty_insert_flip_char(port, 0, TTY_BREAK) == 0)
 			sport->port.icount.buf_overrun++;
-		tty_flip_buffer_push(port);
+		tty_schedule_flip(port);
 	} else {
 		if (usr1 & USR1_FRAMERR) {
 			sport->port.icount.frame++;

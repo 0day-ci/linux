@@ -1787,7 +1787,7 @@ unsigned char serial8250_rx_chars(struct uart_8250_port *up, unsigned char lsr)
 		lsr = serial_in(up, UART_LSR);
 	} while (lsr & (UART_LSR_DR | UART_LSR_BI));
 
-	tty_flip_buffer_push(&port->state->port);
+	tty_schedule_flip(&port->state->port);
 	return lsr;
 }
 EXPORT_SYMBOL_GPL(serial8250_rx_chars);

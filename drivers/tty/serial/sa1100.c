@@ -223,7 +223,7 @@ sa1100_rx_chars(struct sa1100_port *sport)
 			 UTSR0_TO_SM(UART_GET_UTSR0(sport));
 	}
 
-	tty_flip_buffer_push(&sport->port.state->port);
+	tty_schedule_flip(&sport->port.state->port);
 }
 
 static void sa1100_tx_chars(struct sa1100_port *sport)

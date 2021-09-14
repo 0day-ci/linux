@@ -277,7 +277,7 @@ static void stm32_usart_receive_chars(struct uart_port *port, bool threaded)
 
 	uart_unlock_and_check_sysrq(port);
 
-	tty_flip_buffer_push(tport);
+	tty_schedule_flip(tport);
 }
 
 static void stm32_usart_tx_dma_complete(void *arg)

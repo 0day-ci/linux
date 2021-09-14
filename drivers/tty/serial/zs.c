@@ -600,7 +600,7 @@ static void zs_receive_chars(struct zs_port *zport)
 		uart_insert_char(uport, status, Rx_OVR, ch, flag);
 	}
 
-	tty_flip_buffer_push(&uport->state->port);
+	tty_schedule_flip(&uport->state->port);
 }
 
 static void zs_raw_transmit_chars(struct zs_port *zport)

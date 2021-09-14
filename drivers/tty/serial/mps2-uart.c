@@ -196,7 +196,7 @@ static void mps2_uart_rx_chars(struct uart_port *port)
 		tty_insert_flip_char(&port->state->port, rxdata, TTY_NORMAL);
 	}
 
-	tty_flip_buffer_push(tport);
+	tty_schedule_flip(tport);
 }
 
 static irqreturn_t mps2_uart_rxirq(int irq, void *data)
@@ -249,7 +249,7 @@ static irqreturn_t mps2_uart_oerrirq(int irq, void *data)
 		mps2_uart_write8(port, UARTn_INT_RX_OVERRUN, UARTn_INT);
 		port->icount.overrun++;
 		tty_insert_flip_char(tport, 0, TTY_OVERRUN);
-		tty_flip_buffer_push(tport);
+		tty_schedule_flip(tport);
 		handled = IRQ_HANDLED;
 	}
 

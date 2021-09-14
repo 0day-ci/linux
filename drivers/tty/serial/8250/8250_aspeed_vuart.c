@@ -363,7 +363,7 @@ static int aspeed_vuart_handle_irq(struct uart_port *port)
 					break;
 			} while (lsr & (UART_LSR_DR | UART_LSR_BI));
 
-			tty_flip_buffer_push(&port->state->port);
+			tty_schedule_flip(&port->state->port);
 		}
 	}
 

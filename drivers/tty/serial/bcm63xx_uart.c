@@ -294,7 +294,7 @@ static void bcm_uart_do_rx(struct uart_port *port)
 
 	} while (--max_count);
 
-	tty_flip_buffer_push(tty_port);
+	tty_schedule_flip(tty_port);
 }
 
 /*

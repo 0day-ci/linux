@@ -385,7 +385,7 @@ static void ar933x_uart_rx_chars(struct ar933x_uart_port *up)
 			tty_insert_flip_char(port, ch, TTY_NORMAL);
 	} while (max_count-- > 0);
 
-	tty_flip_buffer_push(port);
+	tty_schedule_flip(port);
 }
 
 static void ar933x_uart_tx_chars(struct ar933x_uart_port *up)

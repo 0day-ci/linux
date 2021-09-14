@@ -423,7 +423,7 @@ static void rp2_rx_chars(struct rp2_uart_port *up)
 		up->port.icount.rx++;
 	}
 
-	tty_flip_buffer_push(port);
+	tty_schedule_flip(port);
 }
 
 static void rp2_tx_chars(struct rp2_uart_port *up)

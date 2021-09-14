@@ -230,7 +230,7 @@ static irqreturn_t ulite_isr(int irq, void *dev_id)
 
 	/* work done? */
 	if (n > 1) {
-		tty_flip_buffer_push(&port->state->port);
+		tty_schedule_flip(&port->state->port);
 		return IRQ_HANDLED;
 	} else {
 		return IRQ_NONE;

@@ -592,7 +592,7 @@ static irqreturn_t serial_omap_irq(int irq, void *dev_id)
 
 	spin_unlock(&up->port.lock);
 
-	tty_flip_buffer_push(&up->port.state->port);
+	tty_schedule_flip(&up->port.state->port);
 
 	up->port_activity = jiffies;
 

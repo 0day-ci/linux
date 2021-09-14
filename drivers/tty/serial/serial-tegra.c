@@ -702,7 +702,7 @@ static void do_handle_rx_pio(struct tegra_uart_port *tup)
 
 	tegra_uart_handle_rx_pio(tup, port);
 	if (tty) {
-		tty_flip_buffer_push(port);
+		tty_schedule_flip(port);
 		tty_kref_put(tty);
 	}
 }

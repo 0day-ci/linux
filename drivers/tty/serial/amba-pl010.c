@@ -159,7 +159,7 @@ static void pl010_rx_chars(struct uart_amba_port *uap)
 	ignore_char:
 		status = readb(uap->port.membase + UART01x_FR);
 	}
-	tty_flip_buffer_push(&uap->port.state->port);
+	tty_schedule_flip(&uap->port.state->port);
 }
 
 static void pl010_tx_chars(struct uart_amba_port *uap)

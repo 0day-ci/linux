@@ -829,7 +829,7 @@ ignore_char:
 	}
 	icom_port->next_rcv = rcv_buff;
 
-	tty_flip_buffer_push(port);
+	tty_schedule_flip(port);
 }
 
 static void process_interrupt(u16 port_int_reg,

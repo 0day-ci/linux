@@ -493,7 +493,7 @@ static void brcmuart_rx_buf_done_isr(struct uart_port *up, int index)
 	else
 		priv->dma_rx_full_buf++;
 
-	tty_flip_buffer_push(tty_port);
+	tty_schedule_flip(tty_port);
 }
 
 static void brcmuart_rx_isr(struct uart_port *up, u32 rx_isr)

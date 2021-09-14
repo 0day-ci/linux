@@ -239,7 +239,7 @@ static inline void dz_receive_chars(struct dz_mux *mux)
 	}
 	for (i = 0; i < DZ_NB_PORT; i++)
 		if (lines_rx[i])
-			tty_flip_buffer_push(&mux->dport[i].port.state->port);
+			tty_schedule_flip(&mux->dport[i].port.state->port);
 }
 
 /*

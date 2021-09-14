@@ -523,7 +523,7 @@ error_return:
 	qe_port->rx_cur = bdp;
 
 	/* Activate BH processing */
-	tty_flip_buffer_push(tport);
+	tty_schedule_flip(tport);
 
 	return;
 

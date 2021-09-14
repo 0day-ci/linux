@@ -619,7 +619,7 @@ static int push_rx(struct eg20t_port *priv, const unsigned char *buf,
 	struct tty_port *tport = &port->state->port;
 
 	tty_insert_flip_string(tport, buf, size);
-	tty_flip_buffer_push(tport);
+	tty_schedule_flip(tport);
 
 	return 0;
 }
@@ -757,7 +757,7 @@ static void pch_dma_rx_complete(void *arg)
 	dma_sync_sg_for_cpu(port->dev, &priv->sg_rx, 1, DMA_FROM_DEVICE);
 	count = dma_push_rx(priv, priv->trigger_level);
 	if (count)
-		tty_flip_buffer_push(&port->state->port);
+		tty_schedule_flip(&port->state->port);
 	async_tx_ack(priv->desc_rx);
 	pch_uart_hal_enable_interrupt(priv, PCH_UART_HAL_RX_INT |
 					    PCH_UART_HAL_RX_ERR_INT);

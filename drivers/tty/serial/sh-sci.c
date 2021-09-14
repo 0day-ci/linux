@@ -916,7 +916,7 @@ static void sci_receive_chars(struct uart_port *port)
 
 	if (copied) {
 		/* Tell the rest of the system the news. New characters! */
-		tty_flip_buffer_push(tport);
+		tty_schedule_flip(tport);
 	} else {
 		/* TTY buffers full; read from RX reg to prevent lockup */
 		serial_port_in(port, SCxRDR);
@@ -964,7 +964,7 @@ static int sci_handle_errors(struct uart_port *port)
 	}
 
 	if (copied)
-		tty_flip_buffer_push(tport);
+		tty_schedule_flip(tport);
 
 	return copied;
 }
@@ -989,7 +989,7 @@ static int sci_handle_fifo_overrun(struct uart_port *port)
 		port->icount.overrun++;
 
 		tty_insert_flip_char(tport, 0, TTY_OVERRUN);
-		tty_flip_buffer_push(tport);
+		tty_schedule_flip(tport);
 
 		dev_dbg(port->dev, "overrun error\n");
 		copied++;
@@ -1018,7 +1018,7 @@ static int sci_handle_breaks(struct uart_port *port)
 	}
 
 	if (copied)
-		tty_flip_buffer_push(tport);
+		tty_schedule_flip(tport);
 
 	copied += sci_handle_fifo_overrun(port);
 
@@ -1307,7 +1307,7 @@ static void sci_dma_rx_complete(void *arg)
 	start_hrtimer_us(&s->rx_timer, s->rx_timeout);
 
 	if (count)
-		tty_flip_buffer_push(&port->state->port);
+		tty_schedule_flip(&port->state->port);
 
 	desc = dmaengine_prep_slave_sg(s->chan_rx, &s->sg_rx[active], 1,
 				       DMA_DEV_TO_MEM,
@@ -1517,7 +1517,7 @@ static enum hrtimer_restart sci_dma_rx_timer_fn(struct hrtimer *t)
 	if (read) {
 		count = sci_dma_rx_push(s, s->rx_buf[active], read);
 		if (count)
-			tty_flip_buffer_push(&port->state->port);
+			tty_schedule_flip(&port->state->port);
 	}
 
 	if (port->type == PORT_SCIFA || port->type == PORT_SCIFB)

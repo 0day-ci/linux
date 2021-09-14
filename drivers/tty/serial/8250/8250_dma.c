@@ -56,7 +56,7 @@ static void __dma_rx_complete(void *param)
 	tty_insert_flip_string(tty_port, dma->rx_buf, count);
 	p->port.icount.rx += count;
 
-	tty_flip_buffer_push(tty_port);
+	tty_schedule_flip(tty_port);
 }
 
 int serial8250_tx_dma(struct uart_8250_port *p)

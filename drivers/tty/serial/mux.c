@@ -252,7 +252,7 @@ static void mux_read(struct uart_port *port)
 	}
 	
 	if (start_count != port->icount.rx)
-		tty_flip_buffer_push(tport);
+		tty_schedule_flip(tport);
 }
 
 /**

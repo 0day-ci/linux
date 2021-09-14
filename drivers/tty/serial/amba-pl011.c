@@ -944,7 +944,7 @@ static void pl011_dma_rx_chars(struct uart_amba_port *uap,
 	dev_vdbg(uap->port.dev,
 		 "Took %d chars from DMA buffer and %d chars from the FIFO\n",
 		 dma_count, fifotaken);
-	tty_flip_buffer_push(port);
+	tty_schedule_flip(port);
 }
 
 static void pl011_dma_rx_irq(struct uart_amba_port *uap)
@@ -1084,7 +1084,7 @@ static void pl011_dma_rx_poll(struct timer_list *t)
 			dmarx->last_residue =  state.residue;
 		dmarx->last_jiffies = jiffies;
 	}
-	tty_flip_buffer_push(port);
+	tty_schedule_flip(port);
 
 	/*
 	 * If no data is received in poll_timeout, the driver will fall back
@@ -1383,7 +1383,7 @@ __acquires(&uap->port.lock)
 	pl011_fifo_to_tty(uap);
 
 	spin_unlock(&uap->port.lock);
-	tty_flip_buffer_push(&uap->port.state->port);
+	tty_schedule_flip(&uap->port.state->port);
 	/*
 	 * If we were temporarily out of DMA mode for a while,
 	 * attempt to switch back to DMA mode again.

@@ -375,7 +375,7 @@ static void sbd_receive_chars(struct sbd_port *sport)
 		uart_insert_char(uport, status, M_DUART_OVRUN_ERR, ch, flag);
 	}
 
-	tty_flip_buffer_push(&uport->state->port);
+	tty_schedule_flip(&uport->state->port);
 }
 
 static void sbd_transmit_chars(struct sbd_port *sport)

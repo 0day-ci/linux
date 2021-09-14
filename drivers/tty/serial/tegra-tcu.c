@@ -171,7 +171,7 @@ static void tegra_tcu_receive(struct mbox_client *cl, void *msg)
 		tty_insert_flip_char(port, TCU_MBOX_BYTE_V(value, i),
 				     TTY_NORMAL);
 
-	tty_flip_buffer_push(port);
+	tty_schedule_flip(port);
 }
 
 static int tegra_tcu_probe(struct platform_device *pdev)

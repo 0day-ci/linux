@@ -392,7 +392,7 @@ static void sprd_uart_dma_rx(struct uart_port *port)
 
 	port->icount.rx += sp->rx_dma.trans_len;
 	tty_insert_flip_string(tty, sp->rx_buf_tail, sp->rx_dma.trans_len);
-	tty_flip_buffer_push(tty);
+	tty_schedule_flip(tty);
 }
 
 static void sprd_uart_dma_irq(struct uart_port *port)
@@ -621,7 +621,7 @@ static inline void sprd_rx(struct uart_port *port)
 		uart_insert_char(port, lsr, SPRD_LSR_OE, ch, flag);
 	}
 
-	tty_flip_buffer_push(tty);
+	tty_schedule_flip(tty);
 }
 
 static inline void sprd_tx(struct uart_port *port)

@@ -202,7 +202,7 @@ static void kgdb_nmi_tty_receiver(struct timer_list *t)
 
 	while (kfifo_out(&priv->fifo, &ch, 1))
 		tty_insert_flip_char(&priv->port, ch, TTY_NORMAL);
-	tty_flip_buffer_push(&priv->port);
+	tty_schedule_flip(&priv->port);
 }
 
 static int kgdb_nmi_tty_activate(struct tty_port *port, struct tty_struct *tty)

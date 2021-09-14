@@ -331,7 +331,7 @@ receive_chars(struct uart_txx9_port *up, unsigned int *status)
 		disr = sio_in(up, TXX9_SIDISR);
 	} while (!(disr & TXX9_SIDISR_UVALID) && (max_count-- > 0));
 
-	tty_flip_buffer_push(&up->port.state->port);
+	tty_schedule_flip(&up->port.state->port);
 
 	*status = disr;
 }

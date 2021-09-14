@@ -334,7 +334,7 @@ static irqreturn_t sunsab_interrupt(int irq, void *dev_id)
 	spin_unlock_irqrestore(&up->port.lock, flags);
 
 	if (port)
-		tty_flip_buffer_push(port);
+		tty_schedule_flip(port);
 
 	return IRQ_HANDLED;
 }

@@ -557,7 +557,7 @@ static int handle_rx_console(struct uart_port *uport, u32 bytes, bool drop)
 		}
 	}
 	if (!drop)
-		tty_flip_buffer_push(tport);
+		tty_schedule_flip(tport);
 	return 0;
 }
 #else
@@ -588,7 +588,7 @@ static int handle_rx_uart(struct uart_port *uport, u32 bytes, bool drop)
 		WARN_ON_ONCE(1);
 	}
 	uport->icount.rx += ret;
-	tty_flip_buffer_push(tport);
+	tty_schedule_flip(tport);
 	return ret;
 }
 

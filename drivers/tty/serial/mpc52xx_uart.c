@@ -1421,7 +1421,7 @@ mpc52xx_uart_int_rx_chars(struct uart_port *port)
 		}
 	}
 
-	tty_flip_buffer_push(tport);
+	tty_schedule_flip(tport);
 
 	return psc_ops->raw_rx_rdy(port);
 }

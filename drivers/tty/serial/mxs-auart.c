@@ -687,7 +687,7 @@ static void mxs_auart_rx_chars(struct mxs_auart_port *s)
 	}
 
 	mxs_write(stat, s, REG_STAT);
-	tty_flip_buffer_push(&s->port.state->port);
+	tty_schedule_flip(&s->port.state->port);
 }
 
 static int mxs_auart_request_port(struct uart_port *u)
@@ -848,7 +848,7 @@ static void dma_rx_callback(void *arg)
 	tty_insert_flip_string(port, s->rx_dma_buf, count);
 
 	mxs_write(stat, s, REG_STAT);
-	tty_flip_buffer_push(port);
+	tty_schedule_flip(port);
 
 	/* start the next DMA for RX. */
 	mxs_auart_dma_prep_rx(s);

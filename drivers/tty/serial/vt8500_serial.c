@@ -184,7 +184,7 @@ static void handle_rx(struct uart_port *port)
 			tty_insert_flip_char(tport, c, flag);
 	}
 
-	tty_flip_buffer_push(tport);
+	tty_schedule_flip(tport);
 }
 
 static void handle_tx(struct uart_port *port)

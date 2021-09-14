@@ -281,7 +281,7 @@ static irqreturn_t linflex_rxint(int irq, void *dev_id)
 
 	spin_unlock_irqrestore(&sport->lock, flags);
 
-	tty_flip_buffer_push(port);
+	tty_schedule_flip(port);
 
 	return IRQ_HANDLED;
 }
