@@ -206,6 +206,13 @@ struct intel_context {
 		struct list_head link;
 	} guc_id;
 
+	/**
+	 * @guc_capture_link: in guc->submission_state.capture_list when an
+	 * error capture is pending on this context, protected by
+	 * guc->submission_state.lock
+	 */
+	struct list_head guc_capture_link;
+
 #ifdef CONFIG_DRM_I915_SELFTEST
 	/**
 	 * @drop_schedule_enable: Force drop of schedule enable G2H for selftest
