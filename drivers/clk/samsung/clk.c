@@ -357,6 +357,19 @@ struct samsung_clk_provider * __init samsung_cmu_register_one(
 
 	ctx = samsung_clk_init(np, reg_base, cmu->nr_clk_ids);
 
+	/* Keep bus clock running, so it's possible to access CMU registers */
+	if (cmu->clk_name) {
+		struct clk *bus_clk;
+
+		bus_clk = __clk_lookup(cmu->clk_name);
+		if (bus_clk) {
+			clk_prepare_enable(bus_clk);
+		} else {
+			pr_err("%s: could not find bus clock %s\n", __func__,
+			       cmu->clk_name);
+		}
+	}
+
 	if (cmu->pll_clks)
 		samsung_clk_register_pll(ctx, cmu->pll_clks, cmu->nr_pll_clks,
 			reg_base);
