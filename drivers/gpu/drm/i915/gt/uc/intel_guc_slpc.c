@@ -108,7 +108,6 @@ static u32 slpc_get_state(struct intel_guc_slpc *slpc)
 
 	GEM_BUG_ON(!slpc->vma);
 
-	drm_clflush_virt_range(slpc->vaddr, sizeof(u32));
 	data = slpc->vaddr;
 
 	return data->header.global_state;
@@ -171,8 +170,6 @@ static int slpc_query_task_state(struct intel_guc_slpc *slpc)
 	if (unlikely(ret))
 		drm_err(&i915->drm, "Failed to query task state (%pe)\n",
 			ERR_PTR(ret));
-
-	drm_clflush_virt_range(slpc->vaddr, SLPC_PAGE_SIZE_BYTES);
 
 	return ret;
 }
