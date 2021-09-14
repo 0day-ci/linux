@@ -816,8 +816,10 @@ bool mptcp_established_options(struct sock *sk, struct sk_buff *skb,
 
 	opts->suboptions = 0;
 
-	if (unlikely(__mptcp_check_fallback(msk)))
-		return false;
+	if (unlikely(__mptcp_check_fallback(msk))) {
+		if (!mptcp_check_infinite_map(skb))
+			return false;
+	}
 
 	if (unlikely(skb && TCP_SKB_CB(skb)->tcp_flags & TCPHDR_RST)) {
 		if (mptcp_established_options_mp_fail(sk, &opt_size, remaining, opts)) {
