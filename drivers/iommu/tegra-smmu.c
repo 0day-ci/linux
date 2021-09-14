@@ -22,7 +22,7 @@
 struct tegra_smmu_group {
 	struct list_head list;
 	struct tegra_smmu *smmu;
-	const struct tegra_smmu_group_soc *soc;
+	const struct tegra_smmu_group_soc *group_soc;
 	struct iommu_group *grp;
 	unsigned int swgroup;
 };
@@ -870,7 +870,7 @@ static struct iommu_device *tegra_smmu_probe_device(struct device *dev)
 static void tegra_smmu_release_device(struct device *dev) {}
 
 static const struct tegra_smmu_group_soc *
-tegra_smmu_find_group(struct tegra_smmu *smmu, unsigned int swgroup)
+tegra_smmu_find_group_soc(struct tegra_smmu *smmu, unsigned int swgroup)
 {
 	unsigned int i, j;
 
@@ -896,19 +896,20 @@ static struct iommu_group *tegra_smmu_device_group(struct device *dev)
 {
 	struct iommu_fwspec *fwspec = dev_iommu_fwspec_get(dev);
 	struct tegra_smmu *smmu = dev_iommu_priv_get(dev);
-	const struct tegra_smmu_group_soc *soc;
+	const struct tegra_smmu_group_soc *group_soc;
 	unsigned int swgroup = fwspec->ids[0];
 	struct tegra_smmu_group *group;
 	struct iommu_group *grp;
 
 	/* Find group_soc associating with swgroup */
-	soc = tegra_smmu_find_group(smmu, swgroup);
+	group_soc = tegra_smmu_find_group_soc(smmu, swgroup);
 
 	mutex_lock(&smmu->lock);
 
 	/* Find existing iommu_group associating with swgroup or group_soc */
 	list_for_each_entry(group, &smmu->groups, list)
-		if ((group->swgroup == swgroup) || (soc && group->soc == soc)) {
+		if ((group->swgroup == swgroup) ||
+		    (group_soc && group->group_soc == group_soc)) {
 			grp = iommu_group_ref_get(group->grp);
 			mutex_unlock(&smmu->lock);
 			return grp;
@@ -921,9 +922,9 @@ static struct iommu_group *tegra_smmu_device_group(struct device *dev)
 	}
 
 	INIT_LIST_HEAD(&group->list);
+	group->group_soc = group_soc;
 	group->swgroup = swgroup;
 	group->smmu = smmu;
-	group->soc = soc;
 
 	if (dev_is_pci(dev))
 		group->grp = pci_device_group(dev);
@@ -937,8 +938,8 @@ static struct iommu_group *tegra_smmu_device_group(struct device *dev)
 	}
 
 	iommu_group_set_iommudata(group->grp, group, tegra_smmu_group_release);
-	if (soc)
-		iommu_group_set_name(group->grp, soc->name);
+	if (group_soc)
+		iommu_group_set_name(group->grp, group_soc->name);
 	list_add_tail(&group->list, &smmu->groups);
 	mutex_unlock(&smmu->lock);
 
