@@ -7337,9 +7337,9 @@ F:	include/uapi/linux/fpga-dfl.h
 
 FPGA MANAGER FRAMEWORK
 M:	Moritz Fischer <mdf@kernel.org>
-R:	Tom Rix <trix@redhat.com>
+M:	Tom Rix <trix@redhat.com>
 L:	linux-fpga@vger.kernel.org
-S:	Maintained
+S:	Supported
 W:	http://www.rocketboards.org
 Q:	http://patchwork.kernel.org/project/linux-fpga/list/
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/mdf/linux-fpga.git
