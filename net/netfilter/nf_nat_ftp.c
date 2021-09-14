@@ -72,8 +72,14 @@ static unsigned int nf_nat_ftp(struct sk_buff *skb,
 	u_int16_t port;
 	int dir = CTINFO2DIR(ctinfo);
 	struct nf_conn *ct = exp->master;
+	struct nf_conn_nat *nat = nfct_nat(ct);
+	struct nf_nat_range2 range = {};
 	char buffer[sizeof("|1||65535|") + INET6_ADDRSTRLEN];
 	unsigned int buflen;
+	int ret;
+
+	if (WARN_ON_ONCE(!nat))
+		return NF_DROP;
 
 	pr_debug("type %i, off %u len %u\n", type, matchoff, matchlen);
 
@@ -86,21 +92,29 @@ static unsigned int nf_nat_ftp(struct sk_buff *skb,
 	 * this one. */
 	exp->expectfn = nf_nat_follow_master;
 
-	/* Try to get same port: if not, try to change it. */
-	for (port = ntohs(exp->saved_proto.tcp.port); port != 0; port++) {
-		int ret;
-
-		exp->tuple.dst.u.tcp.port = htons(port);
-		ret = nf_ct_expect_related(exp, 0);
-		if (ret == 0)
-			break;
-		else if (ret != -EBUSY) {
-			port = 0;
-			break;
-		}
+	/* Avoid applying range to external ports */
+	if (!exp->dir || !nat->range_info.min_proto.all || !nat->range_info.max_proto.all) {
+		range.min_proto.all = htons(1);
+		range.max_proto.all = htons(65535);
+	} else {
+		range.min_proto     = nat->range_info.min_proto;
+		range.max_proto     = nat->range_info.max_proto;
 	}
+	range.flags                 = NF_NAT_RANGE_PROTO_SPECIFIED;
 
-	if (port == 0) {
+	/* Try to get same port if it matches range */
+	ret = -1;
+	port = ntohs(exp->tuple.dst.u.tcp.port);
+	if (ntohs(range.min_proto.all) <= port && port <= ntohs(range.max_proto.all))
+		ret = nf_ct_expect_related(exp, 0);
+
+	/* Same port is not available, try to change it */
+	if (ret != 0) {
+		nf_nat_l4proto_unique_tuple(&exp->tuple, &range, NF_NAT_MANIP_DST, ct);
+		port = ntohs(exp->tuple.dst.u.tcp.port);
+		ret = nf_ct_expect_related(exp, 0);
+	}
+	if (ret != 0) {
 		nf_ct_helper_log(skb, ct, "all ports in use");
 		return NF_DROP;
 	}

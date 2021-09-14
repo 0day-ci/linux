@@ -27,18 +27,29 @@ union nf_conntrack_nat_help {
 #endif
 };
 
+struct nf_conn_nat_range_info {
+	union nf_conntrack_man_proto    min_proto;
+	union nf_conntrack_man_proto    max_proto;
+};
+
 /* The structure embedded in the conntrack structure. */
 struct nf_conn_nat {
 	union nf_conntrack_nat_help help;
 #if IS_ENABLED(CONFIG_NF_NAT_MASQUERADE)
 	int masq_index;
 #endif
+	struct nf_conn_nat_range_info range_info;
 };
 
 /* Set up the info structure to map into this range. */
 unsigned int nf_nat_setup_info(struct nf_conn *ct,
 			       const struct nf_nat_range2 *range,
 			       enum nf_nat_manip_type maniptype);
+
+void nf_nat_l4proto_unique_tuple(struct nf_conntrack_tuple *tuple,
+				 const struct nf_nat_range2 *range,
+				 enum nf_nat_manip_type maniptype,
+				 const struct nf_conn *ct);
 
 extern unsigned int nf_nat_alloc_null_binding(struct nf_conn *ct,
 					      unsigned int hooknum);

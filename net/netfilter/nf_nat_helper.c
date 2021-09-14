@@ -188,6 +188,16 @@ void nf_nat_follow_master(struct nf_conn *ct,
 	range.flags = NF_NAT_RANGE_MAP_IPS;
 	range.min_addr = range.max_addr
 		= ct->master->tuplehash[!exp->dir].tuple.dst.u3;
+	if (!exp->dir) {
+		struct nf_conn_nat *nat = nfct_nat(exp->master);
+
+		if (nat && nat->range_info.min_proto.all &&
+		    nat->range_info.max_proto.all) {
+			range.min_proto = nat->range_info.min_proto;
+			range.max_proto = nat->range_info.max_proto;
+			range.flags |= NF_NAT_RANGE_PROTO_SPECIFIED;
+		}
+	}
 	nf_nat_setup_info(ct, &range, NF_NAT_MANIP_SRC);
 
 	/* For DST manip, map port here to where it's expected. */
