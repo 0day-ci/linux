@@ -91,7 +91,8 @@
  *
  * guc->submission_state.lock
  * Protects guc_id allocation for the given GuC, i.e. only one context can be
- * doing guc_id allocation operations at a time for each GuC in the system.
+ * doing guc_id allocation operations at a time for each GuC in the system. Also
+ * protects everything else under the guc->submission_state sub-structure.
  *
  * ce->guc_state.lock
  * Protects everything under ce->guc_state. Ensures that a context is in the
@@ -1126,6 +1127,8 @@ void intel_guc_submission_reset_finish(struct intel_guc *guc)
 	intel_gt_unpark_heartbeats(guc_to_gt(guc));
 }
 
+static void capture_worker_func(struct work_struct *w);
+
 /*
  * Set up the memory resources to be shared with the GuC (via the GGTT)
  * at firmware loading time.
@@ -1151,6 +1154,8 @@ int intel_guc_submission_init(struct intel_guc *guc)
 	spin_lock_init(&guc->submission_state.lock);
 	INIT_LIST_HEAD(&guc->submission_state.guc_id_list);
 	ida_init(&guc->submission_state.guc_ids);
+	INIT_LIST_HEAD(&guc->submission_state.capture_list);
+	INIT_WORK(&guc->submission_state.capture_worker, capture_worker_func);
 
 	return 0;
 }
@@ -2879,17 +2884,51 @@ int intel_guc_sched_done_process_msg(struct intel_guc *guc,
 	return 0;
 }
 
+static void capture_worker_func(struct work_struct *w)
+{
+	struct intel_guc *guc = container_of(w, struct intel_guc,
+					     submission_state.capture_worker);
+	struct intel_gt *gt = guc_to_gt(guc);
+	struct drm_i915_private *i915 = gt->i915;
+	struct intel_context *ce =
+		list_first_entry(&guc->submission_state.capture_list,
+				 struct intel_context, guc_capture_link);
+	struct intel_engine_cs *engine = __context_to_physical_engine(ce);
+	unsigned long flags;
+	intel_wakeref_t wakeref;
+
+	spin_lock_irqsave(&guc->submission_state.lock, flags);
+	list_del_init(&ce->guc_capture_link);
+	spin_unlock_irqrestore(&guc->submission_state.lock, flags);
+
+	intel_engine_set_hung_context(engine, ce);
+	with_intel_runtime_pm(&i915->runtime_pm, wakeref)
+		i915_capture_error_state(gt, ce->engine->mask);
+}
+
 static void capture_error_state(struct intel_guc *guc,
 				struct intel_context *ce)
 {
 	struct intel_gt *gt = guc_to_gt(guc);
 	struct drm_i915_private *i915 = gt->i915;
 	struct intel_engine_cs *engine = __context_to_physical_engine(ce);
-	intel_wakeref_t wakeref;
+	unsigned long flags;
 
-	intel_engine_set_hung_context(engine, ce);
-	with_intel_runtime_pm(&i915->runtime_pm, wakeref)
-		i915_capture_error_state(gt, engine->mask);
+	spin_lock_irqsave(&guc->submission_state.lock, flags);
+	list_add_tail(&guc->submission_state.capture_list,
+		      &ce->guc_capture_link);
+	spin_unlock_irqrestore(&guc->submission_state.lock, flags);
+
+	/*
+	 * We do the error capture async as an error capture can allocate
+	 * memory, the reset path must flush the G2H handler in order to seal
+	 * several races, and the memory allocations depend on the reset path
+	 * (circular dependecy if error capture done here in the G2H handler).
+	 * Doing the error capture async should be ok, as (eventually) all
+	 * register state is captured in buffer by the GuC (i.e. it ok to
+	 * restart the context before the error capture is complete).
+	 */
+	queue_work(system_unbound_wq, &guc->submission_state.capture_worker);
 	atomic_inc(&i915->gpu_error.reset_engine_count[engine->uabi_class]);
 }
 

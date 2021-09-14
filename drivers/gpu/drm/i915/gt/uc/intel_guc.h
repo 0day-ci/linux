@@ -88,6 +88,16 @@ struct intel_guc {
 		 * refs
 		 */
 		struct list_head guc_id_list;
+		/**
+		 * @capture_list: list of intel_context that need to capture
+		 * error state
+		 */
+		struct list_head capture_list;
+		/**
+		 * @capture_worker: worker to do error capture when the GuC
+		 * signals a context has been reset
+		 */
+		struct work_struct capture_worker;
 	} submission_state;
 
 	/**
