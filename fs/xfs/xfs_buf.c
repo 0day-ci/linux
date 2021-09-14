@@ -373,8 +373,8 @@ xfs_buf_alloc_pages(
 
 	/*
 	 * Bulk filling of pages can take multiple calls. Not filling the entire
-	 * array is not an allocation failure, so don't back off if we get at
-	 * least one extra page.
+	 * array is not an allocation failure, so don't fail or fall back on
+	 * __GFP_NOFAIL if we get at least one extra page.
 	 */
 	for (;;) {
 		long	last = filled;
@@ -395,7 +395,7 @@ xfs_buf_alloc_pages(
 		}
 
 		XFS_STATS_INC(bp->b_mount, xb_page_retries);
-		congestion_wait(BLK_RW_ASYNC, HZ / 50);
+		bp->b_pages[filled++] = alloc_page(gfp_mask | __GFP_NOFAIL);
 	}
 	return 0;
 }
