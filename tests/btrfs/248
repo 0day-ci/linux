@@ -1,0 +1,47 @@
+#! /bin/bash
+# SPDX-License-Identifier: GPL-2.0
+# Copyright (c) 2021 SUSE Linux Products GmbH.  All Rights Reserved.
+#
+# FS QA Test 248
+#
+# Test that stransid/rtransid and received_uuid are being reset when a RO
+# snapshot is switched to RW.
+#
+. ./common/preamble
+_begin_fstest auto quick send subvol
+
+# real QA test starts here
+
+# Modify as appropriate.
+_supported_fs btrfs
+_require_scratch
+
+_require_btrfs_command inspect-internal dump-tree
+_require_btrfs_command property
+
+_scratch_mkfs >> $seqres.full 2>&1
+_scratch_mount
+
+# Create a snapshot and send it, so that it has the necessary fields populated
+$BTRFS_UTIL_PROG subvolume snapshot -r $SCRATCH_MNT $SCRATCH_MNT/ro-snap &>> $seqres.full
+$BTRFS_UTIL_PROG send $SCRATCH_MNT/ro-snap -f $SCRATCH_MNT/snap.send &>>$seqres.full
+$BTRFS_UTIL_PROG subvolume delete $SCRATCH_MNT/ro-snap &>>$seqres.full
+$BTRFS_UTIL_PROG receive -f $SCRATCH_MNT/snap.send $SCRATCH_MNT 2>>$seqres.full
+
+# Flip the RO->RW switch and ensure that relevant fields are zeroed out
+$BTRFS_UTIL_PROG property set -ts $SCRATCH_MNT/ro-snap ro false
+
+$BTRFS_UTIL_PROG inspect-internal dump-tree -t1 $SCRATCH_DEV | $AWK_PROG '
+	/received_uuid/ {print "received_uuid present"}
+
+	/stransid/ {
+		if ($6 != 0) {print "send trans id not 0"}
+
+		if ($8 != 0) {print "received trans id not 0"}
+	}
+
+'
+# success, all done
+echo "Silence is golden"
+status=0
+exit
