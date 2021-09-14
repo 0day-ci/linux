@@ -152,7 +152,7 @@ static int metric_show(struct seq_file *s, void *p)
 	struct ceph_mds_client *mdsc = fsc->mdsc;
 	struct ceph_client_metric *m = &mdsc->metric;
 	int nr_caps = 0;
-	s64 total, sum, avg, min, max, sq;
+	s64 total, sum, avg, min, max, stdev;
 	u64 sum_sz, avg_sz, min_sz, max_sz;
 
 	sum = percpu_counter_sum(&m->total_inodes);
@@ -175,9 +175,9 @@ static int metric_show(struct seq_file *s, void *p)
 	avg = total > 0 ? DIV64_U64_ROUND_CLOSEST(sum, total) : 0;
 	min = m->read_latency_min;
 	max = m->read_latency_max;
-	sq = m->read_latency_sq_sum;
+	stdev = m->read_latency_stdev;
 	spin_unlock(&m->read_metric_lock);
-	CEPH_LAT_METRIC_SHOW("read", total, avg, min, max, sq);
+	CEPH_LAT_METRIC_SHOW("read", total, avg, min, max, stdev);
 
 	spin_lock(&m->write_metric_lock);
 	total = m->total_writes;
@@ -185,9 +185,9 @@ static int metric_show(struct seq_file *s, void *p)
 	avg = total > 0 ? DIV64_U64_ROUND_CLOSEST(sum, total) : 0;
 	min = m->write_latency_min;
 	max = m->write_latency_max;
-	sq = m->write_latency_sq_sum;
+	stdev = m->write_latency_stdev;
 	spin_unlock(&m->write_metric_lock);
-	CEPH_LAT_METRIC_SHOW("write", total, avg, min, max, sq);
+	CEPH_LAT_METRIC_SHOW("write", total, avg, min, max, stdev);
 
 	spin_lock(&m->metadata_metric_lock);
 	total = m->total_metadatas;
@@ -195,9 +195,9 @@ static int metric_show(struct seq_file *s, void *p)
 	avg = total > 0 ? DIV64_U64_ROUND_CLOSEST(sum, total) : 0;
 	min = m->metadata_latency_min;
 	max = m->metadata_latency_max;
-	sq = m->metadata_latency_sq_sum;
+	stdev = m->metadata_latency_stdev;
 	spin_unlock(&m->metadata_metric_lock);
-	CEPH_LAT_METRIC_SHOW("metadata", total, avg, min, max, sq);
+	CEPH_LAT_METRIC_SHOW("metadata", total, avg, min, max, stdev);
 
 	seq_printf(s, "\n");
 	seq_printf(s, "item          total       avg_sz(bytes)   min_sz(bytes)   max_sz(bytes)  total_sz(bytes)\n");

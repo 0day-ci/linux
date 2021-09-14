@@ -138,7 +138,8 @@ struct ceph_client_metric {
 	u64 read_size_min;
 	u64 read_size_max;
 	ktime_t read_latency_sum;
-	ktime_t read_latency_sq_sum;
+	ktime_t avg_read_latency;
+	ktime_t read_latency_stdev;
 	ktime_t read_latency_min;
 	ktime_t read_latency_max;
 
@@ -148,14 +149,16 @@ struct ceph_client_metric {
 	u64 write_size_min;
 	u64 write_size_max;
 	ktime_t write_latency_sum;
-	ktime_t write_latency_sq_sum;
+	ktime_t avg_write_latency;
+	ktime_t write_latency_stdev;
 	ktime_t write_latency_min;
 	ktime_t write_latency_max;
 
 	spinlock_t metadata_metric_lock;
 	u64 total_metadatas;
 	ktime_t metadata_latency_sum;
-	ktime_t metadata_latency_sq_sum;
+	ktime_t avg_metadata_latency;
+	ktime_t metadata_latency_stdev;
 	ktime_t metadata_latency_min;
 	ktime_t metadata_latency_max;
 
