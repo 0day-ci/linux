@@ -153,6 +153,13 @@ static inline int wb_congested(struct bdi_writeback *wb, int cong_bits)
 	return wb->congested & cong_bits;
 }
 
+/* NOTE congestion_wait() and wait_iff_congested() are
+ * largely useless except as documentation.
+ * congestion_wait() will (almost) always wait for the given timeout.
+ * wait_iff_congested() will (almost) never wait, but will call
+ * cond_resched().
+ * Were possible an alternative waiting strategy should be found.
+ */
 long congestion_wait(int sync, long timeout);
 long wait_iff_congested(int sync, long timeout);
 

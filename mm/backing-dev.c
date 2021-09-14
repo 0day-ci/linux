@@ -1009,6 +1009,11 @@ EXPORT_SYMBOL(set_bdi_congested);
  * Waits for up to @timeout jiffies for a backing_dev (any backing_dev) to exit
  * write congestion.  If no backing_devs are congested then just wait for the
  * next write to be completed.
+ *
+ * NOTE: in the current implementation, hardly any backing_devs are ever
+ * marked as congested, and write-completion is rarely reported (see calls
+ * to clear_bdi_congested).  So this should not be assumed to ever wake before
+ * the timeout.
  */
 long congestion_wait(int sync, long timeout)
 {
@@ -1040,6 +1045,10 @@ EXPORT_SYMBOL(congestion_wait);
  * The return value is 0 if the sleep is for the full timeout. Otherwise,
  * it is the number of jiffies that were still remaining when the function
  * returned. return_value == timeout implies the function did not sleep.
+ *
+ * NOTE: in the current implementation, hardly any backing_devs are ever
+ * marked as congested, and write-completion is rarely reported (see calls
+ * to clear_bdi_congested).  So this should not be assumed to sleep at all.
  */
 long wait_iff_congested(int sync, long timeout)
 {
