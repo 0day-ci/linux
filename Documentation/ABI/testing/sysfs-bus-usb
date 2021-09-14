@@ -1,4 +1,4 @@
-What:		/sys/bus/usb/devices/INTERFACE/authorized
+What:		/sys/bus/usb/devices/<INTERFACE>/authorized
 Date:		August 2015
 Description:
 		This allows to authorize (1) or deauthorize (0)
@@ -12,7 +12,46 @@ Description:
 
 		A deauthorized interface cannot be probed or claimed.
 
-What:		/sys/bus/usb/devices/usbX/interface_authorized_default
+What:		/sys/bus/usb/devices/<INTERFACE>/bAlternateSetting
+What:		/sys/bus/usb/devices/<INTERFACE>/bcdDevice
+What:		/sys/bus/usb/devices/<INTERFACE>/bConfigurationValue
+What:		/sys/bus/usb/devices/<INTERFACE>/bDeviceClass
+What:		/sys/bus/usb/devices/<INTERFACE>/bDeviceProtocol
+What:		/sys/bus/usb/devices/<INTERFACE>/bDeviceSubClass
+What:		/sys/bus/usb/devices/<INTERFACE>/bAlternateSetting
+What:		/sys/bus/usb/devices/<INTERFACE>/bInterfaceClass
+What:		/sys/bus/usb/devices/<INTERFACE>/bInterfaceNumber
+What:		/sys/bus/usb/devices/<INTERFACE>/bInterfaceProtocol
+What:		/sys/bus/usb/devices/<INTERFACE>/bInterfaceSubClass
+What:		/sys/bus/usb/devices/<INTERFACE>/bmAttributes
+What:		/sys/bus/usb/devices/<INTERFACE>/bMaxPacketSize0
+What:		/sys/bus/usb/devices/<INTERFACE>/bMaxPower
+What:		/sys/bus/usb/devices/<INTERFACE>/bNumConfigurations
+What:		/sys/bus/usb/devices/<INTERFACE>/bNumEndpoints
+What:		/sys/bus/usb/devices/<INTERFACE>/bNumInterfaces
+What:		/sys/bus/usb/devices/<INTERFACE>/busnum
+What:		/sys/bus/usb/devices/<INTERFACE>/configuration
+What:		/sys/bus/usb/devices/<INTERFACE>/descriptors
+What:		/sys/bus/usb/devices/<INTERFACE>/bNumEndpoints
+What:		/sys/bus/usb/devices/<INTERFACE>/idProduct
+What:		/sys/bus/usb/devices/<INTERFACE>/idVendor
+
+Description:
+		Contain the corresponding USB descriptors for <INTERFACE>.
+
+What:		/sys/bus/usb/devices/<INTERFACE>/ep_<N>/bEndpointAddress
+What:		/sys/bus/usb/devices/<INTERFACE>/ep_<N>/bInterval
+What:		/sys/bus/usb/devices/<INTERFACE>/ep_<N>/bLength
+What:		/sys/bus/usb/devices/<INTERFACE>/ep_<N>/bmAttributes
+What:		/sys/bus/usb/devices/<INTERFACE>/ep_<N>/direction
+What:		/sys/bus/usb/devices/<INTERFACE>/ep_<N>/interval
+What:		/sys/bus/usb/devices/<INTERFACE>/ep_<N>/type
+What:		/sys/bus/usb/devices/<INTERFACE>/ep_<N>/wMaxPacketSize
+Description:
+		Contain the corresponding USB descriptors for the USB
+		endpoint ep_<N>.
+
+What:		/sys/bus/usb/devices/usb<X>/interface_authorized_default
 Date:		August 2015
 Description:
 		This is used as value that determines if interfaces
