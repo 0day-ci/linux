@@ -1,4 +1,4 @@
-What:		/sys/bus/soundwire/devices/sdw-master-N/revision
+What:		/sys/bus/soundwire/devices/sdw-master-<N>/revision
 		/sys/bus/soundwire/devices/sdw-master-N/clk_stop_modes
 		/sys/bus/soundwire/devices/sdw-master-N/clk_freq
 		/sys/bus/soundwire/devices/sdw-master-N/clk_gears
