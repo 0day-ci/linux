@@ -21,3 +21,12 @@
 		stdout-path = "serial0:115200n8";
 	};
 };
+
+&pcie1_default_state {
+	nvme-n {
+		pins = "gpio51";
+		function = "gpio";
+
+		bias-pull-up;
+	};
+};

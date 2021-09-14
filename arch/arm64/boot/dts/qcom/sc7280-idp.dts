@@ -61,6 +61,15 @@
 	modem-init;
 };
 
+&pcie1_default_state {
+	nvme-n {
+		pins = "gpio19";
+		function = "gpio";
+
+		bias-pull-up;
+	};
+};
+
 &pmk8350_vadc {
 	pmr735a_die_temp {
 		reg = <PMR735A_ADC7_DIE_TEMP>;
