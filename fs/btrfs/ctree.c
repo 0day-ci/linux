@@ -415,8 +415,11 @@ static noinline int __btrfs_cow_block(struct btrfs_trans_handle *trans,
 	cow = btrfs_alloc_tree_block(trans, root, parent_start,
 				     root->root_key.objectid, &disk_key, level,
 				     search_start, empty_size, nest);
-	if (IS_ERR(cow))
+	if (IS_ERR(cow)) {
+		if (unlock_orig)
+			btrfs_tree_unlock(buf);
 		return PTR_ERR(cow);
+	}
 
 	/* cow is set to blocking by btrfs_init_new_buffer */
 
@@ -436,6 +439,8 @@ static noinline int __btrfs_cow_block(struct btrfs_trans_handle *trans,
 	ret = update_ref_for_cow(trans, root, buf, cow, &last_ref);
 	if (ret) {
 		btrfs_tree_unlock(cow);
+		if (unlock_orig)
+			btrfs_tree_unlock(buf);
 		free_extent_buffer(cow);
 		btrfs_abort_transaction(trans, ret);
 		return ret;
@@ -445,6 +450,8 @@ static noinline int __btrfs_cow_block(struct btrfs_trans_handle *trans,
 		ret = btrfs_reloc_cow_block(trans, root, buf, cow);
 		if (ret) {
 			btrfs_tree_unlock(cow);
+			if (unlock_orig)
+				btrfs_tree_unlock(buf);
 			free_extent_buffer(cow);
 			btrfs_abort_transaction(trans, ret);
 			return ret;
@@ -479,6 +486,8 @@ static noinline int __btrfs_cow_block(struct btrfs_trans_handle *trans,
 			ret = btrfs_tree_mod_log_free_eb(buf);
 			if (ret) {
 				btrfs_tree_unlock(cow);
+				if (unlock_orig)
+					btrfs_tree_unlock(buf);
 				free_extent_buffer(cow);
 				btrfs_abort_transaction(trans, ret);
 				return ret;
