@@ -164,7 +164,7 @@ inline enum dma_data_direction page_pool_get_dma_dir(struct page_pool *pool)
 	return pool->p.dma_dir;
 }
 
-bool page_pool_return_skb_page(struct page *page);
+void page_pool_return_skb_page(struct page *page);
 
 struct page_pool *page_pool_create(const struct page_pool_params *params);
 
@@ -242,6 +242,32 @@ static inline void page_pool_set_frag_count(struct page *page, long nr)
 		return;
 
 	atomic_long_set(&page->pp_frag_count, nr);
+}
+
+static inline void page_pool_atomic_inc_frag_count(struct page *page)
+{
+	atomic_long_inc(&page->pp_frag_count);
+}
+
+static inline bool __page_pool_is_pp_page(struct page *page)
+{
+	/* page->pp_magic is OR'ed with PP_SIGNATURE after the allocation
+	 * in order to preserve any existing bits, such as bit 0 for the
+	 * head page of compound page and bit 1 for pfmemalloc page, so
+	 * mask those bits for freeing side when doing below checking,
+	 * and page_is_pfmemalloc() is checked in __page_pool_put_page()
+	 * to avoid recycling the pfmemalloc page.
+	 */
+	return (page->pp_magic & ~0x3UL) == PP_SIGNATURE;
+}
+
+static inline bool page_pool_is_pp_page(struct page *page)
+{
+	/* For systems with the same dma addr as the bus addr, we can use
+	 * page->pp_magic to indicate a pp page uniquely.
+	 */
+	return !PAGE_POOL_DMA_USE_PP_FRAG_COUNT &&
+			__page_pool_is_pp_page(page);
 }
 
 static inline long page_pool_atomic_sub_frag_count_return(struct page *page,

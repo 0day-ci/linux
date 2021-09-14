@@ -3073,7 +3073,16 @@ static inline struct page *skb_frag_page(const skb_frag_t *frag)
  */
 static inline void __skb_frag_ref(skb_frag_t *frag)
 {
-	get_page(skb_frag_page(frag));
+	struct page *page = skb_frag_page(frag);
+
+#ifdef CONFIG_PAGE_POOL
+	if (page_pool_is_pp_page(page)) {
+		page_pool_atomic_inc_frag_count(page);
+		return;
+	}
+#endif
+
+	get_page(page);
 }
 
 /**
@@ -3089,6 +3098,22 @@ static inline void skb_frag_ref(struct sk_buff *skb, int f)
 }
 
 /**
+ * skb_frag_is_pp_page - decide if a page is recyclable.
+ * @page: frag page
+ * @recycle: skb->pp_recycle
+ *
+ * For 32 bit systems with 64 bit dma, the skb->pp_recycle is
+ * also used to decide if a page can be recycled to the page
+ * pool.
+ */
+static inline bool skb_frag_is_pp_page(struct page *page,
+				       bool recycle)
+{
+	return page_pool_is_pp_page(page) ||
+		(recycle && __page_pool_is_pp_page(page));
+}
+
+/**
  * __skb_frag_unref - release a reference on a paged fragment.
  * @frag: the paged fragment
  * @recycle: recycle the page if allocated via page_pool
@@ -3101,8 +3126,10 @@ static inline void __skb_frag_unref(skb_frag_t *frag, bool recycle)
 	struct page *page = skb_frag_page(frag);
 
 #ifdef CONFIG_PAGE_POOL
-	if (recycle && page_pool_return_skb_page(page))
+	if (skb_frag_is_pp_page(page, recycle)) {
+		page_pool_return_skb_page(page);
 		return;
+	}
 #endif
 	put_page(page);
 }
@@ -4720,9 +4747,14 @@ static inline void skb_mark_for_recycle(struct sk_buff *skb)
 
 static inline bool skb_pp_recycle(struct sk_buff *skb, void *data)
 {
-	if (!IS_ENABLED(CONFIG_PAGE_POOL) || !skb->pp_recycle)
+	struct page *page = virt_to_head_page(data);
+
+	if (!IS_ENABLED(CONFIG_PAGE_POOL) || !skb->pp_recycle ||
+	    !__page_pool_is_pp_page(page))
 		return false;
-	return page_pool_return_skb_page(virt_to_head_page(data));
+
+	page_pool_return_skb_page(page);
+	return true;
 }
 
 #endif	/* __KERNEL__ */
