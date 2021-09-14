@@ -24,6 +24,7 @@ struct tegra_smmu_group {
 	struct tegra_smmu *smmu;
 	const struct tegra_smmu_group_soc *group_soc;
 	const struct tegra_smmu_swgroup *swgrp;
+	struct tegra_smmu_as *as;
 	struct iommu_group *grp;
 };
 
@@ -349,6 +350,19 @@ tegra_smmu_find_swgrp(struct tegra_smmu *smmu, unsigned int swgroup)
 	return swgrp;
 }
 
+static const struct tegra_smmu_group_soc *
+tegra_smmu_find_group_soc(struct tegra_smmu *smmu, unsigned int swgroup)
+{
+	unsigned int i, j;
+
+	for (i = 0; i < smmu->soc->num_groups; i++)
+		for (j = 0; j < smmu->soc->groups[i].num_swgroups; j++)
+			if (smmu->soc->groups[i].swgroups[j] == swgroup)
+				return &smmu->soc->groups[i];
+
+	return NULL;
+}
+
 static void tegra_smmu_enable(struct tegra_smmu *smmu, unsigned int swgroup,
 			      unsigned int asid)
 {
@@ -482,6 +496,57 @@ static void tegra_smmu_as_unprepare(struct tegra_smmu *smmu,
 	mutex_unlock(&smmu->lock);
 }
 
+static void tegra_smmu_attach_as(struct tegra_smmu *smmu,
+				 struct tegra_smmu_as *as,
+				 unsigned int swgroup)
+{
+	const struct tegra_smmu_swgroup *swgrp;
+	struct tegra_smmu_group *group;
+
+	/* Find swgrp according to the swgroup id */
+	swgrp = tegra_smmu_find_swgrp(smmu, swgroup);
+	if (!swgrp)
+		return;
+
+	mutex_lock(&smmu->lock);
+
+	list_for_each_entry(group, &smmu->groups, list) {
+		if (group->swgrp != swgrp)
+			continue;
+		if (group->as)
+			dev_warn(smmu->dev,
+				 "overwriting group->as for swgroup: %s\n", swgrp->name);
+		group->as = as;
+		break;
+	}
+
+	mutex_unlock(&smmu->lock);
+}
+
+static void tegra_smmu_detach_as(struct tegra_smmu *smmu,
+				 unsigned int swgroup)
+{
+	const struct tegra_smmu_swgroup *swgrp;
+	struct tegra_smmu_group *group;
+	struct dentry *d;
+
+	/* Find swgrp according to the swgroup id */
+	swgrp = tegra_smmu_find_swgrp(smmu, swgroup);
+	if (!swgrp)
+		return;
+
+	mutex_lock(&smmu->lock);
+
+	list_for_each_entry(group, &smmu->groups, list) {
+		if (group->swgrp != swgrp)
+			continue;
+		group->as = NULL;
+		break;
+	}
+
+	mutex_unlock(&smmu->lock);
+}
+
 static int tegra_smmu_attach_dev(struct iommu_domain *domain,
 				 struct device *dev)
 {
@@ -495,11 +560,15 @@ static int tegra_smmu_attach_dev(struct iommu_domain *domain,
 		return -ENOENT;
 
 	for (index = 0; index < fwspec->num_ids; index++) {
+		unsigned int swgroup = fwspec->ids[index];
+
 		err = tegra_smmu_as_prepare(smmu, as);
 		if (err)
 			goto disable;
 
-		tegra_smmu_enable(smmu, fwspec->ids[index], as->id);
+		tegra_smmu_attach_as(smmu, as, swgroup);
+
+		tegra_smmu_enable(smmu, swgroup, as->id);
 	}
 
 	if (index == 0)
@@ -509,7 +578,10 @@ static int tegra_smmu_attach_dev(struct iommu_domain *domain,
 
 disable:
 	while (index--) {
-		tegra_smmu_disable(smmu, fwspec->ids[index], as->id);
+		unsigned int swgroup = fwspec->ids[index];
+
+		tegra_smmu_disable(smmu, swgroup, as->id);
+		tegra_smmu_detach_as(smmu, swgroup);
 		tegra_smmu_as_unprepare(smmu, as);
 	}
 
@@ -527,7 +599,10 @@ static void tegra_smmu_detach_dev(struct iommu_domain *domain, struct device *de
 		return;
 
 	for (index = 0; index < fwspec->num_ids; index++) {
-		tegra_smmu_disable(smmu, fwspec->ids[index], as->id);
+		unsigned int swgroup = fwspec->ids[index];
+
+		tegra_smmu_disable(smmu, swgroup, as->id);
+		tegra_smmu_detach_as(smmu, swgroup);
 		tegra_smmu_as_unprepare(smmu, as);
 	}
 }
@@ -868,19 +943,6 @@ static struct iommu_device *tegra_smmu_probe_device(struct device *dev)
 }
 
 static void tegra_smmu_release_device(struct device *dev) {}
-
-static const struct tegra_smmu_group_soc *
-tegra_smmu_find_group_soc(struct tegra_smmu *smmu, unsigned int swgroup)
-{
-	unsigned int i, j;
-
-	for (i = 0; i < smmu->soc->num_groups; i++)
-		for (j = 0; j < smmu->soc->groups[i].num_swgroups; j++)
-			if (smmu->soc->groups[i].swgroups[j] == swgroup)
-				return &smmu->soc->groups[i];
-
-	return NULL;
-}
 
 static void tegra_smmu_group_release(void *iommu_data)
 {
