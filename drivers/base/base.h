@@ -191,6 +191,15 @@ extern void device_links_no_driver(struct device *dev);
 extern bool device_links_busy(struct device *dev);
 extern void device_links_unbind_consumers(struct device *dev);
 extern void fw_devlink_drivers_done(void);
+extern bool fw_devlink_debug;
+
+#define fw_devlink_dbg(dev, fmt, ...)				\
+do {								\
+	if (fw_devlink_debug)					\
+		dev_info(dev, dev_fmt(fmt), ##__VA_ARGS__);	\
+	else							\
+		dev_dbg(dev, dev_fmt(fmt), ##__VA_ARGS__);	\
+} while (0)
 
 /* device pm support */
 void device_pm_move_to_tail(struct device *dev);

@@ -95,8 +95,12 @@ int fwnode_link_add(struct fwnode_handle *con, struct fwnode_handle *sup)
 
 	list_add(&link->s_hook, &sup->consumers);
 	list_add(&link->c_hook, &con->suppliers);
-	pr_debug("%pfwP Linked as a fwnode consumer to %pfwP\n",
-		 con, sup);
+	if (fw_devlink_debug)
+		pr_info("%pfwP Linked as a fwnode consumer to %pfwP\n",
+			con, sup);
+	else
+		pr_debug("%pfwP Linked as a fwnode consumer to %pfwP\n",
+			 con, sup);
 out:
 	mutex_unlock(&fwnode_link_lock);
 
@@ -111,8 +115,12 @@ out:
  */
 static void __fwnode_link_del(struct fwnode_link *link)
 {
-	pr_debug("%pfwP Dropping the fwnode link to %pfwP\n",
-		 link->consumer, link->supplier);
+	if (fw_devlink_debug)
+		pr_info("%pfwP Dropping the fwnode link to %pfwP\n",
+			link->consumer, link->supplier);
+	else
+		pr_debug("%pfwP Dropping the fwnode link to %pfwP\n",
+			 link->consumer, link->supplier);
 	list_del(&link->s_hook);
 	list_del(&link->c_hook);
 	kfree(link);
@@ -852,7 +860,7 @@ struct device_link *device_link_add(struct device *consumer,
 	list_add_tail_rcu(&link->c_node, &consumer->links.suppliers);
 
 	if (flags & DL_FLAG_SYNC_STATE_ONLY) {
-		dev_dbg(consumer,
+		fw_devlink_dbg(consumer,
 			"Linked as a sync state only consumer to %s\n",
 			dev_name(supplier));
 		goto out;
@@ -868,7 +876,8 @@ reorder:
 	 */
 	device_reorder_to_tail(consumer, NULL);
 
-	dev_dbg(consumer, "Linked as a consumer to %s\n", dev_name(supplier));
+	fw_devlink_dbg(consumer, "Linked as a consumer to %s\n",
+		       dev_name(supplier));
 
 out:
 	device_pm_unlock();
@@ -1021,7 +1030,8 @@ int device_links_check_suppliers(struct device *dev)
 		sup_fw = list_first_entry(&dev->fwnode->suppliers,
 					  struct fwnode_link,
 					  c_hook)->supplier;
-		dev_dbg(dev, "probe deferral - wait for supplier %pfwP\n",
+		fw_devlink_dbg(dev,
+			"probe deferral - wait for supplier %pfwP\n",
 			sup_fw);
 		dev_set_def_probe_reason(dev,
 			"wait for supplier %pfwP\n", sup_fw);
@@ -1039,7 +1049,8 @@ int device_links_check_suppliers(struct device *dev)
 		if (link->status != DL_STATE_AVAILABLE &&
 		    !(link->flags & DL_FLAG_SYNC_STATE_ONLY)) {
 			device_links_missing_supplier(dev);
-			dev_dbg(dev, "probe deferral - supplier %s not ready\n",
+			fw_devlink_dbg(dev,
+				"probe deferral - supplier %s not ready\n",
 				dev_name(link->supplier));
 			dev_set_def_probe_reason(dev,
 				"supplier %s not ready\n",
@@ -1615,6 +1626,13 @@ static int __init fw_devlink_strict_setup(char *arg)
 	return strtobool(arg, &fw_devlink_strict);
 }
 early_param("fw_devlink.strict", fw_devlink_strict_setup);
+
+bool fw_devlink_debug;
+static int __init fw_devlink_debug_setup(char *arg)
+{
+	return strtobool(arg, &fw_devlink_debug);
+}
+early_param("fw_devlink.debug", fw_devlink_debug_setup);
 
 u32 fw_devlink_get_flags(void)
 {
