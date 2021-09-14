@@ -47,7 +47,7 @@ void __init svm_swiotlb_init(void)
 	unsigned long bytes, io_tlb_nslabs;
 
 	io_tlb_nslabs = (swiotlb_size_or_default() >> IO_TLB_SHIFT);
-	io_tlb_nslabs = ALIGN(io_tlb_nslabs, IO_TLB_SEGSIZE);
+	io_tlb_nslabs = ALIGN(io_tlb_nslabs, swiotlb_io_seg_size());
 
 	bytes = io_tlb_nslabs << IO_TLB_SHIFT;
 

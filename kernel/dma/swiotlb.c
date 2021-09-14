@@ -73,6 +73,11 @@ enum swiotlb_force swiotlb_force;
 struct io_tlb_mem io_tlb_default_mem;
 
 /*
+ * Maximum IO TLB segment size.
+ */
+static unsigned long io_tlb_seg_size = IO_TLB_SEGSIZE;
+
+/*
  * Max segment that we can provide which (if pages are contingous) will
  * not be bounced (unless SWIOTLB_FORCE is set).
  */
@@ -81,15 +86,30 @@ static unsigned int max_segment;
 static unsigned long default_nslabs = IO_TLB_DEFAULT_SIZE >> IO_TLB_SHIFT;
 
 static int __init
-setup_io_tlb_npages(char *str)
+setup_io_tlb_params(char *str)
 {
+	unsigned long tmp;
+
 	if (isdigit(*str)) {
-		/* avoid tail segment of size < IO_TLB_SEGSIZE */
-		default_nslabs =
-			ALIGN(simple_strtoul(str, &str, 0), IO_TLB_SEGSIZE);
+		default_nslabs = simple_strtoul(str, &str, 0);
 	}
 	if (*str == ',')
 		++str;
+
+	/* get max IO TLB segment size */
+	if (isdigit(*str)) {
+		tmp = simple_strtoul(str, &str, 0);
+		if (tmp)
+			io_tlb_seg_size = ALIGN(tmp, IO_TLB_SEGSIZE);
+	}
+	if (*str == ',')
+		++str;
+
+	/* update io_tlb_nslabs after applying a new segment size and
+	 * avoid tail segment of size < IO TLB segment size
+	 */
+	default_nslabs = ALIGN(default_nslabs, io_tlb_seg_size);
+
 	if (!strcmp(str, "force"))
 		swiotlb_force = SWIOTLB_FORCE;
 	else if (!strcmp(str, "noforce"))
@@ -97,7 +117,7 @@ setup_io_tlb_npages(char *str)
 
 	return 0;
 }
-early_param("swiotlb", setup_io_tlb_npages);
+early_param("swiotlb", setup_io_tlb_params);
 
 unsigned int swiotlb_max_segment(void)
 {
@@ -118,6 +138,11 @@ unsigned long swiotlb_size_or_default(void)
 	return default_nslabs << IO_TLB_SHIFT;
 }
 
+unsigned long swiotlb_io_seg_size(void)
+{
+	return io_tlb_seg_size;
+}
+
 void __init swiotlb_adjust_size(unsigned long size)
 {
 	/*
@@ -128,7 +153,7 @@ void __init swiotlb_adjust_size(unsigned long size)
 	if (default_nslabs != IO_TLB_DEFAULT_SIZE >> IO_TLB_SHIFT)
 		return;
 	size = ALIGN(size, IO_TLB_SIZE);
-	default_nslabs = ALIGN(size >> IO_TLB_SHIFT, IO_TLB_SEGSIZE);
+	default_nslabs = ALIGN(size >> IO_TLB_SHIFT, io_tlb_seg_size);
 	pr_info("SWIOTLB bounce buffer size adjusted to %luMB", size >> 20);
 }
 
@@ -147,7 +172,7 @@ void swiotlb_print_info(void)
 
 static inline unsigned long io_tlb_offset(unsigned long val)
 {
-	return val & (IO_TLB_SEGSIZE - 1);
+	return val & (io_tlb_seg_size - 1);
 }
 
 static inline unsigned long nr_slots(u64 val)
@@ -192,7 +217,7 @@ static void swiotlb_init_io_tlb_mem(struct io_tlb_mem *mem, phys_addr_t start,
 
 	spin_lock_init(&mem->lock);
 	for (i = 0; i < mem->nslabs; i++) {
-		mem->slots[i].list = IO_TLB_SEGSIZE - io_tlb_offset(i);
+		mem->slots[i].list = io_tlb_seg_size - io_tlb_offset(i);
 		mem->slots[i].orig_addr = INVALID_PHYS_ADDR;
 		mem->slots[i].alloc_size = 0;
 	}
@@ -261,7 +286,7 @@ int
 swiotlb_late_init_with_default_size(size_t default_size)
 {
 	unsigned long nslabs =
-		ALIGN(default_size >> IO_TLB_SHIFT, IO_TLB_SEGSIZE);
+		ALIGN(default_size >> IO_TLB_SHIFT, io_tlb_seg_size);
 	unsigned long bytes;
 	unsigned char *vstart = NULL;
 	unsigned int order;
@@ -522,7 +547,7 @@ found:
 			alloc_size - (offset + ((i - index) << IO_TLB_SHIFT));
 	}
 	for (i = index - 1;
-	     io_tlb_offset(i) != IO_TLB_SEGSIZE - 1 &&
+	     io_tlb_offset(i) != io_tlb_seg_size - 1 &&
 	     mem->slots[i].list; i--)
 		mem->slots[i].list = ++count;
 
@@ -600,7 +625,7 @@ static void swiotlb_release_slots(struct device *dev, phys_addr_t tlb_addr)
 	 * with slots below and above the pool being returned.
 	 */
 	spin_lock_irqsave(&mem->lock, flags);
-	if (index + nslots < ALIGN(index + 1, IO_TLB_SEGSIZE))
+	if (index + nslots < ALIGN(index + 1, io_tlb_seg_size))
 		count = mem->slots[index + nslots].list;
 	else
 		count = 0;
@@ -620,7 +645,7 @@ static void swiotlb_release_slots(struct device *dev, phys_addr_t tlb_addr)
 	 * available (non zero)
 	 */
 	for (i = index - 1;
-	     io_tlb_offset(i) != IO_TLB_SEGSIZE - 1 && mem->slots[i].list;
+	     io_tlb_offset(i) != io_tlb_seg_size - 1 && mem->slots[i].list;
 	     i--)
 		mem->slots[i].list = ++count;
 	mem->used -= nslots;
@@ -698,7 +723,7 @@ dma_addr_t swiotlb_map(struct device *dev, phys_addr_t paddr, size_t size,
 
 size_t swiotlb_max_mapping_size(struct device *dev)
 {
-	return ((size_t)IO_TLB_SIZE) * IO_TLB_SEGSIZE;
+	return ((size_t)IO_TLB_SIZE) * io_tlb_seg_size;
 }
 
 bool is_swiotlb_active(struct device *dev)

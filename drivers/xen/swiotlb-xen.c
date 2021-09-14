@@ -110,12 +110,13 @@ static int xen_swiotlb_fixup(void *buf, unsigned long nslabs)
 	int dma_bits;
 	dma_addr_t dma_handle;
 	phys_addr_t p = virt_to_phys(buf);
+	unsigned long tlb_segment_size = swiotlb_io_seg_size();
 
-	dma_bits = get_order(IO_TLB_SEGSIZE << IO_TLB_SHIFT) + PAGE_SHIFT;
+	dma_bits = get_order(tlb_segment_size << IO_TLB_SHIFT) + PAGE_SHIFT;
 
 	i = 0;
 	do {
-		int slabs = min(nslabs - i, (unsigned long)IO_TLB_SEGSIZE);
+		int slabs = min(nslabs - i, (unsigned long)tlb_segment_size);
 
 		do {
 			rc = xen_create_contiguous_region(
@@ -153,7 +154,7 @@ static const char *xen_swiotlb_error(enum xen_swiotlb_err err)
 	return "";
 }
 
-#define DEFAULT_NSLABS		ALIGN(SZ_64M >> IO_TLB_SHIFT, IO_TLB_SEGSIZE)
+#define DEFAULT_NSLABS		ALIGN(SZ_64M >> IO_TLB_SHIFT, swiotlb_io_seg_size())
 
 int __ref xen_swiotlb_init(void)
 {
