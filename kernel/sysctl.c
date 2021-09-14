@@ -1816,7 +1816,8 @@ static struct ctl_table kern_table[] = {
 		.data		= &sysctl_numa_balancing_hot_threshold,
 		.maxlen		= sizeof(unsigned int),
 		.mode		= 0644,
-		.proc_handler	= proc_dointvec,
+		.proc_handler	= sysctl_numa_balancing_threshold,
+		.extra1		= SYSCTL_ZERO,
 	},
 	{
 		.procname	= "numa_balancing_rate_limit_mbps",
