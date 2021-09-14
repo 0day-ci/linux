@@ -3121,16 +3121,19 @@ static inline void btrfs_io_bio_init(struct btrfs_io_bio *btrfs_bio)
 }
 
 /*
- * The following helpers allocate a bio. As it's backed by a bioset, it'll
- * never fail.  We're returning a bio right now but you can call btrfs_io_bio
- * for the appropriate container_of magic
+ * Allocate a btrfs_io_bio, with @nr_iovecs as maxinum iovecs.
+ *
+ * If @nr_iovecs is 0, it will use BIO_MAX_VECS as @nr_iovces instead.
+ * This behavior is to provide a fail-safe default value.
  */
-struct bio *btrfs_bio_alloc(u64 first_byte)
+struct bio *btrfs_io_bio_alloc(unsigned int nr_iovecs)
 {
 	struct bio *bio;
 
-	bio = bio_alloc_bioset(GFP_NOFS, BIO_MAX_VECS, &btrfs_bioset);
-	bio->bi_iter.bi_sector = first_byte >> 9;
+	ASSERT(nr_iovecs <= BIO_MAX_VECS);
+	if (nr_iovecs == 0)
+		nr_iovecs = BIO_MAX_VECS;
+	bio = bio_alloc_bioset(GFP_NOFS, nr_iovecs, &btrfs_bioset);
 	btrfs_io_bio_init(btrfs_io_bio(bio));
 	return bio;
 }
@@ -3146,16 +3149,6 @@ struct bio *btrfs_bio_clone(struct bio *bio)
 	btrfs_io_bio_init(btrfs_bio);
 	btrfs_bio->iter = bio->bi_iter;
 	return new;
-}
-
-struct bio *btrfs_io_bio_alloc(unsigned int nr_iovecs)
-{
-	struct bio *bio;
-
-	/* Bio allocation backed by a bioset does not fail */
-	bio = bio_alloc_bioset(GFP_NOFS, nr_iovecs, &btrfs_bioset);
-	btrfs_io_bio_init(btrfs_io_bio(bio));
-	return bio;
 }
 
 struct bio *btrfs_bio_clone_partial(struct bio *orig, u64 offset, u64 size)
@@ -3307,14 +3300,15 @@ static int alloc_new_bio(struct btrfs_inode *inode,
 	struct bio *bio;
 	int ret;
 
+	bio = btrfs_io_bio_alloc(0);
 	/*
 	 * For compressed page range, its disk_bytenr is always @disk_bytenr
 	 * passed in, no matter if we have added any range into previous bio.
 	 */
 	if (bio_flags & EXTENT_BIO_COMPRESSED)
-		bio = btrfs_bio_alloc(disk_bytenr);
+		bio->bi_iter.bi_sector = disk_bytenr >> SECTOR_SHIFT;
 	else
-		bio = btrfs_bio_alloc(disk_bytenr + offset);
+		bio->bi_iter.bi_sector = (disk_bytenr + offset) >> SECTOR_SHIFT;
 	bio_ctrl->bio = bio;
 	bio_ctrl->bio_flags = bio_flags;
 	bio->bi_end_io = end_io_func;
