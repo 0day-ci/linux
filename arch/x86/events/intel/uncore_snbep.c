@@ -3607,7 +3607,9 @@ static int skx_cha_hw_config(struct intel_uncore_box *box, struct perf_event *ev
 {
 	struct hw_perf_event_extra *reg1 = &event->hw.extra_reg;
 	struct extra_reg *er;
-	int idx = 0;
+	/* Any of the CHA events may be filtered by Thread/Core-ID.*/
+	int idx = !!(event->hw.config & SNBEP_CBO_PMON_CTL_TID_EN) ?
+		     SKX_CHA_MSR_PMON_BOX_FILTER_TID : 0;
 
 	for (er = skx_uncore_cha_extra_regs; er->msr; er++) {
 		if (er->event != (event->hw.config & er->config_mask))
