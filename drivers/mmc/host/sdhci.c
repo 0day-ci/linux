@@ -2685,7 +2685,7 @@ void sdhci_abort_tuning(struct sdhci_host *host, u32 opcode)
 
 	sdhci_end_tuning(host);
 
-	mmc_send_abort_tuning(host->mmc, opcode);
+	mmc_send_abort_tuning(host->mmc);
 }
 EXPORT_SYMBOL_GPL(sdhci_abort_tuning);
 
