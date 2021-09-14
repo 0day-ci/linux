@@ -3920,8 +3920,17 @@ vm_fault_t do_set_pmd(struct vm_fault *vmf, struct page *page)
 	if (unlikely(!pmd_none(*vmf->pmd)))
 		goto out;
 
-	for (i = 0; i < HPAGE_PMD_NR; i++)
+	for (i = 0; i < HPAGE_PMD_NR; i++) {
+		/*
+		 * Just backoff if any subpage of a THP is corrupted otherwise
+		 * the corrupted page may mapped by PMD silently to escape the
+		 * check.  This kind of THP just can be PTE mapped.  Access to
+		 * the corrupted subpage should trigger SIGBUS as expected.
+		 */
+		if (PageHWPoison(page + i))
+			goto out;
 		flush_icache_page(vma, page + i);
+	}
 
 	entry = mk_huge_pmd(page, vma->vm_page_prot);
 	if (write)
