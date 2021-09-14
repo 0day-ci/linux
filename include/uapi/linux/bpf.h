@@ -1629,9 +1629,9 @@ union bpf_attr {
  * u32 bpf_get_smp_processor_id(void)
  * 	Description
  * 		Get the SMP (symmetric multiprocessing) processor id. Note that
- * 		all programs run with preemption disabled, which means that the
- * 		SMP processor id is stable during all the execution of the
- * 		program.
+ * 		programs run with preemption disabled unless BPF_F_SLEEPABLE is
+ * 		set, which means that the SMP processor id is stable during all
+ * 		the execution of the program.
  * 	Return
  * 		The SMP id of the processor running the program.
  *
