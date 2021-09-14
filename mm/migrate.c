@@ -577,6 +577,18 @@ void migrate_page_states(struct page *newpage, struct page *page)
 	 * future migrations of this same page.
 	 */
 	cpupid = page_cpupid_xchg_last(page, -1);
+	/*
+	 * If migrate between slow and fast memory node, reset cpupid,
+	 * because that is used to record page access time in slow
+	 * memory node
+	 */
+	if (sysctl_numa_balancing_mode & NUMA_BALANCING_MEMORY_TIERING) {
+		bool f_toptier = node_is_toptier(page_to_nid(page));
+		bool t_toptier = node_is_toptier(page_to_nid(newpage));
+
+		if (f_toptier != t_toptier)
+			cpupid = -1;
+	}
 	page_cpupid_xchg_last(newpage, cpupid);
 
 	ksm_migrate_page(newpage, page);
