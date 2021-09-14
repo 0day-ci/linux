@@ -4643,8 +4643,10 @@ static bool tcp_ooo_try_coalesce(struct sock *sk,
 	return res;
 }
 
-static void tcp_drop(struct sock *sk, struct sk_buff *skb)
+static void tcp_drop(struct sock *sk, struct sk_buff *skb,
+		int field, const char *reason)
 {
+	trace_tcp_drop(sk, skb, field, reason);
 	sk_drops_add(sk, skb);
 	__kfree_skb(skb);
 }
@@ -4676,7 +4678,7 @@ static void tcp_ofo_queue(struct sock *sk)
 		rb_erase(&skb->rbnode, &tp->out_of_order_queue);
 
 		if (unlikely(!after(TCP_SKB_CB(skb)->end_seq, tp->rcv_nxt))) {
-			tcp_drop(sk, skb);
+			tcp_drop(sk, skb, LINUX_MIB_TCPOFOQUEUE, "TCP queue error");
 			continue;
 		}
 
@@ -4732,7 +4734,7 @@ static void tcp_data_queue_ofo(struct sock *sk, struct sk_buff *skb)
 	if (unlikely(tcp_try_rmem_schedule(sk, skb, skb->truesize))) {
 		NET_INC_STATS(sock_net(sk), LINUX_MIB_TCPOFODROP);
 		sk->sk_data_ready(sk);
-		tcp_drop(sk, skb);
+		tcp_drop(sk, skb, LINUX_MIB_TCPOFODROP, "TCP rmem failed");
 		return;
 	}
 
@@ -4795,7 +4797,7 @@ coalesce_done:
 				/* All the bits are present. Drop. */
 				NET_INC_STATS(sock_net(sk),
 					      LINUX_MIB_TCPOFOMERGE);
-				tcp_drop(sk, skb);
+				tcp_drop(sk, skb, LINUX_MIB_TCPOFOMERGE, "TCP bits are present");
 				skb = NULL;
 				tcp_dsack_set(sk, seq, end_seq);
 				goto add_sack;
@@ -4814,7 +4816,9 @@ coalesce_done:
 						 TCP_SKB_CB(skb1)->end_seq);
 				NET_INC_STATS(sock_net(sk),
 					      LINUX_MIB_TCPOFOMERGE);
-				tcp_drop(sk, skb1);
+				tcp_drop(sk, skb1, LINUX_MIB_TCPOFOMERGE,
+						"TCP replace(skb.seq eq skb1.seq)");
+
 				goto merge_right;
 			}
 		} else if (tcp_ooo_try_coalesce(sk, skb1,
@@ -4842,7 +4846,7 @@ merge_right:
 		tcp_dsack_extend(sk, TCP_SKB_CB(skb1)->seq,
 				 TCP_SKB_CB(skb1)->end_seq);
 		NET_INC_STATS(sock_net(sk), LINUX_MIB_TCPOFOMERGE);
-		tcp_drop(sk, skb1);
+		tcp_drop(sk, skb1, LINUX_MIB_TCPOFOMERGE, "TCP useless other segments");
 	}
 	/* If there is no skb after us, we are the last_skb ! */
 	if (!skb1)
@@ -4978,7 +4982,8 @@ queue_and_out:
 		else if (tcp_try_rmem_schedule(sk, skb, skb->truesize)) {
 			NET_INC_STATS(sock_net(sk), LINUX_MIB_TCPRCVQDROP);
 			sk->sk_data_ready(sk);
-			goto drop;
+			tcp_drop(sk, skb, LINUX_MIB_TCPRCVQDROP, "TCP rmem failed");
+			goto end;
 		}
 
 		eaten = tcp_queue_rcv(sk, skb, &fragstolen);
@@ -5018,8 +5023,8 @@ queue_and_out:
 out_of_window:
 		tcp_enter_quickack_mode(sk, TCP_MAX_QUICKACKS);
 		inet_csk_schedule_ack(sk);
-drop:
-		tcp_drop(sk, skb);
+		tcp_drop(sk, skb, LINUX_MIB_TCPZEROWINDOWDROP, "TCP out of order or zero window");
+end:
 		return;
 	}
 
@@ -5276,7 +5281,7 @@ static bool tcp_prune_ofo_queue(struct sock *sk)
 		prev = rb_prev(node);
 		rb_erase(node, &tp->out_of_order_queue);
 		goal -= rb_to_skb(node)->truesize;
-		tcp_drop(sk, rb_to_skb(node));
+		tcp_drop(sk, rb_to_skb(node), LINUX_MIB_OFOPRUNED, "TCP drop out-of-order queue");
 		if (!prev || goal <= 0) {
 			sk_mem_reclaim(sk);
 			if (atomic_read(&sk->sk_rmem_alloc) <= sk->sk_rcvbuf &&
@@ -5611,7 +5616,8 @@ static bool tcp_validate_incoming(struct sock *sk, struct sk_buff *skb,
 						  LINUX_MIB_TCPACKSKIPPEDPAWS,
 						  &tp->last_oow_ack_time))
 				tcp_send_dupack(sk, skb);
-			goto discard;
+			tcp_drop(sk, skb, LINUX_MIB_PAWSESTABREJECTED, "TCP PAWS seq first");
+			goto end;
 		}
 		/* Reset is accepted even if it did not pass PAWS. */
 	}
@@ -5634,7 +5640,8 @@ static bool tcp_validate_incoming(struct sock *sk, struct sk_buff *skb,
 		} else if (tcp_reset_check(sk, skb)) {
 			tcp_reset(sk, skb);
 		}
-		goto discard;
+		tcp_drop(sk, skb, LINUX_MIB_PAWSESTABREJECTED, "TCP check sequence number");
+		goto end;
 	}
 
 	/* Step 2: check RST bit */
@@ -5679,7 +5686,8 @@ static bool tcp_validate_incoming(struct sock *sk, struct sk_buff *skb,
 				tcp_fastopen_active_disable(sk);
 			tcp_send_challenge_ack(sk, skb);
 		}
-		goto discard;
+		tcp_drop(sk, skb, LINUX_MIB_TCPCHALLENGEACK, "TCP check RST bit ");
+		goto end;
 	}
 
 	/* step 3: check security and precedence [ignored] */
@@ -5693,15 +5701,15 @@ syn_challenge:
 			TCP_INC_STATS(sock_net(sk), TCP_MIB_INERRS);
 		NET_INC_STATS(sock_net(sk), LINUX_MIB_TCPSYNCHALLENGE);
 		tcp_send_challenge_ack(sk, skb);
-		goto discard;
+		tcp_drop(sk, skb, LINUX_MIB_TCPSYNCHALLENGE, "TCP check for a SYN");
+		goto end;
 	}
 
 	bpf_skops_parse_hdr(sk, skb);
 
 	return true;
 
-discard:
-	tcp_drop(sk, skb);
+end:
 	return false;
 }
 
@@ -5819,7 +5827,8 @@ void tcp_rcv_established(struct sock *sk, struct sk_buff *skb)
 				return;
 			} else { /* Header too small */
 				TCP_INC_STATS(sock_net(sk), TCP_MIB_INERRS);
-				goto discard;
+				tcp_drop(sk, skb, TCP_MIB_INERRS, "TCP header too small");
+				goto end;
 			}
 		} else {
 			int eaten = 0;
@@ -5873,8 +5882,10 @@ slow_path:
 	if (len < (th->doff << 2) || tcp_checksum_complete(skb))
 		goto csum_error;
 
-	if (!th->ack && !th->rst && !th->syn)
-		goto discard;
+	if (!th->ack && !th->rst && !th->syn) {
+		tcp_drop(sk, skb, LINUX_MIB_TCPSLOWSTARTRETRANS, "TCP state not in ack|rst|syn");
+		goto end;
+	}
 
 	/*
 	 *	Standard slow path.
@@ -5884,8 +5895,10 @@ slow_path:
 		return;
 
 step5:
-	if (tcp_ack(sk, skb, FLAG_SLOWPATH | FLAG_UPDATE_TS_RECENT) < 0)
-		goto discard;
+	if (tcp_ack(sk, skb, FLAG_SLOWPATH | FLAG_UPDATE_TS_RECENT) < 0) {
+		tcp_drop(sk, skb, LINUX_MIB_TCPSACKDISCARD, "TCP ack have not sent yet");
+		goto end;
+	}
 
 	tcp_rcv_rtt_measure_ts(sk, skb);
 
@@ -5903,9 +5916,10 @@ csum_error:
 	trace_tcp_bad_csum(skb);
 	TCP_INC_STATS(sock_net(sk), TCP_MIB_CSUMERRORS);
 	TCP_INC_STATS(sock_net(sk), TCP_MIB_INERRS);
+	tcp_drop(sk, skb, TCP_MIB_CSUMERRORS, "TCP csum error");
 
-discard:
-	tcp_drop(sk, skb);
+end:
+	return;
 }
 EXPORT_SYMBOL(tcp_rcv_established);
 
@@ -6105,7 +6119,8 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 
 		if (th->rst) {
 			tcp_reset(sk, skb);
-			goto discard;
+			tcp_drop(sk, skb, LINUX_MIB_NUM, "TCP reset");
+			goto end;
 		}
 
 		/* rfc793:
@@ -6194,9 +6209,9 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 			tcp_enter_quickack_mode(sk, TCP_MAX_QUICKACKS);
 			inet_csk_reset_xmit_timer(sk, ICSK_TIME_DACK,
 						  TCP_DELACK_MAX, TCP_RTO_MAX);
+			tcp_drop(sk, skb, LINUX_MIB_TCPFASTOPENACTIVE, "TCP fast open ack error");
 
-discard:
-			tcp_drop(sk, skb);
+end:
 			return 0;
 		} else {
 			tcp_send_ack(sk);
@@ -6269,7 +6284,8 @@ discard:
 		 */
 		return -1;
 #else
-		goto discard;
+		tcp_drop(sk, skb, LINUX_MIB_SYNCOOKIESRECV, "TCP syn received error");
+		goto end;
 #endif
 	}
 	/* "fifth, if neither of the SYN or RST bits is set then
@@ -6279,7 +6295,8 @@ discard:
 discard_and_undo:
 	tcp_clear_options(&tp->rx_opt);
 	tp->rx_opt.mss_clamp = saved_clamp;
-	goto discard;
+	tcp_drop(sk, skb, LINUX_MIB_TCPSACKDISCARD, "TCP not neither of SYN or RST");
+	goto end;
 
 reset_and_undo:
 	tcp_clear_options(&tp->rx_opt);
@@ -6337,18 +6354,23 @@ int tcp_rcv_state_process(struct sock *sk, struct sk_buff *skb)
 
 	switch (sk->sk_state) {
 	case TCP_CLOSE:
-		goto discard;
+		tcp_drop(sk, skb, LINUX_MIB_TCPABORTONCLOSE, "TCP close");
+		goto end;
 
 	case TCP_LISTEN:
 		if (th->ack)
 			return 1;
 
-		if (th->rst)
-			goto discard;
+		if (th->rst) {
+			tcp_drop(sk, skb, LINUX_MIB_LISTENDROPS, "TCP rst");
+			goto end;
+		}
 
 		if (th->syn) {
-			if (th->fin)
-				goto discard;
+			if (th->fin) {
+				tcp_drop(sk, skb, LINUX_MIB_LISTENDROPS, "TCP fin");
+				goto end;
+			}
 			/* It is possible that we process SYN packets from backlog,
 			 * so we need to make sure to disable BH and RCU right there.
 			 */
@@ -6363,7 +6385,8 @@ int tcp_rcv_state_process(struct sock *sk, struct sk_buff *skb)
 			consume_skb(skb);
 			return 0;
 		}
-		goto discard;
+		tcp_drop(sk, skb, LINUX_MIB_LISTENDROPS, "TCP syn");
+		goto end;
 
 	case TCP_SYN_SENT:
 		tp->rx_opt.saw_tstamp = 0;
@@ -6389,12 +6412,16 @@ int tcp_rcv_state_process(struct sock *sk, struct sk_buff *skb)
 		WARN_ON_ONCE(sk->sk_state != TCP_SYN_RECV &&
 		    sk->sk_state != TCP_FIN_WAIT1);
 
-		if (!tcp_check_req(sk, skb, req, true, &req_stolen))
-			goto discard;
+		if (!tcp_check_req(sk, skb, req, true, &req_stolen)) {
+			tcp_drop(sk, skb, LINUX_MIB_LISTENDROPS, "TCP check req error");
+			goto end;
+		}
 	}
 
-	if (!th->ack && !th->rst && !th->syn)
-		goto discard;
+	if (!th->ack && !th->rst && !th->syn) {
+		tcp_drop(sk, skb, LINUX_MIB_LISTENDROPS, "TCP not ack|rst|syn");
+		goto end;
+	}
 
 	if (!tcp_validate_incoming(sk, skb, th, 0))
 		return 0;
@@ -6408,7 +6435,8 @@ int tcp_rcv_state_process(struct sock *sk, struct sk_buff *skb)
 		if (sk->sk_state == TCP_SYN_RECV)
 			return 1;	/* send one RST */
 		tcp_send_challenge_ack(sk, skb);
-		goto discard;
+		tcp_drop(sk, skb, LINUX_MIB_TCPCHALLENGEACK, "TCP check ack failed");
+		goto end;
 	}
 	switch (sk->sk_state) {
 	case TCP_SYN_RECV:
@@ -6501,7 +6529,8 @@ int tcp_rcv_state_process(struct sock *sk, struct sk_buff *skb)
 			inet_csk_reset_keepalive_timer(sk, tmo);
 		} else {
 			tcp_time_wait(sk, TCP_FIN_WAIT2, tmo);
-			goto discard;
+			tcp_drop(sk, skb, LINUX_MIB_TCPABORTONDATA, "TCP fin wait2");
+			goto end;
 		}
 		break;
 	}
@@ -6509,7 +6538,8 @@ int tcp_rcv_state_process(struct sock *sk, struct sk_buff *skb)
 	case TCP_CLOSING:
 		if (tp->snd_una == tp->write_seq) {
 			tcp_time_wait(sk, TCP_TIME_WAIT, 0);
-			goto discard;
+			tcp_drop(sk, skb, LINUX_MIB_TIMEWAITED, "TCP time wait");
+			goto end;
 		}
 		break;
 
@@ -6517,7 +6547,8 @@ int tcp_rcv_state_process(struct sock *sk, struct sk_buff *skb)
 		if (tp->snd_una == tp->write_seq) {
 			tcp_update_metrics(sk);
 			tcp_done(sk);
-			goto discard;
+			tcp_drop(sk, skb, LINUX_MIB_TCPPUREACKS, "TCP last ack");
+			goto end;
 		}
 		break;
 	}
@@ -6534,8 +6565,10 @@ int tcp_rcv_state_process(struct sock *sk, struct sk_buff *skb)
 			/* If a subflow has been reset, the packet should not
 			 * continue to be processed, drop the packet.
 			 */
-			if (sk_is_mptcp(sk) && !mptcp_incoming_options(sk, skb))
-				goto discard;
+			if (sk_is_mptcp(sk) && !mptcp_incoming_options(sk, skb)) {
+				tcp_drop(sk, skb, LINUX_MIB_TCPPUREACKS, "TCP subflow been reset");
+				goto end;
+			}
 			break;
 		}
 		fallthrough;
@@ -6567,9 +6600,10 @@ int tcp_rcv_state_process(struct sock *sk, struct sk_buff *skb)
 	}
 
 	if (!queued) {
-discard:
-		tcp_drop(sk, skb);
+		tcp_drop(sk, skb, LINUX_MIB_TCPOFOQUEUE, "TCP rcv synsent state process");
 	}
+
+end:
 	return 0;
 }
 EXPORT_SYMBOL(tcp_rcv_state_process);
