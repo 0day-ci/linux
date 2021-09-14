@@ -3214,6 +3214,30 @@ static int current_parent_show(struct seq_file *s, void *data)
 }
 DEFINE_SHOW_ATTRIBUTE(current_parent);
 
+#ifdef CLOCK_ALLOW_WRITE_DEBUGFS
+static int clk_set_parent_set(void *data, u64 val)
+{
+	struct clk_core *core = data, *parent;
+	int ret;
+
+	if (val >= core->num_parents)
+		return -EINVAL;
+
+	parent = clk_core_get_parent_by_index(core, val);
+	if (IS_ERR_OR_NULL(parent))
+		return PTR_ERR(parent);
+
+	clk_prepare_lock();
+	ret = clk_core_set_parent_nolock(core, parent);
+	clk_prepare_unlock();
+
+	return ret;
+}
+
+DEFINE_DEBUGFS_ATTRIBUTE(clk_set_parent_fops, NULL, clk_set_parent_set,
+			 "%llu\n");
+#endif
+
 static int clk_duty_cycle_show(struct seq_file *s, void *data)
 {
 	struct clk_core *core = s->private;
@@ -3285,9 +3309,14 @@ static void clk_debug_create_one(struct clk_core *core, struct dentry *pdentry)
 		debugfs_create_file("clk_parent", 0444, root, core,
 				    &current_parent_fops);
 
-	if (core->num_parents > 1)
+	if (core->num_parents > 1) {
 		debugfs_create_file("clk_possible_parents", 0444, root, core,
 				    &possible_parents_fops);
+#ifdef CLOCK_ALLOW_WRITE_DEBUGFS
+		debugfs_create_file("clk_set_parent", 0200, root, core,
+				    &clk_set_parent_fops);
+#endif
+	}
 
 	if (core->ops->debug_init)
 		core->ops->debug_init(core->hw, core->dentry);
