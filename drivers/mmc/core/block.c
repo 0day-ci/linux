@@ -1642,18 +1642,6 @@ static void mmc_blk_rw_rq_prep(struct mmc_queue_req *mqrq,
 #define MMC_DATA_RETRIES	2
 #define MMC_NO_RETRIES		(MMC_MAX_RETRIES + 1)
 
-static int mmc_blk_send_stop(struct mmc_card *card, unsigned int timeout)
-{
-	struct mmc_command cmd = {
-		.opcode = MMC_STOP_TRANSMISSION,
-		.flags = MMC_RSP_SPI_R1 | MMC_RSP_R1 | MMC_CMD_AC,
-		/* Some hosts wait for busy anyway, so provide a busy timeout */
-		.busy_timeout = timeout,
-	};
-
-	return mmc_wait_for_cmd(card->host, &cmd, 5);
-}
-
 static int mmc_blk_fix_state(struct mmc_card *card, struct request *req)
 {
 	struct mmc_queue_req *mqrq = req_to_mmc_queue_req(req);
@@ -1663,7 +1651,7 @@ static int mmc_blk_fix_state(struct mmc_card *card, struct request *req)
 
 	mmc_retune_hold_now(card->host);
 
-	mmc_blk_send_stop(card, timeout);
+	mmc_send_stop(card->host, timeout, 5);
 
 	err = mmc_poll_for_busy(card, timeout, false, MMC_BUSY_IO);
 

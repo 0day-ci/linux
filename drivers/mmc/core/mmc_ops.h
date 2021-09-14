@@ -9,6 +9,7 @@
 #define _MMC_MMC_OPS_H
 
 #include <linux/types.h>
+#include <linux/mmc/mmc.h>
 
 enum mmc_busy_cmd {
 	MMC_BUSY_CMD6,
@@ -56,6 +57,19 @@ void mmc_run_bkops(struct mmc_card *card);
 int mmc_cmdq_enable(struct mmc_card *card);
 int mmc_cmdq_disable(struct mmc_card *card);
 int mmc_sanitize(struct mmc_card *card, unsigned int timeout_ms);
+
+static inline int mmc_send_stop(struct mmc_host *host, unsigned int timeout,
+			   unsigned int retries)
+{
+	struct mmc_command cmd = {
+		.opcode = MMC_STOP_TRANSMISSION,
+		.flags = MMC_RSP_SPI_R1 | MMC_RSP_R1 | MMC_CMD_AC,
+		/* Some hosts wait for busy anyway, so provide a busy timeout */
+		.busy_timeout = timeout,
+	};
+
+	return mmc_wait_for_cmd(host, &cmd, retries);
+}
 
 #endif
 
