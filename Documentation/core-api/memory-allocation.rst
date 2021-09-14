@@ -126,7 +126,14 @@ or another request.
 
   * ``GFP_KERNEL | __GFP_NOFAIL`` - overrides the default allocator behavior
     and all allocation requests will loop endlessly until they succeed.
-    This might be really dangerous especially for larger orders.
+    The allocator may provide access to memory that would otherwise be
+    reserved in order to satisfy this allocation which might adversely
+    affect other subsystems.  So it should only be used when there is no
+    reasonable failure policy and when the memory is likely to be freed
+    again in the near future.  Its use is strong discourage (via a
+    WARN_ON) for allocations larger than ``PAGE_ALLOC_COSTLY_ORDER``.
+    While this flag is best avoided, it is still preferable to endless
+    loops around the allocator.
 
 Selecting memory allocator
 ==========================

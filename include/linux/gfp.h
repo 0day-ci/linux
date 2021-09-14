@@ -209,6 +209,10 @@ struct vm_area_struct;
  * used only when there is no reasonable failure policy) but it is
  * definitely preferable to use the flag rather than opencode endless
  * loop around allocator.
+ * Use of this flag may provide access to memory which would otherwise be
+ * reserved.  As such it must be understood that there can be a cost imposed
+ * on other subsystems as well as the obvious cost of placing the calling
+ * thread in an uninterruptible indefinite wait.
  * Using this flag for costly allocations is _highly_ discouraged.
  */
 #define __GFP_IO	((__force gfp_t)___GFP_IO)
