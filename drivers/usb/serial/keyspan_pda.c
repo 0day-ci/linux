@@ -190,7 +190,7 @@ static void keyspan_pda_rx_interrupt(struct urb *urb)
 		if (len < 2)
 			break;
 		tty_insert_flip_string(&port->port, data + 1, len - 1);
-		tty_flip_buffer_push(&port->port);
+		tty_schedule_flip(&port->port);
 		break;
 	case 1:
 		/* status interrupt */

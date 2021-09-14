@@ -538,7 +538,7 @@ static void mct_u232_read_int_callback(struct urb *urb)
 		if (urb->actual_length) {
 			tty_insert_flip_string(&port->port, data,
 					urb->actual_length);
-			tty_flip_buffer_push(&port->port);
+			tty_schedule_flip(&port->port);
 		}
 		goto exit;
 	}

@@ -149,7 +149,7 @@ static void omninet_process_read_urb(struct urb *urb)
 	data_len = min_t(size_t, urb->actual_length - OMNINET_HEADERLEN,
 								hdr->oh_len);
 	tty_insert_flip_string(&port->port, data, data_len);
-	tty_flip_buffer_push(&port->port);
+	tty_schedule_flip(&port->port);
 }
 
 static int omninet_prepare_write_buffer(struct usb_serial_port *port,

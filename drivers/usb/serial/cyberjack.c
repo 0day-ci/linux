@@ -322,7 +322,7 @@ static void cyberjack_read_bulk_callback(struct urb *urb)
 
 	if (urb->actual_length) {
 		tty_insert_flip_string(&port->port, data, urb->actual_length);
-		tty_flip_buffer_push(&port->port);
+		tty_schedule_flip(&port->port);
 	}
 
 	spin_lock_irqsave(&priv->lock, flags);

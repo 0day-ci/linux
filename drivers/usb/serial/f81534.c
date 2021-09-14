@@ -1239,7 +1239,7 @@ static void f81534_process_per_serial_block(struct usb_serial_port *port,
 		tty_insert_flip_char(&port->port, data[i], tty_flag);
 	}
 
-	tty_flip_buffer_push(&port->port);
+	tty_schedule_flip(&port->port);
 }
 
 static void f81534_process_read_urb(struct urb *urb)

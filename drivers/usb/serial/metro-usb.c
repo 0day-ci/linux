@@ -141,7 +141,7 @@ static void metrousb_read_int_callback(struct urb *urb)
 		tty_insert_flip_string(&port->port, data, urb->actual_length);
 
 		/* Force the data to the tty layer. */
-		tty_flip_buffer_push(&port->port);
+		tty_schedule_flip(&port->port);
 	}
 
 	/* Set any port variables. */

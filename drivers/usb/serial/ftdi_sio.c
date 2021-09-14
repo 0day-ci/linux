@@ -2603,7 +2603,7 @@ static void ftdi_process_read_urb(struct urb *urb)
 	}
 
 	if (count)
-		tty_flip_buffer_push(&port->port);
+		tty_schedule_flip(&port->port);
 }
 
 static void ftdi_break_ctl(struct tty_struct *tty, int break_state)

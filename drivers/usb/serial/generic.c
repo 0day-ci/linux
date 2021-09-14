@@ -363,7 +363,7 @@ void usb_serial_generic_process_read_urb(struct urb *urb)
 	} else {
 		tty_insert_flip_string(&port->port, ch, urb->actual_length);
 	}
-	tty_flip_buffer_push(&port->port);
+	tty_schedule_flip(&port->port);
 }
 EXPORT_SYMBOL_GPL(usb_serial_generic_process_read_urb);
 

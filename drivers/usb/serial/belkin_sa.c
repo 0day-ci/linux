@@ -269,7 +269,7 @@ static void belkin_sa_process_read_urb(struct urb *urb)
 
 	tty_insert_flip_string_fixed_flag(&port->port, data, tty_flag,
 							urb->actual_length);
-	tty_flip_buffer_push(&port->port);
+	tty_schedule_flip(&port->port);
 }
 
 static void belkin_sa_set_termios(struct tty_struct *tty,

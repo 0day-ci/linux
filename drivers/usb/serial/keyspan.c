@@ -810,7 +810,7 @@ static void	usa26_indat_callback(struct urb *urb)
 						flag);
 			}
 		}
-		tty_flip_buffer_push(&port->port);
+		tty_schedule_flip(&port->port);
 	}
 
 	/* Resubmit urb so we continue receiving */
@@ -936,7 +936,7 @@ static void usa28_indat_callback(struct urb *urb)
 		if (urb->actual_length) {
 			tty_insert_flip_string(&port->port, data,
 					urb->actual_length);
-			tty_flip_buffer_push(&port->port);
+			tty_schedule_flip(&port->port);
 		}
 
 		/* Resubmit urb so we continue receiving */
@@ -1154,7 +1154,7 @@ static void	usa49_indat_callback(struct urb *urb)
 						flag);
 			}
 		}
-		tty_flip_buffer_push(&port->port);
+		tty_schedule_flip(&port->port);
 	}
 
 	/* Resubmit urb so we continue receiving */
@@ -1225,7 +1225,7 @@ static void usa49wg_indat_callback(struct urb *urb)
 				i += 2;
 			}
 		}
-		tty_flip_buffer_push(&port->port);
+		tty_schedule_flip(&port->port);
 	}
 
 	/* Resubmit urb so we continue receiving */
@@ -1301,7 +1301,7 @@ static void usa90_indat_callback(struct urb *urb)
 				}
 			}
 		}
-		tty_flip_buffer_push(&port->port);
+		tty_schedule_flip(&port->port);
 	}
 
 	/* Resubmit urb so we continue receiving */

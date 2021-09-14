@@ -1876,7 +1876,7 @@ static void edge_tty_recv(struct usb_serial_port *port, unsigned char *data,
 	data += cnt;
 	length -= cnt;
 
-	tty_flip_buffer_push(&port->port);
+	tty_schedule_flip(&port->port);
 }
 
 

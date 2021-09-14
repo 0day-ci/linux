@@ -388,7 +388,7 @@ static void klsi_105_process_read_urb(struct urb *urb)
 	}
 
 	tty_insert_flip_string(&port->port, data + KLSI_HDR_LEN, len);
-	tty_flip_buffer_push(&port->port);
+	tty_schedule_flip(&port->port);
 }
 
 static void klsi_105_set_termios(struct tty_struct *tty,

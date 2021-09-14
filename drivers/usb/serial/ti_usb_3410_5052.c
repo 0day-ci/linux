@@ -1275,7 +1275,7 @@ static void ti_recv(struct usb_serial_port *port, unsigned char *data,
 			if (cnt == 0)
 				break;
 		}
-		tty_flip_buffer_push(&port->port);
+		tty_schedule_flip(&port->port);
 		data += cnt;
 		length -= cnt;
 	} while (length > 0);

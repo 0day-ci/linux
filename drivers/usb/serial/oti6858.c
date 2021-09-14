@@ -780,7 +780,7 @@ static void oti6858_read_bulk_callback(struct urb *urb)
 
 	if (urb->actual_length > 0) {
 		tty_insert_flip_string(&port->port, data, urb->actual_length);
-		tty_flip_buffer_push(&port->port);
+		tty_schedule_flip(&port->port);
 	}
 
 	/* schedule the interrupt urb */

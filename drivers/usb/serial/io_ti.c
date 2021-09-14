@@ -1794,7 +1794,7 @@ static void edge_tty_recv(struct usb_serial_port *port, unsigned char *data,
 	if (queued < length)
 		dev_err(&port->dev, "%s - dropping data, %d bytes lost\n",
 			__func__, length - queued);
-	tty_flip_buffer_push(&port->port);
+	tty_schedule_flip(&port->port);
 }
 
 static void edge_bulk_out_callback(struct urb *urb)

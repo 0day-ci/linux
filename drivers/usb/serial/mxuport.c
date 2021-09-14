@@ -329,7 +329,7 @@ static void mxuport_process_read_urb_data(struct usb_serial_port *port,
 	} else {
 		tty_insert_flip_string(&port->port, data, size);
 	}
-	tty_flip_buffer_push(&port->port);
+	tty_schedule_flip(&port->port);
 }
 
 static void mxuport_msr_event(struct usb_serial_port *port, u8 buf[4])

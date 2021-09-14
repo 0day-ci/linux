@@ -372,7 +372,7 @@ static void ir_process_read_urb(struct urb *urb)
 		return;
 
 	tty_insert_flip_string(&port->port, data + 1, urb->actual_length - 1);
-	tty_flip_buffer_push(&port->port);
+	tty_schedule_flip(&port->port);
 }
 
 static void ir_set_termios(struct tty_struct *tty,

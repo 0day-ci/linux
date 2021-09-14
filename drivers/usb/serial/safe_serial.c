@@ -217,7 +217,7 @@ static void safe_process_read_urb(struct urb *urb)
 	length = actual_length;
 out:
 	tty_insert_flip_string(&port->port, data, length);
-	tty_flip_buffer_push(&port->port);
+	tty_schedule_flip(&port->port);
 }
 
 static int safe_prepare_write_buffer(struct usb_serial_port *port,

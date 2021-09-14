@@ -521,7 +521,7 @@ static void qt2_process_read_urb(struct urb *urb)
 						 __func__);
 					break;
 				}
-				tty_flip_buffer_push(&port->port);
+				tty_schedule_flip(&port->port);
 
 				newport = *(ch + 3);
 
@@ -560,7 +560,7 @@ static void qt2_process_read_urb(struct urb *urb)
 		tty_insert_flip_char(&port->port, *ch, TTY_NORMAL);
 	}
 
-	tty_flip_buffer_push(&port->port);
+	tty_schedule_flip(&port->port);
 }
 
 static void qt2_write_bulk_callback(struct urb *urb)

@@ -133,7 +133,7 @@ static void aircable_process_read_urb(struct urb *urb)
 	}
 
 	if (count)
-		tty_flip_buffer_push(&port->port);
+		tty_schedule_flip(&port->port);
 }
 
 static struct usb_serial_driver aircable_device = {

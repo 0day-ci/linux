@@ -1128,7 +1128,7 @@ static void cypress_read_int_callback(struct urb *urb)
 	if (bytes > i) {
 		tty_insert_flip_string_fixed_flag(&port->port, data + i,
 				tty_flag, bytes - i);
-		tty_flip_buffer_push(&port->port);
+		tty_schedule_flip(&port->port);
 	}
 
 	spin_lock_irqsave(&priv->lock, flags);

@@ -68,7 +68,7 @@ static void symbol_int_callback(struct urb *urb)
 		if (data_length > (urb->actual_length - 1))
 			data_length = urb->actual_length - 1;
 		tty_insert_flip_string(&port->port, &data[1], data_length);
-		tty_flip_buffer_push(&port->port);
+		tty_schedule_flip(&port->port);
 	} else {
 		dev_dbg(&port->dev, "%s - short packet\n", __func__);
 	}

@@ -451,7 +451,7 @@ static void mos7840_bulk_in_callback(struct urb *urb)
 	if (urb->actual_length) {
 		struct tty_port *tport = &mos7840_port->port->port;
 		tty_insert_flip_string(tport, data, urb->actual_length);
-		tty_flip_buffer_push(tport);
+		tty_schedule_flip(tport);
 		port->icount.rx += urb->actual_length;
 		dev_dbg(&port->dev, "icount.rx is %d:\n", port->icount.rx);
 	}

@@ -428,7 +428,7 @@ static void f81232_process_read_urb(struct urb *urb)
 		tty_insert_flip_char(&port->port, data[i + 1], tty_flag);
 	}
 
-	tty_flip_buffer_push(&port->port);
+	tty_schedule_flip(&port->port);
 }
 
 static void f81534a_process_read_urb(struct urb *urb)
@@ -469,7 +469,7 @@ static void f81534a_process_read_urb(struct urb *urb)
 							tty_flag, len - 2);
 	}
 
-	tty_flip_buffer_push(&port->port);
+	tty_schedule_flip(&port->port);
 }
 
 static void f81232_break_ctl(struct tty_struct *tty, int break_state)

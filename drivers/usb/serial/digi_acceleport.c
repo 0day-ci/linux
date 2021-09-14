@@ -1416,7 +1416,7 @@ static int digi_read_inb_callback(struct urb *urb)
 		if (len > 0) {
 			tty_insert_flip_string_fixed_flag(&port->port, data,
 					tty_flag, len);
-			tty_flip_buffer_push(&port->port);
+			tty_schedule_flip(&port->port);
 		}
 	}
 	spin_unlock_irqrestore(&priv->dp_port_lock, flags);
