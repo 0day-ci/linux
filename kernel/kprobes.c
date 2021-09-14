@@ -2508,9 +2508,6 @@ static int __init init_kprobes(void)
 		err = register_module_notifier(&kprobe_module_nb);
 
 	kprobes_initialized = (err == 0);
-
-	if (!err)
-		init_test_probes();
 	return err;
 }
 early_initcall(init_kprobes);
