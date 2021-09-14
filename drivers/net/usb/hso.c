@@ -2018,7 +2018,7 @@ static int put_rxbuf_data(struct urb *urb, struct hso_serial *serial)
 	if (count >= urb->actual_length) {
 		tty_insert_flip_string(&serial->port, urb->transfer_buffer,
 				       urb->actual_length);
-		tty_flip_buffer_push(&serial->port);
+		tty_schedule_flip(&serial->port);
 	} else {
 		dev_warn(&serial->parent->usb->dev,
 			 "dropping data, %d bytes lost\n", urb->actual_length);

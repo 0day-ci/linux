@@ -184,7 +184,7 @@ static void ipoctal_irq_rx(struct ipoctal_channel *channel, u8 sr)
 		sr = ioread8(&channel->regs->r.sr);
 	} while (isr & channel->isr_rx_rdy_mask);
 
-	tty_flip_buffer_push(port);
+	tty_schedule_flip(port);
 }
 
 static void ipoctal_irq_tx(struct ipoctal_channel *channel)

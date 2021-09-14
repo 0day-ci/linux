@@ -418,7 +418,7 @@ static void sdio_uart_receive_chars(struct sdio_uart_port *port,
 		*status = sdio_in(port, UART_LSR);
 	} while ((*status & UART_LSR_DR) && (max_count-- > 0));
 
-	tty_flip_buffer_push(&port->port);
+	tty_schedule_flip(&port->port);
 }
 
 static void sdio_uart_transmit_chars(struct sdio_uart_port *port)

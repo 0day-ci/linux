@@ -114,7 +114,7 @@ static void bcm_vk_tty_wq_handler(struct work_struct *work)
 		}
 
 		if (count) {
-			tty_flip_buffer_push(&vktty->port);
+			tty_schedule_flip(&vktty->port);
 
 			/* Update read offset from shadow register to card */
 			vkwrite32(vk, vktty->rd, BAR_1,

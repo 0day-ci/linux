@@ -952,7 +952,7 @@ static void rx_ready_async(MGSLPC_INFO *info, int tcd)
 	}
 
 	if (work)
-		tty_flip_buffer_push(port);
+		tty_schedule_flip(port);
 }
 
 
