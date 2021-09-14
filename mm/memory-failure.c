@@ -1101,7 +1101,8 @@ static int page_action(struct page_state *ps, struct page *p,
 	result = ps->action(p, pfn);
 
 	count = page_count(p) - 1;
-	if (ps->action == me_swapcache_dirty && result == MF_DELAYED)
+	if ((ps->action == me_swapcache_dirty && result == MF_DELAYED) ||
+	    (ps->action == me_pagecache_dirty && result == MF_FAILED))
 		count--;
 	if (count > 0) {
 		pr_err("Memory failure: %#lx: %s still referenced by %d users\n",
