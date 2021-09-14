@@ -81,6 +81,60 @@ patternProperties:
         properties:
           vbus-supply: true
 
+      st,phy-tuning:
+        $ref: /schemas/types.yaml#/definitions/phandle
+        description:
+          It can be necessary to adjust the PHY settings to compensate parasitics, which can be due
+          to USB connector/receptacle, routing, ESD protection component,... Here is the list of
+          all optional parameters to tune the interface of the PHY (HS for High-Speed, FS for Full-
+          Speed, LS for Low-Speed)
+            * st,current-boost, <1> current boosting of 1mA
+                                <2> current boosting of 2mA
+            * st,no-lsfs-fb-cap, disables the LS/FS feedback capacitor
+            * st,hs-slew-ctrl, slows the HS driver slew rate by 10%
+            * st,hs-dc-level, <0> = decreases the HS driver DC level by 5 to 7mV
+                              <1> = increases the HS driver DC level by 5 to 7mV
+                              <2> = increases the HS driver DC level by 10 to 14mV
+            * st,fs-rftime-tuning, enables the FS rise/fall tuning option
+            * st,hs-rftime-reduction, enables the HS rise/fall reduction feature
+            * st,hs-current-trim, controls HS driver current trimming for choke
+                                  <0> = 18.87 mA target current / nominal + 0%
+                                  <1> = 19.165 mA target current / nominal + 1.56%
+                                  <2> = 19.46 mA target current / nominal + 3.12%
+                                  <3> = 19.755 mA target current / nominal + 4.68%
+                                  <4> = 20.05 mA target current / nominal + 6.24%
+                                  <5> = 20.345 mA target current / nominal + 7.8%
+                                  <6> = 20.64 mA target current / nominal + 9.36%
+                                  <7> = 20.935 mA target current / nominal + 10.92%
+                                  <8> = 21.23 mA target current / nominal + 12.48%
+                                  <9> = 21.525 mA target current / nominal + 14.04%
+                                  <10> = 21.82 mA target current / nominal + 15.6%
+                                  <11> = 22.115 mA target current / nominal + 17.16%
+                                  <12> = 22.458 mA target current / nominal + 19.01%
+                                  <13> = 22.755 mA target current / nominal + 20.58%
+                                  <14> = 23.052 mA target current / nominal + 22.16%
+                                  <15> = 23.348 mA target current / nominal + 23.73%
+            * st,hs-impedance-trim, controls HS driver impedance tuning for choke
+                                    <0> = no impedance offset
+                                    <1> = reduces the impedance by 2 ohms
+                                    <2> = reduces the impedance by 4 ohms
+                                    <3> = reduces the impedance by 6 ohms
+            * st,squelch-level, adjusts the squelch DC threshold value
+                                <0> = no shift in threshold
+                                <1> = threshold shift by +7 mV
+                                <2> = threshold shift by -5 mV
+                                <3> = threshold shift by +14 mV
+            * st,hs-rx-gain-eq, enables the HS Rx gain equalizer
+            * st,hs-rx-offset, adjusts the HS Rx offset
+                               <0> = no offset
+                               <1> = offset of +5 mV
+                               <2> = offset of +10 mV
+                               <3> = offset of -5 mV
+            * st,no-hs-ftime-ctrl, disables the HS fall time control of single ended signals
+                                   during pre-emphasis
+            * st,no-lsfs-sc, disables the short circuit protection in LS/FS driver
+            * st,hs-tx-staggering, enables the basic staggering in HS Tx mode
+
     allOf:
       - if:
           properties:
@@ -122,6 +176,18 @@ examples:
   - |
     #include <dt-bindings/clock/stm32mp1-clks.h>
     #include <dt-bindings/reset/stm32mp1-resets.h>
+
+    usb_phy_tuning: usb-phy-tuning {
+        st,hs-dc-level = <2>;
+        st,fs-rftime-tuning;
+        st,hs-rftime-reduction;
+        st,hs-current-trim = <15>;
+        st,hs-impedance-trim = <1>;
+        st,squelch-level = <3>;
+        st,hs-rx-offset = <2>;
+        st,no-lsfs-sc;
+    };
+
     usbphyc: usbphyc@5a006000 {
         compatible = "st,stm32mp1-usbphyc";
         reg = <0x5a006000 0x1000>;
@@ -137,6 +203,7 @@ examples:
             reg = <0>;
             phy-supply = <&vdd_usb>;
             #phy-cells = <0>;
+            st,phy-tuning = <&usb_phy_tuning>;
             connector {
                 compatible = "usb-a-connector";
                 vbus-supply = <&vbus_sw>;
@@ -147,6 +214,7 @@ examples:
             reg = <1>;
             phy-supply = <&vdd_usb>;
             #phy-cells = <1>;
+            st,phy-tuning = <&usb_phy_tuning>;
         };
     };
 ...
