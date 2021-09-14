@@ -954,6 +954,7 @@ int blk_register_queue(struct gendisk *disk)
 	blk_queue_flag_set(QUEUE_FLAG_REGISTERED, q);
 	wbt_enable_default(q);
 	blk_throtl_register_queue(q);
+	blk_queue_flag_set(QUEUE_FLAG_THROTL_INIT_DONE, q);
 
 	/* Now everything is ready and send out KOBJ_ADD uevent */
 	kobject_uevent(&q->kobj, KOBJ_ADD);
@@ -986,6 +987,7 @@ void blk_unregister_queue(struct gendisk *disk)
 	if (!blk_queue_registered(q))
 		return;
 
+	blk_queue_flag_clear(QUEUE_FLAG_THROTL_INIT_DONE, q);
 	/*
 	 * Since sysfs_remove_dir() prevents adding new directory entries
 	 * before removal of existing entries starts, protect against
