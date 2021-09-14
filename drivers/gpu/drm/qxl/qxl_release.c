@@ -74,10 +74,25 @@ static long qxl_fence_wait(struct dma_fence *fence, bool intr,
 	return end - cur;
 }
 
+static void qxl_fence_release_rcu(struct rcu_head *rcu)
+{
+	struct dma_fence *fence = container_of(rcu, struct dma_fence, rcu);
+	struct qxl_release *release;
+
+	release = container_of(fence, struct qxl_release, base);
+	kfree(release);
+}
+
+static void qxl_fence_release(struct dma_fence *fence)
+{
+	call_rcu(&fence->rcu, qxl_fence_release_rcu);
+}
+
 static const struct dma_fence_ops qxl_fence_ops = {
 	.get_driver_name = qxl_get_driver_name,
 	.get_timeline_name = qxl_get_timeline_name,
 	.wait = qxl_fence_wait,
+	.release = qxl_fence_release,
 };
 
 static int
