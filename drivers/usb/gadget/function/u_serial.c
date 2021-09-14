@@ -426,7 +426,7 @@ static void gs_rx_push(struct work_struct *work)
 	 * so we won't get callbacks and can hold port_lock
 	 */
 	if (do_push)
-		tty_flip_buffer_push(&port->port);
+		tty_schedule_flip(&port->port);
 
 
 	/* We want our data queue to become empty ASAP, keeping data

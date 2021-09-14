@@ -344,7 +344,7 @@ static void dbc_rx_push(struct tasklet_struct *t)
 	}
 
 	if (do_push)
-		tty_flip_buffer_push(&port->port);
+		tty_schedule_flip(&port->port);
 
 	if (!list_empty(queue) && tty) {
 		if (!tty_throttled(tty)) {

@@ -480,7 +480,7 @@ static void acm_process_read_urb(struct acm *acm, struct urb *urb)
 
 	tty_insert_flip_string(&acm->port, urb->transfer_buffer,
 			urb->actual_length);
-	tty_flip_buffer_push(&acm->port);
+	tty_schedule_flip(&acm->port);
 }
 
 static void acm_read_bulk_callback(struct urb *urb)
