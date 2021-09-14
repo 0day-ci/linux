@@ -64,8 +64,8 @@ static bool ceph_mdsc_send_metrics(struct ceph_mds_client *mdsc,
 	read->header.data_len = cpu_to_le32(sizeof(*read) - header_len);
 	sum = m->read_latency_sum;
 	jiffies_to_timespec64(sum, &ts);
-	read->sec = cpu_to_le32(ts.tv_sec);
-	read->nsec = cpu_to_le32(ts.tv_nsec);
+	read->lat.tv_sec = cpu_to_le32(ts.tv_sec);
+	read->lat.tv_nsec = cpu_to_le32(ts.tv_nsec);
 	items++;
 
 	/* encode the write latency metric */
@@ -76,8 +76,8 @@ static bool ceph_mdsc_send_metrics(struct ceph_mds_client *mdsc,
 	write->header.data_len = cpu_to_le32(sizeof(*write) - header_len);
 	sum = m->write_latency_sum;
 	jiffies_to_timespec64(sum, &ts);
-	write->sec = cpu_to_le32(ts.tv_sec);
-	write->nsec = cpu_to_le32(ts.tv_nsec);
+	write->lat.tv_sec = cpu_to_le32(ts.tv_sec);
+	write->lat.tv_nsec = cpu_to_le32(ts.tv_nsec);
 	items++;
 
 	/* encode the metadata latency metric */
@@ -88,8 +88,8 @@ static bool ceph_mdsc_send_metrics(struct ceph_mds_client *mdsc,
 	meta->header.data_len = cpu_to_le32(sizeof(*meta) - header_len);
 	sum = m->metadata_latency_sum;
 	jiffies_to_timespec64(sum, &ts);
-	meta->sec = cpu_to_le32(ts.tv_sec);
-	meta->nsec = cpu_to_le32(ts.tv_nsec);
+	meta->lat.tv_sec = cpu_to_le32(ts.tv_sec);
+	meta->lat.tv_nsec = cpu_to_le32(ts.tv_nsec);
 	items++;
 
 	/* encode the dentry lease metric */
