@@ -129,7 +129,7 @@ static int gdm_tty_recv_complete(void *data,
 	if (data && len) {
 		if (tty_buffer_request_room(&gdm->port, len) == len) {
 			tty_insert_flip_string(&gdm->port, data, len);
-			tty_flip_buffer_push(&gdm->port);
+			tty_schedule_flip(&gdm->port);
 		} else {
 			return TO_HOST_BUFFER_REQUEST_FAIL;
 		}

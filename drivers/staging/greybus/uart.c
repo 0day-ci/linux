@@ -122,7 +122,7 @@ static int gb_uart_receive_data_handler(struct gb_operation *op)
 			recv_data_size, count);
 	}
 	if (count)
-		tty_flip_buffer_push(port);
+		tty_schedule_flip(port);
 	return 0;
 }
 

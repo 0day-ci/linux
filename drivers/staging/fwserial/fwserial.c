@@ -518,7 +518,7 @@ static void fwtty_emit_breaks(struct work_struct *work)
 		if (c < t)
 			break;
 	}
-	tty_flip_buffer_push(&port->port);
+	tty_schedule_flip(&port->port);
 
 	if (port->mstatus & (UART_LSR_BI << 24))
 		schedule_delayed_work(&port->emit_breaks, FREQ_BREAKS);
@@ -565,7 +565,7 @@ static int fwtty_rx(struct fwtty_port *port, unsigned char *data, size_t len)
 
 	c = tty_insert_flip_string_fixed_flag(&port->port, data, TTY_NORMAL, n);
 	if (c > 0)
-		tty_flip_buffer_push(&port->port);
+		tty_schedule_flip(&port->port);
 	n -= c;
 
 	if (n) {
