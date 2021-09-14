@@ -64,7 +64,7 @@ Description:	SoundWire Slave Data Port-0 DisCo properties.
 		Data port 0 are used by the bus to configure the Data Port 0.
 
 
-What:		/sys/bus/soundwire/devices/sdw:.../dpN_src/max_word
+What:		/sys/bus/soundwire/devices/sdw:.../dp<N>_src/max_word
 		/sys/bus/soundwire/devices/sdw:.../dpN_src/min_word
 		/sys/bus/soundwire/devices/sdw:.../dpN_src/words
 		/sys/bus/soundwire/devices/sdw:.../dpN_src/type
