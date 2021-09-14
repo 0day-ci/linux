@@ -1728,7 +1728,7 @@ int svm_vm_copy_asid_from(struct kvm *kvm, unsigned int source_fd)
 	source_kvm = source_kvm_file->private_data;
 	mutex_lock(&source_kvm->lock);
 
-	if (!sev_guest(source_kvm)) {
+	if (!sev_guest(source_kvm) || sev_es_guest(source_kvm)) {
 		ret = -EINVAL;
 		goto e_source_unlock;
 	}
