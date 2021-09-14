@@ -1150,13 +1150,16 @@ static int __get_hwpoison_page(struct page *page)
 
 	if (PageTransHuge(head)) {
 		/*
-		 * Non anonymous thp exists only in allocation/free time. We
-		 * can't handle such a case correctly, so let's give it up.
-		 * This should be better than triggering BUG_ON when kernel
-		 * tries to touch the "partially handled" page.
+		 * We can't handle allocating or freeing THPs, so let's give
+		 * it up. This should be better than triggering BUG_ON when
+		 * kernel tries to touch the "partially handled" page.
+		 *
+		 * page->mapping won't be initialized until the page is added
+		 * to rmap or page cache.  Use this as an indicator for if
+		 * this is an instantiated page.
 		 */
-		if (!PageAnon(head)) {
-			pr_err("Memory failure: %#lx: non anonymous thp\n",
+		if (!head->mapping) {
+			pr_err("Memory failure: %#lx: non instantiated thp\n",
 				page_to_pfn(page));
 			return 0;
 		}
@@ -1415,12 +1418,12 @@ static int identify_page_state(unsigned long pfn, struct page *p,
 static int try_to_split_thp_page(struct page *page, const char *msg)
 {
 	lock_page(page);
-	if (!PageAnon(page) || unlikely(split_huge_page(page))) {
+	if (!page->mapping || unlikely(split_huge_page(page))) {
 		unsigned long pfn = page_to_pfn(page);
 
 		unlock_page(page);
-		if (!PageAnon(page))
-			pr_info("%s: %#lx: non anonymous thp\n", msg, pfn);
+		if (!page->mapping)
+			pr_info("%s: %#lx: not instantiated thp\n", msg, pfn);
 		else
 			pr_info("%s: %#lx: thp split failed\n", msg, pfn);
 		put_page(page);
