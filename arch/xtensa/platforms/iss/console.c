@@ -84,7 +84,7 @@ static void rs_poll(struct timer_list *unused)
 	}
 
 	if (i)
-		tty_flip_buffer_push(port);
+		tty_schedule_flip(port);
 	if (rd)
 		mod_timer(&serial_timer, jiffies + SERIAL_TIMER_VALUE);
 	spin_unlock(&timer_lock);

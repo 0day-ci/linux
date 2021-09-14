@@ -566,5 +566,5 @@ void chan_interrupt(struct line *line, int irq)
 			return;
 	}
  out:
-	tty_flip_buffer_push(port);
+	tty_schedule_flip(port);
 }
