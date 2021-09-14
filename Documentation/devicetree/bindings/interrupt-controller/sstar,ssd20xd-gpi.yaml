@@ -1,0 +1,53 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/interrupt-controller/sstar,ssd20xd-gpi.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: SigmaStar GPIO Interrupt Controller
+
+maintainers:
+  - Daniel Palmer <daniel@thingy.jp>
+
+description: |+
+  Newer SigmaStar SoCs from the SSD201/SSD202D have an extra
+  interrupt controller that is just for handling interrupts
+  on GPIOs and then routing a single interrupt to the peripheral
+  interrupt controller instead of only having a few interrupt
+  capable GPIOs that are routed directly to the peripheral
+  interrupt controller like older SoCs.
+
+properties:
+  compatible:
+    const: sstar,ssd20xd-gpi
+
+  interrupt-controller: true
+
+  "#interrupt-cells":
+    const: 2
+
+  reg:
+    maxItems: 1
+
+  interrupts:
+    maxItems: 1
+
+required:
+  - compatible
+  - reg
+  - interrupts
+
+additionalProperties: false
+
+examples:
+  - |
+    #include <dt-bindings/interrupt-controller/irq.h>
+    #include <dt-bindings/interrupt-controller/arm-gic.h>
+    interrupt-controller@207a00 {
+      compatible = "sstar,ssd20xd-gpi";
+      reg = <0x207a00 0x200>;
+      #interrupt-cells = <2>;
+      interrupt-controller;
+      interrupts-extended = <&intc_irq GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
+    };
+...
