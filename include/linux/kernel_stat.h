@@ -61,7 +61,7 @@ static inline void kstat_incr_softirqs_this_cpu(unsigned int irq)
 
 static inline unsigned int kstat_softirqs_cpu(unsigned int irq, int cpu)
 {
-       return kstat_cpu(cpu).softirqs[irq];
+	return READ_ONCE(kstat_cpu(cpu).softirqs[irq]);
 }
 
 /*
@@ -74,7 +74,7 @@ extern unsigned int kstat_irqs_usr(unsigned int irq);
  */
 static inline unsigned int kstat_cpu_irqs_sum(unsigned int cpu)
 {
-	return kstat_cpu(cpu).irqs_sum;
+	return READ_ONCE(kstat_cpu(cpu).irqs_sum);
 }
 
 #ifdef CONFIG_VIRT_CPU_ACCOUNTING_GEN
