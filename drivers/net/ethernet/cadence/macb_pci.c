@@ -35,10 +35,8 @@ static int macb_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	/* enable pci device */
 	err = pcim_enable_device(pdev);
-	if (err < 0) {
-		dev_err(&pdev->dev, "Enabling PCI device has failed: %d", err);
-		return err;
-	}
+	if (err < 0)
+		return dev_err_probe(&pdev->dev, err, "Enabling PCI device has failed\n");
 
 	pci_set_master(pdev);
 
