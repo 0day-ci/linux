@@ -269,7 +269,7 @@ static int tpu_pwm_config(struct pwm_chip *chip, struct pwm_device *_pwm,
 
 	if (prescaler == ARRAY_SIZE(prescalers) || period == 0) {
 		dev_err(&tpu->pdev->dev, "clock rate mismatch\n");
-		return -ENOTSUPP;
+		return -EINVAL;
 	}
 
 	if (duty_ns) {
