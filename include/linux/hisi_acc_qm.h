@@ -8,6 +8,13 @@
 #include <linux/module.h>
 #include <linux/pci.h>
 
+#define ZIP_PF_PCI_DEVICE_ID		0xa250
+#define ZIP_VF_PCI_DEVICE_ID		0xa251
+#define SEC_PF_PCI_DEVICE_ID		0xa255
+#define SEC_VF_PCI_DEVICE_ID		0xa256
+#define HPRE_PF_PCI_DEVICE_ID		0xa258
+#define HPRE_VF_PCI_DEVICE_ID		0xa259
+
 #define QM_QNUM_V1			4096
 #define QM_QNUM_V2			1024
 #define QM_MAX_VFS_NUM_V2		63
