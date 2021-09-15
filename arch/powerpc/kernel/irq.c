@@ -581,52 +581,52 @@ int arch_show_interrupts(struct seq_file *p, int prec)
 
 	seq_printf(p, "%*s: ", prec, "LOC");
 	for_each_online_cpu(j)
-		seq_printf(p, "%10u ", per_cpu(irq_stat, j).timer_irqs_event);
+		seq_printf(p, "%10u ", READ_ONCE(per_cpu(irq_stat, j).timer_irqs_event));
         seq_printf(p, "  Local timer interrupts for timer event device\n");
 
 	seq_printf(p, "%*s: ", prec, "BCT");
 	for_each_online_cpu(j)
-		seq_printf(p, "%10u ", per_cpu(irq_stat, j).broadcast_irqs_event);
+		seq_printf(p, "%10u ", READ_ONCE(per_cpu(irq_stat, j).broadcast_irqs_event));
 	seq_printf(p, "  Broadcast timer interrupts for timer event device\n");
 
 	seq_printf(p, "%*s: ", prec, "LOC");
 	for_each_online_cpu(j)
-		seq_printf(p, "%10u ", per_cpu(irq_stat, j).timer_irqs_others);
+		seq_printf(p, "%10u ", READ_ONCE(per_cpu(irq_stat, j).timer_irqs_others));
         seq_printf(p, "  Local timer interrupts for others\n");
 
 	seq_printf(p, "%*s: ", prec, "SPU");
 	for_each_online_cpu(j)
-		seq_printf(p, "%10u ", per_cpu(irq_stat, j).spurious_irqs);
+		seq_printf(p, "%10u ", READ_ONCE(per_cpu(irq_stat, j).spurious_irqs));
 	seq_printf(p, "  Spurious interrupts\n");
 
 	seq_printf(p, "%*s: ", prec, "PMI");
 	for_each_online_cpu(j)
-		seq_printf(p, "%10u ", per_cpu(irq_stat, j).pmu_irqs);
+		seq_printf(p, "%10u ", READ_ONCE(per_cpu(irq_stat, j).pmu_irqs));
 	seq_printf(p, "  Performance monitoring interrupts\n");
 
 	seq_printf(p, "%*s: ", prec, "MCE");
 	for_each_online_cpu(j)
-		seq_printf(p, "%10u ", per_cpu(irq_stat, j).mce_exceptions);
+		seq_printf(p, "%10u ", READ_ONCE(per_cpu(irq_stat, j).mce_exceptions));
 	seq_printf(p, "  Machine check exceptions\n");
 
 #ifdef CONFIG_PPC_BOOK3S_64
 	if (cpu_has_feature(CPU_FTR_HVMODE)) {
 		seq_printf(p, "%*s: ", prec, "HMI");
 		for_each_online_cpu(j)
-			seq_printf(p, "%10u ", paca_ptrs[j]->hmi_irqs);
+			seq_printf(p, "%10u ", READ_ONCE(paca_ptrs[j]->hmi_irqs));
 		seq_printf(p, "  Hypervisor Maintenance Interrupts\n");
 	}
 #endif
 
 	seq_printf(p, "%*s: ", prec, "NMI");
 	for_each_online_cpu(j)
-		seq_printf(p, "%10u ", per_cpu(irq_stat, j).sreset_irqs);
+		seq_printf(p, "%10u ", READ_ONCE(per_cpu(irq_stat, j).sreset_irqs));
 	seq_printf(p, "  System Reset interrupts\n");
 
 #ifdef CONFIG_PPC_WATCHDOG
 	seq_printf(p, "%*s: ", prec, "WDG");
 	for_each_online_cpu(j)
-		seq_printf(p, "%10u ", per_cpu(irq_stat, j).soft_nmi_irqs);
+		seq_printf(p, "%10u ", READ_ONCE(per_cpu(irq_stat, j).soft_nmi_irqs));
 	seq_printf(p, "  Watchdog soft-NMI interrupts\n");
 #endif
 
@@ -634,7 +634,7 @@ int arch_show_interrupts(struct seq_file *p, int prec)
 	if (cpu_has_feature(CPU_FTR_DBELL)) {
 		seq_printf(p, "%*s: ", prec, "DBL");
 		for_each_online_cpu(j)
-			seq_printf(p, "%10u ", per_cpu(irq_stat, j).doorbell_irqs);
+			seq_printf(p, "%10u ", READ_ONCE(per_cpu(irq_stat, j).doorbell_irqs));
 		seq_printf(p, "  Doorbell interrupts\n");
 	}
 #endif
@@ -647,22 +647,22 @@ int arch_show_interrupts(struct seq_file *p, int prec)
  */
 u64 arch_irq_stat_cpu(unsigned int cpu)
 {
-	u64 sum = per_cpu(irq_stat, cpu).timer_irqs_event;
+	u64 sum = READ_ONCE(per_cpu(irq_stat, cpu).timer_irqs_event);
 
-	sum += per_cpu(irq_stat, cpu).broadcast_irqs_event;
-	sum += per_cpu(irq_stat, cpu).pmu_irqs;
-	sum += per_cpu(irq_stat, cpu).mce_exceptions;
-	sum += per_cpu(irq_stat, cpu).spurious_irqs;
-	sum += per_cpu(irq_stat, cpu).timer_irqs_others;
+	sum += READ_ONCE(per_cpu(irq_stat, cpu).broadcast_irqs_event);
+	sum += READ_ONCE(per_cpu(irq_stat, cpu).pmu_irqs);
+	sum += READ_ONCE(per_cpu(irq_stat, cpu).mce_exceptions);
+	sum += READ_ONCE(per_cpu(irq_stat, cpu).spurious_irqs);
+	sum += READ_ONCE(per_cpu(irq_stat, cpu).timer_irqs_others);
 #ifdef CONFIG_PPC_BOOK3S_64
-	sum += paca_ptrs[cpu]->hmi_irqs;
+	sum += READ_ONCE(paca_ptrs[cpu]->hmi_irqs);
 #endif
-	sum += per_cpu(irq_stat, cpu).sreset_irqs;
+	sum += READ_ONCE(per_cpu(irq_stat, cpu).sreset_irqs);
 #ifdef CONFIG_PPC_WATCHDOG
-	sum += per_cpu(irq_stat, cpu).soft_nmi_irqs;
+	sum += READ_ONCE(per_cpu(irq_stat, cpu).soft_nmi_irqs);
 #endif
 #ifdef CONFIG_PPC_DOORBELL
-	sum += per_cpu(irq_stat, cpu).doorbell_irqs;
+	sum += READ_ONCE(per_cpu(irq_stat, cpu).doorbell_irqs);
 #endif
 
 	return sum;
