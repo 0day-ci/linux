@@ -63,7 +63,7 @@ static DEFINE_MUTEX(mce_sysfs_mutex);
 
 #define SPINUNIT		100	/* 100ns */
 
-DEFINE_PER_CPU(unsigned, mce_exception_count);
+DEFINE_PER_CPU(unsigned long, mce_exception_count);
 
 DEFINE_PER_CPU_READ_MOSTLY(unsigned int, mce_num_banks);
 
@@ -718,7 +718,7 @@ static void mce_read_aux(struct mce *m, int i)
 	}
 }
 
-DEFINE_PER_CPU(unsigned, mce_poll_count);
+DEFINE_PER_CPU(unsigned long, mce_poll_count);
 
 /*
  * Poll for corrected events or events that happened before reset.

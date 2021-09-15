@@ -255,8 +255,8 @@ bool mce_is_memory_error(struct mce *m);
 bool mce_is_correctable(struct mce *m);
 int mce_usable_address(struct mce *m);
 
-DECLARE_PER_CPU(unsigned, mce_exception_count);
-DECLARE_PER_CPU(unsigned, mce_poll_count);
+DECLARE_PER_CPU(unsigned long, mce_exception_count);
+DECLARE_PER_CPU(unsigned long, mce_poll_count);
 
 typedef DECLARE_BITMAP(mce_banks_t, MAX_NR_BANKS);
 DECLARE_PER_CPU(mce_banks_t, mce_poll_banks);
