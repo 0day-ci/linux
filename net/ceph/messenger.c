@@ -633,6 +633,7 @@ void ceph_con_init(struct ceph_connection *con, void *private,
 	con_sock_state_init(con);
 
 	mutex_init(&con->mutex);
+	spin_lock_init(&con->out_queue_lock);
 	INIT_LIST_HEAD(&con->out_queue);
 	INIT_LIST_HEAD(&con->out_sent);
 	INIT_DELAYED_WORK(&con->work, ceph_con_workfn);
@@ -691,6 +692,7 @@ void ceph_con_discard_requeued(struct ceph_connection *con, u64 reconnect_seq)
 	u64 seq;
 
 	dout("%s con %p reconnect_seq %llu\n", __func__, con, reconnect_seq);
+	spin_lock(&con->out_queue_lock);
 	while (!list_empty(&con->out_queue)) {
 		msg = list_first_entry(&con->out_queue, struct ceph_msg,
 				       list_head);
@@ -704,6 +706,7 @@ void ceph_con_discard_requeued(struct ceph_connection *con, u64 reconnect_seq)
 		     msg, seq);
 		ceph_msg_remove(msg);
 	}
+	spin_unlock(&con->out_queue_lock);
 }
 
 #ifdef CONFIG_BLOCK
@@ -1601,16 +1604,19 @@ static void con_fault(struct ceph_connection *con)
 	}
 
 	/* Requeue anything that hasn't been acked */
+	spin_lock(&con->out_queue_lock);
 	list_splice_init(&con->out_sent, &con->out_queue);
 
 	/* If there are no messages queued or keepalive pending, place
 	 * the connection in a STANDBY state */
 	if (list_empty(&con->out_queue) &&
 	    !ceph_con_flag_test(con, CEPH_CON_F_KEEPALIVE_PENDING)) {
+		spin_unlock(&con->out_queue_lock);
 		dout("fault %p setting STANDBY clearing WRITE_PENDING\n", con);
 		ceph_con_flag_clear(con, CEPH_CON_F_WRITE_PENDING);
 		con->state = CEPH_CON_S_STANDBY;
 	} else {
+		spin_unlock(&con->out_queue_lock);
 		/* retry after a delay. */
 		con->state = CEPH_CON_S_PREOPEN;
 		if (!con->delay) {
@@ -1691,19 +1697,18 @@ void ceph_con_send(struct ceph_connection *con, struct ceph_msg *msg)
 	BUG_ON(msg->front.iov_len != le32_to_cpu(msg->hdr.front_len));
 	msg->needs_out_seq = true;
 
-	mutex_lock(&con->mutex);
-
-	if (con->state == CEPH_CON_S_CLOSED) {
+	if (READ_ONCE(con->state) == CEPH_CON_S_CLOSED) {
 		dout("con_send %p closed, dropping %p\n", con, msg);
 		ceph_msg_put(msg);
-		mutex_unlock(&con->mutex);
 		return;
 	}
 
 	msg_con_set(msg, con);
 
 	BUG_ON(!list_empty(&msg->list_head));
+	spin_lock(&con->out_queue_lock);
 	list_add_tail(&msg->list_head, &con->out_queue);
+	spin_unlock(&con->out_queue_lock);
 	dout("----- %p to %s%lld %d=%s len %d+%d+%d -----\n", msg,
 	     ENTITY_NAME(con->peer_name), le16_to_cpu(msg->hdr.type),
 	     ceph_msg_type_name(le16_to_cpu(msg->hdr.type)),
@@ -1712,7 +1717,6 @@ void ceph_con_send(struct ceph_connection *con, struct ceph_msg *msg)
 	     le32_to_cpu(msg->hdr.data_len));
 
 	ceph_con_flag_set(con, CEPH_CON_F_CLEAR_STANDBY);
-	mutex_unlock(&con->mutex);
 
 	/* if there wasn't anything waiting to send before, queue
 	 * new work */
@@ -2057,6 +2061,8 @@ int ceph_con_in_msg_alloc(struct ceph_connection *con,
 void ceph_con_get_out_msg(struct ceph_connection *con)
 {
 	struct ceph_msg *msg;
+
+	lockdep_assert_held(&con->out_queue_lock);
 
 	BUG_ON(list_empty(&con->out_queue));
 	msg = list_first_entry(&con->out_queue, struct ceph_msg, list_head);

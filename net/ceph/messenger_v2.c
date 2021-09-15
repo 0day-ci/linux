@@ -3001,7 +3001,9 @@ static int populate_out_iter(struct ceph_connection *con)
 	}
 
 	WARN_ON(con->v2.out_state != OUT_S_GET_NEXT);
+	spin_lock(&con->out_queue_lock);
 	if (ceph_con_flag_test_and_clear(con, CEPH_CON_F_KEEPALIVE_PENDING)) {
+		spin_unlock(&con->out_queue_lock);
 		ret = prepare_keepalive2(con);
 		if (ret) {
 			pr_err("prepare_keepalive2 failed: %d\n", ret);
@@ -3009,18 +3011,21 @@ static int populate_out_iter(struct ceph_connection *con)
 		}
 	} else if (!list_empty(&con->out_queue)) {
 		ceph_con_get_out_msg(con);
+		spin_unlock(&con->out_queue_lock);
 		ret = prepare_message(con);
 		if (ret) {
 			pr_err("prepare_message failed: %d\n", ret);
 			return ret;
 		}
 	} else if (con->in_seq > con->in_seq_acked) {
+		spin_unlock(&con->out_queue_lock);
 		ret = prepare_ack(con);
 		if (ret) {
 			pr_err("prepare_ack failed: %d\n", ret);
 			return ret;
 		}
 	} else {
+		spin_unlock(&con->out_queue_lock);
 		goto nothing_pending;
 	}
 

@@ -448,6 +448,7 @@ struct ceph_connection {
 	struct mutex mutex;
 
 	/* out queue */
+	spinlock_t out_queue_lock; /* protects out_queue */
 	struct list_head out_queue;
 	struct list_head out_sent;   /* sending or sent but unacked */
 	u64 out_seq;		     /* last message queued for send */

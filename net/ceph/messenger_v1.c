@@ -194,24 +194,8 @@ static void prepare_write_message_footer(struct ceph_connection *con)
  */
 static void prepare_write_message(struct ceph_connection *con)
 {
-	struct ceph_msg *m;
+	struct ceph_msg *m = con->out_msg;
 	u32 crc;
-
-	con_out_kvec_reset(con);
-	con->v1.out_msg_done = false;
-
-	/* Sneak an ack in there first?  If we can get it into the same
-	 * TCP packet that's a good thing. */
-	if (con->in_seq > con->in_seq_acked) {
-		con->in_seq_acked = con->in_seq;
-		con_out_kvec_add(con, sizeof (tag_ack), &tag_ack);
-		con->v1.out_temp_ack = cpu_to_le64(con->in_seq_acked);
-		con_out_kvec_add(con, sizeof(con->v1.out_temp_ack),
-			&con->v1.out_temp_ack);
-	}
-
-	ceph_con_get_out_msg(con);
-	m = con->out_msg;
 
 	dout("prepare_write_message %p seq %lld type %d len %d+%d+%zd\n",
 	     m, con->out_seq, le16_to_cpu(m->hdr.type),
@@ -1427,10 +1411,27 @@ do_next:
 			goto more;
 		}
 		/* is anything else pending? */
+		spin_lock(&con->out_queue_lock);
 		if (!list_empty(&con->out_queue)) {
+			con_out_kvec_reset(con);
+			con->v1.out_msg_done = false;
+
+			/* Sneak an ack in there first?  If we can get it into the same
+			 * TCP packet that's a good thing. */
+			if (con->in_seq > con->in_seq_acked) {
+				con->in_seq_acked = con->in_seq;
+				con_out_kvec_add(con, sizeof (tag_ack), &tag_ack);
+				con->v1.out_temp_ack = cpu_to_le64(con->in_seq_acked);
+				con_out_kvec_add(con, sizeof(con->v1.out_temp_ack),
+						 &con->v1.out_temp_ack);
+			}
+
+			ceph_con_get_out_msg(con);
+			spin_unlock(&con->out_queue_lock);
 			prepare_write_message(con);
 			goto more;
 		}
+		spin_unlock(&con->out_queue_lock);
 		if (con->in_seq > con->in_seq_acked) {
 			prepare_write_ack(con);
 			goto more;
