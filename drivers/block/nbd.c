@@ -824,6 +824,7 @@ static void recv_work(struct work_struct *work)
 						     work);
 	struct nbd_device *nbd = args->nbd;
 	struct nbd_config *config = nbd->config;
+	struct request_queue *q = nbd->disk->queue;
 	struct nbd_sock *nsock;
 	struct nbd_cmd *cmd;
 	struct request *rq;
@@ -834,13 +835,29 @@ static void recv_work(struct work_struct *work)
 		if (nbd_read_reply(nbd, args->index, &reply))
 			break;
 
-		cmd = nbd_handle_reply(nbd, args->index, &reply);
-		if (IS_ERR(cmd))
+		/*
+		 * Get q_usage_counter can prevent accessing freed request
+		 * through blk_mq_tag_to_rq() in nbd_handle_reply(). If
+		 * q_usage_counter is zero, then no request is inflight, which
+		 * means something is wrong since we expect to find a request to
+		 * complete here.
+		 */
+		if (!percpu_ref_tryget(&q->q_usage_counter)) {
+			dev_err(disk_to_dev(nbd->disk), "%s: no io inflight\n",
+				__func__);
 			break;
+		}
+
+		cmd = nbd_handle_reply(nbd, args->index, &reply);
+		if (IS_ERR(cmd)) {
+			blk_queue_exit(q);
+			break;
+		}
 
 		rq = blk_mq_rq_from_pdu(cmd);
 		if (likely(!blk_should_fake_timeout(rq->q)))
 			blk_mq_complete_request(rq);
+		blk_queue_exit(q);
 	}
 
 	nsock = config->socks[args->index];
