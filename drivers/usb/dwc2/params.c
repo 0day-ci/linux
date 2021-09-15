@@ -36,6 +36,7 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/of_device.h>
+#include <linux/usb/of.h>
 
 #include "core.h"
 
@@ -245,18 +246,25 @@ static void dwc2_set_param_otg_cap(struct dwc2_hsotg *hsotg)
 	switch (hsotg->hw_params.op_mode) {
 	case GHWCFG2_OP_MODE_HNP_SRP_CAPABLE:
 		val = DWC2_CAP_PARAM_HNP_SRP_CAPABLE;
+		hsotg->dw_otg_caps.hnp_support = true;
+		hsotg->dw_otg_caps.srp_support = true;
 		break;
 	case GHWCFG2_OP_MODE_SRP_ONLY_CAPABLE:
 	case GHWCFG2_OP_MODE_SRP_CAPABLE_DEVICE:
 	case GHWCFG2_OP_MODE_SRP_CAPABLE_HOST:
 		val = DWC2_CAP_PARAM_SRP_ONLY_CAPABLE;
+		hsotg->dw_otg_caps.hnp_support = false;
+		hsotg->dw_otg_caps.srp_support = true;
 		break;
 	default:
 		val = DWC2_CAP_PARAM_NO_HNP_SRP_CAPABLE;
+		hsotg->dw_otg_caps.hnp_support = false;
+		hsotg->dw_otg_caps.srp_support = false;
 		break;
 	}
 
 	hsotg->params.otg_cap = val;
+	hsotg->dw_otg_caps.otg_rev = hsotg->params.otg_rev;
 }
 
 static void dwc2_set_param_phy_type(struct dwc2_hsotg *hsotg)
@@ -464,6 +472,9 @@ static void dwc2_get_device_properties(struct dwc2_hsotg *hsotg)
 		}
 	}
 
+	if (hsotg->dr_mode == USB_DR_MODE_OTG)
+		of_usb_update_otg_caps(hsotg->dev->of_node, &hsotg->dw_otg_caps);
+
 	if (of_find_property(hsotg->dev->of_node, "disable-over-current", NULL))
 		p->oc_disable = true;
 }
@@ -483,6 +494,7 @@ static void dwc2_check_param_otg_cap(struct dwc2_hsotg *hsotg)
 		case GHWCFG2_OP_MODE_SRP_ONLY_CAPABLE:
 		case GHWCFG2_OP_MODE_SRP_CAPABLE_DEVICE:
 		case GHWCFG2_OP_MODE_SRP_CAPABLE_HOST:
+			hsotg->dw_otg_caps.hnp_support = false;
 			break;
 		default:
 			valid = 0;
@@ -491,6 +503,8 @@ static void dwc2_check_param_otg_cap(struct dwc2_hsotg *hsotg)
 		break;
 	case DWC2_CAP_PARAM_NO_HNP_SRP_CAPABLE:
 		/* always valid */
+		hsotg->dw_otg_caps.hnp_support = false;
+		hsotg->dw_otg_caps.srp_support = false;
 		break;
 	default:
 		valid = 0;
