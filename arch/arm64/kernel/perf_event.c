@@ -24,6 +24,9 @@
 #include <linux/sched_clock.h>
 #include <linux/smp.h>
 
+bool arm_pmu_initialized;
+DECLARE_WAIT_QUEUE_HEAD(arm_pmu_wait);
+
 /* ARMv8 Cortex-A53 specific event types. */
 #define ARMV8_A53_PERFCTR_PREF_LINEFILL				0xC2
 
@@ -1284,10 +1287,17 @@ static struct platform_driver armv8_pmu_driver = {
 
 static int __init armv8_pmu_driver_init(void)
 {
+	int ret;
+
 	if (acpi_disabled)
-		return platform_driver_register(&armv8_pmu_driver);
+		ret = platform_driver_register(&armv8_pmu_driver);
 	else
-		return arm_pmu_acpi_probe(armv8_pmuv3_init);
+		ret = arm_pmu_acpi_probe(armv8_pmuv3_init);
+
+	arm_pmu_initialized = true;
+	wake_up_all(&arm_pmu_wait);
+
+	return ret;
 }
 device_initcall(armv8_pmu_driver_init)
 

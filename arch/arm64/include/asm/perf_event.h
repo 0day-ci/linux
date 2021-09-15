@@ -6,6 +6,7 @@
 #ifndef __ASM_PERF_EVENT_H
 #define __ASM_PERF_EVENT_H
 
+#include <linux/wait.h>
 #include <asm/stack_pointer.h>
 #include <asm/ptrace.h>
 
@@ -258,5 +259,9 @@ extern unsigned long perf_misc_flags(struct pt_regs *regs);
 	(regs)->sp = current_stack_pointer; \
 	(regs)->pstate = PSR_MODE_EL1h;	\
 }
+
+extern bool arm_pmu_initialized;
+extern wait_queue_head_t arm_pmu_wait;
+extern bool check_pmu_nmi_ability(void);
 
 #endif

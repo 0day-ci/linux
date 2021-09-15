@@ -105,6 +105,11 @@ static DEFINE_PER_CPU(const struct pmu_irq_ops *, cpu_irq_ops);
 
 static bool has_nmi;
 
+bool check_pmu_nmi_ability(void)
+{
+	return has_nmi;
+}
+
 static inline u64 arm_pmu_event_max_period(struct perf_event *event)
 {
 	if (event->hw.flags & ARMPMU_EVT_64BIT)
