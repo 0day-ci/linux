@@ -1006,10 +1006,12 @@ static void virtio_ccw_release_dev(struct device *_d)
 {
 	struct virtio_device *dev = dev_to_virtio(_d);
 	struct virtio_ccw_device *vcdev = to_vc_device(dev);
+	struct ccw_device *cdev = READ_ONCE(vcdev->cdev);
 
 	ccw_device_dma_free(vcdev->cdev, vcdev->dma_area,
 			    sizeof(*vcdev->dma_area));
 	kfree(vcdev);
+	put_device(&cdev->dev);
 }
 
 static int irb_is_error(struct irb *irb)
@@ -1262,6 +1264,7 @@ static int virtio_ccw_online(struct ccw_device *cdev)
 	struct virtio_ccw_device *vcdev;
 	unsigned long flags;
 
+	get_device(&cdev->dev);
 	vcdev = kzalloc(sizeof(*vcdev), GFP_KERNEL);
 	if (!vcdev) {
 		dev_warn(&cdev->dev, "Could not get memory for virtio\n");
@@ -1315,6 +1318,7 @@ out_free:
 				    sizeof(*vcdev->dma_area));
 	}
 	kfree(vcdev);
+	put_device(&cdev->dev);
 	return ret;
 }
 
