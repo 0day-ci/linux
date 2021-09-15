@@ -123,6 +123,10 @@ static const struct regmap_bus *regmap_get_spi_bus(struct spi_device *spi,
 		bus->free_on_exit = true;
 		bus->max_raw_read = max_size;
 		bus->max_raw_write = max_size;
+
+		if (spi_max_message_size(spi) != SIZE_MAX)
+			bus->max_combined_rw = spi_max_message_size(spi);
+
 		return bus;
 	}
 
