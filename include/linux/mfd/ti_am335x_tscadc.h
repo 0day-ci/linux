@@ -162,11 +162,20 @@
 
 #define TSCADC_CELLS		2
 
+struct ti_tscadc_data {
+	char *name_tscmag;
+	char *compat_tscmag;
+	char *name_adc;
+	char *compat_adc;
+	unsigned int target_clk_rate;
+};
+
 struct ti_tscadc_dev {
 	struct device *dev;
 	struct regmap *regmap;
 	void __iomem *tscadc_base;
 	phys_addr_t tscadc_phys_base;
+	const struct ti_tscadc_data *data;
 	int irq;
 	int used_cells;	/* 1-2 */
 	int tsc_wires;
