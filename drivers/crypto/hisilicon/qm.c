@@ -33,23 +33,6 @@
 #define QM_ABNORMAL_EVENT_IRQ_VECTOR	3
 
 /* mailbox */
-#define QM_MB_CMD_SQC			0x0
-#define QM_MB_CMD_CQC			0x1
-#define QM_MB_CMD_EQC			0x2
-#define QM_MB_CMD_AEQC			0x3
-#define QM_MB_CMD_SQC_BT		0x4
-#define QM_MB_CMD_CQC_BT		0x5
-#define QM_MB_CMD_SQC_VFT_V2		0x6
-#define QM_MB_CMD_STOP_QP		0x8
-#define QM_MB_CMD_SRC			0xc
-#define QM_MB_CMD_DST			0xd
-
-#define QM_MB_CMD_SEND_BASE		0x300
-#define QM_MB_EVENT_SHIFT		8
-#define QM_MB_BUSY_SHIFT		13
-#define QM_MB_OP_SHIFT			14
-#define QM_MB_CMD_DATA_ADDR_L		0x304
-#define QM_MB_CMD_DATA_ADDR_H		0x308
 #define QM_MB_PING_ALL_VFS		0xffff
 #define QM_MB_CMD_DATA_SHIFT		32
 #define QM_MB_CMD_DATA_MASK		GENMASK(31, 0)
@@ -99,19 +82,12 @@
 #define QM_DB_CMD_SHIFT_V1		16
 #define QM_DB_INDEX_SHIFT_V1		32
 #define QM_DB_PRIORITY_SHIFT_V1		48
-#define QM_DOORBELL_SQ_CQ_BASE_V2	0x1000
-#define QM_DOORBELL_EQ_AEQ_BASE_V2	0x2000
 #define QM_QUE_ISO_CFG_V		0x0030
 #define QM_PAGE_SIZE			0x0034
 #define QM_QUE_ISO_EN			0x100154
 #define QM_CAPBILITY			0x100158
 #define QM_QP_NUN_MASK			GENMASK(10, 0)
 #define QM_QP_DB_INTERVAL		0x10000
-#define QM_QP_MAX_NUM_SHIFT		11
-#define QM_DB_CMD_SHIFT_V2		12
-#define QM_DB_RAND_SHIFT_V2		16
-#define QM_DB_INDEX_SHIFT_V2		32
-#define QM_DB_PRIORITY_SHIFT_V2		48
 
 #define QM_MEM_START_INIT		0x100040
 #define QM_MEM_INIT_DONE		0x100044
@@ -594,7 +570,7 @@ static void qm_mb_pre_init(struct qm_mailbox *mailbox, u8 cmd,
 }
 
 /* return 0 mailbox ready, -ETIMEDOUT hardware timeout */
-static int qm_wait_mb_ready(struct hisi_qm *qm)
+int qm_wait_mb_ready(struct hisi_qm *qm)
 {
 	u32 val;
 
@@ -602,6 +578,7 @@ static int qm_wait_mb_ready(struct hisi_qm *qm)
 					  val, !((val >> QM_MB_BUSY_SHIFT) &
 					  0x1), POLL_PERIOD, POLL_TIMEOUT);
 }
+EXPORT_SYMBOL_GPL(qm_wait_mb_ready);
 
 /* 128 bit should be written to hardware at one time to trigger a mailbox */
 static void qm_mb_write(struct hisi_qm *qm, const void *src)
@@ -646,8 +623,8 @@ mb_busy:
 	return -EBUSY;
 }
 
-static int qm_mb(struct hisi_qm *qm, u8 cmd, dma_addr_t dma_addr, u16 queue,
-		 bool op)
+int qm_mb(struct hisi_qm *qm, u8 cmd, dma_addr_t dma_addr, u16 queue,
+	  bool op)
 {
 	struct qm_mailbox mailbox;
 	int ret;
@@ -663,6 +640,7 @@ static int qm_mb(struct hisi_qm *qm, u8 cmd, dma_addr_t dma_addr, u16 queue,
 
 	return ret;
 }
+EXPORT_SYMBOL_GPL(qm_mb);
 
 static void qm_db_v1(struct hisi_qm *qm, u16 qn, u8 cmd, u16 index, u8 priority)
 {
