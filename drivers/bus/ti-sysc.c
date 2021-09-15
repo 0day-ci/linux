@@ -2037,6 +2037,9 @@ static int sysc_reset(struct sysc *ddata)
 		sysc_val = sysc_read_sysconfig(ddata);
 		sysc_val |= sysc_mask;
 		sysc_write(ddata, sysc_offset, sysc_val);
+
+		/* Flush posted write */
+		sysc_read_sysconfig(ddata);
 	}
 
 	if (ddata->cfg.srst_udelay)
