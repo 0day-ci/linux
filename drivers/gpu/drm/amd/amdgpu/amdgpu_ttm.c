@@ -1107,6 +1107,24 @@ static struct ttm_tt *amdgpu_ttm_tt_create(struct ttm_buffer_object *bo,
 	return &gtt->ttm;
 }
 
+static void amdgpu_ttm_tt_add_mapping(struct ttm_device *bdev,
+				      struct ttm_tt *ttm)
+{
+	pgoff_t i;
+
+	for (i = 0; i < ttm->num_pages; ++i)
+		ttm->pages[i]->mapping = bdev->dev_mapping;
+}
+
+static void amdgpu_ttm_tt_clear_mapping(struct ttm_tt *ttm)
+{
+	struct page **page = ttm->pages;
+	pgoff_t i;
+
+	for (i = 0; i < ttm->num_pages; ++i)
+		(*page)->mapping = NULL;
+}
+
 /*
  * amdgpu_ttm_tt_populate - Map GTT pages visible to the device
  *
@@ -1119,6 +1137,7 @@ static int amdgpu_ttm_tt_populate(struct ttm_device *bdev,
 {
 	struct amdgpu_device *adev = amdgpu_ttm_adev(bdev);
 	struct amdgpu_ttm_tt *gtt = (void *)ttm;
+	int ret;
 
 	/* user pages are bound by amdgpu_ttm_tt_pin_userptr() */
 	if (gtt->userptr) {
@@ -1131,7 +1150,12 @@ static int amdgpu_ttm_tt_populate(struct ttm_device *bdev,
 	if (ttm->page_flags & TTM_PAGE_FLAG_SG)
 		return 0;
 
-	return ttm_pool_alloc(&adev->mman.bdev.pool, ttm, ctx);
+	ret = ttm_pool_alloc(&adev->mman.bdev.pool, ttm, ctx);
+	if (ret)
+		return ret;
+
+	amdgpu_ttm_tt_add_mapping(bdev, ttm);
+	return 0;
 }
 
 /*
@@ -1159,6 +1183,7 @@ static void amdgpu_ttm_tt_unpopulate(struct ttm_device *bdev,
 		return;
 
 	adev = amdgpu_ttm_adev(bdev);
+	amdgpu_ttm_tt_clear_mapping(ttm);
 	return ttm_pool_free(&adev->mman.bdev.pool, ttm);
 }
 
