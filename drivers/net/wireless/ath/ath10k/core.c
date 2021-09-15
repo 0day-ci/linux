@@ -730,11 +730,7 @@ static int ath10k_init_sdio(struct ath10k *ar, enum ath10k_firmware_mode mode)
 		return ret;
 
 	param |= HI_ACS_FLAGS_SDIO_REDUCE_TX_COMPL_SET;
-
-	if (mode == ATH10K_FIRMWARE_MODE_NORMAL)
-		param |= HI_ACS_FLAGS_ALT_DATA_CREDIT_SIZE;
-	else
-		param &= ~HI_ACS_FLAGS_ALT_DATA_CREDIT_SIZE;
+	param &= ~HI_ACS_FLAGS_ALT_DATA_CREDIT_SIZE;
 
 	if (mode == ATH10K_FIRMWARE_MODE_UTF)
 		param &= ~HI_ACS_FLAGS_SDIO_SWAP_MAILBOX_SET;
