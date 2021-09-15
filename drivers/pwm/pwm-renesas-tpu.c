@@ -275,7 +275,7 @@ static int tpu_pwm_config(struct pwm_chip *chip, struct pwm_device *_pwm,
 	if (duty_ns) {
 		duty = clk_rate / prescalers[prescaler]
 		     / (NSEC_PER_SEC / duty_ns);
-		if (duty > period)
+		if (duty > period || duty == 0)
 			return -EINVAL;
 	} else {
 		duty = 0;
