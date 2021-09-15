@@ -29,10 +29,14 @@ properties:
 
       - description: K3 J721E SoC
         items:
+          - enum:
+              - ti,j721e-evm
           - const: ti,j721e
 
       - description: K3 J7200 SoC
         items:
+          - enum:
+              - ti,j7200-evm
           - const: ti,j7200
 
       - description: K3 AM642 SoC
