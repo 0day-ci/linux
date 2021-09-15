@@ -91,11 +91,11 @@ static int au1xpsc_i2s_set_fmt(struct snd_soc_dai *cpu_dai,
 	}
 
 	switch (fmt & SND_SOC_DAIFMT_MASTER_MASK) {
-	case SND_SOC_DAIFMT_CBM_CFM:	/* CODEC master */
-		ct |= PSC_I2SCFG_MS;	/* PSC I2S slave mode */
+	case SND_SOC_DAIFMT_CBP_CFP:	/* CODEC provider */
+		ct |= PSC_I2SCFG_MS;	/* PSC I2S consumer mode */
 		break;
-	case SND_SOC_DAIFMT_CBS_CFS:	/* CODEC slave */
-		ct &= ~PSC_I2SCFG_MS;	/* PSC I2S Master mode */
+	case SND_SOC_DAIFMT_CBC_CFC:	/* CODEC consumer */
+		ct &= ~PSC_I2SCFG_MS;	/* PSC I2S provider mode */
 		break;
 	default:
 		goto out;
