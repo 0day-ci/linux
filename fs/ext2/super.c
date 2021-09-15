@@ -587,8 +587,6 @@ static int parse_options(char *options, struct super_block *sb,
 			fallthrough;
 		case Opt_dax:
 #ifdef CONFIG_FS_DAX
-			ext2_msg(sb, KERN_WARNING,
-		"DAX enabled. Warning: EXPERIMENTAL, use at your own risk");
 			set_opt(opts->s_mount_opt, DAX);
 #else
 			ext2_msg(sb, KERN_INFO, "dax option not supported");
