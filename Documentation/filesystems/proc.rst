@@ -1513,6 +1513,14 @@ interrupts serviced  including  unnumbered  architecture specific  interrupts;
 each  subsequent column is the  total for that particular numbered interrupt.
 Unnumbered interrupts are not shown, only summed into the total.
 
+.. note::
+
+   On 32-bit platforms interrupt counters are 32-bit, including the total
+   count of all interrupts. Depending on the system load, these values will
+   sooner or later wrap around. If you want accurate accounting of the rate
+   and *actual* number of interrupts serviced, you should monitor the value
+   closely and handle wrap-arounds.
+
 The "ctxt" line gives the total number of context switches across all CPUs.
 
 The "btime" line gives  the time at which the  system booted, in seconds since
