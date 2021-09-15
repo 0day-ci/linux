@@ -18,6 +18,25 @@ DEFINE_STATIC_KEY_FALSE(delayacct_key);
 int delayacct_on __read_mostly;	/* Delay accounting turned on/off */
 struct kmem_cache *delayacct_cache;
 
+static int __init delayacct_setup_enable(char *str)
+{
+	delayacct_on = 1;
+	return 1;
+}
+__setup("delayacct", delayacct_setup_enable);
+
+void delayacct_init(void)
+{
+	delayacct_cache = KMEM_CACHE(task_delay_info, SLAB_PANIC|SLAB_ACCOUNT);
+	if (delayacct_on)
+		static_branch_enable(&delayacct_key);
+	else
+		return;
+
+	delayacct_tsk_init(&init_task);
+}
+
+#ifdef CONFIG_PROC_SYSCTL
 static void set_delayacct(bool enabled)
 {
 	if (enabled) {
@@ -29,21 +48,6 @@ static void set_delayacct(bool enabled)
 	}
 }
 
-static int __init delayacct_setup_enable(char *str)
-{
-	delayacct_on = 1;
-	return 1;
-}
-__setup("delayacct", delayacct_setup_enable);
-
-void delayacct_init(void)
-{
-	delayacct_cache = KMEM_CACHE(task_delay_info, SLAB_PANIC|SLAB_ACCOUNT);
-	delayacct_tsk_init(&init_task);
-	set_delayacct(delayacct_on);
-}
-
-#ifdef CONFIG_PROC_SYSCTL
 int sysctl_delayacct(struct ctl_table *table, int write, void *buffer,
 		     size_t *lenp, loff_t *ppos)
 {
