@@ -2346,8 +2346,6 @@ static int handle_mount_opt(struct super_block *sb, char *opt, int token,
 					     "both data=journal and dax");
 				    return -1;
 			}
-			ext4_msg(sb, KERN_WARNING,
-				"DAX enabled. Warning: EXPERIMENTAL, use at your own risk");
 			sbi->s_mount_opt |= EXT4_MOUNT_DAX_ALWAYS;
 			sbi->s_mount_opt2 &= ~EXT4_MOUNT2_DAX_NEVER;
 			break;
