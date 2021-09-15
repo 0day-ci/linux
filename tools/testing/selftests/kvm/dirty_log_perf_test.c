@@ -118,6 +118,12 @@ static inline void disable_dirty_logging(struct kvm_vm *vm, int slots)
 	toggle_dirty_logging(vm, slots, false);
 }
 
+static unsigned long *get_slot_bitmap(unsigned long *bitmap, uint64_t page_offset)
+{
+	/* Guaranteed to be evenly divisible by the TEST_ASSERT in run_test. */
+	return &bitmap[page_offset / BITS_PER_LONG];
+}
+
 static void get_dirty_log(struct kvm_vm *vm, int slots, unsigned long *bitmap,
 			  uint64_t nr_pages)
 {
@@ -126,7 +132,8 @@ static void get_dirty_log(struct kvm_vm *vm, int slots, unsigned long *bitmap,
 
 	for (i = 0; i < slots; i++) {
 		int slot = PERF_TEST_MEM_SLOT_INDEX + i;
-		unsigned long *slot_bitmap = bitmap + i * slot_pages;
+		uint64_t page_offset = slot_pages * i;
+		unsigned long *slot_bitmap = get_slot_bitmap(bitmap, page_offset);
 
 		kvm_vm_get_dirty_log(vm, slot, slot_bitmap);
 	}
@@ -140,7 +147,8 @@ static void clear_dirty_log(struct kvm_vm *vm, int slots, unsigned long *bitmap,
 
 	for (i = 0; i < slots; i++) {
 		int slot = PERF_TEST_MEM_SLOT_INDEX + i;
-		unsigned long *slot_bitmap = bitmap + i * slot_pages;
+		uint64_t page_offset = slot_pages * i;
+		unsigned long *slot_bitmap = get_slot_bitmap(bitmap, page_offset);
 
 		kvm_vm_clear_dirty_log(vm, slot, slot_bitmap, 0, slot_pages);
 	}
@@ -172,6 +180,9 @@ static void run_test(enum vm_guest_mode mode, void *arg)
 	guest_num_pages = vm_adjust_num_guest_pages(mode, guest_num_pages);
 	host_num_pages = vm_num_host_pages(mode, guest_num_pages);
 	bmap = bitmap_alloc(host_num_pages);
+	TEST_ASSERT((host_num_pages / p->slots) % BITS_PER_LONG == 0,
+		    "The number of pages per slot must be divisible by %d.",
+		    BITS_PER_LONG);
 
 	if (dirty_log_manual_caps) {
 		cap.cap = KVM_CAP_MANUAL_DIRTY_LOG_PROTECT2;
