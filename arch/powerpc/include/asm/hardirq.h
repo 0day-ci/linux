@@ -7,18 +7,18 @@
 
 typedef struct {
 	unsigned int __softirq_pending;
-	unsigned int timer_irqs_event;
-	unsigned int broadcast_irqs_event;
-	unsigned int timer_irqs_others;
-	unsigned int pmu_irqs;
-	unsigned int mce_exceptions;
-	unsigned int spurious_irqs;
-	unsigned int sreset_irqs;
+	unsigned long timer_irqs_event;
+	unsigned long broadcast_irqs_event;
+	unsigned long timer_irqs_others;
+	unsigned long pmu_irqs;
+	unsigned long mce_exceptions;
+	unsigned long spurious_irqs;
+	unsigned long sreset_irqs;
 #ifdef CONFIG_PPC_WATCHDOG
-	unsigned int soft_nmi_irqs;
+	unsigned long soft_nmi_irqs;
 #endif
 #ifdef CONFIG_PPC_DOORBELL
-	unsigned int doorbell_irqs;
+	unsigned long doorbell_irqs;
 #endif
 } ____cacheline_aligned irq_cpustat_t;
 
