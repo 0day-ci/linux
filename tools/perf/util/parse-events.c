@@ -1465,7 +1465,7 @@ int parse_events_add_numeric(struct parse_events_state *parse_state,
 
 int parse_events_add_tool(struct parse_events_state *parse_state,
 			  struct list_head *list,
-			  enum perf_tool_event tool_event)
+			  int tool_event)
 {
 	return add_event_tool(list, &parse_state->idx, tool_event);
 }
