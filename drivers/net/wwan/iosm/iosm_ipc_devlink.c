@@ -231,7 +231,7 @@ static int ipc_devlink_create_region(struct iosm_devlink *devlink)
 {
 	struct devlink_region_ops *mdm_coredump;
 	int rc = 0;
-	u8 i;
+	int i;
 
 	mdm_coredump = devlink->iosm_devlink_mdm_coredump;
 	for (i = 0; i < IOSM_NOF_CD_REGION; i++) {
@@ -247,7 +247,7 @@ static int ipc_devlink_create_region(struct iosm_devlink *devlink)
 			rc = PTR_ERR(devlink->cd_regions[i]);
 			dev_err(devlink->dev, "Devlink region fail,err %d", rc);
 			/* Delete previously created regions */
-			for ( ; i > 0; i--)
+			for ( ; i >= 0; i--)
 				devlink_region_destroy(devlink->cd_regions[i]);
 			goto region_create_fail;
 		}
