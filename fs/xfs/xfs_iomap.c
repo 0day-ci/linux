@@ -761,7 +761,8 @@ xfs_direct_write_iomap_begin(
 
 		/* may drop and re-acquire the ilock */
 		error = xfs_reflink_allocate_cow(ip, &imap, &cmap, &shared,
-				&lockmode, flags & IOMAP_DIRECT);
+				&lockmode,
+				(flags & IOMAP_DIRECT) || IS_DAX(inode));
 		if (error)
 			goto out_unlock;
 		if (shared)
@@ -852,6 +853,41 @@ out_unlock:
 
 const struct iomap_ops xfs_direct_write_iomap_ops = {
 	.iomap_begin		= xfs_direct_write_iomap_begin,
+};
+
+static int
+xfs_dax_write_iomap_end(
+	struct inode 		*inode,
+	loff_t 			pos,
+	loff_t 			length,
+	ssize_t 		written,
+	unsigned 		flags,
+	struct iomap 		*iomap)
+{
+	struct xfs_inode	*ip = XFS_I(inode);
+	/*
+	 * Usually we use @written to indicate whether the operation was
+	 * successful.  But it is always positive or zero.  The CoW needs the
+	 * actual error code from actor().  So, get it from
+	 * iomap_iter->processed.
+	 */
+	const struct iomap_iter *iter =
+				container_of(iomap, typeof(*iter), iomap);
+
+	if (!xfs_is_cow_inode(ip))
+		return 0;
+
+	if (iter->processed <= 0) {
+		xfs_reflink_cancel_cow_range(ip, pos, length, true);
+		return 0;
+	}
+
+	return xfs_reflink_end_cow(ip, pos, iter->processed);
+}
+
+const struct iomap_ops xfs_dax_write_iomap_ops = {
+	.iomap_begin 	= xfs_direct_write_iomap_begin,
+	.iomap_end	= xfs_dax_write_iomap_end,
 };
 
 static int
