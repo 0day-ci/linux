@@ -140,6 +140,7 @@
 #define TSCADC_CELLS		2
 
 struct ti_tscadc_data {
+	bool has_tsc;
 	char *name_tscmag;
 	char *compat_tscmag;
 	char *name_adc;
