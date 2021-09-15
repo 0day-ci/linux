@@ -73,7 +73,7 @@ int ttm_tt_create(struct ttm_buffer_object *bo, bool zero_alloc)
 	case ttm_bo_type_kernel:
 		break;
 	case ttm_bo_type_sg:
-		page_flags |= TTM_PAGE_FLAG_SG;
+		page_flags |= TTM_PAGE_FLAG_EXTERNAL;
 		break;
 	default:
 		pr_err("Illegal buffer object type\n");
@@ -178,7 +178,7 @@ int ttm_sg_tt_init(struct ttm_tt *ttm, struct ttm_buffer_object *bo,
 
 	ttm_tt_init_fields(ttm, bo, page_flags, caching);
 
-	if (page_flags & TTM_PAGE_FLAG_SG)
+	if (page_flags & TTM_PAGE_FLAG_EXTERNAL)
 		ret = ttm_sg_tt_alloc_page_directory(ttm);
 	else
 		ret = ttm_dma_tt_alloc_page_directory(ttm);
@@ -300,7 +300,7 @@ int ttm_tt_populate(struct ttm_device *bdev,
 	if (ttm_tt_is_populated(ttm))
 		return 0;
 
-	if (!(ttm->page_flags & TTM_PAGE_FLAG_SG)) {
+	if (!(ttm->page_flags & TTM_PAGE_FLAG_EXTERNAL)) {
 		atomic_long_add(ttm->num_pages, &ttm_pages_allocated);
 		if (bdev->pool.use_dma32)
 			atomic_long_add(ttm->num_pages,
@@ -337,7 +337,7 @@ int ttm_tt_populate(struct ttm_device *bdev,
 	return 0;
 
 error:
-	if (!(ttm->page_flags & TTM_PAGE_FLAG_SG)) {
+	if (!(ttm->page_flags & TTM_PAGE_FLAG_EXTERNAL)) {
 		atomic_long_sub(ttm->num_pages, &ttm_pages_allocated);
 		if (bdev->pool.use_dma32)
 			atomic_long_sub(ttm->num_pages,
@@ -357,7 +357,7 @@ void ttm_tt_unpopulate(struct ttm_device *bdev, struct ttm_tt *ttm)
 	else
 		ttm_pool_free(&bdev->pool, ttm);
 
-	if (!(ttm->page_flags & TTM_PAGE_FLAG_SG)) {
+	if (!(ttm->page_flags & TTM_PAGE_FLAG_EXTERNAL)) {
 		atomic_long_sub(ttm->num_pages, &ttm_pages_allocated);
 		if (bdev->pool.use_dma32)
 			atomic_long_sub(ttm->num_pages,
