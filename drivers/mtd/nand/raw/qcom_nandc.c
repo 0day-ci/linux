@@ -213,6 +213,7 @@ nandc_set_reg(chip, reg,			\
 #define QPIC_PER_CW_CMD_ELEMENTS	32
 #define QPIC_PER_CW_CMD_SGL		32
 #define QPIC_PER_CW_DATA_SGL		8
+#define	QPIC_PER_CW_STS_SGL		8
 
 #define QPIC_NAND_COMPLETION_TIMEOUT	msecs_to_jiffies(2000)
 
@@ -258,6 +259,7 @@ struct bam_transaction {
 	struct bam_cmd_element *bam_ce;
 	struct scatterlist *cmd_sgl;
 	struct scatterlist *data_sgl;
+	struct scatterlist *sts_sgl;
 	u32 bam_ce_pos;
 	u32 bam_ce_start;
 	u32 cmd_sgl_pos;
@@ -266,6 +268,8 @@ struct bam_transaction {
 	u32 tx_sgl_start;
 	u32 rx_sgl_pos;
 	u32 rx_sgl_start;
+	u32 sts_sgl_pos;
+	u32 sts_sgl_start;
 	bool wait_second_completion;
 	struct completion txn_done;
 	struct dma_async_tx_descriptor *last_data_desc;
@@ -508,6 +512,8 @@ alloc_bam_transaction(struct qcom_nand_controller *nandc)
 		((sizeof(*bam_txn->bam_ce) * QPIC_PER_CW_CMD_ELEMENTS) +
 		(sizeof(*bam_txn->cmd_sgl) * QPIC_PER_CW_CMD_SGL) +
 		(sizeof(*bam_txn->data_sgl) * QPIC_PER_CW_DATA_SGL));
+	if (nandc->props->qpic_v2)
+		bam_txn_size += (sizeof(*bam_txn->sts_sgl) * QPIC_PER_CW_STS_SGL);
 
 	bam_txn_buf = devm_kzalloc(nandc->dev, bam_txn_size, GFP_KERNEL);
 	if (!bam_txn_buf)
@@ -525,6 +531,12 @@ alloc_bam_transaction(struct qcom_nand_controller *nandc)
 		sizeof(*bam_txn->cmd_sgl) * QPIC_PER_CW_CMD_SGL * num_cw;
 
 	bam_txn->data_sgl = bam_txn_buf;
+
+	if (nandc->props->qpic_v2) {
+		bam_txn_buf +=
+			sizeof(*bam_txn->sts_sgl) * QPIC_PER_CW_STS_SGL * num_cw;
+		bam_txn->sts_sgl = bam_txn_buf;
+	}
 
 	init_completion(&bam_txn->txn_done);
 
@@ -554,6 +566,12 @@ static void clear_bam_transaction(struct qcom_nand_controller *nandc)
 		      QPIC_PER_CW_CMD_SGL);
 	sg_init_table(bam_txn->data_sgl, nandc->max_cwperpage *
 		      QPIC_PER_CW_DATA_SGL);
+	if (nandc->props->qpic_v2) {
+		bam_txn->sts_sgl_pos = 0;
+		bam_txn->sts_sgl_start = 0;
+		sg_init_table(bam_txn->sts_sgl, nandc->max_cwperpage *
+				QPIC_PER_CW_STS_SGL);
+	}
 
 	reinit_completion(&bam_txn->txn_done);
 }
@@ -808,6 +826,12 @@ static int prepare_bam_async_desc(struct qcom_nand_controller *nandc,
 		bam_txn->tx_sgl_start = bam_txn->tx_sgl_pos;
 		dir_eng = DMA_MEM_TO_DEV;
 		desc->dir = DMA_TO_DEVICE;
+	} else if (nandc->props->qpic_v2 && chan == nandc->sts_chan) {
+		sgl = &bam_txn->sts_sgl[bam_txn->sts_sgl_start];
+		sgl_cnt = bam_txn->sts_sgl_pos - bam_txn->sts_sgl_start;
+		bam_txn->sts_sgl_start = bam_txn->sts_sgl_pos;
+		dir_eng = DMA_DEV_TO_MEM;
+		desc->dir = DMA_FROM_DEVICE;
 	} else {
 		sgl = &bam_txn->data_sgl[bam_txn->rx_sgl_start];
 		sgl_cnt = bam_txn->rx_sgl_pos - bam_txn->rx_sgl_start;
@@ -1394,6 +1418,14 @@ static int submit_descs(struct qcom_nand_controller *nandc)
 			if (r)
 				return r;
 		}
+
+		if (nandc->props->qpic_v2) {
+			if (bam_txn->sts_sgl_pos > bam_txn->sts_sgl_start) {
+				r = prepare_bam_async_desc(nandc, nandc->sts_chan, 0);
+				if (r)
+					return r;
+			}
+		}
 	}
 
 	list_for_each_entry(desc, &nandc->desc_list, node)
@@ -1411,6 +1443,8 @@ static int submit_descs(struct qcom_nand_controller *nandc)
 		dma_async_issue_pending(nandc->tx_chan);
 		dma_async_issue_pending(nandc->rx_chan);
 		dma_async_issue_pending(nandc->cmd_chan);
+		if (nandc->props->qpic_v2)
+			dma_async_issue_pending(nandc->sts_chan);
 
 		if (!wait_for_completion_timeout(&bam_txn->txn_done,
 						 QPIC_NAND_COMPLETION_TIMEOUT))
