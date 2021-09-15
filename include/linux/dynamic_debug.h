@@ -181,6 +181,10 @@ void __dynamic_ibdev_dbg(struct _ddebug *descriptor,
 				   KERN_DEBUG, prefix_str, prefix_type,	\
 				   rowsize, groupsize, buf, len, ascii)
 
+struct kernel_param;
+int param_set_dyndbg(const char *instr, const struct kernel_param *kp);
+int param_get_dyndbg(char *buffer, const struct kernel_param *kp);
+
 #else /* !CONFIG_DYNAMIC_DEBUG_CORE */
 
 #include <linux/string.h>
@@ -227,6 +231,64 @@ static inline int dynamic_debug_exec_queries(const char *query, const char *modn
 	return 0;
 }
 
+struct kernel_param;
+static inline int param_set_dyndbg(const char *instr, const struct kernel_param *kp)
+{ return 0; }
+static inline int param_get_dyndbg(char *buffer, const struct kernel_param *kp)
+{ return 0; }
+
 #endif /* !CONFIG_DYNAMIC_DEBUG_CORE */
+
+struct dyndbg_bitdesc {
+	const char *match;	/* search format for this substr */
+};
+
+struct dyndbg_bitmap_param {
+	unsigned long *bits;		/* ref to shared state */
+	struct dyndbg_bitdesc map[];	/* indexed by bitpos */
+};
+
+#if defined(CONFIG_DYNAMIC_DEBUG) || \
+	(defined(CONFIG_DYNAMIC_DEBUG_CORE) && defined(DYNAMIC_DEBUG_MODULE))
+/**
+ * DEFINE_DYNAMIC_DEBUG_CATEGORIES() - bitmap control of categorized prdbgs
+ * @fsname: parameter basename under /sys
+ * @_var:    C-identifier holding bitmap
+ * @desc:  string summarizing the controls provided
+ * @...:    list of struct dyndbg_bitdesc initializations
+ *
+ * Intended for modules with substantial use of "categorized" prdbgs
+ * (those with some systematic prefix in the format string), this lets
+ * modules using pr_debug to control them in groups according to their
+ * format prefixes, and map them to bits 0-N of a sysfs control point.
+ * Each @... gives the index and prefix map.
+ */
+#define DEFINE_DYNAMIC_DEBUG_CATEGORIES(fsname, _var, desc, ...)	\
+	MODULE_PARM_DESC(fsname, desc);					\
+	static struct dyndbg_bitmap_param ddcats_##_var =		\
+	{ .bits = &(_var), .map = { __VA_ARGS__, { .match = NULL }}};	\
+	module_param_cb(fsname, &param_ops_dyndbg, &ddcats_##_var, 0644)
+
+/* helper macros provide combos of ^prefix and ' ' postfix */
+#define _DD_cat_(N, pfx)	[N] = { .match = "^" pfx " " }
+#define _DD_cats_(N, pfx)	[N] = { .match = "^" pfx }
+#define _DD_subtr_(N, flt)	[N] = { .match = flt }
+
+extern const struct kernel_param_ops param_ops_dyndbg;
+
+#elif (defined(CONFIG_DYNAMIC_DEBUG_CORE) && !defined(DYNAMIC_DEBUG_MODULE))
+
+#define DEFINE_DYNAMIC_DEBUG_CATEGORIES(fsname, var, bitmap_desc, ...)	\
+	BUILD_BUG_ON_MSG(1, "you need -DDYNAMIC_DEBUG_MODULE in compile")
+#define _DD_cat_(pfx)
+#define _DD_cats_(N, pfx)
+#define _DD_subtr_(N, flt)
+#else
+#define DEFINE_DYNAMIC_DEBUG_CATEGORIES(fsname, var, bitmap_desc, ...)	\
+	BUILD_BUG_ON_MSG(1, "CONFIG_DYNAMIC_DEBUG needed to use this macro: " #var)
+#define _DD_cat_(pfx)
+#define _DD_cats_(pfx)
+#define _DD_subtr_(N, flt)
+#endif
 
 #endif
