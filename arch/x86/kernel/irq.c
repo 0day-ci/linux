@@ -62,77 +62,77 @@ int arch_show_interrupts(struct seq_file *p, int prec)
 
 	seq_printf(p, "%*s: ", prec, "NMI");
 	for_each_online_cpu(j)
-		seq_printf(p, "%10u ", irq_stats(j)->__nmi_count);
+		seq_printf(p, "%10u ", READ_ONCE(irq_stats(j)->__nmi_count));
 	seq_puts(p, "  Non-maskable interrupts\n");
 #ifdef CONFIG_X86_LOCAL_APIC
 	seq_printf(p, "%*s: ", prec, "LOC");
 	for_each_online_cpu(j)
-		seq_printf(p, "%10u ", irq_stats(j)->apic_timer_irqs);
+		seq_printf(p, "%10u ", READ_ONCE(irq_stats(j)->apic_timer_irqs));
 	seq_puts(p, "  Local timer interrupts\n");
 
 	seq_printf(p, "%*s: ", prec, "SPU");
 	for_each_online_cpu(j)
-		seq_printf(p, "%10u ", irq_stats(j)->irq_spurious_count);
+		seq_printf(p, "%10u ", READ_ONCE(irq_stats(j)->irq_spurious_count));
 	seq_puts(p, "  Spurious interrupts\n");
 	seq_printf(p, "%*s: ", prec, "PMI");
 	for_each_online_cpu(j)
-		seq_printf(p, "%10u ", irq_stats(j)->apic_perf_irqs);
+		seq_printf(p, "%10u ", READ_ONCE(irq_stats(j)->apic_perf_irqs));
 	seq_puts(p, "  Performance monitoring interrupts\n");
 	seq_printf(p, "%*s: ", prec, "IWI");
 	for_each_online_cpu(j)
-		seq_printf(p, "%10u ", irq_stats(j)->apic_irq_work_irqs);
+		seq_printf(p, "%10u ", READ_ONCE(irq_stats(j)->apic_irq_work_irqs));
 	seq_puts(p, "  IRQ work interrupts\n");
 	seq_printf(p, "%*s: ", prec, "RTR");
 	for_each_online_cpu(j)
-		seq_printf(p, "%10u ", irq_stats(j)->icr_read_retry_count);
+		seq_printf(p, "%10u ", READ_ONCE(irq_stats(j)->icr_read_retry_count));
 	seq_puts(p, "  APIC ICR read retries\n");
 	if (x86_platform_ipi_callback) {
 		seq_printf(p, "%*s: ", prec, "PLT");
 		for_each_online_cpu(j)
-			seq_printf(p, "%10u ", irq_stats(j)->x86_platform_ipis);
+			seq_printf(p, "%10u ", READ_ONCE(irq_stats(j)->x86_platform_ipis));
 		seq_puts(p, "  Platform interrupts\n");
 	}
 #endif
 #ifdef CONFIG_SMP
 	seq_printf(p, "%*s: ", prec, "RES");
 	for_each_online_cpu(j)
-		seq_printf(p, "%10u ", irq_stats(j)->irq_resched_count);
+		seq_printf(p, "%10u ", READ_ONCE(irq_stats(j)->irq_resched_count));
 	seq_puts(p, "  Rescheduling interrupts\n");
 	seq_printf(p, "%*s: ", prec, "CAL");
 	for_each_online_cpu(j)
-		seq_printf(p, "%10u ", irq_stats(j)->irq_call_count);
+		seq_printf(p, "%10u ", READ_ONCE(irq_stats(j)->irq_call_count));
 	seq_puts(p, "  Function call interrupts\n");
 	seq_printf(p, "%*s: ", prec, "TLB");
 	for_each_online_cpu(j)
-		seq_printf(p, "%10u ", irq_stats(j)->irq_tlb_count);
+		seq_printf(p, "%10u ", READ_ONCE(irq_stats(j)->irq_tlb_count));
 	seq_puts(p, "  TLB shootdowns\n");
 #endif
 #ifdef CONFIG_X86_THERMAL_VECTOR
 	seq_printf(p, "%*s: ", prec, "TRM");
 	for_each_online_cpu(j)
-		seq_printf(p, "%10u ", irq_stats(j)->irq_thermal_count);
+		seq_printf(p, "%10u ", READ_ONCE(irq_stats(j)->irq_thermal_count));
 	seq_puts(p, "  Thermal event interrupts\n");
 #endif
 #ifdef CONFIG_X86_MCE_THRESHOLD
 	seq_printf(p, "%*s: ", prec, "THR");
 	for_each_online_cpu(j)
-		seq_printf(p, "%10u ", irq_stats(j)->irq_threshold_count);
+		seq_printf(p, "%10u ", READ_ONCE(irq_stats(j)->irq_threshold_count));
 	seq_puts(p, "  Threshold APIC interrupts\n");
 #endif
 #ifdef CONFIG_X86_MCE_AMD
 	seq_printf(p, "%*s: ", prec, "DFR");
 	for_each_online_cpu(j)
-		seq_printf(p, "%10u ", irq_stats(j)->irq_deferred_error_count);
+		seq_printf(p, "%10u ", READ_ONCE(irq_stats(j)->irq_deferred_error_count));
 	seq_puts(p, "  Deferred Error APIC interrupts\n");
 #endif
 #ifdef CONFIG_X86_MCE
 	seq_printf(p, "%*s: ", prec, "MCE");
 	for_each_online_cpu(j)
-		seq_printf(p, "%10u ", per_cpu(mce_exception_count, j));
+		seq_printf(p, "%10u ", READ_ONCE(per_cpu(mce_exception_count, j)));
 	seq_puts(p, "  Machine check exceptions\n");
 	seq_printf(p, "%*s: ", prec, "MCP");
 	for_each_online_cpu(j)
-		seq_printf(p, "%10u ", per_cpu(mce_poll_count, j));
+		seq_printf(p, "%10u ", READ_ONCE(per_cpu(mce_poll_count, j)));
 	seq_puts(p, "  Machine check polls\n");
 #endif
 #ifdef CONFIG_X86_HV_CALLBACK_VECTOR
@@ -140,7 +140,7 @@ int arch_show_interrupts(struct seq_file *p, int prec)
 		seq_printf(p, "%*s: ", prec, "HYP");
 		for_each_online_cpu(j)
 			seq_printf(p, "%10u ",
-				   irq_stats(j)->irq_hv_callback_count);
+				READ_ONCE(irq_stats(j)->irq_hv_callback_count));
 		seq_puts(p, "  Hypervisor callback interrupts\n");
 	}
 #endif
@@ -149,14 +149,14 @@ int arch_show_interrupts(struct seq_file *p, int prec)
 		seq_printf(p, "%*s: ", prec, "HRE");
 		for_each_online_cpu(j)
 			seq_printf(p, "%10u ",
-				   irq_stats(j)->irq_hv_reenlightenment_count);
+				READ_ONCE(irq_stats(j)->irq_hv_reenlightenment_count));
 		seq_puts(p, "  Hyper-V reenlightenment interrupts\n");
 	}
 	if (test_bit(HYPERV_STIMER0_VECTOR, system_vectors)) {
 		seq_printf(p, "%*s: ", prec, "HVS");
 		for_each_online_cpu(j)
 			seq_printf(p, "%10u ",
-				   irq_stats(j)->hyperv_stimer0_count);
+				READ_ONCE(irq_stats(j)->hyperv_stimer0_count));
 		seq_puts(p, "  Hyper-V stimer0 interrupts\n");
 	}
 #endif
@@ -167,19 +167,20 @@ int arch_show_interrupts(struct seq_file *p, int prec)
 #ifdef CONFIG_HAVE_KVM
 	seq_printf(p, "%*s: ", prec, "PIN");
 	for_each_online_cpu(j)
-		seq_printf(p, "%10u ", irq_stats(j)->kvm_posted_intr_ipis);
+		seq_printf(p, "%10u ",
+			READ_ONCE(irq_stats(j)->kvm_posted_intr_ipis));
 	seq_puts(p, "  Posted-interrupt notification event\n");
 
 	seq_printf(p, "%*s: ", prec, "NPI");
 	for_each_online_cpu(j)
 		seq_printf(p, "%10u ",
-			   irq_stats(j)->kvm_posted_intr_nested_ipis);
+			READ_ONCE(irq_stats(j)->kvm_posted_intr_nested_ipis));
 	seq_puts(p, "  Nested posted-interrupt event\n");
 
 	seq_printf(p, "%*s: ", prec, "PIW");
 	for_each_online_cpu(j)
 		seq_printf(p, "%10u ",
-			   irq_stats(j)->kvm_posted_intr_wakeup_ipis);
+			READ_ONCE(irq_stats(j)->kvm_posted_intr_wakeup_ipis));
 	seq_puts(p, "  Posted-interrupt wakeup event\n");
 #endif
 	return 0;
@@ -190,30 +191,30 @@ int arch_show_interrupts(struct seq_file *p, int prec)
  */
 u64 arch_irq_stat_cpu(unsigned int cpu)
 {
-	u64 sum = irq_stats(cpu)->__nmi_count;
+	u64 sum = READ_ONCE(irq_stats(cpu)->__nmi_count);
 
 #ifdef CONFIG_X86_LOCAL_APIC
-	sum += irq_stats(cpu)->apic_timer_irqs;
-	sum += irq_stats(cpu)->irq_spurious_count;
-	sum += irq_stats(cpu)->apic_perf_irqs;
-	sum += irq_stats(cpu)->apic_irq_work_irqs;
-	sum += irq_stats(cpu)->icr_read_retry_count;
+	sum += READ_ONCE(irq_stats(cpu)->apic_timer_irqs);
+	sum += READ_ONCE(irq_stats(cpu)->irq_spurious_count);
+	sum += READ_ONCE(irq_stats(cpu)->apic_perf_irqs);
+	sum += READ_ONCE(irq_stats(cpu)->apic_irq_work_irqs);
+	sum += READ_ONCE(irq_stats(cpu)->icr_read_retry_count);
 	if (x86_platform_ipi_callback)
-		sum += irq_stats(cpu)->x86_platform_ipis;
+		sum += READ_ONCE(irq_stats(cpu)->x86_platform_ipis);
 #endif
 #ifdef CONFIG_SMP
-	sum += irq_stats(cpu)->irq_resched_count;
-	sum += irq_stats(cpu)->irq_call_count;
+	sum += READ_ONCE(irq_stats(cpu)->irq_resched_count);
+	sum += READ_ONCE(irq_stats(cpu)->irq_call_count);
 #endif
 #ifdef CONFIG_X86_THERMAL_VECTOR
-	sum += irq_stats(cpu)->irq_thermal_count;
+	sum += READ_ONCE(irq_stats(cpu)->irq_thermal_count);
 #endif
 #ifdef CONFIG_X86_MCE_THRESHOLD
-	sum += irq_stats(cpu)->irq_threshold_count;
+	sum += READ_ONCE(irq_stats(cpu)->irq_threshold_count);
 #endif
 #ifdef CONFIG_X86_MCE
-	sum += per_cpu(mce_exception_count, cpu);
-	sum += per_cpu(mce_poll_count, cpu);
+	sum += READ_ONCE(per_cpu(mce_exception_count, cpu));
+	sum += READ_ONCE(per_cpu(mce_poll_count, cpu));
 #endif
 	return sum;
 }
