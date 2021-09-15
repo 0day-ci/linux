@@ -284,6 +284,7 @@ struct ceph_msg {
 #define CEPH_CON_F_SOCK_CLOSED		3  /* socket state changed to closed */
 #define CEPH_CON_F_BACKOFF		4  /* need to retry queuing delayed
 					      work */
+#define CEPH_CON_F_CLEAR_STANDBY	5  /* clear standby state */
 
 /* ceph connection fault delay defaults, for exponential backoff */
 #define BASE_DELAY_INTERVAL	(HZ / 4)

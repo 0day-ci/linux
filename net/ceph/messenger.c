@@ -90,6 +90,7 @@ static bool con_flag_valid(unsigned long con_flag)
 	case CEPH_CON_F_WRITE_PENDING:
 	case CEPH_CON_F_SOCK_CLOSED:
 	case CEPH_CON_F_BACKOFF:
+	case CEPH_CON_F_CLEAR_STANDBY:
 		return true;
 	default:
 		return false;
@@ -1488,6 +1489,18 @@ static void con_fault_finish(struct ceph_connection *con)
 		con->ops->fault(con);
 }
 
+static void clear_standby(struct ceph_connection *con)
+{
+	/* come back from STANDBY? */
+	if (con->state == CEPH_CON_S_STANDBY) {
+		dout("clear_standby %p and ++connect_seq\n", con);
+		con->state = CEPH_CON_S_PREOPEN;
+		con->v1.connect_seq++;
+		WARN_ON(ceph_con_flag_test(con, CEPH_CON_F_WRITE_PENDING));
+		WARN_ON(ceph_con_flag_test(con, CEPH_CON_F_KEEPALIVE_PENDING));
+	}
+}
+
 /*
  * Do some work on a connection.  Drop a connection ref when we're done.
  */
@@ -1498,6 +1511,9 @@ static void ceph_con_workfn(struct work_struct *work)
 	bool fault;
 
 	mutex_lock(&con->mutex);
+	if (ceph_con_flag_test_and_clear(con, CEPH_CON_F_CLEAR_STANDBY))
+		clear_standby(con);
+
 	while (true) {
 		int ret;
 
@@ -1663,18 +1679,6 @@ static void msg_con_set(struct ceph_msg *msg, struct ceph_connection *con)
 	BUG_ON(msg->con != con);
 }
 
-static void clear_standby(struct ceph_connection *con)
-{
-	/* come back from STANDBY? */
-	if (con->state == CEPH_CON_S_STANDBY) {
-		dout("clear_standby %p and ++connect_seq\n", con);
-		con->state = CEPH_CON_S_PREOPEN;
-		con->v1.connect_seq++;
-		WARN_ON(ceph_con_flag_test(con, CEPH_CON_F_WRITE_PENDING));
-		WARN_ON(ceph_con_flag_test(con, CEPH_CON_F_KEEPALIVE_PENDING));
-	}
-}
-
 /*
  * Queue up an outgoing message on the given connection.
  *
@@ -1707,7 +1711,7 @@ void ceph_con_send(struct ceph_connection *con, struct ceph_msg *msg)
 	     le32_to_cpu(msg->hdr.middle_len),
 	     le32_to_cpu(msg->hdr.data_len));
 
-	clear_standby(con);
+	ceph_con_flag_set(con, CEPH_CON_F_CLEAR_STANDBY);
 	mutex_unlock(&con->mutex);
 
 	/* if there wasn't anything waiting to send before, queue
@@ -1793,8 +1797,8 @@ void ceph_con_keepalive(struct ceph_connection *con)
 {
 	dout("con_keepalive %p\n", con);
 	mutex_lock(&con->mutex);
-	clear_standby(con);
 	ceph_con_flag_set(con, CEPH_CON_F_KEEPALIVE_PENDING);
+	ceph_con_flag_set(con, CEPH_CON_F_CLEAR_STANDBY);
 	mutex_unlock(&con->mutex);
 
 	if (!ceph_con_flag_test_and_set(con, CEPH_CON_F_WRITE_PENDING))
