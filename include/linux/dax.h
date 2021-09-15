@@ -13,6 +13,7 @@ typedef unsigned long dax_entry_t;
 
 struct iomap_ops;
 struct iomap;
+struct iomap_iter;
 struct dax_device;
 struct dax_operations {
 	/*
@@ -210,7 +211,7 @@ vm_fault_t dax_finish_sync_fault(struct vm_fault *vmf,
 int dax_delete_mapping_entry(struct address_space *mapping, pgoff_t index);
 int dax_invalidate_mapping_entry_sync(struct address_space *mapping,
 				      pgoff_t index);
-s64 dax_iomap_zero(loff_t pos, u64 length, struct iomap *iomap);
+s64 dax_iomap_zero(struct iomap_iter *iter, loff_t pos, u64 length);
 static inline bool dax_mapping(struct address_space *mapping)
 {
 	return mapping->host && IS_DAX(mapping->host);
