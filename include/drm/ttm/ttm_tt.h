@@ -66,11 +66,18 @@ struct ttm_tt {
 	 * Note that enum ttm_bo_type.ttm_bo_type_sg objects will always enable
 	 * this flag.
 	 *
+	 * TTM_PAGE_FLAG_EXTERNAL_MAPPABLE: Same behaviour as
+	 * TTM_PAGE_FLAG_EXTERNAL, but with the reduced restriction that it is
+	 * still valid to use TTM to map the pages directly. This is useful when
+	 * implementing a ttm_tt backend which still allocates driver owned
+	 * pages underneath(say with shmem).
+	 *
 	 * TTM_PAGE_FLAG_PRIV_POPULATED: TTM internal only. DO NOT USE.
 	 */
 #define TTM_PAGE_FLAG_SWAPPED		(1 << 0)
 #define TTM_PAGE_FLAG_ZERO_ALLOC	(1 << 1)
 #define TTM_PAGE_FLAG_EXTERNAL		(1 << 2)
+#define TTM_PAGE_FLAG_EXTERNAL_MAPPABLE	(1 << 3 | TTM_PAGE_FLAG_EXTERNAL)
 
 #define TTM_PAGE_FLAG_PRIV_POPULATED	(1 << 31)
 	uint32_t page_flags;
