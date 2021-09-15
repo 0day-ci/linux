@@ -1297,10 +1297,11 @@ static bool record_context(struct i915_gem_context_coredump *e,
 	return simulated;
 }
 
+#define VMA_NAME_LEN 16
 struct intel_engine_capture_vma {
 	struct intel_engine_capture_vma *next;
 	struct i915_vma *vma;
-	char name[16];
+	char name[VMA_NAME_LEN];
 };
 
 static struct intel_engine_capture_vma *
@@ -1314,7 +1315,7 @@ capture_vma(struct intel_engine_capture_vma *next,
 	if (!vma)
 		return next;
 
-	c = kmalloc(sizeof(*c), gfp);
+	c = kzalloc(sizeof(*c), gfp);
 	if (!c)
 		return next;
 
@@ -1323,7 +1324,7 @@ capture_vma(struct intel_engine_capture_vma *next,
 		return next;
 	}
 
-	strcpy(c->name, name);
+	strncpy(c->name, name, VMA_NAME_LEN-1);
 	c->vma = vma; /* reference held while active */
 
 	c->next = next;
