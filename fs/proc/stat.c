@@ -142,7 +142,7 @@ static int show_stat(struct seq_file *p, void *v)
 		sum		+= arch_irq_stat_cpu(i);
 
 		for (j = 0; j < NR_SOFTIRQS; j++) {
-			unsigned int softirq_stat = kstat_softirqs_cpu(j, i);
+			unsigned long softirq_stat = kstat_softirqs_cpu(j, i);
 
 			per_softirq_sums[j] += softirq_stat;
 			sum_softirq += softirq_stat;

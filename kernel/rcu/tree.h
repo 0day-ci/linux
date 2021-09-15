@@ -242,7 +242,7 @@ struct rcu_data {
 	char rcu_cpu_has_work;
 
 	/* 7) Diagnostic data, including RCU CPU stall warnings. */
-	unsigned int softirq_snap;	/* Snapshot of softirq activity. */
+	unsigned long softirq_snap;	/* Snapshot of softirq activity. */
 	/* ->rcu_iw* fields protected by leaf rcu_node ->lock. */
 	struct irq_work rcu_iw;		/* Check for non-irq activity. */
 	bool rcu_iw_pending;		/* Is ->rcu_iw pending? */

@@ -37,7 +37,7 @@ struct kernel_cpustat {
 
 struct kernel_stat {
 	unsigned long irqs_sum;
-	unsigned int softirqs[NR_SOFTIRQS];
+	unsigned long softirqs[NR_SOFTIRQS];
 };
 
 DECLARE_PER_CPU(struct kernel_stat, kstat);
@@ -59,7 +59,7 @@ static inline void kstat_incr_softirqs_this_cpu(unsigned int irq)
 	__this_cpu_inc(kstat.softirqs[irq]);
 }
 
-static inline unsigned int kstat_softirqs_cpu(unsigned int irq, int cpu)
+static inline unsigned long kstat_softirqs_cpu(unsigned int irq, int cpu)
 {
 	return READ_ONCE(kstat_cpu(cpu).softirqs[irq]);
 }
@@ -72,7 +72,7 @@ extern unsigned int kstat_irqs_usr(unsigned int irq);
 /*
  * Number of interrupts per cpu, since bootup
  */
-static inline unsigned int kstat_cpu_irqs_sum(unsigned int cpu)
+static inline unsigned long kstat_cpu_irqs_sum(unsigned int cpu)
 {
 	return READ_ONCE(kstat_cpu(cpu).irqs_sum);
 }
