@@ -338,19 +338,20 @@ __setup("rootflags=", root_data_setup);
 __setup("rootfstype=", fs_names_setup);
 __setup("rootdelay=", root_delay_setup);
 
-static int __init split_fs_names(char *page, char *names)
+static int __init split_fs_names(char *page, size_t size, char *names)
 {
 	int count = 0;
-	char *p = page;
+	char *p = page, *end = page + size - 1;
 
-	strcpy(p, root_fs_names);
+	strncpy(p, root_fs_names, size);
+	*end = '\0';
+
 	while (*p++) {
 		if (p[-1] == ',')
 			p[-1] = '\0';
 	}
-	*p = '\0';
 
-	for (p = page; *p; p += strlen(p)+1)
+	for (p = page; p < end && *p; p += strlen(p)+1)
 		count++;
 
 	return count;
@@ -404,7 +405,7 @@ void __init mount_block_root(char *name, int flags)
 	scnprintf(b, BDEVNAME_SIZE, "unknown-block(%u,%u)",
 		  MAJOR(ROOT_DEV), MINOR(ROOT_DEV));
 	if (root_fs_names)
-		num_fs = split_fs_names(fs_names, root_fs_names);
+		num_fs = split_fs_names(fs_names, PAGE_SIZE, root_fs_names);
 	else
 		num_fs = list_bdev_fs_names(fs_names, PAGE_SIZE);
 retry:
@@ -543,7 +544,7 @@ static int __init mount_nodev_root(void)
 	fs_names = (void *)__get_free_page(GFP_KERNEL);
 	if (!fs_names)
 		return -EINVAL;
-	num_fs = split_fs_names(fs_names, root_fs_names);
+	num_fs = split_fs_names(fs_names, PAGE_SIZE, root_fs_names);
 
 	for (i = 0, fstype = fs_names; i < num_fs;
 	     i++, fstype += strlen(fstype) + 1) {
