@@ -78,8 +78,10 @@ static inline void reset_hung_task_detector(void) { }
  */
 #define NMI_WATCHDOG_ENABLED_BIT   0
 #define SOFT_WATCHDOG_ENABLED_BIT  1
+#define NMI_WATCHDOG_UNDETERMINED_BIT  2
 #define NMI_WATCHDOG_ENABLED      (1 << NMI_WATCHDOG_ENABLED_BIT)
 #define SOFT_WATCHDOG_ENABLED     (1 << SOFT_WATCHDOG_ENABLED_BIT)
+#define NMI_WATCHDOG_UNDETERMINED    (1 << NMI_WATCHDOG_UNDETERMINED_BIT)
 
 #if defined(CONFIG_HARDLOCKUP_DETECTOR)
 extern void hardlockup_detector_disable(void);
@@ -116,10 +118,16 @@ static inline int hardlockup_detector_perf_init(void) { return 0; }
 # endif
 #endif
 
+struct watchdog_nmi_status {
+	unsigned int cpu;
+	int status;
+};
+
+typedef void (*watchdog_nmi_status_reporter)(struct watchdog_nmi_status *);
 void watchdog_nmi_stop(void);
 void watchdog_nmi_start(void);
-int watchdog_nmi_probe(void);
-int watchdog_nmi_enable(unsigned int cpu);
+int watchdog_nmi_probe(watchdog_nmi_status_reporter notifier);
+void watchdog_nmi_enable(unsigned int cpu);
 void watchdog_nmi_disable(unsigned int cpu);
 
 /**

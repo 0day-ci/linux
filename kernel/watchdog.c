@@ -40,7 +40,7 @@ int __read_mostly watchdog_user_enabled = 1;
 int __read_mostly nmi_watchdog_user_enabled = NMI_WATCHDOG_DEFAULT;
 int __read_mostly soft_watchdog_user_enabled = 1;
 int __read_mostly watchdog_thresh = 10;
-static int __read_mostly nmi_watchdog_available;
+static int __read_mostly nmi_watchdog_status;
 
 struct cpumask watchdog_cpumask __read_mostly;
 unsigned long *watchdog_cpumask_bits = cpumask_bits(&watchdog_cpumask);
@@ -85,6 +85,10 @@ __setup("nmi_watchdog=", hardlockup_panic_setup);
 
 #endif /* CONFIG_HARDLOCKUP_DETECTOR */
 
+static void lockup_detector_update_enable(void);
+
+static watchdog_nmi_status_reporter status_reporter;
+
 /*
  * These functions can be overridden if an architecture implements its
  * own hardlockup detector.
@@ -93,10 +97,9 @@ __setup("nmi_watchdog=", hardlockup_panic_setup);
  * softlockup watchdog start and stop. The arch must select the
  * SOFTLOCKUP_DETECTOR Kconfig.
  */
-int __weak watchdog_nmi_enable(unsigned int cpu)
+void __weak watchdog_nmi_enable(unsigned int cpu)
 {
 	hardlockup_detector_perf_enable();
-	return 0;
 }
 
 void __weak watchdog_nmi_disable(unsigned int cpu)
@@ -104,8 +107,28 @@ void __weak watchdog_nmi_disable(unsigned int cpu)
 	hardlockup_detector_perf_disable();
 }
 
-/* Return 0, if a NMI watchdog is available. Error code otherwise */
-int __weak __init watchdog_nmi_probe(void)
+static void watchdog_nmi_report_capability(struct watchdog_nmi_status *data)
+{
+	/* Set status to 1 temporary to block any further access */
+	if (atomic_cmpxchg((atomic_t *)&nmi_watchdog_status, -EBUSY, 1)
+			== -EBUSY) {
+		if (!data->status) {
+			nmi_watchdog_status = 0;
+			lockup_detector_update_enable();
+		} else {
+			nmi_watchdog_status = -ENODEV;
+			/* turn offf watchdog_enabled forever */
+			lockup_detector_update_enable();
+			pr_info("Perf NMI watchdog permanently disabled\n");
+		}
+	}
+}
+
+/*
+ * Return 0, if a NMI watchdog is available. -ENODEV if unavailable. -EBUSY if
+ * undetermined at this stage, and async notifier will update later.
+ */
+int __weak __init watchdog_nmi_probe(watchdog_nmi_status_reporter notifier)
 {
 	return hardlockup_detector_perf_init();
 }
@@ -144,8 +167,12 @@ static void lockup_detector_update_enable(void)
 	watchdog_enabled = 0;
 	if (!watchdog_user_enabled)
 		return;
-	if (nmi_watchdog_available && nmi_watchdog_user_enabled)
-		watchdog_enabled |= NMI_WATCHDOG_ENABLED;
+	if (nmi_watchdog_user_enabled) {
+		if (nmi_watchdog_status == 0)
+			watchdog_enabled |= NMI_WATCHDOG_ENABLED;
+		else if (nmi_watchdog_status == -EBUSY)
+			watchdog_enabled |= NMI_WATCHDOG_UNDETERMINED;
+	}
 	if (soft_watchdog_user_enabled)
 		watchdog_enabled |= SOFT_WATCHDOG_ENABLED;
 }
@@ -467,7 +494,8 @@ static void watchdog_enable(unsigned int cpu)
 	/* Initialize timestamp */
 	update_touch_ts();
 	/* Enable the perf event */
-	if (watchdog_enabled & NMI_WATCHDOG_ENABLED)
+	if (watchdog_enabled &
+			(NMI_WATCHDOG_ENABLED | NMI_WATCHDOG_UNDETERMINED))
 		watchdog_nmi_enable(cpu);
 }
 
@@ -682,7 +710,7 @@ int proc_watchdog(struct ctl_table *table, int write,
 int proc_nmi_watchdog(struct ctl_table *table, int write,
 		      void *buffer, size_t *lenp, loff_t *ppos)
 {
-	if (!nmi_watchdog_available && write)
+	if (!nmi_watchdog_status && write)
 		return -ENOTSUPP;
 	return proc_watchdog_common(NMI_WATCHDOG_ENABLED,
 				    table, write, buffer, lenp, ppos);
@@ -748,7 +776,6 @@ void __init lockup_detector_init(void)
 	cpumask_copy(&watchdog_cpumask,
 		     housekeeping_cpumask(HK_FLAG_TIMER));
 
-	if (!watchdog_nmi_probe())
-		nmi_watchdog_available = true;
+	nmi_watchdog_status = watchdog_nmi_probe(watchdog_nmi_report_capability);
 	lockup_detector_setup();
 }
