@@ -824,6 +824,7 @@ static void recv_work(struct work_struct *work)
 						     work);
 	struct nbd_device *nbd = args->nbd;
 	struct nbd_config *config = nbd->config;
+	struct request_queue *q = nbd->disk->queue;
 	struct nbd_sock *nsock;
 	struct nbd_cmd *cmd;
 	struct request *rq;
@@ -834,7 +835,24 @@ static void recv_work(struct work_struct *work)
 		if (nbd_read_reply(nbd, args->index, &reply))
 			break;
 
+		/*
+		 * Grab ref of q_usage_counter can prevent request being freed
+		 * during nbd_handle_reply(). If q_usage_counter is zero, then
+		 * no request is inflight, which means something is wrong since
+		 * we expect to find a request to complete here.
+		 */
+		if (!percpu_ref_tryget(&q->q_usage_counter)) {
+			dev_err(disk_to_dev(nbd->disk), "%s: no io inflight\n",
+				__func__);
+			break;
+		}
+
 		cmd = nbd_handle_reply(nbd, args->index, &reply);
+		/*
+		 * It's safe to drop ref before request completion, inflight
+		 * request will ensure q_usage_counter won't be zero.
+		 */
+		percpu_ref_put(&q->q_usage_counter);
 		if (IS_ERR(cmd))
 			break;
 
