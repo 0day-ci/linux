@@ -99,7 +99,17 @@ static watchdog_nmi_status_reporter status_reporter;
  */
 void __weak watchdog_nmi_enable(unsigned int cpu)
 {
-	hardlockup_detector_perf_enable();
+	struct watchdog_nmi_status data;
+	int ret;
+
+	ret = hardlockup_detector_perf_enable();
+	/* No concurrent risk because BP executes this before smp_init() */
+	if (watchdog_enabled & NMI_WATCHDOG_UNDETERMINED
+			&& status_reporter) {
+		data.cpu = cpu;
+		data.status = ret;
+		(*status_reporter)(&data);
+	}
 }
 
 void __weak watchdog_nmi_disable(unsigned int cpu)
@@ -130,7 +140,9 @@ static void watchdog_nmi_report_capability(struct watchdog_nmi_status *data)
  */
 int __weak __init watchdog_nmi_probe(watchdog_nmi_status_reporter notifier)
 {
-	return hardlockup_detector_perf_init();
+	status_reporter = notifier;
+
+	return -EBUSY;
 }
 
 /**

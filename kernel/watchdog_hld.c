@@ -190,16 +190,17 @@ static int hardlockup_detector_event_create(void)
 /**
  * hardlockup_detector_perf_enable - Enable the local event
  */
-void hardlockup_detector_perf_enable(void)
+int hardlockup_detector_perf_enable(void)
 {
 	if (hardlockup_detector_event_create())
-		return;
+		return -ENODEV;
 
 	/* use original value for check */
 	if (!atomic_fetch_inc(&watchdog_cpus))
 		pr_info("Enabled. Permanently consumes one hw-PMU counter.\n");
 
 	perf_event_enable(this_cpu_read(watchdog_ev));
+	return 0;
 }
 
 /**
@@ -280,20 +281,4 @@ void __init hardlockup_detector_perf_restart(void)
 		if (event)
 			perf_event_enable(event);
 	}
-}
-
-/**
- * hardlockup_detector_perf_init - Probe whether NMI event is available at all
- */
-int __init hardlockup_detector_perf_init(void)
-{
-	int ret = hardlockup_detector_event_create();
-
-	if (ret) {
-		pr_info("Perf NMI watchdog permanently disabled\n");
-	} else {
-		perf_event_release_kernel(this_cpu_read(watchdog_ev));
-		this_cpu_write(watchdog_ev, NULL);
-	}
-	return ret;
 }
