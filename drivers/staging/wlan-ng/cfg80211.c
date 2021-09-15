@@ -328,8 +328,7 @@ static int prism2_scan(struct wiphy *wiphy,
 		(i < request->n_channels) && i < ARRAY_SIZE(prism2_channels);
 		i++)
 		msg1.channellist.data.data[i] =
-			ieee80211_frequency_to_channel(
-				request->channels[i]->center_freq);
+			ieee80211_freq_to_channel(request->channels[i]->center_freq);
 	msg1.channellist.data.len = request->n_channels;
 
 	msg1.maxchanneltime.data = 250;
@@ -449,7 +448,7 @@ static int prism2_connect(struct wiphy *wiphy, struct net_device *dev,
 
 	/* Set the channel */
 	if (channel) {
-		chan = ieee80211_frequency_to_channel(channel->center_freq);
+		chan = ieee80211_freq_to_channel(channel->center_freq);
 		result = prism2_domibset_uint32(wlandev,
 						DIDMIB_DOT11PHY_DSSSTABLE_CURRENTCHANNEL,
 						chan);
