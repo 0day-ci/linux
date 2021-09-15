@@ -506,6 +506,8 @@ typedef void (*regmap_hw_free_context)(void *context);
  * @max_raw_read: Max raw read size that can be used on the bus.
  * @max_raw_write: Max raw write size that can be used on the bus.
  * @free_on_exit: kfree this on exit of regmap
+ * @max_combined_rw: Max size for raw_read + raw_write, when they are issued
+ *                   together as part of the same message
  */
 struct regmap_bus {
 	bool fast_io;
@@ -523,6 +525,7 @@ struct regmap_bus {
 	enum regmap_endian val_format_endian_default;
 	size_t max_raw_read;
 	size_t max_raw_write;
+	size_t max_combined_rw;
 	bool free_on_exit;
 };
 
