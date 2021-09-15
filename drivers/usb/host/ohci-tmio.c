@@ -202,6 +202,9 @@ static int ohci_hcd_tmio_drv_probe(struct platform_device *dev)
 	if (!cell)
 		return -EINVAL;
 
+	if (!regs || !config || !sram)
+		return -EINVAL;
+
 	if (irq < 0)
 		return irq;
 
