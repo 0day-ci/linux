@@ -32,7 +32,7 @@ static inline void ack_bad_irq(unsigned int irq)
 	printk(KERN_CRIT "unexpected IRQ trap at vector %02x\n", irq);
 }
 
-extern u64 arch_irq_stat_cpu(unsigned int cpu);
+extern unsigned long arch_irq_stat_cpu(unsigned int cpu);
 #define arch_irq_stat_cpu	arch_irq_stat_cpu
 
 #endif /* _ASM_POWERPC_HARDIRQ_H */
