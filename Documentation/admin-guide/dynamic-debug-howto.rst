@@ -358,7 +358,7 @@ Examples
   // boot-args example, with newlines and comments for readability
   Kernel command line: ...
     // see whats going on in dyndbg=value processing
-    dynamic_debug.verbose=1
+    dynamic_debug.verbose=3
     // enable pr_debugs in 2 builtins, #cmt is stripped
     dyndbg="module params +p #cmt ; module sys +p"
     // enable pr_debugs in 2 functions in a module loaded later
