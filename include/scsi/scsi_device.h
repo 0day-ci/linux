@@ -207,6 +207,7 @@ struct scsi_device {
 	unsigned rpm_autosuspend:1;	/* Enable runtime autosuspend at device
 					 * creation time */
 	unsigned ignore_media_change:1; /* Ignore MEDIA CHANGE on resume */
+	unsigned request_queue_cleaned:1; /* Request queue has been cleaned up */
 
 	bool offline_already;		/* Device offline message logged */
 

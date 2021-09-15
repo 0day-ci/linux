@@ -145,6 +145,12 @@ extern void __scsi_remove_device(struct scsi_device *);
 extern struct bus_type scsi_bus_type;
 extern const struct attribute_group *scsi_sysfs_shost_attr_groups[];
 
+static inline void scsi_sysfs_cleanup_sdev(struct scsi_device *sdev)
+{
+	sdev->request_queue_cleaned = true;
+	blk_cleanup_queue(sdev->request_queue);
+}
+
 /* scsi_netlink.c */
 #ifdef CONFIG_SCSI_NETLINK
 extern void scsi_netlink_init(void);

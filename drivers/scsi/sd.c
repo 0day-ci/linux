@@ -3498,6 +3498,8 @@ static int sd_remove(struct device *dev)
 	del_gendisk(sdkp->disk);
 	sd_shutdown(dev);
 
+	scsi_sysfs_cleanup_sdev(to_scsi_device(dev));
+
 	free_opal_dev(sdkp->opal_dev);
 
 	mutex_lock(&sd_ref_mutex);

@@ -64,7 +64,7 @@
 
 #include "scsi_logging.h"
 #include "sr.h"
-
+#include "scsi_priv.h"
 
 MODULE_DESCRIPTION("SCSI cdrom (sr) driver");
 MODULE_LICENSE("GPL");
@@ -1044,6 +1044,8 @@ static int sr_remove(struct device *dev)
 
 	del_gendisk(cd->disk);
 	dev_set_drvdata(dev, NULL);
+
+	scsi_sysfs_cleanup_sdev(to_scsi_device(dev));
 
 	mutex_lock(&sr_ref_mutex);
 	kref_put(&cd->kref, sr_kref_release);
