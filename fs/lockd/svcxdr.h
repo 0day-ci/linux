@@ -139,6 +139,8 @@ svcxdr_encode_owner(struct xdr_stream *xdr, const struct xdr_netobj *obj)
 
 	if (xdr_stream_encode_u32(xdr, obj->len) < 0)
 		return false;
+	if (obj->len == 0)
+		return true;
 	p = xdr_reserve_space(xdr, obj->len);
 	if (!p)
 		return false;
