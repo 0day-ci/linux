@@ -359,7 +359,5 @@ Examples
   Kernel command line: ...
     // see whats going on in dyndbg=value processing
     dynamic_debug.verbose=3
-    // enable pr_debugs in 2 builtins, #cmt is stripped
-    dyndbg="module params +p #cmt ; module sys +p"
-    // enable pr_debugs in 2 functions in a module loaded later
-    pc87360.dyndbg="func pc87360_init_device +p; func pc87360_find +p"
+    // enable pr_debugs in 2 builtins, 1 loadable modules init* funcs
+    params.dyndbg=+p sys.dyndbg=+p pc87360.dyndbg="func init* +p"
