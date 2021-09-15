@@ -566,11 +566,11 @@ void ocelot_phylink_mac_link_up(struct ocelot *ocelot, int port,
 	/* Take MAC, Port, Phy (intern) and PCS (SGMII/Serdes) clock out of
 	 * reset
 	 */
-	ocelot_port_writel(ocelot_port, DEV_CLOCK_CFG_LINK_SPEED(speed),
+	ocelot_port_writel(ocelot_port, DEV_CLOCK_CFG_LINK_SPEED(mac_speed),
 			   DEV_CLOCK_CFG);
 
 	/* No PFC */
-	ocelot_write_gix(ocelot, ANA_PFC_PFC_CFG_FC_LINK_SPEED(speed),
+	ocelot_write_gix(ocelot, ANA_PFC_PFC_CFG_FC_LINK_SPEED(mac_speed),
 			 ANA_PFC_PFC_CFG, port);
 
 	/* Core: Enable port for frame transfer */
