@@ -1212,6 +1212,7 @@ static vm_fault_t dax_pmd_load_hole(struct xa_state *xas, struct vm_fault *vmf,
 s64 dax_iomap_zero(struct iomap_iter *iter, loff_t pos, u64 length)
 {
 	const struct iomap *iomap = &iter->iomap;
+	const struct iomap *srcmap = &iter->srcmap;
 	sector_t sector = iomap_sector(iomap, pos & PAGE_MASK);
 	pgoff_t pgoff;
 	long rc, id;
@@ -1230,21 +1231,27 @@ s64 dax_iomap_zero(struct iomap_iter *iter, loff_t pos, u64 length)
 
 	id = dax_read_lock();
 
-	if (page_aligned)
+	if (page_aligned) {
 		rc = dax_zero_page_range(iomap->dax_dev, pgoff, 1);
-	else
-		rc = dax_direct_access(iomap->dax_dev, pgoff, 1, &kaddr, NULL);
-	if (rc < 0) {
-		dax_read_unlock(id);
-		return rc;
+		goto out;
 	}
 
-	if (!page_aligned) {
-		memset(kaddr + offset, 0, size);
+	rc = dax_direct_access(iomap->dax_dev, pgoff, 1, &kaddr, NULL);
+	if (rc < 0)
+		goto out;
+	memset(kaddr + offset, 0, size);
+	if (srcmap->addr != IOMAP_HOLE && srcmap->addr != iomap->addr) {
+		rc = dax_iomap_cow_copy(pos, size, PAGE_SIZE, srcmap,
+					kaddr);
+		if (rc < 0)
+			goto out;
+		dax_flush(iomap->dax_dev, kaddr, PAGE_SIZE);
+	} else
 		dax_flush(iomap->dax_dev, kaddr + offset, size);
-	}
+
+out:
 	dax_read_unlock(id);
-	return size;
+	return rc < 0 ? rc : size;
 }
 
 static loff_t dax_iomap_iter(const struct iomap_iter *iomi,
