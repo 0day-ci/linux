@@ -36,8 +36,49 @@
 
 #include "resource.h"
 
-#define DC_LOGGER_INIT(logger)
+#ifdef CONFIG_DRM_USE_DYNAMIC_DEBUG
+/* define a drm.debug style dyndbg pr-debug control point */
+#include <linux/dynamic_debug.h>
 
+unsigned long __debug_dc;
+EXPORT_SYMBOL(__debug_dc);
+
+#define help_(_N, _cat)	"\t  Bit-" #_N "\t" _cat "\n"
+
+#define DC_DYNDBG_BITMAP_DESC(name)					\
+	"Control pr_debugs via /sys/module/amdgpu/parameters/" #name	\
+	", where each bit controls a debug category.\n"			\
+	help_(0, "[SURFACE]:")						\
+	help_(1, "[CURSOR]:")						\
+	help_(2, "[PFLIP]:")						\
+	help_(3, "[VBLANK]:")						\
+	help_(4, "[HW_LINK_TRAINING]:")				\
+	help_(5, "[HW_AUDIO]:")					\
+	help_(6, "[SCALER]:")						\
+	help_(7, "[BIOS]:")						\
+	help_(8, "[BANDWIDTH_CALCS]:")					\
+	help_(9, "[DML]:")						\
+	help_(10, "[IF_TRACE]:")					\
+	help_(11, "[GAMMA]:")						\
+	help_(12, "[SMU_MSG]:")
+
+DEFINE_DYNAMIC_DEBUG_CATEGORIES(debug_dc, __debug_dc,
+				DC_DYNDBG_BITMAP_DESC(debug_dc),
+				_DD_cat_(0, "[CURSOR]:"),
+				_DD_cat_(1, "[PFLIP]:"),
+				_DD_cat_(2, "[VBLANK]:"),
+				_DD_cat_(3, "[HW_LINK_TRAINING]:"),
+				_DD_cat_(4, "[HW_AUDIO]:"),
+				_DD_cat_(5, "[SCALER]:"),
+				_DD_cat_(6, "[BIOS]:"),
+				_DD_cat_(7, "[BANDWIDTH_CALCS]:"),
+				_DD_cat_(8, "[DML]:"),
+				_DD_cat_(9, "[IF_TRACE]:"),
+				_DD_cat_(10, "[GAMMA]:"),
+				_DD_cat_(11, "[SMU_MSG]:"));
+#endif
+
+#define DC_LOGGER_INIT(logger)
 
 #define SURFACE_TRACE(...) do {\
 		if (dc->debug.surface_trace) \
