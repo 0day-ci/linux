@@ -278,6 +278,8 @@ static int klp_check_stack(struct task_struct *task, char *err_buf)
  * Try to safely switch a task to the target patch state.  If it's currently
  * running, or it's sleeping on a to-be-patched or to-be-unpatched function, or
  * if the stack is unreliable, return false.
+ *
+ * Idle tasks are switched in the main loop when running.
  */
 static bool klp_try_switch_task(struct task_struct *task)
 {
@@ -308,6 +310,12 @@ static bool klp_try_switch_task(struct task_struct *task)
 	rq = task_rq_lock(task, &flags);
 
 	if (task_running(rq, task) && task != current) {
+		/*
+		 * Idle task might stay running for a long time. Switch them
+		 * in the main loop.
+		 */
+		if (is_idle_task(task))
+			resched_curr(rq);
 		snprintf(err_buf, STACK_ERR_BUF_SIZE,
 			 "%s: %s:%d is running\n", __func__, task->comm,
 			 task->pid);
