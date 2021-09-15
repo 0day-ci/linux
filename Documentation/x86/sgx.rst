@@ -250,3 +250,9 @@ user wants to deploy SGX applications both on the host and in guests
 on the same machine, the user should reserve enough EPC (by taking out
 total virtual EPC size of all SGX VMs from the physical EPC size) for
 host SGX applications so they can run with acceptable performance.
+
+Debugging
+=========
+
+*/sys/kernel/debug/x86/sgx_total_mem* contains an integer describing
+the total SGX reserved memory in bytes, available in the system.
