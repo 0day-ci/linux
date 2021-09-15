@@ -132,7 +132,7 @@ static void vpr_info_dq(const struct ddebug_query *query, const char *msg)
 			fmtlen--;
 	}
 
-	v3pr_info("%s: func=\"%s\" file=\"%s\" module=\"%s\" format=\"%.*s\" lineno=%u-%u\n",
+	v3pr_info("%s: func=<%s> file=<%s> module=<%s> format=<%.*s> lineno=%u-%u\n",
 		 msg,
 		 query->function ?: "",
 		 query->filename ?: "",
@@ -279,7 +279,7 @@ static int ddebug_tokenize(char *buf, char *words[], int maxwords)
 		int i;
 		pr_info("split into words:");
 		for (i = 0; i < nwords; i++)
-			pr_cont(" \"%s\"", words[i]);
+			pr_cont(" <%s>", words[i]);
 		pr_cont("\n");
 	}
 
@@ -419,7 +419,7 @@ static int ddebug_parse_query(char *words[], int nwords,
 			if (parse_linerange(query, arg))
 				return -EINVAL;
 		} else {
-			pr_err("unknown keyword \"%s\"\n", keyword);
+			pr_err("unknown keyword <%s>\n", keyword);
 			return -EINVAL;
 		}
 		if (rc)
@@ -449,7 +449,7 @@ static int ddebug_parse_flags(const char *str, struct flag_settings *modifiers)
 		pr_err("bad flag-op %c, at start of %s\n", *str, str);
 		return -EINVAL;
 	}
-	v3pr_info("op='%c'\n", op);
+	v3pr_info("op=<%c>\n", op);
 
 	for (; *str ; ++str) {
 		for (i = ARRAY_SIZE(opt_array) - 1; i >= 0; i--) {
@@ -531,7 +531,7 @@ static int ddebug_exec_queries(char *query, const char *modname)
 		if (!query || !*query || *query == '#')
 			continue;
 
-		v2pr_info("query %d: \"%s\" mod:%s\n", i, query, modname ?: "*");
+		v2pr_info("query %d: <%s> mod:<%s>\n", i, query, modname ?: "*");
 
 		rc = ddebug_exec_query(query, modname);
 		if (rc < 0) {
@@ -1000,7 +1000,7 @@ static int ddebug_dyndbg_param_cb(char *param, char *val,
 static int ddebug_dyndbg_boot_param_cb(char *param, char *val,
 				const char *unused, void *arg)
 {
-	vpr_info("bootparam %s=\"%s\"\n", param, val);
+	vpr_info("bootparam %s=<%s>\n", param, val);
 	return ddebug_dyndbg_param_cb(param, val, NULL, 0);
 }
 
@@ -1011,7 +1011,7 @@ static int ddebug_dyndbg_boot_param_cb(char *param, char *val,
  */
 int ddebug_dyndbg_module_param_cb(char *param, char *val, const char *module)
 {
-	vpr_info("module: %s %s=\"%s\"\n", module, param, val);
+	vpr_info("module: %s %s=<%s>\n", module, param, val);
 	return ddebug_dyndbg_param_cb(param, val, module, -ENOENT);
 }
 
@@ -1030,7 +1030,7 @@ int ddebug_remove_module(const char *mod_name)
 	struct ddebug_table *dt, *nextdt;
 	int ret = -ENOENT;
 
-	v2pr_info("removing module \"%s\"\n", mod_name);
+	v2pr_info("removing module <%s>\n", mod_name);
 
 	mutex_lock(&ddebug_lock);
 	list_for_each_entry_safe(dt, nextdt, &ddebug_tables, link) {
