@@ -189,9 +189,9 @@ int arch_show_interrupts(struct seq_file *p, int prec)
 /*
  * /proc/stat helpers
  */
-u64 arch_irq_stat_cpu(unsigned int cpu)
+unsigned long arch_irq_stat_cpu(unsigned int cpu)
 {
-	u64 sum = READ_ONCE(irq_stats(cpu)->__nmi_count);
+	unsigned long sum = READ_ONCE(irq_stats(cpu)->__nmi_count);
 
 #ifdef CONFIG_X86_LOCAL_APIC
 	sum += READ_ONCE(irq_stats(cpu)->apic_timer_irqs);
@@ -219,10 +219,9 @@ u64 arch_irq_stat_cpu(unsigned int cpu)
 	return sum;
 }
 
-u64 arch_irq_stat(void)
+unsigned long arch_irq_stat(void)
 {
-	u64 sum = atomic_long_read(&irq_err_count);
-	return sum;
+	return atomic_long_read(&irq_err_count);
 }
 
 static __always_inline void handle_irq(struct irq_desc *desc,
