@@ -1478,6 +1478,17 @@ static const struct uvc_entity_quirk {
 	u8 guid[16];
 	u32 quirks;
 } uvc_entity_quirk[] = {
+	/*
+	 * Some SunPlus uvc 1.5 device firmware expects that packages with
+	 * no frame data are ignored by the host.
+	 * Therefore it does not clear the PTS/SCR bits in the header, and
+	 * breaks the timestamp decode algorithm.
+	 */
+	{
+		.guid = {0x82, 0x06, 0x61, 0x63, 0x70, 0x50, 0xab, 0x49,
+			 0xb8, 0xcc, 0xb3, 0x85, 0x5e, 0x8d, 0x22, 0x1d},
+		.quirks = UVC_QUIRK_IGNORE_EMPTY_TS,
+	},
 };
 
 static void uvc_entity_quirks(struct uvc_device *dev)

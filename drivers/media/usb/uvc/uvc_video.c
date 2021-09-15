@@ -490,6 +490,14 @@ uvc_video_clock_decode(struct uvc_streaming *stream, struct uvc_buffer *buf,
 	if (len < header_size)
 		return;
 
+	/*
+	 * Ignore the hardware timestamp on frames with no data on
+	 * miss-behaving devices.
+	 */
+	if (stream->dev->quirks & UVC_QUIRK_IGNORE_EMPTY_TS &&
+	    len == header_size)
+		return;
+
 	/* Extract the timestamps:
 	 *
 	 * - store the frame PTS in the buffer structure
