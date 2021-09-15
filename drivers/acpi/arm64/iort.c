@@ -40,6 +40,22 @@ struct iort_fwnode {
 static LIST_HEAD(iort_fwnode_list);
 static DEFINE_SPINLOCK(iort_fwnode_lock);
 
+static bool acpi_smmu_disabled;
+
+static int __init acpi_smmu_parse(char *str)
+{
+	if (!str)
+		return -EINVAL;
+
+	if (!strncmp(str, "off", 3)) {
+		acpi_smmu_disabled = true;
+		pr_info("SMMU disabled\n");
+	}
+
+	return 0;
+}
+__setup("smmu=", acpi_smmu_parse);
+
 /**
  * iort_set_fwnode() - Create iort_fwnode and use it to register
  *		       iommu data in the iort_fwnode_list
@@ -1596,7 +1612,7 @@ static void __init iort_init_platform_devices(void)
 		iort_enable_acs(iort_node);
 
 		ops = iort_get_dev_cfg(iort_node);
-		if (ops) {
+		if (ops && !acpi_smmu_disabled) {
 			fwnode = acpi_alloc_fwnode_static();
 			if (!fwnode)
 				return;
