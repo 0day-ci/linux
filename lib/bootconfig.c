@@ -789,6 +789,7 @@ static int __init xbc_verify_tree(void)
  */
 void __init xbc_destroy_all(void)
 {
+	memblock_free_ptr(xbc_data, xbc_data_size);
 	xbc_data = NULL;
 	xbc_data_size = 0;
 	xbc_node_num = 0;
@@ -810,6 +811,8 @@ void __init xbc_destroy_all(void)
  * In error cases, @emsg will be updated with an error message and
  * @epos will be updated with the error position which is the byte offset
  * of @buf. If the error is not a parser error, @epos will be -1.
+ * Note that the @buf ownership is transferred, so it will be freed
+ * in xbc_destroy_all().
  */
 int __init xbc_init(char *buf, const char **emsg, int *epos)
 {
