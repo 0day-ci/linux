@@ -234,6 +234,15 @@ static int i915_ttm_tt_shmem_populate(struct ttm_device *bdev,
 	if (ttm->page_flags & TTM_PAGE_FLAG_SWAPPED)
 		ttm->page_flags &= ~TTM_PAGE_FLAG_SWAPPED;
 
+	/*
+	 * Even if we lack mm.pages for this object(which will be the case when
+	 * something is evicted to system memory by TTM), we still want to make
+	 * this object visible to the shrinker, since the underlying ttm_tt
+	 * still has the real shmem pages. When unpopulating the tt(possibly due
+	 * to shrinking) we hide it again from the shrinker.
+	 */
+	__i915_gem_object_make_shrinkable(obj);
+
 	i915_tt->cached_st = st;
 	return 0;
 
@@ -247,6 +256,8 @@ static void i915_ttm_tt_shmem_unpopulate(struct ttm_tt *ttm)
 	struct i915_ttm_tt *i915_tt = container_of(ttm, typeof(*i915_tt), ttm);
 	struct drm_i915_gem_object *obj = i915_tt->obj;
 	bool backup = i915_tt->backup;
+
+	i915_gem_object_make_unshrinkable(obj);
 
 	if (obj->mm.madv == I915_MADV_DONTNEED) {
 		obj->mm.dirty = false;
