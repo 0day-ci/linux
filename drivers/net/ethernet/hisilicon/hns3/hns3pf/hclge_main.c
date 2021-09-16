@@ -1342,8 +1342,6 @@ static void hclge_parse_cfg(struct hclge_cfg *cfg, struct hclge_desc *desc)
 	cfg->umv_space = hnae3_get_field(__le32_to_cpu(req->param[1]),
 					 HCLGE_CFG_UMV_TBL_SPACE_M,
 					 HCLGE_CFG_UMV_TBL_SPACE_S);
-	if (!cfg->umv_space)
-		cfg->umv_space = HCLGE_DEFAULT_UMV_SPACE_PER_PF;
 
 	cfg->pf_rss_size_max = hnae3_get_field(__le32_to_cpu(req->param[2]),
 					       HCLGE_CFG_PF_RSS_SIZE_M,
@@ -1419,6 +1417,7 @@ static void hclge_set_default_dev_specs(struct hclge_dev *hdev)
 	ae_dev->dev_specs.max_int_gl = HCLGE_DEF_MAX_INT_GL;
 	ae_dev->dev_specs.max_frm_size = HCLGE_MAC_MAX_FRAME;
 	ae_dev->dev_specs.max_qset_num = HCLGE_MAX_QSET_NUM;
+	ae_dev->dev_specs.umv_size = HCLGE_DEFAULT_UMV_SPACE_PER_PF;
 }
 
 static void hclge_parse_dev_specs(struct hclge_dev *hdev,
@@ -1440,6 +1439,8 @@ static void hclge_parse_dev_specs(struct hclge_dev *hdev,
 	ae_dev->dev_specs.max_qset_num = le16_to_cpu(req1->max_qset_num);
 	ae_dev->dev_specs.max_int_gl = le16_to_cpu(req1->max_int_gl);
 	ae_dev->dev_specs.max_frm_size = le16_to_cpu(req1->max_frm_size);
+	ae_dev->dev_specs.umv_size = le16_to_cpu(req1->umv_size);
+	ae_dev->dev_specs.mc_mac_size = le16_to_cpu(req1->mc_mac_size);
 }
 
 static void hclge_check_dev_specs(struct hclge_dev *hdev)
@@ -1460,6 +1461,8 @@ static void hclge_check_dev_specs(struct hclge_dev *hdev)
 		dev_specs->max_int_gl = HCLGE_DEF_MAX_INT_GL;
 	if (!dev_specs->max_frm_size)
 		dev_specs->max_frm_size = HCLGE_MAC_MAX_FRAME;
+	if (!dev_specs->umv_size)
+		dev_specs->umv_size = HCLGE_DEFAULT_UMV_SPACE_PER_PF;
 }
 
 static int hclge_query_dev_specs(struct hclge_dev *hdev)
@@ -1528,9 +1531,10 @@ static void hclge_init_kdump_kernel_config(struct hclge_dev *hdev)
 static int hclge_configure(struct hclge_dev *hdev)
 {
 	struct hnae3_ae_dev *ae_dev = pci_get_drvdata(hdev->pdev);
+	const struct cpumask *cpumask = cpu_online_mask;
 	struct hclge_cfg cfg;
 	unsigned int i;
-	int ret;
+	int node, ret;
 
 	ret = hclge_get_cfg(hdev, &cfg);
 	if (ret)
@@ -1548,7 +1552,10 @@ static int hclge_configure(struct hclge_dev *hdev)
 	hdev->tm_info.num_pg = 1;
 	hdev->tc_max = cfg.tc_num;
 	hdev->tm_info.hw_pfc_map = 0;
-	hdev->wanted_umv_size = cfg.umv_space;
+	if (cfg.umv_space)
+		hdev->wanted_umv_size = cfg.umv_space;
+	else
+		hdev->wanted_umv_size = hdev->ae_dev->dev_specs.umv_size;
 	hdev->tx_spare_buf_size = cfg.tx_spare_buf_size;
 	hdev->gro_en = true;
 	if (cfg.vlan_fliter_cap == HCLGE_VLAN_FLTR_CAN_MDF)
@@ -1595,11 +1602,12 @@ static int hclge_configure(struct hclge_dev *hdev)
 
 	hclge_init_kdump_kernel_config(hdev);
 
-	/* Set the init affinity based on pci func number */
-	i = cpumask_weight(cpumask_of_node(dev_to_node(&hdev->pdev->dev)));
-	i = i ? PCI_FUNC(hdev->pdev->devfn) % i : 0;
-	cpumask_set_cpu(cpumask_local_spread(i, dev_to_node(&hdev->pdev->dev)),
-			&hdev->affinity_mask);
+	/* Set the affinity based on numa node */
+	node = dev_to_node(&hdev->pdev->dev);
+	if (node != NUMA_NO_NODE)
+		cpumask = cpumask_of_node(node);
+
+	cpumask_copy(&hdev->affinity_mask, cpumask);
 
 	return ret;
 }
@@ -8125,11 +8133,12 @@ static void hclge_ae_stop(struct hnae3_handle *handle)
 	hclge_clear_arfs_rules(hdev);
 	spin_unlock_bh(&hdev->fd_rule_lock);
 
-	/* If it is not PF reset, the firmware will disable the MAC,
+	/* If it is not PF reset or FLR, the firmware will disable the MAC,
 	 * so it only need to stop phy here.
 	 */
 	if (test_bit(HCLGE_STATE_RST_HANDLING, &hdev->state) &&
-	    hdev->reset_type != HNAE3_FUNC_RESET) {
+	    hdev->reset_type != HNAE3_FUNC_RESET &&
+	    hdev->reset_type != HNAE3_FLR_RESET) {
 		hclge_mac_stop_phy(hdev);
 		hclge_update_link_status(hdev);
 		return;
@@ -8475,6 +8484,9 @@ static int hclge_init_umv_space(struct hclge_dev *hdev)
 	hdev->share_umv_size = hdev->priv_umv_size +
 			hdev->max_umv_size % (hdev->num_alloc_vport + 1);
 
+	if (hdev->ae_dev->dev_specs.mc_mac_size)
+		set_bit(HNAE3_DEV_SUPPORT_MC_MAC_MNG_B, hdev->ae_dev->caps);
+
 	return 0;
 }
 
@@ -8492,6 +8504,8 @@ static void hclge_reset_umv_space(struct hclge_dev *hdev)
 	hdev->share_umv_size = hdev->priv_umv_size +
 			hdev->max_umv_size % (hdev->num_alloc_vport + 1);
 	mutex_unlock(&hdev->vport_lock);
+
+	hdev->used_mc_mac_num = 0;
 }
 
 static bool hclge_is_umv_space_full(struct hclge_vport *vport, bool need_lock)
@@ -8753,6 +8767,7 @@ int hclge_add_mc_addr_common(struct hclge_vport *vport,
 	struct hclge_dev *hdev = vport->back;
 	struct hclge_mac_vlan_tbl_entry_cmd req;
 	struct hclge_desc desc[3];
+	bool is_new_addr = false;
 	int status;
 
 	/* mac addr check */
@@ -8766,6 +8781,13 @@ int hclge_add_mc_addr_common(struct hclge_vport *vport,
 	hclge_prepare_mac_addr(&req, addr, true);
 	status = hclge_lookup_mac_vlan_tbl(vport, &req, desc, true);
 	if (status) {
+		if (hnae3_ae_dev_mc_mac_mng_supported(hdev->ae_dev) &&
+		    hdev->used_mc_mac_num >=
+		    hdev->ae_dev->dev_specs.mc_mac_size)
+			goto err_no_space;
+
+		is_new_addr = true;
+
 		/* This mac addr do not exist, add new entry for it */
 		memset(desc[0].data, 0, sizeof(desc[0].data));
 		memset(desc[1].data, 0, sizeof(desc[0].data));
@@ -8775,12 +8797,18 @@ int hclge_add_mc_addr_common(struct hclge_vport *vport,
 	if (status)
 		return status;
 	status = hclge_add_mac_vlan_tbl(vport, &req, desc);
-	/* if already overflow, not to print each time */
-	if (status == -ENOSPC &&
-	    !(vport->overflow_promisc_flags & HNAE3_OVERFLOW_MPE))
-		dev_err(&hdev->pdev->dev, "mc mac vlan table is full\n");
+	if (status == -ENOSPC)
+		goto err_no_space;
+	else if (!status && is_new_addr)
+		hdev->used_mc_mac_num++;
 
 	return status;
+
+err_no_space:
+	/* if already overflow, not to print each time */
+	if (!(vport->overflow_promisc_flags & HNAE3_OVERFLOW_MPE))
+		dev_err(&hdev->pdev->dev, "mc mac vlan table is full\n");
+	return -ENOSPC;
 }
 
 static int hclge_rm_mc_addr(struct hnae3_handle *handle,
@@ -8817,12 +8845,15 @@ int hclge_rm_mc_addr_common(struct hclge_vport *vport,
 		if (status)
 			return status;
 
-		if (hclge_is_all_function_id_zero(desc))
+		if (hclge_is_all_function_id_zero(desc)) {
 			/* All the vfid is zero, so need to delete this entry */
 			status = hclge_remove_mac_vlan_tbl(vport, &req);
-		else
+			if (!status)
+				hdev->used_mc_mac_num--;
+		} else {
 			/* Not all the vfid is zero, update the vfid */
 			status = hclge_add_mac_vlan_tbl(vport, &req, desc);
+		}
 	} else if (status == -ENOENT) {
 		status = 0;
 	}

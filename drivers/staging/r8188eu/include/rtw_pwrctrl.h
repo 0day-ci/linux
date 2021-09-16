@@ -152,9 +152,6 @@ enum { /*  for ips_mode */
 struct pwrctrl_priv {
 	struct semaphore lock;
 	volatile u8 rpwm; /*  requested power state for fw */
-	volatile u8 cpwm; /*  fw current power state. updated when
-			   * 1. read from HCPWM 2. driver lowers power level */
-	volatile u8 tog; /*  toggling */
 	volatile u8 cpwm_tog; /*  toggling */
 
 	u8	pwr_mode;
@@ -188,7 +185,6 @@ struct pwrctrl_priv {
 	u8	power_mgnt;
 	u8	bFwCurrentInPSMode;
 	u32	DelayLPSLastTimeStamp;
-	u8	btcoex_rfon;
 	s32		pnp_current_pwr_state;
 	u8		pnp_bstop_trx;
 
@@ -210,7 +206,6 @@ struct pwrctrl_priv {
 
 	u8		wepkeymask;
 	u8		bHWPowerdown;/* if support hw power down */
-	u8		bHWPwrPindetect;
 	u8		bkeepfwalive;
 	u8		brfoffbyhw;
 	unsigned long PS_BBRegBackup[PSBBREG_TOTALCNT];
@@ -251,8 +246,6 @@ s32 LPS_RF_ON_check(struct adapter *adapter, u32 delay_ms);
 void LPS_Enter(struct adapter *adapter);
 void LPS_Leave(struct adapter *adapter);
 
-u8 rtw_interface_ps_func(struct adapter *adapter,
-			 enum hal_intf_ps_func efunc_id, u8 *val);
 void rtw_set_ips_deny(struct adapter *adapter, u32 ms);
 int _rtw_pwr_wakeup(struct adapter *adapter, u32 ips_defer_ms,
 		    const char *caller);

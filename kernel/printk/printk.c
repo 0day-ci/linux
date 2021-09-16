@@ -392,7 +392,10 @@ static struct latched_seq clear_seq = {
 /* the maximum size of a formatted record (i.e. with prefix added per line) */
 #define CONSOLE_LOG_MAX		1024
 
-/* the maximum size allowed to be reserved for a record */
+/*
+ * The maximum size allowed to be reserved for a record.
+ * Keep in sync with rust/kernel/print.rs.
+ */
 #define LOG_LINE_MAX		(CONSOLE_LOG_MAX - PREFIX_MAX)
 
 #define LOG_LEVEL(v)		((v) & 0x07)
@@ -847,7 +850,7 @@ static int devkmsg_open(struct inode *inode, struct file *file)
 			return err;
 	}
 
-	user = kmalloc(sizeof(struct devkmsg_user), GFP_KERNEL);
+	user = kvmalloc(sizeof(struct devkmsg_user), GFP_KERNEL);
 	if (!user)
 		return -ENOMEM;
 
@@ -875,7 +878,7 @@ static int devkmsg_release(struct inode *inode, struct file *file)
 	ratelimit_state_exit(&user->rs);
 
 	mutex_destroy(&user->lock);
-	kfree(user);
+	kvfree(user);
 	return 0;
 }
 

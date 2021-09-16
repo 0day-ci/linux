@@ -319,6 +319,8 @@ static void * __init get_boot_config_from_initrd(u32 *_size, u32 *_csum)
 #ifdef CONFIG_BOOT_CONFIG
 
 static char xbc_namebuf[XBC_KEYLEN_MAX] __initdata;
+static void *init_xbc_data_copy __initdata;
+static phys_addr_t init_xbc_data_size __initdata;
 
 #define rest(dst, end) ((end) > (dst) ? (end) - (dst) : 0)
 
@@ -458,18 +460,24 @@ static void __init setup_boot_config(void)
 		else
 			pr_err("Failed to parse bootconfig: %s at %d.\n",
 				msg, pos);
+		memblock_free(__pa(copy), size + 1);
 	} else {
 		pr_info("Load bootconfig: %d bytes %d nodes\n", size, ret);
 		/* keys starting with "kernel." are passed via cmdline */
 		extra_command_line = xbc_make_cmdline("kernel");
 		/* Also, "init." keys are init arguments */
 		extra_init_args = xbc_make_cmdline("init");
+		init_xbc_data_copy = copy;
+		init_xbc_data_size = size + 1;
 	}
 	return;
 }
 
 static void __init exit_boot_config(void)
 {
+	if (!init_xbc_data_copy)
+		return;
+	memblock_free(__pa(init_xbc_data_copy), init_xbc_data_size);
 	xbc_destroy_all();
 }
 

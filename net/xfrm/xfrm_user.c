@@ -2005,6 +2005,11 @@ static int xfrm_get_default(struct sk_buff *skb, struct nlmsghdr *nlh,
 		return -EMSGSIZE;
 	}
 
+	if (up->dirmask >= XFRM_USERPOLICY_DIRMASK_MAX) {
+		kfree_skb(r_skb);
+		return -EINVAL;
+	}
+
 	r_up = nlmsg_data(r_nlh);
 
 	r_up->action = ((net->xfrm.policy_default & (1 << up->dirmask)) >> up->dirmask);
@@ -2912,7 +2917,7 @@ static int build_expire(struct sk_buff *skb, struct xfrm_state *x, const struct 
 	copy_to_user_state(x, &ue->state);
 	ue->hard = (c->data.hard != 0) ? 1 : 0;
 	/* clear the padding bytes */
-	memset(&ue->hard + 1, 0, sizeof(*ue) - offsetofend(typeof(*ue), hard));
+	memset_after(ue, 0, hard);
 
 	err = xfrm_mark_put(skb, &x->mark);
 	if (err)

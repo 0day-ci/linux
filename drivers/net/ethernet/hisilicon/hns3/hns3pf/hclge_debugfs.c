@@ -1724,6 +1724,10 @@ hclge_dbg_get_imp_stats_info(struct hclge_dev *hdev, char *buf, int len)
 	}
 
 	bd_num = le32_to_cpu(req->bd_num);
+	if (!bd_num) {
+		dev_err(&hdev->pdev->dev, "imp statistics bd number is 0!\n");
+		return -EINVAL;
+	}
 
 	desc_src = kcalloc(bd_num, sizeof(struct hclge_desc), GFP_KERNEL);
 	if (!desc_src)
@@ -1967,6 +1971,9 @@ static int hclge_dbg_dump_umv_info(struct hclge_dev *hdev, char *buf, int len)
 				 i, vport->used_umv_num);
 	}
 	mutex_unlock(&hdev->vport_lock);
+
+	pos += scnprintf(buf + pos, len - pos, "used_mc_mac_num  : %u\n",
+			 hdev->used_mc_mac_num);
 
 	return 0;
 }
