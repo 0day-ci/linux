@@ -2814,6 +2814,29 @@ ufshcd_check_query_response(struct ufs_hba *hba, struct ufshcd_lrb *lrbp)
 	return query_res->response;
 }
 
+static int
+ufshcd_check_sense_response(struct ufs_hba *hba, struct ufshcd_lrb *lrbp)
+{
+	int scsi_status;
+	int resp;
+
+	resp = ufshcd_get_req_rsp(lrbp->ucd_rsp_ptr);
+	if (resp != UPIU_TRANSACTION_RESPONSE) {
+		dev_err(hba->dev, "%s: Invalid cmd response: %#x\n",
+			__func__, resp);
+		return -EINVAL;
+	}
+
+	resp = ufshcd_get_rsp_upiu_result(lrbp->ucd_rsp_ptr);
+	scsi_status = resp & MASK_SCSI_STATUS;
+	if (scsi_status != SAM_STAT_GOOD) {
+		dev_err(hba->dev, "%s: REQUEST_SENSE failed, status %#x\n",
+			__func__, scsi_status);
+		return -EINVAL;
+	}
+	return 0;
+}
+
 /**
  * ufshcd_dev_cmd_completion() - handles device management command responses
  * @hba: per adapter instance
@@ -2847,6 +2870,12 @@ ufshcd_dev_cmd_completion(struct ufs_hba *hba, struct ufshcd_lrb *lrbp)
 		dev_err(hba->dev, "%s: Reject UPIU not fully implemented\n",
 				__func__);
 		break;
+	case UPIU_TRANSACTION_RESPONSE:
+		if (hba->dev_cmd.type == DEV_CMD_TYPE_SENSE) {
+			err = ufshcd_check_sense_response(hba, lrbp);
+			break;
+		}
+		fallthrough;
 	default:
 		err = -EINVAL;
 		dev_err(hba->dev, "%s: Invalid device management cmd response: %x\n",
@@ -3553,6 +3582,7 @@ static int ufshcd_get_ref_clk_gating_wait(struct ufs_hba *hba)
 static int ufshcd_memory_alloc(struct ufs_hba *hba)
 {
 	size_t utmrdl_size, utrdl_size, ucdl_size;
+	size_t extra, dev_cmd_buf_offs;
 
 	/* Allocate memory for UTP command descriptors */
 	ucdl_size = (sizeof(struct utp_transfer_cmd_desc) * hba->nutrs);
@@ -3590,13 +3620,16 @@ static int ufshcd_memory_alloc(struct ufs_hba *hba)
 		goto out;
 	}
 
+	/* Double for alignment */
+	extra = UFS_DEV_CMD_BUF_SZ * 2;
+
 	/*
 	 * Allocate memory for UTP Task Management descriptors
 	 * UFSHCI requires 1024 byte alignment of UTMRD
 	 */
 	utmrdl_size = sizeof(struct utp_task_req_desc) * hba->nutmrs;
 	hba->utmrdl_base_addr = dmam_alloc_coherent(hba->dev,
-						    utmrdl_size,
+						    utmrdl_size + extra,
 						    &hba->utmrdl_dma_addr,
 						    GFP_KERNEL);
 	if (!hba->utmrdl_base_addr ||
@@ -3605,6 +3638,10 @@ static int ufshcd_memory_alloc(struct ufs_hba *hba)
 		"Task Management Descriptor Memory allocation failed\n");
 		goto out;
 	}
+
+	dev_cmd_buf_offs = round_up(utmrdl_size, UFS_DEV_CMD_BUF_SZ);
+	hba->dev_cmd.buf = (void *)hba->utmrdl_base_addr + dev_cmd_buf_offs;
+	hba->dev_cmd.buf_dma_addr = hba->utmrdl_dma_addr + dev_cmd_buf_offs;
 
 	/* Allocate memory for local reference block */
 	hba->lrb = devm_kcalloc(hba->dev,
@@ -5297,14 +5334,14 @@ static void __ufshcd_transfer_req_compl(struct ufs_hba *hba,
 			cmd->scsi_done(cmd);
 			ufshcd_release(hba);
 			update_scaling = true;
-		} else if (lrbp->command_type == UTP_CMD_TYPE_DEV_MANAGE ||
-			lrbp->command_type == UTP_CMD_TYPE_UFS_STORAGE) {
-			if (hba->dev_cmd.complete) {
-				ufshcd_add_command_trace(hba, index,
-							 UFS_DEV_COMP);
-				complete(hba->dev_cmd.complete);
-				update_scaling = true;
-			}
+		} else if ((lrbp->command_type == UTP_CMD_TYPE_DEV_MANAGE ||
+			    lrbp->command_type == UTP_CMD_TYPE_UFS_STORAGE ||
+			    (lrbp->command_type == UTP_CMD_TYPE_SCSI &&
+			     hba->dev_cmd.type == DEV_CMD_TYPE_SENSE)) &&
+			   hba->dev_cmd.complete) {
+			ufshcd_add_command_trace(hba, index, UFS_DEV_COMP);
+			complete(hba->dev_cmd.complete);
+			update_scaling = true;
 		}
 		if (update_scaling)
 			ufshcd_clk_scaling_update_busy(hba);
@@ -7934,60 +7971,110 @@ out:
 	return ret;
 }
 
-static void ufshcd_request_sense_done(struct request *rq, blk_status_t error)
+static int ufshcd_request_sense_direct(struct ufs_hba *hba, u8 wlun)
 {
-	if (error != BLK_STS_OK)
-		pr_err("%s: REQUEST SENSE failed (%d)\n", __func__, error);
-	kfree(rq->end_io_data);
-	blk_put_request(rq);
-}
-
-static int
-ufshcd_request_sense_async(struct ufs_hba *hba, struct scsi_device *sdev)
-{
-	/*
-	 * Some UFS devices clear unit attention condition only if the sense
-	 * size used (UFS_SENSE_SIZE in this case) is non-zero.
-	 */
 	static const u8 cmd[6] = {REQUEST_SENSE, 0, 0, 0, UFS_SENSE_SIZE, 0};
-	struct scsi_request *rq;
+	struct request_queue *q = hba->cmd_queue;
+	struct ufshcd_sg_entry *prd_table;
+	struct utp_upiu_req *ucd_req_ptr;
+	DECLARE_COMPLETION_ONSTACK(wait);
+	struct ufshcd_lrb *lrbp;
+	int timeout_ms = 1000;
 	struct request *req;
-	char *buffer;
-	int ret;
+	u8 upiu_flags;
+	int err = 0;
+	int tag;
 
-	buffer = kzalloc(UFS_SENSE_SIZE, GFP_KERNEL);
-	if (!buffer)
-		return -ENOMEM;
+	ufshcd_hold(hba, false);
+	mutex_lock(&hba->dev_cmd.lock);
+	down_read(&hba->clk_scaling_lock);
 
-	req = blk_get_request(sdev->request_queue, REQ_OP_DRV_IN,
-			      /*flags=*/BLK_MQ_REQ_PM);
+	/* The command queue cannot be frozen */
+	req = blk_get_request(q, REQ_OP_DRV_OUT, 0);
 	if (IS_ERR(req)) {
-		ret = PTR_ERR(req);
-		goto out_free;
+		err = PTR_ERR(req);
+		goto out_unlock;
+	}
+	tag = req->tag;
+	if (WARN_ONCE(tag < 0, "Invalid tag %d\n", tag) ||
+	    unlikely(test_bit(tag, &hba->outstanding_reqs))) {
+		err = -EBUSY;
+		goto out;
 	}
 
-	ret = blk_rq_map_kern(sdev->request_queue, req,
-			      buffer, UFS_SENSE_SIZE, GFP_NOIO);
-	if (ret)
-		goto out_put;
+	lrbp = &hba->lrb[tag];
+	WARN_ON(lrbp->cmd);
+	lrbp->cmd = NULL;
+	lrbp->sense_bufflen = 0;
+	lrbp->sense_buffer = NULL;
+	lrbp->task_tag = tag;
+	lrbp->lun = wlun;
+	lrbp->intr_cmd = true;
+	ufshcd_prepare_lrbp_crypto(NULL, lrbp);
+	hba->dev_cmd.type = DEV_CMD_TYPE_SENSE;
 
-	rq = scsi_req(req);
-	rq->cmd_len = ARRAY_SIZE(cmd);
-	memcpy(rq->cmd, cmd, rq->cmd_len);
-	rq->retries = 3;
-	req->timeout = 1 * HZ;
-	req->rq_flags |= RQF_PM | RQF_QUIET;
-	req->end_io_data = buffer;
+	if (hba->ufs_version <= ufshci_version(1, 1))
+		lrbp->command_type = UTP_CMD_TYPE_SCSI;
+	else
+		lrbp->command_type = UTP_CMD_TYPE_UFS_STORAGE;
 
-	blk_execute_rq_nowait(/*bd_disk=*/NULL, req, /*at_head=*/true,
-			      ufshcd_request_sense_done);
-	return 0;
+	ufshcd_prepare_req_desc_hdr(lrbp, &upiu_flags, DMA_FROM_DEVICE);
 
-out_put:
+	/* Prepare UPIU */
+	ucd_req_ptr = lrbp->ucd_req_ptr;
+
+	/* command descriptor fields */
+	ucd_req_ptr->header.dword_0 =
+		UPIU_HEADER_DWORD(UPIU_TRANSACTION_COMMAND, upiu_flags,
+				  lrbp->lun, lrbp->task_tag);
+	ucd_req_ptr->header.dword_1 =
+		UPIU_HEADER_DWORD(UPIU_COMMAND_SET_TYPE_SCSI, 0, 0, 0);
+
+	/* Total EHS length and Data segment length will be zero */
+	ucd_req_ptr->header.dword_2 = 0;
+
+	ucd_req_ptr->sc.exp_data_transfer_len = cpu_to_be32(UFS_SENSE_SIZE);
+
+	memset(ucd_req_ptr->sc.cdb, 0, UFS_CDB_SIZE);
+	memcpy(ucd_req_ptr->sc.cdb, cmd, ARRAY_SIZE(cmd));
+
+	memset(lrbp->ucd_rsp_ptr, 0, sizeof(struct utp_upiu_rsp));
+	memset(hba->dev_cmd.buf, 0, UFS_DEV_CMD_BUF_SZ);
+
+	/* Prepare PRD table */
+	if (hba->quirks & UFSHCD_QUIRK_PRDT_BYTE_GRAN) {
+		lrbp->utr_descriptor_ptr->prd_table_length =
+				cpu_to_le16(sizeof(struct ufshcd_sg_entry));
+	} else {
+		lrbp->utr_descriptor_ptr->prd_table_length = cpu_to_le16(1);
+	}
+
+	prd_table = (struct ufshcd_sg_entry *)lrbp->ucd_prdt_ptr;
+
+	prd_table[0].size       = cpu_to_le32(UFS_SENSE_SIZE - 1);
+	prd_table[0].base_addr  = cpu_to_le32(lower_32_bits(hba->dev_cmd.buf_dma_addr));
+	prd_table[0].upper_addr = cpu_to_le32(upper_32_bits(hba->dev_cmd.buf_dma_addr));
+	prd_table[0].reserved   = 0;
+
+	hba->dev_cmd.complete = &wait;
+
+	ufshcd_add_query_upiu_trace(hba, UFS_SENSE_SEND, lrbp->ucd_req_ptr);
+
+	ufshcd_send_command(hba, tag);
+
+	err = ufshcd_wait_for_dev_cmd(hba, lrbp, timeout_ms);
+
+	ufshcd_add_query_upiu_trace(hba, err ? UFS_SENSE_ERR : UFS_SENSE_COMP,
+				    (struct utp_upiu_req *)lrbp->ucd_rsp_ptr);
+out:
 	blk_put_request(req);
-out_free:
-	kfree(buffer);
-	return ret;
+out_unlock:
+	/* Invalidate dev_cmd.type for safety */
+	hba->dev_cmd.type = DEV_CMD_TYPE_INVALID;
+	up_read(&hba->clk_scaling_lock);
+	mutex_unlock(&hba->dev_cmd.lock);
+	ufshcd_release(hba);
+	return err;
 }
 
 static int ufshcd_clear_ua_wlun(struct ufs_hba *hba, u8 wlun)
@@ -8016,7 +8103,7 @@ static int ufshcd_clear_ua_wlun(struct ufs_hba *hba, u8 wlun)
 	if (ret)
 		goto out_err;
 
-	ret = ufshcd_request_sense_async(hba, sdp);
+	ret = ufshcd_request_sense_direct(hba, wlun);
 	scsi_device_put(sdp);
 out_err:
 	if (ret)
@@ -8094,8 +8181,10 @@ static int ufshcd_probe_hba(struct ufs_hba *hba, bool init_dev_params)
 	/* UFS device is also active now */
 	ufshcd_set_ufs_dev_active(hba);
 	ufshcd_force_reset_auto_bkops(hba);
-	hba->wlun_dev_clr_ua = true;
-	hba->wlun_rpmb_clr_ua = true;
+	hba->wlun_dev_clr_ua =
+		!!ufshcd_request_sense_direct(hba, UFS_UPIU_UFS_DEVICE_WLUN);
+	hba->wlun_rpmb_clr_ua =
+		!!ufshcd_request_sense_direct(hba, UFS_UPIU_RPMB_WLUN);
 
 	/* Gear up to HS gear if supported */
 	if (hba->max_pwr_info.is_valid) {

@@ -56,6 +56,8 @@ struct ufs_hba;
 enum dev_cmd_type {
 	DEV_CMD_TYPE_NOP		= 0x0,
 	DEV_CMD_TYPE_QUERY		= 0x1,
+	DEV_CMD_TYPE_SENSE		= 0x2,
+	DEV_CMD_TYPE_INVALID		= 0xff,
 };
 
 enum ufs_event_type {
@@ -236,17 +238,24 @@ struct ufs_query {
 	struct ufs_query_res response;
 };
 
+/* UFS_DEV_CMD_BUF_SZ must be a power of 2 and bigger than UFS_SENSE_SIZE */
+#define UFS_DEV_CMD_BUF_SZ 32
+
 /**
  * struct ufs_dev_cmd - all assosiated fields with device management commands
  * @type: device management command type - Query, NOP OUT
  * @lock: lock to allow one command at a time
  * @complete: internal commands completion
+ * @buf: buffer for data
+ * @buf_dma_addr: DMA address of @buf
  */
 struct ufs_dev_cmd {
 	enum dev_cmd_type type;
 	struct mutex lock;
 	struct completion *complete;
 	struct ufs_query query;
+	void *buf;
+	dma_addr_t buf_dma_addr;
 };
 
 /**

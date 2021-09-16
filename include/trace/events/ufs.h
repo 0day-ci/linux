@@ -46,7 +46,10 @@
 	EM(UFS_QUERY_ERR,	"query_complete_err")		\
 	EM(UFS_TM_SEND,		"tm_send")			\
 	EM(UFS_TM_COMP,		"tm_complete")			\
-	EMe(UFS_TM_ERR,		"tm_complete_err")
+	EM(UFS_TM_ERR,		"tm_complete_err")		\
+	EM(UFS_SENSE_SEND,	"sense_send")			\
+	EM(UFS_SENSE_COMP,	"sense_complete")		\
+	EMe(UFS_SENSE_ERR,	"sense_complete_err")
 
 #define UFS_CMD_TRACE_TSF_TYPES					\
 	EM(UFS_TSF_CDB,		"CDB")		                \
