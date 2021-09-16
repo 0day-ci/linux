@@ -399,14 +399,13 @@ class KUnitMainTest(unittest.TestCase):
 			self.assertNotEqual(call, mock.call(StrContains('Testing complete.')))
 			self.assertNotEqual(call, mock.call(StrContains(' 0 tests run')))
 
-	def test_run_raw_output_kunit(self):
+	def test_run_raw_output_does_not_take_positional_args(self):
+		# --raw_output might eventually support an argument, but we don't want it
+		# to consume any positional arguments, only ones after an '='.
 		self.linux_source_mock.run_kernel = mock.Mock(return_value=[])
-		kunit.main(['run', '--raw_output=kunit'], self.linux_source_mock)
-		self.assertEqual(self.linux_source_mock.build_reconfig.call_count, 1)
-		self.assertEqual(self.linux_source_mock.run_kernel.call_count, 1)
-		for call in self.print_mock.call_args_list:
-			self.assertNotEqual(call, mock.call(StrContains('Testing complete.')))
-			self.assertNotEqual(call, mock.call(StrContains(' 0 tests run')))
+		kunit.main(['run', '--raw_output', 'filter_glob'], self.linux_source_mock)
+		self.linux_source_mock.run_kernel.assert_called_once_with(
+			args=None, build_dir='.kunit', filter_glob='filter_glob', timeout=300)
 
 	def test_exec_timeout(self):
 		timeout = 3453

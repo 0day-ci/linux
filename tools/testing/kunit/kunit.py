@@ -115,13 +115,7 @@ def parse_tests(request: KunitParseRequest) -> KunitResult:
 					      'Tests not Parsed.')
 
 	if request.raw_output:
-		output: Iterable[str] = request.input_data
-		if request.raw_output == 'all':
-			pass
-		elif request.raw_output == 'kunit':
-			output = kunit_parser.extract_tap_lines(output)
-		else:
-			print(f'Unknown --raw_output option "{request.raw_output}"', file=sys.stderr)
+		output = kunit_parser.extract_tap_lines(request.input_data)
 		for line in output:
 			print(line.rstrip())
 
@@ -256,8 +250,8 @@ def add_exec_opts(parser) -> None:
 
 def add_parse_opts(parser) -> None:
 	parser.add_argument('--raw_output', help='If set don\'t format output from kernel. '
-			    'If set to --raw_output=kunit, filters to just KUnit output.',
-			    type=str, nargs='?', const='all', default=None)
+			    'It will only show output from KUnit.',
+			    action='store_true')
 	parser.add_argument('--json',
 			    nargs='?',
 			    help='Stores test results in a JSON, and either '
