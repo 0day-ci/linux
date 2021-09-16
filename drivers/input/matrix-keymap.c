@@ -100,8 +100,8 @@ static int matrix_keypad_parse_keymap(const char *propname,
 
 	retval = device_property_read_u32_array(dev, propname, keys, size);
 	if (retval) {
-		dev_err(dev, "failed to read %s property: %d\n",
-			propname, retval);
+		retval = dev_err_probe(dev, retval,
+				       "failed to read %s property", propname);
 		goto out;
 	}
 
