@@ -167,12 +167,9 @@ static int drv2665_probe(struct i2c_client *client,
 		return -ENOMEM;
 
 	haptics->regulator = devm_regulator_get(&client->dev, "vbat");
-	if (IS_ERR(haptics->regulator)) {
-		error = PTR_ERR(haptics->regulator);
-		dev_err(&client->dev,
-			"unable to get regulator, error: %d\n", error);
-		return error;
-	}
+	if (IS_ERR(haptics->regulator))
+		return dev_err_probe(&client->dev, PTR_ERR(haptics->regulator),
+				     "unable to get regulator\n");
 
 	haptics->input_dev = devm_input_allocate_device(&client->dev);
 	if (!haptics->input_dev) {
