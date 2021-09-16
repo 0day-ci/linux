@@ -637,3 +637,4 @@ module_exit(jr_driver_exit);
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("FSL CAAM JR request backend");
 MODULE_AUTHOR("Freescale Semiconductor - NMG/STC");
+MODULE_ALIAS("platform:caam_jr");
