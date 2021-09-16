@@ -49,7 +49,6 @@ struct aspm_latency {
 struct pcie_link_state {
 	struct pci_dev *pdev;		/* Upstream component of the Link */
 	struct pci_dev *downstream;	/* Downstream component, function 0 */
-	struct pcie_link_state *root;	/* pointer to the root port link */
 	struct list_head sibling;	/* node in link_list */
 
 	/* ASPM state */
@@ -843,6 +842,25 @@ static int pcie_aspm_sanity_check(struct pci_dev *pdev)
 	return 0;
 }
 
+/*
+ * Root Ports and PCI/PCI-X to PCIe Bridges are roots of PCIe
+ * hierarchies.  Note that some PCIe host implementations omit
+ * the root ports entirely, in which case a downstream port on
+ * a switch may become the root of the link state chain for all
+ * its subordinate endpoints.
+ */
+static struct pci_dev *pcie_get_root(struct pci_dev *pdev)
+{
+	struct pci_dev *parent = pdev->bus->parent->self;
+
+	if (pci_pcie_type(pdev) == PCI_EXP_TYPE_ROOT_PORT ||
+	    pci_pcie_type(pdev) == PCI_EXP_TYPE_PCIE_BRIDGE || !parent) {
+		return pdev;
+	} else {
+		return pcie_get_root(parent);
+	}
+}
+
 static struct pcie_link_state *alloc_pcie_link_state(struct pci_dev *pdev)
 {
 	struct pcie_link_state *link;
@@ -854,29 +872,6 @@ static struct pcie_link_state *alloc_pcie_link_state(struct pci_dev *pdev)
 	INIT_LIST_HEAD(&link->sibling);
 	link->pdev = pdev;
 	link->downstream = pci_function_0(pdev->subordinate);
-
-	/*
-	 * Root Ports and PCI/PCI-X to PCIe Bridges are roots of PCIe
-	 * hierarchies.  Note that some PCIe host implementations omit
-	 * the root ports entirely, in which case a downstream port on
-	 * a switch may become the root of the link state chain for all
-	 * its subordinate endpoints.
-	 */
-	if (pci_pcie_type(pdev) == PCI_EXP_TYPE_ROOT_PORT ||
-	    pci_pcie_type(pdev) == PCI_EXP_TYPE_PCIE_BRIDGE ||
-	    !pdev->bus->parent->self) {
-		link->root = link;
-	} else {
-		struct pcie_link_state *parent;
-
-		parent = pdev->bus->parent->self->link_state;
-		if (!parent) {
-			kfree(link);
-			return NULL;
-		}
-
-		link->root = parent->root;
-	}
 
 	list_add(&link->sibling, &link_list);
 	pdev->link_state = link;
@@ -963,18 +958,23 @@ out:
 /* Recheck latencies and update aspm_capable for links under the root */
 static void pcie_update_aspm_capable(struct pcie_link_state *root)
 {
+	struct pci_dev *dev;
 	struct pcie_link_state *link;
 	BUG_ON(root->pdev->bus->parent->self);
 	list_for_each_entry(link, &link_list, sibling) {
-		if (link->root != root)
+		dev = pcie_get_root(link->pdev);
+		if (dev->link_state != root)
 			continue;
+
 		link->aspm_capable = link->aspm_support;
 	}
 	list_for_each_entry(link, &link_list, sibling) {
 		struct pci_dev *child;
 		struct pci_bus *linkbus = link->pdev->subordinate;
-		if (link->root != root)
+		dev = pcie_get_root(link->pdev);
+		if (dev->link_state != root)
 			continue;
+
 		list_for_each_entry(child, &linkbus->devices, bus_list) {
 			if ((pci_pcie_type(child) != PCI_EXP_TYPE_ENDPOINT) &&
 			    (pci_pcie_type(child) != PCI_EXP_TYPE_LEG_END))
@@ -987,9 +987,9 @@ static void pcie_update_aspm_capable(struct pcie_link_state *root)
 /* @pdev: the endpoint device */
 void pcie_aspm_exit_link_state(struct pci_dev *pdev)
 {
-	struct pci_dev *parent_dev;
+	struct pci_dev *parent_dev, *root_dev;
 	struct pci_dev *parent = pdev->bus->self;
-	struct pcie_link_state *link, *root, *parent_link;
+	struct pcie_link_state *link, *parent_link;
 
 	if (!parent || !parent->link_state)
 		return;
@@ -1004,7 +1004,7 @@ void pcie_aspm_exit_link_state(struct pci_dev *pdev)
 		goto out;
 
 	link = parent->link_state;
-	root = link->root;
+	root_dev = pcie_get_root(link->pdev);
 	parent_dev = link->pdev->bus->parent->self;
 	parent_link = !parent_dev ? NULL : parent_dev->link_state;
 
@@ -1016,7 +1016,7 @@ void pcie_aspm_exit_link_state(struct pci_dev *pdev)
 
 	/* Recheck latencies and configure upstream links */
 	if (parent_link) {
-		pcie_update_aspm_capable(root);
+		pcie_update_aspm_capable(root_dev->link_state);
 		pcie_config_aspm_path(parent_link);
 	}
 out:
@@ -1028,6 +1028,7 @@ out:
 void pcie_aspm_pm_state_change(struct pci_dev *pdev)
 {
 	struct pcie_link_state *link = pdev->link_state;
+	struct pci_dev *root = pcie_get_root(pdev);
 
 	if (aspm_disabled || !link)
 		return;
@@ -1037,7 +1038,7 @@ void pcie_aspm_pm_state_change(struct pci_dev *pdev)
 	 */
 	down_read(&pci_bus_sem);
 	mutex_lock(&aspm_lock);
-	pcie_update_aspm_capable(link->root);
+	pcie_update_aspm_capable(root->link_state);
 	pcie_config_aspm_path(link);
 	mutex_unlock(&aspm_lock);
 	up_read(&pci_bus_sem);
