@@ -596,6 +596,15 @@ nf_nat_setup_info(struct nf_conn *ct,
 			   &ct->tuplehash[IP_CT_DIR_REPLY].tuple);
 
 	get_unique_tuple(&new_tuple, &curr_tuple, range, ct, maniptype);
+	if (range && (range->flags & NF_NAT_RANGE_PROTO_SPECIFIED)) {
+		struct nf_conn_nat *nat = nf_ct_nat_ext_add(ct);
+
+		if (!nat)
+			return NF_DROP;
+
+		nat->range_info.min_proto = range->min_proto;
+		nat->range_info.max_proto = range->max_proto;
+	}
 
 	if (!nf_ct_tuple_equal(&new_tuple, &curr_tuple)) {
 		struct nf_conntrack_tuple reply;

@@ -72,8 +72,14 @@ static unsigned int nf_nat_ftp(struct sk_buff *skb,
 	u_int16_t port;
 	int dir = CTINFO2DIR(ctinfo);
 	struct nf_conn *ct = exp->master;
+	struct nf_conn_nat *nat = nfct_nat(ct);
+	unsigned int i, first_port, min, range_size;
 	char buffer[sizeof("|1||65535|") + INET6_ADDRSTRLEN];
 	unsigned int buflen;
+	int ret;
+
+	if (WARN_ON_ONCE(!nat))
+		return NF_DROP;
 
 	pr_debug("type %i, off %u len %u\n", type, matchoff, matchlen);
 
@@ -86,21 +92,28 @@ static unsigned int nf_nat_ftp(struct sk_buff *skb,
 	 * this one. */
 	exp->expectfn = nf_nat_follow_master;
 
-	/* Try to get same port: if not, try to change it. */
-	for (port = ntohs(exp->saved_proto.tcp.port); port != 0; port++) {
-		int ret;
-
-		exp->tuple.dst.u.tcp.port = htons(port);
-		ret = nf_ct_expect_related(exp, 0);
-		if (ret == 0)
-			break;
-		else if (ret != -EBUSY) {
-			port = 0;
-			break;
-		}
+	/* Avoid applying nat->range to the reply direction */
+	if (!exp->dir || !nat->range_info.min_proto.all || !nat->range_info.max_proto.all) {
+		min = ntohs(exp->saved_proto.tcp.port);
+		range_size = 65535 - min + 1;
+	} else {
+		min = ntohs(nat->range_info.min_proto.all);
+		range_size = ntohs(nat->range_info.max_proto.all) - min + 1;
 	}
 
-	if (port == 0) {
+	/* Try to get same port: if not, try to change it. */
+	first_port = ntohs(exp->saved_proto.tcp.port);
+	if (min > first_port || first_port > (min + range_size - 1))
+		first_port = min;
+
+	for (i = 0, port = first_port; i < range_size; i++, port = (port - first_port + i) % range_size) {
+		exp->tuple.dst.u.tcp.port = htons(port);
+		ret = nf_ct_expect_related(exp, 0);
+		if (ret != -EBUSY)
+			break;
+	}
+
+	if (ret != 0) {
 		nf_ct_helper_log(skb, ct, "all ports in use");
 		return NF_DROP;
 	}
