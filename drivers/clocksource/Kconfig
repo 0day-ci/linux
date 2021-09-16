@@ -707,4 +707,17 @@ config MICROCHIP_PIT64B
 	  modes and high resolution. It is used as a clocksource
 	  and a clockevent.
 
+config XILINX_TIMER
+	bool "Xilinx AXI Timer support"
+	depends on OF_ADDRESS
+	depends on COMMON_CLK
+	select REGMAP_MMIO
+	default y if MICROBLAZE
+	help
+	  Clocksource/clockevent driver for Xilinx LogiCORE IP AXI
+	  timers. This timer is typically a soft core which may be
+	  present in Xilinx FPGAs. This device may also be present in
+	  Microblaze soft processors. If you don't have this IP in your
+	  design, choose N.
+
 endmenu
