@@ -1306,6 +1306,9 @@ static int sock_mmap(struct file *file, struct vm_area_struct *vma)
 {
 	struct socket *sock = file->private_data;
 
+	if (likely(!sock->ops->mmap))
+		return -ENODEV;
+
 	return sock->ops->mmap(file, sock, vma);
 }
 
@@ -1629,11 +1632,19 @@ int __sys_socketpair(int family, int type, int protocol, int __user *usockvec)
 		goto out;
 	}
 
-	err = sock1->ops->socketpair(sock1, sock2);
-	if (unlikely(err < 0)) {
+	if (likely(!sock1->ops->socketpair)) {
+		err = -EOPNOTSUPP;
 		sock_release(sock2);
 		sock_release(sock1);
 		goto out;
+
+	} else {
+		err = sock1->ops->socketpair(sock1, sock2);
+		if (unlikely(err < 0)) {
+			sock_release(sock2);
+			sock_release(sock1);
+			goto out;
+		}
 	}
 
 	newfile1 = sock_alloc_file(sock1, flags, NULL);
@@ -1704,6 +1715,14 @@ SYSCALL_DEFINE3(bind, int, fd, struct sockaddr __user *, umyaddr, int, addrlen)
 	return __sys_bind(fd, umyaddr, addrlen);
 }
 
+static int __sock_listen(struct socket *sock, int backlog)
+{
+	if (likely(!sock->ops->listen))
+		return -EOPNOTSUPP;
+
+	return sock->ops->listen(sock, backlog);
+}
+
 /*
  *	Perform a listen. Basically, we allow the protocol to do anything
  *	necessary for a listen, and if that works, we mark the socket as
@@ -1724,7 +1743,7 @@ int __sys_listen(int fd, int backlog)
 
 		err = security_socket_listen(sock, backlog);
 		if (!err)
-			err = sock->ops->listen(sock, backlog);
+			err = __sock_listen(sock, backlog);
 
 		fput_light(sock->file, fput_needed);
 	}
@@ -1734,6 +1753,15 @@ int __sys_listen(int fd, int backlog)
 SYSCALL_DEFINE2(listen, int, fd, int, backlog)
 {
 	return __sys_listen(fd, backlog);
+}
+
+static int __sock_accept(struct socket *sock, struct socket *newsock,
+			 int flags, bool kern)
+{
+	if (likely(!sock->ops->accept))
+		return -EOPNOTSUPP;
+
+	return sock->ops->accept(sock, newsock, flags, kern);
 }
 
 struct file *do_accept(struct file *file, unsigned file_flags,
@@ -1770,8 +1798,8 @@ struct file *do_accept(struct file *file, unsigned file_flags,
 	if (err)
 		goto out_fd;
 
-	err = sock->ops->accept(sock, newsock, sock->file->f_flags | file_flags,
-					false);
+	err = __sock_accept(sock, newsock, sock->file->f_flags | file_flags,
+			    false);
 	if (err < 0)
 		goto out_fd;
 
@@ -1864,6 +1892,15 @@ SYSCALL_DEFINE3(accept, int, fd, struct sockaddr __user *, upeer_sockaddr,
 	return __sys_accept4(fd, upeer_sockaddr, upeer_addrlen, 0);
 }
 
+static int __sock_connect(struct socket *sock, struct sockaddr *saddr,
+			  int len, int flags)
+{
+	if (likely(!sock->ops->connect))
+		return -EOPNOTSUPP;
+
+	return sock->ops->connect(sock, saddr, len, flags);
+}
+
 /*
  *	Attempt to connect to a socket with the server address.  The address
  *	is in user space so we verify it is OK and move it to kernel space.
@@ -1893,8 +1930,8 @@ int __sys_connect_file(struct file *file, struct sockaddr_storage *address,
 	if (err)
 		goto out;
 
-	err = sock->ops->connect(sock, (struct sockaddr *)address, addrlen,
-				 sock->file->f_flags | file_flags);
+	err = __sock_connect(sock, (struct sockaddr *)address, addrlen,
+			     sock->file->f_flags | file_flags);
 out:
 	return err;
 }
@@ -2235,6 +2272,14 @@ SYSCALL_DEFINE5(getsockopt, int, fd, int, level, int, optname,
 	return __sys_getsockopt(fd, level, optname, optval, optlen);
 }
 
+static int __sock_shutdown(struct socket *sock, int how)
+{
+	if (likely(!sock->ops->shutdown))
+		return -EOPNOTSUPP;
+
+	return sock->ops->shutdown(sock, how);
+}
+
 /*
  *	Shutdown a socket.
  */
@@ -2245,7 +2290,7 @@ int __sys_shutdown_sock(struct socket *sock, int how)
 
 	err = security_socket_shutdown(sock, how);
 	if (!err)
-		err = sock->ops->shutdown(sock, how);
+		err = __sock_shutdown(sock, how);
 
 	return err;
 }
@@ -3394,7 +3439,7 @@ EXPORT_SYMBOL(kernel_bind);
 
 int kernel_listen(struct socket *sock, int backlog)
 {
-	return sock->ops->listen(sock, backlog);
+	return __sock_listen(sock, backlog);
 }
 EXPORT_SYMBOL(kernel_listen);
 
@@ -3419,7 +3464,7 @@ int kernel_accept(struct socket *sock, struct socket **newsock, int flags)
 	if (err < 0)
 		goto done;
 
-	err = sock->ops->accept(sock, *newsock, flags, true);
+	err = __sock_accept(sock, *newsock, flags, true);
 	if (err < 0) {
 		sock_release(*newsock);
 		*newsock = NULL;
@@ -3450,7 +3495,7 @@ EXPORT_SYMBOL(kernel_accept);
 int kernel_connect(struct socket *sock, struct sockaddr *addr, int addrlen,
 		   int flags)
 {
-	return sock->ops->connect(sock, addr, addrlen, flags);
+	return __sock_connect(sock, addr, addrlen, flags);
 }
 EXPORT_SYMBOL(kernel_connect);
 
@@ -3498,7 +3543,7 @@ EXPORT_SYMBOL(kernel_getpeername);
 int kernel_sendpage(struct socket *sock, struct page *page, int offset,
 		    size_t size, int flags)
 {
-	if (sock->ops->sendpage) {
+	if (unlikely(sock->ops->sendpage)) {
 		/* Warn in case the improper page to zero-copy send */
 		WARN_ONCE(!sendpage_ok(page), "improper page for zero-copy send");
 		return sock->ops->sendpage(sock, page, offset, size, flags);
@@ -3542,7 +3587,7 @@ EXPORT_SYMBOL(kernel_sendpage_locked);
 
 int kernel_sock_shutdown(struct socket *sock, enum sock_shutdown_cmd how)
 {
-	return sock->ops->shutdown(sock, how);
+	return __sock_shutdown(sock, how);
 }
 EXPORT_SYMBOL(kernel_sock_shutdown);
 
