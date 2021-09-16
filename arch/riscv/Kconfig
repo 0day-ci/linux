@@ -82,6 +82,7 @@ config RISCV
 	select HAVE_DEBUG_KMEMLEAK
 	select HAVE_DMA_CONTIGUOUS if MMU
 	select HAVE_EBPF_JIT if MMU
+	select HAVE_EFFICIENT_UNALIGNED_ACCESS if !CPU_HAS_NO_UNALIGNED && MMU
 	select HAVE_FUNCTION_ERROR_INJECTION
 	select HAVE_FUTEX_CMPXCHG if FUTEX
 	select HAVE_GCC_PLUGINS
@@ -382,6 +383,9 @@ config FPU
 	  in the kernel.
 
 	  If you don't know what to do here, say Y.
+
+config CPU_HAS_NO_UNALIGNED
+	bool
 
 endmenu
 
