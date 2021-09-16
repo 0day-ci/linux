@@ -2067,8 +2067,8 @@ static int trf7970a_probe(struct spi_device *spi)
 
 	trf->regulator = devm_regulator_get(&spi->dev, "vin");
 	if (IS_ERR(trf->regulator)) {
-		ret = PTR_ERR(trf->regulator);
-		dev_err(trf->dev, "Can't get VIN regulator: %d\n", ret);
+		ret = dev_err_probe(trf->dev, PTR_ERR(trf->regulator),
+				    "Can't get VIN regulator\n");
 		goto err_destroy_lock;
 	}
 
@@ -2084,8 +2084,8 @@ static int trf7970a_probe(struct spi_device *spi)
 
 	trf->regulator = devm_regulator_get(&spi->dev, "vdd-io");
 	if (IS_ERR(trf->regulator)) {
-		ret = PTR_ERR(trf->regulator);
-		dev_err(trf->dev, "Can't get VDD_IO regulator: %d\n", ret);
+		ret = dev_err_probe(trf->dev, PTR_ERR(trf->regulator),
+				    "Can't get VDD_IO regulator\n");
 		goto err_destroy_lock;
 	}
 
