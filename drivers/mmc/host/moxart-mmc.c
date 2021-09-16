@@ -606,7 +606,28 @@ static int moxart_probe(struct platform_device *pdev)
 	host->sysclk = clk_get_rate(clk);
 	host->fifo_width = readl(host->base + REG_FEATURE) << 2;
 	host->dma_chan_tx = dma_request_chan(dev, "tx");
+	if (IS_ERR(host->dma_chan_tx)) {
+		if (PTR_ERR(host->dma_chan_tx) == -EPROBE_DEFER) {
+			ret = -EPROBE_DEFER;
+            goto out;
+        }
+    }
+
 	host->dma_chan_rx = dma_request_chan(dev, "rx");
+	if (IS_ERR(host->dma_chan_rx)) {
+		if (!IS_ERR(host->dma_chan_tx))
+			dma_release_channel(host->dma_chan_tx);
+		if (PTR_ERR(host->dma_chan_rx) == -EPROBE_DEFER) {
+			ret = -EPROBE_DEFER;
+			goto out;
+        }
+        dev_dbg(dev, "PIO mode transfer enabled\n");
+        host->have_dma = false;
+    } else if (IS_ERR(host->dma_chan_tx)) {
+		dma_release_channel(host->chan_rx);
+		dev_dbg(dev, "PIO mode transfer enabled\n");
+		host->have_dma = false;
+    }
 
 	spin_lock_init(&host->lock);
 
@@ -615,15 +636,7 @@ static int moxart_probe(struct platform_device *pdev)
 	mmc->f_min = DIV_ROUND_CLOSEST(host->sysclk, CLK_DIV_MASK * 2);
 	mmc->ocr_avail = 0xffff00;	/* Support 2.0v - 3.6v power. */
 
-	if (IS_ERR(host->dma_chan_tx) || IS_ERR(host->dma_chan_rx)) {
-		if (PTR_ERR(host->dma_chan_tx) == -EPROBE_DEFER ||
-		    PTR_ERR(host->dma_chan_rx) == -EPROBE_DEFER) {
-			ret = -EPROBE_DEFER;
-			goto out;
-		}
-		dev_dbg(dev, "PIO mode transfer enabled\n");
-		host->have_dma = false;
-	} else {
+    if (!IS_ERR(host->dma_chan_tx) && !IS_ERR(host->dma_chan_rx)) {
 		dev_dbg(dev, "DMA channels found (%p,%p)\n",
 			 host->dma_chan_tx, host->dma_chan_rx);
 		host->have_dma = true;
@@ -664,8 +677,13 @@ static int moxart_probe(struct platform_device *pdev)
 	}
 
 	ret = devm_request_irq(dev, irq, moxart_irq, 0, "moxart-mmc", host);
-	if (ret)
+	if (ret) {
+		if (host->have_dma) {
+			dma_release_channel(host->dma_chan_tx);
+			dma_release_channel(host->dma_chan_rx);
+		}
 		goto out;
+	}
 
 	dev_set_drvdata(dev, mmc);
 	mmc_add_host(mmc);
