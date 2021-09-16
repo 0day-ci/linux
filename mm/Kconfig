@@ -638,6 +638,12 @@ config ZSWAP_ZPOOL_DEFAULT_Z3FOLD
 	help
 	  Use the z3fold allocator as the default allocator.
 
+config ZSWAP_ZPOOL_DEFAULT_ZTREE
+	bool "ztree"
+	select ZTREE
+	help
+	  Use the ztree allocator as the default allocator.
+
 config ZSWAP_ZPOOL_DEFAULT_ZSMALLOC
 	bool "zsmalloc"
 	select ZSMALLOC
@@ -650,6 +656,7 @@ config ZSWAP_ZPOOL_DEFAULT
        depends on ZSWAP
        default "zbud" if ZSWAP_ZPOOL_DEFAULT_ZBUD
        default "z3fold" if ZSWAP_ZPOOL_DEFAULT_Z3FOLD
+	   default "ztree" if ZSWAP_ZPOOL_DEFAULT_ZTREE
        default "zsmalloc" if ZSWAP_ZPOOL_DEFAULT_ZSMALLOC
        default ""
 
@@ -687,6 +694,17 @@ config Z3FOLD
 	  It is designed to store up to three compressed pages per physical
 	  page. It is a ZBUD derivative so the simplicity and determinism are
 	  still there.
+
+config ZTREE
+	tristate "Simple allocator for compressed pages"
+	depends on ZPOOL
+	help
+	  A special purpose allocator for storing compressed pages.
+	  It stores integer number of compressed pages per block and
+	  each block consists of integer number of physical pages.
+	  Red-black trees are used for efficient block organization.
+	  ztree provides fast random read/write operations and
+	  good compression ratio in most scenarios.
 
 config ZSMALLOC
 	tristate "Memory allocator for compressed pages"
