@@ -40,6 +40,7 @@ static __u64 *blessed_reg, blessed_n;
 struct reg_sublist {
 	const char *name;
 	long capability;
+	long enable_capability;
 	int feature;
 	bool finalize;
 	__u64 *regs;
@@ -397,6 +398,19 @@ static void check_supported(struct vcpu_config *c)
 	}
 }
 
+static void enable_caps(struct kvm_vm *vm, struct vcpu_config *c)
+{
+	struct kvm_enable_cap cap = {0};
+	struct reg_sublist *s;
+
+	for_each_sublist(c, s) {
+		if (s->enable_capability) {
+			cap.cap = s->enable_capability;
+			vm_enable_cap(vm, &cap);
+		}
+	}
+}
+
 static bool print_list;
 static bool print_filtered;
 static bool fixup_core_regs;
@@ -412,6 +426,8 @@ static void run_test(struct vcpu_config *c)
 	check_supported(c);
 
 	vm = vm_create(VM_MODE_DEFAULT, DEFAULT_GUEST_PHY_PAGES, O_RDWR);
+	enable_caps(vm, c);
+
 	prepare_vcpu_init(c, &init);
 	aarch64_vcpu_add_default(vm, 0, &init, NULL);
 	finalize_vcpu(vm, 0, c);
@@ -1014,6 +1030,10 @@ static __u64 sve_rejects_set[] = {
 	KVM_REG_ARM64_SVE_VLS,
 };
 
+static __u64 vtimer_offset_regs[] = {
+	KVM_REG_ARM_TIMER_OFFSET,
+};
+
 #define BASE_SUBLIST \
 	{ "base", .regs = base_regs, .regs_n = ARRAY_SIZE(base_regs), }
 #define VREGS_SUBLIST \
@@ -1025,6 +1045,10 @@ static __u64 sve_rejects_set[] = {
 	{ "sve", .capability = KVM_CAP_ARM_SVE, .feature = KVM_ARM_VCPU_SVE, .finalize = true, \
 	  .regs = sve_regs, .regs_n = ARRAY_SIZE(sve_regs), \
 	  .rejects_set = sve_rejects_set, .rejects_set_n = ARRAY_SIZE(sve_rejects_set), }
+#define VTIMER_OFFSET_SUBLIST \
+	{ "vtimer_offset", .capability = KVM_CAP_ARM_VTIMER_OFFSET, \
+	  .enable_capability = KVM_CAP_ARM_VTIMER_OFFSET, .regs = vtimer_offset_regs, \
+	  .regs_n = ARRAY_SIZE(vtimer_offset_regs), }
 
 static struct vcpu_config vregs_config = {
 	.sublists = {
@@ -1038,6 +1062,14 @@ static struct vcpu_config vregs_pmu_config = {
 	BASE_SUBLIST,
 	VREGS_SUBLIST,
 	PMU_SUBLIST,
+	{0},
+	},
+};
+static struct vcpu_config vregs_vtimer_config = {
+	.sublists = {
+	BASE_SUBLIST,
+	VREGS_SUBLIST,
+	VTIMER_OFFSET_SUBLIST,
 	{0},
 	},
 };
@@ -1056,11 +1088,21 @@ static struct vcpu_config sve_pmu_config = {
 	{0},
 	},
 };
+static struct vcpu_config sve_vtimer_config = {
+	.sublists = {
+	BASE_SUBLIST,
+	SVE_SUBLIST,
+	VTIMER_OFFSET_SUBLIST,
+	{0},
+	},
+};
 
 static struct vcpu_config *vcpu_configs[] = {
 	&vregs_config,
 	&vregs_pmu_config,
+	&vregs_vtimer_config,
 	&sve_config,
 	&sve_pmu_config,
+	&sve_vtimer_config,
 };
 static int vcpu_configs_n = ARRAY_SIZE(vcpu_configs);
