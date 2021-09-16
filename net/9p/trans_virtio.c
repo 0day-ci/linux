@@ -196,6 +196,30 @@ static struct virtqueue_sg *vq_sg_alloc(unsigned int nsgl)
 }
 
 /**
+ * Resize passed virtqueue scatter/gather lists to the passed amount of
+ * list blocks.
+ * @_vq_sg: scatter/gather lists to be resized
+ * @nsgl: new amount of scatter/gather list blocks
+ */
+static int vq_sg_resize(struct virtqueue_sg **_vq_sg, unsigned int nsgl)
+{
+	struct virtqueue_sg *vq_sg;
+
+	BUG_ON(!_vq_sg || !nsgl);
+	vq_sg = *_vq_sg;
+	if (vq_sg->nsgl == nsgl)
+		return 0;
+
+	/* lazy resize implementation for now */
+	vq_sg = vq_sg_alloc(nsgl);
+	if (!vq_sg)
+		return -ENOMEM;
+
+	*_vq_sg = vq_sg;
+	return 0;
+}
+
+/**
  * p9_virtio_close - reclaim resources of a channel
  * @client: client instance
  *
@@ -764,6 +788,10 @@ p9_virtio_create(struct p9_client *client, const char *devname, char *args)
 	struct virtio_chan *chan;
 	int ret = -ENOENT;
 	int found = 0;
+#if !defined(CONFIG_ARCH_NO_SG_CHAIN)
+	size_t npages;
+	size_t nsgl;
+#endif
 
 	if (devname == NULL)
 		return -EINVAL;
@@ -784,6 +812,30 @@ p9_virtio_create(struct p9_client *client, const char *devname, char *args)
 	if (!found) {
 		pr_err("no channels available for device %s\n", devname);
 		return ret;
+	}
+
+	/*
+	 * if user supplied an 'msize' option that's larger than what this
+	 * transport supports by default, then try to allocate more sg lists
+	 */
+	if (client->msize > client->trans_maxsize) {
+#if !defined(CONFIG_ARCH_NO_SG_CHAIN)
+		npages = DIV_ROUND_UP(client->msize, PAGE_SIZE);
+		if (npages > chan->p9_max_pages)
+			npages = chan->p9_max_pages;
+		nsgl = DIV_ROUND_UP(npages, SG_USER_PAGES_PER_LIST);
+		if (nsgl > chan->vq_sg->nsgl) {
+			/*
+			 * if resize fails, no big deal, then just
+			 * continue with default msize instead
+			 */
+			if (!vq_sg_resize(&chan->vq_sg, nsgl)) {
+				client->trans_maxsize =
+					PAGE_SIZE *
+					((nsgl * SG_USER_PAGES_PER_LIST) - 3);
+			}
+		}
+#endif /* !defined(CONFIG_ARCH_NO_SG_CHAIN) */
 	}
 
 	client->trans = (void *)chan;
