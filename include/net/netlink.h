@@ -1920,7 +1920,7 @@ static inline int nla_total_size_64bit(int payload)
 #define nla_for_each_attr(pos, head, len, rem) \
 	for (pos = head, rem = len; \
 	     nla_ok(pos, rem); \
-	     pos = nla_next(pos, &(rem)))
+	     pos = nla_next(pos, &rem))
 
 /**
  * nla_for_each_nested - iterate over nested attributes
