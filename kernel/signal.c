@@ -534,6 +534,10 @@ void flush_itimer_signals(void)
 }
 #endif
 
+/**
+ * ignore_signals - setup task to ignore all signals
+ * @t: task to setup
+ */
 void ignore_signals(struct task_struct *t)
 {
 	int i;
@@ -543,6 +547,7 @@ void ignore_signals(struct task_struct *t)
 
 	flush_signals(t);
 }
+EXPORT_SYMBOL_GPL(ignore_signals);
 
 /*
  * Flush all handlers for a task.
