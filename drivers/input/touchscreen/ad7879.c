@@ -494,10 +494,9 @@ static int ad7879_parse_dt(struct device *dev, struct ad7879 *ts)
 	u32 tmp;
 
 	err = device_property_read_u32(dev, "adi,resistance-plate-x", &tmp);
-	if (err) {
-		dev_err(dev, "failed to get resistance-plate-x property\n");
-		return err;
-	}
+	if (err)
+		return dev_err_probe(dev, err,
+				     "failed to get resistance-plate-x property\n");
 	ts->x_plate_ohms = (u16)tmp;
 
 	device_property_read_u8(dev, "adi,first-conversion-delay",
