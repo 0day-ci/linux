@@ -856,8 +856,7 @@ unsigned long shmem_swap_usage(struct vm_area_struct *vma)
 		return swapped << PAGE_SHIFT;
 
 	/* Here comes the more involved part */
-	return shmem_partial_swap_usage(mapping,
-			linear_page_index(vma, vma->vm_start),
+	return shmem_partial_swap_usage(mapping, vma->vm_pgoff,
 			linear_page_index(vma, vma->vm_end));
 }
 
