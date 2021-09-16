@@ -361,11 +361,9 @@ static int dw_mipi_dsi_stm_probe(struct platform_device *pdev)
 	}
 
 	dsi->vdd_supply = devm_regulator_get(dev, "phy-dsi");
-	if (IS_ERR(dsi->vdd_supply)) {
-		ret = PTR_ERR(dsi->vdd_supply);
-		dev_err_probe(dev, ret, "Failed to request regulator\n");
-		return ret;
-	}
+	if (IS_ERR(dsi->vdd_supply))
+		return dev_err_probe(dev, PTR_ERR(dsi->vdd_supply),
+				     "Failed to request regulator\n");
 
 	ret = regulator_enable(dsi->vdd_supply);
 	if (ret) {
