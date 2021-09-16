@@ -754,10 +754,9 @@ static int pxa27x_keypad_probe(struct platform_device *pdev)
 		return PTR_ERR(keypad->mmio_base);
 
 	keypad->clk = devm_clk_get(&pdev->dev, NULL);
-	if (IS_ERR(keypad->clk)) {
-		dev_err(&pdev->dev, "failed to get keypad clock\n");
-		return PTR_ERR(keypad->clk);
-	}
+	if (IS_ERR(keypad->clk))
+		return dev_err_probe(&pdev->dev, PTR_ERR(keypad->clk),
+				     "failed to get keypad clock\n");
 
 	input_dev->name = pdev->name;
 	input_dev->id.bustype = BUS_HOST;
