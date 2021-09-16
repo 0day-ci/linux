@@ -88,4 +88,7 @@ obj-$(CONFIG_CSKY_MP_TIMER)		+= timer-mp-csky.o
 obj-$(CONFIG_GX6605S_TIMER)		+= timer-gx6605s.o
 obj-$(CONFIG_HYPERV_TIMER)		+= hyperv_timer.o
 obj-$(CONFIG_MICROCHIP_PIT64B)		+= timer-microchip-pit64b.o
-obj-$(CONFIG_XILINX_TIMER)		+= timer-xilinx.o timer-xilinx-common.o
+obj-$(CONFIG_XILINX_TIMER)		+= timer-xilinx.o
+ifneq ($(CONFIG_XILINX_TIMER)$(CONFIG_PWM_XILINX),)
+obj-y					+= timer-xilinx-common.o
+endif

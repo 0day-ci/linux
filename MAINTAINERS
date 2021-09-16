@@ -20367,6 +20367,7 @@ XILINX TIMER/PWM DRIVER
 M:	Sean Anderson <sean.anderson@seco.com>
 S:	Maintained
 F:	drivers/clocksource/timer-xilinx*
+F:	drivers/pwm/pwm-xilinx.c
 F:	include/clocksource/timer-xilinx.h
 
 XILINX UARTLITE SERIAL DRIVER
