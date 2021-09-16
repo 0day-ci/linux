@@ -2463,6 +2463,16 @@ arm64 system registers have the following id bit patterns::
      derived from the register encoding for CNTV_CVAL_EL0.  As this is
      API, it must remain this way.
 
+.. warning::
+
+     The value of KVM_REG_ARM_TIMER_OFFSET is defined as an offset from
+     the guest's view of the physical counter-timer.
+
+     Userspace should use either KVM_REG_ARM_TIMER_OFFSET or
+     KVM_REG_ARM_TIMER_CNT to pause and resume a guest's virtual
+     counter-timer. Mixed use of these registers could result in an
+     unpredictable guest counter value.
+
 arm64 firmware pseudo-registers have the following bit pattern::
 
   0x6030 0000 0014 <regno:16>
@@ -7265,3 +7275,16 @@ The argument to KVM_ENABLE_CAP is also a bitmask, and must be a subset
 of the result of KVM_CHECK_EXTENSION.  KVM will forward to userspace
 the hypercalls whose corresponding bit is in the argument, and return
 ENOSYS for the others.
+
+8.35 KVM_CAP_ARM_VTIMER_OFFSET
+------------------------------
+
+:Capability: KVM_CAP_ARM_VTIMER_OFFSET
+:Architectures: arm64
+:Type: vm
+
+This capability, if enabled, will cause KVM to expose the
+KVM_REG_ARM_TIMER_OFFSET register offset through the
+KVM_{GET,SET}_ONE_REG and KVM_GET_REG_LIST ioctls. Implementing VMMs
+must observe the warning prescribed in section 4.68 with regard to the
+mixed use of timer registers.

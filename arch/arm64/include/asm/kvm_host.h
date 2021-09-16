@@ -136,6 +136,9 @@ struct kvm_arch {
 
 	/* Memory Tagging Extension enabled for the guest */
 	bool mte_enabled;
+
+	/* KVM_REG_ARM_TIMER_OFFSET enabled for the guest */
+	bool vtimer_offset_enabled;
 };
 
 struct kvm_vcpu_fault_info {

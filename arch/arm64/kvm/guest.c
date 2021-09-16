@@ -590,16 +590,23 @@ static unsigned long num_core_regs(const struct kvm_vcpu *vcpu)
 
 static inline unsigned long num_timer_regs(struct kvm_vcpu *vcpu)
 {
-	return 3;
+	unsigned long nr_regs = 3;
+
+	if (vcpu->kvm->arch.vtimer_offset_enabled)
+		nr_regs++;
+
+	return nr_regs;
 }
 
-static bool is_timer_reg(u64 index)
+static bool is_timer_reg(struct kvm_vcpu *vcpu, u64 index)
 {
 	switch (index) {
 	case KVM_REG_ARM_TIMER_CTL:
 	case KVM_REG_ARM_TIMER_CNT:
 	case KVM_REG_ARM_TIMER_CVAL:
 		return true;
+	case KVM_REG_ARM_TIMER_OFFSET:
+		return vcpu->kvm->arch.vtimer_offset_enabled;
 	}
 	return false;
 }
@@ -614,6 +621,12 @@ static int copy_timer_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
 	uindices++;
 	if (put_user(KVM_REG_ARM_TIMER_CVAL, uindices))
 		return -EFAULT;
+
+	if (vcpu->kvm->arch.vtimer_offset_enabled) {
+		uindices++;
+		if (put_user(KVM_REG_ARM_TIMER_OFFSET, uindices))
+			return -EFAULT;
+	}
 
 	return 0;
 }
@@ -763,7 +776,7 @@ int kvm_arm_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
 	case KVM_REG_ARM64_SVE:	return get_sve_reg(vcpu, reg);
 	}
 
-	if (is_timer_reg(reg->id))
+	if (is_timer_reg(vcpu, reg->id))
 		return get_timer_reg(vcpu, reg);
 
 	return kvm_arm_sys_reg_get_reg(vcpu, reg);
@@ -781,7 +794,7 @@ int kvm_arm_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
 	case KVM_REG_ARM64_SVE:	return set_sve_reg(vcpu, reg);
 	}
 
-	if (is_timer_reg(reg->id))
+	if (is_timer_reg(vcpu, reg->id))
 		return set_timer_reg(vcpu, reg);
 
 	return kvm_arm_sys_reg_set_reg(vcpu, reg);
