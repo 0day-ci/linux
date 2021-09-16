@@ -5,10 +5,13 @@
  * Copyright 2019-2020 Analog Devices Inc.
  */
 #include <linux/bitfield.h>
+#include <linux/bitops.h>
 #include <linux/delay.h>
 #include <linux/device.h>
 #include <linux/gpio/consumer.h>
 #include <linux/iio/iio.h>
+#include <linux/iio/triggered_buffer.h>
+#include <linux/iio/trigger_consumer.h>
 #include <linux/module.h>
 #include <linux/spi/spi.h>
 #include <asm/unaligned.h>
@@ -41,6 +44,7 @@
 #define AD5766_CMD_DITHER_SCALE_2		0xD0
 
 #define AD5766_FULL_RESET_CODE			0x1234
+#define AD5766_NUM_CH				16
 
 enum ad5766_type {
 	ID_AD5766,
@@ -455,6 +459,7 @@ static const struct iio_chan_spec_ext_info ad5766_ext_info[] = {
 	.info_mask_separate = BIT(IIO_CHAN_INFO_RAW),			\
 	.info_mask_shared_by_type = BIT(IIO_CHAN_INFO_OFFSET) |		\
 		BIT(IIO_CHAN_INFO_SCALE),				\
+	.scan_index = (_chan),						\
 	.scan_type = {							\
 		.sign = 'u',						\
 		.realbits = (_bits),					\
@@ -576,6 +581,28 @@ static int ad5766_default_setup(struct ad5766_state *st)
 	return  __ad5766_spi_write(st, AD5766_CMD_SPAN_REG, st->crt_range);
 }
 
+static irqreturn_t ad5766_trigger_handler(int irq, void *p)
+{
+	struct iio_poll_func *pf = p;
+	struct iio_dev *indio_dev = pf->indio_dev;
+	struct iio_buffer *buf = indio_dev->buffer;
+	int ret, ch, i;
+	u16 data[AD5766_NUM_CH];
+
+	ret = iio_pop_from_buffer(buf, (u8 *)data);
+	if (ret)
+		goto done;
+
+	i = 0;
+	for_each_set_bit(ch, indio_dev->active_scan_mask, AD5766_NUM_CH - 1)
+		ad5766_write(indio_dev, ch, le16_to_cpu(data[i++]));
+
+done:
+	iio_trigger_notify_done(indio_dev->trig);
+
+	return IRQ_HANDLED;
+}
+
 static int ad5766_probe(struct spi_device *spi)
 {
 	enum ad5766_type type;
@@ -606,6 +633,15 @@ static int ad5766_probe(struct spi_device *spi)
 		return PTR_ERR(st->gpio_reset);
 
 	ret = ad5766_default_setup(st);
+	if (ret)
+		return ret;
+
+	/* Configure trigger buffer */
+	ret = devm_iio_triggered_buffer_setup_ext(&spi->dev, indio_dev, NULL,
+						  ad5766_trigger_handler,
+						  IIO_BUFFER_DIRECTION_OUT,
+						  NULL,
+						  NULL);
 	if (ret)
 		return ret;
 
