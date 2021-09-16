@@ -1532,7 +1532,8 @@ static int copy_fs(unsigned long clone_flags, struct task_struct *tsk)
 	return 0;
 }
 
-static int copy_files(unsigned long clone_flags, struct task_struct *tsk)
+static int copy_files(unsigned long clone_flags, struct task_struct *tsk,
+		      int no_files)
 {
 	struct files_struct *oldf, *newf;
 	int error = 0;
@@ -1543,6 +1544,11 @@ static int copy_files(unsigned long clone_flags, struct task_struct *tsk)
 	oldf = current->files;
 	if (!oldf)
 		goto out;
+
+	if (no_files) {
+		tsk->files = NULL;
+		goto out;
+	}
 
 	if (clone_flags & CLONE_FILES) {
 		atomic_inc(&oldf->count);
@@ -2179,7 +2185,7 @@ static __latent_entropy struct task_struct *copy_process(
 	retval = copy_semundo(clone_flags, p);
 	if (retval)
 		goto bad_fork_cleanup_security;
-	retval = copy_files(clone_flags, p);
+	retval = copy_files(clone_flags, p, args->no_files);
 	if (retval)
 		goto bad_fork_cleanup_semundo;
 	retval = copy_fs(clone_flags, p);
@@ -2539,6 +2545,7 @@ struct task_struct *create_io_thread(int (*fn)(void *), void *arg, int node)
  * @node: numa node to allocate task from
  * @clone_flags: CLONE flags
  * @io_thread: 1 if this will be a PF_IO_WORKER else 0.
+ * @no_files: Do not duplicate or copy the parent's open files.
  *
  * This returns a created task, or an error pointer. The returned task is
  * inactive, and the caller must fire it up through wake_up_new_task(p). If
@@ -2546,7 +2553,7 @@ struct task_struct *create_io_thread(int (*fn)(void *), void *arg, int node)
  */
 struct task_struct *kernel_copy_process(int (*fn)(void *), void *arg, int node,
 					unsigned long clone_flags,
-					int io_thread)
+					int io_thread, int no_files)
 {
 	struct kernel_clone_args args = {
 		.flags		= ((lower_32_bits(clone_flags) | CLONE_VM |
@@ -2555,6 +2562,7 @@ struct task_struct *kernel_copy_process(int (*fn)(void *), void *arg, int node,
 		.stack		= (unsigned long)fn,
 		.stack_size	= (unsigned long)arg,
 		.io_thread	= io_thread,
+		.no_files	= no_files,
 	};
 
 	return copy_process(NULL, 0, node, &args);

@@ -32,6 +32,7 @@ struct kernel_clone_args {
 	size_t set_tid_size;
 	int cgroup;
 	int io_thread;
+	int no_files;
 	struct cgroup *cgrp;
 	struct css_set *cset;
 };
@@ -86,7 +87,7 @@ extern pid_t kernel_clone(struct kernel_clone_args *kargs);
 struct task_struct *create_io_thread(int (*fn)(void *), void *arg, int node);
 struct task_struct *kernel_copy_process(int (*fn)(void *), void *arg, int node,
 					unsigned long clone_flags,
-					int io_thread);
+					int io_thread, int no_files);
 struct task_struct *fork_idle(int);
 struct mm_struct *copy_init_mm(void);
 extern pid_t kernel_thread(int (*fn)(void *), void *arg, unsigned long flags);
