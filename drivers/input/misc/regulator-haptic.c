@@ -169,10 +169,9 @@ static int regulator_haptic_probe(struct platform_device *pdev)
 	}
 
 	haptic->regulator = devm_regulator_get_exclusive(&pdev->dev, "haptic");
-	if (IS_ERR(haptic->regulator)) {
-		dev_err(&pdev->dev, "failed to get regulator\n");
-		return PTR_ERR(haptic->regulator);
-	}
+	if (IS_ERR(haptic->regulator))
+		return dev_err_probe(&pdev->dev, PTR_ERR(haptic->regulator),
+				     "failed to get regulator\n");
 
 	input_dev = devm_input_allocate_device(&pdev->dev);
 	if (!input_dev)
