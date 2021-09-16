@@ -470,10 +470,8 @@ static int drv260x_probe(struct i2c_client *client,
 		return -ENOMEM;
 
 	error = device_property_read_u32(dev, "mode", &haptics->mode);
-	if (error) {
-		dev_err(dev, "Can't fetch 'mode' property: %d\n", error);
-		return error;
-	}
+	if (error)
+		return dev_err_probe(dev, error, "Can't fetch 'mode' property\n");
 
 	if (haptics->mode < DRV260X_LRA_MODE ||
 	    haptics->mode > DRV260X_ERM_MODE) {
@@ -482,10 +480,8 @@ static int drv260x_probe(struct i2c_client *client,
 	}
 
 	error = device_property_read_u32(dev, "library-sel", &haptics->library);
-	if (error) {
-		dev_err(dev, "Can't fetch 'library-sel' property: %d\n", error);
-		return error;
-	}
+	if (error)
+		return dev_err_probe(dev, error, "Can't fetch 'library-sel' property\n");
 
 	if (haptics->library < DRV260X_LIB_EMPTY ||
 	    haptics->library > DRV260X_ERM_LIB_F) {
@@ -517,11 +513,9 @@ static int drv260x_probe(struct i2c_client *client,
 					     drv260x_calculate_voltage(voltage);
 
 	haptics->regulator = devm_regulator_get(dev, "vbat");
-	if (IS_ERR(haptics->regulator)) {
-		error = PTR_ERR(haptics->regulator);
-		dev_err(dev, "unable to get regulator, error: %d\n", error);
-		return error;
-	}
+	if (IS_ERR(haptics->regulator))
+		return dev_err_probe(dev, PTR_ERR(haptics->regulator),
+				     "unable to get regulator\n");
 
 	haptics->enable_gpio = devm_gpiod_get_optional(dev, "enable",
 						       GPIOD_OUT_HIGH);
