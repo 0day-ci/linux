@@ -15,6 +15,8 @@
  */
 
 #include <linux/elfcore-compat.h>
+#include <linux/init.h>
+#include <linux/sysctl.h>
 #include <linux/time.h>
 
 #define ELF_COMPAT	1
@@ -63,7 +65,8 @@
  */
 
 #undef	elf_check_arch
-#define	elf_check_arch	compat_elf_check_arch
+#define	elf_check_arch(ex)	\
+	(compat_binfmt_elf_enable && compat_elf_check_arch(ex))
 
 #ifdef	COMPAT_ELF_PLATFORM
 #undef	ELF_PLATFORM
@@ -135,6 +138,25 @@
 #define elf_format		compat_elf_format
 #define init_elf_binfmt		init_compat_elf_binfmt
 #define exit_elf_binfmt		exit_compat_elf_binfmt
+
+static int compat_binfmt_elf_enable = 1;
+
+static struct ctl_table compat_elf_sysctl_table[] = {
+	{
+		.procname	= "compat-binfmt-elf-enable",
+		.data		= &compat_binfmt_elf_enable,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec,
+	},
+	{ },
+};
+
+static int __init compat_elf_init(void)
+{
+	return register_sysctl("fs", compat_elf_sysctl_table) == NULL;
+}
+fs_initcall(compat_elf_init);
 
 /*
  * We share all the actual code with the native (64-bit) version.
