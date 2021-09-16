@@ -676,32 +676,24 @@ static int tc_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		return ret;
 
 	tc->vddio = devm_regulator_get(dev, "vddio-supply");
-	if (IS_ERR(tc->vddio)) {
-		ret = PTR_ERR(tc->vddio);
-		dev_err(dev, "vddio-supply not found\n");
-		return ret;
-	}
+	if (IS_ERR(tc->vddio))
+		return dev_err_probe(dev, PTR_ERR(tc->vddio),
+				     "vddio-supply not found\n");
 
 	tc->vdd = devm_regulator_get(dev, "vdd-supply");
-	if (IS_ERR(tc->vdd)) {
-		ret = PTR_ERR(tc->vdd);
-		dev_err(dev, "vdd-supply not found\n");
-		return ret;
-	}
+	if (IS_ERR(tc->vdd))
+		return dev_err_probe(dev, PTR_ERR(tc->vdd),
+				     "vdd-supply not found\n");
 
 	tc->stby_gpio = devm_gpiod_get(dev, "stby", GPIOD_OUT_HIGH);
-	if (IS_ERR(tc->stby_gpio)) {
-		ret = PTR_ERR(tc->stby_gpio);
-		dev_err(dev, "cannot get stby-gpio %d\n", ret);
-		return ret;
-	}
+	if (IS_ERR(tc->stby_gpio))
+		return dev_err_probe(dev, PTR_ERR(tc->stby_gpio),
+				     "cannot get stby-gpio\n");
 
 	tc->reset_gpio = devm_gpiod_get(dev, "reset", GPIOD_OUT_HIGH);
-	if (IS_ERR(tc->reset_gpio)) {
-		ret = PTR_ERR(tc->reset_gpio);
-		dev_err(dev, "cannot get reset-gpios %d\n", ret);
-		return ret;
-	}
+	if (IS_ERR(tc->reset_gpio))
+		return dev_err_probe(dev, PTR_ERR(tc->reset_gpio),
+				     "cannot get reset-gpios\n");
 
 	tc->bridge.funcs = &tc_bridge_funcs;
 	tc->bridge.of_node = dev->of_node;
