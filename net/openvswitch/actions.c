@@ -1245,7 +1245,7 @@ static int do_execute_actions(struct datapath *dp, struct sk_buff *skb,
 	const struct nlattr *a;
 	int rem;
 
-	for (a = attr, rem = len; rem > 0;
+	for (a = attr, rem = len; nla_ok(a, rem);
 	     a = nla_next(a, &rem)) {
 		int err = 0;
 
