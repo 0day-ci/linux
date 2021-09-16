@@ -469,6 +469,17 @@ config HISI_HIKEY_USB
 	  switching between the dual-role USB-C port and the USB-A host ports
 	  using only one USB controller.
 
+config RSMU
+	tristate "Renesas Synchronization Management Unit (SMU)"
+	help
+	  This option enables support for RSMU (Renesas Synchronization
+	  Management Unit) driver. It will be used by Renesas PTP Clock Manager
+	  for Linux (pcm4l) software to provide support for GNSS assisted
+	  partial timing support (APTS) and other networking timing functions.
+
+	  For pcm4l, please refer the following link for more details
+	  https://www.renesas.com/us/en/software-tool/ptp-clock-manager-linux
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"
