@@ -441,12 +441,9 @@ static int iproc_ts_probe(struct platform_device *pdev)
 	}
 
 	priv->tsc_clk = devm_clk_get(&pdev->dev, "tsc_clk");
-	if (IS_ERR(priv->tsc_clk)) {
-		error = PTR_ERR(priv->tsc_clk);
-		dev_err(&pdev->dev,
-			"failed getting clock tsc_clk: %d\n", error);
-		return error;
-	}
+	if (IS_ERR(priv->tsc_clk))
+		return dev_err_probe(&pdev->dev, PTR_ERR(priv->tsc_clk),
+				     "failed getting clock tsc_clk\n");
 
 	priv->pdev = pdev;
 	error = iproc_get_tsc_config(&pdev->dev, priv);
