@@ -2271,17 +2271,15 @@ static int kdb_cpu(int argc, const char **argv)
 void kdb_ps_suppressed(void)
 {
 	int idle = 0, daemon = 0;
-	unsigned long mask_I = kdb_task_state_string("I"),
-		      mask_M = kdb_task_state_string("M");
 	unsigned long cpu;
 	const struct task_struct *p, *g;
 	for_each_online_cpu(cpu) {
 		p = kdb_curr_task(cpu);
-		if (kdb_task_state(p, mask_I))
+		if (kdb_task_state(p, "I"))
 			++idle;
 	}
 	for_each_process_thread(g, p) {
-		if (kdb_task_state(p, mask_M))
+		if (kdb_task_state(p, "M"))
 			++daemon;
 	}
 	if (idle || daemon) {
@@ -2300,7 +2298,7 @@ void kdb_ps_suppressed(void)
 /*
  * kdb_ps - This function implements the 'ps' command which shows a
  *	list of the active processes.
- *		ps [DRSTCZEUIMA]   All processes, optionally filtered by state
+ *		ps [RSDTtXZPIMA]   All processes, optionally filtered by state
  */
 void kdb_ps1(const struct task_struct *p)
 {
@@ -2333,14 +2331,15 @@ void kdb_ps1(const struct task_struct *p)
 static int kdb_ps(int argc, const char **argv)
 {
 	struct task_struct *g, *p;
-	unsigned long mask, cpu;
+	const char *mask;
+	unsigned long cpu;
 
 	if (argc == 0)
 		kdb_ps_suppressed();
 	kdb_printf("%-*s      Pid   Parent [*] cpu State %-*s Command\n",
 		(int)(2*sizeof(void *))+2, "Task Addr",
 		(int)(2*sizeof(void *))+2, "Thread");
-	mask = kdb_task_state_string(argc ? argv[1] : NULL);
+	mask = argc ? argv[1] : kdbgetenv("PS");
 	/* Run the active tasks first */
 	for_each_online_cpu(cpu) {
 		if (KDB_FLAG(CMD_INTERRUPT))
@@ -2742,7 +2741,7 @@ static kdbtab_t maintab[] = {
 	},
 	{	.name = "bta",
 		.func = kdb_bt,
-		.usage = "[D|R|S|T|C|Z|E|U|I|M|A]",
+		.usage = "[R|S|D|T|t|X|Z|P|I|M|A]",
 		.help = "Backtrace all processes matching state flag",
 		.flags = KDB_ENABLE_INSPECT,
 	},
