@@ -303,7 +303,7 @@ static enum resp_states get_srq_wqe(struct rxe_qp *qp)
 
 	spin_lock_bh(&srq->rq.consumer_lock);
 
-	if (qp->is_user)
+	if (srq->is_user)
 		wqe = queue_head(q, QUEUE_TYPE_FROM_USER);
 	else
 		wqe = queue_head(q, QUEUE_TYPE_KERNEL);
@@ -322,7 +322,7 @@ static enum resp_states get_srq_wqe(struct rxe_qp *qp)
 	memcpy(&qp->resp.srq_wqe, wqe, size);
 
 	qp->resp.wqe = &qp->resp.srq_wqe.wqe;
-	if (qp->is_user) {
+	if (srq->is_user) {
 		advance_consumer(q, QUEUE_TYPE_FROM_USER);
 		count = queue_count(q, QUEUE_TYPE_FROM_USER);
 	} else {
@@ -357,7 +357,7 @@ static enum resp_states check_resource(struct rxe_qp *qp,
 			qp->resp.status = IB_WC_WR_FLUSH_ERR;
 			return RESPST_COMPLETE;
 		} else if (!srq) {
-			if (qp->is_user)
+			if (qp->rq.is_user)
 				qp->resp.wqe = queue_head(qp->rq.queue,
 						QUEUE_TYPE_FROM_USER);
 			else
@@ -389,7 +389,7 @@ static enum resp_states check_resource(struct rxe_qp *qp,
 		if (srq)
 			return get_srq_wqe(qp);
 
-		if (qp->is_user)
+		if (qp->rq.is_user)
 			qp->resp.wqe = queue_head(qp->rq.queue,
 					QUEUE_TYPE_FROM_USER);
 		else
@@ -937,7 +937,7 @@ static enum resp_states do_complete(struct rxe_qp *qp,
 
 	/* have copy for srq and reference for !srq */
 	if (!qp->srq) {
-		if (qp->is_user)
+		if (qp->rq.is_user)
 			advance_consumer(qp->rq.queue, QUEUE_TYPE_FROM_USER);
 		else
 			advance_consumer(qp->rq.queue, QUEUE_TYPE_KERNEL);

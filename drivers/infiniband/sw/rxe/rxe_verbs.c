@@ -413,14 +413,8 @@ static int rxe_create_qp(struct ib_qp *ibqp, struct ib_qp_init_attr *init,
 	if (err)
 		return err;
 
-	if (udata) {
-		if (udata->inlen)
-			return -EINVAL;
-
-		qp->is_user = true;
-	} else {
-		qp->is_user = false;
-	}
+	if (udata && udata->inlen)
+		return -EINVAL;
 
 	err = rxe_add_to_pool(&rxe->qp_pool, qp);
 	if (err)
@@ -709,7 +703,7 @@ static int rxe_post_send(struct ib_qp *ibqp, const struct ib_send_wr *wr,
 		return -EINVAL;
 	}
 
-	if (qp->is_user) {
+	if (qp->sq.is_user) {
 		/* Utilize process context to do protocol processing */
 		rxe_run_task(&qp->req.task, 0);
 		return 0;

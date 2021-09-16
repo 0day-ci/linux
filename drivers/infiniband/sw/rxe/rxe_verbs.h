@@ -215,7 +215,6 @@ struct rxe_qp {
 	struct ib_qp_attr	attr;
 	unsigned int		valid;
 	unsigned int		mtu;
-	bool			is_user;
 
 	struct rxe_pd		*pd;
 	struct rxe_srq		*srq;
