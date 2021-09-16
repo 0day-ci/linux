@@ -110,4 +110,9 @@ void kvm_arm_timer_write_sysreg(struct kvm_vcpu *vcpu,
 u32 timer_get_ctl(struct arch_timer_context *ctxt);
 u64 timer_get_cval(struct arch_timer_context *ctxt);
 
+static inline bool kvm_timer_physical_offset_allowed(void)
+{
+	return cpus_have_final_cap(ARM64_HAS_ECV2) && has_vhe();
+}
+
 #endif

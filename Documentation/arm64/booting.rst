@@ -340,6 +340,13 @@ Before jumping into the kernel, the following conditions must be met:
     - SMCR_EL2.LEN must be initialised to the same value for all CPUs the
       kernel will execute on.
 
+  For CPUs with the Enhanced Counter Virtualization (FEAT_ECV) extension
+  present with ID_AA64MMFR0_EL1.ECV >= 0x2:
+
+  - if EL3 is present and the kernel is entered at EL2:
+
+    - SCR_EL3.ECVEn (bit 28) must be initialized to 0b1.
+
 The requirements described above for CPU mode, caches, MMUs, architected
 timers, coherency and system registers apply to all CPUs.  All CPUs must
 enter the kernel in the same exception level.  Where the values documented
