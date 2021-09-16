@@ -371,7 +371,7 @@ static inline u32 vmw_surface_subres(const struct vmw_surface_cache *cache,
  * @format: The surface format.
  * @num_mip_levels: Number of mipmap levels.
  * @num_layers: Number of layers.
- * @cache: Pointer to a struct vmw_surface_cach object to be filled in.
+ * @cache: Pointer to a struct vmw_surface_cache object to be filled in.
  *
  * Return: Zero on success, -EINVAL on invalid surface layout.
  */
