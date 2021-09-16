@@ -227,10 +227,9 @@ static int lpc32xx_kscan_probe(struct platform_device *pdev)
 
 	/* Get the key scanner clock */
 	kscandat->clk = devm_clk_get(&pdev->dev, NULL);
-	if (IS_ERR(kscandat->clk)) {
-		dev_err(&pdev->dev, "failed to get clock\n");
-		return PTR_ERR(kscandat->clk);
-	}
+	if (IS_ERR(kscandat->clk))
+		return dev_err_probe(&pdev->dev, PTR_ERR(kscandat->clk),
+				     "failed to get clock\n");
 
 	/* Configure the key scanner */
 	error = clk_prepare_enable(kscandat->clk);
