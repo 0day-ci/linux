@@ -142,6 +142,32 @@ void sg_init_one(struct scatterlist *sg, const void *buf, unsigned int buflen)
 }
 EXPORT_SYMBOL(sg_init_one);
 
+/**
+ * sg_dma_count_chunks - return number of contiguous DMA chunks in scatterlist
+ * @sgl: SG table
+ * @nents: number of entries in SG table
+ */
+unsigned int sg_dma_count_chunks(struct scatterlist *sgl, unsigned int nents)
+{
+	dma_addr_t next = ~(dma_addr_t)0;
+	unsigned int count = 0, i;
+	struct scatterlist *s;
+
+	for_each_sg(sgl, s, nents, i) {
+		/* sg_dma_address(s) is only valid for entries that have sg_dma_len(s) != 0. */
+		if (!sg_dma_len(s))
+			continue;
+
+		if (sg_dma_address(s) != next) {
+			next = sg_dma_address(s) + sg_dma_len(s);
+			count++;
+		}
+	}
+
+	return count;
+}
+EXPORT_SYMBOL(sg_dma_count_chunks);
+
 /*
  * The default behaviour of sg_alloc_table() is to use these kmalloc/kfree
  * helpers.

@@ -275,6 +275,7 @@ int sg_split(struct scatterlist *in, const int in_mapped_nents,
 	     const size_t *split_sizes,
 	     struct scatterlist **out, int *out_mapped_nents,
 	     gfp_t gfp_mask);
+unsigned int sg_dma_count_chunks(struct scatterlist *sgl, unsigned int nents);
 
 typedef struct scatterlist *(sg_alloc_fn)(unsigned int, gfp_t);
 typedef void (sg_free_fn)(struct scatterlist *, unsigned int);
@@ -319,6 +320,16 @@ size_t sg_pcopy_to_buffer(struct scatterlist *sgl, unsigned int nents,
 			  void *buf, size_t buflen, off_t skip);
 size_t sg_zero_buffer(struct scatterlist *sgl, unsigned int nents,
 		       size_t buflen, off_t skip);
+
+static inline unsigned int sgt_dma_count_chunks(struct sg_table *sgt)
+{
+	return sg_dma_count_chunks(sgt->sgl, sgt->nents);
+}
+
+static inline bool sgt_dma_contiguous(struct sg_table *sgt)
+{
+	return sgt_dma_count_chunks(sgt) == 1;
+}
 
 /*
  * Maximum number of entries that will be allocated in one piece, if
