@@ -32,9 +32,6 @@ int __blkdev_issue_discard(struct block_device *bdev, sector_t sector,
 	unsigned int op;
 	sector_t bs_mask, part_offset = 0;
 
-	if (!q)
-		return -ENXIO;
-
 	if (bdev_read_only(bdev))
 		return -EPERM;
 
@@ -172,9 +169,6 @@ static int __blkdev_issue_write_same(struct block_device *bdev, sector_t sector,
 	struct bio *bio = *biop;
 	sector_t bs_mask;
 
-	if (!q)
-		return -ENXIO;
-
 	if (bdev_read_only(bdev))
 		return -EPERM;
 
@@ -250,10 +244,6 @@ static int __blkdev_issue_write_zeroes(struct block_device *bdev,
 {
 	struct bio *bio = *biop;
 	unsigned int max_write_zeroes_sectors;
-	struct request_queue *q = bdev_get_queue(bdev);
-
-	if (!q)
-		return -ENXIO;
 
 	if (bdev_read_only(bdev))
 		return -EPERM;
@@ -304,13 +294,9 @@ static int __blkdev_issue_zero_pages(struct block_device *bdev,
 		sector_t sector, sector_t nr_sects, gfp_t gfp_mask,
 		struct bio **biop)
 {
-	struct request_queue *q = bdev_get_queue(bdev);
 	struct bio *bio = *biop;
 	int bi_size = 0;
 	unsigned int sz;
-
-	if (!q)
-		return -ENXIO;
 
 	if (bdev_read_only(bdev))
 		return -EPERM;
