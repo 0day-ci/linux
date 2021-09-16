@@ -33,6 +33,7 @@ struct kernel_clone_args {
 	int cgroup;
 	int io_thread;
 	int no_files;
+	int user_worker;
 	struct cgroup *cgrp;
 	struct css_set *cset;
 };
