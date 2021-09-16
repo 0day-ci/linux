@@ -648,16 +648,14 @@ static int tegra_kbc_probe(struct platform_device *pdev)
 		return PTR_ERR(kbc->mmio);
 
 	kbc->clk = devm_clk_get(&pdev->dev, NULL);
-	if (IS_ERR(kbc->clk)) {
-		dev_err(&pdev->dev, "failed to get keyboard clock\n");
-		return PTR_ERR(kbc->clk);
-	}
+	if (IS_ERR(kbc->clk))
+		return dev_err_probe(&pdev->dev, PTR_ERR(kbc->clk),
+				     "failed to get keyboard clock\n");
 
 	kbc->rst = devm_reset_control_get(&pdev->dev, "kbc");
-	if (IS_ERR(kbc->rst)) {
-		dev_err(&pdev->dev, "failed to get keyboard reset\n");
-		return PTR_ERR(kbc->rst);
-	}
+	if (IS_ERR(kbc->rst))
+		return dev_err_probe(&pdev->dev, PTR_ERR(kbc->rst),
+			       "failed to get keyboard reset\n");
 
 	/*
 	 * The time delay between two consecutive reads of the FIFO is
