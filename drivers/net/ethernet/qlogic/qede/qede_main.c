@@ -1087,9 +1087,9 @@ static void qede_log_probe(struct qede_dev *edev)
 {
 	struct qed_dev_info *p_dev_info = &edev->dev_info.common;
 	u8 buf[QEDE_FW_VER_STR_SIZE];
-	size_t left_size;
+	int off;
 
-	snprintf(buf, QEDE_FW_VER_STR_SIZE,
+	off = scnprintf(buf, QEDE_FW_VER_STR_SIZE,
 		 "Storm FW %d.%d.%d.%d, Management FW %d.%d.%d.%d",
 		 p_dev_info->fw_major, p_dev_info->fw_minor, p_dev_info->fw_rev,
 		 p_dev_info->fw_eng,
@@ -1102,9 +1102,8 @@ static void qede_log_probe(struct qede_dev *edev)
 		 (p_dev_info->mfw_rev & QED_MFW_VERSION_0_MASK) >>
 		 QED_MFW_VERSION_0_OFFSET);
 
-	left_size = QEDE_FW_VER_STR_SIZE - strlen(buf);
-	if (p_dev_info->mbi_version && left_size)
-		snprintf(buf + strlen(buf), left_size,
+	if (p_dev_info->mbi_version)
+		off += scnprintf(buf + off, sizeof(buf) - off,
 			 " [MBI %d.%d.%d]",
 			 (p_dev_info->mbi_version & QED_MBI_VERSION_2_MASK) >>
 			 QED_MBI_VERSION_2_OFFSET,
