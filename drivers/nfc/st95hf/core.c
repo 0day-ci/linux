@@ -1087,10 +1087,9 @@ static int st95hf_probe(struct spi_device *nfc_spi_dev)
 		st95context->st95hf_supply =
 			devm_regulator_get(&nfc_spi_dev->dev,
 					   "st95hfvin");
-		if (IS_ERR(st95context->st95hf_supply)) {
-			dev_err(&nfc_spi_dev->dev, "failed to acquire regulator\n");
-			return PTR_ERR(st95context->st95hf_supply);
-		}
+		if (IS_ERR(st95context->st95hf_supply))
+			return dev_err_probe(&nfc_spi_dev->dev, PTR_ERR(st95context->st95hf_supply),
+					     "failed to acquire regulator\n");
 
 		ret = regulator_enable(st95context->st95hf_supply);
 		if (ret) {
