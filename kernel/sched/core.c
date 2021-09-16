@@ -4429,8 +4429,9 @@ unsigned long to_ratio(u64 period, u64 runtime)
 	return div64_u64(runtime << BW_SHIFT, period);
 }
 
-/*
+/**
  * wake_up_new_task - wake up a newly created task for the first time.
+ * @p: task to wake up
  *
  * This function will do some initial scheduler statistics housekeeping
  * that must be done for every newly created context, then puts the task
@@ -4476,6 +4477,7 @@ void wake_up_new_task(struct task_struct *p)
 #endif
 	task_rq_unlock(rq, p, &rf);
 }
+EXPORT_SYMBOL_GPL(wake_up_new_task);
 
 #ifdef CONFIG_PREEMPT_NOTIFIERS
 

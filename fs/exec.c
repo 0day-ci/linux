@@ -1220,6 +1220,12 @@ EXPORT_SYMBOL_GPL(__get_task_comm);
  * so that a new one can be started
  */
 
+/**
+ * __set_task_comm - set the task's executable name
+ * @tsk: task_struct to modify
+ * @buf: executable name
+ * @exec: true if called during a process exec. false for name changes.
+ */
 void __set_task_comm(struct task_struct *tsk, const char *buf, bool exec)
 {
 	task_lock(tsk);
@@ -1228,6 +1234,7 @@ void __set_task_comm(struct task_struct *tsk, const char *buf, bool exec)
 	task_unlock(tsk);
 	perf_event_comm(tsk, exec);
 }
+EXPORT_SYMBOL_GPL(__set_task_comm);
 
 /*
  * Calling this is the point of no return. None of the failures will be
