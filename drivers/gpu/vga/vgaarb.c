@@ -605,6 +605,11 @@ static void vga_arb_update_default_device(struct vga_device *vgadev)
 		vgaarb_info(dev, "overriding boot VGA device\n");
 		vga_set_default_device(pdev);
 	}
+
+	if (vga_arb_integrated_gpu(dev) && vgadev->pdev != vga_default_device()) {
+		vgaarb_info(dev, "overriding boot VGA device\n");
+		vga_set_default_device(pdev);
+	}
 }
 
 /*
