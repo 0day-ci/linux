@@ -96,8 +96,8 @@ static struct regulator *mpr121_vdd_supply_init(struct device *dev)
 
 	vdd_supply = devm_regulator_get(dev, "vdd");
 	if (IS_ERR(vdd_supply)) {
-		dev_err(dev, "failed to get vdd regulator: %ld\n",
-			PTR_ERR(vdd_supply));
+		dev_err_probe(dev, PTR_ERR(vdd_supply),
+			      "failed to get vdd regulator\n");
 		return vdd_supply;
 	}
 
@@ -267,11 +267,9 @@ static int mpr_touchkey_probe(struct i2c_client *client,
 	error = device_property_read_u32_array(dev, "linux,keycodes",
 					       mpr121->keycodes,
 					       mpr121->keycount);
-	if (error) {
-		dev_err(dev,
-			"failed to read linux,keycode property: %d\n", error);
-		return error;
-	}
+	if (error)
+		return dev_err_probe(dev, error,
+				     "failed to read linux, keycode property\n");
 
 	input_dev->name = "Freescale MPR121 Touchkey";
 	input_dev->id.bustype = BUS_I2C;
