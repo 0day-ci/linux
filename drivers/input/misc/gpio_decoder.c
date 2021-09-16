@@ -80,10 +80,9 @@ static int gpio_decoder_probe(struct platform_device *pdev)
 	device_property_read_u32(dev, "linux,axis", &decoder->axis);
 
 	decoder->input_gpios = devm_gpiod_get_array(dev, NULL, GPIOD_IN);
-	if (IS_ERR(decoder->input_gpios)) {
-		dev_err(dev, "unable to acquire input gpios\n");
-		return PTR_ERR(decoder->input_gpios);
-	}
+	if (IS_ERR(decoder->input_gpios))
+		return dev_err_probe(dev, PTR_ERR(decoder->input_gpios),
+				     "unable to acquire input gpios\n");
 
 	if (decoder->input_gpios->ndescs < 2) {
 		dev_err(dev, "not enough gpios found\n");
