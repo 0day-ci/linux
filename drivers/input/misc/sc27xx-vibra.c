@@ -135,10 +135,9 @@ static int sc27xx_vibra_probe(struct platform_device *pdev)
 	}
 
 	error = device_property_read_u32(&pdev->dev, "reg", &info->base);
-	if (error) {
-		dev_err(&pdev->dev, "failed to get vibrator base address.\n");
-		return error;
-	}
+	if (error)
+		return dev_err_probe(&pdev->dev, error,
+				     "failed to get vibrator base address.\n");
 
 	info->input_dev = devm_input_allocate_device(&pdev->dev);
 	if (!info->input_dev) {
