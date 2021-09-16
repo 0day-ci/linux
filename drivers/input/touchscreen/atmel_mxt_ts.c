@@ -3101,11 +3101,9 @@ static int mxt_parse_device_properties(struct mxt_data *data)
 
 		error = device_property_read_u32_array(dev, keymap_property,
 						       keymap, n_keys);
-		if (error) {
-			dev_err(dev, "failed to parse '%s' property: %d\n",
-				keymap_property, error);
-			return error;
-		}
+		if (error)
+			return dev_err_probe(dev, error,
+					     "failed to parse '%s'\n", keymap_property);
 
 		data->t19_keymap = keymap;
 		data->t19_num_keys = n_keys;
