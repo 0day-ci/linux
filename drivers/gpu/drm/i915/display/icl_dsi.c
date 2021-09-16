@@ -1999,6 +1999,7 @@ void icl_dsi_init(struct drm_i915_private *dev_priv)
 	struct intel_connector *intel_connector;
 	struct drm_connector *connector;
 	struct drm_display_mode *fixed_mode;
+	struct intel_gmbus *bus;
 	enum port port;
 
 	if (!intel_bios_is_dsi_present(dev_priv, &port))
@@ -2092,6 +2093,19 @@ void icl_dsi_init(struct drm_i915_private *dev_priv)
 	icl_dphy_param_init(intel_dsi);
 
 	icl_dsi_add_properties(intel_connector);
+
+	/*
+	 * DDC bus may configured as gpio and reserved for MIPI driver
+	 * to control panel power on/off sequence. so, unregister gmbus
+	 * if MIPI was LFP display.
+	 */
+	bus = &dev_priv->gmbus[GMBUS_PIN_1_BXT];
+	i2c_del_adapter(&bus->adapter);
+
+	if (dev_priv->vbt.dsi.config->dual_link) {
+		bus = &dev_priv->gmbus[GMBUS_PIN_2_BXT];
+		i2c_del_adapter(&bus->adapter);
+	}
 	return;
 
 err:
