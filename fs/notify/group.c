@@ -34,10 +34,16 @@ static void fsnotify_final_destroy_group(struct fsnotify_group *group)
  * Stop queueing new events for this group. Once this function returns
  * fsnotify_add_event() will not add any new events to the group's queue.
  */
-void fsnotify_group_stop_queueing(struct fsnotify_group *group)
+void fsnotify_group_stop_queueing(struct fsnotify_group *group, unsigned int st)
 {
+	if (st & ~FS_GRP_STOP_QUEUEING)
+		return;
+
 	spin_lock(&group->notification_lock);
-	group->shutdown = true;
+	if (group->state & st)
+		group->state &= ~st;
+	else
+		group->state |= st;
 	spin_unlock(&group->notification_lock);
 }
 
@@ -55,7 +61,7 @@ void fsnotify_destroy_group(struct fsnotify_group *group)
 	 * fsnotify_destroy_group() is called and this makes the other callers
 	 * of fsnotify_destroy_group() to see the same behavior.
 	 */
-	fsnotify_group_stop_queueing(group);
+	fsnotify_group_stop_queueing(group, FS_GRP_SHUTDOWN);
 
 	/* Clear all marks for this group and queue them for destruction */
 	fsnotify_clear_marks_by_group(group, FSNOTIFY_OBJ_ALL_TYPES_MASK);

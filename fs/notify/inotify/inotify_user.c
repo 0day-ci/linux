@@ -322,6 +322,10 @@ static long inotify_ioctl(struct file *file, unsigned int cmd,
 		}
 		break;
 #endif /* CONFIG_CHECKPOINT_RESTORE */
+	case INOTIFY_IOC_SUPPRESS:
+		fsnotify_group_stop_queueing(group, FS_GRP_SUPPRESS);
+		ret = 0;
+		break;
 	}
 
 	return ret;

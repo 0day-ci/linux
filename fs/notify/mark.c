@@ -343,7 +343,8 @@ static void fsnotify_put_mark_wake(struct fsnotify_mark *mark)
 		 * We abuse notification_waitq on group shutdown for waiting for
 		 * all marks pinned when waiting for userspace.
 		 */
-		if (atomic_dec_and_test(&group->user_waits) && group->shutdown)
+		if (atomic_dec_and_test(&group->user_waits) &&
+		    group->state & FS_GRP_SHUTDOWN)
 			wake_up(&group->notification_waitq);
 	}
 }

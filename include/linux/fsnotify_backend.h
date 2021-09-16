@@ -103,6 +103,10 @@
 
 #define ALL_FSNOTIFY_BITS   (ALL_FSNOTIFY_EVENTS | ALL_FSNOTIFY_FLAGS)
 
+#define FS_GRP_SHUTDOWN 0x1	/* group is being shut down, don't queue more events */
+#define FS_GRP_SUPPRESS 0x2	/* group is being suppressed, don't queue more events */
+#define FS_GRP_STOP_QUEUEING (FS_GRP_SHUTDOWN | FS_GRP_SUPPRESS)
+
 struct fsnotify_group;
 struct fsnotify_event;
 struct fsnotify_mark;
@@ -202,7 +206,7 @@ struct fsnotify_group {
 	#define FS_PRIO_1	1 /* fanotify content based access control */
 	#define FS_PRIO_2	2 /* fanotify pre-content access */
 	unsigned int priority;
-	bool shutdown;		/* group is being shut down, don't queue more events */
+	unsigned int state;
 
 	/* stores all fastpath marks assoc with this group so they can be cleaned on unregister */
 	struct mutex mark_mutex;	/* protect marks_list */
@@ -472,8 +476,8 @@ extern struct fsnotify_group *fsnotify_alloc_user_group(const struct fsnotify_op
 extern void fsnotify_get_group(struct fsnotify_group *group);
 /* drop reference on a group from fsnotify_alloc_group */
 extern void fsnotify_put_group(struct fsnotify_group *group);
-/* group destruction begins, stop queuing new events */
-extern void fsnotify_group_stop_queueing(struct fsnotify_group *group);
+/* group destruction begins or suppresses, stop queuing new events */
+extern void fsnotify_group_stop_queueing(struct fsnotify_group *group, unsigned int st);
 /* destroy group */
 extern void fsnotify_destroy_group(struct fsnotify_group *group);
 /* fasync handler function */

@@ -76,7 +76,7 @@ void fsnotify_destroy_event(struct fsnotify_group *group,
  * 0 if the event was added to a queue
  * 1 if the event was merged with some other queued event
  * 2 if the event was not queued - either the queue of events has overflown
- *   or the group is shutting down.
+ *   or the group is suppressing or shutting down.
  */
 int fsnotify_add_event(struct fsnotify_group *group,
 		       struct fsnotify_event *event,
@@ -92,7 +92,7 @@ int fsnotify_add_event(struct fsnotify_group *group,
 
 	spin_lock(&group->notification_lock);
 
-	if (group->shutdown) {
+	if (group->state & FS_GRP_STOP_QUEUEING) {
 		spin_unlock(&group->notification_lock);
 		return 2;
 	}

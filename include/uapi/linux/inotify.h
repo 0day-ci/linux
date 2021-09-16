@@ -78,7 +78,10 @@ struct inotify_event {
  *
  * INOTIFY_IOC_SETNEXTWD: set desired number of next created
  * watch descriptor.
+ *
+ * INOTIFY_IOC_SUPPRESS: suppress events temporarily.
  */
 #define INOTIFY_IOC_SETNEXTWD	_IOW('I', 0, __s32)
+#define INOTIFY_IOC_SUPPRESS	_IOW('I', 1, __s32)
 
 #endif /* _UAPI_LINUX_INOTIFY_H */

@@ -768,7 +768,7 @@ static int fanotify_release(struct inode *ignored, struct file *file)
 	 * userspace cannot use fanotify fd anymore, no event can enter or
 	 * leave access_list by now either.
 	 */
-	fsnotify_group_stop_queueing(group);
+	fsnotify_group_stop_queueing(group, FS_GRP_SHUTDOWN);
 
 	/*
 	 * Process all permission events on access_list and notification queue
