@@ -85,7 +85,6 @@ extern void exit_files(struct task_struct *);
 extern void exit_itimers(struct signal_struct *);
 
 extern pid_t kernel_clone(struct kernel_clone_args *kargs);
-struct task_struct *create_io_thread(int (*fn)(void *), void *arg, int node);
 struct task_struct *kernel_copy_process(int (*fn)(void *), void *arg, int node,
 					unsigned long clone_flags,
 					int io_thread, int no_files);
