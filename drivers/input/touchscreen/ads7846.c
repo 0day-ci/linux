@@ -1337,11 +1337,8 @@ static int ads7846_probe(struct spi_device *spi)
 	ads7846_setup_spi_msg(ts, pdata);
 
 	ts->reg = devm_regulator_get(dev, "vcc");
-	if (IS_ERR(ts->reg)) {
-		err = PTR_ERR(ts->reg);
-		dev_err(dev, "unable to get regulator: %d\n", err);
-		return err;
-	}
+	if (IS_ERR(ts->reg))
+		return dev_err_probe(dev, PTR_ERR(ts->reg), "unable to get regulator\n");
 
 	err = regulator_enable(ts->reg);
 	if (err) {
