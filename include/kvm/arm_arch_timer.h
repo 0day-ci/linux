@@ -96,6 +96,9 @@ bool kvm_arch_timer_get_input_level(int vintid);
 
 #define arch_timer_ctx_index(ctx)	((ctx) - vcpu_timer((ctx)->vcpu)->timers)
 
+#define ptimer_emulation_required(v)	\
+	(!cpus_have_final_cap(ARM64_HAS_ECV2) && vcpu_ptimer(v)->host_offset)
+
 u64 kvm_arm_timer_read_sysreg(struct kvm_vcpu *vcpu,
 			      enum kvm_arch_timers tmr,
 			      enum kvm_arch_timer_regs treg);
