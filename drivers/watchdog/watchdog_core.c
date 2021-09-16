@@ -44,6 +44,11 @@ static int stop_on_reboot = -1;
 module_param(stop_on_reboot, int, 0444);
 MODULE_PARM_DESC(stop_on_reboot, "Stop watchdogs on reboot (0=keep watching, 1=stop)");
 
+static bool start_enabled = IS_ENABLED(CONFIG_WATCHDOG_START_ENABLED);
+module_param(start_enabled, bool, 0444);
+MODULE_PARM_DESC(start_enabled, "Start watchdog on module insertion (default="
+	__MODULE_STRING(IS_ENABLED(CONFIG_WATCHDOG_START_ENABLED)) ")");
+
 /*
  * Deferred Registration infrastructure.
  *
@@ -251,6 +256,17 @@ static int __watchdog_register_device(struct watchdog_device *wdd)
 	 * will not check this anymore in other functions. If data gets
 	 * corrupted in a later stage then we expect a kernel panic!
 	 */
+
+	/* If required, start the watchdog immediately */
+	if (start_enabled && !watchdog_hw_running(wdd)) {
+		set_bit(WDOG_HW_RUNNING, &wdd->status);
+		ret = wdd->ops->start(wdd);
+		if (ret == 0) {
+			pr_info("Watchdog enabled\n");
+		} else {
+			return ret;
+		}
+	}
 
 	/* Use alias for watchdog id if possible */
 	if (wdd->parent) {
