@@ -876,7 +876,6 @@ static enum resp_states do_complete(struct rxe_qp *qp,
 		wc->opcode = (pkt->mask & RXE_IMMDT_MASK &&
 				pkt->mask & RXE_WRITE_MASK) ?
 					IB_WC_RECV_RDMA_WITH_IMM : IB_WC_RECV;
-		wc->vendor_err = 0;
 		wc->byte_len = (pkt->mask & RXE_IMMDT_MASK &&
 				pkt->mask & RXE_WRITE_MASK) ?
 					qp->resp.length : wqe->dma.length - wqe->dma.resid;
@@ -896,8 +895,6 @@ static enum resp_states do_complete(struct rxe_qp *qp,
 				uwc->wc_flags |= IB_WC_WITH_INVALIDATE;
 				uwc->ex.invalidate_rkey = ieth_rkey(pkt);
 			}
-
-			uwc->qp_num		= qp->ibqp.qp_num;
 
 			if (pkt->mask & RXE_DETH_MASK)
 				uwc->src_qp = deth_sqp(pkt);
@@ -930,7 +927,6 @@ static enum resp_states do_complete(struct rxe_qp *qp,
 			if (pkt->mask & RXE_DETH_MASK)
 				wc->src_qp = deth_sqp(pkt);
 
-			wc->qp			= &qp->ibqp;
 			wc->port_num		= qp->attr.port_num;
 		}
 	}
