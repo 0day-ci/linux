@@ -49,6 +49,10 @@
 			};
 		};
 
+		dma@2600000 {
+			status = "okay";
+		};
+
 		memory-controller@2c00000 {
 			status = "okay";
 		};
