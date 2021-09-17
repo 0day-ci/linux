@@ -435,6 +435,11 @@ API usage
   **EXPORT_SYMBOL**
     EXPORT_SYMBOL should immediately follow the symbol to be exported.
 
+  **INCLUDE_LINUX**
+    Whenever asm/file.h is included and linux/file.h exists, a
+    conversion can be made when linux/file.h includes asm/file.h.
+    However this is not always the case (See signal.h).
+
   **IN_ATOMIC**
     in_atomic() is not for driver use so any such use is reported as an ERROR.
     Also in_atomic() is often used to determine if sleeping is permitted,
@@ -661,6 +666,10 @@ Indentation and Line Breaks
 
     See: https://lore.kernel.org/lkml/1328311239.21255.24.camel@joe2Laptop/
 
+  **INDENTED_LABEL**
+    goto labels either should not have any indentation or only a single
+    space indentation.
+
   **SWITCH_CASE_INDENT_LEVEL**
     switch should be at the same indent as case.
     Example::
@@ -789,6 +798,19 @@ Macros, Attributes and Symbols
 
   **DO_WHILE_MACRO_WITH_TRAILING_SEMICOLON**
     do {} while(0) macros should not have a trailing semicolon.
+
+  **IF_0**
+    The code enclosed within #if 0 and #endif is not executed and is used
+    for temporarily removing the segments of code with the intention of
+    using it in the future, much like comments. But comments cannot be
+    nested, so #if 0 is preferred. But if the code inside #if 0 and #endif
+    doesn't seem to be anymore required then remove it.
+
+  **IF_1**
+    The code enclosed within #if 1 and #endif is always executed, so the
+    #if 1 and #endif statements are redundant, thus remove it.
+    It is only useful for debugging purposes, it can quickly disable the
+    code enclosed within itself by changing #if 1 to #if 0
 
   **INIT_ATTRIBUTE**
     Const init definitions should use __initconst instead of
