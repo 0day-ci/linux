@@ -25,6 +25,8 @@ const char *migrate_reason_names[MR_TYPES] = {
 	"mempolicy_mbind",
 	"numa_misplaced",
 	"cma",
+	"longterm_pin",
+	"demotion",
 };
 
 const struct trace_print_flags pageflag_names[] = {
