@@ -269,6 +269,14 @@ tail of KFENCE's freelist, so that the least recently freed objects are reused
 first, and the chances of detecting use-after-frees of recently freed objects
 is increased.
 
+If pool utilization reaches 75% or above, to reduce the probability of the pool
+containing ~100% allocated objects yet ensure diverse coverage of allocations,
+KFENCE limits currently covered allocations of the same source from further
+filling up the pool. A side-effect is that this also limits frequent long-lived
+allocations of the same source filling up the pool permanently, thereby
+reducing the risk of the pool becoming full and the sampled allocation rate
+dropping to zero.
+
 Interface
 ---------
 
