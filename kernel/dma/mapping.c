@@ -297,7 +297,7 @@ dma_addr_t dma_map_resource(struct device *dev, phys_addr_t phys_addr,
 		return DMA_MAPPING_ERROR;
 
 	/* Don't allow RAM to be mapped */
-	if (WARN_ON_ONCE(pfn_valid(PHYS_PFN(phys_addr))))
+	if (WARN_ON_ONCE(page_is_ram(PHYS_PFN(phys_addr))))
 		return DMA_MAPPING_ERROR;
 
 	if (dma_map_direct(dev, ops))
