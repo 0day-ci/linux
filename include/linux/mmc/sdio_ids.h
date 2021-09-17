@@ -25,6 +25,13 @@
  * Vendors and devices.  Sort key: vendor first, device next.
  */
 
+/*
+ * Silabs does not use a reliable vendor ID. To avoid conflicts, the driver
+ * won't probe the device if it is not also declared in the DT.
+ */
+#define SDIO_VENDOR_ID_SILABS			0x0000
+#define SDIO_DEVICE_ID_SILABS_WF200		0x1000
+
 #define SDIO_VENDOR_ID_STE			0x0020
 #define SDIO_DEVICE_ID_STE_CW1200		0x2280
 
