@@ -70,6 +70,9 @@ SECTIONS
 	.exit.data : {
 		EXIT_DATA
 	}
+#ifdef CONFIG_SMP
+	PERCPU_SECTION(1 << CONFIG_L1_CACHE_SHIFT)
+#endif
 
 	/*
 	 * Align to 64K in attempt to eliminate holes before the

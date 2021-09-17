@@ -54,6 +54,41 @@ int find_pch_pic(u32 gsi)
 	return -1;
 }
 
+#ifdef CONFIG_HOTPLUG_CPU
+static void handle_irq_affinity(void)
+{
+	struct irq_desc *desc;
+	struct irq_chip *chip;
+	unsigned int irq;
+	unsigned long flags;
+	struct cpumask *affinity;
+
+	for_each_active_irq(irq) {
+		desc = irq_to_desc(irq);
+		if (!desc)
+			continue;
+
+		raw_spin_lock_irqsave(&desc->lock, flags);
+
+		affinity = desc->irq_data.common->affinity;
+		if (!cpumask_intersects(affinity, cpu_online_mask))
+			cpumask_copy(affinity, cpu_online_mask);
+
+		chip = irq_data_get_irq_chip(&desc->irq_data);
+		if (chip && chip->irq_set_affinity)
+			chip->irq_set_affinity(&desc->irq_data, desc->irq_data.common->affinity, true);
+		raw_spin_unlock_irqrestore(&desc->lock, flags);
+	}
+}
+
+void fixup_irqs(void)
+{
+	handle_irq_affinity();
+	irq_cpu_offline();
+	clear_csr_ecfg(ECFG0_IM);
+}
+#endif
+
 /*
  * 'what should we do if we get a hw irq event on an illegal vector'.
  * each architecture has to answer this themselves.
@@ -72,6 +107,7 @@ asmlinkage void spurious_interrupt(void)
 
 int arch_show_interrupts(struct seq_file *p, int prec)
 {
+	show_ipi_list(p, prec);
 	seq_printf(p, "%*s: %10u\n", prec, "ERR", atomic_read(&irq_err_count));
 	return 0;
 }
@@ -107,13 +143,21 @@ void __init setup_IRQ(void)
 
 void __init init_IRQ(void)
 {
-	int i;
+	int i, r, ipi_irq;
+	static int ipi_dummy_dev;
 	unsigned int order = get_order(IRQ_STACK_SIZE);
 
 	clear_csr_ecfg(ECFG0_IM);
 	clear_csr_estat(ESTATF_IP);
 
 	setup_IRQ();
+#ifdef CONFIG_SMP
+	ipi_irq = get_ipi_irq();
+	irq_set_percpu_devid(ipi_irq);
+	r = request_percpu_irq(ipi_irq, loongson3_ipi_interrupt, "IPI", &ipi_dummy_dev);
+	if (r < 0)
+		panic("IPI IRQ request failed\n");
+#endif
 
 	for (i = 0; i < NR_IRQS; i++)
 		irq_set_noprobe(i);

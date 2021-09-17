@@ -79,6 +79,25 @@
  * t0 and loads the new value in sp.  If not, it clobbers t0 and
  * stores the new value in t1, leaving sp unaffected.
  */
+#ifdef CONFIG_SMP
+	/* SMP variation */
+	.macro	get_saved_sp docfi=0 tosp=0
+	csrrd	t0, PERCPU_BASE_KS
+	la.abs	t1, kernelsp
+	LONG_ADDU	t1, t1, t0
+	.if \tosp
+	or	t0, sp, zero
+	LONG_L	sp, t1, 0
+	.endif
+	.endm
+
+	.macro	set_saved_sp stackp temp temp2
+	la.abs	\temp, kernelsp
+	LONG_ADDU	\temp, \temp, x0
+	LONG_S	\stackp, \temp, 0
+	.endm
+#else /* !CONFIG_SMP */
+	/* Uniprocessor variation */
 	.macro	get_saved_sp docfi=0 tosp=0
 	la.abs	t1, kernelsp
 	.if \tosp
@@ -96,6 +115,7 @@
 	la.abs	\temp, kernelsp
 	LONG_S	\stackp, \temp, 0
 	.endm
+#endif
 
 	.macro	SAVE_SOME docfi=0
 	csrrd	t1, LOONGARCH_CSR_PRMD
