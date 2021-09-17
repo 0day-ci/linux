@@ -5,14 +5,25 @@
 /* PTE level */
 #if defined(CONFIG_PPC_8xx) && defined(CONFIG_PPC_16K_PAGES)
 typedef struct { pte_basic_t pte, pte1, pte2, pte3; } pte_t;
-#else
+#elif defined(__CHECKER__) || !defined(CONFIG_PPC32)
 typedef struct { pte_basic_t pte; } pte_t;
+#else
+typedef pte_basic_t pte_t;
 #endif
+
+#if defined(__CHECKER__) || !defined(CONFIG_PPC32)
 #define __pte(x)	((pte_t) { (x) })
 static inline pte_basic_t pte_val(pte_t x)
 {
 	return x.pte;
 }
+#else
+#define __pte(x)	((pte_t)(x))
+static inline pte_basic_t pte_val(pte_t x)
+{
+	return x;
+}
+#endif
 
 /* PMD level */
 #ifdef CONFIG_PPC64
