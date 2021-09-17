@@ -14,8 +14,10 @@
 
 #if IS_ENABLED(CONFIG_DRM_I915_DEBUG)
 #define I915_SW_FENCE_BUG_ON(expr) BUG_ON(expr)
+#define I915_SW_FENCE_WARN_ON(expr) WARN_ON(expr)
 #else
 #define I915_SW_FENCE_BUG_ON(expr) BUILD_BUG_ON_INVALID(expr)
+#define I915_SW_FENCE_WARN_ON(expr) BUILD_BUG_ON_INVALID(expr)
 #endif
 
 static DEFINE_SPINLOCK(i915_sw_fence_lock);
@@ -242,7 +244,7 @@ void __i915_sw_fence_init(struct i915_sw_fence *fence,
 			  const char *name,
 			  struct lock_class_key *key)
 {
-	BUG_ON(!fn || (unsigned long)fn & ~I915_SW_FENCE_MASK);
+	I915_SW_FENCE_WARN_ON(!fn || (unsigned long)fn & ~I915_SW_FENCE_MASK);
 
 	__init_waitqueue_head(&fence->wait, name, key);
 	fence->flags = (unsigned long)fn;
