@@ -1641,6 +1641,7 @@ static void raid1_error(struct mddev *mddev, struct md_rdev *rdev)
 		 */
 		conf->recovery_disabled = mddev->recovery_disabled;
 		spin_unlock_irqrestore(&conf->device_lock, flags);
+		set_bit(MD_BROKEN, &mddev->flags);
 		return;
 	}
 	set_bit(Blocked, &rdev->flags);

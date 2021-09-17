@@ -1964,6 +1964,7 @@ static void raid10_error(struct mddev *mddev, struct md_rdev *rdev)
 		 * Don't fail the drive, just return an IO error.
 		 */
 		spin_unlock_irqrestore(&conf->device_lock, flags);
+		set_bit(MD_BROKEN, &mddev->flags);
 		return;
 	}
 	if (test_and_clear_bit(In_sync, &rdev->flags))
