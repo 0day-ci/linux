@@ -173,6 +173,7 @@ static unsigned long exit_to_user_mode_loop(struct pt_regs *regs,
 
 		if (ti_work & _TIF_NOTIFY_RESUME) {
 			tracehook_notify_resume(regs);
+			umcg_handle_notify_resume();  /* might sleep */
 			rseq_handle_notify_resume(NULL, regs);
 		}
 
