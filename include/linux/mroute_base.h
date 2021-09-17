@@ -89,13 +89,6 @@ static inline int mr_call_vif_notifiers(struct net *net,
 	return call_fib_notifiers(net, event_type, &info.info);
 }
 
-#ifndef MAXVIFS
-/* This one is nasty; value is defined in uapi using different symbols for
- * mroute and morute6 but both map into same 32.
- */
-#define MAXVIFS	32
-#endif
-
 #define VIF_EXISTS(_mrt, _idx) (!!((_mrt)->vif_table[_idx].dev))
 
 /* mfc_flags:
@@ -145,7 +138,7 @@ struct mr_mfc {
 			unsigned long pkt;
 			unsigned long wrong_if;
 			unsigned long lastuse;
-			unsigned char ttls[MAXVIFS];
+			unsigned char ttls[CONFIG_IP_MROUTE_EXT_MAXVIFS];
 			refcount_t refcount;
 		} res;
 	} mfc_un;
@@ -246,7 +239,7 @@ struct mr_table {
 	struct sock __rcu	*mroute_sk;
 	struct timer_list	ipmr_expire_timer;
 	struct list_head	mfc_unres_queue;
-	struct vif_device	vif_table[MAXVIFS];
+	struct vif_device	vif_table[CONFIG_IP_MROUTE_EXT_MAXVIFS];
 	struct rhltable		mfc_hash;
 	struct list_head	mfc_cache_list;
 	int			maxvif;

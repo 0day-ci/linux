@@ -788,9 +788,9 @@ static void ipmr_update_thresholds(struct mr_table *mrt, struct mr_mfc *cache,
 {
 	int vifi;
 
-	cache->mfc_un.res.minvif = MAXVIFS;
+	cache->mfc_un.res.minvif = CONFIG_IP_MROUTE_EXT_MAXVIFS;
 	cache->mfc_un.res.maxvif = 0;
-	memset(cache->mfc_un.res.ttls, 255, MAXVIFS);
+	memset(cache->mfc_un.res.ttls, 255, CONFIG_IP_MROUTE_EXT_MAXVIFS);
 
 	for (vifi = 0; vifi < mrt->maxvif; vifi++) {
 		if (VIF_EXISTS(mrt, vifi) &&
@@ -952,7 +952,7 @@ static struct mfc_cache *ipmr_cache_alloc(void)
 
 	if (c) {
 		c->_c.mfc_un.res.last_assert = jiffies - MFC_ASSERT_THRESH - 1;
-		c->_c.mfc_un.res.minvif = MAXVIFS;
+		c->_c.mfc_un.res.minvif = CONFIG_IP_MROUTE_EXT_MAXVIFS;
 		c->_c.free = ipmr_cache_free_rcu;
 		refcount_set(&c->_c.mfc_un.res.refcount, 1);
 	}
@@ -1185,15 +1185,15 @@ static int ipmr_mfc_delete(struct mr_table *mrt, struct mfcctl *mfc, int parent)
 	return 0;
 }
 
-static int ipmr_mfc_add(struct net *net, struct mr_table *mrt,
-			struct mfcctl *mfc, int mrtsock, int parent)
+static int ipmr_mfc_add_ext(struct net *net, struct mr_table *mrt,
+			    struct mfcctl_ext *mfc, int mrtsock, int parent)
 {
 	struct mfc_cache *uc, *c;
 	struct mr_mfc *_uc;
 	bool found;
 	int ret;
 
-	if (mfc->mfcc_parent >= MAXVIFS)
+	if (mfc->mfcc_parent >= CONFIG_IP_MROUTE_EXT_MAXVIFS)
 		return -ENFILE;
 
 	/* The entries are added/deleted only under RTNL */
@@ -1263,6 +1263,36 @@ static int ipmr_mfc_add(struct net *net, struct mr_table *mrt,
 	call_ipmr_mfc_entry_notifiers(net, FIB_EVENT_ENTRY_ADD, c, mrt->id);
 	mroute_netlink_event(mrt, c, RTM_NEWROUTE);
 	return 0;
+}
+
+static int ipmr_mfc_add(struct net *net, struct mr_table *mrt,
+			struct mfcctl *mfc, int mrtsock, int parent)
+{
+	unsigned int ext_maxvifs = CONFIG_IP_MROUTE_EXT_MAXVIFS;
+	struct mfcctl_ext *mfc_ext;
+	int i, ret;
+
+	/* Maintain the behavior for MRT_ADD_MFC. */
+	if (mfc->mfcc_parent >= MAXVIFS)
+		return -ENFILE;
+
+	mfc_ext = kzalloc(sizeof(*mfc_ext) +
+			   sizeof(mfc_ext->mfcc_ttls[0]) * ext_maxvifs,
+			   GFP_KERNEL);
+	if (!mfc_ext)
+		return -ENOMEM;
+	memcpy(mfc_ext, mfc, sizeof(*mfc_ext));
+	for (i = 0; i < MAXVIFS; i++)
+		mfc_ext->mfcc_ttls[i] = mfc->mfcc_ttls[i];
+	/* Prevent processing ttls for vifs over MAXVIFS. Also vif above MAXVIFS
+	 * shouldn't exist. So, ipmr_update_thresholds() will not process.
+	 */
+	for (; i < ext_maxvifs; i++)
+		mfc_ext->mfcc_ttls[i] = 0;
+
+	ret = ipmr_mfc_add_ext(net, mrt, mfc_ext, mrtsock, parent);
+	kfree(mfc_ext);
+	return ret;
 }
 
 /* Close the multicast socket, and clear the vif tables etc */
@@ -1348,8 +1378,11 @@ static void mrtsock_destruct(struct sock *sk)
 int ip_mroute_setsockopt(struct sock *sk, int optname, sockptr_t optval,
 			 unsigned int optlen)
 {
+	unsigned int ext_maxvifs = CONFIG_IP_MROUTE_EXT_MAXVIFS;
 	struct net *net = sock_net(sk);
 	int val, ret = 0, parent = 0;
+	struct mfcctl_ext *mfc_ext;
+	unsigned int mfc_ext_size;
 	struct mr_table *mrt;
 	struct vifctl vif;
 	struct mfcctl mfc;
@@ -1413,6 +1446,7 @@ int ip_mroute_setsockopt(struct sock *sk, int optname, sockptr_t optval,
 		break;
 	case MRT_ADD_VIF:
 	case MRT_DEL_VIF:
+	case MRT_ADD_VIF_EXT:
 		if (optlen != sizeof(vif)) {
 			ret = -EINVAL;
 			break;
@@ -1421,11 +1455,18 @@ int ip_mroute_setsockopt(struct sock *sk, int optname, sockptr_t optval,
 			ret = -EFAULT;
 			break;
 		}
-		if (vif.vifc_vifi >= MAXVIFS) {
-			ret = -ENFILE;
-			break;
-		}
 		if (optname == MRT_ADD_VIF) {
+			if (vif.vifc_vifi >= MAXVIFS) {
+				ret = -ENFILE;
+				break;
+			}
+		} else {
+			if (vif.vifc_vifi >= CONFIG_IP_MROUTE_EXT_MAXVIFS) {
+				ret = -ENFILE;
+				break;
+			}
+		}
+		if (optname == MRT_ADD_VIF || optname == MRT_ADD_VIF_EXT) {
 			ret = vif_add(net, mrt, &vif,
 				      sk == rtnl_dereference(mrt->mroute_sk));
 		} else {
@@ -1457,6 +1498,38 @@ int ip_mroute_setsockopt(struct sock *sk, int optname, sockptr_t optval,
 			ret = ipmr_mfc_add(net, mrt, &mfc,
 					   sk == rtnl_dereference(mrt->mroute_sk),
 					   parent);
+		break;
+	case MRT_ADD_MFC_EXT:
+		parent = -1;
+		fallthrough;
+	case MRT_ADD_MFC_PROXY_EXT:
+		if (optlen < sizeof(*mfc_ext)) {
+			ret = -EINVAL;
+			break;
+		}
+		/* If userspace passes less than CONFIG_IP_MROUTE_EXT_MAXVIFS
+		 * ttls, make sure to allocate to the max and initialize to
+		 * zeros. If userspace passes more, the rest of the code will
+		 * process up to CONFIG_IP_MROUTE_EXT_MAXVIFS. MRT_ADD_VIF_EXT
+		 * only accepts up to CONFIG_IP_MROUTE_EXT_MAXVIFS
+		 */
+		mfc_ext_size = (unsigned int)(sizeof(*mfc_ext) +
+			       sizeof(mfc_ext->mfcc_ttls[0]) * ext_maxvifs);
+		mfc_ext = kzalloc(max(optlen, mfc_ext_size), GFP_KERNEL);
+		if (!mfc_ext) {
+			ret = -ENOMEM;
+			break;
+		}
+		if (copy_from_sockptr(mfc_ext, optval, optlen)) {
+			ret = -EFAULT;
+			break;
+		}
+		if (parent == 0)
+			parent = mfc_ext->mfcc_parent;
+		ret = ipmr_mfc_add_ext(net, mrt, mfc_ext,
+				       sk == rtnl_dereference(mrt->mroute_sk),
+				       parent);
+		kfree(mfc_ext);
 		break;
 	case MRT_FLUSH:
 		if (optlen != sizeof(val)) {
@@ -2369,13 +2442,15 @@ static size_t mroute_msgsize(bool unresolved, int maxvif)
 static void mroute_netlink_event(struct mr_table *mrt, struct mfc_cache *mfc,
 				 int cmd)
 {
+	bool unresolved = mfc->_c.mfc_parent >= CONFIG_IP_MROUTE_EXT_MAXVIFS;
 	struct net *net = read_pnet(&mrt->net);
 	struct sk_buff *skb;
 	int err = -ENOBUFS;
 
-	skb = nlmsg_new(mroute_msgsize(mfc->_c.mfc_parent >= MAXVIFS,
-				       mrt->maxvif),
-			GFP_ATOMIC);
+	/* Unresolved cache has the mfc_parent being set to -1, so checking
+	 * with CONFIG_IP_MROUTE_EXT_MAXVIFS should be ok.
+	 */
+	skb = nlmsg_new(mroute_msgsize(unresolved, mrt->maxvif), GFP_ATOMIC);
 	if (!skb)
 		goto errout;
 
@@ -2619,14 +2694,14 @@ static bool ipmr_rtm_validate_proto(unsigned char rtm_protocol)
 	return false;
 }
 
-static int ipmr_nla_get_ttls(const struct nlattr *nla, struct mfcctl *mfcc)
+static int ipmr_nla_get_ttls(const struct nlattr *nla, struct mfcctl_ext *mfcc)
 {
 	struct rtnexthop *rtnh = nla_data(nla);
 	int remaining = nla_len(nla), vifi = 0;
 
 	while (rtnh_ok(rtnh, remaining)) {
 		mfcc->mfcc_ttls[vifi] = rtnh->rtnh_hops;
-		if (++vifi == MAXVIFS)
+		if (++vifi == CONFIG_IP_MROUTE_EXT_MAXVIFS)
 			break;
 		rtnh = rtnh_next(rtnh, &remaining);
 	}
@@ -2636,7 +2711,7 @@ static int ipmr_nla_get_ttls(const struct nlattr *nla, struct mfcctl *mfcc)
 
 /* returns < 0 on error, 0 for ADD_MFC and 1 for ADD_MFC_PROXY */
 static int rtm_to_ipmr_mfcc(struct net *net, struct nlmsghdr *nlh,
-			    struct mfcctl *mfcc, int *mrtsock,
+			    struct mfcctl_ext *mfcc, int *mrtsock,
 			    struct mr_table **mrtret,
 			    struct netlink_ext_ack *extack)
 {
@@ -2713,7 +2788,7 @@ static int ipmr_rtm_route(struct sk_buff *skb, struct nlmsghdr *nlh,
 	struct net *net = sock_net(skb->sk);
 	int ret, mrtsock, parent;
 	struct mr_table *tbl;
-	struct mfcctl mfcc;
+	struct mfcctl_ext mfcc;
 
 	mrtsock = 0;
 	tbl = NULL;
@@ -2723,9 +2798,9 @@ static int ipmr_rtm_route(struct sk_buff *skb, struct nlmsghdr *nlh,
 
 	parent = ret ? mfcc.mfcc_parent : -1;
 	if (nlh->nlmsg_type == RTM_NEWROUTE)
-		return ipmr_mfc_add(net, tbl, &mfcc, mrtsock, parent);
+		return ipmr_mfc_add_ext(net, tbl, &mfcc, mrtsock, parent);
 	else
-		return ipmr_mfc_delete(tbl, &mfcc, parent);
+		return ipmr_mfc_delete(tbl, (struct mfcctl *)&mfcc, parent);
 }
 
 static bool ipmr_fill_table(struct mr_table *mrt, struct sk_buff *skb)
@@ -3105,6 +3180,8 @@ static struct pernet_operations ipmr_net_ops = {
 int __init ip_mr_init(void)
 {
 	int err;
+
+	BUILD_BUG_ON(CONFIG_IP_MROUTE_EXT_MAXVIFS < MAXVIFS);
 
 	mrt_cachep = kmem_cache_create("ip_mrt_cache",
 				       sizeof(struct mfc_cache),

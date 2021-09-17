@@ -215,7 +215,7 @@ int mr_fill_mroute(struct mr_table *mrt, struct sk_buff *skb,
 	int ct;
 
 	/* If cache is unresolved, don't try to parse IIF and OIF */
-	if (c->mfc_parent >= MAXVIFS) {
+	if (c->mfc_parent >= CONFIG_IP_MROUTE_EXT_MAXVIFS) {
 		rtm->rtm_flags |= RTNH_F_UNRESOLVED;
 		return -ENOENT;
 	}

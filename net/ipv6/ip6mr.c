@@ -50,6 +50,8 @@
 
 #include <linux/nospec.h>
 
+#define EXT_MAXMIFS CONFIG_IP_MROUTE_EXT_MAXVIFS
+
 struct ip6mr_rule {
 	struct fib_rule		common;
 };
@@ -839,9 +841,9 @@ static void ip6mr_update_thresholds(struct mr_table *mrt,
 {
 	int vifi;
 
-	cache->mfc_un.res.minvif = MAXMIFS;
+	cache->mfc_un.res.minvif = EXT_MAXMIFS;
 	cache->mfc_un.res.maxvif = 0;
-	memset(cache->mfc_un.res.ttls, 255, MAXMIFS);
+	memset(cache->mfc_un.res.ttls, 255, EXT_MAXMIFS);
 
 	for (vifi = 0; vifi < mrt->maxvif; vifi++) {
 		if (VIF_EXISTS(mrt, vifi) &&
@@ -980,7 +982,7 @@ static struct mfc6_cache *ip6mr_cache_alloc(void)
 	if (!c)
 		return NULL;
 	c->_c.mfc_un.res.last_assert = jiffies - MFC_ASSERT_THRESH - 1;
-	c->_c.mfc_un.res.minvif = MAXMIFS;
+	c->_c.mfc_un.res.minvif = EXT_MAXMIFS;
 	c->_c.free = ip6mr_cache_free_rcu;
 	refcount_set(&c->_c.mfc_un.res.refcount, 1);
 	return c;
@@ -1303,6 +1305,9 @@ static int __net_init ip6mr_net_init(struct net *net)
 {
 	int err;
 
+	BUILD_BUG_ON(EXT_MAXMIFS < MAXMIFS);
+	BUILD_BUG_ON(EXT_MAXMIFS > IF_SETSIZE);
+
 	err = ip6mr_notifier_init(net);
 	if (err)
 		return err;
@@ -1405,17 +1410,18 @@ void ip6_mr_cleanup(void)
 static int ip6mr_mfc_add(struct net *net, struct mr_table *mrt,
 			 struct mf6cctl *mfc, int mrtsock, int parent)
 {
-	unsigned char ttls[MAXMIFS];
+	unsigned char ttls[EXT_MAXMIFS];
 	struct mfc6_cache *uc, *c;
 	struct mr_mfc *_uc;
 	bool found;
 	int i, err;
 
-	if (mfc->mf6cc_parent >= MAXMIFS)
+	/* Check for the case of >= MAXMIFS is done outside of this func */
+	if (mfc->mf6cc_parent >= EXT_MAXMIFS)
 		return -ENFILE;
 
-	memset(ttls, 255, MAXMIFS);
-	for (i = 0; i < MAXMIFS; i++) {
+	memset(ttls, 255, EXT_MAXMIFS);
+	for (i = 0; i < EXT_MAXMIFS; i++) {
 		if (IF_ISSET(i, &mfc->mf6cc_ifset))
 			ttls[i] = 1;
 	}
@@ -1663,12 +1669,18 @@ int ip6_mroute_setsockopt(struct sock *sk, int optname, sockptr_t optval,
 		return ip6mr_sk_done(sk);
 
 	case MRT6_ADD_MIF:
+	case MRT6_ADD_MIF_EXT:
 		if (optlen < sizeof(vif))
 			return -EINVAL;
 		if (copy_from_sockptr(&vif, optval, sizeof(vif)))
 			return -EFAULT;
-		if (vif.mif6c_mifi >= MAXMIFS)
-			return -ENFILE;
+		if (optname == MRT6_ADD_MIF) {
+			if (vif.mif6c_mifi >= MAXMIFS)
+				return -ENFILE;
+		} else {
+			if (vif.mif6c_mifi >= EXT_MAXMIFS)
+				return -ENFILE;
+		}
 		rtnl_lock();
 		ret = mif6_add(net, mrt, &vif,
 			       sk == rtnl_dereference(mrt->mroute_sk));
@@ -1690,10 +1702,12 @@ int ip6_mroute_setsockopt(struct sock *sk, int optname, sockptr_t optval,
 	 *	in a sort of kernel/user symbiosis.
 	 */
 	case MRT6_ADD_MFC:
+	case MRT6_ADD_MFC_EXT:
 	case MRT6_DEL_MFC:
 		parent = -1;
 		fallthrough;
 	case MRT6_ADD_MFC_PROXY:
+	case MRT6_ADD_MFC_PROXY_EXT:
 	case MRT6_DEL_MFC_PROXY:
 		if (optlen < sizeof(mfc))
 			return -EINVAL;
@@ -1702,13 +1716,19 @@ int ip6_mroute_setsockopt(struct sock *sk, int optname, sockptr_t optval,
 		if (parent == 0)
 			parent = mfc.mf6cc_parent;
 		rtnl_lock();
-		if (optname == MRT6_DEL_MFC || optname == MRT6_DEL_MFC_PROXY)
+		if (optname == MRT6_DEL_MFC || optname == MRT6_DEL_MFC_PROXY) {
 			ret = ip6mr_mfc_delete(mrt, &mfc, parent);
-		else
-			ret = ip6mr_mfc_add(net, mrt, &mfc,
-					    sk ==
-					    rtnl_dereference(mrt->mroute_sk),
-					    parent);
+		} else {
+			if ((optname == MRT6_ADD_MFC ||
+			     optname == MRT6_ADD_MFC_PROXY) &&
+			    mfc.mf6cc_parent >= MAXMIFS)
+				ret = -ENFILE;
+			else
+				ret = ip6mr_mfc_add(net, mrt, &mfc,
+						    sk ==
+						    rtnl_dereference(mrt->mroute_sk),
+						    parent);
+		}
 		rtnl_unlock();
 		return ret;
 
@@ -2402,7 +2422,7 @@ static void mr6_netlink_event(struct mr_table *mrt, struct mfc6_cache *mfc,
 	struct sk_buff *skb;
 	int err = -ENOBUFS;
 
-	skb = nlmsg_new(mr6_msgsize(mfc->_c.mfc_parent >= MAXMIFS, mrt->maxvif),
+	skb = nlmsg_new(mr6_msgsize(mfc->_c.mfc_parent >= EXT_MAXMIFS, mrt->maxvif),
 			GFP_ATOMIC);
 	if (!skb)
 		goto errout;

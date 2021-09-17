@@ -243,6 +243,17 @@ config IP_MROUTE_MULTIPLE_TABLES
 
 	  If unsure, say N.
 
+config IP_MROUTE_EXT_MAXVIFS
+	int "IP: extended maximum multicast routing vif"
+	depends on IP_MROUTE || IPV6_MROUTE
+	range 32 256
+	default 32
+	help
+	  Maximum multicast routing vif is set at 32 and it is defined in the
+	  user API header file, so it is fixed. There are cases where more
+	  vifs are needed. This config is used to get more vifs. The default
+	  is set to be the same as MAXVIFS (32).
+
 config IP_PIMSM_V1
 	bool "IP: PIM-SM version 1 support"
 	depends on IP_MROUTE

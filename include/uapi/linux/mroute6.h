@@ -32,7 +32,10 @@
 #define MRT6_ADD_MFC_PROXY	(MRT6_BASE+10)	/* Add a (*,*|G) mfc entry	*/
 #define MRT6_DEL_MFC_PROXY	(MRT6_BASE+11)	/* Del a (*,*|G) mfc entry	*/
 #define MRT6_FLUSH	(MRT6_BASE+12)	/* Flush all mfc entries and/or vifs	*/
-#define MRT6_MAX	(MRT6_BASE+12)
+#define MRT6_ADD_MIF_EXT	(MRT6_BASE+13)	/* Add a virtual interface		*/
+#define MRT6_ADD_MFC_EXT	(MRT6_BASE+14)	/* Add a multicast forwarding entry	*/
+#define MRT6_ADD_MFC_PROXY_EXT	(MRT6_BASE+15)	/* Add a (*,*|G) mfc entry	*/
+#define MRT6_MAX	(MRT6_BASE+15)
 
 #define SIOCGETMIFCNT_IN6	SIOCPROTOPRIVATE	/* IP protocol privates */
 #define SIOCGETSGCNT_IN6	(SIOCPROTOPRIVATE+1)

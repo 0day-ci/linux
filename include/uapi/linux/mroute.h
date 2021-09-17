@@ -29,7 +29,10 @@
 #define MRT_ADD_MFC_PROXY	(MRT_BASE+10)	/* Add a (*,*|G) mfc entry	*/
 #define MRT_DEL_MFC_PROXY	(MRT_BASE+11)	/* Del a (*,*|G) mfc entry	*/
 #define MRT_FLUSH	(MRT_BASE+12)	/* Flush all mfc entries and/or vifs	*/
-#define MRT_MAX		(MRT_BASE+12)
+#define MRT_ADD_VIF_EXT	(MRT_BASE+13)	/* Add a virtual interface		*/
+#define MRT_ADD_MFC_EXT	(MRT_BASE+14)	/* Add a multicast forwarding entry	*/
+#define MRT_ADD_MFC_PROXY_EXT	(MRT_BASE+15)	/* Add a (*,*|G) mfc entry	*/
+#define MRT_MAX		(MRT_BASE+15)
 
 #define SIOCGETVIFCNT	SIOCPROTOPRIVATE	/* IP protocol privates */
 #define SIOCGETSGCNT	(SIOCPROTOPRIVATE+1)
@@ -86,6 +89,15 @@ struct mfcctl {
 	unsigned int mfcc_byte_cnt;
 	unsigned int mfcc_wrong_if;
 	int	     mfcc_expire;
+};
+
+struct mfcctl_ext {
+	/* Need to be the same as mfcctl */
+	struct in_addr mfcc_origin;		/* Origin of mcast	*/
+	struct in_addr mfcc_mcastgrp;		/* Group in question	*/
+	vifi_t	mfcc_parent;			/* Where it arrived	*/
+	unsigned char mfcc_ttls[];		/* Where it is going	*/
+	/* Don't put anything here as mfcc_ttls should grow into here */
 };
 
 /*  Group count retrieval for mrouted */
