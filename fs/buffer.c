@@ -1507,7 +1507,7 @@ void block_invalidatepage(struct page *page, unsigned int offset,
 	/*
 	 * Check for overflow
 	 */
-	BUG_ON(stop > PAGE_SIZE || stop < length);
+	BUG_ON(stop > thp_size(page) || stop < length);
 
 	head = page_buffers(page);
 	bh = head;
@@ -1535,7 +1535,7 @@ void block_invalidatepage(struct page *page, unsigned int offset,
 	 * The get_block cached value has been unconditionally invalidated,
 	 * so real IO is not possible anymore.
 	 */
-	if (length == PAGE_SIZE)
+	if (length >= PAGE_SIZE)
 		try_to_release_page(page, 0);
 out:
 	return;
