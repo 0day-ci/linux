@@ -161,6 +161,7 @@ TODOList:
    riscv/index
    openrisc/index
    parisc/index
+   loongarch/index
 
 TODOList:
 
