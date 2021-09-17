@@ -1488,7 +1488,7 @@ static int ext4_ext_search_left(struct inode *inode,
 static int ext4_ext_search_right(struct inode *inode,
 				 struct ext4_ext_path *path,
 				 ext4_lblk_t *logical, ext4_fsblk_t *phys,
-				 struct ext4_extent *ret_ex)
+				 struct ext4_extent *ret_ex, int nofail)
 {
 	struct buffer_head *bh = NULL;
 	struct ext4_extent_header *eh;
@@ -1565,7 +1565,7 @@ got_index:
 	while (++depth < path->p_depth) {
 		/* subtract from p_depth to get proper eh_depth */
 		bh = read_extent_tree_block(inode, block,
-					    path->p_depth - depth, 0);
+					    path->p_depth - depth, nofail);
 		if (IS_ERR(bh))
 			return PTR_ERR(bh);
 		eh = ext_block_hdr(bh);
@@ -1574,7 +1574,7 @@ got_index:
 		put_bh(bh);
 	}
 
-	bh = read_extent_tree_block(inode, block, path->p_depth - depth, 0);
+	bh = read_extent_tree_block(inode, block, path->p_depth - depth, nofail);
 	if (IS_ERR(bh))
 		return PTR_ERR(bh);
 	eh = ext_block_hdr(bh);
@@ -2773,7 +2773,7 @@ ext4_ext_more_to_rm(struct ext4_ext_path *path)
 }
 
 int ext4_ext_remove_space(struct inode *inode, ext4_lblk_t start,
-			  ext4_lblk_t end)
+			  ext4_lblk_t end, int nofail)
 {
 	struct ext4_sb_info *sbi = EXT4_SB(inode->i_sb);
 	int depth = ext_depth(inode);
@@ -2781,6 +2781,10 @@ int ext4_ext_remove_space(struct inode *inode, ext4_lblk_t start,
 	struct partial_cluster partial;
 	handle_t *handle;
 	int i = 0, err = 0;
+	gfp_t gfp_mask = GFP_NOFS;
+
+	if (nofail)
+		gfp_mask |= __GFP_NOFAIL;
 
 	partial.pclu = 0;
 	partial.lblk = 0;
@@ -2789,7 +2793,8 @@ int ext4_ext_remove_space(struct inode *inode, ext4_lblk_t start,
 	ext_debug(inode, "truncate since %u to %u\n", start, end);
 
 	/* probably first extent we're gonna free will be last in block */
-	handle = ext4_journal_start_with_revoke(inode, EXT4_HT_TRUNCATE,
+	handle = ext4_journal_start_with_revoke(gfp_mask,
+			inode, EXT4_HT_TRUNCATE,
 			depth + 1,
 			ext4_free_metadata_revoke_credits(inode->i_sb, depth));
 	if (IS_ERR(handle))
@@ -2877,7 +2882,7 @@ again:
 			 */
 			lblk = ex_end + 1;
 			err = ext4_ext_search_right(inode, path, &lblk, &pblk,
-						    NULL);
+						    NULL, nofail);
 			if (err < 0)
 				goto out;
 			if (pblk) {
@@ -2899,10 +2904,6 @@ again:
 	} else {
 		path = kcalloc(depth + 1, sizeof(struct ext4_ext_path),
 			       GFP_NOFS | __GFP_NOFAIL);
-		if (path == NULL) {
-			ext4_journal_stop(handle);
-			return -ENOMEM;
-		}
 		path[0].p_maxdepth = path[0].p_depth = depth;
 		path[0].p_hdr = ext_inode_hdr(inode);
 		i = 0;
@@ -2955,7 +2956,7 @@ again:
 			memset(path + i + 1, 0, sizeof(*path));
 			bh = read_extent_tree_block(inode,
 				ext4_idx_pblock(path[i].p_idx), depth - i - 1,
-				EXT4_EX_NOCACHE);
+				EXT4_EX_NOCACHE | nofail);
 			if (IS_ERR(bh)) {
 				/* should we reset i_size? */
 				err = PTR_ERR(bh);
@@ -4186,7 +4187,7 @@ int ext4_ext_map_blocks(handle_t *handle, struct inode *inode,
 	if (err)
 		goto out;
 	ar.lright = map->m_lblk;
-	err = ext4_ext_search_right(inode, path, &ar.lright, &ar.pright, &ex2);
+	err = ext4_ext_search_right(inode, path, &ar.lright, &ar.pright, &ex2, 0);
 	if (err < 0)
 		goto out;
 
@@ -4368,23 +4369,13 @@ int ext4_ext_truncate(handle_t *handle, struct inode *inode)
 
 	last_block = (inode->i_size + sb->s_blocksize - 1)
 			>> EXT4_BLOCK_SIZE_BITS(sb);
-retry:
 	err = ext4_es_remove_extent(inode, last_block,
-				    EXT_MAX_BLOCKS - last_block);
-	if (err == -ENOMEM) {
-		cond_resched();
-		congestion_wait(BLK_RW_ASYNC, HZ/50);
-		goto retry;
-	}
+				    EXT_MAX_BLOCKS - last_block,
+				    EXT4_EX_NOFAIL);
 	if (err)
 		return err;
-retry_remove_space:
-	err = ext4_ext_remove_space(inode, last_block, EXT_MAX_BLOCKS - 1);
-	if (err == -ENOMEM) {
-		cond_resched();
-		congestion_wait(BLK_RW_ASYNC, HZ/50);
-		goto retry_remove_space;
-	}
+	err = ext4_ext_remove_space(inode, last_block, EXT_MAX_BLOCKS - 1,
+				    EXT4_EX_NOFAIL);
 	return err;
 }
 
@@ -5320,13 +5311,13 @@ static int ext4_collapse_range(struct inode *inode, loff_t offset, loff_t len)
 	ext4_discard_preallocations(inode, 0);
 
 	ret = ext4_es_remove_extent(inode, punch_start,
-				    EXT_MAX_BLOCKS - punch_start);
+				    EXT_MAX_BLOCKS - punch_start, 0);
 	if (ret) {
 		up_write(&EXT4_I(inode)->i_data_sem);
 		goto out_stop;
 	}
 
-	ret = ext4_ext_remove_space(inode, punch_start, punch_stop - 1);
+	ret = ext4_ext_remove_space(inode, punch_start, punch_stop - 1, 0);
 	if (ret) {
 		up_write(&EXT4_I(inode)->i_data_sem);
 		goto out_stop;
@@ -5507,7 +5498,7 @@ static int ext4_insert_range(struct inode *inode, loff_t offset, loff_t len)
 	}
 
 	ret = ext4_es_remove_extent(inode, offset_lblk,
-			EXT_MAX_BLOCKS - offset_lblk);
+				    EXT_MAX_BLOCKS - offset_lblk, 0);
 	if (ret) {
 		up_write(&EXT4_I(inode)->i_data_sem);
 		goto out_stop;
@@ -5571,10 +5562,10 @@ ext4_swap_extents(handle_t *handle, struct inode *inode1,
 	BUG_ON(!inode_is_locked(inode1));
 	BUG_ON(!inode_is_locked(inode2));
 
-	*erp = ext4_es_remove_extent(inode1, lblk1, count);
+	*erp = ext4_es_remove_extent(inode1, lblk1, count, 0);
 	if (unlikely(*erp))
 		return 0;
-	*erp = ext4_es_remove_extent(inode2, lblk2, count);
+	*erp = ext4_es_remove_extent(inode2, lblk2, count, 0);
 	if (unlikely(*erp))
 		return 0;
 

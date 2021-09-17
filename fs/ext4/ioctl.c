@@ -79,8 +79,8 @@ static void swap_inode_data(struct inode *inode1, struct inode *inode2)
 		(ei1->i_flags & ~EXT4_FL_SHOULD_SWAP);
 	ei2->i_flags = tmp | (ei2->i_flags & ~EXT4_FL_SHOULD_SWAP);
 	swap(ei1->i_disksize, ei2->i_disksize);
-	ext4_es_remove_extent(inode1, 0, EXT_MAX_BLOCKS);
-	ext4_es_remove_extent(inode2, 0, EXT_MAX_BLOCKS);
+	ext4_es_remove_extent(inode1, 0, EXT_MAX_BLOCKS, 0);
+	ext4_es_remove_extent(inode2, 0, EXT_MAX_BLOCKS, 0);
 
 	isize = i_size_read(inode1);
 	i_size_write(inode1, i_size_read(inode2));

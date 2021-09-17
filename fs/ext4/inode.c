@@ -1559,7 +1559,7 @@ static void mpage_release_unused_pages(struct mpage_da_data *mpd,
 		ext4_lblk_t start, last;
 		start = index << (PAGE_SHIFT - inode->i_blkbits);
 		last = end << (PAGE_SHIFT - inode->i_blkbits);
-		ext4_es_remove_extent(inode, start, last - start + 1);
+		ext4_es_remove_extent(inode, start, last - start + 1, 0);
 	}
 
 	pagevec_init(&pvec);
@@ -4041,7 +4041,7 @@ int ext4_punch_hole(struct inode *inode, loff_t offset, loff_t length)
 		ext4_discard_preallocations(inode, 0);
 
 		ret = ext4_es_remove_extent(inode, first_block,
-					    stop_block - first_block);
+					    stop_block - first_block, 0);
 		if (ret) {
 			up_write(&EXT4_I(inode)->i_data_sem);
 			goto out_stop;
@@ -4049,7 +4049,7 @@ int ext4_punch_hole(struct inode *inode, loff_t offset, loff_t length)
 
 		if (ext4_test_inode_flag(inode, EXT4_INODE_EXTENTS))
 			ret = ext4_ext_remove_space(inode, first_block,
-						    stop_block - 1);
+						    stop_block - 1, 0);
 		else
 			ret = ext4_ind_remove_space(handle, inode, first_block,
 						    stop_block);

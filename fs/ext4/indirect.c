@@ -1125,7 +1125,7 @@ void ext4_ind_truncate(handle_t *handle, struct inode *inode)
 			return;
 	}
 
-	ext4_es_remove_extent(inode, last_block, EXT_MAX_BLOCKS - last_block);
+	ext4_es_remove_extent(inode, last_block, EXT_MAX_BLOCKS - last_block, 0);
 
 	/*
 	 * The orphan list entry will now protect us from any crash which
