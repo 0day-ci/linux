@@ -1983,6 +1983,14 @@ static void dw_mci_set_drto(struct dw_mci *host)
 	/* add a bit spare time */
 	drto_ms += 10;
 
+	/*
+	 * If TMOUT register still holds the reset value the above calculation
+	 * would yield a timeout of over 167 seconds, limit it to 1000ms.
+	 * Normal reads/writes should not take anywhere close to 120s.
+	 */
+	if (drto_ms > 120000)
+		drto_ms = 1000;
+
 	spin_lock_irqsave(&host->irq_lock, irqflags);
 	if (!test_bit(EVENT_DATA_COMPLETE, &host->pending_events))
 		mod_timer(&host->dto_timer,
