@@ -353,7 +353,7 @@ xfs_buf_alloc_pages(
 	if (flags & XBF_READ_AHEAD)
 		gfp_mask |= __GFP_NORETRY;
 	else
-		gfp_mask |= GFP_NOFS;
+		gfp_mask |= GFP_NOFS | __GFP_NOFAIL;
 
 	/* Make sure that we have a page list */
 	bp->b_page_count = DIV_ROUND_UP(BBTOB(bp->b_length), PAGE_SIZE);
@@ -373,8 +373,9 @@ xfs_buf_alloc_pages(
 
 	/*
 	 * Bulk filling of pages can take multiple calls. Not filling the entire
-	 * array is not an allocation failure, so don't back off if we get at
-	 * least one extra page.
+	 * array is not an allocation failure but is worth counting in
+	 * xb_pages_retries statistics.  If we don't even get one page,
+	 * then this must be a READ_AHEAD and we should abort.
 	 */
 	for (;;) {
 		long	last = filled;
@@ -386,16 +387,13 @@ xfs_buf_alloc_pages(
 			break;
 		}
 
-		if (filled != last)
-			continue;
-
-		if (flags & XBF_READ_AHEAD) {
+		if (filled == last) {
+			ASSERT(flags & XBF_READ_AHEAD);
 			xfs_buf_free_pages(bp);
 			return -ENOMEM;
 		}
 
 		XFS_STATS_INC(bp->b_mount, xb_page_retries);
-		congestion_wait(BLK_RW_ASYNC, HZ / 50);
 	}
 	return 0;
 }
