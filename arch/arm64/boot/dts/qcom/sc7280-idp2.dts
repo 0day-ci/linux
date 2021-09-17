@@ -21,3 +21,7 @@
 		stdout-path = "serial0:115200n8";
 	};
 };
+
+&nvme_ldo_enable_pin {
+	pins = "gpio51";
+};

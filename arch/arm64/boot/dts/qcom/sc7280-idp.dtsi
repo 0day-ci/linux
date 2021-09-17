@@ -199,6 +199,39 @@
 	modem-init;
 };
 
+&pcie1 {
+	status = "okay";
+
+	perst-gpio = <&tlmm 2 GPIO_ACTIVE_LOW>;
+	pinctrl-0 = <&pcie1_default_state &nvme_ldo_enable_pin>;
+};
+
+&pcie1_phy {
+	status = "okay";
+
+	vdda-phy-supply = <&vreg_l10c_0p8>;
+	vdda-pll-supply = <&vreg_l6b_1p2>;
+};
+
+&pcie1_default_state {
+	reset-n {
+		pins = "gpio2";
+		function = "gpio";
+
+		drive-strength = <16>;
+		output-low;
+		bias-disable;
+	};
+
+	wake-n {
+		pins = "gpio3";
+		function = "gpio";
+
+		drive-strength = <2>;
+		bias-pull-up;
+	};
+};
+
 &pmk8350_vadc {
 	pmk8350_die_temp {
 		reg = <PMK8350_ADC7_DIE_TEMP>;
@@ -336,6 +369,13 @@
 	};
 
 	sd-cd {
+		bias-pull-up;
+	};
+};
+
+&tlmm {
+	nvme_ldo_enable_pin: nvme_ldo_enable_pin {
+		function = "gpio";
 		bias-pull-up;
 	};
 };
