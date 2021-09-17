@@ -47,10 +47,8 @@ examples:
     };
 
   - |
-    / {
+    soc {
         /* K3 AM65x SoCs */
-        model = "Texas Instruments K3 AM654 SoC";
-        compatible = "ti,am654-evm", "ti,am654";
         #address-cells = <2>;
         #size-cells = <2>;
 
