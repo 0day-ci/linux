@@ -126,7 +126,30 @@ or another request.
 
   * ``GFP_KERNEL | __GFP_NOFAIL`` - overrides the default allocator behavior
     and all allocation requests will loop endlessly until they succeed.
-    This might be really dangerous especially for larger orders.
+    Any attempt to use ``__GFP_NOFAIL`` for allocations larger than
+    order-1 (2 pages) will trigger a warning.
+
+    Use of ``__GFP_NOFAIL`` can cause deadlocks so it should only be used
+    when there is no alternative, and then should be used with caution.
+    Deadlocks can happen if the calling process holds any resources
+    (e.g. locks) which might be needed for memory reclaim or write-back,
+    or which might prevent a process killed by the OOM killer from
+    successfully exiting.  Where possible, locks should be released
+    before using ``__GFP_NOFAIL``.
+
+    While this flag is best avoided, it is still preferable to endless
+    loops around the allocator.  Endless loops may still be used when
+    there is a need to test for the process being killed
+    (fatal_signal_pending(current)).
+
+  * ``GFP_NOFS | __GFP_NOFAIL`` - Loop endlessly instead of failing
+    when performing allocations in file system code.  The same guidance
+    as for ``GFP_KERNEL | __GFP_NOFAIL`` applies with extra emphasis on
+    the possibility of deadlocks.  ``GFP_NOFS`` often implies that
+    filesystem locks are held which might lead to blocking reclaim.
+    Preemptively flushing or reclaiming memory associated with such
+    locks might be appropriate before requesting a ``__GFP_NOFAIL``
+    allocation.
 
 Selecting memory allocator
 ==========================

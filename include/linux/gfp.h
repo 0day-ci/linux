@@ -209,7 +209,11 @@ struct vm_area_struct;
  * used only when there is no reasonable failure policy) but it is
  * definitely preferable to use the flag rather than opencode endless
  * loop around allocator.
- * Using this flag for costly allocations is _highly_ discouraged.
+ * Use of this flag may lead to deadlocks if locks are held which would
+ * be needed for memory reclaim, write-back, or the timely exit of a
+ * process killed by the OOM-killer.  Dropping any locks not absolutely
+ * needed is advisable before requesting a %__GFP_NOFAIL allocate.
+ * Using this flag for costly allocations (order>1) is _highly_ discouraged.
  */
 #define __GFP_IO	((__force gfp_t)___GFP_IO)
 #define __GFP_FS	((__force gfp_t)___GFP_FS)
