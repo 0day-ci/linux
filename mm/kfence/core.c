@@ -11,11 +11,13 @@
 #include <linux/bug.h>
 #include <linux/debugfs.h>
 #include <linux/irq_work.h>
+#include <linux/jhash.h>
 #include <linux/kcsan-checks.h>
 #include <linux/kfence.h>
 #include <linux/kmemleak.h>
 #include <linux/list.h>
 #include <linux/lockdep.h>
+#include <linux/log2.h>
 #include <linux/memblock.h>
 #include <linux/moduleparam.h>
 #include <linux/random.h>
@@ -87,6 +89,28 @@ char *__kfence_pool __ro_after_init;
 EXPORT_SYMBOL(__kfence_pool); /* Export for test modules. */
 
 /*
+ * A lossy hash map of allocation stack trace coverage: limits currently covered
+ * allocations of the same source filling up the pool when close to full.
+ *
+ * The required data fits in 64 bits, and therefore we can avoid a per-entry (or
+ * global) lock by simply storing each entry's data in an atomic64_t.
+ */
+union alloc_covered_entry {
+	struct {
+		u32 alloc_stack_hash;	/* stack trace hash */
+		u32 covered;		/* current coverage count */
+	};
+	u64 entry;
+};
+#define ALLOC_COVERED_SIZE (1 << const_ilog2(CONFIG_KFENCE_NUM_OBJECTS | 128)) /* >= 128 */
+#define ALLOC_COVERED_MASK (ALLOC_COVERED_SIZE - 1)
+static atomic64_t alloc_covered[ALLOC_COVERED_SIZE];
+/* Stack depth used to determine uniqueness of an allocation. */
+#define UNIQUE_ALLOC_STACK_DEPTH 8
+/* Pool usage threshold when currently covered allocations are skipped. */
+#define SKIP_COVERED_THRESHOLD ((CONFIG_KFENCE_NUM_OBJECTS * 3) / 4) /* 75% */
+
+/*
  * Per-object metadata, with one-to-one mapping of object metadata to
  * backing pages (in __kfence_pool).
  */
@@ -114,6 +138,7 @@ enum kfence_counter_id {
 	KFENCE_COUNTER_BUGS,
 	KFENCE_COUNTER_SKIP_INCOMPAT,
 	KFENCE_COUNTER_SKIP_CAPACITY,
+	KFENCE_COUNTER_SKIP_COVERED,
 	KFENCE_COUNTER_COUNT,
 };
 static atomic_long_t counters[KFENCE_COUNTER_COUNT];
@@ -125,10 +150,72 @@ static const char *const counter_names[] = {
 	[KFENCE_COUNTER_BUGS]		= "total bugs",
 	[KFENCE_COUNTER_SKIP_INCOMPAT]	= "skipped allocations (incompatible)",
 	[KFENCE_COUNTER_SKIP_CAPACITY]	= "skipped allocations (capacity)",
+	[KFENCE_COUNTER_SKIP_COVERED]	= "skipped allocations (covered)",
 };
 static_assert(ARRAY_SIZE(counter_names) == KFENCE_COUNTER_COUNT);
 
 /* === Internals ============================================================ */
+
+static u32 get_alloc_stack_hash(void)
+{
+	unsigned long stack_entries[UNIQUE_ALLOC_STACK_DEPTH];
+	size_t num_entries;
+
+	num_entries = stack_trace_save(stack_entries, UNIQUE_ALLOC_STACK_DEPTH, 1);
+	return jhash(stack_entries, num_entries * sizeof(stack_entries[0]), 0);
+}
+
+/*
+ * Check if the allocation stack trace hash @alloc_stack_hash is contained in
+ * @alloc_covered and currently covered.
+ */
+static bool alloc_covered_contains(u32 alloc_stack_hash)
+{
+	union alloc_covered_entry entry;
+
+	if (!alloc_stack_hash)
+		return false;
+
+	entry.entry = (u64)atomic64_read(&alloc_covered[alloc_stack_hash & ALLOC_COVERED_MASK]);
+	return entry.alloc_stack_hash == alloc_stack_hash && entry.covered;
+}
+
+/*
+ * Adds (or subtracts) coverage count to entry corresponding to
+ * @alloc_stack_hash. If @alloc_stack_hash is not yet contained in
+ * @alloc_covered, resets (potentially evicting existing) entry.
+ */
+static void alloc_covered_add(u32 alloc_stack_hash, int val)
+{
+	union alloc_covered_entry old;
+	union alloc_covered_entry new;
+	atomic64_t *bucket;
+
+	if (!alloc_stack_hash)
+		return;
+
+	bucket = &alloc_covered[alloc_stack_hash & ALLOC_COVERED_MASK];
+	old.entry = (u64)atomic64_read(bucket);
+	new.alloc_stack_hash = alloc_stack_hash;
+	do {
+		if (val > 0) {
+			new.covered = old.alloc_stack_hash == alloc_stack_hash
+					? old.covered + val	/* increment */
+					: val;			/* evict/reset */
+		} else if (old.alloc_stack_hash == alloc_stack_hash && old.covered) {
+			new.covered = old.covered + val;
+		} else {
+			/*
+			 * Hash mismatch or covered has become zero. The latter
+			 * is possible if we race with:
+			 *	reset (!= alloc_stack_hash)
+			 *	 -> reset (== alloc_stack_hash)
+			 *	  -> decrement
+			 */
+			break;
+		}
+	} while (!atomic64_try_cmpxchg_relaxed(bucket, (s64 *)&old.entry, (s64)new.entry));
+}
 
 static bool kfence_protect(unsigned long addr)
 {
@@ -261,7 +348,8 @@ static __always_inline void for_each_canary(const struct kfence_metadata *meta, 
 	}
 }
 
-static void *kfence_guarded_alloc(struct kmem_cache *cache, size_t size, gfp_t gfp)
+static void *
+kfence_guarded_alloc(struct kmem_cache *cache, size_t size, gfp_t gfp, u32 alloc_stack_hash)
 {
 	struct kfence_metadata *meta = NULL;
 	unsigned long flags;
@@ -322,6 +410,8 @@ static void *kfence_guarded_alloc(struct kmem_cache *cache, size_t size, gfp_t g
 	/* Pairs with READ_ONCE() in kfence_shutdown_cache(). */
 	WRITE_ONCE(meta->cache, cache);
 	meta->size = size;
+	meta->alloc_stack_hash = alloc_stack_hash;
+
 	for_each_canary(meta, set_canary_byte);
 
 	/* Set required struct page fields. */
@@ -333,6 +423,8 @@ static void *kfence_guarded_alloc(struct kmem_cache *cache, size_t size, gfp_t g
 		page->s_mem = addr;
 
 	raw_spin_unlock_irqrestore(&meta->lock, flags);
+
+	alloc_covered_add(alloc_stack_hash, 1);
 
 	/* Memory initialization. */
 
@@ -362,6 +454,7 @@ no_capacity:
 static void kfence_guarded_free(void *addr, struct kfence_metadata *meta, bool zombie)
 {
 	struct kcsan_scoped_access assert_page_exclusive;
+	u32 alloc_stack_hash;
 	unsigned long flags;
 
 	raw_spin_lock_irqsave(&meta->lock, flags);
@@ -404,7 +497,12 @@ static void kfence_guarded_free(void *addr, struct kfence_metadata *meta, bool z
 	/* Mark the object as freed. */
 	metadata_update_state(meta, KFENCE_OBJECT_FREED);
 
+	alloc_stack_hash = meta->alloc_stack_hash;
+	meta->alloc_stack_hash = 0;
+
 	raw_spin_unlock_irqrestore(&meta->lock, flags);
+
+	alloc_covered_add(alloc_stack_hash, -1);
 
 	/* Protect to detect use-after-frees. */
 	kfence_protect((unsigned long)addr);
@@ -744,6 +842,8 @@ void kfence_shutdown_cache(struct kmem_cache *s)
 
 void *__kfence_alloc(struct kmem_cache *s, size_t size, gfp_t flags)
 {
+	u32 alloc_stack_hash;
+
 	/*
 	 * Perform size check before switching kfence_allocation_gate, so that
 	 * we don't disable KFENCE without making an allocation.
@@ -788,7 +888,23 @@ void *__kfence_alloc(struct kmem_cache *s, size_t size, gfp_t flags)
 	if (!READ_ONCE(kfence_enabled))
 		return NULL;
 
-	return kfence_guarded_alloc(s, size, flags);
+	/*
+	 * Do expensive check for coverage of allocation in slow-path after
+	 * allocation_gate has already become non-zero, even though it might
+	 * mean not making any allocation within a given sample interval.
+	 *
+	 * This ensures reasonable allocation coverage when the pool is almost
+	 * full, including avoiding long-lived allocations of the same source
+	 * filling up the pool (e.g. pagecache allocations).
+	 */
+	alloc_stack_hash = get_alloc_stack_hash();
+	if (atomic_long_read(&counters[KFENCE_COUNTER_ALLOCATED]) > SKIP_COVERED_THRESHOLD &&
+	    alloc_covered_contains(alloc_stack_hash)) {
+		atomic_long_inc(&counters[KFENCE_COUNTER_SKIP_COVERED]);
+		return NULL;
+	}
+
+	return kfence_guarded_alloc(s, size, flags, alloc_stack_hash);
 }
 
 size_t kfence_ksize(const void *addr)
