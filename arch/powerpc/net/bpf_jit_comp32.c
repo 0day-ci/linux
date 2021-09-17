@@ -276,17 +276,17 @@ int bpf_jit_build_body(struct bpf_prog *fp, u32 *image, struct codegen_context *
 	u32 exit_addr = addrs[flen];
 
 	for (i = 0; i < flen; i++) {
-		u32 code = insn[i].code;
 		u32 dst_reg = bpf_to_ppc(ctx, insn[i].dst_reg);
-		u32 dst_reg_h = dst_reg - 1;
 		u32 src_reg = bpf_to_ppc(ctx, insn[i].src_reg);
-		u32 src_reg_h = src_reg - 1;
 		u32 tmp_reg = bpf_to_ppc(ctx, TMP_REG);
+		u32 true_cond, code = insn[i].code;
+		u32 dst_reg_h = dst_reg - 1;
+		u32 src_reg_h = src_reg - 1;
+		u32 size = BPF_SIZE(code);
 		s16 off = insn[i].off;
 		s32 imm = insn[i].imm;
 		bool func_addr_fixed;
 		u64 func_addr;
-		u32 true_cond;
 
 		/*
 		 * addrs[] maps a BPF bytecode address into a real offset from
@@ -809,24 +809,32 @@ int bpf_jit_build_body(struct bpf_prog *fp, u32 *image, struct codegen_context *
 		/*
 		 * BPF_LDX
 		 */
-		case BPF_LDX | BPF_MEM | BPF_B: /* dst = *(u8 *)(ul) (src + off) */
-			EMIT(PPC_RAW_LBZ(dst_reg, src_reg, off));
-			if (!fp->aux->verifier_zext)
+		/* dst = *(u8 *)(ul) (src + off) */
+		case BPF_LDX | BPF_MEM | BPF_B:
+		/* dst = *(u16 *)(ul) (src + off) */
+		case BPF_LDX | BPF_MEM | BPF_H:
+		/* dst = *(u32 *)(ul) (src + off) */
+		case BPF_LDX | BPF_MEM | BPF_W:
+		/* dst = *(u64 *)(ul) (src + off) */
+		case BPF_LDX | BPF_MEM | BPF_DW:
+			switch (size) {
+			case BPF_B:
+				EMIT(PPC_RAW_LBZ(dst_reg, src_reg, off));
+				break;
+			case BPF_H:
+				EMIT(PPC_RAW_LHZ(dst_reg, src_reg, off));
+				break;
+			case BPF_W:
+				EMIT(PPC_RAW_LWZ(dst_reg, src_reg, off));
+				break;
+			case BPF_DW:
+				EMIT(PPC_RAW_LWZ(dst_reg_h, src_reg, off));
+				EMIT(PPC_RAW_LWZ(dst_reg, src_reg, off + 4));
+				break;
+			}
+
+			if ((size != BPF_DW) && !fp->aux->verifier_zext)
 				EMIT(PPC_RAW_LI(dst_reg_h, 0));
-			break;
-		case BPF_LDX | BPF_MEM | BPF_H: /* dst = *(u16 *)(ul) (src + off) */
-			EMIT(PPC_RAW_LHZ(dst_reg, src_reg, off));
-			if (!fp->aux->verifier_zext)
-				EMIT(PPC_RAW_LI(dst_reg_h, 0));
-			break;
-		case BPF_LDX | BPF_MEM | BPF_W: /* dst = *(u32 *)(ul) (src + off) */
-			EMIT(PPC_RAW_LWZ(dst_reg, src_reg, off));
-			if (!fp->aux->verifier_zext)
-				EMIT(PPC_RAW_LI(dst_reg_h, 0));
-			break;
-		case BPF_LDX | BPF_MEM | BPF_DW: /* dst = *(u64 *)(ul) (src + off) */
-			EMIT(PPC_RAW_LWZ(dst_reg_h, src_reg, off));
-			EMIT(PPC_RAW_LWZ(dst_reg, src_reg, off + 4));
 			break;
 
 		/*
