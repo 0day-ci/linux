@@ -506,7 +506,7 @@ int ext4_bio_write_page(struct ext4_io_submit *io,
 	 * can't happen in the common case of blocksize == PAGE_SIZE.
 	 */
 	if (fscrypt_inode_uses_fs_layer_crypto(inode) && nr_to_submit) {
-		gfp_t gfp_flags = GFP_NOFS;
+		gfp_t gfp_flags;
 		unsigned int enc_bytes = round_up(len, i_blocksize(inode));
 
 		/*
@@ -514,21 +514,18 @@ int ext4_bio_write_page(struct ext4_io_submit *io,
 		 * a waiting mask (i.e. request guaranteed allocation) on the
 		 * first page of the bio.  Otherwise it can deadlock.
 		 */
+	retry_encrypt:
 		if (io->io_bio)
 			gfp_flags = GFP_NOWAIT | __GFP_NOWARN;
-	retry_encrypt:
+		else
+			gfp_flags = GFP_NOFS | __GFP_NOFAIL;
 		bounce_page = fscrypt_encrypt_pagecache_blocks(page, enc_bytes,
 							       0, gfp_flags);
 		if (IS_ERR(bounce_page)) {
 			ret = PTR_ERR(bounce_page);
 			if (ret == -ENOMEM &&
 			    (io->io_bio || wbc->sync_mode == WB_SYNC_ALL)) {
-				gfp_flags = GFP_NOFS;
-				if (io->io_bio)
-					ext4_io_submit(io);
-				else
-					gfp_flags |= __GFP_NOFAIL;
-				congestion_wait(BLK_RW_ASYNC, HZ/50);
+				ext4_io_submit(io);
 				goto retry_encrypt;
 			}
 
