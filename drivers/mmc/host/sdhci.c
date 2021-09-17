@@ -969,9 +969,6 @@ static u8 sdhci_calc_timeout(struct sdhci_host *host, struct mmc_command *cmd,
 		count++;
 		current_timeout <<= 1;
 		if (count > host->max_timeout_count) {
-			if (!(host->quirks2 & SDHCI_QUIRK2_DISABLE_HW_TIMEOUT))
-				DBG("Too large timeout 0x%x requested for CMD%d!\n",
-				    count, cmd->opcode);
 			count = host->max_timeout_count;
 			*too_big = true;
 			break;
@@ -1016,8 +1013,7 @@ void __sdhci_set_timeout(struct sdhci_host *host, struct mmc_command *cmd)
 	bool too_big = false;
 	u8 count = sdhci_calc_timeout(host, cmd, &too_big);
 
-	if (too_big &&
-	    host->quirks2 & SDHCI_QUIRK2_DISABLE_HW_TIMEOUT) {
+	if (too_big) {
 		sdhci_calc_sw_timeout(host, cmd);
 		sdhci_set_data_timeout_irq(host, false);
 	} else if (!(host->ier & SDHCI_INT_DATA_TIMEOUT)) {
