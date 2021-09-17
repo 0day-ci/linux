@@ -464,25 +464,59 @@ FOP_FUNC(salc)
 FOP_RET(salc)
 FOP_END;
 
-/*
- * XXX: inoutclob user must know where the argument is being expanded.
- *      Relying on CONFIG_CC_HAS_ASM_GOTO would allow us to remove _fault.
- */
-#define asm_safe(insn, inoutclob...) \
-({ \
-	int _fault = 0; \
- \
-	asm volatile("1:" insn "\n" \
-	             "2:\n" \
-	             ".pushsection .fixup, \"ax\"\n" \
-	             "3: movl $1, %[_fault]\n" \
-	             "   jmp  2b\n" \
-	             ".popsection\n" \
-	             _ASM_EXTABLE(1b, 3b) \
-	             : [_fault] "+qm"(_fault) inoutclob ); \
- \
-	_fault ? X86EMUL_UNHANDLEABLE : X86EMUL_CONTINUE; \
-})
+static __always_inline int safe_fwait(void)
+{
+	asm_volatile_goto("1: fwait\n\t"
+			  _ASM_EXTABLE(1b, %l[fault])
+			  : : : : fault);
+	return X86EMUL_CONTINUE;
+ fault:
+	return X86EMUL_UNHANDLEABLE;
+}
+
+static __always_inline int safe_fxrstor(struct fxregs_state *fx_state)
+{
+	asm_volatile_goto("1: fxrstor %0\n\t"
+			  _ASM_EXTABLE(1b, %l[fault])
+			  : : "m" (*fx_state) : : fault);
+	return X86EMUL_CONTINUE;
+ fault:
+	return X86EMUL_UNHANDLEABLE;
+}
+
+#ifdef CONFIG_CC_HAS_ASM_GOTO_OUTPUT
+
+static __always_inline int safe_fxsave(struct fxregs_state *fx_state)
+{
+	asm_volatile_goto("1: fxsave %0\n\t"
+			  _ASM_EXTABLE(1b, %l[fault])
+			  : "=m" (*fx_state) : : : fault);
+	return X86EMUL_CONTINUE;
+ fault:
+	return X86EMUL_UNHANDLEABLE;
+}
+
+#else // !CONFIG_CC_HAS_ASM_GOTO_OUTPUT
+
+static __always_inline int safe_fxsave(struct fxregs_state *fx_state)
+{
+	int rc;
+
+	asm volatile("1: fxsave %0\n\t"
+		     "movl %2, %1\n\t"
+		     "2:\n\t"
+	             ".pushsection .fixup, \"ax\"\n\t"
+	             "3: movl %3, %1\n\t"
+	             "jmp 2b\n\t"
+	             ".popsection\n\t"
+	             _ASM_EXTABLE(1b, 3b)
+	             : "=m" (*fx_state), "=rm" (rc)
+		     : "i" (X86EMUL_CONTINUE),
+		       "i" (X86EMUL_UNHANDLEABLE));
+	return rc;
+}
+
+#endif // CONFIG_CC_ASM_GOTO_OUTPUT
 
 static int emulator_check_intercept(struct x86_emulate_ctxt *ctxt,
 				    enum x86_intercept intercept,
@@ -4030,7 +4064,7 @@ static int em_fxsave(struct x86_emulate_ctxt *ctxt)
 
 	kvm_fpu_get();
 
-	rc = asm_safe("fxsave %[fx]", , [fx] "+m"(fx_state));
+	rc = safe_fxsave (&fx_state);
 
 	kvm_fpu_put();
 
@@ -4054,7 +4088,7 @@ static noinline int fxregs_fixup(struct fxregs_state *fx_state,
 	struct fxregs_state fx_tmp;
 	int rc;
 
-	rc = asm_safe("fxsave %[fx]", , [fx] "+m"(fx_tmp));
+	rc = safe_fxsave (&fx_tmp);
 	memcpy((void *)fx_state + used_size, (void *)&fx_tmp + used_size,
 	       __fxstate_size(16) - used_size);
 
@@ -4090,7 +4124,7 @@ static int em_fxrstor(struct x86_emulate_ctxt *ctxt)
 	}
 
 	if (rc == X86EMUL_CONTINUE)
-		rc = asm_safe("fxrstor %[fx]", : [fx] "m"(fx_state));
+		rc = safe_fxrstor (&fx_state);
 
 out:
 	kvm_fpu_put();
@@ -5342,7 +5376,7 @@ static int flush_pending_x87_faults(struct x86_emulate_ctxt *ctxt)
 	int rc;
 
 	kvm_fpu_get();
-	rc = asm_safe("fwait");
+	rc = safe_fwait();
 	kvm_fpu_put();
 
 	if (unlikely(rc != X86EMUL_CONTINUE))
