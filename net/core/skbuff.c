@@ -1789,6 +1789,24 @@ struct sk_buff *skb_realloc_headroom(struct sk_buff *skb, unsigned int headroom)
 }
 EXPORT_SYMBOL(skb_realloc_headroom);
 
+static void skb_owner_inherit(struct sk_buff *nskb, struct sk_buff *oskb)
+{
+	if (is_skb_wmem(oskb))
+		skb_set_owner_w(nskb, oskb->sk);
+
+	/* handle rmem sock etc. as needed .. */
+}
+
+static void skb_increase_truesize(struct sk_buff *skb, unsigned int add)
+{
+	if (is_skb_wmem(skb))
+		refcount_add(add, &skb->sk->sk_wmem_alloc);
+	/* handle rmem sock etc. as needed .. */
+	WARN_ON(skb->destructor == sock_rfree);
+
+	skb->truesize += add;
+}
+
 /**
  *	skb_expand_head - reallocate header of &sk_buff
  *	@skb: buffer to reallocate
@@ -1804,6 +1822,7 @@ EXPORT_SYMBOL(skb_realloc_headroom);
 struct sk_buff *skb_expand_head(struct sk_buff *skb, unsigned int headroom)
 {
 	int delta = headroom - skb_headroom(skb);
+	int osize = skb_end_offset(skb);
 
 	if (WARN_ONCE(delta <= 0,
 		      "%s is expecting an increase in the headroom", __func__))
@@ -1813,21 +1832,28 @@ struct sk_buff *skb_expand_head(struct sk_buff *skb, unsigned int headroom)
 	if (skb_shared(skb)) {
 		struct sk_buff *nskb = skb_clone(skb, GFP_ATOMIC);
 
-		if (likely(nskb)) {
-			if (skb->sk)
-				skb_set_owner_w(nskb, skb->sk);
-			consume_skb(skb);
-		} else {
-			kfree_skb(skb);
-		}
+		if (unlikely(!nskb))
+			goto err_free;
+
+		skb_owner_inherit(nskb, skb);
+		consume_skb(skb);
 		skb = nskb;
 	}
-	if (skb &&
-	    pskb_expand_head(skb, SKB_DATA_ALIGN(delta), 0, GFP_ATOMIC)) {
-		kfree_skb(skb);
-		skb = NULL;
-	}
+
+	if (pskb_expand_head(skb, SKB_DATA_ALIGN(delta), 0, GFP_ATOMIC))
+		goto err_free;
+	delta = skb_end_offset(skb) - osize;
+
+	/* pskb_expand_head() will adjust truesize itself for non-sk cases
+	 * todo: move the adjustment there at some point?
+	 */
+	if (skb->sk && skb->destructor != sock_edemux)
+		skb_increase_truesize(skb, delta);
+
 	return skb;
+err_free:
+	kfree_skb(skb);
+	return NULL;
 }
 EXPORT_SYMBOL(skb_expand_head);
 

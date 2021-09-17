@@ -2227,6 +2227,16 @@ void skb_set_owner_w(struct sk_buff *skb, struct sock *sk)
 }
 EXPORT_SYMBOL(skb_set_owner_w);
 
+/* Should clones of this skb count towards skb->sk->sk_wmem_alloc
+ * and use sock_wfree() as their destructor?
+ */
+bool is_skb_wmem(const struct sk_buff *skb)
+{
+	return skb->destructor == sock_wfree ||
+		skb->destructor == __sock_wfree ||
+		(IS_ENABLED(CONFIG_INET) && skb->destructor == tcp_wfree);
+}
+
 static bool can_skb_orphan_partial(const struct sk_buff *skb)
 {
 #ifdef CONFIG_TLS_DEVICE
