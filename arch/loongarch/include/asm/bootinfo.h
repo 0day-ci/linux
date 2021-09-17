@@ -15,6 +15,7 @@ extern void detect_memory_region(phys_addr_t start, phys_addr_t sz_min,  phys_ad
 
 extern void early_init(void);
 extern void platform_init(void);
+extern void plat_swiotlb_setup(void);
 
 extern void free_init_pages(const char *what, unsigned long begin, unsigned long end);
 

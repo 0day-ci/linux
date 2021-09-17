@@ -10,6 +10,7 @@
 #include <linux/pci.h>
 #include <linux/vgaarb.h>
 #include <asm/loongson.h>
+#include <asm/numa.h>
 
 #define PCI_DEVICE_ID_LOONGSON_HOST     0x7a00
 #define PCI_DEVICE_ID_LOONGSON_DC       0x7a06
@@ -79,6 +80,32 @@ int pcibios_alloc_irq(struct pci_dev *dev)
 		return 0;
 	return acpi_pci_irq_enable(dev);
 }
+
+static void pci_root_fix_resbase(struct pci_dev *dev)
+{
+	int node = pcibus_to_node(dev->bus);
+	struct resource *res;
+	struct resource_entry *entry, *window, *tmp;
+	struct pci_host_bridge *bridge = to_pci_host_bridge(dev->bus->bridge);
+
+	resource_list_for_each_entry_safe(entry, tmp, &dev->bus->resources) {
+		res = entry->res;
+
+		if (res->flags & IORESOURCE_MEM) {
+			res->start &= GENMASK_ULL(40, 0);
+			res->end   &= GENMASK_ULL(40, 0);
+		}
+	}
+
+	resource_list_for_each_entry(window, &bridge->windows) {
+		if (window->res->flags & IORESOURCE_MEM) {
+			window->offset = nid_to_addrbase(node) | HT1LO_OFFSET;
+			window->res->start |= nid_to_addrbase(node) | HT1LO_OFFSET;
+			window->res->end   |= nid_to_addrbase(node) | HT1LO_OFFSET;
+		}
+	}
+}
+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_LOONGSON, PCI_DEVICE_ID_LOONGSON_HOST, pci_root_fix_resbase);
 
 static void pci_fixup_vgadev(struct pci_dev *pdev)
 {

@@ -93,6 +93,7 @@ void copy_from_user_page(struct vm_area_struct *vma,
 }
 EXPORT_SYMBOL_GPL(copy_from_user_page);
 
+#ifndef CONFIG_NUMA
 void __init paging_init(void)
 {
 	unsigned long max_zone_pfns[MAX_NR_ZONES];
@@ -116,6 +117,7 @@ void __init mem_init(void)
 	memblock_free_all();
 	setup_zero_pages();	/* Setup zeroed pages.  */
 }
+#endif /* !CONFIG_NUMA */
 
 void free_init_pages(const char *what, unsigned long begin, unsigned long end)
 {
@@ -159,6 +161,34 @@ int arch_add_memory(int nid, u64 start, u64 size, struct mhp_params *params)
 
 	return ret;
 }
+
+#ifdef CONFIG_HAVE_ARCH_NODEDATA_EXTENSION
+pg_data_t *arch_alloc_nodedata(int nid)
+{
+	return kzalloc(sizeof(pg_data_t), GFP_KERNEL);
+}
+
+void arch_free_nodedata(pg_data_t *pgdat)
+{
+	kfree(pgdat);
+}
+
+void arch_refresh_nodedata(int nid, pg_data_t *pgdat)
+{
+	BUG();
+}
+#endif
+
+#ifdef CONFIG_NUMA
+int memory_add_physaddr_to_nid(u64 start)
+{
+	int nid;
+
+	nid = pa_to_nid(start);
+	return nid;
+}
+EXPORT_SYMBOL_GPL(memory_add_physaddr_to_nid);
+#endif
 
 #ifdef CONFIG_MEMORY_HOTREMOVE
 void arch_remove_memory(u64 start, u64 size, struct vmem_altmap *altmap)

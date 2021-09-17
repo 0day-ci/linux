@@ -343,7 +343,9 @@ static void __init arch_mem_init(char **cmdline_p)
 
 	check_kernel_sections_mem();
 
+#ifndef CONFIG_NUMA
 	memblock_set_node(0, PHYS_ADDR_MAX, &memblock.memory, 0);
+#endif
 	pagetable_init();
 
 	/*
@@ -365,7 +367,7 @@ static void __init arch_mem_init(char **cmdline_p)
 	sparse_init();
 	memblock_set_bottom_up(true);
 
-	swiotlb_init(1);
+	plat_swiotlb_setup();
 
 	dma_contiguous_reserve(PFN_PHYS(max_low_pfn));
 
@@ -429,7 +431,11 @@ void __init platform_init(void)
 	acpi_boot_init();
 #endif
 
+#ifndef CONFIG_NUMA
 	fw_init_memory();
+#else
+	fw_init_numa_memory();
+#endif
 	dmi_setup();
 	smbios_parse();
 	pr_info("The BIOS Version: %s\n", b_info.bios_version);
