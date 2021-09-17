@@ -269,6 +269,7 @@ int __intel_wait_for_register_fw(struct intel_uncore *uncore,
 				 unsigned int fast_timeout_us,
 				 unsigned int slow_timeout_ms,
 				 u32 *out_value);
+
 static inline int
 intel_wait_for_register_fw(struct intel_uncore *uncore,
 			   i915_reg_t reg,
@@ -279,6 +280,12 @@ intel_wait_for_register_fw(struct intel_uncore *uncore,
 	return __intel_wait_for_register_fw(uncore, reg, mask, value,
 					    2, timeout_ms, NULL);
 }
+
+int intel_wait_for_condition(struct intel_uncore *uncore,
+			     bool (*func)(void *data),
+			     void *data,
+			     unsigned int fw,
+			     unsigned int timeout_ms);
 
 /* register access functions */
 #define __raw_read(x__, s__) \

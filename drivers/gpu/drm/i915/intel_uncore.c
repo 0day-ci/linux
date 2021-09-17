@@ -2404,6 +2404,28 @@ int __intel_wait_for_register_fw(struct intel_uncore *uncore,
 #undef done
 }
 
+static int __intel_wait_for_condition_fw(bool (*func)(void *data), void *data,
+					 unsigned int fast_timeout_us,
+					 unsigned int slow_timeout_ms)
+{
+#define done (func(data))
+	int ret;
+
+	/* Catch any overuse of this function */
+	might_sleep_if(slow_timeout_ms);
+	GEM_BUG_ON(fast_timeout_us > 20000);
+	GEM_BUG_ON(!fast_timeout_us && !slow_timeout_ms);
+
+	ret = -ETIMEDOUT;
+	if (fast_timeout_us && fast_timeout_us <= 20000)
+		ret = _wait_for_atomic(done, fast_timeout_us, 0);
+	if (ret && slow_timeout_ms)
+		ret = wait_for(done, slow_timeout_ms);
+
+	return ret;
+#undef done
+}
+
 /**
  * __intel_wait_for_register - wait until register matches expected state
  * @uncore: the struct intel_uncore
@@ -2459,6 +2481,31 @@ int __intel_wait_for_register(struct intel_uncore *uncore,
 
 	if (out_value)
 		*out_value = reg_value;
+
+	return ret;
+}
+
+int intel_wait_for_condition(struct intel_uncore *uncore,
+			     bool (*func)(void *data),
+			     void *data,
+			     unsigned int fw,
+			     unsigned int slow_timeout_ms)
+{
+	unsigned int fast_timeout_us = 2;
+	int ret;
+
+	might_sleep_if(slow_timeout_ms);
+
+	spin_lock_irq(&uncore->lock);
+	intel_uncore_forcewake_get__locked(uncore, fw);
+
+	ret = __intel_wait_for_condition_fw(func, data, fast_timeout_us, 0);
+
+	intel_uncore_forcewake_put__locked(uncore, fw);
+	spin_unlock_irq(&uncore->lock);
+
+	if (ret && slow_timeout_ms)
+		ret = __wait_for(, (func(data)), slow_timeout_ms * 1000, 10, 1000);
 
 	return ret;
 }
