@@ -291,12 +291,38 @@ static ssize_t mem_used_max_store(struct device *dev,
 	return len;
 }
 
+/*
+ * Mark all pages which are older than or equal to cutoff as IDLE.
+ * Callers should hold the zram init lock in read mode
+ **/
+static void mark_idle(struct zram *zram, ktime_t cutoff)
+{
+	int is_idle = 1;
+	unsigned long nr_pages = zram->disksize >> PAGE_SHIFT;
+	int index;
+
+	for (index = 0; index < nr_pages; index++) {
+		/*
+		 * Do not mark ZRAM_UNDER_WB slot as ZRAM_IDLE to close race.
+		 * See the comment in writeback_store.
+		 */
+		zram_slot_lock(zram, index);
+		if (zram_allocated(zram, index) &&
+				!zram_test_flag(zram, index, ZRAM_UNDER_WB)) {
+#ifdef CONFIG_ZRAM_MEMORY_TRACKING
+			is_idle = (!cutoff || cutoff >= zram->table[index].ac_time);
+#endif
+			if (is_idle)
+				zram_set_flag(zram, index, ZRAM_IDLE);
+		}
+		zram_slot_unlock(zram, index);
+	}
+}
+
 static ssize_t idle_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t len)
 {
 	struct zram *zram = dev_to_zram(dev);
-	unsigned long nr_pages = zram->disksize >> PAGE_SHIFT;
-	int index;
 
 	if (!sysfs_streq(buf, "all"))
 		return -EINVAL;
@@ -307,22 +333,37 @@ static ssize_t idle_store(struct device *dev,
 		return -EINVAL;
 	}
 
-	for (index = 0; index < nr_pages; index++) {
-		/*
-		 * Do not mark ZRAM_UNDER_WB slot as ZRAM_IDLE to close race.
-		 * See the comment in writeback_store.
-		 */
-		zram_slot_lock(zram, index);
-		if (zram_allocated(zram, index) &&
-				!zram_test_flag(zram, index, ZRAM_UNDER_WB))
-			zram_set_flag(zram, index, ZRAM_IDLE);
-		zram_slot_unlock(zram, index);
-	}
-
+	/* Mark everything as idle */
+	mark_idle(zram, 0);
 	up_read(&zram->init_lock);
 
 	return len;
 }
+
+#ifdef CONFIG_ZRAM_MEMORY_TRACKING
+static ssize_t idle_aged_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t len)
+{
+	struct zram *zram = dev_to_zram(dev);
+	ktime_t cutoff_time;
+	u64 age_sec;
+	ssize_t rv = -EINVAL;
+
+	down_read(&zram->init_lock);
+	if (!init_done(zram))
+		goto out;
+
+	if (kstrtoull(buf, 10, &age_sec))
+		goto out;
+
+	rv = len;
+	cutoff_time = ktime_sub(ktime_get_boottime(), ns_to_ktime(age_sec * NSEC_PER_SEC));
+	mark_idle(zram, cutoff_time);
+out:
+	up_read(&zram->init_lock);
+	return rv;
+}
+#endif
 
 #ifdef CONFIG_ZRAM_WRITEBACK
 static ssize_t writeback_limit_enable_store(struct device *dev,
@@ -1840,6 +1881,9 @@ static DEVICE_ATTR_WO(reset);
 static DEVICE_ATTR_WO(mem_limit);
 static DEVICE_ATTR_WO(mem_used_max);
 static DEVICE_ATTR_WO(idle);
+#ifdef CONFIG_ZRAM_MEMORY_TRACKING
+static DEVICE_ATTR_WO(idle_aged);
+#endif
 static DEVICE_ATTR_RW(max_comp_streams);
 static DEVICE_ATTR_RW(comp_algorithm);
 #ifdef CONFIG_ZRAM_WRITEBACK
@@ -1857,6 +1901,9 @@ static struct attribute *zram_disk_attrs[] = {
 	&dev_attr_mem_limit.attr,
 	&dev_attr_mem_used_max.attr,
 	&dev_attr_idle.attr,
+#ifdef CONFIG_ZRAM_MEMORY_TRACKING
+	&dev_attr_idle_aged.attr,
+#endif
 	&dev_attr_max_comp_streams.attr,
 	&dev_attr_comp_algorithm.attr,
 #ifdef CONFIG_ZRAM_WRITEBACK

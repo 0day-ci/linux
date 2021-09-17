@@ -209,6 +209,8 @@ compact           	WO	trigger memory compaction
 debug_stat        	RO	this file is used for zram debugging purposes
 backing_dev	  	RW	set up backend storage for zram to write out
 idle		  	WO	mark allocated slot as idle
+idle_aged              WO      mark allocated slot older than 'age' seconds
+                                as idle (see later)
 ======================  ======  ===============================================
 
 
@@ -325,8 +327,13 @@ as idle::
 
 	echo all > /sys/block/zramX/idle
 
-From now on, any pages on zram are idle pages. The idle mark
-will be removed until someone requests access of the block.
+Alternatively if the config option CONFIG_ZRAM_MEMORY_TRACKING is enabled
+the idle_aged interface can be used to mark only pages older than 'age'
+seconds as idle::
+
+        echo 86400 > /sys/block/zramX/idle_aged
+
+The idle mark will be removed until someone requests access of the block.
 IOW, unless there is access request, those pages are still idle pages.
 
 Admin can request writeback of those idle pages at right timing via::
