@@ -5204,6 +5204,11 @@ static inline bool prepare_alloc_pages(gfp_t gfp_mask, unsigned int order,
  * is the maximum number of pages that will be stored in the array.
  *
  * Returns the number of pages on the list or array.
+ *
+ * At least one page will be allocated if that is possible while
+ * remaining consistent with @gfp.  Extra pages up to the requested
+ * total will be allocated opportunistically when doing so is
+ * significantly cheaper than having the caller repeat the request.
  */
 unsigned long __alloc_pages_bulk(gfp_t gfp, int preferred_nid,
 			nodemask_t *nodemask, int nr_pages,
@@ -5305,7 +5310,7 @@ unsigned long __alloc_pages_bulk(gfp_t gfp, int preferred_nid,
 								pcp, pcp_list);
 		if (unlikely(!page)) {
 			/* Try and get at least one page */
-			if (!nr_populated)
+			if (!nr_account)
 				goto failed_irq;
 			break;
 		}
