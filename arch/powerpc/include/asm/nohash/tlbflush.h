@@ -32,11 +32,31 @@ extern void flush_tlb_range(struct vm_area_struct *vma, unsigned long start,
 			    unsigned long end);
 extern void flush_tlb_kernel_range(unsigned long start, unsigned long end);
 
+#ifdef CONFIG_PPC_8xx
+#include <asm/trace.h>
+
+static inline void local_flush_tlb_mm(struct mm_struct *mm)
+{
+	unsigned int pid = READ_ONCE(mm->context.id);
+
+	if (pid != MMU_NO_CONTEXT) {
+		asm volatile ("sync; tlbia; isync" : : : "memory");
+		trace_tlbia(pid);
+	}
+}
+
+static inline void local_flush_tlb_page(struct vm_area_struct *vma, unsigned long vmaddr)
+{
+	asm volatile ("tlbie %0; sync" : : "r" (vmaddr) : "memory");
+	trace_tlbie(0, 0, vmaddr, vma ? vma->vm_mm->context.id : 0, 0, 0, 0);
+}
+#else
 extern void local_flush_tlb_mm(struct mm_struct *mm);
 extern void local_flush_tlb_page(struct vm_area_struct *vma, unsigned long vmaddr);
 
 extern void __local_flush_tlb_page(struct mm_struct *mm, unsigned long vmaddr,
 				   int tsize, int ind);
+#endif
 
 #ifdef CONFIG_SMP
 extern void flush_tlb_mm(struct mm_struct *mm);
