@@ -55,6 +55,7 @@
 #define STATE_ERR 2
 
 #define MAX_CAPSET_ID 63
+#define MAX_RINGS 64
 
 struct virtio_gpu_object_params {
 	unsigned long size;
@@ -262,6 +263,8 @@ struct virtio_gpu_fpriv {
 	uint32_t ctx_id;
 	uint32_t context_init;
 	bool context_created;
+	uint32_t num_rings;
+	uint64_t base_fence_ctx;
 	struct mutex context_lock;
 };
 
