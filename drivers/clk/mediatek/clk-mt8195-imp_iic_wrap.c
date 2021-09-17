@@ -3,12 +3,11 @@
 // Copyright (c) 2021 MediaTek Inc.
 // Author: Chun-Jie Chen <chun-jie.chen@mediatek.com>
 
-#include "clk-gate.h"
-#include "clk-mtk.h"
-
-#include <dt-bindings/clock/mt8195-clk.h>
 #include <linux/clk-provider.h>
 #include <linux/platform_device.h>
+
+#include "clk-gate.h"
+#include "clk-mtk.h"
 
 #include <dt-bindings/clock/mt8195-clk.h>
 
