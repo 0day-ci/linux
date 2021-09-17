@@ -4,6 +4,10 @@
 
 / {
 	compatible = "rockchip,rk3566";
+
+	aliases {
+		ethernet0 = &gmac1;
+	};
 };
 
 &power {

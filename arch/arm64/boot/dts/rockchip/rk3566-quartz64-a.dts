@@ -10,12 +10,6 @@
 	model = "Pine64 RK3566 Quartz64-A Board";
 	compatible = "pine64,quartz64-a", "rockchip,rk3566";
 
-	aliases {
-		ethernet0 = &gmac1;
-		mmc0 = &sdmmc0;
-		mmc1 = &sdhci;
-	};
-
 	chosen: chosen {
 		stdout-path = "serial2:1500000n8";
 	};
