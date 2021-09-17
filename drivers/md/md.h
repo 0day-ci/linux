@@ -259,8 +259,8 @@ enum mddev_flags {
 	MD_NOT_READY,		/* do_md_run() is active, so 'array_state'
 				 * must not report that array is ready yet
 				 */
-	MD_BROKEN,              /* This is used in RAID-0/LINEAR only, to stop
-				 * I/O in case an array member is gone/failed.
+	MD_BROKEN,              /* This is used to stop I/O and mark device as
+				 * dead in case an array becomes failed.
 				 */
 };
 
