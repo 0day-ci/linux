@@ -324,6 +324,67 @@ void dma_resv_add_excl_fence(struct dma_resv *obj, struct dma_fence *fence)
 EXPORT_SYMBOL(dma_resv_add_excl_fence);
 
 /**
+ * dma_resv_iter_walk_unlocked - walk over fences in a dma_resv obj
+ * @cursor: cursor to record the current position
+ * @first: if we should start over
+ *
+ * Return all the fences in the dma_resv object which are not yet signaled.
+ * The returned fence has an extra local reference so will stay alive.
+ * If a concurrent modify is detected the whole iterration is started over again.
+ */
+struct dma_fence *dma_resv_iter_walk_unlocked(struct dma_resv_iter *cursor,
+					      bool first)
+{
+	struct dma_resv *obj = cursor->obj;
+
+	first |= read_seqcount_retry(&obj->seq, cursor->seq);
+	do {
+		/* Drop the reference from the previous round */
+		dma_fence_put(cursor->fence);
+
+		cursor->is_first = first;
+		if (first) {
+			cursor->seq = read_seqcount_begin(&obj->seq);
+			cursor->index = -1;
+			cursor->fences = dma_resv_shared_list(obj);
+
+			cursor->fence = dma_resv_excl_fence(obj);
+			if (cursor->fence &&
+			    test_bit(DMA_FENCE_FLAG_SIGNALED_BIT,
+				     &cursor->fence->flags))
+				cursor->fence = NULL;
+		} else {
+			cursor->fence = NULL;
+		}
+
+		if (cursor->fence) {
+			cursor->fence = dma_fence_get_rcu(cursor->fence);
+		} else if (cursor->all_fences && cursor->fences) {
+			struct dma_resv_list *fences = cursor->fences;
+
+			while (++cursor->index < fences->shared_count) {
+				cursor->fence = rcu_dereference(
+					fences->shared[cursor->index]);
+				if (!test_bit(DMA_FENCE_FLAG_SIGNALED_BIT,
+					      &cursor->fence->flags))
+					break;
+			}
+			if (cursor->index < fences->shared_count)
+				cursor->fence =
+					dma_fence_get_rcu(cursor->fence);
+			else
+				cursor->fence = NULL;
+		}
+
+		/* For the eventually next round */
+		first = true;
+	} while (read_seqcount_retry(&obj->seq, cursor->seq));
+
+	return cursor->fence;
+}
+EXPORT_SYMBOL_GPL(dma_resv_iter_walk_unlocked);
+
+/**
  * dma_resv_copy_fences - Copy all fences from src to dst.
  * @dst: the destination reservation object
  * @src: the source reservation object
