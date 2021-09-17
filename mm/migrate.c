@@ -3118,6 +3118,36 @@ static int establish_migrate_target(int node, nodemask_t *used)
 }
 
 /*
+ * The node_demotion[] path is calculated by starting at
+ * nodes with CPUs and then "walking" to nodes with memory.
+ * Only hotplug events which online or offline a node with
+ * memory (N_ONLINE) or CPUs (N_CPU) will actually affect
+ * the migration order.
+ *
+ * Differentiate between hotplug events which are impactful
+ * or superfluous to node_demotion[].
+ *
+ * Must only be called once per hotplug event.  Callers
+ * must not make concurrent calls.
+ */
+static bool node_demotion_topo_changed(void)
+{
+	static int prev_topo_cpus = -1;
+	static int prev_topo_mems = -1;
+	int now_topo_cpus = num_node_state(N_CPU);
+	int now_topo_mems = num_node_state(N_ONLINE);
+
+	if ((now_topo_cpus == prev_topo_cpus) &&
+	    (now_topo_mems == prev_topo_mems))
+	   return false;
+
+	prev_topo_cpus = now_topo_cpus;
+	prev_topo_mems = now_topo_mems;
+
+	return true;
+}
+
+/*
  * When memory fills up on a node, memory contents can be
  * automatically migrated to another node instead of
  * discarded at reclaim.
@@ -3141,6 +3171,16 @@ static void __set_migration_target_nodes(void)
 	nodemask_t this_pass	= NODE_MASK_NONE;
 	nodemask_t used_targets = NODE_MASK_NONE;
 	int node;
+
+	/*
+	 * The "migration path" array is heavily optimized
+	 * for reads.  This is the write side which incurs a
+	 * very heavy synchronize_rcu().  Avoid this overhead
+	 * when nothing of consequence has changed since the
+	 * last write.
+	 */
+	if (!node_demotion_topo_changed())
+		return;
 
 	/*
 	 * Avoid any oddities like cycles that could occur
