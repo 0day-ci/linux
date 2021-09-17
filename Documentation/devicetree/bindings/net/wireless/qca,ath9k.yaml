@@ -1,0 +1,82 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/net/wireless/qca,ath9k.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Qualcomm Atheros ath9k wireless devices Generic Binding
+
+maintainers:
+  - Kalle Valo <kvalo@codeaurora.org>
+
+description: |
+  This node provides properties for configuring the ath9k wireless device.
+  The node is expected to be specified as a child node of the PCI controller
+  to which the wireless chip is connected.
+
+allOf:
+  - $ref: ieee80211.yaml#
+
+properties:
+  compatible:
+    enum:
+      - pci168c,0023
+      - pci168c,0024
+      - pci168c,0027
+      - pci168c,0029
+      - pci168c,002a
+      - pci168c,002b
+      - pci168c,002c
+      - pci168c,002d
+      - pci168c,002e
+      - pci168c,0030
+      - pci168c,0032
+      - pci168c,0033
+      - pci168c,0034
+      - pci168c,0036
+      - pci168c,0037
+
+  reg:
+    maxItems: 1
+
+  interrupts:
+    maxItems: 1
+
+  ieee80211-freq-limit: true
+
+  qca,no-eeprom:
+    $ref: /schemas/types.yaml#/definitions/flag
+    description:
+      Indicates that there is no physical EEPROM connected
+
+  nvmem-cells:
+    items:
+      - description: Reference to an nvmem node for the MAC address
+      - description: Reference to an nvmem node for calibration data
+
+  nvmem-cell-names:
+    items:
+      - const: mac-address
+      - const: calibration
+
+required:
+  - compatible
+  - reg
+
+additionalProperties: false
+
+examples:
+  - |
+    pcie0 {
+      #address-cells = <3>;
+      #size-cells = <2>;
+      wifi@0,0 {
+        compatible = "pci168c,002d";
+        reg = <0 0 0 0 0>;
+        interrupts = <3>;
+        qca,no-eeprom;
+
+        nvmem-cells = <&macaddr_art_c>, <&cal_art_1000>;
+        nvmem-cell-names = "mac-address", "calibration";
+      };
+    };
