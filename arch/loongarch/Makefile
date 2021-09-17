@@ -3,6 +3,8 @@
 # Author: Huacai Chen <chenhuacai@loongson.cn>
 # Copyright (C) 2020-2021 Loongson Technology Corporation Limited
 
+KBUILD_DEFCONFIG := loongson3_defconfig
+
 #
 # Select the object file format to substitute into the linker script.
 #
