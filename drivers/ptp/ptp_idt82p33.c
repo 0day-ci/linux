@@ -24,15 +24,10 @@ MODULE_LICENSE("GPL");
 MODULE_FIRMWARE(FW_FILENAME);
 
 /* Module Parameters */
-static u32 sync_tod_timeout = SYNC_TOD_TIMEOUT_SEC;
-module_param(sync_tod_timeout, uint, 0);
-MODULE_PARM_DESC(sync_tod_timeout,
-"duration in second to keep SYNC_TOD on (set to 0 to keep it always on)");
-
 static u32 phase_snap_threshold = SNAP_THRESHOLD_NS;
 module_param(phase_snap_threshold, uint, 0);
 MODULE_PARM_DESC(phase_snap_threshold,
-"threshold (150000ns by default) below which adjtime would ignore");
+"threshold (1000ns by default) below which adjtime would ignore");
 
 static void idt82p33_byte_array_to_timespec(struct timespec64 *ts,
 					    u8 buf[TOD_BYTE_COUNT])
@@ -206,9 +201,36 @@ static int idt82p33_dpll_set_mode(struct idt82p33_channel *channel,
 	if (err)
 		return err;
 
-	channel->pll_mode = dpll_mode;
+	channel->pll_mode = mode;
 
 	return 0;
+}
+
+static int idt82p33_set_tod_trigger(struct idt82p33_channel *channel,
+				    u8 trigger, bool write)
+{
+	struct idt82p33 *idt82p33 = channel->idt82p33;
+	int err;
+	u8 cfg;
+
+	if (trigger > WR_TRIG_SEL_MAX)
+		return -EINVAL;
+
+	err = idt82p33_read(idt82p33, channel->dpll_tod_trigger,
+			    &cfg, sizeof(cfg));
+
+	if (err)
+		return err;
+
+	if (write == true)
+		trigger = (trigger << WRITE_TRIGGER_SHIFT) |
+			  (cfg & READ_TRIGGER_MASK);
+	else
+		trigger = (trigger << READ_TRIGGER_SHIFT) |
+			  (cfg & WRITE_TRIGGER_MASK);
+
+	return idt82p33_write(idt82p33, channel->dpll_tod_trigger,
+			      &trigger, sizeof(trigger));
 }
 
 static int _idt82p33_gettime(struct idt82p33_channel *channel,
@@ -216,16 +238,10 @@ static int _idt82p33_gettime(struct idt82p33_channel *channel,
 {
 	struct idt82p33 *idt82p33 = channel->idt82p33;
 	u8 buf[TOD_BYTE_COUNT];
-	u8 trigger;
 	int err;
 
-	trigger = TOD_TRIGGER(HW_TOD_WR_TRIG_SEL_MSB_TOD_CNFG,
-			      HW_TOD_RD_TRIG_SEL_LSB_TOD_STS);
-
-
-	err = idt82p33_write(idt82p33, channel->dpll_tod_trigger,
-			     &trigger, sizeof(trigger));
-
+	err = idt82p33_set_tod_trigger(channel, HW_TOD_RD_TRIG_SEL_LSB_TOD_STS,
+				       false);
 	if (err)
 		return err;
 
@@ -255,16 +271,11 @@ static int _idt82p33_settime(struct idt82p33_channel *channel,
 	struct timespec64 local_ts = *ts;
 	char buf[TOD_BYTE_COUNT];
 	s64 dynamic_overhead_ns;
-	unsigned char trigger;
 	int err;
 	u8 i;
 
-	trigger = TOD_TRIGGER(HW_TOD_WR_TRIG_SEL_MSB_TOD_CNFG,
-			      HW_TOD_RD_TRIG_SEL_LSB_TOD_STS);
-
-	err = idt82p33_write(idt82p33, channel->dpll_tod_trigger,
-			&trigger, sizeof(trigger));
-
+	err = idt82p33_set_tod_trigger(channel, HW_TOD_WR_TRIG_SEL_MSB_TOD_CNFG,
+				       true);
 	if (err)
 		return err;
 
@@ -292,7 +303,8 @@ static int _idt82p33_settime(struct idt82p33_channel *channel,
 	return err;
 }
 
-static int _idt82p33_adjtime(struct idt82p33_channel *channel, s64 delta_ns)
+static int _idt82p33_adjtime_immediate(struct idt82p33_channel *channel,
+				       s64 delta_ns)
 {
 	struct idt82p33 *idt82p33 = channel->idt82p33;
 	struct timespec64 ts;
@@ -314,6 +326,60 @@ static int _idt82p33_adjtime(struct idt82p33_channel *channel, s64 delta_ns)
 	err = _idt82p33_settime(channel, &ts);
 
 	return err;
+}
+
+static int _idt82p33_adjtime_internal_triggered(struct idt82p33_channel *channel,
+						s64 delta_ns)
+{
+	struct idt82p33 *idt82p33 = channel->idt82p33;
+	char buf[TOD_BYTE_COUNT];
+	struct timespec64 ts;
+	const u8 delay_ns = 32;
+	s32 delay_ns_remainder;
+	s64 ns;
+	int err;
+
+	err = _idt82p33_gettime(channel, &ts);
+
+	if (err)
+		return err;
+
+	if (ts.tv_nsec > (NSEC_PER_SEC - 5 * NSEC_PER_MSEC)) {
+		/*  Too close to miss next trigger, so skip it */
+		mdelay(6);
+		ns = (ts.tv_sec + 2) * NSEC_PER_SEC + delta_ns + delay_ns;
+	} else
+		ns = (ts.tv_sec + 1) * NSEC_PER_SEC + delta_ns + delay_ns;
+
+	ts = ns_to_timespec64(ns);
+	idt82p33_timespec_to_byte_array(&ts, buf);
+
+	/*
+	 * Store the new time value.
+	 */
+	err = idt82p33_write(idt82p33, channel->dpll_tod_cnfg, buf, sizeof(buf));
+	if (err)
+		return err;
+
+	/* Schedule to implement the workaround in one second */
+	div_s64_rem(delta_ns, NSEC_PER_SEC, &delay_ns_remainder);
+	if (delay_ns_remainder)
+		schedule_delayed_work(&channel->adjtime_work, HZ);
+
+	return idt82p33_set_tod_trigger(channel, HW_TOD_TRIG_SEL_TOD_PPS, true);
+}
+
+static void idt82p33_adjtime_workaround(struct work_struct *work)
+{
+	struct idt82p33_channel *channel = container_of(work,
+							struct idt82p33_channel,
+							adjtime_work.work);
+	struct idt82p33 *idt82p33 = channel->idt82p33;
+
+	mutex_lock(&idt82p33->reg_lock);
+	/* Workaround for TOD-to-output alignment issue */
+	_idt82p33_adjtime_internal_triggered(channel, 0);
+	mutex_unlock(&idt82p33->reg_lock);
 }
 
 static int _idt82p33_adjfine(struct idt82p33_channel *channel, long scaled_ppm)
@@ -397,6 +463,39 @@ static int idt82p33_measure_one_byte_write_overhead(
 	return err;
 }
 
+static int idt82p33_measure_one_byte_read_overhead(
+		struct idt82p33_channel *channel, s64 *overhead_ns)
+{
+	struct idt82p33 *idt82p33 = channel->idt82p33;
+	ktime_t start, stop;
+	u8 trigger = 0;
+	s64 total_ns;
+	int err;
+	u8 i;
+
+	total_ns = 0;
+	*overhead_ns = 0;
+
+	for (i = 0; i < MAX_MEASURMENT_COUNT; i++) {
+
+		start = ktime_get_raw();
+
+		err = idt82p33_read(idt82p33, channel->dpll_tod_trigger,
+				    &trigger, sizeof(trigger));
+
+		stop = ktime_get_raw();
+
+		if (err)
+			return err;
+
+		total_ns += ktime_to_ns(stop) - ktime_to_ns(start);
+	}
+
+	*overhead_ns = div_s64(total_ns, MAX_MEASURMENT_COUNT);
+
+	return err;
+}
+
 static int idt82p33_measure_tod_write_9_byte_overhead(
 			struct idt82p33_channel *channel)
 {
@@ -458,7 +557,7 @@ static int idt82p33_measure_settime_gettime_gap_overhead(
 
 static int idt82p33_measure_tod_write_overhead(struct idt82p33_channel *channel)
 {
-	s64 trailing_overhead_ns, one_byte_write_ns, gap_ns;
+	s64 trailing_overhead_ns, one_byte_write_ns, gap_ns, one_byte_read_ns;
 	struct idt82p33 *idt82p33 = channel->idt82p33;
 	int err;
 
@@ -478,12 +577,19 @@ static int idt82p33_measure_tod_write_overhead(struct idt82p33_channel *channel)
 	if (err)
 		return err;
 
+	err = idt82p33_measure_one_byte_read_overhead(channel,
+						      &one_byte_read_ns);
+
+	if (err)
+		return err;
+
 	err = idt82p33_measure_tod_write_9_byte_overhead(channel);
 
 	if (err)
 		return err;
 
-	trailing_overhead_ns = gap_ns - (2 * one_byte_write_ns);
+	trailing_overhead_ns = gap_ns - 2 * one_byte_write_ns
+			       - one_byte_read_ns;
 
 	idt82p33->tod_write_overhead_ns -= trailing_overhead_ns;
 
@@ -500,7 +606,7 @@ static int idt82p33_check_and_set_masks(struct idt82p33 *idt82p33,
 	if (page == PLLMASK_ADDR_HI && offset == PLLMASK_ADDR_LO) {
 		if ((val & 0xfc) || !(val & 0x3)) {
 			dev_err(&idt82p33->client->dev,
-				"Invalid PLL mask 0x%hhx\n", val);
+				"Invalid PLL mask 0x%02x\n", val);
 			err = -EINVAL;
 		} else {
 			idt82p33->pll_mask = val;
@@ -539,11 +645,6 @@ static int idt82p33_sync_tod(struct idt82p33_channel *channel, bool enable)
 	u8 sync_cnfg;
 	int err;
 
-	/* Turn it off after sync_tod_timeout seconds */
-	if (enable && sync_tod_timeout)
-		ptp_schedule_worker(channel->ptp_clock,
-				    sync_tod_timeout * HZ);
-
 	err = idt82p33_read(idt82p33, channel->dpll_sync_cnfg,
 			    &sync_cnfg, sizeof(sync_cnfg));
 	if (err)
@@ -555,22 +656,6 @@ static int idt82p33_sync_tod(struct idt82p33_channel *channel, bool enable)
 
 	return idt82p33_write(idt82p33, channel->dpll_sync_cnfg,
 			      &sync_cnfg, sizeof(sync_cnfg));
-}
-
-static long idt82p33_sync_tod_work_handler(struct ptp_clock_info *ptp)
-{
-	struct idt82p33_channel *channel =
-			container_of(ptp, struct idt82p33_channel, caps);
-	struct idt82p33 *idt82p33 = channel->idt82p33;
-
-	mutex_lock(&idt82p33->reg_lock);
-
-	(void)idt82p33_sync_tod(channel, false);
-
-	mutex_unlock(&idt82p33->reg_lock);
-
-	/* Return a negative value here to not reschedule */
-	return -1;
 }
 
 static int idt82p33_output_enable(struct idt82p33_channel *channel,
@@ -634,13 +719,6 @@ static int idt82p33_enable_tod(struct idt82p33_channel *channel)
 	struct idt82p33 *idt82p33 = channel->idt82p33;
 	struct timespec64 ts = {0, 0};
 	int err;
-	u8 val;
-
-	val = 0;
-	err = idt82p33_write(idt82p33, channel->dpll_input_mode_cnfg,
-			     &val, sizeof(val));
-	if (err)
-		return err;
 
 	err = idt82p33_measure_tod_write_overhead(channel);
 
@@ -664,11 +742,12 @@ static void idt82p33_ptp_clock_unregister_all(struct idt82p33 *idt82p33)
 	u8 i;
 
 	for (i = 0; i < MAX_PHC_PLL; i++) {
-
 		channel = &idt82p33->channel[i];
 
-		if (channel->ptp_clock)
+		if (channel->ptp_clock) {
+			channel = &idt82p33->channel[i];
 			ptp_clock_unregister(channel->ptp_clock);
+		}
 	}
 }
 
@@ -753,10 +832,11 @@ static int idt82p33_adjfine(struct ptp_clock_info *ptp, long scaled_ppm)
 
 	mutex_lock(&idt82p33->reg_lock);
 	err = _idt82p33_adjfine(channel, scaled_ppm);
+	mutex_unlock(&idt82p33->reg_lock);
+
 	if (err)
 		dev_err(&idt82p33->client->dev,
 			"Failed in %s with err %d!\n", __func__, err);
-	mutex_unlock(&idt82p33->reg_lock);
 
 	return err;
 }
@@ -775,21 +855,16 @@ static int idt82p33_adjtime(struct ptp_clock_info *ptp, s64 delta_ns)
 		return 0;
 	}
 
-	err = _idt82p33_adjtime(channel, delta_ns);
-
-	if (err) {
-		mutex_unlock(&idt82p33->reg_lock);
-		dev_err(&idt82p33->client->dev,
-			"Adjtime failed in %s with err %d!\n", __func__, err);
-		return err;
-	}
-
-	err = idt82p33_sync_tod(channel, true);
-	if (err)
-		dev_err(&idt82p33->client->dev,
-			"Sync_tod failed in %s with err %d!\n", __func__, err);
+	/* Use more accurate internal 1pps triggered write first */
+	err = _idt82p33_adjtime_internal_triggered(channel, delta_ns);
+	if (err && delta_ns > IMMEDIATE_SNAP_THRESHOLD_NS)
+		err = _idt82p33_adjtime_immediate(channel, delta_ns);
 
 	mutex_unlock(&idt82p33->reg_lock);
+
+	if (err)
+		dev_err(&idt82p33->client->dev,
+			"Adjtime failed in %s with err %d!\n", __func__, err);
 
 	return err;
 }
@@ -803,10 +878,11 @@ static int idt82p33_gettime(struct ptp_clock_info *ptp, struct timespec64 *ts)
 
 	mutex_lock(&idt82p33->reg_lock);
 	err = _idt82p33_gettime(channel, ts);
+	mutex_unlock(&idt82p33->reg_lock);
+
 	if (err)
 		dev_err(&idt82p33->client->dev,
 			"Failed in %s with err %d!\n", __func__, err);
-	mutex_unlock(&idt82p33->reg_lock);
 
 	return err;
 }
@@ -821,11 +897,11 @@ static int idt82p33_settime(struct ptp_clock_info *ptp,
 
 	mutex_lock(&idt82p33->reg_lock);
 	err = _idt82p33_settime(channel, ts);
+	mutex_unlock(&idt82p33->reg_lock);
+
 	if (err)
 		dev_err(&idt82p33->client->dev,
 			"Failed in %s with err %d!\n", __func__, err);
-	mutex_unlock(&idt82p33->reg_lock);
-
 	return err;
 }
 
@@ -872,7 +948,6 @@ static void idt82p33_caps_init(struct ptp_clock_info *caps)
 	caps->gettime64 = idt82p33_gettime;
 	caps->settime64 = idt82p33_settime;
 	caps->enable = idt82p33_enable;
-	caps->do_aux_work = idt82p33_sync_tod_work_handler;
 }
 
 static int idt82p33_enable_channel(struct idt82p33 *idt82p33, u32 index)
@@ -894,6 +969,8 @@ static int idt82p33_enable_channel(struct idt82p33 *idt82p33, u32 index)
 	}
 
 	channel->idt82p33 = idt82p33;
+
+	INIT_DELAYED_WORK(&channel->adjtime_work, idt82p33_adjtime_workaround);
 
 	idt82p33_caps_init(&channel->caps);
 	snprintf(channel->caps.name, sizeof(channel->caps.name),
