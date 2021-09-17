@@ -179,6 +179,7 @@ struct dma_resv_iter {
 
 struct dma_fence *dma_resv_iter_walk_unlocked(struct dma_resv_iter *cursor,
 					      bool first);
+struct dma_fence *dma_resv_iter_walk(struct dma_resv_iter *cursor, bool first);
 
 /**
  * dma_resv_iter_begin - initialize a dma_resv_iter object
@@ -232,6 +233,22 @@ static inline bool dma_resv_iter_is_exclusive(struct dma_resv_iter *cursor)
 #define dma_resv_for_each_fence_unlocked(cursor, fence)			\
 	for (fence = dma_resv_iter_walk_unlocked(cursor, true);		\
 	     fence; fence = dma_resv_iter_walk_unlocked(cursor, false))
+
+/**
+ * dma_resv_for_each_fence - fence iterator
+ * @cursor: a struct dma_resv_iter pointer
+ * @obj: a dma_resv object pointer
+ * @all_fences: true if all fences should be returned
+ * @fence: the current fence
+ *
+ * Iterate over the fences in a struct dma_resv object while holding the
+ * dma_resv::lock. @all_fences controls if the shared fences are returned as
+ * well. The cursor initialisation is part of the iterator.
+ */
+#define dma_resv_for_each_fence(cursor, obj, all_fences, fence)	\
+	for (dma_resv_iter_begin(cursor, obj, all_fences),	\
+	     fence = dma_resv_iter_walk(cursor, true); fence;	\
+	     fence = dma_resv_iter_walk(cursor, false))
 
 #define dma_resv_held(obj) lockdep_is_held(&(obj)->lock.base)
 #define dma_resv_assert_held(obj) lockdep_assert_held(&(obj)->lock.base)

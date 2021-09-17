@@ -385,6 +385,39 @@ struct dma_fence *dma_resv_iter_walk_unlocked(struct dma_resv_iter *cursor,
 EXPORT_SYMBOL_GPL(dma_resv_iter_walk_unlocked);
 
 /**
+ * dma_resv_iter_walk - walk over fences in a dma_resv obj
+ * @cursor: cursor to record the current position
+ * @first: if we should start over
+ *
+ * Return all the fences in the dma_resv object while holding the
+ * dma_resv::lock.
+ */
+struct dma_fence *dma_resv_iter_walk(struct dma_resv_iter *cursor, bool first)
+{
+	dma_resv_assert_held(cursor->obj);
+
+	cursor->is_first = first;
+	if (first) {
+		struct dma_fence *fence;
+
+		cursor->index = -1;
+		cursor->fences = dma_resv_shared_list(cursor->obj);
+
+		fence = dma_resv_excl_fence(cursor->obj);
+		if (fence)
+			return fence;
+	}
+
+	if (!cursor->all_fences || !cursor->fences ||
+	    ++cursor->index >= cursor->fences->shared_count)
+		return NULL;
+
+	return rcu_dereference_protected(cursor->fences->shared[cursor->index],
+					 dma_resv_held(cursor->obj));
+}
+EXPORT_SYMBOL_GPL(dma_resv_iter_walk);
+
+/**
  * dma_resv_copy_fences - Copy all fences from src to dst.
  * @dst: the destination reservation object
  * @src: the source reservation object
