@@ -29,6 +29,14 @@ module_param(phase_snap_threshold, uint, 0);
 MODULE_PARM_DESC(phase_snap_threshold,
 "threshold (1000ns by default) below which adjtime would ignore");
 
+static bool delayed_accurate_adjtime;
+module_param(delayed_accurate_adjtime, bool, false);
+MODULE_PARM_DESC(delayed_accurate_adjtime,
+"set to true to use more accurate adjtime that is delayed to next 1PPS signal");
+
+static char *firmware;
+module_param(firmware, charp, 0);
+
 static void idt82p33_byte_array_to_timespec(struct timespec64 *ts,
 					    u8 buf[TOD_BYTE_COUNT])
 {
@@ -389,25 +397,22 @@ static int _idt82p33_adjfine(struct idt82p33_channel *channel, long scaled_ppm)
 	int err, i;
 	s64 fcw;
 
-	if (scaled_ppm == channel->current_freq_ppb)
-		return 0;
-
 	/*
-	 * Frequency Control Word unit is: 1.68 * 10^-10 ppm
+	 * Frequency Control Word unit is: 1.6861512 * 10^-10 ppm
 	 *
 	 * adjfreq:
-	 *       ppb * 10^9
-	 * FCW = ----------
-	 *          168
+	 *       ppb * 10^14
+	 * FCW = -----------
+	 *         16861512
 	 *
 	 * adjfine:
-	 *       scaled_ppm * 5^12
-	 * FCW = -------------
-	 *         168 * 2^4
+	 *       scaled_ppm * 5^12 * 10^5
+	 * FCW = ------------------------
+	 *            16861512 * 2^4
 	 */
 
-	fcw = scaled_ppm * 244140625ULL;
-	fcw = div_s64(fcw, 2688);
+	fcw = scaled_ppm * 762939453125ULL;
+	fcw = div_s64(fcw, 8430756LL);
 
 	for (i = 0; i < 5; i++) {
 		buf[i] = fcw & 0xff;
@@ -422,10 +427,63 @@ static int _idt82p33_adjfine(struct idt82p33_channel *channel, long scaled_ppm)
 	err = idt82p33_write(idt82p33, channel->dpll_freq_cnfg,
 			     buf, sizeof(buf));
 
-	if (err == 0)
-		channel->current_freq_ppb = scaled_ppm;
-
 	return err;
+}
+
+/* ppb = scaled_ppm * 125 / 2^13 */
+static s32 idt82p33_ddco_scaled_ppm(long current_ppm, s32 ddco_ppb)
+{
+	s64 scaled_ppm = (ddco_ppb << 13) / 125;
+	s64 max_scaled_ppm = (DCO_MAX_PPB << 13) / 125;
+
+	current_ppm += scaled_ppm;
+
+	if (current_ppm > max_scaled_ppm)
+		current_ppm = max_scaled_ppm;
+	else if (current_ppm < -max_scaled_ppm)
+		current_ppm = -max_scaled_ppm;
+
+	return (s32)current_ppm;
+}
+
+static int idt82p33_stop_ddco(struct idt82p33_channel *channel)
+{
+	channel->ddco = false;
+	return _idt82p33_adjfine(channel, channel->current_freq);
+}
+
+static int idt82p33_start_ddco(struct idt82p33_channel *channel, s32 delta_ns)
+{
+	s32 current_ppm = channel->current_freq;
+	u32 duration_ms = MSEC_PER_SEC;
+	s32 ppb;
+	int err;
+
+	/* If the ToD correction is less than 5 nanoseconds, then skip it.
+	 * The error introduced by the ToD adjustment procedure would be bigger
+	 * than the required ToD correction
+	 */
+	if (abs(delta_ns) < DDCO_THRESHOLD_NS)
+		return 0;
+
+	/* For most cases, keep ddco duration 1 second */
+	ppb = delta_ns;
+	while (abs(ppb) > DCO_MAX_PPB) {
+		duration_ms *= 2;
+		ppb /= 2;
+	}
+
+	err = _idt82p33_adjfine(channel,
+				idt82p33_ddco_scaled_ppm(current_ppm, ppb));
+	if (err)
+		return err;
+
+	/* schedule the worker to cancel ddco */
+	ptp_schedule_worker(channel->ptp_clock,
+			    msecs_to_jiffies(duration_ms) - 1);
+	channel->ddco = true;
+
+	return 0;
 }
 
 static int idt82p33_measure_one_byte_write_overhead(
@@ -433,15 +491,13 @@ static int idt82p33_measure_one_byte_write_overhead(
 {
 	struct idt82p33 *idt82p33 = channel->idt82p33;
 	ktime_t start, stop;
+	u8 trigger = 0;
 	s64 total_ns;
-	u8 trigger;
 	int err;
 	u8 i;
 
 	total_ns = 0;
 	*overhead_ns = 0;
-	trigger = TOD_TRIGGER(HW_TOD_WR_TRIG_SEL_MSB_TOD_CNFG,
-			      HW_TOD_RD_TRIG_SEL_LSB_TOD_STS);
 
 	for (i = 0; i < MAX_MEASURMENT_COUNT; i++) {
 
@@ -658,6 +714,20 @@ static int idt82p33_sync_tod(struct idt82p33_channel *channel, bool enable)
 			      &sync_cnfg, sizeof(sync_cnfg));
 }
 
+static long idt82p33_work_handler(struct ptp_clock_info *ptp)
+{
+	struct idt82p33_channel *channel =
+			container_of(ptp, struct idt82p33_channel, caps);
+	struct idt82p33 *idt82p33 = channel->idt82p33;
+
+	mutex_lock(&idt82p33->reg_lock);
+	(void)idt82p33_stop_ddco(channel);
+	mutex_unlock(&idt82p33->reg_lock);
+
+	/* Return a negative value here to not reschedule */
+	return -1;
+}
+
 static int idt82p33_output_enable(struct idt82p33_channel *channel,
 				  bool enable, unsigned int outn)
 {
@@ -743,23 +813,20 @@ static void idt82p33_ptp_clock_unregister_all(struct idt82p33 *idt82p33)
 
 	for (i = 0; i < MAX_PHC_PLL; i++) {
 		channel = &idt82p33->channel[i];
-
 		if (channel->ptp_clock) {
-			channel = &idt82p33->channel[i];
+			cancel_delayed_work_sync(&channel->adjtime_work);
 			ptp_clock_unregister(channel->ptp_clock);
 		}
 	}
 }
 
 static int idt82p33_enable(struct ptp_clock_info *ptp,
-			 struct ptp_clock_request *rq, int on)
+			   struct ptp_clock_request *rq, int on)
 {
 	struct idt82p33_channel *channel =
 			container_of(ptp, struct idt82p33_channel, caps);
 	struct idt82p33 *idt82p33 = channel->idt82p33;
-	int err;
-
-	err = -EOPNOTSUPP;
+	int err = -EOPNOTSUPP;
 
 	mutex_lock(&idt82p33->reg_lock);
 
@@ -769,15 +836,18 @@ static int idt82p33_enable(struct ptp_clock_info *ptp,
 						     &rq->perout);
 		/* Only accept a 1-PPS aligned to the second. */
 		else if (rq->perout.start.nsec || rq->perout.period.sec != 1 ||
-		    rq->perout.period.nsec) {
+			 rq->perout.period.nsec)
 			err = -ERANGE;
-		} else
+		else
 			err = idt82p33_perout_enable(channel, true,
 						     &rq->perout);
 	}
 
 	mutex_unlock(&idt82p33->reg_lock);
 
+	if (err)
+		dev_err(&idt82p33->client->dev,
+			"Failed in %s with err %d!\n", __func__, err);
 	return err;
 }
 
@@ -830,14 +900,18 @@ static int idt82p33_adjfine(struct ptp_clock_info *ptp, long scaled_ppm)
 	struct idt82p33 *idt82p33 = channel->idt82p33;
 	int err;
 
+	if (channel->ddco == true || scaled_ppm == channel->current_freq)
+		return 0;
+
 	mutex_lock(&idt82p33->reg_lock);
 	err = _idt82p33_adjfine(channel, scaled_ppm);
+	if (err == 0)
+		channel->current_freq = scaled_ppm;
 	mutex_unlock(&idt82p33->reg_lock);
 
 	if (err)
 		dev_err(&idt82p33->client->dev,
 			"Failed in %s with err %d!\n", __func__, err);
-
 	return err;
 }
 
@@ -848,20 +922,29 @@ static int idt82p33_adjtime(struct ptp_clock_info *ptp, s64 delta_ns)
 	struct idt82p33 *idt82p33 = channel->idt82p33;
 	int err;
 
+	if (delayed_accurate_adjtime == false) {
+		if (abs(delta_ns) < IMMEDIATE_SNAP_THRESHOLD_NS)
+			return 0;
+		mutex_lock(&idt82p33->reg_lock);
+		err = _idt82p33_adjtime_immediate(channel, delta_ns);
+		mutex_unlock(&idt82p33->reg_lock);
+		goto exit;
+	}
+
+	if (channel->ddco == true)
+		return 0;
+
 	mutex_lock(&idt82p33->reg_lock);
 
 	if (abs(delta_ns) < phase_snap_threshold) {
+		err = idt82p33_start_ddco(channel, delta_ns);
 		mutex_unlock(&idt82p33->reg_lock);
-		return 0;
+		return err;
 	}
 
-	/* Use more accurate internal 1pps triggered write first */
 	err = _idt82p33_adjtime_internal_triggered(channel, delta_ns);
-	if (err && delta_ns > IMMEDIATE_SNAP_THRESHOLD_NS)
-		err = _idt82p33_adjtime_immediate(channel, delta_ns);
-
 	mutex_unlock(&idt82p33->reg_lock);
-
+exit:
 	if (err)
 		dev_err(&idt82p33->client->dev,
 			"Adjtime failed in %s with err %d!\n", __func__, err);
@@ -932,7 +1015,7 @@ static int idt82p33_channel_init(struct idt82p33_channel *channel, int index)
 		return -EINVAL;
 	}
 
-	channel->current_freq_ppb = 0;
+	channel->current_freq = 0;
 
 	return 0;
 }
@@ -940,7 +1023,7 @@ static int idt82p33_channel_init(struct idt82p33_channel *channel, int index)
 static void idt82p33_caps_init(struct ptp_clock_info *caps)
 {
 	caps->owner = THIS_MODULE;
-	caps->max_adj = 92000;
+	caps->max_adj = DCO_MAX_PPB;
 	caps->n_per_out = 11;
 	caps->adjphase = idt82p33_adjwritephase;
 	caps->adjfine = idt82p33_adjfine;
@@ -948,6 +1031,7 @@ static void idt82p33_caps_init(struct ptp_clock_info *caps)
 	caps->gettime64 = idt82p33_gettime;
 	caps->settime64 = idt82p33_settime;
 	caps->enable = idt82p33_enable;
+	caps->do_aux_work = idt82p33_work_handler;
 }
 
 static int idt82p33_enable_channel(struct idt82p33 *idt82p33, u32 index)
@@ -1011,16 +1095,19 @@ static int idt82p33_enable_channel(struct idt82p33 *idt82p33, u32 index)
 
 static int idt82p33_load_firmware(struct idt82p33 *idt82p33)
 {
+	char fname[128] = FW_FILENAME;
 	const struct firmware *fw;
 	struct idt82p33_fwrc *rec;
 	u8 loaddr, page, val;
 	int err;
 	s32 len;
 
-	dev_dbg(&idt82p33->client->dev,
-		"requesting firmware '%s'\n", FW_FILENAME);
+	if (firmware) /* module parameter */
+		snprintf(fname, sizeof(fname), "%s", firmware);
 
-	err = request_firmware(&fw, FW_FILENAME, &idt82p33->client->dev);
+	dev_dbg(&idt82p33->client->dev, "requesting firmware '%s'\n", fname);
+
+	err = request_firmware(&fw, fname, &idt82p33->client->dev);
 
 	if (err) {
 		dev_err(&idt82p33->client->dev,
@@ -1050,13 +1137,8 @@ static int idt82p33_load_firmware(struct idt82p33 *idt82p33)
 		}
 
 		if (err == 0) {
-			/* maximum 8 pages  */
-			if (page >= PAGE_NUM)
-				continue;
-
 			/* Page size 128, last 4 bytes of page skipped */
-			if (((loaddr > 0x7b) && (loaddr <= 0x7f))
-			     || loaddr > 0xfb)
+			if (loaddr > 0x7b)
 				continue;
 
 			err = idt82p33_write(idt82p33, _ADDR(page, loaddr),

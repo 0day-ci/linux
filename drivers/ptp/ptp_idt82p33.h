@@ -92,9 +92,11 @@ enum hw_tod_trig_sel {
 #define FW_FILENAME			"idt82p33xxx.bin"
 #define MAX_PHC_PLL			(2)
 #define TOD_BYTE_COUNT			(10)
+#define DCO_MAX_PPB			(92000)
 #define MAX_MEASURMENT_COUNT		(5)
 #define SNAP_THRESHOLD_NS		(10000)
 #define IMMEDIATE_SNAP_THRESHOLD_NS	(50000)
+#define DDCO_THRESHOLD_NS		(5)
 #define IDT82P33_MAX_WRITE_COUNT	(512)
 
 #define PLLMASK_ADDR_HI	0xFF
@@ -129,7 +131,9 @@ struct idt82p33_channel {
 	struct idt82p33		*idt82p33;
 	enum pll_mode		pll_mode;
 	struct delayed_work	adjtime_work;
-	s32			current_freq_ppb;
+	s32			current_freq;
+	/* double dco mode */
+	bool			ddco;
 	u8			output_mask;
 	u16			dpll_tod_cnfg;
 	u16			dpll_tod_trigger;
