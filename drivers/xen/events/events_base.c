@@ -65,6 +65,7 @@
 #include <xen/interface/vcpu.h>
 #include <xen/xenbus.h>
 #include <asm/hw_irq.h>
+#include <xen/pci.h>
 
 #include "events_internal.h"
 

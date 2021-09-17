@@ -182,7 +182,7 @@ config SWIOTLB_XEN
 
 config XEN_PCIDEV_BACKEND
 	tristate "Xen PCI-device backend driver"
-	depends on PCI && X86 && XEN
+	depends on PCI && XEN
 	depends on XEN_BACKEND
 	default m
 	help
