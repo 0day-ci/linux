@@ -270,51 +270,6 @@ static void bpf_jit_emit_tail_call(u32 *image, struct codegen_context *ctx, u32 
 	/* out: */
 }
 
-/*
- * The caller should check for (BPF_MODE(code) == BPF_PROBE_MEM) before calling
- * this function, as this only applies to BPF_PROBE_MEM, for now.
- */
-static int bpf_add_extable_entry(struct bpf_prog *fp, u32 *image, int pass,
-				 struct codegen_context *ctx, int dst_reg)
-{
-	off_t offset;
-	unsigned long pc;
-	struct exception_table_entry *ex;
-	u32 *fixup;
-
-	/* Populate extable entries only in the last pass */
-	if (pass != 2)
-		return 0;
-
-	if (!fp->aux->extable ||
-	    WARN_ON_ONCE(ctx->exentry_idx >= fp->aux->num_exentries))
-		return -EINVAL;
-
-	pc = (unsigned long)&image[ctx->idx - 1];
-
-	fixup = (void *)fp->aux->extable -
-		(fp->aux->num_exentries * BPF_FIXUP_LEN) +
-		(ctx->exentry_idx * BPF_FIXUP_LEN);
-
-	fixup[0] = PPC_RAW_LI(dst_reg, 0);
-	fixup[1] = PPC_RAW_BRANCH((long)(pc + 4) - (long)&fixup[1]);
-
-	ex = &fp->aux->extable[ctx->exentry_idx];
-
-	offset = pc - (long)&ex->insn;
-	if (WARN_ON_ONCE(offset >= 0 || offset < INT_MIN))
-		return -ERANGE;
-	ex->insn = offset;
-
-	offset = (long)fixup - (long)&ex->fixup;
-	if (WARN_ON_ONCE(offset >= 0 || offset < INT_MIN))
-		return -ERANGE;
-	ex->fixup = offset;
-
-	ctx->exentry_idx++;
-	return 0;
-}
-
 /* Assemble the body code between the prologue & epilogue */
 int bpf_jit_build_body(struct bpf_prog *fp, u32 *image, struct codegen_context *ctx,
 		       u32 *addrs, int pass)
@@ -811,7 +766,8 @@ emit_clear:
 				addrs[++i] = ctx->idx * 4;
 
 			if (BPF_MODE(code) == BPF_PROBE_MEM) {
-				ret = bpf_add_extable_entry(fp, image, pass, ctx, dst_reg);
+				ret = bpf_add_extable_entry(fp, image, pass, ctx, ctx->idx - 1,
+							    4, dst_reg);
 				if (ret)
 					return ret;
 			}
