@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0
 # Intel pin control drivers
-
-if (X86 || COMPILE_TEST)
+menu "Intel pinctrl drivers"
+	depends on X86 || COMPILE_TEST
 
 config PINCTRL_BAYTRAIL
 	bool "Intel Baytrail GPIO pin control"
@@ -163,9 +163,9 @@ config PINCTRL_SUNRISEPOINT
 config PINCTRL_TIGERLAKE
 	tristate "Intel Tiger Lake pinctrl and GPIO driver"
 	depends on ACPI
-	select PINCTRL_INTEL
 	help
 	  This pinctrl driver provides an interface that allows configuring
 	  of Intel Tiger Lake PCH pins and using them as GPIOs.
 
-endif
+endmenu
+
