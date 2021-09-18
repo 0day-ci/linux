@@ -728,6 +728,24 @@ static int tps6598x_probe(struct i2c_client *client)
 			dev_err(&client->dev, "failed to register partner\n");
 	}
 
+	if (tps->hw->use_int1) {
+		ret = tps6598x_write64(tps, TPS_REG_INT_MASK1,
+					tps->hw->irq_power_status_update |
+					tps->hw->irq_data_status_update |
+					tps->hw->irq_plug_event);
+		if (ret)
+			goto err_role_put;
+	}
+
+	if (tps->hw->use_int2) {
+		ret = tps6598x_write64(tps, TPS_REG_INT_MASK2,
+					tps->hw->irq_power_status_update |
+					tps->hw->irq_data_status_update |
+					tps->hw->irq_plug_event);
+		if (ret)
+			goto err_role_put;
+	}
+
 	ret = devm_request_threaded_irq(&client->dev, client->irq, NULL,
 					tps6598x_interrupt,
 					IRQF_SHARED | IRQF_ONESHOT,
