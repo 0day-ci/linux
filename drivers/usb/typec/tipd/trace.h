@@ -67,6 +67,13 @@
 		{ TPS_REG_INT_USER_VID_ALT_MODE_ATTN_VDM,	"USER_VID_ALT_MODE_ATTN_VDM" }, \
 		{ TPS_REG_INT_USER_VID_ALT_MODE_OTHER_VDM,	"USER_VID_ALT_MODE_OTHER_VDM" })
 
+#define show_cd321x_irq_flags(flags) \
+	__print_flags_u64(flags, "|", \
+		{ APPLE_TPS_REG_INT_PLUG_EVENT,			"PLUG_EVENT" }, \
+		{ APPLE_TPS_REG_INT_POWER_STATUS_UPDATE,	"POWER_STATUS_UPDATE" }, \
+		{ APPLE_TPS_REG_INT_STATUS_UPDATE,		"DATA_STATUS_UPDATE" }, \
+		{ APPLE_TPS_REG_INT_PLUG_EVENT,			"STATUS_UPDATE" })
+
 #define TPS6598X_STATUS_FLAGS_MASK (GENMASK(31, 0) ^ (TPS_STATUS_CONN_STATE_MASK | \
 						      TPS_STATUS_PP_5V0_SWITCH_MASK | \
 						      TPS_STATUS_PP_HV_SWITCH_MASK | \
@@ -205,6 +212,26 @@ TRACE_EVENT(tps6598x_irq,
 	    TP_printk("event1=%s, event2=%s",
 		      show_irq_flags(__entry->event1),
 		      show_irq_flags(__entry->event2))
+);
+
+TRACE_EVENT(cd321x_irq,
+	    TP_PROTO(u64 event1,
+		     u64 event2),
+	    TP_ARGS(event1, event2),
+
+	    TP_STRUCT__entry(
+			     __field(u64, event1)
+			     __field(u64, event2)
+			     ),
+
+	    TP_fast_assign(
+			   __entry->event1 = event1;
+			   __entry->event2 = event2;
+			   ),
+
+	    TP_printk("event1=%s, event2=%s",
+		      show_cd321x_irq_flags(__entry->event1),
+		      show_cd321x_irq_flags(__entry->event2))
 );
 
 TRACE_EVENT(tps6598x_status,

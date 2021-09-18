@@ -788,8 +788,18 @@ static const struct tps6598x_hw ti_tps6598x_data = {
 	.irq_trace = trace_tps6598x_irq,
 };
 
+static const struct tps6598x_hw apple_cd321x_data = {
+	.use_int1 = true,
+	.use_int2 = false,
+	.irq_power_status_update = APPLE_TPS_REG_INT_POWER_STATUS_UPDATE,
+	.irq_data_status_update = APPLE_TPS_REG_INT_DATA_STATUS_UPDATE,
+	.irq_plug_event = APPLE_TPS_REG_INT_PLUG_EVENT,
+	.irq_trace = trace_cd321x_irq,
+};
+
 static const struct of_device_id tps6598x_of_match[] = {
 	{ .compatible = "ti,tps6598x", .data = &ti_tps6598x_data },
+	{ .compatible = "apple,cd321x", .data = &apple_cd321x_data },
 	{}
 };
 MODULE_DEVICE_TABLE(of, tps6598x_of_match);
