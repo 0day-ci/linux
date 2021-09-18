@@ -547,9 +547,7 @@ free_adapter:
 	if (status != _SUCCESS) {
 		if (pnetdev)
 			rtw_free_netdev(pnetdev);
-		else if (padapter)
-			vfree(padapter);
-		padapter = NULL;
+		vfree(padapter);
 	}
 exit:
 	return padapter;
