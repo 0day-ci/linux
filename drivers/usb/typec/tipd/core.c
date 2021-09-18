@@ -9,6 +9,7 @@
 #include <linux/i2c.h>
 #include <linux/acpi.h>
 #include <linux/module.h>
+#include <linux/of_device.h>
 #include <linux/power_supply.h>
 #include <linux/regmap.h>
 #include <linux/interrupt.h>
@@ -76,6 +77,10 @@ static const char *const modes[] = {
 /* Unrecognized commands will be replaced with "!CMD" */
 #define INVALID_CMD(_cmd_)		(_cmd_ == 0x444d4321)
 
+struct tps6598x_hw {
+};
+static const struct tps6598x_hw ti_tps6598x_data;
+
 struct tps6598x {
 	struct device *dev;
 	struct regmap *regmap;
@@ -91,6 +96,8 @@ struct tps6598x {
 	struct power_supply *psy;
 	struct power_supply_desc psy_desc;
 	enum power_supply_usb_type usb_type;
+
+	const struct tps6598x_hw *hw;
 };
 
 static enum power_supply_property tps6598x_psy_props[] = {
@@ -590,6 +597,13 @@ static int tps6598x_probe(struct i2c_client *client)
 	if (!tps)
 		return -ENOMEM;
 
+	if (client->dev.of_node)
+		tps->hw = of_device_get_match_data(&client->dev);
+	else
+		tps->hw = &ti_tps6598x_data;
+	if (!tps->hw)
+		return -EINVAL;
+
 	mutex_init(&tps->lock);
 	tps->dev = &client->dev;
 
@@ -729,8 +743,11 @@ static int tps6598x_remove(struct i2c_client *client)
 	return 0;
 }
 
+static const struct tps6598x_hw ti_tps6598x_data = {
+};
+
 static const struct of_device_id tps6598x_of_match[] = {
-	{ .compatible = "ti,tps6598x", },
+	{ .compatible = "ti,tps6598x", .data = &ti_tps6598x_data },
 	{}
 };
 MODULE_DEVICE_TABLE(of, tps6598x_of_match);
