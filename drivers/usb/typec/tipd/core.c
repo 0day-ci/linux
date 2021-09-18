@@ -78,6 +78,8 @@ static const char *const modes[] = {
 #define INVALID_CMD(_cmd_)		(_cmd_ == 0x444d4321)
 
 struct tps6598x_hw {
+	bool use_int1;
+	bool use_int2;
 };
 static const struct tps6598x_hw ti_tps6598x_data;
 
@@ -411,21 +413,27 @@ static const struct typec_operations tps6598x_ops = {
 static irqreturn_t tps6598x_interrupt(int irq, void *data)
 {
 	struct tps6598x *tps = data;
-	u64 event1;
-	u64 event2;
+	u64 event1 = 0;
+	u64 event2 = 0;
+	u64 event = 0;
 	u32 status, data_status;
 	u16 pwr_status;
 	int ret;
 
 	mutex_lock(&tps->lock);
 
-	ret = tps6598x_read64(tps, TPS_REG_INT_EVENT1, &event1);
-	ret |= tps6598x_read64(tps, TPS_REG_INT_EVENT2, &event2);
+	ret = 0;
+	if (tps->hw->use_int1)
+		ret |= tps6598x_read64(tps, TPS_REG_INT_EVENT1, &event1);
+	if (tps->hw->use_int2)
+		ret |= tps6598x_read64(tps, TPS_REG_INT_EVENT2, &event2);
 	if (ret) {
 		dev_err(tps->dev, "%s: failed to read events\n", __func__);
 		goto err_unlock;
 	}
 	trace_tps6598x_irq(event1, event2);
+
+	event = event1 | event2;
 
 	ret = tps6598x_read32(tps, TPS_REG_STATUS, &status);
 	if (ret) {
@@ -434,7 +442,7 @@ static irqreturn_t tps6598x_interrupt(int irq, void *data)
 	}
 	trace_tps6598x_status(status);
 
-	if ((event1 | event2) & TPS_REG_INT_POWER_STATUS_UPDATE) {
+	if (event & TPS_REG_INT_POWER_STATUS_UPDATE) {
 		ret = tps6598x_read16(tps, TPS_REG_POWER_STATUS, &pwr_status);
 		if (ret < 0) {
 			dev_err(tps->dev, "failed to read power status: %d\n", ret);
@@ -443,7 +451,7 @@ static irqreturn_t tps6598x_interrupt(int irq, void *data)
 		trace_tps6598x_power_status(pwr_status);
 	}
 
-	if ((event1 | event2) & TPS_REG_INT_DATA_STATUS_UPDATE) {
+	if (event & TPS_REG_INT_DATA_STATUS_UPDATE) {
 		ret = tps6598x_read32(tps, TPS_REG_DATA_STATUS, &data_status);
 		if (ret < 0) {
 			dev_err(tps->dev, "failed to read data status: %d\n", ret);
@@ -453,7 +461,7 @@ static irqreturn_t tps6598x_interrupt(int irq, void *data)
 	}
 
 	/* Handle plug insert or removal */
-	if ((event1 | event2) & TPS_REG_INT_PLUG_EVENT) {
+	if (event & TPS_REG_INT_PLUG_EVENT) {
 		if (status & TPS_STATUS_PLUG_PRESENT) {
 			ret = tps6598x_connect(tps, status);
 			if (ret)
@@ -465,8 +473,10 @@ static irqreturn_t tps6598x_interrupt(int irq, void *data)
 	}
 
 err_clear_ints:
-	tps6598x_write64(tps, TPS_REG_INT_CLEAR1, event1);
-	tps6598x_write64(tps, TPS_REG_INT_CLEAR2, event2);
+	if (tps->hw->use_int1)
+		tps6598x_write64(tps, TPS_REG_INT_CLEAR1, event1);
+	if (tps->hw->use_int2)
+		tps6598x_write64(tps, TPS_REG_INT_CLEAR2, event2);
 
 err_unlock:
 	mutex_unlock(&tps->lock);
@@ -744,6 +754,8 @@ static int tps6598x_remove(struct i2c_client *client)
 }
 
 static const struct tps6598x_hw ti_tps6598x_data = {
+	.use_int1 = true,
+	.use_int2 = true,
 };
 
 static const struct of_device_id tps6598x_of_match[] = {
