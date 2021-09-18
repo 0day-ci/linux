@@ -868,7 +868,28 @@ static void dytc_profile_refresh(struct ideapad_private *priv)
 	}
 }
 
-static int ideapad_dytc_profile_init(struct ideapad_private *priv)
+static int ideapad_dytc_v4_whitelist(struct platform_device *pdev)
+{
+	const char *vendor = dmi_get_system_info(DMI_SYS_VENDOR);
+	const char *product = dmi_get_system_info(DMI_PRODUCT_NAME);
+
+	if ( product ) {
+		if ( vendor ) {
+			dev_info(&pdev->dev, "DYTC Vendor: %s\n", vendor);
+		}
+
+		dev_info(&pdev->dev, "DYTC Product: %s\n", product);
+
+		if ( ! strncmp(product, "82L5", 4) ) /* IdeaPad 5 Pro 16ACH6 */ {
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
+static int ideapad_dytc_profile_init(struct platform_device *pdev,
+				struct ideapad_private *priv)
 {
 	int err, dytc_version;
 	unsigned long output;
@@ -883,11 +904,21 @@ static int ideapad_dytc_profile_init(struct ideapad_private *priv)
 
 	/* Check DYTC is enabled and supports mode setting */
 	if (!test_bit(DYTC_QUERY_ENABLE_BIT, &output))
+	{
+		dev_info(&pdev->dev, "DYTC_QUERY_ENABLE_BIT returned false\n");
 		return -ENODEV;
+	}
 
 	dytc_version = (output >> DYTC_QUERY_REV_BIT) & 0xF;
+
 	if (dytc_version < 5)
-		return -ENODEV;
+	{
+		if ( dytc_version < 4 || ! ideapad_dytc_v4_whitelist(pdev) )
+		{
+			dev_info(&pdev->dev, "DYTC_VERSION is less than 4 or is not whitelisted: %d\n", dytc_version);
+			return -ENODEV;
+		}
+	}
 
 	priv->dytc = kzalloc(sizeof(*priv->dytc), GFP_KERNEL);
 	if (!priv->dytc)
@@ -1595,7 +1626,7 @@ static int ideapad_acpi_add(struct platform_device *pdev)
 	ideapad_sync_rfk_state(priv);
 	ideapad_sync_touchpad_state(priv);
 
-	err = ideapad_dytc_profile_init(priv);
+	err = ideapad_dytc_profile_init(pdev, priv);
 	if (err) {
 		if (err != -ENODEV)
 			dev_warn(&pdev->dev, "Could not set up DYTC interface: %d\n", err);
