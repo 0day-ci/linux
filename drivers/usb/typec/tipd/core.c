@@ -434,6 +434,8 @@ static irqreturn_t tps6598x_interrupt(int irq, void *data)
 	trace_tps6598x_irq(event1, event2);
 
 	event = event1 | event2;
+	if (!event)
+		goto err_unlock;
 
 	ret = tps6598x_read32(tps, TPS_REG_STATUS, &status);
 	if (ret) {
@@ -481,7 +483,9 @@ err_clear_ints:
 err_unlock:
 	mutex_unlock(&tps->lock);
 
-	return IRQ_HANDLED;
+	if (event)
+		return IRQ_HANDLED;
+	return IRQ_NONE;
 }
 
 static int tps6598x_check_mode(struct tps6598x *tps)
