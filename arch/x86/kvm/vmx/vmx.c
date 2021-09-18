@@ -6054,7 +6054,8 @@ static int vmx_handle_exit(struct kvm_vcpu *vcpu, fastpath_t exit_fastpath)
 	 * still need to exit to user space when bus lock detected to inform
 	 * that there is a bus lock in guest.
 	 */
-	if (to_vmx(vcpu)->exit_reason.bus_lock_detected) {
+	if (to_vmx(vcpu)->exit_reason.bus_lock_detected &&
+			to_vmx(vcpu)->exit_reason.basic != EXIT_REASON_BUS_LOCK) {
 		if (ret > 0)
 			vcpu->run->exit_reason = KVM_EXIT_X86_BUS_LOCK;
 
