@@ -523,7 +523,7 @@ static bool it66121_is_hpd_detect(struct it66121_ctx *ctx)
 	if (regmap_read(ctx->regmap, IT66121_SYS_STATUS_REG, &val))
 		return false;
 
-	return val & IT66121_SYS_STATUS_HPDETECT;
+	return ((val & IT66121_SYS_STATUS_HPDETECT) && (val & IT66121_SYS_STATUS_SENDECTECT));
 }
 
 static int it66121_bridge_attach(struct drm_bridge *bridge,
