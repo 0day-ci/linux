@@ -1008,7 +1008,7 @@ struct attribute_set {
 
 struct attribute_set_obj {
 	struct attribute_set s;
-	struct attribute *a;
+	struct attribute *a[];
 } __attribute__((packed));
 
 static struct attribute_set *create_attr_set(unsigned int max_members,
@@ -1020,13 +1020,11 @@ static struct attribute_set *create_attr_set(unsigned int max_members,
 		return NULL;
 
 	/* Allocates space for implicit NULL at the end too */
-	sobj = kzalloc(sizeof(struct attribute_set_obj) +
-		    max_members * sizeof(struct attribute *),
-		    GFP_KERNEL);
+	sobj = kzalloc(struct_size(sobj, a, max_members + 1), GFP_KERNEL);
 	if (!sobj)
 		return NULL;
 	sobj->s.max_members = max_members;
-	sobj->s.group.attrs = &sobj->a;
+	sobj->s.group.attrs = sobj->a;
 	sobj->s.group.name = name;
 
 	return &sobj->s;
