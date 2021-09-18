@@ -1102,8 +1102,13 @@ static void __mptcp_clean_una(struct sock *sk)
 		msk->recovery = false;
 
 out:
-	if (cleaned && tcp_under_memory_pressure(sk))
-		__mptcp_mem_reclaim_partial(sk);
+	if (cleaned) {
+		if (mptcp_is_data_contiguous(msk))
+			msk->last_retrans_seq = msk->snd_una - 1;
+
+		if (tcp_under_memory_pressure(sk))
+			__mptcp_mem_reclaim_partial(sk);
+	}
 
 	if (snd_una == READ_ONCE(msk->snd_nxt) &&
 	    snd_una == READ_ONCE(msk->write_seq)) {
@@ -2419,6 +2424,7 @@ static void __mptcp_retrans(struct sock *sk)
 	struct mptcp_data_frag *dfrag;
 	size_t copied = 0;
 	struct sock *ssk;
+	u64 retrans_seq;
 	int ret;
 
 	mptcp_clean_una_wakeup(sk);
@@ -2464,6 +2470,9 @@ static void __mptcp_retrans(struct sock *sk)
 		dfrag->already_sent = max(dfrag->already_sent, info.sent);
 		tcp_push(ssk, 0, info.mss_now, tcp_sk(ssk)->nonagle,
 			 info.size_goal);
+		retrans_seq = dfrag->data_seq + info.sent;
+		if (after64(retrans_seq, msk->last_retrans_seq))
+			msk->last_retrans_seq = retrans_seq;
 	}
 
 	release_sock(ssk);
@@ -2889,6 +2898,7 @@ struct sock *mptcp_sk_clone(const struct sock *sk,
 	msk->snd_una = msk->write_seq;
 	msk->wnd_end = msk->snd_nxt + req->rsk_rcv_wnd;
 	msk->setsockopt_seq = mptcp_sk(sk)->setsockopt_seq;
+	msk->last_retrans_seq = subflow_req->idsn - 1;
 
 	if (mp_opt->suboptions & OPTIONS_MPTCP_MPC) {
 		msk->can_ack = true;
@@ -3145,6 +3155,7 @@ void mptcp_finish_connect(struct sock *ssk)
 	WRITE_ONCE(msk->rcv_wnd_sent, ack_seq);
 	WRITE_ONCE(msk->can_ack, 1);
 	WRITE_ONCE(msk->snd_una, msk->write_seq);
+	WRITE_ONCE(msk->last_retrans_seq, subflow->idsn - 1);
 
 	mptcp_pm_new_connection(msk, ssk, 0);
 
