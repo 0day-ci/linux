@@ -92,6 +92,7 @@ static int intel_th_pci_probe(struct pci_dev *pdev,
 		r++;
 	}
 
+	/* Freed by the release function registered by pcim_enable_device() */
 	err = pci_alloc_irq_vectors(pdev, 1, 8, PCI_IRQ_ALL_TYPES);
 	if (err > 0)
 		for (i = 0; i < err; i++, r++) {
@@ -116,8 +117,6 @@ static void intel_th_pci_remove(struct pci_dev *pdev)
 	struct intel_th *th = pci_get_drvdata(pdev);
 
 	intel_th_free(th);
-
-	pci_free_irq_vectors(pdev);
 }
 
 static const struct intel_th_drvdata intel_th_1x_multi_is_broken = {
