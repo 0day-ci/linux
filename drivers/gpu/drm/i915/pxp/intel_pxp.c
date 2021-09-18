@@ -3,6 +3,7 @@
  * Copyright(c) 2020 Intel Corporation.
  */
 #include "intel_pxp.h"
+#include "intel_pxp_session.h"
 #include "intel_pxp_tee.h"
 #include "gt/intel_context.h"
 #include "i915_drv.h"
@@ -11,6 +12,11 @@ struct intel_gt *pxp_to_gt(const struct intel_pxp *pxp)
 {
 	return container_of(pxp, struct intel_gt, pxp);
 
+}
+
+bool intel_pxp_is_active(const struct intel_pxp *pxp)
+{
+	return pxp->arb_is_valid;
 }
 
 /* KCR register definitions */
@@ -70,6 +76,8 @@ void intel_pxp_init(struct intel_pxp *pxp)
 	if (!HAS_PXP(gt->i915))
 		return;
 
+	mutex_init(&pxp->tee_mutex);
+
 	ret = create_vcs_context(pxp);
 	if (ret)
 		return;
@@ -91,6 +99,8 @@ void intel_pxp_fini(struct intel_pxp *pxp)
 	if (!intel_pxp_is_enabled(pxp))
 		return;
 
+	pxp->arb_is_valid = false;
+
 	intel_pxp_tee_component_fini(pxp);
 
 	destroy_vcs_context(pxp);
@@ -99,6 +109,8 @@ void intel_pxp_fini(struct intel_pxp *pxp)
 void intel_pxp_init_hw(struct intel_pxp *pxp)
 {
 	kcr_pxp_enable(pxp_to_gt(pxp));
+
+	intel_pxp_create_arb_session(pxp);
 }
 
 void intel_pxp_fini_hw(struct intel_pxp *pxp)
