@@ -2823,40 +2823,6 @@ static inline bool pfmemalloc_match_unsafe(struct page *page, gfp_t gfpflags)
 }
 
 /*
- * Check the page->freelist of a page and either transfer the freelist to the
- * per cpu freelist or deactivate the page.
- *
- * The page is still frozen if the return value is not NULL.
- *
- * If this function returns NULL then the page has been unfrozen.
- */
-static inline void *get_freelist(struct kmem_cache *s, struct page *page)
-{
-	struct page new;
-	unsigned long counters;
-	void *freelist;
-
-	lockdep_assert_held(this_cpu_ptr(&s->cpu_slab->lock));
-
-	do {
-		freelist = page->freelist;
-		counters = page->counters;
-
-		new.counters = counters;
-		VM_BUG_ON(!new.frozen);
-
-		new.inuse = page->objects;
-		new.frozen = freelist != NULL;
-
-	} while (!__cmpxchg_double_slab(s, page,
-		freelist, counters,
-		NULL, new.counters,
-		"get_freelist"));
-
-	return freelist;
-}
-
-/*
  * Slow path. The lockless freelist is empty or we need to perform
  * debugging duties.
  *
@@ -2881,6 +2847,7 @@ static void *___slab_alloc(struct kmem_cache *s, gfp_t gfpflags, int node,
 	void *freelist;
 	struct page *page;
 	unsigned long flags;
+	unsigned long counters;
 
 	stat(s, ALLOC_SLOWPATH);
 
@@ -2927,12 +2894,21 @@ redo:
 		local_unlock_irqrestore(&s->cpu_slab->lock, flags);
 		goto reread_page;
 	}
+
 	freelist = c->freelist;
 	if (freelist)
 		goto load_freelist;
 
-	freelist = get_freelist(s, page);
+	/* deactivate page */
+	do {
+		freelist = page->freelist;
+		counters = page->counters;
+	} while (!__cmpxchg_double_slab(s, page,
+		freelist, counters,
+		NULL, counters,
+		"deactivate_page"));
 
+	/* there was no free objects in that page  */
 	if (!freelist) {
 		c->page = NULL;
 		local_unlock_irqrestore(&s->cpu_slab->lock, flags);
