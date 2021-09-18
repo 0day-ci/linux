@@ -2,23 +2,10 @@
 %{
 #define YYDEBUG 1
 #include <math.h>
-#include <stdio.h>
-#include "util.h"
 #include "util/debug.h"
-#include <stdlib.h> // strtod()
+#include "smt.h"
 #define IN_EXPR_Y 1
 #include "expr.h"
-#include "smt.h"
-#include <string.h>
-
-static double d_ratio(double val0, double val1)
-{
-	if (val1 == 0) {
-		return 0;
-	}
-	return  val0 / val1;
-}
-
 %}
 
 %define api.pure full
@@ -33,11 +20,7 @@ static double d_ratio(double val0, double val1)
 	char	*str;
 }
 
-%token EXPR_PARSE EXPR_OTHER EXPR_ERROR
-%token <num> NUMBER
-%token <str> ID
-%destructor { free ($$); } <str>
-%token MIN MAX IF ELSE SMT_ON D_RATIO
+%token ID NUMBER MIN MAX IF ELSE SMT_ON D_RATIO EXPR_ERROR EXPR_PARSE EXPR_OTHER
 %left MIN MAX IF
 %left '|'
 %left '^'
@@ -46,6 +29,9 @@ static double d_ratio(double val0, double val1)
 %left '-' '+'
 %left '*' '/' '%'
 %left NEG NOT
+%type <num> NUMBER
+%type <str> ID
+%destructor { free ($$); } <str>
 %type <num> expr if_expr
 
 %{
@@ -56,6 +42,12 @@ static void expr_error(double *final_val __maybe_unused,
 {
 	pr_debug("%s\n", s);
 }
+
+#define BINARY_LONG_OP(RESULT, OP, LHS, RHS)				\
+	RESULT = (long)LHS OP (long)RHS;
+
+#define BINARY_OP(RESULT, OP, LHS, RHS)					\
+	RESULT = LHS OP RHS;
 
 %}
 %%
@@ -78,49 +70,78 @@ MIN | MAX | IF | ELSE | SMT_ON | NUMBER | '|' | '^' | '&' | '-' | '+' | '*' | '/
 '<' | '>' | D_RATIO
 
 all_expr: if_expr			{ *final_val = $1; }
-	;
 
-if_expr:
-	expr IF expr ELSE expr { $$ = $3 ? $1 : $5; }
-	| expr
-	;
+if_expr: expr IF expr ELSE expr
+{
+	$$ = $3 ? $1 : $5;
+}
+| expr
+;
 
-expr:	  NUMBER
-	| ID			{
-					struct expr_id_data *data;
+expr: NUMBER
+{
+	$$ = $1;
+}
+| ID
+{
+	struct expr_id_data *data;
 
-					$$ = NAN;
-					if (expr__resolve_id(ctx, $1, &data) == 0)
-						$$ = expr_id_data__value(data);
+	$$ = NAN;
+	if (expr__resolve_id(ctx, $1, &data) == 0)
+		$$ = expr_id_data__value(data);
 
-					free($1);
-				}
-	| expr '|' expr		{ $$ = (long)$1 | (long)$3; }
-	| expr '&' expr		{ $$ = (long)$1 & (long)$3; }
-	| expr '^' expr		{ $$ = (long)$1 ^ (long)$3; }
-	| expr '<' expr		{ $$ = $1 < $3; }
-	| expr '>' expr		{ $$ = $1 > $3; }
-	| expr '+' expr		{ $$ = $1 + $3; }
-	| expr '-' expr		{ $$ = $1 - $3; }
-	| expr '*' expr		{ $$ = $1 * $3; }
-	| expr '/' expr		{ if ($3 == 0) {
-					pr_debug("division by zero\n");
-					YYABORT;
-				  }
-				  $$ = $1 / $3;
-	                        }
-	| expr '%' expr		{ if ((long)$3 == 0) {
-					pr_debug("division by zero\n");
-					YYABORT;
-				  }
-				  $$ = (long)$1 % (long)$3;
-	                        }
-	| '-' expr %prec NEG	{ $$ = -$2; }
-	| '(' if_expr ')'	{ $$ = $2; }
-	| MIN '(' expr ',' expr ')' { $$ = $3 < $5 ? $3 : $5; }
-	| MAX '(' expr ',' expr ')' { $$ = $3 > $5 ? $3 : $5; }
-	| SMT_ON		 { $$ = smt_on() > 0; }
-	| D_RATIO '(' expr ',' expr ')' { $$ = d_ratio($3,$5); }
-	;
-
-%%
+	free($1);
+}
+| expr '|' expr { BINARY_LONG_OP($$, |, $1, $3); }
+| expr '&' expr { BINARY_LONG_OP($$, &, $1, $3); }
+| expr '^' expr { BINARY_LONG_OP($$, ^, $1, $3); }
+| expr '<' expr { BINARY_OP($$, <, $1, $3); }
+| expr '>' expr { BINARY_OP($$, >, $1, $3); }
+| expr '+' expr { BINARY_OP($$, +, $1, $3); }
+| expr '-' expr { BINARY_OP($$, -, $1, $3); }
+| expr '*' expr { BINARY_OP($$, *, $1, $3); }
+| expr '/' expr
+{
+	if ($3 == 0) {
+		pr_debug("division by zero\n");
+		YYABORT;
+	}
+	$$ = $1 / $3;
+}
+| expr '%' expr
+{
+	if ((long)$3 == 0) {
+		pr_debug("division by zero\n");
+		YYABORT;
+	}
+	$$ = (long)$1 % (long)$3;
+}
+| D_RATIO '(' expr ',' expr ')'
+{
+	if ($5 == 0) {
+		$$ = 0;
+	} else {
+		$$ = $3 / $5;
+	}
+}
+| '-' expr %prec NEG
+{
+	$$ = -$2;
+}
+| '(' if_expr ')'
+{
+	$$ = $2;
+}
+| MIN '(' expr ',' expr ')'
+{
+	$$ = $3 < $5 ? $3 : $5;
+}
+| MAX '(' expr ',' expr ')'
+{
+	$$ = $3 > $5 ? $3 : $5;
+}
+| SMT_ON
+{
+	$$ = smt_on() > 0 ? 1.0 : 0.0;
+}
+;
