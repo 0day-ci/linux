@@ -217,7 +217,7 @@
 };
 
 &pcie0 {
-	pci@1,0 {
+	pci@0,0 {
 		#address-cells = <3>;
 		#size-cells = <2>;
 		ranges;
