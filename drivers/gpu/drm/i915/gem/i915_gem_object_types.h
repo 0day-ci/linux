@@ -298,6 +298,7 @@ struct drm_i915_gem_object {
 			     I915_BO_ALLOC_USER)
 #define I915_BO_READONLY         BIT(4)
 #define I915_TILING_QUIRK_BIT    5 /* unknown swizzling; do not release! */
+#define I915_BO_PROTECTED        BIT(6)
 
 	/**
 	 * @mem_flags - Mutable placement-related flags
@@ -536,6 +537,13 @@ struct drm_i915_gem_object {
 		struct i915_gem_object_page_iter get_io_page;
 		bool created:1;
 	} ttm;
+
+	/*
+	 * Record which PXP key instance this object was created against (if
+	 * any), so we can use it to determine if the encryption is valid by
+	 * comparing against the current key instance.
+	 */
+	u32 pxp_key_instance;
 
 	/** Record of address bit 17 of each page at last unbind. */
 	unsigned long *bit_17;
