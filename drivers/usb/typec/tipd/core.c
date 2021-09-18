@@ -80,6 +80,10 @@ static const char *const modes[] = {
 struct tps6598x_hw {
 	bool use_int1;
 	bool use_int2;
+	unsigned int irq_power_status_update;
+	unsigned int irq_data_status_update;
+	unsigned int irq_plug_event;
+	void (*irq_trace)(u64 event1, u64 event2);
 };
 static const struct tps6598x_hw ti_tps6598x_data;
 
@@ -431,7 +435,7 @@ static irqreturn_t tps6598x_interrupt(int irq, void *data)
 		dev_err(tps->dev, "%s: failed to read events\n", __func__);
 		goto err_unlock;
 	}
-	trace_tps6598x_irq(event1, event2);
+	tps->hw->irq_trace(event1, event2);
 
 	event = event1 | event2;
 	if (!event)
@@ -444,7 +448,7 @@ static irqreturn_t tps6598x_interrupt(int irq, void *data)
 	}
 	trace_tps6598x_status(status);
 
-	if (event & TPS_REG_INT_POWER_STATUS_UPDATE) {
+	if (event & tps->hw->irq_power_status_update) {
 		ret = tps6598x_read16(tps, TPS_REG_POWER_STATUS, &pwr_status);
 		if (ret < 0) {
 			dev_err(tps->dev, "failed to read power status: %d\n", ret);
@@ -453,7 +457,7 @@ static irqreturn_t tps6598x_interrupt(int irq, void *data)
 		trace_tps6598x_power_status(pwr_status);
 	}
 
-	if (event & TPS_REG_INT_DATA_STATUS_UPDATE) {
+	if (event & tps->hw->irq_data_status_update) {
 		ret = tps6598x_read32(tps, TPS_REG_DATA_STATUS, &data_status);
 		if (ret < 0) {
 			dev_err(tps->dev, "failed to read data status: %d\n", ret);
@@ -463,7 +467,7 @@ static irqreturn_t tps6598x_interrupt(int irq, void *data)
 	}
 
 	/* Handle plug insert or removal */
-	if (event & TPS_REG_INT_PLUG_EVENT) {
+	if (event & tps->hw->irq_plug_event) {
 		if (status & TPS_STATUS_PLUG_PRESENT) {
 			ret = tps6598x_connect(tps, status);
 			if (ret)
@@ -760,6 +764,10 @@ static int tps6598x_remove(struct i2c_client *client)
 static const struct tps6598x_hw ti_tps6598x_data = {
 	.use_int1 = true,
 	.use_int2 = true,
+	.irq_power_status_update = TPS_REG_INT_POWER_STATUS_UPDATE,
+	.irq_data_status_update = TPS_REG_INT_DATA_STATUS_UPDATE,
+	.irq_plug_event = TPS_REG_INT_PLUG_EVENT,
+	.irq_trace = trace_tps6598x_irq,
 };
 
 static const struct of_device_id tps6598x_of_match[] = {
