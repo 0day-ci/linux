@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: GPL-2.0-only
+menu "Clock driver support for Broadcom"
 
 config CLK_BCM2711_DVP
 	tristate "Broadcom BCM2711 DVP support"
@@ -100,3 +101,5 @@ config CLK_RASPBERRYPI
 	help
 	  Enable common clock framework support for Raspberry Pi's firmware
 	  dependent clocks
+
+endmenu
