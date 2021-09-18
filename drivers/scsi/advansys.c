@@ -7465,6 +7465,7 @@ static int asc_build_req(struct asc_board *boardp, struct scsi_cmnd *scp,
 		return ASC_BUSY;
 	} else if (use_sg > 0) {
 		int sgcnt;
+		size_t size;
 		struct scatterlist *slp;
 		struct asc_sg_head *asc_sg_head;
 
@@ -7477,8 +7478,8 @@ static int asc_build_req(struct asc_board *boardp, struct scsi_cmnd *scp,
 			return ASC_ERROR;
 		}
 
-		asc_sg_head = kzalloc(sizeof(asc_scsi_q->sg_head) +
-			use_sg * sizeof(struct asc_sg_list), GFP_ATOMIC);
+		size = struct_size(asc_scsi_q->sg_head, sg_list, use_sg);
+		asc_sg_head = kzalloc(size, GFP_ATOMIC);
 		if (!asc_sg_head) {
 			scsi_dma_unmap(scp);
 			set_host_byte(scp, DID_SOFT_ERROR);
