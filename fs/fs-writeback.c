@@ -624,8 +624,8 @@ bool cleanup_offline_cgwb(struct bdi_writeback *wb)
 	int nr;
 	bool restart = false;
 
-	isw = kzalloc(sizeof(*isw) + WB_MAX_INODES_PER_ISW *
-		      sizeof(struct inode *), GFP_KERNEL);
+	isw = kzalloc(struct_size(isw, inodes, WB_MAX_INODES_PER_ISW),
+		      GFP_KERNEL);
 	if (!isw)
 		return restart;
 
