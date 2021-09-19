@@ -76,9 +76,8 @@ void show_swap_cache_info(void)
 	printk("Swap cache stats: add %lu, delete %lu, find %lu/%lu\n",
 		swap_cache_info.add_total, swap_cache_info.del_total,
 		swap_cache_info.find_success, swap_cache_info.find_total);
-	printk("Free swap  = %ldkB\n",
-		get_nr_swap_pages() << (PAGE_SHIFT - 10));
-	printk("Total swap = %lukB\n", total_swap_pages << (PAGE_SHIFT - 10));
+	printk("Free swap  = %ldkB\n", PG2KB(get_nr_swap_pages()));
+	printk("Total swap = %lukB\n", PG2KB(total_swap_pages));
 }
 
 void *get_shadow_from_swap_cache(swp_entry_t entry)

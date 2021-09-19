@@ -50,7 +50,7 @@
  * Try to keep balance_dirty_pages() call intervals higher than this many pages
  * by raising pause time to max_pause when falls below it.
  */
-#define DIRTY_POLL_THRESH	(128 >> (PAGE_SHIFT - 10))
+#define DIRTY_POLL_THRESH	KB2PG(128)
 
 /*
  * Estimate write bandwidth at 200ms intervals.
@@ -1893,7 +1893,7 @@ void balance_dirty_pages_ratelimited(struct address_space *mapping)
 
 	ratelimit = current->nr_dirtied_pause;
 	if (wb->dirty_exceeded)
-		ratelimit = min(ratelimit, 32 >> (PAGE_SHIFT - 10));
+		ratelimit = min(ratelimit, KB2PG(32));
 
 	preempt_disable();
 	/*

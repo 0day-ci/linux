@@ -355,8 +355,7 @@ setup_memory(void *kernel_end)
 	if (mem_size_limit && max_low_pfn >= mem_size_limit)
 	{
 		printk("setup: forcing memory size to %ldK (from %ldK).\n",
-		       mem_size_limit << (PAGE_SHIFT - 10),
-		       max_low_pfn    << (PAGE_SHIFT - 10));
+		       PG2KB(mem_size_limit), PG2KB(max_low_pfn));
 		max_low_pfn = mem_size_limit;
 	}
 

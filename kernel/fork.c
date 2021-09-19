@@ -2325,7 +2325,7 @@ static __latent_entropy struct task_struct *copy_process(
 	}
 
 	p->nr_dirtied = 0;
-	p->nr_dirtied_pause = 128 >> (PAGE_SHIFT - 10);
+	p->nr_dirtied_pause = KB2PG(128);
 	p->dirty_paused_when = 0;
 
 	p->pdeath_signal = 0;

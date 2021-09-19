@@ -32,6 +32,7 @@
 #include <drm/ttm/ttm_bo_driver.h>
 #include <drm/ttm/ttm_placement.h>
 #include <linux/idr.h>
+#include <linux/mm.h>
 #include <linux/spinlock.h>
 #include <linux/kernel.h>
 
@@ -92,14 +93,14 @@ static int vmw_gmrid_man_get_node(struct ttm_resource_manager *man,
 				new_max_pages = gman->max_gmr_pages * 2;
 			if (new_max_pages > gman->max_gmr_pages && new_max_pages >= gman->used_gmr_pages) {
 				DRM_WARN("vmwgfx: increasing guest mob limits to %u kB.\n",
-					 ((new_max_pages) << (PAGE_SHIFT - 10)));
+					 PG2KB(new_max_pages));
 
 				gman->max_gmr_pages = new_max_pages;
 			} else {
 				char buf[256];
 				snprintf(buf, sizeof(buf),
 					 "vmwgfx, error: guest graphics is out of memory (mob limit at: %ukB).\n",
-					 ((gman->max_gmr_pages) << (PAGE_SHIFT - 10)));
+					 PG2KB(gman->max_gmr_pages));
 				vmw_host_printf(buf);
 				DRM_WARN("%s", buf);
 				goto nospace;

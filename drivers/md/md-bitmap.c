@@ -17,6 +17,7 @@
  */
 
 #include <linux/blkdev.h>
+#include <linux/mm.h>
 #include <linux/module.h>
 #include <linux/errno.h>
 #include <linux/slab.h>
@@ -2038,8 +2039,7 @@ void md_bitmap_status(struct seq_file *seq, struct bitmap *bitmap)
 		   "%lu%s chunk",
 		   counts->pages - counts->missing_pages,
 		   counts->pages,
-		   (counts->pages - counts->missing_pages)
-		   << (PAGE_SHIFT - 10),
+		   PG2KB(counts->pages - counts->missing_pages),
 		   chunk_kb ? chunk_kb : bitmap->mddev->bitmap_info.chunksize,
 		   chunk_kb ? "KB" : "B");
 	if (bitmap->storage.file) {

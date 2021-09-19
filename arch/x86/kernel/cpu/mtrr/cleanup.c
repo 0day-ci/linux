@@ -18,6 +18,7 @@
  * Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 #include <linux/init.h>
+#include <linux/mm.h>
 #include <linux/pci.h>
 #include <linux/smp.h>
 #include <linux/cpu.h>
@@ -204,8 +205,8 @@ static void __init
 save_var_mtrr(unsigned int reg, unsigned long basek, unsigned long sizek,
 	      unsigned char type)
 {
-	range_state[reg].base_pfn = basek >> (PAGE_SHIFT - 10);
-	range_state[reg].size_pfn = sizek >> (PAGE_SHIFT - 10);
+	range_state[reg].base_pfn = KB2PG(basek);
+	range_state[reg].size_pfn = KB2PG(sizek);
 	range_state[reg].type = type;
 }
 
@@ -216,8 +217,8 @@ static void __init set_var_mtrr_all(unsigned int address_bits)
 	unsigned int reg;
 
 	for (reg = 0; reg < num_var_ranges; reg++) {
-		basek = range_state[reg].base_pfn << (PAGE_SHIFT - 10);
-		sizek = range_state[reg].size_pfn << (PAGE_SHIFT - 10);
+		basek = PG2KB(range_state[reg].base_pfn);
+		sizek = PG2KB(range_state[reg].size_pfn);
 		type = range_state[reg].type;
 
 		set_var_mtrr(reg, basek, sizek, type, address_bits);
@@ -415,8 +416,8 @@ set_var_mtrr_range(struct var_mtrr_state *state, unsigned long base_pfn,
 	if (state->reg >= num_var_ranges)
 		return;
 
-	basek = base_pfn << (PAGE_SHIFT - 10);
-	sizek = size_pfn << (PAGE_SHIFT - 10);
+	basek = PG2KB(base_pfn);
+	sizek = PG2KB(size_pfn);
 
 	/* See if I can merge with the last range: */
 	if ((basek <= 1024) ||
@@ -533,12 +534,12 @@ static void __init print_out_mtrr_range_state(void)
 
 	for (i = 0; i < num_var_ranges; i++) {
 
-		size_base = range_state[i].size_pfn << (PAGE_SHIFT - 10);
+		size_base = PG2KB(range_state[i].size_pfn);
 		if (!size_base)
 			continue;
 
 		size_base = to_size_factor(size_base, &size_factor);
-		start_base = range_state[i].base_pfn << (PAGE_SHIFT - 10);
+		start_base = PG2KB(range_state[i].base_pfn);
 		start_base = to_size_factor(start_base, &start_factor);
 		type = range_state[i].type;
 

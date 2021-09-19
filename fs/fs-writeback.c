@@ -34,7 +34,7 @@
 /*
  * 4MB minimal write chunk size
  */
-#define MIN_WRITEBACK_PAGES	(4096UL >> (PAGE_SHIFT - 10))
+#define MIN_WRITEBACK_PAGES	KB2PG(4096UL)
 
 /*
  * Passed into wb_writeback(), essentially a subset of writeback_control

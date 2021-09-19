@@ -8350,7 +8350,7 @@ static void setup_per_zone_lowmem_reserve(void)
 
 static void __setup_per_zone_wmarks(void)
 {
-	unsigned long pages_min = min_free_kbytes >> (PAGE_SHIFT - 10);
+	unsigned long pages_min = KB2PG(min_free_kbytes);
 	unsigned long lowmem_pages = 0;
 	struct zone *zone;
 	unsigned long flags;

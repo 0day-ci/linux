@@ -9,6 +9,7 @@
 #include <linux/completion.h>
 #include <linux/exportfs.h>
 #include <linux/fs.h>
+#include <linux/mm.h>
 #include <linux/mempool.h>
 #include <linux/pagemap.h>
 #include <linux/wait.h>
@@ -908,7 +909,7 @@ static inline int default_congestion_kb(void)
 	 * This allows larger machines to have larger/more transfers.
 	 * Limit the default to 256M
 	 */
-	congestion_kb = (16*int_sqrt(totalram_pages())) << (PAGE_SHIFT-10);
+	congestion_kb = PG2KB(16*int_sqrt(totalram_pages()));
 	if (congestion_kb > 256*1024)
 		congestion_kb = 256*1024;
 

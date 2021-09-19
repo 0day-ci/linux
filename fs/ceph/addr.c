@@ -57,7 +57,7 @@
  * accounting is preserved.
  */
 
-#define CONGESTION_ON_THRESH(congestion_kb) (congestion_kb >> (PAGE_SHIFT-10))
+#define CONGESTION_ON_THRESH(congestion_kb) KB2PG(congestion_kb)
 #define CONGESTION_OFF_THRESH(congestion_kb)				\
 	(CONGESTION_ON_THRESH(congestion_kb) -				\
 	 (CONGESTION_ON_THRESH(congestion_kb) >> 2))

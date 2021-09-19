@@ -4,6 +4,7 @@
 #include <linux/circ_buf.h>
 #include <linux/ctype.h>
 #include <linux/debugfs.h>
+#include <linux/mm.h>
 #include <linux/pm_runtime.h>
 #include <linux/seq_file.h>
 
@@ -203,7 +204,7 @@ static int v3d_debugfs_bo_stats(struct seq_file *m, void *unused)
 	seq_printf(m, "allocated bos:          %d\n",
 		   v3d->bo_stats.num_allocated);
 	seq_printf(m, "allocated bo size (kb): %ld\n",
-		   (long)v3d->bo_stats.pages_allocated << (PAGE_SHIFT - 10));
+		   PG2KB((long)v3d->bo_stats.pages_allocated));
 	mutex_unlock(&v3d->bo_lock);
 
 	return 0;

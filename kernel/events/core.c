@@ -6267,7 +6267,7 @@ again:
 	user_extra = nr_pages + 1;
 
 accounting:
-	user_lock_limit = sysctl_perf_event_mlock >> (PAGE_SHIFT - 10);
+	user_lock_limit = KB2PG(sysctl_perf_event_mlock);
 
 	/*
 	 * Increase the limit linearly with more CPUs:

@@ -4,6 +4,7 @@
  */
 #include <linux/kernel.h>
 #include <linux/slab.h>
+#include <linux/mm.h>
 #include <linux/module.h>
 #include <linux/bio.h>
 #include <linux/blkdev.h>
@@ -92,7 +93,7 @@ static ssize_t queue_ra_show(struct request_queue *q, char *page)
 
 	if (!q->disk)
 		return -EINVAL;
-	ra_kb = q->disk->bdi->ra_pages << (PAGE_SHIFT - 10);
+	ra_kb = PG2KB(q->disk->bdi->ra_pages);
 	return queue_var_show(ra_kb, page);
 }
 
@@ -107,7 +108,7 @@ queue_ra_store(struct request_queue *q, const char *page, size_t count)
 	ret = queue_var_store(&ra_kb, page, count);
 	if (ret < 0)
 		return ret;
-	q->disk->bdi->ra_pages = ra_kb >> (PAGE_SHIFT - 10);
+	q->disk->bdi->ra_pages = KB2PG(ra_kb);
 	return ret;
 }
 
@@ -240,7 +241,7 @@ queue_max_sectors_store(struct request_queue *q, const char *page, size_t count)
 {
 	unsigned long max_sectors_kb,
 		max_hw_sectors_kb = queue_max_hw_sectors(q) >> 1,
-			page_kb = 1 << (PAGE_SHIFT - 10);
+			page_kb = PG2KB(1);
 	ssize_t ret = queue_var_store(&max_sectors_kb, page, count);
 
 	if (ret < 0)
@@ -255,7 +256,7 @@ queue_max_sectors_store(struct request_queue *q, const char *page, size_t count)
 	spin_lock_irq(&q->queue_lock);
 	q->limits.max_sectors = max_sectors_kb << 1;
 	if (q->disk)
-		q->disk->bdi->io_pages = max_sectors_kb >> (PAGE_SHIFT - 10);
+		q->disk->bdi->io_pages = KB2PG(max_sectors_kb);
 	spin_unlock_irq(&q->queue_lock);
 
 	return ret;

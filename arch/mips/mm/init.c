@@ -414,7 +414,7 @@ void __init paging_init(void)
 	if (cpu_has_dc_aliases && max_low_pfn != highend_pfn) {
 		printk(KERN_WARNING "This processor doesn't support highmem."
 		       " %ldk highmem ignored\n",
-		       (highend_pfn - max_low_pfn) << (PAGE_SHIFT - 10));
+		       PG2KB(highend_pfn - max_low_pfn));
 		max_zone_pfns[ZONE_HIGHMEM] = max_low_pfn;
 	}
 #endif

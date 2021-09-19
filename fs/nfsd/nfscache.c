@@ -9,6 +9,7 @@
  * Copyright (C) 1995, 1996 Olaf Kirch <okir@monad.swb.de>
  */
 
+#include <linux/mm.h>
 #include <linux/sunrpc/svc_xprt.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
@@ -70,7 +71,7 @@ nfsd_cache_size_limit(void)
 	unsigned int limit;
 	unsigned long low_pages = totalram_pages() - totalhigh_pages();
 
-	limit = (16 * int_sqrt(low_pages)) << (PAGE_SHIFT-10);
+	limit = PG2KB(16 * int_sqrt(low_pages));
 	return min_t(unsigned int, limit, 256*1024);
 }
 

@@ -25,7 +25,7 @@ void __attribute__((weak)) arch_report_meminfo(struct seq_file *m)
 
 static void show_val_kb(struct seq_file *m, const char *s, unsigned long num)
 {
-	seq_put_decimal_ull_width(m, s, num << (PAGE_SHIFT - 10), 8);
+	seq_put_decimal_ull_width(m, s, PG2KB(num), 8);
 	seq_write(m, " kB\n", 4);
 }
 
@@ -124,7 +124,7 @@ static int meminfo_proc_show(struct seq_file *m, void *v)
 
 #ifdef CONFIG_MEMORY_FAILURE
 	seq_printf(m, "HardwareCorrupted: %5lu kB\n",
-		   atomic_long_read(&num_poisoned_pages) << (PAGE_SHIFT - 10));
+		   PG2KB(atomic_long_read(&num_poisoned_pages)));
 #endif
 
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
