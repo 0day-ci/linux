@@ -2160,7 +2160,8 @@ static int too_many_isolated(struct pglist_data *pgdat, int file,
  * Returns the number of pages moved to the given lruvec.
  */
 static unsigned int move_pages_to_lru(struct lruvec *lruvec,
-				      struct list_head *list)
+				      struct list_head *list,
+				      bool reactivation)
 {
 	int nr_pages, nr_moved = 0;
 	LIST_HEAD(pages_to_free);
@@ -2211,7 +2212,7 @@ static unsigned int move_pages_to_lru(struct lruvec *lruvec,
 		add_page_to_lru_list(page, lruvec);
 		nr_pages = thp_nr_pages(page);
 		nr_moved += nr_pages;
-		if (PageActive(page))
+		if (PageActive(page) && !reactivation)
 			workingset_age_nonresident(lruvec, nr_pages);
 	}
 
@@ -2289,7 +2290,7 @@ shrink_inactive_list(unsigned long nr_to_scan, struct lruvec *lruvec,
 	nr_reclaimed = shrink_page_list(&page_list, pgdat, sc, &stat, false);
 
 	spin_lock_irq(&lruvec->lru_lock);
-	move_pages_to_lru(lruvec, &page_list);
+	move_pages_to_lru(lruvec, &page_list, false);
 
 	__mod_node_page_state(pgdat, NR_ISOLATED_ANON + file, -nr_taken);
 	item = current_is_kswapd() ? PGSTEAL_KSWAPD : PGSTEAL_DIRECT;
@@ -2426,8 +2427,8 @@ static void shrink_active_list(unsigned long nr_to_scan,
 	 */
 	spin_lock_irq(&lruvec->lru_lock);
 
-	nr_activate = move_pages_to_lru(lruvec, &l_active);
-	nr_deactivate = move_pages_to_lru(lruvec, &l_inactive);
+	nr_activate = move_pages_to_lru(lruvec, &l_active, true);
+	nr_deactivate = move_pages_to_lru(lruvec, &l_inactive, false);
 	/* Keep all free pages in l_active list */
 	list_splice(&l_inactive, &l_active);
 
