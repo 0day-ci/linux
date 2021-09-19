@@ -51,6 +51,19 @@ struct iommufd_ioas {
 	bool enforce_snoop;
 	struct iommufd_ctx *ictx;
 	refcount_t refs;
+	struct mutex lock;
+	struct list_head device_list;
+	struct iommu_domain *domain;
+};
+
+/*
+ * An ioas_device_info object is created per each successful attaching
+ * request. A list of objects are maintained per ioas when the address
+ * space is shared by multiple devices.
+ */
+struct ioas_device_info {
+	struct iommufd_device *idev;
+	struct list_head next;
 };
 
 static int iommufd_fops_open(struct inode *inode, struct file *filep)
@@ -119,6 +132,21 @@ static void iommufd_ctx_put(struct iommufd_ctx *ictx)
 	kfree(ictx);
 }
 
+static struct iommufd_ioas *ioasid_get_ioas(struct iommufd_ctx *ictx, int ioasid)
+{
+	struct iommufd_ioas *ioas;
+
+	if (ioasid < 0)
+		return NULL;
+
+	mutex_lock(&ictx->lock);
+	ioas = xa_load(&ictx->ioasid_xa, ioasid);
+	if (ioas)
+		refcount_inc(&ioas->refs);
+	mutex_unlock(&ictx->lock);
+	return ioas;
+}
+
 /* Caller should hold ictx->lock */
 static void ioas_put_locked(struct iommufd_ioas *ioas)
 {
@@ -128,9 +156,26 @@ static void ioas_put_locked(struct iommufd_ioas *ioas)
 	if (!refcount_dec_and_test(&ioas->refs))
 		return;
 
+	WARN_ON(!list_empty(&ioas->device_list));
 	xa_erase(&ictx->ioasid_xa, ioasid);
 	iommufd_ctx_put(ictx);
 	kfree(ioas);
+}
+
+/*
+ * Caller should hold a ictx reference when calling this function
+ * otherwise ictx might be freed in ioas_put_locked() then the last
+ * unlock becomes problematic. Alternatively we could have a fresh
+ * implementation of ioas_put instead of calling the locked function.
+ * In this case it can ensure ictx is freed after mutext_unlock().
+ */
+static void ioas_put(struct iommufd_ioas *ioas)
+{
+	struct iommufd_ctx *ictx = ioas->ictx;
+
+	mutex_lock(&ictx->lock);
+	ioas_put_locked(ioas);
+	mutex_unlock(&ictx->lock);
 }
 
 static int iommufd_ioasid_alloc(struct iommufd_ctx *ictx, unsigned long arg)
@@ -177,6 +222,9 @@ static int iommufd_ioasid_alloc(struct iommufd_ctx *ictx, unsigned long arg)
 
 	iommufd_ctx_get(ictx);
 	ioas->ictx = ictx;
+
+	mutex_init(&ioas->lock);
+	INIT_LIST_HEAD(&ioas->device_list);
 
 	refcount_set(&ioas->refs, 1);
 
@@ -344,6 +392,166 @@ static struct miscdevice iommu_misc_dev = {
 	.mode = 0666,
 };
 
+/* Caller should hold ioas->lock */
+static struct ioas_device_info *ioas_find_device(struct iommufd_ioas *ioas,
+						 struct iommufd_device *idev)
+{
+	struct ioas_device_info *ioas_dev;
+
+	list_for_each_entry(ioas_dev, &ioas->device_list, next) {
+		if (ioas_dev->idev == idev)
+			return ioas_dev;
+	}
+
+	return NULL;
+}
+
+static void ioas_free_domain_if_empty(struct iommufd_ioas *ioas)
+{
+	if (list_empty(&ioas->device_list)) {
+		iommu_domain_free(ioas->domain);
+		ioas->domain = NULL;
+	}
+}
+
+static int ioas_check_device_compatibility(struct iommufd_ioas *ioas,
+					   struct device *dev)
+{
+	bool snoop = false;
+	u32 addr_width;
+	int ret;
+
+	/*
+	 * currently we only support I/O page table with iommu enforce-snoop
+	 * format. Attaching a device which doesn't support this format in its
+	 * upstreaming iommu is rejected.
+	 */
+	ret = iommu_device_get_info(dev, IOMMU_DEV_INFO_FORCE_SNOOP, &snoop);
+	if (ret || !snoop)
+		return -EINVAL;
+
+	ret = iommu_device_get_info(dev, IOMMU_DEV_INFO_ADDR_WIDTH, &addr_width);
+	if (ret || addr_width < ioas->addr_width)
+		return -EINVAL;
+
+	/* TODO: also need to check permitted iova ranges and pgsize bitmap */
+
+	return 0;
+}
+
+/**
+ * iommufd_device_attach_ioasid - attach device to an ioasid
+ * @idev: [in] Pointer to struct iommufd_device.
+ * @ioasid: [in] ioasid points to an I/O address space.
+ *
+ * Returns 0 for successful attach, otherwise returns error.
+ *
+ */
+int iommufd_device_attach_ioasid(struct iommufd_device *idev, int ioasid)
+{
+	struct iommufd_ioas *ioas;
+	struct ioas_device_info *ioas_dev;
+	struct iommu_domain *domain;
+	int ret;
+
+	ioas = ioasid_get_ioas(idev->ictx, ioasid);
+	if (!ioas) {
+		pr_err_ratelimited("Trying to attach illegal or unkonwn IOASID %u\n", ioasid);
+		return -EINVAL;
+	}
+
+	mutex_lock(&ioas->lock);
+
+	/* Check for duplicates */
+	if (ioas_find_device(ioas, idev)) {
+		ret = -EINVAL;
+		goto out_unlock;
+	}
+
+	ret = ioas_check_device_compatibility(ioas, idev->dev);
+	if (ret)
+		goto out_unlock;
+
+	ioas_dev = kzalloc(sizeof(*ioas_dev), GFP_KERNEL);
+	if (!ioas_dev) {
+		ret = -ENOMEM;
+		goto out_unlock;
+	}
+
+	/*
+	 * Each ioas is backed by an iommu domain, which is allocated
+	 * when the ioas is attached for the first time and then shared
+	 * by following devices.
+	 */
+	if (list_empty(&ioas->device_list)) {
+		struct iommu_domain *d;
+
+		d = iommu_domain_alloc(idev->dev->bus);
+		if (!d) {
+			ret = -ENOMEM;
+			goto out_free;
+		}
+		ioas->domain = d;
+	}
+	domain = ioas->domain;
+
+	/* Install the I/O page table to the iommu for this device */
+	ret = iommu_attach_device(domain, idev->dev);
+	if (ret)
+		goto out_domain;
+
+	ioas_dev->idev = idev;
+	list_add(&ioas_dev->next, &ioas->device_list);
+	mutex_unlock(&ioas->lock);
+
+	return 0;
+out_domain:
+	ioas_free_domain_if_empty(ioas);
+out_free:
+	kfree(ioas_dev);
+out_unlock:
+	mutex_unlock(&ioas->lock);
+	ioas_put(ioas);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(iommufd_device_attach_ioasid);
+
+/**
+ * iommufd_device_detach_ioasid - Detach an ioasid from a device.
+ * @idev: [in] Pointer to struct iommufd_device.
+ * @ioasid: [in] ioasid points to an I/O address space.
+ *
+ */
+void iommufd_device_detach_ioasid(struct iommufd_device *idev, int ioasid)
+{
+	struct iommufd_ioas *ioas;
+	struct ioas_device_info *ioas_dev;
+
+	ioas = ioasid_get_ioas(idev->ictx, ioasid);
+	if (!ioas)
+		return;
+
+	mutex_lock(&ioas->lock);
+	ioas_dev = ioas_find_device(ioas, idev);
+	if (!ioas_dev) {
+		mutex_unlock(&ioas->lock);
+		goto out;
+	}
+
+	list_del(&ioas_dev->next);
+	iommu_detach_device(ioas->domain, idev->dev);
+	ioas_free_domain_if_empty(ioas);
+	kfree(ioas_dev);
+	mutex_unlock(&ioas->lock);
+
+	/* release the reference acquired at the start of this function */
+	ioas_put(ioas);
+out:
+	ioas_put(ioas);
+}
+EXPORT_SYMBOL_GPL(iommufd_device_detach_ioasid);
+
 /**
  * iommufd_bind_device - Bind a physical device marked by a device
  *			 cookie to an iommu fd.
@@ -426,8 +634,26 @@ EXPORT_SYMBOL_GPL(iommufd_bind_device);
 void iommufd_unbind_device(struct iommufd_device *idev)
 {
 	struct iommufd_ctx *ictx = idev->ictx;
+	struct iommufd_ioas *ioas;
+	unsigned long index;
 
 	mutex_lock(&ictx->lock);
+	xa_for_each(&ictx->ioasid_xa, index, ioas) {
+		struct ioas_device_info *ioas_dev;
+
+		mutex_lock(&ioas->lock);
+		ioas_dev = ioas_find_device(ioas, idev);
+		if (!ioas_dev) {
+			mutex_unlock(&ioas->lock);
+			continue;
+		}
+		list_del(&ioas_dev->next);
+		iommu_detach_device(ioas->domain, idev->dev);
+		ioas_free_domain_if_empty(ioas);
+		kfree(ioas_dev);
+		mutex_unlock(&ioas->lock);
+		ioas_put_locked(ioas);
+	}
 	xa_erase(&ictx->device_xa, idev->id);
 	mutex_unlock(&ictx->lock);
 	/* Exit the security context */
