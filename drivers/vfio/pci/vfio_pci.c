@@ -557,6 +557,11 @@ static void vfio_pci_release(struct vfio_device *core_vdev)
 		if (vdev->videv) {
 			struct vfio_iommufd_device *videv = vdev->videv;
 
+			if (videv->ioasid != IOMMUFD_INVALID_IOASID) {
+				iommufd_device_detach_ioasid(videv->idev,
+							     videv->ioasid);
+				videv->ioasid = IOMMUFD_INVALID_IOASID;
+			}
 			vdev->videv = NULL;
 			iommufd_unbind_device(videv->idev);
 			kfree(videv);
@@ -839,6 +844,7 @@ static long vfio_pci_ioctl(struct vfio_device *core_vdev,
 		}
 		videv->idev = idev;
 		videv->iommu_fd = bind_data.iommu_fd;
+		videv->ioasid = IOMMUFD_INVALID_IOASID;
 		/*
 		 * A security context has been established. Unblock
 		 * user access.
@@ -846,6 +852,82 @@ static long vfio_pci_ioctl(struct vfio_device *core_vdev,
 		if (atomic_read(&vdev->block_access))
 			atomic_set(&vdev->block_access, 0);
 		vdev->videv = videv;
+		mutex_unlock(&vdev->videv_lock);
+
+		return 0;
+	} else if (cmd == VFIO_DEVICE_ATTACH_IOASID) {
+		struct vfio_device_attach_ioasid attach;
+		unsigned long minsz;
+		struct vfio_iommufd_device *videv;
+		int ret = 0;
+
+		/* not allowed if the device is opened in legacy interface */
+		if (vfio_device_in_container(core_vdev))
+			return -ENOTTY;
+
+		minsz = offsetofend(struct vfio_device_attach_ioasid, ioasid);
+		if (copy_from_user(&attach, (void __user *)arg, minsz))
+			return -EFAULT;
+
+		if (attach.argsz < minsz || attach.flags ||
+		    attach.iommu_fd < 0 || attach.ioasid < 0)
+			return -EINVAL;
+
+		mutex_lock(&vdev->videv_lock);
+
+		videv = vdev->videv;
+		if (!videv || videv->iommu_fd != attach.iommu_fd) {
+			mutex_unlock(&vdev->videv_lock);
+			return -EINVAL;
+		}
+
+		/* Currently only allows one IOASID attach */
+		if (videv->ioasid != IOMMUFD_INVALID_IOASID) {
+			mutex_unlock(&vdev->videv_lock);
+			return -EBUSY;
+		}
+
+		ret = __pci_iommufd_device_attach_ioasid(vdev->pdev,
+							 videv->idev,
+							 attach.ioasid);
+		if (!ret)
+			videv->ioasid = attach.ioasid;
+		mutex_unlock(&vdev->videv_lock);
+
+		return ret;
+	} else if (cmd == VFIO_DEVICE_DETACH_IOASID) {
+		struct vfio_device_attach_ioasid attach;
+		unsigned long minsz;
+		struct vfio_iommufd_device *videv;
+
+		/* not allowed if the device is opened in legacy interface */
+		if (vfio_device_in_container(core_vdev))
+			return -ENOTTY;
+
+		minsz = offsetofend(struct vfio_device_attach_ioasid, ioasid);
+		if (copy_from_user(&attach, (void __user *)arg, minsz))
+			return -EFAULT;
+
+		if (attach.argsz < minsz || attach.flags ||
+		    attach.iommu_fd < 0 || attach.ioasid < 0)
+			return -EINVAL;
+
+		mutex_lock(&vdev->videv_lock);
+
+		videv = vdev->videv;
+		if (!videv || videv->iommu_fd != attach.iommu_fd) {
+			mutex_unlock(&vdev->videv_lock);
+			return -EINVAL;
+		}
+
+		if (videv->ioasid == IOMMUFD_INVALID_IOASID ||
+		    videv->ioasid != attach.ioasid) {
+			mutex_unlock(&vdev->videv_lock);
+			return -EINVAL;
+		}
+
+		videv->ioasid = IOMMUFD_INVALID_IOASID;
+		iommufd_device_detach_ioasid(videv->idev, attach.ioasid);
 		mutex_unlock(&vdev->videv_lock);
 
 		return 0;

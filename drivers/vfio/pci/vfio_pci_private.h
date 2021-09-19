@@ -103,6 +103,7 @@ struct vfio_pci_mmap_vma {
 struct vfio_iommufd_device {
 	struct iommufd_device *idev;
 	int iommu_fd;
+	int ioasid;
 };
 
 struct vfio_pci_device {
