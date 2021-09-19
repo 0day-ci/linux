@@ -158,6 +158,19 @@ extern int vfio_dma_rw(struct vfio_group *group, dma_addr_t user_iova,
 
 extern struct iommu_domain *vfio_group_iommu_domain(struct vfio_group *group);
 
+struct vfio_iommu;
+extern void *vfio_iommu_type1_open(unsigned long arg);
+extern void vfio_iommu_type1_release(void *iommu_data);
+extern int vfio_iommu_add_group(struct vfio_iommu *iommu,
+				struct iommu_group *iommu_group,
+				struct iommu_domain *iommu_domain);
+extern void vfio_iommu_remove_group(struct vfio_iommu *iommu,
+				    struct iommu_group *iommu_group);
+extern int vfio_iommu_type1_unmap_dma(struct vfio_iommu *iommu,
+				      unsigned long arg);
+extern int vfio_iommu_type1_map_dma(struct vfio_iommu *iommu,
+				    unsigned long arg);
+
 /* each type has independent events */
 enum vfio_notify_type {
 	VFIO_IOMMU_NOTIFY = 0,
