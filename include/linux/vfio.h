@@ -24,6 +24,8 @@ struct vfio_device {
 	refcount_t refcount;
 	struct completion comp;
 	struct list_head group_next;
+	int minor;
+	atomic_t opened;
 };
 
 /**
