@@ -68,6 +68,7 @@
  *		   +---------------+------------+
  *		   ...
  * @addr_width:    the address width of supported I/O address spaces.
+ * @cap_offset:	   Offset within info struct of first cap
  *
  * Availability: after device is bound to iommufd
  */
@@ -77,9 +78,11 @@ struct iommu_device_info {
 #define IOMMU_DEVICE_INFO_ENFORCE_SNOOP	(1 << 0) /* IOMMU enforced snoop */
 #define IOMMU_DEVICE_INFO_PGSIZES	(1 << 1) /* supported page sizes */
 #define IOMMU_DEVICE_INFO_ADDR_WIDTH	(1 << 2) /* addr_wdith field valid */
+#define IOMMU_DEVICE_INFO_CAPS		(1 << 3) /* info supports cap chain */
 	__u64	dev_cookie;
 	__u64   pgsize_bitmap;
 	__u32	addr_width;
+	__u32   cap_offset;
 };
 
 #define IOMMU_DEVICE_GET_INFO	_IO(IOMMU_TYPE, IOMMU_BASE + 1)

@@ -2963,15 +2963,15 @@ static int vfio_iommu_iova_add_cap(struct vfio_info_cap *caps,
 	return 0;
 }
 
-static int vfio_iommu_iova_build_caps(struct vfio_iommu *iommu,
-				      struct vfio_info_cap *caps)
+static int vfio_iova_list_build_caps(struct list_head *iova_list,
+				     struct vfio_info_cap *caps)
 {
 	struct vfio_iommu_type1_info_cap_iova_range *cap_iovas;
 	struct vfio_iova *iova;
 	size_t size;
 	int iovas = 0, i = 0, ret;
 
-	list_for_each_entry(iova, &iommu->iova_list, list)
+	list_for_each_entry(iova, iova_list, list)
 		iovas++;
 
 	if (!iovas) {
@@ -2990,7 +2990,7 @@ static int vfio_iommu_iova_build_caps(struct vfio_iommu *iommu,
 
 	cap_iovas->nr_iovas = iovas;
 
-	list_for_each_entry(iova, &iommu->iova_list, list) {
+	list_for_each_entry(iova, iova_list, list) {
 		cap_iovas->iova_ranges[i].start = iova->start;
 		cap_iovas->iova_ranges[i].end = iova->end;
 		i++;
@@ -3001,6 +3001,45 @@ static int vfio_iommu_iova_build_caps(struct vfio_iommu *iommu,
 	kfree(cap_iovas);
 	return ret;
 }
+
+static int vfio_iommu_iova_build_caps(struct vfio_iommu *iommu,
+				      struct vfio_info_cap *caps)
+{
+	return vfio_iova_list_build_caps(&iommu->iova_list, caps);
+}
+
+/* HACK: called by /dev/iommu core to build iova range cap for a device */
+int vfio_device_add_iova_cap(struct device *dev, struct vfio_info_cap *caps)
+{
+	u64 awidth;
+	dma_addr_t aperture_end;
+	LIST_HEAD(iova);
+	LIST_HEAD(dev_resv_regions);
+	int ret;
+
+	ret = iommu_device_get_info(dev, IOMMU_DEV_INFO_ADDR_WIDTH, &awidth);
+	if (ret)
+		return ret;
+
+	/* FIXME: needs to use geometry info reported by iommu core. */
+	aperture_end = ((dma_addr_t)1) << awidth;
+
+	ret = vfio_iommu_iova_insert(&iova, 0, aperture_end);
+	if (ret)
+		return ret;
+
+	iommu_get_resv_regions(dev, &dev_resv_regions);
+	ret = vfio_iommu_resv_exclude(&iova, &dev_resv_regions);
+	if (ret)
+		goto out;
+
+	ret = vfio_iova_list_build_caps(&iova, caps);
+out:
+	vfio_iommu_iova_free(&iova);
+	iommu_put_resv_regions(dev, &dev_resv_regions);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(vfio_device_add_iova_cap);
 
 static int vfio_iommu_migration_build_caps(struct vfio_iommu *iommu,
 					   struct vfio_info_cap *caps)

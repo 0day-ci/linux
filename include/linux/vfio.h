@@ -212,6 +212,8 @@ extern int vfio_info_add_capability(struct vfio_info_cap *caps,
 extern int vfio_set_irqs_validate_and_prepare(struct vfio_irq_set *hdr,
 					      int num_irqs, int max_irq_type,
 					      size_t *data_size);
+extern int vfio_device_add_iova_cap(struct device *dev,
+				    struct vfio_info_cap *caps);
 
 struct pci_dev;
 #if IS_ENABLED(CONFIG_VFIO_SPAPR_EEH)
