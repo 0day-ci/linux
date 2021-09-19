@@ -26,6 +26,7 @@ struct vfio_device {
 	struct list_head group_next;
 	int minor;
 	atomic_t opened;
+	struct list_head vfio_next;
 };
 
 /**
@@ -72,6 +73,14 @@ extern void vfio_device_put(struct vfio_device *device);
 enum vfio_iommu_notify_type {
 	VFIO_IOMMU_CONTAINER_CLOSE = 0,
 };
+
+/* The device can be opened via VFIO_GROUP_GET_DEVICE_FD */
+#define VFIO_DEVNODE_GROUP	BIT(0)
+/* The device can be opened via /dev/sys/devices/${DEVICE} */
+#define VFIO_DEVNODE_NONGROUP	BIT(1)
+
+extern int vfio_register_device(struct vfio_device *device, u32 flags);
+extern void vfio_unregister_device(struct vfio_device *device);
 
 /**
  * struct vfio_iommu_driver_ops - VFIO IOMMU driver callbacks

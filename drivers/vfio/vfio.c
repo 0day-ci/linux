@@ -51,6 +51,7 @@ static struct vfio {
 	struct cdev			device_cdev;
 	dev_t				device_devt;
 	struct mutex			device_lock;
+	struct list_head		device_list;
 	struct idr			device_idr;
 } vfio;
 
@@ -757,7 +758,7 @@ void vfio_init_group_dev(struct vfio_device *device, struct device *dev,
 }
 EXPORT_SYMBOL_GPL(vfio_init_group_dev);
 
-int vfio_register_group_dev(struct vfio_device *device)
+static int __vfio_register_group_dev(struct vfio_device *device)
 {
 	struct vfio_device *existing_device;
 	struct iommu_group *iommu_group;
@@ -794,8 +795,13 @@ int vfio_register_group_dev(struct vfio_device *device)
 	/* Our reference on group is moved to the device */
 	device->group = group;
 
-	/* Refcounting can't start until the driver calls register */
-	refcount_set(&device->refcount, 1);
+	/*
+	 * Refcounting can't start until the driver call register. Don’t
+	 * start twice when the device is exposed in both group and nongroup
+	 * interfaces.
+	 */
+	if (!refcount_read(&device->refcount))
+		refcount_set(&device->refcount, 1);
 
 	mutex_lock(&group->device_lock);
 	list_add(&device->group_next, &group->device_list);
@@ -804,7 +810,78 @@ int vfio_register_group_dev(struct vfio_device *device)
 
 	return 0;
 }
-EXPORT_SYMBOL_GPL(vfio_register_group_dev);
+
+static int __vfio_register_nongroup_dev(struct vfio_device *device)
+{
+	struct vfio_device *existing_device;
+	struct device *dev;
+	int ret = 0, minor;
+
+	mutex_lock(&vfio.device_lock);
+	list_for_each_entry(existing_device, &vfio.device_list, vfio_next) {
+		if (existing_device == device) {
+			ret = -EBUSY;
+			goto out_unlock;
+		}
+	}
+
+	minor = idr_alloc(&vfio.device_idr, device, 0, MINORMASK + 1, GFP_KERNEL);
+	pr_debug("%s - mnior: %d\n", __func__, minor);
+	if (minor < 0) {
+		ret = minor;
+		goto out_unlock;
+	}
+
+	dev = device_create(vfio.device_class, NULL,
+			    MKDEV(MAJOR(vfio.device_devt), minor),
+			    device, "%s", dev_name(device->dev));
+	if (IS_ERR(dev)) {
+		idr_remove(&vfio.device_idr, minor);
+		ret = PTR_ERR(dev);
+		goto out_unlock;
+	}
+
+	/*
+	 * Refcounting can't start until the driver call register. Don’t
+	 * start twice when the device is exposed in both group and nongroup
+	 * interfaces.
+	 */
+	if (!refcount_read(&device->refcount))
+		refcount_set(&device->refcount, 1);
+
+	device->minor = minor;
+	list_add(&device->vfio_next, &vfio.device_list);
+	dev_info(device->dev, "Creates Device interface successfully!\n");
+out_unlock:
+	mutex_unlock(&vfio.device_lock);
+	return ret;
+}
+
+int vfio_register_device(struct vfio_device *device, u32 flags)
+{
+	int ret = -EINVAL;
+
+	device->minor = -1;
+	device->group = NULL;
+	atomic_set(&device->opened, 0);
+
+	if (flags & ~(VFIO_DEVNODE_GROUP | VFIO_DEVNODE_NONGROUP))
+		return ret;
+
+	if (flags & VFIO_DEVNODE_GROUP) {
+		ret = __vfio_register_group_dev(device);
+		if (ret)
+			return ret;
+	}
+
+	if (flags & VFIO_DEVNODE_NONGROUP) {
+		ret = __vfio_register_nongroup_dev(device);
+		if (ret && device->group)
+			vfio_unregister_device(device);
+	}
+	return ret;
+}
+EXPORT_SYMBOL_GPL(vfio_register_device);
 
 /**
  * Get a reference to the vfio_device for a device.  Even if the
@@ -861,13 +938,14 @@ static struct vfio_device *vfio_device_get_from_name(struct vfio_group *group,
 /*
  * Decrement the device reference count and wait for the device to be
  * removed.  Open file descriptors for the device... */
-void vfio_unregister_group_dev(struct vfio_device *device)
+void vfio_unregister_device(struct vfio_device *device)
 {
 	struct vfio_group *group = device->group;
 	struct vfio_unbound_dev *unbound;
 	unsigned int i = 0;
 	bool interrupted = false;
 	long rc;
+	int minor = device->minor;
 
 	/*
 	 * When the device is removed from the group, the group suddenly
@@ -878,14 +956,20 @@ void vfio_unregister_group_dev(struct vfio_device *device)
 	 * solve this, we track such devices on the unbound_list to bridge
 	 * the gap until they're fully unbound.
 	 */
-	unbound = kzalloc(sizeof(*unbound), GFP_KERNEL);
-	if (unbound) {
-		unbound->dev = device->dev;
-		mutex_lock(&group->unbound_lock);
-		list_add(&unbound->unbound_next, &group->unbound_list);
-		mutex_unlock(&group->unbound_lock);
+	if (group) {
+		/*
+		 * If caller hasn't called vfio_register_group_dev(), this
+		 * branch is not necessary.
+		 */
+		unbound = kzalloc(sizeof(*unbound), GFP_KERNEL);
+		if (unbound) {
+			unbound->dev = device->dev;
+			mutex_lock(&group->unbound_lock);
+			list_add(&unbound->unbound_next, &group->unbound_list);
+			mutex_unlock(&group->unbound_lock);
+		}
+		WARN_ON(!unbound);
 	}
-	WARN_ON(!unbound);
 
 	vfio_device_put(device);
 	rc = try_wait_for_completion(&device->comp);
@@ -909,6 +993,21 @@ void vfio_unregister_group_dev(struct vfio_device *device)
 			}
 		}
 	}
+
+	/* nongroup interface related cleanup */
+	if (minor >= 0) {
+		mutex_lock(&vfio.device_lock);
+		list_del(&device->vfio_next);
+		device->minor = -1;
+		device_destroy(vfio.device_class,
+			       MKDEV(MAJOR(vfio.device_devt), minor));
+		idr_remove(&vfio.device_idr, minor);
+		mutex_unlock(&vfio.device_lock);
+	}
+
+	/* No need go further if no group. */
+	if (!group)
+		return;
 
 	mutex_lock(&group->device_lock);
 	list_del(&device->group_next);
@@ -934,6 +1033,18 @@ void vfio_unregister_group_dev(struct vfio_device *device)
 
 	/* Matches the get in vfio_register_group_dev() */
 	vfio_group_put(group);
+}
+EXPORT_SYMBOL_GPL(vfio_unregister_device);
+
+int vfio_register_group_dev(struct vfio_device *device)
+{
+	return vfio_register_device(device, VFIO_DEVNODE_GROUP);
+}
+EXPORT_SYMBOL_GPL(vfio_register_group_dev);
+
+void vfio_unregister_group_dev(struct vfio_device *device)
+{
+	vfio_unregister_device(device);
 }
 EXPORT_SYMBOL_GPL(vfio_unregister_group_dev);
 
@@ -2447,6 +2558,7 @@ static int vfio_init_device_class(void)
 
 	mutex_init(&vfio.device_lock);
 	idr_init(&vfio.device_idr);
+	INIT_LIST_HEAD(&vfio.device_list);
 
 	/* /dev/vfio/devices/$DEVICE */
 	vfio.device_class = class_create(THIS_MODULE, "vfio-device");
@@ -2542,6 +2654,7 @@ err_class:
 static void __exit vfio_cleanup(void)
 {
 	WARN_ON(!list_empty(&vfio.group_list));
+	WARN_ON(!list_empty(&vfio.device_list));
 
 #ifdef CONFIG_VFIO_NOIOMMU
 	vfio_unregister_iommu_driver(&vfio_noiommu_ops);
