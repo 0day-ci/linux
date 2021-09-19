@@ -382,9 +382,9 @@ static int pwm_regulator_probe(struct platform_device *pdev)
 					    &drvdata->desc, &config);
 	if (IS_ERR(regulator)) {
 		ret = PTR_ERR(regulator);
-		dev_err(&pdev->dev, "Failed to register regulator %s: %d\n",
-			drvdata->desc.name, ret);
-		return ret;
+		return dev_err_probe(&pdev->dev, ret,
+				     "Failed to register regulator %s: %d\n",
+				     drvdata->desc.name, ret);
 	}
 
 	return 0;
