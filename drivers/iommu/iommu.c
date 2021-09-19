@@ -45,6 +45,8 @@ struct iommu_group {
 	struct iommu_domain *default_domain;
 	struct iommu_domain *domain;
 	struct list_head entry;
+	unsigned long user_dma_owner_id;
+	refcount_t owner_cnt;
 };
 
 struct group_device {
@@ -86,6 +88,7 @@ static int iommu_create_device_direct_mappings(struct iommu_group *group,
 static struct iommu_group *iommu_group_get_for_dev(struct device *dev);
 static ssize_t iommu_group_store_type(struct iommu_group *group,
 				      const char *buf, size_t count);
+static bool iommu_group_user_dma_viable(struct iommu_group *group);
 
 #define IOMMU_GROUP_ATTR(_name, _mode, _show, _store)		\
 struct iommu_group_attribute iommu_group_attr_##_name =		\
@@ -275,7 +278,11 @@ int iommu_probe_device(struct device *dev)
 	 */
 	iommu_alloc_default_domain(group, dev);
 
-	if (group->default_domain) {
+	/*
+	 * If any device in the group has been initialized for user dma,
+	 * avoid attaching the default domain.
+	 */
+	if (group->default_domain && !group->user_dma_owner_id) {
 		ret = __iommu_attach_device(group->default_domain, dev);
 		if (ret) {
 			iommu_group_put(group);
@@ -1661,6 +1668,17 @@ static int iommu_bus_notifier(struct notifier_block *nb,
 		group_action = IOMMU_GROUP_NOTIFY_BIND_DRIVER;
 		break;
 	case BUS_NOTIFY_BOUND_DRIVER:
+		/*
+		 * FIXME: Alternatively the attached drivers could generically
+		 * indicate to the iommu layer that they are safe for keeping
+		 * the iommu group user viable by calling some function around
+		 * probe(). We could eliminate this gross BUG_ON() by denying
+		 * probe to non-iommu-safe driver.
+		 */
+		mutex_lock(&group->mutex);
+		if (group->user_dma_owner_id)
+			BUG_ON(!iommu_group_user_dma_viable(group));
+		mutex_unlock(&group->mutex);
 		group_action = IOMMU_GROUP_NOTIFY_BOUND_DRIVER;
 		break;
 	case BUS_NOTIFY_UNBIND_DRIVER:
@@ -2301,7 +2319,11 @@ static int __iommu_attach_group(struct iommu_domain *domain,
 {
 	int ret;
 
-	if (group->default_domain && group->domain != group->default_domain)
+	/*
+	 * group->domain could be NULL when a domain is detached from the
+	 * group but the default_domain is not re-attached.
+	 */
+	if (group->domain && group->domain != group->default_domain)
 		return -EBUSY;
 
 	ret = __iommu_group_for_each_dev(group, domain,
@@ -2338,7 +2360,11 @@ static void __iommu_detach_group(struct iommu_domain *domain,
 {
 	int ret;
 
-	if (!group->default_domain) {
+	/*
+	 * If any device in the group has been initialized for user dma,
+	 * avoid re-attaching the default domain.
+	 */
+	if (!group->default_domain || group->user_dma_owner_id) {
 		__iommu_group_for_each_dev(group, domain,
 					   iommu_group_do_detach_device);
 		group->domain = NULL;
@@ -3273,3 +3299,116 @@ int iommu_device_get_info(struct device *dev, enum iommu_devattr attr, void *dat
 	return ops->device_info(dev, attr, data);
 }
 EXPORT_SYMBOL_GPL(iommu_device_get_info);
+
+/*
+ * IOMMU core interfaces for iommufd.
+ */
+
+/*
+ * FIXME: We currently simply follow vifo policy to mantain the group's
+ * viability to user. Eventually, we should avoid below hard-coded list
+ * by letting drivers indicate to the iommu layer that they are safe for
+ * keeping the iommu group's user aviability.
+ */
+static const char * const iommu_driver_allowed[] = {
+	"vfio-pci",
+	"pci-stub"
+};
+
+/*
+ * An iommu group is viable for use by userspace if all devices are in
+ * one of the following states:
+ *  - driver-less
+ *  - bound to an allowed driver
+ *  - a PCI interconnect device
+ */
+static int device_user_dma_viable(struct device *dev, void *data)
+{
+	struct device_driver *drv = READ_ONCE(dev->driver);
+
+	if (!drv)
+		return 0;
+
+	if (dev_is_pci(dev)) {
+		struct pci_dev *pdev = to_pci_dev(dev);
+
+		if (pdev->hdr_type != PCI_HEADER_TYPE_NORMAL)
+			return 0;
+	}
+
+	return match_string(iommu_driver_allowed,
+			    ARRAY_SIZE(iommu_driver_allowed),
+			    drv->name) < 0;
+}
+
+static bool iommu_group_user_dma_viable(struct iommu_group *group)
+{
+	return !__iommu_group_for_each_dev(group, NULL, device_user_dma_viable);
+}
+
+static int iommu_group_init_user_dma(struct iommu_group *group,
+				     unsigned long owner)
+{
+	if (group->user_dma_owner_id) {
+		if (group->user_dma_owner_id != owner)
+			return -EBUSY;
+
+		refcount_inc(&group->owner_cnt);
+		return 0;
+	}
+
+	if (group->domain && group->domain != group->default_domain)
+		return -EBUSY;
+
+	if (!iommu_group_user_dma_viable(group))
+		return -EINVAL;
+
+	group->user_dma_owner_id = owner;
+	refcount_set(&group->owner_cnt, 1);
+
+	/* default domain is unsafe for user-initiated dma */
+	if (group->domain == group->default_domain)
+		__iommu_detach_group(group->default_domain, group);
+
+	return 0;
+}
+
+int iommu_device_init_user_dma(struct device *dev, unsigned long owner)
+{
+	struct iommu_group *group = iommu_group_get(dev);
+	int ret;
+
+	if (!group || !owner)
+		return -ENODEV;
+
+	mutex_lock(&group->mutex);
+	ret = iommu_group_init_user_dma(group, owner);
+	mutex_unlock(&group->mutex);
+	iommu_group_put(group);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(iommu_device_init_user_dma);
+
+static void iommu_group_exit_user_dma(struct iommu_group *group)
+{
+	if (refcount_dec_and_test(&group->owner_cnt)) {
+		group->user_dma_owner_id = 0;
+		if (group->default_domain)
+			__iommu_attach_group(group->default_domain, group);
+	}
+}
+
+void iommu_device_exit_user_dma(struct device *dev)
+{
+	struct iommu_group *group = iommu_group_get(dev);
+
+	if (WARN_ON(!group || !group->user_dma_owner_id))
+		return;
+
+	mutex_lock(&group->mutex);
+	iommu_group_exit_user_dma(group);
+	mutex_unlock(&group->mutex);
+	iommu_group_put(group);
+}
+EXPORT_SYMBOL_GPL(iommu_device_exit_user_dma);

@@ -617,6 +617,9 @@ u32 iommu_sva_get_pasid(struct iommu_sva *handle);
 
 int iommu_device_get_info(struct device *dev, enum iommu_devattr attr, void *data);
 
+int iommu_device_init_user_dma(struct device *dev, unsigned long owner);
+void iommu_device_exit_user_dma(struct device *dev);
+
 #else /* CONFIG_IOMMU_API */
 
 struct iommu_ops {};
@@ -1017,6 +1020,15 @@ static inline int iommu_device_get_info(struct device *dev,
 					enum iommu_devattr type, void *data)
 {
 	return -ENODEV;
+}
+
+static inline int iommu_device_init_user_dma(struct device *dev, unsigned long owner)
+{
+	return -ENODEV;
+}
+
+static inline void iommu_device_exit_user_dma(struct device *dev)
+{
 }
 #endif /* CONFIG_IOMMU_API */
 
