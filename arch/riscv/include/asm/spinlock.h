@@ -7,129 +7,59 @@
 #ifndef _ASM_RISCV_SPINLOCK_H
 #define _ASM_RISCV_SPINLOCK_H
 
-#include <linux/kernel.h>
-#include <asm/current.h>
-#include <asm/fence.h>
-
-/*
- * Simple spin lock operations.  These provide no fairness guarantees.
- */
-
-/* FIXME: Replace this with a ticket lock, like MIPS. */
-
-#define arch_spin_is_locked(x)	(READ_ONCE((x)->lock) != 0)
-
-static inline void arch_spin_unlock(arch_spinlock_t *lock)
+static __always_inline void ticket_lock(arch_spinlock_t *lock)
 {
-	smp_store_release(&lock->lock, 0);
+	u32 val = atomic_fetch_add(1<<16, lock); /* SC, gives us RCsc */
+	u16 ticket = val >> 16;
+
+	if (ticket == (u16)val)
+		return;
+
+	atomic_cond_read_acquire(lock, ticket == (u16)VAL);
 }
 
-static inline int arch_spin_trylock(arch_spinlock_t *lock)
+static __always_inline bool ticket_trylock(arch_spinlock_t *lock)
 {
-	int tmp = 1, busy;
+	u32 old = atomic_read(lock);
 
-	__asm__ __volatile__ (
-		"	amoswap.w %0, %2, %1\n"
-		RISCV_ACQUIRE_BARRIER
-		: "=r" (busy), "+A" (lock->lock)
-		: "r" (tmp)
-		: "memory");
+	if ((old >> 16) != (old & 0xffff))
+		return false;
 
-	return !busy;
+	return atomic_try_cmpxchg(lock, &old, old + (1<<16)); /* SC, for RCsc */
 }
 
-static inline void arch_spin_lock(arch_spinlock_t *lock)
+static __always_inline void ticket_unlock(arch_spinlock_t *lock)
 {
-	while (1) {
-		if (arch_spin_is_locked(lock))
-			continue;
+	u16 *ptr = (u16 *)lock;
+	u32 val = atomic_read(lock);
 
-		if (arch_spin_trylock(lock))
-			break;
-	}
+	smp_store_release(ptr, (u16)val + 1);
 }
 
-/***********************************************************/
-
-static inline void arch_read_lock(arch_rwlock_t *lock)
+static __always_inline int ticket_value_unlocked(arch_spinlock_t lock)
 {
-	int tmp;
-
-	__asm__ __volatile__(
-		"1:	lr.w	%1, %0\n"
-		"	bltz	%1, 1b\n"
-		"	addi	%1, %1, 1\n"
-		"	sc.w	%1, %1, %0\n"
-		"	bnez	%1, 1b\n"
-		RISCV_ACQUIRE_BARRIER
-		: "+A" (lock->lock), "=&r" (tmp)
-		:: "memory");
+	return (((u32)lock.counter >> 16) == ((u32)lock.counter & 0xffff));
 }
 
-static inline void arch_write_lock(arch_rwlock_t *lock)
+static __always_inline int ticket_is_locked(arch_spinlock_t *lock)
 {
-	int tmp;
-
-	__asm__ __volatile__(
-		"1:	lr.w	%1, %0\n"
-		"	bnez	%1, 1b\n"
-		"	li	%1, -1\n"
-		"	sc.w	%1, %1, %0\n"
-		"	bnez	%1, 1b\n"
-		RISCV_ACQUIRE_BARRIER
-		: "+A" (lock->lock), "=&r" (tmp)
-		:: "memory");
+	return !ticket_value_unlocked(READ_ONCE(*lock));
 }
 
-static inline int arch_read_trylock(arch_rwlock_t *lock)
+static __always_inline int ticket_is_contended(arch_spinlock_t *lock)
 {
-	int busy;
+	u32 val = atomic_read(lock);
 
-	__asm__ __volatile__(
-		"1:	lr.w	%1, %0\n"
-		"	bltz	%1, 1f\n"
-		"	addi	%1, %1, 1\n"
-		"	sc.w	%1, %1, %0\n"
-		"	bnez	%1, 1b\n"
-		RISCV_ACQUIRE_BARRIER
-		"1:\n"
-		: "+A" (lock->lock), "=&r" (busy)
-		:: "memory");
-
-	return !busy;
+	return (s16)((val >> 16) - (val & 0xffff)) > 1;
 }
 
-static inline int arch_write_trylock(arch_rwlock_t *lock)
-{
-	int busy;
+#define arch_spin_lock(l)		ticket_lock(l)
+#define arch_spin_trylock(l)		ticket_trylock(l)
+#define arch_spin_unlock(l)		ticket_unlock(l)
+#define arch_spin_value_unlocked(l)	ticket_value_unlocked(l)
+#define arch_spin_is_locked(l)		ticket_is_locked(l)
+#define arch_spin_is_contended(l)	ticket_is_contended(l)
 
-	__asm__ __volatile__(
-		"1:	lr.w	%1, %0\n"
-		"	bnez	%1, 1f\n"
-		"	li	%1, -1\n"
-		"	sc.w	%1, %1, %0\n"
-		"	bnez	%1, 1b\n"
-		RISCV_ACQUIRE_BARRIER
-		"1:\n"
-		: "+A" (lock->lock), "=&r" (busy)
-		:: "memory");
-
-	return !busy;
-}
-
-static inline void arch_read_unlock(arch_rwlock_t *lock)
-{
-	__asm__ __volatile__(
-		RISCV_RELEASE_BARRIER
-		"	amoadd.w x0, %1, %0\n"
-		: "+A" (lock->lock)
-		: "r" (-1)
-		: "memory");
-}
-
-static inline void arch_write_unlock(arch_rwlock_t *lock)
-{
-	smp_store_release(&lock->lock, 0);
-}
+#include <asm/qrwlock.h>
 
 #endif /* _ASM_RISCV_SPINLOCK_H */
