@@ -5583,6 +5583,40 @@ static void intel_iommu_iotlb_sync_map(struct iommu_domain *domain,
 	}
 }
 
+static int
+intel_iommu_device_info(struct device *dev, enum iommu_devattr type, void *data)
+{
+	struct intel_iommu *iommu = device_to_iommu(dev, NULL, NULL);
+	int ret = 0;
+
+	if (!iommu)
+		return -ENODEV;
+
+	switch (type) {
+	case IOMMU_DEV_INFO_PAGE_SIZE:
+		*(u64 *)data = SZ_4K |
+			(cap_super_page_val(iommu->cap) & BIT(0) ? SZ_2M : 0) |
+			(cap_super_page_val(iommu->cap) & BIT(1) ? SZ_1G : 0);
+		break;
+	case IOMMU_DEV_INFO_FORCE_SNOOP:
+		/*
+		 * Force snoop is always supported in the scalable mode. For the legacy
+		 * mode, check the capability register.
+		 */
+		*(bool *)data = sm_supported(iommu) || ecap_sc_support(iommu->ecap);
+		break;
+	case IOMMU_DEV_INFO_ADDR_WIDTH:
+		*(u32 *)data = min_t(u32, agaw_to_width(iommu->agaw),
+				     cap_mgaw(iommu->cap));
+		break;
+	default:
+		ret = -EINVAL;
+		break;
+	}
+
+	return ret;
+}
+
 const struct iommu_ops intel_iommu_ops = {
 	.capable		= intel_iommu_capable,
 	.domain_alloc		= intel_iommu_domain_alloc,
@@ -5621,6 +5655,7 @@ const struct iommu_ops intel_iommu_ops = {
 	.sva_get_pasid		= intel_svm_get_pasid,
 	.page_response		= intel_svm_page_response,
 #endif
+	.device_info		= intel_iommu_device_info,
 };
 
 static void quirk_iommu_igfx(struct pci_dev *dev)
