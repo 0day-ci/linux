@@ -44,6 +44,7 @@
  */
 
 #include <linux/kernel.h>
+#include <linux/mm.h>
 #include <linux/module.h>
 #include <linux/errno.h>
 #include <linux/init.h>
@@ -2988,8 +2989,6 @@ _base_build_sg_ieee(struct MPT3SAS_ADAPTER *ioc, void *psge,
 	}
 }
 
-#define convert_to_kb(x) ((x) << (PAGE_SHIFT - 10))
-
 /**
  * _base_config_dma_addressing - set dma addressing
  * @ioc: per adapter object
@@ -3026,7 +3025,7 @@ _base_config_dma_addressing(struct MPT3SAS_ADAPTER *ioc, struct pci_dev *pdev)
 
 	si_meminfo(&s);
 	ioc_info(ioc, "%d BIT PCI BUS DMA ADDRESSING SUPPORTED, total mem (%ld kB)\n",
-		ioc->dma_mask, convert_to_kb(s.totalram));
+		ioc->dma_mask, PG2KB(s.totalram));
 
 	return 0;
 }

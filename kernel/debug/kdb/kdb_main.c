@@ -2522,10 +2522,9 @@ static int kdb_summary(int argc, const char **argv)
 		LOAD_INT(val.loads[2]), LOAD_FRAC(val.loads[2]));
 
 	/* Display in kilobytes */
-#define K(x) ((x) << (PAGE_SHIFT - 10))
 	kdb_printf("\nMemTotal:       %8lu kB\nMemFree:        %8lu kB\n"
 		   "Buffers:        %8lu kB\n",
-		   K(val.totalram), K(val.freeram), K(val.bufferram));
+		   PG2KB(val.totalram), PG2KB(val.freeram), PG2KB(val.bufferram));
 	return 0;
 }
 

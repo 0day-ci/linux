@@ -34,6 +34,7 @@
 
 #include <linux/kernel.h>
 #include <linux/errno.h>
+#include <linux/mm.h>
 #include <linux/mm_types.h>
 #include <linux/init.h>
 #include <linux/capability.h>
@@ -46,8 +47,6 @@
 #include <xen/features.h>
 #include <xen/page.h>
 #include <xen/mem-reservation.h>
-
-#define PAGES2KB(_p) ((_p)<<(PAGE_SHIFT-10))
 
 #define BALLOON_CLASS_NAME "xen_memory"
 
@@ -142,9 +141,9 @@ EXPORT_SYMBOL_GPL(xen_balloon_init);
 	}								\
 	static DEVICE_ATTR_RO(name)
 
-BALLOON_SHOW(current_kb, "%lu\n", PAGES2KB(balloon_stats.current_pages));
-BALLOON_SHOW(low_kb, "%lu\n", PAGES2KB(balloon_stats.balloon_low));
-BALLOON_SHOW(high_kb, "%lu\n", PAGES2KB(balloon_stats.balloon_high));
+BALLOON_SHOW(current_kb, "%lu\n", PG2KB(balloon_stats.current_pages));
+BALLOON_SHOW(low_kb, "%lu\n", PG2KB(balloon_stats.balloon_low));
+BALLOON_SHOW(high_kb, "%lu\n", PG2KB(balloon_stats.balloon_high));
 
 static DEVICE_ULONG_ATTR(schedule_delay, 0444, balloon_stats.schedule_delay);
 static DEVICE_ULONG_ATTR(max_schedule_delay, 0644, balloon_stats.max_schedule_delay);
@@ -155,7 +154,7 @@ static DEVICE_BOOL_ATTR(scrub_pages, 0644, xen_scrub_pages);
 static ssize_t target_kb_show(struct device *dev, struct device_attribute *attr,
 			      char *buf)
 {
-	return sprintf(buf, "%lu\n", PAGES2KB(balloon_stats.target_pages));
+	return sprintf(buf, "%lu\n", PG2KB(balloon_stats.target_pages));
 }
 
 static ssize_t target_kb_store(struct device *dev,

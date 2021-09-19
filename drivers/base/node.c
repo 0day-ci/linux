@@ -365,7 +365,6 @@ static void node_init_caches(unsigned int nid) { }
 static void node_remove_caches(struct node *node) { }
 #endif
 
-#define K(x) ((x) << (PAGE_SHIFT - 10))
 static ssize_t node_read_meminfo(struct device *dev,
 			struct device_attribute *attr, char *buf)
 {
@@ -395,20 +394,20 @@ static ssize_t node_read_meminfo(struct device *dev,
 			    "Node %d Inactive(file): %8lu kB\n"
 			    "Node %d Unevictable:    %8lu kB\n"
 			    "Node %d Mlocked:        %8lu kB\n",
-			    nid, K(i.totalram),
-			    nid, K(i.freeram),
-			    nid, K(i.totalram - i.freeram),
-			    nid, K(swapcached),
-			    nid, K(node_page_state(pgdat, NR_ACTIVE_ANON) +
+			    nid, PG2KB(i.totalram),
+			    nid, PG2KB(i.freeram),
+			    nid, PG2KB(i.totalram - i.freeram),
+			    nid, PG2KB(swapcached),
+			    nid, PG2KB(node_page_state(pgdat, NR_ACTIVE_ANON) +
 				   node_page_state(pgdat, NR_ACTIVE_FILE)),
-			    nid, K(node_page_state(pgdat, NR_INACTIVE_ANON) +
+			    nid, PG2KB(node_page_state(pgdat, NR_INACTIVE_ANON) +
 				   node_page_state(pgdat, NR_INACTIVE_FILE)),
-			    nid, K(node_page_state(pgdat, NR_ACTIVE_ANON)),
-			    nid, K(node_page_state(pgdat, NR_INACTIVE_ANON)),
-			    nid, K(node_page_state(pgdat, NR_ACTIVE_FILE)),
-			    nid, K(node_page_state(pgdat, NR_INACTIVE_FILE)),
-			    nid, K(node_page_state(pgdat, NR_UNEVICTABLE)),
-			    nid, K(sum_zone_node_page_state(nid, NR_MLOCK)));
+			    nid, PG2KB(node_page_state(pgdat, NR_ACTIVE_ANON)),
+			    nid, PG2KB(node_page_state(pgdat, NR_INACTIVE_ANON)),
+			    nid, PG2KB(node_page_state(pgdat, NR_ACTIVE_FILE)),
+			    nid, PG2KB(node_page_state(pgdat, NR_INACTIVE_FILE)),
+			    nid, PG2KB(node_page_state(pgdat, NR_UNEVICTABLE)),
+			    nid, PG2KB(sum_zone_node_page_state(nid, NR_MLOCK)));
 
 #ifdef CONFIG_HIGHMEM
 	len += sysfs_emit_at(buf, len,
@@ -416,10 +415,10 @@ static ssize_t node_read_meminfo(struct device *dev,
 			     "Node %d HighFree:       %8lu kB\n"
 			     "Node %d LowTotal:       %8lu kB\n"
 			     "Node %d LowFree:        %8lu kB\n",
-			     nid, K(i.totalhigh),
-			     nid, K(i.freehigh),
-			     nid, K(i.totalram - i.totalhigh),
-			     nid, K(i.freeram - i.freehigh));
+			     nid, PG2KB(i.totalhigh),
+			     nid, PG2KB(i.freehigh),
+			     nid, PG2KB(i.totalram - i.totalhigh),
+			     nid, PG2KB(i.freeram - i.freehigh));
 #endif
 	len += sysfs_emit_at(buf, len,
 			     "Node %d Dirty:          %8lu kB\n"
@@ -448,32 +447,32 @@ static ssize_t node_read_meminfo(struct device *dev,
 			     "Node %d FilePmdMapped: %8lu kB\n"
 #endif
 			     ,
-			     nid, K(node_page_state(pgdat, NR_FILE_DIRTY)),
-			     nid, K(node_page_state(pgdat, NR_WRITEBACK)),
-			     nid, K(node_page_state(pgdat, NR_FILE_PAGES)),
-			     nid, K(node_page_state(pgdat, NR_FILE_MAPPED)),
-			     nid, K(node_page_state(pgdat, NR_ANON_MAPPED)),
-			     nid, K(i.sharedram),
+			     nid, PG2KB(node_page_state(pgdat, NR_FILE_DIRTY)),
+			     nid, PG2KB(node_page_state(pgdat, NR_WRITEBACK)),
+			     nid, PG2KB(node_page_state(pgdat, NR_FILE_PAGES)),
+			     nid, PG2KB(node_page_state(pgdat, NR_FILE_MAPPED)),
+			     nid, PG2KB(node_page_state(pgdat, NR_ANON_MAPPED)),
+			     nid, PG2KB(i.sharedram),
 			     nid, node_page_state(pgdat, NR_KERNEL_STACK_KB),
 #ifdef CONFIG_SHADOW_CALL_STACK
 			     nid, node_page_state(pgdat, NR_KERNEL_SCS_KB),
 #endif
-			     nid, K(node_page_state(pgdat, NR_PAGETABLE)),
+			     nid, PG2KB(node_page_state(pgdat, NR_PAGETABLE)),
 			     nid, 0UL,
-			     nid, K(sum_zone_node_page_state(nid, NR_BOUNCE)),
-			     nid, K(node_page_state(pgdat, NR_WRITEBACK_TEMP)),
-			     nid, K(sreclaimable +
+			     nid, PG2KB(sum_zone_node_page_state(nid, NR_BOUNCE)),
+			     nid, PG2KB(node_page_state(pgdat, NR_WRITEBACK_TEMP)),
+			     nid, PG2KB(sreclaimable +
 				    node_page_state(pgdat, NR_KERNEL_MISC_RECLAIMABLE)),
-			     nid, K(sreclaimable + sunreclaimable),
-			     nid, K(sreclaimable),
-			     nid, K(sunreclaimable)
+			     nid, PG2KB(sreclaimable + sunreclaimable),
+			     nid, PG2KB(sreclaimable),
+			     nid, PG2KB(sunreclaimable)
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
 			     ,
-			     nid, K(node_page_state(pgdat, NR_ANON_THPS)),
-			     nid, K(node_page_state(pgdat, NR_SHMEM_THPS)),
-			     nid, K(node_page_state(pgdat, NR_SHMEM_PMDMAPPED)),
-			     nid, K(node_page_state(pgdat, NR_FILE_THPS)),
-			     nid, K(node_page_state(pgdat, NR_FILE_PMDMAPPED))
+			     nid, PG2KB(node_page_state(pgdat, NR_ANON_THPS)),
+			     nid, PG2KB(node_page_state(pgdat, NR_SHMEM_THPS)),
+			     nid, PG2KB(node_page_state(pgdat, NR_SHMEM_PMDMAPPED)),
+			     nid, PG2KB(node_page_state(pgdat, NR_FILE_THPS)),
+			     nid, PG2KB(node_page_state(pgdat, NR_FILE_PMDMAPPED))
 #endif
 			    );
 	len += hugetlb_report_node_meminfo(buf, len, nid);

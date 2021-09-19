@@ -5,6 +5,7 @@
 #if !defined(_TRACE_WRITEBACK_H) || defined(TRACE_HEADER_MULTI_READ)
 #define _TRACE_WRITEBACK_H
 
+#include <linux/mm.h>
 #include <linux/tracepoint.h>
 #include <linux/backing-dev.h>
 #include <linux/writeback.h>
@@ -570,8 +571,6 @@ TRACE_EVENT(global_dirty_state,
 	)
 );
 
-#define KBps(x)			((x) << (PAGE_SHIFT - 10))
-
 TRACE_EVENT(bdi_dirty_ratelimit,
 
 	TP_PROTO(struct bdi_writeback *wb,
@@ -593,13 +592,13 @@ TRACE_EVENT(bdi_dirty_ratelimit,
 
 	TP_fast_assign(
 		strscpy_pad(__entry->bdi, bdi_dev_name(wb->bdi), 32);
-		__entry->write_bw	= KBps(wb->write_bandwidth);
-		__entry->avg_write_bw	= KBps(wb->avg_write_bandwidth);
-		__entry->dirty_rate	= KBps(dirty_rate);
-		__entry->dirty_ratelimit = KBps(wb->dirty_ratelimit);
-		__entry->task_ratelimit	= KBps(task_ratelimit);
+		__entry->write_bw	= PG2KB(wb->write_bandwidth);
+		__entry->avg_write_bw	= PG2KB(wb->avg_write_bandwidth);
+		__entry->dirty_rate	= PG2KB(dirty_rate);
+		__entry->dirty_ratelimit = PG2KB(wb->dirty_ratelimit);
+		__entry->task_ratelimit	= PG2KB(task_ratelimit);
 		__entry->balanced_dirty_ratelimit =
-					KBps(wb->balanced_dirty_ratelimit);
+					PG2KB(wb->balanced_dirty_ratelimit);
 		__entry->cgroup_ino	= __trace_wb_assign_cgroup(wb);
 	),
 
@@ -666,8 +665,8 @@ TRACE_EVENT(balance_dirty_pages,
 		__entry->bdi_setpoint	= __entry->setpoint *
 						bdi_thresh / (thresh + 1);
 		__entry->bdi_dirty	= bdi_dirty;
-		__entry->dirty_ratelimit = KBps(dirty_ratelimit);
-		__entry->task_ratelimit	= KBps(task_ratelimit);
+		__entry->dirty_ratelimit = PG2KB(dirty_ratelimit);
+		__entry->task_ratelimit	= PG2KB(task_ratelimit);
 		__entry->dirtied	= dirtied;
 		__entry->dirtied_pause	= current->nr_dirtied_pause;
 		__entry->think		= current->dirty_paused_when == 0 ? 0 :

@@ -146,13 +146,13 @@
 
 #ifndef __ASSEMBLY__
 
+#include <linux/mm.h>
 #include <soc/arc/aux.h>
 
 /* Helpers */
 #define TO_KB(bytes)		((bytes) >> 10)
 #define TO_MB(bytes)		(TO_KB(bytes) >> 10)
-#define PAGES_TO_KB(n_pages)	((n_pages) << (PAGE_SHIFT - 10))
-#define PAGES_TO_MB(n_pages)	(PAGES_TO_KB(n_pages) >> 10)
+#define PAGES_TO_MB(n_pages)	(PG2KB(n_pages) >> 10)
 
 
 /*

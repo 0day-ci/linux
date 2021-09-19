@@ -8,6 +8,7 @@
  * Author: Gerald Schaefer <gerald.schaefer@de.ibm.com>
  */
 
+#include <linux/mm.h>
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/errno.h>
@@ -19,8 +20,6 @@
 
 #include "appldata.h"
 
-
-#define P2K(x) ((x) << (PAGE_SHIFT - 10))	/* Converts #Pages to KB */
 
 /*
  * Memory data
@@ -94,17 +93,17 @@ static void appldata_get_mem_data(void *data)
 
 	si_meminfo(&val);
 	mem_data->sharedram = val.sharedram;
-	mem_data->totalram  = P2K(val.totalram);
-	mem_data->freeram   = P2K(val.freeram);
-	mem_data->totalhigh = P2K(val.totalhigh);
-	mem_data->freehigh  = P2K(val.freehigh);
-	mem_data->bufferram = P2K(val.bufferram);
-	mem_data->cached    = P2K(global_node_page_state(NR_FILE_PAGES)
+	mem_data->totalram  = PG2KB(val.totalram);
+	mem_data->freeram   = PG2KB(val.freeram);
+	mem_data->totalhigh = PG2KB(val.totalhigh);
+	mem_data->freehigh  = PG2KB(val.freehigh);
+	mem_data->bufferram = PG2KB(val.bufferram);
+	mem_data->cached    = PG2KB(global_node_page_state(NR_FILE_PAGES)
 				- val.bufferram);
 
 	si_swapinfo(&val);
-	mem_data->totalswap = P2K(val.totalswap);
-	mem_data->freeswap  = P2K(val.freeswap);
+	mem_data->totalswap = PG2KB(val.totalswap);
+	mem_data->freeswap  = PG2KB(val.freeswap);
 
 	mem_data->timestamp = get_tod_clock();
 	mem_data->sync_count_2++;

@@ -12,6 +12,7 @@
 #include <linux/fs.h>
 #include <linux/gfp.h>
 #include <linux/kthread.h>
+#include <linux/mm.h>
 #include <linux/module.h>
 #include <linux/oom.h>
 #include <linux/reboot.h>
@@ -39,8 +40,6 @@
 #define CMM_DISABLE		0
 #define CMM_OOM_KB		1024
 #define CMM_MIN_MEM_MB		256
-#define KB2PAGES(_p)		((_p)>>(PAGE_SHIFT-10))
-#define PAGES2KB(_p)		((_p)<<(PAGE_SHIFT-10))
 
 #define CMM_MEM_HOTPLUG_PRI	1
 
@@ -215,13 +214,13 @@ static int cmm_oom_notify(struct notifier_block *self,
 			  unsigned long dummy, void *parm)
 {
 	unsigned long *freed = parm;
-	long nr = KB2PAGES(oom_kb);
+	long nr = KB2PG(oom_kb);
 
 	cmm_dbg("OOM processing started\n");
 	nr = cmm_free_pages(nr);
 	loaned_pages_target = atomic_long_read(&loaned_pages);
-	*freed += KB2PAGES(oom_kb) - nr;
-	oom_freed_pages += KB2PAGES(oom_kb) - nr;
+	*freed += KB2PG(oom_kb) - nr;
+	oom_freed_pages += KB2PG(oom_kb) - nr;
 	cmm_dbg("OOM processing complete\n");
 	return NOTIFY_OK;
 }
@@ -251,7 +250,7 @@ static void cmm_get_mpp(void)
 					    PAGE_SIZE);
 		target = page_loan_request + __loaned_pages;
 	} else {
-		target = KB2PAGES(simulate_loan_target_kb);
+		target = KB2PG(simulate_loan_target_kb);
 		page_loan_request = target - __loaned_pages;
 	}
 
@@ -342,13 +341,13 @@ static int cmm_thread(void *dummy)
 	}							\
 	static DEVICE_ATTR(name, 0444, show_##name, NULL)
 
-CMM_SHOW(loaned_kb, "%lu\n", PAGES2KB(atomic_long_read(&loaned_pages)));
-CMM_SHOW(loaned_target_kb, "%lu\n", PAGES2KB(loaned_pages_target));
+CMM_SHOW(loaned_kb, "%lu\n", PG2KB(atomic_long_read(&loaned_pages)));
+CMM_SHOW(loaned_target_kb, "%lu\n", PG2KB(loaned_pages_target));
 
 static ssize_t show_oom_pages(struct device *dev,
 			      struct device_attribute *attr, char *buf)
 {
-	return sprintf(buf, "%lu\n", PAGES2KB(oom_freed_pages));
+	return sprintf(buf, "%lu\n", PG2KB(oom_freed_pages));
 }
 
 static ssize_t store_oom_pages(struct device *dev,

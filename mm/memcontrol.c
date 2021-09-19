@@ -53,6 +53,7 @@
 #include <linux/fs.h>
 #include <linux/seq_file.h>
 #include <linux/vmpressure.h>
+#include <linux/mm.h>
 #include <linux/mm_inline.h>
 #include <linux/swap_cgroup.h>
 #include <linux/cpu.h>
@@ -1471,7 +1472,6 @@ static char *memory_stat_format(struct mem_cgroup *memcg)
 	return s.buffer;
 }
 
-#define K(x) ((x) << (PAGE_SHIFT-10))
 /**
  * mem_cgroup_print_oom_context: Print OOM information relevant to
  * memory controller.
@@ -1507,19 +1507,19 @@ void mem_cgroup_print_oom_meminfo(struct mem_cgroup *memcg)
 	char *buf;
 
 	pr_info("memory: usage %llukB, limit %llukB, failcnt %lu\n",
-		K((u64)page_counter_read(&memcg->memory)),
-		K((u64)READ_ONCE(memcg->memory.max)), memcg->memory.failcnt);
+		PG2KB((u64)page_counter_read(&memcg->memory)),
+		PG2KB((u64)READ_ONCE(memcg->memory.max)), memcg->memory.failcnt);
 	if (cgroup_subsys_on_dfl(memory_cgrp_subsys))
 		pr_info("swap: usage %llukB, limit %llukB, failcnt %lu\n",
-			K((u64)page_counter_read(&memcg->swap)),
-			K((u64)READ_ONCE(memcg->swap.max)), memcg->swap.failcnt);
+			PG2KB((u64)page_counter_read(&memcg->swap)),
+			PG2KB((u64)READ_ONCE(memcg->swap.max)), memcg->swap.failcnt);
 	else {
 		pr_info("memory+swap: usage %llukB, limit %llukB, failcnt %lu\n",
-			K((u64)page_counter_read(&memcg->memsw)),
-			K((u64)memcg->memsw.max), memcg->memsw.failcnt);
+			PG2KB((u64)page_counter_read(&memcg->memsw)),
+			PG2KB((u64)memcg->memsw.max), memcg->memsw.failcnt);
 		pr_info("kmem: usage %llukB, limit %llukB, failcnt %lu\n",
-			K((u64)page_counter_read(&memcg->kmem)),
-			K((u64)memcg->kmem.max), memcg->kmem.failcnt);
+			PG2KB((u64)page_counter_read(&memcg->kmem)),
+			PG2KB((u64)memcg->kmem.max), memcg->kmem.failcnt);
 	}
 
 	pr_info("Memory cgroup stats for ");

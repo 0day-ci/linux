@@ -33,8 +33,6 @@ LIST_HEAD(bdi_list);
 /* bdi_wq serves all asynchronous writeback tasks */
 struct workqueue_struct *bdi_wq;
 
-#define K(x) ((x) << (PAGE_SHIFT - 10))
-
 #ifdef CONFIG_DEBUG_FS
 #include <linux/debugfs.h>
 #include <linux/seq_file.h>
@@ -87,14 +85,14 @@ static int bdi_debug_stats_show(struct seq_file *m, void *v)
 		   "b_dirty_time:       %10lu\n"
 		   "bdi_list:           %10u\n"
 		   "state:              %10lx\n",
-		   (unsigned long) K(wb_stat(wb, WB_WRITEBACK)),
-		   (unsigned long) K(wb_stat(wb, WB_RECLAIMABLE)),
-		   K(wb_thresh),
-		   K(dirty_thresh),
-		   K(background_thresh),
-		   (unsigned long) K(wb_stat(wb, WB_DIRTIED)),
-		   (unsigned long) K(wb_stat(wb, WB_WRITTEN)),
-		   (unsigned long) K(wb->write_bandwidth),
+		   (unsigned long) PG2KB(wb_stat(wb, WB_WRITEBACK)),
+		   (unsigned long) PG2KB(wb_stat(wb, WB_RECLAIMABLE)),
+		   PG2KB(wb_thresh),
+		   PG2KB(dirty_thresh),
+		   PG2KB(background_thresh),
+		   (unsigned long) PG2KB(wb_stat(wb, WB_DIRTIED)),
+		   (unsigned long) PG2KB(wb_stat(wb, WB_WRITTEN)),
+		   (unsigned long) PG2KB(wb->write_bandwidth),
 		   nr_dirty,
 		   nr_io,
 		   nr_more_io,
@@ -157,7 +155,7 @@ static ssize_t name##_show(struct device *dev,				\
 }									\
 static DEVICE_ATTR_RW(name);
 
-BDI_SHOW(read_ahead_kb, K(bdi->ra_pages))
+BDI_SHOW(read_ahead_kb, PG2KB(bdi->ra_pages))
 
 static ssize_t min_ratio_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
