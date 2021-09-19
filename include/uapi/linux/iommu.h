@@ -141,6 +141,35 @@ struct iommu_ioasid_alloc {
 
 #define IOMMU_IOASID_FREE		_IO(IOMMU_TYPE, IOMMU_BASE + 3)
 
+/*
+ * Map/unmap process virtual addresses to I/O virtual addresses.
+ *
+ * Provide VFIO type1 equivalent semantics. Start with the same
+ * restriction e.g. the unmap size should match those used in the
+ * original mapping call.
+ *
+ * @argsz:	user filled size of this data.
+ * @flags:	reserved for future extension.
+ * @ioasid:	the handle of target I/O address space.
+ * @data:	the operation payload, refer to vfio_iommu_type1_dma_{un}map.
+ *
+ * FIXME:
+ *	userspace needs to include uapi/vfio.h as well as interface reuses
+ *	the map/unmap logic from vfio iommu type1.
+ *
+ * Return: 0 on success, -errno on failure.
+ */
+struct iommu_ioasid_dma_op {
+	__u32	argsz;
+	__u32	flags;
+	__s32	ioasid;
+	__u32	padding;
+	__u8	data[];
+};
+
+#define IOMMU_MAP_DMA	_IO(IOMMU_TYPE, IOMMU_BASE + 4)
+#define IOMMU_UNMAP_DMA	_IO(IOMMU_TYPE, IOMMU_BASE + 5)
+
 #define IOMMU_FAULT_PERM_READ	(1 << 0) /* read */
 #define IOMMU_FAULT_PERM_WRITE	(1 << 1) /* write */
 #define IOMMU_FAULT_PERM_EXEC	(1 << 2) /* exec */
