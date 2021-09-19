@@ -24,6 +24,7 @@
 struct iommufd_ctx {
 	refcount_t refs;
 	struct mutex lock;
+	struct xarray ioasid_xa; /* xarray of ioasids */
 	struct xarray device_xa; /* xarray of bound devices */
 };
 
@@ -42,6 +43,16 @@ struct iommufd_device {
 	u64 dev_cookie;
 };
 
+/* Represent an I/O address space */
+struct iommufd_ioas {
+	int ioasid;
+	u32 type;
+	u32 addr_width;
+	bool enforce_snoop;
+	struct iommufd_ctx *ictx;
+	refcount_t refs;
+};
+
 static int iommufd_fops_open(struct inode *inode, struct file *filep)
 {
 	struct iommufd_ctx *ictx;
@@ -53,6 +64,7 @@ static int iommufd_fops_open(struct inode *inode, struct file *filep)
 
 	refcount_set(&ictx->refs, 1);
 	mutex_init(&ictx->lock);
+	xa_init_flags(&ictx->ioasid_xa, XA_FLAGS_ALLOC);
 	xa_init_flags(&ictx->device_xa, XA_FLAGS_ALLOC);
 	filep->private_data = ictx;
 
@@ -102,15 +114,117 @@ static void iommufd_ctx_put(struct iommufd_ctx *ictx)
 	if (!refcount_dec_and_test(&ictx->refs))
 		return;
 
+	WARN_ON(!xa_empty(&ictx->ioasid_xa));
 	WARN_ON(!xa_empty(&ictx->device_xa));
 	kfree(ictx);
 }
 
+/* Caller should hold ictx->lock */
+static void ioas_put_locked(struct iommufd_ioas *ioas)
+{
+	struct iommufd_ctx *ictx = ioas->ictx;
+	int ioasid = ioas->ioasid;
+
+	if (!refcount_dec_and_test(&ioas->refs))
+		return;
+
+	xa_erase(&ictx->ioasid_xa, ioasid);
+	iommufd_ctx_put(ictx);
+	kfree(ioas);
+}
+
+static int iommufd_ioasid_alloc(struct iommufd_ctx *ictx, unsigned long arg)
+{
+	struct iommu_ioasid_alloc req;
+	struct iommufd_ioas *ioas;
+	unsigned long minsz;
+	int ioasid, ret;
+
+	minsz = offsetofend(struct iommu_ioasid_alloc, addr_width);
+
+	if (copy_from_user(&req, (void __user *)arg, minsz))
+		return -EFAULT;
+
+	if (req.argsz < minsz || !req.addr_width ||
+	    req.flags != IOMMU_IOASID_ENFORCE_SNOOP ||
+	    req.type != IOMMU_IOASID_TYPE_KERNEL_TYPE1V2)
+		return -EINVAL;
+
+	ioas = kzalloc(sizeof(*ioas), GFP_KERNEL);
+	if (!ioas)
+		return -ENOMEM;
+
+	mutex_lock(&ictx->lock);
+	ret = xa_alloc(&ictx->ioasid_xa, &ioasid, ioas,
+		       XA_LIMIT(IOMMUFD_IOASID_MIN, IOMMUFD_IOASID_MAX),
+		       GFP_KERNEL);
+	mutex_unlock(&ictx->lock);
+	if (ret) {
+		pr_err_ratelimited("Failed to alloc ioasid\n");
+		kfree(ioas);
+		return ret;
+	}
+
+	ioas->ioasid = ioasid;
+
+	/* only supports kernel managed I/O page table so far */
+	ioas->type = IOMMU_IOASID_TYPE_KERNEL_TYPE1V2;
+
+	ioas->addr_width = req.addr_width;
+
+	/* only supports enforce snoop today */
+	ioas->enforce_snoop = true;
+
+	iommufd_ctx_get(ictx);
+	ioas->ictx = ictx;
+
+	refcount_set(&ioas->refs, 1);
+
+	return ioasid;
+}
+
+static int iommufd_ioasid_free(struct iommufd_ctx *ictx, unsigned long arg)
+{
+	struct iommufd_ioas *ioas = NULL;
+	int ioasid, ret;
+
+	if (copy_from_user(&ioasid, (void __user *)arg, sizeof(ioasid)))
+		return -EFAULT;
+
+	if (ioasid < 0)
+		return -EINVAL;
+
+	mutex_lock(&ictx->lock);
+	ioas = xa_load(&ictx->ioasid_xa, ioasid);
+	if (IS_ERR(ioas)) {
+		ret = -EINVAL;
+		goto out_unlock;
+	}
+
+	/* Disallow free if refcount is not 1 */
+	if (refcount_read(&ioas->refs) > 1) {
+		ret = -EBUSY;
+		goto out_unlock;
+	}
+
+	ioas_put_locked(ioas);
+out_unlock:
+	mutex_unlock(&ictx->lock);
+	return ret;
+};
+
 static int iommufd_fops_release(struct inode *inode, struct file *filep)
 {
 	struct iommufd_ctx *ictx = filep->private_data;
+	struct iommufd_ioas *ioas;
+	unsigned long index;
 
 	filep->private_data = NULL;
+
+	mutex_lock(&ictx->lock);
+	xa_for_each(&ictx->ioasid_xa, index, ioas)
+		ioas_put_locked(ioas);
+	mutex_unlock(&ictx->lock);
 
 	iommufd_ctx_put(ictx);
 
@@ -194,6 +308,12 @@ static long iommufd_fops_unl_ioctl(struct file *filep,
 	switch (cmd) {
 	case IOMMU_DEVICE_GET_INFO:
 		ret = iommufd_get_device_info(ictx, arg);
+		break;
+	case IOMMU_IOASID_ALLOC:
+		ret = iommufd_ioasid_alloc(ictx, arg);
+		break;
+	case IOMMU_IOASID_FREE:
+		ret = iommufd_ioasid_free(ictx, arg);
 		break;
 	default:
 		pr_err_ratelimited("unsupported cmd %u\n", cmd);

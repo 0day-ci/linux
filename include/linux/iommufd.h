@@ -14,6 +14,9 @@
 #include <linux/err.h>
 #include <linux/device.h>
 
+#define IOMMUFD_IOASID_MAX	((unsigned int)(0x7FFFFFFF))
+#define IOMMUFD_IOASID_MIN	0
+
 #define IOMMUFD_DEVID_MAX	((unsigned int)(0x7FFFFFFF))
 #define IOMMUFD_DEVID_MIN	0
 

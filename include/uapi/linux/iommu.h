@@ -57,6 +57,60 @@ struct iommu_device_info {
 
 #define IOMMU_DEVICE_GET_INFO	_IO(IOMMU_TYPE, IOMMU_BASE + 1)
 
+/*
+ * IOMMU_IOASID_ALLOC	- _IOWR(IOMMU_TYPE, IOMMU_BASE + 2,
+ *				struct iommu_ioasid_alloc)
+ *
+ * Allocate an IOASID.
+ *
+ * IOASID is the FD-local software handle representing an I/O address
+ * space. Each IOASID is associated with a single I/O page table. User
+ * must call this ioctl to get an IOASID for every I/O address space
+ * that is intended to be tracked by the kernel.
+ *
+ * User needs to specify the attributes of the IOASID and associated
+ * I/O page table format information according to one or multiple devices
+ * which will be attached to this IOASID right after. The I/O page table
+ * is activated in the IOMMU when it's attached by a device. Incompatible
+ * format between device and IOASID will lead to attaching failure in
+ * device side.
+ *
+ * Currently only one flag (IOMMU_IOASID_ENFORCE_SNOOP) is supported and
+ * must be always set.
+ *
+ * Only one I/O page table type (kernel-managed) is supported, with vfio
+ * type1v2 mapping semantics.
+ *
+ * User should call IOMMU_CHECK_EXTENSION for future extensions.
+ *
+ * @argsz:	    user filled size of this data.
+ * @flags:	    additional information for IOASID allocation.
+ * @type:	    I/O address space page table type.
+ * @addr_width:    address width of the I/O address space.
+ *
+ * Return: allocated ioasid on success, -errno on failure.
+ */
+struct iommu_ioasid_alloc {
+	__u32	argsz;
+	__u32	flags;
+#define IOMMU_IOASID_ENFORCE_SNOOP	(1 << 0)
+	__u32	type;
+#define IOMMU_IOASID_TYPE_KERNEL_TYPE1V2	1
+	__u32	addr_width;
+};
+
+#define IOMMU_IOASID_ALLOC		_IO(IOMMU_TYPE, IOMMU_BASE + 2)
+
+/**
+ * IOMMU_IOASID_FREE - _IOWR(IOMMU_TYPE, IOMMU_BASE + 3, int)
+ *
+ * Free an IOASID.
+ *
+ * returns: 0 on success, -errno on failure
+ */
+
+#define IOMMU_IOASID_FREE		_IO(IOMMU_TYPE, IOMMU_BASE + 3)
+
 #define IOMMU_FAULT_PERM_READ	(1 << 0) /* read */
 #define IOMMU_FAULT_PERM_WRITE	(1 << 1) /* write */
 #define IOMMU_FAULT_PERM_EXEC	(1 << 2) /* exec */
