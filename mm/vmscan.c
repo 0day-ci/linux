@@ -2164,6 +2164,8 @@ static unsigned int move_pages_to_lru(struct lruvec *lruvec,
 {
 	int nr_pages, nr_moved = 0;
 	LIST_HEAD(pages_to_free);
+	LIST_HEAD(pages_to_putback);
+	LIST_HEAD(compound_pages_to_free);
 	struct page *page;
 
 	while (!list_empty(list)) {
@@ -2171,9 +2173,7 @@ static unsigned int move_pages_to_lru(struct lruvec *lruvec,
 		VM_BUG_ON_PAGE(PageLRU(page), page);
 		list_del(&page->lru);
 		if (unlikely(!page_evictable(page))) {
-			spin_unlock_irq(&lruvec->lru_lock);
-			putback_lru_page(page);
-			spin_lock_irq(&lruvec->lru_lock);
+			list_move(&page->lru, &pages_to_putback);
 			continue;
 		}
 
@@ -2193,11 +2193,9 @@ static unsigned int move_pages_to_lru(struct lruvec *lruvec,
 		if (unlikely(put_page_testzero(page))) {
 			__clear_page_lru_flags(page);
 
-			if (unlikely(PageCompound(page))) {
-				spin_unlock_irq(&lruvec->lru_lock);
-				destroy_compound_page(page);
-				spin_lock_irq(&lruvec->lru_lock);
-			} else
+			if (unlikely(PageCompound(page)))
+				list_move(&page->lru, &compound_pages_to_free);
+			else
 				list_add(&page->lru, &pages_to_free);
 
 			continue;
@@ -2214,6 +2212,24 @@ static unsigned int move_pages_to_lru(struct lruvec *lruvec,
 		if (PageActive(page))
 			workingset_age_nonresident(lruvec, nr_pages);
 	}
+
+	/*
+	 * Putback as a batch to reduce unlock/lock pair for unevictable pages
+	 */
+	spin_unlock_irq(&lruvec->lru_lock);
+	while (!list_empty(&pages_to_putback)) {
+		page = lru_to_page(&pages_to_putback);
+		putback_lru_page(page);
+	}
+
+	/*
+	 * Free compound page as a batch to reduce unnecessary unlock/lock
+	 */
+	while (!list_empty(&compound_pages_to_free)) {
+		page = lru_to_page(&compound_pages_to_free);
+		destroy_compound_page(page);
+	}
+	spin_lock_irq(&lruvec->lru_lock);
 
 	/*
 	 * To save our caller's stack, now use input list for pages to free.
