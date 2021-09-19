@@ -3257,3 +3257,19 @@ out:
 
 	return ret;
 }
+
+/* Expose per-device iommu attributes. */
+int iommu_device_get_info(struct device *dev, enum iommu_devattr attr, void *data)
+{
+	const struct iommu_ops *ops;
+
+	if (!dev->bus || !dev->bus->iommu_ops)
+		return -EINVAL;
+
+	ops = dev->bus->iommu_ops;
+	if (unlikely(!ops->device_info))
+		return -ENODEV;
+
+	return ops->device_info(dev, attr, data);
+}
+EXPORT_SYMBOL_GPL(iommu_device_get_info);

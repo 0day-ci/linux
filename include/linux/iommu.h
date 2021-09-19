@@ -150,6 +150,14 @@ enum iommu_dev_features {
 	IOMMU_DEV_FEAT_IOPF,
 };
 
+/**
+ * enum iommu_devattr - Per device IOMMU attributes
+ * @IOMMU_DEV_INFO_FORCE_SNOOP [bool]: IOMMU can force DMA to be snooped.
+ */
+enum iommu_devattr {
+	IOMMU_DEV_INFO_FORCE_SNOOP,
+};
+
 #define IOMMU_PASID_INVALID	(-1U)
 
 #ifdef CONFIG_IOMMU_API
@@ -215,6 +223,7 @@ struct iommu_iotlb_gather {
  *		- IOMMU_DOMAIN_IDENTITY: must use an identity domain
  *		- IOMMU_DOMAIN_DMA: must use a dma domain
  *		- 0: use the default setting
+ * @device_info: query per-device iommu attributes
  * @pgsize_bitmap: bitmap of all possible supported page sizes
  * @owner: Driver module providing these ops
  */
@@ -282,6 +291,8 @@ struct iommu_ops {
 	int (*sva_unbind_gpasid)(struct device *dev, u32 pasid);
 
 	int (*def_domain_type)(struct device *dev);
+
+	int (*device_info)(struct device *dev, enum iommu_devattr attr, void *data);
 
 	unsigned long pgsize_bitmap;
 	struct module *owner;
@@ -603,6 +614,8 @@ struct iommu_sva *iommu_sva_bind_device(struct device *dev,
 					void *drvdata);
 void iommu_sva_unbind_device(struct iommu_sva *handle);
 u32 iommu_sva_get_pasid(struct iommu_sva *handle);
+
+int iommu_device_get_info(struct device *dev, enum iommu_devattr attr, void *data);
 
 #else /* CONFIG_IOMMU_API */
 
@@ -998,6 +1011,12 @@ static inline int iommu_sva_unbind_gpasid(struct iommu_domain *domain,
 static inline struct iommu_fwspec *dev_iommu_fwspec_get(struct device *dev)
 {
 	return NULL;
+}
+
+static inline int iommu_device_get_info(struct device *dev,
+					enum iommu_devattr type, void *data)
+{
+	return -ENODEV;
 }
 #endif /* CONFIG_IOMMU_API */
 
