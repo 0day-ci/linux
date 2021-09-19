@@ -14,6 +14,7 @@
 #include <linux/types.h>
 #include <linux/uuid.h>
 #include <linux/notifier.h>
+#include <linux/iommufd.h>
 
 #ifndef VFIO_PCI_PRIVATE_H
 #define VFIO_PCI_PRIVATE_H
@@ -99,6 +100,11 @@ struct vfio_pci_mmap_vma {
 	struct list_head	vma_next;
 };
 
+struct vfio_iommufd_device {
+	struct iommufd_device *idev;
+	int iommu_fd;
+};
+
 struct vfio_pci_device {
 	struct vfio_device	vdev;
 	struct pci_dev		*pdev;
@@ -144,6 +150,8 @@ struct vfio_pci_device {
 	struct list_head	vma_list;
 	struct rw_semaphore	memory_lock;
 	atomic_t		block_access;
+	struct mutex		videv_lock;
+	struct vfio_iommufd_device *videv;
 };
 
 #define is_intx(vdev) (vdev->irq_type == VFIO_PCI_INTX_IRQ_INDEX)

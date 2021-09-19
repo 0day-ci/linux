@@ -552,6 +552,16 @@ static void vfio_pci_release(struct vfio_device *core_vdev)
 			vdev->req_trigger = NULL;
 		}
 		mutex_unlock(&vdev->igate);
+
+		mutex_lock(&vdev->videv_lock);
+		if (vdev->videv) {
+			struct vfio_iommufd_device *videv = vdev->videv;
+
+			vdev->videv = NULL;
+			iommufd_unbind_device(videv->idev);
+			kfree(videv);
+		}
+		mutex_unlock(&vdev->videv_lock);
 	}
 
 	mutex_unlock(&vdev->reflck->lock);
@@ -780,7 +790,66 @@ static long vfio_pci_ioctl(struct vfio_device *core_vdev,
 		container_of(core_vdev, struct vfio_pci_device, vdev);
 	unsigned long minsz;
 
-	if (cmd == VFIO_DEVICE_GET_INFO) {
+	if (cmd == VFIO_DEVICE_BIND_IOMMUFD) {
+		struct vfio_device_iommu_bind_data bind_data;
+		unsigned long minsz;
+		struct iommufd_device *idev;
+		struct vfio_iommufd_device *videv;
+
+		/*
+		 * Reject the request if the device is already opened and
+		 * attached to a container.
+		 */
+		if (vfio_device_in_container(core_vdev))
+			return -ENOTTY;
+
+		minsz = offsetofend(struct vfio_device_iommu_bind_data, dev_cookie);
+
+		if (copy_from_user(&bind_data, (void __user *)arg, minsz))
+			return -EFAULT;
+
+		if (bind_data.argsz < minsz ||
+		    bind_data.flags || bind_data.iommu_fd < 0)
+			return -EINVAL;
+
+		mutex_lock(&vdev->videv_lock);
+		/*
+		 * Allow only one iommufd per device until multiple
+		 * address spaces (e.g. vSVA) support is introduced
+		 * in the future.
+		 */
+		if (vdev->videv) {
+			mutex_unlock(&vdev->videv_lock);
+			return -EBUSY;
+		}
+
+		idev = iommufd_bind_device(bind_data.iommu_fd,
+					   &vdev->pdev->dev,
+					   bind_data.dev_cookie);
+		if (IS_ERR(idev)) {
+			mutex_unlock(&vdev->videv_lock);
+			return PTR_ERR(idev);
+		}
+
+		videv = kzalloc(sizeof(*videv), GFP_KERNEL);
+		if (!videv) {
+			iommufd_unbind_device(idev);
+			mutex_unlock(&vdev->videv_lock);
+			return -ENOMEM;
+		}
+		videv->idev = idev;
+		videv->iommu_fd = bind_data.iommu_fd;
+		/*
+		 * A security context has been established. Unblock
+		 * user access.
+		 */
+		if (atomic_read(&vdev->block_access))
+			atomic_set(&vdev->block_access, 0);
+		vdev->videv = videv;
+		mutex_unlock(&vdev->videv_lock);
+
+		return 0;
+	} else if (cmd == VFIO_DEVICE_GET_INFO) {
 		struct vfio_device_info info;
 		struct vfio_info_cap caps = { .buf = NULL, .size = 0 };
 		unsigned long capsz;
@@ -2031,6 +2100,7 @@ static int vfio_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	mutex_init(&vdev->vma_lock);
 	INIT_LIST_HEAD(&vdev->vma_list);
 	init_rwsem(&vdev->memory_lock);
+	mutex_init(&vdev->videv_lock);
 
 	ret = vfio_pci_reflck_attach(vdev);
 	if (ret)
