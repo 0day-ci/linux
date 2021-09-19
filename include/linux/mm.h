@@ -98,6 +98,9 @@ extern int mmap_rnd_compat_bits __read_mostly;
 #include <asm/page.h>
 #include <asm/processor.h>
 
+#define PG2KB(x)	((x) << (PAGE_SHIFT - 10))
+#define KB2PG(x)	((x) >> (PAGE_SHIFT - 10))
+
 /*
  * Architectures that support memory tagging (assigning tags to memory regions,
  * embedding these tags into addresses that point to these memory regions, and
