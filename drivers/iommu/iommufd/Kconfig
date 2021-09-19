@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: GPL-2.0-only
+config IOMMUFD
+	tristate "I/O Address Space management framework for passthrough devices"
+	select IOMMU_API
+	default n
+	help
+	  provides unified I/O address space management framework for
+	  isolating untrusted DMAs via devices which are passed through
+	  to userspace drivers.
+
+	  If you don't know what to do here, say N.
