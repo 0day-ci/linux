@@ -117,6 +117,71 @@ static int iommufd_fops_release(struct inode *inode, struct file *filep)
 	return 0;
 }
 
+static struct device *
+iommu_find_device_from_cookie(struct iommufd_ctx *ictx, u64 dev_cookie)
+{
+	struct iommufd_device *idev;
+	struct device *dev = NULL;
+	unsigned long index;
+
+	mutex_lock(&ictx->lock);
+	xa_for_each(&ictx->device_xa, index, idev) {
+		if (idev->dev_cookie == dev_cookie) {
+			dev = idev->dev;
+			break;
+		}
+	}
+	mutex_unlock(&ictx->lock);
+
+	return dev;
+}
+
+static void iommu_device_build_info(struct device *dev,
+				    struct iommu_device_info *info)
+{
+	bool snoop;
+	u64 awidth, pgsizes;
+
+	if (!iommu_device_get_info(dev, IOMMU_DEV_INFO_FORCE_SNOOP, &snoop))
+		info->flags |= snoop ? IOMMU_DEVICE_INFO_ENFORCE_SNOOP : 0;
+
+	if (!iommu_device_get_info(dev, IOMMU_DEV_INFO_PAGE_SIZE, &pgsizes)) {
+		info->pgsize_bitmap = pgsizes;
+		info->flags |= IOMMU_DEVICE_INFO_PGSIZES;
+	}
+
+	if (!iommu_device_get_info(dev, IOMMU_DEV_INFO_ADDR_WIDTH, &awidth)) {
+		info->addr_width = awidth;
+		info->flags |= IOMMU_DEVICE_INFO_ADDR_WIDTH;
+	}
+}
+
+static int iommufd_get_device_info(struct iommufd_ctx *ictx,
+				   unsigned long arg)
+{
+	struct iommu_device_info info;
+	unsigned long minsz;
+	struct device *dev;
+
+	minsz = offsetofend(struct iommu_device_info, addr_width);
+
+	if (copy_from_user(&info, (void __user *)arg, minsz))
+		return -EFAULT;
+
+	if (info.argsz < minsz)
+		return -EINVAL;
+
+	info.flags = 0;
+
+	dev = iommu_find_device_from_cookie(ictx, info.dev_cookie);
+	if (!dev)
+		return -EINVAL;
+
+	iommu_device_build_info(dev, &info);
+
+	return copy_to_user((void __user *)arg, &info, minsz) ? -EFAULT : 0;
+}
+
 static long iommufd_fops_unl_ioctl(struct file *filep,
 				   unsigned int cmd, unsigned long arg)
 {
@@ -127,6 +192,9 @@ static long iommufd_fops_unl_ioctl(struct file *filep,
 		return ret;
 
 	switch (cmd) {
+	case IOMMU_DEVICE_GET_INFO:
+		ret = iommufd_get_device_info(ictx, arg);
+		break;
 	default:
 		pr_err_ratelimited("unsupported cmd %u\n", cmd);
 		break;
