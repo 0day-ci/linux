@@ -70,6 +70,11 @@ struct bam_async_desc {
 
 	struct bam_desc_hw *curr_desc;
 
+	/* first descriptor position in fifo */
+	size_t fifo_index;
+	void *metadata;
+	size_t meta_len;
+
 	/* list node for the desc in the bam_chan list of descriptors */
 	struct list_head desc_node;
 	enum dma_transfer_direction dir;
@@ -593,6 +598,65 @@ static int bam_slave_config(struct dma_chan *chan,
 }
 
 /**
+ * bam_update_metadata - update metadata buffer
+ * @async_desc: BAM async descriptior
+ * @fifo: BAM FIFO to read metadata from
+ *
+ * Updates metadata buffer (transfer size) based on values
+ * read from FIFO descriptors
+ */
+
+static void bam_update_metadata(struct bam_async_desc *async_desc,
+				struct bam_desc_hw *fifo)
+{
+	unsigned int len = 0, i;
+
+	if (!async_desc->metadata)
+		return;
+
+	for (i = 0; i < async_desc->xfer_len; ++i) {
+		unsigned int pos = (i + async_desc->fifo_index) % MAX_DESCRIPTORS;
+
+		len += fifo[pos].size;
+	}
+
+	switch (async_desc->meta_len)  {
+	case 4:
+		*((u32 *)async_desc->metadata) = len;
+		break;
+	case 8:
+		*((u64 *)async_desc->metadata) = len;
+		break;
+	}
+}
+
+/**
+ * bam_attach_metadata - attach metadata buffer to the async descriptor
+ * @desc: async descriptor
+ * @data: buffer pointer
+ * @len: length of passed buffer
+ */
+static int bam_attach_metadata(struct dma_async_tx_descriptor *desc, void *data,
+			       size_t len)
+{
+	struct bam_async_desc *async_desc;
+
+	if (!data || !(len == 2 || len == 4 || len == 8))
+		return -EINVAL;
+
+	async_desc = container_of(desc, struct bam_async_desc, vd.tx);
+
+	async_desc->metadata = data;
+	async_desc->meta_len = len;
+
+	return 0;
+}
+
+static struct dma_descriptor_metadata_ops metadata_ops = {
+	.attach = bam_attach_metadata,
+};
+
+/**
  * bam_prep_slave_sg - Prep slave sg transaction
  *
  * @chan: dma channel
@@ -668,6 +732,8 @@ static struct dma_async_tx_descriptor *bam_prep_slave_sg(struct dma_chan *chan,
 			desc++;
 		} while (remainder > 0);
 	}
+
+	async_desc->vd.tx.metadata_ops = &metadata_ops;
 
 	return vchan_tx_prep(&bchan->vc, &async_desc->vd, flags);
 }
@@ -836,6 +902,11 @@ static u32 process_channel_irqs(struct bam_device *bdev)
 			 * it gets restarted by the tasklet
 			 */
 			if (!async_desc->num_desc) {
+				struct bam_desc_hw *fifo = PTR_ALIGN(bchan->fifo_virt,
+						sizeof(struct bam_desc_hw));
+
+				bam_update_metadata(async_desc, fifo);
+
 				vchan_cookie_complete(&async_desc->vd);
 			} else {
 				list_add(&async_desc->vd.node,
@@ -1049,6 +1120,8 @@ static void bam_start_dma(struct bam_chan *bchan)
 			       async_desc->xfer_len *
 			       sizeof(struct bam_desc_hw));
 		}
+
+		async_desc->fifo_index = bchan->tail;
 
 		bchan->tail += async_desc->xfer_len;
 		bchan->tail %= MAX_DESCRIPTORS;
@@ -1328,6 +1401,7 @@ static int bam_dma_probe(struct platform_device *pdev)
 	bdev->common.residue_granularity = DMA_RESIDUE_GRANULARITY_SEGMENT;
 	bdev->common.src_addr_widths = DMA_SLAVE_BUSWIDTH_4_BYTES;
 	bdev->common.dst_addr_widths = DMA_SLAVE_BUSWIDTH_4_BYTES;
+	bdev->common.desc_metadata_modes = DESC_METADATA_CLIENT;
 	bdev->common.device_alloc_chan_resources = bam_alloc_chan;
 	bdev->common.device_free_chan_resources = bam_free_chan;
 	bdev->common.device_prep_slave_sg = bam_prep_slave_sg;
