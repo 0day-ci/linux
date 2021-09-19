@@ -572,6 +572,10 @@ static int vfio_pci_open(struct vfio_device *core_vdev)
 
 		vfio_spapr_pci_eeh_open(vdev->pdev);
 		vfio_pci_vf_token_user_add(vdev, 1);
+		if (!vfio_device_in_container(core_vdev))
+			atomic_set(&vdev->block_access, 1);
+		else
+			atomic_set(&vdev->block_access, 0);
 	}
 	vdev->refcnt++;
 error:
@@ -1374,6 +1378,9 @@ static ssize_t vfio_pci_rw(struct vfio_pci_device *vdev, char __user *buf,
 {
 	unsigned int index = VFIO_PCI_OFFSET_TO_INDEX(*ppos);
 
+	if (atomic_read(&vdev->block_access))
+		return -ENODEV;
+
 	if (index >= VFIO_PCI_NUM_REGIONS + vdev->num_regions)
 		return -EINVAL;
 
@@ -1639,6 +1646,9 @@ static int vfio_pci_mmap(struct vfio_device *core_vdev, struct vm_area_struct *v
 	unsigned int index;
 	u64 phys_len, req_len, pgoff, req_start;
 	int ret;
+
+	if (atomic_read(&vdev->block_access))
+		return -ENODEV;
 
 	index = vma->vm_pgoff >> (VFIO_PCI_OFFSET_SHIFT - PAGE_SHIFT);
 
@@ -1978,6 +1988,8 @@ static int vfio_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	struct vfio_pci_device *vdev;
 	struct iommu_group *group;
 	int ret;
+	u32 flags;
+	bool snoop = false;
 
 	if (vfio_pci_is_denylisted(pdev))
 		return -EINVAL;
@@ -2046,9 +2058,18 @@ static int vfio_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		vfio_pci_set_power_state(vdev, PCI_D3hot);
 	}
 
-	ret = vfio_register_group_dev(&vdev->vdev);
-	if (ret)
+	flags = VFIO_DEVNODE_GROUP;
+	ret = iommu_device_get_info(&pdev->dev,
+				    IOMMU_DEV_INFO_FORCE_SNOOP, &snoop);
+	if (!ret && snoop)
+		flags |= VFIO_DEVNODE_NONGROUP;
+
+	ret = vfio_register_device(&vdev->vdev, flags);
+	if (ret) {
+		pr_debug("Failed to register device interface\n");
 		goto out_power;
+	}
+
 	dev_set_drvdata(&pdev->dev, vdev);
 	return 0;
 

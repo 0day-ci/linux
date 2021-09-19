@@ -81,6 +81,7 @@ enum vfio_iommu_notify_type {
 
 extern int vfio_register_device(struct vfio_device *device, u32 flags);
 extern void vfio_unregister_device(struct vfio_device *device);
+extern bool vfio_device_in_container(struct vfio_device *device);
 
 /**
  * struct vfio_iommu_driver_ops - VFIO IOMMU driver callbacks

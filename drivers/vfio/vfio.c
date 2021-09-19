@@ -1789,10 +1789,11 @@ err_group_try_open:
 	return ret;
 }
 
-static bool vfio_device_in_container(struct vfio_device *device)
+bool vfio_device_in_container(struct vfio_device *device)
 {
 	return !!(device->group && device->group->container);
 }
+EXPORT_SYMBOL_GPL(vfio_device_in_container);
 
 static int vfio_device_fops_release(struct inode *inode, struct file *filep)
 {
