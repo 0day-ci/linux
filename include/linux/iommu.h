@@ -153,9 +153,13 @@ enum iommu_dev_features {
 /**
  * enum iommu_devattr - Per device IOMMU attributes
  * @IOMMU_DEV_INFO_FORCE_SNOOP [bool]: IOMMU can force DMA to be snooped.
+ * @IOMMU_DEV_INFO_PAGE_SIZE [u64]: Page sizes that iommu supports.
+ * @IOMMU_DEV_INFO_ADDR_WIDTH [u32]: Address width supported.
  */
 enum iommu_devattr {
 	IOMMU_DEV_INFO_FORCE_SNOOP,
+	IOMMU_DEV_INFO_PAGE_SIZE,
+	IOMMU_DEV_INFO_ADDR_WIDTH,
 };
 
 #define IOMMU_PASID_INVALID	(-1U)
