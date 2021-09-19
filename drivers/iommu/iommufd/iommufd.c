@@ -306,6 +306,13 @@ static long iommufd_fops_unl_ioctl(struct file *filep,
 		return ret;
 
 	switch (cmd) {
+	case IOMMU_CHECK_EXTENSION:
+		switch (arg) {
+		case EXT_MAP_TYPE1V2:
+			return 1;
+		default:
+			return 0;
+		}
 	case IOMMU_DEVICE_GET_INFO:
 		ret = iommufd_get_device_info(ictx, arg);
 		break;

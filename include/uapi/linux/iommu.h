@@ -15,6 +15,33 @@
 #define IOMMU_BASE	100
 
 /*
+ * IOMMU_CHECK_EXTENSION - _IO(IOMMU_TYPE, IOMMU_BASE + 0)
+ *
+ * Check whether an uAPI extension is supported.
+ *
+ * It's unlikely that all planned capabilities in IOMMU fd will be ready
+ * in one breath. User should check which uAPI extension is supported
+ * according to its intended usage.
+ *
+ * A rough list of possible extensions may include:
+ *
+ *	- EXT_MAP_TYPE1V2 for vfio type1v2 map semantics;
+ *	- EXT_DMA_NO_SNOOP for no-snoop DMA support;
+ *	- EXT_MAP_NEWTYPE for an enhanced map semantics;
+ *	- EXT_MULTIDEV_GROUP for 1:N iommu group;
+ *	- EXT_IOASID_NESTING for what the name stands;
+ *	- EXT_USER_PAGE_TABLE for user managed page table;
+ *	- EXT_USER_PASID_TABLE for user managed PASID table;
+ *	- EXT_DIRTY_TRACKING for tracking pages dirtied by DMA;
+ *	- ...
+ *
+ * Return: 0 if not supported, 1 if supported.
+ */
+#define EXT_MAP_TYPE1V2		1
+#define EXT_DMA_NO_SNOOP	2
+#define IOMMU_CHECK_EXTENSION	_IO(IOMMU_TYPE, IOMMU_BASE + 0)
+
+/*
  * IOMMU_DEVICE_GET_INFO - _IOR(IOMMU_TYPE, IOMMU_BASE + 1,
  *				struct iommu_device_info)
  *
