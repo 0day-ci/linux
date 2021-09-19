@@ -16,8 +16,6 @@ static int usb_read(struct intf_hdl *intfhdl, u16 value, void *data, u8 size)
 	int status;
 	u8 io_buf[4];
 
-	mutex_lock(&dvobjpriv->usb_vendor_req_mutex);
-
 	if (adapt->bSurpriseRemoved || adapt->pwrctrlpriv.pnp_bstop_trx)
 		return -EPERM;
 
@@ -37,7 +35,7 @@ static int usb_read(struct intf_hdl *intfhdl, u16 value, void *data, u8 size)
 		 * exist or is not enabled.
 		 */
 		adapt->bSurpriseRemoved = true;
-		goto mutex_unlock;
+		return status;
 	}
 
 	if (status < 0) {
@@ -47,14 +45,11 @@ static int usb_read(struct intf_hdl *intfhdl, u16 value, void *data, u8 size)
 		if (rtw_inc_and_chk_continual_urb_error(dvobjpriv))
 			adapt->bSurpriseRemoved = true;
 
-		goto mutex_unlock;
+		return status;
 	}
 
 	rtw_reset_continual_urb_error(dvobjpriv);
 	memcpy(data, io_buf, size);
-
-mutex_unlock:
-	mutex_unlock(&dvobjpriv->usb_vendor_req_mutex);
 
 	return status;
 }
@@ -66,8 +61,6 @@ static int usb_write(struct intf_hdl *intfhdl, u16 value, void *data, u8 size)
 	struct usb_device *udev = dvobjpriv->pusbdev;
 	int status;
 	u8 io_buf[VENDOR_CMD_MAX_DATA_LEN];
-
-	mutex_lock(&dvobjpriv->usb_vendor_req_mutex);
 
 	if (adapt->bSurpriseRemoved || adapt->pwrctrlpriv.pnp_bstop_trx)
 		return -EPERM;
@@ -89,7 +82,7 @@ static int usb_write(struct intf_hdl *intfhdl, u16 value, void *data, u8 size)
 		 * exist or is not enabled.
 		 */
 		adapt->bSurpriseRemoved = true;
-		goto mutex_unlock;
+		return status;
 	}
 
 	if (status < 0) {
@@ -99,13 +92,10 @@ static int usb_write(struct intf_hdl *intfhdl, u16 value, void *data, u8 size)
 		if (rtw_inc_and_chk_continual_urb_error(dvobjpriv))
 			adapt->bSurpriseRemoved = true;
 
-		goto mutex_unlock;
+		return status;
 	}
 
 	rtw_reset_continual_urb_error(dvobjpriv);
-
-mutex_unlock:
-	mutex_unlock(&dvobjpriv->usb_vendor_req_mutex);
 
 	return status;
 }
