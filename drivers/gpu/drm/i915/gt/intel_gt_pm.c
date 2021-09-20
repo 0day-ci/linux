@@ -295,8 +295,6 @@ void intel_gt_suspend_prepare(struct intel_gt *gt)
 {
 	user_forcewake(gt, true);
 	wait_for_suspend(gt);
-
-	intel_uc_suspend(&gt->uc);
 }
 
 static suspend_state_t pm_suspend_target(void)
@@ -319,6 +317,8 @@ void intel_gt_suspend_late(struct intel_gt *gt)
 		return;
 
 	GEM_BUG_ON(gt->awake);
+
+	intel_uc_suspend(&gt->uc);
 
 	/*
 	 * On disabling the device, we want to turn off HW access to memory
