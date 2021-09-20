@@ -427,6 +427,17 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
 			goto err_clk;
 	}
 
+	if (!data->phy) {
+		data->phy = devm_usb_get_phy_by_phandle(dev, "phys", 0);
+		if (IS_ERR(data->phy)) {
+			ret = PTR_ERR(data->phy);
+			if (ret == -ENODEV)
+				data->phy = NULL;
+			else
+				goto err_clk;
+		}
+	}
+
 	pdata.usb_phy = data->phy;
 	if (data->usbmisc_data)
 		data->usbmisc_data->usb_phy = data->phy;
