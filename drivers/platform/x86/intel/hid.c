@@ -118,6 +118,24 @@ static const struct dmi_system_id dmi_vgbs_allow_list[] = {
 	{ }
 };
 
+/*
+ * Some devices, even non convertible ones, can send incorrect SW_TABLET_MODE
+ * reports. Accept such reports only from devices in this list.
+ */
+static const struct dmi_system_id dmi_switches_auto_add_allow_list[] = {
+	{
+		.matches = {
+			DMI_EXACT_MATCH(DMI_CHASSIS_TYPE, "31" /* Convertible */),
+		},
+	},
+	{
+		.matches = {
+			DMI_EXACT_MATCH(DMI_CHASSIS_TYPE, "32" /* Detachable */),
+		},
+	},
+	{} /* Array terminator */
+};
+
 struct intel_hid_priv {
 	struct input_dev *input_dev;
 	struct input_dev *array;
@@ -455,11 +473,16 @@ static void notify_handler(acpi_handle handle, u32 event, void *context)
 	 *
 	 * See dual_accel_detect.h for more info on the dual_accel check.
 	 */
-	if (!priv->switches && !priv->dual_accel && (event == 0xcc || event == 0xcd)) {
-		dev_info(&device->dev, "switch event received, enable switches supports\n");
-		err = intel_hid_switches_setup(device);
-		if (err)
-			pr_err("Failed to setup Intel HID switches\n");
+	if (event == 0xcc || event == 0xcd) {
+		if (!dmi_check_system(dmi_switches_auto_add_allow_list))
+			return;
+
+		if (!priv->switches && !priv->dual_accel) {
+			dev_info(&device->dev, "switch event received, enable switches supports\n");
+			err = intel_hid_switches_setup(device);
+			if (err)
+				pr_err("Failed to setup Intel HID switches\n");
+		}
 	}
 
 	if (priv->wakeup_mode) {
