@@ -355,11 +355,21 @@ static void ipa_hardware_config(struct ipa *ipa, const struct ipa_data *data)
 	u32 granularity;
 	u32 val;
 
+	if (ipa->version <= IPA_VERSION_2_6L) {
+		iowrite32(1, ipa->reg_virt + IPA_REG_COMP_SW_RESET_OFFSET);
+		iowrite32(0, ipa->reg_virt + IPA_REG_COMP_SW_RESET_OFFSET);
+
+		iowrite32(1, ipa->reg_virt + ipa_reg_comp_cfg_offset(ipa->version));
+	}
+
 	/* IPA v4.5+ has no backward compatibility register */
-	if (version < IPA_VERSION_4_5) {
+	if (version >= IPA_VERSION_2_5 && version < IPA_VERSION_4_5) {
 		val = data->backward_compat;
 		iowrite32(val, ipa->reg_virt + ipa_reg_bcr_offset(ipa->version));
 	}
+
+	if (ipa->version <= IPA_VERSION_2_6L)
+		return;
 
 	/* Implement some hardware workarounds */
 	if (version >= IPA_VERSION_4_0 && version < IPA_VERSION_4_5) {
@@ -412,7 +422,8 @@ static void ipa_hardware_config(struct ipa *ipa, const struct ipa_data *data)
 static void ipa_hardware_deconfig(struct ipa *ipa)
 {
 	/* Mostly we just leave things as we set them. */
-	ipa_hardware_dcd_deconfig(ipa);
+	if (ipa->version > IPA_VERSION_2_6L)
+		ipa_hardware_dcd_deconfig(ipa);
 }
 
 /**
@@ -765,8 +776,10 @@ static int ipa_probe(struct platform_device *pdev)
 
 	/* Otherwise we need to load the firmware and have Trust Zone validate
 	 * and install it.  If that succeeds we can proceed with setup.
+	 * But on IPA v2.6L we don't need to do firmware loading :D
 	 */
-	ret = ipa_firmware_load(dev);
+	if (ipa->version > IPA_VERSION_2_6L)
+		ret = ipa_firmware_load(dev);
 	if (ret)
 		goto err_deconfig;
 

@@ -233,6 +233,10 @@ int ipa_smp2p_init(struct ipa *ipa, bool modem_init)
 	u32 valid_bit;
 	int ret;
 
+	/* With IPA v2.6L and earlier SMP2P interrupts are used */
+	if (ipa->version <= IPA_VERSION_2_6L)
+		return 0;
+
 	valid_state = qcom_smem_state_get(dev, "ipa-clock-enabled-valid",
 					  &valid_bit);
 	if (IS_ERR(valid_state))
@@ -302,6 +306,9 @@ void ipa_smp2p_exit(struct ipa *ipa)
 {
 	struct ipa_smp2p *smp2p = ipa->smp2p;
 
+	if (!smp2p)
+		return;
+
 	if (smp2p->setup_ready_irq)
 		ipa_smp2p_irq_exit(smp2p, smp2p->setup_ready_irq);
 	ipa_smp2p_panic_notifier_unregister(smp2p);
@@ -317,7 +324,7 @@ void ipa_smp2p_disable(struct ipa *ipa)
 {
 	struct ipa_smp2p *smp2p = ipa->smp2p;
 
-	if (!smp2p->setup_ready_irq)
+	if (!smp2p || !smp2p->setup_ready_irq)
 		return;
 
 	mutex_lock(&smp2p->mutex);
@@ -333,7 +340,7 @@ void ipa_smp2p_notify_reset(struct ipa *ipa)
 	struct ipa_smp2p *smp2p = ipa->smp2p;
 	u32 mask;
 
-	if (!smp2p->notified)
+	if (!smp2p || !smp2p->notified)
 		return;
 
 	ipa_smp2p_power_release(ipa);

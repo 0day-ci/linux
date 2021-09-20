@@ -162,6 +162,9 @@ int ipa_resource_config(struct ipa *ipa, const struct ipa_resource_data *data)
 {
 	u32 i;
 
+	if (ipa->version <= IPA_VERSION_2_6L)
+		return 0;
+
 	if (!ipa_resource_limits_valid(ipa, data))
 		return -EINVAL;
 
