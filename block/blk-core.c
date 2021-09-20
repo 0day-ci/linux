@@ -475,18 +475,32 @@ int blk_queue_enter(struct request_queue *q, blk_mq_req_flags_t flags)
 static inline int bio_queue_enter(struct bio *bio)
 {
 	struct request_queue *q = bio->bi_bdev->bd_disk->queue;
-	bool nowait = bio->bi_opf & REQ_NOWAIT;
-	int ret;
 
-	ret = blk_queue_enter(q, nowait ? BLK_MQ_REQ_NOWAIT : 0);
-	if (unlikely(ret)) {
-		if (nowait && !blk_queue_dying(q))
+	while (!blk_try_enter_queue(q, false)) {
+		if (bio->bi_opf & REQ_NOWAIT) {
 			bio_wouldblock_error(bio);
-		else
+			return -EBUSY;
+		}
+
+		/*
+		 * read pair of barrier in blk_freeze_queue_start(), we need to
+		 * order reading __PERCPU_REF_DEAD flag of .q_usage_counter and
+		 * reading .mq_freeze_depth or queue dying flag, otherwise the
+		 * following wait may never return if the two reads are
+		 * reordered.
+		 */
+		smp_rmb();
+		wait_event(q->mq_freeze_wq,
+			   (!q->mq_freeze_depth &&
+			    blk_pm_resume_queue(false, q)) ||
+			   blk_queue_dying(q));
+		if (blk_queue_dying(q)) {
 			bio_io_error(bio);
+			return -ENODEV;
+		}
 	}
 
-	return ret;
+	return 0;
 }
 
 void blk_queue_exit(struct request_queue *q)
