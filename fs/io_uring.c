@@ -1449,6 +1449,7 @@ static void io_queue_async_work(struct io_kiocb *req, bool *locked)
 
 	/* must not take the lock, NULL it as a precaution */
 	locked = NULL;
+	(void)locked;
 
 	BUG_ON(!tctx);
 	BUG_ON(!tctx->io_wq);
