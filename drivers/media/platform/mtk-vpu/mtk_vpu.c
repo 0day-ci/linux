@@ -349,7 +349,20 @@ int vpu_ipi_send(struct platform_device *pdev,
 		}
 	} while (vpu_cfg_readl(vpu, HOST_TO_VPU));
 
-	memcpy_toio(send_obj->share_buf, buf, len);
+	/*
+	 * when copying data to the vpu hardware, the memcpy_toio operation must copy
+	 * a multiple of 8. Otherwise the processing fails
+	 */
+	if (len % 8 != 0) {
+		unsigned char data[SHARE_BUF_SIZE];
+
+		memset(data + len, 0, sizeof(data) - len);
+		memcpy(data, buf, len);
+		memcpy_toio(send_obj->share_buf, data, round_up(len, 8));
+	} else {
+		memcpy_toio(send_obj->share_buf, buf, len);
+	}
+
 	writel(len, &send_obj->len);
 	writel(id, &send_obj->id);
 
