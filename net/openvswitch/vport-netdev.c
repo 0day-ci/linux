@@ -75,6 +75,7 @@ static struct net_device *get_dpdev(const struct datapath *dp)
 
 struct vport *ovs_netdev_link(struct vport *vport, const char *name)
 {
+	unsigned int saved_flags;
 	int err;
 
 	vport->dev = dev_get_by_name(ovs_dp_get_net(vport->dp), name);
@@ -98,8 +99,17 @@ struct vport *ovs_netdev_link(struct vport *vport, const char *name)
 	if (err)
 		goto error_unlock;
 
+	/* While IFF_NO_RX_HANDLER is rightly set for l3 masters (VRF) as they
+	 * don't work with upper devices, they can be attached to OVS bridges.
+	 */
+	saved_flags = vport->dev->priv_flags;
+	if (netif_is_l3_master(vport->dev))
+		vport->dev->priv_flags &= ~IFF_NO_RX_HANDLER;
+
 	err = netdev_rx_handler_register(vport->dev, netdev_frame_hook,
 					 vport);
+	vport->dev->priv_flags = saved_flags;
+
 	if (err)
 		goto error_master_upper_dev_unlink;
 
