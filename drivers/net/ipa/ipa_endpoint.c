@@ -360,8 +360,10 @@ void ipa_endpoint_modem_pause_all(struct ipa *ipa, bool enable)
 {
 	u32 endpoint_id;
 
-	/* DELAY mode doesn't work correctly on IPA v4.2 */
-	if (ipa->version == IPA_VERSION_4_2)
+	/* DELAY mode doesn't work correctly on IPA v4.2
+	 * Pausing is not supported on IPA v2.6L
+	 */
+	if (ipa->version == IPA_VERSION_4_2 || ipa->version <= IPA_VERSION_2_6L)
 		return;
 
 	for (endpoint_id = 0; endpoint_id < IPA_ENDPOINT_MAX; endpoint_id++) {
@@ -383,6 +385,7 @@ int ipa_endpoint_modem_exception_reset_all(struct ipa *ipa)
 {
 	u32 initialized = ipa->initialized;
 	struct ipa_trans *trans;
+	u32 value = 0, value_mask = ~0;
 	u32 count;
 
 	/* We need one command per modem TX endpoint.  We can get an upper
@@ -396,6 +399,11 @@ int ipa_endpoint_modem_exception_reset_all(struct ipa *ipa)
 		dev_err(&ipa->pdev->dev,
 			"no transaction to reset modem exception endpoints\n");
 		return -EBUSY;
+	}
+
+	if (ipa->version <= IPA_VERSION_2_6L) {
+		value = aggr_force_close_fmask(true);
+		value_mask = aggr_force_close_fmask(true);
 	}
 
 	while (initialized) {
@@ -416,7 +424,7 @@ int ipa_endpoint_modem_exception_reset_all(struct ipa *ipa)
 		 * means status is disabled on the endpoint, and as a
 		 * result all other fields in the register are ignored.
 		 */
-		ipa_cmd_register_write_add(trans, offset, 0, ~0, false);
+		ipa_cmd_register_write_add(trans, offset, value, value_mask, false);
 	}
 
 	ipa_cmd_pipeline_clear_add(trans);
@@ -1531,8 +1539,10 @@ static void ipa_endpoint_program(struct ipa_endpoint *endpoint)
 	ipa_endpoint_init_mode(endpoint);
 	ipa_endpoint_init_aggr(endpoint);
 	ipa_endpoint_init_deaggr(endpoint);
-	ipa_endpoint_init_rsrc_grp(endpoint);
-	ipa_endpoint_init_seq(endpoint);
+	if (endpoint->ipa->version > IPA_VERSION_2_6L) {
+		ipa_endpoint_init_rsrc_grp(endpoint);
+		ipa_endpoint_init_seq(endpoint);
+	}
 	ipa_endpoint_status(endpoint);
 }
 
@@ -1592,7 +1602,6 @@ void ipa_endpoint_suspend_one(struct ipa_endpoint *endpoint)
 {
 	struct device *dev = &endpoint->ipa->pdev->dev;
 	struct ipa_dma *gsi = &endpoint->ipa->dma_subsys;
-	bool stop_channel;
 	int ret;
 
 	if (!(endpoint->ipa->enabled & BIT(endpoint->endpoint_id)))
@@ -1613,7 +1622,6 @@ void ipa_endpoint_resume_one(struct ipa_endpoint *endpoint)
 {
 	struct device *dev = &endpoint->ipa->pdev->dev;
 	struct ipa_dma *gsi = &endpoint->ipa->dma_subsys;
-	bool start_channel;
 	int ret;
 
 	if (!(endpoint->ipa->enabled & BIT(endpoint->endpoint_id)))
@@ -1750,23 +1758,33 @@ int ipa_endpoint_config(struct ipa *ipa)
 	/* Find out about the endpoints supplied by the hardware, and ensure
 	 * the highest one doesn't exceed the number we support.
 	 */
-	val = ioread32(ipa->reg_virt + IPA_REG_FLAVOR_0_OFFSET);
+	if (ipa->version <= IPA_VERSION_2_6L) {
+		// FIXME Not used anywhere?
+		if (ipa->version == IPA_VERSION_2_6L)
+			val = ioread32(ipa->reg_virt +
+					IPA_REG_V2_ENABLED_PIPES_OFFSET);
+		/* IPA v2.6L supports 20 pipes */
+		ipa->available = ipa->filter_map;
+		return 0;
+	} else {
+		val = ioread32(ipa->reg_virt + IPA_REG_FLAVOR_0_OFFSET);
 
-	/* Our RX is an IPA producer */
-	rx_base = u32_get_bits(val, IPA_PROD_LOWEST_FMASK);
-	max = rx_base + u32_get_bits(val, IPA_MAX_PROD_PIPES_FMASK);
-	if (max > IPA_ENDPOINT_MAX) {
-		dev_err(dev, "too many endpoints (%u > %u)\n",
-			max, IPA_ENDPOINT_MAX);
-		return -EINVAL;
+		/* Our RX is an IPA producer */
+		rx_base = u32_get_bits(val, IPA_PROD_LOWEST_FMASK);
+		max = rx_base + u32_get_bits(val, IPA_MAX_PROD_PIPES_FMASK);
+		if (max > IPA_ENDPOINT_MAX) {
+			dev_err(dev, "too many endpoints (%u > %u)\n",
+					max, IPA_ENDPOINT_MAX);
+			return -EINVAL;
+		}
+		rx_mask = GENMASK(max - 1, rx_base);
+
+		/* Our TX is an IPA consumer */
+		max = u32_get_bits(val, IPA_MAX_CONS_PIPES_FMASK);
+		tx_mask = GENMASK(max - 1, 0);
+
+		ipa->available = rx_mask | tx_mask;
 	}
-	rx_mask = GENMASK(max - 1, rx_base);
-
-	/* Our TX is an IPA consumer */
-	max = u32_get_bits(val, IPA_MAX_CONS_PIPES_FMASK);
-	tx_mask = GENMASK(max - 1, 0);
-
-	ipa->available = rx_mask | tx_mask;
 
 	/* Check for initialized endpoints not supported by the hardware */
 	if (ipa->initialized & ~ipa->available) {
@@ -1864,6 +1882,9 @@ u32 ipa_endpoint_init(struct ipa *ipa, u32 count,
 		if (data->endpoint.filter_support)
 			filter_map |= BIT(data->endpoint_id);
 	}
+
+	if (ipa->version <= IPA_VERSION_2_6L)
+		filter_map = 0x1fffff;
 
 	if (!ipa_filter_map_valid(ipa, filter_map))
 		goto err_endpoint_exit;
