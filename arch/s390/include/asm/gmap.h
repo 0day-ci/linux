@@ -147,7 +147,9 @@ int gmap_mprotect_notify(struct gmap *, unsigned long start,
 void gmap_sync_dirty_log_pmd(struct gmap *gmap, unsigned long dirty_bitmap[4],
 			     unsigned long gaddr, unsigned long vmaddr);
 int gmap_mark_unmergeable(void);
-void s390_reset_acc(struct mm_struct *mm);
 void s390_remove_old_asce(struct gmap *gmap);
 int s390_replace_asce(struct gmap *gmap);
+void s390_uv_destroy_range(struct mm_struct *mm, unsigned int users,
+			   unsigned long start, unsigned long end);
+void s390_uv_destroy_pfns(unsigned long count, unsigned long *pfns);
 #endif /* _ASM_S390_GMAP_H */
