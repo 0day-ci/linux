@@ -41,10 +41,10 @@
 
 /** enum ipa_status_opcode - status element opcode hardware values */
 enum ipa_status_opcode {
-	IPA_STATUS_OPCODE_PACKET		= 0x01,
-	IPA_STATUS_OPCODE_DROPPED_PACKET	= 0x04,
-	IPA_STATUS_OPCODE_SUSPENDED_PACKET	= 0x08,
-	IPA_STATUS_OPCODE_PACKET_2ND_PASS	= 0x40,
+	IPA_STATUS_OPCODE_PACKET		= 0,
+	IPA_STATUS_OPCODE_DROPPED_PACKET	= 2,
+	IPA_STATUS_OPCODE_SUSPENDED_PACKET	= 3,
+	IPA_STATUS_OPCODE_PACKET_2ND_PASS	= 6,
 };
 
 /** enum ipa_status_exception - status element exception type */
