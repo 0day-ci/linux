@@ -4,6 +4,7 @@
 #
 menuconfig SOC_SAMSUNG
 	bool "Samsung SoC driver support" if COMPILE_TEST
+	default y if ARCH_EXYNOS
 
 if SOC_SAMSUNG
 
@@ -15,6 +16,7 @@ config EXYNOS_ASV_ARM
 config EXYNOS_CHIPID
 	bool "Exynos ChipID controller and ASV driver" if COMPILE_TEST
 	depends on ARCH_EXYNOS || COMPILE_TEST
+	default y if ARCH_EXYNOS
 	select EXYNOS_ASV_ARM if ARM && ARCH_EXYNOS
 	select MFD_SYSCON
 	select SOC_BUS
@@ -24,6 +26,7 @@ config EXYNOS_CHIPID
 config EXYNOS_PMU
 	bool "Exynos PMU controller driver" if COMPILE_TEST
 	depends on ARCH_EXYNOS || ((ARM || ARM64) && COMPILE_TEST)
+	default y if ARCH_EXYNOS
 	select EXYNOS_PMU_ARM_DRIVERS if ARM && ARCH_EXYNOS
 
 # There is no need to enable these drivers for ARMv8
@@ -34,6 +37,7 @@ config EXYNOS_PMU_ARM_DRIVERS
 config EXYNOS_PM_DOMAINS
 	bool "Exynos PM domains" if COMPILE_TEST
 	depends on (ARCH_EXYNOS && PM_GENERIC_DOMAINS) || COMPILE_TEST
+	default y if (ARCH_EXYNOS && PM_GENERIC_DOMAINS)
 
 config SAMSUNG_PM_DEBUG
 	bool "Samsung PM Suspend debug"
