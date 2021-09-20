@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 
+#include <linux/list_sort.h>
+
 #include "misc.h"
 #include "ctree.h"
 #include "block-group.h"
@@ -1486,6 +1488,21 @@ void btrfs_mark_bg_unused(struct btrfs_block_group *bg)
 	spin_unlock(&fs_info->unused_bgs_lock);
 }
 
+/*
+ * We want block groups with a low number of used bytes to be in the beginning
+ * of the list, so they will get reclaimed first.
+ */
+static int reclaim_bgs_cmp(void *unused, const struct list_head *a,
+			   const struct list_head *b)
+{
+	const struct btrfs_block_group *bg1, *bg2;
+
+	bg1 = list_entry(a, struct btrfs_block_group, bg_list);
+	bg2 = list_entry(b, struct btrfs_block_group, bg_list);
+
+	return bg1->used - bg2->used;
+}
+
 void btrfs_reclaim_bgs_work(struct work_struct *work)
 {
 	struct btrfs_fs_info *fs_info =
@@ -1510,6 +1527,7 @@ void btrfs_reclaim_bgs_work(struct work_struct *work)
 	}
 
 	spin_lock(&fs_info->unused_bgs_lock);
+	list_sort(NULL, &fs_info->reclaim_bgs, reclaim_bgs_cmp);
 	while (!list_empty(&fs_info->reclaim_bgs)) {
 		u64 zone_unusable;
 		int ret = 0;
