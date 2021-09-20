@@ -136,8 +136,10 @@ int tpm_read_log_acpi(struct tpm_chip *chip)
 
 	ret = -EIO;
 	virt = acpi_os_map_iomem(start, len);
-	if (!virt)
+	if (!virt) {
+		dev_warn(&chip->dev, "%s: Failed to map acpi memory\n", __func__);
 		goto err;
+	}
 
 	memcpy_fromio(log->bios_event_log, virt, len);
 
@@ -145,7 +147,6 @@ int tpm_read_log_acpi(struct tpm_chip *chip)
 
 	if (chip->flags & TPM_CHIP_FLAG_TPM2 &&
 	    !tpm_is_tpm2_log(log->bios_event_log, len)) {
-		/* try EFI log next */
 		ret = -ENODEV;
 		goto err;
 	}

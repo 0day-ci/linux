@@ -83,7 +83,11 @@ static int tpm_read_log(struct tpm_chip *chip)
 	}
 
 	rc = tpm_read_log_acpi(chip);
-	if (rc != -ENODEV)
+	/*
+	 * only return if we found a log else we try look for a
+	 * log in the EFI configuration table
+	 */
+	if (rc > 0)
 		return rc;
 
 	rc = tpm_read_log_efi(chip);
