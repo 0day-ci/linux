@@ -48,6 +48,25 @@ static bool ipa_interrupt_uc(struct ipa_interrupt *interrupt, u32 irq_id)
 	return irq_id == IPA_IRQ_UC_0 || irq_id == IPA_IRQ_UC_1;
 }
 
+static bool ipa_interrupt_check_fixup(enum ipa_irq_id *irq_id, enum ipa_version version)
+{
+	switch (*irq_id) {
+	case IPA_IRQ_EOT_COAL:
+		return version < IPA_VERSION_3_5;
+	case IPA_IRQ_DCMP:
+		return version < IPA_VERSION_4_5;
+	case IPA_IRQ_TLV_LEN_MIN_DSM:
+		return version >= IPA_VERSION_4_5;
+	default:
+		break;
+	}
+
+	if (*irq_id >= IPA_IRQ_DRBIP_PKT_EXCEED_MAX_SIZE_EN)
+		return version >= IPA_VERSION_4_9;
+
+	return true;
+}
+
 /* Process a particular interrupt type that has been received */
 static void ipa_interrupt_process(struct ipa_interrupt *interrupt, u32 irq_id)
 {
@@ -191,6 +210,9 @@ void ipa_interrupt_add(struct ipa_interrupt *interrupt,
 	struct ipa *ipa = interrupt->ipa;
 	u32 offset;
 
+	if (!ipa_interrupt_check_fixup(&ipa_irq, ipa->version))
+		return;
+
 	WARN_ON(ipa_irq >= IPA_IRQ_COUNT);
 
 	interrupt->handler[ipa_irq] = handler;
@@ -207,6 +229,9 @@ ipa_interrupt_remove(struct ipa_interrupt *interrupt, enum ipa_irq_id ipa_irq)
 {
 	struct ipa *ipa = interrupt->ipa;
 	u32 offset;
+
+	if (!ipa_interrupt_check_fixup(&ipa_irq, ipa->version))
+		return;
 
 	WARN_ON(ipa_irq >= IPA_IRQ_COUNT);
 
