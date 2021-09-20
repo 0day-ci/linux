@@ -63,6 +63,11 @@ static bool ipa_interrupt_check_fixup(enum ipa_irq_id *irq_id, enum ipa_version 
 
 	if (*irq_id >= IPA_IRQ_DRBIP_PKT_EXCEED_MAX_SIZE_EN)
 		return version >= IPA_VERSION_4_9;
+	else if (*irq_id > IPA_IRQ_BAM_GSI_IDLE)
+		return version >= IPA_VERSION_3_0;
+	else if (version <= IPA_VERSION_2_6L &&
+			*irq_id >= IPA_IRQ_PROC_UC_ACK_Q_NOT_EMPTY)
+		*irq_id += 2;
 
 	return true;
 }
@@ -152,8 +157,8 @@ static void ipa_interrupt_suspend_control(struct ipa_interrupt *interrupt,
 
 	WARN_ON(!(mask & ipa->available));
 
-	/* IPA version 3.0 does not support TX_SUSPEND interrupt control */
-	if (ipa->version == IPA_VERSION_3_0)
+	/* IPA version <=3.0 does not support TX_SUSPEND interrupt control */
+	if (ipa->version <= IPA_VERSION_3_0)
 		return;
 
 	offset = ipa_reg_irq_suspend_en_offset(ipa->version);
@@ -190,7 +195,7 @@ void ipa_interrupt_suspend_clear_all(struct ipa_interrupt *interrupt)
 	val = ioread32(ipa->reg_virt + offset);
 
 	/* SUSPEND interrupt status isn't cleared on IPA version 3.0 */
-	if (ipa->version == IPA_VERSION_3_0)
+	if (ipa->version <= IPA_VERSION_3_0)
 		return;
 
 	offset = ipa_reg_irq_suspend_clr_offset(ipa->version);
