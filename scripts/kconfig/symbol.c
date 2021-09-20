@@ -880,6 +880,11 @@ const char *sym_escape_string(struct symbol *sym)
 
 	in = sym_get_string_value(sym);
 
+	if (strspn(in, "`$")) {
+		fprintf(stderr, "%s: invalid characters in string found\n", sym->name);
+		return xstrdup("\"\"");
+	}
+
 	reslen = strlen(in) + strlen("\"\"") + 1;
 
 	p = in;
