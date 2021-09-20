@@ -10,6 +10,10 @@
 
 struct ipa;
 
+/* The size of a filter or route table entry */
+#define IPA_TABLE_ENTRY_SIZE(version)	\
+	(IPA_IS_64BIT(version) ? sizeof(__le64) : sizeof(__le32))
+
 /* The maximum number of filter table entries (IPv4, IPv6; hashed or not) */
 #define IPA_FILTER_COUNT_MAX	14
 
