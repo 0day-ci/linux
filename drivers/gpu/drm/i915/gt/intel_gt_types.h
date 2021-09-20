@@ -72,6 +72,8 @@ struct intel_gt {
 
 	struct intel_uc uc;
 
+	struct i915_wa_list wa_list;
+
 	struct intel_gt_timelines {
 		spinlock_t lock; /* protects active_list */
 		struct list_head active_list;
@@ -192,6 +194,10 @@ struct intel_gt {
 
 		unsigned long mslice_mask;
 	} info;
+
+	struct {
+		u8 uc_index;
+	} mocs;
 };
 
 enum intel_gt_scratch_field {
