@@ -196,6 +196,28 @@ you can go through every map in the process, find the PFNs, look those up
 in kpagecount, and tally up the number of pages that are only referenced
 once.
 
+Exceptions for Shared Memory
+============================
+
+Page table entries for shared pages are cleared when the pages are zapped or
+swapped out. This makes swapped out pages indistinguishable from never-allocated
+ones.
+
+In kernel space, the swap location can still be retrieved from the page cache.
+However, values stored only on the normal PTE get lost irretrievably when the
+page is swapped out (i.e. SOFT_DIRTY).
+
+In user space, whether the page is swapped or none can be deduced with the
+lseek system call. For a single page, the algorithm is:
+
+0. If the pagemap entry of the page has bit 63 (page present) set, the page
+   is present.
+1. Otherwise, get an fd to the file where the page is backed. For anonymous
+   shared pages, the file can be found in ``/proc/pid/map_files/``.
+2. Call lseek with LSEEK_DATA flag and seek to the virtual address of the page
+   you wish to inspect. If it overshoots the PAGE_SIZE, the page is NONE.
+3. Otherwise, the page is in swap.
+
 Other notes
 ===========
 
