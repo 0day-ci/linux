@@ -191,7 +191,7 @@ static void ipa_hardware_config_comp(struct ipa *ipa)
 	if (ipa->version < IPA_VERSION_4_0)
 		return;
 
-	val = ioread32(ipa->reg_virt + IPA_REG_COMP_CFG_OFFSET);
+	val = ioread32(ipa->reg_virt + ipa_reg_comp_cfg_offset(ipa->version));
 
 	if (ipa->version == IPA_VERSION_4_0) {
 		val &= ~IPA_QMB_SELECT_CONS_EN_FMASK;
@@ -206,7 +206,7 @@ static void ipa_hardware_config_comp(struct ipa *ipa)
 	val |= GSI_MULTI_INORDER_RD_DIS_FMASK;
 	val |= GSI_MULTI_INORDER_WR_DIS_FMASK;
 
-	iowrite32(val, ipa->reg_virt + IPA_REG_COMP_CFG_OFFSET);
+	iowrite32(val, ipa->reg_virt + ipa_reg_comp_cfg_offset(ipa->version));
 }
 
 /* Configure DDR and (possibly) PCIe max read/write QSB values */
@@ -355,7 +355,7 @@ static void ipa_hardware_config(struct ipa *ipa, const struct ipa_data *data)
 	/* IPA v4.5+ has no backward compatibility register */
 	if (version < IPA_VERSION_4_5) {
 		val = data->backward_compat;
-		iowrite32(val, ipa->reg_virt + IPA_REG_BCR_OFFSET);
+		iowrite32(val, ipa->reg_virt + ipa_reg_bcr_offset(ipa->version));
 	}
 
 	/* Implement some hardware workarounds */
@@ -384,7 +384,7 @@ static void ipa_hardware_config(struct ipa *ipa, const struct ipa_data *data)
 		/* Configure aggregation timer granularity */
 		granularity = ipa_aggr_granularity_val(IPA_AGGR_GRANULARITY);
 		val = u32_encode_bits(granularity, AGGR_GRANULARITY_FMASK);
-		iowrite32(val, ipa->reg_virt + IPA_REG_COUNTER_CFG_OFFSET);
+		iowrite32(val, ipa->reg_virt + ipa_reg_counter_cfg_offset(ipa->version));
 	} else {
 		ipa_qtime_config(ipa);
 	}

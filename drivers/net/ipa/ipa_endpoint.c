@@ -242,8 +242,8 @@ static struct ipa_trans *ipa_endpoint_trans_alloc(struct ipa_endpoint *endpoint,
 static bool
 ipa_endpoint_init_ctrl(struct ipa_endpoint *endpoint, bool suspend_delay)
 {
-	u32 offset = IPA_REG_ENDP_INIT_CTRL_N_OFFSET(endpoint->endpoint_id);
 	struct ipa *ipa = endpoint->ipa;
+	u32 offset = ipa_reg_endp_init_ctrl_n_offset(ipa->version, endpoint->endpoint_id);
 	bool state;
 	u32 mask;
 	u32 val;
@@ -410,7 +410,7 @@ int ipa_endpoint_modem_exception_reset_all(struct ipa *ipa)
 		if (!(endpoint->ee_id == GSI_EE_MODEM && endpoint->toward_ipa))
 			continue;
 
-		offset = IPA_REG_ENDP_STATUS_N_OFFSET(endpoint_id);
+		offset = ipa_reg_endp_status_n_offset(ipa->version, endpoint_id);
 
 		/* Value written is 0, and all bits are updated.  That
 		 * means status is disabled on the endpoint, and as a
@@ -431,7 +431,8 @@ int ipa_endpoint_modem_exception_reset_all(struct ipa *ipa)
 
 static void ipa_endpoint_init_cfg(struct ipa_endpoint *endpoint)
 {
-	u32 offset = IPA_REG_ENDP_INIT_CFG_N_OFFSET(endpoint->endpoint_id);
+	struct ipa *ipa = endpoint->ipa;
+	u32 offset = ipa_reg_endp_init_cfg_n_offset(ipa->version, endpoint->endpoint_id);
 	enum ipa_cs_offload_en enabled;
 	u32 val = 0;
 
@@ -523,8 +524,8 @@ ipa_qmap_header_size(enum ipa_version version, struct ipa_endpoint *endpoint)
  */
 static void ipa_endpoint_init_hdr(struct ipa_endpoint *endpoint)
 {
-	u32 offset = IPA_REG_ENDP_INIT_HDR_N_OFFSET(endpoint->endpoint_id);
 	struct ipa *ipa = endpoint->ipa;
+	u32 offset = ipa_reg_endp_init_hdr_n_offset(ipa->version, endpoint->endpoint_id);
 	u32 val = 0;
 
 	if (endpoint->data->qmap) {
@@ -565,9 +566,9 @@ static void ipa_endpoint_init_hdr(struct ipa_endpoint *endpoint)
 
 static void ipa_endpoint_init_hdr_ext(struct ipa_endpoint *endpoint)
 {
-	u32 offset = IPA_REG_ENDP_INIT_HDR_EXT_N_OFFSET(endpoint->endpoint_id);
-	u32 pad_align = endpoint->data->rx.pad_align;
 	struct ipa *ipa = endpoint->ipa;
+	u32 offset = ipa_reg_endp_init_hdr_ext_n_offset(ipa->version, endpoint->endpoint_id);
+	u32 pad_align = endpoint->data->rx.pad_align;
 	u32 val = 0;
 
 	val |= HDR_ENDIANNESS_FMASK;		/* big endian */
@@ -609,6 +610,7 @@ static void ipa_endpoint_init_hdr_ext(struct ipa_endpoint *endpoint)
 
 static void ipa_endpoint_init_hdr_metadata_mask(struct ipa_endpoint *endpoint)
 {
+	enum ipa_version version = endpoint->ipa->version;
 	u32 endpoint_id = endpoint->endpoint_id;
 	u32 val = 0;
 	u32 offset;
@@ -616,7 +618,7 @@ static void ipa_endpoint_init_hdr_metadata_mask(struct ipa_endpoint *endpoint)
 	if (endpoint->toward_ipa)
 		return;		/* Register not valid for TX endpoints */
 
-	offset = IPA_REG_ENDP_INIT_HDR_METADATA_MASK_N_OFFSET(endpoint_id);
+	offset = ipa_reg_endp_init_hdr_metadata_mask_n_offset(version, endpoint_id);
 
 	/* Note that HDR_ENDIANNESS indicates big endian header fields */
 	if (endpoint->data->qmap)
@@ -627,7 +629,8 @@ static void ipa_endpoint_init_hdr_metadata_mask(struct ipa_endpoint *endpoint)
 
 static void ipa_endpoint_init_mode(struct ipa_endpoint *endpoint)
 {
-	u32 offset = IPA_REG_ENDP_INIT_MODE_N_OFFSET(endpoint->endpoint_id);
+	enum ipa_version version = endpoint->ipa->version;
+	u32 offset = ipa_reg_endp_init_mode_n_offset(version, endpoint->endpoint_id);
 	u32 val;
 
 	if (!endpoint->toward_ipa)
@@ -716,8 +719,8 @@ static u32 aggr_sw_eof_active_encoded(enum ipa_version version, bool enabled)
 
 static void ipa_endpoint_init_aggr(struct ipa_endpoint *endpoint)
 {
-	u32 offset = IPA_REG_ENDP_INIT_AGGR_N_OFFSET(endpoint->endpoint_id);
 	enum ipa_version version = endpoint->ipa->version;
+	u32 offset = ipa_reg_endp_init_aggr_n_offset(version, endpoint->endpoint_id);
 	u32 val = 0;
 
 	if (endpoint->data->aggregation) {
@@ -853,7 +856,7 @@ static void ipa_endpoint_init_hol_block_timer(struct ipa_endpoint *endpoint,
 	u32 offset;
 	u32 val;
 
-	offset = IPA_REG_ENDP_INIT_HOL_BLOCK_TIMER_N_OFFSET(endpoint_id);
+	offset = ipa_reg_endp_init_hol_block_timer_n_offset(ipa->version, endpoint_id);
 	val = hol_block_timer_val(ipa, microseconds);
 	iowrite32(val, ipa->reg_virt + offset);
 }
@@ -861,12 +864,13 @@ static void ipa_endpoint_init_hol_block_timer(struct ipa_endpoint *endpoint,
 static void
 ipa_endpoint_init_hol_block_enable(struct ipa_endpoint *endpoint, bool enable)
 {
+	enum ipa_version version = endpoint->ipa->version;
 	u32 endpoint_id = endpoint->endpoint_id;
 	u32 offset;
 	u32 val;
 
 	val = enable ? HOL_BLOCK_EN_FMASK : 0;
-	offset = IPA_REG_ENDP_INIT_HOL_BLOCK_EN_N_OFFSET(endpoint_id);
+	offset = ipa_reg_endp_init_hol_block_en_n_offset(version, endpoint_id);
 	iowrite32(val, endpoint->ipa->reg_virt + offset);
 }
 
@@ -887,7 +891,8 @@ void ipa_endpoint_modem_hol_block_clear_all(struct ipa *ipa)
 
 static void ipa_endpoint_init_deaggr(struct ipa_endpoint *endpoint)
 {
-	u32 offset = IPA_REG_ENDP_INIT_DEAGGR_N_OFFSET(endpoint->endpoint_id);
+	enum ipa_version version = endpoint->ipa->version;
+	u32 offset = ipa_reg_endp_init_deaggr_n_offset(version, endpoint->endpoint_id);
 	u32 val = 0;
 
 	if (!endpoint->toward_ipa)
@@ -979,7 +984,7 @@ static void ipa_endpoint_status(struct ipa_endpoint *endpoint)
 	u32 val = 0;
 	u32 offset;
 
-	offset = IPA_REG_ENDP_STATUS_N_OFFSET(endpoint_id);
+	offset = ipa_reg_endp_status_n_offset(ipa->version, endpoint_id);
 
 	if (endpoint->data->status_enable) {
 		val |= STATUS_EN_FMASK;
@@ -1384,7 +1389,7 @@ void ipa_endpoint_default_route_set(struct ipa *ipa, u32 endpoint_id)
 	val |= u32_encode_bits(endpoint_id, ROUTE_FRAG_DEF_PIPE_FMASK);
 	val |= ROUTE_DEF_RETAIN_HDR_FMASK;
 
-	iowrite32(val, ipa->reg_virt + IPA_REG_ROUTE_OFFSET);
+	iowrite32(val, ipa->reg_virt + ipa_reg_route_offset(ipa->version));
 }
 
 void ipa_endpoint_default_route_clear(struct ipa *ipa)

@@ -65,7 +65,17 @@ struct ipa;
  * of valid bits for the register.
  */
 
-#define IPA_REG_COMP_CFG_OFFSET				0x0000003c
+#define IPA_REG_COMP_SW_RESET_OFFSET		0x0000003c
+
+#define IPA_REG_V2_ENABLED_PIPES_OFFSET		0x000005dc
+
+static inline u32 ipa_reg_comp_cfg_offset(enum ipa_version version)
+{
+	if (version <= IPA_VERSION_2_6L)
+		return 0x38;
+
+	return 0x3c;
+}
 /* The next field is not supported for IPA v4.0+, not present for IPA v4.5+ */
 #define ENABLE_FMASK				GENMASK(0, 0)
 /* The next field is present for IPA v4.7+ */
@@ -124,6 +134,7 @@ static inline u32 full_flush_rsc_closure_en_encoded(enum ipa_version version,
 	return u32_encode_bits(val, GENMASK(17, 17));
 }
 
+/* This register is only present on IPA v3.0 and above */
 #define IPA_REG_CLKON_CFG_OFFSET			0x00000044
 #define RX_FMASK				GENMASK(0, 0)
 #define PROC_FMASK				GENMASK(1, 1)
@@ -164,7 +175,14 @@ static inline u32 full_flush_rsc_closure_en_encoded(enum ipa_version version,
 /* The next field is present for IPA v4.7+ */
 #define DRBIP_FMASK				GENMASK(31, 31)
 
-#define IPA_REG_ROUTE_OFFSET				0x00000048
+static inline u32 ipa_reg_route_offset(enum ipa_version version)
+{
+	if (version <= IPA_VERSION_2_6L)
+		return 0x44;
+
+	return 0x48;
+}
+
 #define ROUTE_DIS_FMASK				GENMASK(0, 0)
 #define ROUTE_DEF_PIPE_FMASK			GENMASK(5, 1)
 #define ROUTE_DEF_HDR_TABLE_FMASK		GENMASK(6, 6)
@@ -172,7 +190,14 @@ static inline u32 full_flush_rsc_closure_en_encoded(enum ipa_version version,
 #define ROUTE_FRAG_DEF_PIPE_FMASK		GENMASK(21, 17)
 #define ROUTE_DEF_RETAIN_HDR_FMASK		GENMASK(24, 24)
 
-#define IPA_REG_SHARED_MEM_SIZE_OFFSET			0x00000054
+static inline u32 ipa_reg_shared_mem_size_offset(enum ipa_version version)
+{
+	if (version <= IPA_VERSION_2_6L)
+		return 0x50;
+
+	return 0x54;
+}
+
 #define SHARED_MEM_SIZE_FMASK			GENMASK(15, 0)
 #define SHARED_MEM_BADDR_FMASK			GENMASK(31, 16)
 
@@ -219,7 +244,13 @@ static inline u32 ipa_reg_state_aggr_active_offset(enum ipa_version version)
 }
 
 /* The next register is not present for IPA v4.5+ */
-#define IPA_REG_BCR_OFFSET				0x000001d0
+static inline u32 ipa_reg_bcr_offset(enum ipa_version version)
+{
+	if (IPA_VERSION_RANGE(version, 2_5, 2_6L))
+		return 0x5b0;
+
+	return 0x1d0;
+}
 /* The next two fields are not present for IPA v4.2+ */
 #define BCR_CMDQ_L_LACK_ONE_ENTRY_FMASK		GENMASK(0, 0)
 #define BCR_TX_NOT_USING_BRESP_FMASK		GENMASK(1, 1)
@@ -236,7 +267,14 @@ static inline u32 ipa_reg_state_aggr_active_offset(enum ipa_version version)
 #define BCR_ROUTER_PREFETCH_EN_FMASK		GENMASK(9, 9)
 
 /* The value of the next register must be a multiple of 8 (bottom 3 bits 0) */
-#define IPA_REG_LOCAL_PKT_PROC_CNTXT_OFFSET		0x000001e8
+static inline u32 ipa_reg_local_pkt_proc_cntxt_base_offset(enum ipa_version version)
+{
+	if (version <= IPA_VERSION_2_6L)
+		return 0x5e0;
+
+	return 0x1e8;
+}
+
 
 /* Encoded value for LOCAL_PKT_PROC_CNTXT register BASE_ADDR field */
 static inline u32 proc_cntxt_base_addr_encoded(enum ipa_version version,
@@ -252,7 +290,14 @@ static inline u32 proc_cntxt_base_addr_encoded(enum ipa_version version,
 #define IPA_REG_AGGR_FORCE_CLOSE_OFFSET			0x000001ec
 
 /* The next register is not present for IPA v4.5+ */
-#define IPA_REG_COUNTER_CFG_OFFSET			0x000001f0
+static inline u32 ipa_reg_counter_cfg_offset(enum ipa_version version)
+{
+	if (IPA_VERSION_RANGE(version, 2_5, 2_6L))
+		return 0x5e8;
+
+	return 0x1f0;
+}
+
 /* The next field is not present for IPA v3.5+ */
 #define EOT_COAL_GRANULARITY			GENMASK(3, 0)
 #define AGGR_GRANULARITY_FMASK			GENMASK(8, 4)
@@ -349,15 +394,27 @@ enum ipa_pulse_gran {
 #define Y_MIN_LIM_FMASK				GENMASK(21, 16)
 #define Y_MAX_LIM_FMASK				GENMASK(29, 24)
 
-#define IPA_REG_ENDP_INIT_CTRL_N_OFFSET(ep) \
-					(0x00000800 + 0x0070 * (ep))
+static inline u32 ipa_reg_endp_init_ctrl_n_offset(enum ipa_version version, u16 ep)
+{
+	if (version <= IPA_VERSION_2_6L)
+		return 0x70 + 0x4 * ep;
+
+	return 0x800 + 0x70 * ep;
+}
+
 /* Valid only for RX (IPA producer) endpoints (do not use for IPA v4.0+) */
 #define ENDP_SUSPEND_FMASK			GENMASK(0, 0)
 /* Valid only for TX (IPA consumer) endpoints */
 #define ENDP_DELAY_FMASK			GENMASK(1, 1)
 
-#define IPA_REG_ENDP_INIT_CFG_N_OFFSET(ep) \
-					(0x00000808 + 0x0070 * (ep))
+static inline u32 ipa_reg_endp_init_cfg_n_offset(enum ipa_version version, u16 ep)
+{
+	if (version <= IPA_VERSION_2_6L)
+		return 0xc0 + 0x4 * ep;
+
+	return 0x808 + 0x70 * ep;
+}
+
 #define FRAG_OFFLOAD_EN_FMASK			GENMASK(0, 0)
 #define CS_OFFLOAD_EN_FMASK			GENMASK(2, 1)
 #define CS_METADATA_HDR_OFFSET_FMASK		GENMASK(6, 3)
@@ -383,8 +440,14 @@ enum ipa_nat_en {
 	IPA_NAT_DST			= 0x2,
 };
 
-#define IPA_REG_ENDP_INIT_HDR_N_OFFSET(ep) \
-					(0x00000810 + 0x0070 * (ep))
+static inline u32 ipa_reg_endp_init_hdr_n_offset(enum ipa_version version, u16 ep)
+{
+	if (IPA_VERSION_RANGE(version, 2_0, 2_6L))
+		return 0x170 + 0x4 * ep;
+
+	return 0x810 + 0x70 * ep;
+}
+
 #define HDR_LEN_FMASK				GENMASK(5, 0)
 #define HDR_OFST_METADATA_VALID_FMASK		GENMASK(6, 6)
 #define HDR_OFST_METADATA_FMASK			GENMASK(12, 7)
@@ -440,8 +503,14 @@ static inline u32 ipa_metadata_offset_encoded(enum ipa_version version,
 	return val;
 }
 
-#define IPA_REG_ENDP_INIT_HDR_EXT_N_OFFSET(ep) \
-					(0x00000814 + 0x0070 * (ep))
+static inline u32 ipa_reg_endp_init_hdr_ext_n_offset(enum ipa_version version, u16 ep)
+{
+	if (IPA_VERSION_RANGE(version, 2_0, 2_6L))
+		return 0x1c0 + 0x4 * ep;
+
+	return 0x814 + 0x70 * ep;
+}
+
 #define HDR_ENDIANNESS_FMASK			GENMASK(0, 0)
 #define HDR_TOTAL_LEN_OR_PAD_VALID_FMASK	GENMASK(1, 1)
 #define HDR_TOTAL_LEN_OR_PAD_FMASK		GENMASK(2, 2)
@@ -454,12 +523,23 @@ static inline u32 ipa_metadata_offset_encoded(enum ipa_version version,
 #define HDR_ADDITIONAL_CONST_LEN_MSB_FMASK	GENMASK(21, 20)
 
 /* Valid only for RX (IPA producer) endpoints */
-#define IPA_REG_ENDP_INIT_HDR_METADATA_MASK_N_OFFSET(rxep) \
-					(0x00000818 + 0x0070 * (rxep))
+static inline u32 ipa_reg_endp_init_hdr_metadata_mask_n_offset(enum ipa_version version, u16 rxep)
+{
+	if (version <= IPA_VERSION_2_6L)
+		return 0x220 + 0x4 * rxep;
+
+	return 0x818 + 0x70 * rxep;
+}
 
 /* Valid only for TX (IPA consumer) endpoints */
-#define IPA_REG_ENDP_INIT_MODE_N_OFFSET(txep) \
-					(0x00000820 + 0x0070 * (txep))
+static inline u32 ipa_reg_endp_init_mode_n_offset(enum ipa_version version, u16 txep)
+{
+	if (IPA_VERSION_RANGE(version, 2_0, 2_6L))
+		return 0x2c0 + 0x4 * txep;
+
+	return 0x820 + 0x70 * txep;
+}
+
 #define MODE_FMASK				GENMASK(2, 0)
 /* The next field is present for IPA v4.5+ */
 #define DCPH_ENABLE_FMASK			GENMASK(3, 3)
@@ -480,8 +560,14 @@ enum ipa_mode {
 	IPA_DMA				= 0x3,
 };
 
-#define IPA_REG_ENDP_INIT_AGGR_N_OFFSET(ep) \
-					(0x00000824 +  0x0070 * (ep))
+static inline u32 ipa_reg_endp_init_aggr_n_offset(enum ipa_version version,
+						  u16 ep)
+{
+	if (IPA_VERSION_RANGE(version, 2_0, 2_6L))
+		return 0x320 + 0x4 * ep;
+	return 0x824 + 0x70 * ep;
+}
+
 #define AGGR_EN_FMASK				GENMASK(1, 0)
 #define AGGR_TYPE_FMASK				GENMASK(4, 2)
 
@@ -543,14 +629,27 @@ enum ipa_aggr_type {
 };
 
 /* Valid only for RX (IPA producer) endpoints */
-#define IPA_REG_ENDP_INIT_HOL_BLOCK_EN_N_OFFSET(rxep) \
-					(0x0000082c +  0x0070 * (rxep))
+static inline u32 ipa_reg_endp_init_hol_block_en_n_offset(enum ipa_version version,
+							  u16 rxep)
+{
+	if (IPA_VERSION_RANGE(version, 2_0, 2_6L))
+		return 0x3c0 + 0x4 * rxep;
+
+	return 0x82c + 0x70 * rxep;
+}
+
 #define HOL_BLOCK_EN_FMASK			GENMASK(0, 0)
 
 /* Valid only for RX (IPA producer) endpoints */
-#define IPA_REG_ENDP_INIT_HOL_BLOCK_TIMER_N_OFFSET(rxep) \
-					(0x00000830 +  0x0070 * (rxep))
-/* The next two fields are present for IPA v4.2 only */
+static inline u32 ipa_reg_endp_init_hol_block_timer_n_offset(enum ipa_version version, u16 rxep)
+{
+	if (IPA_VERSION_RANGE(version, 2_0, 2_6L))
+		return 0x420 + 0x4 * rxep;
+
+	return 0x830 + 0x70 * rxep;
+}
+
+/* The next fields are present for IPA v4.2 only */
 #define BASE_VALUE_FMASK			GENMASK(4, 0)
 #define SCALE_FMASK				GENMASK(12, 8)
 /* The next two fields are present for IPA v4.5 */
@@ -558,8 +657,14 @@ enum ipa_aggr_type {
 #define GRAN_SEL_FMASK				GENMASK(8, 8)
 
 /* Valid only for TX (IPA consumer) endpoints */
-#define IPA_REG_ENDP_INIT_DEAGGR_N_OFFSET(txep) \
-					(0x00000834 + 0x0070 * (txep))
+static inline u32 ipa_reg_endp_init_deaggr_n_offset(enum ipa_version version, u16 txep)
+{
+	if (IPA_VERSION_RANGE(version, 2_0, 2_6L))
+		return 0x470 + 0x4 * txep;
+
+	return 0x834 + 0x70 * txep;
+}
+
 #define DEAGGR_HDR_LEN_FMASK			GENMASK(5, 0)
 #define SYSPIPE_ERR_DETECTION_FMASK		GENMASK(6, 6)
 #define PACKET_OFFSET_VALID_FMASK		GENMASK(7, 7)
@@ -629,8 +734,14 @@ enum ipa_seq_rep_type {
 	IPA_SEQ_REP_DMA_PARSER			= 0x08,
 };
 
-#define IPA_REG_ENDP_STATUS_N_OFFSET(ep) \
-					(0x00000840 + 0x0070 * (ep))
+static inline u32 ipa_reg_endp_status_n_offset(enum ipa_version version, u16 ep)
+{
+	if (version <= IPA_VERSION_2_6L)
+		return 0x4c0 + 0x4 * ep;
+
+	return 0x840 + 0x70 * ep;
+}
+
 #define STATUS_EN_FMASK				GENMASK(0, 0)
 #define STATUS_ENDP_FMASK			GENMASK(5, 1)
 /* The next field is not present for IPA v4.5+ */
@@ -662,6 +773,9 @@ enum ipa_seq_rep_type {
 static inline u32 ipa_reg_irq_stts_ee_n_offset(enum ipa_version version,
 					       u32 ee)
 {
+	if (version <= IPA_VERSION_2_6L)
+		return 0x00001008 + 0x1000 * ee;
+
 	if (version < IPA_VERSION_4_9)
 		return 0x00003008 + 0x1000 * ee;
 
@@ -675,6 +789,9 @@ static inline u32 ipa_reg_irq_stts_offset(enum ipa_version version)
 
 static inline u32 ipa_reg_irq_en_ee_n_offset(enum ipa_version version, u32 ee)
 {
+	if (version <= IPA_VERSION_2_6L)
+		return 0x0000100c + 0x1000 * ee;
+
 	if (version < IPA_VERSION_4_9)
 		return 0x0000300c + 0x1000 * ee;
 
@@ -688,6 +805,9 @@ static inline u32 ipa_reg_irq_en_offset(enum ipa_version version)
 
 static inline u32 ipa_reg_irq_clr_ee_n_offset(enum ipa_version version, u32 ee)
 {
+	if (version <= IPA_VERSION_2_6L)
+		return 0x00001010 + 0x1000 * ee;
+
 	if (version < IPA_VERSION_4_9)
 		return 0x00003010 + 0x1000 * ee;
 
@@ -776,6 +896,9 @@ enum ipa_irq_id {
 
 static inline u32 ipa_reg_irq_uc_ee_n_offset(enum ipa_version version, u32 ee)
 {
+	if (version <= IPA_VERSION_2_6L)
+		return 0x101c + 1000 * ee;
+
 	if (version < IPA_VERSION_4_9)
 		return 0x0000301c + 0x1000 * ee;
 
@@ -793,6 +916,9 @@ static inline u32 ipa_reg_irq_uc_offset(enum ipa_version version)
 static inline u32
 ipa_reg_irq_suspend_info_ee_n_offset(enum ipa_version version, u32 ee)
 {
+	if (version <= IPA_VERSION_2_6L)
+		return 0x00001098 + 0x1000 * ee;
+
 	if (version == IPA_VERSION_3_0)
 		return 0x00003098 + 0x1000 * ee;
 

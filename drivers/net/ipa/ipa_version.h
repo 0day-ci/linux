@@ -8,6 +8,9 @@
 
 /**
  * enum ipa_version
+ * @IPA_VERSION_2_0:	IPA version 2.0
+ * @IPA_VERSION_2_5:	IPA version 2.5/2.6
+ * @IPA_VERSION_2_6:	IPA version 2.6L
  * @IPA_VERSION_3_0:	IPA version 3.0/GSI version 1.0
  * @IPA_VERSION_3_1:	IPA version 3.1/GSI version 1.1
  * @IPA_VERSION_3_5:	IPA version 3.5/GSI version 1.2
@@ -25,6 +28,9 @@
  * new version is added.
  */
 enum ipa_version {
+	IPA_VERSION_2_0,
+	IPA_VERSION_2_5,
+	IPA_VERSION_2_6L,
 	IPA_VERSION_3_0,
 	IPA_VERSION_3_1,
 	IPA_VERSION_3_5,
@@ -37,5 +43,11 @@ enum ipa_version {
 	IPA_VERSION_4_9,
 	IPA_VERSION_4_11,
 };
+
+#define IPA_HAS_GSI(version) ((version) > IPA_VERSION_2_6L)
+#define IPA_IS_64BIT(version) ((version) > IPA_VERSION_2_6L)
+#define IPA_VERSION_RANGE(_version, _from, _to) \
+	((_version) >= (IPA_VERSION_##_from) &&  \
+	 (_version) <= (IPA_VERSION_##_to))
 
 #endif /* _IPA_VERSION_H_ */
