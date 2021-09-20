@@ -8,6 +8,7 @@
 #include <linux/kernel.h>
 #include <linux/bits.h>
 #include <linux/bitops.h>
+#include <linux/module.h>
 #include <linux/bitfield.h>
 #include <linux/io.h>
 #include <linux/build_bug.h>
@@ -561,6 +562,19 @@ void ipa_table_config(struct ipa *ipa)
 	ipa_route_config(ipa, true);
 }
 
+static inline void *ipa_table_write(enum ipa_version version,
+				   void *virt, u64 value)
+{
+	if (IPA_IS_64BIT(version)) {
+		__le64 *ptr = virt;
+		*ptr = cpu_to_le64(value);
+	} else {
+		__le32 *ptr = virt;
+		*ptr = cpu_to_le32(value);
+	}
+	return virt + IPA_TABLE_ENTRY_SIZE(version);
+}
+
 /*
  * Initialize a coherent DMA allocation containing initialized filter and
  * route table data.  This is used when initializing or resetting the IPA
@@ -602,10 +616,11 @@ void ipa_table_config(struct ipa *ipa)
 int ipa_table_init(struct ipa *ipa)
 {
 	u32 count = max_t(u32, IPA_FILTER_COUNT_MAX, IPA_ROUTE_COUNT_MAX);
+	enum ipa_version version = ipa->version;
 	struct device *dev = &ipa->pdev->dev;
+	u64 filter_map = ipa->filter_map << 1;
 	dma_addr_t addr;
-	__le64 le_addr;
-	__le64 *virt;
+	void *virt;
 	size_t size;
 
 	ipa_table_validate_build();
@@ -626,19 +641,21 @@ int ipa_table_init(struct ipa *ipa)
 	ipa->table_addr = addr;
 
 	/* First slot is the zero rule */
-	*virt++ = 0;
+	virt = ipa_table_write(version, virt, 0);
 
 	/* Next is the filter table bitmap.  The "soft" bitmap value
 	 * must be converted to the hardware representation by shifting
 	 * it left one position.  (Bit 0 repesents global filtering,
 	 * which is possible but not used.)
 	 */
-	*virt++ = cpu_to_le64((u64)ipa->filter_map << 1);
+	if (version <= IPA_VERSION_2_6L)
+		filter_map |= 1;
+
+	virt = ipa_table_write(version, virt, filter_map);
 
 	/* All the rest contain the DMA address of the zero rule */
-	le_addr = cpu_to_le64(addr);
 	while (count--)
-		*virt++ = le_addr;
+		virt = ipa_table_write(version, virt, addr);
 
 	return 0;
 }

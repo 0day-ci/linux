@@ -43,7 +43,7 @@ bool ipa_filter_map_valid(struct ipa *ipa, u32 filter_mask);
  */
 static inline bool ipa_table_hash_support(struct ipa *ipa)
 {
-	return ipa->version != IPA_VERSION_4_2;
+	return ipa->version != IPA_VERSION_4_2 && ipa->version > IPA_VERSION_2_6L;
 }
 
 /**
