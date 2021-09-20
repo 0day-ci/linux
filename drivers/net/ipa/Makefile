@@ -2,7 +2,7 @@ obj-$(CONFIG_QCOM_IPA)	+=	ipa.o
 
 ipa-y			:=	ipa_main.o ipa_power.o ipa_reg.o ipa_mem.o \
 				ipa_table.o ipa_interrupt.o gsi.o ipa_trans.o \
-				ipa_gsi.o ipa_smp2p.o ipa_uc.o \
+				ipa_gsi.o ipa_smp2p.o ipa_uc.o bam.o \
 				ipa_endpoint.o ipa_cmd.o ipa_modem.o \
 				ipa_resource.o ipa_qmi.o ipa_qmi_msg.o \
 				ipa_sysfs.o

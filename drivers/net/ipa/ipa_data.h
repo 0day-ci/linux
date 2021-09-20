@@ -188,6 +188,7 @@ struct ipa_gsi_endpoint_data {
 	u8 channel_id;
 	u8 endpoint_id;
 	bool toward_ipa;
+	const char *channel_name;	/* used only for BAM DMA channels */
 
 	struct gsi_channel_data channel;
 	struct ipa_endpoint_data endpoint;

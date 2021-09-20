@@ -2210,6 +2210,7 @@ int gsi_init(struct ipa_dma *gsi, struct platform_device *pdev,
 	gsi->channel_reset = gsi_channel_reset;
 	gsi->channel_suspend = gsi_channel_suspend;
 	gsi->channel_resume = gsi_channel_resume;
+	gsi->trans_commit = gsi_trans_commit;
 
 	/* GSI uses NAPI on all channels.  Create a dummy network device
 	 * for the channel NAPI contexts to be associated with.

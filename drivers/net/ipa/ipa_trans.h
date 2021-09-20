@@ -10,6 +10,7 @@
 #include <linux/refcount.h>
 #include <linux/completion.h>
 #include <linux/dma-direction.h>
+#include <linux/dmaengine.h>
 
 #include "ipa_cmd.h"
 
@@ -61,6 +62,7 @@ struct ipa_trans {
 	struct scatterlist *sgl;
 	struct ipa_cmd_info *info;	/* array of entries, or null */
 	enum dma_data_direction direction;
+	dma_cookie_t cookie;
 
 	refcount_t refcount;
 	struct completion completion;
@@ -148,6 +150,8 @@ struct ipa_trans *ipa_channel_trans_alloc(struct ipa_dma *dma_subsys, u32 channe
  * @trans:	Transaction to be freed
  */
 void ipa_trans_free(struct ipa_trans *trans);
+
+void ipa_trans_move_pending(struct ipa_trans *trans);
 
 /**
  * ipa_trans_cmd_add() - Add an immediate command to a transaction

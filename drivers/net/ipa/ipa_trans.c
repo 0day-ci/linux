@@ -254,7 +254,7 @@ struct ipa_trans *ipa_channel_trans_complete(struct ipa_channel *channel)
 }
 
 /* Move a transaction from the allocated list to the pending list */
-static void ipa_trans_move_pending(struct ipa_trans *trans)
+void ipa_trans_move_pending(struct ipa_trans *trans)
 {
 	struct ipa_channel *channel = &trans->dma_subsys->channel[trans->channel_id];
 	struct ipa_trans_info *trans_info = &channel->trans_info;
@@ -539,7 +539,7 @@ static void gsi_trans_tre_fill(struct gsi_tre *dest_tre, dma_addr_t addr,
  * pending list.  Finally, updates the channel ring pointer and optionally
  * rings the doorbell.
  */
-static void __gsi_trans_commit(struct ipa_trans *trans, bool ring_db)
+void gsi_trans_commit(struct ipa_trans *trans, bool ring_db)
 {
 	struct ipa_channel *channel = &trans->dma_subsys->channel[trans->channel_id];
 	struct gsi_ring *ring = &channel->tre_ring;
@@ -604,9 +604,9 @@ static void __gsi_trans_commit(struct ipa_trans *trans, bool ring_db)
 /* Commit a GSI transaction */
 void ipa_trans_commit(struct ipa_trans *trans, bool ring_db)
 {
-	if (trans->used)
-		__gsi_trans_commit(trans, ring_db);
-	else
+	if (trans->used) {
+		trans->dma_subsys->trans_commit(trans, ring_db);
+	} else
 		ipa_trans_free(trans);
 }
 
@@ -618,7 +618,7 @@ void ipa_trans_commit_wait(struct ipa_trans *trans)
 
 	refcount_inc(&trans->refcount);
 
-	__gsi_trans_commit(trans, true);
+	trans->dma_subsys->trans_commit(trans, true);
 
 	wait_for_completion(&trans->completion);
 
@@ -638,7 +638,7 @@ int ipa_trans_commit_wait_timeout(struct ipa_trans *trans,
 
 	refcount_inc(&trans->refcount);
 
-	__gsi_trans_commit(trans, true);
+	trans->dma_subsys->trans_commit(trans, true);
 
 	remaining = wait_for_completion_timeout(&trans->completion,
 						timeout_jiffies);

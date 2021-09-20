@@ -16,6 +16,8 @@ struct ipa_channel;
 
 #define GSI_RING_ELEMENT_SIZE	16	/* bytes; must be a power of 2 */
 
+void gsi_trans_commit(struct ipa_trans *trans, bool ring_db);
+
 /* Return the entry that follows one provided in a transaction pool */
 void *ipa_trans_pool_next(struct ipa_trans_pool *pool, void *element);
 
