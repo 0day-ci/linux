@@ -29,6 +29,7 @@ config QCOM_COMMAND_DB
 config QCOM_CPR
 	tristate "QCOM Core Power Reduction (CPR) support"
 	depends on ARCH_QCOM && HAS_IOMEM
+	select NVMEM
 	select PM_OPP
 	select REGMAP
 	help
