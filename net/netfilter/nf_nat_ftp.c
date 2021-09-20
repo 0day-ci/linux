@@ -72,8 +72,11 @@ static unsigned int nf_nat_ftp(struct sk_buff *skb,
 	u_int16_t port;
 	int dir = CTINFO2DIR(ctinfo);
 	struct nf_conn *ct = exp->master;
+	unsigned int i, min, max, range_size;
+	static const unsigned int max_attempts = 128;
 	char buffer[sizeof("|1||65535|") + INET6_ADDRSTRLEN];
 	unsigned int buflen;
+	int ret;
 
 	pr_debug("type %i, off %u len %u\n", type, matchoff, matchlen);
 
@@ -86,22 +89,32 @@ static unsigned int nf_nat_ftp(struct sk_buff *skb,
 	 * this one. */
 	exp->expectfn = nf_nat_follow_master;
 
-	/* Try to get same port: if not, try to change it. */
-	for (port = ntohs(exp->saved_proto.tcp.port); port != 0; port++) {
-		int ret;
+	min = ntohs(exp->saved_proto.tcp.port);
+	max = 65535;
 
-		exp->tuple.dst.u.tcp.port = htons(port);
-		ret = nf_ct_expect_related(exp, 0);
-		if (ret == 0)
-			break;
-		else if (ret != -EBUSY) {
-			port = 0;
-			break;
+	/* Try to get same port */
+	ret = nf_ct_expect_related(exp, 0);
+
+	/* if same port is not in range or available, try to change it. */
+	if (ret != 0) {
+		range_size = max - min + 1;
+		if (range_size > max_attempts)
+			range_size = max_attempts;
+
+		port = min + prandom_u32_max(max - min);
+		for (i = 0; i < range_size; i++) {
+			exp->tuple.dst.u.tcp.port = htons(port);
+			ret = nf_ct_expect_related(exp, 0);
+			if (ret != -EBUSY)
+				break;
+			port++;
+			if (port > max)
+				port = min;
 		}
 	}
 
-	if (port == 0) {
-		nf_ct_helper_log(skb, ct, "all ports in use");
+	if (ret != 0) {
+		nf_ct_helper_log(skb, ct, "tried %u ports, all were in use");
 		return NF_DROP;
 	}
 
