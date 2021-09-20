@@ -301,6 +301,9 @@ struct ipa_data {
 	const struct ipa_power_data *power_data;
 };
 
+extern const struct ipa_data ipa_data_v2_0;
+extern const struct ipa_data ipa_data_v2_5;
+extern const struct ipa_data ipa_data_v2_6L;
 extern const struct ipa_data ipa_data_v3_1;
 extern const struct ipa_data ipa_data_v3_5_1;
 extern const struct ipa_data ipa_data_v4_2;

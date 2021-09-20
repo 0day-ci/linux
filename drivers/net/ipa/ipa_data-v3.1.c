@@ -6,7 +6,7 @@
 
 #include <linux/log2.h>
 
-#include "gsi.h"
+#include "ipa_dma.h"
 #include "ipa_data.h"
 #include "ipa_endpoint.h"
 #include "ipa_mem.h"

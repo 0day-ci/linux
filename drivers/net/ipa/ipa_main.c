@@ -561,6 +561,18 @@ out_release_firmware:
 
 static const struct of_device_id ipa_match[] = {
 	{
+		.compatible	= "qcom,ipa-v2.0",
+		.data		= &ipa_data_v2_0,
+	},
+	{
+		.compatible	= "qcom,msm8996-ipa",
+		.data		= &ipa_data_v2_5,
+	},
+	{
+		.compatible	= "qcom,msm8953-ipa",
+		.data		= &ipa_data_v2_6L,
+	},
+	{
 		.compatible	= "qcom,msm8998-ipa",
 		.data		= &ipa_data_v3_1,
 	},
@@ -632,6 +644,9 @@ static void ipa_validate_build(void)
 static bool ipa_version_valid(enum ipa_version version)
 {
 	switch (version) {
+	case IPA_VERSION_2_0:
+	case IPA_VERSION_2_5:
+	case IPA_VERSION_2_6L:
 	case IPA_VERSION_3_0:
 	case IPA_VERSION_3_1:
 	case IPA_VERSION_3_5:
