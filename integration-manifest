@@ -1,0 +1,30 @@
+drm drm-fixes 109f7ea9aedce437b4b7737ab60bfea65d9dbdd3
+	Merge tag 'amd-drm-fixes-5.15-2021-09-16' of https://gitlab.freedesktop.org/agd5f/linux into drm-fixes
+drm-misc drm-misc-fixes 6b457230bfa136f83a6b4d6f03d104f27a584823
+	drm/nouveau/ga102-: support ttm buffer moves via copy engine
+drm-intel drm-intel-fixes e4e737bb5c170df6135a127739a9e6148ee3da82
+	Linux 5.15-rc2
+drm drm-next 6880fa6c56601bb8ed59df6c30fd390cc5f6dd8f
+	Linux 5.15-rc1
+drm-misc drm-misc-next-fixes 70982eef4d7eebb47a3b1ef25ec1bc742f3a21cf
+	drm/ttm: Fix a deadlock if the target BO is not idle during swap
+drm-intel drm-intel-next-fixes fb43ebc83e069625cfeeb2490efc3ffa0013bfa4
+	drm/i915/selftest: Fix use of err in igt_reset_{fail, nop}_engine()
+drm-misc drm-misc-next fba5265fca72436c13c4eae95ae1115b8b875b3b
+	drm/panfrost: simplify getting .driver_data
+drm-intel drm-intel-next 641dd82ffa9daad38f630d9f4a36e4875fd4e0c6
+	drm/i915/display/adlp: Add new PSR2 workarounds
+drm-intel drm-intel-gt-next d0a652493abd86180ad0cc0ed44427831d37fabe
+	drm/i915: Make wa list per-gt
+sound-upstream for-linus 7cf3dead1ad70c72edb03e2d98e1f3dcd332cdb2
+	Linux 5.13
+sound-upstream for-next 7cf3dead1ad70c72edb03e2d98e1f3dcd332cdb2
+	Linux 5.13
+drm-intel topic/core-for-CI 5363e35a435a0699c8b30936b6ca00db8d85c839
+	drm/i915: Add relocation exceptions for two other platforms
+drm topic/nouveau-ampere-modeset 584265dfec70e78ce2085b82ed389f27e06fbca0
+	Merge branch '04.01-ampere-lite' of git://github.com/skeggsb/linux into topic/nouveau-ampere-modeset
+drm-misc topic/i915-ttm cf3e3e86d77970211e0983130e896ae242601003
+	drm/i915: Use ttm mmap handling for ttm bo's.
+drm-intel topic/pxp 316346243be6df12799c0b64b788e06bad97c30b
+	Merge branch 'gcc-min-version-5.1' (make gcc-5.1 the minimum version)
