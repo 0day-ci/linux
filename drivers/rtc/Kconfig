@@ -1396,6 +1396,7 @@ config RTC_DRV_OMAP
 
 config HAVE_S3C_RTC
 	bool
+	default y if (ARCH_EXYNOS && RTC_CLASS)
 	help
 	  This will include RTC support for Samsung SoCs. If
 	  you want to include RTC support for any machine, kindly
