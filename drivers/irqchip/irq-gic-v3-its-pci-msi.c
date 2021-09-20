@@ -54,9 +54,13 @@ static int its_get_pci_alias(struct pci_dev *pdev, u16 alias, void *data)
 static int its_pci_msi_prepare(struct irq_domain *domain, struct device *dev,
 			       int nvec, msi_alloc_info_t *info)
 {
+	int alias_count = 0, map_count = 0, minnvec = 1, ret;
 	struct pci_dev *pdev, *alias_dev;
 	struct msi_domain_info *msi_info;
-	int alias_count = 0, minnvec = 1;
+	struct device *parent_dev;
+	struct pci_bus *root_bus;
+	struct device_node *np;
+	u32 map_mask, rid;
 
 	if (!dev_is_pci(dev))
 		return -EINVAL;
@@ -77,6 +81,21 @@ static int its_pci_msi_prepare(struct irq_domain *domain, struct device *dev,
 				     its_pci_msi_vec_count, &alias_count);
 		info->flags |= MSI_ALLOC_FLAGS_PROXY_DEVICE;
 	}
+
+	for (parent_dev = dev; parent_dev; parent_dev = parent_dev->parent) {
+		np = parent_dev->of_node;
+		if (!np)
+			continue;
+
+		ret = of_property_read_u32(np, "msi-map-mask", &map_mask);
+		if (!ret && map_mask != 0xffff) {
+			rid = pci_dev_id(pdev) & map_mask;
+			root_bus = find_pci_root_bus(pdev->bus);
+			__pci_walk_bus(root_bus, its_pci_msi_vec_count, &map_count, rid, map_mask);
+			break;
+		}
+	}
+	alias_count = max(map_count, alias_count);
 
 	/* ITS specific DeviceID, as the core ITS ignores dev. */
 	info->scratchpad[0].ul = pci_msi_domain_get_msi_rid(domain, pdev);
