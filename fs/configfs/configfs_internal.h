@@ -54,6 +54,8 @@ struct configfs_dirent {
 #define CONFIGFS_USET_DROPPING		BIT(8)
 #define CONFIGFS_USET_IN_MKDIR		BIT(9)
 #define CONFIGFS_USET_CREATING		BIT(10)
+#define CONFIGFS_GROUP_PENDING		BIT(11)
+#define CONFIGFS_GROUP_LIVE		BIT(12)
 #define CONFIGFS_NOT_PINNED	(CONFIGFS_ITEM_ATTR | CONFIGFS_ITEM_BIN_ATTR)
 
 extern struct mutex configfs_symlink_mutex;
