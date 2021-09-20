@@ -205,14 +205,12 @@ release_idr:
 
 static int tcf_mirred_forward(bool want_ingress, struct sk_buff *skb)
 {
-	int err;
-
 	if (!want_ingress)
-		err = tcf_dev_queue_xmit(skb, dev_queue_xmit);
-	else
-		err = netif_receive_skb(skb);
+		return tcf_dev_queue_xmit(skb, dev_queue_xmit);
 
-	return err;
+	nf_reset_ct(skb);
+
+	return netif_receive_skb(skb);
 }
 
 static int tcf_mirred_act(struct sk_buff *skb, const struct tc_action *a,
@@ -270,9 +268,6 @@ static int tcf_mirred_act(struct sk_buff *skb, const struct tc_action *a,
 		if (!skb2)
 			goto out;
 	}
-
-	/* All mirred/redirected skbs should clear previous ct info */
-	nf_reset_ct(skb2);
 
 	want_ingress = tcf_mirred_act_wants_ingress(m_eaction);
 
