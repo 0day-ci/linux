@@ -34,6 +34,15 @@
 
 void page_writeback_init(void);
 
+void __acct_reclaim_writeback(pg_data_t *pgdat, struct page *page);
+static inline void acct_reclaim_writeback(struct page *page)
+{
+	pg_data_t *pgdat = page_pgdat(page);
+
+	if (atomic_read(&pgdat->nr_reclaim_throttled))
+		__acct_reclaim_writeback(pgdat, page);
+}
+
 vm_fault_t do_swap_page(struct vm_fault *vmf);
 
 void free_pgtables(struct mmu_gather *tlb, struct vm_area_struct *start_vma,

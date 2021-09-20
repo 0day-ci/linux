@@ -1006,6 +1006,47 @@ static void handle_write_error(struct address_space *mapping,
 	unlock_page(page);
 }
 
+static void
+reclaim_throttle(pg_data_t *pgdat, enum vmscan_throttle_state reason,
+							long timeout)
+{
+	wait_queue_head_t *wqh = &pgdat->reclaim_wait;
+	unsigned long start = jiffies;
+	long ret;
+	DEFINE_WAIT(wait);
+
+	atomic_inc(&pgdat->nr_reclaim_throttled);
+	WRITE_ONCE(pgdat->nr_reclaim_start,
+		 node_page_state(pgdat, NR_THROTTLED_WRITTEN));
+
+	prepare_to_wait(wqh, &wait, TASK_INTERRUPTIBLE);
+	ret = schedule_timeout(timeout);
+	finish_wait(wqh, &wait);
+	atomic_dec(&pgdat->nr_reclaim_throttled);
+
+	trace_mm_vmscan_throttled(pgdat->node_id, jiffies_to_usecs(timeout),
+				jiffies_to_usecs(jiffies - start),
+				reason);
+}
+
+/*
+ * Account for pages written if tasks are throttled waiting on dirty
+ * pages to clean. If enough pages have been cleaned since throttling
+ * started then wakeup the throttled tasks.
+ */
+void __acct_reclaim_writeback(pg_data_t *pgdat, struct page *page)
+{
+	unsigned long nr_written;
+	int nr_throttled = atomic_read(&pgdat->nr_reclaim_throttled);
+
+	__inc_node_page_state(page, NR_THROTTLED_WRITTEN);
+	nr_written = node_page_state(pgdat, NR_THROTTLED_WRITTEN) -
+		READ_ONCE(pgdat->nr_reclaim_start);
+
+	if (nr_written > SWAP_CLUSTER_MAX * nr_throttled)
+		wake_up_interruptible_all(&pgdat->reclaim_wait);
+}
+
 /* possible outcome of pageout() */
 typedef enum {
 	/* failed to write page out, page is locked */
@@ -1412,9 +1453,8 @@ retry:
 
 		/*
 		 * The number of dirty pages determines if a node is marked
-		 * reclaim_congested which affects wait_iff_congested. kswapd
-		 * will stall and start writing pages if the tail of the LRU
-		 * is all dirty unqueued pages.
+		 * reclaim_congested. kswapd will stall and start writing
+		 * pages if the tail of the LRU is all dirty unqueued pages.
 		 */
 		page_check_dirty_writeback(page, &dirty, &writeback);
 		if (dirty || writeback)
@@ -3180,19 +3220,20 @@ again:
 		 * If kswapd scans pages marked for immediate
 		 * reclaim and under writeback (nr_immediate), it
 		 * implies that pages are cycling through the LRU
-		 * faster than they are written so also forcibly stall.
+		 * faster than they are written so forcibly stall
+		 * until some pages complete writeback.
 		 */
 		if (sc->nr.immediate)
-			congestion_wait(BLK_RW_ASYNC, HZ/10);
+			reclaim_throttle(pgdat, VMSCAN_THROTTLE_WRITEBACK, HZ/10);
 	}
 
 	/*
 	 * Tag a node/memcg as congested if all the dirty pages
 	 * scanned were backed by a congested BDI and
-	 * wait_iff_congested will stall.
+	 * non-kswapd tasks will stall on reclaim_throttle.
 	 *
 	 * Legacy memcg will stall in page writeback so avoid forcibly
-	 * stalling in wait_iff_congested().
+	 * stalling in reclaim_throttle().
 	 */
 	if ((current_is_kswapd() ||
 	     (cgroup_reclaim(sc) && writeback_throttling_sane(sc))) &&
@@ -3208,7 +3249,7 @@ again:
 	if (!current_is_kswapd() && current_may_throttle() &&
 	    !sc->hibernation_mode &&
 	    test_bit(LRUVEC_CONGESTED, &target_lruvec->flags))
-		wait_iff_congested(BLK_RW_ASYNC, HZ/10);
+		reclaim_throttle(pgdat, VMSCAN_THROTTLE_WRITEBACK, HZ/10);
 
 	if (should_continue_reclaim(pgdat, sc->nr_reclaimed - nr_reclaimed,
 				    sc))
@@ -4286,6 +4327,7 @@ static int kswapd(void *p)
 
 	WRITE_ONCE(pgdat->kswapd_order, 0);
 	WRITE_ONCE(pgdat->kswapd_highest_zoneidx, MAX_NR_ZONES);
+	atomic_set(&pgdat->nr_reclaim_throttled, 0);
 	for ( ; ; ) {
 		bool ret;
 
