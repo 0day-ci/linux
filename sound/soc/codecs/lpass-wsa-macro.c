@@ -2446,6 +2446,7 @@ static int wsa_macro_remove(struct platform_device *pdev)
 
 static const struct of_device_id wsa_macro_dt_match[] = {
 	{.compatible = "qcom,sm8250-lpass-wsa-macro"},
+	{.compatible = "qcom,sc7280-lpass-wsa-macro"},
 	{}
 };
 MODULE_DEVICE_TABLE(of, wsa_macro_dt_match);
