@@ -1475,6 +1475,7 @@ int pci_scan_bridge(struct pci_bus *bus, struct pci_dev *dev, int max,
 
 void __pci_walk_bus(struct pci_bus *top, int (*cb)(struct pci_dev *, void *),
 		    void *userdata, u32 rid, u32 mask);
+struct pci_bus *find_pci_root_bus(struct pci_bus *bus);
 int pci_cfg_space_size(struct pci_dev *dev);
 unsigned char pci_bus_max_busnr(struct pci_bus *bus);
 void pci_setup_bridge(struct pci_bus *bus);

@@ -9,13 +9,14 @@
 
 #include "pci.h"
 
-static struct pci_bus *find_pci_root_bus(struct pci_bus *bus)
+struct pci_bus *find_pci_root_bus(struct pci_bus *bus)
 {
 	while (bus->parent)
 		bus = bus->parent;
 
 	return bus;
 }
+EXPORT_SYMBOL_GPL(find_pci_root_bus);
 
 struct pci_host_bridge *pci_find_host_bridge(struct pci_bus *bus)
 {
