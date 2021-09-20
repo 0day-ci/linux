@@ -18,6 +18,7 @@
 #include <linux/phylink.h>
 #include <linux/gpio/consumer.h>
 #include <linux/etherdevice.h>
+#include <linux/leds.h>
 
 #include "qca8k.h"
 
@@ -951,6 +952,467 @@ qca8k_setup_of_rgmii_delay(struct qca8k_priv *priv)
 }
 
 static int
+qca8k_get_enable_led_reg(int port_num, int led_num, struct qca8k_led_pattern_en *reg_info)
+{
+	int shift;
+
+	switch (port_num) {
+	case 0:
+		reg_info->reg = QCA8K_LED_CTRL_REG(led_num);
+		reg_info->shift = 14;
+		break;
+	case 1:
+	case 2:
+	case 3:
+		reg_info->reg = QCA8K_LED_CTRL_REG(3);
+		shift = 2 * led_num + (6 * (port_num - 1));
+
+		reg_info->shift = 8 + shift;
+
+		break;
+	case 4:
+		reg_info->reg = QCA8K_LED_CTRL_REG(led_num);
+		reg_info->shift = 30;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+static int
+qca8k_get_control_led_reg(int port_num, int led_num, struct qca8k_led_pattern_en *reg_info)
+{
+	reg_info->reg = QCA8K_LED_CTRL_REG(led_num);
+
+	/* 6 total control rule:
+	 * 3 control rules for phy0-3 that applies to all their leds
+	 * 3 control rules for phy4
+	 */
+	if (port_num == 4)
+		reg_info->shift = 16;
+	else
+		reg_info->shift = 0;
+
+	return 0;
+}
+
+static int
+qca8k_setup_led_rules(struct qca8k_led *led, struct fwnode_handle *node)
+{
+	struct qca8k_led_pattern_en reg_info;
+	const char **rules;
+	int i, count, ret;
+	const char *rule;
+	u32 val = 0;
+
+	if (!fwnode_property_present(node, "qca,led_rules"))
+		return 0;
+
+	rules = kcalloc(QCA8K_LED_RULE_MAX, sizeof(*rules), GFP_KERNEL);
+	if (!rules)
+		return -ENOMEM;
+
+	ret = fwnode_property_read_string_array(node, "qca,led_rules", rules, QCA8K_LED_RULE_MAX);
+	if (ret < 0)
+		return ret;
+
+	count = (unsigned int)ret;
+
+	for (i = 0; i < count; i++) {
+		rule = rules[i];
+
+		if (!strcmp(rule, "tx-blink"))
+			val |= QCA8K_LED_TX_BLINK_MASK;
+
+		if (!strcmp(rule, "rx-blink"))
+			val |= QCA8K_LED_RX_BLINK_MASK;
+
+		if (!strcmp(rule, "collision-blink"))
+			val |= QCA8K_LED_COL_BLINK_MASK;
+
+		if (!strcmp(rule, "link-10M"))
+			val |= QCA8K_LED_LINK_10M_EN_MASK;
+
+		if (!strcmp(rule, "link-100M"))
+			val |= QCA8K_LED_LINK_100M_EN_MASK;
+
+		if (!strcmp(rule, "link-1000M"))
+			val |= QCA8K_LED_LINK_1000M_EN_MASK;
+
+		if (!strcmp(rule, "half-duplex"))
+			val |= QCA8K_LED_HALF_DUPLEX_MASK;
+
+		if (!strcmp(rule, "full-duplex"))
+			val |= QCA8K_LED_FULL_DUPLEX_MASK;
+
+		if (!strcmp(rule, "linkup-over"))
+			val |= QCA8K_LED_LINKUP_OVER_MASK;
+
+		if (!strcmp(rule, "power-on-reset"))
+			val |= QCA8K_LED_POWER_ON_LIGHT_MASK;
+
+		if (!(val & QCA8K_LED_BLINK_FREQ_MASK)) {
+			if (!strcmp(rule, "blink-2hz"))
+				val |= QCA8K_LED_BLINK_2HZ << QCA8K_LED_BLINK_FREQ_SHITF;
+			else if (!strcmp(rule, "blink-4hz"))
+				val |= QCA8K_LED_BLINK_4HZ << QCA8K_LED_BLINK_FREQ_SHITF;
+			else if (!strcmp(rule, "blink-8hz"))
+				val |= QCA8K_LED_BLINK_8HZ << QCA8K_LED_BLINK_FREQ_SHITF;
+			else if (!strcmp(rule, "blink-auto"))
+				val |= QCA8K_LED_BLINK_AUTO << QCA8K_LED_BLINK_FREQ_SHITF;
+		}
+	}
+
+	kfree(rules);
+
+	qca8k_get_control_led_reg(led->port_num, led->led_num, &reg_info);
+
+	ret = qca8k_rmw(led->priv, reg_info.reg,
+			QCA8K_LED_CTRL_MASK << reg_info.shift,
+			val << reg_info.shift);
+
+	return ret;
+}
+
+static ssize_t
+control_rule_show(struct device *dev, struct device_attribute *attr,
+		  char *buf)
+{
+	struct led_classdev *led_cdev = dev_get_drvdata(dev);
+	struct qca8k_led *led = container_of(led_cdev, struct qca8k_led, cdev);
+	struct qca8k_led_pattern_en reg_info;
+	u32 value;
+	int ret;
+
+	qca8k_get_control_led_reg(led->port_num, led->led_num, &reg_info);
+
+	ret = qca8k_read(led->priv, reg_info.reg, &value);
+	if (ret)
+		return sprintf(buf, "Error reading control rule\n");
+
+	value >>= reg_info.shift;
+	value &= QCA8K_LED_CTRL_MASK;
+
+	return sprintf(buf, "%x\n", value);
+}
+
+static ssize_t
+control_rule_store(struct device *dev,
+		   struct device_attribute *attr, const char *buf,
+		   size_t size)
+{
+	struct led_classdev *led_cdev = dev_get_drvdata(dev);
+	struct qca8k_led *led = container_of(led_cdev, struct qca8k_led, cdev);
+	struct qca8k_led_pattern_en reg_info;
+	ssize_t status;
+	long value;
+	int ret;
+
+	status = kstrtol(buf, 0, &value);
+	if (status)
+		return status;
+
+	if (value < 0)
+		return -EINVAL;
+
+	qca8k_get_control_led_reg(led->port_num, led->led_num, &reg_info);
+
+	value &= QCA8K_LED_CTRL_MASK;
+
+	ret = qca8k_rmw(led->priv, reg_info.reg,
+			QCA8K_LED_CTRL_MASK << reg_info.shift,
+			value << reg_info.shift);
+	if (ret)
+		return ret;
+
+	return size;
+}
+
+static ssize_t
+hw_mode_show(struct device *dev, struct device_attribute *attr,
+	     char *buf)
+{
+	struct led_classdev *led_cdev = dev_get_drvdata(dev);
+	struct qca8k_led *led = container_of(led_cdev, struct qca8k_led, cdev);
+	struct qca8k_led_pattern_en reg_info;
+	u32 value;
+	int ret;
+
+	qca8k_get_enable_led_reg(led->port_num, led->led_num, &reg_info);
+
+	ret = qca8k_read(led->priv, reg_info.reg, &value);
+	if (ret)
+		return sprintf(buf, "Error reading hw mode\n");
+
+	value >>= reg_info.shift;
+	value &= GENMASK(1, 0);
+
+	return sprintf(buf, "%x\n", value == QCA8K_LED_RULE_CONTROLLED ? 1 : 0);
+}
+
+static ssize_t
+hw_mode_store(struct device *dev,
+	      struct device_attribute *attr, const char *buf,
+	      size_t size)
+{
+	struct led_classdev *led_cdev = dev_get_drvdata(dev);
+	struct qca8k_led *led = container_of(led_cdev, struct qca8k_led, cdev);
+	struct qca8k_led_pattern_en reg_info;
+	ssize_t status;
+	long value;
+	int ret;
+
+	status = kstrtol(buf, 0, &value);
+	if (status)
+		return status;
+
+	if (value < 0)
+		return -EINVAL;
+
+	qca8k_get_enable_led_reg(led->port_num, led->led_num, &reg_info);
+
+	if (value)
+		value = QCA8K_LED_RULE_CONTROLLED;
+
+	value &= GENMASK(1, 0);
+
+	ret = qca8k_rmw(led->priv, reg_info.reg,
+			GENMASK(1, 0) << reg_info.shift,
+			value << reg_info.shift);
+	if (ret)
+		return ret;
+
+	return size;
+}
+
+static DEVICE_ATTR_RW(control_rule);
+static DEVICE_ATTR_RW(hw_mode);
+
+/* Each led have a enable hw_mode and optionally a way to set control rule */
+static struct attribute *qca8k_leds_attrs[] = {
+	&dev_attr_hw_mode.attr,
+	&dev_attr_control_rule.attr,
+	NULL,
+};
+
+static struct attribute_group qca8k_leds_rule_group = {
+	.attrs = qca8k_leds_attrs,
+};
+
+static const struct attribute_group *qca8k_leds_groups[] = {
+	&qca8k_leds_rule_group,
+	NULL,
+};
+
+static void
+qca8k_led_brightness_set(struct qca8k_led *led,
+			 enum led_brightness b)
+{
+	struct qca8k_led_pattern_en reg_info;
+	u32 val = QCA8K_LED_ALWAYS_OFF;
+
+	qca8k_get_enable_led_reg(led->port_num, led->led_num, &reg_info);
+
+	if (b)
+		val = QCA8K_LED_ALWAYS_ON;
+
+	qca8k_rmw(led->priv, reg_info.reg,
+		  GENMASK(1, 0) << reg_info.shift,
+		  val << reg_info.shift);
+}
+
+static void
+qca8k_cled_brightness_set(struct led_classdev *ldev,
+			  enum led_brightness b)
+{
+	struct qca8k_led *led = container_of(ldev, struct qca8k_led, cdev);
+
+	return qca8k_led_brightness_set(led, b);
+}
+
+static enum led_brightness
+qca8k_led_brightness_get(struct qca8k_led *led)
+{
+	struct qca8k_led_pattern_en reg_info;
+	u32 val;
+	int ret;
+
+	qca8k_get_enable_led_reg(led->port_num, led->led_num, &reg_info);
+
+	ret = qca8k_read(led->priv, reg_info.reg, &val);
+	if (ret)
+		return 0;
+
+	val >>= reg_info.shift;
+	val &= GENMASK(1, 0);
+
+	return val > 0 ? 1 : 0;
+}
+
+static enum led_brightness
+qca8k_cled_brightness_get(struct led_classdev *ldev)
+{
+	struct qca8k_led *led = container_of(ldev, struct qca8k_led, cdev);
+
+	return qca8k_led_brightness_get(led);
+}
+
+static int
+qca8k_cled_blink_set(struct led_classdev *ldev,
+		     unsigned long *delay_on,
+		     unsigned long *delay_off)
+{
+	struct qca8k_led *led = container_of(ldev, struct qca8k_led, cdev);
+	struct qca8k_led_pattern_en reg_info;
+
+	if (*delay_on == 0 && *delay_off == 0) {
+		*delay_on = 125;
+		*delay_off = 125;
+	}
+
+	if (*delay_on != 125 || *delay_off != 125) {
+		/* The hardware only supports blinking at 4Hz. Fall back
+		 * to software implementation in other cases.
+		 */
+		return -EINVAL;
+	}
+
+	qca8k_get_enable_led_reg(led->port_num, led->led_num, &reg_info);
+
+	qca8k_rmw(led->priv, reg_info.reg,
+		  GENMASK(1, 0) << reg_info.shift,
+		  QCA8K_LED_ALWAYS_BLINK_4HZ << reg_info.shift);
+
+	return 0;
+}
+
+static void
+qca8k_cled_flash_resume(struct led_classdev *ldev)
+{
+	struct qca8k_led *led = container_of(ldev, struct qca8k_led, cdev);
+	struct qca8k_led_pattern_en reg_info;
+
+	qca8k_get_enable_led_reg(led->port_num, led->led_num, &reg_info);
+	qca8k_rmw(led->priv, reg_info.reg,
+		  GENMASK(1, 0) << reg_info.shift,
+		  led->old_pattern << reg_info.shift);
+}
+
+static int
+qca8k_parse_port_leds(struct qca8k_priv *priv, struct fwnode_handle *port, int port_num)
+{
+	struct led_init_data init_data = { };
+	struct fwnode_handle *led = NULL;
+	struct qca8k_led *port_led;
+	int led_num, port_index;
+	const char *state;
+	int ret;
+
+	fwnode_for_each_child_node(port, led) {
+		/* Reg rapresent the led number of the port.
+		 * Each port can have at least 3 leds attached
+		 * Commonly:
+		 * 1. is gigabit led
+		 * 2. is mbit led
+		 * 3. additional status led
+		 */
+		if (fwnode_property_read_u32(led, "reg", &led_num))
+			continue;
+
+		if (led_num >= QCA8K_LED_PORT_COUNT) {
+			dev_warn(priv->dev, "Invalid LED reg defined %d", port_num);
+			continue;
+		}
+
+		port_index = 3 * port_num + led_num;
+
+		port_led = &priv->ports_led[port_index];
+		port_led->port_num = port_num;
+		port_led->led_num = led_num;
+		port_led->priv = priv;
+
+		ret = fwnode_property_read_string(led, "default-state", &state);
+		if (!ret) {
+			if (!strcmp(state, "on")) {
+				port_led->cdev.brightness = 1;
+				qca8k_led_brightness_set(port_led, 1);
+			} else if (!strcmp(state, "off")) {
+				port_led->cdev.brightness = 0;
+				qca8k_led_brightness_set(port_led, 0);
+			} else if (!strcmp(state, "keep")) {
+				port_led->cdev.brightness =
+					qca8k_led_brightness_get(port_led);
+			}
+		}
+
+		/* 3 brightness settings can be applied from Documentation:
+		 * 0 always off
+		 * 1 blink at 4Hz
+		 * 2 always on
+		 * 3 rule controlled
+		 * Suppots only 2 mode: (pcb limitation, with always on and blink
+		 * only the last led is set to this mode)
+		 * 0 always off (sets all leds off)
+		 * 3 rule controlled
+		 */
+		port_led->cdev.max_brightness = 1;
+		port_led->cdev.brightness_set = qca8k_cled_brightness_set;
+		port_led->cdev.brightness_get = qca8k_cled_brightness_get;
+		port_led->cdev.blink_set = qca8k_cled_blink_set;
+		port_led->cdev.flash_resume = qca8k_cled_flash_resume;
+		port_led->cdev.groups = qca8k_leds_groups;
+		port_led->cdev.flags |= LED_CORE_SUSPENDRESUME;
+		init_data.default_label = ":port";
+		init_data.devicename = "qca8k";
+		init_data.fwnode = led;
+
+		/* Provide control rule first lan port and wan port.
+		 * Lan port 2-3-4 follow first lan port control rule if the hw mode
+		 * is active.
+		 * The control_rule sysfs refer to the same reg for lan port (phy0-3)
+		 */
+		ret = qca8k_setup_led_rules(port_led, led);
+		if (ret)
+			dev_warn(priv->dev, "Failed to apply led control rules for %s",
+				 port_led->cdev.name);
+
+		ret = devm_led_classdev_register_ext(priv->dev, &port_led->cdev, &init_data);
+		if (ret)
+			dev_warn(priv->dev, "Failed to int led");
+	}
+
+	return 0;
+}
+
+static int
+qca8k_setup_led_ctrl(struct qca8k_priv *priv)
+{
+	struct fwnode_handle *leds, *port;
+	int port_num;
+	int ret;
+
+	leds = device_get_named_child_node(priv->dev, "leds");
+	if (!leds) {
+		dev_info(priv->dev, "No LEDs specified in device tree!\n");
+		return 0;
+	}
+
+	fwnode_for_each_child_node(leds, port) {
+		if (fwnode_property_read_u32(port, "reg", &port_num))
+			continue;
+
+		/* Each port can have at least 3 different leds attached */
+		ret = qca8k_parse_port_leds(priv, port, port_num);
+		if (ret)
+			return ret;
+	}
+
+	return 0;
+}
+
+static int
 qca8k_setup(struct dsa_switch *ds)
 {
 	struct qca8k_priv *priv = (struct qca8k_priv *)ds->priv;
@@ -976,6 +1438,10 @@ qca8k_setup(struct dsa_switch *ds)
 		return ret;
 
 	ret = qca8k_setup_of_rgmii_delay(priv);
+	if (ret)
+		return ret;
+
+	ret = qca8k_setup_led_ctrl(priv);
 	if (ret)
 		return ret;
 
@@ -1890,13 +2356,29 @@ qca8k_sw_remove(struct mdio_device *mdiodev)
 static void
 qca8k_set_pm(struct qca8k_priv *priv, int enable)
 {
-	int i;
+	struct qca8k_led_pattern_en reg_info;
+	int port, led, port_index;
+	u32 val;
 
-	for (i = 0; i < QCA8K_NUM_PORTS; i++) {
-		if (!priv->port_sts[i].enabled)
+	for (port = 0; port < QCA8K_NUM_PORTS; port++) {
+		/* Save leds state for current port */
+		for (led = 0; led < 3; led++) {
+			port_index = 3 * port + led;
+			qca8k_get_enable_led_reg(port, led, &reg_info);
+
+			if (!enable) {
+				qca8k_read(priv, reg_info.reg, &val);
+				val >>= reg_info.shift;
+				val &= GENMASK(1, 0);
+
+				priv->ports_led[port_index].old_pattern = val;
+			}
+		}
+
+		if (!priv->port_sts[port].enabled)
 			continue;
 
-		qca8k_port_set_status(priv, i, enable);
+		qca8k_port_set_status(priv, port, enable);
 	}
 }
 
