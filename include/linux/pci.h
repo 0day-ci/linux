@@ -1473,13 +1473,16 @@ const struct pci_device_id *pci_match_id(const struct pci_device_id *ids,
 int pci_scan_bridge(struct pci_bus *bus, struct pci_dev *dev, int max,
 		    int pass);
 
-void pci_walk_bus(struct pci_bus *top, int (*cb)(struct pci_dev *, void *),
-		  void *userdata);
+void __pci_walk_bus(struct pci_bus *top, int (*cb)(struct pci_dev *, void *),
+		    void *userdata, u32 rid, u32 mask);
 int pci_cfg_space_size(struct pci_dev *dev);
 unsigned char pci_bus_max_busnr(struct pci_bus *bus);
 void pci_setup_bridge(struct pci_bus *bus);
 resource_size_t pcibios_window_alignment(struct pci_bus *bus,
 					 unsigned long type);
+
+#define pci_walk_bus(top, cb, userdata) \
+	 __pci_walk_bus((top), (cb), (userdata), 0x0, 0xffff)
 
 #define PCI_VGA_STATE_CHANGE_BRIDGE (1 << 0)
 #define PCI_VGA_STATE_CHANGE_DECODES (1 << 1)

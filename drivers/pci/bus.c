@@ -358,10 +358,12 @@ void pci_bus_add_devices(const struct pci_bus *bus)
 }
 EXPORT_SYMBOL(pci_bus_add_devices);
 
-/** pci_walk_bus - walk devices on/under bus, calling callback.
+/** __pci_walk_bus - walk devices on/under bus matching requestor ID, calling callback.
  *  @top      bus whose devices should be walked
  *  @cb       callback to be called for each device found
  *  @userdata arbitrary pointer to be passed to callback.
+ *  @rid      Requestor ID that has to be matched for the callback to be invoked
+ *  @mask     Mask that has to be applied to pci_dev_id(), before compating it with @rid
  *
  *  Walk the given bus, including any bridged devices
  *  on buses under this bus.  Call the provided callback
@@ -371,8 +373,8 @@ EXPORT_SYMBOL(pci_bus_add_devices);
  *  other than 0, we break out.
  *
  */
-void pci_walk_bus(struct pci_bus *top, int (*cb)(struct pci_dev *, void *),
-		  void *userdata)
+void __pci_walk_bus(struct pci_bus *top, int (*cb)(struct pci_dev *, void *),
+		    void *userdata, u32 rid, u32 mask)
 {
 	struct pci_dev *dev;
 	struct pci_bus *bus;
@@ -399,13 +401,16 @@ void pci_walk_bus(struct pci_bus *top, int (*cb)(struct pci_dev *, void *),
 		} else
 			next = dev->bus_list.next;
 
+		if (mask != 0xffff && ((pci_dev_id(dev) & mask) != rid))
+			continue;
+
 		retval = cb(dev, userdata);
 		if (retval)
 			break;
 	}
 	up_read(&pci_bus_sem);
 }
-EXPORT_SYMBOL_GPL(pci_walk_bus);
+EXPORT_SYMBOL_GPL(__pci_walk_bus);
 
 struct pci_bus *pci_bus_get(struct pci_bus *bus)
 {
