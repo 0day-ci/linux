@@ -1353,7 +1353,7 @@ static int va_macro_validate_dmic_sample_rate(u32 dmic_sample_rate,
 					      struct va_macro *va)
 {
 	u32 div_factor;
-	u32 mclk_rate = VA_MACRO_MCLK_FREQ;
+	u32 mclk_rate = 2 * VA_MACRO_MCLK_FREQ;
 
 	if (!dmic_sample_rate || mclk_rate % dmic_sample_rate != 0)
 		goto undefined_rate;
@@ -1432,7 +1432,7 @@ static int va_macro_probe(struct platform_device *pdev)
 	}
 
 	/* mclk rate */
-	clk_set_rate(va->mclk, VA_MACRO_MCLK_FREQ);
+	clk_set_rate(va->mclk, 2 * VA_MACRO_MCLK_FREQ);
 
 	clk_prepare_enable(va->mclk);
 	clk_prepare_enable(va->macro);
