@@ -608,6 +608,8 @@
 		reg = <0x0 0xff180000 0x0 0x100>;
 		clocks = <&cru SCLK_UART0>, <&cru PCLK_UART0>;
 		clock-names = "baudclk", "apb_pclk";
+		dmas = <&dmac_peri 0>, <&dmac_peri 1>;
+		dma-names = "tx", "rx";
 		interrupts = <GIC_SPI 99 IRQ_TYPE_LEVEL_HIGH 0>;
 		reg-shift = <2>;
 		reg-io-width = <4>;
@@ -621,6 +623,8 @@
 		reg = <0x0 0xff190000 0x0 0x100>;
 		clocks = <&cru SCLK_UART1>, <&cru PCLK_UART1>;
 		clock-names = "baudclk", "apb_pclk";
+		dmas = <&dmac_peri 2>, <&dmac_peri 3>;
+		dma-names = "tx", "rx";
 		interrupts = <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH 0>;
 		reg-shift = <2>;
 		reg-io-width = <4>;
@@ -634,6 +638,8 @@
 		reg = <0x0 0xff1a0000 0x0 0x100>;
 		clocks = <&cru SCLK_UART2>, <&cru PCLK_UART2>;
 		clock-names = "baudclk", "apb_pclk";
+		dmas = <&dmac_peri 4>, <&dmac_peri 5>;
+		dma-names = "tx", "rx";
 		interrupts = <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH 0>;
 		reg-shift = <2>;
 		reg-io-width = <4>;
@@ -647,6 +653,8 @@
 		reg = <0x0 0xff1b0000 0x0 0x100>;
 		clocks = <&cru SCLK_UART3>, <&cru PCLK_UART3>;
 		clock-names = "baudclk", "apb_pclk";
+		dmas = <&dmac_peri 6>, <&dmac_peri 7>;
+		dma-names = "tx", "rx";
 		interrupts = <GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH 0>;
 		reg-shift = <2>;
 		reg-io-width = <4>;
@@ -1142,6 +1150,8 @@
 		reg = <0x0 0xff370000 0x0 0x100>;
 		clocks = <&pmucru SCLK_UART4_PMU>, <&pmucru PCLK_UART4_PMU>;
 		clock-names = "baudclk", "apb_pclk";
+		dmas = <&dmac_peri 8>, <&dmac_peri 9>;
+		dma-names = "tx", "rx";
 		interrupts = <GIC_SPI 102 IRQ_TYPE_LEVEL_HIGH 0>;
 		reg-shift = <2>;
 		reg-io-width = <4>;
