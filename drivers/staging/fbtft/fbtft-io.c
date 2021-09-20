@@ -5,6 +5,19 @@
 #include <linux/spi/spi.h>
 #include "fbtft.h"
 
+/**
+ * fbtft_write_spi() - write data to current spi
+ * @par: Driver data including driver &struct spi_device
+ * @buf: Buffer to write to spi
+ * @len: Length of the buffer
+ * Context: can sleep
+ *
+ * Builds an &struct spi_transfer and &struct spi_message object based on the
+ * given @buf and @len.  These are then used in a call to spi_sync() which will
+ * write to the spi.
+ *
+ * Return: zero on success or else a negative error code
+ */
 int fbtft_write_spi(struct fbtft_par *par, void *buf, size_t len)
 {
 	struct spi_transfer t = {
