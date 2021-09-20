@@ -1,6 +1,6 @@
-/* SPDX-License-Identifier: GPL-2.0 */
-#ifndef _LINUX_DIRENT_H
-#define _LINUX_DIRENT_H
+/* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */
+#ifndef _UAPI_LINUX_DIRENT_H
+#define _UAPI_LINUX_DIRENT_H
 
 struct linux_dirent {
 	unsigned long	d_ino;
