@@ -175,19 +175,21 @@ ga102_chan_new(struct nvkm_device *device,
 		}
 	}
 
-	if (!chan->ctrl.runl)
-		return -ENODEV;
+	if (!chan->ctrl.runl) {
+		ret = -ENODEV;
+		goto free_chan;
+	}
 
 	chan->ctrl.chan = nvkm_rd32(device, chan->ctrl.runl + 0x004) & 0xfffffff0;
 	args->token = nvkm_rd32(device, chan->ctrl.runl + 0x008) & 0xffff0000;
 
 	ret = nvkm_memory_new(device, NVKM_MEM_TARGET_INST, 0x1000, 0x1000, true, &chan->mthd);
 	if (ret)
-		return ret;
+		goto free_chan;
 
 	ret = nvkm_memory_new(device, NVKM_MEM_TARGET_INST, 0x1000, 0x1000, true, &chan->inst);
 	if (ret)
-		return ret;
+		goto free_chan;
 
 	nvkm_kmap(chan->inst);
 	nvkm_wo32(chan->inst, 0x010, 0x0000face);
@@ -209,11 +211,11 @@ ga102_chan_new(struct nvkm_device *device,
 
 	ret = nvkm_memory_new(device, NVKM_MEM_TARGET_INST, 0x1000, 0x1000, true, &chan->user);
 	if (ret)
-		return ret;
+		goto free_chan;
 
 	ret = nvkm_memory_new(device, NVKM_MEM_TARGET_INST, 0x1000, 0x1000, true, &chan->runl);
 	if (ret)
-		return ret;
+		goto free_chan;
 
 	nvkm_kmap(chan->runl);
 	nvkm_wo32(chan->runl, 0x00, 0x80030001);
@@ -228,10 +230,14 @@ ga102_chan_new(struct nvkm_device *device,
 
 	ret = nvkm_vmm_join(vmm, chan->inst);
 	if (ret)
-		return ret;
+		goto free_chan;
 
 	chan->vmm = nvkm_vmm_ref(vmm);
 	return 0;
+
+free_chan:
+	kfree(chan);
+	return ret;
 }
 
 static const struct nvkm_device_oclass
