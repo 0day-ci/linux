@@ -219,7 +219,10 @@ struct es58x_fd_urb_cmd {
 		struct es58x_fd_tx_ack_msg tx_ack_msg;
 		__le64 timestamp;
 		__le32 rx_cmd_ret_le32;
-		u8 raw_msg[0];
+		struct {
+			u8 __pad[0];
+			u8 raw_msg[];
+		};
 	} __packed;
 
 	__le16 reserved_for_crc16_do_not_use;
