@@ -170,11 +170,15 @@ static struct sk_buff *napi_skb_cache_get(void)
 	struct napi_alloc_cache *nc = this_cpu_ptr(&napi_alloc_cache);
 	struct sk_buff *skb;
 
-	if (unlikely(!nc->skb_count))
-		nc->skb_count = kmem_cache_alloc_bulk(skbuff_head_cache,
-						      GFP_ATOMIC,
-						      NAPI_SKB_CACHE_BULK,
-						      nc->skb_cache);
+	if (unlikely(!nc->skb_count)) {
+		/* kmem_cache_alloc_cached should be changed to return the size of
+		 * the allocated cache
+		 */
+		nc->skb_cache = kmem_cache_alloc_cached(skbuff_head_cache,
+							GFP_ATOMIC | SLB_LOCKLESS_CACHE);
+		nc->skb_count = this_cpu_ptr(skbuff_head_cache)->size;
+	}
+
 	if (unlikely(!nc->skb_count))
 		return NULL;
 
