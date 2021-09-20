@@ -2,6 +2,13 @@
 #ifndef _LINUX_DIRENT_H
 #define _LINUX_DIRENT_H
 
+struct linux_dirent {
+	unsigned long	d_ino;
+	unsigned long	d_off;
+	unsigned short	d_reclen;
+	char		d_name[1];
+};
+
 struct linux_dirent64 {
 	u64		d_ino;
 	s64		d_off;
