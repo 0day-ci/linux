@@ -215,6 +215,8 @@ static int quad8_function_read(struct counter_device *counter,
 		case 2:
 			*function = COUNTER_FUNCTION_QUADRATURE_X4;
 			break;
+		default:
+			return -1;
 		}
 	else
 		*function = COUNTER_FUNCTION_PULSE_DIRECTION;
