@@ -4511,7 +4511,8 @@ set_next_entity(struct cfs_rq *cfs_rq, struct sched_entity *se)
 }
 
 static int
-wakeup_preempt_entity(struct sched_entity *curr, struct sched_entity *se);
+wakeup_preempt_entity(struct cfs_rq *cfs_rq, struct sched_entity *curr,
+						struct sched_entity *se);
 
 /*
  * Pick the next process, keeping these things in mind, in this order:
@@ -4550,16 +4551,16 @@ pick_next_entity(struct cfs_rq *cfs_rq, struct sched_entity *curr)
 				second = curr;
 		}
 
-		if (second && wakeup_preempt_entity(second, left) < 1)
+		if (second && wakeup_preempt_entity(NULL, second, left) < 1)
 			se = second;
 	}
 
-	if (cfs_rq->next && wakeup_preempt_entity(cfs_rq->next, left) < 1) {
+	if (cfs_rq->next && wakeup_preempt_entity(NULL, cfs_rq->next, left) < 1) {
 		/*
 		 * Someone really wants this to run. If it's not unfair, run it.
 		 */
 		se = cfs_rq->next;
-	} else if (cfs_rq->last && wakeup_preempt_entity(cfs_rq->last, left) < 1) {
+	} else if (cfs_rq->last && wakeup_preempt_entity(NULL, cfs_rq->last, left) < 1) {
 		/*
 		 * Prefer last buddy, try to return the CPU to a preempted task.
 		 */
@@ -7044,9 +7045,21 @@ balance_fair(struct rq *rq, struct task_struct *prev, struct rq_flags *rf)
 }
 #endif /* CONFIG_SMP */
 
-static unsigned long wakeup_gran(struct sched_entity *se)
+static unsigned long
+wakeup_gran(struct cfs_rq *cfs_rq, struct sched_entity *se)
 {
 	unsigned long gran = sysctl_sched_wakeup_granularity;
+
+	/*
+	 * If rq is specified, scale the granularity relative to the number
+	 * of running tasks but no more than 8ms with default
+	 * sysctl_sched_wakeup_granularity settings. The wakeup gran
+	 * reduces over-scheduling but if tasks are stacked then the
+	 * domain is likely overloaded and over-scheduling may
+	 * prolong the overloaded state.
+	 */
+	if (cfs_rq && cfs_rq->nr_running > 1)
+		gran *= min(cfs_rq->nr_running >> 1, sched_nr_latency);
 
 	/*
 	 * Since its curr running now, convert the gran from real-time
@@ -7079,14 +7092,15 @@ static unsigned long wakeup_gran(struct sched_entity *se)
  *
  */
 static int
-wakeup_preempt_entity(struct sched_entity *curr, struct sched_entity *se)
+wakeup_preempt_entity(struct cfs_rq *cfs_rq, struct sched_entity *curr,
+						struct sched_entity *se)
 {
 	s64 gran, vdiff = curr->vruntime - se->vruntime;
 
 	if (vdiff <= 0)
 		return -1;
 
-	gran = wakeup_gran(se);
+	gran = wakeup_gran(cfs_rq, se);
 	if (vdiff > gran)
 		return 1;
 
@@ -7191,7 +7205,7 @@ static void check_preempt_wakeup(struct rq *rq, struct task_struct *p, int wake_
 		return;
 
 	update_curr(cfs_rq);
-	if (wakeup_preempt_entity(se, pse) == 1) {
+	if (wakeup_preempt_entity(cfs_rq, se, pse) == 1) {
 		/*
 		 * Bias pick_next to pick the sched entity that is
 		 * triggering this preemption.
