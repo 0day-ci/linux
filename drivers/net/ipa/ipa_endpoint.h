@@ -10,7 +10,7 @@
 #include <linux/workqueue.h>
 #include <linux/if_ether.h>
 
-#include "gsi.h"
+#include "ipa_dma.h"
 #include "ipa_reg.h"
 
 struct net_device;
@@ -110,8 +110,8 @@ u32 ipa_endpoint_init(struct ipa *ipa, u32 count,
 void ipa_endpoint_exit(struct ipa *ipa);
 
 void ipa_endpoint_trans_complete(struct ipa_endpoint *ipa,
-				 struct gsi_trans *trans);
+				 struct ipa_trans *trans);
 void ipa_endpoint_trans_release(struct ipa_endpoint *ipa,
-				struct gsi_trans *trans);
+				struct ipa_trans *trans);
 
 #endif /* _IPA_ENDPOINT_H_ */

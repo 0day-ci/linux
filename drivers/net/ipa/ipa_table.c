@@ -21,8 +21,8 @@
 #include "ipa_reg.h"
 #include "ipa_mem.h"
 #include "ipa_cmd.h"
-#include "gsi.h"
-#include "gsi_trans.h"
+#include "ipa_dma.h"
+#include "ipa_trans.h"
 
 /**
  * DOC: IPA Filter and Route Tables
@@ -234,10 +234,10 @@ static dma_addr_t ipa_table_addr(struct ipa *ipa, bool filter_mask, u16 count)
 	return ipa->table_addr + skip * IPA_TABLE_ENTRY_SIZE(ipa->version);
 }
 
-static void ipa_table_reset_add(struct gsi_trans *trans, bool filter,
+static void ipa_table_reset_add(struct ipa_trans *trans, bool filter,
 				u16 first, u16 count, enum ipa_mem_id mem_id)
 {
-	struct ipa *ipa = container_of(trans->gsi, struct ipa, gsi);
+	struct ipa *ipa = container_of(trans->dma_subsys, struct ipa, dma_subsys);
 	const struct ipa_mem *mem = ipa_mem_find(ipa, mem_id);
 	dma_addr_t addr;
 	u32 offset;
@@ -266,7 +266,7 @@ ipa_filter_reset_table(struct ipa *ipa, enum ipa_mem_id mem_id, bool modem)
 {
 	u32 ep_mask = ipa->filter_map;
 	u32 count = hweight32(ep_mask);
-	struct gsi_trans *trans;
+	struct ipa_trans *trans;
 	enum gsi_ee_id ee_id;
 
 	trans = ipa_cmd_trans_alloc(ipa, count);
@@ -291,7 +291,7 @@ ipa_filter_reset_table(struct ipa *ipa, enum ipa_mem_id mem_id, bool modem)
 		ipa_table_reset_add(trans, true, endpoint_id, 1, mem_id);
 	}
 
-	gsi_trans_commit_wait(trans);
+	ipa_trans_commit_wait(trans);
 
 	return 0;
 }
@@ -326,7 +326,7 @@ static int ipa_filter_reset(struct ipa *ipa, bool modem)
  * */
 static int ipa_route_reset(struct ipa *ipa, bool modem)
 {
-	struct gsi_trans *trans;
+	struct ipa_trans *trans;
 	u16 first;
 	u16 count;
 
@@ -354,7 +354,7 @@ static int ipa_route_reset(struct ipa *ipa, bool modem)
 	ipa_table_reset_add(trans, false, first, count,
 			    IPA_MEM_V6_ROUTE_HASHED);
 
-	gsi_trans_commit_wait(trans);
+	ipa_trans_commit_wait(trans);
 
 	return 0;
 }
@@ -382,7 +382,7 @@ void ipa_table_reset(struct ipa *ipa, bool modem)
 int ipa_table_hash_flush(struct ipa *ipa)
 {
 	u32 offset = ipa_reg_filt_rout_hash_flush_offset(ipa->version);
-	struct gsi_trans *trans;
+	struct ipa_trans *trans;
 	u32 val;
 
 	if (!ipa_table_hash_support(ipa))
@@ -399,17 +399,17 @@ int ipa_table_hash_flush(struct ipa *ipa)
 
 	ipa_cmd_register_write_add(trans, offset, val, val, false);
 
-	gsi_trans_commit_wait(trans);
+	ipa_trans_commit_wait(trans);
 
 	return 0;
 }
 
-static void ipa_table_init_add(struct gsi_trans *trans, bool filter,
+static void ipa_table_init_add(struct ipa_trans *trans, bool filter,
 			       enum ipa_cmd_opcode opcode,
 			       enum ipa_mem_id mem_id,
 			       enum ipa_mem_id hash_mem_id)
 {
-	struct ipa *ipa = container_of(trans->gsi, struct ipa, gsi);
+	struct ipa *ipa = container_of(trans->dma_subsys, struct ipa, dma_subsys);
 	const struct ipa_mem *hash_mem = ipa_mem_find(ipa, hash_mem_id);
 	const struct ipa_mem *mem = ipa_mem_find(ipa, mem_id);
 	dma_addr_t hash_addr;
@@ -444,7 +444,7 @@ static void ipa_table_init_add(struct gsi_trans *trans, bool filter,
 
 int ipa_table_setup(struct ipa *ipa)
 {
-	struct gsi_trans *trans;
+	struct ipa_trans *trans;
 
 	trans = ipa_cmd_trans_alloc(ipa, 4);
 	if (!trans) {
@@ -464,7 +464,7 @@ int ipa_table_setup(struct ipa *ipa)
 	ipa_table_init_add(trans, true, IPA_CMD_IP_V6_FILTER_INIT,
 			   IPA_MEM_V6_FILTER, IPA_MEM_V6_FILTER_HASHED);
 
-	gsi_trans_commit_wait(trans);
+	ipa_trans_commit_wait(trans);
 
 	return 0;
 }

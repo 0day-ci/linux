@@ -12,7 +12,7 @@
 #include <linux/pm_wakeup.h>
 
 #include "ipa_version.h"
-#include "gsi.h"
+#include "ipa_dma.h"
 #include "ipa_mem.h"
 #include "ipa_qmi.h"
 #include "ipa_endpoint.h"
@@ -29,7 +29,7 @@ struct ipa_interrupt;
 
 /**
  * struct ipa - IPA information
- * @gsi:		Embedded GSI structure
+ * @ipa_dma:		Embedded IPA DMA structure
  * @version:		IPA hardware version
  * @pdev:		Platform device
  * @completion:		Used to signal pipeline clear transfer complete
@@ -71,7 +71,7 @@ struct ipa_interrupt;
  * @qmi:		QMI information
  */
 struct ipa {
-	struct gsi gsi;
+	struct ipa_dma dma_subsys;
 	enum ipa_version version;
 	struct platform_device *pdev;
 	struct completion completion;

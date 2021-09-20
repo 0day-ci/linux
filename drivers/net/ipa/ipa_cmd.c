@@ -10,8 +10,8 @@
 #include <linux/bitfield.h>
 #include <linux/dma-direction.h>
 
-#include "gsi.h"
-#include "gsi_trans.h"
+#include "ipa_dma.h"
+#include "ipa_trans.h"
 #include "ipa.h"
 #include "ipa_endpoint.h"
 #include "ipa_table.h"
@@ -32,8 +32,8 @@
  * immediate command's opcode.  The payload for a command resides in DRAM
  * and is described by a single scatterlist entry in its transaction.
  * Commands do not require a transaction completion callback.  To commit
- * an immediate command transaction, either gsi_trans_commit_wait() or
- * gsi_trans_commit_wait_timeout() is used.
+ * an immediate command transaction, either ipa_trans_commit_wait() or
+ * ipa_trans_commit_wait_timeout() is used.
  */
 
 /* Some commands can wait until indicated pipeline stages are clear */
@@ -346,10 +346,10 @@ bool ipa_cmd_data_valid(struct ipa *ipa)
 }
 
 
-int ipa_cmd_pool_init(struct gsi_channel *channel, u32 tre_max)
+int ipa_cmd_pool_init(struct ipa_channel *channel, u32 tre_max)
 {
-	struct gsi_trans_info *trans_info = &channel->trans_info;
-	struct device *dev = channel->gsi->dev;
+	struct ipa_trans_info *trans_info = &channel->trans_info;
+	struct device *dev = channel->dma_subsys->dev;
 	int ret;
 
 	/* This is as good a place as any to validate build constants */
@@ -359,50 +359,50 @@ int ipa_cmd_pool_init(struct gsi_channel *channel, u32 tre_max)
 	 * a single transaction can require up to tlv_count of them,
 	 * so we treat them as if that many can be allocated at once.
 	 */
-	ret = gsi_trans_pool_init_dma(dev, &trans_info->cmd_pool,
+	ret = ipa_trans_pool_init_dma(dev, &trans_info->cmd_pool,
 				      sizeof(union ipa_cmd_payload),
 				      tre_max, channel->tlv_count);
 	if (ret)
 		return ret;
 
 	/* Each TRE needs a command info structure */
-	ret = gsi_trans_pool_init(&trans_info->info_pool,
+	ret = ipa_trans_pool_init(&trans_info->info_pool,
 				   sizeof(struct ipa_cmd_info),
 				   tre_max, channel->tlv_count);
 	if (ret)
-		gsi_trans_pool_exit_dma(dev, &trans_info->cmd_pool);
+		ipa_trans_pool_exit_dma(dev, &trans_info->cmd_pool);
 
 	return ret;
 }
 
-void ipa_cmd_pool_exit(struct gsi_channel *channel)
+void ipa_cmd_pool_exit(struct ipa_channel *channel)
 {
-	struct gsi_trans_info *trans_info = &channel->trans_info;
-	struct device *dev = channel->gsi->dev;
+	struct ipa_trans_info *trans_info = &channel->trans_info;
+	struct device *dev = channel->dma_subsys->dev;
 
-	gsi_trans_pool_exit(&trans_info->info_pool);
-	gsi_trans_pool_exit_dma(dev, &trans_info->cmd_pool);
+	ipa_trans_pool_exit(&trans_info->info_pool);
+	ipa_trans_pool_exit_dma(dev, &trans_info->cmd_pool);
 }
 
 static union ipa_cmd_payload *
 ipa_cmd_payload_alloc(struct ipa *ipa, dma_addr_t *addr)
 {
-	struct gsi_trans_info *trans_info;
+	struct ipa_trans_info *trans_info;
 	struct ipa_endpoint *endpoint;
 
 	endpoint = ipa->name_map[IPA_ENDPOINT_AP_COMMAND_TX];
-	trans_info = &ipa->gsi.channel[endpoint->channel_id].trans_info;
+	trans_info = &ipa->dma_subsys.channel[endpoint->channel_id].trans_info;
 
-	return gsi_trans_pool_alloc_dma(&trans_info->cmd_pool, addr);
+	return ipa_trans_pool_alloc_dma(&trans_info->cmd_pool, addr);
 }
 
 /* If hash_size is 0, hash_offset and hash_addr ignored. */
-void ipa_cmd_table_init_add(struct gsi_trans *trans,
+void ipa_cmd_table_init_add(struct ipa_trans *trans,
 			    enum ipa_cmd_opcode opcode, u16 size, u32 offset,
 			    dma_addr_t addr, u16 hash_size, u32 hash_offset,
 			    dma_addr_t hash_addr)
 {
-	struct ipa *ipa = container_of(trans->gsi, struct ipa, gsi);
+	struct ipa *ipa = container_of(trans->dma_subsys, struct ipa, dma_subsys);
 	enum dma_data_direction direction = DMA_TO_DEVICE;
 	struct ipa_cmd_hw_ip_fltrt_init *payload;
 	union ipa_cmd_payload *cmd_payload;
@@ -433,15 +433,15 @@ void ipa_cmd_table_init_add(struct gsi_trans *trans,
 	payload->flags = cpu_to_le64(val);
 	payload->nhash_rules_addr = cpu_to_le64(addr);
 
-	gsi_trans_cmd_add(trans, payload, sizeof(*payload), payload_addr,
+	ipa_trans_cmd_add(trans, payload, sizeof(*payload), payload_addr,
 			  direction, opcode);
 }
 
 /* Initialize header space in IPA-local memory */
-void ipa_cmd_hdr_init_local_add(struct gsi_trans *trans, u32 offset, u16 size,
+void ipa_cmd_hdr_init_local_add(struct ipa_trans *trans, u32 offset, u16 size,
 				dma_addr_t addr)
 {
-	struct ipa *ipa = container_of(trans->gsi, struct ipa, gsi);
+	struct ipa *ipa = container_of(trans->dma_subsys, struct ipa, dma_subsys);
 	enum ipa_cmd_opcode opcode = IPA_CMD_HDR_INIT_LOCAL;
 	enum dma_data_direction direction = DMA_TO_DEVICE;
 	struct ipa_cmd_hw_hdr_init_local *payload;
@@ -464,14 +464,14 @@ void ipa_cmd_hdr_init_local_add(struct gsi_trans *trans, u32 offset, u16 size,
 	flags |= u32_encode_bits(offset, HDR_INIT_LOCAL_FLAGS_HDR_ADDR_FMASK);
 	payload->flags = cpu_to_le32(flags);
 
-	gsi_trans_cmd_add(trans, payload, sizeof(*payload), payload_addr,
+	ipa_trans_cmd_add(trans, payload, sizeof(*payload), payload_addr,
 			  direction, opcode);
 }
 
-void ipa_cmd_register_write_add(struct gsi_trans *trans, u32 offset, u32 value,
+void ipa_cmd_register_write_add(struct ipa_trans *trans, u32 offset, u32 value,
 				u32 mask, bool clear_full)
 {
-	struct ipa *ipa = container_of(trans->gsi, struct ipa, gsi);
+	struct ipa *ipa = container_of(trans->dma_subsys, struct ipa, dma_subsys);
 	struct ipa_cmd_register_write *payload;
 	union ipa_cmd_payload *cmd_payload;
 	u32 opcode = IPA_CMD_REGISTER_WRITE;
@@ -521,14 +521,14 @@ void ipa_cmd_register_write_add(struct gsi_trans *trans, u32 offset, u32 value,
 	payload->value_mask = cpu_to_le32(mask);
 	payload->clear_options = cpu_to_le32(options);
 
-	gsi_trans_cmd_add(trans, payload, sizeof(*payload), payload_addr,
+	ipa_trans_cmd_add(trans, payload, sizeof(*payload), payload_addr,
 			  DMA_NONE, opcode);
 }
 
 /* Skip IP packet processing on the next data transfer on a TX channel */
-static void ipa_cmd_ip_packet_init_add(struct gsi_trans *trans, u8 endpoint_id)
+static void ipa_cmd_ip_packet_init_add(struct ipa_trans *trans, u8 endpoint_id)
 {
-	struct ipa *ipa = container_of(trans->gsi, struct ipa, gsi);
+	struct ipa *ipa = container_of(trans->dma_subsys, struct ipa, dma_subsys);
 	enum ipa_cmd_opcode opcode = IPA_CMD_IP_PACKET_INIT;
 	enum dma_data_direction direction = DMA_TO_DEVICE;
 	struct ipa_cmd_ip_packet_init *payload;
@@ -541,15 +541,15 @@ static void ipa_cmd_ip_packet_init_add(struct gsi_trans *trans, u8 endpoint_id)
 	payload->dest_endpoint = u8_encode_bits(endpoint_id,
 					IPA_PACKET_INIT_DEST_ENDPOINT_FMASK);
 
-	gsi_trans_cmd_add(trans, payload, sizeof(*payload), payload_addr,
+	ipa_trans_cmd_add(trans, payload, sizeof(*payload), payload_addr,
 			  direction, opcode);
 }
 
 /* Use a DMA command to read or write a block of IPA-resident memory */
-void ipa_cmd_dma_shared_mem_add(struct gsi_trans *trans, u32 offset, u16 size,
+void ipa_cmd_dma_shared_mem_add(struct ipa_trans *trans, u32 offset, u16 size,
 				dma_addr_t addr, bool toward_ipa)
 {
-	struct ipa *ipa = container_of(trans->gsi, struct ipa, gsi);
+	struct ipa *ipa = container_of(trans->dma_subsys, struct ipa, dma_subsys);
 	enum ipa_cmd_opcode opcode = IPA_CMD_DMA_SHARED_MEM;
 	struct ipa_cmd_hw_dma_mem_mem *payload;
 	union ipa_cmd_payload *cmd_payload;
@@ -586,13 +586,13 @@ void ipa_cmd_dma_shared_mem_add(struct gsi_trans *trans, u32 offset, u16 size,
 
 	direction = toward_ipa ? DMA_TO_DEVICE : DMA_FROM_DEVICE;
 
-	gsi_trans_cmd_add(trans, payload, sizeof(*payload), payload_addr,
+	ipa_trans_cmd_add(trans, payload, sizeof(*payload), payload_addr,
 			  direction, opcode);
 }
 
-static void ipa_cmd_ip_tag_status_add(struct gsi_trans *trans)
+static void ipa_cmd_ip_tag_status_add(struct ipa_trans *trans)
 {
-	struct ipa *ipa = container_of(trans->gsi, struct ipa, gsi);
+	struct ipa *ipa = container_of(trans->dma_subsys, struct ipa, dma_subsys);
 	enum ipa_cmd_opcode opcode = IPA_CMD_IP_PACKET_TAG_STATUS;
 	enum dma_data_direction direction = DMA_TO_DEVICE;
 	struct ipa_cmd_ip_packet_tag_status *payload;
@@ -604,14 +604,14 @@ static void ipa_cmd_ip_tag_status_add(struct gsi_trans *trans)
 
 	payload->tag = le64_encode_bits(0, IP_PACKET_TAG_STATUS_TAG_FMASK);
 
-	gsi_trans_cmd_add(trans, payload, sizeof(*payload), payload_addr,
+	ipa_trans_cmd_add(trans, payload, sizeof(*payload), payload_addr,
 			  direction, opcode);
 }
 
 /* Issue a small command TX data transfer */
-static void ipa_cmd_transfer_add(struct gsi_trans *trans)
+static void ipa_cmd_transfer_add(struct ipa_trans *trans)
 {
-	struct ipa *ipa = container_of(trans->gsi, struct ipa, gsi);
+	struct ipa *ipa = container_of(trans->dma_subsys, struct ipa, dma_subsys);
 	enum dma_data_direction direction = DMA_TO_DEVICE;
 	enum ipa_cmd_opcode opcode = IPA_CMD_NONE;
 	union ipa_cmd_payload *payload;
@@ -620,14 +620,14 @@ static void ipa_cmd_transfer_add(struct gsi_trans *trans)
 	/* Just transfer a zero-filled payload structure */
 	payload = ipa_cmd_payload_alloc(ipa, &payload_addr);
 
-	gsi_trans_cmd_add(trans, payload, sizeof(*payload), payload_addr,
+	ipa_trans_cmd_add(trans, payload, sizeof(*payload), payload_addr,
 			  direction, opcode);
 }
 
 /* Add immediate commands to a transaction to clear the hardware pipeline */
-void ipa_cmd_pipeline_clear_add(struct gsi_trans *trans)
+void ipa_cmd_pipeline_clear_add(struct ipa_trans *trans)
 {
-	struct ipa *ipa = container_of(trans->gsi, struct ipa, gsi);
+	struct ipa *ipa = container_of(trans->dma_subsys, struct ipa, dma_subsys);
 	struct ipa_endpoint *endpoint;
 
 	/* This will complete when the transfer is received */
@@ -664,12 +664,12 @@ void ipa_cmd_pipeline_clear_wait(struct ipa *ipa)
 void ipa_cmd_pipeline_clear(struct ipa *ipa)
 {
 	u32 count = ipa_cmd_pipeline_clear_count();
-	struct gsi_trans *trans;
+	struct ipa_trans *trans;
 
 	trans = ipa_cmd_trans_alloc(ipa, count);
 	if (trans) {
 		ipa_cmd_pipeline_clear_add(trans);
-		gsi_trans_commit_wait(trans);
+		ipa_trans_commit_wait(trans);
 		ipa_cmd_pipeline_clear_wait(ipa);
 	} else {
 		dev_err(&ipa->pdev->dev,
@@ -680,22 +680,22 @@ void ipa_cmd_pipeline_clear(struct ipa *ipa)
 static struct ipa_cmd_info *
 ipa_cmd_info_alloc(struct ipa_endpoint *endpoint, u32 tre_count)
 {
-	struct gsi_channel *channel;
+	struct ipa_channel *channel;
 
-	channel = &endpoint->ipa->gsi.channel[endpoint->channel_id];
+	channel = &endpoint->ipa->dma_subsys.channel[endpoint->channel_id];
 
-	return gsi_trans_pool_alloc(&channel->trans_info.info_pool, tre_count);
+	return ipa_trans_pool_alloc(&channel->trans_info.info_pool, tre_count);
 }
 
 /* Allocate a transaction for the command TX endpoint */
-struct gsi_trans *ipa_cmd_trans_alloc(struct ipa *ipa, u32 tre_count)
+struct ipa_trans *ipa_cmd_trans_alloc(struct ipa *ipa, u32 tre_count)
 {
 	struct ipa_endpoint *endpoint;
-	struct gsi_trans *trans;
+	struct ipa_trans *trans;
 
 	endpoint = ipa->name_map[IPA_ENDPOINT_AP_COMMAND_TX];
 
-	trans = gsi_channel_trans_alloc(&ipa->gsi, endpoint->channel_id,
+	trans = ipa_channel_trans_alloc(&ipa->dma_subsys, endpoint->channel_id,
 					tre_count, DMA_NONE);
 	if (trans)
 		trans->info = ipa_cmd_info_alloc(endpoint, tre_count);

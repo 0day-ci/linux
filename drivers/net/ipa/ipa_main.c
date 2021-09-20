@@ -31,7 +31,7 @@
 #include "ipa_modem.h"
 #include "ipa_uc.h"
 #include "ipa_interrupt.h"
-#include "gsi_trans.h"
+#include "ipa_trans.h"
 #include "ipa_sysfs.h"
 
 /**
@@ -98,7 +98,7 @@ int ipa_setup(struct ipa *ipa)
 	struct device *dev = &ipa->pdev->dev;
 	int ret;
 
-	ret = gsi_setup(&ipa->gsi);
+	ret = gsi_setup(&ipa->dma_subsys);
 	if (ret)
 		return ret;
 
@@ -154,7 +154,7 @@ err_endpoint_teardown:
 	ipa_endpoint_teardown(ipa);
 	ipa_power_teardown(ipa);
 err_gsi_teardown:
-	gsi_teardown(&ipa->gsi);
+	gsi_teardown(&ipa->dma_subsys);
 
 	return ret;
 }
@@ -179,7 +179,7 @@ static void ipa_teardown(struct ipa *ipa)
 	ipa_endpoint_disable_one(command_endpoint);
 	ipa_endpoint_teardown(ipa);
 	ipa_power_teardown(ipa);
-	gsi_teardown(&ipa->gsi);
+	gsi_teardown(&ipa->dma_subsys);
 }
 
 /* Configure bus access behavior for IPA components */
@@ -716,7 +716,7 @@ static int ipa_probe(struct platform_device *pdev)
 	if (ret)
 		goto err_reg_exit;
 
-	ret = gsi_init(&ipa->gsi, pdev, ipa->version, data->endpoint_count,
+	ret = gsi_init(&ipa->dma_subsys, pdev, ipa->version, data->endpoint_count,
 		       data->endpoint_data);
 	if (ret)
 		goto err_mem_exit;
@@ -781,7 +781,7 @@ err_table_exit:
 err_endpoint_exit:
 	ipa_endpoint_exit(ipa);
 err_gsi_exit:
-	gsi_exit(&ipa->gsi);
+	gsi_exit(&ipa->dma_subsys);
 err_mem_exit:
 	ipa_mem_exit(ipa);
 err_reg_exit:
@@ -824,7 +824,7 @@ out_power_put:
 	ipa_modem_exit(ipa);
 	ipa_table_exit(ipa);
 	ipa_endpoint_exit(ipa);
-	gsi_exit(&ipa->gsi);
+	gsi_exit(&ipa->dma_subsys);
 	ipa_mem_exit(ipa);
 	ipa_reg_exit(ipa);
 	kfree(ipa);

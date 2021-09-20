@@ -26,8 +26,8 @@ struct device;
 struct scatterlist;
 struct platform_device;
 
-struct gsi;
-struct gsi_trans;
+struct ipa_dma;
+struct ipa_trans;
 struct gsi_channel_data;
 struct ipa_gsi_endpoint_data;
 
@@ -70,7 +70,7 @@ struct gsi_ring {
  * The result of a pool allocation of multiple elements is always
  * contiguous.
  */
-struct gsi_trans_pool {
+struct ipa_trans_pool {
 	void *base;			/* base address of element pool */
 	u32 count;			/* # elements in the pool */
 	u32 free;			/* next free element in pool (modulo) */
@@ -79,13 +79,13 @@ struct gsi_trans_pool {
 	dma_addr_t addr;		/* DMA address if DMA pool (or 0) */
 };
 
-struct gsi_trans_info {
+struct ipa_trans_info {
 	atomic_t tre_avail;		/* TREs available for allocation */
-	struct gsi_trans_pool pool;	/* transaction pool */
-	struct gsi_trans_pool sg_pool;	/* scatterlist pool */
-	struct gsi_trans_pool cmd_pool;	/* command payload DMA pool */
-	struct gsi_trans_pool info_pool;/* command information pool */
-	struct gsi_trans **map;		/* TRE -> transaction map */
+	struct ipa_trans_pool pool;	/* transaction pool */
+	struct ipa_trans_pool sg_pool;	/* scatterlist pool */
+	struct ipa_trans_pool cmd_pool;	/* command payload DMA pool */
+	struct ipa_trans_pool info_pool;/* command information pool */
+	struct ipa_trans **map;		/* TRE -> transaction map */
 
 	spinlock_t spinlock;		/* protects updates to the lists */
 	struct list_head alloc;		/* allocated, not committed */
@@ -105,8 +105,8 @@ enum gsi_channel_state {
 };
 
 /* We only care about channels between IPA and AP */
-struct gsi_channel {
-	struct gsi *gsi;
+struct ipa_channel {
+	struct ipa_dma *dma_subsys;
 	bool toward_ipa;
 	bool command;			/* AP command TX channel or not */
 
@@ -127,7 +127,7 @@ struct gsi_channel {
 	u64 compl_byte_count;		/* last reported completed byte count */
 	u64 compl_trans_count;		/* ...and completed trans count */
 
-	struct gsi_trans_info trans_info;
+	struct ipa_trans_info trans_info;
 
 	struct napi_struct napi;
 };
@@ -140,12 +140,12 @@ enum gsi_evt_ring_state {
 };
 
 struct gsi_evt_ring {
-	struct gsi_channel *channel;
+	struct ipa_channel *channel;
 	struct completion completion;	/* signals event ring state changes */
 	struct gsi_ring ring;
 };
 
-struct gsi {
+struct ipa_dma {
 	struct device *dev;		/* Same as IPA device */
 	enum ipa_version version;
 	struct net_device dummy_dev;	/* needed for NAPI */
@@ -154,7 +154,7 @@ struct gsi {
 	u32 irq;
 	u32 channel_count;
 	u32 evt_ring_count;
-	struct gsi_channel channel[GSI_CHANNEL_COUNT_MAX];
+	struct ipa_channel channel[GSI_CHANNEL_COUNT_MAX];
 	struct gsi_evt_ring evt_ring[GSI_EVT_RING_COUNT_MAX];
 	u32 event_bitmap;		/* allocated event rings */
 	u32 modem_channel_bitmap;	/* modem channels to allocate */
@@ -174,13 +174,13 @@ struct gsi {
  * Performs initialization that must wait until the GSI hardware is
  * ready (including firmware loaded).
  */
-int gsi_setup(struct gsi *gsi);
+int gsi_setup(struct ipa_dma *dma_subsys);
 
 /**
  * gsi_teardown() - Tear down GSI subsystem
  * @gsi:	GSI address previously passed to a successful gsi_setup() call
  */
-void gsi_teardown(struct gsi *gsi);
+void gsi_teardown(struct ipa_dma *dma_subsys);
 
 /**
  * gsi_channel_tre_max() - Channel maximum number of in-flight TREs
@@ -189,7 +189,7 @@ void gsi_teardown(struct gsi *gsi);
  *
  * Return:	 The maximum number of TREs oustanding on the channel
  */
-u32 gsi_channel_tre_max(struct gsi *gsi, u32 channel_id);
+u32 gsi_channel_tre_max(struct ipa_dma *dma_subsys, u32 channel_id);
 
 /**
  * gsi_channel_trans_tre_max() - Maximum TREs in a single transaction
@@ -198,7 +198,7 @@ u32 gsi_channel_tre_max(struct gsi *gsi, u32 channel_id);
  *
  * Return:	 The maximum TRE count per transaction on the channel
  */
-u32 gsi_channel_trans_tre_max(struct gsi *gsi, u32 channel_id);
+u32 gsi_channel_trans_tre_max(struct ipa_dma *dma_subsys, u32 channel_id);
 
 /**
  * gsi_channel_start() - Start an allocated GSI channel
@@ -207,7 +207,7 @@ u32 gsi_channel_trans_tre_max(struct gsi *gsi, u32 channel_id);
  *
  * Return:	0 if successful, or a negative error code
  */
-int gsi_channel_start(struct gsi *gsi, u32 channel_id);
+int gsi_channel_start(struct ipa_dma *dma_subsys, u32 channel_id);
 
 /**
  * gsi_channel_stop() - Stop a started GSI channel
@@ -216,7 +216,7 @@ int gsi_channel_start(struct gsi *gsi, u32 channel_id);
  *
  * Return:	0 if successful, or a negative error code
  */
-int gsi_channel_stop(struct gsi *gsi, u32 channel_id);
+int gsi_channel_stop(struct ipa_dma *dma_subsys, u32 channel_id);
 
 /**
  * gsi_channel_reset() - Reset an allocated GSI channel
@@ -230,19 +230,19 @@ int gsi_channel_stop(struct gsi *gsi, u32 channel_id);
  * GSI hardware relinquishes ownership of all pending receive buffer
  * transactions and they will complete with their cancelled flag set.
  */
-void gsi_channel_reset(struct gsi *gsi, u32 channel_id, bool doorbell);
+void gsi_channel_reset(struct ipa_dma *dma_subsys, u32 channel_id, bool doorbell);
 
 /**
  * gsi_suspend() - Prepare the GSI subsystem for suspend
  * @gsi:	GSI pointer
  */
-void gsi_suspend(struct gsi *gsi);
+void gsi_suspend(struct ipa_dma *dma_subsys);
 
 /**
  * gsi_resume() - Resume the GSI subsystem following suspend
  * @gsi:	GSI pointer
  */
-void gsi_resume(struct gsi *gsi);
+void gsi_resume(struct ipa_dma *dma_subsys);
 
 /**
  * gsi_channel_suspend() - Suspend a GSI channel
@@ -251,7 +251,7 @@ void gsi_resume(struct gsi *gsi);
  *
  * For IPA v4.0+, suspend is implemented by stopping the channel.
  */
-int gsi_channel_suspend(struct gsi *gsi, u32 channel_id);
+int gsi_channel_suspend(struct ipa_dma *dma_subsys, u32 channel_id);
 
 /**
  * gsi_channel_resume() - Resume a suspended GSI channel
@@ -260,7 +260,7 @@ int gsi_channel_suspend(struct gsi *gsi, u32 channel_id);
  *
  * For IPA v4.0+, the stopped channel is started again.
  */
-int gsi_channel_resume(struct gsi *gsi, u32 channel_id);
+int gsi_channel_resume(struct ipa_dma *dma_subsys, u32 channel_id);
 
 /**
  * gsi_init() - Initialize the GSI subsystem
@@ -275,7 +275,7 @@ int gsi_channel_resume(struct gsi *gsi, u32 channel_id);
  * Early stage initialization of the GSI subsystem, performing tasks
  * that can be done before the GSI hardware is ready to use.
  */
-int gsi_init(struct gsi *gsi, struct platform_device *pdev,
+int gsi_init(struct ipa_dma *dma_subsys, struct platform_device *pdev,
 	     enum ipa_version version, u32 count,
 	     const struct ipa_gsi_endpoint_data *data);
 
@@ -283,6 +283,6 @@ int gsi_init(struct gsi *gsi, struct platform_device *pdev,
  * gsi_exit() - Exit the GSI subsystem
  * @gsi:	GSI address previously passed to a successful gsi_init() call
  */
-void gsi_exit(struct gsi *gsi);
+void gsi_exit(struct ipa_dma *dma_subsys);
 
 #endif /* _GSI_H_ */
