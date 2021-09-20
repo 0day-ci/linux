@@ -814,6 +814,11 @@ struct lfp_brightness_level {
 	u16 reserved;
 } __packed;
 
+/*
+ * Changing struct bdb_lfp_backlight_data might affect its
+ * size comparation to the value hold in BDB.
+ * (e.g. in parse_lfp_backlight())
+ */
 struct bdb_lfp_backlight_data {
 	u8 entry_size;
 	struct lfp_backlight_data_entry data[16];

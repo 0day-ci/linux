@@ -452,7 +452,9 @@ parse_lfp_backlight(struct drm_i915_private *i915,
 
 	i915->vbt.backlight.type = INTEL_BACKLIGHT_DISPLAY_DDI;
 	if (bdb->version >= 191 &&
-	    get_blocksize(backlight_data) >= sizeof(*backlight_data)) {
+	    get_blocksize(backlight_data) >= (sizeof(backlight_data->entry_size) +
+					      sizeof(backlight_data->data) +
+					      sizeof(backlight_data->level))) {
 		const struct lfp_backlight_control_method *method;
 
 		method = &backlight_data->backlight_control[panel_type];
