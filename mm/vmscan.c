@@ -1006,11 +1006,10 @@ static void handle_write_error(struct address_space *mapping,
 	unlock_page(page);
 }
 
-static void
-reclaim_throttle(pg_data_t *pgdat, enum vmscan_throttle_state reason,
+void reclaim_throttle(pg_data_t *pgdat, enum vmscan_throttle_state reason,
 							long timeout)
 {
-	wait_queue_head_t *wqh = &pgdat->reclaim_wait;
+	wait_queue_head_t *wqh = &pgdat->reclaim_wait[reason];
 	unsigned long start = jiffies;
 	long ret;
 	DEFINE_WAIT(wait);
@@ -1044,7 +1043,7 @@ void __acct_reclaim_writeback(pg_data_t *pgdat, struct page *page)
 		READ_ONCE(pgdat->nr_reclaim_start);
 
 	if (nr_written > SWAP_CLUSTER_MAX * nr_throttled)
-		wake_up_interruptible_all(&pgdat->reclaim_wait);
+		wake_up_interruptible_all(&pgdat->reclaim_wait[VMSCAN_THROTTLE_WRITEBACK]);
 }
 
 /* possible outcome of pageout() */
@@ -2159,6 +2158,7 @@ static int too_many_isolated(struct pglist_data *pgdat, int file,
 		struct scan_control *sc)
 {
 	unsigned long inactive, isolated;
+	bool too_many;
 
 	if (current_is_kswapd())
 		return 0;
@@ -2181,6 +2181,17 @@ static int too_many_isolated(struct pglist_data *pgdat, int file,
 	 */
 	if ((sc->gfp_mask & (__GFP_IO | __GFP_FS)) == (__GFP_IO | __GFP_FS))
 		inactive >>= 3;
+
+	too_many = isolated > inactive;
+
+	/* Wake up tasks throttled due to too_many_isolated. */
+	if (!too_many) {
+		wait_queue_head_t *wqh;
+
+		wqh = &pgdat->reclaim_wait[VMSCAN_THROTTLE_ISOLATED];
+		if (waitqueue_active(wqh))
+			wake_up_interruptible_all(wqh);
+	}
 
 	return isolated > inactive;
 }
@@ -2291,8 +2302,7 @@ shrink_inactive_list(unsigned long nr_to_scan, struct lruvec *lruvec,
 			return 0;
 
 		/* wait a bit for the reclaimer. */
-		msleep(100);
-		stalled = true;
+		reclaim_throttle(pgdat, VMSCAN_THROTTLE_ISOLATED, HZ/10);
 
 		/* We are about to die and free our memory. Return now. */
 		if (fatal_signal_pending(current))
