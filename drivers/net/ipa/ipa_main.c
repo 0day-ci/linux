@@ -98,13 +98,13 @@ int ipa_setup(struct ipa *ipa)
 	struct device *dev = &ipa->pdev->dev;
 	int ret;
 
-	ret = gsi_setup(&ipa->dma_subsys);
+	ret = ipa_dma_setup(&ipa->dma_subsys);
 	if (ret)
 		return ret;
 
 	ret = ipa_power_setup(ipa);
 	if (ret)
-		goto err_gsi_teardown;
+		goto err_dma_teardown;
 
 	ipa_endpoint_setup(ipa);
 
@@ -153,8 +153,8 @@ err_command_disable:
 err_endpoint_teardown:
 	ipa_endpoint_teardown(ipa);
 	ipa_power_teardown(ipa);
-err_gsi_teardown:
-	gsi_teardown(&ipa->dma_subsys);
+err_dma_teardown:
+	ipa_dma_teardown(&ipa->dma_subsys);
 
 	return ret;
 }
@@ -179,7 +179,7 @@ static void ipa_teardown(struct ipa *ipa)
 	ipa_endpoint_disable_one(command_endpoint);
 	ipa_endpoint_teardown(ipa);
 	ipa_power_teardown(ipa);
-	gsi_teardown(&ipa->dma_subsys);
+	ipa_dma_teardown(&ipa->dma_subsys);
 }
 
 /* Configure bus access behavior for IPA components */
@@ -726,7 +726,7 @@ static int ipa_probe(struct platform_device *pdev)
 					    data->endpoint_data);
 	if (!ipa->filter_map) {
 		ret = -EINVAL;
-		goto err_gsi_exit;
+		goto err_dma_exit;
 	}
 
 	ret = ipa_table_init(ipa);
@@ -780,8 +780,8 @@ err_table_exit:
 	ipa_table_exit(ipa);
 err_endpoint_exit:
 	ipa_endpoint_exit(ipa);
-err_gsi_exit:
-	gsi_exit(&ipa->dma_subsys);
+err_dma_exit:
+	ipa_dma_exit(&ipa->dma_subsys);
 err_mem_exit:
 	ipa_mem_exit(ipa);
 err_reg_exit:
@@ -824,7 +824,7 @@ out_power_put:
 	ipa_modem_exit(ipa);
 	ipa_table_exit(ipa);
 	ipa_endpoint_exit(ipa);
-	gsi_exit(&ipa->dma_subsys);
+	ipa_dma_exit(&ipa->dma_subsys);
 	ipa_mem_exit(ipa);
 	ipa_reg_exit(ipa);
 	kfree(ipa);

@@ -163,64 +163,96 @@ struct ipa_dma {
 	struct completion completion;	/* for global EE commands */
 	int result;			/* Negative errno (generic commands) */
 	struct mutex mutex;		/* protects commands, programming */
+
+	int (*setup)(struct ipa_dma *dma_subsys);
+	void (*teardown)(struct ipa_dma *dma_subsys);
+	void (*exit)(struct ipa_dma *dma_subsys);
+	void (*suspend)(struct ipa_dma *dma_subsys);
+	void (*resume)(struct ipa_dma *dma_subsys);
+	u32 (*channel_tre_max)(struct ipa_dma *dma_subsys, u32 channel_id);
+	u32 (*channel_trans_tre_max)(struct ipa_dma *dma_subsys, u32 channel_id);
+	int (*channel_start)(struct ipa_dma *dma_subsys, u32 channel_id);
+	int (*channel_stop)(struct ipa_dma *dma_subsys, u32 channel_id);
+	void (*channel_reset)(struct ipa_dma *dma_subsys, u32 channel_id, bool doorbell);
+	int (*channel_suspend)(struct ipa_dma *dma_subsys, u32 channel_id);
+	int (*channel_resume)(struct ipa_dma *dma_subsys, u32 channel_id);
+	void (*trans_commit)(struct ipa_trans *trans, bool ring_db);
 };
 
 /**
- * gsi_setup() - Set up the GSI subsystem
- * @gsi:	Address of GSI structure embedded in an IPA structure
+ * ipa_dma_setup() - Set up the DMA subsystem
+ * @dma_subsys:	Address of ipa_dma structure embedded in an IPA structure
  *
  * Return:	0 if successful, or a negative error code
  *
- * Performs initialization that must wait until the GSI hardware is
+ * Performs initialization that must wait until the GSI/BAM hardware is
  * ready (including firmware loaded).
  */
-int gsi_setup(struct ipa_dma *dma_subsys);
+static inline int ipa_dma_setup(struct ipa_dma *dma_subsys)
+{
+	return dma_subsys->setup(dma_subsys);
+}
 
 /**
- * gsi_teardown() - Tear down GSI subsystem
- * @gsi:	GSI address previously passed to a successful gsi_setup() call
+ * ipa_dma_teardown() - Tear down DMA subsystem
+ * @dma_subsys:	ipa_dma address previously passed to a successful ipa_dma_setup() call
  */
-void gsi_teardown(struct ipa_dma *dma_subsys);
+static inline void ipa_dma_teardown(struct ipa_dma *dma_subsys)
+{
+	dma_subsys->teardown(dma_subsys);
+}
 
 /**
- * gsi_channel_tre_max() - Channel maximum number of in-flight TREs
- * @gsi:	GSI pointer
+ * ipa_channel_tre_max() - Channel maximum number of in-flight TREs
+ * @dma_subsys:	pointer to ipa_dma structure
  * @channel_id:	Channel whose limit is to be returned
  *
  * Return:	 The maximum number of TREs oustanding on the channel
  */
-u32 gsi_channel_tre_max(struct ipa_dma *dma_subsys, u32 channel_id);
+static inline u32 ipa_channel_tre_max(struct ipa_dma *dma_subsys, u32 channel_id)
+{
+	return dma_subsys->channel_tre_max(dma_subsys, channel_id);
+}
 
 /**
- * gsi_channel_trans_tre_max() - Maximum TREs in a single transaction
- * @gsi:	GSI pointer
+ * ipa_channel_trans_tre_max() - Maximum TREs in a single transaction
+ * @dma_subsys:	pointer to ipa_dma structure
  * @channel_id:	Channel whose limit is to be returned
  *
  * Return:	 The maximum TRE count per transaction on the channel
  */
-u32 gsi_channel_trans_tre_max(struct ipa_dma *dma_subsys, u32 channel_id);
+static inline u32 ipa_channel_trans_tre_max(struct ipa_dma *dma_subsys, u32 channel_id)
+{
+	return dma_subsys->channel_trans_tre_max(dma_subsys, channel_id);
+}
 
 /**
- * gsi_channel_start() - Start an allocated GSI channel
- * @gsi:	GSI pointer
+ * ipa_channel_start() - Start an allocated DMA channel
+ * @dma_subsys:	pointer to ipa_dma structure
  * @channel_id:	Channel to start
  *
  * Return:	0 if successful, or a negative error code
  */
-int gsi_channel_start(struct ipa_dma *dma_subsys, u32 channel_id);
+static inline int ipa_channel_start(struct ipa_dma *dma_subsys, u32 channel_id)
+{
+	return dma_subsys->channel_start(dma_subsys, channel_id);
+}
 
 /**
- * gsi_channel_stop() - Stop a started GSI channel
- * @gsi:	GSI pointer returned by gsi_setup()
+ * ipa_channel_stop() - Stop a started DMA channel
+ * @dma_subsys:	pointer to ipa_dma structure returned by ipa_dma_setup()
  * @channel_id:	Channel to stop
  *
  * Return:	0 if successful, or a negative error code
  */
-int gsi_channel_stop(struct ipa_dma *dma_subsys, u32 channel_id);
+static inline int ipa_channel_stop(struct ipa_dma *dma_subsys, u32 channel_id)
+{
+	return dma_subsys->channel_stop(dma_subsys, channel_id);
+}
 
 /**
- * gsi_channel_reset() - Reset an allocated GSI channel
- * @gsi:	GSI pointer
+ * ipa_channel_reset() - Reset an allocated DMA channel
+ * @dma_subsys:	pointer to ipa_dma structure
  * @channel_id:	Channel to be reset
  * @doorbell:	Whether to (possibly) enable the doorbell engine
  *
@@ -230,41 +262,49 @@ int gsi_channel_stop(struct ipa_dma *dma_subsys, u32 channel_id);
  * GSI hardware relinquishes ownership of all pending receive buffer
  * transactions and they will complete with their cancelled flag set.
  */
-void gsi_channel_reset(struct ipa_dma *dma_subsys, u32 channel_id, bool doorbell);
+static inline void ipa_channel_reset(struct ipa_dma *dma_subsys, u32 channel_id, bool doorbell)
+{
+	 dma_subsys->channel_reset(dma_subsys, channel_id, doorbell);
+}
+
 
 /**
- * gsi_suspend() - Prepare the GSI subsystem for suspend
- * @gsi:	GSI pointer
- */
-void gsi_suspend(struct ipa_dma *dma_subsys);
-
-/**
- * gsi_resume() - Resume the GSI subsystem following suspend
- * @gsi:	GSI pointer
- */
-void gsi_resume(struct ipa_dma *dma_subsys);
-
-/**
- * gsi_channel_suspend() - Suspend a GSI channel
- * @gsi:	GSI pointer
+ * ipa_channel_suspend() - Suspend a DMA channel
+ * @dma_subsys:	pointer to ipa_dma structure
  * @channel_id:	Channel to suspend
  *
  * For IPA v4.0+, suspend is implemented by stopping the channel.
  */
-int gsi_channel_suspend(struct ipa_dma *dma_subsys, u32 channel_id);
+static inline int ipa_channel_suspend(struct ipa_dma *dma_subsys, u32 channel_id)
+{
+	return dma_subsys->channel_suspend(dma_subsys, channel_id);
+}
 
 /**
- * gsi_channel_resume() - Resume a suspended GSI channel
- * @gsi:	GSI pointer
+ * ipa_channel_resume() - Resume a suspended DMA channel
+ * @dma_subsys:	pointer to ipa_dma structure
  * @channel_id:	Channel to resume
  *
  * For IPA v4.0+, the stopped channel is started again.
  */
-int gsi_channel_resume(struct ipa_dma *dma_subsys, u32 channel_id);
+static inline int ipa_channel_resume(struct ipa_dma *dma_subsys, u32 channel_id)
+{
+	return dma_subsys->channel_resume(dma_subsys, channel_id);
+}
+
+static inline void ipa_dma_suspend(struct ipa_dma *dma_subsys)
+{
+	return dma_subsys->suspend(dma_subsys);
+}
+
+static inline void ipa_dma_resume(struct ipa_dma *dma_subsys)
+{
+	return dma_subsys->resume(dma_subsys);
+}
 
 /**
- * gsi_init() - Initialize the GSI subsystem
- * @gsi:	Address of GSI structure embedded in an IPA structure
+ * ipa_dma_init() - Initialize the GSI subsystem
+ * @dma_subsys:	Address of ipa_dma structure embedded in an IPA structure
  * @pdev:	IPA platform device
  * @version:	IPA hardware version (implies GSI version)
  * @count:	Number of entries in the configuration data array
@@ -275,14 +315,19 @@ int gsi_channel_resume(struct ipa_dma *dma_subsys, u32 channel_id);
  * Early stage initialization of the GSI subsystem, performing tasks
  * that can be done before the GSI hardware is ready to use.
  */
+
 int gsi_init(struct ipa_dma *dma_subsys, struct platform_device *pdev,
 	     enum ipa_version version, u32 count,
 	     const struct ipa_gsi_endpoint_data *data);
 
 /**
- * gsi_exit() - Exit the GSI subsystem
- * @gsi:	GSI address previously passed to a successful gsi_init() call
+ * ipa_dma_exit() - Exit the DMA subsystem
+ * @dma_subsys:	ipa_dma address previously passed to a successful gsi_init() call
  */
-void gsi_exit(struct ipa_dma *dma_subsys);
+static inline void ipa_dma_exit(struct ipa_dma *dma_subsys)
+{
+	if (dma_subsys)
+		dma_subsys->exit(dma_subsys);
+}
 
 #endif /* _GSI_H_ */

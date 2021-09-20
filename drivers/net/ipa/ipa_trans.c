@@ -747,7 +747,7 @@ int ipa_channel_trans_init(struct ipa_dma *gsi, u32 channel_id)
 	 * for transactions (including transaction structures) based on
 	 * this maximum number.
 	 */
-	tre_max = gsi_channel_tre_max(channel->dma_subsys, channel_id);
+	tre_max = ipa_channel_tre_max(channel->dma_subsys, channel_id);
 
 	/* Transactions are allocated one at a time. */
 	ret = ipa_trans_pool_init(&trans_info->pool, sizeof(struct ipa_trans),
