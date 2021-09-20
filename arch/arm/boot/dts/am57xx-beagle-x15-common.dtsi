@@ -645,3 +645,7 @@
 &pruss2_mdio {
 	status = "disabled";
 };
+
+&bb2d {
+	status = "okay";
+};
