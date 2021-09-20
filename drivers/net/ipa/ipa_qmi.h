@@ -56,6 +56,16 @@ struct ipa_qmi {
 int ipa_qmi_setup(struct ipa *ipa);
 
 /**
+ * ipa_qmi_signal_uc_loaded() - Signal that the UC has been loaded
+ * @ipa:		IPA pointer
+ *
+ * This is called when the uc indicates that it is ready. This exists, because
+ * on IPA v2.x, the modem does not send a DRIVER_INIT_COMPLETED. Thus we have
+ * to rely on the uc's INIT_COMPLETED response to know if it was initialized
+ */
+void ipa_qmi_signal_uc_loaded(struct ipa *ipa);
+
+/**
  * ipa_qmi_teardown() - Tear down IPA QMI handles
  * @ipa:		IPA pointer
  */
