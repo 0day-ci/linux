@@ -72,11 +72,15 @@ static unsigned int nf_nat_ftp(struct sk_buff *skb,
 	u_int16_t port;
 	int dir = CTINFO2DIR(ctinfo);
 	struct nf_conn *ct = exp->master;
+	struct nf_conn_nat *nat = nfct_nat(ct);
 	unsigned int i, min, max, range_size;
 	static const unsigned int max_attempts = 128;
 	char buffer[sizeof("|1||65535|") + INET6_ADDRSTRLEN];
 	unsigned int buflen;
 	int ret;
+
+	if (WARN_ON_ONCE(!nat))
+		return NF_DROP;
 
 	pr_debug("type %i, off %u len %u\n", type, matchoff, matchlen);
 
@@ -89,11 +93,23 @@ static unsigned int nf_nat_ftp(struct sk_buff *skb,
 	 * this one. */
 	exp->expectfn = nf_nat_follow_master;
 
-	min = ntohs(exp->saved_proto.tcp.port);
-	max = 65535;
+	/* Avoid applying nat->range to the reply direction */
+	if (!exp->dir || !nat->range_info.min_proto.all || !nat->range_info.max_proto.all) {
+		min = ntohs(exp->saved_proto.tcp.port);
+		max = 65535;
+	} else {
+		min = ntohs(nat->range_info.min_proto.all);
+		max = ntohs(nat->range_info.max_proto.all);
+		if (unlikely(max < min))
+			swap(max, min);
+	}
 
 	/* Try to get same port */
-	ret = nf_ct_expect_related(exp, 0);
+	ret = -1;
+	port = ntohs(exp->saved_proto.tcp.port);
+	if (min < port && port < max) {
+		ret = nf_ct_expect_related(exp, 0);
+	}
 
 	/* if same port is not in range or available, try to change it. */
 	if (ret != 0) {
