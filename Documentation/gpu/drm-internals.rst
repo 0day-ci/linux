@@ -126,8 +126,8 @@ Memory Manager Initialization
 Every DRM driver requires a memory manager which must be initialized at
 load time. DRM currently contains two memory managers, the Translation
 Table Manager (TTM) and the Graphics Execution Manager (GEM). This
-document describes the use of the GEM memory manager only. See ? for
-details.
+document describes the use of the GEM memory manager only. See
+Documentation/gpu/drm-mm.rst for details.
 
 Miscellaneous Device Configuration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
