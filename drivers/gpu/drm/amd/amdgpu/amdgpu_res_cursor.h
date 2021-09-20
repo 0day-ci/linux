@@ -30,12 +30,25 @@
 #include <drm/ttm/ttm_resource.h>
 #include <drm/ttm/ttm_range_manager.h>
 
+struct amdgpu_vram_mgr_node {
+	struct ttm_range_mgr_node tnode;
+	struct list_head blocks;
+};
+
+static inline struct amdgpu_vram_mgr_node *
+to_amdgpu_vram_mgr_node(struct ttm_resource *res)
+{
+	return container_of(container_of(res, struct ttm_range_mgr_node, base),
+			struct amdgpu_vram_mgr_node, tnode);
+}
+
 /* state back for walking over vram_mgr and gtt_mgr allocations */
 struct amdgpu_res_cursor {
 	uint64_t		start;
 	uint64_t		size;
 	uint64_t		remaining;
-	struct drm_mm_node	*node;
+	void			*node;
+	uint32_t		mem_type;
 };
 
 /**
@@ -52,8 +65,6 @@ static inline void amdgpu_res_first(struct ttm_resource *res,
 				    uint64_t start, uint64_t size,
 				    struct amdgpu_res_cursor *cur)
 {
-	struct drm_mm_node *node;
-
 	if (!res || res->mem_type == TTM_PL_SYSTEM) {
 		cur->start = start;
 		cur->size = size;
@@ -65,14 +76,39 @@ static inline void amdgpu_res_first(struct ttm_resource *res,
 
 	BUG_ON(start + size > res->num_pages << PAGE_SHIFT);
 
-	node = to_ttm_range_mgr_node(res)->mm_nodes;
-	while (start >= node->size << PAGE_SHIFT)
-		start -= node++->size << PAGE_SHIFT;
+	cur->mem_type = res->mem_type;
 
-	cur->start = (node->start << PAGE_SHIFT) + start;
-	cur->size = min((node->size << PAGE_SHIFT) - start, size);
-	cur->remaining = size;
-	cur->node = node;
+	if (cur->mem_type == TTM_PL_VRAM) {
+		struct drm_buddy_block *block;
+		struct list_head *head, *next;
+
+		head = &to_amdgpu_vram_mgr_node(res)->blocks;
+
+		block = list_first_entry_or_null(head, struct drm_buddy_block, link);
+		while (start >= block->size << PAGE_SHIFT) {
+			start -= block->size << PAGE_SHIFT;
+
+			next = block->link.next;
+			if (next != head)
+				block = list_entry(next, struct drm_buddy_block, link);
+		}
+
+		cur->start = (block->start << PAGE_SHIFT) + start;
+		cur->size = min((block->size << PAGE_SHIFT) - start, size);
+		cur->remaining = size;
+		cur->node = block;
+	} else if (cur->mem_type == TTM_PL_TT) {
+		struct drm_mm_node *node;
+
+		node = to_ttm_range_mgr_node(res)->mm_nodes;
+		while (start >= node->size << PAGE_SHIFT)
+			start -= node++->size << PAGE_SHIFT;
+
+		cur->start = (node->start << PAGE_SHIFT) + start;
+		cur->size = min((node->size << PAGE_SHIFT) - start, size);
+		cur->remaining = size;
+		cur->node = node;
+	}
 }
 
 /**
@@ -85,8 +121,6 @@ static inline void amdgpu_res_first(struct ttm_resource *res,
  */
 static inline void amdgpu_res_next(struct amdgpu_res_cursor *cur, uint64_t size)
 {
-	struct drm_mm_node *node = cur->node;
-
 	BUG_ON(size > cur->remaining);
 
 	cur->remaining -= size;
@@ -99,9 +133,23 @@ static inline void amdgpu_res_next(struct amdgpu_res_cursor *cur, uint64_t size)
 		return;
 	}
 
-	cur->node = ++node;
-	cur->start = node->start << PAGE_SHIFT;
-	cur->size = min(node->size << PAGE_SHIFT, cur->remaining);
+	if (cur->mem_type == TTM_PL_VRAM) {
+		struct drm_buddy_block *block = cur->node;
+		struct list_head *next;
+
+		next = block->link.next;
+		block = list_entry(next, struct drm_buddy_block, link);
+
+		cur->node = block;
+		cur->start = block->start << PAGE_SHIFT;
+		cur->size = min(block->size << PAGE_SHIFT, cur->remaining);
+	} else if (cur->mem_type == TTM_PL_TT) {
+		struct drm_mm_node *node = cur->node;
+
+		cur->node = ++node;
+		cur->start = node->start << PAGE_SHIFT;
+		cur->size = min(node->size << PAGE_SHIFT, cur->remaining);
+	}
 }
 
 #endif
