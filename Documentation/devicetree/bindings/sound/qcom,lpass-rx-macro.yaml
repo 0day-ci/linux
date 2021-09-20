@@ -11,7 +11,9 @@ maintainers:
 
 properties:
   compatible:
-    const: qcom,sm8250-lpass-rx-macro
+    oneOf:
+      - const: qcom,sm8250-lpass-rx-macro
+      - const: qcom,sc7280-lpass-rx-macro
 
   reg:
     maxItems: 1
