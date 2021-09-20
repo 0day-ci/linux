@@ -23,8 +23,16 @@
  */
 union qnx4_directory_entry {
 	struct {
-		char de_name;
-		char de_pad[62];
+		/*
+		 * work around gcc-11.x using the first field it observes
+		 * to determing the actual length
+		 * https://gcc.gnu.org/bugzilla/show_bug.cgi?id=99578
+		 */
+		char __empty[0];
+		char de_name[];
+	};
+	struct {
+		char de_pad[63];
 		char de_status;
 	};
 	struct qnx4_inode_entry inode;
@@ -58,7 +66,7 @@ static int qnx4_readdir(struct file *file, struct dir_context *ctx)
 			offset = ix * QNX4_DIR_ENTRY_SIZE;
 			de = (union qnx4_directory_entry *) (bh->b_data + offset);
 
-			if (!de->de_name)
+			if (!de->de_name[0])
 				continue;
 			if (!(de->de_status & (QNX4_FILE_USED|QNX4_FILE_LINK)))
 				continue;
