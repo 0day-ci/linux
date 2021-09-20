@@ -19,6 +19,7 @@
 #include <linux/if_arp.h>
 #include <net/net_namespace.h>
 #include <net/netlink.h>
+#include <net/dst.h>
 #include <net/pkt_sched.h>
 #include <net/pkt_cls.h>
 #include <linux/tc_act/tc_mirred.h>
@@ -209,6 +210,7 @@ static int tcf_mirred_forward(bool want_ingress, struct sk_buff *skb)
 		return tcf_dev_queue_xmit(skb, dev_queue_xmit);
 
 	nf_reset_ct(skb);
+	skb_dst_drop(skb);
 
 	return netif_receive_skb(skb);
 }
