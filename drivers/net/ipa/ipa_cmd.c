@@ -658,7 +658,10 @@ u32 ipa_cmd_pipeline_clear_count(void)
 
 void ipa_cmd_pipeline_clear_wait(struct ipa *ipa)
 {
-	wait_for_completion(&ipa->completion);
+	unsigned long timeout_jiffies = msecs_to_jiffies(1000);
+
+	if (!wait_for_completion_timeout(&ipa->completion, timeout_jiffies))
+		dev_err(&ipa->pdev->dev, "%s time out\n", __func__);
 }
 
 void ipa_cmd_pipeline_clear(struct ipa *ipa)
