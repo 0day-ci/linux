@@ -1227,8 +1227,14 @@ qca8k_phylink_mac_config(struct dsa_switch *ds, int port, unsigned int mode,
 		if (ret)
 			return;
 
-		val |= QCA8K_SGMII_EN_PLL | QCA8K_SGMII_EN_RX |
-			QCA8K_SGMII_EN_TX | QCA8K_SGMII_EN_SD;
+		/* SGMII PLL, TX driver and RX chain is only needed in
+		 * switch revision 1, later revision doesn't need this.
+		 */
+		if (priv->switch_revision == 1)
+			val |= QCA8K_SGMII_EN_PLL | QCA8K_SGMII_EN_RX |
+			       QCA8K_SGMII_EN_TX | QCA8K_SGMII_EN_SD;
+		else
+			val |= QCA8K_SGMII_EN_SD;
 
 		if (dsa_is_cpu_port(ds, port)) {
 			/* CPU port, we're talking to the CPU MAC, be a PHY */
