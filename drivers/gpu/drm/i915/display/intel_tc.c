@@ -432,6 +432,13 @@ static void icl_tc_phy_connect(struct intel_digital_port *dig_port,
 		goto out_set_tbt_alt_mode;
 	}
 
+	if (!(tc_port_live_status_mask(dig_port) &
+	      (BIT(TC_PORT_DP_ALT) | BIT(TC_PORT_LEGACY)))) {
+		drm_dbg_kms(&i915->drm, "Port %s: nothing is connected\n",
+			    dig_port->tc_port_name);
+		goto out_set_tbt_alt_mode;
+	}
+
 	if (!tc_phy_take_ownership(dig_port, true) &&
 	    !drm_WARN_ON(&i915->drm, dig_port->tc_legacy_port))
 		goto out_set_tbt_alt_mode;
