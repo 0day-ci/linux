@@ -1601,9 +1601,13 @@ int intel_psr2_sel_fetch_update(struct intel_atomic_state *state,
 		 * TODO: Not clear how to handle planes with negative position,
 		 * also planes are not updated if they have a negative X
 		 * position so for now doing a full update in this cases
+		 *
+		 * TODO: We are missing biplanar formats handling, until it is
+		 * implemented it will send full frame updates.
 		 */
 		if (new_plane_state->uapi.dst.y1 < 0 ||
-		    new_plane_state->uapi.dst.x1 < 0) {
+		    new_plane_state->uapi.dst.x1 < 0 ||
+		    new_plane_state->hw.fb->format->is_yuv) {
 			full_update = true;
 			break;
 		}
@@ -1681,6 +1685,11 @@ int intel_psr2_sel_fetch_update(struct intel_atomic_state *state,
 		inter = pipe_clip;
 		if (!drm_rect_intersect(&inter, &new_plane_state->uapi.dst))
 			continue;
+
+		if (new_plane_state->hw.fb->format->is_yuv) {
+			full_update = true;
+			break;
+		}
 
 		sel_fetch_area = &new_plane_state->psr2_sel_fetch_area;
 		sel_fetch_area->y1 = inter.y1 - new_plane_state->uapi.dst.y1;
