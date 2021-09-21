@@ -56,6 +56,8 @@ struct drm_i915_gem_object_ops {
 			  struct sg_table *pages);
 	void (*truncate)(struct drm_i915_gem_object *obj);
 	void (*writeback)(struct drm_i915_gem_object *obj);
+	int (*try_to_writeback)(struct drm_i915_gem_object *obj,
+				bool do_writeback);
 
 	int (*pread)(struct drm_i915_gem_object *obj,
 		     const struct drm_i915_gem_pread *arg);
