@@ -916,7 +916,7 @@ static void tcp_v6_send_response(const struct sock *sk, struct sk_buff *skb, u32
 			authopt_info = rcu_dereference(tcp_sk(sk)->authopt_info);
 
 		if (authopt_info) {
-			authopt_key_info = __tcp_authopt_select_key(sk, authopt_info, sk, &authopt_rnextkeyid);
+			authopt_key_info = __tcp_authopt_select_key(sk, authopt_info, sk, &authopt_rnextkeyid, false);
 			if (authopt_key_info) {
 				tot_len += TCPOLEN_AUTHOPT_OUTPUT;
 				/* Don't use MD5 */

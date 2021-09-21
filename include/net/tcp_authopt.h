@@ -47,7 +47,17 @@ struct tcp_authopt_info {
 	/** @head: List of tcp_authopt_key_info */
 	struct hlist_head head;
 	struct rcu_head rcu;
+	/**
+	 * @send_keyid - Current key used for sending, cached.
+	 *
+	 * Once a key is found it only changes by user or remote request.
+	 */
+	struct tcp_authopt_key_info *send_key;
 	u32 flags;
+	u8 send_keyid;
+	u8 send_rnextkeyid;
+	u8 recv_keyid;
+	u8 recv_rnextkeyid;
 	u32 src_isn;
 	u32 dst_isn;
 };
@@ -65,7 +75,8 @@ struct tcp_authopt_key_info *__tcp_authopt_select_key(
 		const struct sock *sk,
 		struct tcp_authopt_info *info,
 		const struct sock *addr_sk,
-		u8 *rnextkeyid);
+		u8 *rnextkeyid,
+		bool locked);
 static inline struct tcp_authopt_key_info *tcp_authopt_select_key(
 		const struct sock *sk,
 		const struct sock *addr_sk,
@@ -75,7 +86,7 @@ static inline struct tcp_authopt_key_info *tcp_authopt_select_key(
 		struct tcp_authopt_info *info = rcu_dereference(tcp_sk(sk)->authopt_info);
 
 		if (info)
-			return __tcp_authopt_select_key(sk, info, addr_sk, rnextkeyid);
+			return __tcp_authopt_select_key(sk, info, addr_sk, rnextkeyid, true);
 	}
 	return NULL;
 }
