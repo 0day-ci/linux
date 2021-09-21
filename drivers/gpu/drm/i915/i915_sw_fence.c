@@ -13,9 +13,9 @@
 #include "i915_selftest.h"
 
 #if IS_ENABLED(CONFIG_DRM_I915_DEBUG)
-#define I915_SW_FENCE_BUG_ON(expr) BUG_ON(expr)
+#define I915_SW_FENCE_WARN_ON(expr) WARN_ON(expr)
 #else
-#define I915_SW_FENCE_BUG_ON(expr) BUILD_BUG_ON_INVALID(expr)
+#define I915_SW_FENCE_WARN_ON(expr) BUILD_BUG_ON_INVALID(expr)
 #endif
 
 static DEFINE_SPINLOCK(i915_sw_fence_lock);
@@ -129,7 +129,10 @@ static int __i915_sw_fence_notify(struct i915_sw_fence *fence,
 	i915_sw_fence_notify_t fn;
 
 	fn = (i915_sw_fence_notify_t)(fence->flags & I915_SW_FENCE_MASK);
-	return fn(fence, state);
+	if (likely(fn))
+		return fn(fence, state);
+	else
+		return 0;
 }
 
 #ifdef CONFIG_DRM_I915_SW_FENCE_DEBUG_OBJECTS
@@ -242,9 +245,9 @@ void __i915_sw_fence_init(struct i915_sw_fence *fence,
 			  const char *name,
 			  struct lock_class_key *key)
 {
-	BUG_ON(!fn || (unsigned long)fn & ~I915_SW_FENCE_MASK);
-
 	__init_waitqueue_head(&fence->wait, name, key);
+	if (WARN_ON(!fn || (unsigned long)fn & ~I915_SW_FENCE_MASK))
+		return;
 	fence->flags = (unsigned long)fn;
 
 	i915_sw_fence_reinit(fence);
@@ -257,8 +260,8 @@ void i915_sw_fence_reinit(struct i915_sw_fence *fence)
 	atomic_set(&fence->pending, 1);
 	fence->error = 0;
 
-	I915_SW_FENCE_BUG_ON(!fence->flags);
-	I915_SW_FENCE_BUG_ON(!list_empty(&fence->wait.head));
+	I915_SW_FENCE_WARN_ON(!fence->flags);
+	I915_SW_FENCE_WARN_ON(!list_empty(&fence->wait.head));
 }
 
 void i915_sw_fence_commit(struct i915_sw_fence *fence)
