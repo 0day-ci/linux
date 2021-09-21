@@ -800,6 +800,22 @@ static unsigned long i915_ttm_io_mem_pfn(struct ttm_buffer_object *bo,
 	return ((base + sg_dma_address(sg)) >> PAGE_SHIFT) + ofs;
 }
 
+static void i915_ttm_del_from_lru_notify(struct ttm_buffer_object *bo)
+{
+	struct i915_ttm_tt *i915_tt =
+		container_of(bo->ttm, typeof(*i915_tt), ttm);
+
+	/* Idealy we need to prevent TTM from seeing shmem objects when doing
+	 * its LRU swap walk. Since these are EXTERNAL they are ignored anyway,
+	 * but keeping them in the LRU is pretty waseful. Trying to use bo_pin()
+	 * for this is very nasty since we need to be able to do the bo_unpin()
+	 * from the unpopulate hook, but since that can be called from the BO
+	 * destroy path we will go down in flames.
+	 */
+	if (bo->ttm && ttm_tt_is_populated(bo->ttm) && i915_tt->is_shmem)
+		list_del_init(&bo->lru);
+}
+
 static struct ttm_device_funcs i915_ttm_bo_driver = {
 	.ttm_tt_create = i915_ttm_tt_create,
 	.ttm_tt_populate = i915_ttm_tt_populate,
@@ -810,6 +826,7 @@ static struct ttm_device_funcs i915_ttm_bo_driver = {
 	.move = i915_ttm_move,
 	.swap_notify = i915_ttm_swap_notify,
 	.delete_mem_notify = i915_ttm_delete_mem_notify,
+	.del_from_lru_notify = i915_ttm_del_from_lru_notify,
 	.io_mem_reserve = i915_ttm_io_mem_reserve,
 	.io_mem_pfn = i915_ttm_io_mem_pfn,
 };
