@@ -53,6 +53,7 @@ struct tcp_authopt_info {
 };
 
 #ifdef CONFIG_TCP_AUTHOPT
+extern int sysctl_tcp_authopt;
 DECLARE_STATIC_KEY_FALSE(tcp_authopt_needed);
 
 void tcp_authopt_free(struct sock *sk, struct tcp_authopt_info *info);
