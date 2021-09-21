@@ -133,6 +133,7 @@ struct omap8250_priv {
 	spinlock_t rx_dma_lock;
 	bool rx_dma_broken;
 	bool throttled;
+	unsigned int allow_rpm:1;
 };
 
 struct omap8250_dma_params {
@@ -676,6 +677,7 @@ static int omap_8250_startup(struct uart_port *port)
 		ret = dev_pm_set_dedicated_wake_irq(port->dev, priv->wakeirq);
 		if (ret)
 			return ret;
+		priv->allow_rpm = 1;
 	}
 
 	pm_runtime_get_sync(port->dev);
@@ -722,6 +724,10 @@ static int omap_8250_startup(struct uart_port *port)
 	if (up->dma && !(priv->habit & UART_HAS_EFR2))
 		up->dma->rx_dma(up);
 
+	/* Block runtime PM if no wakeirq, paired with shutdown */
+	if (!priv->allow_rpm)
+		pm_runtime_get(port->dev);
+
 	pm_runtime_mark_last_busy(port->dev);
 	pm_runtime_put_autosuspend(port->dev);
 	return 0;
@@ -759,6 +765,10 @@ static void omap_8250_shutdown(struct uart_port *port)
 	if (up->lcr & UART_LCR_SBC)
 		serial_out(up, UART_LCR, up->lcr & ~UART_LCR_SBC);
 	serial_out(up, UART_FCR, UART_FCR_CLEAR_RCVR | UART_FCR_CLEAR_XMIT);
+
+	/* Clear possible PM runtime block to pair with startup */
+	if (!priv->allow_rpm)
+		pm_runtime_put(port->dev);
 
 	pm_runtime_mark_last_busy(port->dev);
 	pm_runtime_put_autosuspend(port->dev);
