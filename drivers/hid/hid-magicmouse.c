@@ -36,6 +36,7 @@ static int param_set_scroll_speed(const char *val,
 				  const struct kernel_param *kp)
 {
 	unsigned long speed;
+
 	if (!val || kstrtoul(val, 0, &speed) || speed > 63)
 		return -EINVAL;
 	scroll_speed = speed;
@@ -76,7 +77,8 @@ MODULE_PARM_DESC(report_undeciphered, "Report undeciphered multi-touch state fie
 #define SCROLL_ACCEL_DEFAULT 7
 
 /* Touch surface information. Dimension is in hundredths of a mm, min and max
- * are in units. */
+ * are in units.
+ */
 #define MOUSE_DIMENSION_X ((float)9056)
 #define MOUSE_MIN_X -1100
 #define MOUSE_MAX_X 1258
@@ -153,6 +155,7 @@ static int magicmouse_firm_touch(struct magicmouse_sc *msc)
 	 */
 	for (ii = 0; ii < msc->ntouches; ii++) {
 		int idx = msc->tracking_ids[ii];
+
 		if (msc->touches[idx].size < 8) {
 			/* Ignore this touch. */
 		} else if (touch >= 0) {
@@ -187,6 +190,7 @@ static void magicmouse_emit_buttons(struct magicmouse_sc *msc, int state)
 			id = magicmouse_firm_touch(msc);
 			if (id >= 0) {
 				int x = msc->touches[id].x;
+
 				if (x < middle_button_start)
 					state = 1;
 				else if (x > middle_button_stop)
@@ -502,6 +506,7 @@ static int magicmouse_event(struct hid_device *hdev, struct hid_field *field,
 		struct hid_usage *usage, __s32 value)
 {
 	struct magicmouse_sc *msc = hid_get_drvdata(hdev);
+
 	if (msc->input->id.product == USB_DEVICE_ID_APPLE_MAGICMOUSE2 &&
 	    field->report->id == MOUSE2_REPORT_ID) {
 		/*
@@ -752,10 +757,8 @@ static int magicmouse_probe(struct hid_device *hdev,
 		return -ENODEV;
 
 	msc = devm_kzalloc(&hdev->dev, sizeof(*msc), GFP_KERNEL);
-	if (msc == NULL) {
-		hid_err(hdev, "can't alloc magicmouse descriptor\n");
+	if (msc == NULL)
 		return -ENOMEM;
-	}
 
 	msc->scroll_accel = SCROLL_ACCEL_DEFAULT;
 	msc->hdev = hdev;
@@ -822,9 +825,8 @@ static int magicmouse_probe(struct hid_device *hdev,
 		hid_err(hdev, "unable to request touch data (%d)\n", ret);
 		goto err_stop_hw;
 	}
-	if (ret == -EIO && id->product == USB_DEVICE_ID_APPLE_MAGICMOUSE2) {
+	if (ret == -EIO && id->product == USB_DEVICE_ID_APPLE_MAGICMOUSE2)
 		schedule_delayed_work(&msc->work, msecs_to_jiffies(500));
-	}
 
 	return 0;
 err_stop_hw:
