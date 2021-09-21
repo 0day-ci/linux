@@ -1951,15 +1951,6 @@ int msm_dsi_host_modeset_init(struct mipi_dsi_host *host,
 		return ret;
 	}
 
-	ret = devm_request_irq(&pdev->dev, msm_host->irq,
-			dsi_host_irq, IRQF_TRIGGER_HIGH | IRQF_ONESHOT,
-			"dsi_isr", msm_host);
-	if (ret < 0) {
-		DRM_DEV_ERROR(&pdev->dev, "failed to request IRQ%u: %d\n",
-				msm_host->irq, ret);
-		return ret;
-	}
-
 	msm_host->dev = dev;
 	ret = cfg_hnd->ops->tx_buf_alloc(msm_host, SZ_4K);
 	if (ret) {
@@ -2413,6 +2404,16 @@ int msm_dsi_host_power_on(struct mipi_dsi_host *host,
 	if (msm_host->disp_en_gpio)
 		gpiod_set_value(msm_host->disp_en_gpio, 1);
 
+	ret = devm_request_irq(&msm_host->pdev->dev, msm_host->irq,
+			dsi_host_irq, IRQF_TRIGGER_HIGH | IRQF_ONESHOT,
+			"dsi_isr", msm_host);
+	if (ret < 0) {
+		DRM_DEV_ERROR(&msm_host->pdev->dev, "failed to request IRQ%u: %d\n",
+				msm_host->irq, ret);
+		return ret;
+	}
+
+
 	msm_host->power_on = true;
 	mutex_unlock(&msm_host->dev_mutex);
 
@@ -2438,6 +2439,8 @@ int msm_dsi_host_power_off(struct mipi_dsi_host *host)
 		DBG("dsi host already off");
 		goto unlock_ret;
 	}
+
+	devm_free_irq(&msm_host->pdev->dev, msm_host->irq, msm_host);
 
 	dsi_ctrl_config(msm_host, false, NULL, NULL);
 
