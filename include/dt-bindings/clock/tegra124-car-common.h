@@ -1,5 +1,9 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 /*
+ * Copyright (c) 2015-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ *
+ * Author: Paul Walmsley <paul@pwsan.com>
+ *
  * This header provides constants for binding nvidia,tegra124-car or
  * nvidia,tegra132-car.
  *

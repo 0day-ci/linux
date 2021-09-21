@@ -1,5 +1,9 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 /*
+ * Copyright (c) 2016-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ *
+ * Author: Joseph Lo <josephl@nvidia.com>
+ *
  * This header provides constants for binding nvidia,tegra186-hsp.
  */
 

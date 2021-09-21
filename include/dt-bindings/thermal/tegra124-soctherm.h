@@ -1,5 +1,9 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 /*
+ * Copyright (c) 2014-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ *
+ * Author: Mikko Perttunen <mperttunen@nvidia.com>
+ *
  * This header provides constants for binding nvidia,tegra124-soctherm.
  */
 

@@ -1,5 +1,9 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 /*
+ * Copyright (c) 2017-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ *
+ * Author: Peter De Schrijver <pdeschrijver@nvidia.com>
+ *
  * This header provides Tegra210-specific constants for binding
  * nvidia,tegra210-car.
  */

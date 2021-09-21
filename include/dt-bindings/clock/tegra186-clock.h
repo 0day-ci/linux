@@ -1,4 +1,10 @@
 /* SPDX-License-Identifier: GPL-2.0 */
+/*
+ * Copyright (c) 2016-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ *
+ * Author: Joseph Lo <josephl@nvidia.com>
+ *
+ */
 /** @file */
 
 #ifndef _MACH_T186_CLK_T186_H

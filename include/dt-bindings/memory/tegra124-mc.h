@@ -1,4 +1,10 @@
 /* SPDX-License-Identifier: GPL-2.0 */
+/*
+ * Copyright (c) 2014-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ *
+ * Author: Thierry Reding <treding@nvidia.com>
+ *
+ */
 #ifndef DT_BINDINGS_MEMORY_TEGRA124_MC_H
 #define DT_BINDINGS_MEMORY_TEGRA124_MC_H
 

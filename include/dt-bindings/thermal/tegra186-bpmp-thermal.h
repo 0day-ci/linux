@@ -1,5 +1,9 @@
 /* SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause) */
 /*
+ * Copyright (c) 2017-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ *
+ * Author: Mikko Perttunen <mperttunen@nvidia.com>
+ *
  * This header provides constants for binding nvidia,tegra186-bpmp-thermal.
  */
 
