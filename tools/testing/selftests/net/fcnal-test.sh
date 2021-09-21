@@ -794,6 +794,27 @@ ipv4_ping()
 # IPv4 TCP
 
 #
+# TCP Authentication Option Tests
+#
+ipv4_tcp_authopt()
+{
+	# basic use case
+	log_start
+	run_cmd nettest -s -A ${MD5_PW} &
+	sleep 1
+	run_cmd_nsb nettest -r ${NSA_IP} -A ${MD5_PW}
+	log_test $? 0 "AO: Simple password"
+
+	# wrong password
+	log_start
+	show_hint "Should timeout since client uses wrong password"
+	run_cmd nettest -s -A ${MD5_PW} &
+	sleep 1
+	run_cmd_nsb nettest -r ${NSA_IP} -A ${MD5_WRONG_PW}
+	log_test $? 2 "AO: Client uses wrong password"
+}
+
+#
 # MD5 tests without VRF
 #
 ipv4_tcp_md5_novrf()
@@ -1124,6 +1145,7 @@ ipv4_tcp_novrf()
 	log_test_addr ${a} $? 1 "No server, device client, local conn"
 
 	ipv4_tcp_md5_novrf
+	ipv4_tcp_authopt
 }
 
 ipv4_tcp_vrf()
