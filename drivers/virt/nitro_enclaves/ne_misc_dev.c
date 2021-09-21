@@ -126,6 +126,26 @@ struct ne_cpu_pool {
 static struct ne_cpu_pool ne_cpu_pool;
 
 /**
+ * struct phys_mem_region - Physical memory region
+ * @paddr:	The start physical address of the region.
+ * @size:	The sizeof of the region.
+ */
+struct phys_mem_region {
+	u64 paddr;
+	u64 size;
+};
+
+/**
+ * struct phys_contig_mem_region - Physical contiguous memory regions
+ * @num:	The number of regions that currently has.
+ * @region:	The array of physical memory regions.
+ */
+struct phys_contig_mem_region {
+	unsigned long num;
+	struct phys_mem_region region[0];
+};
+
+/**
  * ne_check_enclaves_created() - Verify if at least one enclave has been created.
  * @void:	No parameters provided.
  *
@@ -824,6 +844,27 @@ static int ne_sanity_check_user_mem_region_page(struct ne_enclave *ne_enclave,
 	return 0;
 }
 
+static void ne_add_phys_memory_region(struct phys_contig_mem_region *regions,
+				      u64 paddr, u64 size)
+{
+	u64 prev_phys_region_end = 0;
+
+	if (regions->num) {
+		prev_phys_region_end = regions->region[regions->num - 1].paddr +
+					regions->region[regions->num - 1].size;
+
+		/* Physical contiguous, just merge */
+		if (prev_phys_region_end == paddr) {
+			regions->region[regions->num - 1].size += size;
+			return;
+		}
+	}
+
+	regions->region[regions->num].paddr = paddr;
+	regions->region[regions->num].size = size;
+	regions->num++;
+}
+
 /**
  * ne_set_user_memory_region_ioctl() - Add user space memory region to the slot
  *				       associated with the current enclave.
@@ -843,9 +884,9 @@ static int ne_set_user_memory_region_ioctl(struct ne_enclave *ne_enclave,
 	unsigned long max_nr_pages = 0;
 	unsigned long memory_size = 0;
 	struct ne_mem_region *ne_mem_region = NULL;
-	unsigned long nr_phys_contig_mem_regions = 0;
 	struct pci_dev *pdev = ne_devs.ne_pci_dev->pdev;
-	struct page **phys_contig_mem_regions = NULL;
+	struct phys_contig_mem_region *phys_regions = NULL;
+	size_t size_to_alloc = 0;
 	int rc = -EINVAL;
 
 	rc = ne_sanity_check_user_mem_region(ne_enclave, mem_region);
@@ -866,9 +907,9 @@ static int ne_set_user_memory_region_ioctl(struct ne_enclave *ne_enclave,
 		goto free_mem_region;
 	}
 
-	phys_contig_mem_regions = kcalloc(max_nr_pages, sizeof(*phys_contig_mem_regions),
-					  GFP_KERNEL);
-	if (!phys_contig_mem_regions) {
+	size_to_alloc = sizeof(*phys_regions) + max_nr_pages * sizeof(struct phys_mem_region);
+	phys_regions = kzalloc(size_to_alloc, GFP_KERNEL);
+	if (!phys_regions) {
 		rc = -ENOMEM;
 
 		goto free_mem_region;
@@ -901,27 +942,15 @@ static int ne_set_user_memory_region_ioctl(struct ne_enclave *ne_enclave,
 		if (rc < 0)
 			goto put_pages;
 
-		/*
-		 * TODO: Update once handled non-contiguous memory regions
-		 * received from user space or contiguous physical memory regions
-		 * larger than 2 MiB e.g. 8 MiB.
-		 */
-		phys_contig_mem_regions[i] = ne_mem_region->pages[i];
+		ne_add_phys_memory_region(phys_regions, page_to_phys(ne_mem_region->pages[i]),
+					  page_size(ne_mem_region->pages[i]));
 
 		memory_size += page_size(ne_mem_region->pages[i]);
 
 		ne_mem_region->nr_pages++;
 	} while (memory_size < mem_region.memory_size);
 
-	/*
-	 * TODO: Update once handled non-contiguous memory regions received
-	 * from user space or contiguous physical memory regions larger than
-	 * 2 MiB e.g. 8 MiB.
-	 */
-	nr_phys_contig_mem_regions = ne_mem_region->nr_pages;
-
-	if ((ne_enclave->nr_mem_regions + nr_phys_contig_mem_regions) >
-	    ne_enclave->max_mem_regions) {
+	if ((ne_enclave->nr_mem_regions + phys_regions->num) > ne_enclave->max_mem_regions) {
 		dev_err_ratelimited(ne_misc_dev.this_device,
 				    "Reached max memory regions %lld\n",
 				    ne_enclave->max_mem_regions);
@@ -931,9 +960,9 @@ static int ne_set_user_memory_region_ioctl(struct ne_enclave *ne_enclave,
 		goto put_pages;
 	}
 
-	for (i = 0; i < nr_phys_contig_mem_regions; i++) {
-		u64 phys_region_addr = page_to_phys(phys_contig_mem_regions[i]);
-		u64 phys_region_size = page_size(phys_contig_mem_regions[i]);
+	for (i = 0; i < phys_regions->num; i++) {
+		u64 phys_region_addr = phys_regions->region[i].paddr;
+		u64 phys_region_size = phys_regions->region[i].size;
 
 		if (phys_region_size & (NE_MIN_MEM_REGION_SIZE - 1)) {
 			dev_err_ratelimited(ne_misc_dev.this_device,
@@ -959,13 +988,13 @@ static int ne_set_user_memory_region_ioctl(struct ne_enclave *ne_enclave,
 
 	list_add(&ne_mem_region->mem_region_list_entry, &ne_enclave->mem_regions_list);
 
-	for (i = 0; i < nr_phys_contig_mem_regions; i++) {
+	for (i = 0; i < phys_regions->num; i++) {
 		struct ne_pci_dev_cmd_reply cmd_reply = {};
 		struct slot_add_mem_req slot_add_mem_req = {};
 
 		slot_add_mem_req.slot_uid = ne_enclave->slot_uid;
-		slot_add_mem_req.paddr = page_to_phys(phys_contig_mem_regions[i]);
-		slot_add_mem_req.size = page_size(phys_contig_mem_regions[i]);
+		slot_add_mem_req.paddr = phys_regions->region[i].paddr;
+		slot_add_mem_req.size = phys_regions->region[i].size;
 
 		rc = ne_do_request(pdev, SLOT_ADD_MEM,
 				   &slot_add_mem_req, sizeof(slot_add_mem_req),
@@ -974,7 +1003,7 @@ static int ne_set_user_memory_region_ioctl(struct ne_enclave *ne_enclave,
 			dev_err_ratelimited(ne_misc_dev.this_device,
 					    "Error in slot add mem [rc=%d]\n", rc);
 
-			kfree(phys_contig_mem_regions);
+			kfree(phys_regions);
 
 			/*
 			 * Exit here without put pages as memory regions may
@@ -987,7 +1016,7 @@ static int ne_set_user_memory_region_ioctl(struct ne_enclave *ne_enclave,
 		ne_enclave->nr_mem_regions++;
 	}
 
-	kfree(phys_contig_mem_regions);
+	kfree(phys_regions);
 
 	return 0;
 
@@ -995,7 +1024,7 @@ put_pages:
 	for (i = 0; i < ne_mem_region->nr_pages; i++)
 		put_page(ne_mem_region->pages[i]);
 free_mem_region:
-	kfree(phys_contig_mem_regions);
+	kfree(phys_regions);
 	kfree(ne_mem_region->pages);
 	kfree(ne_mem_region);
 
