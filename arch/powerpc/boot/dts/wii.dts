@@ -113,6 +113,13 @@
 			interrupts = <4>;
 		};
 
+		aes@d020000 {
+			compatible = "nintendo,hollywood-aes";
+			reg = <0x0d020000 0x14>;
+			interrupts = <2>;
+			interrupt-parent = <&PIC1>;
+		};
+
 		usb@d040000 {
 			compatible = "nintendo,hollywood-usb-ehci",
 					"usb-ehci";
