@@ -127,7 +127,7 @@ static int64_t smccc(uint32_t func, uint32_t arg)
 		"mov	x1, %2\n"
 		"hvc	#0\n"
 		"mov	%0, x0\n"
-	: "=r" (ret) : "r" (func), "r" (arg) :
+	: "=r" (ret) : "r" ((uint64_t)func), "r" ((uint64_t)arg) :
 	  "x0", "x1", "x2", "x3");
 
 	return ret;
