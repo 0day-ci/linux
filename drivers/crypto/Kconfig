@@ -912,4 +912,15 @@ config CRYPTO_DEV_SA2UL
 
 source "drivers/crypto/keembay/Kconfig"
 
+config CRYPTO_DEV_NINTENDO
+	tristate "Support for the Nintendo Wii U AES engine"
+	depends on WII || WIIU || COMPILE_TEST
+	select CRYPTO_AES
+	help
+	  Say 'Y' here to use the Nintendo Wii or Wii U on-board AES
+	  engine for the CryptoAPI AES algorithm.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called nintendo-aes.
+
 endif # CRYPTO_HW
