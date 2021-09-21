@@ -1,5 +1,9 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 /*
+ * Copyright (c) 2013-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ *
+ * Author: Stephen Warren <swarren@nvidia.com>
+ *
  * This header provides constants for binding nvidia,tegra*-gpio.
  *
  * The first cell in Tegra's GPIO specifier is the GPIO ID. The macros below

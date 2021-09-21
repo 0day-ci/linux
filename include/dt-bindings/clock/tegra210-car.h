@@ -1,5 +1,9 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 /*
+ * Copyright (c) 2015-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ *
+ * Author: Thierry Reding <treding@nvidia.com>
+ *
  * This header provides constants for binding nvidia,tegra210-car.
  *
  * The first 224 clocks are numbered to match the bits in the CAR's CLK_OUT_ENB
