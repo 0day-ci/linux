@@ -1333,6 +1333,17 @@ ipv4_tcp()
 	ipv4_tcp_vrf
 }
 
+
+only_tcp_authopt()
+{
+	log_section "TCP Authentication"
+	setup
+	set_sysctl net.ipv4.tcp_l3mdev_accept=0
+	log_subsection "IPv4 no VRF"
+	ipv4_tcp_authopt
+}
+
+
 ################################################################################
 # IPv4 UDP
 
@@ -4023,6 +4034,7 @@ do
 	ipv6_netfilter)  ipv6_netfilter;;
 
 	use_cases)       use_cases;;
+	tcp_authopt)     only_tcp_authopt;;
 
 	# setup namespaces and config, but do not run any tests
 	setup)		 setup; exit 0;;
