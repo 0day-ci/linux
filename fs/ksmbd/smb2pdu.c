@@ -466,6 +466,13 @@ bool is_chained_smb2_message(struct ksmbd_work *work)
 
 	hdr = ksmbd_req_buf_next(work);
 	if (le32_to_cpu(hdr->NextCommand) > 0) {
+		if ((u64)work->next_smb2_rcv_hdr_off + le32_to_cpu(hdr->NextCommand) >
+		    get_rfc1002_len(work->request_buf)) {
+			pr_err("next command(%u) offset exceeds smb msg size\n",
+			       hdr->NextCommand);
+			return false;
+		}
+
 		ksmbd_debug(SMB, "got SMB2 chained command\n");
 		init_chained_smb2_rsp(work);
 		return true;
