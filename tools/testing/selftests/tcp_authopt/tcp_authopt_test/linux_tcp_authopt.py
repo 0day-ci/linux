@@ -25,6 +25,8 @@ TCP_AUTHOPT_MAXKEYLEN = 80
 
 
 class TCP_AUTHOPT_FLAG(IntFlag):
+    LOCK_KEYID = BIT(0)
+    LOCK_RNEXTKEYID = BIT(1)
     REJECT_UNEXPECTED = BIT(2)
 
 
@@ -44,12 +46,20 @@ class tcp_authopt:
     """Like linux struct tcp_authopt"""
 
     flags: int = 0
-    sizeof = 4
+    send_keyid: int = 0
+    send_rnextkeyid: int = 0
+    recv_keyid: int = 0
+    recv_rnextkeyid: int = 0
+    sizeof = 8
 
     def pack(self) -> bytes:
         return struct.pack(
-            "I",
+            "IBBBB",
             self.flags,
+            self.send_keyid,
+            self.send_rnextkeyid,
+            self.recv_keyid,
+            self.recv_rnextkeyid,
         )
 
     def __bytes__(self):
@@ -57,7 +67,7 @@ class tcp_authopt:
 
     @classmethod
     def unpack(cls, b: bytes):
-        tup = struct.unpack("I", b)
+        tup = struct.unpack("IBBBB", b)
         return cls(*tup)
 
 
