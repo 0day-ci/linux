@@ -549,6 +549,8 @@ static ssize_t process_output_block(struct tty_struct *tty,
 	space = tty_write_room(tty);
 	if (space <= 0) {
 		mutex_unlock(&ldata->output_lock);
+		if (!space)
+			space = -EAGAIN;
 		return space;
 	}
 	if (nr > space)
@@ -2287,8 +2289,10 @@ static ssize_t n_tty_write(struct tty_struct *tty, struct file *file,
 			while (nr > 0) {
 				ssize_t num = process_output_block(tty, b, nr);
 				if (num < 0) {
-					if (num == -EAGAIN)
-						break;
+					if (num == -EAGAIN) {
+						retval = 0;
+						goto break_out;
+					}
 					retval = num;
 					goto break_out;
 				}
