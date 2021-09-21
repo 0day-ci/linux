@@ -20,6 +20,7 @@
 #include <linux/mutex.h>
 #include <linux/mfd/core.h>
 #include <linux/regmap.h>
+#include <linux/reboot.h>
 
 #include <linux/mfd/da9063/core.h>
 #include <linux/mfd/da9063/registers.h>
@@ -158,6 +159,18 @@ static int da9063_clear_fault_log(struct da9063 *da9063)
 	return ret;
 }
 
+static int da9063_restart_notify(struct notifier_block *this,
+				 unsigned long mode, void *cmd)
+{
+	struct da9063 *da9063 = container_of(this, struct da9063, restart_handler);
+
+	regmap_write(da9063->regmap, DA9063_REG_PAGE_CON, 0x00);
+	regmap_write(da9063->regmap, DA9063_REG_CONTROL_F, 0x04);
+	regmap_write(da9063->regmap, DA9063_REG_CONTROL_A, 0x68);
+
+	return NOTIFY_DONE;
+}
+
 int da9063_device_init(struct da9063 *da9063, unsigned int irq)
 {
 	int ret;
@@ -196,6 +209,18 @@ int da9063_device_init(struct da9063 *da9063, unsigned int irq)
 			return ret;
 		}
 	}
+
+	da9063->restart_handler.notifier_call = da9063_restart_notify;
+	da9063->restart_handler.priority = 128;
+	ret = register_restart_handler(&da9063->restart_handler);
+	if (ret) {
+		dev_err(da9063->dev, "Failed to register restart handler\n");
+		return ret;
+	}
+
+	devm_add_action(da9063->dev,
+			(void (*)(void *))unregister_restart_handler,
+			&da9063->restart_handler);
 
 	return ret;
 }
