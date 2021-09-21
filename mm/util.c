@@ -797,7 +797,7 @@ int overcommit_policy_handler(struct ctl_table *table, int write, void *buffer,
 		size_t *lenp, loff_t *ppos)
 {
 	struct ctl_table t;
-	int new_policy;
+	int new_policy = sysctl_overcommit_memory;
 	int ret;
 
 	/*
