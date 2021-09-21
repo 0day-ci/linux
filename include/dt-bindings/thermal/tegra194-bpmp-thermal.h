@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause) */
 /*
  * This header provides constants for binding nvidia,tegra194-bpmp-thermal.
  */
