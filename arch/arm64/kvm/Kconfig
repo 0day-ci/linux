@@ -4,6 +4,7 @@
 #
 
 source "virt/lib/Kconfig"
+source "virt/kvm/Kconfig"
 
 menuconfig VIRTUALIZATION
 	bool "Virtualization"
@@ -41,11 +42,5 @@ menuconfig KVM
 	  Support hosting virtualized guest machines.
 
 	  If unsure, say N.
-
-if KVM
-
-source "virt/kvm/Kconfig"
-
-endif # KVM
 
 endif # VIRTUALIZATION
