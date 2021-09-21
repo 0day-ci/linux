@@ -95,6 +95,13 @@ static unsigned int skl_fbc_min_cfb_stride(const struct intel_fbc_state_cache *c
 	stride = cache->plane.src_w * cpp * height / limit;
 
 	/*
+	 * Wa_16011863758: icl+
+	 * Avoid some hardware segment address miscalculation.
+	 */
+	if (DISPLAY_VER(i915) >= 11)
+		stride += 64;
+
+	/*
 	 * At least some of the platforms require each 4 line segment to
 	 * be 512 byte aligned. Just do it always for simplicity.
 	 */
