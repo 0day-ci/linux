@@ -97,7 +97,14 @@ static inline bool vcpu_is_preempted(int cpu)
 
 #ifdef CONFIG_PPC_SPLPAR
 	if (!is_kvm_guest()) {
-		int first_cpu = cpu_first_thread_sibling(smp_processor_id());
+		int first_cpu;
+
+		/*
+		 * This is only a guess at best, and this function may be
+		 * called with preemption enabled. Using raw_smp_processor_id()
+		 * does not damage accuracy.
+		 */
+		first_cpu = cpu_first_thread_sibling(raw_smp_processor_id());
 
 		/*
 		 * Preemption can only happen at core granularity. This CPU
