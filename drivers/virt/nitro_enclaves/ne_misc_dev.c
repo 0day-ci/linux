@@ -844,10 +844,28 @@ static int ne_sanity_check_user_mem_region_page(struct ne_enclave *ne_enclave,
 	return 0;
 }
 
-static void ne_add_phys_memory_region(struct phys_contig_mem_region *regions,
-				      u64 paddr, u64 size)
+static inline int ne_sanity_check_phys_mem_region(u64 paddr, u64 size)
+{
+	if (size & (NE_MIN_MEM_REGION_SIZE - 1)) {
+		dev_err_ratelimited(ne_misc_dev.this_device,
+				    "Physical mem region size is not multiple of 2 MiB\n");
+		return -EINVAL;
+	}
+
+	if (!IS_ALIGNED(paddr, NE_MIN_MEM_REGION_SIZE)) {
+		dev_err_ratelimited(ne_misc_dev.this_device,
+				    "Physical mem region address is not 2 MiB aligned\n");
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+static int ne_add_phys_memory_region(struct phys_contig_mem_region *regions,
+				     u64 paddr, u64 size)
 {
 	u64 prev_phys_region_end = 0;
+	int rc = 0;
 
 	if (regions->num) {
 		prev_phys_region_end = regions->region[regions->num - 1].paddr +
@@ -855,14 +873,23 @@ static void ne_add_phys_memory_region(struct phys_contig_mem_region *regions,
 
 		/* Physical contiguous, just merge */
 		if (prev_phys_region_end == paddr) {
+			rc = ne_sanity_check_phys_mem_region(paddr, size);
+			if (rc < 0)
+				return rc;
+
 			regions->region[regions->num - 1].size += size;
-			return;
+			return 0;
 		}
 	}
+
+	rc = ne_sanity_check_phys_mem_region(paddr, size);
+	if (rc < 0)
+		return rc;
 
 	regions->region[regions->num].paddr = paddr;
 	regions->region[regions->num].size = size;
 	regions->num++;
+	return 0;
 }
 
 /**
@@ -942,8 +969,10 @@ static int ne_set_user_memory_region_ioctl(struct ne_enclave *ne_enclave,
 		if (rc < 0)
 			goto put_pages;
 
-		ne_add_phys_memory_region(phys_regions, page_to_phys(ne_mem_region->pages[i]),
-					  page_size(ne_mem_region->pages[i]));
+		rc = ne_add_phys_memory_region(phys_regions, page_to_phys(ne_mem_region->pages[i]),
+					       page_size(ne_mem_region->pages[i]));
+		if (rc < 0)
+			goto put_pages;
 
 		memory_size += page_size(ne_mem_region->pages[i]);
 
@@ -958,29 +987,6 @@ static int ne_set_user_memory_region_ioctl(struct ne_enclave *ne_enclave,
 		rc = -NE_ERR_MEM_MAX_REGIONS;
 
 		goto put_pages;
-	}
-
-	for (i = 0; i < phys_regions->num; i++) {
-		u64 phys_region_addr = phys_regions->region[i].paddr;
-		u64 phys_region_size = phys_regions->region[i].size;
-
-		if (phys_region_size & (NE_MIN_MEM_REGION_SIZE - 1)) {
-			dev_err_ratelimited(ne_misc_dev.this_device,
-					    "Physical mem region size is not multiple of 2 MiB\n");
-
-			rc = -EINVAL;
-
-			goto put_pages;
-		}
-
-		if (!IS_ALIGNED(phys_region_addr, NE_MIN_MEM_REGION_SIZE)) {
-			dev_err_ratelimited(ne_misc_dev.this_device,
-					    "Physical mem region address is not 2 MiB aligned\n");
-
-			rc = -EINVAL;
-
-			goto put_pages;
-		}
 	}
 
 	ne_mem_region->memory_size = mem_region.memory_size;
