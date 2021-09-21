@@ -52,6 +52,20 @@ static const u8 REG_VOLTAGE_LIMIT_MSB_SHIFT[2][5] = {
 #define REG_VERSION_ID		0xff
 
 /*
+ * Resistance temperature detector (RTD) modes according to 7.2.32 Mode
+ * Selection Register
+ */
+
+#define MODE_RTD_MASK		0x3
+#define MODE_LTD_EN		0x40
+
+/*
+ * Bit offset for sensors modes in REG_MODE.
+ * Valid for index 0..2, indicating RTD1..3.
+ */
+#define MODE_BIT_OFFSET_RTD(index) ((index) * 2)
+
+/*
  * Data structures and manipulation thereof
  */
 
@@ -74,7 +88,9 @@ static ssize_t temp_type_show(struct device *dev,
 	if (ret < 0)
 		return ret;
 
-	return sprintf(buf, "%u\n", (mode >> (2 * sattr->index) & 3) + 2);
+	return sprintf(buf, "%u\n",
+			((mode >> MODE_BIT_OFFSET_RTD(sattr->index)) &
+				MODE_RTD_MASK) + 2);
 }
 
 static ssize_t temp_type_store(struct device *dev,
@@ -94,7 +110,8 @@ static ssize_t temp_type_store(struct device *dev,
 	if (type < 3 || type > 4)
 		return -EINVAL;
 	err = regmap_update_bits(data->regmap, REG_MODE,
-			3 << 2 * sattr->index, (type - 2) << 2 * sattr->index);
+			MODE_RTD_MASK << MODE_BIT_OFFSET_RTD(sattr->index),
+			(type - 2) << MODE_BIT_OFFSET_RTD(sattr->index));
 	return err ? : count;
 }
 
@@ -688,18 +705,18 @@ static umode_t nct7802_temp_is_visible(struct kobject *kobj,
 	if (err < 0)
 		return 0;
 
-	if (index < 10 &&
-	    (reg & 03) != 0x01 && (reg & 0x03) != 0x02)		/* RD1 */
+	if (index >= 0 && index < 20 &&				/* RD1, RD 2*/
+	    ((reg >> MODE_BIT_OFFSET_RTD(index / 10)) & MODE_RTD_MASK) != 0x01 &&
+	    ((reg >> MODE_BIT_OFFSET_RTD(index / 10)) & MODE_RTD_MASK) != 0x02)
 		return 0;
 
-	if (index >= 10 && index < 20 &&
-	    (reg & 0x0c) != 0x04 && (reg & 0x0c) != 0x08)	/* RD2 */
-		return 0;
-	if (index >= 20 && index < 30 && (reg & 0x30) != 0x20)	/* RD3 */
+	if (index >= 20 && index < 30 &&			/* RD3 */
+	    (reg >> MODE_BIT_OFFSET_RTD(index / 10) & MODE_RTD_MASK != 0x02))
 		return 0;
 
-	if (index >= 30 && index < 38)				/* local */
-		return attr->mode;
+	if (index >= 30 && index < 38 &&			/* local */
+	    (reg & MODE_LTD_EN) != MODE_LTD_EN)
+		return 0;
 
 	err = regmap_read(data->regmap, REG_PECI_ENABLE, &reg);
 	if (err < 0)
@@ -1038,8 +1055,97 @@ static const struct regmap_config nct7802_regmap_config = {
 	.volatile_reg = nct7802_regmap_is_volatile,
 };
 
-static int nct7802_init_chip(struct nct7802_data *data)
+static bool nct7802_configure_temperature_sensors_from_device_tree(
+	struct device *dev, unsigned char *mode_mask, unsigned char *mode_val)
 {
+	struct device_node *sensors, *sensor;
+	int err;
+	u8 idx;
+	u32 type;
+
+	if (!dev->of_node)
+		return false;
+
+	sensors = of_get_child_by_name(dev->of_node, "temperature-sensors");
+	if (!sensors)
+		return false;
+
+	for_each_child_of_node(sensors, sensor) {
+		if (!strcmp(sensor->name, "ltd")) {
+			if (!of_device_is_available(sensor)) {
+				*mode_val &= ~MODE_LTD_EN;
+				*mode_mask |= MODE_LTD_EN;
+			} else {
+				*mode_val |= MODE_LTD_EN;
+				*mode_mask |= MODE_LTD_EN;
+			}
+			continue;
+		}
+
+		/* Check for rtdX, with X being the sensor number */
+		if (strcmp(sensor->name, "rtd") > 0) {
+			err = kstrtou8(
+				sensor->name + strlen("rdt"), 10, &idx);
+			if (err) {
+				dev_err(dev,
+					"Unparseable sensor number in '%s'\n",
+					sensor->name);
+				continue;
+			}
+
+			if (idx < 1 || idx > 3) {
+				dev_err(dev,
+					"Invalid sensor number in '%s'\n",
+					sensor->name);
+				continue;
+			}
+
+			if (!of_device_is_available(sensor)) {
+				*mode_val &= ~(MODE_RTD_MASK
+					<< MODE_BIT_OFFSET_RTD(idx-1));
+				*mode_mask |= MODE_RTD_MASK
+					<< MODE_BIT_OFFSET_RTD(idx-1);
+				continue;
+			}
+
+			if (idx == 3) {
+				/* RTD3 only supports thermistor mode */
+				type = 4;
+			} else if (of_property_count_u32_elems(sensor, "type")
+				> 0) {
+				if (of_property_read_u32_index(
+					sensor, "type", 0, &type)) {
+					dev_err(dev,
+						"Could not read type property for '%s'\n",
+						sensor->name);
+					continue;
+				}
+
+				/* Only current and thermistor modes are valid
+				 * for temperature sensors.
+				 */
+				if (type < 3 || type > 4) {
+					dev_err(dev,
+						"Type %u not supported for '%s'\n",
+						type, sensor->name);
+					continue;
+				}
+			}
+
+			/* Everything ok, so write sensor configuration */
+			*mode_val |= ((type - 2) & MODE_RTD_MASK)
+				<< MODE_BIT_OFFSET_RTD(idx-1);
+			*mode_mask |= MODE_RTD_MASK
+				<< MODE_BIT_OFFSET_RTD(idx-1);
+		}
+	}
+
+	return true;
+}
+
+static int nct7802_init_chip(struct device *dev, struct nct7802_data *data)
+{
+	unsigned char mode_val = 0, mode_mask = 0;
 	int err;
 
 	/* Enable ADC */
@@ -1047,8 +1153,15 @@ static int nct7802_init_chip(struct nct7802_data *data)
 	if (err)
 		return err;
 
-	/* Enable local temperature sensor */
-	err = regmap_update_bits(data->regmap, REG_MODE, 0x40, 0x40);
+	if (!nct7802_configure_temperature_sensors_from_device_tree(dev,
+			&mode_mask, &mode_val)) {
+		/* Enable local temperature sensor by default */
+		mode_val |= MODE_LTD_EN;
+		mode_mask |= MODE_LTD_EN;
+	}
+
+	err = regmap_update_bits(data->regmap, REG_MODE, mode_mask,
+		mode_val);
 	if (err)
 		return err;
 
@@ -1074,7 +1187,7 @@ static int nct7802_probe(struct i2c_client *client)
 	mutex_init(&data->access_lock);
 	mutex_init(&data->in_alarm_lock);
 
-	ret = nct7802_init_chip(data);
+	ret = nct7802_init_chip(dev, data);
 	if (ret < 0)
 		return ret;
 
