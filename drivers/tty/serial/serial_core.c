@@ -118,6 +118,17 @@ static void uart_stop(struct tty_struct *tty)
 	uart_port_unlock(port, flags);
 }
 
+static int __uart_prep_tx(struct tty_struct *tty)
+{
+	struct uart_state *state = tty->driver_data;
+	struct uart_port *port = state->uart_port;
+
+	if (port && !uart_tx_stopped(port) && port->ops->prep_tx)
+		return port->ops->prep_tx(port);
+
+	return 0;
+}
+
 static void __uart_start(struct tty_struct *tty)
 {
 	struct uart_state *state = tty->driver_data;
@@ -574,6 +585,12 @@ static int uart_write(struct tty_struct *tty,
 		return 0;
 	}
 
+	ret = __uart_prep_tx(tty);
+	if (ret < 0) {
+		uart_port_unlock(port, flags);
+		return 0;
+	}
+
 	while (port) {
 		c = CIRC_SPACE_TO_END(circ->head, circ->tail, UART_XMIT_SIZE);
 		if (count < c)
@@ -600,6 +617,12 @@ static unsigned int uart_write_room(struct tty_struct *tty)
 	unsigned int ret;
 
 	port = uart_port_lock(state, flags);
+	ret = __uart_prep_tx(tty);
+	if (ret < 0) {
+		uart_port_unlock(port, flags);
+		return 0;
+	}
+
 	ret = uart_circ_chars_free(&state->xmit);
 	uart_port_unlock(port, flags);
 	return ret;

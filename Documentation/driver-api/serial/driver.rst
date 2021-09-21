@@ -136,6 +136,15 @@ hardware.
 
 	This call must not sleep
 
+  prep_tx(port)
+	Prepare port for transmitting characters.
+
+	Locking: port->lock taken.
+
+	Interrupts: locally disabled.
+
+	This call must not sleep
+
   start_tx(port)
 	Start transmitting characters.
 

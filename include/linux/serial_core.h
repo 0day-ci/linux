@@ -40,6 +40,7 @@ struct uart_ops {
 	void		(*set_mctrl)(struct uart_port *, unsigned int mctrl);
 	unsigned int	(*get_mctrl)(struct uart_port *);
 	void		(*stop_tx)(struct uart_port *);
+	int		(*prep_tx)(struct uart_port *);
 	void		(*start_tx)(struct uart_port *);
 	void		(*throttle)(struct uart_port *);
 	void		(*unthrottle)(struct uart_port *);
