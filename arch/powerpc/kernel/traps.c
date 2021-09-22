@@ -790,24 +790,19 @@ void die_mce(const char *str, struct pt_regs *regs, long err)
 	 * do_exit() checks for in_interrupt() and panics in that case, so
 	 * exit the irq/nmi before calling die.
 	 */
-	if (IS_ENABLED(CONFIG_PPC_BOOK3S_64))
-		irq_exit();
-	else
-		nmi_exit();
+	nmi_exit();
 	die(str, regs, err);
 }
 
 /*
- * BOOK3S_64 does not call this handler as a non-maskable interrupt
- * (it uses its own early real-mode handler to handle the MCE proper
- * and then raises irq_work to call this handler when interrupts are
- * enabled).
+ * BOOK3S_64 does not call this handler as a non-maskable interrupt (it uses
+ * its own early real-mode handler to handle the MCE proper and then raises
+ * irq_work to call this handler when interrupts are enabled), except in the
+ * case of unrecoverable_mce. If unrecoverable_mce was a separate NMI handler,
+ * then this could be ASYNC on 64s. However it should all work okay as an NMI
+ * handler (and it is NMI on other platforms) so just make it an NMI.
  */
-#ifdef CONFIG_PPC_BOOK3S_64
-DEFINE_INTERRUPT_HANDLER_ASYNC(machine_check_exception)
-#else
 DEFINE_INTERRUPT_HANDLER_NMI(machine_check_exception)
-#endif
 {
 	int recover = 0;
 
@@ -842,11 +837,7 @@ bail:
 	if (regs_is_unrecoverable(regs))
 		die_mce("Unrecoverable Machine check", regs, SIGBUS);
 
-#ifdef CONFIG_PPC_BOOK3S_64
-	return;
-#else
 	return 0;
-#endif
 }
 
 DEFINE_INTERRUPT_HANDLER(SMIException) /* async? */

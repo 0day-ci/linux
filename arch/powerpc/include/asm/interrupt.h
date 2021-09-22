@@ -524,11 +524,7 @@ static __always_inline long ____##func(struct pt_regs *regs)
 /* Interrupt handlers */
 /* kernel/traps.c */
 DECLARE_INTERRUPT_HANDLER_NMI(system_reset_exception);
-#ifdef CONFIG_PPC_BOOK3S_64
-DECLARE_INTERRUPT_HANDLER_ASYNC(machine_check_exception);
-#else
 DECLARE_INTERRUPT_HANDLER_NMI(machine_check_exception);
-#endif
 DECLARE_INTERRUPT_HANDLER(SMIException);
 DECLARE_INTERRUPT_HANDLER(handle_hmi_exception);
 DECLARE_INTERRUPT_HANDLER(unknown_exception);
