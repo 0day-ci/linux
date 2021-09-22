@@ -170,7 +170,7 @@ noinline int test_dwarf_unwind__krava_1(struct thread *thread)
 	return test_dwarf_unwind__krava_2(thread);
 }
 
-int test__dwarf_unwind(struct test *test __maybe_unused, int subtest __maybe_unused)
+int test__dwarf_unwind(struct test_suite *test __maybe_unused, int subtest __maybe_unused)
 {
 	struct machine *machine;
 	struct thread *thread;
