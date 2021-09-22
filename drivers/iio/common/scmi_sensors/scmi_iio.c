@@ -286,6 +286,9 @@ static int scmi_iio_read_raw(struct iio_dev *iio_dev,
 	struct scmi_iio_priv *sensor = iio_priv(iio_dev);
 	s8 scale;
 	int ret;
+	int err;
+	u32 sensor_config;
+	struct scmi_sensor_reading readings[SCMI_IIO_NUM_OF_AXIS];
 
 	switch (mask) {
 	case IIO_CHAN_INFO_SCALE:
@@ -300,6 +303,38 @@ static int scmi_iio_read_raw(struct iio_dev *iio_dev,
 	case IIO_CHAN_INFO_SAMP_FREQ:
 		ret = scmi_iio_get_odr_val(iio_dev, val, val2);
 		return ret ? ret : IIO_VAL_INT_PLUS_MICRO;
+	case IIO_CHAN_INFO_RAW:
+		sensor_config = FIELD_PREP(SCMI_SENS_CFG_SENSOR_ENABLED_MASK,
+					   SCMI_SENS_CFG_SENSOR_ENABLE);
+		err = sensor->handle->sensor_ops->config_set(
+			sensor->handle, sensor->sensor_info->id, sensor_config);
+		if (err)
+			dev_err(&iio_dev->dev,
+				"Error in enabling sensor %s err %d",
+				sensor->sensor_info->name, err);
+
+		err = sensor->handle->sensor_ops->reading_get_timestamped(
+			sensor->handle, sensor->sensor_info->id,
+			sensor->sensor_info->num_axis,
+			(struct scmi_sensor_reading *)&readings);
+		if (err) {
+			dev_err(&iio_dev->dev,
+				"Error in reading raw attribute for sensor %s err %d",
+				sensor->sensor_info->name, err);
+			return err;
+		}
+
+		sensor_config = FIELD_PREP(SCMI_SENS_CFG_SENSOR_ENABLED_MASK,
+					   SCMI_SENS_CFG_SENSOR_DISABLE);
+		err = sensor->handle->sensor_ops->config_set(
+			sensor->handle, sensor->sensor_info->id, sensor_config);
+		if (err)
+			dev_err(&iio_dev->dev,
+				"Error in enabling sensor %s err %d",
+				sensor->sensor_info->name, err);
+		/* Use 32-bit value, since practically there is no need in 64 bits */
+		*val = (u32)readings[ch->scan_index].value;
+		return IIO_VAL_INT;
 	default:
 		return -EINVAL;
 	}
@@ -381,7 +416,8 @@ static void scmi_iio_set_data_channel(struct iio_chan_spec *iio_chan,
 	iio_chan->type = type;
 	iio_chan->modified = 1;
 	iio_chan->channel2 = mod;
-	iio_chan->info_mask_separate = BIT(IIO_CHAN_INFO_SCALE);
+	iio_chan->info_mask_separate =
+		BIT(IIO_CHAN_INFO_SCALE) | BIT(IIO_CHAN_INFO_RAW);
 	iio_chan->info_mask_shared_by_type = BIT(IIO_CHAN_INFO_SAMP_FREQ);
 	iio_chan->info_mask_shared_by_type_available =
 		BIT(IIO_CHAN_INFO_SAMP_FREQ);
