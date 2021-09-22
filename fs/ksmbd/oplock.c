@@ -1451,26 +1451,41 @@ struct lease_ctx_info *parse_lease_state(void *open_req)
  */
 struct create_context *smb2_find_context_vals(void *open_req, const char *tag)
 {
-	char *data_offset;
-	struct create_context *cc;
-	unsigned int next = 0;
-	char *name;
 	struct smb2_create_req *req = (struct smb2_create_req *)open_req;
+	struct create_context *cc;
+	char *data_offset, *data_end;
+	char *name;
+	unsigned int next = 0;
+	unsigned int name_off, name_len, value_off, value_len;
 
 	data_offset = (char *)req + 4 + le32_to_cpu(req->CreateContextsOffset);
+	data_end = data_offset + le32_to_cpu(req->CreateContextsLength);
 	cc = (struct create_context *)data_offset;
 	do {
-		int val;
-
 		cc = (struct create_context *)((char *)cc + next);
-		name = le16_to_cpu(cc->NameOffset) + (char *)cc;
-		val = le16_to_cpu(cc->NameLength);
-		if (val < 4)
+		if ((char *)cc + offsetof(struct create_context, Buffer) >
+		    data_end)
 			return ERR_PTR(-EINVAL);
 
-		if (memcmp(name, tag, val) == 0)
-			return cc;
 		next = le32_to_cpu(cc->Next);
+		name_off = le16_to_cpu(cc->NameOffset);
+		name_len = le16_to_cpu(cc->NameLength);
+		value_off = le16_to_cpu(cc->DataOffset);
+		value_len = le32_to_cpu(cc->DataLength);
+
+		if ((char *)cc + name_off + name_len > data_end ||
+		    (value_len && (char *)cc + value_off + value_len > data_end))
+			return ERR_PTR(-EINVAL);
+		else if (next && (next < name_off + name_len ||
+			 (value_len && next < value_off + value_len)))
+			return ERR_PTR(-EINVAL);
+
+		name = (char *)cc + name_off;
+		if (name_len < 4)
+			return ERR_PTR(-EINVAL);
+
+		if (memcmp(name, tag, name_len) == 0)
+			return cc;
 	} while (next != 0);
 
 	return NULL;

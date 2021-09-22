@@ -124,7 +124,6 @@ struct b53_device {
 	/* used ports mask */
 	u16 enabled_ports;
 	unsigned int imp_port;
-	unsigned int cpu_port;
 
 	/* connect specific data */
 	u8 current_page;
@@ -226,6 +225,11 @@ int b53_switch_register(struct b53_device *dev);
 static inline void b53_switch_remove(struct b53_device *dev)
 {
 	dsa_unregister_switch(dev->ds);
+}
+
+static inline void b53_switch_shutdown(struct b53_device *dev)
+{
+	dsa_switch_shutdown(dev->ds);
 }
 
 #define b53_build_op(type_op_size, val_type)				\

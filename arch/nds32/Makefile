@@ -9,6 +9,8 @@ endif
 # Avoid generating FPU instructions
 arch-y  += -mno-ext-fpu-sp -mno-ext-fpu-dp -mfloat-abi=soft
 
+# Enable <nds32_intrinsic.h>
+KBUILD_CFLAGS	+= -isystem $(shell $(CC) -print-file-name=include)
 KBUILD_CFLAGS	+= $(call cc-option, -mno-sched-prolog-epilog)
 KBUILD_CFLAGS	+= -mcmodel=large
 
@@ -25,8 +27,6 @@ export	TEXTADDR
 
 
 # If we have a machine-specific directory, then include it in the build.
-core-y				+= arch/nds32/kernel/ arch/nds32/mm/
-core-$(CONFIG_FPU)              += arch/nds32/math-emu/
 libs-y				+= arch/nds32/lib/
 
 ifneq '$(CONFIG_NDS32_BUILTIN_DTB)' '""'
@@ -48,7 +48,6 @@ CHECKFLAGS      += -D__NDS32_EB__
 endif
 
 boot := arch/nds32/boot
-core-y += $(boot)/dts/
 
 Image: vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) $(boot)/$@
