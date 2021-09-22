@@ -238,8 +238,14 @@ int sock_recvmsg(struct socket *sock, struct msghdr *msg, int flags);
 struct file *sock_alloc_file(struct socket *sock, int flags, const char *dname);
 struct socket *sockfd_lookup(int fd, int *err);
 struct socket *sock_from_file(struct file *file);
-#define		     sockfd_put(sock) fput(sock->file)
 int net_ratelimit(void);
+#define		     sockfd_put(sock)             \
+do {                                              \
+	struct fd *fd = (struct fd *)&sock->file; \
+						  \
+	if (fd->flags & FDPUT_FPUT)               \
+		fput(sock->file);                 \
+} while (0)
 
 #define net_ratelimited_function(function, ...)			\
 do {								\
