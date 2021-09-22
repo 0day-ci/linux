@@ -26,7 +26,7 @@
 
 /* Small library of different fence types useful for writing tests */
 
-static int __i915_sw_fence_call
+static int
 nop_fence_notify(struct i915_sw_fence *fence, enum i915_sw_fence_notify state)
 {
 	return NOTIFY_DONE;
@@ -89,7 +89,7 @@ struct heap_fence {
 	};
 };
 
-static int __i915_sw_fence_call
+static int
 heap_fence_notify(struct i915_sw_fence *fence, enum i915_sw_fence_notify state)
 {
 	struct heap_fence *h = container_of(fence, typeof(*h), fence);
