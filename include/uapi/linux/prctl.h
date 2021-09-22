@@ -269,4 +269,13 @@ struct prctl_mm_map {
 # define PR_SCHED_CORE_SHARE_FROM	3 /* pull core_sched cookie to pid */
 # define PR_SCHED_CORE_MAX		4
 
+/* Log uaccesses to a user-provided buffer */
+#define PR_LOG_UACCESS			63
+
+/* Format of the entries in the uaccess log. */
+struct uaccess_buffer_entry {
+	__u64 addr, size, flags;
+};
+# define UACCESS_BUFFER_FLAG_WRITE	1 /* access was a write */
+
 #endif /* _LINUX_PRCTL_H */

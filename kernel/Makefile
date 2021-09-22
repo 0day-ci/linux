@@ -115,6 +115,7 @@ obj-$(CONFIG_KCSAN) += kcsan/
 obj-$(CONFIG_SHADOW_CALL_STACK) += scs.o
 obj-$(CONFIG_HAVE_STATIC_CALL_INLINE) += static_call.o
 obj-$(CONFIG_CFI_CLANG) += cfi.o
+obj-$(CONFIG_UACCESS_BUFFER) += uaccess_buffer.o
 
 obj-$(CONFIG_PERF_EVENTS) += events/
 

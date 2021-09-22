@@ -89,6 +89,8 @@ __syscall_enter_from_user_work(struct pt_regs *regs, long syscall)
 	if (work & SYSCALL_WORK_ENTER)
 		syscall = syscall_trace_enter(regs, syscall, work);
 
+	uaccess_buffer_syscall_entry();
+
 	return syscall;
 }
 
@@ -273,6 +275,7 @@ static void syscall_exit_to_user_mode_prepare(struct pt_regs *regs)
 			local_irq_enable();
 	}
 
+	uaccess_buffer_syscall_exit();
 	rseq_syscall(regs);
 
 	/*

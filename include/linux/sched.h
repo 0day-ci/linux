@@ -34,6 +34,7 @@
 #include <linux/rseq.h>
 #include <linux/seqlock.h>
 #include <linux/kcsan.h>
+#include <linux/uaccess_buffer_info.h>
 #include <asm/kmap_size.h>
 
 /* task_struct member predeclarations (sorted alphabetically): */
@@ -1487,6 +1488,8 @@ struct task_struct {
 	 */
 	struct callback_head		l1d_flush_kill;
 #endif
+
+	struct uaccess_buffer_info	uaccess_buffer;
 
 	/*
 	 * New fields for task_struct should be added above here, so that

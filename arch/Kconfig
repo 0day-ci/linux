@@ -31,6 +31,7 @@ config HOTPLUG_SMT
 	bool
 
 config GENERIC_ENTRY
+       select UACCESS_BUFFER
        bool
 
 config KPROBES
@@ -1287,6 +1288,11 @@ config ARCH_HAS_ELFCORE_COMPAT
 
 config ARCH_HAS_PARANOID_L1D_FLUSH
 	bool
+
+config UACCESS_BUFFER
+	bool
+	help
+	  Select if the architecture's syscall entry/exit code supports uaccess buffers.
 
 source "kernel/gcov/Kconfig"
 

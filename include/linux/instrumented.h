@@ -2,7 +2,7 @@
 
 /*
  * This header provides generic wrappers for memory access instrumentation that
- * the compiler cannot emit for: KASAN, KCSAN.
+ * the compiler cannot emit for: KASAN, KCSAN, access buffers.
  */
 #ifndef _LINUX_INSTRUMENTED_H
 #define _LINUX_INSTRUMENTED_H
@@ -11,6 +11,7 @@
 #include <linux/kasan-checks.h>
 #include <linux/kcsan-checks.h>
 #include <linux/types.h>
+#include <linux/uaccess_buffer.h>
 
 /**
  * instrument_read - instrument regular read access
@@ -117,6 +118,7 @@ instrument_copy_to_user(void __user *to, const void *from, unsigned long n)
 {
 	kasan_check_read(from, n);
 	kcsan_check_read(from, n);
+	uaccess_buffer_log_write(to, n);
 }
 
 /**
@@ -134,6 +136,7 @@ instrument_copy_from_user(const void *to, const void __user *from, unsigned long
 {
 	kasan_check_write(to, n);
 	kcsan_check_write(to, n);
+	uaccess_buffer_log_read(from, n);
 }
 
 #endif /* _LINUX_INSTRUMENTED_H */

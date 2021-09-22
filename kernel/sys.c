@@ -42,6 +42,7 @@
 #include <linux/version.h>
 #include <linux/ctype.h>
 #include <linux/syscall_user_dispatch.h>
+#include <linux/uaccess_buffer.h>
 
 #include <linux/compat.h>
 #include <linux/syscalls.h>
@@ -2530,6 +2531,11 @@ SYSCALL_DEFINE5(prctl, int, option, unsigned long, arg2, unsigned long, arg3,
 		error = sched_core_share_pid(arg2, arg3, arg4, arg5);
 		break;
 #endif
+	case PR_LOG_UACCESS:
+		if (arg5)
+			return -EINVAL;
+		error = uaccess_buffer_set_logging(arg2, arg3, arg4);
+		break;
 	default:
 		error = -EINVAL;
 		break;
