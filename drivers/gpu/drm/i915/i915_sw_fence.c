@@ -34,7 +34,7 @@ enum {
 
 static void *i915_sw_fence_debug_hint(void *addr)
 {
-	return (void *)(((struct i915_sw_fence *)addr)->flags & I915_SW_FENCE_MASK);
+	return (void *)(((struct i915_sw_fence *)addr)->fn);
 }
 
 #ifdef CONFIG_DRM_I915_SW_FENCE_DEBUG_OBJECTS
@@ -126,10 +126,7 @@ static inline void debug_fence_assert(struct i915_sw_fence *fence)
 static int __i915_sw_fence_notify(struct i915_sw_fence *fence,
 				  enum i915_sw_fence_notify state)
 {
-	i915_sw_fence_notify_t fn;
-
-	fn = (i915_sw_fence_notify_t)(fence->flags & I915_SW_FENCE_MASK);
-	return fn(fence, state);
+	return fence->fn(fence, state);
 }
 
 #ifdef CONFIG_DRM_I915_SW_FENCE_DEBUG_OBJECTS
@@ -242,7 +239,7 @@ void __i915_sw_fence_init(struct i915_sw_fence *fence,
 			  const char *name,
 			  struct lock_class_key *key)
 {
-	BUG_ON(!fn || (unsigned long)fn & ~I915_SW_FENCE_MASK);
+	BUG_ON(!fn);
 
 	__init_waitqueue_head(&fence->wait, name, key);
 	fence->flags = (unsigned long)fn;
