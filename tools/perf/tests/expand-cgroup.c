@@ -219,8 +219,8 @@ out:
 	return ret;
 }
 
-int test__expand_cgroup_events(struct test *test __maybe_unused,
-			       int subtest __maybe_unused)
+static int test__expand_cgroup_events(struct test *test __maybe_unused,
+				      int subtest __maybe_unused)
 {
 	int ret;
 
@@ -238,3 +238,5 @@ int test__expand_cgroup_events(struct test *test __maybe_unused,
 
 	return ret;
 }
+
+DEFINE_SUITE("Event expansion for cgroups", expand_cgroup_events);

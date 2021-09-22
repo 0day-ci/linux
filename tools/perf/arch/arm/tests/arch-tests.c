@@ -10,8 +10,8 @@ DEFINE_SUITE("Vectors page", vectors_page);
 
 struct test *arch_tests[] = {
 #ifdef HAVE_DWARF_UNWIND_SUPPORT
-	&dwarf_unwind,
+	&suite__dwarf_unwind,
 #endif
-	&vectors_pages,
+	&suite__vectors_pages,
 	NULL,
 };
