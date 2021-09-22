@@ -3,14 +3,13 @@
 #include "tests/tests.h"
 #include "arch-tests.h"
 
-struct test arch_tests[] = {
 #ifdef HAVE_DWARF_UNWIND_SUPPORT
-	{
-		.desc = "DWARF unwind",
-		.func = test__dwarf_unwind,
-	},
+DEFINE_SUITE("DWARF unwind", dwarf_unwind);
 #endif
-	{
-		.func = NULL,
-	},
+
+struct test *arch_tests[] = {
+#ifdef HAVE_DWARF_UNWIND_SUPPORT
+	&dwarf_unwind,
+#endif
+	NULL,
 };
