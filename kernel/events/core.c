@@ -3766,6 +3766,15 @@ ctx_flexible_sched_in(struct perf_event_context *ctx,
 			   merge_sched_in, &can_add_hw);
 }
 
+static inline void
+perf_event_update_inactive_userpage(struct perf_event *event,
+				    struct perf_event_context *ctx)
+{
+	perf_event_update_time(event);
+	perf_set_shadow_time(event, ctx);
+	perf_event_update_userpage(event);
+}
+
 static void
 ctx_sched_in(struct perf_event_context *ctx,
 	     struct perf_cpu_context *cpuctx,
@@ -3807,6 +3816,23 @@ ctx_sched_in(struct perf_event_context *ctx,
 	/* Then walk through the lower prio flexible groups */
 	if (is_active & EVENT_FLEXIBLE)
 		ctx_flexible_sched_in(ctx, cpuctx);
+
+	/*
+	 * Update userpage for inactive events. This is needed for accurate
+	 * time_enabled.
+	 */
+	if (unlikely(ctx->rotate_necessary)) {
+		struct perf_event *event;
+
+		perf_event_groups_for_each(event, &ctx->pinned_groups) {
+			if (event->state == PERF_EVENT_STATE_INACTIVE)
+				perf_event_update_inactive_userpage(event, ctx);
+		}
+		perf_event_groups_for_each(event, &ctx->flexible_groups) {
+			if (event->state == PERF_EVENT_STATE_INACTIVE)
+				perf_event_update_inactive_userpage(event, ctx);
+		}
+	}
 }
 
 static void cpu_ctx_sched_in(struct perf_cpu_context *cpuctx,
