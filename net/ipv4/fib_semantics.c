@@ -1660,8 +1660,9 @@ nla_put_failure:
 EXPORT_SYMBOL_GPL(fib_nexthop_info);
 
 #if IS_ENABLED(CONFIG_IP_ROUTE_MULTIPATH) || IS_ENABLED(CONFIG_IPV6)
-int fib_add_nexthop(struct sk_buff *skb, const struct fib_nh_common *nhc,
-		    int nh_weight, u8 rt_family)
+static struct rtnexthop *__fib_add_nexthop(struct sk_buff *skb,
+					   const struct fib_nh_common *nhc,
+					   int nh_weight, u8 rt_family)
 {
 	const struct net_device *dev = nhc->nhc_dev;
 	struct rtnexthop *rtnh;
@@ -1682,10 +1683,17 @@ int fib_add_nexthop(struct sk_buff *skb, const struct fib_nh_common *nhc,
 	/* length of rtnetlink header + attributes */
 	rtnh->rtnh_len = nlmsg_get_pos(skb) - (void *)rtnh;
 
-	return 0;
+	return rtnh;
 
 nla_put_failure:
-	return -EMSGSIZE;
+	return ERR_PTR(-EMSGSIZE);
+}
+
+int fib_add_nexthop(struct sk_buff *skb, const struct fib_nh_common *nhc,
+		    int nh_weight, u8 rt_family)
+{
+	return PTR_ERR_OR_ZERO(__fib_add_nexthop(skb, nhc, nh_weight,
+						 rt_family));
 }
 EXPORT_SYMBOL_GPL(fib_add_nexthop);
 #endif
@@ -1706,13 +1714,17 @@ static int fib_add_multipath(struct sk_buff *skb, struct fib_info *fi)
 	}
 
 	for_nexthops(fi) {
-		if (fib_add_nexthop(skb, &nh->nh_common, nh->fib_nh_weight,
-				    AF_INET) < 0)
+		struct rtnexthop *rtnh = __fib_add_nexthop(skb, &nh->nh_common,
+							   nh->fib_nh_weight,
+							   AF_INET);
+		if (IS_ERR(rtnh))
 			goto nla_put_failure;
 #ifdef CONFIG_IP_ROUTE_CLASSID
-		if (nh->nh_tclassid &&
-		    nla_put_u32(skb, RTA_FLOW, nh->nh_tclassid))
-			goto nla_put_failure;
+		if (nh->nh_tclassid) {
+			if (nla_put_u32(skb, RTA_FLOW, nh->nh_tclassid))
+				goto nla_put_failure;
+			rtnh->rtnh_len += nla_total_size(4);
+		}
 #endif
 	} endfor_nexthops(fi);
 
