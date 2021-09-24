@@ -903,13 +903,14 @@ static int tdp_mmu_map_handle_target_level(struct kvm_vcpu *vcpu,
 	bool wrprot = false;
 
 	WARN_ON(sp->role.level != fault->goal_level);
-	if (unlikely(!fault->slot))
+	if (unlikely(!fault->slot)) {
 		new_spte = make_mmio_spte(vcpu, iter->gfn, ACC_ALL);
-	else
+	} else {
+		new_spte = iter->old_spte;
 		wrprot = make_spte(vcpu, sp, fault->slot, ACC_ALL, iter->gfn,
-					 fault->pfn, iter->old_spte, fault->prefault, true,
+					 fault->pfn, fault->prefault, true,
 					 fault->map_writable, &new_spte);
-
+	}
 	if (new_spte == iter->old_spte)
 		ret = RET_PF_SPURIOUS;
 	else if (!tdp_mmu_set_spte_atomic(vcpu->kvm, iter, new_spte))
