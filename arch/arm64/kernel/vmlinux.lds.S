@@ -287,6 +287,9 @@ SECTIONS
 	BSS_SECTION(SBSS_ALIGN, 0, 0)
 
 	. = ALIGN(PAGE_SIZE);
+
+	/* ----- kernel virtual mapping ends here ---- */
+
 	init_pg_dir = .;
 	. += INIT_DIR_SIZE;
 	init_pg_end = .;

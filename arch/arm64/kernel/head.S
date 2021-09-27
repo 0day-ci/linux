@@ -366,10 +366,9 @@ SYM_FUNC_START_LOCAL(__create_page_tables)
 	mov_q	x5, KIMAGE_VADDR		// compile time __va(_text)
 	add	x5, x5, x23			// add KASLR displacement
 	mov	x4, PTRS_PER_PGD
-	adrp	x6, _end			// runtime __pa(_end)
 	adrp	x3, _text			// runtime __pa(_text)
-	sub	x6, x6, x3			// _end - _text
-	add	x6, x6, x5			// runtime __va(_end)
+	sub	x6, x0, x3			// init_pg_dir - _text
+	add	x6, x6, x5			// runtime __va(init_pg_dir)
 
 	map_memory x0, x1, x5, x6, x7, x3, x4, x10, x11, x12, x13, x14
 
