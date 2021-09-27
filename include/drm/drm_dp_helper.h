@@ -1825,24 +1825,6 @@ drm_dp_sink_can_do_video_without_timing_msa(const u8 dpcd[DP_RECEIVER_CAP_SIZE])
 		DP_MSA_TIMING_PAR_IGNORED;
 }
 
-/**
- * drm_edp_backlight_supported() - Check an eDP DPCD for VESA backlight support
- * @edp_dpcd: The DPCD to check
- *
- * Note that currently this function will return %false for panels which support various DPCD
- * backlight features but which require the brightness be set through PWM, and don't support setting
- * the brightness level via the DPCD. This is a TODO.
- *
- * Returns: %True if @edp_dpcd indicates that VESA backlight controls are supported, %false
- * otherwise
- */
-static inline bool
-drm_edp_backlight_supported(const u8 edp_dpcd[EDP_DISPLAY_CTL_CAP_SIZE])
-{
-	return (edp_dpcd[1] & DP_EDP_TCON_BACKLIGHT_ADJUSTMENT_CAP) &&
-		(edp_dpcd[2] & DP_EDP_BACKLIGHT_BRIGHTNESS_AUX_SET_CAP);
-}
-
 /*
  * DisplayPort AUX channel
  */
@@ -2200,7 +2182,11 @@ drm_dp_has_quirk(const struct drm_dp_desc *desc, enum drm_dp_quirk quirk)
  * @pwm_freq_pre_divider: The PWM frequency pre-divider value being used for this backlight, if any
  * @max: The maximum backlight level that may be set
  * @lsb_reg_used: Do we also write values to the DP_EDP_BACKLIGHT_BRIGHTNESS_LSB register?
- * @aux_enable: Does the panel support the AUX enable cap?
+ * @aux_enable: Does the panel support the AUX enable cap? Always %false when the driver doesn't
+ * support %DRM_EDP_BACKLIGHT_DRIVER_CAP_PWM
+ * @aux_set: Does the panel support setting the brightness through AUX? Always %true when the driver
+ * doesn't support %DRM_EDP_BACKLIGHT_DRIVER_CAP_PWM
+ * @pwm_set: Does the panel support setting the brightness through a PWM pin?
  *
  * This structure contains various data about an eDP backlight, which can be populated by using
  * drm_edp_backlight_init().
@@ -2212,8 +2198,30 @@ struct drm_edp_backlight_info {
 
 	bool lsb_reg_used : 1;
 	bool aux_enable : 1;
+	bool aux_set : 1;
 };
 
+/**
+ * enum drm_edp_backlight_driver_caps - Flags for drivers to indicate support of various eDP
+ * backlight functionality
+ *
+ * Used with DRM's eDP backlight helpers in order to indicate to the DRM core which eDP backlight
+ * capabilities the driver is capable of supporting.
+ */
+enum drm_edp_backlight_driver_caps {
+	/**
+	 * @DRM_EDP_BACKLIGHT_DRIVER_CAP_PWM: Some eDP panels require that either panel enablement
+	 * and/or brightness level controls are controlled via PWM. Drivers which want to support
+	 * such panels should enable this cap. If this flag is omitted,
+	 * drm_edp_backlight_supported() will return %false upon encountering such panels and will
+	 * additionally print a debugging message to the kernel log.
+	 */
+	DRM_EDP_BACKLIGHT_DRIVER_CAP_PWM = BIT(0),
+};
+
+bool drm_edp_backlight_supported(struct drm_dp_aux *aux,
+				 const u8 edp_dpcd[EDP_DISPLAY_CTL_CAP_SIZE],
+				 enum drm_edp_backlight_driver_caps caps);
 int
 drm_edp_backlight_init(struct drm_dp_aux *aux, struct drm_edp_backlight_info *bl,
 		       u16 driver_pwm_freq_hz, const u8 edp_dpcd[EDP_DISPLAY_CTL_CAP_SIZE],

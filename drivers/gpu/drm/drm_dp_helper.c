@@ -3163,7 +3163,10 @@ EXPORT_SYMBOL(drm_dp_pcon_convert_rgb_to_ycbcr);
  * @level: The brightness level to set
  *
  * Sets the brightness level of an eDP panel's backlight. Note that the panel's backlight must
- * already have been enabled by the driver by calling drm_edp_backlight_enable().
+ * already have been enabled by the driver by calling drm_edp_backlight_enable(). Note that if the
+ * panel in question requires the PWM pin be used to control brightness levels (e.g.
+ * &drm_edp_backlight_info.aux_set is %false), then this function becomes a no-op and it is up to
+ * the driver to handle adjusting the brightness levels.
  *
  * Returns: %0 on success, negative error code on failure
  */
@@ -3172,6 +3175,10 @@ int drm_edp_backlight_set_level(struct drm_dp_aux *aux, const struct drm_edp_bac
 {
 	int ret;
 	u8 buf[2] = { 0 };
+
+	/* The panel uses PWM for controlling brightness levels */
+	if (!bl->aux_set)
+		return 0;
 
 	if (bl->lsb_reg_used) {
 		buf[0] = (level & 0xff00) >> 8;
@@ -3234,11 +3241,8 @@ drm_edp_backlight_set_enable(struct drm_dp_aux *aux, const struct drm_edp_backli
  * restoring any important backlight state such as the given backlight level, the brightness byte
  * count, backlight frequency, etc.
  *
- * Note that certain panels, while supporting brightness level controls over DPCD, may not support
- * having their backlights enabled via the standard %DP_EDP_DISPLAY_CONTROL_REGISTER. On such panels
- * &drm_edp_backlight_info.aux_enable will be set to %false, this function will skip the step of
- * programming the %DP_EDP_DISPLAY_CONTROL_REGISTER, and the driver must perform the required
- * implementation specific step for enabling the backlight after calling this function.
+ * Drivers supporting %DRM_EDP_BACKLIGHT_DRIVER_CAP_PWM are expected to enable the panel backlight
+ * and/or program the panel's brightness level after calling this function.
  *
  * Returns: %0 on success, negative error code on failure.
  */
@@ -3246,7 +3250,7 @@ int drm_edp_backlight_enable(struct drm_dp_aux *aux, const struct drm_edp_backli
 			     const u16 level)
 {
 	int ret;
-	u8 dpcd_buf, new_dpcd_buf;
+	u8 dpcd_buf, new_dpcd_buf, new_mode;
 
 	ret = drm_dp_dpcd_readb(aux, DP_EDP_BACKLIGHT_MODE_SET_REGISTER, &dpcd_buf);
 	if (ret != 1) {
@@ -3256,10 +3260,14 @@ int drm_edp_backlight_enable(struct drm_dp_aux *aux, const struct drm_edp_backli
 	}
 
 	new_dpcd_buf = dpcd_buf;
+	if (bl->aux_set)
+		new_mode = DP_EDP_BACKLIGHT_CONTROL_MODE_DPCD;
+	else
+		new_mode = DP_EDP_BACKLIGHT_CONTROL_MODE_PWM;
 
-	if ((dpcd_buf & DP_EDP_BACKLIGHT_CONTROL_MODE_MASK) != DP_EDP_BACKLIGHT_CONTROL_MODE_DPCD) {
+	if ((dpcd_buf & DP_EDP_BACKLIGHT_CONTROL_MODE_MASK) != new_mode) {
 		new_dpcd_buf &= ~DP_EDP_BACKLIGHT_CONTROL_MODE_MASK;
-		new_dpcd_buf |= DP_EDP_BACKLIGHT_CONTROL_MODE_DPCD;
+		new_dpcd_buf |= new_mode;
 
 		if (bl->pwmgen_bit_count) {
 			ret = drm_dp_dpcd_writeb(aux, DP_EDP_PWMGEN_BIT_COUNT, bl->pwmgen_bit_count);
@@ -3305,11 +3313,10 @@ EXPORT_SYMBOL(drm_edp_backlight_enable);
  * @bl: Backlight capability info from drm_edp_backlight_init()
  *
  * This function handles disabling DPCD backlight controls on a panel over AUX. Note that some
- * panels have backlights that are enabled/disabled by other means, despite having their brightness
- * values controlled through DPCD. On such panels &drm_edp_backlight_info.aux_enable will be set to
- * %false, this function will become a no-op (and we will skip updating
- * %DP_EDP_DISPLAY_CONTROL_REGISTER), and the driver must take care to perform it's own
- * implementation specific step for disabling the backlight.
+ * panels have backlights that are enabled/disabled via PWM. On such panels
+ * &drm_edp_backlight_info.aux_enable will be set to %false, this function will become a no-op (and
+ * we will skip updating %DP_EDP_DISPLAY_CONTROL_REGISTER), and the driver must handle disabling the
+ * backlight via PWM.
  *
  * Returns: %0 on success or no-op, negative error code on failure.
  */
@@ -3332,6 +3339,9 @@ drm_edp_backlight_probe_max(struct drm_dp_aux *aux, struct drm_edp_backlight_inf
 	int fxp, fxp_min, fxp_max, fxp_actual, f = 1;
 	int ret;
 	u8 pn, pn_min, pn_max;
+
+	if (!bl->aux_set)
+		return 0;
 
 	ret = drm_dp_dpcd_readb(aux, DP_EDP_PWMGEN_BIT_COUNT, &pn);
 	if (ret != 1) {
@@ -3418,7 +3428,7 @@ drm_edp_backlight_probe_max(struct drm_dp_aux *aux, struct drm_edp_backlight_inf
 }
 
 static inline int
-drm_edp_backlight_probe_level(struct drm_dp_aux *aux, struct drm_edp_backlight_info *bl,
+drm_edp_backlight_probe_state(struct drm_dp_aux *aux, struct drm_edp_backlight_info *bl,
 			      u8 *current_mode)
 {
 	int ret;
@@ -3433,6 +3443,9 @@ drm_edp_backlight_probe_level(struct drm_dp_aux *aux, struct drm_edp_backlight_i
 	}
 
 	*current_mode = (mode_reg & DP_EDP_BACKLIGHT_CONTROL_MODE_MASK);
+	if (!bl->aux_set)
+		return 0;
+
 	if (*current_mode == DP_EDP_BACKLIGHT_CONTROL_MODE_DPCD) {
 		int size = 1 + bl->lsb_reg_used;
 
@@ -3463,7 +3476,7 @@ drm_edp_backlight_probe_level(struct drm_dp_aux *aux, struct drm_edp_backlight_i
  * @bl: The &drm_edp_backlight_info struct to fill out with information on the backlight
  * @driver_pwm_freq_hz: Optional PWM frequency from the driver in hz
  * @edp_dpcd: A cached copy of the eDP DPCD
- * @current_level: Where to store the probed brightness level
+ * @current_level: Where to store the probed brightness level, if any
  * @current_mode: Where to store the currently set backlight control mode
  *
  * Initializes a &drm_edp_backlight_info struct by probing @aux for it's backlight capabilities,
@@ -3483,27 +3496,70 @@ drm_edp_backlight_init(struct drm_dp_aux *aux, struct drm_edp_backlight_info *bl
 
 	if (edp_dpcd[1] & DP_EDP_BACKLIGHT_AUX_ENABLE_CAP)
 		bl->aux_enable = true;
+	if (edp_dpcd[2] & DP_EDP_BACKLIGHT_BRIGHTNESS_AUX_SET_CAP)
+		bl->aux_set = true;
 	if (edp_dpcd[2] & DP_EDP_BACKLIGHT_BRIGHTNESS_BYTE_COUNT)
 		bl->lsb_reg_used = true;
+
+	/* Sanity check caps */
+	if (!bl->aux_set && !(edp_dpcd[2] & DP_EDP_BACKLIGHT_BRIGHTNESS_PWM_PIN_CAP)) {
+		drm_dbg_kms(aux->drm_dev,
+			    "%s: Panel supports neither AUX or PWM brightness control? Aborting\n",
+			    aux->name);
+		return -EINVAL;
+	}
 
 	ret = drm_edp_backlight_probe_max(aux, bl, driver_pwm_freq_hz, edp_dpcd);
 	if (ret < 0)
 		return ret;
 
-	ret = drm_edp_backlight_probe_level(aux, bl, current_mode);
+	ret = drm_edp_backlight_probe_state(aux, bl, current_mode);
 	if (ret < 0)
 		return ret;
 	*current_level = ret;
 
 	drm_dbg_kms(aux->drm_dev,
-		    "%s: Found backlight level=%d/%d pwm_freq_pre_divider=%d mode=%x\n",
-		    aux->name, *current_level, bl->max, bl->pwm_freq_pre_divider, *current_mode);
-	drm_dbg_kms(aux->drm_dev,
-		    "%s: Backlight caps: pwmgen_bit_count=%d lsb_reg_used=%d aux_enable=%d\n",
-		    aux->name, bl->pwmgen_bit_count, bl->lsb_reg_used, bl->aux_enable);
+		    "%s: Found backlight: aux_set=%d aux_enable=%d mode=%d\n",
+		    aux->name, bl->aux_set, bl->aux_enable, *current_mode);
+	if (bl->aux_set) {
+		drm_dbg_kms(aux->drm_dev,
+			    "%s: Backlight caps: level=%d/%d pwm_freq_pre_divider=%d lsb_reg_used=%d\n",
+			    aux->name, *current_level, bl->max, bl->pwm_freq_pre_divider,
+			    bl->lsb_reg_used);
+	}
+
 	return 0;
 }
 EXPORT_SYMBOL(drm_edp_backlight_init);
+
+/**
+ * drm_edp_backlight_supported() - Check an eDP DPCD for VESA backlight support
+ * @aux: The AUX channel, only used for debug logging
+ * @edp_dpcd: The DPCD to check
+ * @caps: The backlight capabilities this driver supports
+ *
+ * Returns: %True if @edp_dpcd indicates that VESA backlight controls are supported, %false
+ * otherwise
+ */
+bool drm_edp_backlight_supported(struct drm_dp_aux *aux,
+				 const u8 edp_dpcd[EDP_DISPLAY_CTL_CAP_SIZE],
+				 enum drm_edp_backlight_driver_caps caps)
+{
+	if (!(edp_dpcd[1] & DP_EDP_TCON_BACKLIGHT_ADJUSTMENT_CAP))
+		return false;
+
+	if (!(caps & DRM_EDP_BACKLIGHT_DRIVER_CAP_PWM) &&
+	    (!(edp_dpcd[2] & DP_EDP_BACKLIGHT_BRIGHTNESS_AUX_SET_CAP) ||
+	     !(edp_dpcd[2] & DP_EDP_BACKLIGHT_AUX_ENABLE_CAP))) {
+		drm_dbg_kms(aux->drm_dev,
+			    "%s: eDP backlight needs PWM support, but driver doesn't have it\n",
+			    aux->name);
+		return false;
+	}
+
+	return true;
+}
+EXPORT_SYMBOL(drm_edp_backlight_supported);
 
 #if IS_BUILTIN(CONFIG_BACKLIGHT_CLASS_DEVICE) || \
 	(IS_MODULE(CONFIG_DRM_KMS_HELPER) && IS_MODULE(CONFIG_BACKLIGHT_CLASS_DEVICE))
@@ -3576,7 +3632,7 @@ int drm_panel_dp_aux_backlight(struct drm_panel *panel, struct drm_dp_aux *aux)
 	if (ret < 0)
 		return ret;
 
-	if (!drm_edp_backlight_supported(edp_dpcd)) {
+	if (!drm_edp_backlight_supported(aux, edp_dpcd, 0)) {
 		DRM_DEV_INFO(panel->dev, "DP AUX backlight is not supported\n");
 		return 0;
 	}
