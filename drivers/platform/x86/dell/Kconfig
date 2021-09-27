@@ -164,6 +164,8 @@ config DELL_WMI
 	  To compile this driver as a module, choose M here: the module will
 	  be called dell-wmi.
 
+if DELL_WMI
+
 config DELL_WMI_PRIVACY
 	bool "Dell WMI Hardware Privacy Support"
 	depends on LEDS_TRIGGER_AUDIO = y || DELL_WMI = LEDS_TRIGGER_AUDIO
@@ -197,6 +199,8 @@ config DELL_WMI_LED
 	help
 	  This adds support for the Latitude 2100 and similar
 	  notebooks that have an external LED.
+
+endif # DELL_WMI
 
 config DELL_WMI_SYSMAN
 	tristate "Dell WMI-based Systems management driver"
