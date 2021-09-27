@@ -304,7 +304,7 @@ static u8 intel_dp_phy_preemph_max(struct intel_dp *intel_dp,
 static bool has_per_lane_signal_levels(struct drm_i915_private *i915,
 				       enum drm_dp_phy dp_phy)
 {
-	return false;
+	return dp_phy != DP_PHY_DPRX;
 }
 
 static u8 intel_dp_get_lane_adjust_train(struct intel_dp *intel_dp,
