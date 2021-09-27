@@ -2710,8 +2710,9 @@ int btrfs_replace_file_extents(struct btrfs_inode *inode,
 			 * returned by __btrfs_drop_extents() without having
 			 * changed anything in the file.
 			 */
-			if (extent_info && !extent_info->is_new_extent &&
-			    ret && ret != -EOPNOTSUPP)
+			if (ret &&
+			    (ret != -EOPNOTSUPP ||
+			     (extent_info && extent_info->is_new_extent)))
 				btrfs_abort_transaction(trans, ret);
 			break;
 		}
