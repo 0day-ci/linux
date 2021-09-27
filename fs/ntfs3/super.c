@@ -810,8 +810,13 @@ static int ntfs_init_from_boot(struct super_block *sb, u32 sector_size,
 	sbi->mft.lbo = mlcn << sbi->cluster_bits;
 	sbi->mft.lbo2 = mlcn2 << sbi->cluster_bits;
 
+	/* Compare boot's cluster and sector. */
 	if (sbi->cluster_size < sbi->sector_size)
 		goto out;
+
+	/* Compare boot's cluster and media sector. */
+	if (sbi->cluster_size < sector_size)
+		goto out; /* No way to use ntfs_get_block in this case. */
 
 	sbi->cluster_mask = sbi->cluster_size - 1;
 	sbi->cluster_mask_inv = ~(u64)sbi->cluster_mask;
