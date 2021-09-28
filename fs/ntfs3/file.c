@@ -588,8 +588,8 @@ static long ntfs_fallocate(struct file *file, int mode, loff_t vbo, loff_t len)
 		truncate_pagecache(inode, vbo_down);
 
 		if (!is_sparsed(ni) && !is_compressed(ni)) {
-			/* Normal file. */
-			err = ntfs_zero_range(inode, vbo, end);
+			/* Normal file, can't make hole. */
+			err = -EOPNOTSUPP;
 			goto out;
 		}
 
