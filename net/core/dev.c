@@ -10593,6 +10593,8 @@ void netdev_run_todo(void)
 			continue;
 		}
 
+		device_del(&dev->dev);
+
 		dev->reg_state = NETREG_UNREGISTERED;
 
 		netdev_wait_allrefs(dev);

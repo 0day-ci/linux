@@ -1955,8 +1955,6 @@ void netdev_unregister_kobject(struct net_device *ndev)
 	remove_queue_kobjects(ndev);
 
 	pm_runtime_set_memalloc_noio(dev, false);
-
-	device_del(dev);
 }
 
 /* Create sysfs entries for network device. */
