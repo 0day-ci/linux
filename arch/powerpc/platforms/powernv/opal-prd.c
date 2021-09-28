@@ -393,6 +393,7 @@ static int opal_prd_probe(struct platform_device *pdev)
 	rc = opal_message_notifier_register(OPAL_MSG_PRD2, &opal_prd_event_nb);
 	if (rc) {
 		pr_err("Couldn't register PRD2 event notifier\n");
+		opal_message_notifier_unregister(OPAL_MSG_PRD, &opal_prd_event_nb);
 		return rc;
 	}
 
@@ -400,6 +401,8 @@ static int opal_prd_probe(struct platform_device *pdev)
 	if (rc) {
 		pr_err("failed to register miscdev\n");
 		opal_message_notifier_unregister(OPAL_MSG_PRD,
+				&opal_prd_event_nb);
+		opal_message_notifier_unregister(OPAL_MSG_PRD2,
 				&opal_prd_event_nb);
 		return rc;
 	}
@@ -411,6 +414,7 @@ static int opal_prd_remove(struct platform_device *pdev)
 {
 	misc_deregister(&opal_prd_dev);
 	opal_message_notifier_unregister(OPAL_MSG_PRD, &opal_prd_event_nb);
+	opal_message_notifier_unregister(OPAL_MSG_PRD2, &opal_prd_event_nb);
 	return 0;
 }
 
