@@ -480,7 +480,7 @@ config NF_TABLES_INET
 	  This option enables support for a mixed IPv4/IPv6 "inet" table.
 
 config NF_TABLES_NETDEV
-	bool "Netfilter nf_tables netdev tables support"
+	tristate "Netfilter nf_tables netdev tables support"
 	help
 	  This option enables support for the "netdev" table.
 

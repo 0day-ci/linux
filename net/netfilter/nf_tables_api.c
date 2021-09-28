@@ -26,6 +26,7 @@
 #define NFT_MODULE_AUTOLOAD_LIMIT (MODULE_NAME_LEN - sizeof("nft-expr-255-"))
 
 unsigned int nf_tables_net_id __read_mostly;
+EXPORT_SYMBOL_GPL(nf_tables_net_id);
 
 static LIST_HEAD(nf_tables_expressions);
 static LIST_HEAD(nf_tables_objects);
@@ -1940,8 +1941,6 @@ static int nft_chain_parse_hook(struct net *net,
 	hook->priority = ntohl(nla_get_be32(ha[NFTA_HOOK_PRIORITY]));
 
 	type = __nft_chain_type_get(family, NFT_CHAIN_T_DEFAULT);
-	if (!type)
-		return -EOPNOTSUPP;
 
 	if (nla[NFTA_CHAIN_TYPE]) {
 		type = nf_tables_chain_type_lookup(net, nla[NFTA_CHAIN_TYPE],
@@ -1950,7 +1949,9 @@ static int nft_chain_parse_hook(struct net *net,
 			NL_SET_BAD_ATTR(extack, nla[NFTA_CHAIN_TYPE]);
 			return PTR_ERR(type);
 		}
-	}
+	} else if (!type)
+		return -EOPNOTSUPP;
+
 	if (hook->num >= NFT_MAX_HOOKS || !(type->hook_mask & (1 << hook->num)))
 		return -EOPNOTSUPP;
 
