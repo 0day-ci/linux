@@ -47,6 +47,7 @@
 /* Includes */
 #include <linux/acpi.h>			/* For ACPI support */
 #include <linux/bits.h>			/* For BIT() */
+#include <linux/dmi.h>			/* For DMI matching */
 #include <linux/module.h>		/* For module specific items */
 #include <linux/moduleparam.h>		/* For new moduleparam's */
 #include <linux/types.h>		/* For standard types (like size_t) */
@@ -605,9 +606,20 @@ static int iTCO_wdt_probe(struct platform_device *pdev)
  */
 
 #ifdef CONFIG_ACPI
+static const struct dmi_system_id iTCO_wdt_force_suspend[] = {
+	{
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "LENOVO"),
+			DMI_MATCH(DMI_PRODUCT_FAMILY, "ThinkPad T460s"),
+		},
+	},
+	{ },
+};
+
 static inline bool need_suspend(void)
 {
-	return acpi_target_system_state() == ACPI_STATE_S0;
+	return acpi_target_system_state() == ACPI_STATE_S0 ||
+		dmi_check_system(iTCO_wdt_force_suspend);
 }
 #else
 static inline bool need_suspend(void) { return true; }
@@ -631,8 +643,10 @@ static int iTCO_wdt_resume_noirq(struct device *dev)
 {
 	struct iTCO_wdt_private *p = dev_get_drvdata(dev);
 
-	if (p->suspended)
+	if (p->suspended) {
+		iTCO_wdt_set_timeout(&p->wddev, p->wddev.timeout);
 		iTCO_wdt_start(&p->wddev);
+	}
 
 	return 0;
 }
