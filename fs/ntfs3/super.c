@@ -1246,6 +1246,10 @@ load_root:
 	return 0;
 out:
 	iput(inode);
+
+	/* Restore fc->s_fs_info to free memory allocated in ntfs_init_fs_context. */
+	fc->s_fs_info = sbi;
+
 	return err;
 }
 
