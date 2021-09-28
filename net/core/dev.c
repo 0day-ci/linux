@@ -10611,10 +10611,15 @@ void netdev_run_todo(void)
 		if (dev->needs_free_netdev)
 			free_netdev(dev);
 
-		/* Report a network device has been unregistered */
 		rtnl_lock();
+		unlist_netdevice_name(dev);
+		synchronize_net();
+		netdev_name_node_free(dev->name_node);
+
 		dev_net(dev)->dev_unreg_count--;
 		__rtnl_unlock();
+
+		/* Report a network device has been unregistered */
 		wake_up(&netdev_unregistering_wq);
 
 		/* Free network device */
@@ -11039,7 +11044,12 @@ void unregister_netdevice_many(struct list_head *head)
 	list_for_each_entry(dev, head, unreg_list) {
 		/* And unlink it from device chain. */
 		unlist_netdevice(dev);
-		unlist_netdevice_name(dev);
+
+		/* Unreference the net device from the node name. From this
+		 * point on the node name is only used for naming collision
+		 * detection.
+		 */
+		dev->name_node->dev = NULL;
 
 		dev->reg_state = NETREG_UNREGISTERING;
 	}
@@ -11072,7 +11082,6 @@ void unregister_netdevice_many(struct list_head *head)
 		dev_mc_flush(dev);
 
 		netdev_name_node_alt_flush(dev);
-		netdev_name_node_free(dev->name_node);
 
 		if (dev->netdev_ops->ndo_uninit)
 			dev->netdev_ops->ndo_uninit(dev);
