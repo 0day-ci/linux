@@ -47,7 +47,18 @@ typedef u64 erofs_off_t;
 /* data type for filesystem-wide blocks number */
 typedef u32 erofs_blk_t;
 
+struct erofs_device_info {
+	char *path;
+	struct block_device *bdev;
+	struct dax_device *dax_dev;
+
+	u32 blocks;
+	u32 mapped_blkaddr;
+};
+
 struct erofs_fs_context {
+	struct idr devinfo;
+	struct rw_semaphore devinfo_rwsem;
 #ifdef CONFIG_EROFS_FS_ZIP
 	/* current strategy of how to use managed cache */
 	unsigned char cache_strategy;
@@ -58,6 +69,7 @@ struct erofs_fs_context {
 	unsigned int max_sync_decompress_pages;
 #endif
 	unsigned int mount_opt;
+	unsigned int extra_devices;
 };
 
 /* all filesystem-wide lz4 configurations */
@@ -86,11 +98,14 @@ struct erofs_sb_info {
 	struct erofs_sb_lz4_info lz4;
 #endif	/* CONFIG_EROFS_FS_ZIP */
 	struct dax_device *dax_dev;
-	u32 blocks;
+	u64 total_blocks;
+	u32 primarydevice_blocks;
+
 	u32 meta_blkaddr;
 #ifdef CONFIG_EROFS_FS_XATTR
 	u32 xattr_blkaddr;
 #endif
+	u16 device_id_mask;
 
 	/* inode slot unit size in bit shift */
 	unsigned char islotbits;
@@ -237,6 +252,7 @@ static inline bool erofs_sb_has_##name(struct erofs_sb_info *sbi) \
 EROFS_FEATURE_FUNCS(lz4_0padding, incompat, INCOMPAT_LZ4_0PADDING)
 EROFS_FEATURE_FUNCS(compr_cfgs, incompat, INCOMPAT_COMPR_CFGS)
 EROFS_FEATURE_FUNCS(big_pcluster, incompat, INCOMPAT_BIG_PCLUSTER)
+EROFS_FEATURE_FUNCS(device_table, incompat, INCOMPAT_DEVICE_TABLE)
 EROFS_FEATURE_FUNCS(sb_chksum, compat, COMPAT_SB_CHKSUM)
 
 /* atomic flag definitions */
@@ -355,6 +371,7 @@ struct erofs_map_blocks {
 	erofs_off_t m_pa, m_la;
 	u64 m_plen, m_llen;
 
+	unsigned int m_deviceid;
 	unsigned int m_flags;
 
 	struct page *mpage;
@@ -386,9 +403,18 @@ static inline int z_erofs_map_blocks_iter(struct inode *inode,
 }
 #endif	/* !CONFIG_EROFS_FS_ZIP */
 
+struct erofs_map_dev {
+	struct block_device *m_bdev;
+	struct dax_device *m_daxdev;
+
+	erofs_off_t m_pa;
+	unsigned int m_deviceid;
+};
+
 /* data.c */
 extern const struct file_operations erofs_file_fops;
 struct page *erofs_get_meta_page(struct super_block *sb, erofs_blk_t blkaddr);
+int erofs_map_dev(struct super_block *sb, struct erofs_map_dev *dev);
 int erofs_fiemap(struct inode *inode, struct fiemap_extent_info *fieinfo,
 		 u64 start, u64 len);
 
