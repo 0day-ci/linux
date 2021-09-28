@@ -150,10 +150,9 @@ static struct sk_buff *dsa_xmit_ll(struct sk_buff *skb, struct net_device *dev,
 		 * that's where the packets ingressed from.
 		 */
 		if (!br_vlan_enabled(br)) {
-			/* Safe because __dev_queue_xmit() runs under
-			 * rcu_read_lock_bh()
-			 */
+			rcu_read_lock();
 			err = br_vlan_get_pvid_rcu(br, &pvid);
+			rcu_read_unlock();
 			if (err)
 				return NULL;
 		}
