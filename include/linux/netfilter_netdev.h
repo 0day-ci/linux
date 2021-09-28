@@ -50,10 +50,62 @@ static inline int nf_hook_ingress(struct sk_buff *skb)
 }
 #endif /* CONFIG_NETFILTER_INGRESS */
 
+#ifdef CONFIG_NETFILTER_EGRESS
+static inline bool nf_hook_egress_active(void)
+{
+#ifdef CONFIG_JUMP_LABEL
+	if (!static_key_false(&nf_hooks_needed[NFPROTO_NETDEV][NF_NETDEV_EGRESS]))
+		return false;
+#endif
+	return true;
+}
+
+/* caller must hold rcu_read_lock */
+static inline struct sk_buff *nf_hook_egress(struct sk_buff *skb, int *rc,
+					     struct net_device *dev)
+{
+	struct nf_hook_entries *e = rcu_dereference(dev->nf_hooks_egress);
+	struct nf_hook_state state;
+	int ret;
+
+	if (!e)
+		return skb;
+
+	nf_hook_state_init(&state, NF_NETDEV_EGRESS,
+			   NFPROTO_NETDEV, dev, NULL, NULL,
+			   dev_net(dev), NULL);
+	ret = nf_hook_slow(skb, &state, e, 0);
+
+	if (ret == 1) {
+		return skb;
+	} else if (ret < 0) {
+		*rc = NET_XMIT_DROP;
+		return NULL;
+	} else { /* ret == 0 */
+		*rc = NET_XMIT_SUCCESS;
+		return NULL;
+	}
+}
+#else /* CONFIG_NETFILTER_EGRESS */
+static inline bool nf_hook_egress_active(void)
+{
+	return false;
+}
+
+static inline struct sk_buff *nf_hook_egress(struct sk_buff *skb, int *rc,
+					     struct net_device *dev)
+{
+	return skb;
+}
+#endif /* CONFIG_NETFILTER_EGRESS */
+
 static inline void nf_hook_netdev_init(struct net_device *dev)
 {
 #ifdef CONFIG_NETFILTER_INGRESS
 	RCU_INIT_POINTER(dev->nf_hooks_ingress, NULL);
+#endif
+#ifdef CONFIG_NETFILTER_EGRESS
+	RCU_INIT_POINTER(dev->nf_hooks_egress, NULL);
 #endif
 }
 
