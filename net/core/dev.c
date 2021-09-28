@@ -279,8 +279,8 @@ static void netdev_name_node_del(struct netdev_name_node *name_node)
 	hlist_del_rcu(&name_node->hlist);
 }
 
-static struct netdev_name_node *netdev_name_node_lookup(struct net *net,
-							const char *name)
+struct netdev_name_node *netdev_name_node_lookup(struct net *net,
+						 const char *name)
 {
 	struct hlist_head *head = dev_name_hash(net, name);
 	struct netdev_name_node *name_node;
@@ -290,6 +290,7 @@ static struct netdev_name_node *netdev_name_node_lookup(struct net *net,
 			return name_node;
 	return NULL;
 }
+EXPORT_SYMBOL(netdev_name_node_lookup);
 
 static struct netdev_name_node *netdev_name_node_lookup_rcu(struct net *net,
 							    const char *name)
