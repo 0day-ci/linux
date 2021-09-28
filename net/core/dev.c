@@ -385,11 +385,19 @@ static void unlist_netdevice(struct net_device *dev)
 	/* Unlink dev from the device chain */
 	write_lock_bh(&dev_base_lock);
 	list_del_rcu(&dev->dev_list);
-	netdev_name_node_del(dev->name_node);
 	hlist_del_rcu(&dev->index_hlist);
 	write_unlock_bh(&dev_base_lock);
 
 	dev_base_seq_inc(dev_net(dev));
+}
+
+static void unlist_netdevice_name(struct net_device *dev)
+{
+	ASSERT_RTNL();
+
+	write_lock_bh(&dev_base_lock);
+	netdev_name_node_del(dev->name_node);
+	write_unlock_bh(&dev_base_lock);
 }
 
 /*
@@ -11030,6 +11038,7 @@ void unregister_netdevice_many(struct list_head *head)
 	list_for_each_entry(dev, head, unreg_list) {
 		/* And unlink it from device chain. */
 		unlist_netdevice(dev);
+		unlist_netdevice_name(dev);
 
 		dev->reg_state = NETREG_UNREGISTERING;
 	}
@@ -11177,6 +11186,7 @@ int __dev_change_net_namespace(struct net_device *dev, struct net *net,
 
 	/* And unlink it from device chain */
 	unlist_netdevice(dev);
+	unlist_netdevice_name(dev);
 
 	synchronize_net();
 
