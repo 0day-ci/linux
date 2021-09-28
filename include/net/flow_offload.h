@@ -148,6 +148,7 @@ enum flow_action_id {
 	FLOW_ACTION_MPLS_MANGLE,
 	FLOW_ACTION_GATE,
 	FLOW_ACTION_PPPOE_PUSH,
+	FLOW_ACTION_FRER,
 	NUM_FLOW_ACTIONS,
 };
 
@@ -278,6 +279,14 @@ struct flow_action_entry {
 		struct {				/* FLOW_ACTION_PPPOE_PUSH */
 			u16		sid;
 		} pppoe;
+		struct {
+			u8		tag_type;
+			u8		tag_action;
+			u8		recover;
+			u8		rcvy_alg;
+			u8		rcvy_history_len;
+			u8		rcvy_reset_msec;
+		} frer;
 	};
 	struct flow_action_cookie *cookie; /* user defined action cookie */
 };

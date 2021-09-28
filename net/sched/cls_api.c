@@ -39,6 +39,7 @@
 #include <net/tc_act/tc_ct.h>
 #include <net/tc_act/tc_mpls.h>
 #include <net/tc_act/tc_gate.h>
+#include <net/tc_act/tc_frer.h>
 #include <net/flow_offload.h>
 
 extern const struct nla_policy rtm_tca_policy[TCA_MAX + 1];
@@ -3706,6 +3707,16 @@ int tc_setup_flow_action(struct flow_action *flow_action,
 			err = tcf_gate_get_entries(entry, act);
 			if (err)
 				goto err_out_locked;
+		} else if (is_tcf_frer(act)) {
+			entry->id = FLOW_ACTION_FRER;
+			entry->frer.tag_type = to_frer(act)->tag_type;
+			entry->frer.tag_action = to_frer(act)->tag_action;
+			entry->frer.recover = to_frer(act)->recover;
+			entry->frer.rcvy_alg = to_frer(act)->rcvy_alg;
+			entry->frer.rcvy_history_len =
+				to_frer(act)->rcvy_history_len;
+			entry->frer.rcvy_reset_msec =
+				to_frer(act)->rcvy_reset_msec;
 		} else {
 			err = -EOPNOTSUPP;
 			goto err_out_locked;

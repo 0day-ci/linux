@@ -1,0 +1,50 @@
+/* SPDX-License-Identifier: GPL-2.0+ WITH Linux-syscall-note */
+/* Copyright 2021 NXP */
+
+#ifndef __LINUX_TC_FRER_H
+#define __LINUX_TC_FRER_H
+
+#include <linux/pkt_cls.h>
+
+struct tc_frer {
+	tc_gen;
+};
+
+enum {
+	TCA_FRER_UNSPEC,
+	TCA_FRER_TM,
+	TCA_FRER_PARMS,
+	TCA_FRER_PAD,
+	TCA_FRER_TAG_TYPE,
+	TCA_FRER_TAG_ACTION,
+	TCA_FRER_RECOVER,
+	TCA_FRER_RECOVER_ALG,
+	TCA_FRER_RECOVER_HISTORY_LEN,
+	TCA_FRER_RECOVER_RESET_TM,
+	TCA_FRER_RECOVER_TAGLESS_PKTS,
+	TCA_FRER_RECOVER_OUT_OF_ORDER_PKTS,
+	TCA_FRER_RECOVER_ROGUE_PKTS,
+	TCA_FRER_RECOVER_LOST_PKTS,
+	TCA_FRER_RECOVER_RESETS,
+	__TCA_FRER_MAX,
+};
+#define TCA_FRER_MAX (__TCA_FRER_MAX - 1)
+
+enum tc_frer_tag_action {
+	TCA_FRER_TAG_NULL,
+	TCA_FRER_TAG_PUSH,
+	TCA_FRER_TAG_POP,
+};
+
+enum tc_frer_tag_type {
+	TCA_FRER_TAG_RTAG,
+	TCA_FRER_TAG_HSR,
+	TCA_FRER_TAG_PRP,
+};
+
+enum tc_frer_rcvy_alg {
+	TCA_FRER_RCVY_VECTOR_ALG,
+	TCA_FRER_RCVY_MATCH_ALG,
+};
+
+#endif

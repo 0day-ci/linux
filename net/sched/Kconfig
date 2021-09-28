@@ -997,6 +997,19 @@ config NET_ACT_GATE
 	  To compile this code as a module, choose M here: the
 	  module will be called act_gate.
 
+config NET_ACT_FRER
+	tristate "Frame frer tc action"
+	depends on NET_CLS_ACT
+	help
+	  Say Y here to support frame replication and elimination for
+	  reliability, which is defined by IEEE 802.1CB.
+	  This action allow to add a frer tag. It also allow to remove
+	  the frer tag and drop repeat frames.
+
+	  If unsure, say N.
+	  To compile this code as a module, choose M here: the
+	  module will be called act_frer.
+
 config NET_IFE_SKBMARK
 	tristate "Support to encoding decoding skb mark on IFE action"
 	depends on NET_ACT_IFE
