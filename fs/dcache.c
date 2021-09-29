@@ -2565,6 +2565,15 @@ static void d_wait_lookup(struct dentry *dentry)
 	}
 }
 
+static inline bool d_same_exact_name(const struct dentry *dentry,
+				     const struct dentry *parent,
+				     const struct qstr *name)
+{
+	if (dentry->d_name.len != name->len)
+		return false;
+	return dentry_cmp(dentry, name->name, name->len) == 0;
+}
+
 struct dentry *d_alloc_parallel(struct dentry *parent,
 				const struct qstr *name,
 				wait_queue_head_t *wq)
@@ -2575,6 +2584,7 @@ struct dentry *d_alloc_parallel(struct dentry *parent,
 	struct dentry *new = d_alloc(parent, name);
 	struct dentry *dentry;
 	unsigned seq, r_seq, d_seq;
+	int ci_dir = IS_CASEFOLDED(parent->d_inode);
 
 	if (unlikely(!new))
 		return ERR_PTR(-ENOMEM);
@@ -2626,8 +2636,14 @@ retry:
 			continue;
 		if (dentry->d_parent != parent)
 			continue;
-		if (!d_same_name(dentry, parent, name))
-			continue;
+		if (ci_dir) {
+			if (!d_same_exact_name(dentry, parent, name))
+				continue;
+		} else {
+			if (!d_same_name(dentry, parent, name))
+				continue;
+		}
+
 		hlist_bl_unlock(b);
 		/* now we can try to grab a reference */
 		if (!lockref_get_not_dead(&dentry->d_lockref)) {
