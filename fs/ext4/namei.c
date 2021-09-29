@@ -1801,6 +1801,19 @@ static struct dentry *ext4_lookup(struct inode *dir, struct dentry *dentry, unsi
 	}
 
 #ifdef CONFIG_UNICODE
+	if (inode && IS_CASEFOLDED(dir))
+		if (dentry && strcmp(dentry->d_name.name, de->name)) {
+			struct dentry *new;
+			struct qstr ciname;
+
+			ciname.len = de->name_len;
+			ciname.name = kstrndup(de->name, ciname.len, GFP_NOFS);
+			if (!ciname.name)
+				return ERR_PTR(-ENOMEM);
+			new = d_add_ci(dentry, inode, &ciname);
+			kfree(ciname.name);
+			return new;
+	}
 	if (!inode && IS_CASEFOLDED(dir)) {
 		/* Eventually we want to call d_add_ci(dentry, NULL)
 		 * for negative dentries in the encoding case as
