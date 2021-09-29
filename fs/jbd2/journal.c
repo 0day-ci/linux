@@ -2080,7 +2080,7 @@ int jbd2_journal_load(journal_t *journal)
 	if (jbd2_journal_recover(journal))
 		goto recovery_error;
 
-	if (journal->j_failed_commit) {
+	if (journal->j_failed_commit && !jbd2_journal_has_csum_v2or3(journal)) {
 		printk(KERN_ERR "JBD2: journal transaction %u on %s "
 		       "is corrupt.\n", journal->j_failed_commit,
 		       journal->j_devname);
