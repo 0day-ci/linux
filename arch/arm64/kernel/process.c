@@ -377,6 +377,7 @@ int copy_thread(unsigned long clone_flags, unsigned long stack_start,
 	 * as the final frame for the new task.
 	 */
 	p->thread.cpu_context.fp = (unsigned long)childregs->stackframe;
+	p->thread.tpidr2_el0 = 0;
 
 	ptrace_hw_copy_thread(p);
 
@@ -386,6 +387,8 @@ int copy_thread(unsigned long clone_flags, unsigned long stack_start,
 void tls_preserve_current_state(void)
 {
 	*task_user_tls(current) = read_sysreg(tpidr_el0);
+	if (system_supports_tpidr2())
+		current->thread.tpidr2_el0 = read_sysreg_s(SYS_TPIDR2_EL0);
 }
 
 static void tls_thread_switch(struct task_struct *next)
@@ -398,6 +401,8 @@ static void tls_thread_switch(struct task_struct *next)
 		write_sysreg(0, tpidrro_el0);
 
 	write_sysreg(*task_user_tls(next), tpidr_el0);
+	if (system_supports_tpidr2())
+		write_sysreg_s(next->thread.tpidr2_el0, SYS_TPIDR2_EL0);
 }
 
 /*
