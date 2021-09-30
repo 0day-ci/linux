@@ -1971,6 +1971,10 @@ static bool gpiod_free_commit(struct gpio_desc *desc)
 			gc->free(gc, gpio_chip_hwgpio(desc));
 			spin_lock_irqsave(&gpio_lock, flags);
 		}
+		spin_unlock_irqrestore(&gpio_lock, flags);
+		gpiod_rel_hw_timestamp_ns(desc);
+		spin_lock_irqsave(&gpio_lock, flags);
+
 		kfree_const(desc->label);
 		desc_set_label(desc, NULL);
 		clear_bit(FLAG_ACTIVE_LOW, &desc->flags);
@@ -2382,6 +2386,75 @@ set_output_flag:
 	return ret;
 }
 EXPORT_SYMBOL_GPL(gpiod_direction_output);
+
+/**
+ * gpiod_req_hw_timestamp_ns - Enable the hardware assisted timestamp in
+ * nano second.
+ *
+ * @desc: GPIO to enable
+ * @cb:	Callback, will be called when HTE pushes timestamp data.
+ * @tcb: Threaeded callback, it gets called from kernel thread context and when
+ * cb returns with HTE_RUN_THREADED_CB return value.
+ * @data: Client data, will be sent back with tcb and cb.
+ *
+ * Certain GPIO chip can rely on hardware assisted timestamp engines which can
+ * record timestamp at the occurance of the configured events
+ * i.e. rising/falling on specified GPIO lines. This is helper API to enable hw
+ * assisted timestamp in nano second.
+ *
+ * Return 0 in case of success, else an error code.
+ */
+int gpiod_req_hw_timestamp_ns(struct gpio_desc *desc, hte_ts_cb_t cb,
+			      hte_ts_threaded_cb_t tcb, void *data)
+{
+	struct gpio_chip *gc;
+	int ret = 0;
+
+	VALIDATE_DESC(desc);
+	gc = desc->gdev->chip;
+
+	if (!gc->req_hw_timestamp) {
+		gpiod_warn(desc, "%s: hw ts not supported\n", __func__);
+		return -ENOTSUPP;
+	}
+
+	ret = gc->req_hw_timestamp(gc, gpio_chip_hwgpio(desc), cb, tcb,
+				   &desc->hdesc, data);
+	if (ret)
+		gpiod_warn(desc, "%s: hw ts request failed\n", __func__);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(gpiod_req_hw_timestamp_ns);
+
+/**
+ * gpiod_rel_hw_timestamp_ns - Release and disable the hardware assisted
+ * timestamp.
+ *
+ * @desc: GPIO to disable
+ *
+ * Return 0 in case of success, else an error code.
+ */
+int gpiod_rel_hw_timestamp_ns(struct gpio_desc *desc)
+{
+	struct gpio_chip *gc;
+	int ret = 0;
+
+	VALIDATE_DESC(desc);
+	gc = desc->gdev->chip;
+
+	if (!gc->rel_hw_timestamp) {
+		gpiod_warn(desc, "%s: hw ts not supported\n", __func__);
+		return -ENOTSUPP;
+	}
+
+	ret = gc->rel_hw_timestamp(gc, gpio_chip_hwgpio(desc), &desc->hdesc);
+	if (ret)
+		gpiod_warn(desc, "%s: hw ts release failed\n", __func__);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(gpiod_rel_hw_timestamp_ns);
 
 /**
  * gpiod_set_config - sets @config for a GPIO
