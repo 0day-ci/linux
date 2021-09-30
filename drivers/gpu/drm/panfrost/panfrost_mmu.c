@@ -291,13 +291,19 @@ int panfrost_mmu_map(struct panfrost_gem_mapping *mapping)
 	struct drm_gem_object *obj = &bo->base.base;
 	struct panfrost_device *pfdev = to_panfrost_device(obj->dev);
 	struct sg_table *sgt;
-	int prot = IOMMU_READ | IOMMU_WRITE;
+	int prot = 0;
 
 	if (WARN_ON(mapping->active))
 		return 0;
 
 	if (bo->noexec)
 		prot |= IOMMU_NOEXEC;
+
+	if (!bo->nowrite)
+		prot |= IOMMU_WRITE;
+
+	if (!bo->noread)
+		prot |= IOMMU_READ;
 
 	sgt = drm_gem_shmem_get_pages_sgt(obj);
 	if (WARN_ON(IS_ERR(sgt)))

@@ -251,6 +251,8 @@ panfrost_gem_create_with_handle(struct drm_file *file_priv,
 
 	bo = to_panfrost_bo(&shmem->base);
 	bo->noexec = !!(flags & PANFROST_BO_NOEXEC);
+	bo->noread = !!(flags & PANFROST_BO_NOREAD);
+	bo->nowrite = !!(flags & PANFROST_BO_NOWRITE);
 	bo->is_heap = !!(flags & PANFROST_BO_HEAP);
 
 	/*

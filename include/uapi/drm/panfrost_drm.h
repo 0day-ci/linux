@@ -86,6 +86,8 @@ struct drm_panfrost_wait_bo {
 
 #define PANFROST_BO_NOEXEC	1
 #define PANFROST_BO_HEAP	2
+#define PANFROST_BO_NOREAD	4
+#define PANFROST_BO_NOWRITE	8
 
 /**
  * struct drm_panfrost_create_bo - ioctl argument for creating Panfrost BOs.

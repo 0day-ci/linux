@@ -37,6 +37,8 @@ struct panfrost_gem_object {
 	atomic_t gpu_usecount;
 
 	bool noexec		:1;
+	bool noread		:1;
+	bool nowrite		:1;
 	bool is_heap		:1;
 };
 

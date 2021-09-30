@@ -75,6 +75,10 @@ static int panfrost_ioctl_get_param(struct drm_device *ddev, void *data, struct 
 	return 0;
 }
 
+#define PANFROST_BO_FLAGS \
+	(PANFROST_BO_NOEXEC | PANFROST_BO_HEAP | \
+	 PANFROST_BO_NOREAD | PANFROST_BO_NOWRITE)
+
 static int panfrost_ioctl_create_bo(struct drm_device *dev, void *data,
 		struct drm_file *file)
 {
@@ -84,11 +88,16 @@ static int panfrost_ioctl_create_bo(struct drm_device *dev, void *data,
 	struct panfrost_gem_mapping *mapping;
 
 	if (!args->size || args->pad ||
-	    (args->flags & ~(PANFROST_BO_NOEXEC | PANFROST_BO_HEAP)))
+	    (args->flags & ~PANFROST_BO_FLAGS))
 		return -EINVAL;
 
 	/* Heaps should never be executable */
 	if ((args->flags & PANFROST_BO_HEAP) &&
+	    !(args->flags & PANFROST_BO_NOEXEC))
+		return -EINVAL;
+
+	/* Executable implies readable */
+	if ((args->flags & PANFROST_BO_NOREAD) &&
 	    !(args->flags & PANFROST_BO_NOEXEC))
 		return -EINVAL;
 
@@ -511,6 +520,7 @@ DEFINE_DRM_GEM_FOPS(panfrost_drm_driver_fops);
  * - 1.0 - initial interface
  * - 1.1 - adds HEAP and NOEXEC flags for CREATE_BO
  * - 1.2 - adds AFBC_FEATURES query
+ * - 1.3 - adds PANFROST_BO_NO{READ,WRITE} flags
  */
 static const struct drm_driver panfrost_drm_driver = {
 	.driver_features	= DRIVER_RENDER | DRIVER_GEM | DRIVER_SYNCOBJ,
@@ -523,7 +533,7 @@ static const struct drm_driver panfrost_drm_driver = {
 	.desc			= "panfrost DRM",
 	.date			= "20180908",
 	.major			= 1,
-	.minor			= 2,
+	.minor			= 3,
 
 	.gem_create_object	= panfrost_gem_create_object,
 	.prime_handle_to_fd	= drm_gem_prime_handle_to_fd,
