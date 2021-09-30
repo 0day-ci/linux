@@ -154,6 +154,16 @@ static inline void sve_user_enable(void)
 			write_sysreg_s(__new, (reg));	\
 	} while (0)
 
+static inline void sme_user_disable(void)
+{
+	sysreg_clear_set(cpacr_el1, CPACR_EL1_SMEN_EL0EN, 0);
+}
+
+static inline void sme_user_enable(void)
+{
+	sysreg_clear_set(cpacr_el1, 0, CPACR_EL1_SMEN_EL0EN);
+}
+
 static inline void sme_set_svcr(u64 val)
 {
 	sysreg_clear_set_s(SYS_SVCR_EL0, SYS_SVCR_EL0_ZA_MASK |

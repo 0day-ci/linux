@@ -158,26 +158,63 @@ trace_exit:
 	syscall_trace_exit(regs);
 }
 
-static inline void sve_user_discard(void)
+/*
+ * As per the ABI exit SME streaming mode and clear the SVE state not
+ * shared with FPSIMD on syscall entry.
+ */
+static inline void fp_user_discard(void)
 {
+	/*
+	 * If SME is active then:
+	 *  - Exit streaming mode if we were in it.
+	 *  - If ZA is not in use disable SME and fall through to disable
+	 *    SVE too.
+	 *  - If ZA is in use flush the non-shared SVE state but leave
+	 *    both SVE and SME active.
+	 */
+	if (system_supports_sme()) {
+		u64 svcr = read_sysreg_s(SYS_SVCR_EL0);
+
+		if (svcr & ~SYS_SVCR_EL0_SM_MASK) {
+			svcr &= ~SYS_SVCR_EL0_SM_MASK;
+			write_sysreg_s(svcr, SYS_SVCR_EL0);
+		}
+
+		if (svcr & SYS_SVCR_EL0_ZA_MASK) {
+			unsigned long sve_vq_minus_one =
+				sve_vq_from_vl(task_get_sve_vl(current)) - 1;
+			sve_flush_live(false, sve_vq_minus_one);
+			return;
+		} else {
+			clear_thread_flag(TIF_SME);
+			sme_user_disable();
+		}
+	}
+
 	if (!system_supports_sve())
 		return;
 
+	/*
+	 * If SME is not active then disable SVE, the registers will
+	 * be cleared when userspace next attempts to access them and
+	 * we do not need to track the SVE register state until then.
+	 */
 	clear_thread_flag(TIF_SVE);
 
 	/*
 	 * task_fpsimd_load() won't be called to update CPACR_EL1 in
-	 * ret_to_user unless TIF_FOREIGN_FPSTATE is still set, which only
-	 * happens if a context switch or kernel_neon_begin() or context
-	 * modification (sigreturn, ptrace) intervenes.
-	 * So, ensure that CPACR_EL1 is already correct for the fast-path case.
+	 * ret_to_user unless TIF_FOREIGN_FPSTATE is still set, which
+	 * only happens if a context switch or kernel_neon_begin() or
+	 * context modification (sigreturn, ptrace) intervenes.  So,
+	 * ensure that CPACR_EL1 is already correct for the fast-path
+	 * case.
 	 */
 	sve_user_disable();
 }
 
 void do_el0_svc(struct pt_regs *regs)
 {
-	sve_user_discard();
+	fp_user_discard();
 	el0_svc_common(regs, regs->regs[8], __NR_syscalls, sys_call_table);
 }
 
