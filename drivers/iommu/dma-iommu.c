@@ -66,14 +66,7 @@ early_param("iommu.forcedac", iommu_dma_forcedac_setup);
 
 static void iommu_dma_entry_dtor(unsigned long data)
 {
-	struct page *freelist = (struct page *)data;
-
-	while (freelist) {
-		unsigned long p = (unsigned long)page_address(freelist);
-
-		freelist = freelist->freelist;
-		free_page(p);
-	}
+	put_pages_list((struct list_head *)data);
 }
 
 static inline size_t cookie_msi_granule(struct iommu_dma_cookie *cookie)
@@ -479,7 +472,7 @@ static void iommu_dma_free_iova(struct iommu_dma_cookie *cookie,
 	else if (gather && gather->queued)
 		queue_iova(iovad, iova_pfn(iovad, iova),
 				size >> iova_shift(iovad),
-				(unsigned long)gather->freelist);
+				(unsigned long)&gather->freelist);
 	else
 		free_iova_fast(iovad, iova_pfn(iovad, iova),
 				size >> iova_shift(iovad));
