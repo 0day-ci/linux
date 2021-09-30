@@ -77,6 +77,7 @@ extern void sve_kernel_enable(const struct arm64_cpu_capabilities *__unused);
 extern void sme_kernel_enable(const struct arm64_cpu_capabilities *__unused);
 
 extern u64 read_zcr_features(void);
+extern u64 read_smcr_features(void);
 
 /*
  * Helpers to translate bit indices in sve_vq_map to VQ values (and
@@ -131,6 +132,12 @@ static inline void sve_user_enable(void)
 			write_sysreg_s(__new, (reg));	\
 	} while (0)
 
+static inline void sme_set_svcr(u64 val)
+{
+	sysreg_clear_set_s(SYS_SVCR_EL0, SYS_SVCR_EL0_ZA_MASK |
+			   SYS_SVCR_EL0_SM_MASK, val);
+}
+
 /*
  * Probing and setup functions.
  * Calls to these functions must be serialised with one another.
@@ -174,6 +181,12 @@ static inline void write_vl(enum vec_type type, u64 val)
 	case ARM64_VEC_SVE:
 		tmp = read_sysreg_s(SYS_ZCR_EL1) & ~ZCR_ELx_LEN_MASK;
 		write_sysreg_s(tmp | val, SYS_ZCR_EL1);
+		break;
+#endif
+#ifdef CONFIG_ARM64_SME
+	case ARM64_VEC_SME:
+		tmp = read_sysreg_s(SYS_SMCR_EL1) & ~SMCR_ELx_LEN_MASK;
+		write_sysreg_s(tmp | val, SYS_SMCR_EL1);
 		break;
 #endif
 	default:
@@ -243,6 +256,28 @@ static inline int sve_verify_vq_map(void) { return 0; }
 static inline void sve_setup(void) { }
 
 #endif /* ! CONFIG_ARM64_SVE */
+
+#ifdef CONFIG_ARM64_SME
+
+extern void __init sme_setup(void);
+
+static inline int sme_max_vl(void)
+{
+	return vec_max_vl(ARM64_VEC_SME);
+}
+
+static inline int sme_max_virtualisable_vl(void)
+{
+	return vec_max_virtualisable_vl(ARM64_VEC_SME);
+}
+
+#else
+
+static inline void sme_setup(void) { }
+static inline int sme_max_vl(void) { return 0; }
+static inline int sme_max_virtualisable_vl(void) { return 0; }
+
+#endif /* ! CONFIG_ARM64_SME */
 
 /* For use by EFI runtime services calls only */
 extern void __efi_fpsimd_begin(void);
