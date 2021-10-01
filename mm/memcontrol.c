@@ -2769,10 +2769,8 @@ static struct mem_cgroup *get_mem_cgroup_from_objcg(struct obj_cgroup *objcg)
 	struct mem_cgroup *memcg;
 
 	rcu_read_lock();
-retry:
 	memcg = obj_cgroup_memcg(objcg);
-	if (unlikely(!css_tryget(&memcg->css)))
-		goto retry;
+	css_get(&memcg->css);
 	rcu_read_unlock();
 
 	return memcg;
@@ -2947,13 +2945,14 @@ static void obj_cgroup_uncharge_pages(struct obj_cgroup *objcg,
 {
 	struct mem_cgroup *memcg;
 
-	memcg = get_mem_cgroup_from_objcg(objcg);
+	rcu_read_lock();
+	memcg = obj_cgroup_memcg(objcg);
 
 	if (!cgroup_subsys_on_dfl(memory_cgrp_subsys))
 		page_counter_uncharge(&memcg->kmem, nr_pages);
 	refill_stock(memcg, nr_pages);
 
-	css_put(&memcg->css);
+	rcu_read_unlock();
 }
 
 /*
@@ -3672,6 +3671,13 @@ static void memcg_offline_kmem(struct mem_cgroup *memcg)
 	memcg_drain_all_list_lrus(kmemcg_id, parent);
 
 	memcg_free_cache_id(kmemcg_id);
+
+	/*
+	 * To ensure that a to-be-offlined memcg fetched from objcg remains
+	 * valid within a RCU critical section, we need to wait here until
+	 * the a grace period has elapsed.
+	 */
+	synchronize_rcu();
 }
 #else
 static int memcg_online_kmem(struct mem_cgroup *memcg)
