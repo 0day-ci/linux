@@ -294,6 +294,54 @@ static bool extended_caps_walk_dvsec(struct pci_dev *pdev, unsigned long quirks)
 	return have_devices;
 }
 
+static bool extended_caps_walk_vsec(struct pci_dev *pdev, unsigned long quirks)
+{
+	bool have_devices = false;
+	int pos = 0;
+
+	do {
+		struct extended_caps_header header;
+		u32 table, hdr;
+		int ret;
+
+		pos = pci_find_next_ext_capability(pdev, pos, PCI_EXT_CAP_ID_VNDR);
+		if (!pos)
+			break;
+
+		pci_read_config_dword(pdev, pos + PCI_VNDR_HEADER, &hdr);
+
+		/* Support only revision 1 */
+		header.rev = PCI_VNDR_HEADER_REV(hdr);
+		if (header.rev != 1) {
+			dev_warn(&pdev->dev, "Unsupported VSEC revision %d\n",
+				 header.rev);
+			continue;
+		}
+
+		header.id = PCI_VNDR_HEADER_ID(hdr);
+		header.length = PCI_VNDR_HEADER_LEN(hdr);
+
+		/* entry, size, and table offset are the same as DVSEC */
+		pci_read_config_byte(pdev, pos + INTEL_DVSEC_ENTRIES,
+				     &header.num_entries);
+		pci_read_config_byte(pdev, pos + INTEL_DVSEC_SIZE,
+				     &header.entry_size);
+		pci_read_config_dword(pdev, pos + INTEL_DVSEC_TABLE,
+				      &table);
+
+		header.tbir = INTEL_DVSEC_TABLE_BAR(table);
+		header.offset = INTEL_DVSEC_TABLE_OFFSET(table);
+
+		ret = extended_caps_add_dev(pdev, &header, quirks);
+		if (ret)
+			continue;
+
+		have_devices = true;
+	} while (true);
+
+	return have_devices;
+}
+
 static int extended_caps_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 {
 	struct extended_caps_platform_info *info;
@@ -310,6 +358,7 @@ static int extended_caps_pci_probe(struct pci_dev *pdev, const struct pci_device
 		quirks = info->quirks;
 
 	have_devices |= extended_caps_walk_dvsec(pdev, quirks);
+	have_devices |= extended_caps_walk_vsec(pdev, quirks);
 
 	if (info && (info->quirks & EXT_CAPS_QUIRK_NO_DVSEC))
 		have_devices |= extended_caps_walk_header(pdev, quirks, info->capabilities);
