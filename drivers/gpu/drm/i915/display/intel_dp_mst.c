@@ -40,7 +40,6 @@
 #include "intel_dp_hdcp.h"
 #include "intel_dp_mst.h"
 #include "intel_dpio_phy.h"
-#include "intel_hdcp.h"
 #include "intel_hotplug.h"
 #include "skl_scaler.h"
 
@@ -374,7 +373,10 @@ static void intel_mst_disable_dp(struct intel_atomic_state *state,
 	drm_dbg_kms(&i915->drm, "active links %d\n",
 		    intel_dp->active_mst_links);
 
-	intel_hdcp_disable(intel_mst->connector);
+	if (connector->hdcp_helper_data)
+		drm_hdcp_helper_atomic_commit(connector->hdcp_helper_data,
+					&state->base,
+					&dig_port->hdcp_mutex);
 
 	drm_dp_mst_reset_vcpi_slots(&intel_dp->mst_mgr, connector->port);
 
@@ -544,6 +546,8 @@ static void intel_mst_enable_dp(struct intel_atomic_state *state,
 	struct intel_digital_port *dig_port = intel_mst->primary;
 	struct intel_dp *intel_dp = &dig_port->dp;
 	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
+	struct intel_connector *connector =
+		to_intel_connector(conn_state->connector);
 	enum transcoder trans = pipe_config->cpu_transcoder;
 
 	drm_WARN_ON(&dev_priv->drm, pipe_config->has_pch_encoder);
@@ -585,11 +589,10 @@ static void intel_mst_enable_dp(struct intel_atomic_state *state,
 		intel_audio_codec_enable(encoder, pipe_config, conn_state);
 
 	/* Enable hdcp if it's desired */
-	if (conn_state->content_protection ==
-	    DRM_MODE_CONTENT_PROTECTION_DESIRED)
-		intel_hdcp_enable(to_intel_connector(conn_state->connector),
-				  pipe_config,
-				  (u8)conn_state->hdcp_content_type);
+	if (connector->hdcp_helper_data)
+		drm_hdcp_helper_atomic_commit(connector->hdcp_helper_data,
+					&state->base,
+					&dig_port->hdcp_mutex);
 }
 
 static bool intel_dp_mst_enc_get_hw_state(struct intel_encoder *encoder,
