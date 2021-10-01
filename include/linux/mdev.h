@@ -138,10 +138,6 @@ static inline void mdev_set_drvdata(struct mdev_device *mdev, void *data)
 {
 	mdev->driver_data = data;
 }
-static inline const guid_t *mdev_uuid(struct mdev_device *mdev)
-{
-	return &mdev->uuid;
-}
 
 extern struct bus_type mdev_bus_type;
 
