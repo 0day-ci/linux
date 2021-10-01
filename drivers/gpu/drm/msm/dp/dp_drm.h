@@ -14,5 +14,10 @@
 #include "dp_display.h"
 
 struct drm_connector *dp_drm_connector_init(struct msm_dp *dp_display);
+struct msm_dp *msm_dp_from_connector(struct drm_connector *connector);
+bool dp_drm_is_connector_msm_dp(struct drm_connector *connector);
+void dp_drm_atomic_commit(struct drm_connector *connector,
+			  struct drm_connector_state *conn_state,
+			  struct drm_atomic_state *state);
 
 #endif /* _DP_DRM_H_ */
