@@ -27,7 +27,7 @@
 
 static int affs_statfs(struct dentry *dentry, struct kstatfs *buf);
 static int affs_show_options(struct seq_file *m, struct dentry *root);
-static int affs_remount (struct super_block *sb, int *flags, char *data);
+static int affs_remount(struct super_block *sb, int *flags, char *data);
 
 static void
 affs_commit_super(struct super_block *sb, int wait)
@@ -50,6 +50,7 @@ static void
 affs_put_super(struct super_block *sb)
 {
 	struct affs_sb_info *sbi = AFFS_SB(sb);
+
 	pr_debug("%s()\n", __func__);
 
 	cancel_delayed_work_sync(&sbi->sb_work);
@@ -83,18 +84,18 @@ void affs_mark_sb_dirty(struct super_block *sb)
 	unsigned long delay;
 
 	if (sb_rdonly(sb))
-	       return;
+		return;
 
 	spin_lock(&sbi->work_lock);
 	if (!sbi->work_queued) {
-	       delay = msecs_to_jiffies(dirty_writeback_interval * 10);
-	       queue_delayed_work(system_long_wq, &sbi->sb_work, delay);
-	       sbi->work_queued = 1;
+		delay = msecs_to_jiffies(dirty_writeback_interval * 10);
+		queue_delayed_work(system_long_wq, &sbi->sb_work, delay);
+		sbi->work_queued = 1;
 	}
 	spin_unlock(&sbi->work_lock);
 }
 
-static struct kmem_cache * affs_inode_cachep;
+static struct kmem_cache *affs_inode_cachep;
 
 static struct inode *affs_alloc_inode(struct super_block *sb)
 {
@@ -208,6 +209,7 @@ parse_options(char *options, kuid_t *uid, kgid_t *gid, int *mode, int *reserved,
 
 	while ((p = strsep(&options, ",")) != NULL) {
 		int token, n, option;
+
 		if (!*p)
 			continue;
 
@@ -274,14 +276,15 @@ parse_options(char *options, kuid_t *uid, kgid_t *gid, int *mode, int *reserved,
 			break;
 		case Opt_volume: {
 			char *vol = match_strdup(&args[0]);
+
 			if (!vol)
 				return 0;
-			strlcpy(volume, vol, 32);
+			strscpy(volume, vol, 32);
 			kfree(vol);
 			break;
 		}
 		case Opt_ignore:
-		 	/* Silently ignore the quota options */
+			/* Silently ignore the quota options */
 			break;
 		default:
 			pr_warn("Unrecognized mount option \"%s\" or missing value\n",
@@ -370,19 +373,19 @@ static int affs_fill_super(struct super_block *sb, void *data, int silent)
 	spin_lock_init(&sbi->work_lock);
 	INIT_DELAYED_WORK(&sbi->sb_work, flush_superblock);
 
-	if (!parse_options(data,&uid,&gid,&i,&reserved,&root_block,
-				&blocksize,&sbi->s_prefix,
+	if (!parse_options(data, &uid, &gid, &i, &reserved, &root_block,
+				&blocksize, &sbi->s_prefix,
 				sbi->s_volume, &mount_flags)) {
 		pr_err("Error parsing options\n");
 		return -EINVAL;
 	}
 	/* N.B. after this point s_prefix must be released */
 
-	sbi->s_flags   = mount_flags;
-	sbi->s_mode    = i;
-	sbi->s_uid     = uid;
-	sbi->s_gid     = gid;
-	sbi->s_reserved= reserved;
+	sbi->s_flags    = mount_flags;
+	sbi->s_mode     = i;
+	sbi->s_uid      = uid;
+	sbi->s_gid      = gid;
+	sbi->s_reserved = reserved;
 
 	/* Get the size of the device in 512-byte blocks.
 	 * If we later see that the partition uses bigger
@@ -421,8 +424,7 @@ static int affs_fill_super(struct super_block *sb, void *data, int silent)
 		 * block behind the calculated one. So we check this one, too.
 		 */
 		for (num_bm = 0; num_bm < 2; num_bm++) {
-			pr_debug("Dev %s, trying root=%u, bs=%d, "
-				"size=%d, reserved=%d\n",
+			pr_debug("Dev %s, trying root=%u, bs=%d, size= %d, reserved=%d\n",
 				sb->s_id,
 				sbi->s_root_block + num_bm,
 				blocksize, size, reserved);
@@ -509,6 +511,7 @@ got_root:
 
 	if (affs_test_opt(mount_flags, SF_VERBOSE)) {
 		u8 len = AFFS_ROOT_TAIL(sb, root_bh)->disk_name[0];
+
 		pr_notice("Mounting volume \"%.*s\": Type=%.3s\\%c, Blocksize=%d\n",
 			len > 31 ? 31 : len,
 			AFFS_ROOT_TAIL(sb, root_bh)->disk_name + 1,
@@ -634,6 +637,7 @@ static struct dentry *affs_mount(struct file_system_type *fs_type,
 static void affs_kill_sb(struct super_block *sb)
 {
 	struct affs_sb_info *sbi = AFFS_SB(sb);
+
 	kill_block_super(sb);
 	if (sbi) {
 		affs_free_bitmap(sb);
@@ -656,6 +660,7 @@ MODULE_ALIAS_FS("affs");
 static int __init init_affs_fs(void)
 {
 	int err = init_inodecache();
+
 	if (err)
 		goto out1;
 	err = register_filesystem(&affs_fs_type);
