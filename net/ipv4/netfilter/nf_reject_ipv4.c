@@ -239,7 +239,7 @@ void nf_send_reset(struct net *net, struct sock *sk, struct sk_buff *oldskb,
 {
 	struct net_device *br_indev __maybe_unused;
 	struct sk_buff *nskb;
-	struct iphdr *niph;
+	struct iphdr __maybe_unused *niph;
 	const struct tcphdr *oth;
 	struct tcphdr _oth;
 

@@ -1374,7 +1374,8 @@ int fib6_add(struct fib6_node *root, struct fib6_info *rt,
 	     struct nl_info *info, struct netlink_ext_ack *extack)
 {
 	struct fib6_table *table = rt->fib6_table;
-	struct fib6_node *fn, *pn = NULL;
+	struct fib6_node *fn;
+	struct fib6_node __maybe_unused *pn = NULL;
 	int err = -ENOMEM;
 	int allow_create = 1;
 	int replace_required = 0;
