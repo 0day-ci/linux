@@ -6501,6 +6501,10 @@ static irqreturn_t ufshcd_intr(int irq, void *__hba)
 		enabled_intr_status =
 			intr_status & ufshcd_readl(hba, REG_INTERRUPT_ENABLE);
 		ufshcd_writel(hba, intr_status, REG_INTERRUPT_STATUS);
+
+		/* Make sure interrupt status are clear before service */
+		wmb();
+
 		if (enabled_intr_status)
 			retval |= ufshcd_sl_intr(hba, enabled_intr_status);
 
