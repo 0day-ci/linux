@@ -12,6 +12,8 @@
 #include <linux/vfio.h>
 #include <linux/mdev.h>
 
+#include <asm/isc.h>
+
 #include "ioasm.h"
 #include "vfio_ccw_private.h"
 
@@ -156,12 +158,12 @@ static int fsm_do_clear(struct vfio_ccw_private *private)
 	return ret;
 }
 
-static void fsm_notoper(struct vfio_ccw_private *private,
-			enum vfio_ccw_event event)
+static void fsm_broken(struct vfio_ccw_private *private,
+		       enum vfio_ccw_event event)
 {
 	struct subchannel *sch = private->sch;
 
-	VFIO_CCW_TRACE_EVENT(2, "notoper");
+	VFIO_CCW_TRACE_EVENT(2, "broken");
 	VFIO_CCW_TRACE_EVENT(2, dev_name(&sch->dev));
 
 	/*
@@ -169,7 +171,8 @@ static void fsm_notoper(struct vfio_ccw_private *private,
 	 * Probably we should send the machine check to the guest.
 	 */
 	css_sched_sch_todo(sch, SCH_TODO_UNREG);
-	private->state = VFIO_CCW_STATE_NOT_OPER;
+	private->state = VFIO_CCW_STATE_BROKEN;
+	cp_free(&private->cp);
 }
 
 /*
@@ -367,38 +370,121 @@ static void fsm_irq(struct vfio_ccw_private *private,
 		complete(private->completion);
 }
 
+static void fsm_open(struct vfio_ccw_private *private,
+		     enum vfio_ccw_event event)
+{
+	struct subchannel *sch = private->sch;
+	int ret;
+
+	spin_lock_irq(sch->lock);
+	sch->isc = VFIO_CCW_ISC;
+	ret = cio_enable_subchannel(sch, (u32)(unsigned long)sch);
+	if (ret)
+		private->state = VFIO_CCW_STATE_BROKEN;
+	else
+		private->state = VFIO_CCW_STATE_IDLE;
+	spin_unlock_irq(sch->lock);
+}
+
+static int flush_sch(struct vfio_ccw_private *private)
+{
+	struct subchannel *sch = private->sch;
+	DECLARE_COMPLETION_ONSTACK(completion);
+	int iretry, ret = 0;
+
+	iretry = 255;
+	do {
+		ret = cio_cancel_halt_clear(sch, &iretry);
+		if (ret == -EIO) {
+			pr_err("vfio_ccw: could not quiesce subchannel 0.%x.%04x!\n",
+			       sch->schid.ssid, sch->schid.sch_no);
+			return ret;
+		}
+
+		/*
+		 * Flush all I/O and wait for
+		 * cancel/halt/clear completion.
+		 */
+		private->completion = &completion;
+		spin_unlock_irq(sch->lock);
+
+		if (ret == -EBUSY)
+			wait_for_completion_timeout(&completion, 3 * HZ);
+
+		private->completion = NULL;
+		flush_workqueue(vfio_ccw_work_q);
+		spin_lock_irq(sch->lock);
+		ret = cio_disable_subchannel(sch);
+	} while (ret == -EBUSY);
+	return ret;
+}
+
+static void fsm_close(struct vfio_ccw_private *private,
+		      enum vfio_ccw_event event)
+{
+	struct subchannel *sch = private->sch;
+	int ret;
+
+	spin_lock_irq(sch->lock);
+	if (!sch->schib.pmcw.ena)
+		goto err_unlock;
+	ret = cio_disable_subchannel(sch);
+	if (ret == -EBUSY)
+		ret = flush_sch(private);
+	if (ret)
+		goto err_unlock;
+	private->state = VFIO_CCW_STATE_CLOSED;
+	spin_unlock_irq(sch->lock);
+	cp_free(&private->cp);
+	return;
+
+err_unlock:
+	spin_unlock_irq(sch->lock);
+	vfio_ccw_fsm_event(private, VFIO_CCW_EVENT_BROKEN);
+}
+
 /*
  * Device statemachine
  */
 fsm_func_t *vfio_ccw_jumptable[NR_VFIO_CCW_STATES][NR_VFIO_CCW_EVENTS] = {
-	[VFIO_CCW_STATE_NOT_OPER] = {
-		[VFIO_CCW_EVENT_NOT_OPER]	= fsm_nop,
+	[VFIO_CCW_STATE_BROKEN] = {
+		[VFIO_CCW_EVENT_BROKEN]		= fsm_nop,
 		[VFIO_CCW_EVENT_IO_REQ]		= fsm_io_error,
 		[VFIO_CCW_EVENT_ASYNC_REQ]	= fsm_async_error,
 		[VFIO_CCW_EVENT_INTERRUPT]	= fsm_disabled_irq,
+		[VFIO_CCW_EVENT_OPEN]		= fsm_nop,
+		[VFIO_CCW_EVENT_CLOSE]		= fsm_nop,
 	},
-	[VFIO_CCW_STATE_STANDBY] = {
-		[VFIO_CCW_EVENT_NOT_OPER]	= fsm_notoper,
+	[VFIO_CCW_STATE_CLOSED] = {
+		[VFIO_CCW_EVENT_BROKEN]		= fsm_broken,
 		[VFIO_CCW_EVENT_IO_REQ]		= fsm_io_error,
 		[VFIO_CCW_EVENT_ASYNC_REQ]	= fsm_async_error,
-		[VFIO_CCW_EVENT_INTERRUPT]	= fsm_irq,
+		[VFIO_CCW_EVENT_INTERRUPT]	= fsm_disabled_irq,
+		[VFIO_CCW_EVENT_OPEN]		= fsm_open,
+		[VFIO_CCW_EVENT_CLOSE]		= fsm_broken,
 	},
 	[VFIO_CCW_STATE_IDLE] = {
-		[VFIO_CCW_EVENT_NOT_OPER]	= fsm_notoper,
+		[VFIO_CCW_EVENT_BROKEN]		= fsm_broken,
 		[VFIO_CCW_EVENT_IO_REQ]		= fsm_io_request,
 		[VFIO_CCW_EVENT_ASYNC_REQ]	= fsm_async_request,
 		[VFIO_CCW_EVENT_INTERRUPT]	= fsm_irq,
+		[VFIO_CCW_EVENT_OPEN]		= fsm_broken,
+		[VFIO_CCW_EVENT_CLOSE]		= fsm_close,
 	},
 	[VFIO_CCW_STATE_CP_PROCESSING] = {
-		[VFIO_CCW_EVENT_NOT_OPER]	= fsm_notoper,
+		[VFIO_CCW_EVENT_BROKEN]		= fsm_broken,
 		[VFIO_CCW_EVENT_IO_REQ]		= fsm_io_retry,
 		[VFIO_CCW_EVENT_ASYNC_REQ]	= fsm_async_retry,
 		[VFIO_CCW_EVENT_INTERRUPT]	= fsm_irq,
+		[VFIO_CCW_EVENT_OPEN]		= fsm_broken,
+		[VFIO_CCW_EVENT_CLOSE]		= fsm_close,
 	},
 	[VFIO_CCW_STATE_CP_PENDING] = {
-		[VFIO_CCW_EVENT_NOT_OPER]	= fsm_notoper,
+		[VFIO_CCW_EVENT_BROKEN]		= fsm_broken,
 		[VFIO_CCW_EVENT_IO_REQ]		= fsm_io_busy,
 		[VFIO_CCW_EVENT_ASYNC_REQ]	= fsm_async_request,
 		[VFIO_CCW_EVENT_INTERRUPT]	= fsm_irq,
+		[VFIO_CCW_EVENT_OPEN]		= fsm_broken,
+		[VFIO_CCW_EVENT_CLOSE]		= fsm_close,
 	},
 };

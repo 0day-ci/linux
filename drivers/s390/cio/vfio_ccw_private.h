@@ -122,16 +122,14 @@ struct vfio_ccw_private {
 extern int vfio_ccw_mdev_reg(struct subchannel *sch);
 extern void vfio_ccw_mdev_unreg(struct subchannel *sch);
 
-extern int vfio_ccw_sch_quiesce(struct subchannel *sch);
-
 extern struct mdev_driver vfio_ccw_mdev_driver;
 
 /*
  * States of the device statemachine.
  */
 enum vfio_ccw_state {
-	VFIO_CCW_STATE_NOT_OPER,
-	VFIO_CCW_STATE_STANDBY,
+	VFIO_CCW_STATE_BROKEN,
+	VFIO_CCW_STATE_CLOSED,
 	VFIO_CCW_STATE_IDLE,
 	VFIO_CCW_STATE_CP_PROCESSING,
 	VFIO_CCW_STATE_CP_PENDING,
@@ -143,10 +141,12 @@ enum vfio_ccw_state {
  * Asynchronous events of the device statemachine.
  */
 enum vfio_ccw_event {
-	VFIO_CCW_EVENT_NOT_OPER,
+	VFIO_CCW_EVENT_BROKEN,
 	VFIO_CCW_EVENT_IO_REQ,
 	VFIO_CCW_EVENT_INTERRUPT,
 	VFIO_CCW_EVENT_ASYNC_REQ,
+	VFIO_CCW_EVENT_OPEN,
+	VFIO_CCW_EVENT_CLOSE,
 	/* last element! */
 	NR_VFIO_CCW_EVENTS
 };
@@ -158,7 +158,7 @@ typedef void (fsm_func_t)(struct vfio_ccw_private *, enum vfio_ccw_event);
 extern fsm_func_t *vfio_ccw_jumptable[NR_VFIO_CCW_STATES][NR_VFIO_CCW_EVENTS];
 
 static inline void vfio_ccw_fsm_event(struct vfio_ccw_private *private,
-				     int event)
+				      enum vfio_ccw_event event)
 {
 	trace_vfio_ccw_fsm_event(private->sch->schid, private->state, event);
 	vfio_ccw_jumptable[private->state][event](private, event);

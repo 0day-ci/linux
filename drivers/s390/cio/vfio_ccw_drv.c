@@ -36,51 +36,6 @@ debug_info_t *vfio_ccw_debug_trace_id;
 /*
  * Helpers
  */
-int vfio_ccw_sch_quiesce(struct subchannel *sch)
-{
-	struct vfio_ccw_private *private = dev_get_drvdata(&sch->dev);
-	DECLARE_COMPLETION_ONSTACK(completion);
-	int iretry, ret = 0;
-
-	spin_lock_irq(sch->lock);
-	if (!sch->schib.pmcw.ena)
-		goto out_unlock;
-	ret = cio_disable_subchannel(sch);
-	if (ret != -EBUSY)
-		goto out_unlock;
-
-	iretry = 255;
-	do {
-
-		ret = cio_cancel_halt_clear(sch, &iretry);
-
-		if (ret == -EIO) {
-			pr_err("vfio_ccw: could not quiesce subchannel 0.%x.%04x!\n",
-			       sch->schid.ssid, sch->schid.sch_no);
-			break;
-		}
-
-		/*
-		 * Flush all I/O and wait for
-		 * cancel/halt/clear completion.
-		 */
-		private->completion = &completion;
-		spin_unlock_irq(sch->lock);
-
-		if (ret == -EBUSY)
-			wait_for_completion_timeout(&completion, 3*HZ);
-
-		private->completion = NULL;
-		flush_workqueue(vfio_ccw_work_q);
-		spin_lock_irq(sch->lock);
-		ret = cio_disable_subchannel(sch);
-	} while (ret == -EBUSY);
-out_unlock:
-	private->state = VFIO_CCW_STATE_NOT_OPER;
-	spin_unlock_irq(sch->lock);
-	return ret;
-}
-
 static void vfio_ccw_sch_io_todo(struct work_struct *work)
 {
 	struct vfio_ccw_private *private;
@@ -147,7 +102,7 @@ static struct vfio_ccw_private *vfio_ccw_alloc_private(struct subchannel *sch)
 
 	private->sch = sch;
 	mutex_init(&private->io_mutex);
-	private->state = VFIO_CCW_STATE_NOT_OPER;
+	private->state = VFIO_CCW_STATE_CLOSED;
 	INIT_LIST_HEAD(&private->crw);
 	INIT_WORK(&private->io_work, vfio_ccw_sch_io_todo);
 	INIT_WORK(&private->crw_work, vfio_ccw_crw_todo);
@@ -231,18 +186,9 @@ static int vfio_ccw_sch_probe(struct subchannel *sch)
 
 	dev_set_drvdata(&sch->dev, private);
 
-	spin_lock_irq(sch->lock);
-	sch->isc = VFIO_CCW_ISC;
-	ret = cio_enable_subchannel(sch, (u32)(unsigned long)sch);
-	spin_unlock_irq(sch->lock);
-	if (ret)
-		goto out_free;
-
-	private->state = VFIO_CCW_STATE_STANDBY;
-
 	ret = vfio_ccw_mdev_reg(sch);
 	if (ret)
-		goto out_disable;
+		goto out_free;
 
 	if (dev_get_uevent_suppress(&sch->dev)) {
 		dev_set_uevent_suppress(&sch->dev, 0);
@@ -254,8 +200,6 @@ static int vfio_ccw_sch_probe(struct subchannel *sch)
 			   sch->schid.sch_no);
 	return 0;
 
-out_disable:
-	cio_disable_subchannel(sch);
 out_free:
 	dev_set_drvdata(&sch->dev, NULL);
 	vfio_ccw_free_private(private);
@@ -266,7 +210,6 @@ static void vfio_ccw_sch_remove(struct subchannel *sch)
 {
 	struct vfio_ccw_private *private = dev_get_drvdata(&sch->dev);
 
-	vfio_ccw_sch_quiesce(sch);
 	vfio_ccw_mdev_unreg(sch);
 
 	dev_set_drvdata(&sch->dev, NULL);
@@ -280,7 +223,10 @@ static void vfio_ccw_sch_remove(struct subchannel *sch)
 
 static void vfio_ccw_sch_shutdown(struct subchannel *sch)
 {
-	vfio_ccw_sch_quiesce(sch);
+	struct vfio_ccw_private *private = dev_get_drvdata(&sch->dev);
+
+	vfio_ccw_fsm_event(private, VFIO_CCW_EVENT_CLOSE);
+	vfio_ccw_fsm_event(private, VFIO_CCW_EVENT_BROKEN);
 }
 
 /**
@@ -307,15 +253,9 @@ static int vfio_ccw_sch_event(struct subchannel *sch, int process)
 		goto out_unlock;
 
 	if (cio_update_schib(sch)) {
-		vfio_ccw_fsm_event(private, VFIO_CCW_EVENT_NOT_OPER);
+		vfio_ccw_fsm_event(private, VFIO_CCW_EVENT_BROKEN);
 		rc = 0;
 		goto out_unlock;
-	}
-
-	private = dev_get_drvdata(&sch->dev);
-	if (private->state == VFIO_CCW_STATE_NOT_OPER) {
-		private->state = private->mdev ? VFIO_CCW_STATE_IDLE :
-				 VFIO_CCW_STATE_STANDBY;
 	}
 	rc = 0;
 
