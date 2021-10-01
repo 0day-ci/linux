@@ -36,6 +36,7 @@
 #define DRM_HDCP_DDC_BKSV			0x00
 #define DRM_HDCP_DDC_RI_PRIME			0x08
 #define DRM_HDCP_DDC_AKSV			0x10
+#define DRM_HDCP_DDC_AINFO			0x15
 #define DRM_HDCP_DDC_AN				0x18
 #define DRM_HDCP_DDC_V_PRIME(h)			(0x20 + h * 4)
 #define DRM_HDCP_DDC_BCAPS			0x40
@@ -295,6 +296,19 @@ struct drm_atomic_state;
 struct drm_device;
 struct drm_connector;
 
+struct drm_hdcp_ksv {
+	union {
+		u32 words[2];
+		u8 bytes[DRM_HDCP_KSV_LEN];
+	};
+};
+struct drm_hdcp_an {
+	union {
+		u32 words[2];
+		u8 bytes[DRM_HDCP_AN_LEN];
+	};
+};
+
 int drm_hdcp_check_ksvs_revoked(struct drm_device *dev,
 				u8 *ksvs, u32 ksv_count);
 int drm_connector_attach_content_protection_property(
@@ -303,9 +317,186 @@ void drm_hdcp_update_content_protection(struct drm_connector *connector,
 					u64 val);
 bool drm_hdcp_atomic_check(struct drm_connector *connector,
 			   struct drm_atomic_state *state);
+void drm_hdcp_atomic_commit(struct drm_atomic_state *state,
+			    struct drm_connector *connector);
 
 /* Content Type classification for HDCP2.2 vs others */
 #define DRM_MODE_HDCP_CONTENT_TYPE0		0
 #define DRM_MODE_HDCP_CONTENT_TYPE1		1
+
+/**
+ * struct drm_hdcp_helper_funcs - A vtable of function hooks for the hdcp helper
+ *
+ * These hooks are used by the hdcp helper to call into the driver/connector
+ * code to read/write to hw.
+ */
+struct drm_hdcp_helper_funcs {
+	/**
+	 * @setup - Performs driver-specific setup before hdcp is enabled
+	 *
+	 * Returns: 0 on success, -errno on failure
+	 */
+	int (*setup)(struct drm_connector *connector,
+		     struct drm_atomic_state *state);
+
+	/**
+	 * @are_keys_valid - Checks if the HDCP transmitter keys are valid
+	 *
+	 * Returns: true if the display controller has valid keys loaded
+	 */
+	bool (*are_keys_valid)(struct drm_connector *connector);
+
+	/**
+	 * @load_keys - Instructs the driver to load its HDCP transmitter keys
+	 *
+	 * Returns: 0 on success, -errno on failure
+	 */
+	int (*load_keys)(struct drm_connector *connector);
+
+	/**
+	 * @hdcp2_capable - Checks if both source and sink support HDCP 2.x
+	 *
+	 * Returns: 0 on success, -errno on failure
+	 */
+	int (*hdcp2_capable)(struct drm_connector *connector, bool *capable);
+
+	/**
+	 * @hdcp2_enable - Enables HDCP 2.x on the specified connector
+	 *
+	 * Since we don't have multiple examples of HDCP 2.x enablement, we
+	 * provide the bare minimum support for HDCP 2.x help. Once we have
+	 * more examples, perhaps we can be more helpful.
+	 *
+	 * Returns: 0 on success, -errno on failure
+	 */
+	int (*hdcp2_enable)(struct drm_connector *connector);
+
+	/**
+	 * @hdcp2_check_link - Checks the HDCP 2.x link on a specified connector
+	 *
+	 * Returns: 0 on success, -errno on failure
+	 */
+	int (*hdcp2_check_link)(struct drm_connector *connector);
+
+	/**
+	 * @hdcp2_disable - Disables HDCP 2.x on the specified connector
+	 *
+	 * Returns: 0 on success, -errno on failure
+	 */
+	int (*hdcp2_disable)(struct drm_connector *connector);
+
+	/**
+	 * @hdcp1_read_an_aksv - Reads transmitter's An & Aksv from hardware
+	 *
+	 * Use this function if hardware allows reading the transmitter's An and
+	 * Aksv values from the kernel. If your hardware will not allow this,
+	 * use hdcp1_send_an_aksv() and implement the transmission in the
+	 * driver.
+	 *
+	 * Returns: 0 on success, -errno on failure
+	 */
+	int (*hdcp1_read_an_aksv)(struct drm_connector *connector, u32 *an,
+				  u32 *aksv);
+
+	/**
+	 * @hdcp1_send_an_aksv - Sends transmitter's An & Aksv to the receiver
+	 *
+	 * Only implement this on hardware where An or Aksv are not accessible
+	 * from the kernel. If these values can be read, use
+	 * hdcp1_read_an_aksv() instead.
+	 *
+	 * Returns: 0 on success, -errno on failure
+	 */
+	int (*hdcp1_send_an_aksv)(struct drm_connector *connector);
+
+	/**
+	 * @hdcp1_store_receiver_info - Stores the receiver's info in the transmitter
+	 *
+	 * Returns: 0 on success, -errno on failure
+	 */
+	int (*hdcp1_store_receiver_info)(struct drm_connector *connector,
+					 u32 *ksv, u32 status, u8 caps,
+					 bool repeater_present);
+
+	/**
+	 * @hdcp1_enable_encryption - Enables encryption of the outgoing signal
+	 *
+	 * Returns: 0 on success, -errno on failure
+	 */
+	int (*hdcp1_enable_encryption)(struct drm_connector *connector);
+
+	/**
+	 * @hdcp1_wait_for_r0 - Wait for transmitter to calculate R0
+	 *
+	 * Returns: 0 on success, -errno on failure
+	 */
+	int (*hdcp1_wait_for_r0)(struct drm_connector *connector);
+
+	/**
+	 * @hdcp1_match_ri - Matches the given Ri from the receiver with Ri in
+	 * the transmitter
+	 *
+	 * Returns: 0 on success, -errno on failure
+	 */
+	int (*hdcp1_match_ri)(struct drm_connector *connector, u32 ri_prime);
+
+	/**
+	 * @hdcp1_post_encryption - Allows the driver to confirm encryption and
+	 * perform any post-processing
+	 *
+	 * Returns: 0 on success, -errno on failure
+	 */
+	int (*hdcp1_post_encryption)(struct drm_connector *connector);
+
+	/**
+	 * @hdcp1_store_ksv_fifo - Write the receiver's KSV list to transmitter
+	 *
+	 * Returns: 0 on success, -errno on failure
+	 */
+	int (*hdcp1_store_ksv_fifo)(struct drm_connector *connector,
+				    u8 *ksv_fifo, u8 num_downstream,
+				    u8 *bstatus, u32 *vprime);
+
+	/**
+	 * @hdcp1_check_link - Allows the driver to check the HDCP 1.x status
+	 * on a specified connector
+	 *
+	 * Returns: 0 on success, -errno on failure
+	 */
+	int (*hdcp1_check_link)(struct drm_connector *connector);
+
+	/**
+	 * @hdcp1_disable - Disables HDCP 1.x on the specified connector
+	 *
+	 * Returns: 0 on success, -errno on failure
+	 */
+	int (*hdcp1_disable)(struct drm_connector *connector);
+};
+
+struct drm_hdcp_helper_data;
+struct drm_dp_aux;
+struct i2c_adapter;
+struct mutex;
+
+struct drm_hdcp_helper_data *
+drm_hdcp_helper_initialize_dp(struct drm_connector *connector,
+			      struct drm_dp_aux *aux,
+			      const struct drm_hdcp_helper_funcs *funcs,
+			      bool attach_content_type_property);
+
+struct drm_hdcp_helper_data *
+drm_hdcp_helper_initialize_hdmi(struct drm_connector *connector,
+				const struct drm_hdcp_helper_funcs *funcs,
+				bool attach_content_type_property);
+
+void drm_hdcp_helper_destroy(struct drm_hdcp_helper_data *data);
+
+int drm_hdcp_helper_hdcp1_capable(struct drm_hdcp_helper_data *data,
+				  bool *capable);
+void drm_hdcp_helper_atomic_commit(struct drm_hdcp_helper_data *data,
+				   struct drm_atomic_state *state,
+				   struct mutex *driver_mutex);
+
+void drm_hdcp_helper_schedule_hdcp_check(struct drm_hdcp_helper_data *data);
 
 #endif
