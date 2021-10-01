@@ -242,7 +242,7 @@ static void free_block_entry(struct block_entry *be)
 		kfree(re);
 	}
 
-	while((n = rb_first(&be->refs))) {
+	while ((n = rb_first(&be->refs))) {
 		ref = rb_entry(n, struct ref_entry, node);
 		rb_erase(&ref->node, &be->refs);
 		kfree(ref);
