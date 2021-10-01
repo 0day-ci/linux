@@ -2167,6 +2167,8 @@ static bool consume_stock(struct mem_cgroup *memcg, unsigned int nr_pages)
 	return ret;
 }
 
+static void cancel_charge(struct mem_cgroup *memcg, unsigned int nr_pages);
+
 /*
  * Returns stocks cached in percpu and reset cached information.
  */
@@ -2178,9 +2180,7 @@ static void drain_stock(struct memcg_stock_pcp *stock)
 		return;
 
 	if (stock->nr_pages) {
-		page_counter_uncharge(&old->memory, stock->nr_pages);
-		if (do_memsw_account())
-			page_counter_uncharge(&old->memsw, stock->nr_pages);
+		cancel_charge(old, stock->nr_pages);
 		stock->nr_pages = 0;
 	}
 
@@ -2218,6 +2218,14 @@ static void refill_stock(struct mem_cgroup *memcg, unsigned int nr_pages)
 {
 	struct memcg_stock_pcp *stock;
 	unsigned long flags;
+
+	/*
+	 * An offlined memcg shouldn't be put into stock.
+	 */
+	if (unlikely(memcg->kmem_state != KMEM_ONLINE)) {
+		cancel_charge(memcg, nr_pages);
+		return;
+	}
 
 	local_irq_save(flags);
 
@@ -2732,7 +2740,6 @@ static inline int try_charge(struct mem_cgroup *memcg, gfp_t gfp_mask,
 	return try_charge_memcg(memcg, gfp_mask, nr_pages);
 }
 
-#if defined(CONFIG_MEMCG_KMEM) || defined(CONFIG_MMU)
 static void cancel_charge(struct mem_cgroup *memcg, unsigned int nr_pages)
 {
 	if (mem_cgroup_is_root(memcg))
@@ -2742,7 +2749,6 @@ static void cancel_charge(struct mem_cgroup *memcg, unsigned int nr_pages)
 	if (do_memsw_account())
 		page_counter_uncharge(&memcg->memsw, nr_pages);
 }
-#endif
 
 static void commit_charge(struct folio *folio, struct mem_cgroup *memcg)
 {
