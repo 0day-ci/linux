@@ -34,18 +34,21 @@ typedef Elf64_Addr	kernel_ulong_t;
 typedef uint32_t	__u32;
 typedef uint16_t	__u16;
 typedef unsigned char	__u8;
+
 typedef struct {
 	__u8 b[16];
 } guid_t;
 
-/* backwards compatibility, don't use in new code */
-typedef struct {
-	__u8 b[16];
-} uuid_le;
 typedef struct {
 	__u8 b[16];
 } uuid_t;
+
 #define	UUID_STRING_LEN		36
+
+/* MEI UUID type, don't use anywhere else */
+typedef struct {
+	__u8 b[16];
+} uuid_le;
 
 /* Big exception to the "don't include kernel headers into userspace, which
  * even potentially has different endianness and word sizes, since
@@ -102,17 +105,6 @@ static inline void add_wildcard(char *str)
 
 	if (str[len - 1] != '*')
 		strcat(str + len, "*");
-}
-
-static inline void add_uuid(char *str, uuid_le uuid)
-{
-	int len = strlen(str);
-
-	sprintf(str + len, "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
-		uuid.b[3], uuid.b[2], uuid.b[1], uuid.b[0],
-		uuid.b[5], uuid.b[4], uuid.b[7], uuid.b[6],
-		uuid.b[8], uuid.b[9], uuid.b[10], uuid.b[11],
-		uuid.b[12], uuid.b[13], uuid.b[14], uuid.b[15]);
 }
 
 /**
@@ -1211,12 +1203,16 @@ static int do_mei_entry(const char *filename, void *symval,
 			char *alias)
 {
 	DEF_FIELD_ADDR(symval, mei_cl_device_id, name);
-	DEF_FIELD_ADDR(symval, mei_cl_device_id, uuid);
+	DEF_FIELD(symval, mei_cl_device_id, uuid);
 	DEF_FIELD(symval, mei_cl_device_id, version);
 
 	sprintf(alias, MEI_CL_MODULE_PREFIX);
 	sprintf(alias + strlen(alias), "%s:",  (*name)[0]  ? *name : "*");
-	add_uuid(alias, *uuid);
+	sprintf(alias + strlen(alias), "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
+		uuid.b[3], uuid.b[2], uuid.b[1], uuid.b[0],
+		uuid.b[5], uuid.b[4], uuid.b[7], uuid.b[6],
+		uuid.b[8], uuid.b[9], uuid.b[10], uuid.b[11],
+		uuid.b[12], uuid.b[13], uuid.b[14], uuid.b[15]);
 	ADD(alias, ":", version != MEI_CL_VERSION_ANY, version);
 
 	strcat(alias, ":*");
