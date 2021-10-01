@@ -281,6 +281,10 @@ intel_wait_for_register_fw(struct intel_uncore *uncore,
 					    2, timeout_ms, NULL);
 }
 
+int intel_wait_for_condition_atomic(struct intel_uncore *uncore,
+				    bool (*func)(void *data), void *data,
+				    unsigned int fw, unsigned int timeout_ms);
+
 /* register access functions */
 #define __raw_read(x__, s__) \
 static inline u##x__ __raw_uncore_read##x__(const struct intel_uncore *uncore, \

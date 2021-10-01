@@ -2471,6 +2471,25 @@ int __intel_wait_for_register(struct intel_uncore *uncore,
 	return ret;
 }
 
+int intel_wait_for_condition_atomic(struct intel_uncore *uncore,
+				    bool (*func)(void *data), void *data,
+				    unsigned int fw, unsigned int timeout_ms)
+{
+	int ret;
+
+	might_sleep_if(timeout_ms);
+
+	spin_lock_irq(&uncore->lock);
+	intel_uncore_forcewake_get__locked(uncore, fw);
+
+	ret = _wait_for_atomic(func(data), timeout_ms * USEC_PER_MSEC, 0);
+
+	intel_uncore_forcewake_put__locked(uncore, fw);
+	spin_unlock_irq(&uncore->lock);
+
+	return ret;
+}
+
 bool intel_uncore_unclaimed_mmio(struct intel_uncore *uncore)
 {
 	bool ret;
