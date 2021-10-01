@@ -9,7 +9,6 @@
 #include <linux/module.h>
 #include <linux/device.h>
 #include <linux/slab.h>
-#include <linux/uuid.h>
 
 #include <linux/mei_cl_bus.h>
 

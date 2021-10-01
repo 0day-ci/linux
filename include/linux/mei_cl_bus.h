@@ -6,8 +6,8 @@
 #define _LINUX_MEI_CL_BUS_H
 
 #include <linux/device.h>
-#include <linux/uuid.h>
 #include <linux/mod_devicetable.h>
+#include <uapi/linux/mei.h>
 
 struct mei_cl_device;
 struct mei_device;
