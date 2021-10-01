@@ -187,6 +187,24 @@ static bool nvme_validate_passthru_nsid(struct nvme_ctrl *ctrl,
 	return true;
 }
 
+static bool nvme_user_cmd_allowed(struct nvme_ns *ns, int opcode)
+{
+	if (ns) {
+		if (opcode >= nvme_cmd_vendor_start)
+			return true;
+	} else {
+		if (opcode >= nvme_admin_vendor_start)
+			return true;
+		switch (opcode) {
+		case nvme_admin_identify:
+		case nvme_admin_get_log_page:
+			return true;
+		}
+	}
+
+	return capable(CAP_SYS_ADMIN);
+}
+
 static int nvme_user_cmd(struct nvme_ctrl *ctrl, struct nvme_ns *ns,
 			struct nvme_passthru_cmd __user *ucmd)
 {
@@ -196,10 +214,10 @@ static int nvme_user_cmd(struct nvme_ctrl *ctrl, struct nvme_ns *ns,
 	u64 result;
 	int status;
 
-	if (!capable(CAP_SYS_ADMIN))
-		return -EACCES;
 	if (copy_from_user(&cmd, ucmd, sizeof(cmd)))
 		return -EFAULT;
+	if (!nvme_user_cmd_allowed(ns, cmd.opcode))
+		return -EACCES;
 	if (cmd.flags)
 		return -EINVAL;
 	if (!nvme_validate_passthru_nsid(ctrl, ns, cmd.nsid))
@@ -242,10 +260,10 @@ static int nvme_user_cmd64(struct nvme_ctrl *ctrl, struct nvme_ns *ns,
 	unsigned timeout = 0;
 	int status;
 
-	if (!capable(CAP_SYS_ADMIN))
-		return -EACCES;
 	if (copy_from_user(&cmd, ucmd, sizeof(cmd)))
 		return -EFAULT;
+	if (!nvme_user_cmd_allowed(ns, cmd.opcode))
+		return -EACCES;
 	if (cmd.flags)
 		return -EINVAL;
 	if (!nvme_validate_passthru_nsid(ctrl, ns, cmd.nsid))
