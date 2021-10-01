@@ -106,6 +106,7 @@ structure to represent a mediated device's driver::
 	     int  (*probe)  (struct mdev_device *dev);
 	     void (*remove) (struct mdev_device *dev);
 	     struct device_driver    driver;
+	     unsigned int (*get_available)(struct mdev_type *mtype);
      };
 
 A mediated bus driver for mdev should use this structure in the function calls
@@ -232,7 +233,8 @@ Directories and files under the sysfs for Each Physical Device
 * available_instances
 
   This attribute should show the number of devices of type <type-id> that can be
-  created.
+  created. Drivers can supply a get_available() function pointer to have the
+  core code create and maintain this sysfs automatically.
 
 * [device]
 

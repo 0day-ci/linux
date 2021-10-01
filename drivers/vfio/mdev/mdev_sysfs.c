@@ -93,8 +93,41 @@ static struct attribute_group mdev_type_std_group = {
 	.attrs = mdev_types_std_attrs,
 };
 
+/* mdev_type attribute used by drivers that have an get_available() op */
+static ssize_t available_instances_show(struct mdev_type *mtype,
+					struct mdev_type_attribute *attr,
+					char *buf)
+{
+	unsigned int available;
+
+	mutex_lock(&mdev_list_lock);
+	available = mtype->available;
+	mutex_unlock(&mdev_list_lock);
+
+	return sysfs_emit(buf, "%u\n", available);
+}
+static MDEV_TYPE_ATTR_RO(available_instances);
+static umode_t available_instances_is_visible(struct kobject *kobj,
+					      struct attribute *attr, int n)
+{
+	struct mdev_type *type = to_mdev_type(kobj);
+
+	if (!type->parent->ops->device_driver->get_available)
+		return 0;
+	return attr->mode;
+}
+static struct attribute *mdev_types_name_attrs[] = {
+	&mdev_type_attr_available_instances.attr,
+	NULL,
+};
+static struct attribute_group mdev_type_available_instances_group = {
+	.attrs = mdev_types_name_attrs,
+	.is_visible = available_instances_is_visible,
+};
+
 static const struct attribute_group *mdev_type_groups[] = {
 	&mdev_type_std_group,
+	&mdev_type_available_instances_group,
 	NULL,
 };
 
@@ -135,6 +168,10 @@ static struct mdev_type *add_mdev_supported_type(struct mdev_parent *parent,
 	/* Pairs with the put in mdev_type_release() */
 	mdev_get_parent(parent);
 	type->type_group_id = type_group_id;
+
+	if (parent->ops->device_driver->get_available)
+		type->available =
+			parent->ops->device_driver->get_available(type);
 
 	ret = kobject_init_and_add(&type->kobj, &mdev_type_ktype, NULL,
 				   "%s-%s", dev_driver_string(parent->dev),

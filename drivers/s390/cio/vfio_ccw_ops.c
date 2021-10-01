@@ -70,20 +70,9 @@ static ssize_t name_show(struct mdev_type *mtype,
 }
 static MDEV_TYPE_ATTR_RO(name);
 
-static ssize_t available_instances_show(struct mdev_type *mtype,
-					struct mdev_type_attribute *attr,
-					char *buf)
-{
-	struct vfio_ccw_private *private =
-		dev_get_drvdata(mtype_get_parent_dev(mtype));
-
-	return sprintf(buf, "%d\n", atomic_read(&private->avail));
-}
-static MDEV_TYPE_ATTR_RO(available_instances);
 
 static struct attribute *mdev_types_attrs[] = {
 	&mdev_type_attr_name.attr,
-	&mdev_type_attr_available_instances.attr,
 	NULL,
 };
 
@@ -102,9 +91,6 @@ static int vfio_ccw_mdev_probe(struct mdev_device *mdev)
 	struct vfio_ccw_private *private = dev_get_drvdata(mdev->dev.parent);
 	int ret;
 
-	if (atomic_dec_if_positive(&private->avail) < 0)
-		return -EPERM;
-
 	memset(&private->vdev, 0, sizeof(private->vdev));
 	vfio_init_group_dev(&private->vdev, &mdev->dev,
 			    &vfio_ccw_dev_ops);
@@ -118,13 +104,12 @@ static int vfio_ccw_mdev_probe(struct mdev_device *mdev)
 
 	ret = vfio_register_emulated_iommu_dev(&private->vdev);
 	if (ret)
-		goto err_atomic;
+		goto err_init;
 	dev_set_drvdata(&mdev->dev, private);
 	return 0;
 
-err_atomic:
+err_init:
 	vfio_uninit_group_dev(&private->vdev);
-	atomic_inc(&private->avail);
 	private->mdev = NULL;
 	return ret;
 }
@@ -141,7 +126,6 @@ static void vfio_ccw_mdev_remove(struct mdev_device *mdev)
 	vfio_unregister_group_dev(&private->vdev);
 	vfio_uninit_group_dev(&private->vdev);
 	private->mdev = NULL;
-	atomic_inc(&private->avail);
 }
 
 static int vfio_ccw_mdev_open_device(struct vfio_device *vdev)
@@ -610,6 +594,11 @@ static void vfio_ccw_mdev_request(struct vfio_device *vdev, unsigned int count)
 	}
 }
 
+static unsigned int vfio_ccw_get_available(struct mdev_type *mtype)
+{
+	return 1;
+}
+
 static const struct vfio_device_ops vfio_ccw_dev_ops = {
 	.open_device = vfio_ccw_mdev_open_device,
 	.close_device = vfio_ccw_mdev_close_device,
@@ -627,6 +616,7 @@ struct mdev_driver vfio_ccw_mdev_driver = {
 	},
 	.probe = vfio_ccw_mdev_probe,
 	.remove = vfio_ccw_mdev_remove,
+	.get_available = vfio_ccw_get_available,
 };
 
 static const struct mdev_parent_ops vfio_ccw_mdev_ops = {

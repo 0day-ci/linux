@@ -25,7 +25,7 @@ static DEFINE_MUTEX(parent_list_lock);
 static struct class_compat *mdev_bus_compat_class;
 
 static LIST_HEAD(mdev_list);
-static DEFINE_MUTEX(mdev_list_lock);
+DEFINE_MUTEX(mdev_list_lock);
 
 struct device *mdev_parent_dev(struct mdev_device *mdev)
 {
@@ -245,6 +245,7 @@ static void mdev_device_release(struct device *dev)
 
 	mutex_lock(&mdev_list_lock);
 	list_del(&mdev->next);
+	mdev->type->available++;
 	mutex_unlock(&mdev_list_lock);
 
 	dev_dbg(&mdev->dev, "MDEV: destroying\n");
@@ -266,6 +267,14 @@ int mdev_device_create(struct mdev_type *type, const guid_t *uuid)
 			mutex_unlock(&mdev_list_lock);
 			return -EEXIST;
 		}
+	}
+
+	if (drv && drv->get_available) {
+		if (!type->available) {
+			mutex_unlock(&mdev_list_lock);
+			return -EUSERS;
+		}
+		type->available--;
 	}
 
 	mdev = kzalloc(sizeof(*mdev), GFP_KERNEL);

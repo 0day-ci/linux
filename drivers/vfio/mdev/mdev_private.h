@@ -29,6 +29,7 @@ struct mdev_type {
 	struct kobject *devices_kobj;
 	struct mdev_parent *parent;
 	struct list_head next;
+	unsigned int available;
 	unsigned int type_group_id;
 };
 
@@ -38,6 +39,7 @@ struct mdev_type {
 	container_of(_kobj, struct mdev_type, kobj)
 
 extern struct mdev_driver vfio_mdev_driver;
+extern struct mutex mdev_list_lock;
 
 int  parent_create_sysfs_files(struct mdev_parent *parent);
 void parent_remove_sysfs_files(struct mdev_parent *parent);

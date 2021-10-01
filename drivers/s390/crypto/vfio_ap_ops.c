@@ -333,14 +333,9 @@ static int vfio_ap_mdev_probe(struct mdev_device *mdev)
 	struct ap_matrix_mdev *matrix_mdev;
 	int ret;
 
-	if ((atomic_dec_if_positive(&matrix_dev->available_instances) < 0))
-		return -EPERM;
-
 	matrix_mdev = kzalloc(sizeof(*matrix_mdev), GFP_KERNEL);
-	if (!matrix_mdev) {
-		ret = -ENOMEM;
-		goto err_dec_available;
-	}
+	if (!matrix_mdev)
+		return -ENOMEM;
 	vfio_init_group_dev(&matrix_mdev->vdev, &mdev->dev,
 			    &vfio_ap_matrix_dev_ops);
 
@@ -363,8 +358,6 @@ err_list:
 	mutex_unlock(&matrix_dev->lock);
 	vfio_uninit_group_dev(&matrix_mdev->vdev);
 	kfree(matrix_mdev);
-err_dec_available:
-	atomic_inc(&matrix_dev->available_instances);
 	return ret;
 }
 
@@ -380,7 +373,6 @@ static void vfio_ap_mdev_remove(struct mdev_device *mdev)
 	mutex_unlock(&matrix_dev->lock);
 	vfio_uninit_group_dev(&matrix_mdev->vdev);
 	kfree(matrix_mdev);
-	atomic_inc(&matrix_dev->available_instances);
 }
 
 static ssize_t name_show(struct mdev_type *mtype,
@@ -391,20 +383,8 @@ static ssize_t name_show(struct mdev_type *mtype,
 
 static MDEV_TYPE_ATTR_RO(name);
 
-static ssize_t available_instances_show(struct mdev_type *mtype,
-					struct mdev_type_attribute *attr,
-					char *buf)
-{
-	return sprintf(buf, "%d\n",
-		       atomic_read(&matrix_dev->available_instances));
-}
-
-static MDEV_TYPE_ATTR_RO(available_instances);
-
-
 static struct attribute *vfio_ap_mdev_type_attrs[] = {
 	&mdev_type_attr_name.attr,
-	&mdev_type_attr_available_instances.attr,
 	NULL,
 };
 
@@ -1359,6 +1339,11 @@ static ssize_t vfio_ap_mdev_ioctl(struct vfio_device *vdev,
 	return ret;
 }
 
+static unsigned int vfio_ap_mdev_get_available(struct mdev_type *mtype)
+{
+	return MAX_ZDEV_ENTRIES_EXT;
+}
+
 static const struct vfio_device_ops vfio_ap_matrix_dev_ops = {
 	.open_device = vfio_ap_mdev_open_device,
 	.close_device = vfio_ap_mdev_close_device,
@@ -1374,6 +1359,7 @@ static struct mdev_driver vfio_ap_matrix_driver = {
 	},
 	.probe = vfio_ap_mdev_probe,
 	.remove = vfio_ap_mdev_remove,
+	.get_available = vfio_ap_mdev_get_available,
 };
 
 static const struct mdev_parent_ops vfio_ap_matrix_ops = {
@@ -1386,8 +1372,6 @@ static const struct mdev_parent_ops vfio_ap_matrix_ops = {
 int vfio_ap_mdev_register(void)
 {
 	int ret;
-
-	atomic_set(&matrix_dev->available_instances, MAX_ZDEV_ENTRIES_EXT);
 
 	ret = mdev_register_driver(&vfio_ap_matrix_driver);
 	if (ret)

@@ -120,12 +120,14 @@ struct mdev_type_attribute {
  * @probe: called when new device created
  * @remove: called when device removed
  * @driver: device driver structure
+ * @get_available: Return the max number of instances that can be created
  *
  **/
 struct mdev_driver {
 	int (*probe)(struct mdev_device *dev);
 	void (*remove)(struct mdev_device *dev);
 	struct device_driver driver;
+	unsigned int (*get_available)(struct mdev_type *mtype);
 };
 
 static inline void *mdev_get_drvdata(struct mdev_device *mdev)
