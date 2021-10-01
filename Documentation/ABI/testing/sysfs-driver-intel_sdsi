@@ -1,0 +1,28 @@
+What:		/sys/class/misc/isdsi-<x>
+Date:		Sep 2021
+KernelVersion:	5.16
+Contact:	"David E. Box" <david.e.box@linux.intel.com>
+Description:
+		This folder contains files describing information about the
+		Software Defined Silicon miscdevice for a particular socket.
+
+What:		/sys/class/misc/isdsi-<x>/guid
+Date:		Sep 2021
+KernelVersion:	5.16
+Contact:	"David E. Box" <david.e.box@linux.intel.com>
+Description:
+		(RO) The GUID for the registers file. The GUID identifies
+		the register layout of the registers file in this folder.
+		Information about the register layouts for a particular GUID
+		is available at http://github.com/intel/intel-sdsi
+
+What:		/sys/class/misc/isdsi-<x>/registers
+Date:		Sep 2021
+KernelVersion:	5.16
+Contact:	"David E. Box" <david.e.box@linux.intel.com>
+Description:
+		(RO) Contains information needed by applications to provision
+		a CPU and monitor status intformation. The layout of this file
+		is determined by the GUID in this folder. Information about the
+		layout for a particular GUID is available at
+		http://github.com/intel/intel-sdsi

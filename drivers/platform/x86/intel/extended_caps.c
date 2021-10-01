@@ -31,6 +31,7 @@
 #define EXTENDED_CAP_ID_TELEMETRY	2
 #define EXTENDED_CAP_ID_WATCHER		3
 #define EXTENDED_CAP_ID_CRASHLOG	4
+#define EXTENDED_CAP_ID_SDSI		65
 
 static DEFINE_IDA(extended_caps_ida);
 
@@ -38,6 +39,7 @@ static int extended_caps_allow_list[] = {
 	EXTENDED_CAP_ID_TELEMETRY,
 	EXTENDED_CAP_ID_WATCHER,
 	EXTENDED_CAP_ID_CRASHLOG,
+	EXTENDED_CAP_ID_SDSI,
 };
 
 struct extended_caps_platform_info {
