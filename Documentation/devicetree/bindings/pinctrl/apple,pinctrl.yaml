@@ -34,6 +34,9 @@ properties:
   gpio-ranges:
     maxItems: 1
 
+  apple,npins:
+    maxItems: 1
+
   interrupts:
     description: One interrupt for each of the (up to 7) interrupt
       groups supported by the controller sorted by interrupt group
@@ -86,6 +89,7 @@ examples:
         gpio-controller;
         #gpio-cells = <2>;
         gpio-ranges = <&pinctrl 0 0 212>;
+        apple,npins = <212>;
 
         interrupt-controller;
         interrupt-parent = <&aic>;
