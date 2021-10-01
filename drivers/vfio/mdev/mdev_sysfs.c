@@ -74,8 +74,29 @@ static ssize_t create_store(struct mdev_type *mtype,
 
 	return count;
 }
-
 static MDEV_TYPE_ATTR_WO(create);
+
+static ssize_t device_api_show(struct mdev_type *mtype,
+			       struct mdev_type_attribute *attr, char *buf)
+{
+	return sysfs_emit(buf, "%s\n", mtype->parent->ops->device_api);
+}
+static MDEV_TYPE_ATTR_RO(device_api);
+
+static struct attribute *mdev_types_std_attrs[] = {
+	&mdev_type_attr_create.attr,
+	&mdev_type_attr_device_api.attr,
+	NULL,
+};
+
+static struct attribute_group mdev_type_std_group = {
+	.attrs = mdev_types_std_attrs,
+};
+
+static const struct attribute_group *mdev_type_groups[] = {
+	&mdev_type_std_group,
+	NULL,
+};
 
 static void mdev_type_release(struct kobject *kobj)
 {
@@ -123,7 +144,7 @@ static struct mdev_type *add_mdev_supported_type(struct mdev_parent *parent,
 		return ERR_PTR(ret);
 	}
 
-	ret = sysfs_create_file(&type->kobj, &mdev_type_attr_create.attr);
+	ret = sysfs_create_groups(&type->kobj, mdev_type_groups);
 	if (ret)
 		goto attr_create_failed;
 
@@ -144,7 +165,7 @@ static struct mdev_type *add_mdev_supported_type(struct mdev_parent *parent,
 attrs_failed:
 	kobject_put(type->devices_kobj);
 attr_devices_failed:
-	sysfs_remove_file(&type->kobj, &mdev_type_attr_create.attr);
+	sysfs_remove_groups(&type->kobj, mdev_type_groups);
 attr_create_failed:
 	kobject_del(&type->kobj);
 	kobject_put(&type->kobj);

@@ -137,6 +137,7 @@ The structures in the mdev_parent_ops structure are as follows:
 * mdev_attr_groups: attributes of the mediated device
 * supported_config: attributes to define supported configurations
 * device_driver: device driver to bind for mediated device instances
+* device_api: String to pass through the sysfs file below
 
 The mdev_parent_ops also still has various functions pointers.  Theses exist
 for historical reasons only and shall not be used for new drivers.
@@ -225,7 +226,8 @@ Directories and files under the sysfs for Each Physical Device
 * device_api
 
   This attribute should show which device API is being created, for example,
-  "vfio-pci" for a PCI device.
+  "vfio-pci" for a PCI device. The core code maintins this sysfs using the
+  device_api member of mdev_parent_ops.
 
 * available_instances
 

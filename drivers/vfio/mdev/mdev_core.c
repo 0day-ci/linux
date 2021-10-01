@@ -129,7 +129,7 @@ int mdev_register_device(struct device *dev, const struct mdev_parent_ops *ops)
 	char *envp[] = { env_string, NULL };
 
 	/* check for mandatory ops */
-	if (!ops || !ops->supported_type_groups)
+	if (!ops || !ops->supported_type_groups || !ops->device_api)
 		return -EINVAL;
 	if (!ops->device_driver && (!ops->create || !ops->remove))
 		return -EINVAL;
