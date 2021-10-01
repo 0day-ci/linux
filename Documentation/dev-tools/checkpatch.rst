@@ -1166,3 +1166,80 @@ Others
 
   **TYPO_SPELLING**
     Some words may have been misspelled.  Consider reviewing them.
+
+  **UNNECESSARY_ELSE**
+    Using an else statement just after a return or a break statement is
+    unnecessary. For example::
+
+      for (i = 0; i < 100; i++) {
+              int foo = bar();
+              if (foo < 1)
+                      break;
+              else
+                      usleep(1);
+      }
+
+    is generally better written as::
+
+      for (i = 0; i < 100; i++) {
+              int foo = bar();
+              if (foo < 1)
+                      break;
+              usleep(1);
+      }
+
+    It helps to reduce the indentation and removes the unnecessary else
+    statement. But note there can be some false positives because of the
+    way it is implemented in the checkpatch script. The checkpatch script
+    throws this warning message if it finds an else statement and the line
+    above it is a break or return statement indented at one tab more than
+    the else statement. So there can be some false positives like::
+
+      int n = 15;
+      if (n > 10)
+              n--;
+      else if (n == 10)
+              return 0;
+      else
+              n++;
+
+    Now the checkpatch will give a warning for the use of else after return
+    statement. If the else statement is removed then::
+
+      int n = 15;
+      if (n > 10)
+              n--;
+      else if (n == 10)
+              return 0;
+      n++;
+
+    Now both the n-- and n++ statements will be executed which is different
+    from the logic in the first case. Because the if block doesn't have
+    a return statement, so removing the else statement is wrong.
+
+    Always check the previous if/else if blocks, for break/return
+    statements, and do not blindly follow the checkpatch advice. One
+    patch https://lore.kernel.org/all/20200615155131.GA4563@sevic69/
+    even made it to the mainline, which was again reverted and fixed.
+    Commit 98fe05e21a6e ("staging: rtl8712: Remove unnecesary else
+    after return statement.")
+
+    Also, do not change the code if there is only a single return/break
+    statement inside if-else block, like::
+
+      if (a > b)
+              return a;
+      else
+              return b;
+
+    now if the else statement is removed::
+
+      if (a > b)
+              return a;
+      return b;
+
+    there is no considerable increase in the readability and one can argue
+    that the first form is more readable because of the indentation. So
+    do not remove the else statement in case of a single return/break
+    statements inside the if-else block.
+    See: https://lore.kernel.org/lkml/20140925032215.GK7996@ZenIV.linux.org.uk/
