@@ -495,10 +495,9 @@ intel_dp_prepare_link_train(struct intel_dp *intel_dp,
 				  &rate_select, 1);
 
 	link_config[0] = crtc_state->vrr.enable ? DP_MSA_TIMING_PAR_IGNORE_EN : 0;
-	link_config[1] = DP_SET_ANSI_8B10B;
+	link_config[1] = intel_dp_is_uhbr(crtc_state) ?
+		DP_SET_ANSI_128B132B : DP_SET_ANSI_8B10B;
 	drm_dp_dpcd_write(&intel_dp->aux, DP_DOWNSPREAD_CTRL, link_config, 2);
-
-	intel_dp->DP |= DP_PORT_EN;
 
 	return true;
 }
@@ -602,52 +601,56 @@ intel_dp_link_training_clock_recovery(struct intel_dp *intel_dp,
 }
 
 /*
- * Pick training pattern for channel equalization. Training pattern 4 for HBR3
- * or for 1.4 devices that support it, training Pattern 3 for HBR2
- * or 1.2 devices that support it, Training Pattern 2 otherwise.
+ * Pick Training Pattern Sequence (TPS) for channel equalization. 128b/132b TPS2
+ * for UHBR+, TPS4 for HBR3 or for 1.4 devices that support it, TPS3 for HBR2 or
+ * 1.2 devices that support it, TPS2 otherwise.
  */
 static u32 intel_dp_training_pattern(struct intel_dp *intel_dp,
 				     const struct intel_crtc_state *crtc_state,
 				     enum drm_dp_phy dp_phy)
 {
+	struct drm_i915_private *i915 = dp_to_i915(intel_dp);
 	bool source_tps3, sink_tps3, source_tps4, sink_tps4;
 
+	/* UHBR+ use separate 128b/132b TPS2 */
+	if (intel_dp_is_uhbr(crtc_state))
+		return DP_TRAINING_PATTERN_2;
+
 	/*
-	 * Intel platforms that support HBR3 also support TPS4. It is mandatory
-	 * for all downstream devices that support HBR3. There are no known eDP
-	 * panels that support TPS4 as of Feb 2018 as per VESA eDP_v1.4b_E1
-	 * specification.
+	 * TPS4 support is mandatory for all downstream devices that
+	 * support HBR3. There are no known eDP panels that support
+	 * TPS4 as of Feb 2018 as per VESA eDP_v1.4b_E1 specification.
 	 * LTTPRs must support TPS4.
 	 */
-	source_tps4 = intel_dp_source_supports_hbr3(intel_dp);
+	source_tps4 = intel_dp_source_supports_tps4(i915);
 	sink_tps4 = dp_phy != DP_PHY_DPRX ||
 		    drm_dp_tps4_supported(intel_dp->dpcd);
 	if (source_tps4 && sink_tps4) {
 		return DP_TRAINING_PATTERN_4;
 	} else if (crtc_state->port_clock == 810000) {
 		if (!source_tps4)
-			drm_dbg_kms(&dp_to_i915(intel_dp)->drm,
-				    "8.1 Gbps link rate without source HBR3/TPS4 support\n");
+			drm_dbg_kms(&i915->drm,
+				    "8.1 Gbps link rate without source TPS4 support\n");
 		if (!sink_tps4)
-			drm_dbg_kms(&dp_to_i915(intel_dp)->drm,
+			drm_dbg_kms(&i915->drm,
 				    "8.1 Gbps link rate without sink TPS4 support\n");
 	}
+
 	/*
-	 * Intel platforms that support HBR2 also support TPS3. TPS3 support is
-	 * also mandatory for downstream devices that support HBR2. However, not
-	 * all sinks follow the spec.
+	 * TPS3 support is mandatory for downstream devices that
+	 * support HBR2. However, not all sinks follow the spec.
 	 */
-	source_tps3 = intel_dp_source_supports_hbr2(intel_dp);
+	source_tps3 = intel_dp_source_supports_tps3(i915);
 	sink_tps3 = dp_phy != DP_PHY_DPRX ||
 		    drm_dp_tps3_supported(intel_dp->dpcd);
 	if (source_tps3 && sink_tps3) {
 		return  DP_TRAINING_PATTERN_3;
 	} else if (crtc_state->port_clock >= 540000) {
 		if (!source_tps3)
-			drm_dbg_kms(&dp_to_i915(intel_dp)->drm,
-				    ">=5.4/6.48 Gbps link rate without source HBR2/TPS3 support\n");
+			drm_dbg_kms(&i915->drm,
+				    ">=5.4/6.48 Gbps link rate without source TPS3 support\n");
 		if (!sink_tps3)
-			drm_dbg_kms(&dp_to_i915(intel_dp)->drm,
+			drm_dbg_kms(&i915->drm,
 				    ">=5.4/6.48 Gbps link rate without sink TPS3 support\n");
 	}
 
