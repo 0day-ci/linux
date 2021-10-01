@@ -54,20 +54,20 @@ properties:
     maxItems: 1
 
   clock-names:
-    const: ipg
+    maxItems: 1
 
   clock-frequency:
     enum: [ 100000, 400000 ]
 
   dmas:
-    items:
-      - description: DMA controller phandle and request line for RX
-      - description: DMA controller phandle and request line for TX
+    minItems: 2
+    maxItems: 2
 
   dma-names:
+    minItems: 2
+    maxItems: 2
     items:
-      - const: rx
-      - const: tx
+      enum: [ "rx", "tx" ]
 
   sda-gpios:
     maxItems: 1
