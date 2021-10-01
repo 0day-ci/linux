@@ -2133,8 +2133,10 @@ int msm_dsi_host_cmd_rx(struct mipi_dsi_host *host,
 		}
 
 		ret = dsi_cmds2buf_tx(msm_host, msg);
-		if (ret < msg->tx_len) {
+		if (ret < 0 || ret < msg->tx_len) {
 			pr_err("%s: Read cmd Tx failed, %d\n", __func__, ret);
+			if (ret >= 0)
+				ret = -EIO;
 			return ret;
 		}
 
