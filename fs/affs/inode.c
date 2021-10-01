@@ -41,7 +41,7 @@ struct inode *affs_iget(struct super_block *sb, unsigned long ino)
 		goto bad_inode;
 	}
 	if (affs_checksum_block(sb, bh) || be32_to_cpu(AFFS_HEAD(bh)->ptype) != T_SHORT) {
-		affs_warning(sb,"read_inode",
+		affs_warning(sb, "read_inode",
 			   "Checksum or type (ptype=%d) error on inode %d",
 			   AFFS_HEAD(bh)->ptype, block);
 		goto bad_inode;
@@ -151,7 +151,7 @@ struct inode *affs_iget(struct super_block *sb, unsigned long ino)
 
 	inode->i_mtime.tv_sec = inode->i_atime.tv_sec = inode->i_ctime.tv_sec
 		       = (be32_to_cpu(tail->change.days) * 86400LL +
-		         be32_to_cpu(tail->change.mins) * 60 +
+						 be32_to_cpu(tail->change.mins) * 60 +
 			 be32_to_cpu(tail->change.ticks) / 50 +
 			 AFFS_EPOCH_DELTA) +
 			 sys_tz.tz_minuteswest * 60;
@@ -182,7 +182,7 @@ affs_write_inode(struct inode *inode, struct writeback_control *wbc)
 		return 0;
 	bh = affs_bread(sb, inode->i_ino);
 	if (!bh) {
-		affs_error(sb,"write_inode","Cannot read block %lu",inode->i_ino);
+		affs_error(sb, "write_inode", "Cannot read block %lu", inode->i_ino);
 		return -EIO;
 	}
 	tail = AFFS_TAIL(sb, bh);
@@ -263,6 +263,7 @@ void
 affs_evict_inode(struct inode *inode)
 {
 	unsigned long cache_page;
+
 	pr_debug("evict_inode(ino=%lu, nlink=%u)\n",
 		 inode->i_ino, inode->i_nlink);
 	truncate_inode_pages_final(&inode->i_data);
@@ -298,10 +299,12 @@ affs_new_inode(struct inode *dir)
 	u32			 block;
 	struct buffer_head	*bh;
 
-	if (!(inode = new_inode(sb)))
+	inode = new_inode(sb);
+	if (!inode)
 		goto err_inode;
 
-	if (!(block = affs_alloc_block(dir, dir->i_ino)))
+	block = affs_alloc_block(dir, dir->i_ino);
+	if (!block)
 		goto err_block;
 
 	bh = affs_getzeroblk(sb, block);
@@ -390,7 +393,8 @@ affs_add_entry(struct inode *dir, struct inode *inode, struct dentry *dentry, s3
 
 	if (inode_bh) {
 		__be32 chain;
-	       	chain = AFFS_TAIL(sb, inode_bh)->link_chain;
+
+		chain = AFFS_TAIL(sb, inode_bh)->link_chain;
 		AFFS_TAIL(sb, bh)->original = cpu_to_be32(inode->i_ino);
 		AFFS_TAIL(sb, bh)->link_chain = chain;
 		AFFS_TAIL(sb, inode_bh)->link_chain = cpu_to_be32(block);
