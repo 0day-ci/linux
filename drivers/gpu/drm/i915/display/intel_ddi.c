@@ -1398,11 +1398,16 @@ static int translate_signal_level(struct intel_dp *intel_dp,
 static int intel_ddi_dp_level(struct intel_dp *intel_dp,
 			      const struct intel_crtc_state *crtc_state)
 {
-	u8 train_set = intel_dp->train_set[0];
-	u8 signal_levels = train_set & (DP_TRAIN_VOLTAGE_SWING_MASK |
-					DP_TRAIN_PRE_EMPHASIS_MASK);
+	if (intel_dp_is_uhbr(crtc_state)) {
+		/* FIXME: We'll want independent presets for each lane. */
+		return intel_dp->train_set[0] & DP_TX_FFE_PRESET_VALUE_MASK;
+	} else {
+		u8 train_set = intel_dp->train_set[0];
+		u8 signal_levels = train_set & (DP_TRAIN_VOLTAGE_SWING_MASK |
+						DP_TRAIN_PRE_EMPHASIS_MASK);
 
-	return translate_signal_level(intel_dp, signal_levels);
+		return translate_signal_level(intel_dp, signal_levels);
+	}
 }
 
 static void
