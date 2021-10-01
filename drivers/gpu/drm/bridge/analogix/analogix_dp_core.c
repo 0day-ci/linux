@@ -1632,8 +1632,27 @@ static ssize_t analogix_dpaux_transfer(struct drm_dp_aux *aux,
 				       struct drm_dp_aux_msg *msg)
 {
 	struct analogix_dp_device *dp = to_dp(aux);
+	int ret, ret2;
 
-	return analogix_dp_transfer(dp, msg);
+	ret = analogix_dp_prepare_panel(dp, true, false);
+	if (ret) {
+		drm_err(dp->drm_dev, "Failed to prepare panel (%d)\n", ret);
+		return ret;
+	}
+
+	pm_runtime_get_sync(dp->dev);
+	ret = analogix_dp_transfer(dp, msg);
+	pm_runtime_put(dp->dev);
+
+	ret2 = analogix_dp_prepare_panel(dp, false, false);
+	if (ret2) {
+		drm_err(dp->drm_dev, "Failed to unprepare panel (%d)\n", ret2);
+		/* Prefer the analogix_dp_transfer() error, if it exists. */
+		if (!ret)
+			ret = ret2;
+	}
+
+	return ret;
 }
 
 struct analogix_dp_device *
