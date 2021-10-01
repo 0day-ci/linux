@@ -304,14 +304,25 @@ static void lpi_check_constraints(void)
 			acpi_power_state_string(adev->power.state));
 
 		if (!adev->flags.power_manageable) {
-			acpi_handle_info(handle, "LPI: Device not power manageable\n");
+			if (pm_debug_messages_on)
+				acpi_handle_info(handle, "LPI: Device not power manageable\n");
 			lpi_constraints_table[i].handle = NULL;
 			continue;
 		}
 
-		if (adev->power.state < lpi_constraints_table[i].min_dstate)
-			acpi_handle_info(handle,
-				"LPI: Constraint not met; min power state:%s current power state:%s\n",
+		if (adev->power.state >= lpi_constraints_table[i].min_dstate)
+			continue;
+		/* make sure that anything with shared resources isn't blocked */
+		if (!acpi_get_first_physical_node(adev)) {
+			if (pm_debug_messages_on)
+				acpi_handle_info(handle, "LPI: Device is not physically present - forcing transition from %s to %s\n",
+						acpi_power_state_string(adev->power.state),
+						acpi_power_state_string(ACPI_STATE_D3_COLD));
+			acpi_device_set_power(adev, ACPI_STATE_D3_COLD);
+			continue;
+		}
+		if (pm_debug_messages_on)
+			acpi_handle_info(handle, "LPI: Constraint not met; min power state:%s current power state:%s\n",
 				acpi_power_state_string(lpi_constraints_table[i].min_dstate),
 				acpi_power_state_string(adev->power.state));
 	}
@@ -446,8 +457,7 @@ int acpi_s2idle_prepare_late(void)
 	if (!lps0_device_handle || sleep_no_lps0)
 		return 0;
 
-	if (pm_debug_messages_on)
-		lpi_check_constraints();
+	lpi_check_constraints();
 
 	/* Screen off */
 	if (lps0_dsm_func_mask > 0)
