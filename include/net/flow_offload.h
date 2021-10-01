@@ -148,6 +148,10 @@ enum flow_action_id {
 	FLOW_ACTION_MPLS_MANGLE,
 	FLOW_ACTION_GATE,
 	FLOW_ACTION_PPPOE_PUSH,
+	FLOW_ACTION_PEDIT, /* generic action type of pedit action for action
+			    * offload, it will be different type when adding
+			    * tc actions
+			    */
 	NUM_FLOW_ACTIONS,
 };
 
@@ -551,6 +555,29 @@ struct flow_cls_offload {
 	struct flow_stats stats;
 	u32 classid;
 };
+
+enum flow_act_command {
+	FLOW_ACT_REPLACE,
+	FLOW_ACT_DESTROY,
+	FLOW_ACT_STATS,
+};
+
+enum flow_act_hw_oper {
+	FLOW_ACT_HW_ADD,
+	FLOW_ACT_HW_UPDATE,
+	FLOW_ACT_HW_DEL,
+};
+
+struct flow_offload_action {
+	struct netlink_ext_ack *extack; /* NULL in FLOW_ACT_STATS process*/
+	enum flow_act_command command;
+	enum flow_action_id id;
+	u32 index;
+	struct flow_stats stats;
+	struct flow_action action;
+};
+
+struct flow_offload_action *flow_action_alloc(unsigned int num_actions);
 
 static inline struct flow_rule *
 flow_cls_offload_flow_rule(struct flow_cls_offload *flow_cmd)

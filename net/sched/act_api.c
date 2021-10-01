@@ -21,6 +21,19 @@
 #include <net/pkt_cls.h>
 #include <net/act_api.h>
 #include <net/netlink.h>
+#include <net/tc_act/tc_pedit.h>
+#include <net/tc_act/tc_mirred.h>
+#include <net/tc_act/tc_vlan.h>
+#include <net/tc_act/tc_tunnel_key.h>
+#include <net/tc_act/tc_csum.h>
+#include <net/tc_act/tc_gact.h>
+#include <net/tc_act/tc_police.h>
+#include <net/tc_act/tc_sample.h>
+#include <net/tc_act/tc_skbedit.h>
+#include <net/tc_act/tc_ct.h>
+#include <net/tc_act/tc_mpls.h>
+#include <net/tc_act/tc_gate.h>
+#include <net/flow_offload.h>
 
 #ifdef CONFIG_INET
 DEFINE_STATIC_KEY_FALSE(tcf_frag_xmit_count);
@@ -145,6 +158,7 @@ static int __tcf_action_put(struct tc_action *p, bool bind)
 	if (refcount_dec_and_mutex_lock(&p->tcfa_refcnt, &idrinfo->lock)) {
 		if (bind)
 			atomic_dec(&p->tcfa_bindcnt);
+		tcf_action_offload_del(p);
 		idr_remove(&idrinfo->action_idr, p->tcfa_index);
 		mutex_unlock(&idrinfo->lock);
 
@@ -341,6 +355,7 @@ static int tcf_idr_release_unsafe(struct tc_action *p)
 		return -EPERM;
 
 	if (refcount_dec_and_test(&p->tcfa_refcnt)) {
+		tcf_action_offload_del(p);
 		idr_remove(&p->idrinfo->action_idr, p->tcfa_index);
 		tcf_action_cleanup(p);
 		return ACT_P_DELETED;
@@ -448,6 +463,7 @@ static int tcf_idr_delete_index(struct tcf_idrinfo *idrinfo, u32 index)
 		if (refcount_dec_and_test(&p->tcfa_refcnt)) {
 			struct module *owner = p->ops->owner;
 
+			tcf_action_offload_del(p);
 			WARN_ON(p != idr_remove(&idrinfo->action_idr,
 						p->tcfa_index));
 			mutex_unlock(&idrinfo->lock);
@@ -733,6 +749,9 @@ restart_act_graph:
 			jmp_prgcnt -= 1;
 			continue;
 		}
+
+		if (tc_act_skip_sw(a->tcfa_flags))
+			continue;
 repeat:
 		ret = a->ops->act(skb, a, res);
 		if (ret == TC_ACT_REPEAT)
@@ -838,6 +857,9 @@ tcf_action_dump_1(struct sk_buff *skb, struct tc_action *a, int bind, int ref)
 			       a->tcfa_flags, a->tcfa_flags))
 		goto nla_put_failure;
 
+	if (nla_put_u32(skb, TCA_ACT_IN_HW_COUNT, a->in_hw_count))
+		goto nla_put_failure;
+
 	nest = nla_nest_start_noflag(skb, TCA_OPTIONS);
 	if (nest == NULL)
 		goto nla_put_failure;
@@ -917,7 +939,9 @@ static const struct nla_policy tcf_action_policy[TCA_ACT_MAX + 1] = {
 	[TCA_ACT_COOKIE]	= { .type = NLA_BINARY,
 				    .len = TC_COOKIE_MAX_SIZE },
 	[TCA_ACT_OPTIONS]	= { .type = NLA_NESTED },
-	[TCA_ACT_FLAGS]		= NLA_POLICY_BITFIELD32(TCA_ACT_FLAGS_NO_PERCPU_STATS),
+	[TCA_ACT_FLAGS]		= NLA_POLICY_BITFIELD32(TCA_ACT_FLAGS_NO_PERCPU_STATS |
+							TCA_ACT_FLAGS_SKIP_HW |
+							TCA_ACT_FLAGS_SKIP_SW),
 	[TCA_ACT_HW_STATS]	= NLA_POLICY_BITFIELD32(TCA_ACT_HW_STATS_ANY),
 };
 
@@ -1030,8 +1054,13 @@ struct tc_action *tcf_action_init_1(struct net *net, struct tcf_proto *tp,
 			}
 		}
 		hw_stats = tcf_action_hw_stats_get(tb[TCA_ACT_HW_STATS]);
-		if (tb[TCA_ACT_FLAGS])
+		if (tb[TCA_ACT_FLAGS]) {
 			userflags = nla_get_bitfield32(tb[TCA_ACT_FLAGS]);
+			if (!tc_act_flags_valid(userflags.value)) {
+				err = -EINVAL;
+				goto err_out;
+			}
+		}
 
 		err = a_o->init(net, tb[TCA_ACT_OPTIONS], est, &a, tp,
 				userflags.value | flags, extack);
@@ -1057,6 +1086,219 @@ err_out:
 		kfree(cookie);
 	}
 	return ERR_PTR(err);
+}
+
+static int flow_action_init(struct flow_offload_action *fl_action,
+			    struct tc_action *act,
+			    enum flow_act_command cmd,
+			    struct netlink_ext_ack *extack)
+{
+	int err;
+
+	if (!fl_action)
+		return -EINVAL;
+
+	fl_action->extack = extack;
+	fl_action->command = cmd;
+	fl_action->index = act->tcfa_index;
+
+	if (is_tcf_gact_ok(act)) {
+		fl_action->id = FLOW_ACTION_ACCEPT;
+	} else if (is_tcf_gact_shot(act)) {
+		fl_action->id = FLOW_ACTION_DROP;
+	} else if (is_tcf_gact_trap(act)) {
+		fl_action->id = FLOW_ACTION_TRAP;
+	} else if (is_tcf_gact_goto_chain(act)) {
+		fl_action->id = FLOW_ACTION_GOTO;
+	} else if (is_tcf_mirred_egress_redirect(act)) {
+		fl_action->id = FLOW_ACTION_REDIRECT;
+	} else if (is_tcf_mirred_egress_mirror(act)) {
+		fl_action->id = FLOW_ACTION_MIRRED;
+	} else if (is_tcf_mirred_ingress_redirect(act)) {
+		fl_action->id = FLOW_ACTION_REDIRECT_INGRESS;
+	} else if (is_tcf_mirred_ingress_mirror(act)) {
+		fl_action->id = FLOW_ACTION_MIRRED_INGRESS;
+	} else if (is_tcf_vlan(act)) {
+		switch (tcf_vlan_action(act)) {
+		case TCA_VLAN_ACT_PUSH:
+			fl_action->id = FLOW_ACTION_VLAN_PUSH;
+			break;
+		case TCA_VLAN_ACT_POP:
+			fl_action->id = FLOW_ACTION_VLAN_POP;
+			break;
+		case TCA_VLAN_ACT_MODIFY:
+			fl_action->id = FLOW_ACTION_VLAN_MANGLE;
+			break;
+		default:
+			err = -EOPNOTSUPP;
+			goto err_out;
+		}
+	} else if (is_tcf_tunnel_set(act)) {
+		fl_action->id = FLOW_ACTION_TUNNEL_ENCAP;
+	} else if (is_tcf_tunnel_release(act)) {
+		fl_action->id = FLOW_ACTION_TUNNEL_DECAP;
+	} else if (is_tcf_pedit(act)) {
+		fl_action->id = FLOW_ACTION_PEDIT;
+	} else if (is_tcf_csum(act)) {
+		fl_action->id = FLOW_ACTION_CSUM;
+	} else if (is_tcf_skbedit_mark(act)) {
+		fl_action->id = FLOW_ACTION_MARK;
+	} else if (is_tcf_sample(act)) {
+		fl_action->id = FLOW_ACTION_SAMPLE;
+	} else if (is_tcf_police(act)) {
+		fl_action->id = FLOW_ACTION_POLICE;
+	} else if (is_tcf_ct(act)) {
+		fl_action->id = FLOW_ACTION_CT;
+	} else if (is_tcf_mpls(act)) {
+		switch (tcf_mpls_action(act)) {
+		case TCA_MPLS_ACT_PUSH:
+			fl_action->id = FLOW_ACTION_MPLS_PUSH;
+			break;
+		case TCA_MPLS_ACT_POP:
+			fl_action->id = FLOW_ACTION_MPLS_POP;
+			break;
+		case TCA_MPLS_ACT_MODIFY:
+			fl_action->id = FLOW_ACTION_MPLS_MANGLE;
+			break;
+		default:
+			err = -EOPNOTSUPP;
+			goto err_out;
+		}
+	} else if (is_tcf_skbedit_ptype(act)) {
+		fl_action->id = FLOW_ACTION_PTYPE;
+	} else if (is_tcf_skbedit_priority(act)) {
+		fl_action->id = FLOW_ACTION_PRIORITY;
+	} else if (is_tcf_gate(act)) {
+		fl_action->id = FLOW_ACTION_GATE;
+	} else {
+		goto err_out;
+	}
+	return 0;
+
+err_out:
+	return err;
+}
+
+static void flow_action_update_hw(struct tc_action *act,
+				  u32 hw_count,
+				  enum flow_act_hw_oper cmd)
+{
+	if (!act)
+		return;
+
+	switch (cmd) {
+	case FLOW_ACT_HW_ADD:
+		act->in_hw_count = hw_count;
+		break;
+	case FLOW_ACT_HW_UPDATE:
+		act->in_hw_count += hw_count;
+		break;
+	case FLOW_ACT_HW_DEL:
+		act->in_hw_count = act->in_hw_count > hw_count ?
+				   act->in_hw_count - hw_count : 0;
+		break;
+	default:
+		return;
+	}
+
+	if (act->in_hw_count) {
+		act->tcfa_flags &= ~TCA_ACT_FLAGS_NOT_IN_HW;
+		act->tcfa_flags |= TCA_ACT_FLAGS_IN_HW;
+	} else {
+		act->tcfa_flags &= ~TCA_ACT_FLAGS_IN_HW;
+		act->tcfa_flags |= TCA_ACT_FLAGS_NOT_IN_HW;
+	}
+}
+
+static int tcf_action_offload_cmd(struct flow_offload_action *fl_act,
+				  u32 *hw_count,
+				  struct netlink_ext_ack *extack)
+{
+	int err;
+
+	if (IS_ERR(fl_act))
+		return PTR_ERR(fl_act);
+
+	err = flow_indr_dev_setup_offload(NULL, NULL, TC_SETUP_ACT, fl_act, NULL, NULL);
+
+	if (err < 0)
+		return err;
+
+	if (hw_count)
+		*hw_count = err;
+
+	return 0;
+}
+
+/* offload the tc command after inserted */
+static int tcf_action_offload_add(struct tc_action *action,
+				  struct netlink_ext_ack *extack)
+{
+	bool skip_sw = tc_act_skip_sw(action->tcfa_flags);
+	struct tc_action *actions[TCA_ACT_MAX_PRIO] = {
+		[0] = action,
+	};
+	struct flow_offload_action *fl_action;
+	u32 in_hw_count = 0;
+	int err = 0;
+
+	if (tc_act_skip_hw(action->tcfa_flags))
+		return 0;
+
+	fl_action = flow_action_alloc(tcf_act_num_actions_single(action));
+	if (!fl_action)
+		return -EINVAL;
+
+	err = flow_action_init(fl_action, action, FLOW_ACT_REPLACE, extack);
+	if (err)
+		goto fl_err;
+
+	err = tc_setup_action(&fl_action->action, actions);
+	if (err) {
+		NL_SET_ERR_MSG_MOD(extack,
+				   "Failed to setup tc actions for offload\n");
+		goto fl_err;
+	}
+
+	err = tcf_action_offload_cmd(fl_action, &in_hw_count, extack);
+	if (!err)
+		flow_action_update_hw(action, in_hw_count, FLOW_ACT_HW_ADD);
+
+	if (skip_sw && !tc_act_in_hw(action->tcfa_flags))
+		err = -EINVAL;
+
+	tc_cleanup_flow_action(&fl_action->action);
+
+fl_err:
+	kfree(fl_action);
+
+	return err;
+}
+
+int tcf_action_offload_del(struct tc_action *action)
+{
+	struct flow_offload_action fl_act;
+	u32 in_hw_count = 0;
+	int err = 0;
+
+	if (!action)
+		return -EINVAL;
+
+	if (!tc_act_in_hw(action->tcfa_flags))
+		return 0;
+
+	err = flow_action_init(&fl_act, action, FLOW_ACT_DESTROY, NULL);
+	if (err)
+		return err;
+
+	err = tcf_action_offload_cmd(&fl_act, &in_hw_count, NULL);
+	if (err)
+		return err;
+
+	if (action->in_hw_count != in_hw_count)
+		return -EINVAL;
+
+	return 0;
 }
 
 /* Returns numbers of initialized actions or negative error. */
@@ -1101,6 +1343,11 @@ int tcf_action_init(struct net *net, struct tcf_proto *tp, struct nlattr *nla,
 		sz += tcf_action_fill_size(act);
 		/* Start from index 0 */
 		actions[i - 1] = act;
+		if (!(flags & TCA_ACT_FLAGS_BIND)) {
+			err = tcf_action_offload_add(act, extack);
+			if (tc_act_skip_sw(act->tcfa_flags) && err)
+				goto err;
+		}
 	}
 
 	/* We have to commit them all together, because if any error happened in
