@@ -26,6 +26,17 @@ source "drivers/platform/x86/intel/speed_select_if/Kconfig"
 source "drivers/platform/x86/intel/telemetry/Kconfig"
 source "drivers/platform/x86/intel/wmi/Kconfig"
 
+config INTEL_EXTENDED_CAPS
+	tristate "Intel Extended Capabilities support"
+	depends on PCI
+	select AUXILIARY_BUS
+	help
+	  Adds support for feature drivers exposed using Intel PCIe VSEC and
+	  DVSEC.
+
+	  To compile this driver as a module, choose M here: the module will
+	  be called intel_extended_caps.
+
 config INTEL_HID_EVENT
 	tristate "Intel HID Event"
 	depends on ACPI

@@ -21,6 +21,8 @@ intel-vbtn-y				:= vbtn.o
 obj-$(CONFIG_INTEL_VBTN)		+= intel-vbtn.o
 
 # Intel miscellaneous drivers
+intel_extended_caps-y			:= extended_caps.o
+obj-$(CONFIG_INTEL_EXTENDED_CAPS)	+= intel_extended_caps.o
 intel_int0002_vgpio-y			:= int0002_vgpio.o
 obj-$(CONFIG_INTEL_INT0002_VGPIO)	+= intel_int0002_vgpio.o
 intel_oaktrail-y			:= oaktrail.o

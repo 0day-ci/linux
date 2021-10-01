@@ -14,6 +14,7 @@
 #include <linux/pci.h>
 
 #include "class.h"
+#include "../extended_caps.h"
 
 #define PMT_XA_START		0
 #define PMT_XA_MAX		INT_MAX
@@ -281,31 +282,31 @@ fail_dev_create:
 	return ret;
 }
 
-int intel_pmt_dev_create(struct intel_pmt_entry *entry,
-			 struct intel_pmt_namespace *ns,
-			 struct platform_device *pdev, int idx)
+int intel_pmt_dev_create(struct intel_pmt_entry *entry, struct intel_pmt_namespace *ns,
+			 struct intel_extended_cap_device *intel_cap_dev, int idx)
 {
+	struct device *dev = &intel_cap_dev->aux_dev.dev;
 	struct intel_pmt_header header;
 	struct resource	*disc_res;
 	int ret = -ENODEV;
 
-	disc_res = platform_get_resource(pdev, IORESOURCE_MEM, idx);
+	disc_res = intel_ext_cap_get_resource(intel_cap_dev, idx);
 	if (!disc_res)
 		return ret;
 
-	entry->disc_table = devm_platform_ioremap_resource(pdev, idx);
+	entry->disc_table = devm_ioremap_resource(dev, disc_res);
 	if (IS_ERR(entry->disc_table))
 		return PTR_ERR(entry->disc_table);
 
-	ret = ns->pmt_header_decode(entry, &header, &pdev->dev);
+	ret = ns->pmt_header_decode(entry, &header, dev);
 	if (ret)
 		return ret;
 
-	ret = intel_pmt_populate_entry(entry, &header, &pdev->dev, disc_res);
+	ret = intel_pmt_populate_entry(entry, &header, dev, disc_res);
 	if (ret)
 		return ret;
 
-	return intel_pmt_dev_register(entry, ns, &pdev->dev);
+	return intel_pmt_dev_register(entry, ns, dev);
 
 }
 EXPORT_SYMBOL_GPL(intel_pmt_dev_create);
@@ -342,3 +343,4 @@ module_exit(pmt_class_exit);
 MODULE_AUTHOR("Alexander Duyck <alexander.h.duyck@linux.intel.com>");
 MODULE_DESCRIPTION("Intel PMT Class driver");
 MODULE_LICENSE("GPL v2");
+MODULE_IMPORT_NS(INTEL_EXT_CAPS);
