@@ -213,19 +213,12 @@ static int
 rpc_pipe_open(struct inode *inode, struct file *filp)
 {
 	struct rpc_pipe *pipe;
-	int first_open;
 	int res = -ENXIO;
 
 	inode_lock(inode);
 	pipe = RPC_I(inode)->pipe;
 	if (pipe == NULL)
 		goto out;
-	first_open = pipe->nreaders == 0 && pipe->nwriters == 0;
-	if (first_open && pipe->ops->open_pipe) {
-		res = pipe->ops->open_pipe(inode);
-		if (res)
-			goto out;
-	}
 	if (filp->f_mode & FMODE_READ)
 		pipe->nreaders++;
 	if (filp->f_mode & FMODE_WRITE)
