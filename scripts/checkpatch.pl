@@ -4011,15 +4011,16 @@ sub process {
 
 # check indentation of any line with a bare else
 # (but not if it is a multiple line "if (foo) return bar; else return baz;")
-# if the previous line is a break or return and is indented 1 tab more...
+# if the previous line is a break or continue or return and is indented 1 tab more...
 		if ($sline =~ /^\+([\t]+)(?:}[ \t]*)?else(?:[ \t]*{)?\s*$/) {
 			my $tabs = length($1) + 1;
 			if ($prevline =~ /^\+\t{$tabs,$tabs}break\b/ ||
+			    $prevline =~ /^\+\t{$tabs,$tabs}continue\b/ ||
 			    ($prevline =~ /^\+\t{$tabs,$tabs}return\b/ &&
 			     defined $lines[$linenr] &&
 			     $lines[$linenr] !~ /^[ \+]\t{$tabs,$tabs}return/)) {
 				WARN("UNNECESSARY_ELSE",
-				     "else is not generally useful after a break or return\n" . $hereprev);
+				     "else is not generally useful after a break or continue or return\n" . $hereprev);
 			}
 		}
 
