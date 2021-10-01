@@ -338,6 +338,7 @@ static void vfio_group_unlock_and_free(struct vfio_group *group)
 		list_del(&unbound->unbound_next);
 		kfree(unbound);
 	}
+	iommu_group_put(group->iommu_group);
 	kfree(group);
 }
 
@@ -389,6 +390,8 @@ static struct vfio_group *vfio_create_group(struct iommu_group *iommu_group,
 	atomic_set(&group->opened, 0);
 	init_waitqueue_head(&group->container_q);
 	group->iommu_group = iommu_group;
+	/* put in vfio_group_unlock_and_free() */
+	iommu_group_ref_get(iommu_group);
 	group->type = type;
 	BLOCKING_INIT_NOTIFIER_HEAD(&group->notifier);
 
@@ -396,8 +399,8 @@ static struct vfio_group *vfio_create_group(struct iommu_group *iommu_group,
 
 	ret = iommu_group_register_notifier(iommu_group, &group->nb);
 	if (ret) {
-		kfree(group);
-		return ERR_PTR(ret);
+		group = ERR_PTR(ret);
+		goto err_put_group;
 	}
 
 	mutex_lock(&vfio.group_lock);
@@ -432,6 +435,9 @@ static struct vfio_group *vfio_create_group(struct iommu_group *iommu_group,
 
 	mutex_unlock(&vfio.group_lock);
 
+err_put_group:
+	iommu_group_put(iommu_group);
+	kfree(group);
 	return group;
 }
 
@@ -439,7 +445,6 @@ static struct vfio_group *vfio_create_group(struct iommu_group *iommu_group,
 static void vfio_group_release(struct kref *kref)
 {
 	struct vfio_group *group = container_of(kref, struct vfio_group, kref);
-	struct iommu_group *iommu_group = group->iommu_group;
 
 	WARN_ON(!list_empty(&group->device_list));
 	WARN_ON(atomic_read(&group->container_users));
@@ -449,7 +454,6 @@ static void vfio_group_release(struct kref *kref)
 	list_del(&group->vfio_next);
 	vfio_free_group_minor(group->minor);
 	vfio_group_unlock_and_free(group);
-	iommu_group_put(iommu_group);
 }
 
 static void vfio_group_put(struct vfio_group *group)
@@ -734,7 +738,7 @@ static struct vfio_group *vfio_noiommu_group_alloc(struct device *dev,
 		ret = PTR_ERR(group);
 		goto out_remove_device;
 	}
-
+	iommu_group_put(iommu_group);
 	return group;
 
 out_remove_device:
@@ -776,10 +780,6 @@ static struct vfio_group *vfio_group_find_or_alloc(struct device *dev)
 
 	/* a newly created vfio_group keeps the reference. */
 	group = vfio_create_group(iommu_group, VFIO_IOMMU);
-	if (IS_ERR(group))
-		goto out_put;
-	return group;
-
 out_put:
 	iommu_group_put(iommu_group);
 	return group;
