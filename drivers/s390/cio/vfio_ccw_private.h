@@ -24,6 +24,8 @@
 #include "css.h"
 #include "vfio_ccw_cp.h"
 
+struct mdev_device;
+
 #define VFIO_CCW_OFFSET_SHIFT   10
 #define VFIO_CCW_OFFSET_TO_INDEX(off)	(off >> VFIO_CCW_OFFSET_SHIFT)
 #define VFIO_CCW_INDEX_TO_OFFSET(index)	((u64)(index) << VFIO_CCW_OFFSET_SHIFT)
@@ -69,6 +71,7 @@ struct vfio_ccw_crw {
 /**
  * struct vfio_ccw_private
  * @vdev: Embedded VFIO device
+ * @rcu: head for kfree_rcu()
  * @sch: pointer to the subchannel
  * @state: internal state of the device
  * @completion: synchronization helper of the I/O completion
@@ -91,6 +94,7 @@ struct vfio_ccw_crw {
  */
 struct vfio_ccw_private {
 	struct vfio_device vdev;
+	struct rcu_head rcu;
 	struct subchannel	*sch;
 	int			state;
 	struct completion	*completion;
@@ -115,10 +119,25 @@ struct vfio_ccw_private {
 	struct work_struct	crw_work;
 } __aligned(8);
 
-extern int vfio_ccw_mdev_reg(struct subchannel *sch);
-extern void vfio_ccw_mdev_unreg(struct subchannel *sch);
+struct vfio_ccw_private *vfio_ccw_alloc_private(struct mdev_device *mdev,
+						struct subchannel *sch);
+void vfio_ccw_free_private(struct vfio_ccw_private *private);
 
 extern struct mdev_driver vfio_ccw_mdev_driver;
+extern const struct mdev_parent_ops vfio_ccw_mdev_ops;
+extern const struct vfio_device_ops vfio_ccw_dev_ops;
+
+static inline struct vfio_ccw_private *vfio_ccw_get_priv(struct subchannel *sch)
+{
+	struct vfio_ccw_private *private;
+
+	rcu_read_lock();
+	private = dev_get_drvdata(&sch->dev);
+	if (private && !vfio_device_try_get(&private->vdev))
+		private = NULL;
+	rcu_read_unlock();
+	return private;
+}
 
 /*
  * States of the device statemachine.
