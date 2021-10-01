@@ -11,6 +11,9 @@ obj-y                          += noinitramfs.o
 else
 obj-$(CONFIG_BLK_DEV_INITRD)   += initramfs.o
 endif
+ifeq ($(CONFIG_INITRAMFS_PRESERVE_MTIME),y)
+obj-$(CONFIG_BLK_DEV_INITRD)   += initramfs_mtime.o
+endif
 obj-$(CONFIG_GENERIC_CALIBRATE_DELAY) += calibrate.o
 
 obj-y                          += init_task.o
