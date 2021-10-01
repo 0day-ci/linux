@@ -17,9 +17,10 @@ properties:
   compatible:
     enum:
       - qcom,sc7180-dp
+      - qcom,sc7180-dp-hdcp
 
-  reg:
-    maxItems: 1
+  # See compatible-specific constraints below.
+  reg: true
 
   interrupts:
     maxItems: 1
@@ -89,6 +90,29 @@ required:
   - power-domains
   - ports
 
+allOf:
+  - if:
+      properties:
+        compatible:
+          contains:
+            const: qcom,sc7180-dp-hdcp
+    then:
+      properties:
+        reg:
+          minItems: 3
+          maxItems: 3
+          items:
+            - description: Registers for base DP functionality
+            - description: (Optional) Registers for HDCP device key injection
+            - description: (Optional) Registers for HDCP TrustZone interaction
+    else:
+      properties:
+        reg:
+          minItems: 1
+          maxItems: 1
+          items:
+            - description: Registers for base DP functionality
+
 additionalProperties: false
 
 examples:
@@ -99,8 +123,10 @@ examples:
     #include <dt-bindings/power/qcom-rpmpd.h>
 
     displayport-controller@ae90000 {
-        compatible = "qcom,sc7180-dp";
-        reg = <0xae90000 0x1400>;
+        compatible = "qcom,sc7180-dp-hdcp";
+        reg = <0 0x0ae90000 0 0x1400>,
+              <0 0x0aed1000 0 0x174>,
+              <0 0x0aee1000 0 0x2c>;
         interrupt-parent = <&mdss>;
         interrupts = <12>;
         clocks = <&dispcc DISP_CC_MDSS_AHB_CLK>,
