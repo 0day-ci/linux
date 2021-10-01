@@ -735,6 +735,38 @@ static inline bool tc_in_hw(u32 flags)
 	return (flags & TCA_CLS_FLAGS_IN_HW) ? true : false;
 }
 
+/**
+ * tcf_exts_validate_actions - check if exts actions flags are compatible with
+ * tc filter flags
+ * @exts: tc filter extensions handle
+ * @flags: tc filter flags
+ *
+ * Returns true if exts actions flags are compatible with tc filter flags
+ */
+static inline bool
+tcf_exts_validate_actions(const struct tcf_exts *exts, u32 flags)
+{
+#ifdef CONFIG_NET_CLS_ACT
+	bool skip_sw = tc_skip_sw(flags);
+	bool skip_hw = tc_skip_hw(flags);
+	int i;
+
+	if (!(skip_sw | skip_hw))
+		return true;
+
+	for (i = 0; i < exts->nr_actions; i++) {
+		struct tc_action *a = exts->actions[i];
+
+		if ((skip_sw && tc_act_skip_hw(a->tcfa_flags)) ||
+		    (skip_hw && tc_act_skip_sw(a->tcfa_flags)))
+			return false;
+	}
+	return true;
+#else
+	return true;
+#endif
+}
+
 static inline void
 tc_cls_common_offload_init(struct flow_cls_common_offload *cls_common,
 			   const struct tcf_proto *tp, u32 flags,

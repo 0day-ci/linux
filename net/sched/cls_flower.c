@@ -2039,6 +2039,11 @@ static int fl_change(struct net *net, struct sk_buff *in_skb,
 	if (err)
 		goto errout;
 
+	if (!tcf_exts_validate_actions(&fnew->exts, fnew->flags)) {
+		err = -EINVAL;
+		goto errout;
+	}
+
 	err = fl_check_assign_mask(head, fnew, fold, mask);
 	if (err)
 		goto errout;

@@ -902,6 +902,11 @@ static int u32_change(struct net *net, struct sk_buff *in_skb,
 			return err;
 		}
 
+		if (!tcf_exts_validate_actions(&new->exts, flags)) {
+			u32_destroy_key(new, false);
+			return -EINVAL;
+		}
+
 		err = u32_replace_hw_knode(tp, new, flags, extack);
 		if (err) {
 			u32_destroy_key(new, false);
@@ -1066,6 +1071,11 @@ static int u32_change(struct net *net, struct sk_buff *in_skb,
 		struct tc_u_knode __rcu **ins;
 		struct tc_u_knode *pins;
 
+		if (!tcf_exts_validate_actions(&n->exts, n->flags)) {
+			err = -EINVAL;
+			goto err_validate;
+		}
+
 		err = u32_replace_hw_knode(tp, n, flags, extack);
 		if (err)
 			goto errhw;
@@ -1086,6 +1096,7 @@ static int u32_change(struct net *net, struct sk_buff *in_skb,
 		return 0;
 	}
 
+err_validate:
 errhw:
 #ifdef CONFIG_CLS_U32_MARK
 	free_percpu(n->pcpu_success);

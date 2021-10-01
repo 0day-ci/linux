@@ -231,6 +231,11 @@ static int mall_change(struct net *net, struct sk_buff *in_skb,
 	if (err)
 		goto err_set_parms;
 
+	if (!tcf_exts_validate_actions(&new->exts, new->flags)) {
+		err = -EINVAL;
+		goto err_validate;
+	}
+
 	if (!tc_skip_hw(new->flags)) {
 		err = mall_replace_hw_filter(tp, new, (unsigned long)new,
 					     extack);
@@ -246,6 +251,7 @@ static int mall_change(struct net *net, struct sk_buff *in_skb,
 	return 0;
 
 err_replace_hw_filter:
+err_validate:
 err_set_parms:
 	free_percpu(new->pf);
 err_alloc_percpu:
