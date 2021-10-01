@@ -126,8 +126,8 @@ static inline struct v9fs_inode *V9FS_I(const struct inode *inode)
 
 extern int v9fs_show_options(struct seq_file *m, struct dentry *root);
 
-struct p9_fid *v9fs_session_init(struct v9fs_session_info *, const char *,
-									char *);
+struct p9_fid *v9fs_session_init(struct v9fs_session_info *v9ses, const char
+		*dev_name, char *data);
 extern void v9fs_session_close(struct v9fs_session_info *v9ses);
 extern void v9fs_session_cancel(struct v9fs_session_info *v9ses);
 extern void v9fs_session_begin_cancel(struct v9fs_session_info *v9ses);
@@ -158,7 +158,7 @@ extern struct inode *v9fs_inode_from_fid_dotl(struct v9fs_session_info *v9ses,
 
 static inline struct v9fs_session_info *v9fs_inode2v9ses(struct inode *inode)
 {
-	return (inode->i_sb->s_fs_info);
+	return inode->i_sb->s_fs_info;
 }
 
 static inline struct v9fs_session_info *v9fs_dentry2v9ses(struct dentry *dentry)
