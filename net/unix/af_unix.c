@@ -3254,6 +3254,7 @@ static int bpf_iter_unix_seq_show(struct seq_file *seq, void *v)
 }
 
 static void bpf_iter_unix_seq_stop(struct seq_file *seq, void *v)
+	__releases(unix_table_lock)
 {
 	struct bpf_iter_meta meta;
 	struct bpf_prog *prog;
