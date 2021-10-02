@@ -2370,7 +2370,7 @@ __domain_mapping(struct dmar_domain *domain, unsigned long iov_pfn,
 		 * touches the iova range
 		 */
 		tmp = cmpxchg64_local(&pte->val, 0ULL, pteval);
-		if (tmp) {
+		if (tmp && (tmp != pteval)) {
 			static int dumps = 5;
 			pr_crit("ERROR: DMA PTE for vPFN 0x%lx already set (to %llx not %llx)\n",
 				iov_pfn, tmp, (unsigned long long)pteval);
