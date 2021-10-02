@@ -25,6 +25,7 @@
  *
  */
 
+#include <drm/drm_privacy_screen_consumer.h>
 #include <drm/drm_scdc_helper.h>
 
 #include "i915_drv.h"
@@ -3022,6 +3023,7 @@ static void intel_enable_ddi_dp(struct intel_atomic_state *state,
 	if (port == PORT_A && DISPLAY_VER(dev_priv) < 9)
 		intel_dp_stop_link_train(intel_dp, crtc_state);
 
+	drm_connector_update_privacy_screen(conn_state);
 	intel_edp_backlight_on(crtc_state, conn_state);
 
 	if (!dig_port->lspcon.active || dig_port->dp.has_hdmi_sink)
@@ -3247,6 +3249,7 @@ static void intel_ddi_update_pipe_dp(struct intel_atomic_state *state,
 	intel_drrs_update(intel_dp, crtc_state);
 
 	intel_backlight_update(state, encoder, crtc_state, conn_state);
+	drm_connector_update_privacy_screen(conn_state);
 }
 
 void intel_ddi_update_pipe(struct intel_atomic_state *state,
