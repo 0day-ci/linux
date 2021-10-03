@@ -120,15 +120,12 @@ int hclge_devlink_init(struct hclge_dev *hdev)
 	hdev->devlink = devlink;
 
 	devlink_register(devlink);
-	devlink_reload_enable(devlink);
 	return 0;
 }
 
 void hclge_devlink_uninit(struct hclge_dev *hdev)
 {
 	struct devlink *devlink = hdev->devlink;
-
-	devlink_reload_disable(devlink);
 
 	devlink_unregister(devlink);
 
