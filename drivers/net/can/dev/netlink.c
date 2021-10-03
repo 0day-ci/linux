@@ -264,7 +264,10 @@ static size_t can_get_size(const struct net_device *dev)
 static int can_fill_info(struct sk_buff *skb, const struct net_device *dev)
 {
 	struct can_priv *priv = netdev_priv(dev);
-	struct can_ctrlmode cm = {.flags = priv->ctrlmode};
+	struct can_ctrlmode cm = {
+		.supported = priv->ctrlmode_supported,
+		.flags = priv->ctrlmode
+	};
 	struct can_berr_counter bec = { };
 	enum can_state state = priv->state;
 
