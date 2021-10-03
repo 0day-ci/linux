@@ -756,6 +756,9 @@ int usb_gadget_deactivate(struct usb_gadget *gadget)
 {
 	int ret = 0;
 
+	if (!gadget)
+		return ret;
+
 	if (gadget->deactivated)
 		goto out;
 
