@@ -194,9 +194,41 @@ struct array_cache {
 			 */
 };
 
+/*
+ * Freeing object allocated from another node is batched
+ * to reduce lock contention.
+ *
+ * alien_object keeps information what node it was allocated from
+ * and composes of alien_cache's red-black tree
+ */
+
+struct alien_object {
+	/*
+	 * each alien object has unique key for its red-black tree.
+	 *
+	 * node_id is NUMA node id and is upper 32 bit of key so that
+	 * elements are always sorted by node id.
+	 *
+	 * object_id is lower 32 bit of key for uniqueness.
+	 */
+	u32 node_id;
+	u32 object_id;
+
+	struct rb_node node;
+	void *objp;
+};
+
+#define make_key(node_id, object_id) ((((u64)node_id) << 32) + object_id)
+#define object_id(key) ((u32)((key) & U32_MAX))
+#define node_id(key) ((u32)((key) >> 32))
+
 struct alien_cache {
 	spinlock_t lock;
-	struct array_cache ac;
+	struct rb_root root;
+
+	unsigned int size;
+	unsigned int capacity;
+	struct alien_object **pool;
 };
 
 /*
@@ -473,34 +505,6 @@ static int __init slab_max_order_setup(char *str)
 }
 __setup("slab_max_order=", slab_max_order_setup);
 
-#ifdef CONFIG_NUMA
-/*
- * Special reaping functions for NUMA systems called from cache_reap().
- * These take care of doing round robin flushing of alien caches (containing
- * objects freed on different nodes from which they were allocated) and the
- * flushing of remote pcps by calling drain_node_pages.
- */
-static DEFINE_PER_CPU(unsigned long, slab_reap_node);
-
-static void init_reap_node(int cpu)
-{
-	per_cpu(slab_reap_node, cpu) = next_node_in(cpu_to_mem(cpu),
-						    node_online_map);
-}
-
-static void next_reap_node(void)
-{
-	int node = __this_cpu_read(slab_reap_node);
-
-	node = next_node_in(node, node_online_map);
-	__this_cpu_write(slab_reap_node, node);
-}
-
-#else
-#define init_reap_node(cpu) do { } while (0)
-#define next_reap_node(void) do { } while (0)
-#endif
-
 /*
  * Initiate the reap timer running on the target CPU.  We run at around 1 to 2Hz
  * via the workqueue/eventd.
@@ -513,7 +517,6 @@ static void start_cpu_timer(int cpu)
 	struct delayed_work *reap_work = &per_cpu(slab_reap_work, cpu);
 
 	if (reap_work->work.func == NULL) {
-		init_reap_node(cpu);
 		INIT_DEFERRABLE_WORK(reap_work, cache_reap);
 		schedule_delayed_work_on(cpu, reap_work,
 					__round_jiffies_relative(HZ, cpu));
@@ -604,13 +607,13 @@ static __always_inline void __free_one(struct array_cache *ac, void *objp)
 #define drain_alien_cache(cachep, alien) do { } while (0)
 #define reap_alien(cachep, n) do { } while (0)
 
-static inline struct alien_cache **alloc_alien_cache(int node,
+static inline struct alien_cache *alloc_alien_cache(int node,
 						int limit, gfp_t gfp)
 {
 	return NULL;
 }
 
-static inline void free_alien_cache(struct alien_cache **ac_ptr)
+static inline void free_alien_cache(struct alien_cache *alc_ptr)
 {
 }
 
@@ -641,76 +644,100 @@ static inline gfp_t gfp_exact_node(gfp_t flags)
 static void *____cache_alloc_node(struct kmem_cache *, gfp_t, int);
 static void *alternate_node_alloc(struct kmem_cache *, gfp_t);
 
-static struct alien_cache *__alloc_alien_cache(int node, int entries,
-						int batch, gfp_t gfp)
+static struct alien_cache *alloc_alien_cache(int node, int limit, gfp_t gfp)
 {
-	size_t memsize = sizeof(void *) * entries + sizeof(struct alien_cache);
-	struct alien_cache *alc = NULL;
-
-	alc = kmalloc_node(memsize, gfp, node);
-	if (alc) {
-		kmemleak_no_scan(alc);
-		init_arraycache(&alc->ac, entries, batch);
-		spin_lock_init(&alc->lock);
-	}
-	return alc;
-}
-
-static struct alien_cache **alloc_alien_cache(int node, int limit, gfp_t gfp)
-{
-	struct alien_cache **alc_ptr;
+	struct alien_cache *alc_ptr;
 	int i;
 
 	if (limit > 1)
 		limit = 12;
-	alc_ptr = kcalloc_node(nr_node_ids, sizeof(void *), gfp, node);
+	alc_ptr = kmalloc_node(sizeof(struct alien_cache), gfp, node);
 	if (!alc_ptr)
 		return NULL;
 
-	for_each_node(i) {
-		if (i == node || !node_online(i))
-			continue;
-		alc_ptr[i] = __alloc_alien_cache(node, limit, 0xbaadf00d, gfp);
-		if (!alc_ptr[i]) {
-			for (i--; i >= 0; i--)
-				kfree(alc_ptr[i]);
+	alc_ptr->pool = kmalloc_array_node(limit,
+			sizeof(void *), gfp, node);
+	if (!alc_ptr->pool) {
+		kfree(alc_ptr);
+		return NULL;
+	}
+
+	spin_lock_init(&alc_ptr->lock);
+	alc_ptr->root = RB_ROOT;
+	alc_ptr->capacity = limit;
+	alc_ptr->size = 0;
+
+	for (i = 0; i < alc_ptr->capacity; i++) {
+		alc_ptr->pool[i] = kmalloc_node(sizeof(struct alien_object), gfp, node);
+		if (!alc_ptr->pool) {
+			for (i = i - 1; i >= 0; i--)
+				kfree(alc_ptr->pool[i]);
+			kfree(alc_ptr->pool);
 			kfree(alc_ptr);
 			return NULL;
 		}
 	}
+
 	return alc_ptr;
 }
 
-static void free_alien_cache(struct alien_cache **alc_ptr)
+static void free_alien_cache(struct alien_cache *alc_ptr)
 {
 	int i;
 
 	if (!alc_ptr)
 		return;
-	for_each_node(i)
-	    kfree(alc_ptr[i]);
+
+	for (i = 0; i < alc_ptr->capacity; i++)
+		kfree(alc_ptr->pool[i]);
+
+	kfree(alc_ptr->pool);
 	kfree(alc_ptr);
 }
 
-static void __drain_alien_cache(struct kmem_cache *cachep,
-				struct array_cache *ac, int node,
-				struct list_head *list)
+/* Caller must handle alien_cache's lock */
+static void __drain_alien_cache(struct kmem_cache *cachep, struct alien_cache *alc,
+					struct list_head *list)
 {
-	struct kmem_cache_node *n = get_node(cachep, node);
+	struct kmem_cache_node *alien_node;
+	struct rb_node *curr;
+	struct alien_object *obj;
+	struct array_cache *shared;
 
-	if (ac->avail) {
-		spin_lock(&n->list_lock);
+	if (alc->size) {
+
 		/*
-		 * Stuff objects into the remote nodes shared array first.
-		 * That way we could avoid the overhead of putting the objects
-		 * into the free lists and getting them back later.
+		 * Free all objects allocated from remote node.
+		 * lock contention is reduced as it's sorted by node.
+		 *
+		 * By freeing all of nodes at once, freeing is done in linear time.
 		 */
-		if (n->shared)
-			transfer_objects(n->shared, ac, ac->limit);
+		curr = rb_first(&alc->root);
+		while (curr) {
+			obj = rb_entry(curr, struct alien_object, node);
+			alien_node = get_node(cachep, obj->node_id);
 
-		free_block(cachep, ac->entry, ac->avail, node, list);
-		ac->avail = 0;
-		spin_unlock(&n->list_lock);
+			spin_lock(&alien_node->list_lock);
+			shared = alien_node->shared;
+
+			do {
+				obj = rb_entry(curr, struct alien_object, node);
+				/*
+				 * Stuff objects into the remote nodes shared array first.
+				 * That way we could avoid the overhead of putting the objects
+				 * into the free lists and getting them back later.
+				 */
+				if (shared && shared->avail < shared->limit)
+					shared->entry[shared->avail++] = obj->objp;
+				else
+					free_block(cachep, &obj->objp, 1, obj->node_id, list);
+				alc->pool[--alc->size] = obj;
+				curr = rb_next(curr);
+			} while (curr && rb_entry(curr, struct alien_object, node)->node_id
+					== obj->node_id);
+			spin_unlock(&alien_node->list_lock);
+		}
+		alc->root = RB_ROOT;
 	}
 }
 
@@ -719,70 +746,111 @@ static void __drain_alien_cache(struct kmem_cache *cachep,
  */
 static void reap_alien(struct kmem_cache *cachep, struct kmem_cache_node *n)
 {
-	int node = __this_cpu_read(slab_reap_node);
-
 	if (n->alien) {
-		struct alien_cache *alc = n->alien[node];
-		struct array_cache *ac;
+		struct alien_cache *alc = n->alien;
 
-		if (alc) {
-			ac = &alc->ac;
-			if (ac->avail && spin_trylock_irq(&alc->lock)) {
-				LIST_HEAD(list);
-
-				__drain_alien_cache(cachep, ac, node, &list);
-				spin_unlock_irq(&alc->lock);
-				slabs_destroy(cachep, &list);
-			}
-		}
-	}
-}
-
-static void drain_alien_cache(struct kmem_cache *cachep,
-				struct alien_cache **alien)
-{
-	int i = 0;
-	struct alien_cache *alc;
-	struct array_cache *ac;
-	unsigned long flags;
-
-	for_each_online_node(i) {
-		alc = alien[i];
-		if (alc) {
+		if (alc && alc->size && spin_trylock_irq(&alc->lock)) {
 			LIST_HEAD(list);
 
-			ac = &alc->ac;
-			spin_lock_irqsave(&alc->lock, flags);
-			__drain_alien_cache(cachep, ac, i, &list);
-			spin_unlock_irqrestore(&alc->lock, flags);
+			__drain_alien_cache(cachep, alc, &list);
+			spin_unlock_irq(&alc->lock);
 			slabs_destroy(cachep, &list);
 		}
 	}
 }
 
+static void drain_alien_cache(struct kmem_cache *cachep,
+				struct alien_cache *alc)
+{
+	unsigned long flags;
+	LIST_HEAD(list);
+
+	spin_lock_irqsave(&alc->lock, flags);
+	__drain_alien_cache(cachep, alc, &list);
+	spin_unlock_irqrestore(&alc->lock, flags);
+	slabs_destroy(cachep, &list);
+}
+
+/*
+ * next_object_id
+ * get next object id of given alien cache's red-black tree.
+ */
+static inline u32 next_object_id(struct alien_cache *alc, int node)
+{
+	struct alien_object *obj;
+	struct rb_node **p = &alc->root.rb_node;
+	u64 key = make_key(node, 0);
+	u64 end = make_key(node + 1, 0);
+	u64 next;
+
+	if (!*p) /* the tree is empty now */
+		return 1;
+
+	/* find biggest element of same numa node */
+	while (*p) {
+		obj = rb_entry(*p, struct alien_object, node);
+
+		if (key < make_key(obj->node_id, obj->object_id)) {
+			if (make_key(obj->node_id, obj->object_id) < end) {
+				next = make_key(obj->node_id, obj->object_id);
+				p = &(*p)->rb_right;
+			} else
+				p = &(*p)->rb_left;
+		} else
+			p = &(*p)->rb_right;
+	}
+
+	if (node_id(next) == node)
+		return object_id(next) + 1;
+
+	return 1;
+}
+
 static int __cache_free_alien(struct kmem_cache *cachep, void *objp,
 				int node, int page_node)
 {
-	struct kmem_cache_node *n;
-	struct alien_cache *alien = NULL;
-	struct array_cache *ac;
+	struct kmem_cache_node *n = get_node(cachep, node);
+	struct rb_node **p;
+	struct rb_node *parent = NULL;
+	struct alien_cache *alc = n->alien;
+	struct alien_object *new_obj;
+	struct alien_object *obj;
+
 	LIST_HEAD(list);
 
-	n = get_node(cachep, node);
 	STATS_INC_NODEFREES(cachep);
-	if (n->alien && n->alien[page_node]) {
-		alien = n->alien[page_node];
-		ac = &alien->ac;
-		spin_lock(&alien->lock);
-		if (unlikely(ac->avail == ac->limit)) {
+
+	if (alc) {
+		spin_lock(&alc->lock);
+		if (unlikely(alc->size == alc->capacity)) {
 			STATS_INC_ACOVERFLOW(cachep);
-			__drain_alien_cache(cachep, ac, page_node, &list);
+			__drain_alien_cache(cachep, alc, &list);
 		}
-		__free_one(ac, objp);
-		spin_unlock(&alien->lock);
+
+		p = &alc->root.rb_node;
+		new_obj = alc->pool[alc->size++];
+
+		new_obj->node_id = page_node;
+		new_obj->object_id = next_object_id(alc, page_node);
+		new_obj->objp = objp;
+
+		while (*p) {
+			parent = *p;
+			obj = rb_entry(parent, struct alien_object, node);
+
+			if (make_key(new_obj->node_id, new_obj->object_id)
+					< make_key(obj->node_id, obj->object_id))
+				p = &(*p)->rb_left;
+			else
+				p = &(*p)->rb_right;
+		}
+
+		rb_link_node(&new_obj->node, parent, p);
+		rb_insert_color(&new_obj->node, &alc->root);
+
+		spin_unlock(&alc->lock);
 		slabs_destroy(cachep, &list);
 	} else {
-		n = get_node(cachep, page_node);
 		spin_lock(&n->list_lock);
 		free_block(cachep, &objp, 1, page_node, &list);
 		spin_unlock(&n->list_lock);
@@ -887,7 +955,7 @@ static int setup_kmem_cache_node(struct kmem_cache *cachep,
 	struct kmem_cache_node *n;
 	struct array_cache *old_shared = NULL;
 	struct array_cache *new_shared = NULL;
-	struct alien_cache **new_alien = NULL;
+	struct alien_cache *new_alien = NULL;
 	LIST_HEAD(list);
 
 	if (use_alien_caches) {
@@ -958,7 +1026,7 @@ static void cpuup_canceled(long cpu)
 	list_for_each_entry(cachep, &slab_caches, list) {
 		struct array_cache *nc;
 		struct array_cache *shared;
-		struct alien_cache **alien;
+		struct alien_cache *alien;
 		LIST_HEAD(list);
 
 		n = get_node(cachep, node);
@@ -4040,7 +4108,6 @@ next:
 	}
 	check_irq_on();
 	mutex_unlock(&slab_mutex);
-	next_reap_node();
 out:
 	/* Set up the next iteration */
 	schedule_delayed_work_on(smp_processor_id(), work,
