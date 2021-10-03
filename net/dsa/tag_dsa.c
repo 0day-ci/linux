@@ -149,7 +149,8 @@ static struct sk_buff *dsa_xmit_ll(struct sk_buff *skb, struct net_device *dev,
 		 * inject packets to hardware using the bridge's pvid, since
 		 * that's where the packets ingressed from.
 		 */
-		if (!br_vlan_enabled(br)) {
+		if (IS_ENABLED(CONFIG_BRIDGE_VLAN_FILTERING) &&
+		    !br_vlan_enabled(br)) {
 			/* Safe because __dev_queue_xmit() runs under
 			 * rcu_read_lock_bh()
 			 */
