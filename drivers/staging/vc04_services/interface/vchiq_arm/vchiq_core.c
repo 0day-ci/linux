@@ -3193,7 +3193,6 @@ vchiq_queue_message(unsigned int handle,
 	if (!size) {
 		VCHIQ_SERVICE_STATS_INC(service, error_count);
 		goto error_exit;
-
 	}
 
 	if (size > VCHIQ_MAX_MSG_SIZE) {
