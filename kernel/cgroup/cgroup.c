@@ -5391,7 +5391,7 @@ static struct cgroup *cgroup_create(struct cgroup *parent, const char *name,
 	cgrp->self.serial_nr = css_serial_nr_next++;
 
 	/* allocation complete, commit to creation */
-	list_add_tail_rcu(&cgrp->self.sibling, &cgroup_parent(cgrp)->self.children);
+	list_add_tail_rcu(&cgrp->self.sibling, &parent->self.children);
 	atomic_inc(&root->nr_cgrps);
 	cgroup_get_live(parent);
 
