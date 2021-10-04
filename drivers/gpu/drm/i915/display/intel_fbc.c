@@ -418,13 +418,6 @@ static bool intel_fbc_hw_is_active(struct drm_i915_private *dev_priv)
 
 static void intel_fbc_hw_activate(struct drm_i915_private *dev_priv)
 {
-	struct intel_fbc *fbc = &dev_priv->fbc;
-
-	trace_intel_fbc_activate(fbc->crtc);
-
-	fbc->active = true;
-	fbc->activated = true;
-
 	if (DISPLAY_VER(dev_priv) >= 7)
 		gen7_fbc_activate(dev_priv);
 	else if (DISPLAY_VER(dev_priv) >= 5)
@@ -437,12 +430,6 @@ static void intel_fbc_hw_activate(struct drm_i915_private *dev_priv)
 
 static void intel_fbc_hw_deactivate(struct drm_i915_private *dev_priv)
 {
-	struct intel_fbc *fbc = &dev_priv->fbc;
-
-	trace_intel_fbc_deactivate(fbc->crtc);
-
-	fbc->active = false;
-
 	if (DISPLAY_VER(dev_priv) >= 5)
 		ilk_fbc_deactivate(dev_priv);
 	else if (IS_GM45(dev_priv))
@@ -467,6 +454,13 @@ bool intel_fbc_is_active(struct drm_i915_private *dev_priv)
 
 static void intel_fbc_activate(struct drm_i915_private *dev_priv)
 {
+	struct intel_fbc *fbc = &dev_priv->fbc;
+
+	trace_intel_fbc_activate(fbc->crtc);
+
+	fbc->active = true;
+	fbc->activated = true;
+
 	intel_fbc_hw_activate(dev_priv);
 	intel_fbc_recompress(dev_priv);
 }
@@ -478,10 +472,16 @@ static void intel_fbc_deactivate(struct drm_i915_private *dev_priv,
 
 	drm_WARN_ON(&dev_priv->drm, !mutex_is_locked(&fbc->lock));
 
-	if (fbc->active)
-		intel_fbc_hw_deactivate(dev_priv);
-
 	fbc->no_fbc_reason = reason;
+
+	if (!fbc->active)
+		return;
+
+	trace_intel_fbc_deactivate(fbc->crtc);
+
+	intel_fbc_hw_deactivate(dev_priv);
+
+	fbc->active = false;
 }
 
 static u64 intel_fbc_cfb_base_max(struct drm_i915_private *i915)
