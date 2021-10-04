@@ -331,14 +331,20 @@ struct phylink_pcs_ops;
 
 /**
  * struct phylink_pcs - PHYLINK PCS instance
+ * @dev: the device associated with this PCS, or %NULL if the PCS doesn't have
+ *       a device of its own. Typically, @dev should only be %NULL for internal
+ *       PCS devices which do not need to be looked up via phandle.
  * @ops: a pointer to the &struct phylink_pcs_ops structure
+ * @list: internal list of PCS devices
  * @poll: poll the PCS for link changes
  *
  * This structure is designed to be embedded within the PCS private data,
  * and will be passed between phylink and the PCS.
  */
 struct phylink_pcs {
+	struct device *dev;
 	const struct phylink_pcs_ops *ops;
+	struct list_head list;
 	bool poll;
 };
 
@@ -433,10 +439,13 @@ void pcs_link_up(struct phylink_pcs *pcs, unsigned int mode,
 		 phy_interface_t interface, int speed, int duplex);
 #endif
 
+int phylink_register_pcs(struct phylink_pcs *pcs);
+void phylink_unregister_pcs(struct phylink_pcs *pcs);
+int phylink_set_pcs(struct phylink *pl, struct phylink_pcs *pcs);
+
 struct phylink *phylink_create(struct phylink_config *, struct fwnode_handle *,
 			       phy_interface_t iface,
 			       const struct phylink_mac_ops *mac_ops);
-void phylink_set_pcs(struct phylink *, struct phylink_pcs *pcs);
 void phylink_destroy(struct phylink *);
 
 int phylink_connect_phy(struct phylink *, struct phy_device *);

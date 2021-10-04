@@ -795,6 +795,42 @@ static int phylink_register_sfp(struct phylink *pl,
 	return ret;
 }
 
+static LIST_HEAD(pcs_devices);
+static DEFINE_MUTEX(pcs_mutex);
+
+/**
+ * phylink_register_pcs() - register a new PCS
+ * @pcs: the PCS to register
+ *
+ * Registers a new PCS which can be automatically attached to a phylink.
+ *
+ * Return: 0 on success, or -errno on error
+ */
+int phylink_register_pcs(struct phylink_pcs *pcs)
+{
+	if (!pcs->dev || !pcs->ops)
+		return -EINVAL;
+
+	INIT_LIST_HEAD(&pcs->list);
+	mutex_lock(&pcs_mutex);
+	list_add(&pcs->list, &pcs_devices);
+	mutex_unlock(&pcs_mutex);
+	return 0;
+}
+EXPORT_SYMBOL_GPL(phylink_register_pcs);
+
+/**
+ * phylink_unregister_pcs() - unregister a PCS
+ * @pcs: a PCS previously registered with phylink_register_pcs()
+ */
+void phylink_unregister_pcs(struct phylink_pcs *pcs)
+{
+	mutex_lock(&pcs_mutex);
+	list_del(&pcs->list);
+	mutex_unlock(&pcs_mutex);
+}
+EXPORT_SYMBOL_GPL(phylink_unregister_pcs);
+
 /**
  * phylink_set_pcs() - set the current PCS for phylink to use
  * @pl: a pointer to a &struct phylink returned from phylink_create()
@@ -808,13 +844,71 @@ static int phylink_register_sfp(struct phylink *pl,
  * callback if a PCS is present (denoting a newer setup) so removing a PCS
  * is not supported, and if a PCS is going to be used, it must be registered
  * by calling phylink_set_pcs() at the latest in the first mac_config() call.
+ *
+ * Context: may sleep.
+ * Return: 0 on success or -errno on failure.
  */
-void phylink_set_pcs(struct phylink *pl, struct phylink_pcs *pcs)
+int phylink_set_pcs(struct phylink *pl, struct phylink_pcs *pcs)
 {
+	if (pl->pcs && pl->pcs->dev)
+		device_link_remove(pl->dev, pl->pcs->dev);
+
+	if (pcs->dev) {
+		struct device_link *dl =
+			device_link_add(pl->dev, pcs->dev, 0);
+
+		if (IS_ERR(dl)) {
+			dev_err(pl->dev,
+				"failed to create device link to %s\n",
+				dev_name(pcs->dev));
+			return PTR_ERR(dl);
+		}
+	}
+
 	pl->pcs = pcs;
 	pl->pcs_ops = pcs->ops;
+	return 0;
 }
 EXPORT_SYMBOL_GPL(phylink_set_pcs);
+
+static struct phylink_pcs *phylink_find_pcs(struct fwnode_handle *fwnode)
+{
+	struct phylink_pcs *pcs;
+
+	mutex_lock(&pcs_mutex);
+	list_for_each_entry(pcs, &pcs_devices, list) {
+		if (pcs->dev && pcs->dev->fwnode == fwnode) {
+			mutex_unlock(&pcs_mutex);
+			return pcs;
+		}
+	}
+	mutex_unlock(&pcs_mutex);
+
+	return NULL;
+}
+
+static int phylink_attach_pcs(struct phylink *pl, struct fwnode_handle *fwnode)
+{
+	int ret;
+	struct phylink_pcs *pcs;
+	struct fwnode_reference_args ref;
+
+	ret = fwnode_property_get_reference_args(fwnode, "pcs", NULL,
+						 0, 0, &ref);
+	if (ret == -ENOENT)
+		return 0;
+	else if (ret)
+		return ret;
+
+	pcs = phylink_find_pcs(ref.fwnode);
+	if (pcs)
+		ret = phylink_set_pcs(pl, pcs);
+	else
+		ret = -EPROBE_DEFER;
+
+	fwnode_handle_put(ref.fwnode);
+	return ret;
+}
 
 /**
  * phylink_create() - create a phylink instance
@@ -893,12 +987,20 @@ struct phylink *phylink_create(struct phylink_config *config,
 	pl->cur_link_an_mode = pl->cfg_link_an_mode;
 
 	ret = phylink_register_sfp(pl, fwnode);
-	if (ret < 0) {
-		kfree(pl);
-		return ERR_PTR(ret);
-	}
+	if (ret < 0)
+		goto err_sfp;
+
+	ret = phylink_attach_pcs(pl, fwnode);
+	if (ret)
+		goto err_pcs;
 
 	return pl;
+
+err_pcs:
+	sfp_bus_del_upstream(pl->sfp_bus);
+err_sfp:
+	kfree(pl);
+	return ERR_PTR(ret);
 }
 EXPORT_SYMBOL_GPL(phylink_create);
 
@@ -913,6 +1015,9 @@ EXPORT_SYMBOL_GPL(phylink_create);
  */
 void phylink_destroy(struct phylink *pl)
 {
+	if (pl->pcs && pl->pcs->dev)
+		device_link_remove(pl->dev, pl->pcs->dev);
+
 	sfp_bus_del_upstream(pl->sfp_bus);
 	if (pl->link_gpio)
 		gpiod_put(pl->link_gpio);
