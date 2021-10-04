@@ -147,11 +147,16 @@ void __init reserve_crashkernel(void)
 	if (!crashk_res.start) {
 #ifdef CONFIG_PPC64
 		/*
-		 * On 64bit we split the RMO in half but cap it at half of
-		 * a small SLB (128MB) since the crash kernel needs to place
-		 * itself and some stacks to be in the first segment.
+		 * crash kernel needs to placed in the first segment. On LPAR
+		 * setting crash kernel start to mid of RMA size (512MB or more)
+		 * would help primary kernel to boot properly on large config
+		 * LPAR (with core count 192 or more) and for the reset keep
+		 * cap the crash kernel start at 128MB offse.
 		 */
-		crashk_res.start = min(0x8000000ULL, (ppc64_rma_size / 2));
+		if (firmware_has_feature(FW_FEATURE_LPAR))
+			crashk_res.start = ppc64_rma_size / 2;
+		else
+			crashk_res.start = min(0x8000000ULL, (ppc64_rma_size / 2));
 #else
 		crashk_res.start = KDUMP_KERNELBASE;
 #endif
