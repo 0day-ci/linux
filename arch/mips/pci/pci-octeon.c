@@ -114,24 +114,6 @@ int pcibios_plat_dev_init(struct pci_dev *dev)
 		pci_write_config_word(dev, PCI_BRIDGE_CONTROL, config);
 	}
 
-	/* Find the Advanced Error Reporting capability */
-	pos = pci_find_ext_capability(dev, PCI_EXT_CAP_ID_ERR);
-	if (pos) {
-		/*
-		 * Leave severity at HW default. This only controls if
-		 * errors are reported as uncorrectable or
-		 * correctable, not if the error is reported.
-		 */
-		/* PCI_ERR_UNCOR_SEVER - Uncorrectable Error Severity */
-
-		/* PCI_ERR_HEADER_LOG - Header Log Register (16 bytes) */
-		/* Report all errors to the root complex */
-		pci_write_config_dword(dev, pos + PCI_ERR_ROOT_COMMAND,
-				       PCI_ERR_ROOT_CMD_COR_EN |
-				       PCI_ERR_ROOT_CMD_NONFATAL_EN |
-				       PCI_ERR_ROOT_CMD_FATAL_EN);
-	}
-
 	return 0;
 }
 
