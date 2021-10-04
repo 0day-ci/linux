@@ -1512,6 +1512,9 @@ static int sfp_sm_probe_phy(struct sfp *sfp, bool is_c45)
 	struct phy_device *phy;
 	int err;
 
+	if (!sfp_may_have_phy(sfp->sfp_bus, &sfp->id))
+		return 0;
+
 	phy = get_phy_device(sfp->i2c_mii, SFP_PHY_ADDR, is_c45);
 	if (phy == ERR_PTR(-ENODEV))
 		return PTR_ERR(phy);

@@ -14,6 +14,7 @@ struct sfp_quirk {
 	const char *vendor;
 	const char *part;
 	void (*modes)(const struct sfp_eeprom_id *id, unsigned long *modes);
+	bool ignore_phy;
 };
 
 /**
@@ -68,6 +69,12 @@ static const struct sfp_quirk sfp_quirks[] = {
 		.vendor = "ALCATELLUCENT",
 		.part = "3FE46541AA",
 		.modes = sfp_quirk_2500basex,
+	}, {
+		// Finisar SFP-GB-GE-T has something on its I2C bus at
+		// SFP_PHY_ADDR, but it is not a (c22-compliant) phy
+		.vendor = "FS",
+		.part = "SFP-GB-GE-T",
+		.ignore_phy = true,
 	}, {
 		// Huawei MA5671A can operate at 2500base-X, but report 1.2GBd
 		// NRZ in their EEPROM
@@ -204,6 +211,9 @@ EXPORT_SYMBOL_GPL(sfp_parse_port);
  */
 bool sfp_may_have_phy(struct sfp_bus *bus, const struct sfp_eeprom_id *id)
 {
+	if (bus->sfp_quirk && bus->sfp_quirk->ignore_phy)
+		return false;
+
 	if (id->base.e1000_base_t)
 		return true;
 
@@ -370,7 +380,7 @@ void sfp_parse_support(struct sfp_bus *bus, const struct sfp_eeprom_id *id,
 			phylink_set(modes, 2500baseX_Full);
 	}
 
-	if (bus->sfp_quirk)
+	if (bus->sfp_quirk && bus->sfp_quirk->modes)
 		bus->sfp_quirk->modes(id, modes);
 
 	bitmap_or(support, support, modes, __ETHTOOL_LINK_MODE_MASK_NBITS);
