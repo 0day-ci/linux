@@ -25,6 +25,7 @@
 #include "sysfs.h"
 #include "tree-mod-log.h"
 
+struct kmem_cache *btrfs_qgroup_extent_record_cachep;
 /* TODO XXX FIXME
  *  - subvol delete -> delete when ref goes to 0? delete limits also?
  *  - reorganize keys
@@ -1764,7 +1765,7 @@ int btrfs_qgroup_trace_extent(struct btrfs_trans_handle *trans, u64 bytenr,
 	if (!test_bit(BTRFS_FS_QUOTA_ENABLED, &fs_info->flags)
 	    || bytenr == 0 || num_bytes == 0)
 		return 0;
-	record = kzalloc(sizeof(*record), gfp_flag);
+	record = btrfs_alloc_qgroup_extent_record(gfp_flag);
 	if (!record)
 		return -ENOMEM;
 
@@ -1777,7 +1778,7 @@ int btrfs_qgroup_trace_extent(struct btrfs_trans_handle *trans, u64 bytenr,
 	ret = btrfs_qgroup_trace_extent_nolock(fs_info, delayed_refs, record);
 	spin_unlock(&delayed_refs->lock);
 	if (ret > 0) {
-		kfree(record);
+		btrfs_free_qgroup_extent_record(record);
 		return 0;
 	}
 	return btrfs_qgroup_trace_extent_post(trans, record);
@@ -2687,7 +2688,7 @@ cleanup:
 		ulist_free(new_roots);
 		new_roots = NULL;
 		rb_erase(node, &delayed_refs->dirty_extent_root);
-		kfree(record);
+		btrfs_free_qgroup_extent_record(record);
 
 	}
 	trace_qgroup_num_dirty_extents(fs_info, trans->transid,
@@ -4269,6 +4270,24 @@ void btrfs_qgroup_destroy_extent_records(struct btrfs_transaction *trans)
 	root = &trans->delayed_refs.dirty_extent_root;
 	rbtree_postorder_for_each_entry_safe(entry, next, root, node) {
 		ulist_free(entry->old_roots);
-		kfree(entry);
+		btrfs_free_qgroup_extent_record(entry);
 	}
+}
+
+void __cold btrfs_qgroup_exit(void)
+{
+	kmem_cache_destroy(btrfs_qgroup_extent_record_cachep);
+}
+
+int __init btrfs_qgroup_init(void)
+{
+	btrfs_qgroup_extent_record_cachep = kmem_cache_create(
+				"btrfs_qgroup_extent_record",
+				sizeof(struct btrfs_qgroup_extent_record), 0,
+				SLAB_MEM_SPREAD, NULL);
+
+	if (unlikely(!btrfs_qgroup_extent_record_cachep))
+		return -ENOMEM;
+
+	return 0;
 }

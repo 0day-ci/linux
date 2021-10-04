@@ -12,6 +12,7 @@
 #include "ulist.h"
 #include "delayed-ref.h"
 
+extern struct kmem_cache *btrfs_qgroup_extent_record_cachep;
 /*
  * Btrfs qgroup overview
  *
@@ -102,7 +103,6 @@
 
 /*
  * Record a dirty extent, and info qgroup to update quota on it
- * TODO: Use kmem cache to alloc it.
  */
 struct btrfs_qgroup_extent_record {
 	struct rb_node node;
@@ -231,6 +231,19 @@ struct btrfs_qgroup {
 	struct kobject kobj;
 };
 
+static inline struct btrfs_qgroup_extent_record *
+btrfs_alloc_qgroup_extent_record(gfp_t gfp_flag)
+{
+	return kmem_cache_zalloc(btrfs_qgroup_extent_record_cachep, gfp_flag);
+}
+
+static inline void
+btrfs_free_qgroup_extent_record(struct btrfs_qgroup_extent_record *record)
+{
+	if (record)
+		kmem_cache_free(btrfs_qgroup_extent_record_cachep, record);
+}
+
 static inline u64 btrfs_qgroup_subvolid(u64 qgroupid)
 {
 	return (qgroupid & ((1ULL << BTRFS_QGROUP_LEVEL_SHIFT) - 1));
@@ -243,6 +256,8 @@ static inline u64 btrfs_qgroup_subvolid(u64 qgroupid)
 #define QGROUP_RELEASE		(1<<1)
 #define QGROUP_FREE		(1<<2)
 
+void __cold btrfs_qgroup_exit(void);
+int __init btrfs_qgroup_init(void);
 int btrfs_quota_enable(struct btrfs_fs_info *fs_info);
 int btrfs_quota_disable(struct btrfs_fs_info *fs_info);
 int btrfs_qgroup_rescan(struct btrfs_fs_info *fs_info);

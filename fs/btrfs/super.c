@@ -2588,9 +2588,13 @@ static int __init init_btrfs_fs(void)
 	if (err)
 		goto free_delayed_inode;
 
-	err = btrfs_delayed_ref_init();
+	err = btrfs_qgroup_init();
 	if (err)
 		goto free_auto_defrag;
+
+	err = btrfs_delayed_ref_init();
+	if (err)
+		goto free_qgroup;
 
 	err = btrfs_prelim_ref_init();
 	if (err)
@@ -2624,6 +2628,8 @@ free_prelim_ref:
 	btrfs_prelim_ref_exit();
 free_delayed_ref:
 	btrfs_delayed_ref_exit();
+free_qgroup:
+	btrfs_qgroup_exit();
 free_auto_defrag:
 	btrfs_auto_defrag_exit();
 free_delayed_inode:
@@ -2648,6 +2654,7 @@ free_compress:
 static void __exit exit_btrfs_fs(void)
 {
 	btrfs_destroy_cachep();
+	btrfs_qgroup_exit();
 	btrfs_delayed_ref_exit();
 	btrfs_auto_defrag_exit();
 	btrfs_delayed_inode_exit();
