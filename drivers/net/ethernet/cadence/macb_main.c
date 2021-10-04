@@ -862,7 +862,7 @@ static int macb_mac_prepare(struct phylink_config *config, unsigned int mode,
 	}
 
 	if (set_pcs)
-		phylink_set_pcs(bp->phylink, &bp->phylink_pcs);
+		set_pcs = phylink_set_pcs_weak(bp->phylink, &bp->phylink_pcs);
 
 	spin_lock_irqsave(&bp->lock, flags);
 
@@ -877,8 +877,11 @@ static int macb_mac_prepare(struct phylink_config *config, unsigned int mode,
 		ncr |= MACB_BIT(MIIONRGMII);
 	}
 
-	if (macb_is_gem(bp) && set_pcs)
-		ctrl |= GEM_BIT(PCSSEL);
+	if (macb_is_gem(bp)) {
+		ctrl &= ~GEM_BIT(PCSSEL);
+		if (set_pcs)
+			ctrl |= GEM_BIT(PCSSEL);
+	}
 
 	/* Apply the new configuration, if any */
 	if (old_ctrl ^ ctrl)
