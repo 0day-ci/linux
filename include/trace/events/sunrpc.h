@@ -56,8 +56,8 @@ DECLARE_EVENT_CLASS(rpc_xdr_buf_class,
 	TP_ARGS(task, xdr),
 
 	TP_STRUCT__entry(
-		__field(unsigned int, task_id)
-		__field(unsigned int, client_id)
+		__field(int, task_id)
+		__field(int, client_id)
 		__field(const void *, head_base)
 		__field(size_t, head_len)
 		__field(const void *, tail_base)
@@ -78,7 +78,7 @@ DECLARE_EVENT_CLASS(rpc_xdr_buf_class,
 		__entry->msg_len = xdr->len;
 	),
 
-	TP_printk("task:%u@%u head=[%p,%zu] page=%u tail=[%p,%zu] len=%u",
+	TP_printk("task:%d@%d head=[%p,%zu] page=%u tail=[%p,%zu] len=%u",
 		__entry->task_id, __entry->client_id,
 		__entry->head_base, __entry->head_len, __entry->page_len,
 		__entry->tail_base, __entry->tail_len, __entry->msg_len
@@ -107,14 +107,14 @@ DECLARE_EVENT_CLASS(rpc_clnt_class,
 	TP_ARGS(clnt),
 
 	TP_STRUCT__entry(
-		__field(unsigned int, client_id)
+		__field(int, client_id)
 	),
 
 	TP_fast_assign(
 		__entry->client_id = clnt->cl_clid;
 	),
 
-	TP_printk("clid=%u", __entry->client_id)
+	TP_printk("clid=%d", __entry->client_id)
 );
 
 #define DEFINE_RPC_CLNT_EVENT(name)					\
@@ -143,7 +143,7 @@ TRACE_EVENT(rpc_clnt_new,
 	TP_ARGS(clnt, xprt, program, server),
 
 	TP_STRUCT__entry(
-		__field(unsigned int, client_id)
+		__field(int, client_id)
 		__string(addr, xprt->address_strings[RPC_DISPLAY_ADDR])
 		__string(port, xprt->address_strings[RPC_DISPLAY_PORT])
 		__string(program, program)
@@ -158,7 +158,7 @@ TRACE_EVENT(rpc_clnt_new,
 		__assign_str(server, server);
 	),
 
-	TP_printk("client=%u peer=[%s]:%s program=%s server=%s",
+	TP_printk("client=%d peer=[%s]:%s program=%s server=%s",
 		__entry->client_id, __get_str(addr), __get_str(port),
 		__get_str(program), __get_str(server))
 );
@@ -197,7 +197,7 @@ TRACE_EVENT(rpc_clnt_clone_err,
 	TP_ARGS(clnt, error),
 
 	TP_STRUCT__entry(
-		__field(unsigned int, client_id)
+		__field(int, client_id)
 		__field(int, error)
 	),
 
@@ -206,7 +206,7 @@ TRACE_EVENT(rpc_clnt_clone_err,
 		__entry->error = error;
 	),
 
-	TP_printk("client=%u error=%d", __entry->client_id, __entry->error)
+	TP_printk("client=%d error=%d", __entry->client_id, __entry->error)
 );
 
 
@@ -237,8 +237,8 @@ DECLARE_EVENT_CLASS(rpc_task_status,
 	TP_ARGS(task),
 
 	TP_STRUCT__entry(
-		__field(unsigned int, task_id)
-		__field(unsigned int, client_id)
+		__field(int, task_id)
+		__field(int, client_id)
 		__field(int, status)
 	),
 
@@ -248,7 +248,7 @@ DECLARE_EVENT_CLASS(rpc_task_status,
 		__entry->status = task->tk_status;
 	),
 
-	TP_printk("task:%u@%u status=%d",
+	TP_printk("task:%d@%d status=%d",
 		__entry->task_id, __entry->client_id,
 		__entry->status)
 );
@@ -271,8 +271,8 @@ TRACE_EVENT(rpc_request,
 	TP_ARGS(task),
 
 	TP_STRUCT__entry(
-		__field(unsigned int, task_id)
-		__field(unsigned int, client_id)
+		__field(int, task_id)
+		__field(int, client_id)
 		__field(int, version)
 		__field(bool, async)
 		__string(progname, task->tk_client->cl_program->name)
@@ -288,7 +288,7 @@ TRACE_EVENT(rpc_request,
 		__assign_str(procname, rpc_proc_name(task));
 	),
 
-	TP_printk("task:%u@%u %sv%d %s (%ssync)",
+	TP_printk("task:%d@%d %sv%d %s (%ssync)",
 		__entry->task_id, __entry->client_id,
 		__get_str(progname), __entry->version,
 		__get_str(procname), __entry->async ? "a": ""
@@ -330,8 +330,8 @@ DECLARE_EVENT_CLASS(rpc_task_running,
 	TP_ARGS(task, action),
 
 	TP_STRUCT__entry(
-		__field(unsigned int, task_id)
-		__field(unsigned int, client_id)
+		__field(int, task_id)
+		__field(int, client_id)
 		__field(const void *, action)
 		__field(unsigned long, runstate)
 		__field(int, status)
@@ -348,7 +348,7 @@ DECLARE_EVENT_CLASS(rpc_task_running,
 		__entry->flags = task->tk_flags;
 		),
 
-	TP_printk("task:%u@%d flags=%s runstate=%s status=%d action=%ps",
+	TP_printk("task:%d@%d flags=%s runstate=%s status=%d action=%ps",
 		__entry->task_id, __entry->client_id,
 		rpc_show_task_flags(__entry->flags),
 		rpc_show_runstate(__entry->runstate),
@@ -380,8 +380,8 @@ DECLARE_EVENT_CLASS(rpc_task_queued,
 	TP_ARGS(task, q),
 
 	TP_STRUCT__entry(
-		__field(unsigned int, task_id)
-		__field(unsigned int, client_id)
+		__field(int, task_id)
+		__field(int, client_id)
 		__field(unsigned long, timeout)
 		__field(unsigned long, runstate)
 		__field(int, status)
@@ -400,7 +400,7 @@ DECLARE_EVENT_CLASS(rpc_task_queued,
 		__assign_str(q_name, rpc_qname(q));
 		),
 
-	TP_printk("task:%u@%d flags=%s runstate=%s status=%d timeout=%lu queue=%s",
+	TP_printk("task:%d@%d flags=%s runstate=%s status=%d timeout=%lu queue=%s",
 		__entry->task_id, __entry->client_id,
 		rpc_show_task_flags(__entry->flags),
 		rpc_show_runstate(__entry->runstate),
@@ -427,8 +427,8 @@ DECLARE_EVENT_CLASS(rpc_failure,
 	TP_ARGS(task),
 
 	TP_STRUCT__entry(
-		__field(unsigned int, task_id)
-		__field(unsigned int, client_id)
+		__field(int, task_id)
+		__field(int, client_id)
 	),
 
 	TP_fast_assign(
@@ -436,7 +436,7 @@ DECLARE_EVENT_CLASS(rpc_failure,
 		__entry->client_id = task->tk_client->cl_clid;
 	),
 
-	TP_printk("task:%u@%u",
+	TP_printk("task:%d@%d",
 		__entry->task_id, __entry->client_id)
 );
 
@@ -459,8 +459,8 @@ DECLARE_EVENT_CLASS(rpc_reply_event,
 	TP_ARGS(task),
 
 	TP_STRUCT__entry(
-		__field(unsigned int, task_id)
-		__field(unsigned int, client_id)
+		__field(int, task_id)
+		__field(int, client_id)
 		__field(u32, xid)
 		__string(progname, task->tk_client->cl_program->name)
 		__field(u32, version)
@@ -478,7 +478,7 @@ DECLARE_EVENT_CLASS(rpc_reply_event,
 		__assign_str(servername, task->tk_xprt->servername);
 	),
 
-	TP_printk("task:%u@%d server=%s xid=0x%08x %sv%d %s",
+	TP_printk("task:%d@%d server=%s xid=0x%08x %sv%d %s",
 		__entry->task_id, __entry->client_id, __get_str(servername),
 		__entry->xid, __get_str(progname), __entry->version,
 		__get_str(procname))
@@ -523,8 +523,8 @@ TRACE_EVENT(rpc_buf_alloc,
 	TP_ARGS(task, status),
 
 	TP_STRUCT__entry(
-		__field(unsigned int, task_id)
-		__field(unsigned int, client_id)
+		__field(int, task_id)
+		__field(int, client_id)
 		__field(size_t, callsize)
 		__field(size_t, recvsize)
 		__field(int, status)
@@ -538,7 +538,7 @@ TRACE_EVENT(rpc_buf_alloc,
 		__entry->status = status;
 	),
 
-	TP_printk("task:%u@%u callsize=%zu recvsize=%zu status=%d",
+	TP_printk("task:%d@%d callsize=%zu recvsize=%zu status=%d",
 		__entry->task_id, __entry->client_id,
 		__entry->callsize, __entry->recvsize, __entry->status
 	)
@@ -554,8 +554,8 @@ TRACE_EVENT(rpc_call_rpcerror,
 	TP_ARGS(task, tk_status, rpc_status),
 
 	TP_STRUCT__entry(
-		__field(unsigned int, task_id)
-		__field(unsigned int, client_id)
+		__field(int, task_id)
+		__field(int, client_id)
 		__field(int, tk_status)
 		__field(int, rpc_status)
 	),
@@ -567,7 +567,7 @@ TRACE_EVENT(rpc_call_rpcerror,
 		__entry->rpc_status = rpc_status;
 	),
 
-	TP_printk("task:%u@%u tk_status=%d rpc_status=%d",
+	TP_printk("task:%d@%d tk_status=%d rpc_status=%d",
 		__entry->task_id, __entry->client_id,
 		__entry->tk_status, __entry->rpc_status)
 );
@@ -584,8 +584,8 @@ TRACE_EVENT(rpc_stats_latency,
 	TP_ARGS(task, backlog, rtt, execute),
 
 	TP_STRUCT__entry(
-		__field(unsigned int, task_id)
-		__field(unsigned int, client_id)
+		__field(int, task_id)
+		__field(int, client_id)
 		__field(u32, xid)
 		__field(int, version)
 		__string(progname, task->tk_client->cl_program->name)
@@ -607,7 +607,7 @@ TRACE_EVENT(rpc_stats_latency,
 		__entry->execute = ktime_to_us(execute);
 	),
 
-	TP_printk("task:%u@%d xid=0x%08x %sv%d %s backlog=%lu rtt=%lu execute=%lu",
+	TP_printk("task:%d@%d xid=0x%08x %sv%d %s backlog=%lu rtt=%lu execute=%lu",
 		__entry->task_id, __entry->client_id, __entry->xid,
 		__get_str(progname), __entry->version, __get_str(procname),
 		__entry->backlog, __entry->rtt, __entry->execute)
@@ -622,8 +622,8 @@ TRACE_EVENT(rpc_xdr_overflow,
 	TP_ARGS(xdr, requested),
 
 	TP_STRUCT__entry(
-		__field(unsigned int, task_id)
-		__field(unsigned int, client_id)
+		__field(int, task_id)
+		__field(int, client_id)
 		__field(int, version)
 		__field(size_t, requested)
 		__field(const void *, end)
@@ -651,8 +651,8 @@ TRACE_EVENT(rpc_xdr_overflow,
 			__entry->version = task->tk_client->cl_vers;
 			__assign_str(procedure, task->tk_msg.rpc_proc->p_name);
 		} else {
-			__entry->task_id = 0;
-			__entry->client_id = 0;
+			__entry->task_id = -1;
+			__entry->client_id = -1;
 			__assign_str(progname, "unknown");
 			__entry->version = 0;
 			__assign_str(procedure, "unknown");
@@ -669,7 +669,7 @@ TRACE_EVENT(rpc_xdr_overflow,
 	),
 
 	TP_printk(
-		"task:%u@%u %sv%d %s requested=%zu p=%p end=%p xdr=[%p,%zu]/%u/[%p,%zu]/%u\n",
+		"task:%d@%d %sv%d %s requested=%zu p=%p end=%p xdr=[%p,%zu]/%u/[%p,%zu]/%u\n",
 		__entry->task_id, __entry->client_id,
 		__get_str(progname), __entry->version, __get_str(procedure),
 		__entry->requested, __entry->p, __entry->end,
@@ -690,8 +690,8 @@ TRACE_EVENT(rpc_xdr_alignment,
 	TP_ARGS(xdr, offset, copied),
 
 	TP_STRUCT__entry(
-		__field(unsigned int, task_id)
-		__field(unsigned int, client_id)
+		__field(int, task_id)
+		__field(int, client_id)
 		__field(int, version)
 		__field(size_t, offset)
 		__field(unsigned int, copied)
@@ -728,7 +728,7 @@ TRACE_EVENT(rpc_xdr_alignment,
 	),
 
 	TP_printk(
-		"task:%u@%u %sv%d %s offset=%zu copied=%u xdr=[%p,%zu]/%u/[%p,%zu]/%u\n",
+		"task:%d@%d %sv%d %s offset=%zu copied=%u xdr=[%p,%zu]/%u/[%p,%zu]/%u\n",
 		__entry->task_id, __entry->client_id,
 		__get_str(progname), __entry->version, __get_str(procedure),
 		__entry->offset, __entry->copied,
@@ -904,8 +904,8 @@ TRACE_EVENT(rpc_socket_nospace,
 	TP_ARGS(rqst, transport),
 
 	TP_STRUCT__entry(
-		__field(unsigned int, task_id)
-		__field(unsigned int, client_id)
+		__field(int, task_id)
+		__field(int, client_id)
 		__field(unsigned int, total)
 		__field(unsigned int, remaining)
 	),
@@ -917,7 +917,7 @@ TRACE_EVENT(rpc_socket_nospace,
 		__entry->remaining = rqst->rq_slen - transport->xmit.offset;
 	),
 
-	TP_printk("task:%u@%u total=%u remaining=%u",
+	TP_printk("task:%d@%d total=%u remaining=%u",
 		__entry->task_id, __entry->client_id,
 		__entry->total, __entry->remaining
 	)
@@ -1026,8 +1026,8 @@ TRACE_EVENT(xprt_transmit,
 	TP_ARGS(rqst, status),
 
 	TP_STRUCT__entry(
-		__field(unsigned int, task_id)
-		__field(unsigned int, client_id)
+		__field(int, task_id)
+		__field(int, client_id)
 		__field(u32, xid)
 		__field(u32, seqno)
 		__field(int, status)
@@ -1043,7 +1043,7 @@ TRACE_EVENT(xprt_transmit,
 	),
 
 	TP_printk(
-		"task:%u@%u xid=0x%08x seqno=%u status=%d",
+		"task:%d@%d xid=0x%08x seqno=%u status=%d",
 		__entry->task_id, __entry->client_id, __entry->xid,
 		__entry->seqno, __entry->status)
 );
@@ -1056,8 +1056,8 @@ TRACE_EVENT(xprt_retransmit,
 	TP_ARGS(rqst),
 
 	TP_STRUCT__entry(
-		__field(unsigned int, task_id)
-		__field(unsigned int, client_id)
+		__field(int, task_id)
+		__field(int, client_id)
 		__field(u32, xid)
 		__field(int, ntrans)
 		__field(int, version)
@@ -1083,7 +1083,7 @@ TRACE_EVENT(xprt_retransmit,
 	),
 
 	TP_printk(
-		"task:%u@%u xid=0x%08x %sv%d %s ntrans=%d timeout=%lu",
+		"task:%d@%d xid=0x%08x %sv%d %s ntrans=%d timeout=%lu",
 		__entry->task_id, __entry->client_id, __entry->xid,
 		__get_str(progname), __entry->version, __get_str(procname),
 		__entry->ntrans, __entry->timeout
@@ -1119,9 +1119,9 @@ DECLARE_EVENT_CLASS(xprt_writelock_event,
 	TP_ARGS(xprt, task),
 
 	TP_STRUCT__entry(
-		__field(unsigned int, task_id)
-		__field(unsigned int, client_id)
-		__field(unsigned int, snd_task_id)
+		__field(int, task_id)
+		__field(int, client_id)
+		__field(int, snd_task_id)
 	),
 
 	TP_fast_assign(
@@ -1137,7 +1137,7 @@ DECLARE_EVENT_CLASS(xprt_writelock_event,
 					xprt->snd_task->tk_pid : -1;
 	),
 
-	TP_printk("task:%u@%u snd_task:%u",
+	TP_printk("task:%d@%d snd_task:%d",
 			__entry->task_id, __entry->client_id,
 			__entry->snd_task_id)
 );
@@ -1161,9 +1161,9 @@ DECLARE_EVENT_CLASS(xprt_cong_event,
 	TP_ARGS(xprt, task),
 
 	TP_STRUCT__entry(
-		__field(unsigned int, task_id)
-		__field(unsigned int, client_id)
-		__field(unsigned int, snd_task_id)
+		__field(int, task_id)
+		__field(int, client_id)
+		__field(int, snd_task_id)
 		__field(unsigned long, cong)
 		__field(unsigned long, cwnd)
 		__field(bool, wait)
@@ -1185,7 +1185,7 @@ DECLARE_EVENT_CLASS(xprt_cong_event,
 		__entry->wait = test_bit(XPRT_CWND_WAIT, &xprt->state);
 	),
 
-	TP_printk("task:%u@%u snd_task:%u cong=%lu cwnd=%lu%s",
+	TP_printk("task:%d@%d snd_task:%d cong=%lu cwnd=%lu%s",
 			__entry->task_id, __entry->client_id,
 			__entry->snd_task_id, __entry->cong, __entry->cwnd,
 			__entry->wait ? " (wait)" : "")
@@ -1212,8 +1212,8 @@ TRACE_EVENT(xprt_reserve,
 	TP_ARGS(rqst),
 
 	TP_STRUCT__entry(
-		__field(unsigned int, task_id)
-		__field(unsigned int, client_id)
+		__field(int, task_id)
+		__field(int, client_id)
 		__field(u32, xid)
 	),
 
@@ -1223,7 +1223,7 @@ TRACE_EVENT(xprt_reserve,
 		__entry->xid = be32_to_cpu(rqst->rq_xid);
 	),
 
-	TP_printk("task:%u@%u xid=0x%08x",
+	TP_printk("task:%d@%d xid=0x%08x",
 		__entry->task_id, __entry->client_id, __entry->xid
 	)
 );
@@ -1293,8 +1293,8 @@ TRACE_EVENT(rpcb_getport,
 	TP_ARGS(clnt, task, bind_version),
 
 	TP_STRUCT__entry(
-		__field(unsigned int, task_id)
-		__field(unsigned int, client_id)
+		__field(int, task_id)
+		__field(int, client_id)
 		__field(unsigned int, program)
 		__field(unsigned int, version)
 		__field(int, protocol)
@@ -1312,7 +1312,7 @@ TRACE_EVENT(rpcb_getport,
 		__assign_str(servername, task->tk_xprt->servername);
 	),
 
-	TP_printk("task:%u@%u server=%s program=%u version=%u protocol=%d bind_version=%u",
+	TP_printk("task:%d@%d server=%s program=%u version=%u protocol=%d bind_version=%u",
 		__entry->task_id, __entry->client_id, __get_str(servername),
 		__entry->program, __entry->version, __entry->protocol,
 		__entry->bind_version
@@ -1329,8 +1329,8 @@ TRACE_EVENT(rpcb_setport,
 	TP_ARGS(task, status, port),
 
 	TP_STRUCT__entry(
-		__field(unsigned int, task_id)
-		__field(unsigned int, client_id)
+		__field(int, task_id)
+		__field(int, client_id)
 		__field(int, status)
 		__field(unsigned short, port)
 	),
@@ -1342,7 +1342,7 @@ TRACE_EVENT(rpcb_setport,
 		__entry->port = port;
 	),
 
-	TP_printk("task:%u@%u status=%d port=%u",
+	TP_printk("task:%d@%d status=%d port=%u",
 		__entry->task_id, __entry->client_id,
 		__entry->status, __entry->port
 	)

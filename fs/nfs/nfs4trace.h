@@ -676,8 +676,8 @@ TRACE_EVENT(nfs4_xdr_bad_operation,
 		TP_ARGS(xdr, op, expected),
 
 		TP_STRUCT__entry(
-			__field(unsigned int, task_id)
-			__field(unsigned int, client_id)
+			__field(int, task_id)
+			__field(int, client_id)
 			__field(u32, xid)
 			__field(u32, op)
 			__field(u32, expected)
@@ -695,7 +695,7 @@ TRACE_EVENT(nfs4_xdr_bad_operation,
 		),
 
 		TP_printk(
-			"task:%u@%d xid=0x%08x operation=%u, expected=%u",
+			"task:%d@%d xid=0x%08x operation=%u, expected=%u",
 			__entry->task_id, __entry->client_id, __entry->xid,
 			__entry->op, __entry->expected
 		)
@@ -711,8 +711,8 @@ DECLARE_EVENT_CLASS(nfs4_xdr_event,
 		TP_ARGS(xdr, op, error),
 
 		TP_STRUCT__entry(
-			__field(unsigned int, task_id)
-			__field(unsigned int, client_id)
+			__field(int, task_id)
+			__field(int, client_id)
 			__field(u32, xid)
 			__field(u32, op)
 			__field(unsigned long, error)
@@ -730,7 +730,7 @@ DECLARE_EVENT_CLASS(nfs4_xdr_event,
 		),
 
 		TP_printk(
-			"task:%u@%d xid=0x%08x error=%ld (%s) operation=%u",
+			"task:%d@%d xid=0x%08x error=%ld (%s) operation=%u",
 			__entry->task_id, __entry->client_id, __entry->xid,
 			-__entry->error, show_nfsv4_errors(__entry->error),
 			__entry->op

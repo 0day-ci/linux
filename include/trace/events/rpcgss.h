@@ -87,8 +87,8 @@ DECLARE_EVENT_CLASS(rpcgss_gssapi_event,
 	TP_ARGS(task, maj_stat),
 
 	TP_STRUCT__entry(
-		__field(unsigned int, task_id)
-		__field(unsigned int, client_id)
+		__field(int, task_id)
+		__field(int, client_id)
 		__field(u32, maj_stat)
 
 	),
@@ -99,7 +99,7 @@ DECLARE_EVENT_CLASS(rpcgss_gssapi_event,
 		__entry->maj_stat = maj_stat;
 	),
 
-	TP_printk("task:%u@%u maj_stat=%s",
+	TP_printk("task:%d@%d maj_stat=%s",
 		__entry->task_id, __entry->client_id,
 		__entry->maj_stat == 0 ?
 		"GSS_S_COMPLETE" : show_gss_status(__entry->maj_stat))
@@ -323,8 +323,8 @@ TRACE_EVENT(rpcgss_unwrap_failed,
 	TP_ARGS(task),
 
 	TP_STRUCT__entry(
-		__field(unsigned int, task_id)
-		__field(unsigned int, client_id)
+		__field(int, task_id)
+		__field(int, client_id)
 	),
 
 	TP_fast_assign(
@@ -332,7 +332,7 @@ TRACE_EVENT(rpcgss_unwrap_failed,
 		__entry->client_id = task->tk_client->cl_clid;
 	),
 
-	TP_printk("task:%u@%u", __entry->task_id, __entry->client_id)
+	TP_printk("task:%d@%d", __entry->task_id, __entry->client_id)
 );
 
 TRACE_EVENT(rpcgss_bad_seqno,
@@ -345,8 +345,8 @@ TRACE_EVENT(rpcgss_bad_seqno,
 	TP_ARGS(task, expected, received),
 
 	TP_STRUCT__entry(
-		__field(unsigned int, task_id)
-		__field(unsigned int, client_id)
+		__field(int, task_id)
+		__field(int, client_id)
 		__field(u32, expected)
 		__field(u32, received)
 	),
@@ -358,7 +358,7 @@ TRACE_EVENT(rpcgss_bad_seqno,
 		__entry->received = received;
 	),
 
-	TP_printk("task:%u@%u expected seqno %u, received seqno %u",
+	TP_printk("task:%d@%d expected seqno %u, received seqno %u",
 		__entry->task_id, __entry->client_id,
 		__entry->expected, __entry->received)
 );
@@ -372,7 +372,7 @@ TRACE_EVENT(rpcgss_seqno,
 
 	TP_STRUCT__entry(
 		__field(unsigned int, task_id)
-		__field(unsigned int, client_id)
+		__field(int, client_id)
 		__field(u32, xid)
 		__field(u32, seqno)
 	),
@@ -386,7 +386,7 @@ TRACE_EVENT(rpcgss_seqno,
 		__entry->seqno = rqst->rq_seqno;
 	),
 
-	TP_printk("task:%u@%u xid=0x%08x seqno=%u",
+	TP_printk("task:%u@%d xid=0x%08x seqno=%u",
 		__entry->task_id, __entry->client_id,
 		__entry->xid, __entry->seqno)
 );
@@ -402,7 +402,7 @@ TRACE_EVENT(rpcgss_need_reencode,
 
 	TP_STRUCT__entry(
 		__field(unsigned int, task_id)
-		__field(unsigned int, client_id)
+		__field(int, client_id)
 		__field(u32, xid)
 		__field(u32, seq_xmit)
 		__field(u32, seqno)
@@ -418,7 +418,7 @@ TRACE_EVENT(rpcgss_need_reencode,
 		__entry->ret = ret;
 	),
 
-	TP_printk("task:%u@%u xid=0x%08x rq_seqno=%u seq_xmit=%u reencode %sneeded",
+	TP_printk("task:%u@%d xid=0x%08x rq_seqno=%u seq_xmit=%u reencode %sneeded",
 		__entry->task_id, __entry->client_id,
 		__entry->xid, __entry->seqno, __entry->seq_xmit,
 		__entry->ret ? "" : "un")
@@ -434,7 +434,7 @@ TRACE_EVENT(rpcgss_update_slack,
 
 	TP_STRUCT__entry(
 		__field(unsigned int, task_id)
-		__field(unsigned int, client_id)
+		__field(int, client_id)
 		__field(u32, xid)
 		__field(const void *, auth)
 		__field(unsigned int, rslack)
@@ -452,7 +452,7 @@ TRACE_EVENT(rpcgss_update_slack,
 		__entry->verfsize = auth->au_verfsize;
 	),
 
-	TP_printk("task:%u@%u xid=0x%08x auth=%p rslack=%u ralign=%u verfsize=%u\n",
+	TP_printk("task:%u@%d xid=0x%08x auth=%p rslack=%u ralign=%u verfsize=%u\n",
 		__entry->task_id, __entry->client_id, __entry->xid,
 		__entry->auth, __entry->rslack, __entry->ralign,
 		__entry->verfsize)

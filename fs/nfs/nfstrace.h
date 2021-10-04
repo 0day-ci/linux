@@ -1334,8 +1334,8 @@ DECLARE_EVENT_CLASS(nfs_xdr_event,
 		TP_ARGS(xdr, error),
 
 		TP_STRUCT__entry(
-			__field(unsigned int, task_id)
-			__field(unsigned int, client_id)
+			__field(int, task_id)
+			__field(int, client_id)
 			__field(u32, xid)
 			__field(int, version)
 			__field(unsigned long, error)
@@ -1360,7 +1360,7 @@ DECLARE_EVENT_CLASS(nfs_xdr_event,
 		),
 
 		TP_printk(
-			"task:%u@%d xid=0x%08x %sv%d %s error=%ld (%s)",
+			"task:%d@%d xid=0x%08x %sv%d %s error=%ld (%s)",
 			__entry->task_id, __entry->client_id, __entry->xid,
 			__get_str(program), __entry->version,
 			__get_str(procedure), -__entry->error,

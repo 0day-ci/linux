@@ -258,8 +258,8 @@ DECLARE_EVENT_CLASS(xprtrdma_rdch_event,
 	TP_ARGS(task, pos, mr, nsegs),
 
 	TP_STRUCT__entry(
-		__field(unsigned int, task_id)
-		__field(unsigned int, client_id)
+		__field(int, task_id)
+		__field(int, client_id)
 		__field(unsigned int, pos)
 		__field(int, nents)
 		__field(u32, handle)
@@ -279,7 +279,7 @@ DECLARE_EVENT_CLASS(xprtrdma_rdch_event,
 		__entry->nsegs = nsegs;
 	),
 
-	TP_printk("task:%u@%u pos=%u %u@0x%016llx:0x%08x (%s)",
+	TP_printk("task:%d@%d pos=%u %u@0x%016llx:0x%08x (%s)",
 		__entry->task_id, __entry->client_id,
 		__entry->pos, __entry->length,
 		(unsigned long long)__entry->offset, __entry->handle,
@@ -307,8 +307,8 @@ DECLARE_EVENT_CLASS(xprtrdma_wrch_event,
 	TP_ARGS(task, mr, nsegs),
 
 	TP_STRUCT__entry(
-		__field(unsigned int, task_id)
-		__field(unsigned int, client_id)
+		__field(int, task_id)
+		__field(int, client_id)
 		__field(int, nents)
 		__field(u32, handle)
 		__field(u32, length)
@@ -326,7 +326,7 @@ DECLARE_EVENT_CLASS(xprtrdma_wrch_event,
 		__entry->nsegs = nsegs;
 	),
 
-	TP_printk("task:%u@%u %u@0x%016llx:0x%08x (%s)",
+	TP_printk("task:%d@%d %u@0x%016llx:0x%08x (%s)",
 		__entry->task_id, __entry->client_id,
 		__entry->length, (unsigned long long)__entry->offset,
 		__entry->handle,
@@ -363,8 +363,8 @@ DECLARE_EVENT_CLASS(xprtrdma_mr_class,
 	TP_ARGS(mr),
 
 	TP_STRUCT__entry(
-		__field(unsigned int, task_id)
-		__field(unsigned int, client_id)
+		__field(int, task_id)
+		__field(int, client_id)
 		__field(u32, mr_id)
 		__field(int, nents)
 		__field(u32, handle)
@@ -387,7 +387,7 @@ DECLARE_EVENT_CLASS(xprtrdma_mr_class,
 		__entry->dir    = mr->mr_dir;
 	),
 
-	TP_printk("task:%u@%u mr.id=%u nents=%d %u@0x%016llx:0x%08x (%s)",
+	TP_printk("task:%d@%d mr.id=%u nents=%d %u@0x%016llx:0x%08x (%s)",
 		__entry->task_id, __entry->client_id,
 		__entry->mr_id, __entry->nents, __entry->length,
 		(unsigned long long)__entry->offset, __entry->handle,
@@ -615,8 +615,8 @@ TRACE_EVENT(xprtrdma_nomrs_err,
 	TP_ARGS(r_xprt, req),
 
 	TP_STRUCT__entry(
-		__field(unsigned int, task_id)
-		__field(unsigned int, client_id)
+		__field(int, task_id)
+		__field(int, client_id)
 		__string(addr, rpcrdma_addrstr(r_xprt))
 		__string(port, rpcrdma_portstr(r_xprt))
 	),
@@ -630,7 +630,7 @@ TRACE_EVENT(xprtrdma_nomrs_err,
 		__assign_str(port, rpcrdma_portstr(r_xprt));
 	),
 
-	TP_printk("peer=[%s]:%s task:%u@%u",
+	TP_printk("peer=[%s]:%s task:%d@%d",
 		__get_str(addr), __get_str(port),
 		__entry->task_id, __entry->client_id
 	)
@@ -668,8 +668,8 @@ TRACE_EVENT(xprtrdma_marshal,
 	TP_ARGS(req, rtype, wtype),
 
 	TP_STRUCT__entry(
-		__field(unsigned int, task_id)
-		__field(unsigned int, client_id)
+		__field(int, task_id)
+		__field(int, client_id)
 		__field(u32, xid)
 		__field(unsigned int, hdrlen)
 		__field(unsigned int, headlen)
@@ -693,7 +693,7 @@ TRACE_EVENT(xprtrdma_marshal,
 		__entry->wtype = wtype;
 	),
 
-	TP_printk("task:%u@%u xid=0x%08x: hdr=%u xdr=%u/%u/%u %s/%s",
+	TP_printk("task:%d@%d xid=0x%08x: hdr=%u xdr=%u/%u/%u %s/%s",
 		__entry->task_id, __entry->client_id, __entry->xid,
 		__entry->hdrlen,
 		__entry->headlen, __entry->pagelen, __entry->taillen,
@@ -710,8 +710,8 @@ TRACE_EVENT(xprtrdma_marshal_failed,
 	TP_ARGS(rqst, ret),
 
 	TP_STRUCT__entry(
-		__field(unsigned int, task_id)
-		__field(unsigned int, client_id)
+		__field(int, task_id)
+		__field(int, client_id)
 		__field(u32, xid)
 		__field(int, ret)
 	),
@@ -723,7 +723,7 @@ TRACE_EVENT(xprtrdma_marshal_failed,
 		__entry->ret = ret;
 	),
 
-	TP_printk("task:%u@%u xid=0x%08x: ret=%d",
+	TP_printk("task:%d@%d xid=0x%08x: ret=%d",
 		__entry->task_id, __entry->client_id, __entry->xid,
 		__entry->ret
 	)
@@ -737,8 +737,8 @@ TRACE_EVENT(xprtrdma_prepsend_failed,
 	TP_ARGS(rqst, ret),
 
 	TP_STRUCT__entry(
-		__field(unsigned int, task_id)
-		__field(unsigned int, client_id)
+		__field(int, task_id)
+		__field(int, client_id)
 		__field(u32, xid)
 		__field(int, ret)
 	),
@@ -750,7 +750,7 @@ TRACE_EVENT(xprtrdma_prepsend_failed,
 		__entry->ret = ret;
 	),
 
-	TP_printk("task:%u@%u xid=0x%08x: ret=%d",
+	TP_printk("task:%d@%d xid=0x%08x: ret=%d",
 		__entry->task_id, __entry->client_id, __entry->xid,
 		__entry->ret
 	)
@@ -766,8 +766,8 @@ TRACE_EVENT(xprtrdma_post_send,
 	TP_STRUCT__entry(
 		__field(u32, cq_id)
 		__field(int, completion_id)
-		__field(unsigned int, task_id)
-		__field(unsigned int, client_id)
+		__field(int, task_id)
+		__field(int, client_id)
 		__field(int, num_sge)
 		__field(int, signaled)
 	),
@@ -785,7 +785,7 @@ TRACE_EVENT(xprtrdma_post_send,
 		__entry->signaled = req->rl_wr.send_flags & IB_SEND_SIGNALED;
 	),
 
-	TP_printk("task:%u@%u cq.id=%u cid=%d (%d SGE%s) %s",
+	TP_printk("task:%d@%d cq.id=%u cid=%d (%d SGE%s) %s",
 		__entry->task_id, __entry->client_id,
 		__entry->cq_id, __entry->completion_id,
 		__entry->num_sge, (__entry->num_sge == 1 ? "" : "s"),
@@ -919,8 +919,8 @@ TRACE_EVENT(xprtrdma_post_linv_err,
 	TP_ARGS(req, status),
 
 	TP_STRUCT__entry(
-		__field(unsigned int, task_id)
-		__field(unsigned int, client_id)
+		__field(int, task_id)
+		__field(int, client_id)
 		__field(int, status)
 	),
 
@@ -932,7 +932,7 @@ TRACE_EVENT(xprtrdma_post_linv_err,
 		__entry->status = status;
 	),
 
-	TP_printk("task:%u@%u status=%d",
+	TP_printk("task:%d@%d status=%d",
 		__entry->task_id, __entry->client_id, __entry->status
 	)
 );
@@ -1107,8 +1107,8 @@ TRACE_EVENT(xprtrdma_reply,
 	TP_ARGS(task, rep, credits),
 
 	TP_STRUCT__entry(
-		__field(unsigned int, task_id)
-		__field(unsigned int, client_id)
+		__field(int, task_id)
+		__field(int, client_id)
 		__field(u32, xid)
 		__field(unsigned int, credits)
 	),
@@ -1120,7 +1120,7 @@ TRACE_EVENT(xprtrdma_reply,
 		__entry->credits = credits;
 	),
 
-	TP_printk("task:%u@%u xid=0x%08x credits=%u",
+	TP_printk("task:%d@%d xid=0x%08x credits=%u",
 		__entry->task_id, __entry->client_id, __entry->xid,
 		__entry->credits
 	)
@@ -1141,8 +1141,8 @@ TRACE_EVENT(xprtrdma_err_vers,
 	TP_ARGS(rqst, min, max),
 
 	TP_STRUCT__entry(
-		__field(unsigned int, task_id)
-		__field(unsigned int, client_id)
+		__field(int, task_id)
+		__field(int, client_id)
 		__field(u32, xid)
 		__field(u32, min)
 		__field(u32, max)
@@ -1156,7 +1156,7 @@ TRACE_EVENT(xprtrdma_err_vers,
 		__entry->max = be32_to_cpup(max);
 	),
 
-	TP_printk("task:%u@%u xid=0x%08x versions=[%u, %u]",
+	TP_printk("task:%d@%d xid=0x%08x versions=[%u, %u]",
 		__entry->task_id, __entry->client_id, __entry->xid,
 		__entry->min, __entry->max
 	)
@@ -1170,8 +1170,8 @@ TRACE_EVENT(xprtrdma_err_chunk,
 	TP_ARGS(rqst),
 
 	TP_STRUCT__entry(
-		__field(unsigned int, task_id)
-		__field(unsigned int, client_id)
+		__field(int, task_id)
+		__field(int, client_id)
 		__field(u32, xid)
 	),
 
@@ -1181,7 +1181,7 @@ TRACE_EVENT(xprtrdma_err_chunk,
 		__entry->xid = be32_to_cpu(rqst->rq_xid);
 	),
 
-	TP_printk("task:%u@%u xid=0x%08x",
+	TP_printk("task:%d@%d xid=0x%08x",
 		__entry->task_id, __entry->client_id, __entry->xid
 	)
 );
@@ -1195,8 +1195,8 @@ TRACE_EVENT(xprtrdma_err_unrecognized,
 	TP_ARGS(rqst, procedure),
 
 	TP_STRUCT__entry(
-		__field(unsigned int, task_id)
-		__field(unsigned int, client_id)
+		__field(int, task_id)
+		__field(int, client_id)
 		__field(u32, xid)
 		__field(u32, procedure)
 	),
@@ -1207,7 +1207,7 @@ TRACE_EVENT(xprtrdma_err_unrecognized,
 		__entry->procedure = be32_to_cpup(procedure);
 	),
 
-	TP_printk("task:%u@%u xid=0x%08x procedure=%u",
+	TP_printk("task:%d@%d xid=0x%08x procedure=%u",
 		__entry->task_id, __entry->client_id, __entry->xid,
 		__entry->procedure
 	)
@@ -1222,8 +1222,8 @@ TRACE_EVENT(xprtrdma_fixup,
 	TP_ARGS(rqst, fixup),
 
 	TP_STRUCT__entry(
-		__field(unsigned int, task_id)
-		__field(unsigned int, client_id)
+		__field(int, task_id)
+		__field(int, client_id)
 		__field(unsigned long, fixup)
 		__field(size_t, headlen)
 		__field(unsigned int, pagelen)
@@ -1239,7 +1239,7 @@ TRACE_EVENT(xprtrdma_fixup,
 		__entry->taillen = rqst->rq_rcv_buf.tail[0].iov_len;
 	),
 
-	TP_printk("task:%u@%u fixup=%lu xdr=%zu/%u/%zu",
+	TP_printk("task:%d@%d fixup=%lu xdr=%zu/%u/%zu",
 		__entry->task_id, __entry->client_id, __entry->fixup,
 		__entry->headlen, __entry->pagelen, __entry->taillen
 	)
@@ -1280,8 +1280,8 @@ TRACE_EVENT(xprtrdma_mrs_zap,
 	TP_ARGS(task),
 
 	TP_STRUCT__entry(
-		__field(unsigned int, task_id)
-		__field(unsigned int, client_id)
+		__field(int, task_id)
+		__field(int, client_id)
 	),
 
 	TP_fast_assign(
@@ -1289,7 +1289,7 @@ TRACE_EVENT(xprtrdma_mrs_zap,
 		__entry->client_id = task->tk_client->cl_clid;
 	),
 
-	TP_printk("task:%u@%u",
+	TP_printk("task:%d@%d",
 		__entry->task_id, __entry->client_id
 	)
 );
