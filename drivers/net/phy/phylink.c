@@ -871,6 +871,32 @@ int phylink_set_pcs(struct phylink *pl, struct phylink_pcs *pcs)
 }
 EXPORT_SYMBOL_GPL(phylink_set_pcs);
 
+/**
+ * phylink_set_pcs_weak() - optionally set the current PCS for phylink to use
+ * @pl: a pointer to a &struct phylink returned from phylink_create()
+ * @pcs: a pointer to the &struct phylink_pcs
+ *
+ * Bind the MAC PCS to phylink only if there is no currently-bound PCS. This
+ * may be called to set a "default" PCS, such as an internal PCS which was
+ * previously handled by the MAC driver directly. Otherwise, this function
+ * behaves like phylink_set_pcs();
+ *
+ * Context: may sleep.
+ * Return: 1 if the PCS was set, 0 if it was not, or -errno on failure.
+ */
+int phylink_set_pcs_weak(struct phylink *pl, struct phylink_pcs *pcs)
+{
+	int ret;
+
+	if (!pl->pcs) {
+		ret = phylink_set_pcs(pl, pcs);
+		return ret ? ret : 1;
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(phylink_set_pcs_weak);
+
 static struct phylink_pcs *phylink_find_pcs(struct fwnode_handle *fwnode)
 {
 	struct phylink_pcs *pcs;

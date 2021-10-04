@@ -442,6 +442,7 @@ void pcs_link_up(struct phylink_pcs *pcs, unsigned int mode,
 int phylink_register_pcs(struct phylink_pcs *pcs);
 void phylink_unregister_pcs(struct phylink_pcs *pcs);
 int phylink_set_pcs(struct phylink *pl, struct phylink_pcs *pcs);
+int phylink_set_pcs_weak(struct phylink *pl, struct phylink_pcs *pcs);
 
 struct phylink *phylink_create(struct phylink_config *, struct fwnode_handle *,
 			       phy_interface_t iface,
