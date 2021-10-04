@@ -36,6 +36,14 @@ properties:
         - const: synopsys,dwc3
           deprecated: true
 
+  "#address-cells":
+    enum: [ 1, 2 ]
+
+  "#size-cells":
+    enum: [ 1, 2 ]
+
+  ranges: true
+
   interrupts:
     description:
       It's either a single common DWC3 interrupt (dwc_usb3) or individual
@@ -325,6 +333,13 @@ properties:
     uniqueItems: true
     items:
       enum: [1, 4, 8, 16, 32, 64, 128, 256]
+
+  connector:
+    type: object
+    $ref: /connector/usb-connector.yaml#
+    description:
+      Connector for dual role switch, especially for "eud-usb-c-connector"
+
 
 unevaluatedProperties: false
 
