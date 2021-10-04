@@ -796,6 +796,27 @@ static int phylink_register_sfp(struct phylink *pl,
 }
 
 /**
+ * phylink_set_pcs() - set the current PCS for phylink to use
+ * @pl: a pointer to a &struct phylink returned from phylink_create()
+ * @pcs: a pointer to the &struct phylink_pcs
+ *
+ * Bind the MAC PCS to phylink.  This may be called after phylink_create(),
+ * in mac_prepare() or mac_config() methods if it is desired to dynamically
+ * change the PCS.
+ *
+ * Please note that there are behavioural changes with the mac_config()
+ * callback if a PCS is present (denoting a newer setup) so removing a PCS
+ * is not supported, and if a PCS is going to be used, it must be registered
+ * by calling phylink_set_pcs() at the latest in the first mac_config() call.
+ */
+void phylink_set_pcs(struct phylink *pl, struct phylink_pcs *pcs)
+{
+	pl->pcs = pcs;
+	pl->pcs_ops = pcs->ops;
+}
+EXPORT_SYMBOL_GPL(phylink_set_pcs);
+
+/**
  * phylink_create() - create a phylink instance
  * @config: a pointer to the target &struct phylink_config
  * @fwnode: a pointer to a &struct fwnode_handle describing the network
@@ -880,27 +901,6 @@ struct phylink *phylink_create(struct phylink_config *config,
 	return pl;
 }
 EXPORT_SYMBOL_GPL(phylink_create);
-
-/**
- * phylink_set_pcs() - set the current PCS for phylink to use
- * @pl: a pointer to a &struct phylink returned from phylink_create()
- * @pcs: a pointer to the &struct phylink_pcs
- *
- * Bind the MAC PCS to phylink.  This may be called after phylink_create(),
- * in mac_prepare() or mac_config() methods if it is desired to dynamically
- * change the PCS.
- *
- * Please note that there are behavioural changes with the mac_config()
- * callback if a PCS is present (denoting a newer setup) so removing a PCS
- * is not supported, and if a PCS is going to be used, it must be registered
- * by calling phylink_set_pcs() at the latest in the first mac_config() call.
- */
-void phylink_set_pcs(struct phylink *pl, struct phylink_pcs *pcs)
-{
-	pl->pcs = pcs;
-	pl->pcs_ops = pcs->ops;
-}
-EXPORT_SYMBOL_GPL(phylink_set_pcs);
 
 /**
  * phylink_destroy() - cleanup and destroy the phylink instance
