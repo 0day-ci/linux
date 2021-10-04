@@ -117,18 +117,13 @@ int pcibios_plat_dev_init(struct pci_dev *dev)
 	/* Find the Advanced Error Reporting capability */
 	pos = pci_find_ext_capability(dev, PCI_EXT_CAP_ID_ERR);
 	if (pos) {
-		/* Enable reporting of all uncorrectable errors */
-		/* Uncorrectable Error Mask - turned on bits disable errors */
-		pci_write_config_dword(dev, pos + PCI_ERR_UNCOR_MASK, 0);
 		/*
 		 * Leave severity at HW default. This only controls if
 		 * errors are reported as uncorrectable or
 		 * correctable, not if the error is reported.
 		 */
 		/* PCI_ERR_UNCOR_SEVER - Uncorrectable Error Severity */
-		/* Enable reporting of all correctable errors */
-		/* Correctable Error Mask - turned on bits disable errors */
-		pci_write_config_dword(dev, pos + PCI_ERR_COR_MASK, 0);
+
 		/* Advanced Error Capabilities */
 		pci_read_config_dword(dev, pos + PCI_ERR_CAP, &dconfig);
 		/* ECRC Generation Enable */
