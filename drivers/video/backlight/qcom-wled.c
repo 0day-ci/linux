@@ -1536,6 +1536,8 @@ static int wled_configure(struct wled *wled)
 				string_len, rc);
 			return -EINVAL;
 		}
+
+		cfg->num_strings = string_len;
 	}
 
 	return 0;
