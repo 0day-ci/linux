@@ -543,6 +543,7 @@ static void macb_validate(struct phylink_config *config,
 			goto none;
 		fallthrough;
 	case PHY_INTERFACE_MODE_SGMII:
+	case PHY_INTERFACE_MODE_1000BASEX:
 		if (bp->caps & MACB_CAPS_GIGABIT_MODE_AVAILABLE) {
 			phylink_set(mask, 1000baseT_Full);
 			phylink_set(mask, 1000baseX_Full);
@@ -571,25 +572,100 @@ static void macb_validate(struct phylink_config *config,
 		   __ETHTOOL_LINK_MODE_MASK_NBITS);
 }
 
-static void macb_usx_pcs_link_up(struct phylink_pcs *pcs, unsigned int mode,
-				 phy_interface_t interface, int speed,
-				 int duplex)
+static inline struct macb *pcs_to_macb(struct phylink_pcs *pcs)
 {
-	struct macb *bp = container_of(pcs, struct macb, phylink_pcs);
-	u32 config;
+	return container_of(pcs, struct macb, phylink_pcs);
+}
 
-	config = gem_readl(bp, USX_CONTROL);
-	config = GEM_BFINS(SERDES_RATE, MACB_SERDES_RATE_10G, config);
-	config = GEM_BFINS(USX_CTRL_SPEED, HS_SPEED_10000M, config);
-	config &= ~(GEM_BIT(TX_SCR_BYPASS) | GEM_BIT(RX_SCR_BYPASS));
-	config |= GEM_BIT(TX_EN);
-	gem_writel(bp, USX_CONTROL, config);
+static void macb_pcs_get_state(struct phylink_pcs *pcs,
+			       struct phylink_link_state *state)
+{
+	struct macb *bp = pcs_to_macb(pcs);
+
+	if (gem_readl(bp, NCFGR) & GEM_BIT(SGMIIEN))
+		state->interface = PHY_INTERFACE_MODE_SGMII;
+	else
+		state->interface = PHY_INTERFACE_MODE_1000BASEX;
+
+	phylink_mii_c22_pcs_decode_state(state, gem_readl(bp, PCSSTS),
+					 gem_readl(bp, PCSANLPBASE));
+}
+
+/**
+ * macb_pcs_config_an() - Configure autonegotiation settings for PCSs
+ * @bp - The macb to operate on
+ * @mode - The autonegotiation mode
+ * @interface - The interface to use
+ * @advertising - The advertisement mask
+ *
+ * This provides common configuration for PCS autonegotiation.
+ *
+ * Context: Call with @bp->lock held.
+ * Return: 1 if any registers were changed; 0 otherwise
+ */
+static int macb_pcs_config_an(struct macb *bp, unsigned int mode,
+			      phy_interface_t interface,
+			      const unsigned long *advertising)
+{
+	bool changed = false;
+	u16 old, new;
+
+	old = gem_readl(bp, PCSANADV);
+	new = phylink_mii_c22_pcs_encode_advertisement(interface, advertising,
+						       old);
+	if (old != new) {
+		changed = true;
+		gem_writel(bp, PCSANADV, new);
+	}
+
+	old = new = gem_readl(bp, PCSCNTRL);
+	if (mode == MLO_AN_INBAND)
+		new |= BMCR_ANENABLE;
+	else
+		new &= ~BMCR_ANENABLE;
+	if (old != new) {
+		changed = true;
+		gem_writel(bp, PCSCNTRL, new);
+	}
+	return changed;
+}
+
+static int macb_pcs_config(struct phylink_pcs *pcs, unsigned int mode,
+			   phy_interface_t interface,
+			   const unsigned long *advertising,
+			   bool permit_pause_to_mac)
+{
+	bool changed = false;
+	struct macb *bp = pcs_to_macb(pcs);
+	u16 old, new;
+	unsigned long flags;
+
+	spin_lock_irqsave(&bp->lock, flags);
+	old = new = gem_readl(bp, NCFGR);
+	if (interface == PHY_INTERFACE_MODE_SGMII) {
+		new |= GEM_BIT(SGMIIEN);
+	} else if (interface == PHY_INTERFACE_MODE_1000BASEX) {
+		new &= ~GEM_BIT(SGMIIEN);
+	} else {
+		spin_lock_irqsave(&bp->lock, flags);
+		return -EOPNOTSUPP;
+	}
+	if (old != new) {
+		changed = true;
+		gem_writel(bp, NCFGR, new);
+	}
+
+	if (macb_pcs_config_an(bp, mode, interface, advertising))
+		changed = true;
+
+	spin_unlock_irqrestore(&bp->lock, flags);
+	return changed;
 }
 
 static void macb_usx_pcs_get_state(struct phylink_pcs *pcs,
 				   struct phylink_link_state *state)
 {
-	struct macb *bp = container_of(pcs, struct macb, phylink_pcs);
+	struct macb *bp = pcs_to_macb(pcs);
 	u32 val;
 
 	state->speed = SPEED_10000;
@@ -609,70 +685,60 @@ static int macb_usx_pcs_config(struct phylink_pcs *pcs,
 			       const unsigned long *advertising,
 			       bool permit_pause_to_mac)
 {
-	struct macb *bp = container_of(pcs, struct macb, phylink_pcs);
+	bool changed;
+	struct macb *bp = pcs_to_macb(pcs);
+	u16 old, new;
+	unsigned long flags;
 
-	gem_writel(bp, USX_CONTROL, gem_readl(bp, USX_CONTROL) |
-		   GEM_BIT(SIGNAL_OK));
+	if (interface != PHY_INTERFACE_MODE_10GBASER)
+		return -EOPNOTSUPP;
 
-	return 0;
-}
+	spin_lock_irqsave(&bp->lock, flags);
+	old = new = gem_readl(bp, NCR);
+	new |= GEM_BIT(ENABLE_HS_MAC);
+	if (old != new) {
+		changed = true;
+		gem_writel(bp, NCFGR, new);
+	}
 
-static void macb_pcs_get_state(struct phylink_pcs *pcs,
-			       struct phylink_link_state *state)
-{
-	state->link = 0;
-}
+	if (macb_pcs_config_an(bp, mode, interface, advertising))
+		changed = true;
 
-static void macb_pcs_an_restart(struct phylink_pcs *pcs)
-{
-	/* Not supported */
-}
+	old = new = gem_readl(bp, USX_CONTROL);
+	new |= GEM_BIT(SIGNAL_OK);
+	if (old != new) {
+		changed = true;
+		gem_writel(bp, USX_CONTROL, new);
+	}
 
-static int macb_pcs_config(struct phylink_pcs *pcs,
-			   unsigned int mode,
-			   phy_interface_t interface,
-			   const unsigned long *advertising,
-			   bool permit_pause_to_mac)
-{
-	return 0;
+	old = new = gem_readl(bp, USX_CONTROL);
+	new = GEM_BFINS(SERDES_RATE, MACB_SERDES_RATE_10G, new);
+	new = GEM_BFINS(USX_CTRL_SPEED, HS_SPEED_10000M, new);
+	new &= ~(GEM_BIT(TX_SCR_BYPASS) | GEM_BIT(RX_SCR_BYPASS));
+	new |= GEM_BIT(TX_EN);
+	if (old != new) {
+		changed = true;
+		gem_writel(bp, USX_CONTROL, new);
+	}
+
+	spin_unlock_irqrestore(&bp->lock, flags);
+	return changed;
 }
 
 static const struct phylink_pcs_ops macb_phylink_usx_pcs_ops = {
 	.pcs_get_state = macb_usx_pcs_get_state,
 	.pcs_config = macb_usx_pcs_config,
-	.pcs_link_up = macb_usx_pcs_link_up,
 };
 
 static const struct phylink_pcs_ops macb_phylink_pcs_ops = {
 	.pcs_get_state = macb_pcs_get_state,
-	.pcs_an_restart = macb_pcs_an_restart,
 	.pcs_config = macb_pcs_config,
 };
 
 static void macb_mac_config(struct phylink_config *config, unsigned int mode,
 			    const struct phylink_link_state *state)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&bp->lock, flags);
-
-	/* Disable AN for SGMII fixed link configuration, enable otherwise.
-	 * Must be written after PCSSEL is set in NCFGR,
-	 * otherwise writes will not take effect.
-	 */
-	if (macb_is_gem(bp) && state->interface == PHY_INTERFACE_MODE_SGMII) {
-		u32 pcsctrl, old_pcsctrl;
-
-		old_pcsctrl = gem_readl(bp, PCSCNTRL);
-		if (mode == MLO_AN_FIXED)
-			pcsctrl = old_pcsctrl & ~GEM_BIT(PCSAUTONEG);
-		else
-			pcsctrl = old_pcsctrl | GEM_BIT(PCSAUTONEG);
-		if (old_pcsctrl != pcsctrl)
-			gem_writel(bp, PCSCNTRL, pcsctrl);
-	}
-
-	spin_unlock_irqrestore(&bp->lock, flags);
+	/* Nothing to do */
 }
 
 static void macb_mac_link_down(struct phylink_config *config, unsigned int mode,
@@ -763,20 +829,23 @@ static void macb_mac_link_up(struct phylink_config *config,
 static int macb_mac_prepare(struct phylink_config *config, unsigned int mode,
 			    phy_interface_t interface)
 {
+	int set_pcs = 0;
 	struct net_device *ndev = to_net_dev(config->dev);
 	struct macb *bp = netdev_priv(ndev);
 	unsigned long flags;
 	u32 old_ctrl, ctrl;
 	u32 old_ncr, ncr;
 
-	if (interface == PHY_INTERFACE_MODE_10GBASER)
+	if (interface == PHY_INTERFACE_MODE_10GBASER) {
 		bp->phylink_pcs.ops = &macb_phylink_usx_pcs_ops;
-	else if (interface == PHY_INTERFACE_MODE_SGMII)
+		set_pcs = 1;
+	} else if (interface == PHY_INTERFACE_MODE_SGMII ||
+		   interface == PHY_INTERFACE_MODE_1000BASEX) {
 		bp->phylink_pcs.ops = &macb_phylink_pcs_ops;
-	else
-		bp->phylink_pcs.ops = NULL;
+		set_pcs = 1;
+	}
 
-	if (bp->phylink_pcs.ops)
+	if (set_pcs)
 		phylink_set_pcs(bp->phylink, &bp->phylink_pcs);
 
 	spin_lock_irqsave(&bp->lock, flags);
@@ -787,20 +856,13 @@ static int macb_mac_prepare(struct phylink_config *config, unsigned int mode,
 	if (bp->caps & MACB_CAPS_MACB_IS_EMAC) {
 		if (interface == PHY_INTERFACE_MODE_RMII)
 			ctrl |= MACB_BIT(RM9200_RMII);
-	} else if (macb_is_gem(bp)) {
-		ctrl &= ~(GEM_BIT(SGMIIEN) | GEM_BIT(PCSSEL));
-		ncr &= ~GEM_BIT(ENABLE_HS_MAC);
-
-		if (state->interface == PHY_INTERFACE_MODE_SGMII) {
-			ctrl |= GEM_BIT(SGMIIEN) | GEM_BIT(PCSSEL);
-		} else if (state->interface == PHY_INTERFACE_MODE_10GBASER) {
-			ctrl |= GEM_BIT(PCSSEL);
-			ncr |= GEM_BIT(ENABLE_HS_MAC);
-		} else if (bp->caps & MACB_CAPS_MIIONRGMII &&
-			   bp->phy_interface == PHY_INTERFACE_MODE_MII) {
-			ncr |= MACB_BIT(MIIONRGMII);
-		}
+	} else if (bp->caps & MACB_CAPS_MIIONRGMII &&
+		   bp->phy_interface == PHY_INTERFACE_MODE_MII) {
+		ncr |= MACB_BIT(MIIONRGMII);
 	}
+
+	if (macb_is_gem(bp) && set_pcs)
+		ctrl |= GEM_BIT(PCSSEL);
 
 	/* Apply the new configuration, if any */
 	if (old_ctrl ^ ctrl)
