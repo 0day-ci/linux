@@ -2309,4 +2309,9 @@ static inline void sched_core_free(struct task_struct *tsk) { }
 static inline void sched_core_fork(struct task_struct *p) { }
 #endif
 
+struct notifier_block;
+
+extern int register_user_nice_notifier(struct notifier_block *);
+extern int unregister_user_nice_notifier(struct notifier_block *);
+
 #endif

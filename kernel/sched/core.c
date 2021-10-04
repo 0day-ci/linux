@@ -6864,10 +6864,42 @@ static inline int rt_effective_prio(struct task_struct *p, int prio)
 }
 #endif
 
+ATOMIC_NOTIFIER_HEAD(user_nice_notifier_list);
+
+/**
+ * register_user_nice_notifier - Register function to be called when task nice changes
+ * @nb: Info about notifier function to be called
+ *
+ * Registers a function with the list of functions to be called when task nice
+ * value changes.
+ *
+ * Currently always returns zero, as atomic_notifier_chain_register()
+ * always returns zero.
+ */
+int register_user_nice_notifier(struct notifier_block *nb)
+{
+	return atomic_notifier_chain_register(&user_nice_notifier_list, nb);
+}
+EXPORT_SYMBOL(register_user_nice_notifier);
+
+/**
+ * unregister_user_nice_notifier - Unregister previously registered user nice notifier
+ * @nb: Hook to be unregistered
+ *
+ * Unregisters a previously registered user nice notifier function.
+ *
+ * Returns zero on success, or %-ENOENT on failure.
+ */
+int unregister_user_nice_notifier(struct notifier_block *nb)
+{
+	return atomic_notifier_chain_unregister(&user_nice_notifier_list, nb);
+}
+EXPORT_SYMBOL(unregister_user_nice_notifier);
+
 void set_user_nice(struct task_struct *p, long nice)
 {
 	bool queued, running;
-	int old_prio;
+	int old_prio, ret;
 	struct rq_flags rf;
 	struct rq *rq;
 
@@ -6915,6 +6947,9 @@ void set_user_nice(struct task_struct *p, long nice)
 
 out_unlock:
 	task_rq_unlock(rq, p, &rf);
+
+	ret = atomic_notifier_call_chain(&user_nice_notifier_list, nice, p);
+	WARN_ON_ONCE(ret != NOTIFY_DONE);
 }
 EXPORT_SYMBOL(set_user_nice);
 
