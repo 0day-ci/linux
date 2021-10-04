@@ -116,6 +116,11 @@ properties:
     $ref: "#/properties/phy-handle"
     deprecated: true
 
+  pcs:
+    $ref: /schemas/types.yaml#definitions/phandle
+    description:
+      Specifies a reference to a node representing a PCS device.
+
   rx-fifo-depth:
     $ref: /schemas/types.yaml#/definitions/uint32
     description:
