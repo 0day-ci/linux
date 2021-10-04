@@ -278,10 +278,20 @@ int dpaa2_io_service_register(struct dpaa2_io *d,
 	spin_unlock_irqrestore(&d->lock_notifications, irqflags);
 
 	/* Enable the generation of CDAN notifications */
-	if (ctx->is_cdan)
-		return qbman_swp_CDAN_set_context_enable(d->swp,
-							 (u16)ctx->id,
-							 ctx->qman64);
+	if (ctx->is_cdan) {
+		int ret;
+
+		ret = qbman_swp_CDAN_set_context_enable(d->swp, (u16)ctx->id,
+							ctx->qman64);
+		if (ret) {
+			spin_lock_irqsave(&d->lock_notifications, irqflags);
+			list_del(&ctx->node);
+			spin_unlock_irqrestore(&d->lock_notifications,
+					       irqflags);
+
+			return ret;
+		}
+	}
 	return 0;
 }
 EXPORT_SYMBOL_GPL(dpaa2_io_service_register);
