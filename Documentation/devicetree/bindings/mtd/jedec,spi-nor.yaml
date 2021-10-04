@@ -72,6 +72,12 @@ properties:
       be used on such systems, to denote the absence of a reliable reset
       mechanism.
 
+  output-driver-strength:
+    $ref: /schemas/types.yaml#/definitions/uint32
+    description:
+      Output driver strength in Ohms which optimizes the impedance at Vcc/2
+      output voltage.
+
   label: true
 
   partitions:
