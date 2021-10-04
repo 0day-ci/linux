@@ -662,6 +662,21 @@ static int macb_pcs_config(struct phylink_pcs *pcs, unsigned int mode,
 	return changed;
 }
 
+static void macb_pcs_an_restart(struct phylink_pcs *pcs)
+{
+	struct macb *bp = pcs_to_macb(pcs);
+	u32 bmcr;
+	unsigned long flags;
+
+	spin_lock_irqsave(&bp->lock, flags);
+
+	bmcr = gem_readl(bp, PCSCNTRL);
+	bmcr |= BMCR_ANENABLE;
+	gem_writel(bp, PCSCNTRL, bmcr);
+
+	spin_lock_irqsave(&bp->lock, flags);
+}
+
 static void macb_usx_pcs_get_state(struct phylink_pcs *pcs,
 				   struct phylink_link_state *state)
 {
@@ -733,6 +748,7 @@ static const struct phylink_pcs_ops macb_phylink_usx_pcs_ops = {
 static const struct phylink_pcs_ops macb_phylink_pcs_ops = {
 	.pcs_get_state = macb_pcs_get_state,
 	.pcs_config = macb_pcs_config,
+	.pcs_an_restart = macb_pcs_an_restart,
 };
 
 static void macb_mac_config(struct phylink_config *config, unsigned int mode,
