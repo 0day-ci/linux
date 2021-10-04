@@ -1,0 +1,30 @@
+drm drm-fixes 78ea81417944fe03f48648eddeb8e8a8e513c4ad
+	Merge tag 'exynos-drm-fixes-for-v5.15-rc4' of git://git.kernel.org/pub/scm/linux/kernel/git/daeinki/drm-exynos into drm-fixes
+drm-misc drm-misc-fixes f86e9e383a71be055f4e1fa602a1ee8618316ba4
+	video: fbdev: gbefb: Only instantiate device when built for IP32
+drm-intel drm-intel-fixes 9e1ff307c779ce1f0f810c7ecce3d95bbae40896
+	Linux 5.15-rc4
+drm drm-next 1e3944578b749449bd7fa6bf0bae4c3d3f5f1733
+	Merge tag 'amd-drm-next-5.16-2021-09-27' of https://gitlab.freedesktop.org/agd5f/linux into drm-next
+drm-misc drm-misc-next-fixes 70982eef4d7eebb47a3b1ef25ec1bc742f3a21cf
+	drm/ttm: Fix a deadlock if the target BO is not idle during swap
+drm-intel drm-intel-next-fixes fb43ebc83e069625cfeeb2490efc3ffa0013bfa4
+	drm/i915/selftest: Fix use of err in igt_reset_{fail, nop}_engine()
+drm-misc drm-misc-next 83d7b6d54b8e8a3a487c8a4066e33e6bdd255c3d
+	drm/gud: Add GUD_PIXEL_FORMAT_RGB888
+drm-intel drm-intel-next 104c1b3d6fb6a794babd5e2ffd6a5183b5a3d6c7
+	drm/i915: Allow per-lane drive settings with LTTPRs
+drm-intel drm-intel-gt-next fb2d2de3530ab6f93f88aa3b87dfb1382431ca17
+	drm/i915/guc: Move and improve error message for missed CTB reply
+sound-upstream for-linus 7cf3dead1ad70c72edb03e2d98e1f3dcd332cdb2
+	Linux 5.13
+sound-upstream for-next 7cf3dead1ad70c72edb03e2d98e1f3dcd332cdb2
+	Linux 5.13
+drm-intel topic/core-for-CI b4dd0381f66d0bddc2c4bfc75e18a8a6b8a0d4b7
+	component: do not leave master devres group open after bind
+drm topic/nouveau-ampere-modeset 584265dfec70e78ce2085b82ed389f27e06fbca0
+	Merge branch '04.01-ampere-lite' of git://github.com/skeggsb/linux into topic/nouveau-ampere-modeset
+drm-misc topic/i915-ttm 1e3944578b749449bd7fa6bf0bae4c3d3f5f1733
+	Merge tag 'amd-drm-next-5.16-2021-09-27' of https://gitlab.freedesktop.org/agd5f/linux into drm-next
+drm-intel topic/pxp e4e737bb5c170df6135a127739a9e6148ee3da82
+	Linux 5.15-rc2
