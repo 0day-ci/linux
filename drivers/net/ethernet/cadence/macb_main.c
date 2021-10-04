@@ -652,41 +652,9 @@ static const struct phylink_pcs_ops macb_phylink_pcs_ops = {
 static void macb_mac_config(struct phylink_config *config, unsigned int mode,
 			    const struct phylink_link_state *state)
 {
-	struct net_device *ndev = to_net_dev(config->dev);
-	struct macb *bp = netdev_priv(ndev);
 	unsigned long flags;
-	u32 old_ctrl, ctrl;
-	u32 old_ncr, ncr;
 
 	spin_lock_irqsave(&bp->lock, flags);
-
-	old_ctrl = ctrl = macb_or_gem_readl(bp, NCFGR);
-	old_ncr = ncr = macb_or_gem_readl(bp, NCR);
-
-	if (bp->caps & MACB_CAPS_MACB_IS_EMAC) {
-		if (state->interface == PHY_INTERFACE_MODE_RMII)
-			ctrl |= MACB_BIT(RM9200_RMII);
-	} else if (macb_is_gem(bp)) {
-		ctrl &= ~(GEM_BIT(SGMIIEN) | GEM_BIT(PCSSEL));
-		ncr &= ~GEM_BIT(ENABLE_HS_MAC);
-
-		if (state->interface == PHY_INTERFACE_MODE_SGMII) {
-			ctrl |= GEM_BIT(SGMIIEN) | GEM_BIT(PCSSEL);
-		} else if (state->interface == PHY_INTERFACE_MODE_10GBASER) {
-			ctrl |= GEM_BIT(PCSSEL);
-			ncr |= GEM_BIT(ENABLE_HS_MAC);
-		} else if (bp->caps & MACB_CAPS_MIIONRGMII &&
-			   bp->phy_interface == PHY_INTERFACE_MODE_MII) {
-			ncr |= MACB_BIT(MIIONRGMII);
-		}
-	}
-
-	/* Apply the new configuration, if any */
-	if (old_ctrl ^ ctrl)
-		macb_or_gem_writel(bp, NCFGR, ctrl);
-
-	if (old_ncr ^ ncr)
-		macb_or_gem_writel(bp, NCR, ncr);
 
 	/* Disable AN for SGMII fixed link configuration, enable otherwise.
 	 * Must be written after PCSSEL is set in NCFGR,
@@ -797,6 +765,9 @@ static int macb_mac_prepare(struct phylink_config *config, unsigned int mode,
 {
 	struct net_device *ndev = to_net_dev(config->dev);
 	struct macb *bp = netdev_priv(ndev);
+	unsigned long flags;
+	u32 old_ctrl, ctrl;
+	u32 old_ncr, ncr;
 
 	if (interface == PHY_INTERFACE_MODE_10GBASER)
 		bp->phylink_pcs.ops = &macb_phylink_usx_pcs_ops;
@@ -807,6 +778,38 @@ static int macb_mac_prepare(struct phylink_config *config, unsigned int mode,
 
 	if (bp->phylink_pcs.ops)
 		phylink_set_pcs(bp->phylink, &bp->phylink_pcs);
+
+	spin_lock_irqsave(&bp->lock, flags);
+
+	old_ctrl = ctrl = macb_or_gem_readl(bp, NCFGR);
+	old_ncr = ncr = macb_or_gem_readl(bp, NCR);
+
+	if (bp->caps & MACB_CAPS_MACB_IS_EMAC) {
+		if (interface == PHY_INTERFACE_MODE_RMII)
+			ctrl |= MACB_BIT(RM9200_RMII);
+	} else if (macb_is_gem(bp)) {
+		ctrl &= ~(GEM_BIT(SGMIIEN) | GEM_BIT(PCSSEL));
+		ncr &= ~GEM_BIT(ENABLE_HS_MAC);
+
+		if (state->interface == PHY_INTERFACE_MODE_SGMII) {
+			ctrl |= GEM_BIT(SGMIIEN) | GEM_BIT(PCSSEL);
+		} else if (state->interface == PHY_INTERFACE_MODE_10GBASER) {
+			ctrl |= GEM_BIT(PCSSEL);
+			ncr |= GEM_BIT(ENABLE_HS_MAC);
+		} else if (bp->caps & MACB_CAPS_MIIONRGMII &&
+			   bp->phy_interface == PHY_INTERFACE_MODE_MII) {
+			ncr |= MACB_BIT(MIIONRGMII);
+		}
+	}
+
+	/* Apply the new configuration, if any */
+	if (old_ctrl ^ ctrl)
+		macb_or_gem_writel(bp, NCFGR, ctrl);
+
+	if (old_ncr ^ ncr)
+		macb_or_gem_writel(bp, NCR, ncr);
+
+	spin_unlock_irqrestore(&bp->lock, flags);
 
 	return 0;
 }
