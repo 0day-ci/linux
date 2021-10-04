@@ -14,6 +14,7 @@ import tempfile, shutil # Handling test_tmpdir
 import itertools
 import json
 import signal
+import subprocess
 import os
 
 import kunit_config
@@ -290,6 +291,22 @@ class LinuxSourceTreeTest(unittest.TestCase):
 			with open(os.path.join(dir, '.kunitconfig'), 'w') as f:
 				pass
 			tree = kunit_kernel.LinuxSourceTree('', kunitconfig_path=dir)
+
+	def test_run_kernel_hits_exception(self):
+		def fake_start(unused_args, unused_build_dir):
+			return subprocess.Popen(['echo "hi\nbye"'], shell=True, text=True, stdout=subprocess.PIPE)
+
+		with tempfile.TemporaryDirectory('') as build_dir:
+			tree = kunit_kernel.LinuxSourceTree(build_dir, load_config=False)
+			mock.patch.object(tree._ops, 'start', side_effect=fake_start).start()
+
+			with self.assertRaises(ValueError):
+				for line in tree.run_kernel(build_dir=build_dir):
+					self.assertEqual(line, 'hi\n')
+					raise ValueError('uh oh, did not read all output')
+
+			with open(kunit_kernel.get_outfile_path(build_dir), 'rt') as outfile:
+				self.assertEqual(outfile.read(), 'hi\nbye\n', msg='Missing some output')
 
 	# TODO: add more test cases.
 
