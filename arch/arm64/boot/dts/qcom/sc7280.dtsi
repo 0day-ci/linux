@@ -1308,6 +1308,9 @@
 			usb_2_dwc3: usb@8c00000 {
 				compatible = "snps,dwc3";
 				reg = <0 0x08c00000 0 0xe000>;
+				#address-cells = <2>;
+				#size-cells = <2>;
+				ranges;
 				interrupts = <GIC_SPI 242 IRQ_TYPE_LEVEL_HIGH>;
 				iommus = <&apps_smmu 0xa0 0x0>;
 				snps,dis_u2_susphy_quirk;
@@ -1315,6 +1318,15 @@
 				phys = <&usb_2_hsphy>;
 				phy-names = "usb2-phy";
 				maximum-speed = "high-speed";
+				usb-role-switch;
+				usb_con: eud_usb_connector {
+					compatible = "qcom,usb-connector-eud", "usb-c-connector",
+						     "qcom,sc7280-usb-connector-eud";
+					reg = <0 0x88e0000 0 0x2000>,
+					      <0 0x88e2000 0 0x1000>;
+					interrupt-parent = <&pdc>;
+					interrupts = <11 IRQ_TYPE_LEVEL_HIGH>;
+				};
 			};
 		};
 
