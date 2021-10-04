@@ -458,11 +458,13 @@ static void intel_fbc_activate(struct drm_i915_private *dev_priv)
 
 	trace_intel_fbc_activate(fbc->crtc);
 
+	intel_fbc_hw_activate(dev_priv);
+
+	if (!fbc->active)
+		intel_fbc_recompress(dev_priv);
+
 	fbc->active = true;
 	fbc->activated = true;
-
-	intel_fbc_hw_activate(dev_priv);
-	intel_fbc_recompress(dev_priv);
 }
 
 static void intel_fbc_deactivate(struct drm_i915_private *dev_priv,
