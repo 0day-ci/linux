@@ -199,6 +199,7 @@ extern int mmu_io_psize;
 /* MMU initialization */
 void mmu_cpu_feature_fixup(void);
 void mmu_early_init_devtree(void);
+void hash__early_detect_seg_size(void);
 void hash__early_init_devtree(void);
 void radix__early_init_devtree(void);
 #ifdef CONFIG_PPC_PKEY
