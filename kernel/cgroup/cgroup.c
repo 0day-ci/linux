@@ -732,7 +732,7 @@ EXPORT_SYMBOL_GPL(of_css);
 
 /* walk live descendants in pre order */
 #define cgroup_for_each_live_descendant_pre(dsct, d_css, cgrp)		\
-	css_for_each_descendant_pre((d_css), cgroup_css((cgrp), NULL))	\
+	css_for_each_descendant_pre((d_css), &(cgrp)->self)		\
 		if (({ lockdep_assert_held(&cgroup_mutex);		\
 		       (dsct) = (d_css)->cgroup;			\
 		       cgroup_is_dead(dsct); }))			\
@@ -741,7 +741,7 @@ EXPORT_SYMBOL_GPL(of_css);
 
 /* walk live descendants in postorder */
 #define cgroup_for_each_live_descendant_post(dsct, d_css, cgrp)		\
-	css_for_each_descendant_post((d_css), cgroup_css((cgrp), NULL))	\
+	css_for_each_descendant_post((d_css), &(cgrp)->self)		\
 		if (({ lockdep_assert_held(&cgroup_mutex);		\
 		       (dsct) = (d_css)->cgroup;			\
 		       cgroup_is_dead(dsct); }))			\
