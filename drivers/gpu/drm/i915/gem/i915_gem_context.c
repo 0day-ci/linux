@@ -1932,6 +1932,8 @@ int i915_gem_context_create_ioctl(struct drm_device *dev, void *data,
 		return -EIO;
 	}
 
+	i915_drm_client_update_owner(ext_data.fpriv->client, current);
+
 	ext_data.pc = proto_context_create(i915, args->flags);
 	if (IS_ERR(ext_data.pc))
 		return PTR_ERR(ext_data.pc);

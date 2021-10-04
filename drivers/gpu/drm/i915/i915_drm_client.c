@@ -18,6 +18,9 @@ void i915_drm_clients_init(struct i915_drm_clients *clients,
 	clients->next_id = 0;
 
 	xa_init_flags(&clients->xarray, XA_FLAGS_ALLOC | XA_FLAGS_LOCK_IRQ);
+
+	rwlock_init(&clients->lock);
+	hash_init(clients->tasks);
 }
 
 struct i915_drm_client *i915_drm_client_add(struct i915_drm_clients *clients)
@@ -42,6 +45,8 @@ struct i915_drm_client *i915_drm_client_add(struct i915_drm_clients *clients)
 	INIT_LIST_HEAD(&client->ctx_list);
 	client->clients = clients;
 
+	i915_drm_client_update_owner(client, current);
+
 	return client;
 
 err:
@@ -54,8 +59,13 @@ void __i915_drm_client_free(struct kref *kref)
 {
 	struct i915_drm_client *client =
 		container_of(kref, typeof(*client), kref);
-	struct xarray *xa = &client->clients->xarray;
+	struct i915_drm_clients *clients = client->clients;
+	struct xarray *xa = &clients->xarray;
 	unsigned long flags;
+
+	write_lock(&clients->lock);
+	hash_del(&client->node);
+	write_unlock(&clients->lock);
 
 	xa_lock_irqsave(xa, flags);
 	__xa_erase(xa, client->id);
@@ -67,4 +77,23 @@ void i915_drm_clients_fini(struct i915_drm_clients *clients)
 {
 	GEM_BUG_ON(!xa_empty(&clients->xarray));
 	xa_destroy(&clients->xarray);
+}
+
+void i915_drm_client_update_owner(struct i915_drm_client *client,
+				  struct task_struct *owner)
+{
+	struct i915_drm_clients *clients;
+
+	if (READ_ONCE(client->owner) == owner)
+		return;
+
+	clients = client->clients;
+	write_lock(&clients->lock);
+	if (READ_ONCE(client->owner) != owner) {
+		if (client->owner)
+			hash_del(&client->node);
+		client->owner = owner;
+		hash_add(clients->tasks, &client->node, (uintptr_t)owner);
+	}
+	write_unlock(&clients->lock);
 }

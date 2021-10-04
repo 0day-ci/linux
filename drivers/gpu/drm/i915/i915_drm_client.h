@@ -6,8 +6,11 @@
 #ifndef __I915_DRM_CLIENT_H__
 #define __I915_DRM_CLIENT_H__
 
+#include <linux/hashtable.h>
 #include <linux/kref.h>
 #include <linux/list.h>
+#include <linux/rwlock.h>
+#include <linux/sched.h>
 #include <linux/spinlock.h>
 #include <linux/xarray.h>
 
@@ -18,6 +21,9 @@ struct i915_drm_clients {
 
 	struct xarray xarray;
 	u32 next_id;
+
+	rwlock_t lock;
+	DECLARE_HASHTABLE(tasks, 6);
 };
 
 struct i915_drm_client {
@@ -27,6 +33,9 @@ struct i915_drm_client {
 
 	spinlock_t ctx_lock; /* For add/remove from ctx_list. */
 	struct list_head ctx_list; /* List of contexts belonging to client. */
+
+	struct task_struct *owner; /* No reference kept, never dereferenced. */
+	struct hlist_node node;
 
 	struct i915_drm_clients *clients;
 };
@@ -51,5 +60,9 @@ static inline void i915_drm_client_put(struct i915_drm_client *client)
 struct i915_drm_client *i915_drm_client_add(struct i915_drm_clients *clients);
 
 void i915_drm_clients_fini(struct i915_drm_clients *clients);
+
+void i915_drm_client_update_owner(struct i915_drm_client *client,
+				  struct task_struct *owner);
+
 
 #endif /* !__I915_DRM_CLIENT_H__ */
