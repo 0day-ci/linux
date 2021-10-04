@@ -19,6 +19,8 @@
 #include "intel_rps.h"
 #include "intel_wakeref.h"
 
+#define I915_GT_SUSPEND_IDLE_TIMEOUT (HZ / 2)
+
 static void user_forcewake(struct intel_gt *gt, bool suspend)
 {
 	int count = atomic_read(&gt->user_wakeref);
@@ -279,7 +281,7 @@ static void wait_for_suspend(struct intel_gt *gt)
 	if (!intel_gt_pm_is_awake(gt))
 		return;
 
-	if (intel_gt_wait_for_idle(gt, I915_GEM_IDLE_TIMEOUT) == -ETIME) {
+	if (intel_gt_wait_for_idle(gt, I915_GT_SUSPEND_IDLE_TIMEOUT) == -ETIME) {
 		/*
 		 * Forcibly cancel outstanding work and leave
 		 * the gpu quiet.
@@ -295,8 +297,6 @@ void intel_gt_suspend_prepare(struct intel_gt *gt)
 {
 	user_forcewake(gt, true);
 	wait_for_suspend(gt);
-
-	intel_uc_suspend(&gt->uc);
 }
 
 static suspend_state_t pm_suspend_target(void)
@@ -319,6 +319,8 @@ void intel_gt_suspend_late(struct intel_gt *gt)
 		return;
 
 	GEM_BUG_ON(gt->awake);
+
+	intel_uc_suspend(&gt->uc);
 
 	/*
 	 * On disabling the device, we want to turn off HW access to memory
