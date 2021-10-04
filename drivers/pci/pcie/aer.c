@@ -1212,6 +1212,7 @@ static int set_device_error_reporting(struct pci_dev *dev, void *data)
 {
 	bool enable = *((bool *)data);
 	int type = pci_pcie_type(dev);
+	int aer = dev->aer_cap;
 
 	if ((type == PCI_EXP_TYPE_ROOT_PORT) ||
 	    (type == PCI_EXP_TYPE_RC_EC) ||
@@ -1223,8 +1224,18 @@ static int set_device_error_reporting(struct pci_dev *dev, void *data)
 			pci_disable_pcie_error_reporting(dev);
 	}
 
-	if (enable)
+	if (enable) {
+
+		/* Enable reporting of all uncorrectable errors */
+		/* Uncorrectable Error Mask - turned on bits disable errors */
+		pci_write_config_dword(dev, aer + PCI_ERR_UNCOR_MASK, 0);
+
+		/* Enable reporting of all correctable errors */
+		/* Correctable Error Mask - turned on bits disable errors */
+		pci_write_config_dword(dev, aer + PCI_ERR_COR_MASK, 0);
+
 		pcie_set_ecrc_checking(dev);
+	}
 
 	return 0;
 }
