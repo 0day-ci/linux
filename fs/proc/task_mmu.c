@@ -1302,6 +1302,7 @@ struct pagemapread {
 #define PM_SOFT_DIRTY		BIT_ULL(55)
 #define PM_MMAP_EXCLUSIVE	BIT_ULL(56)
 #define PM_UFFD_WP		BIT_ULL(57)
+#define PM_HWPOISON		BIT_ULL(60)
 #define PM_FILE			BIT_ULL(61)
 #define PM_SWAP			BIT_ULL(62)
 #define PM_PRESENT		BIT_ULL(63)
@@ -1390,6 +1391,10 @@ static pagemap_entry_t pte_to_pagemap_entry(struct pagemapread *pm,
 		flags |= PM_SWAP;
 		if (is_pfn_swap_entry(entry))
 			page = pfn_swap_entry_to_page(entry);
+		if (is_hwpoison_entry(entry)) {
+			page = hwpoison_entry_to_page(entry);
+			flags |= PM_HWPOISON;
+		}
 	}
 
 	if (page && !PageAnon(page))
@@ -1509,25 +1514,40 @@ static int pagemap_hugetlb_range(pte_t *ptep, unsigned long hmask,
 	u64 flags = 0, frame = 0;
 	int err = 0;
 	pte_t pte;
+	struct page *page = NULL;
 
 	if (vma->vm_flags & VM_SOFTDIRTY)
 		flags |= PM_SOFT_DIRTY;
 
 	pte = huge_ptep_get(ptep);
 	if (pte_present(pte)) {
-		struct page *page = pte_page(pte);
-
-		if (!PageAnon(page))
-			flags |= PM_FILE;
-
-		if (page_mapcount(page) == 1)
-			flags |= PM_MMAP_EXCLUSIVE;
+		page = pte_page(pte);
 
 		flags |= PM_PRESENT;
 		if (pm->show_pfn)
 			frame = pte_pfn(pte) +
 				((addr & ~hmask) >> PAGE_SHIFT);
+	} else if (is_swap_pte(pte)) {
+		swp_entry_t entry = pte_to_swp_entry(pte);
+		unsigned long offset;
+
+		if (pm->show_pfn) {
+			offset = swp_offset(entry) +
+				((addr & ~hmask) >> PAGE_SHIFT);
+			frame = swp_type(entry) |
+				(offset << MAX_SWAPFILES_SHIFT);
+		}
+		flags |= PM_SWAP;
+		if (is_migration_entry(entry))
+			page = compound_head(pfn_swap_entry_to_page(entry));
+		if (is_hwpoison_entry(entry))
+			flags |= PM_HWPOISON;
 	}
+
+	if (page && !PageAnon(page))
+		flags |= PM_FILE;
+	if (page && page_mapcount(page) == 1)
+		flags |= PM_MMAP_EXCLUSIVE;
 
 	for (; addr != end; addr += PAGE_SIZE) {
 		pagemap_entry_t pme = make_pme(frame, flags);
@@ -1535,8 +1555,11 @@ static int pagemap_hugetlb_range(pte_t *ptep, unsigned long hmask,
 		err = add_to_pagemap(addr, &pme, pm);
 		if (err)
 			return err;
-		if (pm->show_pfn && (flags & PM_PRESENT))
-			frame++;
+		if (pm->show_pfn)
+			if (flags & PM_PRESENT)
+				frame++;
+			else if (flags & PM_SWAP)
+				frame += (1 << MAX_SWAPFILES_SHIFT);
 	}
 
 	cond_resched();

@@ -53,6 +53,7 @@
 #define PM_SWAP_OFFSET(x)	(((x) & PM_PFRAME_MASK) >> MAX_SWAPFILES_SHIFT)
 #define PM_SOFT_DIRTY		(1ULL << 55)
 #define PM_MMAP_EXCLUSIVE	(1ULL << 56)
+#define PM_HWPOISON		(1ULL << 60)
 #define PM_FILE			(1ULL << 61)
 #define PM_SWAP			(1ULL << 62)
 #define PM_PRESENT		(1ULL << 63)
@@ -311,6 +312,8 @@ static unsigned long pagemap_pfn(uint64_t val)
 
 	if (val & PM_PRESENT)
 		pfn = PM_PFRAME(val);
+	else if (val & PM_SWAP)
+		pfn = PM_SWAP_OFFSET(val);
 	else
 		pfn = 0;
 
@@ -492,6 +495,8 @@ static uint64_t expand_overloaded_flags(uint64_t flags, uint64_t pme)
 		flags |= BIT(FILE);
 	if (pme & PM_SWAP)
 		flags |= BIT(SWAP);
+	if (pme & PM_HWPOISON)
+		flags |= BIT(HWPOISON);
 	if (pme & PM_MMAP_EXCLUSIVE)
 		flags |= BIT(MMAP_EXCLUSIVE);
 
@@ -742,7 +747,7 @@ static void walk_vma(unsigned long index, unsigned long count)
 			pfn = pagemap_pfn(buf[i]);
 			if (pfn)
 				walk_pfn(index + i, pfn, 1, buf[i]);
-			if (buf[i] & PM_SWAP)
+			else if (buf[i] & PM_SWAP)
 				walk_swap(index + i, buf[i]);
 		}
 
