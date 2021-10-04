@@ -20591,6 +20591,12 @@ F:	Documentation/devicetree/bindings/gpio/gpio-zynq.yaml
 F:	drivers/gpio/gpio-xilinx.c
 F:	drivers/gpio/gpio-zynq.c
 
+XILINX PCS DRIVER
+M:	Sean Anderson <sean.anderso@seco.com>
+S:	Maintained
+F:	Documentation/devicetree/bindings/net/xilinx,pcs.yaml
+F:	drivers/net/pcs/pcs-xilinx.c
+
 XILINX SD-FEC IP CORES
 M:	Derek Kiernan <derek.kiernan@xilinx.com>
 M:	Dragan Cvetic <dragan.cvetic@xilinx.com>
