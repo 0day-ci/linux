@@ -177,13 +177,13 @@ struct i915_sched_engine {
 	 * @kick_backend: kick backend after a request's priority has changed
 	 */
 	void	(*kick_backend)(const struct i915_request *rq,
-				int prio);
+				const struct i915_sched_attr *attr);
 
 	/**
 	 * @bump_inflight_request_prio: update priority of an inflight request
 	 */
 	void	(*bump_inflight_request_prio)(struct i915_request *rq,
-					      int prio);
+					      const struct i915_sched_attr *attr);
 
 	/**
 	 * @retire_inflight_request_prio: indicate request is retired to

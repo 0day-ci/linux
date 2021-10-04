@@ -3216,11 +3216,13 @@ static bool can_preempt(struct intel_engine_cs *engine)
 	return engine->class != RENDER_CLASS;
 }
 
-static void kick_execlists(const struct i915_request *rq, int prio)
+static void kick_execlists(const struct i915_request *rq,
+			   const struct i915_sched_attr *attr)
 {
 	struct intel_engine_cs *engine = rq->engine;
 	struct i915_sched_engine *sched_engine = engine->sched_engine;
 	const struct i915_request *inflight;
+	const int prio = attr->priority;
 
 	/*
 	 * We only need to kick the tasklet once for the high priority

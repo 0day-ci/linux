@@ -255,7 +255,7 @@ static void __i915_schedule(struct i915_sched_node *node,
 
 		/* Must be called before changing the nodes priority */
 		if (sched_engine->bump_inflight_request_prio)
-			sched_engine->bump_inflight_request_prio(from, prio);
+			sched_engine->bump_inflight_request_prio(from, attr);
 
 		WRITE_ONCE(node->attr.priority, prio);
 
@@ -280,7 +280,7 @@ static void __i915_schedule(struct i915_sched_node *node,
 
 		/* Defer (tasklet) submission until after all of our updates. */
 		if (sched_engine->kick_backend)
-			sched_engine->kick_backend(node_to_request(node), prio);
+			sched_engine->kick_backend(node_to_request(node), attr);
 	}
 
 	spin_unlock(&sched_engine->lock);

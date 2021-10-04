@@ -2414,9 +2414,10 @@ static void guc_init_breadcrumbs(struct intel_engine_cs *engine)
 }
 
 static void guc_bump_inflight_request_prio(struct i915_request *rq,
-					   int prio)
+					   const struct i915_sched_attr *attr)
 {
 	struct intel_context *ce = rq->context;
+	const int prio = attr->priority;
 	u8 new_guc_prio = map_i915_prio_to_guc_prio(prio);
 
 	/* Short circuit function */
