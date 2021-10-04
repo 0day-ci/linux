@@ -114,13 +114,6 @@ int pcibios_plat_dev_init(struct pci_dev *dev)
 		pci_write_config_word(dev, PCI_BRIDGE_CONTROL, config);
 	}
 
-	/* Enable the PCIe normal error reporting */
-	config = PCI_EXP_DEVCTL_CERE; /* Correctable Error Reporting */
-	config |= PCI_EXP_DEVCTL_NFERE; /* Non-Fatal Error Reporting */
-	config |= PCI_EXP_DEVCTL_FERE;	/* Fatal Error Reporting */
-	config |= PCI_EXP_DEVCTL_URRE;	/* Unsupported Request */
-	pcie_capability_set_word(dev, PCI_EXP_DEVCTL, config);
-
 	/* Find the Advanced Error Reporting capability */
 	pos = pci_find_ext_capability(dev, PCI_EXT_CAP_ID_ERR);
 	if (pos) {
