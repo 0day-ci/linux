@@ -1930,7 +1930,7 @@ static int print_sched_attr(const struct i915_sched_attr *attr,
 		return x;
 
 	x += snprintf(buf + x, len - x,
-		      " prio=%d", attr->priority);
+		      " prio=%d nice=%d", attr->priority, attr->nice);
 
 	return x;
 }

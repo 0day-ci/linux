@@ -257,6 +257,7 @@ proto_context_create(struct drm_i915_private *i915, unsigned int flags)
 	if (i915->params.enable_hangcheck)
 		pc->user_flags |= BIT(UCONTEXT_PERSISTENCE);
 	pc->sched.priority = I915_PRIORITY_NORMAL;
+	pc->sched.nice = task_nice(current);
 
 	if (flags & I915_CONTEXT_CREATE_FLAGS_SINGLE_TIMELINE) {
 		if (!HAS_EXECLISTS(i915)) {

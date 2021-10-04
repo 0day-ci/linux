@@ -399,6 +399,11 @@ long i915_request_wait(struct i915_request *rq,
 #define I915_WAIT_PRIORITY	BIT(1) /* small priority bump for the request */
 #define I915_WAIT_ALL		BIT(2) /* used by i915_gem_object_wait() */
 
+static inline int i915_request_priority(const struct i915_request *rq)
+{
+	return i915_sched_attr_priority(&rq->sched.attr);
+}
+
 void i915_request_show(struct drm_printer *m,
 		       const struct i915_request *rq,
 		       const char *prefix,

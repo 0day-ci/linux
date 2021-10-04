@@ -29,6 +29,14 @@ struct i915_sched_attr {
 	 * The &drm_i915_private.kernel_context is assigned the lowest priority.
 	 */
 	int priority;
+
+	/**
+	 * @nice: context nice level
+	 *
+	 * Nice level follows the CPU scheduler nice value as set for the
+	 * process owning the GPU context.
+	 */
+	int nice;
 };
 
 /*

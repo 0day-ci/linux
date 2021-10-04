@@ -38,6 +38,20 @@ void i915_sched_node_fini(struct i915_sched_node *node);
 void i915_schedule(struct i915_request *request,
 		   const struct i915_sched_attr *attr);
 
+static inline int i915_sched_attr_priority(const struct i915_sched_attr *attr)
+{
+	int prio = attr->priority;
+
+	/*
+	 * Only allow I915_CONTEXT_DEFAULT_PRIORITY to be affected by the
+	 * nice setting.
+	 */
+	if (!prio)
+		prio = -attr->nice;
+
+	return prio;
+}
+
 struct list_head *
 i915_sched_lookup_priolist(struct i915_sched_engine *sched_engine, int prio);
 

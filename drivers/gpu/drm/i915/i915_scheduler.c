@@ -155,7 +155,9 @@ lock_sched_engine(struct i915_sched_node *node,
 static void __i915_schedule(struct i915_sched_node *node,
 			    const struct i915_sched_attr *attr)
 {
-	const int prio = max(attr->priority, node->attr.priority);
+	const int prio =
+		max(i915_sched_attr_priority(attr),
+		    i915_sched_attr_priority(&node->attr));
 	struct i915_sched_engine *sched_engine;
 	struct i915_dependency *dep, *p;
 	struct i915_dependency stack;
@@ -209,7 +211,7 @@ static void __i915_schedule(struct i915_sched_node *node,
 			if (node_signaled(p->signaler))
 				continue;
 
-			if (prio > READ_ONCE(p->signaler->attr.priority))
+			if (prio > i915_sched_attr_priority(&p->signaler->attr))
 				list_move_tail(&p->dfs_link, &dfs);
 		}
 	}
@@ -247,7 +249,8 @@ static void __i915_schedule(struct i915_sched_node *node,
 		lockdep_assert_held(&sched_engine->lock);
 
 		/* Recheck after acquiring the engine->timeline.lock */
-		if (prio <= node->attr.priority || node_signaled(node))
+		if (prio <= i915_sched_attr_priority(&node->attr) ||
+		    node_signaled(node))
 			continue;
 
 		GEM_BUG_ON(node_to_request(node)->engine->sched_engine !=
@@ -257,7 +260,7 @@ static void __i915_schedule(struct i915_sched_node *node,
 		if (sched_engine->bump_inflight_request_prio)
 			sched_engine->bump_inflight_request_prio(from, attr);
 
-		WRITE_ONCE(node->attr.priority, prio);
+		WRITE_ONCE(node->attr, *attr);
 
 		/*
 		 * Once the request is ready, it will be placed into the
@@ -305,6 +308,7 @@ void i915_sched_node_init(struct i915_sched_node *node)
 void i915_sched_node_reinit(struct i915_sched_node *node)
 {
 	node->attr.priority = I915_PRIORITY_INVALID;
+	node->attr.nice = 0;
 	node->semaphores = 0;
 	node->flags = 0;
 

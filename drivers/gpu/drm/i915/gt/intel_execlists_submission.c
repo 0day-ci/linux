@@ -250,7 +250,7 @@ static struct i915_priolist *to_priolist(struct rb_node *rb)
 
 static int rq_prio(const struct i915_request *rq)
 {
-	return READ_ONCE(rq->sched.attr.priority);
+	return i915_request_priority(rq);
 }
 
 static int effective_prio(const struct i915_request *rq)
@@ -3221,8 +3221,8 @@ static void kick_execlists(const struct i915_request *rq,
 {
 	struct intel_engine_cs *engine = rq->engine;
 	struct i915_sched_engine *sched_engine = engine->sched_engine;
+	const int prio = i915_sched_attr_priority(attr);
 	const struct i915_request *inflight;
-	const int prio = attr->priority;
 
 	/*
 	 * We only need to kick the tasklet once for the high priority
