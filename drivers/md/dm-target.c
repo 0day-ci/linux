@@ -41,17 +41,22 @@ static struct target_type *get_target_type(const char *name)
 	return tt;
 }
 
-static void load_module(const char *name)
+static int load_module(const char *name)
 {
-	request_module("dm-%s", name);
+	return request_module("dm-%s", name);
 }
 
 struct target_type *dm_get_target_type(const char *name)
 {
 	struct target_type *tt = get_target_type(name);
+	int ret;
 
 	if (!tt) {
-		load_module(name);
+		ret = load_module(name);
+		if (ret < 0) {
+			pr_err("Module %s load failed %d\n", name, ret);
+			return NULL;
+		}
 		tt = get_target_type(name);
 	}
 
