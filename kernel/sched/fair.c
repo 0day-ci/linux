@@ -2137,9 +2137,6 @@ static void update_task_scan_period(struct task_struct *p,
 		p->numa_scan_period = min(p->numa_scan_period_max,
 			p->numa_scan_period << 1);
 
-		p->mm->numa_next_scan = jiffies +
-			msecs_to_jiffies(p->numa_scan_period);
-
 		return;
 	}
 
