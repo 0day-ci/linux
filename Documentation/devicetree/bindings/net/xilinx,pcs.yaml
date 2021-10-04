@@ -1,0 +1,83 @@
+# SPDX-License-Identifier: (GPL-2.0 OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/net/xilinx,pcs.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Xilinx 1G/2.5G Ethernet PCS/PMA or SGMII LogiCORE IP
+
+maintainers:
+  - Sean Anderson <sean.anderson@seco.com>
+
+description:
+  This is a soft device which converts between GMII and SGMII, 2.5G SGMII,
+  1000BASE-X, or 2500BASE-X. It may have an attached SERDES, or may talk
+  directly to LVDS.
+
+allOf:
+  - $ref: "ethernet-controller.yaml#"
+
+properties:
+  compatible:
+    contains:
+      const:
+        - xilinx,pcs-16.2
+
+  reg:
+    maxItems: 1
+
+  clocks:
+    maxItems: 1
+    items:
+      - description: The reference clock for the PMD, which is typically a
+                     SERDES but may be a direct interface to LVDS I/Os.
+                     Depending on your setup, this may be the gtrefclk, refclk,
+                     or clk125m signal.
+
+  clock-names:
+    const: refclk
+
+  resets:
+    maxItems: 1
+
+  reset-names:
+    const: pcs
+
+  standard:
+    description:
+      The interface standard that the PCS supports. The sgmii/1000base-x
+      setting indicates that the PCS supports dynamically switching between
+      SGMII and 1000BASE-X.
+    enum:
+      - sgmii
+      - 1000base-x
+      - sgmii/1000base-x
+      - 2500base-x
+
+required:
+  - compatible
+  - reg
+  - clocks
+  - clock-names
+  - resets
+  - reset-names
+  - standard
+
+additionalProperties: false
+
+examples:
+  - |
+    mdio {
+        #address-cells = <1>;
+        #size-cells = <0>;
+
+        pcs0: ethernet-pcs@0 {
+            compatible = "xlnx,pcs-16.2";
+            reg = <0>;
+            clocks = <&si570>;
+            clock-names = "refclk";
+            resets = <&pcs_reset 1>;
+            reset-names = "pcs";
+            standard = "sgmii/1000base-x";
+        };
+    };
