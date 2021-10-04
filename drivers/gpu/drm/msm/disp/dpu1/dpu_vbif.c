@@ -305,8 +305,8 @@ void dpu_debugfs_vbif_init(struct dpu_kms *dpu_kms, struct dentry *debugfs_root)
 
 		debugfs_vbif = debugfs_create_dir(vbif_name, entry);
 
-		debugfs_create_u32("features", 0600, debugfs_vbif,
-			(u32 *)&vbif->features);
+		debugfs_create_ulong("features", 0600, debugfs_vbif,
+				     (unsigned long *)&vbif->features);
 
 		debugfs_create_u32("xin_halt_timeout", 0400, debugfs_vbif,
 			(u32 *)&vbif->xin_halt_timeout);
