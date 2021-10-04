@@ -705,7 +705,7 @@ struct cgroup_subsys {
 	 * not visible to userland until explicitly enabled.  The following
 	 * specifies the mask of subsystems that this one depends on.
 	 */
-	unsigned int depends_on;
+	u16 depends_on;
 };
 
 extern struct percpu_rw_semaphore cgroup_threadgroup_rwsem;
