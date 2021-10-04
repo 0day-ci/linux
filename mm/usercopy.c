@@ -194,11 +194,6 @@ static inline void check_page_span(const void *ptr, unsigned long n,
 		   ((unsigned long)end & (unsigned long)PAGE_MASK)))
 		return;
 
-	/* Allow if fully inside the same compound (__GFP_COMP) page. */
-	endpage = virt_to_head_page(end);
-	if (likely(endpage == page))
-		return;
-
 	/*
 	 * Reject if range is entirely either Reserved (i.e. special or
 	 * device memory), or CMA. Otherwise, reject since the object spans
@@ -250,6 +245,10 @@ static inline void check_heap_object(const void *ptr, unsigned long n,
 	if (PageSlab(page)) {
 		/* Check slab allocator for flags and size. */
 		__check_heap_object(ptr, n, page, to_user);
+	} else if (PageHead(page)) {
+		/* A compound allocation */
+		if (ptr + n > page_address(page) + page_size(page))
+			usercopy_abort("page alloc", NULL, to_user, 0, n);
 	} else {
 		/* Verify object does not incorrectly span multiple pages. */
 		check_page_span(ptr, n, page, to_user);
