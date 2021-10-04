@@ -1528,11 +1528,18 @@ static int wled_configure(struct wled *wled)
 	string_len = of_property_count_elems_of_size(dev->of_node,
 						     "qcom,enabled-strings",
 						     sizeof(u32));
-	if (string_len > 0)
-		of_property_read_u32_array(dev->of_node,
+	if (string_len > 0) {
+		rc = of_property_read_u32_array(dev->of_node,
 						"qcom,enabled-strings",
 						wled->cfg.enabled_strings,
-						sizeof(u32));
+						string_len);
+		if (rc) {
+			dev_err(dev, "Failed to read %d elements from "
+				"qcom,enabled-strings: %d\n",
+				string_len, rc);
+			return -EINVAL;
+		}
+	}
 
 	return 0;
 }
