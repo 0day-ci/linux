@@ -124,15 +124,6 @@ int pcibios_plat_dev_init(struct pci_dev *dev)
 		 */
 		/* PCI_ERR_UNCOR_SEVER - Uncorrectable Error Severity */
 
-		/* Advanced Error Capabilities */
-		pci_read_config_dword(dev, pos + PCI_ERR_CAP, &dconfig);
-		/* ECRC Generation Enable */
-		if (config & PCI_ERR_CAP_ECRC_GENC)
-			config |= PCI_ERR_CAP_ECRC_GENE;
-		/* ECRC Check Enable */
-		if (config & PCI_ERR_CAP_ECRC_CHKC)
-			config |= PCI_ERR_CAP_ECRC_CHKE;
-		pci_write_config_dword(dev, pos + PCI_ERR_CAP, dconfig);
 		/* PCI_ERR_HEADER_LOG - Header Log Register (16 bytes) */
 		/* Report all errors to the root complex */
 		pci_write_config_dword(dev, pos + PCI_ERR_ROOT_COMMAND,
