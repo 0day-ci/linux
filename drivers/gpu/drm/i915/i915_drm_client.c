@@ -7,9 +7,34 @@
 #include <linux/slab.h>
 #include <linux/types.h>
 
+#include "gem/i915_gem_context.h"
 #include "i915_drm_client.h"
 #include "i915_gem.h"
 #include "i915_utils.h"
+
+static int
+clients_notify(struct notifier_block *nb, unsigned long val, void *ptr)
+{
+	struct i915_drm_clients *clients =
+		container_of(nb, typeof(*clients), prio_notifier);
+	struct i915_drm_client *client;
+
+	rcu_read_lock();
+	read_lock(&clients->lock);
+	hash_for_each_possible(clients->tasks, client, node, (uintptr_t)ptr) {
+		struct i915_gem_context *ctx;
+
+		if (client->owner != ptr)
+			continue;
+
+		list_for_each_entry_rcu(ctx, &client->ctx_list, client_link)
+			ctx->sched.nice = (int)val;
+	}
+	read_unlock(&clients->lock);
+	rcu_read_unlock();
+
+	return NOTIFY_DONE;
+}
 
 void i915_drm_clients_init(struct i915_drm_clients *clients,
 			   struct drm_i915_private *i915)
@@ -21,6 +46,10 @@ void i915_drm_clients_init(struct i915_drm_clients *clients,
 
 	rwlock_init(&clients->lock);
 	hash_init(clients->tasks);
+
+	memset(&clients->prio_notifier, 0, sizeof(clients->prio_notifier));
+	clients->prio_notifier.notifier_call = clients_notify;
+	register_user_nice_notifier(&clients->prio_notifier);
 }
 
 struct i915_drm_client *i915_drm_client_add(struct i915_drm_clients *clients)
@@ -75,6 +104,8 @@ void __i915_drm_client_free(struct kref *kref)
 
 void i915_drm_clients_fini(struct i915_drm_clients *clients)
 {
+	unregister_user_nice_notifier(&clients->prio_notifier);
+
 	GEM_BUG_ON(!xa_empty(&clients->xarray));
 	xa_destroy(&clients->xarray);
 }

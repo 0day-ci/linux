@@ -9,6 +9,7 @@
 #include <linux/hashtable.h>
 #include <linux/kref.h>
 #include <linux/list.h>
+#include <linux/notifier.h>
 #include <linux/rwlock.h>
 #include <linux/sched.h>
 #include <linux/spinlock.h>
@@ -24,6 +25,8 @@ struct i915_drm_clients {
 
 	rwlock_t lock;
 	DECLARE_HASHTABLE(tasks, 6);
+
+	struct notifier_block prio_notifier;
 };
 
 struct i915_drm_client {
