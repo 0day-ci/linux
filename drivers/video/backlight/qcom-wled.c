@@ -1526,6 +1526,12 @@ static int wled_configure(struct wled *wled)
 						     "qcom,enabled-strings",
 						     sizeof(u32));
 	if (string_len > 0) {
+		if (string_len > wled->max_string_count) {
+			dev_err(dev, "Cannot have more than %d strings\n",
+				wled->max_string_count);
+			return -EINVAL;
+		}
+
 		rc = of_property_read_u32_array(dev->of_node,
 						"qcom,enabled-strings",
 						wled->cfg.enabled_strings,
@@ -1535,6 +1541,14 @@ static int wled_configure(struct wled *wled)
 				"qcom,enabled-strings: %d\n",
 				string_len, rc);
 			return -EINVAL;
+		}
+
+		for (i = 0; i < string_len; ++i) {
+			if (wled->cfg.enabled_strings[i] >= wled->max_string_count) {
+				dev_err(dev, "qcom,enabled-strings index %d at %d is out of bounds\n",
+					wled->cfg.enabled_strings[i], i);
+				return -EINVAL;
+			}
 		}
 
 		cfg->num_strings = string_len;
