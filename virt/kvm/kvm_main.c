@@ -56,6 +56,7 @@
 #include <asm/processor.h>
 #include <asm/ioctl.h>
 #include <linux/uaccess.h>
+#include <linux/sched/isolation.h>
 
 #include "coalesced_mmio.h"
 #include "async_pf.h"
@@ -5657,11 +5658,20 @@ static int kvm_vm_worker_thread(void *context)
 	if (err)
 		goto init_complete;
 
-	err = cgroup_attach_task_all(init_context->parent, current);
-	if (err) {
-		kvm_err("%s: cgroup_attach_task_all failed with err %d\n",
-			__func__, err);
-		goto init_complete;
+	/*
+	 * For nohz_full enabled environments, don't migrate the worker thread
+	 * to parent cgroup as its effective mask may have a CPU running in
+	 * nohz_full mode. nohz_full CPUs often run SCHED_FIFO task which could
+	 * result in starvation of the worker thread if it is pinned on the same
+	 * CPU.
+	 */
+	if (!housekeeping_enabled(HK_FLAG_KTHREAD)) {
+		err = cgroup_attach_task_all(init_context->parent, current);
+		if (err) {
+			kvm_err("%s: cgroup_attach_task_all failed with err %d\n",
+				__func__, err);
+			goto init_complete;
+		}
 	}
 
 	set_user_nice(current, task_nice(init_context->parent));
