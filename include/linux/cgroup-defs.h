@@ -672,6 +672,15 @@ struct cgroup_subsys {
 	 */
 	bool threaded:1;
 
+	/*
+	 * A subsystem may depend on other subsystems.  When such subsystem
+	 * is enabled on a cgroup, the depended-upon subsystems are enabled
+	 * together if available.  Subsystems enabled due to dependency are
+	 * not visible to userland until explicitly enabled.  The following
+	 * specifies the mask of subsystems that this one depends on.
+	 */
+	u16 depends_on;
+
 	/* the following two fields are initialized automatically during boot */
 	int id;
 	const char *name;
@@ -698,14 +707,6 @@ struct cgroup_subsys {
 	struct cftype *dfl_cftypes;	/* for the default hierarchy */
 	struct cftype *legacy_cftypes;	/* for the legacy hierarchies */
 
-	/*
-	 * A subsystem may depend on other subsystems.  When such subsystem
-	 * is enabled on a cgroup, the depended-upon subsystems are enabled
-	 * together if available.  Subsystems enabled due to dependency are
-	 * not visible to userland until explicitly enabled.  The following
-	 * specifies the mask of subsystems that this one depends on.
-	 */
-	u16 depends_on;
 };
 
 extern struct percpu_rw_semaphore cgroup_threadgroup_rwsem;
