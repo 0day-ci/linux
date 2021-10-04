@@ -124,11 +124,6 @@ int pcibios_plat_dev_init(struct pci_dev *dev)
 	/* Find the Advanced Error Reporting capability */
 	pos = pci_find_ext_capability(dev, PCI_EXT_CAP_ID_ERR);
 	if (pos) {
-		/* Clear Uncorrectable Error Status */
-		pci_read_config_dword(dev, pos + PCI_ERR_UNCOR_STATUS,
-				      &dconfig);
-		pci_write_config_dword(dev, pos + PCI_ERR_UNCOR_STATUS,
-				       dconfig);
 		/* Enable reporting of all uncorrectable errors */
 		/* Uncorrectable Error Mask - turned on bits disable errors */
 		pci_write_config_dword(dev, pos + PCI_ERR_UNCOR_MASK, 0);
@@ -138,9 +133,6 @@ int pcibios_plat_dev_init(struct pci_dev *dev)
 		 * correctable, not if the error is reported.
 		 */
 		/* PCI_ERR_UNCOR_SEVER - Uncorrectable Error Severity */
-		/* Clear Correctable Error Status */
-		pci_read_config_dword(dev, pos + PCI_ERR_COR_STATUS, &dconfig);
-		pci_write_config_dword(dev, pos + PCI_ERR_COR_STATUS, dconfig);
 		/* Enable reporting of all correctable errors */
 		/* Correctable Error Mask - turned on bits disable errors */
 		pci_write_config_dword(dev, pos + PCI_ERR_COR_MASK, 0);
@@ -159,9 +151,6 @@ int pcibios_plat_dev_init(struct pci_dev *dev)
 				       PCI_ERR_ROOT_CMD_COR_EN |
 				       PCI_ERR_ROOT_CMD_NONFATAL_EN |
 				       PCI_ERR_ROOT_CMD_FATAL_EN);
-		/* Clear the Root status register */
-		pci_read_config_dword(dev, pos + PCI_ERR_ROOT_STATUS, &dconfig);
-		pci_write_config_dword(dev, pos + PCI_ERR_ROOT_STATUS, dconfig);
 	}
 
 	return 0;
