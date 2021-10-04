@@ -638,7 +638,7 @@ bool ice_is_safe_mode(struct ice_pf *pf)
  */
 bool ice_is_aux_ena(struct ice_pf *pf)
 {
-	return test_bit(ICE_FLAG_AUX_ENA, pf->flags);
+	return test_bit(ICE_FLAG_RDMA_ENA, pf->flags);
 }
 
 /**
