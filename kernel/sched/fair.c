@@ -10815,7 +10815,7 @@ static int newidle_balance(struct rq *this_rq, struct rq_flags *rf)
 	int this_cpu = this_rq->cpu;
 	struct sched_domain *sd;
 	int pulled_task = 0;
-	u64 curr_cost = 0;
+	u64 t0, domain_cost, curr_cost = 0;
 
 	update_misfit_status(NULL, this_rq);
 
@@ -10860,11 +10860,14 @@ static int newidle_balance(struct rq *this_rq, struct rq_flags *rf)
 
 	raw_spin_rq_unlock(this_rq);
 
+	t0 = sched_clock_cpu(this_cpu);
 	update_blocked_averages(this_cpu);
+	domain_cost = sched_clock_cpu(this_cpu) - t0;
+	curr_cost += domain_cost;
+
 	rcu_read_lock();
 	for_each_domain(this_cpu, sd) {
 		int continue_balancing = 1;
-		u64 t0, domain_cost;
 
 		if (this_rq->avg_idle < curr_cost + sd->max_newidle_lb_cost) {
 			update_next_balance(sd, &next_balance);
