@@ -4567,7 +4567,6 @@ static int nand_suspend(struct mtd_info *mtd)
 		ret = chip->ops.suspend(chip);
 	if (!ret)
 		chip->suspended = 1;
-	mutex_unlock(&chip->lock);
 
 	return ret;
 }
@@ -4580,7 +4579,6 @@ static void nand_resume(struct mtd_info *mtd)
 {
 	struct nand_chip *chip = mtd_to_nand(mtd);
 
-	mutex_lock(&chip->lock);
 	if (chip->suspended) {
 		if (chip->ops.resume)
 			chip->ops.resume(chip);
