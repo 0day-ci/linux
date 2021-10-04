@@ -11,3 +11,4 @@ usb-common-$(CONFIG_USB_LED_TRIG) += led.o
 obj-$(CONFIG_USB_CONN_GPIO)	+= usb-conn-gpio.o
 obj-$(CONFIG_USB_OTG_FSM) += usb-otg-fsm.o
 obj-$(CONFIG_USB_ULPI_BUS)	+= ulpi.o
+obj-$(CONFIG_USB_QCOM_EUD)      += qcom_eud.o

@@ -1,0 +1,7 @@
+What:		/sys/bus/platform/.../enable
+Date:           October 2021
+Contact:        Souradeep Chowdhury <schowdhu@codeaurora.org>
+Description:
+		The Enable/Disable sysfs interface for Embedded
+		USB Debugger(EUD).This enables and disables the
+		EUD based on a 1 or a 0 value.
