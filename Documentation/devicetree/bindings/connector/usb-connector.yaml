@@ -30,6 +30,21 @@ properties:
           - const: samsung,usb-connector-11pin
           - const: usb-b-connector
 
+      - items:
+          - enum:
+              - qcom,sc7280-usb-connector-eud
+          - const: qcom,usb-connector-eud
+          - const: usb-c-connector
+
+  reg:
+    items:
+      - description: EUD Base Register Region
+      - description: EUD Mode Manager Region
+
+  interrupts:
+    description:
+      EUD interrupt
+
   label:
     description: Symbolic name for the connector.
 
