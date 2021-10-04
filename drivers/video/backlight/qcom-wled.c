@@ -1255,17 +1255,17 @@ static const struct wled_var_cfg wled5_ovp_cfg = {
 
 static u32 wled3_num_strings_values_fn(u32 idx)
 {
-	return idx + 1;
+	return idx;
 }
 
 static const struct wled_var_cfg wled3_num_strings_cfg = {
 	.fn = wled3_num_strings_values_fn,
-	.size = 3,
+	.size = 4, /* [0, 3] */
 };
 
 static const struct wled_var_cfg wled4_num_strings_cfg = {
 	.fn = wled3_num_strings_values_fn,
-	.size = 4,
+	.size = 5, /* [0, 4] */
 };
 
 static u32 wled3_switch_freq_values_fn(u32 idx)
@@ -1519,8 +1519,6 @@ static int wled_configure(struct wled *wled)
 		if (of_property_read_bool(dev->of_node, bool_opts[i].name))
 			*bool_opts[i].val_ptr = true;
 	}
-
-	cfg->num_strings = cfg->num_strings + 1;
 
 	string_len = of_property_count_elems_of_size(dev->of_node,
 						     "qcom,enabled-strings",
