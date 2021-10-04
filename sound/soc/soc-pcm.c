@@ -320,6 +320,7 @@ int dpcm_dapm_stream_event(struct snd_soc_pcm_runtime *fe, int dir,
 {
 	struct snd_soc_dpcm *dpcm;
 
+	mutex_lock(&fe->card->dpcm_mutex);
 	for_each_dpcm_be(fe, dir, dpcm) {
 
 		struct snd_soc_pcm_runtime *be = dpcm->be;
@@ -333,6 +334,8 @@ int dpcm_dapm_stream_event(struct snd_soc_pcm_runtime *fe, int dir,
 
 		snd_soc_dapm_stream_event(be, dir, event);
 	}
+	mutex_unlock(&fe->card->dpcm_mutex);
+
 
 	snd_soc_dapm_stream_event(fe, dir, event);
 
@@ -1142,10 +1145,14 @@ static int dpcm_be_connect(struct snd_soc_pcm_runtime *fe,
 	struct snd_soc_dpcm *dpcm;
 
 	/* only add new dpcms */
+	mutex_lock(&fe->card->dpcm_mutex);
 	for_each_dpcm_be(fe, stream, dpcm) {
-		if (dpcm->be == be && dpcm->fe == fe)
+		if (dpcm->be == be && dpcm->fe == fe) {
+			mutex_unlock(&fe->card->dpcm_mutex);
 			return 0;
+		}
 	}
+	mutex_unlock(&fe->card->dpcm_mutex);
 
 	dpcm = kzalloc(sizeof(struct snd_soc_dpcm), GFP_KERNEL);
 	if (!dpcm)
@@ -1202,6 +1209,7 @@ void dpcm_be_disconnect(struct snd_soc_pcm_runtime *fe, int stream)
 {
 	struct snd_soc_dpcm *dpcm, *d;
 
+	mutex_lock(&fe->card->dpcm_mutex);
 	for_each_dpcm_be_safe(fe, stream, dpcm, d) {
 		dev_dbg(fe->dev, "ASoC: BE %s disconnect check for %s\n",
 				stream ? "capture" : "playback",
@@ -1219,12 +1227,11 @@ void dpcm_be_disconnect(struct snd_soc_pcm_runtime *fe, int stream)
 
 		dpcm_remove_debugfs_state(dpcm);
 
-		mutex_lock(&fe->card->dpcm_mutex);
 		list_del(&dpcm->list_be);
 		list_del(&dpcm->list_fe);
-		mutex_unlock(&fe->card->dpcm_mutex);
 		kfree(dpcm);
 	}
+	mutex_unlock(&fe->card->dpcm_mutex);
 }
 
 /* get BE for DAI widget and stream */
@@ -1351,6 +1358,7 @@ static int dpcm_prune_paths(struct snd_soc_pcm_runtime *fe, int stream,
 	int prune = 0;
 
 	/* Destroy any old FE <--> BE connections */
+	mutex_lock(&fe->card->dpcm_mutex);
 	for_each_dpcm_be(fe, stream, dpcm) {
 		if (dpcm_be_is_active(dpcm, stream, *list_))
 			continue;
@@ -1362,6 +1370,7 @@ static int dpcm_prune_paths(struct snd_soc_pcm_runtime *fe, int stream,
 		dpcm_set_be_update_state(dpcm->be, stream, SND_SOC_DPCM_UPDATE_BE);
 		prune++;
 	}
+	mutex_unlock(&fe->card->dpcm_mutex);
 
 	dev_dbg(fe->dev, "ASoC: found %d old BE paths for pruning\n", prune);
 	return prune;
@@ -1455,13 +1464,16 @@ void dpcm_be_dai_stop(struct snd_soc_pcm_runtime *fe, int stream,
 	struct snd_soc_dpcm *dpcm;
 
 	/* disable any enabled and non active backends */
+	mutex_lock(&fe->card->dpcm_mutex);
 	for_each_dpcm_be(fe, stream, dpcm) {
 		struct snd_soc_pcm_runtime *be = dpcm->be;
 		struct snd_pcm_substream *be_substream =
 			snd_soc_dpcm_get_substream(be, stream);
 
-		if (dpcm == last)
+		if (dpcm == last) {
+			mutex_unlock(&fe->card->dpcm_mutex);
 			return;
+		}
 
 		/* is this op for this BE ? */
 		if (!snd_soc_dpcm_be_can_update(fe, be, stream))
@@ -1491,6 +1503,7 @@ void dpcm_be_dai_stop(struct snd_soc_pcm_runtime *fe, int stream,
 		be_substream->runtime = NULL;
 		be->dpcm[stream].state = SND_SOC_DPCM_STATE_CLOSE;
 	}
+	mutex_unlock(&fe->card->dpcm_mutex);
 }
 
 int dpcm_be_dai_startup(struct snd_soc_pcm_runtime *fe, int stream)
@@ -1500,6 +1513,7 @@ int dpcm_be_dai_startup(struct snd_soc_pcm_runtime *fe, int stream)
 	int err, count = 0;
 
 	/* only startup BE DAIs that are either sinks or sources to this FE DAI */
+	mutex_lock(&fe->card->dpcm_mutex);
 	for_each_dpcm_be(fe, stream, dpcm) {
 		struct snd_pcm_substream *be_substream;
 
@@ -1550,11 +1564,13 @@ int dpcm_be_dai_startup(struct snd_soc_pcm_runtime *fe, int stream)
 		be->dpcm[stream].state = SND_SOC_DPCM_STATE_OPEN;
 		count++;
 	}
+	mutex_unlock(&fe->card->dpcm_mutex);
 
 	return count;
 
 unwind:
 	dpcm_be_dai_startup_rollback(fe, stream, dpcm);
+	mutex_unlock(&fe->card->dpcm_mutex);
 
 	dev_err(fe->dev, "ASoC: %s() failed at %s (%d)\n",
 		__func__, be->dai_link->name, err);
@@ -1609,6 +1625,7 @@ static void dpcm_runtime_setup_be_format(struct snd_pcm_substream *substream)
 	 * if FE want to use it (= dpcm_merged_format)
 	 */
 
+	mutex_lock(&fe->card->dpcm_mutex);
 	for_each_dpcm_be(fe, stream, dpcm) {
 		struct snd_soc_pcm_runtime *be = dpcm->be;
 		struct snd_soc_pcm_stream *codec_stream;
@@ -1627,6 +1644,7 @@ static void dpcm_runtime_setup_be_format(struct snd_pcm_substream *substream)
 			soc_pcm_hw_update_format(hw, codec_stream);
 		}
 	}
+	mutex_unlock(&fe->card->dpcm_mutex);
 }
 
 static void dpcm_runtime_setup_be_chan(struct snd_pcm_substream *substream)
@@ -1644,7 +1662,7 @@ static void dpcm_runtime_setup_be_chan(struct snd_pcm_substream *substream)
 	 * It returns merged BE codec channel;
 	 * if FE want to use it (= dpcm_merged_chan)
 	 */
-
+	mutex_lock(&fe->card->dpcm_mutex);
 	for_each_dpcm_be(fe, stream, dpcm) {
 		struct snd_soc_pcm_runtime *be = dpcm->be;
 		struct snd_soc_pcm_stream *cpu_stream;
@@ -1675,6 +1693,7 @@ static void dpcm_runtime_setup_be_chan(struct snd_pcm_substream *substream)
 			soc_pcm_hw_update_chan(hw, codec_stream);
 		}
 	}
+	mutex_unlock(&fe->card->dpcm_mutex);
 }
 
 static void dpcm_runtime_setup_be_rate(struct snd_pcm_substream *substream)
@@ -1692,7 +1711,7 @@ static void dpcm_runtime_setup_be_rate(struct snd_pcm_substream *substream)
 	 * It returns merged BE codec channel;
 	 * if FE want to use it (= dpcm_merged_chan)
 	 */
-
+	mutex_lock(&fe->card->dpcm_mutex);
 	for_each_dpcm_be(fe, stream, dpcm) {
 		struct snd_soc_pcm_runtime *be = dpcm->be;
 		struct snd_soc_pcm_stream *pcm;
@@ -1712,6 +1731,7 @@ static void dpcm_runtime_setup_be_rate(struct snd_pcm_substream *substream)
 			soc_pcm_hw_update_rate(hw, pcm);
 		}
 	}
+	mutex_unlock(&fe->card->dpcm_mutex);
 }
 
 static int dpcm_apply_symmetry(struct snd_pcm_substream *fe_substream,
@@ -1734,6 +1754,7 @@ static int dpcm_apply_symmetry(struct snd_pcm_substream *fe_substream,
 	}
 
 	/* apply symmetry for BE */
+	mutex_lock(&fe->card->dpcm_mutex);
 	for_each_dpcm_be(fe, stream, dpcm) {
 		struct snd_soc_pcm_runtime *be = dpcm->be;
 		struct snd_pcm_substream *be_substream =
@@ -1759,6 +1780,7 @@ static int dpcm_apply_symmetry(struct snd_pcm_substream *fe_substream,
 		}
 	}
 error:
+	mutex_unlock(&fe->card->dpcm_mutex);
 	if (err < 0)
 		dev_err(fe->dev, "ASoC: %s failed (%d)\n", __func__, err);
 
@@ -1834,6 +1856,7 @@ void dpcm_be_dai_hw_free(struct snd_soc_pcm_runtime *fe, int stream)
 
 	/* only hw_params backends that are either sinks or sources
 	 * to this frontend DAI */
+	mutex_lock(&fe->card->dpcm_mutex);
 	for_each_dpcm_be(fe, stream, dpcm) {
 
 		struct snd_soc_pcm_runtime *be = dpcm->be;
@@ -1846,7 +1869,7 @@ void dpcm_be_dai_hw_free(struct snd_soc_pcm_runtime *fe, int stream)
 
 		/* only free hw when no longer used - check all FEs */
 		if (!snd_soc_dpcm_can_be_free_stop(fe, be, stream))
-				continue;
+			continue;
 
 		/* do not free hw if this BE is used by other FE */
 		if (be->dpcm[stream].users > 1)
@@ -1867,6 +1890,7 @@ void dpcm_be_dai_hw_free(struct snd_soc_pcm_runtime *fe, int stream)
 
 		be->dpcm[stream].state = SND_SOC_DPCM_STATE_HW_FREE;
 	}
+	mutex_unlock(&fe->card->dpcm_mutex);
 }
 
 static int dpcm_fe_dai_hw_free(struct snd_pcm_substream *substream)
@@ -1900,6 +1924,7 @@ int dpcm_be_dai_hw_params(struct snd_soc_pcm_runtime *fe, int stream)
 	struct snd_soc_dpcm *dpcm;
 	int ret;
 
+	mutex_lock(&fe->card->dpcm_mutex);
 	for_each_dpcm_be(fe, stream, dpcm) {
 		be = dpcm->be;
 		be_substream = snd_soc_dpcm_get_substream(be, stream);
@@ -1939,6 +1964,7 @@ int dpcm_be_dai_hw_params(struct snd_soc_pcm_runtime *fe, int stream)
 
 		be->dpcm[stream].state = SND_SOC_DPCM_STATE_HW_PARAMS;
 	}
+	mutex_unlock(&fe->card->dpcm_mutex);
 	return 0;
 
 unwind:
@@ -1965,6 +1991,7 @@ unwind:
 
 		soc_pcm_hw_free(be_substream);
 	}
+	mutex_unlock(&fe->card->dpcm_mutex);
 
 	return ret;
 }
@@ -2012,6 +2039,7 @@ int dpcm_be_dai_trigger(struct snd_soc_pcm_runtime *fe, int stream,
 	struct snd_soc_dpcm *dpcm;
 	int ret = 0;
 
+	mutex_lock(&fe->card->dpcm_mutex);
 	for_each_dpcm_be(fe, stream, dpcm) {
 		struct snd_pcm_substream *be_substream;
 
@@ -2101,6 +2129,7 @@ int dpcm_be_dai_trigger(struct snd_soc_pcm_runtime *fe, int stream,
 		}
 	}
 end:
+	mutex_unlock(&fe->card->dpcm_mutex);
 	if (ret < 0)
 		dev_err(fe->dev, "ASoC: %s() failed at %s (%d)\n",
 			__func__, be->dai_link->name, ret);
@@ -2835,6 +2864,7 @@ struct snd_pcm_substream *
 }
 EXPORT_SYMBOL_GPL(snd_soc_dpcm_get_substream);
 
+/* This must be called with fe->card->dpcm_mutex held */
 static int snd_soc_dpcm_check_state(struct snd_soc_pcm_runtime *fe,
 				    struct snd_soc_pcm_runtime *be,
 				    int stream,
@@ -2846,7 +2876,6 @@ static int snd_soc_dpcm_check_state(struct snd_soc_pcm_runtime *fe,
 	int ret = 1;
 	int i;
 
-	mutex_lock(&fe->card->dpcm_mutex);
 	for_each_dpcm_fe(be, stream, dpcm) {
 
 		if (dpcm->fe == fe)
@@ -2860,7 +2889,6 @@ static int snd_soc_dpcm_check_state(struct snd_soc_pcm_runtime *fe,
 			}
 		}
 	}
-	mutex_unlock(&fe->card->dpcm_mutex);
 
 	/* it's safe to do this BE DAI */
 	return ret;
@@ -2869,6 +2897,7 @@ static int snd_soc_dpcm_check_state(struct snd_soc_pcm_runtime *fe,
 /*
  * We can only hw_free, stop, pause or suspend a BE DAI if any of it's FE
  * are not running, paused or suspended for the specified stream direction.
+ * This must be called with fe->card->dpcm_mutex held.
  */
 static int snd_soc_dpcm_can_be_free_stop(struct snd_soc_pcm_runtime *fe,
 		struct snd_soc_pcm_runtime *be, int stream)
@@ -2885,6 +2914,7 @@ static int snd_soc_dpcm_can_be_free_stop(struct snd_soc_pcm_runtime *fe,
 /*
  * We can only change hw params a BE DAI if any of it's FE are not prepared,
  * running, paused or suspended for the specified stream direction.
+ * This must be called with fe->card->dpcm_mutex held.
  */
 static int snd_soc_dpcm_can_be_params(struct snd_soc_pcm_runtime *fe,
 		struct snd_soc_pcm_runtime *be, int stream)
