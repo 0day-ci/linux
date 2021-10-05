@@ -835,7 +835,8 @@ static void __i915_request_ctor(void *arg)
 }
 
 struct i915_request *
-__i915_request_create(struct intel_context *ce, gfp_t gfp)
+__i915_request_create(struct intel_context *ce, gfp_t gfp,
+		      bool timeline_mutex_needed)
 {
 	struct intel_timeline *tl = ce->timeline;
 	struct i915_request *rq;
@@ -964,7 +965,7 @@ __i915_request_create(struct intel_context *ce, gfp_t gfp)
 
 	rq->infix = rq->ring->emit; /* end of header; start of user payload */
 
-	intel_context_mark_active(ce);
+	intel_context_mark_active(ce, timeline_mutex_needed);
 	list_add_tail_rcu(&rq->link, &tl->requests);
 
 	return rq;
@@ -1000,7 +1001,7 @@ i915_request_create(struct intel_context *ce)
 		i915_request_retire(rq);
 
 	intel_context_enter(ce);
-	rq = __i915_request_create(ce, GFP_KERNEL);
+	rq = __i915_request_create(ce, GFP_KERNEL, true);
 	intel_context_exit(ce); /* active reference transferred to request */
 	if (IS_ERR(rq))
 		goto err_unlock;
