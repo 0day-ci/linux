@@ -30,6 +30,8 @@ static int vkms_wb_encoder_atomic_check(struct drm_encoder *encoder,
 {
 	struct drm_framebuffer *fb;
 	const struct drm_display_mode *mode = &crtc_state->mode;
+	bool format_supported = false;
+	int i;
 
 	if (!conn_state->writeback_job || !conn_state->writeback_job->fb)
 		return 0;
@@ -41,7 +43,14 @@ static int vkms_wb_encoder_atomic_check(struct drm_encoder *encoder,
 		return -EINVAL;
 	}
 
-	if (fb->format->format != vkms_wb_formats[0]) {
+	for (i = 0; i < ARRAY_SIZE(vkms_wb_formats); i++) {
+		if (fb->format->format == vkms_wb_formats[i]) {
+			format_supported = true;
+			break;
+		}
+	}
+
+	if (!format_supported) {
 		DRM_DEBUG_KMS("Invalid pixel format %p4cc\n",
 			      &fb->format->format);
 		return -EINVAL;
