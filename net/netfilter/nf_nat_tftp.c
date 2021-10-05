@@ -48,7 +48,7 @@ static int __init nf_nat_tftp_init(void)
 {
 	BUG_ON(nf_nat_tftp_hook != NULL);
 	nf_nat_helper_register(&nat_helper_tftp);
-	RCU_INIT_POINTER(nf_nat_tftp_hook, help);
+	RCU_INIT_POINTER(nf_nat_tftp_hook, &help);
 	return 0;
 }
 

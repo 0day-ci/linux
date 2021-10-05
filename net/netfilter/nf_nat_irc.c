@@ -106,7 +106,7 @@ static int __init nf_nat_irc_init(void)
 {
 	BUG_ON(nf_nat_irc_hook != NULL);
 	nf_nat_helper_register(&nat_helper_irc);
-	RCU_INIT_POINTER(nf_nat_irc_hook, help);
+	RCU_INIT_POINTER(nf_nat_irc_hook, &help);
 	return 0;
 }
 

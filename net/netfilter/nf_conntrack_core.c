@@ -2733,7 +2733,7 @@ static struct nf_ct_hook nf_conntrack_hook = {
 void nf_conntrack_init_end(void)
 {
 	/* For use by REJECT target */
-	RCU_INIT_POINTER(ip_ct_attach, nf_conntrack_attach);
+	RCU_INIT_POINTER(ip_ct_attach, &nf_conntrack_attach);
 	RCU_INIT_POINTER(nf_ct_hook, &nf_conntrack_hook);
 }
 

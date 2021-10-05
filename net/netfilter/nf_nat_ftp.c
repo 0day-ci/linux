@@ -135,7 +135,7 @@ static int __init nf_nat_ftp_init(void)
 {
 	BUG_ON(nf_nat_ftp_hook != NULL);
 	nf_nat_helper_register(&nat_helper_ftp);
-	RCU_INIT_POINTER(nf_nat_ftp_hook, nf_nat_ftp);
+	RCU_INIT_POINTER(nf_nat_ftp_hook, &nf_nat_ftp);
 	return 0;
 }
 

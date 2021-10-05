@@ -619,8 +619,8 @@ static int __init cttimeout_init(void)
 			"nfnetlink.\n");
 		goto err_out;
 	}
-	RCU_INIT_POINTER(nf_ct_timeout_find_get_hook, ctnl_timeout_find_get);
-	RCU_INIT_POINTER(nf_ct_timeout_put_hook, ctnl_timeout_put);
+	RCU_INIT_POINTER(nf_ct_timeout_find_get_hook, &ctnl_timeout_find_get);
+	RCU_INIT_POINTER(nf_ct_timeout_put_hook, &ctnl_timeout_put);
 	return 0;
 
 err_out:

@@ -358,7 +358,7 @@ static inline void rcu_preempt_sleep_check(void) { }
 
 #ifdef __CHECKER__
 #define rcu_check_sparse(p, space) \
-	((void)(((typeof(*p) space *)p) == p))
+	((void)(((typeof(p) space)p) == p))
 #else /* #ifdef __CHECKER__ */
 #define rcu_check_sparse(p, space)
 #endif /* #else #ifdef __CHECKER__ */
@@ -372,43 +372,43 @@ static inline void rcu_preempt_sleep_check(void) { }
  */
 #define unrcu_pointer(p)						\
 ({									\
-	typeof(*p) *_________p1 = (typeof(*p) *__force)(p);		\
+	typeof(p)_________p1 = (typeof(p) __force)(p);			\
 	rcu_check_sparse(p, __rcu);					\
-	((typeof(*p) __force __kernel *)(_________p1)); 		\
+	((typeof(p) __force __kernel)(_________p1));			\
 })
 
 #define __rcu_access_pointer(p, space) \
 ({ \
-	typeof(*p) *_________p1 = (typeof(*p) *__force)READ_ONCE(p); \
+	typeof(p) _________p1 = (typeof(p) __force)READ_ONCE(p); \
 	rcu_check_sparse(p, space); \
-	((typeof(*p) __force __kernel *)(_________p1)); \
+	((typeof(p) __force __kernel)(_________p1)); \
 })
 #define __rcu_dereference_check(p, c, space) \
 ({ \
 	/* Dependency order vs. p above. */ \
-	typeof(*p) *________p1 = (typeof(*p) *__force)READ_ONCE(p); \
+	typeof(p) ________p1 = (typeof(p) __force)READ_ONCE(p); \
 	RCU_LOCKDEP_WARN(!(c), "suspicious rcu_dereference_check() usage"); \
 	rcu_check_sparse(p, space); \
-	((typeof(*p) __force __kernel *)(________p1)); \
+	((typeof(p) __force __kernel )(________p1)); \
 })
 #define __rcu_dereference_protected(p, c, space) \
 ({ \
 	RCU_LOCKDEP_WARN(!(c), "suspicious rcu_dereference_protected() usage"); \
 	rcu_check_sparse(p, space); \
-	((typeof(*p) __force __kernel *)(p)); \
+	((typeof(p) __force __kernel)(p)); \
 })
 #define rcu_dereference_raw(p) \
 ({ \
 	/* Dependency order vs. p above. */ \
 	typeof(p) ________p1 = READ_ONCE(p); \
-	((typeof(*p) __force __kernel *)(________p1)); \
+	((typeof(p) __force __kernel)(________p1)); \
 })
 
 /**
  * RCU_INITIALIZER() - statically initialize an RCU-protected global variable
  * @v: The value to statically initialize with.
  */
-#define RCU_INITIALIZER(v) (typeof(*(v)) __force __rcu *)(v)
+#define RCU_INITIALIZER(v) (typeof((v)) __force __rcu)(v)
 
 /**
  * rcu_assign_pointer() - assign to RCU-protected pointer

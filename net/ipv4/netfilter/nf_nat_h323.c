@@ -592,15 +592,15 @@ static int __init init(void)
 	BUG_ON(nat_callforwarding_hook != NULL);
 	BUG_ON(nat_q931_hook != NULL);
 
-	RCU_INIT_POINTER(set_h245_addr_hook, set_h245_addr);
-	RCU_INIT_POINTER(set_h225_addr_hook, set_h225_addr);
-	RCU_INIT_POINTER(set_sig_addr_hook, set_sig_addr);
-	RCU_INIT_POINTER(set_ras_addr_hook, set_ras_addr);
-	RCU_INIT_POINTER(nat_rtp_rtcp_hook, nat_rtp_rtcp);
-	RCU_INIT_POINTER(nat_t120_hook, nat_t120);
-	RCU_INIT_POINTER(nat_h245_hook, nat_h245);
-	RCU_INIT_POINTER(nat_callforwarding_hook, nat_callforwarding);
-	RCU_INIT_POINTER(nat_q931_hook, nat_q931);
+	RCU_INIT_POINTER(set_h245_addr_hook, &set_h245_addr);
+	RCU_INIT_POINTER(set_h225_addr_hook, &set_h225_addr);
+	RCU_INIT_POINTER(set_sig_addr_hook, &set_sig_addr);
+	RCU_INIT_POINTER(set_ras_addr_hook, &set_ras_addr);
+	RCU_INIT_POINTER(nat_rtp_rtcp_hook, &nat_rtp_rtcp);
+	RCU_INIT_POINTER(nat_t120_hook, &nat_t120);
+	RCU_INIT_POINTER(nat_h245_hook, &nat_h245);
+	RCU_INIT_POINTER(nat_callforwarding_hook, &nat_callforwarding);
+	RCU_INIT_POINTER(nat_q931_hook, &nat_q931);
 	nf_ct_helper_expectfn_register(&q931_nat);
 	nf_ct_helper_expectfn_register(&callforwarding_nat);
 	return 0;

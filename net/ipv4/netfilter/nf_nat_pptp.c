@@ -298,16 +298,16 @@ pptp_inbound_pkt(struct sk_buff *skb,
 static int __init nf_nat_helper_pptp_init(void)
 {
 	BUG_ON(nf_nat_pptp_hook_outbound != NULL);
-	RCU_INIT_POINTER(nf_nat_pptp_hook_outbound, pptp_outbound_pkt);
+	RCU_INIT_POINTER(nf_nat_pptp_hook_outbound, &pptp_outbound_pkt);
 
 	BUG_ON(nf_nat_pptp_hook_inbound != NULL);
-	RCU_INIT_POINTER(nf_nat_pptp_hook_inbound, pptp_inbound_pkt);
+	RCU_INIT_POINTER(nf_nat_pptp_hook_inbound, &pptp_inbound_pkt);
 
 	BUG_ON(nf_nat_pptp_hook_exp_gre != NULL);
-	RCU_INIT_POINTER(nf_nat_pptp_hook_exp_gre, pptp_exp_gre);
+	RCU_INIT_POINTER(nf_nat_pptp_hook_exp_gre, &pptp_exp_gre);
 
 	BUG_ON(nf_nat_pptp_hook_expectfn != NULL);
-	RCU_INIT_POINTER(nf_nat_pptp_hook_expectfn, pptp_nat_expected);
+	RCU_INIT_POINTER(nf_nat_pptp_hook_expectfn, &pptp_nat_expected);
 	return 0;
 }
 
