@@ -12,6 +12,7 @@
 #include "gt/intel_engine_pm.h"
 #include "gt/intel_engine_heartbeat.h"
 #include "gt/intel_gt.h"
+#include "gt/intel_gt_clock_utils.h"
 #include "gt/intel_gt_irq.h"
 #include "gt/intel_gt_pm.h"
 #include "gt/intel_gt_requests.h"
@@ -20,6 +21,7 @@
 #include "gt/intel_mocs.h"
 #include "gt/intel_ring.h"
 
+#include "intel_guc_ads.h"
 #include "intel_guc_submission.h"
 
 #include "i915_drv.h"
@@ -762,12 +764,25 @@ submission_disabled(struct intel_guc *guc)
 static void disable_submission(struct intel_guc *guc)
 {
 	struct i915_sched_engine * const sched_engine = guc->sched_engine;
+	struct intel_gt *gt = guc_to_gt(guc);
+	struct intel_engine_cs *engine;
+	enum intel_engine_id id;
+	unsigned long flags;
 
 	if (__tasklet_is_enabled(&sched_engine->tasklet)) {
 		GEM_BUG_ON(!guc->ct.enabled);
 		__tasklet_disable_sync_once(&sched_engine->tasklet);
 		sched_engine->tasklet.callback = NULL;
 	}
+
+	cancel_delayed_work(&guc->timestamp.work);
+
+	spin_lock_irqsave(&guc->timestamp.lock, flags);
+
+	for_each_engine(engine, gt, id)
+		engine->stats.prev_total = 0;
+
+	spin_unlock_irqrestore(&guc->timestamp.lock, flags);
 }
 
 static void enable_submission(struct intel_guc *guc)
@@ -1127,11 +1142,216 @@ void intel_guc_submission_reset_finish(struct intel_guc *guc)
 }
 
 /*
+ * GuC stores busyness stats for each engine at context in/out boundaries. A
+ * context 'in' logs execution start time, 'out' adds in -> out delta to total.
+ * i915/kmd accesses 'start', 'total' and 'context id' from memory shared with
+ * GuC.
+ *
+ * __i915_pmu_event_read samples engine busyness. When sampling, if context id
+ * is valid (!= ~0) and start is non-zero, the engine is considered to be
+ * active. For an active engine total busyness = total + (now - start), where
+ * 'now' is the time at which the busyness is sampled. For inactive engine,
+ * total busyness = total.
+ *
+ * All times are captured from GUCPMTIMESTAMP reg and are in gt clock domain.
+ *
+ * The start and total values provided by GuC are 32 bits and wrap around in a
+ * few minutes. Since perf pmu provides busyness as 64 bit monotonically
+ * increasing ns values, there is a need for this implementation to account for
+ * overflows and extend the GuC provided values to 64 bits before returning
+ * busyness to the user. In order to do that, a worker runs periodically at
+ * frequency = 1/8th the time it takes for the timestamp to wrap (i.e. once in
+ * 27 seconds for a gt clock frequency of 19.2 MHz).
+ */
+
+#define WRAP_TIME_CLKS U32_MAX
+#define POLL_TIME_CLKS (WRAP_TIME_CLKS >> 3)
+
+static void
+__extend_last_switch(struct intel_guc *guc, u64 *prev_start, u32 new_start)
+{
+	u32 gt_stamp_hi = upper_32_bits(guc->timestamp.gt_stamp);
+	u32 gt_stamp_last = lower_32_bits(guc->timestamp.gt_stamp);
+
+	if (new_start == lower_32_bits(*prev_start))
+		return;
+
+	if (new_start < gt_stamp_last &&
+	    (new_start - gt_stamp_last) <= POLL_TIME_CLKS)
+		gt_stamp_hi++;
+
+	if (new_start > gt_stamp_last &&
+	    (gt_stamp_last - new_start) <= POLL_TIME_CLKS && gt_stamp_hi)
+		gt_stamp_hi--;
+
+	*prev_start = ((u64)gt_stamp_hi << 32) | new_start;
+}
+
+static void guc_update_engine_gt_clks(struct intel_engine_cs *engine)
+{
+	struct guc_engine_usage_record *rec = intel_guc_engine_usage(engine);
+	struct intel_guc *guc = &engine->gt->uc.guc;
+	u32 last_switch = rec->last_switch_in_stamp;
+	u32 ctx_id = rec->current_context_index;
+	u32 total = rec->total_runtime;
+
+	lockdep_assert_held(&guc->timestamp.lock);
+
+	engine->stats.running = ctx_id != ~0U && last_switch;
+	if (engine->stats.running)
+		__extend_last_switch(guc, &engine->stats.start_gt_clk,
+				     last_switch);
+
+	/*
+	 * Instead of adjusting the total for overflow, just add the
+	 * difference from previous sample to the stats.total_gt_clks
+	 */
+	if (total && total != ~0U) {
+		engine->stats.total_gt_clks += (u32)(total -
+						     engine->stats.prev_total);
+		engine->stats.prev_total = total;
+	}
+}
+
+static void guc_update_pm_timestamp(struct intel_guc *guc)
+{
+	struct intel_gt *gt = guc_to_gt(guc);
+	u32 gt_stamp_now, gt_stamp_hi;
+
+	lockdep_assert_held(&guc->timestamp.lock);
+
+	gt_stamp_hi = upper_32_bits(guc->timestamp.gt_stamp);
+	gt_stamp_now = intel_uncore_read(gt->uncore, GUCPMTIMESTAMP);
+
+	if (gt_stamp_now < lower_32_bits(guc->timestamp.gt_stamp))
+		gt_stamp_hi++;
+
+	guc->timestamp.gt_stamp = ((u64) gt_stamp_hi << 32) | gt_stamp_now;
+}
+
+/*
+ * Unlike the execlist mode of submission total and active times are in terms of
+ * gt clocks. The *now parameter is retained to return the cpu time at which the
+ * busyness was sampled.
+ */
+static ktime_t guc_engine_busyness(struct intel_engine_cs *engine, ktime_t *now)
+{
+	struct intel_gt *gt = engine->gt;
+	struct intel_guc *guc = &gt->uc.guc;
+	unsigned long flags;
+	u64 total;
+
+	spin_lock_irqsave(&guc->timestamp.lock, flags);
+
+	*now = ktime_get();
+
+	/*
+	 * The active busyness depends on start_gt_clk and gt_stamp.
+	 * gt_stamp is updated by i915 only when gt is awake and the
+	 * start_gt_clk is derived from GuC state. To get a consistent
+	 * view of activity, we query the GuC state only if gt is awake.
+	 */
+	if (intel_gt_pm_get_if_awake(gt)) {
+		guc_update_engine_gt_clks(engine);
+		guc_update_pm_timestamp(guc);
+		intel_gt_pm_put_async(gt);
+	}
+
+	total = intel_gt_clock_interval_to_ns(gt, engine->stats.total_gt_clks);
+	if (engine->stats.running) {
+		u64 clk = guc->timestamp.gt_stamp - engine->stats.start_gt_clk;
+
+		total += intel_gt_clock_interval_to_ns(gt, clk);
+	}
+
+	spin_unlock_irqrestore(&guc->timestamp.lock, flags);
+
+	return ns_to_ktime(total);
+}
+
+static void __update_guc_busyness_stats(struct intel_guc *guc)
+{
+	struct intel_gt *gt = guc_to_gt(guc);
+	struct intel_engine_cs *engine;
+	enum intel_engine_id id;
+	unsigned long flags;
+
+	spin_lock_irqsave(&guc->timestamp.lock, flags);
+
+	if (intel_gt_pm_get_if_awake(gt)) {
+		guc_update_pm_timestamp(guc);
+
+		for_each_engine(engine, gt, id)
+			guc_update_engine_gt_clks(engine);
+
+		intel_gt_pm_put_async(gt);
+	}
+
+	spin_unlock_irqrestore(&guc->timestamp.lock, flags);
+}
+
+static void guc_timestamp_ping(struct work_struct *wrk)
+{
+	struct intel_guc *guc = container_of(wrk, typeof(*guc),
+					     timestamp.work.work);
+
+	__update_guc_busyness_stats(guc);
+	mod_delayed_work(system_highpri_wq, &guc->timestamp.work,
+			 guc->timestamp.ping_delay);
+}
+
+static int guc_action_enable_usage_stats(struct intel_guc *guc)
+{
+	u32 offset = intel_guc_engine_usage_offset(guc);
+	u32 action[] = {
+		INTEL_GUC_ACTION_SET_ENG_UTIL_BUFF,
+		offset,
+		0,
+	};
+
+	return intel_guc_send(guc, action, ARRAY_SIZE(action));
+}
+
+static void guc_init_engine_stats(struct intel_guc *guc)
+{
+	struct intel_gt *gt = guc_to_gt(guc);
+	intel_wakeref_t wakeref;
+
+	mod_delayed_work(system_highpri_wq, &guc->timestamp.work,
+			 guc->timestamp.ping_delay);
+
+	with_intel_runtime_pm(&gt->i915->runtime_pm, wakeref) {
+		int ret = guc_action_enable_usage_stats(guc);
+
+		if (ret)
+			drm_err(&gt->i915->drm,
+				"Failed to enable usage stats: %d!\n", ret);
+	}
+}
+
+void intel_guc_busyness_park(struct intel_gt *gt)
+{
+	struct intel_guc *guc = &gt->uc.guc;
+
+	cancel_delayed_work(&guc->timestamp.work);
+	__update_guc_busyness_stats(guc);
+}
+
+void intel_guc_busyness_unpark(struct intel_gt *gt)
+{
+	struct intel_guc *guc = &gt->uc.guc;
+
+	mod_delayed_work(system_highpri_wq, &guc->timestamp.work,
+			 guc->timestamp.ping_delay);
+}
+
+/*
  * Set up the memory resources to be shared with the GuC (via the GGTT)
  * at firmware loading time.
  */
 int intel_guc_submission_init(struct intel_guc *guc)
 {
+	struct intel_gt *gt = guc_to_gt(guc);
 	int ret;
 
 	if (guc->lrc_desc_pool)
@@ -1151,6 +1371,10 @@ int intel_guc_submission_init(struct intel_guc *guc)
 	spin_lock_init(&guc->contexts_lock);
 	INIT_LIST_HEAD(&guc->guc_id_list);
 	ida_init(&guc->guc_ids);
+
+	spin_lock_init(&guc->timestamp.lock);
+	INIT_DELAYED_WORK(&guc->timestamp.work, guc_timestamp_ping);
+	guc->timestamp.ping_delay = (POLL_TIME_CLKS / gt->clock_frequency + 1) * HZ;
 
 	return 0;
 }
@@ -2606,7 +2830,9 @@ static void guc_default_vfuncs(struct intel_engine_cs *engine)
 		engine->emit_flush = gen12_emit_flush_xcs;
 	}
 	engine->set_default_submission = guc_set_default_submission;
+	engine->busyness = guc_engine_busyness;
 
+	engine->flags |= I915_ENGINE_SUPPORTS_STATS;
 	engine->flags |= I915_ENGINE_HAS_PREEMPTION;
 	engine->flags |= I915_ENGINE_HAS_TIMESLICES;
 
@@ -2705,6 +2931,7 @@ int intel_guc_submission_setup(struct intel_engine_cs *engine)
 void intel_guc_submission_enable(struct intel_guc *guc)
 {
 	guc_init_lrc_mapping(guc);
+	guc_init_engine_stats(guc);
 }
 
 void intel_guc_submission_disable(struct intel_guc *guc)
