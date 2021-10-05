@@ -804,8 +804,13 @@ static int at91_poll(struct napi_struct *napi, int quota)
 		work_done += at91_poll_err(dev, quota - work_done, reg_sr);
 
 	if (work_done < quota) {
-		/* enable IRQs for frame errors and all mailboxes >= rx_next */
+		/* enable IRQs for frame errors and all mailboxes >= rx_next,
+		 * disable the ack error in passive mode to avoid flooding
+		 * ourselves with interrupts
+		 */
 		u32 reg_ier = AT91_IRQ_ERR_FRAME;
+		if (priv->can.state == CAN_STATE_ERROR_PASSIVE)
+			reg_ier &= ~AT91_IRQ_AERR;
 
 		reg_ier |= get_irq_mb_rx(priv) & ~AT91_MB_MASK(priv->rx_next);
 
