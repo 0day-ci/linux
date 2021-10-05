@@ -18021,6 +18021,7 @@ M:	Yoshinori Sato <ysato@users.sourceforge.jp>
 M:	Rich Felker <dalias@libc.org>
 L:	linux-sh@vger.kernel.org
 S:	Maintained
+T:	git git://git.libc.org/linux-sh
 Q:	http://patchwork.kernel.org/project/linux-sh/list/
 F:	Documentation/sh/
 F:	arch/sh/
