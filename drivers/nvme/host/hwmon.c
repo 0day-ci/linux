@@ -164,6 +164,10 @@ static umode_t nvme_hwmon_is_visible(const void *_data,
 	case hwmon_temp_min:
 		if ((!channel && data->ctrl->wctemp) ||
 		    (channel && data->log.temp_sensor[channel - 1])) {
+			long val;
+
+			if (nvme_get_temp_thresh(data->ctrl, channel, (attr == hwmon_temp_min), &val) < 0)
+				return 0;
 			if (data->ctrl->quirks &
 			    NVME_QUIRK_NO_TEMP_THRESH_CHANGE)
 				return 0444;
