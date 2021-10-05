@@ -12,6 +12,7 @@
 
 #include <linux/bitfield.h>
 #include <linux/delay.h>
+#include <linux/dsa/mv88e6xxx.h>
 #include <linux/etherdevice.h>
 #include <linux/ethtool.h>
 #include <linux/if_bridge.h>
@@ -1754,11 +1755,15 @@ static int mv88e6xxx_port_db_load_purge(struct mv88e6xxx_chip *chip, int port,
 	u16 fid;
 	int err;
 
-	/* Null VLAN ID corresponds to the port private database */
+	/* Ports have two private address databases: one for when the port is
+	 * standalone and one for when the port is under a bridge and the
+	 * 802.1Q mode is disabled. When the port is standalone, DSA wants its
+	 * address database to remain 100% empty, so we never load an ATU entry
+	 * into a standalone port's database. Therefore, translate the null
+	 * VLAN ID into the port's database used for VLAN-unaware bridging.
+	 */
 	if (vid == 0) {
-		err = mv88e6xxx_port_get_fid(chip, port, &fid);
-		if (err)
-			return err;
+		fid = MV88E6XXX_FID_BRIDGED;
 	} else {
 		err = mv88e6xxx_vtu_get(chip, vid, &vlan);
 		if (err)
@@ -2434,7 +2439,16 @@ static int mv88e6xxx_port_bridge_join(struct dsa_switch *ds, int port,
 	int err;
 
 	mv88e6xxx_reg_lock(chip);
+
 	err = mv88e6xxx_bridge_map(chip, br);
+	if (err)
+		goto unlock;
+
+	err = mv88e6xxx_port_set_fid(chip, port, MV88E6XXX_FID_BRIDGED);
+	if (err)
+		goto unlock;
+
+unlock:
 	mv88e6xxx_reg_unlock(chip);
 
 	return err;
@@ -2446,9 +2460,14 @@ static void mv88e6xxx_port_bridge_leave(struct dsa_switch *ds, int port,
 	struct mv88e6xxx_chip *chip = ds->priv;
 
 	mv88e6xxx_reg_lock(chip);
+
 	if (mv88e6xxx_bridge_map(chip, br) ||
 	    mv88e6xxx_port_vlan_map(chip, port))
 		dev_err(ds->dev, "failed to remap in-chip Port VLAN\n");
+
+	if (mv88e6xxx_port_set_fid(chip, port, MV88E6XXX_FID_STANDALONE))
+		dev_err(ds->dev, "failed to restore port default FID\n");
+
 	mv88e6xxx_reg_unlock(chip);
 }
 
@@ -2823,8 +2842,8 @@ static int mv88e6xxx_setup_upstream_port(struct mv88e6xxx_chip *chip, int port)
 static int mv88e6xxx_setup_port(struct mv88e6xxx_chip *chip, int port)
 {
 	struct dsa_switch *ds = chip->ds;
+	u16 reg, mode, member;
 	int err;
-	u16 reg;
 
 	chip->ports[port].chip = chip;
 	chip->ports[port].port = port;
@@ -2889,8 +2908,24 @@ static int mv88e6xxx_setup_port(struct mv88e6xxx_chip *chip, int port)
 	if (err)
 		return err;
 
-	err = mv88e6xxx_port_set_8021q_mode(chip, port,
-				MV88E6XXX_PORT_CTL2_8021Q_MODE_DISABLED);
+	if (dsa_is_user_port(ds, port)) {
+		mode = MV88E6XXX_PORT_CTL2_8021Q_MODE_DISABLED;
+		member = MV88E6XXX_G1_VTU_DATA_MEMBER_TAG_UNTAGGED;
+	} else {
+		mode = MV88E6XXX_PORT_CTL2_8021Q_MODE_FALLBACK;
+		member = MV88E6XXX_G1_VTU_DATA_MEMBER_TAG_UNMODIFIED;
+	}
+
+	err = mv88e6xxx_port_set_8021q_mode(chip, port, mode);
+	if (err)
+		return err;
+
+	/* Associate MV88E6XXX_VID_BRIDGED with MV88E6XXX_FID_BRIDGED in the
+	 * ATU by virtue of the fact that mv88e6xxx_atu_new() will pick it as
+	 * the first free FID after MV88E6XXX_FID_STANDALONE.
+	 */
+	err = mv88e6xxx_port_vlan_join(chip, port, MV88E6XXX_VID_BRIDGED,
+				       member, false);
 	if (err)
 		return err;
 
@@ -2966,7 +3001,7 @@ static int mv88e6xxx_setup_port(struct mv88e6xxx_chip *chip, int port)
 	 * database, and allow bidirectional communication between the
 	 * CPU and DSA port(s), and the other ports.
 	 */
-	err = mv88e6xxx_port_set_fid(chip, port, 0);
+	err = mv88e6xxx_port_set_fid(chip, port, MV88E6XXX_FID_STANDALONE);
 	if (err)
 		return err;
 
@@ -3156,6 +3191,10 @@ static int mv88e6xxx_setup(struct dsa_switch *ds)
 		}
 	}
 
+	err = mv88e6xxx_vtu_setup(chip);
+	if (err)
+		goto unlock;
+
 	/* Setup Switch Port Registers */
 	for (i = 0; i < mv88e6xxx_num_ports(chip); i++) {
 		if (dsa_is_unused_port(ds, i))
@@ -3182,10 +3221,6 @@ static int mv88e6xxx_setup(struct dsa_switch *ds)
 		goto unlock;
 
 	err = mv88e6xxx_phy_setup(chip);
-	if (err)
-		goto unlock;
-
-	err = mv88e6xxx_vtu_setup(chip);
 	if (err)
 		goto unlock;
 
