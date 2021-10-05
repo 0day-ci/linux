@@ -46,17 +46,6 @@ static void intel_dp_reset_lttpr_count(struct intel_dp *intel_dp)
 				    DP_LT_TUNABLE_PHY_REPEATER_FIELD_DATA_STRUCTURE_REV] = 0;
 }
 
-static const char *intel_dp_phy_name(enum drm_dp_phy dp_phy,
-				     char *buf, size_t buf_size)
-{
-	if (dp_phy == DP_PHY_DPRX)
-		snprintf(buf, buf_size, "DPRX");
-	else
-		snprintf(buf, buf_size, "LTTPR %d", dp_phy - DP_PHY_LTTPR1 + 1);
-
-	return buf;
-}
-
 static u8 *intel_dp_lttpr_phy_caps(struct intel_dp *intel_dp,
 				   enum drm_dp_phy dp_phy)
 {
@@ -67,20 +56,17 @@ static void intel_dp_read_lttpr_phy_caps(struct intel_dp *intel_dp,
 					 enum drm_dp_phy dp_phy)
 {
 	u8 *phy_caps = intel_dp_lttpr_phy_caps(intel_dp, dp_phy);
-	char phy_name[10];
-
-	intel_dp_phy_name(dp_phy, phy_name, sizeof(phy_name));
 
 	if (drm_dp_read_lttpr_phy_caps(&intel_dp->aux, dp_phy, phy_caps) < 0) {
 		drm_dbg_kms(&dp_to_i915(intel_dp)->drm,
 			    "failed to read the PHY caps for %s\n",
-			    phy_name);
+			    drm_dp_phy_name(dp_phy));
 		return;
 	}
 
 	drm_dbg_kms(&dp_to_i915(intel_dp)->drm,
 		    "%s PHY capabilities: %*ph\n",
-		    phy_name,
+		    drm_dp_phy_name(dp_phy),
 		    (int)sizeof(intel_dp->lttpr_phy_caps[0]),
 		    phy_caps);
 }
@@ -443,7 +429,6 @@ void intel_dp_set_signal_levels(struct intel_dp *intel_dp,
 {
 	struct intel_encoder *encoder = &dp_to_dig_port(intel_dp)->base;
 	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
-	char phy_name[10];
 
 	drm_dbg_kms(&dev_priv->drm, "[ENCODER:%d:%s] lanes: %d, "
 		    "vswing levels: " TRAIN_SET_FMT ", "
@@ -452,7 +437,7 @@ void intel_dp_set_signal_levels(struct intel_dp *intel_dp,
 		    crtc_state->lane_count,
 		    TRAIN_SET_VSWING_ARGS(intel_dp->train_set),
 		    TRAIN_SET_PREEMPH_ARGS(intel_dp->train_set),
-		    intel_dp_phy_name(dp_phy, phy_name, sizeof(phy_name)));
+		    drm_dp_phy_name(dp_phy));
 
 	if (intel_dp_phy_is_downstream_of_source(intel_dp, dp_phy))
 		encoder->set_signal_levels(encoder, crtc_state);
@@ -849,7 +834,6 @@ intel_dp_link_train_phy(struct intel_dp *intel_dp,
 			enum drm_dp_phy dp_phy)
 {
 	struct intel_connector *intel_connector = intel_dp->attached_connector;
-	char phy_name[10];
 	bool ret = false;
 
 	if (!intel_dp_link_training_clock_recovery(intel_dp, crtc_state, dp_phy))
@@ -867,7 +851,7 @@ out:
 		    intel_connector->base.name,
 		    ret ? "passed" : "failed",
 		    crtc_state->port_clock, crtc_state->lane_count,
-		    intel_dp_phy_name(dp_phy, phy_name, sizeof(phy_name)));
+		    drm_dp_phy_name(dp_phy));
 
 	return ret;
 }
