@@ -1341,6 +1341,14 @@ static int intel_mrfld_mmc_probe_slot(struct sdhci_pci_slot *slot)
 					 MMC_CAP_1_8V_DDR;
 		break;
 	case INTEL_MRFLD_SD:
+		slot->cd_idx = 0;
+		/*
+		 * There are two PCB designs of SD card slot with the opposite
+		 * card detection sense. Quirk this out by ignoring GPIO state
+		 * completely.
+		 */
+		slot->host->quirks2 |= SDHCI_QUIRK_CARD_DETECTION_IF_GPIO_LOW |
+				       SDHCI_QUIRK_CARD_DETECTION_IF_GPIO_HIGH;
 		slot->host->quirks2 |= SDHCI_QUIRK2_NO_1_8_V;
 		break;
 	case INTEL_MRFLD_SDIO:
