@@ -424,7 +424,6 @@ static inline bool pci_dev_is_added(const struct pci_dev *dev)
 #define AER_MAX_MULTI_ERR_DEVICES	5	/* Not likely to have more */
 
 struct aer_err_info {
-	struct pci_dev *dev[AER_MAX_MULTI_ERR_DEVICES];
 	int error_dev_num;
 
 	u16	id;
@@ -438,6 +437,18 @@ struct aer_err_info {
 	u32 status;		/* COR/UNCOR Error Status */
 	u32 mask;		/* COR/UNCOR Error Mask */
 	struct aer_header_log_regs tlp;	/* TLP Header */
+};
+
+/* Preliminary AER error information processed from Root port */
+struct aer_devices_err_info {
+	struct pci_dev *dev[AER_MAX_MULTI_ERR_DEVICES];
+	struct aer_err_info err_info;
+};
+
+/* AER information associated with each error device */
+struct aer_dev_err_info {
+	struct pci_dev *dev;
+	struct aer_err_info err_info;
 };
 
 int aer_get_device_error_info(struct pci_dev *dev, struct aer_err_info *info);
