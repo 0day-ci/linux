@@ -34,9 +34,11 @@ struct i915_lut_handle {
 
 struct drm_i915_gem_object_ops {
 	unsigned int flags;
-#define I915_GEM_OBJECT_IS_SHRINKABLE	BIT(1)
-#define I915_GEM_OBJECT_IS_PROXY	BIT(2)
-#define I915_GEM_OBJECT_NO_MMAP		BIT(3)
+#define I915_GEM_OBJECT_IS_SHRINKABLE			BIT(1)
+/* Skip the shrinker management in set_pages/unset_pages */
+#define I915_GEM_OBJECT_SELF_MANAGED_SHRINK_LIST	BIT(2)
+#define I915_GEM_OBJECT_IS_PROXY			BIT(3)
+#define I915_GEM_OBJECT_NO_MMAP				BIT(4)
 
 	/* Interface between the GEM object and its backing storage.
 	 * get_pages() is called once prior to the use of the associated set
@@ -484,6 +486,23 @@ struct drm_i915_gem_object {
 		 * and make the pages visible again.
 		 */
 		atomic_t shrink_pin;
+
+		/**
+		 * @ttm_shrinker_status: Whether TTM is currently holding a
+		 * shrink_pin for this object. Protected by the object lock.
+		 *
+		 * I915_TTM_SHRINKER_UNPINNED: We don't have an extra shrink_pin
+		 * for this object. The underlying pages or ttm_tt is using
+		 * shmem pages underneath, and as such this object might be
+		 * currently visible to the shrinker.
+		 *
+		 * I915_TTM_SHRINKER_PINNED: We are holding shrink_pin for this
+		 * object, which prevents the shrinker from seeing this object.
+		 * The object is not currently using shmem pages undearneath.
+		 */
+#define I915_TTM_SHRINKER_UNPINNED 1
+#define I915_TTM_SHRINKER_PINNED   2
+		int ttm_shrinker_status;
 
 		/**
 		 * Priority list of potential placements for this object.
