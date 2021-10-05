@@ -717,13 +717,8 @@ static void wdtpci_remove_one(struct pci_dev *pdev)
 
 
 static const struct pci_device_id wdtpci_pci_tbl[] = {
-	{
-		.vendor	   = PCI_VENDOR_ID_ACCESSIO,
-		.device	   = PCI_DEVICE_ID_ACCESSIO_WDG_CSM,
-		.subvendor = PCI_ANY_ID,
-		.subdevice = PCI_ANY_ID,
-	},
-	{ 0, }, /* terminate list */
+	{ PCI_DEVICE(PCI_VENDOR_ID_ACCESIO, PCI_DEVICE_ID_ACCESIO_WDG_CSM) },
+	{ } /* terminate list */
 };
 MODULE_DEVICE_TABLE(pci, wdtpci_pci_tbl);
 
