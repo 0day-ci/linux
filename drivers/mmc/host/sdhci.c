@@ -2398,7 +2398,7 @@ EXPORT_SYMBOL_GPL(sdhci_set_ios);
 static int sdhci_get_cd(struct mmc_host *mmc)
 {
 	struct sdhci_host *host = mmc_priv(mmc);
-	int gpio_cd = mmc_gpio_get_cd(mmc);
+	int gpio_cd;
 
 	if (host->flags & SDHCI_DEVICE_DEAD)
 		return 0;
@@ -2408,11 +2408,14 @@ static int sdhci_get_cd(struct mmc_host *mmc)
 		return 1;
 
 	/*
-	 * Try slot gpio detect, if defined it take precedence
-	 * over build in controller functionality
+	 * Try slot GPIO detect, if defined it take precedence
+	 * over build in controller functionality.
 	 */
-	if (gpio_cd >= 0)
-		return !!gpio_cd;
+	gpio_cd = mmc_gpio_get_cd(mmc);
+	if (gpio_cd == 0 && !(host->quirks2 & SDHCI_QUIRK_CARD_DETECTION_IF_GPIO_LOW))
+		return 0;
+	if (gpio_cd > 0 && !(host->quirks2 & SDHCI_QUIRK_CARD_DETECTION_IF_GPIO_HIGH))
+		return 1;
 
 	/* If polling, assume that the card is always present. */
 	if (host->quirks & SDHCI_QUIRK_BROKEN_CARD_DETECTION)

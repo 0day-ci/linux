@@ -464,6 +464,10 @@ struct sdhci_host {
 #define SDHCI_QUIRK2_CLOCK_DIV_ZERO_BROKEN		(1<<15)
 /* Controller has CRC in 136 bit Command Response */
 #define SDHCI_QUIRK2_RSP_136_HAS_CRC			(1<<16)
+/* Controller requires additional card detection test on GPIO low */
+#define SDHCI_QUIRK_CARD_DETECTION_IF_GPIO_LOW		(1<<17)
+/* Controller requires additional card detection test on GPIO high */
+#define SDHCI_QUIRK_CARD_DETECTION_IF_GPIO_HIGH		(1<<18)
 /*
  * Disable HW timeout if the requested timeout is more than the maximum
  * obtainable timeout.
