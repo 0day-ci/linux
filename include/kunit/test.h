@@ -607,7 +607,7 @@ void kunit_remove_resource(struct kunit *test, struct kunit_resource *res);
  * @test: The test context object.
  * @n: number of elements.
  * @size: The size in bytes of the desired memory.
- * @gfp: flags passed to underlying kmalloc().
+ * @flags: gfp flags passed to underlying kmalloc().
  *
  * Just like `kmalloc_array(...)`, except the allocation is managed by the test case
  * and is automatically cleaned up after the test case concludes. See &struct
@@ -653,7 +653,7 @@ static inline void *kunit_kzalloc(struct kunit *test, size_t size, gfp_t gfp)
  * @test: The test context object.
  * @n: number of elements.
  * @size: The size in bytes of the desired memory.
- * @gfp: flags passed to underlying kmalloc().
+ * @flags: gfp flags passed to underlying kmalloc().
  *
  * See kcalloc() and kunit_kmalloc_array() for more information.
  */
