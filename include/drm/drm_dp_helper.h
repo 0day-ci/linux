@@ -2095,6 +2095,8 @@ bool drm_dp_read_sink_count_cap(struct drm_connector *connector,
 				const struct drm_dp_desc *desc);
 int drm_dp_read_sink_count(struct drm_dp_aux *aux);
 
+const char *drm_dp_phy_name(enum drm_dp_phy dp_phy);
+
 int drm_dp_read_lttpr_common_caps(struct drm_dp_aux *aux,
 				  u8 caps[DP_LTTPR_COMMON_CAP_SIZE]);
 int drm_dp_read_lttpr_phy_caps(struct drm_dp_aux *aux,
