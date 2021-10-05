@@ -673,7 +673,7 @@ static int __wakeup_tracer_init(struct trace_array *tr)
 
 	tr->max_latency = 0;
 	wakeup_trace = tr;
-	ftrace_init_array_ops(tr, wakeup_tracer_call);
+	ftrace_init_array_ops(tr, CAST_FTRACE_FUNC(wakeup_tracer_call));
 	start_wakeup_tracer(tr);
 
 	wakeup_busy = true;

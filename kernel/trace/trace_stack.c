@@ -317,7 +317,7 @@ stack_trace_call(unsigned long ip, unsigned long parent_ip,
 
 static struct ftrace_ops trace_ops __read_mostly =
 {
-	.func = stack_trace_call,
+	.func = CAST_FTRACE_FUNC(stack_trace_call),
 };
 
 static ssize_t

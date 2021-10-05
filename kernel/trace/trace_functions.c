@@ -62,7 +62,7 @@ int ftrace_allocate_ftrace_ops(struct trace_array *tr)
 		return -ENOMEM;
 
 	/* Currently only the non stack version is supported */
-	ops->func = function_trace_call;
+	ops->func = CAST_FTRACE_FUNC(function_trace_call);
 	ops->flags = FTRACE_OPS_FL_PID;
 
 	tr->ops = ops;
@@ -105,13 +105,13 @@ static ftrace_func_t select_trace_function(u32 flags_val)
 {
 	switch (flags_val & TRACE_FUNC_OPT_MASK) {
 	case TRACE_FUNC_NO_OPTS:
-		return function_trace_call;
+		return CAST_FTRACE_FUNC(function_trace_call);
 	case TRACE_FUNC_OPT_STACK:
-		return function_stack_trace_call;
+		return CAST_FTRACE_FUNC(function_stack_trace_call);
 	case TRACE_FUNC_OPT_NO_REPEATS:
-		return function_no_repeats_trace_call;
+		return CAST_FTRACE_FUNC(function_no_repeats_trace_call);
 	case TRACE_FUNC_OPT_STACK | TRACE_FUNC_OPT_NO_REPEATS:
-		return function_stack_no_repeats_trace_call;
+		return CAST_FTRACE_FUNC(function_stack_no_repeats_trace_call);
 	default:
 		return NULL;
 	}

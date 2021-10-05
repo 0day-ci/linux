@@ -484,7 +484,7 @@ static int perf_ftrace_function_register(struct perf_event *event)
 {
 	struct ftrace_ops *ops = &event->ftrace_ops;
 
-	ops->func    = perf_ftrace_function_call;
+	ops->func    = CAST_FTRACE_FUNC(perf_ftrace_function_call);
 	ops->private = (void *)(unsigned long)nr_cpu_ids;
 
 	return register_ftrace_function(ops);

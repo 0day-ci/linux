@@ -114,8 +114,15 @@ static __always_inline struct pt_regs *ftrace_get_regs(struct ftrace_regs *fregs
 	return arch_ftrace_get_regs(fregs);
 }
 
+#if ARCH_SUPPORTS_FTRACE_OPS
 typedef void (*ftrace_func_t)(unsigned long ip, unsigned long parent_ip,
 			      struct ftrace_ops *op, struct ftrace_regs *fregs);
+#else
+typedef void (*ftrace_func_t)(unsigned long ip, unsigned long parent_ip);
+#endif
+
+typedef void (*ftrace_func_base_t)(void);
+#define CAST_FTRACE_FUNC(f) ((ftrace_func_t)((ftrace_func_base_t)(f)))
 
 ftrace_func_t ftrace_ops_get_func(struct ftrace_ops *ops);
 

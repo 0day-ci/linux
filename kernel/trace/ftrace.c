@@ -79,7 +79,7 @@ enum {
 };
 
 struct ftrace_ops ftrace_list_end __read_mostly = {
-	.func		= ftrace_stub,
+	.func		= CAST_FTRACE_FUNC(ftrace_stub),
 	.flags		= FTRACE_OPS_FL_STUB,
 	INIT_OPS_HASH(ftrace_list_end)
 };
@@ -116,7 +116,7 @@ static int ftrace_disabled __read_mostly;
 DEFINE_MUTEX(ftrace_lock);
 
 struct ftrace_ops __rcu *ftrace_ops_list __read_mostly = &ftrace_list_end;
-ftrace_func_t ftrace_trace_function __read_mostly = ftrace_stub;
+ftrace_func_t ftrace_trace_function __read_mostly = CAST_FTRACE_FUNC(ftrace_stub);
 struct ftrace_ops global_ops;
 
 #if ARCH_SUPPORTS_FTRACE_OPS
@@ -142,6 +142,7 @@ static inline void ftrace_ops_init(struct ftrace_ops *ops)
 static void ftrace_pid_func(unsigned long ip, unsigned long parent_ip,
 			    struct ftrace_ops *op, struct ftrace_regs *fregs)
 {
+#if ARCH_SUPPORTS_FTRACE_OPS
 	struct trace_array *tr = op->private;
 	int pid;
 
@@ -155,6 +156,7 @@ static void ftrace_pid_func(unsigned long ip, unsigned long parent_ip,
 	}
 
 	op->saved_func(ip, parent_ip, op, fregs);
+#endif
 }
 
 static void ftrace_sync_ipi(void *data)
@@ -190,7 +192,7 @@ static void update_ftrace_function(void)
 
 	/* If there's no ftrace_ops registered, just call the stub function */
 	if (set_function_trace_op == &ftrace_list_end) {
-		func = ftrace_stub;
+		func = CAST_FTRACE_FUNC(ftrace_stub);
 
 	/*
 	 * If we are at the end of the list and this ops is
@@ -332,7 +334,7 @@ int __register_ftrace_function(struct ftrace_ops *ops)
 	ops->saved_func = ops->func;
 
 	if (ftrace_pids_enabled(ops))
-		ops->func = ftrace_pid_func;
+		ops->func = CAST_FTRACE_FUNC(ftrace_pid_func);
 
 	ftrace_update_trampoline(ops);
 
@@ -367,13 +369,13 @@ static void ftrace_update_pid_func(void)
 	struct ftrace_ops *op;
 
 	/* Only do something if we are tracing something */
-	if (ftrace_trace_function == ftrace_stub)
+	if (ftrace_trace_function == CAST_FTRACE_FUNC(ftrace_stub))
 		return;
 
 	do_for_each_ftrace_op(op, ftrace_ops_list) {
 		if (op->flags & FTRACE_OPS_FL_PID) {
 			op->func = ftrace_pids_enabled(op) ?
-				ftrace_pid_func : op->saved_func;
+				CAST_FTRACE_FUNC(ftrace_pid_func) : op->saved_func;
 			ftrace_update_trampoline(op);
 		}
 	} while_for_each_ftrace_op(op);
@@ -1036,7 +1038,7 @@ static const struct ftrace_hash empty_hash = {
 #define EMPTY_HASH	((struct ftrace_hash *)&empty_hash)
 
 struct ftrace_ops global_ops = {
-	.func				= ftrace_stub,
+	.func				= CAST_FTRACE_FUNC(ftrace_stub),
 	.local_hash.notrace_hash	= EMPTY_HASH,
 	.local_hash.filter_hash		= EMPTY_HASH,
 	INIT_OPS_HASH(global_ops)
@@ -4545,7 +4547,7 @@ register_ftrace_function_probe(char *glob, struct trace_array *tr,
 			return -ENOMEM;
 		}
 		probe->probe_ops = probe_ops;
-		probe->ops.func = function_trace_probe_call;
+		probe->ops.func = CAST_FTRACE_FUNC(function_trace_probe_call);
 		probe->tr = tr;
 		ftrace_ops_init(&probe->ops);
 		list_add(&probe->list, &tr->func_probes);
@@ -6956,7 +6958,7 @@ void ftrace_init_array_ops(struct trace_array *tr, ftrace_func_t func)
 {
 	/* If we filter on pids, update to use the pid function */
 	if (tr->flags & TRACE_ARRAY_FL_GLOBAL) {
-		if (WARN_ON(tr->ops->func != ftrace_stub))
+		if (WARN_ON(tr->ops->func != CAST_FTRACE_FUNC(ftrace_stub)))
 			printk("ftrace ops had %pS for function\n",
 			       tr->ops->func);
 	}
@@ -6966,7 +6968,7 @@ void ftrace_init_array_ops(struct trace_array *tr, ftrace_func_t func)
 
 void ftrace_reset_array_ops(struct trace_array *tr)
 {
-	tr->ops->func = ftrace_stub;
+	tr->ops->func = CAST_FTRACE_FUNC(ftrace_stub);
 }
 
 static nokprobe_inline void
@@ -7006,7 +7008,11 @@ __ftrace_ops_list_func(unsigned long ip, unsigned long parent_ip,
 				pr_warn("op=%p %pS\n", op, op);
 				goto out;
 			}
+#if ARCH_SUPPORTS_FTRACE_OPS
 			op->func(ip, parent_ip, op, fregs);
+#else
+			op->func(ip, parent_ip);
+#endif
 		}
 	} while_for_each_ftrace_op(op);
 out:
@@ -7050,6 +7056,7 @@ NOKPROBE_SYMBOL(ftrace_ops_no_ops);
 static void ftrace_ops_assist_func(unsigned long ip, unsigned long parent_ip,
 				   struct ftrace_ops *op, struct ftrace_regs *fregs)
 {
+#if ARCH_SUPPORTS_FTRACE_OPS
 	int bit;
 
 	bit = trace_test_and_set_recursion(ip, parent_ip, TRACE_LIST_START, TRACE_LIST_MAX);
@@ -7063,6 +7070,7 @@ static void ftrace_ops_assist_func(unsigned long ip, unsigned long parent_ip,
 
 	preempt_enable_notrace();
 	trace_clear_recursion(bit);
+#endif
 }
 NOKPROBE_SYMBOL(ftrace_ops_assist_func);
 
@@ -7085,7 +7093,7 @@ ftrace_func_t ftrace_ops_get_func(struct ftrace_ops *ops)
 	 */
 	if (ops->flags & (FTRACE_OPS_FL_RECURSION |
 			  FTRACE_OPS_FL_RCU))
-		return ftrace_ops_assist_func;
+		return CAST_FTRACE_FUNC(ftrace_ops_assist_func);
 
 	return ops->func;
 }
@@ -7521,7 +7529,7 @@ void ftrace_kill(void)
 {
 	ftrace_disabled = 1;
 	ftrace_enabled = 0;
-	ftrace_trace_function = ftrace_stub;
+	ftrace_trace_function = CAST_FTRACE_FUNC(ftrace_stub);
 }
 
 /**
@@ -7622,7 +7630,7 @@ ftrace_enable_sysctl(struct ctl_table *table, int write,
 		}
 
 		/* stopping ftrace calls (just send to ftrace_stub) */
-		ftrace_trace_function = ftrace_stub;
+		ftrace_trace_function = CAST_FTRACE_FUNC(ftrace_stub);
 
 		ftrace_shutdown_sysctl();
 	}
