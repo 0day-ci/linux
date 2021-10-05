@@ -347,8 +347,9 @@ static int __rpm_callback(int (*cb)(struct device *), struct device *dev)
 {
 	int retval = 0, idx;
 	bool use_links = dev->power.links_count > 0;
+	bool irq_safe = dev->power.irq_safe && !IS_ENABLED(CONFIG_PREEMPT_RT);
 
-	if (dev->power.irq_safe) {
+	if (irq_safe) {
 		spin_unlock(&dev->power.lock);
 	} else {
 		spin_unlock_irq(&dev->power.lock);
@@ -376,7 +377,7 @@ static int __rpm_callback(int (*cb)(struct device *), struct device *dev)
 	if (cb)
 		retval = cb(dev);
 
-	if (dev->power.irq_safe) {
+	if (irq_safe) {
 		spin_lock(&dev->power.lock);
 	} else {
 		/*
@@ -596,7 +597,7 @@ static int rpm_suspend(struct device *dev, int rpmflags)
 			goto out;
 		}
 
-		if (dev->power.irq_safe) {
+		if (dev->power.irq_safe && !IS_ENABLED(CONFIG_PREEMPT_RT)) {
 			spin_unlock(&dev->power.lock);
 
 			cpu_relax();
@@ -777,7 +778,7 @@ static int rpm_resume(struct device *dev, int rpmflags)
 			goto out;
 		}
 
-		if (dev->power.irq_safe) {
+		if (dev->power.irq_safe && !IS_ENABLED(CONFIG_PREEMPT_RT)) {
 			spin_unlock(&dev->power.lock);
 
 			cpu_relax();
