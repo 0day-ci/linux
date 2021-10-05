@@ -292,6 +292,9 @@ struct vmstorage_protocol_version {
 #define STORAGE_CHANNEL_REMOVABLE_FLAG		0x1
 #define STORAGE_CHANNEL_EMULATED_IDE_FLAG	0x2
 
+/* Lower bound on the size of unsolicited packets with ID of 0 */
+#define VSTOR_MIN_UNSOL_PKT_SIZE		48
+
 struct vstor_packet {
 	/* Requested operation type */
 	enum vstor_packet_operation operation;
@@ -1285,11 +1288,15 @@ static void storvsc_on_channel_callback(void *context)
 	foreach_vmbus_pkt(desc, channel) {
 		struct vstor_packet *packet = hv_pkt_data(desc);
 		struct storvsc_cmd_request *request = NULL;
+		u32 pktlen = hv_pkt_datalen(desc);
 		u64 rqst_id = desc->trans_id;
+		u32 minlen = rqst_id ? sizeof(struct vstor_packet) -
+			stor_device->vmscsi_size_delta : VSTOR_MIN_UNSOL_PKT_SIZE;
 
-		if (hv_pkt_datalen(desc) < sizeof(struct vstor_packet) -
-				stor_device->vmscsi_size_delta) {
-			dev_err(&device->device, "Invalid packet len\n");
+		if (pktlen < minlen) {
+			dev_err(&device->device,
+				"Invalid pkt: id=%llu, len=%u, minlen=%u\n",
+				rqst_id, pktlen, minlen);
 			continue;
 		}
 
