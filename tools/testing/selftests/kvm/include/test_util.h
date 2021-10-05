@@ -59,6 +59,8 @@ void test_assert(bool exp, const char *exp_str,
 #define TEST_FAIL(fmt, ...) \
 	TEST_ASSERT(false, fmt, ##__VA_ARGS__)
 
+#define	KVM_DEBUGFS_PATH	"/sys/kernel/debug/kvm"
+
 size_t parse_size(const char *size);
 
 int64_t timespec_to_ns(struct timespec ts);
