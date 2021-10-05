@@ -616,28 +616,6 @@ static int intel_select_drive_strength(struct mmc_card *card,
 	return intel_host->drv_strength;
 }
 
-static int bxt_get_cd(struct mmc_host *mmc)
-{
-	int gpio_cd = mmc_gpio_get_cd(mmc);
-	struct sdhci_host *host = mmc_priv(mmc);
-	unsigned long flags;
-	int ret = 0;
-
-	if (!gpio_cd)
-		return 0;
-
-	spin_lock_irqsave(&host->lock, flags);
-
-	if (host->flags & SDHCI_DEVICE_DEAD)
-		goto out;
-
-	ret = !!(sdhci_readl(host, SDHCI_PRESENT_STATE) & SDHCI_CARD_PRESENT);
-out:
-	spin_unlock_irqrestore(&host->lock, flags);
-
-	return ret;
-}
-
 #define SDHCI_INTEL_PWR_TIMEOUT_CNT	20
 #define SDHCI_INTEL_PWR_TIMEOUT_UDELAY	100
 
@@ -1171,7 +1149,7 @@ static int byt_sd_probe_slot(struct sdhci_pci_slot *slot)
 	    slot->chip->pdev->device == PCI_DEVICE_ID_INTEL_BXTM_SD ||
 	    slot->chip->pdev->device == PCI_DEVICE_ID_INTEL_APL_SD ||
 	    slot->chip->pdev->device == PCI_DEVICE_ID_INTEL_GLK_SD)
-		slot->host->mmc_host_ops.get_cd = bxt_get_cd;
+		slot->host->quirks2 |= SDHCI_QUIRK_CARD_DETECTION_IF_GPIO_HIGH;
 
 	if (slot->chip->pdev->subsystem_vendor == PCI_VENDOR_ID_NI &&
 	    slot->chip->pdev->subsystem_device == PCI_SUBDEVICE_ID_NI_78E3)
