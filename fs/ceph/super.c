@@ -104,6 +104,12 @@ static int ceph_statfs(struct dentry *dentry, struct kstatfs *buf)
 	       le64_to_cpu(*((__le64 *)&monc->monmap->fsid + 1));
 	mutex_unlock(&monc->mutex);
 
+	/* mix the fsid down to 32 bits */
+	fsid = *(u32 *)&fsid ^ *((u32 *)&fsid + 1);
+
+	/* fold the fs_cluster_id into the upper bits */
+	fsid |= ((u64)monc->fs_cluster_id << 32);
+
 	buf->f_fsid = u64_to_fsid(fsid);
 
 	return 0;
