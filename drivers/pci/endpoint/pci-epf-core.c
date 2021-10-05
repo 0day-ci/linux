@@ -35,17 +35,19 @@ struct config_group *pci_epf_type_add_cfs(struct pci_epf *epf,
 					  struct config_group *group)
 {
 	struct config_group *epf_type_group;
+	struct pci_epf_driver *epf_driver;
 
-	if (!epf->driver) {
+	if (!epf->dev.driver) {
 		dev_err(&epf->dev, "epf device not bound to driver\n");
 		return NULL;
 	}
 
-	if (!epf->driver->ops->add_cfs)
+	epf_driver = to_pci_epf_driver(epf->dev.driver);
+	if (!epf_driver->ops->add_cfs)
 		return NULL;
 
 	mutex_lock(&epf->lock);
-	epf_type_group = epf->driver->ops->add_cfs(epf, group);
+	epf_type_group = epf_driver->ops->add_cfs(epf, group);
 	mutex_unlock(&epf->lock);
 
 	return epf_type_group;
@@ -63,21 +65,25 @@ EXPORT_SYMBOL_GPL(pci_epf_type_add_cfs);
 void pci_epf_unbind(struct pci_epf *epf)
 {
 	struct pci_epf *epf_vf;
+	struct pci_epf_driver *epf_driver;
 
-	if (!epf->driver) {
+	if (!epf->dev.driver) {
 		dev_WARN(&epf->dev, "epf device not bound to driver\n");
 		return;
 	}
 
 	mutex_lock(&epf->lock);
 	list_for_each_entry(epf_vf, &epf->pci_vepf, list) {
-		if (epf_vf->is_bound)
-			epf_vf->driver->ops->unbind(epf_vf);
+		if (epf_vf->is_bound) {
+			epf_driver = to_pci_epf_driver(epf_vf->dev.driver);
+			epf_driver->ops->unbind(epf_vf);
+		}
 	}
+	epf_driver = to_pci_epf_driver(epf->dev.driver);
 	if (epf->is_bound)
-		epf->driver->ops->unbind(epf);
+		epf_driver->ops->unbind(epf);
 	mutex_unlock(&epf->lock);
-	module_put(epf->driver->owner);
+	module_put(epf_driver->owner);
 }
 EXPORT_SYMBOL_GPL(pci_epf_unbind);
 
@@ -94,18 +100,21 @@ int pci_epf_bind(struct pci_epf *epf)
 	struct pci_epf *epf_vf;
 	u8 func_no, vfunc_no;
 	struct pci_epc *epc;
+	struct pci_epf_driver *epf_driver;
 	int ret;
 
-	if (!epf->driver) {
+	if (!epf->dev.driver) {
 		dev_WARN(dev, "epf device not bound to driver\n");
 		return -EINVAL;
 	}
 
-	if (!try_module_get(epf->driver->owner))
+	epf_driver = to_pci_epf_driver(epf->dev.driver);
+	if (!try_module_get(epf_driver->owner))
 		return -EAGAIN;
 
 	mutex_lock(&epf->lock);
 	list_for_each_entry(epf_vf, &epf->pci_vepf, list) {
+		struct pci_epf_driver *epf_vf_driver;
 		vfunc_no = epf_vf->vfunc_no;
 
 		if (vfunc_no < 1) {
@@ -152,13 +161,14 @@ int pci_epf_bind(struct pci_epf *epf)
 		epf_vf->sec_epc_func_no = epf->sec_epc_func_no;
 		epf_vf->epc = epf->epc;
 		epf_vf->sec_epc = epf->sec_epc;
-		ret = epf_vf->driver->ops->bind(epf_vf);
+		epf_vf_driver = to_pci_epf_driver(epf_vf->dev.driver);
+		ret = epf_vf_driver->ops->bind(epf_vf);
 		if (ret)
 			goto ret;
 		epf_vf->is_bound = true;
 	}
 
-	ret = epf->driver->ops->bind(epf);
+	ret = epf_driver->ops->bind(epf);
 	if (ret)
 		goto ret;
 	epf->is_bound = true;
@@ -524,8 +534,6 @@ static int pci_epf_device_probe(struct device *dev)
 	if (!driver->probe)
 		return -ENODEV;
 
-	epf->driver = driver;
-
 	return driver->probe(epf);
 }
 
@@ -536,7 +544,6 @@ static void pci_epf_device_remove(struct device *dev)
 
 	if (driver->remove)
 		driver->remove(epf);
-	epf->driver = NULL;
 }
 
 static struct bus_type pci_epf_bus_type = {

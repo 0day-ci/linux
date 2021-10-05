@@ -152,7 +152,6 @@ struct pci_epf {
 
 	struct pci_epc		*epc;
 	struct pci_epf		*epf_pf;
-	struct pci_epf_driver	*driver;
 	struct list_head	list;
 	struct notifier_block   nb;
 	/* mutex to protect against concurrent access of pci_epf_ops */
