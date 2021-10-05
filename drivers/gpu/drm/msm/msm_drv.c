@@ -1241,9 +1241,16 @@ static int add_components_mdp(struct device *mdp_dev,
 	return 0;
 }
 
-static int compare_name_mdp(struct device *dev, void *data)
+static int find_mdp_node(struct device *dev, void *data)
 {
-	return (strstr(dev_name(dev), "mdp") != NULL);
+	return of_device_is_compatible(dev->of_node, "qcom,mdp4") ||
+		of_device_is_compatible(dev->of_node, "qcom,mdp5") ||
+		of_device_is_compatible(dev->of_node, "qcom,mdss_mdp") ||
+		of_device_is_compatible(dev->of_node, "qcom,sdm845-dpu") ||
+		of_device_is_compatible(dev->of_node, "qcom,sm8150-dpu") ||
+		of_device_is_compatible(dev->of_node, "qcom,sm8250-dpu") ||
+		of_device_is_compatible(dev->of_node, "qcom,sc7180-dpu") ||
+		of_device_is_compatible(dev->of_node, "qcom,sc7280-dpu");
 }
 
 static int add_display_components(struct platform_device *pdev,
@@ -1268,7 +1275,7 @@ static int add_display_components(struct platform_device *pdev,
 			return ret;
 		}
 
-		mdp_dev = device_find_child(dev, NULL, compare_name_mdp);
+		mdp_dev = device_find_child(dev, NULL, find_mdp_node);
 		if (!mdp_dev) {
 			DRM_DEV_ERROR(dev, "failed to find MDSS MDP node\n");
 			of_platform_depopulate(dev);
