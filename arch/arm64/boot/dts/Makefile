@@ -8,6 +8,7 @@ subdir-y += amlogic
 subdir-y += apm
 subdir-y += apple
 subdir-y += arm
+subdir-y += asem
 subdir-y += bitmain
 subdir-y += broadcom
 subdir-y += cavium

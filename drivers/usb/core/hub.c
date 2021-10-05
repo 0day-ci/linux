@@ -5577,7 +5577,8 @@ static void port_event(struct usb_hub *hub, int port1)
 		msleep(100);	/* Cool down */
 		hub_power_on(hub, true);
 		hub_port_status(hub, port1, &status, &unused);
-		if (status & USB_PORT_STAT_OVERCURRENT)
+		if ((status & USB_PORT_STAT_OVERCURRENT) ||
+		    !(port_dev->over_current_count % 15))
 			dev_err(&port_dev->dev, "over-current condition\n");
 	}
 
@@ -5738,7 +5739,7 @@ static void hub_event(struct work_struct *work)
 			u16 status = 0;
 			u16 unused;
 
-			dev_dbg(hub_dev, "over-current change\n");
+			dev_info(hub_dev, "over-current change\n");
 			clear_hub_feature(hdev, C_HUB_OVER_CURRENT);
 			msleep(500);	/* Cool down */
 			hub_power_on(hub, true);
