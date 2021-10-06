@@ -40,6 +40,9 @@ void drm_of_component_match_add(struct device *master,
 int drm_of_component_probe(struct device *dev,
 			   int (*compare_of)(struct device *, void *),
 			   const struct component_master_ops *m_ops);
+int drm_of_aggregate_probe(struct device *dev,
+			   int (*compare_of)(struct device *, void *),
+			   struct aggregate_driver *adrv);
 int drm_of_encoder_active_endpoint(struct device_node *node,
 				   struct drm_encoder *encoder,
 				   struct of_endpoint *endpoint);
@@ -74,6 +77,14 @@ static inline int
 drm_of_component_probe(struct device *dev,
 		       int (*compare_of)(struct device *, void *),
 		       const struct component_master_ops *m_ops)
+{
+	return -EINVAL;
+}
+
+static inline int
+drm_of_aggregate_probe(struct device *dev,
+		       int (*compare_of)(struct device *, void *),
+		       struct aggregate_driver *adrv)
 {
 	return -EINVAL;
 }
