@@ -4017,3 +4017,4 @@ cleanup 2>/dev/null
 
 printf "\nTests passed: %3d\n" ${nsuccess}
 printf "Tests failed: %3d\n"   ${nfail}
+exit $(( nfail != 0 ))
