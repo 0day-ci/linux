@@ -3695,6 +3695,8 @@ static noinline void kvmppc_run_core(struct kvmppc_vcore *vc)
 
 	srcu_read_unlock(&vc->kvm->srcu, srcu_idx);
 
+	context_tracking_guest_exit();
+
 	set_irq_happened(trap);
 
 	spin_lock(&vc->lock);
@@ -3726,9 +3728,8 @@ static noinline void kvmppc_run_core(struct kvmppc_vcore *vc)
 
 	kvmppc_set_host_core(pcpu);
 
-	guest_exit_irqoff();
-
 	local_irq_enable();
+	vtime_account_guest_exit();
 
 	/* Let secondaries go back to the offline loop */
 	for (i = 0; i < controlled_threads; ++i) {
@@ -4506,13 +4507,14 @@ int kvmhv_run_single_vcpu(struct kvm_vcpu *vcpu, u64 time_limit,
 
 	srcu_read_unlock(&kvm->srcu, srcu_idx);
 
+	context_tracking_guest_exit();
+
 	set_irq_happened(trap);
 
 	kvmppc_set_host_core(pcpu);
 
-	guest_exit_irqoff();
-
 	local_irq_enable();
+	vtime_account_guest_exit();
 
 	cpumask_clear_cpu(pcpu, &kvm->arch.cpu_in_guest);
 
