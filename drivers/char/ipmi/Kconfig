@@ -152,13 +152,15 @@ config IPMI_KCS_BMC_SERIO
 	  called kcs_bmc_serio.
 
 config BT_IPMI_BMC
-	depends on ARCH_ASPEED || COMPILE_TEST
+	depends on ARCH_ASPEED || PPC_MICROWATT || COMPILE_TEST
 	depends on REGMAP && REGMAP_MMIO && MFD_SYSCON
 	tristate "BT IPMI bmc driver"
 	help
 	  Provides a driver for the BT (Block Transfer) IPMI interface
-	  found on Aspeed SOCs (AST2400 and AST2500). The driver
-	  implements the BMC side of the BT interface.
+	  found on Aspeed SOCs (AST2400 and AST2500) as well as the OpenPOWER
+	  LPC peripheral macro at
+	  <https://github.com/OpenPOWERFoundation/lpcperipheral>
+	  The driver implements the BMC side of the BT interface.
 
 config IPMB_DEVICE_INTERFACE
 	tristate 'IPMB Interface handler'
