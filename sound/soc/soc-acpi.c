@@ -8,6 +8,25 @@
 #include <linux/module.h>
 #include <sound/soc-acpi.h>
 
+static bool snd_soc_acpi_id_present(struct snd_soc_acpi_mach *machine)
+{
+	struct snd_soc_acpi_codecs *id_alt = machine->id_alt;
+	int i;
+
+	if (acpi_dev_present(machine->id, NULL, -1))
+		return true;
+
+	if (id_alt == NULL)
+		return false;
+
+	for (i = 0; i < id_alt->num_codecs; i++) {
+		if (acpi_dev_present(id_alt->codecs[i], NULL, -1))
+			return true;
+	}
+
+	return false;
+}
+
 struct snd_soc_acpi_mach *
 snd_soc_acpi_find_machine(struct snd_soc_acpi_mach *machines)
 {
@@ -15,7 +34,7 @@ snd_soc_acpi_find_machine(struct snd_soc_acpi_mach *machines)
 	struct snd_soc_acpi_mach *mach_alt;
 
 	for (mach = machines; mach->id[0]; mach++) {
-		if (acpi_dev_present(mach->id, NULL, -1)) {
+		if (snd_soc_acpi_id_present(mach) != false) {
 			if (mach->machine_quirk) {
 				mach_alt = mach->machine_quirk(mach);
 				if (!mach_alt)
