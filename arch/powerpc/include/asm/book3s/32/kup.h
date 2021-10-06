@@ -80,7 +80,7 @@ static inline void kuap_unlock(unsigned long addr, bool ool)
 		kuap_unlock_all_ool();
 }
 
-static inline void kuap_save_and_lock(struct pt_regs *regs)
+static inline void __kuap_save_and_lock(struct pt_regs *regs)
 {
 	unsigned long kuap = current->thread.kuap;
 
@@ -99,7 +99,7 @@ static inline void kuap_user_restore(struct pt_regs *regs)
 {
 }
 
-static inline void kuap_kernel_restore(struct pt_regs *regs, unsigned long kuap)
+static inline void __kuap_kernel_restore(struct pt_regs *regs, unsigned long kuap)
 {
 	if (kuap_is_disabled())
 		return;
@@ -109,7 +109,7 @@ static inline void kuap_kernel_restore(struct pt_regs *regs, unsigned long kuap)
 	kuap_unlock(regs->kuap, false);
 }
 
-static inline unsigned long kuap_get_and_assert_locked(void)
+static inline unsigned long __kuap_get_and_assert_locked(void)
 {
 	unsigned long kuap = current->thread.kuap;
 
@@ -121,13 +121,13 @@ static inline unsigned long kuap_get_and_assert_locked(void)
 	return kuap;
 }
 
-static inline void kuap_assert_locked(void)
+static inline void __kuap_assert_locked(void)
 {
-	kuap_get_and_assert_locked();
+	__kuap_get_and_assert_locked();
 }
 
-static __always_inline void allow_user_access(void __user *to, const void __user *from,
-					      u32 size, unsigned long dir)
+static __always_inline void __allow_user_access(void __user *to, const void __user *from,
+						u32 size, unsigned long dir)
 {
 	if (kuap_is_disabled())
 		return;
@@ -141,7 +141,7 @@ static __always_inline void allow_user_access(void __user *to, const void __user
 	kuap_unlock_one((__force u32)to);
 }
 
-static __always_inline void prevent_user_access(unsigned long dir)
+static __always_inline void __prevent_user_access(unsigned long dir)
 {
 	u32 kuap = current->thread.kuap;
 
@@ -157,7 +157,7 @@ static __always_inline void prevent_user_access(unsigned long dir)
 	kuap_lock(kuap, true);
 }
 
-static inline unsigned long prevent_user_access_return(void)
+static inline unsigned long __prevent_user_access_return(void)
 {
 	unsigned long flags = current->thread.kuap;
 
@@ -172,7 +172,7 @@ static inline unsigned long prevent_user_access_return(void)
 	return flags;
 }
 
-static inline void restore_user_access(unsigned long flags)
+static inline void __restore_user_access(unsigned long flags)
 {
 	if (kuap_is_disabled())
 		return;
@@ -184,7 +184,7 @@ static inline void restore_user_access(unsigned long flags)
 }
 
 static inline bool
-bad_kuap_fault(struct pt_regs *regs, unsigned long address, bool is_write)
+__bad_kuap_fault(struct pt_regs *regs, unsigned long address, bool is_write)
 {
 	unsigned long kuap = regs->kuap;
 
