@@ -112,6 +112,7 @@ static void drain_openssl_errors(void)
 	} while(0)
 
 static const char *key_pass;
+static const char *pkcs11_module;
 
 static int pem_pw_cb(char *buf, int len, int w, void *v)
 {
@@ -150,6 +151,10 @@ static EVP_PKEY *read_private_key(const char *private_key_name)
 		if (key_pass)
 			ERR(!ENGINE_ctrl_cmd_string(e, "PIN", key_pass, 0),
 			    "Set PKCS#11 PIN");
+		if (pkcs11_module)
+			ERR(!ENGINE_ctrl_cmd_string(e, "MODULE_PATH",
+			    pkcs11_module, 0),
+			    "Set PKCS#11 module");
 		private_key = ENGINE_load_private_key(e, private_key_name,
 						      NULL, NULL);
 		ERR(!private_key, "%s", private_key_name);
@@ -234,6 +239,7 @@ int main(int argc, char **argv)
 	ERR_clear_error();
 
 	key_pass = getenv("KBUILD_SIGN_PIN");
+	pkcs11_module = getenv("KBUILD_PKCS11_MODULE");
 
 #ifndef USE_PKCS7
 	use_signed_attrs = CMS_NOATTR;

@@ -230,7 +230,8 @@ doesn't, you should make sure that hash algorithm is either built into the
 kernel or can be loaded without requiring itself.
 
 If the private key requires a passphrase or PIN, it can be provided in the
-$KBUILD_SIGN_PIN environment variable.
+$KBUILD_SIGN_PIN environment variable. If you want to specify non-default
+PKCS11 module you can define it via $KBUILD_PKCS11_MODULE variable.
 
 
 ============================

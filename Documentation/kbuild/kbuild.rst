@@ -223,6 +223,11 @@ KBUILD_SIGN_PIN
 This variable allows a passphrase or PIN to be passed to the sign-file
 utility when signing kernel modules, if the private key requires such.
 
+KBUILD_PKCS11_MODULE
+---------------
+This variable allows to specify PKCS11 module to be passed to the
+sign-file utility when signing kernel modules with PKCS11 engine.
+
 KBUILD_MODPOST_WARN
 -------------------
 KBUILD_MODPOST_WARN can be set to avoid errors in case of undefined
