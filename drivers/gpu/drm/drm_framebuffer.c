@@ -292,7 +292,8 @@ drm_internal_framebuffer_create(struct drm_device *dev,
 	struct drm_framebuffer *fb;
 	int ret;
 
-	if (r->flags & ~(DRM_MODE_FB_INTERLACED | DRM_MODE_FB_MODIFIERS)) {
+	if (r->flags & ~(DRM_MODE_FB_INTERLACED | DRM_MODE_FB_MODIFIERS |
+			 DRM_MODE_FB_PERSIST)) {
 		DRM_DEBUG_KMS("bad framebuffer flags 0x%08x\n", r->flags);
 		return ERR_PTR(-EINVAL);
 	}
@@ -789,7 +790,8 @@ void drm_fb_release(struct drm_file *priv)
 	 * at it any more.
 	 */
 	list_for_each_entry_safe(fb, tfb, &priv->fbs, filp_head) {
-		if (drm_framebuffer_read_refcount(fb) > 1) {
+		if (drm_framebuffer_read_refcount(fb) > 1 &&
+		    !(fb->flags & DRM_MODE_FB_PERSIST)) {
 			list_move_tail(&fb->filp_head, &arg.fbs);
 		} else {
 			list_del_init(&fb->filp_head);

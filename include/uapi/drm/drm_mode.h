@@ -662,6 +662,21 @@ struct drm_mode_fb_cmd {
 
 #define DRM_MODE_FB_INTERLACED	(1<<0) /* for interlaced framebuffers */
 #define DRM_MODE_FB_MODIFIERS	(1<<1) /* enables ->modifer[] */
+/**
+ * DRM_MODE_FB_PERSIST
+ *
+ * DRM framebuffers are normally implicitly removed when their owner closes the
+ * DRM FD. Passing this flag will make the framebuffer persistent: it will not
+ * be implicitly removed. This is useful to implement flicker-free transitions
+ * between two processes.
+ *
+ * This flag doesn't change the behavior of &DRM_IOCTL_MODE_RMFB.
+ *
+ * User-space should ensure the framebuffer doesn't expose any sensitive user
+ * information: persistent framebuffers can be read back by the next DRM
+ * master.
+ */
+#define DRM_MODE_FB_PERSIST (1 << 2)
 
 struct drm_mode_fb_cmd2 {
 	__u32 fb_id;
