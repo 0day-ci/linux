@@ -42,6 +42,11 @@ ksft_skip=4
 
 VERBOSE=0
 
+# Use a reduced client timeout by default
+# Can be overridden by user
+NETTEST_CLIENT_TIMEOUT=${NETTEST_CLIENT_TIMEOUT:-0.5}
+export NETTEST_CLIENT_TIMEOUT
+
 NSA_DEV=eth1
 NSA_DEV2=eth2
 NSB_DEV=eth1
@@ -1078,7 +1083,7 @@ ipv4_tcp_novrf()
 		log_start
 		show_hint "Should fail 'No route to host' since addresses on loopback are out of device scope"
 		run_cmd nettest -s -k
-		run_cmd nettest -r ${a} -d ${NSA_DEV}
+		run_cmd nettest -r ${a} -d ${NSA_DEV} -t5
 		log_test_addr ${a} $? 1 "Global server, device client, local connection"
 	done
 
@@ -1381,19 +1386,19 @@ ipv4_udp_novrf()
 		log_start
 		show_hint "Should fail since addresses on loopback are out of device scope"
 		run_cmd nettest -D -s -k
-		run_cmd nettest -D -r ${a} -d ${NSA_DEV}
+		run_cmd nettest -D -r ${a} -d ${NSA_DEV} -t5
 		log_test_addr ${a} $? 2 "Global server, device client, local connection"
 
 		log_start
 		show_hint "Should fail since addresses on loopback are out of device scope"
 		run_cmd nettest -D -s -k
-		run_cmd nettest -D -r ${a} -d ${NSA_DEV} -C
+		run_cmd nettest -D -r ${a} -d ${NSA_DEV} -C -t5
 		log_test_addr ${a} $? 1 "Global server, device send via cmsg, local connection"
 
 		log_start
 		show_hint "Should fail since addresses on loopback are out of device scope"
 		run_cmd nettest -D -s -k
-		run_cmd nettest -D -r ${a} -d ${NSA_DEV} -S
+		run_cmd nettest -D -r ${a} -d ${NSA_DEV} -S -t5
 		log_test_addr ${a} $? 1 "Global server, device client via IP_UNICAST_IF, local connection"
 	done
 
@@ -3445,7 +3450,7 @@ netfilter_icmp()
 	do
 		log_start
 		run_cmd nettest ${arg} -s -k
-		run_cmd_nsb nettest ${arg} -r ${a}
+		run_cmd_nsb nettest ${arg} -r ${a} -t5
 		log_test_addr ${a} $? 1 "Global ${stype} server, Rx reject icmp-port-unreach"
 	done
 }
@@ -3500,7 +3505,7 @@ netfilter_icmp6()
 	do
 		log_start
 		run_cmd nettest -6 -s ${arg} -k
-		run_cmd_nsb nettest -6 ${arg} -r ${a}
+		run_cmd_nsb nettest -6 ${arg} -r ${a} -t5
 		log_test_addr ${a} $? 1 "Global ${stype} server, Rx reject icmp-port-unreach"
 	done
 }
