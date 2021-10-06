@@ -26,19 +26,19 @@
 #define BT_IO_BASE	0xe4
 #define BT_IRQ		10
 
-#define BT_CR0		0x0
+#define ASPEED_BT_CR0	0x0
 #define   BT_CR0_IO_BASE		16
 #define   BT_CR0_IRQ			12
 #define   BT_CR0_EN_CLR_SLV_RDP		0x8
 #define   BT_CR0_EN_CLR_SLV_WRP		0x4
 #define   BT_CR0_ENABLE_IBT		0x1
-#define BT_CR1		0x4
+#define ASPEED_BT_CR1	0x4
 #define   BT_CR1_IRQ_H2B	0x01
 #define   BT_CR1_IRQ_HBUSY	0x40
-#define BT_CR2		0x8
+#define ASPEED_BT_CR2	0x8
 #define   BT_CR2_IRQ_H2B	0x01
 #define   BT_CR2_IRQ_HBUSY	0x40
-#define BT_CR3		0xc
+#define ASPEED_BT_CR3	0xc
 
 #define BT_CTRL		0x10
 #define   BT_CTRL_B_BUSY		0x80
@@ -379,7 +379,7 @@ static irqreturn_t aspeed_bt_bmc_irq(int irq, void *arg)
 	u32 reg;
 	int rc;
 
-	rc = regmap_read(bt_bmc->map, bt_bmc->offset + BT_CR2, &reg);
+	rc = regmap_read(bt_bmc->map, bt_bmc->offset + ASPEED_BT_CR2, &reg);
 	if (rc)
 		return IRQ_NONE;
 
@@ -388,7 +388,7 @@ static irqreturn_t aspeed_bt_bmc_irq(int irq, void *arg)
 		return IRQ_NONE;
 
 	/* ack pending IRQs */
-	regmap_write(bt_bmc->map, bt_bmc->offset + BT_CR2, reg);
+	regmap_write(bt_bmc->map, bt_bmc->offset + ASPEED_BT_CR2, reg);
 
 	wake_up(&bt_bmc->queue);
 	return IRQ_HANDLED;
@@ -418,7 +418,7 @@ static int aspeed_bt_bmc_config_irq(struct bt_bmc *bt_bmc,
 	 * will be cleared (along with B2H) when we can write the next
 	 * message to the BT buffer
 	 */
-	rc = regmap_update_bits(bt_bmc->map, bt_bmc->offset + BT_CR1,
+	rc = regmap_update_bits(bt_bmc->map, bt_bmc->offset + ASPEED_BT_CR1,
 				(BT_CR1_IRQ_H2B | BT_CR1_IRQ_HBUSY),
 				(BT_CR1_IRQ_H2B | BT_CR1_IRQ_HBUSY));
 
@@ -427,7 +427,7 @@ static int aspeed_bt_bmc_config_irq(struct bt_bmc *bt_bmc,
 
 static void aspeed_enable_bt(struct bt_bmc *bt_bmc)
 {
-	regmap_write(bt_bmc->map, bt_bmc->offset + BT_CR0,
+	regmap_write(bt_bmc->map, bt_bmc->offset + ASPEED_BT_CR0,
 		     (BT_IO_BASE << BT_CR0_IO_BASE) |
 		     (BT_IRQ << BT_CR0_IRQ) |
 		     BT_CR0_EN_CLR_SLV_RDP |
