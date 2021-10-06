@@ -96,17 +96,6 @@ instead of "[This patch] makes xyzzy do frotz" or "[I] changed xyzzy
 to do frotz", as if you are giving orders to the codebase to change
 its behaviour.
 
-If the patch fixes a logged bug entry, refer to that bug entry by
-number and URL.  If the patch follows from a mailing list discussion,
-give a URL to the mailing list archive; use the https://lkml.kernel.org/
-redirector with a ``Message-Id``, to ensure that the links cannot become
-stale.
-
-However, try to make your explanation understandable without external
-resources.  In addition to giving a URL to a mailing list archive or
-bug, summarize the relevant points of the discussion that led to the
-patch as submitted.
-
 If you want to refer to a specific commit, don't just refer to the
 SHA-1 ID of the commit. Please also include the oneline summary of
 the commit, to make it easier for reviewers to know what it is about.
@@ -122,6 +111,21 @@ SHA-1 ID.  The kernel repository holds a *lot* of objects, making
 collisions with shorter IDs a real possibility.  Bear in mind that, even if
 there is no collision with your six-character ID now, that condition may
 change five years from now.
+
+Add 'Link:' tags with URLs pointing to related discussions and rationale
+behind the change whenever that makes sense. If your patch for example
+fixes a bug, add a tag with a URL referencing the report in the mailing
+list archives or a bug tracker; if the patch follows from a mailing list
+discussion, point to it. When linking to mailing list archives, use the
+https://lkml.kernel.org/r/ redirector with a ``Message-Id``, to ensure
+that the links cannot become stale. These tags should look like this::
+
+	Link: https://lkml.kernel.org/r/<message-id>
+
+However, try to make your explanation understandable without external
+resources.  In addition to giving a URL to a mailing list archive or
+bug, summarize the relevant points of the discussion that led to the
+patch as submitted.
 
 If your patch fixes a bug in a specific commit, e.g. you found an issue using
 ``git bisect``, please use the 'Fixes:' tag with the first 12 characters of
