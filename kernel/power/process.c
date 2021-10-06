@@ -124,6 +124,9 @@ int freeze_processes(void)
 {
 	int error;
 
+	if (pm_wakeup_pending())
+		return -EBUSY;
+
 	error = __usermodehelper_disable(UMH_FREEZING);
 	if (error)
 		return error;
