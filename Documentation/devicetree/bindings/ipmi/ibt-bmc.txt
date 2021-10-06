@@ -1,4 +1,4 @@
-* Aspeed BT (Block Transfer) IPMI interface
+* BT (Block Transfer) IPMI interface
 
 The Aspeed SOCs (AST2400 and AST2500) are commonly used as BMCs
 (BaseBoard Management Controllers) and the BT interface can be used to
