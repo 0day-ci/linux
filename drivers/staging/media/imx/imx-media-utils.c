@@ -545,13 +545,13 @@ int imx_media_mbus_fmt_to_pix_fmt(struct v4l2_pix_format *pix,
 	}
 
 	/* Round up width for minimum burst size */
-	width = round_up(mbus->width, 8);
+	width = round_up(mbus->width, 4);
 
 	/* Round up stride for IDMAC line start address alignment */
 	if (cc->planar)
 		stride = round_up(width, 16);
 	else
-		stride = round_up((width * cc->bpp) >> 3, 8);
+		stride = round_up((width * cc->bpp) >> 3, 4);
 
 	pix->width = width;
 	pix->height = mbus->height;
