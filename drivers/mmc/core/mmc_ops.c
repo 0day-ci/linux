@@ -7,6 +7,7 @@
 
 #include <linux/slab.h>
 #include <linux/export.h>
+#include <linux/of.h>
 #include <linux/types.h>
 #include <linux/scatterlist.h>
 
@@ -107,6 +108,35 @@ static int _mmc_select_card(struct mmc_host *host, struct mmc_card *card)
 
 int mmc_select_card(struct mmc_card *card)
 {
+	if (card->type == MMC_TYPE_SDIO || card->type == MMC_TYPE_SD_COMBO) {
+		struct device_node *np = card->host->parent->of_node;
+
+		/*
+		 * REVISIT: should be made more general
+		 * e.g. by expanding the DT bindings of child nodes to
+		 * optionally provide this information:
+		 * Documentation/devicetree/bindings/mmc/mmc-card.txt
+		 */
+
+		np = of_get_compatible_child(np, "ti,wl1251");
+		if (np) {
+			/*
+			 * We have TI wl1251 attached to this mmc. Pass this
+			 * information to the SDIO core because it can't be
+			 * probed by normal methods.
+			 */
+
+			dev_info(card->host->parent, "found wl1251\n");
+			card->quirks |= MMC_QUIRK_NONSTD_SDIO;
+			card->cccr.wide_bus = 1;
+			card->cis.vendor = 0x104c;
+			card->cis.device = 0x9066;
+			card->cis.blksize = 512;
+			card->cis.max_dtr = 24000000;
+			card->ocr = 0x80;
+			of_node_put(np);
+		}
+	}
 
 	return _mmc_select_card(card->host, card);
 }
