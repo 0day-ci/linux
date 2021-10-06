@@ -191,17 +191,15 @@ kill_procs()
 
 do_run_cmd()
 {
-	local cmd="$*"
-	local out
+	local rc cmd="$*"
 
-	if [ "$VERBOSE" = "1" ]; then
+	if [[ "$VERBOSE" = "1" ]]; then
 		echo "COMMAND: ${cmd}"
-	fi
-
-	out=$($cmd 2>&1)
-	rc=$?
-	if [ "$VERBOSE" = "1" -a -n "$out" ]; then
-		echo "$out"
+		$cmd
+		rc=$?
+	else
+		$cmd &> /dev/null
+		rc=$?
 	fi
 
 	return $rc
