@@ -1,11 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
  * Componentized device handling.
- *
- * This is work in progress.  We gather up the component devices into a list,
- * and bind them when instructed.  At the moment, we're specific to the DRM
- * subsystem, and only handles one master device, but this doesn't have to be
- * the case.
  */
 #include <linux/component.h>
 #include <linux/device.h>
@@ -119,23 +114,23 @@ static int __init component_debug_init(void)
 
 core_initcall(component_debug_init);
 
-static void component_master_debugfs_add(struct aggregate_device *m)
+static void component_debugfs_add(struct aggregate_device *m)
 {
 	debugfs_create_file(dev_name(m->parent), 0444, component_debugfs_dir, m,
 			    &component_devices_fops);
 }
 
-static void component_master_debugfs_del(struct aggregate_device *m)
+static void component_debugfs_del(struct aggregate_device *m)
 {
 	debugfs_remove(debugfs_lookup(dev_name(m->parent), component_debugfs_dir));
 }
 
 #else
 
-static void component_master_debugfs_add(struct aggregate_device *m)
+static void component_debugfs_add(struct aggregate_device *m)
 { }
 
-static void component_master_debugfs_del(struct aggregate_device *m)
+static void component_debugfs_del(struct aggregate_device *m)
 { }
 
 #endif
@@ -343,7 +338,7 @@ EXPORT_SYMBOL(component_match_add_release);
  * @compare_typed: compare function to match against all typed components
  * @compare_data: opaque pointer passed to the @compare function
  *
- * Adds a new component match to the list stored in @matchptr, which the @master
+ * Adds a new component match to the list stored in @matchptr, which the
  * aggregate driver needs to function. The list of component matches pointed to
  * by @matchptr must be initialized to NULL before adding the first match. This
  * only matches against components added with component_add_typed().
@@ -367,7 +362,7 @@ static void free_aggregate_device(struct aggregate_device *adev)
 	struct component_match *match = adev->match;
 	int i;
 
-	component_master_debugfs_del(adev);
+	component_debugfs_del(adev);
 
 	if (match) {
 		for (i = 0; i < match->num; i++) {
@@ -548,7 +543,7 @@ static struct aggregate_device *aggregate_device_add(struct device *parent,
 		return ERR_PTR(ret);
 	}
 
-	component_master_debugfs_add(adev);
+	component_debugfs_add(adev);
 
 	return adev;
 }
