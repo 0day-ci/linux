@@ -359,7 +359,7 @@ create_vrf()
 	ip -netns ${ns} -6 route add vrf ${vrf} unreachable default metric 8192
 
 	ip -netns ${ns} addr add 127.0.0.1/8 dev ${vrf}
-	ip -netns ${ns} -6 addr add ::1 dev ${vrf} nodad
+	ip -netns ${ns} -6 addr add ::1 dev ${vrf}
 	if [ "${addr}" != "-" ]; then
 		ip -netns ${ns} addr add dev ${vrf} ${addr}
 	fi
@@ -380,6 +380,7 @@ create_ns()
 	local addr6=$3
 
 	ip netns add ${ns}
+	ip netns exec ${ns} sysctl -wq net.ipv6.conf.{all,default}.accept_dad=0
 
 	ip -netns ${ns} link set lo up
 	if [ "${addr}" != "-" ]; then
@@ -492,8 +493,6 @@ setup()
 	ip -netns ${NSB} ro add ${NSA_LO_IP6}/128 via ${NSA_IP6} dev ${NSB_DEV}
 
 	set +e
-
-	sleep 1
 }
 
 setup_lla_only()
@@ -522,8 +521,6 @@ setup_lla_only()
 	ip -netns ${NSA} link set dev ${NSA_DEV2} vrf ${VRF}
 
 	set +e
-
-	sleep 1
 }
 
 ################################################################################
@@ -3016,7 +3013,7 @@ ipv6_udp_novrf()
 	log_test $? 0 "UDP in - LLA to GUA"
 
 	run_cmd_nsb ip -6 ro del ${NSA_IP6}/128 dev ${NSB_DEV}
-	run_cmd_nsb ip -6 addr add ${NSB_IP6}/64 dev ${NSB_DEV} nodad
+	run_cmd_nsb ip -6 addr add ${NSB_IP6}/64 dev ${NSB_DEV}
 }
 
 ipv6_udp_vrf()
@@ -3294,7 +3291,7 @@ ipv6_udp_vrf()
 	log_test $? 0 "UDP in - LLA to GUA"
 
 	run_cmd_nsb ip -6 ro del ${NSA_IP6}/128 dev ${NSB_DEV}
-	run_cmd_nsb ip -6 addr add ${NSB_IP6}/64 dev ${NSB_DEV} nodad
+	run_cmd_nsb ip -6 addr add ${NSB_IP6}/64 dev ${NSB_DEV}
 }
 
 ipv6_udp()
@@ -3744,7 +3741,7 @@ use_case_br()
 
 	setup_cmd ip link add br0 type bridge
 	setup_cmd ip addr add dev br0 ${NSA_IP}/24
-	setup_cmd ip -6 addr add dev br0 ${NSA_IP6}/64 nodad
+	setup_cmd ip -6 addr add dev br0 ${NSA_IP6}/64
 
 	setup_cmd ip li set ${NSA_DEV} master br0
 	setup_cmd ip li set ${NSA_DEV} up
@@ -3793,11 +3790,11 @@ use_case_br()
 	setup_cmd ip li add br0.100 link br0 type vlan id 100
 	setup_cmd ip li set br0.100 vrf ${VRF} up
 	setup_cmd ip    addr add dev br0.100 172.16.101.1/24
-	setup_cmd ip -6 addr add dev br0.100 2001:db8:101::1/64 nodad
+	setup_cmd ip -6 addr add dev br0.100 2001:db8:101::1/64
 
 	setup_cmd_nsb ip li add vlan100 link ${NSB_DEV} type vlan id 100
 	setup_cmd_nsb ip addr add dev vlan100 172.16.101.2/24
-	setup_cmd_nsb ip -6 addr add dev vlan100 2001:db8:101::2/64 nodad
+	setup_cmd_nsb ip -6 addr add dev vlan100 2001:db8:101::2/64
 	setup_cmd_nsb ip li set vlan100 up
 	sleep 1
 
