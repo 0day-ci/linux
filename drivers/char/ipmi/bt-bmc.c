@@ -39,6 +39,7 @@
 #define   BT_CR2_IRQ_H2B	0x01
 #define   BT_CR2_IRQ_HBUSY	0x40
 #define BT_CR3		0xc
+
 #define BT_CTRL		0x10
 #define   BT_CTRL_B_BUSY		0x80
 #define   BT_CTRL_H_BUSY		0x40
@@ -372,7 +373,7 @@ static void poll_timer(struct timer_list *t)
 	add_timer(&bt_bmc->poll_timer);
 }
 
-static irqreturn_t bt_bmc_irq(int irq, void *arg)
+static irqreturn_t aspeed_bt_bmc_irq(int irq, void *arg)
 {
 	struct bt_bmc *bt_bmc = arg;
 	u32 reg;
@@ -393,7 +394,7 @@ static irqreturn_t bt_bmc_irq(int irq, void *arg)
 	return IRQ_HANDLED;
 }
 
-static int bt_bmc_config_irq(struct bt_bmc *bt_bmc,
+static int aspeed_bt_bmc_config_irq(struct bt_bmc *bt_bmc,
 			     struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
@@ -403,7 +404,7 @@ static int bt_bmc_config_irq(struct bt_bmc *bt_bmc,
 	if (bt_bmc->irq < 0)
 		return bt_bmc->irq;
 
-	rc = devm_request_irq(dev, bt_bmc->irq, bt_bmc_irq, IRQF_SHARED,
+	rc = devm_request_irq(dev, bt_bmc->irq, aspeed_bt_bmc_irq, IRQF_SHARED,
 			      DEVICE_NAME, bt_bmc);
 	if (rc < 0) {
 		dev_warn(dev, "Unable to request IRQ %d\n", bt_bmc->irq);
@@ -422,6 +423,16 @@ static int bt_bmc_config_irq(struct bt_bmc *bt_bmc,
 				(BT_CR1_IRQ_H2B | BT_CR1_IRQ_HBUSY));
 
 	return rc;
+}
+
+static void aspeed_enable_bt(struct bt_bmc *bt_bmc)
+{
+	regmap_write(bt_bmc->map, bt_bmc->offset + BT_CR0,
+		     (BT_IO_BASE << BT_CR0_IO_BASE) |
+		     (BT_IRQ << BT_CR0_IRQ) |
+		     BT_CR0_EN_CLR_SLV_RDP |
+		     BT_CR0_EN_CLR_SLV_WRP |
+		     BT_CR0_ENABLE_IBT);
 }
 
 static int bt_bmc_probe(struct platform_device *pdev)
@@ -472,7 +483,7 @@ static int bt_bmc_probe(struct platform_device *pdev)
 		return rc;
 	}
 
-	bt_bmc_config_irq(bt_bmc, pdev);
+	aspeed_bt_bmc_config_irq(bt_bmc, pdev);
 
 	if (bt_bmc->irq >= 0) {
 		dev_info(dev, "Using IRQ %d\n", bt_bmc->irq);
@@ -483,12 +494,7 @@ static int bt_bmc_probe(struct platform_device *pdev)
 		add_timer(&bt_bmc->poll_timer);
 	}
 
-	regmap_write(bt_bmc->map, bt_bmc->offset + BT_CR0,
-		     (BT_IO_BASE << BT_CR0_IO_BASE) |
-		     (BT_IRQ << BT_CR0_IRQ) |
-		     BT_CR0_EN_CLR_SLV_RDP |
-		     BT_CR0_EN_CLR_SLV_WRP |
-		     BT_CR0_ENABLE_IBT);
+	aspeed_enable_bt(bt_bmc);
 
 	clr_b_busy(bt_bmc);
 
