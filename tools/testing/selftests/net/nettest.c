@@ -75,6 +75,7 @@ struct sock_args {
 		     has_grp:1,
 		     has_expected_laddr:1,
 		     has_expected_raddr:1,
+		     fork_background:1,
 		     bind_test_only:1;
 
 	unsigned short port;
@@ -1390,6 +1391,25 @@ static int config_xfrm_policy(int sd, struct sock_args *args)
 	return 0;
 }
 
+static void handle_fork_background(struct sock_args *args)
+{
+	pid_t fork_result;
+	int result;
+
+	if (!args->fork_background)
+		return;
+
+	fork_result = fork();
+	if (fork_result)
+		exit(0);
+	result = setpgid(0, 0);
+	if (result) {
+		log_err_errno("Failed setpgid");
+		exit(1);
+	}
+	log_msg("server running in background\n");
+}
+
 static int lsock_init(struct sock_args *args)
 {
 	long flags;
@@ -1423,6 +1443,8 @@ static int lsock_init(struct sock_args *args)
 		log_err_errno("listen failed");
 		goto err;
 	}
+
+	handle_fork_background(args);
 
 	flags = fcntl(sd, F_GETFL);
 	if ((flags < 0) || (fcntl(sd, F_SETFL, flags|O_NONBLOCK) < 0)) {
@@ -1821,7 +1843,7 @@ static int ipc_parent(int cpid, int fd, struct sock_args *args)
 	return client_status;
 }
 
-#define GETOPT_STR  "sr:l:c:p:t:g:P:DRn:M:X:m:d:I:BN:O:SCi6xL:0:1:2:3:Fbq"
+#define GETOPT_STR  "sr:l:c:p:t:g:P:DRn:M:X:m:d:I:BN:O:SCi6xL:0:1:2:3:Fbqk"
 
 static void print_usage(char *prog)
 {
@@ -1868,6 +1890,7 @@ static void print_usage(char *prog)
 	"\n"
 	"    -b            Bind test only.\n"
 	"    -q            Be quiet. Run test without printing anything.\n"
+	"    -k            Fork server in background after bind or listen.\n"
 	, prog, DEFAULT_PORT);
 }
 
@@ -2019,6 +2042,9 @@ int main(int argc, char *argv[])
 		case 'x':
 			args.use_xfrm = 1;
 			break;
+		case 'k':
+			args.fork_background = 1;
+			break;
 		default:
 			print_usage(argv[0]);
 			return 1;
@@ -2057,6 +2083,12 @@ int main(int argc, char *argv[])
 	    !args.has_remote_ip && !args.has_local_ip) {
 		fprintf(stderr,
 			"Local (server mode) or remote IP (client IP) required\n");
+		return 1;
+	}
+
+	if (args.fork_background && (both_mode || !server_mode)) {
+		fprintf(stderr,
+			"Fork after listen only supported for server mode\n");
 		return 1;
 	}
 
