@@ -178,8 +178,15 @@ show_hint()
 
 kill_procs()
 {
-	killall nettest ping ping6 >/dev/null 2>&1
-	sleep 1
+	local pids
+	while true; do
+		pids=$(pidof nettest ping ping6)
+		if [[ -z $pids ]]; then
+			break
+		fi
+		kill $pids
+		sleep 0.01
+	done
 }
 
 do_run_cmd()
