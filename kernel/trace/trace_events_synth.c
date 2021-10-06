@@ -2043,11 +2043,17 @@ static int create_synth_event(const char *raw_command)
 {
 	char *fields, *p;
 	const char *name;
-	int len, ret = 0;
+	int len, ret;
 
 	raw_command = skip_spaces(raw_command);
 	if (raw_command[0] == '\0')
-		return ret;
+		return -ECANCELED;
+
+	name = raw_command;
+
+	if (name[0] != 's' || name[1] != ':')
+		return -ECANCELED;
+	name += 2;
 
 	last_cmd_set(raw_command);
 
@@ -2058,12 +2064,6 @@ static int create_synth_event(const char *raw_command)
 	}
 
 	fields = skip_spaces(p);
-
-	name = raw_command;
-
-	if (name[0] != 's' || name[1] != ':')
-		return -ECANCELED;
-	name += 2;
 
 	/* This interface accepts group name prefix */
 	if (strchr(name, '/')) {
