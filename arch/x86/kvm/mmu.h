@@ -230,14 +230,20 @@ int kvm_arch_write_log_dirty(struct kvm_vcpu *vcpu);
 int kvm_mmu_post_init_vm(struct kvm *kvm);
 void kvm_mmu_pre_destroy_vm(struct kvm *kvm);
 
-static inline bool kvm_memslots_have_rmaps(struct kvm *kvm)
+static inline bool kvm_shadow_root_alloced(struct kvm *kvm)
 {
 	/*
-	 * Read memslot_have_rmaps before rmap pointers.  Hence, threads reading
-	 * memslots_have_rmaps in any lock context are guaranteed to see the
-	 * pointers.  Pairs with smp_store_release in alloc_all_memslots_rmaps.
+	 * Read shadow_root_alloced before related pointers. Hence, threads
+	 * reading shadow_root_alloced in any lock context are guaranteed to
+	 * see the pointers. Pairs with smp_store_release in
+	 * mmu_first_shadow_root_alloc.
 	 */
-	return smp_load_acquire(&kvm->arch.memslots_have_rmaps);
+	return smp_load_acquire(&kvm->arch.shadow_root_alloced);
+}
+
+static inline bool kvm_memslots_have_rmaps(struct kvm *kvm)
+{
+	return !kvm->arch.tdp_mmu_enabled || kvm_shadow_root_alloced(kvm);
 }
 
 static inline gfn_t gfn_to_index(gfn_t gfn, gfn_t base_gfn, int level)
