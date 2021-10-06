@@ -1616,7 +1616,16 @@ static int vsock_connectible_setsockopt(struct socket *sock,
 
 	case SO_VM_SOCKETS_CONNECT_TIMEOUT: {
 		struct __kernel_old_timeval tv;
-		COPY_IN(tv);
+		struct old_timeval32 tv32;
+
+		if (in_compat_syscall() && !COMPAT_USE_64BIT_TIME) {
+			COPY_IN(tv32);
+			tv.tv_sec = tv32.tv_sec;
+			tv.tv_usec = tv32.tv_usec;
+		} else {
+			COPY_IN(tv);
+		}
+
 		if (tv.tv_sec >= 0 && tv.tv_usec < USEC_PER_SEC &&
 		    tv.tv_sec < (MAX_SCHEDULE_TIMEOUT / HZ - 1)) {
 			vsk->connect_timeout = tv.tv_sec * HZ +
@@ -1694,11 +1703,20 @@ static int vsock_connectible_getsockopt(struct socket *sock,
 
 	case SO_VM_SOCKETS_CONNECT_TIMEOUT: {
 		struct __kernel_old_timeval tv;
+		struct old_timeval32 tv32;
+
 		tv.tv_sec = vsk->connect_timeout / HZ;
 		tv.tv_usec =
 		    (vsk->connect_timeout -
 		     tv.tv_sec * HZ) * (1000000 / HZ);
-		COPY_OUT(tv);
+
+		if (in_compat_syscall() && !COMPAT_USE_64BIT_TIME) {
+			tv32.tv_sec = (u32)tv.tv_sec;
+			tv32.tv_usec = (u32)tv.tv_usec;
+			COPY_OUT(tv32);
+		} else {
+			COPY_OUT(tv);
+		}
 		break;
 	}
 	default:
