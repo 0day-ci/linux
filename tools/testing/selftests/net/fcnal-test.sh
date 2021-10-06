@@ -4007,6 +4007,9 @@ do
 	vrf_setup)	 setup "yes"; exit 0;;
 
 	help)            echo "Test names: $TESTS"; exit 0;;
+	*)
+		echo "Unknown test '$t'"
+		exit 1
 	esac
 done
 
