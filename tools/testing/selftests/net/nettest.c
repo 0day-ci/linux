@@ -127,13 +127,19 @@ struct sock_args {
 };
 
 static int server_mode;
-static unsigned int prog_timeout = 5;
+static unsigned int prog_timeout_ms = 5000;
 static unsigned int interactive;
 static int iter = 1;
 static char *msg = "Hello world!";
 static int msglen;
 static int quiet;
 static int try_broadcast = 1;
+
+static void set_timeval_ms(struct timeval *tv, unsigned long ms)
+{
+	tv->tv_sec = ms / 1000;
+	tv->tv_usec = (ms % 1000) * 1000;
+}
 
 static char *timestamp(char *timebuf, int buflen)
 {
@@ -562,6 +568,25 @@ static int str_to_uint(const char *str, int min, int max, unsigned int *value)
 	if (((*end == '\0') || (*end == '\n')) && (end != str) &&
 	    (errno != ERANGE) && (min <= number) && (number <= max)) {
 		*value = number;
+		return 0;
+	}
+
+	return -1;
+}
+
+/* parse seconds with a decimal point as miliseconds */
+static int str_to_msec(const char *str, unsigned int *value)
+{
+	float float_value;
+	char *end;
+
+	float_value = strtof(str, &end);
+
+	/* entire string should be consumed by conversion
+	 * and value should be between min and max
+	 */
+	if (((*end == '\0') || (*end == '\n')) && (end != str)) {
+		*value = float_value * 1000;
 		return 0;
 	}
 
@@ -1167,7 +1192,7 @@ static void set_recv_attr(int sd, int version)
 static int msg_loop(int client, int sd, void *addr, socklen_t alen,
 		    struct sock_args *args)
 {
-	struct timeval timeout = { .tv_sec = prog_timeout }, *ptval = NULL;
+	struct timeval timeout, *ptval = NULL;
 	fd_set rfds;
 	int nfds;
 	int rc;
@@ -1184,9 +1209,11 @@ static int msg_loop(int client, int sd, void *addr, socklen_t alen,
 				return 1;
 		}
 		if (!interactive) {
+			if (!prog_timeout_ms)
+				set_timeval_ms(&timeout, 5000);
+			else
+				set_timeval_ms(&timeout, prog_timeout_ms);
 			ptval = &timeout;
-			if (!prog_timeout)
-				timeout.tv_sec = 5;
 		}
 	}
 
@@ -1481,7 +1508,7 @@ static void ipc_write(int fd, int message)
 static int do_server(struct sock_args *args, int ipc_fd)
 {
 	/* ipc_fd = -1 if no parent process to signal */
-	struct timeval timeout = { .tv_sec = prog_timeout }, *ptval = NULL;
+	struct timeval timeout, *ptval = NULL;
 	unsigned char addr[sizeof(struct sockaddr_in6)] = {};
 	socklen_t alen = sizeof(addr);
 	int lsd, csd = -1;
@@ -1503,8 +1530,10 @@ static int do_server(struct sock_args *args, int ipc_fd)
 	if (resolve_devices(args) || validate_addresses(args))
 		goto err_exit;
 
-	if (prog_timeout)
+	if (prog_timeout_ms) {
+		set_timeval_ms(&timeout, prog_timeout_ms);
 		ptval = &timeout;
+	}
 
 	if (args->has_grp)
 		lsd = msock_server(args);
@@ -1586,7 +1615,7 @@ err_exit:
 
 static int wait_for_connect(int sd)
 {
-	struct timeval _tv = { .tv_sec = prog_timeout }, *tv = NULL;
+	struct timeval _tv, *tv = NULL;
 	fd_set wfd;
 	int val = 0, sz = sizeof(val);
 	int rc;
@@ -1594,8 +1623,10 @@ static int wait_for_connect(int sd)
 	FD_ZERO(&wfd);
 	FD_SET(sd, &wfd);
 
-	if (prog_timeout)
+	if (prog_timeout_ms) {
+		set_timeval_ms(&_tv, prog_timeout_ms);
 		tv = &_tv;
+	}
 
 	rc = select(FD_SETSIZE, NULL, &wfd, NULL, tv);
 	if (rc == 0) {
@@ -1947,8 +1978,7 @@ int main(int argc, char *argv[])
 			args.port = (unsigned short) tmp;
 			break;
 		case 't':
-			if (str_to_uint(optarg, 0, INT_MAX,
-					&prog_timeout) != 0) {
+			if (str_to_msec(optarg, &prog_timeout_ms) != 0) {
 				fprintf(stderr, "Invalid timeout\n");
 				return 1;
 			}
@@ -2093,7 +2123,7 @@ int main(int argc, char *argv[])
 	}
 
 	if (interactive) {
-		prog_timeout = 0;
+		prog_timeout_ms = 0;
 		msg = NULL;
 	}
 
