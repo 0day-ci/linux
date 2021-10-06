@@ -561,6 +561,11 @@ static void renesas_sdhi_reset(struct tmio_mmc_host *host)
 		/* Unknown why but without polling reset status, it will hang */
 		read_poll_timeout(reset_control_status, ret, ret == 0, 1, 100,
 				  false, priv->rstc);
+
+		if (priv->internal_cd)
+			tmio_mmc_enable_mmc_irqs(host, TMIO_STAT_CARD_REMOVE |
+						 TMIO_STAT_CARD_INSERT);
+
 		/* At least SDHI_VER_GEN2_SDR50 needs manual release of reset */
 		sd_ctrl_write16(host, CTL_RESET_SD, 0x0001);
 		priv->needs_adjust_hs400 = false;
@@ -1016,6 +1021,10 @@ int renesas_sdhi_probe(struct platform_device *pdev,
 	priv->rstc = devm_reset_control_get_optional_exclusive(&pdev->dev, NULL);
 	if (IS_ERR(priv->rstc))
 		return PTR_ERR(priv->rstc);
+
+	if (priv->rstc && !(host->mmc->caps & MMC_CAP_NONREMOVABLE) &&
+	    !mmc_can_gpio_cd(host->mmc))
+		priv->internal_cd = true;
 
 	ver = sd_ctrl_read16(host, CTL_VERSION);
 	/* GEN2_SDR104 is first known SDHI to use 32bit block count */
