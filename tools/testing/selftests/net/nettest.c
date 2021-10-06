@@ -124,10 +124,12 @@ struct sock_args {
 
 	/* ESP in UDP encap test */
 	int use_xfrm;
+
+	unsigned int client_timeout_ms;
+	unsigned int server_timeout_ms;
 };
 
 static int server_mode;
-static unsigned int prog_timeout_ms = 5000;
 static unsigned int interactive;
 static int iter = 1;
 static char *msg = "Hello world!";
@@ -1209,10 +1211,17 @@ static int msg_loop(int client, int sd, void *addr, socklen_t alen,
 				return 1;
 		}
 		if (!interactive) {
-			if (!prog_timeout_ms)
+			unsigned int timeout_ms;
+
+			if (client)
+				timeout_ms = args->client_timeout_ms;
+			else
+				timeout_ms = args->server_timeout_ms;
+
+			if (!timeout_ms)
 				set_timeval_ms(&timeout, 5000);
 			else
-				set_timeval_ms(&timeout, prog_timeout_ms);
+				set_timeval_ms(&timeout, timeout_ms);
 			ptval = &timeout;
 		}
 	}
@@ -1530,8 +1539,8 @@ static int do_server(struct sock_args *args, int ipc_fd)
 	if (resolve_devices(args) || validate_addresses(args))
 		goto err_exit;
 
-	if (prog_timeout_ms) {
-		set_timeval_ms(&timeout, prog_timeout_ms);
+	if (args->server_timeout_ms) {
+		set_timeval_ms(&timeout, args->server_timeout_ms);
 		ptval = &timeout;
 	}
 
@@ -1613,7 +1622,7 @@ err_exit:
 	return 1;
 }
 
-static int wait_for_connect(int sd)
+static int wait_for_connect(int sd, struct sock_args *args)
 {
 	struct timeval _tv, *tv = NULL;
 	fd_set wfd;
@@ -1623,8 +1632,8 @@ static int wait_for_connect(int sd)
 	FD_ZERO(&wfd);
 	FD_SET(sd, &wfd);
 
-	if (prog_timeout_ms) {
-		set_timeval_ms(&_tv, prog_timeout_ms);
+	if (args->client_timeout_ms) {
+		set_timeval_ms(&_tv, args->client_timeout_ms);
 		tv = &_tv;
 	}
 
@@ -1694,7 +1703,7 @@ static int connectsock(void *addr, socklen_t alen, struct sock_args *args)
 			rc = -1;
 			goto err;
 		}
-		rc = wait_for_connect(sd);
+		rc = wait_for_connect(sd, args);
 		if (rc < 0)
 			goto err;
 	}
@@ -1885,7 +1894,7 @@ static void print_usage(char *prog)
 	"    -p port       port to connect to (client mode)/listen on (server mode)\n"
 	"                  (default: %d)\n"
 	"    -s            server mode (default: client mode)\n"
-	"    -t            timeout seconds (default: none)\n"
+	"    -t seconds    timeout seconds for both client and server (default: 5.000)\n"
 	"\n"
 	"Optional:\n"
 	"    -B            do both client and server via fork and IPC\n"
@@ -1922,7 +1931,32 @@ static void print_usage(char *prog)
 	"    -b            Bind test only.\n"
 	"    -q            Be quiet. Run test without printing anything.\n"
 	"    -k            Fork server in background after bind or listen.\n"
+	"\n"
+	"Environment Variables:"
+	"\n"
+	"NETTEST_CLIENT_TIMEOUT:  timeouts in seconds for client"
+	"NETTEST_SERVER_TIMEOUT:  timeouts in seconds for server"
 	, prog, DEFAULT_PORT);
+}
+
+int parse_env(struct sock_args *args)
+{
+	const char *str;
+
+	if ((str = getenv("NETTEST_CLIENT_TIMEOUT"))) {
+		if (str_to_msec(str, &args->client_timeout_ms) != 0) {
+			fprintf(stderr, "Invalid NETTEST_CLIENT_TIMEOUT\n");
+			return 1;
+		}
+	}
+	if ((str = getenv("NETTEST_SERVER_TIMEOUT"))) {
+		if (str_to_msec(str, &args->server_timeout_ms) != 0) {
+			fprintf(stderr, "Invalid NETTEST_SERVER_TIMEOUT\n");
+			return 1;
+		}
+	}
+
+	return 0;
 }
 
 int main(int argc, char *argv[])
@@ -1931,6 +1965,8 @@ int main(int argc, char *argv[])
 		.version = AF_INET,
 		.type    = SOCK_STREAM,
 		.port    = DEFAULT_PORT,
+		.client_timeout_ms = 5000,
+		.server_timeout_ms = 5000,
 	};
 	struct protoent *pe;
 	int both_mode = 0;
@@ -1942,6 +1978,10 @@ int main(int argc, char *argv[])
 	/* process inputs */
 	extern char *optarg;
 	int rc = 0;
+
+	rc = parse_env(&args);
+	if (rc)
+		return rc;
 
 	/*
 	 * process input args
@@ -1978,10 +2018,11 @@ int main(int argc, char *argv[])
 			args.port = (unsigned short) tmp;
 			break;
 		case 't':
-			if (str_to_msec(optarg, &prog_timeout_ms) != 0) {
+			if (str_to_msec(optarg, &args.client_timeout_ms) != 0) {
 				fprintf(stderr, "Invalid timeout\n");
 				return 1;
 			}
+			args.server_timeout_ms = args.client_timeout_ms;
 			break;
 		case 'D':
 			args.type = SOCK_DGRAM;
@@ -2123,7 +2164,8 @@ int main(int argc, char *argv[])
 	}
 
 	if (interactive) {
-		prog_timeout_ms = 0;
+		args.client_timeout_ms = 0;
+		args.server_timeout_ms = 0;
 		msg = NULL;
 	}
 
