@@ -16,11 +16,6 @@
 #define barrier() __memory_barrier()
 #define barrier_data(ptr) barrier()
 
-#define RELOC_HIDE(ptr, off)					\
-  ({ unsigned long __ptr;					\
-     __ptr = (unsigned long) (ptr);				\
-    (typeof(ptr)) (__ptr + (off)); })
-
 /* This should act as an optimization barrier on var.
  * Given that this compiler does not have inline assembly, a compiler barrier
  * is the best we can do.
