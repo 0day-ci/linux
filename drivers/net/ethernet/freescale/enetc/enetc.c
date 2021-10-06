@@ -8,6 +8,7 @@
 #include <linux/vmalloc.h>
 #include <linux/ptp_classify.h>
 #include <net/pkt_sched.h>
+#include <net/tso.h>
 
 static int enetc_num_stack_tx_queues(struct enetc_ndev_priv *priv)
 {
@@ -314,6 +315,235 @@ dma_err:
 	return 0;
 }
 
+static void enetc_map_tx_tso_hdr(struct enetc_bdr *tx_ring, struct sk_buff *skb,
+				 struct enetc_tx_swbd *tx_swbd,
+				 union enetc_tx_bd *txbd, int *i, int hdr_len,
+				 int data_len)
+{
+	union enetc_tx_bd txbd_tmp;
+	u8 flags = 0, e_flags = 0;
+	dma_addr_t addr;
+
+	enetc_clear_tx_bd(&txbd_tmp);
+	addr = tx_ring->tso_headers_dma + *i * TSO_HEADER_SIZE;
+
+	if (skb_vlan_tag_present(skb))
+		flags |= ENETC_TXBD_FLAGS_EX;
+
+	txbd_tmp.addr = cpu_to_le64(addr);
+	txbd_tmp.buf_len = cpu_to_le16(hdr_len);
+
+	/* first BD needs frm_len and offload flags set */
+	txbd_tmp.frm_len = cpu_to_le16(hdr_len + data_len);
+	txbd_tmp.flags = flags;
+
+	/* For the TSO header we do not set the dma address since we do not
+	 * want it unmapped when we do cleanup. We still set len so that we
+	 * count the bytes sent.
+	 */
+	tx_swbd->len = hdr_len;
+	tx_swbd->do_twostep_tstamp = false;
+	tx_swbd->check_wb = false;
+
+	/* Actually write the header in the BD */
+	*txbd = txbd_tmp;
+
+	/* Add extension BD for VLAN */
+	if (flags & ENETC_TXBD_FLAGS_EX) {
+		/* Get the next BD */
+		enetc_bdr_idx_inc(tx_ring, i);
+		txbd = ENETC_TXBD(*tx_ring, *i);
+		tx_swbd = &tx_ring->tx_swbd[*i];
+		prefetchw(txbd);
+
+		/* Setup the VLAN fields */
+		enetc_clear_tx_bd(&txbd_tmp);
+		txbd_tmp.ext.vid = cpu_to_le16(skb_vlan_tag_get(skb));
+		txbd_tmp.ext.tpid = 0; /* < C-TAG */
+		e_flags |= ENETC_TXBD_E_FLAGS_VLAN_INS;
+
+		/* Write the BD */
+		txbd_tmp.ext.e_flags = e_flags;
+		*txbd = txbd_tmp;
+	}
+}
+
+static int enetc_map_tx_tso_data(struct enetc_bdr *tx_ring, struct sk_buff *skb,
+				 struct enetc_tx_swbd *tx_swbd,
+				 union enetc_tx_bd *txbd, char *data,
+				 int size, bool last_bd)
+{
+	union enetc_tx_bd txbd_tmp;
+	dma_addr_t addr;
+	u8 flags = 0;
+
+	enetc_clear_tx_bd(&txbd_tmp);
+
+	addr = dma_map_single(tx_ring->dev, data, size, DMA_TO_DEVICE);
+	if (unlikely(dma_mapping_error(tx_ring->dev, addr))) {
+		netdev_err(tx_ring->ndev, "DMA map error\n");
+		return -ENOMEM;
+	}
+
+	if (last_bd) {
+		flags |= ENETC_TXBD_FLAGS_F;
+		tx_swbd->is_eof = 1;
+	}
+
+	txbd_tmp.addr = cpu_to_le64(addr);
+	txbd_tmp.buf_len = cpu_to_le16(size);
+	txbd_tmp.flags = flags;
+
+	tx_swbd->dma = addr;
+	tx_swbd->len = size;
+	tx_swbd->dir = DMA_TO_DEVICE;
+
+	*txbd = txbd_tmp;
+
+	return 0;
+}
+
+__wsum enetc_tso_hdr_csum(struct tso_t *tso, struct sk_buff *skb, char *hdr,
+			  int hdr_len, int *l4_hdr_len)
+{
+	int mac_hdr_len = skb_network_offset(skb);
+	struct iphdr *iph = (void *)(hdr + mac_hdr_len);
+	struct tcphdr *tcph;
+	struct udphdr *udph;
+
+	if (tso->tlen == sizeof(struct udphdr)) {
+		udph = (struct udphdr *)(hdr + skb_transport_offset(skb));
+		udph->check = 0;
+	} else {
+		tcph = (struct tcphdr *)(hdr + skb_transport_offset(skb));
+		tcph->check = 0;
+	}
+
+	/* Compute the IP checksum. This is necessary since tso_build_hdr()
+	 * already incremented the IP ID field.
+	 */
+	iph->check = 0;
+	iph->check = ip_fast_csum((unsigned char *)iph, iph->ihl);
+
+	/* Compute the checksum over the L4 header. */
+	*l4_hdr_len = hdr_len - skb_transport_offset(skb);
+	return csum_partial((char *)tcph, *l4_hdr_len, 0);
+}
+
+void enetc_tso_complete_csum(struct enetc_bdr *tx_ring, struct tso_t *tso, struct sk_buff *skb,
+			     char *hdr, int len, __wsum sum)
+{
+	struct tcphdr *tcph;
+
+	/* Complete the L4 checksum by appending the pseudo-header to the
+	 * already computed checksum.
+	 */
+	tcph = (struct tcphdr *)(hdr + skb_transport_offset(skb));
+	tcph->check = csum_tcpudp_magic(ip_hdr(skb)->saddr, ip_hdr(skb)->daddr,
+					len, ip_hdr(skb)->protocol, sum);
+}
+
+static int enetc_map_tx_tso_buffs(struct enetc_bdr *tx_ring, struct sk_buff *skb)
+{
+	int hdr_len, total_len, data_len;
+	struct enetc_tx_swbd *tx_swbd;
+	union enetc_tx_bd *txbd;
+	struct tso_t tso;
+	__wsum csum, csum2;
+	int count = 0, pos;
+	int err, i;
+
+	/* Check that we have enough BDs for this skb */
+	if (enetc_bd_unused(tx_ring) < tso_count_descs(skb)) {
+		if (net_ratelimit())
+			netdev_err(tx_ring->ndev, "Not enough BDs for TSO!\n");
+		return 0;
+	}
+
+	/* Initialize the TSO handler, and prepare the first payload */
+	hdr_len = tso_start(skb, &tso);
+	total_len = skb->len - hdr_len;
+	i = tx_ring->next_to_use;
+
+	while (total_len > 0) {
+		char *hdr;
+
+		/* Get the BD */
+		txbd = ENETC_TXBD(*tx_ring, i);
+		tx_swbd = &tx_ring->tx_swbd[i];
+		prefetchw(txbd);
+
+		/* Determine the length of this packet */
+		data_len = min_t(int, skb_shinfo(skb)->gso_size, total_len);
+		total_len -= data_len;
+
+		/* prepare packet headers: MAC + IP + TCP */
+		hdr = tx_ring->tso_headers + i * TSO_HEADER_SIZE;
+		tso_build_hdr(skb, hdr, &tso, data_len, total_len == 0);
+
+		/* compute the csum over the L4 header */
+		csum = enetc_tso_hdr_csum(&tso, skb, hdr, hdr_len, &pos);
+		enetc_map_tx_tso_hdr(tx_ring, skb, tx_swbd, txbd, &i, hdr_len, data_len);
+		count++;
+
+		while (data_len > 0) {
+			int size;
+
+			size = min_t(int, tso.size, data_len);
+
+			/* Advance the index in the BDR */
+			enetc_bdr_idx_inc(tx_ring, &i);
+			txbd = ENETC_TXBD(*tx_ring, i);
+			tx_swbd = &tx_ring->tx_swbd[i];
+			prefetchw(txbd);
+
+			/* Compute the checksum over this segment of data and
+			 * add it to the csum already computed (over the L4
+			 * header and possible other data segments).
+			 */
+			csum2 = csum_partial(tso.data, size, 0);
+			csum = csum_block_add(csum, csum2, pos);
+			pos += size;
+
+			err = enetc_map_tx_tso_data(tx_ring, skb, tx_swbd, txbd,
+						    tso.data, size,
+						    size == data_len);
+			if (err)
+				goto err_map_data;
+
+			data_len -= size;
+			count++;
+			tso_build_data(skb, &tso, size);
+		}
+
+		enetc_tso_complete_csum(tx_ring, &tso, skb, hdr, pos, csum);
+
+		if (total_len == 0)
+			tx_swbd->skb = skb;
+
+		/* Go to the next BD */
+		enetc_bdr_idx_inc(tx_ring, &i);
+	}
+
+	tx_ring->next_to_use = i;
+	enetc_update_tx_ring_tail(tx_ring);
+
+	return count;
+
+err_map_data:
+	dev_err(tx_ring->dev, "DMA map error");
+
+	do {
+		tx_swbd = &tx_ring->tx_swbd[i];
+		enetc_free_tx_frame(tx_ring, tx_swbd);
+		if (i == 0)
+			i = tx_ring->bd_count;
+		i--;
+	} while (count--);
+
+	return 0;
+}
+
 static netdev_tx_t enetc_start_xmit(struct sk_buff *skb,
 				    struct net_device *ndev)
 {
@@ -342,14 +572,17 @@ static netdev_tx_t enetc_start_xmit(struct sk_buff *skb,
 		return NETDEV_TX_BUSY;
 	}
 
-	if (skb->ip_summed == CHECKSUM_PARTIAL) {
-		err = skb_csum_hwoffload_help(skb, 0);
-		if (err)
-			goto drop_packet_err;
-	}
-
 	enetc_lock_mdio();
-	count = enetc_map_tx_buffs(tx_ring, skb);
+	if (skb_is_gso(skb)) {
+		count = enetc_map_tx_tso_buffs(tx_ring, skb);
+	} else {
+		if (skb->ip_summed == CHECKSUM_PARTIAL) {
+			err = skb_csum_hwoffload_help(skb, 0);
+			if (err)
+				goto drop_packet_err;
+		}
+		count = enetc_map_tx_buffs(tx_ring, skb);
+	}
 	enetc_unlock_mdio();
 
 	if (unlikely(!count))
@@ -573,7 +806,7 @@ static bool enetc_clean_tx_ring(struct enetc_bdr *tx_ring, int napi_budget)
 		if (xdp_frame) {
 			xdp_return_frame(xdp_frame);
 		} else if (skb) {
-			if (unlikely(tx_swbd->skb->cb[0] &
+			if (unlikely(skb->cb[0] &
 				     ENETC_F_TX_ONESTEP_SYNC_TSTAMP)) {
 				/* Start work to release lock for next one-step
 				 * timestamping packet. And send one skb in
@@ -1499,15 +1732,30 @@ static int enetc_alloc_txbdr(struct enetc_bdr *txr)
 		return -ENOMEM;
 
 	err = enetc_dma_alloc_bdr(txr, sizeof(union enetc_tx_bd));
-	if (err) {
-		vfree(txr->tx_swbd);
-		return err;
-	}
+	if (err)
+		goto err_alloc_bdr;
+
+	txr->tso_headers = dma_alloc_coherent(txr->dev,
+					      txr->bd_count * TSO_HEADER_SIZE,
+					      &txr->tso_headers_dma,
+					      GFP_KERNEL);
+	if (err)
+		goto err_alloc_tso;
 
 	txr->next_to_clean = 0;
 	txr->next_to_use = 0;
 
 	return 0;
+
+err_alloc_tso:
+	dma_free_coherent(txr->dev, txr->bd_count * sizeof(union enetc_tx_bd),
+			  txr->bd_base, txr->bd_dma_base);
+	txr->bd_base = NULL;
+err_alloc_bdr:
+	vfree(txr->tx_swbd);
+	txr->tx_swbd = NULL;
+
+	return err;
 }
 
 static void enetc_free_txbdr(struct enetc_bdr *txr)
@@ -1518,6 +1766,10 @@ static void enetc_free_txbdr(struct enetc_bdr *txr)
 		enetc_free_tx_frame(txr, &txr->tx_swbd[i]);
 
 	size = txr->bd_count * sizeof(union enetc_tx_bd);
+
+	dma_free_coherent(txr->dev, txr->bd_count * TSO_HEADER_SIZE,
+			  txr->tso_headers, txr->tso_headers_dma);
+	txr->tso_headers = NULL;
 
 	dma_free_coherent(txr->dev, size, txr->bd_base, txr->bd_dma_base);
 	txr->bd_base = NULL;
