@@ -17,6 +17,7 @@
 #include <linux/regmap.h>
 #include <linux/sched.h>
 #include <linux/timer.h>
+#include <linux/of_device.h>
 
 /*
  * This is a BMC device used to communicate to the host
@@ -435,14 +436,29 @@ static void aspeed_enable_bt(struct bt_bmc *bt_bmc)
 		     BT_CR0_ENABLE_IBT);
 }
 
+struct bt_bmc_ops {
+	int (*config_irq)(struct bt_bmc *bt_bmc, struct platform_device *pdev);
+	void (*enable_bt)(struct bt_bmc *bt_bmc);
+};
+
+static const struct bt_bmc_ops aspeed_bt_bmc_ops = {
+	.config_irq = aspeed_bt_bmc_config_irq,
+	.enable_bt = aspeed_enable_bt,
+};
+
 static int bt_bmc_probe(struct platform_device *pdev)
 {
 	struct bt_bmc *bt_bmc;
 	struct device *dev;
 	int rc;
+	const struct bt_bmc_ops *ops;
 
 	dev = &pdev->dev;
 	dev_info(dev, "Found bt bmc device\n");
+
+	ops = of_device_get_match_data(&pdev->dev);
+	if (!ops)
+		return -ENODEV;
 
 	bt_bmc = devm_kzalloc(dev, sizeof(*bt_bmc), GFP_KERNEL);
 	if (!bt_bmc)
@@ -483,7 +499,7 @@ static int bt_bmc_probe(struct platform_device *pdev)
 		return rc;
 	}
 
-	aspeed_bt_bmc_config_irq(bt_bmc, pdev);
+	ops->config_irq(bt_bmc, pdev);
 
 	if (bt_bmc->irq >= 0) {
 		dev_info(dev, "Using IRQ %d\n", bt_bmc->irq);
@@ -494,7 +510,7 @@ static int bt_bmc_probe(struct platform_device *pdev)
 		add_timer(&bt_bmc->poll_timer);
 	}
 
-	aspeed_enable_bt(bt_bmc);
+	ops->enable_bt(bt_bmc);
 
 	clr_b_busy(bt_bmc);
 
@@ -512,8 +528,8 @@ static int bt_bmc_remove(struct platform_device *pdev)
 }
 
 static const struct of_device_id bt_bmc_match[] = {
-	{ .compatible = "aspeed,ast2400-ibt-bmc" },
-	{ .compatible = "aspeed,ast2500-ibt-bmc" },
+	{ .compatible = "aspeed,ast2400-ibt-bmc", .data = &aspeed_bt_bmc_ops },
+	{ .compatible = "aspeed,ast2500-ibt-bmc", .data = &aspeed_bt_bmc_ops },
 	{ },
 };
 
