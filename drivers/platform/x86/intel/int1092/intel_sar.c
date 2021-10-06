@@ -305,7 +305,6 @@ static struct platform_driver sar_driver = {
 	.remove = sar_remove,
 	.driver = {
 		.name = DRVNAME,
-		.owner = THIS_MODULE,
 		.acpi_match_table = ACPI_PTR(sar_device_ids)
 	}
 };
