@@ -35,7 +35,7 @@ acpi_db_device_resources(acpi_handle obj_handle,
 
 static void acpi_db_do_one_sleep_state(u8 sleep_state);
 
-static char *acpi_db_trace_method_name = NULL;
+static char *acpi_db_trace_method_name;
 
 /*******************************************************************************
  *
