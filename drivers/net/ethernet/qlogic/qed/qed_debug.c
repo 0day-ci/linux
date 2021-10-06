@@ -1231,6 +1231,8 @@ static u32 qed_dump_common_global_params(struct qed_hwfn *p_hwfn,
 	u32 offset = 0;
 	u8 num_params;
 
+	sw_platform_str[0] = '\0';
+
 	/* Dump global params section header */
 	num_params = NUM_COMMON_GLOBAL_PARAMS + num_specific_global_params +
 		(dev_data->chip_id == CHIP_BB ? 1 : 0);
