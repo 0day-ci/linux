@@ -33,6 +33,7 @@
 #include <asm/kup.h>
 #include <asm/bug.h>
 #include <asm/interrupt.h>
+#include <asm/code-patching-asm.h>
 
 #include "head_32.h"
 
@@ -76,17 +77,17 @@ _ASM_NOKPROBE_SYMBOL(prepare_transfer_to_handler)
 #if defined(CONFIG_PPC_KUEP) && defined(CONFIG_PPC_BOOK3S_32)
 	.globl	__kuep_lock
 __kuep_lock:
-	mfsr    r9,0
-	rlwinm  r9,r9,0,8,3
-	oris    r9,r9,SR_NX@h
+0:	blr	/* lwz	r9, current->thread.sr0(r2) */
 	update_user_segments_by_4 r9, r10, r11, r12
 	blr
+	patch_site	0b, patch__kuep_lock
 
 __kuep_unlock:
-	mfsr    r9,0
-	rlwinm  r9,r9,0,8,2
+0:	blr	/* lwz	r9, current->thread.sr0(r2) */
+	rlwinm  r9,r9,0,~SR_NX
 	update_user_segments_by_4 r9, r10, r11, r12
 	blr
+	patch_site	0b, patch__kuep_unlock
 
 .macro	kuep_lock
 	bl	__kuep_lock
