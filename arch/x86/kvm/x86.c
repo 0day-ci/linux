@@ -4944,8 +4944,11 @@ static int kvm_arch_tsc_has_attr(struct kvm_vcpu *vcpu,
 static int kvm_arch_tsc_get_attr(struct kvm_vcpu *vcpu,
 				 struct kvm_device_attr *attr)
 {
-	u64 __user *uaddr = (u64 __user *)attr->addr;
+	u64 __user *uaddr = (u64 __user *)(unsigned long)attr->addr;
 	int r;
+
+	if ((u64)(unsigned long)uaddr != attr->addr)
+		return -EFAULT;
 
 	switch (attr->attr) {
 	case KVM_VCPU_TSC_OFFSET:
@@ -4964,9 +4967,12 @@ static int kvm_arch_tsc_get_attr(struct kvm_vcpu *vcpu,
 static int kvm_arch_tsc_set_attr(struct kvm_vcpu *vcpu,
 				 struct kvm_device_attr *attr)
 {
-	u64 __user *uaddr = (u64 __user *)attr->addr;
+	u64 __user *uaddr = (u64 __user *)(unsigned long)attr->addr;
 	struct kvm *kvm = vcpu->kvm;
 	int r;
+
+	if ((u64)(unsigned long)uaddr != attr->addr)
+		return -EFAULT;
 
 	switch (attr->attr) {
 	case KVM_VCPU_TSC_OFFSET: {
