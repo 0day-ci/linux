@@ -4236,16 +4236,25 @@ static struct bin_attribute ipr_ioa_async_err_log = {
 	.write = ipr_next_async_err_log
 };
 
-static struct device_attribute *ipr_ioa_attrs[] = {
-	&ipr_fw_version_attr,
-	&ipr_log_level_attr,
-	&ipr_diagnostics_attr,
-	&ipr_ioa_state_attr,
-	&ipr_ioa_reset_attr,
-	&ipr_update_fw_attr,
-	&ipr_ioa_fw_type_attr,
-	&ipr_iopoll_weight_attr,
+static struct attribute *ipr_ioa_attrs[] = {
+	&ipr_fw_version_attr.attr,
+	&ipr_log_level_attr.attr,
+	&ipr_diagnostics_attr.attr,
+	&ipr_ioa_state_attr.attr,
+	&ipr_ioa_reset_attr.attr,
+	&ipr_update_fw_attr.attr,
+	&ipr_ioa_fw_type_attr.attr,
+	&ipr_iopoll_weight_attr.attr,
 	NULL,
+};
+
+static const struct attribute_group ipr_ioa_attr_group = {
+	.attrs = ipr_ioa_attrs
+};
+
+static const struct attribute_group *ipr_ioa_attr_groups[] = {
+	&ipr_ioa_attr_group,
+	NULL
 };
 
 #ifdef CONFIG_SCSI_IPR_DUMP
@@ -4732,13 +4741,22 @@ static struct device_attribute ipr_raw_mode_attr = {
 	.store = ipr_store_raw_mode
 };
 
-static struct device_attribute *ipr_dev_attrs[] = {
-	&ipr_adapter_handle_attr,
-	&ipr_resource_path_attr,
-	&ipr_device_id_attr,
-	&ipr_resource_type_attr,
-	&ipr_raw_mode_attr,
+static struct attribute *ipr_dev_attrs[] = {
+	&ipr_adapter_handle_attr.attr,
+	&ipr_resource_path_attr.attr,
+	&ipr_device_id_attr.attr,
+	&ipr_resource_type_attr.attr,
+	&ipr_raw_mode_attr.attr,
 	NULL,
+};
+
+static const struct attribute_group ipr_dev_attr_group = {
+	.attrs = ipr_dev_attrs
+};
+
+static const struct attribute_group *ipr_dev_attr_groups[] = {
+	&ipr_dev_attr_group,
+	NULL
 };
 
 /**
@@ -6762,8 +6780,8 @@ static struct scsi_host_template driver_template = {
 	.sg_tablesize = IPR_MAX_SGLIST,
 	.max_sectors = IPR_IOA_MAX_SECTORS,
 	.cmd_per_lun = IPR_MAX_CMD_PER_LUN,
-	.shost_attrs = ipr_ioa_attrs,
-	.sdev_attrs = ipr_dev_attrs,
+	.shost_groups = ipr_ioa_attr_groups,
+	.sdev_groups = ipr_dev_attr_groups,
 	.proc_name = IPR_NAME,
 };
 
