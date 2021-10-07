@@ -64,10 +64,10 @@ int
 ice_read_flat_nvm(struct ice_hw *hw, u32 offset, u32 *length, u8 *data,
 		  bool read_shadow_ram)
 {
-	int status;
 	u32 inlen = *length;
 	u32 bytes_read = 0;
 	bool last_cmd;
+	int status;
 
 	*length = 0;
 
@@ -188,8 +188,8 @@ static int
 ice_read_sr_word_aq(struct ice_hw *hw, u16 offset, u16 *data)
 {
 	u32 bytes = sizeof(u16);
-	int status;
 	__le16 data_local;
+	int status;
 
 	/* Note that ice_read_flat_nvm takes into account the 4Kb AdminQ and
 	 * Shadow RAM sector restrictions necessary when reading from the NVM.
@@ -356,8 +356,8 @@ ice_read_flash_module(struct ice_hw *hw, enum ice_bank_select bank, u16 module,
 static int
 ice_read_nvm_module(struct ice_hw *hw, enum ice_bank_select bank, u32 offset, u16 *data)
 {
-	int status;
 	__le16 data_local;
+	int status;
 
 	status = ice_read_flash_module(hw, bank, ICE_SR_1ST_NVM_BANK_PTR, offset * sizeof(u16),
 				       (__force u8 *)&data_local, sizeof(u16));
@@ -395,8 +395,8 @@ ice_read_nvm_sr_copy(struct ice_hw *hw, enum ice_bank_select bank, u32 offset, u
 static int
 ice_read_netlist_module(struct ice_hw *hw, enum ice_bank_select bank, u32 offset, u16 *data)
 {
-	int status;
 	__le16 data_local;
+	int status;
 
 	status = ice_read_flash_module(hw, bank, ICE_SR_NETLIST_BANK_PTR, offset * sizeof(u16),
 				       (__force u8 *)&data_local, sizeof(u16));
@@ -442,9 +442,9 @@ int
 ice_get_pfa_module_tlv(struct ice_hw *hw, u16 *module_tlv, u16 *module_tlv_len,
 		       u16 module_type)
 {
-	int status;
 	u16 pfa_len, pfa_ptr;
 	u16 next_tlv;
+	int status;
 
 	status = ice_read_sr_word(hw, ICE_SR_PFA_PTR, &pfa_ptr);
 	if (status) {
@@ -505,8 +505,8 @@ int
 ice_read_pba_string(struct ice_hw *hw, u8 *pba_num, u32 pba_num_size)
 {
 	u16 pba_tlv, pba_tlv_len;
-	int status;
 	u16 pba_word, pba_size;
+	int status;
 	u16 i;
 
 	status = ice_get_pfa_module_tlv(hw, &pba_tlv, &pba_tlv_len,
@@ -673,8 +673,8 @@ static int
 ice_get_orom_ver_info(struct ice_hw *hw, enum ice_bank_select bank, struct ice_orom_info *orom)
 {
 	struct ice_orom_civd_info civd;
-	int status;
 	u32 combo_ver;
+	int status;
 
 	status = ice_get_orom_civd_data(hw, bank, &civd);
 	if (status) {
@@ -720,8 +720,8 @@ ice_get_netlist_info(struct ice_hw *hw, enum ice_bank_select bank,
 		     struct ice_netlist_info *netlist)
 {
 	u16 module_id, length, node_count, i;
-	int status;
 	u16 *id_blk;
+	int status;
 
 	status = ice_read_netlist_module(hw, bank, ICE_NETLIST_TYPE_OFFSET, &module_id);
 	if (status)
@@ -921,8 +921,8 @@ static int
 ice_determine_active_flash_banks(struct ice_hw *hw)
 {
 	struct ice_bank_info *banks = &hw->flash.banks;
-	int status;
 	u16 ctrl_word;
+	int status;
 
 	status = ice_read_sr_word(hw, ICE_SR_NVM_CTRL_WORD, &ctrl_word);
 	if (status) {
@@ -1000,9 +1000,9 @@ ice_determine_active_flash_banks(struct ice_hw *hw)
 int ice_init_nvm(struct ice_hw *hw)
 {
 	struct ice_flash_info *flash = &hw->flash;
-	int status;
 	u32 fla, gens_stat;
 	u8 sr_size;
+	int status;
 
 	/* The SR size is stored regardless of the NVM programming mode
 	 * as the blank mode may be used in the factory line.
