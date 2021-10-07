@@ -674,7 +674,7 @@ ice_get_pca9575_handle(struct ice_hw *hw, u16 *pca9575_handle)
 	u8 idx;
 
 	if (!hw || !pca9575_handle)
-		return ICE_ERR_PARAM;
+		return -EINVAL;
 
 	/* If handle was read previously return cached value */
 	if (hw->io_expander_handle) {
@@ -700,18 +700,18 @@ ice_get_pca9575_handle(struct ice_hw *hw, u16 *pca9575_handle)
 	else if (hw->device_id == ICE_DEV_ID_E810C_QSFP)
 		idx = SW_PCA9575_QSFP_TOPO_IDX;
 	else
-		return ICE_ERR_NOT_SUPPORTED;
+		return -EOPNOTSUPP;
 
 	cmd->addr.topo_params.index = idx;
 
 	status = ice_aq_send_cmd(hw, &desc, NULL, 0, NULL);
 	if (status)
-		return ICE_ERR_NOT_SUPPORTED;
+		return -EOPNOTSUPP;
 
 	/* Verify if we found the right IO expander type */
 	if (desc.params.get_link_topo.node_part_num !=
 		ICE_AQC_GET_LINK_TOPO_NODE_NR_PCA9575)
-		return ICE_ERR_NOT_SUPPORTED;
+		return -EOPNOTSUPP;
 
 	/* If present save the handle and return it */
 	hw->io_expander_handle =
