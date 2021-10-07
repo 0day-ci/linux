@@ -4097,13 +4097,21 @@ static struct device_attribute pmcraid_adapter_id_attr = {
 	.show = pmcraid_show_adapter_id,
 };
 
-static struct device_attribute *pmcraid_host_attrs[] = {
-	&pmcraid_log_level_attr,
-	&pmcraid_driver_version_attr,
-	&pmcraid_adapter_id_attr,
+static struct attribute *pmcraid_host_attrs[] = {
+	&pmcraid_log_level_attr.attr,
+	&pmcraid_driver_version_attr.attr,
+	&pmcraid_adapter_id_attr.attr,
 	NULL,
 };
 
+static const struct attribute_group pmcraid_host_attr_group = {
+	.attrs = pmcraid_host_attrs
+};
+
+static const struct attribute_group *pmcraid_host_attr_groups[] = {
+	&pmcraid_host_attr_group,
+	NULL
+};
 
 /* host template structure for pmcraid driver */
 static struct scsi_host_template pmcraid_host_template = {
@@ -4126,7 +4134,7 @@ static struct scsi_host_template pmcraid_host_template = {
 	.max_sectors = PMCRAID_IOA_MAX_SECTORS,
 	.no_write_same = 1,
 	.cmd_per_lun = PMCRAID_MAX_CMD_PER_LUN,
-	.shost_attrs = pmcraid_host_attrs,
+	.shost_groups = pmcraid_host_attr_groups,
 	.proc_name = PMCRAID_DRIVER_NAME,
 };
 
