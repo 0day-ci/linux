@@ -32,7 +32,7 @@ ice_get_sma_config_e810t(struct ice_hw *hw, struct ptp_pin_desc *ptp_pins)
 	/* Read initial pin state */
 	status = ice_read_sma_ctrl_e810t(hw, &data);
 	if (status)
-		return ice_status_to_errno(status);
+		return status;
 
 	/* initialize with defaults */
 	for (i = 0; i < NUM_PTP_PINS_E810T; i++) {
@@ -120,7 +120,7 @@ ice_ptp_set_sma_config_e810t(struct ice_hw *hw,
 	/* Read initial pin state value */
 	status = ice_read_sma_ctrl_e810t(hw, &data);
 	if (status)
-		return ice_status_to_errno(status);
+		return status;
 
 	/* Set the right sate based on the desired configuration */
 	data &= ~ICE_SMA1_MASK_E810T;
@@ -172,7 +172,7 @@ ice_ptp_set_sma_config_e810t(struct ice_hw *hw,
 
 	status = ice_write_sma_ctrl_e810t(hw, data);
 	if (status)
-		return ice_status_to_errno(status);
+		return status;
 
 	return 0;
 }

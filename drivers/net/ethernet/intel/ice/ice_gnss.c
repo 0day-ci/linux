@@ -59,7 +59,7 @@ static void ice_gnss_read(struct kthread_work *work)
 					 cpu_to_le16(ICE_GNSS_UBX_DATA_LEN_H),
 					 i2c_params, (u8 *)&data_len_b, NULL);
 		if (status) {
-			err = ice_status_to_errno(status);
+			err = status;
 			goto exit_buf;
 		}
 
@@ -91,7 +91,7 @@ static void ice_gnss_read(struct kthread_work *work)
 					 cpu_to_le16(ICE_GNSS_UBX_EMPTY_DATA),
 					 bytes_read, &buf[i], NULL);
 		if (status) {
-			err = ice_status_to_errno(status);
+			err = status;
 			goto exit_buf;
 		}
 	}
