@@ -122,6 +122,10 @@ static inline void hash_del_rcu(struct hlist_node *node)
  * @bkt: integer to use as bucket loop cursor
  * @obj: the type * to use as a loop cursor for each entry
  * @member: the name of the hlist_node within the struct
+ *
+ * Note: It is safe to 'break' out of this loop even though it is a two nested
+ * loops.  The 'obj == NULL' test ensures that when the inner loop is broken,
+ * the outer loop will break too.
  */
 #define hash_for_each(name, bkt, obj, member)				\
 	for ((bkt) = 0, obj = NULL; obj == NULL && (bkt) < HASH_SIZE(name);\
@@ -134,6 +138,8 @@ static inline void hash_del_rcu(struct hlist_node *node)
  * @bkt: integer to use as bucket loop cursor
  * @obj: the type * to use as a loop cursor for each entry
  * @member: the name of the hlist_node within the struct
+ *
+ * Note: It is safe to 'break' out of this loop.
  */
 #define hash_for_each_rcu(name, bkt, obj, member)			\
 	for ((bkt) = 0, obj = NULL; obj == NULL && (bkt) < HASH_SIZE(name);\
@@ -148,6 +154,8 @@ static inline void hash_del_rcu(struct hlist_node *node)
  * @tmp: a &struct hlist_node used for temporary storage
  * @obj: the type * to use as a loop cursor for each entry
  * @member: the name of the hlist_node within the struct
+ *
+ * Note: It is safe to 'break' out of this loop.
  */
 #define hash_for_each_safe(name, bkt, tmp, obj, member)			\
 	for ((bkt) = 0, obj = NULL; obj == NULL && (bkt) < HASH_SIZE(name);\
