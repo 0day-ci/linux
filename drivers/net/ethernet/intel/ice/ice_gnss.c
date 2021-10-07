@@ -24,7 +24,7 @@ static void ice_gnss_read(struct kthread_work *work)
 	__be16 data_len_b;
 	char *buf = NULL;
 	u16 i, data_len;
-	int err = 0;
+	int err;
 
 	pf = gnss->back;
 	if (!pf || !&pf->hw || !gnss->tty || !gnss->tty->port) {
@@ -52,16 +52,11 @@ static void ice_gnss_read(struct kthread_work *work)
 
 	/* Read data length in a loop, when it's not 0 the data is ready */
 	for (i = 0; i < ICE_MAX_UBX_READ_TRIES; i++) {
-		int status;
-
-		status = ice_aq_read_i2c(hw, link_topo,
-					 ICE_GNSS_UBX_I2C_BUS_ADDR,
-					 cpu_to_le16(ICE_GNSS_UBX_DATA_LEN_H),
-					 i2c_params, (u8 *)&data_len_b, NULL);
-		if (status) {
-			err = status;
+		err = ice_aq_read_i2c(hw, link_topo, ICE_GNSS_UBX_I2C_BUS_ADDR,
+				      cpu_to_le16(ICE_GNSS_UBX_DATA_LEN_H),
+				      i2c_params, (u8 *)&data_len_b, NULL);
+		if (err)
 			goto exit_buf;
-		}
 
 		data_len = be16_to_cpu(data_len_b);
 		if (data_len != 0 && data_len != U16_MAX)
@@ -79,21 +74,16 @@ static void ice_gnss_read(struct kthread_work *work)
 
 	/* Read received data */
 	for (i = 0; i < data_len; i += bytes_read) {
-		int status;
-
 		u16 bytes_left = data_len - i;
 
 		bytes_read = bytes_left < ICE_MAX_I2C_DATA_SIZE ? bytes_left :
 					  ICE_MAX_I2C_DATA_SIZE;
 
-		status = ice_aq_read_i2c(hw, link_topo,
-					 ICE_GNSS_UBX_I2C_BUS_ADDR,
-					 cpu_to_le16(ICE_GNSS_UBX_EMPTY_DATA),
-					 bytes_read, &buf[i], NULL);
-		if (status) {
-			err = status;
+		err = ice_aq_read_i2c(hw, link_topo, ICE_GNSS_UBX_I2C_BUS_ADDR,
+				      cpu_to_le16(ICE_GNSS_UBX_EMPTY_DATA),
+				      bytes_read, &buf[i], NULL);
+		if (err)
 			goto exit_buf;
-		}
 	}
 
 	/* Send the data to the tty layer for users to read. This doesn't
