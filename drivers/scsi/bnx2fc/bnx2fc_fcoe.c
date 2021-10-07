@@ -2951,9 +2951,18 @@ bnx2fc_tm_timeout_store(struct device *dev,
 static DEVICE_ATTR(tm_timeout, S_IRUGO|S_IWUSR, bnx2fc_tm_timeout_show,
 	bnx2fc_tm_timeout_store);
 
-static struct device_attribute *bnx2fc_host_attrs[] = {
-	&dev_attr_tm_timeout,
+static struct attribute *bnx2fc_host_attrs[] = {
+	&dev_attr_tm_timeout.attr,
 	NULL,
+};
+
+static const struct attribute_group bnx2fc_host_attr_group = {
+	.attrs = bnx2fc_host_attrs
+};
+
+static const struct attribute_group *bnx2fc_host_attr_groups[] = {
+	&bnx2fc_host_attr_group,
+	NULL
 };
 
 /*
@@ -2977,7 +2986,7 @@ static struct scsi_host_template bnx2fc_shost_template = {
 	.max_sectors		= 0x3fbf,
 	.track_queue_depth	= 1,
 	.slave_configure	= bnx2fc_slave_configure,
-	.shost_attrs		= bnx2fc_host_attrs,
+	.shost_groups		= bnx2fc_host_attr_groups,
 };
 
 static struct libfc_function_template bnx2fc_libfc_fcn_templ = {
