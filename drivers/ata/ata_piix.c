@@ -1085,14 +1085,23 @@ static struct ata_port_operations ich_pata_ops = {
 	.set_dmamode		= ich_set_dmamode,
 };
 
-static struct device_attribute *piix_sidpr_shost_attrs[] = {
-	&dev_attr_link_power_management_policy,
+static struct attribute *piix_sidpr_shost_attrs[] = {
+	&dev_attr_link_power_management_policy.attr,
+	NULL
+};
+
+static const struct attribute_group piix_sidpr_shost_attr_group = {
+	.attrs = piix_sidpr_shost_attrs
+};
+
+static const struct attribute_group *piix_sidpr_shost_groups[] = {
+	&piix_sidpr_shost_attr_group,
 	NULL
 };
 
 static struct scsi_host_template piix_sidpr_sht = {
 	ATA_BMDMA_SHT(DRV_NAME),
-	.shost_attrs		= piix_sidpr_shost_attrs,
+	.shost_groups		= piix_sidpr_shost_groups,
 };
 
 static struct ata_port_operations piix_sidpr_sata_ops = {
