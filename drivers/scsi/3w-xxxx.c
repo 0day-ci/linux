@@ -532,9 +532,18 @@ static struct device_attribute tw_host_stats_attr = {
 };
 
 /* Host attributes initializer */
-static struct device_attribute *tw_host_attrs[] = {
-	&tw_host_stats_attr,
+static struct attribute *tw_host_attrs[] = {
+	&tw_host_stats_attr.attr,
 	NULL,
+};
+
+static const struct attribute_group tw_host_attr_group = {
+	.attrs = tw_host_attrs
+};
+
+static const struct attribute_group *tw_host_attr_groups[] = {
+	&tw_host_attr_group,
+	NULL
 };
 
 /* This function will read the aen queue from the isr */
@@ -2242,7 +2251,7 @@ static struct scsi_host_template driver_template = {
 	.sg_tablesize		= TW_MAX_SGL_LENGTH,
 	.max_sectors		= TW_MAX_SECTORS,
 	.cmd_per_lun		= TW_MAX_CMDS_PER_LUN,
-	.shost_attrs		= tw_host_attrs,
+	.shost_groups		= tw_host_attr_groups,
 	.emulated		= 1,
 	.no_write_same		= 1,
 };
