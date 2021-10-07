@@ -1665,20 +1665,19 @@ int ice_vsi_kill_vlan(struct ice_vsi *vsi, u16 vid)
 {
 	struct ice_pf *pf = vsi->back;
 	struct device *dev;
-	int err = 0;
-	int status;
+	int err;
 
 	dev = ice_pf_to_dev(pf);
 
-	status = ice_fltr_remove_vlan(vsi, vid, ICE_FWD_TO_VSI);
-	if (!status) {
+	err = ice_fltr_remove_vlan(vsi, vid, ICE_FWD_TO_VSI);
+	if (!err) {
 		vsi->num_vlan--;
-	} else if (status == -ENOENT) {
+	} else if (err == -ENOENT) {
 		dev_dbg(dev, "Failed to remove VLAN %d on VSI %i, it does not exist, error: %d\n",
-			vid, vsi->vsi_num, status);
+			vid, vsi->vsi_num, err);
 	} else {
 		dev_err(dev, "Error removing VLAN %d on vsi %i error: %d\n",
-			vid, vsi->vsi_num, status);
+			vid, vsi->vsi_num, err);
 		err = -EIO;
 	}
 
@@ -2019,8 +2018,7 @@ int ice_vsi_manage_vlan_insertion(struct ice_vsi *vsi)
 {
 	struct ice_hw *hw = &vsi->back->hw;
 	struct ice_vsi_ctx *ctxt;
-	int ret = 0;
-	int status;
+	int ret;
 
 	ctxt = kzalloc(sizeof(*ctxt), GFP_KERNEL);
 	if (!ctxt)
@@ -2038,11 +2036,10 @@ int ice_vsi_manage_vlan_insertion(struct ice_vsi *vsi)
 
 	ctxt->info.valid_sections = cpu_to_le16(ICE_AQ_VSI_PROP_VLAN_VALID);
 
-	status = ice_update_vsi(hw, vsi->idx, ctxt, NULL);
-	if (status) {
+	ret = ice_update_vsi(hw, vsi->idx, ctxt, NULL);
+	if (ret) {
 		dev_err(ice_pf_to_dev(vsi->back), "update VSI for VLAN insert failed, err %d aq_err %s\n",
-			status,
-			ice_aq_str(hw->adminq.sq_last_status));
+			ret, ice_aq_str(hw->adminq.sq_last_status));
 		ret = -EIO;
 		goto out;
 	}
@@ -2062,8 +2059,7 @@ int ice_vsi_manage_vlan_stripping(struct ice_vsi *vsi, bool ena)
 {
 	struct ice_hw *hw = &vsi->back->hw;
 	struct ice_vsi_ctx *ctxt;
-	int status;
-	int ret = 0;
+	int ret;
 
 	/* do not allow modifying VLAN stripping when a port VLAN is configured
 	 * on this VSI
@@ -2091,11 +2087,10 @@ int ice_vsi_manage_vlan_stripping(struct ice_vsi *vsi, bool ena)
 
 	ctxt->info.valid_sections = cpu_to_le16(ICE_AQ_VSI_PROP_VLAN_VALID);
 
-	status = ice_update_vsi(hw, vsi->idx, ctxt, NULL);
-	if (status) {
+	ret = ice_update_vsi(hw, vsi->idx, ctxt, NULL);
+	if (ret) {
 		dev_err(ice_pf_to_dev(vsi->back), "update VSI for VLAN strip failed, ena = %d err %d aq_err %s\n",
-			ena, status,
-			ice_aq_str(hw->adminq.sq_last_status));
+			ena, ret, ice_aq_str(hw->adminq.sq_last_status));
 		ret = -EIO;
 		goto out;
 	}
@@ -2485,7 +2480,6 @@ ice_vsi_setup(struct ice_pf *pf, struct ice_port_info *pi,
 	struct device *dev = ice_pf_to_dev(pf);
 	struct ice_vsi *vsi;
 	int ret, i;
-	int status;
 
 	if (vsi_type == ICE_VSI_VF || vsi_type == ICE_VSI_CTRL)
 		vsi = ice_vsi_alloc(pf, vsi_type, vf_id);
@@ -2610,11 +2604,11 @@ ice_vsi_setup(struct ice_pf *pf, struct ice_port_info *pi,
 	for (i = 0; i < vsi->tc_cfg.numtc; i++)
 		max_txqs[i] = vsi->alloc_txq;
 
-	status = ice_cfg_vsi_lan(vsi->port_info, vsi->idx, vsi->tc_cfg.ena_tc,
-				 max_txqs);
-	if (status) {
+	ret = ice_cfg_vsi_lan(vsi->port_info, vsi->idx, vsi->tc_cfg.ena_tc,
+			      max_txqs);
+	if (ret) {
 		dev_err(dev, "VSI %d failed lan queue config, error %d\n",
-			vsi->vsi_num, status);
+			vsi->vsi_num, ret);
 		goto unroll_clear_rings;
 	}
 
@@ -3160,7 +3154,6 @@ int ice_vsi_rebuild(struct ice_vsi *vsi, bool init_vsi)
 	enum ice_vsi_type vtype;
 	struct ice_pf *pf;
 	int ret, i;
-	int status;
 
 	if (!vsi)
 		return -EINVAL;
@@ -3287,11 +3280,11 @@ int ice_vsi_rebuild(struct ice_vsi *vsi, bool init_vsi)
 			max_txqs[i] += vsi->num_xdp_txq;
 	}
 
-	status = ice_cfg_vsi_lan(vsi->port_info, vsi->idx, vsi->tc_cfg.ena_tc,
-				 max_txqs);
-	if (status) {
+	ret = ice_cfg_vsi_lan(vsi->port_info, vsi->idx, vsi->tc_cfg.ena_tc,
+			      max_txqs);
+	if (ret) {
 		dev_err(ice_pf_to_dev(pf), "VSI %d failed lan queue config, error %d\n",
-			vsi->vsi_num, status);
+			vsi->vsi_num, ret);
 		if (init_vsi) {
 			ret = -EIO;
 			goto err_vectors;
@@ -3388,9 +3381,8 @@ int ice_vsi_cfg_tc(struct ice_vsi *vsi, u8 ena_tc)
 	struct ice_pf *pf = vsi->back;
 	struct ice_vsi_ctx *ctx;
 	struct device *dev;
-	int i, ret = 0;
 	u8 num_tc = 0;
-	int status;
+	int i, ret;
 
 	dev = ice_pf_to_dev(pf);
 
@@ -3416,19 +3408,19 @@ int ice_vsi_cfg_tc(struct ice_vsi *vsi, u8 ena_tc)
 
 	/* must to indicate which section of VSI context are being modified */
 	ctx->info.valid_sections = cpu_to_le16(ICE_AQ_VSI_PROP_RXQ_MAP_VALID);
-	status = ice_update_vsi(&pf->hw, vsi->idx, ctx, NULL);
-	if (status) {
+	ret = ice_update_vsi(&pf->hw, vsi->idx, ctx, NULL);
+	if (ret) {
 		dev_info(dev, "Failed VSI Update\n");
 		ret = -EIO;
 		goto out;
 	}
 
-	status = ice_cfg_vsi_lan(vsi->port_info, vsi->idx, vsi->tc_cfg.ena_tc,
-				 max_txqs);
+	ret = ice_cfg_vsi_lan(vsi->port_info, vsi->idx, vsi->tc_cfg.ena_tc,
+			      max_txqs);
 
-	if (status) {
+	if (ret) {
 		dev_err(dev, "VSI %d failed TC config, error %d\n",
-			vsi->vsi_num, status);
+			vsi->vsi_num, ret);
 		ret = -EIO;
 		goto out;
 	}
