@@ -421,8 +421,7 @@ ice_devlink_reload_down(struct devlink *devlink, bool netns_change,
 		status = ice_aq_nvm_update_empr(hw);
 		if (status) {
 			dev_err(dev, "Failed to trigger EMP device reset to reload firmware, err %d aq_err %s\n",
-				status,
-				ice_aq_str(hw->adminq.sq_last_status));
+				status, ice_aq_str(hw->adminq.sq_last_status));
 			NL_SET_ERR_MSG_MOD(extack, "Failed to trigger EMP device reset to reload firmware");
 			return -EIO;
 		}
@@ -785,9 +784,9 @@ static int ice_devlink_nvm_snapshot(struct devlink *devlink,
 	struct ice_pf *pf = devlink_priv(devlink);
 	struct device *dev = ice_pf_to_dev(pf);
 	struct ice_hw *hw = &pf->hw;
-	int status;
 	void *nvm_data;
 	u32 nvm_size;
+	int status;
 
 	nvm_size = hw->flash.flash_size;
 	nvm_data = vzalloc(nvm_size);
@@ -843,9 +842,9 @@ ice_devlink_sram_snapshot(struct devlink *devlink,
 	struct ice_pf *pf = devlink_priv(devlink);
 	struct device *dev = ice_pf_to_dev(pf);
 	struct ice_hw *hw = &pf->hw;
-	int status;
 	u8 *sram_data;
 	u32 sram_size;
+	int status;
 
 	sram_size = hw->flash.sr_words * 2u;
 	sram_data = vzalloc(sram_size);
@@ -902,8 +901,8 @@ ice_devlink_devcaps_snapshot(struct devlink *devlink,
 	struct ice_pf *pf = devlink_priv(devlink);
 	struct device *dev = ice_pf_to_dev(pf);
 	struct ice_hw *hw = &pf->hw;
-	int status;
 	void *devcaps;
+	int status;
 
 	devcaps = vzalloc(ICE_AQ_MAX_BUF_LEN);
 	if (!devcaps)
