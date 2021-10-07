@@ -115,6 +115,7 @@ const struct intel_modifier_desc {
 	u64 display_versions;
 	const struct drm_format_info *formats;
 	int format_count;
+	u8 tiling;
 
 	struct {
 #define INTEL_CCS_RC		BIT(0)
@@ -132,10 +133,12 @@ const struct intel_modifier_desc {
 	{
 		.id = I915_FORMAT_MOD_X_TILED,
 		.display_versions = DISPLAY_VER_MASK_ALL,
+		.tiling = I915_TILING_X,
 	},
 	{
 		.id = I915_FORMAT_MOD_Y_TILED,
 		.display_versions = DISPLAY_VER_MASK(9, 13),
+		.tiling = I915_TILING_Y,
 	},
 	{
 		.id = I915_FORMAT_MOD_Yf_TILED,
@@ -144,6 +147,7 @@ const struct intel_modifier_desc {
 	{
 		.id = I915_FORMAT_MOD_Y_TILED_CCS,
 		.display_versions = DISPLAY_VER_MASK(9, 11),
+		.tiling = I915_TILING_Y,
 
 		.ccs.type = INTEL_CCS_RC,
 
@@ -160,6 +164,7 @@ const struct intel_modifier_desc {
 	{
 		.id = I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS,
 		.display_versions = DISPLAY_VER_MASK(12, 13),
+		.tiling = I915_TILING_Y,
 
 		.ccs.type = INTEL_CCS_RC,
 
@@ -168,6 +173,7 @@ const struct intel_modifier_desc {
 	{
 		.id = I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC,
 		.display_versions = DISPLAY_VER_MASK(12, 13),
+		.tiling = I915_TILING_Y,
 
 		.ccs.type = INTEL_CCS_RC_CC,
 
@@ -176,6 +182,7 @@ const struct intel_modifier_desc {
 	{
 		.id = I915_FORMAT_MOD_Y_TILED_GEN12_MC_CCS,
 		.display_versions = DISPLAY_VER_MASK(12, 13),
+		.tiling = I915_TILING_Y,
 
 		.ccs.type = INTEL_CCS_MC,
 
@@ -556,18 +563,7 @@ intel_fb_align_height(const struct drm_framebuffer *fb,
 
 static unsigned int intel_fb_modifier_to_tiling(u64 fb_modifier)
 {
-	switch (fb_modifier) {
-	case I915_FORMAT_MOD_X_TILED:
-		return I915_TILING_X;
-	case I915_FORMAT_MOD_Y_TILED:
-	case I915_FORMAT_MOD_Y_TILED_CCS:
-	case I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS:
-	case I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC:
-	case I915_FORMAT_MOD_Y_TILED_GEN12_MC_CCS:
-		return I915_TILING_Y;
-	default:
-		return I915_TILING_NONE;
-	}
+	return lookup_modifier(fb_modifier)->tiling;
 }
 
 unsigned int intel_cursor_alignment(const struct drm_i915_private *i915)
