@@ -25,7 +25,6 @@ struct intel_plane_state;
 bool is_ccs_plane(const struct drm_framebuffer *fb, int plane);
 bool is_gen12_ccs_plane(const struct drm_framebuffer *fb, int plane);
 bool is_gen12_ccs_cc_plane(const struct drm_framebuffer *fb, int plane);
-bool is_semiplanar_uv_plane(const struct drm_framebuffer *fb, int color_plane);
 
 u64 *intel_fb_plane_get_modifiers(struct drm_i915_private *i915,
 				  enum pipe pipe, enum plane_id plane_id);
