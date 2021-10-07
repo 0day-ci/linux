@@ -88,7 +88,14 @@ static int live_nop_switch(void *arg)
 				goto out_file;
 			}
 			if (rq) {
-				i915_request_await_dma_fence(this, &rq->fence);
+				if (i915_request_await_dma_fence(this,
+					&rq->fence)) {
+					pr_err("Failed to populate %ld contexts\n", n);
+					intel_gt_set_wedged(to_gt(i915));
+					i915_request_put(rq);
+					err = -EIO;
+					goto out_file;
+				}
 				i915_request_put(rq);
 			}
 			rq = i915_request_get(this);
