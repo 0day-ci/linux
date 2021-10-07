@@ -22,6 +22,8 @@ struct intel_framebuffer;
 struct intel_plane;
 struct intel_plane_state;
 
+bool intel_fb_is_ccs_modifier(u64 modifier);
+
 bool intel_fb_is_ccs_ctrl_plane(const struct drm_framebuffer *fb, int plane);
 int intel_fb_rc_ccs_cc_plane(const struct drm_framebuffer *fb);
 
