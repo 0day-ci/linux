@@ -20,6 +20,7 @@ struct css_set;
 
 #define KERN_WORKER_IO		BIT(0)
 #define KERN_WORKER_USER	BIT(1)
+#define KERN_WORKER_NO_FILES	BIT(2)
 
 struct kernel_clone_args {
 	u64 flags;
