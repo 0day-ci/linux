@@ -2085,6 +2085,8 @@ static __latent_entropy struct task_struct *copy_process(
 		siginitsetinv(&p->blocked, sigmask(SIGKILL)|sigmask(SIGSTOP));
 	}
 
+	if (args->worker_flags & KERN_WORKER_USER)
+		p->flags |= PF_USER_WORKER;
 	/*
 	 * This _must_ happen before we call free_task(), i.e. before we jump
 	 * to any of the bad_fork_* labels. This is to avoid freeing
@@ -2576,7 +2578,7 @@ struct task_struct *create_io_thread(int (*fn)(void *), void *arg, int node)
 		.exit_signal	= (lower_32_bits(flags) & CSIGNAL),
 		.stack		= (unsigned long)fn,
 		.stack_size	= (unsigned long)arg,
-		.worker_flags	= KERN_WORKER_IO,
+		.worker_flags	= KERN_WORKER_IO | KERN_WORKER_USER,
 	};
 
 	return copy_process(NULL, 0, node, &args);
