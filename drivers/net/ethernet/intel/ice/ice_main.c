@@ -155,9 +155,9 @@ static void ice_check_for_hang_subtask(struct ice_pf *pf)
  */
 static int ice_init_mac_fltr(struct ice_pf *pf)
 {
-	int status;
 	struct ice_vsi *vsi;
 	u8 *perm_addr;
+	int status;
 
 	vsi = ice_get_main_vsi(pf);
 	if (!vsi)
@@ -297,8 +297,8 @@ static int ice_vsi_sync_fltr(struct ice_vsi *vsi)
 	bool promisc_forced_on = false;
 	struct ice_pf *pf = vsi->back;
 	struct ice_hw *hw = &pf->hw;
-	int status = 0;
 	u32 changed_flags = 0;
+	int status = 0;
 	u8 promisc_m;
 	int err = 0;
 
@@ -710,12 +710,12 @@ void ice_print_link_msg(struct ice_vsi *vsi, bool isup)
 {
 	struct ice_aqc_get_phy_caps_data *caps;
 	const char *an_advertised;
-	int status;
 	const char *fec_req;
 	const char *speed;
 	const char *fec;
 	const char *fc;
 	const char *an;
+	int status;
 
 	if (!vsi)
 		return;
@@ -998,10 +998,10 @@ ice_link_event(struct ice_pf *pf, struct ice_port_info *pi, bool link_up,
 {
 	struct device *dev = ice_pf_to_dev(pf);
 	struct ice_phy_info *phy_info;
-	int status;
 	struct ice_vsi *vsi;
 	u16 old_link_speed;
 	bool old_link;
+	int status;
 
 	phy_info = &pi->phy;
 	phy_info->link_info_old = phy_info->link_info;
@@ -1384,8 +1384,8 @@ static int __ice_clean_ctrlq(struct ice_pf *pf, enum ice_ctl_q q_type)
 		return 0;
 
 	do {
-		int ret;
 		u16 opcode;
+		int ret;
 
 		ret = ice_clean_rq_elem(hw, cq, &event, &pending);
 		if (ret == -EALREADY)
@@ -1843,8 +1843,8 @@ static int ice_init_nvm_phy_type(struct ice_port_info *pi)
 {
 	struct ice_aqc_get_phy_caps_data *pcaps;
 	struct ice_pf *pf = pi->hw->back;
-	int status;
 	int err = 0;
+	int status;
 
 	pcaps = kzalloc(sizeof(*pcaps), GFP_KERNEL);
 	if (!pcaps)
@@ -1954,8 +1954,8 @@ static int ice_init_phy_user_cfg(struct ice_port_info *pi)
 	struct ice_aqc_get_phy_caps_data *pcaps;
 	struct ice_phy_info *phy = &pi->phy;
 	struct ice_pf *pf = pi->hw->back;
-	int status;
 	int err = 0;
+	int status;
 
 	if (!(phy->link_info.link_info & ICE_AQ_MEDIA_AVAILABLE))
 		return -EIO;
@@ -2026,8 +2026,8 @@ static int ice_configure_phy(struct ice_vsi *vsi)
 	struct ice_aqc_set_phy_cfg_data *cfg;
 	struct ice_phy_info *phy = &pi->phy;
 	struct ice_pf *pf = vsi->back;
-	int status;
 	int err = 0;
+	int status;
 
 	/* Ensure we have media as we cannot configure a medialess port */
 	if (!(phy->link_info.link_info & ICE_AQ_MEDIA_AVAILABLE))
@@ -2526,9 +2526,9 @@ int ice_prepare_xdp_rings(struct ice_vsi *vsi, struct bpf_prog *prog)
 		.vsi_map_offset = vsi->alloc_txq,
 		.mapping_mode = ICE_VSI_MAP_CONTIG
 	};
-	int status;
 	struct device *dev;
 	int i, v_idx;
+	int status;
 
 	dev = ice_pf_to_dev(pf);
 	vsi->xdp_rings = devm_kcalloc(dev, vsi->num_xdp_txq,
@@ -3981,8 +3981,8 @@ static void ice_set_safe_mode_vlan_cfg(struct ice_pf *pf)
 {
 	struct ice_vsi *vsi = ice_get_main_vsi(pf);
 	struct ice_vsi_ctx *ctxt;
-	int status;
 	struct ice_hw *hw;
+	int status;
 
 	if (!vsi)
 		return;
@@ -4013,8 +4013,7 @@ static void ice_set_safe_mode_vlan_cfg(struct ice_pf *pf)
 	status = ice_update_vsi(hw, vsi->idx, ctxt, NULL);
 	if (status) {
 		dev_err(ice_pf_to_dev(vsi->back), "Failed to update VSI for safe mode VLANs, err %d aq_err %s\n",
-			status,
-			ice_aq_str(hw->adminq.sq_last_status));
+			status, ice_aq_str(hw->adminq.sq_last_status));
 	} else {
 		vsi->info.sec_flags = ctxt->info.sec_flags;
 		vsi->info.sw_flags2 = ctxt->info.sw_flags2;
@@ -4733,9 +4732,9 @@ static void ice_setup_mc_magic_wake(struct ice_pf *pf)
 {
 	struct device *dev = ice_pf_to_dev(pf);
 	struct ice_hw *hw = &pf->hw;
-	int status;
 	u8 mac_addr[ETH_ALEN];
 	struct ice_vsi *vsi;
+	int status;
 	u8 flags;
 
 	if (!pf->wol_ena)
@@ -4758,8 +4757,7 @@ static void ice_setup_mc_magic_wake(struct ice_pf *pf)
 	status = ice_aq_manage_mac_write(hw, mac_addr, flags, NULL);
 	if (status)
 		dev_err(dev, "Failed to enable Multicast Magic Packet wake, err %d aq_err %s\n",
-			status,
-			ice_aq_str(hw->adminq.sq_last_status));
+			status, ice_aq_str(hw->adminq.sq_last_status));
 }
 
 /**
@@ -5297,10 +5295,10 @@ static int ice_set_mac_address(struct net_device *netdev, void *pi)
 	struct ice_pf *pf = vsi->back;
 	struct ice_hw *hw = &pf->hw;
 	struct sockaddr *addr = pi;
-	int status;
 	u8 old_mac[ETH_ALEN];
 	u8 flags = 0;
 	int err = 0;
+	int status;
 	u8 *mac;
 
 	mac = (u8 *)addr->sa_data;
@@ -5412,8 +5410,8 @@ ice_set_tx_maxrate(struct net_device *netdev, int queue_index, u32 maxrate)
 {
 	struct ice_netdev_priv *np = netdev_priv(netdev);
 	struct ice_vsi *vsi = np->vsi;
-	int status;
 	u16 q_handle;
+	int status;
 	u8 tc;
 
 	/* Validate maxrate requested is within permitted range */
@@ -6484,8 +6482,7 @@ static int ice_vsi_rebuild_by_type(struct ice_pf *pf, enum ice_vsi_type type)
 		status = ice_replay_vsi(&pf->hw, vsi->idx);
 		if (status) {
 			dev_err(dev, "replay VSI failed, error %d, VSI index %d, type %s\n",
-				status, vsi->idx,
-				ice_vsi_type_str(type));
+				status, vsi->idx, ice_vsi_type_str(type));
 			return -EIO;
 		}
 
@@ -6559,8 +6556,7 @@ static void ice_rebuild(struct ice_pf *pf, enum ice_reset_req reset_type)
 
 	ret = ice_init_all_ctrlq(hw);
 	if (ret) {
-		dev_err(dev, "control queues init failed %d\n",
-			ret);
+		dev_err(dev, "control queues init failed %d\n", ret);
 		goto err_init_ctrlq;
 	}
 
@@ -6576,8 +6572,7 @@ static void ice_rebuild(struct ice_pf *pf, enum ice_reset_req reset_type)
 
 	ret = ice_clear_pf_cfg(hw);
 	if (ret) {
-		dev_err(dev, "clear PF configuration failed %d\n",
-			ret);
+		dev_err(dev, "clear PF configuration failed %d\n", ret);
 		goto err_init_ctrlq;
 	}
 
@@ -6894,8 +6889,7 @@ int ice_set_rss_lut(struct ice_vsi *vsi, u8 *lut, u16 lut_size)
 	status = ice_aq_set_rss_lut(hw, &params);
 	if (status) {
 		dev_err(ice_pf_to_dev(vsi->back), "Cannot set RSS lut, err %d aq_err %s\n",
-			status,
-			ice_aq_str(hw->adminq.sq_last_status));
+			status, ice_aq_str(hw->adminq.sq_last_status));
 		return -EIO;
 	}
 
@@ -6920,8 +6914,7 @@ int ice_set_rss_key(struct ice_vsi *vsi, u8 *seed)
 	status = ice_aq_set_rss_key(hw, vsi->idx, (struct ice_aqc_get_set_rss_keys *)seed);
 	if (status) {
 		dev_err(ice_pf_to_dev(vsi->back), "Cannot set RSS key, err %d aq_err %s\n",
-			status,
-			ice_aq_str(hw->adminq.sq_last_status));
+			status, ice_aq_str(hw->adminq.sq_last_status));
 		return -EIO;
 	}
 
@@ -6953,8 +6946,7 @@ int ice_get_rss_lut(struct ice_vsi *vsi, u8 *lut, u16 lut_size)
 	status = ice_aq_get_rss_lut(hw, &params);
 	if (status) {
 		dev_err(ice_pf_to_dev(vsi->back), "Cannot get RSS lut, err %d aq_err %s\n",
-			status,
-			ice_aq_str(hw->adminq.sq_last_status));
+			status, ice_aq_str(hw->adminq.sq_last_status));
 		return -EIO;
 	}
 
@@ -6979,8 +6971,7 @@ int ice_get_rss_key(struct ice_vsi *vsi, u8 *seed)
 	status = ice_aq_get_rss_key(hw, vsi->idx, (struct ice_aqc_get_set_rss_keys *)seed);
 	if (status) {
 		dev_err(ice_pf_to_dev(vsi->back), "Cannot get RSS key, err %d aq_err %s\n",
-			status,
-			ice_aq_str(hw->adminq.sq_last_status));
+			status, ice_aq_str(hw->adminq.sq_last_status));
 		return -EIO;
 	}
 
@@ -7025,8 +7016,8 @@ static int ice_vsi_update_bridge_mode(struct ice_vsi *vsi, u16 bmode)
 	struct ice_aqc_vsi_props *vsi_props;
 	struct ice_hw *hw = &vsi->back->hw;
 	struct ice_vsi_ctx *ctxt;
-	int status;
 	int ret = 0;
+	int status;
 
 	vsi_props = &vsi->info;
 
@@ -7047,8 +7038,7 @@ static int ice_vsi_update_bridge_mode(struct ice_vsi *vsi, u16 bmode)
 	status = ice_update_vsi(hw, vsi->idx, ctxt, NULL);
 	if (status) {
 		dev_err(ice_pf_to_dev(vsi->back), "update VSI for bridge mode failed, bmode = %d err %d aq_err %s\n",
-			bmode, status,
-			ice_aq_str(hw->adminq.sq_last_status));
+			bmode, status, ice_aq_str(hw->adminq.sq_last_status));
 		ret = -EIO;
 		goto out;
 	}
@@ -7081,9 +7071,9 @@ ice_bridge_setlink(struct net_device *dev, struct nlmsghdr *nlh,
 	struct ice_pf *pf = np->vsi->back;
 	struct nlattr *attr, *br_spec;
 	struct ice_hw *hw = &pf->hw;
-	int status;
 	struct ice_sw *pf_sw;
 	int rem, v, err = 0;
+	int status;
 
 	pf_sw = pf->first_sw;
 	/* find the attribute in the netlink message */

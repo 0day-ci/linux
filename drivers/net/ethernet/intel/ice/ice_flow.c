@@ -1574,8 +1574,7 @@ ice_flow_add_prof(struct ice_hw *hw, enum ice_block blk, enum ice_flow_dir dir,
  * @blk: the block for which the flow profile is to be removed
  * @prof_id: unique ID of the flow profile to be removed
  */
-int
-ice_flow_rem_prof(struct ice_hw *hw, enum ice_block blk, u64 prof_id)
+int ice_flow_rem_prof(struct ice_hw *hw, enum ice_block blk, u64 prof_id)
 {
 	struct ice_flow_prof *prof;
 	int status;
@@ -1680,8 +1679,7 @@ out:
  * @blk: classification stage
  * @entry_h: handle to the flow entry to be removed
  */
-int ice_flow_rem_entry(struct ice_hw *hw, enum ice_block blk,
-		       u64 entry_h)
+int ice_flow_rem_entry(struct ice_hw *hw, enum ice_block blk, u64 entry_h)
 {
 	struct ice_flow_entry *entry;
 	struct ice_flow_prof *prof;
@@ -2370,8 +2368,8 @@ ice_add_avf_rss_cfg(struct ice_hw *hw, u16 vsi_handle, u64 avf_hash)
  */
 int ice_replay_rss_cfg(struct ice_hw *hw, u16 vsi_handle)
 {
-	int status = 0;
 	struct ice_rss_cfg *r;
+	int status = 0;
 
 	if (!ice_is_vsi_valid(hw, vsi_handle))
 		return -EINVAL;
