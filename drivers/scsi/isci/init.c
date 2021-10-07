@@ -142,8 +142,17 @@ static ssize_t isci_show_id(struct device *dev, struct device_attribute *attr, c
 
 static DEVICE_ATTR(isci_id, S_IRUGO, isci_show_id, NULL);
 
-static struct device_attribute *isci_host_attrs[] = {
-	&dev_attr_isci_id,
+static struct attribute *isci_host_attrs[] = {
+	&dev_attr_isci_id.attr,
+	NULL
+};
+
+static const struct attribute_group isci_host_attr_group = {
+	.attrs = isci_host_attrs
+};
+
+static const struct attribute_group *isci_host_attr_groups[] = {
+	&isci_host_attr_group,
 	NULL
 };
 
@@ -173,7 +182,7 @@ static struct scsi_host_template isci_sht = {
 #ifdef CONFIG_COMPAT
 	.compat_ioctl			= sas_ioctl,
 #endif
-	.shost_attrs			= isci_host_attrs,
+	.shost_groups			= isci_host_attr_groups,
 	.track_queue_depth		= 1,
 };
 
