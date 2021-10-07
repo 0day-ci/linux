@@ -588,9 +588,18 @@ static ssize_t max_sectors_store(struct device *dev, struct device_attribute *at
 }
 static DEVICE_ATTR_RW(max_sectors);
 
-static struct device_attribute *sysfs_device_attr_list[] = {
-	&dev_attr_max_sectors,
+static struct attribute *usb_sdev_attrs[] = {
+	&dev_attr_max_sectors.attr,
 	NULL,
+};
+
+static const struct attribute_group usb_sdev_attr_group = {
+	.attrs = usb_sdev_attrs
+};
+
+static const struct attribute_group *usb_sdev_attr_groups[] = {
+	&usb_sdev_attr_group,
+	NULL
 };
 
 /*
@@ -653,7 +662,7 @@ static const struct scsi_host_template usb_stor_host_template = {
 	.skip_settle_delay =		1,
 
 	/* sysfs device attributes */
-	.sdev_attrs =			sysfs_device_attr_list,
+	.sdev_groups =			usb_sdev_attr_groups,
 
 	/* module management */
 	.module =			THIS_MODULE
