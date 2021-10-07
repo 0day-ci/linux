@@ -1338,6 +1338,9 @@ static inline struct drm_i915_private *pdev_to_i915(struct pci_dev *pdev)
 #define DISPLAY_VER(i915)	(INTEL_INFO(i915)->display.ver)
 #define IS_DISPLAY_VER(i915, from, until) \
 	(DISPLAY_VER(i915) >= (from) && DISPLAY_VER(i915) <= (until))
+#define DISPLAY_VER_BIT(d)	BIT_ULL(d)
+#define DISPLAY_VER_MASK(f, u)	GENMASK_ULL(u, f)
+#define DISPLAY_VER_MASK_ALL	DISPLAY_VER_MASK(0, BITS_PER_LONG_LONG - 1)
 
 #define INTEL_REVID(dev_priv)	(to_pci_dev((dev_priv)->drm.dev)->revision)
 

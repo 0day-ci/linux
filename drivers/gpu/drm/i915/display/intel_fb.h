@@ -8,6 +8,9 @@
 
 #include <linux/types.h>
 
+enum pipe;
+enum plane_id;
+
 struct drm_device;
 struct drm_file;
 struct drm_framebuffer;
@@ -16,12 +19,17 @@ struct drm_i915_private;
 struct drm_mode_fb_cmd2;
 struct intel_fb_view;
 struct intel_framebuffer;
+struct intel_plane;
 struct intel_plane_state;
 
 bool is_ccs_plane(const struct drm_framebuffer *fb, int plane);
 bool is_gen12_ccs_plane(const struct drm_framebuffer *fb, int plane);
 bool is_gen12_ccs_cc_plane(const struct drm_framebuffer *fb, int plane);
 bool is_semiplanar_uv_plane(const struct drm_framebuffer *fb, int color_plane);
+
+u64 *intel_fb_plane_get_modifiers(struct drm_i915_private *i915,
+				  enum pipe pipe, enum plane_id plane_id);
+bool intel_fb_plane_supports_modifier(struct intel_plane *plane, u64 modifier);
 
 bool is_surface_linear(const struct drm_framebuffer *fb, int color_plane);
 
