@@ -52,7 +52,7 @@ static void ice_gnss_read(struct kthread_work *work)
 
 	/* Read data length in a loop, when it's not 0 the data is ready */
 	for (i = 0; i < ICE_MAX_UBX_READ_TRIES; i++) {
-		enum ice_status status;
+		int status;
 
 		status = ice_aq_read_i2c(hw, link_topo,
 					 ICE_GNSS_UBX_I2C_BUS_ADDR,
@@ -79,7 +79,7 @@ static void ice_gnss_read(struct kthread_work *work)
 
 	/* Read received data */
 	for (i = 0; i < data_len; i += bytes_read) {
-		enum ice_status status;
+		int status;
 
 		u16 bytes_left = data_len - i;
 
@@ -353,7 +353,7 @@ bool ice_gnss_is_gps_present(struct ice_hw *hw)
 		return false;
 
 	if (ice_is_e810t(hw)) {
-		enum ice_status status;
+		int status;
 		u8 data;
 
 		status = ice_read_pca9575_reg_e810t(hw, ICE_PCA9575_P0_IN,
