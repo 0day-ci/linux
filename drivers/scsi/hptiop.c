@@ -1150,9 +1150,18 @@ static struct device_attribute hptiop_attr_fw_version = {
 	.show = hptiop_show_fw_version,
 };
 
-static struct device_attribute *hptiop_attrs[] = {
-	&hptiop_attr_version,
-	&hptiop_attr_fw_version,
+static struct attribute *hptiop_attrs[] = {
+	&hptiop_attr_version.attr,
+	&hptiop_attr_fw_version.attr,
+	NULL
+};
+
+static const struct attribute_group hptiop_attr_group = {
+	.attrs = hptiop_attrs
+};
+
+static const struct attribute_group *hptiop_attr_groups[] = {
+	&hptiop_attr_group,
 	NULL
 };
 
@@ -1172,7 +1181,7 @@ static struct scsi_host_template driver_template = {
 	.info                       = hptiop_info,
 	.emulated                   = 0,
 	.proc_name                  = driver_name,
-	.shost_attrs                = hptiop_attrs,
+	.shost_groups		    = hptiop_attr_groups,
 	.slave_configure            = hptiop_slave_config,
 	.this_id                    = -1,
 	.change_queue_depth         = hptiop_adjust_disk_queue_depth,
