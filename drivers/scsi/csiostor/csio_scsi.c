@@ -1460,12 +1460,21 @@ static DEVICE_ATTR(disable_port, S_IWUSR, NULL, csio_disable_port);
 static DEVICE_ATTR(dbg_level, S_IRUGO | S_IWUSR, csio_show_dbg_level,
 		  csio_store_dbg_level);
 
-static struct device_attribute *csio_fcoe_lport_attrs[] = {
-	&dev_attr_hw_state,
-	&dev_attr_device_reset,
-	&dev_attr_disable_port,
-	&dev_attr_dbg_level,
+static struct attribute *csio_fcoe_lport_attrs[] = {
+	&dev_attr_hw_state.attr,
+	&dev_attr_device_reset.attr,
+	&dev_attr_disable_port.attr,
+	&dev_attr_dbg_level.attr,
 	NULL,
+};
+
+static const struct attribute_group csio_fcoe_lport_attr_group = {
+	.attrs = csio_fcoe_lport_attrs
+};
+
+static const struct attribute_group *csio_fcoe_lport_attr_groups[] = {
+	&csio_fcoe_lport_attr_group,
+	NULL
 };
 
 static ssize_t
@@ -1479,10 +1488,19 @@ csio_show_num_reg_rnodes(struct device *dev,
 
 static DEVICE_ATTR(num_reg_rnodes, S_IRUGO, csio_show_num_reg_rnodes, NULL);
 
-static struct device_attribute *csio_fcoe_vport_attrs[] = {
-	&dev_attr_num_reg_rnodes,
-	&dev_attr_dbg_level,
+static struct attribute *csio_fcoe_vport_attrs[] = {
+	&dev_attr_num_reg_rnodes.attr,
+	&dev_attr_dbg_level.attr,
 	NULL,
+};
+
+static const struct attribute_group csio_fcoe_vport_attr_group = {
+	.attrs = csio_fcoe_vport_attrs
+};
+
+static const struct attribute_group *csio_fcoe_vport_attr_groups[] = {
+	&csio_fcoe_vport_attr_group,
+	NULL
 };
 
 static inline uint32_t
@@ -2277,7 +2295,7 @@ struct scsi_host_template csio_fcoe_shost_template = {
 	.this_id		= -1,
 	.sg_tablesize		= CSIO_SCSI_MAX_SGE,
 	.cmd_per_lun		= CSIO_MAX_CMD_PER_LUN,
-	.shost_attrs		= csio_fcoe_lport_attrs,
+	.shost_groups		= csio_fcoe_lport_attr_groups,
 	.max_sectors		= CSIO_MAX_SECTOR_SIZE,
 };
 
@@ -2296,7 +2314,7 @@ struct scsi_host_template csio_fcoe_shost_vport_template = {
 	.this_id		= -1,
 	.sg_tablesize		= CSIO_SCSI_MAX_SGE,
 	.cmd_per_lun		= CSIO_MAX_CMD_PER_LUN,
-	.shost_attrs		= csio_fcoe_vport_attrs,
+	.shost_groups		= csio_fcoe_vport_attr_groups,
 	.max_sectors		= CSIO_MAX_SECTOR_SIZE,
 };
 
