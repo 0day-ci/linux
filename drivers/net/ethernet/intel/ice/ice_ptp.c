@@ -26,7 +26,7 @@ static const struct ptp_pin_desc ice_pin_desc_e810t[] = {
 static int
 ice_get_sma_config_e810t(struct ice_hw *hw, struct ptp_pin_desc *ptp_pins)
 {
-	enum ice_status status;
+	int status;
 	u8 data, i;
 
 	/* Read initial pin state */
@@ -104,7 +104,7 @@ static int
 ice_ptp_set_sma_config_e810t(struct ice_hw *hw,
 			     const struct ptp_pin_desc *ptp_pins)
 {
-	enum ice_status status;
+	int status;
 	u8 data;
 
 	/* SMA1 and UFL1 cannot be set to TX at the same time */

@@ -141,7 +141,7 @@ static void ice_check_for_hang_subtask(struct ice_pf *pf)
  */
 static int ice_init_mac_fltr(struct ice_pf *pf)
 {
-	enum ice_status status;
+	int status;
 	struct ice_vsi *vsi;
 	u8 *perm_addr;
 
@@ -230,7 +230,7 @@ static bool ice_vsi_fltr_changed(struct ice_vsi *vsi)
  */
 static int ice_set_promisc(struct ice_vsi *vsi, u8 promisc_m)
 {
-	enum ice_status status;
+	int status;
 
 	if (vsi->type != ICE_VSI_PF)
 		return 0;
@@ -254,7 +254,7 @@ static int ice_set_promisc(struct ice_vsi *vsi, u8 promisc_m)
  */
 static int ice_clear_promisc(struct ice_vsi *vsi, u8 promisc_m)
 {
-	enum ice_status status;
+	int status;
 
 	if (vsi->type != ICE_VSI_PF)
 		return 0;
@@ -283,7 +283,7 @@ static int ice_vsi_sync_fltr(struct ice_vsi *vsi)
 	bool promisc_forced_on = false;
 	struct ice_pf *pf = vsi->back;
 	struct ice_hw *hw = &pf->hw;
-	enum ice_status status = 0;
+	int status = 0;
 	u32 changed_flags = 0;
 	u8 promisc_m;
 	int err = 0;
@@ -664,7 +664,7 @@ void ice_print_link_msg(struct ice_vsi *vsi, bool isup)
 {
 	struct ice_aqc_get_phy_caps_data *caps;
 	const char *an_advertised;
-	enum ice_status status;
+	int status;
 	const char *fec_req;
 	const char *speed;
 	const char *fec;
@@ -989,7 +989,7 @@ ice_link_event(struct ice_pf *pf, struct ice_port_info *pi, bool link_up,
 {
 	struct device *dev = ice_pf_to_dev(pf);
 	struct ice_phy_info *phy_info;
-	enum ice_status status;
+	int status;
 	struct ice_vsi *vsi;
 	u16 old_link_speed;
 	bool old_link;
@@ -1376,7 +1376,7 @@ static int __ice_clean_ctrlq(struct ice_pf *pf, enum ice_ctl_q q_type)
 		return 0;
 
 	do {
-		enum ice_status ret;
+		int ret;
 		u16 opcode;
 
 		ret = ice_clean_rq_elem(hw, cq, &event, &pending);
@@ -1835,7 +1835,7 @@ static int ice_init_nvm_phy_type(struct ice_port_info *pi)
 {
 	struct ice_aqc_get_phy_caps_data *pcaps;
 	struct ice_pf *pf = pi->hw->back;
-	enum ice_status status;
+	int status;
 	int err = 0;
 
 	pcaps = kzalloc(sizeof(*pcaps), GFP_KERNEL);
@@ -1946,7 +1946,7 @@ static int ice_init_phy_user_cfg(struct ice_port_info *pi)
 	struct ice_aqc_get_phy_caps_data *pcaps;
 	struct ice_phy_info *phy = &pi->phy;
 	struct ice_pf *pf = pi->hw->back;
-	enum ice_status status;
+	int status;
 	int err = 0;
 
 	if (!(phy->link_info.link_info & ICE_AQ_MEDIA_AVAILABLE))
@@ -2018,7 +2018,7 @@ static int ice_configure_phy(struct ice_vsi *vsi)
 	struct ice_aqc_set_phy_cfg_data *cfg;
 	struct ice_phy_info *phy = &pi->phy;
 	struct ice_pf *pf = vsi->back;
-	enum ice_status status;
+	int status;
 	int err = 0;
 
 	/* Ensure we have media as we cannot configure a medialess port */
@@ -2518,7 +2518,7 @@ int ice_prepare_xdp_rings(struct ice_vsi *vsi, struct bpf_prog *prog)
 		.vsi_map_offset = vsi->alloc_txq,
 		.mapping_mode = ICE_VSI_MAP_CONTIG
 	};
-	enum ice_status status;
+	int status;
 	struct device *dev;
 	int i, v_idx;
 
@@ -3897,7 +3897,7 @@ static void ice_set_safe_mode_vlan_cfg(struct ice_pf *pf)
 {
 	struct ice_vsi *vsi = ice_get_main_vsi(pf);
 	struct ice_vsi_ctx *ctxt;
-	enum ice_status status;
+	int status;
 	struct ice_hw *hw;
 
 	if (!vsi)
@@ -4083,7 +4083,7 @@ static void ice_verify_cacheline_size(struct ice_pf *pf)
  *
  * Returns ICE_SUCCESS on success, else error code
  */
-static enum ice_status ice_send_version(struct ice_pf *pf)
+static int ice_send_version(struct ice_pf *pf)
 {
 	struct ice_driver_ver dv;
 
@@ -4655,7 +4655,7 @@ static void ice_setup_mc_magic_wake(struct ice_pf *pf)
 {
 	struct device *dev = ice_pf_to_dev(pf);
 	struct ice_hw *hw = &pf->hw;
-	enum ice_status status;
+	int status;
 	u8 mac_addr[ETH_ALEN];
 	struct ice_vsi *vsi;
 	u8 flags;
@@ -5218,7 +5218,7 @@ static int ice_set_mac_address(struct net_device *netdev, void *pi)
 	struct ice_pf *pf = vsi->back;
 	struct ice_hw *hw = &pf->hw;
 	struct sockaddr *addr = pi;
-	enum ice_status status;
+	int status;
 	u8 old_mac[ETH_ALEN];
 	u8 flags = 0;
 	int err = 0;
@@ -5327,7 +5327,7 @@ ice_set_tx_maxrate(struct net_device *netdev, int queue_index, u32 maxrate)
 {
 	struct ice_netdev_priv *np = netdev_priv(netdev);
 	struct ice_vsi *vsi = np->vsi;
-	enum ice_status status;
+	int status;
 	u16 q_handle;
 	u8 tc;
 
@@ -6363,7 +6363,7 @@ static void ice_vsi_release_all(struct ice_pf *pf)
 static int ice_vsi_rebuild_by_type(struct ice_pf *pf, enum ice_vsi_type type)
 {
 	struct device *dev = ice_pf_to_dev(pf);
-	enum ice_status status;
+	int status;
 	int i, err;
 
 	ice_for_each_vsi(pf, i) {
@@ -6449,7 +6449,7 @@ static void ice_rebuild(struct ice_pf *pf, enum ice_reset_req reset_type)
 {
 	struct device *dev = ice_pf_to_dev(pf);
 	struct ice_hw *hw = &pf->hw;
-	enum ice_status ret;
+	int ret;
 	int err;
 
 	if (test_bit(ICE_DOWN, pf->state))
@@ -6775,7 +6775,7 @@ int ice_set_rss_lut(struct ice_vsi *vsi, u8 *lut, u16 lut_size)
 {
 	struct ice_aq_get_set_rss_lut_params params = {};
 	struct ice_hw *hw = &vsi->back->hw;
-	enum ice_status status;
+	int status;
 
 	if (!lut)
 		return -EINVAL;
@@ -6806,7 +6806,7 @@ int ice_set_rss_lut(struct ice_vsi *vsi, u8 *lut, u16 lut_size)
 int ice_set_rss_key(struct ice_vsi *vsi, u8 *seed)
 {
 	struct ice_hw *hw = &vsi->back->hw;
-	enum ice_status status;
+	int status;
 
 	if (!seed)
 		return -EINVAL;
@@ -6834,7 +6834,7 @@ int ice_get_rss_lut(struct ice_vsi *vsi, u8 *lut, u16 lut_size)
 {
 	struct ice_aq_get_set_rss_lut_params params = {};
 	struct ice_hw *hw = &vsi->back->hw;
-	enum ice_status status;
+	int status;
 
 	if (!lut)
 		return -EINVAL;
@@ -6865,7 +6865,7 @@ int ice_get_rss_lut(struct ice_vsi *vsi, u8 *lut, u16 lut_size)
 int ice_get_rss_key(struct ice_vsi *vsi, u8 *seed)
 {
 	struct ice_hw *hw = &vsi->back->hw;
-	enum ice_status status;
+	int status;
 
 	if (!seed)
 		return -EINVAL;
@@ -6919,7 +6919,7 @@ static int ice_vsi_update_bridge_mode(struct ice_vsi *vsi, u16 bmode)
 	struct ice_aqc_vsi_props *vsi_props;
 	struct ice_hw *hw = &vsi->back->hw;
 	struct ice_vsi_ctx *ctxt;
-	enum ice_status status;
+	int status;
 	int ret = 0;
 
 	vsi_props = &vsi->info;
@@ -6975,7 +6975,7 @@ ice_bridge_setlink(struct net_device *dev, struct nlmsghdr *nlh,
 	struct ice_pf *pf = np->vsi->back;
 	struct nlattr *attr, *br_spec;
 	struct ice_hw *hw = &pf->hw;
-	enum ice_status status;
+	int status;
 	struct ice_sw *pf_sw;
 	int rem, v, err = 0;
 
@@ -7213,7 +7213,7 @@ int ice_open_internal(struct net_device *netdev)
 	struct ice_vsi *vsi = np->vsi;
 	struct ice_pf *pf = vsi->back;
 	struct ice_port_info *pi;
-	enum ice_status status;
+	int status;
 	int err;
 
 	if (test_bit(ICE_NEEDS_RESTART, pf->state)) {
