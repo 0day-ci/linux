@@ -798,7 +798,6 @@ int ice_read_pca9575_reg_e810t(struct ice_hw *hw, u8 offset, u8 *data)
 	struct ice_aqc_link_topo_addr link_topo;
 	__le16 addr;
 	u16 handle;
-	int status;
 	int err;
 
 	memset(&link_topo, 0, sizeof(link_topo));
@@ -814,8 +813,8 @@ int ice_read_pca9575_reg_e810t(struct ice_hw *hw, u8 offset, u8 *data)
 
 	addr = cpu_to_le16((u16)offset);
 
-	status = ice_aq_read_i2c(hw, link_topo, 0, addr, 1, data, NULL);
-	if (status)
+	err = ice_aq_read_i2c(hw, link_topo, 0, addr, 1, data, NULL);
+	if (err)
 		return -ENODEV;
 
 	return 0;
