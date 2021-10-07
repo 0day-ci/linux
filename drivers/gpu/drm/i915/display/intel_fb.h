@@ -22,10 +22,7 @@ struct intel_framebuffer;
 struct intel_plane;
 struct intel_plane_state;
 
-bool is_ccs_plane(const struct drm_framebuffer *fb, int plane);
-bool is_gen12_ccs_plane(const struct drm_framebuffer *fb, int plane);
-bool is_gen12_ccs_cc_plane(const struct drm_framebuffer *fb, int plane);
-
+bool intel_fb_is_ccs_ctrl_plane(const struct drm_framebuffer *fb, int plane);
 int intel_fb_rc_ccs_cc_plane(const struct drm_framebuffer *fb);
 
 u64 *intel_fb_plane_get_modifiers(struct drm_i915_private *i915,
