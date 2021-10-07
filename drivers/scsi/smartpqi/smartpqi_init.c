@@ -6847,17 +6847,26 @@ static DEVICE_ATTR(enable_r5_writes, 0644,
 static DEVICE_ATTR(enable_r6_writes, 0644,
 	pqi_host_enable_r6_writes_show, pqi_host_enable_r6_writes_store);
 
-static struct device_attribute *pqi_shost_attrs[] = {
-	&dev_attr_driver_version,
-	&dev_attr_firmware_version,
-	&dev_attr_model,
-	&dev_attr_serial_number,
-	&dev_attr_vendor,
-	&dev_attr_rescan,
-	&dev_attr_lockup_action,
-	&dev_attr_enable_stream_detection,
-	&dev_attr_enable_r5_writes,
-	&dev_attr_enable_r6_writes,
+static struct attribute *pqi_shost_attrs[] = {
+	&dev_attr_driver_version.attr,
+	&dev_attr_firmware_version.attr,
+	&dev_attr_model.attr,
+	&dev_attr_serial_number.attr,
+	&dev_attr_vendor.attr,
+	&dev_attr_rescan.attr,
+	&dev_attr_lockup_action.attr,
+	&dev_attr_enable_stream_detection.attr,
+	&dev_attr_enable_r5_writes.attr,
+	&dev_attr_enable_r6_writes.attr,
+	NULL
+};
+
+static const struct attribute_group pqi_shost_attr_group = {
+	.attrs = pqi_shost_attrs
+};
+
+static const struct attribute_group *pqi_shost_groups[] = {
+	&pqi_shost_attr_group,
 	NULL
 };
 
@@ -7129,14 +7138,23 @@ static DEVICE_ATTR(ssd_smart_path_enabled, 0444, pqi_ssd_smart_path_enabled_show
 static DEVICE_ATTR(raid_level, 0444, pqi_raid_level_show, NULL);
 static DEVICE_ATTR(raid_bypass_cnt, 0444, pqi_raid_bypass_cnt_show, NULL);
 
-static struct device_attribute *pqi_sdev_attrs[] = {
-	&dev_attr_lunid,
-	&dev_attr_unique_id,
-	&dev_attr_path_info,
-	&dev_attr_sas_address,
-	&dev_attr_ssd_smart_path_enabled,
-	&dev_attr_raid_level,
-	&dev_attr_raid_bypass_cnt,
+static struct attribute *pqi_sdev_attrs[] = {
+	&dev_attr_lunid.attr,
+	&dev_attr_unique_id.attr,
+	&dev_attr_path_info.attr,
+	&dev_attr_sas_address.attr,
+	&dev_attr_ssd_smart_path_enabled.attr,
+	&dev_attr_raid_level.attr,
+	&dev_attr_raid_bypass_cnt.attr,
+	NULL
+};
+
+static const struct attribute_group pqi_sdev_attr_group = {
+	.attrs = pqi_sdev_attrs
+};
+
+static const struct attribute_group *pqi_sdev_attr_groups[] = {
+	&pqi_sdev_attr_group,
 	NULL
 };
 
@@ -7153,8 +7171,8 @@ static struct scsi_host_template pqi_driver_template = {
 	.slave_alloc = pqi_slave_alloc,
 	.slave_configure = pqi_slave_configure,
 	.map_queues = pqi_map_queues,
-	.sdev_attrs = pqi_sdev_attrs,
-	.shost_attrs = pqi_shost_attrs,
+	.sdev_groups = pqi_sdev_attr_groups,
+	.shost_groups = pqi_shost_groups,
 };
 
 static int pqi_register_scsi(struct pqi_ctrl_info *ctrl_info)
