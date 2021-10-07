@@ -289,6 +289,7 @@ int init_smb3_11_server(struct ksmbd_conn *conn)
 
 void init_smb2_max_read_size(unsigned int sz)
 {
+	sz = min_t(u32, sz, SMB_MAX_IOSIZE);
 	smb21_server_values.max_read_size = sz;
 	smb30_server_values.max_read_size = sz;
 	smb302_server_values.max_read_size = sz;
@@ -297,6 +298,7 @@ void init_smb2_max_read_size(unsigned int sz)
 
 void init_smb2_max_write_size(unsigned int sz)
 {
+	sz = min_t(u32, sz, SMB_MAX_IOSIZE);
 	smb21_server_values.max_write_size = sz;
 	smb30_server_values.max_write_size = sz;
 	smb302_server_values.max_write_size = sz;
@@ -305,6 +307,7 @@ void init_smb2_max_write_size(unsigned int sz)
 
 void init_smb2_max_trans_size(unsigned int sz)
 {
+	sz = min_t(u32, sz, SMB_MAX_IOSIZE);
 	smb21_server_values.max_trans_size = sz;
 	smb30_server_values.max_trans_size = sz;
 	smb302_server_values.max_trans_size = sz;
