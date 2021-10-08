@@ -242,8 +242,16 @@ Control IDs
     * - ``V4L2_COLORFX_SET_CBCR``
       - The Cb and Cr chroma components are replaced by fixed coefficients
 	determined by ``V4L2_CID_COLORFX_CBCR`` control.
+    * - ``V4L2_COLORFX_SET_ARGB``
+      - ARGB colors.
 
 
+``V4L2_CID_COLORFX_ARGB`` ``(integer)``
+    Determines the Alpha, Red, Green, and Blue coefficients for
+    ``V4L2_COLORFX_SET_ARGB`` color effect.
+    Bits [7:0] of the supplied 32 bit value are interpreted as Blue component,
+    bits [15:8] as Green component, bits [23:16] as Red component, and
+    bits [31:24] as Alpha component.
 
 ``V4L2_CID_COLORFX_CBCR`` ``(integer)``
     Determines the Cb and Cr coefficients for ``V4L2_COLORFX_SET_CBCR``
