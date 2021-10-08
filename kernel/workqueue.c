@@ -6099,3 +6099,44 @@ void __init workqueue_init(void)
 	wq_online = true;
 	wq_watchdog_init();
 }
+
+struct temp_work {
+	struct work_struct work;
+	int i;
+};
+
+#include <linux/delay.h>
+static void __init work_func(struct work_struct *work)
+{
+	struct temp_work *tmp = (struct temp_work *)work;
+	int p = 0;
+	int q;
+
+	for (p = 0; p < 1000000; p++) {
+		q = READ_ONCE(tmp->i);
+		WRITE_ONCE(tmp->i, q + 1);
+	}
+
+	printk("result of i is %d\n", tmp->i);
+}
+
+static int __init work_reentry(void)
+{
+	struct temp_work tmp;
+
+	tmp.i = 0;
+
+	INIT_WORK_ONSTACK(&tmp.work, work_func);
+
+	queue_work_on(1, system_wq, &tmp.work);
+
+	while (!queue_work_on(2, system_unbound_wq, &tmp.work)) { }
+
+	printk("second queue succeeds\n");
+
+	flush_work(&tmp.work);
+
+	return 0;
+}
+
+late_initcall(work_reentry);
