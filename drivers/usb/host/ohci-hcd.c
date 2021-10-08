@@ -878,7 +878,8 @@ static irqreturn_t ohci_irq (struct usb_hcd *hcd)
 {
 	struct ohci_hcd		*ohci = hcd_to_ohci (hcd);
 	struct ohci_regs __iomem *regs = ohci->regs;
-	int			ints;
+	int			ints, ctl;
+
 
 	/* Read interrupt status (and flush pending writes).  We ignore the
 	 * optimization of checking the LSB of hcca->done_head; it doesn't
@@ -968,9 +969,15 @@ static irqreturn_t ohci_irq (struct usb_hcd *hcd)
 	 * when there's still unlinking to be done (next frame).
 	 */
 	ohci_work(ohci);
-	if ((ints & OHCI_INTR_SF) != 0 && !ohci->ed_rm_list
-			&& ohci->rh_state == OHCI_RH_RUNNING)
+
+	ctl = ohci_readl(ohci, &regs->control);
+
+	if (((ints & OHCI_INTR_SF) != 0 && !ohci->ed_rm_list
+			&& ohci->rh_state == OHCI_RH_RUNNING) ||
+			((ctl & OHCI_CTRL_HCFS) != OHCI_USB_OPER)) {
 		ohci_writel (ohci, OHCI_INTR_SF, &regs->intrdisable);
+		(void)ohci_readl(ohci, &regs->intrdisable);
+	}
 
 	if (ohci->rh_state == OHCI_RH_RUNNING) {
 		ohci_writel (ohci, ints, &regs->intrstatus);
