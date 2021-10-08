@@ -136,6 +136,7 @@ enum intel_ppgtt_type {
 	func(has_pxp); \
 	func(has_rc6); \
 	func(has_rc6p); \
+	func(has_remote_tiles); \
 	func(has_rps); \
 	func(has_runtime_pm); \
 	func(has_snoop); \

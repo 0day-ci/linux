@@ -943,6 +943,17 @@ tile_setup(struct intel_gt *gt, unsigned int id, phys_addr_t phys_addr)
 	if (ret)
 		return ret;
 
+	/* Which tile am I? default to zero on single tile systems */
+	if (HAS_REMOTE_TILES(i915)) {
+		u32 instance =
+			__raw_uncore_read32(gt->uncore, XEHPSDV_MTCFG_ADDR) &
+			TILE_NUMBER;
+
+		if (GEM_WARN_ON(instance != id))
+			return -ENXIO;
+	}
+
+	gt->info.id = id;
 	gt->phys_addr = phys_addr;
 
 	return 0;
@@ -958,11 +969,25 @@ static void tile_cleanup(struct intel_gt *gt)
 	}
 }
 
+static unsigned int tile_count(struct drm_i915_private *i915)
+{
+	u32 mtcfg;
+
+	/*
+	 * We use raw MMIO reads at this point since the
+	 * MMIO vfuncs are not setup yet
+	 */
+	mtcfg = __raw_uncore_read32(&i915->uncore, XEHPSDV_MTCFG_ADDR);
+	return REG_FIELD_GET(TILE_COUNT, mtcfg) + 1;
+}
+
 int intel_probe_gts(struct drm_i915_private *i915)
 {
 	struct pci_dev *pdev = to_pci_dev(i915->drm.dev);
+	struct intel_gt *gt;
 	phys_addr_t phys_addr;
 	unsigned int mmio_bar;
+	unsigned int i, tiles;
 	int ret;
 
 	mmio_bar = GRAPHICS_VER(i915) == 2 ? 1 : 0;
@@ -975,8 +1000,47 @@ int intel_probe_gts(struct drm_i915_private *i915)
 
 	i915->gts[0] = &i915->gt;
 
-	/* TODO: add more tiles */
+	if (!HAS_REMOTE_TILES(i915))
+		return 0;
+
+	/* Setup other tiles */
+	tiles = tile_count(i915);
+	drm_dbg(&i915->drm, "Tile count: %u\n", tiles);
+
+	if (GEM_WARN_ON(tiles > I915_MAX_TILES))
+		return -EINVAL;
+
+	/* For multi-tile platforms, size of GTTMMADR is 16MB per tile */
+	if (GEM_WARN_ON(pci_resource_len(pdev, 0) / tiles != SZ_16M))
+		return -EINVAL;
+
+	for (i = 1; i < tiles; i++) {
+		gt = kzalloc(sizeof(*gt), GFP_KERNEL);
+		if (!gt) {
+			ret = -ENOMEM;
+			goto err;
+		}
+
+		ret = tile_setup(gt, i, phys_addr + SZ_16M * i);
+		if (ret)
+			goto err;
+
+		i915->gts[i] = gt;
+	}
+
+	i915->remote_tiles = tiles - 1;
+
 	return 0;
+
+err:
+	drm_err(&i915->drm, "Failed to initialize tile %u! (%d)\n", i, ret);
+
+	for_each_gt(i915, i, gt) {
+		tile_cleanup(gt);
+		i915->gts[i] = NULL;
+	}
+
+	return ret;
 }
 
 int intel_gt_tiles_init(struct drm_i915_private *i915)
