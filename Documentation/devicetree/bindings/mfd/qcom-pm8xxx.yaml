@@ -38,9 +38,21 @@ properties:
   interrupt-controller: true
 
 patternProperties:
+  "gpio@[0-9a-f]+$":
+    type: object
+    $ref: "../pinctrl/qcom,pmic-gpio.yaml"
+
+  "mpps@[0-9a-f]+$":
+    type: object
+    $ref: "../pinctrl/qcom,pmic-mpp.yaml"
+
   "rtc@[0-9a-f]+$":
     type: object
     $ref: "../rtc/qcom-pm8xxx-rtc.yaml"
+
+  "xoadc@[0-9a-f]+$":
+    type: object
+    $ref: "../iio/adc/qcom,pm8018-adc.yaml"
 
 required:
   - compatible
