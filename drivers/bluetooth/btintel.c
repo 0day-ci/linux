@@ -2207,11 +2207,22 @@ error:
 	return err;
 }
 
-static int btintel_get_data_path_id(struct hci_dev *hdev, __u8 *data_path_id)
+static int btintel_get_data_path_id(struct hci_dev *hdev, __u8 transport,
+				    __u8 *data_path_id)
 {
-	/* Intel uses 1 as data path id for all the usecases */
-	*data_path_id = 1;
-	return 0;
+	struct btintel_data *intel_data;
+
+	if (transport != HCI_TRANSPORT_SCO_ESCO)
+		return -EINVAL;
+
+	intel_data = hci_get_priv((hdev));
+
+	if (intel_data->use_cases.preset[0] & 0x03) {
+		/* Intel uses 1 as data path id for all the usecases */
+		*data_path_id = 1;
+		return 0;
+	}
+	return  -EOPNOTSUPP;
 }
 
 static int btintel_configure_offload(struct hci_dev *hdev)

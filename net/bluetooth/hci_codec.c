@@ -259,6 +259,7 @@ int hci_get_supported_codecs(struct hci_dev *hdev, u8 type, char __user *optval,
 	struct bt_codec codec;
 	u8 num_codecs = 0, i, __user *ptr;
 	struct codec_list *c;
+	u8 data_path;
 
 	if (!hci_dev_test_flag(hdev, HCI_OFFLOAD_CODECS_ENABLED)) {
 		err = -EOPNOTSUPP;
@@ -269,6 +270,10 @@ int hci_get_supported_codecs(struct hci_dev *hdev, u8 type, char __user *optval,
 		err = -EOPNOTSUPP;
 		goto error;
 	}
+
+	err = hdev->get_data_path_id(hdev, type, &data_path);
+	if (err < 0)
+		goto error;
 
 	/* find total buffer size required to copy codec + capabilities */
 	hci_dev_lock(hdev);
@@ -306,9 +311,7 @@ int hci_get_supported_codecs(struct hci_dev *hdev, u8 type, char __user *optval,
 		codec.id = c->id;
 		codec.cid = c->cid;
 		codec.vid = c->vid;
-		err = hdev->get_data_path_id(hdev, &codec.data_path);
-		if (err < 0)
-			break;
+		codec.data_path = data_path;
 		codec.num_caps = c->num_caps;
 		if (copy_to_user(ptr, &codec, sizeof(codec))) {
 			err = -EFAULT;
