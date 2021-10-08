@@ -13,6 +13,8 @@
 #include <drm/drm_mm.h>
 #include <drm/i915_drm.h>
 
+#include "i915_sw_fence_work.h"
+
 struct drm_i915_private;
 struct drm_i915_gem_object;
 struct drm_printer;
@@ -94,6 +96,11 @@ struct intel_memory_region {
 	bool is_range_manager;
 
 	void *region_private;
+
+	/** Timeline for TTM eviction fences */
+	struct dma_fence_work_timeline tl;
+	/** Work struct for _region_put() from atomic / irq context */
+	struct work_struct tl_put_work;
 };
 
 struct intel_memory_region *

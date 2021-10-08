@@ -7,6 +7,9 @@
 #include "i915_drv.h"
 #include "i915_ttm_buddy_manager.h"
 
+static const struct dma_fence_work_timeline_ops tl_ops;
+static void intel_region_timeline_release_work(struct work_struct *work);
+
 static const struct {
 	u16 class;
 	u16 instance;
@@ -127,6 +130,10 @@ intel_memory_region_create(struct drm_i915_private *i915,
 	}
 
 	kref_init(&mem->kref);
+
+	INIT_WORK(&mem->tl_put_work, intel_region_timeline_release_work);
+	dma_fence_work_timeline_init(&mem->tl, NULL, &tl_ops);
+
 	return mem;
 
 err_free:
@@ -237,6 +244,42 @@ void intel_memory_regions_driver_release(struct drm_i915_private *i915)
 			intel_memory_region_put(region);
 	}
 }
+
+static void intel_region_timeline_get(struct dma_fence_work_timeline *tl)
+{
+	struct intel_memory_region *mr = container_of(tl, typeof(*mr), tl);
+
+	intel_memory_region_get(mr);
+}
+
+static void intel_region_timeline_release_work(struct work_struct *work)
+{
+	struct intel_memory_region *mr =
+		container_of(work, typeof(*mr), tl_put_work);
+
+	__intel_memory_region_destroy(&mr->kref);
+}
+
+static void intel_region_timeline_release(struct kref *ref)
+{
+	struct intel_memory_region *mr = container_of(ref, typeof(*mr), kref);
+
+	/* May be called from hardirq context, so queue the final release. */
+	queue_work(system_unbound_wq, &mr->tl_put_work);
+}
+
+static void intel_region_timeline_put(struct dma_fence_work_timeline *tl)
+{
+	struct intel_memory_region *mr = container_of(tl, typeof(*mr), tl);
+
+	kref_put(&mr->kref, intel_region_timeline_release);
+}
+
+static const struct dma_fence_work_timeline_ops tl_ops = {
+	.name = "Region timeline",
+	.get = intel_region_timeline_get,
+	.put = intel_region_timeline_put,
+};
 
 #if IS_ENABLED(CONFIG_DRM_I915_SELFTEST)
 #include "selftests/intel_memory_region.c"

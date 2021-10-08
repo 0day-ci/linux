@@ -672,9 +672,10 @@ static void __i915_ttm_move_fallback(struct ttm_buffer_object *bo, bool clear,
 	}
 }
 
-static int __i915_ttm_move(struct ttm_buffer_object *bo, bool clear,
-			   struct ttm_resource *dst_mem, struct ttm_tt *dst_ttm,
-			   struct i915_refct_sgt *dst_rsgt, bool allow_accel)
+static struct dma_fence *
+__i915_ttm_move(struct ttm_buffer_object *bo, bool clear,
+		struct ttm_resource *dst_mem, struct ttm_tt *dst_ttm,
+		struct i915_refct_sgt *dst_rsgt, bool allow_accel)
 {
 	struct i915_ttm_memcpy_work *copy_work;
 	struct dma_fence *fence;
@@ -689,7 +690,7 @@ static int __i915_ttm_move(struct ttm_buffer_object *bo, bool clear,
 		/* Don't fail with -ENOMEM. Move sync instead. */
 		__i915_ttm_move_fallback(bo, clear, dst_mem, dst_ttm, dst_rsgt,
 					 allow_accel);
-		return 0;
+		return NULL;
 	}
 
 	dma_fence_work_init(&copy_work->base, &i915_ttm_memcpy_ops);
@@ -714,14 +715,45 @@ static int __i915_ttm_move(struct ttm_buffer_object *bo, bool clear,
 	fence = dma_fence_get(&copy_work->base.dma);
 	dma_fence_work_commit_imm(&copy_work->base);
 
-	/*
-	 * We're synchronizing here for now. For async moves, return the
-	 * fence.
-	 */
-	dma_fence_wait(fence, false);
-	dma_fence_put(fence);
+	return fence;
+}
 
-	return ret;
+/**
+ * struct i915_coalesce_fence - A dma-fence used to coalesce multiple fences
+ * similar to struct dm_fence_array, and at the same time being timeline-
+ * attached.
+ * @base: struct dma_fence_work base.
+ * @cb: Callback for timeline attachment.
+ */
+struct i915_coalesce_fence {
+	struct dma_fence_work base;
+	struct i915_sw_dma_fence_cb cb;
+};
+
+/* No .work or .release callback. Just coalescing. */
+static const struct dma_fence_work_ops i915_coalesce_fence_ops = {
+	.name = "Coalesce fence",
+};
+
+static struct dma_fence *
+i915_ttm_coalesce_fence(struct dma_fence *fence, struct intel_memory_region *mr)
+{
+	struct i915_coalesce_fence *coalesce =
+		kmalloc(sizeof(*coalesce), GFP_KERNEL);
+
+	if (!coalesce) {
+		dma_fence_wait(fence, false);
+		dma_fence_put(fence);
+		return NULL;
+	}
+
+	dma_fence_work_init(&coalesce->base, &i915_coalesce_fence_ops);
+	dma_fence_work_chain(&coalesce->base, fence);
+	dma_fence_work_timeline_attach(&mr->tl, &coalesce->base, &coalesce->cb);
+	dma_fence_get(&coalesce->base.dma);
+	dma_fence_work_commit_imm(&coalesce->base);
+	dma_fence_put(fence);
+	return &coalesce->base.dma;
 }
 
 static int i915_ttm_move(struct ttm_buffer_object *bo, bool evict,
@@ -734,6 +766,7 @@ static int i915_ttm_move(struct ttm_buffer_object *bo, bool evict,
 		ttm_manager_type(bo->bdev, dst_mem->mem_type);
 	struct ttm_tt *ttm = bo->ttm;
 	struct i915_refct_sgt *dst_rsgt;
+	struct dma_fence *fence = NULL;
 	bool clear;
 	int ret;
 
@@ -765,7 +798,23 @@ static int i915_ttm_move(struct ttm_buffer_object *bo, bool evict,
 
 	clear = !cpu_maps_iomem(bo->resource) && (!ttm || !ttm_tt_is_populated(ttm));
 	if (!(clear && ttm && !(ttm->page_flags & TTM_TT_FLAG_ZERO_ALLOC)))
-		__i915_ttm_move(bo, clear, dst_mem, bo->ttm, dst_rsgt, true);
+		fence = __i915_ttm_move(bo, clear, dst_mem, bo->ttm, dst_rsgt, true);
+	if (fence && evict) {
+		struct intel_memory_region *mr =
+			i915_ttm_region(bo->bdev, bo->resource->mem_type);
+
+		/*
+		 * Attach to the region timeline and for future async unbind,
+		 * which requires a timeline. Also future async unbind fences
+		 * can be attached here.
+		 */
+		fence = i915_ttm_coalesce_fence(fence, mr);
+	}
+
+	if (fence) {
+		dma_fence_wait(fence, false);
+		dma_fence_put(fence);
+	}
 
 	ttm_bo_move_sync_cleanup(bo, dst_mem);
 	i915_ttm_adjust_domains_after_move(obj);
@@ -1223,6 +1272,7 @@ int i915_gem_obj_copy_ttm(struct drm_i915_gem_object *dst,
 		.interruptible = intr,
 	};
 	struct i915_refct_sgt *dst_rsgt;
+	struct dma_fence *fence;
 	int ret;
 
 	assert_object_held(dst);
@@ -1238,10 +1288,14 @@ int i915_gem_obj_copy_ttm(struct drm_i915_gem_object *dst,
 		return ret;
 
 	dst_rsgt = i915_ttm_resource_get_st(dst, dst_bo->resource);
-	__i915_ttm_move(src_bo, false, dst_bo->resource, dst_bo->ttm,
-			dst_rsgt, allow_accel);
-
+	fence = __i915_ttm_move(src_bo, false, dst_bo->resource, dst_bo->ttm,
+				dst_rsgt, allow_accel);
 	i915_refct_sgt_put(dst_rsgt);
+
+	if (fence) {
+		dma_fence_wait(fence, false);
+		dma_fence_put(fence);
+	}
 
 	return 0;
 }
