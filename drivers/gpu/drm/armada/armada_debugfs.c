@@ -93,6 +93,9 @@ static const struct file_operations armada_debugfs_crtc_reg_fops = {
 
 void armada_drm_crtc_debugfs_init(struct armada_crtc *dcrtc)
 {
+	if (!dcrtc->crtc.debugfs_entry)
+		return;
+
 	debugfs_create_file("armada-regs", 0600, dcrtc->crtc.debugfs_entry,
 			    dcrtc, &armada_debugfs_crtc_reg_fops);
 }
@@ -104,6 +107,9 @@ static struct drm_info_list armada_debugfs_list[] = {
 
 int armada_drm_debugfs_init(struct drm_minor *minor)
 {
+	if (!minor->debugfs_root)
+		return;
+
 	drm_debugfs_create_files(armada_debugfs_list, ARMADA_DEBUGFS_ENTRIES,
 				 minor->debugfs_root, minor);
 
