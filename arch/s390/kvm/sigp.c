@@ -27,6 +27,8 @@ static int __sigp_sense(struct kvm_vcpu *vcpu, struct kvm_vcpu *dst_vcpu,
 	ext_call_pending = kvm_s390_ext_call_pending(dst_vcpu);
 	if (!stopped && !ext_call_pending)
 		rc = SIGP_CC_ORDER_CODE_ACCEPTED;
+	else if (stopped && dst_vcpu->arch.sigp_restart)
+		rc = SIGP_CC_BUSY;
 	else {
 		*reg &= 0xffffffff00000000UL;
 		if (ext_call_pending)
@@ -385,6 +387,18 @@ static int handle_sigp_order_in_user_space(struct kvm_vcpu *vcpu, u8 order_code,
 	return 1;
 }
 
+static void handle_sigp_restart(struct kvm_vcpu *vcpu, u16 cpu_addr)
+{
+	struct kvm_vcpu *dst_vcpu = kvm_get_vcpu_by_id(vcpu->kvm, cpu_addr);
+
+	/* Ignore SIGP Restart to non-existent CPUs */
+	if (!dst_vcpu)
+		return;
+
+	if (is_vcpu_stopped(dst_vcpu))
+		dst_vcpu->arch.sigp_restart = 1;
+}
+
 static int handle_sigp_order_is_blocked(struct kvm_vcpu *vcpu, u8 order_code,
 					u16 cpu_addr)
 {
@@ -442,6 +456,9 @@ int kvm_s390_handle_sigp(struct kvm_vcpu *vcpu)
 
 	if (handle_sigp_order_is_blocked(vcpu, order_code, cpu_addr))
 		return 0;
+
+	if (order_code == SIGP_RESTART)
+		handle_sigp_restart(vcpu, cpu_addr);
 
 	if (handle_sigp_order_in_user_space(vcpu, order_code, cpu_addr))
 		return -EOPNOTSUPP;

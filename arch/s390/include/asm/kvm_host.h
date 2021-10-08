@@ -746,6 +746,7 @@ struct kvm_vcpu_arch {
 	__u64 cputm_start;
 	bool gs_enabled;
 	bool skey_enabled;
+	bool sigp_restart;
 	struct kvm_s390_pv_vcpu pv;
 	union diag318_info diag318_info;
 };

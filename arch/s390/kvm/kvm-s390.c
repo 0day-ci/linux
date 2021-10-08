@@ -4603,6 +4603,7 @@ int kvm_s390_vcpu_start(struct kvm_vcpu *vcpu)
 	}
 
 	kvm_s390_clear_cpuflags(vcpu, CPUSTAT_STOPPED);
+	vcpu->arch.sigp_restart = 0;
 	/*
 	 * The real PSW might have changed due to a RESTART interpreted by the
 	 * ultravisor. We block all interrupts and let the next sie exit
