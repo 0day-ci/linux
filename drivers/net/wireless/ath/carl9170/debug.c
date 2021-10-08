@@ -628,7 +628,7 @@ static ssize_t carl9170_debugfs_bug_write(struct ar9170 *ar, const char *buf,
 
 	case 'R':
 		if (!IS_STARTED(ar)) {
-			err = -EAGAIN;
+			count = -EAGAIN;
 			goto out;
 		}
 
