@@ -2772,37 +2772,38 @@ static irqreturn_t dg1_irq_handler(int irq, void *arg)
 {
 	struct drm_i915_private * const i915 = arg;
 	struct intel_gt *gt = &i915->gt;
-	void __iomem * const regs = gt->uncore->regs;
+	void __iomem * const t0_regs = gt->uncore->regs;
 	u32 master_tile_ctl, master_ctl;
-	u32 gu_misc_iir;
+	u32 gu_misc_iir = 0;
+	unsigned int i;
 
 	if (!intel_irqs_enabled(i915))
 		return IRQ_NONE;
 
-	master_tile_ctl = dg1_master_intr_disable(regs);
+	master_tile_ctl = dg1_master_intr_disable(t0_regs);
 	if (!master_tile_ctl) {
-		dg1_master_intr_enable(regs);
+		dg1_master_intr_enable(t0_regs);
 		return IRQ_NONE;
 	}
 
-	/* FIXME: we only support tile 0 for now. */
-	if (master_tile_ctl & DG1_MSTR_TILE(0)) {
+	for_each_gt(i915, i, gt) {
+		void __iomem *const regs = gt->uncore->regs;
+
+		if ((master_tile_ctl & DG1_MSTR_TILE(i)) == 0)
+			continue;
+
 		master_ctl = raw_reg_read(regs, GEN11_GFX_MSTR_IRQ);
 		raw_reg_write(regs, GEN11_GFX_MSTR_IRQ, master_ctl);
-	} else {
-		DRM_ERROR("Tile not supported: 0x%08x\n", master_tile_ctl);
-		dg1_master_intr_enable(regs);
-		return IRQ_NONE;
-	}
 
-	gen11_gt_irq_handler(gt, master_ctl);
+		gen11_gt_irq_handler(gt, master_ctl);
+
+		gu_misc_iir = gen11_gu_misc_irq_ack(gt, master_ctl);
+	}
 
 	if (master_ctl & GEN11_DISPLAY_IRQ)
 		gen11_display_irq_handler(i915);
 
-	gu_misc_iir = gen11_gu_misc_irq_ack(gt, master_ctl);
-
-	dg1_master_intr_enable(regs);
+	dg1_master_intr_enable(t0_regs);
 
 	gen11_gu_misc_irq_handler(gt, gu_misc_iir);
 
