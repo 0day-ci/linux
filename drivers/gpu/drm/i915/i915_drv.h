@@ -1193,6 +1193,12 @@ struct drm_i915_private {
 	/* Abstract the submission mechanism (legacy ringbuffer or execlists) away */
 	struct intel_gt gt;
 
+	/*
+	 * i915->gts[0] == &i915->gt
+	 */
+#define I915_MAX_TILES 4
+	struct intel_gt *gts[I915_MAX_TILES];
+
 	struct {
 		struct i915_gem_contexts {
 			spinlock_t lock; /* locks list */

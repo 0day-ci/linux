@@ -36,7 +36,6 @@ static inline struct intel_gt *huc_to_gt(struct intel_huc *huc)
 
 void intel_gt_init_early(struct intel_gt *gt, struct drm_i915_private *i915);
 void intel_gt_init_hw_early(struct intel_gt *gt, struct i915_ggtt *ggtt);
-int intel_gt_probe_lmem(struct intel_gt *gt);
 int intel_gt_init_mmio(struct intel_gt *gt);
 int __must_check intel_gt_init_hw(struct intel_gt *gt);
 int intel_gt_init(struct intel_gt *gt);
@@ -86,7 +85,14 @@ static inline bool intel_gt_needs_read_steering(struct intel_gt *gt,
 u32 intel_gt_read_register_fw(struct intel_gt *gt, i915_reg_t reg);
 
 int intel_probe_gts(struct drm_i915_private *i915);
+int intel_gt_tiles_init(struct drm_i915_private *i915);
 void intel_gts_release(struct drm_i915_private *i915);
+
+#define for_each_gt(i915__, id__, gt__) \
+	for ((id__) = 0; \
+	     (id__) < I915_MAX_TILES; \
+	     (id__)++) \
+		for_each_if (((gt__) = (i915__)->gts[(id__)]))
 
 void intel_gt_info_print(const struct intel_gt_info *info,
 			 struct drm_printer *p);

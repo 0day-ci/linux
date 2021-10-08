@@ -186,6 +186,8 @@ struct intel_gt {
 	phys_addr_t phys_addr;
 
 	struct intel_gt_info {
+		unsigned int id;
+
 		intel_engine_mask_t engine_mask;
 
 		u32 l3bank_mask;
