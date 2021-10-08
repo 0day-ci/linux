@@ -1022,6 +1022,9 @@ void radeon_debugfs_fence_init(struct radeon_device *rdev)
 #if defined(CONFIG_DEBUG_FS)
 	struct dentry *root = rdev->ddev->primary->debugfs_root;
 
+	if (!root)
+		return;
+
 	debugfs_create_file("radeon_gpu_reset", 0444, root, rdev,
 			    &radeon_debugfs_gpu_reset_fops);
 	debugfs_create_file("radeon_fence_info", 0444, root, rdev,

@@ -550,6 +550,9 @@ static void radeon_debugfs_ring_init(struct radeon_device *rdev, struct radeon_r
 	const char *ring_name = radeon_debugfs_ring_idx_to_name(ring->idx);
 	struct dentry *root = rdev->ddev->primary->debugfs_root;
 
+	if (!root)
+		return;
+
 	if (ring_name)
 		debugfs_create_file(ring_name, 0444, root, ring,
 				    &radeon_debugfs_ring_info_fops);

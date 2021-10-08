@@ -257,6 +257,9 @@ void rv515_debugfs(struct radeon_device *rdev)
 #if defined(CONFIG_DEBUG_FS)
 	struct dentry *root = rdev->ddev->primary->debugfs_root;
 
+	if (!root)
+		return;
+
 	debugfs_create_file("rv515_pipes_info", 0444, root, rdev,
 			    &rv515_debugfs_pipes_info_fops);
 	debugfs_create_file("rv515_ga_info", 0444, root, rdev,

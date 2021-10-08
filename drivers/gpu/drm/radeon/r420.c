@@ -494,6 +494,9 @@ void r420_debugfs_pipes_info_init(struct radeon_device *rdev)
 #if defined(CONFIG_DEBUG_FS)
 	struct dentry *root = rdev->ddev->primary->debugfs_root;
 
+	if (!root)
+		return;
+
 	debugfs_create_file("r420_pipes_info", 0444, root, rdev,
 			    &r420_debugfs_pipes_info_fops);
 #endif

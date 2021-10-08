@@ -380,6 +380,9 @@ static void rs400_debugfs_pcie_gart_info_init(struct radeon_device *rdev)
 #if defined(CONFIG_DEBUG_FS)
 	struct dentry *root = rdev->ddev->primary->debugfs_root;
 
+	if (!root)
+		return;
+
 	debugfs_create_file("rs400_gart_info", 0444, root, rdev,
 			    &rs400_debugfs_gart_info_fops);
 #endif
