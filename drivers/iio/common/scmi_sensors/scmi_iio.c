@@ -311,6 +311,67 @@ static const struct iio_info scmi_iio_info = {
 	.write_raw = scmi_iio_write_raw,
 };
 
+static ssize_t scmi_iio_get_raw(struct iio_dev *iio_dev, uintptr_t private,
+				const struct iio_chan_spec *chan, char *buf)
+{
+	struct scmi_iio_priv *sensor = iio_priv(iio_dev);
+	int err;
+	u32 sensor_config;
+	struct scmi_sensor_reading readings[SCMI_IIO_NUM_OF_AXIS];
+	int len = 0;
+
+	err = iio_device_claim_direct_mode(iio_dev);
+	if (err) {
+		dev_err(&iio_dev->dev,
+			"Error in climing direct mode for sensor %s err %d",
+			sensor->sensor_info->name, err);
+		return len;
+	}
+
+	sensor_config = FIELD_PREP(SCMI_SENS_CFG_SENSOR_ENABLED_MASK,
+				   SCMI_SENS_CFG_SENSOR_ENABLE);
+	err = sensor->sensor_ops->config_set(
+		sensor->ph, sensor->sensor_info->id, sensor_config);
+	if (err) {
+		dev_err(&iio_dev->dev, "Error in enabling sensor %s err %d",
+			sensor->sensor_info->name, err);
+		return len;
+	}
+
+	err = sensor->sensor_ops->reading_get_timestamped(
+		sensor->ph, sensor->sensor_info->id,
+		sensor->sensor_info->num_axis, readings);
+	if (err) {
+		dev_err(&iio_dev->dev,
+			"Error in reading raw attribute for sensor %s err %d",
+			sensor->sensor_info->name, err);
+		return len;
+	}
+
+	sensor_config = FIELD_PREP(SCMI_SENS_CFG_SENSOR_ENABLED_MASK,
+				   SCMI_SENS_CFG_SENSOR_DISABLE);
+	err = sensor->sensor_ops->config_set(
+		sensor->ph, sensor->sensor_info->id, sensor_config);
+	if (err) {
+		dev_err(&iio_dev->dev, "Error in enabling sensor %s err %d",
+			sensor->sensor_info->name, err);
+		return len;
+	}
+
+	iio_device_release_direct_mode(iio_dev);
+	if (err) {
+		dev_err(&iio_dev->dev,
+			"Error in releasing direct mode for sensor %s err %d",
+			sensor->sensor_info->name, err);
+		return len;
+	}
+
+	len = scnprintf(buf, PAGE_SIZE, "%lld\n",
+			readings[chan->scan_index].value);
+
+	return len;
+}
+
 static ssize_t scmi_iio_get_raw_available(struct iio_dev *iio_dev,
 					  uintptr_t private,
 					  const struct iio_chan_spec *chan,
@@ -355,6 +416,11 @@ static ssize_t scmi_iio_get_raw_available(struct iio_dev *iio_dev,
 }
 
 static const struct iio_chan_spec_ext_info scmi_iio_ext_info[] = {
+	{
+		.name = "raw",
+		.read = scmi_iio_get_raw,
+		.shared = IIO_SEPARATE,
+	},
 	{
 		.name = "raw_available",
 		.read = scmi_iio_get_raw_available,
