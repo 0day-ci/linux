@@ -365,13 +365,27 @@ struct per_cpu_pages {
 	short expire;		/* When 0, remote pagesets are drained */
 #endif
 
-	struct pcplists *lp;
+	/*
+	 * Having two pcplists allows us to remotely flush them in a lock-less
+	 * manner: we atomically switch the 'lp' and 'drain' pointers, wait a
+	 * grace period to synchronize against concurrent users of 'lp', and
+	 * safely free whatever is left in 'drain'.
+	 *
+	 * All accesses to 'lp' are protected by local locks, which also serve
+	 * as RCU critical section delimiters. 'lp' should only be dereferenced
+	 * *once* per critical section.
+	 *
+	 * See mm/page_alloc.c's __drain_all_pages() for the bulk of the remote
+	 * drain implementation.
+	 */
+	struct pcplists __rcu *lp;
+	struct pcplists *drain;
 	struct pcplists {
 		/* Number of pages in the lists */
 		int count;
 		/* Lists of pages, one per migrate type stored on the pcp-lists */
 		struct list_head lists[NR_PCP_LISTS];
-	} __private pcplists;
+	} __private pcplists[2];
 };
 
 struct per_cpu_zonestat {
