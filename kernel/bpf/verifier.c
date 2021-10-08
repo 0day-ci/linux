@@ -1783,10 +1783,8 @@ static struct btf *find_kfunc_desc_btf(struct bpf_verifier_env *env,
 		}
 
 		kfunc_btf = __find_kfunc_desc_btf(env, offset, btf_modp);
-		if (IS_ERR_OR_NULL(kfunc_btf)) {
+		if (IS_ERR(kfunc_btf))
 			verbose(env, "cannot find module BTF for func_id %u\n", func_id);
-			return kfunc_btf ?: ERR_PTR(-ENOENT);
-		}
 		return kfunc_btf;
 	}
 	return btf_vmlinux ?: ERR_PTR(-ENOENT);
