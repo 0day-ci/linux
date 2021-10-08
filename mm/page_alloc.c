@@ -5179,6 +5179,55 @@ static inline bool prepare_alloc_pages(gfp_t gfp_mask, unsigned int order,
 	return true;
 }
 
+#ifdef CONFIG_MEMCG_KMEM
+static bool memcg_bulk_pre_charge_hook(struct obj_cgroup **objcgp, gfp_t gfp,
+					unsigned int nr_pages)
+{
+	struct obj_cgroup *objcg = NULL;
+
+	if (!memcg_kmem_enabled() || !(gfp & __GFP_ACCOUNT))
+		return true;
+
+	objcg = get_obj_cgroup_from_current();
+
+	if (objcg && obj_cgroup_charge(objcg, gfp, nr_pages << PAGE_SHIFT)) {
+		obj_cgroup_put(objcg);
+		return false;
+	}
+	obj_cgroup_get_many(objcg, nr_pages);
+	*objcgp = objcg;
+	return true;
+}
+
+static void memcg_bulk_charge_hook(struct obj_cgroup *objcg,
+					struct page *page)
+{
+	page->memcg_data = (unsigned long)objcg | MEMCG_DATA_KMEM;
+}
+
+static void memcg_bulk_post_charge_hook(struct obj_cgroup *objcg,
+					unsigned int nr_pages)
+{
+	obj_cgroup_uncharge(objcg, nr_pages << PAGE_SHIFT);
+	percpu_ref_put_many(&objcg->refcnt, nr_pages + 1);
+}
+#else
+static bool memcg_bulk_pre_charge_hook(struct obj_cgroup **objcgp, gfp_t gfp,
+					unsigned int nr_pages)
+{
+	return true;
+}
+
+static void memcg_bulk_charge_hook(struct obj_cgroup *objcgp,
+					struct page *page)
+{
+}
+
+static void memcg_bulk_post_charge_hook(struct obj_cgroup *objcg,
+					unsigned int nr_pages)
+{
+}
+#endif
 /*
  * __alloc_pages_bulk - Allocate a number of order-0 pages to a list or array
  * @gfp: GFP flags for the allocation
@@ -5214,6 +5263,8 @@ unsigned long __alloc_pages_bulk(gfp_t gfp, int preferred_nid,
 	gfp_t alloc_gfp;
 	unsigned int alloc_flags = ALLOC_WMARK_LOW;
 	int nr_populated = 0, nr_account = 0;
+	unsigned int nr_pre_charge = 0;
+	struct obj_cgroup *objcg = NULL;
 
 	/*
 	 * Skip populated array elements to determine if any pages need
@@ -5282,6 +5333,10 @@ unsigned long __alloc_pages_bulk(gfp_t gfp, int preferred_nid,
 	if (unlikely(!zone))
 		goto failed;
 
+	nr_pre_charge = nr_pages - nr_populated;
+	if (!memcg_bulk_pre_charge_hook(&objcg, gfp, nr_pre_charge))
+		goto failed;
+
 	/* Attempt the batch allocation */
 	local_lock_irqsave(&pagesets.lock, flags);
 	pcp = this_cpu_ptr(zone->per_cpu_pageset);
@@ -5294,9 +5349,9 @@ unsigned long __alloc_pages_bulk(gfp_t gfp, int preferred_nid,
 			nr_populated++;
 			continue;
 		}
-
 		page = __rmqueue_pcplist(zone, 0, ac.migratetype, alloc_flags,
 								pcp, pcp_list);
+
 		if (unlikely(!page)) {
 			/* Try and get at least one page */
 			if (!nr_populated)
@@ -5304,6 +5359,8 @@ unsigned long __alloc_pages_bulk(gfp_t gfp, int preferred_nid,
 			break;
 		}
 		nr_account++;
+		if (objcg)
+			memcg_bulk_charge_hook(objcg, page);
 
 		prep_new_page(page, 0, gfp, 0);
 		if (page_list)
@@ -5317,13 +5374,16 @@ unsigned long __alloc_pages_bulk(gfp_t gfp, int preferred_nid,
 
 	__count_zid_vm_events(PGALLOC, zone_idx(zone), nr_account);
 	zone_statistics(ac.preferred_zoneref->zone, zone, nr_account);
+	if (objcg)
+		memcg_bulk_post_charge_hook(objcg, nr_pre_charge - nr_account);
 
 out:
 	return nr_populated;
 
 failed_irq:
 	local_unlock_irqrestore(&pagesets.lock, flags);
-
+	if (objcg)
+		memcg_bulk_post_charge_hook(objcg, nr_pre_charge);
 failed:
 	page = __alloc_pages(gfp, 0, preferred_nid, nodemask);
 	if (page) {
