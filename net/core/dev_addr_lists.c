@@ -614,6 +614,38 @@ int dev_addr_del(struct net_device *dev, const unsigned char *addr,
 }
 EXPORT_SYMBOL(dev_addr_del);
 
+static int __dev_addr_add(struct net_device *dev, const unsigned char *addr,
+			  unsigned char addr_type, bool global, bool sync,
+			  bool exclusive)
+{
+	int err;
+
+	netif_addr_lock_bh(dev);
+	err = __hw_addr_add_ex(&dev->uc, addr, dev->addr_len,
+			       addr_type, global, sync,
+			       0, exclusive);
+	if (!err)
+		__dev_set_rx_mode(dev);
+	netif_addr_unlock_bh(dev);
+
+	return err;
+}
+
+static int __dev_addr_del(struct net_device *dev, const unsigned char *addr,
+			  unsigned char addr_type, bool global, bool sync)
+{
+	int err;
+
+	netif_addr_lock_bh(dev);
+	err = __hw_addr_del_ex(&dev->uc, addr, dev->addr_len,
+			       addr_type, global, sync);
+	if (!err)
+		__dev_set_rx_mode(dev);
+	netif_addr_unlock_bh(dev);
+
+	return err;
+}
+
 /*
  * Unicast list handling functions
  */
@@ -625,16 +657,9 @@ EXPORT_SYMBOL(dev_addr_del);
  */
 int dev_uc_add_excl(struct net_device *dev, const unsigned char *addr)
 {
-	int err;
 
-	netif_addr_lock_bh(dev);
-	err = __hw_addr_add_ex(&dev->uc, addr, dev->addr_len,
-			       NETDEV_HW_ADDR_T_UNICAST, true, false,
-			       0, true);
-	if (!err)
-		__dev_set_rx_mode(dev);
-	netif_addr_unlock_bh(dev);
-	return err;
+	return __dev_addr_add(dev, addr, NETDEV_HW_ADDR_T_UNICAST,
+			      true, false, true);
 }
 EXPORT_SYMBOL(dev_uc_add_excl);
 
@@ -648,15 +673,8 @@ EXPORT_SYMBOL(dev_uc_add_excl);
  */
 int dev_uc_add(struct net_device *dev, const unsigned char *addr)
 {
-	int err;
-
-	netif_addr_lock_bh(dev);
-	err = __hw_addr_add(&dev->uc, addr, dev->addr_len,
-			    NETDEV_HW_ADDR_T_UNICAST);
-	if (!err)
-		__dev_set_rx_mode(dev);
-	netif_addr_unlock_bh(dev);
-	return err;
+	return __dev_addr_add(dev, addr, NETDEV_HW_ADDR_T_UNICAST,
+			      false, false, false);
 }
 EXPORT_SYMBOL(dev_uc_add);
 
@@ -670,15 +688,8 @@ EXPORT_SYMBOL(dev_uc_add);
  */
 int dev_uc_del(struct net_device *dev, const unsigned char *addr)
 {
-	int err;
-
-	netif_addr_lock_bh(dev);
-	err = __hw_addr_del(&dev->uc, addr, dev->addr_len,
-			    NETDEV_HW_ADDR_T_UNICAST);
-	if (!err)
-		__dev_set_rx_mode(dev);
-	netif_addr_unlock_bh(dev);
-	return err;
+	return __dev_addr_del(dev, addr, NETDEV_HW_ADDR_T_UNICAST,
+			      false, false);
 }
 EXPORT_SYMBOL(dev_uc_del);
 
@@ -810,33 +821,11 @@ EXPORT_SYMBOL(dev_uc_init);
  */
 int dev_mc_add_excl(struct net_device *dev, const unsigned char *addr)
 {
-	int err;
-
-	netif_addr_lock_bh(dev);
-	err = __hw_addr_add_ex(&dev->mc, addr, dev->addr_len,
-			       NETDEV_HW_ADDR_T_MULTICAST, true, false,
-			       0, true);
-	if (!err)
-		__dev_set_rx_mode(dev);
-	netif_addr_unlock_bh(dev);
-	return err;
+	return __dev_addr_add(dev, addr, NETDEV_HW_ADDR_T_MULTICAST,
+			       true, false, true);
 }
 EXPORT_SYMBOL(dev_mc_add_excl);
 
-static int __dev_mc_add(struct net_device *dev, const unsigned char *addr,
-			bool global)
-{
-	int err;
-
-	netif_addr_lock_bh(dev);
-	err = __hw_addr_add_ex(&dev->mc, addr, dev->addr_len,
-			       NETDEV_HW_ADDR_T_MULTICAST, global, false,
-			       0, false);
-	if (!err)
-		__dev_set_rx_mode(dev);
-	netif_addr_unlock_bh(dev);
-	return err;
-}
 /**
  *	dev_mc_add - Add a multicast address
  *	@dev: device
@@ -847,7 +836,8 @@ static int __dev_mc_add(struct net_device *dev, const unsigned char *addr,
  */
 int dev_mc_add(struct net_device *dev, const unsigned char *addr)
 {
-	return __dev_mc_add(dev, addr, false);
+	return __dev_addr_add(dev, addr, NETDEV_HW_ADDR_T_MULTICAST,
+			      false, false, false);
 }
 EXPORT_SYMBOL(dev_mc_add);
 
@@ -860,23 +850,10 @@ EXPORT_SYMBOL(dev_mc_add);
  */
 int dev_mc_add_global(struct net_device *dev, const unsigned char *addr)
 {
-	return __dev_mc_add(dev, addr, true);
+	return __dev_addr_add(dev, addr, NETDEV_HW_ADDR_T_MULTICAST,
+			      true, false, false);
 }
 EXPORT_SYMBOL(dev_mc_add_global);
-
-static int __dev_mc_del(struct net_device *dev, const unsigned char *addr,
-			bool global)
-{
-	int err;
-
-	netif_addr_lock_bh(dev);
-	err = __hw_addr_del_ex(&dev->mc, addr, dev->addr_len,
-			       NETDEV_HW_ADDR_T_MULTICAST, global, false);
-	if (!err)
-		__dev_set_rx_mode(dev);
-	netif_addr_unlock_bh(dev);
-	return err;
-}
 
 /**
  *	dev_mc_del - Delete a multicast address.
@@ -888,7 +865,8 @@ static int __dev_mc_del(struct net_device *dev, const unsigned char *addr,
  */
 int dev_mc_del(struct net_device *dev, const unsigned char *addr)
 {
-	return __dev_mc_del(dev, addr, false);
+	return __dev_addr_del(dev, addr, NETDEV_HW_ADDR_T_MULTICAST,
+			      false, false);
 }
 EXPORT_SYMBOL(dev_mc_del);
 
@@ -902,7 +880,8 @@ EXPORT_SYMBOL(dev_mc_del);
  */
 int dev_mc_del_global(struct net_device *dev, const unsigned char *addr)
 {
-	return __dev_mc_del(dev, addr, true);
+	return __dev_addr_del(dev, addr, NETDEV_HW_ADDR_T_MULTICAST,
+			      true, false);
 }
 EXPORT_SYMBOL(dev_mc_del_global);
 
