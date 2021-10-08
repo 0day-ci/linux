@@ -4232,7 +4232,8 @@ EXPORT_SYMBOL_GPL(devlink_flash_update_timeout_notify);
 static int devlink_nl_cmd_flash_update(struct sk_buff *skb,
 				       struct genl_info *info)
 {
-	struct nlattr *nla_component, *nla_overwrite_mask, *nla_file_name;
+	struct nlattr *nla_component, *nla_overwrite_mask, *nla_file_name,
+		      *nla_dry_run;
 	struct devlink_flash_update_params params = {};
 	struct devlink *devlink = info->user_ptr[0];
 	const char *file_name;
@@ -4276,6 +4277,21 @@ static int devlink_nl_cmd_flash_update(struct sk_buff *skb,
 	if (ret) {
 		NL_SET_ERR_MSG_ATTR(info->extack, nla_file_name, "failed to locate the requested firmware file");
 		return ret;
+	}
+
+	/* Always check dry run last, in order to allow verification of other
+	 * parameter support even if the particular driver does not yet
+	 * support a full dry-run
+	 */
+	nla_dry_run = info->attrs[DEVLINK_ATTR_DRY_RUN];
+	if (nla_dry_run) {
+		if (!(supported_params & DEVLINK_SUPPORT_FLASH_UPDATE_DRY_RUN)) {
+			NL_SET_ERR_MSG_ATTR(info->extack, nla_dry_run,
+					    "flash update is supported, but dry run is not supported for this device");
+			release_firmware(params.fw);
+			return -EOPNOTSUPP;
+		}
+		params.dry_run = true;
 	}
 
 	devlink_flash_update_begin_notify(devlink);
@@ -8514,6 +8530,7 @@ static const struct nla_policy devlink_nl_policy[DEVLINK_ATTR_MAX + 1] = {
 	[DEVLINK_ATTR_RATE_TX_MAX] = { .type = NLA_U64 },
 	[DEVLINK_ATTR_RATE_NODE_NAME] = { .type = NLA_NUL_STRING },
 	[DEVLINK_ATTR_RATE_PARENT_NODE_NAME] = { .type = NLA_NUL_STRING },
+	[DEVLINK_ATTR_DRY_RUN] = { .type = NLA_FLAG },
 };
 
 static const struct genl_small_ops devlink_nl_ops[] = {
