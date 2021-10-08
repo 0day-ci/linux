@@ -67,12 +67,19 @@ struct module_signature {
 static char magic_number[] = "~Module signature appended~\n";
 
 static __attribute__((noreturn))
-void format(void)
+void format(char *argv0)
 {
 	fprintf(stderr,
-		"Usage: scripts/sign-file [-dp] <hash algo> <key> <x509> <module> [<dest>]\n");
-	fprintf(stderr,
-		"       scripts/sign-file -s <raw sig> <hash algo> <x509> <module> [<dest>]\n");
+		"Usage:	%s [-dp] <hash algo> <key> <x509> <module> [<dest>]\n"
+		"	%s -s <raw sig> <hash algo> <x509> <module> [<dest>]\n"
+		"\n"
+		"	-d only generate signature (implies -p)\n"
+#ifndef USE_PKCS7
+		"	-k use subject key identifier\n"
+#endif
+		"	-p keep signature file\n"
+		"	-s use raw signature\n",
+		argv0, argv0);
 	exit(2);
 }
 
@@ -245,20 +252,20 @@ int main(int argc, char **argv)
 		opt = getopt(argc, argv, "sdpk");
 		switch (opt) {
 		case 's': raw_sig = true; break;
+		case 'd': sign_only = true;
 		case 'p': save_sig = true; break;
-		case 'd': sign_only = true; save_sig = true; break;
 #ifndef USE_PKCS7
 		case 'k': use_keyid = CMS_USE_KEYID; break;
 #endif
 		case -1: break;
-		default: format();
+		default: format(basename(argv[0]));
 		}
 	} while (opt != -1);
 
 	argc -= optind;
-	argv += optind;
 	if (argc < 4 || argc > 5)
-		format();
+		format(basename(argv[0]));
+	argv += optind;
 
 	if (raw_sig) {
 		raw_sig_name = argv[0];
