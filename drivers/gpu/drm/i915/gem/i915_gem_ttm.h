@@ -51,6 +51,10 @@ int i915_gem_obj_copy_ttm(struct drm_i915_gem_object *dst,
 			  struct drm_i915_gem_object *src,
 			  bool allow_accel, bool intr);
 
+I915_SELFTEST_DECLARE
+(void i915_ttm_migrate_set_failure_modes(bool gpu_migration,
+					 bool work_allocation);)
+
 /* Internal I915 TTM declarations and definitions below. */
 
 #define I915_PL_LMEM0 TTM_PL_PRIV
