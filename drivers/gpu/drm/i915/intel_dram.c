@@ -257,8 +257,11 @@ skl_get_dram_info(struct drm_i915_private *i915)
 
 	val = intel_uncore_read(&i915->uncore,
 				SKL_MC_BIOS_DATA_0_0_0_MCHBAR_PCU);
-	mem_freq_khz = DIV_ROUND_UP((val & SKL_REQ_DATA_MASK) *
-				    SKL_MEMORY_FREQ_MULTIPLIER_HZ, 1000);
+	if (DISPLAY_VER(i915) == 11)
+		val &= ICL_FREQ_MASK;
+	else
+		val &= SKL_REQ_DATA_MASK;
+	mem_freq_khz = DIV_ROUND_UP(val * SKL_MEMORY_FREQ_MULTIPLIER_HZ, 1000);
 
 	if (dram_info->num_channels * mem_freq_khz == 0) {
 		drm_info(&i915->drm,
