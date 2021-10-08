@@ -2219,6 +2219,7 @@ static int btintel_configure_offload(struct hci_dev *hdev)
 	struct sk_buff *skb;
 	int err = 0;
 	struct intel_offload_use_cases *use_cases;
+	struct btintel_data *intel_data;
 
 	skb = __hci_cmd_sync(hdev, 0xfc86, 0, NULL, HCI_INIT_TIMEOUT);
 	if (IS_ERR(skb)) {
@@ -2239,10 +2240,15 @@ static int btintel_configure_offload(struct hci_dev *hdev)
 		goto error;
 	}
 
+	intel_data = hci_get_priv((hdev));
+
+	intel_data->use_cases = *use_cases;
+
 	if (use_cases->preset[0] & 0x03) {
 		hdev->get_data_path_id = btintel_get_data_path_id;
 		hdev->get_codec_config_data = btintel_get_codec_config_data;
 	}
+
 error:
 	kfree_skb(skb);
 	return err;
