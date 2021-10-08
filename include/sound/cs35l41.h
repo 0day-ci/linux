@@ -23,6 +23,8 @@ struct cs35l41_irq_cfg {
 };
 
 struct cs35l41_platform_data {
+	bool no_bst;
+	bool hda;
 	int bst_ind;
 	int bst_ipk;
 	int bst_cap;
@@ -30,5 +32,7 @@ struct cs35l41_platform_data {
 	struct cs35l41_irq_cfg irq_config1;
 	struct cs35l41_irq_cfg irq_config2;
 };
+
+void cs35l41_hda_init(void);
 
 #endif /* __CS35L41_H */

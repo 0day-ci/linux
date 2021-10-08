@@ -21,8 +21,16 @@
 #include <sound/soc.h>
 #include <sound/soc-dapm.h>
 #include <sound/tlv.h>
+#include <linux/acpi.h>
 
 #include "cs35l41.h"
+
+static struct list_head *cs35l41_hda_lst;
+
+struct cs35l41_hda_node {
+	struct list_head node;
+	struct cs35l41_private *cs35l41;
+};
 
 static const char * const cs35l41_supplies[CS35L41_NUM_SUPPLIES] = {
 	"VA",
@@ -1039,9 +1047,7 @@ static int cs35l41_set_pdata(struct cs35l41_private *cs35l41)
 {
 	int ret;
 
-	/* Set Platform Data */
-	/* Required */
-	if (cs35l41->pdata.bst_ipk &&
+	if (!cs35l41->pdata.no_bst && cs35l41->pdata.bst_ipk &&
 	    cs35l41->pdata.bst_ind && cs35l41->pdata.bst_cap) {
 		ret = cs35l41_boost_config(cs35l41, cs35l41->pdata.bst_ind,
 					   cs35l41->pdata.bst_cap,
@@ -1051,8 +1057,7 @@ static int cs35l41_set_pdata(struct cs35l41_private *cs35l41)
 			return ret;
 		}
 	} else {
-		dev_err(cs35l41->dev, "Incomplete Boost component DT config\n");
-		return -EINVAL;
+		dev_info(cs35l41->dev, "Boost disabled\n");
 	}
 
 	/* Optional */
@@ -1148,8 +1153,30 @@ static int cs35l41_handle_pdata(struct device *dev,
 {
 	struct cs35l41_irq_cfg *irq_gpio1_config = &pdata->irq_config1;
 	struct cs35l41_irq_cfg *irq_gpio2_config = &pdata->irq_config2;
+	struct acpi_device *adev;
+	struct device *phys_dev;
 	unsigned int val;
 	int ret;
+
+	if (memcmp(dev_name(cs35l41->dev), "i2c-CLSA0100", 12) == 0) {
+		pdata->no_bst = true;
+		pdata->hda = true;
+		adev = acpi_dev_get_first_match_dev("CLSA0100", "1", -1);
+		if (!adev) {
+			dev_err(dev, "Failed to find an ACPI device\n");
+			return -ENODEV;
+		}
+
+		phys_dev = get_device(acpi_get_first_physical_node(adev));
+		acpi_dev_put(adev);
+
+		if (!phys_dev) {
+			dev_err(dev, "Failed to find a physical device\n");
+			return -ENODEV;
+		}
+		cs35l41->reset_gpio = gpiod_get_index(phys_dev, NULL, 0, GPIOD_ASIS);
+		return 0;
+	}
 
 	ret = device_property_read_u32(dev, "cirrus,boost-peak-milliamp", &val);
 	if (ret >= 0)
@@ -1237,10 +1264,22 @@ static const struct reg_sequence cs35l41_revb2_errata_patch[] = {
 	{ 0x00000040,			 0x00003333 },
 };
 
+void cs35l41_hda_init(void)
+{
+	struct list_head *p;
+	int i = 0;
+
+	list_for_each(p, cs35l41_hda_lst) {
+		pr_info("%s %d\n", __func__, i++);
+	}
+}
+EXPORT_SYMBOL_GPL(cs35l41_hda_init);
+
 int cs35l41_probe(struct cs35l41_private *cs35l41,
 		  struct cs35l41_platform_data *pdata)
 {
 	u32 regid, reg_revid, i, mtl_revid, int_status, chipid_match;
+	struct cs35l41_hda_node *cs35l41_hda;
 	int irq_pol = 0;
 	int ret;
 
@@ -1269,8 +1308,8 @@ int cs35l41_probe(struct cs35l41_private *cs35l41,
 	}
 
 	/* returning NULL can be an option if in stereo mode */
-	cs35l41->reset_gpio = devm_gpiod_get_optional(cs35l41->dev, "reset",
-						      GPIOD_OUT_LOW);
+	if (!cs35l41->reset_gpio)
+		cs35l41->reset_gpio = devm_gpiod_get_optional(cs35l41->dev, "reset", GPIOD_OUT_LOW);
 	if (IS_ERR(cs35l41->reset_gpio)) {
 		ret = PTR_ERR(cs35l41->reset_gpio);
 		cs35l41->reset_gpio = NULL;
@@ -1413,12 +1452,22 @@ int cs35l41_probe(struct cs35l41_private *cs35l41,
 		goto err;
 	}
 
-	ret = devm_snd_soc_register_component(cs35l41->dev,
-					      &soc_component_dev_cs35l41,
-					      cs35l41_dai, ARRAY_SIZE(cs35l41_dai));
-	if (ret < 0) {
-		dev_err(cs35l41->dev, "Register codec failed: %d\n", ret);
-		goto err;
+	if (!cs35l41->pdata.hda) {
+		ret = devm_snd_soc_register_component(cs35l41->dev,
+						      &soc_component_dev_cs35l41,
+						      cs35l41_dai, ARRAY_SIZE(cs35l41_dai));
+		if (ret < 0) {
+			dev_err(cs35l41->dev, "Register codec failed: %d\n", ret);
+			goto err;
+		}
+	} else {
+		if (!cs35l41_hda_lst) {
+			cs35l41_hda_lst = devm_kzalloc(cs35l41->dev, sizeof(*cs35l41_hda_lst),
+						       GFP_KERNEL);
+			INIT_LIST_HEAD(cs35l41_hda_lst);
+		}
+		cs35l41_hda = devm_kzalloc(cs35l41->dev, sizeof(*cs35l41_hda), GFP_KERNEL);
+		list_add(&cs35l41_hda->node, cs35l41_hda_lst);
 	}
 
 	dev_info(cs35l41->dev, "Cirrus Logic CS35L41 (%x), Revision: %02X\n",

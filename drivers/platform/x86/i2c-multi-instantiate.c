@@ -139,6 +139,12 @@ static const struct i2c_inst_data bsg2150_data[]  = {
 	{}
 };
 
+static const struct i2c_inst_data clsa0100_data[]  = {
+	{ "cs35l41", IRQ_RESOURCE_GPIO, 0 },
+	{ "cs35l41", IRQ_RESOURCE_GPIO, 0 },
+	{}
+};
+
 /*
  * Device with _HID INT3515 (TI PD controllers) has some unresolved interrupt
  * issues. The most common problem seen is interrupt flood.
@@ -170,6 +176,7 @@ static const struct i2c_inst_data bsg2150_data[]  = {
 static const struct acpi_device_id i2c_multi_inst_acpi_ids[] = {
 	{ "BSG1160", (unsigned long)bsg1160_data },
 	{ "BSG2150", (unsigned long)bsg2150_data },
+	{ "CLSA0100", (unsigned long)clsa0100_data },
 	{ }
 };
 MODULE_DEVICE_TABLE(acpi, i2c_multi_inst_acpi_ids);
