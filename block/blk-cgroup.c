@@ -226,6 +226,20 @@ struct blkcg_gq *blkg_lookup_slowpath(struct blkcg *blkcg,
 }
 EXPORT_SYMBOL_GPL(blkg_lookup_slowpath);
 
+static void blkg_check_pd(struct request_queue *q, struct blkcg_gq *blkg)
+{
+	int i;
+
+	for (i = 0; i < BLKCG_MAX_POLS; i++) {
+		struct blkcg_policy *pol = blkcg_policy[i];
+
+		if (blkg->pd[i] && !blkcg_policy_enabled(q, pol)) {
+			pol->pd_free_fn(blkg->pd[i]);
+			blkg->pd[i] = NULL;
+		}
+	}
+}
+
 /*
  * If @new_blkg is %NULL, this function tries to allocate a new one as
  * necessary using %GFP_NOWAIT.  @new_blkg is always consumed on return.
@@ -251,6 +265,9 @@ static struct blkcg_gq *blkg_create(struct blkcg *blkcg,
 		ret = -ENODEV;
 		goto err_free_blkg;
 	}
+
+	if (new_blkg)
+		blkg_check_pd(q, new_blkg);
 
 	/* allocate */
 	if (!new_blkg) {
