@@ -394,6 +394,45 @@ static int handle_sigp_order_in_user_space(struct kvm_vcpu *vcpu, u8 order_code,
 	return 1;
 }
 
+static int handle_sigp_order_is_blocked(struct kvm_vcpu *vcpu, u8 order_code,
+					u16 cpu_addr)
+{
+	struct kvm_vcpu *dst_vcpu = kvm_get_vcpu_by_id(vcpu->kvm, cpu_addr);
+	int rc = 0;
+
+	/*
+	 * SIGP orders directed at invalid vcpus are not blocking,
+	 * and should not return busy here. The code that handles
+	 * the actual SIGP order will generate the "not operational"
+	 * response for such a vcpu.
+	 */
+	if (!dst_vcpu)
+		return 0;
+
+	/*
+	 * SIGP orders that process a flavor of reset would not be
+	 * blocked through another SIGP on the destination CPU.
+	 */
+	if (order_code == SIGP_CPU_RESET ||
+	    order_code == SIGP_INITIAL_CPU_RESET)
+		return 0;
+
+	/*
+	 * Any other SIGP order could race with an existing SIGP order
+	 * on the destination CPU, and thus encounter a busy condition
+	 * on the CPU processing the SIGP order. Reject the order at
+	 * this point, rather than racing with the STOP IRQ injection.
+	 */
+	spin_lock(&dst_vcpu->arch.local_int.lock);
+	if (kvm_s390_is_stop_irq_pending(dst_vcpu)) {
+		kvm_s390_set_psw_cc(vcpu, SIGP_CC_BUSY);
+		rc = 1;
+	}
+	spin_unlock(&dst_vcpu->arch.local_int.lock);
+
+	return rc;
+}
+
 int kvm_s390_handle_sigp(struct kvm_vcpu *vcpu)
 {
 	int r1 = (vcpu->arch.sie_block->ipa & 0x00f0) >> 4;
@@ -408,6 +447,10 @@ int kvm_s390_handle_sigp(struct kvm_vcpu *vcpu)
 		return kvm_s390_inject_program_int(vcpu, PGM_PRIVILEGED_OP);
 
 	order_code = kvm_s390_get_base_disp_rs(vcpu, NULL);
+
+	if (handle_sigp_order_is_blocked(vcpu, order_code, cpu_addr))
+		return 0;
+
 	if (handle_sigp_order_in_user_space(vcpu, order_code, cpu_addr))
 		return -EOPNOTSUPP;
 
