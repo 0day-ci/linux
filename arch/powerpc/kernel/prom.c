@@ -380,6 +380,8 @@ static int __init early_init_dt_scan_cpus(unsigned long node,
 		check_cpu_pa_features(node);
 	}
 
+	/* Update cpu features based on kernel command line */
+	update_cpu_features();
 	identical_pvr_fixup(node);
 	init_mmu_slb_size(node);
 
