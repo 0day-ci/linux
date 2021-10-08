@@ -372,7 +372,8 @@ out_free_ctx:
 }
 
 static const struct devlink_ops ice_devlink_ops = {
-	.supported_flash_update_params = DEVLINK_SUPPORT_FLASH_UPDATE_OVERWRITE_MASK,
+	.supported_flash_update_params = DEVLINK_SUPPORT_FLASH_UPDATE_OVERWRITE_MASK |
+					 DEVLINK_SUPPORT_FLASH_UPDATE_DRY_RUN,
 	.info_get = ice_devlink_info_get,
 	.flash_update = ice_devlink_flash_update,
 };

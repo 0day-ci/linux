@@ -51,6 +51,16 @@ unaligned access of multi-byte fields, and to properly convert from Little
 Endian to CPU host format. Additionally the records, descriptors, and
 components are stored in linked lists.
 
+Validating a PLDM firmware file
+===============================
+
+To simply validate a PLDM firmware file, and verify whether it applies to
+the device, set the ``dry_run`` flag in the ``pldmfw`` context structure.
+If this flag is set, the library will parse the file, validating its UUID
+and checking if any record matches the device. Note that in a dry run, the
+library will *not* issue any ops besides ``match_record``. It will not
+attempt to send the component table or package data to the device firmware.
+
 Performing a flash update
 =========================
 

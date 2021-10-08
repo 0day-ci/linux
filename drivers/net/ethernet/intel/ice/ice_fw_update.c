@@ -783,11 +783,15 @@ int ice_devlink_flash_update(struct devlink *devlink,
 
 	priv.context.ops = &ice_fwu_ops;
 	priv.context.dev = dev;
+	priv.context.dry_run = params->dry_run;
 	priv.extack = extack;
 	priv.pf = pf;
 	priv.activate_flags = preservation;
 
-	devlink_flash_update_status_notify(devlink, "Preparing to flash", NULL, 0, 0);
+	if (params->dry_run)
+		devlink_flash_update_status_notify(devlink, "Validating flash binary", NULL, 0, 0);
+	else
+		devlink_flash_update_status_notify(devlink, "Preparing to flash", NULL, 0, 0);
 
 	status = ice_acquire_nvm(hw, ICE_RES_WRITE);
 	if (status) {
@@ -798,9 +802,12 @@ int ice_devlink_flash_update(struct devlink *devlink,
 		return -EIO;
 	}
 
-	err = ice_cancel_pending_update(pf, NULL, extack);
-	if (err)
-		goto out_release_nvm;
+	/* Do not cancel a previous flash update if this is a dry run */
+	if (!params->dry_run) {
+		err = ice_cancel_pending_update(pf, NULL, extack);
+		if (err)
+			goto out_release_nvm;
+	}
 
 	err = pldmfw_flash_image(&priv.context, params->fw);
 	if (err == -ENOENT) {

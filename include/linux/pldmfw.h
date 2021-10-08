@@ -124,10 +124,15 @@ struct pldmfw_ops;
  * should embed this in a private structure and use container_of to obtain
  * a pointer to their own data, used to implement the device specific
  * operations.
+ *
+ * @ops: function pointers used as callbacks from the PLDMFW library
+ * @dev: pointer to the device being updated
+ * @dry_run: if true, only validate the file, do not perform an update.
  */
 struct pldmfw {
 	const struct pldmfw_ops *ops;
 	struct device *dev;
+	bool dry_run;
 };
 
 bool pldmfw_op_pci_match_record(struct pldmfw *context, struct pldmfw_record *record);

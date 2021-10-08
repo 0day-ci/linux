@@ -827,6 +827,10 @@ static int pldm_finalize_update(struct pldmfw_priv *data)
  * to the device firmware. Extract and write the flash data for each of the
  * components indicated in the firmware file.
  *
+ * If the context->dry_run is set, this is a request for a dry run, i.e. to
+ * only validate the PLDM firmware file. In this case, stop and exit after we
+ * find a valid matching record.
+ *
  * Returns: zero on success, or a negative error code on failure.
  */
 int pldmfw_flash_image(struct pldmfw *context, const struct firmware *fw)
@@ -844,13 +848,21 @@ int pldmfw_flash_image(struct pldmfw *context, const struct firmware *fw)
 	data->fw = fw;
 	data->context = context;
 
+	/* Parse the image and make sure it is a valid PLDM firmware binary */
 	err = pldm_parse_image(data);
 	if (err)
 		goto out_release_data;
 
+	/* Search for a record matching the device */
 	err = pldm_find_matching_record(data);
 	if (err)
 		goto out_release_data;
+
+	/* If this is a dry run, do not perform an update */
+	if (context->dry_run)
+		goto out_release_data;
+
+	/* Perform the device update */
 
 	err = pldm_send_package_data(data);
 	if (err)
