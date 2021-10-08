@@ -43,14 +43,12 @@
 #include <linux/pci-ecam.h>
 #include <linux/delay.h>
 #include <linux/semaphore.h>
-#include <linux/irqdomain.h>
-#include <asm/irqdomain.h>
-#include <asm/apic.h>
 #include <linux/irq.h>
 #include <linux/msi.h>
 #include <linux/hyperv.h>
 #include <linux/refcount.h>
 #include <asm/mshyperv.h>
+#include "pci-hyperv-irqchip.h"
 
 /*
  * Protocol versions. The low word is the minor version, the high word the
@@ -80,6 +78,10 @@ static enum pci_protocol_version_t pci_protocol_versions[] = {
 	PCI_PROTOCOL_VERSION_1_2,
 	PCI_PROTOCOL_VERSION_1_1,
 };
+
+static struct irq_domain *parent_domain;
+static bool fasteoi;
+static u8 delivery_mode;
 
 #define PCI_CONFIG_MMIO_LENGTH	0x2000
 #define CFG_PAGE_OFFSET 0x1000
@@ -1217,7 +1219,6 @@ static void hv_irq_mask(struct irq_data *data)
 static void hv_irq_unmask(struct irq_data *data)
 {
 	struct msi_desc *msi_desc = irq_data_get_msi_desc(data);
-	struct irq_cfg *cfg = irqd_cfg(data);
 	struct hv_retarget_device_interrupt *params;
 	struct hv_pcibus_device *hbus;
 	struct cpumask *dest;
@@ -1246,11 +1247,12 @@ static void hv_irq_unmask(struct irq_data *data)
 			   (hbus->hdev->dev_instance.b[7] << 8) |
 			   (hbus->hdev->dev_instance.b[6] & 0xf8) |
 			   PCI_FUNC(pdev->devfn);
-	params->int_target.vector = cfg->vector;
+	params->int_target.vector = hv_msi_get_int_vector(data);
 
 	/*
-	 * Honoring apic->delivery_mode set to APIC_DELIVERY_MODE_FIXED by
-	 * setting the HV_DEVICE_INTERRUPT_TARGET_MULTICAST flag results in a
+	 * For x64, honoring apic->delivery_mode set to
+	 * APIC_DELIVERY_MODE_FIXED by setting the
+	 * HV_DEVICE_INTERRUPT_TARGET_MULTICAST flag results in a
 	 * spurious interrupt storm. Not doing so does not seem to have a
 	 * negative effect (yet?).
 	 */
@@ -1347,7 +1349,7 @@ static u32 hv_compose_msi_req_v1(
 	int_pkt->wslot.slot = slot;
 	int_pkt->int_desc.vector = vector;
 	int_pkt->int_desc.vector_count = 1;
-	int_pkt->int_desc.delivery_mode = APIC_DELIVERY_MODE_FIXED;
+	int_pkt->int_desc.delivery_mode = delivery_mode;
 
 	/*
 	 * Create MSI w/ dummy vCPU set, overwritten by subsequent retarget in
@@ -1377,7 +1379,7 @@ static u32 hv_compose_msi_req_v2(
 	int_pkt->wslot.slot = slot;
 	int_pkt->int_desc.vector = vector;
 	int_pkt->int_desc.vector_count = 1;
-	int_pkt->int_desc.delivery_mode = APIC_DELIVERY_MODE_FIXED;
+	int_pkt->int_desc.delivery_mode = delivery_mode;
 	cpu = hv_compose_msi_req_get_cpu(affinity);
 	int_pkt->int_desc.processor_array[0] =
 		hv_cpu_number_to_vp_number(cpu);
@@ -1397,7 +1399,7 @@ static u32 hv_compose_msi_req_v3(
 	int_pkt->int_desc.vector = vector;
 	int_pkt->int_desc.reserved = 0;
 	int_pkt->int_desc.vector_count = 1;
-	int_pkt->int_desc.delivery_mode = APIC_DELIVERY_MODE_FIXED;
+	int_pkt->int_desc.delivery_mode = delivery_mode;
 	cpu = hv_compose_msi_req_get_cpu(affinity);
 	int_pkt->int_desc.processor_array[0] =
 		hv_cpu_number_to_vp_number(cpu);
@@ -1419,7 +1421,6 @@ static u32 hv_compose_msi_req_v3(
  */
 static void hv_compose_msi_msg(struct irq_data *data, struct msi_msg *msg)
 {
-	struct irq_cfg *cfg = irqd_cfg(data);
 	struct hv_pcibus_device *hbus;
 	struct vmbus_channel *channel;
 	struct hv_pci_dev *hpdev;
@@ -1470,7 +1471,7 @@ static void hv_compose_msi_msg(struct irq_data *data, struct msi_msg *msg)
 		size = hv_compose_msi_req_v1(&ctxt.int_pkts.v1,
 					dest,
 					hpdev->desc.win_slot.slot,
-					cfg->vector);
+					hv_msi_get_int_vector(data));
 		break;
 
 	case PCI_PROTOCOL_VERSION_1_2:
@@ -1478,14 +1479,14 @@ static void hv_compose_msi_msg(struct irq_data *data, struct msi_msg *msg)
 		size = hv_compose_msi_req_v2(&ctxt.int_pkts.v2,
 					dest,
 					hpdev->desc.win_slot.slot,
-					cfg->vector);
+					hv_msi_get_int_vector(data));
 		break;
 
 	case PCI_PROTOCOL_VERSION_1_4:
 		size = hv_compose_msi_req_v3(&ctxt.int_pkts.v3,
 					dest,
 					hpdev->desc.win_slot.slot,
-					cfg->vector);
+					hv_msi_get_int_vector(data));
 		break;
 
 	default:
@@ -1601,7 +1602,7 @@ static struct irq_chip hv_msi_irq_chip = {
 };
 
 static struct msi_domain_ops hv_msi_ops = {
-	.msi_prepare	= pci_msi_prepare,
+	.msi_prepare	= hv_msi_prepare,
 	.msi_free	= hv_msi_free,
 };
 
@@ -1625,12 +1626,13 @@ static int hv_pcie_init_irq_domain(struct hv_pcibus_device *hbus)
 	hbus->msi_info.flags = (MSI_FLAG_USE_DEF_DOM_OPS |
 		MSI_FLAG_USE_DEF_CHIP_OPS | MSI_FLAG_MULTI_PCI_MSI |
 		MSI_FLAG_PCI_MSIX);
-	hbus->msi_info.handler = handle_edge_irq;
-	hbus->msi_info.handler_name = "edge";
+	hbus->msi_info.handler =
+		fasteoi ? handle_fasteoi_irq : handle_edge_irq;
+	hbus->msi_info.handler_name = fasteoi ? "fasteoi" : "edge";
 	hbus->msi_info.data = hbus;
 	hbus->irq_domain = pci_msi_create_irq_domain(hbus->fwnode,
 						     &hbus->msi_info,
-						     x86_vector_domain);
+						     parent_domain);
 	if (!hbus->irq_domain) {
 		dev_err(&hbus->hdev->device,
 			"Failed to build an MSI IRQ domain\n");
@@ -3531,12 +3533,20 @@ static void __exit exit_hv_pci_drv(void)
 	hvpci_block_ops.read_block = NULL;
 	hvpci_block_ops.write_block = NULL;
 	hvpci_block_ops.reg_blk_invalidate = NULL;
+
+	hv_pci_irqchip_free();
 }
 
 static int __init init_hv_pci_drv(void)
 {
+	int ret;
+
 	if (!hv_is_hyperv_initialized())
 		return -ENODEV;
+
+	ret = hv_pci_irqchip_init(&parent_domain, &fasteoi, &delivery_mode);
+	if (ret)
+		return ret;
 
 	/* Set the invalid domain number's bit, so it will not be used */
 	set_bit(HVPCI_DOM_INVALID, hvpci_dom_map);
@@ -3546,7 +3556,11 @@ static int __init init_hv_pci_drv(void)
 	hvpci_block_ops.write_block = hv_write_config_block;
 	hvpci_block_ops.reg_blk_invalidate = hv_register_block_invalidate;
 
-	return vmbus_driver_register(&hv_pci_drv);
+	ret = vmbus_driver_register(&hv_pci_drv);
+	if (ret)
+		hv_pci_irqchip_free();
+
+	return ret;
 }
 
 module_init(init_hv_pci_drv);
