@@ -180,6 +180,9 @@ void drm_debugfs_create_files(const struct drm_info_list *files, int count,
 	struct drm_info_node *tmp;
 	int i;
 
+	if (!minor->debugfs_root)
+		return;
+
 	for (i = 0; i < count; i++) {
 		u32 features = files[i].driver_features;
 
@@ -203,7 +206,7 @@ void drm_debugfs_create_files(const struct drm_info_list *files, int count,
 }
 EXPORT_SYMBOL(drm_debugfs_create_files);
 
-int drm_debugfs_init(struct drm_minor *minor, int minor_id,
+void drm_debugfs_init(struct drm_minor *minor, int minor_id,
 		     struct dentry *root)
 {
 	struct drm_device *dev = minor->dev;
@@ -212,7 +215,15 @@ int drm_debugfs_init(struct drm_minor *minor, int minor_id,
 	INIT_LIST_HEAD(&minor->debugfs_list);
 	mutex_init(&minor->debugfs_lock);
 	sprintf(name, "%d", minor_id);
+
+	if (!root)
+		goto error;
+
 	minor->debugfs_root = debugfs_create_dir(name, root);
+
+	if (IS_ERR(minor->debugfs_root))
+		goto error;
+
 
 	drm_debugfs_create_files(drm_debugfs_list, DRM_DEBUGFS_ENTRIES,
 				 minor->debugfs_root, minor);
@@ -230,7 +241,11 @@ int drm_debugfs_init(struct drm_minor *minor, int minor_id,
 	if (dev->driver->debugfs_init)
 		dev->driver->debugfs_init(minor);
 
-	return 0;
+	return;
+
+error:
+	minor->debugfs_root = NULL;
+	return;
 }
 
 
@@ -240,6 +255,9 @@ int drm_debugfs_remove_files(const struct drm_info_list *files, int count,
 	struct list_head *pos, *q;
 	struct drm_info_node *tmp;
 	int i;
+
+	if (!minor->debugfs_root)
+		return 0;
 
 	mutex_lock(&minor->debugfs_lock);
 	for (i = 0; i < count; i++) {
@@ -260,6 +278,9 @@ EXPORT_SYMBOL(drm_debugfs_remove_files);
 static void drm_debugfs_remove_all_files(struct drm_minor *minor)
 {
 	struct drm_info_node *node, *tmp;
+
+	if (!minor->debugfs_root)
+		return;
 
 	mutex_lock(&minor->debugfs_lock);
 	list_for_each_entry_safe(node, tmp, &minor->debugfs_list, list) {

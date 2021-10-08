@@ -182,8 +182,8 @@ int drm_gem_dumb_destroy(struct drm_file *file, struct drm_device *dev,
 
 /* drm_debugfs.c drm_debugfs_crc.c */
 #if defined(CONFIG_DEBUG_FS)
-int drm_debugfs_init(struct drm_minor *minor, int minor_id,
-		     struct dentry *root);
+void drm_debugfs_init(struct drm_minor *minor, int minor_id,
+		      struct dentry *root);
 void drm_debugfs_cleanup(struct drm_minor *minor);
 void drm_debugfs_connector_add(struct drm_connector *connector);
 void drm_debugfs_connector_remove(struct drm_connector *connector);
@@ -191,10 +191,9 @@ void drm_debugfs_crtc_add(struct drm_crtc *crtc);
 void drm_debugfs_crtc_remove(struct drm_crtc *crtc);
 void drm_debugfs_crtc_crc_add(struct drm_crtc *crtc);
 #else
-static inline int drm_debugfs_init(struct drm_minor *minor, int minor_id,
+static inline void drm_debugfs_init(struct drm_minor *minor, int minor_id,
 				   struct dentry *root)
 {
-	return 0;
 }
 
 static inline void drm_debugfs_cleanup(struct drm_minor *minor)
