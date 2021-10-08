@@ -592,6 +592,9 @@ static int scmi_iio_dev_probe(struct scmi_device *sdev)
 	if (!handle)
 		return -ENODEV;
 
+	if (!dev)
+		return -ENODEV;
+
 	sensor_ops = handle->devm_protocol_get(sdev, SCMI_PROTOCOL_SENSOR, &ph);
 	if (IS_ERR(sensor_ops)) {
 		dev_err(dev, "SCMI device has no sensor interface\n");
