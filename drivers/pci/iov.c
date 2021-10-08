@@ -140,7 +140,7 @@ int pci_iov_sysfs_link(struct pci_dev *dev,
 	char buf[VIRTFN_ID_LEN];
 	int rc;
 
-	sprintf(buf, "virtfn%u", id);
+	sprintf(buf, "virtfn%d", id);
 	rc = sysfs_create_link(&dev->dev.kobj, &virtfn->dev.kobj, buf);
 	if (rc)
 		goto failed;
@@ -321,7 +321,7 @@ void pci_iov_remove_virtfn(struct pci_dev *dev, int id)
 	if (!virtfn)
 		return;
 
-	sprintf(buf, "virtfn%u", id);
+	sprintf(buf, "virtfn%d", id);
 	sysfs_remove_link(&dev->dev.kobj, buf);
 	/*
 	 * pci_stop_dev() could have been called for this virtfn already,
