@@ -1465,7 +1465,7 @@ retry:
 
 		worker = find_worker_executing_work(last_pool, work);
 
-		if (worker && worker->current_pwq->wq == wq) {
+		if (worker) {
 			pwq = worker->current_pwq;
 		} else {
 			/* meh... not running there, queue here */
