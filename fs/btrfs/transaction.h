@@ -133,6 +133,7 @@ struct btrfs_trans_handle {
 	bool adding_csums;
 	bool allocating_chunk;
 	bool removing_chunk;
+	bool creating_pending_block_groups;
 	bool reloc_reserved;
 	bool in_fsync;
 	struct btrfs_root *root;

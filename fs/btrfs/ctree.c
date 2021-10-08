@@ -8,6 +8,7 @@
 #include <linux/rbtree.h>
 #include <linux/mm.h>
 #include "ctree.h"
+#include "block-group.h"
 #include "disk-io.h"
 #include "transaction.h"
 #include "print-tree.h"
@@ -1693,6 +1694,7 @@ int btrfs_search_slot(struct btrfs_trans_handle *trans, struct btrfs_root *root,
 	u8 lowest_level = 0;
 	int min_write_lock_level;
 	int prev_cmp;
+	bool reserved_chunk_space = false;
 
 	lowest_level = p->lowest_level;
 	WARN_ON(lowest_level && ins_len > 0);
@@ -1722,6 +1724,14 @@ int btrfs_search_slot(struct btrfs_trans_handle *trans, struct btrfs_root *root,
 		write_lock_level = BTRFS_MAX_LEVEL;
 
 	min_write_lock_level = write_lock_level;
+
+	if (cow && root == root->fs_info->chunk_root &&
+	    !trans->allocating_chunk &&
+	    !trans->removing_chunk &&
+	    !trans->creating_pending_block_groups) {
+		btrfs_reserve_chunk_btree_space(trans, (ins_len > 0));
+		reserved_chunk_space = true;
+	}
 
 again:
 	prev_cmp = -1;
@@ -1917,6 +1927,10 @@ cow_done:
 done:
 	if (ret < 0 && !p->skip_release_on_error)
 		btrfs_release_path(p);
+
+	if (reserved_chunk_space)
+		btrfs_trans_release_chunk_metadata(trans);
+
 	return ret;
 }
 ALLOW_ERROR_INJECTION(btrfs_search_slot, ERRNO);

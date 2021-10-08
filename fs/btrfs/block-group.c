@@ -2373,6 +2373,7 @@ void btrfs_create_pending_block_groups(struct btrfs_trans_handle *trans)
 	struct btrfs_block_group *block_group;
 	int ret = 0;
 
+	trans->creating_pending_block_groups = true;
 	while (!list_empty(&trans->new_bgs)) {
 		int index;
 
@@ -2414,6 +2415,7 @@ next:
 		btrfs_delayed_refs_rsv_release(fs_info, 1);
 		list_del_init(&block_group->bg_list);
 	}
+	trans->creating_pending_block_groups = false;
 	btrfs_trans_release_chunk_metadata(trans);
 }
 
@@ -3403,25 +3405,6 @@ static int do_chunk_alloc(struct btrfs_trans_handle *trans, u64 flags)
 		goto out;
 	}
 
-	/*
-	 * If this is a system chunk allocation then stop right here and do not
-	 * add the chunk item to the chunk btree. This is to prevent a deadlock
-	 * because this system chunk allocation can be triggered while COWing
-	 * some extent buffer of the chunk btree and while holding a lock on a
-	 * parent extent buffer, in which case attempting to insert the chunk
-	 * item (or update the device item) would result in a deadlock on that
-	 * parent extent buffer. In this case defer the chunk btree updates to
-	 * the second phase of chunk allocation and keep our reservation until
-	 * the second phase completes.
-	 *
-	 * This is a rare case and can only be triggered by the very few cases
-	 * we have where we need to touch the chunk btree outside chunk allocation
-	 * and chunk removal. These cases are basically adding a device, removing
-	 * a device or resizing a device.
-	 */
-	if (flags & BTRFS_BLOCK_GROUP_SYSTEM)
-		return 0;
-
 	ret = btrfs_chunk_alloc_add_chunk_item(trans, bg);
 	/*
 	 * Normally we are not expected to fail with -ENOSPC here, since we have
@@ -3598,11 +3581,27 @@ int btrfs_chunk_alloc(struct btrfs_trans_handle *trans, u64 flags,
 	if (trans->allocating_chunk)
 		return -ENOSPC;
 	/*
-	 * If we are removing a chunk, don't re-enter or we would deadlock.
-	 * System space reservation and system chunk allocation is done by the
-	 * chunk remove operation (btrfs_remove_chunk()).
+	 * Allocation of system chunks can not happen through this path, as we
+	 * could end up in a deadlock if we are allocating a data or metadata
+	 * chunk and there is another task modifying the chunk btree
+	 *
+	 * This is because while we are holding the chunk mutex, we will attempt
+	 * to add the new chunk item to the chunk btree or update an existing
+	 * device item in the chunk btree, while the other task that is modifying
+	 * the chunk btree is attempting to COW an extent buffer while holding a
+	 * lock on it and on its parent - if the COW operation triggers a system
+	 * chunk allocation, then we can deadlock because we are holding the
+	 * chunk mutex and we may need to access that extent buffer or its parent
+	 * in order to add the chunk item or update a device item.
+	 *
+	 * Tasks that want to modify the chunk tree should reserve system space
+	 * before updating the chunk btree, by calling either
+	 * btrfs_reserve_chunk_space_for_cow() or check_system_chunk().
+	 * It's possible that after a task reserves the space, it still ends up
+	 * here - this happens in the cases described above at do_chunk_alloc().
+	 * The task will have to either retry or fail.
 	 */
-	if (trans->removing_chunk)
+	if (flags & BTRFS_BLOCK_GROUP_SYSTEM)
 		return -ENOSPC;
 
 	space_info = btrfs_find_space_info(fs_info, flags);
@@ -3701,17 +3700,14 @@ static u64 get_profile_num_devs(struct btrfs_fs_info *fs_info, u64 type)
 	return num_dev;
 }
 
-/*
- * Reserve space in the system space for allocating or removing a chunk
- */
-void check_system_chunk(struct btrfs_trans_handle *trans, u64 type)
+static void reserve_chunk_space(struct btrfs_trans_handle *trans,
+				u64 bytes,
+				u64 type)
 {
 	struct btrfs_fs_info *fs_info = trans->fs_info;
 	struct btrfs_space_info *info;
 	u64 left;
-	u64 thresh;
 	int ret = 0;
-	u64 num_devs;
 
 	/*
 	 * Needed because we can end up allocating a system chunk and for an
@@ -3724,19 +3720,13 @@ void check_system_chunk(struct btrfs_trans_handle *trans, u64 type)
 	left = info->total_bytes - btrfs_space_info_used(info, true);
 	spin_unlock(&info->lock);
 
-	num_devs = get_profile_num_devs(fs_info, type);
-
-	/* num_devs device items to update and 1 chunk item to add or remove */
-	thresh = btrfs_calc_metadata_size(fs_info, num_devs) +
-		btrfs_calc_insert_metadata_size(fs_info, 1);
-
-	if (left < thresh && btrfs_test_opt(fs_info, ENOSPC_DEBUG)) {
+	if (left < bytes && btrfs_test_opt(fs_info, ENOSPC_DEBUG)) {
 		btrfs_info(fs_info, "left=%llu, need=%llu, flags=%llu",
-			   left, thresh, type);
+			   left, bytes, type);
 		btrfs_dump_space_info(fs_info, info, 0, 0);
 	}
 
-	if (left < thresh) {
+	if (left < bytes) {
 		u64 flags = btrfs_system_alloc_profile(fs_info);
 		struct btrfs_block_group *bg;
 
@@ -3746,10 +3736,10 @@ void check_system_chunk(struct btrfs_trans_handle *trans, u64 type)
 		 * the paths we visit in the chunk tree (they were already COWed
 		 * or created in the current transaction for example).
 		 *
-		 * Also, if our caller is allocating a system chunk, do not
+		 * Also, if we are being called to reserve chunk space, do not
 		 * attempt to insert the chunk item in the chunk btree, as we
-		 * could deadlock on an extent buffer since our caller may be
-		 * COWing an extent buffer from the chunk btree.
+		 * could deadlock on the chunk mutex if we need to COW an extent
+		 * buffer of the chunk btree.
 		 */
 		bg = btrfs_create_chunk(trans, flags);
 		if (IS_ERR(bg)) {
@@ -3768,10 +3758,58 @@ void check_system_chunk(struct btrfs_trans_handle *trans, u64 type)
 	if (!ret) {
 		ret = btrfs_block_rsv_add(fs_info->chunk_root,
 					  &fs_info->chunk_block_rsv,
-					  thresh, BTRFS_RESERVE_NO_FLUSH);
+					  bytes, BTRFS_RESERVE_NO_FLUSH);
 		if (!ret)
-			trans->chunk_bytes_reserved += thresh;
+			trans->chunk_bytes_reserved += bytes;
 	}
+}
+
+/*
+ * Reserve space in the system space for allocating or removing a chunk.
+ * The caller must be holding fs_info->chunk_mutex.
+ */
+void check_system_chunk(struct btrfs_trans_handle *trans, u64 type)
+{
+	struct btrfs_fs_info *fs_info = trans->fs_info;
+	const u64 num_devs = get_profile_num_devs(fs_info, type);
+	u64 bytes;
+
+	/* num_devs device items to update and 1 chunk item to add or remove. */
+	bytes = btrfs_calc_metadata_size(fs_info, num_devs) +
+		btrfs_calc_insert_metadata_size(fs_info, 1);
+
+	reserve_chunk_space(trans, bytes, type);
+}
+
+/*
+ * Reserve space in the system space, if needed, for doing a modification to the
+ * chunk btree.
+ *
+ * This is used in a context where we need to update the chunk btree outside
+ * block group allocation and removal, to avoid a deadlock with a concurrent
+ * task that is allocating a metadata or data block group and therefore needs to
+ * update the chunk btree while holding the chunk mutex. After the update to the
+ * chunk btree is done, btrfs_trans_release_chunk_metadata() should be called.
+ *
+ * @trans:		A transaction handle.
+ * @is_item_insertion:	Indicate if the modification is for inserting a new item
+ *			in the chunk btree or if it's for the deletion or update
+ *			of an existing item.
+ */
+void btrfs_reserve_chunk_btree_space(struct btrfs_trans_handle *trans,
+				     bool is_item_insertion)
+{
+	struct btrfs_fs_info *fs_info = trans->fs_info;
+	u64 bytes;
+
+	if (is_item_insertion)
+		bytes = btrfs_calc_insert_metadata_size(fs_info, 1);
+	else
+		bytes = btrfs_calc_metadata_size(fs_info, 1);
+
+	mutex_lock(&fs_info->chunk_mutex);
+	reserve_chunk_space(trans, bytes, BTRFS_BLOCK_GROUP_SYSTEM);
+	mutex_unlock(&fs_info->chunk_mutex);
 }
 
 void btrfs_put_block_group_cache(struct btrfs_fs_info *info)
