@@ -115,6 +115,23 @@ static const struct iio_info lpc18xx_adc_info = {
 	.read_raw = lpc18xx_adc_read_raw,
 };
 
+static void lpc18xx_writel(void *data)
+{
+	struct lpc18xx_adc *adc = data;
+
+	writel(0, adc->base + LPC18XX_ADC_CR);
+}
+
+static void lpc18xx_clk_disable_unprepare(void *clk)
+{
+	clk_disable_unprepare(clk);
+}
+
+static void lpc18xx_regulator_disable(void *vref)
+{
+	regulator_disable(vref);
+}
+
 static int lpc18xx_adc_probe(struct platform_device *pdev)
 {
 	struct iio_dev *indio_dev;
@@ -163,44 +180,34 @@ static int lpc18xx_adc_probe(struct platform_device *pdev)
 		return ret;
 	}
 
+	ret = devm_add_action_or_reset(&pdev->dev, lpc18xx_regulator_disable, adc->vref);
+	if (ret)
+		return ret;
+
 	ret = clk_prepare_enable(adc->clk);
 	if (ret) {
 		dev_err(&pdev->dev, "unable to enable clock\n");
-		goto dis_reg;
+		return ret;
 	}
+
+	ret = devm_add_action_or_reset(&pdev->dev, lpc18xx_clk_disable_unprepare,
+				       adc->clk);
+	if (ret)
+		return ret;
 
 	adc->cr_reg = (clkdiv << LPC18XX_ADC_CR_CLKDIV_SHIFT) |
 			LPC18XX_ADC_CR_PDN;
 	writel(adc->cr_reg, adc->base + LPC18XX_ADC_CR);
 
-	ret = iio_device_register(indio_dev);
-	if (ret) {
+	ret = devm_add_action_or_reset(&pdev->dev, lpc18xx_writel, adc);
+	if (ret)
+		return ret;
+
+	ret = devm_iio_device_register(&pdev->dev, indio_dev);
+	if (ret)
 		dev_err(&pdev->dev, "unable to register device\n");
-		goto dis_clk;
-	}
 
-	return 0;
-
-dis_clk:
-	writel(0, adc->base + LPC18XX_ADC_CR);
-	clk_disable_unprepare(adc->clk);
-dis_reg:
-	regulator_disable(adc->vref);
 	return ret;
-}
-
-static int lpc18xx_adc_remove(struct platform_device *pdev)
-{
-	struct iio_dev *indio_dev = platform_get_drvdata(pdev);
-	struct lpc18xx_adc *adc = iio_priv(indio_dev);
-
-	iio_device_unregister(indio_dev);
-
-	writel(0, adc->base + LPC18XX_ADC_CR);
-	clk_disable_unprepare(adc->clk);
-	regulator_disable(adc->vref);
-
-	return 0;
 }
 
 static const struct of_device_id lpc18xx_adc_match[] = {
@@ -211,7 +218,6 @@ MODULE_DEVICE_TABLE(of, lpc18xx_adc_match);
 
 static struct platform_driver lpc18xx_adc_driver = {
 	.probe	= lpc18xx_adc_probe,
-	.remove	= lpc18xx_adc_remove,
 	.driver	= {
 		.name = "lpc18xx-adc",
 		.of_match_table = lpc18xx_adc_match,
