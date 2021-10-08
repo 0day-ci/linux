@@ -36,6 +36,44 @@
 
 struct backing_dev_info *mtd_bdi;
 
+static void mtd_start_access(struct mtd_info *mtd)
+{
+	struct mtd_info *master = mtd_get_master(mtd);
+
+	/*
+	 * Don't take the suspend_lock on devices that don't
+	 * implement the suspend hook. Otherwise, lockdep will
+	 * complain about nested locks when trying to suspend MTD
+	 * partitions or MTD devices created by gluebi which are
+	 * backed by real devices.
+	 */
+	if (!master->_suspend)
+		return;
+
+	/*
+	 * Wait until the device is resumed. Should we have a
+	 * non-blocking mode here?
+	 */
+	while (1) {
+		down_read(&master->master.suspend_lock);
+		if (!master->master.suspended)
+			return;
+
+		up_read(&master->master.suspend_lock);
+		wait_event(master->master.resume_wq, master->master.suspended == 0);
+	}
+}
+
+static void mtd_end_access(struct mtd_info *mtd)
+{
+	struct mtd_info *master = mtd_get_master(mtd);
+
+	if (!master->_suspend)
+		return;
+
+	up_read(&master->master.suspend_lock);
+}
+
 #ifdef CONFIG_PM_SLEEP
 
 static int mtd_cls_suspend(struct device *dev)
@@ -1000,6 +1038,9 @@ int mtd_device_parse_register(struct mtd_info *mtd, const char * const *types,
 
 	ret = mtd_otp_nvmem_add(mtd);
 
+	init_waitqueue_head(&mtd->master.resume_wq);
+	init_rwsem(&mtd->master.suspend_lock);
+
 out:
 	if (ret && device_is_registered(&mtd->dev))
 		del_mtd_device(mtd);
@@ -1241,6 +1282,8 @@ int mtd_erase(struct mtd_info *mtd, struct erase_info *instr)
 	struct erase_info adjinstr;
 	int ret;
 
+	mtd_start_access(mtd);
+
 	instr->fail_addr = MTD_FAIL_ADDR_UNKNOWN;
 	adjinstr = *instr;
 
@@ -1277,6 +1320,8 @@ int mtd_erase(struct mtd_info *mtd, struct erase_info *instr)
 			instr->fail_addr *= mtd->erasesize;
 		}
 	}
+
+	mtd_end_access(mtd);
 
 	return ret;
 }
@@ -1558,6 +1603,8 @@ int mtd_read_oob(struct mtd_info *mtd, loff_t from, struct mtd_oob_ops *ops)
 	struct mtd_ecc_stats old_stats = master->ecc_stats;
 	int ret_code;
 
+	mtd_start_access(mtd);
+
 	ops->retlen = ops->oobretlen = 0;
 
 	ret_code = mtd_check_oob_ops(mtd, from, ops);
@@ -1576,6 +1623,8 @@ int mtd_read_oob(struct mtd_info *mtd, loff_t from, struct mtd_oob_ops *ops)
 		ret_code = mtd_read_oob_std(mtd, from, ops);
 
 	mtd_update_ecc_stats(mtd, master, &old_stats);
+
+	mtd_end_access(mtd);
 
 	/*
 	 * In cases where ops->datbuf != NULL, mtd->_read_oob() has semantics
@@ -1597,6 +1646,8 @@ int mtd_write_oob(struct mtd_info *mtd, loff_t to,
 	struct mtd_info *master = mtd_get_master(mtd);
 	int ret;
 
+	mtd_start_access(mtd);
+
 	ops->retlen = ops->oobretlen = 0;
 
 	if (!(mtd->flags & MTD_WRITEABLE))
@@ -1615,7 +1666,11 @@ int mtd_write_oob(struct mtd_info *mtd, loff_t to,
 	if (mtd->flags & MTD_SLC_ON_MLC_EMULATION)
 		return mtd_io_emulated_slc(mtd, to, false, ops);
 
-	return mtd_write_oob_std(mtd, to, ops);
+	ret = mtd_write_oob_std(mtd, to, ops);
+
+	mtd_end_access(mtd);
+
+	return ret;
 }
 EXPORT_SYMBOL_GPL(mtd_write_oob);
 
