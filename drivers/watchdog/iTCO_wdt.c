@@ -64,8 +64,6 @@
 #include <linux/platform_data/itco_wdt.h>
 #include <linux/mfd/intel_pmc_bxt.h>
 
-#include "iTCO_vendor.h"
-
 /* Address definitions for the TCO */
 /* TCO base address */
 #define TCOBASE(p)	((p)->tco_res->start)
@@ -274,8 +272,6 @@ static int iTCO_wdt_start(struct watchdog_device *wd_dev)
 
 	spin_lock(&p->io_lock);
 
-	iTCO_vendor_pre_start(p->smi_res, wd_dev->timeout);
-
 	/* disable chipset's NO_REBOOT bit */
 	if (p->update_no_reboot_bit(p->no_reboot_priv, false)) {
 		spin_unlock(&p->io_lock);
@@ -308,8 +304,6 @@ static int iTCO_wdt_stop(struct watchdog_device *wd_dev)
 	unsigned int val;
 
 	spin_lock(&p->io_lock);
-
-	iTCO_vendor_pre_stop(p->smi_res);
 
 	/* Bit 11: TCO Timer Halt -> 1 = The TCO timer is disabled */
 	val = inw(TCO1_CNT(p));
@@ -489,10 +483,6 @@ static int iTCO_wdt_probe(struct platform_device *pdev)
 			       (u64)SMI_EN(p));
 			return -EBUSY;
 		}
-	} else if (iTCO_vendorsupport ||
-		   turn_SMI_watchdog_clear_off >= p->iTCO_version) {
-		dev_err(dev, "SMI I/O resource is missing\n");
-		return -ENODEV;
 	}
 
 	iTCO_wdt_no_reboot_bit_setup(p, pdev, pdata);
@@ -509,13 +499,6 @@ static int iTCO_wdt_probe(struct platform_device *pdev)
 		p->gcs_pmc = devm_ioremap_resource(dev, p->gcs_pmc_res);
 		if (IS_ERR(p->gcs_pmc))
 			return PTR_ERR(p->gcs_pmc);
-	}
-
-	/* Check chipset's NO_REBOOT bit */
-	if (p->update_no_reboot_bit(p->no_reboot_priv, false) &&
-	    iTCO_vendor_check_noreboot_on()) {
-		dev_info(dev, "unable to reset NO_REBOOT flag, device disabled by hardware/BIOS\n");
-		return -ENODEV;	/* Cannot reset NO_REBOOT bit */
 	}
 
 	/* Set the NO_REBOOT bit to prevent later reboots, just for sure */
