@@ -72,6 +72,7 @@
 #include <linux/padata.h>
 #include <linux/khugepaged.h>
 #include <linux/buffer_head.h>
+#include <linux/smpboot.h>
 #include <asm/sections.h>
 #include <asm/tlbflush.h>
 #include <asm/div64.h>
@@ -146,6 +147,12 @@ DEFINE_STATIC_KEY_TRUE(vm_numa_stat_key);
 DEFINE_PER_CPU(int, _numa_mem_);		/* Kernel "local memory" node */
 EXPORT_PER_CPU_SYMBOL(_numa_mem_);
 #endif
+
+struct freepcp_stat {
+	struct task_struct *thread;
+	bool should_run;
+};
+DEFINE_PER_CPU(struct freepcp_stat, kfreepcp);
 
 /* work_structs for global per-cpu drains */
 struct pcpu_drain {
@@ -3361,6 +3368,81 @@ static int nr_pcp_high(struct per_cpu_pages *pcp, struct zone *zone)
 	return min(READ_ONCE(pcp->batch) << 2, high);
 }
 
+void kfreepcp_set_run(unsigned int cpu)
+{
+	struct task_struct *tsk;
+	struct freepcp_stat *stat = this_cpu_ptr(&kfreepcp);
+
+	tsk = stat->thread;
+	per_cpu(kfreepcp.should_run, cpu) = true;
+
+	if (tsk && !task_is_running(tsk))
+		wake_up_process(tsk);
+}
+EXPORT_SYMBOL_GPL(kfreepcp_set_run);
+
+static int kfreepcp_should_run(unsigned int cpu)
+{
+	struct freepcp_stat *stat = this_cpu_ptr(&kfreepcp);
+
+	return stat->should_run;
+}
+
+static void run_kfreepcp(unsigned int cpu)
+{
+	struct zone *zone;
+	struct per_cpu_pages *pcp;
+	unsigned long flags;
+	struct freepcp_stat *stat = this_cpu_ptr(&kfreepcp);
+	bool need_free_more = false;
+
+
+
+again:
+	need_free_more = false;
+	for_each_populated_zone(zone) {
+		pcp = per_cpu_ptr(zone->per_cpu_pageset, cpu);
+		if (pcp->count && pcp->high && pcp->count > pcp->high) {
+			unsigned long batch = READ_ONCE(pcp->batch);
+			int high;
+
+			high = nr_pcp_high(pcp, zone);
+			local_irq_save(flags);
+			free_pcppages_bulk(zone, nr_pcp_free(pcp, high, batch),
+					pcp);
+			local_irq_restore(flags);
+			if (pcp->count > pcp->high)
+				need_free_more = true;
+		}
+
+		cond_resched();
+	}
+	if (need_free_more)
+		goto again;
+
+	stat->should_run = false;
+}
+
+static struct smp_hotplug_thread freepcp_threads = {
+	.store                  = &kfreepcp.thread,
+	.thread_should_run      = kfreepcp_should_run,
+	.thread_fn              = run_kfreepcp,
+	.thread_comm            = "kfreepcp/%u",
+};
+
+static int __init freepcp_init(void)
+{
+	int cpu;
+
+	for_each_possible_cpu(cpu)
+		per_cpu(kfreepcp.should_run, cpu) = false;
+
+	BUG_ON(smpboot_register_percpu_thread(&freepcp_threads));
+
+	return 0;
+}
+late_initcall(freepcp_init);
+
 static void free_unref_page_commit(struct page *page, unsigned long pfn,
 				   int migratetype, unsigned int order)
 {
@@ -3375,11 +3457,8 @@ static void free_unref_page_commit(struct page *page, unsigned long pfn,
 	list_add(&page->lru, &pcp->lists[pindex]);
 	pcp->count += 1 << order;
 	high = nr_pcp_high(pcp, zone);
-	if (pcp->count >= high) {
-		int batch = READ_ONCE(pcp->batch);
-
-		free_pcppages_bulk(zone, nr_pcp_free(pcp, high, batch), pcp);
-	}
+	if (pcp->count >= high)
+		this_cpu_ptr(&kfreepcp)->should_run = false;
 }
 
 /*

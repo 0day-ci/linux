@@ -167,10 +167,12 @@ static void __exit_signal(struct task_struct *tsk)
 static void delayed_put_task_struct(struct rcu_head *rhp)
 {
 	struct task_struct *tsk = container_of(rhp, struct task_struct, rcu);
+	unsigned int cpu = tsk->cpu;
 
 	perf_event_delayed_put(tsk);
 	trace_sched_process_free(tsk);
 	put_task_struct(tsk);
+	kfreepcp_set_run(cpu);
 }
 
 void put_task_struct_rcu_user(struct task_struct *task)
