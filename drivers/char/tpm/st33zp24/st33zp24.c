@@ -62,7 +62,7 @@ enum tis_defaults {
 
 /*
  * clear_interruption clear the pending interrupt.
- * @param: tpm_dev, the tpm device device.
+ * @param: tpm_dev, the tpm device.
  * @return: the interrupt status value.
  */
 static u8 clear_interruption(struct st33zp24_dev *tpm_dev)
@@ -434,7 +434,7 @@ out_err:
 /*
  * st33zp24_recv received TPM response through TPM phy.
  * @param: chip, the tpm_chip description as specified in driver/char/tpm/tpm.h.
- * @param: buf,	the buffer to store datas.
+ * @param: buf,	the buffer to store data.
  * @param: count, the number of bytes to send.
  * @return: In case of success the number of bytes received.
  *	    In other case, a < 0 value describing the issue.
