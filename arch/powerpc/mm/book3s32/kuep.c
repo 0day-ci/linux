@@ -7,8 +7,13 @@ struct static_key_false disable_kuep_key;
 
 void setup_kuep(bool disabled)
 {
+	if (disabled) {
+		pr_info("KUEP cannot be disabled for the time being\n");
+		disabled = false;
+	}
+
 	if (!disabled)
-		kuep_lock();
+		update_user_segments(mfsr(0) | SR_NX);
 
 	if (smp_processor_id() != boot_cpuid)
 		return;
