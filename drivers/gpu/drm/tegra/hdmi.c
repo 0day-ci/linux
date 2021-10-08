@@ -1065,6 +1065,11 @@ static int tegra_hdmi_late_register(struct drm_connector *connector)
 	struct dentry *root = connector->debugfs_entry;
 	struct tegra_hdmi *hdmi = to_hdmi(output);
 
+	if (!root) {
+		hdmi->debugfs_files = NULL;
+		return 0;
+	}
+
 	hdmi->debugfs_files = kmemdup(debugfs_files, sizeof(debugfs_files),
 				      GFP_KERNEL);
 	if (!hdmi->debugfs_files)

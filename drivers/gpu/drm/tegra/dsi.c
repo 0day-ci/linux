@@ -236,6 +236,10 @@ static int tegra_dsi_late_register(struct drm_connector *connector)
 	struct dentry *root = connector->debugfs_entry;
 	struct tegra_dsi *dsi = to_dsi(output);
 
+	if (!root) {
+		dsi->debugfs_files = NULL;
+		return 0;
+	}
 	dsi->debugfs_files = kmemdup(debugfs_files, sizeof(debugfs_files),
 				     GFP_KERNEL);
 	if (!dsi->debugfs_files)

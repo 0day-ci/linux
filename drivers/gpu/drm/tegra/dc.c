@@ -1623,6 +1623,11 @@ static int tegra_dc_late_register(struct drm_crtc *crtc)
 	struct dentry *root;
 	struct tegra_dc *dc = to_tegra_dc(crtc);
 
+	if (!crtc->debugfs_entry) {
+		dc->debugfs_files = NULL;
+		return 0;
+	}
+
 #ifdef CONFIG_DEBUG_FS
 	root = crtc->debugfs_entry;
 #else

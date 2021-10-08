@@ -1687,6 +1687,10 @@ static int tegra_sor_late_register(struct drm_connector *connector)
 	struct dentry *root = connector->debugfs_entry;
 	struct tegra_sor *sor = to_sor(output);
 
+	if (!root) {
+		sor->debugfs_files = NULL;
+		return 0;
+	}
 	sor->debugfs_files = kmemdup(debugfs_files, sizeof(debugfs_files),
 				     GFP_KERNEL);
 	if (!sor->debugfs_files)
