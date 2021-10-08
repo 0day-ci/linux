@@ -28,6 +28,11 @@ static void clflush_work(struct dma_fence_work *base)
 {
 	struct clflush *clflush = container_of(base, typeof(*clflush), base);
 
+	if (base->error) {
+		dma_fence_set_error(&base->dma, base->error);
+		return;
+	}
+
 	__do_clflush(clflush->obj);
 }
 

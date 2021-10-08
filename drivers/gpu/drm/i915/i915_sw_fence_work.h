@@ -24,6 +24,7 @@ struct dma_fence_work_ops {
 struct dma_fence_work {
 	struct dma_fence dma;
 	spinlock_t lock;
+	int error;
 
 	struct i915_sw_fence chain;
 	struct i915_sw_dma_fence_cb cb;

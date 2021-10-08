@@ -301,6 +301,11 @@ static void __vma_bind(struct dma_fence_work *work)
 	struct i915_vma_work *vw = container_of(work, typeof(*vw), base);
 	struct i915_vma *vma = vw->vma;
 
+	if (work->error) {
+		dma_fence_set_error(&work->dma, work->error);
+		return;
+	}
+
 	vma->ops->bind_vma(vw->vm, &vw->stash,
 			   vma, vw->cache_level, vw->flags);
 }
@@ -333,7 +338,7 @@ struct i915_vma_work *i915_vma_work(void)
 		return NULL;
 
 	dma_fence_work_init(&vw->base, &bind_ops);
-	vw->base.dma.error = -EAGAIN; /* disable the worker by default */
+	vw->base.error = -EAGAIN; /* disable the worker by default */
 
 	return vw;
 }
@@ -416,6 +421,9 @@ int i915_vma_bind(struct i915_vma *vma,
 		 * part of the obj->resv->excl_fence as it only affects
 		 * execution and not content or object's backing store lifetime.
 		 */
+
+		work->base.error = 0; /* enable the queue_work() */
+
 		prev = i915_active_set_exclusive(&vma->active, &work->base.dma);
 		if (prev) {
 			__i915_sw_fence_await_dma_fence(&work->base.chain,
@@ -423,8 +431,6 @@ int i915_vma_bind(struct i915_vma *vma,
 							&work->cb);
 			dma_fence_put(prev);
 		}
-
-		work->base.dma.error = 0; /* enable the queue_work() */
 
 		if (vma->obj) {
 			__i915_gem_object_pin_pages(vma->obj);

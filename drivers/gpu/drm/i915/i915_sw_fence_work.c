@@ -6,21 +6,24 @@
 
 #include "i915_sw_fence_work.h"
 
-static void fence_complete(struct dma_fence_work *f)
+static void dma_fence_work_complete(struct dma_fence_work *f)
 {
+	dma_fence_signal(&f->dma);
+
 	if (f->ops->release)
 		f->ops->release(f);
-	dma_fence_signal(&f->dma);
+
+	dma_fence_put(&f->dma);
 }
 
-static void fence_work(struct work_struct *work)
+static void dma_fence_work_work(struct work_struct *work)
 {
 	struct dma_fence_work *f = container_of(work, typeof(*f), work);
 
-	f->ops->work(f);
+	if (f->ops->work)
+		f->ops->work(f);
 
-	fence_complete(f);
-	dma_fence_put(&f->dma);
+	dma_fence_work_complete(f);
 }
 
 static int __i915_sw_fence_call
@@ -31,17 +34,13 @@ fence_notify(struct i915_sw_fence *fence, enum i915_sw_fence_notify state)
 	switch (state) {
 	case FENCE_COMPLETE:
 		if (fence->error)
-			dma_fence_set_error(&f->dma, fence->error);
+			cmpxchg(&f->error, 0, fence->error);
 
-		if (!f->dma.error) {
-			dma_fence_get(&f->dma);
-			if (test_bit(DMA_FENCE_WORK_IMM, &f->dma.flags))
-				fence_work(&f->work);
-			else
-				queue_work(system_unbound_wq, &f->work);
-		} else {
-			fence_complete(f);
-		}
+		dma_fence_get(&f->dma);
+		if (test_bit(DMA_FENCE_WORK_IMM, &f->dma.flags))
+			dma_fence_work_work(&f->work);
+		else
+			queue_work(system_unbound_wq, &f->work);
 		break;
 
 	case FENCE_FREE:
@@ -84,10 +83,11 @@ void dma_fence_work_init(struct dma_fence_work *f,
 			 const struct dma_fence_work_ops *ops)
 {
 	f->ops = ops;
+	f->error = 0;
 	spin_lock_init(&f->lock);
 	dma_fence_init(&f->dma, &fence_ops, &f->lock, 0, 0);
 	i915_sw_fence_init(&f->chain, fence_notify);
-	INIT_WORK(&f->work, fence_work);
+	INIT_WORK(&f->work, dma_fence_work_work);
 }
 
 int dma_fence_work_chain(struct dma_fence_work *f, struct dma_fence *signal)
