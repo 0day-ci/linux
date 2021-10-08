@@ -57,6 +57,21 @@ test_write_fail "$file" "1 2 3 5 4" "$orig_content" \
 test_content "$file" "$orig_content" "1 2 3 4 5" "successfully written"
 echo "$orig_content" > "$file"
 
+# Test record file
+# ================
+
+file="$DBGFS/record"
+orig_content=$(cat "$file")
+
+test_write_succ "$file" "4242 foo.bar" "$orig_content" "valid input"
+test_write_fail "$file" "abc 2 3" "$orig_content" "too many fields"
+test_write_fail "$file" "123" "$orig_content" "not enough fields"
+test_content "$file" "$orig_content" "4242 foo.bar" "successfully written"
+test_write_succ "$file" "0 null" "$orig_content" "disabling"
+test_content "$file" "$orig_content" "0 null" "should disabled"
+test_write_succ "$file" "4242 foo.bar2" "$orig_content" "reenabling"
+echo "$orig_content" > "$file"
+
 # Test schemes file
 # =================
 

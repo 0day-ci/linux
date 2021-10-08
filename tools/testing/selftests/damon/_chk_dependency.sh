@@ -18,7 +18,7 @@ then
 	exit $ksft_skip
 fi
 
-for f in attrs target_ids monitor_on
+for f in attrs record target_ids monitor_on
 do
 	if [ ! -f "$DBGFS/$f" ]
 	then
