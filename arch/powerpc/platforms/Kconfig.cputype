@@ -62,6 +62,7 @@ config 44x
 	select HAVE_PCI
 	select PHYS_64BIT
 	select PPC_HAVE_KUEP
+	select PPC_HAVE_KUAP
 
 endchoice
 
