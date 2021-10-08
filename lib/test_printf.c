@@ -614,6 +614,7 @@ page_flags_test(int section, int node, int zone, int last_cpupid,
 	bool append = false;
 	int i;
 
+	snprintf(cmp_buf + size, BUF_SIZE - size, "%x(", flags);
 	flags &= PAGEFLAGS_MASK;
 	if (flags) {
 		page_flags |= flags;
@@ -648,6 +649,7 @@ page_flags_test(int section, int node, int zone, int last_cpupid,
 		size = strlen(cmp_buf);
 		append = true;
 	}
+	snprintf(cmp_buf + size, BUF_SIZE - size, ")");
 
 	test(cmp_buf, "%pGp", &page_flags);
 }
