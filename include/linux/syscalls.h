@@ -71,6 +71,7 @@ struct open_how;
 struct mount_attr;
 struct landlock_ruleset_attr;
 enum landlock_rule_type;
+enum trusted_for_usage;
 
 #include <linux/types.h>
 #include <linux/aio_abi.h>
@@ -461,6 +462,7 @@ asmlinkage long sys_fallocate(int fd, int mode, loff_t offset, loff_t len);
 asmlinkage long sys_faccessat(int dfd, const char __user *filename, int mode);
 asmlinkage long sys_faccessat2(int dfd, const char __user *filename, int mode,
 			       int flags);
+asmlinkage long sys_trusted_for(int fd, enum trusted_for_usage usage, u32 flags);
 asmlinkage long sys_chdir(const char __user *filename);
 asmlinkage long sys_fchdir(unsigned int fd);
 asmlinkage long sys_chroot(const char __user *filename);

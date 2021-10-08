@@ -32,6 +32,8 @@
 #include <linux/ima.h>
 #include <linux/dnotify.h>
 #include <linux/compat.h>
+#include <linux/sysctl.h>
+#include <uapi/linux/trusted-for.h>
 
 #include "internal.h"
 
@@ -478,6 +480,82 @@ SYSCALL_DEFINE4(faccessat2, int, dfd, const char __user *, filename, int, mode,
 SYSCALL_DEFINE2(access, const char __user *, filename, int, mode)
 {
 	return do_faccessat(AT_FDCWD, filename, mode, 0);
+}
+
+#define TRUST_POLICY_EXEC_MOUNT			BIT(0)
+#define TRUST_POLICY_EXEC_FILE			BIT(1)
+
+int sysctl_trusted_for_policy __read_mostly;
+
+SYSCALL_DEFINE3(trusted_for, const int, fd, const enum trusted_for_usage, usage,
+		const u32, flags)
+{
+	int mask, err = -EACCES;
+	struct fd f;
+	struct inode *inode;
+
+	if (flags)
+		return -EINVAL;
+
+	/* Only handles execution for now. */
+	if (usage != TRUSTED_FOR_EXECUTION)
+		return -EINVAL;
+	mask = MAY_EXEC;
+
+	f = fdget(fd);
+	if (!f.file)
+		return -EBADF;
+	inode = file_inode(f.file);
+
+	/*
+	 * For compatibility reasons, without a defined security policy, we
+	 * must map the execute permission to the read permission.  Indeed,
+	 * from user space point of view, being able to execute data (e.g.
+	 * scripts) implies to be able to read this data.
+	 */
+	if ((mask & MAY_EXEC)) {
+		/*
+		 * If there is a system-wide execute policy enforced, then
+		 * forbids access to non-regular files and special superblocks.
+		 */
+		if ((sysctl_trusted_for_policy & (TRUST_POLICY_EXEC_MOUNT |
+						TRUST_POLICY_EXEC_FILE))) {
+			if (!S_ISREG(inode->i_mode))
+				goto out_fd;
+			/*
+			 * Denies access to pseudo filesystems that will never
+			 * be mountable (e.g. sockfs, pipefs) but can still be
+			 * reachable through /proc/self/fd, or memfd-like file
+			 * descriptors, or nsfs-like files.
+			 *
+			 * According to the selftests, SB_NOEXEC seems to be
+			 * only used by proc and nsfs filesystems.
+			 */
+			if ((f.file->f_path.dentry->d_sb->s_flags &
+						(SB_NOUSER | SB_KERNMOUNT | SB_NOEXEC)))
+				goto out_fd;
+		}
+
+		if ((sysctl_trusted_for_policy & TRUST_POLICY_EXEC_MOUNT) &&
+				path_noexec(&f.file->f_path))
+			goto out_fd;
+		/*
+		 * For compatibility reasons, if the system-wide policy doesn't
+		 * enforce file permission checks, then replaces the execute
+		 * permission request with a read permission request.
+		 */
+		if (!(sysctl_trusted_for_policy & TRUST_POLICY_EXEC_FILE))
+			mask &= ~MAY_EXEC;
+		/* To be executed *by* user space, files must be readable. */
+		mask |= MAY_READ;
+	}
+
+	err = inode_permission(file_mnt_user_ns(f.file), inode,
+			mask | MAY_ACCESS);
+
+out_fd:
+	fdput(f);
+	return err;
 }
 
 SYSCALL_DEFINE1(chdir, const char __user *, filename)
