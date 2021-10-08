@@ -16,11 +16,6 @@ extern struct static_key_false disable_kuep_key;
 
 extern s32 patch__kuep_lock, patch__kuep_unlock;
 
-static __always_inline bool kuap_is_disabled(void)
-{
-	return !IS_ENABLED(CONFIG_PPC_KUAP) || static_branch_unlikely(&disable_kuap_key);
-}
-
 static __always_inline bool kuep_is_disabled(void)
 {
 	return !IS_ENABLED(CONFIG_PPC_KUEP) || static_branch_unlikely(&disable_kuep_key);
@@ -32,6 +27,11 @@ static __always_inline bool kuep_is_disabled(void)
 
 #define KUAP_NONE	(~0UL)
 #define KUAP_ALL	(~1UL)
+
+static __always_inline bool kuap_is_disabled(void)
+{
+	return static_branch_unlikely(&disable_kuap_key);
+}
 
 static inline void kuap_lock_one(unsigned long addr)
 {
@@ -84,9 +84,6 @@ static inline void __kuap_save_and_lock(struct pt_regs *regs)
 {
 	unsigned long kuap = current->thread.kuap;
 
-	if (kuap_is_disabled())
-		return;
-
 	regs->kuap = kuap;
 	if (unlikely(kuap == KUAP_NONE))
 		return;
@@ -101,9 +98,6 @@ static inline void kuap_user_restore(struct pt_regs *regs)
 
 static inline void __kuap_kernel_restore(struct pt_regs *regs, unsigned long kuap)
 {
-	if (kuap_is_disabled())
-		return;
-
 	if (unlikely(kuap != KUAP_NONE)) {
 		current->thread.kuap = KUAP_NONE;
 		kuap_lock(kuap, false);
@@ -121,9 +115,6 @@ static inline unsigned long __kuap_get_and_assert_locked(void)
 {
 	unsigned long kuap = current->thread.kuap;
 
-	if (kuap_is_disabled())
-		return KUAP_NONE;
-
 	WARN_ON_ONCE(IS_ENABLED(CONFIG_PPC_KUAP_DEBUG) && kuap != KUAP_NONE);
 
 	return kuap;
@@ -137,9 +128,6 @@ static inline void __kuap_assert_locked(void)
 static __always_inline void __allow_user_access(void __user *to, const void __user *from,
 						u32 size, unsigned long dir)
 {
-	if (kuap_is_disabled())
-		return;
-
 	BUILD_BUG_ON(!__builtin_constant_p(dir));
 
 	if (!(dir & KUAP_WRITE))
@@ -152,9 +140,6 @@ static __always_inline void __allow_user_access(void __user *to, const void __us
 static __always_inline void __prevent_user_access(unsigned long dir)
 {
 	u32 kuap = current->thread.kuap;
-
-	if (kuap_is_disabled())
-		return;
 
 	BUILD_BUG_ON(!__builtin_constant_p(dir));
 
@@ -169,9 +154,6 @@ static inline unsigned long __prevent_user_access_return(void)
 {
 	unsigned long flags = current->thread.kuap;
 
-	if (kuap_is_disabled())
-		return KUAP_NONE;
-
 	if (flags != KUAP_NONE) {
 		current->thread.kuap = KUAP_NONE;
 		kuap_lock(flags, true);
@@ -182,9 +164,6 @@ static inline unsigned long __prevent_user_access_return(void)
 
 static inline void __restore_user_access(unsigned long flags)
 {
-	if (kuap_is_disabled())
-		return;
-
 	if (flags != KUAP_NONE) {
 		current->thread.kuap = flags;
 		kuap_unlock(flags, true);
@@ -195,9 +174,6 @@ static inline bool
 __bad_kuap_fault(struct pt_regs *regs, unsigned long address, bool is_write)
 {
 	unsigned long kuap = regs->kuap;
-
-	if (kuap_is_disabled())
-		return false;
 
 	if (!is_write || kuap == KUAP_ALL)
 		return false;
