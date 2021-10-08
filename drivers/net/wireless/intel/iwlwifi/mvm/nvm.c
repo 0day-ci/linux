@@ -59,7 +59,7 @@ static int iwl_nvm_write_chunk(struct iwl_mvm *mvm, u16 section,
 	pkt = cmd.resp_pkt;
 	/* Extract & check NVM write response */
 	nvm_resp = (void *)pkt->data;
-	if (le16_to_cpu(nvm_resp->status) != READ_NVM_CHUNK_SUCCEED) {
+	if ((le16_to_cpu(nvm_resp->status) & 0xfff) != READ_NVM_CHUNK_SUCCEED) {
 		IWL_ERR(mvm,
 			"NVM access write command failed for section %u (status = 0x%x)\n",
 			section, le16_to_cpu(nvm_resp->status));
