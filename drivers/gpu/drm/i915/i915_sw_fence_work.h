@@ -14,6 +14,53 @@
 #include "i915_sw_fence.h"
 
 struct dma_fence_work;
+struct dma_fence_work_timeline;
+
+/**
+ * struct dma_fence_work_timeline_ops - Timeline operations struct
+ * @name: Timeline ops name. This field is used if the timeline itself has
+ * a NULL name. Can be set to NULL in which case a default name is used.
+ *
+ * The struct dma_fence_work_timeline is intended to be embeddable.
+ * We use the ops to get and put the parent structure.
+ */
+struct dma_fence_work_timeline_ops {
+	/**
+	 * Timeline ops name. Used if the timeline itself has no name.
+	 */
+	const char *name;
+
+	/**
+	 * put() - Put the structure embedding the timeline
+	 * @tl: The timeline
+	 */
+	void (*put)(struct dma_fence_work_timeline *tl);
+
+	/**
+	 * get() - Get the structure embedding the timeline
+	 * @tl: The timeline
+	 */
+	void (*get)(struct dma_fence_work_timeline *tl);
+};
+
+/**
+ * struct dma_fence_work_timeline - Simple timeline struct for dma_fence_work
+ * @name: The name of the timeline. May be set to NULL. Immutable
+ * @lock: Protects mutable members of the structure.
+ * @context: The timeline fence context. Immutable.
+ * @seqno: The previous seqno used. Protected by @lock.
+ * @last_fence : The previous fence of the timeline. Protected by @lock.
+ * @ops: The timeline operations struct. Immutable.
+ */
+struct dma_fence_work_timeline {
+	const char *name;
+	/** Protects mutable members of the structure */
+	spinlock_t lock;
+	u64 context;
+	u64 seqno;
+	struct dma_fence *last_fence;
+	const struct dma_fence_work_timeline_ops *ops;
+};
 
 struct dma_fence_work_ops {
 	const char *name;
@@ -30,6 +77,9 @@ struct dma_fence_work {
 	struct i915_sw_dma_fence_cb cb;
 
 	struct work_struct work;
+
+	struct dma_fence_work_timeline *tl;
+
 	const struct dma_fence_work_ops *ops;
 };
 
@@ -64,5 +114,13 @@ static inline void dma_fence_work_commit_imm(struct dma_fence_work *f)
 
 	dma_fence_work_commit(f);
 }
+
+void dma_fence_work_timeline_attach(struct dma_fence_work_timeline *tl,
+				    struct dma_fence_work *f,
+				    struct i915_sw_dma_fence_cb *tl_cb);
+
+void dma_fence_work_timeline_init(struct dma_fence_work_timeline *tl,
+				  const char *name,
+				  const struct dma_fence_work_timeline_ops *ops);
 
 #endif /* I915_SW_FENCE_WORK_H */
