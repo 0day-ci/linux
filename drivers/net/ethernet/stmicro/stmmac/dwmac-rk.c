@@ -21,6 +21,7 @@
 #include <linux/delay.h>
 #include <linux/mfd/syscon.h>
 #include <linux/regmap.h>
+#include <linux/pm_runtime.h>
 
 #include "stmmac_platform.h"
 
@@ -1626,7 +1627,8 @@ static int rk_gmac_remove(struct platform_device *pdev)
 	struct rk_priv_data *bsp_priv = get_stmmac_bsp_priv(&pdev->dev);
 	int ret = stmmac_dvr_remove(&pdev->dev);
 
-	rk_gmac_powerdown(bsp_priv);
+	if (!pm_runtime_status_suspended(&pdev->dev))
+		rk_gmac_powerdown(bsp_priv);
 
 	return ret;
 }
@@ -1638,7 +1640,7 @@ static int rk_gmac_suspend(struct device *dev)
 	int ret = stmmac_suspend(dev);
 
 	/* Keep the PHY up if we use Wake-on-Lan. */
-	if (!device_may_wakeup(dev)) {
+	if (pm_runtime_active(dev) && !device_may_wakeup(dev)) {
 		rk_gmac_powerdown(bsp_priv);
 		bsp_priv->suspended = true;
 	}
@@ -1660,7 +1662,24 @@ static int rk_gmac_resume(struct device *dev)
 }
 #endif /* CONFIG_PM_SLEEP */
 
-static SIMPLE_DEV_PM_OPS(rk_gmac_pm_ops, rk_gmac_suspend, rk_gmac_resume);
+#ifdef CONFIG_PM
+static int rk_gmac_runtime_suspend(struct device *dev)
+{
+	rk_gmac_powerdown(get_stmmac_bsp_priv(dev));
+	return 0;
+}
+
+static int rk_gmac_runtime_resume(struct device *dev)
+{
+	rk_gmac_powerup(get_stmmac_bsp_priv(dev));
+	return 0;
+}
+#endif
+
+static const struct dev_pm_ops __maybe_unused rk_gmac_pm_ops = {
+    SET_SYSTEM_SLEEP_PM_OPS(rk_gmac_suspend, rk_gmac_resume)
+    SET_RUNTIME_PM_OPS(rk_gmac_runtime_suspend, rk_gmac_runtime_resume, NULL)
+};
 
 static const struct of_device_id rk_gmac_dwmac_match[] = {
 	{ .compatible = "rockchip,px30-gmac",	.data = &px30_ops   },
