@@ -44,6 +44,7 @@
 #include <linux/delay.h>
 #include <linux/semaphore.h>
 #include <linux/irq.h>
+#include <linux/irqdomain.h>
 #include <linux/msi.h>
 #include <linux/hyperv.h>
 #include <linux/refcount.h>
@@ -1204,6 +1205,8 @@ static int hv_set_affinity(struct irq_data *data, const struct cpumask *dest,
 static void hv_irq_mask(struct irq_data *data)
 {
 	pci_msi_mask_irq(data);
+	if (data->parent_data->chip->irq_mask)
+		irq_chip_mask_parent(data);
 }
 
 /**
@@ -1321,6 +1324,8 @@ exit_unlock:
 		dev_err(&hbus->hdev->device,
 			"%s() failed: %#llx", __func__, res);
 
+	if (data->parent_data->chip->irq_unmask)
+		irq_chip_unmask_parent(data);
 	pci_msi_unmask_irq(data);
 }
 
@@ -1597,6 +1602,7 @@ static struct irq_chip hv_msi_irq_chip = {
 	.irq_compose_msi_msg	= hv_compose_msi_msg,
 	.irq_set_affinity	= hv_set_affinity,
 	.irq_ack		= irq_chip_ack_parent,
+	.irq_eoi		= irq_chip_eoi_parent,
 	.irq_mask		= hv_irq_mask,
 	.irq_unmask		= hv_irq_unmask,
 };
