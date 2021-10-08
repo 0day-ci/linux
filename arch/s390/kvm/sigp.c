@@ -240,17 +240,8 @@ static int __sigp_sense_running(struct kvm_vcpu *vcpu,
 static int __prepare_sigp_re_start(struct kvm_vcpu *vcpu,
 				   struct kvm_vcpu *dst_vcpu, u8 order_code)
 {
-	struct kvm_s390_local_interrupt *li = &dst_vcpu->arch.local_int;
 	/* handle (RE)START in user space */
-	int rc = -EOPNOTSUPP;
-
-	/* make sure we don't race with STOP irq injection */
-	spin_lock(&li->lock);
-	if (kvm_s390_is_stop_irq_pending(dst_vcpu))
-		rc = SIGP_CC_BUSY;
-	spin_unlock(&li->lock);
-
-	return rc;
+	return -EOPNOTSUPP;
 }
 
 static int __prepare_sigp_cpu_reset(struct kvm_vcpu *vcpu,
