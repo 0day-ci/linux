@@ -2212,16 +2212,30 @@ static int btintel_get_data_path_id(struct hci_dev *hdev, __u8 transport,
 {
 	struct btintel_data *intel_data;
 
-	if (transport != HCI_TRANSPORT_SCO_ESCO)
+	if (transport != HCI_TRANSPORT_SCO_ESCO &&
+	    transport != HCI_TRANSPORT_ACL) {
+		bt_dev_err(hdev, "Invalid transport type %u", transport);
 		return -EINVAL;
+	}
 
 	intel_data = hci_get_priv((hdev));
 
-	if (intel_data->use_cases.preset[0] & 0x03) {
-		/* Intel uses 1 as data path id for all the usecases */
-		*data_path_id = 1;
-		return 0;
+	switch (transport) {
+	case HCI_TRANSPORT_SCO_ESCO:
+		if (intel_data->use_cases.preset[0] & 0x03) {
+			*data_path_id = 1;
+			return 0;
+		}
+		break;
+	case HCI_TRANSPORT_ACL:
+		if (intel_data->use_cases.preset[0] & 0x08) {
+			*data_path_id = 1;
+			return 0;
+		}
+		break;
 	}
+	bt_dev_err(hdev, "Required preset is not supported 0x%02x",
+		   intel_data->use_cases.preset[0]);
 	return  -EOPNOTSUPP;
 }
 
@@ -2259,6 +2273,10 @@ static int btintel_configure_offload(struct hci_dev *hdev)
 		hdev->get_data_path_id = btintel_get_data_path_id;
 		hdev->get_codec_config_data = btintel_get_codec_config_data;
 	}
+
+	/* supports SBC codec for a2dp offload */
+	if (use_cases->preset[0] & 0x08)
+		hdev->get_data_path_id = btintel_get_data_path_id;
 
 error:
 	kfree_skb(skb);
