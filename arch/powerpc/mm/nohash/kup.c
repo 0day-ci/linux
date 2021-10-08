@@ -10,7 +10,6 @@
 #include <linux/smp.h>
 
 #include <asm/kup.h>
-#include <asm/mmu.h>
 #include <asm/smp.h>
 
 #ifdef CONFIG_PPC_KUAP
