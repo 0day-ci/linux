@@ -1047,6 +1047,9 @@ void proc_sched_show_task(struct task_struct *p, struct pid_namespace *ns,
 	__PS("effective uclamp.min", uclamp_eff_value(p, UCLAMP_MIN));
 	__PS("effective uclamp.max", uclamp_eff_value(p, UCLAMP_MAX));
 #endif
+#ifdef CONFIG_SCHED_CORE
+	PN(core_forceidle_sum);
+#endif
 	P(policy);
 	P(prio);
 	if (task_has_dl_policy(p)) {

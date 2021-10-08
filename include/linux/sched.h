@@ -784,6 +784,7 @@ struct task_struct {
 	struct rb_node			core_node;
 	unsigned long			core_cookie;
 	unsigned int			core_occupation;
+	u64				core_forceidle_sum;
 #endif
 
 #ifdef CONFIG_CGROUP_SCHED

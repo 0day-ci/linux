@@ -1113,6 +1113,7 @@ struct rq {
 	unsigned long		core_cookie;
 	unsigned char		core_forceidle;
 	unsigned int		core_forceidle_seq;
+	u64			core_forceidle_start;
 #endif
 };
 
@@ -1253,10 +1254,14 @@ static inline bool sched_core_enqueued(struct task_struct *p)
 }
 
 extern void sched_core_enqueue(struct rq *rq, struct task_struct *p);
-extern void sched_core_dequeue(struct rq *rq, struct task_struct *p);
+extern void sched_core_dequeue(struct rq *rq, struct task_struct *p, int flags);
 
 extern void sched_core_get(void);
 extern void sched_core_put(void);
+
+extern void sched_core_account_forceidle(struct rq *rq);
+
+extern void sched_core_tick(struct rq *rq);
 
 #else /* !CONFIG_SCHED_CORE */
 
@@ -1300,6 +1305,10 @@ static inline bool sched_group_cookie_match(struct rq *rq,
 {
 	return true;
 }
+
+static inline void sched_core_account_forceidle(struct rq *rq) {}
+
+static inline void sched_core_tick(struct rq *rq) {}
 #endif /* CONFIG_SCHED_CORE */
 
 static inline void lockdep_assert_rq_held(struct rq *rq)
