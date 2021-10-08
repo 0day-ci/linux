@@ -187,6 +187,9 @@ void intel_gvt_debugfs_init(struct intel_gvt *gvt)
 {
 	struct drm_minor *minor = gvt->gt->i915->drm.primary;
 
+	if (!minor->debugfs_root)
+		return;
+
 	gvt->debugfs_root = debugfs_create_dir("gvt", minor->debugfs_root);
 
 	debugfs_create_ulong("num_tracked_mmio", 0444, gvt->debugfs_root,

@@ -1012,6 +1012,9 @@ void i915_debugfs_register(struct drm_i915_private *dev_priv)
 	struct drm_minor *minor = dev_priv->drm.primary;
 	int i;
 
+	if (!minor->debugfs_root)
+		return;
+
 	i915_debugfs_params(dev_priv);
 
 	debugfs_create_file("i915_forcewake_user", S_IRUSR, minor->debugfs_root,
