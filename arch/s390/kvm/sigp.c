@@ -412,10 +412,11 @@ static int handle_sigp_order_is_blocked(struct kvm_vcpu *vcpu, u8 order_code,
 	 * Any other SIGP order could race with an existing SIGP order
 	 * on the destination CPU, and thus encounter a busy condition
 	 * on the CPU processing the SIGP order. Reject the order at
-	 * this point, rather than racing with the STOP IRQ injection.
+	 * this point, rather than racing with any IRQ injection.
 	 */
 	spin_lock(&dst_vcpu->arch.local_int.lock);
-	if (kvm_s390_is_stop_irq_pending(dst_vcpu)) {
+	if (kvm_s390_is_stop_irq_pending(dst_vcpu) ||
+	    kvm_s390_is_restart_irq_pending(dst_vcpu)) {
 		kvm_s390_set_psw_cc(vcpu, SIGP_CC_BUSY);
 		rc = 1;
 	}
