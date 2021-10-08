@@ -1775,6 +1775,7 @@ static void cpu_enable_pan(const struct arm64_cpu_capabilities *__unused)
 	WARN_ON_ONCE(in_interrupt());
 
 	sysreg_clear_set(sctlr_el1, SCTLR_EL1_SPAN, 0);
+	isb();
 	set_pstate_pan(1);
 }
 #endif /* CONFIG_ARM64_PAN */
