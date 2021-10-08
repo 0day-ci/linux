@@ -32,16 +32,17 @@ void dma_fence_work_timeline_attach(struct dma_fence_work_timeline *tl,
 {
 	struct dma_fence *await;
 
+	might_sleep();
 	if (tl->ops->get)
 		tl->ops->get(tl);
 
-	spin_lock(&tl->lock);
+	spin_lock_irq(&tl->lock);
 	await = tl->last_fence;
 	tl->last_fence = dma_fence_get(&f->dma);
 	f->dma.seqno = tl->seqno++;
 	f->dma.context = tl->context;
 	f->tl = tl;
-	spin_unlock(&tl->lock);
+	spin_unlock_irq(&tl->lock);
 
 	if (await) {
 		__i915_sw_fence_await_dma_fence(&f->chain, await, tl_cb);
@@ -53,13 +54,14 @@ static void dma_fence_work_timeline_detach(struct dma_fence_work *f)
 {
 	struct dma_fence_work_timeline *tl = f->tl;
 	bool put = false;
+	unsigned long irq_flags;
 
-	spin_lock(&tl->lock);
+	spin_lock_irqsave(&tl->lock, irq_flags);
 	if (tl->last_fence == &f->dma) {
 		put = true;
 		tl->last_fence = NULL;
 	}
-	spin_unlock(&tl->lock);
+	spin_unlock_irqrestore(&tl->lock, irq_flags);
 	if (tl->ops->put)
 		tl->ops->put(tl);
 	if (put)
@@ -68,8 +70,6 @@ static void dma_fence_work_timeline_detach(struct dma_fence_work *f)
 
 static void dma_fence_work_complete(struct dma_fence_work *f)
 {
-	dma_fence_signal(&f->dma);
-
 	if (f->ops->release)
 		f->ops->release(f);
 
@@ -79,12 +79,31 @@ static void dma_fence_work_complete(struct dma_fence_work *f)
 	dma_fence_put(&f->dma);
 }
 
+static void dma_fence_work_irq_work(struct irq_work *irq_work)
+{
+	struct dma_fence_work *f = container_of(irq_work, typeof(*f), irq_work);
+
+	dma_fence_signal(&f->dma);
+	if (f->ops->release)
+		/* Note we take the signaled path in dma_fence_work_work() */
+		queue_work(system_unbound_wq, &f->work);
+	else
+		dma_fence_work_complete(f);
+}
+
 static void dma_fence_work_work(struct work_struct *work)
 {
 	struct dma_fence_work *f = container_of(work, typeof(*f), work);
 
+	if (test_bit(DMA_FENCE_FLAG_SIGNALED_BIT, &f->dma.flags)) {
+		dma_fence_work_complete(f);
+		return;
+	}
+
 	if (f->ops->work)
 		f->ops->work(f);
+
+	dma_fence_signal(&f->dma);
 
 	dma_fence_work_complete(f);
 }
@@ -102,8 +121,10 @@ fence_notify(struct i915_sw_fence *fence, enum i915_sw_fence_notify state)
 		dma_fence_get(&f->dma);
 		if (test_bit(DMA_FENCE_WORK_IMM, &f->dma.flags))
 			dma_fence_work_work(&f->work);
-		else
+		else if (f->ops->work)
 			queue_work(system_unbound_wq, &f->work);
+		else
+			irq_work_queue(&f->irq_work);
 		break;
 
 	case FENCE_FREE:
@@ -155,6 +176,7 @@ void dma_fence_work_init(struct dma_fence_work *f,
 	dma_fence_init(&f->dma, &fence_ops, &f->lock, 0, 0);
 	i915_sw_fence_init(&f->chain, fence_notify);
 	INIT_WORK(&f->work, dma_fence_work_work);
+	init_irq_work(&f->irq_work, dma_fence_work_irq_work);
 }
 
 int dma_fence_work_chain(struct dma_fence_work *f, struct dma_fence *signal)

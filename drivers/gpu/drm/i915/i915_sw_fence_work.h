@@ -8,6 +8,7 @@
 #define I915_SW_FENCE_WORK_H
 
 #include <linux/dma-fence.h>
+#include <linux/irq_work.h>
 #include <linux/spinlock.h>
 #include <linux/workqueue.h>
 
@@ -77,6 +78,7 @@ struct dma_fence_work {
 	struct i915_sw_dma_fence_cb cb;
 
 	struct work_struct work;
+	struct irq_work irq_work;
 
 	struct dma_fence_work_timeline *tl;
 
