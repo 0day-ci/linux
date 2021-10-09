@@ -272,11 +272,11 @@ void rtw_set_rpwm(struct adapter *padapter, u8 pslv)
 	pwrpriv->rpwm = pslv;
 
 	cpwm_orig = 0;
-	if (rpwm & PS_ACK)
+	if (rpwm & PS_ACK) {
 		rtw_hal_get_hwreg(padapter, HW_VAR_CPWM, &cpwm_orig);
-
-	if (rpwm & PS_ACK)
 		_set_timer(&pwrpriv->pwr_rpwm_timer, LPS_RPWM_WAIT_MS);
+	}
+
 	rtw_hal_set_hwreg(padapter, HW_VAR_SET_RPWM, (u8 *)(&rpwm));
 
 	pwrpriv->tog += 0x80;
