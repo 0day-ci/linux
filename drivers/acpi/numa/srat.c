@@ -300,6 +300,61 @@ out_err:
 }
 #endif /* defined(CONFIG_X86) || defined (CONFIG_ARM64) */
 
+/* Add a NUMA node and memblk for each node-less CFMWS */
+static int __init acpi_parse_cfmws(struct acpi_table_header *acpi_cedt)
+{
+	struct acpi_cedt_cfmws *cfmws;
+	acpi_size len, cur = 0;
+	void *cedt_subtable;
+	int i, pxm, node;
+	u64 start, end;
+
+	/* Use fake PXM values starting after the max PXM found in the SRAT */
+	for (i = 0; i < MAX_PXM_DOMAINS - 1; i++)
+		if (node_to_pxm_map[i] > pxm)
+			pxm = node_to_pxm_map[i];
+	pxm++;
+
+	len = acpi_cedt->length - sizeof(*acpi_cedt);
+	cedt_subtable = acpi_cedt + 1;
+
+	while (cur < len) {
+		struct acpi_cedt_header *c = cedt_subtable + cur;
+
+		if (c->type != ACPI_CEDT_TYPE_CFMWS)
+			goto next;
+
+		cfmws = cedt_subtable + cur;
+		if (cfmws->header.length < sizeof(*cfmws)) {
+			pr_warn_once("CFMWS entry skipped:invalid length:%u\n",
+				     cfmws->header.length);
+			goto next;
+		}
+
+		start = cfmws->base_hpa;
+		end = cfmws->base_hpa + cfmws->window_size;
+
+		/* Skip if the HPA is already assigned to a NUMA node */
+		node = phys_to_target_node(start);
+		if (node != NUMA_NO_NODE)
+			goto next;
+
+		node = acpi_map_pxm_to_node(pxm);
+		if (node == NUMA_NO_NODE) {
+			pr_err("ACPI NUMA: Too many proximity domains.\n");
+			return -EINVAL;
+		}
+		if (numa_add_memblk(node, start, end) < 0) {
+			pr_warn("ACPI NUMA: Failed to add memblk for CFMWS node %d [mem %#llx-%#llx]\n",
+				node, start, end);
+		}
+		pxm++;
+next:
+		cur += c->length;
+	}
+	return 0;
+}
+
 static int __init acpi_parse_slit(struct acpi_table_header *table)
 {
 	struct acpi_table_slit *slit = (struct acpi_table_slit *)table;
@@ -477,6 +532,9 @@ int __init acpi_numa_init(void)
 
 	/* SLIT: System Locality Information Table */
 	acpi_table_parse(ACPI_SIG_SLIT, acpi_parse_slit);
+
+	/* CEDT: CXL Early Discovery Table */
+	acpi_table_parse(ACPI_SIG_CEDT, acpi_parse_cfmws);
 
 	if (cnt < 0)
 		return cnt;
