@@ -23,7 +23,7 @@ static struct tpm2_hash tpm2_hash_map[] = {
 	{HASH_ALGO_SHA256, TPM_ALG_SHA256},
 	{HASH_ALGO_SHA384, TPM_ALG_SHA384},
 	{HASH_ALGO_SHA512, TPM_ALG_SHA512},
-	{HASH_ALGO_SM3, TPM_ALG_SM3_256},
+	{HASH_ALGO_SM3, TPM_ALG_SM3},
 };
 
 static u32 tpm2key_oid[] = { 2, 23, 133, 10, 1, 5 };
