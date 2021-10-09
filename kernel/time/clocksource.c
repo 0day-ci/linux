@@ -136,8 +136,10 @@ static void __clocksource_change_rating(struct clocksource *cs, int rating);
 
 /*
  * Interval: 0.5sec.
+ * MaxInterval: 1s.
  */
 #define WATCHDOG_INTERVAL (HZ >> 1)
+#define WATCHDOG_MAX_INTERVAL_NS (NSEC_PER_SEC)
 
 static void clocksource_watchdog_work(struct work_struct *work)
 {
@@ -404,7 +406,8 @@ static void clocksource_watchdog(struct timer_list *unused)
 
 		/* Check the deviation from the watchdog clocksource. */
 		md = cs->uncertainty_margin + watchdog->uncertainty_margin;
-		if (abs(cs_nsec - wd_nsec) > md) {
+		if ((abs(cs_nsec - wd_nsec) > md) &&
+		    wd_nsec < WATCHDOG_MAX_INTERVAL_NS) {
 			pr_warn("timekeeping watchdog on CPU%d: Marking clocksource '%s' as unstable because the skew is too large:\n",
 				smp_processor_id(), cs->name);
 			pr_warn("                      '%s' wd_nsec: %lld wd_now: %llx wd_last: %llx mask: %llx\n",
