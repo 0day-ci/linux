@@ -219,6 +219,7 @@ static void page_pool_set_pp_info(struct page_pool *pool,
 {
 	page->pp = pool;
 	page->pp_magic |= PP_SIGNATURE;
+	page_pool_set_frag_count(page, 0);
 }
 
 static void page_pool_clear_pp_info(struct page *page)
@@ -736,21 +737,9 @@ void page_pool_update_nid(struct page_pool *pool, int new_nid)
 }
 EXPORT_SYMBOL(page_pool_update_nid);
 
-bool page_pool_return_skb_page(struct page *page)
+void page_pool_return_skb_page(struct page *page)
 {
 	struct page_pool *pp;
-
-	page = compound_head(page);
-
-	/* page->pp_magic is OR'ed with PP_SIGNATURE after the allocation
-	 * in order to preserve any existing bits, such as bit 0 for the
-	 * head page of compound page and bit 1 for pfmemalloc page, so
-	 * mask those bits for freeing side when doing below checking,
-	 * and page_is_pfmemalloc() is checked in __page_pool_put_page()
-	 * to avoid recycling the pfmemalloc page.
-	 */
-	if (unlikely((page->pp_magic & ~0x3UL) != PP_SIGNATURE))
-		return false;
 
 	pp = page->pp;
 
@@ -760,7 +749,5 @@ bool page_pool_return_skb_page(struct page *page)
 	 * 'flipped' fragment being in use or not.
 	 */
 	page_pool_put_full_page(pp, page, false);
-
-	return true;
 }
 EXPORT_SYMBOL(page_pool_return_skb_page);

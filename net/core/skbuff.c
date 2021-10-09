@@ -646,9 +646,15 @@ static void skb_free_head(struct sk_buff *skb)
 	unsigned char *head = skb->head;
 
 	if (skb->head_frag) {
-		if (skb_pp_recycle(skb, head))
+		struct page *page = virt_to_head_page(head);
+
+		if (page_pool_is_pp_page(page) &&
+		    (skb->pp_recycle || page_pool_is_pp_page_frag(page))) {
+			page_pool_return_skb_page(page);
 			return;
-		skb_free_frag(head);
+		}
+
+		__page_frag_cache_drain(page, 1);
 	} else {
 		kfree(head);
 	}
