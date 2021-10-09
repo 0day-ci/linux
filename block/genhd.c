@@ -1269,11 +1269,13 @@ struct gendisk *__alloc_disk_node(struct request_queue *q, int node_id,
 
 out_destroy_part_tbl:
 	xa_destroy(&disk->part_tbl);
-	iput(disk->part0->bd_inode);
 out_free_bdi:
 	bdi_put(disk->bdi);
 out_free_disk:
-	kfree(disk);
+	if (disk->part0)
+		iput(disk->part0->bd_inode);
+	else
+		kfree(disk);
 out_put_queue:
 	blk_put_queue(q);
 	return NULL;
