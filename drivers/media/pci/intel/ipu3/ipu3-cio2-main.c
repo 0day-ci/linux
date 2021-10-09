@@ -2050,3 +2050,9 @@ MODULE_AUTHOR("Yuning Pu <yuning.pu@intel.com>");
 MODULE_AUTHOR("Yong Zhi <yong.zhi@intel.com>");
 MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("IPU3 CIO2 driver");
+/*
+ * The sensor detection in cio2-bridge.c relies on adev->status.present/enabled
+ * which will only be true for sensors if their _DEP dependencies are met, which
+ * requires the INT3472 drivers to have loaded.
+ */
+MODULE_SOFTDEP("pre: intel_skl_int3472_discrete intel_skl_int3472_tps68470");
