@@ -3210,8 +3210,6 @@ bool kvm_vcpu_block(struct kvm_vcpu *vcpu)
 
 	vcpu->stat.generic.blocking = 1;
 
-	kvm_arch_vcpu_blocking(vcpu);
-
 	prepare_to_rcuwait(wait);
 	for (;;) {
 		set_current_state(TASK_INTERRUPTIBLE);
@@ -3223,8 +3221,6 @@ bool kvm_vcpu_block(struct kvm_vcpu *vcpu)
 		schedule();
 	}
 	finish_rcuwait(wait);
-
-	kvm_arch_vcpu_unblocking(vcpu);
 
 	vcpu->stat.generic.blocking = 0;
 

@@ -1445,9 +1445,6 @@ struct kvm_x86_ops {
 	const struct kvm_pmu_ops *pmu_ops;
 	const struct kvm_x86_nested_ops *nested_ops;
 
-	void (*vcpu_blocking)(struct kvm_vcpu *vcpu);
-	void (*vcpu_unblocking)(struct kvm_vcpu *vcpu);
-
 	int (*update_pi_irte)(struct kvm *kvm, unsigned int host_irq,
 			      uint32_t guest_irq, bool set);
 	void (*start_assignment)(struct kvm *kvm);
@@ -1902,16 +1899,6 @@ static inline bool kvm_irq_is_postable(struct kvm_lapic_irq *irq)
 	/* We can only post Fixed and LowPrio IRQs */
 	return (irq->delivery_mode == APIC_DM_FIXED ||
 		irq->delivery_mode == APIC_DM_LOWEST);
-}
-
-static inline void kvm_arch_vcpu_blocking(struct kvm_vcpu *vcpu)
-{
-	static_call_cond(kvm_x86_vcpu_blocking)(vcpu);
-}
-
-static inline void kvm_arch_vcpu_unblocking(struct kvm_vcpu *vcpu)
-{
-	static_call_cond(kvm_x86_vcpu_unblocking)(vcpu);
 }
 
 static inline int kvm_cpu_get_apicid(int mps_cpu)
