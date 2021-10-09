@@ -162,7 +162,7 @@ Usage::
                      default 1 (resealing allowed)
        hash=         hash algorithm name as a string. For TPM 1.x the only
                      allowed value is sha1. For TPM 2.x the allowed values
-                     are sha1, sha256, sha384, sha512 and sm3-256.
+                     are sha1, sha256, sha384, sha512 and sm3.
        policydigest= digest for the authorization policy. must be calculated
                      with the same hash algorithm as specified by the 'hash='
                      option.
