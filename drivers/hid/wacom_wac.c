@@ -4814,6 +4814,9 @@ static const struct wacom_features wacom_features_0x3c8 =
 	{ "Wacom Intuos BT M", 21600, 13500, 4095, 63,
 	  INTUOSHT3_BT, WACOM_INTUOS_RES, WACOM_INTUOS_RES, 4 };
 
+static const struct wacom_features wacom_features_0x95 =
+	{ "Wacom AG14", .type = HID_GENERIC, .oVid = 0x2D1F, .oPid = 149 };
+
 static const struct wacom_features wacom_features_HID_ANY_ID =
 	{ "Wacom HID", .type = HID_GENERIC, .oVid = HID_ANY_ID, .oPid = HID_ANY_ID };
 
@@ -4827,6 +4830,10 @@ static const struct wacom_features wacom_features_HID_ANY_ID =
 
 #define I2C_DEVICE_WACOM(prod)						\
 	HID_DEVICE(BUS_I2C, HID_GROUP_WACOM, USB_VENDOR_ID_WACOM, prod),\
+	.driver_data = (kernel_ulong_t)&wacom_features_##prod
+
+#define I2C_AG14_DEVICE_WACOM(prod)					    \
+	HID_DEVICE(BUS_I2C, HID_GROUP_WACOM, USB_VENDOR_ID_I2C_WACOM, prod),\
 	.driver_data = (kernel_ulong_t)&wacom_features_##prod
 
 #define USB_DEVICE_LENOVO(prod)					\
@@ -4890,6 +4897,7 @@ const struct hid_device_id wacom_ids[] = {
 	{ USB_DEVICE_WACOM(0x84) },
 	{ USB_DEVICE_WACOM(0x90) },
 	{ USB_DEVICE_WACOM(0x93) },
+	{ I2C_AG14_DEVICE_WACOM(0x95) },
 	{ USB_DEVICE_WACOM(0x97) },
 	{ USB_DEVICE_WACOM(0x9A) },
 	{ USB_DEVICE_WACOM(0x9F) },

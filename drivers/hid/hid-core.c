@@ -904,6 +904,7 @@ static int hid_scan_report(struct hid_device *hid)
 	 * Vendor specific handlings
 	 */
 	switch (hid->vendor) {
+	case USB_VENDOR_ID_I2C_WACOM:
 	case USB_VENDOR_ID_WACOM:
 		hid->group = HID_GROUP_WACOM;
 		break;
