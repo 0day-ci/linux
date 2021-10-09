@@ -1756,6 +1756,10 @@ static void acpi_scan_dep_init(struct acpi_device *adev)
 {
 	struct acpi_dep_data *dep;
 
+	/* Always honor the deps for battery devices */
+	if (acpi_device_is_battery(adev))
+		adev->honor_deps = true;
+
 	list_for_each_entry(dep, &acpi_dep_list, node) {
 		if (dep->consumer == adev->handle)
 			adev->dep_unmet++;
