@@ -902,7 +902,7 @@ static inline struct page *virt_to_head_page(const void *x)
 	return compound_head(page);
 }
 
-void __put_page(struct page *page);
+void __put_single_or_compound_page(struct page *page);
 
 void put_pages_list(struct list_head *pages);
 
@@ -1203,15 +1203,19 @@ static inline bool is_pci_p2pdma_page(const struct page *page)
 #define page_ref_zero_or_close_to_overflow(page) \
 	((unsigned int) page_ref_count(page) + 127u <= 127u)
 
-static inline void get_page(struct page *page)
+static inline void __get_page(struct page *page)
 {
-	page = compound_head(page);
 	/*
 	 * Getting a normal page or the head of a compound page
 	 * requires to already have an elevated page->_refcount.
 	 */
 	VM_BUG_ON_PAGE(page_ref_zero_or_close_to_overflow(page), page);
 	page_ref_inc(page);
+}
+
+static inline void get_page(struct page *page)
+{
+	__get_page(compound_head(page));
 }
 
 bool __must_check try_grab_page(struct page *page, unsigned int flags);
@@ -1228,10 +1232,8 @@ static inline __must_check bool try_get_page(struct page *page)
 	return true;
 }
 
-static inline void put_page(struct page *page)
+static inline void __put_page(struct page *page)
 {
-	page = compound_head(page);
-
 	/*
 	 * For devmap managed pages we need to catch refcount transition from
 	 * 2 to 1, when refcount reach one it means the page is free and we
@@ -1244,7 +1246,12 @@ static inline void put_page(struct page *page)
 	}
 
 	if (put_page_testzero(page))
-		__put_page(page);
+		__put_single_or_compound_page(page);
+}
+
+static inline void put_page(struct page *page)
+{
+	__put_page(compound_head(page));
 }
 
 /*

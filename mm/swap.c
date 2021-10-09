@@ -111,7 +111,7 @@ static void __put_compound_page(struct page *page)
 	destroy_compound_page(page);
 }
 
-void __put_page(struct page *page)
+void __put_single_or_compound_page(struct page *page)
 {
 	if (is_zone_device_page(page)) {
 		put_dev_pagemap(page->pgmap);
@@ -128,7 +128,7 @@ void __put_page(struct page *page)
 	else
 		__put_single_page(page);
 }
-EXPORT_SYMBOL(__put_page);
+EXPORT_SYMBOL(__put_single_or_compound_page);
 
 /**
  * put_pages_list() - release a list of pages
@@ -1153,7 +1153,7 @@ void put_devmap_managed_page(struct page *page)
 	if (count == 1)
 		free_devmap_managed_page(page);
 	else if (!count)
-		__put_page(page);
+		__put_single_or_compound_page(page);
 }
 EXPORT_SYMBOL(put_devmap_managed_page);
 #endif
