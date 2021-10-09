@@ -14,6 +14,12 @@
 #include <linux/interrupt.h>
 #include <asm/unaligned.h>
 
+// Bitmasks (for data[3])
+#define WACOM_TIP_SWITCH_bm         (1 << 0)
+#define WACOM_BARREL_SWITCH_bm      (1 << 1)
+#define WACOM_ERASER_bm             (1 << 2)
+#define WACOM_BARREL_SWITCH_2_bm    (1 << 4)
+
 // Registers
 #define WACOM_COMMAND_LSB   0x04
 #define WACOM_COMMAND_MSB   0x00
@@ -110,10 +116,10 @@ static irqreturn_t wacom_i2c_irq(int irq, void *dev_id)
 	if (error < 0)
 		goto out;
 
-	tsw = data[3] & 0x01;
-	ers = data[3] & 0x04;
-	f1 = data[3] & 0x02;
-	f2 = data[3] & 0x10;
+	tsw = data[3] & WACOM_TIP_SWITCH_bm;
+	ers = data[3] & WACOM_ERASER_bm;
+	f1 = data[3] & WACOM_BARREL_SWITCH_bm;
+	f2 = data[3] & WACOM_BARREL_SWITCH_2_bm;
 	x = le16_to_cpup((__le16 *)&data[4]);
 	y = le16_to_cpup((__le16 *)&data[6]);
 	pressure = le16_to_cpup((__le16 *)&data[8]);
