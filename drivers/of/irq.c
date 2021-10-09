@@ -538,7 +538,7 @@ void __init of_irq_init(const struct of_device_id *matches)
 				 desc->dev,
 				 desc->dev, desc->interrupt_parent);
 			ret = desc->irq_init_cb(desc->dev,
-						desc->interrupt_parent);
+						desc->interrupt_parent, NULL);
 			if (ret) {
 				of_node_clear_flag(desc->dev, OF_POPULATED);
 				kfree(desc);

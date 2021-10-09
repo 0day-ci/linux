@@ -359,7 +359,8 @@ static int pdc_setup_pin_mapping(struct device_node *np)
 	return 0;
 }
 
-static int qcom_pdc_init(struct device_node *node, struct device_node *parent)
+static int qcom_pdc_init(struct device_node *node, struct device_node *parent,
+			 struct platform_device *pdev)
 {
 	struct irq_domain *parent_domain, *pdc_domain, *pdc_gpio_domain;
 	int ret;
