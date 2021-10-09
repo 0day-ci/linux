@@ -322,6 +322,9 @@ static ssize_t pci_10bit_tag_store(struct device *dev,
 	if (pdev->driver)
 		return -EBUSY;
 
+	if (pcie_tag_config == PCIE_TAG_PEER2PEER)
+		return -EPERM;
+
 	if (!pcie_rp_10bit_tag_cmp_supported(pdev))
 		return -EPERM;
 

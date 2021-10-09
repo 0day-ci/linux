@@ -3979,6 +3979,11 @@
 				any pair of devices, possibly at the cost of
 				reduced performance.  This also guarantees
 				that hot-added devices will work.
+		pcie_tag_peer2peer	Disable 10-Bit Tag Requester for all
+				PCIe devices. This configuration allows
+				peer-to-peer DMA between any pair of devices,
+				possibly at the cost of reduced performance.
+
 		cbiosize=nn[KMG]	The fixed amount of bus space which is
 				reserved for the CardBus bridge's IO window.
 				The default value is 256 bytes.
