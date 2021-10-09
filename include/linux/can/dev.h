@@ -69,7 +69,6 @@ struct can_priv {
 	/* CAN controller features - see include/uapi/linux/can/netlink.h */
 	u32 ctrlmode;		/* current options setting */
 	u32 ctrlmode_supported;	/* options that can be modified by netlink */
-	u32 ctrlmode_static;	/* static enabled options for driver/hardware */
 
 	int restart_ms;
 	struct delayed_work restart_work;
@@ -104,12 +103,21 @@ static inline void can_set_static_ctrlmode(struct net_device *dev,
 	struct can_priv *priv = netdev_priv(dev);
 
 	/* alloc_candev() succeeded => netdev_priv() is valid at this point */
+	if (priv->ctrlmode_supported & static_mode) {
+		netdev_warn(dev,
+			    "Controller features can not be supported and static at the same time\n");
+		return;
+	}
 	priv->ctrlmode = static_mode;
-	priv->ctrlmode_static = static_mode;
 
 	/* override MTU which was set by default in can_setup()? */
 	if (static_mode & CAN_CTRLMODE_FD)
 		dev->mtu = CANFD_MTU;
+}
+
+static inline u32 can_get_static_ctrlmode(struct can_priv *priv)
+{
+	return priv->ctrlmode & ~priv->ctrlmode_supported;
 }
 
 void can_setup(struct net_device *dev);
