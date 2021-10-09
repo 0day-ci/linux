@@ -33,6 +33,26 @@ device-specific compatible properties, which should be used in addition to the
 - post-power-on-delay-ms: time required by the device after enabling its regulators
   or powering it on, before it is ready for communication.
 
+  flip-tilt-x:
+    type: boolean
+    description: Flip the tilt X values read from device
+
+  flip-tilt-y:
+    type: boolean
+    description: Flip the tilt Y values read from device
+
+  flip-pos-x:
+    type: boolean
+    description: Flip the X position values read from device
+
+  flip-pos-y:
+    type: boolean
+    description: Flip the Y position values read from device
+
+  flip-distance:
+    type: boolean
+    description: Flip the distance values read from device
+
 Example:
 
 	i2c-hid-dev@2c {

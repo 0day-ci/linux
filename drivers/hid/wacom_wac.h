@@ -157,6 +157,14 @@
 #define WACOM_HID_WT_Y                  (WACOM_HID_UP_WACOMTOUCH | 0x131)
 #define WACOM_HID_WT_REPORT_VALID       (WACOM_HID_UP_WACOMTOUCH | 0x1d0)
 
+// Bitmasks (for data[3])
+#define WACOM_TIP_SWITCH_bm         (1 << 0)
+#define WACOM_BARREL_SWITCH_bm      (1 << 1)
+#define WACOM_ERASER_bm             (1 << 2)
+#define WACOM_INVERT_bm             (1 << 3)
+#define WACOM_BARREL_SWITCH_2_bm    (1 << 4)
+#define WACOM_IN_RANGE_bm           (1 << 5)
+
 #define WACOM_BATTERY_USAGE(f)	(((f)->hid == HID_DG_BATTERYSTRENGTH) || \
 				 ((f)->hid == WACOM_HID_WD_BATTERY_CHARGING) || \
 				 ((f)->hid == WACOM_HID_WD_BATTERY_LEVEL))
@@ -357,6 +365,11 @@ struct wacom_wac {
 	bool has_mode_change;
 	bool is_direct_mode;
 	bool is_invalid_bt_frame;
+	bool flip_tilt_x;
+	bool flip_tilt_y;
+	bool flip_pos_x;
+	bool flip_pos_y;
+	bool flip_distance;
 };
 
 #endif

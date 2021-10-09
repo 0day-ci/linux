@@ -3261,6 +3261,63 @@ static int wacom_status_irq(struct wacom_wac *wacom_wac, size_t len)
 	return 0;
 }
 
+static int wacom_of_irq(struct wacom_wac *wacom_wac, size_t len)
+{
+	const struct wacom_features *features = &wacom_wac->features;
+	unsigned char *data = wacom_wac->data;
+	struct input_dev *input = wacom_wac->pen_input;
+	unsigned int x, y, pressure;
+	unsigned char tsw, f1, f2, ers;
+	short tilt_x, tilt_y, distance;
+
+	if (!IS_ENABLED(CONFIG_OF))
+		return 0;
+
+	tsw = data[1] & WACOM_TIP_SWITCH_bm;
+	ers = data[1] & WACOM_ERASER_bm;
+	f1 = data[1] & WACOM_BARREL_SWITCH_bm;
+	f2 = data[1] & WACOM_BARREL_SWITCH_2_bm;
+	x = le16_to_cpup((__le16 *)&data[2]);
+	y = le16_to_cpup((__le16 *)&data[4]);
+	pressure = le16_to_cpup((__le16 *)&data[6]);
+
+	/* Signed */
+	tilt_x = get_unaligned_le16(&data[9]);
+	tilt_y = get_unaligned_le16(&data[11]);
+
+	distance = get_unaligned_le16(&data[13]);
+
+	/* keep touch state for pen events */
+	if (!wacom_wac->shared->touch_down)
+		wacom_wac->tool[0] = (data[1] & 0x0c) ?
+			BTN_TOOL_RUBBER : BTN_TOOL_PEN;
+
+	wacom_wac->shared->touch_down = data[1] & 0x20;
+
+	// Flip the values based on properties from the device tree
+
+	// Default to a negative value for distance as HID compliant Wacom
+	// devices generally specify the hovering distance as negative.
+	distance = wacom_wac->flip_distance ? distance : -distance;
+	x = wacom_wac->flip_pos_x ? (features->x_max - x) : x;
+	y = wacom_wac->flip_pos_y ? (features->y_max - y) : y;
+	tilt_x = wacom_wac->flip_tilt_x ? -tilt_x : tilt_x;
+	tilt_y = wacom_wac->flip_tilt_y ? -tilt_y : tilt_y;
+
+	input_report_key(input, BTN_TOUCH, tsw || ers);
+	input_report_key(input, wacom_wac->tool[0], wacom_wac->shared->touch_down);
+	input_report_key(input, BTN_STYLUS, f1);
+	input_report_key(input, BTN_STYLUS2, f2);
+	input_report_abs(input, ABS_X, x);
+	input_report_abs(input, ABS_Y, y);
+	input_report_abs(input, ABS_PRESSURE, pressure);
+	input_report_abs(input, ABS_DISTANCE, distance);
+	input_report_abs(input, ABS_TILT_X, tilt_x);
+	input_report_abs(input, ABS_TILT_Y, tilt_y);
+
+	return 1;
+}
+
 void wacom_wac_irq(struct wacom_wac *wacom_wac, size_t len)
 {
 	bool sync;
@@ -3377,6 +3434,10 @@ void wacom_wac_irq(struct wacom_wac *wacom_wac, size_t len)
 			wacom_remote_status_irq(wacom_wac, len);
 		else
 			sync = wacom_remote_irq(wacom_wac, len);
+		break;
+
+	case HID_GENERIC:
+		sync = wacom_of_irq(wacom_wac, len);
 		break;
 
 	default:

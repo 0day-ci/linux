@@ -10,6 +10,7 @@
 
 #include "wacom_wac.h"
 #include "wacom.h"
+#include <linux/of.h>
 #include <linux/input/mt.h>
 
 #define WAC_MSG_RETRIES		5
@@ -2730,6 +2731,28 @@ static void wacom_mode_change_work(struct work_struct *work)
 	return;
 }
 
+static void wacom_of_read(struct hid_device *hdev, struct wacom_wac *wacom_wac)
+{
+	if (IS_ENABLED(CONFIG_OF)) {
+		wacom_wac->flip_tilt_x = of_property_read_bool(hdev->dev.parent->of_node,
+							"flip-tilt-x");
+		wacom_wac->flip_tilt_y = of_property_read_bool(hdev->dev.parent->of_node,
+							"flip-tilt-y");
+		wacom_wac->flip_pos_x = of_property_read_bool(hdev->dev.parent->of_node,
+							"flip-pos-x");
+		wacom_wac->flip_pos_y = of_property_read_bool(hdev->dev.parent->of_node,
+							"flip-pos-y");
+		wacom_wac->flip_distance = of_property_read_bool(hdev->dev.parent->of_node,
+							"flip-distance");
+	} else {
+		wacom_wac->flip_tilt_x = false;
+		wacom_wac->flip_tilt_y = false;
+		wacom_wac->flip_pos_x = false;
+		wacom_wac->flip_pos_y = false;
+		wacom_wac->flip_distance = false;
+	}
+}
+
 static int wacom_probe(struct hid_device *hdev,
 		const struct hid_device_id *id)
 {
@@ -2796,6 +2819,8 @@ static int wacom_probe(struct hid_device *hdev,
 				 "can't create sysfs speed attribute err: %d\n",
 				 error);
 	}
+
+	wacom_of_read(hdev, wacom_wac);
 
 	wacom_wac->probe_complete = true;
 	return 0;
