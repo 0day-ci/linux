@@ -2044,18 +2044,13 @@ static void pci_configure_mps(struct pci_dev *dev)
 int pci_configure_extended_tags(struct pci_dev *dev, void *ign)
 {
 	struct pci_host_bridge *host;
-	u32 cap;
 	u16 ctl;
 	int ret;
 
 	if (!pci_is_pcie(dev))
 		return 0;
 
-	ret = pcie_capability_read_dword(dev, PCI_EXP_DEVCAP, &cap);
-	if (ret)
-		return 0;
-
-	if (!(cap & PCI_EXP_DEVCAP_EXT_TAG))
+	if (!(dev->devcap & PCI_EXP_DEVCAP_EXT_TAG))
 		return 0;
 
 	ret = pcie_capability_read_word(dev, PCI_EXP_DEVCTL, &ctl);
