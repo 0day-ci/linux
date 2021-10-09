@@ -796,6 +796,12 @@ static const char * const acpi_ignore_dep_ids[] = {
 	NULL
 };
 
+/* List of HIDs for which we honor deps of matching ACPI devs, when checking _DEP lists. */
+static const char * const acpi_honor_dep_ids[] = {
+	"INT3472", /* Camera sensor PMIC / clk and regulator info */
+	NULL
+};
+
 static struct acpi_device *acpi_bus_get_parent(acpi_handle handle)
 {
 	struct acpi_device *device = NULL;
@@ -1761,8 +1767,12 @@ static void acpi_scan_dep_init(struct acpi_device *adev)
 		adev->honor_deps = true;
 
 	list_for_each_entry(dep, &acpi_dep_list, node) {
-		if (dep->consumer == adev->handle)
+		if (dep->consumer == adev->handle) {
+			if (dep->honor_dep)
+				adev->honor_deps = true;
+
 			adev->dep_unmet++;
+		}
 	}
 }
 
@@ -1966,7 +1976,7 @@ static u32 acpi_scan_check_dep(acpi_handle handle, bool check_dep)
 	for (count = 0, i = 0; i < dep_devices.count; i++) {
 		struct acpi_device_info *info;
 		struct acpi_dep_data *dep;
-		bool skip;
+		bool skip, honor_dep;
 
 		status = acpi_get_object_info(dep_devices.handles[i], &info);
 		if (ACPI_FAILURE(status)) {
@@ -1975,6 +1985,7 @@ static u32 acpi_scan_check_dep(acpi_handle handle, bool check_dep)
 		}
 
 		skip = acpi_info_matches_ids(info, acpi_ignore_dep_ids);
+		honor_dep = acpi_info_matches_ids(info, acpi_honor_dep_ids);
 		kfree(info);
 
 		if (skip)
@@ -1988,6 +1999,7 @@ static u32 acpi_scan_check_dep(acpi_handle handle, bool check_dep)
 
 		dep->supplier = dep_devices.handles[i];
 		dep->consumer = handle;
+		dep->honor_dep = honor_dep;
 
 		mutex_lock(&acpi_dep_list_lock);
 		list_add_tail(&dep->node , &acpi_dep_list);

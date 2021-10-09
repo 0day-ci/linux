@@ -284,6 +284,7 @@ struct acpi_dep_data {
 	struct list_head node;
 	acpi_handle supplier;
 	acpi_handle consumer;
+	bool honor_dep;
 };
 
 /* Performance Management */
