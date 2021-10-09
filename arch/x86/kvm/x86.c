@@ -9425,29 +9425,27 @@ EXPORT_SYMBOL_GPL(kvm_vcpu_update_apicv);
 
 void __kvm_request_apicv_update(struct kvm *kvm, bool activate, ulong bit)
 {
-	unsigned long old, new;
+	unsigned long old;
 
 	if (!kvm_x86_ops.check_apicv_inhibit_reasons ||
 	    !static_call(kvm_x86_check_apicv_inhibit_reasons)(bit))
 		return;
 
-	old = new = kvm->arch.apicv_inhibit_reasons;
+	old = kvm->arch.apicv_inhibit_reasons;
 
 	if (activate)
-		__clear_bit(bit, &new);
+		__clear_bit(bit, &kvm->arch.apicv_inhibit_reasons);
 	else
-		__set_bit(bit, &new);
+		__set_bit(bit, &kvm->arch.apicv_inhibit_reasons);
 
-	if (!!old != !!new) {
+	if (!!old != !!kvm->arch.apicv_inhibit_reasons) {
 		trace_kvm_apicv_update_request(activate, bit);
 		kvm_make_all_cpus_request(kvm, KVM_REQ_APICV_UPDATE);
-		kvm->arch.apicv_inhibit_reasons = new;
-		if (new) {
+		if (kvm->arch.apicv_inhibit_reasons) {
 			unsigned long gfn = gpa_to_gfn(APIC_DEFAULT_PHYS_BASE);
 			kvm_zap_gfn_range(kvm, gfn, gfn+1);
 		}
-	} else
-		kvm->arch.apicv_inhibit_reasons = new;
+	}
 }
 EXPORT_SYMBOL_GPL(__kvm_request_apicv_update);
 
