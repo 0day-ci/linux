@@ -1753,7 +1753,7 @@ static struct nbd_device *nbd_dev_add(int index, unsigned int refs)
 	 * byte in __device_add_disk().
 	 */
 	disk->first_minor = index << part_shift;
-	if (disk->first_minor > 0xff) {
+	if (disk->first_minor > MINORMASK) {
 		err = -EINVAL;
 		goto out_free_idr;
 	}
