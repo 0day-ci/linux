@@ -356,15 +356,12 @@ static void tpm_ibmvtpm_remove(struct vio_dev *vdev)
 		rc = plpar_hcall_norets(H_FREE_CRQ, vdev->unit_address);
 	} while (rc == H_BUSY || H_IS_LONG_BUSY(rc));
 
-	dma_unmap_single(ibmvtpm->dev, ibmvtpm->crq_dma_handle,
-			 CRQ_RES_BUF_SIZE, DMA_BIDIRECTIONAL);
-	free_page((unsigned long)ibmvtpm->crq_queue.crq_addr);
+	dma_free_coherent(ibmvtpm->dev, CRQ_RES_BUF_SIZE,
+			  crq_q->crq_addr, crq_q->crq_dma_handle);
 
-	if (ibmvtpm->rtce_buf) {
-		dma_unmap_single(ibmvtpm->dev, ibmvtpm->rtce_dma_handle,
-				 ibmvtpm->rtce_size, DMA_BIDIRECTIONAL);
-		kfree(ibmvtpm->rtce_buf);
-	}
+	if (ibmvtpm->rtce_buf)
+		dma_free_coherent(ibmvtpm->dev, ibmvtpm->rtce_size,
+				  ibmvtpm->rtce_buf, ibmvtpm->rtce_dma_handle);
 
 	kfree(ibmvtpm);
 	/* For tpm_ibmvtpm_get_desired_dma */
@@ -522,23 +519,12 @@ static void ibmvtpm_crq_process(struct ibmvtpm_crq *crq,
 				return;
 			}
 			ibmvtpm->rtce_size = be16_to_cpu(crq->len);
-			ibmvtpm->rtce_buf = kmalloc(ibmvtpm->rtce_size,
-						    GFP_ATOMIC);
-			if (!ibmvtpm->rtce_buf) {
-				dev_err(ibmvtpm->dev, "Failed to allocate memory for rtce buffer\n");
-				return;
-			}
-
-			ibmvtpm->rtce_dma_handle = dma_map_single(ibmvtpm->dev,
-				ibmvtpm->rtce_buf, ibmvtpm->rtce_size,
-				DMA_BIDIRECTIONAL);
-
-			if (dma_mapping_error(ibmvtpm->dev,
-					      ibmvtpm->rtce_dma_handle)) {
-				kfree(ibmvtpm->rtce_buf);
-				ibmvtpm->rtce_buf = NULL;
-				dev_err(ibmvtpm->dev, "Failed to dma map rtce buffer\n");
-			}
+			ibmvtpm->rtce_buf = dma_alloc_coherent(ibmvtpm->dev,
+							       ibmvtpm->rtce_size,
+							       &ibmvtpm->rtce_dma_handle,
+							       GFP_ATOMIC);
+			if (!ibmvtpm->rtce_buf)
+				dev_err(ibmvtpm->dev, "Failed to dma allocate rtce buffer\n");
 
 			return;
 		case VTPM_GET_VERSION_RES:
@@ -618,22 +604,13 @@ static int tpm_ibmvtpm_probe(struct vio_dev *vio_dev,
 	ibmvtpm->vdev = vio_dev;
 
 	crq_q = &ibmvtpm->crq_queue;
-	crq_q->crq_addr = (struct ibmvtpm_crq *)get_zeroed_page(GFP_KERNEL);
-	if (!crq_q->crq_addr) {
-		dev_err(dev, "Unable to allocate memory for crq_addr\n");
-		goto cleanup;
-	}
 
 	crq_q->num_entry = CRQ_RES_BUF_SIZE / sizeof(*crq_q->crq_addr);
 	init_waitqueue_head(&crq_q->wq);
-	ibmvtpm->crq_dma_handle = dma_map_single(dev, crq_q->crq_addr,
-						 CRQ_RES_BUF_SIZE,
-						 DMA_BIDIRECTIONAL);
-
-	if (dma_mapping_error(dev, ibmvtpm->crq_dma_handle)) {
-		dev_err(dev, "dma mapping failed\n");
+	crq_q->crq_addr = dma_alloc_coherent(dev, CRQ_RES_BUF_SIZE,
+					    &ibmvtpm->crq_dma_handle, GFP_KERNEL);
+	if (!crq_q->crq_addr)
 		goto cleanup;
-	}
 
 	rc = plpar_hcall_norets(H_REG_CRQ, vio_dev->unit_address,
 				ibmvtpm->crq_dma_handle, CRQ_RES_BUF_SIZE);
@@ -642,7 +619,7 @@ static int tpm_ibmvtpm_probe(struct vio_dev *vio_dev,
 
 	if (rc) {
 		dev_err(dev, "Unable to register CRQ rc=%d\n", rc);
-		goto reg_crq_cleanup;
+		goto cleanup;
 	}
 
 	rc = request_irq(vio_dev->irq, ibmvtpm_interrupt, 0,
@@ -704,13 +681,11 @@ init_irq_cleanup:
 	do {
 		rc1 = plpar_hcall_norets(H_FREE_CRQ, vio_dev->unit_address);
 	} while (rc1 == H_BUSY || H_IS_LONG_BUSY(rc1));
-reg_crq_cleanup:
-	dma_unmap_single(dev, ibmvtpm->crq_dma_handle, CRQ_RES_BUF_SIZE,
-			 DMA_BIDIRECTIONAL);
 cleanup:
 	if (ibmvtpm) {
 		if (crq_q->crq_addr)
-			free_page((unsigned long)crq_q->crq_addr);
+			dma_free_coherent(dev, CRQ_RES_BUF_SIZE,
+					  crq_q->crq_addr, crq_q->crq_dma_handle);
 		kfree(ibmvtpm);
 	}
 
