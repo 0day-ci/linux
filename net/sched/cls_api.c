@@ -563,8 +563,6 @@ static void __tcf_chain_put(struct tcf_chain *chain, bool by_act,
 	if (refcnt - chain->action_refcnt == 0 && !by_act) {
 		tc_chain_notify_delete(tmplt_ops, tmplt_priv, chain->index,
 				       block, NULL, 0, 0, false);
-		/* Last reference to chain, no need to lock. */
-		chain->flushing = false;
 	}
 
 	if (refcnt == 0)
@@ -615,6 +613,9 @@ static void tcf_chain_flush(struct tcf_chain *chain, bool rtnl_held)
 		tcf_proto_put(tp, rtnl_held, NULL);
 		tp = tp_next;
 	}
+
+	/* Last reference to chain, no need to lock. */
+	chain->flushing = false;
 }
 
 static int tcf_block_setup(struct tcf_block *block,
