@@ -1310,6 +1310,10 @@ st_lsm6dsx_set_odr(struct st_lsm6dsx_sensor *sensor, u32 req_odr)
 		break;
 	}
 
+	if (ref_sensor->id >= 2) {
+		return -EINVAL;
+	}
+
 	if (req_odr > 0) {
 		err = st_lsm6dsx_check_odr(ref_sensor, req_odr, &val);
 		if (err < 0)
