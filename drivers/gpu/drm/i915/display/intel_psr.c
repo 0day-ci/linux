@@ -933,6 +933,21 @@ static bool intel_psr2_config_valid(struct intel_dp *intel_dp,
 	return true;
 }
 
+void intel_panel_replay_compute_config(struct intel_dp *intel_dp,
+				       struct intel_crtc_state *crtc_state)
+{
+	struct drm_i915_private *i915 = dp_to_i915(intel_dp);
+
+	if (!intel_dp->psr.sink_panel_replay_support)
+		return;
+
+	crtc_state->has_panel_replay = true;
+	crtc_state->infoframes.enable |= intel_hdmi_infoframe_enable(DP_SDP_VSC);
+
+	if (HAS_PSR2_SEL_FETCH(i915))
+		intel_psr2_sel_fetch_config_valid(intel_dp, crtc_state);
+}
+
 void intel_psr_compute_config(struct intel_dp *intel_dp,
 			      struct intel_crtc_state *crtc_state,
 			      struct drm_connector_state *conn_state)
@@ -941,6 +956,8 @@ void intel_psr_compute_config(struct intel_dp *intel_dp,
 	const struct drm_display_mode *adjusted_mode =
 		&crtc_state->hw.adjusted_mode;
 	int psr_setup_time;
+
+	intel_panel_replay_compute_config(intel_dp, crtc_state);
 
 	/*
 	 * Current PSR panels dont work reliably with VRR enabled
@@ -2171,6 +2188,35 @@ void intel_psr_flush(struct drm_i915_private *dev_priv,
 }
 
 /**
+ * intel_panel_replay_init - Check for sink and source capability.
+ * @intel_dp: Intel DP
+ *
+ * This function is called after the initializing connector.
+ * (the initializing of connector treats the handling of connector capabilities)
+ * And it initializes basic panel replay stuff for each DP Encoder.
+ */
+void intel_panel_replay_init(struct intel_dp *intel_dp)
+{
+	struct drm_i915_private *dev_priv = dp_to_i915(intel_dp);
+	u8 pr_dpcd = 0;
+
+	if (!(HAS_DP20(dev_priv) && HAS_PANEL_REPLAY(dev_priv)))
+		return;
+
+	drm_dp_dpcd_readb(&intel_dp->aux, DP_PANEL_REPLAY_CAP, &pr_dpcd);
+
+	if (!(pr_dpcd & PANEL_REPLAY_SUPPORT)) {
+		drm_dbg_kms(&dev_priv->drm,
+			    "Panel replay is not supported by panel\n");
+		return;
+	}
+
+	drm_dbg_kms(&dev_priv->drm,
+		    "Panel replay is supported by panel\n");
+	intel_dp->psr.sink_panel_replay_support = true;
+}
+
+/**
  * intel_psr_init - Init basic PSR work and mutex.
  * @intel_dp: Intel DP
  *
@@ -2182,6 +2228,8 @@ void intel_psr_init(struct intel_dp *intel_dp)
 {
 	struct intel_digital_port *dig_port = dp_to_dig_port(intel_dp);
 	struct drm_i915_private *dev_priv = dp_to_i915(intel_dp);
+
+	intel_panel_replay_init(intel_dp);
 
 	if (!HAS_PSR(dev_priv))
 		return;

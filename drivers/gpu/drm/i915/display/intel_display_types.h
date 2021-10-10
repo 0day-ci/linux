@@ -1070,6 +1070,7 @@ struct intel_crtc_state {
 	bool req_psr2_sdp_prior_scanline;
 	u32 dc3co_exitline;
 	u16 su_y_granularity;
+	bool has_panel_replay;
 	struct drm_dp_vsc_sdp psr_vsc;
 
 	/*
@@ -1531,6 +1532,7 @@ struct intel_psr {
 	bool irq_aux_error;
 	u16 su_w_granularity;
 	u16 su_y_granularity;
+	bool sink_panel_replay_support;
 	u32 dc3co_exitline;
 	u32 dc3co_exit_delay;
 	struct delayed_work dc3co_work;

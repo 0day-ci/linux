@@ -32,6 +32,7 @@ void intel_psr_flush(struct drm_i915_private *dev_priv,
 		     unsigned frontbuffer_bits,
 		     enum fb_op_origin origin);
 void intel_psr_init(struct intel_dp *intel_dp);
+void intel_panel_replay_init(struct intel_dp *intel_dp);
 void intel_psr_compute_config(struct intel_dp *intel_dp,
 			      struct intel_crtc_state *crtc_state,
 			      struct drm_connector_state *conn_state);
@@ -52,5 +53,7 @@ void intel_psr2_disable_plane_sel_fetch(struct intel_plane *plane,
 					const struct intel_crtc_state *crtc_state);
 void intel_psr_pause(struct intel_dp *intel_dp);
 void intel_psr_resume(struct intel_dp *intel_dp);
+void intel_panel_replay_compute_config(struct intel_dp *intel_dp,
+				       struct intel_crtc_state *crtc_state);
 
 #endif /* __INTEL_PSR_H__ */
