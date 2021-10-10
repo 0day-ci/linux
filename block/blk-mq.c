@@ -2228,7 +2228,6 @@ void blk_mq_submit_bio(struct bio *bio)
 	const int is_flush_fua = op_is_flush(bio->bi_opf);
 	struct request *rq;
 	struct blk_plug *plug;
-	struct request *same_queue_rq = NULL;
 	unsigned int nr_segs;
 	blk_status_t ret;
 
@@ -2236,10 +2235,6 @@ void blk_mq_submit_bio(struct bio *bio)
 	__blk_queue_split(&bio, &nr_segs);
 
 	if (!bio_integrity_prep(bio))
-		goto queue_exit;
-
-	if (!is_flush_fua && !blk_queue_nomerges(q) &&
-	    blk_attempt_plug_merge(q, bio, nr_segs, &same_queue_rq))
 		goto queue_exit;
 
 	if (blk_mq_sched_bio_merge(q, bio, nr_segs))
@@ -2291,9 +2286,7 @@ void blk_mq_submit_bio(struct bio *bio)
 		/* Bypass scheduler for flush requests */
 		blk_insert_flush(rq);
 		blk_mq_run_hw_queue(rq->mq_hctx, true);
-	} else if (plug && (q->nr_hw_queues == 1 ||
-		   blk_mq_is_shared_tags(rq->mq_hctx->flags) ||
-		   q->mq_ops->commit_rqs || !blk_queue_nonrot(q))) {
+	} else if (plug) {
 		/*
 		 * Use plugging if we have a ->commit_rqs() hook as well, as
 		 * we know the driver uses bd->last in a smart fashion.
@@ -2319,28 +2312,6 @@ void blk_mq_submit_bio(struct bio *bio)
 	} else if (q->elevator) {
 		/* Insert the request at the IO scheduler queue */
 		blk_mq_sched_insert_request(rq, false, true, true);
-	} else if (plug && !blk_queue_nomerges(q)) {
-		/*
-		 * We do limited plugging. If the bio can be merged, do that.
-		 * Otherwise the existing request in the plug list will be
-		 * issued. So the plug list will have one request at most
-		 * The plug list might get flushed before this. If that happens,
-		 * the plug list is empty, and same_queue_rq is invalid.
-		 */
-		if (list_empty(&plug->mq_list))
-			same_queue_rq = NULL;
-		if (same_queue_rq) {
-			list_del_init(&same_queue_rq->queuelist);
-			plug->rq_count--;
-		}
-		blk_add_rq_to_plug(plug, rq);
-		trace_block_plug(q);
-
-		if (same_queue_rq) {
-			trace_block_unplug(q, 1, true);
-			blk_mq_try_issue_directly(same_queue_rq->mq_hctx,
-						  same_queue_rq);
-		}
 	} else if ((q->nr_hw_queues > 1 && is_sync) ||
 		   !rq->mq_hctx->dispatch_busy) {
 		/*
