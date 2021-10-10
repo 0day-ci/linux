@@ -541,6 +541,9 @@ struct drm_panel;
 /* DFP Capability Extension */
 #define DP_DFP_CAPABILITY_EXTENSION_SUPPORT	0x0a3	/* 2.0 */
 
+#define DP_PANEL_REPLAY_CAP                 0x0b0
+# define PANEL_REPLAY_SUPPORT               (1 << 0)
+
 /* Link Configuration */
 #define	DP_LINK_BW_SET		            0x100
 # define DP_LINK_RATE_TABLE		    0x00    /* eDP 1.4 */
@@ -708,6 +711,9 @@ struct drm_panel;
 
 #define DP_BRANCH_DEVICE_CTRL		    0x1a1
 # define DP_BRANCH_DEVICE_IRQ_HPD	    (1 << 0)
+
+#define PANEL_REPLAY_CONFIG                 0x1b0
+# define PANEL_REPLAY_ENABLE                (1 << 0)
 
 #define DP_PAYLOAD_ALLOCATE_SET		    0x1c0
 #define DP_PAYLOAD_ALLOCATE_START_TIME_SLOT 0x1c1
