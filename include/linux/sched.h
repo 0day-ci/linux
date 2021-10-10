@@ -275,7 +275,11 @@ struct task_group;
 #define get_current_state()	READ_ONCE(current->__state)
 
 /* Task command name length: */
+#if CONFIG_BASE_SMALL
 #define TASK_COMM_LEN			16
+#else
+#define TASK_COMM_LEN			24
+#endif
 
 extern void scheduler_tick(void);
 
