@@ -50,6 +50,7 @@ struct hstate hstates[HUGE_MAX_HSTATE];
 
 #ifdef CONFIG_CMA
 static struct cma *hugetlb_cma[MAX_NUMNODES];
+static unsigned long hugetlb_cma_size_in_node[MAX_NUMNODES] __initdata;
 static bool hugetlb_cma_page(struct page *page, unsigned int order)
 {
 	return cma_pages_valid(hugetlb_cma[page_to_nid(page)], page,
@@ -62,6 +63,7 @@ static bool hugetlb_cma_page(struct page *page, unsigned int order)
 }
 #endif
 static unsigned long hugetlb_cma_size __initdata;
+static nodemask_t hugetlb_cma_nodes_allowed = NODE_MASK_NONE;
 
 /*
  * Minimum page order among possible hugepage sizes, set to a proper value
@@ -3497,9 +3499,15 @@ static ssize_t __nr_hugepages_store_common(bool obey_mempolicy,
 
 	if (nid == NUMA_NO_NODE) {
 		/*
+		 * If we've specified the size of CMA area per node,
+		 * should use it firstly.
+		 */
+		if (hstate_is_gigantic(h) && !nodes_empty(hugetlb_cma_nodes_allowed))
+			n_mask = &hugetlb_cma_nodes_allowed;
+		/*
 		 * global hstate attribute
 		 */
-		if (!(obey_mempolicy &&
+		else if (!(obey_mempolicy &&
 				init_nodemask_of_mempolicy(&nodes_allowed)))
 			n_mask = &node_states[N_MEMORY];
 		else
@@ -6745,7 +6753,38 @@ static bool cma_reserve_called __initdata;
 
 static int __init cmdline_parse_hugetlb_cma(char *p)
 {
-	hugetlb_cma_size = memparse(p, &p);
+	int nid, count = 0;
+	unsigned long tmp;
+	char *s = p;
+
+	while (*s) {
+		if (sscanf(s, "%lu%n", &tmp, &count) != 1)
+			break;
+
+		if (s[count] == ':') {
+			nid = tmp;
+			if (nid < 0 || nid >= MAX_NUMNODES)
+				break;
+
+			s += count + 1;
+			tmp = memparse(s, &s);
+			hugetlb_cma_size_in_node[nid] = tmp;
+			hugetlb_cma_size += tmp;
+
+			/*
+			 * Skip the separator if have one, otherwise
+			 * break the parsing.
+			 */
+			if (*s == ',')
+				s++;
+			else
+				break;
+		} else {
+			hugetlb_cma_size = memparse(p, &p);
+			break;
+		}
+	}
+
 	return 0;
 }
 
@@ -6754,6 +6793,7 @@ early_param("hugetlb_cma", cmdline_parse_hugetlb_cma);
 void __init hugetlb_cma_reserve(int order)
 {
 	unsigned long size, reserved, per_node;
+	bool node_specific_cma_alloc = false;
 	int nid;
 
 	cma_reserve_called = true;
@@ -6767,20 +6807,37 @@ void __init hugetlb_cma_reserve(int order)
 		return;
 	}
 
-	/*
-	 * If 3 GB area is requested on a machine with 4 numa nodes,
-	 * let's allocate 1 GB on first three nodes and ignore the last one.
-	 */
-	per_node = DIV_ROUND_UP(hugetlb_cma_size, nr_online_nodes);
-	pr_info("hugetlb_cma: reserve %lu MiB, up to %lu MiB per node\n",
-		hugetlb_cma_size / SZ_1M, per_node / SZ_1M);
+	for_each_node_state(nid, N_ONLINE) {
+		if (hugetlb_cma_size_in_node[nid] > 0) {
+			node_specific_cma_alloc = true;
+			break;
+		}
+	}
+
+	if (!node_specific_cma_alloc) {
+		/*
+		 * If 3 GB area is requested on a machine with 4 numa nodes,
+		 * let's allocate 1 GB on first three nodes and ignore the last one.
+		 */
+		per_node = DIV_ROUND_UP(hugetlb_cma_size, nr_online_nodes);
+		pr_info("hugetlb_cma: reserve %lu MiB, up to %lu MiB per node\n",
+			hugetlb_cma_size / SZ_1M, per_node / SZ_1M);
+	}
 
 	reserved = 0;
 	for_each_node_state(nid, N_ONLINE) {
 		int res;
 		char name[CMA_MAX_NAME];
 
-		size = min(per_node, hugetlb_cma_size - reserved);
+		if (node_specific_cma_alloc) {
+			if (hugetlb_cma_size_in_node[nid] <= 0)
+				continue;
+
+			size = hugetlb_cma_size_in_node[nid];
+		} else {
+			size = min(per_node, hugetlb_cma_size - reserved);
+		}
+
 		size = round_up(size, PAGE_SIZE << order);
 
 		snprintf(name, sizeof(name), "hugetlb%d", nid);
@@ -6799,6 +6856,8 @@ void __init hugetlb_cma_reserve(int order)
 			continue;
 		}
 
+		if (node_specific_cma_alloc)
+			node_set(nid, hugetlb_cma_nodes_allowed);
 		reserved += size;
 		pr_info("hugetlb_cma: reserved %lu MiB on node %d\n",
 			size / SZ_1M, nid);
