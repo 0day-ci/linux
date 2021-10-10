@@ -49,11 +49,6 @@ struct rcar_msi {
  * the L1 link state fixup function, called from the ARM fault handler.
  */
 static void __iomem *pcie_base;
-/*
- * Static copy of bus clock pointer, so we can check whether the clock
- * is enabled or not.
- */
-static struct clk *pcie_bus_clk;
 #endif
 
 /* Structure representing the PCIe interface */
@@ -792,7 +787,6 @@ static int rcar_pcie_get_resources(struct rcar_pcie_host *host)
 #ifdef CONFIG_ARM
 	/* Cache static copy for L1 link state fixup hook on aarch32 */
 	pcie_base = pcie->base;
-	pcie_bus_clk = host->bus_clk;
 #endif
 
 	return 0;
@@ -1062,7 +1056,7 @@ static int rcar_pcie_aarch32_abort_handler(unsigned long addr,
 
 	spin_lock_irqsave(&pmsr_lock, flags);
 
-	if (!pcie_base || !__clk_is_enabled(pcie_bus_clk)) {
+	if (!pcie_base) {
 		ret = 1;
 		goto unlock_exit;
 	}
