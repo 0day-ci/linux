@@ -44,8 +44,6 @@ struct rxe_type_info {
 	size_t			key_size;
 };
 
-extern struct rxe_type_info rxe_type_info[];
-
 struct rxe_pool_entry {
 	struct rxe_pool		*pool;
 	struct kref		ref_cnt;
@@ -61,6 +59,7 @@ struct rxe_pool_entry {
 
 struct rxe_pool {
 	struct rxe_dev		*rxe;
+	const char		*name;
 	rwlock_t		pool_lock; /* protects pool add/del/search */
 	size_t			elem_size;
 	void			(*cleanup)(struct rxe_pool_entry *obj);
@@ -69,6 +68,8 @@ struct rxe_pool {
 
 	unsigned int		max_elem;
 	atomic_t		num_elem;
+	size_t			size;
+	size_t			elem_offset;
 
 	/* only used if indexed */
 	struct {
