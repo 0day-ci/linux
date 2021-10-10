@@ -1165,12 +1165,66 @@ qca8k_setup(struct dsa_switch *ds)
 }
 
 static void
+qca8k_mac_config_setup_internal_delay(struct qca8k_priv *priv, struct dsa_port *dp,
+				      u32 reg, const struct phylink_link_state *state)
+{
+	u32 delay, val = 0;
+	int ret;
+
+	if (state->interface == PHY_INTERFACE_MODE_RGMII_ID ||
+	    state->interface == PHY_INTERFACE_MODE_RGMII_TXID ||
+	    state->interface == PHY_INTERFACE_MODE_SGMII) {
+		if (of_property_read_u32(dp->dn, "tx-internal-delay-ps", &delay))
+			delay = 1;
+		else
+			/* Switch regs accept value in ns, convert ps to ns */
+			delay = delay / 1000;
+
+		if (delay > QCA8K_MAX_DELAY) {
+			dev_err(priv->dev, "rgmii tx delay is limited to a max value of 3ns, setting to the max value");
+			delay = 3;
+		}
+
+		val |= QCA8K_PORT_PAD_RGMII_TX_DELAY(delay) |
+			QCA8K_PORT_PAD_RGMII_TX_DELAY_EN;
+	}
+
+	if (state->interface == PHY_INTERFACE_MODE_RGMII_ID ||
+	    state->interface == PHY_INTERFACE_MODE_RGMII_RXID ||
+	    state->interface == PHY_INTERFACE_MODE_SGMII) {
+		if (of_property_read_u32(dp->dn, "rx-internal-delay-ps", &delay))
+			delay = 2;
+		else
+			/* Switch regs accept value in ns, convert ps to ns */
+			delay = delay / 1000;
+
+		if (delay > QCA8K_MAX_DELAY) {
+			dev_err(priv->dev, "rgmii rx delay is limited to a max value of 3ns, setting to the max value");
+			delay = 3;
+		}
+
+		val |= QCA8K_PORT_PAD_RGMII_RX_DELAY(delay) |
+			QCA8K_PORT_PAD_RGMII_RX_DELAY_EN;
+	}
+
+	/* Set RGMII delay based on the selected values */
+	ret = qca8k_rmw(priv, reg,
+			QCA8K_PORT_PAD_RGMII_TX_DELAY_MASK |
+			QCA8K_PORT_PAD_RGMII_TX_DELAY_MASK |
+			QCA8K_PORT_PAD_RGMII_RX_DELAY_MASK |
+			QCA8K_PORT_PAD_RGMII_RX_DELAY_EN,
+			val);
+	if (ret)
+		dev_err(priv->dev, "Failed to set internal delay for CPU port %d", dp->index);
+}
+
+static void
 qca8k_phylink_mac_config(struct dsa_switch *ds, int port, unsigned int mode,
 			 const struct phylink_link_state *state)
 {
 	struct qca8k_priv *priv = ds->priv;
 	struct dsa_port *dp;
-	u32 reg, val, delay;
+	u32 reg, val;
 	int ret;
 
 	switch (port) {
@@ -1222,44 +1276,11 @@ qca8k_phylink_mac_config(struct dsa_switch *ds, int port, unsigned int mode,
 	case PHY_INTERFACE_MODE_RGMII_TXID:
 	case PHY_INTERFACE_MODE_RGMII_RXID:
 		dp = dsa_to_port(ds, port);
-		val = QCA8K_PORT_PAD_RGMII_EN;
 
-		if (state->interface == PHY_INTERFACE_MODE_RGMII_ID ||
-		    state->interface == PHY_INTERFACE_MODE_RGMII_TXID) {
-			if (of_property_read_u32(dp->dn, "tx-internal-delay-ps", &delay))
-				delay = 1;
-			else
-				/* Switch regs accept value in ns, convert ps to ns */
-				delay = delay / 1000;
+		qca8k_write(priv, reg, QCA8K_PORT_PAD_RGMII_EN);
 
-			if (delay > QCA8K_MAX_DELAY) {
-				dev_err(priv->dev, "rgmii tx delay is limited to a max value of 3ns, setting to the max value");
-				delay = 3;
-			}
-
-			val |= QCA8K_PORT_PAD_RGMII_TX_DELAY(delay) |
-			       QCA8K_PORT_PAD_RGMII_TX_DELAY_EN;
-		}
-
-		if (state->interface == PHY_INTERFACE_MODE_RGMII_ID ||
-		    state->interface == PHY_INTERFACE_MODE_RGMII_RXID) {
-			if (of_property_read_u32(dp->dn, "rx-internal-delay-ps", &delay))
-				delay = 2;
-			else
-				/* Switch regs accept value in ns, convert ps to ns */
-				delay = delay / 1000;
-
-			if (delay > QCA8K_MAX_DELAY) {
-				dev_err(priv->dev, "rgmii rx delay is limited to a max value of 3ns, setting to the max value");
-				delay = 3;
-			}
-
-			val |= QCA8K_PORT_PAD_RGMII_RX_DELAY(delay) |
-			       QCA8K_PORT_PAD_RGMII_RX_DELAY_EN;
-		}
-
-		/* Set RGMII delay based on the selected values */
-		qca8k_write(priv, reg, val);
+		/* Configure rgmii delay from dp or taking advised values */
+		qca8k_mac_config_setup_internal_delay(priv, dp, reg, state);
 
 		/* QCA8337 requires to set rgmii rx delay for all ports.
 		 * This is enabled through PORT5_PAD_CTRL for all ports,
@@ -1341,6 +1362,13 @@ qca8k_phylink_mac_config(struct dsa_switch *ds, int port, unsigned int mode,
 					QCA8K_PORT0_PAD_SGMII_RXCLK_FALLING_EDGE |
 					QCA8K_PORT0_PAD_SGMII_TXCLK_FALLING_EDGE,
 					val);
+
+		/* From original code is reported port instability as SGMII also
+		 * require delay set. Apply advised values here or take them from DT.
+		 */
+		if (state->interface == PHY_INTERFACE_MODE_SGMII)
+			qca8k_mac_config_setup_internal_delay(priv, dp, reg, state);
+
 		break;
 	default:
 		dev_err(ds->dev, "xMII mode %s not supported for port %d\n",
