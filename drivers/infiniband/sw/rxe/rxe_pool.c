@@ -266,10 +266,10 @@ static void rxe_drop_index(struct rxe_pool_entry *elem)
 	rb_erase(&elem->index_node, &pool->index.tree);
 }
 
-void *rxe_alloc_locked(struct rxe_pool *pool)
+static void *__rxe_alloc_locked(struct rxe_pool *pool)
 {
 	struct rxe_pool_entry *elem;
-	u8 *obj;
+	void *obj;
 	int err;
 
 	if (atomic_inc_return(&pool->num_elem) > pool->max_elem)
@@ -279,11 +279,10 @@ void *rxe_alloc_locked(struct rxe_pool *pool)
 	if (!obj)
 		goto out_cnt;
 
-	elem = (struct rxe_pool_entry *)(obj + pool->elem_offset);
+	elem = (struct rxe_pool_entry *)((u8 *)obj + pool->elem_offset);
 
 	elem->pool = pool;
 	elem->obj = obj;
-	kref_init(&elem->ref_cnt);
 
 	if (pool->flags & RXE_POOL_INDEX) {
 		err = rxe_add_index(elem);
@@ -300,23 +299,40 @@ out_cnt:
 	return NULL;
 }
 
-void *rxe_alloc_with_key_locked(struct rxe_pool *pool, void *key)
+void *rxe_alloc_locked(struct rxe_pool *pool)
 {
 	struct rxe_pool_entry *elem;
-	u8 *obj;
-	int err;
+	void *obj;
 
-	obj = rxe_alloc_locked(pool);
+	obj = __rxe_alloc_locked(pool);
 	if (!obj)
 		return NULL;
 
 	elem = (struct rxe_pool_entry *)(obj + pool->elem_offset);
+	kref_init(&elem->ref_cnt);
+
+	return obj;
+}
+
+void *rxe_alloc_with_key_locked(struct rxe_pool *pool, void *key)
+{
+	struct rxe_pool_entry *elem;
+	void *obj;
+	int err;
+
+	obj = __rxe_alloc_locked(pool);
+	if (!obj)
+		return NULL;
+
+	elem = (struct rxe_pool_entry *)((u8 *)obj + pool->elem_offset);
 	memcpy((u8 *)elem + pool->key.key_offset, key, pool->key.key_size);
 	err = rxe_insert_key(pool, elem);
 	if (err) {
 		kfree(obj);
 		goto out_cnt;
 	}
+
+	kref_init(&elem->ref_cnt);
 
 	return obj;
 
@@ -351,14 +367,15 @@ void *rxe_alloc_with_key(struct rxe_pool *pool, void *key)
 
 int __rxe_add_to_pool(struct rxe_pool *pool, struct rxe_pool_entry *elem)
 {
+	unsigned long flags;
 	int err;
 
+	write_lock_irqsave(&pool->pool_lock, flags);
 	if (atomic_inc_return(&pool->num_elem) > pool->max_elem)
 		goto out_cnt;
 
 	elem->pool = pool;
 	elem->obj = (u8 *)elem - pool->elem_offset;
-	kref_init(&elem->ref_cnt);
 
 	if (pool->flags & RXE_POOL_INDEX) {
 		err = rxe_add_index(elem);
@@ -366,10 +383,14 @@ int __rxe_add_to_pool(struct rxe_pool *pool, struct rxe_pool_entry *elem)
 			goto out_cnt;
 	}
 
+	kref_init(&elem->ref_cnt);
+	write_unlock_irqrestore(&pool->pool_lock, flags);
+
 	return 0;
 
 out_cnt:
 	atomic_dec(&pool->num_elem);
+	write_unlock_irqrestore(&pool->pool_lock, flags);
 	return -EINVAL;
 }
 
@@ -401,7 +422,7 @@ void *rxe_pool_get_index_locked(struct rxe_pool *pool, u32 index)
 {
 	struct rb_node *node;
 	struct rxe_pool_entry *elem;
-	void *obj;
+	void *obj = NULL;
 
 	node = pool->index.tree.rb_node;
 
@@ -416,12 +437,8 @@ void *rxe_pool_get_index_locked(struct rxe_pool *pool, u32 index)
 			break;
 	}
 
-	if (node) {
-		kref_get(&elem->ref_cnt);
+	if (node && kref_get_unless_zero(&elem->ref_cnt))
 		obj = elem->obj;
-	} else {
-		obj = NULL;
-	}
 
 	return obj;
 }
@@ -442,7 +459,7 @@ void *rxe_pool_get_key_locked(struct rxe_pool *pool, void *key)
 {
 	struct rb_node *node;
 	struct rxe_pool_entry *elem;
-	void *obj;
+	void *obj = NULL;
 	int cmp;
 
 	node = pool->key.tree.rb_node;
@@ -461,12 +478,8 @@ void *rxe_pool_get_key_locked(struct rxe_pool *pool, void *key)
 			break;
 	}
 
-	if (node) {
-		kref_get(&elem->ref_cnt);
+	if (node && kref_get_unless_zero(&elem->ref_cnt))
 		obj = elem->obj;
-	} else {
-		obj = NULL;
-	}
 
 	return obj;
 }
