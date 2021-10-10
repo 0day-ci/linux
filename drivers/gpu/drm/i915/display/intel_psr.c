@@ -1054,6 +1054,12 @@ void intel_psr_get_config(struct intel_encoder *encoder,
 	pipe_config->has_psr2 = intel_dp->psr.psr2_enabled;
 	pipe_config->infoframes.enable |= intel_hdmi_infoframe_enable(DP_SDP_VSC);
 
+	if (HAS_PANEL_REPLAY(dev_priv) && HAS_DP20(dev_priv)) {
+		val = intel_de_read(dev_priv, TRANS_DP2_CTL(intel_dp->psr.transcoder));
+		if (val & TRANS_DP2_PANEL_REPLAY_ENABLE)
+			pipe_config->has_panel_replay = true;
+	}
+
 	if (!intel_dp->psr.psr2_enabled)
 		goto unlock;
 
