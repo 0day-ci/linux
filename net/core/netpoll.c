@@ -682,7 +682,7 @@ int netpoll_setup(struct netpoll *np)
 	}
 
 	if (!netif_running(ndev)) {
-		unsigned long atmost, atleast;
+		unsigned long atmost, atleast, start;
 
 		np_info(np, "device %s not up yet, forcing it\n", np->dev_name);
 
@@ -694,14 +694,15 @@ int netpoll_setup(struct netpoll *np)
 		}
 
 		rtnl_unlock();
-		atleast = jiffies + HZ/10;
-		atmost = jiffies + carrier_timeout * HZ;
+		start = jiffies;
+		atleast = start + msecs_to_jiffies(MSEC_PER_SEC / 10);
+		atmost = start + msecs_to_jiffies(carrier_timeout * MSEC_PER_SEC);
 		while (!netif_carrier_ok(ndev)) {
 			if (time_after(jiffies, atmost)) {
 				np_notice(np, "timeout waiting for carrier\n");
 				break;
 			}
-			msleep(1);
+			usleep_range(USEC_PER_MSEC, 2 * USEC_PER_MSEC);
 		}
 
 		/* If carrier appears to come up instantly, we don't
@@ -710,8 +711,9 @@ int netpoll_setup(struct netpoll *np)
 		 */
 
 		if (time_before(jiffies, atleast)) {
-			np_notice(np, "carrier detect appears untrustworthy, waiting 4 seconds\n");
-			msleep(4000);
+			np_notice(np, "carrier detect appears untrustworthy, waiting %d seconds\n",
+				  carrier_timeout);
+			msleep(carrier_timeout * MSEC_PER_SEC);
 		}
 		rtnl_lock();
 	}
