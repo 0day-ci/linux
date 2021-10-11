@@ -372,7 +372,7 @@ struct tcpm_port {
 	struct kthread_work enable_frs;
 	struct hrtimer send_discover_timer;
 	struct kthread_work send_discover_work;
-	bool state_machine_running;
+	bool state_machine_pending_or_running;
 	/* Set to true when VDM State Machine has following actions. */
 	bool vdm_sm_running;
 
@@ -1194,6 +1194,7 @@ static void mod_tcpm_delayed_work(struct tcpm_port *port, unsigned int delay_ms)
 	} else {
 		hrtimer_cancel(&port->state_machine_timer);
 		kthread_queue_work(port->wq, &port->state_machine);
+		port->state_machine_pending_or_running = true;
 	}
 }
 
@@ -1252,7 +1253,7 @@ static void tcpm_set_state(struct tcpm_port *port, enum tcpm_state state,
 		 * tcpm_state_machine_work() will continue running the state
 		 * machine.
 		 */
-		if (!port->state_machine_running)
+		if (!port->state_machine_pending_or_running)
 			mod_tcpm_delayed_work(port, 0);
 	}
 }
@@ -4805,13 +4806,15 @@ static void tcpm_state_machine_work(struct kthread_work *work)
 	enum tcpm_state prev_state;
 
 	mutex_lock(&port->lock);
-	port->state_machine_running = true;
 
 	if (port->queued_message && tcpm_send_queued_message(port))
 		goto done;
 
 	/* If we were queued due to a delayed state change, update it now */
 	if (port->delayed_state) {
+		if (ktime_before(ktime_get(), port->delayed_runtime))
+			goto done;
+
 		tcpm_log(port, "state change %s -> %s [delayed %ld ms]",
 			 tcpm_states[port->state],
 			 tcpm_states[port->delayed_state], port->delay_ms);
@@ -4832,7 +4835,7 @@ static void tcpm_state_machine_work(struct kthread_work *work)
 	} while (port->state != prev_state && !port->delayed_state);
 
 done:
-	port->state_machine_running = false;
+	port->state_machine_pending_or_running = false;
 	mutex_unlock(&port->lock);
 }
 
@@ -6296,6 +6299,7 @@ static enum hrtimer_restart state_machine_timer_handler(struct hrtimer *timer)
 	struct tcpm_port *port = container_of(timer, struct tcpm_port, state_machine_timer);
 
 	kthread_queue_work(port->wq, &port->state_machine);
+	port->state_machine_pending_or_running = true;
 	return HRTIMER_NORESTART;
 }
 
