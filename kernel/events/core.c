@@ -3730,6 +3730,8 @@ static int merge_sched_in(struct perf_event *event, void *data)
 			perf_event_set_state(event, PERF_EVENT_STATE_ERROR);
 		}
 
+		perf_set_shadow_time(event, ctx);
+
 		*can_add_hw = 0;
 		ctx->rotate_necessary = 1;
 		perf_mux_hrtimer_restart(cpuctx);
