@@ -1316,6 +1316,11 @@ static void spinand_mtd_resume(struct mtd_info *mtd)
 	int ret;
 
 	spinand->reg_proto = SPINAND_SINGLE_STR;
+	/*
+	 * PoR Reset (if available by the manufacturer) is performed at the suspend
+	 * time. Hence, those flashes remain in power-on-state at this point, in a
+	 * standard SPI IO mode. So, now the core unanimously performs a soft reset.
+	 */
 	ret = spinand_reset_op(spinand);
 	if (ret)
 		return;
@@ -1325,6 +1330,21 @@ static void spinand_mtd_resume(struct mtd_info *mtd)
 		return;
 
 	spinand_ecc_enable(spinand, false);
+}
+
+static int spinand_mtd_suspend(struct mtd_info *mtd)
+{
+	struct spinand_device *spinand = mtd_to_spinand(mtd);
+	int ret;
+
+	if (!(spinand->flags & SPINAND_HAS_POR_CMD_BIT))
+		return 0;
+
+	ret = spinand_power_on_rst_op(spinand);
+	if (ret)
+		dev_err(&spinand->spimem->spi->dev, "suspend() failed\n");
+
+	return ret;
 }
 
 static int spinand_init(struct spinand_device *spinand)
@@ -1399,6 +1419,7 @@ static int spinand_init(struct spinand_device *spinand)
 	mtd->_erase = spinand_mtd_erase;
 	mtd->_max_bad_blocks = nanddev_mtd_max_bad_blocks;
 	mtd->_resume = spinand_mtd_resume;
+	mtd->_suspend = spinand_mtd_suspend;
 
 	if (nand->ecc.engine) {
 		ret = mtd_ooblayout_count_freebytes(mtd);
