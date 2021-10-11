@@ -8,6 +8,11 @@
 #include "mac.h"
 #include "eeprom.h"
 
+static int fw_debug = 0;
+module_param(fw_debug, int, 0644);
+MODULE_PARM_DESC(fw_debug,
+		 "Set to 1 to enable FW debugging on startup.");
+
 struct mt7915_patch_hdr {
 	char build_date[16];
 	char platform[4];
@@ -3011,7 +3016,19 @@ int mt7915_mcu_init(struct mt7915_dev *dev)
 		return ret;
 
 	set_bit(MT76_STATE_MCU_RUNNING, &dev->mphy.state);
-	mt7915_mcu_fw_log_2_host(dev, 0);
+	if (fw_debug) {
+		enum mt_debug debug;
+
+		/* enable debugging on bootup */
+		dev->fw_debug = 1;
+		mt7915_mcu_fw_log_2_host(dev, 2);
+		for (debug = DEBUG_TXCMD; debug <= DEBUG_RPT_RX; debug++)
+			mt7915_mcu_fw_dbg_ctrl(dev, debug, dev->fw_debug);
+	}
+	else {
+		mt7915_mcu_fw_log_2_host(dev, 0);
+	}
+
 	mt7915_mcu_set_mwds(dev, 1);
 	mt7915_mcu_wa_cmd(dev, MCU_WA_PARAM_CMD(SET), MCU_WA_PARAM_RED, 0, 0);
 

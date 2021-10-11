@@ -1126,6 +1126,14 @@ enum {
 	MT_BF_MODULE_UPDATE = 25
 };
 
+enum mt_debug {
+	DEBUG_TXCMD = 62,
+	DEBUG_CMD_RPT_TX,
+	DEBUG_CMD_RPT_TRIG,
+	DEBUG_SPL,
+	DEBUG_RPT_RX,
+};
+
 #define MT7915_WTBL_UPDATE_MAX_SIZE	(sizeof(struct wtbl_req_hdr) +	\
 					 sizeof(struct wtbl_generic) +	\
 					 sizeof(struct wtbl_rx) +	\
