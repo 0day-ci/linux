@@ -30,6 +30,15 @@ config ARM_PL172_MPMC
 	  If you have an embedded system with an AMBA bus and a PL172
 	  controller, say Y or M here.
 
+config APPLE_MCC
+	tristate "Apple SoC MCC driver"
+	default y if ARCH_APPLE
+	select PM_GENERIC_DOMAINS
+	depends on ARCH_APPLE || COMPILE_TEST
+	help
+	  This driver manages performance tuning for the memory controller in
+	  Apple SoCs, such as the Apple M1.
+
 config ATMEL_SDRAMC
 	bool "Atmel (Multi-port DDR-)SDRAM Controller"
 	default y if ARCH_AT91
