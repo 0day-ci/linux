@@ -2277,6 +2277,7 @@ static inline void pqi_mask_device(u8 *scsi3addr)
 static inline bool pqi_is_device_with_sas_address(struct pqi_scsi_dev *device)
 {
 	switch (device->device_type) {
+	case SA_DEVICE_TYPE_SATA:
 	case SA_DEVICE_TYPE_SAS:
 	case SA_DEVICE_TYPE_EXPANDER_SMP:
 	case SA_DEVICE_TYPE_SES:
