@@ -287,6 +287,7 @@ static int regcache_rbtree_insert_to_block(struct regmap *map,
 				   GFP_KERNEL);
 		if (!present) {
 			kfree(blk);
+			rbnode->block = NULL;
 			return -ENOMEM;
 		}
 
