@@ -11517,13 +11517,6 @@ void unregister_fair_sched_group(struct task_group *tg)
 		if (tg->se[cpu])
 			remove_entity_load_avg(tg->se[cpu]);
 
-		/*
-		 * Only empty task groups can be destroyed; so we can speculatively
-		 * check on_list without danger of it being re-added.
-		 */
-		if (!tg->cfs_rq[cpu]->on_list)
-			continue;
-
 		rq = cpu_rq(cpu);
 
 		raw_spin_rq_lock_irqsave(rq, flags);
