@@ -3694,8 +3694,8 @@ struct sctp_chunk *sctp_make_strreset_req(
 	struct sctp_chunk *retval;
 	__u16 outlen, inlen;
 
-	outlen = (sizeof(outreq) + stream_len) * out;
-	inlen = (sizeof(inreq) + stream_len) * in;
+	outlen = (sizeof(outreq) + SCTP_PAD4(stream_len)) * out;
+	inlen = (sizeof(inreq) + SCTP_PAD4(stream_len)) * in;
 
 	retval = sctp_make_reconf(asoc, outlen + inlen);
 	if (!retval)
