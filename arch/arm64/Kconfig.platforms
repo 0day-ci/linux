@@ -30,6 +30,8 @@ config ARCH_ALPINE
 config ARCH_APPLE
 	bool "Apple Silicon SoC family"
 	select APPLE_AIC
+	select MEMORY
+	select APPLE_MCC
 	help
 	  This enables support for Apple's in-house ARM SoC family, starting
 	  with the Apple M1.
