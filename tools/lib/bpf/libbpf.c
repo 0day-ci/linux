@@ -285,7 +285,8 @@ struct bpf_program {
 	size_t sub_insn_off;
 
 	char *name;
-	/* sec_name with / replaced by _; makes recursive pinning
+	/* sec_name (or name when using LIBBPF_STRICT_SEC_NAME)
+	 * with / replaced by _; makes recursive pinning
 	 * in bpf_object__pin_programs easier
 	 */
 	char *pin_name;
@@ -614,7 +615,11 @@ static char *__bpf_program__pin_name(struct bpf_program *prog)
 {
 	char *name, *p;
 
-	name = p = strdup(prog->sec_name);
+	if (libbpf_mode & LIBBPF_STRICT_SEC_NAME)
+		name = p = strdup(prog->name);
+	else
+		name = p = strdup(prog->sec_name);
+
 	while ((p = strchr(p, '/')))
 		*p = '_';
 
