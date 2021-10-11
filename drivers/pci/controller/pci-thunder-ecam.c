@@ -42,7 +42,7 @@ static int handle_ea_bar(u32 e0, int bar, struct pci_bus *bus,
 	if (where_a == 0x4) {
 		addr = bus->ops->map_bus(bus, devfn, bar); /* BAR 0 */
 		if (!addr) {
-			*val = ~0;
+			SET_PCI_ERROR_RESPONSE(val);
 			return PCIBIOS_DEVICE_NOT_FOUND;
 		}
 		v = readl(addr);
@@ -57,7 +57,7 @@ static int handle_ea_bar(u32 e0, int bar, struct pci_bus *bus,
 
 		addr = bus->ops->map_bus(bus, devfn, bar); /* BAR 0 */
 		if (!addr) {
-			*val = ~0;
+			SET_PCI_ERROR_RESPONSE(val);
 			return PCIBIOS_DEVICE_NOT_FOUND;
 		}
 		barl_orig = readl(addr + 0);
@@ -73,7 +73,7 @@ static int handle_ea_bar(u32 e0, int bar, struct pci_bus *bus,
 	if (where_a == 0xc) {
 		addr = bus->ops->map_bus(bus, devfn, bar + 4); /* BAR 1 */
 		if (!addr) {
-			*val = ~0;
+			SET_PCI_ERROR_RESPONSE(val);
 			return PCIBIOS_DEVICE_NOT_FOUND;
 		}
 		v = readl(addr); /* EA entry-3. Base-H */
@@ -105,7 +105,7 @@ static int thunder_ecam_p2_config_read(struct pci_bus *bus, unsigned int devfn,
 
 	addr = bus->ops->map_bus(bus, devfn, where_a);
 	if (!addr) {
-		*val = ~0;
+		SET_PCI_ERROR_RESPONSE(val);
 		return PCIBIOS_DEVICE_NOT_FOUND;
 	}
 
@@ -136,7 +136,7 @@ static int thunder_ecam_config_read(struct pci_bus *bus, unsigned int devfn,
 
 	addr = bus->ops->map_bus(bus, devfn, 0xc);
 	if (!addr) {
-		*val = ~0;
+		SET_PCI_ERROR_RESPONSE(val);
 		return PCIBIOS_DEVICE_NOT_FOUND;
 	}
 
@@ -147,7 +147,7 @@ static int thunder_ecam_config_read(struct pci_bus *bus, unsigned int devfn,
 
 	addr = bus->ops->map_bus(bus, devfn, 8);
 	if (!addr) {
-		*val = ~0;
+		SET_PCI_ERROR_RESPONSE(val);
 		return PCIBIOS_DEVICE_NOT_FOUND;
 	}
 
@@ -177,7 +177,7 @@ static int thunder_ecam_config_read(struct pci_bus *bus, unsigned int devfn,
 
 	addr = bus->ops->map_bus(bus, devfn, 0);
 	if (!addr) {
-		*val = ~0;
+		SET_PCI_ERROR_RESPONSE(val);
 		return PCIBIOS_DEVICE_NOT_FOUND;
 	}
 
@@ -197,7 +197,7 @@ static int thunder_ecam_config_read(struct pci_bus *bus, unsigned int devfn,
 
 		addr = bus->ops->map_bus(bus, devfn, 0x70);
 		if (!addr) {
-			*val = ~0;
+			SET_PCI_ERROR_RESPONSE(val);
 			return PCIBIOS_DEVICE_NOT_FOUND;
 		}
 		/* E_CAP */
@@ -212,7 +212,7 @@ static int thunder_ecam_config_read(struct pci_bus *bus, unsigned int devfn,
 		if (where_a == 0xb0) {
 			addr = bus->ops->map_bus(bus, devfn, where_a);
 			if (!addr) {
-				*val = ~0;
+				SET_PCI_ERROR_RESPONSE(val);
 				return PCIBIOS_DEVICE_NOT_FOUND;
 			}
 			v = readl(addr);
@@ -269,7 +269,7 @@ static int thunder_ecam_config_read(struct pci_bus *bus, unsigned int devfn,
 		if (where_a == 0x70) {
 			addr = bus->ops->map_bus(bus, devfn, where_a);
 			if (!addr) {
-				*val = ~0;
+				SET_PCI_ERROR_RESPONSE(val);
 				return PCIBIOS_DEVICE_NOT_FOUND;
 			}
 			v = readl(addr);
