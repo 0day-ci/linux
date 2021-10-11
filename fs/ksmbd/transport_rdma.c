@@ -549,6 +549,10 @@ static void recv_done(struct ib_cq *cq, struct ib_wc *wc)
 
 	switch (recvmsg->type) {
 	case SMB_DIRECT_MSG_NEGOTIATE_REQ:
+		if (wc->byte_len < sizeof(struct smb_direct_negotiate_req)) {
+			put_empty_recvmsg(t, recvmsg);
+			return;
+		}
 		t->negotiation_requested = true;
 		t->full_packet_received = true;
 		wake_up_interruptible(&t->wait_status);
@@ -556,9 +560,18 @@ static void recv_done(struct ib_cq *cq, struct ib_wc *wc)
 	case SMB_DIRECT_MSG_DATA_TRANSFER: {
 		struct smb_direct_data_transfer *data_transfer =
 			(struct smb_direct_data_transfer *)recvmsg->packet;
-		int data_length = le32_to_cpu(data_transfer->data_length);
+		int data_length;
 		int avail_recvmsg_count, receive_credits;
 
+		if (wc->byte_len < offsetof(struct smb_direct_data_transfer, padding) ||
+		    (le32_to_cpu(data_transfer->data_length) > 0 &&
+		     wc->byte_len < sizeof(struct smb_direct_data_transfer) +
+		     le32_to_cpu(data_transfer->data_length))) {
+			put_empty_recvmsg(t, recvmsg);
+			return;
+		}
+
+		data_length = le32_to_cpu(data_transfer->data_length);
 		if (data_length) {
 			if (t->full_packet_received)
 				recvmsg->first_segment = true;
