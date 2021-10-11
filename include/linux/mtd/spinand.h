@@ -257,6 +257,8 @@ struct spinand_devid {
 /**
  * struct manufacurer_ops - SPI NAND manufacturer specific operations
  * @init: initialize a SPI NAND device
+ * @adjust_op: modify the ops for any variation in their cmd, address, dummy or
+ *	       data phase by the manufacturer
  * @cleanup: cleanup a SPI NAND device
  *
  * Each SPI NAND manufacturer driver should implement this interface so that
@@ -264,6 +266,8 @@ struct spinand_devid {
  */
 struct spinand_manufacturer_ops {
 	int (*init)(struct spinand_device *spinand);
+	void (*adjust_op)(struct spi_mem_op *op,
+			  const enum spinand_proto reg_proto);
 	void (*cleanup)(struct spinand_device *spinand);
 };
 

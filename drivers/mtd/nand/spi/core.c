@@ -61,6 +61,9 @@ static void spinand_patch_op(const struct spinand_device *spinand,
 		op->data.buswidth = op_buswidth;
 		op->data.dtr = op_is_dtr;
 	}
+
+	if (spinand->manufacturer->ops->adjust_op)
+		spinand->manufacturer->ops->adjust_op(op, spinand->reg_proto);
 }
 
 static void spinand_patch_reg_op(const struct spinand_device *spinand,
