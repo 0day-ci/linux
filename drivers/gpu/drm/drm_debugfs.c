@@ -272,9 +272,6 @@ static void drm_debugfs_remove_all_files(struct drm_minor *minor)
 
 void drm_debugfs_cleanup(struct drm_minor *minor)
 {
-	if (!minor->debugfs_root)
-		return;
-
 	drm_debugfs_remove_all_files(minor);
 
 	debugfs_remove_recursive(minor->debugfs_root);
@@ -419,9 +416,6 @@ void drm_debugfs_connector_add(struct drm_connector *connector)
 	struct drm_minor *minor = connector->dev->primary;
 	struct dentry *root;
 
-	if (!minor->debugfs_root)
-		return;
-
 	root = debugfs_create_dir(connector->name, minor->debugfs_root);
 	connector->debugfs_entry = root;
 
@@ -440,9 +434,6 @@ void drm_debugfs_connector_add(struct drm_connector *connector)
 
 void drm_debugfs_connector_remove(struct drm_connector *connector)
 {
-	if (!connector->debugfs_entry)
-		return;
-
 	debugfs_remove_recursive(connector->debugfs_entry);
 
 	connector->debugfs_entry = NULL;
