@@ -10,6 +10,7 @@
 
 #ifdef PPC64_ELF_ABI_v1
 #define HAVE_DEREFERENCE_FUNCTION_DESCRIPTOR 1
+typedef struct ppc64_opd_entry funct_descr_t;
 #endif
 
 #include <asm-generic/sections.h>

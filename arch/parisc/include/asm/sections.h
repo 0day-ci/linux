@@ -4,6 +4,7 @@
 
 #ifdef CONFIG_64BIT
 #define HAVE_DEREFERENCE_FUNCTION_DESCRIPTOR 1
+typedef Elf64_Fdesc funct_descr_t;
 #endif
 
 /* nothing to see, move along */

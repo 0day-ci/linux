@@ -8,6 +8,7 @@
  */
 
 #define HAVE_DEREFERENCE_FUNCTION_DESCRIPTOR 1
+typedef struct fdesc funct_descr_t;
 
 #include <linux/elf.h>
 #include <linux/uaccess.h>
