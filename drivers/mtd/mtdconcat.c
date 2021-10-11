@@ -561,25 +561,32 @@ static void concat_sync(struct mtd_info *mtd)
 
 static int concat_suspend(struct mtd_info *mtd)
 {
+	struct mtd_info *master = mtd_get_master(mtd);
 	struct mtd_concat *concat = CONCAT(mtd);
 	int i, rc = 0;
 
 	for (i = 0; i < concat->num_subdev; i++) {
 		struct mtd_info *subdev = concat->subdev[i];
-		if ((rc = mtd_suspend(subdev)) < 0)
+
+		down_write(&master->master.suspend_lock);
+		if ((rc = __mtd_suspend(subdev)) < 0)
 			return rc;
+		up_write(&master->master.suspend_lock);
 	}
 	return rc;
 }
 
 static void concat_resume(struct mtd_info *mtd)
 {
+	struct mtd_info *master = mtd_get_master(mtd);
 	struct mtd_concat *concat = CONCAT(mtd);
 	int i;
 
 	for (i = 0; i < concat->num_subdev; i++) {
 		struct mtd_info *subdev = concat->subdev[i];
-		mtd_resume(subdev);
+		down_write(&master->master.suspend_lock);
+		__mtd_resume(subdev);
+		up_write(&master->master.suspend_lock);
 	}
 }
 
