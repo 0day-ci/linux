@@ -30,6 +30,10 @@ static const int phy_10_features_array[] = {
 #define   ADIN_CRSM_SFT_PD_RDY			BIT(1)
 #define   ADIN_CRSM_SYS_RDY			BIT(0)
 
+#define ADIN_AN_PHY_INST_STATUS			0x8030
+#define   ADIN_IS_CFG_SLV			BIT(2)
+#define   ADIN_IS_CFG_MST			BIT(3)
+
 /**
  * struct adin_priv - ADIN PHY driver private data
  * tx_level_2v4_able		set if the PHY supports 2.4V TX levels (10BASE-T1L)
@@ -88,6 +92,7 @@ static int adin_read_lpa(struct phy_device *phydev)
 static int adin_read_status(struct phy_device *phydev)
 {
 	int ret;
+	int cfg;
 
 	ret = genphy_c45_read_link(phydev);
 	if (ret)
@@ -97,6 +102,8 @@ static int adin_read_status(struct phy_device *phydev)
 	phydev->duplex = DUPLEX_UNKNOWN;
 	phydev->pause = 0;
 	phydev->asym_pause = 0;
+	phydev->master_slave_get = MASTER_SLAVE_CFG_UNKNOWN;
+	phydev->master_slave_state = MASTER_SLAVE_STATE_UNKNOWN;
 
 	if (phydev->autoneg == AUTONEG_ENABLE) {
 		ret = adin_read_lpa(phydev);
@@ -111,7 +118,37 @@ static int adin_read_status(struct phy_device *phydev)
 		phydev->duplex = DUPLEX_FULL;
 	}
 
-	return ret;
+	ret = phy_read_mmd(phydev, MDIO_MMD_AN, MDIO_AN_T1_ADV_L);
+	if (ret < 0)
+		return ret;
+
+	cfg = phy_read_mmd(phydev, MDIO_MMD_AN, MDIO_AN_T1_ADV_M);
+	if (cfg < 0)
+		return cfg;
+
+	if (ret & MDIO_AN_T1_ADV_L_FORCE_MS) {
+		if (cfg & MDIO_AN_T1_ADV_M_MST)
+			phydev->master_slave_get = MASTER_SLAVE_CFG_MASTER_FORCE;
+		else
+			phydev->master_slave_get = MASTER_SLAVE_CFG_SLAVE_FORCE;
+	} else {
+		if (cfg & MDIO_AN_T1_ADV_M_MST)
+			phydev->master_slave_get = MASTER_SLAVE_CFG_MASTER_PREFERRED;
+		else
+			phydev->master_slave_get = MASTER_SLAVE_CFG_SLAVE_PREFERRED;
+	}
+
+	ret = phy_read_mmd(phydev, MDIO_MMD_AN, ADIN_AN_PHY_INST_STATUS);
+	if (ret < 0)
+		return ret;
+
+	if (ret & ADIN_IS_CFG_SLV)
+		phydev->master_slave_state = MASTER_SLAVE_STATE_SLAVE;
+
+	if (ret & ADIN_IS_CFG_MST)
+		phydev->master_slave_state = MASTER_SLAVE_STATE_MASTER;
+
+	return 0;
 }
 
 static int adin_config_aneg(struct phy_device *phydev)
@@ -124,6 +161,41 @@ static int adin_config_aneg(struct phy_device *phydev)
 	 */
 	if (phydev->autoneg == AUTONEG_DISABLE)
 		return 0;
+
+	switch (phydev->master_slave_set) {
+	case MASTER_SLAVE_CFG_MASTER_FORCE:
+	case MASTER_SLAVE_CFG_SLAVE_FORCE:
+		ret = phy_set_bits_mmd(phydev, MDIO_MMD_AN, MDIO_AN_T1_ADV_L,
+				       MDIO_AN_T1_ADV_L_FORCE_MS);
+		if (ret < 0)
+			return ret;
+		break;
+	case MASTER_SLAVE_CFG_MASTER_PREFERRED:
+	case MASTER_SLAVE_CFG_SLAVE_PREFERRED:
+		ret = phy_clear_bits_mmd(phydev, MDIO_MMD_AN, MDIO_AN_T1_ADV_L,
+					 MDIO_AN_T1_ADV_L_FORCE_MS);
+		break;
+	default:
+		break;
+	}
+
+	switch (phydev->master_slave_set) {
+	case MASTER_SLAVE_CFG_MASTER_FORCE:
+	case MASTER_SLAVE_CFG_MASTER_PREFERRED:
+		ret = phy_set_bits_mmd(phydev, MDIO_MMD_AN, MDIO_AN_T1_ADV_M, MDIO_AN_T1_ADV_M_MST);
+		if (ret < 0)
+			return ret;
+		break;
+	case MASTER_SLAVE_CFG_SLAVE_FORCE:
+	case MASTER_SLAVE_CFG_SLAVE_PREFERRED:
+		ret = phy_clear_bits_mmd(phydev, MDIO_MMD_AN, MDIO_AN_T1_ADV_M,
+					 MDIO_AN_T1_ADV_M_MST);
+		if (ret < 0)
+			return ret;
+		break;
+	default:
+		break;
+	}
 
 	/* Request increased transmit level from LP. */
 	if (priv->tx_level_prop_present && priv->tx_level_2v4) {
