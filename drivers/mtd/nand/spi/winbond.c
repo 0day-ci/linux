@@ -16,6 +16,13 @@
 
 #define WINBOND_CFG_BUF_READ		BIT(3)
 
+#define WINBOND_BLK_ERASE_OPCODE	0xD8
+#define WINBOND_PAGE_READ_OPCODE	0x13
+#define WINBOND_PROG_EXEC_OPCODE	0x10
+#define WINBOND_READ_REG_OPCODE_1	0x05
+#define WINBOND_READ_REG_OPCODE_2	0x0F
+#define WINBOND_READ_VCR_OPCODE		0x85
+
 /* Octal DTR SPI mode (8D-8D-8D) with Data Strobe output*/
 #define WINBOND_IO_MODE_VCR_OCTAL_DTR	0xE7
 #define WINBOND_IO_MODE_VCR_ADDR	0x00
@@ -197,9 +204,47 @@ static int winbond_spinand_octal_dtr_enable(struct spinand_device *spinand)
 	return 0;
 }
 
+static void winbond_spinand_adjust_op(struct spi_mem_op *op,
+				      const enum spinand_proto reg_proto)
+{
+	/*
+	 * To support both 1 byte opcode and 2 byte opcodes, extract the MSB
+	 * byte from the opcode as the LSB byte in 2 byte opcode is treated as
+	 * don't care.
+	 */
+	u8 opcode = op->cmd.opcode >> (8 * (op->cmd.nbytes - 1));
+
+	if (reg_proto == SPINAND_OCTAL_DTR) {
+		switch (opcode) {
+		case WINBOND_READ_REG_OPCODE_1:
+		case WINBOND_READ_REG_OPCODE_2:
+			op->dummy.nbytes = 14;
+			op->dummy.buswidth = 8;
+			op->dummy.dtr = true;
+			return;
+
+		case WINBOND_READ_VCR_OPCODE:
+			op->dummy.nbytes = 16;
+			op->dummy.buswidth = 8;
+			op->dummy.dtr = true;
+			return;
+
+		case WINBOND_BLK_ERASE_OPCODE:
+		case WINBOND_PAGE_READ_OPCODE:
+		case WINBOND_PROG_EXEC_OPCODE:
+			op->addr.nbytes = 2;
+			return;
+
+		default:
+			return;
+		}
+	}
+}
+
 static const struct spinand_manufacturer_ops winbond_spinand_manuf_ops = {
 	.init = winbond_spinand_init,
 	.octal_dtr_enable = winbond_spinand_octal_dtr_enable,
+	.adjust_op = winbond_spinand_adjust_op,
 };
 
 const struct spinand_manufacturer winbond_spinand_manufacturer = {
