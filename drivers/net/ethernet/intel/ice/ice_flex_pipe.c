@@ -1707,6 +1707,26 @@ static struct ice_buf_build *ice_pkg_buf_alloc(struct ice_hw *hw)
 }
 
 /**
+ * ice_get_sw_prof_type - determine switch profile type
+ * @hw: pointer to the HW structure
+ * @fv: pointer to the switch field vector
+ */
+static enum ice_prof_type
+ice_get_sw_prof_type(struct ice_hw *hw, struct ice_fv *fv)
+{
+	u16 i;
+
+	for (i = 0; i < hw->blk[ICE_BLK_SW].es.fvw; i++) {
+		/* UDP tunnel will have UDP_OF protocol ID and VNI offset */
+		if (fv->ew[i].prot_id == (u8)ICE_PROT_UDP_OF &&
+		    fv->ew[i].off == ICE_VNI_OFFSET)
+			return ICE_PROF_TUN_UDP;
+	}
+
+	return ICE_PROF_NON_TUN;
+}
+
+/**
  * ice_get_sw_fv_bitmap - Get switch field vector bitmap based on profile type
  * @hw: pointer to hardware structure
  * @req_profs: type of profiles requested
@@ -1737,7 +1757,7 @@ ice_get_sw_fv_bitmap(struct ice_hw *hw, enum ice_prof_type req_profs,
 		ice_seg = NULL;
 
 		if (fv) {
-			prof_type = ICE_PROF_NON_TUN;
+			prof_type = ice_get_sw_prof_type(hw, fv);
 
 			if (req_profs & prof_type)
 				set_bit((u16)offset, bm);
