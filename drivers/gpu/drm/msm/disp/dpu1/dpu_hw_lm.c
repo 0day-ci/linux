@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
-/* Copyright (c) 2015-2018, The Linux Foundation. All rights reserved.
+/*
+ * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
  */
 
 #include "dpu_kms.h"
@@ -23,6 +24,9 @@
 
 #define LM_BLEND0_FG_ALPHA               0x04
 #define LM_BLEND0_BG_ALPHA               0x08
+
+#define LM_MISR_CTRL                     0x310
+#define LM_MISR_SIGNATURE                0x314
 
 static const struct dpu_lm_cfg *_lm_offset(enum dpu_lm mixer,
 		const struct dpu_mdss_cfg *m,
@@ -96,6 +100,44 @@ static void dpu_hw_lm_setup_border_color(struct dpu_hw_mixer *ctx,
 	}
 }
 
+static void dpu_hw_lm_setup_misr(struct dpu_hw_mixer *ctx, bool enable, u32 frame_count)
+{
+	struct dpu_hw_blk_reg_map *c = &ctx->hw;
+	u32 config = 0;
+
+	DPU_REG_WRITE(c, LM_MISR_CTRL, MISR_CTRL_STATUS_CLEAR);
+
+	/* Clear MISR data */
+	wmb();
+
+	if (enable)
+		config = (frame_count & MISR_FRAME_COUNT_MASK) |
+			MISR_CTRL_ENABLE | INTF_MISR_CTRL_FREE_RUN_MASK;
+
+	DPU_REG_WRITE(c, LM_MISR_CTRL, config);
+}
+
+static int dpu_hw_lm_collect_misr(struct dpu_hw_mixer *ctx, u32 *misr_value)
+{
+	struct dpu_hw_blk_reg_map *c = &ctx->hw;
+	u32 ctrl = 0;
+
+	if (!misr_value)
+		return -EINVAL;
+
+	ctrl = DPU_REG_READ(c, LM_MISR_CTRL);
+
+	if (!(ctrl & MISR_CTRL_ENABLE))
+		return -EINVAL;
+
+	if (!(ctrl & MISR_CTRL_STATUS))
+		return -EINVAL;
+
+	*misr_value = DPU_REG_READ(c, LM_MISR_SIGNATURE);
+
+	return 0;
+}
+
 static void dpu_hw_lm_setup_blend_config_sdm845(struct dpu_hw_mixer *ctx,
 	u32 stage, u32 fg_alpha, u32 bg_alpha, u32 blend_op)
 {
@@ -158,6 +200,8 @@ static void _setup_mixer_ops(const struct dpu_mdss_cfg *m,
 		ops->setup_blend_config = dpu_hw_lm_setup_blend_config;
 	ops->setup_alpha_out = dpu_hw_lm_setup_color3;
 	ops->setup_border_color = dpu_hw_lm_setup_border_color;
+	ops->setup_misr = dpu_hw_lm_setup_misr;
+	ops->collect_misr = dpu_hw_lm_collect_misr;
 }
 
 struct dpu_hw_mixer *dpu_hw_lm_init(enum dpu_lm idx,
