@@ -8153,6 +8153,11 @@ unsigned long free_reserved_area(void *start, void *end, int poison, const char 
 	if (pages && s)
 		pr_info("Freeing %s memory: %ldK\n", s, K(pages));
 
+#ifdef CONFIG_HAVE_MEMBLOCK
+		pr_debug("%#016llx-%#016llx %pS\n",
+			__pa(start), __pa(end), (void *)_RET_IP_);
+#endif
+
 	return pages;
 }
 
