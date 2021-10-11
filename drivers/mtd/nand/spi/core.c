@@ -63,12 +63,29 @@ static void spinand_patch_op(const struct spinand_device *spinand,
 	}
 }
 
+static void spinand_patch_reg_op(const struct spinand_device *spinand,
+				 struct spi_mem_op *op)
+{
+	if (spinand->reg_proto == SPINAND_OCTAL_DTR) {
+		/*
+		 * Assigning same first and second byte will result in constant
+		 * bits on the SPI bus between positive and negative clock edges
+		 */
+		op->addr.val = (op->addr.val << 8) | op->addr.val;
+		op->addr.nbytes = 2;
+		op->data.nbytes = 2;
+	}
+
+	spinand_patch_op(spinand, op);
+}
+
 static int spinand_read_reg_op(struct spinand_device *spinand, u8 reg, u8 *val)
 {
 	struct spi_mem_op op = SPINAND_GET_FEATURE_OP(reg,
 						      spinand->scratchbuf);
 	int ret;
 
+	spinand_patch_reg_op(spinand, &op);
 	ret = spi_mem_exec_op(spinand->spimem, &op);
 	if (ret)
 		return ret;
@@ -82,7 +99,8 @@ static int spinand_write_reg_op(struct spinand_device *spinand, u8 reg, u8 val)
 	struct spi_mem_op op = SPINAND_SET_FEATURE_OP(reg,
 						      spinand->scratchbuf);
 
-	*spinand->scratchbuf = val;
+	spinand_patch_reg_op(spinand, &op);
+	memset(spinand->scratchbuf, val, op.data.nbytes);
 	return spi_mem_exec_op(spinand->spimem, &op);
 }
 
@@ -547,6 +565,7 @@ static int spinand_wait(struct spinand_device *spinand,
 	u8 status;
 	int ret;
 
+	spinand_patch_reg_op(spinand, &op);
 	ret = spi_mem_poll_status(spinand->spimem, &op, STATUS_BUSY, 0,
 				  initial_delay_us,
 				  poll_delay_us,
