@@ -561,6 +561,7 @@ static int msi_capability_init(struct pci_dev *dev, int nvec,
 	dev->msi_irq_groups = msi_populate_sysfs(&dev->dev);
 	if (IS_ERR(dev->msi_irq_groups)) {
 		ret = PTR_ERR(dev->msi_irq_groups);
+		dev->msi_irq_groups = NULL;
 		goto err;
 	}
 
@@ -733,6 +734,7 @@ static int msix_capability_init(struct pci_dev *dev, struct msix_entry *entries,
 	dev->msi_irq_groups = msi_populate_sysfs(&dev->dev);
 	if (IS_ERR(dev->msi_irq_groups)) {
 		ret = PTR_ERR(dev->msi_irq_groups);
+		dev->msi_irq_groups = NULL;
 		goto out_free;
 	}
 
