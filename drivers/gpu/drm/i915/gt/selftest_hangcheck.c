@@ -734,7 +734,8 @@ static int __igt_reset_engine(struct intel_gt *gt, bool active)
 		reset_engine_count = i915_reset_engine_count(global, engine);
 
 		st_engine_heartbeat_disable(engine);
-		set_bit(I915_RESET_ENGINE + id, &gt->reset.flags);
+		if (!using_guc)
+			set_bit(I915_RESET_ENGINE + id, &gt->reset.flags);
 		count = 0;
 		do {
 			struct i915_request *rq = NULL;
@@ -824,7 +825,8 @@ restore:
 			if (err)
 				break;
 		} while (time_before(jiffies, end_time));
-		clear_bit(I915_RESET_ENGINE + id, &gt->reset.flags);
+		if (!using_guc)
+			clear_bit(I915_RESET_ENGINE + id, &gt->reset.flags);
 		st_engine_heartbeat_enable(engine);
 		pr_info("%s: Completed %lu %s resets\n",
 			engine->name, count, active ? "active" : "idle");
@@ -1042,7 +1044,8 @@ static int __igt_reset_engines(struct intel_gt *gt,
 		yield(); /* start all threads before we begin */
 
 		st_engine_heartbeat_disable_no_pm(engine);
-		set_bit(I915_RESET_ENGINE + id, &gt->reset.flags);
+		if (!using_guc)
+			set_bit(I915_RESET_ENGINE + id, &gt->reset.flags);
 		do {
 			struct i915_request *rq = NULL;
 			struct intel_selftest_saved_policy saved;
@@ -1165,7 +1168,8 @@ restore:
 			if (err)
 				break;
 		} while (time_before(jiffies, end_time));
-		clear_bit(I915_RESET_ENGINE + id, &gt->reset.flags);
+		if (!using_guc)
+			clear_bit(I915_RESET_ENGINE + id, &gt->reset.flags);
 		st_engine_heartbeat_enable_no_pm(engine);
 
 		pr_info("i915_reset_engine(%s:%s): %lu resets\n",
