@@ -191,8 +191,8 @@ static int ct_register_buffer(struct intel_guc_ct *ct, u32 type,
 	err = guc_action_register_ct_buffer(ct_to_guc(ct), type,
 					    desc_addr, buff_addr, size);
 	if (unlikely(err))
-		CT_ERROR(ct, "Failed to register %s buffer (%pe)\n",
-			 guc_ct_buffer_type_to_str(type), ERR_PTR(err));
+		CT_PROBE_ERROR(ct, "Failed to register %s buffer (%pe)\n",
+			       guc_ct_buffer_type_to_str(type), ERR_PTR(err));
 	return err;
 }
 
