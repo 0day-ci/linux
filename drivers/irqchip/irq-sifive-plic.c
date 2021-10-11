@@ -64,6 +64,7 @@ struct plic_priv {
 	struct cpumask lmask;
 	struct irq_domain *irqdomain;
 	void __iomem *regs;
+	bool claim_mask_support;
 };
 
 struct plic_handler {
@@ -111,7 +112,7 @@ static inline void plic_irq_toggle(const struct cpumask *mask,
 	}
 }
 
-static void plic_irq_unmask(struct irq_data *d)
+static void plic_irq_enable(struct irq_data *d)
 {
 	struct cpumask amask;
 	unsigned int cpu;
@@ -125,7 +126,7 @@ static void plic_irq_unmask(struct irq_data *d)
 	plic_irq_toggle(cpumask_of(cpu), d, 1);
 }
 
-static void plic_irq_mask(struct irq_data *d)
+static void plic_irq_disable(struct irq_data *d)
 {
 	struct plic_priv *priv = irq_data_get_irq_chip_data(d);
 
@@ -168,8 +169,8 @@ static void plic_irq_eoi(struct irq_data *d)
 
 static struct irq_chip plic_chip = {
 	.name		= "SiFive PLIC",
-	.irq_mask	= plic_irq_mask,
-	.irq_unmask	= plic_irq_unmask,
+	.irq_enable	= plic_irq_enable,
+	.irq_disable	= plic_irq_disable,
 	.irq_eoi	= plic_irq_eoi,
 #ifdef CONFIG_SMP
 	.irq_set_affinity = plic_set_affinity,
@@ -180,6 +181,11 @@ static int plic_irqdomain_map(struct irq_domain *d, unsigned int irq,
 			      irq_hw_number_t hwirq)
 {
 	struct plic_priv *priv = d->host_data;
+
+	if (!priv->claim_mask_support) {
+		plic_chip.irq_mask	= plic_irq_disable;
+		plic_chip.irq_unmask	= plic_irq_enable;
+	}
 
 	irq_domain_set_info(d, irq, hwirq, &plic_chip, d->host_data,
 			    handle_fasteoi_irq, NULL, NULL);
@@ -297,6 +303,8 @@ static int __init plic_init(struct device_node *node,
 	nr_contexts = of_irq_count(node);
 	if (WARN_ON(!nr_contexts))
 		goto out_iounmap;
+
+	priv->claim_mask_support = of_property_read_bool(node, "claim-mask-support");
 
 	error = -ENOMEM;
 	priv->irqdomain = irq_domain_add_linear(node, nr_irqs + 1,
