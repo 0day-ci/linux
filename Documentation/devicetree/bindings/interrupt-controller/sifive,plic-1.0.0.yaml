@@ -71,6 +71,8 @@ properties:
     description:
       Specifies how many external interrupts are supported by this controller.
 
+  claim-mask-support: true
+
 required:
   - compatible
   - '#address-cells'
