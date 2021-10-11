@@ -1,0 +1,62 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/opp/apple,mcc-operating-points.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Apple SoC memory controller OPP bindings
+
+maintainers:
+  - Hector Martin <marcan@marcan.st>
+
+description: |
+  Apple SoCs can have their memory controller performance adjusted depending on
+  system requirements. These performance states are represented by specific
+  memory controller register values. The apple-mcc driver uses these values
+  to change the MCC performance.
+
+allOf:
+  - $ref: opp-v2-base.yaml#
+
+properties:
+  compatible:
+    const: apple,mcc-operating-points
+
+required:
+  - compatible
+
+patternProperties:
+  "opp[0-9]+":
+    type: object
+
+    properties:
+      opp-level: true
+      apple,memory-perf-config:
+        $ref: /schemas/types.yaml#/definitions/uint32-array
+        description: |
+          A pair of register values used to configure this performance state.
+        minItems: 2
+        maxItems: 2
+
+    required:
+      - opp-level
+      - apple,memory-perf-config
+
+    unevaluatedProperties: false
+
+additionalProperties: false
+
+examples:
+  - |
+    mcc_opp: opp-table-2 {
+        compatible = "operating-points-v2";
+
+        mcc_lowperf: opp0 {
+            opp-level = <0>;
+            apple,memory-perf-config = <0x813057f 0x1800180>;
+        };
+        mcc_highperf: opp1 {
+            opp-level = <1>;
+            apple,memory-perf-config = <0x133 0x55555340>;
+        };
+    };
