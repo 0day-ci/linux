@@ -8285,11 +8285,9 @@ ice_indr_setup_tc_block(struct net_device *netdev, struct Qdisc *sch,
 	struct ice_indr_block_priv *indr_priv;
 	struct flow_block_cb *block_cb;
 
-	int tunnel_type = 0;
-
-	if (tunnel_type != TNL_VXLAN && tunnel_type != TNL_GENEVE &&
+	if (!ice_is_tunnel_supported(netdev) &&
 	    !(is_vlan_dev(netdev) &&
-	    vlan_dev_real_dev(netdev) == np->vsi->netdev))
+	      vlan_dev_real_dev(netdev) == np->vsi->netdev))
 		return -EOPNOTSUPP;
 
 	if (f->binder_type != FLOW_BLOCK_BINDER_TYPE_CLSACT_INGRESS)
