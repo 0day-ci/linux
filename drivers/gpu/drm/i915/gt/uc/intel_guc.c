@@ -403,6 +403,10 @@ int intel_guc_send_mmio(struct intel_guc *guc, const u32 *request, u32 len,
 	int i;
 	int ret;
 
+	ret = i915_inject_probe_error(i915, -ENXIO);
+	if (ret)
+		return ret;
+
 	GEM_BUG_ON(!len);
 	GEM_BUG_ON(len > guc->send_regs.count);
 
