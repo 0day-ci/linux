@@ -16,9 +16,6 @@ void debugfs_gt_register(struct intel_gt *gt)
 {
 	struct dentry *root;
 
-	if (!gt->i915->drm.primary->debugfs_root)
-		return;
-
 	root = debugfs_create_dir("gt", gt->i915->drm.primary->debugfs_root);
 	if (IS_ERR(root))
 		return;
