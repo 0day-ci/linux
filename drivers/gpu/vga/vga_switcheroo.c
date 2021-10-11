@@ -914,7 +914,7 @@ static void vga_switcheroo_debugfs_fini(struct vgasr_priv *priv)
 static void vga_switcheroo_debugfs_init(struct vgasr_priv *priv)
 {
 	/* already initialised */
-	if (priv->debugfs_root)
+	if (debugfs_lookup("vgaswitcheroo", NULL))
 		return;
 
 	priv->debugfs_root = debugfs_create_dir("vgaswitcheroo", NULL);
