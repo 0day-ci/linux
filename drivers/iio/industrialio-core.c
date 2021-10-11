@@ -466,7 +466,7 @@ static void iio_device_register_debugfs(struct iio_dev *indio_dev)
 	if (indio_dev->info->debugfs_reg_access == NULL)
 		return;
 
-	if (!iio_debugfs_dentry)
+	if (!iio_debugfs_dentry || !dev_name(&indio_dev->dev))
 		return;
 
 	iio_dev_opaque = to_iio_dev_opaque(indio_dev);
