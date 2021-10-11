@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/net/adi,adin1100.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Analog Devices ADIN1100 PHY
+
+maintainers:
+  - Alexandru Tachici <alexandru.tachici@analog.com>
+
+description:
+  Bindings for Analog Devices Industrial Low Power 10BASE-T1L Ethernet PHY
+
+allOf:
+  - $ref: ethernet-phy.yaml#
+
+examples:
+  - |
+    ethernet {
+        #address-cells = <1>;
+        #size-cells = <0>;
+
+        10base-t1l-2.4vpp = <0>;
+
+        ethernet-phy@0 {
+            compatible = "ethernet-phy-id0283.bc81";
+            reg = <0>;
+        };
+    };
