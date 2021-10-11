@@ -399,12 +399,14 @@ int __devm_rtc_register_device(struct module *owner, struct rtc_device *rtc)
 	rtc_dev_prepare(rtc);
 
 	err = cdev_device_add(&rtc->char_dev, &rtc->dev);
-	if (err)
+	if (err) {
 		dev_warn(rtc->dev.parent, "failed to add char device %d:%d\n",
 			 MAJOR(rtc->dev.devt), rtc->id);
-	else
+		return err;
+	} else {
 		dev_dbg(rtc->dev.parent, "char device (%d:%d)\n",
 			MAJOR(rtc->dev.devt), rtc->id);
+	}
 
 	rtc_proc_add_device(rtc);
 
