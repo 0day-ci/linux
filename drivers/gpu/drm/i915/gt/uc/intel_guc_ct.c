@@ -765,6 +765,14 @@ int intel_guc_ct_send(struct intel_guc_ct *ct, const u32 *action, u32 len,
 	u32 status = ~0; /* undefined */
 	int ret;
 
+	ret = i915_inject_probe_error(ct_to_i915(ct), -ENXIO);
+	if (ret)
+		return ret;
+
+	ret = i915_inject_probe_error(ct_to_i915(ct), -EBUSY);
+	if (ret)
+		return ret;
+
 	if (unlikely(!ct->enabled)) {
 		struct intel_guc *guc = ct_to_guc(ct);
 		struct intel_uc *uc = container_of(guc, struct intel_uc, guc);
