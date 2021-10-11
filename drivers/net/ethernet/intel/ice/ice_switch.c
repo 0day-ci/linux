@@ -35,6 +35,105 @@ struct ice_dummy_pkt_offsets {
 	u16 offset; /* ICE_PROTOCOL_LAST indicates end of list */
 };
 
+static const struct ice_dummy_pkt_offsets dummy_udp_tun_tcp_packet_offsets[] = {
+	{ ICE_MAC_OFOS,		0 },
+	{ ICE_ETYPE_OL,		12 },
+	{ ICE_IPV4_OFOS,	14 },
+	{ ICE_UDP_OF,		34 },
+	{ ICE_VXLAN,		42 },
+	{ ICE_GENEVE,		42 },
+	{ ICE_VXLAN_GPE,	42 },
+	{ ICE_MAC_IL,		50 },
+	{ ICE_IPV4_IL,		64 },
+	{ ICE_TCP_IL,		84 },
+	{ ICE_PROTOCOL_LAST,	0 },
+};
+
+static const u8 dummy_udp_tun_tcp_packet[] = {
+	0x00, 0x00, 0x00, 0x00,  /* ICE_MAC_OFOS 0 */
+	0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00,
+
+	0x08, 0x00,		/* ICE_ETYPE_OL 12 */
+
+	0x45, 0x00, 0x00, 0x5a, /* ICE_IPV4_OFOS 14 */
+	0x00, 0x01, 0x00, 0x00,
+	0x40, 0x11, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00,
+
+	0x00, 0x00, 0x12, 0xb5, /* ICE_UDP_OF 34 */
+	0x00, 0x46, 0x00, 0x00,
+
+	0x00, 0x00, 0x65, 0x58, /* ICE_VXLAN 42 */
+	0x00, 0x00, 0x00, 0x00,
+
+	0x00, 0x00, 0x00, 0x00, /* ICE_MAC_IL 50 */
+	0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00,
+	0x08, 0x00,
+
+	0x45, 0x00, 0x00, 0x28, /* ICE_IPV4_IL 64 */
+	0x00, 0x01, 0x00, 0x00,
+	0x40, 0x06, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00,
+
+	0x00, 0x00, 0x00, 0x00, /* ICE_TCP_IL 84 */
+	0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00,
+	0x50, 0x02, 0x20, 0x00,
+	0x00, 0x00, 0x00, 0x00
+};
+
+static const struct ice_dummy_pkt_offsets dummy_udp_tun_udp_packet_offsets[] = {
+	{ ICE_MAC_OFOS,		0 },
+	{ ICE_ETYPE_OL,		12 },
+	{ ICE_IPV4_OFOS,	14 },
+	{ ICE_UDP_OF,		34 },
+	{ ICE_VXLAN,		42 },
+	{ ICE_GENEVE,		42 },
+	{ ICE_VXLAN_GPE,	42 },
+	{ ICE_MAC_IL,		50 },
+	{ ICE_IPV4_IL,		64 },
+	{ ICE_UDP_ILOS,		84 },
+	{ ICE_PROTOCOL_LAST,	0 },
+};
+
+static const u8 dummy_udp_tun_udp_packet[] = {
+	0x00, 0x00, 0x00, 0x00,  /* ICE_MAC_OFOS 0 */
+	0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00,
+
+	0x08, 0x00,		/* ICE_ETYPE_OL 12 */
+
+	0x45, 0x00, 0x00, 0x4e, /* ICE_IPV4_OFOS 14 */
+	0x00, 0x01, 0x00, 0x00,
+	0x00, 0x11, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00,
+
+	0x00, 0x00, 0x12, 0xb5, /* ICE_UDP_OF 34 */
+	0x00, 0x3a, 0x00, 0x00,
+
+	0x00, 0x00, 0x65, 0x58, /* ICE_VXLAN 42 */
+	0x00, 0x00, 0x00, 0x00,
+
+	0x00, 0x00, 0x00, 0x00, /* ICE_MAC_IL 50 */
+	0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00,
+	0x08, 0x00,
+
+	0x45, 0x00, 0x00, 0x1c, /* ICE_IPV4_IL 64 */
+	0x00, 0x01, 0x00, 0x00,
+	0x00, 0x11, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00,
+
+	0x00, 0x00, 0x00, 0x00, /* ICE_UDP_ILOS 84 */
+	0x00, 0x08, 0x00, 0x00,
+};
+
 /* offset info for MAC + IPv4 + UDP dummy packet */
 static const struct ice_dummy_pkt_offsets dummy_udp_packet_offsets[] = {
 	{ ICE_MAC_OFOS,		0 },
@@ -3463,6 +3562,8 @@ static const struct ice_prot_ext_tbl_entry ice_prot_ext[ICE_PROTOCOL_LAST] = {
 	{ ICE_TCP_IL,		{ 0, 2 } },
 	{ ICE_UDP_OF,		{ 0, 2 } },
 	{ ICE_UDP_ILOS,		{ 0, 2 } },
+	{ ICE_VXLAN,		{ 8, 10, 12, 14 } },
+	{ ICE_GENEVE,		{ 8, 10, 12, 14 } },
 };
 
 static struct ice_protocol_entry ice_prot_id_tbl[ICE_PROTOCOL_LAST] = {
@@ -3477,6 +3578,8 @@ static struct ice_protocol_entry ice_prot_id_tbl[ICE_PROTOCOL_LAST] = {
 	{ ICE_TCP_IL,		ICE_TCP_IL_HW },
 	{ ICE_UDP_OF,		ICE_UDP_OF_HW },
 	{ ICE_UDP_ILOS,		ICE_UDP_ILOS_HW },
+	{ ICE_VXLAN,		ICE_UDP_OF_HW },
+	{ ICE_GENEVE,		ICE_UDP_OF_HW },
 };
 
 /**
@@ -4080,6 +4183,7 @@ ice_add_sw_recipe(struct ice_hw *hw, struct ice_sw_recipe *rm,
 		recp->chain_idx = entry->chain_idx;
 		recp->priority = buf[buf_idx].content.act_ctrl_fwd_priority;
 		recp->n_grp_count = rm->n_grp_count;
+		recp->tun_type = rm->tun_type;
 		recp->recp_created = true;
 	}
 	rm->root_buf = buf;
@@ -4160,6 +4264,54 @@ free_mem:
 	return status;
 }
 
+/**
+ * ice_tun_type_match_word - determine if tun type needs a match mask
+ * @tun_type: tunnel type
+ * @mask: mask to be used for the tunnel
+ */
+static bool ice_tun_type_match_word(enum ice_sw_tunnel_type tun_type, u16 *mask)
+{
+	switch (tun_type) {
+	case ICE_SW_TUN_GENEVE:
+	case ICE_SW_TUN_VXLAN:
+		*mask = ICE_TUN_FLAG_MASK;
+		return true;
+
+	default:
+		*mask = 0;
+		return false;
+	}
+}
+
+/**
+ * ice_add_special_words - Add words that are not protocols, such as metadata
+ * @rinfo: other information regarding the rule e.g. priority and action info
+ * @lkup_exts: lookup word structure
+ */
+static enum ice_status
+ice_add_special_words(struct ice_adv_rule_info *rinfo,
+		      struct ice_prot_lkup_ext *lkup_exts)
+{
+	u16 mask;
+
+	/* If this is a tunneled packet, then add recipe index to match the
+	 * tunnel bit in the packet metadata flags.
+	 */
+	if (ice_tun_type_match_word(rinfo->tun_type, &mask)) {
+		if (lkup_exts->n_val_words < ICE_MAX_CHAIN_WORDS) {
+			u8 word = lkup_exts->n_val_words++;
+
+			lkup_exts->fv_words[word].prot_id = ICE_META_DATA_ID_HW;
+			lkup_exts->fv_words[word].off = ICE_TUN_FLAG_MDID_OFF;
+			lkup_exts->field_mask[word] = mask;
+		} else {
+			return ICE_ERR_MAX_LIMIT;
+		}
+	}
+
+	return 0;
+}
+
 /* ice_get_compat_fv_bitmap - Get compatible field vector bitmap for rule
  * @hw: pointer to hardware structure
  * @rinfo: other information regarding the rule e.g. priority and action info
@@ -4169,9 +4321,27 @@ static void
 ice_get_compat_fv_bitmap(struct ice_hw *hw, struct ice_adv_rule_info *rinfo,
 			 unsigned long *bm)
 {
+	enum ice_prof_type prof_type;
+
 	bitmap_zero(bm, ICE_MAX_NUM_PROFILES);
 
-	ice_get_sw_fv_bitmap(hw, ICE_PROF_NON_TUN, bm);
+	switch (rinfo->tun_type) {
+	case ICE_NON_TUN:
+		prof_type = ICE_PROF_NON_TUN;
+		break;
+	case ICE_ALL_TUNNELS:
+		prof_type = ICE_PROF_TUN_ALL;
+		break;
+	case ICE_SW_TUN_GENEVE:
+	case ICE_SW_TUN_VXLAN:
+		prof_type = ICE_PROF_TUN_UDP;
+		break;
+	default:
+		prof_type = ICE_PROF_ALL;
+		break;
+	}
+
+	ice_get_sw_fv_bitmap(hw, prof_type, bm);
 }
 
 /**
@@ -4197,6 +4367,7 @@ ice_add_adv_recipe(struct ice_hw *hw, struct ice_adv_lkup_elem *lkups,
 	enum ice_status status = 0;
 	struct ice_sw_recipe *rm;
 	u16 match_tun_mask = 0;
+	u16 mask;
 	u8 i;
 
 	if (!lkups_cnt)
@@ -4253,6 +4424,10 @@ ice_add_adv_recipe(struct ice_hw *hw, struct ice_adv_lkup_elem *lkups,
 	if (status)
 		goto err_unroll;
 
+	if (ice_tun_type_match_word(rinfo->tun_type, &mask) &&
+	    rm->n_grp_count > 1)
+		match_tun_mask = mask;
+
 	/* set the recipe priority if specified */
 	rm->priority = (u8)rinfo->priority;
 
@@ -4269,6 +4444,13 @@ ice_add_adv_recipe(struct ice_hw *hw, struct ice_adv_lkup_elem *lkups,
 		ice_debug(hw, ICE_DBG_SW, "profile: %d\n", fvit->profile_id);
 		set_bit((u16)fvit->profile_id, profiles);
 	}
+
+	/* Create any special protocol/offset pairs, such as looking at tunnel
+	 * bits by extracting metadata
+	 */
+	status = ice_add_special_words(rinfo, lkup_exts);
+	if (status)
+		goto err_free_lkup_exts;
 
 	/* Look for a recipe which matches our requested fv / mask list */
 	*rid = ice_find_recp(hw, lkup_exts);
@@ -4347,12 +4529,14 @@ err_free_lkup_exts:
  * @lkups: lookup elements or match criteria for the advanced recipe, one
  *	   structure per protocol header
  * @lkups_cnt: number of protocols
+ * @tun_type: tunnel type
  * @pkt: dummy packet to fill according to filter match criteria
  * @pkt_len: packet length of dummy packet
  * @offsets: pointer to receive the pointer to the offsets for the packet
  */
 static void
 ice_find_dummy_packet(struct ice_adv_lkup_elem *lkups, u16 lkups_cnt,
+		      enum ice_sw_tunnel_type tun_type,
 		      const u8 **pkt, u16 *pkt_len,
 		      const struct ice_dummy_pkt_offsets **offsets)
 {
@@ -4374,6 +4558,21 @@ ice_find_dummy_packet(struct ice_adv_lkup_elem *lkups, u16 lkups_cnt,
 			 lkups[i].m_u.ethertype.ethtype_id ==
 					cpu_to_be16(0xFFFF))
 			ipv6 = true;
+	}
+
+	if (tun_type == ICE_SW_TUN_VXLAN ||
+	    tun_type == ICE_SW_TUN_GENEVE) {
+		if (tcp) {
+			*pkt = dummy_udp_tun_tcp_packet;
+			*pkt_len = sizeof(dummy_udp_tun_tcp_packet);
+			*offsets = dummy_udp_tun_tcp_packet_offsets;
+			return;
+		}
+
+		*pkt = dummy_udp_tun_udp_packet;
+		*pkt_len = sizeof(dummy_udp_tun_udp_packet);
+		*offsets = dummy_udp_tun_udp_packet_offsets;
+		return;
 	}
 
 	if (udp && !ipv6) {
@@ -4496,6 +4695,10 @@ ice_fill_adv_dummy_packet(struct ice_adv_lkup_elem *lkups, u16 lkups_cnt,
 		case ICE_SCTP_IL:
 			len = sizeof(struct ice_sctp_hdr);
 			break;
+		case ICE_VXLAN:
+		case ICE_GENEVE:
+			len = sizeof(struct ice_udp_tnl_hdr);
+			break;
 		default:
 			return ICE_ERR_PARAM;
 		}
@@ -4523,6 +4726,48 @@ ice_fill_adv_dummy_packet(struct ice_adv_lkup_elem *lkups, u16 lkups_cnt,
 	s_rule->pdata.lkup_tx_rx.hdr_len = cpu_to_le16(pkt_len);
 
 	return 0;
+}
+
+/**
+ * ice_fill_adv_packet_tun - fill dummy packet with udp tunnel port
+ * @hw: pointer to the hardware structure
+ * @tun_type: tunnel type
+ * @pkt: dummy packet to fill in
+ * @offsets: offset info for the dummy packet
+ */
+static enum ice_status
+ice_fill_adv_packet_tun(struct ice_hw *hw, enum ice_sw_tunnel_type tun_type,
+			u8 *pkt, const struct ice_dummy_pkt_offsets *offsets)
+{
+	u16 open_port, i;
+
+	switch (tun_type) {
+	case ICE_SW_TUN_VXLAN:
+	case ICE_SW_TUN_GENEVE:
+		if (!ice_get_open_tunnel_port(hw, &open_port))
+			return ICE_ERR_CFG;
+		break;
+
+	default:
+		/* Nothing needs to be done for this tunnel type */
+		return 0;
+	}
+
+	/* Find the outer UDP protocol header and insert the port number */
+	for (i = 0; offsets[i].type != ICE_PROTOCOL_LAST; i++) {
+		if (offsets[i].type == ICE_UDP_OF) {
+			struct ice_l4_hdr *hdr;
+			u16 offset;
+
+			offset = offsets[i].offset;
+			hdr = (struct ice_l4_hdr *)&pkt[offset];
+			hdr->dst_port = cpu_to_be16(open_port);
+
+			return 0;
+		}
+	}
+
+	return ICE_ERR_CFG;
 }
 
 /**
@@ -4559,6 +4804,7 @@ ice_find_adv_rule_entry(struct ice_hw *hw, struct ice_adv_lkup_elem *lkups,
 				break;
 			}
 		if (rinfo->sw_act.flag == list_itr->rule_info.sw_act.flag &&
+		    rinfo->tun_type == list_itr->rule_info.tun_type &&
 		    lkups_matched)
 			return list_itr;
 	}
@@ -4733,7 +4979,7 @@ ice_add_adv_rule(struct ice_hw *hw, struct ice_adv_lkup_elem *lkups,
 		return ICE_ERR_PARAM;
 
 	/* make sure that we can locate a dummy packet */
-	ice_find_dummy_packet(lkups, lkups_cnt, &pkt, &pkt_len,
+	ice_find_dummy_packet(lkups, lkups_cnt, rinfo->tun_type, &pkt, &pkt_len,
 			      &pkt_offsets);
 	if (!pkt) {
 		status = ICE_ERR_PARAM;
@@ -4843,6 +5089,14 @@ ice_add_adv_rule(struct ice_hw *hw, struct ice_adv_lkup_elem *lkups,
 					   pkt_len, pkt_offsets);
 	if (status)
 		goto err_ice_add_adv_rule;
+
+	if (rinfo->tun_type != ICE_NON_TUN) {
+		status = ice_fill_adv_packet_tun(hw, rinfo->tun_type,
+						 s_rule->pdata.lkup_tx_rx.hdr,
+						 pkt_offsets);
+		if (status)
+			goto err_ice_add_adv_rule;
+	}
 
 	status = ice_aq_sw_rules(hw, (struct ice_aqc_sw_rules *)s_rule,
 				 rule_buf_sz, 1, ice_aqc_opc_add_sw_rules,
@@ -5078,6 +5332,13 @@ ice_rem_adv_rule(struct ice_hw *hw, struct ice_adv_lkup_elem *lkups,
 		if (!count)
 			return ICE_ERR_CFG;
 	}
+
+	/* Create any special protocol/offset pairs, such as looking at tunnel
+	 * bits by extracting metadata
+	 */
+	status = ice_add_special_words(rinfo, &lkup_exts);
+	if (status)
+		return status;
 
 	rid = ice_find_recp(hw, &lkup_exts);
 	/* If did not find a recipe that match the existing criteria */
