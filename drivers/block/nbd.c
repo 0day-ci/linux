@@ -1750,10 +1750,10 @@ static struct nbd_device *nbd_dev_add(int index, unsigned int refs)
 
 	/* Too big first_minor can cause duplicate creation of
 	 * sysfs files/links, since first_minor will be truncated to
-	 * byte in __device_add_disk().
+	 * 20-bits number in __device_add_disk().
 	 */
 	disk->first_minor = index << part_shift;
-	if (disk->first_minor > 0xff) {
+	if (disk->first_minor > MINORMASK) {
 		err = -EINVAL;
 		goto out_free_idr;
 	}
