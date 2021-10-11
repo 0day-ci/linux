@@ -830,10 +830,6 @@ static int nfp_flower_init(struct nfp_app *app)
 	if (err)
 		goto err_cleanup;
 
-	err = flow_indr_dev_register(nfp_flower_indr_setup_tc_cb, app);
-	if (err)
-		goto err_cleanup;
-
 	if (app_priv->flower_ext_feats & NFP_FL_FEATS_VF_RLIM)
 		nfp_flower_qos_init(app);
 
@@ -941,6 +937,10 @@ static int nfp_flower_start(struct nfp_app *app)
 		if (err)
 			return err;
 	}
+
+	err = flow_indr_dev_register(nfp_flower_indr_setup_tc_cb, app);
+	if (err)
+		return err;
 
 	return nfp_tunnel_config_start(app);
 }
