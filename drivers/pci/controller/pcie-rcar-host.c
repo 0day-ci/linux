@@ -160,7 +160,7 @@ static int rcar_pcie_read_conf(struct pci_bus *bus, unsigned int devfn,
 	ret = rcar_pcie_config_access(host, RCAR_PCI_ACCESS_READ,
 				      bus, devfn, where, val);
 	if (ret != PCIBIOS_SUCCESSFUL) {
-		*val = 0xffffffff;
+		SET_PCI_ERROR_RESPONSE(val);
 		return ret;
 	}
 
