@@ -153,7 +153,14 @@ void lkdtm_EXEC_VMALLOC(void)
 
 void lkdtm_EXEC_RODATA(void)
 {
-	execute_location(lkdtm_rodata_do_nothing, CODE_AS_IS);
+	pr_info("attempting ok execution at %px\n",
+		dereference_symbol_descriptor(do_nothing));
+	do_nothing();
+
+	pr_info("attempting bad execution at %px\n",
+		dereference_symbol_descriptor(lkdtm_rodata_do_nothing));
+	lkdtm_rodata_do_nothing();
+	pr_err("FAIL: func returned\n");
 }
 
 void lkdtm_EXEC_USERSPACE(void)
