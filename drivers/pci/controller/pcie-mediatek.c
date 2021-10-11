@@ -369,13 +369,13 @@ static int mtk_pcie_config_read(struct pci_bus *bus, unsigned int devfn,
 
 	port = mtk_pcie_find_port(bus, devfn);
 	if (!port) {
-		*val = ~0;
+		SET_PCI_ERROR_RESPONSE(val);
 		return PCIBIOS_DEVICE_NOT_FOUND;
 	}
 
 	ret = mtk_pcie_hw_rd_cfg(port, bn, devfn, where, size, val);
 	if (ret)
-		*val = ~0;
+		SET_PCI_ERROR_RESPONSE(val);
 
 	return ret;
 }
