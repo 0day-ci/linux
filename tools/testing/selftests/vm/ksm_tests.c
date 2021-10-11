@@ -5,6 +5,7 @@
 #include <time.h>
 #include <string.h>
 #include <numa.h>
+#include <err.h>
 
 #include "../kselftest.h"
 #include "../../../../include/vdso/time64.h"
@@ -34,7 +35,8 @@ enum ksm_test_name {
 	CHECK_KSM_ZERO_PAGE_MERGE,
 	CHECK_KSM_NUMA_MERGE,
 	KSM_MERGE_TIME,
-	KSM_COW_TIME
+	KSM_COW_TIME,
+	KSM_MERGE_TIME_HUGE_PAGES
 };
 
 static int ksm_write_sysfs(const char *file_path, unsigned long val)
@@ -100,6 +102,9 @@ static void print_help(void)
 	       " -P evaluate merging time and speed.\n"
 	       "    For this test, the size of duplicated memory area (in MiB)\n"
 	       "    must be provided using -s option\n"
+		   " -H evaluate merging time and speed of huge pages.\n"
+	       "    For this test, the size of duplicated memory area (in MiB)\n"
+	       "    must be provided using -s option\n"
 	       " -C evaluate the time required to break COW of merged pages.\n\n");
 
 	printf(" -a: specify the access protections of pages.\n"
@@ -118,9 +123,13 @@ static void print_help(void)
 	exit(0);
 }
 
-static void  *allocate_memory(void *ptr, int prot, int mapping, char data, size_t map_size)
+static void  *allocate_memory(void *ptr, int prot, int mapping, char data, size_t map_size,
+				 bool huge_page)
 {
 	void *map_ptr = mmap(ptr, map_size, PROT_WRITE, mapping, -1, 0);
+
+	if (huge_page && madvise(map_ptr, map_size, MADV_HUGEPAGE))
+		err(2, "MADV_HUGEPAGE");
 
 	if (!map_ptr) {
 		perror("mmap");
@@ -250,7 +259,7 @@ static int check_ksm_merge(int mapping, int prot, long page_count, int timeout, 
 	}
 
 	/* fill pages with the same data and merge them */
-	map_ptr = allocate_memory(NULL, prot, mapping, '*', page_size * page_count);
+	map_ptr = allocate_memory(NULL, prot, mapping, '*', page_size * page_count, false);
 	if (!map_ptr)
 		return KSFT_FAIL;
 
@@ -282,7 +291,7 @@ static int check_ksm_unmerge(int mapping, int prot, int timeout, size_t page_siz
 	}
 
 	/* fill pages with the same data and merge them */
-	map_ptr = allocate_memory(NULL, prot, mapping, '*', page_size * page_count);
+	map_ptr = allocate_memory(NULL, prot, mapping, '*', page_size * page_count, false);
 	if (!map_ptr)
 		return KSFT_FAIL;
 
@@ -325,7 +334,7 @@ static int check_ksm_zero_page_merge(int mapping, int prot, long page_count, int
 		return KSFT_FAIL;
 
 	/* fill pages with zero and try to merge them */
-	map_ptr = allocate_memory(NULL, prot, mapping, 0, page_size * page_count);
+	map_ptr = allocate_memory(NULL, prot, mapping, 0, page_size * page_count, false);
 	if (!map_ptr)
 		return KSFT_FAIL;
 
@@ -439,7 +448,7 @@ err_out:
 	return KSFT_FAIL;
 }
 
-static int ksm_merge_time(int mapping, int prot, int timeout, size_t map_size)
+static int ksm_merge_time(int mapping, int prot, int timeout, size_t map_size, bool huge_page)
 {
 	void *map_ptr;
 	struct timespec start_time, end_time;
@@ -447,7 +456,7 @@ static int ksm_merge_time(int mapping, int prot, int timeout, size_t map_size)
 
 	map_size *= MB;
 
-	map_ptr = allocate_memory(NULL, prot, mapping, '*', map_size);
+	map_ptr = allocate_memory(NULL, prot, mapping, '*', map_size, huge_page);
 	if (!map_ptr)
 		return KSFT_FAIL;
 
@@ -489,7 +498,7 @@ static int ksm_cow_time(int mapping, int prot, int timeout, size_t page_size)
 	/* page_count must be less than 2*page_size */
 	size_t page_count = 4000;
 
-	map_ptr = allocate_memory(NULL, prot, mapping, '*', page_size * page_count);
+	map_ptr = allocate_memory(NULL, prot, mapping, '*', page_size * page_count, false);
 	if (!map_ptr)
 		return KSFT_FAIL;
 
@@ -564,7 +573,7 @@ int main(int argc, char *argv[])
 	bool merge_across_nodes = KSM_MERGE_ACROSS_NODES_DEFAULT;
 	long size_MB = 0;
 
-	while ((opt = getopt(argc, argv, "ha:p:l:z:m:s:MUZNPC")) != -1) {
+	while ((opt = getopt(argc, argv, "ha:p:l:z:m:s:MUZNPCH")) != -1) {
 		switch (opt) {
 		case 'a':
 			prot = str_to_prot(optarg);
@@ -621,6 +630,9 @@ int main(int argc, char *argv[])
 		case 'C':
 			test_name = KSM_COW_TIME;
 			break;
+		case 'H':
+			test_name = KSM_MERGE_TIME_HUGE_PAGES;
+			break;
 		default:
 			return KSFT_FAIL;
 		}
@@ -668,11 +680,19 @@ int main(int argc, char *argv[])
 			return KSFT_FAIL;
 		}
 		ret = ksm_merge_time(MAP_PRIVATE | MAP_ANONYMOUS, prot, ksm_scan_limit_sec,
-				     size_MB);
+				     size_MB, false);
 		break;
 	case KSM_COW_TIME:
 		ret = ksm_cow_time(MAP_PRIVATE | MAP_ANONYMOUS, prot, ksm_scan_limit_sec,
 				   page_size);
+		break;
+	case KSM_MERGE_TIME_HUGE_PAGES:
+		if (size_MB == 0) {
+			printf("Option '-s' is required.\n");
+			return KSFT_FAIL;
+		}
+		ret = ksm_merge_time(MAP_PRIVATE | MAP_ANONYMOUS, prot, ksm_scan_limit_sec,
+				     size_MB, true);
 		break;
 	}
 
