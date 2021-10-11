@@ -194,6 +194,34 @@ static const struct file_operations force_wakeup_fops = {
 	.llseek		= default_llseek,
 };
 
+
+static int msft_opcode_set(void *data, u64 val)
+{
+	struct vhci_data *vhci = data;
+	uint16_t ogf = (val & 0xffff >> 10);
+
+	if (val > 0xffff || ogf != 0x3f)
+		return -EINVAL;
+
+	hci_set_msft_opcode(vhci->hdev, val);
+
+	return 0;
+}
+
+static int msft_opcode_get(void *data, u64 *val)
+{
+	struct vhci_data *vhci = data;
+
+	hci_dev_lock(vhci->hdev);
+	*val = vhci->hdev->msft_opcode;
+	hci_dev_unlock(vhci->hdev);
+
+	return 0;
+}
+
+DEFINE_DEBUGFS_ATTRIBUTE(msft_opcode_fops, msft_opcode_get, msft_opcode_set,
+			 "%llu\n");
+
 static int __vhci_create_device(struct vhci_data *data, __u8 opcode)
 {
 	struct hci_dev *hdev;
@@ -258,6 +286,10 @@ static int __vhci_create_device(struct vhci_data *data, __u8 opcode)
 
 	debugfs_create_file("force_wakeup", 0644, hdev->debugfs, data,
 			    &force_wakeup_fops);
+
+	if (IS_ENABLED(CONFIG_BT_MSFTEXT))
+		debugfs_create_file("msft_opcode", 0644, hdev->debugfs, data,
+				    &msft_opcode_fops);
 
 	hci_skb_pkt_type(skb) = HCI_VENDOR_PKT;
 
