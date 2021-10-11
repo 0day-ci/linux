@@ -662,6 +662,8 @@ struct mt76_dev {
 	struct device *dev;
 
 	struct mt76_mcu mcu;
+	u32 first_failed_mcu_cmd; /* for debugging */
+	u32 last_successful_mcu_cmd; /* for debugging */
 
 	struct net_device napi_dev;
 	struct net_device tx_napi_dev;
