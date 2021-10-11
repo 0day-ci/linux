@@ -5502,9 +5502,9 @@ static int handle_invpcid(struct kvm_vcpu *vcpu)
 	}
 
 	vmx_instruction_info = vmcs_read32(VMX_INSTRUCTION_INFO);
-	type = kvm_register_read(vcpu, (vmx_instruction_info >> 28) & 0xf);
+	type = vmx_read_invalidation_type(vcpu, vmx_instruction_info);
 
-	if (type > 3) {
+	if (type > INVPCID_TYPE_MAX) {
 		kvm_inject_gp(vcpu, 0);
 		return 1;
 	}

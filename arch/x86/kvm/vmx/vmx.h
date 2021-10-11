@@ -522,4 +522,16 @@ static inline bool vmx_guest_state_valid(struct kvm_vcpu *vcpu)
 
 void dump_vmcs(struct kvm_vcpu *vcpu);
 
+/*
+ * When handling a VM-exit for one of INVPCID, INVEPT or INVVPID, read the type
+ * of invalidation specified by the instruction.
+ */
+static inline unsigned long vmx_read_invalidation_type(struct kvm_vcpu *vcpu,
+						       u32 vmx_instr_info)
+{
+	u32 vmx_instr_reg2 = (vmx_instr_info >> 28) & 0xf;
+
+	return kvm_register_read(vcpu, vmx_instr_reg2);
+}
+
 #endif /* __KVM_X86_VMX_H */

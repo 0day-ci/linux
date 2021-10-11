@@ -21,6 +21,7 @@ static inline void __invpcid(unsigned long pcid, unsigned long addr,
 #define INVPCID_TYPE_SINGLE_CTXT	1
 #define INVPCID_TYPE_ALL_INCL_GLOBAL	2
 #define INVPCID_TYPE_ALL_NON_GLOBAL	3
+#define INVPCID_TYPE_MAX		3
 
 /* Flush all mappings for a given pcid and addr, not including globals. */
 static inline void invpcid_flush_one(unsigned long pcid,
