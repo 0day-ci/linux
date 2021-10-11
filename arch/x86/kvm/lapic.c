@@ -2126,13 +2126,15 @@ int kvm_lapic_reg_write(struct kvm_lapic *apic, u32 reg, u32 val)
 			ret = 1;
 		break;
 
-	case APIC_SELF_IPI:
-		if (apic_x2apic_mode(apic)) {
+	case APIC_SELF_IPI: {
+		/* Top 7 bytes of val are reserved in x2apic mode */
+                if (apic_x2apic_mode(apic) && !(val & GENMASK(31, 8))) {
 			kvm_lapic_reg_write(apic, APIC_ICR,
 					    APIC_DEST_SELF | (val & APIC_VECTOR_MASK));
 		} else
 			ret = 1;
 		break;
+	}
 	default:
 		ret = 1;
 		break;
@@ -2797,6 +2799,9 @@ int kvm_x2apic_msr_write(struct kvm_vcpu *vcpu, u32 msr, u64 data)
 	/* if this is ICR write vector before command */
 	if (reg == APIC_ICR)
 		kvm_lapic_reg_write(apic, APIC_ICR2, (u32)(data >> 32));
+	else if (data & GENMASK_ULL(63, 32))
+		return 1;
+
 	return kvm_lapic_reg_write(apic, reg, (u32)data);
 }
 
