@@ -390,6 +390,15 @@ config COMMON_CLK_K210
 	help
 	  Support for the Canaan Kendryte K210 RISC-V SoC clocks.
 
+config COMMON_CLK_APPLE_CLUSTER
+	bool "Clock driver for Apple SoC CPU clusters"
+	depends on ARCH_APPLE || COMPILE_TEST
+	select CPUFREQ_DT
+	default ARCH_APPLE
+	help
+	  This driver supports CPU cluster frequency switching on Apple SoC
+	  platforms.
+
 source "drivers/clk/actions/Kconfig"
 source "drivers/clk/analogbits/Kconfig"
 source "drivers/clk/baikal-t1/Kconfig"
