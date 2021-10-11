@@ -1,0 +1,47 @@
+====================
+I915 DG2 RFC Section
+====================
+
+Upstream plan
+=============
+Plan to upstream the DG2 enabling is:
+
+* Merge basic HW enabling for DG2(Still without pciid)
+* Merge the 64k support for lmem
+* Merge the flat CCS enabling patches
+* Add the pciid for DG2 and enable the DG2 in CI
+
+
+64K page support for lmem
+=========================
+On DG2 hw, local-memory supports minimum GTT page size of 64k only. 4k is not supported anymore.
+
+DG2 hw dont support the 64k(lmem) and 4k(smem) pages in the same ppgtt Page table. Refer the
+struct drm_i915_gem_create_ext for the implication of handling the 64k page size.
+
+.. kernel-doc:: include/uapi/drm/i915_drm.h
+        :functions: drm_i915_gem_create_ext
+
+
+flat CCS support for lmem
+=========================
+Gen 12+ devices support 3D surfaces compression and compression formats. This is
+accomplished by an additional compression control state (CCS) stored for each surface.
+
+Gen 12 devices(TGL and DG1) stores compression state in a separate region of memory.
+It is managed by userspace and has an associated set of userspace managed page tables
+used by hardware for address translation.
+
+In Gen 12.5 devices(XEXPSDV and DG2) Flat CCS is introduced to replace the userspace
+managed AUX pagetable with the flat indexed region of device memory for storing the
+compression state
+
+GOP Driver steals a chunk of memory for the CCS surface corresponding to the entire
+range of local memory. The memory required for the CCS of the entire local memory is
+1/256 of the main local memory. The Gop driver will also program a secure register
+(XEHPSDV_FLAT_CCS_BASE_ADDR 0x4910) with this address value.
+
+So the Total local memory available for driver allocation is Total lmem size - CCS data size
+
+Flat CCS data needs to be cleared when a lmem object is allocated. And CCS data can
+be copied in and out of CCS region through XY_CTRL_SURF_COPY_BLT.
