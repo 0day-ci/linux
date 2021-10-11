@@ -534,22 +534,18 @@ static void macb_validate(struct phylink_config *config,
 	case PHY_INTERFACE_MODE_RGMII_ID:
 	case PHY_INTERFACE_MODE_RGMII_RXID:
 	case PHY_INTERFACE_MODE_RGMII_TXID:
-		if (!macb_is_gem(bp)) {
-			if (one)
-				goto none;
-			else
-				goto mii;
-		}
-		fallthrough;
 	case PHY_INTERFACE_MODE_SGMII:
-		if (bp->caps & MACB_CAPS_GIGABIT_MODE_AVAILABLE) {
-			phylink_set(mask, 1000baseT_Full);
-			phylink_set(mask, 1000baseX_Full);
-			if (!(bp->caps & MACB_CAPS_NO_GIGABIT_HALF))
-				phylink_set(mask, 1000baseT_Half);
+		if (macb_is_gem(bp)) {
+			if (bp->caps & MACB_CAPS_GIGABIT_MODE_AVAILABLE) {
+				phylink_set(mask, 1000baseT_Full);
+				phylink_set(mask, 1000baseX_Full);
+				if (!(bp->caps & MACB_CAPS_NO_GIGABIT_HALF))
+					phylink_set(mask, 1000baseT_Half);
+			}
+		} else if (one) {
+			goto none;
 		}
 		fallthrough;
-	mii:
 	case PHY_INTERFACE_MODE_MII:
 	case PHY_INTERFACE_MODE_RMII:
 		phylink_set(mask, 10baseT_Half);
