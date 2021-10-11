@@ -44,13 +44,17 @@ properties:
     maxItems: 1
 
   "#dma-cells":
-    const: 2
+    enum: [2, 3]
     description: >
       DMA clients must use the format described in dma.txt, giving a phandle
-      to the DMA controller plus the following 2 integer cells:
+      to the DMA controller plus the following integer cells:
 
       - Request type: The DMA request type for transfers to/from the
         device on the allocated channel, as defined in the SoC documentation.
+        If "#dma-cells" is 2, the request type is a single cell. If
+        "#dma-cells" is 3, the request type has two cells; the first one
+        corresponds to the host to device direction, the second one corresponds
+        to the device to host direction.
 
       - Channel: If set to 0xffffffff, any available channel will be allocated
         for the client. Otherwise, the exact channel specified will be used.
