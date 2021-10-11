@@ -670,8 +670,13 @@ i915_vma_insert(struct i915_vma *vma, u64 size, u64 alignment, u64 flags)
 	}
 
 	color = 0;
-	if (vma->obj && i915_vm_has_cache_coloring(vma->vm))
-		color = vma->obj->cache_level;
+	if (vma->obj) {
+		if (HAS_64K_PAGES(vma->vm->i915) && i915_gem_object_is_lmem(vma->obj))
+			alignment = max(alignment, I915_GTT_PAGE_SIZE_64K);
+
+		if (i915_vm_has_cache_coloring(vma->vm))
+			color = vma->obj->cache_level;
+	}
 
 	if (flags & PIN_OFFSET_FIXED) {
 		u64 offset = flags & PIN_OFFSET_MASK;
