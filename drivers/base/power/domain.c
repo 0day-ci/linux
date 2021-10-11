@@ -2227,13 +2227,9 @@ static bool genpd_present(const struct generic_pm_domain *genpd)
 	return ret;
 }
 
-/**
- * of_genpd_add_provider_simple() - Register a simple PM domain provider
- * @np: Device node pointer associated with the PM domain provider.
- * @genpd: Pointer to PM domain associated with the PM domain provider.
- */
-int of_genpd_add_provider_simple(struct device_node *np,
-				 struct generic_pm_domain *genpd)
+static int _of_genpd_add_provider_simple(struct device_node *np,
+					 struct generic_pm_domain *genpd,
+					 bool getclk)
 {
 	int ret;
 
@@ -2247,7 +2243,10 @@ int of_genpd_add_provider_simple(struct device_node *np,
 
 	/* Parse genpd OPP table */
 	if (genpd->set_performance_state) {
-		ret = dev_pm_opp_of_add_table(&genpd->dev);
+		if (getclk)
+			ret = dev_pm_opp_of_add_table(&genpd->dev);
+		else
+			ret = dev_pm_opp_of_add_table_noclk(&genpd->dev, 0);
 		if (ret) {
 			if (ret != -EPROBE_DEFER)
 				dev_err(&genpd->dev, "Failed to add OPP table: %d\n",
@@ -2278,7 +2277,31 @@ int of_genpd_add_provider_simple(struct device_node *np,
 
 	return 0;
 }
+
+/**
+ * of_genpd_add_provider_simple() - Register a simple PM domain provider
+ * @np: Device node pointer associated with the PM domain provider.
+ * @genpd: Pointer to PM domain associated with the PM domain provider.
+ */
+int of_genpd_add_provider_simple(struct device_node *np,
+				 struct generic_pm_domain *genpd)
+{
+	return _of_genpd_add_provider_simple(np, genpd, true);
+}
 EXPORT_SYMBOL_GPL(of_genpd_add_provider_simple);
+
+/**
+ * of_genpd_add_provider_simple_noclk() - Register a simple clockless
+ *   PM domain provider
+ * @np: Device node pointer associated with the PM domain provider.
+ * @genpd: Pointer to PM domain associated with the PM domain provider.
+ */
+int of_genpd_add_provider_simple_noclk(struct device_node *np,
+				       struct generic_pm_domain *genpd)
+{
+	return _of_genpd_add_provider_simple(np, genpd, false);
+}
+EXPORT_SYMBOL_GPL(of_genpd_add_provider_simple_noclk);
 
 /**
  * of_genpd_add_provider_onecell() - Register a onecell PM domain provider

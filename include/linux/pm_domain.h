@@ -316,6 +316,8 @@ struct genpd_onecell_data {
 #ifdef CONFIG_PM_GENERIC_DOMAINS_OF
 int of_genpd_add_provider_simple(struct device_node *np,
 				 struct generic_pm_domain *genpd);
+int of_genpd_add_provider_simple_noclk(struct device_node *np,
+				       struct generic_pm_domain *genpd);
 int of_genpd_add_provider_onecell(struct device_node *np,
 				  struct genpd_onecell_data *data);
 void of_genpd_del_provider(struct device_node *np);
@@ -337,6 +339,12 @@ struct device *genpd_dev_pm_attach_by_name(struct device *dev,
 					   const char *name);
 #else /* !CONFIG_PM_GENERIC_DOMAINS_OF */
 static inline int of_genpd_add_provider_simple(struct device_node *np,
+					struct generic_pm_domain *genpd)
+{
+	return -EOPNOTSUPP;
+}
+
+static inline int of_genpd_add_provider_simple_noclk(struct device_node *np,
 					struct generic_pm_domain *genpd)
 {
 	return -EOPNOTSUPP;
