@@ -77,9 +77,6 @@ static int ttm_global_init(void)
 	si_meminfo(&si);
 
 	ttm_debugfs_root = debugfs_create_dir("ttm", NULL);
-	if (IS_ERR(ttm_debugfs_root)) {
-		ttm_debugfs_root = NULL;
-	}
 
 	/* Limit the number of pages in the pool to about 50% of the total
 	 * system memory.
@@ -108,8 +105,7 @@ static int ttm_global_init(void)
 	debugfs_create_atomic_t("buffer_objects", 0444, ttm_debugfs_root,
 				&glob->bo_count);
 out:
-	if (ret && ttm_debugfs_root)
-		debugfs_remove(ttm_debugfs_root);
+	debugfs_remove(ttm_debugfs_root);
 	if (ret)
 		--ttm_glob_use_count;
 	mutex_unlock(&ttm_global_mutex);
