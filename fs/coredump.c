@@ -390,7 +390,7 @@ static int zap_threads(struct task_struct *tsk,
 static int coredump_wait(int exit_code, struct core_state *core_state)
 {
 	struct task_struct *tsk = current;
-	int core_waiters = -EBUSY;
+	int core_waiters;
 
 	init_completion(&core_state->startup);
 	core_state->dumper.task = tsk;
