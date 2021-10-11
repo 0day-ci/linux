@@ -67,3 +67,10 @@ config SND_SOC_AMD_ACP6x
 	depends on X86 && PCI
 	help
 	 This option enables ACP v6.x DMIC support on AMD platform
+
+config SND_SOC_AMD_YC_MACH
+        tristate "AMD YC support for DMIC"
+        select SND_SOC_DMIC
+        depends on SND_SOC_AMD_ACP6x
+        help
+         This option enables machine driver for DMIC endpoint
