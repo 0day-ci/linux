@@ -2427,8 +2427,11 @@ static int trace_save_cmdline(struct task_struct *tsk)
 		savedcmd->cmdline_idx = idx;
 	}
 
-	savedcmd->map_cmdline_to_pid[idx] = tsk->pid;
-	set_cmdline(idx, tsk->comm);
+	/* save cmdline only when task does not exist in savecmd */
+	if (savedcmd->map_cmdline_to_pid[idx] != tsk->pid) {
+		savedcmd->map_cmdline_to_pid[idx] = tsk->pid;
+		set_cmdline(idx, tsk->comm);
+	}
 
 	arch_spin_unlock(&trace_cmdline_lock);
 
