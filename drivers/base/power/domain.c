@@ -2249,10 +2249,8 @@ int of_genpd_add_provider_simple(struct device_node *np,
 	if (genpd->set_performance_state) {
 		ret = dev_pm_opp_of_add_table(&genpd->dev);
 		if (ret) {
-			if (ret != -EPROBE_DEFER)
-				dev_err(&genpd->dev, "Failed to add OPP table: %d\n",
+			return dev_err_probe(&genpd->dev, ret, "Failed to add OPP table: %d\n",
 					ret);
-			return ret;
 		}
 
 		/*
@@ -2312,9 +2310,8 @@ int of_genpd_add_provider_onecell(struct device_node *np,
 		if (genpd->set_performance_state) {
 			ret = dev_pm_opp_of_add_table_indexed(&genpd->dev, i);
 			if (ret) {
-				if (ret != -EPROBE_DEFER)
-					dev_err(&genpd->dev, "Failed to add OPP table for index %d: %d\n",
-						i, ret);
+				dev_err_probe(&genpd->dev, ret, "Failed to add OPP table for index %d: %d\n",
+					i, ret);
 				goto error;
 			}
 
@@ -2673,10 +2670,8 @@ static int __genpd_dev_pm_attach(struct device *dev, struct device *base_dev,
 	mutex_unlock(&gpd_list_lock);
 
 	if (ret < 0) {
-		if (ret != -EPROBE_DEFER)
-			dev_err(dev, "failed to add to PM domain %s: %d",
+		return dev_err_probe(dev, ret, "failed to add to PM domain %s: %d",
 				pd->name, ret);
-		return ret;
 	}
 
 	dev->pm_domain->detach = genpd_dev_pm_detach;
@@ -2707,8 +2702,8 @@ static int __genpd_dev_pm_attach(struct device *dev, struct device *base_dev,
 	return 1;
 
 err:
-	dev_err(dev, "failed to set required performance state for power-domain %s: %d\n",
-		pd->name, ret);
+	dev_err(dev, "failed to set required performance state for power-domain %s: %d\n", 
+			pd->name, ret);
 	genpd_remove_device(pd, dev);
 	return ret;
 }
