@@ -1,0 +1,30 @@
+drm drm-fixes ff01a6220400a944e8c27ae599d9da8e1e3610d9
+	Merge tag 'drm-msm-fixes-2021-10-11' of https://gitlab.freedesktop.org/drm/msm into drm-fixes
+drm-misc drm-misc-fixes cacc0de1133c667bc36c89eaa1e6fc4592f579ac
+	drm/panel: olimex-lcd-olinuxino: select CRC32
+drm-intel drm-intel-fixes e02083f0bcc250c0556ec9e6f7ddb74220c72572
+	drm/i915: remember to call i915_sw_fence_fini
+drm drm-next 1176d15f0f6e556d54ced510ac4a91694960332b
+	Merge tag 'drm-intel-gt-next-2021-10-08' of git://anongit.freedesktop.org/drm/drm-intel into drm-next
+drm-misc drm-misc-next-fixes 70982eef4d7eebb47a3b1ef25ec1bc742f3a21cf
+	drm/ttm: Fix a deadlock if the target BO is not idle during swap
+drm-intel drm-intel-next-fixes fb43ebc83e069625cfeeb2490efc3ffa0013bfa4
+	drm/i915/selftest: Fix use of err in igt_reset_{fail, nop}_engine()
+drm-misc drm-misc-next 381ba6a6baf104b572379c6b2deab884555104d4
+	drm/nouveau/mmu/gp100: remove unused variable
+drm-intel drm-intel-next c5f44559e919fadff5c03864d92c09a5a90bdbe4
+	drm/i915/display: remove unused intel-mid.h include
+drm-intel drm-intel-gt-next a5b51a9f8523a0b88ce7e8e8059f75a43c34c57f
+	drm/i915/gt: add asm/cacheflush.h for use of clflush()
+sound-upstream for-linus 7cf3dead1ad70c72edb03e2d98e1f3dcd332cdb2
+	Linux 5.13
+sound-upstream for-next 7cf3dead1ad70c72edb03e2d98e1f3dcd332cdb2
+	Linux 5.13
+drm-intel topic/core-for-CI b4dd0381f66d0bddc2c4bfc75e18a8a6b8a0d4b7
+	component: do not leave master devres group open after bind
+drm topic/nouveau-ampere-modeset 584265dfec70e78ce2085b82ed389f27e06fbca0
+	Merge branch '04.01-ampere-lite' of git://github.com/skeggsb/linux into topic/nouveau-ampere-modeset
+drm-misc topic/i915-ttm 1e3944578b749449bd7fa6bf0bae4c3d3f5f1733
+	Merge tag 'amd-drm-next-5.16-2021-09-27' of https://gitlab.freedesktop.org/agd5f/linux into drm-next
+drm-intel topic/pxp e4e737bb5c170df6135a127739a9e6148ee3da82
+	Linux 5.15-rc2
