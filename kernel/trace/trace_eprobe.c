@@ -120,6 +120,25 @@ static bool eprobe_dyn_event_match(const char *system, const char *event,
 {
 	struct trace_eprobe *ep = to_trace_eprobe(ev);
 
+	/* First argument is the system/event the probe is attached to */
+
+	if (argc < 1)
+		return false;
+
+	slash = strchr(argv[0], '/');
+	if (!slash)
+		slash = strchr(argv[0], '.');
+	if (!slash)
+		return false;
+
+	if (strncmp(ep->event_system, argv[0], slash - argv[0]))
+		return false;
+	if (strcmp(ep->event_name, slash + 1))
+		return false;
+
+	argc--;
+	argv++;
+
 	return strcmp(trace_probe_name(&ep->tp), event) == 0 &&
 	    (!system || strcmp(trace_probe_group_name(&ep->tp), system) == 0) &&
 	    trace_probe_match_command_args(&ep->tp, argc, argv);
