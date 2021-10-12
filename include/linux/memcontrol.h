@@ -397,7 +397,7 @@ static inline struct mem_cgroup *__page_memcg(struct page *page)
 {
 	unsigned long memcg_data = page->memcg_data;
 
-	VM_BUG_ON_PAGE(PageSlab(compound_head(page)), page);
+	VM_BUG_ON_PAGE(PageSlab(page), page);
 	VM_BUG_ON_PAGE(memcg_data & MEMCG_DATA_OBJCGS, page);
 	VM_BUG_ON_PAGE(memcg_data & MEMCG_DATA_KMEM, page);
 
@@ -418,7 +418,7 @@ static inline struct obj_cgroup *__page_objcg(struct page *page)
 {
 	unsigned long memcg_data = page->memcg_data;
 
-	VM_BUG_ON_PAGE(PageSlab(compound_head(page)), page);
+	VM_BUG_ON_PAGE(PageSlab(page), page);
 	VM_BUG_ON_PAGE(memcg_data & MEMCG_DATA_OBJCGS, page);
 	VM_BUG_ON_PAGE(!(memcg_data & MEMCG_DATA_KMEM), page);
 
@@ -466,7 +466,7 @@ static inline struct mem_cgroup *page_memcg_rcu(struct page *page)
 {
 	unsigned long memcg_data = READ_ONCE(page->memcg_data);
 
-	VM_BUG_ON_PAGE(PageSlab(compound_head(page)), page);
+	VM_BUG_ON_PAGE(PageSlab(page), page);
 	WARN_ON_ONCE(!rcu_read_lock_held());
 
 	if (memcg_data & MEMCG_DATA_KMEM) {
