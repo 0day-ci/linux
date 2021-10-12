@@ -2466,7 +2466,7 @@ qla8044_minidump_process_l2tag(struct scsi_qla_host *vha,
 	uint32_t addr, r_addr, c_addr, t_r_addr;
 	uint32_t i, k, loop_count, t_value, r_cnt, r_value;
 	unsigned long p_wait, w_time, p_mask;
-	uint32_t c_value_w, c_value_r;
+	uint32_t c_value_w, c_value_r = 0;
 	struct qla8044_minidump_entry_cache *cache_hdr;
 	int rval = QLA_FUNCTION_FAILED;
 	uint32_t *data_ptr = *d_ptr;

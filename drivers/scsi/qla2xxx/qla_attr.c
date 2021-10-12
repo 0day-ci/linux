@@ -698,7 +698,7 @@ qla2x00_sysfs_write_reset(struct file *filp, struct kobject *kobj,
 	struct qla_hw_data *ha = vha->hw;
 	struct scsi_qla_host *base_vha = pci_get_drvdata(ha->pdev);
 	int type;
-	uint32_t idc_control;
+	uint32_t idc_control = 0;
 	uint8_t *tmp_data = NULL;
 
 	if (off != 0)

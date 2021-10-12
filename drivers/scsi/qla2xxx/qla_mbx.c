@@ -1681,7 +1681,7 @@ qla2x00_get_adapter_id(scsi_qla_host_t *vha, uint16_t *id, uint8_t *al_pa,
     uint8_t *area, uint8_t *domain, uint16_t *top, uint16_t *sw_cap)
 {
 	int rval;
-	mbx_cmd_t mc;
+	mbx_cmd_t mc = { 0, };
 	mbx_cmd_t *mcp = &mc;
 
 	ql_dbg(ql_dbg_mbx + ql_dbg_verbose, vha, 0x1046,
@@ -2257,7 +2257,7 @@ qla2x00_get_port_name(scsi_qla_host_t *vha, uint16_t loop_id, uint8_t *name,
     uint8_t opt)
 {
 	int rval;
-	mbx_cmd_t mc;
+	mbx_cmd_t mc = { 0, };
 	mbx_cmd_t *mcp = &mc;
 
 	ql_dbg(ql_dbg_mbx + ql_dbg_verbose, vha, 0x1057,
@@ -6366,7 +6366,7 @@ qla2x00_dump_mctp_data(scsi_qla_host_t *vha, dma_addr_t req_dma, uint32_t addr,
 	uint32_t size)
 {
 	int rval;
-	mbx_cmd_t mc;
+	mbx_cmd_t mc = { 0, };
 	mbx_cmd_t *mcp = &mc;
 
 	if (!IS_MCTP_CAPABLE(vha->hw))

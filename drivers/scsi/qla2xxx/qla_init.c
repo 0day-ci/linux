@@ -6630,8 +6630,8 @@ void
 qla83xx_reset_ownership(scsi_qla_host_t *vha)
 {
 	struct qla_hw_data *ha = vha->hw;
-	uint32_t drv_presence, drv_presence_mask;
-	uint32_t dev_part_info1, dev_part_info2, class_type;
+	uint32_t drv_presence = 0, drv_presence_mask;
+	uint32_t dev_part_info1 = 0, dev_part_info2 = 0, class_type;
 	uint32_t class_type_mask = 0x3;
 	uint16_t fcoe_other_function = 0xffff, i;
 
@@ -6775,7 +6775,7 @@ static int
 qla83xx_initiating_reset(scsi_qla_host_t *vha)
 {
 	struct qla_hw_data *ha = vha->hw;
-	uint32_t  idc_control, dev_state;
+	uint32_t  idc_control = 0, dev_state = 0;
 
 	__qla83xx_get_idc_control(vha, &idc_control);
 	if ((idc_control & QLA83XX_IDC_RESET_DISABLED)) {

@@ -5673,7 +5673,7 @@ qla83xx_check_nic_core_fw_alive(scsi_qla_host_t *base_vha)
 {
 	int rval = QLA_SUCCESS;
 	unsigned long heart_beat_wait = jiffies + (1 * HZ);
-	uint32_t heart_beat_counter1, heart_beat_counter2;
+	uint32_t heart_beat_counter1 = 0, heart_beat_counter2 = 0;
 
 	do {
 		if (time_after(jiffies, heart_beat_wait)) {
@@ -5743,7 +5743,7 @@ qla83xx_service_idc_aen(struct work_struct *work)
 	struct qla_hw_data *ha =
 		container_of(work, struct qla_hw_data, idc_aen);
 	scsi_qla_host_t *base_vha = pci_get_drvdata(ha->pdev);
-	uint32_t dev_state, idc_control;
+	uint32_t dev_state = 0, idc_control = 0;
 
 	qla83xx_idc_lock(base_vha, 0);
 	qla83xx_rd_reg(base_vha, QLA83XX_IDC_DEV_STATE, &dev_state);
@@ -6524,7 +6524,7 @@ static void
 qla83xx_need_reset_handler(scsi_qla_host_t *vha)
 {
 	struct qla_hw_data *ha = vha->hw;
-	uint32_t drv_ack, drv_presence;
+	uint32_t drv_ack = 0, drv_presence = 0;
 	unsigned long ack_timeout;
 
 	/* Wait for IDC ACK from all functions (DRV-ACK == DRV-PRESENCE) */
@@ -6563,7 +6563,7 @@ static int
 qla83xx_device_bootstrap(scsi_qla_host_t *vha)
 {
 	int rval = QLA_SUCCESS;
-	uint32_t idc_control;
+	uint32_t idc_control = 0;
 
 	qla83xx_wr_reg(vha, QLA83XX_IDC_DEV_STATE, QLA8XXX_DEV_INITIALIZING);
 	ql_log(ql_log_info, vha, 0xb069, "HW State: INITIALIZING.\n");
