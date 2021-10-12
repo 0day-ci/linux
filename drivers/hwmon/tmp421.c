@@ -200,20 +200,26 @@ static int tmp421_read(struct device *dev, enum hwmon_sensor_types type,
 	if (ret)
 		return ret;
 
-	if (!tmp421->channel[channel].enabled)
-		return -ENODATA;
-
 	switch (attr) {
 	case hwmon_temp_input:
+		if (!tmp421->channel[channel].enabled)
+			return -ENODATA;
+
 		*val = temp_from_raw(tmp421->channel[channel].temp,
 				     tmp421->config & TMP421_CONFIG_RANGE);
+
 		return 0;
 	case hwmon_temp_fault:
+		if (!tmp421->channel[channel].enabled)
+			return -ENODATA;
 		/*
 		 * Any of OPEN or /PVLD bits indicate a hardware mulfunction
 		 * and the conversion result may be incorrect
 		 */
 		*val = !!(tmp421->channel[channel].temp & 0x03);
+		return 0;
+	case hwmon_temp_enable:
+		*val = tmp421->channel[channel].enabled;
 		return 0;
 	default:
 		return -EOPNOTSUPP;
@@ -231,6 +237,24 @@ static int tmp421_read_string(struct device *dev, enum hwmon_sensor_types type,
 	return 0;
 }
 
+static int tmp421_write(struct device *dev, enum hwmon_sensor_types type,
+			u32 attr, int channel, long val)
+{
+	struct tmp421_data *data = dev_get_drvdata(dev);
+	int ret;
+
+	switch (type) {
+	case hwmon_temp:
+		data->channel[channel].enabled = val;
+		ret = tmp421_enable_channels(data);
+		break;
+	default:
+	    ret = -EOPNOTSUPP;
+	}
+
+	return ret;
+}
+
 static umode_t tmp421_is_visible(const void *data, enum hwmon_sensor_types type,
 				 u32 attr, int channel)
 {
@@ -240,6 +264,8 @@ static umode_t tmp421_is_visible(const void *data, enum hwmon_sensor_types type,
 		return 0444;
 	case hwmon_temp_label:
 		return 0444;
+	case hwmon_temp_enable:
+		return 0644;
 	default:
 		return 0;
 	}
@@ -397,6 +423,7 @@ static const struct hwmon_ops tmp421_ops = {
 	.is_visible = tmp421_is_visible,
 	.read = tmp421_read,
 	.read_string = tmp421_read_string,
+	.write = tmp421_write,
 };
 
 static int tmp421_probe(struct i2c_client *client)
@@ -419,7 +446,7 @@ static int tmp421_probe(struct i2c_client *client)
 	data->client = client;
 
 	for (i = 0; i < data->channels; i++) {
-		data->temp_config[i] = HWMON_T_INPUT | HWMON_T_FAULT;
+		data->temp_config[i] = HWMON_T_INPUT | HWMON_T_FAULT | HWMON_T_ENABLE;
 		data->channel[i].enabled = true;
 	}
 
