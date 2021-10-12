@@ -83,11 +83,30 @@ struct hns_roce_ib_create_qp_resp {
 	__aligned_u64 cap_flags;
 };
 
+enum hns_roce_alloc_uctx_comp_flag {
+	HNS_ROCE_ALLOC_UCTX_COMP_CONFIG = 1 << 0,
+};
+
+enum hns_roce_alloc_uctx_resp_config {
+	HNS_ROCE_UCTX_RESP_MMAP_KEY_EN = 1 << 0,
+};
+
+enum hns_roce_alloc_uctx_req_config {
+	HNS_ROCE_UCTX_REQ_MMAP_KEY_EN = 1 << 0,
+};
+
+struct hns_roce_ib_alloc_ucontext {
+	__u32 comp;
+	__u32 config;
+};
+
 struct hns_roce_ib_alloc_ucontext_resp {
 	__u32	qp_tab_size;
 	__u32	cqe_size;
 	__u32	srq_tab_size;
-	__u32	reserved;
+	__u8    config;
+	__u8    rsv[3];
+	__aligned_u64 db_mmap_key;
 };
 
 struct hns_roce_ib_alloc_pd_resp {
