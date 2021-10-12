@@ -408,4 +408,50 @@ void __noreturn usercopy_abort(const char *name, const char *detail,
 			       unsigned long len);
 #endif
 
+#ifdef ARCH_HAS_ATOMIC_UACCESS_HELPERS
+/**
+ * cmpxchg_user_[32|64][_nofault|]() - compare_exchange 32/64-bit values
+ * @uaddr:     Destination address, in user space;
+ * @curr_val:  Source address, in kernel space;
+ * @new_val:   The value to write to the destination address.
+ *
+ * This is the standard cmpxchg: atomically: compare *@uaddr to *@curr_val;
+ * if the values match, write @new_val to @uaddr, return 0; if the values
+ * do not match, write *@uaddr to @curr_val, return -EAGAIN.
+ *
+ * The _nofault versions don't fault and can be used in
+ * atomic/preempt-disabled contexts.
+ *
+ * Return:
+ * 0      : OK/success;
+ * -EINVAL: @uaddr is not properly aligned ('may fault' versions only);
+ * -EFAULT: memory access error (including mis-aligned @uaddr in _nofault);
+ * -EAGAIN: @old did not match.
+ */
+int cmpxchg_user_32_nofault(u32 __user *uaddr, u32 *curr_val, u32 new_val);
+int cmpxchg_user_64_nofault(u64 __user *uaddr, u64 *curr_val, u64 new_val);
+int cmpxchg_user_32(u32 __user *uaddr, u32 *curr_val, u32 new_val);
+int cmpxchg_user_64(u64 __user *uaddr, u64 *curr_val, u64 new_val);
+
+/**
+ * xchg_user_[32|64][_nofault|]() - exchange 32/64-bit values
+ * @uaddr:   Destination address, in user space;
+ * @val:     Source address, in kernel space.
+ *
+ * This is the standard atomic xchg: exchange values pointed to by @uaddr and @val.
+ *
+ * The _nofault versions don't fault and can be used in
+ * atomic/preempt-disabled contexts.
+ *
+ * Return:
+ * 0      : OK/success;
+ * -EINVAL: @uaddr is not properly aligned ('may fault' versions only);
+ * -EFAULT: memory access error (including mis-aligned @uaddr in _nofault).
+ */
+int xchg_user_32_nofault(u32 __user *uaddr, u32 *val);
+int xchg_user_64_nofault(u64 __user *uaddr, u64 *val);
+int xchg_user_32(u32 __user *uaddr, u32 *val);
+int xchg_user_64(u64 __user *uaddr, u64 *val);
+#endif		/* ARCH_HAS_ATOMIC_UACCESS_HELPERS */
+
 #endif		/* __LINUX_UACCESS_H__ */
