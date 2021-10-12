@@ -608,14 +608,12 @@ page_flags_test(int section, int node, int zone, int last_cpupid,
 		int kasan_tag, int flags, const char *name, char *cmp_buf)
 {
 	unsigned long values[] = {section, node, zone, last_cpupid, kasan_tag};
-	unsigned long page_flags = 0;
+	unsigned long page_flags = flags;
 	unsigned long size = 0;
 	bool append = false;
 	int i;
 
-	flags &= PAGEFLAGS_MASK;
-	if (flags) {
-		page_flags |= flags;
+	if (flags & PAGEFLAGS_MASK) {
 		snprintf(cmp_buf + size, BUF_SIZE - size, "%s", name);
 		size = strlen(cmp_buf);
 #if SECTIONS_WIDTH || NODES_WIDTH || ZONES_WIDTH || \
