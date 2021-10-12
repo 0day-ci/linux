@@ -623,6 +623,18 @@ static inline unsigned int blk_queue_get_max_sectors(struct request_queue *q,
 }
 
 /*
+ * Return how much of the chunk sectors is left to be used for an I/O at the
+ * given offset.
+ */
+static inline unsigned int chunk_size_left(sector_t offset,
+		unsigned int chunk_sectors)
+{
+	if (unlikely(!is_power_of_2(chunk_sectors)))
+		return chunk_sectors - sector_div(offset, chunk_sectors);
+	return chunk_sectors - (offset & (chunk_sectors - 1));
+}
+
+/*
  * Return maximum size of a request at given offset. Only valid for
  * file system requests.
  */
@@ -637,12 +649,8 @@ static inline unsigned int blk_max_size_offset(struct request_queue *q,
 			return q->limits.max_sectors;
 	}
 
-	if (likely(is_power_of_2(chunk_sectors)))
-		chunk_sectors -= offset & (chunk_sectors - 1);
-	else
-		chunk_sectors -= sector_div(offset, chunk_sectors);
-
-	return min(q->limits.max_sectors, chunk_sectors);
+	return min(q->limits.max_sectors,
+			chunk_size_left(offset, chunk_sectors));
 }
 
 /*
