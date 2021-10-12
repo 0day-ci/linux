@@ -410,8 +410,7 @@ static inline struct kmem_cache *virt_to_cache(const void *obj)
 	struct page *page;
 
 	page = virt_to_head_page(obj);
-	if (WARN_ONCE(!PageSlab(compound_head(page)),
-		      "%s: Object is not a Slab page!\n",
+	if (WARN_ONCE(!PageSlab(page), "%s: Object is not a Slab page!\n",
 		      __func__))
 		return NULL;
 	return page->slab_cache;
