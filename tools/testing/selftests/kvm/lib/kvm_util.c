@@ -151,7 +151,7 @@ void vm_enable_dirty_ring(struct kvm_vm *vm, uint32_t ring_size)
 	vm->dirty_ring_size = ring_size;
 }
 
-static void vm_open(struct kvm_vm *vm, int perm)
+static void __vm_create(struct kvm_vm *vm, int perm)
 {
 	vm->kvm_fd = _open_kvm_dev_path_or_exit(perm);
 
@@ -296,7 +296,7 @@ struct kvm_vm *vm_create(enum vm_guest_mode mode, uint64_t phy_pages, int perm)
 		vm->type = KVM_VM_TYPE_ARM_IPA_SIZE(vm->pa_bits);
 #endif
 
-	vm_open(vm, perm);
+	__vm_create(vm, perm);
 
 	/* Limit to VA-bit canonical virtual addresses. */
 	vm->vpages_valid = sparsebit_alloc();
@@ -418,7 +418,7 @@ void kvm_vm_restart(struct kvm_vm *vmp, int perm)
 	int ctr;
 	struct userspace_mem_region *region;
 
-	vm_open(vmp, perm);
+	__vm_create(vmp, perm);
 	if (vmp->has_irqchip)
 		vm_create_irqchip(vmp);
 
