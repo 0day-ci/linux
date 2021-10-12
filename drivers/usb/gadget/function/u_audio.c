@@ -27,12 +27,6 @@
 #define PRD_SIZE_MAX	PAGE_SIZE
 #define MIN_PERIODS	4
 
-enum {
-	UAC_FBACK_CTRL,
-	UAC_MUTE_CTRL,
-	UAC_VOLUME_CTRL,
-};
-
 /* Runtime data params for one stream */
 struct uac_rtd_params {
 	struct snd_uac_chip *uac;	/* parent chip */
@@ -900,31 +894,6 @@ static int u_audio_volume_put(struct snd_kcontrol *kcontrol,
 	return change;
 }
 
-
-static struct snd_kcontrol_new u_audio_controls[]  = {
-	[UAC_FBACK_CTRL] {
-		.iface =        SNDRV_CTL_ELEM_IFACE_PCM,
-		.name =         "Capture Pitch 1000000",
-		.info =         u_audio_pitch_info,
-		.get =          u_audio_pitch_get,
-		.put =          u_audio_pitch_put,
-	},
-	[UAC_MUTE_CTRL] {
-		.iface =	SNDRV_CTL_ELEM_IFACE_MIXER,
-		.name =		"", /* will be filled later */
-		.info =		u_audio_mute_info,
-		.get =		u_audio_mute_get,
-		.put =		u_audio_mute_put,
-	},
-	[UAC_VOLUME_CTRL] {
-		.iface =	SNDRV_CTL_ELEM_IFACE_MIXER,
-		.name =		"", /* will be filled later */
-		.info =		u_audio_volume_info,
-		.get =		u_audio_volume_get,
-		.put =		u_audio_volume_put,
-	},
-};
-
 int g_audio_setup(struct g_audio *g_audio, const char *pcm_name,
 		  const char *card_name)
 {
@@ -932,6 +901,7 @@ int g_audio_setup(struct g_audio *g_audio, const char *pcm_name,
 	struct snd_card *card;
 	struct snd_pcm *pcm;
 	struct snd_kcontrol *kctl;
+	struct snd_kcontrol_new kctl_new;
 	struct uac_params *params;
 	int p_chmask, c_chmask;
 	int i, err;
@@ -1029,8 +999,14 @@ int g_audio_setup(struct g_audio *g_audio, const char *pcm_name,
 		strscpy(card->mixername, card_name, sizeof(card->driver));
 
 	if (c_chmask && g_audio->in_ep_fback) {
-		kctl = snd_ctl_new1(&u_audio_controls[UAC_FBACK_CTRL],
-				    &uac->c_prm);
+		kctl_new = (struct snd_kcontrol_new) {
+			.iface =        SNDRV_CTL_ELEM_IFACE_PCM,
+			.name =         "Capture Pitch 1000000",
+			.info =         u_audio_pitch_info,
+			.get =          u_audio_pitch_get,
+			.put =          u_audio_pitch_put,
+		};
+		kctl = snd_ctl_new1(&kctl_new, &uac->c_prm);
 		if (!kctl) {
 			err = -ENOMEM;
 			goto snd_fail;
@@ -1069,9 +1045,14 @@ int g_audio_setup(struct g_audio *g_audio, const char *pcm_name,
 			snprintf(ctrl_name, sizeof(ctrl_name), "PCM %s Switch",
 				 direction);
 
-			u_audio_controls[UAC_MUTE_CTRL].name = ctrl_name;
-
-			kctl = snd_ctl_new1(&u_audio_controls[UAC_MUTE_CTRL],
+			kctl_new = (struct snd_kcontrol_new) {
+				.iface =	SNDRV_CTL_ELEM_IFACE_MIXER,
+				.name =		ctrl_name,
+				.info =		u_audio_mute_info,
+				.get =		u_audio_mute_get,
+				.put =		u_audio_mute_put,
+			},
+			kctl = snd_ctl_new1(&kctl_new,
 					    prm);
 			if (!kctl) {
 				err = -ENOMEM;
@@ -1092,10 +1073,14 @@ int g_audio_setup(struct g_audio *g_audio, const char *pcm_name,
 			snprintf(ctrl_name, sizeof(ctrl_name), "PCM %s Volume",
 				 direction);
 
-			u_audio_controls[UAC_VOLUME_CTRL].name = ctrl_name;
-
-			kctl = snd_ctl_new1(&u_audio_controls[UAC_VOLUME_CTRL],
-					    prm);
+			kctl_new = (struct snd_kcontrol_new) {
+				.iface =	SNDRV_CTL_ELEM_IFACE_MIXER,
+				.name =		ctrl_name,
+				.info =		u_audio_volume_info,
+				.get =		u_audio_volume_get,
+				.put =		u_audio_volume_put,
+			};
+			kctl = snd_ctl_new1(&kctl_new, prm);
 			if (!kctl) {
 				err = -ENOMEM;
 				goto snd_fail;
