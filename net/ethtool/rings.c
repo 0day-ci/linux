@@ -26,6 +26,7 @@ static int rings_prepare_data(const struct ethnl_req_info *req_base,
 			      struct genl_info *info)
 {
 	struct rings_reply_data *data = RINGS_REPDATA(reply_base);
+	struct netlink_ext_ack *extack = info ? info->extack : NULL;
 	struct net_device *dev = reply_base->dev;
 	int ret;
 
@@ -34,7 +35,8 @@ static int rings_prepare_data(const struct ethnl_req_info *req_base,
 	ret = ethnl_ops_begin(dev);
 	if (ret < 0)
 		return ret;
-	dev->ethtool_ops->get_ringparam(dev, &data->ringparam);
+	dev->ethtool_ops->get_ringparam(dev, &data->ringparam,
+					&data->ringparam_ext, extack);
 	ethnl_ops_complete(dev);
 
 	return 0;
@@ -59,6 +61,7 @@ static int rings_fill_reply(struct sk_buff *skb,
 			    const struct ethnl_reply_data *reply_base)
 {
 	const struct rings_reply_data *data = RINGS_REPDATA(reply_base);
+	const struct ethtool_ringparam_ext *ringparam_ext = &data->ringparam_ext;
 	const struct ethtool_ringparam *ringparam = &data->ringparam;
 
 	if ((ringparam->rx_max_pending &&
@@ -80,7 +83,10 @@ static int rings_fill_reply(struct sk_buff *skb,
 	     (nla_put_u32(skb, ETHTOOL_A_RINGS_TX_MAX,
 			  ringparam->tx_max_pending) ||
 	      nla_put_u32(skb, ETHTOOL_A_RINGS_TX,
-			  ringparam->tx_pending))))
+			  ringparam->tx_pending)))  ||
+	    (ringparam_ext->rx_buf_len &&
+	     (nla_put_u32(skb, ETHTOOL_A_RINGS_RX_BUF_LEN,
+			  ringparam_ext->rx_buf_len))))
 		return -EMSGSIZE;
 
 	return 0;
@@ -138,7 +144,7 @@ int ethnl_set_rings(struct sk_buff *skb, struct genl_info *info)
 	ret = ethnl_ops_begin(dev);
 	if (ret < 0)
 		goto out_rtnl;
-	ops->get_ringparam(dev, &ringparam);
+	ops->get_ringparam(dev, &ringparam, &ringparam_ext, info->extack);
 
 	ethnl_update_u32(&ringparam.rx_pending, tb[ETHTOOL_A_RINGS_RX], &mod);
 	ethnl_update_u32(&ringparam.rx_mini_pending,
@@ -179,7 +185,8 @@ int ethnl_set_rings(struct sk_buff *skb, struct genl_info *info)
 		goto out_ops;
 	}
 
-	ret = dev->ethtool_ops->set_ringparam(dev, &ringparam);
+	ret = dev->ethtool_ops->set_ringparam(dev, &ringparam, &ringparam_ext,
+					      info->extack);
 	if (ret < 0)
 		goto out_ops;
 	ethtool_notify(dev, ETHTOOL_MSG_RINGS_NTF, NULL);

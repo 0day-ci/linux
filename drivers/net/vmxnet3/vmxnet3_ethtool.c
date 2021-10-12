@@ -578,7 +578,9 @@ vmxnet3_get_link_ksettings(struct net_device *netdev,
 
 static void
 vmxnet3_get_ringparam(struct net_device *netdev,
-		      struct ethtool_ringparam *param)
+		      struct ethtool_ringparam *param,
+		      struct ethtool_ringparam_ext *param_ext,
+		      struct netlink_ext_ack *extack)
 {
 	struct vmxnet3_adapter *adapter = netdev_priv(netdev);
 
@@ -598,7 +600,9 @@ vmxnet3_get_ringparam(struct net_device *netdev,
 
 static int
 vmxnet3_set_ringparam(struct net_device *netdev,
-		      struct ethtool_ringparam *param)
+		      struct ethtool_ringparam *param,
+		      struct ethtool_ringparam_ext *param_ext,
+		      struct netlink_ext_ack *extack)
 {
 	struct vmxnet3_adapter *adapter = netdev_priv(netdev);
 	u32 new_tx_ring_size, new_rx_ring_size, new_rx_ring2_size;

@@ -947,7 +947,9 @@ static int lio_set_phys_id(struct net_device *netdev,
 
 static void
 lio_ethtool_get_ringparam(struct net_device *netdev,
-			  struct ethtool_ringparam *ering)
+			  struct ethtool_ringparam *ering,
+			  struct ethtool_ringparam_ext *ering_ext,
+			  struct netlink_ext_ack *extack)
 {
 	struct lio *lio = GET_LIO(netdev);
 	struct octeon_device *oct = lio->oct_dev;
@@ -1253,7 +1255,9 @@ static int lio_reset_queues(struct net_device *netdev, uint32_t num_qs)
 }
 
 static int lio_ethtool_set_ringparam(struct net_device *netdev,
-				     struct ethtool_ringparam *ering)
+				     struct ethtool_ringparam *ering,
+				     struct ethtool_ringparam_ext *ering_ext,
+				     struct netlink_ext_ack *extack)
 {
 	u32 rx_count, tx_count, rx_count_old, tx_count_old;
 	struct lio *lio = GET_LIO(netdev);

@@ -4556,7 +4556,9 @@ static void mvneta_ethtool_get_drvinfo(struct net_device *dev,
 
 
 static void mvneta_ethtool_get_ringparam(struct net_device *netdev,
-					 struct ethtool_ringparam *ring)
+					 struct ethtool_ringparam *ring,
+					 struct ethtool_ringparam_ext *ring_ext,
+					 struct netlink_ext_ack *extack)
 {
 	struct mvneta_port *pp = netdev_priv(netdev);
 
@@ -4567,7 +4569,9 @@ static void mvneta_ethtool_get_ringparam(struct net_device *netdev,
 }
 
 static int mvneta_ethtool_set_ringparam(struct net_device *dev,
-					struct ethtool_ringparam *ring)
+					struct ethtool_ringparam *ring,
+					struct ethtool_ringparam_ext *ring_ext,
+					struct netlink_ext_ack *extack)
 {
 	struct mvneta_port *pp = netdev_priv(dev);
 

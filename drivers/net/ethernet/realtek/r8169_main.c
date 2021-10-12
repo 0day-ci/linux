@@ -1872,7 +1872,9 @@ static int rtl8169_set_eee(struct net_device *dev, struct ethtool_eee *data)
 }
 
 static void rtl8169_get_ringparam(struct net_device *dev,
-				  struct ethtool_ringparam *data)
+				  struct ethtool_ringparam *data,
+				  struct ethtool_ringparam_ext *data_ext,
+				  struct netlink_ext_ack *extack)
 {
 	data->rx_max_pending = NUM_RX_DESC;
 	data->rx_pending = NUM_RX_DESC;

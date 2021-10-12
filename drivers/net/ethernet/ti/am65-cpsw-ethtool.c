@@ -454,7 +454,9 @@ static int am65_cpsw_set_channels(struct net_device *ndev,
 }
 
 static void am65_cpsw_get_ringparam(struct net_device *ndev,
-				    struct ethtool_ringparam *ering)
+				    struct ethtool_ringparam *ering,
+				    struct ethtool_ringparam_ext *ering_ext,
+				    struct netlink_ext_ack *extack)
 {
 	struct am65_cpsw_common *common = am65_ndev_to_common(ndev);
 

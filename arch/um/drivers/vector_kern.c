@@ -1441,7 +1441,9 @@ flash_fail:
 }
 
 static void vector_get_ringparam(struct net_device *netdev,
-				struct ethtool_ringparam *ring)
+				 struct ethtool_ringparam *ring,
+				 struct ethtool_ringparam_ext *ring_ext,
+				 struct netlink_ext_ack *extack)
 {
 	struct vector_private *vp = netdev_priv(netdev);
 

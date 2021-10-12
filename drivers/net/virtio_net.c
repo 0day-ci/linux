@@ -2173,7 +2173,9 @@ static void virtnet_cpu_notif_remove(struct virtnet_info *vi)
 }
 
 static void virtnet_get_ringparam(struct net_device *dev,
-				struct ethtool_ringparam *ring)
+				  struct ethtool_ringparam *ring,
+				  struct ethtool_ringparam_ext *ring_ext,
+				  struct netlink_ext_ack *extack)
 {
 	struct virtnet_info *vi = netdev_priv(dev);
 

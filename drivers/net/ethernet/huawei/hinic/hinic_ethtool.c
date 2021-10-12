@@ -549,7 +549,9 @@ static void hinic_get_drvinfo(struct net_device *netdev,
 }
 
 static void hinic_get_ringparam(struct net_device *netdev,
-				struct ethtool_ringparam *ring)
+				struct ethtool_ringparam *ring,
+				struct ethtool_ringparam_ext *ring_ext,
+				struct netlink_ext_ack *extack)
 {
 	struct hinic_dev *nic_dev = netdev_priv(netdev);
 
@@ -582,7 +584,9 @@ static int check_ringparam_valid(struct hinic_dev *nic_dev,
 }
 
 static int hinic_set_ringparam(struct net_device *netdev,
-			       struct ethtool_ringparam *ring)
+			       struct ethtool_ringparam *ring,
+			       struct ethtool_ringparam_ext *ring_ext,
+			       struct netlink_ext_ack *extack)
 {
 	struct hinic_dev *nic_dev = netdev_priv(netdev);
 	u16 new_sq_depth, new_rq_depth;
