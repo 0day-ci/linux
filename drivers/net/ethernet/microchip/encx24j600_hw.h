@@ -15,7 +15,7 @@ struct encx24j600_context {
 	int bank;
 };
 
-void devm_regmap_init_encx24j600(struct device *dev,
+int devm_regmap_init_encx24j600(struct device *dev,
 				 struct encx24j600_context *ctx);
 
 /* Single-byte instructions */
