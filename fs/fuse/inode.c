@@ -23,6 +23,7 @@
 #include <linux/exportfs.h>
 #include <linux/posix_acl.h>
 #include <linux/pid_namespace.h>
+#include <linux/fs.h>
 
 MODULE_AUTHOR("Miklos Szeredi <miklos@szeredi.hu>");
 MODULE_DESCRIPTION("Filesystem in Userspace");
@@ -164,7 +165,7 @@ static ino_t fuse_squash_ino(u64 ino64)
 }
 
 void fuse_change_attributes_common(struct inode *inode, struct fuse_attr *attr,
-				   u64 attr_valid)
+				   u64 attr_valid, bool update_cmtime)
 {
 	struct fuse_conn *fc = get_fuse_conn(inode);
 	struct fuse_inode *fi = get_fuse_inode(inode);
@@ -183,8 +184,7 @@ void fuse_change_attributes_common(struct inode *inode, struct fuse_attr *attr,
 	inode->i_blocks  = attr->blocks;
 	inode->i_atime.tv_sec   = attr->atime;
 	inode->i_atime.tv_nsec  = attr->atimensec;
-	/* mtime from server may be stale due to local buffered write */
-	if (!fc->writeback_cache || !S_ISREG(inode->i_mode)) {
+	if (update_cmtime) {
 		inode->i_mtime.tv_sec   = attr->mtime;
 		inode->i_mtime.tv_nsec  = attr->mtimensec;
 		inode->i_ctime.tv_sec   = attr->ctime;
@@ -226,8 +226,22 @@ void fuse_change_attributes(struct inode *inode, struct fuse_attr *attr,
 	bool is_wb = fc->writeback_cache;
 	loff_t oldsize;
 	struct timespec64 old_mtime;
+	bool is_dirty = false;
 
 	spin_lock(&fi->lock);
+
+	/*
+	 * is_dirty will be true if:
+	 *   1. Writeback cache is enabled,
+	 *   2. the file is a regular one, and
+	 *   3. at least one dirty page in the inode mapping, or at least
+	 *      one fuse writeback page is in-flight.
+	 */
+	is_dirty = is_wb && S_ISREG(inode->i_mode) &&
+		    (filemap_range_needs_writeback(inode->i_mapping, 0,
+		    i_size_read(inode) - 1) ||
+		    fuse_file_is_writeback_locked(inode));
+
 	if ((attr_version != 0 && fi->attr_version > attr_version) ||
 	    test_bit(FUSE_I_SIZE_UNSTABLE, &fi->state)) {
 		spin_unlock(&fi->lock);
@@ -235,7 +249,11 @@ void fuse_change_attributes(struct inode *inode, struct fuse_attr *attr,
 	}
 
 	old_mtime = inode->i_mtime;
-	fuse_change_attributes_common(inode, attr, attr_valid);
+	/*
+	 * mtime from server may be stale due to local buffered write, so
+	 * don't update c/mtime when is_dirty is true.
+	 */
+	fuse_change_attributes_common(inode, attr, attr_valid, !is_dirty);
 
 	oldsize = inode->i_size;
 	/*
@@ -243,8 +261,16 @@ void fuse_change_attributes(struct inode *inode, struct fuse_attr *attr,
 	 * extend local i_size without keeping userspace server in sync. So,
 	 * attr->size coming from server can be stale. We cannot trust it.
 	 */
-	if (!is_wb || !S_ISREG(inode->i_mode))
+	if (!is_dirty) {
 		i_size_write(inode, attr->size);
+		/*
+		 * If writeback cache is enabled, the truncated_pagecache should
+		 * be executed with fi->lock held, in case of racing with write
+		 * operations.
+		 */
+		if (is_wb && S_ISREG(inode->i_mode) && (oldsize != attr->size))
+			truncate_pagecache(inode, attr->size);
+	}
 	spin_unlock(&fi->lock);
 
 	if (!is_wb && S_ISREG(inode->i_mode)) {

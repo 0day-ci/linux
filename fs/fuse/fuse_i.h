@@ -1031,7 +1031,7 @@ void fuse_change_attributes(struct inode *inode, struct fuse_attr *attr,
 			    u64 attr_valid, u64 attr_version);
 
 void fuse_change_attributes_common(struct inode *inode, struct fuse_attr *attr,
-				   u64 attr_valid);
+				   u64 attr_valid, bool update_cmtime);
 
 /**
  * Initialize the client device
@@ -1286,5 +1286,6 @@ struct fuse_file *fuse_file_open(struct fuse_mount *fm, u64 nodeid,
 				 unsigned int open_flags, bool isdir);
 void fuse_file_release(struct inode *inode, struct fuse_file *ff,
 		       unsigned int open_flags, fl_owner_t id, bool isdir);
+bool fuse_file_is_writeback_locked(struct inode *inode);
 
 #endif /* _FS_FUSE_I_H */
