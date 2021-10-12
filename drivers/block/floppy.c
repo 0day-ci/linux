@@ -3110,6 +3110,8 @@ loop:
 	if (ptr->flags & (FD_RAW_READ | FD_RAW_WRITE)) {
 		if (ptr->length <= 0)
 			return -EINVAL;
+		if (get_order(ptr->length) >= MAX_ORDER)
+			return -EINVAL;
 		ptr->kernel_data = (char *)fd_dma_mem_alloc(ptr->length);
 		fallback_on_nodma_alloc(&ptr->kernel_data, ptr->length);
 		if (!ptr->kernel_data)
