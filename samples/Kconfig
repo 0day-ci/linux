@@ -26,7 +26,7 @@ config SAMPLE_TRACE_PRINTK
 config SAMPLE_FTRACE_DIRECT
 	tristate "Build register_ftrace_direct() example"
 	depends on DYNAMIC_FTRACE_WITH_DIRECT_CALLS && m
-	depends on X86_64 # has x86_64 inlined asm
+	depends on HAVE_SAMPLE_FTRACE_DIRECT
 	help
 	  This builds an ftrace direct function example
 	  that hooks to wake_up_process and prints the parameters.
@@ -226,3 +226,6 @@ config SAMPLE_WATCH_QUEUE
 source "samples/rust/Kconfig"
 
 endif # SAMPLES
+
+config HAVE_SAMPLE_FTRACE_DIRECT
+	bool
