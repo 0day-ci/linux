@@ -526,3 +526,15 @@ static int __init pgtable_debugfs_setup(void)
 	return 0;
 }
 arch_initcall(pgtable_debugfs_setup);
+
+#ifdef CONFIG_DEBUG_PAGEALLOC
+void __kernel_map_pages(struct page *page, int numpages, int enable)
+{
+	if (radix_enabled()) {
+		pr_warn_once("DEBUG_PAGEALLOC not supported in radix mode\n");
+		return;
+	}
+
+	hash__kernel_map_pages(page, numpages, enable);
+}
+#endif
