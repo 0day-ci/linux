@@ -1283,11 +1283,16 @@ static inline int hci_set_msft_opcode(struct hci_dev *hdev, __u16 opcode)
 	return 0;
 }
 
-static inline void hci_set_aosp_capable(struct hci_dev *hdev)
+static inline int hci_set_aosp_capable(struct hci_dev *hdev)
 {
+	if (!hci_dev_test_flag(hdev, HCI_SETUP))
+		return -EPERM;
+
 #if IS_ENABLED(CONFIG_BT_AOSPEXT)
 	hdev->aosp_capable = true;
 #endif
+
+	return 0;
 }
 
 int hci_dev_open(__u16 dev);
