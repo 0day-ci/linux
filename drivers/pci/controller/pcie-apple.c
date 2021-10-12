@@ -634,7 +634,7 @@ static struct apple_pcie_port *apple_pcie_get_port(struct pci_dev *pdev)
 {
 	struct pci_config_window *cfg = pdev->sysdata;
 	struct apple_pcie *pcie = cfg->priv;
-	struct pci_dev *port_pdev = pdev;
+	struct pci_dev *port_pdev;
 	struct apple_pcie_port *port;
 
 	/* Find the root port this device is on */
