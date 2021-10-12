@@ -149,7 +149,7 @@ static int i915_ttm_restore(struct i915_gem_apply_to_region *apply,
 	struct i915_gem_ttm_pm_apply *pm_apply =
 		container_of(apply, typeof(*pm_apply), base);
 	struct drm_i915_gem_object *backup = obj->ttm.backup;
-	struct ttm_buffer_object *backup_bo = i915_gem_to_ttm(backup);
+	struct ttm_buffer_object *backup_bo;
 	struct ttm_operation_ctx ctx = {};
 	int err;
 
@@ -162,6 +162,8 @@ static int i915_ttm_restore(struct i915_gem_apply_to_region *apply,
 	err = i915_gem_object_lock(backup, apply->ww);
 	if (err)
 		return err;
+
+	backup_bo = i915_gem_to_ttm(backup);
 
 	/* Content may have been swapped. */
 	err = ttm_tt_populate(backup_bo->bdev, backup_bo->ttm, &ctx);
