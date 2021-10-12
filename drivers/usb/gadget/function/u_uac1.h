@@ -36,14 +36,14 @@ struct f_uac1_opts {
 	int				p_srate;
 	int				p_ssize;
 
-	bool			p_mute_present;
-	bool			p_volume_present;
+	bool				p_mute_present;
+	bool				p_volume_present;
 	s16				p_volume_min;
 	s16				p_volume_max;
 	s16				p_volume_res;
 
-	bool			c_mute_present;
-	bool			c_volume_present;
+	bool				c_mute_present;
+	bool				c_volume_present;
 	s16				c_volume_min;
 	s16				c_volume_max;
 	s16				c_volume_res;

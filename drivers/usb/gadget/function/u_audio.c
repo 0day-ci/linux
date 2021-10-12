@@ -35,8 +35,8 @@ enum {
 
 /* Runtime data params for one stream */
 struct uac_rtd_params {
-	struct snd_uac_chip *uac; /* parent chip */
-	bool ep_enabled; /* if the ep is enabled */
+	struct snd_uac_chip *uac;	/* parent chip */
+	bool ep_enabled;		/* if the ep is enabled */
 
 	struct snd_pcm_substream *ss;
 
@@ -45,24 +45,23 @@ struct uac_rtd_params {
 
 	void *rbuf;
 
-	unsigned int pitch;	/* Stream pitch ratio to 1000000 */
-	unsigned int max_psize;	/* MaxPacketSize of endpoint */
+	unsigned int pitch;		/* Stream pitch ratio to 1000000 */
+	unsigned int max_psize;		/* MaxPacketSize of endpoint */
 
 	struct usb_request **reqs;
 
-	struct usb_request *req_fback; /* Feedback endpoint request */
-	bool fb_ep_enabled; /* if the ep is enabled */
+	struct usb_request *req_fback;	/* Feedback endpoint request */
+	bool fb_ep_enabled;		/* if the ep is enabled */
 
-  /* Volume/Mute controls and their state */
-  int fu_id; /* Feature Unit ID */
-  struct snd_kcontrol *snd_kctl_volume;
-  struct snd_kcontrol *snd_kctl_mute;
-  s16 volume_min, volume_max, volume_res;
-  s16 volume;
-  int mute;
+	/* Volume/Mute controls and their state */
+	int fu_id;			/* Feature Unit ID */
+	struct snd_kcontrol *snd_kctl_volume;
+	struct snd_kcontrol *snd_kctl_mute;
+	s16 volume_min, volume_max, volume_res;
+	s16 volume;
+	int mute;
 
-  spinlock_t lock; /* lock for control transfers */
-
+	spinlock_t lock;		/* lock for control transfers */
 };
 
 struct snd_uac_chip {
@@ -658,7 +657,7 @@ int u_audio_set_volume(struct g_audio *audio_dev, int playback, s16 val)
 
 	if (change)
 		snd_ctl_notify(uac->card, SNDRV_CTL_EVENT_MASK_VALUE,
-				&prm->snd_kctl_volume->id);
+			       &prm->snd_kctl_volume->id);
 
 	return 0;
 }
@@ -713,9 +712,8 @@ int u_audio_set_mute(struct g_audio *audio_dev, int playback, int val)
 }
 EXPORT_SYMBOL_GPL(u_audio_set_mute);
 
-
 static int u_audio_pitch_info(struct snd_kcontrol *kcontrol,
-				   struct snd_ctl_elem_info *uinfo)
+			      struct snd_ctl_elem_info *uinfo)
 {
 	struct uac_rtd_params *prm = snd_kcontrol_chip(kcontrol);
 	struct snd_uac_chip *uac = prm->uac;
@@ -735,7 +733,7 @@ static int u_audio_pitch_info(struct snd_kcontrol *kcontrol,
 }
 
 static int u_audio_pitch_get(struct snd_kcontrol *kcontrol,
-				   struct snd_ctl_elem_value *ucontrol)
+			     struct snd_ctl_elem_value *ucontrol)
 {
 	struct uac_rtd_params *prm = snd_kcontrol_chip(kcontrol);
 
@@ -745,7 +743,7 @@ static int u_audio_pitch_get(struct snd_kcontrol *kcontrol,
 }
 
 static int u_audio_pitch_put(struct snd_kcontrol *kcontrol,
-				  struct snd_ctl_elem_value *ucontrol)
+			     struct snd_ctl_elem_value *ucontrol)
 {
 	struct uac_rtd_params *prm = snd_kcontrol_chip(kcontrol);
 	struct snd_uac_chip *uac = prm->uac;
@@ -774,7 +772,7 @@ static int u_audio_pitch_put(struct snd_kcontrol *kcontrol,
 }
 
 static int u_audio_mute_info(struct snd_kcontrol *kcontrol,
-				   struct snd_ctl_elem_info *uinfo)
+			     struct snd_ctl_elem_info *uinfo)
 {
 	uinfo->type = SNDRV_CTL_ELEM_TYPE_BOOLEAN;
 	uinfo->count = 1;
@@ -786,7 +784,7 @@ static int u_audio_mute_info(struct snd_kcontrol *kcontrol,
 }
 
 static int u_audio_mute_get(struct snd_kcontrol *kcontrol,
-				   struct snd_ctl_elem_value *ucontrol)
+			    struct snd_ctl_elem_value *ucontrol)
 {
 	struct uac_rtd_params *prm = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
@@ -799,7 +797,7 @@ static int u_audio_mute_get(struct snd_kcontrol *kcontrol,
 }
 
 static int u_audio_mute_put(struct snd_kcontrol *kcontrol,
-				  struct snd_ctl_elem_value *ucontrol)
+			    struct snd_ctl_elem_value *ucontrol)
 {
 	struct uac_rtd_params *prm = snd_kcontrol_chip(kcontrol);
 	struct snd_uac_chip *uac = prm->uac;
@@ -827,7 +825,7 @@ static int u_audio_mute_put(struct snd_kcontrol *kcontrol,
  * TLV callback for mixer volume controls
  */
 static int u_audio_volume_tlv(struct snd_kcontrol *kcontrol, int op_flag,
-			 unsigned int size, unsigned int __user *_tlv)
+			      unsigned int size, unsigned int __user *_tlv)
 {
 	struct uac_rtd_params *prm = snd_kcontrol_chip(kcontrol);
 	DECLARE_TLV_DB_MINMAX(scale, 0, 0);
@@ -845,7 +843,7 @@ static int u_audio_volume_tlv(struct snd_kcontrol *kcontrol, int op_flag,
 }
 
 static int u_audio_volume_info(struct snd_kcontrol *kcontrol,
-				   struct snd_ctl_elem_info *uinfo)
+			       struct snd_ctl_elem_info *uinfo)
 {
 	struct uac_rtd_params *prm = snd_kcontrol_chip(kcontrol);
 
@@ -853,29 +851,29 @@ static int u_audio_volume_info(struct snd_kcontrol *kcontrol,
 	uinfo->count = 1;
 	uinfo->value.integer.min = 0;
 	uinfo->value.integer.max =
-		(prm->volume_max - prm->volume_min + prm->volume_res - 1)
-		/ prm->volume_res;
+		(prm->volume_max - prm->volume_min + prm->volume_res - 1) /
+		prm->volume_res;
 	uinfo->value.integer.step = 1;
 
 	return 0;
 }
 
 static int u_audio_volume_get(struct snd_kcontrol *kcontrol,
-				   struct snd_ctl_elem_value *ucontrol)
+			      struct snd_ctl_elem_value *ucontrol)
 {
 	struct uac_rtd_params *prm = snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
 
 	spin_lock_irqsave(&prm->lock, flags);
 	ucontrol->value.integer.value[0] =
-			(prm->volume - prm->volume_min) / prm->volume_res;
+		(prm->volume - prm->volume_min) / prm->volume_res;
 	spin_unlock_irqrestore(&prm->lock, flags);
 
 	return 0;
 }
 
 static int u_audio_volume_put(struct snd_kcontrol *kcontrol,
-				  struct snd_ctl_elem_value *ucontrol)
+			      struct snd_ctl_elem_value *ucontrol)
 {
 	struct uac_rtd_params *prm = snd_kcontrol_chip(kcontrol);
 	struct snd_uac_chip *uac = prm->uac;
@@ -904,14 +902,14 @@ static int u_audio_volume_put(struct snd_kcontrol *kcontrol,
 
 
 static struct snd_kcontrol_new u_audio_controls[]  = {
-  [UAC_FBACK_CTRL] {
-    .iface =        SNDRV_CTL_ELEM_IFACE_PCM,
-    .name =         "Capture Pitch 1000000",
-    .info =         u_audio_pitch_info,
-    .get =          u_audio_pitch_get,
-    .put =          u_audio_pitch_put,
-  },
-  [UAC_MUTE_CTRL] {
+	[UAC_FBACK_CTRL] {
+		.iface =        SNDRV_CTL_ELEM_IFACE_PCM,
+		.name =         "Capture Pitch 1000000",
+		.info =         u_audio_pitch_info,
+		.get =          u_audio_pitch_get,
+		.put =          u_audio_pitch_put,
+	},
+	[UAC_MUTE_CTRL] {
 		.iface =	SNDRV_CTL_ELEM_IFACE_MIXER,
 		.name =		"", /* will be filled later */
 		.info =		u_audio_mute_info,
@@ -928,7 +926,7 @@ static struct snd_kcontrol_new u_audio_controls[]  = {
 };
 
 int g_audio_setup(struct g_audio *g_audio, const char *pcm_name,
-					const char *card_name)
+		  const char *card_name)
 {
 	struct snd_uac_chip *uac;
 	struct snd_card *card;
@@ -954,20 +952,19 @@ int g_audio_setup(struct g_audio *g_audio, const char *pcm_name,
 	if (c_chmask) {
 		struct uac_rtd_params *prm = &uac->c_prm;
 
-    spin_lock_init(&prm->lock);
-    uac->c_prm.uac = uac;
+		spin_lock_init(&prm->lock);
+		uac->c_prm.uac = uac;
 		prm->max_psize = g_audio->out_ep_maxpsize;
 
 		prm->reqs = kcalloc(params->req_number,
-				    sizeof(struct usb_request *),
-				    GFP_KERNEL);
+				    sizeof(struct usb_request *), GFP_KERNEL);
 		if (!prm->reqs) {
 			err = -ENOMEM;
 			goto fail;
 		}
 
-		prm->rbuf = kcalloc(params->req_number, prm->max_psize,
-				GFP_KERNEL);
+		prm->rbuf =
+			kcalloc(params->req_number, prm->max_psize, GFP_KERNEL);
 		if (!prm->rbuf) {
 			prm->max_psize = 0;
 			err = -ENOMEM;
@@ -983,15 +980,14 @@ int g_audio_setup(struct g_audio *g_audio, const char *pcm_name,
 		prm->max_psize = g_audio->in_ep_maxpsize;
 
 		prm->reqs = kcalloc(params->req_number,
-				    sizeof(struct usb_request *),
-				    GFP_KERNEL);
+				    sizeof(struct usb_request *), GFP_KERNEL);
 		if (!prm->reqs) {
 			err = -ENOMEM;
 			goto fail;
 		}
 
-		prm->rbuf = kcalloc(params->req_number, prm->max_psize,
-				GFP_KERNEL);
+		prm->rbuf =
+			kcalloc(params->req_number, prm->max_psize, GFP_KERNEL);
 		if (!prm->rbuf) {
 			prm->max_psize = 0;
 			err = -ENOMEM;
@@ -1011,8 +1007,8 @@ int g_audio_setup(struct g_audio *g_audio, const char *pcm_name,
 	 * Create first PCM device
 	 * Create a substream only for non-zero channel streams
 	 */
-	err = snd_pcm_new(uac->card, pcm_name, 0,
-			       p_chmask ? 1 : 0, c_chmask ? 1 : 0, &pcm);
+	err = snd_pcm_new(uac->card, pcm_name, 0, p_chmask ? 1 : 0,
+			  c_chmask ? 1 : 0, &pcm);
 	if (err < 0)
 		goto snd_fail;
 
@@ -1070,8 +1066,8 @@ int g_audio_setup(struct g_audio *g_audio, const char *pcm_name,
 		prm->fu_id = fu->id;
 
 		if (fu->mute_present) {
-			snprintf(ctrl_name, sizeof(ctrl_name),
-					"PCM %s Switch", direction);
+			snprintf(ctrl_name, sizeof(ctrl_name), "PCM %s Switch",
+				 direction);
 
 			u_audio_controls[UAC_MUTE_CTRL].name = ctrl_name;
 
@@ -1093,8 +1089,8 @@ int g_audio_setup(struct g_audio *g_audio, const char *pcm_name,
 		}
 
 		if (fu->volume_present) {
-			snprintf(ctrl_name, sizeof(ctrl_name),
-					"PCM %s Volume", direction);
+			snprintf(ctrl_name, sizeof(ctrl_name), "PCM %s Volume",
+				 direction);
 
 			u_audio_controls[UAC_VOLUME_CTRL].name = ctrl_name;
 
@@ -1108,10 +1104,10 @@ int g_audio_setup(struct g_audio *g_audio, const char *pcm_name,
 			kctl->id.device = pcm->device;
 			kctl->id.subdevice = i;
 
-
 			kctl->tlv.c = u_audio_volume_tlv;
-			kctl->vd[0].access |= SNDRV_CTL_ELEM_ACCESS_TLV_READ |
-					SNDRV_CTL_ELEM_ACCESS_TLV_CALLBACK;
+			kctl->vd[0].access |=
+				SNDRV_CTL_ELEM_ACCESS_TLV_READ |
+				SNDRV_CTL_ELEM_ACCESS_TLV_CALLBACK;
 
 			err = snd_ctl_add(card, kctl);
 			if (err < 0)

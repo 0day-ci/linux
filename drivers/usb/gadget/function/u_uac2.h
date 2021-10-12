@@ -43,21 +43,21 @@ struct f_uac2_opts {
 	int				c_ssize;
 	int				c_sync;
 
-	bool			p_mute_present;
-	bool			p_volume_present;
+	bool				p_mute_present;
+	bool				p_volume_present;
 	s16				p_volume_min;
 	s16				p_volume_max;
 	s16				p_volume_res;
 
-	bool			c_mute_present;
-	bool			c_volume_present;
+	bool				c_mute_present;
+	bool				c_volume_present;
 	s16				c_volume_min;
 	s16				c_volume_max;
 	s16				c_volume_res;
 
 	int				req_number;
 	int				fb_max;
-	bool			bound;
+	bool				bound;
 
 	struct mutex			lock;
 	int				refcnt;
