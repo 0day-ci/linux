@@ -380,6 +380,16 @@ config ARM_SMMU_V3_SVA
 	  Say Y here if your system supports SVA extensions such as PCIe PASID
 	  and PRI.
 
+config ARM_SMMU_QCOM
+	bool "QCOM Specific ARM SMMU implementation support"
+	depends on ARM_SMMU
+	default ARCH_QCOM
+	help
+          Support for the QCOM implementation of the ARM System MMU architecture.
+
+          Say Y here if your SoC includes an QCOM IOMMU device implementing
+          the ARM SMMU architecture.
+
 config S390_IOMMU
 	def_bool y if S390 && PCI
 	depends on S390 && PCI
