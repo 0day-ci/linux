@@ -100,6 +100,14 @@ int core_kernel_data(unsigned long addr)
 	return 0;
 }
 
+int core_kernel_bss(unsigned long addr)
+{
+	if (addr >= (unsigned long)__bss_start &&
+	    addr < (unsigned long)__bss_stop)
+		return 1;
+	return 0;
+}
+
 int __kernel_text_address(unsigned long addr)
 {
 	if (kernel_text_address(addr))

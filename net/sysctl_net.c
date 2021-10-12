@@ -144,7 +144,7 @@ static void ensure_safe_net_sysctl(struct net *net, const char *path,
 		addr = (unsigned long)ent->data;
 		if (is_module_address(addr))
 			where = "module";
-		else if (core_kernel_data(addr))
+		else if (core_kernel_data(addr) || core_kernel_bss(addr))
 			where = "kernel";
 		else
 			continue;
