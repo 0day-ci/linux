@@ -161,6 +161,7 @@ struct ice_rule_query_data {
 };
 
 struct ice_adv_rule_info {
+	enum ice_sw_tunnel_type tun_type;
 	struct ice_sw_act_ctrl sw_act;
 	u32 priority;
 	u8 rx; /* true means LOOKUP_RX otherwise LOOKUP_TX */
