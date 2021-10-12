@@ -268,6 +268,17 @@ config CRYPTO_ECRDSA
 config CRYPTO_EC_MPI
 	tristate
 
+config CRYPTO_EDDSA
+	tristate "EDDSA (ed25519) algorithm"
+	select CRYPTO_ECC
+	select CRYPTO_EC_MPI
+	select CRYPTO_AKCIPHER
+	select ASN1
+	help
+	  Edwards-curve Digital Signature Algorithm (ed25519) is a variant
+	  of Schnorr's signature system with (possibly twisted) Edwards curves.
+	  Only signature verification is implemented.
+
 config CRYPTO_SM2
 	tristate "SM2 algorithm"
 	select CRYPTO_SM3
