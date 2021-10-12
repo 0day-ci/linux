@@ -266,6 +266,57 @@ out:
 	return len;
 }
 
+static ssize_t dbgfs_region_stat_read(struct file *file,
+		char __user *buf, size_t count, loff_t *ppos)
+{
+	struct damon_ctx *ctx = file->private_data;
+	struct damon_target *t;
+	char *kbuf;
+	ssize_t len;
+	int id, rc, written = 0;
+
+	kbuf = kmalloc(count, GFP_KERNEL);
+	if (!kbuf)
+		return -ENOMEM;
+
+	mutex_lock(&ctx->kdamond_lock);
+	damon_for_each_target(t, ctx) {
+		struct damon_region *r;
+
+		if (targetid_is_pid(ctx))
+			id = (int)pid_vnr((struct pid *)t->id);
+
+		rc = scnprintf(&kbuf[written], count - written,
+				"last_aggregation=%lld.%lds\ntarget_id=%d\nnr_regions=%u\n",
+				ctx->last_aggregation.tv_sec,
+				ctx->last_aggregation.tv_nsec / 1000000,
+				id, t->nr_regions);
+		if (!rc)
+			goto out;
+
+		written += rc;
+
+		damon_for_each_region(r, t) {
+			rc = scnprintf(&kbuf[written], count - written,
+				       "%lx-%lx(%lu KiB): %u\n",
+				       r->ar.start, r->ar.end,
+					   (r->ar.end - r->ar.start) >> 10,
+					   r->nr_accesses);
+			if (!rc)
+				goto out;
+
+			written += rc;
+		}
+
+		len += simple_read_from_buffer(buf, count, ppos, kbuf, written);
+	}
+
+out:
+	mutex_unlock(&ctx->kdamond_lock);
+	kfree(kbuf);
+	return len;
+}
+
 static int damon_dbgfs_open(struct inode *inode, struct file *file)
 {
 	file->private_data = inode->i_private;
@@ -290,12 +341,17 @@ static const struct file_operations kdamond_pid_fops = {
 	.read = dbgfs_kdamond_pid_read,
 };
 
+static const struct file_operations region_stat_fops = {
+	.open = damon_dbgfs_open,
+	.read = dbgfs_region_stat_read,
+};
+
 static void dbgfs_fill_ctx_dir(struct dentry *dir, struct damon_ctx *ctx)
 {
 	const char * const file_names[] = {"attrs", "target_ids",
-		"kdamond_pid"};
+		"kdamond_pid", "region_stat"};
 	const struct file_operations *fops[] = {&attrs_fops, &target_ids_fops,
-		&kdamond_pid_fops};
+		&kdamond_pid_fops, &region_stat_fops};
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(file_names); i++)
