@@ -15,6 +15,7 @@
 #include <linux/vmalloc.h>
 #include <linux/init.h>
 #include <linux/slab.h>
+#include <linux/atomic.h>
 
 #include <net/ip.h>
 #include <net/sock.h>
@@ -307,6 +308,22 @@ proc_dolongvec_minmax_bpf_restricted(struct ctl_table *table, int write,
 
 	return proc_doulongvec_minmax(table, write, buffer, lenp, ppos);
 }
+
+static int proc_bpf_jit_current(struct ctl_table *table, int write,
+				void *buffer, size_t *lenp, loff_t *ppos)
+{
+	long curr = atomic_long_read(&bpf_jit_current) << PAGE_SHIFT;
+	struct ctl_table ctl_entry = {
+		.data		= &curr,
+		.maxlen		= sizeof(long),
+	};
+
+
+	if (!capable(CAP_SYS_ADMIN) || write)
+		return -EPERM;
+
+	return proc_doulongvec_minmax(&ctl_entry, write, buffer, lenp, ppos);
+}
 #endif
 
 static struct ctl_table net_core_table[] = {
@@ -420,6 +437,13 @@ static struct ctl_table net_core_table[] = {
 		.proc_handler	= proc_dolongvec_minmax_bpf_restricted,
 		.extra1		= &long_one,
 		.extra2		= &bpf_jit_limit_max,
+	},
+	{
+		.procname	= "bpf_jit_current",
+		.data		= &bpf_jit_current,
+		.maxlen		= sizeof(long),
+		.mode		= 0400,
+		.proc_handler	= proc_bpf_jit_current,
 	},
 #endif
 	{

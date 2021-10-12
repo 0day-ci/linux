@@ -123,6 +123,12 @@ compiler in order to reject unprivileged JIT requests once it has
 been surpassed. bpf_jit_limit contains the value of the global limit
 in bytes.
 
+bpf_jit_current
+---------------
+
+The amount of JIT memory currently allocated, in bytes. JITing of
+unprivileged BPF is rejected if this value is above bpf_jit_limit.
+
 dev_weight
 ----------
 
