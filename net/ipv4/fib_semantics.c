@@ -1401,17 +1401,20 @@ struct fib_info *fib_create_info(struct fib_config *cfg,
 
 		if (!new_size)
 			new_size = 16;
-		bytes = new_size * sizeof(struct hlist_head *);
-		new_info_hash = fib_info_hash_alloc(bytes);
-		new_laddrhash = fib_info_hash_alloc(bytes);
-		if (!new_info_hash || !new_laddrhash) {
-			fib_info_hash_free(new_info_hash, bytes);
-			fib_info_hash_free(new_laddrhash, bytes);
-		} else
-			fib_info_hash_move(new_info_hash, new_laddrhash, new_size);
 
-		if (!fib_info_hash_size)
-			goto failure;
+		if (new_size > fib_info_hash_size) {
+			bytes = new_size * sizeof(struct hlist_head *);
+			new_info_hash = fib_info_hash_alloc(bytes);
+			new_laddrhash = fib_info_hash_alloc(bytes);
+			if (!new_info_hash || !new_laddrhash) {
+				fib_info_hash_free(new_info_hash, bytes);
+				fib_info_hash_free(new_laddrhash, bytes);
+
+				if (!fib_info_hash_size)
+					goto failure;
+			} else
+				fib_info_hash_move(new_info_hash, new_laddrhash, new_size);
+		}
 	}
 
 	fi = kzalloc(struct_size(fi, fib_nh, nhs), GFP_KERNEL);
