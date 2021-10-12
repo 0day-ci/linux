@@ -83,11 +83,7 @@ static bool rt_mt6(const struct sk_buff *skb, struct xt_action_param *par)
 		 !(rtinfo->flags & IP6T_RT_LEN) ||
 		  ((rtinfo->hdrlen == hdrlen) ^
 		   !!(rtinfo->invflags & IP6T_RT_INV_LEN)));
-	pr_debug("res %02X %02X %02X ",
-		 rtinfo->flags & IP6T_RT_RES,
-		 ((const struct rt0_hdr *)rh)->reserved,
-		 !((rtinfo->flags & IP6T_RT_RES) &&
-		   (((const struct rt0_hdr *)rh)->reserved)));
+	pr_debug("res flag %02X ", rtinfo->flags & IP6T_RT_RES);
 
 	ret = (segsleft_match(rtinfo->segsleft[0], rtinfo->segsleft[1],
 			      rh->segments_left,
@@ -107,7 +103,12 @@ static bool rt_mt6(const struct sk_buff *skb, struct xt_action_param *par)
 						       reserved),
 					sizeof(_reserved),
 					&_reserved);
+		if (!rp) {
+			par->hotdrop = true;
+			return false;
+		}
 
+		pr_debug("res value %02X ", *rp);
 		ret = (*rp == 0);
 	}
 
