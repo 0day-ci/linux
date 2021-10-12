@@ -977,9 +977,9 @@ static int qcom_pcie_get_resources_2_3_3(struct qcom_pcie *pcie)
 	struct dw_pcie *pci = pcie->pci;
 	struct device *dev = pci->dev;
 	int i;
-	const char *rst_names[] = { "axi_m", "axi_s", "pipe",
-				    "axi_m_sticky", "sticky",
-				    "ahb", "sleep", };
+	static const char * const rst_names[] = { "axi_m", "axi_s", "pipe",
+						  "axi_m_sticky", "sticky",
+						  "ahb", "sleep", };
 
 	res->iface = devm_clk_get(dev, "iface");
 	if (IS_ERR(res->iface))
