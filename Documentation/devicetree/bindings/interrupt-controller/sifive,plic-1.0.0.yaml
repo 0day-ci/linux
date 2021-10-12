@@ -46,6 +46,7 @@ properties:
       - enum:
           - sifive,fu540-c000-plic
           - canaan,k210-plic
+          - thead,c9xx-plic
       - const: sifive,plic-1.0.0
 
   reg:
