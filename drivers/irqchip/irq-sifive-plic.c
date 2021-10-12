@@ -79,6 +79,7 @@ struct plic_handler {
 };
 static int plic_parent_irq __ro_after_init;
 static bool plic_cpuhp_setup_done __ro_after_init;
+static bool disable_mask_unmask __ro_after_init;
 static DEFINE_PER_CPU(struct plic_handler, plic_handlers);
 
 static inline void plic_toggle(struct plic_handler *handler,
@@ -180,6 +181,13 @@ static int plic_irqdomain_map(struct irq_domain *d, unsigned int irq,
 			      irq_hw_number_t hwirq)
 {
 	struct plic_priv *priv = d->host_data;
+
+	if (disable_mask_unmask) {
+		plic_chip.irq_mask	= NULL;
+		plic_chip.irq_unmask	= NULL;
+		plic_chip.irq_enable	= plic_irq_unmask;
+		plic_chip.irq_disable	= plic_irq_mask;
+	}
 
 	irq_domain_set_info(d, irq, hwirq, &plic_chip, d->host_data,
 			    handle_fasteoi_irq, NULL, NULL);
@@ -390,5 +398,14 @@ out_free_priv:
 	return error;
 }
 
+static int __init thead_c9xx_plic_init(struct device_node *node,
+		struct device_node *parent)
+{
+	disable_mask_unmask = true;
+
+	return plic_init(node, parent);
+}
+
 IRQCHIP_DECLARE(sifive_plic, "sifive,plic-1.0.0", plic_init);
 IRQCHIP_DECLARE(riscv_plic0, "riscv,plic0", plic_init); /* for legacy systems */
+IRQCHIP_DECLARE(thead_c9xx_plic, "thead,c9xx-plic", thead_c9xx_plic_init);
