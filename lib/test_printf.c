@@ -613,6 +613,10 @@ page_flags_test(int section, int node, int zone, int last_cpupid,
 	bool append = false;
 	int i;
 
+	for (i = 0; i < ARRAY_SIZE(values); i++)
+		page_flags |= (values[i] & pft[i].mask) << pft[i].shift;
+	snprintf(cmp_buf + size, BUF_SIZE - size, "%#lx(", page_flags);
+	size = strlen(cmp_buf);
 	if (flags & PAGEFLAGS_MASK) {
 		snprintf(cmp_buf + size, BUF_SIZE - size, "%s", name);
 		size = strlen(cmp_buf);
@@ -628,13 +632,17 @@ page_flags_test(int section, int node, int zone, int last_cpupid,
 			cmp_buf[size] = '\0';
 		}
 
-		page_flags |= (values[i] & pft[i].mask) << pft[i].shift;
 		snprintf(cmp_buf + size, BUF_SIZE - size, "%s=", pft[i].name);
 		size = strlen(cmp_buf);
 		snprintf(cmp_buf + size, BUF_SIZE - size, pft[i].fmt,
 			 values[i] & pft[i].mask);
 		size = strlen(cmp_buf);
 		append = true;
+	}
+
+	if (size < BUF_SIZE) {
+		cmp_buf[size++] = ')';
+		cmp_buf[size] = '\0';
 	}
 
 	test(cmp_buf, "%pGp", &page_flags);
