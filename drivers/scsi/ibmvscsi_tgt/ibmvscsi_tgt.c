@@ -3007,20 +3007,13 @@ static long ibmvscsis_create_command_q(struct scsi_info *vscsi, int num_cmds)
 
 	vscsi->cmd_q.size = pages;
 
-	vscsi->cmd_q.base_addr =
-		(struct viosrp_crq *)get_zeroed_page(GFP_KERNEL);
-	if (!vscsi->cmd_q.base_addr)
-		return -ENOMEM;
-
 	vscsi->cmd_q.mask = ((uint)pages * CRQ_PER_PAGE) - 1;
 
-	vscsi->cmd_q.crq_token = dma_map_single(&vdev->dev,
-						vscsi->cmd_q.base_addr,
-						PAGE_SIZE, DMA_BIDIRECTIONAL);
-	if (dma_mapping_error(&vdev->dev, vscsi->cmd_q.crq_token)) {
-		free_page((unsigned long)vscsi->cmd_q.base_addr);
+	vscsi->cmd_q.base_addr = dma_alloc_noncoherent(&vdev->dev, PAGE_SIZE,
+						       &vscsi->cmd_q.crq_token,
+						       DMA_BIDIRECTIONAL, GFP_KERNEL);
+	if (!vscsi->cmd_q.base_addr)
 		return -ENOMEM;
-	}
 
 	return 0;
 }
@@ -3036,9 +3029,9 @@ static long ibmvscsis_create_command_q(struct scsi_info *vscsi, int num_cmds)
  */
 static void ibmvscsis_destroy_command_q(struct scsi_info *vscsi)
 {
-	dma_unmap_single(&vscsi->dma_dev->dev, vscsi->cmd_q.crq_token,
-			 PAGE_SIZE, DMA_BIDIRECTIONAL);
-	free_page((unsigned long)vscsi->cmd_q.base_addr);
+	dma_free_noncoherent(&vscsi->dma_dev->dev,
+			     PAGE_SIZE, vscsi->cmd_q.base_addr,
+			     vscsi->cmd_q.crq_token, DMA_BIDIRECTIONAL);
 	vscsi->cmd_q.base_addr = NULL;
 	vscsi->state = NO_QUEUE;
 }
@@ -3504,18 +3497,12 @@ static int ibmvscsis_probe(struct vio_dev *vdev,
 		goto free_timer;
 	}
 
-	vscsi->map_buf = kzalloc(PAGE_SIZE, GFP_KERNEL);
+	vscsi->map_buf = dma_alloc_noncoherent(&vdev->dev,
+					       PAGE_SIZE, &vscsi->map_ioba,
+					       DMA_BIDIRECTIONAL, GFP_KERNEL);
 	if (!vscsi->map_buf) {
 		rc = -ENOMEM;
 		dev_err(&vscsi->dev, "probe: allocating cmd buffer failed\n");
-		goto destroy_queue;
-	}
-
-	vscsi->map_ioba = dma_map_single(&vdev->dev, vscsi->map_buf, PAGE_SIZE,
-					 DMA_BIDIRECTIONAL);
-	if (dma_mapping_error(&vdev->dev, vscsi->map_ioba)) {
-		rc = -ENOMEM;
-		dev_err(&vscsi->dev, "probe: error mapping command buffer\n");
 		goto free_buf;
 	}
 
@@ -3544,7 +3531,7 @@ static int ibmvscsis_probe(struct vio_dev *vdev,
 	if (!vscsi->work_q) {
 		rc = -ENOMEM;
 		dev_err(&vscsi->dev, "create_workqueue failed\n");
-		goto unmap_buf;
+		goto destroy_queue;
 	}
 
 	rc = request_irq(vdev->irq, ibmvscsis_interrupt, 0, "ibmvscsis", vscsi);
@@ -3562,11 +3549,9 @@ static int ibmvscsis_probe(struct vio_dev *vdev,
 
 destroy_WQ:
 	destroy_workqueue(vscsi->work_q);
-unmap_buf:
-	dma_unmap_single(&vdev->dev, vscsi->map_ioba, PAGE_SIZE,
-			 DMA_BIDIRECTIONAL);
 free_buf:
-	kfree(vscsi->map_buf);
+	dma_free_noncoherent(&vdev->dev, PAGE_SIZE, vscsi->map_buf,
+			     vscsi->map_ioba, DMA_BIDIRECTIONAL);
 destroy_queue:
 	tasklet_kill(&vscsi->work_task);
 	ibmvscsis_unregister_command_q(vscsi);
@@ -3602,9 +3587,8 @@ static void ibmvscsis_remove(struct vio_dev *vdev)
 	vio_disable_interrupts(vdev);
 	free_irq(vdev->irq, vscsi);
 	destroy_workqueue(vscsi->work_q);
-	dma_unmap_single(&vdev->dev, vscsi->map_ioba, PAGE_SIZE,
-			 DMA_BIDIRECTIONAL);
-	kfree(vscsi->map_buf);
+	dma_free_noncoherent(&vdev->dev, PAGE_SIZE, vscsi->map_buf,
+			     vscsi->map_ioba, DMA_BIDIRECTIONAL);
 	tasklet_kill(&vscsi->work_task);
 	ibmvscsis_destroy_command_q(vscsi);
 	ibmvscsis_freetimer(vscsi);
