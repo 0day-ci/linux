@@ -10,7 +10,7 @@
 #include <linux/clk.h>
 #include <linux/delay.h>
 #include <linux/firmware.h>
-#include <linux/gpio.h>
+#include <linux/gpio/consumer.h>
 #include <linux/i2c.h>
 #include <linux/init.h>
 #include <linux/media.h>
@@ -1349,9 +1349,9 @@ static int s5c73m3_oif_open(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
 
 static int s5c73m3_gpio_set_value(struct s5c73m3 *priv, int id, u32 val)
 {
-	if (!gpio_is_valid(priv->gpio[id].gpio))
+	if (!priv->gpio[id].gpio)
 		return 0;
-	gpio_set_value(priv->gpio[id].gpio, !!val);
+	gpiod_set_value(priv->gpio[id].gpio, !!val);
 	return 1;
 }
 
@@ -1548,20 +1548,24 @@ static int s5c73m3_configure_gpios(struct s5c73m3 *state)
 	static const char * const gpio_names[] = {
 		"S5C73M3_STBY", "S5C73M3_RST"
 	};
+	static const char * const prop_names[] = {
+		"standby", "xshutdown",
+	};
+
 	struct i2c_client *c = state->i2c_client;
 	struct s5c73m3_gpio *g = state->gpio;
-	int ret, i;
+	int i;
 
 	for (i = 0; i < GPIO_NUM; ++i) {
-		unsigned int flags = GPIOF_DIR_OUT;
+		unsigned int flags = GPIOD_OUT_LOW;
 		if (g[i].level)
-			flags |= GPIOF_INIT_HIGH;
-		ret = devm_gpio_request_one(&c->dev, g[i].gpio, flags,
-					    gpio_names[i]);
-		if (ret) {
+			flags = GPIOD_OUT_HIGH;
+		g[i].gpio = devm_gpiod_get_optional(&c->dev, prop_names[i],
+				flags);
+		if (IS_ERR(g[i].gpio)) {
 			v4l2_err(c, "failed to request gpio %s\n",
 				 gpio_names[i]);
-			return ret;
+			return PTR_ERR(g[i].gpio);
 		}
 	}
 	return 0;
@@ -1586,7 +1590,6 @@ static int s5c73m3_parse_gpios(struct s5c73m3 *state)
 				prop_names[i]);
 			return -EINVAL;
 		}
-		state->gpio[i].gpio = ret;
 		state->gpio[i].level = !(of_flags & OF_GPIO_ACTIVE_LOW);
 	}
 	return 0;
