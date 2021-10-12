@@ -108,6 +108,7 @@ static inline u64 kpf_copy_bit(u64 kflags, int ubit, int kbit)
 
 u64 stable_page_flags(struct page *page)
 {
+	struct page *head;
 	u64 k;
 	u64 u;
 
@@ -118,6 +119,7 @@ u64 stable_page_flags(struct page *page)
 	if (!page)
 		return 1 << KPF_NOPAGE;
 
+	head = compound_head(page);
 	k = page->flags;
 	u = 0;
 
@@ -127,7 +129,7 @@ u64 stable_page_flags(struct page *page)
 	 * Note that page->_mapcount is overloaded in SLOB/SLUB/SLQB, so the
 	 * simple test in page_mapped() is not enough.
 	 */
-	if (!PageSlab(compound_head(page)) && page_mapped(page))
+	if (!PageSlab(head) && page_mapped(page))
 		u |= 1 << KPF_MMAP;
 	if (PageAnon(page))
 		u |= 1 << KPF_ANON;
@@ -151,8 +153,6 @@ u64 stable_page_flags(struct page *page)
 	 * to make sure a given page is a thp, not a non-huge compound page.
 	 */
 	else if (PageTransCompound(page)) {
-		struct page *head = compound_head(page);
-
 		/* XXX: misses isolated file THPs */
 		if (PageLRU(head) || PageAnon(head))
 			u |= 1 << KPF_THP;
@@ -185,7 +185,7 @@ u64 stable_page_flags(struct page *page)
 	u |= kpf_copy_bit(k, KPF_LOCKED,	PG_locked);
 
 	u |= kpf_copy_bit(k, KPF_SLAB,		PG_slab);
-	if (PageTail(page) && PageSlab(compound_head(page)))
+	if (PageTail(page) && PageSlab(head))
 		u |= 1 << KPF_SLAB;
 
 	u |= kpf_copy_bit(k, KPF_ERROR,		PG_error);
