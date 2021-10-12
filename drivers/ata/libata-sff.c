@@ -647,7 +647,7 @@ static void ata_pio_xfer(struct ata_queued_cmd *qc, struct page *page,
 	qc->ap->ops->sff_data_xfer(qc, buf + offset, xfer_size, do_write);
 	kunmap_atomic(buf);
 
-	if (!do_write && !PageSlab(page))
+	if (!do_write && !PageSlab(compound_head(page)))
 		flush_dcache_page(page);
 }
 

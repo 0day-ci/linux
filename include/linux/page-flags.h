@@ -344,7 +344,7 @@ PAGEFLAG(Active, active, PF_HEAD) __CLEARPAGEFLAG(Active, active, PF_HEAD)
 	TESTCLEARFLAG(Active, active, PF_HEAD)
 PAGEFLAG(Workingset, workingset, PF_HEAD)
 	TESTCLEARFLAG(Workingset, workingset, PF_HEAD)
-__PAGEFLAG(Slab, slab, PF_NO_TAIL)
+__PAGEFLAG(Slab, slab, PF_ONLY_HEAD)
 __PAGEFLAG(SlobFree, slob_free, PF_NO_TAIL)
 PAGEFLAG(Checked, checked, PF_NO_COMPOUND)	   /* Used by some filesystems */
 
@@ -776,7 +776,7 @@ __PAGEFLAG(Isolated, isolated, PF_ANY);
  */
 static inline int PageSlabPfmemalloc(struct page *page)
 {
-	VM_BUG_ON_PAGE(!PageSlab(page), page);
+	VM_BUG_ON_PAGE(!PageSlab(compound_head(page)), page);
 	return PageActive(page);
 }
 
@@ -791,19 +791,19 @@ static inline int __PageSlabPfmemalloc(struct page *page)
 
 static inline void SetPageSlabPfmemalloc(struct page *page)
 {
-	VM_BUG_ON_PAGE(!PageSlab(page), page);
+	VM_BUG_ON_PAGE(!PageSlab(compound_head(page)), page);
 	SetPageActive(page);
 }
 
 static inline void __ClearPageSlabPfmemalloc(struct page *page)
 {
-	VM_BUG_ON_PAGE(!PageSlab(page), page);
+	VM_BUG_ON_PAGE(!PageSlab(compound_head(page)), page);
 	__ClearPageActive(page);
 }
 
 static inline void ClearPageSlabPfmemalloc(struct page *page)
 {
-	VM_BUG_ON_PAGE(!PageSlab(page), page);
+	VM_BUG_ON_PAGE(!PageSlab(compound_head(page)), page);
 	ClearPageActive(page);
 }
 

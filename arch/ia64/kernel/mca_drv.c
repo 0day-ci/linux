@@ -136,7 +136,7 @@ mca_page_isolate(unsigned long paddr)
 		return ISOLATE_NG;
 
 	/* kick pages having attribute 'SLAB' or 'Reserved' */
-	if (PageSlab(p) || PageReserved(p))
+	if (PageSlab(compound_head(p)) || PageReserved(p))
 		return ISOLATE_NG;
 
 	/* add attribute 'Reserved' and register the page */

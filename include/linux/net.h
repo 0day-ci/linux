@@ -299,7 +299,7 @@ do {									\
  */
 static inline bool sendpage_ok(struct page *page)
 {
-	return !PageSlab(page) && page_count(page) >= 1;
+	return !PageSlab(compound_head(page)) && page_count(page) >= 1;
 }
 
 int kernel_sendmsg(struct socket *sock, struct msghdr *msg, struct kvec *vec,

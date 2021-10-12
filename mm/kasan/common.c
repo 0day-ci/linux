@@ -411,7 +411,7 @@ void __kasan_slab_free_mempool(void *ptr, unsigned long ip)
 	 * !PageSlab() when the size provided to kmalloc is larger than
 	 * KMALLOC_MAX_SIZE, and kmalloc falls back onto page_alloc.
 	 */
-	if (unlikely(!PageSlab(page))) {
+	if (unlikely(!PageSlab(compound_head(page)))) {
 		if (____kasan_kfree_large(ptr, ip))
 			return;
 		kasan_poison(ptr, page_size(page), KASAN_FREE_PAGE, false);
@@ -575,7 +575,7 @@ void * __must_check __kasan_krealloc(const void *object, size_t size, gfp_t flag
 	page = virt_to_head_page(object);
 
 	/* Piggy-back on kmalloc() instrumentation to poison the redzone. */
-	if (unlikely(!PageSlab(page)))
+	if (unlikely(!PageSlab(compound_head(page))))
 		return __kasan_kmalloc_large(object, size, flags);
 	else
 		return ____kasan_kmalloc(page->slab_cache, object, size, flags);

@@ -1089,7 +1089,7 @@ static int check_slab(struct kmem_cache *s, struct page *page)
 {
 	int maxobj;
 
-	if (!PageSlab(page)) {
+	if (!PageSlab(compound_head(page))) {
 		slab_err(s, page, "Not a valid slab page");
 		return 0;
 	}
@@ -1295,7 +1295,7 @@ static noinline int alloc_debug_processing(struct kmem_cache *s,
 	return 1;
 
 bad:
-	if (PageSlab(page)) {
+	if (PageSlab(compound_head(page))) {
 		/*
 		 * If this is a slab page then lets do the best we can
 		 * to avoid issues in the future. Marking all objects
@@ -1325,7 +1325,7 @@ static inline int free_consistency_checks(struct kmem_cache *s,
 		return 0;
 
 	if (unlikely(s != page->slab_cache)) {
-		if (!PageSlab(page)) {
+		if (!PageSlab(compound_head(page))) {
 			slab_err(s, page, "Attempt to free object(0x%p) outside of slab",
 				 object);
 		} else if (!page->slab_cache) {
@@ -3554,7 +3554,7 @@ int build_detached_freelist(struct kmem_cache *s, size_t size,
 	page = virt_to_head_page(object);
 	if (!s) {
 		/* Handle kalloc'ed objects */
-		if (unlikely(!PageSlab(page))) {
+		if (unlikely(!PageSlab(compound_head(page)))) {
 			free_nonslab_page(page, object);
 			p[size] = NULL; /* mark object processed */
 			return size;
@@ -4516,7 +4516,7 @@ size_t __ksize(const void *object)
 
 	page = virt_to_head_page(object);
 
-	if (unlikely(!PageSlab(page))) {
+	if (unlikely(!PageSlab(compound_head(page)))) {
 		WARN_ON(!PageCompound(page));
 		return page_size(page);
 	}
@@ -4536,7 +4536,7 @@ void kfree(const void *x)
 		return;
 
 	page = virt_to_head_page(x);
-	if (unlikely(!PageSlab(page))) {
+	if (unlikely(!PageSlab(compound_head(page)))) {
 		free_nonslab_page(page, object);
 		return;
 	}

@@ -131,7 +131,7 @@ static int hwpoison_filter_dev(struct page *p)
 	/*
 	 * page_mapping() does not accept slab pages.
 	 */
-	if (PageSlab(p))
+	if (PageSlab(compound_head(p)))
 		return -EINVAL;
 
 	mapping = page_mapping(p);
@@ -289,7 +289,7 @@ void shake_page(struct page *p)
 	if (PageHuge(p))
 		return;
 
-	if (!PageSlab(p)) {
+	if (!PageSlab(compound_head(p))) {
 		lru_add_drain_all();
 		if (PageLRU(p) || is_free_buddy_page(p))
 			return;
@@ -1285,7 +1285,7 @@ static bool hwpoison_user_mappings(struct page *p, unsigned long pfn,
 	 * Here we are interested only in user-mapped pages, so skip any
 	 * other types of pages.
 	 */
-	if (PageReserved(p) || PageSlab(p))
+	if (PageReserved(p) || PageSlab(compound_head(p)))
 		return true;
 	if (!(PageLRU(hpage) || PageHuge(p)))
 		return true;

@@ -235,7 +235,7 @@ static inline void check_heap_object(const void *ptr, unsigned long n,
 	 */
 	page = compound_head(kmap_to_page((void *)ptr));
 
-	if (PageSlab(page)) {
+	if (PageSlab(compound_head(page))) {
 		/* Check slab allocator for flags and size. */
 		__check_heap_object(ptr, n, page, to_user);
 	} else {

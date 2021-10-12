@@ -564,7 +564,7 @@ bool kmem_valid_obj(void *object)
 	if (object < (void *)PAGE_SIZE || !virt_addr_valid(object))
 		return false;
 	page = virt_to_head_page(object);
-	return PageSlab(page);
+	return PageSlab(compound_head(page));
 }
 EXPORT_SYMBOL_GPL(kmem_valid_obj);
 
@@ -594,7 +594,7 @@ void kmem_dump_obj(void *object)
 	if (WARN_ON_ONCE(!virt_addr_valid(object)))
 		return;
 	page = virt_to_head_page(object);
-	if (WARN_ON_ONCE(!PageSlab(page))) {
+	if (WARN_ON_ONCE(!PageSlab(compound_head(page)))) {
 		pr_cont(" non-slab memory.\n");
 		return;
 	}

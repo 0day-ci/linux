@@ -66,7 +66,8 @@ static ssize_t kpagecount_read(struct file *file, char __user *buf,
 		 */
 		ppage = pfn_to_online_page(pfn);
 
-		if (!ppage || PageSlab(ppage) || page_has_type(ppage))
+		if (!ppage ||
+		    PageSlab(compound_head(ppage)) || page_has_type(ppage))
 			pcount = 0;
 		else
 			pcount = page_mapcount(ppage);
@@ -126,7 +127,7 @@ u64 stable_page_flags(struct page *page)
 	 * Note that page->_mapcount is overloaded in SLOB/SLUB/SLQB, so the
 	 * simple test in page_mapped() is not enough.
 	 */
-	if (!PageSlab(page) && page_mapped(page))
+	if (!PageSlab(compound_head(page)) && page_mapped(page))
 		u |= 1 << KPF_MMAP;
 	if (PageAnon(page))
 		u |= 1 << KPF_ANON;
@@ -152,6 +153,7 @@ u64 stable_page_flags(struct page *page)
 	else if (PageTransCompound(page)) {
 		struct page *head = compound_head(page);
 
+		/* XXX: misses isolated file THPs */
 		if (PageLRU(head) || PageAnon(head))
 			u |= 1 << KPF_THP;
 		else if (is_huge_zero_page(head)) {

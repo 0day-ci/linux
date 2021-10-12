@@ -256,7 +256,7 @@ static void print_address_description(void *addr, u8 tag)
 	dump_stack_lvl(KERN_ERR);
 	pr_err("\n");
 
-	if (page && PageSlab(page)) {
+	if (page && PageSlab(compound_head(page))) {
 		struct kmem_cache *cache = page->slab_cache;
 		void *object = nearest_obj(cache, page,	addr);
 

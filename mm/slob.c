@@ -553,7 +553,7 @@ void kfree(const void *block)
 	kmemleak_free(block);
 
 	sp = virt_to_page(block);
-	if (PageSlab(sp)) {
+	if (PageSlab(compound_head(sp))) {
 		int align = max_t(size_t, ARCH_KMALLOC_MINALIGN, ARCH_SLAB_MINALIGN);
 		unsigned int *m = (unsigned int *)(block - align);
 		slob_free(m, *m + align);
@@ -579,7 +579,7 @@ size_t __ksize(const void *block)
 		return 0;
 
 	sp = virt_to_page(block);
-	if (unlikely(!PageSlab(sp)))
+	if (unlikely(!PageSlab(compound_head(sp))))
 		return page_size(sp);
 
 	align = max_t(size_t, ARCH_KMALLOC_MINALIGN, ARCH_SLAB_MINALIGN);

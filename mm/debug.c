@@ -84,7 +84,7 @@ static void __dump_page(struct page *page)
 	 * page->_mapcount space in struct page is used by sl[aou]b pages to
 	 * encode own info.
 	 */
-	mapcount = PageSlab(head) ? 0 : page_mapcount(page);
+	mapcount = PageSlab(compound_head(head)) ? 0 : page_mapcount(page);
 
 	pr_warn("page:%p refcount:%d mapcount:%d mapping:%p index:%#lx pfn:%#lx\n",
 			page, page_ref_count(head), mapcount, mapping,

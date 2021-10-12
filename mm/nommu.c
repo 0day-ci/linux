@@ -87,7 +87,7 @@ unsigned int kobjsize(const void *objp)
 	 * If the allocator sets PageSlab, we know the pointer came from
 	 * kmalloc().
 	 */
-	if (PageSlab(page))
+	if (PageSlab(compound_head(page)))
 		return ksize(objp);
 
 	/*
