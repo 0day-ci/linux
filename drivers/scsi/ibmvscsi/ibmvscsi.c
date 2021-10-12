@@ -151,10 +151,8 @@ static void ibmvscsi_release_crq_queue(struct crq_queue *queue,
 			msleep(100);
 		rc = plpar_hcall_norets(H_FREE_CRQ, vdev->unit_address);
 	} while ((rc == H_BUSY) || (H_IS_LONG_BUSY(rc)));
-	dma_unmap_single(hostdata->dev,
-			 queue->msg_token,
-			 queue->size * sizeof(*queue->msgs), DMA_BIDIRECTIONAL);
-	free_page((unsigned long)queue->msgs);
+	dma_free_noncoherent(hostdata->dev, PAGE_SIZE,
+			     queue->msgs, queue->msg_token, DMA_BIDIRECTIONAL);
 }
 
 /**
@@ -331,18 +329,12 @@ static int ibmvscsi_init_crq_queue(struct crq_queue *queue,
 	int retrc;
 	struct vio_dev *vdev = to_vio_dev(hostdata->dev);
 
-	queue->msgs = (struct viosrp_crq *)get_zeroed_page(GFP_KERNEL);
-
-	if (!queue->msgs)
-		goto malloc_failed;
 	queue->size = PAGE_SIZE / sizeof(*queue->msgs);
-
-	queue->msg_token = dma_map_single(hostdata->dev, queue->msgs,
-					  queue->size * sizeof(*queue->msgs),
-					  DMA_BIDIRECTIONAL);
-
-	if (dma_mapping_error(hostdata->dev, queue->msg_token))
-		goto map_failed;
+	queue->msgs = dma_alloc_noncoherent(hostdata->dev,
+					    PAGE_SIZE, &queue->msg_token,
+					    DMA_BIDIRECTIONAL, GFP_KERNEL);
+	if (!queue->msg)
+		goto malloc_failed;
 
 	gather_partition_info();
 	set_adapter_info(hostdata);
@@ -395,11 +387,8 @@ static int ibmvscsi_init_crq_queue(struct crq_queue *queue,
 		rc = plpar_hcall_norets(H_FREE_CRQ, vdev->unit_address);
 	} while ((rc == H_BUSY) || (H_IS_LONG_BUSY(rc)));
       reg_crq_failed:
-	dma_unmap_single(hostdata->dev,
-			 queue->msg_token,
-			 queue->size * sizeof(*queue->msgs), DMA_BIDIRECTIONAL);
-      map_failed:
-	free_page((unsigned long)queue->msgs);
+	dma_free_noncoherent(hostdata->dev, PAGE_SIZE, queue->msg,
+			     queue->msg_token, DMA_BIDIRECTIONAL);
       malloc_failed:
 	return -1;
 }
