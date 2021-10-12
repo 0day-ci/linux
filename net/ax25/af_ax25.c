@@ -1624,22 +1624,22 @@ static int ax25_recvmsg(struct socket *sock, struct msghdr *msg, size_t size,
 	int copied;
 	int err = 0;
 
-	lock_sock(sk);
 	/*
 	 * 	This works for seqpacket too. The receiver has ordered the
 	 *	queue for us! We do one quick check first though
 	 */
 	if (sk->sk_type == SOCK_SEQPACKET && sk->sk_state != TCP_ESTABLISHED) {
 		err =  -ENOTCONN;
-		goto out;
+		goto out_nolock;
 	}
 
 	/* Now we can treat all alike */
 	skb = skb_recv_datagram(sk, flags & ~MSG_DONTWAIT,
 				flags & MSG_DONTWAIT, &err);
 	if (skb == NULL)
-		goto out;
+		goto out_nolock;
 
+	lock_sock(sk);
 	if (!sk_to_ax25(sk)->pidincl)
 		skb_pull(skb, 1);		/* Remove PID */
 
@@ -1684,6 +1684,7 @@ static int ax25_recvmsg(struct socket *sock, struct msghdr *msg, size_t size,
 
 out:
 	release_sock(sk);
+out_nolock:
 
 	return err;
 }
