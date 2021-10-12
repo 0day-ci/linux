@@ -10,6 +10,7 @@ struct rings_req_info {
 struct rings_reply_data {
 	struct ethnl_reply_data		base;
 	struct ethtool_ringparam	ringparam;
+	struct ethtool_ringparam_ext	ringparam_ext;
 };
 
 #define RINGS_REPDATA(__reply_base) \
@@ -49,7 +50,8 @@ static int rings_reply_size(const struct ethnl_req_info *req_base,
 	       nla_total_size(sizeof(u32)) +	/* _RINGS_RX */
 	       nla_total_size(sizeof(u32)) +	/* _RINGS_RX_MINI */
 	       nla_total_size(sizeof(u32)) +	/* _RINGS_RX_JUMBO */
-	       nla_total_size(sizeof(u32));	/* _RINGS_TX */
+	       nla_total_size(sizeof(u32)) +	/* _RINGS_TX */
+	       nla_total_size(sizeof(u32));     /* _RINGS_RX_BUF_LEN */
 }
 
 static int rings_fill_reply(struct sk_buff *skb,
@@ -105,10 +107,12 @@ const struct nla_policy ethnl_rings_set_policy[] = {
 	[ETHTOOL_A_RINGS_RX_MINI]		= { .type = NLA_U32 },
 	[ETHTOOL_A_RINGS_RX_JUMBO]		= { .type = NLA_U32 },
 	[ETHTOOL_A_RINGS_TX]			= { .type = NLA_U32 },
+	[ETHTOOL_A_RINGS_RX_BUF_LEN]            = NLA_POLICY_MIN(NLA_U32, 1),
 };
 
 int ethnl_set_rings(struct sk_buff *skb, struct genl_info *info)
 {
+	struct ethtool_ringparam_ext ringparam_ext = {};
 	struct ethtool_ringparam ringparam = {};
 	struct ethnl_req_info req_info = {};
 	struct nlattr **tb = info->attrs;
@@ -142,6 +146,8 @@ int ethnl_set_rings(struct sk_buff *skb, struct genl_info *info)
 	ethnl_update_u32(&ringparam.rx_jumbo_pending,
 			 tb[ETHTOOL_A_RINGS_RX_JUMBO], &mod);
 	ethnl_update_u32(&ringparam.tx_pending, tb[ETHTOOL_A_RINGS_TX], &mod);
+	ethnl_update_u32(&ringparam_ext.rx_buf_len,
+			 tb[ETHTOOL_A_RINGS_RX_BUF_LEN], &mod);
 	ret = 0;
 	if (!mod)
 		goto out_ops;
@@ -161,6 +167,15 @@ int ethnl_set_rings(struct sk_buff *skb, struct genl_info *info)
 		ret = -EINVAL;
 		NL_SET_ERR_MSG_ATTR(info->extack, err_attr,
 				    "requested ring size exceeds maximum");
+		goto out_ops;
+	}
+
+	if (ringparam_ext.rx_buf_len != 0 &&
+	    !(ops->supported_ring_params & ETHTOOL_RING_USE_RX_BUF_LEN)) {
+		ret = -EOPNOTSUPP;
+		NL_SET_ERR_MSG_ATTR(info->extack,
+				    tb[ETHTOOL_A_RINGS_RX_BUF_LEN],
+				    "setting not supported rx buf len");
 		goto out_ops;
 	}
 

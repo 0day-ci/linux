@@ -536,6 +536,14 @@ struct ethtool_ringparam {
 };
 
 /**
+ * struct ethtool_ringparam_ext - RX/TX ring configuration
+ * @rx_buf_len: Current length of buffers on the rx ring.
+ */
+struct ethtool_ringparam_ext {
+	__u32	rx_buf_len;
+};
+
+/**
  * struct ethtool_channels - configuring number of network channel
  * @cmd: ETHTOOL_{G,S}CHANNELS
  * @max_rx: Read only. Maximum number of receive channel the driver support.
