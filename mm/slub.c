@@ -3554,7 +3554,7 @@ int build_detached_freelist(struct kmem_cache *s, size_t size,
 	page = virt_to_head_page(object);
 	if (!s) {
 		/* Handle kalloc'ed objects */
-		if (unlikely(!PageSlab(compound_head(page)))) {
+		if (unlikely(!PageSlab(page))) {
 			free_nonslab_page(page, object);
 			p[size] = NULL; /* mark object processed */
 			return size;
@@ -4516,7 +4516,7 @@ size_t __ksize(const void *object)
 
 	page = virt_to_head_page(object);
 
-	if (unlikely(!PageSlab(compound_head(page)))) {
+	if (unlikely(!PageSlab(page))) {
 		WARN_ON(!PageCompound(page));
 		return page_size(page);
 	}
@@ -4536,7 +4536,7 @@ void kfree(const void *x)
 		return;
 
 	page = virt_to_head_page(x);
-	if (unlikely(!PageSlab(compound_head(page)))) {
+	if (unlikely(!PageSlab(page))) {
 		free_nonslab_page(page, object);
 		return;
 	}
