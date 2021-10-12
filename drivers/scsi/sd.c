@@ -1756,6 +1756,42 @@ static void sd_rescan(struct device *dev)
 	sd_revalidate_disk(sdkp->disk);
 }
 
+static int sd_get_unique_id(struct gendisk *disk, u8 id[16], u8 type)
+{
+	struct scsi_device *sdev = scsi_disk(disk)->device;
+	const struct scsi_vpd *vpd;
+	const unsigned char *d;
+	int len = -ENXIO;
+
+	rcu_read_lock();
+	vpd = rcu_dereference(sdev->vpd_pg83);
+	if (!vpd)
+		goto out_unlock;
+
+	len = -EINVAL;
+	for (d = vpd->data + 4; d < vpd->data + vpd->len; d += d[3] + 4) {
+		/* we only care about designators with LU association */
+		if (((d[1] >> 4) & 0x3) != 0x00)
+			continue;
+		if ((d[1] & 0xf) != type)
+			continue;
+
+		/*
+		 * Only exit early if a 16-byte descriptor was found.  Otherwise
+		 * keep looking as one with more entropy might still show up.
+		 */
+		len = d[3];
+		if (len != 8 && len != 12 && len != 16)
+			continue;
+		memcpy(id, d + 4, len);
+		if (len == 16)
+			break;
+	}
+out_unlock:
+	rcu_read_unlock();
+	return len;
+}
+
 static char sd_pr_type(enum pr_type type)
 {
 	switch (type) {
@@ -1860,6 +1896,7 @@ static const struct block_device_operations sd_fops = {
 	.check_events		= sd_check_events,
 	.unlock_native_capacity	= sd_unlock_native_capacity,
 	.report_zones		= sd_zbc_report_zones,
+	.get_unique_id		= sd_get_unique_id,
 	.pr_ops			= &sd_pr_ops,
 };
 
