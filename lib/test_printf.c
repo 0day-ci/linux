@@ -623,9 +623,9 @@ page_flags_test(int section, int node, int zone, int last_cpupid,
 		if (!pft[i].width)
 			continue;
 
-		if (append) {
-			snprintf(cmp_buf + size, BUF_SIZE - size, "|");
-			size = strlen(cmp_buf);
+		if (append && size < BUF_SIZE) {
+			cmp_buf[size++] = '|';
+			cmp_buf[size] = '\0';
 		}
 
 		page_flags |= (values[i] & pft[i].mask) << pft[i].shift;
