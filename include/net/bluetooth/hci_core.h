@@ -1272,11 +1272,15 @@ int hci_recv_diag(struct hci_dev *hdev, struct sk_buff *skb);
 __printf(2, 3) void hci_set_hw_info(struct hci_dev *hdev, const char *fmt, ...);
 __printf(2, 3) void hci_set_fw_info(struct hci_dev *hdev, const char *fmt, ...);
 
-static inline void hci_set_msft_opcode(struct hci_dev *hdev, __u16 opcode)
+static inline int hci_set_msft_opcode(struct hci_dev *hdev, __u16 opcode)
 {
+	if (!hci_dev_test_flag(hdev, HCI_SETUP))
+		return -EPERM;
+
 #if IS_ENABLED(CONFIG_BT_MSFTEXT)
 	hdev->msft_opcode = opcode;
 #endif
+	return 0;
 }
 
 static inline void hci_set_aosp_capable(struct hci_dev *hdev)
