@@ -3759,6 +3759,11 @@ struct hci_dev *hci_alloc_dev_priv(int sizeof_priv)
 	INIT_DELAYED_WORK(&hdev->cmd_timer, hci_cmd_timeout);
 	INIT_DELAYED_WORK(&hdev->ncmd_timer, hci_ncmd_timeout);
 
+	/* We need to set HCI_UNREGISTER flag to correctly release
+	 * the device in hci_free_dev()
+	 */
+	hci_dev_set_flag(hdev, HCI_UNREGISTER);
+
 	hci_request_setup(hdev);
 
 	hci_init_sysfs(hdev);
