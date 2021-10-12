@@ -1534,3 +1534,13 @@ Contact:	Avri Altman <avri.altman@wdc.com>
 Description:	In host control mode the host is the originator of map requests.
 		To avoid flooding the device with map requests, use a simple throttling
 		mechanism that limits the number of inflight map requests.
+
+What:		/sys/class/scsi_host/*/trigger_eh
+Date:		October 2021
+Contact:	Bart Van Assche <bvanassche@acm.org>
+Description:	Writing into this sysfs attribute triggers the UFS error
+		handler. This is useful for testing how the UFS error handler
+		affects SCSI command processing. The supported values are as
+		follows: "1" triggers the error handler without resetting the
+		host controller and "2" starts the error handler and makes it
+		reset the host interface.

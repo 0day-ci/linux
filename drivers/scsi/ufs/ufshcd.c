@@ -8144,6 +8144,42 @@ out:
 	}
 }
 
+static ssize_t trigger_eh_store(struct device *dev,
+				struct device_attribute *attr,
+				const char *buf, size_t count)
+{
+	struct Scsi_Host *host = class_to_shost(dev);
+	struct ufs_hba *hba = shost_priv(host);
+
+	/*
+	 * Using locking would be a better solution. However, this is a debug
+	 * attribute so ufshcd_eh_in_progress() should be good enough.
+	 */
+	if (ufshcd_eh_in_progress(hba))
+		return -EBUSY;
+
+	if (sysfs_streq(buf, "1")) {
+		hba->ufshcd_state = UFSHCD_STATE_EH_SCHEDULED_NON_FATAL;
+		hba->saved_err |= UIC_ERROR;
+	} else if (sysfs_streq(buf, "2")) {
+		hba->ufshcd_state = UFSHCD_STATE_EH_SCHEDULED_FATAL;
+		hba->saved_err |= UIC_ERROR;
+	} else {
+		return -EINVAL;
+	}
+
+	scsi_schedule_eh(hba->host);
+
+	return count;
+}
+
+static DEVICE_ATTR_WO(trigger_eh);
+
+static struct device_attribute *ufshcd_shost_attrs[] = {
+	&dev_attr_trigger_eh,
+	NULL
+};
+
 static const struct attribute_group *ufshcd_driver_groups[] = {
 	&ufs_sysfs_unit_descriptor_group,
 	&ufs_sysfs_lun_attributes_group,
@@ -8183,6 +8219,7 @@ static struct scsi_host_template ufshcd_driver_template = {
 	.max_segment_size	= PRDT_DATA_BYTE_COUNT_MAX,
 	.max_host_blocked	= 1,
 	.track_queue_depth	= 1,
+	.shost_attrs		= ufshcd_shost_attrs,
 	.sdev_groups		= ufshcd_driver_groups,
 	.dma_boundary		= PAGE_SIZE - 1,
 	.rpm_autosuspend_delay	= RPM_AUTOSUSPEND_DELAY_MS,
