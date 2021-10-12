@@ -925,6 +925,10 @@ static void __init print_unknown_bootoptions(void)
 	for (p = &envp_init[2]; *p; p++)
 		end += sprintf(end, " %s", *p);
 
+	pr_notice("The kernel command line has unknown parameters. They are either\n");
+	pr_notice("misspelled, not valid for the current kernel configuration,\n");
+	pr_notice("or are meant for init but are not after the '--' delineator. They will\n");
+	pr_notice("be passed to init along with those after '--' on the command line.\n");
 	pr_notice("Unknown command line parameters:%s\n", unknown_options);
 	memblock_free(unknown_options, len);
 }
