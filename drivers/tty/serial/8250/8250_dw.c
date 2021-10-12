@@ -51,6 +51,7 @@ struct dw8250_data {
 
 	unsigned int		skip_autocfg:1;
 	unsigned int		uart_16550_compatible:1;
+	unsigned int		skip_clk_set_rate:1;
 };
 
 static inline struct dw8250_data *to_dw8250_data(struct dw8250_port_data *data)
@@ -334,21 +335,23 @@ static void dw8250_set_termios(struct uart_port *p, struct ktermios *termios,
 	long rate;
 	int ret;
 
-	clk_disable_unprepare(d->clk);
-	rate = clk_round_rate(d->clk, newrate);
-	if (rate > 0) {
-		/*
-		 * Premilinary set the uartclk to the new clock rate so the
-		 * clock update event handler caused by the clk_set_rate()
-		 * calling wouldn't actually update the UART divisor since
-		 * we about to do this anyway.
-		 */
-		swap(p->uartclk, rate);
-		ret = clk_set_rate(d->clk, newrate);
-		if (ret)
+	if (!d->skip_clk_set_rate) {
+		clk_disable_unprepare(d->clk);
+		rate = clk_round_rate(d->clk, newrate);
+		if (rate > 0) {
+			/*
+			 * Premilinary set the uartclk to the new clock rate so
+			 * the clock update event handler caused by the
+			 * clk_set_rate() calling wouldn't actually update the
+			 * UART divisor since we about to do this anyway.
+			 */
 			swap(p->uartclk, rate);
+			ret = clk_set_rate(d->clk, newrate);
+			if (ret)
+				swap(p->uartclk, rate);
+		}
+		clk_prepare_enable(d->clk);
 	}
-	clk_prepare_enable(d->clk);
 
 	p->status &= ~UPSTAT_AUTOCTS;
 	if (termios->c_cflag & CRTSCTS)
@@ -418,6 +421,8 @@ static void dw8250_quirks(struct uart_port *p, struct dw8250_data *data)
 		}
 		if (of_device_is_compatible(np, "marvell,armada-38x-uart"))
 			p->serial_out = dw8250_serial_out38x;
+		if (of_device_is_compatible(np, "starfive,jh7100-uart"))
+			data->skip_clk_set_rate = true;
 
 	} else if (acpi_dev_present("APMC0D08", NULL, -1)) {
 		p->iotype = UPIO_MEM32;
@@ -700,6 +705,7 @@ static const struct of_device_id dw8250_of_match[] = {
 	{ .compatible = "cavium,octeon-3860-uart" },
 	{ .compatible = "marvell,armada-38x-uart" },
 	{ .compatible = "renesas,rzn1-uart" },
+	{ .compatible = "starfive,jh7100-uart" },
 	{ /* Sentinel */ }
 };
 MODULE_DEVICE_TABLE(of, dw8250_of_match);
