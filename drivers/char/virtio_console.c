@@ -28,6 +28,7 @@
 #include "../tty/hvc/hvc_console.h"
 
 #define is_rproc_enabled IS_ENABLED(CONFIG_REMOTEPROC)
+#define VIRTCONS_MAX_PORTS 0x8000
 
 /*
  * This is a global struct for storing common data for all the devices
@@ -1981,6 +1982,8 @@ static void virtcons_remove(struct virtio_device *vdev)
 
 static int virtcons_validate(struct virtio_device *vdev)
 {
+	u32 max_nr_ports;
+
 	if (is_rproc_serial(vdev)) {
 		/* Don't test F_SIZE at all if we're rproc: not a
 		 * valid feature! */
@@ -1997,6 +2000,13 @@ static int virtcons_validate(struct virtio_device *vdev)
 		dev_err(&vdev->dev, "%s failure: config access disabled\n",
 			__func__);
 		return -EINVAL;
+	}
+
+	if (virtio_cread_feature(vdev, VIRTIO_CONSOLE_F_MULTIPORT,
+				 struct virtio_console_config, max_nr_ports,
+				 &max_nr_ports) == 0) {
+		if (max_nr_ports == 0 || max_nr_ports > VIRTCONS_MAX_PORTS)
+			__virtio_clear_bit(vdev, VIRTIO_CONSOLE_F_MULTIPORT);
 	}
 
 	return 0;
