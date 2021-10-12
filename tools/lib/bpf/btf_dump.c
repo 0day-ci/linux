@@ -1577,14 +1577,15 @@ static int btf_dump_get_bitfield_value(struct btf_dump *d,
 	/* Bitfield value retrieval is done in two steps; first relevant bytes are
 	 * stored in num, then we left/right shift num to eliminate irrelevant bits.
 	 */
-	nr_copy_bits = bit_sz + bits_offset;
 	nr_copy_bytes = t->size;
 #if __BYTE_ORDER == __LITTLE_ENDIAN
 	for (i = nr_copy_bytes - 1; i >= 0; i--)
 		num = num * 256 + bytes[i];
+	nr_copy_bits = bit_sz + bits_offset;
 #elif __BYTE_ORDER == __BIG_ENDIAN
 	for (i = 0; i < nr_copy_bytes; i++)
 		num = num * 256 + bytes[i];
+	nr_copy_bits = nr_copy_bytes * 8 - bits_offset;
 #else
 # error "Unrecognized __BYTE_ORDER__"
 #endif
