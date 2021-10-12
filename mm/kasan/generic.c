@@ -330,12 +330,12 @@ DEFINE_ASAN_SET_SHADOW(f8);
 
 void kasan_record_aux_stack(void *addr)
 {
-	struct page *page = kasan_addr_to_page(addr);
+	struct page *page = kasan_addr_to_head_page(addr);
 	struct kmem_cache *cache;
 	struct kasan_alloc_meta *alloc_meta;
 	void *object;
 
-	if (is_kfence_address(addr) || !(page && PageSlab(compound_head(page))))
+	if (is_kfence_address(addr) || !(page && PageSlab(page)))
 		return;
 
 	cache = page->slab_cache;

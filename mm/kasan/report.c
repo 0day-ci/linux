@@ -151,7 +151,7 @@ static void print_track(struct kasan_track *track, const char *prefix)
 	}
 }
 
-struct page *kasan_addr_to_page(const void *addr)
+struct page *kasan_addr_to_head_page(const void *addr)
 {
 	if ((addr >= (void *)PAGE_OFFSET) &&
 			(addr < high_memory))
@@ -251,12 +251,12 @@ static inline bool init_task_stack_addr(const void *addr)
 
 static void print_address_description(void *addr, u8 tag)
 {
-	struct page *page = kasan_addr_to_page(addr);
+	struct page *page = kasan_addr_to_head_page(addr);
 
 	dump_stack_lvl(KERN_ERR);
 	pr_err("\n");
 
-	if (page && PageSlab(compound_head(page))) {
+	if (page && PageSlab(page)) {
 		struct kmem_cache *cache = page->slab_cache;
 		void *object = nearest_obj(cache, page,	addr);
 
