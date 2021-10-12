@@ -1449,17 +1449,10 @@ int otx2_cpt_discover_eng_capabilities(struct otx2_cptpf_dev *cptpf)
 	compl_rlen = ALIGN(sizeof(union otx2_cpt_res_s), OTX2_CPT_DMA_MINALIGN);
 	len = compl_rlen + LOADFVC_RLEN;
 
-	result = kzalloc(len, GFP_KERNEL);
+	result = dma_alloc_noncoherent(&pdev->dev, len, &rptr_baddr, DMA_BIDIRECTIONAL, GFP_KERNEL);
 	if (!result) {
 		ret = -ENOMEM;
 		goto lf_cleanup;
-	}
-	rptr_baddr = dma_map_single(&pdev->dev, (void *)result, len,
-				    DMA_BIDIRECTIONAL);
-	if (dma_mapping_error(&pdev->dev, rptr_baddr)) {
-		dev_err(&pdev->dev, "DMA mapping failed\n");
-		ret = -EFAULT;
-		goto free_result;
 	}
 	rptr = (u8 *)result + compl_rlen;
 
@@ -1489,11 +1482,9 @@ int otx2_cpt_discover_eng_capabilities(struct otx2_cptpf_dev *cptpf)
 
 		cptpf->eng_caps[etype].u = be64_to_cpup(rptr);
 	}
-	dma_unmap_single(&pdev->dev, rptr_baddr, len, DMA_BIDIRECTIONAL);
+	dma_free_noncoherent(&pdev->dev, len, (void *)result, rptr_baddr, DMA_BIDIRECTIONAL);
 	cptpf->is_eng_caps_discovered = true;
 
-free_result:
-	kfree(result);
 lf_cleanup:
 	otx2_cptlf_shutdown(&cptpf->lfs);
 delete_grps:
