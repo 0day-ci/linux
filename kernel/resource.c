@@ -151,7 +151,7 @@ static void free_resource(struct resource *res)
 	if (!res)
 		return;
 
-	if (!PageSlab(compound_head(virt_to_head_page(res)))) {
+	if (!PageSlab(virt_to_head_page(res))) {
 		spin_lock(&bootmem_resource_lock);
 		res->sibling = bootmem_resource_free;
 		bootmem_resource_free = res;
