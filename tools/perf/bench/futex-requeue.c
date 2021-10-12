@@ -97,7 +97,7 @@ static void *workerfn(void *arg __maybe_unused)
 
 			if (ret && errno != EAGAIN) {
 				if (!params.silent)
-					warnx("futex_wait");
+					warn("futex_wait");
 				break;
 			}
 		} else {
@@ -111,7 +111,7 @@ static void *workerfn(void *arg __maybe_unused)
 
 			if (ret && errno != EAGAIN) {
 				if (!params.silent)
-					warnx("futex_wait_requeue_pi");
+					warn("futex_wait_requeue_pi");
 				break;
 			}
 		}

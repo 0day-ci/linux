@@ -132,9 +132,18 @@ static void *blocked_workerfn(void *arg __maybe_unused)
 	pthread_cond_wait(&thread_worker, &thread_lock);
 	pthread_mutex_unlock(&thread_lock);
 
-	while (1) { /* handle spurious wakeups */
-		if (futex_wait(&futex, 0, NULL, futex_flag) != EINTR)
+	while (1) {
+		int ret;
+
+		ret = futex_wait(&futex, 0, NULL, futex_flag);
+		if (!ret)
 			break;
+
+		if (ret && errno != EAGAIN) {
+			if (!params.silent)
+				warn("futex_wait");
+			break;
+		}
 	}
 
 	pthread_exit(NULL);

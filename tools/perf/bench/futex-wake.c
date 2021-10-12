@@ -73,8 +73,17 @@ static void *workerfn(void *arg __maybe_unused)
 	pthread_mutex_unlock(&thread_lock);
 
 	while (1) {
-		if (futex_wait(&futex1, 0, NULL, futex_flag) != EINTR)
+		int ret;
+
+		ret = futex_wait(&futex1, 0, NULL, futex_flag);
+		if (!ret)
 			break;
+
+		if (ret && errno != EAGAIN) {
+			if (!params.silent)
+				warn("futex_wait");
+			break;
+		}
 	}
 
 	pthread_exit(NULL);
