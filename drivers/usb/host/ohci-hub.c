@@ -88,6 +88,8 @@ __acquires(ohci->lock)
 		msleep (8);
 		spin_lock_irq (&ohci->lock);
 	}
+	/* All ED unlinks should be finished, no need for SOF interrupts */
+	ohci_writel(ohci, OHCI_INTR_SF, &ohci->regs->intrdisable);
 	update_done_list(ohci);
 	ohci_work(ohci);
 
