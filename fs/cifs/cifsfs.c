@@ -1281,6 +1281,9 @@ const struct file_operations cifs_file_ops = {
 	.remap_file_range = cifs_remap_file_range,
 	.setlease = cifs_setlease,
 	.fallocate = cifs_fallocate,
+	.fallocate_supported_flags = FALLOC_FL_PUNCH_HOLE |
+		FALLOC_FL_ZERO_RANGE | FALLOC_FL_KEEP_SIZE |
+		FALLOC_FL_COLLAPSE_RANGE | FALLOC_FL_INSERT_RANGE,
 };
 
 const struct file_operations cifs_file_strict_ops = {
@@ -1301,6 +1304,9 @@ const struct file_operations cifs_file_strict_ops = {
 	.remap_file_range = cifs_remap_file_range,
 	.setlease = cifs_setlease,
 	.fallocate = cifs_fallocate,
+	.fallocate_supported_flags = FALLOC_FL_PUNCH_HOLE |
+		FALLOC_FL_ZERO_RANGE | FALLOC_FL_KEEP_SIZE |
+		FALLOC_FL_COLLAPSE_RANGE | FALLOC_FL_INSERT_RANGE,
 };
 
 const struct file_operations cifs_file_direct_ops = {
@@ -1321,6 +1327,9 @@ const struct file_operations cifs_file_direct_ops = {
 	.llseek = cifs_llseek,
 	.setlease = cifs_setlease,
 	.fallocate = cifs_fallocate,
+	.fallocate_supported_flags = FALLOC_FL_PUNCH_HOLE |
+		FALLOC_FL_ZERO_RANGE | FALLOC_FL_KEEP_SIZE |
+		FALLOC_FL_COLLAPSE_RANGE | FALLOC_FL_INSERT_RANGE,
 };
 
 const struct file_operations cifs_file_nobrl_ops = {
@@ -1339,6 +1348,9 @@ const struct file_operations cifs_file_nobrl_ops = {
 	.remap_file_range = cifs_remap_file_range,
 	.setlease = cifs_setlease,
 	.fallocate = cifs_fallocate,
+	.fallocate_supported_flags = FALLOC_FL_PUNCH_HOLE |
+		FALLOC_FL_ZERO_RANGE | FALLOC_FL_KEEP_SIZE |
+		FALLOC_FL_COLLAPSE_RANGE | FALLOC_FL_INSERT_RANGE,
 };
 
 const struct file_operations cifs_file_strict_nobrl_ops = {
@@ -1357,6 +1369,9 @@ const struct file_operations cifs_file_strict_nobrl_ops = {
 	.remap_file_range = cifs_remap_file_range,
 	.setlease = cifs_setlease,
 	.fallocate = cifs_fallocate,
+	.fallocate_supported_flags = FALLOC_FL_PUNCH_HOLE |
+		FALLOC_FL_ZERO_RANGE | FALLOC_FL_KEEP_SIZE |
+		FALLOC_FL_COLLAPSE_RANGE | FALLOC_FL_INSERT_RANGE,
 };
 
 const struct file_operations cifs_file_direct_nobrl_ops = {
@@ -1375,6 +1390,9 @@ const struct file_operations cifs_file_direct_nobrl_ops = {
 	.llseek = cifs_llseek,
 	.setlease = cifs_setlease,
 	.fallocate = cifs_fallocate,
+	.fallocate_supported_flags = FALLOC_FL_PUNCH_HOLE |
+		FALLOC_FL_ZERO_RANGE | FALLOC_FL_KEEP_SIZE |
+		FALLOC_FL_COLLAPSE_RANGE | FALLOC_FL_INSERT_RANGE,
 };
 
 const struct file_operations cifs_dir_ops = {
