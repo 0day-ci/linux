@@ -1847,6 +1847,7 @@ struct block_device_operations {
 	int (*report_zones)(struct gendisk *, sector_t sector,
 			unsigned int nr_zones, report_zones_cb cb, void *data);
 	char *(*devnode)(struct gendisk *disk, umode_t *mode);
+	int (*get_unique_id)(struct gendisk *disk, u8 id[16], u8 id_type);
 	struct module *owner;
 	const struct pr_ops *pr_ops;
 
