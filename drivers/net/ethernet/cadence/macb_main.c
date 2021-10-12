@@ -528,6 +528,7 @@ static void macb_validate(struct phylink_config *config,
 
 	if (!macb_is_gem(bp) &&
 	    (state->interface == PHY_INTERFACE_MODE_GMII ||
+	     state->interface == PHY_INTERFACE_MODE_SGMII ||
 	     phy_interface_mode_is_rgmii(state->interface))) {
 		bitmap_zero(supported, __ETHTOOL_LINK_MODE_MASK_NBITS);
 		return;
