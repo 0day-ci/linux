@@ -16,7 +16,9 @@
 	compatible = "qcom,sc7280-idp", "google,senor", "qcom,sc7280";
 
 	aliases {
+		bluetooth0 = &bluetooth;
 		serial0 = &uart5;
+		serial1 = &uart7;
 	};
 
 	chosen {
@@ -67,4 +69,8 @@
 		label = "pmr735a_die_temp";
 		qcom,pre-scaling = <1 1>;
 	};
+};
+
+&bluetooth {
+	vddio-supply = <&vreg_l19b_1p8>;
 };
