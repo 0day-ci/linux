@@ -606,8 +606,10 @@ static noinline void check_multi_store(struct xarray *xa)
 	XA_BUG_ON(xa, xa_load(xa, 1) != xa_mk_value(0));
 	XA_BUG_ON(xa, xa_load(xa, 2) != NULL);
 	rcu_read_lock();
-	XA_BUG_ON(xa, xa_to_node(xa_head(xa))->count != 2);
-	XA_BUG_ON(xa, xa_to_node(xa_head(xa))->nr_values != 2);
+	if (xa_is_node(xa_head(xa))) {
+		XA_BUG_ON(xa, xa_to_node(xa_head(xa))->count != 2);
+		XA_BUG_ON(xa, xa_to_node(xa_head(xa))->nr_values != 2);
+	}
 	rcu_read_unlock();
 
 	/* Storing adjacent to the value does not alter the value */
