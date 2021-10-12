@@ -986,4 +986,24 @@ struct fuse_syncfs_in {
 	uint64_t	padding;
 };
 
+/*
+ * For each security context, send fuse_secctx with size of security context
+ * fuse_secctx will be followed by security context name and this in turn
+ * will be followed by actual context label.
+ * fuse_secctx, name, context
+ * */
+struct fuse_secctx {
+	uint32_t	size;
+	uint32_t	padding;
+};
+
+/*
+ * Contains the information about how many fuse_secctx structures are being
+ * sent.
+ */
+struct fuse_secctxs {
+	uint32_t	nr_secctx;
+	uint32_t	padding;
+};
+
 #endif /* _LINUX_FUSE_H */

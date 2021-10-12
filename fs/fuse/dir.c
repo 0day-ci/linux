@@ -17,6 +17,9 @@
 #include <linux/xattr.h>
 #include <linux/iversion.h>
 #include <linux/posix_acl.h>
+#include <linux/security.h>
+#include <linux/types.h>
+#include <linux/kernel.h>
 
 static void fuse_advise_use_readdirplus(struct inode *dir)
 {
@@ -456,6 +459,66 @@ static struct dentry *fuse_lookup(struct inode *dir, struct dentry *entry,
 	return ERR_PTR(err);
 }
 
+static int get_security_context(struct dentry *entry, umode_t mode,
+				void **security_ctx, u32 *security_ctxlen)
+{
+	struct fuse_secctx *fsecctx;
+	struct fuse_secctxs *fsecctxs;
+	void *ctx, *full_ctx;
+	u32 ctxlen, full_ctxlen;
+	int err = 0;
+	const char *name;
+
+	err = security_dentry_init_security(entry, mode, &entry->d_name,
+					    &name, &ctx, &ctxlen);
+	if (err) {
+		if (err != -EOPNOTSUPP)
+			goto out_err;
+		/* No LSM is supporting this security hook. Ignore error */
+		err = 0;
+		ctxlen = 0;
+	}
+
+	if (ctxlen > 0) {
+		void *ptr;
+
+		full_ctxlen = sizeof(*fsecctxs) + sizeof(*fsecctx) +
+			      strlen(name) + ctxlen + 1;
+		full_ctx = kzalloc(full_ctxlen, GFP_KERNEL);
+		if (!full_ctx) {
+			err = -ENOMEM;
+			kfree(ctx);
+			goto out_err;
+		}
+
+		ptr = full_ctx;
+		fsecctxs = (struct fuse_secctxs*) ptr;
+		fsecctxs->nr_secctx = 1;
+		ptr += sizeof(*fsecctxs);
+
+		fsecctx = (struct fuse_secctx*) ptr;
+		fsecctx->size = ctxlen;
+		ptr += sizeof(*fsecctx);
+
+		strcpy(ptr, name);
+		ptr += strlen(name) + 1;
+		memcpy(ptr, ctx, ctxlen);
+		kfree(ctx);
+	} else {
+		full_ctxlen = sizeof(*fsecctxs);
+		full_ctx = kzalloc(full_ctxlen, GFP_KERNEL);
+		if (!full_ctx) {
+			err = -ENOMEM;
+			goto out_err;
+		}
+	}
+
+	*security_ctxlen = full_ctxlen;
+	*security_ctx = full_ctx;
+out_err:
+	return err;
+}
+
 /*
  * Atomic create+open operation
  *
@@ -476,6 +539,8 @@ static int fuse_create_open(struct inode *dir, struct dentry *entry,
 	struct fuse_entry_out outentry;
 	struct fuse_inode *fi;
 	struct fuse_file *ff;
+	void *security_ctx = NULL;
+	u32 security_ctxlen;
 
 	/* Userspace expects S_IFREG in create mode */
 	BUG_ON((mode & S_IFMT) != S_IFREG);
@@ -517,6 +582,18 @@ static int fuse_create_open(struct inode *dir, struct dentry *entry,
 	args.out_args[0].value = &outentry;
 	args.out_args[1].size = sizeof(outopen);
 	args.out_args[1].value = &outopen;
+
+	if (fm->fc->init_security) {
+		err = get_security_context(entry, mode, &security_ctx,
+					   &security_ctxlen);
+		if (err)
+			goto out_put_forget_req;
+
+		args.in_numargs = 3;
+		args.in_args[2].size = security_ctxlen;
+		args.in_args[2].value = security_ctx;
+	}
+
 	err = fuse_simple_request(fm, &args);
 	if (err)
 		goto out_free_ff;
@@ -554,6 +631,7 @@ static int fuse_create_open(struct inode *dir, struct dentry *entry,
 
 out_free_ff:
 	fuse_file_free(ff);
+	kfree(security_ctx);
 out_put_forget_req:
 	kfree(forget);
 out_err:
@@ -613,13 +691,15 @@ no_open:
  */
 static int create_new_entry(struct fuse_mount *fm, struct fuse_args *args,
 			    struct inode *dir, struct dentry *entry,
-			    umode_t mode)
+			    umode_t mode, bool init_security)
 {
 	struct fuse_entry_out outarg;
 	struct inode *inode;
 	struct dentry *d;
 	int err;
 	struct fuse_forget_link *forget;
+	void *security_ctx = NULL;
+	u32 security_ctxlen = 0;
 
 	if (fuse_is_bad(dir))
 		return -EIO;
@@ -633,7 +713,29 @@ static int create_new_entry(struct fuse_mount *fm, struct fuse_args *args,
 	args->out_numargs = 1;
 	args->out_args[0].size = sizeof(outarg);
 	args->out_args[0].value = &outarg;
+
+	if (init_security) {
+		unsigned short idx = args->in_numargs;
+
+		if ((size_t)idx >= ARRAY_SIZE(args->in_args)) {
+			err = -ENOMEM;
+			goto out_put_forget_req;
+		}
+
+		err = get_security_context(entry, mode, &security_ctx,
+					   &security_ctxlen);
+		if (err)
+			goto out_put_forget_req;
+
+		if (security_ctxlen > 0) {
+			args->in_args[idx].size = security_ctxlen;
+			args->in_args[idx].value = security_ctx;
+			args->in_numargs++;
+		}
+	}
+
 	err = fuse_simple_request(fm, args);
+	kfree(security_ctx);
 	if (err)
 		goto out_put_forget_req;
 
@@ -691,7 +793,7 @@ static int fuse_mknod(struct user_namespace *mnt_userns, struct inode *dir,
 	args.in_args[0].value = &inarg;
 	args.in_args[1].size = entry->d_name.len + 1;
 	args.in_args[1].value = entry->d_name.name;
-	return create_new_entry(fm, &args, dir, entry, mode);
+	return create_new_entry(fm, &args, dir, entry, mode, fm->fc->init_security);
 }
 
 static int fuse_create(struct user_namespace *mnt_userns, struct inode *dir,
@@ -719,7 +821,8 @@ static int fuse_mkdir(struct user_namespace *mnt_userns, struct inode *dir,
 	args.in_args[0].value = &inarg;
 	args.in_args[1].size = entry->d_name.len + 1;
 	args.in_args[1].value = entry->d_name.name;
-	return create_new_entry(fm, &args, dir, entry, S_IFDIR);
+	return create_new_entry(fm, &args, dir, entry, S_IFDIR,
+				fm->fc->init_security);
 }
 
 static int fuse_symlink(struct user_namespace *mnt_userns, struct inode *dir,
@@ -735,7 +838,8 @@ static int fuse_symlink(struct user_namespace *mnt_userns, struct inode *dir,
 	args.in_args[0].value = entry->d_name.name;
 	args.in_args[1].size = len;
 	args.in_args[1].value = link;
-	return create_new_entry(fm, &args, dir, entry, S_IFLNK);
+	return create_new_entry(fm, &args, dir, entry, S_IFLNK,
+				fm->fc->init_security);
 }
 
 void fuse_update_ctime(struct inode *inode)
@@ -915,7 +1019,8 @@ static int fuse_link(struct dentry *entry, struct inode *newdir,
 	args.in_args[0].value = &inarg;
 	args.in_args[1].size = newent->d_name.len + 1;
 	args.in_args[1].value = newent->d_name.name;
-	err = create_new_entry(fm, &args, newdir, newent, inode->i_mode);
+	err = create_new_entry(fm, &args, newdir, newent, inode->i_mode,
+			       false);
 	/* Contrary to "normal" filesystems it can happen that link
 	   makes two "logical" inodes point to the same "physical"
 	   inode.  We invalidate the attributes of the old one, so it
