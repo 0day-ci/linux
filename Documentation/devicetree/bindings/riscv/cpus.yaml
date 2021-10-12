@@ -63,6 +63,11 @@ properties:
       - riscv,sv48
       - riscv,none
 
+  mmu-supports-svpbmt:
+    description:
+      Describes the CPU's mmu-supports-svpbmt support
+    $ref: '/schemas/types.yaml#/definitions/phandle'
+
   riscv,isa:
     description:
       Identifies the specific RISC-V instruction set architecture
