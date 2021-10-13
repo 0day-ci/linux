@@ -45,6 +45,9 @@ struct vhci_data {
 #if IS_ENABLED(CONFIG_BT_MSFTEXT)
 	__u16 msft_opcode;
 #endif
+#if IS_ENABLED(CONFIG_BT_AOSPEXT)
+	__u16 aosp_capable;
+#endif
 };
 
 static int vhci_open_dev(struct hci_dev *hdev)
@@ -223,17 +226,67 @@ static int msft_opcode_get(void *data, u64 *val)
 DEFINE_DEBUGFS_ATTRIBUTE(msft_opcode_fops, msft_opcode_get, msft_opcode_set,
 			 "%llu\n");
 
+#endif /* CONFIG_BT_MSFTEXT */
+
+#if IS_ENABLED(CONFIG_BT_AOSPEXT)
+
+static ssize_t aosp_capable_read(struct file *file, char __user *user_buf,
+				 size_t count, loff_t *ppos)
+{
+	struct vhci_data *vhci = file->private_data;
+	char buf[3];
+
+	buf[0] = vhci->aosp_capable ? 'Y' : 'N';
+	buf[1] = '\n';
+	buf[2] = '\0';
+	return simple_read_from_buffer(user_buf, count, ppos, buf, 2);
+}
+
+static ssize_t aosp_capable_write(struct file *file,
+				  const char __user *user_buf, size_t count,
+				  loff_t *ppos)
+{
+	struct vhci_data *vhci = file->private_data;
+	bool enable;
+	int err;
+
+	err = kstrtobool_from_user(user_buf, count, &enable);
+	if (err)
+		return err;
+
+	if (vhci->aosp_capable == enable)
+		return -EALREADY;
+
+	vhci->aosp_capable = enable;
+
+	return count;
+}
+
+static const struct file_operations aosp_capable_fops = {
+	.open		= simple_open,
+	.read		= aosp_capable_read,
+	.write		= aosp_capable_write,
+	.llseek		= default_llseek,
+};
+
+#endif /* CONFIG_BT_AOSEXT */
+
 static int vhci_setup(struct hci_dev *hdev)
 {
 	struct vhci_data *vhci = hci_get_drvdata(hdev);
 
+#if IS_ENABLED(CONFIG_BT_MSFTEXT)
 	if (vhci->msft_opcode)
 		hci_set_msft_opcode(hdev, vhci->msft_opcode);
+#endif
+
+#if IS_ENABLED(CONFIG_BT_AOSPEXT)
+	if (vhci->aosp_capable)
+		hci_set_aosp_capable(hdev);
+#endif
 
 	return 0;
 }
-
-#endif /* CONFIG_BT_MSFTEXT */
 
 static int __vhci_create_device(struct vhci_data *data, __u8 opcode)
 {
@@ -278,8 +331,10 @@ static int __vhci_create_device(struct vhci_data *data, __u8 opcode)
 	hdev->get_codec_config_data = vhci_get_codec_config_data;
 	hdev->wakeup = vhci_wakeup;
 
-	/* Enable custom setup if CONFIG_BT_MSFTEXT is selected */
-#if IS_ENABLED(CONFIG_BT_MSFTEXT)
+	/* Enable custom setup if CONFIG_BT_MSFTEXT or CONFIG_BT_AOSPEXT is
+	 * selected.
+	 */
+#if IS_ENABLED(CONFIG_BT_MSFTEXT) || IS_ENABLED(CONFIG_BT_AOSPEXT)
 	hdev->setup = vhci_setup;
 	set_bit(HCI_QUIRK_NON_PERSISTENT_SETUP, &hdev->quirks);
 #endif
@@ -309,6 +364,11 @@ static int __vhci_create_device(struct vhci_data *data, __u8 opcode)
 #if IS_ENABLED(CONFIG_BT_MSFTEXT)
 	debugfs_create_file("msft_opcode", 0644, hdev->debugfs, data,
 			    &msft_opcode_fops);
+#endif
+
+#if IS_ENABLED(CONFIG_BT_AOSPEXT)
+	debugfs_create_file("aosp_capable", 0644, hdev->debugfs, data,
+			    &aosp_capable_fops);
 #endif
 
 	hci_skb_pkt_type(skb) = HCI_VENDOR_PKT;
