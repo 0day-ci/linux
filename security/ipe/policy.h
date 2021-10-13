@@ -26,7 +26,14 @@ struct ipe_policy_line {
 struct ipe_module;
 
 enum ipe_operation {
-	ipe_operation_max = 0,
+	ipe_operation_exec = 0,
+	ipe_operation_firmware,
+	ipe_operation_kernel_module,
+	ipe_operation_kexec_image,
+	ipe_operation_kexec_initramfs,
+	ipe_operation_ima_policy,
+	ipe_operation_ima_x509,
+	ipe_operation_max
 };
 
 /*
@@ -34,7 +41,8 @@ enum ipe_operation {
  * that are just one or more operations under the hood
  */
 enum ipe_op_alias {
-	ipe_op_alias_max = ipe_operation_max,
+	ipe_op_alias_kernel_read = ipe_operation_max,
+	ipe_op_alias_max,
 };
 
 enum ipe_action {

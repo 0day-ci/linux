@@ -483,6 +483,14 @@ int ipe_parse_op(const struct ipe_policy_token *tok,
 {
 	substring_t match[MAX_OPT_ARGS] = { 0 };
 	const match_table_t ops = {
+		{ ipe_operation_exec,		 "EXECUTE" },
+		{ ipe_operation_firmware,	 "FIRMWARE" },
+		{ ipe_operation_kernel_module,	 "KMODULE" },
+		{ ipe_operation_kexec_image,	 "KEXEC_IMAGE" },
+		{ ipe_operation_kexec_initramfs, "KEXEC_INITRAMFS"},
+		{ ipe_operation_ima_policy,	 "IMA_POLICY" },
+		{ ipe_operation_ima_x509,	 "IMA_X509_CERT" },
+		{ ipe_op_alias_kernel_read,	 "KERNEL_READ" },
 		{ ipe_op_alias_max, NULL },
 	};
 
@@ -838,6 +846,15 @@ out:
 	return rc;
 }
 
+static const enum ipe_operation alias_kread[] = {
+	ipe_operation_firmware,
+	ipe_operation_kernel_module,
+	ipe_operation_ima_policy,
+	ipe_operation_ima_x509,
+	ipe_operation_kexec_image,
+	ipe_operation_kexec_initramfs,
+};
+
 /**
  * ipe_is_op_alias: Determine if @op is an alias for one or more operations
  * @op: Supplies the operation to check. Should be either ipe_operation or
@@ -852,9 +869,15 @@ out:
 bool ipe_is_op_alias(int op, const enum ipe_operation **map, size_t *size)
 {
 	switch (op) {
+	case ipe_op_alias_kernel_read:
+		*map = alias_kread;
+		*size = ARRAY_SIZE(alias_kread);
+		break;
 	default:
 		return false;
 	}
+
+	return true;
 }
 
 /**
