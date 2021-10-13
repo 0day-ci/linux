@@ -1240,6 +1240,30 @@ struct dentry *mount_single(struct file_system_type *fs_type,
 }
 EXPORT_SYMBOL(mount_single);
 
+static int fs_set_subtype(struct super_block *sb)
+{
+	int err;
+	const char *fstype = sb->s_type->name;
+	const char *subtype = strchr(fstype, '.');
+	if (subtype) {
+		subtype++;
+		err = -EINVAL;
+		if (!subtype[0])
+			goto err;
+	} else {
+		subtype = "";
+	}
+
+	sb->s_subtype = kstrdup(subtype, GFP_KERNEL);
+	err = -ENOMEM;
+	if (!sb->s_subtype)
+		goto err;
+	return 0;
+
+err:
+	return err;
+}
+
 struct dentry *
 mount_fs(struct file_system_type *type, int flags, const char *name, void *data)
 {
@@ -1288,6 +1312,12 @@ mount_fs(struct file_system_type *type, int flags, const char *name, void *data)
 	 */
 	WARN((sb->s_maxbytes < 0), "%s set sb->s_maxbytes to "
 		"negative value (%lld)\n", type->name, sb->s_maxbytes);
+
+	if ((sb->s_type->fs_flags & FS_HAS_SUBTYPE) && !sb->s_subtype) {
+		error = fs_set_subtype(sb);
+		if (error)
+			goto out_sb;
+	}
 
 	up_write(&sb->s_umount);
 	free_secdata(secdata);
