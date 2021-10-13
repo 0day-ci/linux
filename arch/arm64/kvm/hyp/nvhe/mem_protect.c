@@ -560,6 +560,9 @@ static int hyp_check_incoming_share(struct pkvm_page_req *req,
 	if (ack->completer.prot != prot)
 		return -EPERM;
 
+	if (WARN_ON(!hyp_phys_to_page(req->phys)->refcount))
+		return -EINVAL;
+
 	return 0;
 }
 
@@ -619,13 +622,22 @@ static int hyp_complete_share(struct pkvm_page_req *req,
 			      enum kvm_pgtable_prot perms)
 {
 	void *start = (void *)req->completer.addr, *end = start + PAGE_SIZE;
+	struct hyp_page *page = hyp_phys_to_page(req->phys);
 	enum kvm_pgtable_prot prot;
+	int ret = 0;
 
-	if (req->initiator.state == PKVM_PAGE_SHARED_OWNED)
+	if (req->initiator.state == PKVM_PAGE_SHARED_OWNED) {
+		hyp_page_ref_inc(page);
 		return 0;
+	}
 
 	prot = pkvm_mkstate(perms, PKVM_PAGE_SHARED_BORROWED);
-	return pkvm_create_mappings_locked(start, end, prot);
+	ret = pkvm_create_mappings_locked(start, end, prot);
+
+	if (!ret)
+		hyp_set_page_refcounted(page);
+
+	return ret;
 }
 
 /* Update the completer's page-table for the page-sharing request */
