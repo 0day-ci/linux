@@ -56,11 +56,16 @@ static size_t pci_vpd_size(struct pci_dev *dev)
 {
 	size_t off = 0, size;
 	unsigned char tag, header[1+2];	/* 1 byte tag, 2 bytes length */
+	int num_tags = 0;
 
 	while (pci_read_vpd_any(dev, off, 1, header) == 1) {
 		size = 0;
 
 		if (off == 0 && (header[0] == 0x00 || header[0] == 0xff))
+			goto error;
+
+		/* We can have max 4 tags: STRING_ID, RO, RW, END */
+		if (++num_tags > 4)
 			goto error;
 
 		if (header[0] & PCI_VPD_LRDT) {
