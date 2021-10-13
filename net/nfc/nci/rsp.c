@@ -334,6 +334,14 @@ static void nci_core_conn_close_rsp_packet(struct nci_dev *ndev,
 							 ndev->cur_conn_id);
 		if (conn_info) {
 			list_del(&conn_info->list);
+			/* Other places held conn_info like
+			 * ndev->hci_dev->conn_info, ndev->rf_conn_info
+			 * need to be NULL out.
+			 */
+			if (ndev->hci_dev->conn_info == conn_info)
+				ndev->hci_dev->conn_info = NULL;
+			if (ndev->rf_conn_info == conn_info)
+				ndev->rf_conn_info = NULL;
 			devm_kfree(&ndev->nfc_dev->dev, conn_info);
 		}
 	}
