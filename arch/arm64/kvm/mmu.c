@@ -281,30 +281,23 @@ static phys_addr_t kvm_kaddr_to_phys(void *kaddr)
 	}
 }
 
-static int pkvm_share_hyp(phys_addr_t start, phys_addr_t end)
-{
-	phys_addr_t addr;
-	int ret;
-
-	for (addr = ALIGN_DOWN(start, PAGE_SIZE); addr < end; addr += PAGE_SIZE) {
-		ret = kvm_call_hyp_nvhe(__pkvm_host_share_hyp,
-					__phys_to_pfn(addr));
-		if (ret)
-			return ret;
-	}
-
-	return 0;
-}
-
 int kvm_share_hyp(void *from, void *to)
 {
+	phys_addr_t start, end;
+	u64 nr_pages;
+
 	if (is_kernel_in_hyp_mode())
 		return 0;
 
 	if (kvm_host_owns_hyp_mappings())
 		return create_hyp_mappings(from, to, PAGE_HYP);
 
-	return pkvm_share_hyp(kvm_kaddr_to_phys(from), kvm_kaddr_to_phys(to));
+	start = ALIGN_DOWN(kvm_kaddr_to_phys(from), PAGE_SIZE);
+	end = PAGE_ALIGN(kvm_kaddr_to_phys(to));
+	nr_pages = (end - start) >> PAGE_SHIFT;
+
+	return kvm_call_hyp_nvhe(__pkvm_host_share_hyp, __phys_to_pfn(start),
+				 nr_pages);
 }
 
 /**
