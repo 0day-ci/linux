@@ -408,15 +408,39 @@ retry:
 		blk_mq_tag_busy(data->hctx);
 
 	/*
-	 * Waiting allocations only fail because of an inactive hctx.  In that
-	 * case just retry the hctx assignment and tag allocation as CPU hotplug
-	 * should have migrated us to an online CPU by now.
+	 * Try batched alloc if we want more than 1 tag.
 	 */
-	do {
+	if (data->nr_tags > 1) {
+		unsigned long tags;
+		unsigned int tag_offset;
+		int i, nr = 0;
+
+		tags = blk_mq_get_tags(data, data->nr_tags, &tag_offset);
+		if (unlikely(!tags)) {
+			data->nr_tags = 1;
+			goto retry;
+		}
+		for (i = 0; tags; i++) {
+			if (!(tags & (1UL << i)))
+				continue;
+			tag = tag_offset + i;
+			tags &= ~(1UL << i);
+			rq = blk_mq_rq_ctx_init(data, tag, alloc_time_ns);
+			rq->rq_next = *data->cached_rq;
+			*data->cached_rq = rq;
+		}
+		data->nr_tags -= nr;
+	} else {
+		/*
+		 * Waiting allocations only fail because of an inactive hctx.
+		 * In that case just retry the hctx assignment and tag
+		 * allocation as CPU hotplug should have migrated us to an
+		 * online CPU by now.
+		 */
 		tag = blk_mq_get_tag(data);
 		if (tag == BLK_MQ_NO_TAG) {
 			if (data->flags & BLK_MQ_REQ_NOWAIT)
-				break;
+				return NULL;
 			/*
 			 * Give up the CPU and sleep for a random short time to
 			 * ensure that thread using a realtime scheduling class
@@ -427,23 +451,16 @@ retry:
 			goto retry;
 		}
 
-		rq = blk_mq_rq_ctx_init(data, tag, alloc_time_ns);
-		if (!--data->nr_tags || e ||
-		    (data->hctx->flags & BLK_MQ_F_TAG_QUEUE_SHARED))
-			return rq;
+		return blk_mq_rq_ctx_init(data, tag, alloc_time_ns);
+	}
 
-		/* link into the cached list */
-		rq->rq_next = *data->cached_rq;
-		*data->cached_rq = rq;
-		data->flags |= BLK_MQ_REQ_NOWAIT;
-	} while (1);
+	if (data->cached_rq) {
+		rq = *data->cached_rq;
+		*data->cached_rq = rq->rq_next;
+		return rq;
+	}
 
-	if (!data->cached_rq)
-		return NULL;
-
-	rq = *data->cached_rq;
-	*data->cached_rq = rq->rq_next;
-	return rq;
+	return NULL;
 }
 
 struct request *blk_mq_alloc_request(struct request_queue *q, unsigned int op,
