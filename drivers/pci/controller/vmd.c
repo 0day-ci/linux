@@ -9,6 +9,7 @@
 #include <linux/irq.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/device.h>
 #include <linux/msi.h>
 #include <linux/pci.h>
 #include <linux/pci-acpi.h>
@@ -18,8 +19,6 @@
 #include <linux/rcupdate.h>
 
 #include <asm/irqdomain.h>
-#include <asm/device.h>
-#include <asm/msi.h>
 
 #define VMD_CFGBAR	0
 #define VMD_MEMBAR1	2
