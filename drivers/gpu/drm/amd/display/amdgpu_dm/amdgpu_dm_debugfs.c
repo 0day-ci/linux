@@ -1237,12 +1237,6 @@ static ssize_t trigger_hotplug(struct file *f, const char __user *buf,
 			goto unlock;
 
 		amdgpu_dm_update_connector_after_detect(aconnector);
-
-		drm_modeset_lock_all(dev);
-		dm_restore_drm_connector_state(dev, connector);
-		drm_modeset_unlock_all(dev);
-
-		drm_kms_helper_hotplug_event(dev);
 	} else if (param[0] == 0) {
 		if (!aconnector->dc_link)
 			goto unlock;
@@ -1260,12 +1254,14 @@ static ssize_t trigger_hotplug(struct file *f, const char __user *buf,
 
 		amdgpu_dm_update_connector_after_detect(aconnector);
 
-		drm_modeset_lock_all(dev);
-		dm_restore_drm_connector_state(dev, connector);
-		drm_modeset_unlock_all(dev);
-
-		drm_kms_helper_hotplug_event(dev);
+	} else {
+		goto unlock;
 	}
+
+	drm_modeset_lock_all(dev);
+	dm_restore_drm_connector_state(dev, connector);
+	drm_modeset_unlock_all(dev);
+	drm_kms_helper_hotplug_event(dev);
 
 unlock:
 	mutex_unlock(&aconnector->hpd_lock);

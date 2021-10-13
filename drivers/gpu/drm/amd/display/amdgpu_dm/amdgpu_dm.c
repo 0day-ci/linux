@@ -2935,13 +2935,6 @@ static void handle_hpd_irq_helper(struct amdgpu_dm_connector *aconnector)
 	if (aconnector->base.force && new_connection_type == dc_connection_none) {
 		emulated_link_detect(aconnector->dc_link);
 
-		drm_modeset_lock_all(dev);
-		dm_restore_drm_connector_state(dev, connector);
-		drm_modeset_unlock_all(dev);
-
-		if (aconnector->base.force == DRM_FORCE_UNSPECIFIED)
-			drm_kms_helper_hotplug_event(dev);
-
 	} else if (dc_link_detect(aconnector->dc_link, DETECT_REASON_HPD)) {
 		if (new_connection_type == dc_connection_none &&
 		    aconnector->dc_link->type == dc_connection_none &&
@@ -2950,13 +2943,18 @@ static void handle_hpd_irq_helper(struct amdgpu_dm_connector *aconnector)
 
 		amdgpu_dm_update_connector_after_detect(aconnector);
 
-		drm_modeset_lock_all(dev);
-		dm_restore_drm_connector_state(dev, connector);
-		drm_modeset_unlock_all(dev);
-
-		if (aconnector->base.force == DRM_FORCE_UNSPECIFIED)
-			drm_kms_helper_hotplug_event(dev);
+	} else {
+		goto out;
 	}
+
+	drm_modeset_lock_all(dev);
+	dm_restore_drm_connector_state(dev, connector);
+	drm_modeset_unlock_all(dev);
+
+	if (aconnector->base.force == DRM_FORCE_UNSPECIFIED)
+		drm_kms_helper_hotplug_event(dev);
+
+out:
 	mutex_unlock(&aconnector->hpd_lock);
 
 }
@@ -3144,12 +3142,6 @@ out:
 
 			amdgpu_dm_update_connector_after_detect(aconnector);
 
-
-			drm_modeset_lock_all(dev);
-			dm_restore_drm_connector_state(dev, connector);
-			drm_modeset_unlock_all(dev);
-
-			drm_kms_helper_hotplug_event(dev);
 		} else if (dc_link_detect(dc_link, DETECT_REASON_HPDRX)) {
 
 			if (aconnector->fake_enable)
@@ -3157,14 +3149,17 @@ out:
 
 			amdgpu_dm_update_connector_after_detect(aconnector);
 
-
-			drm_modeset_lock_all(dev);
-			dm_restore_drm_connector_state(dev, connector);
-			drm_modeset_unlock_all(dev);
-
-			drm_kms_helper_hotplug_event(dev);
+		} else {
+			goto finish;
 		}
+
+		drm_modeset_lock_all(dev);
+		dm_restore_drm_connector_state(dev, connector);
+		drm_modeset_unlock_all(dev);
+
+		drm_kms_helper_hotplug_event(dev);
 	}
+finish:
 #ifdef CONFIG_DRM_AMD_DC_HDCP
 	if (hpd_irq_data.bytes.device_service_irq.bits.CP_IRQ) {
 		if (adev->dm.hdcp_workqueue)
