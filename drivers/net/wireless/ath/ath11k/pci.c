@@ -1373,6 +1373,7 @@ static void ath11k_pci_remove(struct pci_dev *pdev)
 
 	set_bit(ATH11K_FLAG_UNREGISTERING, &ab->dev_flags);
 
+	cancel_work_sync(&ab->reset_work);
 	ath11k_core_deinit(ab);
 
 qmi_fail:
@@ -1384,6 +1385,8 @@ qmi_fail:
 
 	ath11k_hal_srng_deinit(ab);
 	ath11k_ce_free_pipes(ab);
+
+	destroy_workqueue(ab->workqueue_aux);
 	ath11k_core_free(ab);
 }
 
