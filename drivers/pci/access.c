@@ -57,6 +57,7 @@ int noinline pci_bus_write_config_##size \
 	pci_lock_config(flags);						\
 	res = bus->ops->write(bus, devfn, pos, len, value);		\
 	pci_unlock_config(flags);					\
+	_cond_resched();						\
 	return res;							\
 }
 
