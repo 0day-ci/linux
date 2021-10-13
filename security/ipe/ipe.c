@@ -22,11 +22,17 @@
 struct lsm_blob_sizes ipe_blobs __lsm_ro_after_init = {
 	.lbs_task = sizeof(struct ipe_context __rcu *),
 	.lbs_bdev = sizeof(struct ipe_bdev),
+	.lbs_inode = sizeof(struct ipe_inode),
 };
 
 struct ipe_bdev *ipe_bdev(struct block_device *b)
 {
 	return b->security + ipe_blobs.lbs_bdev;
+}
+
+struct ipe_inode *ipe_inode(const struct inode *inode)
+{
+	return inode->i_security + ipe_blobs.lbs_inode;
 }
 
 static struct security_hook_list ipe_hooks[] __lsm_ro_after_init = {
@@ -40,6 +46,8 @@ static struct security_hook_list ipe_hooks[] __lsm_ro_after_init = {
 	LSM_HOOK_INIT(sb_free_security, ipe_sb_free_security),
 	LSM_HOOK_INIT(bdev_free_security, ipe_bdev_free_security),
 	LSM_HOOK_INIT(bdev_setsecurity, ipe_bdev_setsecurity),
+	LSM_HOOK_INIT(inode_setsecurity, ipe_inode_setsecurity),
+	LSM_HOOK_INIT(inode_free_security, ipe_inode_free_security),
 };
 
 /**

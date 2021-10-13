@@ -21,6 +21,14 @@ struct ipe_bdev {
 	size_t		hashlen;
 };
 
+struct ipe_inode {
+	const u8       *sigdata;
+	size_t		siglen;
+
+	const u8       *hash;
+	size_t		hashlen;
+};
+
 struct ipe_eval_ctx {
 	enum ipe_hook hook;
 	enum ipe_operation op;
@@ -29,6 +37,7 @@ struct ipe_eval_ctx {
 	struct ipe_context *ci_ctx;
 
 	const struct ipe_bdev *ipe_bdev;
+	const struct ipe_inode *ipe_inode;
 
 	bool from_init_sb;
 };

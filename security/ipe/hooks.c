@@ -268,3 +268,61 @@ int ipe_bdev_setsecurity(struct block_device *bdev, const char *key,
 
 	return -ENOSYS;
 }
+
+/**
+ * ipe_inode_setsecurity: Sets the a certain field of a inode security
+ *			 blob, based on @key.
+ * @inode: The inode to source the security blob from.
+ * @name: The name representing the information to be stored.
+ * @value: The value to be stored.
+ * @size: The size of @value.
+ * @flags: unused
+ *
+ * Saves fsverity signature & digest into inode security blob
+ *
+ * Return:
+ * 0 - OK
+ * !0 - Error
+ */
+int ipe_inode_setsecurity(struct inode *inode, const char *name,
+			  const void *value, size_t size,
+			  int flags)
+{
+	struct ipe_inode *inode_sec = ipe_inode(inode);
+
+	if (!strcmp(name, FS_VERITY_SIGNATURE_SEC_NAME)) {
+		inode_sec->siglen = size;
+		inode_sec->sigdata = kmemdup(value, size, GFP_KERNEL);
+		if (!inode_sec->sigdata)
+			return -ENOMEM;
+
+		return 0;
+	}
+
+	if (!strcmp(name, FS_VERITY_DIGEST_SEC_NAME)) {
+		inode_sec->hashlen = size;
+		inode_sec->hash = kmemdup(value, size, GFP_KERNEL);
+		if (!inode_sec->hash)
+			return -ENOMEM;
+
+		return 0;
+	}
+
+	return -EOPNOTSUPP;
+}
+
+/**
+ * ipe_node_free_security: Frees all fields of IPE's inode security blob.
+ * @inode: The inode structure to source the security blob from.
+ *
+ * The deallocation of the blob itself is performed later by the LSM
+ * infrastructure, (on behalf of all LSMs) in lsm_free_file.
+ *
+ */
+void ipe_inode_free_security(struct inode *inode)
+{
+	struct ipe_inode *inode_sec = ipe_inode(inode);
+
+	kfree(inode_sec->sigdata);
+	kfree(inode_sec->hash);
+}

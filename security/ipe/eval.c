@@ -97,6 +97,7 @@ static struct ipe_eval_ctx *build_ctx(const struct file *file,
 	ctx->ci_ctx = ipe_current_ctx();
 	ctx->from_init_sb = from_pinned(file);
 	if (file) {
+		ctx->ipe_inode = ipe_inode(file->f_inode);
 		if (FILE_BLOCK_DEV(file))
 			ctx->ipe_bdev = ipe_bdev(FILE_BLOCK_DEV(file));
 	}

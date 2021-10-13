@@ -10,6 +10,7 @@
 #include <linux/sched.h>
 #include <linux/binfmts.h>
 #include <linux/security.h>
+#include <linux/fsverity.h>
 #include <linux/device-mapper.h>
 
 enum ipe_hook {
@@ -45,5 +46,11 @@ void ipe_bdev_free_security(struct block_device *bdev);
 
 int ipe_bdev_setsecurity(struct block_device *bdev, const char *key,
 			 const void *value, size_t len);
+
+void ipe_inode_free_security(struct inode *inode);
+
+int ipe_inode_setsecurity(struct inode *inode, const char *name,
+			  const void *value, size_t size,
+			  int flags);
 
 #endif /* IPE_HOOKS_H */

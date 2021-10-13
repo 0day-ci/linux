@@ -22,5 +22,6 @@ extern struct ipe_parser __start_ipe_parsers[], __end_ipe_parsers[];
 extern struct ipe_module __start_ipe_modules[], __end_ipe_modules[];
 
 struct ipe_bdev *ipe_bdev(struct block_device *b);
+struct ipe_inode *ipe_inode(const struct inode *inode);
 
 #endif /* IPE_H */

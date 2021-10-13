@@ -40,4 +40,27 @@ config IPE_PROP_DM_VERITY_ROOTHASH
 
 	  If unsure, answer Y.
 
+config IPE_PROP_FS_VERITY_SIGNATURE
+	bool "Enable property for signed fs-verity files"
+	depends on FS_VERITY_BUILTIN_SIGNATURES
+	help
+	  This option enables IPE's integration with FSVerity's
+	  signed hashes. This enables the usage of the property,
+	  "fsverity_signature" in IPE's policy.
+
+	  if unsure, answer Y.
+
+config IPE_PROP_FS_VERITY_DIGEST
+	bool "Enable property for authorizing fs-verity files via digest"
+	depends on FS_VERITY
+	help
+	  This option enables IPE's integration with FSVerity.
+	  This enables the usage of the property "fsverity_digest" in IPE's
+	  policy. This property allows authorization or revocation via a
+	  a hex-string representing the digest of a fsverity file.
+
+	  if unsure, answer Y.
+
+
+
 endmenu
