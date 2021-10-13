@@ -252,6 +252,13 @@ MPOL_PREFERRED_MANY
 	can fall back to all existing numa nodes. This is effectively
 	MPOL_PREFERRED allowed for a mask rather than a single node.
 
+MPOL_PREFERRED_STRICT
+	This mode specifies that the allocation should be attempted
+	from the first node specified in the nodemask of the policy.
+	If that allocation fails, the kernel will search other nodes
+	in the nodemask, in order of increasing distance from the
+	preferred node based on information provided by the platform firmware.
+
 NUMA memory policy supports the following optional mode flags:
 
 MPOL_F_STATIC_NODES

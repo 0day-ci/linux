@@ -407,6 +407,10 @@ static const struct mempolicy_operations mpol_ops[MPOL_MAX] = {
 		.create = mpol_new_nodemask,
 		.rebind = mpol_rebind_preferred,
 	},
+	[MPOL_PREFERRED_STRICT] = {
+		.create = mpol_new_nodemask,
+		.rebind = mpol_rebind_preferred,
+	},
 };
 
 static int migrate_page_add(struct page *page, struct list_head *pagelist,
@@ -890,6 +894,7 @@ static void get_policy_nodemask(struct mempolicy *p, nodemask_t *nodes)
 	case MPOL_INTERLEAVE:
 	case MPOL_PREFERRED:
 	case MPOL_PREFERRED_MANY:
+	case MPOL_PREFERRED_STRICT:
 		*nodes = p->nodes;
 		break;
 	case MPOL_LOCAL:
@@ -1775,7 +1780,7 @@ nodemask_t *policy_nodemask(gfp_t gfp, struct mempolicy *policy)
 		cpuset_nodemask_valid_mems_allowed(&policy->nodes))
 		return &policy->nodes;
 
-	if (mode == MPOL_PREFERRED_MANY)
+	if (mode == MPOL_PREFERRED_MANY || mode == MPOL_PREFERRED_STRICT)
 		return &policy->nodes;
 
 	return NULL;
@@ -1790,7 +1795,7 @@ nodemask_t *policy_nodemask(gfp_t gfp, struct mempolicy *policy)
  */
 static int policy_node(gfp_t gfp, struct mempolicy *policy, int nd)
 {
-	if (policy->mode == MPOL_PREFERRED) {
+	if (policy->mode == MPOL_PREFERRED || policy->mode == MPOL_PREFERRED_STRICT) {
 		nd = first_node(policy->nodes);
 	} else {
 		/*
@@ -1834,6 +1839,7 @@ unsigned int mempolicy_slab_node(void)
 
 	switch (policy->mode) {
 	case MPOL_PREFERRED:
+	case MPOL_PREFERRED_STRICT:
 		return first_node(policy->nodes);
 
 	case MPOL_INTERLEAVE:
@@ -1946,7 +1952,8 @@ int huge_node(struct vm_area_struct *vma, unsigned long addr, gfp_t gfp_flags,
 					huge_page_shift(hstate_vma(vma)));
 	} else {
 		nid = policy_node(gfp_flags, *mpol, numa_node_id());
-		if (mode == MPOL_BIND || mode == MPOL_PREFERRED_MANY)
+		if (mode == MPOL_BIND || mode == MPOL_PREFERRED_MANY ||
+			mode == MPOL_PREFERRED_STRICT)
 			*nodemask = &(*mpol)->nodes;
 	}
 	return nid;
@@ -1980,6 +1987,7 @@ bool init_nodemask_of_mempolicy(nodemask_t *mask)
 	switch (mempolicy->mode) {
 	case MPOL_PREFERRED:
 	case MPOL_PREFERRED_MANY:
+	case MPOL_PREFERRED_STRICT:
 	case MPOL_BIND:
 	case MPOL_INTERLEAVE:
 		*mask = mempolicy->nodes;
@@ -2066,6 +2074,23 @@ static struct page *alloc_pages_preferred_many(gfp_t gfp, unsigned int order,
 	return page;
 }
 
+static struct page *alloc_pages_preferred_strict(gfp_t gfp, unsigned int order,
+						 struct mempolicy *pol)
+{
+	int nid;
+	gfp_t preferred_gfp;
+
+	/*
+	 * With MPOL_PREFERRED_STRICT first node in the policy nodemask
+	 * is picked as the preferred node id and the fallback allocation
+	 * is still restricted to the preferred nodes in the nodemask.
+	 */
+	preferred_gfp = gfp | __GFP_NOWARN;
+	preferred_gfp &= ~(__GFP_DIRECT_RECLAIM | __GFP_NOFAIL);
+	nid = first_node(pol->nodes);
+	return __alloc_pages(preferred_gfp, order, nid, &pol->nodes);
+}
+
 /**
  * alloc_pages_vma - Allocate a page for a VMA.
  * @gfp: GFP flags.
@@ -2103,6 +2128,12 @@ struct page *alloc_pages_vma(gfp_t gfp, int order, struct vm_area_struct *vma,
 
 	if (pol->mode == MPOL_PREFERRED_MANY) {
 		page = alloc_pages_preferred_many(gfp, order, node, pol);
+		mpol_cond_put(pol);
+		goto out;
+	}
+
+	if (pol->mode == MPOL_PREFERRED_STRICT) {
+		page = alloc_pages_preferred_strict(gfp, order, pol);
 		mpol_cond_put(pol);
 		goto out;
 	}
@@ -2187,6 +2218,8 @@ struct page *alloc_pages(gfp_t gfp, unsigned order)
 	else if (pol->mode == MPOL_PREFERRED_MANY)
 		page = alloc_pages_preferred_many(gfp, order,
 				numa_node_id(), pol);
+	else if (pol->mode == MPOL_PREFERRED_STRICT)
+		page = alloc_pages_preferred_strict(gfp, order, pol);
 	else
 		page = __alloc_pages(gfp, order,
 				policy_node(gfp, pol, numa_node_id()),
@@ -2269,6 +2302,7 @@ bool __mpol_equal(struct mempolicy *a, struct mempolicy *b)
 	case MPOL_INTERLEAVE:
 	case MPOL_PREFERRED:
 	case MPOL_PREFERRED_MANY:
+	case MPOL_PREFERRED_STRICT:
 		return !!nodes_equal(a->nodes, b->nodes);
 	case MPOL_LOCAL:
 		return true;
@@ -2409,6 +2443,7 @@ int mpol_misplaced(struct page *page, struct vm_area_struct *vma, unsigned long 
 		break;
 
 	case MPOL_PREFERRED:
+	case MPOL_PREFERRED_STRICT:
 		if (node_isset(curnid, pol->nodes))
 			goto out;
 		polnid = first_node(pol->nodes);
@@ -2870,6 +2905,7 @@ int mpol_parse_str(char *str, struct mempolicy **mpol)
 			err = 0;
 		goto out;
 	case MPOL_PREFERRED_MANY:
+	case MPOL_PREFERRED_STRICT:
 	case MPOL_BIND:
 		/*
 		 * Insist on a nodelist
@@ -2957,6 +2993,7 @@ void mpol_to_str(char *buffer, int maxlen, struct mempolicy *pol)
 		break;
 	case MPOL_PREFERRED:
 	case MPOL_PREFERRED_MANY:
+	case MPOL_PREFERRED_STRICT:
 	case MPOL_BIND:
 	case MPOL_INTERLEAVE:
 		nodes = pol->nodes;
