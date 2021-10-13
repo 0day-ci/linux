@@ -49,8 +49,6 @@
 #include <linux/sunrpc/sched.h>
 #include <linux/sunrpc/svc_rdma.h>
 
-#define RPCDBG_FACILITY	RPCDBG_SVCXPRT
-
 /* RPC/RDMA parameters */
 unsigned int svcrdma_ord = 16;	/* historical default */
 static unsigned int min_ord = 1;
@@ -275,7 +273,6 @@ out_err:
 
 void svc_rdma_cleanup(void)
 {
-	dprintk("SVCRDMA Module Removed, deregister RPC RDMA transport\n");
 	svc_unreg_xprt_class(&svc_rdma_class);
 	svc_rdma_proc_cleanup();
 }
@@ -283,12 +280,6 @@ void svc_rdma_cleanup(void)
 int svc_rdma_init(void)
 {
 	int rc;
-
-	dprintk("SVCRDMA Module Init, register RPC RDMA transport\n");
-	dprintk("\tsvcrdma_ord      : %d\n", svcrdma_ord);
-	dprintk("\tmax_requests     : %u\n", svcrdma_max_requests);
-	dprintk("\tmax_bc_requests  : %u\n", svcrdma_max_bc_requests);
-	dprintk("\tmax_inline       : %d\n", svcrdma_max_req_size);
 
 	rc = svc_rdma_proc_init();
 	if (rc)
