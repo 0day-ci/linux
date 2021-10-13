@@ -11,10 +11,62 @@
 #include "modules/ipe_module.h"
 #include "audit.h"
 
+#include <linux/fs.h>
+#include <linux/types.h>
 #include <linux/slab.h>
 #include <linux/file.h>
 #include <linux/sched.h>
 #include <linux/rcupdate.h>
+#include <linux/spinlock.h>
+
+static struct super_block *pinned_sb;
+static DEFINE_SPINLOCK(pin_lock);
+
+#define FILE_SUPERBLOCK(f) ((f)->f_path.mnt->mnt_sb)
+
+/**
+ * pin_sb: pin the underlying superblock of @f, marking it as trusted
+ * @f: Supplies a file structure to source the super_block from.
+ */
+static void pin_sb(const struct file *f)
+{
+	if (!f)
+		return;
+
+	spin_lock(&pin_lock);
+
+	if (pinned_sb)
+		goto out;
+
+	pinned_sb = FILE_SUPERBLOCK(f);
+
+out:
+	spin_unlock(&pin_lock);
+}
+
+/**
+ * from_pinned: determine whether @f is source from the pinned super_block.
+ * @f: Supplies a file structure to check against the pinned super_block.
+ *
+ * Return:
+ * true - @f is sourced from the pinned super_block
+ * false - @f is not sourced from the pinned super_block
+ */
+static bool from_pinned(const struct file *f)
+{
+	bool rv;
+
+	if (!f)
+		return false;
+
+	spin_lock(&pin_lock);
+
+	rv = !IS_ERR_OR_NULL(pinned_sb) && pinned_sb == FILE_SUPERBLOCK(f);
+
+	spin_unlock(&pin_lock);
+
+	return rv;
+}
 
 /**
  * build_ctx: Build an evaluation context.
@@ -42,6 +94,7 @@ static struct ipe_eval_ctx *build_ctx(const struct file *file,
 	ctx->op = op;
 	ctx->hook = hook;
 	ctx->ci_ctx = ipe_current_ctx();
+	ctx->from_init_sb = from_pinned(file);
 
 	return ctx;
 }
@@ -145,6 +198,9 @@ int ipe_process_event(const struct file *file, enum ipe_operation op,
 	int rc = 0;
 	struct ipe_eval_ctx *ctx = NULL;
 
+	if (op == ipe_operation_exec)
+		pin_sb(file);
+
 	ctx = build_ctx(file, op, hook);
 	if (IS_ERR(ctx))
 		return PTR_ERR(ctx);
@@ -153,4 +209,19 @@ int ipe_process_event(const struct file *file, enum ipe_operation op,
 
 	free_ctx(ctx);
 	return rc;
+}
+
+/**
+ * ipe_invalidate_pinned_sb: if @mnt_sb is the pinned superblock, ensure
+ *			     nothing can match it again.
+ * @mnt_sb: super_block to check against the pinned super_block
+ */
+void ipe_invalidate_pinned_sb(const struct super_block *mnt_sb)
+{
+	spin_lock(&pin_lock);
+
+	if (!IS_ERR_OR_NULL(pinned_sb) && mnt_sb == pinned_sb)
+		pinned_sb = ERR_PTR(-EIO);
+
+	spin_unlock(&pin_lock);
 }

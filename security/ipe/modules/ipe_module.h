@@ -9,6 +9,8 @@
 #include <linux/audit.h>
 #include "../eval.h"
 
+int ipe_bool_parse(const char *valstr, void **value);
+
 /**
  * ipe_module: definition of an extensible module for IPE properties.
  *	       These structures are used to implement 'key=value' pairs

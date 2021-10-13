@@ -107,3 +107,28 @@ int ipe_register_module(struct ipe_module *m)
 
 	return 0;
 }
+
+/**
+ * ipe_bool_parse: parse a boolean in IPE's policy and associate
+ *		   it as @value in IPE's policy.
+ * @valstr: Supplies the string parsed from the policy
+ * @value: Supplies a pointer to be populated with the result.
+ *
+ * Modules can use this function for simple true/false values
+ * instead of defining their own.
+ *
+ * Return:
+ * 0 - OK
+ * !0 - Error
+ */
+int ipe_bool_parse(const char *valstr, void **value)
+{
+	if (!strcmp(valstr, "TRUE"))
+		*value = (void *)true;
+	else if (!strcmp(valstr, "FALSE"))
+		*value = (void *)false;
+	else
+		return -EBADMSG;
+
+	return 0;
+}

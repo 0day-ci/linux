@@ -205,3 +205,17 @@ int ipe_on_kernel_load_data(enum kernel_load_data_id id, bool contents)
 
 	return ipe_process_event(NULL, op, ipe_hook_kernel_load);
 }
+
+/**
+ * ipe_bdev_free_security: free nested structures within IPE's LSM blob
+ *			   in super_blocks
+ * @mnt_sb: Supplies a pointer to a super_block that contains the structure
+ *	    to free.
+ *
+ * IPE does not have any structures with mnt_sb, but uses this hook to
+ * invalidate a pinned super_block.
+ */
+void ipe_sb_free_security(struct super_block *mnt_sb)
+{
+	ipe_invalidate_pinned_sb(mnt_sb);
+}

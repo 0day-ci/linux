@@ -7,6 +7,7 @@
 #define IPE_EVAL_H
 
 #include <linux/file.h>
+#include <linux/types.h>
 
 #include "ctx.h"
 #include "hooks.h"
@@ -18,6 +19,8 @@ struct ipe_eval_ctx {
 
 	const struct file *file;
 	struct ipe_context *ci_ctx;
+
+	bool from_init_sb;
 };
 
 enum ipe_match {
@@ -29,5 +32,7 @@ enum ipe_match {
 
 int ipe_process_event(const struct file *file, enum ipe_operation op,
 		      enum ipe_hook hook);
+
+void ipe_invalidate_pinned_sb(const struct super_block *mnt_sb);
 
 #endif /* IPE_EVAL_H */

@@ -13,6 +13,7 @@ obj-$(CONFIG_SECURITY_IPE) += \
 	fs.o \
 	hooks.o \
 	ipe.o \
+	modules/ \
 	modules.o \
 	parsers/ \
 	parsers.o \

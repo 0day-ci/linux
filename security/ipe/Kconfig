@@ -68,4 +68,6 @@ config IPE_AUDIT_HASH_ALG
 	default "sha384" if IPE_AUDIT_HASH_SHA384
 	default "sha512" if IPE_AUDIT_HASH_SHA512
 
+source "security/ipe/modules/Kconfig"
+
 endif

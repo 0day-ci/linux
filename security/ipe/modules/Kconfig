@@ -1,0 +1,20 @@
+
+menu "IPE Trust Providers"
+
+config IPE_PROP_BOOT_VERIFIED
+	bool "Enable trust for initramfs"
+	depends on SECURITY_IPE
+	default N
+	help
+	  This option enables the property 'boot_verified' in IPE policy.
+	  This property 'pins' the initial superblock when something
+	  is evaluated as an execution. This property will evaluate
+	  to true when the file being evaluated originates from this
+	  superblock.
+
+	  This property is useful to authorize a signed initramfs.
+
+	  If unsure, answer N.
+
+
+endmenu
