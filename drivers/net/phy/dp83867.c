@@ -878,6 +878,7 @@ static struct phy_driver dp83867_driver[] = {
 
 		.suspend	= genphy_suspend,
 		.resume		= genphy_resume,
+		.set_loopback	= genphy_loopback,
 	},
 };
 module_phy_driver(dp83867_driver);
