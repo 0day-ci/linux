@@ -859,7 +859,9 @@ static int vfio_exp_config_write(struct vfio_pci_core_device *vdev, int pos,
 
 		if (!ret && (cap & PCI_EXP_DEVCAP_FLR)) {
 			vfio_pci_zap_and_down_write_memory_lock(vdev);
-			pci_try_reset_function(vdev->pdev);
+			ret = pci_try_reset_function(vdev->pdev);
+			if (!ret && vdev->ops && vdev->ops->reset_done)
+				vdev->ops->reset_done(vdev);
 			up_write(&vdev->memory_lock);
 		}
 	}
@@ -941,7 +943,9 @@ static int vfio_af_config_write(struct vfio_pci_core_device *vdev, int pos,
 
 		if (!ret && (cap & PCI_AF_CAP_FLR) && (cap & PCI_AF_CAP_TP)) {
 			vfio_pci_zap_and_down_write_memory_lock(vdev);
-			pci_try_reset_function(vdev->pdev);
+			ret = pci_try_reset_function(vdev->pdev);
+			if (!ret && vdev->ops && vdev->ops->reset_done)
+				vdev->ops->reset_done(vdev);
 			up_write(&vdev->memory_lock);
 		}
 	}

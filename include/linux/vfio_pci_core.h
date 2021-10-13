@@ -95,6 +95,15 @@ struct vfio_pci_mmap_vma {
 	struct list_head	vma_next;
 };
 
+/**
+ * struct vfio_pci_core_device_ops - VFIO PCI driver device callbacks
+ *
+ * @reset_done: Called when the device was reset
+ */
+struct vfio_pci_core_device_ops {
+	void	(*reset_done)(struct vfio_pci_core_device *vdev);
+};
+
 struct vfio_pci_core_device {
 	struct vfio_device	vdev;
 	struct pci_dev		*pdev;
@@ -137,6 +146,7 @@ struct vfio_pci_core_device {
 	struct mutex		vma_lock;
 	struct list_head	vma_list;
 	struct rw_semaphore	memory_lock;
+	const struct vfio_pci_core_device_ops *ops;
 };
 
 #define is_intx(vdev) (vdev->irq_type == VFIO_PCI_INTX_IRQ_INDEX)

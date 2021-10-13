@@ -923,6 +923,8 @@ long vfio_pci_core_ioctl(struct vfio_device *core_vdev, unsigned int cmd,
 
 		vfio_pci_zap_and_down_write_memory_lock(vdev);
 		ret = pci_try_reset_function(vdev->pdev);
+		if (!ret && vdev->ops && vdev->ops->reset_done)
+			vdev->ops->reset_done(vdev);
 		up_write(&vdev->memory_lock);
 
 		return ret;
