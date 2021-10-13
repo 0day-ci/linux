@@ -706,7 +706,8 @@ enum drm_mode_status amdgpu_dm_connector_mode_valid(struct drm_connector *connec
 				   struct drm_display_mode *mode);
 
 void dm_restore_drm_connector_state(struct drm_device *dev,
-				    struct drm_connector *connector);
+				    struct drm_connector *connector,
+				    struct drm_modeset_acquire_ctx *ctx);
 
 void amdgpu_dm_update_freesync_caps(struct drm_connector *connector,
 					struct edid *edid);
