@@ -613,6 +613,19 @@ static const struct vfio_device_ops mlx5vf_pci_ops = {
 	.match = vfio_pci_core_match,
 };
 
+static void mlx5vf_reset_done(struct vfio_pci_core_device *core_vdev)
+{
+	struct mlx5vf_pci_core_device *mvdev = container_of(
+			core_vdev, struct mlx5vf_pci_core_device,
+			core_device);
+
+	mvdev->vmig.vfio_dev_state = VFIO_DEVICE_STATE_RUNNING;
+}
+
+static const struct vfio_pci_core_device_ops mlx5vf_pci_core_ops = {
+	.reset_done = mlx5vf_reset_done,
+};
+
 static int mlx5vf_pci_probe(struct pci_dev *pdev,
 			    const struct pci_device_id *id)
 {
@@ -629,8 +642,10 @@ static int mlx5vf_pci_probe(struct pci_dev *pdev,
 			mlx5_vf_get_core_dev(pdev);
 
 		if (mdev) {
-			if (MLX5_CAP_GEN(mdev, migration))
+			if (MLX5_CAP_GEN(mdev, migration)) {
 				mvdev->migrate_cap = 1;
+				mvdev->core_device.ops = &mlx5vf_pci_core_ops;
+			}
 			mlx5_vf_put_core_dev(mdev);
 		}
 	}
