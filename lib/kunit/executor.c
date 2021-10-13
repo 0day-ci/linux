@@ -88,60 +88,18 @@ kunit_filter_tests(struct kunit_suite *const suite, const char *test_glob)
 static char *kunit_shutdown;
 core_param(kunit_shutdown, kunit_shutdown, charp, 0644);
 
-static struct kunit_suite * const *
-kunit_filter_subsuite(struct kunit_suite * const * const subsuite,
-		      struct kunit_test_filter *filter)
-{
-	int i, n = 0;
-	struct kunit_suite **filtered, *filtered_suite;
-
-	n = 0;
-	for (i = 0; subsuite[i]; ++i) {
-		if (glob_match(filter->suite_glob, subsuite[i]->name))
-			++n;
-	}
-
-	if (n == 0)
-		return NULL;
-
-	filtered = kmalloc_array(n + 1, sizeof(*filtered), GFP_KERNEL);
-	if (!filtered)
-		return NULL;
-
-	n = 0;
-	for (i = 0; subsuite[i] != NULL; ++i) {
-		if (!glob_match(filter->suite_glob, subsuite[i]->name))
-			continue;
-		filtered_suite = kunit_filter_tests(subsuite[i], filter->test_glob);
-		if (filtered_suite)
-			filtered[n++] = filtered_suite;
-	}
-	filtered[n] = NULL;
-
-	return filtered;
-}
-
+/* Stores a NULL-terminated array of suites. */
 struct suite_set {
-	struct kunit_suite * const * const *start;
-	struct kunit_suite * const * const *end;
+	struct kunit_suite * const *start;
+	struct kunit_suite * const *end;
 };
-
-static void kunit_free_subsuite(struct kunit_suite * const *subsuite)
-{
-	unsigned int i;
-
-	for (i = 0; subsuite[i]; i++)
-		kfree(subsuite[i]);
-
-	kfree(subsuite);
-}
 
 static void kunit_free_suite_set(struct suite_set suite_set)
 {
-	struct kunit_suite * const * const *suites;
+	struct kunit_suite * const *suites;
 
 	for (suites = suite_set.start; suites < suite_set.end; suites++)
-		kunit_free_subsuite(*suites);
+		kfree(*suites);
 	kfree(suite_set.start);
 }
 
@@ -149,10 +107,11 @@ static struct suite_set kunit_filter_suites(const struct suite_set *suite_set,
 					    const char *filter_glob)
 {
 	int i;
-	struct kunit_suite * const **copy, * const *filtered_subsuite;
+	struct kunit_suite **copy, *filtered_suite;
 	struct suite_set filtered;
 	struct kunit_test_filter filter;
 
+	/* Note: this includes space for the terminating NULL. */
 	const size_t max = suite_set->end - suite_set->start;
 
 	copy = kmalloc_array(max, sizeof(*filtered.start), GFP_KERNEL);
@@ -164,11 +123,17 @@ static struct suite_set kunit_filter_suites(const struct suite_set *suite_set,
 
 	kunit_parse_filter_glob(&filter, filter_glob);
 
-	for (i = 0; i < max; ++i) {
-		filtered_subsuite = kunit_filter_subsuite(suite_set->start[i], &filter);
-		if (filtered_subsuite)
-			*copy++ = filtered_subsuite;
+	for (i = 0; suite_set->start[i] != NULL; i++) {
+		if (!glob_match(filter.suite_glob, suite_set->start[i]->name))
+			continue;
+
+		filtered_suite = kunit_filter_tests(suite_set->start[i], filter.test_glob);
+		if (!filtered_suite)
+			continue;
+
+		*copy++ = filtered_suite;
 	}
+	*copy = NULL;
 	filtered.end = copy;
 
 	kfree(filter.suite_glob);
@@ -190,52 +155,56 @@ static void kunit_handle_shutdown(void)
 
 }
 
-static void kunit_print_tap_header(struct suite_set *suite_set)
-{
-	struct kunit_suite * const * const *suites, * const *subsuite;
-	int num_of_suites = 0;
-
-	for (suites = suite_set->start; suites < suite_set->end; suites++)
-		for (subsuite = *suites; *subsuite != NULL; subsuite++)
-			num_of_suites++;
-
-	pr_info("TAP version 14\n");
-	pr_info("1..%d\n", num_of_suites);
-}
-
 static void kunit_exec_run_tests(struct suite_set *suite_set)
 {
-	struct kunit_suite * const * const *suites;
+	pr_info("TAP version 14\n");
+	pr_info("1..%zu\n", suite_set->end - suite_set->start);
 
-	kunit_print_tap_header(suite_set);
-
-	for (suites = suite_set->start; suites < suite_set->end; suites++)
-		__kunit_test_suites_init(*suites);
+	__kunit_test_suites_init(suite_set->start);
 }
 
 static void kunit_exec_list_tests(struct suite_set *suite_set)
 {
-	unsigned int i;
-	struct kunit_suite * const * const *suites;
+	struct kunit_suite * const *suites;
 	struct kunit_case *test_case;
 
 	/* Hack: print a tap header so kunit.py can find the start of KUnit output. */
 	pr_info("TAP version 14\n");
 
 	for (suites = suite_set->start; suites < suite_set->end; suites++)
-		for (i = 0; (*suites)[i] != NULL; i++) {
-			kunit_suite_for_each_test_case((*suites)[i], test_case) {
-				pr_info("%s.%s\n", (*suites)[i]->name, test_case->name);
-			}
+		kunit_suite_for_each_test_case((*suites), test_case) {
+			pr_info("%s.%s\n", (*suites)->name, test_case->name);
 		}
+}
+
+// TODO(dlatypov@google.com): delete this when we store suites in a single array.
+static struct suite_set make_suite_set(void)
+{
+	struct suite_set flattened;
+	size_t num_of_suites = 0;
+
+	struct kunit_suite * const * const *suites, * const *subsuite;
+	struct kunit_suite **end;
+
+	for (suites = __kunit_suites_start; suites < __kunit_suites_end; suites++)
+		for (subsuite = *suites; *subsuite != NULL; subsuite++)
+			num_of_suites++;
+
+	end = kcalloc(num_of_suites + 1, sizeof(*flattened.start), GFP_KERNEL);
+	flattened.start = end;
+
+	for (suites = __kunit_suites_start; suites < __kunit_suites_end; suites++)
+		for (subsuite = *suites; *subsuite != NULL; subsuite++)
+			*end++ = *subsuite;
+	*end = NULL;
+	flattened.end = end;
+	return flattened;
 }
 
 int kunit_run_all_tests(void)
 {
-	struct suite_set suite_set = {
-		.start = __kunit_suites_start,
-		.end = __kunit_suites_end,
-	};
+	struct suite_set suite_set = make_suite_set();
+	struct kunit_suite * const *unfiltered = suite_set.start; /* need to free at end */
 
 	if (filter_glob_param)
 		suite_set = kunit_filter_suites(&suite_set, filter_glob_param);
@@ -247,9 +216,10 @@ int kunit_run_all_tests(void)
 	else
 		pr_err("kunit executor: unknown action '%s'\n", action_param);
 
-	if (filter_glob_param) { /* a copy was made of each array */
+	if (filter_glob_param) { /* a copy was made of each suite */
 		kunit_free_suite_set(suite_set);
 	}
+	kfree(unfiltered);
 
 	kunit_handle_shutdown();
 
