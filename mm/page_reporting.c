@@ -115,8 +115,7 @@ page_reporting_cycle(struct page_reporting_dev_info *prdev, struct zone *zone,
 		     unsigned int order, unsigned int mt,
 		     struct scatterlist *sgl, unsigned int *offset)
 {
-	struct free_area *area = &zone->free_area[order];
-	struct list_head *list = &area->free_list[mt];
+	struct page_free_list *list = &zone->free_area[order].free[mt];
 	unsigned int page_len = PAGE_SIZE << order;
 	struct page *page, *next;
 	long budget;
@@ -126,7 +125,7 @@ page_reporting_cycle(struct page_reporting_dev_info *prdev, struct zone *zone,
 	 * Perform early check, if free area is empty there is
 	 * nothing to process so we can skip this free_list.
 	 */
-	if (list_empty(list))
+	if (list_empty(&list->list))
 		return err;
 
 	spin_lock_irq(&zone->lock);
@@ -145,10 +144,10 @@ page_reporting_cycle(struct page_reporting_dev_info *prdev, struct zone *zone,
 	 * The division here should be cheap since PAGE_REPORTING_CAPACITY
 	 * should always be a power of 2.
 	 */
-	budget = DIV_ROUND_UP(area->nr_free[mt], PAGE_REPORTING_CAPACITY * 16);
+	budget = DIV_ROUND_UP(list->nr, PAGE_REPORTING_CAPACITY * 16);
 
 	/* loop through free list adding unreported pages to sg list */
-	list_for_each_entry_safe(page, next, list, lru) {
+	list_for_each_entry_safe(page, next, &list->list, lru) {
 		/* We are going to skip over the reported pages. */
 		if (PageReported(page))
 			continue;
@@ -183,8 +182,8 @@ page_reporting_cycle(struct page_reporting_dev_info *prdev, struct zone *zone,
 		 * the new head of the free list before we release the
 		 * zone lock.
 		 */
-		if (!list_is_first(&page->lru, list))
-			list_rotate_to_front(&page->lru, list);
+		if (!list_is_first(&page->lru, &list->list))
+			list_rotate_to_front(&page->lru, &list->list);
 
 		/* release lock before waiting on report processing */
 		spin_unlock_irq(&zone->lock);
@@ -208,7 +207,7 @@ page_reporting_cycle(struct page_reporting_dev_info *prdev, struct zone *zone,
 		 * Reset next to first entry, the old next isn't valid
 		 * since we dropped the lock to report the pages
 		 */
-		next = list_first_entry(list, struct page, lru);
+		next = list_first_entry(&list->list, struct page, lru);
 
 		/* exit on error */
 		if (err)
@@ -216,8 +215,9 @@ page_reporting_cycle(struct page_reporting_dev_info *prdev, struct zone *zone,
 	}
 
 	/* Rotate any leftover pages to the head of the freelist */
-	if (!list_entry_is_head(next, list, lru) && !list_is_first(&next->lru, list))
-		list_rotate_to_front(&next->lru, list);
+	if (!list_entry_is_head(next, &list->list, lru) &&
+	    !list_is_first(&next->lru, &list->list))
+		list_rotate_to_front(&next->lru, &list->list);
 
 	spin_unlock_irq(&zone->lock);
 

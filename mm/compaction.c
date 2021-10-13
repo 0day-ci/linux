@@ -1414,19 +1414,21 @@ fast_isolate_freepages(struct compact_control *cc)
 	for (order = cc->search_order;
 	     !page && order >= 0;
 	     order = next_search_order(cc, order)) {
-		struct free_area *area = &cc->zone->free_area[order];
-		struct list_head *freelist;
+		struct page_free_list *free =
+			&cc->zone->free_area[order].free[MIGRATE_MOVABLE];
 		struct page *freepage;
 		unsigned long flags;
 		unsigned int order_scanned = 0;
 		unsigned long high_pfn = 0;
 
-		if (!area->nr_free)
-			continue;
-
 		spin_lock_irqsave(&cc->zone->lock, flags);
-		freelist = &area->free_list[MIGRATE_MOVABLE];
-		list_for_each_entry_reverse(freepage, freelist, lru) {
+
+		if (!free->nr) {
+			spin_unlock_irqrestore(&cc->zone->lock, flags);
+			continue;
+		}
+
+		list_for_each_entry_reverse(freepage, &free->list, lru) {
 			unsigned long pfn;
 
 			order_scanned++;
@@ -1464,7 +1466,7 @@ fast_isolate_freepages(struct compact_control *cc)
 		}
 
 		/* Reorder to so a future search skips recent pages */
-		move_freelist_head(freelist, freepage);
+		move_freelist_head(&free->list, freepage);
 
 		/* Isolate the page if available */
 		if (page) {
@@ -1786,11 +1788,11 @@ static unsigned long fast_find_migrateblock(struct compact_control *cc)
 		unsigned long flags;
 		struct page *freepage;
 
-		if (!area->nr_free)
+		if (!free_area_nr_free(area))
 			continue;
 
 		spin_lock_irqsave(&cc->zone->lock, flags);
-		freelist = &area->free_list[MIGRATE_MOVABLE];
+		freelist = &area->free[MIGRATE_MOVABLE].list;
 		list_for_each_entry(freepage, freelist, lru) {
 			unsigned long free_pfn;
 

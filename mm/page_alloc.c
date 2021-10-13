@@ -963,20 +963,20 @@ compaction_capture(struct capture_control *capc, struct page *page,
 static inline void add_to_free_list(struct page *page, struct zone *zone,
 				    unsigned int order, int migratetype)
 {
-	struct free_area *area = &zone->free_area[order];
+	struct page_free_list *list = &zone->free_area[order].free[migratetype];
 
-	list_add(&page->lru, &area->free_list[migratetype]);
-	area->nr_free[migratetype]++;
+	list_add(&page->lru, &list->list);
+	list->nr++;
 }
 
 /* Used for pages not on another list */
 static inline void add_to_free_list_tail(struct page *page, struct zone *zone,
 					 unsigned int order, int migratetype)
 {
-	struct free_area *area = &zone->free_area[order];
+	struct page_free_list *list = &zone->free_area[order].free[migratetype];
 
-	list_add_tail(&page->lru, &area->free_list[migratetype]);
-	area->nr_free[migratetype]++;
+	list_add_tail(&page->lru, &list->list);
+	list->nr++;
 }
 
 /*
@@ -987,9 +987,9 @@ static inline void add_to_free_list_tail(struct page *page, struct zone *zone,
 static inline void move_to_free_list(struct page *page, struct zone *zone,
 				     unsigned int order, int migratetype)
 {
-	struct free_area *area = &zone->free_area[order];
+	struct page_free_list *list = &zone->free_area[order].free[migratetype];
 
-	list_move_tail(&page->lru, &area->free_list[migratetype]);
+	list_move_tail(&page->lru, &list->list);
 }
 
 static inline void del_page_from_free_list(struct page *page, struct zone *zone,
@@ -1002,7 +1002,7 @@ static inline void del_page_from_free_list(struct page *page, struct zone *zone,
 	list_del(&page->lru);
 	__ClearPageBuddy(page);
 	set_page_private(page, 0);
-	zone->free_area[order].nr_free[migratetype]--;
+	zone->free_area[order].free[migratetype].nr--;
 }
 
 /*
@@ -2734,7 +2734,7 @@ int find_suitable_fallback(struct free_area *area, unsigned int order,
 	int i;
 	int fallback_mt;
 
-	if (area->nr_free == 0)
+	if (free_area_nr_free(area) == 0)
 		return -1;
 
 	*can_steal = false;
@@ -3290,7 +3290,7 @@ void mark_free_pages(struct zone *zone)
 
 	for_each_migratetype_order(order, t) {
 		list_for_each_entry(page,
-				&zone->free_area[order].free_list[t], lru) {
+				&zone->free_area[order].free[t].list, lru) {
 			unsigned long i;
 
 			pfn = page_to_pfn(page);
@@ -3886,7 +3886,7 @@ bool __zone_watermark_ok(struct zone *z, unsigned int order, unsigned long mark,
 		struct free_area *area = &z->free_area[o];
 		int mt;
 
-		if (!area->nr_free)
+		if (!free_area_nr_free(area))
 			continue;
 
 		for (mt = 0; mt < MIGRATE_PCPTYPES; mt++) {
@@ -6044,7 +6044,7 @@ void show_free_areas(unsigned int filter, nodemask_t *nodemask)
 			for (type = 0; type < MIGRATE_TYPES; type++) {
 				if (!free_area_empty(area, type))
 					types[order] |= 1 << type;
-				nr[order] += area->nr_free[type];
+				nr[order] += area->free[type].nr;
 			}
 
 			total += nr[order] << order;
@@ -6624,8 +6624,8 @@ static void __meminit zone_init_free_lists(struct zone *zone)
 {
 	unsigned int order, t;
 	for_each_migratetype_order(order, t) {
-		INIT_LIST_HEAD(&zone->free_area[order].free_list[t]);
-		zone->free_area[order].nr_free[t] = 0;
+		INIT_LIST_HEAD(&zone->free_area[order].free[t].list);
+		zone->free_area[order].free[t].nr = 0;
 	}
 }
 

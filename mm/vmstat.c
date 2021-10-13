@@ -1470,7 +1470,7 @@ static void pagetypeinfo_showfree_print(struct seq_file *m,
 					zone->name,
 					migratetype_names[mtype]);
 		for (order = 0; order < MAX_ORDER; ++order) {
-			seq_printf(m, "%6zu ", zone->free_area[order].nr_free[mtype]);
+			seq_printf(m, "%6zu ", zone->free_area[order].free[mtype].nr);
 			spin_unlock_irq(&zone->lock);
 			cond_resched();
 			spin_lock_irq(&zone->lock);

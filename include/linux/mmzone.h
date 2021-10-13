@@ -94,21 +94,25 @@ extern int page_group_by_mobility_disabled;
 #define get_pageblock_migratetype(page)					\
 	get_pfnblock_flags_mask(page, page_to_pfn(page), MIGRATETYPE_MASK)
 
+struct page_free_list {
+	struct list_head	list;
+	size_t			nr;
+};
+
 struct free_area {
-	struct list_head	free_list[MIGRATE_TYPES];
-	unsigned long		nr_free[MIGRATE_TYPES];
+	struct page_free_list	free[MIGRATE_TYPES];
 };
 
 static inline struct page *get_page_from_free_area(struct free_area *area,
 					    int migratetype)
 {
-	return list_first_entry_or_null(&area->free_list[migratetype],
+	return list_first_entry_or_null(&area->free[migratetype].list,
 					struct page, lru);
 }
 
 static inline bool free_area_empty(struct free_area *area, int migratetype)
 {
-	return area->nr_free[migratetype] == 0;
+	return area->free[migratetype].nr == 0;
 }
 
 static inline size_t free_area_nr_free(struct free_area *area)
@@ -117,7 +121,7 @@ static inline size_t free_area_nr_free(struct free_area *area)
 	size_t nr_free = 0;
 
 	for (migratetype = 0; migratetype < MIGRATE_TYPES; migratetype++)
-		nr_free += area->nr_free[migratetype];
+		nr_free += area->free[migratetype].nr;
 	return nr_free;
 }
 
