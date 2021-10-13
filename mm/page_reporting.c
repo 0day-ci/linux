@@ -71,10 +71,8 @@ void __page_reporting_notify(void)
 
 static void
 page_reporting_drain(struct page_reporting_dev_info *prdev,
-		     struct scatterlist *sgl, unsigned int nents, bool reported)
+		     struct scatterlist *sg, bool reported)
 {
-	struct scatterlist *sg = sgl;
-
 	/*
 	 * Drain the now reported pages back into their respective
 	 * free lists/areas. We assume at least one page is populated.
@@ -100,9 +98,45 @@ page_reporting_drain(struct page_reporting_dev_info *prdev,
 		if (PageBuddy(page) && buddy_order(page) == order)
 			__SetPageReported(page);
 	} while ((sg = sg_next(sg)));
+}
 
-	/* reinitialize scatterlist now that it is empty */
-	sg_init_table(sgl, nents);
+static int
+page_reporting_get_pages(struct page_reporting_dev_info *prdev, struct zone *zone,
+			 unsigned int order, unsigned int mt,
+			 struct scatterlist *sgl)
+{
+	struct page_free_list *list = &zone->free_area[order].free[mt];
+	unsigned int page_len = PAGE_SIZE << order;
+	struct page *page, *next;
+	unsigned nr_got = 0;
+
+	spin_lock_irq(&zone->lock);
+
+	/* loop through free list adding unreported pages to sg list */
+	list_for_each_entry_safe(page, next, &list->list, lru) {
+		/* We are going to skip over the reported pages. */
+		if (PageReported(page))
+			continue;
+
+		/* Attempt to pull page from list and place in scatterlist */
+		if (!__isolate_free_page(page, order)) {
+			next = page;
+			break;
+		}
+
+		sg_set_page(&sgl[nr_got++], page, page_len, 0);
+		if (nr_got == PAGE_REPORTING_CAPACITY)
+			break;
+	}
+
+	/* Rotate any leftover pages to the head of the freelist */
+	if (!list_entry_is_head(next, &list->list, lru) &&
+	    !list_is_first(&next->lru, &list->list))
+		list_rotate_to_front(&next->lru, &list->list);
+
+	spin_unlock_irq(&zone->lock);
+
+	return nr_got;
 }
 
 /*
@@ -113,22 +147,12 @@ page_reporting_drain(struct page_reporting_dev_info *prdev,
 static int
 page_reporting_cycle(struct page_reporting_dev_info *prdev, struct zone *zone,
 		     unsigned int order, unsigned int mt,
-		     struct scatterlist *sgl, unsigned int *offset)
+		     struct scatterlist *sgl)
 {
 	struct page_free_list *list = &zone->free_area[order].free[mt];
-	unsigned int page_len = PAGE_SIZE << order;
-	struct page *page, *next;
+	unsigned nr_pages;
 	long budget;
 	int err = 0;
-
-	/*
-	 * Perform early check, if free area is empty there is
-	 * nothing to process so we can skip this free_list.
-	 */
-	if (list_empty(&list->list))
-		return err;
-
-	spin_lock_irq(&zone->lock);
 
 	/*
 	 * Limit how many calls we will be making to the page reporting
@@ -146,80 +170,25 @@ page_reporting_cycle(struct page_reporting_dev_info *prdev, struct zone *zone,
 	 */
 	budget = DIV_ROUND_UP(list->nr, PAGE_REPORTING_CAPACITY * 16);
 
-	/* loop through free list adding unreported pages to sg list */
-	list_for_each_entry_safe(page, next, &list->list, lru) {
-		/* We are going to skip over the reported pages. */
-		if (PageReported(page))
-			continue;
+	while (budget > 0 && !err) {
+		sg_init_table(sgl, PAGE_REPORTING_CAPACITY);
 
-		/*
-		 * If we fully consumed our budget then update our
-		 * state to indicate that we are requesting additional
-		 * processing and exit this list.
-		 */
-		if (budget < 0) {
-			atomic_set(&prdev->state, PAGE_REPORTING_REQUESTED);
-			next = page;
+		nr_pages = page_reporting_get_pages(prdev, zone, order, mt, sgl);
+		if (!nr_pages)
 			break;
-		}
 
-		/* Attempt to pull page from list and place in scatterlist */
-		if (*offset) {
-			if (!__isolate_free_page(page, order)) {
-				next = page;
-				break;
-			}
+		sg_mark_end(sgl + nr_pages);
 
-			/* Add page to scatter list */
-			--(*offset);
-			sg_set_page(&sgl[*offset], page, page_len, 0);
+		budget -= nr_pages;
+		err = prdev->report(prdev, sgl, nr_pages);
 
-			continue;
-		}
-
-		/*
-		 * Make the first non-reported page in the free list
-		 * the new head of the free list before we release the
-		 * zone lock.
-		 */
-		if (!list_is_first(&page->lru, &list->list))
-			list_rotate_to_front(&page->lru, &list->list);
-
-		/* release lock before waiting on report processing */
-		spin_unlock_irq(&zone->lock);
-
-		/* begin processing pages in local list */
-		err = prdev->report(prdev, sgl, PAGE_REPORTING_CAPACITY);
-
-		/* reset offset since the full list was reported */
-		*offset = PAGE_REPORTING_CAPACITY;
-
-		/* update budget to reflect call to report function */
-		budget--;
-
-		/* reacquire zone lock and resume processing */
 		spin_lock_irq(&zone->lock);
-
-		/* flush reported pages from the sg list */
-		page_reporting_drain(prdev, sgl, PAGE_REPORTING_CAPACITY, !err);
-
-		/*
-		 * Reset next to first entry, the old next isn't valid
-		 * since we dropped the lock to report the pages
-		 */
-		next = list_first_entry(&list->list, struct page, lru);
-
-		/* exit on error */
-		if (err)
-			break;
+		page_reporting_drain(prdev, sgl, !err);
+		spin_unlock_irq(&zone->lock);
 	}
 
-	/* Rotate any leftover pages to the head of the freelist */
-	if (!list_entry_is_head(next, &list->list, lru) &&
-	    !list_is_first(&next->lru, &list->list))
-		list_rotate_to_front(&next->lru, &list->list);
-
-	spin_unlock_irq(&zone->lock);
+	if (budget <= 0 && list->nr)
+		atomic_set(&prdev->state, PAGE_REPORTING_REQUESTED);
 
 	return err;
 }
@@ -228,7 +197,7 @@ static int
 page_reporting_process_zone(struct page_reporting_dev_info *prdev,
 			    struct scatterlist *sgl, struct zone *zone)
 {
-	unsigned int order, mt, leftover, offset = PAGE_REPORTING_CAPACITY;
+	unsigned int order, mt;
 	unsigned long watermark;
 	int err = 0;
 
@@ -250,23 +219,10 @@ page_reporting_process_zone(struct page_reporting_dev_info *prdev,
 			if (is_migrate_isolate(mt))
 				continue;
 
-			err = page_reporting_cycle(prdev, zone, order, mt,
-						   sgl, &offset);
+			err = page_reporting_cycle(prdev, zone, order, mt, sgl);
 			if (err)
 				return err;
 		}
-	}
-
-	/* report the leftover pages before going idle */
-	leftover = PAGE_REPORTING_CAPACITY - offset;
-	if (leftover) {
-		sgl = &sgl[offset];
-		err = prdev->report(prdev, sgl, leftover);
-
-		/* flush any remaining pages out from the last report */
-		spin_lock_irq(&zone->lock);
-		page_reporting_drain(prdev, sgl, leftover, !err);
-		spin_unlock_irq(&zone->lock);
 	}
 
 	return err;
@@ -293,8 +249,6 @@ static void page_reporting_process(struct work_struct *work)
 	sgl = kmalloc_array(PAGE_REPORTING_CAPACITY, sizeof(*sgl), GFP_KERNEL);
 	if (!sgl)
 		goto err_out;
-
-	sg_init_table(sgl, PAGE_REPORTING_CAPACITY);
 
 	for_each_zone(zone) {
 		err = page_reporting_process_zone(prdev, sgl, zone);
