@@ -33,4 +33,7 @@ obj-$(CONFIG_SECURITY_IPE) += \
 
 obj-$(CONFIG_AUDIT) += audit.o
 
+obj-$(CONFIG_SECURITY_IPE_KUNIT_TEST) += \
+	policy_parser_tests.o \
+
 clean-files := boot-policy.c \

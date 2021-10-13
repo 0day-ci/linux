@@ -231,3 +231,7 @@ void ipe_invalidate_pinned_sb(const struct super_block *mnt_sb)
 
 	spin_unlock(&pin_lock);
 }
+
+#ifdef CONFIG_SECURITY_IPE_KUNIT_TEST
+#include "ctx_test.c"
+#endif /* CONFIG_SECURITY_IPE_KUNIT_TEST */
