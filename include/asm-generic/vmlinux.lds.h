@@ -278,6 +278,20 @@
 #define EARLY_LSM_TABLE()
 #endif
 
+#ifdef CONFIG_SECURITY_IPE
+#define IPE_PARSER_TABLE()	. = ALIGN(8);				\
+				__start_ipe_parsers = .;		\
+				KEEP(*(.ipe_parsers))		\
+				__end_ipe_parsers = .;
+#define IPE_MODULE_TABLE()	. = ALIGN(8);				\
+				__start_ipe_modules = .;		\
+				KEEP(*(.ipe_modules))			\
+				__end_ipe_modules = .;
+#else
+#define IPE_PARSER_TABLE()
+#define IPE_MODULE_TABLE()
+#endif
+
 #define ___OF_TABLE(cfg, name)	_OF_TABLE_##cfg(name)
 #define __OF_TABLE(cfg, name)	___OF_TABLE(cfg, name)
 #define OF_TABLE(cfg, name)	__OF_TABLE(IS_ENABLED(cfg), name)
@@ -436,6 +450,8 @@
 		KEEP(*(__tracepoints_ptrs)) /* Tracepoints: pointer array */ \
 		__stop___tracepoints_ptrs = .;				\
 		*(__tracepoints_strings)/* Tracepoints: strings */	\
+		IPE_PARSER_TABLE()					\
+		IPE_MODULE_TABLE()					\
 	}								\
 									\
 	.rodata1          : AT(ADDR(.rodata1) - LOAD_OFFSET) {		\

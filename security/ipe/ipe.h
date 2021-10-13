@@ -9,11 +9,15 @@
 #define pr_fmt(fmt) "IPE " fmt "\n"
 
 #include "ctx.h"
+#include "ipe_parser.h"
+#include "modules/ipe_module.h"
 
 #include <linux/types.h>
 #include <linux/sched.h>
 #include <linux/lsm_hooks.h>
 
 extern struct lsm_blob_sizes ipe_blobs;
+extern struct ipe_parser __start_ipe_parsers[], __end_ipe_parsers[];
+extern struct ipe_module __start_ipe_modules[], __end_ipe_modules[];
 
 #endif /* IPE_H */

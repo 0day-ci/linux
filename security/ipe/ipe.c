@@ -6,6 +6,9 @@
 #include "ipe.h"
 #include "ctx.h"
 #include "hooks.h"
+#include "ipe_parser.h"
+#include "modules/ipe_module.h"
+#include "modules.h"
 
 #include <linux/fs.h>
 #include <linux/sched.h>
@@ -25,6 +28,58 @@ static struct security_hook_list ipe_hooks[] __lsm_ro_after_init = {
 };
 
 /**
+ * load_parsers: Load all the parsers compiled into IPE. This needs
+ *		 to be called prior to the boot policy being loaded.
+ *
+ * Return:
+ * 0 - OK
+ * !0 - Error
+ */
+static int load_parsers(void)
+{
+	int rc = 0;
+	struct ipe_parser *parser;
+
+	for (parser = __start_ipe_parsers; parser < __end_ipe_parsers; ++parser) {
+		rc = ipe_register_parser(parser);
+		if (rc) {
+			pr_err("failed to initialize '%s'", parser->first_token);
+			return rc;
+		}
+
+		pr_info("initialized parser module '%s'", parser->first_token);
+	}
+
+	return 0;
+}
+
+/**
+ * load_modules: Load all the modules compiled into IPE. This needs
+ *		 to be called prior to the boot policy being loaded.
+ *
+ * Return:
+ * 0 - OK
+ * !0 - Error
+ */
+static int load_modules(void)
+{
+	int rc = 0;
+	struct ipe_module *m;
+
+	for (m = __start_ipe_modules; m < __end_ipe_modules; ++m) {
+		rc = ipe_register_module(m);
+		if (rc) {
+			pr_err("failed to initialize '%s'", m->name);
+			return rc;
+		}
+
+		pr_info("initialized module '%s'", m->name);
+	}
+
+	return 0;
+}
+
+/**
  * ipe_init: Entry point of IPE.
  *
  * This is called at LSM init, which happens occurs early during kernel
@@ -40,6 +95,14 @@ static struct security_hook_list ipe_hooks[] __lsm_ro_after_init = {
 static int __init ipe_init(void)
 {
 	int rc = 0;
+
+	rc = load_parsers();
+	if (rc)
+		return rc;
+
+	rc = load_modules();
+	if (rc)
+		return rc;
 
 	rc = ipe_init_ctx();
 	if (rc)

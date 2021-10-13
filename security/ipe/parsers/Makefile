@@ -5,13 +5,8 @@
 # Makefile for building the IPE module as part of the kernel tree.
 #
 
-ccflags-y := -I$(srctree)/security/ipe/modules
+ccflags-y := -I$(srctree)/security/ipe
 
 obj-$(CONFIG_SECURITY_IPE) += \
-	ctx.o \
-	hooks.o \
-	ipe.o \
-	modules.o \
-	parsers/ \
-	parsers.o \
-	policy.o \
+	default.o \
+	policy_header.o \
