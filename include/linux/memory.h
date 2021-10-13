@@ -125,7 +125,10 @@ static inline int memory_notify(unsigned long val, void *v)
 {
 	return 0;
 }
-#define hotplug_memory_notifier(fn, pri)	({ 0; })
+static inline int hotplug_memory_notifier(notifier_fn_t fn, int pri)
+{
+	return 0;
+}
 /* These aren't inline functions due to a GCC bug. */
 #define register_hotmemory_notifier(nb)    ({ (void)(nb); 0; })
 #define unregister_hotmemory_notifier(nb)  ({ (void)(nb); })
