@@ -384,16 +384,6 @@ struct drm_mode_config {
 	struct drm_modeset_lock connection_mutex;
 
 	/**
-	 * @acquire_ctx:
-	 *
-	 * Global implicit acquire context used by atomic drivers for legacy
-	 * IOCTLs. Deprecated, since implicit locking contexts make it
-	 * impossible to use driver-private &struct drm_modeset_lock. Users of
-	 * this must hold @mutex.
-	 */
-	struct drm_modeset_acquire_ctx *acquire_ctx;
-
-	/**
 	 * @idr_mutex:
 	 *
 	 * Mutex for KMS ID allocation and management. Protects both @object_idr
