@@ -13,12 +13,22 @@
 #include "hooks.h"
 #include "policy.h"
 
+struct ipe_bdev {
+	const u8       *sigdata;
+	size_t		siglen;
+
+	const u8       *hash;
+	size_t		hashlen;
+};
+
 struct ipe_eval_ctx {
 	enum ipe_hook hook;
 	enum ipe_operation op;
 
 	const struct file *file;
 	struct ipe_context *ci_ctx;
+
+	const struct ipe_bdev *ipe_bdev;
 
 	bool from_init_sb;
 };

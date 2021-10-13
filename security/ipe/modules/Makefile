@@ -6,3 +6,5 @@
 #
 
 obj-$(CONFIG_IPE_PROP_BOOT_VERIFIED) += boot_verified.o
+obj-$(CONFIG_IPE_PROP_DM_VERITY_SIGNATURE) += dmverity_signature.o
+obj-$(CONFIG_IPE_PROP_DM_VERITY_ROOTHASH) += dmverity_roothash.o

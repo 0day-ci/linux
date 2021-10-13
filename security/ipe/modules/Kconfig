@@ -16,5 +16,28 @@ config IPE_PROP_BOOT_VERIFIED
 
 	  If unsure, answer N.
 
+config IPE_PROP_DM_VERITY_SIGNATURE
+	bool "Enable support for signed dm-verity volumes"
+	depends on DM_VERITY_VERIFY_ROOTHASH_SIG
+	default Y
+	help
+	  This option enables the property 'dmverity_signature' in
+	  IPE policy. This property evaluates to TRUE when a file
+	  is evaluated against a dm-verity volume that was mounted
+	  with a signed root-hash.
+
+	  If unsure, answer Y.
+
+config IPE_PROP_DM_VERITY_ROOTHASH
+	bool "Enable support for dm-verity volumes"
+	depends on DM_VERITY
+	default Y
+	help
+	  This option enables the property 'dmverity_roothash' in
+	  IPE policy. This property evaluates to TRUE when a file
+	  is evaluated against a dm-verity volume whose root hash
+	  matches the supplied value.
+
+	  If unsure, answer Y.
 
 endmenu

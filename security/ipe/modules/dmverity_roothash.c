@@ -1,0 +1,80 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * Copyright (C) Microsoft Corporation. All rights reserved.
+ */
+
+#include "ipe_module.h"
+
+#include <linux/fs.h>
+#include <linux/types.h>
+
+struct counted_array {
+	size_t	len;
+	u8     *data;
+};
+
+static int dvrh_parse(const char *valstr, void **value)
+{
+	int rv = 0;
+	struct counted_array *arr;
+
+	arr = kzalloc(sizeof(*arr), GFP_KERNEL);
+	if (!arr) {
+		rv = -ENOMEM;
+		goto err;
+	}
+
+	arr->len = (strlen(valstr) / 2);
+
+	arr->data = kzalloc(arr->len, GFP_KERNEL);
+	if (!arr->data) {
+		rv = -ENOMEM;
+		goto err;
+	}
+
+	rv = hex2bin(arr->data, valstr, arr->len);
+	if (rv != 0)
+		goto err2;
+
+	*value = arr;
+	return rv;
+err2:
+	kfree(arr->data);
+err:
+	kfree(arr);
+	return rv;
+}
+
+static bool dvrh_eval(const struct ipe_eval_ctx *ctx, const void *val)
+{
+	const u8 *src;
+	struct counted_array *expect = (struct counted_array *)val;
+
+	if (!ctx->ipe_bdev)
+		return false;
+
+	if (ctx->ipe_bdev->hashlen != expect->len)
+		return false;
+
+	src = ctx->ipe_bdev->hash;
+
+	return !memcmp(expect->data, src, expect->len);
+}
+
+static int dvrh_free(void **val)
+{
+	struct counted_array *expect = (struct counted_array *)val;
+
+	kfree(expect->data);
+	kfree(expect);
+
+	return 0;
+}
+
+IPE_MODULE(dvrh) = {
+	.name = "dmverity_roothash",
+	.version = 1,
+	.parse = dvrh_parse,
+	.free = dvrh_free,
+	.eval = dvrh_eval,
+};

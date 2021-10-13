@@ -23,6 +23,7 @@ static struct super_block *pinned_sb;
 static DEFINE_SPINLOCK(pin_lock);
 
 #define FILE_SUPERBLOCK(f) ((f)->f_path.mnt->mnt_sb)
+#define FILE_BLOCK_DEV(f) (FILE_SUPERBLOCK(f)->s_bdev)
 
 /**
  * pin_sb: pin the underlying superblock of @f, marking it as trusted
@@ -95,6 +96,10 @@ static struct ipe_eval_ctx *build_ctx(const struct file *file,
 	ctx->hook = hook;
 	ctx->ci_ctx = ipe_current_ctx();
 	ctx->from_init_sb = from_pinned(file);
+	if (file) {
+		if (FILE_BLOCK_DEV(file))
+			ctx->ipe_bdev = ipe_bdev(FILE_BLOCK_DEV(file));
+	}
 
 	return ctx;
 }

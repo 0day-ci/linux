@@ -13,6 +13,7 @@
 #include <linux/types.h>
 #include <linux/refcount.h>
 #include <linux/rcupdate.h>
+#include <linux/blk_types.h>
 #include <linux/binfmts.h>
 #include <linux/mman.h>
 
@@ -218,4 +219,51 @@ int ipe_on_kernel_load_data(enum kernel_load_data_id id, bool contents)
 void ipe_sb_free_security(struct super_block *mnt_sb)
 {
 	ipe_invalidate_pinned_sb(mnt_sb);
+}
+
+/**
+ * ipe_bdev_free_security: free nested structures within IPE's LSM blob
+ *			   in block_devices
+ * @bdev: Supplies a pointer to a block_device that contains the structure
+ *	  to free.
+ */
+void ipe_bdev_free_security(struct block_device *bdev)
+{
+	struct ipe_bdev *blob = ipe_bdev(bdev);
+
+	kfree(blob->sigdata);
+}
+
+/**
+ * ipe_bdev_setsecurity: associate some data from the block device layer
+ *			 with IPE's LSM blob.
+ * @bdev: Supplies a pointer to a block_device that contains the LSM blob.
+ * @key: Supplies the string key that uniquely identifies the value.
+ * @value: Supplies the value to store.
+ * @len: The length of @value.
+ */
+int ipe_bdev_setsecurity(struct block_device *bdev, const char *key,
+			 const void *value, size_t len)
+{
+	struct ipe_bdev *blob = ipe_bdev(bdev);
+
+	if (!strcmp(key, DM_VERITY_SIGNATURE_SEC_NAME)) {
+		blob->siglen = len;
+		blob->sigdata = kmemdup(value, len, GFP_KERNEL);
+		if (!blob->sigdata)
+			return -ENOMEM;
+
+		return 0;
+	}
+
+	if (!strcmp(key, DM_VERITY_ROOTHASH_SEC_NAME)) {
+		blob->hashlen = len;
+		blob->hash = kmemdup(value, len, GFP_KERNEL);
+		if (!blob->hash)
+			return -ENOMEM;
+
+		return 0;
+	}
+
+	return -ENOSYS;
 }

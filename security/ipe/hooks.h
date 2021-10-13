@@ -10,6 +10,7 @@
 #include <linux/sched.h>
 #include <linux/binfmts.h>
 #include <linux/security.h>
+#include <linux/device-mapper.h>
 
 enum ipe_hook {
 	ipe_hook_exec = 0,
@@ -39,5 +40,10 @@ int ipe_on_kernel_read(struct file *file, enum kernel_read_file_id id,
 int ipe_on_kernel_load_data(enum kernel_load_data_id id, bool contents);
 
 void ipe_sb_free_security(struct super_block *mnt_sb);
+
+void ipe_bdev_free_security(struct block_device *bdev);
+
+int ipe_bdev_setsecurity(struct block_device *bdev, const char *key,
+			 const void *value, size_t len);
 
 #endif /* IPE_HOOKS_H */
