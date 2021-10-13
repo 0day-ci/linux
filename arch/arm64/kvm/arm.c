@@ -618,6 +618,18 @@ static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
 	if (ret)
 		return ret;
 
+	if (vcpu->arch.sve_state) {
+		void *sve_end;
+
+		sve_end = vcpu->arch.sve_state + vcpu_sve_state_size(vcpu);
+
+		ret = create_hyp_mappings(vcpu->arch.sve_state, sve_end,
+					  PAGE_HYP);
+		if (ret)
+			return ret;
+	}
+
+
 	ret = kvm_arm_pmu_v3_enable(vcpu);
 
 	return ret;
