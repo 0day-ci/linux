@@ -443,3 +443,318 @@ void handle_host_mem_abort(struct kvm_cpu_context *host_ctxt)
 	ret = host_stage2_idmap(addr);
 	BUG_ON(ret && ret != -EAGAIN);
 }
+
+/* This corresponds to locking order */
+enum pkvm_component_id {
+	PKVM_ID_HOST,
+	PKVM_ID_HYP,
+};
+
+struct pkvm_mem_transition {
+	u64				nr_pages;
+
+	struct {
+		enum pkvm_component_id	id;
+		u64			addr;
+
+		union {
+			struct {
+				u64	completer_addr;
+			} host;
+		};
+	} initiator;
+
+	struct {
+		enum pkvm_component_id	id;
+	} completer;
+};
+
+struct pkvm_mem_share {
+	struct pkvm_mem_transition	tx;
+	enum kvm_pgtable_prot		prot;
+};
+
+struct pkvm_page_req {
+	struct {
+		enum pkvm_page_state	state;
+		u64			addr;
+	} initiator;
+
+	struct {
+		u64			addr;
+	} completer;
+
+	phys_addr_t			phys;
+};
+
+struct pkvm_page_share_ack {
+	struct {
+		enum pkvm_page_state	state;
+		phys_addr_t		phys;
+		enum kvm_pgtable_prot	prot;
+	} completer;
+};
+
+static void host_lock_component(void)
+{
+	hyp_spin_lock(&host_kvm.lock);
+}
+
+static void host_unlock_component(void)
+{
+	hyp_spin_unlock(&host_kvm.lock);
+}
+
+static void hyp_lock_component(void)
+{
+	hyp_spin_lock(&pkvm_pgd_lock);
+}
+
+static void hyp_unlock_component(void)
+{
+	hyp_spin_unlock(&pkvm_pgd_lock);
+}
+
+static int host_request_share(struct pkvm_page_req *req,
+			      struct pkvm_mem_transition *tx,
+			      u64 idx)
+{
+	u64 offset = idx * PAGE_SIZE;
+	enum kvm_pgtable_prot prot;
+	u64 host_addr;
+	kvm_pte_t pte;
+	int err;
+
+	hyp_assert_lock_held(&host_kvm.lock);
+
+	host_addr = tx->initiator.addr + offset;
+	err = kvm_pgtable_get_leaf(&host_kvm.pgt, host_addr, &pte, NULL);
+	if (err)
+		return err;
+
+	if (!kvm_pte_valid(pte) && pte)
+		return -EPERM;
+
+	prot = kvm_pgtable_stage2_pte_prot(pte);
+	*req = (struct pkvm_page_req) {
+		.initiator	= {
+			.state	= pkvm_getstate(prot),
+			.addr	= host_addr,
+		},
+		.completer	= {
+			.addr	= tx->initiator.host.completer_addr + offset,
+		},
+		.phys		= host_addr,
+	};
+
+	return 0;
+}
+
+/*
+ * Populate the page-sharing request (@req) based on the share transition
+ * information from the initiator and its current page state.
+ */
+static int request_share(struct pkvm_page_req *req,
+			 struct pkvm_mem_share *share,
+			 u64 idx)
+{
+	struct pkvm_mem_transition *tx = &share->tx;
+
+	switch (tx->initiator.id) {
+	case PKVM_ID_HOST:
+		return host_request_share(req, tx, idx);
+	default:
+		return -EINVAL;
+	}
+}
+
+static int hyp_ack_share(struct pkvm_page_share_ack *ack,
+			 struct pkvm_page_req *req,
+			 enum kvm_pgtable_prot perms)
+{
+	enum pkvm_page_state state = PKVM_NOPAGE;
+	enum kvm_pgtable_prot prot = 0;
+	phys_addr_t phys = 0;
+	kvm_pte_t pte;
+	u64 hyp_addr;
+	int err;
+
+	hyp_assert_lock_held(&pkvm_pgd_lock);
+
+	if (perms != PAGE_HYP)
+		return -EPERM;
+
+	hyp_addr = req->completer.addr;
+	err = kvm_pgtable_get_leaf(&pkvm_pgtable, hyp_addr, &pte, NULL);
+	if (err)
+		return err;
+
+	if (kvm_pte_valid(pte)) {
+		state	= pkvm_getstate(kvm_pgtable_hyp_pte_prot(pte));
+		phys	= kvm_pte_to_phys(pte);
+		prot	= kvm_pgtable_hyp_pte_prot(pte) & KVM_PGTABLE_PROT_RWX;
+	}
+
+	*ack = (struct pkvm_page_share_ack) {
+		.completer	= {
+			.state	= state,
+			.phys	= phys,
+			.prot	= prot,
+		},
+	};
+
+	return 0;
+}
+
+/*
+ * Populate the page-sharing acknowledgment (@ack) based on the sharing request
+ * from the initiator and the current page state in the completer.
+ */
+static int ack_share(struct pkvm_page_share_ack *ack,
+		     struct pkvm_page_req *req,
+		     struct pkvm_mem_share *share)
+{
+	struct pkvm_mem_transition *tx = &share->tx;
+
+	switch (tx->completer.id) {
+	case PKVM_ID_HYP:
+		return hyp_ack_share(ack, req, share->prot);
+	default:
+		return -EINVAL;
+	}
+}
+
+/*
+ * Check that the page states in the initiator and the completer are compatible
+ * for the requested page-sharing operation to go ahead.
+ */
+static int check_share(struct pkvm_page_req *req,
+		       struct pkvm_page_share_ack *ack,
+		       struct pkvm_mem_share *share)
+{
+	if (!addr_is_memory(req->phys))
+		return -EINVAL;
+
+	if (req->initiator.state == PKVM_PAGE_OWNED &&
+	    ack->completer.state == PKVM_NOPAGE) {
+		return 0;
+	}
+
+	if (req->initiator.state != PKVM_PAGE_SHARED_OWNED)
+		return -EPERM;
+
+	if (ack->completer.state != PKVM_PAGE_SHARED_BORROWED)
+		return -EPERM;
+
+	if (ack->completer.phys != req->phys)
+		return -EPERM;
+
+	if (ack->completer.prot != share->prot)
+		return -EPERM;
+
+	return 0;
+}
+
+static int host_initiate_share(struct pkvm_page_req *req)
+{
+	enum kvm_pgtable_prot prot;
+
+	prot = pkvm_mkstate(PKVM_HOST_MEM_PROT, PKVM_PAGE_SHARED_OWNED);
+	return host_stage2_idmap_locked(req->initiator.addr, PAGE_SIZE, prot);
+}
+
+/* Update the initiator's page-table for the page-sharing request */
+static int initiate_share(struct pkvm_page_req *req,
+			  struct pkvm_mem_share *share)
+{
+	struct pkvm_mem_transition *tx = &share->tx;
+
+	switch (tx->initiator.id) {
+	case PKVM_ID_HOST:
+		return host_initiate_share(req);
+	default:
+		return -EINVAL;
+	}
+}
+
+static int hyp_complete_share(struct pkvm_page_req *req,
+			      enum kvm_pgtable_prot perms)
+{
+	void *start = (void *)req->completer.addr, *end = start + PAGE_SIZE;
+	enum kvm_pgtable_prot prot;
+
+	prot = pkvm_mkstate(perms, PKVM_PAGE_SHARED_BORROWED);
+	return pkvm_create_mappings_locked(start, end, prot);
+}
+
+/* Update the completer's page-table for the page-sharing request */
+static int complete_share(struct pkvm_page_req *req,
+			  struct pkvm_mem_share *share)
+{
+	struct pkvm_mem_transition *tx = &share->tx;
+
+	switch (tx->completer.id) {
+	case PKVM_ID_HYP:
+		return hyp_complete_share(req, share->prot);
+	default:
+		return -EINVAL;
+	}
+}
+
+/*
+ * do_share():
+ *
+ * The page owner grants access to another component with a given set
+ * of permissions.
+ *
+ * Initiator: OWNED	=> SHARED_OWNED
+ * Completer: NOPAGE	=> SHARED_BORROWED
+ *
+ * Note that we permit the same share operation to be repeated from the
+ * host to the hypervisor, as this removes the need for excessive
+ * book-keeping of shared KVM data structures at EL1.
+ */
+static int do_share(struct pkvm_mem_share *share)
+{
+	struct pkvm_page_req req;
+	int ret = 0;
+	u64 idx;
+
+	for (idx = 0; idx < share->tx.nr_pages; ++idx) {
+		struct pkvm_page_share_ack ack;
+
+		ret = request_share(&req, share, idx);
+		if (ret)
+			goto out;
+
+		ret = ack_share(&ack, &req, share);
+		if (ret)
+			goto out;
+
+		ret = check_share(&req, &ack, share);
+		if (ret)
+			goto out;
+	}
+
+	for (idx = 0; idx < share->tx.nr_pages; ++idx) {
+		ret = request_share(&req, share, idx);
+		if (ret)
+			break;
+
+		/* Allow double-sharing by skipping over the page */
+		if (req.initiator.state == PKVM_PAGE_SHARED_OWNED)
+			continue;
+
+		ret = initiate_share(&req, share);
+		if (ret)
+			break;
+
+		ret = complete_share(&req, share);
+		if (ret)
+			break;
+	}
+
+	WARN_ON(ret);
+out:
+	return ret;
+}
