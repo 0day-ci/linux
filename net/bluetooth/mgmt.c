@@ -173,6 +173,7 @@ static const u16 mgmt_events[] = {
 	MGMT_EV_ADV_MONITOR_REMOVED,
 	MGMT_EV_CONTROLLER_SUSPEND,
 	MGMT_EV_CONTROLLER_RESUME,
+	MGMT_EV_ADV_MONITOR_DEVICE_LOST,
 };
 
 static const u16 mgmt_untrusted_commands[] = {
@@ -4394,6 +4395,19 @@ done:
 
 	return mgmt_cmd_complete(sk, hdev->id, MGMT_OP_SET_DEVICE_FLAGS, status,
 				 &cp->addr, sizeof(cp->addr));
+}
+
+void mgmt_adv_monitor_device_lost(struct hci_dev *hdev, u16 handle,
+				  bdaddr_t *addr, u8 addr_type)
+{
+	struct mgmt_ev_adv_monitor_device_lost ev;
+
+	ev.monitor_handle = cpu_to_le16(handle);
+	bacpy(&ev.addr.bdaddr, addr);
+	ev.addr.type = addr_type;
+
+	mgmt_event(MGMT_EV_ADV_MONITOR_DEVICE_LOST, hdev, &ev, sizeof(ev),
+		   NULL);
 }
 
 static void mgmt_adv_monitor_added(struct sock *sk, struct hci_dev *hdev,
@@ -9609,8 +9623,10 @@ void mgmt_device_found(struct hci_dev *hdev, bdaddr_t *bdaddr, u8 link_type,
 		       u8 *eir, u16 eir_len, u8 *scan_rsp, u8 scan_rsp_len)
 {
 	char buf[512];
+	struct monitored_device *dev, *tmp_dev;
 	struct mgmt_ev_device_found *ev = (void *)buf;
 	size_t ev_size;
+	bool monitored = false;
 
 	/* Don't send events for a non-kernel initiated discovery. With
 	 * LE one exception is if we have pend_le_reports > 0 in which
@@ -9686,7 +9702,28 @@ void mgmt_device_found(struct hci_dev *hdev, bdaddr_t *bdaddr, u8 link_type,
 	ev->eir_len = cpu_to_le16(eir_len + scan_rsp_len);
 	ev_size = sizeof(*ev) + eir_len + scan_rsp_len;
 
-	mgmt_event(MGMT_EV_DEVICE_FOUND, hdev, ev, ev_size, NULL);
+	if (!list_empty(&hdev->monitored_devices)) {
+		/* An advertisement could match multiple advertisement monitors.
+		 * Send the Device Found event once for all matched monitors.
+		 */
+		list_for_each_entry_safe(dev, tmp_dev, &hdev->monitored_devices,
+					 list) {
+			if (!bacmp(&dev->bdaddr, &ev->addr.bdaddr)) {
+				ev->flags |= MGMT_DEV_FOUND_MONITORING;
+				ev->monitor_handle = cpu_to_le16(dev->handle);
+
+				list_del(&dev->list);
+				kfree(dev);
+
+				mgmt_event(MGMT_EV_DEVICE_FOUND, hdev, ev,
+					   ev_size, NULL);
+				monitored = true;
+			}
+		}
+	}
+
+	if (!monitored)
+		mgmt_event(MGMT_EV_DEVICE_FOUND, hdev, ev, ev_size, NULL);
 }
 
 void mgmt_remote_name(struct hci_dev *hdev, bdaddr_t *bdaddr, u8 link_type,
