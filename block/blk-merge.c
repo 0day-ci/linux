@@ -177,14 +177,19 @@ static struct bio *blk_bio_write_same_split(struct request_queue *q,
 static inline unsigned get_max_io_size(struct request_queue *q,
 				       struct bio *bio)
 {
-	unsigned sectors = blk_max_size_offset(q, bio->bi_iter.bi_sector, 0);
-	unsigned max_sectors = sectors;
 	unsigned pbs = queue_physical_block_size(q) >> SECTOR_SHIFT;
 	unsigned lbs = queue_logical_block_size(q) >> SECTOR_SHIFT;
-	unsigned start_offset = bio->bi_iter.bi_sector & (pbs - 1);
+	sector_t sector = bio->bi_iter.bi_sector;
+	unsigned start_offset = sector & (pbs - 1);
+	unsigned sectors = q->limits.max_sectors;
+	unsigned max_sectors;
 
-	max_sectors += start_offset;
-	max_sectors &= ~(pbs - 1);
+	if (q->limits.chunk_sectors) {
+		sectors = min(sectors, blk_chunk_sectors_left(sector,
+						q->limits.chunk_sectors));
+	}
+
+	max_sectors = (sectors + start_offset) & ~(pbs - 1);
 	if (max_sectors > start_offset)
 		return max_sectors - start_offset;
 
