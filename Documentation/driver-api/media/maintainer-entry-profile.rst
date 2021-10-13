@@ -180,6 +180,30 @@ In particular, we accept lines with more than 80 columns:
     - when they avoid a line to end with an open parenthesis or an open
       bracket.
 
+There are a few additional requirements which are not enforced by tooling
+but mostly during the review process:
+
+    - C++ style comments are not allowed, if not for SPDX headers;
+    - hexadecimal values should be spelled using lowercase letters;
+    - one structure/enum member declaration per line;
+    - one variable declaration per line;
+    - prefer variable declaration order in reverse-x-mas-tree over
+      initialization at variable declare time;
+
+      As an example, the following style is preferred::
+
+         struct priv_struct *priv = container_of(....)
+         struct foo_struct *foo = priv->foo;
+         int b;
+
+         b = a_very_long_operation_name(foo, s->bar)
+
+      over the following one::
+
+         struct priv_struct *priv = container_of(....)
+         struct foo_struct *foo = priv->foo;
+         int b = a_very_long_operation_name(foo, s->bar)
+
 Key Cycle Dates
 ---------------
 
