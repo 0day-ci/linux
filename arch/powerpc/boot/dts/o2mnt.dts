@@ -12,8 +12,8 @@
 	model = "ifm,o2mnt";
 	compatible = "ifm,o2d";
 
-	localbus {
-		flash@0,0 {
+	localbus@80000000 {
+		flash@0 {
 			partition@60000 {
 				label = "kernel";
 				reg = <0x00060000 0x00260000>;

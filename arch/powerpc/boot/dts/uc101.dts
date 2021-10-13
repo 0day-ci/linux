@@ -101,12 +101,14 @@
 		status = "disabled";
 	};
 
-	localbus {
-		ranges = <0 0 0xff800000 0x00800000
-			  1 0 0x80000000 0x00800000
-			  3 0 0x80000000 0x00800000>;
+	localbus@80000000 {
+		#address-cells = <2>;
+		#size-cells = <1>;
+		ranges = <0 0 0xff800000 0x00800000>,
+			 <1 0 0x80000000 0x00800000>,
+			 <3 0 0x80000000 0x00800000>;
 
-		flash@0,0 {
+		flash@0 {
 			compatible = "cfi-flash";
 			reg = <0 0 0x00800000>;
 			bank-width = <2>;

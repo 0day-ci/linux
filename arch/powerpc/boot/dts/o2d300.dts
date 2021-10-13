@@ -12,10 +12,12 @@
 	model = "ifm,o2d300";
 	compatible = "ifm,o2d";
 
-	localbus {
-		ranges = <0 0 0xfc000000 0x02000000
-			  3 0 0xe3000000 0x00100000>;
-		flash@0,0 {
+	localbus@80000000 {
+		#address-cells = <2>;
+		#size-cells = <1>;
+		ranges = <0 0 0xfc000000 0x02000000>,
+			 <3 0 0xe3000000 0x00100000>;
+		flash@0 {
 			compatible = "cfi-flash";
 			reg = <0 0 0x02000000>;
 			bank-width = <2>;

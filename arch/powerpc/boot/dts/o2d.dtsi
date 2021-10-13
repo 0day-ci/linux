@@ -73,12 +73,14 @@
 		};
 	};
 
-	localbus {
-		ranges = <0 0 0xff000000 0x01000000
-			  3 0 0xe3000000 0x00100000>;
+	localbus@80000000 {
+		#address-cells = <2>;
+		#size-cells = <1>;
+		ranges = <0 0 0xff000000 0x01000000>,
+			 <3 0 0xe3000000 0x00100000>;
 
 		// flash device at LocalPlus Bus CS0
-		flash@0,0 {
+		flash@0 {
 			compatible = "cfi-flash";
 			reg = <0 0 0x01000000>;
 			bank-width = <1>;
@@ -100,7 +102,7 @@
 			};
 		};
 
-		csi@3,0 {
+		csi@300000000 {
 			compatible = "ifm,o2d-csi";
 			reg = <3 0 0x00100000>;
 			ifm,csi-clk-handle = <&gpt7>;

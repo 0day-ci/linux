@@ -87,15 +87,15 @@
 		};
 	};
 
-	localbus {
+	localbus@80000000 {
 		compatible = "fsl,mpc5200b-lpb","simple-bus";
 		#address-cells = <2>;
 		#size-cells = <1>;
-		ranges = <0 0 0xfc000000 0x02000000
-			  3 0 0xe9000000 0x00080000
-			  5 0 0xe8000000 0x00010000>;
+		ranges = <0 0 0xfc000000 0x02000000>,
+			 <3 0 0xe9000000 0x00080000>,
+			 <5 0 0xe8000000 0x00010000>;
 
-		flash@0,0 {
+		flash@0 {
 			#address-cells = <1>;
 			#size-cells = <1>;
 			reg = <0 0x0 0x02000000>;
@@ -124,7 +124,7 @@
 			};
 		};
 
-		fpga@3,0 {
+		fpga@300000000 {
 			compatible = "anonymous,a3m071-fpga";
 			reg = <3 0x0 0x00080000
 			       5 0x0 0x00010000>;

@@ -177,15 +177,15 @@
 		};
 	};
 
-	localbus {
+	localbus@80000000 {
 		compatible = "fsl,mpc5200-lpb","simple-bus";
 		#address-cells = <2>;
 		#size-cells = <1>;
-		ranges = <	0 0 0xfc000000 0x02000000
-				1 0 0xe0000000 0x04000000 // CS1 range, SM501
-				3 0 0xe8000000 0x00080000>;
+		ranges = <0 0 0xfc000000 0x02000000>,
+			 <1 0 0xe0000000 0x04000000>, // CS1 range, SM501
+			 <3 0 0xe8000000 0x00080000>;
 
-		flash@0,0 {
+		flash@0 {
 			compatible = "cfi-flash";
 			reg = <0 0 0x02000000>;
 			bank-width = <4>;
@@ -194,7 +194,7 @@
 			#address-cells = <1>;
 		};
 
-		display@1,0 {
+		display@100000000 {
 			compatible = "smi,sm501";
 			reg = <1 0x00000000 0x00800000
 			       1 0x03e00000 0x00200000>;
@@ -203,7 +203,7 @@
 			little-endian;
 		};
 
-		mram0@3,0 {
+		mram0@300000000 {
 			compatible = "mtd-ram";
 			reg = <3 0x00000 0x80000>;
 			bank-width = <1>;

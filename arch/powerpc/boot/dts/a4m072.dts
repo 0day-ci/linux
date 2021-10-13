@@ -98,25 +98,25 @@
 		};
 	};
 
-	localbus {
+	localbus@80000000 {
 		compatible = "fsl,mpc5200b-lpb","simple-bus";
 		#address-cells = <2>;
 		#size-cells = <1>;
-		ranges = <0 0 0xfe000000 0x02000000
-			  1 0 0x62000000 0x00400000
-			  2 0 0x64000000 0x00200000
-			  3 0 0x66000000 0x01000000
-			  6 0 0x68000000 0x01000000
-			  7 0 0x6a000000 0x00000004>;
+		ranges = <0 0 0xfe000000 0x02000000>,
+			 <1 0 0x62000000 0x00400000>,
+			 <2 0 0x64000000 0x00200000>,
+			 <3 0 0x66000000 0x01000000>,
+			 <6 0 0x68000000 0x01000000>,
+			 <7 0 0x6a000000 0x00000004>;
 
-		flash@0,0 {
+		flash@0 {
 			compatible = "cfi-flash";
 			reg = <0 0 0x02000000>;
 			bank-width = <2>;
 			#size-cells = <1>;
 			#address-cells = <1>;
 		};
-		sram0@1,0 {
+		sram0@100000000 {
 			compatible = "mtd-ram";
 			reg = <1 0x00000 0x00400000>;
 			bank-width = <2>;

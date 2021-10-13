@@ -288,14 +288,14 @@
 			 <0x01000000 0 0x00000000 0xb0000000 0 0x01000000>;
 	};
 
-	localbus {
+	localbus@80000000 {
 		compatible = "fsl,mpc5200-lpb","simple-bus";
 		#address-cells = <2>;
 		#size-cells = <1>;
 
 		ranges = <0 0 0xff000000 0x01000000>;
 
-		flash@0,0 {
+		flash@0 {
 			compatible = "amd,am29lv652d", "cfi-flash";
 			reg = <0 0 0x01000000>;
 			bank-width = <1>;

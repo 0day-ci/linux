@@ -71,9 +71,12 @@
 		status = "disabled";
 	};
 
-	localbus {
+	localbus@80000000 {
+		#address-cells = <2>;
+		#size-cells = <1>;
+
 		// 16-bit flash device at LocalPlus Bus CS0
-		flash@0,0 {
+		flash@0 {
 			compatible = "cfi-flash";
 			reg = <0 0 0x2000000>;
 			bank-width = <2>;

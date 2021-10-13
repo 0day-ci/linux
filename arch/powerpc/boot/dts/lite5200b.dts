@@ -121,10 +121,12 @@
 			 <0x01000000 0 0x00000000 0xb0000000 0 0x01000000>;
 	};
 
-	localbus {
+	localbus@80000000 {
+		#address-cells = <2>;
+		#size-cells = <1>;
 		ranges = <0 0 0xfe000000 0x02000000>;
 
-		flash@0,0 {
+		flash@0 {
 			compatible = "cfi-flash";
 			reg = <0 0 0x02000000>;
 			bank-width = <1>;

@@ -111,12 +111,14 @@
 			 <0x01000000 0 0x00000000 0xa0000000 0 0x01000000>;
 	};
 
-	localbus {
-		ranges = <0 0 0xff800000 0x00800000
-			  1 0 0x80000000 0x00800000
-			  3 0 0x80000000 0x00800000>;
+	localbus@80000000 {
+		#address-cells = <2>;
+		#size-cells = <1>;
+		ranges = <0 0 0xff800000 0x00800000>,
+			 <1 0 0x80000000 0x00800000>,
+			 <3 0 0x80000000 0x00800000>;
 
-		flash@0,0 {
+		flash@0 {
 			compatible = "cfi-flash";
 			reg = <0 0 0x00800000>;
 			bank-width = <4>;
@@ -157,61 +159,61 @@
 			};
 		};
 
-		simple100: gpio-controller-100@3,600100 {
+		simple100: gpio-controller-100@300600100 {
 			compatible = "manroland,mucmc52-aux-gpio";
 			reg = <3 0x00600100 0x1>;
 			gpio-controller;
 			#gpio-cells = <2>;
 		};
-		simple104: gpio-controller-104@3,600104 {
+		simple104: gpio-controller-104@300600104 {
 			compatible = "manroland,mucmc52-aux-gpio";
 			reg = <3 0x00600104 0x1>;
 			gpio-controller;
 			#gpio-cells = <2>;
 		};
-		simple200: gpio-controller-200@3,600200 {
+		simple200: gpio-controller-200@300600200 {
 			compatible = "manroland,mucmc52-aux-gpio";
 			reg = <3 0x00600200 0x1>;
 			gpio-controller;
 			#gpio-cells = <2>;
 		};
-		simple201: gpio-controller-201@3,600201 {
+		simple201: gpio-controller-201@300600201 {
 			compatible = "manroland,mucmc52-aux-gpio";
 			reg = <3 0x00600201 0x1>;
 			gpio-controller;
 			#gpio-cells = <2>;
 		};
-		simple202: gpio-controller-202@3,600202 {
+		simple202: gpio-controller-202@300600202 {
 			compatible = "manroland,mucmc52-aux-gpio";
 			reg = <3 0x00600202 0x1>;
 			gpio-controller;
 			#gpio-cells = <2>;
 		};
-		simple203: gpio-controller-203@3,600203 {
+		simple203: gpio-controller-203@300600203 {
 			compatible = "manroland,mucmc52-aux-gpio";
 			reg = <3 0x00600203 0x1>;
 			gpio-controller;
 			#gpio-cells = <2>;
 		};
-		simple204: gpio-controller-204@3,600204 {
+		simple204: gpio-controller-204@300600204 {
 			compatible = "manroland,mucmc52-aux-gpio";
 			reg = <3 0x00600204 0x1>;
 			gpio-controller;
 			#gpio-cells = <2>;
 		};
-		simple206: gpio-controller-206@3,600206 {
+		simple206: gpio-controller-206@300600206 {
 			compatible = "manroland,mucmc52-aux-gpio";
 			reg = <3 0x00600206 0x1>;
 			gpio-controller;
 			#gpio-cells = <2>;
 		};
-		simple207: gpio-controller-207@3,600207 {
+		simple207: gpio-controller-207@300600207 {
 			compatible = "manroland,mucmc52-aux-gpio";
 			reg = <3 0x00600207 0x1>;
 			gpio-controller;
 			#gpio-cells = <2>;
 		};
-		simple20f: gpio-controller-20f@3,60020f {
+		simple20f: gpio-controller-20f@30060020f {
 			compatible = "manroland,mucmc52-aux-gpio";
 			reg = <3 0x0060020f 0x1>;
 			gpio-controller;

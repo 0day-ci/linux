@@ -85,41 +85,45 @@
 		status = "disabled";
 	};
 
-	localbus {
-		ranges = <0 0 0xff000000 0x01000000
-			  1 0 0x50000000 0x00010000
-			  2 0 0x50010000 0x00010000
-			  3 0 0x50020000 0x00010000>;
+	localbus@80000000 {
+		#address-cells = <2>;
+		#size-cells = <1>;
+		ranges = <0 0 0xff000000 0x01000000>,
+			 <1 0 0x50000000 0x00010000>,
+			 <2 0 0x50010000 0x00010000>,
+			 <3 0 0x50020000 0x00010000>;
 
 		// 8-bit DualPort SRAM on LocalPlus Bus CS1
-		kollmorgen@1,0 {
+		kollmorgen@100000000 {
 			compatible = "promess,motionpro-kollmorgen";
 			reg = <1 0 0x10000>;
 			interrupts = <1 1 0>;
 		};
 
 		// 8-bit board CPLD on LocalPlus Bus CS2
-		cpld@2,0 {
+		cpld@200000000 {
 			compatible = "promess,motionpro-cpld";
 			reg = <2 0 0x10000>;
 		};
 
 		// 8-bit custom Anybus Module on LocalPlus Bus CS3
-		anybus@3,0 {
+		anybus@300000000 {
 			compatible = "promess,motionpro-anybus";
 			reg = <3 0 0x10000>;
 		};
-		pro_module_general@3,0 {
-			compatible = "promess,pro_module_general";
-			reg = <3 0 3>;
-		};
-		pro_module_dio@3,800 {
+		/*
+		 * pro_module_general@300000000 {
+		 *	compatible = "promess,pro_module_general";
+		 *	reg = <3 0 3>;
+		 * };
+		 */
+		pro_module_dio@300000800 {
 			compatible = "promess,pro_module_dio";
 			reg = <3 0x800 2>;
 		};
 
 		// 16-bit flash device at LocalPlus Bus CS0
-		flash@0,0 {
+		flash@0 {
 			compatible = "cfi-flash";
 			reg = <0 0 0x01000000>;
 			bank-width = <2>;
