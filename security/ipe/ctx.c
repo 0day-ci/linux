@@ -15,6 +15,7 @@
 #include <linux/spinlock.h>
 #include <linux/moduleparam.h>
 
+extern const char *const ipe_boot_policy;
 static bool success_audit;
 static bool enforce = true;
 
@@ -329,6 +330,7 @@ void ipe_put_ctx(struct ipe_context *ctx)
 int __init ipe_init_ctx(void)
 {
 	int rc = 0;
+	struct ipe_policy *p = NULL;
 	struct ipe_context *lns = NULL;
 
 	lns = create_ctx();
@@ -342,10 +344,26 @@ int __init ipe_init_ctx(void)
 	WRITE_ONCE(lns->enforce, enforce);
 	spin_unlock(&lns->lock);
 
+	if (ipe_boot_policy) {
+		p = ipe_new_policy(ipe_boot_policy, strlen(ipe_boot_policy),
+				   NULL, 0);
+		if (IS_ERR(p)) {
+			rc = PTR_ERR(lns);
+			goto err;
+		}
+
+		ipe_add_policy(lns, p);
+		rc = ipe_set_active_pol(p);
+		if (!rc)
+			goto err;
+	}
+
 	rcu_assign_pointer(*ipe_tsk_ctx(current), lns);
+	ipe_put_policy(p);
 
 	return 0;
 err:
+	ipe_put_policy(p);
 	ipe_put_ctx(lns);
 	return rc;
 }

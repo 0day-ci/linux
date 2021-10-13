@@ -7,7 +7,18 @@
 
 ccflags-y := -I$(srctree)/security/ipe/modules
 
+quiet_cmd_polgen = IPE_POL $(2)
+      cmd_polgen = scripts/ipe/polgen/polgen security/ipe/boot-policy.c $(2)
+
+$(eval $(call config_filename,IPE_BOOT_POLICY))
+
+targets += boot-policy.c
+
+$(obj)/boot-policy.c: scripts/ipe/polgen/polgen $(IPE_BOOT_POLICY_FILENAME) FORCE
+	$(call if_changed,polgen,$(IPE_BOOT_POLICY_FILENAME))
+
 obj-$(CONFIG_SECURITY_IPE) += \
+	boot-policy.o \
 	ctx.o \
 	eval.o \
 	fs.o \
@@ -21,3 +32,5 @@ obj-$(CONFIG_SECURITY_IPE) += \
 	policyfs.o \
 
 obj-$(CONFIG_AUDIT) += audit.o
+
+clean-files := boot-policy.c \
