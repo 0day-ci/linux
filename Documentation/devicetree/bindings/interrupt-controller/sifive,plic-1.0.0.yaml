@@ -35,6 +35,11 @@ description:
   contains a specific memory layout, which is documented in chapter 8 of the
   SiFive U5 Coreplex Series Manual <https://static.dev.sifive.com/U54-MC-RVCoreIP.pdf>.
 
+  While the "thead,c900-plic" would mask IRQ with readl(claim), so it needn't
+  mask/unmask which needed in RISC-V PLIC. When in IRQS_ONESHOT & IRQCHIP_EOI_THREADED
+  path, unnecessary mask operation would cause a blocking irq bug in thead,c900-plic.
+  Because when IRQ is disabled in c900, writel(hwirq, claim) would be invalid.
+
 maintainers:
   - Sagar Kadam <sagar.kadam@sifive.com>
   - Paul Walmsley  <paul.walmsley@sifive.com>
@@ -46,6 +51,7 @@ properties:
       - enum:
           - sifive,fu540-c000-plic
           - canaan,k210-plic
+          - thead,c900-plic
       - const: sifive,plic-1.0.0
 
   reg:
