@@ -31,7 +31,6 @@ struct fwnode_handle;
 int eth_platform_get_mac_address(struct device *dev, u8 *mac_addr);
 int platform_get_ethdev_address(struct device *dev, struct net_device *netdev);
 unsigned char *arch_get_platform_mac_address(void);
-int nvmem_get_mac_address(struct device *dev, void *addrbuf);
 int device_get_mac_address(struct device *dev, char *addr);
 int device_get_ethdev_address(struct device *dev, struct net_device *netdev);
 int fwnode_get_mac_address(struct fwnode_handle *fwnode, char *addr);

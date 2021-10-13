@@ -543,42 +543,6 @@ int platform_get_ethdev_address(struct device *dev, struct net_device *netdev)
 }
 EXPORT_SYMBOL(platform_get_ethdev_address);
 
-/**
- * nvmem_get_mac_address - Obtain the MAC address from an nvmem cell named
- * 'mac-address' associated with given device.
- *
- * @dev:	Device with which the mac-address cell is associated.
- * @addrbuf:	Buffer to which the MAC address will be copied on success.
- *
- * Returns 0 on success or a negative error number on failure.
- */
-int nvmem_get_mac_address(struct device *dev, void *addrbuf)
-{
-	struct nvmem_cell *cell;
-	const void *mac;
-	size_t len;
-
-	cell = nvmem_cell_get(dev, "mac-address");
-	if (IS_ERR(cell))
-		return PTR_ERR(cell);
-
-	mac = nvmem_cell_read(cell, &len);
-	nvmem_cell_put(cell);
-
-	if (IS_ERR(mac))
-		return PTR_ERR(mac);
-
-	if (len != ETH_ALEN || !is_valid_ether_addr(mac)) {
-		kfree(mac);
-		return -EINVAL;
-	}
-
-	ether_addr_copy(addrbuf, mac);
-	kfree(mac);
-
-	return 0;
-}
-
 static int fwnode_get_mac_addr(struct fwnode_handle *fwnode,
 			       const char *name, char *addr)
 {
