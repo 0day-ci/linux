@@ -403,7 +403,7 @@ int nilfs_resize_fs(struct super_block *sb, __u64 newsize)
 	int ret;
 
 	ret = -ERANGE;
-	devsize = i_size_read(sb->s_bdev->bd_inode);
+	devsize = bdev_nr_sectors(sb->s_bdev) << SECTOR_SHIFT;
 	if (newsize > devsize)
 		goto out;
 
