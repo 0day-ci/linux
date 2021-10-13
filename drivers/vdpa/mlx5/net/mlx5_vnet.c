@@ -1445,7 +1445,10 @@ static virtio_net_ctrl_ack handle_ctrl_mac(struct mlx5_vdpa_dev *mvdev, u8 cmd)
 	size_t read;
 	u8 mac[ETH_ALEN];
 
-	pfmdev = pci_get_drvdata(pci_physfn(mvdev->mdev->pdev));
+	pfmdev = mlx5_vf_get_core_dev(mvdev->mdev->pdev);
+	if (!pfmdev)
+		return status;
+
 	switch (cmd) {
 	case VIRTIO_NET_CTRL_MAC_ADDR_SET:
 		read = vringh_iov_pull_iotlb(&cvq->vring, &cvq->riov, (void *)mac, ETH_ALEN);
@@ -1479,6 +1482,7 @@ static virtio_net_ctrl_ack handle_ctrl_mac(struct mlx5_vdpa_dev *mvdev, u8 cmd)
 		break;
 	}
 
+	mlx5_vf_put_core_dev(pfmdev);
 	return status;
 }
 
@@ -2261,8 +2265,11 @@ static void mlx5_vdpa_free(struct vdpa_device *vdev)
 	free_resources(ndev);
 	mlx5_vdpa_destroy_mr(mvdev);
 	if (!is_zero_ether_addr(ndev->config.mac)) {
-		pfmdev = pci_get_drvdata(pci_physfn(mvdev->mdev->pdev));
-		mlx5_mpfs_del_mac(pfmdev, ndev->config.mac);
+		pfmdev = mlx5_vf_get_core_dev(mvdev->mdev->pdev);
+		if (pfmdev) {
+			mlx5_mpfs_del_mac(pfmdev, ndev->config.mac);
+			mlx5_vf_put_core_dev(pfmdev);
+		}
 	}
 	mlx5_vdpa_free_resources(&ndev->mvdev);
 	mutex_destroy(&ndev->reslock);
@@ -2449,8 +2456,11 @@ static int mlx5_vdpa_dev_add(struct vdpa_mgmt_dev *v_mdev, const char *name)
 		goto err_mtu;
 
 	if (!is_zero_ether_addr(config->mac)) {
-		pfmdev = pci_get_drvdata(pci_physfn(mdev->pdev));
+		pfmdev = mlx5_vf_get_core_dev(mdev->pdev);
+		if (!pfmdev)
+			goto err_mtu;
 		err = mlx5_mpfs_add_mac(pfmdev, config->mac);
+		mlx5_vf_put_core_dev(pfmdev);
 		if (err)
 			goto err_mtu;
 
@@ -2497,8 +2507,13 @@ err_mr:
 err_res:
 	mlx5_vdpa_free_resources(&ndev->mvdev);
 err_mpfs:
-	if (!is_zero_ether_addr(config->mac))
-		mlx5_mpfs_del_mac(pfmdev, config->mac);
+	if (!is_zero_ether_addr(config->mac)) {
+		pfmdev = mlx5_vf_get_core_dev(mdev->pdev);
+		if (pfmdev) {
+			mlx5_mpfs_del_mac(pfmdev, config->mac);
+			mlx5_vf_put_core_dev(pfmdev);
+		}
+	}
 err_mtu:
 	mutex_destroy(&ndev->reslock);
 	put_device(&mvdev->vdev.dev);
