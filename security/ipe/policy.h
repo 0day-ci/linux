@@ -87,11 +87,15 @@ struct ipe_policy {
 	struct ipe_parsed_policy *parsed;
 
 	refcount_t	refcount;
+
+	struct list_head next;		/* type: ipe_policy */
+	struct ipe_context __rcu *ctx;
 };
 
 struct ipe_policy *ipe_new_policy(const char *text, size_t textlen,
 				  const char *pkcs7, size_t pkcs7len);
 void ipe_put_policy(struct ipe_policy *pol);
 bool ipe_is_op_alias(int op, const enum ipe_operation **map, size_t *size);
+struct ipe_policy *ipe_get_policy_rcu(struct ipe_policy __rcu *p);
 
 #endif /* IPE_POLICY_H */

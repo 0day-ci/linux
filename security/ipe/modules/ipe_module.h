@@ -6,6 +6,7 @@
 #define IPE_MODULE_H
 
 #include <linux/types.h>
+#include "../eval.h"
 
 /**
  * ipe_module: definition of an extensible module for IPE properties.
@@ -23,6 +24,8 @@ struct ipe_module {
 	u16				version;	/* required */
 	int (*parse)(const char *valstr, void **value);	/* required */
 	int (*free)(void **value);			/* optional */
+	bool (*eval)(const struct ipe_eval_ctx *ctx,	/* required */
+		     const void *val);
 };
 
 #define IPE_MODULE(parser)				\

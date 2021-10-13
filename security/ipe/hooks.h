@@ -8,6 +8,10 @@
 #include <linux/types.h>
 #include <linux/sched.h>
 
+enum ipe_hook {
+	ipe_hook_max = 0
+};
+
 int ipe_task_alloc(struct task_struct *task,
 		   unsigned long clone_flags);
 

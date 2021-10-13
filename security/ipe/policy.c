@@ -874,6 +874,32 @@ void ipe_put_policy(struct ipe_policy *p)
 	kfree(p);
 }
 
+/**
+ * ipe_get_policy_rcu: Dereference rcu-protected @p and increase the reference
+ *		       count.
+ * @p: rcu-protected pointer to dereference
+ *
+ * Not safe to call on IS_ERR.
+ *
+ * Return:
+ * !NULL - reference count of @p was valid, and increased by one.
+ * NULL - reference count of @p is not valid.
+ */
+struct ipe_policy *ipe_get_policy_rcu(struct ipe_policy __rcu *p)
+{
+	struct ipe_policy *rv = NULL;
+
+	rcu_read_lock();
+
+	rv = rcu_dereference(p);
+	if (!rv || !refcount_inc_not_zero(&rv->refcount))
+		rv = NULL;
+
+	rcu_read_unlock();
+
+	return rv;
+}
+
 static int set_pkcs7_data(void *ctx, const void *data, size_t len,
 			  size_t asn1hdrlen)
 {
@@ -912,6 +938,7 @@ struct ipe_policy *ipe_new_policy(const char *text, size_t textlen,
 		return ERR_PTR(-ENOMEM);
 
 	refcount_set(&new->refcount, 1);
+	INIT_LIST_HEAD(&new->next);
 
 	if (!text) {
 		new->pkcs7len = pkcs7len;

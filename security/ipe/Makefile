@@ -9,6 +9,7 @@ ccflags-y := -I$(srctree)/security/ipe/modules
 
 obj-$(CONFIG_SECURITY_IPE) += \
 	ctx.o \
+	eval.o \
 	hooks.o \
 	ipe.o \
 	modules.o \

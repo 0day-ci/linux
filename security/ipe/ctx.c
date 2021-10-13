@@ -5,6 +5,7 @@
 
 #include "ipe.h"
 #include "ctx.h"
+#include "policy.h"
 
 #include <linux/slab.h>
 #include <linux/types.h>
@@ -76,9 +77,24 @@ struct ipe_context *ipe_get_ctx_rcu(struct ipe_context __rcu *ctx)
  */
 static void free_ctx_work(struct work_struct *const work)
 {
+	struct ipe_policy *p = NULL;
 	struct ipe_context *ctx = NULL;
 
 	ctx = container_of(work, struct ipe_context, free_work);
+
+	/* Make p->ctx no longer have any references */
+	spin_lock(&ctx->lock);
+	list_for_each_entry(p, &ctx->policies, next)
+		rcu_assign_pointer(p->ctx, NULL);
+	spin_unlock(&ctx->lock);
+	synchronize_rcu();
+
+	/*
+	 * locking no longer necessary - nothing can get a reference to ctx,
+	 * so list is guaranteed stable.
+	 */
+	list_for_each_entry(p, &ctx->policies, next)
+		ipe_put_policy(p);
 
 	kfree(ctx);
 }
@@ -104,6 +120,7 @@ static struct ipe_context *create_ctx(void)
 	}
 
 	INIT_WORK(&ctx->free_work, free_ctx_work);
+	INIT_LIST_HEAD(&ctx->policies);
 	refcount_set(&ctx->refcount, 1);
 	spin_lock_init(&ctx->lock);
 
@@ -112,6 +129,46 @@ static struct ipe_context *create_ctx(void)
 err:
 	ipe_put_ctx(ctx);
 	return ERR_PTR(rc);
+}
+
+/**
+ * remove_policy: Remove a policy from its context
+ * @p: Supplies a pointer to a policy that will be removed from its context
+ *
+ * Decrements @p's reference by 1.
+ */
+void ipe_remove_policy(struct ipe_policy *p)
+{
+	struct ipe_context *ctx;
+
+	ctx = ipe_get_ctx_rcu(p->ctx);
+	if (!ctx)
+		return;
+
+	spin_lock(&ctx->lock);
+	list_del_init(&p->next);
+	rcu_assign_pointer(p->ctx, NULL);
+	spin_unlock(&ctx->lock);
+	synchronize_rcu();
+
+	ipe_put_ctx(ctx);
+	/* drop the reference representing the list */
+	ipe_put_policy(p);
+}
+
+/**
+ * ipe_add_policy: Associate @p with @ctx
+ * @ctx: Supplies a pointer to the ipe_context structure to associate @p with.
+ * @p: Supplies a pointer to the ipe_policy structure to associate.
+ */
+void ipe_add_policy(struct ipe_context *ctx, struct ipe_policy *p)
+{
+	spin_lock(&ctx->lock);
+	rcu_assign_pointer(p->ctx, ctx);
+	list_add_tail(&p->next, &ctx->policies);
+	refcount_inc(&p->refcount);
+	spin_unlock(&ctx->lock);
+	synchronize_rcu();
 }
 
 /**

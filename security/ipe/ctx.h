@@ -12,9 +12,13 @@
 #include <linux/workqueue.h>
 
 struct ipe_context {
+	struct ipe_policy __rcu *active_policy;
+
 	refcount_t refcount;
 	/* Protects concurrent writers */
 	spinlock_t lock;
+
+	struct list_head policies; /* type: ipe_policy */
 
 	struct work_struct free_work;
 };
@@ -24,5 +28,7 @@ struct ipe_context __rcu **ipe_tsk_ctx(struct task_struct *tsk);
 struct ipe_context *ipe_current_ctx(void);
 struct ipe_context *ipe_get_ctx_rcu(struct ipe_context __rcu *ctx);
 void ipe_put_ctx(struct ipe_context *ctx);
+void ipe_add_policy(struct ipe_context *ctx, struct ipe_policy *p);
+void ipe_remove_policy(struct ipe_policy *p);
 
 #endif /* IPE_CONTEXT_H */
