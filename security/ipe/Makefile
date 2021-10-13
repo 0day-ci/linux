@@ -10,9 +10,11 @@ ccflags-y := -I$(srctree)/security/ipe/modules
 obj-$(CONFIG_SECURITY_IPE) += \
 	ctx.o \
 	eval.o \
+	fs.o \
 	hooks.o \
 	ipe.o \
 	modules.o \
 	parsers/ \
 	parsers.o \
 	policy.o \
+	policyfs.o \

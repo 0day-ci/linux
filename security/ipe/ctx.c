@@ -14,6 +14,29 @@
 #include <linux/spinlock.h>
 
 /**
+ * ver_to_u64: convert an internal ipe_policy_version to a u64
+ * @p: Policy to extract the version from
+ *
+ * Bits (LSB is index 0):
+ *	[48,32] -> Major
+ *	[32,16] -> Minor
+ *	[16, 0] -> Revision
+ *
+ * Return:
+ * u64 version of the embedded version structure.
+ */
+static inline u64 ver_to_u64(const struct ipe_policy *const p)
+{
+	u64 r = 0;
+
+	r = (((u64)p->parsed->version.major) << 32)
+	  | (((u64)p->parsed->version.minor) << 16)
+	  | ((u64)(p->parsed->version.rev));
+
+	return r;
+}
+
+/**
  * ipe_current_ctx: Helper to retrieve the ipe_context for the current task.
  *
  * Return:
@@ -96,6 +119,7 @@ static void free_ctx_work(struct work_struct *const work)
 	list_for_each_entry(p, &ctx->policies, next)
 		ipe_put_policy(p);
 
+	securityfs_remove(ctx->policy_root);
 	kfree(ctx);
 }
 
@@ -160,6 +184,9 @@ void ipe_remove_policy(struct ipe_policy *p)
  * ipe_add_policy: Associate @p with @ctx
  * @ctx: Supplies a pointer to the ipe_context structure to associate @p with.
  * @p: Supplies a pointer to the ipe_policy structure to associate.
+ *
+ * This will increase @p's reference count by one.
+ *
  */
 void ipe_add_policy(struct ipe_context *ctx, struct ipe_policy *p)
 {
@@ -168,7 +195,101 @@ void ipe_add_policy(struct ipe_context *ctx, struct ipe_policy *p)
 	list_add_tail(&p->next, &ctx->policies);
 	refcount_inc(&p->refcount);
 	spin_unlock(&ctx->lock);
+}
+
+/**
+ * ipe_replace_policy: Replace @old with @new in the list of policies in @ctx
+ * @ctx: Supplies the context object to manipulate.
+ * @old: Supplies a pointer to the ipe_policy to replace with @new
+ * @new: Supplies a pointer to the ipe_policy structure to replace @old with
+ */
+int ipe_replace_policy(struct ipe_policy *old, struct ipe_policy *new)
+{
+	int rc = -EINVAL;
+	struct ipe_context *ctx;
+	struct ipe_policy *cursor;
+	struct ipe_policy *p = NULL;
+
+	ctx = ipe_get_ctx_rcu(old->ctx);
+	if (!ctx)
+		return -ENOENT;
+
+	spin_lock(&ctx->lock);
+	list_for_each_entry(cursor, &ctx->policies, next) {
+		if (!strcmp(old->parsed->name, cursor->parsed->name)) {
+			if (ipe_is_policy_active(old)) {
+				if (ver_to_u64(old) > ver_to_u64(new))
+					break;
+				rcu_assign_pointer(ctx->active_policy, new);
+			}
+			list_replace_init(&cursor->next, &new->next);
+			refcount_inc(&new->refcount);
+			rcu_assign_pointer(new->ctx, old->ctx);
+			p = cursor;
+			rc = 0;
+			break;
+		}
+	}
+	spin_unlock(&ctx->lock);
 	synchronize_rcu();
+
+	ipe_put_policy(p);
+	ipe_put_ctx(ctx);
+	return rc;
+}
+
+/**
+ * ipe_set_active_pol: Make @p the active policy.
+ * @p: Supplies a pointer to the policy to make active.
+ */
+int ipe_set_active_pol(const struct ipe_policy *p)
+{
+	int rc = 0;
+	struct ipe_policy *ap = NULL;
+	struct ipe_context *ctx = NULL;
+
+	ctx = ipe_get_ctx_rcu(p->ctx);
+	if (!ctx) {
+		rc = -ENOENT;
+		goto out;
+	}
+
+	ap = ipe_get_policy_rcu(ctx->active_policy);
+	if (ap && ver_to_u64(ap) > ver_to_u64(p)) {
+		rc = -EINVAL;
+		goto out;
+	}
+
+	spin_lock(&ctx->lock);
+	rcu_assign_pointer(ctx->active_policy, p);
+	spin_unlock(&ctx->lock);
+	synchronize_rcu();
+
+out:
+	ipe_put_policy(ap);
+	ipe_put_ctx(ctx);
+	return rc;
+}
+
+/**
+ * ipe_is_policy_active: Determine wehther @p is the active policy
+ * @p: Supplies a pointer to the policy to check.
+ *
+ * Return:
+ * true - @p is the active policy of @ctx
+ * false - @p is not the active policy of @ctx
+ */
+bool ipe_is_policy_active(const struct ipe_policy *p)
+{
+	bool rv;
+	struct ipe_context *ctx;
+
+	rcu_read_lock();
+	ctx = rcu_dereference(p->ctx);
+	rv = !IS_ERR_OR_NULL(ctx) && rcu_access_pointer(ctx->active_policy) == p;
+	rcu_read_unlock();
+
+	return rv;
 }
 
 /**

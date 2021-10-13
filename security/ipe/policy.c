@@ -4,6 +4,7 @@
  */
 
 #include "ipe.h"
+#include "fs.h"
 #include "policy.h"
 #include "ipe_parser.h"
 #include "modules.h"
@@ -867,6 +868,8 @@ void ipe_put_policy(struct ipe_policy *p)
 	if (IS_ERR_OR_NULL(p) || !refcount_dec_and_test(&p->refcount))
 		return;
 
+	ipe_del_policyfs_node(p);
+	securityfs_remove(p->policyfs);
 	free_parsed_policy(p->parsed);
 	if (!p->pkcs7)
 		kfree(p->text);
@@ -909,6 +912,44 @@ static int set_pkcs7_data(void *ctx, const void *data, size_t len,
 	p->textlen = len;
 
 	return 0;
+}
+
+/**
+ * ipe_update_policy: parse a new policy and replace @old with it.
+ * @old: Supplies a pointer to the policy to replace
+ * @text: Supplies a pointer to the plain text policy
+ * @textlen: Supplies the length of @text
+ * @pkcs7: Supplies a pointer to a buffer containing a pkcs7 message.
+ * @pkcs7len: Supplies the length of @pkcs7len
+ *
+ * @text/@textlen is mutually exclusive with @pkcs7/@pkcs7len - see
+ * ipe_new_policy.
+ *
+ * Return:
+ * !IS_ERR - OK
+ */
+struct ipe_policy *ipe_update_policy(struct ipe_policy *old,
+				     const char *text, size_t textlen,
+				     const char *pkcs7, size_t pkcs7len)
+{
+	int rc = 0;
+	struct ipe_policy *new;
+
+	new = ipe_new_policy(text, textlen, pkcs7, pkcs7len);
+	if (IS_ERR(new)) {
+		rc = PTR_ERR(new);
+		goto err;
+	}
+
+	if (strcmp(new->parsed->name, old->parsed->name)) {
+		rc = -EINVAL;
+		goto err;
+	}
+
+	rc = ipe_replace_policy(old, new);
+err:
+	ipe_put_policy(new);
+	return (rc < 0) ? ERR_PTR(rc) : new;
 }
 
 /**
