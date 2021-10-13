@@ -201,4 +201,9 @@ extern int vfio_virqfd_enable(void *opaque,
 			      void *data, struct virqfd **pvirqfd, int fd);
 extern void vfio_virqfd_disable(struct virqfd **pvirqfd);
 
+static inline bool vfio_is_state_invalid(u32 state)
+{
+	return state >= VFIO_DEVICE_STATE_INVALID;
+}
+
 #endif /* VFIO_H */
