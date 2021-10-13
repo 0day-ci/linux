@@ -1,0 +1,88 @@
+# SPDX-License-Identifier: GPL-2.0-only OR BSD-2-Clause
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/nvmem/denx,u-boot-env.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: U-Boot environment NVMEM Device Tree Bindings
+
+maintainers:
+  - Marek Behún <kabel@kernel.org>
+
+description:
+  This binding represents U-Boot's environment NVMEM settings which can be
+  stored on a specific offset of an EEPROM, MMC, NAND or SATA device, or
+  an UBI volume, or in a file on a filesystem.
+
+properties:
+  compatible:
+    const: denx,u-boot-env
+
+  path:
+    description:
+      The path to the file containing the environment if on a filesystem.
+    $ref: /schemas/types.yaml#/definitions/string
+
+patternProperties:
+  "^[^=]+$":
+    type: object
+
+    description:
+      This node represents one U-Boot environment variable, which is also one
+      NVMEM data cell.
+
+    properties:
+      name:
+        description:
+          If the variable name contains characters not allowed in device tree node
+          name, use this property to specify the name, otherwise the variable name
+          is equal to node name.
+        $ref: /schemas/types.yaml#/definitions/string
+
+      type:
+        description:
+          Type of the variable. Since variables, even integers and MAC addresses,
+          are stored as strings in U-Boot environment, for proper conversion the
+          type needs to be specified. Use one of the U_BOOT_ENV_TYPE_* prefixed
+          definitions from include/dt-bindings/nvmem/u-boot-env.h.
+        $ref: /schemas/types.yaml#/definitions/uint32
+        minimum: 0
+        maximum: 5
+
+    required:
+      - type
+
+required:
+  - compatible
+
+additionalProperties: true
+
+examples:
+  - |
+
+    #include <dt-bindings/nvmem/u-boot-env.h>
+
+    spi-flash {
+        partitions {
+            compatible = "fixed-partitions";
+            #address-cells = <1>;
+            #size-cells = <1>;
+
+            partition@180000 {
+                compatible = "denx,u-boot-env";
+                label = "u-boot-env";
+                reg = <0x180000 0x10000>;
+
+                eth0_addr: ethaddr {
+                    type = <U_BOOT_ENV_TYPE_MAC_ADDRESS>;
+                };
+            };
+        };
+    };
+
+    ethernet-controller {
+        nvmem-cells = <&eth0_addr>;
+        nvmem-cell-names = "mac-address";
+    };
+
+...
