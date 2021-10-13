@@ -1807,7 +1807,7 @@ static int xcan_probe(struct platform_device *pdev)
 	ret = register_candev(ndev);
 	if (ret) {
 		dev_err(&pdev->dev, "fail to register failed (err=%d)\n", ret);
-		goto err_disableclks;
+		goto err_del_napi;
 	}
 
 	devm_can_led_init(ndev);
@@ -1825,6 +1825,8 @@ static int xcan_probe(struct platform_device *pdev)
 
 	return 0;
 
+err_del_napi:
+	netif_napi_del(&priv->napi);
 err_disableclks:
 	pm_runtime_put(priv->dev);
 	pm_runtime_disable(&pdev->dev);
