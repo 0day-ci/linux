@@ -166,10 +166,20 @@ static int finalize_host_mappings_walker(u64 addr, u64 end, u32 level,
 {
 	enum kvm_pgtable_prot prot;
 	enum pkvm_page_state state;
+	struct kvm_pgtable_mm_ops *mm_ops = arg;
 	kvm_pte_t pte = *ptep;
 	phys_addr_t phys;
 
 	if (!kvm_pte_valid(pte))
+		return 0;
+
+	/*
+	 * Fix-up the refcount for the page-table pages as the early allocator
+	 * was unable to access the hyp_vmemmap and so the buddy allocator has
+	 * initialised the refcount to '1'.
+	 */
+	mm_ops->get_page(ptep);
+	if (flag != KVM_PGTABLE_WALK_LEAF)
 		return 0;
 
 	if (level != (KVM_PGTABLE_MAX_LEVELS - 1))
@@ -204,7 +214,8 @@ static int finalize_host_mappings(void)
 {
 	struct kvm_pgtable_walker walker = {
 		.cb	= finalize_host_mappings_walker,
-		.flags	= KVM_PGTABLE_WALK_LEAF,
+		.flags	= KVM_PGTABLE_WALK_LEAF | KVM_PGTABLE_WALK_TABLE_POST,
+		.arg	= pkvm_pgtable.mm_ops,
 	};
 
 	return kvm_pgtable_walk(&pkvm_pgtable, 0, BIT(pkvm_pgtable.ia_bits), &walker);
@@ -229,18 +240,18 @@ void __noreturn __pkvm_init_finalise(void)
 	if (ret)
 		goto out;
 
+	pkvm_pgtable_mm_ops = (struct kvm_pgtable_mm_ops) {
+		.zalloc_page	= hyp_zalloc_hyp_page,
+		.phys_to_virt	= hyp_phys_to_virt,
+		.virt_to_phys	= hyp_virt_to_phys,
+		.get_page	= hpool_get_page,
+		.put_page	= hpool_put_page,
+	};
+	pkvm_pgtable.mm_ops = &pkvm_pgtable_mm_ops;
+
 	ret = finalize_host_mappings();
 	if (ret)
 		goto out;
-
-	pkvm_pgtable_mm_ops = (struct kvm_pgtable_mm_ops) {
-		.zalloc_page = hyp_zalloc_hyp_page,
-		.phys_to_virt = hyp_phys_to_virt,
-		.virt_to_phys = hyp_virt_to_phys,
-		.get_page = hpool_get_page,
-		.put_page = hpool_put_page,
-	};
-	pkvm_pgtable.mm_ops = &pkvm_pgtable_mm_ops;
 
 out:
 	/*
