@@ -1462,7 +1462,7 @@ int security_inode_getsecurity(struct user_namespace *mnt_userns,
 int security_inode_setsecurity(struct inode *inode, const char *name, const void *value, size_t size, int flags)
 {
 	struct security_hook_list *hp;
-	int rc;
+	int rc = LSM_RET_DEFAULT(inode_setsecurity);
 
 	if (unlikely(IS_PRIVATE(inode)))
 		return LSM_RET_DEFAULT(inode_setsecurity);
@@ -1472,10 +1472,10 @@ int security_inode_setsecurity(struct inode *inode, const char *name, const void
 	hlist_for_each_entry(hp, &security_hook_heads.inode_setsecurity, list) {
 		rc = hp->hook.inode_setsecurity(inode, name, value, size,
 								flags);
-		if (rc != LSM_RET_DEFAULT(inode_setsecurity))
+		if (rc && rc != LSM_RET_DEFAULT(inode_setsecurity))
 			return rc;
 	}
-	return LSM_RET_DEFAULT(inode_setsecurity);
+	return rc;
 }
 
 int security_inode_listsecurity(struct inode *inode, char *buffer, size_t buffer_size)

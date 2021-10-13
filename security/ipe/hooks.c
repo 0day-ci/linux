@@ -232,6 +232,7 @@ void ipe_bdev_free_security(struct block_device *bdev)
 	struct ipe_bdev *blob = ipe_bdev(bdev);
 
 	kfree(blob->sigdata);
+	kfree(blob->hash);
 }
 
 /**

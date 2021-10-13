@@ -233,4 +233,7 @@ static inline bool fsverity_active(const struct inode *inode)
 	return fsverity_get_info(inode) != NULL;
 }
 
+#define FS_VERITY_SIGNATURE_SEC_NAME "fsverity.verity-sig"
+#define FS_VERITY_DIGEST_SEC_NAME "fsverity.verity-digest"
+
 #endif	/* _LINUX_FSVERITY_H */

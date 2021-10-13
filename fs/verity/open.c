@@ -7,6 +7,7 @@
 
 #include "fsverity_private.h"
 
+#include <linux/security.h>
 #include <linux/slab.h>
 
 static struct kmem_cache *fsverity_info_cachep;
@@ -177,6 +178,17 @@ struct fsverity_info *fsverity_create_info(const struct inode *inode,
 		fsverity_err(inode, "Error %d computing file digest", err);
 		goto out;
 	}
+
+	err = security_inode_setsecurity((struct inode *)inode,
+					 FS_VERITY_DIGEST_SEC_NAME,
+					 vi->file_digest,
+					 vi->tree_params.hash_alg->digest_size,
+					 0);
+	if (err) {
+		fsverity_err(inode, "Error %d inode setsecurity hook", err);
+		goto out;
+	}
+
 	pr_debug("Computed file digest: %s:%*phN\n",
 		 vi->tree_params.hash_alg->name,
 		 vi->tree_params.digest_size, vi->file_digest);

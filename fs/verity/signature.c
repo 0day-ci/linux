@@ -9,6 +9,7 @@
 
 #include <linux/cred.h>
 #include <linux/key.h>
+#include <linux/security.h>
 #include <linux/slab.h>
 #include <linux/verification.h>
 
@@ -84,7 +85,9 @@ int fsverity_verify_signature(const struct fsverity_info *vi,
 
 	pr_debug("Valid signature for file digest %s:%*phN\n",
 		 hash_alg->name, hash_alg->digest_size, vi->file_digest);
-	return 0;
+	return security_inode_setsecurity((struct inode *)inode,
+					FS_VERITY_SIGNATURE_SEC_NAME,
+					signature, sig_size, 0);
 }
 
 #ifdef CONFIG_SYSCTL
