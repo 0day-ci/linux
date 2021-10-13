@@ -96,7 +96,7 @@ extern int page_group_by_mobility_disabled;
 
 struct free_area {
 	struct list_head	free_list[MIGRATE_TYPES];
-	unsigned long		nr_free;
+	unsigned long		nr_free[MIGRATE_TYPES];
 };
 
 static inline struct page *get_page_from_free_area(struct free_area *area,
@@ -108,7 +108,17 @@ static inline struct page *get_page_from_free_area(struct free_area *area,
 
 static inline bool free_area_empty(struct free_area *area, int migratetype)
 {
-	return list_empty(&area->free_list[migratetype]);
+	return area->nr_free[migratetype] == 0;
+}
+
+static inline size_t free_area_nr_free(struct free_area *area)
+{
+	unsigned migratetype;
+	size_t nr_free = 0;
+
+	for (migratetype = 0; migratetype < MIGRATE_TYPES; migratetype++)
+		nr_free += area->nr_free[migratetype];
+	return nr_free;
 }
 
 struct pglist_data;

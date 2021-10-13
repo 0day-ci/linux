@@ -966,7 +966,7 @@ static inline void add_to_free_list(struct page *page, struct zone *zone,
 	struct free_area *area = &zone->free_area[order];
 
 	list_add(&page->lru, &area->free_list[migratetype]);
-	area->nr_free++;
+	area->nr_free[migratetype]++;
 }
 
 /* Used for pages not on another list */
@@ -976,7 +976,7 @@ static inline void add_to_free_list_tail(struct page *page, struct zone *zone,
 	struct free_area *area = &zone->free_area[order];
 
 	list_add_tail(&page->lru, &area->free_list[migratetype]);
-	area->nr_free++;
+	area->nr_free[migratetype]++;
 }
 
 /*
@@ -993,7 +993,7 @@ static inline void move_to_free_list(struct page *page, struct zone *zone,
 }
 
 static inline void del_page_from_free_list(struct page *page, struct zone *zone,
-					   unsigned int order)
+					   unsigned int order, int migratetype)
 {
 	/* clear reported state and update reported page count */
 	if (page_reported(page))
@@ -1002,7 +1002,7 @@ static inline void del_page_from_free_list(struct page *page, struct zone *zone,
 	list_del(&page->lru);
 	__ClearPageBuddy(page);
 	set_page_private(page, 0);
-	zone->free_area[order].nr_free--;
+	zone->free_area[order].nr_free[migratetype]--;
 }
 
 /*
@@ -1098,7 +1098,7 @@ continue_merging:
 		if (page_is_guard(buddy))
 			clear_page_guard(zone, buddy, order, migratetype);
 		else
-			del_page_from_free_list(buddy, zone, order);
+			del_page_from_free_list(buddy, zone, order, migratetype);
 		combined_pfn = buddy_pfn & pfn;
 		page = page + (combined_pfn - pfn);
 		pfn = combined_pfn;
@@ -2456,7 +2456,7 @@ struct page *__rmqueue_smallest(struct zone *zone, unsigned int order,
 		page = get_page_from_free_area(area, migratetype);
 		if (!page)
 			continue;
-		del_page_from_free_list(page, zone, current_order);
+		del_page_from_free_list(page, zone, current_order, migratetype);
 		expand(zone, page, order, current_order, migratetype);
 		set_pcppage_migratetype(page, migratetype);
 		return page;
@@ -3525,7 +3525,7 @@ int __isolate_free_page(struct page *page, unsigned int order)
 
 	/* Remove page from free list */
 
-	del_page_from_free_list(page, zone, order);
+	del_page_from_free_list(page, zone, order, mt);
 
 	/*
 	 * Set the pageblock if the isolated page is at least half of a
@@ -6038,14 +6038,16 @@ void show_free_areas(unsigned int filter, nodemask_t *nodemask)
 			struct free_area *area = &zone->free_area[order];
 			int type;
 
-			nr[order] = area->nr_free;
-			total += nr[order] << order;
+			nr[order]	= 0;
+			types[order]	= 0;
 
-			types[order] = 0;
 			for (type = 0; type < MIGRATE_TYPES; type++) {
 				if (!free_area_empty(area, type))
 					types[order] |= 1 << type;
+				nr[order] += area->nr_free[type];
 			}
+
+			total += nr[order] << order;
 		}
 		spin_unlock_irqrestore(&zone->lock, flags);
 		for (order = 0; order < MAX_ORDER; order++) {
@@ -6623,7 +6625,7 @@ static void __meminit zone_init_free_lists(struct zone *zone)
 	unsigned int order, t;
 	for_each_migratetype_order(order, t) {
 		INIT_LIST_HEAD(&zone->free_area[order].free_list[t]);
-		zone->free_area[order].nr_free = 0;
+		zone->free_area[order].nr_free[t] = 0;
 	}
 }
 
@@ -9317,6 +9319,7 @@ void __offline_isolated_pages(unsigned long start_pfn, unsigned long end_pfn)
 	struct page *page;
 	struct zone *zone;
 	unsigned int order;
+	unsigned int migratetype;
 	unsigned long flags;
 
 	offline_mem_sections(pfn, end_pfn);
@@ -9346,7 +9349,8 @@ void __offline_isolated_pages(unsigned long start_pfn, unsigned long end_pfn)
 		BUG_ON(page_count(page));
 		BUG_ON(!PageBuddy(page));
 		order = buddy_order(page);
-		del_page_from_free_list(page, zone, order);
+		migratetype = get_pfnblock_migratetype(page, pfn);
+		del_page_from_free_list(page, zone, order, migratetype);
 		pfn += (1 << order);
 	}
 	spin_unlock_irqrestore(&zone->lock, flags);
@@ -9428,7 +9432,7 @@ bool take_page_off_buddy(struct page *page)
 			int migratetype = get_pfnblock_migratetype(page_head,
 								   pfn_head);
 
-			del_page_from_free_list(page_head, zone, page_order);
+			del_page_from_free_list(page_head, zone, page_order, migratetype);
 			break_down_buddy_pages(zone, page_head, page, 0,
 						page_order, migratetype);
 			if (!is_migrate_isolate(migratetype))
