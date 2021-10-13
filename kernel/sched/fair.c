@@ -3315,7 +3315,7 @@ static inline bool cfs_rq_is_decayed(struct cfs_rq *cfs_rq)
  * differential update where we store the last value we propagated. This in
  * turn allows skipping updates if the differential is 'small'.
  *
- * Updating tg's load_avg is necessary before update_cfs_share().
+ * Updating tg's load_avg is necessary before update_cfs_group().
  */
 static inline void update_tg_load_avg(struct cfs_rq *cfs_rq)
 {
@@ -3651,7 +3651,7 @@ static inline void add_tg_cfs_propagate(struct cfs_rq *cfs_rq, long runnable_sum
  * avg. The immediate corollary is that all (fair) tasks must be attached, see
  * post_init_entity_util_avg().
  *
- * cfs_rq->avg is used for task_h_load() and update_cfs_share() for example.
+ * cfs_rq->avg is used for task_h_load() and update_cfs_group() for example.
  *
  * Returns true if the load decayed or we removed load.
  *
@@ -4801,7 +4801,7 @@ static bool throttle_cfs_rq(struct cfs_rq *cfs_rq)
 		 * entire period. We additionally needed to make sure that any
 		 * subsequent check_cfs_rq_runtime calls agree not to throttle
 		 * us, as we may commit to do cfs put_prev+pick_next, so we ask
-		 * for 1ns of runtime rather than just check cfs_b.
+		 * for 1ms of runtime rather than just check cfs_b.
 		 */
 		dequeue = 0;
 	} else {
@@ -5224,7 +5224,10 @@ static void sync_throttle(struct task_group *tg, int cpu)
 	cfs_rq->throttled_clock_task = rq_clock_task(cpu_rq(cpu));
 }
 
-/* conditionally throttle active cfs_rq's from put_prev_entity() */
+/*
+ * conditionally throttle active cfs_rq's from put_prev_entity()
+ * and pick_task_fair()
+ */
 static bool check_cfs_rq_runtime(struct cfs_rq *cfs_rq)
 {
 	if (!cfs_bandwidth_used())
@@ -5847,11 +5850,11 @@ static void record_wakee(struct task_struct *p)
  * Detect M:N waker/wakee relationships via a switching-frequency heuristic.
  *
  * A waker of many should wake a different task than the one last awakened
- * at a frequency roughly N times higher than one of its wakees.
+ * at a frequency roughly N/M times higher than one of its wakees.
  *
  * In order to determine whether we should let the load spread vs consolidating
  * to shared cache, we look for a minimum 'flip' frequency of llc_size in one
- * partner, and a factor of lls_size higher frequency in the other.
+ * partner, and a factor of llc_size higher frequency in the other.
  *
  * With both conditions met, we can be relatively sure that the relationship is
  * non-monogamous, with partner count exceeding socket size.
@@ -7124,7 +7127,7 @@ static void check_preempt_wakeup(struct rq *rq, struct task_struct *p, int wake_
 	 *
 	 * Note: this also catches the edge-case of curr being in a throttled
 	 * group (e.g. via set_curr_task), since update_curr() (in the
-	 * enqueue of curr) will have resulted in resched being set.  This
+	 * enqueue of se) will have resulted in resched being set.  This
 	 * prevents us from potentially nominating it as a false LAST_BUDDY
 	 * below.
 	 */
@@ -7176,8 +7179,8 @@ preempt:
 	/*
 	 * Only set the backward buddy when the current task is still
 	 * on the rq. This can happen when a wakeup gets interleaved
-	 * with schedule on the ->pre_schedule() or idle_balance()
-	 * point, either of which can * drop the rq lock.
+	 * with schedule on the -> put_prev_task_balance() point, which
+	 * can drop the rq lock.
 	 *
 	 * Also, during early boot the idle thread is in the fair class,
 	 * for obvious reasons its a bad idea to schedule back to it.
@@ -7447,7 +7450,7 @@ static bool yield_to_task_fair(struct rq *rq, struct task_struct *p)
  * per-CPU scheduler provides, namely provide a proportional amount of compute
  * time to each task. This is expressed in the following equation:
  *
- *   W_i,n/P_i == W_j,n/P_j for all i,j                               (1)
+ *   W_i,n/C_i == W_j,n/C_j for all i,j                               (1)
  *
  * Where W_i,n is the n-th weight average for CPU i. The instantaneous weight
  * W_i,0 is defined as:
@@ -7581,7 +7584,7 @@ enum group_type {
 	 */
 	group_misfit_task,
 	/*
-	 * SD_ASYM_PACKING only: One local CPU with higher capacity is available,
+	 * SD_ASYM_PACKING only: One local CPU with higher priority is available,
 	 * and the task should be migrated to it instead of running on the
 	 * current CPU.
 	 */
@@ -8496,7 +8499,7 @@ static inline int sg_imbalanced(struct sched_group *group)
  * available capacity for CFS tasks.
  * For the latter, we use a threshold to stabilize the state, to take into
  * account the variance of the tasks' load and to return true if the available
- * capacity in meaningful for the load balancer.
+ * capacity is meaningful for the load balancer.
  * As an example, an available capacity of 1% can appear but it doesn't make
  * any benefit for the load balance.
  */
