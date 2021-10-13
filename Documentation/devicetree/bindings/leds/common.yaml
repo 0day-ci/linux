@@ -59,6 +59,14 @@ properties:
       deprecated - use 'function' and 'color' properties instead.
       function-enumerator has no effect when this property is present.
 
+  excludes:
+    description:
+      List of LEDs that are excluded by this LED: if this LED is ON, the others
+      must be OFF. This is mostly the case when there are two LEDs connected in
+      parallel, but inversely: inverting the polarity of the source turns one
+      LED ON while the other OFF. There are RJ-45 connectors with such wiring.
+    $ref: /schemas/types.yaml#/definitions/phandle-array
+
   default-state:
     description:
       The initial state of the LED. If the LED is already on or off and the
