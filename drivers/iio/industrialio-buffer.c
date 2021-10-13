@@ -1626,7 +1626,7 @@ int iio_buffers_alloc_sysfs_and_mask(struct iio_dev *indio_dev)
 	iio_dev_opaque->buffer_ioctl_handler = kzalloc(sz, GFP_KERNEL);
 	if (!iio_dev_opaque->buffer_ioctl_handler) {
 		ret = -ENOMEM;
-		goto error_unwind_sysfs_and_mask;
+		goto error_unregister_legacy_sysfs_groups;
 	}
 
 	iio_dev_opaque->buffer_ioctl_handler->ioctl = iio_device_buffer_ioctl;
@@ -1635,6 +1635,8 @@ int iio_buffers_alloc_sysfs_and_mask(struct iio_dev *indio_dev)
 
 	return 0;
 
+error_unregister_legacy_sysfs_groups:
+	iio_buffer_unregister_legacy_sysfs_groups(indio_dev);
 error_unwind_sysfs_and_mask:
 	for (; unwind_idx >= 0; unwind_idx--) {
 		buffer = iio_dev_opaque->attached_buffers[unwind_idx];
