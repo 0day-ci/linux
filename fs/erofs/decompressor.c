@@ -326,7 +326,7 @@ static int z_erofs_decompress_generic(struct z_erofs_decompress_req *rq,
 
 			rq->inplace_io = false;
 			ret = alg->decompress(rq, dst);
-			if (!ret)
+			if (ret > 0)
 				copy_from_pcpubuf(rq->out, dst, rq->pageofs_out,
 						  rq->outputsize);
 
