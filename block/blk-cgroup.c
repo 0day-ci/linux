@@ -621,6 +621,7 @@ struct block_device *blkcg_conf_open_bdev(char **inputp)
  */
 int blkg_conf_prep(struct blkcg *blkcg, const struct blkcg_policy *pol,
 		   char *input, struct blkg_conf_ctx *ctx)
+	__acquires(&bdev->bd_disk->queue->blkg_lock)
 	__acquires(rcu) __acquires(&bdev->bd_disk->queue->queue_lock)
 {
 	struct block_device *bdev;
@@ -634,6 +635,7 @@ int blkg_conf_prep(struct blkcg *blkcg, const struct blkcg_policy *pol,
 
 	q = bdev->bd_disk->queue;
 
+	mutex_lock(&q->blkg_lock);
 	rcu_read_lock();
 	spin_lock_irq(&q->queue_lock);
 
@@ -713,6 +715,7 @@ fail_preloaded:
 fail_unlock:
 	spin_unlock_irq(&q->queue_lock);
 	rcu_read_unlock();
+	mutex_unlock(&q->blkg_lock);
 fail:
 	blkdev_put_no_open(bdev);
 	/*
@@ -738,9 +741,11 @@ EXPORT_SYMBOL_GPL(blkg_conf_prep);
  */
 void blkg_conf_finish(struct blkg_conf_ctx *ctx)
 	__releases(&ctx->bdev->bd_disk->queue->queue_lock) __releases(rcu)
+	__releases(&ctx->bdev->bd_disk->queue->blkg_lock)
 {
 	spin_unlock_irq(&ctx->bdev->bd_disk->queue->queue_lock);
 	rcu_read_unlock();
+	mutex_unlock(&ctx->bdev->bd_disk->queue->blkg_lock);
 	blkdev_put_no_open(ctx->bdev);
 }
 EXPORT_SYMBOL_GPL(blkg_conf_finish);
@@ -1401,6 +1406,7 @@ void blkcg_deactivate_policy(struct request_queue *q,
 	if (queue_is_mq(q))
 		blk_mq_freeze_queue(q);
 
+	mutex_lock(&q->blkg_lock);
 	spin_lock_irq(&q->queue_lock);
 
 	__clear_bit(pol->plid, q->blkcg_pols);
@@ -1419,6 +1425,7 @@ void blkcg_deactivate_policy(struct request_queue *q,
 	}
 
 	spin_unlock_irq(&q->queue_lock);
+	mutex_unlock(&q->blkg_lock);
 
 	if (queue_is_mq(q))
 		blk_mq_unfreeze_queue(q);

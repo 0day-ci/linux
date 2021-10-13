@@ -246,6 +246,11 @@ struct request_queue {
 	DECLARE_BITMAP		(blkcg_pols, BLKCG_MAX_POLS);
 	struct blkcg_gq		*root_blkg;
 	struct list_head	blkg_list;
+	/*
+	 * used to synchronize blkg allocation and initialization against
+	 * policy deactivation.
+	 */
+	struct mutex		blkg_lock;
 #endif
 
 	struct queue_limits	limits;

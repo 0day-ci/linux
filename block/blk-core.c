@@ -544,6 +544,7 @@ struct request_queue *blk_alloc_queue(int node_id)
 	INIT_LIST_HEAD(&q->icq_list);
 #ifdef CONFIG_BLK_CGROUP
 	INIT_LIST_HEAD(&q->blkg_list);
+	mutex_init(&q->blkg_lock);
 #endif
 
 	kobject_init(&q->kobj, &blk_queue_ktype);
