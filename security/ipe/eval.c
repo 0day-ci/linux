@@ -9,6 +9,7 @@
 #include "hooks.h"
 #include "policy.h"
 #include "modules/ipe_module.h"
+#include "audit.h"
 
 #include <linux/slab.h>
 #include <linux/file.h>
@@ -73,7 +74,9 @@ static int evaluate(const struct ipe_eval_ctx *const ctx)
 {
 	int rc = 0;
 	bool match = false;
+	bool enforcing = true;
 	enum ipe_action action;
+	enum ipe_match match_type;
 	struct ipe_policy *pol = NULL;
 	const struct ipe_rule *rule = NULL;
 	const struct ipe_policy_mod *module = NULL;
@@ -97,11 +100,16 @@ static int evaluate(const struct ipe_eval_ctx *const ctx)
 
 	if (match) {
 		action = rule->action;
+		match_type = ipe_match_rule;
 	} else if (rules->default_action != ipe_action_max) {
 		action = rules->default_action;
+		match_type = ipe_match_table;
 	} else {
 		action = pol->parsed->global_default;
+		match_type = ipe_match_global;
 	}
+
+	ipe_audit_match(ctx, match_type, action, rule, enforcing);
 
 	if (action == ipe_action_deny)
 		rc = -EACCES;

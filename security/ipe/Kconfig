@@ -17,3 +17,55 @@ menuconfig SECURITY_IPE
 	  requirements on the fly.
 
 	  If unsure, answer N.
+
+if SECURITY_IPE
+
+choice
+	prompt "Hash algorithm used in auditing policies"
+	default IPE_AUDIT_HASH_SHA1
+	depends on AUDIT
+	help
+		Specify the hash algorithm used when auditing policies.
+		The hash is used to uniquely identify a policy from other
+		policies on the system.
+
+		If unsure, leave default.
+
+	config IPE_AUDIT_HASH_SHA1
+		bool "sha1"
+		depends on CRYPTO_SHA1
+		help
+			Use the SHA128 algorithm to hash policies
+			in the audit records.
+
+	config IPE_AUDIT_HASH_SHA256
+		bool "sha256"
+		depends on CRYPTO_SHA256
+		help
+			Use the SHA256 algorithm to hash policies
+			in the audit records.
+
+	config IPE_AUDIT_HASH_SHA384
+		bool "sha384"
+		depends on CRYPTO_SHA512
+		help
+			Use the SHA384 algorithm to hash policies
+			in the audit records
+
+	config IPE_AUDIT_HASH_SHA512
+		bool "sha512"
+		depends on CRYPTO_SHA512
+		help
+			Use the SHA512 algorithm to hash policies
+			in the audit records
+endchoice
+
+config IPE_AUDIT_HASH_ALG
+	string
+	depends on AUDIT
+	default "sha1" if IPE_AUDIT_HASH_SHA1
+	default "sha256" if IPE_AUDIT_HASH_SHA256
+	default "sha384" if IPE_AUDIT_HASH_SHA384
+	default "sha512" if IPE_AUDIT_HASH_SHA512
+
+endif

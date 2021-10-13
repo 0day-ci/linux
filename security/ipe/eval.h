@@ -20,6 +20,13 @@ struct ipe_eval_ctx {
 	struct ipe_context *ci_ctx;
 };
 
+enum ipe_match {
+	ipe_match_rule = 0,
+	ipe_match_table,
+	ipe_match_global,
+	ipe_match_max
+};
+
 int ipe_process_event(const struct file *file, enum ipe_operation op,
 		      enum ipe_hook hook);
 

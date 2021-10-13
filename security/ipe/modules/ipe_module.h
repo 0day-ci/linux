@@ -6,6 +6,7 @@
 #define IPE_MODULE_H
 
 #include <linux/types.h>
+#include <linux/audit.h>
 #include "../eval.h"
 
 /**
@@ -26,6 +27,7 @@ struct ipe_module {
 	int (*free)(void **value);			/* optional */
 	bool (*eval)(const struct ipe_eval_ctx *ctx,	/* required */
 		     const void *val);
+	void (*audit)(struct audit_buffer *ab, const void *val); /* required */
 };
 
 #define IPE_MODULE(parser)				\

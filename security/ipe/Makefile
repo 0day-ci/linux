@@ -18,3 +18,5 @@ obj-$(CONFIG_SECURITY_IPE) += \
 	parsers.o \
 	policy.o \
 	policyfs.o \
+
+obj-$(CONFIG_AUDIT) += audit.o

@@ -15,6 +15,8 @@
 struct ipe_context {
 	struct ipe_policy __rcu *active_policy;
 
+	bool __rcu success_audit;
+
 	refcount_t refcount;
 	/* Protects concurrent writers */
 	spinlock_t lock;

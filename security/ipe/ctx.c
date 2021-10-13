@@ -6,12 +6,16 @@
 #include "ipe.h"
 #include "ctx.h"
 #include "policy.h"
+#include "audit.h"
 
 #include <linux/slab.h>
 #include <linux/types.h>
 #include <linux/parser.h>
 #include <linux/refcount.h>
 #include <linux/spinlock.h>
+#include <linux/moduleparam.h>
+
+static bool success_audit;
 
 /**
  * ver_to_u64: convert an internal ipe_policy_version to a u64
@@ -265,6 +269,7 @@ int ipe_set_active_pol(const struct ipe_policy *p)
 	spin_unlock(&ctx->lock);
 	synchronize_rcu();
 
+	ipe_audit_policy_activation(p);
 out:
 	ipe_put_policy(ap);
 	ipe_put_ctx(ctx);
@@ -330,6 +335,10 @@ int __init ipe_init_ctx(void)
 		goto err;
 	}
 
+	spin_lock(&lns->lock);
+	WRITE_ONCE(lns->success_audit, success_audit);
+	spin_unlock(&lns->lock);
+
 	rcu_assign_pointer(*ipe_tsk_ctx(current), lns);
 
 	return 0;
@@ -337,3 +346,12 @@ err:
 	ipe_put_ctx(lns);
 	return rc;
 }
+
+/* Set the right module name */
+#ifdef KBUILD_MODNAME
+#undef KBUILD_MODNAME
+#define KBUILD_MODNAME "ipe"
+#endif
+
+module_param(success_audit, bool, 0400);
+MODULE_PARM_DESC(success_audit, "Start IPE with success auditing enabled");
