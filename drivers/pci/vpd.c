@@ -96,14 +96,14 @@ error:
 	return off ?: PCI_VPD_SZ_INVALID;
 }
 
-static bool pci_vpd_available(struct pci_dev *dev)
+static bool pci_vpd_available(struct pci_dev *dev, bool check_size)
 {
 	struct pci_vpd *vpd = &dev->vpd;
 
 	if (!vpd->cap)
 		return false;
 
-	if (vpd->len == 0) {
+	if (vpd->len == 0 && check_size) {
 		vpd->len = pci_vpd_size(dev);
 		if (vpd->len == PCI_VPD_SZ_INVALID) {
 			vpd->cap = 0;
@@ -156,16 +156,18 @@ static ssize_t pci_vpd_read(struct pci_dev *dev, loff_t pos, size_t count,
 			    void *arg, bool check_size)
 {
 	struct pci_vpd *vpd = &dev->vpd;
-	unsigned int max_len = check_size ? vpd->len : PCI_VPD_MAX_SIZE;
+	unsigned int max_len;
 	int ret = 0;
 	loff_t end = pos + count;
 	u8 *buf = arg;
 
-	if (!pci_vpd_available(dev))
+	if (!pci_vpd_available(dev, check_size))
 		return -ENODEV;
 
 	if (pos < 0)
 		return -EINVAL;
+
+	max_len = check_size ? vpd->len : PCI_VPD_MAX_SIZE;
 
 	if (pos >= max_len)
 		return 0;
@@ -218,16 +220,18 @@ static ssize_t pci_vpd_write(struct pci_dev *dev, loff_t pos, size_t count,
 			     const void *arg, bool check_size)
 {
 	struct pci_vpd *vpd = &dev->vpd;
-	unsigned int max_len = check_size ? vpd->len : PCI_VPD_MAX_SIZE;
+	unsigned int max_len;
 	const u8 *buf = arg;
 	loff_t end = pos + count;
 	int ret = 0;
 
-	if (!pci_vpd_available(dev))
+	if (!pci_vpd_available(dev, check_size))
 		return -ENODEV;
 
 	if (pos < 0 || (pos & 3) || (count & 3))
 		return -EINVAL;
+
+	max_len = check_size ? vpd->len : PCI_VPD_MAX_SIZE;
 
 	if (end > max_len)
 		return -EINVAL;
@@ -312,7 +316,7 @@ void *pci_vpd_alloc(struct pci_dev *dev, unsigned int *size)
 	void *buf;
 	int cnt;
 
-	if (!pci_vpd_available(dev))
+	if (!pci_vpd_available(dev, true))
 		return ERR_PTR(-ENODEV);
 
 	len = dev->vpd.len;
