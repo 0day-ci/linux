@@ -13,7 +13,72 @@
 static struct dentry *np __ro_after_init;
 static struct dentry *root __ro_after_init;
 static struct dentry *config __ro_after_init;
+static struct dentry *enforce __ro_after_init;
 static struct dentry *success_audit __ro_after_init;
+
+/**
+ * setenforce: Write handler for the securityfs node, "ipe/enforce"
+ * @f: Supplies a file structure representing the securityfs node.
+ * @data: Supplies a buffer passed to the write syscall
+ * @len: Supplies the length of @data
+ * @offset: unused.
+ *
+ * Return:
+ * >0 - Success, Length of buffer written
+ * <0 - Error
+ */
+static ssize_t setenforce(struct file *f, const char __user *data,
+			  size_t len, loff_t *offset)
+{
+	int rc = 0;
+	bool value;
+	struct ipe_context *ctx;
+
+	if (!file_ns_capable(f, &init_user_ns, CAP_MAC_ADMIN))
+		return -EPERM;
+
+	rc = kstrtobool_from_user(data, len, &value);
+	if (rc)
+		return rc;
+
+	ctx = ipe_current_ctx();
+
+	spin_lock(&ctx->lock);
+	WRITE_ONCE(ctx->enforce, value);
+	spin_unlock(&ctx->lock);
+	synchronize_rcu();
+
+	ipe_audit_enforce(ctx);
+	ipe_put_ctx(ctx);
+	return len;
+}
+
+/**
+ * getenforce: Read handler for the securityfs node, "ipe/enforce"
+ * @f: Supplies a file structure representing the securityfs node.
+ * @data: Supplies a buffer passed to the read syscall
+ * @len: Supplies the length of @data
+ * @offset: unused.
+ *
+ * Return:
+ * >0 - Success, Length of buffer written
+ * <0 - Error
+ */
+static ssize_t getenforce(struct file *f, char __user *data,
+			  size_t len, loff_t *offset)
+{
+	const char *result;
+	struct ipe_context *ctx;
+
+	ctx = ipe_current_ctx();
+
+	rcu_read_lock();
+	result = ((READ_ONCE(ctx->enforce)) ? "1" : "0");
+	rcu_read_unlock();
+
+	ipe_put_ctx(ctx);
+	return simple_read_from_buffer(data, len, offset, result, 2);
+}
 
 /**
  * setaudit: Write handler for the securityfs node, "ipe/success_audit"
@@ -185,6 +250,11 @@ static const struct file_operations np_fops = {
 	.write = new_policy,
 };
 
+static const struct file_operations enforce_fops = {
+	.write = setenforce,
+	.read = getenforce,
+};
+
 static const struct file_operations audit_fops = {
 	.write = setaudit,
 	.read = getaudit,
@@ -230,6 +300,13 @@ static int __init ipe_init_securityfs(void)
 		goto err;
 	}
 
+	enforce = securityfs_create_file("enforce", 0600, root, NULL,
+					 &enforce_fops);
+	if (IS_ERR(enforce)) {
+		rc = PTR_ERR(enforce);
+		goto err;
+	}
+
 	ctx->policy_root = securityfs_create_dir("policies", root);
 	if (IS_ERR(ctx->policy_root)) {
 		rc = PTR_ERR(ctx->policy_root);
@@ -241,6 +318,7 @@ err:
 	securityfs_remove(np);
 	securityfs_remove(root);
 	securityfs_remove(config);
+	securityfs_remove(enforce);
 	securityfs_remove(success_audit);
 	securityfs_remove(ctx->policy_root);
 	return rc;

@@ -16,6 +16,7 @@
 #include <linux/moduleparam.h>
 
 static bool success_audit;
+static bool enforce = true;
 
 /**
  * ver_to_u64: convert an internal ipe_policy_version to a u64
@@ -151,6 +152,7 @@ static struct ipe_context *create_ctx(void)
 	INIT_LIST_HEAD(&ctx->policies);
 	refcount_set(&ctx->refcount, 1);
 	spin_lock_init(&ctx->lock);
+	WRITE_ONCE(ctx->enforce, true);
 
 	return ctx;
 
@@ -337,6 +339,7 @@ int __init ipe_init_ctx(void)
 
 	spin_lock(&lns->lock);
 	WRITE_ONCE(lns->success_audit, success_audit);
+	WRITE_ONCE(lns->enforce, enforce);
 	spin_unlock(&lns->lock);
 
 	rcu_assign_pointer(*ipe_tsk_ctx(current), lns);
@@ -355,3 +358,6 @@ err:
 
 module_param(success_audit, bool, 0400);
 MODULE_PARM_DESC(success_audit, "Start IPE with success auditing enabled");
+
+module_param(enforce, bool, 0400);
+MODULE_PARM_DESC(enforce, "Start IPE in enforce or permissive mode");

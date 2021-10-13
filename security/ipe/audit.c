@@ -262,3 +262,43 @@ void ipe_audit_policy_load(const struct ipe_policy *const p)
 
 	audit_log_end(ab);
 }
+
+/**
+ * ipe_audit_enforce: Audit a change in IPE's enforcement state
+ * @ctx: Supplies a pointer to the contexts whose state changed.
+ */
+void ipe_audit_enforce(const struct ipe_context *const ctx)
+{
+	struct audit_buffer *ab;
+	bool enforcing = false;
+
+	ab = audit_log_start(audit_context(), GFP_KERNEL, AUDIT_TRUST_STATUS);
+	if (!ab)
+		return;
+
+	rcu_read_lock();
+	enforcing = READ_ONCE(ctx->enforce);
+	rcu_read_unlock();
+
+	audit_log_format(ab, "IPE enforce=%d", enforcing);
+
+	audit_log_end(ab);
+}
+
+/**
+ * emit_enforcement: Emit the enforcement state of IPE started with.
+ *
+ * Return:
+ * 0 - Always
+ */
+static int emit_enforcement(void)
+{
+	struct ipe_context *ctx = NULL;
+
+	ctx = ipe_current_ctx();
+	ipe_audit_enforce(ctx);
+	ipe_put_ctx(ctx);
+	return 0;
+}
+
+late_initcall(emit_enforcement);

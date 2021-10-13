@@ -86,6 +86,10 @@ static int evaluate(const struct ipe_eval_ctx *const ctx)
 	if (!pol)
 		goto out;
 
+	rcu_read_lock();
+	enforcing = READ_ONCE(ctx->ci_ctx->enforce);
+	rcu_read_unlock();
+
 	rules = &pol->parsed->rules[ctx->op];
 
 	list_for_each_entry(rule, &rules->rules, next) {
@@ -114,6 +118,8 @@ static int evaluate(const struct ipe_eval_ctx *const ctx)
 	if (action == ipe_action_deny)
 		rc = -EACCES;
 
+	if (!enforcing)
+		rc = 0;
 out:
 	ipe_put_policy(pol);
 	return rc;

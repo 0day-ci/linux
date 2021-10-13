@@ -14,6 +14,7 @@
 
 struct ipe_context {
 	struct ipe_policy __rcu *active_policy;
+	bool __rcu enforce;
 
 	bool __rcu success_audit;
 

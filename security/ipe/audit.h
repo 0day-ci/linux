@@ -16,6 +16,7 @@ void ipe_audit_match(const struct ipe_eval_ctx *const ctx,
 		     bool enforce);
 void ipe_audit_policy_load(const struct ipe_policy *const p);
 void ipe_audit_policy_activation(const struct ipe_policy *const p);
+void ipe_audit_enforce(const struct ipe_context *const ctx);
 #else
 static inline void ipe_audit_match(const struct ipe_eval_ctx *const ctx,
 				   enum ipe_match match_type,
@@ -29,6 +30,10 @@ static inline void ipe_audit_policy_load(const struct ipe_policy *const p)
 }
 
 static inline void ipe_audit_policy_activation(const struct ipe_policy *const p)
+{
+}
+
+static inline void ipe_audit_enforce(const struct ipe_context *const ctx)
 {
 }
 #endif /* CONFIG_AUDIT */
