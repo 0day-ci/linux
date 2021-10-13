@@ -37,13 +37,21 @@ properties:
     $ref: /schemas/types.yaml#/definitions/string
 
   color:
-    description:
+    description: |
       Color of the LED. Use one of the LED_COLOR_ID_* prefixed definitions from
       the header include/dt-bindings/leds/common.h. If there is no matching
       LED_COLOR_ID available, add a new one.
-    $ref: /schemas/types.yaml#/definitions/uint32
-    minimum: 0
-    maximum: 9
+
+      For multi color LEDs there are two cases:
+        - the LED can mix the channels (i.e. RGB LED); in this case use
+          LED_COLOR_ID_MULTI or LED_COLOR_ID_RGB
+        - the LED cannot mix the channels, only one can be active; in this case
+          enumerate all the possible colors
+    $ref: /schemas/types.yaml#/definitions/uint32-array
+    minItems: 1
+    items:
+      minimum: 0
+      maximum: 9
 
   function-enumerator:
     description:
