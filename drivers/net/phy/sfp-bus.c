@@ -55,6 +55,13 @@ static void sfp_quirk_ubnt_uf_instant(const struct sfp_eeprom_id *id,
 	phylink_set(modes, 1000baseX_Full);
 }
 
+static void sfp_quirk_finisar_25g(const struct sfp_eeprom_id *id,
+				  unsigned long *modes)
+{
+	phylink_set(modes, 1000baseX_Full);
+	phylink_set(modes, 10000baseSR_Full);
+}
+
 static const struct sfp_quirk sfp_quirks[] = {
 	{
 		// Alcatel Lucent G-010S-P can operate at 2500base-X, but
@@ -78,7 +85,13 @@ static const struct sfp_quirk sfp_quirks[] = {
 		.vendor = "UBNT",
 		.part = "UF-INSTANT",
 		.modes = sfp_quirk_ubnt_uf_instant,
-	},
+	}, {
+		// Finisar FTLF8536P4BCL can operate at 1000base-X and 10000base-SR,
+		// but reports 25G & 100GBd SR in it's EEPROM
+		.vendor = "FINISAR CORP.",
+		.part = "FTLF8536P4BCL",
+		.modes = sfp_quirk_finisar_25g,
+	}
 };
 
 static size_t sfp_strlen(const char *str, size_t maxlen)
