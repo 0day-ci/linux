@@ -50,6 +50,9 @@
 #define USB_TP_TRANSMISSION_DELAY_MAX	65535	/* ns */
 #define USB_PING_RESPONSE_TIME		400	/* ns */
 
+#define USB_OC_COOL_DOWN_TIME		100	/* ms */
+#define USB_OC_REPEATED_MSG_DELAY	2000	/* ms */
+
 /* Protect struct usb_device->state and ->children members
  * Note: Both are also protected by ->dev.sem, except that ->state can
  * change to USB_STATE_NOTATTACHED even when the semaphore isn't held. */
@@ -5565,6 +5568,11 @@ static void port_event(struct usb_hub *hub, int port1)
 		}
 	}
 
+	/*
+	 * The over-current events can be continuous or intermittent (sometimes
+	 * the event disappears after the cooling-down time); in both cases
+	 * display an error message.
+	 */
 	if (portchange & USB_PORT_STAT_C_OVERCURRENT) {
 		u16 status = 0, unused;
 		port_dev->over_current_count++;
@@ -5574,10 +5582,12 @@ static void port_event(struct usb_hub *hub, int port1)
 			port_dev->over_current_count);
 		usb_clear_port_feature(hdev, port1,
 				USB_PORT_FEAT_C_OVER_CURRENT);
-		msleep(100);	/* Cool down */
+		msleep(USB_OC_COOL_DOWN_TIME); /* Cool down */
 		hub_power_on(hub, true);
 		hub_port_status(hub, port1, &status, &unused);
-		if (status & USB_PORT_STAT_OVERCURRENT)
+		if ((status & USB_PORT_STAT_OVERCURRENT) ||
+		    !(port_dev->over_current_count %
+		      (USB_OC_REPEATED_MSG_DELAY / USB_OC_COOL_DOWN_TIME)))
 			dev_err(&port_dev->dev, "over-current condition\n");
 	}
 
