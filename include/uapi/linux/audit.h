@@ -139,6 +139,10 @@
 #define AUDIT_MAC_UNLBL_STCDEL	1417	/* NetLabel: del a static label */
 #define AUDIT_MAC_CALIPSO_ADD	1418	/* NetLabel: add CALIPSO DOI entry */
 #define AUDIT_MAC_CALIPSO_DEL	1419	/* NetLabel: del CALIPSO DOI entry */
+#define AUDIT_TRUST_RESULT	1420	/* IPE Denial or Grant */
+#define AUDIT_TRUST_POLICY_LOAD 1421	/* IPE Policy Load */
+#define AUDIT_TRUST_POLICY_ACTIVATE 1422	/* IPE Policy Activate */
+#define AUDIT_TRUST_STATUS	1423	/* IPE enforcing,permissive */
 
 #define AUDIT_FIRST_KERN_ANOM_MSG   1700
 #define AUDIT_LAST_KERN_ANOM_MSG    1799
