@@ -244,7 +244,6 @@ static int
 skl_get_dram_info(struct drm_i915_private *i915)
 {
 	struct dram_info *dram_info = &i915->dram_info;
-	u32 mem_freq_khz, val;
 	int ret;
 
 	dram_info->type = skl_get_dram_type(i915);
@@ -254,17 +253,6 @@ skl_get_dram_info(struct drm_i915_private *i915)
 	ret = skl_dram_get_channels_info(i915);
 	if (ret)
 		return ret;
-
-	val = intel_uncore_read(&i915->uncore,
-				SKL_MC_BIOS_DATA_0_0_0_MCHBAR_PCU);
-	mem_freq_khz = DIV_ROUND_UP((val & SKL_REQ_DATA_MASK) *
-				    SKL_MEMORY_FREQ_MULTIPLIER_HZ, 1000);
-
-	if (dram_info->num_channels * mem_freq_khz == 0) {
-		drm_info(&i915->drm,
-			 "Couldn't get system memory bandwidth\n");
-		return -EINVAL;
-	}
 
 	return 0;
 }
