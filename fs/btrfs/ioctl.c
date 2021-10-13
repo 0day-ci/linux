@@ -1069,7 +1069,10 @@ again:
 	if (!page)
 		return ERR_PTR(-ENOMEM);
 
-	ret = set_page_extent_mapped(page);
+	if (PageCompound(page))
+		ret = -ETXTBSY;
+	else
+		ret = set_page_extent_mapped(page);
 	if (ret < 0) {
 		unlock_page(page);
 		put_page(page);
