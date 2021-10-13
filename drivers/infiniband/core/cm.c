@@ -4508,7 +4508,7 @@ static void __exit ib_cm_cleanup(void)
 
 	spin_lock_irq(&cm.lock);
 	list_for_each_entry(timewait_info, &cm.timewait_list, list)
-		cancel_delayed_work(&timewait_info->work.work);
+		cancel_delayed_work_sync(&timewait_info->work.work);
 	spin_unlock_irq(&cm.lock);
 
 	ib_unregister_client(&cm_client);
