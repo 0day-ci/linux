@@ -1,0 +1,30 @@
+drm drm-fixes 0dee6f70fd40e3375d45d3f93abdf6a57fc0e549
+	drm: rcar-du: Don't create encoder for unconnected LVDS outputs
+drm-misc drm-misc-fixes 6de148d82d9e790caf7622a002229df745fd2d94
+	drm/vc4: crtc: Make sure the HDMI controller is powered when disabling
+drm-intel drm-intel-fixes 82a59c7f456db9f2874e9f1e9cb4cc19e71e95c5
+	drm/i915: Free the returned object of acpi_evaluate_dsm()
+drm drm-next 1176d15f0f6e556d54ced510ac4a91694960332b
+	Merge tag 'drm-intel-gt-next-2021-10-08' of git://anongit.freedesktop.org/drm/drm-intel into drm-next
+drm-misc drm-misc-next-fixes 70982eef4d7eebb47a3b1ef25ec1bc742f3a21cf
+	drm/ttm: Fix a deadlock if the target BO is not idle during swap
+drm-intel drm-intel-next-fixes fb43ebc83e069625cfeeb2490efc3ffa0013bfa4
+	drm/i915/selftest: Fix use of err in igt_reset_{fail, nop}_engine()
+drm-misc drm-misc-next b3ec8cdf457e5e63d396fe1346cc788cf7c1b578
+	fbdev: Garbage collect fbdev scrolling acceleration, part 1 (from TODO list)
+drm-intel drm-intel-next c5f44559e919fadff5c03864d92c09a5a90bdbe4
+	drm/i915/display: remove unused intel-mid.h include
+drm-intel drm-intel-gt-next c46f4405486d953dd749613f67d3a0eec69e1b87
+	drm/i915: Stop using I915_TILING_* in client blit selftest
+sound-upstream for-linus 7cf3dead1ad70c72edb03e2d98e1f3dcd332cdb2
+	Linux 5.13
+sound-upstream for-next 7cf3dead1ad70c72edb03e2d98e1f3dcd332cdb2
+	Linux 5.13
+drm-intel topic/core-for-CI b4dd0381f66d0bddc2c4bfc75e18a8a6b8a0d4b7
+	component: do not leave master devres group open after bind
+drm topic/nouveau-ampere-modeset 584265dfec70e78ce2085b82ed389f27e06fbca0
+	Merge branch '04.01-ampere-lite' of git://github.com/skeggsb/linux into topic/nouveau-ampere-modeset
+drm-misc topic/i915-ttm 1e3944578b749449bd7fa6bf0bae4c3d3f5f1733
+	Merge tag 'amd-drm-next-5.16-2021-09-27' of https://gitlab.freedesktop.org/agd5f/linux into drm-next
+drm-intel topic/pxp e4e737bb5c170df6135a127739a9e6148ee3da82
+	Linux 5.15-rc2
