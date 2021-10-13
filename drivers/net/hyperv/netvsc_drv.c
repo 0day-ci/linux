@@ -807,7 +807,7 @@ static void netvsc_xdp_xmit(struct sk_buff *skb, struct net_device *ndev)
 {
 	int rc;
 
-	skb->queue_mapping = skb_get_rx_queue(skb);
+	skb->queue_mapping = skb_rx_queue_recorded(skb) ? skb_get_rx_queue(skb) : 0;
 	__skb_push(skb, ETH_HLEN);
 
 	rc = netvsc_xmit(skb, ndev, true);
