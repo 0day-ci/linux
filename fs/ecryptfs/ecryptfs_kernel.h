@@ -573,7 +573,8 @@ int ecryptfs_encrypt_page(struct page *page);
 int ecryptfs_decrypt_page(struct page *page);
 int ecryptfs_write_metadata(struct dentry *ecryptfs_dentry,
 			    struct inode *ecryptfs_inode);
-int ecryptfs_read_metadata(struct dentry *ecryptfs_dentry);
+int ecryptfs_read_or_initialize_metadata(struct dentry *dentry);
+int ecryptfs_read_or_initialize_metadata_locked(struct dentry *dentry);
 int ecryptfs_new_file_context(struct inode *ecryptfs_inode);
 void ecryptfs_write_crypt_stat_flags(char *page_virt,
 				     struct ecryptfs_crypt_stat *crypt_stat,

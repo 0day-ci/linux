@@ -916,7 +916,7 @@ static int ecryptfs_setattr(struct user_namespace *mnt_userns,
 			mutex_unlock(&crypt_stat->cs_mutex);
 			goto out;
 		}
-		rc = ecryptfs_read_metadata(dentry);
+		rc = ecryptfs_read_or_initialize_metadata_locked(dentry);
 		ecryptfs_put_lower_file(inode);
 		if (rc) {
 			if (!(mount_crypt_stat->flags
