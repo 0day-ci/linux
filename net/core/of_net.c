@@ -51,7 +51,7 @@ static int of_get_mac_addr(struct device_node *np, const char *name, u8 *addr)
 	struct property *pp = of_find_property(np, name, NULL);
 
 	if (pp && pp->length == ETH_ALEN && is_valid_ether_addr(pp->value)) {
-		memcpy(addr, pp->value, ETH_ALEN);
+		ether_addr_copy(addr, pp->value);
 		return 0;
 	}
 	return -ENODEV;
@@ -68,13 +68,11 @@ static int of_get_mac_addr_nvmem(struct device_node *np, u8 *addr)
 	/* Try lookup by device first, there might be a nvmem_cell_lookup
 	 * associated with a given device.
 	 */
-	if (pdev) {
-		ret = nvmem_get_mac_address(&pdev->dev, addr);
-		put_device(&pdev->dev);
-		return ret;
-	}
+	if (pdev)
+		cell = nvmem_cell_get(&pdev->dev, "mac-address");
+	else
+		cell = of_nvmem_cell_get(np, "mac-address");
 
-	cell = of_nvmem_cell_get(np, "mac-address");
 	if (IS_ERR(cell))
 		return PTR_ERR(cell);
 
@@ -89,8 +87,11 @@ static int of_get_mac_addr_nvmem(struct device_node *np, u8 *addr)
 		return -EINVAL;
 	}
 
-	memcpy(addr, mac, ETH_ALEN);
+	ether_addr_copy(addr, mac);
 	kfree(mac);
+
+	if (pdev)
+		put_device(&pdev->dev);
 
 	return 0;
 }
