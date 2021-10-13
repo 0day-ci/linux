@@ -2518,6 +2518,7 @@ void usb_composite_setup_continue(struct usb_composite_dev *cdev)
 		DBG(cdev, "%s: Completing delayed status\n", __func__);
 		req->length = 0;
 		req->context = cdev;
+		req->complete = composite_setup_complete;
 		value = composite_ep0_queue(cdev, req, GFP_ATOMIC);
 		if (value < 0) {
 			DBG(cdev, "ep_queue --> %d\n", value);
