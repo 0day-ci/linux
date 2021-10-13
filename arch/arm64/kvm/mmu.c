@@ -300,6 +300,22 @@ int kvm_share_hyp(void *from, void *to)
 				 nr_pages);
 }
 
+void kvm_unshare_hyp(void *from, void *to)
+{
+	phys_addr_t start, end;
+	u64 nr_pages;
+
+	if (is_kernel_in_hyp_mode() || kvm_host_owns_hyp_mappings() || !from)
+		return;
+
+	start = ALIGN_DOWN(kvm_kaddr_to_phys(from), PAGE_SIZE);
+	end = PAGE_ALIGN(kvm_kaddr_to_phys(to));
+	nr_pages = (end - start) >> PAGE_SHIFT;
+
+	WARN_ON(kvm_call_hyp_nvhe(__pkvm_host_unshare_hyp, __phys_to_pfn(start),
+				  nr_pages));
+}
+
 /**
  * create_hyp_mappings - duplicate a kernel virtual address range in Hyp mode
  * @from:	The virtual kernel start address of the range

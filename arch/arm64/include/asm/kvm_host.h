@@ -322,6 +322,8 @@ struct kvm_vcpu_arch {
 
 	struct thread_info *host_thread_info;	/* hyp VA */
 	struct user_fpsimd_state *host_fpsimd_state;	/* hyp VA */
+	struct thread_info *kern_thread_info;
+	struct user_fpsimd_state *kern_fpsimd_state;
 
 	struct {
 		/* {Break,watch}point registers */
