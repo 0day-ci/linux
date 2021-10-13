@@ -1617,7 +1617,7 @@ static inline unsigned int blksize_bits(unsigned int size)
 
 static inline unsigned int block_size(struct block_device *bdev)
 {
-	return 1 << bdev->bd_inode->i_blkbits;
+	return 1 << bdev->inode.i_blkbits;
 }
 
 int kblockd_schedule_work(struct work_struct *work);
@@ -1984,9 +1984,13 @@ void blkdev_put_no_open(struct block_device *bdev);
 
 struct block_device *bdev_alloc(struct gendisk *disk, u8 partno);
 void bdev_add(struct block_device *bdev, dev_t dev);
-struct block_device *I_BDEV(struct inode *inode);
 int truncate_bdev_range(struct block_device *bdev, fmode_t mode, loff_t lstart,
 		loff_t lend);
+
+static inline struct block_device *I_BDEV(struct inode *inode)
+{
+	return container_of(inode, struct block_device, inode);
+}
 
 #ifdef CONFIG_BLOCK
 void invalidate_bdev(struct block_device *bdev);

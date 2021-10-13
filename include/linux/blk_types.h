@@ -49,6 +49,7 @@ struct block_device {
 #ifdef CONFIG_FAIL_MAKE_REQUEST
 	bool			bd_make_it_fail;
 #endif
+	struct inode		inode;
 } __randomize_layout;
 
 #define bdev_whole(_bdev) \

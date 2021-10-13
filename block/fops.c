@@ -17,11 +17,6 @@
 #include <linux/fs.h>
 #include "blk.h"
 
-static inline struct inode *bdev_file_inode(struct file *file)
-{
-	return file->f_mapping->host;
-}
-
 static int blkdev_get_block(struct inode *inode, sector_t iblock,
 		struct buffer_head *bh, int create)
 {
@@ -390,7 +385,8 @@ const struct address_space_operations def_blk_aops = {
  */
 static loff_t blkdev_llseek(struct file *file, loff_t offset, int whence)
 {
-	struct inode *bd_inode = bdev_file_inode(file);
+	struct block_device *bdev = file->private_data;
+	struct inode *bd_inode = &bdev->inode;
 	loff_t retval;
 
 	inode_lock(bd_inode);
@@ -446,7 +442,7 @@ static int blkdev_open(struct inode *inode, struct file *filp)
 		return PTR_ERR(bdev);
 
 	filp->private_data = bdev;
-	filp->f_mapping = bdev->bd_inode->i_mapping;
+	filp->f_mapping = bdev->inode.i_mapping;
 	filp->f_wb_err = filemap_sample_wb_err(filp->f_mapping);
 	return 0;
 }
@@ -486,7 +482,7 @@ static long block_ioctl(struct file *file, unsigned cmd, unsigned long arg)
 static ssize_t blkdev_write_iter(struct kiocb *iocb, struct iov_iter *from)
 {
 	struct block_device *bdev = iocb->ki_filp->private_data;
-	struct inode *bd_inode = bdev->bd_inode;
+	struct inode *bd_inode = &bdev->inode;
 	loff_t size = i_size_read(bd_inode);
 	struct blk_plug plug;
 	size_t shorted = 0;
@@ -525,7 +521,7 @@ static ssize_t blkdev_write_iter(struct kiocb *iocb, struct iov_iter *from)
 static ssize_t blkdev_read_iter(struct kiocb *iocb, struct iov_iter *to)
 {
 	struct block_device *bdev = iocb->ki_filp->private_data;
-	loff_t size = i_size_read(bdev->bd_inode);
+	loff_t size = i_size_read(&bdev->inode);
 	loff_t pos = iocb->ki_pos;
 	size_t shorted = 0;
 	ssize_t ret;
@@ -551,8 +547,8 @@ static ssize_t blkdev_read_iter(struct kiocb *iocb, struct iov_iter *to)
 static long blkdev_fallocate(struct file *file, int mode, loff_t start,
 			     loff_t len)
 {
-	struct inode *inode = bdev_file_inode(file);
-	struct block_device *bdev = I_BDEV(inode);
+	struct block_device *bdev = file->private_data;
+	struct inode *inode = &bdev->inode;
 	loff_t end = start + len - 1;
 	loff_t isize;
 	int error;
@@ -562,7 +558,7 @@ static long blkdev_fallocate(struct file *file, int mode, loff_t start,
 		return -EOPNOTSUPP;
 
 	/* Don't go off the end of the device. */
-	isize = i_size_read(bdev->bd_inode);
+	isize = i_size_read(inode);
 	if (start >= isize)
 		return -EINVAL;
 	if (end >= isize) {

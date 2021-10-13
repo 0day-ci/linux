@@ -29,22 +29,6 @@
 #include "../fs/internal.h"
 #include "blk.h"
 
-struct bdev_inode {
-	struct block_device bdev;
-	struct inode vfs_inode;
-};
-
-static inline struct bdev_inode *BDEV_I(struct inode *inode)
-{
-	return container_of(inode, struct bdev_inode, vfs_inode);
-}
-
-struct block_device *I_BDEV(struct inode *inode)
-{
-	return &BDEV_I(inode)->bdev;
-}
-EXPORT_SYMBOL(I_BDEV);
-
 static void bdev_write_inode(struct block_device *bdev)
 {
 	struct inode *inode = bdev->bd_inode;
@@ -388,12 +372,13 @@ static struct kmem_cache * bdev_cachep __read_mostly;
 
 static struct inode *bdev_alloc_inode(struct super_block *sb)
 {
-	struct bdev_inode *ei = kmem_cache_alloc(bdev_cachep, GFP_KERNEL);
+	struct block_device *bdev = kmem_cache_alloc(bdev_cachep, GFP_KERNEL);
 
-	if (!ei)
+	if (!bdev)
 		return NULL;
-	memset(&ei->bdev, 0, sizeof(ei->bdev));
-	return &ei->vfs_inode;
+	memset(bdev, 0, sizeof(*bdev));
+	inode_init_once(&bdev->inode);
+	return &bdev->inode;
 }
 
 static void bdev_free_inode(struct inode *inode)
@@ -412,14 +397,7 @@ static void bdev_free_inode(struct inode *inode)
 	if (MAJOR(bdev->bd_dev) == BLOCK_EXT_MAJOR)
 		blk_free_ext_minor(MINOR(bdev->bd_dev));
 
-	kmem_cache_free(bdev_cachep, BDEV_I(inode));
-}
-
-static void init_once(void *data)
-{
-	struct bdev_inode *ei = data;
-
-	inode_init_once(&ei->vfs_inode);
+	kmem_cache_free(bdev_cachep, bdev);
 }
 
 static void bdev_evict_inode(struct inode *inode)
@@ -461,10 +439,10 @@ void __init bdev_cache_init(void)
 	int err;
 	static struct vfsmount *bd_mnt;
 
-	bdev_cachep = kmem_cache_create("bdev_cache", sizeof(struct bdev_inode),
-			0, (SLAB_HWCACHE_ALIGN|SLAB_RECLAIM_ACCOUNT|
-				SLAB_MEM_SPREAD|SLAB_ACCOUNT|SLAB_PANIC),
-			init_once);
+	bdev_cachep = kmem_cache_create("bdev_cache",
+			sizeof(struct block_device), 0,
+			(SLAB_HWCACHE_ALIGN|SLAB_RECLAIM_ACCOUNT|
+				SLAB_MEM_SPREAD|SLAB_ACCOUNT|SLAB_PANIC), NULL);
 	err = register_filesystem(&bd_type);
 	if (err)
 		panic("Cannot register bdev pseudo-fs");
@@ -743,7 +721,7 @@ struct block_device *blkdev_get_no_open(dev_t dev)
 	}
 
 	/* switch from the inode reference to a device mode one: */
-	bdev = &BDEV_I(inode)->bdev;
+	bdev = I_BDEV(inode);
 	if (!kobject_get_unless_zero(&bdev->bd_device.kobj))
 		bdev = NULL;
 	iput(inode);
