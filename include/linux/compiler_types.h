@@ -179,6 +179,13 @@ struct ftrace_likely_data {
 #define noinline_for_stack noinline
 
 /*
+ * Treat __SANITIZE_HWADDRESS__ the same as __SANITIZE_ADDRESS__ in the kernel
+ */
+#ifdef __SANITIZE_HWADDRESS__
+#define __SANITIZE_ADDRESS__
+#endif
+
+/*
  * Sanitizer helper attributes: Because using __always_inline and
  * __no_sanitize_* conflict, provide helper attributes that will either expand
  * to __no_sanitize_* in compilation units where instrumentation is enabled
