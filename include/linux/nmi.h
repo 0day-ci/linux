@@ -118,6 +118,15 @@ static inline int hardlockup_detector_perf_init(void) { return 0; }
 
 void watchdog_nmi_stop(void);
 void watchdog_nmi_start(void);
+
+enum hld_detector_state {
+	DELAY_INIT_NOP,
+	DELAY_INIT_WAIT,
+	DELAY_INIT_READY
+};
+
+extern enum hld_detector_state detector_delay_init_state;
+extern struct wait_queue_head hld_detector_wait;
 int watchdog_nmi_probe(void);
 void watchdog_nmi_enable(unsigned int cpu);
 void watchdog_nmi_disable(unsigned int cpu);

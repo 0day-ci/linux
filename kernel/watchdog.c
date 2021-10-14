@@ -103,7 +103,11 @@ void __weak watchdog_nmi_disable(unsigned int cpu)
 	hardlockup_detector_perf_disable();
 }
 
-/* Return 0, if a NMI watchdog is available. Error code otherwise */
+/*
+ * Arch specific API. Return 0, if a NMI watchdog is available. -EBUSY if not
+ * ready, and arch code should wake up hld_detector_wait when ready. Other
+ * negative value if not support.
+ */
 int __weak __init watchdog_nmi_probe(void)
 {
 	return hardlockup_detector_perf_init();
@@ -739,15 +743,64 @@ int proc_watchdog_cpumask(struct ctl_table *table, int write,
 }
 #endif /* CONFIG_SYSCTL */
 
+static void lockup_detector_delay_init(struct work_struct *work);
+enum hld_detector_state detector_delay_init_state __initdata;
+
+struct wait_queue_head hld_detector_wait __initdata =
+		__WAIT_QUEUE_HEAD_INITIALIZER(hld_detector_wait);
+
+static struct work_struct detector_work __initdata =
+		__WORK_INITIALIZER(detector_work, lockup_detector_delay_init);
+
+static void __init lockup_detector_delay_init(struct work_struct *work)
+{
+	int ret;
+
+	wait_event(hld_detector_wait,
+			detector_delay_init_state == DELAY_INIT_READY);
+	ret = watchdog_nmi_probe();
+	if (!ret) {
+		nmi_watchdog_available = true;
+		lockup_detector_setup();
+	} else {
+		WARN_ON(ret == -EBUSY);
+		pr_info("Perf NMI watchdog permanently disabled\n");
+	}
+}
+
+/* Ensure the check is called after the initialization of PMU driver */
+static int __init lockup_detector_check(void)
+{
+	if (detector_delay_init_state < DELAY_INIT_WAIT)
+		return 0;
+
+	if (WARN_ON(detector_delay_init_state == DELAY_INIT_WAIT)) {
+		detector_delay_init_state = DELAY_INIT_READY;
+		wake_up(&hld_detector_wait);
+	}
+	flush_work(&detector_work);
+	return 0;
+}
+late_initcall_sync(lockup_detector_check);
+
+
 void __init lockup_detector_init(void)
 {
+	int ret;
+
 	if (tick_nohz_full_enabled())
 		pr_info("Disabling watchdog on nohz_full cores by default\n");
 
 	cpumask_copy(&watchdog_cpumask,
 		     housekeeping_cpumask(HK_FLAG_TIMER));
 
-	if (!watchdog_nmi_probe())
+	ret = watchdog_nmi_probe();
+	if (!ret)
 		nmi_watchdog_available = true;
+	else if (ret == -EBUSY) {
+		detector_delay_init_state = DELAY_INIT_WAIT;
+		queue_work_on(smp_processor_id(), system_wq, &detector_work);
+	}
+
 	lockup_detector_setup();
 }
