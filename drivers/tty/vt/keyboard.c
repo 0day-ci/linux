@@ -1140,6 +1140,31 @@ static unsigned char getledstate(void)
 	return ledstate & 0xff;
 }
 
+void update_value_ledstate(unsigned int flag, unsigned int value)
+{
+	unsigned int bit;
+
+	switch (flag) {
+	case LED_NUML:
+		bit = VC_NUMLOCK;
+		break;
+	case LED_CAPSL:
+		bit = VC_CAPSLOCK;
+		break;
+	case LED_SCROLLL:
+		bit = VC_SCROLLOCK;
+		break;
+	default:
+		WARN_ON_ONCE(1);
+		return;
+	}
+
+	if (value)
+		ledstate |= BIT(bit);
+	else
+		ledstate &= ~BIT(bit);
+}
+
 void setledstate(struct kbd_struct *kb, unsigned int led)
 {
         unsigned long flags;
@@ -1249,6 +1274,10 @@ static void kbd_bh(struct tasklet_struct *unused)
 {
 	unsigned int leds;
 	unsigned long flags;
+	struct kbd_struct *kb = kbd_table + fg_console;
+
+	if (kb->kbdmode == VC_OFF)
+		return;
 
 	spin_lock_irqsave(&led_lock, flags);
 	leds = getleds();
@@ -1257,7 +1286,6 @@ static void kbd_bh(struct tasklet_struct *unused)
 
 	if (leds != ledstate) {
 		kbd_propagate_led_state(ledstate, leds);
-		ledstate = leds;
 	}
 }
 
