@@ -169,10 +169,19 @@
 			compatible = "fsl,mpc5121-psc-uart", "fsl,mpc5121-psc";
 		};
 
-		psc@11900 {
+		/delete-node/ psc@11900;
+
+		spi@11900 {
 			compatible = "fsl,mpc5121-psc-spi", "fsl,mpc5121-psc";
+			reg = <0x11900 0x100>;
 			#address-cells = <1>;
 			#size-cells = <0>;
+			interrupts = <40 0x8>;
+			fsl,rx-fifo-size = <16>;
+			fsl,tx-fifo-size = <16>;
+			clocks = <&clks MPC512x_CLK_PSC9>,
+				 <&clks MPC512x_CLK_PSC9_MCLK>;
+			clock-names = "ipg", "mclk";
 
 			/* ADS7845 touch screen controller */
 			ts@0 {

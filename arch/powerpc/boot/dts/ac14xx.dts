@@ -301,13 +301,21 @@
 			fsl,tx-fifo-size = <512>;
 		};
 
+		/delete-node/ psc@11400;
+		/delete-node/ psc@11500;
+
 		/* PSC4 in SPI mode */
-		spi4: psc@11400 {
+		spi4: spi@11400 {
 			compatible = "fsl,mpc5121-psc-spi", "fsl,mpc5121-psc";
+			reg = <0x11400 0x100>;
 			fsl,rx-fifo-size = <768>;
 			fsl,tx-fifo-size = <768>;
 			#address-cells = <1>;
 			#size-cells = <0>;
+			interrupts = <40 0x8>;
+			clocks = <&clks MPC512x_CLK_PSC4>,
+				 <&clks MPC512x_CLK_PSC4_MCLK>;
+			clock-names = "ipg", "mclk";
 			num-cs = <1>;
 			cs-gpios = <&gpio_pic 25 0>;
 
@@ -326,13 +334,18 @@
 		};
 
 		/* PSC5 in SPI mode */
-		spi5: psc@11500 {
+		spi5: spi@11500 {
 			compatible = "fsl,mpc5121-psc-spi", "fsl,mpc5121-psc";
+			reg = <0x11500 0x100>;
 			fsl,mode = "spi-master";
 			fsl,rx-fifo-size = <128>;
 			fsl,tx-fifo-size = <128>;
 			#address-cells = <1>;
 			#size-cells = <0>;
+			interrupts = <40 0x8>;
+			clocks = <&clks MPC512x_CLK_PSC5>,
+				 <&clks MPC512x_CLK_PSC5_MCLK>;
+			clock-names = "ipg", "mclk";
 
 			lcd@0 {
 				compatible = "ilitek,ili922x";
