@@ -70,6 +70,11 @@ typedef struct {
 } func_desc_t;
 #endif
 
+static inline bool have_function_descriptors(void)
+{
+	return __is_defined(HAVE_FUNCTION_DESCRIPTORS);
+}
+
 /* random extra sections (if any).  Override
  * in asm/sections.h */
 #ifndef arch_is_kernel_text

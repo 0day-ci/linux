@@ -44,19 +44,32 @@ static noinline void do_overwritten(void)
 	return;
 }
 
+static void *setup_function_descriptor(func_desc_t *fdesc, void *dst)
+{
+	memcpy(fdesc, do_nothing, sizeof(*fdesc));
+	fdesc->addr = (unsigned long)dst;
+	barrier();
+
+	return fdesc;
+}
+
 static noinline void execute_location(void *dst, bool write)
 {
 	void (*func)(void) = dst;
+	func_desc_t fdesc;
+	void *do_nothing_text = dereference_function_descriptor(do_nothing);
 
-	pr_info("attempting ok execution at %px\n", do_nothing);
+	pr_info("attempting ok execution at %px\n", do_nothing_text);
 	do_nothing();
 
 	if (write == CODE_WRITE) {
-		memcpy(dst, do_nothing, EXEC_SIZE);
+		memcpy(dst, do_nothing_text, EXEC_SIZE);
 		flush_icache_range((unsigned long)dst,
 				   (unsigned long)dst + EXEC_SIZE);
 	}
 	pr_info("attempting bad execution at %px\n", func);
+	if (have_function_descriptors())
+		func = setup_function_descriptor(&fdesc, dst);
 	func();
 	pr_err("FAIL: func returned\n");
 }
@@ -67,15 +80,19 @@ static void execute_user_location(void *dst)
 
 	/* Intentionally crossing kernel/user memory boundary. */
 	void (*func)(void) = dst;
+	func_desc_t fdesc;
+	void *do_nothing_text = dereference_function_descriptor(do_nothing);
 
-	pr_info("attempting ok execution at %px\n", do_nothing);
+	pr_info("attempting ok execution at %px\n", do_nothing_text);
 	do_nothing();
 
-	copied = access_process_vm(current, (unsigned long)dst, do_nothing,
+	copied = access_process_vm(current, (unsigned long)dst, do_nothing_text,
 				   EXEC_SIZE, FOLL_WRITE);
 	if (copied < EXEC_SIZE)
 		return;
 	pr_info("attempting bad execution at %px\n", func);
+	if (have_function_descriptors())
+		func = setup_function_descriptor(&fdesc, dst);
 	func();
 	pr_err("FAIL: func returned\n");
 }
