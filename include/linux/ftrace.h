@@ -1062,4 +1062,10 @@ unsigned long arch_syscall_addr(int nr);
 
 #endif /* CONFIG_FTRACE_SYSCALLS */
 
+#ifdef CONFIG_TRACE_OBJECT
+int init_trace_object(void);
+int exit_trace_object(void);
+void set_trace_object(void *obj);
+#endif
+
 #endif /* _LINUX_FTRACE_H */

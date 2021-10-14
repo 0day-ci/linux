@@ -1349,6 +1349,9 @@ retry:
 		break;
 	case FETCH_OP_RETVAL:
 		val = regs_return_value(regs);
+#ifdef CONFIG_TRACE_OBJECT
+		set_trace_object((void *)val);
+#endif
 		break;
 	case FETCH_OP_IMM:
 		val = code->immediate;
@@ -1362,6 +1365,9 @@ retry:
 #ifdef CONFIG_HAVE_FUNCTION_ARG_ACCESS_API
 	case FETCH_OP_ARG:
 		val = regs_get_kernel_argument(regs, code->param);
+#ifdef CONFIG_TRACE_OBJECT
+		set_trace_object((void *)val);
+#endif
 		break;
 #endif
 	case FETCH_NOP_SYMBOL:	/* Ignore a place holder */

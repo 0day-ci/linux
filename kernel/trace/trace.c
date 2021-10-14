@@ -9396,6 +9396,70 @@ static __init void create_trace_instances(struct dentry *d_tracer)
 	mutex_unlock(&event_mutex);
 }
 
+#if defined(CONFIG_TRACE_OBJECT)
+
+static DEFINE_MUTEX(trace_object_lock);
+static int trace_object_enabled __read_mostly;
+
+static ssize_t
+trace_object_read(struct file *filp, char __user *ubuf,
+		size_t cnt, loff_t *ppos)
+{
+	char buf[64];
+	int r;
+
+	r = sprintf(buf, "%u\n", trace_object_enabled);
+	return simple_read_from_buffer(ubuf, cnt, ppos, buf, r);
+}
+
+static ssize_t
+trace_object_write(struct file *filp, const char __user *ubuf,
+		size_t cnt, loff_t *ppos)
+{
+	unsigned long val;
+	int ret;
+
+	ret = kstrtoul_from_user(ubuf, cnt, 10, &val);
+	if (ret)
+		return ret;
+
+	val = !!val;
+
+	mutex_lock(&trace_object_lock);
+	if (trace_object_enabled ^ val) {
+		if (val) {
+			ret = init_trace_object();
+			if (ret < 0) {
+				cnt = ret;
+				goto out;
+			}
+
+			trace_object_enabled = 1;
+		} else {
+			ret = exit_trace_object();
+			if (ret < 0) {
+				cnt = ret;
+				goto out;
+			}
+
+			trace_object_enabled = 0;
+		}
+	}
+out:
+	mutex_unlock(&trace_object_lock);
+	*ppos += cnt;
+	return cnt;
+}
+
+static const struct file_operations trace_object_fops = {
+	.open           = tracing_open_generic,
+	.read           = trace_object_read,
+	.write          = trace_object_write,
+	.llseek         = default_llseek,
+};
+
+#endif
+
 static void
 init_tracer_tracefs(struct trace_array *tr, struct dentry *d_tracer)
 {
@@ -9459,6 +9523,11 @@ init_tracer_tracefs(struct trace_array *tr, struct dentry *d_tracer)
 
 #if defined(CONFIG_TRACER_MAX_TRACE) || defined(CONFIG_HWLAT_TRACER)
 	trace_create_maxlat_file(tr, d_tracer);
+#endif
+
+#if defined(CONFIG_TRACE_OBJECT)
+	trace_create_file("trace_object", 0644, d_tracer, tr,
+			&trace_object_fops);
 #endif
 
 	if (ftrace_create_function_files(tr, d_tracer))
