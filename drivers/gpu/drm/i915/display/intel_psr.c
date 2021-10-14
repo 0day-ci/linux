@@ -68,7 +68,7 @@
  *
  * DC3CO (DC3 clock off)
  *
- * On top of PSR2, GEN12 adds a intermediate power savings state that turns
+ * On top of PSR2, Display 12 adds a intermediate power savings state that turns
  * clock off automatically during PSR2 idle state.
  * The smaller overhead of DC3co entry/exit vs. the overhead of PSR2 deep sleep
  * entry/exit allows the HW to enter a low-power state even when page flipping
@@ -117,9 +117,9 @@ static void psr_irq_control(struct intel_dp *intel_dp)
 	u32 mask, val;
 
 	/*
-	 * gen12+ has registers relative to transcoder and one per transcoder
-	 * using the same bit definition: handle it as TRANSCODER_EDP to force
-	 * 0 shift in bit definition
+	 * Display 12 and newer platforms have registers relative to transcoder
+	 * and one per transcoder using the same bit definition: handle it as
+	 * TRANSCODER_EDP to force 0 shift in bit definition.
 	 */
 	if (DISPLAY_VER(dev_priv) >= 12) {
 		trans_shift = 0;
@@ -2193,7 +2193,7 @@ void intel_psr_init(struct intel_dp *intel_dp)
 	 * than eDP one.
 	 * For now it only supports one instance of PSR for BDW, GEN9 and GEN11.
 	 * So lets keep it hardcoded to PORT_A for BDW, GEN9 and GEN11.
-	 * But GEN12 supports a instance of PSR registers per transcoder.
+	 * But Display 12 supports a instance of PSR registers per transcoder.
 	 */
 	if (DISPLAY_VER(dev_priv) < 12 && dig_port->base.port != PORT_A) {
 		drm_dbg_kms(&dev_priv->drm,

@@ -2188,7 +2188,7 @@ static int initialize_hdcp_port_data(struct intel_connector *connector,
 	/*
 	 * As associated transcoder is set and modified at modeset, here fw_tc
 	 * is initialized to zero (invalid transcoder index). This will be
-	 * retained for <Gen12 forever.
+	 * retained forever for platforms older than Display 12.
 	 */
 	data->fw_tc = MEI_INVALID_TRANSCODER;
 

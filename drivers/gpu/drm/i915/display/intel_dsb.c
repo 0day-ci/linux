@@ -18,7 +18,7 @@
  * engine that can be programmed to download the DSB from memory.
  * It allows driver to batch submit display HW programming. This helps to
  * reduce loading time and CPU activity, thereby making the context switch
- * faster. DSB Support added from Gen12 Intel graphics based platform.
+ * faster. DSB Support is introduced on Display Version 12.
  *
  * DSB's can access only the pipe, plane, and transcoder Data Island Packet
  * registers.

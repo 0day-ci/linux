@@ -5287,7 +5287,7 @@ static void icl_mbus_init(struct drm_i915_private *dev_priv)
 		MBUS_ABOX_BW_CREDIT(1);
 
 	/*
-	 * gen12 platforms that use abox1 and abox2 for pixel data reads still
+	 * Display 12 platforms using abox1 and abox2 for pixel data reads still
 	 * expect us to program the abox_ctl0 register as well, even though
 	 * we don't have to program other instance-0 registers like BW_BUDDY.
 	 */
