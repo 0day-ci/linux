@@ -3820,7 +3820,28 @@ fec_probe(struct platform_device *pdev)
 		goto failed_stop_mode;
 
 	phy_node = of_parse_phandle(np, "phy-handle", 0);
-	if (!phy_node && of_phy_is_fixed_link(np)) {
+	if (phy_node) {
+		struct device_node *mdio_parent =
+			of_get_next_parent(of_get_parent(phy_node));
+
+		ret = 0;
+
+		/* Skip PHY availability check for our own MDIO bus to avoid
+		 * cyclic dependency
+		 */
+		if (mdio_parent != np) {
+			struct phy_device *phy = of_phy_find_device(phy_node);
+
+			if (phy)
+				put_device(&phy->mdio.dev);
+			else
+				ret = -EPROBE_DEFER;
+		}
+
+		of_node_put(mdio_parent);
+		if (ret)
+			goto failed_phy;
+	} else if (of_phy_is_fixed_link(np)) {
 		ret = of_phy_register_fixed_link(np);
 		if (ret < 0) {
 			dev_err(&pdev->dev,
