@@ -11,6 +11,7 @@
 #include <linux/uaccess.h>
 
 #define HAVE_FUNCTION_DESCRIPTORS 1
+typedef struct fdesc func_desc_t;
 
 #include <asm-generic/sections.h>
 

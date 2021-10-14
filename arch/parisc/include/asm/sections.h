@@ -3,7 +3,9 @@
 #define _PARISC_SECTIONS_H
 
 #ifdef CONFIG_64BIT
+#include <asm/elf.h>
 #define HAVE_FUNCTION_DESCRIPTORS 1
+typedef Elf64_Fdesc func_desc_t;
 #endif
 
 /* nothing to see, move along */

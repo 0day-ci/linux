@@ -10,6 +10,7 @@
 
 #ifdef PPC64_ELF_ABI_v1
 #define HAVE_FUNCTION_DESCRIPTORS 1
+typedef struct ppc64_opd_entry func_desc_t;
 #endif
 
 #include <asm-generic/sections.h>
