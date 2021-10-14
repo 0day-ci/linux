@@ -154,6 +154,7 @@ static inline void nf_hook_state_init(struct nf_hook_state *p,
 {
 	p->hook = hook;
 	p->pf = pf;
+	p->hook_index = 0;
 	p->in = indev;
 	p->out = outdev;
 	p->sk = sk;
@@ -198,7 +199,7 @@ extern struct static_key nf_hooks_needed[NFPROTO_NUMPROTO][NF_MAX_HOOKS];
 #endif
 
 int nf_hook_slow(struct sk_buff *skb, struct nf_hook_state *state,
-		 const struct nf_hook_entries *e, unsigned int i);
+		 const struct nf_hook_entries *e);
 
 void nf_hook_slow_list(struct list_head *head, struct nf_hook_state *state,
 		       const struct nf_hook_entries *e);
@@ -260,7 +261,7 @@ static inline int nf_hook(u_int8_t pf, unsigned int hook, struct net *net,
 		nf_hook_state_init(&state, hook, pf, indev, outdev,
 				   sk, net, okfn);
 
-		ret = nf_hook_slow(skb, &state, hook_head, 0);
+		ret = nf_hook_slow(skb, &state, hook_head);
 	}
 	rcu_read_unlock();
 

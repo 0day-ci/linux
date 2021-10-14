@@ -1020,7 +1020,8 @@ int br_nf_hook_thresh(unsigned int hook, struct net *net,
 	nf_hook_state_init(&state, hook, NFPROTO_BRIDGE, indev, outdev,
 			   sk, net, okfn);
 
-	ret = nf_hook_slow(skb, &state, e, i);
+	state.hook_index = i;
+	ret = nf_hook_slow(skb, &state, e);
 	if (ret == 1)
 		ret = okfn(net, sk, skb);
 

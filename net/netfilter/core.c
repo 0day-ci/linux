@@ -580,9 +580,9 @@ EXPORT_SYMBOL(nf_unregister_net_hooks);
 /* Returns 1 if okfn() needs to be executed by the caller,
  * -EPERM for NF_DROP, 0 otherwise.  Caller must hold rcu_read_lock. */
 int nf_hook_slow(struct sk_buff *skb, struct nf_hook_state *state,
-		 const struct nf_hook_entries *e, unsigned int s)
+		 const struct nf_hook_entries *e)
 {
-	unsigned int verdict;
+	unsigned int verdict, s = state->hook_index;
 	int ret;
 
 	for (; s < e->num_hook_entries; s++) {
@@ -625,7 +625,7 @@ void nf_hook_slow_list(struct list_head *head, struct nf_hook_state *state,
 
 	list_for_each_entry_safe(skb, next, head, list) {
 		skb_list_del_init(skb);
-		ret = nf_hook_slow(skb, state, e, 0);
+		ret = nf_hook_slow(skb, state, e);
 		if (ret == 1)
 			list_add_tail(&skb->list, &sublist);
 	}
