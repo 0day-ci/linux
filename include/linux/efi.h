@@ -550,6 +550,7 @@ extern struct efi {
 	unsigned long			tpm_log;		/* TPM2 Event Log table */
 	unsigned long			tpm_final_log;		/* TPM2 Final Events Log table */
 	unsigned long			mokvar_table;		/* MOK variable config table */
+	unsigned long			coco_secret;		/* Confidential computing secret table */
 
 	efi_get_time_t			*get_time;
 	efi_set_time_t			*set_time;
@@ -1188,6 +1189,8 @@ struct efi_tcg2_final_events_table {
 extern int efi_tpm_final_log_size;
 
 extern unsigned long rci2_table_phys;
+
+extern int efi_coco_secret_area_reserve(void);
 
 /*
  * efi_runtime_service() function identifiers.
