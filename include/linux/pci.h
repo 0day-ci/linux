@@ -508,6 +508,7 @@ struct pci_dev {
 
 	/* These methods index pci_reset_fn_methods[] */
 	u8 reset_methods[PCI_NUM_RESET_METHODS]; /* In priority order */
+	u8 ignore_reset; /* ignore reset control in driver */
 };
 
 static inline struct pci_dev *pci_physfn(struct pci_dev *dev)

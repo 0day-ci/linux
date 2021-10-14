@@ -255,6 +255,30 @@ static ssize_t ari_enabled_show(struct device *dev,
 }
 static DEVICE_ATTR_RO(ari_enabled);
 
+static ssize_t ignore_reset_show(struct device *dev,
+		struct device_attribute *attr,
+		char *buf)
+{
+	struct pci_dev *pci_dev = to_pci_dev(dev);
+
+	return sprintf(buf, "%u\n", pci_dev->ignore_reset);
+}
+static ssize_t ignore_reset_store(struct device *dev,
+		struct device_attribute *attr,
+		const char *buf, size_t count)
+{
+	struct pci_dev *pdev = to_pci_dev(dev);
+	unsigned long val;
+
+	if (kstrtoul(buf, 0, &val) < 0)
+		return -EINVAL;
+
+	pdev->ignore_reset = !!val;
+
+	return count;
+}
+static DEVICE_ATTR_RW(ignore_reset);
+
 static ssize_t modalias_show(struct device *dev, struct device_attribute *attr,
 			     char *buf)
 {
@@ -617,6 +641,7 @@ static struct attribute *pci_dev_attrs[] = {
 #endif
 	&dev_attr_driver_override.attr,
 	&dev_attr_ari_enabled.attr,
+	&dev_attr_ignore_reset.attr,
 	NULL,
 };
 
