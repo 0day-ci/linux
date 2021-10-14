@@ -13,7 +13,6 @@ struct nf_queue_entry {
 	struct list_head	list;
 	struct sk_buff		*skb;
 	unsigned int		id;
-	unsigned int		hook_index;	/* index in hook_entries->hook[] */
 #if IS_ENABLED(CONFIG_BRIDGE_NETFILTER)
 	struct net_device	*physin;
 	struct net_device	*physout;
@@ -125,6 +124,6 @@ nfqueue_hash(const struct sk_buff *skb, u16 queue, u16 queues_total, u8 family,
 }
 
 int nf_queue(struct sk_buff *skb, struct nf_hook_state *state,
-	     unsigned int index, unsigned int verdict);
+	     unsigned int verdict);
 
 #endif /* _NF_QUEUE_H */

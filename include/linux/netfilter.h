@@ -67,6 +67,7 @@ struct sock;
 struct nf_hook_state {
 	u8 hook;
 	u8 pf;
+	u16 hook_index; /* index in hook_entries->hook[] */
 	struct net_device *in;
 	struct net_device *out;
 	struct sock *sk;

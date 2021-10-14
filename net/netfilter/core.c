@@ -597,7 +597,8 @@ int nf_hook_slow(struct sk_buff *skb, struct nf_hook_state *state,
 				ret = -EPERM;
 			return ret;
 		case NF_QUEUE:
-			ret = nf_queue(skb, state, s, verdict);
+			state->hook_index = s;
+			ret = nf_queue(skb, state, verdict);
 			if (ret == 1)
 				continue;
 			return ret;
@@ -752,6 +753,9 @@ static struct pernet_operations netfilter_net_ops = {
 int __init netfilter_init(void)
 {
 	int ret;
+
+	/* state->index */
+	BUILD_BUG_ON(MAX_HOOK_COUNT > USHRT_MAX);
 
 	ret = register_pernet_subsys(&netfilter_net_ops);
 	if (ret < 0)

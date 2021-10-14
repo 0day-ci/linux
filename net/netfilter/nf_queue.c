@@ -145,7 +145,7 @@ static void nf_ip6_saveroute(const struct sk_buff *skb,
 }
 
 static int __nf_queue(struct sk_buff *skb, const struct nf_hook_state *state,
-		      unsigned int index, unsigned int queuenum)
+		      unsigned int queuenum)
 {
 	struct nf_queue_entry *entry = NULL;
 	const struct nf_queue_handler *qh;
@@ -181,7 +181,6 @@ static int __nf_queue(struct sk_buff *skb, const struct nf_hook_state *state,
 	*entry = (struct nf_queue_entry) {
 		.skb	= skb,
 		.state	= *state,
-		.hook_index = index,
 		.size	= sizeof(*entry) + route_key_size,
 	};
 
@@ -209,11 +208,11 @@ static int __nf_queue(struct sk_buff *skb, const struct nf_hook_state *state,
 
 /* Packets leaving via this function must come back through nf_reinject(). */
 int nf_queue(struct sk_buff *skb, struct nf_hook_state *state,
-	     unsigned int index, unsigned int verdict)
+	     unsigned int verdict)
 {
 	int ret;
 
-	ret = __nf_queue(skb, state, index, verdict >> NF_VERDICT_QBITS);
+	ret = __nf_queue(skb, state, verdict >> NF_VERDICT_QBITS);
 	if (ret < 0) {
 		if (ret == -ESRCH &&
 		    (verdict & NF_VERDICT_FLAG_QUEUE_BYPASS))
@@ -285,7 +284,7 @@ void nf_reinject(struct nf_queue_entry *entry, unsigned int verdict)
 
 	hooks = nf_hook_entries_head(net, pf, entry->state.hook);
 
-	i = entry->hook_index;
+	i = entry->state.hook_index;
 	if (WARN_ON_ONCE(!hooks || i >= hooks->num_hook_entries)) {
 		kfree_skb(skb);
 		nf_queue_entry_free(entry);
@@ -317,7 +316,8 @@ next_hook:
 		local_bh_enable();
 		break;
 	case NF_QUEUE:
-		err = nf_queue(skb, &entry->state, i, verdict);
+		entry->state.hook_index = i;
+		err = nf_queue(skb, &entry->state, verdict);
 		if (err == 1)
 			goto next_hook;
 		break;
