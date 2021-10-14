@@ -11,16 +11,15 @@
 #include <net/netfilter/nf_tables_ipv6.h>
 
 #ifdef CONFIG_NF_TABLES_IPV4
-static unsigned int nft_do_chain_ipv4(void *priv,
-				      struct sk_buff *skb,
-				      const struct nf_hook_state *state)
+static unsigned int nft_do_chain_ipv4(const struct nf_hook_state *state)
 {
+	struct sk_buff *skb = state->skb;
 	struct nft_pktinfo pkt;
 
 	nft_set_pktinfo(&pkt, skb, state);
 	nft_set_pktinfo_ipv4(&pkt);
 
-	return nft_do_chain(&pkt, priv);
+	return nft_do_chain(&pkt, state->priv);
 }
 
 static const struct nft_chain_type nft_chain_filter_ipv4 = {
@@ -56,15 +55,15 @@ static inline void nft_chain_filter_ipv4_fini(void) {}
 #endif /* CONFIG_NF_TABLES_IPV4 */
 
 #ifdef CONFIG_NF_TABLES_ARP
-static unsigned int nft_do_chain_arp(void *priv, struct sk_buff *skb,
-				     const struct nf_hook_state *state)
+static unsigned int nft_do_chain_arp(const struct nf_hook_state *state)
 {
+	struct sk_buff *skb = state->skb;
 	struct nft_pktinfo pkt;
 
 	nft_set_pktinfo(&pkt, skb, state);
 	nft_set_pktinfo_unspec(&pkt);
 
-	return nft_do_chain(&pkt, priv);
+	return nft_do_chain(&pkt, state->priv);
 }
 
 static const struct nft_chain_type nft_chain_filter_arp = {
@@ -95,16 +94,15 @@ static inline void nft_chain_filter_arp_fini(void) {}
 #endif /* CONFIG_NF_TABLES_ARP */
 
 #ifdef CONFIG_NF_TABLES_IPV6
-static unsigned int nft_do_chain_ipv6(void *priv,
-				      struct sk_buff *skb,
-				      const struct nf_hook_state *state)
+static unsigned int nft_do_chain_ipv6(const struct nf_hook_state *state)
 {
+	struct sk_buff *skb = state->skb;
 	struct nft_pktinfo pkt;
 
 	nft_set_pktinfo(&pkt, skb, state);
 	nft_set_pktinfo_ipv6(&pkt);
 
-	return nft_do_chain(&pkt, priv);
+	return nft_do_chain(&pkt, state->priv);
 }
 
 static const struct nft_chain_type nft_chain_filter_ipv6 = {
@@ -140,9 +138,9 @@ static inline void nft_chain_filter_ipv6_fini(void) {}
 #endif /* CONFIG_NF_TABLES_IPV6 */
 
 #ifdef CONFIG_NF_TABLES_INET
-static unsigned int nft_do_chain_inet(void *priv, struct sk_buff *skb,
-				      const struct nf_hook_state *state)
+static unsigned int nft_do_chain_inet(const struct nf_hook_state *state)
 {
+	struct sk_buff *skb = state->skb;
 	struct nft_pktinfo pkt;
 
 	nft_set_pktinfo(&pkt, skb, state);
@@ -158,13 +156,13 @@ static unsigned int nft_do_chain_inet(void *priv, struct sk_buff *skb,
 		break;
 	}
 
-	return nft_do_chain(&pkt, priv);
+	return nft_do_chain(&pkt, state->priv);
 }
 
-static unsigned int nft_do_chain_inet_ingress(void *priv, struct sk_buff *skb,
-					      const struct nf_hook_state *state)
+static unsigned int nft_do_chain_inet_ingress(const struct nf_hook_state *state)
 {
 	struct nf_hook_state ingress_state = *state;
+	struct sk_buff *skb = state->skb;
 	struct nft_pktinfo pkt;
 
 	switch (skb->protocol) {
@@ -189,7 +187,7 @@ static unsigned int nft_do_chain_inet_ingress(void *priv, struct sk_buff *skb,
 		return NF_ACCEPT;
 	}
 
-	return nft_do_chain(&pkt, priv);
+	return nft_do_chain(&pkt, state->priv);
 }
 
 static const struct nft_chain_type nft_chain_filter_inet = {
@@ -228,10 +226,9 @@ static inline void nft_chain_filter_inet_fini(void) {}
 
 #if IS_ENABLED(CONFIG_NF_TABLES_BRIDGE)
 static unsigned int
-nft_do_chain_bridge(void *priv,
-		    struct sk_buff *skb,
-		    const struct nf_hook_state *state)
+nft_do_chain_bridge(const struct nf_hook_state *state)
 {
+	struct sk_buff *skb = state->skb;
 	struct nft_pktinfo pkt;
 
 	nft_set_pktinfo(&pkt, skb, state);
@@ -248,7 +245,7 @@ nft_do_chain_bridge(void *priv,
 		break;
 	}
 
-	return nft_do_chain(&pkt, priv);
+	return nft_do_chain(&pkt, state->priv);
 }
 
 static const struct nft_chain_type nft_chain_filter_bridge = {
@@ -284,14 +281,13 @@ static inline void nft_chain_filter_bridge_fini(void) {}
 #endif /* CONFIG_NF_TABLES_BRIDGE */
 
 #ifdef CONFIG_NF_TABLES_NETDEV
-static unsigned int nft_do_chain_netdev(void *priv, struct sk_buff *skb,
-					const struct nf_hook_state *state)
+static unsigned int nft_do_chain_netdev(const struct nf_hook_state *state)
 {
 	struct nft_pktinfo pkt;
 
-	nft_set_pktinfo(&pkt, skb, state);
+	nft_set_pktinfo(&pkt, state->skb, state);
 
-	switch (skb->protocol) {
+	switch (state->skb->protocol) {
 	case htons(ETH_P_IP):
 		nft_set_pktinfo_ipv4_validate(&pkt);
 		break;
@@ -303,7 +299,7 @@ static unsigned int nft_do_chain_netdev(void *priv, struct sk_buff *skb,
 		break;
 	}
 
-	return nft_do_chain(&pkt, priv);
+	return nft_do_chain(&pkt, state->priv);
 }
 
 static const struct nft_chain_type nft_chain_filter_netdev = {

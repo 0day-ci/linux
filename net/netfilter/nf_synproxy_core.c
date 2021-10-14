@@ -659,10 +659,10 @@ synproxy_recv_client_ack(struct net *net,
 EXPORT_SYMBOL_GPL(synproxy_recv_client_ack);
 
 unsigned int
-ipv4_synproxy_hook(void *priv, struct sk_buff *skb,
-		   const struct nf_hook_state *nhs)
+ipv4_synproxy_hook(const struct nf_hook_state *nhs)
 {
 	struct net *net = nhs->net;
+	struct sk_buff *skb = nhs->skb;
 	struct synproxy_net *snet = synproxy_pernet(net);
 	enum ip_conntrack_info ctinfo;
 	struct nf_conn *ct;
@@ -1076,9 +1076,9 @@ synproxy_recv_client_ack_ipv6(struct net *net,
 EXPORT_SYMBOL_GPL(synproxy_recv_client_ack_ipv6);
 
 unsigned int
-ipv6_synproxy_hook(void *priv, struct sk_buff *skb,
-		   const struct nf_hook_state *nhs)
+ipv6_synproxy_hook(const struct nf_hook_state *nhs)
 {
+	struct sk_buff *skb = nhs->skb;
 	struct net *net = nhs->net;
 	struct synproxy_net *snet = synproxy_pernet(net);
 	enum ip_conntrack_info ctinfo;

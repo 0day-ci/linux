@@ -236,10 +236,10 @@ static int nf_ct_br_ipv6_check(const struct sk_buff *skb)
 	return 0;
 }
 
-static unsigned int nf_ct_bridge_pre(void *priv, struct sk_buff *skb,
-				     const struct nf_hook_state *state)
+static unsigned int nf_ct_bridge_pre(const struct nf_hook_state *state)
 {
 	struct nf_hook_state bridge_state = *state;
+	struct sk_buff *skb = state->skb;
 	enum ip_conntrack_info ctinfo;
 	struct nf_conn *ct;
 	u32 len;
@@ -395,9 +395,9 @@ static unsigned int nf_ct_bridge_confirm(struct sk_buff *skb)
 	return nf_confirm(skb, protoff, ct, ctinfo);
 }
 
-static unsigned int nf_ct_bridge_post(void *priv, struct sk_buff *skb,
-				      const struct nf_hook_state *state)
+static unsigned int nf_ct_bridge_post(const struct nf_hook_state *state)
 {
+	struct sk_buff *skb = state->skb;
 	int ret;
 
 	ret = nf_ct_bridge_confirm(skb);

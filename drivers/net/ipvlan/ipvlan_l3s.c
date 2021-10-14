@@ -90,9 +90,9 @@ static const struct l3mdev_ops ipvl_l3mdev_ops = {
 	.l3mdev_l3_rcv = ipvlan_l3_rcv,
 };
 
-static unsigned int ipvlan_nf_input(void *priv, struct sk_buff *skb,
-				    const struct nf_hook_state *state)
+static unsigned int ipvlan_nf_input(const struct nf_hook_state *state)
 {
+	struct sk_buff *skb = state->skb;
 	struct ipvl_addr *addr;
 	unsigned int len;
 

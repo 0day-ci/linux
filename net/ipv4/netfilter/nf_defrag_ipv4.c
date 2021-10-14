@@ -63,10 +63,9 @@ static enum ip_defrag_users nf_ct_defrag_user(unsigned int hooknum,
 		return IP_DEFRAG_CONNTRACK_OUT + zone_id;
 }
 
-static unsigned int ipv4_conntrack_defrag(void *priv,
-					  struct sk_buff *skb,
-					  const struct nf_hook_state *state)
+static unsigned int ipv4_conntrack_defrag(const struct nf_hook_state *state)
 {
+	struct sk_buff *skb = state->skb;
 	struct sock *sk = skb->sk;
 
 	if (sk && sk_fullsock(sk) && (sk->sk_family == PF_INET) &&

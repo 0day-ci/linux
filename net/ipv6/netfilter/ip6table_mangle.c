@@ -64,9 +64,11 @@ ip6t_mangle_out(struct sk_buff *skb, const struct nf_hook_state *state, void *pr
 
 /* The work comes in here from netfilter.c. */
 static unsigned int
-ip6table_mangle_hook(void *priv, struct sk_buff *skb,
-		     const struct nf_hook_state *state)
+ip6table_mangle_hook(const struct nf_hook_state *state)
 {
+	struct sk_buff *skb = state->skb;
+	void *priv = state->priv;
+
 	if (state->hook == NF_INET_LOCAL_OUT)
 		return ip6t_mangle_out(skb, state, priv);
 	return ip6t_do_table(skb, state, priv);

@@ -88,9 +88,7 @@ static void nf_hook_entries_free(struct nf_hook_entries *e)
 	call_rcu(&head->head, __nf_hook_entries_free);
 }
 
-static unsigned int accept_all(void *priv,
-			       struct sk_buff *skb,
-			       const struct nf_hook_state *state)
+static unsigned int accept_all(const struct nf_hook_state *state)
 {
 	return NF_ACCEPT; /* ACCEPT makes nf_hook_slow call next hook */
 }
@@ -585,6 +583,7 @@ int nf_hook_slow(struct sk_buff *skb, struct nf_hook_state *state,
 	unsigned int verdict, s = state->hook_index;
 	int ret;
 
+	state->skb = skb;
 	for (; s < e->num_hook_entries; s++) {
 		verdict = nf_hook_entry_hookfn(&e->hooks[s], skb, state);
 		switch (verdict & NF_VERDICT_MASK) {

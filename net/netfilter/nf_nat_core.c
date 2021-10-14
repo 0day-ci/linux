@@ -700,20 +700,24 @@ unsigned int nf_nat_packet(struct nf_conn *ct,
 EXPORT_SYMBOL_GPL(nf_nat_packet);
 
 static unsigned int nf_nat_inet_run_hooks(const struct nf_hook_state *state,
-					  struct sk_buff *skb,
 					  struct nf_conn *ct,
 					  struct nf_nat_lookup_hook_priv *lpriv)
 {
 	enum nf_nat_manip_type maniptype = HOOK2MANIP(state->hook);
 	struct nf_hook_entries *e = rcu_dereference(lpriv->entries);
+	struct nf_hook_state __state;
 	unsigned int ret;
 	int i;
 
 	if (!e)
 		goto null_bind;
 
+	__state = *state;
+
 	for (i = 0; i < e->num_hook_entries; i++) {
-		ret = e->hooks[i].hook(e->hooks[i].priv, skb, state);
+		__state.priv = e->hooks[i].priv;
+
+		ret = e->hooks[i].hook(&__state);
 		if (ret != NF_ACCEPT)
 			return ret;
 
@@ -758,7 +762,7 @@ nf_nat_inet_fn(void *priv, struct sk_buff *skb,
 			struct nf_nat_lookup_hook_priv *lpriv = priv;
 			unsigned int ret;
 
-			ret = nf_nat_inet_run_hooks(state, skb, ct, lpriv);
+			ret = nf_nat_inet_run_hooks(state, ct, lpriv);
 			if (ret != NF_ACCEPT)
 				return ret;
 		} else {

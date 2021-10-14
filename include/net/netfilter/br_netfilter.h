@@ -57,9 +57,7 @@ struct net_device *setup_pre_routing(struct sk_buff *skb,
 
 #if IS_ENABLED(CONFIG_IPV6)
 int br_validate_ipv6(struct net *net, struct sk_buff *skb);
-unsigned int br_nf_pre_routing_ipv6(void *priv,
-				    struct sk_buff *skb,
-				    const struct nf_hook_state *state);
+unsigned int br_nf_pre_routing_ipv6(const struct nf_hook_state *state);
 #else
 static inline int br_validate_ipv6(struct net *net, struct sk_buff *skb)
 {
@@ -67,8 +65,7 @@ static inline int br_validate_ipv6(struct net *net, struct sk_buff *skb)
 }
 
 static inline unsigned int
-br_nf_pre_routing_ipv6(void *priv, struct sk_buff *skb,
-		       const struct nf_hook_state *state)
+br_nf_pre_routing_ipv6(const struct nf_hook_state *state)
 {
 	return NF_ACCEPT;
 }

@@ -75,7 +75,7 @@ struct clusterip_net {
 	unsigned int hook_users;
 };
 
-static unsigned int clusterip_arp_mangle(void *priv, struct sk_buff *skb, const struct nf_hook_state *state);
+static unsigned int clusterip_arp_mangle(const struct nf_hook_state *state);
 
 static const struct nf_hook_ops cip_arp_ops = {
 	.hook = clusterip_arp_mangle,
@@ -635,9 +635,9 @@ static void arp_print(struct arp_payload *payload)
 #endif
 
 static unsigned int
-clusterip_arp_mangle(void *priv, struct sk_buff *skb,
-		     const struct nf_hook_state *state)
+clusterip_arp_mangle(const struct nf_hook_state *state)
 {
+	struct sk_buff *skb = state->skb;
 	struct arphdr *arp = arp_hdr(skb);
 	struct arp_payload *payload;
 	struct clusterip_config *c;

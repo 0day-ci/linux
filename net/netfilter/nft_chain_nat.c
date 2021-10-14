@@ -7,12 +7,11 @@
 #include <net/netfilter/nf_tables_ipv4.h>
 #include <net/netfilter/nf_tables_ipv6.h>
 
-static unsigned int nft_nat_do_chain(void *priv, struct sk_buff *skb,
-				     const struct nf_hook_state *state)
+static unsigned int nft_nat_do_chain(const struct nf_hook_state *state)
 {
 	struct nft_pktinfo pkt;
 
-	nft_set_pktinfo(&pkt, skb, state);
+	nft_set_pktinfo(&pkt, state->skb, state);
 
 	switch (state->pf) {
 #ifdef CONFIG_NF_TABLES_IPV4
@@ -29,7 +28,7 @@ static unsigned int nft_nat_do_chain(void *priv, struct sk_buff *skb,
 		break;
 	}
 
-	return nft_do_chain(&pkt, priv);
+	return nft_do_chain(&pkt, state->priv);
 }
 
 #ifdef CONFIG_NF_TABLES_IPV4

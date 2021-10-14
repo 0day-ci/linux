@@ -59,10 +59,9 @@ static const struct ebt_table frame_filter = {
 };
 
 static unsigned int
-ebt_filter_hook(void *priv, struct sk_buff *skb,
-		const struct nf_hook_state *state)
+ebt_filter_hook(const struct nf_hook_state *state)
 {
-	return ebt_do_table(skb, state, priv);
+	return ebt_do_table(state->skb, state, state->priv);
 }
 
 static const struct nf_hook_ops ebt_ops_filter[] = {

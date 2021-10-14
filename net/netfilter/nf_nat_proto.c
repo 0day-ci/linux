@@ -622,11 +622,12 @@ int nf_nat_icmp_reply_translation(struct sk_buff *skb,
 EXPORT_SYMBOL_GPL(nf_nat_icmp_reply_translation);
 
 static unsigned int
-nf_nat_ipv4_fn(void *priv, struct sk_buff *skb,
-	       const struct nf_hook_state *state)
+nf_nat_ipv4_fn(const struct nf_hook_state *state)
 {
-	struct nf_conn *ct;
+	struct sk_buff *skb = state->skb;
+	void *priv = state->priv;
 	enum ip_conntrack_info ctinfo;
+	struct nf_conn *ct;
 
 	ct = nf_ct_get(skb, &ctinfo);
 	if (!ct)
@@ -646,13 +647,13 @@ nf_nat_ipv4_fn(void *priv, struct sk_buff *skb,
 }
 
 static unsigned int
-nf_nat_ipv4_pre_routing(void *priv, struct sk_buff *skb,
-			const struct nf_hook_state *state)
+nf_nat_ipv4_pre_routing(const struct nf_hook_state *state)
 {
-	unsigned int ret;
+	struct sk_buff *skb = state->skb;
 	__be32 daddr = ip_hdr(skb)->daddr;
+	unsigned int ret;
 
-	ret = nf_nat_ipv4_fn(priv, skb, state);
+	ret = nf_nat_ipv4_fn(state);
 	if (ret == NF_ACCEPT && daddr != ip_hdr(skb)->daddr)
 		skb_dst_drop(skb);
 
@@ -698,14 +699,14 @@ static int nf_xfrm_me_harder(struct net *net, struct sk_buff *skb, unsigned int 
 #endif
 
 static unsigned int
-nf_nat_ipv4_local_in(void *priv, struct sk_buff *skb,
-		     const struct nf_hook_state *state)
+nf_nat_ipv4_local_in(const struct nf_hook_state *state)
 {
+	struct sk_buff *skb = state->skb;
 	__be32 saddr = ip_hdr(skb)->saddr;
 	struct sock *sk = skb->sk;
 	unsigned int ret;
 
-	ret = nf_nat_ipv4_fn(priv, skb, state);
+	ret = nf_nat_ipv4_fn(state);
 
 	if (ret == NF_ACCEPT && sk && saddr != ip_hdr(skb)->saddr &&
 	    !inet_sk_transparent(sk))
@@ -715,9 +716,9 @@ nf_nat_ipv4_local_in(void *priv, struct sk_buff *skb,
 }
 
 static unsigned int
-nf_nat_ipv4_out(void *priv, struct sk_buff *skb,
-		const struct nf_hook_state *state)
+nf_nat_ipv4_out(const struct nf_hook_state *state)
 {
+	struct sk_buff *skb = state->skb;
 #ifdef CONFIG_XFRM
 	const struct nf_conn *ct;
 	enum ip_conntrack_info ctinfo;
@@ -725,7 +726,7 @@ nf_nat_ipv4_out(void *priv, struct sk_buff *skb,
 #endif
 	unsigned int ret;
 
-	ret = nf_nat_ipv4_fn(priv, skb, state);
+	ret = nf_nat_ipv4_fn(state);
 #ifdef CONFIG_XFRM
 	if (ret != NF_ACCEPT)
 		return ret;
@@ -752,15 +753,15 @@ nf_nat_ipv4_out(void *priv, struct sk_buff *skb,
 }
 
 static unsigned int
-nf_nat_ipv4_local_fn(void *priv, struct sk_buff *skb,
-		     const struct nf_hook_state *state)
+nf_nat_ipv4_local_fn(const struct nf_hook_state *state)
 {
+	struct sk_buff *skb = state->skb;
 	const struct nf_conn *ct;
 	enum ip_conntrack_info ctinfo;
 	unsigned int ret;
 	int err;
 
-	ret = nf_nat_ipv4_fn(priv, skb, state);
+	ret = nf_nat_ipv4_fn(state);
 	if (ret != NF_ACCEPT)
 		return ret;
 
@@ -901,9 +902,10 @@ int nf_nat_icmpv6_reply_translation(struct sk_buff *skb,
 EXPORT_SYMBOL_GPL(nf_nat_icmpv6_reply_translation);
 
 static unsigned int
-nf_nat_ipv6_fn(void *priv, struct sk_buff *skb,
-	       const struct nf_hook_state *state)
+nf_nat_ipv6_fn(const struct nf_hook_state *state)
 {
+	struct sk_buff *skb = state->skb;
+	void *priv = state->priv;
 	struct nf_conn *ct;
 	enum ip_conntrack_info ctinfo;
 	__be16 frag_off;
@@ -938,13 +940,13 @@ nf_nat_ipv6_fn(void *priv, struct sk_buff *skb,
 }
 
 static unsigned int
-nf_nat_ipv6_in(void *priv, struct sk_buff *skb,
-	       const struct nf_hook_state *state)
+nf_nat_ipv6_in(const struct nf_hook_state *state)
 {
+	struct sk_buff *skb = state->skb;
 	unsigned int ret;
 	struct in6_addr daddr = ipv6_hdr(skb)->daddr;
 
-	ret = nf_nat_ipv6_fn(priv, skb, state);
+	ret = nf_nat_ipv6_fn(state);
 	if (ret != NF_DROP && ret != NF_STOLEN &&
 	    ipv6_addr_cmp(&daddr, &ipv6_hdr(skb)->daddr))
 		skb_dst_drop(skb);
@@ -953,9 +955,9 @@ nf_nat_ipv6_in(void *priv, struct sk_buff *skb,
 }
 
 static unsigned int
-nf_nat_ipv6_out(void *priv, struct sk_buff *skb,
-		const struct nf_hook_state *state)
+nf_nat_ipv6_out(const struct nf_hook_state *state)
 {
+	struct sk_buff *skb = state->skb;
 #ifdef CONFIG_XFRM
 	const struct nf_conn *ct;
 	enum ip_conntrack_info ctinfo;
@@ -963,7 +965,7 @@ nf_nat_ipv6_out(void *priv, struct sk_buff *skb,
 #endif
 	unsigned int ret;
 
-	ret = nf_nat_ipv6_fn(priv, skb, state);
+	ret = nf_nat_ipv6_fn(state);
 #ifdef CONFIG_XFRM
 	if (ret != NF_ACCEPT)
 		return ret;
@@ -990,15 +992,15 @@ nf_nat_ipv6_out(void *priv, struct sk_buff *skb,
 }
 
 static unsigned int
-nf_nat_ipv6_local_fn(void *priv, struct sk_buff *skb,
-		     const struct nf_hook_state *state)
+nf_nat_ipv6_local_fn(const struct nf_hook_state *state)
 {
+	struct sk_buff *skb = state->skb;
 	const struct nf_conn *ct;
 	enum ip_conntrack_info ctinfo;
 	unsigned int ret;
 	int err;
 
-	ret = nf_nat_ipv6_fn(priv, skb, state);
+	ret = nf_nat_ipv6_fn(state);
 	if (ret != NF_ACCEPT)
 		return ret;
 

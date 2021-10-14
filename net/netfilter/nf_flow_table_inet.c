@@ -8,14 +8,15 @@
 #include <net/netfilter/nf_tables.h>
 
 static unsigned int
-nf_flow_offload_inet_hook(void *priv, struct sk_buff *skb,
-			  const struct nf_hook_state *state)
+nf_flow_offload_inet_hook(const struct nf_hook_state *state)
 {
+	struct sk_buff *skb = state->skb;
+
 	switch (skb->protocol) {
 	case htons(ETH_P_IP):
-		return nf_flow_offload_ip_hook(priv, skb, state);
+		return nf_flow_offload_ip_hook(state);
 	case htons(ETH_P_IPV6):
-		return nf_flow_offload_ipv6_hook(priv, skb, state);
+		return nf_flow_offload_ipv6_hook(state);
 	}
 
 	return NF_ACCEPT;

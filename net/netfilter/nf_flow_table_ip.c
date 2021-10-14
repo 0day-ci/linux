@@ -325,12 +325,12 @@ static unsigned int nf_flow_queue_xmit(struct net *net, struct sk_buff *skb,
 }
 
 unsigned int
-nf_flow_offload_ip_hook(void *priv, struct sk_buff *skb,
-			const struct nf_hook_state *state)
+nf_flow_offload_ip_hook(const struct nf_hook_state *state)
 {
+	struct nf_flowtable *flow_table = state->priv;
 	struct flow_offload_tuple_rhash *tuplehash;
-	struct nf_flowtable *flow_table = priv;
 	struct flow_offload_tuple tuple = {};
+	struct sk_buff *skb = state->skb;
 	enum flow_offload_tuple_dir dir;
 	struct flow_offload *flow;
 	struct net_device *outdev;
@@ -561,12 +561,12 @@ static int nf_flow_tuple_ipv6(struct sk_buff *skb, const struct net_device *dev,
 }
 
 unsigned int
-nf_flow_offload_ipv6_hook(void *priv, struct sk_buff *skb,
-			  const struct nf_hook_state *state)
+nf_flow_offload_ipv6_hook(const struct nf_hook_state *state)
 {
+	struct nf_flowtable *flow_table = state->priv;
 	struct flow_offload_tuple_rhash *tuplehash;
-	struct nf_flowtable *flow_table = priv;
 	struct flow_offload_tuple tuple = {};
+	struct sk_buff *skb = state->skb;
 	enum flow_offload_tuple_dir dir;
 	const struct in6_addr *nexthop;
 	struct flow_offload *flow;

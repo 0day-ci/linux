@@ -1474,10 +1474,9 @@ ip_vs_out(struct netns_ipvs *ipvs, unsigned int hooknum, struct sk_buff *skb, in
  *	Check if packet is reply for established ip_vs_conn.
  */
 static unsigned int
-ip_vs_reply4(void *priv, struct sk_buff *skb,
-	     const struct nf_hook_state *state)
+ip_vs_reply4(const struct nf_hook_state *state)
 {
-	return ip_vs_out(net_ipvs(state->net), state->hook, skb, AF_INET);
+	return ip_vs_out(net_ipvs(state->net), state->hook, state->skb, AF_INET);
 }
 
 /*
@@ -1485,10 +1484,9 @@ ip_vs_reply4(void *priv, struct sk_buff *skb,
  *	Check if packet is reply for established ip_vs_conn.
  */
 static unsigned int
-ip_vs_local_reply4(void *priv, struct sk_buff *skb,
-		   const struct nf_hook_state *state)
+ip_vs_local_reply4(const struct nf_hook_state *state)
 {
-	return ip_vs_out(net_ipvs(state->net), state->hook, skb, AF_INET);
+	return ip_vs_out(net_ipvs(state->net), state->hook, state->skb, AF_INET);
 }
 
 #ifdef CONFIG_IP_VS_IPV6
@@ -1499,10 +1497,9 @@ ip_vs_local_reply4(void *priv, struct sk_buff *skb,
  *	Check if packet is reply for established ip_vs_conn.
  */
 static unsigned int
-ip_vs_reply6(void *priv, struct sk_buff *skb,
-	     const struct nf_hook_state *state)
+ip_vs_reply6(const struct nf_hook_state *state)
 {
-	return ip_vs_out(net_ipvs(state->net), state->hook, skb, AF_INET6);
+	return ip_vs_out(net_ipvs(state->net), state->hook, state->skb, AF_INET6);
 }
 
 /*
@@ -1510,10 +1507,9 @@ ip_vs_reply6(void *priv, struct sk_buff *skb,
  *	Check if packet is reply for established ip_vs_conn.
  */
 static unsigned int
-ip_vs_local_reply6(void *priv, struct sk_buff *skb,
-		   const struct nf_hook_state *state)
+ip_vs_local_reply6(const struct nf_hook_state *state)
 {
-	return ip_vs_out(net_ipvs(state->net), state->hook, skb, AF_INET6);
+	return ip_vs_out(net_ipvs(state->net), state->hook, state->skb, AF_INET6);
 }
 
 #endif
@@ -2142,10 +2138,9 @@ ip_vs_in(struct netns_ipvs *ipvs, unsigned int hooknum, struct sk_buff *skb, int
  *	Schedule and forward packets from remote clients
  */
 static unsigned int
-ip_vs_remote_request4(void *priv, struct sk_buff *skb,
-		      const struct nf_hook_state *state)
+ip_vs_remote_request4(const struct nf_hook_state *state)
 {
-	return ip_vs_in(net_ipvs(state->net), state->hook, skb, AF_INET);
+	return ip_vs_in(net_ipvs(state->net), state->hook, state->skb, AF_INET);
 }
 
 /*
@@ -2153,10 +2148,9 @@ ip_vs_remote_request4(void *priv, struct sk_buff *skb,
  *	Schedule and forward packets from local clients
  */
 static unsigned int
-ip_vs_local_request4(void *priv, struct sk_buff *skb,
-		     const struct nf_hook_state *state)
+ip_vs_local_request4(const struct nf_hook_state *state)
 {
-	return ip_vs_in(net_ipvs(state->net), state->hook, skb, AF_INET);
+	return ip_vs_in(net_ipvs(state->net), state->hook, state->skb, AF_INET);
 }
 
 #ifdef CONFIG_IP_VS_IPV6
@@ -2166,10 +2160,9 @@ ip_vs_local_request4(void *priv, struct sk_buff *skb,
  *	Schedule and forward packets from remote clients
  */
 static unsigned int
-ip_vs_remote_request6(void *priv, struct sk_buff *skb,
-		      const struct nf_hook_state *state)
+ip_vs_remote_request6(const struct nf_hook_state *state)
 {
-	return ip_vs_in(net_ipvs(state->net), state->hook, skb, AF_INET6);
+	return ip_vs_in(net_ipvs(state->net), state->hook, state->skb, AF_INET6);
 }
 
 /*
@@ -2177,10 +2170,9 @@ ip_vs_remote_request6(void *priv, struct sk_buff *skb,
  *	Schedule and forward packets from local clients
  */
 static unsigned int
-ip_vs_local_request6(void *priv, struct sk_buff *skb,
-		     const struct nf_hook_state *state)
+ip_vs_local_request6(const struct nf_hook_state *state)
 {
-	return ip_vs_in(net_ipvs(state->net), state->hook, skb, AF_INET6);
+	return ip_vs_in(net_ipvs(state->net), state->hook, state->skb, AF_INET6);
 }
 
 #endif
@@ -2196,11 +2188,11 @@ ip_vs_local_request6(void *priv, struct sk_buff *skb,
  *      and send them to ip_vs_in_icmp.
  */
 static unsigned int
-ip_vs_forward_icmp(void *priv, struct sk_buff *skb,
-		   const struct nf_hook_state *state)
+ip_vs_forward_icmp(const struct nf_hook_state *state)
 {
 	int r;
 	struct netns_ipvs *ipvs = net_ipvs(state->net);
+	struct sk_buff *skb = state->skb;
 
 	if (ip_hdr(skb)->protocol != IPPROTO_ICMP)
 		return NF_ACCEPT;
@@ -2214,11 +2206,11 @@ ip_vs_forward_icmp(void *priv, struct sk_buff *skb,
 
 #ifdef CONFIG_IP_VS_IPV6
 static unsigned int
-ip_vs_forward_icmp_v6(void *priv, struct sk_buff *skb,
-		      const struct nf_hook_state *state)
+ip_vs_forward_icmp_v6(const struct nf_hook_state *state)
 {
 	int r;
 	struct netns_ipvs *ipvs = net_ipvs(state->net);
+	struct sk_buff *skb = state->skb;
 	struct ip_vs_iphdr iphdr;
 
 	ip_vs_fill_iph_skb(AF_INET6, skb, false, &iphdr);

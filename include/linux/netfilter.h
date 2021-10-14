@@ -65,6 +65,8 @@ struct nf_hook_ops;
 struct sock;
 
 struct nf_hook_state {
+	struct sk_buff *skb;
+	void *priv;
 	u8 hook;
 	u8 pf;
 	u16 hook_index; /* index in hook_entries->hook[] */
@@ -75,9 +77,7 @@ struct nf_hook_state {
 	int (*okfn)(struct net *, struct sock *, struct sk_buff *);
 };
 
-typedef unsigned int nf_hookfn(void *priv,
-			       struct sk_buff *skb,
-			       const struct nf_hook_state *state);
+typedef unsigned int nf_hookfn(const struct nf_hook_state *state);
 enum nf_hook_ops_type {
 	NF_HOOK_OP_UNDEFINED,
 	NF_HOOK_OP_NF_TABLES,
@@ -140,7 +140,9 @@ static inline int
 nf_hook_entry_hookfn(const struct nf_hook_entry *entry, struct sk_buff *skb,
 		     struct nf_hook_state *state)
 {
-	return entry->hook(entry->priv, skb, state);
+	state->skb = skb;
+	state->priv = entry->priv;
+	return entry->hook(state);
 }
 
 static inline void nf_hook_state_init(struct nf_hook_state *p,

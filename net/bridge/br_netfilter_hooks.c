@@ -472,10 +472,9 @@ struct net_device *setup_pre_routing(struct sk_buff *skb, const struct net *net)
  * receiving device) to make netfilter happy, the REDIRECT
  * target in particular.  Save the original destination IP
  * address to be able to detect DNAT afterwards. */
-static unsigned int br_nf_pre_routing(void *priv,
-				      struct sk_buff *skb,
-				      const struct nf_hook_state *state)
+static unsigned int br_nf_pre_routing(const struct nf_hook_state *state)
 {
+	struct sk_buff *skb = state->skb;
 	struct nf_bridge_info *nf_bridge;
 	struct net_bridge_port *p;
 	struct net_bridge *br;
@@ -502,7 +501,7 @@ static unsigned int br_nf_pre_routing(void *priv,
 		}
 
 		nf_bridge_pull_encap_header_rcsum(skb);
-		return br_nf_pre_routing_ipv6(priv, skb, state);
+		return br_nf_pre_routing_ipv6(state);
 	}
 
 	if (!brnet->call_iptables && !br_opt_get(br, BROPT_NF_CALL_IPTABLES))
@@ -572,10 +571,9 @@ static int br_nf_forward_finish(struct net *net, struct sock *sk, struct sk_buff
  * but we are still able to filter on the 'real' indev/outdev
  * because of the physdev module. For ARP, indev and outdev are the
  * bridge ports. */
-static unsigned int br_nf_forward_ip(void *priv,
-				     struct sk_buff *skb,
-				     const struct nf_hook_state *state)
+static unsigned int br_nf_forward_ip(const struct nf_hook_state *state)
 {
+	struct sk_buff *skb = state->skb;
 	struct nf_bridge_info *nf_bridge;
 	struct net_device *parent;
 	u_int8_t pf;
@@ -638,10 +636,9 @@ static unsigned int br_nf_forward_ip(void *priv,
 	return NF_STOLEN;
 }
 
-static unsigned int br_nf_forward_arp(void *priv,
-				      struct sk_buff *skb,
-				      const struct nf_hook_state *state)
+static unsigned int br_nf_forward_arp(const struct nf_hook_state *state)
 {
+	struct sk_buff *skb = state->skb;
 	struct net_bridge_port *p;
 	struct net_bridge *br;
 	struct net_device **d = (struct net_device **)(skb->cb);
@@ -812,10 +809,9 @@ static int br_nf_dev_queue_xmit(struct net *net, struct sock *sk, struct sk_buff
 }
 
 /* PF_BRIDGE/POST_ROUTING ********************************************/
-static unsigned int br_nf_post_routing(void *priv,
-				       struct sk_buff *skb,
-				       const struct nf_hook_state *state)
+static unsigned int br_nf_post_routing(const struct nf_hook_state *state)
 {
+	struct sk_buff *skb = state->skb;
 	struct nf_bridge_info *nf_bridge = nf_bridge_info_get(skb);
 	struct net_device *realoutdev = bridge_parent(skb->dev);
 	u_int8_t pf;
@@ -861,10 +857,9 @@ static unsigned int br_nf_post_routing(void *priv,
 /* IP/SABOTAGE *****************************************************/
 /* Don't hand locally destined packets to PF_INET(6)/PRE_ROUTING
  * for the second time. */
-static unsigned int ip_sabotage_in(void *priv,
-				   struct sk_buff *skb,
-				   const struct nf_hook_state *state)
+static unsigned int ip_sabotage_in(const struct nf_hook_state *state)
 {
+	struct sk_buff *skb = state->skb;
 	struct nf_bridge_info *nf_bridge = nf_bridge_info_get(skb);
 
 	if (nf_bridge && !nf_bridge->in_prerouting &&

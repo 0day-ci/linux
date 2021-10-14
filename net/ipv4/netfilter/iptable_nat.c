@@ -29,11 +29,9 @@ static const struct xt_table nf_nat_ipv4_table = {
 	.af		= NFPROTO_IPV4,
 };
 
-static unsigned int iptable_nat_do_chain(void *priv,
-					 struct sk_buff *skb,
-					 const struct nf_hook_state *state)
+static unsigned int iptable_nat_do_chain(const struct nf_hook_state *state)
 {
-	return ipt_do_table(skb, state, priv);
+	return ipt_do_table(state->skb, state, state->priv);
 }
 
 static const struct nf_hook_ops nf_nat_ipv4_ops[] = {

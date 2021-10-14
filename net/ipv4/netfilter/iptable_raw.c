@@ -34,10 +34,9 @@ static const struct xt_table packet_raw_before_defrag = {
 
 /* The work comes in here from netfilter.c. */
 static unsigned int
-iptable_raw_hook(void *priv, struct sk_buff *skb,
-		 const struct nf_hook_state *state)
+iptable_raw_hook(const struct nf_hook_state *state)
 {
-	return ipt_do_table(skb, state, priv);
+	return ipt_do_table(state->skb, state, state->priv);
 }
 
 static struct nf_hook_ops *rawtable_ops __read_mostly;

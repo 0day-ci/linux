@@ -29,10 +29,9 @@ static const struct xt_table packet_filter = {
 
 /* The work comes in here from netfilter.c. */
 static unsigned int
-ip6table_filter_hook(void *priv, struct sk_buff *skb,
-		     const struct nf_hook_state *state)
+ip6table_filter_hook(const struct nf_hook_state *state)
 {
-	return ip6t_do_table(skb, state, priv);
+	return ip6t_do_table(state->skb, state, state->priv);
 }
 
 static struct nf_hook_ops *filter_ops __read_mostly;

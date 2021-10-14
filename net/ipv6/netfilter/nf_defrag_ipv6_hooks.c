@@ -50,10 +50,9 @@ static enum ip6_defrag_users nf_ct6_defrag_user(unsigned int hooknum,
 		return IP6_DEFRAG_CONNTRACK_OUT + zone_id;
 }
 
-static unsigned int ipv6_defrag(void *priv,
-				struct sk_buff *skb,
-				const struct nf_hook_state *state)
+static unsigned int ipv6_defrag(const struct nf_hook_state *state)
 {
+	struct sk_buff *skb = state->skb;
 	int err;
 
 #if IS_ENABLED(CONFIG_NF_CONNTRACK)

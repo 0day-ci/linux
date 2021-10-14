@@ -155,10 +155,9 @@ unsigned int nf_confirm(struct sk_buff *skb, unsigned int protoff,
 }
 EXPORT_SYMBOL_GPL(nf_confirm);
 
-static unsigned int ipv4_confirm(void *priv,
-				 struct sk_buff *skb,
-				 const struct nf_hook_state *state)
+static unsigned int ipv4_confirm(const struct nf_hook_state *state)
 {
+	struct sk_buff *skb = state->skb;
 	enum ip_conntrack_info ctinfo;
 	struct nf_conn *ct;
 
@@ -171,17 +170,15 @@ static unsigned int ipv4_confirm(void *priv,
 			  ct, ctinfo);
 }
 
-static unsigned int ipv4_conntrack_in(void *priv,
-				      struct sk_buff *skb,
-				      const struct nf_hook_state *state)
+static unsigned int ipv4_conntrack_in(const struct nf_hook_state *state)
 {
-	return nf_conntrack_in(skb, state);
+	return nf_conntrack_in(state->skb, state);
 }
 
-static unsigned int ipv4_conntrack_local(void *priv,
-					 struct sk_buff *skb,
-					 const struct nf_hook_state *state)
+static unsigned int ipv4_conntrack_local(const struct nf_hook_state *state)
 {
+	struct sk_buff *skb = state->skb;
+
 	if (ip_is_fragment(ip_hdr(skb))) { /* IP_NODEFRAG setsockopt set */
 		enum ip_conntrack_info ctinfo;
 		struct nf_conn *tmpl;
@@ -360,10 +357,9 @@ static struct nf_sockopt_ops so_getorigdst6 = {
 	.owner		= THIS_MODULE,
 };
 
-static unsigned int ipv6_confirm(void *priv,
-				 struct sk_buff *skb,
-				 const struct nf_hook_state *state)
+static unsigned int ipv6_confirm(const struct nf_hook_state *state)
 {
+	struct sk_buff *skb = state->skb;
 	struct nf_conn *ct;
 	enum ip_conntrack_info ctinfo;
 	unsigned char pnum = ipv6_hdr(skb)->nexthdr;
@@ -384,18 +380,14 @@ static unsigned int ipv6_confirm(void *priv,
 	return nf_confirm(skb, protoff, ct, ctinfo);
 }
 
-static unsigned int ipv6_conntrack_in(void *priv,
-				      struct sk_buff *skb,
-				      const struct nf_hook_state *state)
+static unsigned int ipv6_conntrack_in(const struct nf_hook_state *state)
 {
-	return nf_conntrack_in(skb, state);
+	return nf_conntrack_in(state->skb, state);
 }
 
-static unsigned int ipv6_conntrack_local(void *priv,
-					 struct sk_buff *skb,
-					 const struct nf_hook_state *state)
+static unsigned int ipv6_conntrack_local(const struct nf_hook_state *state)
 {
-	return nf_conntrack_in(skb, state);
+	return nf_conntrack_in(state->skb, state);
 }
 
 static const struct nf_hook_ops ipv6_conntrack_ops[] = {

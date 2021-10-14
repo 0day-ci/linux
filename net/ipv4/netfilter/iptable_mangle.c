@@ -70,10 +70,11 @@ ipt_mangle_out(struct sk_buff *skb, const struct nf_hook_state *state, void *pri
 
 /* The work comes in here from netfilter.c. */
 static unsigned int
-iptable_mangle_hook(void *priv,
-		     struct sk_buff *skb,
-		     const struct nf_hook_state *state)
+iptable_mangle_hook(const struct nf_hook_state *state)
 {
+	struct sk_buff *skb = state->skb;
+	void *priv = state->priv;
+
 	if (state->hook == NF_INET_LOCAL_OUT)
 		return ipt_mangle_out(skb, state, priv);
 	return ipt_do_table(skb, state, priv);

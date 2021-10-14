@@ -58,10 +58,9 @@ static const struct ebt_table frame_nat = {
 	.me		= THIS_MODULE,
 };
 
-static unsigned int ebt_nat_hook(void *priv, struct sk_buff *skb,
-				 const struct nf_hook_state *state)
+static unsigned int ebt_nat_hook(const struct nf_hook_state *state)
 {
-	return ebt_do_table(skb, state, priv);
+	return ebt_do_table(state->skb, state, state->priv);
 }
 
 static const struct nf_hook_ops ebt_ops_nat[] = {

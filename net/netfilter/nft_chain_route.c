@@ -13,10 +13,10 @@
 #include <net/ip.h>
 
 #ifdef CONFIG_NF_TABLES_IPV4
-static unsigned int nf_route_table_hook4(void *priv,
-					 struct sk_buff *skb,
-					 const struct nf_hook_state *state)
+static unsigned int nf_route_table_hook4(const struct nf_hook_state *state)
 {
+	struct sk_buff *skb = state->skb;
+	void *priv = state->priv;
 	const struct iphdr *iph;
 	struct nft_pktinfo pkt;
 	__be32 saddr, daddr;
@@ -62,10 +62,10 @@ static const struct nft_chain_type nft_chain_route_ipv4 = {
 #endif
 
 #ifdef CONFIG_NF_TABLES_IPV6
-static unsigned int nf_route_table_hook6(void *priv,
-					 struct sk_buff *skb,
-					 const struct nf_hook_state *state)
+static unsigned int nf_route_table_hook6(const struct nf_hook_state *state)
 {
+	struct sk_buff *skb = state->skb;
+	void *priv = state->priv;
 	struct in6_addr saddr, daddr;
 	struct nft_pktinfo pkt;
 	u32 mark, flowlabel;
@@ -112,17 +112,17 @@ static const struct nft_chain_type nft_chain_route_ipv6 = {
 #endif
 
 #ifdef CONFIG_NF_TABLES_INET
-static unsigned int nf_route_table_inet(void *priv,
-					struct sk_buff *skb,
-					const struct nf_hook_state *state)
+static unsigned int nf_route_table_inet(const struct nf_hook_state *state)
 {
+	struct sk_buff *skb = state->skb;
+	void *priv = state->priv;
 	struct nft_pktinfo pkt;
 
 	switch (state->pf) {
 	case NFPROTO_IPV4:
-		return nf_route_table_hook4(priv, skb, state);
+		return nf_route_table_hook4(state);
 	case NFPROTO_IPV6:
-		return nf_route_table_hook6(priv, skb, state);
+		return nf_route_table_hook6(state);
 	default:
 		nft_set_pktinfo(&pkt, skb, state);
 		break;

@@ -51,9 +51,9 @@ static const struct ebt_table broute_table = {
 	.me		= THIS_MODULE,
 };
 
-static unsigned int ebt_broute(void *priv, struct sk_buff *skb,
-			       const struct nf_hook_state *s)
+static unsigned int ebt_broute(const struct nf_hook_state *s)
 {
+	struct sk_buff *skb = s->skb;
 	struct net_bridge_port *p = br_port_get_rcu(skb->dev);
 	struct nf_hook_state state;
 	unsigned char *dest;
@@ -66,7 +66,9 @@ static unsigned int ebt_broute(void *priv, struct sk_buff *skb,
 			   NFPROTO_BRIDGE, s->in, NULL, NULL,
 			   s->net, NULL);
 
-	ret = ebt_do_table(skb, &state, priv);
+	state.skb = skb;
+	state.priv = s->priv;
+	ret = ebt_do_table(skb, &state, s->priv);
 	if (ret != NF_DROP)
 		return ret;
 
