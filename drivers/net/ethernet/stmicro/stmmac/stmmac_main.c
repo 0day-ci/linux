@@ -7263,9 +7263,7 @@ int stmmac_resume(struct device *dev)
 		if (device_may_wakeup(priv->device))
 			phylink_speed_up(priv->phylink);
 	}
-	rtnl_unlock();
 
-	rtnl_lock();
 	mutex_lock(&priv->lock);
 
 	stmmac_reset_queues_param(priv);
