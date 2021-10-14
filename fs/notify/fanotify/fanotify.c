@@ -611,7 +611,9 @@ static struct fanotify_event *fanotify_alloc_error_event(
 {
 	struct fs_error_report *report =
 			fsnotify_data_error_report(data, data_type);
+	struct inode *inode = report->inode;
 	struct fanotify_error_event *fee;
+	int fh_len;
 
 	if (WARN_ON(!report))
 		return NULL;
@@ -622,6 +624,19 @@ static struct fanotify_event *fanotify_alloc_error_event(
 
 	fee->fae.type = FANOTIFY_EVENT_TYPE_FS_ERROR;
 	fee->err_count = 1;
+	fee->fsid = *fsid;
+
+	fh_len = fanotify_encode_fh_len(inode);
+	if (WARN_ON(fh_len > MAX_HANDLE_SZ)) {
+		/*
+		 * Fallback to reporting the error against the super
+		 * block.  It should never happen.
+		 */
+		inode = NULL;
+		fh_len = fanotify_encode_fh_len(NULL);
+	}
+
+	fanotify_encode_fh(&fee->object_fh, inode, fh_len, NULL, 0);
 
 	*hash ^= fanotify_hash_fsid(fsid);
 
