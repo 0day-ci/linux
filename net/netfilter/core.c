@@ -251,6 +251,7 @@ EXPORT_SYMBOL_GPL(nf_hook_entries_insert_raw);
  *
  * @old -- current hook blob at @pp
  * @pp -- location of hook blob
+ * @recompile -- false if bpf prog should not be replaced
  *
  * Hook unregistration must always succeed, so to-be-removed hooks
  * are replaced by a dummy one that will just move to next hook.
@@ -263,7 +264,8 @@ EXPORT_SYMBOL_GPL(nf_hook_entries_insert_raw);
  * Returns address to free, or NULL.
  */
 static void *__nf_hook_entries_try_shrink(struct nf_hook_entries *old,
-					  struct nf_hook_entries __rcu **pp)
+					  struct nf_hook_entries __rcu **pp,
+					  bool recompile)
 {
 	unsigned int i, j, skip = 0, hook_entries;
 	struct bpf_prog *hook_bpf_prog = NULL;
@@ -311,10 +313,12 @@ static void *__nf_hook_entries_try_shrink(struct nf_hook_entries *old,
 	hooks_validate(new);
 
 #if IS_ENABLED(CONFIG_NF_HOOK_BPF)
-	/* if this fails fallback prog calls nf_hook_slow. */
-	hook_bpf_prog = nf_hook_bpf_create(new);
-	if (hook_bpf_prog)
-		new->hook_prog = hook_bpf_prog;
+	if (recompile) {
+		/* if this fails fallback prog calls nf_hook_slow. */
+		hook_bpf_prog = nf_hook_bpf_create(new);
+		if (hook_bpf_prog)
+			new->hook_prog = hook_bpf_prog;
+	}
 #endif
 out_assign:
 	nf_hook_bpf_change_prog(BPF_DISPATCHER_PTR(nf_hook_base),
@@ -540,7 +544,7 @@ static void __nf_unregister_net_hook(struct net *net, int pf,
 		WARN_ONCE(1, "hook not found, pf %d num %d", pf, reg->hooknum);
 	}
 
-	p = __nf_hook_entries_try_shrink(p, pp);
+	p = __nf_hook_entries_try_shrink(p, pp, check_net(net));
 	mutex_unlock(&nf_hook_mutex);
 	if (!p)
 		return;
@@ -571,7 +575,7 @@ void nf_hook_entries_delete_raw(struct nf_hook_entries __rcu **pp,
 
 	p = rcu_dereference_raw(*pp);
 	if (nf_remove_net_hook(p, reg)) {
-		p = __nf_hook_entries_try_shrink(p, pp);
+		p = __nf_hook_entries_try_shrink(p, pp, false);
 		nf_hook_entries_free(p);
 	}
 }
