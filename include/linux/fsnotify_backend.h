@@ -247,6 +247,7 @@ struct fsnotify_group {
 			int f_flags; /* event_f_flags from fanotify_init() */
 			struct ucounts *ucounts;
 			mempool_t error_events_pool;
+			unsigned int error_event_marks;
 		} fanotify_data;
 #endif /* CONFIG_FANOTIFY */
 	};
