@@ -254,11 +254,13 @@ int vfio_pci_core_enable(struct vfio_pci_core_device *vdev)
 	if (ret)
 		return ret;
 
-	/* If reset fails because of the device lock, fail this path entirely */
-	ret = pci_try_reset_function(pdev);
-	if (ret == -EAGAIN) {
-		pci_disable_device(pdev);
-		return ret;
+	if (!pdev->ignore_reset) {
+		/* If reset fails because of the device lock, fail this path entirely */
+		ret = pci_try_reset_function(pdev);
+		if (ret == -EAGAIN) {
+			pci_disable_device(pdev);
+			return ret;
+		}
 	}
 
 	vdev->reset_works = !ret;
@@ -388,25 +390,30 @@ void vfio_pci_core_disable(struct vfio_pci_core_device *vdev)
 	 */
 	pci_write_config_word(pdev, PCI_COMMAND, PCI_COMMAND_INTX_DISABLE);
 
-	/*
-	 * Try to get the locks ourselves to prevent a deadlock. The
-	 * success of this is dependent on being able to lock the device,
-	 * which is not always possible.
-	 * We can not use the "try" reset interface here, which will
-	 * overwrite the previously restored configuration information.
-	 */
-	if (vdev->reset_works && pci_dev_trylock(pdev)) {
-		if (!__pci_reset_function_locked(pdev))
-			vdev->needs_reset = false;
-		pci_dev_unlock(pdev);
+	if (!pdev->ignore_reset) {
+		/*
+		 * Try to get the locks ourselves to prevent a deadlock. The
+		 * success of this is dependent on being able to lock the device,
+		 * which is not always possible.
+		 * We can not use the "try" reset interface here, which will
+		 * overwrite the previously restored configuration information.
+		 */
+		if (vdev->reset_works && pci_dev_trylock(pdev)) {
+			if (!__pci_reset_function_locked(pdev))
+				vdev->needs_reset = false;
+			pci_dev_unlock(pdev);
+		}
 	}
 
 	pci_restore_state(pdev);
 out:
 	pci_disable_device(pdev);
 
-	if (!vfio_pci_dev_set_try_reset(vdev->vdev.dev_set) && !disable_idle_d3)
-		vfio_pci_set_power_state(vdev, PCI_D3hot);
+	if (!pdev->ignore_reset) {
+		if (!vfio_pci_dev_set_try_reset(vdev->vdev.dev_set) &&
+					!disable_idle_d3)
+			vfio_pci_set_power_state(vdev, PCI_D3hot);
+	}
 }
 EXPORT_SYMBOL_GPL(vfio_pci_core_disable);
 
@@ -919,6 +926,8 @@ long vfio_pci_core_ioctl(struct vfio_device *core_vdev, unsigned int cmd,
 
 		if (!vdev->reset_works)
 			return -EINVAL;
+		if (vdev->pdev->ignore_reset)
+			return -EINVAL;
 
 		vfio_pci_zap_and_down_write_memory_lock(vdev);
 		ret = pci_try_reset_function(vdev->pdev);
@@ -1006,6 +1015,9 @@ reset_info_exit:
 		struct vfio_pci_group_info info;
 		bool slot = false;
 		int group_idx, count = 0, ret = 0;
+
+		if (vdev->pdev->ignore_reset)
+			return -EINVAL;
 
 		minsz = offsetofend(struct vfio_pci_hot_reset, count);
 
