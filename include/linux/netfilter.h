@@ -2,6 +2,7 @@
 #ifndef __LINUX_NETFILTER_H
 #define __LINUX_NETFILTER_H
 
+#include <linux/filter.h>
 #include <linux/init.h>
 #include <linux/skbuff.h>
 #include <linux/net.h>
@@ -106,6 +107,9 @@ struct nf_hook_entries_rcu_head {
 };
 
 struct nf_hook_entries {
+#if IS_ENABLED(CONFIG_NF_HOOK_BPF)
+	struct bpf_prog			*hook_prog;
+#endif
 	u16				num_hook_entries;
 	/* padding */
 	struct nf_hook_entry		hooks[];
@@ -205,6 +209,17 @@ int nf_hook_slow(struct sk_buff *skb, struct nf_hook_state *state,
 
 void nf_hook_slow_list(struct list_head *head, struct nf_hook_state *state,
 		       const struct nf_hook_entries *e);
+
+#if IS_ENABLED(CONFIG_NF_HOOK_BPF)
+DECLARE_BPF_DISPATCHER(nf_hook_base);
+
+static __always_inline int bpf_prog_run_nf(const struct bpf_prog *prog,
+					   struct nf_hook_state *state)
+{
+	return __bpf_prog_run(prog, state, BPF_DISPATCHER_FUNC(nf_hook_base));
+}
+#endif
+
 /**
  *	nf_hook - call a netfilter hook
  *
@@ -259,11 +274,24 @@ static inline int nf_hook(u_int8_t pf, unsigned int hook, struct net *net,
 
 	if (hook_head) {
 		struct nf_hook_state state;
+#if IS_ENABLED(CONFIG_NF_HOOK_BPF)
+		const struct bpf_prog *p = READ_ONCE(hook_head->hook_prog);
 
 		nf_hook_state_init(&state, hook, pf, indev, outdev,
 				   sk, net, okfn);
 
+		state.priv = (void *)hook_head;
+		state.skb = skb;
+
+		migrate_disable();
+		ret = bpf_prog_run_nf(p, &state);
+		migrate_enable();
+#else
+		nf_hook_state_init(&state, hook, pf, indev, outdev,
+				   sk, net, okfn);
+
 		ret = nf_hook_slow(skb, &state, hook_head);
+#endif
 	}
 	rcu_read_unlock();
 
@@ -341,10 +369,38 @@ NF_HOOK_LIST(uint8_t pf, unsigned int hook, struct net *net, struct sock *sk,
 
 	if (hook_head) {
 		struct nf_hook_state state;
+#if IS_ENABLED(CONFIG_NF_HOOK_BPF)
+		const struct bpf_prog *p = hook_head->hook_prog;
+		struct sk_buff *skb, *next;
+		struct list_head sublist;
+		int ret;
 
 		nf_hook_state_init(&state, hook, pf, in, out, sk, net, okfn);
 
+		INIT_LIST_HEAD(&sublist);
+
+		migrate_disable();
+
+		list_for_each_entry_safe(skb, next, head, list) {
+			skb_list_del_init(skb);
+
+			state.priv = (void *)hook_head;
+			state.skb = skb;
+
+			ret = bpf_prog_run_nf(p, &state);
+			if (ret == 1)
+				list_add_tail(&skb->list, &sublist);
+		}
+
+		migrate_enable();
+
+		/* Put passed packets back on main list */
+		list_splice(&sublist, head);
+#else
+		nf_hook_state_init(&state, hook, pf, in, out, sk, net, okfn);
+
 		nf_hook_slow_list(head, &state, hook_head);
+#endif
 	}
 	rcu_read_unlock();
 }

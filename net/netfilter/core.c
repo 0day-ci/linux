@@ -24,6 +24,7 @@
 #include <linux/rcupdate.h>
 #include <net/net_namespace.h>
 #include <net/netfilter/nf_queue.h>
+#include <net/netfilter/nf_hook_bpf.h>
 #include <net/sock.h>
 
 #include "nf_internals.h"
@@ -47,6 +48,12 @@ static DEFINE_MUTEX(nf_hook_mutex);
 #define nf_entry_dereference(e) \
 	rcu_dereference_protected(e, lockdep_is_held(&nf_hook_mutex))
 
+#if IS_ENABLED(CONFIG_NF_HOOK_BPF)
+DEFINE_BPF_DISPATCHER(nf_hook_base);
+
+static struct bpf_prog *fallback_nf_hook_slow;
+#endif
+
 static struct nf_hook_entries *allocate_hook_entries_size(u16 num)
 {
 	struct nf_hook_entries *e;
@@ -58,9 +65,25 @@ static struct nf_hook_entries *allocate_hook_entries_size(u16 num)
 	if (num == 0)
 		return NULL;
 
+#if IS_ENABLED(CONFIG_NF_HOOK_BPF)
+	if (!fallback_nf_hook_slow) {
+		/* never free'd */
+		fallback_nf_hook_slow = nf_hook_bpf_create_fb();
+
+		if (!fallback_nf_hook_slow)
+			return NULL;
+	}
+#endif
+
 	e = kvzalloc(alloc, GFP_KERNEL);
-	if (e)
-		e->num_hook_entries = num;
+	if (!e)
+		return NULL;
+
+	e->num_hook_entries = num;
+#if IS_ENABLED(CONFIG_NF_HOOK_BPF)
+	e->hook_prog = fallback_nf_hook_slow;
+#endif
+
 	return e;
 }
 
@@ -104,6 +127,7 @@ nf_hook_entries_grow(const struct nf_hook_entries *old,
 {
 	unsigned int i, alloc_entries, nhooks, old_entries;
 	struct nf_hook_ops **orig_ops = NULL;
+	struct bpf_prog *hook_bpf_prog;
 	struct nf_hook_ops **new_ops;
 	struct nf_hook_entries *new;
 	bool inserted = false;
@@ -154,6 +178,27 @@ nf_hook_entries_grow(const struct nf_hook_entries *old,
 		new_ops[nhooks] = (void *)reg;
 		new->hooks[nhooks].hook = reg->hook;
 		new->hooks[nhooks].priv = reg->priv;
+	}
+
+	hook_bpf_prog = nf_hook_bpf_create(new);
+
+	/* XXX: jit failure handling?
+	 * We could refuse hook registration.
+	 *
+	 * For now, allocate_hook_entries_size() sets
+	 * ->hook_prog to a small fallback program that
+	 *  calls nf_hook_slow().
+	 */
+	if (hook_bpf_prog) {
+		struct bpf_prog *old_prog = NULL;
+
+		new->hook_prog = hook_bpf_prog;
+
+		if (old)
+			old_prog = old->hook_prog;
+
+		nf_hook_bpf_change_prog(BPF_DISPATCHER_PTR(nf_hook_base),
+					old_prog, hook_bpf_prog);
 	}
 
 	return new;
@@ -221,6 +266,7 @@ static void *__nf_hook_entries_try_shrink(struct nf_hook_entries *old,
 					  struct nf_hook_entries __rcu **pp)
 {
 	unsigned int i, j, skip = 0, hook_entries;
+	struct bpf_prog *hook_bpf_prog = NULL;
 	struct nf_hook_entries *new = NULL;
 	struct nf_hook_ops **orig_ops;
 	struct nf_hook_ops **new_ops;
@@ -244,8 +290,15 @@ static void *__nf_hook_entries_try_shrink(struct nf_hook_entries *old,
 
 	hook_entries -= skip;
 	new = allocate_hook_entries_size(hook_entries);
-	if (!new)
+	if (!new) {
+#if IS_ENABLED(CONFIG_NF_HOOK_BPF)
+		struct bpf_prog *old_prog = old->hook_prog;
+
+		WRITE_ONCE(old->hook_prog, fallback_nf_hook_slow);
+		nf_hook_bpf_change_prog(BPF_DISPATCHER_PTR(nf_hook_base), old_prog, NULL);
+#endif
 		return NULL;
+	}
 
 	new_ops = nf_hook_entries_get_hook_ops(new);
 	for (i = 0, j = 0; i < old->num_hook_entries; i++) {
@@ -256,7 +309,16 @@ static void *__nf_hook_entries_try_shrink(struct nf_hook_entries *old,
 		j++;
 	}
 	hooks_validate(new);
+
+#if IS_ENABLED(CONFIG_NF_HOOK_BPF)
+	/* if this fails fallback prog calls nf_hook_slow. */
+	hook_bpf_prog = nf_hook_bpf_create(new);
+	if (hook_bpf_prog)
+		new->hook_prog = hook_bpf_prog;
+#endif
 out_assign:
+	nf_hook_bpf_change_prog(BPF_DISPATCHER_PTR(nf_hook_base),
+				old ? old->hook_prog : NULL, hook_bpf_prog);
 	rcu_assign_pointer(*pp, new);
 	return old;
 }
@@ -584,6 +646,7 @@ int nf_hook_slow(struct sk_buff *skb, struct nf_hook_state *state,
 	int ret;
 
 	state->skb = skb;
+
 	for (; s < e->num_hook_entries; s++) {
 		verdict = nf_hook_entry_hookfn(&e->hooks[s], skb, state);
 		switch (verdict & NF_VERDICT_MASK) {
@@ -763,6 +826,11 @@ int __init netfilter_init(void)
 	ret = netfilter_log_init();
 	if (ret < 0)
 		goto err_pernet;
+
+#if IS_ENABLED(CONFIG_NF_HOOK_BPF)
+	fallback_nf_hook_slow = nf_hook_bpf_create_fb();
+	WARN_ON_ONCE(!fallback_nf_hook_slow);
+#endif
 
 	return 0;
 err_pernet:

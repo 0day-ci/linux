@@ -19,6 +19,16 @@ config NETFILTER_FAMILY_BRIDGE
 config NETFILTER_FAMILY_ARP
 	bool
 
+config HAVE_NF_HOOK_BPF
+	bool
+
+config NF_HOOK_BPF
+	bool "netfilter base hook bpf translator"
+	depends on BPF_JIT
+	help
+	  This partially unrolls nf_hook_slow interpreter loop with
+	  auto-generated BPF programs.
+
 config NETFILTER_NETLINK_HOOK
 	tristate "Netfilter base hook dump support"
 	depends on NETFILTER_ADVANCED
