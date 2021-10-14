@@ -131,6 +131,8 @@ struct intel_modifier_desc {
 #define INTEL_CCS_ANY		(INTEL_CCS_RC | INTEL_CCS_RC_CC | INTEL_CCS_MC)
 		u8 type:3;
 		u8 cc_planes:3;
+		u8 packed_aux_planes:4;
+		u8 planar_aux_planes:4;
 	} ccs;
 };
 
@@ -163,6 +165,7 @@ static const struct intel_modifier_desc intel_modifiers[] = {
 		.tiling = I915_TILING_Y,
 
 		.ccs.type = INTEL_CCS_RC,
+		.ccs.packed_aux_planes = BIT(1),
 
 		FORMAT_OVERRIDE(skl_ccs_formats),
 	},
@@ -172,6 +175,7 @@ static const struct intel_modifier_desc intel_modifiers[] = {
 		.tiling = I915_TILING_NONE,
 
 		.ccs.type = INTEL_CCS_RC,
+		.ccs.packed_aux_planes = BIT(1),
 
 		FORMAT_OVERRIDE(skl_ccs_formats),
 	},
@@ -181,6 +185,7 @@ static const struct intel_modifier_desc intel_modifiers[] = {
 		.tiling = I915_TILING_Y,
 
 		.ccs.type = INTEL_CCS_RC,
+		.ccs.packed_aux_planes = BIT(1),
 
 		FORMAT_OVERRIDE(gen12_ccs_formats),
 	},
@@ -190,6 +195,7 @@ static const struct intel_modifier_desc intel_modifiers[] = {
 		.tiling = I915_TILING_Y,
 
 		.ccs.type = INTEL_CCS_RC_CC,
+		.ccs.packed_aux_planes = BIT(1),
 		.ccs.cc_planes = BIT(2),
 
 		FORMAT_OVERRIDE(gen12_ccs_cc_formats),
@@ -200,6 +206,8 @@ static const struct intel_modifier_desc intel_modifiers[] = {
 		.tiling = I915_TILING_Y,
 
 		.ccs.type = INTEL_CCS_MC,
+		.ccs.packed_aux_planes = BIT(1),
+		.ccs.planar_aux_planes = BIT(2) | BIT(3),
 
 		FORMAT_OVERRIDE(gen12_ccs_formats),
 	},
@@ -269,6 +277,13 @@ static bool check_modifier_display_ver(const struct intel_modifier_desc *md,
 {
 	return display_ver >= md->display_ver.from &&
 	       display_ver <= md->display_ver.until;
+}
+
+static bool check_modifier_display_ver_range(const struct intel_modifier_desc *md,
+					     u8 display_ver_from, u8 display_ver_until)
+{
+	return check_modifier_display_ver(md, display_ver_from) &&
+	       check_modifier_display_ver(md, display_ver_until);
 }
 
 static bool plane_has_modifier(struct drm_i915_private *i915,
@@ -377,17 +392,44 @@ bool intel_format_info_is_yuv_semiplanar(const struct drm_format_info *info,
 	return format_is_yuv_semiplanar(lookup_modifier(modifier), info);
 }
 
-bool is_ccs_plane(const struct drm_framebuffer *fb, int plane)
+static u8 ccs_aux_plane_mask(const struct intel_modifier_desc *md,
+			     const struct drm_format_info *format)
 {
-	if (!is_ccs_modifier(fb->modifier))
-		return false;
-
-	return plane >= fb->format->num_planes / 2;
+	if (format_is_yuv_semiplanar(md, format))
+		return md->ccs.planar_aux_planes;
+	else
+		return md->ccs.packed_aux_planes;
 }
 
-bool is_gen12_ccs_plane(const struct drm_framebuffer *fb, int plane)
+/**
+ * intel_fb_is_ccs_aux_plane: Check if a framebuffer color plane is a CCS AUX plane
+ * @fb: Framebuffer
+ * @color_plane: color plane index to check
+ *
+ * Returns:
+ * Returns %true if @fb's color plane at index @color_plane is a CCS AUX plane.
+ */
+bool intel_fb_is_ccs_aux_plane(const struct drm_framebuffer *fb, int color_plane)
 {
-	return is_gen12_ccs_modifier(fb->modifier) && is_ccs_plane(fb, plane);
+	const struct intel_modifier_desc *md = lookup_modifier(fb->modifier);
+
+	return ccs_aux_plane_mask(md, fb->format) & BIT(color_plane);
+}
+
+/**
+ * intel_fb_is_gen12_ccs_aux_plane: Check if a framebuffer color plane is a GEN12 CCS AUX plane
+ * @fb: Framebuffer
+ * @color_plane: color plane index to check
+ *
+ * Returns:
+ * Returns %true if @fb's color plane at index @color_plane is a GEN12 CCS AUX plane.
+ */
+static bool intel_fb_is_gen12_ccs_aux_plane(const struct drm_framebuffer *fb, int color_plane)
+{
+	const struct intel_modifier_desc *md = lookup_modifier(fb->modifier);
+
+	return check_modifier_display_ver_range(md, 12, 13) &&
+	       ccs_aux_plane_mask(md, fb->format) & BIT(color_plane);
 }
 
 /**
@@ -410,9 +452,9 @@ int intel_fb_rc_ccs_cc_plane(const struct drm_framebuffer *fb)
 	return ilog2((int)md->ccs.cc_planes);
 }
 
-bool is_gen12_ccs_cc_plane(const struct drm_framebuffer *fb, int plane)
+static bool is_gen12_ccs_cc_plane(const struct drm_framebuffer *fb, int color_plane)
 {
-	return intel_fb_rc_ccs_cc_plane(fb) == plane;
+	return intel_fb_rc_ccs_cc_plane(fb) == color_plane;
 }
 
 static bool is_semiplanar_uv_plane(const struct drm_framebuffer *fb, int color_plane)
@@ -424,7 +466,7 @@ static bool is_semiplanar_uv_plane(const struct drm_framebuffer *fb, int color_p
 bool is_surface_linear(const struct drm_framebuffer *fb, int color_plane)
 {
 	return fb->modifier == DRM_FORMAT_MOD_LINEAR ||
-	       is_gen12_ccs_plane(fb, color_plane) ||
+	       intel_fb_is_gen12_ccs_aux_plane(fb, color_plane) ||
 	       is_gen12_ccs_cc_plane(fb, color_plane);
 }
 
@@ -512,13 +554,13 @@ intel_tile_width_bytes(const struct drm_framebuffer *fb, int color_plane)
 		else
 			return 512;
 	case I915_FORMAT_MOD_Y_TILED_CCS:
-		if (is_ccs_plane(fb, color_plane))
+		if (intel_fb_is_ccs_aux_plane(fb, color_plane))
 			return 128;
 		fallthrough;
 	case I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS:
 	case I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC:
 	case I915_FORMAT_MOD_Y_TILED_GEN12_MC_CCS:
-		if (is_ccs_plane(fb, color_plane) ||
+		if (intel_fb_is_ccs_aux_plane(fb, color_plane) ||
 		    is_gen12_ccs_cc_plane(fb, color_plane))
 			return 64;
 		fallthrough;
@@ -528,7 +570,7 @@ intel_tile_width_bytes(const struct drm_framebuffer *fb, int color_plane)
 		else
 			return 512;
 	case I915_FORMAT_MOD_Yf_TILED_CCS:
-		if (is_ccs_plane(fb, color_plane))
+		if (intel_fb_is_ccs_aux_plane(fb, color_plane))
 			return 128;
 		fallthrough;
 	case I915_FORMAT_MOD_Yf_TILED:
@@ -584,7 +626,7 @@ static void intel_tile_block_dims(const struct drm_framebuffer *fb, int color_pl
 {
 	intel_tile_dims(fb, color_plane, tile_width, tile_height);
 
-	if (is_gen12_ccs_plane(fb, color_plane))
+	if (intel_fb_is_gen12_ccs_aux_plane(fb, color_plane))
 		*tile_height = 1;
 }
 
@@ -645,7 +687,7 @@ unsigned int intel_surf_alignment(const struct drm_framebuffer *fb,
 		return 512 * 4096;
 
 	/* AUX_DIST needs only 4K alignment */
-	if (is_ccs_plane(fb, color_plane))
+	if (intel_fb_is_ccs_aux_plane(fb, color_plane))
 		return 4096;
 
 	if (is_semiplanar_uv_plane(fb, color_plane)) {
@@ -704,7 +746,7 @@ void intel_fb_plane_get_subsampling(int *hsub, int *vsub,
 	 * TODO: Deduct the subsampling from the char block for all CCS
 	 * formats and planes.
 	 */
-	if (!is_gen12_ccs_plane(fb, color_plane)) {
+	if (!intel_fb_is_gen12_ccs_aux_plane(fb, color_plane)) {
 		*hsub = fb->format->hsub;
 		*vsub = fb->format->vsub;
 
@@ -732,7 +774,7 @@ void intel_fb_plane_get_subsampling(int *hsub, int *vsub,
 static void intel_fb_plane_dims(const struct intel_framebuffer *fb, int color_plane, int *w, int *h)
 {
 	struct drm_i915_private *i915 = to_i915(fb->base.dev);
-	int main_plane = is_ccs_plane(&fb->base, color_plane) ?
+	int main_plane = intel_fb_is_ccs_aux_plane(&fb->base, color_plane) ?
 			 skl_ccs_to_main_plane(&fb->base, color_plane) : 0;
 	unsigned int main_width = fb->base.width;
 	unsigned int main_height = fb->base.height;
@@ -745,7 +787,7 @@ static void intel_fb_plane_dims(const struct intel_framebuffer *fb, int color_pl
 	 * stride in the allocated FB object may not be power-of-two
 	 * sized, in which case it is auto-padded to the POT size.
 	 */
-	if (IS_ALDERLAKE_P(i915) && is_ccs_plane(&fb->base, color_plane))
+	if (IS_ALDERLAKE_P(i915) && intel_fb_is_ccs_aux_plane(&fb->base, color_plane))
 		main_width = gen12_aligned_scanout_stride(fb, 0) /
 			     fb->base.format->cpp[0];
 
@@ -984,7 +1026,7 @@ static int intel_fb_check_ccs_xy(const struct drm_framebuffer *fb, int ccs_plane
 	int ccs_x, ccs_y;
 	int main_x, main_y;
 
-	if (!is_ccs_plane(fb, ccs_plane) || is_gen12_ccs_cc_plane(fb, ccs_plane))
+	if (!intel_fb_is_ccs_aux_plane(fb, ccs_plane))
 		return 0;
 
 	/*
@@ -1188,7 +1230,7 @@ plane_view_dst_stride_tiles(const struct intel_framebuffer *fb, int color_plane,
 			    unsigned int pitch_tiles)
 {
 	if (intel_fb_needs_pot_stride_remap(fb)) {
-		unsigned int min_stride = is_ccs_plane(&fb->base, color_plane) ? 2 : 8;
+		unsigned int min_stride = intel_fb_is_ccs_aux_plane(&fb->base, color_plane) ? 2 : 8;
 		/*
 		 * ADL_P, the only platform needing a POT stride has a minimum
 		 * of 8 main surface and 2 CCS AUX stride tiles.
@@ -1804,7 +1846,7 @@ int intel_framebuffer_init(struct intel_framebuffer *intel_fb,
 			goto err;
 		}
 
-		if (is_gen12_ccs_plane(fb, i) && !is_gen12_ccs_cc_plane(fb, i)) {
+		if (intel_fb_is_gen12_ccs_aux_plane(fb, i)) {
 			int ccs_aux_stride = gen12_ccs_aux_stride(intel_fb, i);
 
 			if (fb->pitches[i] != ccs_aux_stride) {
