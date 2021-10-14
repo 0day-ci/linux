@@ -15,8 +15,8 @@
 	#size-cells = <1>;
 
 	aliases {
-		serial0 = &serial0;
-		serial1 = &serial7;
+		serial0 = &psc3;
+		serial1 = &psc7;
 		spi4 = &spi4;
 		spi5 = &spi5;
 	};
@@ -294,62 +294,6 @@
 			status = "disabled";
 		};
 
-		/* PSC3 serial port A, aka ttyPSC0 */
-		serial0: psc@11300 {
-			compatible = "fsl,mpc5121-psc-uart", "fsl,mpc5121-psc";
-			fsl,rx-fifo-size = <512>;
-			fsl,tx-fifo-size = <512>;
-		};
-
-		/* PSC4 in SPI mode */
-		spi4: psc@11400 {
-			compatible = "fsl,mpc5121-psc-spi", "fsl,mpc5121-psc";
-			fsl,rx-fifo-size = <768>;
-			fsl,tx-fifo-size = <768>;
-			#address-cells = <1>;
-			#size-cells = <0>;
-			num-cs = <1>;
-			cs-gpios = <&gpio_pic 25 0>;
-
-			flash: m25p128@0 {
-				compatible = "st,m25p128";
-				spi-max-frequency = <20000000>;
-				reg = <0>;
-				#address-cells = <1>;
-				#size-cells = <1>;
-
-				partition@0 {
-					label = "spi-flash0";
-					reg = <0x00000000 0x01000000>;
-				};
-			};
-		};
-
-		/* PSC5 in SPI mode */
-		spi5: psc@11500 {
-			compatible = "fsl,mpc5121-psc-spi", "fsl,mpc5121-psc";
-			fsl,mode = "spi-master";
-			fsl,rx-fifo-size = <128>;
-			fsl,tx-fifo-size = <128>;
-			#address-cells = <1>;
-			#size-cells = <0>;
-
-			lcd@0 {
-				compatible = "ilitek,ili922x";
-				reg = <0>;
-				spi-max-frequency = <100000>;
-				spi-cpol;
-				spi-cpha;
-			};
-		};
-
-		/* PSC7 serial port C, aka ttyPSC2 */
-		serial7: psc@11700 {
-			compatible = "fsl,mpc5121-psc-uart", "fsl,mpc5121-psc";
-			fsl,rx-fifo-size = <512>;
-			fsl,tx-fifo-size = <512>;
-		};
-
 		matrix_keypad@0 {
 			compatible = "gpio-matrix-keypad";
 			debounce-delay-ms = <5>;
@@ -391,5 +335,63 @@
 			gpios = <&gpio_pic 19 0>;
 			default-state = "keep";
 		};
+	};
+};
+
+/* PSC3 serial port A, aka ttyPSC0 */
+#include "mpc5121-psc3.dtsi"
+&psc3 {
+	compatible = "fsl,mpc5121-psc-uart", "fsl,mpc5121-psc";
+	fsl,rx-fifo-size = <512>;
+	fsl,tx-fifo-size = <512>;
+	status = "okay";
+};
+
+/* PSC7 serial port C, aka ttyPSC2 */
+#include "mpc5121-psc7.dtsi"
+&psc7 {
+	compatible = "fsl,mpc5121-psc-uart", "fsl,mpc5121-psc";
+	fsl,rx-fifo-size = <512>;
+	fsl,tx-fifo-size = <512>;
+	status = "okay";
+};
+
+/* PSC4 in SPI mode */
+#include "mpc5121-psc4-spi.dtsi"
+&spi4 {
+	status = "okay";
+	fsl,rx-fifo-size = <768>;
+	fsl,tx-fifo-size = <768>;
+	num-cs = <1>;
+	cs-gpios = <&gpio_pic 25 0>;
+
+	flash: m25p128@0 {
+		compatible = "st,m25p128";
+		spi-max-frequency = <20000000>;
+		reg = <0>;
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		partition@0 {
+			label = "spi-flash0";
+			reg = <0x00000000 0x01000000>;
+		};
+	};
+};
+
+/* PSC5 in SPI mode */
+#include "mpc5121-psc5-spi.dtsi"
+&spi5 {
+	status = "okay";
+	fsl,mode = "spi-master";
+	fsl,rx-fifo-size = <128>;
+	fsl,tx-fifo-size = <128>;
+
+	lcd@0 {
+		compatible = "ilitek,ili922x";
+		reg = <0>;
+		spi-max-frequency = <100000>;
+		spi-cpol;
+		spi-cpha;
 	};
 };

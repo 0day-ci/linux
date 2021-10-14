@@ -1,0 +1,16 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+&soc {
+	/* 512x PSCs are not 52xx PSC compatible */
+	psc0: psc@11000 {
+		compatible = "fsl,mpc5121-psc";
+		reg = <0x11000 0x100>;
+		interrupts = <40 0x8>;
+		fsl,rx-fifo-size = <16>;
+		fsl,tx-fifo-size = <16>;
+		clocks = <&clks MPC512x_CLK_PSC0>,
+			 <&clks MPC512x_CLK_PSC0_MCLK>;
+		clock-names = "ipg", "mclk";
+		status = "disabled";
+	};
+};

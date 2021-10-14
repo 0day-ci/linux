@@ -133,24 +133,6 @@
 			fsl,invert-drvvbus;
 			fsl,invert-pwr-fault;
 		};
-
-		/* PSC3 serial port A aka ttyPSC0 */
-		psc@11300 {
-			compatible = "fsl,mpc5121-psc-uart", "fsl,mpc5121-psc";
-		};
-
-		/* PSC4 serial port B aka ttyPSC1 */
-		psc@11400 {
-			compatible = "fsl,mpc5121-psc-uart", "fsl,mpc5121-psc";
-		};
-
-		/* PSC5 in ac97 mode */
-		ac97: psc@11500 {
-			compatible = "fsl,mpc5121-psc-ac97", "fsl,mpc5121-psc";
-			fsl,mode = "ac97-slave";
-			fsl,rx-fifo-size = <384>;
-			fsl,tx-fifo-size = <384>;
-		};
 	};
 
 	pci: pci@80008500 {
@@ -171,4 +153,28 @@
 				 0xb800 0x0 0x0 0x2 &cpld_pic 0x7 0x8
 				>;
 	};
+};
+
+/* PSC3 serial port A aka ttyPSC0 */
+#include "mpc5121-psc3.dtsi"
+&psc3 {
+	compatible = "fsl,mpc5121-psc-uart", "fsl,mpc5121-psc";
+	status = "okay";
+};
+
+/* PSC4 serial port B aka ttyPSC1 */
+#include "mpc5121-psc4.dtsi"
+&psc4 {
+	compatible = "fsl,mpc5121-psc-uart", "fsl,mpc5121-psc";
+	status = "okay";
+};
+
+/* PSC5 in ac97 mode */
+#include "mpc5121-psc5.dtsi"
+&psc5 {
+	compatible = "fsl,mpc5121-psc-ac97", "fsl,mpc5121-psc";
+	status = "okay";
+	fsl,mode = "ac97-slave";
+	fsl,rx-fifo-size = <384>;
+	fsl,tx-fifo-size = <384>;
 };

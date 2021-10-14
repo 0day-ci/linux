@@ -132,64 +132,68 @@
 		usb@4000 {
 			fsl,invert-pwr-fault;
 		};
+	};
+};
 
-		psc@11000 {
-			compatible = "fsl,mpc5121-psc-uart", "fsl,mpc5121-psc";
-		};
+#include "mpc5121-psc0.dtsi"
+#include "mpc5121-psc1.dtsi"
+#include "mpc5121-psc2.dtsi"
+#include "mpc5121-psc3.dtsi"
+#include "mpc5121-psc4.dtsi"
+#include "mpc5121-psc6.dtsi"
+#include "mpc5121-psc8.dtsi"
+#include "mpc5121-psc11.dtsi"
+/* Select PSC UART mode */
+&psc0 {
+	compatible = "fsl,mpc5121-psc-uart", "fsl,mpc5121-psc";
+	status = "okay";
+};
 
-		psc@11100 {
-			compatible = "fsl,mpc5121-psc-uart", "fsl,mpc5121-psc";
-		};
+&psc1 {
+	compatible = "fsl,mpc5121-psc-uart", "fsl,mpc5121-psc";
+	status = "okay";
+};
 
-		psc@11200 {
-			compatible = "fsl,mpc5121-psc-uart", "fsl,mpc5121-psc";
-		};
+&psc2 {
+	compatible = "fsl,mpc5121-psc-uart", "fsl,mpc5121-psc";
+	status = "okay";
+};
 
-		psc@11300 {
-			compatible = "fsl,mpc5121-psc-uart", "fsl,mpc5121-psc";
-		};
+&psc3 {
+	compatible = "fsl,mpc5121-psc-uart", "fsl,mpc5121-psc";
+	status = "okay";
+};
 
-		psc@11400 {
-			compatible = "fsl,mpc5121-psc-uart", "fsl,mpc5121-psc";
-		};
+&psc4 {
+	compatible = "fsl,mpc5121-psc-uart", "fsl,mpc5121-psc";
+	status = "okay";
+};
 
-		psc@11500 {
-			status = "disabled";
-		};
+&psc6 {
+	compatible = "fsl,mpc5121-psc-uart", "fsl,mpc5121-psc";
+	status = "okay";
+};
 
-		psc@11600 {
-			compatible = "fsl,mpc5121-psc-uart", "fsl,mpc5121-psc";
-		};
+&psc8 {
+	compatible = "fsl,mpc5121-psc-uart", "fsl,mpc5121-psc";
+	status = "okay";
+};
 
-		psc@11700 {
-			status = "disabled";
-		};
+&psc11 {
+	compatible = "fsl,mpc5121-psc-uart", "fsl,mpc5121-psc";
+	status = "okay";
+};
 
-		psc@11800 {
-			compatible = "fsl,mpc5121-psc-uart", "fsl,mpc5121-psc";
-		};
+#include "mpc5121-psc9-spi.dtsi"
+&spi9 {
+	status = "okay";
 
-		psc@11900 {
-			compatible = "fsl,mpc5121-psc-spi", "fsl,mpc5121-psc";
-			#address-cells = <1>;
-			#size-cells = <0>;
-
-			/* ADS7845 touch screen controller */
-			ts@0 {
-				compatible = "ti,ads7846";
-				reg = <0x0>;
-				spi-max-frequency = <3000000>;
-				/* pen irq is GPIO25 */
-				interrupts = <78 0x8>;
-			};
-		};
-
-		psc@11a00 {
-			status = "disabled";
-		};
-
-		psc@11b00 {
-			compatible = "fsl,mpc5121-psc-uart", "fsl,mpc5121-psc";
-		};
+	/* ADS7845 touch screen controller */
+	ts@0 {
+		compatible = "ti,ads7846";
+		reg = <0x0>;
+		spi-max-frequency = <3000000>;
+		/* pen irq is GPIO25 */
+		interrupts = <78 0x8>;
 	};
 };
