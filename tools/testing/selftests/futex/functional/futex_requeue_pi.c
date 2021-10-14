@@ -48,7 +48,7 @@ static int locked;
 
 struct thread_arg {
 	long id;
-	struct timespec *timeout;
+	struct timespec64 *timeout;
 	int lock;
 	int ret;
 };
@@ -281,7 +281,7 @@ int unit_test(int broadcast, long lock, int third_party_owner, long timeout_ns)
 	struct thread_arg blocker_arg = THREAD_ARG_INITIALIZER;
 	struct thread_arg waker_arg = THREAD_ARG_INITIALIZER;
 	pthread_t waiter[THREAD_MAX], waker, blocker;
-	struct timespec ts, *tsp = NULL;
+	struct timespec64 ts, *tsp = NULL;
 	struct thread_arg args[THREAD_MAX];
 	int *waiter_ret;
 	int i, ret = RET_PASS;
@@ -290,7 +290,7 @@ int unit_test(int broadcast, long lock, int third_party_owner, long timeout_ns)
 		time_t secs;
 
 		info("timeout_ns = %ld\n", timeout_ns);
-		ret = clock_gettime(CLOCK_MONOTONIC, &ts);
+		ret = gettime64(CLOCK_MONOTONIC, &ts);
 		secs = (ts.tv_nsec + timeout_ns) / 1000000000;
 		ts.tv_nsec = ((int64_t)ts.tv_nsec + timeout_ns) % 1000000000;
 		ts.tv_sec += secs;

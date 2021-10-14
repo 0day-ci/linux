@@ -38,7 +38,7 @@ futex_t val = 1;
 char pad2[PAGE_SZ] = {1};
 
 #define WAKE_WAIT_US 3000000
-struct timespec wait_timeout = { .tv_sec = 5, .tv_nsec = 0};
+struct timespec64 wait_timeout = { .tv_sec = 5, .tv_nsec = 0};
 
 void usage(char *prog)
 {
