@@ -699,6 +699,32 @@ unsigned int nf_nat_packet(struct nf_conn *ct,
 }
 EXPORT_SYMBOL_GPL(nf_nat_packet);
 
+static unsigned int nf_nat_inet_run_hooks(const struct nf_hook_state *state,
+					  struct sk_buff *skb,
+					  struct nf_conn *ct,
+					  struct nf_nat_lookup_hook_priv *lpriv)
+{
+	enum nf_nat_manip_type maniptype = HOOK2MANIP(state->hook);
+	struct nf_hook_entries *e = rcu_dereference(lpriv->entries);
+	unsigned int ret;
+	int i;
+
+	if (!e)
+		goto null_bind;
+
+	for (i = 0; i < e->num_hook_entries; i++) {
+		ret = e->hooks[i].hook(e->hooks[i].priv, skb, state);
+		if (ret != NF_ACCEPT)
+			return ret;
+
+		if (nf_nat_initialized(ct, maniptype))
+			return NF_ACCEPT;
+	}
+
+null_bind:
+	return nf_nat_alloc_null_binding(ct, state->hook);
+}
+
 unsigned int
 nf_nat_inet_fn(void *priv, struct sk_buff *skb,
 	       const struct nf_hook_state *state)
@@ -730,23 +756,9 @@ nf_nat_inet_fn(void *priv, struct sk_buff *skb,
 		 */
 		if (!nf_nat_initialized(ct, maniptype)) {
 			struct nf_nat_lookup_hook_priv *lpriv = priv;
-			struct nf_hook_entries *e = rcu_dereference(lpriv->entries);
 			unsigned int ret;
-			int i;
 
-			if (!e)
-				goto null_bind;
-
-			for (i = 0; i < e->num_hook_entries; i++) {
-				ret = e->hooks[i].hook(e->hooks[i].priv, skb,
-						       state);
-				if (ret != NF_ACCEPT)
-					return ret;
-				if (nf_nat_initialized(ct, maniptype))
-					goto do_nat;
-			}
-null_bind:
-			ret = nf_nat_alloc_null_binding(ct, state->hook);
+			ret = nf_nat_inet_run_hooks(state, skb, ct, lpriv);
 			if (ret != NF_ACCEPT)
 				return ret;
 		} else {
@@ -765,7 +777,7 @@ null_bind:
 		if (nf_nat_oif_changed(state->hook, ctinfo, nat, state->out))
 			goto oif_changed;
 	}
-do_nat:
+
 	return nf_nat_packet(ct, ctinfo, state->hook, skb);
 
 oif_changed:
