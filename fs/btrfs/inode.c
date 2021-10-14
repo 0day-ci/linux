@@ -899,7 +899,7 @@ static int submit_uncompressed_range(struct btrfs_inode *inode,
 	ret = cow_file_range(inode, locked_page, start, end, &page_started,
 			     &nr_written, 0);
 	/* Inline extent inserted, page gets unlocked and everything is done */
-	if (ret > 0) {
+	if (page_started) {
 		ret = 0;
 		goto out;
 	}
