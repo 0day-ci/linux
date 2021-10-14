@@ -3782,7 +3782,7 @@ static int io_mkdirat_prep(struct io_kiocb *req,
 	return 0;
 }
 
-static int io_mkdirat(struct io_kiocb *req, int issue_flags)
+static int io_mkdirat(struct io_kiocb *req, unsigned int issue_flags)
 {
 	struct io_mkdir *mkd = &req->mkdir;
 	int ret;
@@ -3831,7 +3831,7 @@ static int io_symlinkat_prep(struct io_kiocb *req,
 	return 0;
 }
 
-static int io_symlinkat(struct io_kiocb *req, int issue_flags)
+static int io_symlinkat(struct io_kiocb *req, unsigned int issue_flags)
 {
 	struct io_symlink *sl = &req->symlink;
 	int ret;
@@ -3881,7 +3881,7 @@ static int io_linkat_prep(struct io_kiocb *req,
 	return 0;
 }
 
-static int io_linkat(struct io_kiocb *req, int issue_flags)
+static int io_linkat(struct io_kiocb *req, unsigned int issue_flags)
 {
 	struct io_hardlink *lnk = &req->hardlink;
 	int ret;
