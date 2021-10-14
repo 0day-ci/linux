@@ -935,8 +935,6 @@ static void bdi_remove_from_list(struct backing_dev_info *bdi)
 	rb_erase(&bdi->rb_node, &bdi_tree);
 	list_del_rcu(&bdi->bdi_list);
 	spin_unlock_bh(&bdi_lock);
-
-	synchronize_rcu_expedited();
 }
 
 void bdi_unregister(struct backing_dev_info *bdi)
@@ -969,7 +967,7 @@ static void release_bdi(struct kref *ref)
 		bdi_unregister(bdi);
 	WARN_ON_ONCE(bdi->dev);
 	wb_exit(&bdi->wb);
-	kfree(bdi);
+	kfree_rcu(bdi, rcu);
 }
 
 void bdi_put(struct backing_dev_info *bdi)

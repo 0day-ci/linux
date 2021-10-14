@@ -202,6 +202,7 @@ struct backing_dev_info {
 #ifdef CONFIG_DEBUG_FS
 	struct dentry *debug_dir;
 #endif
+	struct rcu_head rcu;
 };
 
 enum {
