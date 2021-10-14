@@ -3065,7 +3065,7 @@ int gpiod_to_irq(const struct gpio_desc *desc)
 
 		return retirq;
 	}
-	return -ENXIO;
+	return -EPROBE_DEFER;
 }
 EXPORT_SYMBOL_GPL(gpiod_to_irq);
 
