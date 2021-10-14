@@ -611,10 +611,10 @@ static const u8 dg2_rcs_offsets[] = {
 static const u8 *reg_offsets(const struct intel_engine_cs *engine)
 {
 	/*
-	 * The gen12+ lists only have the registers we program in the basic
-	 * default state. We rely on the context image using relative
-	 * addressing to automatic fixup the register state between the
-	 * physical engines for virtual engine.
+	 * The graphics 12 and newer platforms, lists only have the registers we
+	 * program in the basic default state. We rely on the context image
+	 * using relative addressing to automatic fixup the register state
+	 * between the physical engines for virtual engine.
 	 */
 	GEM_BUG_ON(GRAPHICS_VER(engine->i915) >= 12 &&
 		   !intel_engine_has_relative_mmio(engine));

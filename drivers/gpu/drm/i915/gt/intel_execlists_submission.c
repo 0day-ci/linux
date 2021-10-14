@@ -1650,7 +1650,7 @@ static void invalidate_csb_entries(const u64 *first, const u64 *last)
 }
 
 /*
- * Starting with Gen12, the status has a new format:
+ * Starting with Graphics version 12, the status has a new format:
  *
  *     bit  0:     switched to new queue
  *     bit  1:     reserved
