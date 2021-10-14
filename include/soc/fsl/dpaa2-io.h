@@ -55,6 +55,7 @@ struct dpaa2_io_desc {
 	void __iomem *regs_cinh;
 	int dpio_id;
 	u32 qman_version;
+	u32 qman_clk;
 };
 
 struct dpaa2_io *dpaa2_io_create(const struct dpaa2_io_desc *desc,
