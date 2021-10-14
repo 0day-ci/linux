@@ -34,7 +34,9 @@ static void mlxbf_gige_get_regs(struct net_device *netdev,
 }
 
 static void mlxbf_gige_get_ringparam(struct net_device *netdev,
-				     struct ethtool_ringparam *ering)
+				     struct ethtool_ringparam *ering,
+				     struct ethtool_ringparam_ext *ering_ext,
+				     struct netlink_ext_ack *extack)
 {
 	struct mlxbf_gige *priv = netdev_priv(netdev);
 

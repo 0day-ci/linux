@@ -69,7 +69,9 @@ pasemi_mac_ethtool_set_msglevel(struct net_device *netdev,
 
 static void
 pasemi_mac_ethtool_get_ringparam(struct net_device *netdev,
-				 struct ethtool_ringparam *ering)
+				 struct ethtool_ringparam *ering,
+				 struct ethtool_ringparam_ext *ering_ext,
+				 struct netlink_ext_ack *extack)
 {
 	struct pasemi_mac *mac = netdev_priv(netdev);
 

@@ -1179,7 +1179,9 @@ static void ftgmac100_get_drvinfo(struct net_device *netdev,
 }
 
 static void ftgmac100_get_ringparam(struct net_device *netdev,
-				    struct ethtool_ringparam *ering)
+				    struct ethtool_ringparam *ering,
+				    struct ethtool_ringparam_ext *ering_ext,
+				    struct netlink_ext_ack *extack)
 {
 	struct ftgmac100 *priv = netdev_priv(netdev);
 
@@ -1191,7 +1193,9 @@ static void ftgmac100_get_ringparam(struct net_device *netdev,
 }
 
 static int ftgmac100_set_ringparam(struct net_device *netdev,
-				   struct ethtool_ringparam *ering)
+				   struct ethtool_ringparam *ering,
+				   struct ethtool_ringparam_ext *ering_ext,
+				   struct netlink_ext_ack *extack)
 {
 	struct ftgmac100 *priv = netdev_priv(netdev);
 

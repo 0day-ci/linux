@@ -1498,7 +1498,9 @@ static int bcm_enet_set_link_ksettings(struct net_device *dev,
 }
 
 static void bcm_enet_get_ringparam(struct net_device *dev,
-				   struct ethtool_ringparam *ering)
+				   struct ethtool_ringparam *ering,
+				   struct ethtool_ringparam_ext *ering_ext,
+				   struct netlink_ext_ack *extack)
 {
 	struct bcm_enet_priv *priv;
 
@@ -1512,7 +1514,9 @@ static void bcm_enet_get_ringparam(struct net_device *dev,
 }
 
 static int bcm_enet_set_ringparam(struct net_device *dev,
-				  struct ethtool_ringparam *ering)
+				  struct ethtool_ringparam *ering,
+				  struct ethtool_ringparam_ext *ering_ext,
+				  struct netlink_ext_ack *extack)
 {
 	struct bcm_enet_priv *priv;
 	int was_running;
@@ -2580,7 +2584,9 @@ static void bcm_enetsw_get_ethtool_stats(struct net_device *netdev,
 }
 
 static void bcm_enetsw_get_ringparam(struct net_device *dev,
-				     struct ethtool_ringparam *ering)
+				     struct ethtool_ringparam *ering,
+				     struct ethtool_ringparam_ext *ering_ext,
+				     struct netlink_ext_ack *extack)
 {
 	struct bcm_enet_priv *priv;
 
@@ -2596,7 +2602,9 @@ static void bcm_enetsw_get_ringparam(struct net_device *dev,
 }
 
 static int bcm_enetsw_set_ringparam(struct net_device *dev,
-				    struct ethtool_ringparam *ering)
+				    struct ethtool_ringparam *ering,
+				    struct ethtool_ringparam_ext *ering_ext,
+				    struct netlink_ext_ack *extack)
 {
 	struct bcm_enet_priv *priv;
 	int was_running;

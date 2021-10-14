@@ -5430,7 +5430,9 @@ static void mvpp2_ethtool_get_drvinfo(struct net_device *dev,
 }
 
 static void mvpp2_ethtool_get_ringparam(struct net_device *dev,
-					struct ethtool_ringparam *ring)
+					struct ethtool_ringparam *ring,
+					struct ethtool_ringparam_ext *ring_ext,
+					struct netlink_ext_ack *extack)
 {
 	struct mvpp2_port *port = netdev_priv(dev);
 
@@ -5441,7 +5443,9 @@ static void mvpp2_ethtool_get_ringparam(struct net_device *dev,
 }
 
 static int mvpp2_ethtool_set_ringparam(struct net_device *dev,
-				       struct ethtool_ringparam *ring)
+				       struct ethtool_ringparam *ring,
+				       struct ethtool_ringparam_ext *ring_ext,
+				       struct netlink_ext_ack *extack)
 {
 	struct mvpp2_port *port = netdev_priv(dev);
 	u16 prev_rx_ring_size = port->rx_ring_size;

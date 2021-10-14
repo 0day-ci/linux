@@ -622,7 +622,9 @@ static int xgbe_get_module_eeprom(struct net_device *netdev,
 }
 
 static void xgbe_get_ringparam(struct net_device *netdev,
-			       struct ethtool_ringparam *ringparam)
+			       struct ethtool_ringparam *ringparam,
+			       struct ethtool_ringparam_ext *ringparam_ext,
+			       struct netlink_ext_ack *extack)
 {
 	struct xgbe_prv_data *pdata = netdev_priv(netdev);
 
@@ -633,7 +635,9 @@ static void xgbe_get_ringparam(struct net_device *netdev,
 }
 
 static int xgbe_set_ringparam(struct net_device *netdev,
-			      struct ethtool_ringparam *ringparam)
+			      struct ethtool_ringparam *ringparam,
+			      struct ethtool_ringparam_ext *ringparam_ext,
+			      struct netlink_ext_ack *extack)
 {
 	struct xgbe_prv_data *pdata = netdev_priv(netdev);
 	unsigned int rx, tx;

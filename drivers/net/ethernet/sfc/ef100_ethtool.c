@@ -21,7 +21,9 @@
 #define EFX_EF100_MAX_DMAQ_SIZE 16384UL
 
 static void ef100_ethtool_get_ringparam(struct net_device *net_dev,
-					struct ethtool_ringparam *ring)
+					struct ethtool_ringparam *ring,
+					struct ethtool_ringparam_ext *ring_ext,
+					struct netlink_ext_ack *extack)
 {
 	struct efx_nic *efx = netdev_priv(net_dev);
 

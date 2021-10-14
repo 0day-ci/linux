@@ -568,7 +568,9 @@ static int igc_ethtool_set_eeprom(struct net_device *netdev,
 }
 
 static void igc_ethtool_get_ringparam(struct net_device *netdev,
-				      struct ethtool_ringparam *ring)
+				      struct ethtool_ringparam *ring,
+				      struct ethtool_ringparam_ext *ring_ext,
+				      struct netlink_ext_ack *extack)
 {
 	struct igc_adapter *adapter = netdev_priv(netdev);
 
@@ -579,7 +581,9 @@ static void igc_ethtool_get_ringparam(struct net_device *netdev,
 }
 
 static int igc_ethtool_set_ringparam(struct net_device *netdev,
-				     struct ethtool_ringparam *ring)
+				     struct ethtool_ringparam *ring,
+				     struct ethtool_ringparam_ext *ring_ext,
+				     struct netlink_ext_ack *extack)
 {
 	struct igc_adapter *adapter = netdev_priv(netdev);
 	struct igc_ring *temp_ring;

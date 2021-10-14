@@ -1603,7 +1603,9 @@ static void ravb_get_strings(struct net_device *ndev, u32 stringset, u8 *data)
 }
 
 static void ravb_get_ringparam(struct net_device *ndev,
-			       struct ethtool_ringparam *ring)
+			       struct ethtool_ringparam *ring,
+			       struct ethtool_ringparam_ext *ring_ext,
+			       struct netlink_ext_ack *extack)
 {
 	struct ravb_private *priv = netdev_priv(ndev);
 
@@ -1614,7 +1616,9 @@ static void ravb_get_ringparam(struct net_device *ndev,
 }
 
 static int ravb_set_ringparam(struct net_device *ndev,
-			      struct ethtool_ringparam *ring)
+			      struct ethtool_ringparam *ring,
+			      struct ethtool_ringparam_ext *ring_ext,
+			      struct netlink_ext_ack *extack)
 {
 	struct ravb_private *priv = netdev_priv(ndev);
 	const struct ravb_hw_info *info = priv->info;

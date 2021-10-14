@@ -2138,7 +2138,9 @@ emac_ethtool_set_link_ksettings(struct net_device *ndev,
 }
 
 static void emac_ethtool_get_ringparam(struct net_device *ndev,
-				       struct ethtool_ringparam *rp)
+				       struct ethtool_ringparam *rp,
+				       struct ethtool_ringparam_ext *rp_ext,
+				       struct netlink_ext_ack *extack)
 {
 	rp->rx_max_pending = rp->rx_pending = NUM_RX_BUFF;
 	rp->tx_max_pending = rp->tx_pending = NUM_TX_BUFF;
