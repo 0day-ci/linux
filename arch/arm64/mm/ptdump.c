@@ -309,6 +309,7 @@ static void note_page(struct ptdump_state *pt_st, unsigned long addr, int level,
 
 void ptdump_walk(struct seq_file *s, struct ptdump_info *info)
 {
+	struct mm_struct *mm = info->mm ?: current->mm;
 	unsigned long end = ~0UL;
 	struct pg_state st;
 
@@ -328,7 +329,7 @@ void ptdump_walk(struct seq_file *s, struct ptdump_info *info)
 		}
 	};
 
-	ptdump_walk_pgd(&st.ptdump, info->mm, NULL);
+	ptdump_walk_pgd(&st.ptdump, mm, NULL);
 }
 
 static void __init ptdump_initialize(void)
@@ -345,6 +346,16 @@ static struct ptdump_info kernel_ptdump_info = {
 	.mm		= &init_mm,
 	.markers	= address_markers,
 	.base_addr	= PAGE_OFFSET,
+};
+
+static struct addr_marker user_address_markers[] = {
+	{ 0,				"Userspace memory start" },
+	{ 0 /* TASK_SIZE_64 */,		"Userspace memory end" },
+	{ -1,				NULL },
+};
+
+static struct ptdump_info user_ptdump_info = {
+	.markers	= user_address_markers,
 };
 
 void ptdump_check_wx(void)
@@ -381,8 +392,10 @@ static int __init ptdump_init(void)
 #if defined(CONFIG_KASAN_GENERIC) || defined(CONFIG_KASAN_SW_TAGS)
 	address_markers[KASAN_START_NR].start_address = KASAN_SHADOW_START;
 #endif
+	user_address_markers[1].start_address = TASK_SIZE_64;
 	ptdump_initialize();
 	ptdump_debugfs_register(&kernel_ptdump_info, "kernel_page_tables");
+	ptdump_debugfs_register(&user_ptdump_info, "user_page_tables");
 	return 0;
 }
 device_initcall(ptdump_init);
