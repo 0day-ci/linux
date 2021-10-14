@@ -5735,13 +5735,17 @@ enum nl80211_tdls_operation {
 	NL80211_TDLS_DISABLE_LINK,
 };
 
-/*
+/**
  * enum nl80211_ap_sme_features - device-integrated AP features
- * Reserved for future use, no bits are defined in
- * NL80211_ATTR_DEVICE_AP_SME yet.
-enum nl80211_ap_sme_features {
-};
+ * @NL80211_DEVICE_AP_SME_SA_QUERY_OFFLOAD: Driver handles SA Query procedures.
+ *	If this flag is advertised by the driver, SA Query request/response
+ *	frames are handled within the driver and won't be reported to userspace.
+ *	Userspace shall skip SA Query specific validations if the driver is
+ *	advertizing this capability.
  */
+enum nl80211_ap_sme_features {
+	NL80211_DEVICE_AP_SME_SA_QUERY_OFFLOAD		= 1 << 0,
+};
 
 /**
  * enum nl80211_feature_flags - device/driver features
