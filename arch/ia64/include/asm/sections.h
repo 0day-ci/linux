@@ -9,6 +9,9 @@
 
 #include <linux/elf.h>
 #include <linux/uaccess.h>
+
+#define HAVE_FUNCTION_DESCRIPTORS 1
+
 #include <asm-generic/sections.h>
 
 extern char __phys_per_cpu_start[];
@@ -26,8 +29,6 @@ extern char __start_gate_fsyscall_patchlist[], __end_gate_fsyscall_patchlist[];
 extern char __start_gate_brl_fsys_bubble_down_patchlist[], __end_gate_brl_fsys_bubble_down_patchlist[];
 extern char __start_unwind[], __end_unwind[];
 extern char __start_ivt_text[], __end_ivt_text[];
-
-#define HAVE_DEREFERENCE_FUNCTION_DESCRIPTOR 1
 
 #undef dereference_function_descriptor
 static inline void *dereference_function_descriptor(void *ptr)
