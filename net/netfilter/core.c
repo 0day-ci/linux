@@ -42,7 +42,7 @@ EXPORT_SYMBOL(nf_hooks_needed);
 static DEFINE_MUTEX(nf_hook_mutex);
 
 /* max hooks per family/hooknum */
-#define MAX_HOOK_COUNT		1024
+#define MAX_HOOK_COUNT		32
 
 #define nf_entry_dereference(e) \
 	rcu_dereference_protected(e, lockdep_is_held(&nf_hook_mutex))
