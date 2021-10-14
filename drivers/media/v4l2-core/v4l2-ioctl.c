@@ -3279,6 +3279,10 @@ video_usercopy(struct file *file, unsigned int orig_cmd, unsigned long arg,
 
 	/*  Copy arguments into temp kernel buffer  */
 	if (_IOC_DIR(cmd) != _IOC_NONE) {
+#ifndef CONFIG_MMU
+		if (!arg)
+			return -EFAULT;
+#endif
 		if (ioc_size <= sizeof(sbuf)) {
 			parg = sbuf;
 		} else {

@@ -1254,6 +1254,11 @@ long v4l2_compat_ioctl32(struct file *file, unsigned int cmd, unsigned long arg)
 	if (!video_is_registered(vdev))
 		return -ENODEV;
 
+#ifndef CONFIG_MMU
+	if (_IOC_DIR(cmd) != _IOC_NONE && !arg)
+		return -EFAULT;
+#endif
+
 	if (_IOC_TYPE(cmd) == 'V' && _IOC_NR(cmd) < BASE_VIDIOC_PRIVATE)
 		ret = file->f_op->unlocked_ioctl(file, cmd,
 					(unsigned long)compat_ptr(arg));

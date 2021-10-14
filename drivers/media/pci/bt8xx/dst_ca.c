@@ -532,6 +532,10 @@ static long dst_ca_ioctl(struct file *file, unsigned int cmd, unsigned long ioct
 	void __user *arg = (void __user *)ioctl_arg;
 	int result = 0;
 
+#ifndef CONFIG_MMU
+	if (_IOC_DIR(cmd) != _IOC_NONE && !ioctl_arg)
+		return -EFAULT;
+#endif
 	mutex_lock(&dst_ca_mutex);
 	dvbdev = file->private_data;
 	state = (struct dst_state *)dvbdev->priv;

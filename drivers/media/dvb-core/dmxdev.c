@@ -1187,6 +1187,10 @@ static int dvb_demux_do_ioctl(struct file *file,
 static long dvb_demux_ioctl(struct file *file, unsigned int cmd,
 			    unsigned long arg)
 {
+#ifndef CONFIG_MMU
+	if (_IOC_DIR(cmd) != _IOC_NONE && !arg)
+		return -EFAULT;
+#endif
 	return dvb_usercopy(file, cmd, arg, dvb_demux_do_ioctl);
 }
 

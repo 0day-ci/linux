@@ -184,6 +184,10 @@ long dvb_generic_ioctl(struct file *file,
 	if (!dvbdev)
 		return -ENODEV;
 
+#ifndef CONFIG_MMU
+	if (_IOC_DIR(cmd) != _IOC_NONE && !arg)
+		return -EFAULT;
+#endif
 	if (!dvbdev->kernel_ioctl)
 		return -EINVAL;
 

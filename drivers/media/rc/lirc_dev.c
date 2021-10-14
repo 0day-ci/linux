@@ -372,6 +372,10 @@ static long lirc_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	u32 val = 0;
 	int ret;
 
+#ifndef CONFIG_MMU
+	if (_IOC_DIR(cmd) != _IOC_NONE && !arg)
+		return -EFAULT;
+#endif
 	if (_IOC_DIR(cmd) & _IOC_WRITE) {
 		ret = get_user(val, argp);
 		if (ret)

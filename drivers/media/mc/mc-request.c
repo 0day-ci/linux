@@ -223,6 +223,10 @@ static long media_request_ioctl(struct file *filp, unsigned int cmd,
 {
 	struct media_request *req = filp->private_data;
 
+#ifndef CONFIG_MMU
+	if (_IOC_DIR(cmd) != _IOC_NONE && !arg)
+		return -EFAULT;
+#endif
 	switch (cmd) {
 	case MEDIA_REQUEST_IOC_QUEUE:
 		return media_request_ioctl_queue(req);

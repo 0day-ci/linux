@@ -1422,6 +1422,10 @@ out_unlock:
 static long dvb_ca_en50221_io_ioctl(struct file *file,
 				    unsigned int cmd, unsigned long arg)
 {
+#ifndef CONFIG_MMU
+	if (_IOC_DIR(cmd) != _IOC_NONE && !arg)
+		return -EFAULT;
+#endif
 	return dvb_usercopy(file, cmd, arg, dvb_ca_en50221_io_do_ioctl);
 }
 

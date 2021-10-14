@@ -2100,6 +2100,10 @@ static long dvb_frontend_ioctl(struct file *file, unsigned int cmd,
 	if (!dvbdev)
 		return -ENODEV;
 
+#ifndef CONFIG_MMU
+	if (_IOC_DIR(cmd) != _IOC_NONE && !arg)
+		return -EFAULT;
+#endif
 	return dvb_usercopy(file, cmd, arg, dvb_frontend_do_ioctl);
 }
 
@@ -2136,6 +2140,10 @@ static int dvb_frontend_handle_compat_ioctl(struct file *file, unsigned int cmd,
 	struct dvb_frontend_private *fepriv = fe->frontend_priv;
 	int i, err = 0;
 
+#ifndef CONFIG_MMU
+	if (_IOC_DIR(cmd) != _IOC_NONE && !arg)
+		return -EFAULT;
+#endif
 	if (cmd == COMPAT_FE_SET_PROPERTY) {
 		struct compat_dtv_properties prop, *tvps = NULL;
 		struct compat_dtv_property *tvp = NULL;

@@ -511,6 +511,11 @@ static long cec_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	if (!cec_is_registered(adap))
 		return -ENODEV;
 
+#ifndef CONFIG_MMU
+	if (_IOC_DIR(cmd) != _IOC_NONE && !arg)
+		return -EFAULT;
+#endif
+
 	switch (cmd) {
 	case CEC_ADAP_G_CAPS:
 		return cec_adap_g_caps(adap, parg);
