@@ -19,6 +19,9 @@ static inline bool nf_hook_ingress_active(const struct sk_buff *skb)
 static inline int nf_hook_ingress(struct sk_buff *skb)
 {
 	struct nf_hook_entries *e = rcu_dereference(skb->dev->nf_hooks_ingress);
+#if IS_ENABLED(CONFIG_NF_HOOK_BPF)
+	const struct bpf_prog *prog;
+#endif
 	struct nf_hook_state state;
 	int ret;
 
@@ -31,7 +34,19 @@ static inline int nf_hook_ingress(struct sk_buff *skb)
 	nf_hook_state_init(&state, NF_NETDEV_INGRESS,
 			   NFPROTO_NETDEV, skb->dev, NULL, NULL,
 			   dev_net(skb->dev), NULL);
+
+#if IS_ENABLED(CONFIG_NF_HOOK_BPF)
+	prog = READ_ONCE(e->hook_prog);
+
+	state.priv = (void *)e;
+	state.skb = skb;
+
+	migrate_disable();
+	ret = bpf_prog_run_nf(prog, &state);
+	migrate_enable();
+#else
 	ret = nf_hook_slow(skb, &state, e);
+#endif
 	if (ret == 0)
 		return -1;
 
