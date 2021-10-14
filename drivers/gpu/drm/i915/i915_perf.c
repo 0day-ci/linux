@@ -3444,10 +3444,10 @@ i915_perf_open_ioctl_locked(struct i915_perf *perf,
 	 * MI_REPORT_PERF_COUNT commands and so consider it a privileged op to
 	 * enable the OA unit by default.
 	 *
-	 * For Gen12+ we gain a new OAR unit that only monitors the RCS on a
-	 * per context basis. So we can relax requirements there if the user
-	 * doesn't request global stream access (i.e. query based sampling
-	 * using MI_RECORD_PERF_COUNT.
+	 * For Graphics 12 and newer platforms, we gain a new OAR unit that only
+	 * monitors the RCS on a per context basis. So we can relax requirements
+	 * there if the user doesn't request global stream access (i.e. query
+	 * based sampling using MI_RECORD_PERF_COUNT.
 	 */
 	if (IS_HASWELL(perf->i915) && specific_ctx)
 		privileged_op = false;

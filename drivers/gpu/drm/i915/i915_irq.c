@@ -2362,7 +2362,7 @@ gen8_de_misc_irq_handler(struct drm_i915_private *dev_priv, u32 iir)
 
 			intel_psr_irq_handler(intel_dp, psr_iir);
 
-			/* prior GEN12 only have one EDP PSR */
+			/* prior Display 12 only have one EDP PSR */
 			if (DISPLAY_VER(dev_priv) < 12)
 				break;
 		}
