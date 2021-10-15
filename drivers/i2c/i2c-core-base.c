@@ -1047,8 +1047,6 @@ i2c_new_client_device(struct i2c_adapter *adap, struct i2c_board_info const *inf
 	client->dev.of_node = of_node_get(info->of_node);
 	client->dev.fwnode = info->fwnode;
 
-	i2c_dev_set_name(adap, client, info);
-
 	if (info->swnode) {
 		status = device_add_software_node(&client->dev, info->swnode);
 		if (status) {
@@ -1059,17 +1057,20 @@ i2c_new_client_device(struct i2c_adapter *adap, struct i2c_board_info const *inf
 		}
 	}
 
+	i2c_dev_set_name(adap, client, info);
 	status = device_register(&client->dev);
-	if (status)
-		goto out_remove_swnode;
+	if (status) {
+		device_remove_software_node(&client->dev);
+		of_node_put(info->of_node);
+		put_device(&client->dev);
+		return ERR_PTR(status);
+	}
 
 	dev_dbg(&adap->dev, "client [%s] registered with bus id %s\n",
 		client->name, dev_name(&client->dev));
 
 	return client;
 
-out_remove_swnode:
-	device_remove_software_node(&client->dev);
 out_err_put_of_node:
 	of_node_put(info->of_node);
 out_err:
