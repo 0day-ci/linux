@@ -1969,6 +1969,13 @@ static int zram_remove(struct zram *zram)
 	pr_info("Removed device: %s\n", zram->disk->disk_name);
 
 	del_gendisk(zram->disk);
+
+	/*
+	 * disksize store may come after the above zram_reset_device
+	 * returns, so run the last reset to avoid the race
+	 */
+	zram_reset_device(zram);
+
 	blk_cleanup_disk(zram->disk);
 	kfree(zram);
 	return 0;
