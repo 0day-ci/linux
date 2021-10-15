@@ -751,6 +751,12 @@ bool blk_mq_complete_request_remote(struct request *rq)
 }
 EXPORT_SYMBOL_GPL(blk_mq_complete_request_remote);
 
+void blk_mq_complete_request_direct(struct request *rq)
+{
+	WRITE_ONCE(rq->state, MQ_RQ_COMPLETE);
+	rq->q->mq_ops->complete(rq);
+}
+
 /**
  * blk_mq_complete_request - end I/O on a request
  * @rq:		the request being processed
