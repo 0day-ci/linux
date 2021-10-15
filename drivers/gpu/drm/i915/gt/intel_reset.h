@@ -38,6 +38,7 @@ int __intel_engine_reset_bh(struct intel_engine_cs *engine,
 
 void __i915_request_reset(struct i915_request *rq, bool guilty);
 
+bool __must_check intel_gt_reset_trylock_no_wait(struct intel_gt *gt, int *srcu);
 int __must_check intel_gt_reset_trylock(struct intel_gt *gt, int *srcu);
 void intel_gt_reset_unlock(struct intel_gt *gt, int tag);
 
