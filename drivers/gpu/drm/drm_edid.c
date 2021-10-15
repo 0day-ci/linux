@@ -5358,10 +5358,12 @@ int drm_add_edid_modes(struct drm_connector *connector, struct edid *edid)
 
 	if (edid == NULL) {
 		clear_eld(connector);
+		drm_reset_display_info(connector);
 		return 0;
 	}
 	if (!drm_edid_is_valid(edid)) {
 		clear_eld(connector);
+		drm_reset_display_info(connector);
 		drm_warn(connector->dev, "%s: EDID invalid.\n",
 			 connector->name);
 		return 0;
