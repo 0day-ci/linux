@@ -375,7 +375,7 @@ static ssize_t smm665_show_##what(struct device *dev, \
 { \
 	struct sensor_device_attribute *attr = to_sensor_dev_attr(da); \
 	const int val = smm665_get_##what(dev, attr->index); \
-	return snprintf(buf, PAGE_SIZE, "%d\n", val); \
+	return sysfs_emit(buf, "%d\n", val); \
 }
 
 SMM665_SHOW(min);
