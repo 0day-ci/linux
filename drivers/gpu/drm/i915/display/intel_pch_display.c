@@ -470,6 +470,16 @@ void lpt_pch_enable(struct intel_atomic_state *state,
 	lpt_enable_pch_transcoder(dev_priv, cpu_transcoder);
 }
 
+void lpt_pch_disable(struct intel_atomic_state *state,
+		     struct intel_crtc *crtc)
+{
+	struct drm_i915_private *dev_priv = to_i915(crtc->base.dev);
+
+	lpt_disable_pch_transcoder(dev_priv);
+
+	lpt_disable_iclkip(dev_priv);
+}
+
 void lpt_pch_get_config(struct intel_crtc_state *crtc_state)
 {
 	struct intel_crtc *crtc = to_intel_crtc(crtc_state->uapi.crtc);
