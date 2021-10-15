@@ -1576,14 +1576,29 @@ static blk_status_t scsi_prepare_cmd(struct request *req)
 	return scsi_cmd_to_driver(cmd)->init_command(cmd);
 }
 
-static void scsi_mq_done(struct scsi_cmnd *cmd)
+static void _scsi_mq_done(struct scsi_cmnd *cmd)
 {
 	if (unlikely(blk_should_fake_timeout(scsi_cmd_to_rq(cmd)->q)))
 		return;
 	if (unlikely(test_and_set_bit(SCMD_STATE_COMPLETE, &cmd->state)))
 		return;
 	trace_scsi_dispatch_cmd_done(cmd);
+}
+
+static void scsi_mq_done(struct scsi_cmnd *cmd)
+{
+	_scsi_mq_done(cmd);
 	blk_mq_complete_request(scsi_cmd_to_rq(cmd));
+}
+
+void scsi_done_preemptible(struct scsi_cmnd *scmd)
+{
+	if (scmd->scsi_done != scsi_mq_done) {
+		scmd->scsi_done(scmd);
+		return;
+	}
+	_scsi_mq_done(scmd);
+	blk_mq_complete_request_direct(scsi_cmd_to_rq(scmd));
 }
 
 static void scsi_mq_put_budget(struct request_queue *q, int budget_token)

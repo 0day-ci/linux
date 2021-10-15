@@ -417,7 +417,7 @@ SkipForAbort:
 		if (srb) {
 			usb_stor_dbg(us, "scsi cmd done, result=0x%x\n",
 					srb->result);
-			srb->scsi_done(srb);
+			scsi_done_preemptible(srb);
 		}
 	} /* for (;;) */
 

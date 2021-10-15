@@ -396,4 +396,11 @@ static inline unsigned scsi_transfer_length(struct scsi_cmnd *scmd)
 extern void scsi_build_sense(struct scsi_cmnd *scmd, int desc,
 			     u8 key, u8 asc, u8 ascq);
 
+static inline void scsi_done(struct scsi_cmnd *scmd)
+{
+	scmd->scsi_done(scmd);
+}
+
+extern void scsi_done_preemptible(struct scsi_cmnd *scmd);
+
 #endif /* _SCSI_SCSI_CMND_H */
