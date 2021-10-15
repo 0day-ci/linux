@@ -724,7 +724,7 @@ void serial8250_rpm_get_tx(struct uart_8250_port *p)
 	rpm_active = xchg(&p->rpm_tx_active, 1);
 	if (rpm_active)
 		return;
-	pm_runtime_get_sync(p->port.dev);
+	pm_runtime_get(p->port.dev);
 }
 EXPORT_SYMBOL_GPL(serial8250_rpm_get_tx);
 
@@ -2507,6 +2507,42 @@ static void serial8250_shutdown(struct uart_port *port)
 		serial8250_do_shutdown(port);
 }
 
+/*
+ * Wakes up the serial port if it has been runtime PM suspended.
+ *
+ * Note that we rely on the serial8250_rpm functions to manage the
+ * runtime PM usage count. We also currently depend on the runtime
+ * PM autosuspend timeout to keep the port awake until start_tx().
+ * Eventually we should just use runtime PM functions and not rely
+ * on the autosuspend timeout.
+ *
+ * Caller must hold port->lock for port->runtime_suspended status.
+ * Also the port drivers must hold port->lock when changing the
+ * state for port->runtime_suspended in runtime PM functions.
+ */
+static int serial8250_wakeup(struct uart_port *port)
+{
+	struct uart_8250_port *up = up_to_u8250p(port);
+	struct device *dev = up->port.dev;
+	int err;
+
+	if (!(up->capabilities & UART_CAP_RPM))
+		return 0;
+
+	if (!port->runtime_suspended) {
+		pm_runtime_mark_last_busy(dev);
+		return 0;
+	}
+
+	err = pm_request_resume(dev);
+	if (err < 0) {
+		dev_warn(dev, "wakeup failed: %d\n", err);
+		return err;
+	}
+
+	return -EINPROGRESS;
+}
+
 /* Nuvoton NPCM UARTs have a custom divisor calculation */
 static unsigned int npcm_get_divisor(struct uart_8250_port *up,
 		unsigned int baud)
@@ -3235,6 +3271,7 @@ static const struct uart_ops serial8250_pops = {
 	.break_ctl	= serial8250_break_ctl,
 	.startup	= serial8250_startup,
 	.shutdown	= serial8250_shutdown,
+	.wakeup		= serial8250_wakeup,
 	.set_termios	= serial8250_set_termios,
 	.set_ldisc	= serial8250_set_ldisc,
 	.pm		= serial8250_pm,
