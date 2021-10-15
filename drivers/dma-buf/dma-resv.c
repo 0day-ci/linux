@@ -617,18 +617,18 @@ EXPORT_SYMBOL_GPL(dma_resv_get_fences);
 long dma_resv_wait_timeout(struct dma_resv *obj, bool wait_all, bool intr,
 			   unsigned long timeout)
 {
-	long ret = timeout ? timeout : 1;
+	long ret = timeout ?: 1;
 	struct dma_resv_iter cursor;
 	struct dma_fence *fence;
 
 	dma_resv_iter_begin(&cursor, obj, wait_all);
 	dma_resv_for_each_fence_unlocked(&cursor, fence) {
+		ret = dma_fence_wait_timeout(fence, intr, timeout);
+		if (ret <= 0)
+			break;
 
-		ret = dma_fence_wait_timeout(fence, intr, ret);
-		if (ret <= 0) {
-			dma_resv_iter_end(&cursor);
-			return ret;
-		}
+		if (timeout)
+			timeout = ret;
 	}
 	dma_resv_iter_end(&cursor);
 
