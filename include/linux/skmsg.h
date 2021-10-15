@@ -390,6 +390,7 @@ void sk_psock_stop(struct sk_psock *psock, bool wait);
 int sk_psock_init_strp(struct sock *sk, struct sk_psock *psock);
 void sk_psock_start_strp(struct sock *sk, struct sk_psock *psock);
 void sk_psock_stop_strp(struct sock *sk, struct sk_psock *psock);
+bool sk_psock_strparser_started(struct sock *sk);
 #else
 static inline int sk_psock_init_strp(struct sock *sk, struct sk_psock *psock)
 {
@@ -402,6 +403,11 @@ static inline void sk_psock_start_strp(struct sock *sk, struct sk_psock *psock)
 
 static inline void sk_psock_stop_strp(struct sock *sk, struct sk_psock *psock)
 {
+}
+
+static inline bool sk_psock_strparser_started(struct sock *sk)
+{
+	return false;
 }
 #endif
 

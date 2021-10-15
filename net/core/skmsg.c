@@ -1085,6 +1085,11 @@ void sk_psock_start_strp(struct sock *sk, struct sk_psock *psock)
 	sk->sk_write_space = sk_psock_write_space;
 }
 
+bool sk_psock_strparser_started(struct sock *sk)
+{
+	return sk->sk_data_ready == sk_psock_strp_data_ready;
+}
+
 void sk_psock_stop_strp(struct sock *sk, struct sk_psock *psock)
 {
 	if (!psock->saved_data_ready)

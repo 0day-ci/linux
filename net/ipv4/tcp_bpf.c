@@ -198,6 +198,7 @@ static int tcp_bpf_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 	if (unlikely(!psock))
 		return tcp_recvmsg(sk, msg, len, nonblock, flags, addr_len);
 	if (!skb_queue_empty(&sk->sk_receive_queue) &&
+	    !sk_psock_strparser_started(sk) &&
 	    sk_psock_queue_empty(psock)) {
 		sk_psock_put(sk, psock);
 		return tcp_recvmsg(sk, msg, len, nonblock, flags, addr_len);
@@ -214,9 +215,11 @@ msg_bytes_ready:
 		if (data) {
 			if (!sk_psock_queue_empty(psock))
 				goto msg_bytes_ready;
-			release_sock(sk);
-			sk_psock_put(sk, psock);
-			return tcp_recvmsg(sk, msg, len, nonblock, flags, addr_len);
+			if (!sk_psock_strparser_started(sk)) {
+				release_sock(sk);
+				sk_psock_put(sk, psock);
+				return tcp_recvmsg(sk, msg, len, nonblock, flags, addr_len);
+			}
 		}
 		copied = -EAGAIN;
 	}
