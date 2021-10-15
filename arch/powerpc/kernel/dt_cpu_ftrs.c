@@ -269,6 +269,7 @@ static int __init feat_enable_idle_stop(struct dt_cpu_feature *f)
 
 static int __init feat_enable_mmu_hash(struct dt_cpu_feature *f)
 {
+#ifdef CONFIG_PPC_64S_HASH_MMU
 	u64 lpcr;
 
 	lpcr = mfspr(SPRN_LPCR);
@@ -284,10 +285,13 @@ static int __init feat_enable_mmu_hash(struct dt_cpu_feature *f)
 	cur_cpu_spec->cpu_user_features |= PPC_FEATURE_HAS_MMU;
 
 	return 1;
+#endif
+	return 0;
 }
 
 static int __init feat_enable_mmu_hash_v3(struct dt_cpu_feature *f)
 {
+#ifdef CONFIG_PPC_64S_HASH_MMU
 	u64 lpcr;
 
 	lpcr = mfspr(SPRN_LPCR);
@@ -298,14 +302,16 @@ static int __init feat_enable_mmu_hash_v3(struct dt_cpu_feature *f)
 	cur_cpu_spec->cpu_user_features |= PPC_FEATURE_HAS_MMU;
 
 	return 1;
+#endif
+	return 0;
 }
 
 
 static int __init feat_enable_mmu_radix(struct dt_cpu_feature *f)
 {
 #ifdef CONFIG_PPC_RADIX_MMU
+	cur_cpu_spec->mmu_features |= MMU_FTR_KERNEL_RO;
 	cur_cpu_spec->mmu_features |= MMU_FTR_TYPE_RADIX;
-	cur_cpu_spec->mmu_features |= MMU_FTRS_HASH_BASE;
 	cur_cpu_spec->mmu_features |= MMU_FTR_GTSE;
 	cur_cpu_spec->cpu_user_features |= PPC_FEATURE_HAS_MMU;
 

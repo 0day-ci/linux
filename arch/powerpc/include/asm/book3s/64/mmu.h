@@ -98,7 +98,9 @@ typedef struct {
 		 * from EA and new context ids to build the new VAs.
 		 */
 		mm_context_id_t id;
+#ifdef CONFIG_PPC_64S_HASH_MMU
 		mm_context_id_t extended_id[TASK_SIZE_USER64/TASK_CONTEXT_SIZE];
+#endif
 	};
 
 	/* Number of bits in the mm_cpumask */
@@ -110,7 +112,9 @@ typedef struct {
 	/* Number of user space windows opened in process mm_context */
 	atomic_t vas_windows;
 
+#ifdef CONFIG_PPC_64S_HASH_MMU
 	struct hash_mm_context *hash_context;
+#endif
 
 	void __user *vdso;
 	/*
@@ -133,6 +137,7 @@ typedef struct {
 #endif
 } mm_context_t;
 
+#ifdef CONFIG_PPC_64S_HASH_MMU
 static inline u16 mm_ctx_user_psize(mm_context_t *ctx)
 {
 	return ctx->hash_context->user_psize;
@@ -187,11 +192,22 @@ static inline struct subpage_prot_table *mm_ctx_subpage_prot(mm_context_t *ctx)
 }
 #endif
 
+#endif
+
 /*
  * The current system page and segment sizes
  */
-extern int mmu_linear_psize;
+#if defined(CONFIG_PPC_RADIX_MMU) && !defined(CONFIG_PPC_64S_HASH_MMU)
+#ifdef CONFIG_PPC_64K_PAGES
+#define mmu_virtual_psize MMU_PAGE_64K
+#else
+#define mmu_virtual_psize MMU_PAGE_4K
+#endif
+#else
 extern int mmu_virtual_psize;
+#endif
+
+extern int mmu_linear_psize;
 extern int mmu_vmalloc_psize;
 extern int mmu_vmemmap_psize;
 extern int mmu_io_psize;
@@ -228,6 +244,7 @@ extern void hash__setup_initial_memory_limit(phys_addr_t first_memblock_base,
 static inline void setup_initial_memory_limit(phys_addr_t first_memblock_base,
 					      phys_addr_t first_memblock_size)
 {
+#ifdef CONFIG_PPC_64S_HASH_MMU
 	/*
 	 * Hash has more strict restrictions. At this point we don't
 	 * know which translations we will pick. Hence go with hash
@@ -235,6 +252,7 @@ static inline void setup_initial_memory_limit(phys_addr_t first_memblock_base,
 	 */
 	return hash__setup_initial_memory_limit(first_memblock_base,
 					   first_memblock_size);
+#endif
 }
 
 #ifdef CONFIG_PPC_PSERIES
@@ -255,6 +273,7 @@ static inline void radix_init_pseries(void) { }
 void cleanup_cpu_mmu_context(void);
 #endif
 
+#ifdef CONFIG_PPC_64S_HASH_MMU
 static inline int get_user_context(mm_context_t *ctx, unsigned long ea)
 {
 	int index = ea >> MAX_EA_BITS_PER_CONTEXT;
@@ -274,6 +293,7 @@ static inline unsigned long get_user_vsid(mm_context_t *ctx,
 
 	return get_vsid(context, ea, ssize);
 }
+#endif
 
 #endif /* __ASSEMBLY__ */
 #endif /* _ASM_POWERPC_BOOK3S_64_MMU_H_ */
