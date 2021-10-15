@@ -151,7 +151,6 @@ static bool rep;			/* flag telling character repeat */
 
 static int shift_state = 0;
 
-static unsigned int ledstate = -1U;			/* undefined */
 static unsigned char ledioctl;
 
 /*
@@ -1021,10 +1020,14 @@ struct kbd_led_trigger {
 
 static int kbd_led_trigger_activate(struct led_classdev *cdev)
 {
+	unsigned int ledstate;
+
 	struct kbd_led_trigger *trigger =
 		container_of(cdev->trigger, struct kbd_led_trigger, trigger);
 
 	tasklet_disable(&keyboard_tasklet);
+
+	ledstate = input_get_ledstate();
 	if (ledstate != -1U)
 		led_trigger_event(&trigger->trigger,
 				  ledstate & trigger->mask ?
@@ -1137,6 +1140,10 @@ static void kbd_init_leds(void)
  */
 static unsigned char getledstate(void)
 {
+	unsigned int ledstate;
+
+	ledstate = input_get_ledstate();
+
 	return ledstate & 0xff;
 }
 
@@ -1248,16 +1255,21 @@ void vt_kbd_con_stop(int console)
 static void kbd_bh(struct tasklet_struct *unused)
 {
 	unsigned int leds;
+	unsigned int ledstate;
 	unsigned long flags;
+	struct kbd_struct *kb = kbd_table + fg_console;
+
+	if (kb->kbdmode == VC_OFF)
+		return;
 
 	spin_lock_irqsave(&led_lock, flags);
 	leds = getleds();
+	ledstate = input_get_ledstate();
 	leds |= (unsigned int)kbd->lockstate << 8;
 	spin_unlock_irqrestore(&led_lock, flags);
 
 	if (leds != ledstate) {
 		kbd_propagate_led_state(ledstate, leds);
-		ledstate = leds;
 	}
 }
 
@@ -1604,8 +1616,11 @@ static void kbd_disconnect(struct input_handle *handle)
  */
 static void kbd_start(struct input_handle *handle)
 {
+	unsigned int ledstate;
+
 	tasklet_disable(&keyboard_tasklet);
 
+	ledstate = input_get_ledstate();
 	if (ledstate != -1U)
 		kbd_update_leds_helper(handle, &ledstate);
 

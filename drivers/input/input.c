@@ -37,6 +37,11 @@ static DEFINE_IDA(input_ida);
 static LIST_HEAD(input_dev_list);
 static LIST_HEAD(input_handler_list);
 
+#define VC_SCROLLOCK	0	/* scroll-lock mode */
+#define VC_NUMLOCK	1	/* numeric lock mode */
+#define VC_CAPSLOCK	2	/* capslock mode */
+static unsigned int ledstate = -1U;			/* undefined */
+
 /*
  * input_mutex protects access to both input_dev_list and input_handler_list.
  * This also causes input_[un]register_device and input_[un]register_handler
@@ -472,14 +477,53 @@ void input_inject_event(struct input_handle *handle,
 
 		rcu_read_lock();
 		grab = rcu_dereference(dev->grab);
-		if (!grab || grab == handle)
+		if (!grab || grab == handle) {
 			input_handle_event(dev, type, code, value);
+
+			if (type == EV_LED && code <= LED_SCROLLL)
+				input_update_ledstate(code, value);
+		}
 		rcu_read_unlock();
 
 		spin_unlock_irqrestore(&dev->event_lock, flags);
 	}
 }
 EXPORT_SYMBOL(input_inject_event);
+
+void input_update_ledstate(unsigned int flag, unsigned int value)
+{
+	unsigned int bit;
+
+	switch (flag) {
+	case LED_NUML:
+		bit = VC_NUMLOCK;
+		break;
+	case LED_CAPSL:
+		bit = VC_CAPSLOCK;
+		break;
+	case LED_SCROLLL:
+		bit = VC_SCROLLOCK;
+		break;
+	default:
+		WARN_ON_ONCE(1);
+		return;
+	}
+
+	if (ledstate == -1U)
+		ledstate = 0;
+
+	if (value)
+		ledstate |= BIT(bit);
+	else
+		ledstate &= ~BIT(bit);
+}
+EXPORT_SYMBOL(input_update_ledstate);
+
+unsigned int input_get_ledstate(void)
+{
+	return ledstate;
+}
+EXPORT_SYMBOL(input_get_ledstate);
 
 /**
  * input_alloc_absinfo - allocates array of input_absinfo structs
