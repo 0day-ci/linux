@@ -133,6 +133,7 @@ struct neigh_table nd_tbl = {
 			[NEIGH_VAR_PROXY_QLEN] = 64,
 			[NEIGH_VAR_ANYCAST_DELAY] = 1 * HZ,
 			[NEIGH_VAR_PROXY_DELAY] = (8 * HZ) / 10,
+			[NEIGH_VAR_EVICT_NOCARRIER] = 1,
 		},
 	},
 	.gc_interval =	  30 * HZ,

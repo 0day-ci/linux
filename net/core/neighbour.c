@@ -308,7 +308,8 @@ static void neigh_flush_dev(struct neigh_table *tbl, struct net_device *dev,
 				np = &n->next;
 				continue;
 			}
-			if (skip_perm && n->nud_state & NUD_PERMANENT) {
+			if ((skip_perm && n->nud_state & NUD_PERMANENT) ||
+			    !NEIGH_VAR(n->parms, EVICT_NOCARRIER)) {
 				np = &n->next;
 				continue;
 			}
@@ -2020,7 +2021,9 @@ static int neightbl_fill_parms(struct sk_buff *skb, struct neigh_parms *parms)
 	    nla_put_msecs(skb, NDTPA_PROXY_DELAY,
 			  NEIGH_VAR(parms, PROXY_DELAY), NDTPA_PAD) ||
 	    nla_put_msecs(skb, NDTPA_LOCKTIME,
-			  NEIGH_VAR(parms, LOCKTIME), NDTPA_PAD))
+			  NEIGH_VAR(parms, LOCKTIME), NDTPA_PAD) ||
+	    nla_put_u8(skb, NDTPA_EVICT_NOCARRIER,
+			  NEIGH_VAR(parms, EVICT_NOCARRIER)))
 		goto nla_put_failure;
 	return nla_nest_end(skb, nest);
 
@@ -2175,6 +2178,7 @@ static const struct nla_policy nl_ntbl_parm_policy[NDTPA_MAX+1] = {
 	[NDTPA_ANYCAST_DELAY]		= { .type = NLA_U64 },
 	[NDTPA_PROXY_DELAY]		= { .type = NLA_U64 },
 	[NDTPA_LOCKTIME]		= { .type = NLA_U64 },
+	[NDTPA_EVICT_NOCARRIER]		= { .type = NLA_U8 },
 };
 
 static int neightbl_set(struct sk_buff *skb, struct nlmsghdr *nlh,
@@ -2309,6 +2313,9 @@ static int neightbl_set(struct sk_buff *skb, struct nlmsghdr *nlh,
 				NEIGH_VAR_SET(p, LOCKTIME,
 					      nla_get_msecs(tbp[i]));
 				break;
+			case NDTPA_EVICT_NOCARRIER:
+				NEIGH_VAR_SET(p, EVICT_NOCARRIER,
+					      nla_get_u8(tbp[i]));
 			}
 		}
 	}
@@ -3591,6 +3598,7 @@ static struct neigh_sysctl_table {
 		NEIGH_SYSCTL_UNRES_QLEN_REUSED_ENTRY(QUEUE_LEN, QUEUE_LEN_BYTES, "unres_qlen"),
 		NEIGH_SYSCTL_MS_JIFFIES_REUSED_ENTRY(RETRANS_TIME_MS, RETRANS_TIME, "retrans_time_ms"),
 		NEIGH_SYSCTL_MS_JIFFIES_REUSED_ENTRY(BASE_REACHABLE_TIME_MS, BASE_REACHABLE_TIME, "base_reachable_time_ms"),
+		NEIGH_SYSCTL_ZERO_INTMAX_ENTRY(EVICT_NOCARRIER, "evict_nocarrier"),
 		[NEIGH_VAR_GC_INTERVAL] = {
 			.procname	= "gc_interval",
 			.maxlen		= sizeof(int),

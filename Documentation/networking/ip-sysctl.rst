@@ -200,6 +200,15 @@ neigh/default/unres_qlen - INTEGER
 
 	Default: 101
 
+neigh/default/evict_nocarrier - BOOLEAN
+	Clears the neighbor cache on NOCARRIER events. This option is important
+	for wireless devices where the cache should not be cleared when roaming
+	between access points on the same network. In most cases this should
+	remain as the default (1).
+
+	- 1 - (default): Clear the neighbor cache on NOCARRIER events
+	- 0 - Do not clear neighbor cache on NOCARRIER events
+
 mtu_expires - INTEGER
 	Time, in seconds, that cached PMTU information is kept.
 

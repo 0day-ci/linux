@@ -138,6 +138,7 @@ enum {
 	NDTPA_LOCKTIME,			/* u64, msecs */
 	NDTPA_QUEUE_LENBYTES,		/* u32 */
 	NDTPA_MCAST_REPROBES,		/* u32 */
+	NDTPA_EVICT_NOCARRIER,		/* u8 */
 	NDTPA_PAD,
 	__NDTPA_MAX
 };
