@@ -10264,10 +10264,10 @@ static void rebalance_domains(struct rq *rq, enum cpu_idle_type idle)
 		 * Decay the newidle max times here because this is a regular
 		 * visit to all the domains. Decay ~1% per second.
 		 */
-		if (time_after(jiffies, sd->next_decay_max_lb_cost)) {
+		if (time_after(jiffies, sd->last_decay_max_lb_cost + HZ)) {
 			sd->max_newidle_lb_cost =
 				(sd->max_newidle_lb_cost * 253) / 256;
-			sd->next_decay_max_lb_cost = jiffies + HZ;
+			sd->last_decay_max_lb_cost = jiffies;
 			need_decay = 1;
 		}
 		max_cost += sd->max_newidle_lb_cost;
@@ -10911,8 +10911,10 @@ static int newidle_balance(struct rq *this_rq, struct rq_flags *rf)
 
 			t1 = sched_clock_cpu(this_cpu);
 			domain_cost = t1 - t0;
-			if (domain_cost > sd->max_newidle_lb_cost)
+			if (domain_cost > sd->max_newidle_lb_cost) {
 				sd->max_newidle_lb_cost = domain_cost;
+				sd->last_decay_max_lb_cost = jiffies;
+			}
 
 			curr_cost += domain_cost;
 			t0 = t1;
