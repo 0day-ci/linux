@@ -354,27 +354,14 @@ out_cnt:
 
 void *rxe_alloc(struct rxe_pool *pool)
 {
-	struct rxe_type_info *info = &rxe_type_info[pool->type];
-	struct rxe_pool_entry *elem;
+	unsigned long flags;
 	u8 *obj;
 
-	if (atomic_inc_return(&pool->num_elem) > pool->max_elem)
-		goto out_cnt;
-
-	obj = kzalloc(info->size, GFP_KERNEL);
-	if (!obj)
-		goto out_cnt;
-
-	elem = (struct rxe_pool_entry *)(obj + info->elem_offset);
-
-	elem->pool = pool;
-	kref_init(&elem->ref_cnt);
+	write_lock_irqsave(&pool->pool_lock, flags);
+	obj = rxe_alloc_locked(pool);
+	write_unlock_irqrestore(&pool->pool_lock, flags);
 
 	return obj;
-
-out_cnt:
-	atomic_dec(&pool->num_elem);
-	return NULL;
 }
 
 int __rxe_add_to_pool(struct rxe_pool *pool, struct rxe_pool_entry *elem)
