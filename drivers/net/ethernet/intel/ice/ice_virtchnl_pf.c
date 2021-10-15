@@ -1975,8 +1975,10 @@ static int ice_ena_vfs(struct ice_pf *pf, u16 num_vfs)
 
 	clear_bit(ICE_VF_DIS, pf->state);
 
-	if (ice_eswitch_configure(pf))
+	if (ice_eswitch_configure(pf)) {
+		ret = -EINVAL;
 		goto err_unroll_sriov;
+	}
 
 	return 0;
 
