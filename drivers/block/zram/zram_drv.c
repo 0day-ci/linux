@@ -55,6 +55,8 @@ static size_t huge_class_size;
 static const struct block_device_operations zram_devops;
 static const struct block_device_operations zram_wb_devops;
 
+static struct lock_class_key zram_open_lock_key;
+
 static void zram_free_page(struct zram *zram, size_t index);
 static int zram_bvec_read(struct zram *zram, struct bio_vec *bvec,
 				u32 index, int offset, struct bio *bio);
@@ -1778,44 +1780,21 @@ static ssize_t reset_store(struct device *dev,
 	bdev = zram->disk->part0;
 
 	mutex_lock(&bdev->bd_disk->open_mutex);
-	/* Do not reset an active device or claimed device */
-	if (bdev->bd_openers || zram->claim) {
+	/* Do not reset an active device */
+	if (bdev->bd_openers) {
 		mutex_unlock(&bdev->bd_disk->open_mutex);
 		return -EBUSY;
 	}
 
-	/* From now on, anyone can't open /dev/zram[0-9] */
-	zram->claim = true;
-	mutex_unlock(&bdev->bd_disk->open_mutex);
-
 	/* Make sure all the pending I/O are finished */
 	sync_blockdev(bdev);
 	zram_reset_device(zram);
-
-	mutex_lock(&bdev->bd_disk->open_mutex);
-	zram->claim = false;
 	mutex_unlock(&bdev->bd_disk->open_mutex);
 
 	return len;
 }
 
-static int zram_open(struct block_device *bdev, fmode_t mode)
-{
-	int ret = 0;
-	struct zram *zram;
-
-	WARN_ON(!mutex_is_locked(&bdev->bd_disk->open_mutex));
-
-	zram = bdev->bd_disk->private_data;
-	/* zram was claimed to reset so open request fails */
-	if (zram->claim)
-		ret = -EBUSY;
-
-	return ret;
-}
-
 static const struct block_device_operations zram_devops = {
-	.open = zram_open,
 	.submit_bio = zram_submit_bio,
 	.swap_slot_free_notify = zram_slot_free_notify,
 	.rw_page = zram_rw_page,
@@ -1823,7 +1802,6 @@ static const struct block_device_operations zram_devops = {
 };
 
 static const struct block_device_operations zram_wb_devops = {
-	.open = zram_open,
 	.submit_bio = zram_submit_bio,
 	.swap_slot_free_notify = zram_slot_free_notify,
 	.owner = THIS_MODULE
@@ -1918,6 +1896,13 @@ static int zram_add(void)
 	zram->disk->private_data = zram;
 	snprintf(zram->disk->disk_name, 16, "zram%d", device_id);
 
+	/*
+	 * avoid false warning on disk->open_mutex because we hold
+	 * init_lock before acquiring backing disk's open_mutex, see
+	 * backing_dev_store()
+	 */
+	lockdep_set_class(&zram->disk->open_mutex, &zram_open_lock_key);
+
 	/* Actual capacity set using syfs (/sys/block/zram<id>/disksize */
 	set_capacity(zram->disk, 0);
 	/* zram devices sort of resembles non-rotational disks */
@@ -1969,19 +1954,17 @@ static int zram_remove(struct zram *zram)
 	struct block_device *bdev = zram->disk->part0;
 
 	mutex_lock(&bdev->bd_disk->open_mutex);
-	if (bdev->bd_openers || zram->claim) {
+	if (bdev->bd_openers) {
 		mutex_unlock(&bdev->bd_disk->open_mutex);
 		return -EBUSY;
 	}
 
-	zram->claim = true;
-	mutex_unlock(&bdev->bd_disk->open_mutex);
-
-	zram_debugfs_unregister(zram);
-
 	/* Make sure all the pending I/O are finished */
 	sync_blockdev(bdev);
 	zram_reset_device(zram);
+	mutex_unlock(&bdev->bd_disk->open_mutex);
+
+	zram_debugfs_unregister(zram);
 
 	pr_info("Removed device: %s\n", zram->disk->disk_name);
 
@@ -2062,7 +2045,11 @@ static struct class zram_control_class = {
 
 static int zram_remove_cb(int id, void *ptr, void *data)
 {
-	zram_remove(ptr);
+	/*
+	 * No one should own the device during module_exit, otherwise zram
+	 * module refcount has to be handled wrong by block layer.
+	 */
+	WARN_ON_ONCE(zram_remove(ptr));
 	return 0;
 }
 
