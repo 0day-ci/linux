@@ -554,6 +554,16 @@ Commit message
 
     See: https://www.kernel.org/doc/html/latest/process/submitting-patches.html#describe-your-changes
 
+  **RFC_TAG_PREFIX**
+    RFC tag is outside subject prefix.
+    RFC tag outside subject prefix is incorrect like this::
+
+      Subject: [PATCH v2] RFC:
+
+    Perfer::
+
+      Subject: [RFC PATCH v2]
+
   **FROM_SIGN_OFF_MISMATCH**
     The author's email does not match with that in the Signed-off-by:
     line(s). This can be sometimes caused due to an improperly configured
