@@ -290,6 +290,7 @@ static int prestera_port_create(struct prestera_switch *sw, u32 id)
 {
 	struct prestera_port *port;
 	struct net_device *dev;
+	u8 addr[ETH_ALEN] = {};
 	int err;
 
 	dev = alloc_etherdev(sizeof(*port));
@@ -341,8 +342,8 @@ static int prestera_port_create(struct prestera_switch *sw, u32 id)
 	/* firmware requires that port's MAC address consist of the first
 	 * 5 bytes of the base MAC address
 	 */
-	memcpy(dev->dev_addr, sw->base_mac, dev->addr_len - 1);
-	dev->dev_addr[dev->addr_len - 1] = port->fp_id;
+	memcpy(addr, sw->base_mac, dev->addr_len - 1);
+	eth_hw_addr_set_port(dev, addr, port->fp_id);
 
 	err = prestera_hw_port_mac_set(port, dev->dev_addr);
 	if (err) {
