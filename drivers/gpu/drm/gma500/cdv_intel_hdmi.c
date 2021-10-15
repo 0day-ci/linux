@@ -130,6 +130,7 @@ static enum drm_connector_status cdv_hdmi_detect(
 	struct edid *edid = NULL;
 	enum drm_connector_status status = connector_status_disconnected;
 
+	/* This updates connector->display_info */
 	edid = drm_get_edid(connector, &gma_encoder->i2c_bus->adapter);
 
 	hdmi_priv->has_hdmi_sink = false;
@@ -138,7 +139,7 @@ static enum drm_connector_status cdv_hdmi_detect(
 		if (edid->input & DRM_EDID_INPUT_DIGITAL) {
 			status = connector_status_connected;
 			hdmi_priv->has_hdmi_sink =
-						drm_detect_hdmi_monitor(edid);
+						connector->display_info.is_hdmi;
 			hdmi_priv->has_hdmi_audio =
 						drm_detect_monitor_audio(edid);
 		}
