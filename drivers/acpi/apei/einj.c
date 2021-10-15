@@ -14,6 +14,7 @@
 
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/init.h>
 #include <linux/io.h>
 #include <linux/debugfs.h>
@@ -28,9 +29,9 @@
 #undef pr_fmt
 #define pr_fmt(fmt) "EINJ: " fmt
 
-#define SPIN_UNIT		100			/* 100ns */
-/* Firmware should respond within 1 milliseconds */
-#define FIRMWARE_TIMEOUT	(1 * NSEC_PER_MSEC)
+#define SPIN_UNIT		100			/* 100us */
+/* Firmware should respond within 1 seconds */
+#define FIRMWARE_TIMEOUT	(1 * USEC_PER_SEC)
 #define ACPI5_VENDOR_BIT	BIT(31)
 #define MEM_ERROR_MASK		(ACPI_EINJ_MEMORY_CORRECTABLE | \
 				ACPI_EINJ_MEMORY_UNCORRECTABLE | \
@@ -40,6 +41,8 @@
  * ACPI version 5 provides a SET_ERROR_TYPE_WITH_ADDRESS action.
  */
 static int acpi5;
+static int timeout_default = FIRMWARE_TIMEOUT;
+module_param(timeout_default, int, 0644);
 
 struct set_error_type_with_address {
 	u32	type;
@@ -176,7 +179,7 @@ static int einj_timedout(u64 *t)
 		return 1;
 	}
 	*t -= SPIN_UNIT;
-	ndelay(SPIN_UNIT);
+	udelay(SPIN_UNIT);
 	touch_nmi_watchdog();
 	return 0;
 }
@@ -403,7 +406,7 @@ static int __einj_error_inject(u32 type, u32 flags, u64 param1, u64 param2,
 			       u64 param3, u64 param4)
 {
 	struct apei_exec_context ctx;
-	u64 val, trigger_paddr, timeout = FIRMWARE_TIMEOUT;
+	u64 val, trigger_paddr, timeout = timeout_default;
 	int rc;
 
 	einj_exec_ctx_init(&ctx);
