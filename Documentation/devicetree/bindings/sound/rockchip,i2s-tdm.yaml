@@ -86,7 +86,7 @@ properties:
     $ref: /schemas/types.yaml#/definitions/phandle
     description:
       The phandle of the cru.
-      Required if neither trcm-sync-tx-only nor trcm-sync-rx-only are specified.
+      Required if either trcm-sync-tx-only or trcm-sync-rx-only are specified.
 
   rockchip,grf:
     $ref: /schemas/types.yaml#/definitions/phandle
@@ -147,8 +147,13 @@ required:
 allOf:
   - if:
       properties:
-        rockchip,trcm-sync-tx-only: false
-        rockchip,trcm-sync-rx-only: false
+        rockchip,trcm-sync-tx-only: true
+    then:
+      required:
+        - rockchip,cru
+  - if:
+      properties:
+        rockchip,trcm-sync-rx-only: true
     then:
       required:
         - rockchip,cru
