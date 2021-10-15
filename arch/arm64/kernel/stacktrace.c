@@ -19,6 +19,22 @@
 #include <asm/stacktrace.h>
 
 /*
+ * Check the stack frame for conditions that make further unwinding unreliable.
+ */
+static void notrace unwind_check_reliability(struct stackframe *frame)
+{
+	/*
+	 * If the PC is not a known kernel text address, then we cannot
+	 * be sure that a subsequent unwind will be reliable, as we
+	 * don't know that the code follows our unwind requirements.
+	 */
+	if (!__kernel_text_address(frame->pc))
+		frame->reliable = false;
+}
+
+NOKPROBE_SYMBOL(unwind_check_reliability);
+
+/*
  * AArch64 PCS assigns the frame pointer to x29.
  *
  * A simple function prologue looks like this:
@@ -55,6 +71,8 @@ static void notrace unwind_start(struct stackframe *frame, unsigned long fp,
 	frame->prev_fp = 0;
 	frame->prev_type = STACK_TYPE_UNKNOWN;
 	frame->failed = false;
+	frame->reliable = true;
+	unwind_check_reliability(frame);
 }
 
 NOKPROBE_SYMBOL(unwind_start);
@@ -138,6 +156,7 @@ static void notrace unwind_next(struct task_struct *tsk,
 #endif /* CONFIG_FUNCTION_GRAPH_TRACER */
 
 	frame->pc = ptrauth_strip_insn_pac(frame->pc);
+	unwind_check_reliability(frame);
 }
 
 NOKPROBE_SYMBOL(unwind_next);
@@ -167,7 +186,7 @@ static bool notrace unwind_continue(struct task_struct *task,
 
 NOKPROBE_SYMBOL(unwind_continue);
 
-static void notrace unwind(struct task_struct *tsk,
+static bool notrace unwind(struct task_struct *tsk,
 			   unsigned long fp, unsigned long pc,
 			   bool (*fn)(void *, unsigned long),
 			   void *data)
@@ -177,6 +196,7 @@ static void notrace unwind(struct task_struct *tsk,
 	unwind_start(&frame, fp, pc);
 	while (unwind_continue(tsk, &frame, fn, data))
 		unwind_next(tsk, &frame);
+	return frame.reliable;
 }
 
 NOKPROBE_SYMBOL(unwind);
@@ -236,6 +256,32 @@ noinline notrace void arch_stack_walk(stack_trace_consume_fn consume_entry,
 	}
 	unwind(task, fp, pc, consume_entry, cookie);
 
+}
+
+/*
+ * arch_stack_walk_reliable() may not be used for livepatch until all of
+ * the reliability checks are in place in unwind_consume(). However,
+ * debug and test code can choose to use it even if all the checks are not
+ * in place.
+ */
+noinline int notrace arch_stack_walk_reliable(stack_trace_consume_fn consume_fn,
+					      void *cookie,
+					      struct task_struct *task)
+{
+	unsigned long fp, pc;
+
+	if (task == current) {
+		/* Skip arch_stack_walk_reliable() in the stack trace. */
+		fp = (unsigned long)__builtin_frame_address(1);
+		pc = (unsigned long)__builtin_return_address(0);
+	} else {
+		/* Caller guarantees that the task is not running. */
+		fp = thread_saved_fp(task);
+		pc = thread_saved_pc(task);
+	}
+	if (unwind(task, fp, pc, consume_fn, cookie))
+		return 0;
+	return -EINVAL;
 }
 
 #endif
