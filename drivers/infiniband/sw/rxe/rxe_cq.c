@@ -141,18 +141,15 @@ int rxe_cq_post(struct rxe_cq *cq, struct rxe_cqe *cqe, int solicited)
 	return 0;
 }
 
-void rxe_cq_disable(struct rxe_cq *cq)
-{
-	unsigned long flags;
-
-	spin_lock_irqsave(&cq->cq_lock, flags);
-	cq->is_dying = true;
-	spin_unlock_irqrestore(&cq->cq_lock, flags);
-}
-
 void rxe_cq_cleanup(struct rxe_pool_entry *arg)
 {
 	struct rxe_cq *cq = container_of(arg, typeof(*cq), pelem);
+	unsigned long flags;
+
+	/* TODO get rid of this */
+	spin_lock_irqsave(&cq->cq_lock, flags);
+	cq->is_dying = true;
+	spin_unlock_irqrestore(&cq->cq_lock, flags);
 
 	if (cq->queue)
 		rxe_queue_cleanup(cq->queue);

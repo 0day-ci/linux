@@ -835,5 +835,6 @@ void rxe_qp_cleanup(struct rxe_pool_entry *arg)
 {
 	struct rxe_qp *qp = container_of(arg, typeof(*qp), pelem);
 
+	rxe_qp_destroy(qp);
 	execute_in_process_context(rxe_qp_do_cleanup, &qp->cleanup_work);
 }

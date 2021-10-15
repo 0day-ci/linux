@@ -7,6 +7,8 @@
 #ifndef RXE_POOL_H
 #define RXE_POOL_H
 
+#include <linux/refcount.h>
+
 #define RXE_POOL_ALIGN		(16)
 #define RXE_POOL_CACHE_FLAGS	(0)
 
@@ -47,7 +49,7 @@ struct rxe_type_info {
 struct rxe_pool_entry {
 	struct rxe_pool		*pool;
 	void			*obj;
-	struct kref		ref_cnt;
+	refcount_t		refcnt;
 	struct list_head	list;
 
 	/* only used if keyed */
@@ -127,24 +129,33 @@ void *rxe_pool_get_key_locked(struct rxe_pool *pool, void *key);
 
 void *rxe_pool_get_key(struct rxe_pool *pool, void *key);
 
-/* cleanup an object when all references are dropped */
-void rxe_elem_release(struct kref *kref);
-
 /* take a reference on an object */
-static inline int __rxe_add_ref(struct rxe_pool_entry *elem)
-{
-	int ret = kref_get_unless_zero(&elem->ref_cnt);
+int __rxe_add_ref_locked(struct rxe_pool_entry *elem);
 
-	if (unlikely(!ret))
-		pr_warn("Taking a reference on a %s object that is already destroyed\n",
-			elem->pool->name);
+#define rxe_add_ref_locked(obj) __rxe_add_ref_locked(&(obj)->pelem)
 
-	return (ret) ? 0 : -EINVAL;
-}
+int __rxe_add_ref(struct rxe_pool_entry *elem);
 
 #define rxe_add_ref(obj) __rxe_add_ref(&(obj)->pelem)
 
 /* drop a reference on an object */
-#define rxe_drop_ref(obj) kref_put(&(obj)->pelem.ref_cnt, rxe_elem_release)
+int __rxe_drop_ref_locked(struct rxe_pool_entry *elem);
+
+#define rxe_drop_ref_locked(obj) __rxe_drop_ref_locked(&(obj)->pelem)
+
+int __rxe_drop_ref(struct rxe_pool_entry *elem);
+
+#define rxe_drop_ref(obj) __rxe_drop_ref(&(obj)->pelem)
+
+/* drop last reference on an object */
+int __rxe_fini_ref_locked(struct rxe_pool_entry *elem);
+
+#define rxe_fini_ref_locked(obj) __rxe_fini_ref_locked(&(obj)->pelem)
+
+int __rxe_fini_ref(struct rxe_pool_entry *elem);
+
+#define rxe_fini_ref(obj) __rxe_fini_ref(&(obj)->pelem)
+
+#define rxe_read_ref(obj) refcount_read(&(obj)->pelem.refcnt)
 
 #endif /* RXE_POOL_H */

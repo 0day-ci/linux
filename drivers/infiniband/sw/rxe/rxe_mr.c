@@ -684,6 +684,8 @@ int rxe_mr_set_page(struct ib_mr *ibmr, u64 addr)
 int rxe_dereg_mr(struct ib_mr *ibmr, struct ib_udata *udata)
 {
 	struct rxe_mr *mr = to_rmr(ibmr);
+	struct rxe_pd *pd = mr_pd(mr);
+	int err;
 
 	if (atomic_read(&mr->num_mw) > 0) {
 		pr_warn("%s: Attempt to deregister an MR while bound to MWs\n",
@@ -692,8 +694,12 @@ int rxe_dereg_mr(struct ib_mr *ibmr, struct ib_udata *udata)
 	}
 
 	mr->state = RXE_MR_STATE_INVALID;
-	rxe_drop_ref(mr_pd(mr));
-	rxe_drop_ref(mr);
+
+	err = rxe_fini_ref(mr);
+	if (err)
+		return err;
+
+	rxe_drop_ref(pd);
 
 	return 0;
 }

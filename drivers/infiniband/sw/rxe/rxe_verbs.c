@@ -115,7 +115,7 @@ static void rxe_dealloc_ucontext(struct ib_ucontext *ibuc)
 {
 	struct rxe_ucontext *uc = to_ruc(ibuc);
 
-	rxe_drop_ref(uc);
+	rxe_fini_ref(uc);
 }
 
 static int rxe_port_immutable(struct ib_device *dev, u32 port_num,
@@ -149,8 +149,7 @@ static int rxe_dealloc_pd(struct ib_pd *ibpd, struct ib_udata *udata)
 {
 	struct rxe_pd *pd = to_rpd(ibpd);
 
-	rxe_drop_ref(pd);
-	return 0;
+	return rxe_fini_ref(pd);
 }
 
 static int rxe_create_ah(struct ib_ah *ibah,
@@ -228,8 +227,7 @@ static int rxe_destroy_ah(struct ib_ah *ibah, u32 flags)
 {
 	struct rxe_ah *ah = to_rah(ibah);
 
-	rxe_drop_ref(ah);
-	return 0;
+	return rxe_fini_ref(ah);
 }
 
 static int post_one_recv(struct rxe_rq *rq, const struct ib_recv_wr *ibwr)
@@ -313,8 +311,8 @@ static int rxe_create_srq(struct ib_srq *ibsrq, struct ib_srq_init_attr *init,
 	return 0;
 
 err2:
+	rxe_fini_ref(srq);
 	rxe_drop_ref(pd);
-	rxe_drop_ref(srq);
 err1:
 	return err;
 }
@@ -367,12 +365,15 @@ static int rxe_query_srq(struct ib_srq *ibsrq, struct ib_srq_attr *attr)
 static int rxe_destroy_srq(struct ib_srq *ibsrq, struct ib_udata *udata)
 {
 	struct rxe_srq *srq = to_rsrq(ibsrq);
+	struct rxe_pd *pd = srq->pd;
+	int err;
 
-	if (srq->rq.queue)
-		rxe_queue_cleanup(srq->rq.queue);
+	err = rxe_fini_ref(srq);
+	if (err)
+		return err;
 
-	rxe_drop_ref(srq->pd);
-	rxe_drop_ref(srq);
+	rxe_drop_ref(pd);
+
 	return 0;
 }
 
@@ -437,12 +438,12 @@ static int rxe_create_qp(struct ib_qp *ibqp, struct ib_qp_init_attr *init,
 
 	err = rxe_qp_from_init(rxe, qp, pd, init, uresp, ibqp->pd, udata);
 	if (err)
-		goto qp_init;
+		goto err_fini;
 
 	return 0;
 
-qp_init:
-	rxe_drop_ref(qp);
+err_fini:
+	rxe_fini_ref(qp);
 	return err;
 }
 
@@ -485,9 +486,7 @@ static int rxe_destroy_qp(struct ib_qp *ibqp, struct ib_udata *udata)
 {
 	struct rxe_qp *qp = to_rqp(ibqp);
 
-	rxe_qp_destroy(qp);
-	rxe_drop_ref(qp);
-	return 0;
+	return rxe_fini_ref(qp);
 }
 
 static int validate_send_wr(struct rxe_qp *qp, const struct ib_send_wr *ibwr,
@@ -797,10 +796,7 @@ static int rxe_destroy_cq(struct ib_cq *ibcq, struct ib_udata *udata)
 {
 	struct rxe_cq *cq = to_rcq(ibcq);
 
-	rxe_cq_disable(cq);
-
-	rxe_drop_ref(cq);
-	return 0;
+	return rxe_fini_ref(cq);
 }
 
 static int rxe_resize_cq(struct ib_cq *ibcq, int cqe, struct ib_udata *udata)
@@ -924,8 +920,8 @@ static struct ib_mr *rxe_reg_user_mr(struct ib_pd *ibpd,
 	return &mr->ibmr;
 
 err3:
+	rxe_fini_ref(mr);
 	rxe_drop_ref(pd);
-	rxe_drop_ref(mr);
 err2:
 	return ERR_PTR(err);
 }
@@ -956,8 +952,8 @@ static struct ib_mr *rxe_alloc_mr(struct ib_pd *ibpd, enum ib_mr_type mr_type,
 	return &mr->ibmr;
 
 err2:
+	rxe_fini_ref(mr);
 	rxe_drop_ref(pd);
-	rxe_drop_ref(mr);
 err1:
 	return ERR_PTR(err);
 }

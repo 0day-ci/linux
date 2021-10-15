@@ -154,3 +154,11 @@ err2:
 	srq->rq.queue = NULL;
 	return err;
 }
+
+void rxe_srq_cleanup(struct rxe_pool_entry *arg)
+{
+	struct rxe_srq *srq = container_of(arg, typeof(*srq), pelem);
+
+	if (srq->rq.queue)
+		rxe_queue_cleanup(srq->rq.queue);
+}

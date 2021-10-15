@@ -56,12 +56,15 @@ int rxe_dealloc_mw(struct ib_mw *ibmw)
 	struct rxe_mw *mw = to_rmw(ibmw);
 	struct rxe_pd *pd = to_rpd(ibmw->pd);
 	unsigned long flags;
+	int err;
 
 	spin_lock_irqsave(&mw->lock, flags);
 	rxe_do_dealloc_mw(mw);
 	spin_unlock_irqrestore(&mw->lock, flags);
 
-	rxe_drop_ref(mw);
+	err = rxe_fini_ref(mw);
+	if (err)
+		return err;
 	rxe_drop_ref(pd);
 
 	return 0;
@@ -177,9 +180,9 @@ static void rxe_do_bind_mw(struct rxe_qp *qp, struct rxe_send_wqe *wqe,
 	}
 
 	if (mw->length) {
+		/* take over ref on mr from caller */
 		mw->mr = mr;
 		atomic_inc(&mr->num_mw);
-		rxe_add_ref(mr);
 	}
 
 	if (mw->ibmw.type == IB_MW_TYPE_2) {
@@ -192,7 +195,7 @@ int rxe_bind_mw(struct rxe_qp *qp, struct rxe_send_wqe *wqe)
 {
 	int ret;
 	struct rxe_mw *mw;
-	struct rxe_mr *mr;
+	struct rxe_mr *mr = NULL;
 	struct rxe_dev *rxe = to_rdev(qp->ibqp.device);
 	u32 mw_rkey = wqe->wr.wr.mw.mw_rkey;
 	u32 mr_lkey = wqe->wr.wr.mw.mr_lkey;
@@ -217,25 +220,23 @@ int rxe_bind_mw(struct rxe_qp *qp, struct rxe_send_wqe *wqe)
 		}
 
 		if (unlikely(mr->lkey != mr_lkey)) {
+			rxe_drop_ref(mr);
 			ret = -EINVAL;
-			goto err_drop_mr;
+			goto err_drop_mw;
 		}
-	} else {
-		mr = NULL;
 	}
 
 	spin_lock_irqsave(&mw->lock, flags);
-
 	ret = rxe_check_bind_mw(qp, wqe, mw, mr);
-	if (ret)
+	if (ret) {
+		if (mr)
+			rxe_drop_ref(mr);
 		goto err_unlock;
+	}
 
 	rxe_do_bind_mw(qp, wqe, mw, mr);
 err_unlock:
 	spin_unlock_irqrestore(&mw->lock, flags);
-err_drop_mr:
-	if (mr)
-		rxe_drop_ref(mr);
 err_drop_mw:
 	rxe_drop_ref(mw);
 err:

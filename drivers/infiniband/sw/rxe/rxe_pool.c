@@ -33,6 +33,7 @@ static const struct rxe_type_info rxe_type_info[RXE_NUM_TYPES] = {
 		.name		= "rxe-srq",
 		.size		= sizeof(struct rxe_srq),
 		.elem_offset	= offsetof(struct rxe_srq, pelem),
+		.cleanup	= rxe_srq_cleanup,
 		.flags		= RXE_POOL_INDEX | RXE_POOL_NO_ALLOC,
 		.min_index	= RXE_MIN_SRQ_INDEX,
 		.max_index	= RXE_MAX_SRQ_INDEX,
@@ -195,8 +196,11 @@ static int rxe_insert_index(struct rxe_pool *pool, struct rxe_pool_entry *new)
 		parent = *link;
 		elem = rb_entry(parent, struct rxe_pool_entry, index_node);
 
-		if (elem->index == new->index) {
-			pr_warn("element with index = 0x%x already exists!\n",
+		/* this can happen if memory was recycled and/or the
+		 * old object was not deleted from the pool index
+		 */
+		if (unlikely(elem == new || elem->index == new->index)) {
+			pr_warn("%s#%d: already in pool\n", pool->name,
 					new->index);
 			return -EINVAL;
 		}
@@ -310,7 +314,7 @@ void *rxe_alloc_locked(struct rxe_pool *pool)
 		return NULL;
 
 	elem = (struct rxe_pool_entry *)(obj + pool->elem_offset);
-	kref_init(&elem->ref_cnt);
+	refcount_set(&elem->refcnt, 1);
 
 	return obj;
 }
@@ -333,7 +337,7 @@ void *rxe_alloc_with_key_locked(struct rxe_pool *pool, void *key)
 		goto out_cnt;
 	}
 
-	kref_init(&elem->ref_cnt);
+	refcount_set(&elem->refcnt, 1);
 
 	return obj;
 
@@ -384,7 +388,7 @@ int __rxe_add_to_pool(struct rxe_pool *pool, struct rxe_pool_entry *elem)
 			goto out_cnt;
 	}
 
-	kref_init(&elem->ref_cnt);
+	refcount_set(&elem->refcnt, 1);
 	write_unlock_irqrestore(&pool->pool_lock, flags);
 
 	return 0;
@@ -393,30 +397,6 @@ out_cnt:
 	atomic_dec(&pool->num_elem);
 	write_unlock_irqrestore(&pool->pool_lock, flags);
 	return -EINVAL;
-}
-
-void rxe_elem_release(struct kref *kref)
-{
-	struct rxe_pool_entry *elem =
-		container_of(kref, struct rxe_pool_entry, ref_cnt);
-	struct rxe_pool *pool = elem->pool;
-	void *obj;
-
-	if (pool->cleanup)
-		pool->cleanup(elem);
-
-	if (pool->flags & RXE_POOL_INDEX)
-		rxe_drop_index(elem);
-
-	if (pool->flags & RXE_POOL_KEY)
-		rb_erase(&elem->key_node, &pool->key.tree);
-
-	if (!(pool->flags & RXE_POOL_NO_ALLOC)) {
-		obj = elem->obj;
-		kfree(obj);
-	}
-
-	atomic_dec(&pool->num_elem);
 }
 
 void *rxe_pool_get_index_locked(struct rxe_pool *pool, u32 index)
@@ -438,7 +418,7 @@ void *rxe_pool_get_index_locked(struct rxe_pool *pool, u32 index)
 			break;
 	}
 
-	if (node && kref_get_unless_zero(&elem->ref_cnt))
+	if (node && refcount_inc_not_zero(&elem->refcnt))
 		obj = elem->obj;
 
 	return obj;
@@ -479,7 +459,7 @@ void *rxe_pool_get_key_locked(struct rxe_pool *pool, void *key)
 			break;
 	}
 
-	if (node && kref_get_unless_zero(&elem->ref_cnt))
+	if (node && refcount_inc_not_zero(&elem->refcnt))
 		obj = elem->obj;
 
 	return obj;
@@ -495,4 +475,110 @@ void *rxe_pool_get_key(struct rxe_pool *pool, void *key)
 	read_unlock_irqrestore(&pool->pool_lock, flags);
 
 	return obj;
+}
+
+int __rxe_add_ref_locked(struct rxe_pool_entry *elem)
+{
+	int done;
+
+	done = refcount_inc_not_zero(&elem->refcnt);
+	if (done)
+		return 0;
+	else
+		return -EINVAL;
+}
+
+int __rxe_add_ref(struct rxe_pool_entry *elem)
+{
+	struct rxe_pool *pool = elem->pool;
+	unsigned long flags;
+	int ret;
+
+	read_lock_irqsave(&pool->pool_lock, flags);
+	ret = __rxe_add_ref_locked(elem);
+	read_unlock_irqrestore(&pool->pool_lock, flags);
+
+	return ret;
+}
+
+int __rxe_drop_ref_locked(struct rxe_pool_entry *elem)
+{
+	int done;
+
+	done = refcount_dec_not_one(&elem->refcnt);
+	if (done)
+		return 0;
+	else
+		return -EINVAL;
+}
+
+int __rxe_drop_ref(struct rxe_pool_entry *elem)
+{
+	struct rxe_pool *pool = elem->pool;
+	unsigned long flags;
+	int ret;
+
+	read_lock_irqsave(&pool->pool_lock, flags);
+	ret = __rxe_drop_ref_locked(elem);
+	read_unlock_irqrestore(&pool->pool_lock, flags);
+
+	return ret;
+}
+
+static int __rxe_fini(struct rxe_pool_entry *elem)
+{
+	struct rxe_pool *pool = elem->pool;
+	int done;
+
+	done = refcount_dec_if_one(&elem->refcnt);
+	if (done) {
+		if (pool->flags & RXE_POOL_INDEX)
+			rxe_drop_index(elem);
+		if (pool->flags & RXE_POOL_KEY)
+			rb_erase(&elem->key_node, &pool->key.tree);
+		atomic_dec(&pool->num_elem);
+		return 0;
+	} else {
+		return -EBUSY;
+	}
+}
+
+/* can only be used by pools that have a cleanup
+ * routine that can run while holding a spinlock
+ */
+int __rxe_fini_ref_locked(struct rxe_pool_entry *elem)
+{
+	struct rxe_pool *pool = elem->pool;
+	int ret;
+
+	ret = __rxe_fini(elem);
+
+	if (!ret) {
+		if (pool->cleanup)
+			pool->cleanup(elem);
+		if (!(pool->flags & RXE_POOL_NO_ALLOC))
+			kfree(elem->obj);
+	}
+
+	return ret;
+}
+
+int __rxe_fini_ref(struct rxe_pool_entry *elem)
+{
+	struct rxe_pool *pool = elem->pool;
+	unsigned long flags;
+	int ret;
+
+	read_lock_irqsave(&pool->pool_lock, flags);
+	ret = __rxe_fini(elem);
+	read_unlock_irqrestore(&pool->pool_lock, flags);
+
+	if (!ret) {
+		if (pool->cleanup)
+			pool->cleanup(elem);
+		if (!(pool->flags & RXE_POOL_NO_ALLOC))
+			kfree(elem->obj);
+	}
+
+	return ret;
 }
