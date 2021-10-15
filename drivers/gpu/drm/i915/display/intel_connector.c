@@ -213,6 +213,11 @@ int intel_ddc_get_modes(struct drm_connector *connector,
 	return ret;
 }
 
+bool intel_connector_is_hdmi_monitor(struct drm_connector *connector)
+{
+	return connector->display_info.is_hdmi;
+}
+
 static const struct drm_prop_enum_list force_audio_names[] = {
 	{ HDMI_AUDIO_OFF_DVI, "force-dvi" },
 	{ HDMI_AUDIO_OFF, "off" },
