@@ -51,6 +51,8 @@ struct stack_info {
  *               replacement lr value in the ftrace graph stack.
  *
  * @failed:      Unwind failed.
+ *
+ * @reliable:    Stack trace is reliable.
  */
 struct stackframe {
 	unsigned long fp;
@@ -62,6 +64,7 @@ struct stackframe {
 	int graph;
 #endif
 	bool failed;
+	bool reliable;
 };
 
 extern void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk,
