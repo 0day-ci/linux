@@ -126,17 +126,17 @@ enum {
 	NHLT_MIC_ARRAY_VENDOR_DEFINED = 0xf,
 };
 
-struct nhlt_acpi_table *intel_nhlt_init(struct device *dev);
+struct nhlt_acpi_table *intel_nhlt_init(void);
 
 void intel_nhlt_free(struct nhlt_acpi_table *addr);
 
-int intel_nhlt_get_dmic_geo(struct device *dev, struct nhlt_acpi_table *nhlt);
+int intel_nhlt_get_dmic_geo(struct nhlt_acpi_table *nhlt);
 
 #else
 
 struct nhlt_acpi_table;
 
-static inline struct nhlt_acpi_table *intel_nhlt_init(struct device *dev)
+static inline struct nhlt_acpi_table *intel_nhlt_init(void)
 {
 	return NULL;
 }
@@ -145,8 +145,7 @@ static inline void intel_nhlt_free(struct nhlt_acpi_table *addr)
 {
 }
 
-static inline int intel_nhlt_get_dmic_geo(struct device *dev,
-					  struct nhlt_acpi_table *nhlt)
+static inline int intel_nhlt_get_dmic_geo(struct nhlt_acpi_table *nhlt)
 {
 	return 0;
 }

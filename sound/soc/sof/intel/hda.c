@@ -651,9 +651,9 @@ static int check_nhlt_dmic(struct snd_sof_dev *sdev)
 	struct nhlt_acpi_table *nhlt;
 	int dmic_num;
 
-	nhlt = intel_nhlt_init(sdev->dev);
+	nhlt = intel_nhlt_init();
 	if (nhlt) {
-		dmic_num = intel_nhlt_get_dmic_geo(sdev->dev, nhlt);
+		dmic_num = intel_nhlt_get_dmic_geo(nhlt);
 		intel_nhlt_free(nhlt);
 		if (dmic_num >= 1 && dmic_num <= 4)
 			return dmic_num;

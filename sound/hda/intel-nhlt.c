@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: GPL-2.0-only
 // Copyright (c) 2015-2019 Intel Corporation
 
+#define pr_fmt(fmt)     "NHLT: " fmt
+
 #include <linux/acpi.h>
 #include <sound/intel-nhlt.h>
 
-struct nhlt_acpi_table *intel_nhlt_init(struct device *dev)
+struct nhlt_acpi_table *intel_nhlt_init(void)
 {
 	struct nhlt_acpi_table *nhlt;
 	acpi_status status;
@@ -12,7 +14,7 @@ struct nhlt_acpi_table *intel_nhlt_init(struct device *dev)
 	status = acpi_get_table(ACPI_SIG_NHLT, 0,
 				(struct acpi_table_header **)&nhlt);
 	if (ACPI_FAILURE(status)) {
-		dev_warn(dev, "NHLT table not found\n");
+		pr_warn("NHLT table not found\n");
 		return NULL;
 	}
 
@@ -26,7 +28,7 @@ void intel_nhlt_free(struct nhlt_acpi_table *nhlt)
 }
 EXPORT_SYMBOL_GPL(intel_nhlt_free);
 
-int intel_nhlt_get_dmic_geo(struct device *dev, struct nhlt_acpi_table *nhlt)
+int intel_nhlt_get_dmic_geo(struct nhlt_acpi_table *nhlt)
 {
 	struct nhlt_endpoint *epnt;
 	struct nhlt_dmic_array_config *cfg;
@@ -40,7 +42,7 @@ int intel_nhlt_get_dmic_geo(struct device *dev, struct nhlt_acpi_table *nhlt)
 		return 0;
 
 	if (nhlt->header.length <= sizeof(struct acpi_table_header)) {
-		dev_warn(dev, "Invalid DMIC description table\n");
+		pr_warn("Invalid DMIC description table\n");
 		return 0;
 	}
 
@@ -55,7 +57,7 @@ int intel_nhlt_get_dmic_geo(struct device *dev, struct nhlt_acpi_table *nhlt)
 
 		/* find max number of channels based on format_configuration */
 		if (fmt_configs->fmt_count) {
-			dev_dbg(dev, "%s: found %d format definitions\n",
+			pr_debug("%s: found %d format definitions\n",
 				__func__, fmt_configs->fmt_count);
 
 			for (i = 0; i < fmt_configs->fmt_count; i++) {
@@ -66,9 +68,9 @@ int intel_nhlt_get_dmic_geo(struct device *dev, struct nhlt_acpi_table *nhlt)
 				if (fmt_ext->fmt.channels > max_ch)
 					max_ch = fmt_ext->fmt.channels;
 			}
-			dev_dbg(dev, "%s: max channels found %d\n", __func__, max_ch);
+			pr_debug("%s: max channels found %d\n", __func__, max_ch);
 		} else {
-			dev_dbg(dev, "%s: No format information found\n", __func__);
+			pr_debug("%s: No format information found\n", __func__);
 		}
 
 		if (cfg->device_config.config_type != NHLT_CONFIG_TYPE_MIC_ARRAY) {
@@ -90,21 +92,21 @@ int intel_nhlt_get_dmic_geo(struct device *dev, struct nhlt_acpi_table *nhlt)
 				dmic_geo = cfg_vendor->nb_mics;
 				break;
 			default:
-				dev_warn(dev, "%s: undefined DMIC array_type 0x%0x\n",
+				pr_warn("%s: undefined DMIC array_type 0x%0x\n",
 					 __func__, cfg->array_type);
 			}
 
 			if (dmic_geo > 0) {
-				dev_dbg(dev, "%s: Array with %d dmics\n", __func__, dmic_geo);
+				pr_debug("%s: Array with %d dmics\n", __func__, dmic_geo);
 			}
 			if (max_ch > dmic_geo) {
-				dev_dbg(dev, "%s: max channels %d exceed dmic number %d\n",
+				pr_debug("%s: max channels %d exceed dmic number %d\n",
 					__func__, max_ch, dmic_geo);
 			}
 		}
 	}
 
-	dev_dbg(dev, "%s: dmic number %d max_ch %d\n",
+	pr_debug("%s: dmic number %d max_ch %d\n",
 		__func__, dmic_geo, max_ch);
 
 	return dmic_geo;

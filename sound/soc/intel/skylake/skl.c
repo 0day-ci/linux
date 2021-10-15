@@ -517,8 +517,7 @@ static int skl_find_machine(struct skl_dev *skl, void *driver_data)
 	if (pdata) {
 		skl->use_tplg_pcm = pdata->use_tplg_pcm;
 		mach->mach_params.dmic_num =
-			intel_nhlt_get_dmic_geo(&skl->pci->dev,
-						skl->nhlt);
+			intel_nhlt_get_dmic_geo(skl->nhlt);
 	}
 
 	return 0;
@@ -1009,7 +1008,7 @@ static int skl_probe(struct pci_dev *pci,
 
 	device_disable_async_suspend(bus->dev);
 
-	skl->nhlt = intel_nhlt_init(bus->dev);
+	skl->nhlt = intel_nhlt_init();
 
 	if (skl->nhlt == NULL) {
 #if !IS_ENABLED(CONFIG_SND_SOC_INTEL_SKYLAKE_HDAUDIO_CODEC)
