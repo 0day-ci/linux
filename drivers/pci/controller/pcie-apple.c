@@ -772,6 +772,7 @@ static int apple_pcie_init(struct pci_config_window *cfg)
 		ret = apple_pcie_setup_port(pcie, of_port);
 		if (ret) {
 			dev_err(pcie->dev, "Port %pOF setup fail: %d\n", of_port, ret);
+			of_node_put(of_port);
 			return ret;
 		}
 	}
