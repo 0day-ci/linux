@@ -1534,9 +1534,14 @@ static bool rtw89_core_txq_agg_wait(struct rtw89_dev *rtwdev,
 {
 	struct rtw89_txq *rtwtxq = (struct rtw89_txq *)txq->drv_priv;
 	struct ieee80211_sta *sta = txq->sta;
-	struct rtw89_sta *rtwsta = (struct rtw89_sta *)sta->drv_priv;
+	struct rtw89_sta *rtwsta;
 
-	if (!sta || rtwsta->max_agg_wait <= 0)
+	if (!sta)
+		return false;
+	rtwsta = (struct rtw89_sta *)sta->drv_priv;
+	if (!rtwsta)
+		return false;
+	if (rtwsta->max_agg_wait <= 0)
 		return false;
 
 	if (rtwdev->stats.tx_tfc_lv <= RTW89_TFC_MID)
