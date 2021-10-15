@@ -10026,9 +10026,8 @@ lpfc_mbox_api_table_setup(struct lpfc_hba *phba, uint8_t dev_grp)
 		phba->lpfc_sli_brdready = lpfc_sli_brdready_s4;
 		break;
 	default:
-		lpfc_printf_log(phba, KERN_ERR, LOG_TRACE_EVENT,
-				"1420 Invalid HBA PCI-device group: 0x%x\n",
-				dev_grp);
+		dev_err(&phba->pcidev->dev,
+				"1420 Invalid HBA PCI-device group: 0x%x\n", dev_grp);
 		return -ENODEV;
 	}
 	return 0;
@@ -11194,9 +11193,8 @@ lpfc_sli_api_table_setup(struct lpfc_hba *phba, uint8_t dev_grp)
 		phba->__lpfc_sli_issue_fcp_io = __lpfc_sli_issue_fcp_io_s4;
 		break;
 	default:
-		lpfc_printf_log(phba, KERN_ERR, LOG_TRACE_EVENT,
-				"1419 Invalid HBA PCI-device group: 0x%x\n",
-				dev_grp);
+		dev_err(&phba->pcidev->dev,
+				"1419 Invalid HBA PCI-device group: 0x%x\n", dev_grp);
 		return -ENODEV;
 	}
 	phba->lpfc_get_iocb_from_iocbq = lpfc_get_iocb_from_iocbq;

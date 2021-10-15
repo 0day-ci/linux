@@ -7358,10 +7358,10 @@ static void lpfc_log_intr_mode(struct lpfc_hba *phba, uint32_t intr_mode)
 static int
 lpfc_enable_pci_dev(struct lpfc_hba *phba)
 {
-	struct pci_dev *pdev;
+	struct pci_dev *pdev = phba->pcidev;
 
 	/* Obtain PCI device reference */
-	if (!phba->pcidev)
+	if (!pdev)
 		goto out_error;
 	else
 		pdev = phba->pcidev;
@@ -7385,8 +7385,7 @@ lpfc_enable_pci_dev(struct lpfc_hba *phba)
 out_disable_device:
 	pci_disable_device(pdev);
 out_error:
-	lpfc_printf_log(phba, KERN_ERR, LOG_TRACE_EVENT,
-			"1401 Failed to enable pci device\n");
+	dev_err(&pdev->dev, "1401 Failed to enable pci device\n");
 	return -ENODEV;
 }
 
@@ -8428,9 +8427,8 @@ lpfc_init_api_table_setup(struct lpfc_hba *phba, uint8_t dev_grp)
 		phba->lpfc_stop_port = lpfc_stop_port_s4;
 		break;
 	default:
-		lpfc_printf_log(phba, KERN_ERR, LOG_TRACE_EVENT,
-				"1431 Invalid HBA PCI-device group: 0x%x\n",
-				dev_grp);
+		dev_err(&phba->pcidev->dev,
+				"1431 Invalid HBA PCI-device group: 0x%x\n", dev_grp);
 		return -ENODEV;
 	}
 	return 0;

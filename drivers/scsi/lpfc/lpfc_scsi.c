@@ -5115,9 +5115,8 @@ lpfc_scsi_api_table_setup(struct lpfc_hba *phba, uint8_t dev_grp)
 		phba->lpfc_scsi_prep_cmnd_buf = lpfc_scsi_prep_cmnd_buf_s4;
 		break;
 	default:
-		lpfc_printf_log(phba, KERN_ERR, LOG_TRACE_EVENT,
-				"1418 Invalid HBA PCI-device group: 0x%x\n",
-				dev_grp);
+		dev_err(&phba->pcidev->dev,
+				"1418 Invalid HBA PCI-device group: 0x%x\n", dev_grp);
 		return -ENODEV;
 	}
 	phba->lpfc_rampdown_queue_depth = lpfc_rampdown_queue_depth;
