@@ -10,6 +10,7 @@
 
 #include <linux/clk-provider.h>
 #include <linux/bcd.h>
+#include <linux/bitfield.h>
 #include <linux/bitops.h>
 #include <linux/i2c.h>
 #include <linux/interrupt.h>
@@ -80,6 +81,10 @@
 
 #define RV3028_BACKUP_TCE		BIT(5)
 #define RV3028_BACKUP_TCR_MASK		GENMASK(1,0)
+#define RV3028_BACKUP_BSM		GENMASK(3,2)
+
+#define RV3028_BACKUP_BSM_DSM		0x1
+#define RV3028_BACKUP_BSM_LSM		0x3
 
 #define OFFSET_STEP_PPT			953674
 
@@ -512,6 +517,72 @@ exit_eerd:
 
 }
 
+static int rv3028_param_get(struct device *dev, struct rtc_param *param)
+{
+	struct rv3028_data *rv3028 = dev_get_drvdata(dev);
+	int ret;
+
+	switch(param->param) {
+		u32 value;
+
+	case RTC_PARAM_BACKUP_SWITCH_MODE:
+		ret = regmap_read(rv3028->regmap, RV3028_BACKUP, &value);
+		if (ret < 0)
+			return ret;
+
+		value = FIELD_GET(RV3028_BACKUP_BSM, value);
+
+		switch(value) {
+		case RV3028_BACKUP_BSM_DSM:
+			param->uvalue = RTC_BSM_DIRECT;
+			break;
+		case RV3028_BACKUP_BSM_LSM:
+			param->uvalue = RTC_BSM_LEVEL;
+			break;
+		default:
+			param->uvalue = RTC_BSM_DISABLED;
+		}
+		break;
+
+	default:
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+static int rv3028_param_set(struct device *dev, struct rtc_param *param)
+{
+	struct rv3028_data *rv3028 = dev_get_drvdata(dev);
+
+	switch(param->param) {
+		u8 mode;
+	case RTC_PARAM_BACKUP_SWITCH_MODE:
+		switch (param->uvalue) {
+		case RTC_BSM_DISABLED:
+			mode = 0;
+			break;
+		case RTC_BSM_DIRECT:
+			mode = RV3028_BACKUP_BSM_DSM;
+			break;
+		case RTC_BSM_LEVEL:
+			mode = RV3028_BACKUP_BSM_LSM;
+			break;
+		default:
+			return -EINVAL;
+		}
+
+		rv3028_update_cfg(rv3028, RV3028_BACKUP, RV3028_BACKUP_BSM,
+				  FIELD_PREP(RV3028_BACKUP_BSM, mode));
+		break;
+
+	default:
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
 static int rv3028_ioctl(struct device *dev, unsigned int cmd, unsigned long arg)
 {
 	struct rv3028_data *rv3028 = dev_get_drvdata(dev);
@@ -776,6 +847,8 @@ static const struct rtc_class_ops rv3028_rtc_ops = {
 	.read_offset = rv3028_read_offset,
 	.set_offset = rv3028_set_offset,
 	.ioctl = rv3028_ioctl,
+	.param_get = rv3028_param_get,
+	.param_set = rv3028_param_set,
 };
 
 static const struct regmap_config regmap_config = {
