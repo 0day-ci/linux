@@ -166,12 +166,16 @@ void rxe_pool_cleanup(struct rxe_pool *pool)
 	kfree(pool->index.table);
 }
 
+/* should never fail because there are at least as many indices as
+ * max objects
+ */
 static u32 alloc_index(struct rxe_pool *pool)
 {
 	u32 index;
 	u32 range = pool->index.max_index - pool->index.min_index + 1;
 
-	index = find_next_zero_bit(pool->index.table, range, pool->index.last);
+	index = find_next_zero_bit(pool->index.table, range,
+				   pool->index.last);
 	if (index >= range)
 		index = find_first_zero_bit(pool->index.table, range);
 
@@ -192,7 +196,8 @@ static int rxe_insert_index(struct rxe_pool *pool, struct rxe_pool_entry *new)
 		elem = rb_entry(parent, struct rxe_pool_entry, index_node);
 
 		if (elem->index == new->index) {
-			pr_warn("element already exists!\n");
+			pr_warn("element with index = 0x%x already exists!\n",
+					new->index);
 			return -EINVAL;
 		}
 
@@ -281,31 +286,21 @@ void __rxe_drop_key(struct rxe_pool_entry *elem)
 	write_unlock_irqrestore(&pool->pool_lock, flags);
 }
 
-int __rxe_add_index_locked(struct rxe_pool_entry *elem)
+static int rxe_add_index(struct rxe_pool_entry *elem)
 {
 	struct rxe_pool *pool = elem->pool;
 	int err;
 
 	elem->index = alloc_index(pool);
 	err = rxe_insert_index(pool, elem);
+	if (err)
+		clear_bit(elem->index - pool->index.min_index,
+			  pool->index.table);
 
 	return err;
 }
 
-int __rxe_add_index(struct rxe_pool_entry *elem)
-{
-	struct rxe_pool *pool = elem->pool;
-	unsigned long flags;
-	int err;
-
-	write_lock_irqsave(&pool->pool_lock, flags);
-	err = __rxe_add_index_locked(elem);
-	write_unlock_irqrestore(&pool->pool_lock, flags);
-
-	return err;
-}
-
-void __rxe_drop_index_locked(struct rxe_pool_entry *elem)
+static void rxe_drop_index(struct rxe_pool_entry *elem)
 {
 	struct rxe_pool *pool = elem->pool;
 
@@ -313,20 +308,11 @@ void __rxe_drop_index_locked(struct rxe_pool_entry *elem)
 	rb_erase(&elem->index_node, &pool->index.tree);
 }
 
-void __rxe_drop_index(struct rxe_pool_entry *elem)
-{
-	struct rxe_pool *pool = elem->pool;
-	unsigned long flags;
-
-	write_lock_irqsave(&pool->pool_lock, flags);
-	__rxe_drop_index_locked(elem);
-	write_unlock_irqrestore(&pool->pool_lock, flags);
-}
-
 void *rxe_alloc_locked(struct rxe_pool *pool)
 {
 	struct rxe_pool_entry *elem;
 	void *obj;
+	int err;
 
 	if (atomic_inc_return(&pool->num_elem) > pool->max_elem)
 		goto out_cnt;
@@ -340,6 +326,14 @@ void *rxe_alloc_locked(struct rxe_pool *pool)
 	elem->pool = pool;
 	elem->obj = obj;
 	kref_init(&elem->ref_cnt);
+
+	if (pool->flags & RXE_POOL_INDEX) {
+		err = rxe_add_index(elem);
+		if (err) {
+			kfree(obj);
+			goto out_cnt;
+		}
+	}
 
 	return obj;
 
@@ -362,12 +356,20 @@ void *rxe_alloc(struct rxe_pool *pool)
 
 int __rxe_add_to_pool(struct rxe_pool *pool, struct rxe_pool_entry *elem)
 {
+	int err;
+
 	if (atomic_inc_return(&pool->num_elem) > pool->max_elem)
 		goto out_cnt;
 
 	elem->pool = pool;
 	elem->obj = (u8 *)elem - pool->elem_offset;
 	kref_init(&elem->ref_cnt);
+
+	if (pool->flags & RXE_POOL_INDEX) {
+		err = rxe_add_index(elem);
+		if (err)
+			goto out_cnt;
+	}
 
 	return 0;
 
@@ -385,6 +387,9 @@ void rxe_elem_release(struct kref *kref)
 
 	if (pool->cleanup)
 		pool->cleanup(elem);
+
+	if (pool->flags & RXE_POOL_INDEX)
+		rxe_drop_index(elem);
 
 	if (!(pool->flags & RXE_POOL_NO_ALLOC)) {
 		obj = elem->obj;

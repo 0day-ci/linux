@@ -109,28 +109,6 @@ int __rxe_add_to_pool(struct rxe_pool *pool, struct rxe_pool_entry *elem);
 
 #define rxe_add_to_pool(pool, obj) __rxe_add_to_pool(pool, &(obj)->pelem)
 
-/* assign an index to an indexed object and insert object into
- *  pool's rb tree holding and not holding the pool_lock
- */
-int __rxe_add_index_locked(struct rxe_pool_entry *elem);
-
-#define rxe_add_index_locked(obj) __rxe_add_index_locked(&(obj)->pelem)
-
-int __rxe_add_index(struct rxe_pool_entry *elem);
-
-#define rxe_add_index(obj) __rxe_add_index(&(obj)->pelem)
-
-/* drop an index and remove object from rb tree
- * holding and not holding the pool_lock
- */
-void __rxe_drop_index_locked(struct rxe_pool_entry *elem);
-
-#define rxe_drop_index_locked(obj) __rxe_drop_index_locked(&(obj)->pelem)
-
-void __rxe_drop_index(struct rxe_pool_entry *elem);
-
-#define rxe_drop_index(obj) __rxe_drop_index(&(obj)->pelem)
-
 /* assign a key to a keyed object and insert object into
  * pool's rb tree holding and not holding pool_lock
  */
