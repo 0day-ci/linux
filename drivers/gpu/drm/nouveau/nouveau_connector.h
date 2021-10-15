@@ -167,6 +167,12 @@ nouveau_connector_is_mst(struct drm_connector *connector)
 	return encoder->encoder_type == DRM_MODE_ENCODER_DPMST;
 }
 
+static inline bool
+nouveau_connector_is_hdmi_monitor(struct drm_connector *connector)
+{
+	return connector->display_info.is_hdmi;
+}
+
 #define nouveau_for_each_non_mst_connector_iter(connector, iter) \
 	drm_for_each_connector_iter(connector, iter) \
 		for_each_if(!nouveau_connector_is_mst(connector))
