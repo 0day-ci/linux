@@ -92,6 +92,35 @@ static inline struct uart_port *uart_port_check(struct uart_state *state)
 }
 
 /*
+ * This routine can be used before register access to wake up a serial
+ * port that has been runtime PM suspended by the serial port driver.
+ * Note that the runtime_suspended flag is managed by the serial port
+ * device driver runtime PM.
+ */
+static int __uart_port_wakeup(struct uart_port *port)
+{
+	if (!port->runtime_suspended)
+		return 0;
+
+	if (port->ops->wakeup)
+		return port->ops->wakeup(port);
+
+	return 0;
+}
+
+static int uart_port_wakeup(struct uart_port *port)
+{
+	unsigned long flags;
+	int ret;
+
+	spin_lock_irqsave(&port->lock, flags);
+	ret = __uart_port_wakeup(port);
+	spin_unlock_irqrestore(&port->lock, flags);
+
+	return ret;
+}
+
+/*
  * This routine is used by the interrupt handler to schedule processing in
  * the software interrupt portion of the driver.
  */
@@ -123,8 +152,13 @@ static void __uart_start(struct tty_struct *tty)
 	struct uart_state *state = tty->driver_data;
 	struct uart_port *port = state->uart_port;
 
-	if (port && !uart_tx_stopped(port))
-		port->ops->start_tx(port);
+	if (!port || uart_tx_stopped(port))
+		return;
+
+	if (__uart_port_wakeup(port) < 0)
+		return;
+
+	port->ops->start_tx(port);
 }
 
 static void uart_start(struct tty_struct *tty)
@@ -137,6 +171,21 @@ static void uart_start(struct tty_struct *tty)
 	__uart_start(tty);
 	uart_port_unlock(port, flags);
 }
+
+/*
+ * This routine can be called from the serial driver runtime PM resume function
+ * to transmit buffered data if the serial port was not active on uart_write().
+ */
+void uart_start_pending_tx(struct uart_port *port)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&port->lock, flags);
+	if (!uart_tx_stopped(port) && uart_circ_chars_pending(&port->state->xmit))
+		port->ops->start_tx(port);
+	spin_unlock_irqrestore(&port->lock, flags);
+}
+EXPORT_SYMBOL(uart_start_pending_tx);
 
 static void
 uart_update_mctrl(struct uart_port *port, unsigned int set, unsigned int clear)
@@ -1074,6 +1123,11 @@ uart_tiocmset(struct tty_struct *tty, unsigned int set, unsigned int clear)
 	if (!uport)
 		goto out;
 
+	if (uart_port_wakeup(uport) < 0) {
+		ret = -EAGAIN;
+		goto out;
+	}
+
 	if (!tty_io_error(tty)) {
 		uart_update_mctrl(uport, set, clear);
 		ret = 0;
@@ -1409,6 +1463,11 @@ uart_ioctl(struct tty_struct *tty, unsigned int cmd, unsigned long arg)
 		goto out_up;
 	}
 
+	if (uart_port_wakeup(uport) < 0) {
+		ret = -EAGAIN;
+		goto out_up;
+	}
+
 	/*
 	 * All these rely on hardware being present and need to be
 	 * protected against the tty being hung up.
@@ -1731,7 +1790,12 @@ static void uart_dtr_rts(struct tty_port *port, int raise)
 	uport = uart_port_ref(state);
 	if (!uport)
 		return;
+
+	if (uart_port_wakeup(uport) < 0)
+		goto out;
+
 	uart_port_dtr_rts(uport, raise);
+out:
 	uart_port_deref(uport);
 }
 

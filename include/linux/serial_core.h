@@ -40,6 +40,7 @@ struct uart_ops {
 	void		(*set_mctrl)(struct uart_port *, unsigned int mctrl);
 	unsigned int	(*get_mctrl)(struct uart_port *);
 	void		(*stop_tx)(struct uart_port *);
+	int		(*wakeup)(struct uart_port *);
 	void		(*start_tx)(struct uart_port *);
 	void		(*throttle)(struct uart_port *);
 	void		(*unthrottle)(struct uart_port *);
@@ -250,6 +251,7 @@ struct uart_port {
 	unsigned char		suspended;
 	unsigned char		console_reinit;
 	const char		*name;			/* port name */
+	unsigned int		runtime_suspended:1;	/* port runtime state set by port driver */
 	struct attribute_group	*attr_group;		/* port specific attributes */
 	const struct attribute_group **tty_groups;	/* all attributes (serial core use only) */
 	struct serial_rs485     rs485;
@@ -414,6 +416,7 @@ bool uart_match_port(const struct uart_port *port1,
 /*
  * Power Management
  */
+void uart_start_pending_tx(struct uart_port *port);
 int uart_suspend_port(struct uart_driver *reg, struct uart_port *port);
 int uart_resume_port(struct uart_driver *reg, struct uart_port *port);
 

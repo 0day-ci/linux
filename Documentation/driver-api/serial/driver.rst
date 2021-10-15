@@ -234,6 +234,15 @@ hardware.
 
 	Interrupts: caller dependent.
 
+  wakeup(port)
+	Wake up port if it has been runtime PM suspended.
+
+	Locking: port->lock taken.
+
+	Interrupts: locally disabled.
+
+	This call must not sleep
+
   flush_buffer(port)
 	Flush any write buffers, reset any DMA state and stop any
 	ongoing DMA transfers.
