@@ -245,47 +245,6 @@ static int rxe_insert_key(struct rxe_pool *pool, struct rxe_pool_entry *new)
 	return 0;
 }
 
-int __rxe_add_key_locked(struct rxe_pool_entry *elem, void *key)
-{
-	struct rxe_pool *pool = elem->pool;
-	int err;
-
-	memcpy((u8 *)elem + pool->key.key_offset, key, pool->key.key_size);
-	err = rxe_insert_key(pool, elem);
-
-	return err;
-}
-
-int __rxe_add_key(struct rxe_pool_entry *elem, void *key)
-{
-	struct rxe_pool *pool = elem->pool;
-	unsigned long flags;
-	int err;
-
-	write_lock_irqsave(&pool->pool_lock, flags);
-	err = __rxe_add_key_locked(elem, key);
-	write_unlock_irqrestore(&pool->pool_lock, flags);
-
-	return err;
-}
-
-void __rxe_drop_key_locked(struct rxe_pool_entry *elem)
-{
-	struct rxe_pool *pool = elem->pool;
-
-	rb_erase(&elem->key_node, &pool->key.tree);
-}
-
-void __rxe_drop_key(struct rxe_pool_entry *elem)
-{
-	struct rxe_pool *pool = elem->pool;
-	unsigned long flags;
-
-	write_lock_irqsave(&pool->pool_lock, flags);
-	__rxe_drop_key_locked(elem);
-	write_unlock_irqrestore(&pool->pool_lock, flags);
-}
-
 static int rxe_add_index(struct rxe_pool_entry *elem)
 {
 	struct rxe_pool *pool = elem->pool;
@@ -342,6 +301,31 @@ out_cnt:
 	return NULL;
 }
 
+void *rxe_alloc_with_key_locked(struct rxe_pool *pool, void *key)
+{
+	struct rxe_pool_entry *elem;
+	u8 *obj;
+	int err;
+
+	obj = rxe_alloc_locked(pool);
+	if (!obj)
+		return NULL;
+
+	elem = (struct rxe_pool_entry *)(obj + pool->elem_offset);
+	memcpy((u8 *)elem + pool->key.key_offset, key, pool->key.key_size);
+	err = rxe_insert_key(pool, elem);
+	if (err) {
+		kfree(obj);
+		goto out_cnt;
+	}
+
+	return obj;
+
+out_cnt:
+	atomic_dec(&pool->num_elem);
+	return NULL;
+}
+
 void *rxe_alloc(struct rxe_pool *pool)
 {
 	unsigned long flags;
@@ -349,6 +333,18 @@ void *rxe_alloc(struct rxe_pool *pool)
 
 	write_lock_irqsave(&pool->pool_lock, flags);
 	obj = rxe_alloc_locked(pool);
+	write_unlock_irqrestore(&pool->pool_lock, flags);
+
+	return obj;
+}
+
+void *rxe_alloc_with_key(struct rxe_pool *pool, void *key)
+{
+	unsigned long flags;
+	void *obj;
+
+	write_lock_irqsave(&pool->pool_lock, flags);
+	obj = rxe_alloc_with_key_locked(pool, key);
 	write_unlock_irqrestore(&pool->pool_lock, flags);
 
 	return obj;
@@ -390,6 +386,9 @@ void rxe_elem_release(struct kref *kref)
 
 	if (pool->flags & RXE_POOL_INDEX)
 		rxe_drop_index(elem);
+
+	if (pool->flags & RXE_POOL_KEY)
+		rb_erase(&elem->key_node, &pool->key.tree);
 
 	if (!(pool->flags & RXE_POOL_NO_ALLOC)) {
 		obj = elem->obj;

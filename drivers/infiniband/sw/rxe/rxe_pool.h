@@ -104,30 +104,14 @@ void *rxe_alloc_locked(struct rxe_pool *pool);
 
 void *rxe_alloc(struct rxe_pool *pool);
 
+void *rxe_alloc_with_key_locked(struct rxe_pool *pool, void *key);
+
+void *rxe_alloc_with_key(struct rxe_pool *pool, void *key);
+
 /* connect already allocated object to pool */
 int __rxe_add_to_pool(struct rxe_pool *pool, struct rxe_pool_entry *elem);
 
 #define rxe_add_to_pool(pool, obj) __rxe_add_to_pool(pool, &(obj)->pelem)
-
-/* assign a key to a keyed object and insert object into
- * pool's rb tree holding and not holding pool_lock
- */
-int __rxe_add_key_locked(struct rxe_pool_entry *elem, void *key);
-
-#define rxe_add_key_locked(obj, key) __rxe_add_key_locked(&(obj)->pelem, key)
-
-int __rxe_add_key(struct rxe_pool_entry *elem, void *key);
-
-#define rxe_add_key(obj, key) __rxe_add_key(&(obj)->pelem, key)
-
-/* remove elem from rb tree holding and not holding the pool_lock */
-void __rxe_drop_key_locked(struct rxe_pool_entry *elem);
-
-#define rxe_drop_key_locked(obj) __rxe_drop_key_locked(&(obj)->pelem)
-
-void __rxe_drop_key(struct rxe_pool_entry *elem);
-
-#define rxe_drop_key(obj) __rxe_drop_key(&(obj)->pelem)
 
 /* lookup an indexed object from index holding and not holding the pool_lock.
  * takes a reference on object
