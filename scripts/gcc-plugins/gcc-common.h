@@ -27,6 +27,7 @@
 #include "except.h"
 #include "function.h"
 #include "toplev.h"
+#include "insn-codes.h"
 #if BUILDING_GCC_VERSION >= 5000
 #include "expr.h"
 #endif
@@ -534,6 +535,9 @@ static inline void ipa_remove_stmt_references(symtab_node *referring_node, gimpl
 	referring_node->remove_stmt_references(stmt);
 }
 #endif
+
+/* RTL related */
+extern int recog(rtx, rtx_insn *, int *);
 
 #if BUILDING_GCC_VERSION < 6000
 #define get_inner_reference(exp, pbitsize, pbitpos, poffset, pmode, punsignedp, preversep, pvolatilep, keep_aligning)	\
