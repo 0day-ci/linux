@@ -132,6 +132,12 @@ void intel_nhlt_free(struct acpi_table_nhlt *addr);
 
 int intel_nhlt_get_dmic_geo(struct acpi_table_nhlt *nhlt);
 
+bool intel_nhlt_has_endpoint_type(struct acpi_table_nhlt *nhlt, u8 link_type);
+struct nhlt_specific_cfg *
+intel_nhlt_get_endpoint_blob(struct acpi_table_nhlt *nhlt,
+			     u32 bus_id, u8 link_type, u8 vbps, u8 bps,
+			     u8 num_ch, u32 rate, u8 dir, u8 dev_type);
+
 #else
 
 struct acpi_table_nhlt;
@@ -149,6 +155,20 @@ static inline int intel_nhlt_get_dmic_geo(struct acpi_table_nhlt *nhlt)
 {
 	return 0;
 }
+
+bool intel_nhlt_has_endpoint_type(struct acpi_table_nhlt *nhlt, u8 link_type)
+{
+	return false;
+}
+
+struct nhlt_specific_cfg *
+intel_nhlt_get_endpoint_blob(struct acpi_table_nhlt *nhlt,
+			     u32 bus_id, u8 link_type, u8 vbps, u8 bps,
+			     u8 num_ch, u32 rate, u8 dir, u8 dev_type)
+{
+	return NULL;
+}
+
 #endif
 
 #endif
