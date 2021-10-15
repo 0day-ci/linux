@@ -831,6 +831,32 @@ unlock:
 	return ret;
 }
 
+int wcn36xx_dxe_set_tx_ack_skb(struct wcn36xx *wcn, struct sk_buff *skb)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&wcn->dxe_lock, flags);
+	if (wcn->tx_ack_skb) {
+		spin_unlock_irqrestore(&wcn->dxe_lock, flags);
+		wcn36xx_warn("tx_ack_skb already set\n");
+		return -EINVAL;
+	}
+
+	wcn->tx_ack_skb = skb;
+	spin_unlock_irqrestore(&wcn->dxe_lock, flags);
+
+	return 0;
+}
+
+void wcn36xx_dxe_unset_tx_ack_skb(struct wcn36xx *wcn)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&wcn->dxe_lock, flags);
+	wcn->tx_ack_skb = NULL;
+	spin_unlock_irqrestore(&wcn->dxe_lock, flags);
+}
+
 int wcn36xx_dxe_init(struct wcn36xx *wcn)
 {
 	int reg_data = 0, ret;

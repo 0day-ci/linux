@@ -502,7 +502,6 @@ int wcn36xx_start_tx(struct wcn36xx *wcn,
 	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *)skb->data;
 	struct wcn36xx_vif *vif_priv = NULL;
 	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
-	unsigned long flags;
 	bool is_low = ieee80211_is_data(hdr->frame_control);
 	bool bcast = is_broadcast_ether_addr(hdr->addr1) ||
 		is_multicast_ether_addr(hdr->addr1);
@@ -524,15 +523,8 @@ int wcn36xx_start_tx(struct wcn36xx *wcn,
 	if (info->flags & IEEE80211_TX_CTL_REQ_TX_STATUS) {
 		wcn36xx_dbg(WCN36XX_DBG_DXE, "TX_ACK status requested\n");
 
-		spin_lock_irqsave(&wcn->dxe_lock, flags);
-		if (wcn->tx_ack_skb) {
-			spin_unlock_irqrestore(&wcn->dxe_lock, flags);
-			wcn36xx_warn("tx_ack_skb already set\n");
+		if (wcn36xx_dxe_set_tx_ack_skb(wcn, skb))
 			return -EINVAL;
-		}
-
-		wcn->tx_ack_skb = skb;
-		spin_unlock_irqrestore(&wcn->dxe_lock, flags);
 
 		/* Only one at a time is supported by fw. Stop the TX queues
 		 * until the ack status gets back.
@@ -562,10 +554,7 @@ int wcn36xx_start_tx(struct wcn36xx *wcn,
 		/* If the skb has not been transmitted,
 		 * don't keep a reference to it.
 		 */
-		spin_lock_irqsave(&wcn->dxe_lock, flags);
-		wcn->tx_ack_skb = NULL;
-		spin_unlock_irqrestore(&wcn->dxe_lock, flags);
-
+		wcn36xx_dxe_unset_tx_ack_skb(wcn);
 		ieee80211_wake_queues(wcn->hw);
 	}
 

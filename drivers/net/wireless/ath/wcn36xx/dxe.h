@@ -467,4 +467,6 @@ int wcn36xx_dxe_tx_frame(struct wcn36xx *wcn,
 			 struct sk_buff *skb,
 			 bool is_low);
 void wcn36xx_dxe_tx_ack_ind(struct wcn36xx *wcn, u32 status);
+int wcn36xx_dxe_set_tx_ack_skb(struct wcn36xx *wcn, struct sk_buff *skb);
+void wcn36xx_dxe_unset_tx_ack_skb(struct wcn36xx *wcn);
 #endif	/* _DXE_H_ */
