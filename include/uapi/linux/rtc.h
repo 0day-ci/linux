@@ -113,8 +113,10 @@ struct rtc_pll_info {
 /* feature list */
 #define RTC_FEATURE_ALARM		0
 #define RTC_FEATURE_ALARM_RES_MINUTE	1
-#define RTC_FEATURE_NEED_WEEK_DAY	2
-#define RTC_FEATURE_CNT			3
+#define RTC_FEATURE_ALARM_RES_2S	2
+#define RTC_FEATURE_UPDATE_INTERRUPT	3
+#define RTC_FEATURE_NEED_WEEK_DAY	4
+#define RTC_FEATURE_CNT			5
 
 #define RTC_MAX_FREQ	8192
 
