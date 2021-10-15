@@ -1922,6 +1922,55 @@ unsigned long kretprobe_find_ret_addr(struct task_struct *tsk, void *fp,
 }
 NOKPROBE_SYMBOL(kretprobe_find_ret_addr);
 
+/**
+ * kretprobe_next_ret_addr -- Find next correct return address from @cur
+ * @tsk: Target task
+ * @fp: A framepointer to verify
+ * @cur: a storage and the base point of the loop cursor.
+ *
+ * Find the next correct return address modified by a kretprobe on @tsk from
+ * the entry which points *@cur. If it finds the next currect return address
+ * whose framepointer matches @fp, returns the return address.
+ * If the next current return address's framepointer doesn't match @fp, this
+ * returns ERR_PTR(-EILSEQ). If the *@cur is the end of the kretprobe_instance
+ * list, returns ERR_PTR(-ENOENT). If the @cur is NULL, returns ERR_PTR(-EINVAL).
+ * The @tsk must be 'current' or a task which is not running. @fp is used for
+ * verifying the framepointer which recorded with the correct return address
+ * (kretprobe_instance::fp field.)
+ * The @cur is a loop cursor for searching the kretprobe return addresses on
+ * the @tsk. If *@cur is NULL, this returns the top entry of the correct return
+ * address.
+ */
+kprobe_opcode_t *kretprobe_next_ret_addr(struct task_struct *tsk, void *fp,
+					 struct llist_node **cur)
+{
+	struct kretprobe_instance *ri = NULL;
+	kprobe_opcode_t *ret;
+
+	if (WARN_ON_ONCE(!cur))
+		return ERR_PTR(-EINVAL);
+
+	if (*cur) {
+		/* This returns the next correct return address */
+		ret = __kretprobe_find_ret_addr(tsk, cur);
+		if (!ret)
+			return ERR_PTR(-ENOENT);
+		ri = container_of(*cur, struct kretprobe_instance, llist);
+		return ri->fp == fp ? ret : ERR_PTR(-EILSEQ);
+	}
+
+	/* If this is the first try, find the FP-matched entry */
+	do {
+		ret = __kretprobe_find_ret_addr(tsk, cur);
+		if (!ret)
+			return ERR_PTR(-ENOENT);
+		ri = container_of(*cur, struct kretprobe_instance, llist);
+	} while (ri->fp != fp);
+
+	return ret;
+}
+NOKPROBE_SYMBOL(kretprobe_next_ret_addr);
+
 void __weak arch_kretprobe_fixup_return(struct pt_regs *regs,
 					kprobe_opcode_t *correct_ret_addr)
 {

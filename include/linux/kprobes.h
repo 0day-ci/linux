@@ -516,6 +516,8 @@ static nokprobe_inline bool is_kretprobe_trampoline(unsigned long addr)
 
 unsigned long kretprobe_find_ret_addr(struct task_struct *tsk, void *fp,
 				      struct llist_node **cur);
+kprobe_opcode_t *kretprobe_next_ret_addr(struct task_struct *tsk, void *fp,
+					 struct llist_node **cur);
 #else
 static nokprobe_inline bool is_kretprobe_trampoline(unsigned long addr)
 {

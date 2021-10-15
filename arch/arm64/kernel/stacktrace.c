@@ -133,8 +133,14 @@ int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
 	}
 #endif /* CONFIG_FUNCTION_GRAPH_TRACER */
 #ifdef CONFIG_KRETPROBES
-	if (is_kretprobe_trampoline(frame->pc))
-		frame->pc = kretprobe_find_ret_addr(tsk, (void *)frame->fp, &frame->kr_cur);
+	if (is_kretprobe_trampoline(frame->pc)) {
+		void *ret = kretprobe_next_ret_addr(tsk, (void *)frame->fp, &frame->kr_cur);
+		/* There must be a bug in this unwinder or kretprobe. */
+		if (WARN_ON_ONCE(IS_ERR(ret)))
+			pr_err("Kretprobe_trampoline recovery failed (%d)\n", PTR_ERR(ret));
+		else
+			frame->pc = (unsigned long)ret;
+	}
 #endif
 
 	frame->pc = ptrauth_strip_insn_pac(frame->pc);
