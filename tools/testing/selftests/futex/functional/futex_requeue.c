@@ -27,7 +27,7 @@ void usage(char *prog)
 
 void *waiterfn(void *arg)
 {
-	struct timespec to;
+	struct timespec64 to;
 
 	to.tv_sec = 0;
 	to.tv_nsec = timeout_ns;

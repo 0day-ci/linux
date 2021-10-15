@@ -30,7 +30,7 @@ void usage(char *prog)
 
 static void *waiterfn(void *arg)
 {
-	struct timespec to;
+	struct timespec64 to;
 	unsigned int flags = 0;
 
 	if (arg)

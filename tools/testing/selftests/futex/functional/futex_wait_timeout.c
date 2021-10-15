@@ -71,11 +71,11 @@ static void test_timeout(int res, int *ret, char *test_name, int err)
 /*
  * Calculate absolute timeout and correct overflow
  */
-static int futex_get_abs_timeout(clockid_t clockid, struct timespec *to,
+static int futex_get_abs_timeout(clockid_t clockid, struct timespec64 *to,
 				 long timeout_ns)
 {
-	if (clock_gettime(clockid, to)) {
-		error("clock_gettime failed\n", errno);
+	if (gettime64(clockid, to)) {
+		error("gettime64 failed\n", errno);
 		return errno;
 	}
 
@@ -93,7 +93,7 @@ int main(int argc, char *argv[])
 {
 	futex_t f1 = FUTEX_INITIALIZER;
 	int res, ret = RET_PASS;
-	struct timespec to;
+	struct timespec64 to;
 	pthread_t thread;
 	int c;
 
