@@ -655,14 +655,16 @@ bool dma_resv_test_signaled(struct dma_resv *obj, bool test_all)
 {
 	struct dma_resv_iter cursor;
 	struct dma_fence *fence;
+	bool ret = true;
 
 	dma_resv_iter_begin(&cursor, obj, test_all);
 	dma_resv_for_each_fence_unlocked(&cursor, fence) {
-		dma_resv_iter_end(&cursor);
-		return false;
+		ret = dma_fence_is_signaled(fence);
+		if (!ret)
+			break;
 	}
 	dma_resv_iter_end(&cursor);
-	return true;
+	return ret;
 }
 EXPORT_SYMBOL_GPL(dma_resv_test_signaled);
 
