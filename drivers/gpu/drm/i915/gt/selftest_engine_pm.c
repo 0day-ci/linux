@@ -234,6 +234,7 @@ static int live_engine_busy_stats(void *arg)
 		struct i915_request *rq;
 		ktime_t de, dt;
 		ktime_t t[2];
+		u32 gt_stamp;
 
 		if (!intel_engine_supports_stats(engine))
 			continue;
@@ -251,10 +252,16 @@ static int live_engine_busy_stats(void *arg)
 		ENGINE_TRACE(engine, "measuring idle time\n");
 		preempt_disable();
 		de = intel_engine_get_busy_time(engine, &t[0]);
-		udelay(100);
+		gt_stamp = intel_uncore_read(gt->uncore, GUCPMTIMESTAMP);
+		udelay(10000);
 		de = ktime_sub(intel_engine_get_busy_time(engine, &t[1]), de);
+		gt_stamp = intel_uncore_read(gt->uncore, GUCPMTIMESTAMP) - gt_stamp;
 		preempt_enable();
-		dt = ktime_sub(t[1], t[0]);
+
+		dt = intel_engine_uses_guc(engine) ?
+		     intel_gt_clock_interval_to_ns(engine->gt, gt_stamp) :
+		     ktime_sub(t[1], t[0]);
+
 		if (de < 0 || de > 10) {
 			pr_err("%s: reported %lldns [%d%%] busyness while sleeping [for %lldns]\n",
 			       engine->name,
@@ -283,10 +290,16 @@ static int live_engine_busy_stats(void *arg)
 		ENGINE_TRACE(engine, "measuring busy time\n");
 		preempt_disable();
 		de = intel_engine_get_busy_time(engine, &t[0]);
-		udelay(100);
+		gt_stamp = intel_uncore_read(gt->uncore, GUCPMTIMESTAMP);
+		udelay(10000);
 		de = ktime_sub(intel_engine_get_busy_time(engine, &t[1]), de);
+		gt_stamp = intel_uncore_read(gt->uncore, GUCPMTIMESTAMP) - gt_stamp;
 		preempt_enable();
-		dt = ktime_sub(t[1], t[0]);
+
+		dt = intel_engine_uses_guc(engine) ?
+		     intel_gt_clock_interval_to_ns(engine->gt, gt_stamp) :
+		     ktime_sub(t[1], t[0]);
+
 		if (100 * de < 95 * dt || 95 * de > 100 * dt) {
 			pr_err("%s: reported %lldns [%d%%] busyness while spinning [for %lldns]\n",
 			       engine->name,

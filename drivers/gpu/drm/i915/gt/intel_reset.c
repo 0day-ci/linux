@@ -1389,6 +1389,21 @@ out:
 	intel_runtime_pm_put(gt->uncore->rpm, wakeref);
 }
 
+bool intel_gt_reset_trylock_no_wait(struct intel_gt *gt, int *srcu)
+{
+	int reset_in_progress;
+
+	might_lock(&gt->reset.backoff_srcu);
+
+	rcu_read_lock();
+	reset_in_progress = test_bit(I915_RESET_BACKOFF, &gt->reset.flags);
+	if (!reset_in_progress)
+		*srcu = srcu_read_lock(&gt->reset.backoff_srcu);
+	rcu_read_unlock();
+
+	return reset_in_progress;
+}
+
 int intel_gt_reset_trylock(struct intel_gt *gt, int *srcu)
 {
 	might_lock(&gt->reset.backoff_srcu);
