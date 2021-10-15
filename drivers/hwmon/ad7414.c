@@ -107,6 +107,7 @@ static ssize_t temp_input_show(struct device *dev,
 			       struct device_attribute *attr, char *buf)
 {
 	struct ad7414_data *data = ad7414_update_device(dev);
+
 	return sprintf(buf, "%d\n", ad7414_temp_from_reg(data->temp_input));
 }
 static SENSOR_DEVICE_ATTR_RO(temp1_input, temp_input, 0);
@@ -116,6 +117,7 @@ static ssize_t max_min_show(struct device *dev, struct device_attribute *attr,
 {
 	int index = to_sensor_dev_attr(attr)->index;
 	struct ad7414_data *data = ad7414_update_device(dev);
+
 	return sprintf(buf, "%d\n", data->temps[index] * 1000);
 }
 
@@ -152,6 +154,7 @@ static ssize_t alarm_show(struct device *dev, struct device_attribute *attr,
 	int bitnr = to_sensor_dev_attr(attr)->index;
 	struct ad7414_data *data = ad7414_update_device(dev);
 	int value = (data->temp_input >> bitnr) & 1;
+
 	return sprintf(buf, "%d\n", value);
 }
 
@@ -192,7 +195,7 @@ static int ad7414_probe(struct i2c_client *client)
 	/* Make sure the chip is powered up. */
 	conf = i2c_smbus_read_byte_data(client, AD7414_REG_CONF);
 	if (conf < 0)
-		dev_warn(dev, "ad7414_probe unable to read config register.\n");
+		dev_warn(dev, "%s unable to read config register.\n", __func__);
 	else {
 		conf &= ~(1 << 7);
 		i2c_smbus_write_byte_data(client, AD7414_REG_CONF, conf);
@@ -227,8 +230,7 @@ static struct i2c_driver ad7414_driver = {
 
 module_i2c_driver(ad7414_driver);
 
-MODULE_AUTHOR("Stefan Roese <sr at denx.de>, "
-	      "Frank Edelhaeuser <frank.edelhaeuser at spansion.com>");
+MODULE_AUTHOR("Stefan Roese <sr at denx.de>, Frank Edelhaeuser <frank.edelhaeuser at spansion.com>");
 
 MODULE_DESCRIPTION("AD7414 driver");
 MODULE_LICENSE("GPL");
