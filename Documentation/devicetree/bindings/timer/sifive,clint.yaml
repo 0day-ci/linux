@@ -26,6 +26,7 @@ properties:
       - enum:
           - sifive,fu540-c000-clint
           - canaan,k210-clint
+          - allwinner,sun20i-d1-clint
       - const: sifive,clint0
 
     description:
@@ -33,13 +34,21 @@ properties:
       Supported compatible strings are -
       "sifive,fu540-c000-clint" for the SiFive CLINT v0 as integrated
       onto the SiFive FU540 chip, "canaan,k210-clint" for the SiFive
-      CLINT v0 as integrated onto the Canaan Kendryte K210 chip, and
-      "sifive,clint0" for the SiFive CLINT v0 IP block with no chip
+      CLINT v0 as integrated onto the Canaan Kendryte K210 chip,
+      "allwinner,sun20i-d1-clint" for the CLINT in the Allwinner D1 SoC,
+      and "sifive,clint0" for the SiFive CLINT v0 IP block with no chip
       integration tweaks.
       Please refer to sifive-blocks-ip-versioning.txt for details
 
   reg:
     maxItems: 1
+
+  reg-io-width:
+    description: |
+      Some CLINT implementations, e.g. on the T-HEAD 9xx, only support
+      32bit access for MTIMER.
+    $ref: /schemas/types.yaml#/definitions/uint32
+    const: 4
 
   interrupts-extended:
     minItems: 1
