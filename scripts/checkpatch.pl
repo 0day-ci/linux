@@ -3121,6 +3121,12 @@ sub process {
 			     "A patch subject line should describe the change not the tool that found it\n" . $herecurr);
 		}
 
+# Check if RFC tags is outside the subject prefix
+		if ($in_header_lines && $line =~ /^Subject:.*patch\s*.*]\s*rfc:/i) {
+			WARN("RFC_TAG_PREFIX",
+			     "RFC tag is outside subject prefix, try \"git format-patch --rfc\"\n" . $herecurr);
+		}
+
 # Check for Gerrit Change-Ids not in any patch context
 		if ($realfile eq '' && !$has_patch_separator && $line =~ /^\s*change-id:/i) {
 			if (ERROR("GERRIT_CHANGE_ID",
