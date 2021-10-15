@@ -219,9 +219,9 @@ void free_inode_nonrcu(struct inode *inode)
 }
 EXPORT_SYMBOL(free_inode_nonrcu);
 
-static void i_callback(struct rcu_head *head)
+static void i_callback(struct work_struct *work)
 {
-	struct inode *inode = container_of(head, struct inode, i_rcu);
+	struct inode *inode = container_of(to_rcu_work(work), struct inode, rwork);
 	if (inode->free_inode)
 		inode->free_inode(inode);
 	else
@@ -248,7 +248,7 @@ static struct inode *alloc_inode(struct super_block *sb)
 				return NULL;
 		}
 		inode->free_inode = ops->free_inode;
-		i_callback(&inode->i_rcu);
+		i_callback(&inode->rwork.work);
 		return NULL;
 	}
 
@@ -289,7 +289,8 @@ static void destroy_inode(struct inode *inode)
 			return;
 	}
 	inode->free_inode = ops->free_inode;
-	call_rcu(&inode->i_rcu, i_callback);
+	INIT_RCU_WORK(&inode->rwork, i_callback);
+	queue_rcu_work(system_wq, &inode->rwork);
 }
 
 /**

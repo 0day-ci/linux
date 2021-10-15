@@ -690,7 +690,7 @@ struct inode {
 	struct list_head	i_wb_list;	/* backing dev writeback list */
 	union {
 		struct hlist_head	i_dentry;
-		struct rcu_head		i_rcu;
+		struct rcu_work         rwork;
 	};
 	atomic64_t		i_version;
 	atomic64_t		i_sequence; /* see futex */
