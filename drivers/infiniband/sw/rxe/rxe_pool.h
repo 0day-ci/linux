@@ -46,6 +46,7 @@ struct rxe_type_info {
 
 struct rxe_pool_entry {
 	struct rxe_pool		*pool;
+	void			*obj;
 	struct kref		ref_cnt;
 	struct list_head	list;
 
