@@ -111,6 +111,7 @@ static int isp1301_probe(struct i2c_client *client,
 	phy->init = isp1301_phy_init;
 	phy->set_vbus = isp1301_phy_set_vbus;
 	phy->type = USB_PHY_TYPE_USB2;
+	client->dev.release = client->dev.type->release;
 
 	i2c_set_clientdata(client, isp);
 	usb_add_phy_dev(phy);
