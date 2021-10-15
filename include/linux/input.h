@@ -420,6 +420,9 @@ ktime_t *input_get_timestamp(struct input_dev *dev);
 void input_event(struct input_dev *dev, unsigned int type, unsigned int code, int value);
 void input_inject_event(struct input_handle *handle, unsigned int type, unsigned int code, int value);
 
+void input_update_ledstate(unsigned int flag, unsigned int value);
+unsigned int input_get_ledstate(void);
+
 static inline void input_report_key(struct input_dev *dev, unsigned int code, int value)
 {
 	input_event(dev, EV_KEY, code, !!value);
