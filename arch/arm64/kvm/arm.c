@@ -583,21 +583,25 @@ static void update_vmid(struct kvm_vmid *vmid)
 	spin_unlock(&kvm_vmid_lock);
 }
 
+/*
+ * Handle both the initialisation that is being done when the vcpu is
+ * run for the first time, as well as the updates that must be
+ * performed each time we get a new thread dealing with this vcpu.
+ */
 int kvm_arch_vcpu_run_pid_change(struct kvm_vcpu *vcpu)
 {
-	return kvm_arch_vcpu_run_map_fp(vcpu);
-}
-
-static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
-{
 	struct kvm *kvm = vcpu->kvm;
-	int ret = 0;
-
-	if (likely(vcpu->arch.has_run_once))
-		return 0;
+	int ret;
 
 	if (!kvm_arm_vcpu_is_finalized(vcpu))
 		return -EPERM;
+
+	ret = kvm_arch_vcpu_run_map_fp(vcpu);
+	if (ret)
+		return ret;
+
+	if (likely(vcpu->arch.has_run_once))
+		return 0;
 
 	vcpu->arch.has_run_once = true;
 
@@ -777,10 +781,6 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu)
 
 	if (unlikely(!kvm_vcpu_initialized(vcpu)))
 		return -ENOEXEC;
-
-	ret = kvm_vcpu_first_run_init(vcpu);
-	if (ret)
-		return ret;
 
 	if (run->exit_reason == KVM_EXIT_MMIO) {
 		ret = kvm_handle_mmio_return(vcpu);
