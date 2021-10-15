@@ -711,13 +711,13 @@ static u8 intel_dp_dsc_get_slice_count(struct intel_dp *intel_dp,
 }
 
 static enum intel_output_format
-intel_dp_output_format(struct drm_connector *connector,
+intel_dp_output_format(struct intel_connector *connector,
 		       const struct drm_display_mode *mode)
 {
-	struct intel_dp *intel_dp = intel_attached_dp(to_intel_connector(connector));
-	const struct drm_display_info *info = &connector->display_info;
+	struct intel_dp *intel_dp = intel_attached_dp(connector);
+	const struct drm_display_info *info = &connector->base.display_info;
 
-	if (!connector->ycbcr_420_allowed ||
+	if (!connector->base.ycbcr_420_allowed ||
 	    !drm_mode_is_420_only(info, mode))
 		return INTEL_OUTPUT_FORMAT_RGB;
 
@@ -753,7 +753,7 @@ static int intel_dp_output_bpp(enum intel_output_format output_format, int bpp)
 }
 
 static int
-intel_dp_mode_min_output_bpp(struct drm_connector *connector,
+intel_dp_mode_min_output_bpp(struct intel_connector *connector,
 			     const struct drm_display_mode *mode)
 {
 	enum intel_output_format output_format =
@@ -826,7 +826,7 @@ intel_dp_mode_valid_downstream(struct intel_connector *connector,
 	if (intel_dp->dfp.pcon_max_frl_bw) {
 		int target_bw;
 		int max_frl_bw;
-		int bpp = intel_dp_mode_min_output_bpp(&connector->base, mode);
+		int bpp = intel_dp_mode_min_output_bpp(connector, mode);
 
 		target_bw = bpp * target_clock;
 
@@ -862,13 +862,13 @@ static bool intel_dp_need_bigjoiner(struct intel_dp *intel_dp,
 }
 
 static enum drm_mode_status
-intel_dp_mode_valid(struct drm_connector *connector,
+intel_dp_mode_valid(struct drm_connector *_connector,
 		    struct drm_display_mode *mode)
 {
-	struct intel_dp *intel_dp = intel_attached_dp(to_intel_connector(connector));
-	struct intel_connector *intel_connector = to_intel_connector(connector);
-	struct drm_display_mode *fixed_mode = intel_connector->panel.fixed_mode;
-	struct drm_i915_private *dev_priv = to_i915(connector->dev);
+	struct intel_connector *connector = to_intel_connector(_connector);
+	struct intel_dp *intel_dp = intel_attached_dp(connector);
+	struct drm_display_mode *fixed_mode = connector->panel.fixed_mode;
+	struct drm_i915_private *dev_priv = to_i915(connector->base.dev);
 	int target_clock = mode->clock;
 	int max_rate, mode_rate, max_lanes, max_link_clock;
 	int max_dotclk = dev_priv->max_dotclk_freq;
@@ -884,7 +884,7 @@ intel_dp_mode_valid(struct drm_connector *connector,
 		return MODE_H_ILLEGAL;
 
 	if (intel_dp_is_edp(intel_dp) && fixed_mode) {
-		status = intel_panel_mode_valid(intel_connector, mode);
+		status = intel_panel_mode_valid(connector, mode);
 		if (status != MODE_OK)
 			return status;
 
@@ -958,8 +958,7 @@ intel_dp_mode_valid(struct drm_connector *connector,
 	if (mode_rate > max_rate && !dsc)
 		return MODE_CLOCK_HIGH;
 
-	status = intel_dp_mode_valid_downstream(intel_connector,
-						mode, target_clock);
+	status = intel_dp_mode_valid_downstream(connector, mode, target_clock);
 	if (status != MODE_OK)
 		return status;
 
@@ -1757,7 +1756,7 @@ intel_dp_compute_config(struct intel_encoder *encoder,
 	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
 	struct drm_display_mode *adjusted_mode = &pipe_config->hw.adjusted_mode;
 	struct intel_dp *intel_dp = enc_to_intel_dp(encoder);
-	struct intel_connector *intel_connector = intel_dp->attached_connector;
+	struct intel_connector *connector = intel_dp->attached_connector;
 	bool constant_n = drm_dp_has_quirk(&intel_dp->desc, DP_DPCD_QUIRK_CONSTANT_N);
 	int ret = 0, output_bpp;
 
@@ -1766,8 +1765,8 @@ intel_dp_compute_config(struct intel_encoder *encoder,
 
 	pipe_config->has_audio = intel_dp_has_audio(encoder, pipe_config, conn_state);
 
-	if (intel_dp_is_edp(intel_dp) && intel_connector->panel.fixed_mode) {
-		ret = intel_panel_compute_config(intel_connector, adjusted_mode);
+	if (intel_dp_is_edp(intel_dp) && connector->panel.fixed_mode) {
+		ret = intel_panel_compute_config(connector, adjusted_mode);
 		if (ret)
 			return ret;
 	}
@@ -1785,14 +1784,13 @@ intel_dp_compute_config(struct intel_encoder *encoder,
 	if (intel_dp_hdisplay_bad(dev_priv, adjusted_mode->crtc_hdisplay))
 		return -EINVAL;
 
-	pipe_config->output_format = intel_dp_output_format(&intel_connector->base,
-							    adjusted_mode);
+	pipe_config->output_format = intel_dp_output_format(connector, adjusted_mode);
 
 	ret = intel_dp_compute_link_config(encoder, pipe_config, conn_state);
 	if (ret < 0)
 		return ret;
 
-	if ((intel_dp_is_edp(intel_dp) && intel_connector->panel.fixed_mode) ||
+	if ((intel_dp_is_edp(intel_dp) && connector->panel.fixed_mode) ||
 	    pipe_config->output_format == INTEL_OUTPUT_FORMAT_YCBCR420) {
 		ret = intel_panel_fitting(pipe_config, conn_state);
 		if (ret)
