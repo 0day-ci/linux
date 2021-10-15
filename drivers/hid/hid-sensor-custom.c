@@ -371,7 +371,7 @@ static ssize_t show_value(struct device *dev, struct device_attribute *attr,
 				     sizeof(struct hid_custom_usage_desc),
 				     usage_id_cmp);
 		if (usage_desc)
-			return snprintf(buf, PAGE_SIZE, "%s\n",
+			return sysfs_emit(buf, "%s\n",
 					usage_desc->desc);
 		else
 			return sprintf(buf, "not-specified\n");

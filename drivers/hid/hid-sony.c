@@ -707,7 +707,7 @@ static ssize_t ds4_show_poll_interval(struct device *dev,
 	struct hid_device *hdev = to_hid_device(dev);
 	struct sony_sc *sc = hid_get_drvdata(hdev);
 
-	return snprintf(buf, PAGE_SIZE, "%i\n", sc->ds4_bt_poll_interval);
+	return sysfs_emit(buf, "%i\n", sc->ds4_bt_poll_interval);
 }
 
 static ssize_t ds4_store_poll_interval(struct device *dev,
@@ -744,7 +744,7 @@ static ssize_t sony_show_firmware_version(struct device *dev,
 	struct hid_device *hdev = to_hid_device(dev);
 	struct sony_sc *sc = hid_get_drvdata(hdev);
 
-	return snprintf(buf, PAGE_SIZE, "0x%04x\n", sc->fw_version);
+	return sysfs_emit(buf, "0x%04x\n", sc->fw_version);
 }
 
 static DEVICE_ATTR(firmware_version, 0444, sony_show_firmware_version, NULL);
@@ -756,7 +756,7 @@ static ssize_t sony_show_hardware_version(struct device *dev,
 	struct hid_device *hdev = to_hid_device(dev);
 	struct sony_sc *sc = hid_get_drvdata(hdev);
 
-	return snprintf(buf, PAGE_SIZE, "0x%04x\n", sc->hw_version);
+	return sysfs_emit(buf, "0x%04x\n", sc->hw_version);
 }
 
 static DEVICE_ATTR(hardware_version, 0444, sony_show_hardware_version, NULL);
