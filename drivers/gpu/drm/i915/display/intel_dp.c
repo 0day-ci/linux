@@ -1107,6 +1107,7 @@ static bool intel_dp_supports_dsc(struct intel_dp *intel_dp,
 static bool intel_dp_is_ycbcr420(struct intel_dp *intel_dp,
 				 const struct intel_crtc_state *crtc_state)
 {
+	/* FIXME see intel_dp_update_420() regarding rgb_to_ycbcr */
 	return crtc_state->output_format == INTEL_OUTPUT_FORMAT_YCBCR420 ||
 		(crtc_state->output_format == INTEL_OUTPUT_FORMAT_YCBCR444 &&
 		 intel_dp->dfp.ycbcr_444_to_420);
@@ -2456,6 +2457,7 @@ void intel_dp_configure_protocol_converter(struct intel_dp *intel_dp,
 			    "Failed to %s protocol converter YCbCr 4:2:0 conversion mode\n",
 			    enabledisable(intel_dp->dfp.ycbcr_444_to_420));
 
+	/* FIXME see intel_dp_update_420() regarding rgb_to_ycbcr */
 	tmp = intel_dp->dfp.rgb_to_ycbcr ?
 		DP_CONVERSION_BT709_RGB_YCBCR_ENABLE : 0;
 
@@ -4261,6 +4263,14 @@ intel_dp_update_420(struct intel_dp *intel_dp)
 	rgb_to_ycbcr = drm_dp_downstream_rgb_to_ycbcr_conversion(intel_dp->dpcd,
 								 intel_dp->downstream_ports,
 								 DP_DS_HDMI_BT709_RGB_YCBCR_CONV);
+	/*
+	 * FIXME need to actually track whether we're really
+	 * going to be doing the RGB->YCbCr connversion or not.
+	 * We can't tell by simply looking at intel_dp->dfp.rgb_to_ycbcr.
+	 * Readout is going to annoying due to having to read that
+	 * state from external hardware that may vanish at any time :(
+	 */
+	rgb_to_ycbcr = false;
 
 	if (DISPLAY_VER(i915) >= 11) {
 		/* Let PCON convert from RGB->YCbCr if possible */
