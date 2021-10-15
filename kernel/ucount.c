@@ -284,6 +284,47 @@ bool dec_rlimit_ucounts(struct ucounts *ucounts, enum ucount_type type, long v)
 	return (new == 0);
 }
 
+static void do_dec_rlimit_put_ucounts(struct ucounts *ucounts,
+				struct ucounts *last, enum ucount_type type)
+{
+	struct ucounts *iter;
+	for (iter = ucounts; iter != last; iter = iter->ns->ucounts) {
+		long dec = atomic_long_add_return(-1, &iter->ucount[type]);
+		WARN_ON_ONCE(dec < 0);
+		if (dec == 0)
+			put_ucounts(iter);
+	}
+}
+
+void dec_rlimit_put_ucounts(struct ucounts *ucounts, enum ucount_type type)
+{
+	do_dec_rlimit_put_ucounts(ucounts, NULL, type);
+}
+
+long inc_rlimit_get_ucounts(struct ucounts *ucounts, enum ucount_type type)
+{
+	struct ucounts *iter;
+	long dec, ret = 0;
+
+	for (iter = ucounts; iter; iter = iter->ns->ucounts) {
+		long max = READ_ONCE(iter->ns->ucount_max[type]);
+		long new = atomic_long_add_return(1, &iter->ucount[type]);
+		if (new < 0 || new > max)
+			goto unwind;
+		else if (iter == ucounts)
+			ret = new;
+		if ((new == 1) && (get_ucounts(iter) != iter))
+			goto dec_unwind;
+	}
+	return ret;
+dec_unwind:
+	dec = atomic_long_add_return(1, &iter->ucount[type]);
+	WARN_ON_ONCE(dec < 0);
+unwind:
+	do_dec_rlimit_put_ucounts(ucounts, iter, type);
+	return LONG_MAX;
+}
+
 bool is_ucounts_overlimit(struct ucounts *ucounts, enum ucount_type type, unsigned long max)
 {
 	struct ucounts *iter;
