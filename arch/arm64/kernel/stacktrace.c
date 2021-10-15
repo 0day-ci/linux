@@ -54,6 +54,7 @@ static void notrace unwind_start(struct stackframe *frame, unsigned long fp,
 	bitmap_zero(frame->stacks_done, __NR_STACK_TYPES);
 	frame->prev_fp = 0;
 	frame->prev_type = STACK_TYPE_UNKNOWN;
+	frame->failed = false;
 }
 
 NOKPROBE_SYMBOL(unwind_start);
@@ -65,24 +66,26 @@ NOKPROBE_SYMBOL(unwind_start);
  * records (e.g. a cycle), determined based on the location and fp value of A
  * and the location (but not the fp value) of B.
  */
-static int notrace unwind_next(struct task_struct *tsk,
-			       struct stackframe *frame)
+static void notrace unwind_next(struct task_struct *tsk,
+				struct stackframe *frame)
 {
 	unsigned long fp = frame->fp;
 	struct stack_info info;
 
-	/* Final frame; nothing to unwind */
-	if (fp == (unsigned long)task_pt_regs(tsk)->stackframe)
-		return -ENOENT;
+	if (fp & 0x7) {
+		frame->failed = true;
+		return;
+	}
 
-	if (fp & 0x7)
-		return -EINVAL;
+	if (!on_accessible_stack(tsk, fp, 16, &info)) {
+		frame->failed = true;
+		return;
+	}
 
-	if (!on_accessible_stack(tsk, fp, 16, &info))
-		return -EINVAL;
-
-	if (test_bit(info.type, frame->stacks_done))
-		return -EINVAL;
+	if (test_bit(info.type, frame->stacks_done)) {
+		frame->failed = true;
+		return;
+	}
 
 	/*
 	 * As stacks grow downward, any valid record on the same stack must be
@@ -98,8 +101,10 @@ static int notrace unwind_next(struct task_struct *tsk,
 	 * stack.
 	 */
 	if (info.type == frame->prev_type) {
-		if (fp <= frame->prev_fp)
-			return -EINVAL;
+		if (fp <= frame->prev_fp) {
+			frame->failed = true;
+			return;
+		}
 	} else {
 		set_bit(frame->prev_type, frame->stacks_done);
 	}
@@ -124,18 +129,43 @@ static int notrace unwind_next(struct task_struct *tsk,
 		 * So replace it to an original value.
 		 */
 		ret_stack = ftrace_graph_get_ret_stack(tsk, frame->graph++);
-		if (WARN_ON_ONCE(!ret_stack))
-			return -EINVAL;
+		if (WARN_ON_ONCE(!ret_stack)) {
+			frame->failed = true;
+			return;
+		}
 		frame->pc = ret_stack->ret;
 	}
 #endif /* CONFIG_FUNCTION_GRAPH_TRACER */
 
 	frame->pc = ptrauth_strip_insn_pac(frame->pc);
-
-	return 0;
 }
 
 NOKPROBE_SYMBOL(unwind_next);
+
+static bool notrace unwind_continue(struct task_struct *task,
+				    struct stackframe *frame,
+				    stack_trace_consume_fn consume_entry,
+				    void *cookie)
+{
+	if (frame->failed) {
+		/* PC is suspect. Cannot consume it. */
+		return false;
+	}
+
+	if (!consume_entry(cookie, frame->pc)) {
+		/* Caller terminated the unwind. */
+		frame->failed = true;
+		return false;
+	}
+
+	if (frame->fp == (unsigned long)task_pt_regs(task)->stackframe) {
+		/* Final frame; nothing to unwind */
+		return false;
+	}
+	return true;
+}
+
+NOKPROBE_SYMBOL(unwind_continue);
 
 static void notrace unwind(struct task_struct *tsk,
 			   unsigned long fp, unsigned long pc,
@@ -145,16 +175,8 @@ static void notrace unwind(struct task_struct *tsk,
 	struct stackframe frame;
 
 	unwind_start(&frame, fp, pc);
-
-	while (1) {
-		int ret;
-
-		if (!fn(data, frame.pc))
-			break;
-		ret = unwind_next(tsk, &frame);
-		if (ret < 0)
-			break;
-	}
+	while (unwind_continue(tsk, &frame, fn, data))
+		unwind_next(tsk, &frame);
 }
 
 NOKPROBE_SYMBOL(unwind);
