@@ -552,6 +552,27 @@ static inline unsigned long compare_ether_header(const void *a, const void *b)
 }
 
 /**
+ * eth_hw_addr_set_port - Generate and assign Ethernet address to a port
+ * @dev: pointer to port's net_device structure
+ * @base_addr: base Ethernet address
+ * @id: offset to add to the base address
+ *
+ * Assign a MAC address to the net_device using a base address and an offset.
+ * Commonly used by switch drivers which need to compute addresses for all
+ * their ports. addr_assign_type is not changed.
+ */
+static inline void eth_hw_addr_set_port(struct net_device *dev,
+					const u8 *base_addr, u8 id)
+{
+	u64 u = ether_addr_to_u64(base_addr);
+	u8 addr[ETH_ALEN];
+
+	u += id;
+	u64_to_ether_addr(u, addr);
+	eth_hw_addr_set(dev, addr);
+}
+
+/**
  * eth_skb_pad - Pad buffer to mininum number of octets for Ethernet frame
  * @skb: Buffer to pad
  *
