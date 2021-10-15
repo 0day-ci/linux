@@ -131,9 +131,20 @@ void *rxe_pool_get_key(struct rxe_pool *pool, void *key);
 void rxe_elem_release(struct kref *kref);
 
 /* take a reference on an object */
-#define rxe_add_ref(elem) kref_get(&(elem)->pelem.ref_cnt)
+static inline int __rxe_add_ref(struct rxe_pool_entry *elem)
+{
+	int ret = kref_get_unless_zero(&elem->ref_cnt);
+
+	if (unlikely(!ret))
+		pr_warn("Taking a reference on a %s object that is already destroyed\n",
+			elem->pool->name);
+
+	return (ret) ? 0 : -EINVAL;
+}
+
+#define rxe_add_ref(obj) __rxe_add_ref(&(obj)->pelem)
 
 /* drop a reference on an object */
-#define rxe_drop_ref(elem) kref_put(&(elem)->pelem.ref_cnt, rxe_elem_release)
+#define rxe_drop_ref(obj) kref_put(&(obj)->pelem.ref_cnt, rxe_elem_release)
 
 #endif /* RXE_POOL_H */
