@@ -1896,14 +1896,14 @@ bool evsel__detect_missing_features(struct evsel *evsel)
 		perf_missing_features.cloexec = true;
 		pr_debug2_peo("switching off cloexec flag\n");
 		return true;
-	} else if (!perf_missing_features.mmap2 && evsel->core.attr.mmap2) {
-		perf_missing_features.mmap2 = true;
-		pr_debug2_peo("switching off mmap2\n");
-		return true;
 	} else if (!perf_missing_features.exclude_guest &&
 		   (evsel->core.attr.exclude_guest || evsel->core.attr.exclude_host)) {
 		perf_missing_features.exclude_guest = true;
 		pr_debug2_peo("switching off exclude_guest, exclude_host\n");
+		return true;
+	} else if (!perf_missing_features.mmap2 && evsel->core.attr.mmap2) {
+		perf_missing_features.mmap2 = true;
+		pr_debug2_peo("switching off mmap2\n");
 		return true;
 	} else if (!perf_missing_features.sample_id_all) {
 		perf_missing_features.sample_id_all = true;
