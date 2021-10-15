@@ -6915,6 +6915,11 @@ select_task_rq_fair(struct task_struct *p, int prev_cpu, int wake_flags)
 			break;
 		}
 
+		/*
+		 * This is usually true only for WF_EXEC and WF_FORK, for WF_TTWU
+		 * it is almost always false as sched_domain hasn't SD_BALANCE_WAKE
+		 * in default
+		 */
 		if (tmp->flags & sd_flag)
 			sd = tmp;
 		else if (!want_affine)
@@ -6922,7 +6927,11 @@ select_task_rq_fair(struct task_struct *p, int prev_cpu, int wake_flags)
 	}
 
 	if (unlikely(sd)) {
-		/* Slow path */
+		/*
+		 * Slow path, usually only for WF_EXEC and WF_FORK; WF_TTWU almost
+		 * always goes to fast path as sched_domain hasn't SD_BALANCE_WAKE
+		 * in default
+		 */
 		new_cpu = find_idlest_cpu(sd, p, cpu, prev_cpu, sd_flag);
 	} else if (wake_flags & WF_TTWU) { /* XXX always ? */
 		/* Fast path */
