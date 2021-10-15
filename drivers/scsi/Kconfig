@@ -290,6 +290,7 @@ config ISCSI_TCP
 	tristate "iSCSI Initiator over TCP/IP"
 	depends on SCSI && INET
 	select CRYPTO
+	select CRYPTO_HASH
 	select CRYPTO_MD5
 	select CRYPTO_CRC32C
 	select SCSI_ISCSI_ATTRS
