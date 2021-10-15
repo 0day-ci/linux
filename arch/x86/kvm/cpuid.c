@@ -931,12 +931,19 @@ static inline int __do_cpuid_func(struct kvm_cpuid_array *array, u32 function)
 		 *
 		 * If TDP is enabled but an explicit guest MAXPHYADDR is not
 		 * provided, use the raw bare metal MAXPHYADDR as reductions to
-		 * the HPAs do not affect GPAs.
+		 * the HPAs do not affect GPAs. The value, however, has to be
+		 * reduced by 1 in case C-bit is a physical bit (APM section
+		 * 15.34.6).
 		 */
-		if (!tdp_enabled)
+		if (!tdp_enabled) {
 			g_phys_as = boot_cpu_data.x86_phys_bits;
-		else if (!g_phys_as)
+		} else if (!g_phys_as) {
 			g_phys_as = phys_as;
+
+			if (kvm_cpu_cap_has(X86_FEATURE_SEV) &&
+			    (cpuid_ebx(0x8000001f) & 0x3f) < g_phys_as)
+				g_phys_as -= 1;
+		}
 
 		entry->eax = g_phys_as | (virt_as << 8);
 		entry->edx = 0;
