@@ -927,7 +927,7 @@ EXPORT_SYMBOL(drm_connector_helper_hpd_irq_event);
  */
 bool drm_helper_hpd_irq_event(struct drm_device *dev)
 {
-	struct drm_connector *connector;
+	struct drm_connector *connector, *changed_connector = NULL;
 	struct drm_connector_list_iter conn_iter;
 	bool changed = false;
 
@@ -941,15 +941,27 @@ bool drm_helper_hpd_irq_event(struct drm_device *dev)
 		if (!(connector->polled & DRM_CONNECTOR_POLL_HPD))
 			continue;
 
-		if (check_connector_changed(connector))
+		if (check_connector_changed(connector)) {
+			if (changed) {
+				if (changed_connector)
+					drm_connector_put(changed_connector);
+				changed_connector = NULL;
+			} else {
+				drm_connector_get(connector);
+				changed_connector = connector;
+			}
+
 			changed = true;
+		}
 	}
 	drm_connector_list_iter_end(&conn_iter);
 	mutex_unlock(&dev->mode_config.mutex);
 
-	if (changed) {
+	if (changed_connector) {
+		drm_kms_helper_connector_hotplug_event(changed_connector);
+		drm_connector_put(changed_connector);
+	} else if (changed) {
 		drm_kms_helper_hotplug_event(dev);
-		DRM_DEBUG_KMS("Sent hotplug event\n");
 	}
 
 	return changed;
