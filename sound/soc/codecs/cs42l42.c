@@ -2025,6 +2025,14 @@ static int cs42l42_i2c_probe(struct i2c_client *i2c_client,
 		return ret;
 	}
 
+	/* Hold device in reset while it powers up */
+	cs42l42->reset_gpio = devm_gpiod_get(&i2c_client->dev, "reset", GPIOD_OUT_LOW);
+	if (IS_ERR(cs42l42->reset_gpio)) {
+		ret = PTR_ERR(cs42l42->reset_gpio);
+		dev_err(&i2c_client->dev, "Failed to request reset gpio: %d\n", ret);
+		return ret;
+	}
+
 	ret = regulator_bulk_enable(ARRAY_SIZE(cs42l42->supplies),
 				    cs42l42->supplies);
 	if (ret != 0) {
@@ -2033,14 +2041,7 @@ static int cs42l42_i2c_probe(struct i2c_client *i2c_client,
 		return ret;
 	}
 
-	/* Reset the Device */
-	cs42l42->reset_gpio = devm_gpiod_get(&i2c_client->dev, "reset", GPIOD_OUT_LOW);
-	if (IS_ERR(cs42l42->reset_gpio)) {
-		ret = PTR_ERR(cs42l42->reset_gpio);
-		dev_err(&i2c_client->dev, "Failed to request reset gpio: %d\n", ret);
-		goto err_disable;
-	}
-
+	/* Release reset and wait for boot */
 	gpiod_set_value_cansleep(cs42l42->reset_gpio, 1);
 	usleep_range(CS42L42_BOOT_TIME_US, CS42L42_BOOT_TIME_US * 2);
 
@@ -2116,6 +2117,7 @@ static int cs42l42_i2c_probe(struct i2c_client *i2c_client,
 	return 0;
 
 err_disable:
+	gpiod_set_value_cansleep(cs42l42->reset_gpio, 0);
 	regulator_bulk_disable(ARRAY_SIZE(cs42l42->supplies),
 				cs42l42->supplies);
 	return ret;

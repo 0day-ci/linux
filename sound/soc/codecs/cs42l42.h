@@ -822,11 +822,11 @@
 #define CS42L42_PLL_LOCK_TIMEOUT_US	1250
 
 static const char *const cs42l42_supply_names[CS42L42_NUM_SUPPLIES] = {
-	"VA",
 	"VP",
+	"VA",
 	"VCP",
-	"VD_FILT",
 	"VL",
+	"VD_FILT",
 };
 
 struct  cs42l42_private {
