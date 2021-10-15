@@ -58,8 +58,11 @@ static inline struct dpaa2_io *service_select_by_cpu(struct dpaa2_io *d,
 	 * If cpu == -1, choose the current cpu, with no guarantees about
 	 * potentially being migrated away.
 	 */
-	if (cpu < 0)
-		cpu = smp_processor_id();
+        if (cpu < 0) {
+                preempt_disable();
+                cpu = smp_processor_id();
+                preempt_enable();
+        }
 
 	/* If a specific cpu was requested, pick it up immediately */
 	return dpio_by_cpu[cpu];
