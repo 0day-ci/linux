@@ -5264,6 +5264,8 @@ static void intel_dp_modeset_retry_work_fn(struct work_struct *work)
 	mutex_unlock(&connector->dev->mode_config.mutex);
 	/* Send Hotplug uevent so userspace can reprobe */
 	drm_kms_helper_hotplug_event(connector->dev);
+	drm_sysfs_connector_status_event(connector,
+					 connector->dev->mode_config.link_status_property);
 }
 
 bool
