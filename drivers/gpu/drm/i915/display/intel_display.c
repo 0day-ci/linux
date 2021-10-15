@@ -2020,7 +2020,7 @@ static void ilk_crtc_enable(struct intel_atomic_state *state,
 	intel_enable_transcoder(new_crtc_state);
 
 	if (new_crtc_state->has_pch_encoder)
-		ilk_pch_enable(state, new_crtc_state);
+		ilk_pch_enable(state, crtc);
 
 	intel_crtc_vblank_on(new_crtc_state);
 
@@ -2299,7 +2299,7 @@ static void ilk_crtc_disable(struct intel_atomic_state *state,
 	intel_encoders_post_disable(state, crtc);
 
 	if (old_crtc_state->has_pch_encoder) {
-		ilk_disable_pch_transcoder(dev_priv, pipe);
+		ilk_disable_pch_transcoder(crtc);
 
 		if (HAS_PCH_CPT(dev_priv)) {
 			i915_reg_t reg;
