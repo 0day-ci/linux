@@ -144,6 +144,7 @@ enum ip_conntrack_events {
 	IPCT_SECMARK,		/* new security mark has been set */
 	IPCT_LABEL,		/* new connlabel has been set */
 	IPCT_SYNPROXY,		/* synproxy has been set */
+	IPCT_UDPSTREAM,		/* udp stream has been set */
 #ifdef __KERNEL__
 	__IPCT_MAX
 #endif

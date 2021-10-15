@@ -96,18 +96,23 @@ int nf_conntrack_udp_packet(struct nf_conn *ct,
 	if (!timeouts)
 		timeouts = udp_get_timeouts(nf_ct_net(ct));
 
-	if (!nf_ct_is_confirmed(ct))
+	if (!nf_ct_is_confirmed(ct)) {
 		ct->proto.udp.stream_ts = 2 * HZ + jiffies;
+		ct->proto.udp.notified = false;
+	}
 
 	/* If we've seen traffic both ways, this is some kind of UDP
 	 * stream. Set Assured.
 	 */
 	if (test_bit(IPS_SEEN_REPLY_BIT, &ct->status)) {
 		unsigned long extra = timeouts[UDP_CT_UNREPLIED];
+		bool stream = false;
 
 		/* Still active after two seconds? Extend timeout. */
-		if (time_after(jiffies, ct->proto.udp.stream_ts))
+		if (time_after(jiffies, ct->proto.udp.stream_ts)) {
 			extra = timeouts[UDP_CT_REPLIED];
+			stream = true;
+		}
 
 		nf_ct_refresh_acct(ct, ctinfo, skb, extra);
 
@@ -115,9 +120,16 @@ int nf_conntrack_udp_packet(struct nf_conn *ct,
 		if (unlikely((ct->status & IPS_NAT_CLASH)))
 			return NF_ACCEPT;
 
+		if (stream) {
+			stream = !ct->proto.udp.notified;
+			ct->proto.udp.notified = true;
+		}
+
 		/* Also, more likely to be important, and not a probe */
 		if (!test_and_set_bit(IPS_ASSURED_BIT, &ct->status))
 			nf_conntrack_event_cache(IPCT_ASSURED, ct);
+		else if (stream)
+			nf_conntrack_event_cache(IPCT_UDPSTREAM, ct);
 	} else {
 		nf_ct_refresh_acct(ct, ctinfo, skb, timeouts[UDP_CT_UNREPLIED]);
 	}

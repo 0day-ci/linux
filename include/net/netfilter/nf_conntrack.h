@@ -26,6 +26,7 @@
 
 struct nf_ct_udp {
 	unsigned long	stream_ts;
+	bool		notified;
 };
 
 /* per conntrack: protocol private data */
