@@ -314,9 +314,12 @@ static __always_inline bool is_rsvd_spte(struct rsvd_bits_validate *rsvd_check,
 	 * Use a bitwise-OR instead of a logical-OR to aggregate the reserved
 	 * bits and EPT's invalid memtype/XWR checks to avoid an extra Jcc
 	 * (this is extremely unlikely to be short-circuited as true).
+	 *
+	 * (int) avoids clang's "use of bitwise '|' with boolean operands"
+	 * warning.
 	 */
-	return __is_bad_mt_xwr(rsvd_check, spte) |
-	       __is_rsvd_bits_set(rsvd_check, spte, level);
+	return (int)__is_bad_mt_xwr(rsvd_check, spte) |
+	       (int)__is_rsvd_bits_set(rsvd_check, spte, level);
 }
 
 static inline bool spte_can_locklessly_be_made_writable(u64 spte)
