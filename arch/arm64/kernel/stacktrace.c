@@ -33,8 +33,8 @@
  */
 
 
-void start_backtrace(struct stackframe *frame, unsigned long fp,
-		     unsigned long pc)
+static void start_backtrace(struct stackframe *frame, unsigned long fp,
+			    unsigned long pc)
 {
 	frame->fp = fp;
 	frame->pc = pc;
@@ -63,13 +63,11 @@ void start_backtrace(struct stackframe *frame, unsigned long fp,
  * records (e.g. a cycle), determined based on the location and fp value of A
  * and the location (but not the fp value) of B.
  */
-int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
+static int notrace unwind_frame(struct task_struct *tsk,
+				struct stackframe *frame)
 {
 	unsigned long fp = frame->fp;
 	struct stack_info info;
-
-	if (!tsk)
-		tsk = current;
 
 	/* Final frame; nothing to unwind */
 	if (fp == (unsigned long)task_pt_regs(tsk)->stackframe)
@@ -136,15 +134,21 @@ int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
 }
 NOKPROBE_SYMBOL(unwind_frame);
 
-void notrace walk_stackframe(struct task_struct *tsk, struct stackframe *frame,
-			     bool (*fn)(void *, unsigned long), void *data)
+static void notrace walk_stackframe(struct task_struct *tsk,
+				    unsigned long fp, unsigned long pc,
+				    bool (*fn)(void *, unsigned long),
+				    void *data)
 {
+	struct stackframe frame;
+
+	start_backtrace(&frame, fp, pc);
+
 	while (1) {
 		int ret;
 
-		if (!fn(data, frame->pc))
+		if (!fn(data, frame.pc))
 			break;
-		ret = unwind_frame(tsk, frame);
+		ret = unwind_frame(tsk, &frame);
 		if (ret < 0)
 			break;
 	}
@@ -190,19 +194,22 @@ noinline notrace void arch_stack_walk(stack_trace_consume_fn consume_entry,
 			      void *cookie, struct task_struct *task,
 			      struct pt_regs *regs)
 {
-	struct stackframe frame;
+	unsigned long fp, pc;
 
-	if (regs)
-		start_backtrace(&frame, regs->regs[29], regs->pc);
-	else if (task == current)
-		start_backtrace(&frame,
-				(unsigned long)__builtin_frame_address(1),
-				(unsigned long)__builtin_return_address(0));
-	else
-		start_backtrace(&frame, thread_saved_fp(task),
-				thread_saved_pc(task));
+	if (regs) {
+		fp = regs->regs[29];
+		pc = regs->pc;
+	} else if (task == current) {
+		/* Skip arch_stack_walk() in the stack trace. */
+		fp = (unsigned long)__builtin_frame_address(1);
+		pc = (unsigned long)__builtin_return_address(0);
+	} else {
+		/* Caller guarantees that the task is not running. */
+		fp = thread_saved_fp(task);
+		pc = thread_saved_pc(task);
+	}
+	walk_stackframe(task, fp, pc, consume_entry, cookie);
 
-	walk_stackframe(task, &frame, consume_entry, cookie);
 }
 
 #endif
