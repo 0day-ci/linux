@@ -133,6 +133,10 @@
 	cpu-supply = <&vdd_arm>;
 };
 
+&gpu {
+	mali-supply = <&vdd_logic>;
+};
+
 &emmc {
 	bus-width = <8>;
 	cap-mmc-highspeed;
