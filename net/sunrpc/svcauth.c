@@ -23,8 +23,6 @@
 
 #include "sunrpc.h"
 
-#define RPCDBG_FACILITY	RPCDBG_AUTH
-
 
 /*
  * Table of authenticators
@@ -67,8 +65,6 @@ svc_authenticate(struct svc_rqst *rqstp)
 	rqstp->rq_auth_stat = rpc_auth_ok;
 
 	flavor = svc_getnl(&rqstp->rq_arg.head[0]);
-
-	dprintk("svc: svc_authenticate (%d)\n", flavor);
 
 	aops = svc_get_auth_ops(flavor);
 	if (aops == NULL) {
