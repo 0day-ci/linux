@@ -621,6 +621,8 @@ struct rtl8169_private {
 		struct work_struct work;
 	} wk;
 
+	struct mutex config_lock;
+
 	unsigned supports_gmii:1;
 	dma_addr_t counters_phys_addr;
 	struct rtl8169_counters *counters;
@@ -670,12 +672,14 @@ static inline struct device *tp_to_dev(struct rtl8169_private *tp)
 
 static void rtl_lock_config_regs(struct rtl8169_private *tp)
 {
+	mutex_lock(&tp->config_lock);
 	RTL_W8(tp, Cfg9346, Cfg9346_Lock);
 }
 
 static void rtl_unlock_config_regs(struct rtl8169_private *tp)
 {
 	RTL_W8(tp, Cfg9346, Cfg9346_Unlock);
+	mutex_unlock(&tp->config_lock);
 }
 
 static void rtl_pci_commit(struct rtl8169_private *tp)
@@ -5306,6 +5310,8 @@ static int rtl_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 		dev_err(&pdev->dev, "cannot remap MMIO, aborting\n");
 		return rc;
 	}
+
+	mutex_init(&tp->config_lock);
 
 	tp->mmio_addr = pcim_iomap_table(pdev)[region];
 
