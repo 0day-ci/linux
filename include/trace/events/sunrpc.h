@@ -1665,6 +1665,29 @@ TRACE_EVENT(svc_decode_len_err,
 	TP_printk("addr=%s len=%zu", __get_str(addr), __entry->len)
 );
 
+TRACE_EVENT(svc_decode_prog_unavail_err,
+	TP_PROTO(
+		const struct svc_rqst *rqst,
+		u32 program
+	),
+
+	TP_ARGS(rqst, program),
+
+	TP_STRUCT__entry(
+		__field(u32, program)
+		__string(addr, rqst->rq_xprt ?
+			 rqst->rq_xprt->xpt_remotebuf : "(null)")
+	),
+
+	TP_fast_assign(
+		__entry->program = program;
+		__assign_str(addr, rqst->rq_xprt ?
+			     rqst->rq_xprt->xpt_remotebuf : "(null)");
+	),
+
+	TP_printk("addr=%s program=%u", __get_str(addr), __entry->program)
+);
+
 DECLARE_EVENT_CLASS(svc_rqst_event,
 
 	TP_PROTO(

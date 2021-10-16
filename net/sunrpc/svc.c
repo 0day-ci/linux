@@ -1400,7 +1400,7 @@ err_bad_auth:
 	goto sendit;
 
 err_bad_prog:
-	dprintk("svc: unknown program %d\n", prog);
+	trace_svc_decode_prog_unavail_err(rqstp, prog);
 	serv->sv_stats->rpcbadfmt++;
 	svc_putnl(resv, RPC_PROG_UNAVAIL);
 	goto sendit;
