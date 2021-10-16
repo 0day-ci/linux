@@ -181,6 +181,39 @@ do_resize:
 					pos++;
 				}
 				continue;
+			case KEY_HOME:
+				if (pos > 0) {
+					pos = show_x = input_x = 0;
+					wmove(dialog, box_y, box_x);
+					for (i = 0; i < box_width; i++)
+						waddch(dialog, ' ');
+					wmove(dialog, box_y, box_x);
+					for (i = 0; i < box_width && instr[show_x + i]; i++)
+						waddch(dialog, instr[show_x + i]);
+					wmove(dialog, box_y, box_x);
+				}
+				continue;
+			case KEY_END:
+				if (pos < len) {
+					pos = len;
+					wmove(dialog, box_y, box_x);
+					for (i = 0; i < box_width; i++)
+						waddch(dialog, ' ');
+					wmove(dialog, box_y, box_x);
+					if (len < box_width) {
+						show_x = 0;
+						input_x = box_width - 1;
+						for (i = 0; i < box_width && instr[show_x + i]; i++)
+							waddch(dialog, instr[show_x + i]);
+					} else {
+						show_x = len - box_width + 1;
+						input_x = box_width - 1;
+					}
+					for (i = 0; i < box_width && instr[show_x + i]; i++)
+						waddch(dialog, instr[show_x + i]);
+					wmove(dialog, box_y, input_x + box_x);
+				}
+				continue;
 			default:
 				if (key < 0x100 && isprint(key)) {
 					if (len < MAX_LEN) {
