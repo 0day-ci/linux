@@ -1127,9 +1127,6 @@ static void __svc_unregister(struct net *net, const u32 program, const u32 versi
  * All netids, bind addresses and ports registered for [program, version]
  * are removed from the local rpcbind database (if the service is not
  * hidden) to make way for a new instance of the service.
- *
- * The result of unregistration is reported via dprintk for those who want
- * verification of the result, but is otherwise not important.
  */
 static void svc_unregister(const struct svc_serv *serv, struct net *net)
 {
