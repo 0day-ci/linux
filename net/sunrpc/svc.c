@@ -1406,9 +1406,7 @@ err_bad_prog:
 	goto sendit;
 
 err_bad_vers:
-	svc_printk(rqstp, "unknown version (%d for prog %d, %s)\n",
-		       rqstp->rq_vers, rqstp->rq_prog, progp->pg_name);
-
+	trace_svc_decode_prog_mismatch_err(rqstp, progp);
 	serv->sv_stats->rpcbadfmt++;
 	svc_putnl(resv, RPC_PROG_MISMATCH);
 	svc_putnl(resv, process.mismatch.lovers);
