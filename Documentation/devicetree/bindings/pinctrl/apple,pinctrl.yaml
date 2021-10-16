@@ -43,6 +43,9 @@ properties:
 
   interrupt-controller: true
 
+  '#interrupt-cells':
+    const: 2
+
 patternProperties:
   '-pins$':
     type: object
