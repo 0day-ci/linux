@@ -177,8 +177,10 @@ static int thunder_i2c_probe_pci(struct pci_dev *pdev,
 		return ret;
 
 	i2c->twsi_base = pcim_iomap(pdev, 0, pci_resource_len(pdev, 0));
-	if (!i2c->twsi_base)
-		return -EINVAL;
+	if (!i2c->twsi_base) {
+		ret = -EINVAL;
+		goto err_release_regions;
+	}
 
 	thunder_i2c_clock_enable(dev, i2c);
 	ret = device_property_read_u32(dev, "clock-frequency", &i2c->twsi_freq);
@@ -231,6 +233,8 @@ static int thunder_i2c_probe_pci(struct pci_dev *pdev,
 
 error:
 	thunder_i2c_clock_disable(dev, i2c->clk);
+err_release_regions:
+	pci_release_regions(pdev);
 	return ret;
 }
 
@@ -241,6 +245,7 @@ static void thunder_i2c_remove_pci(struct pci_dev *pdev)
 	thunder_i2c_smbus_remove(i2c);
 	thunder_i2c_clock_disable(&pdev->dev, i2c->clk);
 	i2c_del_adapter(&i2c->adap);
+	pci_release_regions(pdev);
 }
 
 static const struct pci_device_id thunder_i2c_pci_id_table[] = {
