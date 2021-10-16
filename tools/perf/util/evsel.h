@@ -172,6 +172,12 @@ struct perf_missing_features {
 	bool data_page_size;
 	bool code_page_size;
 	bool weight_struct;
+
+	struct hashmap *pmu;
+};
+
+struct perf_missing_pmu_features {
+	bool exclude_guest;
 };
 
 extern struct perf_missing_features perf_missing_features;
