@@ -11,6 +11,9 @@
 #include <linux/refcount.h>
 #include <linux/mutex.h>
 
+static int bpf_struct_ops_test_run(struct bpf_prog *prog,
+				   const union bpf_attr *kattr,
+				   union bpf_attr __user *uattr);
 enum bpf_struct_ops_state {
 	BPF_STRUCT_OPS_STATE_INIT,
 	BPF_STRUCT_OPS_STATE_INUSE,
@@ -93,6 +96,7 @@ const struct bpf_verifier_ops bpf_struct_ops_verifier_ops = {
 };
 
 const struct bpf_prog_ops bpf_struct_ops_prog_ops = {
+	.test_run = bpf_struct_ops_test_run,
 };
 
 static const struct btf_type *module_type;
@@ -666,4 +670,17 @@ void bpf_struct_ops_put(const void *kdata)
 		 */
 		call_rcu(&st_map->rcu, bpf_struct_ops_put_rcu);
 	}
+}
+
+static int bpf_struct_ops_test_run(struct bpf_prog *prog,
+				   const union bpf_attr *kattr,
+				   union bpf_attr __user *uattr)
+{
+	const struct bpf_struct_ops *st_ops;
+
+	st_ops = bpf_struct_ops_find(prog->aux->attach_btf_id);
+	if (st_ops != &bpf_bpf_dummy_ops)
+		return -EOPNOTSUPP;
+
+	return bpf_dummy_struct_ops_test_run(prog, kattr, uattr);
 }
