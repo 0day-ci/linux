@@ -593,8 +593,12 @@ void *kvmalloc_node(size_t size, gfp_t flags, int node)
 	if (ret || size <= PAGE_SIZE)
 		return ret;
 
-	/* Don't even allow crazy sizes */
-	if (WARN_ON_ONCE(size > INT_MAX))
+	/*
+	 * Don't even allow crazy sizes unless memcg accounting is
+	 * request.  We take that as a sign that huge allocations
+	 * are indeed expected.
+	 */
+	if (likely(!(flags & __GFP_ACCOUNT)) && WARN_ON_ONCE(size > INT_MAX))
 		return NULL;
 
 	return __vmalloc_node(size, 1, flags, node,
