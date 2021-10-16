@@ -1369,7 +1369,6 @@ svc_process_common(struct svc_rqst *rqstp, struct kvec *argv, struct kvec *resv)
 
  dropit:
 	svc_authorise(rqstp);	/* doesn't hurt to call this twice */
-	dprintk("svc: svc_process dropit\n");
 	return 0;
 
  close:
@@ -1377,7 +1376,6 @@ svc_process_common(struct svc_rqst *rqstp, struct kvec *argv, struct kvec *resv)
 close_xprt:
 	if (rqstp->rq_xprt && test_bit(XPT_TEMP, &rqstp->rq_xprt->xpt_flags))
 		svc_close_xprt(rqstp->rq_xprt);
-	dprintk("svc: svc_process close\n");
 	return 0;
 
 err_short_len:
@@ -1394,8 +1392,6 @@ err_bad_rpc:
 	goto sendit;
 
 err_bad_auth:
-	dprintk("svc: authentication failed (%d)\n",
-		be32_to_cpu(rqstp->rq_auth_stat));
 	serv->sv_stats->rpcbadauth++;
 	/* Restore write pointer to location of accept status: */
 	xdr_ressize_check(rqstp, reply_statp);
