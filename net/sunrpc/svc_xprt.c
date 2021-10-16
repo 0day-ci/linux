@@ -20,8 +20,6 @@
 #include <linux/netdevice.h>
 #include <trace/events/sunrpc.h>
 
-#define RPCDBG_FACILITY	RPCDBG_SVCXPRT
-
 static unsigned int svc_rpc_per_connection_limit __read_mostly;
 module_param(svc_rpc_per_connection_limit, uint, 0644);
 
@@ -78,8 +76,6 @@ int svc_reg_xprt_class(struct svc_xprt_class *xcl)
 	struct svc_xprt_class *cl;
 	int res = -EEXIST;
 
-	dprintk("svc: Adding svc transport class '%s'\n", xcl->xcl_name);
-
 	INIT_LIST_HEAD(&xcl->xcl_list);
 	spin_lock(&svc_xprt_class_lock);
 	/* Make sure there isn't already a class with the same name */
@@ -97,7 +93,6 @@ EXPORT_SYMBOL_GPL(svc_reg_xprt_class);
 
 void svc_unreg_xprt_class(struct svc_xprt_class *xcl)
 {
-	dprintk("svc: Removing svc transport class '%s'\n", xcl->xcl_name);
 	spin_lock(&svc_xprt_class_lock);
 	list_del_init(&xcl->xcl_list);
 	spin_unlock(&svc_xprt_class_lock);
@@ -829,9 +824,6 @@ static int svc_handle_xprt(struct svc_rqst *rqstp, struct svc_xprt *xprt)
 		svc_xprt_received(xprt);
 	} else if (svc_xprt_reserve_slot(rqstp, xprt)) {
 		/* XPT_DATA|XPT_DEFERRED case: */
-		dprintk("svc: server %p, pool %u, transport %p, inuse=%d\n",
-			rqstp, rqstp->rq_pool->sp_id, xprt,
-			kref_read(&xprt->xpt_ref));
 		rqstp->rq_deferred = svc_deferred_dequeue(xprt);
 		if (rqstp->rq_deferred)
 			len = svc_deferred_recv(rqstp);
@@ -951,11 +943,8 @@ static void svc_age_temp_xprts(struct timer_list *t)
 	struct svc_xprt *xprt;
 	struct list_head *le, *next;
 
-	dprintk("svc_age_temp_xprts\n");
-
 	if (!spin_trylock_bh(&serv->sv_lock)) {
 		/* busy, try again 1 sec later */
-		dprintk("svc_age_temp_xprts: busy\n");
 		mod_timer(&serv->sv_temptimer, jiffies + HZ);
 		return;
 	}
@@ -972,7 +961,6 @@ static void svc_age_temp_xprts(struct timer_list *t)
 			continue;
 		list_del_init(le);
 		set_bit(XPT_CLOSE, &xprt->xpt_flags);
-		dprintk("queuing xprt %p for closing\n", xprt);
 
 		/* a thread will dequeue and close it soon */
 		svc_xprt_enqueue(xprt);
@@ -999,7 +987,6 @@ void svc_age_temp_xprts_now(struct svc_serv *serv, struct sockaddr *server_addr)
 		xprt = list_entry(le, struct svc_xprt, xpt_list);
 		if (rpc_cmp_addr(server_addr, (struct sockaddr *)
 				&xprt->xpt_local)) {
-			dprintk("svc_age_temp_xprts_now: found %p\n", xprt);
 			list_move(le, &to_be_closed);
 		}
 	}
@@ -1011,8 +998,6 @@ void svc_age_temp_xprts_now(struct svc_serv *serv, struct sockaddr *server_addr)
 		xprt = list_entry(le, struct svc_xprt, xpt_list);
 		set_bit(XPT_CLOSE, &xprt->xpt_flags);
 		set_bit(XPT_KILL_TEMP, &xprt->xpt_flags);
-		dprintk("svc_age_temp_xprts_now: queuing xprt %p for closing\n",
-				xprt);
 		svc_xprt_enqueue(xprt);
 	}
 }
@@ -1386,8 +1371,6 @@ static void *svc_pool_stats_start(struct seq_file *m, loff_t *pos)
 	unsigned int pidx = (unsigned int)*pos;
 	struct svc_serv *serv = m->private;
 
-	dprintk("svc_pool_stats_start, *pidx=%u\n", pidx);
-
 	if (!pidx)
 		return SEQ_START_TOKEN;
 	return (pidx > serv->sv_nrpools ? NULL : &serv->sv_pools[pidx-1]);
@@ -1397,8 +1380,6 @@ static void *svc_pool_stats_next(struct seq_file *m, void *p, loff_t *pos)
 {
 	struct svc_pool *pool = p;
 	struct svc_serv *serv = m->private;
-
-	dprintk("svc_pool_stats_next, *pos=%llu\n", *pos);
 
 	if (p == SEQ_START_TOKEN) {
 		pool = &serv->sv_pools[0];
