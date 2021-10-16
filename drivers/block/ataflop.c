@@ -2072,7 +2072,8 @@ static int __init atari_floppy_init (void)
 	       UseTrackbuffer ? "" : "no ");
 	config_types();
 
-	return 0;
+	ret = 0;
+	goto out_unlock;
 
 err:
 	while (--i >= 0) {
