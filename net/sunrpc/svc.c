@@ -33,8 +33,6 @@
 
 #include "fail.h"
 
-#define RPCDBG_FACILITY	RPCDBG_SVCDSP
-
 static void svc_unregister(const struct svc_serv *serv, struct net *net);
 
 #define svc_serv_is_pooled(serv)    ((serv)->sv_ops->svo_function)
@@ -1156,30 +1154,6 @@ static void svc_unregister(const struct svc_serv *serv, struct net *net)
 	spin_unlock_irqrestore(&current->sighand->siglock, flags);
 }
 
-/*
- * dprintk the given error with the address of the client that caused it.
- */
-#if IS_ENABLED(CONFIG_SUNRPC_DEBUG)
-static __printf(2, 3)
-void svc_printk(struct svc_rqst *rqstp, const char *fmt, ...)
-{
-	struct va_format vaf;
-	va_list args;
-	char 	buf[RPC_MAX_ADDRBUFLEN];
-
-	va_start(args, fmt);
-
-	vaf.fmt = fmt;
-	vaf.va = &args;
-
-	dprintk("svc: %s: %pV", svc_print_addr(rqstp, buf, sizeof(buf)), &vaf);
-
-	va_end(args);
-}
-#else
-static __printf(2,3) void svc_printk(struct svc_rqst *rqstp, const char *fmt, ...) {}
-#endif
-
 __be32
 svc_generic_init_request(struct svc_rqst *rqstp,
 		const struct svc_program *progp,
@@ -1420,8 +1394,7 @@ err_bad_proc:
 	goto sendit;
 
 err_garbage:
-	svc_printk(rqstp, "failed to decode args\n");
-
+	trace_svc_decode_header_err(rqstp);
 	rpc_stat = rpc_garbage_args;
 err_bad:
 	serv->sv_stats->rpcbadfmt++;
