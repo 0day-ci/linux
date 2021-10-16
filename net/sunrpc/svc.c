@@ -1414,8 +1414,7 @@ err_bad_vers:
 	goto sendit;
 
 err_bad_proc:
-	svc_printk(rqstp, "unknown procedure (%d)\n", rqstp->rq_proc);
-
+	trace_svc_decode_proc_unavail_err(rqstp, progp);
 	serv->sv_stats->rpcbadfmt++;
 	svc_putnl(resv, RPC_PROC_UNAVAIL);
 	goto sendit;

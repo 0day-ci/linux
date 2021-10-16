@@ -1716,6 +1716,36 @@ TRACE_EVENT(svc_decode_prog_mismatch_err,
 	)
 );
 
+TRACE_EVENT(svc_decode_proc_unavail_err,
+	TP_PROTO(
+		const struct svc_rqst *rqst,
+		const struct svc_program *progp
+	),
+
+	TP_ARGS(rqst, progp),
+
+	TP_STRUCT__entry(
+		__field(u32, procedure)
+		__field(u32, version)
+		__string(progname, progp->pg_name)
+		__string(addr, rqst->rq_xprt ?
+			 rqst->rq_xprt->xpt_remotebuf : "(null)")
+	),
+
+	TP_fast_assign(
+		__entry->version = rqst->rq_vers;
+		__entry->procedure = rqst->rq_proc;
+		__assign_str(progname, progp->pg_name)
+		__assign_str(addr, rqst->rq_xprt ?
+			     rqst->rq_xprt->xpt_remotebuf : "(null)");
+	),
+
+	TP_printk("addr=%s %sv%u procedure=%u",
+		__get_str(addr), __get_str(progname),
+		__entry->version, __entry->procedure
+	)
+);
+
 DECLARE_EVENT_CLASS(svc_rqst_event,
 
 	TP_PROTO(
