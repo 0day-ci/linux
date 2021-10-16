@@ -617,7 +617,7 @@ static struct edid *adv7511_get_edid(struct adv7511 *adv7511,
 		__adv7511_power_off(adv7511);
 
 	adv7511_set_config_csc(adv7511, connector, adv7511->rgb,
-			       drm_detect_hdmi_monitor(edid));
+			       connector->display_info.is_hdmi);
 
 	cec_s_phys_addr_from_edid(adv7511->cec_adap, edid);
 
