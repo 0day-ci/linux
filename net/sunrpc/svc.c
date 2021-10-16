@@ -521,24 +521,21 @@ void svc_shutdown_net(struct svc_serv *serv, struct net *net)
 }
 EXPORT_SYMBOL_GPL(svc_shutdown_net);
 
-/*
- * Destroy an RPC service. Should be called with appropriate locking to
- * protect the sv_nrthreads, sv_permsocks and sv_tempsocks.
+/**
+ * svc_destroy - Destroy an RPC service
+ * @serv: RPC server context to be destroyed
+ *
+ * Caller must serialize to protect sv_nrthreads, sv_permsocks
+ * and sv_tempsocks.
  */
-void
-svc_destroy(struct svc_serv *serv)
+void svc_destroy(struct svc_serv *serv)
 {
-	dprintk("svc: svc_destroy(%s, %d)\n",
-				serv->sv_program->pg_name,
-				serv->sv_nrthreads);
-
 	if (serv->sv_nrthreads) {
 		if (--(serv->sv_nrthreads) != 0) {
 			svc_sock_update_bufs(serv);
 			return;
 		}
-	} else
-		printk("svc_destroy: no threads for serv=%p!\n", serv);
+	}
 
 	del_timer_sync(&serv->sv_temptimer);
 
@@ -546,8 +543,8 @@ svc_destroy(struct svc_serv *serv)
 	 * The last user is gone and thus all sockets have to be destroyed to
 	 * the point. Check this.
 	 */
-	BUG_ON(!list_empty(&serv->sv_permsocks));
-	BUG_ON(!list_empty(&serv->sv_tempsocks));
+	WARN_ON(!list_empty(&serv->sv_permsocks));
+	WARN_ON(!list_empty(&serv->sv_tempsocks));
 
 	cache_clean_deferred(serv);
 
