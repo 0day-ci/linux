@@ -51,6 +51,8 @@ struct ili9881c {
 
 	struct regulator	*power;
 	struct gpio_desc	*reset;
+
+	bool			prepared;
 };
 
 #define ILI9881C_SWITCH_PAGE_INSTR(_page)	\
@@ -499,6 +501,10 @@ static int ili9881c_prepare(struct drm_panel *panel)
 	unsigned int i;
 	int ret;
 
+	/* Preparing when already prepared is a no-op */
+	if (ctx->prepared)
+		return 0;
+
 	/* Power the panel */
 	ret = regulator_enable(ctx->power);
 	if (ret)
@@ -537,6 +543,8 @@ static int ili9881c_prepare(struct drm_panel *panel)
 	if (ret)
 		return ret;
 
+	ctx->prepared = true;
+
 	return 0;
 }
 
@@ -562,9 +570,15 @@ static int ili9881c_unprepare(struct drm_panel *panel)
 {
 	struct ili9881c *ctx = panel_to_ili9881c(panel);
 
+	/* Unpreparing when already unprepared is a no-op */
+	if (!ctx->prepared)
+		return 0;
+
 	mipi_dsi_dcs_enter_sleep_mode(ctx->dsi);
 	regulator_disable(ctx->power);
 	gpiod_set_value(ctx->reset, 1);
+
+	ctx->prepared = false;
 
 	return 0;
 }
