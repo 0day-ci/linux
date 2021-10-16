@@ -1472,7 +1472,6 @@ svc_process(struct svc_rqst *rqstp)
 	dir  = svc_getnl(argv);
 	if (dir != 0) {
 		/* direction != CALL */
-		svc_printk(rqstp, "bad direction %d, dropping request\n", dir);
 		serv->sv_stats->rpcbadfmt++;
 		goto out_drop;
 	}
@@ -1501,8 +1500,6 @@ bc_svc_process(struct svc_serv *serv, struct rpc_rqst *req,
 	struct rpc_task *task;
 	int proc_error;
 	int error;
-
-	dprintk("svc: %s(%p)\n", __func__, req);
 
 	/* Build the svc_rqst used by the common processing routine */
 	rqstp->rq_xid = req->rq_xid;
@@ -1561,7 +1558,6 @@ bc_svc_process(struct svc_serv *serv, struct rpc_rqst *req,
 	rpc_put_task(task);
 
 out:
-	dprintk("svc: %s(), error=%d\n", __func__, error);
 	return error;
 }
 EXPORT_SYMBOL_GPL(bc_svc_process);
