@@ -997,13 +997,16 @@ static const struct component_ops dw_mipi_dsi_rockchip_ops = {
 };
 
 static int dw_mipi_dsi_rockchip_host_attach(void *priv_data,
-					    struct mipi_dsi_device *device)
+					    struct mipi_dsi_device *device,
+					    struct dw_mipi_dsi *dmd)
 {
 	struct dw_mipi_dsi_rockchip *dsi = priv_data;
 	struct device *second;
 	int ret;
 
 	mutex_lock(&dsi->usage_mutex);
+
+	dsi->dmd = dmd;
 
 	if (dsi->usage_mode != DW_DSI_USAGE_IDLE) {
 		DRM_DEV_ERROR(dsi->dev, "dsi controller already in use\n");
@@ -1280,6 +1283,7 @@ static int dw_mipi_dsi_rockchip_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	struct device_node *np = dev->of_node;
+	struct dw_mipi_dsi *dmd;
 	struct dw_mipi_dsi_rockchip *dsi;
 	struct phy_provider *phy_provider;
 	struct resource *res;
@@ -1391,9 +1395,9 @@ static int dw_mipi_dsi_rockchip_probe(struct platform_device *pdev)
 	if (IS_ERR(phy_provider))
 		return PTR_ERR(phy_provider);
 
-	dsi->dmd = dw_mipi_dsi_probe(pdev, &dsi->pdata);
-	if (IS_ERR(dsi->dmd)) {
-		ret = PTR_ERR(dsi->dmd);
+	dmd = dw_mipi_dsi_probe(pdev, &dsi->pdata);
+	if (IS_ERR(dmd)) {
+		ret = PTR_ERR(dmd);
 		if (ret != -EPROBE_DEFER)
 			DRM_DEV_ERROR(dev,
 				      "Failed to probe dw_mipi_dsi: %d\n", ret);

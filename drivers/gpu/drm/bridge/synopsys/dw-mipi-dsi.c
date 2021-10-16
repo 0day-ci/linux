@@ -362,8 +362,14 @@ static int dw_mipi_dsi_host_attach(struct mipi_dsi_host *host,
 		dsi->device_found = true;
 	}
 
+	/*
+	 * NOTE: the dsi registration is implemented in
+	 * platform driver, that to say dsi would be exist after
+	 * probe is terminated. The call is done before the end of probe
+	 * so we need to pass the dsi to the platform driver.
+	 */
 	if (pdata->host_ops && pdata->host_ops->attach) {
-		ret = pdata->host_ops->attach(pdata->priv_data, device);
+		ret = pdata->host_ops->attach(pdata->priv_data, device, dsi);
 		if (ret < 0)
 			return ret;
 	}
