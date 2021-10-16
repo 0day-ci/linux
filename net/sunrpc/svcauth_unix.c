@@ -17,8 +17,6 @@
 #include <net/ipv6.h>
 #include <linux/kernel.h>
 #include <linux/user_namespace.h>
-#define RPCDBG_FACILITY	RPCDBG_AUTH
-
 
 #include "netns.h"
 
@@ -739,12 +737,10 @@ svcauth_null_accept(struct svc_rqst *rqstp)
 		return SVC_GARBAGE;
 
 	if (svc_getu32(argv) != 0) {
-		dprintk("svc: bad null cred\n");
 		rqstp->rq_auth_stat = rpc_autherr_badcred;
 		return SVC_DENIED;
 	}
 	if (svc_getu32(argv) != htonl(RPC_AUTH_NULL) || svc_getu32(argv) != 0) {
-		dprintk("svc: bad null verf\n");
 		rqstp->rq_auth_stat = rpc_autherr_badverf;
 		return SVC_DENIED;
 	}
