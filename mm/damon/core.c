@@ -107,6 +107,11 @@ void damon_add_target(struct damon_ctx *ctx, struct damon_target *t)
 	list_add_tail(&t->list, &ctx->adaptive_targets);
 }
 
+static int damon_target_empty(struct damon_ctx *ctx)
+{
+	return list_empty(&ctx->adaptive_targets);
+}
+
 static void damon_del_target(struct damon_target *t)
 {
 	list_del(&t->list);
@@ -307,15 +312,14 @@ static int __damon_start(struct damon_ctx *ctx)
 	int err = -EBUSY;
 
 	mutex_lock(&ctx->kdamond_lock);
-	if (!ctx->kdamond) {
+	ctx->kdamond_stop = false;
+	ctx->kdamond = kthread_run(kdamond_fn, ctx, "kdamond.%d",
+				   nr_running_ctxs);
+	if (IS_ERR(ctx->kdamond)) {
+		err = PTR_ERR(ctx->kdamond);
+		ctx->kdamond = 0;
+	} else {
 		err = 0;
-		ctx->kdamond_stop = false;
-		ctx->kdamond = kthread_run(kdamond_fn, ctx, "kdamond.%d",
-				nr_running_ctxs);
-		if (IS_ERR(ctx->kdamond)) {
-			err = PTR_ERR(ctx->kdamond);
-			ctx->kdamond = 0;
-		}
 	}
 	mutex_unlock(&ctx->kdamond_lock);
 
@@ -347,10 +351,12 @@ int damon_start(struct damon_ctx **ctxs, int nr_ctxs)
 	}
 
 	for (i = 0; i < nr_ctxs; i++) {
-		err = __damon_start(ctxs[i]);
-		if (err)
-			break;
-		nr_running_ctxs++;
+		if (!damon_target_empty(ctxs[i]) && !ctxs[i]->kdamond) {
+			err = __damon_start(ctxs[i]);
+			if (err)
+				break;
+			nr_running_ctxs++;
+		}
 	}
 	mutex_unlock(&damon_lock);
 
