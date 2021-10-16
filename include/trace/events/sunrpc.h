@@ -1642,6 +1642,29 @@ TRACE_EVENT(svc_process,
 	)
 );
 
+TRACE_EVENT(svc_decode_len_err,
+	TP_PROTO(
+		const struct svc_rqst *rqst,
+		const struct kvec *argv
+	),
+
+	TP_ARGS(rqst, argv),
+
+	TP_STRUCT__entry(
+		__field(size_t, len)
+		__string(addr, rqst->rq_xprt ?
+			 rqst->rq_xprt->xpt_remotebuf : "(null)")
+	),
+
+	TP_fast_assign(
+		__entry->len = argv->iov_len;
+		__assign_str(addr, rqst->rq_xprt ?
+			     rqst->rq_xprt->xpt_remotebuf : "(null)");
+	),
+
+	TP_printk("addr=%s len=%zu", __get_str(addr), __entry->len)
+);
+
 DECLARE_EVENT_CLASS(svc_rqst_event,
 
 	TP_PROTO(

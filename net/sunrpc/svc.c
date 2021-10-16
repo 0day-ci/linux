@@ -1379,8 +1379,7 @@ close_xprt:
 	return 0;
 
 err_short_len:
-	svc_printk(rqstp, "short len %zd, dropping request\n",
-			argv->iov_len);
+	trace_svc_decode_len_err(rqstp, argv);
 	goto close_xprt;
 
 err_bad_rpc:
