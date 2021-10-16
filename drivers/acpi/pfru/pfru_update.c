@@ -55,6 +55,27 @@ enum update_index {
 	UPDATE_NR_IDX,
 };
 
+enum log_index {
+	LOG_STATUS_IDX,
+	LOG_EXT_STATUS_IDX,
+	LOG_MAX_SZ_IDX,
+	LOG_CHUNK1_LO_IDX,
+	LOG_CHUNK1_HI_IDX,
+	LOG_CHUNK1_SZ_IDX,
+	LOG_CHUNK2_LO_IDX,
+	LOG_CHUNK2_HI_IDX,
+	LOG_CHUNK2_SZ_IDX,
+	LOG_ROLLOVER_CNT_IDX,
+	LOG_RESET_CNT_IDX,
+	LOG_NR_IDX,
+};
+
+struct pfru_log_device {
+	struct device *dev;
+	guid_t uuid;
+	struct pfru_log_info info;
+};
+
 struct pfru_device {
 	guid_t uuid, code_uuid, drv_uuid;
 	int rev_id;
@@ -62,6 +83,299 @@ struct pfru_device {
 };
 
 static struct pfru_device *pfru_dev;
+static struct pfru_log_device *pfru_log_dev;
+
+static int get_pfru_log_data_info(struct pfru_log_data_info *data_info,
+				  int log_type)
+{
+	union acpi_object *out_obj, in_obj, in_buf;
+	acpi_handle handle;
+	int ret = -EINVAL;
+
+	handle = ACPI_HANDLE(pfru_log_dev->dev);
+
+	memset(&in_obj, 0, sizeof(in_obj));
+	memset(&in_buf, 0, sizeof(in_buf));
+	in_obj.type = ACPI_TYPE_PACKAGE;
+	in_obj.package.count = 1;
+	in_obj.package.elements = &in_buf;
+	in_buf.type = ACPI_TYPE_INTEGER;
+	in_buf.integer.value = log_type;
+
+	out_obj = acpi_evaluate_dsm_typed(handle, &pfru_log_dev->uuid,
+					  pfru_log_dev->info.log_revid, FUNC_GET_DATA,
+					  &in_obj, ACPI_TYPE_PACKAGE);
+	if (!out_obj)
+		return ret;
+
+	if (out_obj->package.count < LOG_NR_IDX)
+		goto free_acpi_buffer;
+
+	if (out_obj->package.elements[LOG_STATUS_IDX].type != ACPI_TYPE_INTEGER)
+		goto free_acpi_buffer;
+
+	data_info->status = out_obj->package.elements[LOG_STATUS_IDX].integer.value;
+
+	if (out_obj->package.elements[LOG_EXT_STATUS_IDX].type != ACPI_TYPE_INTEGER)
+		goto free_acpi_buffer;
+
+	data_info->ext_status =
+		out_obj->package.elements[LOG_EXT_STATUS_IDX].integer.value;
+
+	if (out_obj->package.elements[LOG_MAX_SZ_IDX].type != ACPI_TYPE_INTEGER)
+		goto free_acpi_buffer;
+
+	data_info->max_data_size =
+		out_obj->package.elements[LOG_MAX_SZ_IDX].integer.value;
+
+	if (out_obj->package.elements[LOG_CHUNK1_LO_IDX].type != ACPI_TYPE_INTEGER)
+		goto free_acpi_buffer;
+
+	data_info->chunk1_addr_lo =
+		out_obj->package.elements[LOG_CHUNK1_LO_IDX].integer.value;
+
+	if (out_obj->package.elements[LOG_CHUNK1_HI_IDX].type != ACPI_TYPE_INTEGER)
+		goto free_acpi_buffer;
+
+	data_info->chunk1_addr_hi =
+		out_obj->package.elements[LOG_CHUNK1_HI_IDX].integer.value;
+
+	if (out_obj->package.elements[LOG_CHUNK1_SZ_IDX].type != ACPI_TYPE_INTEGER)
+		goto free_acpi_buffer;
+
+	data_info->chunk1_size =
+		out_obj->package.elements[LOG_CHUNK1_SZ_IDX].integer.value;
+
+	if (out_obj->package.elements[LOG_CHUNK2_LO_IDX].type != ACPI_TYPE_INTEGER)
+		goto free_acpi_buffer;
+
+	data_info->chunk2_addr_lo =
+		out_obj->package.elements[LOG_CHUNK2_LO_IDX].integer.value;
+
+	if (out_obj->package.elements[LOG_CHUNK2_HI_IDX].type != ACPI_TYPE_INTEGER)
+		goto free_acpi_buffer;
+
+	data_info->chunk2_addr_hi =
+		out_obj->package.elements[LOG_CHUNK2_HI_IDX].integer.value;
+
+	if (out_obj->package.elements[LOG_CHUNK2_SZ_IDX].type != ACPI_TYPE_INTEGER)
+		goto free_acpi_buffer;
+
+	data_info->chunk2_size =
+		out_obj->package.elements[LOG_CHUNK2_SZ_IDX].integer.value;
+
+	if (out_obj->package.elements[LOG_ROLLOVER_CNT_IDX].type != ACPI_TYPE_INTEGER)
+		goto free_acpi_buffer;
+
+	data_info->rollover_cnt =
+		out_obj->package.elements[LOG_ROLLOVER_CNT_IDX].integer.value;
+
+	if (out_obj->package.elements[LOG_RESET_CNT_IDX].type != ACPI_TYPE_INTEGER)
+		goto free_acpi_buffer;
+
+	data_info->reset_cnt =
+		out_obj->package.elements[LOG_RESET_CNT_IDX].integer.value;
+
+	ret = 0;
+free_acpi_buffer:
+	ACPI_FREE(out_obj);
+
+	return ret;
+}
+
+static int set_pfru_log_level(int level)
+{
+	union acpi_object *out_obj, *obj, in_obj, in_buf;
+	enum pfru_dsm_status status;
+	acpi_handle handle;
+	int ret = -EINVAL;
+
+	handle = ACPI_HANDLE(pfru_log_dev->dev);
+
+	memset(&in_obj, 0, sizeof(in_obj));
+	memset(&in_buf, 0, sizeof(in_buf));
+	in_obj.type = ACPI_TYPE_PACKAGE;
+	in_obj.package.count = 1;
+	in_obj.package.elements = &in_buf;
+	in_buf.type = ACPI_TYPE_INTEGER;
+	in_buf.integer.value = level;
+
+	out_obj = acpi_evaluate_dsm_typed(handle, &pfru_log_dev->uuid,
+					  pfru_log_dev->info.log_revid, FUNC_SET_LEV,
+					  &in_obj, ACPI_TYPE_PACKAGE);
+	if (!out_obj)
+		return -EINVAL;
+
+	obj = &out_obj->package.elements[0];
+	status = obj->integer.value;
+	if (status)
+		goto free_acpi_buffer;
+
+	obj = &out_obj->package.elements[1];
+	status = obj->integer.value;
+	if (status)
+		goto free_acpi_buffer;
+
+	ret = 0;
+
+free_acpi_buffer:
+	ACPI_FREE(out_obj);
+
+	return ret;
+}
+
+static int get_pfru_log_level(int *level)
+{
+	union acpi_object *out_obj, *obj;
+	enum pfru_dsm_status status;
+	acpi_handle handle;
+	int ret = -EINVAL;
+
+	handle = ACPI_HANDLE(pfru_log_dev->dev);
+	out_obj = acpi_evaluate_dsm_typed(handle, &pfru_log_dev->uuid,
+					  pfru_log_dev->info.log_revid, FUNC_GET_LEV,
+					  NULL, ACPI_TYPE_PACKAGE);
+	if (!out_obj)
+		return -EINVAL;
+
+	obj = &out_obj->package.elements[0];
+	if (obj->type != ACPI_TYPE_INTEGER)
+		goto free_acpi_buffer;
+
+	status = obj->integer.value;
+	if (status)
+		goto free_acpi_buffer;
+
+	obj = &out_obj->package.elements[1];
+	if (obj->type != ACPI_TYPE_INTEGER)
+		goto free_acpi_buffer;
+
+	status = obj->integer.value;
+	if (status)
+		goto free_acpi_buffer;
+
+	obj = &out_obj->package.elements[2];
+	if (obj->type != ACPI_TYPE_INTEGER)
+		goto free_acpi_buffer;
+
+	*level = obj->integer.value;
+	ret = 0;
+free_acpi_buffer:
+	ACPI_FREE(out_obj);
+
+	return ret;
+}
+
+static int valid_log_level(int level)
+{
+	return level == LOG_ERR || level == LOG_WARN ||
+		level == LOG_INFO || level == LOG_VERB;
+}
+
+static int valid_log_type(int type)
+{
+	return type == LOG_EXEC_IDX || type == LOG_HISTORY_IDX;
+}
+
+long pfru_log_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+{
+	struct pfru_log_data_info data_info;
+	struct pfru_log_info info;
+	void __user *p;
+	int ret = 0;
+
+	if (!pfru_log_dev)
+		return -ENODEV;
+
+	p = (void __user *)arg;
+
+	switch (cmd) {
+	case PFRU_LOG_IOC_SET_INFO:
+		if (copy_from_user(&info, p, sizeof(info)))
+			return -EFAULT;
+
+		if (pfru_valid_revid(info.log_revid))
+			pfru_log_dev->info.log_revid = info.log_revid;
+
+		if (valid_log_level(info.log_level)) {
+			ret = set_pfru_log_level(info.log_level);
+			if (ret)
+				return ret;
+			pfru_log_dev->info.log_level = info.log_level;
+		}
+
+		if (valid_log_type(info.log_type))
+			pfru_log_dev->info.log_type = info.log_type;
+
+		break;
+	case PFRU_LOG_IOC_GET_INFO:
+		ret = get_pfru_log_level(&info.log_level);
+		if (ret)
+			return ret;
+
+		info.log_type = pfru_log_dev->info.log_type;
+		info.log_revid = pfru_log_dev->info.log_revid;
+		if (copy_to_user(p, &info, sizeof(info)))
+			ret = -EFAULT;
+
+		break;
+	case PFRU_LOG_IOC_GET_DATA_INFO:
+		ret = get_pfru_log_data_info(&data_info, pfru_log_dev->info.log_type);
+		if (ret)
+			return ret;
+
+		if (copy_to_user(p, &data_info, sizeof(struct pfru_log_data_info)))
+			ret = -EFAULT;
+
+		break;
+	default:
+		ret = -ENOTTY;
+		break;
+	}
+	return ret;
+}
+
+ssize_t pfru_log_read(struct file *filp, char __user *ubuf,
+		      size_t size, loff_t *off)
+{
+	struct pfru_log_data_info info;
+	phys_addr_t base_addr;
+	int buf_size, ret;
+	char *buf_ptr;
+
+	if (!pfru_log_dev)
+		return -ENODEV;
+
+	if (*off < 0)
+		return -EINVAL;
+
+	ret = get_pfru_log_data_info(&info, pfru_log_dev->info.log_type);
+	if (ret)
+		return ret;
+
+	base_addr = (phys_addr_t)(info.chunk2_addr_lo | (info.chunk2_addr_hi << 32));
+	/* pfru update has not been launched yet.*/
+	if (!base_addr)
+		return -EBUSY;
+
+	buf_size = info.max_data_size;
+	if (*off >= buf_size)
+		return 0;
+
+	buf_ptr = memremap(base_addr, buf_size, MEMREMAP_WB);
+	if (IS_ERR(buf_ptr))
+		return PTR_ERR(buf_ptr);
+
+	size = min_t(size_t, size, buf_size - *off);
+	if (copy_to_user(ubuf, buf_ptr + *off, size))
+		ret = -EFAULT;
+	else
+		ret = 0;
+
+	memunmap(buf_ptr);
+
+	return ret ? ret : size;
+}
 
 static int query_capability(struct pfru_update_cap_info *cap)
 {
@@ -406,7 +720,7 @@ static long pfru_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		ret = start_acpi_update(START_STAGE_ACTIVATE);
 		break;
 	default:
-		ret = -ENOTTY;
+		ret = pfru_log_ioctl(file, cmd, arg);
 		break;
 	}
 
@@ -467,6 +781,7 @@ unmap:
 static const struct file_operations acpi_pfru_fops = {
 	.owner		= THIS_MODULE,
 	.write		= pfru_write,
+	.read		= pfru_log_read,
 	.unlocked_ioctl = pfru_ioctl,
 	.llseek		= noop_llseek,
 };
@@ -477,6 +792,44 @@ static struct miscdevice pfru_misc_dev = {
 	.nodename = "acpi_pfru",
 	.fops = &acpi_pfru_fops,
 };
+
+static int acpi_pfru_log_remove(struct platform_device *pdev)
+{
+	return 0;
+}
+
+static int acpi_pfru_log_probe(struct platform_device *pdev)
+{
+	acpi_handle handle;
+	int ret;
+
+	/* One instance is expected. */
+	if (pfru_log_dev)
+		return 0;
+
+	pfru_log_dev = kzalloc(sizeof(*pfru_log_dev), GFP_KERNEL);
+	if (!pfru_log_dev)
+		return -ENOMEM;
+
+	ret = guid_parse(PFRU_LOG_UUID, &pfru_log_dev->uuid);
+	if (ret)
+		goto out;
+
+	pfru_log_dev->info.log_revid = 1;
+	pfru_log_dev->dev = &pdev->dev;
+	handle = ACPI_HANDLE(pfru_log_dev->dev);
+	if (!acpi_has_method(handle, "_DSM")) {
+		ret = -ENODEV;
+		goto out;
+	}
+
+	return 0;
+out:
+	kfree(pfru_log_dev);
+	pfru_log_dev = NULL;
+
+	return ret;
+}
 
 static int acpi_pfru_remove(struct platform_device *pdev)
 {
@@ -526,6 +879,21 @@ out:
 	return ret;
 }
 
+static const struct acpi_device_id acpi_pfru_log_ids[] = {
+	{"INTC1081", 0},
+	{}
+};
+MODULE_DEVICE_TABLE(acpi, acpi_pfru_log_ids);
+
+static struct platform_driver acpi_pfru_log_driver = {
+	.driver = {
+		.name = "pfru_log",
+		.acpi_match_table = acpi_pfru_log_ids,
+	},
+	.probe = acpi_pfru_log_probe,
+	.remove = acpi_pfru_log_remove,
+};
+
 static const struct acpi_device_id acpi_pfru_ids[] = {
 	{"INTC1080", 0},
 	{}
@@ -549,7 +917,11 @@ static int __init pfru_init(void)
 	if (ret)
 		return ret;
 
-	return platform_driver_register(&acpi_pfru_driver);
+	ret = platform_driver_register(&acpi_pfru_driver);
+	if (ret)
+		misc_deregister(&pfru_misc_dev);
+
+	return platform_driver_register(&acpi_pfru_log_driver);
 }
 
 static void __exit pfru_exit(void)
@@ -558,6 +930,10 @@ static void __exit pfru_exit(void)
 	misc_deregister(&pfru_misc_dev);
 	kfree(pfru_dev);
 	pfru_dev = NULL;
+
+	platform_driver_unregister(&acpi_pfru_log_driver);
+	kfree(pfru_log_dev);
+	pfru_log_dev = NULL;
 }
 
 module_init(pfru_init);
