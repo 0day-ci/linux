@@ -1266,8 +1266,10 @@ psb_intel_sdvo_hdmi_sink_detect(struct drm_connector *connector)
 		if (edid->input & DRM_EDID_INPUT_DIGITAL) {
 			status = connector_status_connected;
 			if (psb_intel_sdvo->is_hdmi) {
-				psb_intel_sdvo->has_hdmi_monitor = drm_detect_hdmi_monitor(edid);
-				psb_intel_sdvo->has_hdmi_audio = drm_detect_monitor_audio(edid);
+				psb_intel_sdvo->has_hdmi_monitor =
+						connector->display_info.is_hdmi;
+				psb_intel_sdvo->has_hdmi_audio =
+						drm_detect_monitor_audio(edid);
 			}
 		} else
 			status = connector_status_disconnected;
