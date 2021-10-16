@@ -8,7 +8,12 @@
 #define __PFRU_H__
 
 #include <linux/ioctl.h>
+#ifdef __KERNEL__
 #include <linux/uuid.h>
+#else
+#include <uuid/uuid.h>
+#include <linux/types.h>
+#endif
 
 #define PFRU_UUID		"ECF9533B-4A3C-4E89-939E-C77112601C6D"
 #define PFRU_CODE_INJ_UUID		"B2F84B79-7B6E-4E45-885F-3FB9BB185402"
