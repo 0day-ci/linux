@@ -1,0 +1,41 @@
+What:		/dev/acpi_pfru
+Date:		October 2021
+KernelVersion:	5.15
+Contact:	Chen Yu <yu.c.chen@intel.com>
+Description:
+		The ioctl interface to drivers for platform firmware runtime
+		update(PFRU). Following actions are supported:
+
+		* PFRU_IOC_QUERY_CAP: Read the PFRU Runtime Update capability.
+		  The value is a structure of pfru_update_cap_info.
+		  See include/uapi/linux/pfru.h for definition.
+
+		* PFRU_SET_REV: Set the Revision ID for PFRU Runtime Update.
+		  It could be either 1 or 2.
+
+		* PFRU_IOC_STAGE: Stage a capsule image from communication
+		  buffer and perform authentication.
+
+		* PFRU_IOC_ACTIVATE: Activate a previous staged capsule image.
+
+		* PFRU_IOC_STAGE_ACTIVATE: Perform both stage and activation
+		  actions.
+
+		* PFRU_LOG_IOC_SET_INFO: set log information in Telemetry
+		  Service. The input is a structure of pfru_log_info.
+		  This structure includes log revision id(1 or 2),
+		  log level(0 : Error Message, 1 : Warning Message,
+		  2 : Informational Message, 4 : Verbose), log data type
+		  (0 : Execution Log, 1 : History Information).
+		  See include/uapi/linux/pfru.h for definition.
+
+		* PFRU_LOG_IOC_GET_INFO: get log information in Telemetry.
+		  The output is a structure of pfru_log_info.
+
+		* PFRU_LOG_IOC_GET_DATA_INFO: get log data information in
+		  Telemetry. The output is a structure of pfru_log_data_info.
+		  See include/uapi/linux/pfru.h for definition.
+
+		Besides ioctl interface, write() and read() are supported on
+		/dev/acpi_pfru. The write() will be the code injection/update,
+		and the read() will be telemetry retrieval.
