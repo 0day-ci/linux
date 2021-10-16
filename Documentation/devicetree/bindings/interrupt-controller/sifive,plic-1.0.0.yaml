@@ -35,6 +35,12 @@ description:
   contains a specific memory layout, which is documented in chapter 8 of the
   SiFive U5 Coreplex Series Manual <https://static.dev.sifive.com/U54-MC-RVCoreIP.pdf>.
 
+  The C9xx PLIC does not comply with the interrupt claim/completion process defined
+  by the RISC-V PLIC specification because C9xx PLIC will mask an IRQ when it is
+  claimed by PLIC driver (i.e. readl(claim) and the IRQ will be unmasked upon
+  completion by PLIC driver (i.e. writel(claim). This behaviour breaks the handling
+  of IRQS_ONESHOT by the generic handle_fasteoi_irq() used in the PLIC driver.
+
 maintainers:
   - Sagar Kadam <sagar.kadam@sifive.com>
   - Paul Walmsley  <paul.walmsley@sifive.com>
@@ -46,7 +52,10 @@ properties:
       - enum:
           - sifive,fu540-c000-plic
           - canaan,k210-plic
-      - const: sifive,plic-1.0.0
+      - enmu:
+          - sifive,plic-1.0.0
+          - thead,c900-plic
+          - allwinner,sun20i-d1-plic
 
   reg:
     maxItems: 1
