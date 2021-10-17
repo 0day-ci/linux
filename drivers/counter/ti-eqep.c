@@ -680,7 +680,7 @@ static int ti_eqep_probe(struct platform_device *pdev)
 	pm_runtime_get_sync(dev);
 
 	/*
-	 * We can end up with an interupt infinite loop (interrupts triggered
+	 * We can end up with an interrupt infinite loop (interrupts triggered
 	 * as soon as they are cleared) if we leave these at the default value
 	 * of 0 and events are enabled.
 	 */
