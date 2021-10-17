@@ -1115,6 +1115,27 @@ static void regular_request_wait(struct mddev *mddev, struct r10conf *conf,
 	}
 }
 
+static void get_error_dev(struct mddev *mddev, struct r10conf *conf, int slot,
+			  struct md_rdev **err_rdev, struct r10bio *r10_bio)
+{
+	/*
+	 * This is an error retry, but we cannot
+	 * safely dereference the rdev in the r10_bio,
+	 * we must use the one in conf.
+	 * If it has already been disconnected (unlikely)
+	 * we lose the device name in error messages.
+	 */
+	int disk;
+
+	rcu_read_lock();
+	disk = r10_bio->devs[slot].devnum;
+	*err_rdev = rcu_dereference(conf->mirrors[disk].rdev);
+	if (!*err_rdev)
+		/* This never gets dereferenced */
+		*err_rdev = r10_bio->devs[slot].rdev;
+	rcu_read_unlock();
+}
+
 static void raid10_read_request(struct mddev *mddev, struct bio *bio,
 				struct r10bio *r10_bio, bool handle_read_err)
 {
@@ -1131,36 +1152,17 @@ static void raid10_read_request(struct mddev *mddev, struct bio *bio,
 
 	if (handle_read_err && slot >= 0 && r10_bio->devs[slot].rdev) {
 		/*
-		 * This is an error retry, but we cannot
-		 * safely dereference the rdev in the r10_bio,
-		 * we must use the one in conf.
-		 * If it has already been disconnected (unlikely)
-		 * we lose the device name in error messages.
-		 */
-		int disk;
-		/*
 		 * As we are blocking raid10, it is a little safer to
 		 * use __GFP_HIGH.
 		 */
 		gfp = GFP_NOIO | __GFP_HIGH;
-
-		rcu_read_lock();
-		disk = r10_bio->devs[slot].devnum;
-		err_rdev = rcu_dereference(conf->mirrors[disk].rdev);
-		if (err_rdev)
-			bdevname(err_rdev->bdev, b);
-		else {
-			strcpy(b, "???");
-			/* This never gets dereferenced */
-			err_rdev = r10_bio->devs[slot].rdev;
-		}
-		rcu_read_unlock();
+		get_error_dev(mddev, conf, slot, &err_rdev, r10_bio);
 	}
-
 	regular_request_wait(mddev, conf, bio, r10_bio->sectors);
 	rdev = read_balance(conf, r10_bio, &max_sectors);
 	if (!rdev) {
 		if (err_rdev) {
+			bdevname(err_rdev->bdev, b);
 			pr_crit_ratelimited("md/raid10:%s: %s: unrecoverable I/O read error for block %llu\n",
 					    mdname(mddev), b,
 					    (unsigned long long)r10_bio->sector);
