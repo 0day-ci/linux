@@ -377,6 +377,17 @@ static const struct dmi_system_id gmin_vars[] = {
 		},
 		.driver_data = surface3_vars,
 	},
+	{
+		.ident = "Surface 3",
+		.matches = {
+			/* DMI data for Surface 3 with broken DMI table */
+			DMI_MATCH(DMI_BIOS_VENDOR, "American Megatrends Inc."),
+			DMI_MATCH(DMI_BOARD_NAME, "OEMB"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "OEMB"),
+			DMI_MATCH(DMI_SYS_VENDOR, "OEMB"),
+		},
+		.driver_data = surface3_vars,
+	},
 	{}
 };
 
