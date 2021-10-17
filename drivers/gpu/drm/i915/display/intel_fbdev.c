@@ -171,6 +171,38 @@ static int intelfb_alloc(struct drm_fb_helper *helper,
 	return 0;
 }
 
+static void intel_fbdev_unpin(struct intel_fbdev *ifbdev)
+{
+	if (ifbdev->vma)
+		intel_unpin_fb_vma(ifbdev->vma, ifbdev->vma_flags);
+	ifbdev->vma = NULL;
+	ifbdev->vma_flags = 0;
+}
+
+static int intel_fbdev_pin_and_fence(struct drm_i915_private *dev_priv,
+				     struct intel_fbdev *ifbdev,
+				     void **vaddr)
+{
+	const struct i915_ggtt_view view = {
+		.type = I915_GGTT_VIEW_NORMAL,
+	};
+	ifbdev->vma = intel_pin_and_fence_fb_obj(&ifbdev->fb->base, false,
+						 &view, false, &ifbdev->vma_flags);
+
+	if (IS_ERR(ifbdev->vma)) {
+		return PTR_ERR(ifbdev->vma);
+	}
+
+	*vaddr = i915_vma_pin_iomap(ifbdev->vma);
+	if (IS_ERR(*vaddr)) {
+		intel_fbdev_unpin(ifbdev);
+		drm_err(&dev_priv->drm,
+			"Failed to remap framebuffer into virtual memory\n");
+		return PTR_ERR(vaddr);
+	}
+	return 0;
+}
+
 static int intelfb_create(struct drm_fb_helper *helper,
 			  struct drm_fb_helper_surface_size *sizes)
 {
@@ -181,13 +213,8 @@ static int intelfb_create(struct drm_fb_helper *helper,
 	struct drm_i915_private *dev_priv = to_i915(dev);
 	struct pci_dev *pdev = to_pci_dev(dev_priv->drm.dev);
 	struct i915_ggtt *ggtt = &dev_priv->ggtt;
-	const struct i915_ggtt_view view = {
-		.type = I915_GGTT_VIEW_NORMAL,
-	};
 	intel_wakeref_t wakeref;
 	struct fb_info *info;
-	struct i915_vma *vma;
-	unsigned long flags = 0;
 	bool prealloc = false;
 	void __iomem *vaddr;
 	struct drm_i915_gem_object *obj;
@@ -224,10 +251,8 @@ static int intelfb_create(struct drm_fb_helper *helper,
 	 * This also validates that any existing fb inherited from the
 	 * BIOS is suitable for own access.
 	 */
-	vma = intel_pin_and_fence_fb_obj(&ifbdev->fb->base, false,
-					 &view, false, &flags);
-	if (IS_ERR(vma)) {
-		ret = PTR_ERR(vma);
+	ret = intel_fbdev_pin_and_fence(dev_priv, ifbdev, &vaddr);
+	if (ret) {
 		goto out_unlock;
 	}
 
@@ -261,19 +286,12 @@ static int intelfb_create(struct drm_fb_helper *helper,
 
 		/* Our framebuffer is the entirety of fbdev's system memory */
 		info->fix.smem_start =
-			(unsigned long)(ggtt->gmadr.start + vma->node.start);
-		info->fix.smem_len = vma->node.size;
+			(unsigned long)(ggtt->gmadr.start + ifbdev->vma->node.start);
+		info->fix.smem_len = ifbdev->vma->node.size;
 	}
 
-	vaddr = i915_vma_pin_iomap(vma);
-	if (IS_ERR(vaddr)) {
-		drm_err(&dev_priv->drm,
-			"Failed to remap framebuffer into virtual memory\n");
-		ret = PTR_ERR(vaddr);
-		goto out_unpin;
-	}
 	info->screen_base = vaddr;
-	info->screen_size = vma->node.size;
+	info->screen_size = ifbdev->vma->node.size;
 
 	drm_fb_helper_fill_info(info, &ifbdev->helper, sizes);
 
@@ -281,23 +299,21 @@ static int intelfb_create(struct drm_fb_helper *helper,
 	 * If the object is stolen however, it will be full of whatever
 	 * garbage was left in there.
 	 */
-	if (!i915_gem_object_is_shmem(vma->obj) && !prealloc)
+	if (!i915_gem_object_is_shmem(ifbdev->vma->obj) && !prealloc)
 		memset_io(info->screen_base, 0, info->screen_size);
 
 	/* Use default scratch pixmap (info->pixmap.flags = FB_PIXMAP_SYSTEM) */
 
 	drm_dbg_kms(&dev_priv->drm, "allocated %dx%d fb: 0x%08x\n",
 		    ifbdev->fb->base.width, ifbdev->fb->base.height,
-		    i915_ggtt_offset(vma));
-	ifbdev->vma = vma;
-	ifbdev->vma_flags = flags;
+		    i915_ggtt_offset(ifbdev->vma));
 
 	intel_runtime_pm_put(&dev_priv->runtime_pm, wakeref);
 	vga_switcheroo_client_fb_set(pdev, info);
 	return 0;
 
 out_unpin:
-	intel_unpin_fb_vma(vma, flags);
+	intel_fbdev_unpin(ifbdev);
 out_unlock:
 	intel_runtime_pm_put(&dev_priv->runtime_pm, wakeref);
 	return ret;
@@ -316,8 +332,7 @@ static void intel_fbdev_destroy(struct intel_fbdev *ifbdev)
 
 	drm_fb_helper_fini(&ifbdev->helper);
 
-	if (ifbdev->vma)
-		intel_unpin_fb_vma(ifbdev->vma, ifbdev->vma_flags);
+	intel_fbdev_unpin(ifbdev);
 
 	if (ifbdev->fb)
 		drm_framebuffer_remove(&ifbdev->fb->base);
