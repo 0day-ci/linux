@@ -684,9 +684,11 @@ static void blk_account_io_completion(struct request *req, unsigned int bytes)
 bool blk_update_request(struct request *req, blk_status_t error,
 		unsigned int nr_bytes)
 {
-	int total_bytes;
+	int total_bytes, blk_errno = 0;
 
-	trace_block_rq_complete(req, blk_status_to_errno(error), nr_bytes);
+	if (unlikely(error != BLK_STS_OK))
+		blk_errno = blk_status_to_errno(error);
+	trace_block_rq_complete(req, blk_errno, nr_bytes);
 
 	if (!req->bio)
 		return false;
