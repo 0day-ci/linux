@@ -65,10 +65,7 @@
 #include "display/intel_vdsc.h"
 #include "display/intel_vrr.h"
 
-#include "gem/i915_gem_lmem.h"
 #include "gem/i915_gem_object.h"
-
-#include "gt/gen8_ppgtt.h"
 
 #include "pxp/intel_pxp.h"
 
