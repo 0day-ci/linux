@@ -1848,7 +1848,6 @@ static int xcan_remove(struct platform_device *pdev)
 
 	unregister_candev(ndev);
 	pm_runtime_disable(&pdev->dev);
-	netif_napi_del(&priv->napi);
 	free_candev(ndev);
 
 	return 0;
