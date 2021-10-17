@@ -19,7 +19,6 @@
 #include <linux/smp.h>
 #include <linux/interrupt.h>
 #include <linux/llist.h>
-#include <linux/list_sort.h>
 #include <linux/cpu.h>
 #include <linux/cache.h>
 #include <linux/sched/sysctl.h>
@@ -2126,54 +2125,100 @@ void blk_mq_insert_requests(struct blk_mq_hw_ctx *hctx, struct blk_mq_ctx *ctx,
 	spin_unlock(&ctx->lock);
 }
 
-static int plug_rq_cmp(void *priv, const struct list_head *a,
-		       const struct list_head *b)
+static void blk_mq_plug_issue_direct(struct blk_plug *plug, bool from_schedule)
 {
-	struct request *rqa = container_of(a, struct request, queuelist);
-	struct request *rqb = container_of(b, struct request, queuelist);
+	struct blk_mq_hw_ctx *hctx = NULL;
+	int queued = 0;
+	int errors = 0;
 
-	if (rqa->mq_ctx != rqb->mq_ctx)
-		return rqa->mq_ctx > rqb->mq_ctx;
-	if (rqa->mq_hctx != rqb->mq_hctx)
-		return rqa->mq_hctx > rqb->mq_hctx;
+	while (!rq_list_empty(plug->mq_list)) {
+		struct request *rq;
+		blk_status_t ret;
 
-	return blk_rq_pos(rqa) > blk_rq_pos(rqb);
+		rq = rq_list_pop(&plug->mq_list);
+
+		if (!hctx)
+			hctx = rq->mq_hctx;
+		else if (hctx != rq->mq_hctx && hctx->queue->mq_ops->commit_rqs) {
+			trace_block_unplug(hctx->queue, queued, !from_schedule);
+			hctx->queue->mq_ops->commit_rqs(hctx);
+			queued = 0;
+			hctx = rq->mq_hctx;
+		}
+
+		ret = blk_mq_request_issue_directly(rq,
+						rq_list_empty(plug->mq_list));
+		if (ret != BLK_STS_OK) {
+			if (ret == BLK_STS_RESOURCE ||
+					ret == BLK_STS_DEV_RESOURCE) {
+				blk_mq_request_bypass_insert(rq, false,
+						rq_list_empty(plug->mq_list));
+				break;
+			}
+			blk_mq_end_request(rq, ret);
+			errors++;
+		} else
+			queued++;
+	}
+
+	/*
+	 * If we didn't flush the entire list, we could have told
+	 * the driver there was more coming, but that turned out to
+	 * be a lie.
+	 */
+	if ((!rq_list_empty(plug->mq_list) || errors) &&
+	     hctx->queue->mq_ops->commit_rqs && queued)
+		hctx->queue->mq_ops->commit_rqs(hctx);
 }
 
 void blk_mq_flush_plug_list(struct blk_plug *plug, bool from_schedule)
 {
+	struct blk_mq_hw_ctx *this_hctx;
+	struct blk_mq_ctx *this_ctx;
+	unsigned int depth;
 	LIST_HEAD(list);
 
-	if (list_empty(&plug->mq_list))
+	if (rq_list_empty(plug->mq_list))
 		return;
-	list_splice_init(&plug->mq_list, &list);
-
-	if (plug->rq_count > 2 && plug->multiple_queues)
-		list_sort(NULL, &list, plug_rq_cmp);
-
 	plug->rq_count = 0;
 
-	do {
-		struct list_head rq_list;
-		struct request *rq, *head_rq = list_entry_rq(list.next);
-		struct list_head *pos = &head_rq->queuelist; /* skip first */
-		struct blk_mq_hw_ctx *this_hctx = head_rq->mq_hctx;
-		struct blk_mq_ctx *this_ctx = head_rq->mq_ctx;
-		unsigned int depth = 1;
+	if (!plug->multiple_queues && !plug->has_elevator) {
+		blk_mq_plug_issue_direct(plug, from_schedule);
+		if (rq_list_empty(plug->mq_list))
+			return;
+	}
 
-		list_for_each_continue(pos, &list) {
-			rq = list_entry_rq(pos);
-			BUG_ON(!rq->q);
-			if (rq->mq_hctx != this_hctx || rq->mq_ctx != this_ctx)
-				break;
-			depth++;
+	this_hctx = NULL;
+	this_ctx = NULL;
+	depth = 0;
+	do {
+		struct request *rq;
+
+		rq = rq_list_pop(&plug->mq_list);
+
+		if (!this_hctx) {
+			this_hctx = rq->mq_hctx;
+			this_ctx = rq->mq_ctx;
+		} else if (this_hctx != rq->mq_hctx || this_ctx != rq->mq_ctx) {
+			trace_block_unplug(this_hctx->queue, depth,
+						!from_schedule);
+			blk_mq_sched_insert_requests(this_hctx, this_ctx,
+						&list, from_schedule);
+			depth = 0;
+			this_hctx = rq->mq_hctx;
+			this_ctx = rq->mq_ctx;
+
 		}
 
-		list_cut_before(&rq_list, &list, pos);
-		trace_block_unplug(head_rq->q, depth, !from_schedule);
-		blk_mq_sched_insert_requests(this_hctx, this_ctx, &rq_list,
+		list_add(&rq->queuelist, &list);
+		depth++;
+	} while (!rq_list_empty(plug->mq_list));
+
+	if (!list_empty(&list)) {
+		trace_block_unplug(this_hctx->queue, depth, !from_schedule);
+		blk_mq_sched_insert_requests(this_hctx, this_ctx, &list,
 						from_schedule);
-	} while(!list_empty(&list));
+	}
 }
 
 static void blk_mq_bio_to_request(struct request *rq, struct bio *bio,
@@ -2353,16 +2398,17 @@ void blk_mq_try_issue_list_directly(struct blk_mq_hw_ctx *hctx,
 
 static void blk_add_rq_to_plug(struct blk_plug *plug, struct request *rq)
 {
-	list_add_tail(&rq->queuelist, &plug->mq_list);
-	plug->rq_count++;
-	if (!plug->multiple_queues && !list_is_singular(&plug->mq_list)) {
-		struct request *tmp;
+	if (!plug->multiple_queues) {
+		struct request *nxt = rq_list_peek(&plug->mq_list);
 
-		tmp = list_first_entry(&plug->mq_list, struct request,
-						queuelist);
-		if (tmp->q != rq->q)
+		if (nxt && nxt->q != rq->q)
 			plug->multiple_queues = true;
 	}
+	if (!plug->has_elevator && (rq->rq_flags & RQF_ELV))
+		plug->has_elevator = true;
+	rq->rq_next = NULL;
+	rq_list_add(&plug->mq_list, rq);
+	plug->rq_count++;
 }
 
 /*
@@ -2397,7 +2443,7 @@ void blk_mq_submit_bio(struct bio *bio)
 	const int is_flush_fua = op_is_flush(bio->bi_opf);
 	struct request *rq;
 	struct blk_plug *plug;
-	struct request *same_queue_rq = NULL;
+	bool same_queue_rq = false;
 	unsigned int nr_segs = 1;
 	blk_status_t ret;
 
@@ -2472,15 +2518,17 @@ void blk_mq_submit_bio(struct bio *bio)
 		 * IO may benefit a lot from plug merging.
 		 */
 		unsigned int request_count = plug->rq_count;
-		struct request *last = NULL;
+		struct request *tmp = NULL;
 
-		if (!request_count)
+		if (!request_count) {
 			trace_block_plug(q);
-		else
-			last = list_entry_rq(plug->mq_list.prev);
+		} else if (!blk_queue_nomerges(q)) {
+			tmp = rq_list_peek(&plug->mq_list);
+			if (blk_rq_bytes(tmp) < BLK_PLUG_FLUSH_SIZE)
+				tmp = NULL;
+		}
 
-		if (request_count >= blk_plug_max_rq_count(plug) || (last &&
-		    blk_rq_bytes(last) >= BLK_PLUG_FLUSH_SIZE)) {
+		if (request_count >= blk_plug_max_rq_count(plug) || tmp) {
 			blk_flush_plug_list(plug, false);
 			trace_block_plug(q);
 		}
@@ -2490,6 +2538,8 @@ void blk_mq_submit_bio(struct bio *bio)
 		/* Insert the request at the IO scheduler queue */
 		blk_mq_sched_insert_request(rq, false, true, true);
 	} else if (plug && !blk_queue_nomerges(q)) {
+		struct request *first_rq = NULL;
+
 		/*
 		 * We do limited plugging. If the bio can be merged, do that.
 		 * Otherwise the existing request in the plug list will be
@@ -2497,19 +2547,17 @@ void blk_mq_submit_bio(struct bio *bio)
 		 * The plug list might get flushed before this. If that happens,
 		 * the plug list is empty, and same_queue_rq is invalid.
 		 */
-		if (list_empty(&plug->mq_list))
-			same_queue_rq = NULL;
-		if (same_queue_rq) {
-			list_del_init(&same_queue_rq->queuelist);
+		if (!rq_list_empty(plug->mq_list) && same_queue_rq) {
+			first_rq = rq_list_pop(&plug->mq_list);
 			plug->rq_count--;
 		}
 		blk_add_rq_to_plug(plug, rq);
 		trace_block_plug(q);
 
-		if (same_queue_rq) {
+		if (first_rq) {
 			trace_block_unplug(q, 1, true);
-			blk_mq_try_issue_directly(same_queue_rq->mq_hctx,
-						  same_queue_rq);
+			blk_mq_try_issue_directly(first_rq->mq_hctx,
+						  first_rq);
 		}
 	} else if ((q->nr_hw_queues > 1 && is_sync) ||
 		   !rq->mq_hctx->dispatch_busy) {

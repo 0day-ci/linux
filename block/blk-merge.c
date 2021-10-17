@@ -1085,23 +1085,23 @@ static enum bio_merge_status blk_attempt_bio_merge(struct request_queue *q,
  * Caller must ensure !blk_queue_nomerges(q) beforehand.
  */
 bool blk_attempt_plug_merge(struct request_queue *q, struct bio *bio,
-		unsigned int nr_segs, struct request **same_queue_rq)
+		unsigned int nr_segs, bool *same_queue_rq)
 {
 	struct blk_plug *plug;
 	struct request *rq;
 
 	plug = blk_mq_plug(q, bio);
-	if (!plug || list_empty(&plug->mq_list))
+	if (!plug || rq_list_empty(plug->mq_list))
 		return false;
 
 	/* check the previously added entry for a quick merge attempt */
-	rq = list_last_entry(&plug->mq_list, struct request, queuelist);
+	rq = rq_list_peek(&plug->mq_list);
 	if (rq->q == q && same_queue_rq) {
 		/*
 		 * Only blk-mq multiple hardware queues case checks the rq in
 		 * the same queue, there should be only one such rq in a queue
 		 */
-		*same_queue_rq = rq;
+		*same_queue_rq = true;
 	}
 	if (blk_attempt_bio_merge(q, rq, bio, nr_segs, false) == BIO_MERGE_OK)
 		return true;
