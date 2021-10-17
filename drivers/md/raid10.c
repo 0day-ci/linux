@@ -1116,7 +1116,7 @@ static void regular_request_wait(struct mddev *mddev, struct r10conf *conf,
 }
 
 static void raid10_read_request(struct mddev *mddev, struct bio *bio,
-				struct r10bio *r10_bio)
+				struct r10bio *r10_bio, bool handle_read_err)
 {
 	struct r10conf *conf = mddev->private;
 	struct bio *read_bio;
@@ -1129,7 +1129,7 @@ static void raid10_read_request(struct mddev *mddev, struct bio *bio,
 	struct md_rdev *err_rdev = NULL;
 	gfp_t gfp = GFP_NOIO;
 
-	if (slot >= 0 && r10_bio->devs[slot].rdev) {
+	if (handle_read_err && slot >= 0 && r10_bio->devs[slot].rdev) {
 		/*
 		 * This is an error retry, but we cannot
 		 * safely dereference the rdev in the r10_bio,
@@ -1519,7 +1519,7 @@ static void __make_request(struct mddev *mddev, struct bio *bio, int sectors)
 			conf->geo.raid_disks);
 
 	if (bio_data_dir(bio) == READ)
-		raid10_read_request(mddev, bio, r10_bio);
+		raid10_read_request(mddev, bio, r10_bio, false);
 	else
 		raid10_write_request(mddev, bio, r10_bio);
 }
@@ -2918,7 +2918,7 @@ static void handle_read_error(struct mddev *mddev, struct r10bio *r10_bio)
 	rdev_dec_pending(rdev, mddev);
 	allow_barrier(conf);
 	r10_bio->state = 0;
-	raid10_read_request(mddev, r10_bio->master_bio, r10_bio);
+	raid10_read_request(mddev, r10_bio->master_bio, r10_bio, true);
 }
 
 static void handle_write_completed(struct r10conf *conf, struct r10bio *r10_bio)
