@@ -171,38 +171,6 @@ static int intelfb_alloc(struct drm_fb_helper *helper,
 	return 0;
 }
 
-static void intel_fbdev_unpin(struct intel_fbdev *ifbdev)
-{
-	if (ifbdev->vma)
-		intel_unpin_fb_vma(ifbdev->vma, ifbdev->vma_flags);
-	ifbdev->vma = NULL;
-	ifbdev->vma_flags = 0;
-}
-
-static int intel_fbdev_pin_and_fence(struct drm_i915_private *dev_priv,
-				     struct intel_fbdev *ifbdev,
-				     void **vaddr)
-{
-	const struct i915_ggtt_view view = {
-		.type = I915_GGTT_VIEW_NORMAL,
-	};
-	ifbdev->vma = intel_pin_and_fence_fb_obj(&ifbdev->fb->base, false,
-						 &view, false, &ifbdev->vma_flags);
-
-	if (IS_ERR(ifbdev->vma)) {
-		return PTR_ERR(ifbdev->vma);
-	}
-
-	*vaddr = i915_vma_pin_iomap(ifbdev->vma);
-	if (IS_ERR(*vaddr)) {
-		intel_fbdev_unpin(ifbdev);
-		drm_err(&dev_priv->drm,
-			"Failed to remap framebuffer into virtual memory\n");
-		return PTR_ERR(vaddr);
-	}
-	return 0;
-}
-
 static int intelfb_create(struct drm_fb_helper *helper,
 			  struct drm_fb_helper_surface_size *sizes)
 {

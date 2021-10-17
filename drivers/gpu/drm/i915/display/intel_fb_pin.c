@@ -71,7 +71,7 @@ err:
 	return vma;
 }
 
-struct i915_vma *
+static struct i915_vma *
 intel_pin_and_fence_fb_obj(struct drm_framebuffer *fb,
 			   bool phys_cursor,
 			   const struct i915_ggtt_view *view,
@@ -199,7 +199,8 @@ err:
 	return vma;
 }
 
-void intel_unpin_fb_vma(struct i915_vma *vma, unsigned long flags)
+static void
+intel_unpin_fb_vma(struct i915_vma *vma, unsigned long flags)
 {
 	if (flags & PLANE_HAS_FENCE)
 		i915_vma_unpin_fence(vma);
@@ -271,4 +272,36 @@ void intel_plane_unpin_fb(struct intel_plane_state *old_plane_state)
 		if (vma)
 			intel_dpt_unpin(intel_fb->dpt_vm);
 	}
+}
+
+void intel_fbdev_unpin(struct intel_fbdev *ifbdev)
+{
+	if (ifbdev->vma)
+		intel_unpin_fb_vma(ifbdev->vma, ifbdev->vma_flags);
+	ifbdev->vma = NULL;
+	ifbdev->vma_flags = 0;
+}
+
+int intel_fbdev_pin_and_fence(struct drm_i915_private *dev_priv,
+			      struct intel_fbdev *ifbdev,
+			      void **vaddr)
+{
+	const struct i915_ggtt_view view = {
+		.type = I915_GGTT_VIEW_NORMAL,
+	};
+	ifbdev->vma = intel_pin_and_fence_fb_obj(&ifbdev->fb->base, false,
+						 &view, false, &ifbdev->vma_flags);
+
+	if (IS_ERR(ifbdev->vma)) {
+		return PTR_ERR(ifbdev->vma);
+	}
+
+	*vaddr = i915_vma_pin_iomap(ifbdev->vma);
+	if (IS_ERR(*vaddr)) {
+		intel_fbdev_unpin(ifbdev);
+		drm_err(&dev_priv->drm,
+			"Failed to remap framebuffer into virtual memory\n");
+		return PTR_ERR(vaddr);
+	}
+	return 0;
 }
