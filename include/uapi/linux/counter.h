@@ -63,6 +63,8 @@ enum counter_event_type {
 	COUNTER_EVENT_INDEX,
 	/* Direction change detected */
 	COUNTER_EVENT_DIRECTION_CHANGE,
+	/* Timer exceeded timeout */
+	COUNTER_EVENT_TIMEOUT,
 };
 
 /**
