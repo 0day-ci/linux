@@ -516,10 +516,9 @@ void imx_media_try_colorimetry(struct v4l2_mbus_framefmt *tryfmt,
 }
 EXPORT_SYMBOL_GPL(imx_media_try_colorimetry);
 
-int imx_media_mbus_fmt_to_pix_fmt(struct v4l2_pix_format *pix,
-				  const struct v4l2_mbus_framefmt *mbus,
-				  const struct imx_media_pixfmt *cc,
-				  enum imx_device_type type)
+static int imx56_media_mbus_fmt_to_pix_fmt(struct v4l2_pix_format *pix,
+					   const struct v4l2_mbus_framefmt *mbus,
+					   const struct imx_media_pixfmt *cc)
 {
 	u32 width;
 	u32 stride;
@@ -567,6 +566,77 @@ int imx_media_mbus_fmt_to_pix_fmt(struct v4l2_pix_format *pix,
 			 stride * pix->height;
 
 	return 0;
+}
+
+static int imx78_media_mbus_fmt_to_pix_fmt(struct v4l2_pix_format *pix,
+					   const struct v4l2_mbus_framefmt *mbus,
+					   const struct imx_media_pixfmt *cc)
+{
+	u32 width;
+	u32 stride;
+	u8 divisor;
+
+	if (!cc) {
+		cc = imx_media_find_ipu_format(mbus->code,
+					       PIXFMT_SEL_YUV_RGB);
+		if (!cc)
+			cc = imx_media_find_mbus_format(mbus->code,
+							PIXFMT_SEL_ANY);
+		if (!cc)
+			return -EINVAL;
+	}
+
+	/*
+	 * TODO: the IPU currently does not support the AYUV32 format,
+	 * so until it does convert to a supported YUV format.
+	 */
+	if (cc->ipufmt && cc->cs == IPUV3_COLORSPACE_YUV) {
+		u32 code;
+
+		imx_media_enum_mbus_formats(&code, 0, PIXFMT_SEL_YUV);
+		cc = imx_media_find_mbus_format(code, PIXFMT_SEL_YUV);
+	}
+
+	/*
+	 * The hardware can handle line lengths divisible by 4 bytes,
+	 * as long as the number of lines is even.
+	 * Otherwise, use the value of 8 bytes recommended in the datasheet.
+	 */
+	divisor = 4 << (mbus->height % 2);
+
+	width = round_up(mbus->width, divisor);
+
+	if (cc->planar)
+		stride = round_up(width, 16);
+	else
+		stride = round_up((width * cc->bpp) >> 3, divisor);
+
+	pix->width = width;
+	pix->height = mbus->height;
+	pix->pixelformat = cc->fourcc;
+	pix->colorspace = mbus->colorspace;
+	pix->xfer_func = mbus->xfer_func;
+	pix->ycbcr_enc = mbus->ycbcr_enc;
+	pix->quantization = mbus->quantization;
+	pix->field = mbus->field;
+	pix->bytesperline = stride;
+	pix->sizeimage = cc->planar ? ((stride * pix->height * cc->bpp) >> 3) :
+			 stride * pix->height;
+
+	return 0;
+}
+
+int imx_media_mbus_fmt_to_pix_fmt(struct v4l2_pix_format *pix,
+				  const struct v4l2_mbus_framefmt *mbus,
+				  const struct imx_media_pixfmt *cc,
+				  enum imx_device_type type) {
+	switch (type) {
+	case DEVICE_TYPE_IMX56:
+		return imx56_media_mbus_fmt_to_pix_fmt(pix, mbus, cc);
+	case DEVICE_TYPE_IMX78:
+		return imx78_media_mbus_fmt_to_pix_fmt(pix, mbus, cc);
+	}
+	return -EINVAL;
 }
 EXPORT_SYMBOL_GPL(imx_media_mbus_fmt_to_pix_fmt);
 
