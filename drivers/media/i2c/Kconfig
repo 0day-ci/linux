@@ -746,6 +746,7 @@ config VIDEO_HI556
 config VIDEO_HI846
 	tristate "Hynix Hi-846 sensor support"
 	depends on I2C && VIDEO_V4L2
+	depends on OF
 	select MEDIA_CONTROLLER
 	select VIDEO_V4L2_SUBDEV_API
 	select V4L2_FWNODE
