@@ -1655,7 +1655,6 @@ static void chv_prepare_pll(const struct intel_crtc_state *crtc_state)
 	bestp1 = crtc_state->dpll.p1;
 	bestp2 = crtc_state->dpll.p2;
 	vco = crtc_state->dpll.vco;
-	dpio_val = 0;
 	loopfilter = 0;
 
 	vlv_dpio_get(dev_priv);
