@@ -8884,6 +8884,12 @@ static int intel_atomic_check_async(struct intel_atomic_state *state)
 			return -EINVAL;
 		}
 
+		if (new_plane_state->hw.fb->format->num_planes > 1) {
+			drm_dbg_kms(&i915->drm,
+				    "Planar formats not supported with async flips\n");
+			return -EINVAL;
+		}
+
 		if (old_plane_state->view.color_plane[0].stride !=
 		    new_plane_state->view.color_plane[0].stride) {
 			drm_dbg_kms(&i915->drm, "Stride cannot be changed in async flip\n");
