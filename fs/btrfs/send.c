@@ -84,6 +84,8 @@ struct send_ctx {
 	u64 total_send_size;
 	u64 cmd_send_size[BTRFS_SEND_C_MAX + 1];
 	u64 flags;	/* 'flags' member of btrfs_ioctl_send_args is u64 */
+	/* Protocol version compatibility requested */
+	u32 proto;
 
 	struct btrfs_root *send_root;
 	struct btrfs_root *parent_root;
@@ -310,6 +312,15 @@ static void inconsistent_snapshot_error(struct send_ctx *sctx,
 		  sctx->send_root->root_key.objectid,
 		  (sctx->parent_root ?
 		   sctx->parent_root->root_key.objectid : 0));
+}
+
+static bool proto_cmd_ok(const struct send_ctx *sctx, int cmd)
+{
+	switch (sctx->proto) {
+	case 1:	 return cmd < __BTRFS_SEND_C_MAX_V1;
+	case 2:	 return cmd < __BTRFS_SEND_C_MAX_V2;
+	default: return false;
+	}
 }
 
 static int is_waiting_for_move(struct send_ctx *sctx, u64 ino);
@@ -2507,6 +2518,7 @@ static int send_utimes(struct send_ctx *sctx, u64 ino, u64 gen)
 	struct extent_buffer *eb;
 	struct btrfs_key key;
 	int slot;
+	int cmd;
 
 	btrfs_debug(fs_info, "send_utimes %llu", ino);
 
@@ -2533,7 +2545,12 @@ static int send_utimes(struct send_ctx *sctx, u64 ino, u64 gen)
 	slot = path->slots[0];
 	ii = btrfs_item_ptr(eb, slot, struct btrfs_inode_item);
 
-	ret = begin_cmd(sctx, BTRFS_SEND_C_UTIMES);
+	if (proto_cmd_ok(sctx, BTRFS_SEND_C_UTIMES2))
+		cmd = BTRFS_SEND_C_UTIMES2;
+	else
+		cmd = BTRFS_SEND_C_UTIMES;
+
+	ret = begin_cmd(sctx, cmd);
 	if (ret < 0)
 		goto out;
 
@@ -2544,7 +2561,8 @@ static int send_utimes(struct send_ctx *sctx, u64 ino, u64 gen)
 	TLV_PUT_BTRFS_TIMESPEC(sctx, BTRFS_SEND_A_ATIME, eb, &ii->atime);
 	TLV_PUT_BTRFS_TIMESPEC(sctx, BTRFS_SEND_A_MTIME, eb, &ii->mtime);
 	TLV_PUT_BTRFS_TIMESPEC(sctx, BTRFS_SEND_A_CTIME, eb, &ii->ctime);
-	/* TODO Add otime support when the otime patches get into upstream */
+	if (proto_cmd_ok(sctx, BTRFS_SEND_C_UTIMES2))
+		TLV_PUT_BTRFS_TIMESPEC(sctx, BTRFS_SEND_A_OTIME, eb, &ii->otime);
 
 	ret = send_cmd(sctx);
 
@@ -2552,6 +2570,43 @@ tlv_put_failure:
 out:
 	fs_path_free(p);
 	btrfs_free_path(path);
+	return ret;
+}
+
+static int send_inode_otime(struct send_ctx *sctx, const struct fs_path *fsp, u64 ino)
+{
+	int ret;
+	struct btrfs_path *path;
+	struct btrfs_inode_item *ii;
+	struct btrfs_key key;
+
+	if (!proto_cmd_ok(sctx, BTRFS_SEND_C_OTIME))
+		return 0;
+
+	path = alloc_path_for_send();
+	if (!path)
+		return -ENOMEM;
+
+	key.objectid = ino;
+	key.type = BTRFS_INODE_ITEM_KEY;
+	key.offset = 0;
+	ret = btrfs_search_slot(NULL, sctx->send_root, &key, path, 0, 0);
+	if (ret) {
+		if (ret > 0)
+			ret = -ENOENT;
+		goto out;
+	}
+
+	ret = begin_cmd(sctx, BTRFS_SEND_C_OTIME);
+	ii = btrfs_item_ptr(path->nodes[0], path->slots[0], struct btrfs_inode_item);
+	TLV_PUT_PATH(sctx, BTRFS_SEND_A_PATH, fsp);
+	TLV_PUT_BTRFS_TIMESPEC(sctx, BTRFS_SEND_A_OTIME, path->nodes[0], &ii->otime);
+	ret = send_cmd(sctx);
+
+tlv_put_failure:
+out:
+	btrfs_free_path(path);
+
 	return ret;
 }
 
@@ -2633,6 +2688,9 @@ static int send_create_inode(struct send_ctx *sctx, u64 ino)
 	if (ret < 0)
 		goto out;
 
+	ret = send_inode_otime(sctx, p, ino);
+	if (ret < 0)
+		goto out;
 
 tlv_put_failure:
 out:
@@ -7268,6 +7326,17 @@ long btrfs_ioctl_send(struct file *mnt_file, struct btrfs_ioctl_send_args *arg)
 	INIT_LIST_HEAD(&sctx->name_cache_list);
 
 	sctx->flags = arg->flags;
+
+	if (arg->flags & BTRFS_SEND_FLAG_VERSION) {
+		if (arg->version > BTRFS_SEND_STREAM_VERSION) {
+			ret = -EPROTO;
+			goto out;
+		}
+		/* Zero means "use the highest version" */
+		sctx->proto = arg->version ?: BTRFS_SEND_STREAM_VERSION;
+	} else {
+		sctx->proto = 1;
+	}
 
 	sctx->send_filp = fget(arg->send_fd);
 	if (!sctx->send_filp) {
