@@ -8538,12 +8538,6 @@ int kvm_arch_init(void *opaque)
 	struct kvm_x86_init_ops *ops = opaque;
 	int r;
 
-	if (kvm_x86_ops.hardware_enable) {
-		pr_err("kvm: already loaded vendor module '%s'\n", kvm_x86_ops.name);
-		r = -EEXIST;
-		goto out;
-	}
-
 	if (!ops->cpu_has_kvm_support()) {
 		pr_err_ratelimited("kvm: no hardware support for '%s'\n",
 				   ops->runtime_ops->name);
@@ -8554,6 +8548,11 @@ int kvm_arch_init(void *opaque)
 		pr_err_ratelimited("kvm: support for '%s' disabled by bios\n",
 				   ops->runtime_ops->name);
 		r = -EOPNOTSUPP;
+		goto out;
+	}
+	if (kvm_x86_ops.hardware_enable) {
+		pr_err("kvm: already loaded vendor module '%s'\n", kvm_x86_ops.name);
+		r = -EEXIST;
 		goto out;
 	}
 
