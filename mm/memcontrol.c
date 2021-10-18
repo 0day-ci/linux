@@ -1896,7 +1896,7 @@ bool mem_cgroup_oom_synchronize(bool handle)
 
 	/* OOM is global, do not handle */
 	if (!memcg)
-		return false;
+		return current->is_over_memcg_limit;
 
 	if (!handle)
 		goto cleanup;
@@ -2594,6 +2594,8 @@ static int try_charge_memcg(struct mem_cgroup *memcg, gfp_t gfp_mask,
 	bool drained = false;
 	unsigned long pflags;
 
+	if (current->in_user_fault)
+		current->is_over_memcg_limit = false;
 retry:
 	if (consume_stock(memcg, nr_pages))
 		return 0;
@@ -2698,8 +2700,11 @@ retry:
 		goto retry;
 	}
 nomem:
-	if (!(gfp_mask & __GFP_NOFAIL))
+	if (!(gfp_mask & __GFP_NOFAIL)) {
+		if (current->in_user_fault)
+			current->is_over_memcg_limit = true;
 		return -ENOMEM;
+	}
 force:
 	/*
 	 * The allocation either can't fail or will lead to more memory
@@ -3023,10 +3028,11 @@ static int obj_cgroup_charge_pages(struct obj_cgroup *objcg, gfp_t gfp,
 		}
 		cancel_charge(memcg, nr_pages);
 		ret = -ENOMEM;
+		if (current->in_user_fault)
+			current->is_over_memcg_limit = true;
 	}
 out:
 	css_put(&memcg->css);
-
 	return ret;
 }
 
