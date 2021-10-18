@@ -1439,6 +1439,8 @@ static int tegra_xusb_probe(struct platform_device *pdev)
 	tegra->xhci_irq = platform_get_irq(pdev, 0);
 	if (tegra->xhci_irq < 0)
 		return tegra->xhci_irq;
+	if (!tegra->xhci_irq)
+		return -ENIVAL;
 
 	tegra->mbox_irq = platform_get_irq(pdev, 1);
 	if (tegra->mbox_irq < 0)
