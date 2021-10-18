@@ -148,6 +148,9 @@ static noinline void pci_msi_update_mask(struct msi_desc *desc, u32 clear, u32 s
 	raw_spinlock_t *lock = &desc->dev->msi_lock;
 	unsigned long flags;
 
+	if (pci_msi_ignore_mask || desc->msi_attrib.is_virtual)
+		return;
+
 	raw_spin_lock_irqsave(lock, flags);
 	desc->msi_mask &= ~clear;
 	desc->msi_mask |= set;
@@ -180,6 +183,9 @@ static inline void __iomem *pci_msix_desc_addr(struct msi_desc *desc)
 static void pci_msix_write_vector_ctrl(struct msi_desc *desc, u32 ctrl)
 {
 	void __iomem *desc_addr = pci_msix_desc_addr(desc);
+
+	if (pci_msi_ignore_mask || desc->msi_attrib.is_virtual)
+		return;
 
 	writel(ctrl, desc_addr + PCI_MSIX_ENTRY_VECTOR_CTRL);
 }
