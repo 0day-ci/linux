@@ -181,6 +181,8 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
 		dev_dbg(dev, "hcd probe: missing irq resource\n");
 		return irq;
 	}
+	if (!irq)
+		return -EINVAL;
 
 	hcd = usb_create_hcd(driver, dev, "at91");
 	if (!hcd)
