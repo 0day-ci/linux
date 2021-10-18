@@ -315,7 +315,7 @@ static __always_inline bool is_rsvd_spte(struct rsvd_bits_validate *rsvd_check,
 	 * bits and EPT's invalid memtype/XWR checks to avoid an extra Jcc
 	 * (this is extremely unlikely to be short-circuited as true).
 	 */
-	return __is_bad_mt_xwr(rsvd_check, spte) |
+	return __is_bad_mt_xwr(rsvd_check, spte) ||
 	       __is_rsvd_bits_set(rsvd_check, spte, level);
 }
 
