@@ -655,8 +655,10 @@ static inline void copy_buffer(void *from, void *to)
 		*p2++ = *p1++;
 }
 
+/* finish_fdc() handling */
   
-  
+static void (*fdc_finish_action)( void ) = NULL;
+
 
 /* General Interrupt Handling */
 
@@ -1230,6 +1232,12 @@ static void fd_rwsec_done1(int status)
 	}
 	else {
 		/* all sectors finished */
+		void (*handler)( void );
+
+		handler = xchg(&fdc_finish_action, NULL);
+		if (handler)
+			handler();
+
 		fd_end_request_cur(BLK_STS_OK);
 	}
 	return;
@@ -1393,6 +1401,11 @@ static void finish_fdc_done( int dummy )
 	DPRINT(("finish_fdc() finished\n"));
 }
 
+static void queue_finish_fdc( void )
+{
+	fdc_finish_action = finish_fdc;
+}
+
 /* The detection of disk changes is a dark chapter in Atari history :-(
  * Because the "Drive ready" signal isn't present in the Atari
  * hardware, one has to rely on the "Write Protect". This works fine,
@@ -1493,6 +1506,8 @@ static blk_status_t ataflop_queue_rq(struct blk_mq_hw_ctx *hctx,
 	int drive = floppy - unit;
 	int type = floppy->type;
 
+	DPRINT(("Queue request: drive %d type %d\n", drive, type));
+
 	spin_lock_irq(&ataflop_lock);
 	if (fd_request) {
 		spin_unlock_irq(&ataflop_lock);
@@ -1553,7 +1568,7 @@ static blk_status_t ataflop_queue_rq(struct blk_mq_hw_ctx *hctx,
 	do_fd_action( drive );
 
 	if (bd->last)
-		finish_fdc();
+		queue_finish_fdc();
 	atari_enable_irq( IRQ_MFP_FDC );
 
 out:
