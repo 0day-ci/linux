@@ -873,6 +873,7 @@ static blk_status_t nvme_setup_discard(struct nvme_ns *ns, struct request *req,
 		return BLK_STS_IOERR;
 	}
 
+	memset(cmnd, 0, sizeof(*cmnd));
 	cmnd->dsm.opcode = nvme_cmd_dsm;
 	cmnd->dsm.nsid = cpu_to_le32(ns->head->ns_id);
 	cmnd->dsm.nr = cpu_to_le32(segments - 1);
@@ -889,6 +890,8 @@ static blk_status_t nvme_setup_discard(struct nvme_ns *ns, struct request *req,
 static inline blk_status_t nvme_setup_write_zeroes(struct nvme_ns *ns,
 		struct request *req, struct nvme_command *cmnd)
 {
+	memset(cmnd, 0, sizeof(*cmnd));
+
 	if (ns->ctrl->quirks & NVME_QUIRK_DEALLOCATE_ZEROES)
 		return nvme_setup_discard(ns, req, cmnd);
 
@@ -912,6 +915,8 @@ static inline blk_status_t nvme_setup_rw(struct nvme_ns *ns,
 	struct nvme_ctrl *ctrl = ns->ctrl;
 	u16 control = 0;
 	u32 dsmgmt = 0;
+
+	memset(cmnd, 0, sizeof(*cmnd));
 
 	if (req->cmd_flags & REQ_FUA)
 		control |= NVME_RW_FUA;
@@ -981,17 +986,17 @@ blk_status_t nvme_setup_cmd(struct nvme_ns *ns, struct request *req)
 	struct nvme_ctrl *ctrl = nvme_req(req)->ctrl;
 	blk_status_t ret = BLK_STS_OK;
 
-	if (!(req->rq_flags & RQF_DONTPREP)) {
+	if (!(req->rq_flags & RQF_DONTPREP))
 		nvme_clear_nvme_request(req);
-		memset(cmd, 0, sizeof(*cmd));
-	}
 
 	switch (req_op(req)) {
 	case REQ_OP_DRV_IN:
 	case REQ_OP_DRV_OUT:
 		/* these are setup prior to execution in nvme_init_request() */
+		memset(cmd, 0, sizeof(*cmd));
 		break;
 	case REQ_OP_FLUSH:
+		memset(cmd, 0, sizeof(*cmd));
 		nvme_setup_flush(ns, cmd);
 		break;
 	case REQ_OP_ZONE_RESET_ALL:
