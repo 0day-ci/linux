@@ -3677,21 +3677,19 @@ static int io_write(struct io_kiocb *req, unsigned int issue_flags)
 	 */
 	if (ret2 == -EOPNOTSUPP && (kiocb->ki_flags & IOCB_NOWAIT))
 		ret2 = -EAGAIN;
-	/* no retry on NONBLOCK nor RWF_NOWAIT */
-	if (ret2 == -EAGAIN && (req->flags & REQ_F_NOWAIT))
-		goto done;
-	if (!force_nonblock || ret2 != -EAGAIN) {
-		/* IOPOLL retry should happen for io-wq threads */
-		if (ret2 == -EAGAIN && (req->ctx->flags & IORING_SETUP_IOPOLL))
-			goto copy_iov;
-done:
+
+	if (ret2 != -EAGAIN ||
+	    /* no retry on NONBLOCK nor RWF_NOWAIT */
+	    (req->flags & REQ_F_NOWAIT)
+	    /* IOPOLL retry should happen for io-wq threads */
+	    || (!force_nonblock && !(req->ctx->flags & IORING_SETUP_IOPOLL))) {
 		kiocb_done(kiocb, ret2, issue_flags);
 	} else {
 copy_iov:
 		iov_iter_restore(&s->iter, &s->iter_state);
 		ret = io_setup_async_rw(req, iovec, s, false);
 		return ret ?: -EAGAIN;
-	}
+}
 out_free:
 	/* it's reportedly faster than delegating the null check to kfree() */
 	if (iovec)
