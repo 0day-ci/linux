@@ -66,6 +66,17 @@ config RESET_BRCMSTB_RESCAL
 	  This enables the RESCAL reset controller for SATA, PCIe0, or PCIe1 on
 	  BCM7216.
 
+config RESET_GPIO
+	tristate "GPIO reset controller"
+	depends on OF
+	help
+	  This enables a generic controller for resets attached via GPIOs. It
+	  may be used to add GPIO resets to drivers which expect a reset
+	  controller. It supports adding delays and waiting for a "done" GPIO
+	  to be asserted.
+
+	  If compiled as module, it will be called reset-gpio.
+
 config RESET_HSDK
 	bool "Synopsys HSDK Reset Driver"
 	depends on HAS_IOMEM
