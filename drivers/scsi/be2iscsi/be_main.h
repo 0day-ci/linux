@@ -799,7 +799,7 @@ void hwi_ring_cq_db(struct beiscsi_hba *phba,
 		     unsigned int id, unsigned int num_processed,
 		     unsigned char rearm);
 
-unsigned int beiscsi_process_cq(struct be_eq_obj *pbe_eq, int budget);
+unsigned int beiscsi_process_cq(struct be_eq_obj *pbe_eq);
 void beiscsi_process_mcc_cq(struct beiscsi_hba *phba);
 
 struct pdu_nop_out {
