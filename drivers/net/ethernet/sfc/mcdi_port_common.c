@@ -133,9 +133,9 @@ void mcdi_to_ethtool_linkset(u32 media, u32 cap, unsigned long *linkset)
 	case MC_CMD_MEDIA_QSFP_PLUS:
 		SET_BIT(FIBRE);
 		if (cap & (1 << MC_CMD_PHY_CAP_1000FDX_LBN))
-			SET_BIT(1000baseT_Full);
+			SET_BIT(1000baseX_Full);
 		if (cap & (1 << MC_CMD_PHY_CAP_10000FDX_LBN))
-			SET_BIT(10000baseT_Full);
+			SET_BIT(10000baseCR_Full);
 		if (cap & (1 << MC_CMD_PHY_CAP_40000FDX_LBN))
 			SET_BIT(40000baseCR4_Full);
 		if (cap & (1 << MC_CMD_PHY_CAP_100000FDX_LBN))
@@ -192,9 +192,11 @@ u32 ethtool_linkset_to_mcdi_cap(const unsigned long *linkset)
 		result |= (1 << MC_CMD_PHY_CAP_100FDX_LBN);
 	if (TEST_BIT(1000baseT_Half))
 		result |= (1 << MC_CMD_PHY_CAP_1000HDX_LBN);
-	if (TEST_BIT(1000baseT_Full) || TEST_BIT(1000baseKX_Full))
+	if (TEST_BIT(1000baseT_Full) || TEST_BIT(1000baseKX_Full) ||
+	    TEST_BIT(1000baseX_Full))
 		result |= (1 << MC_CMD_PHY_CAP_1000FDX_LBN);
-	if (TEST_BIT(10000baseT_Full) || TEST_BIT(10000baseKX4_Full))
+	if (TEST_BIT(10000baseT_Full) || TEST_BIT(10000baseKX4_Full) ||
+	    TEST_BIT(10000baseCR_Full))
 		result |= (1 << MC_CMD_PHY_CAP_10000FDX_LBN);
 	if (TEST_BIT(40000baseCR4_Full) || TEST_BIT(40000baseKR4_Full))
 		result |= (1 << MC_CMD_PHY_CAP_40000FDX_LBN);
