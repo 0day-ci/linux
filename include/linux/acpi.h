@@ -426,6 +426,7 @@ extern bool acpi_osi_is_win8(void);
 #ifdef CONFIG_ACPI_NUMA
 int acpi_map_pxm_to_node(int pxm);
 int acpi_get_node(acpi_handle handle);
+int __init numa_add_memblk(int nodeid, u64 start, u64 end);
 
 /**
  * pxm_to_online_node - Map proximity ID to online node
