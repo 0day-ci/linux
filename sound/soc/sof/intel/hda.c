@@ -609,8 +609,9 @@ static int hda_init(struct snd_sof_dev *sdev)
 	bus = sof_to_bus(sdev);
 
 	/* HDA bus init */
-	sof_hda_bus_init(bus, &pci->dev);
+	sof_hda_bus_init(hbus, pci, hda_model);
 
+#if !IS_ENABLED(CONFIG_SND_SOC_SOF_HDA)
 	bus->use_posbuf = 1;
 	bus->bdl_pos_adj = 0;
 	bus->sync_write = 1;
@@ -619,7 +620,7 @@ static int hda_init(struct snd_sof_dev *sdev)
 	hbus->pci = pci;
 	hbus->mixer_assigned = -1;
 	hbus->modelname = hda_model;
-
+#endif
 	/* initialise hdac bus */
 	bus->addr = pci_resource_start(pci, 0);
 	bus->remap_addr = pci_ioremap_bar(pci, 0);
