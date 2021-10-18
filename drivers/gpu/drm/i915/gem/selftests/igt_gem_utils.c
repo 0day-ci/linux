@@ -157,6 +157,7 @@ skip_request:
 	if (err)
 		i915_request_set_error_once(rq, err);
 	i915_request_add(rq);
+	err = i915_request_wait(rq, 0, HZ/5);
 err_batch:
 	i915_vma_unpin_and_release(&batch, 0);
 	return err;
