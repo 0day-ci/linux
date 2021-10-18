@@ -96,6 +96,10 @@ static int ohci_hcd_sm501_drv_probe(struct platform_device *pdev)
 	irq = retval = platform_get_irq(pdev, 0);
 	if (retval < 0)
 		goto err0;
+	if (!retval) {
+		retval = -EINVAL;
+		goto err0;
+	}
 
 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 1);
 	if (mem == NULL) {
