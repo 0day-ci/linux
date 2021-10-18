@@ -1215,8 +1215,6 @@ static int e1000_integrated_phy_loopback(struct e1000_adapter *adapter)
 		e1000_write_phy_reg(hw, PHY_CTRL, 0x8140);
 	}
 
-	ctrl_reg = er32(CTRL);
-
 	/* force 1000, set loopback */
 	e1000_write_phy_reg(hw, PHY_CTRL, 0x4140);
 
