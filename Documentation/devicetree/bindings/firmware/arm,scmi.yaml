@@ -38,6 +38,9 @@ properties:
                      The virtio transport only supports a single device.
         items:
           - const: arm,scmi-virtio
+      - description: SCMI compliant firmware with OP-TEE transport
+        items:
+          - const: linaro,scmi-optee
 
   interrupts:
     description:
@@ -82,6 +85,11 @@ properties:
     $ref: /schemas/types.yaml#/definitions/uint32
     description:
       SMC id required when using smc or hvc transports
+
+  linaro,optee-channel-id:
+    $ref: /schemas/types.yaml#/definitions/uint32
+    description:
+      Channel id required when using OP-TEE transports
 
   protocol@11:
     type: object
@@ -195,6 +203,9 @@ patternProperties:
         minItems: 1
         maxItems: 2
 
+      linaro,optee-channel-id:
+        maxItems: 1
+
     required:
       - reg
 
@@ -225,6 +236,16 @@ else:
     required:
       - arm,smc-id
       - shmem
+
+  else:
+    if:
+      properties:
+        compatible:
+          contains:
+            const: linaro,scmi-optee
+    then:
+      required:
+        - linaro,optee-channel-id
 
 examples:
   - |
@@ -340,7 +361,30 @@ examples:
                 reg = <0x11>;
                 #power-domain-cells = <1>;
             };
+        };
+    };
 
+  - |
+    firmware {
+        scmi {
+            compatible = "linaro,scmi-optee";
+            linaro,optee-channel = <0>;
+
+            #address-cells = <1>;
+            #size-cells = <0>;
+
+            scmi_clk: protocol@14 {
+                reg = <0x14>;
+                #clock-cells = <1>;
+            };
+
+            scmi_dvfs: protocol@13 {
+                reg = <0x13>;
+
+                #clock-cells = <1>;
+                linaro,optee-channel = <1>;
+                shmem = <&cpu_scp_hpri0>;
+            };
         };
     };
 
