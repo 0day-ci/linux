@@ -632,7 +632,6 @@ int drm_crtc_helper_set_config(struct drm_mode_set *set,
 	}
 
 	/* a) traverse passed in connector list and get encoders for them */
-	count = 0;
 	drm_connector_list_iter_begin(dev, &conn_iter);
 	drm_for_each_connector_iter(connector, &conn_iter) {
 		const struct drm_connector_helper_funcs *connector_funcs =
@@ -678,7 +677,6 @@ int drm_crtc_helper_set_config(struct drm_mode_set *set,
 		goto fail;
 	}
 
-	count = 0;
 	drm_connector_list_iter_begin(dev, &conn_iter);
 	drm_for_each_connector_iter(connector, &conn_iter) {
 		if (!connector->encoder)
