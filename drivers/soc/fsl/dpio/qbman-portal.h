@@ -250,7 +250,7 @@ void *qbman_swp_mc_result(struct qbman_swp *p);
  * @d:  the enqueue descriptor
  * @fd: the frame descriptor to be enqueued
  *
- * Return 0 for successful enqueue, -EBUSY if the EQCR is not ready.
+ * Return: 0 for successful enqueue, -EBUSY if the EQCR is not ready.
  */
 static inline int
 qbman_swp_enqueue(struct qbman_swp *s, const struct qbman_eq_desc *d,
@@ -268,7 +268,7 @@ qbman_swp_enqueue(struct qbman_swp *s, const struct qbman_eq_desc *d,
  * @flags: table pointer of QBMAN_ENQUEUE_FLAG_DCA flags, not used if NULL
  * @num_frames: number of fd to be enqueued
  *
- * Return the number of fd enqueued, or a negative error number.
+ * Return: the number of fd enqueued, or a negative error number.
  */
 static inline int
 qbman_swp_enqueue_multiple(struct qbman_swp *s,
@@ -288,7 +288,7 @@ qbman_swp_enqueue_multiple(struct qbman_swp *s,
  * @fd: table pointer of frame descriptor table to be enqueued
  * @num_frames: number of fd to be enqueued
  *
- * Return the number of fd enqueued, or a negative error number.
+ * Return: the number of fd enqueued, or a negative error number.
  */
 static inline int
 qbman_swp_enqueue_multiple_desc(struct qbman_swp *s,
@@ -304,6 +304,7 @@ qbman_swp_enqueue_multiple_desc(struct qbman_swp *s,
  * @dq: the dequeue result to be checked
  *
  * DQRR entries may contain non-dequeue results, ie. notifications
+ * Return: returns 1 if result is DQ, 0 otherwise
  */
 static inline int qbman_result_is_DQ(const struct dpaa2_dq *dq)
 {
@@ -314,6 +315,7 @@ static inline int qbman_result_is_DQ(const struct dpaa2_dq *dq)
  * qbman_result_is_SCN() - Check the dequeue result is notification or not
  * @dq: the dequeue result to be checked
  *
+ * Return: returns 1 if result is DQ is notification, 0 otherwise
  */
 static inline int qbman_result_is_SCN(const struct dpaa2_dq *dq)
 {
@@ -370,6 +372,9 @@ static inline int qbman_result_is_FQPN(const struct dpaa2_dq *dq)
 
 /**
  * qbman_result_SCN_state() - Get the state field in State-change notification
+ * @scn: state change notification
+ *
+ * Return: the state field from scn
  */
 static inline u8 qbman_result_SCN_state(const struct dpaa2_dq *scn)
 {
@@ -380,6 +385,9 @@ static inline u8 qbman_result_SCN_state(const struct dpaa2_dq *scn)
 
 /**
  * qbman_result_SCN_rid() - Get the resource id in State-change notification
+ * @scn: state change notification
+ *
+ * Return: the resource id from scn
  */
 static inline u32 qbman_result_SCN_rid(const struct dpaa2_dq *scn)
 {
@@ -388,6 +396,9 @@ static inline u32 qbman_result_SCN_rid(const struct dpaa2_dq *scn)
 
 /**
  * qbman_result_SCN_ctx() - Get the context data in State-change notification
+ * @scn: state change notification
+ *
+ * Return: the context data field from scn
  */
 static inline u64 qbman_result_SCN_ctx(const struct dpaa2_dq *scn)
 {
@@ -402,7 +413,7 @@ static inline u64 qbman_result_SCN_ctx(const struct dpaa2_dq *scn)
  * There are a couple of different ways that a FQ can end up parked state,
  * This schedules it.
  *
- * Return 0 for success, or negative error code for failure.
+ * Return: 0 for success, or negative error code for failure.
  */
 static inline int qbman_swp_fq_schedule(struct qbman_swp *s, u32 fqid)
 {
@@ -420,7 +431,7 @@ static inline int qbman_swp_fq_schedule(struct qbman_swp *s, u32 fqid)
  * empty at the time this happens, the resulting dq_entry will have no FD.
  * (qbman_result_DQ_fd() will return NULL.)
  *
- * Return 0 for success, or negative error code for failure.
+ * Return: 0 for success, or negative error code for failure.
  */
 static inline int qbman_swp_fq_force(struct qbman_swp *s, u32 fqid)
 {
@@ -434,7 +445,7 @@ static inline int qbman_swp_fq_force(struct qbman_swp *s, u32 fqid)
  *
  * This setting doesn't affect enqueues to the FQ, just dequeues.
  *
- * Return 0 for success, or negative error code for failure.
+ * Return: 0 for success, or negative error code for failure.
  */
 static inline int qbman_swp_fq_xon(struct qbman_swp *s, u32 fqid)
 {
@@ -454,7 +465,7 @@ static inline int qbman_swp_fq_xon(struct qbman_swp *s, u32 fqid)
  * that FQ for dequeuing, then the resulting dq_entry will have no FD.
  * (qbman_result_DQ_fd() will return NULL.)
  *
- * Return 0 for success, or negative error code for failure.
+ * Return: 0 for success, or negative error code for failure.
  */
 static inline int qbman_swp_fq_xoff(struct qbman_swp *s, u32 fqid)
 {
@@ -480,7 +491,7 @@ static inline int qbman_swp_fq_xoff(struct qbman_swp *s, u32 fqid)
  * @channelid: the channel index
  * @ctx:       the context to be set in CDAN
  *
- * Return 0 for success, or negative error code for failure.
+ * Return: 0 for success, or negative error code for failure.
  */
 static inline int qbman_swp_CDAN_set_context(struct qbman_swp *s, u16 channelid,
 					     u64 ctx)
@@ -495,7 +506,7 @@ static inline int qbman_swp_CDAN_set_context(struct qbman_swp *s, u16 channelid,
  * @s:         the software portal object
  * @channelid: the index of the channel to generate CDAN
  *
- * Return 0 for success, or negative error code for failure.
+ * Return: 0 for success, or negative error code for failure.
  */
 static inline int qbman_swp_CDAN_enable(struct qbman_swp *s, u16 channelid)
 {
@@ -509,7 +520,7 @@ static inline int qbman_swp_CDAN_enable(struct qbman_swp *s, u16 channelid)
  * @s:         the software portal object
  * @channelid: the index of the channel to generate CDAN
  *
- * Return 0 for success, or negative error code for failure.
+ * Return: 0 for success, or negative error code for failure.
  */
 static inline int qbman_swp_CDAN_disable(struct qbman_swp *s, u16 channelid)
 {
@@ -524,7 +535,7 @@ static inline int qbman_swp_CDAN_disable(struct qbman_swp *s, u16 channelid)
  * @channelid: the index of the channel to generate CDAN
  * @ctx:i      the context set in CDAN
  *
- * Return 0 for success, or negative error code for failure.
+ * Return: 0 for success, or negative error code for failure.
  */
 static inline int qbman_swp_CDAN_set_context_enable(struct qbman_swp *s,
 						    u16 channelid,
@@ -617,7 +628,7 @@ u32 qbman_bp_info_num_free_bufs(struct qbman_bp_query_rslt *a);
  * @buffers:     a pointer pointing to the buffer address to be released
  * @num_buffers: number of buffers to be released,  must be less than 8
  *
- * Return 0 for success, -EBUSY if the release command ring is not ready.
+ * Return: 0 for success, -EBUSY if the release command ring is not ready.
  */
 static inline int qbman_swp_release(struct qbman_swp *s,
 				    const struct qbman_release_desc *d,
@@ -633,7 +644,7 @@ static inline int qbman_swp_release(struct qbman_swp *s,
  * @d: the software portal descriptor which has been configured with
  *     the set of qbman_pull_desc_set_*() calls
  *
- * Return 0 for success, and -EBUSY if the software portal is not ready
+ * Return: 0 for success, and -EBUSY if the software portal is not ready
  * to do pull dequeue.
  */
 static inline int qbman_swp_pull(struct qbman_swp *s,
@@ -646,7 +657,7 @@ static inline int qbman_swp_pull(struct qbman_swp *s,
  * qbman_swp_dqrr_next() - Get an valid DQRR entry
  * @s: the software portal object
  *
- * Return NULL if there are no unconsumed DQRR entries. Return a DQRR entry
+ * Return: NULL if there are no unconsumed DQRR entries. Return a DQRR entry
  * only once, so repeated calls can return a sequence of DQRR entries, without
  * requiring they be consumed immediately or in any particular order.
  */

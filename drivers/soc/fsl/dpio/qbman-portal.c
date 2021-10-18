@@ -241,7 +241,7 @@ static inline u8 qm_cyc_diff(u8 ringsize, u8 first, u8 last)
  *                    QBMan portal descriptor.
  * @d: the given qbman swp descriptor
  *
- * Return qbman_swp portal for success, NULL if the object cannot
+ * Return: qbman_swp portal for success, NULL if the object cannot
  * be created.
  */
 struct qbman_swp *qbman_swp_init(const struct qbman_swp_desc *d)
@@ -374,10 +374,10 @@ void qbman_swp_finish(struct qbman_swp *p)
 }
 
 /**
- * qbman_swp_interrupt_read_status()
+ * qbman_swp_interrupt_read_status() - Read interrupt status for swp
  * @p: the given software portal
  *
- * Return the value in the SWP_ISR register.
+ * Return: the value in the SWP_ISR register.
  */
 u32 qbman_swp_interrupt_read_status(struct qbman_swp *p)
 {
@@ -385,7 +385,7 @@ u32 qbman_swp_interrupt_read_status(struct qbman_swp *p)
 }
 
 /**
- * qbman_swp_interrupt_clear_status()
+ * qbman_swp_interrupt_clear_status() - Clear interrupt status for swp
  * @p: the given software portal
  * @mask: The mask to clear in SWP_ISR register
  */
@@ -398,7 +398,7 @@ void qbman_swp_interrupt_clear_status(struct qbman_swp *p, u32 mask)
  * qbman_swp_interrupt_get_trigger() - read interrupt enable register
  * @p: the given software portal
  *
- * Return the value in the SWP_IER register.
+ * Return: the value in the SWP_IER register.
  */
 u32 qbman_swp_interrupt_get_trigger(struct qbman_swp *p)
 {
@@ -419,7 +419,7 @@ void qbman_swp_interrupt_set_trigger(struct qbman_swp *p, u32 mask)
  * qbman_swp_interrupt_get_inhibit() - read interrupt mask register
  * @p: the given software portal object
  *
- * Return the value in the SWP_IIR register.
+ * Return: the value in the SWP_IIR register.
  */
 int qbman_swp_interrupt_get_inhibit(struct qbman_swp *p)
 {
@@ -442,7 +442,7 @@ void qbman_swp_interrupt_set_inhibit(struct qbman_swp *p, int inhibit)
  */
 
 /*
- * Returns a pointer to where the caller should fill in their management command
+ * Return: a pointer to where the caller should fill in their management command
  * (caller should ignore the verb byte)
  */
 void *qbman_swp_mc_start(struct qbman_swp *p)
@@ -587,7 +587,7 @@ void qbman_eq_desc_set_qd(struct qbman_eq_desc *d, u32 qdid,
  * Please note that 'fd' should only be NULL if the "action" of the
  * descriptor is "orp_hole" or "orp_nesn".
  *
- * Return 0 for successful enqueue, -EBUSY if the EQCR is not ready.
+ * Return: 0 for successful enqueue, -EBUSY if the EQCR is not ready.
  */
 static
 int qbman_swp_enqueue_direct(struct qbman_swp *s,
@@ -613,7 +613,7 @@ int qbman_swp_enqueue_direct(struct qbman_swp *s,
  * Please note that 'fd' should only be NULL if the "action" of the
  * descriptor is "orp_hole" or "orp_nesn".
  *
- * Return 0 for successful enqueue, -EBUSY if the EQCR is not ready.
+ * Return: 0 for successful enqueue, -EBUSY if the EQCR is not ready.
  */
 static
 int qbman_swp_enqueue_mem_back(struct qbman_swp *s,
@@ -639,7 +639,7 @@ int qbman_swp_enqueue_mem_back(struct qbman_swp *s,
  * @flags: table pointer of QBMAN_ENQUEUE_FLAG_DCA flags, not used if NULL
  * @num_frames: number of fd to be enqueued
  *
- * Return the number of fd enqueued, or a negative error number.
+ * Return: the number of fd enqueued, or a negative error number.
  */
 static
 int qbman_swp_enqueue_multiple_direct(struct qbman_swp *s,
@@ -722,7 +722,7 @@ int qbman_swp_enqueue_multiple_direct(struct qbman_swp *s,
  * @flags: table pointer of QBMAN_ENQUEUE_FLAG_DCA flags, not used if NULL
  * @num_frames: number of fd to be enqueued
  *
- * Return the number of fd enqueued, or a negative error number.
+ * Return: the number of fd enqueued, or a negative error number.
  */
 static
 int qbman_swp_enqueue_multiple_mem_back(struct qbman_swp *s,
@@ -803,7 +803,7 @@ int qbman_swp_enqueue_multiple_mem_back(struct qbman_swp *s,
  * @fd: table pointer of frame descriptor table to be enqueued
  * @num_frames: number of fd to be enqueued
  *
- * Return the number of fd enqueued, or a negative error number.
+ * Return: the number of fd enqueued, or a negative error number.
  */
 static
 int qbman_swp_enqueue_multiple_desc_direct(struct qbman_swp *s,
@@ -873,7 +873,7 @@ int qbman_swp_enqueue_multiple_desc_direct(struct qbman_swp *s,
  * @fd: table pointer of frame descriptor table to be enqueued
  * @num_frames: number of fd to be enqueued
  *
- * Return the number of fd enqueued, or a negative error number.
+ * Return: the number of fd enqueued, or a negative error number.
  */
 static
 int qbman_swp_enqueue_multiple_desc_mem_back(struct qbman_swp *s,
@@ -1096,7 +1096,7 @@ void qbman_pull_desc_set_channel(struct qbman_pull_desc *d, u32 chid,
  * @d: the software portal descriptor which has been configured with
  *     the set of qbman_pull_desc_set_*() calls
  *
- * Return 0 for success, and -EBUSY if the software portal is not ready
+ * Return: 0 for success, and -EBUSY if the software portal is not ready
  * to do pull dequeue.
  */
 static
@@ -1132,7 +1132,7 @@ int qbman_swp_pull_direct(struct qbman_swp *s, struct qbman_pull_desc *d)
  * @d: the software portal descriptor which has been configured with
  *     the set of qbman_pull_desc_set_*() calls
  *
- * Return 0 for success, and -EBUSY if the software portal is not ready
+ * Return: 0 for success, and -EBUSY if the software portal is not ready
  * to do pull dequeue.
  */
 static
@@ -1170,7 +1170,7 @@ int qbman_swp_pull_mem_back(struct qbman_swp *s, struct qbman_pull_desc *d)
  * qbman_swp_dqrr_next_direct() - Get an valid DQRR entry
  * @s: the software portal object
  *
- * Return NULL if there are no unconsumed DQRR entries. Return a DQRR entry
+ * Return: NULL if there are no unconsumed DQRR entries. Return a DQRR entry
  * only once, so repeated calls can return a sequence of DQRR entries, without
  * requiring they be consumed immediately or in any particular order.
  */
@@ -1262,7 +1262,7 @@ const struct dpaa2_dq *qbman_swp_dqrr_next_direct(struct qbman_swp *s)
  * qbman_swp_dqrr_next_mem_back() - Get an valid DQRR entry
  * @s: the software portal object
  *
- * Return NULL if there are no unconsumed DQRR entries. Return a DQRR entry
+ * Return: NULL if there are no unconsumed DQRR entries. Return a DQRR entry
  * only once, so repeated calls can return a sequence of DQRR entries, without
  * requiring they be consumed immediately or in any particular order.
  */
@@ -1367,7 +1367,7 @@ void qbman_swp_dqrr_consume(struct qbman_swp *s, const struct dpaa2_dq *dq)
  * @s: the software portal object
  * @dq: the dequeue result read from the memory
  *
- * Return 1 for getting a valid dequeue result, or 0 for not getting a valid
+ * Return: 1 for getting a valid dequeue result, or 0 for not getting a valid
  * dequeue result.
  *
  * Only used for user-provided storage of dequeue results, not DQRR. For
@@ -1449,7 +1449,7 @@ void qbman_release_desc_set_rcdi(struct qbman_release_desc *d, int enable)
  * @buffers:     a pointer pointing to the buffer address to be released
  * @num_buffers: number of buffers to be released,  must be less than 8
  *
- * Return 0 for success, -EBUSY if the release command ring is not ready.
+ * Return: 0 for success, -EBUSY if the release command ring is not ready.
  */
 int qbman_swp_release_direct(struct qbman_swp *s,
 			     const struct qbman_release_desc *d,
@@ -1491,7 +1491,7 @@ int qbman_swp_release_direct(struct qbman_swp *s,
  * @buffers:     a pointer pointing to the buffer address to be released
  * @num_buffers: number of buffers to be released,  must be less than 8
  *
- * Return 0 for success, -EBUSY if the release command ring is not ready.
+ * Return: 0 for success, -EBUSY if the release command ring is not ready.
  */
 int qbman_swp_release_mem_back(struct qbman_swp *s,
 			       const struct qbman_release_desc *d,
@@ -1548,7 +1548,7 @@ struct qbman_acquire_rslt {
  * @buffers:     a pointer pointing to the acquired buffer addresses
  * @num_buffers: number of buffers to be acquired, must be less than 8
  *
- * Return 0 for success, or negative error code if the acquire command
+ * Return: 0 for success, or negative error code if the acquire command
  * fails.
  */
 int qbman_swp_acquire(struct qbman_swp *s, u16 bpid, u64 *buffers,
@@ -1808,7 +1808,7 @@ u32 qbman_bp_info_num_free_bufs(struct qbman_bp_query_rslt *a)
  * @irq_threshold: interrupt threshold
  * @irq_holdoff: interrupt holdoff (timeout) period in us
  *
- * Return 0 for success, or negative error code on error.
+ * Return: 0 for success, or negative error code on error.
  */
 int qbman_swp_set_irq_coalescing(struct qbman_swp *p, u32 irq_threshold,
 				 u32 irq_holdoff)

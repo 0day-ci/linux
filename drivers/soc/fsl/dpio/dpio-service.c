@@ -96,7 +96,7 @@ static inline struct dpaa2_io *service_select(struct dpaa2_io *d)
  * dpaa2_io_service_select() - return a dpaa2_io service affined to this cpu
  * @cpu: the cpu id
  *
- * Return the affine dpaa2_io service, or NULL if there is no service affined
+ * Return: the affine dpaa2_io service, or NULL if there is no service affined
  * to the specified cpu. If DPAA2_IO_ANY_CPU is used, return the next available
  * service.
  */
@@ -128,7 +128,7 @@ static void dpaa2_io_dim_work(struct work_struct *w)
  * Activates a "struct dpaa2_io" corresponding to the given config of an actual
  * DPIO object.
  *
- * Return a valid dpaa2_io object for success, or NULL for failure.
+ * Return: a valid dpaa2_io object for success, or NULL for failure.
  */
 struct dpaa2_io *dpaa2_io_create(const struct dpaa2_io_desc *desc,
 				 struct device *dev)
@@ -220,7 +220,7 @@ void dpaa2_io_down(struct dpaa2_io *d)
  *
  * @obj: the given DPIO object.
  *
- * Return IRQ_HANDLED for success or IRQ_NONE if there
+ * Return: IRQ_HANDLED for success or IRQ_NONE if there
  * were no pending interrupts.
  */
 irqreturn_t dpaa2_io_irq(struct dpaa2_io *obj)
@@ -266,7 +266,7 @@ done:
  *
  * @d: the given DPIO object.
  *
- * Return the cpu associated with the DPIO object
+ * Return: the cpu associated with the DPIO object
  */
 int dpaa2_io_get_cpu(struct dpaa2_io *d)
 {
@@ -291,7 +291,7 @@ EXPORT_SYMBOL(dpaa2_io_get_cpu);
  *        in order for the object to be configured to produce the right
  *        notification fields to the DPIO service.
  *
- * Return 0 for success, or -ENODEV for failure.
+ * Return: 0 for success, or -ENODEV for failure.
  */
 int dpaa2_io_service_register(struct dpaa2_io *d,
 			      struct dpaa2_io_notification_ctx *ctx,
@@ -361,7 +361,7 @@ EXPORT_SYMBOL_GPL(dpaa2_io_service_deregister);
  * that source to allow it to produce another FQDAN/CDAN, that's what this
  * function achieves.
  *
- * Return 0 for success.
+ * Return: 0 for success.
  */
 int dpaa2_io_service_rearm(struct dpaa2_io *d,
 			   struct dpaa2_io_notification_ctx *ctx)
@@ -390,7 +390,7 @@ EXPORT_SYMBOL_GPL(dpaa2_io_service_rearm);
  * @fqid: the given frame queue id.
  * @s: the dpaa2_io_store object for the result.
  *
- * Return 0 for success, or error code for failure.
+ * Return: 0 for success, or error code for failure.
  */
 int dpaa2_io_service_pull_fq(struct dpaa2_io *d, u32 fqid,
 			     struct dpaa2_io_store *s)
@@ -421,7 +421,7 @@ EXPORT_SYMBOL(dpaa2_io_service_pull_fq);
  * @channelid: the given channel id.
  * @s: the dpaa2_io_store object for the result.
  *
- * Return 0 for success, or error code for failure.
+ * Return: 0 for success, or error code for failure.
  */
 int dpaa2_io_service_pull_channel(struct dpaa2_io *d, u32 channelid,
 				  struct dpaa2_io_store *s)
@@ -453,7 +453,7 @@ EXPORT_SYMBOL_GPL(dpaa2_io_service_pull_channel);
  * @fqid: the given frame queue id.
  * @fd: the frame descriptor which is enqueued.
  *
- * Return 0 for successful enqueue, -EBUSY if the enqueue ring is not ready,
+ * Return: 0 for successful enqueue, -EBUSY if the enqueue ring is not ready,
  * or -ENODEV if there is no dpio service.
  */
 int dpaa2_io_service_enqueue_fq(struct dpaa2_io *d,
@@ -482,7 +482,7 @@ EXPORT_SYMBOL(dpaa2_io_service_enqueue_fq);
  * @fd: the frame descriptor which is enqueued.
  * @nb: number of frames to be enqueud
  *
- * Return 0 for successful enqueue, -EBUSY if the enqueue ring is not ready,
+ * Return: 0 for successful enqueue, -EBUSY if the enqueue ring is not ready,
  * or -ENODEV if there is no dpio service.
  */
 int dpaa2_io_service_enqueue_multiple_fq(struct dpaa2_io *d,
@@ -512,7 +512,7 @@ EXPORT_SYMBOL(dpaa2_io_service_enqueue_multiple_fq);
  * @fd: the frame descriptor which is enqueued.
  * @nb: number of frames to be enqueud
  *
- * Return 0 for successful enqueue, -EBUSY if the enqueue ring is not ready,
+ * Return: 0 for successful enqueue, -EBUSY if the enqueue ring is not ready,
  * or -ENODEV if there is no dpio service.
  */
 int dpaa2_io_service_enqueue_multiple_desc_fq(struct dpaa2_io *d,
@@ -554,7 +554,7 @@ EXPORT_SYMBOL(dpaa2_io_service_enqueue_multiple_desc_fq);
  * @qdbin: the given queuing destination bin.
  * @fd: the frame descriptor which is enqueued.
  *
- * Return 0 for successful enqueue, or -EBUSY if the enqueue ring is not ready,
+ * Return: 0 for successful enqueue, or -EBUSY if the enqueue ring is not ready,
  * or -ENODEV if there is no dpio service.
  */
 int dpaa2_io_service_enqueue_qd(struct dpaa2_io *d,
@@ -582,7 +582,7 @@ EXPORT_SYMBOL_GPL(dpaa2_io_service_enqueue_qd);
  * @buffers: the buffers to be released.
  * @num_buffers: the number of the buffers to be released.
  *
- * Return 0 for success, and negative error code for failure.
+ * Return: 0 for success, and negative error code for failure.
  */
 int dpaa2_io_service_release(struct dpaa2_io *d,
 			     u16 bpid,
@@ -609,7 +609,7 @@ EXPORT_SYMBOL_GPL(dpaa2_io_service_release);
  * @buffers: the buffer addresses for acquired buffers.
  * @num_buffers: the expected number of the buffers to acquire.
  *
- * Return a negative error code if the command failed, otherwise it returns
+ * Return: a negative error code if the command failed, otherwise it returns
  * the number of buffers acquired, which may be less than the number requested.
  * Eg. if the buffer pool is empty, this will return zero.
  */
@@ -646,7 +646,7 @@ EXPORT_SYMBOL_GPL(dpaa2_io_service_acquire);
  * The size of the storage is "max_frames*sizeof(struct dpaa2_dq)".
  * The 'dpaa2_io_store' returned is a DPIO service managed object.
  *
- * Return pointer to dpaa2_io_store struct for successfully created storage
+ * Return: pointer to dpaa2_io_store struct for successfully created storage
  * memory, or NULL on error.
  */
 struct dpaa2_io_store *dpaa2_io_store_create(unsigned int max_frames,
@@ -716,7 +716,7 @@ EXPORT_SYMBOL_GPL(dpaa2_io_store_destroy);
  * the caller to always check for this. As such, "is_last" can be used to
  * differentiate between "end-of-empty-dequeue" and "still-waiting".
  *
- * Return dequeue result for a valid dequeue result, or NULL for empty dequeue.
+ * Return: dequeue result for a valid dequeue result, or NULL for empty dequeue.
  */
 struct dpaa2_dq *dpaa2_io_store_next(struct dpaa2_io_store *s, int *is_last)
 {
@@ -760,7 +760,7 @@ EXPORT_SYMBOL_GPL(dpaa2_io_store_next);
  * Knowing the FQ count at run-time can be useful in debugging situations.
  * The instantaneous frame- and byte-count are hereby returned.
  *
- * Return 0 for a successful query, and negative error code if query fails.
+ * Return: 0 for a successful query, and negative error code if query fails.
  */
 int dpaa2_io_query_fq_count(struct dpaa2_io *d, u32 fqid,
 			    u32 *fcnt, u32 *bcnt)
@@ -794,7 +794,7 @@ EXPORT_SYMBOL_GPL(dpaa2_io_query_fq_count);
  * @bpid: the index of buffer pool to be queried.
  * @num: the queried number of buffers in the buffer pool.
  *
- * Return 0 for a successful query, and negative error code if query fails.
+ * Return: 0 for a successful query, and negative error code if query fails.
  */
 int dpaa2_io_query_bp_count(struct dpaa2_io *d, u16 bpid, u32 *num)
 {
@@ -823,7 +823,7 @@ EXPORT_SYMBOL_GPL(dpaa2_io_query_bp_count);
  * @d: the given DPIO object
  * @irq_holdoff: interrupt holdoff (timeout) period in us
  *
- * Return 0 for success, or negative error code on error.
+ * Return: 0 for success, or negative error code on error.
  */
 int dpaa2_io_set_irq_coalescing(struct dpaa2_io *d, u32 irq_holdoff)
 {
@@ -863,7 +863,7 @@ EXPORT_SYMBOL(dpaa2_io_set_adaptive_coalescing);
  * dpaa2_io_get_adaptive_coalescing() - Query adaptive coalescing state
  * @d: the given DPIO object
  *
- * Return 1 when adaptive coalescing is enabled on the DPIO object and 0
+ * Return: 1 when adaptive coalescing is enabled on the DPIO object and 0
  * otherwise.
  */
 int dpaa2_io_get_adaptive_coalescing(struct dpaa2_io *d)
