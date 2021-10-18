@@ -1,0 +1,93 @@
+# SPDX-License-Identifier: (GPL-2.0+ OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/reset/gpio-reset.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Generic GPIO reset driver
+
+maintainers:
+  - Sean Anderson <seanga2@gmail.com>
+
+description: |
+  This is a generic GPIO reset driver which can provide a reset-controller
+  interface for GPIO-based reset lines. This driver always operates with
+  logical GPIO values; to invert the polarity, specify GPIO_ACTIVE_LOW in the
+  GPIO's flags.
+
+properties:
+  compatible:
+    const: gpio-reset
+
+  '#reset-cells':
+    const: 1
+
+  reset-gpios:
+    description: |
+      GPIOs to assert when asserting a reset. There is a one-to-one mapping
+      between the reset specifier and the index of the GPIO in this list to
+      assert.
+
+  done-gpios:
+    description: |
+      GPIOs which indicate that the device controlled by the GPIO has exited
+      reset. There must be one done GPIO for each reset GPIO, or no done GPIOs
+      at all. The driver will wait for up to done-timeout-us for the
+      corresponding done GPIO to assert before returning.
+
+  pre-assert-us:
+    default: 0
+    description: |
+      Microseconds to delay between when the reset was requested to be
+      asserted, and asserting the reset GPIO
+
+  post-assert-us:
+    default: 0
+    description: |
+      Microseconds to delay after asserting the reset GPIO and before returning
+      to the caller.
+
+  pre-deassert-us:
+    default: 0
+    description: |
+      Microseconds to delay between when the reset was requested to be
+      deasserted, and asserting the reset GPIO
+
+  post-deassert-us:
+    default: 0
+    description: |
+      Microseconds to delay after deasserting the reset GPIO and before
+      returning to the caller. This delay is always present, even if the done
+      GPIO goes high earlier.
+
+  done-timeout-us:
+    default: 1000
+    description:
+      Microseconds to wait for the done GPIO to assert after deasserting the
+      reset GPIO. If post-deassert-us is present, this property defaults to 10
+      times that delay. The timeout starts after waiting for the post deassert
+      delay.
+
+required:
+  - '#reset-cells'
+  - compatible
+  - reset-gpios
+
+additionalProperties: false
+
+examples:
+  - |
+    #include <dt-bindings/gpio/gpio.h>
+    pcs_reset: reset-pcs {
+        #reset-cells = <1>;
+        compatible = "gpio-reset";
+        reset-gpios = <&gpio 0 GPIO_ACTIVE_LOW>,
+                      <&gpio 1 GPIO_ACTIVE_LOW>,
+                      <&gpio 2 GPIO_ACTIVE_LOW>,
+                      <&gpio 3 GPIO_ACTIVE_LOW>;
+        done-gpios = <&gpio 4 GPIO_ACTIVE_HIGH>,
+                     <&gpio 5 GPIO_ACTIVE_HIGH>,
+                     <&gpio 6 GPIO_ACTIVE_HIGH>,
+                     <&gpio 7 GPIO_ACTIVE_HIGH>;
+        post-deassert-us = <100>;
+    };
