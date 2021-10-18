@@ -5439,6 +5439,7 @@ static int ext4_mb_release_context(struct ext4_allocation_context *ac)
 		}
 
 		ext4_mb_put_pa(ac, ac->ac_sb, pa);
+		ext4_mb_pa_free(ac);
 	}
 	if (ac->ac_bitmap_page)
 		put_page(ac->ac_bitmap_page);
