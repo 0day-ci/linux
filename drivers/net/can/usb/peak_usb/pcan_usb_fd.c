@@ -50,8 +50,6 @@ struct __packed pcan_ufd_fw_info {
 struct pcan_usb_fd_if {
 	struct peak_usb_device	*dev[PCAN_USB_MAX_CHANNEL];
 	struct pcan_ufd_fw_info	fw_info;
-	struct peak_time_ref	time_ref;
-	int			cm_ignore_count;
 	int			dev_opened_count;
 };
 
@@ -642,19 +640,6 @@ static int pcan_usb_fd_decode_overrun(struct pcan_usb_fd_if *usb_if,
 	return 0;
 }
 
-/* handle USB calibration message */
-static void pcan_usb_fd_decode_ts(struct pcan_usb_fd_if *usb_if,
-				  struct pucan_msg *rx_msg)
-{
-	struct pcan_ufd_ts_msg *ts = (struct pcan_ufd_ts_msg *)rx_msg;
-
-	/* should wait until clock is stabilized */
-	if (usb_if->cm_ignore_count > 0)
-		usb_if->cm_ignore_count--;
-	else
-		peak_usb_set_ts_now(&usb_if->time_ref, le32_to_cpu(ts->ts_low));
-}
-
 /* callback for bulk IN urb */
 static int pcan_usb_fd_decode_buf(struct peak_usb_device *dev, struct urb *urb)
 {
@@ -695,7 +680,6 @@ static int pcan_usb_fd_decode_buf(struct peak_usb_device *dev, struct urb *urb)
 			break;
 
 		case PCAN_UFD_MSG_CALIBRATION:
-			pcan_usb_fd_decode_ts(usb_if, rx_msg);
 			break;
 
 		case PUCAN_MSG_ERROR:
@@ -811,10 +795,6 @@ static int pcan_usb_fd_start(struct peak_usb_device *dev)
 
 	/* opening first device: */
 	if (pdev->usb_if->dev_opened_count == 0) {
-		/* reset time_ref */
-		peak_usb_init_time_ref(&pdev->usb_if->time_ref,
-				       &pcan_usb_pro_fd);
-
 		/* enable USB calibration messages */
 		err = pcan_usb_fd_set_options(dev, 1,
 					      PUCAN_OPTION_ERROR,
@@ -879,9 +859,6 @@ static int pcan_usb_fd_init(struct peak_usb_device *dev)
 						GFP_KERNEL);
 		if (!pdev->cmd_buffer_addr)
 			goto err_out_1;
-
-		/* number of ts msgs to ignore before taking one into account */
-		pdev->usb_if->cm_ignore_count = 5;
 
 		err = pcan_usb_pro_send_req(dev, PCAN_USBPRO_REQ_INFO,
 					    PCAN_USBPRO_INFO_FW,
