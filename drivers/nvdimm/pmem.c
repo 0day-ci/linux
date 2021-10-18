@@ -399,6 +399,7 @@ static void pmem_release_disk(void *__pmem)
 {
 	struct pmem_device *pmem = __pmem;
 
+	dax_remove_host(pmem->disk);
 	kill_dax(pmem->dax_dev);
 	put_dax(pmem->dax_dev);
 	del_gendisk(pmem->disk);
@@ -524,10 +525,11 @@ static int pmem_attach_disk(struct device *dev,
 
 	if (is_nvdimm_sync(nd_region))
 		flags = DAXDEV_F_SYNC;
-	dax_dev = alloc_dax(pmem, disk->disk_name, &pmem_dax_ops, flags);
-	if (IS_ERR(dax_dev)) {
+	dax_dev = alloc_dax(pmem, &pmem_dax_ops, flags);
+	if (IS_ERR(dax_dev))
 		return PTR_ERR(dax_dev);
-	}
+	if (dax_add_host(dax_dev, disk))
+		return -ENOMEM;
 	dax_write_cache(dax_dev, nvdimm_has_cache(nd_region));
 	pmem->dax_dev = dax_dev;
 
