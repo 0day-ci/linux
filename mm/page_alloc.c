@@ -8097,6 +8097,8 @@ EXPORT_SYMBOL(adjust_managed_page_count);
 
 unsigned long free_reserved_area(void *start, void *end, int poison, const char *s)
 {
+	const phys_addr_t pstart = __pa(start);
+	const phys_addr_t pend = __pa(end);
 	void *pos;
 	unsigned long pages = 0;
 
@@ -8125,9 +8127,12 @@ unsigned long free_reserved_area(void *start, void *end, int poison, const char 
 		free_reserved_page(page);
 	}
 
-	if (pages && s)
+	if (pages && s) {
 		pr_info("Freeing %s memory: %ldK\n",
 			s, pages << (PAGE_SHIFT - 10));
+		pr_debug("[%pa-%pa] %pS\n", &pstart, &pend,
+			(void *)_RET_IP_);
+	}
 
 	return pages;
 }
