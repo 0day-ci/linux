@@ -1076,7 +1076,7 @@ void rpc_task_set_transport(struct rpc_task *task, struct rpc_clnt *clnt)
 static
 void rpc_task_set_client(struct rpc_task *task, struct rpc_clnt *clnt)
 {
-
+	BUG_ON(clnt == NULL && task->tk_client == NULL);
 	if (clnt != NULL) {
 		rpc_task_set_transport(task, clnt);
 		task->tk_client = clnt;
