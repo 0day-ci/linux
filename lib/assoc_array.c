@@ -94,7 +94,6 @@ finished_node:
 
 	if (assoc_array_ptr_is_shortcut(parent)) {
 		shortcut = assoc_array_ptr_to_shortcut(parent);
-		cursor = parent;
 		parent = READ_ONCE(shortcut->back_pointer); /* Address dependency. */
 		slot = shortcut->parent_slot;
 		if (parent == stop)
@@ -406,7 +405,6 @@ continue_node:
 	if (assoc_array_ptr_is_shortcut(parent)) {
 		shortcut = assoc_array_ptr_to_shortcut(parent);
 		BUG_ON(shortcut->next_node != cursor);
-		cursor = parent;
 		parent = shortcut->back_pointer;
 		slot = shortcut->parent_slot;
 		pr_devel("free shortcut\n");
