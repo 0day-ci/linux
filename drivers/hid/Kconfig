@@ -757,6 +757,13 @@ config NINTENDO_FF
 	controller. For the pro controller, both rumble motors can be controlled
 	individually.
 
+config HID_NINTENDO_WIIU
+	tristate "Nintendo Wii U gamepad (DRC) over internal DRH"
+	depends on HID_NINTENDO
+	help
+	  Support for the Wii U gamepad, when connected with the Wii U’s
+	  internal DRH chip.
+
 config HID_NINTENDO_SWITCH
 	tristate "Nintendo Wii U gamepad (DRC) over internal DRH"
 	depends on HID_NINTENDO

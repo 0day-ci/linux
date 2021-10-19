@@ -18,6 +18,10 @@ static int nintendo_hid_event(struct hid_device *hdev,
 {
 	enum nintendo_driver *driver = hid_get_drvdata(hdev);
 
+#ifdef CONFIG_HID_NINTENDO_WIIU
+	if (*driver == NINTENDO_WIIU)
+		return wiiu_hid_event(hdev, report, raw_data, size);
+#endif
 #ifdef CONFIG_HID_NINTENDO_SWITCH
 	if (*driver == NINTENDO_SWITCH)
 		return switch_hid_event(hdev, report, raw_data, size);
@@ -30,10 +34,14 @@ static int nintendo_hid_probe(struct hid_device *hdev,
 {
 	int ret;
 
-#ifdef CONFIG_HID_NINTENDO_SWITCH
-	ret = switch_hid_probe(hdev, id);
+#ifdef CONFIG_HID_NINTENDO_WIIU
+	if (id->product == USB_DEVICE_ID_NINTENDO_WIIU_DRH)
+		ret = wiiu_hid_probe(hdev, id);
 #endif
-
+#ifdef CONFIG_HID_NINTENDO_SWITCH
+	if (id->product != USB_DEVICE_ID_NINTENDO_WIIU_DRH)
+		ret = switch_hid_probe(hdev, id);
+#endif
 	return ret;
 }
 
@@ -48,6 +56,11 @@ static void nintendo_hid_remove(struct hid_device *hdev)
 }
 
 static const struct hid_device_id nintendo_hid_devices[] = {
+#ifdef CONFIG_HID_NINTENDO_WIIU
+	{ HID_USB_DEVICE(USB_VENDOR_ID_NINTENDO,
+			 USB_DEVICE_ID_NINTENDO_WIIU_DRH) },
+#endif
+
 #ifdef CONFIG_HID_NINTENDO_SWITCH
 	{ HID_USB_DEVICE(USB_VENDOR_ID_NINTENDO,
 			 USB_DEVICE_ID_NINTENDO_PROCON) },

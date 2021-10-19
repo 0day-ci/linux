@@ -6,8 +6,14 @@
 /* Every HID drvdata supported by this driver MUST start with this
  * enum, so that dispatch can work properly. */
 enum nintendo_driver {
+	NINTENDO_WIIU,
 	NINTENDO_SWITCH,
 };
+
+int wiiu_hid_event(struct hid_device *hdev, struct hid_report *report,
+		   u8 *data, int len);
+int wiiu_hid_probe(struct hid_device *hdev,
+		   const struct hid_device_id *id);
 
 int switch_hid_event(struct hid_device *hdev,
 		     struct hid_report *report, u8 *raw_data, int size);

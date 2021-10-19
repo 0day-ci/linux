@@ -79,6 +79,7 @@ obj-$(CONFIG_HID_MICROSOFT)	+= hid-microsoft.o
 obj-$(CONFIG_HID_MONTEREY)	+= hid-monterey.o
 obj-$(CONFIG_HID_MULTITOUCH)	+= hid-multitouch.o
 obj-$(CONFIG_HID_NINTENDO)	+= hid-nintendo.o
+obj-$(CONFIG_HID_NINTENDO_WIIU)	+= hid-nintendo-wiiu.o
 obj-$(CONFIG_HID_NINTENDO_SWITCH)	+= hid-nintendo-switch.o
 obj-$(CONFIG_HID_NTI)			+= hid-nti.o
 obj-$(CONFIG_HID_NTRIG)		+= hid-ntrig.o
