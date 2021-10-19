@@ -8,12 +8,10 @@
 
 #include <sound/soc.h>
 #include <sound/soc-dapm.h>
-#include <linux/module.h>
-#include <linux/io.h>
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
-
 #include <sound/jack.h>
+
 #include <linux/clk.h>
 #include <linux/gpio.h>
 #include <linux/gpio/consumer.h>
