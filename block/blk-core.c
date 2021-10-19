@@ -776,6 +776,7 @@ static noinline_for_stack bool submit_bio_checks(struct bio *bio)
 	struct request_queue *q = bdev_get_queue(bdev);
 	blk_status_t status = BLK_STS_IOERR;
 	struct blk_plug *plug;
+	unsigned op;
 
 	might_sleep();
 
@@ -817,41 +818,44 @@ static noinline_for_stack bool submit_bio_checks(struct bio *bio)
 	if (!test_bit(QUEUE_FLAG_POLL, &q->queue_flags))
 		bio_clear_polled(bio);
 
-	switch (bio_op(bio)) {
-	case REQ_OP_DISCARD:
-		if (!blk_queue_discard(q))
-			goto not_supported;
-		break;
-	case REQ_OP_SECURE_ERASE:
-		if (!blk_queue_secure_erase(q))
-			goto not_supported;
-		break;
-	case REQ_OP_WRITE_SAME:
-		if (!q->limits.max_write_same_sectors)
-			goto not_supported;
-		break;
-	case REQ_OP_ZONE_APPEND:
-		status = blk_check_zone_append(q, bio);
-		if (status != BLK_STS_OK)
-			goto end_io;
-		break;
-	case REQ_OP_ZONE_RESET:
-	case REQ_OP_ZONE_OPEN:
-	case REQ_OP_ZONE_CLOSE:
-	case REQ_OP_ZONE_FINISH:
-		if (!blk_queue_is_zoned(q))
-			goto not_supported;
-		break;
-	case REQ_OP_ZONE_RESET_ALL:
-		if (!blk_queue_is_zoned(q) || !blk_queue_zone_resetall(q))
-			goto not_supported;
-		break;
-	case REQ_OP_WRITE_ZEROES:
-		if (!q->limits.max_write_zeroes_sectors)
-			goto not_supported;
-		break;
-	default:
-		break;
+	op = bio_op(bio);
+	if (op != REQ_OP_READ && op != REQ_OP_WRITE && op != REQ_OP_FLUSH) {
+		switch (op) {
+		case REQ_OP_DISCARD:
+			if (!blk_queue_discard(q))
+				goto not_supported;
+			break;
+		case REQ_OP_SECURE_ERASE:
+			if (!blk_queue_secure_erase(q))
+				goto not_supported;
+			break;
+		case REQ_OP_WRITE_SAME:
+			if (!q->limits.max_write_same_sectors)
+				goto not_supported;
+			break;
+		case REQ_OP_ZONE_APPEND:
+			status = blk_check_zone_append(q, bio);
+			if (status != BLK_STS_OK)
+				goto end_io;
+			break;
+		case REQ_OP_ZONE_RESET:
+		case REQ_OP_ZONE_OPEN:
+		case REQ_OP_ZONE_CLOSE:
+		case REQ_OP_ZONE_FINISH:
+			if (!blk_queue_is_zoned(q))
+				goto not_supported;
+			break;
+		case REQ_OP_ZONE_RESET_ALL:
+			if (!blk_queue_is_zoned(q) || !blk_queue_zone_resetall(q))
+				goto not_supported;
+			break;
+		case REQ_OP_WRITE_ZEROES:
+			if (!q->limits.max_write_zeroes_sectors)
+				goto not_supported;
+			break;
+		default:
+			break;
+		}
 	}
 
 	/*
