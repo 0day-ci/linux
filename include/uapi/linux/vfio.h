@@ -622,7 +622,7 @@ struct vfio_device_migration_info {
 					      VFIO_DEVICE_STATE_RESUMING))
 
 #define VFIO_DEVICE_STATE_SET_ERROR(state) \
-	((state & ~VFIO_DEVICE_STATE_MASK) | VFIO_DEVICE_SATE_SAVING | \
+	((state & ~VFIO_DEVICE_STATE_MASK) | VFIO_DEVICE_STATE_SAVING | \
 					     VFIO_DEVICE_STATE_RESUMING)
 
 	__u32 reserved;
