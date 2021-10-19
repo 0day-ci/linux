@@ -941,23 +941,23 @@ out:
 static const struct of_device_id mtk_thermal_of_match[] = {
 	{
 		.compatible = "mediatek,mt8173-thermal",
-		.data = (void *)&mt8173_thermal_data,
+		.data = &mt8173_thermal_data,
 	},
 	{
 		.compatible = "mediatek,mt2701-thermal",
-		.data = (void *)&mt2701_thermal_data,
+		.data = &mt2701_thermal_data,
 	},
 	{
 		.compatible = "mediatek,mt2712-thermal",
-		.data = (void *)&mt2712_thermal_data,
+		.data = &mt2712_thermal_data,
 	},
 	{
 		.compatible = "mediatek,mt7622-thermal",
-		.data = (void *)&mt7622_thermal_data,
+		.data = &mt7622_thermal_data,
 	},
 	{
 		.compatible = "mediatek,mt8183-thermal",
-		.data = (void *)&mt8183_thermal_data,
+		.data = &mt8183_thermal_data,
 	}, {
 	},
 };
