@@ -776,6 +776,7 @@ static const struct nla_policy nl80211_policy[NUM_NL80211_ATTR] = {
 	[NL80211_ATTR_MBSSID_CONFIG] =
 			NLA_POLICY_NESTED(nl80211_mbssid_config_policy),
 	[NL80211_ATTR_MBSSID_ELEMS] = { .type = NLA_NESTED },
+	[NL80211_ATTR_RADAR_OFFCHAN] = { .type = NLA_FLAG },
 };
 
 /* policy for the key attributes */
@@ -9279,10 +9280,12 @@ static int nl80211_start_radar_detection(struct sk_buff *skb,
 	if (err)
 		return err;
 
-	if (netif_carrier_ok(dev))
+	if (!nla_get_flag(info->attrs[NL80211_ATTR_RADAR_OFFCHAN]) &&
+	    netif_carrier_ok(dev))
 		return -EBUSY;
 
-	if (wdev->cac_started)
+	if (!nla_get_flag(info->attrs[NL80211_ATTR_RADAR_OFFCHAN]) &&
+	    wdev->cac_started)
 		return -EBUSY;
 
 	err = cfg80211_chandef_dfs_required(wiphy, &chandef, wdev->iftype);
@@ -9298,6 +9301,11 @@ static int nl80211_start_radar_detection(struct sk_buff *skb,
 	/* CAC start is offloaded to HW and can't be started manually */
 	if (wiphy_ext_feature_isset(wiphy, NL80211_EXT_FEATURE_DFS_OFFLOAD))
 		return -EOPNOTSUPP;
+
+	if (nla_get_flag(info->attrs[NL80211_ATTR_RADAR_OFFCHAN])) {
+		/* offchannel radar detection */
+		return rdev_set_radar_offchan(rdev, &chandef);
+	}
 
 	if (!rdev->ops->start_radar_detection)
 		return -EOPNOTSUPP;

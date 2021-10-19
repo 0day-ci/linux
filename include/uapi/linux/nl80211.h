@@ -2639,6 +2639,10 @@ enum nl80211_commands {
  *	Mandatory parameter for the transmitting interface to enable MBSSID.
  *	Optional for the non-transmitting interfaces.
  *
+ * @NL80211_ATTR_RADAR_OFFCHAN: Configure dedicated chain available for radar
+ *	detection on some hw. The chain can't be used to transmits or receives
+ *	frames. The driver is supposed to implement CAC management in sw or fw.
+ *
  * @NUM_NL80211_ATTR: total number of nl80211_attrs available
  * @NL80211_ATTR_MAX: highest attribute number currently defined
  * @__NL80211_ATTR_AFTER_LAST: internal use
@@ -3144,6 +3148,8 @@ enum nl80211_attrs {
 
 	NL80211_ATTR_MBSSID_CONFIG,
 	NL80211_ATTR_MBSSID_ELEMS,
+
+	NL80211_ATTR_RADAR_OFFCHAN,
 
 	/* add attributes here, update the policy in nl80211.c */
 
