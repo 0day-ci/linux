@@ -403,6 +403,28 @@ static int s3c_rtc_remove(struct platform_device *pdev)
 	return 0;
 }
 
+/* Set RTC with valid date/time values on first boot */
+static int s3c_rtc_init_time(struct s3c_rtc *info)
+{
+	struct rtc_time tm;
+	int ret;
+
+	ret = s3c_rtc_read_time(info, &tm);
+	if (ret)
+		return ret;
+
+	/* Only init RTC date/time on first boot */
+	if (tm.tm_mday > 0)
+		return 0;
+
+	/* Init date/time: 1 Jan 2000 00:00:00 */
+	memset(&tm, 0, sizeof(struct rtc_time));
+	tm.tm_mday = 1;	/* tm_mday min valid value is 1 */
+	tm.tm_mon = 1;	/* January in internal representation */
+
+	return s3c_rtc_write_time(info, &tm);
+}
+
 static int s3c_rtc_probe(struct platform_device *pdev)
 {
 	struct s3c_rtc *info = NULL;
@@ -470,6 +492,10 @@ static int s3c_rtc_probe(struct platform_device *pdev)
 		readw(info->base + S3C2410_RTCCON));
 
 	device_init_wakeup(&pdev->dev, 1);
+
+	ret = s3c_rtc_init_time(info);
+	if (ret)
+		goto err_nortc;
 
 	info->rtc = devm_rtc_allocate_device(&pdev->dev);
 	if (IS_ERR(info->rtc)) {
