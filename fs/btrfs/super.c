@@ -2552,6 +2552,8 @@ static int __init init_btrfs_fs(void)
 {
 	int err;
 
+	BUILD_BUG_ON(sizeof(struct btrfs_super_block) != BTRFS_SUPER_INFO_SIZE);
+
 	btrfs_props_init();
 
 	err = btrfs_init_sysfs();
