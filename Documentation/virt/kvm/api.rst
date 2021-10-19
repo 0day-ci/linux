@@ -5473,6 +5473,17 @@ the trailing ``'\0'``, is indicated by ``name_size`` in the header.
 The Stats Data block contains an array of 64-bit values in the same order
 as the descriptors in Descriptors block.
 
+4.134 KVM SET MMU PREFETCH
+----------------------
+
+:Capability: KVM_CAP_MMU PREFETCH
+:Architectures: x86
+:Type: vm ioctl
+:Parameters: int value (in)
+:Returns: 0 on success, error code otherwise
+
+Sets the maximum number of PTEs KVM will try to prefetch.
+
 5. The kvm_run structure
 ========================
 
@@ -7440,3 +7451,13 @@ The argument to KVM_ENABLE_CAP is also a bitmask, and must be a subset
 of the result of KVM_CHECK_EXTENSION.  KVM will forward to userspace
 the hypercalls whose corresponding bit is in the argument, and return
 ENOSYS for the others.
+
+8.35 KVM_CAP_MMU_PTE_PREFETCH
+---------------------------
+
+:Capability: KVM_CAP_MMU_PTE_PREFETCH
+:Architectures: x86
+:Parameters: args[0] - the number of PTEs to prefetch
+
+Sets the maximum number of PTEs KVM will prefetch. The value must be power
+of two and within (0, 128] range.

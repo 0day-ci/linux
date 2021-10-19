@@ -1120,6 +1120,7 @@ struct kvm_ppc_resize_hpt {
 #define KVM_CAP_BINARY_STATS_FD 203
 #define KVM_CAP_EXIT_ON_EMULATION_FAILURE 204
 #define KVM_CAP_ARM_MTE 205
+#define KVM_CAP_MMU_PTE_PREFETCH 206
 
 #ifdef KVM_CAP_IRQ_ROUTING
 
@@ -2014,5 +2015,8 @@ struct kvm_stats_desc {
 };
 
 #define KVM_GET_STATS_FD  _IO(KVMIO,  0xce)
+
+/* Set number of PTEs to prefetch */
+#define KVM_SET_MMU_PREFETCH      _IOW(KVMIO, 0xcf, __u64)
 
 #endif /* __LINUX_KVM_H */

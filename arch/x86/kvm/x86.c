@@ -4030,6 +4030,7 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
 	case KVM_CAP_VM_COPY_ENC_CONTEXT_FROM:
 	case KVM_CAP_SREGS2:
 	case KVM_CAP_EXIT_ON_EMULATION_FAILURE:
+	case KVM_CAP_MMU_PTE_PREFETCH:
 		r = 1;
 		break;
 	case KVM_CAP_EXIT_HYPERCALL:
@@ -5831,6 +5832,25 @@ int kvm_arch_pm_notifier(struct kvm *kvm, unsigned long state)
 }
 #endif /* CONFIG_HAVE_KVM_PM_NOTIFIER */
 
+static int kvm_arch_mmu_pte_prefetch(struct kvm *kvm, unsigned int num_pages)
+{
+	struct kvm_vcpu *vcpu;
+	int i, ret;
+
+	mutex_lock(&kvm->lock);
+	kvm_for_each_vcpu(i, vcpu, kvm) {
+		ret = kvm_set_pte_prefetch(vcpu, num_pages);
+		if (ret) {
+			kvm_err("Failed to set PTE prefetch on VCPU%d: %d\n",
+				vcpu->vcpu_id, ret);
+			break;
+		}
+	}
+	mutex_unlock(&kvm->lock);
+
+	return ret;
+}
+
 static int kvm_vm_ioctl_get_clock(struct kvm *kvm, void __user *argp)
 {
 	struct kvm_clock_data data;
@@ -6169,6 +6189,15 @@ set_pit2_out:
 	case KVM_X86_SET_MSR_FILTER:
 		r = kvm_vm_ioctl_set_msr_filter(kvm, argp);
 		break;
+	case KVM_SET_MMU_PREFETCH: {
+		u64 val;
+
+		r = -EFAULT;
+		if (copy_from_user(&val, argp, sizeof(val)))
+			goto out;
+		r = kvm_arch_mmu_pte_prefetch(kvm, val);
+		break;
+	}
 	default:
 		r = -ENOTTY;
 	}
