@@ -10,7 +10,7 @@
 #include <linux/clk-provider.h>
 #include <linux/platform_device.h>
 
-#include <dt-bindings/clock/mt8195-clk.h>
+
 
 static const struct mtk_gate_regs imp_iic_wrap_cg_regs = {
 	.set_ofs = 0xe08,
