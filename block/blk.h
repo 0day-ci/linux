@@ -269,14 +269,18 @@ ssize_t part_timeout_store(struct device *, struct device_attribute *,
 
 static inline bool blk_may_split(struct request_queue *q, struct bio *bio)
 {
-	switch (bio_op(bio)) {
-	case REQ_OP_DISCARD:
-	case REQ_OP_SECURE_ERASE:
-	case REQ_OP_WRITE_ZEROES:
-	case REQ_OP_WRITE_SAME:
-		return true; /* non-trivial splitting decisions */
-	default:
-		break;
+	unsigned int op = bio_op(bio);
+
+	if (op != REQ_OP_READ && op != REQ_OP_WRITE && op != REQ_OP_FLUSH) {
+		switch (op) {
+		case REQ_OP_DISCARD:
+		case REQ_OP_SECURE_ERASE:
+		case REQ_OP_WRITE_ZEROES:
+		case REQ_OP_WRITE_SAME:
+			return true; /* non-trivial splitting decisions */
+		default:
+			break;
+		}
 	}
 
 	/*
