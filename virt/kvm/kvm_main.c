@@ -3322,8 +3322,15 @@ void kvm_vcpu_kick(struct kvm_vcpu *vcpu)
 {
 	int me, cpu;
 
-	if (kvm_vcpu_wake_up(vcpu))
-		return;
+	me = get_cpu();
+
+	if (rcuwait_active(kvm_arch_vcpu_get_wait(vcpu)) && kvm_vcpu_wake_up(vcpu))
+		goto out;
+
+	if (vcpu == __this_cpu_read(kvm_running_vcpu)) {
+		WARN_ON_ONCE(vcpu->mode == IN_GUEST_MODE);
+		goto out;
+	}
 
 	/*
 	 * Note, the vCPU could get migrated to a different pCPU at any point
@@ -3332,12 +3339,12 @@ void kvm_vcpu_kick(struct kvm_vcpu *vcpu)
 	 * IPI is to force the vCPU to leave IN_GUEST_MODE, and migrating the
 	 * vCPU also requires it to leave IN_GUEST_MODE.
 	 */
-	me = get_cpu();
 	if (kvm_arch_vcpu_should_kick(vcpu)) {
 		cpu = READ_ONCE(vcpu->cpu);
 		if (cpu != me && (unsigned)cpu < nr_cpu_ids && cpu_online(cpu))
 			smp_send_reschedule(cpu);
 	}
+out:
 	put_cpu();
 }
 EXPORT_SYMBOL_GPL(kvm_vcpu_kick);
