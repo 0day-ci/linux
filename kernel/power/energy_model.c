@@ -68,6 +68,11 @@ static void em_debug_create_pd(struct device *dev)
 	struct dentry *d;
 	int i;
 
+	if (!rootdir) {
+		pr_err("EM: energy_model debug is not available yet\n");
+		return;
+	}
+
 	/* Create the directory of the performance domain */
 	d = debugfs_create_dir(dev_name(dev), rootdir);
 
