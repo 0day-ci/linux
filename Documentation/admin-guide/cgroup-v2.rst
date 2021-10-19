@@ -2260,6 +2260,13 @@ HugeTLB Interface Files
 	are local to the cgroup i.e. not hierarchical. The file modified event
 	generated on this file reflects only the local events.
 
+  hugetlb.<hugepagesize>.numa_stat
+	Similar to memory.numa_stat, it shows the numa information of the
+	memory in this cgroup:
+
+	/dev/cgroup/memory/test # cat hugetlb.2MB.numa_stat
+	total=0 N0=0 N1=0
+
 Misc
 ----
 

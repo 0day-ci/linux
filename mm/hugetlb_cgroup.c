@@ -92,6 +92,7 @@ static void hugetlb_cgroup_init(struct hugetlb_cgroup *h_cgroup,
 				struct hugetlb_cgroup *parent_h_cgroup)
 {
 	int idx;
+	int node;
 
 	for (idx = 0; idx < HUGE_MAX_HSTATE; idx++) {
 		struct page_counter *fault_parent = NULL;
@@ -124,6 +125,15 @@ static void hugetlb_cgroup_init(struct hugetlb_cgroup *h_cgroup,
 			limit);
 		VM_BUG_ON(ret);
 	}
+
+	for_each_node(node) {
+		/* Set node_to_alloc to -1 for offline nodes. */
+		int node_to_alloc =
+			node_state(node, N_NORMAL_MEMORY) ? node : -1;
+		h_cgroup->nodeinfo[node] =
+			kzalloc_node(sizeof(struct hugetlb_cgroup_per_node),
+				     GFP_KERNEL, node_to_alloc);
+	}
 }
 
 static struct cgroup_subsys_state *
@@ -132,7 +142,10 @@ hugetlb_cgroup_css_alloc(struct cgroup_subsys_state *parent_css)
 	struct hugetlb_cgroup *parent_h_cgroup = hugetlb_cgroup_from_css(parent_css);
 	struct hugetlb_cgroup *h_cgroup;
 
-	h_cgroup = kzalloc(sizeof(*h_cgroup), GFP_KERNEL);
+	unsigned int size =
+		sizeof(*h_cgroup) +
+		MAX_NUMNODES * sizeof(struct hugetlb_cgroup_per_node *);
+	h_cgroup = kzalloc(size, GFP_KERNEL);
 	if (!h_cgroup)
 		return ERR_PTR(-ENOMEM);
 
@@ -292,7 +305,9 @@ static void __hugetlb_cgroup_commit_charge(int idx, unsigned long nr_pages,
 		return;
 
 	__set_hugetlb_cgroup(page, h_cg, rsvd);
-	return;
+	if (!rsvd && h_cg)
+		h_cg->nodeinfo[page_to_nid(page)]->usage[idx] += nr_pages
+								 << PAGE_SHIFT;
 }
 
 void hugetlb_cgroup_commit_charge(int idx, unsigned long nr_pages,
@@ -331,7 +346,9 @@ static void __hugetlb_cgroup_uncharge_page(int idx, unsigned long nr_pages,
 
 	if (rsvd)
 		css_put(&h_cg->css);
-
+	else
+		h_cg->nodeinfo[page_to_nid(page)]->usage[idx] -= nr_pages
+								 << PAGE_SHIFT;
 	return;
 }
 
@@ -420,6 +437,56 @@ enum {
 	RES_FAILCNT,
 	RES_RSVD_FAILCNT,
 };
+
+static int hugetlb_cgroup_read_numa_stat(struct seq_file *seq, void *dummy)
+{
+	int nid;
+	struct cftype *cft = seq_cft(seq);
+	int idx = MEMFILE_IDX(cft->private);
+	bool legacy = MEMFILE_ATTR(cft->private);
+	struct hugetlb_cgroup *h_cg = hugetlb_cgroup_from_css(seq_css(seq));
+	struct cgroup_subsys_state *css;
+	unsigned long usage;
+
+	if (legacy) {
+		/* Add up usage across all nodes for the non-hierarchical total. */
+		usage = 0;
+		for_each_node_state(nid, N_MEMORY)
+			usage += h_cg->nodeinfo[nid]->usage[idx];
+		seq_printf(seq, "total=%lu", usage);
+
+		/* Simply print the per-node usage for the non-hierarchical total. */
+		for_each_node_state(nid, N_MEMORY)
+			seq_printf(seq, " N%d=%lu", nid,
+				   h_cg->nodeinfo[nid]->usage[idx]);
+		seq_putc(seq, '\n');
+	}
+
+	/* The hierarchical total is pretty much the value recorded by the
+	 * counter, so use that.
+	 */
+	seq_printf(seq, "%stotal=%lu", legacy ? "hierarichal_" : "",
+		   (u64)page_counter_read(&h_cg->hugepage[idx]) * PAGE_SIZE);
+
+	/* For each node, transverse the css tree to obtain the hierarichal
+	 * node usage.
+	 */
+	for_each_node_state(nid, N_MEMORY) {
+		usage = 0;
+		rcu_read_lock();
+		css_for_each_descendant_pre(css, &h_cg->css) {
+			usage += hugetlb_cgroup_from_css(css)
+					 ->nodeinfo[nid]
+					 ->usage[idx];
+		}
+		rcu_read_unlock();
+		seq_printf(seq, " N%d=%lu", nid, usage);
+	}
+
+	seq_putc(seq, '\n');
+
+	return 0;
+}
 
 static u64 hugetlb_cgroup_read_u64(struct cgroup_subsys_state *css,
 				   struct cftype *cft)
@@ -654,8 +721,14 @@ static void __init __hugetlb_cgroup_file_dfl_init(int idx)
 	cft->seq_show = hugetlb_cgroup_read_u64_max;
 	cft->flags = CFTYPE_NOT_ON_ROOT;
 
-	/* Add the events file */
+	/* Add the numa stat file */
 	cft = &h->cgroup_files_dfl[4];
+	snprintf(cft->name, MAX_CFTYPE_NAME, "%s.numa_stat", buf);
+	cft->seq_show = hugetlb_cgroup_read_numa_stat;
+	cft->flags = CFTYPE_NOT_ON_ROOT;
+
+	/* Add the events file */
+	cft = &h->cgroup_files_dfl[5];
 	snprintf(cft->name, MAX_CFTYPE_NAME, "%s.events", buf);
 	cft->private = MEMFILE_PRIVATE(idx, 0);
 	cft->seq_show = hugetlb_events_show;
@@ -663,7 +736,7 @@ static void __init __hugetlb_cgroup_file_dfl_init(int idx)
 	cft->flags = CFTYPE_NOT_ON_ROOT;
 
 	/* Add the events.local file */
-	cft = &h->cgroup_files_dfl[5];
+	cft = &h->cgroup_files_dfl[6];
 	snprintf(cft->name, MAX_CFTYPE_NAME, "%s.events.local", buf);
 	cft->private = MEMFILE_PRIVATE(idx, 0);
 	cft->seq_show = hugetlb_events_local_show;
@@ -672,7 +745,7 @@ static void __init __hugetlb_cgroup_file_dfl_init(int idx)
 	cft->flags = CFTYPE_NOT_ON_ROOT;
 
 	/* NULL terminate the last cft */
-	cft = &h->cgroup_files_dfl[6];
+	cft = &h->cgroup_files_dfl[7];
 	memset(cft, 0, sizeof(*cft));
 
 	WARN_ON(cgroup_add_dfl_cftypes(&hugetlb_cgrp_subsys,
@@ -742,8 +815,14 @@ static void __init __hugetlb_cgroup_file_legacy_init(int idx)
 	cft->write = hugetlb_cgroup_reset;
 	cft->read_u64 = hugetlb_cgroup_read_u64;
 
+	/* Add the numa stat file */
+	cft = &h->cgroup_files_dfl[8];
+	snprintf(cft->name, MAX_CFTYPE_NAME, "%s.numa_stat", buf);
+	cft->private = MEMFILE_PRIVATE(idx, 1);
+	cft->seq_show = hugetlb_cgroup_read_numa_stat;
+
 	/* NULL terminate the last cft */
-	cft = &h->cgroup_files_legacy[8];
+	cft = &h->cgroup_files_legacy[9];
 	memset(cft, 0, sizeof(*cft));
 
 	WARN_ON(cgroup_add_legacy_cftypes(&hugetlb_cgrp_subsys,
