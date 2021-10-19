@@ -29,24 +29,8 @@
 #include "amdgpu_vm.h"
 #include "amdgpu_res_cursor.h"
 #include "amdgpu_atomfirmware.h"
+#include "amdgpu_vram_mgr.h"
 #include "atom.h"
-
-struct amdgpu_vram_reservation {
-	struct list_head node;
-	struct drm_mm_node mm_node;
-};
-
-static inline struct amdgpu_vram_mgr *
-to_vram_mgr(struct ttm_resource_manager *man)
-{
-	return container_of(man, struct amdgpu_vram_mgr, manager);
-}
-
-static inline struct amdgpu_device *
-to_amdgpu_device(struct amdgpu_vram_mgr *mgr)
-{
-	return container_of(mgr, struct amdgpu_device, mman.vram_mgr);
-}
 
 /**
  * DOC: mem_info_vram_total
