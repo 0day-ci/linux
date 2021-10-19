@@ -47,13 +47,13 @@ static void afu_port_err_mask(struct device *dev, bool mask)
 }
 
 /* clear port errors. */
-static int afu_port_err_clear(struct device *dev, u64 err)
+static int afu_port_err_clear(struct device *dev, u64 err, bool clear_all)
 {
 	struct dfl_feature_platform_data *pdata = dev_get_platdata(dev);
 	struct platform_device *pdev = to_platform_device(dev);
+	u64 v, port_error, port_first_error;
 	void __iomem *base_err, *base_hdr;
 	int enable_ret = 0, ret = -EBUSY;
-	u64 v;
 
 	base_err = dfl_get_feature_ioaddr_by_id(dev, PORT_FEATURE_ID_ERROR);
 	base_hdr = dfl_get_feature_ioaddr_by_id(dev, PORT_FEATURE_ID_HEADER);
@@ -88,16 +88,21 @@ static int afu_port_err_clear(struct device *dev, u64 err)
 	__afu_port_err_mask(dev, true);
 
 	/* Clear errors if err input matches with current port errors.*/
-	v = readq(base_err + PORT_ERROR);
+	port_error = readq(base_err + PORT_ERROR);
 
-	if (v == err) {
-		writeq(v, base_err + PORT_ERROR);
+	if (clear_all || port_error == err) {
+		port_first_error = readq(base_err + PORT_FIRST_ERROR);
 
-		v = readq(base_err + PORT_FIRST_ERROR);
-		writeq(v, base_err + PORT_FIRST_ERROR);
+		if (clear_all && (port_error || port_first_error))
+			dev_warn(dev,
+				 "Port Error: 0x%llx, First Error 0x%llx\n",
+				 port_error, port_first_error);
+
+		writeq(port_error, base_err + PORT_ERROR);
+		writeq(port_first_error, base_err + PORT_FIRST_ERROR);
 	} else {
 		dev_warn(dev, "%s: received 0x%llx, expected 0x%llx\n",
-			 __func__, v, err);
+			 __func__, port_error, err);
 		ret = -EINVAL;
 	}
 
@@ -137,7 +142,7 @@ static ssize_t errors_store(struct device *dev, struct device_attribute *attr,
 	if (kstrtou64(buff, 0, &value))
 		return -EINVAL;
 
-	ret = afu_port_err_clear(dev, value);
+	ret = afu_port_err_clear(dev, value, false);
 
 	return ret ? ret : count;
 }
@@ -211,7 +216,8 @@ const struct attribute_group port_err_group = {
 static int port_err_init(struct platform_device *pdev,
 			 struct dfl_feature *feature)
 {
-	afu_port_err_mask(&pdev->dev, false);
+	if (afu_port_err_clear(&pdev->dev, 0, true))
+		afu_port_err_mask(&pdev->dev, false);
 
 	return 0;
 }
