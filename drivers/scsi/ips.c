@@ -6898,7 +6898,7 @@ ips_init_phase1(struct pci_dev *pci_dev, int *indexPtr)
 	if (ha == NULL) {
 		IPS_PRINTK(KERN_WARNING, pci_dev,
 			   "Unable to allocate temporary ha struct\n");
-		return -1;
+		return -ENOMEM;
 	}
 
 	ips_sh[index] = NULL;
