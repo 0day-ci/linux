@@ -397,7 +397,8 @@ static const struct irq_domain_ops bcm7038_l1_domain_ops = {
 };
 
 static int __init bcm7038_l1_of_init(struct device_node *dn,
-			      struct device_node *parent)
+				     struct device_node *parent,
+				     struct platform_device *pdev)
 {
 	struct bcm7038_l1_chip *intc;
 	int idx, ret;
@@ -455,4 +456,8 @@ out_free:
 	return ret;
 }
 
-IRQCHIP_DECLARE(bcm7038_l1, "brcm,bcm7038-l1-intc", bcm7038_l1_of_init);
+IRQCHIP_PLATFORM_DRIVER_BEGIN(bcm7038_l1)
+IRQCHIP_MATCH("brcm,bcm7038-l1-intc", bcm7038_l1_of_init)
+IRQCHIP_PLATFORM_DRIVER_END(bcm7038_l1)
+MODULE_DESCRIPTION("Broadcom STB 7038-style L1/L2 interrupt controller");
+MODULE_LICENSE("GPL v2");
