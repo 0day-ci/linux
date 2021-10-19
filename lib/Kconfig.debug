@@ -2606,6 +2606,25 @@ config TEST_CLOCKSOURCE_WATCHDOG
 
 	  If unsure, say N.
 
+config TEST_RBTREE_INTERFACE
+	tristate "Expose an Red-Black tree instance to userspace for testing"
+	depends on DEBUG_FS
+	help
+	  Exposes rbtree maniplation functions on debugfs. These can be used for
+	  testing the core rbtree implementation from userspace against a
+	  verified oracle (a mathematically proven correct Red-Black tree):
+	  <debugfs>/rbt_if/cmd
+		write:
+		0 = Reset rbtree (remove all nodes).
+		1 = Insert key (see other file) into rbtree.
+		2 = Delete key (see other file) from rbtree.
+		read:
+		Print tree.
+	  <debugfs>/rbt_if/key
+		Read or write the key used for cmds
+
+	  If unsure, say N.
+
 endif # RUNTIME_TESTING_MENU
 
 config ARCH_USE_MEMTEST
