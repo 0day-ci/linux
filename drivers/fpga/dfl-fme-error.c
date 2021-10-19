@@ -39,6 +39,27 @@
 
 #define ERROR_MASK		GENMASK_ULL(63, 0)
 
+struct err_reg {
+	char *name;
+	u32 err_offset;
+	u32 mask_offset;
+	u32 mask_value;
+};
+
+static struct err_reg pcie0_reg = {
+	.name = "PCIE0",
+	.err_offset = PCIE0_ERROR,
+	.mask_offset = PCIE0_ERROR_MASK,
+	.mask_value = 0ULL
+};
+
+static struct err_reg pcie1_reg = {
+	.name = "PCIE1",
+	.err_offset = PCIE1_ERROR,
+	.mask_offset = PCIE1_ERROR_MASK,
+	.mask_value = 0ULL
+};
+
 static ssize_t pcie0_errors_show(struct device *dev,
 				 struct device_attribute *attr, char *buf)
 {
@@ -55,31 +76,48 @@ static ssize_t pcie0_errors_show(struct device *dev,
 	return sprintf(buf, "0x%llx\n", (unsigned long long)value);
 }
 
-static ssize_t pcie0_errors_store(struct device *dev,
-				  struct device_attribute *attr,
-				  const char *buf, size_t count)
+static int fme_err_clear(struct device *dev, struct err_reg *reg,
+			 u64 err, bool clear_all)
 {
 	struct dfl_feature_platform_data *pdata = dev_get_platdata(dev);
 	void __iomem *base;
 	int ret = 0;
-	u64 v, val;
-
-	if (kstrtou64(buf, 0, &val))
-		return -EINVAL;
+	u64 v;
 
 	base = dfl_get_feature_ioaddr_by_id(dev, FME_FEATURE_ID_GLOBAL_ERR);
 
 	mutex_lock(&pdata->lock);
-	writeq(GENMASK_ULL(63, 0), base + PCIE0_ERROR_MASK);
+	writeq(GENMASK_ULL(63, 0), base + reg->mask_offset);
 
-	v = readq(base + PCIE0_ERROR);
-	if (val == v)
-		writeq(v, base + PCIE0_ERROR);
-	else
+	v = readq(base + reg->err_offset);
+	if (clear_all || err == v) {
+		if (clear_all && v)
+			dev_warn(dev, "%s: %s Errors: 0x%llx\n",
+				 __func__, reg->name, v);
+
+		writeq(v, base + reg->err_offset);
+	} else {
 		ret = -EINVAL;
+	}
 
-	writeq(0ULL, base + PCIE0_ERROR_MASK);
+	writeq(reg->mask_value, base + reg->mask_offset);
 	mutex_unlock(&pdata->lock);
+
+	return ret;
+}
+
+static ssize_t pcie0_errors_store(struct device *dev,
+				  struct device_attribute *attr,
+				  const char *buf, size_t count)
+{
+	u64 val;
+	int ret;
+
+	if (kstrtou64(buf, 0, &val))
+		return -EINVAL;
+
+	ret = fme_err_clear(dev, &pcie0_reg, val, false);
+
 	return ret ? ret : count;
 }
 static DEVICE_ATTR_RW(pcie0_errors);
@@ -104,27 +142,14 @@ static ssize_t pcie1_errors_store(struct device *dev,
 				  struct device_attribute *attr,
 				  const char *buf, size_t count)
 {
-	struct dfl_feature_platform_data *pdata = dev_get_platdata(dev);
-	void __iomem *base;
-	int ret = 0;
-	u64 v, val;
+	u64 val;
+	int ret;
 
 	if (kstrtou64(buf, 0, &val))
 		return -EINVAL;
 
-	base = dfl_get_feature_ioaddr_by_id(dev, FME_FEATURE_ID_GLOBAL_ERR);
+	ret = fme_err_clear(dev, &pcie1_reg, val, false);
 
-	mutex_lock(&pdata->lock);
-	writeq(GENMASK_ULL(63, 0), base + PCIE1_ERROR_MASK);
-
-	v = readq(base + PCIE1_ERROR);
-	if (val == v)
-		writeq(v, base + PCIE1_ERROR);
-	else
-		ret = -EINVAL;
-
-	writeq(0ULL, base + PCIE1_ERROR_MASK);
-	mutex_unlock(&pdata->lock);
 	return ret ? ret : count;
 }
 static DEVICE_ATTR_RW(pcie1_errors);
@@ -218,29 +243,26 @@ static ssize_t fme_errors_store(struct device *dev,
 				struct device_attribute *attr,
 				const char *buf, size_t count)
 {
-	struct dfl_feature_platform_data *pdata = dev_get_platdata(dev);
+	static struct err_reg fme_reg = {
+		.name = "FME",
+		.err_offset = FME_ERROR,
+		.mask_offset = FME_ERROR_MASK,
+		.mask_value = 0ULL
+	};
 	void __iomem *base;
-	u64 v, val;
-	int ret = 0;
+	u64 val;
+	int ret;
 
 	if (kstrtou64(buf, 0, &val))
 		return -EINVAL;
 
-	base = dfl_get_feature_ioaddr_by_id(dev, FME_FEATURE_ID_GLOBAL_ERR);
-
-	mutex_lock(&pdata->lock);
-	writeq(GENMASK_ULL(63, 0), base + FME_ERROR_MASK);
-
-	v = readq(base + FME_ERROR);
-	if (val == v)
-		writeq(v, base + FME_ERROR);
-	else
-		ret = -EINVAL;
-
 	/* Workaround: disable MBP_ERROR if feature revision is 0 */
-	writeq(dfl_feature_revision(base) ? 0ULL : MBP_ERROR,
-	       base + FME_ERROR_MASK);
-	mutex_unlock(&pdata->lock);
+	base = dfl_get_feature_ioaddr_by_id(dev, FME_FEATURE_ID_GLOBAL_ERR);
+	if (!dfl_feature_revision(base))
+		fme_reg.mask_value = MBP_ERROR;
+
+	ret = fme_err_clear(dev, &fme_reg, val, false);
+
 	return ret ? ret : count;
 }
 static DEVICE_ATTR_RW(fme_errors);
@@ -338,6 +360,24 @@ static void fme_err_mask(struct device *dev, bool mask)
 static int fme_global_err_init(struct platform_device *pdev,
 			       struct dfl_feature *feature)
 {
+	static struct err_reg fme_reg = {
+		.name = "FME",
+		.err_offset = FME_ERROR,
+		.mask_offset = FME_ERROR_MASK,
+		.mask_value = 0ULL
+	};
+	void __iomem *base;
+
+	/* Workaround: disable MBP_ERROR if feature revision is 0 */
+	base = dfl_get_feature_ioaddr_by_id(&pdev->dev,
+					    FME_FEATURE_ID_GLOBAL_ERR);
+	if (!dfl_feature_revision(base))
+		fme_reg.mask_value = MBP_ERROR;
+
+	(void)fme_err_clear(&pdev->dev, &pcie0_reg, 0ULL, true);
+	(void)fme_err_clear(&pdev->dev, &pcie1_reg, 0ULL, true);
+	(void)fme_err_clear(&pdev->dev, &fme_reg, 0ULL, true);
+
 	fme_err_mask(&pdev->dev, false);
 
 	return 0;
