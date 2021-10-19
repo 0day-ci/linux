@@ -43,6 +43,7 @@
 #include <drm/drm_managed.h>
 #include <drm/drm_mode_object.h>
 #include <drm/drm_print.h>
+#include <drm/drm_buddy.h>
 
 #include "drm_crtc_internal.h"
 #include "drm_internal.h"
@@ -1034,6 +1035,7 @@ static void drm_core_exit(void)
 	drm_sysfs_destroy();
 	idr_destroy(&drm_minors_idr);
 	drm_connector_ida_destroy();
+	drm_buddy_module_exit();
 }
 
 static int __init drm_core_init(void)
@@ -1043,6 +1045,7 @@ static int __init drm_core_init(void)
 	drm_connector_ida_init();
 	idr_init(&drm_minors_idr);
 	drm_memcpy_init_early();
+	drm_buddy_module_init();
 
 	ret = drm_sysfs_init();
 	if (ret < 0) {
