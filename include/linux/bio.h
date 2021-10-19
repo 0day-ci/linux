@@ -453,13 +453,19 @@ static inline void bio_clone_blkg_association(struct bio *dst,
 					      struct bio *src) { }
 #endif	/* CONFIG_BLK_CGROUP */
 
+/* can be used only with freshly allocated bios */
+static inline void __bio_set_dev(struct bio *bio, struct block_device *bdev)
+{
+	bio->bi_bdev = bdev;
+	bio_associate_blkg(bio);
+}
+
 static inline void bio_set_dev(struct bio *bio, struct block_device *bdev)
 {
 	bio_clear_flag(bio, BIO_REMAPPED);
 	if (bio->bi_bdev != bdev)
 		bio_clear_flag(bio, BIO_THROTTLED);
-	bio->bi_bdev = bdev;
-	bio_associate_blkg(bio);
+	__bio_set_dev(bio, bdev);
 }
 
 static inline void bio_copy_dev(struct bio *dst, struct bio *src)
