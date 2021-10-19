@@ -631,6 +631,8 @@ struct vfio_device_migration_info {
 	__u64 data_size;
 };
 
+#define VFIO_DEVICE_STATE_ERROR (VFIO_DEVICE_STATE_SAVING | \
+				 VFIO_DEVICE_STATE_RESUMING)
 /*
  * The MSIX mappable capability informs that MSIX data of a BAR can be mmapped
  * which allows direct access to non-MSIX registers which happened to be within
