@@ -145,13 +145,13 @@ static struct bio_set blkdev_dio_pool;
 static void blkdev_bio_end_io(struct bio *bio)
 {
 	struct blkdev_dio *dio = bio->bi_private;
-	bool should_dirty = dio->flags & DIO_SHOULD_DIRTY;
+	unsigned int flags = dio->flags;
 
 	if (bio->bi_status && !dio->bio.bi_status)
 		dio->bio.bi_status = bio->bi_status;
 
-	if (!(dio->flags & DIO_MULTI_BIO) || atomic_dec_and_test(&dio->ref)) {
-		if (!(dio->flags & DIO_IS_SYNC)) {
+	if (!(flags & DIO_MULTI_BIO) || atomic_dec_and_test(&dio->ref)) {
+		if (!(flags & DIO_IS_SYNC)) {
 			struct kiocb *iocb = dio->iocb;
 			ssize_t ret;
 
@@ -164,8 +164,8 @@ static void blkdev_bio_end_io(struct bio *bio)
 				ret = blk_status_to_errno(dio->bio.bi_status);
 			}
 
-			dio->iocb->ki_complete(iocb, ret, 0);
-			if (dio->flags & DIO_MULTI_BIO)
+			iocb->ki_complete(iocb, ret, 0);
+			if (flags & DIO_MULTI_BIO)
 				bio_put(&dio->bio);
 		} else {
 			struct task_struct *waiter = dio->waiter;
@@ -175,7 +175,7 @@ static void blkdev_bio_end_io(struct bio *bio)
 		}
 	}
 
-	if (should_dirty) {
+	if (flags & DIO_SHOULD_DIRTY) {
 		bio_check_pages_dirty(bio);
 	} else {
 		bio_release_pages(bio, false);
