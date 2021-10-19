@@ -17,7 +17,7 @@ Required properties:
 - gpio-controller: Marks the device node as a GPIO controller.
 
 This node must be a subnode of the axp20x PMIC, documented in
-Documentation/devicetree/bindings/mfd/axp20x.txt
+Documentation/devicetree/bindings/mfd/x-powers,axp152.yaml
 
 Example:
 
