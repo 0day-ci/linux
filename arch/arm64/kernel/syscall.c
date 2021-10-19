@@ -158,11 +158,50 @@ trace_exit:
 	syscall_trace_exit(regs);
 }
 
-static inline void sve_user_discard(void)
+/*
+ * As per the ABI exit SME streaming mode and clear the SVE state not
+ * shared with FPSIMD on syscall entry.
+ */
+static inline void fp_user_discard(void)
 {
+	/*
+	 * If SME is active then exit streaming mode.  If ZA is active
+	 * then flush the SVE registers but leave userspace access to
+	 * both SVE and SME enabled, otherwise disable SME for the
+	 * task and fall through to disabling SVE too.
+	 *
+	 * Since with SME traps disabled userspace can freely enter
+	 * and exit streaming mode and SVE register state is shared
+	 * between the two it is simpler to just leave SVE enabled
+	 * while userspace is actively using SME than to track state
+	 * transitions.
+	 */
+	if (system_supports_sme() && test_thread_flag(TIF_SME)) {
+		u64 svcr = read_sysreg_s(SYS_SVCR_EL0);
+
+		if (svcr & SYS_SVCR_EL0_SM_MASK)
+			sme_smstop_sm();
+
+		if (svcr & SYS_SVCR_EL0_ZA_MASK) {
+			unsigned long sve_vq_minus_one =
+				sve_vq_from_vl(task_get_sve_vl(current)) - 1;
+			sve_flush_live(true, sve_vq_minus_one);
+			return;
+		} else {
+			clear_thread_flag(TIF_SME);
+			sme_user_disable();
+		}
+	}
+
+
 	if (!system_supports_sve())
 		return;
 
+	/*
+	 * If SME is not active then disable SVE, the registers will
+	 * be cleared when userspace next attempts to access them and
+	 * we do not need to track the SVE register state until then.
+	 */
 	clear_thread_flag(TIF_SVE);
 
 	/*
@@ -177,7 +216,7 @@ static inline void sve_user_discard(void)
 
 void do_el0_svc(struct pt_regs *regs)
 {
-	sve_user_discard();
+	fp_user_discard();
 	el0_svc_common(regs, regs->regs[8], __NR_syscalls, sys_call_table);
 }
 
