@@ -58,6 +58,7 @@ struct mlx5vf_pci_core_device {
 	/* protect migartion state */
 	struct mutex state_mutex;
 	struct mlx5vf_pci_migration_info vmig;
+	struct work_struct work;
 };
 
 static int mlx5vf_pci_unquiesce_device(struct mlx5vf_pci_core_device *mvdev)
@@ -615,6 +616,27 @@ static const struct vfio_device_ops mlx5vf_pci_ops = {
 	.match = vfio_pci_core_match,
 };
 
+static void mlx5vf_reset_work_handler(struct work_struct *work)
+{
+	struct mlx5vf_pci_core_device *mvdev =
+		container_of(work, struct mlx5vf_pci_core_device, work);
+
+	mutex_lock(&mvdev->state_mutex);
+	mlx5vf_reset_mig_state(mvdev);
+	mvdev->vmig.vfio_dev_state = VFIO_DEVICE_STATE_RUNNING;
+	mutex_unlock(&mvdev->state_mutex);
+}
+
+static void mlx5vf_pci_aer_reset_done(struct pci_dev *pdev)
+{
+	struct mlx5vf_pci_core_device *mvdev = dev_get_drvdata(&pdev->dev);
+
+	if (!mvdev->migrate_cap)
+		return;
+
+	schedule_work(&mvdev->work);
+}
+
 static int mlx5vf_pci_probe(struct pci_dev *pdev,
 			    const struct pci_device_id *id)
 {
@@ -634,6 +656,8 @@ static int mlx5vf_pci_probe(struct pci_dev *pdev,
 			if (MLX5_CAP_GEN(mdev, migration)) {
 				mvdev->migrate_cap = 1;
 				mutex_init(&mvdev->state_mutex);
+				INIT_WORK(&mvdev->work,
+					  mlx5vf_reset_work_handler);
 			}
 			mlx5_vf_put_core_dev(mdev);
 		}
@@ -656,6 +680,8 @@ static void mlx5vf_pci_remove(struct pci_dev *pdev)
 {
 	struct mlx5vf_pci_core_device *mvdev = dev_get_drvdata(&pdev->dev);
 
+	if (mvdev->migrate_cap)
+		cancel_work_sync(&mvdev->work);
 	vfio_pci_core_unregister_device(&mvdev->core_device);
 	vfio_pci_core_uninit_device(&mvdev->core_device);
 	kfree(mvdev);
@@ -668,12 +694,17 @@ static const struct pci_device_id mlx5vf_pci_table[] = {
 
 MODULE_DEVICE_TABLE(pci, mlx5vf_pci_table);
 
+const struct pci_error_handlers mlx5vf_err_handlers = {
+	.reset_done = mlx5vf_pci_aer_reset_done,
+	.error_detected = vfio_pci_aer_err_detected,
+};
+
 static struct pci_driver mlx5vf_pci_driver = {
 	.name = KBUILD_MODNAME,
 	.id_table = mlx5vf_pci_table,
 	.probe = mlx5vf_pci_probe,
 	.remove = mlx5vf_pci_remove,
-	.err_handler = &vfio_pci_core_err_handlers,
+	.err_handler = &mlx5vf_err_handlers,
 };
 
 static void __exit mlx5vf_pci_cleanup(void)
