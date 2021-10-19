@@ -2251,22 +2251,24 @@ static void flush_plug_callbacks(struct blk_plug *plug, bool from_schedule)
 {
 	LIST_HEAD(callbacks);
 
-	while (!list_empty(&plug->cb_list)) {
+	do {
 		list_splice_init(&plug->cb_list, &callbacks);
 
-		while (!list_empty(&callbacks)) {
+		do {
 			struct blk_plug_cb *cb = list_first_entry(&callbacks,
 							  struct blk_plug_cb,
 							  list);
+
 			list_del(&cb->list);
 			cb->callback(cb, from_schedule);
-		}
-	}
+		} while (!list_empty(&callbacks));
+	} while (!list_empty(&plug->cb_list));
 }
 
 void blk_flush_plug_list(struct blk_plug *plug, bool from_schedule)
 {
-	flush_plug_callbacks(plug, from_schedule);
+	if (!list_empty(&plug->cb_list))
+		flush_plug_callbacks(plug, from_schedule);
 
 	if (!rq_list_empty(plug->mq_list))
 		blk_mq_flush_plug_list(plug, from_schedule);
