@@ -954,6 +954,10 @@ static int fanotify_remove_mark(struct fsnotify_group *group,
 
 	removed = fanotify_mark_remove_from_mask(fsn_mark, mask, flags,
 						 umask, &destroy_mark);
+
+	if (removed & FAN_FS_ERROR)
+		group->fanotify_data.error_event_marks--;
+
 	if (removed & fsnotify_conn_mask(fsn_mark->connector))
 		fsnotify_recalc_mask(fsn_mark->connector);
 	if (destroy_mark)
@@ -1052,12 +1056,24 @@ out_dec_ucounts:
 
 static int fanotify_group_init_error_pool(struct fsnotify_group *group)
 {
-	if (mempool_initialized(&group->fanotify_data.error_events_pool))
-		return 0;
+	int ret;
 
-	return mempool_init_kmalloc_pool(&group->fanotify_data.error_events_pool,
-					 FANOTIFY_DEFAULT_MAX_FEE_POOL,
-					 sizeof(struct fanotify_error_event));
+	if (group->fanotify_data.error_event_marks >=
+	    FANOTIFY_DEFAULT_MAX_FEE_POOL)
+		return -ENOMEM;
+
+	if (!mempool_initialized(&group->fanotify_data.error_events_pool))
+		ret = mempool_init_kmalloc_pool(
+				&group->fanotify_data.error_events_pool,
+				 1, sizeof(struct fanotify_error_event));
+	else
+		ret = mempool_resize(&group->fanotify_data.error_events_pool,
+				     group->fanotify_data.error_event_marks + 1);
+
+	if (!ret)
+		group->fanotify_data.error_event_marks++;
+
+	return ret;
 }
 
 static int fanotify_add_mark(struct fsnotify_group *group,
