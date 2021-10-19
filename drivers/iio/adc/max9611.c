@@ -514,8 +514,6 @@ static int max9611_probe(struct i2c_client *client,
 {
 	const char * const shunt_res_prop = "shunt-resistor-micro-ohms";
 	const struct device_node *of_node = client->dev.of_node;
-	const struct of_device_id *of_id =
-		of_match_device(max9611_of_table, &client->dev);
 	struct max9611_dev *max9611;
 	struct iio_dev *indio_dev;
 	unsigned int of_shunt;
@@ -545,7 +543,7 @@ static int max9611_probe(struct i2c_client *client,
 	if (ret)
 		return ret;
 
-	indio_dev->name		= of_id->data;
+	indio_dev->name		= of_device_get_match_data(&client->dev);
 	indio_dev->modes	= INDIO_DIRECT_MODE;
 	indio_dev->info		= &indio_info;
 	indio_dev->channels	= max9611_channels;
