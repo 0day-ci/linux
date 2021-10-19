@@ -7123,8 +7123,10 @@ static int ufshcd_host_reset_and_restore(struct ufs_hba *hba)
 	err = ufshcd_hba_enable(hba);
 
 	/* Establish the link again and restore the device */
-	if (!err)
+	if (!err) {
+		ufshcd_retry_aborted_requests(hba);
 		err = ufshcd_probe_hba(hba, false);
+	}
 
 	if (err)
 		dev_err(hba->dev, "%s: Host init failed %d\n", __func__, err);
