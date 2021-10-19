@@ -15,7 +15,7 @@ description: |
 
   The S2MPA01 provides buck and LDO regulators.
 
-  See also Documentation/devicetree/bindings/mfd/samsung,s2mpa01.yaml for
+  See also Documentation/devicetree/bindings/regulator/samsung,s2mpa01.yaml for
   additional information and example.
 
 patternProperties:
