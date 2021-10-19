@@ -19,6 +19,7 @@
 #include <linux/irq.h>
 #include <linux/mm.h>
 #include <linux/mutex.h>
+#include <linux/pfn.h>
 #include <linux/pci.h>
 #include <linux/swiotlb.h>
 #include <linux/scatterlist.h>
@@ -878,8 +879,9 @@ static int __finalise_sg(struct device *dev, struct scatterlist *sg, int nents,
 		unsigned int s_length = sg_dma_len(s);
 		unsigned int s_iova_len = s->length;
 
-		s->offset += s_iova_off;
-		s->length = s_length;
+		sg_set_page(s,
+			    pfn_to_page(PHYS_PFN(sg_phys(s) + s_iova_off)),
+			    s_length, s_iova_off & ~PAGE_MASK);
 		sg_dma_address(s) = DMA_MAPPING_ERROR;
 		sg_dma_len(s) = 0;
 
@@ -920,13 +922,17 @@ static int __finalise_sg(struct device *dev, struct scatterlist *sg, int nents,
 static void __invalidate_sg(struct scatterlist *sg, int nents)
 {
 	struct scatterlist *s;
+	phys_addr_t orig_paddr;
 	int i;
 
 	for_each_sg(sg, s, nents, i) {
-		if (sg_dma_address(s) != DMA_MAPPING_ERROR)
-			s->offset += sg_dma_address(s);
-		if (sg_dma_len(s))
-			s->length = sg_dma_len(s);
+		if (sg_dma_len(s)) {
+			orig_paddr = sg_phys(s) + sg_dma_address(s);
+			sg_set_page(s,
+				    pfn_to_page(PHYS_PFN(orig_paddr)),
+				    sg_dma_len(s),
+				    sg_dma_address(s) & ~PAGE_MASK);
+		}
 		sg_dma_address(s) = DMA_MAPPING_ERROR;
 		sg_dma_len(s) = 0;
 	}
@@ -1003,15 +1009,16 @@ static int iommu_dma_map_sg(struct device *dev, struct scatterlist *sg,
 	 * stashing the unaligned parts in the as-yet-unused DMA fields.
 	 */
 	for_each_sg(sg, s, nents, i) {
-		size_t s_iova_off = iova_offset(iovad, s->offset);
+		phys_addr_t s_phys = sg_phys(s);
+		size_t s_iova_off = iova_offset(iovad, s_phys);
 		size_t s_length = s->length;
 		size_t pad_len = (mask - iova_len + 1) & mask;
 
 		sg_dma_address(s) = s_iova_off;
 		sg_dma_len(s) = s_length;
-		s->offset -= s_iova_off;
 		s_length = iova_align(iovad, s_length + s_iova_off);
-		s->length = s_length;
+		sg_set_page(s, pfn_to_page(PHYS_PFN(s_phys - s_iova_off)),
+			    s_length, s->offset & ~s_iova_off);
 
 		/*
 		 * Due to the alignment of our single IOVA allocation, we can
