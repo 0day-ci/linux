@@ -129,6 +129,9 @@ static void blk_flush_restore_request(struct request *rq)
 	/* make @rq a normal request */
 	rq->rq_flags &= ~RQF_FLUSH_SEQ;
 	rq->end_io = rq->flush.saved_end_io;
+	/* clear pointers overlapping with flush data */
+	rq->elv.icq = NULL;
+	rq->elv.priv[0] = rq->elv.priv[1] = NULL;
 }
 
 static void blk_flush_queue_rq(struct request *rq, bool add_front)
