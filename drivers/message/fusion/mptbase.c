@@ -381,7 +381,8 @@ mpt_fault_reset_work(struct work_struct *work)
 		 * since dead ioc will never return any command back from HW.
 		 */
 		hd = shost_priv(ioc->sh);
-		ioc->schedule_dead_ioc_flush_running_cmds(hd);
+		if (ioc->schedule_dead_ioc_flush_running_cmds)
+			ioc->schedule_dead_ioc_flush_running_cmds(hd);
 
 		/*Remove the Dead Host */
 		p = kthread_run(mpt_remove_dead_ioc_func, ioc,
