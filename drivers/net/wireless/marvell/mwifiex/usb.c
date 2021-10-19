@@ -693,7 +693,7 @@ static int mwifiex_write_data_sync(struct mwifiex_adapter *adapter, u8 *pbuf,
 	struct usb_card_rec *card = adapter->card;
 	int actual_length, ret;
 
-	if (!(*len % card->bulk_out_maxpktsize))
+	if (card->bulk_out_maxpktsize && !(*len % card->bulk_out_maxpktsize))
 		(*len)++;
 
 	/* Send the data block */
