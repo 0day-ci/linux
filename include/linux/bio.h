@@ -743,6 +743,11 @@ static inline void bio_set_polled(struct bio *bio, struct kiocb *kiocb)
 		bio->bi_opf |= REQ_NOWAIT;
 }
 
+static inline void bio_set_polled_async(struct bio *bio, struct kiocb *kiocb)
+{
+	bio->bi_opf |= REQ_POLLED | REQ_NOWAIT;
+}
+
 struct bio *blk_next_bio(struct bio *bio, unsigned int nr_pages, gfp_t gfp);
 
 #endif /* __LINUX_BIO_H */
