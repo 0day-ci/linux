@@ -29,6 +29,7 @@ int check_user_usb_string(const char *name,
 
 #define MAX_NAME_LEN	40
 #define MAX_USB_STRING_LANGS 2
+#define MAX_TRACE_STR_LEN	512
 
 static const struct usb_descriptor_header *otg_desc[2];
 
@@ -51,6 +52,9 @@ struct gadget_info {
 	char qw_sign[OS_STRING_QW_SIGN_LEN];
 	spinlock_t spinlock;
 	bool unbind;
+#ifdef CONFIG_TRACING
+	char trace_string[MAX_TRACE_STR_LEN];
+#endif
 };
 
 static inline struct gadget_info *to_gadget_info(struct config_item *item)
@@ -101,6 +105,10 @@ struct gadget_config_name {
 	struct config_group group;
 	struct list_head list;
 };
+
+#define CONFIGFS_TRACE_STRING
+#define CREATE_TRACE_POINTS
+#include "configfs_trace.h"
 
 #define USB_MAX_STRING_WITH_NULL_LEN	(USB_MAX_STRING_LEN+1)
 
@@ -212,6 +220,7 @@ static ssize_t gadget_dev_desc_bcdDevice_store(struct config_item *item,
 
 	mutex_lock(&gi->lock);
 	gi->cdev.desc.bcdDevice = cpu_to_le16(bcdDevice);
+	trace_gadget_dev_desc_bcdDevice_store(gi);
 	mutex_unlock(&gi->lock);
 	return len;
 }
@@ -232,6 +241,7 @@ static ssize_t gadget_dev_desc_bcdUSB_store(struct config_item *item,
 
 	mutex_lock(&gi->lock);
 	gi->cdev.desc.bcdUSB = cpu_to_le16(bcdUSB);
+	trace_gadget_dev_desc_bcdUSB_store(gi);
 	mutex_unlock(&gi->lock);
 	return len;
 }
@@ -254,6 +264,7 @@ static int unregister_gadget(struct gadget_info *gi)
 {
 	int ret;
 
+	trace_unregister_gadget(gi);
 	if (!gi->composite.gadget_driver.udc_name)
 		return -ENODEV;
 
@@ -300,6 +311,7 @@ static ssize_t gadget_dev_desc_UDC_store(struct config_item *item,
 			goto err;
 		}
 	}
+	trace_gadget_dev_desc_UDC_store(gi);
 	mutex_unlock(&gi->lock);
 	return len;
 err:
@@ -342,6 +354,7 @@ static ssize_t gadget_dev_desc_max_speed_store(struct config_item *item,
 
 	gi->composite.gadget_driver.max_speed = gi->composite.max_speed;
 
+	trace_gadget_dev_desc_max_speed_store(gi);
 	mutex_unlock(&gi->lock);
 	return len;
 err:
@@ -465,6 +478,7 @@ static int config_usb_cfg_link(
 	list_add_tail(&f->list, &cfg->func_list);
 	ret = 0;
 out:
+	trace_config_usb_cfg_link(gi);
 	mutex_unlock(&gi->lock);
 	return ret;
 }
@@ -496,6 +510,7 @@ static void config_usb_cfg_unlink(
 		if (f->fi == fi) {
 			list_del(&f->list);
 			usb_put_function(f);
+			trace_config_usb_cfg_unlink(gi);
 			mutex_unlock(&gi->lock);
 			return;
 		}
@@ -533,6 +548,7 @@ static ssize_t gadget_config_desc_MaxPower_store(struct config_item *item,
 		return -ERANGE;
 	mutex_lock(&gi->lock);
 	cfg->c.MaxPower = val;
+	trace_gadget_config_desc_MaxPower_store(gi);
 	mutex_unlock(&gi->lock);
 	return len;
 }
@@ -562,6 +578,7 @@ static ssize_t gadget_config_desc_bmAttributes_store(struct config_item *item,
 		return -EINVAL;
 	mutex_lock(&gi->lock);
 	cfg->c.bmAttributes = val;
+	trace_gadget_config_desc_bmAttributes_store(gi);
 	mutex_unlock(&gi->lock);
 	return len;
 }
