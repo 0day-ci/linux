@@ -968,3 +968,29 @@ void cfg80211_cac_event(struct net_device *netdev,
 	nl80211_radar_notify(rdev, chandef, event, netdev, gfp);
 }
 EXPORT_SYMBOL(cfg80211_cac_event);
+
+void cfg80211_cac_offchan_event(struct wiphy *wiphy,
+				const struct cfg80211_chan_def *chandef,
+				enum nl80211_radar_event event, gfp_t gfp)
+{
+	struct cfg80211_registered_device *rdev = wiphy_to_rdev(wiphy);
+
+	switch (event) {
+	case NL80211_RADAR_CAC_FINISHED:
+		cfg80211_set_dfs_state(wiphy, chandef, NL80211_DFS_AVAILABLE);
+		memcpy(&rdev->cac_done_chandef, chandef,
+		       sizeof(struct cfg80211_chan_def));
+		queue_work(cfg80211_wq, &rdev->propagate_cac_done_wk);
+		cfg80211_sched_dfs_chan_update(rdev);
+		break;
+	case NL80211_RADAR_CAC_ABORTED:
+	case NL80211_RADAR_CAC_STARTED:
+		break;
+	default:
+		WARN_ON(1);
+		return;
+	}
+
+	nl80211_radar_notify(rdev, chandef, event, NULL, gfp);
+}
+EXPORT_SYMBOL(cfg80211_cac_offchan_event);
