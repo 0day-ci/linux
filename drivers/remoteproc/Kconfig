@@ -171,11 +171,13 @@ config QCOM_Q6V5_COMMON
 	tristate
 	depends on ARCH_QCOM
 	depends on QCOM_SMEM
+	depends on QCOM_AOSS_QMP || !QCOM_AOSS_QMP
 
 config QCOM_Q6V5_ADSP
 	tristate "Qualcomm Technology Inc ADSP Peripheral Image Loader"
 	depends on OF && ARCH_QCOM
 	depends on QCOM_SMEM
+	depends on QCOM_AOSS_QMP || !QCOM_AOSS_QMP
 	depends on RPMSG_QCOM_SMD || RPMSG_QCOM_SMD=n
 	depends on RPMSG_QCOM_GLINK_SMEM || RPMSG_QCOM_GLINK_SMEM=n
 	depends on QCOM_SYSMON || QCOM_SYSMON=n
@@ -198,6 +200,7 @@ config QCOM_Q6V5_MSS
 	depends on RPMSG_QCOM_SMD || RPMSG_QCOM_SMD=n
 	depends on RPMSG_QCOM_GLINK_SMEM || RPMSG_QCOM_GLINK_SMEM=n
 	depends on QCOM_SYSMON || QCOM_SYSMON=n
+	depends on QCOM_AOSS_QMP || !QCOM_AOSS_QMP
 	depends on RPMSG_QCOM_GLINK || RPMSG_QCOM_GLINK=n
 	select MFD_SYSCON
 	select QCOM_MDT_LOADER
@@ -214,6 +217,7 @@ config QCOM_Q6V5_PAS
 	tristate "Qualcomm Hexagon v5 Peripheral Authentication Service support"
 	depends on OF && ARCH_QCOM
 	depends on QCOM_SMEM
+	depends on QCOM_AOSS_QMP || !QCOM_AOSS_QMP
 	depends on RPMSG_QCOM_SMD || RPMSG_QCOM_SMD=n
 	depends on RPMSG_QCOM_GLINK_SMEM || RPMSG_QCOM_GLINK_SMEM=n
 	depends on QCOM_SYSMON || QCOM_SYSMON=n
@@ -235,6 +239,7 @@ config QCOM_Q6V5_WCSS
 	tristate "Qualcomm Hexagon based WCSS Peripheral Image Loader"
 	depends on OF && ARCH_QCOM
 	depends on QCOM_SMEM
+	depends on QCOM_AOSS_QMP || !QCOM_AOSS_QMP
 	depends on RPMSG_QCOM_SMD || RPMSG_QCOM_SMD=n
 	depends on RPMSG_QCOM_GLINK_SMEM || RPMSG_QCOM_GLINK_SMEM=n
 	depends on QCOM_SYSMON || QCOM_SYSMON=n
