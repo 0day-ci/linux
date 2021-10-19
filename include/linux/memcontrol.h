@@ -1524,16 +1524,22 @@ static inline bool page_matches_lruvec(struct page *page, struct lruvec *lruvec)
 }
 
 /* Don't lock again iff page's lruvec locked */
+static inline struct lruvec *relock_page_lruvec(struct page *page,
+		struct lruvec *locked_lruvec)
+{
+	if (page_matches_lruvec(page, locked_lruvec))
+		return locked_lruvec;
+
+	unlock_page_lruvec(locked_lruvec);
+	return lock_page_lruvec(page);
+}
+
+/* Don't lock again iff page's lruvec locked */
 static inline struct lruvec *relock_page_lruvec_irq(struct page *page,
 		struct lruvec *locked_lruvec)
 {
-	if (locked_lruvec) {
-		if (page_matches_lruvec(page, locked_lruvec))
-			return locked_lruvec;
-
-		unlock_page_lruvec_irq(locked_lruvec);
-	}
-
+	if (locked_lruvec)
+		return relock_page_lruvec(page, locked_lruvec);
 	return lock_page_lruvec_irq(page);
 }
 
@@ -1541,13 +1547,8 @@ static inline struct lruvec *relock_page_lruvec_irq(struct page *page,
 static inline struct lruvec *relock_page_lruvec_irqsave(struct page *page,
 		struct lruvec *locked_lruvec, unsigned long *flags)
 {
-	if (locked_lruvec) {
-		if (page_matches_lruvec(page, locked_lruvec))
-			return locked_lruvec;
-
-		unlock_page_lruvec_irqrestore(locked_lruvec, *flags);
-	}
-
+	if (locked_lruvec)
+		return relock_page_lruvec(page, locked_lruvec);
 	return lock_page_lruvec_irqsave(page, flags);
 }
 
