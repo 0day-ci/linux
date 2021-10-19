@@ -256,6 +256,93 @@ static inline bool contains(u64 s1, u64 e1, u64 s2, u64 e2)
 	return s1 <= s2 && e1 >= e2;
 }
 
+int drm_buddy_free_unused_pages(struct drm_buddy_mm *mm,
+				u64 actual_size,
+				struct list_head *blocks)
+{
+	struct drm_buddy_block *block;
+	struct drm_buddy_block *buddy;
+	u64 actual_start;
+	u64 actual_end;
+	LIST_HEAD(dfs);
+	u64 count = 0;
+	int err;
+
+	if (!list_is_singular(blocks))
+		return -EINVAL;
+
+	block = list_first_entry_or_null(blocks,
+					 struct drm_buddy_block,
+					 link);
+
+	if (!block)
+		return -EINVAL;
+
+	if (actual_size > drm_buddy_block_size(mm, block))
+		return -EINVAL;
+
+	if (actual_size == drm_buddy_block_size(mm, block))
+		return 0;
+
+	list_del(&block->link);
+
+	actual_start = drm_buddy_block_offset(block);
+	actual_end = actual_start + actual_size - 1;
+
+	if (drm_buddy_block_is_allocated(block))
+		mark_free(mm, block);
+
+	list_add(&block->tmp_link, &dfs);
+
+	while (1) {
+		block = list_first_entry_or_null(&dfs,
+						 struct drm_buddy_block,
+						 tmp_link);
+
+		if (!block)
+			break;
+
+		list_del(&block->tmp_link);
+
+		if (count == actual_size)
+			return 0;
+
+		if (contains(actual_start, actual_end, drm_buddy_block_offset(block),
+			(drm_buddy_block_offset(block) + drm_buddy_block_size(mm, block) - 1))) {
+			BUG_ON(!drm_buddy_block_is_free(block));
+			/* Allocate only required blocks */
+			mark_allocated(block);
+			mm->avail -= drm_buddy_block_size(mm, block);
+			list_add_tail(&block->link, blocks);
+			count += drm_buddy_block_size(mm, block);
+			continue;
+		}
+
+		if (drm_buddy_block_order(block) == 0)
+			continue;
+
+		if (!drm_buddy_block_is_split(block)) {
+			err = split_block(mm, block);
+
+			if (unlikely(err))
+				goto err_undo;
+		}
+
+		list_add(&block->right->tmp_link, &dfs);
+		list_add(&block->left->tmp_link, &dfs);
+	}
+
+	return -ENOSPC;
+
+err_undo:
+	buddy = get_buddy(block);
+	if (buddy &&
+	    (drm_buddy_block_is_free(block) &&
+	     drm_buddy_block_is_free(buddy)))
+		__drm_buddy_free(mm, block);
+	return err;
+}
+
 static struct drm_buddy_block *
 alloc_range(struct drm_buddy_mm *mm,
 	    u64 start, u64 end,
