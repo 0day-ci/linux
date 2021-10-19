@@ -203,10 +203,13 @@ static vm_fault_t ttm_bo_vm_insert_huge(struct vm_fault *vmf,
 	if (page_offset + fault_page_size > bo->resource->num_pages)
 		goto out_fallback;
 
+	/*
+	 * vmf_insert_pfn_pud/pmd_prot() can only be called with struct page
+	 * backed memory
+	 */
 	if (bo->resource->bus.is_iomem)
-		pfn = ttm_bo_io_mem_pfn(bo, page_offset);
-	else
-		pfn = page_to_pfn(ttm->pages[page_offset]);
+		goto out_fallback;
+	pfn = page_to_pfn(ttm->pages[page_offset]);
 
 	/* pfn must be fault_page_size aligned. */
 	if ((pfn & (fault_page_size - 1)) != 0)
