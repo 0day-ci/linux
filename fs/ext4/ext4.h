@@ -2601,6 +2601,8 @@ struct ext4_features {
 #define EXT4_MMP_SEQ_FSCK  0xE24D4D50U /* mmp_seq value when being fscked */
 #define EXT4_MMP_SEQ_MAX   0xE24D4D4FU /* maximum valid mmp_seq value */
 
+#define EXT4_MMP_NODENAME_LEN   64 /* mmp_nodename length */
+
 struct mmp_struct {
 	__le32	mmp_magic;		/* Magic number for MMP */
 	__le32	mmp_seq;		/* Sequence no. updated periodically */
@@ -2610,7 +2612,8 @@ struct mmp_struct {
 	 * purposes and do not affect the correctness of the algorithm
 	 */
 	__le64	mmp_time;		/* Time last updated */
-	char	mmp_nodename[64];	/* Node which last updated MMP block */
+	/* Node which last updated MMP block */
+	char	mmp_nodename[EXT4_MMP_NODENAME_LEN];
 	char	mmp_bdevname[32];	/* Bdev which last updated MMP block */
 
 	/*
