@@ -449,6 +449,7 @@ static struct ufs_hba_variant_ops ufs_intel_lkf_hba_vops = {
 	.device_reset		= ufs_intel_device_reset,
 };
 
+#ifdef CONFIG_PM_SLEEP
 static int ufshcd_pci_restore(struct device *dev)
 {
 	struct ufs_hba *hba = dev_get_drvdata(dev);
@@ -458,6 +459,7 @@ static int ufshcd_pci_restore(struct device *dev)
 
 	return ufshcd_system_resume(dev);
 }
+#endif
 
 /**
  * ufshcd_pci_shutdown - main function to put the controller in reset state
