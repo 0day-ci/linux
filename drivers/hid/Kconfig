@@ -739,18 +739,13 @@ config HID_MULTITOUCH
 	  module will be called hid-multitouch.
 
 config HID_NINTENDO
-	tristate "Nintendo Joy-Con and Pro Controller support"
+	tristate "Nintendo controllers support"
 	depends on HID
-	depends on NEW_LEDS
-	depends on LEDS_CLASS
-	select POWER_SUPPLY
 	help
-	Adds support for the Nintendo Switch Joy-Cons and Pro Controller.
-	All controllers support bluetooth, and the Pro Controller also supports
-	its USB mode.
+	  Adds support for various Nintendo controllers.
 
-	To compile this driver as a module, choose M here: the
-	module will be called hid-nintendo.
+	  To compile this driver as a module, choose M here: the
+	  module will be called hid-nintendo.
 
 config NINTENDO_FF
 	bool "Nintendo Switch controller force feedback support"
@@ -761,6 +756,17 @@ config NINTENDO_FF
 	force feedback support for it. This works for both joy-cons and the pro
 	controller. For the pro controller, both rumble motors can be controlled
 	individually.
+
+config HID_NINTENDO_SWITCH
+	tristate "Nintendo Wii U gamepad (DRC) over internal DRH"
+	depends on HID_NINTENDO
+	depends on NEW_LEDS
+	depends on LEDS_CLASS
+	select POWER_SUPPLY
+	help
+	  Adds support for the Nintendo Switch Joy-Cons and Pro Controller.
+	  All controllers support bluetooth, and the Pro Controller also supports
+	  its USB mode.
 
 config HID_NTI
 	tristate "NTI keyboard adapters"
