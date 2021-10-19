@@ -689,10 +689,6 @@ void drm_buddy_print(struct drm_buddy_mm *mm, struct drm_printer *p)
 }
 EXPORT_SYMBOL(drm_buddy_print);
 
-#if IS_ENABLED(CONFIG_DRM_I915_SELFTEST)
-#include "selftests/i915_buddy.c"
-#endif
-
 void drm_buddy_module_exit(void)
 {
 	kmem_cache_destroy(slab_blocks);
