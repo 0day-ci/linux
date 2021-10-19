@@ -11,27 +11,7 @@
 #include <linux/tracepoint.h>
 #include <linux/iversion.h>
 
-TRACE_DEFINE_ENUM(DT_UNKNOWN);
-TRACE_DEFINE_ENUM(DT_FIFO);
-TRACE_DEFINE_ENUM(DT_CHR);
-TRACE_DEFINE_ENUM(DT_DIR);
-TRACE_DEFINE_ENUM(DT_BLK);
-TRACE_DEFINE_ENUM(DT_REG);
-TRACE_DEFINE_ENUM(DT_LNK);
-TRACE_DEFINE_ENUM(DT_SOCK);
-TRACE_DEFINE_ENUM(DT_WHT);
-
-#define nfs_show_file_type(ftype) \
-	__print_symbolic(ftype, \
-			{ DT_UNKNOWN, "UNKNOWN" }, \
-			{ DT_FIFO, "FIFO" }, \
-			{ DT_CHR, "CHR" }, \
-			{ DT_DIR, "DIR" }, \
-			{ DT_BLK, "BLK" }, \
-			{ DT_REG, "REG" }, \
-			{ DT_LNK, "LNK" }, \
-			{ DT_SOCK, "SOCK" }, \
-			{ DT_WHT, "WHT" })
+#include <trace/events/fs.h>
 
 TRACE_DEFINE_ENUM(NFS_INO_INVALID_DATA);
 TRACE_DEFINE_ENUM(NFS_INO_INVALID_ATIME);
@@ -168,7 +148,7 @@ DECLARE_EVENT_CLASS(nfs_inode_event_done,
 			(unsigned long long)__entry->fileid,
 			__entry->fhandle,
 			__entry->type,
-			nfs_show_file_type(__entry->type),
+			show_fs_dirent_type(__entry->type),
 			(unsigned long long)__entry->version,
 			(long long)__entry->size,
 			__entry->cache_validity,
@@ -259,7 +239,7 @@ TRACE_EVENT(nfs_access_exit,
 			(unsigned long long)__entry->fileid,
 			__entry->fhandle,
 			__entry->type,
-			nfs_show_file_type(__entry->type),
+			show_fs_dirent_type(__entry->type),
 			(unsigned long long)__entry->version,
 			(long long)__entry->size,
 			__entry->cache_validity,
@@ -269,34 +249,6 @@ TRACE_EVENT(nfs_access_exit,
 			__entry->mask, __entry->permitted
 		)
 );
-
-TRACE_DEFINE_ENUM(LOOKUP_FOLLOW);
-TRACE_DEFINE_ENUM(LOOKUP_DIRECTORY);
-TRACE_DEFINE_ENUM(LOOKUP_AUTOMOUNT);
-TRACE_DEFINE_ENUM(LOOKUP_PARENT);
-TRACE_DEFINE_ENUM(LOOKUP_REVAL);
-TRACE_DEFINE_ENUM(LOOKUP_RCU);
-TRACE_DEFINE_ENUM(LOOKUP_OPEN);
-TRACE_DEFINE_ENUM(LOOKUP_CREATE);
-TRACE_DEFINE_ENUM(LOOKUP_EXCL);
-TRACE_DEFINE_ENUM(LOOKUP_RENAME_TARGET);
-TRACE_DEFINE_ENUM(LOOKUP_EMPTY);
-TRACE_DEFINE_ENUM(LOOKUP_DOWN);
-
-#define show_lookup_flags(flags) \
-	__print_flags(flags, "|", \
-			{ LOOKUP_FOLLOW, "FOLLOW" }, \
-			{ LOOKUP_DIRECTORY, "DIRECTORY" }, \
-			{ LOOKUP_AUTOMOUNT, "AUTOMOUNT" }, \
-			{ LOOKUP_PARENT, "PARENT" }, \
-			{ LOOKUP_REVAL, "REVAL" }, \
-			{ LOOKUP_RCU, "RCU" }, \
-			{ LOOKUP_OPEN, "OPEN" }, \
-			{ LOOKUP_CREATE, "CREATE" }, \
-			{ LOOKUP_EXCL, "EXCL" }, \
-			{ LOOKUP_RENAME_TARGET, "RENAME_TARGET" }, \
-			{ LOOKUP_EMPTY, "EMPTY" }, \
-			{ LOOKUP_DOWN, "DOWN" })
 
 DECLARE_EVENT_CLASS(nfs_lookup_event,
 		TP_PROTO(
@@ -324,7 +276,7 @@ DECLARE_EVENT_CLASS(nfs_lookup_event,
 		TP_printk(
 			"flags=0x%lx (%s) name=%02x:%02x:%llu/%s",
 			__entry->flags,
-			show_lookup_flags(__entry->flags),
+			show_fs_lookup_flags(__entry->flags),
 			MAJOR(__entry->dev), MINOR(__entry->dev),
 			(unsigned long long)__entry->dir,
 			__get_str(name)
@@ -370,7 +322,7 @@ DECLARE_EVENT_CLASS(nfs_lookup_event_done,
 			"error=%ld (%s) flags=0x%lx (%s) name=%02x:%02x:%llu/%s",
 			-__entry->error, nfs_show_status(__entry->error),
 			__entry->flags,
-			show_lookup_flags(__entry->flags),
+			show_fs_lookup_flags(__entry->flags),
 			MAJOR(__entry->dev), MINOR(__entry->dev),
 			(unsigned long long)__entry->dir,
 			__get_str(name)
@@ -392,46 +344,6 @@ DEFINE_NFS_LOOKUP_EVENT_DONE(nfs_lookup_exit);
 DEFINE_NFS_LOOKUP_EVENT(nfs_lookup_revalidate_enter);
 DEFINE_NFS_LOOKUP_EVENT_DONE(nfs_lookup_revalidate_exit);
 
-TRACE_DEFINE_ENUM(O_WRONLY);
-TRACE_DEFINE_ENUM(O_RDWR);
-TRACE_DEFINE_ENUM(O_CREAT);
-TRACE_DEFINE_ENUM(O_EXCL);
-TRACE_DEFINE_ENUM(O_NOCTTY);
-TRACE_DEFINE_ENUM(O_TRUNC);
-TRACE_DEFINE_ENUM(O_APPEND);
-TRACE_DEFINE_ENUM(O_NONBLOCK);
-TRACE_DEFINE_ENUM(O_DSYNC);
-TRACE_DEFINE_ENUM(O_DIRECT);
-TRACE_DEFINE_ENUM(O_LARGEFILE);
-TRACE_DEFINE_ENUM(O_DIRECTORY);
-TRACE_DEFINE_ENUM(O_NOFOLLOW);
-TRACE_DEFINE_ENUM(O_NOATIME);
-TRACE_DEFINE_ENUM(O_CLOEXEC);
-
-#define show_open_flags(flags) \
-	__print_flags(flags, "|", \
-		{ O_WRONLY, "O_WRONLY" }, \
-		{ O_RDWR, "O_RDWR" }, \
-		{ O_CREAT, "O_CREAT" }, \
-		{ O_EXCL, "O_EXCL" }, \
-		{ O_NOCTTY, "O_NOCTTY" }, \
-		{ O_TRUNC, "O_TRUNC" }, \
-		{ O_APPEND, "O_APPEND" }, \
-		{ O_NONBLOCK, "O_NONBLOCK" }, \
-		{ O_DSYNC, "O_DSYNC" }, \
-		{ O_DIRECT, "O_DIRECT" }, \
-		{ O_LARGEFILE, "O_LARGEFILE" }, \
-		{ O_DIRECTORY, "O_DIRECTORY" }, \
-		{ O_NOFOLLOW, "O_NOFOLLOW" }, \
-		{ O_NOATIME, "O_NOATIME" }, \
-		{ O_CLOEXEC, "O_CLOEXEC" })
-
-#define show_fmode_flags(mode) \
-	__print_flags(mode, "|", \
-		{ ((__force unsigned long)FMODE_READ), "READ" }, \
-		{ ((__force unsigned long)FMODE_WRITE), "WRITE" }, \
-		{ ((__force unsigned long)FMODE_EXEC), "EXEC" })
-
 TRACE_EVENT(nfs_atomic_open_enter,
 		TP_PROTO(
 			const struct inode *dir,
@@ -443,7 +355,7 @@ TRACE_EVENT(nfs_atomic_open_enter,
 
 		TP_STRUCT__entry(
 			__field(unsigned long, flags)
-			__field(unsigned int, fmode)
+			__field(unsigned long, fmode)
 			__field(dev_t, dev)
 			__field(u64, dir)
 			__string(name, ctx->dentry->d_name.name)
@@ -453,15 +365,15 @@ TRACE_EVENT(nfs_atomic_open_enter,
 			__entry->dev = dir->i_sb->s_dev;
 			__entry->dir = NFS_FILEID(dir);
 			__entry->flags = flags;
-			__entry->fmode = (__force unsigned int)ctx->mode;
+			__entry->fmode = (__force unsigned long)ctx->mode;
 			__assign_str(name, ctx->dentry->d_name.name);
 		),
 
 		TP_printk(
 			"flags=0x%lx (%s) fmode=%s name=%02x:%02x:%llu/%s",
 			__entry->flags,
-			show_open_flags(__entry->flags),
-			show_fmode_flags(__entry->fmode),
+			show_fs_fcntl_open_flags(__entry->flags),
+			show_fs_fmode_flags(__entry->fmode),
 			MAJOR(__entry->dev), MINOR(__entry->dev),
 			(unsigned long long)__entry->dir,
 			__get_str(name)
@@ -481,7 +393,7 @@ TRACE_EVENT(nfs_atomic_open_exit,
 		TP_STRUCT__entry(
 			__field(unsigned long, error)
 			__field(unsigned long, flags)
-			__field(unsigned int, fmode)
+			__field(unsigned long, fmode)
 			__field(dev_t, dev)
 			__field(u64, dir)
 			__string(name, ctx->dentry->d_name.name)
@@ -492,7 +404,7 @@ TRACE_EVENT(nfs_atomic_open_exit,
 			__entry->dev = dir->i_sb->s_dev;
 			__entry->dir = NFS_FILEID(dir);
 			__entry->flags = flags;
-			__entry->fmode = (__force unsigned int)ctx->mode;
+			__entry->fmode = (__force unsigned long)ctx->mode;
 			__assign_str(name, ctx->dentry->d_name.name);
 		),
 
@@ -501,8 +413,8 @@ TRACE_EVENT(nfs_atomic_open_exit,
 			"name=%02x:%02x:%llu/%s",
 			-__entry->error, nfs_show_status(__entry->error),
 			__entry->flags,
-			show_open_flags(__entry->flags),
-			show_fmode_flags(__entry->fmode),
+			show_fs_fcntl_open_flags(__entry->flags),
+			show_fs_fmode_flags(__entry->fmode),
 			MAJOR(__entry->dev), MINOR(__entry->dev),
 			(unsigned long long)__entry->dir,
 			__get_str(name)
@@ -535,7 +447,7 @@ TRACE_EVENT(nfs_create_enter,
 		TP_printk(
 			"flags=0x%lx (%s) name=%02x:%02x:%llu/%s",
 			__entry->flags,
-			show_open_flags(__entry->flags),
+			show_fs_fcntl_open_flags(__entry->flags),
 			MAJOR(__entry->dev), MINOR(__entry->dev),
 			(unsigned long long)__entry->dir,
 			__get_str(name)
@@ -572,7 +484,7 @@ TRACE_EVENT(nfs_create_exit,
 			"error=%ld (%s) flags=0x%lx (%s) name=%02x:%02x:%llu/%s",
 			-__entry->error, nfs_show_status(__entry->error),
 			__entry->flags,
-			show_open_flags(__entry->flags),
+			show_fs_fcntl_open_flags(__entry->flags),
 			MAJOR(__entry->dev), MINOR(__entry->dev),
 			(unsigned long long)__entry->dir,
 			__get_str(name)
