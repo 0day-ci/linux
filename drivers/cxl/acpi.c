@@ -122,9 +122,11 @@ static void cxl_add_cfmws_decoders(struct device *dev,
 				cfmws->base_hpa, cfmws->base_hpa +
 				cfmws->window_size - 1);
 		} else {
-			dev_dbg(dev, "add: %s range %#llx-%#llx\n",
-				dev_name(&cxld->dev), cfmws->base_hpa,
-				 cfmws->base_hpa + cfmws->window_size - 1);
+			dev_dbg(dev, "add: %s node: %d range %#llx-%#llx\n",
+				dev_name(&cxld->dev),
+				phys_to_target_node(cxld->range.start),
+				cfmws->base_hpa,
+				cfmws->base_hpa + cfmws->window_size - 1);
 		}
 		cur += c->length;
 	}
