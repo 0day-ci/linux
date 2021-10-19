@@ -1123,6 +1123,7 @@ M:	Kieran Bingham <kieran.bingham@ideasonboard.com>
 L:	linux-media@vger.kernel.org
 S:	Maintained
 F:	drivers/media/i2c/adv748x/*
+F:	Documentation/devicetree/bindings/media/i2c/adv748x.yaml
 
 ANALOG DEVICES INC ADV7511 DRIVER
 M:	Hans Verkuil <hverkuil-cisco@xs4all.nl>
