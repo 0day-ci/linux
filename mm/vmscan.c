@@ -3029,6 +3029,13 @@ static void shrink_node_memcgs(pg_data_t *pgdat, struct scan_control *sc)
 				sc->memcg_low_skipped = 1;
 				continue;
 			}
+			/*
+			 * Don't bother current when its memcg is below low
+			 */
+			if (get_mem_cgroup_from_mm(current->mm) == memcg) {
+				sc->memcg_low_skipped = 1;
+				continue;
+			}
 			memcg_memory_event(memcg, MEMCG_LOW);
 		}
 
