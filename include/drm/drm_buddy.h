@@ -9,8 +9,18 @@
 #include <linux/bitops.h>
 #include <linux/list.h>
 #include <linux/slab.h>
+#include <linux/sched.h>
 
 #include <drm/drm_print.h>
+
+#define range_overflows(start, size, max) ({ \
+	typeof(start) start__ = (start); \
+	typeof(size) size__ = (size); \
+	typeof(max) max__ = (max); \
+	(void)(&start__ == &size__); \
+	(void)(&start__ == &max__); \
+	start__ >= max__ || size__ > max__ - start__; \
+})
 
 struct drm_buddy_block {
 #define DRM_BUDDY_HEADER_OFFSET GENMASK_ULL(63, 12)
