@@ -2482,12 +2482,13 @@ void blk_mq_submit_bio(struct bio *bio)
 	if (!bio_integrity_prep(bio))
 		goto queue_exit;
 
-	if (!is_flush_fua && !blk_queue_nomerges(q) &&
-	    blk_attempt_plug_merge(q, bio, nr_segs, &same_queue_rq))
-		goto queue_exit;
-
-	if (blk_mq_sched_bio_merge(q, bio, nr_segs))
-		goto queue_exit;
+	if (!blk_queue_nomerges(q) && bio_mergeable(bio)) {
+		if (!is_flush_fua &&
+		    blk_attempt_plug_merge(q, bio, nr_segs, &same_queue_rq))
+			goto queue_exit;
+		if (blk_mq_sched_bio_merge(q, bio, nr_segs))
+			goto queue_exit;
+	}
 
 	rq_qos_throttle(q, bio);
 
