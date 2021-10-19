@@ -40,10 +40,8 @@ enum lp872x_regulator_id {
 	LP872X_ID_MAX,
 };
 
-enum lp872x_dvs_state {
-	DVS_LOW  = GPIOD_OUT_LOW,
-	DVS_HIGH = GPIOD_OUT_HIGH,
-};
+#define	DVS_LOW				GPIOD_OUT_LOW
+#define	DVS_HIGH			GPIOD_OUT_HIGH
 
 enum lp872x_dvs_sel {
 	SEL_V1,
@@ -59,7 +57,7 @@ enum lp872x_dvs_sel {
 struct lp872x_dvs {
 	struct gpio_desc *gpio;
 	enum lp872x_dvs_sel vsel;
-	enum lp872x_dvs_state init_state;
+	enum gpiod_flags init_state;
 };
 
 /**

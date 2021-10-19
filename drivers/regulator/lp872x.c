@@ -103,7 +103,7 @@ struct lp872x {
 	enum lp872x_id chipid;
 	struct lp872x_platform_data *pdata;
 	int num_regulators;
-	enum lp872x_dvs_state dvs_pin;
+	enum gpiod_flags dvs_pin;
 };
 
 /* LP8720/LP8725 shared voltage table for LDOs */
@@ -251,7 +251,7 @@ static int lp872x_regulator_enable_time(struct regulator_dev *rdev)
 static void lp872x_set_dvs(struct lp872x *lp, enum lp872x_dvs_sel dvs_sel,
 			struct gpio_desc *gpio)
 {
-	enum lp872x_dvs_state state;
+	enum gpiod_flags state;
 
 	state = dvs_sel == SEL_V1 ? DVS_HIGH : DVS_LOW;
 	gpiod_set_value(gpio, state);
@@ -675,7 +675,7 @@ static const struct regulator_desc lp8725_regulator_desc[] = {
 static int lp872x_init_dvs(struct lp872x *lp)
 {
 	struct lp872x_dvs *dvs = lp->pdata ? lp->pdata->dvs : NULL;
-	enum lp872x_dvs_state pinstate;
+	enum gpiod_flags pinstate;
 	u8 mask[] = { LP8720_EXT_DVS_M, LP8725_DVS1_M | LP8725_DVS2_M };
 	u8 default_dvs_mode[] = { LP8720_DEFAULT_DVS, LP8725_DEFAULT_DVS };
 
