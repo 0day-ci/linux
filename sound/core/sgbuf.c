@@ -79,9 +79,7 @@ static void *snd_dma_sg_alloc(struct snd_dma_buffer *dmab, size_t size)
 		return NULL;
 	if (dmab->dev.type == SNDRV_DMA_TYPE_DEV_WC_SG) {
 		type = SNDRV_DMA_TYPE_DEV_WC;
-#ifdef pgprot_noncached
-		prot = pgprot_noncached(PAGE_KERNEL);
-#endif
+		prot = pgprot_writecombine(PAGE_KERNEL);
 	}
 	sgbuf->dev = dmab->dev.dev;
 	pages = snd_sgbuf_aligned_pages(size);
