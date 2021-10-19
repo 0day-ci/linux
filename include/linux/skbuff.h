@@ -4052,7 +4052,9 @@ static inline bool __skb_checksum_validate_needed(struct sk_buff *skb,
 						  bool zero_okay,
 						  __sum16 check)
 {
-	if (skb_csum_unnecessary(skb) || (zero_okay && !check)) {
+	if (skb_csum_unnecessary(skb) ||
+	    (zero_okay && !check) ||
+	    skb->pkt_type == PACKET_LOOPBACK) {
 		skb->csum_valid = 1;
 		__skb_decr_checksum_unnecessary(skb);
 		return false;
