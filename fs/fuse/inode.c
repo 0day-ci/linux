@@ -23,6 +23,7 @@
 #include <linux/exportfs.h>
 #include <linux/posix_acl.h>
 #include <linux/pid_namespace.h>
+#include <linux/fs.h>
 
 MODULE_AUTHOR("Miklos Szeredi <miklos@szeredi.hu>");
 MODULE_DESCRIPTION("Filesystem in Userspace");
@@ -244,8 +245,17 @@ void fuse_change_attributes(struct inode *inode, struct fuse_attr *attr,
 	 * In case of writeback_cache enabled, writes update mtime, ctime and
 	 * may update i_size.  In these cases trust the cached value in the
 	 * inode.
+	 *
+	 * One expection is if the page cache is clean and there is no in-flight
+	 * fuse writeback request. The c/mtime and file size are allowed to be
+	 * updated from server, so clear cache_mask in this case.
 	 */
 	cache_mask = fuse_get_cache_mask(inode);
+	if (!filemap_range_needs_writeback(inode->i_mapping, 0,
+	    i_size_read(inode) - 1) && !fuse_file_is_writeback_locked(inode)) {
+		cache_mask = 0;
+	}
+
 	if (cache_mask & STATX_SIZE)
 		attr->size = i_size_read(inode);
 

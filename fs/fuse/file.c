@@ -413,6 +413,27 @@ static struct fuse_writepage_args *fuse_find_writeback(struct fuse_inode *fi,
 }
 
 /*
+ * Check if any page of this file is under writeback.
+ *
+ * The fuse_inode lock should be held by the caller.
+ */
+bool fuse_file_is_writeback_locked(struct inode *inode)
+{
+	struct fuse_inode *fi = get_fuse_inode(inode);
+	pgoff_t idx_from = 0;
+	pgoff_t idx_to = 0;
+	size_t fuse_inode_size = i_size_read(inode);
+	bool found;
+
+	if (fuse_inode_size > 0)
+		idx_to = (fuse_inode_size - 1) >> PAGE_SHIFT;
+
+	found = fuse_find_writeback(fi, idx_from, idx_to);
+
+	return found;
+}
+
+/*
  * Check if any page in a range is under writeback
  *
  * This is currently done by walking the list of writepage requests
