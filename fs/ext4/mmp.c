@@ -295,6 +295,10 @@ int ext4_multi_mount_protect(struct super_block *sb,
 		goto failed;
 	}
 
+	bh = sb_getblk(sb, mmp_block);
+	if (bh)
+		goto failed;
+
 	retval = read_mmp_block(sb, &bh, mmp_block);
 	if (retval)
 		goto failed;
