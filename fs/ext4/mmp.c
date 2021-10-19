@@ -64,33 +64,26 @@ static int write_mmp_block(struct super_block *sb, struct buffer_head *bh)
 /*
  * Read the MMP block. It _must_ be read from disk and hence we clear the
  * uptodate flag on the buffer.
+ * Caller must ensure pass valid 'bh'.
  */
-static int read_mmp_block(struct super_block *sb, struct buffer_head **bh,
-			  ext4_fsblk_t mmp_block)
+static int read_mmp_block(struct super_block *sb, struct buffer_head *bh)
 {
 	struct mmp_struct *mmp;
 	int ret;
 
-	if (*bh)
-		clear_buffer_uptodate(*bh);
-
-	/* This would be sb_bread(sb, mmp_block), except we need to be sure
-	 * that the MD RAID device cache has been bypassed, and that the read
-	 * is not blocked in the elevator. */
-	if (!*bh) {
-		*bh = sb_getblk(sb, mmp_block);
-		if (!*bh) {
-			ret = -ENOMEM;
-			goto warn_exit;
-		}
+	if (!bh) {
+		ret = -EINVAL;
+		goto warn_exit;
 	}
 
-	lock_buffer(*bh);
-	ret = ext4_read_bh(*bh, REQ_META | REQ_PRIO, NULL);
+	clear_buffer_uptodate(bh);
+
+	lock_buffer(bh);
+	ret = ext4_read_bh(bh, REQ_META | REQ_PRIO, NULL);
 	if (ret)
 		goto warn_exit;
 
-	mmp = (struct mmp_struct *)((*bh)->b_data);
+	mmp = (struct mmp_struct *)((bh)->b_data);
 	if (le32_to_cpu(mmp->mmp_magic) != EXT4_MMP_MAGIC) {
 		ret = -EFSCORRUPTED;
 		goto warn_exit;
@@ -101,10 +94,7 @@ static int read_mmp_block(struct super_block *sb, struct buffer_head **bh,
 	}
 	return 0;
 warn_exit:
-	brelse(*bh);
-	*bh = NULL;
-	ext4_warning(sb, "Error %d while reading MMP block %llu",
-		     ret, mmp_block);
+	ext4_warning(sb, "Error %d while reading MMP block", ret);
 	return ret;
 }
 
@@ -199,7 +189,7 @@ static int kmmpd(void *data)
 			struct buffer_head *bh_check = NULL;
 			struct mmp_struct *mmp_check;
 
-			retval = read_mmp_block(sb, &bh_check, mmp_block);
+			retval = read_mmp_block(sb, bh_check);
 			if (retval) {
 				ext4_error_err(sb, -retval,
 					       "error reading MMP data: %d",
@@ -299,7 +289,7 @@ int ext4_multi_mount_protect(struct super_block *sb,
 	if (bh)
 		goto failed;
 
-	retval = read_mmp_block(sb, &bh, mmp_block);
+	retval = read_mmp_block(sb, bh);
 	if (retval)
 		goto failed;
 
@@ -337,7 +327,7 @@ int ext4_multi_mount_protect(struct super_block *sb,
 		goto failed;
 	}
 
-	retval = read_mmp_block(sb, &bh, mmp_block);
+	retval = read_mmp_block(sb, bh);
 	if (retval)
 		goto failed;
 	mmp = (struct mmp_struct *)(bh->b_data);
@@ -366,7 +356,7 @@ skip:
 		goto failed;
 	}
 
-	retval = read_mmp_block(sb, &bh, mmp_block);
+	retval = read_mmp_block(sb, bh);
 	if (retval)
 		goto failed;
 	mmp = (struct mmp_struct *)(bh->b_data);
