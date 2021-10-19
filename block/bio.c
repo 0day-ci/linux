@@ -1058,10 +1058,12 @@ static void __bio_iov_bvec_set(struct bio *bio, struct iov_iter *iter)
 	bio_set_flag(bio, BIO_CLONED);
 }
 
-static int bio_iov_bvec_set(struct bio *bio, struct iov_iter *iter)
+static int bio_iov_bvec_set(struct bio *bio, struct iov_iter *iter,
+			    bool hint_skip_advance)
 {
 	__bio_iov_bvec_set(bio, iter);
-	iov_iter_advance(iter, iter->count);
+	if (!hint_skip_advance)
+		iov_iter_advance(iter, iter->count);
 	return 0;
 }
 
@@ -1212,14 +1214,15 @@ static int __bio_iov_append_get_pages(struct bio *bio, struct iov_iter *iter)
  * It's intended for direct IO, so doesn't do PSI tracking, the caller is
  * responsible for setting BIO_WORKINGSET if necessary.
  */
-int bio_iov_iter_get_pages(struct bio *bio, struct iov_iter *iter)
+int bio_iov_iter_get_pages_hint(struct bio *bio, struct iov_iter *iter,
+				bool hint_skip_advance)
 {
 	int ret = 0;
 
 	if (iov_iter_is_bvec(iter)) {
 		if (bio_op(bio) == REQ_OP_ZONE_APPEND)
 			return bio_iov_bvec_set_append(bio, iter);
-		return bio_iov_bvec_set(bio, iter);
+		return bio_iov_bvec_set(bio, iter, hint_skip_advance);
 	}
 
 	do {
@@ -1233,7 +1236,7 @@ int bio_iov_iter_get_pages(struct bio *bio, struct iov_iter *iter)
 	bio_clear_flag(bio, BIO_WORKINGSET);
 	return bio->bi_vcnt ? 0 : ret;
 }
-EXPORT_SYMBOL_GPL(bio_iov_iter_get_pages);
+EXPORT_SYMBOL_GPL(bio_iov_iter_get_pages_hint);
 
 static void submit_bio_wait_endio(struct bio *bio)
 {

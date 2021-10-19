@@ -416,7 +416,8 @@ int bio_add_zone_append_page(struct bio *bio, struct page *page,
 			     unsigned int len, unsigned int offset);
 void __bio_add_page(struct bio *bio, struct page *page,
 		unsigned int len, unsigned int off);
-int bio_iov_iter_get_pages(struct bio *bio, struct iov_iter *iter);
+int bio_iov_iter_get_pages_hint(struct bio *bio, struct iov_iter *iter,
+				bool hint_skip_advance);
 void __bio_release_pages(struct bio *bio, bool mark_dirty);
 extern void bio_set_pages_dirty(struct bio *bio);
 extern void bio_check_pages_dirty(struct bio *bio);
@@ -427,6 +428,12 @@ extern void bio_copy_data(struct bio *dst, struct bio *src);
 extern void bio_free_pages(struct bio *bio);
 void guard_bio_eod(struct bio *bio);
 void zero_fill_bio(struct bio *bio);
+
+static inline int bio_iov_iter_get_pages(struct bio *bio,
+					 struct iov_iter *iter)
+{
+	return bio_iov_iter_get_pages_hint(bio, iter, false);
+}
 
 static inline void bio_release_pages(struct bio *bio, bool mark_dirty)
 {
