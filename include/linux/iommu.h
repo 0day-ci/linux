@@ -101,6 +101,11 @@ static inline bool iommu_is_dma_domain(struct iommu_domain *domain)
 	return domain->type & __IOMMU_DOMAIN_DMA_API;
 }
 
+static inline bool iommu_is_paging_domain(struct iommu_domain *domain)
+{
+	return domain->type & __IOMMU_DOMAIN_PAGING;
+}
+
 enum iommu_cap {
 	IOMMU_CAP_CACHE_COHERENCY,	/* IOMMU can enforce cache coherent DMA
 					   transactions */
