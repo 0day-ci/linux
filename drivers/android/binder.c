@@ -6030,6 +6030,5 @@ err_alloc_device_names_failed:
 device_initcall(binder_init);
 
 #define CREATE_TRACE_POINTS
-#include "binder_trace.h"
 
 MODULE_LICENSE("GPL v2");
