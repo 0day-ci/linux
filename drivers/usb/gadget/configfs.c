@@ -199,6 +199,7 @@ static ssize_t is_valid_bcd(u16 bcd_val)
 static ssize_t gadget_dev_desc_bcdDevice_store(struct config_item *item,
 		const char *page, size_t len)
 {
+	struct gadget_info *gi = to_gadget_info(item);
 	u16 bcdDevice;
 	int ret;
 
@@ -209,13 +210,16 @@ static ssize_t gadget_dev_desc_bcdDevice_store(struct config_item *item,
 	if (ret)
 		return ret;
 
-	to_gadget_info(item)->cdev.desc.bcdDevice = cpu_to_le16(bcdDevice);
+	mutex_lock(&gi->lock);
+	gi->cdev.desc.bcdDevice = cpu_to_le16(bcdDevice);
+	mutex_unlock(&gi->lock);
 	return len;
 }
 
 static ssize_t gadget_dev_desc_bcdUSB_store(struct config_item *item,
 		const char *page, size_t len)
 {
+	struct gadget_info *gi = to_gadget_info(item);
 	u16 bcdUSB;
 	int ret;
 
@@ -226,7 +230,9 @@ static ssize_t gadget_dev_desc_bcdUSB_store(struct config_item *item,
 	if (ret)
 		return ret;
 
-	to_gadget_info(item)->cdev.desc.bcdUSB = cpu_to_le16(bcdUSB);
+	mutex_lock(&gi->lock);
+	gi->cdev.desc.bcdUSB = cpu_to_le16(bcdUSB);
+	mutex_unlock(&gi->lock);
 	return len;
 }
 
@@ -517,6 +523,7 @@ static ssize_t gadget_config_desc_MaxPower_store(struct config_item *item,
 		const char *page, size_t len)
 {
 	struct config_usb_cfg *cfg = to_config_usb_cfg(item);
+	struct gadget_info *gi = cfg_to_gadget_info(cfg);
 	u16 val;
 	int ret;
 	ret = kstrtou16(page, 0, &val);
@@ -524,7 +531,9 @@ static ssize_t gadget_config_desc_MaxPower_store(struct config_item *item,
 		return ret;
 	if (DIV_ROUND_UP(val, 8) > 0xff)
 		return -ERANGE;
+	mutex_lock(&gi->lock);
 	cfg->c.MaxPower = val;
+	mutex_unlock(&gi->lock);
 	return len;
 }
 
@@ -540,6 +549,7 @@ static ssize_t gadget_config_desc_bmAttributes_store(struct config_item *item,
 		const char *page, size_t len)
 {
 	struct config_usb_cfg *cfg = to_config_usb_cfg(item);
+	struct gadget_info *gi = cfg_to_gadget_info(cfg);
 	u8 val;
 	int ret;
 	ret = kstrtou8(page, 0, &val);
@@ -550,7 +560,9 @@ static ssize_t gadget_config_desc_bmAttributes_store(struct config_item *item,
 	if (val & ~(USB_CONFIG_ATT_ONE | USB_CONFIG_ATT_SELFPOWER |
 				USB_CONFIG_ATT_WAKEUP))
 		return -EINVAL;
+	mutex_lock(&gi->lock);
 	cfg->c.bmAttributes = val;
+	mutex_unlock(&gi->lock);
 	return len;
 }
 
@@ -729,7 +741,9 @@ static struct config_group *config_desc_make(
 			&gadget_config_name_strings_type);
 	configfs_add_default_group(&cfg->strings_group, &cfg->group);
 
+	mutex_lock(&gi->lock);
 	ret = usb_add_config_only(&gi->cdev, &cfg->c);
+	mutex_unlock(&gi->lock);
 	if (ret)
 		goto err;
 
