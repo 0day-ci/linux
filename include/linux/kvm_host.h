@@ -1364,102 +1364,105 @@ struct _kvm_stats_desc {
 	.size = sz,							       \
 	.bucket_size = bsz
 
-#define VM_GENERIC_STATS_DESC(stat, type, unit, base, exp, sz, bsz)	       \
-	{								       \
-		{							       \
-			STATS_DESC_COMMON(type, unit, base, exp, sz, bsz),     \
-			.offset = offsetof(struct kvm_vm_stat, generic.stat)   \
-		},							       \
-		.name = #stat,						       \
-	}
-#define VCPU_GENERIC_STATS_DESC(stat, type, unit, base, exp, sz, bsz)	       \
-	{								       \
-		{							       \
-			STATS_DESC_COMMON(type, unit, base, exp, sz, bsz),     \
-			.offset = offsetof(struct kvm_vcpu_stat, generic.stat) \
-		},							       \
-		.name = #stat,						       \
-	}
-#define VM_STATS_DESC(stat, type, unit, base, exp, sz, bsz)		       \
+#define VM_STATS_DESC(stat, type, unit, base, exp, sz, bsz, nm)		       \
 	{								       \
 		{							       \
 			STATS_DESC_COMMON(type, unit, base, exp, sz, bsz),     \
 			.offset = offsetof(struct kvm_vm_stat, stat)	       \
 		},							       \
-		.name = #stat,						       \
+		.name = nm,						       \
 	}
-#define VCPU_STATS_DESC(stat, type, unit, base, exp, sz, bsz)		       \
+#define VCPU_STATS_DESC(stat, type, unit, base, exp, sz, bsz, nm)	       \
 	{								       \
 		{							       \
 			STATS_DESC_COMMON(type, unit, base, exp, sz, bsz),     \
 			.offset = offsetof(struct kvm_vcpu_stat, stat)	       \
 		},							       \
-		.name = #stat,						       \
+		.name = nm,						       \
 	}
-/* SCOPE: VM, VM_GENERIC, VCPU, VCPU_GENERIC */
-#define STATS_DESC(SCOPE, stat, type, unit, base, exp, sz, bsz)		       \
-	SCOPE##_STATS_DESC(stat, type, unit, base, exp, sz, bsz)
 
-#define STATS_DESC_CUMULATIVE(SCOPE, name, unit, base, exponent)	       \
-	STATS_DESC(SCOPE, name, KVM_STATS_TYPE_CUMULATIVE,		       \
-		unit, base, exponent, 1, 0)
-#define STATS_DESC_INSTANT(SCOPE, name, unit, base, exponent)		       \
-	STATS_DESC(SCOPE, name, KVM_STATS_TYPE_INSTANT,			       \
-		unit, base, exponent, 1, 0)
-#define STATS_DESC_PEAK(SCOPE, name, unit, base, exponent)		       \
-	STATS_DESC(SCOPE, name, KVM_STATS_TYPE_PEAK,			       \
-		unit, base, exponent, 1, 0)
-#define STATS_DESC_LINEAR_HIST(SCOPE, name, unit, base, exponent, sz, bsz)     \
-	STATS_DESC(SCOPE, name, KVM_STATS_TYPE_LINEAR_HIST,		       \
-		unit, base, exponent, sz, bsz)
-#define STATS_DESC_LOG_HIST(SCOPE, name, unit, base, exponent, sz)	       \
-	STATS_DESC(SCOPE, name, KVM_STATS_TYPE_LOG_HIST,		       \
-		unit, base, exponent, sz, 0)
+/* SCOPE: VM, VCPU */
+#define STATS_DESC(SCOPE, stat, type, unit, base, exp, sz, bsz, nm)	       \
+	SCOPE##_STATS_DESC(stat, type, unit, base, exp, sz, bsz, nm)
+
+#define STATS_DESC_CUMULATIVE(SCOPE, stat, unit, base, exp, name)	       \
+	STATS_DESC(SCOPE, stat, KVM_STATS_TYPE_CUMULATIVE,		       \
+		unit, base, exp, 1, 0, name)
+#define STATS_DESC_INSTANT(SCOPE, stat, unit, base, exp, name)		       \
+	STATS_DESC(SCOPE, stat, KVM_STATS_TYPE_INSTANT,			       \
+		unit, base, exp, 1, 0, name)
+#define STATS_DESC_PEAK(SCOPE, stat, unit, base, exp, name)		       \
+	STATS_DESC(SCOPE, stat, KVM_STATS_TYPE_PEAK,			       \
+		unit, base, exp, 1, 0, name)
+#define STATS_DESC_LINEAR_HIST(SCOPE, stat, unit, base, exp, sz, bsz, name)    \
+	STATS_DESC(SCOPE, stat, KVM_STATS_TYPE_LINEAR_HIST,		       \
+		unit, base, exp, sz, bsz, name)
+#define STATS_DESC_LOG_HIST(SCOPE, stat, unit, base, exp, sz, name)	       \
+	STATS_DESC(SCOPE, stat, KVM_STATS_TYPE_LOG_HIST,		       \
+		unit, base, exp, sz, 0, name)
 
 /* Cumulative counter, read/write */
-#define STATS_DESC_COUNTER(SCOPE, name)					       \
-	STATS_DESC_CUMULATIVE(SCOPE, name, KVM_STATS_UNIT_NONE,		       \
-		KVM_STATS_BASE_POW10, 0)
+#define _STATS_DESC_COUNTER(SCOPE, stat, name)				       \
+	STATS_DESC_CUMULATIVE(SCOPE, stat, KVM_STATS_UNIT_NONE,		       \
+		KVM_STATS_BASE_POW10, 0, name)
+#define STATS_DESC_COUNTER(SCOPE, stat)					       \
+	_STATS_DESC_COUNTER(SCOPE, stat, #stat)
 /* Instantaneous counter, read only */
-#define STATS_DESC_ICOUNTER(SCOPE, name)				       \
-	STATS_DESC_INSTANT(SCOPE, name, KVM_STATS_UNIT_NONE,		       \
-		KVM_STATS_BASE_POW10, 0)
+#define _STATS_DESC_ICOUNTER(SCOPE, stat, name)				       \
+	STATS_DESC_INSTANT(SCOPE, stat, KVM_STATS_UNIT_NONE,		       \
+		KVM_STATS_BASE_POW10, 0, name)
+#define STATS_DESC_ICOUNTER(SCOPE, stat)				       \
+	_STATS_DESC_ICOUNTER(SCOPE, stat, #stat)			       \
 /* Peak counter, read/write */
-#define STATS_DESC_PCOUNTER(SCOPE, name)				       \
-	STATS_DESC_PEAK(SCOPE, name, KVM_STATS_UNIT_NONE,		       \
-		KVM_STATS_BASE_POW10, 0)
+#define _STATS_DESC_PCOUNTER(SCOPE, stat, name)				       \
+	STATS_DESC_PEAK(SCOPE, stat, KVM_STATS_UNIT_NONE,		       \
+		KVM_STATS_BASE_POW10, 0, name)
+#define STATS_DESC_PCOUNTER(SCOPE, stat)				       \
+	_STATS_DESC_PCOUNTER(SCOPE, stat, #stat)			       \
 
 /* Cumulative time in nanosecond */
-#define STATS_DESC_TIME_NSEC(SCOPE, name)				       \
-	STATS_DESC_CUMULATIVE(SCOPE, name, KVM_STATS_UNIT_SECONDS,	       \
-		KVM_STATS_BASE_POW10, -9)
+#define _STATS_DESC_TIME_NSEC(SCOPE, stat, name)			       \
+	STATS_DESC_CUMULATIVE(SCOPE, stat, KVM_STATS_UNIT_SECONDS,	       \
+		KVM_STATS_BASE_POW10, -9, name)
+#define STATS_DESC_TIME_NSEC(SCOPE, stat)				       \
+	_STATS_DESC_TIME_NSEC(SCOPE, stat, #stat)			       \
 /* Linear histogram for time in nanosecond */
-#define STATS_DESC_LINHIST_TIME_NSEC(SCOPE, name, sz, bsz)		       \
-	STATS_DESC_LINEAR_HIST(SCOPE, name, KVM_STATS_UNIT_SECONDS,	       \
-		KVM_STATS_BASE_POW10, -9, sz, bsz)
+#define _STATS_DESC_LINHIST_TIME_NSEC(SCOPE, stat, sz, bsz, name)	       \
+	STATS_DESC_LINEAR_HIST(SCOPE, stat, KVM_STATS_UNIT_SECONDS,	       \
+		KVM_STATS_BASE_POW10, -9, sz, bsz, name)
+#define STATS_DESC_LINHIST_TIME_NSEC(SCOPE, stat, sz, bsz)		       \
+	_STATS_DESC_LINHIST_TIME_NSEC(SCOPE, stat, sz, bsz, #stat)	       \
 /* Logarithmic histogram for time in nanosecond */
-#define STATS_DESC_LOGHIST_TIME_NSEC(SCOPE, name, sz)			       \
-	STATS_DESC_LOG_HIST(SCOPE, name, KVM_STATS_UNIT_SECONDS,	       \
-		KVM_STATS_BASE_POW10, -9, sz)
+#define _STATS_DESC_LOGHIST_TIME_NSEC(SCOPE, stat, sz, name)		       \
+	STATS_DESC_LOG_HIST(SCOPE, stat, KVM_STATS_UNIT_SECONDS,	       \
+		KVM_STATS_BASE_POW10, -9, sz, name)
+#define STATS_DESC_LOGHIST_TIME_NSEC(SCOPE, stat, sz)			       \
+	_STATS_DESC_LOGHIST_TIME_NSEC(SCOPE, stat, sz, #stat)		       \
 
 #define KVM_GENERIC_VM_STATS()						       \
-	STATS_DESC_COUNTER(VM_GENERIC, remote_tlb_flush),		       \
-	STATS_DESC_COUNTER(VM_GENERIC, remote_tlb_flush_requests)
+	_STATS_DESC_COUNTER(VM, generic.remote_tlb_flush, "remote_tlb_flush"), \
+	_STATS_DESC_COUNTER(VM, generic.remote_tlb_flush_requests,	       \
+			"remote_tlb_flush_requests")
 
 #define KVM_GENERIC_VCPU_STATS()					       \
-	STATS_DESC_COUNTER(VCPU_GENERIC, halt_successful_poll),		       \
-	STATS_DESC_COUNTER(VCPU_GENERIC, halt_attempted_poll),		       \
-	STATS_DESC_COUNTER(VCPU_GENERIC, halt_poll_invalid),		       \
-	STATS_DESC_COUNTER(VCPU_GENERIC, halt_wakeup),			       \
-	STATS_DESC_TIME_NSEC(VCPU_GENERIC, halt_poll_success_ns),	       \
-	STATS_DESC_TIME_NSEC(VCPU_GENERIC, halt_poll_fail_ns),		       \
-	STATS_DESC_TIME_NSEC(VCPU_GENERIC, halt_wait_ns),		       \
-	STATS_DESC_LOGHIST_TIME_NSEC(VCPU_GENERIC, halt_poll_success_hist,     \
-			HALT_POLL_HIST_COUNT),				       \
-	STATS_DESC_LOGHIST_TIME_NSEC(VCPU_GENERIC, halt_poll_fail_hist,	       \
-			HALT_POLL_HIST_COUNT),				       \
-	STATS_DESC_LOGHIST_TIME_NSEC(VCPU_GENERIC, halt_wait_hist,	       \
-			HALT_POLL_HIST_COUNT)
+	_STATS_DESC_COUNTER(VCPU, generic.halt_successful_poll,		       \
+			"halt_successful_poll"),			       \
+	_STATS_DESC_COUNTER(VCPU, generic.halt_attempted_poll,		       \
+			"halt_attempted_poll"),				       \
+	_STATS_DESC_COUNTER(VCPU, generic.halt_poll_invalid,		       \
+			"halt_poll_invalid"),				       \
+	_STATS_DESC_COUNTER(VCPU, generic.halt_wakeup, "halt_wakeup"),	       \
+	_STATS_DESC_TIME_NSEC(VCPU, generic.halt_poll_success_ns,	       \
+			"halt_poll_success_ns"),			       \
+	_STATS_DESC_TIME_NSEC(VCPU, generic.halt_poll_fail_ns,		       \
+			"halt_poll_fail_ns"),				       \
+	_STATS_DESC_TIME_NSEC(VCPU, generic.halt_wait_ns, "halt_wait_ns"),     \
+	_STATS_DESC_LOGHIST_TIME_NSEC(VCPU, generic.halt_poll_success_hist,    \
+			HALT_POLL_HIST_COUNT, "halt_poll_success_hist"),       \
+	_STATS_DESC_LOGHIST_TIME_NSEC(VCPU, generic.halt_poll_fail_hist,       \
+			HALT_POLL_HIST_COUNT, "halt_poll_fail_hist"),	       \
+	_STATS_DESC_LOGHIST_TIME_NSEC(VCPU, generic.halt_wait_hist,	       \
+			HALT_POLL_HIST_COUNT, "halt_wait_hist")
 
 extern struct dentry *kvm_debugfs_dir;
 
