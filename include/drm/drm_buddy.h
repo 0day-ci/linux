@@ -27,6 +27,7 @@
 		|| size__ > end__ - start__; \
 })
 
+#define DRM_BUDDY_TOPDOWN_ALLOCATION (1 << 0)
 #define DRM_BUDDY_RANGE_ALLOCATION (1 << 1)
 
 struct drm_buddy_block {
