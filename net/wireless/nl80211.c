@@ -9304,6 +9304,10 @@ static int nl80211_start_radar_detection(struct sk_buff *skb,
 
 	if (nla_get_flag(info->attrs[NL80211_ATTR_RADAR_OFFCHAN])) {
 		/* offchannel radar detection */
+		if (!wiphy_ext_feature_isset(wiphy,
+					     NL80211_EXT_FEATURE_RADAR_OFFCHAN))
+			return -EOPNOTSUPP;
+
 		return rdev_set_radar_offchan(rdev, &chandef);
 	}
 

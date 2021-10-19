@@ -6055,6 +6055,9 @@ enum nl80211_feature_flags {
  *	frames. Userspace has to share FILS AAD details to the driver by using
  *	@NL80211_CMD_SET_FILS_AAD.
  *
+ * @NL80211_EXT_FEATURE_RADAR_OFFCHAN: Device supports offchannel radar/CAC
+ *	detection.
+ *
  * @NUM_NL80211_EXT_FEATURES: number of extended features.
  * @MAX_NL80211_EXT_FEATURES: highest extended feature index.
  */
@@ -6121,6 +6124,7 @@ enum nl80211_ext_feature_index {
 	NL80211_EXT_FEATURE_PROT_RANGE_NEGO_AND_MEASURE,
 	NL80211_EXT_FEATURE_BSS_COLOR,
 	NL80211_EXT_FEATURE_FILS_CRYPTO_OFFLOAD,
+	NL80211_EXT_FEATURE_RADAR_OFFCHAN,
 
 	/* add new features before the definition below */
 	NUM_NL80211_EXT_FEATURES,
