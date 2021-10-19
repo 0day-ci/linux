@@ -86,7 +86,6 @@ struct guest_walker {
 	unsigned max_level;
 	gfn_t table_gfn[PT_MAX_FULL_LEVELS];
 	pt_element_t ptes[PT_MAX_FULL_LEVELS];
-	pt_element_t prefetch_ptes[PTE_PREFETCH_NUM];
 	gpa_t pte_gpa[PT_MAX_FULL_LEVELS];
 	pt_element_t __user *ptep_user[PT_MAX_FULL_LEVELS];
 	bool pte_writable[PT_MAX_FULL_LEVELS];
@@ -592,23 +591,30 @@ FNAME(prefetch_gpte)(struct kvm_vcpu *vcpu, struct kvm_mmu_page *sp,
 static bool FNAME(gpte_changed)(struct kvm_vcpu *vcpu,
 				struct guest_walker *gw, int level)
 {
+	pt_element_t *prefetch_ptes;
 	pt_element_t curr_pte;
 	gpa_t base_gpa, pte_gpa = gw->pte_gpa[level - 1];
-	u64 mask;
+	u32 pte_prefetch_num;
+	u64 len;
 	int r, index;
 
+	spin_lock(&vcpu->arch.mmu_pte_prefetch.lock);
+	prefetch_ptes = (pt_element_t *)vcpu->arch.mmu_pte_prefetch.ents;
+	pte_prefetch_num = vcpu->arch.mmu_pte_prefetch.num_ents;
+
 	if (level == PG_LEVEL_4K) {
-		mask = PTE_PREFETCH_NUM * sizeof(pt_element_t) - 1;
-		base_gpa = pte_gpa & ~mask;
+		len = pte_prefetch_num * sizeof(pt_element_t);
+		base_gpa = pte_gpa & ~(len - 1);
 		index = (pte_gpa - base_gpa) / sizeof(pt_element_t);
 
-		r = kvm_vcpu_read_guest_atomic(vcpu, base_gpa,
-				gw->prefetch_ptes, sizeof(gw->prefetch_ptes));
-		curr_pte = gw->prefetch_ptes[index];
+		r = kvm_vcpu_read_guest_atomic(vcpu, base_gpa, prefetch_ptes,
+					       len);
+		curr_pte = prefetch_ptes[index];
 	} else
 		r = kvm_vcpu_read_guest_atomic(vcpu, pte_gpa,
 				  &curr_pte, sizeof(curr_pte));
 
+	spin_unlock(&vcpu->arch.mmu_pte_prefetch.lock);
 	return r || curr_pte != gw->ptes[level - 1];
 }
 
@@ -616,7 +622,8 @@ static void FNAME(pte_prefetch)(struct kvm_vcpu *vcpu, struct guest_walker *gw,
 				u64 *sptep)
 {
 	struct kvm_mmu_page *sp;
-	pt_element_t *gptep = gw->prefetch_ptes;
+	u32 pte_prefetch_num;
+	pt_element_t *gptep;
 	u64 *spte;
 	int i;
 
@@ -632,13 +639,19 @@ static void FNAME(pte_prefetch)(struct kvm_vcpu *vcpu, struct guest_walker *gw,
 	if (unlikely(vcpu->kvm->mmu_notifier_count))
 		return;
 
-	if (sp->role.direct)
-		return __direct_pte_prefetch(vcpu, sp, sptep);
+	spin_lock(&vcpu->arch.mmu_pte_prefetch.lock);
+	gptep = (pt_element_t *)vcpu->arch.mmu_pte_prefetch.ents;
+	pte_prefetch_num = vcpu->arch.mmu_pte_prefetch.num_ents;
 
-	i = (sptep - sp->spt) & ~(PTE_PREFETCH_NUM - 1);
+	if (sp->role.direct) {
+		__direct_pte_prefetch(vcpu, sp, sptep);
+		goto out;
+	}
+
+	i = (sptep - sp->spt) & ~(pte_prefetch_num - 1);
 	spte = sp->spt + i;
 
-	for (i = 0; i < PTE_PREFETCH_NUM; i++, spte++) {
+	for (i = 0; i < pte_prefetch_num; i++, spte++) {
 		if (spte == sptep)
 			continue;
 
@@ -648,6 +661,8 @@ static void FNAME(pte_prefetch)(struct kvm_vcpu *vcpu, struct guest_walker *gw,
 		if (!FNAME(prefetch_gpte)(vcpu, sp, spte, gptep[i], true))
 			break;
 	}
+out:
+	spin_unlock(&vcpu->arch.mmu_pte_prefetch.lock);
 }
 
 /*

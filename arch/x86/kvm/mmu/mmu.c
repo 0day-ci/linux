@@ -2788,7 +2788,6 @@ static void __direct_pte_prefetch(struct kvm_vcpu *vcpu,
 
 	WARN_ON(!sp->role.direct);
 
-	spin_lock(&vcpu->arch.mmu_pte_prefetch.lock);
 	pte_prefetch_num = vcpu->arch.mmu_pte_prefetch.num_ents;
 	i = (sptep - sp->spt) & ~(pte_prefetch_num - 1);
 	spte = sp->spt + i;
@@ -2805,7 +2804,6 @@ static void __direct_pte_prefetch(struct kvm_vcpu *vcpu,
 	}
 	if (start)
 		direct_pte_prefetch_many(vcpu, sp, start, spte);
-	spin_unlock(&vcpu->arch.mmu_pte_prefetch.lock);
 }
 
 static void direct_pte_prefetch(struct kvm_vcpu *vcpu, u64 *sptep)
@@ -2832,7 +2830,9 @@ static void direct_pte_prefetch(struct kvm_vcpu *vcpu, u64 *sptep)
 	if (unlikely(vcpu->kvm->mmu_notifier_count))
 		return;
 
+	spin_lock(&vcpu->arch.mmu_pte_prefetch.lock);
 	__direct_pte_prefetch(vcpu, sp, sptep);
+	spin_unlock(&vcpu->arch.mmu_pte_prefetch.lock);
 }
 
 static int host_pfn_mapping_level(struct kvm *kvm, gfn_t gfn, kvm_pfn_t pfn,
