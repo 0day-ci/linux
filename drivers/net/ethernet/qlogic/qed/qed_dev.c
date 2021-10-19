@@ -3987,30 +3987,35 @@ static int qed_hw_get_resc(struct qed_hwfn *p_hwfn, struct qed_ptt *p_ptt)
 				       QED_RESC_LOCK_RESC_ALLOC, false);
 
 	rc = qed_mcp_resc_lock(p_hwfn, p_ptt, &resc_lock_params);
-	if (rc && rc != -EINVAL) {
-		return rc;
-	} else if (rc == -EINVAL) {
+	if (rc) {
+		if (rc != -EINVAL)
+			return rc;
+
 		DP_INFO(p_hwfn,
 			"Skip the max values setting of the soft resources since the resource lock is not supported by the MFW\n");
-	} else if (!rc && !resc_lock_params.b_granted) {
+	}
+
+	if (!resc_lock_params.b_granted) {
 		DP_NOTICE(p_hwfn,
 			  "Failed to acquire the resource lock for the resource allocation commands\n");
 		return -EBUSY;
-	} else {
-		rc = qed_hw_set_soft_resc_size(p_hwfn, p_ptt);
-		if (rc && rc != -EINVAL) {
+	}
+
+	rc = qed_hw_set_soft_resc_size(p_hwfn, p_ptt);
+	if (rc) {
+		if (rc != -EINVAL) {
 			DP_NOTICE(p_hwfn,
 				  "Failed to set the max values of the soft resources\n");
 			goto unlock_and_exit;
-		} else if (rc == -EINVAL) {
-			DP_INFO(p_hwfn,
-				"Skip the max values setting of the soft resources since it is not supported by the MFW\n");
-			rc = qed_mcp_resc_unlock(p_hwfn, p_ptt,
-						 &resc_unlock_params);
-			if (rc)
-				DP_INFO(p_hwfn,
-					"Failed to release the resource lock for the resource allocation commands\n");
 		}
+
+		DP_INFO(p_hwfn,
+			"Skip the max values setting of the soft resources since it is not supported by the MFW\n");
+		rc = qed_mcp_resc_unlock(p_hwfn, p_ptt,
+					 &resc_unlock_params);
+		if (rc)
+			DP_INFO(p_hwfn,
+				"Failed to release the resource lock for the resource allocation commands\n");
 	}
 
 	rc = qed_hw_set_resc_info(p_hwfn);
