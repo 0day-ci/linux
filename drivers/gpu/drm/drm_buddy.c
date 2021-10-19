@@ -63,6 +63,18 @@ static void mark_split(struct drm_buddy_block *block)
 	list_del(&block->link);
 }
 
+/**
+ * drm_buddy_init - init memory manager
+ *
+ * @mm: DRM buddy manager to initialize
+ * @size: size in bytes to manage
+ * @chunk_size: minimum page size in bytes for our allocations
+ *
+ * Initializes the memory manager and its resources.
+ *
+ * Returns:
+ * 0 on success, error code on failure.
+ */
 int drm_buddy_init(struct drm_buddy_mm *mm, u64 size, u64 chunk_size)
 {
 	unsigned int i;
@@ -144,7 +156,15 @@ out_free_list:
 	kfree(mm->free_list);
 	return -ENOMEM;
 }
+EXPORT_SYMBOL(drm_buddy_init);
 
+/**
+ * drm_buddy_fini - tear down the memory manager
+ *
+ * @mm: DRM buddy manager to free
+ *
+ * Cleanup memory manager resources and the freelist
+ */
 void drm_buddy_fini(struct drm_buddy_mm *mm)
 {
 	int i;
@@ -159,6 +179,7 @@ void drm_buddy_fini(struct drm_buddy_mm *mm)
 	kfree(mm->roots);
 	kfree(mm->free_list);
 }
+EXPORT_SYMBOL(drm_buddy_fini);
 
 static int split_block(struct drm_buddy_mm *mm,
 		       struct drm_buddy_block *block)
@@ -235,6 +256,12 @@ void drm_buddy_free(struct drm_buddy_mm *mm,
 	__drm_buddy_free(mm, block);
 }
 
+/**
+ * drm_buddy_free_list - free blocks
+ *
+ * @mm: DRM buddy manager
+ * @objects: input list head to free blocks
+ */
 void drm_buddy_free_list(struct drm_buddy_mm *mm, struct list_head *objects)
 {
 	struct drm_buddy_block *block, *on;
@@ -245,6 +272,7 @@ void drm_buddy_free_list(struct drm_buddy_mm *mm, struct list_head *objects)
 	}
 	INIT_LIST_HEAD(objects);
 }
+EXPORT_SYMBOL(drm_buddy_free_list);
 
 static inline bool overlaps(u64 s1, u64 e1, u64 s2, u64 e2)
 {
@@ -256,6 +284,20 @@ static inline bool contains(u64 s1, u64 e1, u64 s2, u64 e2)
 	return s1 <= s2 && e1 >= e2;
 }
 
+/**
+ * drm_buddy_free_unused_pages - free unused pages
+ *
+ * @mm: DRM buddy manager
+ * @actual_size: original size requested
+ * @blocks: output list head to add allocated blocks
+ *
+ * For contiguous allocation, we round up the size to the nearest
+ * power of two value, drivers consume *actual* size, so remaining
+ * portions are unused and it can be freed.
+ *
+ * Returns:
+ * 0 on success, error code on failure.
+ */
 int drm_buddy_free_unused_pages(struct drm_buddy_mm *mm,
 				u64 actual_size,
 				struct list_head *blocks)
@@ -342,6 +384,7 @@ err_undo:
 		__drm_buddy_free(mm, block);
 	return err;
 }
+EXPORT_SYMBOL(drm_buddy_free_unused_pages);
 
 static struct drm_buddy_block *
 alloc_range(struct drm_buddy_mm *mm,
@@ -494,13 +537,31 @@ err_undo:
 	return ERR_PTR(err);
 }
 
-/*
- * Allocate power-of-two block. The order value here translates to:
+/**
+ * drm_buddy_alloc - allocate power-of-two blocks
  *
- *   0 = 2^0 * mm->chunk_size
- *   1 = 2^1 * mm->chunk_size
- *   2 = 2^2 * mm->chunk_size
- *   ...
+ * @mm: DRM buddy manager to allocate from
+ * @start: start of the allowed range for this block
+ * @end: end of the allowed range for this block
+ * @size: size of the allocation
+ * @min_page_size: alignment of the allocation
+ * @blocks: output list head to add allocated blocks
+ * @flags: DRM_BUDDY_*_ALLOCATION flags
+ *
+ * alloc_range() invoked on range limitations, which traverses
+ * the tree and returns the desired block.
+ *
+ * alloc_from_freelist() called when *no* range restrictions
+ * are enforced, which picks the block from the freelist.
+ *
+ * blocks are allocated in order, order value here translates to:
+ *
+ * 0 = 2^0 * mm->chunk_size
+ * 1 = 2^1 * mm->chunk_size
+ * 2 = 2^2 * mm->chunk_size
+ *
+ * Returns:
+ * 0 on success, error code on failure.
  */
 int drm_buddy_alloc(struct drm_buddy_mm *mm,
 		    u64 start, u64 end, u64 size,
@@ -573,7 +634,15 @@ err_free:
 	drm_buddy_free_list(mm, &allocated);
 	return err;
 }
+EXPORT_SYMBOL(drm_buddy_alloc);
 
+/**
+ * drm_buddy_block_print - print block information
+ *
+ * @mm: DRM buddy manager
+ * @block: DRM buddy block
+ * @p: DRM printer to use
+ */
 void drm_buddy_block_print(struct drm_buddy_mm *mm,
 			   struct drm_buddy_block *block,
 			   struct drm_printer *p)
@@ -583,7 +652,14 @@ void drm_buddy_block_print(struct drm_buddy_mm *mm,
 
 	drm_printf(p, "%#018llx-%#018llx: %llu\n", start, start + size, size);
 }
+EXPORT_SYMBOL(drm_buddy_block_print);
 
+/**
+ * drm_buddy_print - print allocator state
+ *
+ * @mm: DRM buddy manager
+ * @p: DRM printer to use
+ */
 void drm_buddy_print(struct drm_buddy_mm *mm, struct drm_printer *p)
 {
 	int order;
@@ -611,6 +687,7 @@ void drm_buddy_print(struct drm_buddy_mm *mm, struct drm_printer *p)
 		drm_printf(p, ", pages: %llu\n", count);
 	}
 }
+EXPORT_SYMBOL(drm_buddy_print);
 
 #if IS_ENABLED(CONFIG_DRM_I915_SELFTEST)
 #include "selftests/i915_buddy.c"
