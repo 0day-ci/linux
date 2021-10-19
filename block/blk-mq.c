@@ -604,7 +604,7 @@ void blk_mq_free_request(struct request *rq)
 }
 EXPORT_SYMBOL_GPL(blk_mq_free_request);
 
-void blk_mq_free_plug_rqs(struct blk_plug *plug)
+static void blk_mq_free_plug_rqs(struct blk_plug *plug)
 {
 	struct request *rq;
 
@@ -2199,15 +2199,13 @@ static void blk_mq_plug_issue_direct(struct blk_plug *plug, bool from_schedule)
 		blk_mq_commit_rqs(hctx, &queued, from_schedule);
 }
 
-void blk_mq_flush_plug_list(struct blk_plug *plug, bool from_schedule)
+static void blk_mq_flush_plug_list(struct blk_plug *plug, bool from_schedule)
 {
 	struct blk_mq_hw_ctx *this_hctx;
 	struct blk_mq_ctx *this_ctx;
 	unsigned int depth;
 	LIST_HEAD(list);
 
-	if (rq_list_empty(plug->mq_list))
-		return;
 	plug->rq_count = 0;
 
 	if (!plug->multiple_queues && !plug->has_elevator) {
@@ -2247,6 +2245,33 @@ void blk_mq_flush_plug_list(struct blk_plug *plug, bool from_schedule)
 		blk_mq_sched_insert_requests(this_hctx, this_ctx, &list,
 						from_schedule);
 	}
+}
+
+static void flush_plug_callbacks(struct blk_plug *plug, bool from_schedule)
+{
+	LIST_HEAD(callbacks);
+
+	while (!list_empty(&plug->cb_list)) {
+		list_splice_init(&plug->cb_list, &callbacks);
+
+		while (!list_empty(&callbacks)) {
+			struct blk_plug_cb *cb = list_first_entry(&callbacks,
+							  struct blk_plug_cb,
+							  list);
+			list_del(&cb->list);
+			cb->callback(cb, from_schedule);
+		}
+	}
+}
+
+void blk_flush_plug_list(struct blk_plug *plug, bool from_schedule)
+{
+	flush_plug_callbacks(plug, from_schedule);
+
+	if (!rq_list_empty(plug->mq_list))
+		blk_mq_flush_plug_list(plug, from_schedule);
+	if (unlikely(!from_schedule && plug->cached_rq))
+		blk_mq_free_plug_rqs(plug);
 }
 
 static void blk_mq_bio_to_request(struct request *rq, struct bio *bio,

@@ -1595,23 +1595,6 @@ void blk_start_plug(struct blk_plug *plug)
 }
 EXPORT_SYMBOL(blk_start_plug);
 
-static void flush_plug_callbacks(struct blk_plug *plug, bool from_schedule)
-{
-	LIST_HEAD(callbacks);
-
-	while (!list_empty(&plug->cb_list)) {
-		list_splice_init(&plug->cb_list, &callbacks);
-
-		while (!list_empty(&callbacks)) {
-			struct blk_plug_cb *cb = list_first_entry(&callbacks,
-							  struct blk_plug_cb,
-							  list);
-			list_del(&cb->list);
-			cb->callback(cb, from_schedule);
-		}
-	}
-}
-
 struct blk_plug_cb *blk_check_plugged(blk_plug_cb_fn unplug, void *data,
 				      int size)
 {
@@ -1636,16 +1619,6 @@ struct blk_plug_cb *blk_check_plugged(blk_plug_cb_fn unplug, void *data,
 	return cb;
 }
 EXPORT_SYMBOL(blk_check_plugged);
-
-void blk_flush_plug_list(struct blk_plug *plug, bool from_schedule)
-{
-	flush_plug_callbacks(plug, from_schedule);
-
-	if (!rq_list_empty(plug->mq_list))
-		blk_mq_flush_plug_list(plug, from_schedule);
-	if (unlikely(!from_schedule && plug->cached_rq))
-		blk_mq_free_plug_rqs(plug);
-}
 
 /**
  * blk_finish_plug - mark the end of a batch of submitted I/O
