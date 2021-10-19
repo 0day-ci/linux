@@ -2012,6 +2012,11 @@ char *format_page_flags(char *buf, char *end, unsigned long flags)
 	bool append = false;
 	int i;
 
+	buf = number(buf, end, flags, default_flag_spec);
+	if (buf < end)
+		*buf = '(';
+	buf++;
+
 	/* Page flags from the main area. */
 	if (main_flags) {
 		buf = format_flags(buf, end, main_flags, pageflag_names);
@@ -2040,6 +2045,9 @@ char *format_page_flags(char *buf, char *end, unsigned long flags)
 
 		append = true;
 	}
+	if (buf < end)
+		*buf = ')';
+	buf++;
 
 	return buf;
 }
