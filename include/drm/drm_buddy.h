@@ -144,10 +144,6 @@ int drm_buddy_alloc(struct drm_buddy_mm *mm,
 		    struct list_head *blocks,
 		    unsigned long flags);
 
-int drm_buddy_alloc_range(struct drm_buddy_mm *mm,
-			   struct list_head *blocks,
-			   u64 start, u64 size);
-
 void drm_buddy_free(struct drm_buddy_mm *mm, struct drm_buddy_block *block);
 
 void drm_buddy_free_list(struct drm_buddy_mm *mm, struct list_head *objects);
