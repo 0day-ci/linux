@@ -3944,6 +3944,9 @@ struct ieee80211_prep_tx_info {
  *	twt structure.
  * @twt_teardown_request: Update the hw with TWT teardown request received
  *	from the peer.
+ * @set_radar_offchan: Configure dedicated chain available for radar detection
+ *	on some hw. The chain can't be used to transmits or receives frames.
+ *	The driver is supposed to implement CAC management in sw or fw.
  */
 struct ieee80211_ops {
 	void (*tx)(struct ieee80211_hw *hw,
@@ -4272,6 +4275,8 @@ struct ieee80211_ops {
 			      struct ieee80211_twt_setup *twt);
 	void (*twt_teardown_request)(struct ieee80211_hw *hw,
 				     struct ieee80211_sta *sta, u8 flowid);
+	int (*set_radar_offchan)(struct ieee80211_hw *hw,
+				 struct cfg80211_chan_def *chandef);
 };
 
 /**

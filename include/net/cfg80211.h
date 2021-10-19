@@ -4072,6 +4072,10 @@ struct mgmt_frame_regs {
  * @set_fils_aad: Set FILS AAD data to the AP driver so that the driver can use
  *	those to decrypt (Re)Association Request and encrypt (Re)Association
  *	Response frame.
+ *
+ * @set_radar_offchan: Configure dedicated chain available for radar detection
+ *	on some hw. The chain can't be used to transmits or receives frames.
+ *	The driver is supposed to implement CAC management in sw or fw.
  */
 struct cfg80211_ops {
 	int	(*suspend)(struct wiphy *wiphy, struct cfg80211_wowlan *wow);
@@ -4404,6 +4408,8 @@ struct cfg80211_ops {
 				struct cfg80211_color_change_settings *params);
 	int     (*set_fils_aad)(struct wiphy *wiphy, struct net_device *dev,
 				struct cfg80211_fils_aad *fils_aad);
+	int	(*set_radar_offchan)(struct wiphy *wiphy,
+				     struct cfg80211_chan_def *chandef);
 };
 
 /*
