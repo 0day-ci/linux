@@ -2114,13 +2114,13 @@ static void ravb_parse_delay_mode(struct device_node *np, struct net_device *nde
 	/* Fall back to legacy rgmii-*id behavior */
 	if (priv->phy_interface == PHY_INTERFACE_MODE_RGMII_ID ||
 	    priv->phy_interface == PHY_INTERFACE_MODE_RGMII_RXID) {
-		priv->rxcidm = 1;
+		priv->txcidm = 1;
 		priv->rgmii_override = 1;
 	}
 
 	if (priv->phy_interface == PHY_INTERFACE_MODE_RGMII_ID ||
 	    priv->phy_interface == PHY_INTERFACE_MODE_RGMII_TXID) {
-		priv->txcidm = 1;
+		priv->rxcidm = 1;
 		priv->rgmii_override = 1;
 	}
 }
