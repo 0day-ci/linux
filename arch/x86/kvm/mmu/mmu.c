@@ -115,6 +115,7 @@ module_param(dbg, bool, 0644);
 #endif
 
 #define PTE_PREFETCH_NUM		8
+#define MAX_PTE_PREFETCH_NUM		128
 
 #define PT32_LEVEL_BITS 10
 
@@ -732,7 +733,7 @@ static int mmu_topup_memory_caches(struct kvm_vcpu *vcpu, bool maybe_indirect)
 
 	/* 1 rmap, 1 parent PTE per level, and the prefetched rmaps. */
 	r = kvm_mmu_topup_memory_cache(&vcpu->arch.mmu_pte_list_desc_cache,
-				       1 + PT64_ROOT_MAX_LEVEL + PTE_PREFETCH_NUM);
+				       1 + PT64_ROOT_MAX_LEVEL + MAX_PTE_PREFETCH_NUM);
 	if (r)
 		return r;
 	r = kvm_mmu_topup_memory_cache(&vcpu->arch.mmu_shadow_page_cache,
@@ -2753,12 +2754,13 @@ static int direct_pte_prefetch_many(struct kvm_vcpu *vcpu,
 				    struct kvm_mmu_page *sp,
 				    u64 *start, u64 *end)
 {
-	struct page *pages[PTE_PREFETCH_NUM];
+	struct page **pages;
 	struct kvm_memory_slot *slot;
 	unsigned int access = sp->role.access;
 	int i, ret;
 	gfn_t gfn;
 
+	pages = (struct page **)vcpu->arch.mmu_pte_prefetch.ents;
 	gfn = kvm_mmu_page_get_gfn(sp, start - sp->spt);
 	slot = gfn_to_memslot_dirty_bitmap(vcpu, gfn, access & ACC_WRITE_MASK);
 	if (!slot)
@@ -2781,14 +2783,17 @@ static void __direct_pte_prefetch(struct kvm_vcpu *vcpu,
 				  struct kvm_mmu_page *sp, u64 *sptep)
 {
 	u64 *spte, *start = NULL;
+	unsigned int pte_prefetch_num;
 	int i;
 
 	WARN_ON(!sp->role.direct);
 
-	i = (sptep - sp->spt) & ~(PTE_PREFETCH_NUM - 1);
+	spin_lock(&vcpu->arch.mmu_pte_prefetch.lock);
+	pte_prefetch_num = vcpu->arch.mmu_pte_prefetch.num_ents;
+	i = (sptep - sp->spt) & ~(pte_prefetch_num - 1);
 	spte = sp->spt + i;
 
-	for (i = 0; i < PTE_PREFETCH_NUM; i++, spte++) {
+	for (i = 0; i < pte_prefetch_num; i++, spte++) {
 		if (is_shadow_present_pte(*spte) || spte == sptep) {
 			if (!start)
 				continue;
@@ -2800,6 +2805,7 @@ static void __direct_pte_prefetch(struct kvm_vcpu *vcpu,
 	}
 	if (start)
 		direct_pte_prefetch_many(vcpu, sp, start, spte);
+	spin_unlock(&vcpu->arch.mmu_pte_prefetch.lock);
 }
 
 static void direct_pte_prefetch(struct kvm_vcpu *vcpu, u64 *sptep)
@@ -4914,6 +4920,49 @@ void kvm_init_mmu(struct kvm_vcpu *vcpu)
 		init_kvm_softmmu(vcpu);
 }
 EXPORT_SYMBOL_GPL(kvm_init_mmu);
+
+int kvm_set_pte_prefetch(struct kvm_vcpu *vcpu, u64 num_ents)
+{
+	u64 *ents;
+
+	if (!num_ents)
+		return -EINVAL;
+
+	if (!is_power_of_2(num_ents))
+		return -EINVAL;
+
+	if (num_ents > MAX_PTE_PREFETCH_NUM)
+		return -EINVAL;
+
+	ents = kmalloc_array(num_ents, sizeof(u64), GFP_KERNEL);
+	if (!ents)
+		return -ENOMEM;
+
+	spin_lock(&vcpu->arch.mmu_pte_prefetch.lock);
+	kfree(vcpu->arch.mmu_pte_prefetch.ents);
+	vcpu->arch.mmu_pte_prefetch.ents = ents;
+	vcpu->arch.mmu_pte_prefetch.num_ents = num_ents;
+	spin_unlock(&vcpu->arch.mmu_pte_prefetch.lock);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(kvm_set_pte_prefetch);
+
+int kvm_init_pte_prefetch(struct kvm_vcpu *vcpu)
+{
+	spin_lock_init(&vcpu->arch.mmu_pte_prefetch.lock);
+
+	return kvm_set_pte_prefetch(vcpu, PTE_PREFETCH_NUM);
+}
+EXPORT_SYMBOL_GPL(kvm_init_pte_prefetch);
+
+void kvm_pte_prefetch_destroy(struct kvm_vcpu *vcpu)
+{
+	vcpu->arch.mmu_pte_prefetch.num_ents = 0;
+	kfree(vcpu->arch.mmu_pte_prefetch.ents);
+	vcpu->arch.mmu_pte_prefetch.ents = NULL;
+}
+EXPORT_SYMBOL_GPL(kvm_pte_prefetch_destroy);
 
 static union kvm_mmu_page_role
 kvm_mmu_calc_root_page_role(struct kvm_vcpu *vcpu)

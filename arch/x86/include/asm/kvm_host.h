@@ -607,6 +607,16 @@ struct kvm_vcpu_xen {
 	u64 runstate_times[4];
 };
 
+struct kvm_mmu_pte_prefetch {
+	/*
+	 * This will be cast either to array of pointers to struct page,
+	 * or array of u64, or array of u32
+	 */
+	void *ents;
+	unsigned int num_ents;
+	spinlock_t lock;
+};
+
 struct kvm_vcpu_arch {
 	/*
 	 * rip and regs accesses must go through
@@ -681,6 +691,8 @@ struct kvm_vcpu_arch {
 	struct kvm_mmu_memory_cache mmu_shadow_page_cache;
 	struct kvm_mmu_memory_cache mmu_gfn_array_cache;
 	struct kvm_mmu_memory_cache mmu_page_header_cache;
+
+	struct kvm_mmu_pte_prefetch mmu_pte_prefetch;
 
 	/*
 	 * QEMU userspace and the guest each have their own FPU state.
