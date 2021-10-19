@@ -426,6 +426,7 @@ static void __unset_cpu_idle(struct kvm_vcpu *vcpu)
 {
 	kvm_s390_clear_cpuflags(vcpu, CPUSTAT_WAIT);
 	clear_bit(vcpu->vcpu_idx, vcpu->kvm->arch.idle_mask);
+	clear_bit(vcpu->vcpu_idx, vcpu->kvm->arch.gisa_int.kicked_mask);
 }
 
 static void __reset_intercept_indicators(struct kvm_vcpu *vcpu)
@@ -3064,7 +3065,11 @@ static void __airqs_kick_single_vcpu(struct kvm *kvm, u8 deliverable_mask)
 			/* lately kicked but not yet running */
 			if (test_and_set_bit(vcpu_idx, gi->kicked_mask))
 				return;
-			kvm_s390_vcpu_wakeup(vcpu);
+			/* if meanwhile not idle: clear  and don't kick */
+			if (test_bit(vcpu_idx, kvm->arch.idle_mask))
+				kvm_s390_vcpu_wakeup(vcpu);
+			else
+				clear_bit(vcpu_idx, gi->kicked_mask);
 			return;
 		}
 	}
