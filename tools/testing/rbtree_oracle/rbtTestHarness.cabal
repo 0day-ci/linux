@@ -1,0 +1,15 @@
+cabal-version:       2.4
+name:                rbtTestHarness
+version:             1.0.0.0
+
+executable rbtTestHarness
+  main-is:             Main.hs
+  other-modules:       Strategy RBT.Kernel RBT.Verified
+  build-depends:       base ^>=4.15,
+                       random,
+                       optparse-applicative,
+                       extra,
+                       mtl
+  default-language:    Haskell2010
+  default-extensions:  RecordWildCards, DuplicateRecordFields
+  license:             GPL-2.0
