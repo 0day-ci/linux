@@ -31,8 +31,6 @@ static bool pci_mmcfg_arch_init_failed;
 static DEFINE_MUTEX(pci_mmcfg_lock);
 #define pci_mmcfg_lock_held() lock_is_held(&(pci_mmcfg_lock).dep_map)
 
-LIST_HEAD(pci_mmcfg_list);
-
 static void __init pci_mmconfig_remove(struct pci_mmcfg_region *cfg)
 {
 	if (cfg->res.parent)
