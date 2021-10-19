@@ -51,6 +51,25 @@
 		startup-delay-us = <70000>;
 		enable-active-high;
 	};
+
+	mpcie_3v3: regulator-mpcie_3v3 {
+		compatible = "regulator-fixed";
+		regulator-name = "mPCIe 3v3";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		gpio = <&gpio_exp_77 14 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+	};
+
+	mpcie_1v8: regulator-mpcie_1v8 {
+		compatible = "regulator-fixed";
+		regulator-name = "mPCIe 1v8";
+		regulator-min-microvolt = <1800000>;
+		regulator-max-microvolt = <1800000>;
+		gpio = <&gpio_exp_77 15 GPIO_ACTIVE_HIGH>;
+		startup-delay-us = <200000>;
+		enable-active-high;
+	};
 };
 
 &can0 {
@@ -233,6 +252,31 @@
 		interrupt-controller;
 		interrupt-parent = <&gpio5>;
 		interrupts = <9 IRQ_TYPE_EDGE_FALLING>;
+
+		mpcie_wake {
+			gpio-hog;
+			gpios = <0 GPIO_ACTIVE_HIGH>;
+			output-low;
+			line-name = "mPCIe WAKE#";
+		};
+		mpcie_wdisable {
+			gpio-hog;
+			gpios = <1 GPIO_ACTIVE_HIGH>;
+			output-high;
+			line-name = "mPCIe W_DISABLE";
+		};
+		mpcie_clreq {
+			gpio-hog;
+			gpios = <2 GPIO_ACTIVE_HIGH>;
+			input;
+			line-name = "mPCIe CLKREQ#";
+		};
+		mpcie_ovc {
+			gpio-hog;
+			gpios = <3 GPIO_ACTIVE_HIGH>;
+			input;
+			line-name = "mPCIe OVC";
+		};
 	};
 };
 
@@ -251,6 +295,9 @@
 
 &pciec1 {
 	status = "okay";
+
+	pcie3v3-supply = <&mpcie_3v3>;
+	pcie1v8-supply = <&mpcie_1v8>;
 };
 
 &pfc {
