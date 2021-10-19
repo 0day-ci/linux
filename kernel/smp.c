@@ -1170,14 +1170,14 @@ void wake_up_all_idle_cpus(void)
 {
 	int cpu;
 
-	cpus_read_lock();
+	migrate_disable();
 	for_each_online_cpu(cpu) {
 		if (cpu == raw_smp_processor_id())
 			continue;
 
 		wake_up_if_idle(cpu);
 	}
-	cpus_read_unlock();
+	migrate_enable();
 }
 EXPORT_SYMBOL_GPL(wake_up_all_idle_cpus);
 
