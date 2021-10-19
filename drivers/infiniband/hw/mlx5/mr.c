@@ -1381,6 +1381,11 @@ static struct ib_mr *mlx5_ib_get_dm_mr(struct ib_pd *pd, u64 start_addr,
 	kfree(in);
 
 	set_mr_fields(dev, mr, length, acc);
+	mr->umem = ib_umem_get_dummy(&dev->ib_dev);
+	if (IS_ERR(mr->umem)) {
+		err = PTR_ERR(mr->umem);
+		goto err_free;
+	}
 
 	return &mr->ibmr;
 

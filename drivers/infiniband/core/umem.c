@@ -261,6 +261,27 @@ umem_kfree:
 EXPORT_SYMBOL(ib_umem_get);
 
 /**
+ * ib_umem_get_dummy - Create an empty umem
+ *
+ * @device: IB device to connect UMEM
+ */
+struct ib_umem *ib_umem_get_dummy(struct ib_device *device)
+{
+	struct ib_umem *umem;
+
+	umem = kzalloc(sizeof(*umem), GFP_KERNEL);
+	if (!umem)
+		return ERR_PTR(-ENOMEM);
+
+	umem->ibdev = device;
+	umem->owning_mm = current->mm;
+	mmgrab(umem->owning_mm);
+
+	return umem;
+}
+EXPORT_SYMBOL(ib_umem_get_dummy);
+
+/**
  * ib_umem_release - release memory pinned with ib_umem_get
  * @umem: umem struct to release
  */

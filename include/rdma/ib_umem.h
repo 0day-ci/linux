@@ -98,6 +98,7 @@ static inline void __rdma_umem_block_iter_start(struct ib_block_iter *biter,
 
 struct ib_umem *ib_umem_get(struct ib_device *device, unsigned long addr,
 			    size_t size, int access);
+struct ib_umem *ib_umem_get_dummy(struct ib_device *device);
 void ib_umem_release(struct ib_umem *umem);
 int ib_umem_copy_from(void *dst, struct ib_umem *umem, size_t offset,
 		      size_t length);
@@ -150,6 +151,10 @@ void ib_umem_dmabuf_release(struct ib_umem_dmabuf *umem_dmabuf);
 static inline struct ib_umem *ib_umem_get(struct ib_device *device,
 					  unsigned long addr, size_t size,
 					  int access)
+{
+	return ERR_PTR(-EOPNOTSUPP);
+}
+static struct ib_umem *ib_umem_get_dummy(struct ib_device *device)
 {
 	return ERR_PTR(-EOPNOTSUPP);
 }
