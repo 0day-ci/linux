@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 /* Copyright (c) 2020 Facebook */
 #define _GNU_SOURCE
+#include <stdio.h>
 #include <sched.h>
 #include <sys/mount.h>
 #include <sys/stat.h>
@@ -29,6 +30,7 @@ static int read_iter(char *file)
 
 static int fn(void)
 {
+	struct stat a, b;
 	int err, duration = 0;
 
 	err = unshare(CLONE_NEWNS);
@@ -67,6 +69,43 @@ static int fn(void)
 	err = read_iter(TDIR "/fs2/progs.debug");
 	if (CHECK(err, "reading " TDIR "/fs2/progs.debug", "failed\n"))
 		goto out;
+
+	err = mkdir(TDIR "/fs1/a", 0777);
+	if (CHECK(err, "creating " TDIR "/fs1/a", "failed\n"))
+		goto out;
+	err = mkdir(TDIR "/fs1/a/1", 0777);
+	if (CHECK(err, "creating " TDIR "/fs1/a/1", "failed\n"))
+		goto out;
+	err = mkdir(TDIR "/fs1/b", 0777);
+	if (CHECK(err, "creating " TDIR "/fs1/b", "failed\n"))
+		goto out;
+
+	/* Check that RENAME_EXCHANGE works. */
+	err = stat(TDIR "/fs1/a", &a);
+	if (CHECK(err, "stat(" TDIR "/fs1/a)", "failed\n"))
+		goto out;
+	err = renameat2(0, TDIR "/fs1/a", 0, TDIR "/fs1/b", RENAME_EXCHANGE);
+	if (CHECK(err, "renameat2(RENAME_EXCHANGE)", "failed\n"))
+		goto out;
+	err = stat(TDIR "/fs1/b", &b);
+	if (CHECK(err, "stat(" TDIR "/fs1/b)", "failed\n"))
+		goto out;
+	if (CHECK(a.st_ino != b.st_ino, "b should have a's inode", "failed\n"))
+		goto out;
+	err = access(TDIR "/fs1/b/1", F_OK);
+	if (CHECK(err, "access(" TDIR "/fs1/b/1)", "failed\n"))
+		goto out;
+
+	/* Check that RENAME_NOREPLACE works. */
+	err = renameat2(0, TDIR "/fs1/b", 0, TDIR "/fs1/a", RENAME_NOREPLACE);
+	if (CHECK(!err, "renameat2(RENAME_NOREPLACE)", "succeeded\n")) {
+		err = -EINVAL;
+		goto out;
+	}
+	err = access(TDIR "/fs1/b", F_OK);
+	if (CHECK(err, "access(" TDIR "/fs1/b)", "failed\n"))
+		goto out;
+
 out:
 	umount(TDIR "/fs1");
 	umount(TDIR "/fs2");
