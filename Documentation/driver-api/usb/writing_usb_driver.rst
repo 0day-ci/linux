@@ -54,12 +54,15 @@ information is passed to the USB subsystem in the :c:type:`usb_driver`
 structure. The skeleton driver declares a :c:type:`usb_driver` as::
 
     static struct usb_driver skel_driver = {
-	    .name        = "skeleton",
-	    .probe       = skel_probe,
-	    .disconnect  = skel_disconnect,
-	    .fops        = &skel_fops,
-	    .minor       = USB_SKEL_MINOR_BASE,
-	    .id_table    = skel_table,
+           .name        = "skeleton",
+           .probe       = skel_probe,
+           .disconnect  = skel_disconnect,
+           .suspend     = skel_suspend,
+           .resume      = skel_resume,
+           .pre_reset   = skel_pre_reset,
+           .post_reset  = skel_post_reset,
+           .id_table    = skel_table,
+           .supports_autosuspend = 1,
     };
 
 
@@ -81,36 +84,35 @@ this user-space interaction. The skeleton driver needs this kind of
 interface, so it provides a minor starting number and a pointer to its
 :c:type:`file_operations` functions.
 
-The USB driver is then registered with a call to :c:func:`usb_register`,
-usually in the driver's init function, as shown here::
-
-    static int __init usb_skel_init(void)
-    {
-	    int result;
-
-	    /* register this driver with the USB subsystem */
-	    result = usb_register(&skel_driver);
-	    if (result < 0) {
-		    err("usb_register failed for the "__FILE__ "driver."
-			"Error number %d", result);
-		    return -1;
-	    }
-
-	    return 0;
-    }
-    module_init(usb_skel_init);
-
+The USB driver is then registered with a call to usb_register()
+which is usually in the driver's init function. Since this functionality
+is usable with many USB drivers, it is hidden behind multi-stage macros.
+While the first macros are USB specific the later macros are used in different
+subsystems. This removes a lot of boilerplate code.
 
 When the driver is unloaded from the system, it needs to deregister
-itself with the USB subsystem. This is done with the :c:func:`usb_deregister`
-function::
+itself with the USB subsystem. This is done with usb_deregister()
+which is also hidden behind multi-stage macros.
 
-    static void __exit usb_skel_exit(void)
-    {
-	    /* deregister this driver with the USB subsystem */
-	    usb_deregister(&skel_driver);
-    }
-    module_exit(usb_skel_exit);
+The init and exit functions are included in the macro module_usb_driver.
+Find the first three stages of macros below::
+
+    module_usb_driver(skel_driver);
+                         |
+                         V
+    module_driver(__usb_driver, usb_register, usb_deregister)
+                         |               \               \
+                         V                ----------      ----------
+    static int __init __driver##_init(void) \      |               |
+    { \                 v---------------------------               |
+            return __register(&(__driver) , ##__VA_ARGS__); \      |
+    } \                                                            |
+    module_init(__driver##_init); \                                |
+    static void __exit __driver##_exit(void) \                     |
+    { \            v------------------------------------------------
+            __unregister(&(__driver) , ##__VA_ARGS__); \
+    } \
+    module_exit(__driver##_exit);
 
 
 To enable the linux-hotplug system to load the driver automatically when
