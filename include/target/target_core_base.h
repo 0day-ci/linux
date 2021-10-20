@@ -192,6 +192,7 @@ enum tcm_sense_reason_table {
 	TCM_ALUA_TG_PT_UNAVAILABLE		= R(0x21),
 	TCM_ALUA_STATE_TRANSITION		= R(0x22),
 	TCM_ALUA_OFFLINE			= R(0x23),
+	TCM_SPACE_ALLOCATION_FAILED		= R(0x24),
 #undef R
 };
 

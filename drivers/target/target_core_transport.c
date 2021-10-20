@@ -2025,6 +2025,7 @@ void transport_generic_request_failure(struct se_cmd *cmd,
 	case TCM_ALUA_TG_PT_UNAVAILABLE:
 	case TCM_ALUA_STATE_TRANSITION:
 	case TCM_ALUA_OFFLINE:
+	case TCM_SPACE_ALLOCATION_FAILED:
 		break;
 	case TCM_OUT_OF_RESOURCES:
 		cmd->scsi_status = SAM_STAT_TASK_SET_FULL;
@@ -3400,6 +3401,11 @@ static const struct sense_detail sense_detail_table[] = {
 		.key = NOT_READY,
 		.asc = 0x04,
 		.ascq = ASCQ_04H_ALUA_OFFLINE,
+	},
+	[TCM_SPACE_ALLOCATION_FAILED] = {
+		.key = DATA_PROTECT,
+		.asc = 0x27,
+		.ascq = 0x07, /* SPACE ALLOCATION FAILED WRITE PROTECT */
 	},
 };
 
