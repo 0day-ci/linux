@@ -95,6 +95,11 @@ properties:
           - description: Path leading to system memory
           - description: Path leading to internal memory
           - description: Path between the AP and IPA config space
+      - items: # IPA v4.5
+          - description: Path leading to system memory region A
+          - description: Path leading to system memory region B
+          - description: Path leading to internal memory
+          - description: Path between the AP and IPA config space
 
   interconnect-names:
     oneOf:
@@ -103,6 +108,11 @@ properties:
           - const: config
       - items:
           - const: memory
+          - const: imem
+          - const: config
+      - items: # IPA v4.5
+          - const: memory-a
+          - const: memory-b
           - const: imem
           - const: config
 
