@@ -213,7 +213,7 @@ static void pids_cancel_attach(struct cgroup_taskset *tset)
 
 /*
  * task_css_check(true) in pids_can_fork() and pids_cancel_fork() relies
- * on cgroup_threadgroup_change_begin() held by the copy_process().
+ * on threadgroup_change_begin() held by the copy_process().
  */
 static int pids_can_fork(struct task_struct *task, struct css_set *cset)
 {

@@ -109,7 +109,7 @@ static DEFINE_SPINLOCK(cgroup_idr_lock);
  */
 static DEFINE_SPINLOCK(cgroup_file_kn_lock);
 
-DEFINE_PERCPU_RWSEM(cgroup_threadgroup_rwsem);
+DEFINE_PERCPU_RWSEM(threadgroup_rwsem);
 
 #define cgroup_assert_mutex_or_rcu_locked()				\
 	RCU_LOCKDEP_WARN(!rcu_read_lock_held() &&			\
@@ -918,9 +918,9 @@ static void css_set_move_task(struct task_struct *task,
 
 	if (to_cset) {
 		/*
-		 * We are synchronized through cgroup_threadgroup_rwsem
-		 * against PF_EXITING setting such that we can't race
-		 * against cgroup_exit()/cgroup_free() dropping the css_set.
+		 * We are synchronized through threadgroup_rwsem against
+		 * PF_EXITING setting such that we can't race against
+		 * cgroup_exit()/cgroup_free() dropping the css_set.
 		 */
 		WARN_ON_ONCE(task->flags & PF_EXITING);
 
@@ -2361,7 +2361,7 @@ static void cgroup_migrate_add_task(struct task_struct *task,
 	if (task->flags & PF_EXITING)
 		return;
 
-	/* cgroup_threadgroup_rwsem protects racing against forks */
+	/* threadgroup_rwsem protects racing against forks */
 	WARN_ON_ONCE(list_empty(&task->cg_list));
 
 	cset = task_css_set(task);
@@ -2625,7 +2625,7 @@ void cgroup_migrate_finish(struct cgroup_mgctx *mgctx)
  * @src_cset and add it to @mgctx->src_csets, which should later be cleaned
  * up by cgroup_migrate_finish().
  *
- * This function may be called without holding cgroup_threadgroup_rwsem
+ * This function may be called without holding threadgroup_rwsem
  * even if the target is a process.  Threads may be created and destroyed
  * but as long as cgroup_mutex is not dropped, no new css_set can be put
  * into play and the preloaded css_sets are guaranteed to cover all
@@ -2734,7 +2734,7 @@ int cgroup_migrate_prepare_dst(struct cgroup_mgctx *mgctx)
  * @mgctx: migration context
  *
  * Migrate a process or task denoted by @leader.  If migrating a process,
- * the caller must be holding cgroup_threadgroup_rwsem.  The caller is also
+ * the caller must be holding threadgroup_rwsem.  The caller is also
  * responsible for invoking cgroup_migrate_add_src() and
  * cgroup_migrate_prepare_dst() on the targets before invoking this
  * function and following up with cgroup_migrate_finish().
@@ -2775,7 +2775,7 @@ int cgroup_migrate(struct task_struct *leader, bool threadgroup,
  * @leader: the task or the leader of the threadgroup to be attached
  * @threadgroup: attach the whole threadgroup?
  *
- * Call holding cgroup_mutex and cgroup_threadgroup_rwsem.
+ * Call holding cgroup_mutex and threadgroup_rwsem.
  */
 int cgroup_attach_task(struct cgroup *dst_cgrp, struct task_struct *leader,
 		       bool threadgroup)
@@ -2811,7 +2811,7 @@ int cgroup_attach_task(struct cgroup *dst_cgrp, struct task_struct *leader,
 
 struct task_struct *cgroup_procs_write_start(char *buf, bool threadgroup,
 					     bool *locked)
-	__acquires(&cgroup_threadgroup_rwsem)
+	__acquires(&threadgroup_rwsem)
 {
 	struct task_struct *tsk;
 	pid_t pid;
@@ -2829,7 +2829,7 @@ struct task_struct *cgroup_procs_write_start(char *buf, bool threadgroup,
 	 */
 	lockdep_assert_held(&cgroup_mutex);
 	if (pid || threadgroup) {
-		percpu_down_write(&cgroup_threadgroup_rwsem);
+		percpu_down_write(&threadgroup_rwsem);
 		*locked = true;
 	} else {
 		*locked = false;
@@ -2865,7 +2865,7 @@ struct task_struct *cgroup_procs_write_start(char *buf, bool threadgroup,
 
 out_unlock_threadgroup:
 	if (*locked) {
-		percpu_up_write(&cgroup_threadgroup_rwsem);
+		percpu_up_write(&threadgroup_rwsem);
 		*locked = false;
 	}
 out_unlock_rcu:
@@ -2874,7 +2874,7 @@ out_unlock_rcu:
 }
 
 void cgroup_procs_write_finish(struct task_struct *task, bool locked)
-	__releases(&cgroup_threadgroup_rwsem)
+	__releases(&threadgroup_rwsem)
 {
 	struct cgroup_subsys *ss;
 	int ssid;
@@ -2883,7 +2883,7 @@ void cgroup_procs_write_finish(struct task_struct *task, bool locked)
 	put_task_struct(task);
 
 	if (locked)
-		percpu_up_write(&cgroup_threadgroup_rwsem);
+		percpu_up_write(&threadgroup_rwsem);
 	for_each_subsys(ss, ssid)
 		if (ss->post_attach)
 			ss->post_attach();
@@ -2942,7 +2942,7 @@ static int cgroup_update_dfl_csses(struct cgroup *cgrp)
 
 	lockdep_assert_held(&cgroup_mutex);
 
-	percpu_down_write(&cgroup_threadgroup_rwsem);
+	percpu_down_write(&threadgroup_rwsem);
 
 	/* look up all csses currently attached to @cgrp's subtree */
 	spin_lock_irq(&css_set_lock);
@@ -2972,7 +2972,7 @@ static int cgroup_update_dfl_csses(struct cgroup *cgrp)
 	ret = cgroup_migrate_execute(&mgctx);
 out_finish:
 	cgroup_migrate_finish(&mgctx);
-	percpu_up_write(&cgroup_threadgroup_rwsem);
+	percpu_up_write(&threadgroup_rwsem);
 	return ret;
 }
 
@@ -5807,7 +5807,7 @@ int __init cgroup_init(void)
 	 * The latency of the synchronize_rcu() is too high for cgroups,
 	 * avoid it at the cost of forcing all readers into the slow path.
 	 */
-	rcu_sync_enter_start(&cgroup_threadgroup_rwsem.rss);
+	rcu_sync_enter_start(&threadgroup_rwsem.rss);
 
 	get_user_ns(init_cgroup_ns.user_ns);
 
@@ -6067,13 +6067,13 @@ static struct cgroup *cgroup_get_from_file(struct file *f)
  * If CLONE_INTO_CGROUP is specified this function will try to find an
  * existing css_set which includes the requested cgroup and if not create
  * a new css_set that the child will be attached to later. If this function
- * succeeds it will hold cgroup_threadgroup_rwsem on return. If
+ * succeeds it will hold threadgroup_rwsem on return. If
  * CLONE_INTO_CGROUP is requested this function will grab cgroup mutex
- * before grabbing cgroup_threadgroup_rwsem and will hold a reference
+ * before grabbing threadgroup_rwsem and will hold a reference
  * to the target cgroup.
  */
 static int cgroup_css_set_fork(struct kernel_clone_args *kargs)
-	__acquires(&cgroup_mutex) __acquires(&cgroup_threadgroup_rwsem)
+	__acquires(&cgroup_mutex) __acquires(&threadgroup_rwsem)
 {
 	int ret;
 	struct cgroup *dst_cgrp = NULL;
@@ -6084,7 +6084,7 @@ static int cgroup_css_set_fork(struct kernel_clone_args *kargs)
 	if (kargs->flags & CLONE_INTO_CGROUP)
 		mutex_lock(&cgroup_mutex);
 
-	cgroup_threadgroup_change_begin(current);
+	threadgroup_change_begin(current);
 
 	spin_lock_irq(&css_set_lock);
 	cset = task_css_set(current);
@@ -6141,7 +6141,7 @@ static int cgroup_css_set_fork(struct kernel_clone_args *kargs)
 	return ret;
 
 err:
-	cgroup_threadgroup_change_end(current);
+	threadgroup_change_end(current);
 	mutex_unlock(&cgroup_mutex);
 	if (f)
 		fput(f);
@@ -6161,9 +6161,9 @@ err:
  * CLONE_INTO_CGROUP was requested.
  */
 static void cgroup_css_set_put_fork(struct kernel_clone_args *kargs)
-	__releases(&cgroup_threadgroup_rwsem) __releases(&cgroup_mutex)
+	__releases(&threadgroup_rwsem) __releases(&cgroup_mutex)
 {
-	cgroup_threadgroup_change_end(current);
+	threadgroup_change_end(current);
 
 	if (kargs->flags & CLONE_INTO_CGROUP) {
 		struct cgroup *cgrp = kargs->cgrp;
@@ -6254,7 +6254,7 @@ void cgroup_cancel_fork(struct task_struct *child,
  */
 void cgroup_post_fork(struct task_struct *child,
 		      struct kernel_clone_args *kargs)
-	__releases(&cgroup_threadgroup_rwsem) __releases(&cgroup_mutex)
+	__releases(&threadgroup_rwsem) __releases(&cgroup_mutex)
 {
 	unsigned long cgrp_flags = 0;
 	bool kill = false;

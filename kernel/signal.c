@@ -2956,11 +2956,11 @@ void exit_signals(struct task_struct *tsk)
 	 * @tsk is about to have PF_EXITING set - lock out users which
 	 * expect stable threadgroup.
 	 */
-	cgroup_threadgroup_change_begin(tsk);
+	threadgroup_change_begin(tsk);
 
 	if (thread_group_empty(tsk) || signal_group_exit(tsk->signal)) {
 		tsk->flags |= PF_EXITING;
-		cgroup_threadgroup_change_end(tsk);
+		threadgroup_change_end(tsk);
 		return;
 	}
 
@@ -2971,7 +2971,7 @@ void exit_signals(struct task_struct *tsk)
 	 */
 	tsk->flags |= PF_EXITING;
 
-	cgroup_threadgroup_change_end(tsk);
+	threadgroup_change_end(tsk);
 
 	if (!task_sigpending(tsk))
 		goto out;
