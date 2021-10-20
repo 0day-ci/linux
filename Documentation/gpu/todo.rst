@@ -460,6 +460,55 @@ Contact: Thomas Zimmermann <tzimmermann@suse.de>, Christian König, Daniel Vette
 
 Level: Intermediate
 
+Drop use of deprecated operations in bridge drivers
+--------------------------------------------------
+
+&struct drm_bridge_funcs contains a number of deprecated operations
+which use can be replaced by the atomic variants.
+
+The following is more or less 1:1 replacements whit the arguments
+and names adjusted:
+* pre_enable => atomic_pre_enable
+* enable => atomic_enable
+* disable => atomic_disable
+* post_disable => atomic_post_disable
+
+* mode_set is no longer required and the implementation shall be merged
+  with atomic_enable.
+
+* mode_fixup => atomic_check
+  mode_fixup() was created a long time ago, when we were supposed to have
+  a single bridge at the output of the CRTC. The bridge could then instruct
+  the CRTC to output a different mode than what the display requires.
+  Now that we have support for multiple bridges, it's not as straightforward,
+  and we've so far just pretended to ignore the problem. The .mode_fixup()
+  operation is used and abused, and just telling people to use .atomic_check()
+  will likely make things worse as that operation has access to the full atomic
+  commit and can alter the mode of pretty much anything. We need to define clear
+  semantics for .atomic_check() in bridges.
+
+
+Contact: bridge maintainers, Sam Ravnborg <sam@ravnborg.org>,
+         Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
+Level: Beginner or intermediate (depending on the driver)
+
+Move connector creation to display drivers
+------------------------------------------
+
+With the introduction of chained bridges the creation of connectors are moved
+to the display drivers. The flag DRM_BRIDGE_ATTACH_NO_CONNECTOR is used to
+signal to the bridge driver that no connector shall be created and that the
+display driver will take care. Display drivers will in most cases be able to
+utilise drm_bridge_connector_init() for all the logic.
+
+Step 1 is to have all bridge drivers supporting DRM_BRIDGE_ATTACH_NO_CONNECTOR.
+Step 2 is to move connector creation to all relevant display drivers, utilizing
+the drm_bridge_connector where possible.
+
+Contact: Sam Ravnborg <sam@ravnborg.org>, bridge and/or driver maintainer(s)
+
+Level: Intermediate or advanced (depending on the driver)
 
 Core refactorings
 =================
