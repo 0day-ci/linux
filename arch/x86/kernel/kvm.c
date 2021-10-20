@@ -62,6 +62,17 @@ static int __init parse_no_stealacc(char *arg)
 
 early_param("no-steal-acc", parse_no_stealacc);
 
+static int kvm_pvipi = 1;
+
+static int __init parse_no_kvm_pvipi(char *arg)
+{
+	kvm_pvipi = 0;
+
+	return 0;
+}
+
+early_param("no-kvm-pvipi", parse_no_kvm_pvipi);
+
 static DEFINE_PER_CPU_DECRYPTED(struct kvm_vcpu_pv_apf_data, apf_reason) __aligned(64);
 DEFINE_PER_CPU_DECRYPTED(struct kvm_steal_time, steal_time) __aligned(64) __visible;
 static int has_steal_clock = 0;
@@ -795,7 +806,7 @@ static uint32_t __init kvm_detect(void)
 static void __init kvm_apic_init(void)
 {
 #ifdef CONFIG_SMP
-	if (pv_ipi_supported())
+	if (pv_ipi_supported() && kvm_pvipi)
 		kvm_setup_pv_ipi();
 #endif
 }
