@@ -234,8 +234,6 @@ int rcuwait_wake_up(struct rcuwait *w)
 	int ret = 0;
 	struct task_struct *task;
 
-	rcu_read_lock();
-
 	/*
 	 * Order condition vs @task, such that everything prior to the load
 	 * of @task is visible. This is the condition as to why the user called
@@ -245,9 +243,21 @@ int rcuwait_wake_up(struct rcuwait *w)
 	 *    WAIT                WAKE
 	 *    [S] tsk = current	  [S] cond = true
 	 *        MB (A)	      MB (B)
-	 *    [L] cond		  [L] tsk
+	 *    [L] cond		  [L] rcuwait_active(w)
+	 *                            task = rcu_dereference(w->task)
 	 */
 	smp_mb(); /* (B) */
+
+#ifdef CONFIG_PREEMPT_RCU
+	/*
+	 * The cost of rcu_read_lock() dominates for preemptible RCU,
+	 * avoid it if possible.
+	 */
+	if (!rcuwait_active(w))
+		return ret;
+#endif
+
+	rcu_read_lock();
 
 	task = rcu_dereference(w->task);
 	if (task)
