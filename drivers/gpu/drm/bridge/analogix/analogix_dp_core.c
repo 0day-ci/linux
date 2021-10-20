@@ -1055,7 +1055,7 @@ static int analogix_dp_disable_psr(struct analogix_dp_device *dp)
 	psr_vsc.db[0] = 0;
 	psr_vsc.db[1] = 0;
 
-	return analogix_dp_send_psr_spd(dp, &psr_vsc, true);
+	return analogix_dp_send_psr_spd(dp, &psr_vsc, false);
 }
 
 /*
