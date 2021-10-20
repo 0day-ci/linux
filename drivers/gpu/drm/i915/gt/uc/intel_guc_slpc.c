@@ -613,6 +613,24 @@ void intel_guc_slpc_boost(struct intel_guc_slpc *slpc)
 	slpc->num_waiters++;
 }
 
+int intel_guc_slpc_set_boost_freq(struct intel_guc_slpc *slpc, u32 val)
+{
+	if (val < slpc->min_freq || val > slpc->rp0_freq)
+		return -EINVAL;
+
+	if (val != slpc->boost_freq) {
+		slpc->boost_freq = val;
+
+		/* Apply only if there are active waiters */
+		if (slpc->num_waiters)
+			return slpc_set_param(slpc,
+					      SLPC_PARAM_GLOBAL_MIN_GT_UNSLICE_FREQ_MHZ,
+					      slpc->boost_freq);
+	}
+
+ 	return 0;
+}
+
 void intel_guc_slpc_update_waiters(struct intel_guc_slpc *slpc)
 {
 	/* Return min back to the softlimit.
