@@ -598,6 +598,34 @@ int intel_guc_slpc_enable(struct intel_guc_slpc *slpc)
 	return 0;
 }
 
+void intel_guc_slpc_boost(struct intel_guc_slpc *slpc)
+{
+	/* Raise min freq to boost. It's possible that
+	 * this is greater than current max. But it will
+	 * certainly be limited by RP0. An error setting
+	 * the min param is not fatal.
+	 */
+	if (!slpc->num_waiters)
+		slpc_set_param(slpc,
+			       SLPC_PARAM_GLOBAL_MIN_GT_UNSLICE_FREQ_MHZ,
+			       slpc->boost_freq);
+
+	slpc->num_waiters++;
+}
+
+void intel_guc_slpc_update_waiters(struct intel_guc_slpc *slpc)
+{
+	/* Return min back to the softlimit.
+	 * This is called during request retire,
+	 * so we don't need to fail that if the
+	 * set_param fails.
+	 */
+	if (!(--slpc->num_waiters))
+		slpc_set_param(slpc,
+			       SLPC_PARAM_GLOBAL_MIN_GT_UNSLICE_FREQ_MHZ,
+			       slpc->min_freq_softlimit);
+}
+
 int intel_guc_slpc_print_info(struct intel_guc_slpc *slpc, struct drm_printer *p)
 {
 	struct drm_i915_private *i915 = slpc_to_i915(slpc);

@@ -936,6 +936,16 @@ void intel_rps_park(struct intel_rps *rps)
 	GT_TRACE(rps_to_gt(rps), "park:%x\n", rps->cur_freq);
 }
 
+void intel_rps_update_waiters(struct intel_rps *rps)
+{
+	struct intel_guc_slpc *slpc = rps_to_slpc(rps);
+
+	if (rps_uses_slpc(rps))
+		intel_guc_slpc_update_waiters(slpc);
+	else
+		atomic_dec(&rps->num_waiters);
+}
+
 void intel_rps_boost(struct i915_request *rq)
 {
 	if (i915_request_signaled(rq) || i915_request_has_waitboost(rq))
@@ -944,6 +954,9 @@ void intel_rps_boost(struct i915_request *rq)
 	/* Serializes with i915_request_retire() */
 	if (!test_and_set_bit(I915_FENCE_FLAG_BOOST, &rq->fence.flags)) {
 		struct intel_rps *rps = &READ_ONCE(rq->engine)->gt->rps;
+
+		if (rps_uses_slpc(rps))
+			return intel_guc_slpc_boost(rps_to_slpc(rps));
 
 		if (atomic_fetch_inc(&rps->num_waiters))
 			return;
