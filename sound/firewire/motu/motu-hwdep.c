@@ -16,6 +16,47 @@
 
 #include "motu.h"
 
+static bool has_dsp_event(struct snd_motu *motu)
+{
+	if (motu->spec->flags & SND_MOTU_SPEC_REGISTER_DSP)
+		return (snd_motu_register_dsp_message_parser_count_event(motu) > 0);
+	else
+		return false;
+}
+
+// NOTE: Take care of page fault due to accessing to userspace.
+static long copy_dsp_event_to_user(struct snd_motu *motu, char __user *buf, long count,
+				   struct snd_firewire_event_motu_register_dsp_change *event)
+{
+	if (motu->spec->flags & SND_MOTU_SPEC_REGISTER_DSP) {
+		size_t consumed = 0;
+		u32 __user *ptr;
+		u32 ev;
+
+		// Header is filled later.
+		consumed += sizeof(*event);
+
+		while (consumed < count &&
+		       snd_motu_register_dsp_message_parser_copy_event(motu, &ev)) {
+			ptr = (u32 __user *)(buf + consumed);
+			if (put_user(ev, ptr))
+				return -EFAULT;
+			consumed += sizeof(ev);
+		}
+
+		event->type = SNDRV_FIREWIRE_EVENT_MOTU_REGISTER_DSP_CHANGE;
+		event->count = (consumed - sizeof(*event)) / 4;
+		if (copy_to_user(buf, &event, sizeof(*event)))
+			return -EFAULT;
+
+		count = consumed;
+	} else {
+		count = 0;
+	}
+
+	return count;
+}
+
 static long hwdep_read(struct snd_hwdep *hwdep, char __user *buf, long count,
 		       loff_t *offset)
 {
@@ -25,8 +66,7 @@ static long hwdep_read(struct snd_hwdep *hwdep, char __user *buf, long count,
 
 	spin_lock_irq(&motu->lock);
 
-	while (!motu->dev_lock_changed && motu->msg == 0 &&
-			snd_motu_register_dsp_message_parser_count_event(motu) == 0) {
+	while (!motu->dev_lock_changed && motu->msg == 0 && !has_dsp_event(motu)) {
 		prepare_to_wait(&motu->hwdep_wait, &wait, TASK_INTERRUPTIBLE);
 		spin_unlock_irq(&motu->lock);
 		schedule();
@@ -55,31 +95,10 @@ static long hwdep_read(struct snd_hwdep *hwdep, char __user *buf, long count,
 		count = min_t(long, count, sizeof(event));
 		if (copy_to_user(buf, &event, count))
 			return -EFAULT;
-	} else if (snd_motu_register_dsp_message_parser_count_event(motu) > 0) {
-		size_t consumed = 0;
-		u32 __user *ptr;
-		u32 ev;
-
+	} else if (has_dsp_event(motu)) {
 		spin_unlock_irq(&motu->lock);
 
-		// Header is filled later.
-		consumed += sizeof(event.motu_register_dsp_change);
-
-		while (consumed < count &&
-		       snd_motu_register_dsp_message_parser_copy_event(motu, &ev)) {
-			ptr = (u32 __user *)(buf + consumed);
-			if (put_user(ev, ptr))
-				return -EFAULT;
-			consumed += sizeof(ev);
-		}
-
-		event.motu_register_dsp_change.type = SNDRV_FIREWIRE_EVENT_MOTU_REGISTER_DSP_CHANGE;
-		event.motu_register_dsp_change.count =
-			(consumed - sizeof(event.motu_register_dsp_change)) / 4;
-		if (copy_to_user(buf, &event, sizeof(event.motu_register_dsp_change)))
-			return -EFAULT;
-
-		count = consumed;
+		count = copy_dsp_event_to_user(motu, buf, count, &event.motu_register_dsp_change);
 	}
 
 	return count;
@@ -94,8 +113,7 @@ static __poll_t hwdep_poll(struct snd_hwdep *hwdep, struct file *file,
 	poll_wait(file, &motu->hwdep_wait, wait);
 
 	spin_lock_irq(&motu->lock);
-	if (motu->dev_lock_changed || motu->msg ||
-	    snd_motu_register_dsp_message_parser_count_event(motu) > 0)
+	if (motu->dev_lock_changed || motu->msg || has_dsp_event(motu))
 		events = EPOLLIN | EPOLLRDNORM;
 	else
 		events = 0;
