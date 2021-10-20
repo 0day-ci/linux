@@ -432,15 +432,22 @@ static int lm3560_probe(struct i2c_client *client,
 
 	rval = lm3560_subdev_init(flash, LM3560_LED1, "lm3560-led1");
 	if (rval < 0)
-		return rval;
+		goto err_subdev_init_led1;
 
 	rval = lm3560_init_device(flash);
 	if (rval < 0)
-		return rval;
+		goto err_init_device;
 
 	i2c_set_clientdata(client, flash);
 
 	return 0;
+
+err_init_device:
+	v4l2_ctrl_handler_free(&flash->ctrls_led[LM3560_LED1]);
+err_subdev_init_led1:
+	v4l2_ctrl_handler_free(&flash->ctrls_led[LM3560_LED0]);
+
+	return rval;
 }
 
 static int lm3560_remove(struct i2c_client *client)
