@@ -131,7 +131,7 @@ struct page {
 #endif
 				};
 			};
-			struct kmem_cache *slab_cache; /* not slob */
+			struct kmem_cache *slab_cache;
 			/* Double-word boundary */
 			void *freelist;		/* first free object */
 			union {
@@ -209,7 +209,7 @@ struct page {
 		unsigned int page_type;
 
 		unsigned int active;		/* SLAB */
-		int units;			/* SLOB */
+		int units;			/* zsmalloc */
 	};
 
 	/* Usage count. *DO NOT USE DIRECTLY*. See page_ref.h */
