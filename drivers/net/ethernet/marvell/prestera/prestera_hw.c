@@ -47,7 +47,6 @@ enum prestera_cmd_type_t {
 	PRESTERA_CMD_TYPE_ACL_PORT_UNBIND = 0x531,
 
 	PRESTERA_CMD_TYPE_RXTX_INIT = 0x800,
-	PRESTERA_CMD_TYPE_RXTX_PORT_INIT = 0x801,
 
 	PRESTERA_CMD_TYPE_LAG_MEMBER_ADD = 0x900,
 	PRESTERA_CMD_TYPE_LAG_MEMBER_DELETE = 0x901,
@@ -76,16 +75,12 @@ enum {
 	PRESTERA_CMD_PORT_ATTR_LEARNING = 7,
 	PRESTERA_CMD_PORT_ATTR_FLOOD = 8,
 	PRESTERA_CMD_PORT_ATTR_CAPABILITY = 9,
-	PRESTERA_CMD_PORT_ATTR_REMOTE_CAPABILITY = 10,
-	PRESTERA_CMD_PORT_ATTR_REMOTE_FC = 11,
-	PRESTERA_CMD_PORT_ATTR_LINK_MODE = 12,
+	PRESTERA_CMD_PORT_ATTR_PHY_MODE = 12,
 	PRESTERA_CMD_PORT_ATTR_TYPE = 13,
-	PRESTERA_CMD_PORT_ATTR_FEC = 14,
-	PRESTERA_CMD_PORT_ATTR_AUTONEG = 15,
-	PRESTERA_CMD_PORT_ATTR_DUPLEX = 16,
 	PRESTERA_CMD_PORT_ATTR_STATS = 17,
-	PRESTERA_CMD_PORT_ATTR_MDIX = 18,
-	PRESTERA_CMD_PORT_ATTR_AUTONEG_RESTART = 19,
+	PRESTERA_CMD_PORT_ATTR_MAC_AUTONEG_RESTART = 18,
+	PRESTERA_CMD_PORT_ATTR_PHY_AUTONEG_RESTART = 19,
+	PRESTERA_CMD_PORT_ATTR_MAC_MODE = 22,
 };
 
 enum {
@@ -203,24 +198,33 @@ struct prestera_msg_switch_init_resp {
 	u8  switch_id;
 	u8  lag_max;
 	u8  lag_member_max;
-};
+	u32 size_tbl_router_nexthop;
+} __packed __aligned(4);
 
-struct prestera_msg_port_autoneg_param {
-	u64 link_mode;
-	u8  enable;
-	u8  fec;
-};
+struct prestera_msg_event_port_param {
+	union {
+		struct {
+			u8 oper;
+			u32 mode;
+			u32 speed;
+			u8 duplex;
+			u8 fc;
+			u8 fec;
+		} mac;
+		struct {
+			u8 mdix;
+			u64 lmode_bmap;
+			u8 fc;
+		} phy;
+	};
+} __packed __aligned(4);
 
 struct prestera_msg_port_cap_param {
 	u64 link_mode;
 	u8  type;
 	u8  fec;
+	u8  fc;
 	u8  transceiver;
-};
-
-struct prestera_msg_port_mdix_param {
-	u8 status;
-	u8 admin_mode;
 };
 
 struct prestera_msg_port_flood_param {
@@ -242,10 +246,44 @@ union prestera_msg_port_param {
 	u8  duplex;
 	u8  fec;
 	u8  fc;
-	struct prestera_msg_port_mdix_param mdix;
-	struct prestera_msg_port_autoneg_param autoneg;
+
+	union {
+		struct {
+			/* TODO: merge it with "mode" */
+			u8 admin:1;
+			u8  fc;
+			u8 ap_enable;
+			union {
+				struct {
+					u32 mode;
+					u8  inband:1;
+					u32 speed;
+					u8  duplex;
+					u8  fec;
+					u8  fec_supp;
+				} reg_mode;
+				struct {
+					u32 mode;
+					u32 speed;
+					u8  fec;
+					u8  fec_supp;
+				} ap_modes[PRESTERA_AP_PORT_MAX];
+			};
+		} mac;
+		struct {
+			/* TODO: merge it with "mode" */
+			u8 admin:1;
+			u8 adv_enable;
+			u64 modes;
+			/* TODO: merge it with modes */
+			u32 mode;
+			u8 mdix;
+		} phy;
+	} link;
+
 	struct prestera_msg_port_cap_param cap;
 	struct prestera_msg_port_flood_param flood_ext;
+	struct prestera_msg_event_port_param link_evt;
 };
 
 struct prestera_msg_port_attr_req {
@@ -254,12 +292,14 @@ struct prestera_msg_port_attr_req {
 	u32 port;
 	u32 dev;
 	union prestera_msg_port_param param;
-};
+} __packed __aligned(4);
+
 
 struct prestera_msg_port_attr_resp {
 	struct prestera_msg_ret ret;
 	union prestera_msg_port_param param;
-};
+} __packed __aligned(4);
+
 
 struct prestera_msg_port_stats_resp {
 	struct prestera_msg_ret ret;
@@ -412,12 +452,6 @@ struct prestera_msg_rxtx_resp {
 	u32 map_addr;
 };
 
-struct prestera_msg_rxtx_port_req {
-	struct prestera_msg_cmd cmd;
-	u32 port;
-	u32 dev;
-};
-
 struct prestera_msg_lag_req {
 	struct prestera_msg_cmd cmd;
 	u32 port;
@@ -441,14 +475,10 @@ struct prestera_msg_event {
 	u16 id;
 };
 
-union prestera_msg_event_port_param {
-	u32 oper_state;
-};
-
 struct prestera_msg_event_port {
 	struct prestera_msg_event id;
 	u32 port_id;
-	union prestera_msg_event_port_param param;
+	struct prestera_msg_event_port_param param;
 };
 
 union prestera_msg_event_fdb_param {
@@ -466,6 +496,9 @@ struct prestera_msg_event_fdb {
 	union prestera_msg_event_fdb_param param;
 };
 
+static u8 prestera_hw_mdix_to_eth(u8 mode);
+static void prestera_hw_remote_fc_to_eth(u8 fc, bool *pause, bool *asym_pause);
+
 static int __prestera_cmd_ret(struct prestera_switch *sw,
 			      enum prestera_cmd_type_t type,
 			      struct prestera_msg_cmd *cmd, size_t clen,
@@ -477,7 +510,7 @@ static int __prestera_cmd_ret(struct prestera_switch *sw,
 
 	cmd->type = type;
 
-	err = dev->send_req(dev, cmd, clen, ret, rlen, waitms);
+	err = dev->send_req(dev, 0, cmd, clen, ret, rlen, waitms);
 	if (err)
 		return err;
 
@@ -517,13 +550,22 @@ static int prestera_cmd(struct prestera_switch *sw,
 
 static int prestera_fw_parse_port_evt(void *msg, struct prestera_event *evt)
 {
-	struct prestera_msg_event_port *hw_evt = msg;
+	struct prestera_msg_event_port *hw_evt;
 
-	if (evt->id != PRESTERA_PORT_EVENT_STATE_CHANGED)
-		return -EINVAL;
+	hw_evt = (struct prestera_msg_event_port *)msg;
 
-	evt->port_evt.data.oper_state = hw_evt->param.oper_state;
 	evt->port_evt.port_id = hw_evt->port_id;
+
+	if (evt->id == PRESTERA_PORT_EVENT_MAC_STATE_CHANGED) {
+		evt->port_evt.data.mac.oper = hw_evt->param.mac.oper;
+		evt->port_evt.data.mac.mode = hw_evt->param.mac.mode;
+		evt->port_evt.data.mac.speed = hw_evt->param.mac.speed;
+		evt->port_evt.data.mac.duplex = hw_evt->param.mac.duplex;
+		evt->port_evt.data.mac.fc = hw_evt->param.mac.fc;
+		evt->port_evt.data.mac.fec = hw_evt->param.mac.fec;
+	} else {
+		return -EINVAL;
+	}
 
 	return 0;
 }
@@ -635,6 +677,34 @@ static void prestera_pkt_recv(struct prestera_device *dev)
 	eh.func(sw, &ev, eh.arg);
 }
 
+static u8 prestera_hw_mdix_to_eth(u8 mode)
+{
+	switch (mode) {
+	case PRESTERA_PORT_TP_MDI:
+		return ETH_TP_MDI;
+	case PRESTERA_PORT_TP_MDIX:
+		return ETH_TP_MDI_X;
+	case PRESTERA_PORT_TP_AUTO:
+		return ETH_TP_MDI_AUTO;
+	default:
+		return ETH_TP_MDI_INVALID;
+	}
+}
+
+static u8 prestera_hw_mdix_from_eth(u8 mode)
+{
+	switch (mode) {
+	case ETH_TP_MDI:
+		return PRESTERA_PORT_TP_MDI;
+	case ETH_TP_MDI_X:
+		return PRESTERA_PORT_TP_MDIX;
+	case ETH_TP_MDI_AUTO:
+		return PRESTERA_PORT_TP_AUTO;
+	default:
+		return PRESTERA_PORT_TP_NA;
+	}
+}
+
 int prestera_hw_port_info_get(const struct prestera_port *port,
 			      u32 *dev_id, u32 *hw_id, u16 *fp_id)
 {
@@ -713,17 +783,114 @@ int prestera_hw_switch_ageing_set(struct prestera_switch *sw, u32 ageing_ms)
 			    &req.cmd, sizeof(req));
 }
 
-int prestera_hw_port_state_set(const struct prestera_port *port,
-			       bool admin_state)
+int prestera_hw_port_mac_mode_get(const struct prestera_port *port,
+				  u32 *mode, u32 *speed, u8 *duplex, u8 *fec)
+{
+	struct prestera_msg_port_attr_resp resp;
+	struct prestera_msg_port_attr_req req = {
+		.attr = PRESTERA_CMD_PORT_ATTR_MAC_MODE,
+		.port = port->hw_id,
+		.dev = port->dev_id
+	};
+	int err;
+
+	err = prestera_cmd_ret(port->sw, PRESTERA_CMD_TYPE_PORT_ATTR_GET,
+			       &req.cmd, sizeof(req), &resp.ret, sizeof(resp));
+	if (err)
+		return err;
+
+	if (mode)
+		*mode = resp.param.link_evt.mac.mode;
+
+	if (speed)
+		*speed = resp.param.link_evt.mac.speed;
+
+	if (duplex)
+		*duplex = resp.param.link_evt.mac.duplex;
+
+	if (fec)
+		*fec = resp.param.link_evt.mac.fec;
+
+	return err;
+}
+
+int prestera_hw_port_mac_mode_set(const struct prestera_port *port,
+				  bool admin, u32 mode, u8 inband,
+				  u32 speed, u8 duplex, u8 fec)
 {
 	struct prestera_msg_port_attr_req req = {
-		.attr = PRESTERA_CMD_PORT_ATTR_ADMIN_STATE,
+		.attr = PRESTERA_CMD_PORT_ATTR_MAC_MODE,
 		.port = port->hw_id,
 		.dev = port->dev_id,
 		.param = {
-			.admin_state = admin_state,
+			.link = {
+				.mac = {
+					.admin = admin,
+					.reg_mode.mode = mode,
+					.reg_mode.inband = inband,
+					.reg_mode.speed = speed,
+					.reg_mode.duplex = duplex,
+					.reg_mode.fec = fec
+				}
+			}
 		}
 	};
+
+	return prestera_cmd(port->sw, PRESTERA_CMD_TYPE_PORT_ATTR_SET,
+			    &req.cmd, sizeof(req));
+}
+
+int prestera_hw_port_phy_mode_get(const struct prestera_port *port,
+				  u8 *mdix, u64 *lmode_bmap,
+				  bool *fc_pause, bool *fc_asym)
+{
+	struct prestera_msg_port_attr_resp resp;
+	struct prestera_msg_port_attr_req req = {
+		.attr = PRESTERA_CMD_PORT_ATTR_PHY_MODE,
+		.port = port->hw_id,
+		.dev = port->dev_id
+	};
+	int err;
+
+	err = prestera_cmd_ret(port->sw, PRESTERA_CMD_TYPE_PORT_ATTR_GET,
+			       &req.cmd, sizeof(req), &resp.ret, sizeof(resp));
+	if (err)
+		return err;
+
+	if (mdix)
+		*mdix = prestera_hw_mdix_to_eth(resp.param.link_evt.phy.mdix);
+
+	if (lmode_bmap)
+		*lmode_bmap = resp.param.link_evt.phy.lmode_bmap;
+
+	if (fc_pause && fc_asym)
+		prestera_hw_remote_fc_to_eth(resp.param.link_evt.phy.fc,
+					     fc_pause, fc_asym);
+
+	return err;
+}
+
+int prestera_hw_port_phy_mode_set(const struct prestera_port *port,
+				  bool admin, bool adv, u32 mode, u64 modes,
+				  u8 mdix)
+{
+	struct prestera_msg_port_attr_req req = {
+		.attr = PRESTERA_CMD_PORT_ATTR_PHY_MODE,
+		.port = port->hw_id,
+		.dev = port->dev_id,
+		.param = {
+			.link = {
+				.phy = {
+					.admin = admin,
+					.adv_enable = adv ? 1 : 0,
+					.mode = mode,
+					.modes = modes,
+				}
+			}
+		}
+	};
+
+	req.param.link.phy.mdix = prestera_hw_mdix_from_eth(mdix);
 
 	return prestera_cmd(port->sw, PRESTERA_CMD_TYPE_PORT_ATTR_SET,
 			    &req.cmd, sizeof(req));
@@ -798,44 +965,9 @@ int prestera_hw_port_cap_get(const struct prestera_port *port,
 	return err;
 }
 
-int prestera_hw_port_remote_cap_get(const struct prestera_port *port,
-				    u64 *link_mode_bitmap)
+static void prestera_hw_remote_fc_to_eth(u8 fc, bool *pause, bool *asym_pause)
 {
-	struct prestera_msg_port_attr_req req = {
-		.attr = PRESTERA_CMD_PORT_ATTR_REMOTE_CAPABILITY,
-		.port = port->hw_id,
-		.dev = port->dev_id,
-	};
-	struct prestera_msg_port_attr_resp resp;
-	int err;
-
-	err = prestera_cmd_ret(port->sw, PRESTERA_CMD_TYPE_PORT_ATTR_GET,
-			       &req.cmd, sizeof(req), &resp.ret, sizeof(resp));
-	if (err)
-		return err;
-
-	*link_mode_bitmap = resp.param.cap.link_mode;
-
-	return 0;
-}
-
-int prestera_hw_port_remote_fc_get(const struct prestera_port *port,
-				   bool *pause, bool *asym_pause)
-{
-	struct prestera_msg_port_attr_req req = {
-		.attr = PRESTERA_CMD_PORT_ATTR_REMOTE_FC,
-		.port = port->hw_id,
-		.dev = port->dev_id,
-	};
-	struct prestera_msg_port_attr_resp resp;
-	int err;
-
-	err = prestera_cmd_ret(port->sw, PRESTERA_CMD_TYPE_PORT_ATTR_GET,
-			       &req.cmd, sizeof(req), &resp.ret, sizeof(resp));
-	if (err)
-		return err;
-
-	switch (resp.param.fc) {
+	switch (fc) {
 	case PRESTERA_FC_SYMMETRIC:
 		*pause = true;
 		*asym_pause = false;
@@ -852,8 +984,6 @@ int prestera_hw_port_remote_fc_get(const struct prestera_port *port,
 		*pause = false;
 		*asym_pause = false;
 	}
-
-	return 0;
 }
 
 int prestera_hw_acl_ruleset_create(struct prestera_switch *sw, u16 *ruleset_id)
@@ -1144,140 +1274,6 @@ int prestera_hw_port_type_get(const struct prestera_port *port, u8 *type)
 	return 0;
 }
 
-int prestera_hw_port_fec_get(const struct prestera_port *port, u8 *fec)
-{
-	struct prestera_msg_port_attr_req req = {
-		.attr = PRESTERA_CMD_PORT_ATTR_FEC,
-		.port = port->hw_id,
-		.dev = port->dev_id,
-	};
-	struct prestera_msg_port_attr_resp resp;
-	int err;
-
-	err = prestera_cmd_ret(port->sw, PRESTERA_CMD_TYPE_PORT_ATTR_GET,
-			       &req.cmd, sizeof(req), &resp.ret, sizeof(resp));
-	if (err)
-		return err;
-
-	*fec = resp.param.fec;
-
-	return 0;
-}
-
-int prestera_hw_port_fec_set(const struct prestera_port *port, u8 fec)
-{
-	struct prestera_msg_port_attr_req req = {
-		.attr = PRESTERA_CMD_PORT_ATTR_FEC,
-		.port = port->hw_id,
-		.dev = port->dev_id,
-		.param = {
-			.fec = fec,
-		}
-	};
-
-	return prestera_cmd(port->sw, PRESTERA_CMD_TYPE_PORT_ATTR_SET,
-			    &req.cmd, sizeof(req));
-}
-
-static u8 prestera_hw_mdix_to_eth(u8 mode)
-{
-	switch (mode) {
-	case PRESTERA_PORT_TP_MDI:
-		return ETH_TP_MDI;
-	case PRESTERA_PORT_TP_MDIX:
-		return ETH_TP_MDI_X;
-	case PRESTERA_PORT_TP_AUTO:
-		return ETH_TP_MDI_AUTO;
-	default:
-		return ETH_TP_MDI_INVALID;
-	}
-}
-
-static u8 prestera_hw_mdix_from_eth(u8 mode)
-{
-	switch (mode) {
-	case ETH_TP_MDI:
-		return PRESTERA_PORT_TP_MDI;
-	case ETH_TP_MDI_X:
-		return PRESTERA_PORT_TP_MDIX;
-	case ETH_TP_MDI_AUTO:
-		return PRESTERA_PORT_TP_AUTO;
-	default:
-		return PRESTERA_PORT_TP_NA;
-	}
-}
-
-int prestera_hw_port_mdix_get(const struct prestera_port *port, u8 *status,
-			      u8 *admin_mode)
-{
-	struct prestera_msg_port_attr_req req = {
-		.attr = PRESTERA_CMD_PORT_ATTR_MDIX,
-		.port = port->hw_id,
-		.dev = port->dev_id,
-	};
-	struct prestera_msg_port_attr_resp resp;
-	int err;
-
-	err = prestera_cmd_ret(port->sw, PRESTERA_CMD_TYPE_PORT_ATTR_GET,
-			       &req.cmd, sizeof(req), &resp.ret, sizeof(resp));
-	if (err)
-		return err;
-
-	*status = prestera_hw_mdix_to_eth(resp.param.mdix.status);
-	*admin_mode = prestera_hw_mdix_to_eth(resp.param.mdix.admin_mode);
-
-	return 0;
-}
-
-int prestera_hw_port_mdix_set(const struct prestera_port *port, u8 mode)
-{
-	struct prestera_msg_port_attr_req req = {
-		.attr = PRESTERA_CMD_PORT_ATTR_MDIX,
-		.port = port->hw_id,
-		.dev = port->dev_id,
-	};
-
-	req.param.mdix.admin_mode = prestera_hw_mdix_from_eth(mode);
-
-	return prestera_cmd(port->sw, PRESTERA_CMD_TYPE_PORT_ATTR_SET,
-			    &req.cmd, sizeof(req));
-}
-
-int prestera_hw_port_link_mode_set(const struct prestera_port *port, u32 mode)
-{
-	struct prestera_msg_port_attr_req req = {
-		.attr = PRESTERA_CMD_PORT_ATTR_LINK_MODE,
-		.port = port->hw_id,
-		.dev = port->dev_id,
-		.param = {
-			.link_mode = mode,
-		}
-	};
-
-	return prestera_cmd(port->sw, PRESTERA_CMD_TYPE_PORT_ATTR_SET,
-			    &req.cmd, sizeof(req));
-}
-
-int prestera_hw_port_link_mode_get(const struct prestera_port *port, u32 *mode)
-{
-	struct prestera_msg_port_attr_req req = {
-		.attr = PRESTERA_CMD_PORT_ATTR_LINK_MODE,
-		.port = port->hw_id,
-		.dev = port->dev_id,
-	};
-	struct prestera_msg_port_attr_resp resp;
-	int err;
-
-	err = prestera_cmd_ret(port->sw, PRESTERA_CMD_TYPE_PORT_ATTR_GET,
-			       &req.cmd, sizeof(req), &resp.ret, sizeof(resp));
-	if (err)
-		return err;
-
-	*mode = resp.param.link_mode;
-
-	return 0;
-}
-
 int prestera_hw_port_speed_get(const struct prestera_port *port, u32 *speed)
 {
 	struct prestera_msg_port_attr_req req = {
@@ -1298,56 +1294,16 @@ int prestera_hw_port_speed_get(const struct prestera_port *port, u32 *speed)
 	return 0;
 }
 
-int prestera_hw_port_autoneg_set(const struct prestera_port *port,
-				 bool autoneg, u64 link_modes, u8 fec)
-{
-	struct prestera_msg_port_attr_req req = {
-		.attr = PRESTERA_CMD_PORT_ATTR_AUTONEG,
-		.port = port->hw_id,
-		.dev = port->dev_id,
-		.param = {
-			.autoneg = {
-				.link_mode = link_modes,
-				.enable = autoneg,
-				.fec = fec,
-			}
-		}
-	};
-
-	return prestera_cmd(port->sw, PRESTERA_CMD_TYPE_PORT_ATTR_SET,
-			    &req.cmd, sizeof(req));
-}
-
 int prestera_hw_port_autoneg_restart(struct prestera_port *port)
 {
 	struct prestera_msg_port_attr_req req = {
-		.attr = PRESTERA_CMD_PORT_ATTR_AUTONEG_RESTART,
+		.attr = PRESTERA_CMD_PORT_ATTR_PHY_AUTONEG_RESTART,
 		.port = port->hw_id,
 		.dev = port->dev_id,
 	};
 
 	return prestera_cmd(port->sw, PRESTERA_CMD_TYPE_PORT_ATTR_SET,
 			    &req.cmd, sizeof(req));
-}
-
-int prestera_hw_port_duplex_get(const struct prestera_port *port, u8 *duplex)
-{
-	struct prestera_msg_port_attr_req req = {
-		.attr = PRESTERA_CMD_PORT_ATTR_DUPLEX,
-		.port = port->hw_id,
-		.dev = port->dev_id,
-	};
-	struct prestera_msg_port_attr_resp resp;
-	int err;
-
-	err = prestera_cmd_ret(port->sw, PRESTERA_CMD_TYPE_PORT_ATTR_GET,
-			       &req.cmd, sizeof(req), &resp.ret, sizeof(resp));
-	if (err)
-		return err;
-
-	*duplex = resp.param.duplex;
-
-	return 0;
 }
 
 int prestera_hw_port_stats_get(const struct prestera_port *port,
@@ -1772,17 +1728,6 @@ int prestera_hw_rxtx_init(struct prestera_switch *sw,
 	params->map_addr = resp.map_addr;
 
 	return 0;
-}
-
-int prestera_hw_rxtx_port_init(struct prestera_port *port)
-{
-	struct prestera_msg_rxtx_port_req req = {
-		.port = port->hw_id,
-		.dev = port->dev_id,
-	};
-
-	return prestera_cmd(port->sw, PRESTERA_CMD_TYPE_RXTX_PORT_INIT,
-			    &req.cmd, sizeof(req));
 }
 
 int prestera_hw_lag_member_add(struct prestera_port *port, u16 lag_id)
