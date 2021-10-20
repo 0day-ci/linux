@@ -125,6 +125,13 @@ static int bd71837_clk_probe(struct platform_device *pdev)
 	c->pdev = pdev;
 	c->hw.init = &init;
 
+	/*
+	 * The clock supply vital clock net, e.g. SoC XTAL input,
+	 * and the clock must not ever be turned off.
+	 */
+	if (of_property_read_bool(parent->of_node, "rohm,clock-output-is-critical"))
+		init.flags |= CLK_IS_CRITICAL,
+
 	of_property_read_string_index(parent->of_node,
 				      "clock-output-names", 0, &init.name);
 
