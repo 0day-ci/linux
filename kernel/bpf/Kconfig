@@ -29,6 +29,7 @@ config BPF_SYSCALL
 	select IRQ_WORK
 	select TASKS_TRACE_RCU
 	select BINARY_PRINTF
+	select THREADGROUP_RWSEM
 	select NET_SOCK_MSG if NET
 	default n
 	help

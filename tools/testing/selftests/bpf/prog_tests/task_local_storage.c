@@ -5,10 +5,21 @@
 #include <unistd.h>
 #include <sys/syscall.h>   /* For SYS_xxx definitions */
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <test_progs.h>
 #include "task_local_storage.skel.h"
 #include "task_local_storage_exit_creds.skel.h"
 #include "task_ls_recursion.skel.h"
+#include "task_ls_prealloc.skel.h"
+
+#ifndef __NR_pidfd_open
+#define __NR_pidfd_open 434
+#endif
+
+static inline int sys_pidfd_open(pid_t pid, unsigned int flags)
+{
+	return syscall(__NR_pidfd_open, pid, flags);
+}
 
 static void test_sys_enter_exit(void)
 {
@@ -81,6 +92,94 @@ out:
 	task_ls_recursion__destroy(skel);
 }
 
+static int fork_prealloc_child(int *pipe_fd)
+{
+	int pipe_fds[2], pid_fd, err;
+	pid_t pid;
+
+	err = pipe(pipe_fds);
+	if (!ASSERT_OK(err, "pipe"))
+		return -1;
+
+	*pipe_fd = pipe_fds[1];
+
+	pid = fork();
+	if (pid == 0) {
+		char ch;
+		close(pipe_fds[1]);
+		read(pipe_fds[0], &ch, 1);
+		exit(0);
+	}
+
+	if (!ASSERT_GE(pid, 0, "fork"))
+		return -1;
+
+	pid_fd = sys_pidfd_open(pid, 0);
+	if (!ASSERT_GE(pid_fd, 0, "pidfd_open"))
+		return -1;
+
+	return pid_fd;
+}
+
+static void test_prealloc_elem(int map_fd, int pid_fd)
+{
+	int val, err;
+
+	err = bpf_map_lookup_elem(map_fd, &pid_fd, &val);
+	if (ASSERT_OK(err, "bpf_map_lookup_elem"))
+		ASSERT_EQ(val, 0, "elem value == 0");
+
+	val = 0xdeadbeef;
+	err = bpf_map_update_elem(map_fd, &pid_fd, &val, BPF_EXIST);
+	ASSERT_OK(err, "bpf_map_update_elem to 0xdeadbeef");
+
+	err = bpf_map_lookup_elem(map_fd, &pid_fd, &val);
+	if (ASSERT_OK(err, "bpf_map_lookup_elem"))
+		ASSERT_EQ(val, 0xdeadbeef, "elem value == 0xdeadbeef");
+}
+
+static void test_prealloc(void)
+{
+	struct task_ls_prealloc *skel = NULL;
+	int pre_pipe_fd = -1, post_pipe_fd = -1;
+	int pre_pid_fd, post_pid_fd;
+	int map_fd, err;
+
+	pre_pid_fd = fork_prealloc_child(&pre_pipe_fd);
+	if (pre_pid_fd < 0)
+		goto out;
+
+	skel = task_ls_prealloc__open_and_load();
+	if (!ASSERT_OK_PTR(skel, "skel_open_and_load"))
+		goto out;
+
+	err = task_ls_prealloc__attach(skel);
+	if (!ASSERT_OK(err, "skel_attach"))
+		goto out;
+
+	post_pid_fd = fork_prealloc_child(&post_pipe_fd);
+	if (post_pid_fd < 0)
+		goto out;
+
+	map_fd = bpf_map__fd(skel->maps.prealloc_map);
+	if (!ASSERT_GE(map_fd, 0, "bpf_map__fd"))
+		goto out;
+
+	test_prealloc_elem(map_fd, pre_pid_fd);
+	test_prealloc_elem(map_fd, post_pid_fd);
+out:
+	if (pre_pipe_fd >= 0)
+		close(pre_pipe_fd);
+	if (post_pipe_fd >= 0)
+		close(post_pipe_fd);
+	do {
+		err = wait4(-1, NULL, 0, NULL);
+	} while (!err);
+
+	if (skel)
+		task_ls_prealloc__destroy(skel);
+}
+
 void test_task_local_storage(void)
 {
 	if (test__start_subtest("sys_enter_exit"))
@@ -89,4 +188,6 @@ void test_task_local_storage(void)
 		test_exit_creds();
 	if (test__start_subtest("recursion"))
 		test_recursion();
+	if (test__start_subtest("prealloc"))
+		test_prealloc();
 }

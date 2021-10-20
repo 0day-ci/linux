@@ -2290,6 +2290,10 @@ static __latent_entropy struct task_struct *copy_process(
 
 	threadgroup_change_begin(current);
 
+	retval = bpf_task_storage_fork(p);
+	if (retval)
+		goto bad_fork_threadgroup_change_end;
+
 	/*
 	 * Ensure that the cgroup subsystem policies allow the new process to be
 	 * forked. It should be noted that the new process's css_set can be changed
@@ -2298,7 +2302,7 @@ static __latent_entropy struct task_struct *copy_process(
 	 */
 	retval = cgroup_can_fork(p, args);
 	if (retval)
-		goto bad_fork_threadgroup_change_end;
+		goto bad_fork_bpf_task_storage_free;
 
 	/*
 	 * From this point on we must avoid any synchronous user-space
@@ -2427,6 +2431,8 @@ bad_fork_cancel_cgroup:
 	spin_unlock(&current->sighand->siglock);
 	write_unlock_irq(&tasklist_lock);
 	cgroup_cancel_fork(p, args);
+bad_fork_bpf_task_storage_free:
+	bpf_task_storage_free(p);
 bad_fork_threadgroup_change_end:
 	threadgroup_change_end(current);
 bad_fork_put_pidfd:

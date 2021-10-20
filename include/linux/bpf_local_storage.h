@@ -51,6 +51,12 @@ struct bpf_local_storage_map {
 	u32 bucket_log;
 	u16 elem_size;
 	u16 cache_idx;
+	/* Maps with prealloc need to be tracked and allocated when a new
+	 * containing object is created. The following node can be used to keep
+	 * track of the prealloc maps. Outside of initializing the field, the
+	 * shared local_storage code doesn't use it directly.
+	 */
+	struct list_head prealloc_node;
 };
 
 struct bpf_local_storage_data {
@@ -118,6 +124,7 @@ void bpf_local_storage_cache_idx_free(struct bpf_local_storage_cache *cache,
 
 /* Helper functions for bpf_local_storage */
 int bpf_local_storage_map_alloc_check(union bpf_attr *attr);
+int bpf_local_storage_prealloc_map_alloc_check(union bpf_attr *attr);
 
 struct bpf_local_storage_map *bpf_local_storage_map_alloc(union bpf_attr *attr);
 
@@ -157,6 +164,11 @@ bpf_local_storage_alloc(void *owner,
 			struct bpf_local_storage_map *smap,
 			struct bpf_local_storage_elem *first_selem);
 
+struct bpf_local_storage_data *
+__bpf_local_storage_update(void *owner, struct bpf_local_storage_map *smap,
+			   void *value, u64 map_flags,
+			   struct bpf_local_storage **local_storage_prealloc,
+			   struct bpf_local_storage_elem **selem_prealloc);
 struct bpf_local_storage_data *
 bpf_local_storage_update(void *owner, struct bpf_local_storage_map *smap,
 			 void *value, u64 map_flags);

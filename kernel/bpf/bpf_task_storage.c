@@ -17,10 +17,14 @@
 #include <uapi/linux/btf.h>
 #include <linux/btf_ids.h>
 #include <linux/fdtable.h>
+#include <linux/sched/threadgroup_rwsem.h>
 
 DEFINE_BPF_STORAGE_CACHE(task_cache);
 
 static DEFINE_PER_CPU(int, bpf_task_storage_busy);
+
+/* Protected by threadgroup_rwsem. */
+static LIST_HEAD(prealloc_smaps);
 
 static void bpf_task_storage_lock(void)
 {
@@ -280,13 +284,102 @@ static int notsupp_get_next_key(struct bpf_map *map, void *key, void *next_key)
 	return -ENOTSUPP;
 }
 
+static int task_storage_map_populate(struct bpf_local_storage_map *smap)
+{
+	struct bpf_local_storage *storage = NULL;
+	struct bpf_local_storage_elem *selem = NULL;
+	struct task_struct *p, *g;
+	int err = 0;
+
+	lockdep_assert_held(&threadgroup_rwsem);
+retry:
+	if (!storage)
+		storage = bpf_map_kzalloc(&smap->map, sizeof(*storage),
+					  GFP_USER);
+	if (!selem)
+		selem = bpf_map_kzalloc(&smap->map, smap->elem_size, GFP_USER);
+	if (!storage || !selem) {
+		err = -ENOMEM;
+		goto out_free;
+	}
+
+	rcu_read_lock();
+	bpf_task_storage_lock();
+
+	for_each_process_thread(g, p) {
+		struct bpf_local_storage_data *sdata;
+
+		/* Try inserting with atomic allocations. On failure, retry with
+		 * the preallocated ones.
+		 */
+		sdata = bpf_local_storage_update(p, smap, NULL, BPF_NOEXIST);
+
+		if (PTR_ERR(sdata) == -ENOMEM && storage && selem) {
+			sdata = __bpf_local_storage_update(p, smap, NULL,
+							   BPF_NOEXIST,
+							   &storage, &selem);
+		}
+
+		/* Check -EEXIST before need_resched() to guarantee forward
+		 * progress.
+		 */
+		if (PTR_ERR(sdata) == -EEXIST)
+			continue;
+
+		/* If requested or alloc failed, take a breather and loop back
+		 * to preallocate.
+		 */
+		if (need_resched() ||
+		    PTR_ERR(sdata) == -EAGAIN || PTR_ERR(sdata) == -ENOMEM) {
+			bpf_task_storage_unlock();
+			rcu_read_unlock();
+			cond_resched();
+			goto retry;
+		}
+
+		if (IS_ERR(sdata)) {
+			err = PTR_ERR(sdata);
+			goto out_unlock;
+		}
+	}
+out_unlock:
+	bpf_task_storage_unlock();
+	rcu_read_unlock();
+out_free:
+	if (storage)
+		kfree(storage);
+	if (selem)
+		kfree(selem);
+	return err;
+}
+
 static struct bpf_map *task_storage_map_alloc(union bpf_attr *attr)
 {
 	struct bpf_local_storage_map *smap;
+	int err;
 
 	smap = bpf_local_storage_map_alloc(attr);
 	if (IS_ERR(smap))
 		return ERR_CAST(smap);
+
+	if (!(attr->map_flags & BPF_F_NO_PREALLOC)) {
+		/* We're going to exercise the regular update path to populate
+		 * the map for the existing tasks, which will call into map ops
+		 * which is normally initialized after this function returns.
+		 * Initialize it early here.
+		 */
+		smap->map.ops = &task_storage_map_ops;
+
+		percpu_down_write(&threadgroup_rwsem);
+		list_add_tail(&smap->prealloc_node, &prealloc_smaps);
+		err = task_storage_map_populate(smap);
+		percpu_up_write(&threadgroup_rwsem);
+		if (err) {
+			bpf_local_storage_map_free(smap,
+						   &bpf_task_storage_busy);
+			return ERR_PTR(err);
+		}
+	}
 
 	smap->cache_idx = bpf_local_storage_cache_idx_get(&task_cache);
 	return &smap->map;
@@ -298,13 +391,20 @@ static void task_storage_map_free(struct bpf_map *map)
 
 	smap = (struct bpf_local_storage_map *)map;
 	bpf_local_storage_cache_idx_free(&task_cache, smap->cache_idx);
+
+	if (!list_empty(&smap->prealloc_node)) {
+		percpu_down_write(&threadgroup_rwsem);
+		list_del_init(&smap->prealloc_node);
+		percpu_up_write(&threadgroup_rwsem);
+	}
+
 	bpf_local_storage_map_free(smap, &bpf_task_storage_busy);
 }
 
 static int task_storage_map_btf_id;
 const struct bpf_map_ops task_storage_map_ops = {
 	.map_meta_equal = bpf_map_meta_equal,
-	.map_alloc_check = bpf_local_storage_map_alloc_check,
+	.map_alloc_check = bpf_local_storage_prealloc_map_alloc_check,
 	.map_alloc = task_storage_map_alloc,
 	.map_free = task_storage_map_free,
 	.map_get_next_key = notsupp_get_next_key,
@@ -316,6 +416,42 @@ const struct bpf_map_ops task_storage_map_ops = {
 	.map_btf_id = &task_storage_map_btf_id,
 	.map_owner_storage_ptr = task_storage_ptr,
 };
+
+int bpf_task_storage_fork(struct task_struct *task)
+{
+	struct bpf_local_storage_map *smap;
+
+	percpu_rwsem_assert_held(&threadgroup_rwsem);
+
+	list_for_each_entry(smap, &prealloc_smaps, prealloc_node) {
+		struct bpf_local_storage *storage;
+		struct bpf_local_storage_elem *selem;
+		struct bpf_local_storage_data *sdata;
+
+		storage = bpf_map_kzalloc(&smap->map, sizeof(*storage),
+					  GFP_USER);
+		selem = bpf_map_kzalloc(&smap->map, smap->elem_size, GFP_USER);
+
+		rcu_read_lock();
+		bpf_task_storage_lock();
+		sdata = __bpf_local_storage_update(task, smap, NULL, BPF_NOEXIST,
+						   &storage, &selem);
+		bpf_task_storage_unlock();
+		rcu_read_unlock();
+
+		if (storage)
+			kfree(storage);
+		if (selem)
+			kfree(selem);
+
+		if (IS_ERR(sdata)) {
+			bpf_task_storage_free(task);
+			return PTR_ERR(sdata);
+		}
+	}
+
+	return 0;
+}
 
 const struct bpf_func_proto bpf_task_storage_get_proto = {
 	.func = bpf_task_storage_get,

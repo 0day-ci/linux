@@ -1668,6 +1668,7 @@ struct bpf_prog *bpf_prog_by_id(u32 id);
 struct bpf_link *bpf_link_by_id(u32 id);
 
 const struct bpf_func_proto *bpf_base_func_proto(enum bpf_func_id func_id);
+int bpf_task_storage_fork(struct task_struct *task);
 void bpf_task_storage_free(struct task_struct *task);
 bool bpf_prog_has_kfunc_call(const struct bpf_prog *prog);
 const struct btf_func_model *
@@ -1874,6 +1875,11 @@ static inline const struct bpf_func_proto *
 bpf_base_func_proto(enum bpf_func_id func_id)
 {
 	return NULL;
+}
+
+static inline int bpf_task_storage_fork(struct task_struct *p)
+{
+	return 0;
 }
 
 static inline void bpf_task_storage_free(struct task_struct *task)
