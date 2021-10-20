@@ -16,7 +16,6 @@
 #include <linux/rcupdate.h>
 #include <linux/refcount.h>
 #include <linux/percpu-refcount.h>
-#include <linux/percpu-rwsem.h>
 #include <linux/u64_stats_sync.h>
 #include <linux/workqueue.h>
 #include <linux/bpf-cgroup.h>
@@ -708,41 +707,9 @@ struct cgroup_subsys {
 	unsigned int depends_on;
 };
 
-extern struct percpu_rw_semaphore threadgroup_rwsem;
-
-/**
- * threadgroup_change_begin - threadgroup exclusion for cgroups
- * @tsk: target task
- *
- * Allows cgroup operations to synchronize against threadgroup changes
- * using a percpu_rw_semaphore.
- */
-static inline void threadgroup_change_begin(struct task_struct *tsk)
-{
-	percpu_down_read(&threadgroup_rwsem);
-}
-
-/**
- * threadgroup_change_end - threadgroup exclusion for cgroups
- * @tsk: target task
- *
- * Counterpart of threadgroup_change_begin().
- */
-static inline void threadgroup_change_end(struct task_struct *tsk)
-{
-	percpu_up_read(&threadgroup_rwsem);
-}
-
 #else	/* CONFIG_CGROUPS */
 
 #define CGROUP_SUBSYS_COUNT 0
-
-static inline void threadgroup_change_begin(struct task_struct *tsk)
-{
-	might_sleep();
-}
-
-static inline void threadgroup_change_end(struct task_struct *tsk) {}
 
 #endif	/* CONFIG_CGROUPS */
 

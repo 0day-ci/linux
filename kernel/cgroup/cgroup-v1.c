@@ -8,6 +8,7 @@
 #include <linux/mm.h>
 #include <linux/sched/signal.h>
 #include <linux/sched/task.h>
+#include <linux/sched/threadgroup_rwsem.h>
 #include <linux/magic.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>

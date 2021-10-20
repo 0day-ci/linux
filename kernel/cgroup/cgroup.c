@@ -42,6 +42,7 @@
 #include <linux/rcupdate.h>
 #include <linux/sched.h>
 #include <linux/sched/task.h>
+#include <linux/sched/threadgroup_rwsem.h>
 #include <linux/slab.h>
 #include <linux/spinlock.h>
 #include <linux/percpu-rwsem.h>
@@ -108,8 +109,6 @@ static DEFINE_SPINLOCK(cgroup_idr_lock);
  * against file removal/re-creation across css hiding.
  */
 static DEFINE_SPINLOCK(cgroup_file_kn_lock);
-
-DEFINE_PERCPU_RWSEM(threadgroup_rwsem);
 
 #define cgroup_assert_mutex_or_rcu_locked()				\
 	RCU_LOCKDEP_WARN(!rcu_read_lock_held() &&			\
@@ -6073,18 +6072,12 @@ static struct cgroup *cgroup_get_from_file(struct file *f)
  * to the target cgroup.
  */
 static int cgroup_css_set_fork(struct kernel_clone_args *kargs)
-	__acquires(&cgroup_mutex) __acquires(&threadgroup_rwsem)
 {
 	int ret;
 	struct cgroup *dst_cgrp = NULL;
 	struct css_set *cset;
 	struct super_block *sb;
 	struct file *f;
-
-	if (kargs->flags & CLONE_INTO_CGROUP)
-		mutex_lock(&cgroup_mutex);
-
-	threadgroup_change_begin(current);
 
 	spin_lock_irq(&css_set_lock);
 	cset = task_css_set(current);
@@ -6141,7 +6134,6 @@ static int cgroup_css_set_fork(struct kernel_clone_args *kargs)
 	return ret;
 
 err:
-	threadgroup_change_end(current);
 	mutex_unlock(&cgroup_mutex);
 	if (f)
 		fput(f);
@@ -6161,10 +6153,8 @@ err:
  * CLONE_INTO_CGROUP was requested.
  */
 static void cgroup_css_set_put_fork(struct kernel_clone_args *kargs)
-	__releases(&threadgroup_rwsem) __releases(&cgroup_mutex)
+	__releases(&cgroup_mutex)
 {
-	threadgroup_change_end(current);
-
 	if (kargs->flags & CLONE_INTO_CGROUP) {
 		struct cgroup *cgrp = kargs->cgrp;
 		struct css_set *cset = kargs->cset;
@@ -6184,8 +6174,25 @@ static void cgroup_css_set_put_fork(struct kernel_clone_args *kargs)
 }
 
 /**
+ * cgroup_prep_fork - called during fork before threadgroup_rwsem is acquired
+ * @kargs: the arguments passed to create the child process
+ *
+ * CLONE_INTO_CGROUP requires cgroup_mutex as we're migrating while forking.
+ * However, cgroup_mutex must nest outside threadgroup_rwsem which is
+ * read-locked before cgroup_can_fork(). Break out cgroup_mutex locking to this
+ * function to follow the locking order.
+ */
+void cgroup_prep_fork(struct kernel_clone_args *kargs)
+	__acquires(&cgroup_mutex)
+{
+	if (kargs->flags & CLONE_INTO_CGROUP)
+		mutex_lock(&cgroup_mutex);
+}
+
+/**
  * cgroup_can_fork - called on a new task before the process is exposed
  * @child: the child process
+ * @kargs: the arguments passed to create the child process
  *
  * This prepares a new css_set for the child process which the child will
  * be attached to in cgroup_post_fork().
@@ -6197,6 +6204,13 @@ int cgroup_can_fork(struct task_struct *child, struct kernel_clone_args *kargs)
 {
 	struct cgroup_subsys *ss;
 	int i, j, ret;
+
+	/*
+	 * cgroup_mutex should have been acquired by cgroup_prep_fork() if
+	 * CLONE_INTO_CGROUP
+	 */
+	if (kargs->flags & CLONE_INTO_CGROUP)
+		lockdep_assert_held(&cgroup_mutex);
 
 	ret = cgroup_css_set_fork(kargs);
 	if (ret)
