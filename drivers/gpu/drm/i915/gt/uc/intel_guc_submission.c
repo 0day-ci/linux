@@ -3231,10 +3231,7 @@ guc_create_virtual(struct intel_engine_cs **siblings, unsigned int count)
 
 			ve->base.flags |= sibling->flags;
 
-			ve->base.props.timeslice_duration_ms =
-				sibling->props.timeslice_duration_ms;
-			ve->base.props.preempt_timeout_ms =
-				sibling->props.preempt_timeout_ms;
+			ve->base.props = sibling->props;
 		}
 	}
 
