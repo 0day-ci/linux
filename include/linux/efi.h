@@ -550,6 +550,7 @@ extern struct efi {
 	unsigned long			tpm_log;		/* TPM2 Event Log table */
 	unsigned long			tpm_final_log;		/* TPM2 Final Events Log table */
 	unsigned long			mokvar_table;		/* MOK variable config table */
+	unsigned long			coco_secret;		/* Confidential computing secret table */
 
 	efi_get_time_t			*get_time;
 	efi_set_time_t			*set_time;
@@ -1287,5 +1288,14 @@ struct linux_efi_coco_secret_area {
 	u32	size;
 	u8	area[];
 };
+
+#ifdef CONFIG_EFI_COCO_SECRET
+extern int efi_coco_secret_area_reserve(void);
+#else
+static inline int efi_coco_secret_area_reserve(void)
+{
+	return 0;
+}
+#endif
 
 #endif /* _LINUX_EFI_H */
