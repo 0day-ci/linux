@@ -1477,7 +1477,9 @@ static void mark_readonly(void)
 		 * insecure pages which are W+X.
 		 */
 		rcu_barrier();
+		get_online_mems();
 		mark_rodata_ro();
+		put_online_mems();
 		rodata_test();
 	} else
 		pr_info("Kernel memory protection disabled.\n");
