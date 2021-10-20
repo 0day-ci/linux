@@ -305,20 +305,35 @@ static unsigned long long iblock_emulate_read_cap_with_block_size(
 	return blocks_long;
 }
 
+static sense_reason_t iblock_blk_status_to_reason(blk_status_t status)
+{
+       switch (status) {
+       case BLK_STS_OK:
+               return TCM_NO_SENSE;
+       case BLK_STS_NOSPC:
+               return TCM_SPACE_ALLOCATION_FAILED;
+       default:
+               return TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
+       }
+}
+
 static void iblock_complete_cmd(struct se_cmd *cmd)
 {
 	struct iblock_req *ibr = cmd->priv;
 	u8 status;
+	sense_reason_t reason;
 
 	if (!refcount_dec_and_test(&ibr->pending))
 		return;
 
-	if (atomic_read(&ibr->ib_bio_err_cnt))
+	reason = iblock_blk_status_to_reason(atomic_read(&ibr->status));
+
+	if (reason != TCM_NO_SENSE)
 		status = SAM_STAT_CHECK_CONDITION;
 	else
 		status = SAM_STAT_GOOD;
 
-	target_complete_cmd(cmd, status);
+	target_complete_cmd_with_sense(cmd, status, reason);
 	kfree(ibr);
 }
 
@@ -330,9 +345,10 @@ static void iblock_bio_done(struct bio *bio)
 	if (bio->bi_status) {
 		pr_err("bio error: %p,  err: %d\n", bio, bio->bi_status);
 		/*
-		 * Bump the ib_bio_err_cnt and release bio.
+		 * Set the error status of the iblock request to the error
+		 * status of the first failed bio.
 		 */
-		atomic_inc(&ibr->ib_bio_err_cnt);
+		atomic_cmpxchg(&ibr->status, BLK_STS_OK, bio->bi_status);
 		smp_mb__after_atomic();
 	}
 

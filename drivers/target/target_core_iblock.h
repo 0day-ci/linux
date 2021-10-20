@@ -13,7 +13,7 @@
 
 struct iblock_req {
 	refcount_t pending;
-	atomic_t ib_bio_err_cnt;
+	atomic_t status;
 } ____cacheline_aligned;
 
 #define IBDF_HAS_UDEV_PATH		0x01
