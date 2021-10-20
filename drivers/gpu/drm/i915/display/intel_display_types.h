@@ -1563,6 +1563,8 @@ struct intel_dp {
 	int num_sink_rates;
 	int sink_rates[DP_MAX_SUPPORTED_RATES];
 	bool use_rate_select;
+	/* Max sink lane count as reported by DP_MAX_LANE_COUNT */
+	int max_sink_lane_count;
 	/* intersection of source and sink rates */
 	int num_common_rates;
 	int common_rates[DP_MAX_SUPPORTED_RATES];
@@ -1580,7 +1582,6 @@ struct intel_dp {
 
 	struct intel_pps pps;
 
-	bool can_mst; /* this port supports mst */
 	bool is_mst;
 	int active_mst_links;
 
