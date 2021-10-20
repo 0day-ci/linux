@@ -927,6 +927,103 @@ out:
 	return ret;
 }
 
+static void wcn36xx_channel_set_max_power(struct wcn36xx_hal_channel_param *p, u32 max)
+{
+	u32 min = WCN36XX_HAL_DEFAULT_MIN_POWER;
+
+	if (min > max)
+		min = max;
+
+	p->reg_info_1 &= 0xffff0000;
+	p->reg_info_1 |= (min & 0xff) + ((max & 0xff) << 8);
+}
+
+static void wcn36xx_channel_set_reg_power(struct wcn36xx_hal_channel_param *p, u32 power)
+{
+	p->reg_info_1 &= 0xff00ffff;
+	p->reg_info_1 |= (power & 0xff) << 16;
+}
+
+static void wcn36xx_channel_set_class_id(struct wcn36xx_hal_channel_param *p, u32 id)
+{
+	p->reg_info_1 &= 0x00ffffff;
+	p->reg_info_1 |= (id & 0xff) << 24;
+}
+
+static void wcn36xx_channel_set_antenna_gain(struct wcn36xx_hal_channel_param *p, u32 gain)
+{
+	if (!gain)
+		gain = WCN36XX_HAL_DEFAULT_ANT_GAIN;
+
+	p->reg_info_2 = gain;
+}
+
+int wcn36xx_smd_update_channel_list(struct wcn36xx *wcn, struct cfg80211_scan_request *req)
+{
+	struct wcn36xx_hal_update_channel_list_req_msg *msg_body;
+	int ret, i;
+
+	msg_body = kzalloc(sizeof(*msg_body), GFP_KERNEL);
+	if (!msg_body)
+		return -ENOMEM;
+
+	INIT_HAL_MSG((*msg_body), WCN36XX_HAL_UPDATE_CHANNEL_LIST_REQ);
+
+	msg_body->num_channel = min_t(u8, req->n_channels, sizeof(msg_body->channels));
+	for (i = 0; i < msg_body->num_channel; i++) {
+		struct wcn36xx_hal_channel_param *param = &msg_body->channels[i];
+
+		param->mhz = req->channels[i]->center_freq;
+		param->band_center_freq1 = req->channels[i]->center_freq;
+		param->band_center_freq2 = 0;
+
+		if (req->channels[i]->flags & IEEE80211_CHAN_NO_IR)
+			param->channel_info |= WCN36XX_HAL_CHAN_FLAG_PASSIVE;
+
+		if (req->channels[i]->flags & IEEE80211_CHAN_RADAR)
+			param->channel_info |= WCN36XX_HAL_CHAN_FLAG_DFS;
+
+		if (req->channels[i]->band == NL80211_BAND_5GHZ) {
+			param->channel_info |= WCN36XX_HAL_CHAN_FLAG_HT;
+			param->channel_info |= WCN36XX_HAL_CHAN_FLAG_VHT;
+			param->channel_info |= WCN36XX_HAL_CHAN_PHY_MODE_11A;
+		} else {
+			param->channel_info |= WCN36XX_HAL_CHAN_PHY_MODE_11BG;
+		}
+
+		wcn36xx_channel_set_max_power(param, req->channels[i]->max_power);
+		wcn36xx_channel_set_reg_power(param, req->channels[i]->max_reg_power);
+		wcn36xx_channel_set_antenna_gain(param, req->channels[i]->max_antenna_gain);
+		wcn36xx_channel_set_class_id(param, 0); /* don't care ? */
+
+		wcn36xx_dbg(WCN36XX_DBG_HAL,
+			    "%s: freq=%u, channel_info=%08x, reg_info1=%08x, reg_info2=%08x\n",
+			    __func__, param->mhz, param->channel_info, param->reg_info_1,
+			    param->reg_info_2);
+	}
+
+	mutex_lock(&wcn->hal_mutex);
+
+	PREPARE_HAL_BUF(wcn->hal_buf, (*msg_body));
+
+	ret = wcn36xx_smd_send_and_wait(wcn, msg_body->header.len);
+	if (ret) {
+		wcn36xx_err("Sending hal_update_channel_list failed\n");
+		goto out;
+	}
+
+	ret = wcn36xx_smd_rsp_status_check(wcn->hal_buf, wcn->hal_rsp_len);
+	if (ret) {
+		wcn36xx_err("hal_update_channel_list response failed err=%d\n", ret);
+		goto out;
+	}
+
+out:
+	kfree(msg_body);
+	mutex_unlock(&wcn->hal_mutex);
+	return ret;
+}
+
 static int wcn36xx_smd_switch_channel_rsp(void *buf, size_t len)
 {
 	struct wcn36xx_hal_switch_channel_rsp_msg *rsp;
@@ -3137,6 +3234,7 @@ int wcn36xx_smd_rsp_process(struct rpmsg_device *rpdev,
 	case WCN36XX_HAL_HOST_RESUME_RSP:
 	case WCN36XX_HAL_ENTER_IMPS_RSP:
 	case WCN36XX_HAL_EXIT_IMPS_RSP:
+	case WCN36XX_HAL_UPDATE_CHANNEL_LIST_RSP:
 		memcpy(wcn->hal_buf, buf, len);
 		wcn->hal_rsp_len = len;
 		complete(&wcn->hal_rsp_compl);
