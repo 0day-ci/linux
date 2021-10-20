@@ -3333,11 +3333,22 @@ void kvm_vcpu_kick(struct kvm_vcpu *vcpu)
 	 * vCPU also requires it to leave IN_GUEST_MODE.
 	 */
 	me = get_cpu();
+
+	/*
+	 * avoid the moderately expensive "should kick" operation if this pCPU
+	 * is currently running the target vcpu, in which case it's a KVM bug
+	 * if the vCPU is in the inner run loop.
+	 */
+	if (vcpu == __this_cpu_read(kvm_running_vcpu) &&
+	    !WARN_ON_ONCE(vcpu->mode == IN_GUEST_MODE))
+		goto out;
+
 	if (kvm_arch_vcpu_should_kick(vcpu)) {
 		cpu = READ_ONCE(vcpu->cpu);
 		if (cpu != me && (unsigned)cpu < nr_cpu_ids && cpu_online(cpu))
 			smp_send_reschedule(cpu);
 	}
+out:
 	put_cpu();
 }
 EXPORT_SYMBOL_GPL(kvm_vcpu_kick);
