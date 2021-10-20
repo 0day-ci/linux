@@ -3322,12 +3322,6 @@ F:	include/linux/blk*
 F:	kernel/trace/blktrace.c
 F:	lib/sbitmap.c
 
-BLOCK2MTD DRIVER
-M:	Joern Engel <joern@lazybastard.org>
-L:	linux-mtd@lists.infradead.org
-S:	Maintained
-F:	drivers/mtd/devices/block2mtd.c
-
 BLUETOOTH DRIVERS
 M:	Marcel Holtmann <marcel@holtmann.org>
 M:	Johan Hedberg <johan.hedberg@gmail.com>
@@ -14740,12 +14734,6 @@ F:	include/linux/phonet.h
 F:	include/net/phonet/
 F:	include/uapi/linux/phonet.h
 F:	net/phonet/
-
-PHRAM MTD DRIVER
-M:	Joern Engel <joern@lazybastard.org>
-L:	linux-mtd@lists.infradead.org
-S:	Maintained
-F:	drivers/mtd/devices/phram.c
 
 PICOLCD HID DRIVER
 M:	Bruno Prémont <bonbons@linux-vserver.org>
