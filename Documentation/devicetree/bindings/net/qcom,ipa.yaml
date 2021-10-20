@@ -64,7 +64,7 @@ properties:
       - const: gsi
 
   iommus:
-    maxItems: 1
+    maxItems: 2
 
   clocks:
     maxItems: 1
