@@ -1810,11 +1810,21 @@ static enum oom_status mem_cgroup_oom(struct mem_cgroup *memcg, gfp_t mask, int 
 		mem_cgroup_oom_notify(memcg);
 
 	mem_cgroup_unmark_under_oom(memcg);
-	if (mem_cgroup_out_of_memory(memcg, mask, order))
+	if (mem_cgroup_out_of_memory(memcg, mask, order)) {
 		ret = OOM_SUCCESS;
-	else
+	} else {
 		ret = OOM_FAILED;
-
+		/*
+		 * In some rare cases mem_cgroup_out_of_memory() can return false.
+		 * If it was called from #PF it forces handle_mm_fault()
+		 * return VM_FAULT_OOM and executes pagefault_out_of_memory().
+		 * memcg_in_oom is set here to notify pagefault_out_of_memory()
+		 * that it was a memcg-related failure and not allow to run
+		 * global OOM.
+		 */
+		if (current->in_user_fault)
+			current->memcg_in_oom = (struct mem_cgroup *)ret;
+	}
 	if (locked)
 		mem_cgroup_oom_unlock(memcg);
 
@@ -1848,6 +1858,15 @@ bool mem_cgroup_oom_synchronize(bool handle)
 	if (!memcg)
 		return false;
 
+	/* OOM is memcg, however out_of_memory() found no victim */
+	if (memcg == (struct mem_cgroup *)OOM_FAILED) {
+		/*
+		 * Should be called from pagefault_out_of_memory() only,
+		 * where it is used to prevent false global OOM.
+		 */
+		current->memcg_in_oom = NULL;
+		return true;
+	}
 	if (!handle)
 		goto cleanup;
 
@@ -2633,15 +2652,10 @@ retry:
 	 */
 	oom_status = mem_cgroup_oom(mem_over_limit, gfp_mask,
 		       get_order(nr_pages * PAGE_SIZE));
-	switch (oom_status) {
-	case OOM_SUCCESS:
+	if (oom_status == OOM_SUCCESS) {
 		passed_oom = true;
 		nr_retries = MAX_RECLAIM_RETRIES;
 		goto retry;
-	case OOM_FAILED:
-		goto force;
-	default:
-		goto nomem;
 	}
 nomem:
 	if (!(gfp_mask & __GFP_NOFAIL))
