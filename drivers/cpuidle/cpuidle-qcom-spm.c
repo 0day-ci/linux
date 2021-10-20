@@ -129,12 +129,26 @@ static int spm_cpuidle_register(struct device *cpuidle_dev, int cpu)
 	return cpuidle_register(&data->cpuidle_driver, NULL);
 }
 
+static int spm_dev_check(struct device_driver *drv, void *data)
+{
+	if (strcmp(drv->name, "qcom_spm") == 0) {
+		struct device_node *np;
+
+		np = of_find_matching_node(NULL, drv->of_match_table);
+		if (np) {
+			of_node_put(np);
+			return -EPROBE_DEFER;
+		}
+	}
+	return -ENODEV;
+}
+
 static int spm_cpuidle_drv_probe(struct platform_device *pdev)
 {
 	int cpu, ret;
 
 	if (!qcom_scm_is_available())
-		return -EPROBE_DEFER;
+		return bus_for_each_drv(pdev->dev.bus, NULL, NULL, spm_dev_check);
 
 	for_each_possible_cpu(cpu) {
 		ret = spm_cpuidle_register(&pdev->dev, cpu);
