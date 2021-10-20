@@ -1119,5 +1119,8 @@ drm_atomic_get_old_bridge_state(struct drm_atomic_state *state,
 struct drm_bridge_state *
 drm_atomic_get_new_bridge_state(struct drm_atomic_state *state,
 				struct drm_bridge *bridge);
+const struct drm_crtc_state *
+drm_atomic_get_new_crtc_for_bridge(struct drm_atomic_state *state,
+				   struct drm_bridge *bridge);
 
 #endif /* DRM_ATOMIC_H_ */

@@ -1135,6 +1135,48 @@ drm_atomic_get_new_bridge_state(struct drm_atomic_state *state,
 EXPORT_SYMBOL(drm_atomic_get_new_bridge_state);
 
 /**
+ * drm_atomic_get_new_crtc_for_bridge - get new crtc_state for the bridge
+ * @state: state of the bridge
+ * @bridge: bridge object
+ *
+ * This function is often used in the &struct drm_bridge_funcs operations
+ * to provide easy access to the mode like this:
+ *
+ * .. code-block:: c
+ *
+ *	crtc_state = drm_atomic_get_new_crtc_for_bridge(old_bridge_state->base.state,
+ *							bridge);
+ *	if (crtc_state) {
+ *		mode = &crtc_state->mode;
+ *		...
+ *
+ * If no connector can be looked up or if no connector state is available
+ * then this will be logged using WARN().
+ *
+ * Returns:
+ * The &struct drm_crtc_state for the given bridge/state, or NULL
+ * if no crtc_state could be looked up.
+ */
+const struct drm_crtc_state *
+drm_atomic_get_new_crtc_for_bridge(struct drm_atomic_state *state,
+				   struct drm_bridge *bridge)
+{
+	const struct drm_connector_state *conn_state;
+	struct drm_connector *connector;
+
+	connector = drm_atomic_get_new_connector_for_encoder(state, bridge->encoder);
+	if (WARN_ON(!connector))
+		return NULL;
+
+	conn_state = drm_atomic_get_new_connector_state(state, connector);
+	if (WARN_ON(!conn_state || !conn_state->crtc))
+		return NULL;
+
+	return drm_atomic_get_new_crtc_state(state, conn_state->crtc);
+}
+EXPORT_SYMBOL(drm_atomic_get_new_crtc_for_bridge);
+
+/**
  * drm_atomic_add_encoder_bridges - add bridges attached to an encoder
  * @state: atomic state
  * @encoder: DRM encoder
