@@ -3161,14 +3161,14 @@ static int qedf_set_fcoe_pf_param(struct qedf_ctx *qedf)
 
 	if (!qedf->p_cpuq) {
 		QEDF_ERR(&(qedf->dbg_ctx), "dma_alloc_coherent failed.\n");
-		return 1;
+		return -ENOMEM;
 	}
 
 	rval = qedf_alloc_global_queues(qedf);
 	if (rval) {
 		QEDF_ERR(&(qedf->dbg_ctx), "Global queue allocation "
 			  "failed.\n");
-		return 1;
+		return rval;
 	}
 
 	/* Calculate SQ PBL size in the same manner as in qedf_sq_alloc() */
