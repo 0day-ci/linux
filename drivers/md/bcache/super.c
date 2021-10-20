@@ -1493,7 +1493,7 @@ static int register_bdev(struct cache_sb *sb, struct cache_sb_disk *sb_disk,
 
 	return 0;
 err:
-	pr_notice("error %s: %s\n", dc->backing_dev_name, err);
+	pr_err("%s: %s\n", dc->backing_dev_name, err);
 	bcache_device_stop(&dc->disk);
 	return ret;
 }
@@ -2338,7 +2338,7 @@ err_btree_alloc:
 err_free:
 	module_put(THIS_MODULE);
 	if (err)
-		pr_notice("error %s: %s\n", ca->cache_dev_name, err);
+		pr_err("%s: %s\n", ca->cache_dev_name, err);
 	return ret;
 }
 
@@ -2397,7 +2397,7 @@ out:
 
 err:
 	if (err)
-		pr_notice("error %s: %s\n", ca->cache_dev_name, err);
+		pr_err("%s: %s\n", ca->cache_dev_name, err);
 
 	return ret;
 }
