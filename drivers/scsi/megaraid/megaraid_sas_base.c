@@ -7470,7 +7470,7 @@ static int megasas_probe_one(struct pci_dev *pdev,
 	case PCI_DEVICE_ID_LSI_AERO_10E4:
 	case PCI_DEVICE_ID_LSI_AERO_10E7:
 		dev_err(&pdev->dev, "Adapter is in non secure mode\n");
-		return 1;
+		return -ENODEV;
 	case PCI_DEVICE_ID_LSI_AERO_10E1:
 	case PCI_DEVICE_ID_LSI_AERO_10E5:
 		dev_info(&pdev->dev, "Adapter is in configurable secure mode\n");
