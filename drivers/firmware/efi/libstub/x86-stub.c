@@ -793,6 +793,8 @@ unsigned long efi_main(efi_handle_t handle,
 
 	efi_retrieve_tpm2_eventlog();
 
+	efi_copy_coco_secret_area();
+
 	setup_graphics(boot_params);
 
 	setup_efi_pci(boot_params);

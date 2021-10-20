@@ -858,4 +858,10 @@ efi_enable_reset_attack_mitigation(void) { }
 
 void efi_retrieve_tpm2_eventlog(void);
 
+#ifdef CONFIG_EFI_COCO_SECRET
+void efi_copy_coco_secret_area(void);
+#else
+static inline void efi_copy_coco_secret_area(void) { }
+#endif
+
 #endif

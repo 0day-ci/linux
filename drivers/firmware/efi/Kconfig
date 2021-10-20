@@ -284,3 +284,15 @@ config EFI_CUSTOM_SSDT_OVERLAYS
 
 	  See Documentation/admin-guide/acpi/ssdt-overlays.rst for more
 	  information.
+
+config EFI_COCO_SECRET
+	bool "Copy and reserve EFI Confidential Computing secret area"
+	depends on EFI
+	default n
+	help
+	  Copy memory reserved by EFI for Confidential Computing (coco)
+	  injected secrets, if EFI exposes such a table entry.
+
+	  If you say Y here, the EFI stub copy the EFI secret area (if
+	  available) and reserve it for use inside the kernel.  This will
+	  allow the virt/coo/efi_secret module to access the secrets.
