@@ -369,6 +369,8 @@ void __init early_fixmap_init(void)
 	 */
 	BUILD_BUG_ON((__fix_to_virt(__end_of_early_ioremap_region) >> PMD_SHIFT)
 		     != FIXADDR_TOP >> PMD_SHIFT);
+	BUILD_BUG_ON((__fix_to_virt(__end_of_fixmap_region) >> PMD_SHIFT)
+		     != FIXADDR_TOP >> PMD_SHIFT);
 
 	pmd = fixmap_pmd(FIXADDR_TOP);
 	pmd_populate_kernel(&init_mm, pmd, bm_pte);
