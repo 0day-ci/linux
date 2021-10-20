@@ -20,10 +20,13 @@ struct intel_guc_slpc {
 	u32 min_freq;
 	u32 rp0_freq;
 	u32 rp1_freq;
+	u32 boost_freq;
 
 	/* frequency softlimits */
 	u32 min_freq_softlimit;
 	u32 max_freq_softlimit;
+
+	u32 num_waiters;
 };
 
 #endif

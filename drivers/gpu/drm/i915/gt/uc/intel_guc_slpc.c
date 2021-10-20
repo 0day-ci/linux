@@ -522,6 +522,14 @@ static void slpc_get_rp_values(struct intel_guc_slpc *slpc)
 					GT_FREQUENCY_MULTIPLIER;
 	slpc->min_freq = REG_FIELD_GET(RPN_CAP_MASK, rp_state_cap) *
 					GT_FREQUENCY_MULTIPLIER;
+
+	slpc->boost_freq = slpc->rp0_freq;
+}
+
+static void slpc_reset_waiters(struct intel_guc_slpc *slpc)
+{
+	/* min, max and boost frequencies have all been reset */
+	slpc->num_waiters = 0;
 }
 
 /*
@@ -584,6 +592,8 @@ int intel_guc_slpc_enable(struct intel_guc_slpc *slpc)
 			ERR_PTR(ret));
 		return ret;
 	}
+
+	slpc_reset_waiters(slpc);
 
 	return 0;
 }
