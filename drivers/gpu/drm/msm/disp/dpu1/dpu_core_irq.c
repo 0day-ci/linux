@@ -208,8 +208,16 @@ void dpu_core_irq_preinstall(struct dpu_kms *dpu_kms)
 	dpu_kms->irq_obj.total_irqs = dpu_kms->hw_intr->total_irqs;
 	dpu_kms->irq_obj.irq_cb_tbl = kcalloc(dpu_kms->irq_obj.total_irqs,
 			sizeof(struct list_head), GFP_KERNEL);
+
+	if (!dpu_kms->irq_obj.irq_cb_tbl)
+		return;
+
 	dpu_kms->irq_obj.irq_counts = kcalloc(dpu_kms->irq_obj.total_irqs,
 			sizeof(atomic_t), GFP_KERNEL);
+
+	if (!dpu_kms->irq_obj.irq_counts)
+		return;
+
 	for (i = 0; i < dpu_kms->irq_obj.total_irqs; i++) {
 		INIT_LIST_HEAD(&dpu_kms->irq_obj.irq_cb_tbl[i]);
 		atomic_set(&dpu_kms->irq_obj.irq_counts[i], 0);
