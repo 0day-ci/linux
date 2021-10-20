@@ -2074,6 +2074,9 @@ out:
 		set_bit(NBD_RT_HAS_CONFIG_REF, &config->runtime_flags);
 		refcount_inc(&nbd->config_refs);
 		nbd_connect_reply(info, nbd->index);
+	} else if (nbd->recv_workq){
+		sock_shutdown(nbd);
+		flush_workqueue(nbd->recv_workq);
 	}
 	nbd_config_put(nbd);
 	if (put_dev)
