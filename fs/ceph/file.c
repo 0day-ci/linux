@@ -2254,6 +2254,7 @@ static ssize_t ceph_do_objects_copy(struct ceph_inode_info *src_ci, u64 *src_off
 				bytes = ret;
 			goto out;
 		}
+		atomic64_inc(&fsc->copyfrom_count);
 		len -= object_size;
 		bytes += object_size;
 		*src_off += object_size;

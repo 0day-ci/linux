@@ -119,6 +119,7 @@ struct ceph_fs_client {
 	struct ceph_mds_client *mdsc;
 
 	atomic_long_t writeback_count;
+	atomic64_t copyfrom_count;
 
 	struct workqueue_struct *inode_wq;
 	struct workqueue_struct *cap_wq;
@@ -131,6 +132,7 @@ struct ceph_fs_client {
 	struct dentry *debugfs_metric;
 	struct dentry *debugfs_status;
 	struct dentry *debugfs_mds_sessions;
+	struct dentry *debugfs_copyfrom;
 #endif
 
 #ifdef CONFIG_CEPH_FSCACHE

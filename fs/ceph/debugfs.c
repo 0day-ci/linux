@@ -346,13 +346,22 @@ static int status_show(struct seq_file *s, void *p)
 	return 0;
 }
 
+static int copyfrom_show(struct seq_file *s, void *p)
+{
+	struct ceph_fs_client *fsc = s->private;
+
+	seq_printf(s, "%llu\n", atomic64_read(&fsc->copyfrom_count));
+
+	return 0;
+}
+
 DEFINE_SHOW_ATTRIBUTE(mdsmap);
 DEFINE_SHOW_ATTRIBUTE(mdsc);
 DEFINE_SHOW_ATTRIBUTE(caps);
 DEFINE_SHOW_ATTRIBUTE(mds_sessions);
 DEFINE_SHOW_ATTRIBUTE(metric);
 DEFINE_SHOW_ATTRIBUTE(status);
-
+DEFINE_SHOW_ATTRIBUTE(copyfrom);
 
 /*
  * debugfs
@@ -387,6 +396,7 @@ void ceph_fs_debugfs_cleanup(struct ceph_fs_client *fsc)
 	debugfs_remove(fsc->debugfs_caps);
 	debugfs_remove(fsc->debugfs_metric);
 	debugfs_remove(fsc->debugfs_mdsc);
+	debugfs_remove(fsc->debugfs_copyfrom);
 }
 
 void ceph_fs_debugfs_init(struct ceph_fs_client *fsc)
@@ -443,6 +453,11 @@ void ceph_fs_debugfs_init(struct ceph_fs_client *fsc)
 						  fsc->client->debugfs_dir,
 						  fsc,
 						  &status_fops);
+	fsc->debugfs_copyfrom = debugfs_create_file("copyfrom",
+						    0400,
+						    fsc->client->debugfs_dir,
+						    fsc,
+						    &copyfrom_fops);
 }
 
 
