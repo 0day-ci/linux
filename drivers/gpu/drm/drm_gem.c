@@ -49,6 +49,8 @@
 #include <drm/drm_print.h>
 #include <drm/drm_vma_manager.h>
 
+#include <trace/events/gpu_mem.h>
+
 #include "drm_internal.h"
 
 /** @file drm_gem.c
@@ -137,6 +139,53 @@ int drm_gem_object_init(struct drm_device *dev,
 	return 0;
 }
 EXPORT_SYMBOL(drm_gem_object_init);
+
+/**
+ * drm_gem_trace_gpu_mem_total - emit a total memory trace event
+ * @dev: drm_device to emit trace event for
+ * @delta: size change
+ * @imported: whether the imported or total memory counter should be used
+ *
+ * Emits a `gpu_mem_total` trace event with given parameters.
+ */
+void
+drm_gem_trace_gpu_mem_total(struct drm_device *dev, s64 delta, bool imported)
+{
+	if (imported)
+		atomic64_add(delta, &dev->import_mem_total);
+	else
+		atomic64_add(delta, &dev->mem_total);
+
+	trace_gpu_mem_total(dev->primary->index, 0,
+			    atomic64_read(&dev->mem_total),
+			    atomic64_read(&dev->import_mem_total));
+}
+EXPORT_SYMBOL(drm_gem_trace_gpu_mem_total);
+
+/**
+ * drm_gem_trace_gpu_mem_instance - emit a per instance memory trace event
+ * @dev: drm_device associated with DRM file
+ * @file: drm_file to emit event for
+ * @delta: size change
+ * @imported: whether the imported or total memory counter should be used
+ *
+ * Emits a `gpu_mem_instance` trace event with given parameters.
+ */
+void
+drm_gem_trace_gpu_mem_instance(struct drm_device *dev, struct drm_file *file,
+			       s64 delta, bool imported)
+{
+	if (imported)
+		atomic64_add(delta, &file->import_mem_instance);
+	else
+		atomic64_add(delta, &file->mem_instance);
+
+	trace_gpu_mem_total(dev->primary->index,
+			    file_inode(file->filp)->i_ino,
+			    atomic64_read(&file->mem_instance),
+			    atomic64_read(&file->import_mem_instance));
+}
+EXPORT_SYMBOL(drm_gem_trace_gpu_mem_instance);
 
 /**
  * drm_gem_private_object_init - initialize an allocated private GEM object

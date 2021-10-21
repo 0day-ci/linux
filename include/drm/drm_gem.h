@@ -342,6 +342,13 @@ struct drm_gem_object {
 
 void drm_gem_object_release(struct drm_gem_object *obj);
 void drm_gem_object_free(struct kref *kref);
+
+void drm_gem_trace_gpu_mem_total(struct drm_device *dev, s64 delta,
+				 bool imported);
+void drm_gem_trace_gpu_mem_instance(struct drm_device *dev,
+				    struct drm_file *file,
+				    s64 delta, bool imported);
+
 int drm_gem_object_init(struct drm_device *dev,
 			struct drm_gem_object *obj, size_t size);
 void drm_gem_private_object_init(struct drm_device *dev,
