@@ -12,6 +12,8 @@
 #include <linux/kfifo.h>
 #include <linux/kstrtox.h>
 #include <linux/list.h>
+#include <linux/mutex.h>
+#include <linux/spinlock.h>
 #include <linux/string.h>
 #include <linux/sysfs.h>
 #include <linux/types.h>
@@ -797,6 +799,7 @@ static int counter_events_queue_size_write(struct counter_device *counter,
 {
 	DECLARE_KFIFO_PTR(events, struct counter_event);
 	int err;
+	unsigned long flags;
 
 	/* Allocate new events queue */
 	err = kfifo_alloc(&events, val, GFP_KERNEL);
@@ -804,8 +807,12 @@ static int counter_events_queue_size_write(struct counter_device *counter,
 		return err;
 
 	/* Swap in new events queue */
+	mutex_lock(&counter->events_out_lock);
+	spin_lock_irqsave(&counter->events_in_lock, flags);
 	kfifo_free(&counter->events);
 	counter->events.kfifo = events.kfifo;
+	spin_unlock_irqrestore(&counter->events_in_lock, flags);
+	mutex_unlock(&counter->events_out_lock);
 
 	return 0;
 }
