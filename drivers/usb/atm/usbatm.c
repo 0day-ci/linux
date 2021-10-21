@@ -976,7 +976,7 @@ static int usbatm_heavy_init(struct usbatm_data *instance)
 {
 	struct task_struct *t;
 
-	t = kthread_create(usbatm_do_heavy_init, instance, "%s",
+	t = kthread_run(usbatm_do_heavy_init, instance, "%s",
 			instance->driver->driver_name);
 	if (IS_ERR(t)) {
 		usb_err(instance, "%s: failed to create kernel_thread (%ld)!\n",
@@ -985,7 +985,6 @@ static int usbatm_heavy_init(struct usbatm_data *instance)
 	}
 
 	instance->thread = t;
-	wake_up_process(t);
 	wait_for_completion(&instance->thread_started);
 
 	return 0;
