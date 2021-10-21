@@ -4249,6 +4249,9 @@ int regulator_sync_voltage(struct regulator *regulator)
 	struct regulator_voltage *voltage = &regulator->voltage[PM_SUSPEND_ON];
 	int ret, min_uV, max_uV;
 
+	if (rdev->desc->fixed_uV && rdev->desc->n_voltages == 1)
+		return 0;
+
 	regulator_lock(rdev);
 
 	if (!rdev->desc->ops->set_voltage &&
