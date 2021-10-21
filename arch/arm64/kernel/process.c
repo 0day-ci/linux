@@ -61,6 +61,9 @@ unsigned long __stack_chk_guard __ro_after_init;
 EXPORT_SYMBOL(__stack_chk_guard);
 #endif
 
+DEFINE_STATIC_KEY_FALSE(contextidr_in_use);
+EXPORT_SYMBOL_GPL(contextidr_in_use);
+
 /*
  * Function pointers to optional machine specific functions
  */
@@ -721,3 +724,11 @@ int arch_elf_adjust_prot(int prot, const struct arch_elf_state *state,
 	return prot;
 }
 #endif
+
+static int __init contextidr_init(void)
+{
+	if (IS_ENABLED(CONFIG_PID_IN_CONTEXTIDR))
+		static_branch_inc(&contextidr_in_use);
+	return 0;
+}
+early_initcall(contextidr_init);

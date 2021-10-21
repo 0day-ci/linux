@@ -26,9 +26,11 @@
 
 extern bool rodata_full;
 
+DECLARE_STATIC_KEY_FALSE(contextidr_in_use);
+
 static inline void contextidr_thread_switch(struct task_struct *next)
 {
-	if (!IS_ENABLED(CONFIG_PID_IN_CONTEXTIDR))
+	if (!static_branch_unlikely(&contextidr_in_use))
 		return;
 
 	write_sysreg(task_pid_nr(next), contextidr_el1);
