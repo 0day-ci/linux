@@ -60,6 +60,8 @@ struct pcie_link_state {
 	u32 aspm_default:7;		/* Default ASPM state by BIOS */
 	u32 aspm_disable:7;		/* Disabled ASPM state */
 
+	bool aspm_ignore_policy;	/* Ignore ASPM policy after sysfs overwrite */
+
 	/* Clock PM state */
 	u32 clkpm_capable:1;		/* Clock PM capable? */
 	u32 clkpm_enabled:1;		/* Current Clock PM state */
@@ -796,7 +798,8 @@ static void pcie_config_aspm_link(struct pcie_link_state *link, u32 state)
 static void pcie_config_aspm_path(struct pcie_link_state *link)
 {
 	while (link) {
-		pcie_config_aspm_link(link, policy_to_aspm_state(link));
+		pcie_config_aspm_link(link, link->aspm_ignore_policy ?
+				      link->aspm_capable : policy_to_aspm_state(link));
 		link = link->parent;
 	}
 }
@@ -1238,8 +1241,8 @@ static ssize_t aspm_attr_store_common(struct device *dev,
 
 		link->aspm_disable |= state;
 	}
-
-	pcie_config_aspm_link(link, policy_to_aspm_state(link));
+	pcie_config_aspm_link(link, link->aspm_capable);
+	link->aspm_ignore_policy = true;
 
 	mutex_unlock(&aspm_lock);
 	up_read(&pci_bus_sem);
