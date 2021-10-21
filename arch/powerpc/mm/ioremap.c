@@ -109,12 +109,16 @@ void __iomem *do_ioremap(phys_addr_t pa, phys_addr_t offset, unsigned long size,
 */
 unsigned long memremap_compat_align(void)
 {
+#ifdef CONFIG_PPC_BOOK3E_64
+	// 1GB maximum possible size of the linear mapping.
+	return max(SUBSECTION_SIZE, 1UL << 30);
+#else
 	unsigned int shift = mmu_psize_defs[mmu_linear_psize].shift;
 
 	if (radix_enabled())
 		return SUBSECTION_SIZE;
 	return max(SUBSECTION_SIZE, 1UL << shift);
-
+#endif
 }
 EXPORT_SYMBOL_GPL(memremap_compat_align);
 #endif
