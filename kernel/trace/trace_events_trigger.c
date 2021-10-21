@@ -756,12 +756,36 @@ int set_trigger_filter(char *filter_str,
 	struct event_filter *filter = NULL, *tmp;
 	int ret = -EINVAL;
 	char *s;
+	unsigned long param;
+	struct object_trigger_param *obj_param;
+	int len;
 
 	if (!filter_str) /* clear the current filter */
 		goto assign;
 
 	s = strsep(&filter_str, " \t");
 
+	if (data->cmd_ops->trigger_type == ETT_TRACE_OBJECT) {
+		obj_param = data->private_data;
+		len = str_has_prefix(s, "arg");
+		if (!len)
+			goto out;
+		ret = kstrtoul(s + len, 10, &param);
+		if (ret || param == 0)
+			goto out;
+		obj_param = kmalloc(sizeof(*obj_param), GFP_KERNEL);
+		if (!obj_param) {
+			ret = -ENOMEM;
+			goto out;
+		}
+		data->private_data = obj_param;
+		obj_param->param = param;
+		init_trace_object();
+	}
+	if (!strlen(s) || !filter_str)
+		goto out;
+
+	s = strsep(&filter_str, " \t");
 	if (!strlen(s) || strcmp(s, "if") != 0)
 		goto out;
 
@@ -1679,6 +1703,103 @@ static __init int register_trigger_traceon_traceoff_cmds(void)
 	return ret;
 }
 
+#ifdef CONFIG_TRACE_OBJECT
+
+static void
+trace_object_trigger(struct event_trigger_data *data,
+		   struct trace_buffer *buffer,  void *rec,
+		   struct ring_buffer_event *event)
+{
+
+	struct object_trigger_param *obj_param = data->private_data;
+	unsigned long param;
+
+	param = regs_get_kernel_argument(obj_param->regs, obj_param->param - 1);
+	set_trace_object((void *)param);
+}
+
+static void
+trace_object_trigger_free(struct event_trigger_ops *ops,
+		   struct event_trigger_data *data)
+{
+	if (WARN_ON_ONCE(data->ref <= 0))
+		return;
+
+	data->ref--;
+	if (!data->ref) {
+		exit_trace_object();
+		trigger_data_free(data);
+		kfree(data->private_data);
+	}
+}
+
+static void
+trace_object_count_trigger(struct event_trigger_data *data,
+			 struct trace_buffer *buffer, void *rec,
+			 struct ring_buffer_event *event)
+{
+	if (!data->count)
+		return;
+
+	if (data->count != -1)
+		(data->count)--;
+
+	trace_object_trigger(data, buffer, rec, event);
+}
+
+static int
+trace_object_trigger_print(struct seq_file *m, struct event_trigger_ops *ops,
+			 struct event_trigger_data *data)
+{
+	return event_trigger_print("objfilter", m, (void *)data->count,
+				   data->filter_str);
+}
+
+static struct event_trigger_ops objecttrace_trigger_ops = {
+	.func			= trace_object_trigger,
+	.print			= trace_object_trigger_print,
+	.init			= event_trigger_init,
+	.free			= trace_object_trigger_free,
+};
+
+static struct event_trigger_ops objecttrace_count_trigger_ops = {
+	.func			= trace_object_count_trigger,
+	.print			= trace_object_trigger_print,
+	.init			= event_trigger_init,
+	.free			= trace_object_trigger_free,
+};
+
+static struct event_trigger_ops *
+objecttrace_get_trigger_ops(char *cmd, char *param)
+{
+	return param ? &objecttrace_count_trigger_ops : &objecttrace_trigger_ops;
+}
+
+static struct event_command trigger_object_cmd = {
+	.name			= "objfilter",
+	.trigger_type		= ETT_TRACE_OBJECT,
+	.flags			= EVENT_CMD_FL_NEEDS_REC,
+	.func			= event_trigger_callback,
+	.reg			= register_trigger,
+	.unreg			= unregister_trigger,
+	.get_trigger_ops	= objecttrace_get_trigger_ops,
+	.set_filter		= set_trigger_filter,
+};
+
+static __init int register_trigger_object_cmd(void)
+{
+	int ret;
+
+	ret = register_event_command(&trigger_object_cmd);
+	WARN_ON(ret < 0);
+
+	return ret;
+}
+
+#else
+static __init int register_trigger_object_cmd(void) { return 0; }
+#endif
+
 __init int register_trigger_cmds(void)
 {
 	register_trigger_traceon_traceoff_cmds();
@@ -1687,6 +1808,7 @@ __init int register_trigger_cmds(void)
 	register_trigger_enable_disable_cmds();
 	register_trigger_hist_enable_disable_cmds();
 	register_trigger_hist_cmd();
+	register_trigger_object_cmd();
 
 	return 0;
 }

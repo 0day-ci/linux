@@ -49,6 +49,7 @@ enum trace_type {
 	TRACE_TIMERLAT,
 	TRACE_RAW_DATA,
 	TRACE_FUNC_REPEATS,
+	TRACE_OBJECT,
 
 	__TRACE_LAST_TYPE,
 };
@@ -460,6 +461,7 @@ extern void __ftrace_bad_type(void);
 			  TRACE_GRAPH_RET);		\
 		IF_ASSIGN(var, ent, struct func_repeats_entry,		\
 			  TRACE_FUNC_REPEATS);				\
+		IF_ASSIGN(var, ent, struct trace_object_entry, TRACE_OBJECT);\
 		__ftrace_bad_type();					\
 	} while (0)
 
@@ -1948,6 +1950,11 @@ struct trace_min_max_param {
 	u64		*val;
 	u64		*min;
 	u64		*max;
+};
+
+struct object_trigger_param {
+	struct pt_regs *regs;
+	int param;
 };
 
 #define U64_STR_SIZE		24	/* 20 digits max */

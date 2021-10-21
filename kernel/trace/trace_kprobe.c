@@ -1380,6 +1380,7 @@ __kprobe_trace_func(struct trace_kprobe *tk, struct pt_regs *regs,
 
 	WARN_ON(call != trace_file->event_call);
 
+	record_trace_object(trace_file, regs);
 	if (trace_trigger_soft_disabled(trace_file))
 		return;
 

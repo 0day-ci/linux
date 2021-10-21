@@ -960,6 +960,7 @@ static void __uprobe_trace_func(struct trace_uprobe *tu,
 	if (WARN_ON_ONCE(tu->tp.size + dsize > PAGE_SIZE))
 		return;
 
+	record_trace_object(trace_file, regs);
 	if (trace_trigger_soft_disabled(trace_file))
 		return;
 

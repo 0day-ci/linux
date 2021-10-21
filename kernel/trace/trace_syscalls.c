@@ -312,6 +312,7 @@ static void ftrace_syscall_enter(void *data, struct pt_regs *regs, long id)
 	if (!trace_file)
 		return;
 
+	record_trace_object(trace_file, regs);
 	if (trace_trigger_soft_disabled(trace_file))
 		return;
 
