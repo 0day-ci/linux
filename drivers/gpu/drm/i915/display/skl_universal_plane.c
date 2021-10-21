@@ -207,7 +207,19 @@ static const u64 adlp_step_a_plane_format_modifiers[] = {
 	DRM_FORMAT_MOD_INVALID
 };
 
+static const u64 dg2_step_a_b_plane_format_modifiers[] = {
+	I915_FORMAT_MOD_F_TILED_DG2_RC_CCS,
+	I915_FORMAT_MOD_F_TILED_DG2_RC_CCS_CC,
+	I915_FORMAT_MOD_X_TILED,
+	I915_FORMAT_MOD_4_TILED,
+	DRM_FORMAT_MOD_LINEAR,
+	DRM_FORMAT_MOD_INVALID
+};
+
 static const u64 dg2_plane_format_modifiers[] = {
+	I915_FORMAT_MOD_F_TILED_DG2_RC_CCS,
+	I915_FORMAT_MOD_F_TILED_DG2_MC_CCS,
+	I915_FORMAT_MOD_F_TILED_DG2_RC_CCS_CC,
 	I915_FORMAT_MOD_X_TILED,
 	I915_FORMAT_MOD_4_TILED,
 	DRM_FORMAT_MOD_LINEAR,
@@ -804,6 +816,16 @@ static u32 skl_plane_ctl_tiling(u64 fb_modifier)
 		return PLANE_CTL_TILED_Y;
 	case I915_FORMAT_MOD_4_TILED:
 		return PLANE_CTL_TILED_F;
+	case I915_FORMAT_MOD_F_TILED_DG2_RC_CCS:
+		return PLANE_CTL_TILED_F |
+			PLANE_CTL_RENDER_DECOMPRESSION_ENABLE |
+			PLANE_CTL_CLEAR_COLOR_DISABLE;
+	case I915_FORMAT_MOD_F_TILED_DG2_MC_CCS:
+		return PLANE_CTL_TILED_F |
+			PLANE_CTL_MEDIA_DECOMPRESSION_ENABLE |
+			PLANE_CTL_CLEAR_COLOR_DISABLE;
+	case I915_FORMAT_MOD_F_TILED_DG2_RC_CCS_CC:
+		return PLANE_CTL_TILED_F | PLANE_CTL_RENDER_DECOMPRESSION_ENABLE;
 	case I915_FORMAT_MOD_Y_TILED_CCS:
 	case I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC:
 		return PLANE_CTL_TILED_Y | PLANE_CTL_RENDER_DECOMPRESSION_ENABLE;
@@ -2011,7 +2033,14 @@ static bool gen12_plane_format_mod_supported(struct drm_plane *_plane,
 		if (IS_ADLP_DISPLAY_STEP(dev_priv, STEP_A0, STEP_B0))
 			return false;
 		break;
+	case I915_FORMAT_MOD_F_TILED_DG2_MC_CCS:
+		/* Wa_14013215631 */
+		if (IS_DG2_DISP_STEP(dev_priv, STEP_A0, STEP_C0))
+			return false;
+		fallthrough;
 	case I915_FORMAT_MOD_4_TILED:
+	case I915_FORMAT_MOD_F_TILED_DG2_RC_CCS:
+	case I915_FORMAT_MOD_F_TILED_DG2_RC_CCS_CC:
 		if (!HAS_FTILE(dev_priv))
 			return false;
 		break;
@@ -2036,7 +2065,8 @@ static bool gen12_plane_format_mod_supported(struct drm_plane *_plane,
 	case DRM_FORMAT_P010:
 	case DRM_FORMAT_P012:
 	case DRM_FORMAT_P016:
-		if (modifier == I915_FORMAT_MOD_Y_TILED_GEN12_MC_CCS)
+		if (modifier == I915_FORMAT_MOD_Y_TILED_GEN12_MC_CCS ||
+		    modifier == I915_FORMAT_MOD_F_TILED_DG2_MC_CCS)
 			return true;
 		fallthrough;
 	case DRM_FORMAT_RGB565:
@@ -2066,7 +2096,10 @@ static bool gen12_plane_format_mod_supported(struct drm_plane *_plane,
 static const u64 *gen12_get_plane_modifiers(struct drm_i915_private *dev_priv,
 					    enum plane_id plane_id)
 {
-	if (HAS_FTILE(dev_priv))
+	/* Wa_14013215631 */
+	if (IS_DG2_DISP_STEP(dev_priv, STEP_A0, STEP_C0))
+		return dg2_step_a_b_plane_format_modifiers;
+	else if (HAS_FTILE(dev_priv))
 		return dg2_plane_format_modifiers;
 	/* Wa_22011186057 */
 	else if (IS_ADLP_DISPLAY_STEP(dev_priv, STEP_A0, STEP_B0))
@@ -2341,7 +2374,17 @@ skl_get_initial_plane_config(struct intel_crtc *crtc,
 		break;
 	case PLANE_CTL_TILED_YF: /* aka PLANE_CTL_TILED_F on XE_LPD+ */
 		if (DISPLAY_VER(dev_priv) >= 13) {
-			fb->modifier = I915_FORMAT_MOD_4_TILED;
+			u32 rc_mask = PLANE_CTL_RENDER_DECOMPRESSION_ENABLE |
+					PLANE_CTL_CLEAR_COLOR_DISABLE;
+
+			if ((val & rc_mask) == rc_mask)
+				fb->modifier = I915_FORMAT_MOD_F_TILED_DG2_RC_CCS;
+			else if (val & PLANE_CTL_MEDIA_DECOMPRESSION_ENABLE)
+				fb->modifier = I915_FORMAT_MOD_F_TILED_DG2_MC_CCS;
+			else if (val & PLANE_CTL_RENDER_DECOMPRESSION_ENABLE)
+				fb->modifier = I915_FORMAT_MOD_F_TILED_DG2_RC_CCS_CC;
+			else
+				fb->modifier = I915_FORMAT_MOD_4_TILED;
 		} else {
 			if (val & PLANE_CTL_RENDER_DECOMPRESSION_ENABLE)
 				fb->modifier = I915_FORMAT_MOD_Yf_TILED_CCS;

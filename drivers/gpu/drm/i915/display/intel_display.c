@@ -787,6 +787,9 @@ intel_get_format_info(const struct drm_mode_fb_cmd2 *cmd)
 					  cmd->pixel_format);
 	case I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS:
 	case I915_FORMAT_MOD_Y_TILED_GEN12_MC_CCS:
+	case I915_FORMAT_MOD_F_TILED_DG2_RC_CCS:
+	case I915_FORMAT_MOD_F_TILED_DG2_MC_CCS:
+	case I915_FORMAT_MOD_F_TILED_DG2_RC_CCS_CC:
 		return lookup_format_info(gen12_ccs_formats,
 					  ARRAY_SIZE(gen12_ccs_formats),
 					  cmd->pixel_format);
