@@ -33,7 +33,6 @@ struct fs_context;
 #define MNT_NOSYMFOLLOW	0x80
 
 #define MNT_SHRINKABLE	0x100
-#define MNT_WRITE_HOLD	0x200
 
 #define MNT_SHARED	0x1000	/* if the vfsmount is a shared mount */
 #define MNT_UNBINDABLE	0x2000	/* if the vfsmount is a unbindable mount */
@@ -50,7 +49,7 @@ struct fs_context;
 				 | MNT_READONLY | MNT_NOSYMFOLLOW)
 #define MNT_ATIME_MASK (MNT_NOATIME | MNT_NODIRATIME | MNT_RELATIME )
 
-#define MNT_INTERNAL_FLAGS (MNT_SHARED | MNT_WRITE_HOLD | MNT_INTERNAL | \
+#define MNT_INTERNAL_FLAGS (MNT_SHARED | MNT_INTERNAL | \
 			    MNT_DOOMED | MNT_SYNC_UMOUNT | MNT_MARKED | \
 			    MNT_CURSOR)
 

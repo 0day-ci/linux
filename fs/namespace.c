@@ -333,30 +333,17 @@ static int mnt_is_readonly(struct vfsmount *mnt)
 int __mnt_want_write(struct vfsmount *m)
 {
 	struct mount *mnt = real_mount(m);
+	struct super_block *sb = m->mnt_sb;
 	int ret = 0;
 
-	preempt_disable();
-	mnt_inc_writers(mnt);
-	/*
-	 * The store to mnt_inc_writers must be visible before we pass
-	 * MNT_WRITE_HOLD loop below, so that the slowpath can see our
-	 * incremented count after it has set MNT_WRITE_HOLD.
-	 */
-	smp_mb();
-	while (READ_ONCE(mnt->mnt.mnt_flags) & MNT_WRITE_HOLD)
-		cpu_relax();
-	/*
-	 * After the slowpath clears MNT_WRITE_HOLD, mnt_is_readonly will
-	 * be set to match its requirements. So we must not load that until
-	 * MNT_WRITE_HOLD is cleared.
-	 */
-	smp_rmb();
-	if (mnt_is_readonly(m)) {
-		mnt_dec_writers(mnt);
-		ret = -EROFS;
-	}
-	preempt_enable();
+	percpu_down_read(&sb->mnt_writers_rws);
 
+	if (mnt_is_readonly(m))
+		ret = -EROFS;
+	else
+		mnt_inc_writers(mnt);
+
+	percpu_up_read(&sb->mnt_writers_rws);
 	return ret;
 }
 
@@ -435,9 +422,11 @@ EXPORT_SYMBOL_GPL(mnt_want_write_file);
  */
 void __mnt_drop_write(struct vfsmount *mnt)
 {
-	preempt_disable();
+	struct super_block *sb = mnt->mnt_sb;
+
+	percpu_down_read(&sb->mnt_writers_rws);
 	mnt_dec_writers(real_mount(mnt));
-	preempt_enable();
+	percpu_up_read(&sb->mnt_writers_rws);
 }
 
 /**
@@ -470,43 +459,20 @@ EXPORT_SYMBOL(mnt_drop_write_file);
 
 static inline int mnt_hold_writers(struct mount *mnt)
 {
-	mnt->mnt.mnt_flags |= MNT_WRITE_HOLD;
-	/*
-	 * After storing MNT_WRITE_HOLD, we'll read the counters. This store
-	 * should be visible before we do.
-	 */
-	smp_mb();
+	lockdep_assert_held(&mnt->mnt.mnt_sb->mnt_writers_rws);
 
 	/*
 	 * With writers on hold, if this value is zero, then there are
-	 * definitely no active writers (although held writers may subsequently
-	 * increment the count, they'll have to wait, and decrement it after
-	 * seeing MNT_READONLY).
+	 * definitely no active writers.
 	 *
 	 * It is OK to have counter incremented on one CPU and decremented on
-	 * another: the sum will add up correctly. The danger would be when we
-	 * sum up each counter, if we read a counter before it is incremented,
-	 * but then read another CPU's count which it has been subsequently
-	 * decremented from -- we would see more decrements than we should.
-	 * MNT_WRITE_HOLD protects against this scenario, because
-	 * mnt_want_write first increments count, then smp_mb, then spins on
-	 * MNT_WRITE_HOLD, so it can't be decremented by another CPU while
-	 * we're counting up here.
+	 * another: the sum will add up correctly. The rwsem ensures that the
+	 * counters are not modified once the writer lock is acquired.
 	 */
 	if (mnt_get_writers(mnt) > 0)
 		return -EBUSY;
 
 	return 0;
-}
-
-static inline void mnt_unhold_writers(struct mount *mnt)
-{
-	/*
-	 * MNT_READONLY must become visible before ~MNT_WRITE_HOLD, so writers
-	 * that become unheld will see MNT_READONLY.
-	 */
-	smp_wmb();
-	mnt->mnt.mnt_flags &= ~MNT_WRITE_HOLD;
 }
 
 static int mnt_make_readonly(struct mount *mnt)
@@ -516,7 +482,6 @@ static int mnt_make_readonly(struct mount *mnt)
 	ret = mnt_hold_writers(mnt);
 	if (!ret)
 		mnt->mnt.mnt_flags |= MNT_READONLY;
-	mnt_unhold_writers(mnt);
 	return ret;
 }
 
@@ -525,15 +490,15 @@ int sb_prepare_remount_readonly(struct super_block *sb)
 	struct mount *mnt;
 	int err = 0;
 
-	/* Racy optimization.  Recheck the counter under MNT_WRITE_HOLD */
+	/* Racy optimization.  Recheck the counter under mnt_writers_rws. */
 	if (atomic_long_read(&sb->s_remove_count))
 		return -EBUSY;
 
+	percpu_down_write(&sb->mnt_writers_rws);
 	lock_mount_hash();
+
 	list_for_each_entry(mnt, &sb->s_mounts, mnt_instance) {
 		if (!(mnt->mnt.mnt_flags & MNT_READONLY)) {
-			mnt->mnt.mnt_flags |= MNT_WRITE_HOLD;
-			smp_mb();
 			if (mnt_get_writers(mnt) > 0) {
 				err = -EBUSY;
 				break;
@@ -547,11 +512,9 @@ int sb_prepare_remount_readonly(struct super_block *sb)
 		sb->s_readonly_remount = 1;
 		smp_wmb();
 	}
-	list_for_each_entry(mnt, &sb->s_mounts, mnt_instance) {
-		if (mnt->mnt.mnt_flags & MNT_WRITE_HOLD)
-			mnt->mnt.mnt_flags &= ~MNT_WRITE_HOLD;
-	}
+
 	unlock_mount_hash();
+	percpu_up_write(&sb->mnt_writers_rws);
 
 	return err;
 }
@@ -1068,7 +1031,7 @@ static struct mount *clone_mnt(struct mount *old, struct dentry *root,
 	}
 
 	mnt->mnt.mnt_flags = old->mnt.mnt_flags;
-	mnt->mnt.mnt_flags &= ~(MNT_WRITE_HOLD|MNT_MARKED|MNT_INTERNAL);
+	mnt->mnt.mnt_flags &= ~(MNT_MARKED|MNT_INTERNAL);
 
 	atomic_inc(&sb->s_active);
 	mnt->mnt.mnt_userns = mnt_user_ns(&old->mnt);
@@ -2585,8 +2548,8 @@ static void mnt_warn_timestamp_expiry(struct path *mountpoint, struct vfsmount *
  */
 static int do_reconfigure_mnt(struct path *path, unsigned int mnt_flags)
 {
-	struct super_block *sb = path->mnt->mnt_sb;
 	struct mount *mnt = real_mount(path->mnt);
+	struct super_block *sb = mnt->mnt.mnt_sb;
 	int ret;
 
 	if (!check_mnt(mnt))
@@ -2603,11 +2566,13 @@ static int do_reconfigure_mnt(struct path *path, unsigned int mnt_flags)
 	 * changing it, so only take down_read(&sb->s_umount).
 	 */
 	down_read(&sb->s_umount);
+	percpu_down_write(&sb->mnt_writers_rws);
 	lock_mount_hash();
 	ret = change_mount_ro_state(mnt, mnt_flags);
 	if (ret == 0)
 		set_mount_attributes(mnt, mnt_flags);
 	unlock_mount_hash();
+	percpu_up_write(&sb->mnt_writers_rws);
 	up_read(&sb->s_umount);
 
 	mnt_warn_timestamp_expiry(path, &mnt->mnt);
@@ -4027,15 +3992,6 @@ static void mount_setattr_commit(struct mount_kattr *kattr,
 			WRITE_ONCE(m->mnt.mnt_flags, flags);
 		}
 
-		/*
-		 * We either set MNT_READONLY above so make it visible
-		 * before ~MNT_WRITE_HOLD or we failed to recursively
-		 * apply mount options.
-		 */
-		if ((kattr->attr_set & MNT_READONLY) &&
-		    (m->mnt.mnt_flags & MNT_WRITE_HOLD))
-			mnt_unhold_writers(m);
-
 		if (!err && kattr->propagation)
 			change_mnt_propagation(m, kattr->propagation);
 
@@ -4054,26 +4010,39 @@ static void mount_setattr_commit(struct mount_kattr *kattr,
 static int do_mount_setattr(struct path *path, struct mount_kattr *kattr)
 {
 	struct mount *mnt = real_mount(path->mnt), *last = NULL;
+	bool ns_lock = false;
 	int err = 0;
 
 	if (path->dentry != mnt->mnt.mnt_root)
 		return -EINVAL;
 
-	if (kattr->propagation) {
+	if ((kattr->attr_set & MNT_READONLY) || kattr->propagation)
 		/*
 		 * Only take namespace_lock() if we're actually changing
-		 * propagation.
+		 * propagation or iterate via next_mnt().
 		 */
+		ns_lock = true;
+
+	if (ns_lock)
 		namespace_lock();
-		if (kattr->propagation == MS_SHARED) {
-			err = invent_group_ids(mnt, kattr->recurse);
-			if (err) {
-				namespace_unlock();
-				return err;
-			}
+
+	if (kattr->propagation == MS_SHARED) {
+		err = invent_group_ids(mnt, kattr->recurse);
+		if (err) {
+			namespace_unlock();
+			return err;
 		}
 	}
 
+	if (kattr->attr_set & MNT_READONLY) {
+		struct mount *m = mnt;
+		int num = 0;
+
+		do {
+			percpu_down_write_nested(&m->mnt.mnt_sb->mnt_writers_rws, num++);
+		} while (kattr->recurse && (m = next_mnt(m, mnt)));
+
+	}
 	lock_mount_hash();
 
 	/*
@@ -4086,8 +4055,18 @@ static int do_mount_setattr(struct path *path, struct mount_kattr *kattr)
 
 	unlock_mount_hash();
 
-	if (kattr->propagation) {
+	if (kattr->attr_set & MNT_READONLY) {
+		struct mount *m = mnt;
+
+		do {
+			percpu_up_write(&m->mnt.mnt_sb->mnt_writers_rws);
+		} while (kattr->recurse && (m = next_mnt(m, mnt)));
+
+	}
+	if (ns_lock)
 		namespace_unlock();
+
+	if (kattr->propagation) {
 		if (err)
 			cleanup_group_ids(mnt, NULL);
 	}

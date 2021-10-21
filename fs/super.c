@@ -162,6 +162,7 @@ static void destroy_super_work(struct work_struct *work)
 
 	for (i = 0; i < SB_FREEZE_LEVELS; i++)
 		percpu_free_rwsem(&s->s_writers.rw_sem[i]);
+	percpu_free_rwsem(&s->mnt_writers_rws);
 	kfree(s);
 }
 
@@ -210,6 +211,8 @@ static struct super_block *alloc_super(struct file_system_type *type, int flags,
 	INIT_LIST_HEAD(&s->s_mounts);
 	s->s_user_ns = get_user_ns(user_ns);
 	init_rwsem(&s->s_umount);
+	percpu_init_rwsem(&s->mnt_writers_rws);
+
 	lockdep_set_class(&s->s_umount, &type->s_umount_key);
 	/*
 	 * sget() can have s_umount recursion.

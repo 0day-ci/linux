@@ -121,6 +121,13 @@ static inline void percpu_up_read(struct percpu_rw_semaphore *sem)
 	preempt_enable();
 }
 
+#ifdef CONFIG_DEBUG_LOCK_ALLOC
+extern void percpu_down_write_nested(struct percpu_rw_semaphore *, int subclass);
+#else
+# define percpu_down_write_nested(lock, subclass)		\
+	percpu_down_write(((void)(subclass), (lock)))
+#endif
+
 extern void percpu_down_write(struct percpu_rw_semaphore *);
 extern void percpu_up_write(struct percpu_rw_semaphore *);
 

@@ -211,11 +211,8 @@ static bool readers_active_check(struct percpu_rw_semaphore *sem)
 	return true;
 }
 
-void percpu_down_write(struct percpu_rw_semaphore *sem)
+static void _percpu_down_write(struct percpu_rw_semaphore *sem)
 {
-	might_sleep();
-	rwsem_acquire(&sem->dep_map, 0, 0, _RET_IP_);
-
 	/* Notify readers to take the slow path. */
 	rcu_sync_enter(&sem->rss);
 
@@ -237,7 +234,25 @@ void percpu_down_write(struct percpu_rw_semaphore *sem)
 	/* Wait for all active readers to complete. */
 	rcuwait_wait_event(&sem->writer, readers_active_check(sem), TASK_UNINTERRUPTIBLE);
 }
+
+void percpu_down_write(struct percpu_rw_semaphore *sem)
+{
+	might_sleep();
+	rwsem_acquire(&sem->dep_map, 0, 0, _RET_IP_);
+	_percpu_down_write(sem);
+}
 EXPORT_SYMBOL_GPL(percpu_down_write);
+
+#ifdef CONFIG_DEBUG_LOCK_ALLOC
+void percpu_down_write_nested(struct percpu_rw_semaphore *sem, int subclass)
+{
+	might_sleep();
+	rwsem_acquire(&sem->dep_map, subclass, 0, _RET_IP_);
+
+	_percpu_down_write(sem);
+}
+EXPORT_SYMBOL_GPL(percpu_down_write_nested);
+#endif
 
 void percpu_up_write(struct percpu_rw_semaphore *sem)
 {
