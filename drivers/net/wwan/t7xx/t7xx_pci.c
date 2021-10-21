@@ -11,6 +11,7 @@
 #include <linux/module.h>
 #include <linux/mutex.h>
 #include <linux/pci.h>
+#include <linux/pm_runtime.h>
 #include <linux/spinlock.h>
 
 #include "t7xx_mhccif.h"
@@ -25,6 +26,7 @@
 #define	PCI_EREG_BASE			2
 
 #define PM_ACK_TIMEOUT_MS		1500
+#define PM_AUTOSUSPEND_MS		20000
 #define PM_RESOURCE_POLL_TIMEOUT_US	10000
 #define PM_RESOURCE_POLL_STEP_US	100
 
@@ -69,6 +71,8 @@ static int mtk_pci_pm_init(struct mtk_pci_dev *mtk_dev)
 	atomic_set(&mtk_dev->md_pm_state, MTK_PM_INIT);
 
 	iowrite32(L1_DISABLE_BIT(0), IREG_BASE(mtk_dev) + DIS_ASPM_LOWPWR_SET_0);
+	pm_runtime_set_autosuspend_delay(&pdev->dev, PM_AUTOSUSPEND_MS);
+	pm_runtime_use_autosuspend(&pdev->dev);
 
 	return mtk_wait_pm_config(mtk_dev);
 }
@@ -83,6 +87,8 @@ void mtk_pci_pm_init_late(struct mtk_pci_dev *mtk_dev)
 			D2H_INT_RESUME_ACK_AP);
 	iowrite32(L1_DISABLE_BIT(0), IREG_BASE(mtk_dev) + DIS_ASPM_LOWPWR_CLR_0);
 	atomic_set(&mtk_dev->md_pm_state, MTK_PM_RESUMED);
+
+	pm_runtime_put_noidle(&mtk_dev->pdev->dev);
 }
 
 static int mtk_pci_pm_reinit(struct mtk_pci_dev *mtk_dev)
@@ -91,6 +97,8 @@ static int mtk_pci_pm_reinit(struct mtk_pci_dev *mtk_dev)
 	 * so just roll back PM setting to the init setting.
 	 */
 	atomic_set(&mtk_dev->md_pm_state, MTK_PM_INIT);
+
+	pm_runtime_get_noresume(&mtk_dev->pdev->dev);
 
 	iowrite32(L1_DISABLE_BIT(0), IREG_BASE(mtk_dev) + DIS_ASPM_LOWPWR_SET_0);
 	return mtk_wait_pm_config(mtk_dev);
@@ -396,6 +404,7 @@ static int __mtk_pci_pm_resume(struct pci_dev *pdev, bool state_check)
 	mtk_dev->rgu_pci_irq_en = true;
 	mtk_pcie_mac_set_int(mtk_dev, SAP_RGU_INT);
 	iowrite32(L1_DISABLE_BIT(0), IREG_BASE(mtk_dev) + DIS_ASPM_LOWPWR_CLR_0);
+	pm_runtime_mark_last_busy(&pdev->dev);
 	atomic_set(&mtk_dev->md_pm_state, MTK_PM_RESUMED);
 
 	return ret;
@@ -437,6 +446,16 @@ static int mtk_pci_pm_thaw(struct device *dev)
 	return __mtk_pci_pm_resume(to_pci_dev(dev), false);
 }
 
+static int mtk_pci_pm_runtime_suspend(struct device *dev)
+{
+	return __mtk_pci_pm_suspend(to_pci_dev(dev));
+}
+
+static int mtk_pci_pm_runtime_resume(struct device *dev)
+{
+	return __mtk_pci_pm_resume(to_pci_dev(dev), true);
+}
+
 static const struct dev_pm_ops mtk_pci_pm_ops = {
 	.suspend = mtk_pci_pm_suspend,
 	.resume = mtk_pci_pm_resume,
@@ -446,6 +465,8 @@ static const struct dev_pm_ops mtk_pci_pm_ops = {
 	.poweroff = mtk_pci_pm_suspend,
 	.restore = mtk_pci_pm_resume,
 	.restore_noirq = mtk_pci_pm_resume_noirq,
+	.runtime_suspend = mtk_pci_pm_runtime_suspend,
+	.runtime_resume = mtk_pci_pm_runtime_resume
 };
 
 static int mtk_request_irq(struct pci_dev *pdev)
