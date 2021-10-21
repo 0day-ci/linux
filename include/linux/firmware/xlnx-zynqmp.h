@@ -138,6 +138,8 @@ enum pm_ioctl_id {
 	IOCTL_READ_PGGS = 15,
 	/* Set healthy bit value */
 	IOCTL_SET_BOOT_HEALTH_STATUS = 17,
+	/* Register SGI to ATF */
+	IOCTL_REGISTER_SGI = 25,
 };
 
 enum pm_query_id {
