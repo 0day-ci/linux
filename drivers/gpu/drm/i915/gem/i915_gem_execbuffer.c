@@ -265,6 +265,9 @@ struct i915_execbuffer {
 	/* number of batches in execbuf IOCTL */
 	unsigned int num_batches;
 
+	/* Number of objects with EXEC_OBJECT_CAPTURE set */
+	unsigned int capture_count;
+
 	/** list of vma not yet bound during reservation phase */
 	struct list_head unbound;
 
@@ -908,6 +911,9 @@ static int eb_lookup_vmas(struct i915_execbuffer *eb)
 			err = PTR_ERR(vma);
 			goto err;
 		}
+
+		if (eb->exec[i].flags & EXEC_OBJECT_CAPTURE)
+			eb->capture_count++;
 
 		err = eb_validate_vma(eb, &eb->exec[i], vma);
 		if (unlikely(err)) {
@@ -1906,19 +1912,11 @@ static int eb_move_to_gpu(struct i915_execbuffer *eb)
 		assert_vma_held(vma);
 
 		if (flags & EXEC_OBJECT_CAPTURE) {
-			struct i915_capture_list *capture;
+			eb->capture_count--;
 
 			for_each_batch_create_order(eb, j) {
-				if (!eb->requests[j])
-					break;
-
-				capture = kmalloc(sizeof(*capture), GFP_KERNEL);
-				if (capture) {
-					capture->next =
-						eb->requests[j]->capture_list;
-					capture->vma = vma;
-					eb->requests[j]->capture_list = capture;
-				}
+				if (eb->requests[j]->capture_list)
+					eb->requests[j]->capture_list[eb->capture_count] = vma;
 			}
 		}
 
@@ -3130,6 +3128,14 @@ eb_requests_create(struct i915_execbuffer *eb, struct dma_fence *in_fence,
 			return out_fence;
 		}
 
+		if (eb->capture_count) {
+			eb->requests[i]->capture_list =
+				kvcalloc(eb->capture_count + 1,
+					sizeof(*eb->requests[i]->capture_list),
+					GFP_KERNEL | __GFP_NOWARN);
+		}
+
+
 		/*
 		 * Only the first request added (committed to backend) has to
 		 * take the in fences into account as all subsequent requests
@@ -3197,6 +3203,7 @@ i915_gem_do_execbuffer(struct drm_device *dev,
 
 	eb.fences = NULL;
 	eb.num_fences = 0;
+	eb.capture_count = 0;
 
 	memset(eb.requests, 0, sizeof(struct i915_request *) *
 	       ARRAY_SIZE(eb.requests));

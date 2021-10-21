@@ -188,15 +188,10 @@ void i915_request_notify_execute_cb_imm(struct i915_request *rq)
 
 static void free_capture_list(struct i915_request *request)
 {
-	struct i915_capture_list *capture;
+	struct i915_vma **capture;
 
 	capture = fetch_and_zero(&request->capture_list);
-	while (capture) {
-		struct i915_capture_list *next = capture->next;
-
-		kfree(capture);
-		capture = next;
-	}
+	kvfree(capture);
 }
 
 static void __i915_request_fill(struct i915_request *rq, u8 val)
