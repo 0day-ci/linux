@@ -239,7 +239,6 @@
 
 		#sound-dai-cells = <0>;
 		audio-ports = <TDA998x_I2S 0x03>;
-		clocks = <&rcar_sound 1>;
 
 		ports {
 			#address-cells = <1>;
