@@ -1,0 +1,91 @@
+# SPDX-License-Identifier: GPL-2.0
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/timer/samsung,s5e99xx-mct.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Samsung Exynos SoC Multi Core Timer (MCT)
+
+maintainers:
+  - Krzysztof Kozlowski <krzk@kernel.org>
+
+description: |+
+  The Samsung's Multi Core Timer (MCT) version 2 module includes
+  one 64-bit FRC(Free Running Counter) and 12 comparators.
+  The FRC serves up-counter and starts running at power-on.
+  The 12 comparators use the FRC value to produce interrupts.
+  They will produce interrupts when their internal value is matched with the FRC value.
+  Theses interrupts can be used as local timer interrupt of each CPU.
+
+properties:
+  compatible:
+    enum:
+      - samsung,s5e99xx-mct
+
+  clocks:
+    items:
+      - description: OSC clock
+      - description: PCLK clock
+      - description: RTC clock(optional)
+    minItems: 2
+
+  clock-names:
+    items:
+      - const: fin_pll
+      - const: mct
+      - const: rtc
+    minItems: 2
+
+  reg:
+    maxItems: 1
+
+  interrupts:
+    description: |
+      Interrupts should be put in specific order.
+      0: Local Timer Interrupt 0
+      1: Local Timer Interrupt 1
+      2: Local Timer Interrupt 2
+      3: ..
+      4: ..
+      i: Local Timer Interrupt n
+    minItems: 1              #  1 local timer interrupts
+    maxItems: 12             # 12 local timer interrupts
+
+  div:
+    description: If present, OSC clock freqency will be divided with this value.
+      And the divided value will be provided to MCT module.
+
+required:
+  - compatible
+  - clock-names
+  - clocks
+  - interrupts
+  - reg
+
+additionalProperties: false
+
+examples:
+  - |
+    // In this example, the IP contains 12 local timers, using separate interrupts,
+    // so 12 local timer interrupts have been specified,
+    #include <dt-bindings/interrupt-controller/arm-gic.h>
+
+    timer@10050000 {
+        compatible = "samsung,s5e99xx-mct";
+        reg = <0x10050000 0x800>;
+        clocks = <&clock 1>, <&clock 10>;
+        clock-names = "fin_pll", "mct";
+
+        interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>,
+                     <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>,
+                     <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>,
+                     <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>,
+                     <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>,
+                     <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>,
+                     <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>,
+                     <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>,
+                     <GIC_SPI 63 IRQ_TYPE_LEVEL_HIGH>,
+                     <GIC_SPI 64 IRQ_TYPE_LEVEL_HIGH>,
+                     <GIC_SPI 65 IRQ_TYPE_LEVEL_HIGH>,
+                     <GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>;
+    };
