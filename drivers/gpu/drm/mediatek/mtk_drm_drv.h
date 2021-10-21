@@ -53,6 +53,7 @@ extern struct platform_driver mtk_disp_gamma_driver;
 extern struct platform_driver mtk_disp_ovl_driver;
 extern struct platform_driver mtk_disp_rdma_driver;
 extern struct platform_driver mtk_dpi_driver;
+extern struct platform_driver mtk_dp_driver;
 extern struct platform_driver mtk_dsi_driver;
 
 #endif /* MTK_DRM_DRV_H */
