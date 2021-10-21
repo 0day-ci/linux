@@ -286,7 +286,7 @@ static int persistent_memory_claim(struct dm_writecache *wc)
 
 	id = dax_read_lock();
 
-	da = dax_direct_access(wc->ssd_dev->dax_dev, offset, p, &wc->memory_map, &pfn);
+	da = dax_direct_access(wc->ssd_dev->dax_dev, offset, p, &wc->memory_map, &pfn, 0);
 	if (da < 0) {
 		wc->memory_map = NULL;
 		r = da;
@@ -309,7 +309,7 @@ static int persistent_memory_claim(struct dm_writecache *wc)
 		do {
 			long daa;
 			daa = dax_direct_access(wc->ssd_dev->dax_dev, offset + i, p - i,
-						NULL, &pfn);
+						NULL, &pfn, 0);
 			if (daa <= 0) {
 				r = daa ? daa : -EINVAL;
 				goto err3;

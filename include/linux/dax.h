@@ -9,6 +9,9 @@
 /* Flag for synchronous flush */
 #define DAXDEV_F_SYNC (1UL << 0)
 
+/* Flag for DAX data recovery */
+#define DAXDEV_F_RECOVERY	(1UL << 1)
+
 typedef unsigned long dax_entry_t;
 
 struct iomap_ops;
@@ -21,7 +24,7 @@ struct dax_operations {
 	 * number of pages available for DAX at that pfn.
 	 */
 	long (*direct_access)(struct dax_device *, pgoff_t, long,
-			void **, pfn_t *);
+			void **, pfn_t *, unsigned long);
 	/*
 	 * Validate whether this device is usable as an fsdax backing
 	 * device.
@@ -192,7 +195,7 @@ static inline void dax_read_unlock(int id)
 bool dax_alive(struct dax_device *dax_dev);
 void *dax_get_private(struct dax_device *dax_dev);
 long dax_direct_access(struct dax_device *dax_dev, pgoff_t pgoff, long nr_pages,
-		void **kaddr, pfn_t *pfn);
+		void **kaddr, pfn_t *pfn, unsigned long);
 size_t dax_copy_from_iter(struct dax_device *dax_dev, pgoff_t pgoff, void *addr,
 		size_t bytes, struct iov_iter *i);
 size_t dax_copy_to_iter(struct dax_device *dax_dev, pgoff_t pgoff, void *addr,

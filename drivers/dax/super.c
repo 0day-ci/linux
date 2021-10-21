@@ -156,8 +156,8 @@ bool generic_fsdax_supported(struct dax_device *dax_dev,
 	}
 
 	id = dax_read_lock();
-	len = dax_direct_access(dax_dev, pgoff, 1, &kaddr, &pfn);
-	len2 = dax_direct_access(dax_dev, pgoff_end, 1, &end_kaddr, &end_pfn);
+	len = dax_direct_access(dax_dev, pgoff, 1, &kaddr, &pfn, 0);
+	len2 = dax_direct_access(dax_dev, pgoff_end, 1, &end_kaddr, &end_pfn, 0);
 
 	if (len < 1 || len2 < 1) {
 		pr_info("%pg: error: dax access failed (%ld)\n",
@@ -302,12 +302,13 @@ EXPORT_SYMBOL_GPL(dax_attribute_group);
  * @nr_pages: number of consecutive pages caller can handle relative to @pfn
  * @kaddr: output parameter that returns a virtual address mapping of pfn
  * @pfn: output parameter that returns an absolute pfn translation of @pgoff
+ * @flags: indication whether on dax data recovery code path or not
  *
  * Return: negative errno if an error occurs, otherwise the number of
  * pages accessible at the device relative @pgoff.
  */
 long dax_direct_access(struct dax_device *dax_dev, pgoff_t pgoff, long nr_pages,
-		void **kaddr, pfn_t *pfn)
+		void **kaddr, pfn_t *pfn, unsigned long flags)
 {
 	long avail;
 
@@ -321,7 +322,7 @@ long dax_direct_access(struct dax_device *dax_dev, pgoff_t pgoff, long nr_pages,
 		return -EINVAL;
 
 	avail = dax_dev->ops->direct_access(dax_dev, pgoff, nr_pages,
-			kaddr, pfn);
+			kaddr, pfn, flags);
 	if (!avail)
 		return -ERANGE;
 	return min(avail, nr_pages);

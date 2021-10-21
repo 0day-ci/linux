@@ -8,7 +8,7 @@
 #include <nd.h>
 
 long __pmem_direct_access(struct pmem_device *pmem, pgoff_t pgoff,
-		long nr_pages, void **kaddr, pfn_t *pfn)
+	long nr_pages, void **kaddr, pfn_t *pfn, unsigned long flags)
 {
 	resource_size_t offset = PFN_PHYS(pgoff) + pmem->data_offset;
 

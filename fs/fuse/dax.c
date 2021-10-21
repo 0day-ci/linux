@@ -1245,7 +1245,7 @@ static int fuse_dax_mem_range_init(struct fuse_conn_dax *fcd)
 
 	id = dax_read_lock();
 	nr_pages = dax_direct_access(fcd->dev, 0, PHYS_PFN(dax_size), NULL,
-				     NULL);
+				     NULL, 0);
 	dax_read_unlock(id);
 	if (nr_pages < 0) {
 		pr_debug("dax_direct_access() returned %ld\n", nr_pages);

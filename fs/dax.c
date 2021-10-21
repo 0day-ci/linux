@@ -722,7 +722,7 @@ static int copy_cow_page_dax(struct block_device *bdev, struct dax_device *dax_d
 		return rc;
 
 	id = dax_read_lock();
-	rc = dax_direct_access(dax_dev, pgoff, 1, &kaddr, NULL);
+	rc = dax_direct_access(dax_dev, pgoff, 1, &kaddr, NULL, 0);
 	if (rc < 0) {
 		dax_read_unlock(id);
 		return rc;
@@ -1023,7 +1023,7 @@ static int dax_iomap_pfn(const struct iomap *iomap, loff_t pos, size_t size,
 		return rc;
 	id = dax_read_lock();
 	length = dax_direct_access(iomap->dax_dev, pgoff, PHYS_PFN(size),
-				   NULL, pfnp);
+				   NULL, pfnp, 0);
 	if (length < 0) {
 		rc = length;
 		goto out;
@@ -1149,7 +1149,7 @@ s64 dax_iomap_zero(loff_t pos, u64 length, struct iomap *iomap)
 	if (page_aligned)
 		rc = dax_zero_page_range(iomap->dax_dev, pgoff, 1);
 	else
-		rc = dax_direct_access(iomap->dax_dev, pgoff, 1, &kaddr, NULL);
+		rc = dax_direct_access(iomap->dax_dev, pgoff, 1, &kaddr, NULL, 0);
 	if (rc < 0) {
 		dax_read_unlock(id);
 		return rc;
@@ -1172,6 +1172,7 @@ static loff_t dax_iomap_iter(const struct iomap_iter *iomi,
 	struct block_device *bdev = iomap->bdev;
 	struct dax_device *dax_dev = iomap->dax_dev;
 	loff_t end = pos + length, done = 0;
+	unsigned long dax_flag = 0;
 	ssize_t ret = 0;
 	size_t xfer;
 	int id;
@@ -1199,6 +1200,9 @@ static loff_t dax_iomap_iter(const struct iomap_iter *iomi,
 					      (end - 1) >> PAGE_SHIFT);
 	}
 
+	if (iomi->flags & IOMAP_RECOVERY)
+		dax_flag |= DAXDEV_F_RECOVERY;
+
 	id = dax_read_lock();
 	while (pos < end) {
 		unsigned offset = pos & (PAGE_SIZE - 1);
@@ -1218,7 +1222,7 @@ static loff_t dax_iomap_iter(const struct iomap_iter *iomi,
 			break;
 
 		map_len = dax_direct_access(dax_dev, pgoff, PHYS_PFN(size),
-				&kaddr, NULL);
+				&kaddr, NULL, dax_flag);
 		if (map_len < 0) {
 			ret = map_len;
 			break;
