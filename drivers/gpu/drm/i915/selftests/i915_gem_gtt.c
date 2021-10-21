@@ -1378,7 +1378,7 @@ static int igt_gtt_reserve(void *arg)
 		}
 
 		mutex_lock(&ggtt->vm.mutex);
-		err = i915_gem_gtt_reserve(&ggtt->vm, &vma->node,
+		err = i915_gem_gtt_reserve(&ggtt->vm, NULL, &vma->node,
 					   obj->base.size,
 					   total,
 					   obj->cache_level,
@@ -1430,7 +1430,7 @@ static int igt_gtt_reserve(void *arg)
 		}
 
 		mutex_lock(&ggtt->vm.mutex);
-		err = i915_gem_gtt_reserve(&ggtt->vm, &vma->node,
+		err = i915_gem_gtt_reserve(&ggtt->vm, NULL, &vma->node,
 					   obj->base.size,
 					   total,
 					   obj->cache_level,
@@ -1477,7 +1477,7 @@ static int igt_gtt_reserve(void *arg)
 					   I915_GTT_MIN_ALIGNMENT);
 
 		mutex_lock(&ggtt->vm.mutex);
-		err = i915_gem_gtt_reserve(&ggtt->vm, &vma->node,
+		err = i915_gem_gtt_reserve(&ggtt->vm, NULL, &vma->node,
 					   obj->base.size,
 					   offset,
 					   obj->cache_level,
@@ -1552,7 +1552,7 @@ static int igt_gtt_insert(void *arg)
 	/* Check a couple of obviously invalid requests */
 	for (ii = invalid_insert; ii->size; ii++) {
 		mutex_lock(&ggtt->vm.mutex);
-		err = i915_gem_gtt_insert(&ggtt->vm, &tmp,
+		err = i915_gem_gtt_insert(&ggtt->vm, NULL, &tmp,
 					  ii->size, ii->alignment,
 					  I915_COLOR_UNEVICTABLE,
 					  ii->start, ii->end,
@@ -1594,7 +1594,7 @@ static int igt_gtt_insert(void *arg)
 		}
 
 		mutex_lock(&ggtt->vm.mutex);
-		err = i915_gem_gtt_insert(&ggtt->vm, &vma->node,
+		err = i915_gem_gtt_insert(&ggtt->vm, NULL, &vma->node,
 					  obj->base.size, 0, obj->cache_level,
 					  0, ggtt->vm.total,
 					  0);
@@ -1654,7 +1654,7 @@ static int igt_gtt_insert(void *arg)
 		}
 
 		mutex_lock(&ggtt->vm.mutex);
-		err = i915_gem_gtt_insert(&ggtt->vm, &vma->node,
+		err = i915_gem_gtt_insert(&ggtt->vm, NULL, &vma->node,
 					  obj->base.size, 0, obj->cache_level,
 					  0, ggtt->vm.total,
 					  0);
@@ -1703,7 +1703,7 @@ static int igt_gtt_insert(void *arg)
 		}
 
 		mutex_lock(&ggtt->vm.mutex);
-		err = i915_gem_gtt_insert(&ggtt->vm, &vma->node,
+		err = i915_gem_gtt_insert(&ggtt->vm, NULL, &vma->node,
 					  obj->base.size, 0, obj->cache_level,
 					  0, ggtt->vm.total,
 					  0);
