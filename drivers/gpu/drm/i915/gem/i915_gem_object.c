@@ -548,7 +548,7 @@ bool i915_gem_object_has_struct_page(const struct drm_i915_gem_object *obj)
 #ifdef CONFIG_LOCKDEP
 	if (IS_DGFX(to_i915(obj->base.dev)) &&
 	    i915_gem_object_evictable((void __force *)obj))
-		assert_object_held_shared(obj);
+		assert_object_held(obj);
 #endif
 	return obj->mem_flags & I915_BO_FLAG_STRUCT_PAGE;
 }
@@ -567,7 +567,7 @@ bool i915_gem_object_has_iomem(const struct drm_i915_gem_object *obj)
 #ifdef CONFIG_LOCKDEP
 	if (IS_DGFX(to_i915(obj->base.dev)) &&
 	    i915_gem_object_evictable((void __force *)obj))
-		assert_object_held_shared(obj);
+		assert_object_held(obj);
 #endif
 	return obj->mem_flags & I915_BO_FLAG_IOMEM;
 }
