@@ -118,22 +118,45 @@ void i915_ggtt_suspend(struct i915_ggtt *ggtt)
 	struct i915_vma *vma, *vn;
 	int open;
 
+retry:
+	i915_gem_drain_freed_objects(ggtt->vm.i915);
+
 	mutex_lock(&ggtt->vm.mutex);
 
 	/* Skip rewriting PTE on VMA unbind. */
 	open = atomic_xchg(&ggtt->vm.open, 0);
 
 	list_for_each_entry_safe(vma, vn, &ggtt->vm.bound_list, vm_link) {
-		GEM_BUG_ON(!drm_mm_node_allocated(&vma->node));
-		i915_vma_wait_for_bind(vma);
+		struct drm_i915_gem_object *obj = vma->obj;
 
-		if (i915_vma_is_pinned(vma))
+		GEM_BUG_ON(!drm_mm_node_allocated(&vma->node));
+
+		if (i915_vma_is_pinned(vma) || !i915_vma_is_bound(vma, I915_VMA_GLOBAL_BIND))
 			continue;
 
-		if (!i915_vma_is_bound(vma, I915_VMA_GLOBAL_BIND)) {
-			__i915_vma_evict(vma);
-			drm_mm_remove_node(&vma->node);
+		/* unlikely to race when GPU is idle, so no worry about slowpath.. */
+		if (!i915_gem_object_trylock(obj, NULL)) {
+			atomic_set(&ggtt->vm.open, open);
+
+			i915_gem_object_get(obj);
+			mutex_unlock(&ggtt->vm.mutex);
+
+			i915_gem_object_lock(obj, NULL);
+			open = i915_vma_unbind(vma);
+			i915_gem_object_unlock(obj);
+
+			GEM_WARN_ON(open);
+
+			i915_gem_object_put(obj);
+			goto retry;
 		}
+
+		i915_vma_wait_for_bind(vma);
+
+		__i915_vma_evict(vma);
+		drm_mm_remove_node(&vma->node);
+
+		i915_gem_object_unlock(obj);
 	}
 
 	ggtt->vm.clear_range(&ggtt->vm, 0, ggtt->vm.total);
@@ -725,11 +748,21 @@ static void ggtt_cleanup_hw(struct i915_ggtt *ggtt)
 	atomic_set(&ggtt->vm.open, 0);
 
 	flush_workqueue(ggtt->vm.i915->wq);
+	i915_gem_drain_freed_objects(ggtt->vm.i915);
 
 	mutex_lock(&ggtt->vm.mutex);
 
-	list_for_each_entry_safe(vma, vn, &ggtt->vm.bound_list, vm_link)
+	list_for_each_entry_safe(vma, vn, &ggtt->vm.bound_list, vm_link) {
+		struct drm_i915_gem_object *obj = vma->obj;
+		bool trylock;
+
+		trylock = i915_gem_object_trylock(obj, NULL);
+		WARN_ON(!trylock);
+
 		WARN_ON(__i915_vma_unbind(vma));
+		if (trylock)
+			i915_gem_object_unlock(obj);
+	}
 
 	if (drm_mm_node_allocated(&ggtt->error_capture))
 		drm_mm_remove_node(&ggtt->error_capture);
