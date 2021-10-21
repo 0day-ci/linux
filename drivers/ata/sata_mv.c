@@ -3897,7 +3897,7 @@ static int mv_chip_id(struct ata_host *host, unsigned int board_idx)
 
 	default:
 		dev_err(host->dev, "BUG: invalid board index %u\n", board_idx);
-		return 1;
+		return -ENODEV;
 	}
 
 	hpriv->hp_flags = hp_flags;
