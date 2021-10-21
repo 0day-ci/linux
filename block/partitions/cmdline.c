@@ -164,11 +164,9 @@ static int parse_parts(struct cmdline_parts **parts, const char *bdevdef)
 		next_subpart = &(*next_subpart)->next_subpart;
 	}
 
-	if (!newparts->subpart) {
-		pr_warn("cmdline partition has no valid partition.");
-		ret = -EINVAL;
-		goto fail;
-	}
+	if (!newparts->subpart)
+		pr_warn("%s: cmdline partition has no valid partitions.",
+			newparts->name);
 
 	*parts = newparts;
 

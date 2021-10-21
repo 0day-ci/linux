@@ -13,7 +13,7 @@ Users can easily change the partition.
 The format for the command line is just like mtdparts:
 
 blkdevparts=<blkdev-def>[;<blkdev-def>]
-  <blkdev-def> := <blkdev-id>:<partdef>[,<partdef>]
+  <blkdev-def> := <blkdev-id>:[<partdef>[,<partdef>]]
     <partdef> := <size>[@<offset>](part-name)
 
 <blkdev-id>
