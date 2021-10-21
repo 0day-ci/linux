@@ -36,6 +36,7 @@
 
 #include <linux/types.h>
 #include <asm/byteorder.h>
+#include <linux/bug.h>
 #include <linux/crypto.h>
 #include <linux/socket.h>
 #include <linux/tcp.h>
@@ -468,7 +469,9 @@ static inline bool tls_is_sk_tx_device_offloaded(struct sock *sk)
 
 static inline void tls_err_abort(struct sock *sk, int err)
 {
-	sk->sk_err = err;
+	WARN_ON_ONCE(err >= 0);
+	/* sk->sk_err should contain a positive error code. */
+	sk->sk_err = -err;
 	sk_error_report(sk);
 }
 
@@ -512,7 +515,7 @@ static inline void tls_advance_record_sn(struct sock *sk,
 					 struct cipher_context *ctx)
 {
 	if (tls_bigint_increment(ctx->rec_seq, prot->rec_seq_size))
-		tls_err_abort(sk, EBADMSG);
+		tls_err_abort(sk, -EBADMSG);
 
 	if (prot->version != TLS_1_3_VERSION &&
 	    prot->cipher_type != TLS_CIPHER_CHACHA20_POLY1305)
