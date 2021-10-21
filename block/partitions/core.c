@@ -16,6 +16,13 @@
 
 static int (*check_part[])(struct parsed_partitions *) = {
 	/*
+	 * Let cmdline override whatever there is on disk.
+	 */
+#ifdef CONFIG_CMDLINE_PARTITION
+	cmdline_partition,
+#endif
+
+	/*
 	 * Probe partition formats with tables at disk address 0
 	 * that also have an ADFS boot block at 0xdc0.
 	 */
@@ -42,9 +49,6 @@ static int (*check_part[])(struct parsed_partitions *) = {
 	adfspart_check_ADFS,
 #endif
 
-#ifdef CONFIG_CMDLINE_PARTITION
-	cmdline_partition,
-#endif
 #ifdef CONFIG_EFI_PARTITION
 	efi_partition,		/* this must come before msdos */
 #endif
