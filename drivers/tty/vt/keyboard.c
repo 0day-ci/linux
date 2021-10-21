@@ -1130,6 +1130,20 @@ static void kbd_init_leds(void)
 
 #endif
 
+static void kbd_update_ledstate(struct input_dev *dev)
+{
+	unsigned long leds;
+
+	leds = (unsigned long)ledstate;
+
+	if (!!test_bit(LED_NUML, dev->led) != !!test_bit(VC_NUMLOCK, &leds))
+		ledstate ^= BIT(VC_NUMLOCK);
+	if (!!test_bit(LED_CAPSL, dev->led) != !!test_bit(VC_CAPSLOCK, &leds))
+		ledstate ^= BIT(VC_CAPSLOCK);
+	if (!!test_bit(LED_SCROLLL, dev->led) != !!test_bit(VC_SCROLLOCK, &leds))
+		ledstate ^= BIT(VC_SCROLLOCK);
+}
+
 /*
  * The leds display either (i) the status of NumLock, CapsLock, ScrollLock,
  * or (ii) whatever pattern of lights people want to show using KDSETLED,
@@ -1247,8 +1261,13 @@ void vt_kbd_con_stop(unsigned int console)
  */
 static void kbd_bh(struct tasklet_struct *unused)
 {
+	struct kbd_struct *kb;
 	unsigned int leds;
 	unsigned long flags;
+
+	kb = kbd_table + fg_console;
+	if (kb->kbdmode == VC_OFF)
+		return;
 
 	spin_lock_irqsave(&led_lock, flags);
 	leds = getleds();
@@ -1523,6 +1542,9 @@ static void kbd_event(struct input_handle *handle, unsigned int event_type,
 {
 	/* We are called with interrupts disabled, just take the lock */
 	spin_lock(&kbd_event_lock);
+
+	if (test_bit(EV_LED, handle->dev->evbit))
+		kbd_update_ledstate(handle->dev);
 
 	if (event_type == EV_MSC && event_code == MSC_RAW &&
 			kbd_is_hw_raw(handle->dev))
