@@ -113,11 +113,16 @@ unsigned long memremap_compat_align(void)
 	// 1GB maximum possible size of the linear mapping.
 	return max(SUBSECTION_SIZE, 1UL << 30);
 #else
-	unsigned int shift = mmu_psize_defs[mmu_linear_psize].shift;
-
-	if (radix_enabled())
+	if (radix_enabled()) {
 		return SUBSECTION_SIZE;
-	return max(SUBSECTION_SIZE, 1UL << shift);
+	} else {
+#ifdef CONFIG_PPC_64S_HASH_MMU
+		unsigned int shift = mmu_psize_defs[mmu_linear_psize].shift;
+		return max(SUBSECTION_SIZE, 1UL << shift);
+#else
+		BUILD_BUG(); // radix_enabled() should be constant true
+#endif
+	}
 #endif
 }
 EXPORT_SYMBOL_GPL(memremap_compat_align);

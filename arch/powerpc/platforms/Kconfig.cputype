@@ -105,6 +105,7 @@ config PPC_BOOK3S_64
 	select HAVE_MOVE_PMD
 	select HAVE_MOVE_PUD
 	select IRQ_WORK
+	select PPC_64S_HASH_MMU
 	select PPC_MM_SLICES
 	select PPC_HAVE_KUEP
 	select PPC_HAVE_KUAP
@@ -363,6 +364,9 @@ config SPE
 	  effect on a non-spe cpu (it does, however add code to the kernel).
 
 	  If in doubt, say Y here.
+
+config PPC_64S_HASH_MMU
+	bool
 
 config PPC_RADIX_MMU
 	bool "Radix MMU Support"
