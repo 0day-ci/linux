@@ -37,6 +37,16 @@ static inline void contextidr_thread_switch(struct task_struct *next)
 	isb();
 }
 
+static inline void contextidr_enable(void)
+{
+	static_branch_inc(&contextidr_in_use);
+}
+
+static inline void contextidr_disable(void)
+{
+	static_branch_dec(&contextidr_in_use);
+}
+
 /*
  * Set TTBR0 to reserved_pg_dir. No translations will be possible via TTBR0.
  */
