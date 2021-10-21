@@ -6835,8 +6835,10 @@ static int find_energy_efficient_cpu(struct task_struct *p, int prev_cpu)
 		/* Evaluate the energy impact of using max_spare_cap_cpu. */
 		if (max_spare_cap_cpu >= 0) {
 			cur_delta = compute_energy(p, max_spare_cap_cpu, pd);
-			if (cur_delta < base_energy_pd)
+			if (cur_delta < base_energy_pd) {
+				target = max_spare_cap_cpu;
 				goto unlock;
+			}
 			cur_delta -= base_energy_pd;
 			if (cur_delta < best_delta) {
 				best_delta = cur_delta;
