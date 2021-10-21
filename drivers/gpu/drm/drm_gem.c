@@ -226,8 +226,11 @@ drm_gem_remove_prime_handles(struct drm_gem_object *obj, struct drm_file *filp)
 	 */
 	mutex_lock(&filp->prime.lock);
 	if (obj->dma_buf) {
+		struct drm_device *dev = filp->minor->dev;
+		bool removed_real_import = false;
 		drm_prime_remove_buf_handle_locked(&filp->prime,
-						   obj->dma_buf);
+						   obj->dma_buf,
+						   &removed_real_import);
 	}
 	mutex_unlock(&filp->prime.lock);
 }

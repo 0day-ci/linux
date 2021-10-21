@@ -90,13 +90,15 @@
 struct drm_prime_member {
 	struct dma_buf *dma_buf;
 	uint32_t handle;
+	bool fake_import;
 
 	struct rb_node dmabuf_rb;
 	struct rb_node handle_rb;
 };
 
 static int drm_prime_add_buf_handle(struct drm_prime_file_private *prime_fpriv,
-				    struct dma_buf *dma_buf, uint32_t handle)
+				    struct dma_buf *dma_buf, uint32_t handle,
+				    bool fake_import)
 {
 	struct drm_prime_member *member;
 	struct rb_node **p, *rb;
@@ -108,6 +110,7 @@ static int drm_prime_add_buf_handle(struct drm_prime_file_private *prime_fpriv,
 	get_dma_buf(dma_buf);
 	member->dma_buf = dma_buf;
 	member->handle = handle;
+	member->fake_import = fake_import;
 
 	rb = NULL;
 	p = &prime_fpriv->dmabufs.rb_node;
@@ -188,9 +191,11 @@ static int drm_prime_lookup_buf_handle(struct drm_prime_file_private *prime_fpri
 }
 
 void drm_prime_remove_buf_handle_locked(struct drm_prime_file_private *prime_fpriv,
-					struct dma_buf *dma_buf)
+					struct dma_buf *dma_buf,
+					bool *removed_real_import)
 {
 	struct rb_node *rb;
+	*removed_real_import = false;
 
 	rb = prime_fpriv->dmabufs.rb_node;
 	while (rb) {
@@ -200,6 +205,9 @@ void drm_prime_remove_buf_handle_locked(struct drm_prime_file_private *prime_fpr
 		if (member->dma_buf == dma_buf) {
 			rb_erase(&member->handle_rb, &prime_fpriv->handles);
 			rb_erase(&member->dmabuf_rb, &prime_fpriv->dmabufs);
+
+			if (!member->fake_import)
+				*removed_real_import = true;
 
 			dma_buf_put(dma_buf);
 			kfree(member);
@@ -303,7 +311,6 @@ int drm_gem_prime_fd_to_handle(struct drm_device *dev,
 		return PTR_ERR(dma_buf);
 
 	mutex_lock(&file_priv->prime.lock);
-
 	ret = drm_prime_lookup_buf_handle(&file_priv->prime,
 			dma_buf, handle);
 	if (ret == 0)
@@ -315,6 +322,7 @@ int drm_gem_prime_fd_to_handle(struct drm_device *dev,
 		obj = dev->driver->gem_prime_import(dev, dma_buf);
 	else
 		obj = drm_gem_prime_import(dev, dma_buf);
+
 	if (IS_ERR(obj)) {
 		ret = PTR_ERR(obj);
 		goto out_unlock;
@@ -334,7 +342,7 @@ int drm_gem_prime_fd_to_handle(struct drm_device *dev,
 		goto out_put;
 
 	ret = drm_prime_add_buf_handle(&file_priv->prime,
-			dma_buf, *handle);
+			dma_buf, *handle, false);
 	mutex_unlock(&file_priv->prime.lock);
 	if (ret)
 		goto fail;
@@ -473,7 +481,7 @@ out_have_obj:
 	 * ioctl doesn't miss to remove this buffer handle from the cache.
 	 */
 	ret = drm_prime_add_buf_handle(&file_priv->prime,
-				       dmabuf, handle);
+				       dmabuf, handle, true);
 	mutex_unlock(&dev->object_name_lock);
 	if (ret)
 		goto fail_put_dmabuf;
