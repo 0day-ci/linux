@@ -298,6 +298,7 @@ drm_gem_object_release_handle(int id, void *ptr, void *data)
 {
 	struct drm_file *file_priv = data;
 	struct drm_gem_object *obj = ptr;
+	struct drm_device *dev = file_priv->minor->dev;
 
 	if (obj->funcs->close)
 		obj->funcs->close(obj, file_priv);
@@ -305,6 +306,7 @@ drm_gem_object_release_handle(int id, void *ptr, void *data)
 	drm_gem_remove_prime_handles(obj, file_priv);
 	drm_vma_node_revoke(&obj->vma_node, file_priv);
 
+	drm_gem_trace_gpu_mem_instance(dev, file_priv, -obj->size, false);
 	drm_gem_object_handle_put_unlocked(obj);
 
 	return 0;
@@ -447,6 +449,7 @@ drm_gem_handle_create_tail(struct drm_file *file_priv,
 			goto err_revoke;
 	}
 
+	drm_gem_trace_gpu_mem_instance(dev, file_priv, obj->size, false);
 	*handlep = handle;
 	return 0;
 
