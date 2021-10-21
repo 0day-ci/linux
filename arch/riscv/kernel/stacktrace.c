@@ -16,12 +16,12 @@
 
 register unsigned long sp_in_global __asm__("sp");
 
-#ifdef CONFIG_FRAME_POINTER
-
 void notrace walk_stackframe(struct task_struct *task, struct pt_regs *regs,
 			     bool (*fn)(void *, unsigned long), void *arg)
 {
 	unsigned long fp, sp, pc;
+
+        BUILD_BUG_ON(!IS_ENABLED(CONFIG_FRAME_POINTER));
 
 	if (regs) {
 		fp = frame_pointer(regs);
@@ -64,39 +64,6 @@ void notrace walk_stackframe(struct task_struct *task, struct pt_regs *regs,
 
 	}
 }
-
-#else /* !CONFIG_FRAME_POINTER */
-
-void notrace walk_stackframe(struct task_struct *task,
-	struct pt_regs *regs, bool (*fn)(void *, unsigned long), void *arg)
-{
-	unsigned long sp, pc;
-	unsigned long *ksp;
-
-	if (regs) {
-		sp = user_stack_pointer(regs);
-		pc = instruction_pointer(regs);
-	} else if (task == NULL || task == current) {
-		sp = sp_in_global;
-		pc = (unsigned long)walk_stackframe;
-	} else {
-		/* task blocked in __switch_to */
-		sp = task->thread.sp;
-		pc = task->thread.ra;
-	}
-
-	if (unlikely(sp & 0x7))
-		return;
-
-	ksp = (unsigned long *)sp;
-	while (!kstack_end(ksp)) {
-		if (__kernel_text_address(pc) && unlikely(!fn(arg, pc)))
-			break;
-		pc = (*ksp++) - 0x4;
-	}
-}
-
-#endif /* CONFIG_FRAME_POINTER */
 
 static bool print_trace_address(void *arg, unsigned long pc)
 {
