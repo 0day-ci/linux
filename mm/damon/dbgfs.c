@@ -379,6 +379,12 @@ static ssize_t dbgfs_target_ids_write(struct file *file,
 		goto out;
 	}
 
+	if (!nr_targets) {
+		/* remove targets with previously-set primitive */
+		damon_set_targets(ctx, NULL, 0);
+		goto free_targets_out;
+	}
+
 	if (id_is_pid) {
 		for (i = 0; i < nr_targets; i++) {
 			targets[i] = (unsigned long)find_get_pid(
