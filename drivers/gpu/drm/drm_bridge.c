@@ -583,18 +583,14 @@ EXPORT_SYMBOL(drm_bridge_chain_mode_set);
 void drm_bridge_chain_pre_enable(struct drm_bridge *bridge)
 {
 	struct drm_encoder *encoder;
-	struct drm_bridge *iter;
 
 	if (!bridge)
 		return;
 
 	encoder = bridge->encoder;
-	list_for_each_entry_reverse(iter, &encoder->bridge_chain, chain_node) {
-		if (iter->funcs->pre_enable)
-			iter->funcs->pre_enable(iter);
-
-		if (iter == bridge)
-			break;
+	list_for_each_entry_from(bridge, &encoder->bridge_chain, chain_node) {
+		if (bridge->funcs->pre_enable)
+			bridge->funcs->pre_enable(bridge);
 	}
 }
 EXPORT_SYMBOL(drm_bridge_chain_pre_enable);
@@ -684,26 +680,30 @@ void drm_atomic_bridge_chain_post_disable(struct drm_bridge *bridge,
 					  struct drm_atomic_state *old_state)
 {
 	struct drm_encoder *encoder;
+	struct drm_bridge *iter;
 
 	if (!bridge)
 		return;
 
 	encoder = bridge->encoder;
-	list_for_each_entry_from(bridge, &encoder->bridge_chain, chain_node) {
-		if (bridge->funcs->atomic_post_disable) {
+	list_for_each_entry_reverse(iter, &encoder->bridge_chain, chain_node) {
+		if (iter->funcs->atomic_post_disable) {
 			struct drm_bridge_state *old_bridge_state;
 
 			old_bridge_state =
 				drm_atomic_get_old_bridge_state(old_state,
-								bridge);
+								iter);
 			if (WARN_ON(!old_bridge_state))
 				return;
 
-			bridge->funcs->atomic_post_disable(bridge,
-							   old_bridge_state);
-		} else if (bridge->funcs->post_disable) {
-			bridge->funcs->post_disable(bridge);
+			iter->funcs->atomic_post_disable(iter,
+							 old_bridge_state);
+		} else if (iter->funcs->post_disable) {
+			iter->funcs->post_disable(iter);
 		}
+
+		if (iter == bridge)
+			break;
 	}
 }
 EXPORT_SYMBOL(drm_atomic_bridge_chain_post_disable);
