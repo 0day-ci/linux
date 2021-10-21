@@ -931,7 +931,14 @@ new_vma:
 			goto new_vma;
 		}
 
-		ret = i915_vma_unbind(vma);
+		ret = 0;
+		if (!ww)
+			ret = i915_gem_object_lock_interruptible(obj, NULL);
+		if (!ret) {
+			ret = i915_vma_unbind(vma);
+			if (!ww)
+				i915_gem_object_unlock(obj);
+		}
 		if (ret)
 			return ERR_PTR(ret);
 	}
