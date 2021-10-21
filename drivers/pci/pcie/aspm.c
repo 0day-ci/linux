@@ -658,6 +658,8 @@ static void pcie_aspm_cap_init(struct pcie_link_state *link, int blacklist)
 	/* Setup initial capable state. Will be updated later */
 	link->aspm_capable = link->aspm_support;
 
+	link->aspm_disable = link->aspm_capable & ~link->aspm_default;
+
 	/* Get and check endpoint acceptable latencies */
 	list_for_each_entry(child, &linkbus->devices, bus_list) {
 		u32 reg32, encoding;
@@ -1231,6 +1233,9 @@ static ssize_t aspm_attr_store_common(struct device *dev,
 		if (state & ASPM_STATE_L1SS)
 			link->aspm_disable &= ~ASPM_STATE_L1;
 	} else {
+		if (state == ASPM_STATE_L1)
+			state |= ASPM_STATE_L1SS;
+
 		link->aspm_disable |= state;
 	}
 
