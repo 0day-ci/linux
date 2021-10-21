@@ -1299,6 +1299,59 @@ static ssize_t clkpm_store(struct device *dev,
 	return len;
 }
 
+static ssize_t ltr_attr_show_common(struct device *dev,
+			  struct device_attribute *attr, char *buf, u8 state)
+{
+	struct pci_dev *pdev = to_pci_dev(dev);
+	int ltr;
+	u16 val;
+
+	ltr = pci_find_ext_capability(pdev, PCI_EXT_CAP_ID_LTR);
+	if (!ltr)
+		return -EINVAL;
+
+	pci_read_config_word(pdev, ltr + state, &val);
+
+	return sysfs_emit(buf, "0x%0x\n", val);
+}
+
+static ssize_t ltr_attr_store_common(struct device *dev,
+			   struct device_attribute *attr,
+			   const char *buf, size_t len, u8 state)
+{
+	struct pci_dev *pdev = to_pci_dev(dev);
+	int ltr;
+	u16 val;
+
+	ltr = pci_find_ext_capability(pdev, PCI_EXT_CAP_ID_LTR);
+	if (!ltr)
+		return -EINVAL;
+
+	if (kstrtou16(buf, 16, &val) < 0)
+		return -EINVAL;
+
+	/* LatencyScale is not permitted to be 110 or 111 */
+	if ((val >> 10) > 5)
+		return -EINVAL;
+
+	pci_write_config_word(pdev, ltr + state, val);
+
+	return len;
+}
+
+#define LTR_ATTR(_f, _s)						\
+static ssize_t _f##_show(struct device *dev,				\
+			 struct device_attribute *attr, char *buf)	\
+{ return ltr_attr_show_common(dev, attr, buf, PCI_LTR_##_s); }		\
+									\
+static ssize_t _f##_store(struct device *dev,				\
+			  struct device_attribute *attr,		\
+			  const char *buf, size_t len)			\
+{ return ltr_attr_store_common(dev, attr, buf, len, PCI_LTR_##_s); }
+
+LTR_ATTR(ltr_max_snoop_lat, MAX_SNOOP_LAT);
+LTR_ATTR(ltr_max_nosnoop_lat, MAX_NOSNOOP_LAT);
+
 static DEVICE_ATTR_RW(clkpm);
 static DEVICE_ATTR_RW(l0s_aspm);
 static DEVICE_ATTR_RW(l1_aspm);
@@ -1306,6 +1359,8 @@ static DEVICE_ATTR_RW(l1_1_aspm);
 static DEVICE_ATTR_RW(l1_2_aspm);
 static DEVICE_ATTR_RW(l1_1_pcipm);
 static DEVICE_ATTR_RW(l1_2_pcipm);
+static DEVICE_ATTR_RW(ltr_max_snoop_lat);
+static DEVICE_ATTR_RW(ltr_max_nosnoop_lat);
 
 static struct attribute *aspm_ctrl_attrs[] = {
 	&dev_attr_clkpm.attr,
@@ -1315,6 +1370,8 @@ static struct attribute *aspm_ctrl_attrs[] = {
 	&dev_attr_l1_2_aspm.attr,
 	&dev_attr_l1_1_pcipm.attr,
 	&dev_attr_l1_2_pcipm.attr,
+	&dev_attr_ltr_max_snoop_lat.attr,
+	&dev_attr_ltr_max_nosnoop_lat.attr,
 	NULL
 };
 
@@ -1338,6 +1395,8 @@ static umode_t aspm_ctrl_attrs_are_visible(struct kobject *kobj,
 
 	if (n == 0)
 		return link->clkpm_capable ? a->mode : 0;
+	else if (n == 7 || n == 8)
+		return pdev->ltr_path ? a->mode : 0;
 
 	return link->aspm_capable & aspm_state_map[n - 1] ? a->mode : 0;
 }
