@@ -171,4 +171,9 @@ int wwan_register_ops(struct device *parent, const struct wwan_ops *ops,
 
 void wwan_unregister_ops(struct device *parent);
 
+/*
+ * Default WWAN interface MTU value
+ */
+#define WWAN_DEFAULT_MTU       1500
+
 #endif /* __WWAN_H */
