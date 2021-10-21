@@ -50,10 +50,17 @@ extern "C" {
 
 #define VIRTGPU_EXECBUF_FENCE_FD_IN	0x01
 #define VIRTGPU_EXECBUF_FENCE_FD_OUT	0x02
-#define VIRTGPU_EXECBUF_FLAGS  (\
-		VIRTGPU_EXECBUF_FENCE_FD_IN |\
-		VIRTGPU_EXECBUF_FENCE_FD_OUT |\
-		0)
+#define VIRTGPU_EXECBUF_ACC_BO_PRESENT 0x04
+#define VIRTGPU_EXECBUF_FLAGS                                                  \
+	(VIRTGPU_EXECBUF_FENCE_FD_IN | VIRTGPU_EXECBUF_FENCE_FD_OUT |          \
+	 VIRTGPU_EXECBUF_ACC_BO_PRESENT | 0)
+
+/* it is used in resource_create_ioctl as resource
+ * flag.
+ * First 8 bits of uint32_t and 24th bit 
+ * are reserved for user space driver.
+ */
+#define VIRTGPU_NOT_PIN_FLAG (1 << 9)
 
 struct drm_virtgpu_map {
 	__u64 offset; /* use for mmap system call */
@@ -68,6 +75,8 @@ struct drm_virtgpu_execbuffer {
 	__u64 bo_handles;
 	__u32 num_bo_handles;
 	__s32 fence_fd; /* in/out fence fd (see VIRTGPU_EXECBUF_FENCE_FD_IN/OUT) */
+	__u64 accessed_bo_handles;
+	__u32 num_acc_bo_handles;
 };
 
 #define VIRTGPU_PARAM_3D_FEATURES 1 /* do we have 3D features in the hw */
@@ -75,6 +84,7 @@ struct drm_virtgpu_execbuffer {
 #define VIRTGPU_PARAM_RESOURCE_BLOB 3 /* DRM_VIRTGPU_RESOURCE_CREATE_BLOB */
 #define VIRTGPU_PARAM_HOST_VISIBLE 4 /* Host blob resources are mappable */
 #define VIRTGPU_PARAM_CROSS_DEVICE 5 /* Cross virtio-device resource sharing  */
+#define VIRTGPU_PARAM_PIN_ON_DEMAND 6 /* is pinning on demand available? */
 
 struct drm_virtgpu_getparam {
 	__u64 param;

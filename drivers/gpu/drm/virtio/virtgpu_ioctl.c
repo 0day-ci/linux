@@ -83,8 +83,11 @@ static int virtio_gpu_execbuffer_ioctl(struct drm_device *dev, void *data,
 	struct virtio_gpu_fence *out_fence;
 	int ret;
 	uint32_t *bo_handles = NULL;
+	uint32_t *accessed_bo_handles = NULL;
 	void __user *user_bo_handles = NULL;
+	void __user *user_accessed_bo_handles = NULL;
 	struct virtio_gpu_object_array *buflist = NULL;
+	struct virtio_gpu_object_array *acc_buflist = NULL;
 	struct sync_file *sync_file;
 	int in_fence_fd = exbuf->fence_fd;
 	int out_fence_fd = -1;
@@ -149,6 +152,44 @@ static int virtio_gpu_execbuffer_ioctl(struct drm_device *dev, void *data,
 		}
 		kvfree(bo_handles);
 		bo_handles = NULL;
+
+		if (exbuf->flags & VIRTGPU_EXECBUF_ACC_BO_PRESENT &&
+		    exbuf->num_acc_bo_handles != 0) {
+			accessed_bo_handles =
+				kvmalloc_array(exbuf->num_acc_bo_handles,
+					       sizeof(uint32_t), GFP_KERNEL);
+			if (!accessed_bo_handles) {
+				ret = -ENOMEM;
+				goto out_unused_fd;
+			}
+
+			user_accessed_bo_handles =
+				u64_to_user_ptr(exbuf->accessed_bo_handles);
+			if (copy_from_user(accessed_bo_handles,
+					   user_accessed_bo_handles,
+					   exbuf->num_acc_bo_handles *
+						   sizeof(uint32_t))) {
+				ret = -EFAULT;
+				goto out_unused_fd;
+			}
+
+			acc_buflist = virtio_gpu_array_from_handles(
+				file, accessed_bo_handles,
+				exbuf->num_acc_bo_handles);
+			if (!buflist) {
+				ret = -ENOENT;
+				goto out_unused_fd;
+			}
+
+			ret = virtio_gpu_object_pin(vgdev, acc_buflist,
+						    exbuf->num_acc_bo_handles);
+			if (ret < 0) {
+				goto out_unused_fd;
+			}
+
+			kvfree(accessed_bo_handles);
+			accessed_bo_handles = NULL;
+		}
 	}
 
 	buf = vmemdup_user(u64_to_user_ptr(exbuf->command), exbuf->size);
@@ -225,6 +266,9 @@ static int virtio_gpu_getparam_ioctl(struct drm_device *dev, void *data,
 		break;
 	case VIRTGPU_PARAM_CROSS_DEVICE:
 		value = vgdev->has_resource_assign_uuid ? 1 : 0;
+		break;
+	case VIRTGPU_PARAM_PIN_ON_DEMAND:
+		value = 1;
 		break;
 	default:
 		return -EINVAL;
@@ -331,6 +375,7 @@ static int virtio_gpu_transfer_from_host_ioctl(struct drm_device *dev,
 	struct virtio_gpu_object *bo;
 	struct virtio_gpu_object_array *objs;
 	struct virtio_gpu_fence *fence;
+	struct virtio_gpu_object_shmem *shmem;
 	int ret;
 	u32 offset = args->offset;
 
@@ -346,6 +391,11 @@ static int virtio_gpu_transfer_from_host_ioctl(struct drm_device *dev,
 	if (bo->guest_blob && !bo->host3d_blob) {
 		ret = -EINVAL;
 		goto err_put_free;
+	}
+
+	shmem = to_virtio_gpu_shmem(bo);
+	if (!shmem->pages) {
+		virtio_gpu_object_pin(vgdev, objs, 1);
 	}
 
 	if (!bo->host3d_blob && (args->stride || args->layer_stride)) {
@@ -385,6 +435,7 @@ static int virtio_gpu_transfer_to_host_ioctl(struct drm_device *dev, void *data,
 	struct drm_virtgpu_3d_transfer_to_host *args = data;
 	struct virtio_gpu_object *bo;
 	struct virtio_gpu_object_array *objs;
+	struct virtio_gpu_object_shmem *shmem;
 	struct virtio_gpu_fence *fence;
 	int ret;
 	u32 offset = args->offset;
@@ -397,6 +448,11 @@ static int virtio_gpu_transfer_to_host_ioctl(struct drm_device *dev, void *data,
 	if (bo->guest_blob && !bo->host3d_blob) {
 		ret = -EINVAL;
 		goto err_put_free;
+	}
+
+	shmem = to_virtio_gpu_shmem(bo);
+	if (!shmem->pages) {
+		virtio_gpu_object_pin(vgdev, objs, 1);
 	}
 
 	if (!vgdev->has_virgl_3d) {
