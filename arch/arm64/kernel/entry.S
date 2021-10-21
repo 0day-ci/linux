@@ -356,12 +356,8 @@ alternative_else_nop_endif
 
 #ifdef CONFIG_ARM64_ERRATUM_845719
 alternative_if ARM64_WORKAROUND_845719
-#ifdef CONFIG_PID_IN_CONTEXTIDR
 	mrs	x29, contextidr_el1
 	msr	contextidr_el1, x29
-#else
-	msr contextidr_el1, xzr
-#endif
 alternative_else_nop_endif
 #endif
 3:
