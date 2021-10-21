@@ -28,6 +28,7 @@ unsigned long __pmd_frag_size_shift;
 EXPORT_SYMBOL(__pmd_frag_size_shift);
 
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
+
 /*
  * This is called when relaxing access to a hugepage. It's also called in the page
  * fault path when we don't hit any of the major fault cases, ie, a minor
