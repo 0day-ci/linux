@@ -1,0 +1,32 @@
+====================
+I915 DG2 RFC Section
+====================
+
+Upstream plan
+=============
+Plan to upstream the DG2 enabling is:
+
+* Merge basic HW enabling for DG2 (Still without pciid)
+* Merge the 64k support for lmem
+* Merge the flat CCS enabling patches
+* Add the pciid for DG2 and enable the DG2 in CI
+
+
+64K page support for lmem
+=========================
+On DG2 hw, local-memory supports minimum GTT page size of 64k only. 4k is not
+supported anymore.
+
+DG2 hw doesn't support the 64k (lmem) and 4k (smem) pages in the same ppgtt
+Page table. Refer the struct drm_i915_gem_create_ext for the implication of
+handling the 64k page size.
+
+.. kernel-doc:: include/uapi/drm/i915_drm.h
+        :functions: drm_i915_gem_create_ext
+
+
+Flat CCS support for lmem
+=========================
+
+.. kernel-doc:: drivers/gpu/drm/i915/gt/intel_migrate.c
+        :doc: Flat-CCS - Memory compression for Local memory
