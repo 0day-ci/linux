@@ -78,7 +78,10 @@
  * indicate whether or not the userland FPSIMD state of the current task is
  * present in the registers. The flag is set unless the FPSIMD registers of this
  * CPU currently contain the most recent userland FPSIMD state of the current
- * task.
+ * task *or* the state of the corresponding KVM vcpu if userspace is behaving
+ * as a VMM and that the vcpu has used FP during its last run. In the latter
+ * case, KVM will set TIF_FOREIGN_FPSTATE on kvm_vcpu_put(). For all intents
+ * and purposes, the vcpu FP state is treated identically to userspace's.
  *
  * In order to allow softirq handlers to use FPSIMD, kernel_neon_begin() may
  * save the task's FPSIMD context back to task_struct from softirq context.
