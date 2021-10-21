@@ -636,13 +636,12 @@ static int __init apm_init(void)
 		return -ENODEV;
 	}
 
-	kapmd_tsk = kthread_create(kapmd, NULL, "kapmd");
+	kapmd_tsk = kthread_run(kapmd, NULL, "kapmd");
 	if (IS_ERR(kapmd_tsk)) {
 		ret = PTR_ERR(kapmd_tsk);
 		kapmd_tsk = NULL;
 		goto out;
 	}
-	wake_up_process(kapmd_tsk);
 
 #ifdef CONFIG_PROC_FS
 	proc_create_single("apm", 0, NULL, proc_apm_show);
