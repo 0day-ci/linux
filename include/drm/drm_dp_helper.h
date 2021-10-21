@@ -862,16 +862,9 @@ struct drm_panel;
 # define DP_TEST_CRC_SUPPORTED		    (1 << 5)
 # define DP_TEST_COUNT_MASK		    0xf
 
-#define DP_PHY_TEST_PATTERN                 0x248
-# define DP_PHY_TEST_PATTERN_SEL_MASK       0x7
-# define DP_PHY_TEST_PATTERN_NONE           0x0
-# define DP_PHY_TEST_PATTERN_D10_2          0x1
-# define DP_PHY_TEST_PATTERN_ERROR_COUNT    0x2
-# define DP_PHY_TEST_PATTERN_PRBS7          0x3
-# define DP_PHY_TEST_PATTERN_80BIT_CUSTOM   0x4
-# define DP_PHY_TEST_PATTERN_CP2520         0x5
+#define DP_LINK_QUAL_PATTERN_SELECT         0x248
 
-#define DP_PHY_SQUARE_PATTERN				0x249
+#define DP_PHY_SQUARE_PATTERN               0x249
 
 #define DP_TEST_HBR2_SCRAMBLER_RESET        0x24A
 #define DP_TEST_80BIT_CUSTOM_PATTERN_7_0    0x250
