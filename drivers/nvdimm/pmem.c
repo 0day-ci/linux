@@ -305,21 +305,83 @@ static long pmem_dax_direct_access(struct dax_device *dax_dev,
 }
 
 /*
- * Use the 'no check' versions of copy_from_iter_flushcache() and
- * copy_mc_to_iter() to bypass HARDENED_USERCOPY overhead. Bounds
- * checking, both file offset and device offset, is handled by
- * dax_iomap_actor()
+ * Even though the 'no check' versions of copy_from_iter_flushcache()
+ * and copy_mc_to_iter() are used to bypass HARDENED_USERCOPY overhead,
+ * 'read'/'write' aren't always safe when poison is consumed. They happen
+ * to be safe because the 'read'/'write' range has been guaranteed
+ * be free of poison(s) by a prior call to dax_direct_access() on the
+ * caller stack.
+ * However with the introduction of DAXDEV_F_RECOVERY, the 'read'/'write'
+ * range may contain poison(s), so the functions perform explicit check
+ * on poison, and 'read' end up fetching only non-poisoned page(s) up
+ * till  the first poison is encountered while 'write' require the range
+ * is page aligned in order to restore the poisoned page's memory type
+ * back to "rw" after clearing the poison(s).
+ * In the event of poison related failure, (size_t) -EIO is returned and
+ * caller may check the return value after casting it to (ssize_t).
  */
 static size_t pmem_copy_from_iter(struct dax_device *dax_dev, pgoff_t pgoff,
 	void *addr, size_t bytes, struct iov_iter *i, unsigned long flags)
 {
+	phys_addr_t pmem_off;
+	size_t len, lead_off;
+	struct pmem_device *pmem = dax_get_private(dax_dev);
+	struct device *dev = pmem->bb.dev;
+
+	if (flags & DAXDEV_F_RECOVERY) {
+		lead_off = (unsigned long)addr & ~PAGE_MASK;
+		len = PFN_PHYS(PFN_UP(lead_off + bytes));
+		if (is_bad_pmem(&pmem->bb, PFN_PHYS(pgoff) / 512, len)) {
+			if (lead_off || !(PAGE_ALIGNED(bytes))) {
+				dev_warn(dev, "Found poison, but addr(%p) and/or bytes(%#lx) not page aligned\n",
+					addr, bytes);
+				return (size_t) -EIO;
+			}
+			pmem_off = PFN_PHYS(pgoff) + pmem->data_offset;
+			if (pmem_clear_poison(pmem, pmem_off, bytes) !=
+					BLK_STS_OK)
+				return (size_t) -EIO;
+		}
+	}
+
 	return _copy_from_iter_flushcache(addr, bytes, i);
 }
 
 static size_t pmem_copy_to_iter(struct dax_device *dax_dev, pgoff_t pgoff,
 	void *addr, size_t bytes, struct iov_iter *i, unsigned long flags)
 {
-	return _copy_mc_to_iter(addr, bytes, i);
+	int num_bad;
+	size_t len, lead_off;
+	unsigned long bad_pfn;
+	bool bad_pmem = false;
+	size_t adj_len = bytes;
+	sector_t sector, first_bad;
+	struct pmem_device *pmem = dax_get_private(dax_dev);
+	struct device *dev = pmem->bb.dev;
+
+	if (flags & DAXDEV_F_RECOVERY) {
+		sector = PFN_PHYS(pgoff) / 512;
+		lead_off = (unsigned long)addr & ~PAGE_MASK;
+		len = PFN_PHYS(PFN_UP(lead_off + bytes));
+		if (pmem->bb.count)
+			bad_pmem = !!badblocks_check(&pmem->bb, sector,
+					len / 512, &first_bad, &num_bad);
+		if (bad_pmem) {
+			bad_pfn = PHYS_PFN(first_bad * 512);
+			if (bad_pfn == pgoff) {
+				dev_warn(dev, "Found poison in page: pgoff(%#lx)\n",
+					 pgoff);
+				return -EIO;
+			}
+			adj_len = PFN_PHYS(bad_pfn - pgoff) - lead_off;
+			dev_WARN_ONCE(dev, (adj_len > bytes),
+					"out-of-range first_bad?");
+		}
+		if (adj_len == 0)
+			return (size_t) -EIO;
+	}
+
+	return _copy_mc_to_iter(addr, adj_len, i);
 }
 
 static const struct dax_operations pmem_dax_ops = {
