@@ -1553,25 +1553,25 @@ static bool dp_ctrl_send_phy_test_pattern(struct dp_ctrl_private *ctrl)
 	switch (pattern_sent) {
 	case MR_LINK_TRAINING1:
 		success = (pattern_requested ==
-				DP_PHY_TEST_PATTERN_D10_2);
+				DP_LINK_QUAL_PATTERN_D10_2);
 		break;
 	case MR_LINK_SYMBOL_ERM:
 		success = ((pattern_requested ==
-			DP_PHY_TEST_PATTERN_ERROR_COUNT) ||
+			DP_LINK_QUAL_PATTERN_ERROR_RATE) ||
 				(pattern_requested ==
-				DP_PHY_TEST_PATTERN_CP2520));
+				DP_LINK_QUAL_PATTERN_CP2520_PAT_1));
 		break;
 	case MR_LINK_PRBS7:
 		success = (pattern_requested ==
-				DP_PHY_TEST_PATTERN_PRBS7);
+				DP_LINK_QUAL_PATTERN_PRBS7);
 		break;
 	case MR_LINK_CUSTOM80:
 		success = (pattern_requested ==
-				DP_PHY_TEST_PATTERN_80BIT_CUSTOM);
+				DP_LINK_QUAL_PATTERN_80BIT_CUSTOM);
 		break;
 	case MR_LINK_TRAINING4:
 		success = (pattern_requested ==
-				DP_PHY_TEST_PATTERN_SEL_MASK);
+				DP_LINK_QUAL_PATTERN_CP2520_PAT_3);
 		break;
 	default:
 		success = false;

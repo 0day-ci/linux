@@ -574,7 +574,7 @@ static int dp_link_parse_phy_test_params(struct dp_link_private *link)
 	u8 data;
 	ssize_t rlen;
 
-	rlen = drm_dp_dpcd_readb(link->aux, DP_PHY_TEST_PATTERN,
+	rlen = drm_dp_dpcd_readb(link->aux, DP_LINK_QUAL_PATTERN_SELECT,
 					&data);
 	if (rlen < 0) {
 		DRM_ERROR("failed to read phy link pattern. rlen=%zd\n", rlen);
@@ -586,13 +586,13 @@ static int dp_link_parse_phy_test_params(struct dp_link_private *link)
 	DRM_DEBUG_DP("phy_test_pattern_sel = 0x%x\n", data);
 
 	switch (data) {
-	case DP_PHY_TEST_PATTERN_SEL_MASK:
-	case DP_PHY_TEST_PATTERN_NONE:
-	case DP_PHY_TEST_PATTERN_D10_2:
-	case DP_PHY_TEST_PATTERN_ERROR_COUNT:
-	case DP_PHY_TEST_PATTERN_PRBS7:
-	case DP_PHY_TEST_PATTERN_80BIT_CUSTOM:
-	case DP_PHY_TEST_PATTERN_CP2520:
+	case DP_LINK_QUAL_PATTERN_DISABLE:
+	case DP_LINK_QUAL_PATTERN_D10_2:
+	case DP_LINK_QUAL_PATTERN_ERROR_RATE:
+	case DP_LINK_QUAL_PATTERN_PRBS7:
+	case DP_LINK_QUAL_PATTERN_80BIT_CUSTOM:
+	case DP_LINK_QUAL_PATTERN_CP2520_PAT_1:
+	case DP_LINK_QUAL_PATTERN_CP2520_PAT_3
 		return 0;
 	default:
 		return -EINVAL;
