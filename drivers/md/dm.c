@@ -1061,6 +1061,8 @@ static size_t dm_dax_copy_from_iter(struct dax_device *dax_dev, pgoff_t pgoff,
 	if (!ti)
 		goto out;
 	if (!ti->type->dax_copy_from_iter) {
+		if (flags & DAXDEV_F_RECOVERY)
+			goto out;
 		ret = copy_from_iter(addr, bytes, i);
 		goto out;
 	}
@@ -1085,6 +1087,8 @@ static size_t dm_dax_copy_to_iter(struct dax_device *dax_dev, pgoff_t pgoff,
 	if (!ti)
 		goto out;
 	if (!ti->type->dax_copy_to_iter) {
+		if (flags & DAXDEV_F_RECOVERY)
+			goto out;
 		ret = copy_to_iter(addr, bytes, i);
 		goto out;
 	}
