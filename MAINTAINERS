@@ -11437,6 +11437,28 @@ L:	netdev@vger.kernel.org
 S:	Supported
 F:	drivers/net/phy/mxl-gpy.c
 
+MAXLINEAR LGM SoC support
+M:	Rahul Tanwar <rtanwar@maxlinear.com>
+M:	linux-lgm-soc@maxlinear.com
+S:	Supported
+F:	drivers/clk/x86/clk-cgu.c
+F:	drivers/clk/x86/clk-cgu-pll.c
+F:	drivers/clk/x86/clk-lgm.c
+F:	drivers/reset/reset-intel-gw.c
+F:	drivers/tty/serial/lantiq.c
+F:	drivers/pinctrl/pinctrl-equilibrium.c
+F:	drivers/pci/controller/dwc/pcie-intel-gw.c
+F:	drivers/leds/blink/leds-lgm-sso.c
+F:	drivers/spi/spi-lantiq-ssc.c
+F:	drivers/phy/intel/phy-intel-lgm-emmc.c
+F:	drivers/mtd/nand/raw/ntel-nand-controller.c
+F:	drivers/phy/phy-lgm-usb.c
+F:	drivers/pwm/pwm-intel-lgm.c
+F:	drivers/hwmon/mr75203.c
+F:	drivers/dma/lgm/lgm-dma.c
+F:	drivers/phy/intel/phy-intel-lgm-combo.c
+K:	lgm
+
 MCBA MICROCHIP CAN BUS ANALYZER TOOL DRIVER
 R:	Yasushi SHOJI <yashi@spacecubics.com>
 L:	linux-can@vger.kernel.org
