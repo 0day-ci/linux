@@ -955,6 +955,7 @@ struct drm_gem_object *drm_gem_prime_import_dev(struct drm_device *dev,
 
 	obj->import_attach = attach;
 	obj->resv = dma_buf->resv;
+	drm_gem_trace_gpu_mem_total(dev, obj->size, true);
 
 	return obj;
 
@@ -1055,6 +1056,7 @@ void drm_prime_gem_destroy(struct drm_gem_object *obj, struct sg_table *sg)
 	struct dma_buf_attachment *attach;
 	struct dma_buf *dma_buf;
 
+	drm_gem_trace_gpu_mem_total(obj->dev, -obj->size, true);
 	attach = obj->import_attach;
 	if (sg)
 		dma_buf_unmap_attachment(attach, sg, DMA_BIDIRECTIONAL);
