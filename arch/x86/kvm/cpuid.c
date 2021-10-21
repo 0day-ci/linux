@@ -902,7 +902,13 @@ static inline int __do_cpuid_func(struct kvm_cpuid_array *array, u32 function)
 		entry->edx = 0;
 		break;
 	case 0x80000000:
-		entry->eax = min(entry->eax, 0x8000001f);
+		entry->eax = min(entry->eax, 0x80000021);
+		/*
+		 * X86_BUG_NULL_SEG is not reported in CPUID on Zen2; in
+		 * that case, provide the CPUID leaf ourselves.
+		 */
+		if (!static_cpu_has_bug(X86_BUG_NULL_SEG))
+			entry->eax = max(entry->eax, 0x80000021);
 		break;
 	case 0x80000001:
 		cpuid_entry_override(entry, CPUID_8000_0001_EDX);
@@ -972,6 +978,15 @@ static inline int __do_cpuid_func(struct kvm_cpuid_array *array, u32 function)
 			 */
 			entry->ebx &= ~GENMASK(11, 6);
 		}
+		break;
+	case 0x80000020:
+		entry->eax = entry->ebx = entry->ecx = entry->edx = 0;
+		break;
+	case 0x80000021:
+		entry->ebx = entry->ecx = entry->edx = 0;
+		entry->eax &= BIT(6);
+		if (!static_cpu_has_bug(X86_BUG_NULL_SEG))
+			entry->eax |= BIT(6);
 		break;
 	/*Add support for Centaur's CPUID instruction*/
 	case 0xC0000000:
