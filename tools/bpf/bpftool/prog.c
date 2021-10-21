@@ -1420,8 +1420,13 @@ static int load_with_options(int argc, char **argv, bool first_prog_only)
 			err = get_prog_type_by_name(type, &common_prog_type,
 						    &expected_attach_type);
 			free(type);
-			if (err < 0)
-				goto err_free_reuse_maps;
+			if (err < 0) {
+				err = get_prog_type_by_name(*argv, &common_prog_type,
+							    &expected_attach_type);
+				if (err < 0)
+
+					goto err_free_reuse_maps;
+			}
 
 			NEXT_ARG();
 		} else if (is_prefix(*argv, "map")) {
