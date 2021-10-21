@@ -23,6 +23,7 @@
 #include <linux/irq.h>
 #include <linux/kernel.h>
 #include <linux/list.h>
+#include <linux/mmu_context.h>
 #include <linux/module.h>
 #include <linux/of_address.h>
 #include <linux/of_device.h>
@@ -272,7 +273,7 @@ static u64 arm_spe_event_to_pmscr(struct perf_event *event)
 	if (!attr->exclude_kernel)
 		reg |= BIT(SYS_PMSCR_EL1_E1SPE_SHIFT);
 
-	if (IS_ENABLED(CONFIG_PID_IN_CONTEXTIDR) && perfmon_capable())
+	if (perfmon_capable() && (task_active_pid_ns(current) == &init_pid_ns))
 		reg |= BIT(SYS_PMSCR_EL1_CX_SHIFT);
 
 	return reg;
@@ -731,6 +732,13 @@ static void arm_spe_pmu_start(struct perf_event *event, int flags)
 	if (hwc->state)
 		return;
 
+	/*
+	 * Enable tracing PID to contextidr if profiling program runs in
+	 * root PID namespace.
+	 */
+	if (perfmon_capable() && (task_active_pid_ns(current) == &init_pid_ns))
+		contextidr_enable();
+
 	reg = arm_spe_event_to_pmsfcr(event);
 	write_sysreg_s(reg, SYS_PMSFCR_EL1);
 
@@ -792,6 +800,9 @@ static void arm_spe_pmu_stop(struct perf_event *event, int flags)
 	}
 
 	hwc->state |= PERF_HES_STOPPED;
+
+	if (perfmon_capable() && (task_active_pid_ns(current) == &init_pid_ns))
+		contextidr_disable();
 }
 
 static int arm_spe_pmu_add(struct perf_event *event, int flags)
