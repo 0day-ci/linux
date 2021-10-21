@@ -298,6 +298,22 @@ struct drm_device {
 	 */
 	struct drm_fb_helper *fb_helper;
 
+	/**
+	 * @mem_total:
+	 *
+	 * The total size of all GEM objects known to this DRM device.  Used
+	 * with `gpu_mem_total` tracepoint.
+	 */
+	atomic64_t mem_total;
+
+	/**
+	 * @import_mem_total:
+	 *
+	 * The total size of all GEM objects imported into this DRM device from
+	 * external exporters.  Used with `gpu_mem_total` tracepoint.
+	 */
+	atomic64_t import_mem_total;
+
 	/* Everything below here is for legacy driver, never use! */
 	/* private: */
 #if IS_ENABLED(CONFIG_DRM_LEGACY)

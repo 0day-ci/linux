@@ -362,6 +362,22 @@ struct drm_file {
 	 */
 	struct drm_prime_file_private prime;
 
+	/**
+	 * @mem_instance:
+	 *
+	 * The total size of all GEM objects known into this instance of the DRM
+	 * device.  Used with `gpu_mem_instance` tracepoint.
+	 */
+	atomic64_t mem_instance;
+
+	/**
+	 * @import_mem_instance:
+	 *
+	 * The total size of all GEM objects imported into this instance of the
+	 * DRM device.  Used with `gpu_mem_instance` tracepoint.
+	 */
+	atomic64_t import_mem_instance;
+
 	/* private: */
 #if IS_ENABLED(CONFIG_DRM_LEGACY)
 	unsigned long lock_count; /* DRI1 legacy lock count */
