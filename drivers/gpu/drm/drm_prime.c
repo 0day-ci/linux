@@ -349,6 +349,8 @@ int drm_gem_prime_fd_to_handle(struct drm_device *dev,
 
 	dma_buf_put(dma_buf);
 
+	drm_gem_trace_gpu_mem_instance(dev, file_priv, obj->size, true);
+
 	return 0;
 
 fail:

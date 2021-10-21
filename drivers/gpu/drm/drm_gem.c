@@ -231,6 +231,9 @@ drm_gem_remove_prime_handles(struct drm_gem_object *obj, struct drm_file *filp)
 		drm_prime_remove_buf_handle_locked(&filp->prime,
 						   obj->dma_buf,
 						   &removed_real_import);
+		if (removed_real_import)
+			drm_gem_trace_gpu_mem_instance(dev, filp, -obj->size,
+						       true);
 	}
 	mutex_unlock(&filp->prime.lock);
 }
