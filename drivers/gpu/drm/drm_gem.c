@@ -213,6 +213,7 @@ void drm_gem_private_object_init(struct drm_device *dev,
 		obj->resv = &obj->_resv;
 
 	drm_vma_node_reset(&obj->vma_node);
+	drm_gem_trace_gpu_mem_total(dev, obj->size, false);
 }
 EXPORT_SYMBOL(drm_gem_private_object_init);
 
@@ -1014,6 +1015,10 @@ drm_gem_object_free(struct kref *kref)
 {
 	struct drm_gem_object *obj =
 		container_of(kref, struct drm_gem_object, refcount);
+
+	struct drm_device *dev = obj->dev;
+
+	drm_gem_trace_gpu_mem_total(dev, -obj->size, false);
 
 	if (WARN_ON(!obj->funcs->free))
 		return;
