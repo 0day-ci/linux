@@ -325,19 +325,23 @@ static unsigned long *str_to_target_ids(const char *str, ssize_t len,
 	unsigned long *ids;
 	const int max_nr_ids = 32;
 	unsigned long id;
-	int pos = 0, parsed, ret;
+	int pos = 0, parsed;
 
 	*nr_ids = 0;
 	ids = kmalloc_array(max_nr_ids, sizeof(id), GFP_KERNEL);
 	if (!ids)
 		return NULL;
 	while (*nr_ids < max_nr_ids && pos < len) {
-		ret = sscanf(&str[pos], "%lu%n", &id, &parsed);
-		pos += parsed;
-		if (ret != 1)
+		if (sscanf(&str[pos], "%lu%n", &id, &parsed) != 1)
 			break;
+		pos += parsed;
 		ids[*nr_ids] = id;
 		*nr_ids += 1;
+	}
+
+	if (!*nr_ids) {
+		kfree(ids);
+		return NULL;
 	}
 
 	return ids;
