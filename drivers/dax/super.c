@@ -330,22 +330,24 @@ long dax_direct_access(struct dax_device *dax_dev, pgoff_t pgoff, long nr_pages,
 EXPORT_SYMBOL_GPL(dax_direct_access);
 
 size_t dax_copy_from_iter(struct dax_device *dax_dev, pgoff_t pgoff, void *addr,
-		size_t bytes, struct iov_iter *i)
+		size_t bytes, struct iov_iter *i, unsigned long flags)
 {
 	if (!dax_alive(dax_dev))
 		return 0;
 
-	return dax_dev->ops->copy_from_iter(dax_dev, pgoff, addr, bytes, i);
+	return dax_dev->ops->copy_from_iter(dax_dev, pgoff, addr, bytes, i,
+					    flags);
 }
 EXPORT_SYMBOL_GPL(dax_copy_from_iter);
 
 size_t dax_copy_to_iter(struct dax_device *dax_dev, pgoff_t pgoff, void *addr,
-		size_t bytes, struct iov_iter *i)
+		size_t bytes, struct iov_iter *i, unsigned long flags)
 {
 	if (!dax_alive(dax_dev))
 		return 0;
 
-	return dax_dev->ops->copy_to_iter(dax_dev, pgoff, addr, bytes, i);
+	return dax_dev->ops->copy_to_iter(dax_dev, pgoff, addr, bytes, i,
+					  flags);
 }
 EXPORT_SYMBOL_GPL(dax_copy_to_iter);
 

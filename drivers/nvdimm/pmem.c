@@ -311,13 +311,13 @@ static long pmem_dax_direct_access(struct dax_device *dax_dev,
  * dax_iomap_actor()
  */
 static size_t pmem_copy_from_iter(struct dax_device *dax_dev, pgoff_t pgoff,
-		void *addr, size_t bytes, struct iov_iter *i)
+	void *addr, size_t bytes, struct iov_iter *i, unsigned long flags)
 {
 	return _copy_from_iter_flushcache(addr, bytes, i);
 }
 
 static size_t pmem_copy_to_iter(struct dax_device *dax_dev, pgoff_t pgoff,
-		void *addr, size_t bytes, struct iov_iter *i)
+	void *addr, size_t bytes, struct iov_iter *i, unsigned long flags)
 {
 	return _copy_mc_to_iter(addr, bytes, i);
 }

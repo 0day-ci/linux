@@ -754,15 +754,15 @@ static long virtio_fs_direct_access(struct dax_device *dax_dev, pgoff_t pgoff,
 }
 
 static size_t virtio_fs_copy_from_iter(struct dax_device *dax_dev,
-				       pgoff_t pgoff, void *addr,
-				       size_t bytes, struct iov_iter *i)
+	pgoff_t pgoff, void *addr, size_t bytes, struct iov_iter *i,
+	unsigned long flags)
 {
 	return copy_from_iter(addr, bytes, i);
 }
 
 static size_t virtio_fs_copy_to_iter(struct dax_device *dax_dev,
-				       pgoff_t pgoff, void *addr,
-				       size_t bytes, struct iov_iter *i)
+	pgoff_t pgoff, void *addr, size_t bytes, struct iov_iter *i,
+	unsigned long flags)
 {
 	return copy_to_iter(addr, bytes, i);
 }

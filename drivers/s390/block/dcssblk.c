@@ -45,13 +45,15 @@ static const struct block_device_operations dcssblk_devops = {
 };
 
 static size_t dcssblk_dax_copy_from_iter(struct dax_device *dax_dev,
-		pgoff_t pgoff, void *addr, size_t bytes, struct iov_iter *i)
+	pgoff_t pgoff, void *addr, size_t bytes, struct iov_iter *i,
+	unsigned long flags)
 {
 	return copy_from_iter(addr, bytes, i);
 }
 
 static size_t dcssblk_dax_copy_to_iter(struct dax_device *dax_dev,
-		pgoff_t pgoff, void *addr, size_t bytes, struct iov_iter *i)
+	pgoff_t pgoff, void *addr, size_t bytes, struct iov_iter *i,
+	unsigned long flags)
 {
 	return copy_to_iter(addr, bytes, i);
 }

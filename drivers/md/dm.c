@@ -1048,7 +1048,7 @@ out:
 }
 
 static size_t dm_dax_copy_from_iter(struct dax_device *dax_dev, pgoff_t pgoff,
-				    void *addr, size_t bytes, struct iov_iter *i)
+	void *addr, size_t bytes, struct iov_iter *i, unsigned long flags)
 {
 	struct mapped_device *md = dax_get_private(dax_dev);
 	sector_t sector = pgoff * PAGE_SECTORS;
@@ -1064,7 +1064,7 @@ static size_t dm_dax_copy_from_iter(struct dax_device *dax_dev, pgoff_t pgoff,
 		ret = copy_from_iter(addr, bytes, i);
 		goto out;
 	}
-	ret = ti->type->dax_copy_from_iter(ti, pgoff, addr, bytes, i);
+	ret = ti->type->dax_copy_from_iter(ti, pgoff, addr, bytes, i, flags);
  out:
 	dm_put_live_table(md, srcu_idx);
 
@@ -1072,7 +1072,7 @@ static size_t dm_dax_copy_from_iter(struct dax_device *dax_dev, pgoff_t pgoff,
 }
 
 static size_t dm_dax_copy_to_iter(struct dax_device *dax_dev, pgoff_t pgoff,
-		void *addr, size_t bytes, struct iov_iter *i)
+	void *addr, size_t bytes, struct iov_iter *i, unsigned long flags)
 {
 	struct mapped_device *md = dax_get_private(dax_dev);
 	sector_t sector = pgoff * PAGE_SECTORS;
@@ -1088,7 +1088,7 @@ static size_t dm_dax_copy_to_iter(struct dax_device *dax_dev, pgoff_t pgoff,
 		ret = copy_to_iter(addr, bytes, i);
 		goto out;
 	}
-	ret = ti->type->dax_copy_to_iter(ti, pgoff, addr, bytes, i);
+	ret = ti->type->dax_copy_to_iter(ti, pgoff, addr, bytes, i, flags);
  out:
 	dm_put_live_table(md, srcu_idx);
 

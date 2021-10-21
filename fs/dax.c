@@ -1241,10 +1241,10 @@ static loff_t dax_iomap_iter(const struct iomap_iter *iomi,
 		 */
 		if (iov_iter_rw(iter) == WRITE)
 			xfer = dax_copy_from_iter(dax_dev, pgoff, kaddr,
-					map_len, iter);
+					map_len, iter, dax_flag);
 		else
 			xfer = dax_copy_to_iter(dax_dev, pgoff, kaddr,
-					map_len, iter);
+					map_len, iter, dax_flag);
 
 		pos += xfer;
 		length -= xfer;
