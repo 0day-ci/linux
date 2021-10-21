@@ -20,6 +20,7 @@ static void __do_clflush(struct drm_i915_gem_object *obj)
 {
 	GEM_BUG_ON(!i915_gem_object_has_pages(obj));
 	drm_clflush_sg(obj->mm.pages);
+	obj->cache_dirty = false;
 
 	i915_gem_object_flush_frontbuffer(obj, ORIGIN_CPU);
 }
@@ -115,6 +116,5 @@ bool i915_gem_clflush_object(struct drm_i915_gem_object *obj,
 		GEM_BUG_ON(obj->write_domain != I915_GEM_DOMAIN_CPU);
 	}
 
-	obj->cache_dirty = false;
 	return true;
 }
