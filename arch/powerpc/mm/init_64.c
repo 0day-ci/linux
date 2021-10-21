@@ -453,6 +453,7 @@ void __init mmu_early_init_devtree(void)
 		early_check_vec5();
 
 	if (early_radix_enabled()) {
+		cur_cpu_spec->mmu_features &= ~MMU_FTR_HPTE_TABLE;
 		radix__early_init_devtree();
 		/*
 		 * We have finalized the translation we are going to use by now.
