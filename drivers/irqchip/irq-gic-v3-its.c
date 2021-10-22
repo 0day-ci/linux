@@ -5206,6 +5206,15 @@ int its_cpu_init(void)
 }
 
 #ifdef CONFIG_EFI
+static void rdist_memreserve_cpuhp_cleanup_workfn(struct work_struct *work)
+{
+	cpuhp_remove_state_nocalls(gic_rdists->cpuhp_memreserve_state);
+	gic_rdists->cpuhp_memreserve_state = CPUHP_INVALID;
+}
+
+static DECLARE_WORK(rdist_memreserve_cpuhp_cleanup_work,
+		    rdist_memreserve_cpuhp_cleanup_workfn);
+
 static int its_cpu_memreserve_lpi(unsigned int cpu)
 {
 	struct page *pend_page = gic_data_rdist()->pend_page;
@@ -5226,13 +5235,18 @@ static int its_cpu_memreserve_lpi(unsigned int cpu)
 	 * invocation of this callback, or in a previous life before kexec.
 	 */
 	if (gic_data_rdist()->flags & RDIST_FLAGS_PENDTABLE_RESERVED)
-		return 0;
+		goto out;
 
 	gic_data_rdist()->flags |= RDIST_FLAGS_PENDTABLE_RESERVED;
 
 	pend_page = gic_data_rdist()->pend_page;
 	paddr = page_to_phys(pend_page);
 	WARN_ON(gic_reserve_range(paddr, LPI_PENDBASE_SZ));
+
+out:
+	/* This only needs to run once per CPU */
+	if (cpumask_equal(&cpus_booted_once_mask, cpu_possible_mask))
+		schedule_work(&rdist_memreserve_cpuhp_cleanup_work);
 
 	return 0;
 }
@@ -5421,19 +5435,22 @@ static void __init its_acpi_probe(void)
 static void __init its_acpi_probe(void) { }
 #endif
 
-static int __init its_lpi_memreserve_init(void)
+static int __init its_lpi_memreserve_init(struct rdists *rdists)
 {
 	int state;
 
 	if (!efi_enabled(EFI_CONFIG_TABLES))
 		return 0;
 
+	rdists->cpuhp_memreserve_state = CPUHP_INVALID;
 	state = cpuhp_setup_state(CPUHP_AP_ONLINE_DYN,
 				"irqchip/arm/gicv3/memreserve:online",
 				its_cpu_memreserve_lpi,
 				NULL);
 	if (state < 0)
 		return state;
+
+	rdists->cpuhp_memreserve_state = state;
 
 	return 0;
 }
@@ -5465,7 +5482,7 @@ int __init its_init(struct fwnode_handle *handle, struct rdists *rdists,
 	if (err)
 		return err;
 
-	err = its_lpi_memreserve_init();
+	err = its_lpi_memreserve_init(rdists);
 	if (err)
 		return err;
 
