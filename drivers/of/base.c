@@ -601,14 +601,16 @@ int of_machine_is_compatible(const char *compat)
 EXPORT_SYMBOL(of_machine_is_compatible);
 
 /**
- *  __of_device_is_available - check if a device is available for use
+ * __of_device_check_status - check if a device's status matches a particular string
  *
- *  @device: Node to check for availability, with locks already held
+ * @device: Node to check status of, with locks already held
+ * @val: Status string to check for, or NULL for "okay"/"ok"
  *
- *  Return: True if the status property is absent or set to "okay" or "ok",
- *  false otherwise
+ * Return: True if status property exists and matches @val, or either "okay"
+ * or "ok" if @val is NULL, or if status property is absent and @val is
+ * "okay", "ok", or NULL.  False otherwise.
  */
-static bool __of_device_is_available(const struct device_node *device)
+static bool __of_device_check_status(const struct device_node *device, const char *val)
 {
 	const char *status;
 	int statlen;
@@ -617,15 +619,33 @@ static bool __of_device_is_available(const struct device_node *device)
 		return false;
 
 	status = __of_get_property(device, "status", &statlen);
-	if (status == NULL)
-		return true;
+	if (!status) {
+		/* a missing status property is treated as "okay" */
+		status = "okay";
+		statlen = strlen(status) + 1; /* property lengths include the NUL terminator */
+	}
 
 	if (statlen > 0) {
-		if (!strcmp(status, "okay") || !strcmp(status, "ok"))
+		if (!val && (!strcmp(status, "okay") || !strcmp(status, "ok")))
+			return true;
+		else if (val && !strcmp(status, val))
 			return true;
 	}
 
 	return false;
+}
+
+/**
+ * __of_device_is_available - check if a device is available for use
+ *
+ * @device: Node to check for availability, with locks already held
+ *
+ * Return: True if the status property is absent or set to "okay" or "ok",
+ * false otherwise
+ */
+static bool __of_device_is_available(const struct device_node *device)
+{
+	return __of_device_check_status(device, NULL);
 }
 
 /**
@@ -648,6 +668,26 @@ bool of_device_is_available(const struct device_node *device)
 
 }
 EXPORT_SYMBOL(of_device_is_available);
+
+/**
+ * of_device_is_reserved - check if a device is marked as reserved
+ *
+ * @device: Node to check for reservation
+ *
+ * Return: True if the status property is set to "reserved", false otherwise
+ */
+bool of_device_is_reserved(const struct device_node *device)
+{
+	unsigned long flags;
+	bool res;
+
+	raw_spin_lock_irqsave(&devtree_lock, flags);
+	res = __of_device_check_status(device, "reserved");
+	raw_spin_unlock_irqrestore(&devtree_lock, flags);
+
+	return res;
+}
+EXPORT_SYMBOL(of_device_is_reserved);
 
 /**
  *  of_device_is_big_endian - check if a device has BE registers
