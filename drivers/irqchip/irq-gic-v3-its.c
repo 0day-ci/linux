@@ -47,6 +47,8 @@
 #define RDISTS_FLAGS_RD_TABLES_PREALLOCATED	(1 << 1)
 
 #define RDIST_FLAGS_LPI_ENABLED                 BIT(0)
+#define RDIST_FLAGS_PENDTABLE_RESERVED          BIT(1)
+#define RDIST_FLAGS_PENDTABLE_PREALLOCATED      BIT(2)
 
 static u32 lpi_id_bits;
 
@@ -3065,15 +3067,15 @@ static void its_cpu_init_lpis(void)
 		paddr &= GENMASK_ULL(51, 16);
 
 		WARN_ON(!gic_check_reserved_range(paddr, LPI_PENDBASE_SZ));
-		its_free_pending_table(gic_data_rdist()->pend_page);
-		gic_data_rdist()->pend_page = NULL;
+		gic_data_rdist()->flags |=
+			RDIST_FLAGS_PENDTABLE_RESERVED |
+			RDIST_FLAGS_PENDTABLE_PREALLOCATED;
 
 		goto out;
 	}
 
 	pend_page = gic_data_rdist()->pend_page;
 	paddr = page_to_phys(pend_page);
-	WARN_ON(gic_reserve_range(paddr, LPI_PENDBASE_SZ));
 
 	/* set PROPBASE */
 	val = (gic_rdists->prop_table_pa |
@@ -3163,7 +3165,8 @@ out:
 	gic_data_rdist()->flags |= RDIST_FLAGS_LPI_ENABLED;
 	pr_info("GICv3: CPU%d: using %s LPI pending table @%pa\n",
 		smp_processor_id(),
-		gic_data_rdist()->pend_page ? "allocated" : "reserved",
+		gic_data_rdist()->flags & RDIST_FLAGS_PENDTABLE_PREALLOCATED ?
+		"reserved" : "allocated",
 		&paddr);
 }
 
@@ -5202,6 +5205,39 @@ int its_cpu_init(void)
 	return 0;
 }
 
+#ifdef CONFIG_EFI
+static int its_cpu_memreserve_lpi(unsigned int cpu)
+{
+	struct page *pend_page = gic_data_rdist()->pend_page;
+	phys_addr_t paddr;
+
+	/*
+	 * If the pending table was pre-programmed, free the memory we
+	 * preemptively allocated.
+	 */
+	if (pend_page &&
+	    (gic_data_rdist()->flags & RDIST_FLAGS_PENDTABLE_PREALLOCATED)) {
+		its_free_pending_table(gic_data_rdist()->pend_page);
+		gic_data_rdist()->pend_page = NULL;
+	}
+
+	/*
+	 * Did we already issue a memreserve? This could be via a previous
+	 * invocation of this callback, or in a previous life before kexec.
+	 */
+	if (gic_data_rdist()->flags & RDIST_FLAGS_PENDTABLE_RESERVED)
+		return 0;
+
+	gic_data_rdist()->flags |= RDIST_FLAGS_PENDTABLE_RESERVED;
+
+	pend_page = gic_data_rdist()->pend_page;
+	paddr = page_to_phys(pend_page);
+	WARN_ON(gic_reserve_range(paddr, LPI_PENDBASE_SZ));
+
+	return 0;
+}
+#endif
+
 static const struct of_device_id its_device_id[] = {
 	{	.compatible	= "arm,gic-v3-its",	},
 	{},
@@ -5385,6 +5421,23 @@ static void __init its_acpi_probe(void)
 static void __init its_acpi_probe(void) { }
 #endif
 
+static int __init its_lpi_memreserve_init(void)
+{
+	int state;
+
+	if (!efi_enabled(EFI_CONFIG_TABLES))
+		return 0;
+
+	state = cpuhp_setup_state(CPUHP_AP_ONLINE_DYN,
+				"irqchip/arm/gicv3/memreserve:online",
+				its_cpu_memreserve_lpi,
+				NULL);
+	if (state < 0)
+		return state;
+
+	return 0;
+}
+
 int __init its_init(struct fwnode_handle *handle, struct rdists *rdists,
 		    struct irq_domain *parent_domain)
 {
@@ -5409,6 +5462,10 @@ int __init its_init(struct fwnode_handle *handle, struct rdists *rdists,
 	}
 
 	err = allocate_lpi_tables();
+	if (err)
+		return err;
+
+	err = its_lpi_memreserve_init();
 	if (err)
 		return err;
 
