@@ -273,6 +273,16 @@ debug
 This parameter adjusts the level of debug messages displayed in the system
 logs.
 
+disable_nbase_t_suppression_hack
+--------------------------------
+:Valid Range: 0,1
+:Default Value: 0 (hack enabled)
+
+This parameter disables the hack which suppresses the advertisement of NBASE-T
+speeds to accommodate broken network switches which cannot cope with advertised
+NBASE-T speeds. It is recommended to set this parameter to 1 in all network
+environments with properly functioning network switches.
+
 
 Additional Features and Configurations
 ======================================
@@ -514,6 +524,26 @@ The offload is also supported for ixgbe's VFs, but the VF must be set as
 
   ethtool --set-priv-flags eth<x> vf-ipsec on
   ip link set eth<x> vf <y> trust on
+
+NBASE-T Support
+---------------
+The ixgbe driver supports NBASE-T on some devices. However, the advertisement
+of NBASE-T speeds is suppressed by default, to accommodate broken network
+switches which cannot cope with advertised NBASE-T speeds. There are two ways
+to enable advertising NBASE-T speeds on devices which support it:
+
+1. At runtime using the ethtool command (required after each boot)::
+
+  ethtool -s eth? advertise 0x1800000001028
+
+2. At boot time using the module parameter disable_nbase_t_suppression_hack::
+
+  Create a file /etc/modprobe.d/ixgbe.conf with the line::
+
+  options ixgbe disable_nbase_t_suppression_hack=1
+
+  Note that you may have to rebuild the initial ramdisk image for this change
+  to take effect. On Debian or Ubuntu, this is done via "update-initramfs -u".
 
 
 Known Issues/Troubleshooting
