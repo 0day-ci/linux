@@ -3911,10 +3911,35 @@ static bool kvm_faultin_pfn(struct kvm_vcpu *vcpu, struct kvm_page_fault *fault,
 		 * If the APIC access page exists but is disabled, go directly
 		 * to emulation without caching the MMIO access or creating a
 		 * MMIO SPTE.  That way the cache doesn't need to be purged
-		 * when the AVIC is re-enabled.
+		 * when the AVIC is re-enabled.  Note, the vCPU's APICv state
+		 * may be stale if an APICv update is in-progress, but KVM is
+		 * guaranteed to operate correctly in all scenarios:
+		 *
+		 * 1.  APICv is globally enabled but locally disabled.  This
+		 *     vCPU will go straight to emulation without touching the
+		 *     MMIO cache or installing a SPTE.
+		 *
+		 * 2a. APICv is globally disabled but locally enabled, and this
+		 *     vCPU acquires mmu_lock before the APICv update calls
+		 *     kvm_zap_gfn_range().  This vCPU will install a bad SPTE,
+		 *     but the SPTE will never be consumed as (a) no vCPUs can
+		 *     be running due to the kick from KVM_REQ_APICV_UPDATE,
+		 *     and (b) the "bad" SPTE is guaranteed to be zapped by
+		 *     kvm_zap_gfn_range() before any vCPU re-enters the guest.
+		 *     Because KVM_REQ_APICV_UPDATE is raised before the VM
+		 *     state is update, vCPUs will block on apicv_update_lock
+		 *     when attempting to service the request until the lock is
+		 *     dropped by the update flow, _after_ the SPTE is zapped.
+		 *
+		 * 2b. APICv is globally disabled but locally enabled, and the
+		 *     APICv update kvm_zap_gfn_range() acquires mmu_lock before
+		 *     this vCPU.  This vCPU will bail from the page fault
+		 *     handler due kvm_zap_gfn_range() bumping mmu_notifier_seq,
+		 *     and will retry the faulting instruction after servicing
+		 *     the KVM_REQ_APICV_UPDATE request.
 		 */
 		if (slot && slot->id == APIC_ACCESS_PAGE_PRIVATE_MEMSLOT &&
-		    !kvm_apicv_activated(vcpu->kvm)) {
+		    !kvm_vcpu_apicv_active(vcpu)) {
 			*r = RET_PF_EMULATE;
 			return true;
 		}
