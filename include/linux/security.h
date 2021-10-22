@@ -1423,6 +1423,8 @@ int security_sctp_bind_connect(struct sock *sk, int optname,
 			       struct sockaddr *address, int addrlen);
 void security_sctp_sk_clone(struct sctp_association *asoc, struct sock *sk,
 			    struct sock *newsk);
+void security_sctp_assoc_established(struct sctp_association *asoc,
+				     struct sk_buff *skb);
 
 #else	/* CONFIG_SECURITY_NETWORK */
 static inline int security_unix_stream_connect(struct sock *sock,
@@ -1641,6 +1643,12 @@ static inline void security_sctp_sk_clone(struct sctp_association *asoc,
 					  struct sock *sk,
 					  struct sock *newsk)
 {
+}
+
+static inline void security_sctp_assoc_established(struct sctp_association *asoc,
+						   struct sk_buff *skb)
+{
+	return 0;
 }
 #endif	/* CONFIG_SECURITY_NETWORK */
 
