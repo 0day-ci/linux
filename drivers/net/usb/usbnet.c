@@ -397,7 +397,7 @@ int usbnet_change_mtu (struct net_device *net, int new_mtu)
 	int		old_rx_urb_size = dev->rx_urb_size;
 
 	// no second zero-length packet read wanted after mtu-sized packets
-	if ((ll_mtu % dev->maxpacket) == 0)
+	if (dev->maxpacket && ((ll_mtu % dev->maxpacket) == 0))
 		return -EDOM;
 	net->mtu = new_mtu;
 
@@ -1401,7 +1401,7 @@ netdev_tx_t usbnet_start_xmit (struct sk_buff *skb,
 	 * handling ZLP/short packets, so cdc_ncm driver will make short
 	 * packet itself if needed.
 	 */
-	if (length % dev->maxpacket == 0) {
+	if (dev->maxpacket && (length % dev->maxpacket == 0)) {
 		if (!(info->flags & FLAG_SEND_ZLP)) {
 			if (!(info->flags & FLAG_MULTI_PACKET)) {
 				length++;
