@@ -130,6 +130,11 @@ enum sec_alg_type {
 	SEC_AEAD
 };
 
+struct pending_sgl {
+	struct scatterlist sgl[MERGE_SGL_NUM];
+	u32 len;
+};
+
 /* SEC Crypto TFM context which defines queue and cipher .etc relatives */
 struct sec_ctx {
 	struct sec_qp_ctx *qp_ctx;
@@ -154,6 +159,15 @@ struct sec_ctx {
 	struct sec_cipher_ctx c_ctx;
 	struct sec_auth_ctx a_ctx;
 	u8 type_supported;
+
+	/*
+	 * For stream mode operations, we don't send data into HW everytime.
+	 * now ahash uses this. To avoid multiple copy, use pingpong buffers.
+	 */
+	struct pending_sgl pingpong_sg[SEC_MAX_STREAMS][PINGPONG_BUF_NUM];
+	u8 pingpong_idx[SEC_MAX_STREAMS];
+	struct idr stream_idr;
+	struct mutex stream_idr_lock;
 	struct device *dev;
 };
 
