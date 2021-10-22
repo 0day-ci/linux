@@ -354,6 +354,10 @@ static int __init hung_task_init(void)
 	pm_notifier(hungtask_pm_notify, 0);
 
 	watchdog_task = kthread_run(watchdog, NULL, "khungtaskd");
+	if (IS_ERR(watchdog_task)) {
+		pr_err("Failed to start khungtaskd\n");
+		watchdog_task = NULL;
+	}
 
 	return 0;
 }
