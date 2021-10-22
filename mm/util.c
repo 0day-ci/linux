@@ -750,12 +750,13 @@ int __page_mapcount(struct page *page)
 }
 EXPORT_SYMBOL_GPL(__page_mapcount);
 
-void copy_huge_page(struct page *dst, struct page *src)
+void __copy_huge_page(struct page *dst, struct page *src, bool atomic)
 {
 	unsigned i, nr = compound_nr(src);
 
 	for (i = 0; i < nr; i++) {
-		cond_resched();
+		if (!atomic)
+			cond_resched();
 		copy_highpage(nth_page(dst, i), nth_page(src, i));
 	}
 }

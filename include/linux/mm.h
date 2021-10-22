@@ -907,7 +907,15 @@ void __put_page(struct page *page);
 void put_pages_list(struct list_head *pages);
 
 void split_page(struct page *page, unsigned int order);
-void copy_huge_page(struct page *dst, struct page *src);
+void __copy_huge_page(struct page *dst, struct page *src, bool atomic);
+static inline void copy_huge_page(struct page *dst, struct page *src)
+{
+	__copy_huge_page(dst, src, false);
+}
+static inline void copy_huge_page_nowait(struct page *dst, struct page *src)
+{
+	__copy_huge_page(dst, src, true);
+}
 
 /*
  * Compound pages have a destructor function.  Provide a

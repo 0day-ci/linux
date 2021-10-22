@@ -52,7 +52,15 @@ extern struct page *alloc_migration_target(struct page *page, unsigned long priv
 extern int isolate_movable_page(struct page *page, isolate_mode_t mode);
 
 extern void migrate_page_states(struct page *newpage, struct page *page);
-extern void migrate_page_copy(struct page *newpage, struct page *page);
+extern void __migrate_page_copy(struct page *newpage, struct page *page, bool atomic);
+static inline void migrate_page_copy(struct page *newpage, struct page *page)
+{
+	return __migrate_page_copy(newpage, page, false);
+}
+static inline void migrate_page_copy_nowait(struct page *newpage, struct page *page)
+{
+	return __migrate_page_copy(newpage, page, true);
+}
 extern int migrate_huge_page_move_mapping(struct address_space *mapping,
 				  struct page *newpage, struct page *page);
 extern int migrate_page_move_mapping(struct address_space *mapping,

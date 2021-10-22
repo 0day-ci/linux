@@ -613,16 +613,16 @@ void migrate_page_states(struct page *newpage, struct page *page)
 }
 EXPORT_SYMBOL(migrate_page_states);
 
-void migrate_page_copy(struct page *newpage, struct page *page)
+void __migrate_page_copy(struct page *newpage, struct page *page, bool atomic)
 {
 	if (PageHuge(page) || PageTransHuge(page))
-		copy_huge_page(newpage, page);
+		__copy_huge_page(newpage, page, atomic);
 	else
 		copy_highpage(newpage, page);
 
 	migrate_page_states(newpage, page);
 }
-EXPORT_SYMBOL(migrate_page_copy);
+EXPORT_SYMBOL(__migrate_page_copy);
 
 /************************************************************
  *                    Migration functions
@@ -755,7 +755,7 @@ recheck_buffers:
 	} while (bh != head);
 
 	if (mode != MIGRATE_SYNC_NO_COPY)
-		migrate_page_copy(newpage, page);
+		migrate_page_copy_nowait(newpage, page);
 	else
 		migrate_page_states(newpage, page);
 
