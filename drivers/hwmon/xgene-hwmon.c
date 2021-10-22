@@ -648,7 +648,7 @@ static int xgene_hwmon_probe(struct platform_device *pdev)
 		if (IS_ERR(ctx->mbox_chan)) {
 			dev_err(&pdev->dev,
 				"SLIMpro mailbox channel request failed\n");
-			rc = -ENODEV;
+			rc = PTR_ERR(ctx->mbox_chan);
 			goto out_mbox_free;
 		}
 	} else {
@@ -675,7 +675,7 @@ static int xgene_hwmon_probe(struct platform_device *pdev)
 		if (IS_ERR(ctx->mbox_chan)) {
 			dev_err(&pdev->dev,
 				"PPC channel request failed\n");
-			rc = -ENODEV;
+			rc = PTR_ERR(ctx->mbox_chan);
 			goto out_mbox_free;
 		}
 
