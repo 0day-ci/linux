@@ -211,7 +211,7 @@ static ssize_t bind_store(struct device_driver *drv, const char *buf,
 
 	dev = bus_find_device_by_name(bus, NULL, buf);
 	if (dev && driver_match_device(drv, dev)) {
-		err = device_driver_attach(drv, dev);
+		err = device_driver_attach(drv, dev, DRV_BIND_EXPLICIT);
 		if (!err) {
 			/* success */
 			err = count;

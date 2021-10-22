@@ -877,11 +877,23 @@ static inline void *dev_get_platdata(const struct device *dev)
 }
 
 /*
+ * Driver-binding flags (for passing to device_driver_attach())
+ *
+ * DRV_BIND_DEFAULT: a default, automatic bind, e.g. as a result of a device
+ *                   being added for which we already have a driver, or vice
+ *                   versa.
+ * DRV_BIND_EXPLICIT: an explicit, userspace-requested driver bind, e.g. as a
+ *                    result of a write to /sys/bus/.../drivers/.../bind
+ */
+#define DRV_BIND_DEFAULT	0
+#define DRV_BIND_EXPLICIT	BIT(0)
+
+/*
  * Manual binding of a device to driver. See drivers/base/bus.c
  * for information on use.
  */
 int __must_check device_driver_attach(struct device_driver *drv,
-				      struct device *dev);
+				      struct device *dev, u32 flags);
 int __must_check device_bind_driver(struct device *dev);
 void device_release_driver(struct device *dev);
 int  __must_check device_attach(struct device *dev);

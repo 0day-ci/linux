@@ -309,7 +309,7 @@ int mdev_device_create(struct mdev_type *type, const guid_t *uuid)
 
 	if (!drv)
 		drv = &vfio_mdev_driver;
-	ret = device_driver_attach(&drv->driver, &mdev->dev);
+	ret = device_driver_attach(&drv->driver, &mdev->dev, DRV_BIND_DEFAULT);
 	if (ret)
 		goto out_del;
 

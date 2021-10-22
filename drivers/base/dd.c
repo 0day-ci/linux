@@ -22,6 +22,7 @@
 #include <linux/dma-map-ops.h>
 #include <linux/init.h>
 #include <linux/module.h>
+#include <linux/property.h>
 #include <linux/kthread.h>
 #include <linux/wait.h>
 #include <linux/async.h>
@@ -727,13 +728,14 @@ void wait_for_device_probe(void)
 }
 EXPORT_SYMBOL_GPL(wait_for_device_probe);
 
-static int __driver_probe_device(struct device_driver *drv, struct device *dev)
+static int __driver_probe_device(struct device_driver *drv, struct device *dev, u32 flags)
 {
 	int ret = 0;
 
 	if (dev->p->dead || !device_is_registered(dev))
 		return -ENODEV;
-	if (dev->driver)
+	if (dev->driver ||
+	    (fwnode_device_is_reserved(dev->fwnode) && !(flags & DRV_BIND_EXPLICIT)))
 		return -EBUSY;
 
 	dev->can_match = true;
@@ -778,7 +780,7 @@ static int driver_probe_device(struct device_driver *drv, struct device *dev)
 	int ret;
 
 	atomic_inc(&probe_count);
-	ret = __driver_probe_device(drv, dev);
+	ret = __driver_probe_device(drv, dev, DRV_BIND_DEFAULT);
 	if (ret == -EPROBE_DEFER || ret == EPROBE_DEFER) {
 		driver_deferred_probe_add(dev);
 
@@ -1052,16 +1054,17 @@ static void __device_driver_unlock(struct device *dev, struct device *parent)
  * device_driver_attach - attach a specific driver to a specific device
  * @drv: Driver to attach
  * @dev: Device to attach it to
+ * @flags: Bitmask of DRV_BIND_* flags
  *
  * Manually attach driver to a device. Will acquire both @dev lock and
  * @dev->parent lock if needed. Returns 0 on success, -ERR on failure.
  */
-int device_driver_attach(struct device_driver *drv, struct device *dev)
+int device_driver_attach(struct device_driver *drv, struct device *dev, u32 flags)
 {
 	int ret;
 
 	__device_driver_lock(dev, dev->parent);
-	ret = __driver_probe_device(drv, dev);
+	ret = __driver_probe_device(drv, dev, flags);
 	__device_driver_unlock(dev, dev->parent);
 
 	/* also return probe errors as normal negative errnos */
