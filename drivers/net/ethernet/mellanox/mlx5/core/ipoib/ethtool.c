@@ -222,8 +222,8 @@ static int mlx5i_get_link_ksettings(struct net_device *netdev,
 	return 0;
 }
 
-#ifdef CONFIG_MLX5_EN_RXNFC
-static int mlx5i_set_rxnfc(struct net_device *dev, struct ethtool_rxnfc *cmd)
+static __maybe_unused int mlx5i_set_rxnfc(struct net_device *dev,
+					  struct ethtool_rxnfc *cmd)
 {
 	struct mlx5e_priv *priv = mlx5i_epriv(dev);
 	struct ethtool_rx_flow_spec *fs = &cmd->fs;
@@ -234,14 +234,14 @@ static int mlx5i_set_rxnfc(struct net_device *dev, struct ethtool_rxnfc *cmd)
 	return mlx5e_ethtool_set_rxnfc(priv, cmd);
 }
 
-static int mlx5i_get_rxnfc(struct net_device *dev, struct ethtool_rxnfc *info,
-			   u32 *rule_locs)
+static __maybe_unused int mlx5i_get_rxnfc(struct net_device *dev,
+					  struct ethtool_rxnfc *info,
+					  u32 *rule_locs)
 {
 	struct mlx5e_priv *priv = mlx5i_epriv(dev);
 
 	return mlx5e_ethtool_get_rxnfc(priv, info, rule_locs);
 }
-#endif
 
 const struct ethtool_ops mlx5i_ethtool_ops = {
 	.supported_coalesce_params = ETHTOOL_COALESCE_USECS |
