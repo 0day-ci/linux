@@ -114,6 +114,16 @@ struct intel_guc {
 		 * function as it might be in an atomic context (no sleeping)
 		 */
 		struct work_struct destroyed_worker;
+		/**
+		 * @capture_list: list of intel_context that need to capture
+		 * error state
+		 */
+		struct list_head capture_list;
+		/**
+		 * @capture_worker: worker to do error capture when the GuC
+		 * signals a context has been reset
+		 */
+		struct work_struct capture_worker;
 	} submission_state;
 
 	/**
