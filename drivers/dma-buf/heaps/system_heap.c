@@ -435,5 +435,5 @@ static int system_heap_create(void)
 
 	return 0;
 }
-module_init(system_heap_create);
+subsys_initcall(system_heap_create);
 MODULE_LICENSE("GPL v2");
