@@ -846,6 +846,22 @@ bool fwnode_device_is_available(const struct fwnode_handle *fwnode)
 EXPORT_SYMBOL_GPL(fwnode_device_is_available);
 
 /**
+ * fwnode_device_is_reserved - check if a device is reserved for use
+ * @fwnode: Pointer to the fwnode of the device.
+ *
+ * For fwnode node types that don't implement the .device_is_reserved()
+ * operation, this function returns false.
+ */
+bool fwnode_device_is_reserved(const struct fwnode_handle *fwnode)
+{
+	if (!fwnode_has_op(fwnode, device_is_reserved))
+		return false;
+
+	return fwnode_call_bool_op(fwnode, device_is_reserved);
+}
+EXPORT_SYMBOL_GPL(fwnode_device_is_reserved);
+
+/**
  * device_get_child_node_count - return the number of child nodes for device
  * @dev: Device to cound the child nodes for
  */

@@ -81,6 +81,7 @@ struct fwnode_reference_args {
  * @get: Get a reference to an fwnode.
  * @put: Put a reference to an fwnode.
  * @device_is_available: Return true if the device is available.
+ * @device_is_reserved: Return true if the device is reserved.
  * @device_get_match_data: Return the device driver match data.
  * @property_present: Return true if a property is present.
  * @property_read_int_array: Read an array of integer properties. Return zero on
@@ -105,6 +106,7 @@ struct fwnode_operations {
 	struct fwnode_handle *(*get)(struct fwnode_handle *fwnode);
 	void (*put)(struct fwnode_handle *fwnode);
 	bool (*device_is_available)(const struct fwnode_handle *fwnode);
+	bool (*device_is_reserved)(const struct fwnode_handle *fwnode);
 	const void *(*device_get_match_data)(const struct fwnode_handle *fwnode,
 					     const struct device *dev);
 	bool (*property_present)(const struct fwnode_handle *fwnode,
