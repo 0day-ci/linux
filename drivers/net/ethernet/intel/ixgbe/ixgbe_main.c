@@ -156,6 +156,11 @@ module_param(allow_unsupported_sfp, uint, 0);
 MODULE_PARM_DESC(allow_unsupported_sfp,
 		 "Allow unsupported and untested SFP+ modules on 82599-based adapters");
 
+static unsigned int enable_nbase_t_suppression_hack = 1;
+module_param(enable_nbase_t_suppression_hack, uint, 0);
+MODULE_PARM_DESC(enable_nbase_t_suppression_hack,
+		 "Enable hack which suppresses the advertisement of NBASE-T speeds to accommodate broken network switches");
+
 #define DEFAULT_MSG_ENABLE (NETIF_MSG_DRV|NETIF_MSG_PROBE|NETIF_MSG_LINK)
 static int debug = -1;
 module_param(debug, int, 0);
@@ -5531,8 +5536,14 @@ static int ixgbe_non_sfp_link_config(struct ixgbe_hw *hw)
 	if (!speed && hw->mac.ops.get_link_capabilities) {
 		ret = hw->mac.ops.get_link_capabilities(hw, &speed,
 							&autoneg);
-		speed &= ~(IXGBE_LINK_SPEED_5GB_FULL |
-			   IXGBE_LINK_SPEED_2_5GB_FULL);
+		if (enable_nbase_t_suppression_hack) {
+			/* remove NBASE-T speeds from default autonegotiation
+			 * to accommodate broken network switches in the field
+			 * which cannot cope with advertised NBASE-T speeds
+			 */
+			speed &= ~(IXGBE_LINK_SPEED_5GB_FULL |
+				   IXGBE_LINK_SPEED_2_5GB_FULL);
+		}
 	}
 
 	if (ret)
