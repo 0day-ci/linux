@@ -503,7 +503,7 @@ static int register_pcc_channel(int pcc_ss_idx)
 		if (IS_ERR(pcc_data[pcc_ss_idx]->pcc_channel)) {
 			pr_err("Failed to find PCC channel for subspace %d\n",
 			       pcc_ss_idx);
-			return -ENODEV;
+			return PTR_ERR(pcc_data[pcc_ss_idx]->pcc_channel);
 		}
 
 		/*
