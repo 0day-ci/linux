@@ -499,11 +499,13 @@ int cmtp_get_conninfo(struct cmtp_conninfo *ci)
 
 static int __init cmtp_init(void)
 {
+	int err;
+
 	BT_INFO("CMTP (CAPI Emulation) ver %s", VERSION);
 
-	cmtp_init_sockets();
+	err = cmtp_init_sockets();
 
-	return 0;
+	return err;
 }
 
 static void __exit cmtp_exit(void)
