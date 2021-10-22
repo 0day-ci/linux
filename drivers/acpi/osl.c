@@ -456,13 +456,23 @@ void __iomem *acpi_os_map_generic_address(struct acpi_generic_address *gas)
 
 	if (gas->space_id != ACPI_ADR_SPACE_SYSTEM_MEMORY)
 		return NULL;
+	/* Handle a non-register GAS (i.e., a pointer to a data structure),
+	 * whose bit width is expected to be 0 according to ACPI spec. 6.4.
+	 * For example, The RegisterRegion field in SET_ERROR_TYPE_WITH_ADDRESS
+	 * points to a data structure whose format is defined in Table 18.30 in
+	 * ACPI Spec. 6.4
+	 */
+	if (!gas->bit_width) {
+		pr_info("Mapping IOMEM for a non-register GAS.\n");
+		return  acpi_os_map_iomem(addr, sizeof(unsigned long long));
+	}
 
 	/* Handle possible alignment issues */
 	memcpy(&addr, &gas->address, sizeof(addr));
-	if (!addr || !gas->bit_width)
+	if (!addr)
 		return NULL;
-
-	return acpi_os_map_iomem(addr, gas->bit_width / 8);
+	else
+		return acpi_os_map_iomem(addr, gas->bit_width / 8);
 }
 EXPORT_SYMBOL(acpi_os_map_generic_address);
 
