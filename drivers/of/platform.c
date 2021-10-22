@@ -170,7 +170,7 @@ static struct platform_device *of_platform_device_create_pdata(
 {
 	struct platform_device *dev;
 
-	if (!of_device_is_available(np) ||
+	if ((!of_device_is_available(np) && !of_device_is_reserved(np)) ||
 	    of_node_test_and_set_flag(np, OF_POPULATED))
 		return NULL;
 
