@@ -14,6 +14,11 @@
 #include <drm/drm_drv.h>
 #include <drm/drm_print.h>
 
+static bool drm_aperture_remove_fb = true;
+module_param_named(remove_fb, drm_aperture_remove_fb, bool, 0600);
+MODULE_PARM_DESC(remove_fb,
+		 "Allow conflicting framebuffers removal [default=true]");
+
 /**
  * DOC: overview
  *
@@ -283,6 +288,9 @@ static void drm_aperture_detach_drivers(resource_size_t base, resource_size_t si
  * This function removes graphics device drivers which use memory range described by
  * @base and @size.
  *
+ * The conflicting framebuffers removal can be disabled by setting the drm.remove_fb=0 kernel
+ * command line option. When this is disabled, the function will return an -EINVAL errno code.
+ *
  * Returns:
  * 0 on success, or a negative errno code otherwise
  */
@@ -292,7 +300,12 @@ int drm_aperture_remove_conflicting_framebuffers(resource_size_t base, resource_
 #if IS_REACHABLE(CONFIG_FB)
 	struct apertures_struct *a;
 	int ret;
+#endif
 
+	if (!drm_aperture_remove_fb)
+		return -EINVAL;
+
+#if IS_REACHABLE(CONFIG_FB)
 	a = alloc_apertures(1);
 	if (!a)
 		return -ENOMEM;
@@ -322,6 +335,9 @@ EXPORT_SYMBOL(drm_aperture_remove_conflicting_framebuffers);
  * for any of @pdev's memory bars. The function assumes that PCI device with
  * shadowed ROM drives a primary display and so kicks out vga16fb.
  *
+ * The conflicting framebuffers removal can be disabled by setting the drm.remove_fb=0 kernel
+ * command line option. When this is disabled, the function will return an -EINVAL errno code.
+ *
  * Returns:
  * 0 on success, or a negative errno code otherwise
  */
@@ -330,6 +346,9 @@ int drm_aperture_remove_conflicting_pci_framebuffers(struct pci_dev *pdev,
 {
 	resource_size_t base, size;
 	int bar, ret = 0;
+
+	if (!drm_aperture_remove_fb)
+		return -EINVAL;
 
 	for (bar = 0; bar < PCI_STD_NUM_BARS; ++bar) {
 		if (!(pci_resource_flags(pdev, bar) & IORESOURCE_MEM))
