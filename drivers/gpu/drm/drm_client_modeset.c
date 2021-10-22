@@ -789,7 +789,7 @@ int drm_client_modeset_probe(struct drm_client_dev *client, unsigned int width, 
 		tmp = krealloc(connectors, (connector_count + 1) * sizeof(*connectors), GFP_KERNEL);
 		if (!tmp) {
 			ret = -ENOMEM;
-			goto free_connectors;
+			break;
 		}
 
 		connectors = tmp;
@@ -797,6 +797,9 @@ int drm_client_modeset_probe(struct drm_client_dev *client, unsigned int width, 
 		connectors[connector_count++] = connector;
 	}
 	drm_connector_list_iter_end(&conn_iter);
+
+	if (ret)
+		goto free_connectors;
 
 	if (!connector_count)
 		return 0;
