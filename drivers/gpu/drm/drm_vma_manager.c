@@ -300,11 +300,11 @@ int drm_vma_node_allow(struct drm_vma_offset_node *node, struct drm_file *tag)
 	new->vm_count = 1;
 	rb_link_node(&new->vm_rb, parent, iter);
 	rb_insert_color(&new->vm_rb, &node->vm_files);
-	new = NULL;
 
 unlock:
 	write_unlock(&node->vm_lock);
 	kfree(new);
+	new = NULL;
 	return ret;
 }
 EXPORT_SYMBOL(drm_vma_node_allow);
