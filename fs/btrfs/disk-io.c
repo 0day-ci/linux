@@ -3981,8 +3981,14 @@ static void write_dev_flush(struct btrfs_device *device)
 	struct request_queue *q = bdev_get_queue(device->bdev);
 	struct bio *bio = device->flush_bio;
 
+	#ifndef CONFIG_BTRFS_FS_CHECK_INTEGRITY
+	/*
+	* submit_bio(REQ_SYNC | REQ_PREFLUSH) can be skipped when !QUEUE_FLAG_WC.
+	* but btrfsic_submit_bio() != submit_bio() when CONFIG_BTRFS_FS_CHECK_INTEGRITY
+	*/
 	if (!test_bit(QUEUE_FLAG_WC, &q->queue_flags))
 		return;
+	#endif
 
 	bio_reset(bio);
 	bio->bi_end_io = btrfs_end_empty_barrier;
