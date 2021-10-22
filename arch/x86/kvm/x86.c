@@ -4361,7 +4361,7 @@ void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
 static int kvm_vcpu_ioctl_get_lapic(struct kvm_vcpu *vcpu,
 				    struct kvm_lapic_state *s)
 {
-	if (vcpu->arch.apicv_active)
+	if (kvm_vcpu_apicv_active(vcpu))
 		static_call(kvm_x86_sync_pir_to_irr)(vcpu);
 
 	return kvm_apic_get_state(vcpu, s);
@@ -8945,10 +8945,7 @@ static void update_cr8_intercept(struct kvm_vcpu *vcpu)
 	if (!kvm_x86_ops.update_cr8_intercept)
 		return;
 
-	if (!lapic_in_kernel(vcpu))
-		return;
-
-	if (vcpu->arch.apicv_active)
+	if (!kvm_vcpu_apicv_active(vcpu))
 		return;
 
 	if (!vcpu->arch.apic->vapic_addr)
@@ -9399,6 +9396,7 @@ void kvm_make_scan_ioapic_request(struct kvm *kvm)
 
 void kvm_vcpu_update_apicv(struct kvm_vcpu *vcpu)
 {
+	struct kvm_lapic *apic = vcpu->arch.apic;
 	bool activate;
 
 	if (!lapic_in_kernel(vcpu))
@@ -9407,11 +9405,11 @@ void kvm_vcpu_update_apicv(struct kvm_vcpu *vcpu)
 	mutex_lock(&vcpu->kvm->arch.apicv_update_lock);
 
 	activate = kvm_apicv_activated(vcpu->kvm);
-	if (vcpu->arch.apicv_active == activate)
+	if (apic->apicv_active == activate)
 		goto out;
 
-	vcpu->arch.apicv_active = activate;
-	kvm_apic_update_apicv(vcpu);
+	apic->apicv_active = activate;
+	kvm_apic_update_apicv(apic);
 	static_call(kvm_x86_refresh_apicv_exec_ctrl)(vcpu);
 
 	/*
@@ -9420,7 +9418,7 @@ void kvm_vcpu_update_apicv(struct kvm_vcpu *vcpu)
 	 * still active when the interrupt got accepted. Make sure
 	 * inject_pending_event() is called to check for that.
 	 */
-	if (!vcpu->arch.apicv_active)
+	if (!activate)
 		kvm_make_request(KVM_REQ_EVENT, vcpu);
 
 out:
@@ -9486,7 +9484,7 @@ static void vcpu_scan_ioapic(struct kvm_vcpu *vcpu)
 	if (irqchip_split(vcpu->kvm))
 		kvm_scan_ioapic_routes(vcpu, vcpu->arch.ioapic_handled_vectors);
 	else {
-		if (vcpu->arch.apicv_active)
+		if (kvm_vcpu_apicv_active(vcpu))
 			static_call(kvm_x86_sync_pir_to_irr)(vcpu);
 		if (ioapic_in_kernel(vcpu->kvm))
 			kvm_ioapic_scan_entry(vcpu, vcpu->arch.ioapic_handled_vectors);
@@ -9758,7 +9756,7 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 	 * This handles the case where a posted interrupt was
 	 * notified with kvm_vcpu_kick.
 	 */
-	if (kvm_lapic_enabled(vcpu) && vcpu->arch.apicv_active)
+	if (kvm_lapic_enabled(vcpu) && kvm_vcpu_apicv_active(vcpu))
 		static_call(kvm_x86_sync_pir_to_irr)(vcpu);
 
 	if (kvm_vcpu_exit_request(vcpu)) {
@@ -9808,7 +9806,7 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 			break;
 		}
 
-		if (vcpu->arch.apicv_active)
+		if (kvm_vcpu_apicv_active(vcpu))
 			static_call(kvm_x86_sync_pir_to_irr)(vcpu);
         }
 
@@ -10824,8 +10822,6 @@ int kvm_arch_vcpu_create(struct kvm_vcpu *vcpu)
 		r = kvm_create_lapic(vcpu, lapic_timer_advance_ns);
 		if (r < 0)
 			goto fail_mmu_destroy;
-		if (kvm_apicv_activated(vcpu->kvm))
-			vcpu->arch.apicv_active = true;
 	} else
 		static_branch_inc(&kvm_has_noapic_vcpu);
 
@@ -11821,7 +11817,8 @@ int kvm_arch_vcpu_runnable(struct kvm_vcpu *vcpu)
 
 bool kvm_arch_dy_has_pending_interrupt(struct kvm_vcpu *vcpu)
 {
-	if (vcpu->arch.apicv_active && static_call(kvm_x86_dy_apicv_has_pending_interrupt)(vcpu))
+	if (kvm_vcpu_apicv_active(vcpu) &&
+	    static_call(kvm_x86_dy_apicv_has_pending_interrupt)(vcpu))
 		return true;
 
 	return false;
