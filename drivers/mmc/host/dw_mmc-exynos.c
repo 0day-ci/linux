@@ -431,6 +431,7 @@ static inline u8 dw_mci_exynos_move_next_clksmpl(struct dw_mci *host)
 		clksel = mci_readl(host, CLKSEL);
 
 	sample = (clksel + 1) & 0x7;
+
 	clksel = SDMMC_CLKSEL_UP_SAMPLE(clksel, sample);
 
 	if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
@@ -464,6 +465,14 @@ static s8 dw_mci_exynos_get_best_clksmpl(u8 candiates)
 		}
 	}
 
+	/* Return a first candiates value, if there is some candiates */
+	for (i = 0; i < iter; i++) {
+		__c = ror8(candiates, i);
+		if ((__c & 0x1) == 0x1) {
+			loc = i;
+			goto out;
+		}
+	}
 out:
 	return loc;
 }
@@ -493,7 +502,18 @@ static int dw_mci_exynos_execute_tuning(struct dw_mci_slot *slot, u32 opcode)
 		dw_mci_exynos_set_clksmpl(host, found);
 		priv->tuned_sample = found;
 	} else {
-		ret = -EIO;
+		/*
+		 * If there is no cadiates value, then it needs to return -EIO.
+		 * If there are candiates values and don't find bset clk sample value,
+		 * then use a first candiates clock sample value.
+		 */
+		if (candiates == 0) {
+			ret = -EIO;
+			dev_warn(&mmc->class_dev,
+				"There is no candiates value about clksmpl!\n");
+		} else {
+			priv->tuned_sample = dw_mci_exynos_get_clksmpl(host);
+		}
 	}
 
 	return ret;
