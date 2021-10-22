@@ -302,13 +302,10 @@ static u64 cppc_get_dmi_max_khz(void)
 }
 
 /*
- * If CPPC lowest_freq and nominal_freq registers are exposed then we can
- * use them to convert perf to freq and vice versa
- *
- * If the perf/freq point lies between Nominal and Lowest, we can treat
- * (Low perf, Low freq) and (Nom Perf, Nom freq) as 2D co-ordinates of a line
- * and extrapolate the rest
- * For perf/freq > Nominal, we use the ratio perf:freq at Nominal for conversion
+ * The CPPC driver receives frequency requests and translates them to performance
+ * requests. Thus, frequency values are actually performance values on a frequency
+ * scale. The conversion is done as:
+ * target_freq = target_perf * (nominal_freq / nominal_perf)
  */
 static unsigned int cppc_cpufreq_perf_to_khz(struct cppc_cpudata *cpu_data,
 					     unsigned int perf)
@@ -317,14 +314,9 @@ static unsigned int cppc_cpufreq_perf_to_khz(struct cppc_cpudata *cpu_data,
 	static u64 max_khz;
 	u64 mul, div;
 
-	if (caps->lowest_freq && caps->nominal_freq) {
-		if (perf >= caps->nominal_perf) {
-			mul = caps->nominal_freq;
-			div = caps->nominal_perf;
-		} else {
-			mul = caps->nominal_freq - caps->lowest_freq;
-			div = caps->nominal_perf - caps->lowest_perf;
-		}
+	if (caps->nominal_freq) {
+		mul = caps->nominal_freq;
+		div = caps->nominal_perf;
 	} else {
 		if (!max_khz)
 			max_khz = cppc_get_dmi_max_khz();
@@ -341,14 +333,9 @@ static unsigned int cppc_cpufreq_khz_to_perf(struct cppc_cpudata *cpu_data,
 	static u64 max_khz;
 	u64  mul, div;
 
-	if (caps->lowest_freq && caps->nominal_freq) {
-		if (freq >= caps->nominal_freq) {
-			mul = caps->nominal_perf;
-			div = caps->nominal_freq;
-		} else {
-			mul = caps->lowest_perf;
-			div = caps->lowest_freq;
-		}
+	if (caps->nominal_freq) {
+		mul = caps->nominal_perf;
+		div = caps->nominal_freq;
 	} else {
 		if (!max_khz)
 			max_khz = cppc_get_dmi_max_khz();
