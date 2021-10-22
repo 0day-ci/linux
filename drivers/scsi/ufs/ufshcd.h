@@ -662,31 +662,6 @@ struct ufs_hba_variant_params {
 	u32 wb_flush_threshold;
 };
 
-#ifdef CONFIG_SCSI_UFS_HPB
-/**
- * struct ufshpb_dev_info - UFSHPB device related info
- * @num_lu: the number of user logical unit to check whether all lu finished
- *          initialization
- * @rgn_size: device reported HPB region size
- * @srgn_size: device reported HPB sub-region size
- * @slave_conf_cnt: counter to check all lu finished initialization
- * @hpb_disabled: flag to check if HPB is disabled
- * @max_hpb_single_cmd: device reported bMAX_DATA_SIZE_FOR_SINGLE_CMD value
- * @is_legacy: flag to check HPB 1.0
- * @control_mode: either host or device
- */
-struct ufshpb_dev_info {
-	int num_lu;
-	int rgn_size;
-	int srgn_size;
-	atomic_t slave_conf_cnt;
-	bool hpb_disabled;
-	u8 max_hpb_single_cmd;
-	bool is_legacy;
-	u8 control_mode;
-};
-#endif
-
 struct ufs_hba_monitor {
 	unsigned long chunk_size;
 
@@ -900,10 +875,6 @@ struct ufs_hba {
 	struct device		bsg_dev;
 	struct request_queue	*bsg_queue;
 	struct delayed_work rpm_dev_flush_recheck_work;
-
-#ifdef CONFIG_SCSI_UFS_HPB
-	struct ufshpb_dev_info ufshpb_dev;
-#endif
 
 	struct ufs_hba_monitor	monitor;
 
@@ -1145,9 +1116,6 @@ int ufshcd_read_desc_param(struct ufs_hba *hba,
 			   u8 param_offset,
 			   u8 *param_read_buf,
 			   u8 param_size);
-int ufshcd_query_attr_retry(struct ufs_hba *hba, enum query_opcode opcode,
-			    enum attr_idn idn, u8 index, u8 selector,
-			    u32 *attr_val);
 int ufshcd_query_attr(struct ufs_hba *hba, enum query_opcode opcode,
 		      enum attr_idn idn, u8 index, u8 selector, u32 *attr_val);
 int ufshcd_query_flag(struct ufs_hba *hba, enum query_opcode opcode,

@@ -25,7 +25,6 @@
 #include "ufs-fault-injection.h"
 #include "ufs_bsg.h"
 #include "ufshcd-crypto.h"
-#include "ufshpb.h"
 #include <asm/unaligned.h>
 
 #define CREATE_TRACE_POINTS
@@ -197,8 +196,7 @@ ufs_get_desired_pm_lvl_for_dev_link_state(enum ufs_dev_pwr_mode dev_state,
 static struct ufs_dev_fix ufs_fixups[] = {
 	/* UFS cards deviations table */
 	UFS_FIX(UFS_VENDOR_MICRON, UFS_ANY_MODEL,
-		UFS_DEVICE_QUIRK_DELAY_BEFORE_LPM |
-		UFS_DEVICE_QUIRK_SWAP_L2P_ENTRY_FOR_HPB_READ),
+		UFS_DEVICE_QUIRK_DELAY_BEFORE_LPM),
 	UFS_FIX(UFS_VENDOR_SAMSUNG, UFS_ANY_MODEL,
 		UFS_DEVICE_QUIRK_DELAY_BEFORE_LPM |
 		UFS_DEVICE_QUIRK_HOST_PA_TACTIVATE |
@@ -2737,13 +2735,6 @@ static int ufshcd_queuecommand(struct Scsi_Host *host, struct scsi_cmnd *cmd)
 
 	lrbp->req_abort_skip = false;
 
-	err = ufshpb_prep(hba, lrbp);
-	if (err == -EAGAIN) {
-		lrbp->cmd = NULL;
-		ufshcd_release(hba);
-		goto out;
-	}
-
 	ufshcd_comp_scsi_upiu(hba, lrbp);
 
 	err = ufshcd_map_sg(hba, lrbp);
@@ -3149,7 +3140,7 @@ out_unlock:
  *
  * Returns 0 for success, non-zero in case of failure
 */
-int ufshcd_query_attr_retry(struct ufs_hba *hba,
+static int ufshcd_query_attr_retry(struct ufs_hba *hba,
 	enum query_opcode opcode, enum attr_idn idn, u8 index, u8 selector,
 	u32 *attr_val)
 {
@@ -4943,26 +4934,6 @@ static int ufshcd_change_queue_depth(struct scsi_device *sdev, int depth)
 	return scsi_change_queue_depth(sdev, depth);
 }
 
-static void ufshcd_hpb_destroy(struct ufs_hba *hba, struct scsi_device *sdev)
-{
-	/* skip well-known LU */
-	if ((sdev->lun >= UFS_UPIU_MAX_UNIT_NUM_ID) ||
-	    !(hba->dev_info.hpb_enabled) || !ufshpb_is_allowed(hba))
-		return;
-
-	ufshpb_destroy_lu(hba, sdev);
-}
-
-static void ufshcd_hpb_configure(struct ufs_hba *hba, struct scsi_device *sdev)
-{
-	/* skip well-known LU */
-	if ((sdev->lun >= UFS_UPIU_MAX_UNIT_NUM_ID) ||
-	    !(hba->dev_info.hpb_enabled) || !ufshpb_is_allowed(hba))
-		return;
-
-	ufshpb_init_hpb_lu(hba, sdev);
-}
-
 /**
  * ufshcd_slave_configure - adjust SCSI device configurations
  * @sdev: pointer to SCSI device
@@ -4971,8 +4942,6 @@ static int ufshcd_slave_configure(struct scsi_device *sdev)
 {
 	struct ufs_hba *hba = shost_priv(sdev->host);
 	struct request_queue *q = sdev->request_queue;
-
-	ufshcd_hpb_configure(hba, sdev);
 
 	blk_queue_update_dma_pad(q, PRDT_DATA_BYTE_COUNT_PAD - 1);
 	if (hba->quirks & UFSHCD_QUIRK_ALIGN_SG_WITH_PAGE_SIZE)
@@ -5001,9 +4970,6 @@ static void ufshcd_slave_destroy(struct scsi_device *sdev)
 	unsigned long flags;
 
 	hba = shost_priv(sdev->host);
-
-	ufshcd_hpb_destroy(hba, sdev);
-
 	/* Drop the reference as it won't be needed anymore */
 	if (ufshcd_scsi_to_upiu_lun(sdev->lun) == UFS_UPIU_UFS_DEVICE_WLUN) {
 		spin_lock_irqsave(hba->host->host_lock, flags);
@@ -5124,9 +5090,6 @@ ufshcd_transfer_rsp_status(struct ufs_hba *hba, struct ufshcd_lrb *lrbp)
 			    ufshcd_is_exception_event(lrbp->ucd_rsp_ptr))
 				/* Flushed in suspend */
 				schedule_work(&hba->eeh_work);
-
-			if (scsi_status == SAM_STAT_GOOD)
-				ufshpb_rsp_upiu(hba, lrbp);
 			break;
 		case UPIU_TRANSACTION_REJECT_UPIU:
 			/* TODO: handle Reject UPIU Response */
@@ -7075,7 +7038,6 @@ static int ufshcd_host_reset_and_restore(struct ufs_hba *hba)
 	 * Stop the host controller and complete the requests
 	 * cleared by h/w
 	 */
-	ufshpb_reset_host(hba);
 	ufshcd_hba_stop(hba);
 	hba->silence_err_logs = true;
 	ufshcd_retry_aborted_requests(hba);
@@ -7474,7 +7436,6 @@ static int ufs_get_device_desc(struct ufs_hba *hba)
 {
 	int err;
 	u8 model_index;
-	u8 b_ufs_feature_sup;
 	u8 *desc_buf;
 	struct ufs_dev_info *dev_info = &hba->dev_info;
 
@@ -7502,25 +7463,8 @@ static int ufs_get_device_desc(struct ufs_hba *hba)
 	/* getting Specification Version in big endian format */
 	dev_info->wspecversion = desc_buf[DEVICE_DESC_PARAM_SPEC_VER] << 8 |
 				      desc_buf[DEVICE_DESC_PARAM_SPEC_VER + 1];
-	b_ufs_feature_sup = desc_buf[DEVICE_DESC_PARAM_UFS_FEAT];
 
 	model_index = desc_buf[DEVICE_DESC_PARAM_PRDCT_NAME];
-
-	if (dev_info->wspecversion >= UFS_DEV_HPB_SUPPORT_VERSION &&
-	    (b_ufs_feature_sup & UFS_DEV_HPB_SUPPORT)) {
-		bool hpb_en = false;
-
-		ufshpb_get_dev_info(hba, desc_buf);
-
-		if (!ufshpb_is_legacy(hba))
-			err = ufshcd_query_flag_retry(hba,
-						      UPIU_QUERY_OPCODE_READ_FLAG,
-						      QUERY_FLAG_IDN_HPB_EN, 0,
-						      &hpb_en);
-
-		if (ufshpb_is_legacy(hba) || (!err && hpb_en))
-			dev_info->hpb_enabled = true;
-	}
 
 	err = ufshcd_read_string_desc(hba, model_index,
 				      &dev_info->model, SD_ASCII_STD);
@@ -7753,10 +7697,6 @@ static int ufshcd_device_geo_params_init(struct ufs_hba *hba)
 	else if (desc_buf[GEOMETRY_DESC_PARAM_MAX_NUM_LUN] == 0)
 		hba->dev_info.max_lu_supported = 8;
 
-	if (hba->desc_size[QUERY_DESC_IDN_GEOMETRY] >=
-		GEOMETRY_DESC_PARAM_HPB_MAX_ACTIVE_REGS)
-		ufshpb_get_geo_info(hba, desc_buf);
-
 out:
 	kfree(desc_buf);
 	return err;
@@ -7899,7 +7839,6 @@ static int ufshcd_add_lus(struct ufs_hba *hba)
 	}
 
 	ufs_bsg_probe(hba);
-	ufshpb_init(hba);
 	scsi_scan_host(hba->host);
 	pm_runtime_put_sync(hba->dev);
 
@@ -8101,7 +8040,6 @@ static int ufshcd_probe_hba(struct ufs_hba *hba, bool init_dev_params)
 	/* Enable Auto-Hibernate if configured */
 	ufshcd_auto_hibern8_enable(hba);
 
-	ufshpb_reset(hba);
 out:
 	spin_lock_irqsave(hba->host->host_lock, flags);
 	if (ret)
@@ -8149,10 +8087,6 @@ out:
 static const struct attribute_group *ufshcd_driver_groups[] = {
 	&ufs_sysfs_unit_descriptor_group,
 	&ufs_sysfs_lun_attributes_group,
-#ifdef CONFIG_SCSI_UFS_HPB
-	&ufs_sysfs_hpb_stat_group,
-	&ufs_sysfs_hpb_param_group,
-#endif
 	NULL,
 };
 
@@ -8827,8 +8761,6 @@ static int __ufshcd_wl_suspend(struct ufs_hba *hba, enum ufs_pm_op pm_op)
 		req_link_state = UIC_LINK_OFF_STATE;
 	}
 
-	ufshpb_suspend(hba);
-
 	/*
 	 * If we can't transition into any of the low power modes
 	 * just gate the clocks.
@@ -8952,7 +8884,6 @@ out:
 		ufshcd_update_evt_hist(hba, UFS_EVT_WL_SUSP_ERR, (u32)ret);
 		hba->clk_gating.is_suspended = false;
 		ufshcd_release(hba);
-		ufshpb_resume(hba);
 	}
 	hba->pm_op_in_progress = false;
 	return ret;
@@ -9031,8 +8962,6 @@ static int __ufshcd_wl_resume(struct ufs_hba *hba, enum ufs_pm_op pm_op)
 
 	/* Enable Auto-Hibernate if configured */
 	ufshcd_auto_hibern8_enable(hba);
-
-	ufshpb_resume(hba);
 	goto out;
 
 set_old_link_state:
@@ -9384,7 +9313,6 @@ void ufshcd_remove(struct ufs_hba *hba)
 	if (hba->sdev_ufs_device)
 		ufshcd_rpm_get_sync(hba);
 	ufs_bsg_remove(hba);
-	ufshpb_remove(hba);
 	ufs_sysfs_remove_nodes(hba->dev);
 	blk_cleanup_queue(hba->tmf_queue);
 	blk_mq_free_tag_set(&hba->tmf_tag_set);
