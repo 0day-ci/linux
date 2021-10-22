@@ -8,11 +8,13 @@
  */
 
 #include <linux/ctype.h>
+#include <linux/delay.h>
 #include <linux/device.h>
 #include <linux/device-mapper.h>
 #include <linux/init.h>
 #include <linux/list.h>
 #include <linux/moduleparam.h>
+#include <linux/mount.h>
 
 #define DM_MSG_PREFIX "init"
 #define DM_MAX_DEVICES 256
@@ -20,6 +22,7 @@
 #define DM_MAX_STR_SIZE 4096
 
 static char *create;
+static char *bdev_wait;
 
 /*
  * Format: dm-mod.create=<name>,<uuid>,<minor>,<flags>,<table>[,<table>+][;<name>,<uuid>,<minor>,<flags>,<table>[,<table>+]+]
@@ -286,6 +289,12 @@ static int __init dm_init_init(void)
 	DMINFO("waiting for all devices to be available before creating mapped devices");
 	wait_for_device_probe();
 
+	if (bdev_wait) {
+		DMINFO("Waiting for block device %s...", bdev_wait);
+		while (!name_to_dev_t(bdev_wait))
+			msleep(5);
+	}
+
 	list_for_each_entry(dev, &devices, list) {
 		if (dm_early_create(&dev->dmi, dev->table,
 				    dev->target_args_array))
@@ -301,3 +310,5 @@ late_initcall(dm_init_init);
 
 module_param(create, charp, 0);
 MODULE_PARM_DESC(create, "Create a mapped device in early boot");
+module_param(bdev_wait, charp, 0);
+MODULE_PARM_DESC(bdev_wait, "Wait until the block device ready before dm_early_create");
