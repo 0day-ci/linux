@@ -43,8 +43,10 @@
 #define ITS_FLAGS_WORKAROUND_CAVIUM_22375	(1ULL << 1)
 #define ITS_FLAGS_WORKAROUND_CAVIUM_23144	(1ULL << 2)
 
-#define RDIST_FLAGS_PROPBASE_NEEDS_FLUSHING	(1 << 0)
-#define RDIST_FLAGS_RD_TABLES_PREALLOCATED	(1 << 1)
+#define RDISTS_FLAGS_PROPBASE_NEEDS_FLUSHING	(1 << 0)
+#define RDISTS_FLAGS_RD_TABLES_PREALLOCATED	(1 << 1)
+
+#define RDIST_FLAGS_LPI_ENABLED                 BIT(0)
 
 static u32 lpi_id_bits;
 
@@ -1415,7 +1417,7 @@ static void lpi_write_config(struct irq_data *d, u8 clr, u8 set)
 	 * And yes, we're flushing exactly: One. Single. Byte.
 	 * Humpf...
 	 */
-	if (gic_rdists->flags & RDIST_FLAGS_PROPBASE_NEEDS_FLUSHING)
+	if (gic_rdists->flags & RDISTS_FLAGS_PROPBASE_NEEDS_FLUSHING)
 		gic_flush_dcache_to_poc(cfg, sizeof(*cfg));
 	else
 		dsb(ishst);
@@ -2224,7 +2226,7 @@ static int gic_reserve_range(phys_addr_t addr, unsigned long size)
 
 static int __init its_setup_lpi_prop_table(void)
 {
-	if (gic_rdists->flags & RDIST_FLAGS_RD_TABLES_PREALLOCATED) {
+	if (gic_rdists->flags & RDISTS_FLAGS_RD_TABLES_PREALLOCATED) {
 		u64 val;
 
 		val = gicr_read_propbaser(gic_data_rdist_rd_base() + GICR_PROPBASER);
@@ -2978,8 +2980,8 @@ static int __init allocate_lpi_tables(void)
 	 */
 	val = readl_relaxed(gic_data_rdist_rd_base() + GICR_CTLR);
 	if ((val & GICR_CTLR_ENABLE_LPIS) && enabled_lpis_allowed()) {
-		gic_rdists->flags |= (RDIST_FLAGS_RD_TABLES_PREALLOCATED |
-				      RDIST_FLAGS_PROPBASE_NEEDS_FLUSHING);
+		gic_rdists->flags |= (RDISTS_FLAGS_RD_TABLES_PREALLOCATED |
+				      RDISTS_FLAGS_PROPBASE_NEEDS_FLUSHING);
 		pr_info("GICv3: Using preallocated redistributor tables\n");
 	}
 
@@ -3044,11 +3046,11 @@ static void its_cpu_init_lpis(void)
 	phys_addr_t paddr;
 	u64 val, tmp;
 
-	if (gic_data_rdist()->lpi_enabled)
+	if (gic_data_rdist()->flags & RDIST_FLAGS_LPI_ENABLED)
 		return;
 
 	val = readl_relaxed(rbase + GICR_CTLR);
-	if ((gic_rdists->flags & RDIST_FLAGS_RD_TABLES_PREALLOCATED) &&
+	if ((gic_rdists->flags & RDISTS_FLAGS_RD_TABLES_PREALLOCATED) &&
 	    (val & GICR_CTLR_ENABLE_LPIS)) {
 		/*
 		 * Check that we get the same property table on all
@@ -3095,7 +3097,7 @@ static void its_cpu_init_lpis(void)
 			gicr_write_propbaser(val, rbase + GICR_PROPBASER);
 		}
 		pr_info_once("GIC: using cache flushing for LPI property table\n");
-		gic_rdists->flags |= RDIST_FLAGS_PROPBASE_NEEDS_FLUSHING;
+		gic_rdists->flags |= RDISTS_FLAGS_PROPBASE_NEEDS_FLUSHING;
 	}
 
 	/* set PENDBASE */
@@ -3158,7 +3160,7 @@ static void its_cpu_init_lpis(void)
 	/* Make sure the GIC has seen the above */
 	dsb(sy);
 out:
-	gic_data_rdist()->lpi_enabled = true;
+	gic_data_rdist()->flags |= RDIST_FLAGS_LPI_ENABLED;
 	pr_info("GICv3: CPU%d: using %s LPI pending table @%pa\n",
 		smp_processor_id(),
 		gic_data_rdist()->pend_page ? "allocated" : "reserved",
@@ -5138,8 +5140,8 @@ static int redist_disable_lpis(void)
 	 *
 	 * If running with preallocated tables, there is nothing to do.
 	 */
-	if (gic_data_rdist()->lpi_enabled ||
-	    (gic_rdists->flags & RDIST_FLAGS_RD_TABLES_PREALLOCATED))
+	if ((gic_data_rdist()->flags & RDIST_FLAGS_LPI_ENABLED) ||
+	    (gic_rdists->flags & RDISTS_FLAGS_RD_TABLES_PREALLOCATED))
 		return 0;
 
 	/*
