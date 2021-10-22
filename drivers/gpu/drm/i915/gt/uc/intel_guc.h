@@ -104,6 +104,10 @@ struct intel_guc {
 		 */
 		struct list_head guc_id_list;
 		/**
+		 * @guc_ids_in_use: Number single-lrc guc_ids in use
+		 */
+		u16 guc_ids_in_use;
+		/**
 		 * @destroyed_contexts: list of contexts waiting to be destroyed
 		 * (deregistered with the GuC)
 		 */
@@ -114,6 +118,12 @@ struct intel_guc {
 		 * function as it might be in an atomic context (no sleeping)
 		 */
 		struct work_struct destroyed_worker;
+#define SCHED_DISABLE_DELAY_MS	100
+		/**
+		 * @sched_disable_delay_ms: schedule disable delay, in ms, for
+		 * contexts
+		 */
+		u64 sched_disable_delay_ms;
 	} submission_state;
 
 	/**

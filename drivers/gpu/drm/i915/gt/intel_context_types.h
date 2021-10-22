@@ -38,6 +38,7 @@ struct intel_context_ops {
 	int (*alloc)(struct intel_context *ce);
 
 	void (*ban)(struct intel_context *ce, struct i915_request *rq);
+	void (*close)(struct intel_context *ce);
 
 	int (*pre_pin)(struct intel_context *ce, struct i915_gem_ww_ctx *ww, void **vaddr);
 	int (*pin)(struct intel_context *ce, void *vaddr);
@@ -224,6 +225,12 @@ struct intel_context {
 	 * GuC), protected by guc->submission_state.lock
 	 */
 	struct list_head destroyed_link;
+
+	/**
+	 * @guc_sched_disable_delay: worker to disable scheduling on this
+	 * context
+	 */
+	struct delayed_work guc_sched_disable_delay;
 
 	/** @parallel: sub-structure for parallel submission members */
 	struct {

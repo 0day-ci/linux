@@ -60,7 +60,13 @@
  * corresponding G2H returns indicating the scheduling disable operation has
  * completed it is safe to unpin the context. While a disable is in flight it
  * isn't safe to resubmit the context so a fence is used to stall all future
- * requests of that context until the G2H is returned.
+ * requests of that context until the G2H is returned. Because this interaction
+ * with the GuC takes a non-zero amount of time / GuC cycles we delay the
+ * disabling of scheduling after the pin count goes to zero by configurable
+ * (default 100 ms) period of time. The thought is this gives the user a window
+ * of time to resubmit something on the context before doing a somewhat costly
+ * operation. This delay is only done if the context is close and less than 3/4
+ * of the guc_ids are in use.
  *
  * Context deregistration:
  * Before a context can be destroyed or if we steal its guc_id we must
@@ -1506,6 +1512,7 @@ int intel_guc_submission_init(struct intel_guc *guc)
 	INIT_LIST_HEAD(&guc->submission_state.destroyed_contexts);
 	INIT_WORK(&guc->submission_state.destroyed_worker,
 		  destroyed_worker_func);
+	guc->submission_state.sched_disable_delay_ms = SCHED_DISABLE_DELAY_MS;
 
 	guc->submission_state.guc_ids_bitmap =
 		bitmap_zalloc(NUMBER_MULTI_LRC_GUC_ID, GFP_KERNEL);
@@ -1610,6 +1617,9 @@ static int new_guc_id(struct intel_guc *guc, struct intel_context *ce)
 	if (unlikely(ret < 0))
 		return ret;
 
+	if (!intel_context_is_parent(ce))
+		guc->submission_state.guc_ids_in_use++;
+
 	ce->guc_id.id = ret;
 	return 0;
 }
@@ -1619,14 +1629,16 @@ static void __release_guc_id(struct intel_guc *guc, struct intel_context *ce)
 	GEM_BUG_ON(intel_context_is_child(ce));
 
 	if (!context_guc_id_invalid(ce)) {
-		if (intel_context_is_parent(ce))
+		if (intel_context_is_parent(ce)) {
 			bitmap_release_region(guc->submission_state.guc_ids_bitmap,
 					      ce->guc_id.id,
 					      order_base_2(ce->parallel.number_children
 							   + 1));
-		else
+		} else {
+			guc->submission_state.guc_ids_in_use--;
 			ida_simple_remove(&guc->submission_state.guc_ids,
 					  ce->guc_id.id);
+		}
 		reset_lrc_desc(guc, ce->guc_id.id);
 		set_context_guc_id_invalid(ce);
 	}
@@ -2329,41 +2341,98 @@ static void guc_context_ban(struct intel_context *ce, struct i915_request *rq)
 	}
 }
 
-static void guc_context_sched_disable(struct intel_context *ce)
+static void do_sched_disable(struct intel_guc *guc, struct intel_context *ce,
+			     unsigned long flags)
+	__releases(ce->guc_state.lock)
 {
-	struct intel_guc *guc = ce_to_guc(ce);
-	unsigned long flags;
 	struct intel_runtime_pm *runtime_pm = &ce->engine->gt->i915->runtime_pm;
 	intel_wakeref_t wakeref;
 	u16 guc_id;
 
-	GEM_BUG_ON(intel_context_is_child(ce));
-
-	spin_lock_irqsave(&ce->guc_state.lock, flags);
-
-	/*
-	 * We have to check if the context has been disabled by another thread,
-	 * check if submssion has been disabled to seal a race with reset and
-	 * finally check if any more requests have been committed to the
-	 * context ensursing that a request doesn't slip through the
-	 * 'context_pending_disable' fence.
-	 */
-	if (unlikely(!context_enabled(ce) || submission_disabled(guc) ||
-		     context_has_committed_requests(ce))) {
-		clr_context_enabled(ce);
-		spin_unlock_irqrestore(&ce->guc_state.lock, flags);
-		goto unpin;
-	}
+	lockdep_assert_held(&ce->guc_state.lock);
 	guc_id = prep_context_pending_disable(ce);
 
 	spin_unlock_irqrestore(&ce->guc_state.lock, flags);
 
 	with_intel_runtime_pm(runtime_pm, wakeref)
 		__guc_context_sched_disable(guc, ce, guc_id);
+}
 
-	return;
-unpin:
-	intel_context_sched_disable_unpin(ce);
+static bool bypass_sched_disable(struct intel_guc *guc,
+				 struct intel_context *ce)
+{
+	lockdep_assert_held(&ce->guc_state.lock);
+	GEM_BUG_ON(intel_context_is_child(ce));
+
+	if (submission_disabled(guc) || context_guc_id_invalid(ce) ||
+	    !lrc_desc_registered(guc, ce->guc_id.id)) {
+		clr_context_enabled(ce);
+		return true;
+	}
+
+	return !context_enabled(ce);
+}
+
+static void __delay_sched_disable(struct work_struct *wrk)
+{
+	struct intel_context *ce =
+		container_of(wrk, typeof(*ce), guc_sched_disable_delay.work);
+	struct intel_guc *guc = ce_to_guc(ce);
+	unsigned long flags;
+
+	spin_lock_irqsave(&ce->guc_state.lock, flags);
+
+	if (bypass_sched_disable(guc, ce)) {
+		spin_unlock_irqrestore(&ce->guc_state.lock, flags);
+		intel_context_sched_disable_unpin(ce);
+	} else {
+		do_sched_disable(guc, ce, flags);
+	}
+}
+
+static bool guc_id_pressure(struct intel_guc *guc, struct intel_context *ce)
+{
+	/*
+	 * parent contexts are perma-pinned, if we are unpinning do schedule
+	 * disable immediately.
+	 */
+	if (intel_context_is_parent(ce))
+		return true;
+
+	/*
+	 * If more than 3/4 of guc_ids in use, do schedule disable immediately.
+	 */
+	return guc->submission_state.guc_ids_in_use >
+		((GUC_MAX_LRC_DESCRIPTORS - NUMBER_MULTI_LRC_GUC_ID) / 4) * 3;
+}
+
+static void guc_context_sched_disable(struct intel_context *ce)
+{
+	struct intel_guc *guc = ce_to_guc(ce);
+	u64 delay = guc->submission_state.sched_disable_delay_ms;
+	unsigned long flags;
+
+	spin_lock_irqsave(&ce->guc_state.lock, flags);
+
+	if (bypass_sched_disable(guc, ce)) {
+		spin_unlock_irqrestore(&ce->guc_state.lock, flags);
+		intel_context_sched_disable_unpin(ce);
+	} else if (!intel_context_is_closed(ce) && !guc_id_pressure(guc, ce) &&
+		   delay) {
+		spin_unlock_irqrestore(&ce->guc_state.lock, flags);
+		mod_delayed_work(system_unbound_wq,
+				 &ce->guc_sched_disable_delay,
+				 msecs_to_jiffies(delay));
+	} else {
+		do_sched_disable(guc, ce, flags);
+	}
+}
+
+static void guc_context_close(struct intel_context *ce)
+{
+	if (test_bit(CONTEXT_GUC_INIT, &ce->flags) &&
+	    cancel_delayed_work(&ce->guc_sched_disable_delay))
+		__delay_sched_disable(&ce->guc_sched_disable_delay.work);
 }
 
 static inline void guc_lrc_desc_unpin(struct intel_context *ce)
@@ -2662,6 +2731,7 @@ static const struct intel_context_ops guc_context_ops = {
 	.post_unpin = guc_context_post_unpin,
 
 	.ban = guc_context_ban,
+	.close = guc_context_close,
 
 	.cancel_request = guc_context_cancel_request,
 
@@ -2738,6 +2808,10 @@ static void guc_context_init(struct intel_context *ce)
 	rcu_read_unlock();
 
 	ce->guc_state.prio = map_i915_prio_to_guc_prio(prio);
+
+	INIT_DELAYED_WORK(&ce->guc_sched_disable_delay,
+			  __delay_sched_disable);
+
 	set_bit(CONTEXT_GUC_INIT, &ce->flags);
 }
 
@@ -2774,6 +2848,9 @@ static int guc_request_alloc(struct i915_request *rq)
 
 	if (unlikely(!test_bit(CONTEXT_GUC_INIT, &ce->flags)))
 		guc_context_init(ce);
+
+	if (cancel_delayed_work(&ce->guc_sched_disable_delay))
+		intel_context_sched_disable_unpin(ce);
 
 	/*
 	 * Call pin_guc_id here rather than in the pinning step as with
@@ -2911,6 +2988,7 @@ static const struct intel_context_ops virtual_guc_context_ops = {
 	.post_unpin = guc_context_post_unpin,
 
 	.ban = guc_context_ban,
+	.close = guc_context_close,
 
 	.cancel_request = guc_context_cancel_request,
 
@@ -3002,6 +3080,7 @@ static const struct intel_context_ops virtual_parent_context_ops = {
 	.post_unpin = guc_context_post_unpin,
 
 	.ban = guc_context_ban,
+	.close = guc_context_close,
 
 	.cancel_request = guc_context_cancel_request,
 

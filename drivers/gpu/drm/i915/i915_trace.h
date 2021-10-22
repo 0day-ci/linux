@@ -929,6 +929,11 @@ DEFINE_EVENT(intel_context, intel_context_reset,
 	     TP_ARGS(ce)
 );
 
+DEFINE_EVENT(intel_context, intel_context_close,
+	     TP_PROTO(struct intel_context *ce),
+	     TP_ARGS(ce)
+);
+
 DEFINE_EVENT(intel_context, intel_context_ban,
 	     TP_PROTO(struct intel_context *ce),
 	     TP_ARGS(ce)
@@ -1028,6 +1033,11 @@ trace_intel_context_set_prio(struct intel_context *ce)
 
 static inline void
 trace_intel_context_reset(struct intel_context *ce)
+{
+}
+
+static inline void
+trace_intel_context_close(struct intel_context *ce)
 {
 }
 
