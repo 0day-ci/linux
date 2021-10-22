@@ -109,8 +109,6 @@ void lkdtm_READ_AFTER_FREE(void)
 	base[offset] = *val;
 	pr_info("Value in memory before free: %x\n", base[offset]);
 
-	kfree(base);
-
 	pr_info("Attempting bad read from freed memory\n");
 	saw = base[offset];
 	if (saw != *val) {
@@ -121,6 +119,7 @@ void lkdtm_READ_AFTER_FREE(void)
 		pr_expected_config_param(CONFIG_INIT_ON_FREE_DEFAULT_ON, "init_on_free");
 	}
 
+	kfree(base);
 	kfree(val);
 }
 
