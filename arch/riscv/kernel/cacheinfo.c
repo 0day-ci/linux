@@ -29,7 +29,7 @@ static struct cacheinfo *get_cacheinfo(u32 level, enum cache_type type)
 	/*
 	 * Using raw_smp_processor_id() elides a preemptability check, but this
 	 * is really indicative of a larger problem: the cacheinfo UABI assumes
-	 * that cores have a homonogenous view of the cache hierarchy.  That
+	 * that cores have a homogeneous view of the cache hierarchy.  That
 	 * happens to be the case for the current set of RISC-V systems, but
 	 * likely won't be true in general.  Since there's no way to provide
 	 * correct information for these systems via the current UABI we're
