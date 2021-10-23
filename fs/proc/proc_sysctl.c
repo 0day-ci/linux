@@ -1146,6 +1146,26 @@ static int sysctl_check_table(const char *path, struct ctl_table *table)
 	return err;
 }
 
+static size_t new_links_size(size_t nr_entries, size_t name_bytes)
+{
+	size_t bytes;
+
+	if (check_add_overflow(nr_entries, (size_t)1, &bytes))
+		return SIZE_MAX;
+	if (check_add_overflow(sizeof(struct ctl_table_header),
+			       array_size(sizeof(struct ctl_node), nr_entries),
+			       &bytes))
+		return SIZE_MAX;
+	if (check_add_overflow(bytes, array_size(sizeof(struct ctl_table),
+						 nr_entries + 1),
+			       &bytes))
+		return SIZE_MAX;
+	if (check_add_overflow(bytes, name_bytes, &bytes))
+		return SIZE_MAX;
+
+	return bytes;
+}
+
 static struct ctl_table_header *new_links(struct ctl_dir *dir, struct ctl_table *table,
 	struct ctl_table_root *link_root)
 {
@@ -1162,11 +1182,15 @@ static struct ctl_table_header *new_links(struct ctl_dir *dir, struct ctl_table 
 		name_bytes += strlen(entry->procname) + 1;
 	}
 
-	links = kzalloc(sizeof(struct ctl_table_header) +
-			sizeof(struct ctl_node)*nr_entries +
-			sizeof(struct ctl_table)*(nr_entries + 1) +
-			name_bytes,
-			GFP_KERNEL);
+	/*
+	 * Allocation layout in bytes:
+	 *
+	 * sizeof(struct ctl_table_header) +
+	 * sizeof(struct ctl_node) * nr_entries +
+	 * sizeof(struct ctl_table) * (nr_entries + 1) +
+	 * name_bytes
+	 */
+	links = kzalloc(new_links_size(nr_entries, name_bytes), GFP_KERNEL);
 
 	if (!links)
 		return NULL;
@@ -1258,6 +1282,18 @@ out:
 	return err;
 }
 
+static inline size_t sysctl_table_size(int nr_entries)
+{
+	size_t bytes;
+
+	if (check_add_overflow(sizeof(struct ctl_table_header),
+			       array_size(sizeof(struct ctl_node), nr_entries),
+			       &bytes))
+		return SIZE_MAX;
+
+	return bytes;
+}
+
 /**
  * __register_sysctl_table - register a leaf sysctl table
  * @set: Sysctl tree to register on
@@ -1315,8 +1351,13 @@ struct ctl_table_header *__register_sysctl_table(
 	for (entry = table; entry->procname; entry++)
 		nr_entries++;
 
-	header = kzalloc(sizeof(struct ctl_table_header) +
-			 sizeof(struct ctl_node)*nr_entries, GFP_KERNEL);
+	/*
+	 * Allocation layout in bytes:
+	 *
+	 * sizeof(struct ctl_table_header) +
+	 * sizeof(struct ctl_node) * nr_entries
+	 */
+	header = kzalloc(sysctl_table_size(nr_entries), GFP_KERNEL);
 	if (!header)
 		return NULL;
 
@@ -1437,8 +1478,11 @@ static int register_leaf_sysctl_tables(const char *path, char *pos,
 	/* If there are mixed files and directories we need a new table */
 	if (nr_dirs && nr_files) {
 		struct ctl_table *new;
-		files = kcalloc(nr_files + 1, sizeof(struct ctl_table),
-				GFP_KERNEL);
+		int n;
+
+		if (unlikely(check_add_overflow(nr_files, 1, &n)))
+			goto out;
+		files = kcalloc(n, sizeof(struct ctl_table), GFP_KERNEL);
 		if (!files)
 			goto out;
 
@@ -1490,6 +1534,19 @@ out:
 	return err;
 }
 
+static inline size_t sysctl_paths_size(int nr_subheaders)
+{
+	size_t bytes;
+
+	if (check_add_overflow(sizeof(struct ctl_table_header),
+			       array_size(sizeof(struct ctl_table_header *),
+					  nr_subheaders),
+			       &bytes))
+		return SIZE_MAX;
+
+	return bytes;
+}
+
 /**
  * __register_sysctl_paths - register a sysctl table hierarchy
  * @set: Sysctl tree to register on
@@ -1532,8 +1589,13 @@ struct ctl_table_header *__register_sysctl_paths(
 		if (header)
 			header->ctl_table_arg = ctl_table_arg;
 	} else {
-		header = kzalloc(sizeof(*header) +
-				 sizeof(*subheaders)*nr_subheaders, GFP_KERNEL);
+		/*
+		 * Allocation layout in bytes:
+		 *
+		 * sizeof(struct ctl_table_header) +
+		 * sizeof(struct ctl_table_header *) * nr_subheaders
+		 */
+		header = kzalloc(sysctl_paths_size(nr_subheaders), GFP_KERNEL);
 		if (!header)
 			goto out;
 
