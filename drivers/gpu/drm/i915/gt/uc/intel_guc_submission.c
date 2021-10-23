@@ -3662,6 +3662,8 @@ static void capture_worker_func(struct work_struct *w)
 	with_intel_runtime_pm(&i915->runtime_pm, wakeref)
 		i915_capture_error_state(gt, ce->engine->mask);
 
+	intel_context_put(ce);
+
 	if (!list_empty(&guc->submission_state.capture_list))
 		queue_work(system_unbound_wq,
 			   &guc->submission_state.capture_worker);
@@ -3711,7 +3713,7 @@ static void guc_context_replay(struct intel_context *ce)
 	tasklet_hi_schedule(&sched_engine->tasklet);
 }
 
-static void guc_handle_context_reset(struct intel_guc *guc,
+static bool guc_handle_context_reset(struct intel_guc *guc,
 				     struct intel_context *ce)
 {
 	trace_intel_context_reset(ce);
@@ -3724,7 +3726,11 @@ static void guc_handle_context_reset(struct intel_guc *guc,
 		   !context_blocked(ce))) {
 		capture_error_state(guc, ce);
 		guc_context_replay(ce);
+
+		return false;
 	}
+
+	return true;
 }
 
 int intel_guc_context_reset_process_msg(struct intel_guc *guc,
@@ -3732,6 +3738,7 @@ int intel_guc_context_reset_process_msg(struct intel_guc *guc,
 {
 	struct intel_context *ce;
 	int desc_idx;
+	unsigned long flags;
 
 	if (unlikely(len != 1)) {
 		drm_err(&guc_to_gt(guc)->i915->drm, "Invalid length %u", len);
@@ -3739,11 +3746,24 @@ int intel_guc_context_reset_process_msg(struct intel_guc *guc,
 	}
 
 	desc_idx = msg[0];
+
+	/*
+	 * The context lookup uses the xarray but lookups only require an RCU lock
+	 * not the full spinlock. So take the lock explicitly and keep it until the
+	 * context has been reference count locked to ensure it can't be destroyed
+	 * asynchronously until the reset is done.
+	 */
+	xa_lock_irqsave(&guc->context_lookup, flags);
 	ce = g2h_context_lookup(guc, desc_idx);
+	if (ce)
+		intel_context_get(ce);
+	xa_unlock_irqrestore(&guc->context_lookup, flags);
+
 	if (unlikely(!ce))
 		return -EPROTO;
 
-	guc_handle_context_reset(guc, ce);
+	if (guc_handle_context_reset(guc, ce))
+		intel_context_put(ce);
 
 	return 0;
 }
