@@ -413,7 +413,7 @@ static int FIX_O_NONBLOCK(int flags)
 			!test_thread_flag(TIF_NONBLOCK_WARNING)) {
 		set_thread_flag(TIF_NONBLOCK_WARNING);
 		pr_warn("%s(%d) uses a deprecated O_NONBLOCK value."
-			" Plase recompile with newer glibc.\n",
+			" Please recompile with newer glibc.\n",
 			current->comm, current->pid);
 	}
 	return flags & ~O_NONBLOCK_MASK_OUT;
