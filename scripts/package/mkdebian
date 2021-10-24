@@ -132,6 +132,14 @@ else
         echo >&2 "Install lsb-release or set \$KDEB_CHANGELOG_DIST explicitly"
 fi
 
+image_depends=
+if is_enabled MODULES; then
+    image_depends=kmod
+fi
+if is_enabled BLK_DEV_INITRD && ! is_enabled INITRAMFS_SOURCE; then
+    image_depends="${image_depends}${image_depends:+, }initramfs-tools | linux-initramfs-tool"
+fi
+
 mkdir -p debian/source/
 echo "1.0" > debian/source/format
 
@@ -180,6 +188,7 @@ Homepage: https://www.kernel.org/
 
 Package: $packagename-$version
 Architecture: $debarch
+Depends: $image_depends
 Description: Linux kernel, version $version
  This package contains the Linux kernel, modules and corresponding other
  files, version: $version.
