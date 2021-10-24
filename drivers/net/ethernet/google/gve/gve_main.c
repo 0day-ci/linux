@@ -866,7 +866,7 @@ static int gve_alloc_qpls(struct gve_priv *priv)
 	}
 
 	priv->qpl_cfg.qpl_map_size = BITS_TO_LONGS(num_qpls) *
-				     sizeof(unsigned long) * BITS_PER_BYTE;
+				     sizeof(unsigned long);
 	priv->qpl_cfg.qpl_id_map = kvcalloc(BITS_TO_LONGS(num_qpls),
 					    sizeof(unsigned long), GFP_KERNEL);
 	if (!priv->qpl_cfg.qpl_id_map) {
