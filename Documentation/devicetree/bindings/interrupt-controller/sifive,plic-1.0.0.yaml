@@ -35,6 +35,10 @@ description:
   contains a specific memory layout, which is documented in chapter 8 of the
   SiFive U5 Coreplex Series Manual <https://static.dev.sifive.com/U54-MC-RVCoreIP.pdf>.
 
+  The thead,c900-plic couldn't complete masked irq source which has been disabled in
+  enable register. Add thead_plic_chip which fix up c906-plic irq source completion
+  problem by unmask/mask wrapper.
+
 maintainers:
   - Sagar Kadam <sagar.kadam@sifive.com>
   - Paul Walmsley  <paul.walmsley@sifive.com>
@@ -42,11 +46,16 @@ maintainers:
 
 properties:
   compatible:
-    items:
+   oneOf:
+    - items:
       - enum:
-          - sifive,fu540-c000-plic
-          - canaan,k210-plic
+        - sifive,fu540-c000-plic
+        - canaan,k210-plic
       - const: sifive,plic-1.0.0
+    - items:
+      - enum:
+        - allwinner,sun20i-d1-plic
+      - const: thead,c900-plic
 
   reg:
     maxItems: 1
