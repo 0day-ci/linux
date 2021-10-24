@@ -12,6 +12,16 @@ maintainers:
 allOf:
   - $ref: name-prefix.yaml#
 
+  - if:
+      properties:
+        compatible:
+          contains:
+            const: nxp,tfa9897
+    then:
+      properties:
+        rcv-gpios:
+          description: optional GPIO to be asserted when receiver mode is enabled.
+
 properties:
   compatible:
     enum:
