@@ -98,3 +98,6 @@ config CLK_IMX8QXP
 	select MXC_CLK_SCU
 	help
 	  Build the driver for IMX8QXP SCU based clocks.
+config CLK_IMXRT
+	def_bool SOC_IMXRT
+	select MXC_CLK
