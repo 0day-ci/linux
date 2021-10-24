@@ -202,6 +202,28 @@ export DEB_MAINT_PARAMS="\$*"
 # Tell initramfs builder whether it's wanted
 export INITRD=$(if_enabled_echo CONFIG_BLK_DEV_INITRD Yes No)
 
+# Call linux-base scripts if they are installed
+if command -v linux-update-symlinks > /dev/null; then
+    if [ $script = preinst ] && [ "\$1" = install ]; then
+        mkdir -p /lib/modules/$version
+        touch /lib/modules/$version/.fresh-install
+    elif [ $script = postinst ] && [ "\$1" = configure ]; then
+        if [ -f /lib/modules/$version/.fresh-install ]; then
+            linux-update-symlinks install $version /$installed_image_path
+            rm /lib/modules/$version/.fresh-install
+        else
+            linux-update-symlinks upgrade $version /$installed_image_path
+        fi
+    elif [ $script = prerm ] && [ "\$1" = remove ]; then
+        linux-check-removal $version
+    elif [ $script = postrm ]; then
+        rm -f /lib/modules/$version/.fresh-install
+        if [ "\$1" != upgrade ]; then
+            linux-update-symlinks remove $version /$installed_image_path
+        fi
+    fi
+fi
+
 test -d $debhookdir/$script.d && run-parts --arg="$version" --arg="/$installed_image_path" $debhookdir/$script.d
 exit 0
 EOF
