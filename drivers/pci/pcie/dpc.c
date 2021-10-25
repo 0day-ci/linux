@@ -262,16 +262,24 @@ static int dpc_get_aer_uncorrect_severity(struct pci_dev *dev,
 
 void dpc_process_error(struct pci_dev *pdev)
 {
-	u16 cap = pdev->dpc_cap, status, source, reason, ext_reason;
+	u16 cap = pdev->dpc_cap, status, reason, ext_reason;
 	struct aer_err_info info;
 
 	pci_read_config_word(pdev, cap + PCI_EXP_DPC_STATUS, &status);
-	pci_read_config_word(pdev, cap + PCI_EXP_DPC_SOURCE_ID, &source);
+	reason = (status & PCI_EXP_DPC_STATUS_TRIGGER_RSN) >> 1;
+
+	/*
+	 * Per PCIe r5.0, sec 7.9.15.5, the Source ID is defined only when the
+	 * Trigger Reason indicates ERR_NONFATAL or ERR_FATAL.
+	 */
+	if (reason == 1 || reason == 2)
+		pci_read_config_word(pdev, cap + PCI_EXP_DPC_SOURCE_ID, &info.id);
+	else
+		info.id = 0;
 
 	pci_info(pdev, "containment event, status:%#06x source:%#06x\n",
-		 status, source);
+		 status, info.id);
 
-	reason = (status & PCI_EXP_DPC_STATUS_TRIGGER_RSN) >> 1;
 	ext_reason = (status & PCI_EXP_DPC_STATUS_TRIGGER_RSN_EXT) >> 5;
 	pci_warn(pdev, "%s detected\n",
 		 (reason == 0) ? "unmasked uncorrectable error" :
