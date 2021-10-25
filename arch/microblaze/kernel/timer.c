@@ -251,6 +251,9 @@ static int __init xilinx_timer_init(struct device_node *timer)
 	u32 timer_num = 1;
 	int ret;
 
+	if (of_property_read_bool(np, "#pwm-cells"))
+		return 0;
+
 	if (initialized)
 		return -EINVAL;
 
