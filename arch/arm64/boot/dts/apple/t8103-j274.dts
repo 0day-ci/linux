@@ -17,6 +17,7 @@
 
 	aliases {
 		serial0 = &serial0;
+		serial2 = &serial2;
 	};
 
 	chosen {
@@ -41,5 +42,9 @@
 };
 
 &serial0 {
+	status = "okay";
+};
+
+&serial2 {
 	status = "okay";
 };
