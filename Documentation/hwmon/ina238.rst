@@ -1,0 +1,57 @@
+.. SPDX-License-Identifier: GPL-2.0-only
+
+Kernel driver ina238
+====================
+
+Supported chips:
+
+  * Texas Instruments INA238
+
+    Prefix: 'ina238'
+
+    Addresses: I2C 0x40 - 0x4f
+
+    Datasheet:
+	https://www.ti.com/lit/gpn/ina238
+
+Author: Nathan Rossi <nathan.rossi@digi.com>
+
+Description
+-----------
+
+The INA238 is a current shunt, power and temperature monitor with an I2C
+interface. It includes a number of programmable functions including alerts,
+conversion rate, sample averaging and selectable shunt voltage accuracy.
+
+The shunt value in micro-ohms can be set via platform data or device tree at
+compile-time or via the shunt_resistor attribute in sysfs at run-time. Please
+refer to the Documentation/devicetree/bindings/hwmon/ti,ina2xx.yaml for bindings
+if the device tree is used.
+
+Sysfs entries
+-------------
+
+======================= =======================================================
+in0_input		Shunt voltage (mV)
+in0_lcrit		Critical low shunt voltage
+in0_crit		Critical high shunt voltage
+
+in1_input		Bus voltage (mV)
+in1_lcrit		Critical low bus voltage (mV)
+in1_crit		Critical high bus voltage (mV)
+
+power1_input		Power measurement (uW)
+power1_crit		Critical power limit (uW)
+
+curr1_input		Current measurement (mA)
+
+temp1_input		Die temperature measurement (mC)
+temp1_crit		Critical die temperature limit (mC)
+
+shunt_resistor		Shunt resistance (uOhm)
+======================= =======================================================
+
+.. note::
+
+   - Configure `shunt_resistor` before configure `power1_crit`, because power
+     value is calculated based on `shunt_resistor` set.
