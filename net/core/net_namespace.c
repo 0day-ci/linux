@@ -360,7 +360,7 @@ static int __net_init net_defaults_init_net(struct net *net)
 {
 	net->core.sysctl_somaxconn = SOMAXCONN;
 
-	net->core.sysctl_txrehash = SOCK_TXREHASH_DISABLED;
+	net->core.sysctl_txrehash = SOCK_TXREHASH_ENABLED;
 
 	return 0;
 }
