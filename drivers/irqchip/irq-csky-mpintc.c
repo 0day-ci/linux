@@ -164,8 +164,8 @@ static int csky_irq_set_affinity(struct irq_data *d,
 static struct irq_chip csky_irq_chip = {
 	.name           = "C-SKY SMP Intc",
 	.irq_eoi	= csky_mpintc_eoi,
-	.irq_enable	= csky_mpintc_enable,
-	.irq_disable	= csky_mpintc_disable,
+	.irq_unmask	= csky_mpintc_enable,
+	.irq_mask	= csky_mpintc_disable,
 	.irq_set_type	= csky_mpintc_set_type,
 #ifdef CONFIG_SMP
 	.irq_set_affinity = csky_irq_set_affinity,
