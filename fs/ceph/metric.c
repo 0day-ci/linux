@@ -278,6 +278,8 @@ int ceph_metric_init(struct ceph_client_metric *m)
 	if (ret)
 		goto err_total_inodes;
 
+	atomic64_set(&m->total_copyfrom, 0);
+
 	m->session = NULL;
 	INIT_DELAYED_WORK(&m->delayed_work, metric_delayed_work);
 

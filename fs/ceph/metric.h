@@ -169,6 +169,8 @@ struct ceph_client_metric {
 	struct percpu_counter opened_inodes;
 	struct percpu_counter total_inodes;
 
+	atomic64_t total_copyfrom;
+
 	struct ceph_mds_session *session;
 	struct delayed_work delayed_work;  /* delayed work */
 };

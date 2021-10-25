@@ -235,6 +235,12 @@ static int metric_show(struct seq_file *s, void *p)
 		   percpu_counter_sum(&m->i_caps_mis),
 		   percpu_counter_sum(&m->i_caps_hit));
 
+	seq_printf(s, "\n");
+	seq_printf(s, "item          total\n");
+	seq_printf(s, "-------------------\n");
+	seq_printf(s, "%-14s%-16lld\n", "copy-from",
+		   atomic64_read(&m->total_copyfrom));
+
 	return 0;
 }
 
