@@ -574,7 +574,9 @@ static void pcpu_isolate_chunk(struct pcpu_chunk *chunk)
 
 	if (!chunk->isolated) {
 		chunk->isolated = true;
-		pcpu_nr_empty_pop_pages -= chunk->nr_empty_pop_pages;
+		WRITE_ONCE(pcpu_nr_empty_pop_pages,
+			   READ_ONCE(pcpu_nr_empty_pop_pages) -
+			   chunk->nr_empty_pop_pages);
 	}
 	list_move(&chunk->list, &pcpu_chunk_lists[pcpu_to_depopulate_slot]);
 }
@@ -585,7 +587,9 @@ static void pcpu_reintegrate_chunk(struct pcpu_chunk *chunk)
 
 	if (chunk->isolated) {
 		chunk->isolated = false;
-		pcpu_nr_empty_pop_pages += chunk->nr_empty_pop_pages;
+		WRITE_ONCE(pcpu_nr_empty_pop_pages,
+			   READ_ONCE(pcpu_nr_empty_pop_pages) +
+			   chunk->nr_empty_pop_pages);
 		pcpu_chunk_relocate(chunk, -1);
 	}
 }
@@ -603,7 +607,8 @@ static inline void pcpu_update_empty_pages(struct pcpu_chunk *chunk, int nr)
 {
 	chunk->nr_empty_pop_pages += nr;
 	if (chunk != pcpu_reserved_chunk && !chunk->isolated)
-		pcpu_nr_empty_pop_pages += nr;
+		WRITE_ONCE(pcpu_nr_empty_pop_pages,
+			   READ_ONCE(pcpu_nr_empty_pop_pages) + nr);
 }
 
 /*
@@ -1874,7 +1879,7 @@ area_found:
 		mutex_unlock(&pcpu_alloc_mutex);
 	}
 
-	if (pcpu_nr_empty_pop_pages < PCPU_EMPTY_POP_PAGES_LOW)
+	if (READ_ONCE(pcpu_nr_empty_pop_pages) < PCPU_EMPTY_POP_PAGES_LOW)
 		pcpu_schedule_balance_work();
 
 	/* clear the areas and return address relative to base address */
@@ -2062,7 +2067,7 @@ retry_pop:
 		pcpu_atomic_alloc_failed = false;
 	} else {
 		nr_to_pop = clamp(PCPU_EMPTY_POP_PAGES_HIGH -
-				  pcpu_nr_empty_pop_pages,
+				  READ_ONCE(pcpu_nr_empty_pop_pages),
 				  0, PCPU_EMPTY_POP_PAGES_HIGH);
 	}
 
@@ -2163,7 +2168,8 @@ static void pcpu_reclaim_populated(void)
 				break;
 
 			/* reintegrate chunk to prevent atomic alloc failures */
-			if (pcpu_nr_empty_pop_pages < PCPU_EMPTY_POP_PAGES_HIGH) {
+			if (READ_ONCE(pcpu_nr_empty_pop_pages) <
+			    PCPU_EMPTY_POP_PAGES_HIGH) {
 				reintegrate = true;
 				goto end_chunk;
 			}
