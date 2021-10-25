@@ -118,25 +118,9 @@ test_config_present()
 	fi
 }
 
-# Defaults :
-#
-# send_uevent: 1
-# sync_direct: 0
-# name: test-firmware.bin
-# num_requests: 4
-config_reset()
-{
-	echo 1 >  $DIR/reset
-}
-
 release_all_firmware()
 {
 	echo 1 >  $DIR/release_all_firmware
-}
-
-config_set_name()
-{
-	echo -n $1 >  $DIR/config_name
 }
 
 config_set_into_buf()

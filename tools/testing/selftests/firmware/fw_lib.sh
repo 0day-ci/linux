@@ -221,3 +221,20 @@ kconfig_has()
 		fi
 	fi
 }
+
+# Defaults :
+#
+# send_uevent: 1
+# sync_direct: 0
+# name: test-firmware.bin
+# num_requests: 4
+config_reset()
+{
+	echo 1 >  $DIR/reset
+}
+
+
+config_set_name()
+{
+	echo -n $1 >  $DIR/config_name
+}
