@@ -273,21 +273,9 @@ static void drm_aperture_detach_drivers(resource_size_t base, resource_size_t si
 	mutex_unlock(&drm_apertures_lock);
 }
 
-/**
- * drm_aperture_remove_conflicting_framebuffers - remove existing framebuffers in the given range
- * @base: the aperture's base address in physical memory
- * @size: aperture size in bytes
- * @primary: also kick vga16fb if present
- * @req_driver: requesting DRM driver
- *
- * This function removes graphics device drivers which use memory range described by
- * @base and @size.
- *
- * Returns:
- * 0 on success, or a negative errno code otherwise
- */
-int drm_aperture_remove_conflicting_framebuffers(resource_size_t base, resource_size_t size,
-						 bool primary, const struct drm_driver *req_driver)
+static int drm_aperture_remove_conflicting_fbdev_framebuffers(resource_size_t base,
+							      resource_size_t size, bool primary,
+							      const struct drm_driver *req_driver)
 {
 #if IS_REACHABLE(CONFIG_FB)
 	struct apertures_struct *a;
@@ -306,6 +294,31 @@ int drm_aperture_remove_conflicting_framebuffers(resource_size_t base, resource_
 	if (ret)
 		return ret;
 #endif
+	return 0;
+}
+
+/**
+ * drm_aperture_remove_conflicting_framebuffers - remove existing framebuffers in the given range
+ * @base: the aperture's base address in physical memory
+ * @size: aperture size in bytes
+ * @primary: also kick vga16fb if present
+ * @req_driver: requesting DRM driver
+ *
+ * This function removes graphics device drivers which use memory range described by
+ * @base and @size.
+ *
+ * Returns:
+ * 0 on success, or a negative errno code otherwise
+ */
+int drm_aperture_remove_conflicting_framebuffers(resource_size_t base, resource_size_t size,
+						 bool primary, const struct drm_driver *req_driver)
+{
+	int ret;
+
+	ret = drm_aperture_remove_conflicting_fbdev_framebuffers(base, size, primary,
+								 req_driver);
+	if (ret)
+		return ret;
 
 	drm_aperture_detach_drivers(base, size);
 
