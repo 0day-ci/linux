@@ -17,6 +17,7 @@
 #include <linux/of_platform.h>
 #include <linux/platform_device.h>
 #include <linux/phy/phy.h>
+#include <linux/pm_domain.h>
 #include <linux/usb/of.h>
 #include <linux/reset.h>
 #include <linux/iopoll.h>
@@ -89,6 +90,14 @@ struct dwc3_qcom {
 	bool			pm_suspended;
 	struct icc_path		*icc_path_ddr;
 	struct icc_path		*icc_path_apps;
+
+	/* power domain for cx */
+	struct device		*pd_cx;
+	struct device_link	*pd_link_cx;
+
+	/* power domain for usb gdsc */
+	struct device		*pd_usb_gdsc;
+	struct device_link	*pd_link_usb_gdsc;
 };
 
 static inline void dwc3_qcom_setbits(void __iomem *base, u32 offset, u32 val)
@@ -521,6 +530,79 @@ static int dwc3_qcom_setup_irq(struct platform_device *pdev)
 	return 0;
 }
 
+static int dwc3_qcom_attach_pd(struct device *dev)
+{
+	struct dwc3_qcom *qcom = dev_get_drvdata(dev);
+	int ret;
+
+	/* Do nothing when in a single power domain */
+	if (dev->pm_domain)
+		return 0;
+
+	qcom->pd_cx = dev_pm_domain_attach_by_id(dev, 0);
+	if (IS_ERR_OR_NULL(qcom->pd_cx)) {
+		dev_err(dev, "Failed to attach cx pd.\n");
+
+		if (!qcom->pd_cx)
+			return -EINVAL;
+		else
+			return PTR_ERR(qcom->pd_cx);
+	}
+
+	qcom->pd_link_cx = device_link_add(dev, qcom->pd_cx,
+			DL_FLAG_STATELESS |
+			DL_FLAG_PM_RUNTIME |
+			DL_FLAG_RPM_ACTIVE);
+	if (!qcom->pd_link_cx) {
+		dev_err(dev, "Failed to add device_link to cx pd.\n");
+		ret = -EINVAL;
+		goto detach_cx_pd;
+	}
+
+	qcom->pd_usb_gdsc = dev_pm_domain_attach_by_id(dev, 1);
+	if (IS_ERR_OR_NULL(qcom->pd_usb_gdsc)) {
+		dev_err(dev, "Failed to attach usb gdsc pd.\n");
+		if (!qcom->pd_usb_gdsc)
+			ret = -EINVAL;
+		else
+			ret = PTR_ERR(qcom->pd_usb_gdsc);
+		goto del_cx_link;
+	}
+
+	qcom->pd_link_usb_gdsc = device_link_add(dev, qcom->pd_usb_gdsc,
+			DL_FLAG_STATELESS |
+			DL_FLAG_PM_RUNTIME |
+			DL_FLAG_RPM_ACTIVE);
+	if (!qcom->pd_link_usb_gdsc) {
+		dev_err(dev, "Failed to add device_link to usb gdsc pd.\n");
+		ret = -EINVAL;
+		goto detach_gdsc_pd;
+	}
+
+	return 0;
+
+detach_gdsc_pd:
+	dev_pm_domain_detach(qcom->pd_usb_gdsc, true);
+del_cx_link:
+	device_link_del(qcom->pd_link_cx);
+detach_cx_pd:
+	dev_pm_domain_detach(qcom->pd_cx, true);
+	return ret;
+}
+
+static void dwc3_qcom_detach_pd(struct device *dev)
+{
+	struct dwc3_qcom *qcom = dev_get_drvdata(dev);
+
+	if (dev->pm_domain)
+		return;
+
+	device_link_del(qcom->pd_link_usb_gdsc);
+	dev_pm_domain_detach(qcom->pd_usb_gdsc, true);
+	device_link_del(qcom->pd_link_cx);
+	dev_pm_domain_detach(qcom->pd_cx, true);
+}
+
 static int dwc3_qcom_clk_init(struct dwc3_qcom *qcom, int count)
 {
 	struct device		*dev = qcom->dev;
@@ -837,6 +919,10 @@ static int dwc3_qcom_probe(struct platform_device *pdev)
 	if (ret)
 		goto interconnect_exit;
 
+	ret = dwc3_qcom_attach_pd(dev);
+	if (ret)
+		goto interconnect_exit;
+
 	device_init_wakeup(&pdev->dev, 1);
 	qcom->is_suspended = false;
 	pm_runtime_set_active(dev);
@@ -878,6 +964,7 @@ static int dwc3_qcom_remove(struct platform_device *pdev)
 	}
 	qcom->num_clocks = 0;
 
+	dwc3_qcom_detach_pd(dev);
 	dwc3_qcom_interconnect_exit(qcom);
 	reset_control_assert(qcom->resets);
 
