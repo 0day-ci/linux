@@ -571,6 +571,14 @@ static void lo_rw_aio_complete(struct kiocb *iocb, long ret, long ret2)
 	lo_rw_aio_do_completion(cmd);
 }
 
+static inline int lo_call_backing_rw_iter(struct file *file,
+		struct kiocb *iocb, struct iov_iter *iter, bool rw)
+{
+	if (rw == WRITE)
+		return call_write_iter(file, iocb, iter);
+	return call_read_iter(file, iocb, iter);
+}
+
 static int lo_rw_aio(struct loop_device *lo, struct loop_cmd *cmd,
 		     loff_t pos, bool rw)
 {
@@ -628,10 +636,7 @@ static int lo_rw_aio(struct loop_device *lo, struct loop_cmd *cmd,
 	cmd->iocb.ki_flags = IOCB_DIRECT;
 	cmd->iocb.ki_ioprio = IOPRIO_PRIO_VALUE(IOPRIO_CLASS_NONE, 0);
 
-	if (rw == WRITE)
-		ret = call_write_iter(file, &cmd->iocb, &iter);
-	else
-		ret = call_read_iter(file, &cmd->iocb, &iter);
+	ret = lo_call_backing_rw_iter(file, &cmd->iocb, &iter, rw);
 
 	lo_rw_aio_do_completion(cmd);
 
