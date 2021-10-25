@@ -831,6 +831,67 @@ static const struct file_operations fops_soc_dp_stats = {
 	.llseek = default_llseek,
 };
 
+static ssize_t ath11k_write_rx_hash(struct file *file,
+				    const char __user *ubuf,
+				    size_t count, loff_t *ppos)
+{
+	struct ath11k_base *ab = file->private_data;
+	struct ath11k_pdev *pdev;
+	u32 rx_hash;
+	u8 buf[128] = {0};
+	int ret, i;
+
+	for (i = 0; i < ab->num_radios; i++) {
+		pdev = &ab->pdevs[i];
+		if (pdev && pdev->ar)
+			break;
+	}
+
+	if (i == ab->num_radios) {
+		ath11k_err(ab, "radio is not up\n");
+		ret = -ENETDOWN;
+		goto exit;
+	}
+
+	ret = simple_write_to_buffer(buf, sizeof(buf) - 1, ppos, ubuf, count);
+	if (ret < 0)
+		goto exit;
+
+	buf[ret] = '\0';
+	ret = kstrtou32(buf, 0, &rx_hash);
+	if (ret) {
+		ret = -EINVAL;
+		goto exit;
+	}
+
+	if (rx_hash != ab->rx_hash) {
+		ab->rx_hash = rx_hash;
+		if (rx_hash)
+			ath11k_hal_reo_hash_setup(ab, rx_hash);
+	}
+	ret = count;
+exit:
+	return ret;
+}
+
+static ssize_t ath11k_read_rx_hash(struct file *file,
+				   char __user *ubuf,
+				   size_t count, loff_t *ppos)
+{
+	struct ath11k_base *ab = file->private_data;
+	int len = 0;
+	char buf[32];
+
+	len = scnprintf(buf, sizeof(buf) - len, "0x%x\n", ab->rx_hash);
+	return simple_read_from_buffer(ubuf, count, ppos, buf, len);
+}
+
+static const struct file_operations fops_soc_rx_hash = {
+	.read = ath11k_read_rx_hash,
+	.write = ath11k_write_rx_hash,
+	.open = simple_open,
+};
+
 int ath11k_debugfs_pdev_create(struct ath11k_base *ab)
 {
 	if (test_bit(ATH11K_FLAG_REGISTERED, &ab->dev_flags))
@@ -845,6 +906,9 @@ int ath11k_debugfs_pdev_create(struct ath11k_base *ab)
 
 	debugfs_create_file("soc_dp_stats", 0600, ab->debugfs_soc, ab,
 			    &fops_soc_dp_stats);
+
+	debugfs_create_file("rx_hash", 0600, ab->debugfs_soc, ab,
+			    &fops_soc_rx_hash);
 
 	return 0;
 }

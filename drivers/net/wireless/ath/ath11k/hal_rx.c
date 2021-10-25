@@ -801,6 +801,16 @@ void ath11k_hal_reo_init_cmd_ring(struct ath11k_base *ab,
 	}
 }
 
+void ath11k_hal_reo_hash_setup(struct ath11k_base *ab, u32 ring_hash_map)
+{
+	u32 reo_base = HAL_SEQ_WCSS_UMAC_REO_REG;
+
+	ath11k_hif_write32(ab, reo_base + HAL_REO1_DEST_RING_CTRL_IX_2,
+			   ring_hash_map << HAL_REO_DEST_RING_CTRL_HASH_RING_SHIFT);
+	ath11k_hif_write32(ab, reo_base + HAL_REO1_DEST_RING_CTRL_IX_3,
+			   ring_hash_map << HAL_REO_DEST_RING_CTRL_HASH_RING_SHIFT);
+}
+
 static enum hal_rx_mon_status
 ath11k_hal_rx_parse_mon_status_tlv(struct ath11k_base *ab,
 				   struct hal_rx_mon_ppdu_info *ppdu_info,

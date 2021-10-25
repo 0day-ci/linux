@@ -36,6 +36,9 @@
 #define ATH11K_INVALID_HW_MAC_ID	0xFF
 #define ATH11K_CONNECTION_LOSS_HZ	(3 * HZ)
 
+/* Shift value to set the dest rings hash map to the dest control register */
+#define HAL_REO_DEST_RING_CTRL_HASH_RING_SHIFT 8
+
 extern unsigned int ath11k_frame_mode;
 
 #define ATH11K_MON_TIMER_INTERVAL  10
@@ -759,6 +762,7 @@ struct ath11k_base {
 
 	struct completion htc_suspend;
 
+	u32 rx_hash;
 	/* must be last */
 	u8 drv_priv[0] __aligned(sizeof(void *));
 };
