@@ -74,6 +74,7 @@ struct loop_device {
 struct loop_cmd {
 	struct list_head list_entry;
 	bool use_aio; /* use AIO interface to handle I/O */
+	bool use_dio;
 	atomic_t ref; /* only for aio */
 	long ret;
 	struct kiocb iocb;

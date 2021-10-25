@@ -339,23 +339,6 @@ static int lo_write_bvec(struct file *file, struct bio_vec *bvec, loff_t *ppos)
 	return bw;
 }
 
-static int lo_write_simple(struct loop_device *lo, struct request *rq,
-		loff_t pos)
-{
-	struct bio_vec bvec;
-	struct req_iterator iter;
-	int ret = 0;
-
-	rq_for_each_segment(bvec, rq, iter) {
-		ret = lo_write_bvec(lo->lo_backing_file, &bvec, &pos);
-		if (ret < 0)
-			break;
-		cond_resched();
-	}
-
-	return ret;
-}
-
 /*
  * This is the slow, transforming version that needs to double buffer the
  * data as it cannot do the transformations in place without having direct
@@ -389,33 +372,6 @@ static int lo_write_transfer(struct loop_device *lo, struct request *rq,
 
 	__free_page(page);
 	return ret;
-}
-
-static int lo_read_simple(struct loop_device *lo, struct request *rq,
-		loff_t pos)
-{
-	struct bio_vec bvec;
-	struct req_iterator iter;
-	struct iov_iter i;
-	ssize_t len;
-
-	rq_for_each_segment(bvec, rq, iter) {
-		iov_iter_bvec(&i, READ, &bvec, 1, bvec.bv_len);
-		len = vfs_iter_read(lo->lo_backing_file, &i, &pos, 0);
-		if (len < 0)
-			return len;
-
-		if (len != bvec.bv_len) {
-			struct bio *bio;
-
-			__rq_for_each_bio(bio, rq)
-				zero_fill_bio(bio);
-			break;
-		}
-		cond_resched();
-	}
-
-	return 0;
 }
 
 static int lo_read_transfer(struct loop_device *lo, struct request *rq,
@@ -520,10 +476,10 @@ static void lo_complete_rq(struct request *rq)
 	blk_status_t ret = BLK_STS_OK;
 
 	/* Kernel wrote to our pages, call flush_dcache_page */
-	if (req_op(rq) == REQ_OP_READ && !cmd->use_aio && cmd->ret >= 0)
+	if (req_op(rq) == REQ_OP_READ && !cmd->use_dio && cmd->ret >= 0)
 		lo_flush_dcache_for_read(rq);
 
-	if (!cmd->use_aio || cmd->ret < 0 || cmd->ret == blk_rq_bytes(rq) ||
+	if (!cmd->use_dio || cmd->ret < 0 || cmd->ret == blk_rq_bytes(rq) ||
 	    req_op(rq) != REQ_OP_READ) {
 		if (cmd->ret < 0)
 			ret = errno_to_blk_status(cmd->ret);
@@ -625,17 +581,24 @@ static int lo_rw_aio(struct loop_device *lo, struct loop_cmd *cmd,
 		offset = bio->bi_iter.bi_bvec_done;
 		bvec = __bvec_iter_bvec(bio->bi_io_vec, bio->bi_iter);
 	}
-	atomic_set(&cmd->ref, 2);
-
 	iov_iter_bvec(&iter, rw, bvec, nr_bvec, blk_rq_bytes(rq));
 	iter.iov_offset = offset;
 
 	cmd->iocb.ki_pos = pos;
 	cmd->iocb.ki_filp = file;
+
+	cmd->iocb.ki_ioprio = IOPRIO_PRIO_VALUE(IOPRIO_CLASS_NONE, 0);
+	if (!cmd->use_dio) {
+		atomic_set(&cmd->ref, 1);
+		cmd->iocb.ki_flags = 0;
+		cmd->ret = lo_call_backing_rw_iter(file, &cmd->iocb, &iter, rw);
+		lo_rw_aio_do_completion(cmd);
+		return 0;
+	}
+
+	atomic_set(&cmd->ref, 2);
 	cmd->iocb.ki_complete = lo_rw_aio_complete;
 	cmd->iocb.ki_flags = IOCB_DIRECT;
-	cmd->iocb.ki_ioprio = IOPRIO_PRIO_VALUE(IOPRIO_CLASS_NONE, 0);
-
 	ret = lo_call_backing_rw_iter(file, &cmd->iocb, &iter, rw);
 
 	lo_rw_aio_do_completion(cmd);
@@ -650,15 +613,6 @@ static int do_req_filebacked(struct loop_device *lo, struct request *rq)
 	struct loop_cmd *cmd = blk_mq_rq_to_pdu(rq);
 	loff_t pos = ((loff_t) blk_rq_pos(rq) << 9) + lo->lo_offset;
 
-	/*
-	 * lo_write_simple and lo_read_simple should have been covered
-	 * by io submit style function like lo_rw_aio(), one blocker
-	 * is that lo_read_simple() need to call flush_dcache_page after
-	 * the page is written from kernel, and it isn't easy to handle
-	 * this in io submit style function which submits all segments
-	 * of the req at one time. And direct read IO doesn't need to
-	 * run flush_dcache_page().
-	 */
 	switch (req_op(rq)) {
 	case REQ_OP_FLUSH:
 		return lo_req_flush(lo, rq);
@@ -676,17 +630,13 @@ static int do_req_filebacked(struct loop_device *lo, struct request *rq)
 	case REQ_OP_WRITE:
 		if (lo->transfer)
 			return lo_write_transfer(lo, rq, pos);
-		else if (cmd->use_aio)
-			return lo_rw_aio(lo, cmd, pos, WRITE);
 		else
-			return lo_write_simple(lo, rq, pos);
+			return lo_rw_aio(lo, cmd, pos, WRITE);
 	case REQ_OP_READ:
 		if (lo->transfer)
 			return lo_read_transfer(lo, rq, pos);
-		else if (cmd->use_aio)
-			return lo_rw_aio(lo, cmd, pos, READ);
 		else
-			return lo_read_simple(lo, rq, pos);
+			return lo_rw_aio(lo, cmd, pos, READ);
 	default:
 		WARN_ON_ONCE(1);
 		return -EIO;
@@ -2171,7 +2121,8 @@ static blk_status_t loop_queue_rq(struct blk_mq_hw_ctx *hctx,
 		cmd->use_aio = false;
 		break;
 	default:
-		cmd->use_aio = lo->use_dio;
+		cmd->use_aio = !lo->transfer;
+		cmd->use_dio = lo->use_dio && cmd->use_aio;
 		break;
 	}
 
