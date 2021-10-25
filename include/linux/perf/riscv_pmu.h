@@ -29,10 +29,13 @@
 struct cpu_hw_events {
 	/* currently enabled events */
 	int			n_events;
+	/* Counter overflow interrupt */
+	int		irq;
 	/* currently enabled events */
 	struct perf_event	*events[RISCV_MAX_COUNTERS];
 	/* currently enabled counters */
 	DECLARE_BITMAP(used_event_ctrs, RISCV_MAX_COUNTERS);
+	bool sscof_ext_present;
 };
 
 struct riscv_pmu {
@@ -40,7 +43,6 @@ struct riscv_pmu {
 	char		*name;
 
 	irqreturn_t	(*handle_irq)(int irq_num, void *dev);
-	int		irq;
 
 	int		num_counters;
 	u64		(*ctr_read)(struct perf_event *event);
