@@ -14,6 +14,11 @@
 #include <drm/drm_drv.h>
 #include <drm/drm_print.h>
 
+static bool drm_disable_native_drivers;
+module_param_named(disable_native_drivers, drm_disable_native_drivers, bool, 0600);
+MODULE_PARM_DESC(disable_native_drivers,
+		 "Disable native DRM drivers probing [default=false]");
+
 /**
  * DOC: overview
  *
@@ -307,6 +312,9 @@ static int drm_aperture_remove_conflicting_fbdev_framebuffers(resource_size_t ba
  * This function removes graphics device drivers which use memory range described by
  * @base and @size.
  *
+ * The conflicting framebuffers removal does not happen when drm.disable_native_drivers=1 is
+ * set. When this option is enabled, the function will return an -EBUSY errno code instead.
+ *
  * Returns:
  * 0 on success, or a negative errno code otherwise
  */
@@ -314,6 +322,9 @@ int drm_aperture_remove_conflicting_framebuffers(resource_size_t base, resource_
 						 bool primary, const struct drm_driver *req_driver)
 {
 	int ret;
+
+	if (drm_disable_native_drivers)
+		return -EBUSY;
 
 	ret = drm_aperture_remove_conflicting_fbdev_framebuffers(base, size, primary,
 								 req_driver);
@@ -335,6 +346,9 @@ EXPORT_SYMBOL(drm_aperture_remove_conflicting_framebuffers);
  * for any of @pdev's memory bars. The function assumes that PCI device with
  * shadowed ROM drives a primary display and so kicks out vga16fb.
  *
+ * The conflicting framebuffers removal does not happen when drm.disable_native_drivers=1 is
+ * set. When this option is enabled, the function will return an -EBUSY errno code instead.
+ *
  * Returns:
  * 0 on success, or a negative errno code otherwise
  */
@@ -343,6 +357,9 @@ int drm_aperture_remove_conflicting_pci_framebuffers(struct pci_dev *pdev,
 {
 	resource_size_t base, size;
 	int bar, ret = 0;
+
+	if (drm_disable_native_drivers)
+		return -EBUSY;
 
 	for (bar = 0; bar < PCI_STD_NUM_BARS; ++bar) {
 		if (!(pci_resource_flags(pdev, bar) & IORESOURCE_MEM))
