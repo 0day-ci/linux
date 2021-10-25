@@ -266,6 +266,9 @@ static inline int fanotify_event_dir_fh_len(struct fanotify_event *event)
 
 static inline bool fanotify_event_has_object_fh(struct fanotify_event *event)
 {
+	/* For error events, even zeroed fh are reported. */
+	if (event->type == FANOTIFY_EVENT_TYPE_FS_ERROR)
+		return true;
 	return fanotify_event_object_fh_len(event) > 0;
 }
 
