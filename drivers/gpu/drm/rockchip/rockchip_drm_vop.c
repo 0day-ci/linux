@@ -1581,19 +1581,19 @@ static void vop_crtc_reset(struct drm_crtc *crtc)
 #ifdef CONFIG_DRM_ANALOGIX_DP
 static struct drm_connector *vop_get_edp_connector(struct vop *vop)
 {
-	struct drm_connector *connector;
+	struct drm_connector *connector = NULL;
 	struct drm_connector_list_iter conn_iter;
 
 	drm_connector_list_iter_begin(vop->drm_dev, &conn_iter);
 	drm_for_each_connector_iter(connector, &conn_iter) {
 		if (connector->connector_type == DRM_MODE_CONNECTOR_eDP) {
-			drm_connector_list_iter_end(&conn_iter);
-			return connector;
+			drm_connector_get(connector);
+			break;
 		}
 	}
 	drm_connector_list_iter_end(&conn_iter);
 
-	return NULL;
+	return connector;
 }
 
 static int vop_crtc_set_crc_source(struct drm_crtc *crtc,
@@ -1614,6 +1614,7 @@ static int vop_crtc_set_crc_source(struct drm_crtc *crtc,
 	else
 		ret = -EINVAL;
 
+	drm_connector_put(connector);
 	return ret;
 }
 
