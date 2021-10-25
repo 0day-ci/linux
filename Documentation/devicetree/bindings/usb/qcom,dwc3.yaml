@@ -41,7 +41,13 @@ properties:
 
   power-domains:
     description: specifies a phandle to PM domain provider node
-    maxItems: 1
+    minItems: 2
+    items:
+      - description: cx power domain
+      - description: USB gdsc power domain
+
+  required-opps:
+    description: specifies the performance state to power domain
 
   clocks:
     description:
