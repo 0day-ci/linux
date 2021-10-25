@@ -29,6 +29,24 @@
 		pinctrl-0 = <&keys_pins>;
 		pinctrl-names = "default";
 
+		sw-1 {
+			gpios = <&gpio1 28 GPIO_ACTIVE_LOW>;
+			linux,code = <SW_LID>;
+			linux,input-type = <EV_SW>;
+			label = "SW46-1";
+			wakeup-source;
+			debounce-interval = <20>;
+		};
+
+		sw-2 {
+			gpios = <&gpio1 29 GPIO_ACTIVE_LOW>;
+			linux,code = <SW_DOCK>;
+			linux,input-type = <EV_SW>;
+			label = "SW46-2";
+			wakeup-source;
+			debounce-interval = <20>;
+		};
+
 		key-1 {
 			gpios = <&gpio6 18 GPIO_ACTIVE_LOW>;
 			linux,code = <KEY_1>;
