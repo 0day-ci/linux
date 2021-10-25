@@ -621,6 +621,7 @@ static void netdevice_event_work_handler(struct work_struct *_work)
 {
 	struct netdev_event_work *work =
 		container_of(_work, struct netdev_event_work, work);
+	struct net_device *real_dev;
 	unsigned int i;
 
 	for (i = 0; i < ARRAY_SIZE(work->cmds) && work->cmds[i].cb; i++) {
@@ -628,6 +629,12 @@ static void netdevice_event_work_handler(struct work_struct *_work)
 					 work->cmds[i].filter_ndev,
 					 work->cmds[i].cb,
 					 work->cmds[i].ndev);
+		real_dev = rdma_vlan_dev_real_dev(work->cmds[i].ndev);
+		if (real_dev)
+			dev_put(real_dev);
+		real_dev = rdma_vlan_dev_real_dev(work->cmds[i].filter_ndev);
+		if (real_dev)
+			dev_put(real_dev);
 		dev_put(work->cmds[i].ndev);
 		dev_put(work->cmds[i].filter_ndev);
 	}
@@ -638,9 +645,10 @@ static void netdevice_event_work_handler(struct work_struct *_work)
 static int netdevice_queue_work(struct netdev_event_work_cmd *cmds,
 				struct net_device *ndev)
 {
-	unsigned int i;
 	struct netdev_event_work *ndev_work =
 		kmalloc(sizeof(*ndev_work), GFP_KERNEL);
+	struct net_device *real_dev;
+	unsigned int i;
 
 	if (!ndev_work)
 		return NOTIFY_DONE;
@@ -653,6 +661,12 @@ static int netdevice_queue_work(struct netdev_event_work_cmd *cmds,
 			ndev_work->cmds[i].filter_ndev = ndev;
 		dev_hold(ndev_work->cmds[i].ndev);
 		dev_hold(ndev_work->cmds[i].filter_ndev);
+		real_dev = rdma_vlan_dev_real_dev(ndev_work->cmds[i].ndev);
+		if (real_dev)
+			dev_hold(real_dev);
+		real_dev = rdma_vlan_dev_real_dev(ndev_work->cmds[i].filter_ndev);
+		if (real_dev)
+			dev_hold(real_dev);
 	}
 	INIT_WORK(&ndev_work->work, netdevice_event_work_handler);
 
