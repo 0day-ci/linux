@@ -405,8 +405,6 @@ static int lo_read_simple(struct loop_device *lo, struct request *rq,
 		if (len < 0)
 			return len;
 
-		flush_dcache_page(bvec.bv_page);
-
 		if (len != bvec.bv_len) {
 			struct bio *bio;
 
@@ -507,10 +505,23 @@ static int lo_req_flush(struct loop_device *lo, struct request *rq)
 	return ret;
 }
 
+static void lo_flush_dcache_for_read(struct request *rq)
+{
+	struct bio_vec bvec;
+	struct req_iterator iter;
+
+	rq_for_each_segment(bvec, rq, iter)
+		flush_dcache_page(bvec.bv_page);
+}
+
 static void lo_complete_rq(struct request *rq)
 {
 	struct loop_cmd *cmd = blk_mq_rq_to_pdu(rq);
 	blk_status_t ret = BLK_STS_OK;
+
+	/* Kernel wrote to our pages, call flush_dcache_page */
+	if (req_op(rq) == REQ_OP_READ && !cmd->use_aio && cmd->ret >= 0)
+		lo_flush_dcache_for_read(rq);
 
 	if (!cmd->use_aio || cmd->ret < 0 || cmd->ret == blk_rq_bytes(rq) ||
 	    req_op(rq) != REQ_OP_READ) {
