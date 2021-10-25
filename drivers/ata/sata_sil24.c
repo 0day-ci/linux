@@ -785,6 +785,8 @@ static inline void sil24_fill_sg(struct ata_queued_cmd *qc,
 		sge++;
 	}
 
+	if (!last_sge)
+		return;
 	last_sge->flags = cpu_to_le32(SGE_TRM);
 }
 
