@@ -590,6 +590,7 @@ static int lo_rw_aio(struct loop_device *lo, struct loop_cmd *cmd,
 	cmd->iocb.ki_ioprio = IOPRIO_PRIO_VALUE(IOPRIO_CLASS_NONE, 0);
 	if (!cmd->use_dio) {
 		atomic_set(&cmd->ref, 1);
+buffered_io:
 		cmd->iocb.ki_flags = 0;
 		cmd->ret = lo_call_backing_rw_iter(file, &cmd->iocb, &iter, rw);
 		lo_rw_aio_do_completion(cmd);
@@ -603,8 +604,13 @@ static int lo_rw_aio(struct loop_device *lo, struct loop_cmd *cmd,
 
 	lo_rw_aio_do_completion(cmd);
 
-	if (ret != -EIOCBQUEUED)
+	if (ret != -EIOCBQUEUED) {
+		if (ret < 0) {
+			cmd->use_dio = false;
+			goto buffered_io;
+		}
 		cmd->iocb.ki_complete(&cmd->iocb, ret, 0);
+	}
 	return 0;
 }
 
