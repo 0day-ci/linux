@@ -9,6 +9,11 @@ The USB/IP protocol follows a server/client architecture. The server exports the
 USB devices and the clients import them. The device driver for the exported
 USB device runs on the client machine.
 
+Initially the server may choose to export any of its available USB devices,
+based on the busid. The device will remain exported until it's unplugged or
+unbound from the usbip driver. It is also possible to persistently export
+devices on a given bus by monitor when they are plugged in.
+
 The client may ask for the list of the exported USB devices. To get the list the
 client opens a TCP/IP connection to the server, and sends an OP_REQ_DEVLIST
 packet on top of the TCP/IP connection (so the actual OP_REQ_DEVLIST may be sent
