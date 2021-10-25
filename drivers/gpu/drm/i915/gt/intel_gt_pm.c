@@ -298,10 +298,14 @@ static void wait_for_suspend(struct intel_gt *gt)
 
 void intel_gt_suspend_prepare(struct intel_gt *gt)
 {
+	intel_wakeref_t wakeref;
+
 	user_forcewake(gt, true);
 	wait_for_suspend(gt);
 
-	intel_pxp_suspend(&gt->pxp, false);
+	with_intel_runtime_pm(gt->uncore->rpm, wakeref) {
+		intel_pxp_suspend(&gt->pxp, false);
+	}
 }
 
 static suspend_state_t pm_suspend_target(void)
