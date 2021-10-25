@@ -2364,11 +2364,11 @@ static void io_free_batch_list(struct io_ring_ctx *ctx,
 static void __io_submit_flush_completions(struct io_ring_ctx *ctx)
 	__must_hold(&ctx->uring_lock)
 {
-	struct io_wq_work_node *node, *prev;
+	struct io_wq_work_node *node;
 	struct io_submit_state *state = &ctx->submit_state;
 
 	spin_lock(&ctx->completion_lock);
-	wq_list_for_each(node, prev, &state->compl_reqs) {
+	for (node = state->compl_reqs.first; node; node = node->next) {
 		struct io_kiocb *req = container_of(node, struct io_kiocb,
 						    comp_list);
 
