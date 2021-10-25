@@ -615,6 +615,15 @@ static const struct samsung_cmu_info peri_cmu_info __initconst = {
 	.clk_name		= "dout_peri_bus",
 };
 
+static void __init exynos850_cmu_peri_init(struct device_node *np)
+{
+	exynos850_init_clocks(np, peri_clk_regs, ARRAY_SIZE(peri_clk_regs));
+	samsung_cmu_register_one(np, &peri_cmu_info);
+}
+
+CLK_OF_DECLARE_DRIVER(exynos850_cmu_peri, "samsung,exynos850-cmu-peri",
+		      exynos850_cmu_peri_init);
+
 /* ---- CMU_CORE ------------------------------------------------------------ */
 
 /* Register Offset definitions for CMU_CORE (0x12000000) */
@@ -782,8 +791,12 @@ static int __init exynos850_cmu_probe(struct platform_device *pdev)
 	struct device_node *np = dev->of_node;
 
 	info = of_device_get_match_data(dev);
-	exynos850_init_clocks(np, info->clk_regs, info->nr_clk_regs);
-	samsung_cmu_register_one(np, info);
+
+	/* Early clocks are already registered using CLK_OF_DECLARE_DRIVER() */
+	if (info != &peri_cmu_info) {
+		exynos850_init_clocks(np, info->clk_regs, info->nr_clk_regs);
+		samsung_cmu_register_one(np, info);
+	}
 
 	/* Keep bus clock running, so it's possible to access CMU registers */
 	if (info->clk_name) {
