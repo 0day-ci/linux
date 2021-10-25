@@ -22,14 +22,14 @@ config FW_LOADER
 	  You typically want this built-in (=y) but you can also enable this
 	  as a module, in which case the firmware_class module will be built.
 	  You also want to be sure to enable this built-in if you are going to
-	  enable built-in firmware (CONFIG_EXTRA_FIRMWARE).
+	  enable built-in firmware (CONFIG_FW_LOADER_BUILTIN_FILES).
 
 if FW_LOADER
 
 config FW_LOADER_PAGED_BUF
 	bool
 
-config EXTRA_FIRMWARE
+config FW_LOADER_BUILTIN_FILES
 	string "Build named firmware blobs into the kernel binary"
 	help
 	  Device drivers which require firmware can typically deal with
@@ -43,14 +43,21 @@ config EXTRA_FIRMWARE
 	  in boot and cannot rely on the firmware being placed in an initrd or
 	  initramfs.
 
-	  This option is a string and takes the (space-separated) names of the
+	  Support for built-in firmware is not supported if you are using
+	  the firmware loader as a module.
+
+	  This option is a string and takes the space-separated names of the
 	  firmware files -- the same names that appear in MODULE_FIRMWARE()
 	  and request_firmware() in the source. These files should exist under
-	  the directory specified by the EXTRA_FIRMWARE_DIR option, which is
+	  the directory specified by the FW_LOADER_BUILTIN_DIR option, which is
 	  /lib/firmware by default.
 
-	  For example, you might set CONFIG_EXTRA_FIRMWARE="usb8388.bin", copy
-	  the usb8388.bin file into /lib/firmware, and build the kernel. Then
+	  For example, you might have set:
+
+	  CONFIG_FW_LOADER_BUILTIN_FILES="usb8388.bin"
+
+	  After this you would copy the usb8388.bin file into directory
+	  specified by FW_LOADER_BUILTIN_DIR and build the kernel. Then
 	  any request_firmware("usb8388.bin") will be satisfied internally
 	  inside the kernel without ever looking at your filesystem at runtime.
 
@@ -60,13 +67,15 @@ config EXTRA_FIRMWARE
 	  image since it combines both GPL and non-GPL work. You should
 	  consult a lawyer of your own before distributing such an image.
 
-config EXTRA_FIRMWARE_DIR
-	string "Firmware blobs root directory"
-	depends on EXTRA_FIRMWARE != ""
+config FW_LOADER_BUILTIN_DIR
+	string "Directory with firmware to be built-in to the kernel"
+	depends on FW_LOADER_BUILTIN_FILES != ""
 	default "/lib/firmware"
 	help
-	  This option controls the directory in which the kernel build system
-	  looks for the firmware files listed in the EXTRA_FIRMWARE option.
+	  This option specifies the directory which the kernel build system
+	  will use to look for the firmware files which are going to be
+	  built into the kernel using the space-separated
+	  FW_LOADER_BUILTIN_FILES entries.
 
 config FW_LOADER_USER_HELPER
 	bool "Enable the firmware sysfs fallback mechanism"

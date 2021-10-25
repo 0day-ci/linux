@@ -31,8 +31,8 @@ config DVB_AV7110
 	  or /lib/firmware (depending on configuration of firmware hotplug).
 
 	  Alternatively, you can download the file and use the kernel's
-	  EXTRA_FIRMWARE configuration option to build it into your
-	  kernel image by adding the filename to the EXTRA_FIRMWARE
+	  FW_LOADER_BUILTIN_FILES configuration option to build it into your
+	  kernel image by adding the filename to the FW_LOADER_BUILTIN_FILES
 	  configuration option string.
 
 	  Say Y if you own such a card and want to use it.

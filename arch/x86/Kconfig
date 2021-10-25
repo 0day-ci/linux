@@ -1305,8 +1305,8 @@ config MICROCODE
 	  initrd for microcode blobs.
 
 	  In addition, you can build the microcode into the kernel. For that you
-	  need to add the vendor-supplied microcode to the CONFIG_EXTRA_FIRMWARE
-	  config option.
+	  need to add the vendor-supplied microcode to the configuration option
+	  CONFIG_FW_LOADER_BUILTIN_FILES
 
 config MICROCODE_INTEL
 	bool "Intel microcode loading support"

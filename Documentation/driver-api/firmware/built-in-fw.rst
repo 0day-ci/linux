@@ -8,11 +8,11 @@ the filesystem. Instead, firmware can be looked for inside the kernel
 directly. You can enable built-in firmware using the kernel configuration
 options:
 
-  * CONFIG_EXTRA_FIRMWARE
-  * CONFIG_EXTRA_FIRMWARE_DIR
+  * CONFIG_FW_LOADER_BUILTIN_FILES
+  * CONFIG_FW_LOADER_BUILTIN_DIR
 
 There are a few reasons why you might want to consider building your firmware
-into the kernel with CONFIG_EXTRA_FIRMWARE:
+into the kernel with CONFIG_FW_LOADER_BUILTIN_FILES:
 
 * Speed
 * Firmware is needed for accessing the boot device, and the user doesn't
