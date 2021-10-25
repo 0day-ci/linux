@@ -191,6 +191,17 @@ static const struct resource axp20x_usb_power_supply_resources[] = {
 	DEFINE_RES_IRQ_NAMED(AXP20X_IRQ_VBUS_NOT_VALID, "VBUS_NOT_VALID"),
 };
 
+static const struct resource axp20x_battery_power_supply_resources[] = {
+	DEFINE_RES_IRQ_NAMED(AXP20X_IRQ_BATT_PLUGIN, "BATT_PLUGIN"),
+	DEFINE_RES_IRQ_NAMED(AXP20X_IRQ_BATT_REMOVAL, "BATT_REMOVAL"),
+	DEFINE_RES_IRQ_NAMED(AXP20X_IRQ_CHARG, "CHARG"),
+	DEFINE_RES_IRQ_NAMED(AXP20X_IRQ_CHARG_DONE, "CHARG_DONE"),
+	DEFINE_RES_IRQ_NAMED(AXP20X_IRQ_BATT_TEMP_HIGH, "BATT_TEMP_HIGH"),
+	DEFINE_RES_IRQ_NAMED(AXP20X_IRQ_BATT_TEMP_LOW, "BATT_TEMP_LOW"),
+	DEFINE_RES_IRQ_NAMED(AXP20X_IRQ_LOW_PWR_LVL1, "LOW_PWR_LVL1"),
+	DEFINE_RES_IRQ_NAMED(AXP20X_IRQ_LOW_PWR_LVL2, "LOW_PWR_LVL2"),
+};
+
 static const struct resource axp22x_usb_power_supply_resources[] = {
 	DEFINE_RES_IRQ_NAMED(AXP22X_IRQ_VBUS_PLUGIN, "VBUS_PLUGIN"),
 	DEFINE_RES_IRQ_NAMED(AXP22X_IRQ_VBUS_REMOVAL, "VBUS_REMOVAL"),
@@ -604,6 +615,8 @@ static const struct mfd_cell axp20x_cells[] = {
 	}, {
 		.name		= "axp20x-battery-power-supply",
 		.of_compatible	= "x-powers,axp209-battery-power-supply",
+		.num_resources	= ARRAY_SIZE(axp20x_battery_power_supply_resources),
+		.resources	= axp20x_battery_power_supply_resources,
 	}, {
 		.name		= "axp20x-ac-power-supply",
 		.of_compatible	= "x-powers,axp202-ac-power-supply",
