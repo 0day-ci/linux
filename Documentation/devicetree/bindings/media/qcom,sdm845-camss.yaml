@@ -106,7 +106,8 @@ properties:
 
             properties:
               clock-lanes:
-                maxItems: 1
+                items:
+                  - const: 7
 
               data-lanes:
                 minItems: 1
@@ -153,7 +154,8 @@ properties:
 
             properties:
               clock-lanes:
-                maxItems: 1
+                items:
+                  - const: 7
 
               data-lanes:
                 minItems: 1
@@ -176,7 +178,8 @@ properties:
 
             properties:
               clock-lanes:
-                maxItems: 1
+                items:
+                  - const: 7
 
               data-lanes:
                 minItems: 1
