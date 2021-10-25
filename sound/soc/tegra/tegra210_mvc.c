@@ -123,7 +123,42 @@ static int tegra210_mvc_get_mute(struct snd_kcontrol *kcontrol,
 	mute_mask = (val >>  TEGRA210_MVC_MUTE_SHIFT) &
 		TEGRA210_MUTE_MASK_EN;
 
-	ucontrol->value.integer.value[0] = mute_mask;
+	if (strstr(kcontrol->id.name, "Per Chan Mute Mask")) {
+		/*
+		 * If per channel control is enabled, then return
+		 * exact mute/unmute setting of all channels.
+		 *
+		 * Else report setting based on CH0 bit to reflect
+		 * the correct HW state.
+		 */
+		if (val & TEGRA210_MVC_PER_CHAN_CTRL_EN) {
+			ucontrol->value.integer.value[0] = mute_mask;
+		} else {
+			if (mute_mask & TEGRA210_MVC_CH0_MUTE_EN)
+				ucontrol->value.integer.value[0] =
+					TEGRA210_MUTE_MASK_EN;
+			else
+				ucontrol->value.integer.value[0] = 0;
+		}
+	} else {
+		/*
+		 * If per channel control is disabled, then return
+		 * master mute/unmute setting based on CH0 bit.
+		 *
+		 * Else report settings based on state of all
+		 * channels.
+		 */
+		if (!(val & TEGRA210_MVC_PER_CHAN_CTRL_EN)) {
+			ucontrol->value.integer.value[0] =
+				mute_mask & TEGRA210_MVC_CH0_MUTE_EN;
+		} else {
+			if (mute_mask == TEGRA210_MUTE_MASK_EN)
+				ucontrol->value.integer.value[0] =
+					TEGRA210_MVC_CH0_MUTE_EN;
+			else
+				ucontrol->value.integer.value[0] = 0;
+		}
+	}
 
 	return 0;
 }
@@ -136,6 +171,7 @@ static int tegra210_mvc_put_mute(struct snd_kcontrol *kcontrol,
 	struct snd_soc_component *cmpnt = snd_soc_kcontrol_component(kcontrol);
 	struct tegra210_mvc *mvc = snd_soc_component_get_drvdata(cmpnt);
 	unsigned int value;
+	u32 reg_mask;
 	u8 mute_mask;
 	int err;
 
@@ -150,11 +186,22 @@ static int tegra210_mvc_put_mute(struct snd_kcontrol *kcontrol,
 
 	mute_mask = ucontrol->value.integer.value[0];
 
-	err = regmap_update_bits(mvc->regmap, mc->reg,
-				 TEGRA210_MVC_MUTE_MASK,
-				 mute_mask << TEGRA210_MVC_MUTE_SHIFT);
-	if (err < 0)
-		goto end;
+	if (strstr(kcontrol->id.name, "Per Chan Mute Mask")) {
+		regmap_update_bits(mvc->regmap, TEGRA210_MVC_CTRL,
+				   TEGRA210_MVC_PER_CHAN_CTRL_EN_MASK,
+				   TEGRA210_MVC_PER_CHAN_CTRL_EN);
+
+		reg_mask = TEGRA210_MVC_MUTE_MASK;
+	} else {
+		regmap_update_bits(mvc->regmap, TEGRA210_MVC_CTRL,
+				   TEGRA210_MVC_PER_CHAN_CTRL_EN_MASK,
+				   0);
+
+		reg_mask = TEGRA210_MVC_CH0_MUTE_MASK;
+	}
+
+	regmap_update_bits(mvc->regmap, mc->reg, reg_mask,
+			   mute_mask << TEGRA210_MVC_MUTE_SHIFT);
 
 	return 1;
 
@@ -212,11 +259,31 @@ static int tegra210_mvc_put_vol(struct snd_kcontrol *kcontrol,
 			      ucontrol->value.integer.value[0]);
 
 	/* Configure init volume same as target volume */
-	regmap_write(mvc->regmap,
-		TEGRA210_MVC_REG_OFFSET(TEGRA210_MVC_INIT_VOL, chan),
-		mvc->volume[chan]);
+	if (strstr(kcontrol->id.name, "Channel")) {
+		regmap_update_bits(mvc->regmap, TEGRA210_MVC_CTRL,
+				   TEGRA210_MVC_PER_CHAN_CTRL_EN_MASK,
+				   TEGRA210_MVC_PER_CHAN_CTRL_EN);
 
-	regmap_write(mvc->regmap, reg, mvc->volume[chan]);
+		regmap_write(mvc->regmap,
+			TEGRA210_MVC_REG_OFFSET(TEGRA210_MVC_INIT_VOL, chan),
+			mvc->volume[chan]);
+
+		regmap_write(mvc->regmap, reg, mvc->volume[chan]);
+	} else {
+		int i;
+
+		regmap_update_bits(mvc->regmap, TEGRA210_MVC_CTRL,
+				   TEGRA210_MVC_PER_CHAN_CTRL_EN_MASK,
+				   0);
+
+		for (i = 1; i < TEGRA210_MVC_MAX_CHAN_COUNT; i++)
+			mvc->volume[i] = mvc->volume[0];
+
+		regmap_write(mvc->regmap, TEGRA210_MVC_INIT_VOL,
+			     mvc->volume[0]);
+
+		regmap_write(mvc->regmap, reg, mvc->volume[0]);
+	}
 
 	regmap_update_bits(mvc->regmap, TEGRA210_MVC_SWITCH,
 			   TEGRA210_MVC_VOLUME_SWITCH_MASK,
@@ -420,6 +487,14 @@ static const struct snd_kcontrol_new tegra210_mvc_vol_ctrl[] = {
 	/* Per channel mute */
 	SOC_SINGLE_EXT("Per Chan Mute Mask",
 		       TEGRA210_MVC_CTRL, 0, TEGRA210_MUTE_MASK_EN, 0,
+		       tegra210_mvc_get_mute, tegra210_mvc_put_mute),
+
+	/* Master volume */
+	SOC_SINGLE_EXT("Volume", TEGRA210_MVC_TARGET_VOL, 0, 16000, 0,
+		       tegra210_mvc_get_vol, tegra210_mvc_put_vol),
+
+	/* Master mute */
+	SOC_SINGLE_EXT("Mute", TEGRA210_MVC_CTRL, 0, 1, 0,
 		       tegra210_mvc_get_mute, tegra210_mvc_put_mute),
 
 	SOC_ENUM_EXT("Curve Type", tegra210_mvc_curve_type_ctrl,
