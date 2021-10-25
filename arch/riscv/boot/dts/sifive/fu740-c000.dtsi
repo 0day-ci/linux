@@ -140,6 +140,9 @@
 		#size-cells = <2>;
 		compatible = "simple-bus";
 		ranges;
+		pmu {
+			compatible = "riscv,pmu";
+		};
 		plic0: interrupt-controller@c000000 {
 			#interrupt-cells = <1>;
 			#address-cells = <0>;
