@@ -787,6 +787,7 @@ TRACE_EVENT(i915_request_queue,
 		      __entry->ctx, __entry->seqno, __entry->flags)
 );
 
+#if defined(CONFIG_DRM_I915_LOW_LEVEL_TRACEPOINTS)
 DECLARE_EVENT_CLASS(i915_request,
 	    TP_PROTO(struct i915_request *rq),
 	    TP_ARGS(rq),
@@ -816,6 +817,32 @@ DECLARE_EVENT_CLASS(i915_request,
 		      __entry->guc_id, __entry->ctx, __entry->seqno,
 		      __entry->tail)
 );
+#else
+DECLARE_EVENT_CLASS(i915_request,
+	    TP_PROTO(struct i915_request *rq),
+	    TP_ARGS(rq),
+
+	    TP_STRUCT__entry(
+			     __field(u32, dev)
+			     __field(u64, ctx)
+			     __field(u16, class)
+			     __field(u16, instance)
+			     __field(u32, seqno)
+			     ),
+
+	    TP_fast_assign(
+			   __entry->dev = rq->engine->i915->drm.primary->index;
+			   __entry->class = rq->engine->uabi_class;
+			   __entry->instance = rq->engine->uabi_instance;
+			   __entry->ctx = rq->fence.context;
+			   __entry->seqno = rq->fence.seqno;
+			   ),
+
+	    TP_printk("dev=%u, engine=%u:%u, ctx=%llu, seqno=%u",
+		      __entry->dev, __entry->class, __entry->instance,
+		      __entry->ctx, __entry->seqno)
+);
+#endif
 
 DEFINE_EVENT(i915_request, i915_request_add,
 	     TP_PROTO(struct i915_request *rq),
