@@ -12,6 +12,7 @@
 #include <limits.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdbool.h>
 #include <string.h>
 
 #include <fcntl.h>
@@ -21,14 +22,23 @@
 
 #include "vhci_driver.h"
 #include "usbip_common.h"
+#include "usbip_monitor.h"
 #include "usbip_network.h"
 #include "usbip.h"
+
+struct attach_options {
+	char *busid;
+	bool is_persistent;
+};
 
 static const char usbip_attach_usage_string[] =
 	"usbip attach <args>\n"
 	"    -r, --remote=<host>      The machine with exported USB devices\n"
-	"    -b, --busid=<busid>    Busid of the device on <host>\n"
-	"    -d, --device=<devid>    Id of the virtual UDC on <host>\n";
+	"    -b, --busid=<busid>      Busid of the device on <host>\n"
+	"    -d, --device=<devid>     Id of the virtual UDC on <host>\n"
+	"    -p, --persistent         Persistently monitor the given bus and import\n"
+	"                             USB devices when available on the remote end\n";
+
 
 void usbip_attach_usage(void)
 {
@@ -117,7 +127,7 @@ err_out:
 	return -1;
 }
 
-static int query_import_device(int sockfd, char *busid)
+static int query_import_device(int sockfd, char *busid, bool is_persistent)
 {
 	int rc;
 	struct op_import_request request;
@@ -127,31 +137,35 @@ static int query_import_device(int sockfd, char *busid)
 
 	memset(&request, 0, sizeof(request));
 	memset(&reply, 0, sizeof(reply));
-
-	/* send a request */
-	rc = usbip_net_send_op_common(sockfd, OP_REQ_IMPORT, 0);
-	if (rc < 0) {
-		err("send op_common");
-		return -1;
-	}
-
 	strncpy(request.busid, busid, SYSFS_BUS_ID_SIZE-1);
-
-	PACK_OP_IMPORT_REQUEST(0, &request);
-
-	rc = usbip_net_send(sockfd, (void *) &request, sizeof(request));
-	if (rc < 0) {
-		err("send op_import_request");
-		return -1;
+	if (is_persistent) {
+		request.poll_timeout_ms = 5000;
+		info("remote device on busid %s: polling", busid);
 	}
+	PACK_OP_IMPORT_REQUEST(1, &request);
 
-	/* receive a reply */
-	rc = usbip_net_recv_op_common(sockfd, &code, &status);
-	if (rc < 0) {
-		err("Attach Request for %s failed - %s\n",
-		    busid, usbip_op_common_status_string(status));
-		return -1;
-	}
+	do {
+		/* send a request */
+		rc = usbip_net_send_op_common(sockfd, OP_REQ_IMPORT, 0);
+		if (rc < 0) {
+			err("send op_common");
+			return -1;
+		}
+
+		rc = usbip_net_send(sockfd, (void *) &request, sizeof(request));
+		if (rc < 0) {
+			err("send op_import_request");
+			return -1;
+		}
+
+		/* receive a reply */
+		rc = usbip_net_recv_op_common(sockfd, &code, &status);
+		if (status != ST_POLL_TIMEOUT && rc < 0) {
+			err("Attach Request for %s failed - %s\n",
+					busid, usbip_op_common_status_string(status));
+			return -1;
+		}
+	} while (status == ST_POLL_TIMEOUT);
 
 	rc = usbip_net_recv(sockfd, (void *) &reply, sizeof(reply));
 	if (rc < 0) {
@@ -171,7 +185,17 @@ static int query_import_device(int sockfd, char *busid)
 	return import_device(sockfd, &reply.udev);
 }
 
-static int attach_device(char *host, char *busid)
+static int get_local_busid_from(int port, char *local_busid)
+{
+	int rc = usbip_vhci_driver_open();
+
+	if (rc == 0)
+		rc = usbip_vhci_get_local_busid_from(port, local_busid);
+	usbip_vhci_driver_close();
+	return rc;
+}
+
+static int attach_device(char *host, struct attach_options opt)
 {
 	int sockfd;
 	int rc;
@@ -183,19 +207,53 @@ static int attach_device(char *host, char *busid)
 		return -1;
 	}
 
-	rhport = query_import_device(sockfd, busid);
+	rhport = query_import_device(sockfd, opt.busid, opt.is_persistent);
 	if (rhport < 0)
 		return -1;
 
 	close(sockfd);
 
-	rc = record_connection(host, usbip_port_string, busid, rhport);
+	rc = record_connection(host, usbip_port_string, opt.busid, rhport);
 	if (rc < 0) {
 		err("record connection");
 		return -1;
 	}
+	info("remote device on busid %s: attach complete", opt.busid);
+	return rhport;
+}
 
-	return 0;
+static void monitor_disconnect(usbip_monitor_t *monitor, char *busid, int rhport)
+{
+	// To monitor unbind we must first ensure to be at a bound state. To
+	// monitor bound state a local busid is needed, which is unknown at this
+	// moment. Local busid is not available until it's already bound to the usbip
+	// driver. Thus monitor bind events for any usb device until the busid is
+	// available for the port.
+	char local_busid[SYSFS_BUS_ID_SIZE] = {};
+
+	while (get_local_busid_from(rhport, local_busid))
+		usbip_monitor_await_usb_bind(monitor, USBIP_USB_DRV_NAME);
+	info("remote device on busid %s: monitor disconnect", busid);
+	usbip_monitor_set_busid(monitor, local_busid);
+	usbip_monitor_await_usb_unbind(monitor);
+	usbip_monitor_set_busid(monitor, NULL);
+}
+
+static int attach_device_persistently(char *host, struct attach_options opt)
+{
+	int rc = 0;
+	usbip_monitor_t *monitor = usbip_monitor_new();
+
+	while (rc == 0) {
+		int rhport = attach_device(host, opt);
+
+		if (rhport < 0)
+			rc = -1;
+		else
+			monitor_disconnect(monitor, opt.busid, rhport);
+	}
+	usbip_monitor_delete(monitor);
+	return rc;
 }
 
 int usbip_attach(int argc, char *argv[])
@@ -204,15 +262,16 @@ int usbip_attach(int argc, char *argv[])
 		{ "remote", required_argument, NULL, 'r' },
 		{ "busid",  required_argument, NULL, 'b' },
 		{ "device",  required_argument, NULL, 'd' },
+		{ "persistent",  no_argument, NULL, 'p' },
 		{ NULL, 0,  NULL, 0 }
 	};
 	char *host = NULL;
-	char *busid = NULL;
+	struct attach_options options = {};
 	int opt;
 	int ret = -1;
 
 	for (;;) {
-		opt = getopt_long(argc, argv, "d:r:b:", opts, NULL);
+		opt = getopt_long(argc, argv, "d:r:b:p", opts, NULL);
 
 		if (opt == -1)
 			break;
@@ -223,17 +282,24 @@ int usbip_attach(int argc, char *argv[])
 			break;
 		case 'd':
 		case 'b':
-			busid = optarg;
+			options.busid = optarg;
+			break;
+		case 'p':
+			options.is_persistent = true;
 			break;
 		default:
 			goto err_out;
 		}
 	}
 
-	if (!host || !busid)
+	if (!host || !options.busid)
 		goto err_out;
 
-	ret = attach_device(host, busid);
+	if (options.is_persistent)
+		ret = attach_device_persistently(host, options);
+	else
+		ret = attach_device(host, options);
+
 	goto out;
 
 err_out:

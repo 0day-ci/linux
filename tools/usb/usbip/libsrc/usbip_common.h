@@ -53,6 +53,7 @@
 #define ST_DEV_ERR	0x03
 #define ST_NODEV	0x04
 #define ST_ERROR	0x05
+#define ST_POLL_TIMEOUT 0x06
 
 extern int usbip_use_syslog;
 extern int usbip_use_stderr;

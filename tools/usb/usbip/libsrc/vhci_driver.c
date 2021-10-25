@@ -465,3 +465,19 @@ int usbip_vhci_imported_device_dump(struct usbip_imported_device *idev)
 
 	return 0;
 }
+
+int usbip_vhci_get_local_busid_from(int port, char *local_busid)
+{
+	int rc = -1;
+
+	for (int i = 0; i < vhci_driver->nports; ++i) {
+		struct usbip_imported_device *idev = &vhci_driver->idev[i];
+
+		if (idev->port == port && strnlen(idev->udev.busid, SYSFS_BUS_ID_SIZE)) {
+			memcpy(local_busid, idev->udev.busid, SYSFS_BUS_ID_SIZE);
+			rc = 0;
+			break;
+		}
+	}
+	return rc;
+}

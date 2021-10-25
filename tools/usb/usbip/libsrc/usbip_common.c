@@ -78,6 +78,7 @@ static struct op_common_status_string op_common_status_strings[] = {
 	{ ST_DEV_ERR,	"Device in error state" },
 	{ ST_NODEV,	"Device not found" },
 	{ ST_ERROR,	"Unexpected response" },
+	{ ST_POLL_TIMEOUT,	"Poll timeout" },
 	{ 0, NULL}
 };
 
