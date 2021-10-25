@@ -144,6 +144,10 @@ static const u8 READ_COUNTER_RESPONSE[]	= {0x00, 0x01, 0x00, 0x10,
 					   0x00, 0x00, 0x00, 0x02,
 					   0x00, 0x00, 0x00, 0x00};
 
+/* Largest supported packets */
+static const size_t TX_MAX_SIZE	= sizeof(SET_PORT_DIR_REQUEST);
+static const size_t RX_MAX_SIZE	= sizeof(READ_PORT_RESPONSE);
+
 enum commands {
 	READ_PORT,
 	WRITE_PORT,
@@ -486,12 +490,16 @@ static int ni6501_find_endpoints(struct comedi_device *dev)
 		ep_desc = &iface_desc->endpoint[i].desc;
 
 		if (usb_endpoint_is_bulk_in(ep_desc)) {
+			if (usb_endpoint_maxp(ep_desc) < RX_MAX_SIZE)
+				continue;
 			if (!devpriv->ep_rx)
 				devpriv->ep_rx = ep_desc;
 			continue;
 		}
 
 		if (usb_endpoint_is_bulk_out(ep_desc)) {
+			if (usb_endpoint_maxp(ep_desc) < TX_MAX_SIZE)
+				continue;
 			if (!devpriv->ep_tx)
 				devpriv->ep_tx = ep_desc;
 			continue;
