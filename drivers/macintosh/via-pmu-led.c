@@ -25,6 +25,7 @@
 #include <linux/leds.h>
 #include <linux/adb.h>
 #include <linux/pmu.h>
+#include <linux/moduleparam.h>
 #include <asm/prom.h>
 
 static spinlock_t pmu_blink_lock;
@@ -71,11 +72,10 @@ static void pmu_led_set(struct led_classdev *led_cdev,
  	spin_unlock_irqrestore(&pmu_blink_lock, flags);
 }
 
+int adb_pmu_led_disk;
+
 static struct led_classdev pmu_led = {
 	.name = "pmu-led::front",
-#ifdef CONFIG_ADB_PMU_LED_DISK
-	.default_trigger = "disk-activity",
-#endif
 	.brightness_set = pmu_led_set,
 };
 
@@ -106,6 +106,9 @@ static int __init via_pmu_led_init(void)
 	}
 	of_node_put(dt);
 
+	if (adb_pmu_led_disk)
+		pmu_led.default_trigger = "disk-activity";
+
 	spin_lock_init(&pmu_blink_lock);
 	/* no outstanding req */
 	pmu_blink_req.complete = 1;
@@ -113,5 +116,7 @@ static int __init via_pmu_led_init(void)
 
 	return led_classdev_register(NULL, &pmu_led);
 }
+
+core_param(adb_pmu_led_disk, adb_pmu_led_disk, bool, 0644);
 
 late_initcall(via_pmu_led_init);
