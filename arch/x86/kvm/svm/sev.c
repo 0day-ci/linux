@@ -2579,11 +2579,16 @@ int sev_handle_vmgexit(struct kvm_vcpu *vcpu)
 
 int sev_es_string_io(struct vcpu_svm *svm, int size, unsigned int port, int in)
 {
-	if (!setup_vmgexit_scratch(svm, in, svm->vmcb->control.exit_info_2))
+	u32 bytes;
+
+	if (unlikely(check_mul_overflow(svm->vmcb->control.exit_info_2, size, &bytes)))
 		return -EINVAL;
 
-	return kvm_sev_es_string_io(&svm->vcpu, size, port,
-				    svm->ghcb_sa, svm->ghcb_sa_len / size, in);
+	if (!setup_vmgexit_scratch(svm, in, bytes))
+		return -EINVAL;
+
+	return kvm_sev_es_string_io(&svm->vcpu, size, port, svm->ghcb_sa,
+				    svm->vmcb->control.exit_info_2, in);
 }
 
 void sev_es_init_vmcb(struct vcpu_svm *svm)
