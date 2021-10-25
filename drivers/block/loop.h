@@ -61,7 +61,6 @@ struct loop_device {
 	struct list_head        idle_worker_list;
 	struct rb_root          worker_tree;
 	struct timer_list       timer;
-	bool			use_dio;
 	bool			sysfs_inited;
 
 	struct request_queue	*lo_queue;

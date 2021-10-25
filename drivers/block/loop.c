@@ -226,13 +226,12 @@ static void __loop_update_dio(struct loop_device *lo, bool dio)
 		use_dio = false;
 	}
 
-	if (lo->use_dio == use_dio)
+	if (!!(lo->lo_flags & LO_FLAGS_DIRECT_IO) == use_dio)
 		return;
 
 	/* flush dirty pages before changing direct IO */
 	vfs_fsync(file, 0);
 
-	lo->use_dio = use_dio;
 	if (use_dio) {
 		blk_queue_flag_clear(QUEUE_FLAG_NOMERGES, lo->lo_queue);
 		lo->lo_flags |= LO_FLAGS_DIRECT_IO;
@@ -622,7 +621,7 @@ static int do_req_filebacked(struct loop_device *lo, struct request *rq)
 static inline void loop_update_dio(struct loop_device *lo)
 {
 	__loop_update_dio(lo, (lo->lo_backing_file->f_flags & O_DIRECT) |
-				lo->use_dio);
+				(lo->lo_flags & LO_FLAGS_DIRECT_IO));
 }
 
 static void loop_reread_partitions(struct loop_device *lo)
@@ -1207,7 +1206,6 @@ static int loop_configure(struct loop_device *lo, fmode_t mode,
 	lo->worker_tree = RB_ROOT;
 	timer_setup(&lo->timer, loop_free_idle_workers,
 		TIMER_DEFERRABLE);
-	lo->use_dio = lo->lo_flags & LO_FLAGS_DIRECT_IO;
 	lo->lo_device = bdev;
 	lo->lo_backing_file = file;
 	lo->old_gfp_mask = mapping_gfp_mask(mapping);
@@ -1495,7 +1493,7 @@ loop_set_status(struct loop_device *lo, const struct loop_info64 *info)
 	loop_config_discard(lo);
 
 	/* update dio if lo_offset or transfer is changed */
-	__loop_update_dio(lo, lo->use_dio);
+	__loop_update_dio(lo, lo->lo_flags & LO_FLAGS_DIRECT_IO);
 
 out_unfreeze:
 	blk_mq_unfreeze_queue(lo->lo_queue);
@@ -1682,7 +1680,7 @@ static int loop_set_dio(struct loop_device *lo, unsigned long arg)
 		goto out;
 
 	__loop_update_dio(lo, !!arg);
-	if (lo->use_dio == !!arg)
+	if (!!(lo->lo_flags & LO_FLAGS_DIRECT_IO) == !!arg)
 		return 0;
 	error = -EINVAL;
  out:
@@ -2094,7 +2092,7 @@ static blk_status_t loop_queue_rq(struct blk_mq_hw_ctx *hctx,
 		break;
 	default:
 		cmd->use_aio = !lo->transfer;
-		cmd->use_dio = lo->use_dio && cmd->use_aio;
+		cmd->use_dio = (lo->lo_flags & LO_FLAGS_DIRECT_IO) && cmd->use_aio;
 		break;
 	}
 
