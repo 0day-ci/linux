@@ -34,6 +34,7 @@ MODULE_IMPORT_NS(TEST_FIRMWARE);
 
 static DEFINE_MUTEX(test_fw_mutex);
 static const struct firmware *test_firmware;
+static struct firmware builtin_test_firmware;
 
 struct test_batched_req {
 	u8 idx;
@@ -58,6 +59,10 @@ struct test_batched_req {
  * @sync_direct: when the sync trigger is used if this is true
  *	request_firmware_direct() will be used instead.
  * @send_uevent: whether or not to send a uevent for async requests
+ * @is_builtin: used only internally to determine if the firmware was found
+ *	to be built-in to the kernel using only the API call
+ *	firmware_request_builtin(). We treat this specially as we are
+ *	responsible for the firmware struct.
  * @num_requests: number of requests to try per test case. This is trigger
  *	specific.
  * @reqs: stores all requests information
@@ -99,6 +104,7 @@ struct test_config {
 	bool partial;
 	bool sync_direct;
 	bool send_uevent;
+	bool is_builtin;
 	u8 num_requests;
 	u8 read_fw_idx;
 
@@ -120,7 +126,11 @@ static ssize_t test_fw_misc_read(struct file *f, char __user *buf,
 	ssize_t rc = 0;
 
 	mutex_lock(&test_fw_mutex);
-	if (test_firmware)
+	if (test_fw_config->is_builtin)
+		rc = simple_read_from_buffer(buf, size, offset,
+					     builtin_test_firmware.data,
+					     builtin_test_firmware.size);
+	else if (test_firmware)
 		rc = simple_read_from_buffer(buf, size, offset,
 					     test_firmware->data,
 					     test_firmware->size);
@@ -194,6 +204,7 @@ static int __test_firmware_config_init(void)
 	test_fw_config->buf_size = TEST_FIRMWARE_BUF_SIZE;
 	test_fw_config->file_offset = 0;
 	test_fw_config->partial = false;
+	test_fw_config->is_builtin = false;
 	test_fw_config->sync_direct = false;
 	test_fw_config->req_firmware = request_firmware;
 	test_fw_config->test_result = 0;
@@ -1051,6 +1062,44 @@ out:
 }
 static DEVICE_ATTR_RO(read_firmware);
 
+/*
+ * In order to test this, set CONFIG_FW_LOADER_BUILTIN_FILES to a firmware file
+ * which will be built into the kernel image. Then echo the name into the
+ * "trigger_request_builtin" sysfs file of this module.
+ */
+static ssize_t trigger_request_builtin_store(struct device *dev,
+					     struct device_attribute *attr,
+					     const char *buf, size_t count)
+{
+	int rc = -ENOENT;
+
+	if (!test_fw_config->name) {
+		pr_warn("unconfigured firmware settings\n");
+		return rc;
+	}
+
+	pr_info("loading builtin '%s'\n", test_fw_config->name);
+
+	mutex_lock(&test_fw_mutex);
+
+	if (firmware_request_builtin(&builtin_test_firmware,
+				     test_fw_config->name)) {
+		/* This let's us diff against the firmware */
+		test_fw_config->is_builtin = true;
+		pr_info("loaded: %zu\n", builtin_test_firmware.size);
+		rc = count;
+		goto out;
+	}
+
+	pr_info("load of '%s' failed\n", test_fw_config->name);
+
+out:
+	mutex_unlock(&test_fw_mutex);
+
+	return rc;
+}
+static DEVICE_ATTR_WO(trigger_request_builtin);
+
 #define TEST_FW_DEV_ATTR(name)          &dev_attr_##name.attr
 
 static struct attribute *test_dev_attrs[] = {
@@ -1082,6 +1131,7 @@ static struct attribute *test_dev_attrs[] = {
 	TEST_FW_DEV_ATTR(release_all_firmware),
 	TEST_FW_DEV_ATTR(test_result),
 	TEST_FW_DEV_ATTR(read_firmware),
+	TEST_FW_DEV_ATTR(trigger_request_builtin),
 	NULL,
 };
 

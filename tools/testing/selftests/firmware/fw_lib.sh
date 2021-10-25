@@ -15,6 +15,10 @@ TEST_DIR=$(dirname $0)
 # To reproduce rename this to test-firmware.bin
 TEST_FIRMWARE_INTO_BUF_FILENAME=test-firmware-into-buf.bin
 
+# We should use a different filename for built-in firmware otherwise
+# we'd always have the file present.
+TEST_FIRMWARE_BUILTIN_FILENAME=test-builtin-firmware.bin
+
 # Kselftest framework requirement - SKIP code is 4.
 ksft_skip=4
 
@@ -63,6 +67,9 @@ check_setup()
 	HAS_FW_LOADER_USER_HELPER="$(kconfig_has CONFIG_FW_LOADER_USER_HELPER=y)"
 	HAS_FW_LOADER_USER_HELPER_FALLBACK="$(kconfig_has CONFIG_FW_LOADER_USER_HELPER_FALLBACK=y)"
 	HAS_FW_LOADER_COMPRESS="$(kconfig_has CONFIG_FW_LOADER_COMPRESS=y)"
+	HAS_FW_LOADER_USER_HELPER="$(kconfig_has CONFIG_FW_LOADER_USER_HELPER=y)"
+	HAS_FW_LOADER_BUILTIN="$(kconfig_has CONFIG_FW_LOADER=y)"
+	HAS_TEST_FIRMWARE_BUILTIN="$(kconfig_has CONFIG_TEST_FIRMWARE_BUILTIN=y)"
 	PROC_FW_IGNORE_SYSFS_FALLBACK="0"
 	PROC_FW_FORCE_SYSFS_FALLBACK="0"
 

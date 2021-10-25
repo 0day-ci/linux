@@ -2,6 +2,7 @@
 include $(srctree)/drivers/base/firmware_loader/builtin/lib.Makefile
 
 obj-y  += main.o
+obj-$(CONFIG_TEST_BUILTIN_FIRMWARE)  += test-builtin-firmware.bin.gen.o
 
 # Create $(fwdir) from $(CONFIG_FW_LOADER_BUILTIN_DIR) -- if it doesn't have a
 # leading /, it's relative to $(srctree).
