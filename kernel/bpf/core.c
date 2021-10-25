@@ -1823,8 +1823,12 @@ static unsigned int __bpf_prog_ret0_warn(const void *ctx,
 bool bpf_prog_array_compatible(struct bpf_array *array,
 			       const struct bpf_prog *fp)
 {
+	bool ret;
+
 	if (fp->kprobe_override)
 		return false;
+
+	spin_lock(&array->aux->type_check_lock);
 
 	if (!array->aux->type) {
 		/* There's no owner yet where we could check for
@@ -1832,11 +1836,13 @@ bool bpf_prog_array_compatible(struct bpf_array *array,
 		 */
 		array->aux->type  = fp->type;
 		array->aux->jited = fp->jited;
-		return true;
+		ret = true;
+	} else {
+		ret = array->aux->type  == fp->type &&
+		      array->aux->jited == fp->jited;
 	}
-
-	return array->aux->type  == fp->type &&
-	       array->aux->jited == fp->jited;
+	spin_unlock(&array->aux->type_check_lock);
+	return ret;
 }
 
 static int bpf_check_tail_call(const struct bpf_prog *fp)

@@ -929,6 +929,7 @@ struct bpf_array_aux {
 	 * stored in the map to make sure that all callers and callees have
 	 * the same prog type and JITed flag.
 	 */
+	spinlock_t type_check_lock;
 	enum bpf_prog_type type;
 	bool jited;
 	/* Programs with direct jumps into programs part of this array. */
