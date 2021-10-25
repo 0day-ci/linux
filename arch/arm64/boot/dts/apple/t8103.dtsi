@@ -122,6 +122,7 @@
 			 */
 			clocks = <&clkref>, <&clkref>;
 			clock-names = "uart", "clk_uart_baud0";
+			power-domains = <&ps_uart0>;
 			status = "disabled";
 		};
 
@@ -130,6 +131,121 @@
 			#interrupt-cells = <3>;
 			interrupt-controller;
 			reg = <0x2 0x3b100000 0x0 0x8000>;
+		};
+
+		pmgr: power-management@23b700000 {
+			compatible = "apple,t8103-pmgr", "apple,pmgr", "syscon", "simple-mfd";
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			reg = <0x2 0x3b700000 0x0 0x14000>;
+
+			ps_sio_busif: power-controller@1c0 {
+				compatible = "apple,t8103-pmgr-pwrstate", "apple,pmgr-pwrstate";
+				reg = <0x1c0>;
+				#power-domain-cells = <0>;
+				#reset-cells = <0>;
+				label = "sio_busif";
+			};
+
+			ps_sio: power-controller@1c8 {
+				compatible = "apple,t8103-pmgr-pwrstate", "apple,pmgr-pwrstate";
+				reg = <0x1c8>;
+				#power-domain-cells = <0>;
+				#reset-cells = <0>;
+				label = "sio";
+				power-domains = <&ps_sio_busif>;
+			};
+
+			ps_uart_p: power-controller@220 {
+				compatible = "apple,t8103-pmgr-pwrstate", "apple,pmgr-pwrstate";
+				reg = <0x220>;
+				#power-domain-cells = <0>;
+				#reset-cells = <0>;
+				label = "uart_p";
+				power-domains = <&ps_sio>;
+			};
+
+			ps_uart0: power-controller@270 {
+				compatible = "apple,t8103-pmgr-pwrstate", "apple,pmgr-pwrstate";
+				reg = <0x270>;
+				#power-domain-cells = <0>;
+				#reset-cells = <0>;
+				label = "uart0";
+				power-domains = <&ps_uart_p>;
+			};
+
+			ps_uart1: power-controller@278 {
+				compatible = "apple,t8103-pmgr-pwrstate", "apple,pmgr-pwrstate";
+				reg = <0x278>;
+				#power-domain-cells = <0>;
+				#reset-cells = <0>;
+				label = "uart1";
+				power-domains = <&ps_uart_p>;
+			};
+
+			ps_uart2: power-controller@280 {
+				compatible = "apple,t8103-pmgr-pwrstate", "apple,pmgr-pwrstate";
+				reg = <0x280>;
+				#power-domain-cells = <0>;
+				#reset-cells = <0>;
+				label = "uart2";
+				power-domains = <&ps_uart_p>;
+			};
+
+			ps_uart3: power-controller@288 {
+				compatible = "apple,t8103-pmgr-pwrstate", "apple,pmgr-pwrstate";
+				reg = <0x288>;
+				#power-domain-cells = <0>;
+				#reset-cells = <0>;
+				label = "uart3";
+				power-domains = <&ps_uart_p>;
+			};
+
+			ps_uart4: power-controller@290 {
+				compatible = "apple,t8103-pmgr-pwrstate", "apple,pmgr-pwrstate";
+				reg = <0x290>;
+				#power-domain-cells = <0>;
+				#reset-cells = <0>;
+				label = "uart4";
+				power-domains = <&ps_uart_p>;
+			};
+
+			ps_uart5: power-controller@298 {
+				compatible = "apple,t8103-pmgr-pwrstate", "apple,pmgr-pwrstate";
+				reg = <0x298>;
+				#power-domain-cells = <0>;
+				#reset-cells = <0>;
+				label = "uart5";
+				power-domains = <&ps_uart_p>;
+			};
+
+			ps_uart6: power-controller@2a0 {
+				compatible = "apple,t8103-pmgr-pwrstate", "apple,pmgr-pwrstate";
+				reg = <0x2a0>;
+				#power-domain-cells = <0>;
+				#reset-cells = <0>;
+				label = "uart6";
+				power-domains = <&ps_uart_p>;
+			};
+
+			ps_uart7: power-controller@2a8 {
+				compatible = "apple,t8103-pmgr-pwrstate", "apple,pmgr-pwrstate";
+				reg = <0x2a8>;
+				#power-domain-cells = <0>;
+				#reset-cells = <0>;
+				label = "uart7";
+				power-domains = <&ps_uart_p>;
+			};
+
+			ps_uart8: power-controller@2b0 {
+				compatible = "apple,t8103-pmgr-pwrstate", "apple,pmgr-pwrstate";
+				reg = <0x2b0>;
+				#power-domain-cells = <0>;
+				#reset-cells = <0>;
+				label = "uart8";
+				power-domains = <&ps_uart_p>;
+			};
 		};
 	};
 };
