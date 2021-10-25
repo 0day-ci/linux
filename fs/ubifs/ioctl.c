@@ -107,9 +107,9 @@ static int setflags(struct inode *inode, int flags)
 	int err, release;
 	struct ubifs_inode *ui = ubifs_inode(inode);
 	struct ubifs_info *c = inode->i_sb->s_fs_info;
-	struct ubifs_budget_req req = { .dirtied_ino = 1,
-					.dirtied_ino_d = ui->data_len };
+	struct ubifs_budget_req req = { .dirtied_ino = 1 };
 
+	ubifs_assert(c, !ui->data_len);
 	err = ubifs_budget_space(c, &req);
 	if (err)
 		return err;
