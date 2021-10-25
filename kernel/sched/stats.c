@@ -186,7 +186,7 @@ static int show_schedstat(struct seq_file *seq, void *v)
  */
 static void *schedstat_start(struct seq_file *file, loff_t *offset)
 {
-	unsigned long n = *offset;
+	int n = *offset;
 
 	if (n == 0)
 		return (void *) 1;
