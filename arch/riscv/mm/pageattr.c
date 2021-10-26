@@ -208,28 +208,40 @@ void __kernel_map_pages(struct page *page, int numpages, int enable)
 bool kernel_page_present(struct page *page)
 {
 	unsigned long addr = (unsigned long)page_address(page);
-	pgd_t *pgd;
-	pud_t *pud;
-	p4d_t *p4d;
-	pmd_t *pmd;
-	pte_t *pte;
+	pgd_t *pgdp, pgd;
+	p4d_t *p4dp, p4d;
+	pud_t *pudp, pud;
+	pmd_t *pmdp, pmd;
+	pte_t *ptep;
 
-	pgd = pgd_offset_k(addr);
-	if (!pgd_present(*pgd))
+	pgdp = pgd_offset_k(addr);
+	pgd = READ_ONCE(*pgdp);
+	if (!pgd_present(pgd))
 		return false;
+	if (pgd_leaf(pgd))
+		return true;
 
-	p4d = p4d_offset(pgd, addr);
-	if (!p4d_present(*p4d))
+	p4dp = p4d_offset(pgdp, addr);
+	p4d = READ_ONCE(*p4dp);
+	if (!p4d_present(p4d))
 		return false;
+	if (p4d_leaf(p4d))
+		return true;
 
-	pud = pud_offset(p4d, addr);
-	if (!pud_present(*pud))
+	pudp = pud_offset(p4dp, addr);
+	pud = READ_ONCE(*pudp);
+	if (!pud_present(pud))
 		return false;
+	if (pud_leaf(pud))
+		return true;
 
-	pmd = pmd_offset(pud, addr);
-	if (!pmd_present(*pmd))
+	pmdp = pmd_offset(pudp, addr);
+	pmd = READ_ONCE(*pmdp);
+	if (!pmd_present(pmd))
 		return false;
+	if (pmd_leaf(pmd))
+		return true;
 
-	pte = pte_offset_kernel(pmd, addr);
-	return pte_present(*pte);
+	ptep = pte_offset_kernel(pmdp, addr);
+	return pte_present(READ_ONCE(*ptep));
 }
