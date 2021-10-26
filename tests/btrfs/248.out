@@ -1,0 +1,11 @@
+QA output created by 248
+Capture default stripe sizes.
+Check free space.
+First allocation.
+Second allocation.
+Calculate request size so last memory allocation cannot be completely fullfilled.
+Third allocation.
+Verify first allocation.
+Verify second allocation.
+Verify third allocation.
+Silence is golden

@@ -1,0 +1,317 @@
+#!/bin/bash
+# SPDX-License-Identifier: GPL-2.0
+# Copyright (c) 2021 Facebook.  All Rights Reserved.
+#
+# FS QA Test 250
+#
+# Test the new /sys/fs/btrfs/<uuid>/allocation/<block-type>/stripe_size
+# setting. This setting allows the admin to change the stripe size
+# setting for the next allocation.
+#
+# Test 1:
+#   Allocate storage for all three block types (data, metadata and system)
+#   with the default stripe size.
+#
+# Test 2:
+#   Set a new stripe size to double the default size and allocate space
+#   for all new block types with the new stripe size.
+#
+# Test 3:
+#   Pick an allocation size that is used in a loop and make sure the last
+#   allocation cannot be partially fullfilled.
+#
+# Note: Variable naming uses the following convention: if a variable name
+#       ends in "_B" then its a byte value, if it ends in "_MB" then the
+#       value is in megabytes.
+#
+. ./common/preamble
+_begin_fstest auto
+
+test_file="${TEST_DIR}/${seq}"
+seq=`basename $0`
+seqres="${RESULT_DIR}/${seq}"
+
+# Override the default cleanup function.
+_cleanup()
+{
+	cd /
+	rm -f "$test_file"
+}
+
+# Parse a size string which is in the format "XX.XXMib".
+#
+# Parameters:
+#   - (IN)    Block group type (Data, Metadata, System)
+#   - (INOUT) Variable to store block group size in MB
+#
+_parse_size_string() {
+	local SIZE=$(echo "$1" | awk 'match($0, /([0-9.]+)/) { print substr($0, RSTART, RLENGTH) }')
+        eval $2="${SIZE%.*}"
+}
+
+# Determine the size of the device in MB.
+#
+# Parameters:
+#   - (INOUT) Variable to store device size in MB
+#
+_device_size() {
+	$BTRFS_UTIL_PROG fi show ${SCRATCH_MNT} --mbytes | grep devid >> $seqres.full
+	local SIZE=$($BTRFS_UTIL_PROG fi show ${SCRATCH_MNT} --mbytes | grep devid)
+	_parse_size_string $(echo "${SIZE}" | awk '{print $4}') SIZE_ALLOC
+	eval $1=${SIZE_ALLOC%.*}
+}
+
+# Determine the free space of a block group in MB.
+#
+# Parameters:
+#   - (INOUT) Variable to store free space in MB
+#
+_free_space() {
+	local SIZE=$($BTRFS_UTIL_PROG fi show ${SCRATCH_MNT} --mbytes | grep devid)
+	_parse_size_string $(echo "${SIZE}" | awk '{print $4}') SIZE_ALLOC
+	_parse_size_string $(echo "${SIZE}" | awk '{print $6}') SIZE_USED
+	eval $1=$(expr ${SIZE_ALLOC} - ${SIZE_USED})
+}
+
+# Determine how much space in MB has been allocated to a block group.
+#
+# Parameters:
+#   - (IN)    Block group type (Data, Metadata, System)
+#   - (INOUT) Variable to store block group size in MB
+#
+_alloc_size() {
+	local SIZE_STRING=$($BTRFS_UTIL_PROG filesystem df ${SCRATCH_MNT} -m | grep  "$1" | awk '{print $3}')
+	_parse_size_string ${SIZE_STRING} BLOCK_GROUP_SIZE
+        eval $2="${BLOCK_GROUP_SIZE}"
+}
+
+. ./common/filter
+_supported_fs btrfs
+_require_test
+_require_scratch
+_require_btrfs_fs_sysfs
+
+# Delete log file if it exists.
+rm -f "${seqres}.full"
+
+# Make filesystem.
+_scratch_mkfs >> $seqres.full 2>&1
+_scratch_mount >> $seqres.full 2>&1
+
+# Get UUID of device.
+UUID="$(findmnt -n -o UUID ${SCRATCH_MNT})"
+echo "UUID = ${UUID}" >> ${seqres}.full
+
+# Check if there is sufficient sysfs support.
+if [[ ! -e /sys/fs/btrfs/${UUID}/allocation/metadata/stripe_size ]]; then
+	_notrun "The filesystem has no support to set the BTRFS stripe size."
+fi
+
+if [[ ! -e /sys/fs/btrfs/${UUID}/allocation/metadata/force_chunk_alloc ]]; then
+	_notrun "The filesystem has no support to force BTRFS allocation."
+fi
+
+# Get free space.
+_free_space  FREE_SPACE_MB
+_device_size DEVICE_SIZE_MB
+
+echo "free space = ${FREE_SPACE_MB}" >> ${seqres}.full
+
+# Get stripe sizes.
+echo "Capture default stripe sizes."
+FIRST_DATA_STRIPE_SIZE_B=$(cat /sys/fs/btrfs/${UUID}/allocation/data/stripe_size)
+FIRST_METADATA_STRIPE_SIZE_B=$(cat /sys/fs/btrfs/${UUID}/allocation/metadata/stripe_size)
+FIRST_SYSTEM_STRIPE_SIZE_B=$(cat /sys/fs/btrfs/${UUID}/allocation/system/stripe_size)
+
+echo "Data stripe size    = ${FIRST_DATA_STRIPE_SIZE_B}"     >> ${seqres}.full
+echo "Metaata stripe size = ${FIRST_METADATA_STRIPE_SIZE_B}" >> ${seqres}.full
+echo "System stripe size  = ${FIRST_SYSTEM_STRIPE_SIZE_B}"   >> ${seqres}.full
+
+INIT_ALLOC_SIZE_MB=$(expr \( ${FIRST_DATA_STRIPE_SIZE_B} + ${METADATA_STRIP_SIZE} + ${FIRST_SYSTEM_STRIPE_SIZE_B} \) / 1024 / 1024)
+echo "Allocation size for initial allocation = $INIT_ALLOC_SIZE_MB" >> $seqres.full
+
+# Check if there is enough free space.
+echo "Check free space."
+if [[ ${FREE_SPACE_MB} -lt 10000 ]]; then
+	_notrun "The filesystem has less than 10GB free space."
+fi
+
+if [[ $(expr ${INIT_ALLOC_SIZE_MB} \* 4) -gt ${FREE_SPACE_MB} ]]; then
+	_notrun "The filesystem default stripe size > available free space."
+fi
+
+#
+# Do first allocation with the default stripe sizes for the different block
+# types.
+#
+echo "First allocation."
+_alloc_size "Data"     DATA_SIZE_START_MB
+_alloc_size "Metadata" METADATA_SIZE_START_MB
+_alloc_size "System"   SYSTEM_SIZE_START_MB
+
+echo "Block group Data alloc size     = ${DATA_SIZE_START_MB}"     >> $seqres.full
+echo "Block group Metadata alloc size = ${METADATA_SIZE_START_MB}" >> $seqres.full
+echo "Block group System alloc size   = ${SYSTEM_SIZE_START_MB}"   >> $seqres.full
+
+echo "1" > /sys/fs/btrfs/${UUID}/allocation/data/force_chunk_alloc
+echo "1" > /sys/fs/btrfs/${UUID}/allocation/metadata/force_chunk_alloc
+echo "1" > /sys/fs/btrfs/${UUID}/allocation/system/force_chunk_alloc
+
+_alloc_size "Data"     FIRST_DATA_SIZE_MB
+_alloc_size "Metadata" FIRST_METADATA_SIZE_MB
+_alloc_size "System"   FIRST_SYSTEM_SIZE_MB
+
+echo "First block group Data alloc size     = ${FIRST_DATA_SIZE_MB}"     >> ${seqres}.full
+echo "First block group Metadata alloc size = ${FIRST_METADATA_SIZE_MB}" >> ${seqres}.full
+echo "First block group System alloc size   = ${FIRST_SYSTEM_SIZE_MB}"   >> ${seqres}.full
+
+_free_space FREE_SPACE_AFTER
+echo "Free space after first allocation = ${FREE_SPACE_AFTER}" >> ${seqres}.full
+
+#
+# Do allocation with the doubled stripe sizes for the different block types.
+#
+echo "Second allocation."
+SECOND_DATA_STRIPE_SIZE_B=$(expr ${FIRST_DATA_STRIPE_SIZE_B} \* 2)
+SECOND_METADATA_STRIPE_SIZE_B=$(expr ${FIRST_METADATA_STRIPE_SIZE_B} \* 2)
+SECOND_SYSTEM_STRIPE_SIZE_B=$(expr ${FIRST_SYSTEM_STRIPE_SIZE_B} \* 2)
+
+# Stripe size is limited to 10% of device size.
+if [[ ${SECOND_DATA_STRIPE_SIZE_B} -gt $(expr ${DEVICE_SIZE_MB} \* 10 / 100) ]]; then
+	SECOND_DATA_STRIPE_SIZE_B=$(expr ${DEVICE_SIZE_MB} \* 10 / 100 \* 1024 \* 1024)
+fi
+if [[ ${SECOND_METADATA_STRIPE_SIZE_B} -gt $(expr ${DEVICE_SIZE_MB} \* 10 / 100) ]]; then
+	SECOND_METADATA_STRIPE_SIZE_B=$(expr ${DEVICE_SIZE_MB} \* 10 / 100 \* 1024 \* 1024)
+fi
+if [[ ${SECOND_SYSTEM_STRIPE_SIZE_B} -gt $(expr ${DEVICE_SIZE_MB} \* 10 / 100) ]]; then
+	SECOND_SYSTEM_STRIPE_SIZE_B=$(expr ${DEVICE_SIZE_MB} \* 10 / 100 \* 1024 \* 1024)
+fi
+
+echo "${SECOND_DATA_STRIPE_SIZE_B}"     > /sys/fs/btrfs/${UUID}/allocation/data/stripe_size
+echo "${SECOND_METADATA_STRIPE_SIZE_B}" > /sys/fs/btrfs/${UUID}/allocation/metadata/stripe_size
+echo "${SECOND_SYSTEM_STRIPE_SIZE_B}"   > /sys/fs/btrfs/${UUID}/allocation/system/stripe_size
+
+SECOND_DATA_STRIPE_SIZE_READ_B=$(cat /sys/fs/btrfs/${UUID}/allocation/data/stripe_size)
+SECOND_METADATA_STRIPE_SIZE_READ_B=$(cat /sys/fs/btrfs/${UUID}/allocation/metadata/stripe_size)
+SECOND_SYSTEM_STRIPE_SIZE_READ_B=$(cat /sys/fs/btrfs/${UUID}/allocation/system/stripe_size)
+
+echo "1" > /sys/fs/btrfs/${UUID}/allocation/data/force_chunk_alloc
+echo "1" > /sys/fs/btrfs/${UUID}/allocation/metadata/force_chunk_alloc
+echo "1" > /sys/fs/btrfs/${UUID}/allocation/system/force_chunk_alloc
+
+_alloc_size "Data"     SECOND_DATA_SIZE_MB
+_alloc_size "Metadata" SECOND_METADATA_SIZE_MB
+_alloc_size "System"   SECOND_SYSTEM_SIZE_MB
+
+echo "Calculate request size so last memory allocation cannot be completely fullfilled."
+_free_space FREE_SPACE_MB
+
+# Find request size whose space allocation cannot be completely fullfilled.
+THIRD_DATA_STRIPE_SIZE_MB=$(expr 256)
+until [ ${THIRD_DATA_STRIPE_SIZE_MB} -gt $(expr 7 \* 1024) ]
+do
+	if [ $((FREE_SPACE_MB%THIRD_DATA_STRIPE_SIZE_MB)) -ne 0 ]; then
+	       break
+        fi
+	THIRD_DATA_STRIPE_SIZE_MB=$((THIRD_DATA_STRIPE_SIZE_MB+256))
+done
+
+if [[ ${THIRD_DATA_STRIPE_SIZE_MB} -eq $(expr 7 \* 1024) ]]; then
+	_fail "Cannot find allocation size for partial block allocation."
+fi
+
+THIRD_DATA_STRIPE_SIZE_B=$(expr ${THIRD_DATA_STRIPE_SIZE_MB} \* 1024 \* 1024)
+echo "Allocation size in mb    = ${THIRD_DATA_STRIPE_SIZE_MB}" >> ${seqres}.full
+echo "Allocation size in bytes = ${THIRD_DATA_STRIPE_SIZE_B}"  >> ${seqres}.full
+
+#
+# Do allocation until free space is exhausted.
+#
+echo "Third allocation."
+echo "${THIRD_DATA_STRIPE_SIZE_B}" > /sys/fs/btrfs/${UUID}/allocation/data/stripe_size
+
+_free_space FREE_SPACE_MB
+while [ $FREE_SPACE_MB -gt $THIRD_DATA_STRIPE_SIZE_MB ]
+do
+	_alloc_size "Data" THIRD_DATA_SIZE_MB
+	echo "1" > /sys/fs/btrfs/${UUID}/allocation/data/force_chunk_alloc
+
+	_free_space FREE_SPACE_MB
+done
+
+_alloc_size "Data" FOURTH_DATA_SIZE_MB
+
+#
+# Verification of initial allocation.
+#
+echo "Verify first allocation."
+FIRST_DATA_STRIPE_SIZE_MB=$(expr ${FIRST_DATA_STRIPE_SIZE_B} / 1024 / 1024)
+FIRST_METADATA_STRIPE_SIZE_MB=$(expr ${FIRST_METADATA_STRIPE_SIZE_B} / 1024 / 1024)
+FIRST_SYSTEM_STRIPE_SIZE_MB=$(expr ${FIRST_SYSTEM_STRIPE_SIZE_B} / 1024 / 1024)
+
+# if [[ $(expr ${FIRST_DATA_STRIPE_SIZE_MB} + ${DATA_SIZE_START_MB}) -ne $(expr ${FIRST_DATA_SIZE_MB}) ]]; then
+if [[ $(expr ${FIRST_DATA_STRIPE_SIZE_MB} + ${DATA_SIZE_START_MB}) -ne ${FIRST_DATA_SIZE_MB} ]]; then
+	_fail "tInitial data allocation not correct."
+fi
+
+if [[ $(expr ${FIRST_METADATA_STRIPE_SIZE_MB} + ${METADATA_SIZE_START_MB}) -ne ${FIRST_METADATA_SIZE_MB} ]]; then
+	_fail "Initial metadata allocation not correct."
+fi
+
+if [[ $(expr ${FIRST_SYSTEM_STRIPE_SIZE_MB} + ${SYSTEM_SIZE_START_MB}) -ne ${FIRST_SYSTEM_SIZE_MB} ]]; then
+	_fail "Initial system allocation not correct."
+fi
+
+#
+# Verification of second allocation.
+#
+echo "Verify second allocation."
+SECOND_DATA_STRIPE_SIZE_MB=$(expr ${SECOND_DATA_STRIPE_SIZE_B} / 1024 / 1024)
+SECOND_METADATA_STRIPE_SIZE_MB=$(expr ${SECOND_METADATA_STRIPE_SIZE_B} / 1024 / 1024)
+SECOND_SYSTEM_STRIPE_SIZE_MB=$(expr ${SECOND_SYSTEM_STRIPE_SIZE_B} / 1024 / 1024)
+
+if [[ ${SECOND_DATA_STRIPE_SIZE_B} -ne ${SECOND_DATA_STRIPE_SIZE_READ_B} ]]; then
+	_fail "Value written to /sys/fs/btrfs/<uuid>/allocation/data/stripe_size and read value are different."
+fi
+
+if [[ ${SECOND_METADATA_STRIPE_SIZE_B} -ne ${SECOND_METADATA_STRIPE_SIZE_READ_B} ]]; then
+	_fail "Value written to /sys/fs/btrfs/<uuid>/allocation/metadata/stripe_size and read value are different."
+fi
+
+if [[ ${SECOND_SYSTEM_STRIPE_SIZE_B} -ne ${SECOND_SYSTEM_STRIPE_SIZE_READ_B} ]]; then
+	_fail "Value written to /sys/fs/btrfs/<uuid>/allocation/system/stripe_size and read value are different."
+fi
+
+
+if [[ $(expr ${SECOND_DATA_STRIPE_SIZE_MB} + ${FIRST_DATA_SIZE_MB}) -ne ${SECOND_DATA_SIZE_MB} ]]; then
+	_fail "Data allocation after stripe size change not correct."
+fi
+
+if [[ $(expr ${SECOND_METADATA_STRIPE_SIZE_MB} + ${FIRST_METADATA_SIZE_MB}) -ne ${SECOND_METADATA_SIZE_MB} ]]; then
+	_fail "Metadata allocation after stripe size change not correct."
+fi
+
+if [[ $(expr ${SECOND_SYSTEM_STRIPE_SIZE_MB} + ${FIRST_SYSTEM_SIZE_MB}) -ne ${SECOND_SYSTEM_SIZE_MB} ]]; then
+	_fail "System allocation after stripe size change not correct."
+fi
+
+#
+# Verification of third allocation.
+#
+echo "Verify third allocation."
+if [[ ${FREE_SPACE_MB} -gt ${THIRD_DATA_STRIPE_SIZE_MB} ]]; then
+	_fail "Free space after allocating over memlimit is too high."
+fi
+
+# The + 1 is required as 1MB is always kept as free space.
+if [[ $(expr ${THIRD_DATA_STRIPE_SIZE_MB} + ${THIRD_DATA_SIZE_MB} + 1) -le $(expr ${FOURTH_DATA_SIZE_MB}) ]]; then
+	_fail "Allocation until out of memory: last memory allocation size is not correct."
+fi
+
+
+# Report success.
+echo "Silence is golden"
+
+status=0
+exit
+
