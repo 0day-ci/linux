@@ -309,6 +309,10 @@ static int ohci_hcd_omap_probe(struct platform_device *pdev)
 		retval = -ENXIO;
 		goto err3;
 	}
+	if (!irq) {
+		retval = -EINVAL;
+		goto err3;
+	}
 	retval = usb_add_hcd(hcd, irq, 0);
 	if (retval)
 		goto err3;
