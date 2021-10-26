@@ -2393,6 +2393,17 @@ struct shmem2_region {
 
 	/* mini dump driver info */
 	struct mdump_driver_info drv_info;			/* 0x218 */
+
+	/* written by mfw, read by driver, eg. feature capability support */
+	u32 mfw_flags;						/* 0x22c */
+	#define DISABLE_EMBEDDED_LLDP_SUPPORT	0x00000001
+	/* DEBUG DATA (EDDC) is enabled */
+	#define DEBUG_DATA_SUPPORT		0x00000002
+
+	/* Internal mask similar to the drv_status in the drv_mb
+	 * which used by MFW to sync message
+	 */
+	u32 drv_status_do_not_ack[E2_FUNC_MAX];			/* 0x230 */
 };
 
 
@@ -3024,7 +3035,7 @@ struct afex_stats {
 
 #define BCM_5710_FW_MAJOR_VERSION			7
 #define BCM_5710_FW_MINOR_VERSION			13
-#define BCM_5710_FW_REVISION_VERSION		15
+#define BCM_5710_FW_REVISION_VERSION		20
 #define BCM_5710_FW_ENGINEERING_VERSION		0
 #define BCM_5710_FW_COMPILE_FLAGS			1
 
