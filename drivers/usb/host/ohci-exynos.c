@@ -175,6 +175,10 @@ static int exynos_ohci_probe(struct platform_device *pdev)
 		err = irq;
 		goto fail_io;
 	}
+	if (!irq) {
+		err = -EINVAL;
+		goto fail_io;
+	}
 
 	platform_set_drvdata(pdev, hcd);
 
