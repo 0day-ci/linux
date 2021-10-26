@@ -102,6 +102,9 @@ struct gadget_config_name {
 	struct list_head list;
 };
 
+#define CREATE_TRACE_POINTS
+#include "configfs_trace.h"
+
 #define USB_MAX_STRING_WITH_NULL_LEN	(USB_MAX_STRING_LEN+1)
 
 static int usb_string_copy(const char *s, char **s_copy)
@@ -157,6 +160,7 @@ static ssize_t gadget_dev_desc_##_name##_store(struct config_item *item, \
 	if (ret)					\
 		return ret;				\
 	gi->cdev.desc._name = val;			\
+	trace_gadget_dev_desc_##_name##_store(gi);	\
 	return len;					\
 }
 
@@ -171,6 +175,7 @@ static ssize_t gadget_dev_desc_##_name##_store(struct config_item *item, \
 	if (ret)					\
 		return ret;				\
 	gi->cdev.desc._name = cpu_to_le16p(&val);	\
+	trace_gadget_dev_desc_##_name##_store(gi);	\
 	return len;					\
 }
 
@@ -215,6 +220,7 @@ static ssize_t gadget_dev_desc_bcdDevice_store(struct config_item *item,
 		return ret;
 
 	gi->cdev.desc.bcdDevice = cpu_to_le16(bcdDevice);
+	trace_gadget_dev_desc_bcdDevice_store(gi);
 	return len;
 }
 
@@ -233,6 +239,7 @@ static ssize_t gadget_dev_desc_bcdUSB_store(struct config_item *item,
 		return ret;
 
 	gi->cdev.desc.bcdUSB = cpu_to_le16(bcdUSB);
+	trace_gadget_dev_desc_bcdUSB_store(gi);
 	return len;
 }
 
@@ -254,6 +261,7 @@ static int unregister_gadget(struct gadget_info *gi)
 {
 	int ret;
 
+	trace_unregister_gadget(gi);
 	if (!gi->composite.gadget_driver.udc_name)
 		return -ENODEV;
 
@@ -300,6 +308,7 @@ static ssize_t gadget_dev_desc_UDC_store(struct config_item *item,
 			goto err;
 		}
 	}
+	trace_gadget_dev_desc_UDC_store(gi);
 	mutex_unlock(&gi->lock);
 	return len;
 err:
@@ -343,6 +352,7 @@ static ssize_t gadget_dev_desc_max_speed_store(struct config_item *item,
 
 	gi->composite.gadget_driver.max_speed = gi->composite.max_speed;
 
+	trace_gadget_dev_desc_max_speed_store(gi);
 	mutex_unlock(&gi->lock);
 	return len;
 err:
@@ -462,6 +472,7 @@ static int config_usb_cfg_link(
 		goto out;
 	}
 
+	trace_config_usb_cfg_link(cfg, f);
 	/* stash the function until we bind it to the gadget */
 	list_add_tail(&f->list, &cfg->func_list);
 	ret = 0;
@@ -495,6 +506,7 @@ static void config_usb_cfg_unlink(
 
 	list_for_each_entry(f, &cfg->func_list, list) {
 		if (f->fi == fi) {
+			trace_config_usb_cfg_unlink(cfg, f);
 			list_del(&f->list);
 			usb_put_function(f);
 			mutex_unlock(&gi->lock);
@@ -532,6 +544,7 @@ static ssize_t gadget_config_desc_MaxPower_store(struct config_item *item,
 	if (DIV_ROUND_UP(val, 8) > 0xff)
 		return -ERANGE;
 	cfg->c.MaxPower = val;
+	trace_gadget_config_desc_MaxPower_store(cfg);
 	return len;
 }
 
@@ -558,6 +571,7 @@ static ssize_t gadget_config_desc_bmAttributes_store(struct config_item *item,
 				USB_CONFIG_ATT_WAKEUP))
 		return -EINVAL;
 	cfg->c.bmAttributes = val;
+	trace_gadget_config_desc_bmAttributes_store(cfg);
 	return len;
 }
 
@@ -818,6 +832,7 @@ static ssize_t os_desc_use_store(struct config_item *item, const char *page,
 	ret = strtobool(page, &use);
 	if (!ret) {
 		gi->use_os_desc = use;
+		trace_os_desc_use_store(gi);
 		ret = len;
 	}
 	mutex_unlock(&gi->lock);
@@ -842,6 +857,7 @@ static ssize_t os_desc_b_vendor_code_store(struct config_item *item,
 	ret = kstrtou8(page, 0, &b_vendor_code);
 	if (!ret) {
 		gi->b_vendor_code = b_vendor_code;
+		trace_os_desc_b_vendor_code_store(gi);
 		ret = len;
 	}
 	mutex_unlock(&gi->lock);
@@ -1432,6 +1448,7 @@ static int configfs_composite_bind(struct usb_gadget *gadget,
 	}
 
 	usb_ep_autoconfig_reset(cdev->gadget);
+	trace_configfs_composite_bind(gi);
 	return 0;
 
 err_purge_funcs:
@@ -1464,6 +1481,7 @@ static void configfs_composite_unbind(struct usb_gadget *gadget)
 	cdev->gadget = NULL;
 	set_gadget_data(gadget, NULL);
 	spin_unlock_irqrestore(&gi->spinlock, flags);
+	trace_configfs_composite_unbind(gi);
 }
 
 static int configfs_composite_setup(struct usb_gadget *gadget,
@@ -1487,6 +1505,7 @@ static int configfs_composite_setup(struct usb_gadget *gadget,
 	}
 
 	ret = composite_setup(gadget, ctrl);
+	trace_configfs_composite_setup(gi);
 	spin_unlock_irqrestore(&gi->spinlock, flags);
 	return ret;
 }
@@ -1510,6 +1529,7 @@ static void configfs_composite_disconnect(struct usb_gadget *gadget)
 	}
 
 	composite_disconnect(gadget);
+	trace_configfs_composite_disconnect(gi);
 	spin_unlock_irqrestore(&gi->spinlock, flags);
 }
 
@@ -1532,6 +1552,7 @@ static void configfs_composite_reset(struct usb_gadget *gadget)
 	}
 
 	composite_reset(gadget);
+	trace_configfs_composite_reset(gi);
 	spin_unlock_irqrestore(&gi->spinlock, flags);
 }
 
@@ -1554,6 +1575,7 @@ static void configfs_composite_suspend(struct usb_gadget *gadget)
 	}
 
 	composite_suspend(gadget);
+	trace_configfs_composite_suspend(gi);
 	spin_unlock_irqrestore(&gi->spinlock, flags);
 }
 
@@ -1576,6 +1598,7 @@ static void configfs_composite_resume(struct usb_gadget *gadget)
 	}
 
 	composite_resume(gadget);
+	trace_configfs_composite_resume(gi);
 	spin_unlock_irqrestore(&gi->spinlock, flags);
 }
 
