@@ -1374,9 +1374,15 @@ eb_relocate_entry(struct i915_execbuffer *eb,
 		 */
 		if (reloc->write_domain == I915_GEM_DOMAIN_INSTRUCTION &&
 		    GRAPHICS_VER(eb->i915) == 6) {
+			struct i915_vma_resource *vma_res =
+				i915_vma_resource_alloc();
+
+			if (IS_ERR(vma_res))
+				return PTR_ERR(vma_res);
+
 			err = i915_vma_bind(target->vma,
 					    target->vma->obj->cache_level,
-					    PIN_GLOBAL, NULL);
+					    PIN_GLOBAL, NULL, vma_res);
 			if (err)
 				return err;
 		}
