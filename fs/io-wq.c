@@ -853,9 +853,7 @@ static void io_wqe_enqueue(struct io_wqe *wqe, struct io_wq_work *work)
 	io_wqe_insert_work(wqe, work);
 	clear_bit(IO_ACCT_STALLED_BIT, &acct->flags);
 
-	rcu_read_lock();
 	do_create = !io_wqe_activate_free_worker(wqe, acct);
-	rcu_read_unlock();
 
 	raw_spin_unlock(&wqe->lock);
 
