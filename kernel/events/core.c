@@ -3753,8 +3753,10 @@ static int merge_sched_in(struct perf_event *event, void *data)
 			perf_cgroup_event_disable(event, ctx);
 			perf_event_set_state(event, PERF_EVENT_STATE_ERROR);
 		} else {
-			ctx->rotate_necessary = 1;
-			perf_mux_hrtimer_restart(cpuctx);
+			if (!ctx->rotate_necessary) {
+				ctx->rotate_necessary = 1;
+				perf_mux_hrtimer_restart(cpuctx);
+			}
 			group_update_userpage(event);
 		}
 	}
