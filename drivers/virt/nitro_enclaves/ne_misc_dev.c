@@ -168,7 +168,7 @@ static bool ne_check_enclaves_created(void)
 static int ne_setup_cpu_pool(const char *ne_cpu_list)
 {
 	int core_id = -1;
-	unsigned int cpu = 0;
+	int cpu = 0;
 	cpumask_var_t cpu_pool;
 	unsigned int cpu_sibling = 0;
 	unsigned int i = 0;
