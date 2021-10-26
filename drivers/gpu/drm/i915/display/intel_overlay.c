@@ -755,10 +755,14 @@ static u32 overlay_cmd_reg(struct drm_intel_overlay_put_image *params)
 	return cmd;
 }
 
-static struct i915_vma *intel_overlay_pin_fb(struct drm_i915_gem_object *new_bo)
+static struct i915_vma *intel_overlay_pin_fb(struct drm_i915_gem_object *new_bo,
+					     struct intel_overlay *overlay)
 {
 	struct i915_gem_ww_ctx ww;
 	struct i915_vma *vma;
+	const struct intel_plane_state *plane_state =
+		to_intel_plane_state(overlay->crtc->base.primary->state);
+	bool uses_fence = intel_plane_uses_fence(plane_state);
 	int ret;
 
 	i915_gem_ww_ctx_init(&ww, true);
@@ -766,7 +770,8 @@ retry:
 	ret = i915_gem_object_lock(new_bo, &ww);
 	if (!ret) {
 		vma = i915_gem_object_pin_to_display_plane(new_bo, &ww, 0,
-							   NULL, PIN_MAPPABLE);
+							   NULL, PIN_MAPPABLE,
+							   uses_fence);
 		ret = PTR_ERR_OR_ZERO(vma);
 	}
 	if (ret == -EDEADLK) {
@@ -802,7 +807,7 @@ static int intel_overlay_do_put_image(struct intel_overlay *overlay,
 
 	atomic_inc(&dev_priv->gpu_error.pending_fb_pin);
 
-	vma = intel_overlay_pin_fb(new_bo);
+	vma = intel_overlay_pin_fb(new_bo, overlay);
 	if (IS_ERR(vma)) {
 		ret = PTR_ERR(vma);
 		goto out_pin_section;

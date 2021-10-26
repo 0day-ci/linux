@@ -528,7 +528,8 @@ i915_gem_object_pin_to_display_plane(struct drm_i915_gem_object *obj,
 				     struct i915_gem_ww_ctx *ww,
 				     u32 alignment,
 				     const struct i915_ggtt_view *view,
-				     unsigned int flags);
+				     unsigned int flags,
+				     bool uses_fence);
 
 void i915_gem_object_make_unshrinkable(struct drm_i915_gem_object *obj);
 void i915_gem_object_make_shrinkable(struct drm_i915_gem_object *obj);

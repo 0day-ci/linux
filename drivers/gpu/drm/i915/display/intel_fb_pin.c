@@ -144,7 +144,7 @@ retry:
 
 	if (!ret) {
 		vma = i915_gem_object_pin_to_display_plane(obj, &ww, alignment,
-							   view, pinctl);
+							   view, pinctl, uses_fence);
 		if (IS_ERR(vma)) {
 			ret = PTR_ERR(vma);
 			goto err_unpin;
@@ -218,9 +218,16 @@ int intel_plane_pin_fb(struct intel_plane_state *plane_state)
 		INTEL_INFO(dev_priv)->display.cursor_needs_physical;
 
 	if (!intel_fb_uses_dpt(fb)) {
+		struct intel_crtc *crtc = to_intel_crtc(plane_state->hw.crtc);
+		struct intel_crtc_state *crtc_state =
+					to_intel_crtc_state(crtc->base.state);
+		bool uses_fence = intel_plane_uses_fence(plane_state);
+		bool is_bigjoiner = crtc_state->bigjoiner ||
+				    crtc_state->bigjoiner_slave;
+
 		vma = intel_pin_and_fence_fb_obj(fb, phys_cursor,
 						 &plane_state->view.gtt,
-						 intel_plane_uses_fence(plane_state),
+						 uses_fence && !is_bigjoiner,
 						 &plane_state->flags);
 		if (IS_ERR(vma))
 			return PTR_ERR(vma);
