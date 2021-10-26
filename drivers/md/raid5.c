@@ -2425,7 +2425,7 @@ static int scribble_alloc(struct raid5_percpu *percpu,
 
 static int resize_chunks(struct r5conf *conf, int new_disks, int new_sectors)
 {
-	unsigned long cpu;
+	int cpu;
 	int err = 0;
 
 	/*
