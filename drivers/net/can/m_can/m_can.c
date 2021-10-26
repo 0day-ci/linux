@@ -476,7 +476,7 @@ static int m_can_read_fifo(struct net_device *dev, u32 rxfs)
 	struct id_and_dlc fifo_header;
 	u32 fgi;
 	u32 timestamp = 0;
-	int err;
+	int err = 0;
 
 	/* calculate the fifo get index for where to read data */
 	fgi = FIELD_GET(RXFS_FGI_MASK, rxfs);
@@ -517,7 +517,7 @@ static int m_can_read_fifo(struct net_device *dev, u32 rxfs)
 		err = m_can_fifo_read(cdev, fgi, M_CAN_FIFO_DATA,
 				      cf->data, DIV_ROUND_UP(cf->len, 4));
 		if (err)
-			goto out_fail;
+			goto out_receive_skb;
 	}
 
 	/* acknowledge rx fifo 0 */
@@ -528,12 +528,12 @@ static int m_can_read_fifo(struct net_device *dev, u32 rxfs)
 
 	timestamp = FIELD_GET(RX_BUF_RXTS_MASK, fifo_header.dlc);
 
+out_receive_skb:
 	m_can_receive_skb(cdev, skb, timestamp);
 
-	return 0;
-
 out_fail:
-	netdev_err(dev, "FIFO read returned %d\n", err);
+	if (err)
+		netdev_err(dev, "FIFO read returned %d\n", err);
 	return err;
 }
 
