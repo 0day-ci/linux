@@ -471,7 +471,7 @@ PCR_ATTR_BUILD(TPM_ALG_SHA1, sha1);
 PCR_ATTR_BUILD(TPM_ALG_SHA256, sha256);
 PCR_ATTR_BUILD(TPM_ALG_SHA384, sha384);
 PCR_ATTR_BUILD(TPM_ALG_SHA512, sha512);
-PCR_ATTR_BUILD(TPM_ALG_SM3_256, sm3);
+PCR_ATTR_BUILD(TPM_ALG_SM3, sm3);
 
 
 void tpm_sysfs_add_device(struct tpm_chip *chip)
@@ -500,7 +500,7 @@ void tpm_sysfs_add_device(struct tpm_chip *chip)
 		case TPM_ALG_SHA512:
 			chip->groups[chip->groups_cnt++] = &pcr_group_sha512;
 			break;
-		case TPM_ALG_SM3_256:
+		case TPM_ALG_SM3:
 			chip->groups[chip->groups_cnt++] = &pcr_group_sm3;
 			break;
 		default:

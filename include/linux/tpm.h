@@ -40,7 +40,7 @@ enum tpm_algorithms {
 	TPM_ALG_SHA384		= 0x000C,
 	TPM_ALG_SHA512		= 0x000D,
 	TPM_ALG_NULL		= 0x0010,
-	TPM_ALG_SM3_256		= 0x0012,
+	TPM_ALG_SM3		= 0x0012,
 };
 
 /*
