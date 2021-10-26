@@ -23,3 +23,9 @@ bool is_dirty_quota_full(struct vCPUDirtyQuotaContext *vCPUdqctx)
 {
 	return (vCPUdqctx->dirty_counter >= vCPUdqctx->dirty_quota);
 }
+
+void kvm_vcpu_dirty_quota_free(struct vCPUDirtyQuotaContext **vCPUdqctx)
+{
+	vfree(*vCPUdqctx);
+	*vCPUdqctx = NULL;
+}

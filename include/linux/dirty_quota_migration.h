@@ -16,5 +16,6 @@ int kvm_vcpu_dirty_quota_alloc(struct vCPUDirtyQuotaContext **vCPUdqctx);
 struct page *kvm_dirty_quota_context_get_page(
 		struct vCPUDirtyQuotaContext *vCPUdqctx, u32 offset);
 bool is_dirty_quota_full(struct vCPUDirtyQuotaContext *vCPUdqctx);
+void kvm_vcpu_dirty_quota_free(struct vCPUDirtyQuotaContext **vCPUdqctx);
 
 #endif  /* DIRTY_QUOTA_MIGRATION_H */
