@@ -24,15 +24,10 @@ u8 rtw_validate_bssid(u8 *bssid)
 
 u8 rtw_validate_ssid(struct ndis_802_11_ssid *ssid)
 {
-	u8 ret = true;
+	if (ssid->ssid_length > 32)
+		return false;
 
-	if (ssid->ssid_length > 32) {
-		ret = false;
-		goto exit;
-	}
-
-exit:
-	return ret;
+	return true;
 }
 
 u8 rtw_do_join(struct adapter *padapter)
