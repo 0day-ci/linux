@@ -8,8 +8,6 @@
 #include <linux/tracepoint-defs.h>
 
 DECLARE_TRACEPOINT(page_ref_init);
-DECLARE_TRACEPOINT(page_ref_mod);
-DECLARE_TRACEPOINT(page_ref_mod_and_test);
 DECLARE_TRACEPOINT(page_ref_mod_and_return);
 DECLARE_TRACEPOINT(page_ref_mod_unless);
 DECLARE_TRACEPOINT(page_ref_freeze);
@@ -27,8 +25,6 @@ DECLARE_TRACEPOINT(page_ref_unfreeze);
 #define page_ref_tracepoint_active(t) tracepoint_enabled(t)
 
 extern void __page_ref_init(struct page *page);
-extern void __page_ref_mod(struct page *page, int v);
-extern void __page_ref_mod_and_test(struct page *page, int v, int ret);
 extern void __page_ref_mod_and_return(struct page *page, int v, int ret);
 extern void __page_ref_mod_unless(struct page *page, int v, int u);
 extern void __page_ref_freeze(struct page *page, int v, int ret);
@@ -39,12 +35,6 @@ extern void __page_ref_unfreeze(struct page *page, int v);
 #define page_ref_tracepoint_active(t) false
 
 static inline void __page_ref_init(struct page *page)
-{
-}
-static inline void __page_ref_mod(struct page *page, int v)
-{
-}
-static inline void __page_ref_mod_and_test(struct page *page, int v, int ret)
 {
 }
 static inline void __page_ref_mod_and_return(struct page *page, int v, int ret)
@@ -102,26 +92,7 @@ static inline int page_ref_add_return(struct page *page, int nr)
 
 static inline void page_ref_add(struct page *page, int nr)
 {
-	int ret;
-
-	VM_BUG_ON(nr <= 0);
-	ret = atomic_add_return(nr, &page->_refcount);
-	VM_BUG_ON_PAGE(ret <= 0, page);
-
-	if (page_ref_tracepoint_active(page_ref_mod))
-		__page_ref_mod(page, nr);
-}
-
-static inline void page_ref_sub(struct page *page, int nr)
-{
-	int ret;
-
-	VM_BUG_ON(nr <= 0);
-	ret = atomic_sub_return(nr, &page->_refcount);
-	VM_BUG_ON_PAGE(ret < 0, page);
-
-	if (page_ref_tracepoint_active(page_ref_mod))
-		__page_ref_mod(page, -nr);
+	page_ref_add_return(page, nr);
 }
 
 static inline int page_ref_sub_return(struct page *page, int nr)
@@ -137,37 +108,14 @@ static inline int page_ref_sub_return(struct page *page, int nr)
 	return ret;
 }
 
-static inline void page_ref_inc(struct page *page)
+static inline void page_ref_sub(struct page *page, int nr)
 {
-	int ret = atomic_inc_return(&page->_refcount);
-
-	VM_BUG_ON_PAGE(ret <= 0, page);
-
-	if (page_ref_tracepoint_active(page_ref_mod))
-		__page_ref_mod(page, 1);
-}
-
-static inline void page_ref_dec(struct page *page)
-{
-	int ret = atomic_dec_return(&page->_refcount);
-
-	VM_BUG_ON_PAGE(ret < 0, page);
-
-	if (page_ref_tracepoint_active(page_ref_mod))
-		__page_ref_mod(page, -1);
+	page_ref_sub_return(page, nr);
 }
 
 static inline int page_ref_sub_and_test(struct page *page, int nr)
 {
-	int ret;
-
-	VM_BUG_ON(nr <= 0);
-	ret = atomic_sub_return(nr, &page->_refcount);
-	VM_BUG_ON_PAGE(ret < 0, page);
-
-	if (page_ref_tracepoint_active(page_ref_mod_and_test))
-		__page_ref_mod_and_test(page, -nr, ret);
-	return ret == 0;
+	return page_ref_sub_return(page, nr) == 0;
 }
 
 static inline int page_ref_inc_return(struct page *page)
@@ -181,15 +129,10 @@ static inline int page_ref_inc_return(struct page *page)
 	return ret;
 }
 
-static inline int page_ref_dec_and_test(struct page *page)
+static inline void page_ref_inc(struct page *page)
 {
-	int ret = atomic_dec_return(&page->_refcount);
 
-	VM_BUG_ON_PAGE(ret < 0, page);
-
-	if (page_ref_tracepoint_active(page_ref_mod_and_test))
-		__page_ref_mod_and_test(page, -1, ret);
-	return ret == 0;
+	page_ref_inc_return(page);
 }
 
 static inline int page_ref_dec_return(struct page *page)
@@ -201,6 +144,16 @@ static inline int page_ref_dec_return(struct page *page)
 	if (page_ref_tracepoint_active(page_ref_mod_and_return))
 		__page_ref_mod_and_return(page, -1, ret);
 	return ret;
+}
+
+static inline void page_ref_dec(struct page *page)
+{
+	page_ref_dec_return(page);
+}
+
+static inline int page_ref_dec_and_test(struct page *page)
+{
+	return page_ref_dec_return(page) == 0;
 }
 
 static inline int page_ref_add_unless(struct page *page, int nr, int u)
