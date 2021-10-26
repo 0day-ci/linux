@@ -8,6 +8,7 @@
 
 #include <asm/page.h>
 
+#include <xen/balloon.h>
 #include <xen/page.h>
 #include <xen/xen.h>
 
@@ -15,13 +16,29 @@ static DEFINE_MUTEX(list_lock);
 static struct page *page_list;
 static unsigned int list_count;
 
+static struct resource *target_resource;
+static struct resource xen_resource = {
+	.name = "Xen unused space",
+};
+
+/*
+ * If arch is not happy with system "iomem_resource" being used for
+ * the region allocation it can provide it's own view by initializing
+ * "xen_resource" with unused regions of guest physical address space
+ * provided by the hypervisor.
+ */
+int __weak arch_xen_unpopulated_init(struct resource *res)
+{
+	return -ENOSYS;
+}
+
 static int fill_list(unsigned int nr_pages)
 {
 	struct dev_pagemap *pgmap;
-	struct resource *res;
+	struct resource *res, *tmp_res = NULL;
 	void *vaddr;
 	unsigned int i, alloc_pages = round_up(nr_pages, PAGES_PER_SECTION);
-	int ret = -ENOMEM;
+	int ret;
 
 	res = kzalloc(sizeof(*res), GFP_KERNEL);
 	if (!res)
@@ -30,12 +47,37 @@ static int fill_list(unsigned int nr_pages)
 	res->name = "Xen scratch";
 	res->flags = IORESOURCE_MEM | IORESOURCE_BUSY;
 
-	ret = allocate_resource(&iomem_resource, res,
+	ret = allocate_resource(target_resource, res,
 				alloc_pages * PAGE_SIZE, 0, -1,
 				PAGES_PER_SECTION * PAGE_SIZE, NULL, NULL);
 	if (ret < 0) {
 		pr_err("Cannot allocate new IOMEM resource\n");
 		goto err_resource;
+	}
+
+	/*
+	 * Reserve the region previously allocated from Xen resource to avoid
+	 * re-using it by someone else.
+	 */
+	if (target_resource != &iomem_resource) {
+		tmp_res = kzalloc(sizeof(*tmp_res), GFP_KERNEL);
+		if (!res) {
+			ret = -ENOMEM;
+			goto err_insert;
+		}
+
+		tmp_res->name = res->name;
+		tmp_res->start = res->start;
+		tmp_res->end = res->end;
+		tmp_res->flags = res->flags;
+
+		ret = insert_resource(&iomem_resource, tmp_res);
+		if (ret < 0) {
+			pr_err("Cannot insert IOMEM resource [%llx - %llx]\n",
+			       tmp_res->start, tmp_res->end);
+			kfree(tmp_res);
+			goto err_insert;
+		}
 	}
 
 	pgmap = kzalloc(sizeof(*pgmap), GFP_KERNEL);
@@ -95,10 +137,38 @@ static int fill_list(unsigned int nr_pages)
 err_memremap:
 	kfree(pgmap);
 err_pgmap:
+	if (tmp_res) {
+		release_resource(tmp_res);
+		kfree(tmp_res);
+	}
+err_insert:
 	release_resource(res);
 err_resource:
 	kfree(res);
 	return ret;
+}
+
+static void unpopulated_init(void)
+{
+	static bool inited = false;
+	int ret;
+
+	if (inited)
+		return;
+
+	/*
+	 * Try to initialize Xen resource the first and fall back to default
+	 * resource if arch doesn't offer one.
+	 */
+	ret = arch_xen_unpopulated_init(&xen_resource);
+	if (!ret)
+		target_resource = &xen_resource;
+	else if (ret == -ENOSYS)
+		target_resource = &iomem_resource;
+	else
+		pr_err("Cannot initialize Xen resource\n");
+
+	inited = true;
 }
 
 /**
@@ -111,6 +181,16 @@ int xen_alloc_unpopulated_pages(unsigned int nr_pages, struct page **pages)
 {
 	unsigned int i;
 	int ret = 0;
+
+	unpopulated_init();
+
+	/*
+	 * Fall back to default behavior if we do not have any suitable resource
+	 * to allocate required region from and as the result we won't be able to
+	 * construct pages.
+	 */
+	if (!target_resource)
+		return alloc_xenballooned_pages(nr_pages, pages);
 
 	mutex_lock(&list_lock);
 	if (list_count < nr_pages) {
@@ -158,6 +238,9 @@ EXPORT_SYMBOL(xen_alloc_unpopulated_pages);
 void xen_free_unpopulated_pages(unsigned int nr_pages, struct page **pages)
 {
 	unsigned int i;
+
+	if (!target_resource)
+		return free_xenballooned_pages(nr_pages, pages);
 
 	mutex_lock(&list_lock);
 	for (i = 0; i < nr_pages; i++) {
