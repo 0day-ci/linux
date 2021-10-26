@@ -7,6 +7,7 @@
 #include <linux/dma-buf.h>
 #include <linux/highmem.h>
 #include <linux/dma-resv.h>
+#include <asm/smp.h>
 
 #include "i915_drv.h"
 #include "i915_gem_object.h"
