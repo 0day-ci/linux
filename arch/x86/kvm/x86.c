@@ -59,6 +59,7 @@
 #include <linux/mem_encrypt.h>
 #include <linux/entry-kvm.h>
 #include <linux/suspend.h>
+#include <linux/dirty_quota_migration.h>
 
 #include <trace/events/kvm.h>
 
@@ -9825,6 +9826,14 @@ static int vcpu_run(struct kvm_vcpu *vcpu)
 			if (r)
 				return r;
 			vcpu->srcu_idx = srcu_read_lock(&kvm->srcu);
+		}
+
+		/* check for dirty quota migration exit condition if it is enabled */
+		if (vcpu->kvm->dirty_quota_migration_enabled &&
+				is_dirty_quota_full(vcpu->vCPUdqctx)) {
+			vcpu->run->exit_reason = KVM_EXIT_DIRTY_QUOTA_FULL;
+			r = 0;
+			break;
 		}
 	}
 

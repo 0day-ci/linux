@@ -18,3 +18,8 @@ struct page *kvm_dirty_quota_context_get_page(
 {
 	return vmalloc_to_page((void *)vCPUdqctx + offset * PAGE_SIZE);
 }
+
+bool is_dirty_quota_full(struct vCPUDirtyQuotaContext *vCPUdqctx)
+{
+	return (vCPUdqctx->dirty_counter >= vCPUdqctx->dirty_quota);
+}
