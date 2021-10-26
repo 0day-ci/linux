@@ -390,17 +390,6 @@ static unsigned long damon_region_sz_limit(struct damon_ctx *ctx)
 	return sz;
 }
 
-static bool damon_kdamond_running(struct damon_ctx *ctx)
-{
-	bool running;
-
-	mutex_lock(&ctx->kdamond_lock);
-	running = ctx->kdamond != NULL;
-	mutex_unlock(&ctx->kdamond_lock);
-
-	return running;
-}
-
 static int kdamond_fn(void *data);
 
 /*
@@ -418,13 +407,13 @@ static int __damon_start(struct damon_ctx *ctx)
 	mutex_lock(&ctx->kdamond_lock);
 	if (!ctx->kdamond) {
 		err = 0;
-		ctx->kdamond_stop = false;
 		ctx->kdamond = kthread_run(kdamond_fn, ctx, "kdamond.%d",
 				nr_running_ctxs);
 		if (IS_ERR(ctx->kdamond)) {
 			err = PTR_ERR(ctx->kdamond);
 			ctx->kdamond = NULL;
-		}
+		} else
+			get_task_struct(ctx->kdamond);
 	}
 	mutex_unlock(&ctx->kdamond_lock);
 
@@ -474,18 +463,18 @@ int damon_start(struct damon_ctx **ctxs, int nr_ctxs)
  */
 static int __damon_stop(struct damon_ctx *ctx)
 {
+	int ret = -EPERM;
+
 	mutex_lock(&ctx->kdamond_lock);
 	if (ctx->kdamond) {
-		ctx->kdamond_stop = true;
-		mutex_unlock(&ctx->kdamond_lock);
-		while (damon_kdamond_running(ctx))
-			usleep_range(ctx->sample_interval,
-					ctx->sample_interval * 2);
-		return 0;
+		kthread_stop(ctx->kdamond);
+		put_task_struct(ctx->kdamond);
+		ctx->kdamond = NULL;
+		ret = 0;
 	}
 	mutex_unlock(&ctx->kdamond_lock);
 
-	return -EPERM;
+	return ret;
 }
 
 /**
@@ -925,12 +914,8 @@ static bool kdamond_need_update_primitive(struct damon_ctx *ctx)
 static bool kdamond_need_stop(struct damon_ctx *ctx)
 {
 	struct damon_target *t;
-	bool stop;
 
-	mutex_lock(&ctx->kdamond_lock);
-	stop = ctx->kdamond_stop;
-	mutex_unlock(&ctx->kdamond_lock);
-	if (stop)
+	if (kthread_should_stop())
 		return true;
 
 	if (!ctx->primitive.target_valid)
@@ -1021,13 +1006,6 @@ static int kdamond_wait_activation(struct damon_ctx *ctx)
 	return -EBUSY;
 }
 
-static void set_kdamond_stop(struct damon_ctx *ctx)
-{
-	mutex_lock(&ctx->kdamond_lock);
-	ctx->kdamond_stop = true;
-	mutex_unlock(&ctx->kdamond_lock);
-}
-
 /*
  * The monitoring daemon that runs as a kernel thread
  */
@@ -1038,17 +1016,18 @@ static int kdamond_fn(void *data)
 	struct damon_region *r, *next;
 	unsigned int max_nr_accesses = 0;
 	unsigned long sz_limit = 0;
+	bool done = false;
 
 	pr_debug("kdamond (%d) starts\n", current->pid);
 
 	if (ctx->primitive.init)
 		ctx->primitive.init(ctx);
 	if (ctx->callback.before_start && ctx->callback.before_start(ctx))
-		set_kdamond_stop(ctx);
+		done = true;
 
 	sz_limit = damon_region_sz_limit(ctx);
 
-	while (!kdamond_need_stop(ctx)) {
+	while (!kdamond_need_stop(ctx) && !done) {
 		if (kdamond_wait_activation(ctx))
 			continue;
 
@@ -1056,7 +1035,7 @@ static int kdamond_fn(void *data)
 			ctx->primitive.prepare_access_checks(ctx);
 		if (ctx->callback.after_sampling &&
 				ctx->callback.after_sampling(ctx))
-			set_kdamond_stop(ctx);
+			done = true;
 
 		usleep_range(ctx->sample_interval, ctx->sample_interval + 1);
 
@@ -1069,7 +1048,7 @@ static int kdamond_fn(void *data)
 					sz_limit);
 			if (ctx->callback.after_aggregation &&
 					ctx->callback.after_aggregation(ctx))
-				set_kdamond_stop(ctx);
+				done = true;
 			kdamond_apply_schemes(ctx);
 			kdamond_reset_aggregated(ctx);
 			kdamond_split_regions(ctx);
@@ -1088,16 +1067,12 @@ static int kdamond_fn(void *data)
 			damon_destroy_region(r, t);
 	}
 
-	if (ctx->callback.before_terminate &&
-			ctx->callback.before_terminate(ctx))
-		set_kdamond_stop(ctx);
+	if (ctx->callback.before_terminate)
+		ctx->callback.before_terminate(ctx);
 	if (ctx->primitive.cleanup)
 		ctx->primitive.cleanup(ctx);
 
 	pr_debug("kdamond (%d) finishes\n", current->pid);
-	mutex_lock(&ctx->kdamond_lock);
-	ctx->kdamond = NULL;
-	mutex_unlock(&ctx->kdamond_lock);
 
 	mutex_lock(&damon_lock);
 	nr_running_ctxs--;
