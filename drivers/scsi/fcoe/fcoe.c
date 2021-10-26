@@ -1309,7 +1309,7 @@ static void fcoe_thread_cleanup_local(unsigned int cpu)
  */
 static inline unsigned int fcoe_select_cpu(void)
 {
-	static unsigned int selected_cpu;
+	static int selected_cpu;
 
 	selected_cpu = cpumask_next(selected_cpu, cpu_online_mask);
 	if (selected_cpu >= nr_cpu_ids)
