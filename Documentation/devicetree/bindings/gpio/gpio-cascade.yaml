@@ -1,0 +1,103 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/gpio/gpio-cascade.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Generic GPIO cascade
+
+maintainers:
+  - Mauri Sandberg <maukka@ext.kapsi.fi>
+
+description: |
+  A generic GPIO cascade
+
+  This hardware construction cascades (multiplexes) several GPIO lines from
+  one-to-many using a software controlled multiplexer. The most common use
+  case is probably reading several inputs by switching the multiplexer over
+  several input lines, which in practice works well since input lines has
+  high impedance.
+
+  Constructions with multiplexed outputs are also possible using open drain
+  electronics.
+
+  The number of cascaded GPIO lines is limited by the technology used to
+  switch over the cascaded lines. There are readily available dual/triple
+  4-to-1 multiplexers, for example, and others.
+
+  Illustration (pins used to drive the multiplexer are omitted for clarity)
+
+                 /|---- Cascaded GPIO line 0
+  Upstream      | |---- Cascaded GPIO line 1
+  GPIO line ----+ | .
+                | | .
+                 \|---- Cascaded GPIO line n
+
+properties:
+  compatible:
+    enum:
+      - gpio-cascade
+
+  gpio-controller: true
+
+  '#gpio-cells':
+    const: 2
+
+  mux-controls:
+    minItems: 1
+    maxItems: 1
+    description: |
+      The mux controller that will be driving the GPIO cascade.
+
+  upstream-gpios:
+    description: |
+      The GPIO line used as the upstream line will convey the status to/from
+      cascaded GPIO lines. In an input mode, by using this line, it is
+      possible to read the status from selected cascaded GPIO line.
+
+      In an output mode the status of the upstream GPIO will be conveyed to
+      the selected cascaded GPIO line.
+
+required:
+  - compatible
+  - gpio-controller
+  - "#gpio-cells"
+  - mux-controls
+  - upstream-gpios
+
+additionalProperties: false
+
+examples:
+  - |
+    #include <dt-bindings/gpio/gpio.h>
+    mux: mux-controller {
+        compatible = "gpio-mux";
+        #mux-control-cells = <0>;
+
+        mux-gpios = <&gpio 9 GPIO_ACTIVE_HIGH>,
+                    <&gpio 11 GPIO_ACTIVE_HIGH>;
+    };
+
+    gpio2: key-mux1 {
+        compatible = "gpio-cascade";
+        mux-controls = <&mux>;
+
+        gpio-controller;
+        #gpio-cells = <2>;
+
+        // GPIOs used by this node, upstream pin
+        upstream-gpios = <&gpio 12 GPIO_ACTIVE_HIGH>;
+    };
+
+    gpio3: key-mux2 {
+        compatible = "gpio-cascade";
+        mux-controls = <&mux>;
+
+        gpio-controller;
+        #gpio-cells = <2>;
+
+        // GPIOs used by this node, upstream pin
+        upstream-gpios = <&gpio 14 GPIO_ACTIVE_HIGH>;
+    };
+
+...
