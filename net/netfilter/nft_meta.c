@@ -367,7 +367,11 @@ void nft_meta_get_eval(const struct nft_expr *expr,
 		break;
 #endif
 	case NFT_META_PKTTYPE:
-		if (skb->pkt_type != PACKET_LOOPBACK) {
+		if (skb->pkt_type != PACKET_LOOPBACK &&
+		    nft_hook(pkt) != NF_INET_LOCAL_OUT &&
+		    nft_hook(pkt) != NF_INET_POST_ROUTING &&
+		    (nft_pf(pkt) == NFPROTO_NETDEV &&
+		     nft_hook(pkt) != NF_NETDEV_EGRESS)) {
 			nft_reg_store8(dest, skb->pkt_type);
 			break;
 		}
