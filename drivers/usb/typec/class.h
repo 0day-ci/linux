@@ -14,6 +14,7 @@ struct typec_plug {
 	enum typec_plug_index		index;
 	struct ida			mode_ids;
 	int				num_altmodes;
+	const struct pd_dev		*pd_dev;
 };
 
 struct typec_cable {
@@ -33,6 +34,7 @@ struct typec_partner {
 	int				num_altmodes;
 	u16				pd_revision; /* 0300H = "3.0" */
 	enum usb_pd_svdm_ver		svdm_version;
+	const struct pd_dev		*pd_dev;
 };
 
 struct typec_port {
@@ -59,6 +61,8 @@ struct typec_port {
 	struct mutex			port_list_lock; /* Port list lock */
 
 	void				*pld;
+
+	const struct pd_dev		*pd_dev;
 };
 
 #define to_typec_port(_dev_) container_of(_dev_, struct typec_port, dev)

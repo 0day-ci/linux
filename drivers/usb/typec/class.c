@@ -15,6 +15,7 @@
 
 #include "bus.h"
 #include "class.h"
+#include "pd-dev.h"
 
 static DEFINE_IDA(typec_index_ida);
 
@@ -665,6 +666,11 @@ static const struct attribute_group *typec_partner_groups[] = {
 	NULL
 };
 
+char *typec_partner_devnode(struct device *dev, umode_t *mode, kuid_t *uid, kgid_t *gid)
+{
+	return kasprintf(GFP_KERNEL, "pd%u/partner", to_typec_port(dev->parent)->id);
+}
+
 static void typec_partner_release(struct device *dev)
 {
 	struct typec_partner *partner = to_typec_partner(dev);
@@ -676,6 +682,7 @@ static void typec_partner_release(struct device *dev)
 const struct device_type typec_partner_dev_type = {
 	.name = "typec_partner",
 	.groups = typec_partner_groups,
+	.devnode = typec_partner_devnode,
 	.release = typec_partner_release,
 };
 
@@ -807,6 +814,7 @@ struct typec_partner *typec_register_partner(struct typec_port *port,
 
 	ida_init(&partner->mode_ids);
 	partner->usb_pd = desc->usb_pd;
+	partner->pd_dev = desc->pd_dev;
 	partner->accessory = desc->accessory;
 	partner->num_altmodes = -1;
 	partner->pd_revision = desc->pd_revision;
@@ -825,6 +833,9 @@ struct typec_partner *typec_register_partner(struct typec_port *port,
 	partner->dev.parent = &port->dev;
 	partner->dev.type = &typec_partner_dev_type;
 	dev_set_name(&partner->dev, "%s-partner", dev_name(&port->dev));
+
+	if (partner->pd_dev)
+		partner->dev.devt = MKDEV(PD_DEV_MAJOR, port->id * 4 + 3);
 
 	ret = device_register(&partner->dev);
 	if (ret) {
@@ -852,6 +863,13 @@ EXPORT_SYMBOL_GPL(typec_unregister_partner);
 
 /* ------------------------------------------------------------------------- */
 /* Type-C Cable Plugs */
+
+char *typec_plug_devnode(struct device *dev, umode_t *mode, kuid_t *uid, kgid_t *gid)
+{
+	return kasprintf(GFP_KERNEL, "pd%u/plug%d",
+			 to_typec_port(dev->parent->parent)->id,
+			 to_typec_plug(dev)->index);
+}
 
 static void typec_plug_release(struct device *dev)
 {
@@ -891,6 +909,7 @@ static const struct attribute_group *typec_plug_groups[] = {
 const struct device_type typec_plug_dev_type = {
 	.name = "typec_plug",
 	.groups = typec_plug_groups,
+	.devnode = typec_plug_devnode,
 	.release = typec_plug_release,
 };
 
@@ -973,10 +992,15 @@ struct typec_plug *typec_register_plug(struct typec_cable *cable,
 	ida_init(&plug->mode_ids);
 	plug->num_altmodes = -1;
 	plug->index = desc->index;
+	plug->pd_dev = desc->pd_dev;
 	plug->dev.class = &typec_class;
 	plug->dev.parent = &cable->dev;
 	plug->dev.type = &typec_plug_dev_type;
 	dev_set_name(&plug->dev, "%s-%s", dev_name(cable->dev.parent), name);
+
+	if (plug->pd_dev)
+		plug->dev.devt = MKDEV(PD_DEV_MAJOR,
+				       to_typec_port(cable->dev.parent)->id * 4 + 1 + plug->index);
 
 	ret = device_register(&plug->dev);
 	if (ret) {
@@ -1595,6 +1619,11 @@ static int typec_uevent(struct device *dev, struct kobj_uevent_env *env)
 	return ret;
 }
 
+char *typec_devnode(struct device *dev, umode_t *mode, kuid_t *uid, kgid_t *gid)
+{
+	return kasprintf(GFP_KERNEL, "pd%u/port", to_typec_port(dev)->id);
+}
+
 static void typec_release(struct device *dev)
 {
 	struct typec_port *port = to_typec_port(dev);
@@ -1611,6 +1640,7 @@ const struct device_type typec_port_dev_type = {
 	.name = "typec_port",
 	.groups = typec_groups,
 	.uevent = typec_uevent,
+	.devnode = typec_devnode,
 	.release = typec_release,
 };
 
@@ -2044,6 +2074,7 @@ struct typec_port *typec_register_port(struct device *parent,
 
 	port->id = id;
 	port->ops = cap->ops;
+	port->pd_dev = cap->pd_dev;
 	port->port_type = cap->type;
 	port->prefer_role = cap->prefer_role;
 
@@ -2054,6 +2085,9 @@ struct typec_port *typec_register_port(struct device *parent,
 	port->dev.type = &typec_port_dev_type;
 	dev_set_name(&port->dev, "port%d", id);
 	dev_set_drvdata(&port->dev, cap->driver_data);
+
+	if (port->pd_dev)
+		port->dev.devt = MKDEV(PD_DEV_MAJOR, id * 4);
 
 	port->cap = kmemdup(cap, sizeof(*cap), GFP_KERNEL);
 	if (!port->cap) {
@@ -2121,7 +2155,14 @@ static int __init typec_init(void)
 	if (ret)
 		goto err_unregister_mux_class;
 
+	ret = usbpd_dev_init();
+	if (ret)
+		goto err_unregister_class;
+
 	return 0;
+
+err_unregister_class:
+	class_unregister(&typec_class);
 
 err_unregister_mux_class:
 	class_unregister(&typec_mux_class);
@@ -2135,6 +2176,7 @@ subsys_initcall(typec_init);
 
 static void __exit typec_exit(void)
 {
+	usbpd_dev_exit();
 	class_unregister(&typec_class);
 	ida_destroy(&typec_index_ida);
 	bus_unregister(&typec_bus);

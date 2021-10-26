@@ -20,6 +20,7 @@ struct typec_port;
 struct typec_altmode_ops;
 
 struct fwnode_handle;
+struct pd_dev;
 struct device;
 
 enum typec_port_type {
@@ -159,11 +160,13 @@ enum typec_plug_index {
  * struct typec_plug_desc - USB Type-C Cable Plug Descriptor
  * @index: SOP Prime for the plug connected to DFP and SOP Double Prime for the
  *         plug connected to UFP
+ * @pd_dev: USB Power Delivery Character Device
  *
  * Represents USB Type-C Cable Plug.
  */
 struct typec_plug_desc {
 	enum typec_plug_index	index;
+	const struct pd_dev	*pd_dev;
 };
 
 /*
@@ -189,6 +192,7 @@ struct typec_cable_desc {
  * @accessory: Audio, Debug or none.
  * @identity: Discover Identity command data
  * @pd_revision: USB Power Delivery Specification Revision if supported
+ * @pd_dev: USB Power Delivery Character Device
  *
  * Details about a partner that is attached to USB Type-C port. If @identity
  * member exists when partner is registered, a directory named "identity" is
@@ -204,6 +208,7 @@ struct typec_partner_desc {
 	enum typec_accessory	accessory;
 	struct usb_pd_identity	*identity;
 	u16			pd_revision; /* 0300H = "3.0" */
+	const struct pd_dev	*pd_dev;
 };
 
 /**
@@ -241,6 +246,7 @@ enum usb_pd_svdm_ver {
  * @fwnode: Optional fwnode of the port
  * @driver_data: Private pointer for driver specific info
  * @ops: Port operations vector
+ * @pd_dev: USB Power Delivery Character Device
  *
  * Static capabilities of a single USB Type-C port.
  */
@@ -258,6 +264,8 @@ struct typec_capability {
 	void			*driver_data;
 
 	const struct typec_operations	*ops;
+
+	const struct pd_dev	*pd_dev;
 };
 
 /* Specific to try_role(). Indicates the user want's to clear the preference. */
