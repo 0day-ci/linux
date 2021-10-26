@@ -14,7 +14,6 @@
 #define TRNG_SUCCESS			0UL
 #define TRNG_NOT_SUPPORTED		((unsigned long)-1)
 #define TRNG_INVALID_PARAMETER		((unsigned long)-2)
-#define TRNG_NO_ENTROPY			((unsigned long)-3)
 
 #define TRNG_MAX_BITS64			192
 
