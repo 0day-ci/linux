@@ -168,6 +168,10 @@ static int mv_ehci_probe(struct platform_device *pdev)
 	retval = platform_get_irq(pdev, 0);
 	if (retval < 0)
 		goto err_disable_clk;
+	if (!retval) {
+		retval = -EINVAL;
+		goto err_disable_clk;
+	}
 	hcd->irq = retval;
 
 	ehci = hcd_to_ehci(hcd);
