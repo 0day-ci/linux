@@ -1273,4 +1273,31 @@ enum {
 
 #define IFLA_MCTP_MAX (__IFLA_MCTP_MAX - 1)
 
+/* SyncE section */
+
+enum if_eec_state {
+	IF_EEC_STATE_INVALID = 0,
+	IF_EEC_STATE_FREERUN,
+	IF_EEC_STATE_LOCKED,
+	IF_EEC_STATE_LOCKED_HO_ACQ,
+	IF_EEC_STATE_HOLDOVER,
+};
+
+#define EEC_SRC_PORT		(1 << 0) /* recovered clock from the port is
+					  * currently the source for the EEC
+					  */
+
+struct if_eec_state_msg {
+	__u32 ifindex;
+};
+
+enum {
+	IFLA_EEC_UNSPEC,
+	IFLA_EEC_STATE,
+	IFLA_EEC_SRC_IDX,
+	__IFLA_EEC_MAX,
+};
+
+#define IFLA_EEC_MAX (__IFLA_EEC_MAX - 1)
+
 #endif /* _UAPI_LINUX_IF_LINK_H */
