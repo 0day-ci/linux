@@ -585,17 +585,17 @@ int drm_plane_create_color_properties(struct drm_plane *plane,
 EXPORT_SYMBOL(drm_plane_create_color_properties);
 
 /**
- * drm_color_lut_check - check validity of lookup table
+ * drm_color_lut_channels_check - check validity of the channels in the lookup table
  * @lut: property blob containing LUT to check
  * @tests: bitmask of tests to run
  *
- * Helper to check whether a userspace-provided lookup table is valid and
- * satisfies hardware requirements.  Drivers pass a bitmask indicating which of
- * the tests in &drm_color_lut_tests should be performed.
+ * Helper to check whether each color channel of userspace-provided lookup table is valid and
+ * satisfies hardware requirements. Drivers pass a bitmask indicating which of in
+ * &drm_color_lut_channels_tests should be performed.
  *
  * Returns 0 on success, -EINVAL on failure.
  */
-int drm_color_lut_check(const struct drm_property_blob *lut, u32 tests)
+int drm_color_lut_channels_check(const struct drm_property_blob *lut, u32 tests)
 {
 	const struct drm_color_lut *entry;
 	int i;
@@ -625,4 +625,4 @@ int drm_color_lut_check(const struct drm_property_blob *lut, u32 tests)
 
 	return 0;
 }
-EXPORT_SYMBOL(drm_color_lut_check);
+EXPORT_SYMBOL(drm_color_lut_channels_check);

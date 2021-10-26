@@ -94,12 +94,12 @@ int drm_plane_create_color_properties(struct drm_plane *plane,
 				      enum drm_color_range default_range);
 
 /**
- * enum drm_color_lut_tests - hw-specific LUT tests to perform
+ * enum drm_color_lut_channels_tests - hw-specific LUT tests to perform
  *
  * The drm_color_lut_check() function takes a bitmask of the values here to
  * determine which tests to apply to a userspace-provided LUT.
  */
-enum drm_color_lut_tests {
+enum drm_color_lut_channels_tests {
 	/**
 	 * @DRM_COLOR_LUT_EQUAL_CHANNELS:
 	 *
@@ -119,5 +119,6 @@ enum drm_color_lut_tests {
 	DRM_COLOR_LUT_NON_DECREASING = BIT(1),
 };
 
-int drm_color_lut_check(const struct drm_property_blob *lut, u32 tests);
+int drm_color_lut_channels_check(const struct drm_property_blob *lut,
+				 u32 tests);
 #endif
