@@ -2095,9 +2095,12 @@ skl_universal_plane_create(struct drm_i915_private *dev_priv,
 	else
 		plane_type = DRM_PLANE_TYPE_OVERLAY;
 
-	plane_caps = PLANE_HAS_TILING;
+	plane_caps = PLANE_HAS_TILING_X | PLANE_HAS_TILING_Y;
+	if (IS_DISPLAY_VER(dev_priv, 9, 11))
+		plane_caps |= PLANE_HAS_TILING_Yf;
+
 	if (skl_plane_has_rc_ccs(dev_priv, pipe, plane_id))
-		plane_caps |= PLANE_HAS_CCS_RC;
+		plane_caps |= PLANE_HAS_CCS_RC | PLANE_HAS_CCS_RC_CC;
 
 	if (gen12_plane_has_mc_ccs(dev_priv, plane_id))
 		plane_caps |= PLANE_HAS_CCS_MC;
