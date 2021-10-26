@@ -215,6 +215,10 @@ static int ohci_hcd_nxp_probe(struct platform_device *pdev)
 		ret = -ENXIO;
 		goto fail_resource;
 	}
+	if (!irq) {
+		ret = -EINVAL;
+		goto fail_resource;
+	}
 
 	ohci_nxp_start_hc();
 	platform_set_drvdata(pdev, hcd);
