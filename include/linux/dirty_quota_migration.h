@@ -8,4 +8,6 @@ struct vCPUDirtyQuotaContext {
 	u64 dirty_quota;
 };
 
+int kvm_vcpu_dirty_quota_alloc(struct vCPUDirtyQuotaContext **vCPUdqctx);
+
 #endif  /* DIRTY_QUOTA_MIGRATION_H */
