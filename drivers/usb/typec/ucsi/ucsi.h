@@ -9,6 +9,7 @@
 #include <linux/types.h>
 #include <linux/usb/typec.h>
 #include <linux/usb/pd.h>
+#include <linux/usb/pd_dev.h>
 #include <linux/usb/role.h>
 
 /* -------------------------------------------------------------------------- */
@@ -335,6 +336,9 @@ struct ucsi_connector {
 	int num_pdos;
 
 	struct usb_role_switch *usb_role_sw;
+
+	struct pd_dev pd_port_dev;
+	struct pd_dev pd_partner_dev;
 };
 
 int ucsi_send_command(struct ucsi *ucsi, u64 command,
@@ -342,6 +346,9 @@ int ucsi_send_command(struct ucsi *ucsi, u64 command,
 
 void ucsi_altmode_update_active(struct ucsi_connector *con);
 int ucsi_resume(struct ucsi *ucsi);
+
+void ucsi_init_pd_dev(struct ucsi_connector *con);
+int ucsi_read_pdos(struct ucsi_connector *con, int partner, int source, u32 *pdos);
 
 #if IS_ENABLED(CONFIG_POWER_SUPPLY)
 int ucsi_register_port_psy(struct ucsi_connector *con);

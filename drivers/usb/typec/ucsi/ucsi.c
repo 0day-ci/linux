@@ -557,7 +557,7 @@ static void ucsi_unregister_altmodes(struct ucsi_connector *con, u8 recipient)
 	}
 }
 
-static int ucsi_get_pdos(struct ucsi_connector *con, int is_partner,
+static int ucsi_get_pdos(struct ucsi_connector *con, int is_partner, int source,
 			 u32 *pdos, int offset, int num_pdos)
 {
 	struct ucsi *ucsi = con->ucsi;
@@ -568,7 +568,7 @@ static int ucsi_get_pdos(struct ucsi_connector *con, int is_partner,
 	command |= UCSI_GET_PDOS_PARTNER_PDO(is_partner);
 	command |= UCSI_GET_PDOS_PDO_OFFSET(offset);
 	command |= UCSI_GET_PDOS_NUM_PDOS(num_pdos - 1);
-	command |= UCSI_GET_PDOS_SRC_PDOS;
+	command |= source ? UCSI_GET_PDOS_SRC_PDOS : 0;
 	ret = ucsi_send_command(ucsi, command, pdos + offset,
 				num_pdos * sizeof(u32));
 	if (ret < 0 && ret != -ETIMEDOUT)
@@ -579,27 +579,43 @@ static int ucsi_get_pdos(struct ucsi_connector *con, int is_partner,
 	return ret;
 }
 
-static int ucsi_get_src_pdos(struct ucsi_connector *con)
+int ucsi_read_pdos(struct ucsi_connector *con, int partner, int source, u32 *pdos)
 {
+	u32 pdo[PDO_MAX_OBJECTS];
+	int num_pdos;
 	int ret;
 
 	/* UCSI max payload means only getting at most 4 PDOs at a time */
-	ret = ucsi_get_pdos(con, 1, con->src_pdos, 0, UCSI_MAX_PDOS);
+	ret = ucsi_get_pdos(con, partner, source, pdo, 0, UCSI_MAX_PDOS);
 	if (ret < 0)
 		return ret;
 
-	con->num_pdos = ret / sizeof(u32); /* number of bytes to 32-bit PDOs */
-	if (con->num_pdos < UCSI_MAX_PDOS)
-		return 0;
+	num_pdos = ret / sizeof(u32); /* number of bytes to 32-bit PDOs */
+	if (num_pdos < UCSI_MAX_PDOS)
+		goto done;
 
 	/* get the remaining PDOs, if any */
-	ret = ucsi_get_pdos(con, 1, con->src_pdos, UCSI_MAX_PDOS,
+	ret = ucsi_get_pdos(con, partner, source, pdo, UCSI_MAX_PDOS,
 			    PDO_MAX_OBJECTS - UCSI_MAX_PDOS);
 	if (ret < 0)
 		return ret;
 
-	con->num_pdos += ret / sizeof(u32);
+	num_pdos += ret / sizeof(u32);
+done:
+	memcpy(pdos, pdo, num_pdos * sizeof(pdo));
 
+	return num_pdos;
+}
+
+static int ucsi_get_src_pdos(struct ucsi_connector *con)
+{
+	int ret;
+
+	ret = ucsi_read_pdos(con, 0, 1, con->src_pdos);
+	if (ret < 0)
+		return ret;
+
+	con->num_pdos = ret;
 	ucsi_port_psy_changed(con);
 
 	return 0;
@@ -671,6 +687,7 @@ static int ucsi_register_partner(struct ucsi_connector *con)
 	}
 
 	desc.usb_pd = pwr_opmode == UCSI_CONSTAT_PWR_OPMODE_PD;
+	desc.pd_dev = &con->pd_partner_dev;
 
 	partner = typec_register_partner(con->port, &desc);
 	if (IS_ERR(partner)) {
@@ -1038,6 +1055,7 @@ static int ucsi_register_port(struct ucsi *ucsi, int index)
 	mutex_init(&con->lock);
 	con->num = index + 1;
 	con->ucsi = ucsi;
+	ucsi_init_pd_dev(con);
 
 	/* Delay other interactions with the con until registration is complete */
 	mutex_lock(&con->lock);
@@ -1077,6 +1095,7 @@ static int ucsi_register_port(struct ucsi *ucsi, int index)
 	cap->fwnode = ucsi_find_fwnode(con);
 	cap->driver_data = con;
 	cap->ops = &ucsi_ops;
+	cap->pd_dev = &con->pd_port_dev;
 
 	ret = ucsi_register_port_psy(con);
 	if (ret)
