@@ -931,6 +931,58 @@ drm_atomic_helper_check_planes(struct drm_device *dev,
 EXPORT_SYMBOL(drm_atomic_helper_check_planes);
 
 /**
+ * drm_atomic_helper_check_crtcs - validate state object for CRTC changes
+ * @state: the driver state object
+ *
+ * Check the CRTC state object such as the Gamma/Degamma LUT sizes if the new
+ * state holds them.
+ *
+ * RETURNS:
+ * Zero for success or -errno
+ */
+int drm_atomic_helper_check_crtcs(struct drm_atomic_state *state)
+{
+	struct drm_crtc *crtc;
+	struct drm_crtc_state *new_crtc_state;
+	int i;
+
+	for_each_new_crtc_in_state (state, crtc, new_crtc_state, i) {
+		if (new_crtc_state->color_mgmt_changed &&
+		    new_crtc_state->gamma_lut) {
+			if (drm_check_lut_size(new_crtc_state->gamma_lut,
+					       crtc->gamma_lut_size) ||
+			    drm_check_lut_size(new_crtc_state->gamma_lut,
+					       crtc->gamma_size)) {
+				drm_dbg_state(
+					state->dev,
+					"Invalid Gamma LUT size. Should be %u (or %u for legacy) but got %u.\n",
+					crtc->gamma_lut_size, crtc->gamma_size,
+					drm_color_lut_size(
+						new_crtc_state->gamma_lut));
+				return -EINVAL;
+			}
+		}
+
+		if (new_crtc_state->color_mgmt_changed &&
+		    new_crtc_state->degamma_lut) {
+			if (drm_check_lut_size(new_crtc_state->degamma_lut,
+					       crtc->degamma_lut_size)) {
+				drm_dbg_state(
+					state->dev,
+					"Invalid DeGamma LUT size. Should be %u but got %u.\n",
+					crtc->degamma_lut_size,
+					drm_color_lut_size(
+						new_crtc_state->degamma_lut));
+				return -EINVAL;
+			}
+		}
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL(drm_atomic_helper_check_crtcs);
+
+/**
  * drm_atomic_helper_check - validate state object
  * @dev: DRM device
  * @state: the driver state object
@@ -972,6 +1024,10 @@ int drm_atomic_helper_check(struct drm_device *dev,
 	}
 
 	ret = drm_atomic_helper_check_planes(dev, state);
+	if (ret)
+		return ret;
+
+	ret = drm_atomic_helper_check_crtcs(state);
 	if (ret)
 		return ret;
 

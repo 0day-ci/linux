@@ -1263,23 +1263,6 @@ intel_color_add_affected_planes(struct intel_crtc_state *new_crtc_state)
 	return 0;
 }
 
-static int check_lut_size(const struct drm_property_blob *lut, int expected)
-{
-	int len;
-
-	if (!lut)
-		return 0;
-
-	len = drm_color_lut_size(lut);
-	if (len != expected) {
-		DRM_DEBUG_KMS("Invalid LUT size; got %d, expected %d\n",
-			      len, expected);
-		return -EINVAL;
-	}
-
-	return 0;
-}
-
 static int check_luts(const struct intel_crtc_state *crtc_state)
 {
 	struct drm_i915_private *dev_priv = to_i915(crtc_state->uapi.crtc->dev);
@@ -1304,9 +1287,25 @@ static int check_luts(const struct intel_crtc_state *crtc_state)
 	degamma_channels_tests = INTEL_INFO(dev_priv)->color.degamma_lut_tests;
 	gamma_channels_tests = INTEL_INFO(dev_priv)->color.gamma_lut_tests;
 
-	if (check_lut_size(degamma_lut, degamma_length) ||
-	    check_lut_size(gamma_lut, gamma_length))
-		return -EINVAL;
+	if (degamma_lut) {
+		if (drm_check_lut_size(degamma_lut, degamma_length)) {
+			drm_dbg_state(
+				&dev_priv->drm,
+				"Invalid DeGamma LUT size. Should be %u but got %u.\n",
+				degamma_length,
+				drm_color_lut_size(degamma_lut));
+			return -EINVAL;
+		}
+	}
+	if (gamma_lut) {
+		if (drm_check_lut_size(gamma_lut, degamma_length)) {
+			drm_dbg_state(
+				&dev_priv->drm,
+				"Invalid Gamma LUT size. Should be %u but got %u.\n",
+				degamma_length, drm_color_lut_size(gamma_lut));
+			return -EINVAL;
+		}
+	}
 
 	if (drm_color_lut_channels_check(degamma_lut, degamma_channels_tests) ||
 	    drm_color_lut_channels_check(gamma_lut, gamma_channels_tests))
