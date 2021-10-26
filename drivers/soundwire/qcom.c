@@ -109,6 +109,7 @@
 #define SWR_MAX_CMD_ID	14
 #define MAX_FIFO_RD_RETRY 3
 #define SWR_OVERFLOW_RETRY_COUNT 30
+#define SWR_RXTX_CGCR_HW_CTL_MASK ~BIT(1)
 
 struct qcom_swrm_port_config {
 	u8 si;
@@ -127,6 +128,7 @@ struct qcom_swrm_ctrl {
 	struct device *dev;
 	struct regmap *regmap;
 	void __iomem *mmio;
+	char __iomem *audio_csr_mmio;
 	struct completion broadcast;
 	struct completion enumeration;
 	struct work_struct slave_work;
@@ -609,6 +611,12 @@ static int qcom_swrm_init(struct qcom_swrm_ctrl *ctrl)
 	/* Clear Rows and Cols */
 	val = FIELD_PREP(SWRM_MCP_FRAME_CTRL_BANK_ROW_CTRL_BMSK, ctrl->rows_index);
 	val |= FIELD_PREP(SWRM_MCP_FRAME_CTRL_BANK_COL_CTRL_BMSK, ctrl->cols_index);
+
+	if (ctrl->audio_csr_mmio) {
+		val = ioread32(ctrl->audio_csr_mmio);
+		val &= SWR_RXTX_CGCR_HW_CTL_MASK;
+		iowrite32(val, ctrl->audio_csr_mmio);
+	}
 
 	ctrl->reg_write(ctrl, SWRM_MCP_FRAME_CTRL_BANK_ADDR(0), val);
 
@@ -1201,6 +1209,7 @@ static int qcom_swrm_probe(struct platform_device *pdev)
 	const struct qcom_swrm_data *data;
 	int ret;
 	u32 val;
+	int swrm_hctl_reg;
 
 	ctrl = devm_kzalloc(dev, sizeof(*ctrl), GFP_KERNEL);
 	if (!ctrl)
@@ -1251,6 +1260,11 @@ static int qcom_swrm_probe(struct platform_device *pdev)
 	ctrl->bus.port_ops = &qcom_swrm_port_ops;
 	ctrl->bus.compute_params = &qcom_swrm_compute_params;
 
+	if (!of_property_read_u32(dev->of_node, "qcom,swrm-hctl-reg", &swrm_hctl_reg)) {
+		ctrl->audio_csr_mmio = devm_ioremap(&pdev->dev, swrm_hctl_reg, 0x4);
+		if (!ctrl->audio_csr_mmio)
+			return -ENODEV;
+	}
 	ret = qcom_swrm_get_port_config(ctrl);
 	if (ret)
 		goto err_clk;
