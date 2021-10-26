@@ -3674,7 +3674,7 @@ u32 pci_rebar_get_possible_sizes(struct pci_dev *pdev, int bar)
 
 	/* Sapphire RX 5600 XT Pulse has an invalid cap dword for BAR 0 */
 	if (pdev->vendor == PCI_VENDOR_ID_ATI && pdev->device == 0x731f &&
-	    bar == 0 && cap == 0x7000)
+	    pdev->revision == 0xC1 && bar == 0 && cap == 0x7000)
 		cap = 0x3f000;
 
 	return cap >> 4;
