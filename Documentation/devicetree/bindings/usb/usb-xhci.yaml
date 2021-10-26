@@ -25,6 +25,10 @@ properties:
     description: Set if the controller has broken port disable mechanism
     type: boolean
 
+  usb-skip-phy-init:
+    description: Set if the phy initiazation is managed by controller
+    type: boolean
+
   imod-interval-ns:
     description: Interrupt moderation interval
     default: 5000
