@@ -48,6 +48,7 @@
 #define ACPI_SIG_SDEV           "SDEV"	/* Secure Devices table */
 #define ACPI_SIG_NHLT           "NHLT"	/* Non-HDAudio Link Table */
 #define ACPI_SIG_SVKL           "SVKL"	/* Storage Volume Key Location Table */
+#define ACPI_SIG_AEST           "AEST" /* Arm Error Source Table */
 
 /*
  * All tables must be byte-packed to match the ACPI specification, since
