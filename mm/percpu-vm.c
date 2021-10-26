@@ -404,7 +404,7 @@ static bool pcpu_should_reclaim_chunk(struct pcpu_chunk *chunk)
 	 * chunk, move it to the to_depopulate list.
 	 */
 	return ((chunk->isolated && chunk->nr_empty_pop_pages) ||
-		(pcpu_nr_empty_pop_pages >
+		(atomic_read(&pcpu_nr_empty_pop_pages) >
 		 (PCPU_EMPTY_POP_PAGES_HIGH + chunk->nr_empty_pop_pages) &&
 		 chunk->nr_empty_pop_pages >= chunk->nr_pages / 4));
 }

@@ -181,7 +181,7 @@ static LIST_HEAD(pcpu_map_extend_chunks);
  * The number of empty populated pages, protected by pcpu_lock.
  * The reserved chunk doesn't contribute to the count.
  */
-int pcpu_nr_empty_pop_pages;
+atomic_t pcpu_nr_empty_pop_pages = ATOMIC_INIT(0);
 
 /*
  * The number of populated pages in use by the allocator, protected by
@@ -574,7 +574,7 @@ static void pcpu_isolate_chunk(struct pcpu_chunk *chunk)
 
 	if (!chunk->isolated) {
 		chunk->isolated = true;
-		pcpu_nr_empty_pop_pages -= chunk->nr_empty_pop_pages;
+		atomic_sub(chunk->nr_empty_pop_pages, &pcpu_nr_empty_pop_pages);
 	}
 	list_move(&chunk->list, &pcpu_chunk_lists[pcpu_to_depopulate_slot]);
 }
@@ -585,7 +585,7 @@ static void pcpu_reintegrate_chunk(struct pcpu_chunk *chunk)
 
 	if (chunk->isolated) {
 		chunk->isolated = false;
-		pcpu_nr_empty_pop_pages += chunk->nr_empty_pop_pages;
+		atomic_add(chunk->nr_empty_pop_pages, &pcpu_nr_empty_pop_pages);
 		pcpu_chunk_relocate(chunk, -1);
 	}
 }
@@ -603,7 +603,7 @@ static inline void pcpu_update_empty_pages(struct pcpu_chunk *chunk, int nr)
 {
 	chunk->nr_empty_pop_pages += nr;
 	if (chunk != pcpu_reserved_chunk && !chunk->isolated)
-		pcpu_nr_empty_pop_pages += nr;
+		atomic_add(nr, &pcpu_nr_empty_pop_pages);
 }
 
 /*
@@ -1874,7 +1874,7 @@ area_found:
 		mutex_unlock(&pcpu_alloc_mutex);
 	}
 
-	if (pcpu_nr_empty_pop_pages < PCPU_EMPTY_POP_PAGES_LOW)
+	if (atomic_read(&pcpu_nr_empty_pop_pages) < PCPU_EMPTY_POP_PAGES_LOW)
 		pcpu_schedule_balance_work();
 
 	/* clear the areas and return address relative to base address */
@@ -2062,7 +2062,7 @@ retry_pop:
 		pcpu_atomic_alloc_failed = false;
 	} else {
 		nr_to_pop = clamp(PCPU_EMPTY_POP_PAGES_HIGH -
-				  pcpu_nr_empty_pop_pages,
+				  atomic_read(&pcpu_nr_empty_pop_pages),
 				  0, PCPU_EMPTY_POP_PAGES_HIGH);
 	}
 
@@ -2163,7 +2163,8 @@ static void pcpu_reclaim_populated(void)
 				break;
 
 			/* reintegrate chunk to prevent atomic alloc failures */
-			if (pcpu_nr_empty_pop_pages < PCPU_EMPTY_POP_PAGES_HIGH) {
+			if (atomic_read(&pcpu_nr_empty_pop_pages) <
+			    PCPU_EMPTY_POP_PAGES_HIGH) {
 				reintegrate = true;
 				goto end_chunk;
 			}
@@ -2765,7 +2766,8 @@ void __init pcpu_setup_first_chunk(const struct pcpu_alloc_info *ai,
 
 	/* link the first chunk in */
 	pcpu_first_chunk = chunk;
-	pcpu_nr_empty_pop_pages = pcpu_first_chunk->nr_empty_pop_pages;
+	atomic_set(&pcpu_nr_empty_pop_pages,
+		   pcpu_first_chunk->nr_empty_pop_pages);
 	pcpu_chunk_relocate(pcpu_first_chunk, -1);
 
 	/* include all regions of the first chunk */
