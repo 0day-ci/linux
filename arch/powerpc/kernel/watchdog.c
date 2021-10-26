@@ -149,6 +149,8 @@ static void set_cpu_stuck(int cpu, u64 tb)
 
 static void watchdog_smp_panic(int cpu, u64 tb)
 {
+	cpumask_t cpus_pending_copy;
+	u64 last_reset_tb_copy;
 	unsigned long flags;
 	int c;
 
@@ -161,28 +163,31 @@ static void watchdog_smp_panic(int cpu, u64 tb)
 	if (cpumask_weight(&wd_smp_cpus_pending) == 0)
 		goto out;
 
+	cpumask_copy(&cpus_pending_copy, &wd_smp_cpus_pending);
+	last_reset_tb_copy = wd_smp_last_reset_tb;
+
+	/* Take the stuck CPUs out of the watch group */
+	set_cpumask_stuck(&wd_smp_cpus_pending, tb);
+
+	wd_smp_unlock(&flags);
+
 	pr_emerg("CPU %d detected hard LOCKUP on other CPUs %*pbl\n",
-		 cpu, cpumask_pr_args(&wd_smp_cpus_pending));
+		 cpu, cpumask_pr_args(&cpus_pending_copy));
 	pr_emerg("CPU %d TB:%lld, last SMP heartbeat TB:%lld (%lldms ago)\n",
-		 cpu, tb, wd_smp_last_reset_tb,
-		 tb_to_ns(tb - wd_smp_last_reset_tb) / 1000000);
+		 cpu, tb, last_reset_tb_copy,
+		 tb_to_ns(tb - last_reset_tb_copy) / 1000000);
 
 	if (!sysctl_hardlockup_all_cpu_backtrace) {
 		/*
 		 * Try to trigger the stuck CPUs, unless we are going to
 		 * get a backtrace on all of them anyway.
 		 */
-		for_each_cpu(c, &wd_smp_cpus_pending) {
+		for_each_cpu(c, &cpus_pending_copy) {
 			if (c == cpu)
 				continue;
 			smp_send_nmi_ipi(c, wd_lockup_ipi, 1000000);
 		}
 	}
-
-	/* Take the stuck CPUs out of the watch group */
-	set_cpumask_stuck(&wd_smp_cpus_pending, tb);
-
-	wd_smp_unlock(&flags);
 
 	if (sysctl_hardlockup_all_cpu_backtrace)
 		trigger_allbutself_cpu_backtrace();
@@ -204,6 +209,8 @@ static void wd_smp_clear_cpu_pending(int cpu, u64 tb)
 			unsigned long flags;
 
 			wd_smp_lock(&flags);
+			cpumask_clear_cpu(cpu, &wd_smp_cpus_stuck);
+			wd_smp_unlock(&flags);
 
 			pr_emerg("CPU %d became unstuck TB:%lld\n",
 				 cpu, tb);
@@ -212,9 +219,6 @@ static void wd_smp_clear_cpu_pending(int cpu, u64 tb)
 				show_regs(regs);
 			else
 				dump_stack();
-
-			cpumask_clear_cpu(cpu, &wd_smp_cpus_stuck);
-			wd_smp_unlock(&flags);
 		}
 		return;
 	}
@@ -267,6 +271,7 @@ DEFINE_INTERRUPT_HANDLER_NMI(soft_nmi_interrupt)
 			return 0;
 		}
 		set_cpu_stuck(cpu, tb);
+		wd_smp_unlock(&flags);
 
 		pr_emerg("CPU %d self-detected hard LOCKUP @ %pS\n",
 			 cpu, (void *)regs->nip);
@@ -276,8 +281,6 @@ DEFINE_INTERRUPT_HANDLER_NMI(soft_nmi_interrupt)
 		print_modules();
 		print_irqtrace_events(current);
 		show_regs(regs);
-
-		wd_smp_unlock(&flags);
 
 		if (sysctl_hardlockup_all_cpu_backtrace)
 			trigger_allbutself_cpu_backtrace();
