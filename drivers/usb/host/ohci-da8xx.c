@@ -449,6 +449,10 @@ static int ohci_da8xx_probe(struct platform_device *pdev)
 		error = -ENODEV;
 		goto err;
 	}
+	if (!hcd_irq) {
+		error = -EINVAL;
+		goto err;
+	}
 
 	error = usb_add_hcd(hcd, hcd_irq, 0);
 	if (error)
