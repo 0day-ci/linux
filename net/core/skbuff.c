@@ -4406,6 +4406,7 @@ merge:
 		skb_shinfo(p)->frag_list = skb;
 	else
 		NAPI_GRO_CB(p)->last->next = skb;
+	skb->next = NULL;
 	NAPI_GRO_CB(p)->last = skb;
 	__skb_header_release(skb);
 	lp = p;
