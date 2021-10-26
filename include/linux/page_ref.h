@@ -88,6 +88,19 @@ static inline void init_page_count(struct page *page)
 	set_page_count(page, 1);
 }
 
+static inline int page_ref_add_return(struct page *page, int nr)
+{
+	int ret;
+
+	VM_BUG_ON(nr <= 0);
+	ret = atomic_add_return(nr, &page->_refcount);
+	VM_BUG_ON_PAGE(ret <= 0, page);
+
+	if (page_ref_tracepoint_active(page_ref_mod_and_return))
+		__page_ref_mod_and_return(page, nr, ret);
+	return ret;
+}
+
 static inline void page_ref_add(struct page *page, int nr)
 {
 	int ret;
