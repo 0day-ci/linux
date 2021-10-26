@@ -115,11 +115,8 @@ unsigned long find_next_zero_bit(const unsigned long *addr, unsigned long size,
 static inline
 unsigned long find_first_bit(const unsigned long *addr, unsigned long size)
 {
-	if (small_const_nbits(size)) {
-		unsigned long val = *addr & GENMASK(size - 1, 0);
-
-		return val ? __ffs(val) : size;
-	}
+	if (small_const_nbits(size))
+		return size;
 
 	return _find_first_bit(addr, size);
 }
@@ -140,11 +137,8 @@ unsigned long find_first_and_bit(const unsigned long *addr1,
 				 const unsigned long *addr2,
 				 unsigned long size)
 {
-	if (small_const_nbits(size)) {
-		unsigned long val = *addr1 & *addr2 & GENMASK(size - 1, 0);
-
-		return val ? __ffs(val) : size;
-	}
+	if (small_const_nbits(size))
+		return size;
 
 	return _find_first_and_bit(addr1, addr2, size);
 }
@@ -162,11 +156,8 @@ unsigned long find_first_and_bit(const unsigned long *addr1,
 static inline
 unsigned long find_first_zero_bit(const unsigned long *addr, unsigned long size)
 {
-	if (small_const_nbits(size)) {
-		unsigned long val = *addr | ~GENMASK(size - 1, 0);
-
-		return val == ~0UL ? size : ffz(val);
-	}
+	if (small_const_nbits(size))
+		return size;
 
 	return _find_first_zero_bit(addr, size);
 }
@@ -183,11 +174,8 @@ unsigned long find_first_zero_bit(const unsigned long *addr, unsigned long size)
 static inline
 unsigned long find_last_bit(const unsigned long *addr, unsigned long size)
 {
-	if (small_const_nbits(size)) {
-		unsigned long val = *addr & GENMASK(size - 1, 0);
-
-		return val ? __fls(val) : size;
-	}
+	if (small_const_nbits(size))
+		return size;
 
 	return _find_last_bit(addr, size);
 }
