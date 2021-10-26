@@ -1105,11 +1105,6 @@ Others
     The patch seems to be corrupted or lines are wrapped.
     Please regenerate the patch file before sending it to the maintainer.
 
-  **CVS_KEYWORD**
-    Since linux moved to git, the CVS markers are no longer used.
-    So, CVS style keywords ($Id$, $Revision$, $Log$) should not be
-    added.
-
   **DEFAULT_NO_BREAK**
     switch default case is sometimes written as "default:;".  This can
     cause new cases added below default to be defective.
