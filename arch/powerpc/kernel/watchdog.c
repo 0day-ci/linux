@@ -203,12 +203,13 @@ out:
 
 static void wd_smp_clear_cpu_pending(int cpu, u64 tb)
 {
+	unsigned long flags;
+
+	wd_smp_lock(&flags);
 	if (!cpumask_test_cpu(cpu, &wd_smp_cpus_pending)) {
 		if (unlikely(cpumask_test_cpu(cpu, &wd_smp_cpus_stuck))) {
 			struct pt_regs *regs = get_irq_regs();
-			unsigned long flags;
 
-			wd_smp_lock(&flags);
 			cpumask_clear_cpu(cpu, &wd_smp_cpus_stuck);
 			wd_smp_unlock(&flags);
 
@@ -219,22 +220,23 @@ static void wd_smp_clear_cpu_pending(int cpu, u64 tb)
 				show_regs(regs);
 			else
 				dump_stack();
+			return;
 		}
+
+		wd_smp_unlock(&flags);
 		return;
 	}
+
 	cpumask_clear_cpu(cpu, &wd_smp_cpus_pending);
 	if (cpumask_empty(&wd_smp_cpus_pending)) {
-		unsigned long flags;
-
-		wd_smp_lock(&flags);
 		if (cpumask_empty(&wd_smp_cpus_pending)) {
 			wd_smp_last_reset_tb = tb;
 			cpumask_andnot(&wd_smp_cpus_pending,
 					&wd_cpus_enabled,
 					&wd_smp_cpus_stuck);
 		}
-		wd_smp_unlock(&flags);
 	}
+	wd_smp_unlock(&flags);
 }
 
 static void watchdog_timer_interrupt(int cpu)
