@@ -181,6 +181,54 @@ void btrfs_clear_space_info_full(struct btrfs_fs_info *info)
 		found->full = 0;
 }
 
+/*
+ * Compute stripe size depending on block type.
+ */
+static u64 compute_stripe_size(struct btrfs_fs_info *info, u64 flags)
+{
+	if (flags & BTRFS_BLOCK_GROUP_DATA) {
+		return SZ_1G;
+	} else if (flags & BTRFS_BLOCK_GROUP_METADATA) {
+		/* For larger filesystems, use larger metadata chunks */
+		return info->fs_devices->total_rw_bytes > 50ULL * SZ_1G
+			? 5ULL * SZ_1G
+			: SZ_256M;
+	} else if (flags & BTRFS_BLOCK_GROUP_SYSTEM) {
+		return SZ_32M;
+	}
+
+	BUG();
+}
+
+/*
+ * Compute chunk size depending on block type and stripe size.
+ */
+static u64 compute_chunk_size(u64 flags, u64 max_stripe_size)
+{
+	if (flags & BTRFS_BLOCK_GROUP_DATA)
+		return BTRFS_MAX_DATA_CHUNK_SIZE;
+	else if (flags & BTRFS_BLOCK_GROUP_METADATA)
+		return max_stripe_size;
+	else if (flags & BTRFS_BLOCK_GROUP_SYSTEM)
+		return 2 * max_stripe_size;
+
+	BUG();
+}
+
+/*
+ * Update maximum stripe size and chunk size.
+ *
+ */
+void btrfs_update_space_info_max_alloc_sizes(struct btrfs_space_info *space_info,
+					     u64 flags, u64 max_stripe_size)
+{
+	spin_lock(&space_info->lock);
+	space_info->max_stripe_size = max_stripe_size;
+	space_info->max_chunk_size = compute_chunk_size(flags,
+						space_info->max_stripe_size);
+	spin_unlock(&space_info->lock);
+}
+
 static int create_space_info(struct btrfs_fs_info *info, u64 flags)
 {
 
@@ -202,6 +250,10 @@ static int create_space_info(struct btrfs_fs_info *info, u64 flags)
 	INIT_LIST_HEAD(&space_info->tickets);
 	INIT_LIST_HEAD(&space_info->priority_tickets);
 	space_info->clamp = 1;
+
+	space_info->max_stripe_size = compute_stripe_size(info, flags);
+	space_info->max_chunk_size = compute_chunk_size(flags,
+						space_info->max_stripe_size);
 
 	ret = btrfs_sysfs_add_space_info_type(info, space_info);
 	if (ret)
