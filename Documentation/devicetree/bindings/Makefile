@@ -9,6 +9,10 @@ DT_SCHEMA_MIN_VERSION = 2021.2.1
 
 PHONY += check_dtschema_version
 check_dtschema_version:
+	@which $(DT_DOC_CHECKER) >/dev/null || \
+		{ echo "Error: '$(DT_DOC_CHECKER)' not found!" \
+		"\nEnsure dtschema python package is installed and in your PATH." \
+		"\nCurrent PATH is:\n$$PATH\n" >&2; false; }
 	@{ echo $(DT_SCHEMA_MIN_VERSION); \
 	$(DT_DOC_CHECKER) --version 2>/dev/null || echo 0; } | sort -Vc >/dev/null || \
 	{ echo "ERROR: dtschema minimum version is v$(DT_SCHEMA_MIN_VERSION)" >&2; false; }
