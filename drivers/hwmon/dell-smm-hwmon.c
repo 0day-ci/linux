@@ -111,6 +111,14 @@ static uint fan_max;
 module_param(fan_max, uint, 0);
 MODULE_PARM_DESC(fan_max, "Maximum configurable fan speed (default: autodetect)");
 
+static uint manual_fan;
+module_param_unsafe(manual_fan, uint, 0);
+MODULE_PARM_DESC(manual_fan, "SMM command to disable BIOS fan control (default: disabled)");
+
+static uint auto_fan;
+module_param_unsafe(auto_fan, uint, 0);
+MODULE_PARM_DESC(auto_fan, "SMM command to enable BIOS fan control (default: disabled)");
+
 struct smm_regs {
 	unsigned int eax;
 	unsigned int ebx __packed;
@@ -700,7 +708,7 @@ static umode_t dell_smm_is_visible(const void *drvdata, enum hwmon_sensor_types 
 
 			break;
 		case hwmon_pwm_enable:
-			if (data->auto_fan)
+			if (data->auto_fan && data->manual_fan)
 				/*
 				 * There is no command for retrieve the current status
 				 * from BIOS, and userspace/firmware itself can change
@@ -1305,12 +1313,20 @@ static int __init dell_smm_probe(struct platform_device *pdev)
 	data->i8k_fan_max = fan_max ? : I8K_FAN_HIGH;	/* Must not be 0 */
 	data->i8k_pwm_mult = DIV_ROUND_UP(255, data->i8k_fan_max);
 
+	/* Values specified in module parameters override values from dmi */
 	fan_control = dmi_first_match(i8k_whitelist_fan_control);
 	if (fan_control && fan_control->driver_data) {
 		const struct i8k_fan_control_data *control = fan_control->driver_data;
 
-		data->manual_fan = control->manual_fan;
-		data->auto_fan = control->auto_fan;
+		if (!manual_fan)
+			manual_fan = control->manual_fan;
+
+		if (!auto_fan)
+			auto_fan = control->auto_fan;
+	}
+	if (manual_fan && auto_fan) {
+		data->manual_fan = manual_fan;
+		data->auto_fan = auto_fan;
 		dev_info(&pdev->dev, "enabling support for setting automatic/manual fan control\n");
 	}
 

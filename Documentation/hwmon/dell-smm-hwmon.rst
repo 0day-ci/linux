@@ -67,13 +67,13 @@ for your hardware. It is possible that codes that work for other
 laptops actually work for yours as well, or that you have to discover
 new codes.
 
-Check the list ``i8k_whitelist_fan_control`` in file
-``drivers/hwmon/dell-smm-hwmon.c`` in the kernel tree: as a first
-attempt you can try to add your machine and use an already-known code
-pair. If, after recompiling the kernel, you see that ``pwm1_enable``
-is present and works (i.e., you can manually control the fan speed),
-then please submit your finding as a kernel patch, so that other users
-can benefit from it. Please see
+Check the list ``i8k_fan_control_data`` in file
+``drivers/hwmon/dell-smm-hwmon.c`` inside the kernel tree:
+as a first attempt you can load the module with ``manual_fan`` and
+``auto_fan`` set to an already-known code pair. If you see that
+``pwm1_enable`` is present and works (i.e., you can manually control
+the fan speed), then please submit your finding as a kernel patch,
+so that other users can benefit from it. Please see
 :ref:`Documentation/process/submitting-patches.rst <submittingpatches>`
 for information on submitting patches.
 
@@ -119,6 +119,19 @@ Module parameters
 * fan_max:uint
                    Maximum configurable fan speed. (default:
                    autodetect)
+
+* manual_fan:uint
+                   SMM code to disable BIOS fan control, must
+                   be set together with auto_fan to work.
+                   Please note that this parameter is unsafe and
+                   will taint your kernel when set, use only for
+                   testing codes on your hardware!
+                   (default: retrieved from whitelist)
+
+* auto_fan:uint
+                   SMM command to enable BIOS fan control, see
+                   manual_fan for further explaination.
+                   (default: retrieved from whitelist)
 
 Legacy ``/proc`` interface
 --------------------------
