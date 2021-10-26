@@ -502,6 +502,9 @@ static int mwifiex_usb_probe(struct usb_interface *intf,
 			atomic_set(&card->tx_cmd_urb_pending, 0);
 			card->bulk_out_maxpktsize =
 					le16_to_cpu(epd->wMaxPacketSize);
+			/* Reject broken descriptors. */
+			if (card->bulk_out_maxpktsize == 0)
+				return -ENODEV;
 		}
 	}
 
