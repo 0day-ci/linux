@@ -205,6 +205,8 @@ static int xhci_plat_probe(struct platform_device *pdev)
 	irq = platform_get_irq(pdev, 0);
 	if (irq < 0)
 		return irq;
+	if (!irq)
+		return -EINVAL;
 
 	/*
 	 * sysdev must point to a device that is known to the system firmware
