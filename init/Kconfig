@@ -922,7 +922,7 @@ config NUMA_BALANCING
 config NUMA_BALANCING_DEFAULT_ENABLED
 	bool "Automatically enable NUMA aware memory/task placement"
 	default y
-	depends on NUMA_BALANCING
+	depends on NUMA_BALANCING && !PREEMPT_RT
 	help
 	  If set, automatic NUMA balancing will be enabled if running on a NUMA
 	  machine.
