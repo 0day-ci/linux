@@ -78,16 +78,6 @@ config ADB_PMU_LED
 	  behaviour of the old CONFIG_BLK_DEV_IDE_PMAC_BLINK, select this
 	  and the disk LED trigger and configure appropriately through sysfs.
 
-config ADB_PMU_LED_DISK
-	bool "Use front LED as DISK LED by default"
-	depends on ADB_PMU_LED
-	depends on LEDS_CLASS
-	select LEDS_TRIGGERS
-	select LEDS_TRIGGER_DISK
-	help
-	  This option makes the front LED default to the disk trigger
-	  so that it blinks on disk activity.
-
 config PMAC_SMU
 	bool "Support for SMU  based PowerMacs"
 	depends on PPC_PMAC64
