@@ -276,7 +276,8 @@ static const u8 minstrel_sample_seq[] = {
 };
 
 static void
-minstrel_ht_update_rates(struct minstrel_priv *mp, struct minstrel_ht_sta *mi);
+minstrel_ht_update_rates(struct minstrel_priv *mp, struct minstrel_ht_sta *mi,
+			 bool use_rts);
 
 /*
  * Some VHT MCSes are invalid (when Ndbps / Nes is not an integer)
@@ -1254,7 +1255,7 @@ minstrel_ht_tx_status(void *priv, struct ieee80211_supported_band *sband,
 	}
 
 	if (update)
-		minstrel_ht_update_rates(mp, mi);
+		minstrel_ht_update_rates(mp, mi, info->control.use_rts);
 }
 
 static void
@@ -1319,7 +1320,8 @@ minstrel_calc_retransmit(struct minstrel_priv *mp, struct minstrel_ht_sta *mi,
 
 static void
 minstrel_ht_set_rate(struct minstrel_priv *mp, struct minstrel_ht_sta *mi,
-                     struct ieee80211_sta_rates *ratetbl, int offset, int index)
+		     struct ieee80211_sta_rates *ratetbl, int offset, int index,
+		     bool use_rts)
 {
 	int group_idx = MI_RATE_GROUP(index);
 	const struct mcs_group *group = &minstrel_mcs_groups[group_idx];
@@ -1357,7 +1359,7 @@ minstrel_ht_set_rate(struct minstrel_priv *mp, struct minstrel_ht_sta *mi,
 	 *  - if station is in dynamic SMPS (and streams > 1)
 	 *  - for fallback rates, to increase chances of getting through
 	 */
-	if (offset > 0 ||
+	if ((offset > 0 && use_rts) ||
 	    (mi->sta->smps_mode == IEEE80211_SMPS_DYNAMIC &&
 	     group->streams > 1)) {
 		ratetbl->rate[offset].count = ratetbl->rate[offset].count_rts;
@@ -1426,7 +1428,8 @@ minstrel_ht_get_max_amsdu_len(struct minstrel_ht_sta *mi)
 }
 
 static void
-minstrel_ht_update_rates(struct minstrel_priv *mp, struct minstrel_ht_sta *mi)
+minstrel_ht_update_rates(struct minstrel_priv *mp, struct minstrel_ht_sta *mi,
+			 bool use_rts)
 {
 	struct ieee80211_sta_rates *rates;
 	int i = 0;
@@ -1436,15 +1439,15 @@ minstrel_ht_update_rates(struct minstrel_priv *mp, struct minstrel_ht_sta *mi)
 		return;
 
 	/* Start with max_tp_rate[0] */
-	minstrel_ht_set_rate(mp, mi, rates, i++, mi->max_tp_rate[0]);
+	minstrel_ht_set_rate(mp, mi, rates, i++, mi->max_tp_rate[0], use_rts);
 
 	if (mp->hw->max_rates >= 3) {
 		/* At least 3 tx rates supported, use max_tp_rate[1] next */
-		minstrel_ht_set_rate(mp, mi, rates, i++, mi->max_tp_rate[1]);
+		minstrel_ht_set_rate(mp, mi, rates, i++, mi->max_tp_rate[1], use_rts);
 	}
 
 	if (mp->hw->max_rates >= 2) {
-		minstrel_ht_set_rate(mp, mi, rates, i++, mi->max_prob_rate);
+		minstrel_ht_set_rate(mp, mi, rates, i++, mi->max_prob_rate, use_rts);
 	}
 
 	mi->sta->max_rc_amsdu_len = minstrel_ht_get_max_amsdu_len(mi);
@@ -1705,7 +1708,7 @@ minstrel_ht_update_caps(void *priv, struct ieee80211_supported_band *sband,
 
 	/* create an initial rate table with the lowest supported rates */
 	minstrel_ht_update_stats(mp, mi);
-	minstrel_ht_update_rates(mp, mi);
+	minstrel_ht_update_rates(mp, mi, false);
 }
 
 static void
