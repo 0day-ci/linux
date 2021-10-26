@@ -3372,7 +3372,9 @@ int drm_edp_backlight_enable(struct drm_dp_aux *aux, const struct drm_edp_backli
 		return ret < 0 ? ret : -EIO;
 	}
 
-	new_dpcd_buf = dpcd_buf;
+	/* Disable any backlight functionality we don't support that might be on */
+	new_dpcd_buf = dpcd_buf & (DP_EDP_BACKLIGHT_CONTROL_MODE_MASK |
+				   DP_EDP_BACKLIGHT_FREQ_AUX_SET_ENABLE);
 
 	if ((dpcd_buf & DP_EDP_BACKLIGHT_CONTROL_MODE_MASK) != DP_EDP_BACKLIGHT_CONTROL_MODE_DPCD) {
 		new_dpcd_buf &= ~DP_EDP_BACKLIGHT_CONTROL_MODE_MASK;
@@ -3394,6 +3396,8 @@ int drm_edp_backlight_enable(struct drm_dp_aux *aux, const struct drm_edp_backli
 				    aux->name, ret);
 		else
 			new_dpcd_buf |= DP_EDP_BACKLIGHT_FREQ_AUX_SET_ENABLE;
+	} else {
+		new_dpcd_buf &= ~DP_EDP_BACKLIGHT_FREQ_AUX_SET_ENABLE;
 	}
 
 	if (new_dpcd_buf != dpcd_buf) {
