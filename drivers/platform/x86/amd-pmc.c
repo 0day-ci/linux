@@ -414,6 +414,7 @@ static int amd_pmc_get_os_hint(struct amd_pmc_dev *dev)
 	return -EINVAL;
 }
 
+#ifdef CONFIG_RTC_SYSTOHC
 static int amd_pmc_verify_czn_rtc(struct amd_pmc_dev *pdev, u32 *arg)
 {
 	struct rtc_device *rtc_device;
@@ -461,6 +462,7 @@ static int amd_pmc_verify_czn_rtc(struct amd_pmc_dev *pdev, u32 *arg)
 
 	return rc;
 }
+#endif
 
 static int __maybe_unused amd_pmc_suspend(struct device *dev)
 {
@@ -473,12 +475,14 @@ static int __maybe_unused amd_pmc_suspend(struct device *dev)
 	amd_pmc_send_cmd(pdev, 0, NULL, SMU_MSG_LOG_RESET, 0);
 	amd_pmc_send_cmd(pdev, 0, NULL, SMU_MSG_LOG_START, 0);
 
+#ifdef CONFIG_RTC_SYSTOHC
 	/* Activate CZN specific RTC functionality */
 	if (pdev->cpu_id == AMD_CPU_ID_CZN) {
 		rc = amd_pmc_verify_czn_rtc(pdev, &arg);
 		if (rc < 0)
 			return rc;
 	}
+#endif
 
 	/* Dump the IdleMask before we send hint to SMU */
 	amd_pmc_idlemask_read(pdev, dev, NULL);
