@@ -3511,6 +3511,9 @@ static vm_fault_t kvm_vcpu_fault(struct vm_fault *vmf)
 		page = kvm_dirty_ring_get_page(
 		    &vcpu->dirty_ring,
 		    vmf->pgoff - KVM_DIRTY_LOG_PAGE_OFFSET);
+	else if (vmf->pgoff == KVM_DIRTY_QUOTA_PAGE_OFFSET)
+		page = kvm_dirty_quota_context_get_page(vcpu->vCPUdqctx,
+				vmf->pgoff - KVM_DIRTY_QUOTA_PAGE_OFFSET);
 	else
 		return kvm_arch_vcpu_fault(vcpu, vmf);
 	get_page(page);
@@ -4263,6 +4266,15 @@ static int kvm_vm_ioctl_reset_dirty_pages(struct kvm *kvm)
 	return cleared;
 }
 
+static int kvm_vm_ioctl_enable_dirty_quota_migration(struct kvm *kvm,
+		bool dirty_quota_migration_enabled)
+{
+	mutex_lock(&kvm->lock);
+	kvm->dirty_quota_migration_enabled = dirty_quota_migration_enabled;
+	mutex_unlock(&kvm->lock);
+	return 0;
+}
+
 int __attribute__((weak)) kvm_vm_ioctl_enable_cap(struct kvm *kvm,
 						  struct kvm_enable_cap *cap)
 {
@@ -4295,6 +4307,9 @@ static int kvm_vm_ioctl_enable_cap_generic(struct kvm *kvm,
 	}
 	case KVM_CAP_DIRTY_LOG_RING:
 		return kvm_vm_ioctl_enable_dirty_log_ring(kvm, cap->args[0]);
+	case KVM_CAP_DIRTY_QUOTA_MIGRATION:
+		return kvm_vm_ioctl_enable_dirty_quota_migration(kvm,
+				cap->args[0]);
 	default:
 		return kvm_vm_ioctl_enable_cap(kvm, cap);
 	}
