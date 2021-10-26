@@ -159,7 +159,9 @@ events is calculated separately from IPC for "instructions" events.
 
 Even with the 'cyc' config term, it is possible to produce IPC information for
 every change of timestamp, but at the expense of accuracy.  That is selected by
-specifying the itrace 'A' option.
+specifying the itrace 'A' option.  It may also be useful to use the 'A' option
+in conjunction with dlfilter-show-cycles.so to provide higher granularity cycle
+information.
 
 Also note that the IPC instruction count may or may not include the current
 instruction.  If the cycle count is associated with an asynchronous branch
@@ -1075,6 +1077,21 @@ What *will* be decoded with the qq option:
 The Z option is equivalent to having recorded a trace without TSC
 (i.e. config term tsc=0). It can be useful to avoid timestamp issues when
 decoding a trace of a virtual machine.
+
+
+dlfilter-show-cycles.so
+~~~~~~~~~~~~~~~~~~~~~~~
+
+Cycles can be displayed using dlfilter-show-cycles.so in which case the itrace A
+option can be useful to provide higher granularity cycle information:
+
+	perf script --itrace=A --call-trace --dlfilter dlfilter-show-cycles.so
+
+To see a list of dlfilters:
+
+	perf script -v --list-dlfilters
+
+See also linkperf:perf-dlfilters[1]
 
 
 dump option
