@@ -16,7 +16,7 @@ MAKEFLAGS += -r
 override CFLAGS += -O2 -Wall -Wextra -g -D_GNU_SOURCE -I$(OUTPUT)include -I$(srctree)/tools/include
 override LDFLAGS += -lpthread
 
-ALL_TARGETS := testusb ffs-test
+ALL_TARGETS := testusb ffs-test pd-test
 ALL_PROGRAMS := $(patsubst %,$(OUTPUT)%,$(ALL_TARGETS))
 
 all: $(ALL_PROGRAMS)
@@ -35,6 +35,12 @@ $(FFS_TEST_IN): FORCE
 	$(Q)$(MAKE) $(build)=ffs-test
 $(OUTPUT)ffs-test: $(FFS_TEST_IN)
 	$(QUIET_LINK)$(CC) $(CFLAGS) $< -o $@ $(LDFLAGS)
+
+PD_TEST_IN := $(OUTPUT)pd-test-in.o
+$(PD_TEST_IN): FORCE
+	$(Q)$(MAKE) $(build)=pd-test
+$(OUTPUT)pd-test: $(PD_TEST_IN)
+	$(QUIET_LINK)$(CC) $(CFLAGS) $< -o $@
 
 clean:
 	rm -f $(ALL_PROGRAMS)
