@@ -207,6 +207,10 @@ static int exynos_ehci_probe(struct platform_device *pdev)
 		err = irq;
 		goto fail_io;
 	}
+	if (!irq) {
+		err = -EINVAL;
+		goto fail_io;
+	}
 
 	err = exynos_ehci_phy_enable(&pdev->dev);
 	if (err) {
