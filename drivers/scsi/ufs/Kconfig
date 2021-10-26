@@ -186,7 +186,7 @@ config SCSI_UFS_CRYPTO
 
 config SCSI_UFS_HPB
 	bool "Support UFS Host Performance Booster"
-	depends on SCSI_UFSHCD
+	depends on SCSI_UFSHCD && BROKEN
 	help
 	  The UFS HPB feature improves random read performance. It caches
 	  L2P (logical to physical) map of UFS to host DRAM. The driver uses HPB
