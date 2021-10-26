@@ -127,20 +127,22 @@ static int usb_string_copy(const char *s, char **s_copy)
 	return 0;
 }
 
-#define GI_DEVICE_DESC_SIMPLE_R_u8(__name)	\
+#define GI_DEVICE_DESC_SIMPLE_R_u8(__name)		\
 static ssize_t gadget_dev_desc_##__name##_show(struct config_item *item, \
-			char *page)	\
-{	\
-	return sprintf(page, "0x%02x\n", \
-		to_gadget_info(item)->cdev.desc.__name); \
+			char *page)			\
+{							\
+	struct gadget_info *gi = to_gadget_info(item);	\
+	return sprintf(page, "0x%02x\n",		\
+			gi->cdev.desc.__name); 		\
 }
 
-#define GI_DEVICE_DESC_SIMPLE_R_u16(__name)	\
+#define GI_DEVICE_DESC_SIMPLE_R_u16(__name)		\
 static ssize_t gadget_dev_desc_##__name##_show(struct config_item *item, \
-			char *page)	\
-{	\
-	return sprintf(page, "0x%04x\n", \
-		le16_to_cpup(&to_gadget_info(item)->cdev.desc.__name)); \
+			char *page)			\
+{							\
+	struct gadget_info *gi = to_gadget_info(item);	\
+	return sprintf(page, "0x%04x\n",		\
+		le16_to_cpup(&gi->cdev.desc.__name));	\
 }
 
 
@@ -148,25 +150,27 @@ static ssize_t gadget_dev_desc_##__name##_show(struct config_item *item, \
 static ssize_t gadget_dev_desc_##_name##_store(struct config_item *item, \
 		const char *page, size_t len)		\
 {							\
+	struct gadget_info *gi = to_gadget_info(item);	\
 	u8 val;						\
 	int ret;					\
 	ret = kstrtou8(page, 0, &val);			\
 	if (ret)					\
 		return ret;				\
-	to_gadget_info(item)->cdev.desc._name = val;	\
+	gi->cdev.desc._name = val;			\
 	return len;					\
 }
 
-#define GI_DEVICE_DESC_SIMPLE_W_u16(_name)	\
+#define GI_DEVICE_DESC_SIMPLE_W_u16(_name)		\
 static ssize_t gadget_dev_desc_##_name##_store(struct config_item *item, \
 		const char *page, size_t len)		\
 {							\
+	struct gadget_info *gi = to_gadget_info(item);	\
 	u16 val;					\
 	int ret;					\
 	ret = kstrtou16(page, 0, &val);			\
 	if (ret)					\
 		return ret;				\
-	to_gadget_info(item)->cdev.desc._name = cpu_to_le16p(&val);	\
+	gi->cdev.desc._name = cpu_to_le16p(&val);	\
 	return len;					\
 }
 
@@ -199,6 +203,7 @@ static ssize_t is_valid_bcd(u16 bcd_val)
 static ssize_t gadget_dev_desc_bcdDevice_store(struct config_item *item,
 		const char *page, size_t len)
 {
+	struct gadget_info *gi = to_gadget_info(item);
 	u16 bcdDevice;
 	int ret;
 
@@ -209,13 +214,14 @@ static ssize_t gadget_dev_desc_bcdDevice_store(struct config_item *item,
 	if (ret)
 		return ret;
 
-	to_gadget_info(item)->cdev.desc.bcdDevice = cpu_to_le16(bcdDevice);
+	gi->cdev.desc.bcdDevice = cpu_to_le16(bcdDevice);
 	return len;
 }
 
 static ssize_t gadget_dev_desc_bcdUSB_store(struct config_item *item,
 		const char *page, size_t len)
 {
+	struct gadget_info *gi = to_gadget_info(item);
 	u16 bcdUSB;
 	int ret;
 
@@ -226,7 +232,7 @@ static ssize_t gadget_dev_desc_bcdUSB_store(struct config_item *item,
 	if (ret)
 		return ret;
 
-	to_gadget_info(item)->cdev.desc.bcdUSB = cpu_to_le16(bcdUSB);
+	gi->cdev.desc.bcdUSB = cpu_to_le16(bcdUSB);
 	return len;
 }
 
@@ -305,7 +311,8 @@ err:
 static ssize_t gadget_dev_desc_max_speed_show(struct config_item *item,
 					      char *page)
 {
-	enum usb_device_speed speed = to_gadget_info(item)->composite.max_speed;
+	struct gadget_info *gi = to_gadget_info(item);
+	enum usb_device_speed speed = gi->composite.max_speed;
 
 	return sprintf(page, "%s\n", usb_speed_string(speed));
 }
