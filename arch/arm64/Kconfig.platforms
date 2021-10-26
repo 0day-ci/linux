@@ -100,6 +100,7 @@ config ARCH_EXYNOS
 	select PINCTRL_EXYNOS
 	select PM_GENERIC_DOMAINS if PM
 	select SOC_SAMSUNG
+	select CLKSRC_EXYNOS_MCT
 	help
 	  This enables support for ARMv8 based Samsung Exynos SoC family.
 
