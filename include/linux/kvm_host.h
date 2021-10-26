@@ -1243,12 +1243,12 @@ search_memslots(struct kvm_memslots *slots, gfn_t gfn, int *index)
 		return NULL;
 
 	while (start < end) {
-		int slot = start + (end - start) / 2;
+		int new_slot = start + (end - start) / 2;
 
-		if (gfn >= memslots[slot].base_gfn)
-			end = slot;
+		if (gfn >= memslots[new_slot].base_gfn)
+			end = new_slot;
 		else
-			start = slot + 1;
+			start = new_slot + 1;
 	}
 
 	slot = try_get_memslot(slots, start, gfn);
