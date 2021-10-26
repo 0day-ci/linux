@@ -3083,8 +3083,15 @@ void mark_page_dirty_in_slot(struct kvm *kvm,
 		if (kvm->dirty_ring_size)
 			kvm_dirty_ring_push(kvm_dirty_ring_get(kvm),
 					    slot, rel_gfn);
-		else
+		else {
+			struct kvm_vcpu *vcpu = kvm_get_running_vcpu();
+
+			if (vcpu && vcpu->kvm->dirty_quota_migration_enabled &&
+					vcpu->vCPUdqctx)
+				vcpu->vCPUdqctx->dirty_counter++;
+
 			set_bit_le(rel_gfn, memslot->dirty_bitmap);
+		}
 	}
 }
 EXPORT_SYMBOL_GPL(mark_page_dirty_in_slot);
