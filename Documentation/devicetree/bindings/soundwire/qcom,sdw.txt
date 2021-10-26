@@ -150,6 +150,15 @@ board specific bus parameters.
 		    or applicable for the respective data port.
 		    More info in MIPI Alliance SoundWire 1.0 Specifications.
 
+- qcom,swrm-hctl-reg:
+	Usage: optional
+	Value type: <prop-encoded-array>
+	Definition: The base address of SoundWire RX and TX cgcr register
+		    address space.
+		    This is to update soundwire master rxtx cgcr register field to
+		    make clock gating control as software controllable for RX path and
+		    TX path which is required for SoundWire version 1.6.0 and above.
+
 Note:
 	More Information on detail of encoding of these fields can be
 found in MIPI Alliance SoundWire 1.0 Specifications.
