@@ -443,6 +443,8 @@ static int ohci_hcd_pxa27x_probe(struct platform_device *pdev)
 		pr_err("no resource of IORESOURCE_IRQ");
 		return irq;
 	}
+	if (!irq)
+		return -EINVAL;
 
 	usb_clk = devm_clk_get(&pdev->dev, NULL);
 	if (IS_ERR(usb_clk))
