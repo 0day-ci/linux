@@ -291,6 +291,13 @@ config GTP
 	  To compile this drivers as a module, choose M here: the module
 	  will be called gtp.
 
+config AMT
+	tristate "Automatic Multicast Tunneling (AMT)"
+	depends on INET && IP_MULTICAST
+	select NET_UDP_TUNNEL
+	help
+	   AMT is an tunneling standard for Multicast.
+
 config MACSEC
 	tristate "IEEE 802.1AE MAC-level encryption (MACsec)"
 	select CRYPTO
