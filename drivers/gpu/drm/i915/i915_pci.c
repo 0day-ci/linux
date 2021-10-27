@@ -992,6 +992,7 @@ static const struct intel_device_info adl_p_info = {
 	.dma_mask_size = 46, \
 	.has_64bit_reloc = 1, \
 	.has_flat_ccs = 1, \
+	.has_4tile = 1, \
 	.has_global_mocs = 1, \
 	.has_gt_uc = 1, \
 	.has_llc = 1, \
