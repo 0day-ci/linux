@@ -187,6 +187,24 @@ struct spi_nor_locking_ops {
 	int (*is_locked)(struct spi_nor *nor, loff_t ofs, uint64_t len);
 };
 
+struct spi_nor_sec_ops {
+	int (*secure_read)(struct spi_nor *nor, size_t len, u8 *buf);
+	int (*secure_write)(struct spi_nor *nor, size_t len, u8 *buf);
+	int (*read_nvlock_bits)(struct spi_nor *nor, u32 addr, size_t len,
+				u8 *buf);
+	int (*read_vlock_bits)(struct spi_nor *nor, u32 addr, size_t len,
+			       u8 *buf);
+	int (*read_global_freeze_bits)(struct spi_nor *nor, size_t len,
+				       u8 *buf);
+	int (*read_password)(struct spi_nor *nor, size_t len, u8 *buf);
+	int (*write_global_freeze_bits)(struct spi_nor *nor, size_t len,
+					u8 *buf);
+	int (*write_vlock_bits)(struct spi_nor *nor, u32 addr, size_t len,
+				u8 *buf);
+	int (*write_nvlock_bits)(struct spi_nor *nor, u32 addr);
+	int (*erase_nvlock_bits)(struct spi_nor *nor);
+};
+
 /**
  * struct spi_nor_otp_organization - Structure to describe the SPI NOR OTP regions
  * @len:	size of one OTP region in bytes.
@@ -285,6 +303,8 @@ struct spi_nor_flash_parameter {
 	int (*setup)(struct spi_nor *nor, const struct spi_nor_hwcaps *hwcaps);
 
 	const struct spi_nor_locking_ops *locking_ops;
+
+	const struct spi_nor_sec_ops *sec_ops;
 };
 
 /**

@@ -16,6 +16,23 @@
 #define SPINOR_MT_OCT_DTR	0xe7	/* Enable Octal DTR. */
 #define SPINOR_MT_EXSPI		0xff	/* Enable Extended SPI (default) */
 
+#define AUTHENTA_ID		0x8c
+#define AUTHENTA_ID_BYTE	0x05
+
+#define SPINOR_OP_SECURE_READ			0x96
+#define SPINOR_OP_SECURE_WRITE			0x9b
+
+#define SPINOR_OP_RD_VOL_LOCK_BITS		0xe8
+#define SPINOR_OP_WR_VOL_LOCK_BITS		0xe5
+#define SPINOR_OP_RD_NV_LOCK_BITS		0xe2
+#define SPINOR_OP_WR_NV_LOCK_BITS		0xe3
+#define SPINOR_OP_ER_NV_LOCK_BITS		0xe4
+
+#define SPINOR_OP_RD_GLOBAL_FREEZE_BITS		0xa7
+#define SPINOR_OP_WR_GLOBAL_FREEZE_BITS		0xa6
+
+#define SPINOR_OP_RD_PASSWORD			0x27
+
 static int spi_nor_micron_octal_dtr_enable(struct spi_nor *nor, bool enable)
 {
 	struct spi_mem_op op;
@@ -247,12 +264,233 @@ static int st_micron_set_4byte_addr_mode(struct spi_nor *nor, bool enable)
 	return spi_nor_write_disable(nor);
 }
 
+/**
+ * authenta_secure_read() - read the secure packet from authenta SPI NOR
+ *
+ * @nor: pointer to 'struct spi_nor'
+ * @len: number of bytes to read
+ * @buf: pointer to dst buffer
+ *
+ * Return: 0 in case of success, a negative error code otherwise.
+ */
+static int authenta_secure_read(struct spi_nor *nor, size_t len, u8 *buf)
+{
+	struct spi_mem_op op =
+		SPI_MEM_OP(SPI_MEM_OP_CMD(SPINOR_OP_SECURE_READ, 1),
+			   SPI_MEM_OP_NO_ADDR,
+			   SPI_MEM_OP_DUMMY(1, 1),
+			   SPI_MEM_OP_DATA_IN(len, buf, 1));
+
+	return spi_mem_exec_op(nor->spimem, &op);
+}
+
+/**
+ * authenta_secure_write() - write the secure packet to authenta SPI NOR
+ *
+ * @nor: pointer to 'struct spi_nor'
+ * @len: number of bytes to be written
+ * @buf: pointer to dst buffer
+ *
+ * Return: 0 in case of success, a negative error code otherwise.
+ */
+static int authenta_secure_write(struct spi_nor *nor, size_t len, u8 *buf)
+{
+	struct spi_mem_op op =
+		SPI_MEM_OP(SPI_MEM_OP_CMD(SPINOR_OP_SECURE_WRITE, 1),
+			   SPI_MEM_OP_NO_ADDR,
+			   SPI_MEM_OP_NO_DUMMY,
+			   SPI_MEM_OP_DATA_OUT(len, buf, 1));
+
+	return spi_mem_exec_op(nor->spimem, &op);
+}
+
+/**
+ * authenta_read_vlock_bits() - read the volatile lock bits
+ *
+ * @nor: pointer to 'struct spi_nor'
+ * @addr: address for volatile lock bits
+ * @len: number of bytes to read
+ * @buf: pointer to dst buffer
+ *
+ * Return: 0 in case of success, a negative error code otherwise.
+ */
+static int authenta_read_vlock_bits(struct spi_nor *nor, u32 addr,
+				    size_t len, u8 *buf)
+{
+	struct spi_mem_op op =
+		SPI_MEM_OP(SPI_MEM_OP_CMD(SPINOR_OP_RD_VOL_LOCK_BITS, 1),
+			   SPI_MEM_OP_ADDR(nor->addr_width, addr, 1),
+			   SPI_MEM_OP_NO_DUMMY,
+			   SPI_MEM_OP_DATA_IN(len, buf, 1));
+
+	return spi_mem_exec_op(nor->spimem, &op);
+}
+
+/**
+ * authenta_write_vlock_bits() - write data to the volatile lock bits
+ *
+ * @nor: pointer to 'struct spi_nor'
+ * @addr: address for volatile lock bits
+ * @len: number of bytes to be written
+ * @buf: pointer to dst buffer
+ *
+ * Return: 0 in case of success, a negative error code otherwise.
+ */
+static int authenta_write_vlock_bits(struct spi_nor *nor, u32 addr, size_t len,
+				     u8 *buf)
+{
+	struct spi_mem_op op =
+		SPI_MEM_OP(SPI_MEM_OP_CMD(SPINOR_OP_WR_VOL_LOCK_BITS, 1),
+			   SPI_MEM_OP_ADDR(nor->addr_width, addr, 1),
+			   SPI_MEM_OP_NO_DUMMY,
+			   SPI_MEM_OP_DATA_OUT(len, buf, 1));
+
+	return spi_mem_exec_op(nor->spimem, &op);
+}
+
+/**
+ * authenta_read_nvlock_bits() - read the non-volatile lock bits
+ *
+ * @nor: pointer to 'struct spi_nor'
+ * @addr: address for non-volatile lock bits
+ * @len: number of bytes to be written
+ * @buf: pointer to dst buffer
+ *
+ * Return: 0 in case of success, a negative error code otherwise.
+ */
+static int authenta_read_nvlock_bits(struct spi_nor *nor, u32 addr,
+				     size_t len, u8 *buf)
+{
+	struct spi_mem_op op =
+		SPI_MEM_OP(SPI_MEM_OP_CMD(SPINOR_OP_RD_NV_LOCK_BITS, 1),
+			   SPI_MEM_OP_ADDR(nor->addr_width, addr, 1),
+			   SPI_MEM_OP_NO_DUMMY,
+			   SPI_MEM_OP_DATA_IN(len, buf, 1));
+
+	return spi_mem_exec_op(nor->spimem, &op);
+}
+
+/**
+ * authenta_write_nvlock_bits() - write to the non-volatile lock bits
+ *
+ * @nor: pointer to 'struct spi_nor'
+ * @addr: address for non-volatile lock bits
+ *
+ * Return: 0 in case of success, a negative error code otherwise.
+ */
+static int authenta_write_nvlock_bits(struct spi_nor *nor, u32 addr)
+{
+	struct spi_mem_op op =
+		SPI_MEM_OP(SPI_MEM_OP_CMD(SPINOR_OP_WR_NV_LOCK_BITS, 1),
+			   SPI_MEM_OP_ADDR(nor->addr_width, addr, 1),
+			   SPI_MEM_OP_NO_DUMMY,
+			   SPI_MEM_OP_NO_DATA);
+
+	return spi_mem_exec_op(nor->spimem, &op);
+}
+
+/**
+ * authenta_erase_nvlock_bits() - erase the non-volatile lock bits
+ *
+ * @nor: pointer to 'struct spi_nor'
+ *
+ * Return: 0 in case of success, a negative error code otherwise.
+ */
+static int authenta_erase_nvlock_bits(struct spi_nor *nor)
+{
+	struct spi_mem_op op =
+		SPI_MEM_OP(SPI_MEM_OP_CMD(SPINOR_OP_ER_NV_LOCK_BITS, 1),
+			   SPI_MEM_OP_NO_ADDR,
+			   SPI_MEM_OP_NO_DUMMY,
+			   SPI_MEM_OP_NO_DATA);
+
+	return spi_mem_exec_op(nor->spimem, &op);
+}
+
+/**
+ * authenta_read_global_freeze_bits() - read the global freeze bits
+ *
+ * @nor: pointer to 'struct spi_nor'
+ * @len: number of bytes to read
+ * @buf: pointer to dst buffer
+ *
+ * Return: 0 in case of success, a negative error code otherwise.
+ */
+static int authenta_read_global_freeze_bits(struct spi_nor *nor, size_t len,
+					    u8 *buf)
+{
+	struct spi_mem_op op =
+		SPI_MEM_OP(SPI_MEM_OP_CMD(SPINOR_OP_RD_GLOBAL_FREEZE_BITS, 1),
+			   SPI_MEM_OP_NO_ADDR,
+			   SPI_MEM_OP_NO_DUMMY,
+			   SPI_MEM_OP_DATA_IN(len, buf, 1));
+
+	return spi_mem_exec_op(nor->spimem, &op);
+}
+
+/**
+ * authenta_write_global_freeze_bits() - write data to the global freeze bits
+ *
+ * @nor: pointer to 'struct spi_nor'
+ * @len: number of bytes to be written
+ * @buf: pointer to dst buffer
+ *
+ * Return: 0 in case of success, a negative error code otherwise.
+ */
+static int authenta_write_global_freeze_bits(struct spi_nor *nor, size_t len,
+					     u8 *buf)
+{
+	struct spi_mem_op op =
+		SPI_MEM_OP(SPI_MEM_OP_CMD(SPINOR_OP_WR_GLOBAL_FREEZE_BITS, 1),
+			   SPI_MEM_OP_NO_ADDR,
+			   SPI_MEM_OP_NO_DUMMY,
+			   SPI_MEM_OP_DATA_OUT(len, buf, 1));
+
+	return spi_mem_exec_op(nor->spimem, &op);
+}
+
+/**
+ * authenta_read_password() - read the password
+ *
+ * @nor: pointer to 'struct spi_nor'
+ * @len: number of bytes to read
+ * @buf: pointer to dst buffer
+ *
+ * Return: 0 in case of success, a negative error code otherwise.
+ */
+static int authenta_read_password(struct spi_nor *nor, size_t len, u8 *buf)
+{
+	struct spi_mem_op op =
+		SPI_MEM_OP(SPI_MEM_OP_CMD(SPINOR_OP_RD_PASSWORD, 1),
+			   SPI_MEM_OP_NO_ADDR,
+			   SPI_MEM_OP_NO_DUMMY,
+			   SPI_MEM_OP_DATA_IN(len, buf, 1));
+
+	return spi_mem_exec_op(nor->spimem, &op);
+}
+
+static const struct spi_nor_sec_ops authenta_ops = {
+	.secure_read = authenta_secure_read,
+	.secure_write = authenta_secure_write,
+	.read_vlock_bits = authenta_read_vlock_bits,
+	.write_vlock_bits = authenta_write_vlock_bits,
+	.read_nvlock_bits = authenta_read_nvlock_bits,
+	.write_nvlock_bits = authenta_write_nvlock_bits,
+	.erase_nvlock_bits = authenta_erase_nvlock_bits,
+	.read_global_freeze_bits = authenta_read_global_freeze_bits,
+	.write_global_freeze_bits = authenta_write_global_freeze_bits,
+	.read_password = authenta_read_password,
+};
+
 static void micron_st_default_init(struct spi_nor *nor)
 {
 	nor->flags |= SNOR_F_HAS_LOCK;
 	nor->flags &= ~SNOR_F_HAS_16BIT_SR;
 	nor->params->quad_enable = NULL;
 	nor->params->set_4byte_addr_mode = st_micron_set_4byte_addr_mode;
+
+	if (nor->info->id[AUTHENTA_ID_BYTE] == AUTHENTA_ID)
+		nor->params->sec_ops = &authenta_ops;
 }
 
 static const struct spi_nor_fixups micron_st_fixups = {
