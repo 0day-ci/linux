@@ -1298,7 +1298,6 @@ eb_relocate_entry(struct i915_execbuffer *eb,
 {
 	struct drm_i915_private *i915 = eb->i915;
 	struct eb_vma *target;
-	int err;
 
 	/* we've already hold a reference to all valid objects */
 	target = eb_get_vma(eb, reloc->target_handle);
@@ -1328,24 +1327,8 @@ eb_relocate_entry(struct i915_execbuffer *eb,
 		return -EINVAL;
 	}
 
-	if (reloc->write_domain) {
+	if (reloc->write_domain)
 		target->flags |= EXEC_OBJECT_WRITE;
-
-		/*
-		 * Sandybridge PPGTT errata: We need a global gtt mapping
-		 * for MI and pipe_control writes because the gpu doesn't
-		 * properly redirect them through the ppgtt for non_secure
-		 * batchbuffers.
-		 */
-		if (reloc->write_domain == I915_GEM_DOMAIN_INSTRUCTION &&
-		    GRAPHICS_VER(eb->i915) == 6) {
-			err = i915_vma_bind(target->vma,
-					    target->vma->obj->cache_level,
-					    PIN_GLOBAL, NULL);
-			if (err)
-				return err;
-		}
-	}
 
 	/*
 	 * If the relocation already has the right value in it, no
