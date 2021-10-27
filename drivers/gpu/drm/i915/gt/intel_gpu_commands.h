@@ -203,6 +203,20 @@
 #define GFX_OP_DRAWRECT_INFO     ((0x3<<29)|(0x1d<<24)|(0x80<<16)|(0x3))
 #define GFX_OP_DRAWRECT_INFO_I965  ((0x7900<<16)|0x2)
 
+#define XY_CTRL_SURF_INSTR_SIZE	5
+#define MI_FLUSH_DW_SIZE		3
+#define XY_CTRL_SURF_COPY_BLT		((2 << 29) | (0x48 << 22) | 3)
+#define   SRC_ACCESS_TYPE_SHIFT	21
+#define   DST_ACCESS_TYPE_SHIFT	20
+#define   CCS_SIZE_SHIFT		8
+#define   XY_CTRL_SURF_MOCS_SHIFT	25
+#define   NUM_CCS_BYTES_PER_BLOCK	256
+#define   NUM_CCS_BLKS_PER_XFER	1024
+#define   INDIRECT_ACCESS		0
+#define   DIRECT_ACCESS		1
+#define  MI_FLUSH_LLC			BIT(9)
+#define  MI_FLUSH_CCS			BIT(16)
+
 #define COLOR_BLT_CMD			(2 << 29 | 0x40 << 22 | (5 - 2))
 #define XY_COLOR_BLT_CMD		(2 << 29 | 0x50 << 22)
 #define SRC_COPY_BLT_CMD		(2 << 29 | 0x43 << 22)
