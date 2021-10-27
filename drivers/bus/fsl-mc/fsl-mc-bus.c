@@ -146,7 +146,7 @@ static int fsl_mc_dma_configure(struct device *dev)
 		dma_dev = dma_dev->parent;
 
 	if (dev_of_node(dma_dev))
-		return of_dma_configure_id(dev, dma_dev->of_node, 0, &input_id);
+		return of_dma_configure_id(dev, dma_dev->of_node, 1, &input_id);
 
 	return acpi_dma_configure_id(dev, DEV_DMA_COHERENT, &input_id);
 }
