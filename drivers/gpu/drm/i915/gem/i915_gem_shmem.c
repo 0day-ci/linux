@@ -25,8 +25,8 @@ static void check_release_pagevec(struct pagevec *pvec)
 	cond_resched();
 }
 
-void shmem_free_st(struct sg_table *st, struct address_space *mapping,
-		   bool dirty, bool backup)
+void shmem_free_st_table(struct sg_table *st, struct address_space *mapping,
+			 bool dirty, bool backup)
 {
 	struct sgt_iter sgt_iter;
 	struct pagevec pvec;
@@ -49,7 +49,6 @@ void shmem_free_st(struct sg_table *st, struct address_space *mapping,
 		check_release_pagevec(&pvec);
 
 	sg_free_table(st);
-	kfree(st);
 }
 
 struct sg_table *shmem_alloc_st(struct drm_i915_private *i915,
@@ -171,7 +170,8 @@ struct sg_table *shmem_alloc_st(struct drm_i915_private *i915,
 err_sg:
 	sg_mark_end(sg);
 	if (sg != st->sgl) {
-		shmem_free_st(st, mapping, false, false);
+		shmem_free_st_table(st, mapping, false, false);
+		kfree(st);
 	} else {
 		mapping_clear_unevictable(mapping);
 		sg_free_table(st);
@@ -254,7 +254,8 @@ rebuild_st:
 	return 0;
 
 err_pages:
-	shmem_free_st(st, mapping, false, false);
+	shmem_free_st_table(st, mapping, false, false);
+	kfree(st);
 	/*
 	 * shmemfs first checks if there is enough memory to allocate the page
 	 * and reports ENOSPC should there be insufficient, along with the usual
@@ -374,8 +375,9 @@ void i915_gem_object_put_pages_shmem(struct drm_i915_gem_object *obj, struct sg_
 	if (i915_gem_object_needs_bit17_swizzle(obj))
 		i915_gem_object_save_bit_17_swizzle(obj, pages);
 
-	shmem_free_st(pages, file_inode(obj->base.filp)->i_mapping,
-		      obj->mm.dirty, obj->mm.madv == I915_MADV_WILLNEED);
+	shmem_free_st_table(pages, file_inode(obj->base.filp)->i_mapping,
+			    obj->mm.dirty, obj->mm.madv == I915_MADV_WILLNEED);
+	kfree(pages);
 	obj->mm.dirty = false;
 }
 
