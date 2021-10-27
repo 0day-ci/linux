@@ -136,8 +136,6 @@ EXPORT_SYMBOL_GPL(usb_ep_enable);
  * gadget drivers must call usb_ep_enable() again before queueing
  * requests to the endpoint.
  *
- * This routine must be called in process context.
- *
  * returns zero, or a negative error code.
  */
 int usb_ep_disable(struct usb_ep *ep)
