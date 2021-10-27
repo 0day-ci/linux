@@ -126,6 +126,7 @@ void unregister_vlan_dev(struct net_device *dev, struct list_head *head)
 
 	/* Get rid of the vlan's reference to real_dev */
 	dev_put(real_dev);
+	vlan->real_dev = NULL;
 }
 
 int vlan_check_real_dev(struct net_device *real_dev,

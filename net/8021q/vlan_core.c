@@ -103,7 +103,7 @@ struct net_device *vlan_dev_real_dev(const struct net_device *dev)
 {
 	struct net_device *ret = vlan_dev_priv(dev)->real_dev;
 
-	while (is_vlan_dev(ret))
+	while (ret && is_vlan_dev(ret))
 		ret = vlan_dev_priv(ret)->real_dev;
 
 	return ret;
