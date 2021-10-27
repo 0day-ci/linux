@@ -4184,6 +4184,12 @@ int sdhci_setup_host(struct sdhci_host *host)
 		host->flags &= ~SDHCI_USE_ADMA;
 	}
 
+	if ((host->quirks & SDHCI_QUIRK_BROKEN_ADMA_ZEROLEN_DESC) &&
+		PAGE_SIZE >= 65536 && (host->flags & SDHCI_USE_ADMA)) {
+		DBG("Disabling ADMA as it don't support >= 64K PAGE_SIZE\n");
+		host->flags &= ~SDHCI_USE_ADMA;
+	}
+
 	if (sdhci_can_64bit_dma(host))
 		host->flags |= SDHCI_USE_64_BIT_DMA;
 
