@@ -73,6 +73,25 @@ DEFINE_DYNAMIC_DEBUG_CATEGORIES(debug, __drm_debug,
 				[7] = { DRM_DBG_CAT_LEASE },
 				[8] = { DRM_DBG_CAT_DP },
 				[9] = { DRM_DBG_CAT_DRMRES });
+
+#ifdef CONFIG_TRACING
+unsigned long __drm_trace;
+EXPORT_SYMBOL(__drm_trace);
+DEFINE_DYNAMIC_DEBUG_TRACE_CATEGORIES(trace, __drm_trace,
+				      DRM_DEBUG_DESC,
+				      [0] = { DRM_DBG_CAT_CORE },
+				      [1] = { DRM_DBG_CAT_DRIVER },
+				      [2] = { DRM_DBG_CAT_KMS },
+				      [3] = { DRM_DBG_CAT_PRIME },
+				      [4] = { DRM_DBG_CAT_ATOMIC },
+				      [5] = { DRM_DBG_CAT_VBL },
+				      [6] = { DRM_DBG_CAT_STATE },
+				      [7] = { DRM_DBG_CAT_LEASE },
+				      [8] = { DRM_DBG_CAT_DP },
+				      [9] = { DRM_DBG_CAT_DRMRES });
+
+struct trace_array *trace_arr;
+#endif
 #endif
 
 void __drm_puts_coredump(struct drm_printer *p, const char *str)
