@@ -254,11 +254,20 @@ struct dyndbg_bitdesc {
 
 struct dyndbg_bitmap_param {
 	unsigned long *bits;		/* ref to shared state */
+	const char *flags;
 	struct dyndbg_bitdesc map[];	/* indexed by bitpos */
 };
 
 #if defined(CONFIG_DYNAMIC_DEBUG) || \
 	(defined(CONFIG_DYNAMIC_DEBUG_CORE) && defined(DYNAMIC_DEBUG_MODULE))
+
+#define DEFINE_DYNAMIC_DEBUG_CATEGORIES_FLAGS(fsname, _var, _flags, desc, ...) \
+	MODULE_PARM_DESC(fsname, desc);					\
+	static struct dyndbg_bitmap_param ddcats_##_var =		\
+	{ .bits = &(_var), .flags = (_flags),				\
+	  .map = { __VA_ARGS__, { .match = NULL }}};			\
+	module_param_cb(fsname, &param_ops_dyndbg, &ddcats_##_var, 0644)
+
 /**
  * DEFINE_DYNAMIC_DEBUG_CATEGORIES() - bitmap control of categorized pr_debugs
  * @fsname: parameter basename under /sys
@@ -271,11 +280,11 @@ struct dyndbg_bitmap_param {
  * modules calling pr_debugs to control them in groups according to
  * those prefixes, and map them to bits 0-N of a sysfs control point.
  */
-#define DEFINE_DYNAMIC_DEBUG_CATEGORIES(fsname, _var, desc, ...)	\
-	MODULE_PARM_DESC(fsname, desc);					\
-	static struct dyndbg_bitmap_param ddcats_##_var =		\
-	{ .bits = &(_var), .map = { __VA_ARGS__, { .match = NULL }}};	\
-	module_param_cb(fsname, &param_ops_dyndbg, &ddcats_##_var, 0644)
+#define DEFINE_DYNAMIC_DEBUG_CATEGORIES(fsname, _var, desc, ...) \
+	DEFINE_DYNAMIC_DEBUG_CATEGORIES_FLAGS(fsname, _var, "p", desc, ##__VA_ARGS__)
+
+#define DEFINE_DYNAMIC_DEBUG_TRACE_CATEGORIES(fsname, _var, desc, ...) \
+	DEFINE_DYNAMIC_DEBUG_CATEGORIES_FLAGS(fsname, _var, "T", desc, ##__VA_ARGS__)
 
 extern const struct kernel_param_ops param_ops_dyndbg;
 
