@@ -39,10 +39,14 @@ int jffs2_fsync(struct file *filp, loff_t start, loff_t end, int datasync)
 	if (ret)
 		return ret;
 
-	inode_lock(inode);
-	/* Trigger GC to flush any pending writes for this inode */
+	/* Trigger GC to flush any pending writes for this inode
+	 *
+	 * We need to leave the inode unlocked to avoid a deadlock condition
+	 * because the function jffs2_garbage_collect_pass() can try to lock
+	 * the same inode if it is inside the erase block that GC is
+	 * processing.
+	 */
 	jffs2_flush_wbuf_gc(c, inode->i_ino);
-	inode_unlock(inode);
 
 	return 0;
 }
