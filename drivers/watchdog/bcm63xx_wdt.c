@@ -9,6 +9,7 @@
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
+#include <linux/bcm63xx_wdt.h>
 #include <linux/bitops.h>
 #include <linux/errno.h>
 #include <linux/fs.h>
@@ -27,10 +28,10 @@
 #include <linux/resource.h>
 #include <linux/platform_device.h>
 
-#include <bcm63xx_cpu.h>
+#ifdef BCM63XX
 #include <bcm63xx_io.h>
-#include <bcm63xx_regs.h>
 #include <bcm63xx_timer.h>
+#endif
 
 #define PFX KBUILD_MODNAME
 
@@ -53,26 +54,40 @@ module_param(nowayout, bool, 0);
 MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default="
 	__MODULE_STRING(WATCHDOG_NOWAYOUT) ")");
 
+static void bcm63xx_wdt_write_reg(u32 reg, u32 val)
+{
+	void __iomem *addr = bcm63xx_wdt_device.regs;
+
+	addr += reg;
+#ifdef BCM63XX
+	bcm_writel(val, addr);
+#else
+	writel(val, addr);
+#endif
+}
+
 /* HW functions */
 static void bcm63xx_wdt_hw_start(void)
 {
-	bcm_writel(0xfffffffe, bcm63xx_wdt_device.regs + WDT_DEFVAL_REG);
-	bcm_writel(WDT_START_1, bcm63xx_wdt_device.regs + WDT_CTL_REG);
-	bcm_writel(WDT_START_2, bcm63xx_wdt_device.regs + WDT_CTL_REG);
+	bcm63xx_wdt_write_reg(WDT_DEFVAL_REG, 0xfffffffe);
+	bcm63xx_wdt_write_reg(WDT_CTL_REG, WDT_START_1);
+	bcm63xx_wdt_write_reg(WDT_CTL_REG, WDT_START_2);
 }
 
 static void bcm63xx_wdt_hw_stop(void)
 {
-	bcm_writel(WDT_STOP_1, bcm63xx_wdt_device.regs + WDT_CTL_REG);
-	bcm_writel(WDT_STOP_2, bcm63xx_wdt_device.regs + WDT_CTL_REG);
+	bcm63xx_wdt_write_reg(WDT_CTL_REG, WDT_STOP_1);
+	bcm63xx_wdt_write_reg(WDT_CTL_REG, WDT_STOP_2);
 }
 
+#ifdef BCM63XX
 static void bcm63xx_wdt_isr(void *data)
 {
 	struct pt_regs *regs = get_irq_regs();
 
 	die(PFX " fire", regs);
 }
+#endif
 
 static void bcm63xx_timer_tick(struct timer_list *unused)
 {
@@ -253,11 +268,13 @@ static int bcm63xx_wdt_probe(struct platform_device *pdev)
 		return -ENXIO;
 	}
 
+#ifdef BCM63XX
 	ret = bcm63xx_timer_register(TIMER_WDT_ID, bcm63xx_wdt_isr, NULL);
 	if (ret < 0) {
 		dev_err(&pdev->dev, "failed to register wdt timer isr\n");
 		return ret;
 	}
+#endif
 
 	if (bcm63xx_wdt_settimeout(wdt_time)) {
 		bcm63xx_wdt_settimeout(WDT_DEFAULT_TIME);
@@ -278,7 +295,9 @@ static int bcm63xx_wdt_probe(struct platform_device *pdev)
 	return 0;
 
 unregister_timer:
+#ifdef BCM63XX
 	bcm63xx_timer_unregister(TIMER_WDT_ID);
+#endif
 	return ret;
 }
 
@@ -288,7 +307,9 @@ static int bcm63xx_wdt_remove(struct platform_device *pdev)
 		bcm63xx_wdt_pause();
 
 	misc_deregister(&bcm63xx_wdt_miscdev);
+#ifdef BCM63XX
 	bcm63xx_timer_unregister(TIMER_WDT_ID);
+#endif
 	return 0;
 }
 
