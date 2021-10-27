@@ -8156,9 +8156,6 @@ ice_indr_block_priv_lookup(struct ice_netdev_priv *np,
 {
 	struct ice_indr_block_priv *cb_priv;
 
-	/* All callback list access should be protected by RTNL. */
-	ASSERT_RTNL();
-
 	list_for_each_entry(cb_priv, &np->tc_indr_block_priv_list, list) {
 		if (!cb_priv->netdev)
 			return NULL;
