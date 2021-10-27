@@ -158,10 +158,17 @@ static const struct flash_info st_parts[] = {
 			      SECT_4K | SPI_NOR_QUAD_READ) },
 	{ "n25q064a",    INFO(0x20bb17, 0, 64 * 1024,  128,
 			      SECT_4K | SPI_NOR_QUAD_READ) },
+	{ "mt25qu128abb", INFO6(0x20bb18, 0x12008c, 64 * 1024,  256,
+				SECT_4K | USE_FSR | SPI_NOR_QUAD_READ |
+				SPI_NOR_HAS_LOCK | SPI_NOR_HAS_TB |
+				SPI_NOR_4BIT_BP | SPI_NOR_BP3_SR_BIT6) },
 	{ "n25q128a11",  INFO(0x20bb18, 0, 64 * 1024,  256,
 			      SECT_4K | USE_FSR | SPI_NOR_QUAD_READ |
 			      SPI_NOR_HAS_LOCK | SPI_NOR_HAS_TB |
 			      SPI_NOR_4BIT_BP | SPI_NOR_BP3_SR_BIT6) },
+	{ "mt25ql128abb", INFO6(0x20ba18, 0x12008c, 64 * 1024,  256,
+				SECT_4K | USE_FSR | SPI_NOR_HAS_LOCK |
+				SPI_NOR_QUAD_READ) },
 	{ "n25q128a13",  INFO(0x20ba18, 0, 64 * 1024,  256,
 			      SECT_4K | USE_FSR | SPI_NOR_QUAD_READ) },
 	{ "mt25ql256a",  INFO6(0x20ba19, 0x104400, 64 * 1024,  512,
