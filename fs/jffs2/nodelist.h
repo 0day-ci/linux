@@ -192,6 +192,7 @@ struct jffs2_inode_cache {
 #define INO_STATE_GC		4	/* GCing a 'pristine' node */
 #define INO_STATE_READING	5	/* In read_inode() */
 #define INO_STATE_CLEARING	6	/* In clear_inode() */
+#define INO_STATE_CREATING	7	/* Inode locked! GC can't touch */
 
 #define INO_FLAGS_XATTR_CHECKED	0x01	/* has no duplicate xattr_ref */
 #define INO_FLAGS_IS_DIR	0x02	/* is a directory */

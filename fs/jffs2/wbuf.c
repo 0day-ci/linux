@@ -518,7 +518,8 @@ static void jffs2_wbuf_recover(struct jffs2_sb_info *c)
 								      (void *)(buf?:c->wbuf) + (ref_offset(raw) - start));
 			} else if (unlikely(ic->state != INO_STATE_PRESENT &&
 					    ic->state != INO_STATE_CHECKEDABSENT &&
-					    ic->state != INO_STATE_GC)) {
+					    ic->state != INO_STATE_GC &&
+					    ic->state != INO_STATE_CREATING)) {
 				JFFS2_ERROR("Inode #%u is in strange state %d!\n", ic->ino, ic->state);
 				BUG();
 			}

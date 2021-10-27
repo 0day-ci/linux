@@ -1352,6 +1352,7 @@ int jffs2_do_read_inode(struct jffs2_sb_info *c, struct jffs2_inode_info *f,
 			goto retry_inocache;
 
 		case INO_STATE_READING:
+		case INO_STATE_CREATING:
 		case INO_STATE_PRESENT:
 			/* Eep. This should never happen. It can
 			happen if Linux calls read_inode() again

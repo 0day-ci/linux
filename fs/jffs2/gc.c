@@ -208,6 +208,8 @@ int jffs2_garbage_collect_pass(struct jffs2_sb_info *c)
 			spin_unlock(&c->inocache_lock);
 			BUG();
 
+			/* fall through */
+		case INO_STATE_CREATING:
 		case INO_STATE_READING:
 			/* We need to wait for it to finish, lest we move on
 			   and trigger the BUG() above while we haven't yet
@@ -394,6 +396,14 @@ int jffs2_garbage_collect_pass(struct jffs2_sb_info *c)
 		spin_unlock(&c->inocache_lock);
 		BUG();
 
+		/* fall through */
+	case INO_STATE_CREATING:
+		/* We can't process this inode while it is being created
+		 * to avoid a deadlock condition the inode is locked.
+		 * However, to finish the creation we need to unlock the
+		 * alloc_sem() and because we dropped the alloc_sem we must
+		 * return to start again from the beginning.
+		 */
 	case INO_STATE_READING:
 		/* Someone's currently trying to read it. We must wait for
 		   them to finish and then go through the full iget() route
