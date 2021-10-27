@@ -13,14 +13,7 @@
 #include <linux/pci-acpi.h>
 #include <linux/pci-ecam.h>
 
-/* Structure to hold entries from the MCFG table */
-struct mcfg_entry {
-	struct list_head	list;
-	phys_addr_t		addr;
-	u16			segment;
-	u8			bus_start;
-	u8			bus_end;
-};
+extern struct list_head pci_mmcfg_list;
 
 #ifdef CONFIG_PCI_QUIRKS
 struct mcfg_fixup {
@@ -214,16 +207,13 @@ static void pci_mcfg_apply_quirks(struct acpi_pci_root *root,
 #endif
 }
 
-/* List to save MCFG entries */
-static LIST_HEAD(pci_mcfg_list);
-
 int pci_mcfg_lookup(struct acpi_pci_root *root, struct resource *cfgres,
 		    const struct pci_ecam_ops **ecam_ops)
 {
 	const struct pci_ecam_ops *ops = &pci_generic_ecam_ops;
 	struct resource *bus_res = &root->secondary;
 	u16 seg = root->segment;
-	struct mcfg_entry *e;
+	struct pci_mmcfg_region *e;
 	struct resource res;
 
 	/* Use address from _CBA if present, otherwise lookup MCFG */
@@ -233,10 +223,10 @@ int pci_mcfg_lookup(struct acpi_pci_root *root, struct resource *cfgres,
 	/*
 	 * We expect the range in bus_res in the coverage of MCFG bus range.
 	 */
-	list_for_each_entry(e, &pci_mcfg_list, list) {
-		if (e->segment == seg && e->bus_start <= bus_res->start &&
-		    e->bus_end >= bus_res->end) {
-			root->mcfg_addr = e->addr;
+	list_for_each_entry(e, &pci_mmcfg_list, list) {
+		if (e->segment == seg && e->start_bus <= bus_res->start &&
+		    e->end_bus >= bus_res->end) {
+			root->mcfg_addr = e->address;
 		}
 
 	}
@@ -268,7 +258,7 @@ static __init int pci_mcfg_parse(struct acpi_table_header *header)
 {
 	struct acpi_table_mcfg *mcfg;
 	struct acpi_mcfg_allocation *mptr;
-	struct mcfg_entry *e, *arr;
+	struct pci_mmcfg_region *e, *arr;
 	int i, n;
 
 	if (header->length < sizeof(struct acpi_table_mcfg))
@@ -285,10 +275,13 @@ static __init int pci_mcfg_parse(struct acpi_table_header *header)
 
 	for (i = 0, e = arr; i < n; i++, mptr++, e++) {
 		e->segment = mptr->pci_segment;
-		e->addr =  mptr->address;
-		e->bus_start = mptr->start_bus_number;
-		e->bus_end = mptr->end_bus_number;
-		list_add(&e->list, &pci_mcfg_list);
+		e->address =  mptr->address;
+		e->start_bus = mptr->start_bus_number;
+		e->end_bus = mptr->end_bus_number;
+		e->res.start = e->address + PCI_MMCFG_BUS_OFFSET(e->start_bus);
+		e->res.end = e->address + PCI_MMCFG_BUS_OFFSET(e->end_bus + 1) - 1;
+		e->res.flags = IORESOURCE_MEM | IORESOURCE_BUSY;
+		list_add(&e->list, &pci_mmcfg_list);
 	}
 
 #ifdef CONFIG_PCI_QUIRKS
