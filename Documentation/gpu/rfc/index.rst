@@ -21,5 +21,8 @@ host such documentation:
     i915_gem_lmem.rst
 
 .. toctree::
+    i915_dg2.rst
+
+.. toctree::
 
     i915_scheduler.rst
