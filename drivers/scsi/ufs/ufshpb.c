@@ -547,8 +547,7 @@ static int ufshpb_execute_pre_req(struct ufshpb_lu *hpb, struct scsi_cmnd *cmd,
 				 read_id);
 	rq->cmd_len = scsi_command_size(rq->cmd);
 
-	if (blk_insert_cloned_request(q, req) != BLK_STS_OK)
-		return -EAGAIN;
+	blk_execute_rq_nowait(NULL, req, true, ufshpb_pre_req_compl_fn);
 
 	hpb->stats.pre_req_cnt++;
 
@@ -2313,19 +2312,19 @@ struct attribute_group ufs_sysfs_hpb_param_group = {
 static int ufshpb_pre_req_mempool_init(struct ufshpb_lu *hpb)
 {
 	struct ufshpb_req *pre_req = NULL, *t;
-	int qd = hpb->sdev_ufs_lu->queue_depth / 2;
 	int i;
 
 	INIT_LIST_HEAD(&hpb->lh_pre_req_free);
 
-	hpb->pre_req = kcalloc(qd, sizeof(struct ufshpb_req), GFP_KERNEL);
-	hpb->throttle_pre_req = qd;
+	hpb->pre_req = kcalloc(HPB_INFLIGHT_PRE_REQ, sizeof(struct ufshpb_req),
+			       GFP_KERNEL);
+	hpb->throttle_pre_req = HPB_INFLIGHT_PRE_REQ;
 	hpb->num_inflight_pre_req = 0;
 
 	if (!hpb->pre_req)
 		goto release_mem;
 
-	for (i = 0; i < qd; i++) {
+	for (i = 0; i < HPB_INFLIGHT_PRE_REQ; i++) {
 		pre_req = hpb->pre_req + i;
 		INIT_LIST_HEAD(&pre_req->list_req);
 		pre_req->req = NULL;
