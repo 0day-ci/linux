@@ -1,0 +1,50 @@
+# SPDX-License-Identifier: GPL-2.0-only OR BSD-2-Clause
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/watchdog/brcm,bcm63xx-wdt.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: BCM63xx watchdog
+
+allOf:
+  - $ref: "watchdog.yaml#"
+
+maintainers:
+  - Rafał Miłecki <rafal@milecki.pl>
+
+properties:
+  compatible:
+    enum:
+      - brcm,bcm3368-wdt
+      - brcm,bcm4908-wdt
+      - brcm,bcm6328-wdt
+      - brcm,bcm6338-wdt
+      - brcm,bcm6345-wdt
+      - brcm,bcm6348-wdt
+      - brcm,bcm6358-wdt
+      - brcm,bcm6362-wdt
+      - brcm,bcm6368-wdt
+      - brcm,bcm6838-wdt
+      - brcm,bcm6848-wdt
+      - brcm,bcm6858-wdt
+      - brcm,bcm60333-wdt
+      - brcm,bcm63138-wdt
+      - brcm,bcm63148-wdt
+      - brcm,bcm63268-wdt
+      - brcm,bcm63381-wdt
+      - brcm,bcm68360-wdt
+
+  reg:
+    maxItems: 1
+
+unevaluatedProperties: false
+
+required:
+  - reg
+
+examples:
+  - |
+    watchdog@ff800400 {
+      compatible = "brcm,bcm4908-wdt";
+      reg = <0xff800400 0x3c>;
+    };
