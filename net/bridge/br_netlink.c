@@ -126,8 +126,10 @@ static size_t br_get_link_af_size_filtered(const struct net_device *dev,
 		return vinfo_sz;
 
 	/* CFM status info must be added */
-	br_cfm_mep_count(br, &num_cfm_mep_infos);
-	br_cfm_peer_mep_count(br, &num_cfm_peer_mep_infos);
+	if (br_cfm_mep_count(br, &num_cfm_mep_infos) < 0)
+		num_cfm_mep_infos = 0;
+	if (br_cfm_peer_mep_count(br, &num_cfm_peer_mep_infos) < 0)
+		num_cfm_peer_mep_infos = 0;
 
 	vinfo_sz += nla_total_size(0);	/* IFLA_BRIDGE_CFM */
 	/* For each status struct the MEP instance (u32) is added */
