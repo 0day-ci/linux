@@ -19,6 +19,7 @@
 #include <linux/shmem_fs.h>
 #include <linux/uaccess.h>
 #include <linux/pkeys.h>
+#include <linux/sched/numa_balancing.h>
 
 #include <asm/elf.h>
 #include <asm/tlb.h>
@@ -27,14 +28,23 @@
 
 #define SEQ_PUT_DEC(str, val) \
 		seq_put_decimal_ull_width(m, str, (val) << (PAGE_SHIFT-10), 8)
+
+DECLARE_STATIC_KEY_FALSE(sched_numa_balancing);
+
 void task_mem(struct seq_file *m, struct mm_struct *mm)
 {
 	unsigned long text, lib, swap, anon, file, shmem;
 	unsigned long hiwater_vm, total_vm, hiwater_rss, total_rss;
+#ifdef CONFIG_NUMA_BALANCING
+	int numa_balancing;
+#endif
 
 	anon = get_mm_counter(mm, MM_ANONPAGES);
 	file = get_mm_counter(mm, MM_FILEPAGES);
 	shmem = get_mm_counter(mm, MM_SHMEMPAGES);
+#ifdef CONFIG_NUMA_BALANCING
+	numa_balancing = READ_ONCE(mm->numa_balancing);
+#endif
 
 	/*
 	 * Note: to minimize their overhead, mm maintains hiwater_vm and
@@ -75,6 +85,12 @@ void task_mem(struct seq_file *m, struct mm_struct *mm)
 		    " kB\nVmPTE:\t", mm_pgtables_bytes(mm) >> 10, 8);
 	SEQ_PUT_DEC(" kB\nVmSwap:\t", swap);
 	seq_puts(m, " kB\n");
+#ifdef CONFIG_NUMA_BALANCING
+	if (!static_branch_unlikely(&sched_numa_balancing))
+		numa_balancing = 0;
+
+	seq_printf(m, "NumaBalancing_enabled:\t%d\n", numa_balancing);
+#endif
 	hugetlb_report_usage(m, mm);
 }
 #undef SEQ_PUT_DEC

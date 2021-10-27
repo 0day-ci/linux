@@ -154,6 +154,8 @@ int fs_overflowgid = DEFAULT_FS_OVERFLOWGID;
 EXPORT_SYMBOL(fs_overflowuid);
 EXPORT_SYMBOL(fs_overflowgid);
 
+DECLARE_STATIC_KEY_FALSE(sched_numa_balancing);
+
 /*
  * Returns true if current's euid is same as p's uid or euid,
  * or has CAP_SYS_NICE to p's user_ns.
@@ -2081,6 +2083,28 @@ static int prctl_set_auxv(struct mm_struct *mm, unsigned long addr,
 	return 0;
 }
 
+#ifdef CONFIG_NUMA_BALANCING
+static int prctl_pid_numa_balancing_write(int numa_balancing)
+{
+	if (!static_branch_unlikely(&sched_numa_balancing))
+		return -EPERM;
+
+	if (numa_balancing != 0 && numa_balancing != 1)
+		return -EINVAL;
+
+	WRITE_ONCE(current->mm->numa_balancing, numa_balancing);
+	return 0;
+}
+
+static int prctl_pid_numa_balancing_read(void)
+{
+	if (!static_branch_unlikely(&sched_numa_balancing))
+		return 0;
+	else
+		return READ_ONCE(current->mm->numa_balancing);
+}
+#endif
+
 static int prctl_set_mm(int opt, unsigned long addr,
 			unsigned long arg4, unsigned long arg5)
 {
@@ -2525,6 +2549,21 @@ SYSCALL_DEFINE5(prctl, int, option, unsigned long, arg2, unsigned long, arg3,
 		error = set_syscall_user_dispatch(arg2, arg3, arg4,
 						  (char __user *) arg5);
 		break;
+#ifdef CONFIG_NUMA_BALANCING
+	case PR_NUMA_BALANCING:
+		switch (arg2) {
+		case PR_SET_NUMA_BALANCING:
+			error = prctl_pid_numa_balancing_write((int)arg3);
+			break;
+		case PR_GET_NUMA_BALANCING:
+			put_user(prctl_pid_numa_balancing_read(), (int __user *)arg3);
+			break;
+		default:
+			error = -EINVAL;
+			break;
+		}
+		break;
+#endif
 #ifdef CONFIG_SCHED_CORE
 	case PR_SCHED_CORE:
 		error = sched_core_share_pid(arg2, arg3, arg4, arg5);

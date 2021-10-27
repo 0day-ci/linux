@@ -2866,6 +2866,9 @@ static void task_tick_numa(struct rq *rq, struct task_struct *curr)
 	if ((curr->flags & (PF_EXITING | PF_KTHREAD)) || work->next != work)
 		return;
 
+	if (!READ_ONCE(curr->mm->numa_balancing))
+		return;
+
 	/*
 	 * Using runtime rather than walltime has the dual advantage that
 	 * we (mostly) drive the selection from busy threads and that the
