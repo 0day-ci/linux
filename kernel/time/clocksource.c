@@ -466,7 +466,7 @@ static void clocksource_watchdog(struct timer_list *unused)
 	 * to each other.
 	 */
 	next_cpu = cpumask_next(raw_smp_processor_id(), cpu_online_mask);
-	if (next_cpu >= nr_cpu_ids)
+	if (next_cpu < 0 || next_cpu >= nr_cpu_ids)
 		next_cpu = cpumask_first(cpu_online_mask);
 
 	/*
