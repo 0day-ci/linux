@@ -546,6 +546,10 @@ static void smc_switch_to_fallback(struct smc_sock *smc, int reason_code)
 {
 	smc->use_fallback = true;
 	smc->fallback_rsn = reason_code;
+
+	/* clcsock's sock uses back to clcsock->wq, see also smc_create() */
+	rcu_assign_pointer(smc->clcsock->sk->sk_wq, &smc->clcsock->wq);
+
 	smc_stat_fallback(smc);
 	if (smc->sk.sk_socket && smc->sk.sk_socket->file) {
 		smc->clcsock->file = smc->sk.sk_socket->file;
@@ -1972,6 +1976,10 @@ static int smc_accept(struct socket *sock, struct socket *new_sock,
 	if (rc)
 		goto out;
 
+	/* new smc sock uses clcsock's wq. see also smc_create() */
+	if (!smc_sk(nsk)->use_fallback)
+		rcu_assign_pointer(nsk->sk_wq, &smc_sk(nsk)->clcsock->wq);
+
 	if (lsmc->sockopt_defer_accept && !(flags & O_NONBLOCK)) {
 		/* wait till data arrives on the socket */
 		timeo = msecs_to_jiffies(lsmc->sockopt_defer_accept *
@@ -2108,6 +2116,9 @@ static __poll_t smc_poll(struct file *file, struct socket *sock,
 		mask = smc->clcsock->ops->poll(file, smc->clcsock, wait);
 		sk->sk_err = smc->clcsock->sk->sk_err;
 	} else {
+		/* use clcsock->wq in sock_poll_wait(), see also smc_create() */
+		sock = smc->clcsock;
+
 		if (sk->sk_state != SMC_CLOSED)
 			sock_poll_wait(file, sock, wait);
 		if (sk->sk_err)
@@ -2504,6 +2515,10 @@ static int smc_create(struct net *net, struct socket *sock, int protocol,
 	}
 	smc->sk.sk_sndbuf = max(smc->clcsock->sk->sk_sndbuf, SMC_BUF_MIN_SIZE);
 	smc->sk.sk_rcvbuf = max(smc->clcsock->sk->sk_rcvbuf, SMC_BUF_MIN_SIZE);
+
+	/* In case smc fallbacks to tcp, smc's sock will use clcsock's wq in advance */
+	rcu_assign_pointer(sk->sk_wq, &smc->clcsock->wq);
+	rcu_assign_pointer(smc->clcsock->sk->sk_wq, &smc->sk.sk_socket->wq);
 
 out:
 	return rc;
