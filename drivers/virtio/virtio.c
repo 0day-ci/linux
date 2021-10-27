@@ -442,6 +442,12 @@ bool is_virtio_device(struct device *dev)
 }
 EXPORT_SYMBOL_GPL(is_virtio_device);
 
+void virtio_use_desc_cache(struct virtio_device *dev, bool val)
+{
+	dev->desc_cache = val;
+}
+EXPORT_SYMBOL_GPL(virtio_use_desc_cache);
+
 void unregister_virtio_device(struct virtio_device *dev)
 {
 	int index = dev->index; /* save for after device release */

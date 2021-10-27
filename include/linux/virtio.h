@@ -109,6 +109,7 @@ struct virtio_device {
 	bool failed;
 	bool config_enabled;
 	bool config_change_pending;
+	bool desc_cache;
 	spinlock_t config_lock;
 	spinlock_t vqs_list_lock; /* Protects VQs list access */
 	struct device dev;
@@ -129,6 +130,15 @@ void virtio_add_status(struct virtio_device *dev, unsigned int status);
 int register_virtio_device(struct virtio_device *dev);
 void unregister_virtio_device(struct virtio_device *dev);
 bool is_virtio_device(struct device *dev);
+
+/**
+ * virtio_use_desc_cache - virtio ring use desc cache
+ *
+ * virtio will cache the allocated indirect desc.
+ *
+ * This function must be called before find_vqs.
+ */
+void virtio_use_desc_cache(struct virtio_device *dev, bool val);
 
 void virtio_break_device(struct virtio_device *dev);
 
