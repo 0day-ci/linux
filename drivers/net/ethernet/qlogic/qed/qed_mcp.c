@@ -485,10 +485,12 @@ _qed_mcp_cmd_and_union(struct qed_hwfn *p_hwfn,
 
 		spin_unlock_bh(&p_hwfn->mcp_info->cmd_lock);
 
-		if (QED_MB_FLAGS_IS_SET(p_mb_params, CAN_SLEEP))
+		if (QED_MB_FLAGS_IS_SET(p_mb_params, CAN_SLEEP)) {
 			msleep(msecs);
-		else
+		} else {
+			cond_resched();
 			udelay(usecs);
+		}
 	} while (++cnt < max_retries);
 
 	if (cnt >= max_retries) {
@@ -517,10 +519,12 @@ _qed_mcp_cmd_and_union(struct qed_hwfn *p_hwfn,
 		 * The spinlock stays locked until the list element is removed.
 		 */
 
-		if (QED_MB_FLAGS_IS_SET(p_mb_params, CAN_SLEEP))
+		if (QED_MB_FLAGS_IS_SET(p_mb_params, CAN_SLEEP)) {
 			msleep(msecs);
-		else
+		} else {
+			cond_resched();
 			udelay(usecs);
+		}
 
 		spin_lock_bh(&p_hwfn->mcp_info->cmd_lock);
 
