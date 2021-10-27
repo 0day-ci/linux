@@ -636,6 +636,23 @@ void nvdimm_check_and_set_ro(struct gendisk *disk)
 }
 EXPORT_SYMBOL(nvdimm_check_and_set_ro);
 
+int nd_set_ro(struct block_device *bdev, bool ro)
+{
+	struct gendisk *disk = bdev->bd_disk;
+	struct device *dev = disk_to_dev(disk)->parent;
+	int disk_ro = get_disk_ro(disk);
+
+	/* nothing to change with ro state */
+	if (disk_ro == ro)
+		return 0;
+
+	dev_info(dev, "set %s to read-%s\n",
+		 disk->disk_name, ro ? "only" : "write");
+	set_disk_ro(disk, ro);
+	return 0;
+}
+EXPORT_SYMBOL(nd_set_ro);
+
 static ssize_t modalias_show(struct device *dev, struct device_attribute *attr,
 		char *buf)
 {
