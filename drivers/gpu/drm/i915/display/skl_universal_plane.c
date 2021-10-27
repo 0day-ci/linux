@@ -823,8 +823,9 @@ static u32 icl_plane_ctl_flip(unsigned int reflect)
 static u32 adlp_plane_ctl_arb_slots(const struct intel_plane_state *plane_state)
 {
 	const struct drm_framebuffer *fb = plane_state->hw.fb;
+	struct drm_i915_private *i915 = to_i915(fb->dev);
 
-	if (intel_format_info_is_yuv_semiplanar(fb->format, fb->modifier)) {
+	if (intel_format_info_is_yuv_semiplanar(i915, fb->format, fb->modifier)) {
 		switch (fb->format->cpp[0]) {
 		case 2:
 			return PLANE_CTL_ARB_SLOTS(1);
@@ -1077,7 +1078,9 @@ skl_program_plane(struct intel_plane *plane,
 	intel_de_write_fw(dev_priv, PLANE_SIZE(pipe, plane_id),
 			  (src_h << 16) | src_w);
 
-	intel_de_write_fw(dev_priv, PLANE_AUX_DIST(pipe, plane_id), aux_dist);
+	/* FLAT CCS doesn't need to program AUX_DIST */
+	if (!HAS_FLAT_CCS(dev_priv))
+		intel_de_write_fw(dev_priv, PLANE_AUX_DIST(pipe, plane_id), aux_dist);
 
 	if (icl_is_hdr_plane(dev_priv, plane_id))
 		intel_de_write_fw(dev_priv, PLANE_CUS_CTL(pipe, plane_id),
@@ -1300,11 +1303,12 @@ static int skl_plane_check_dst_coordinates(const struct intel_crtc_state *crtc_s
 static int skl_plane_check_nv12_rotation(const struct intel_plane_state *plane_state)
 {
 	const struct drm_framebuffer *fb = plane_state->hw.fb;
+	struct drm_i915_private *i915 = to_i915(fb->dev);
 	unsigned int rotation = plane_state->hw.rotation;
 	int src_w = drm_rect_width(&plane_state->uapi.src) >> 16;
 
 	/* Display WA #1106 */
-	if (intel_format_info_is_yuv_semiplanar(fb->format, fb->modifier) &&
+	if (intel_format_info_is_yuv_semiplanar(i915, fb->format, fb->modifier) &&
 	    src_w & 3 &&
 	    (rotation == DRM_MODE_ROTATE_270 ||
 	     rotation == (DRM_MODE_REFLECT_X | DRM_MODE_ROTATE_90))) {
@@ -1325,7 +1329,7 @@ static int skl_plane_max_scale(struct drm_i915_private *dev_priv,
 	 * FIXME need to properly check this later.
 	 */
 	if (DISPLAY_VER(dev_priv) >= 10 ||
-	    !intel_format_info_is_yuv_semiplanar(fb->format, fb->modifier))
+	    !intel_format_info_is_yuv_semiplanar(dev_priv, fb->format, fb->modifier))
 		return 0x30000 - 1;
 	else
 		return 0x20000 - 1;
@@ -1493,8 +1497,9 @@ static int skl_check_main_surface(struct intel_plane_state *plane_state)
 	/*
 	 * CCS AUX surface doesn't have its own x/y offsets, we must make sure
 	 * they match with the main surface x/y offsets.
+	 * On DG2 with Flat-CCS, there's no aux plane on fb so skip this checking.
 	 */
-	if (intel_fb_is_ccs_modifier(fb->modifier)) {
+	if (intel_fb_is_ccs_modifier(fb->modifier) && !HAS_FLAT_CCS(dev_priv)) {
 		while (!skl_check_main_ccs_coordinates(plane_state, x, y,
 						       offset, aux_plane)) {
 			if (offset == 0)
@@ -1558,7 +1563,7 @@ static int skl_check_nv12_aux_surface(struct intel_plane_state *plane_state)
 	offset = intel_plane_compute_aligned_offset(&x, &y,
 						    plane_state, uv_plane);
 
-	if (intel_fb_is_ccs_modifier(fb->modifier)) {
+	if (intel_fb_is_ccs_modifier(fb->modifier) && !HAS_FLAT_CCS(i915)) {
 		int ccs_plane = main_to_ccs_plane(fb, uv_plane);
 		u32 aux_offset = plane_state->view.color_plane[ccs_plane].offset;
 		u32 alignment = intel_surf_alignment(fb, uv_plane);
@@ -1662,7 +1667,7 @@ static int skl_check_plane_surface(struct intel_plane_state *plane_state)
 			return ret;
 	}
 
-	if (intel_format_info_is_yuv_semiplanar(fb->format,
+	if (intel_format_info_is_yuv_semiplanar(to_i915(fb->dev), fb->format,
 						fb->modifier)) {
 		ret = skl_check_nv12_aux_surface(plane_state);
 		if (ret)
@@ -1765,7 +1770,7 @@ static int skl_plane_check(struct intel_crtc_state *crtc_state,
 		plane_state->color_ctl = glk_plane_color_ctl(crtc_state,
 							     plane_state);
 
-	if (intel_format_info_is_yuv_semiplanar(fb->format, fb->modifier) &&
+	if (intel_format_info_is_yuv_semiplanar(dev_priv, fb->format, fb->modifier) &&
 	    icl_is_hdr_plane(dev_priv, plane->id))
 		/* Enable and use MPEG-2 chroma siting */
 		plane_state->cus_ctl = PLANE_CUS_ENABLE |

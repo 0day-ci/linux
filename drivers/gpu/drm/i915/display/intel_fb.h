@@ -42,7 +42,8 @@ const struct drm_format_info *
 intel_fb_get_format_info(const struct drm_mode_fb_cmd2 *cmd);
 
 bool
-intel_format_info_is_yuv_semiplanar(const struct drm_format_info *info,
+intel_format_info_is_yuv_semiplanar(const struct drm_i915_private *i915,
+				    const struct drm_format_info *info,
 				    u64 modifier);
 
 bool is_surface_linear(const struct drm_framebuffer *fb, int color_plane);

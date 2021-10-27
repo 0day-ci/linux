@@ -4926,7 +4926,8 @@ skl_plane_relative_data_rate(const struct intel_crtc_state *crtc_state,
 		return 0;
 
 	if (color_plane == 1 &&
-	    !intel_format_info_is_yuv_semiplanar(fb->format, fb->modifier))
+	    !intel_format_info_is_yuv_semiplanar(to_i915(fb->dev), fb->format,
+						 fb->modifier))
 		return 0;
 
 	/*
@@ -5367,11 +5368,11 @@ skl_compute_wm_params(const struct intel_crtc_state *crtc_state,
 {
 	struct intel_crtc *crtc = to_intel_crtc(crtc_state->uapi.crtc);
 	struct drm_i915_private *dev_priv = to_i915(crtc->base.dev);
+	bool planar = intel_format_info_is_yuv_semiplanar(dev_priv, format, modifier);
 	u32 interm_pbpl;
 
 	/* only planar format has two planes */
-	if (color_plane == 1 &&
-	    !intel_format_info_is_yuv_semiplanar(format, modifier)) {
+	if (color_plane == 1 && !planar) {
 		drm_dbg_kms(&dev_priv->drm,
 			    "Non planar format have single plane\n");
 		return -EINVAL;
@@ -5385,7 +5386,7 @@ skl_compute_wm_params(const struct intel_crtc_state *crtc_state,
 	wp->x_tiled = modifier == I915_FORMAT_MOD_X_TILED;
 	wp->rc_surface = modifier == I915_FORMAT_MOD_Y_TILED_CCS ||
 			 modifier == I915_FORMAT_MOD_Yf_TILED_CCS;
-	wp->is_planar = intel_format_info_is_yuv_semiplanar(format, modifier);
+	wp->is_planar = planar;
 
 	wp->width = width;
 	if (color_plane == 1 && wp->is_planar)

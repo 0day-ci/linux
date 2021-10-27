@@ -148,7 +148,7 @@ skl_update_scaler(struct intel_crtc_state *crtc_state, bool force_detach,
 		return 0;
 	}
 
-	if (format && intel_format_info_is_yuv_semiplanar(format, modifier) &&
+	if (format && intel_format_info_is_yuv_semiplanar(dev_priv, format, modifier) &&
 	    (src_h < SKL_MIN_YUV_420_SRC_H || src_w < SKL_MIN_YUV_420_SRC_W)) {
 		drm_dbg_kms(&dev_priv->drm,
 			    "Planar YUV: src dimensions not met\n");
@@ -224,7 +224,7 @@ int skl_update_scaler_plane(struct intel_crtc_state *crtc_state,
 
 	/* Pre-gen11 and SDR planes always need a scaler for planar formats. */
 	if (!icl_is_hdr_plane(dev_priv, intel_plane->id) &&
-	    fb && intel_format_info_is_yuv_semiplanar(fb->format, fb->modifier))
+	    fb && intel_format_info_is_yuv_semiplanar(dev_priv, fb->format, fb->modifier))
 		need_scaler = true;
 
 	ret = skl_update_scaler(crtc_state, force_detach,
@@ -481,7 +481,7 @@ skl_program_plane_scaler(struct intel_plane *plane,
 				      0, INT_MAX);
 
 	/* TODO: handle sub-pixel coordinates */
-	if (intel_format_info_is_yuv_semiplanar(fb->format, fb->modifier) &&
+	if (intel_format_info_is_yuv_semiplanar(dev_priv, fb->format, fb->modifier) &&
 	    !icl_is_hdr_plane(dev_priv, plane->id)) {
 		y_hphase = skl_scaler_calc_phase(1, hscale, false);
 		y_vphase = skl_scaler_calc_phase(1, vscale, false);

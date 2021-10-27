@@ -427,7 +427,8 @@ bool intel_fb_plane_supports_modifier(struct intel_plane *plane, u64 modifier)
 	return false;
 }
 
-static bool format_is_yuv_semiplanar(const struct intel_modifier_desc *md,
+static bool format_is_yuv_semiplanar(const struct drm_i915_private *i915,
+				     const struct intel_modifier_desc *md,
 				     const struct drm_format_info *info)
 {
 	int yuv_planes;
@@ -435,7 +436,7 @@ static bool format_is_yuv_semiplanar(const struct intel_modifier_desc *md,
 	if (!info->is_yuv)
 		return false;
 
-	if (is_ccs_type_modifier(md, INTEL_CCS_ANY))
+	if (is_ccs_type_modifier(md, INTEL_CCS_ANY) && !!HAS_FLAT_CCS(i915))
 		yuv_planes = 4;
 	else
 		yuv_planes = 2;
@@ -451,16 +452,18 @@ static bool format_is_yuv_semiplanar(const struct intel_modifier_desc *md,
  * Returns:
  * %true if @info / @modifier is YUV semiplanar.
  */
-bool intel_format_info_is_yuv_semiplanar(const struct drm_format_info *info,
+bool intel_format_info_is_yuv_semiplanar(const struct drm_i915_private *i915,
+					 const struct drm_format_info *info,
 					 u64 modifier)
 {
-	return format_is_yuv_semiplanar(lookup_modifier(modifier), info);
+	return format_is_yuv_semiplanar(i915, lookup_modifier(modifier), info);
 }
 
-static u8 ccs_aux_plane_mask(const struct intel_modifier_desc *md,
+static u8 ccs_aux_plane_mask(const struct drm_i915_private *i915,
+			     const struct intel_modifier_desc *md,
 			     const struct drm_format_info *format)
 {
-	if (format_is_yuv_semiplanar(md, format))
+	if (format_is_yuv_semiplanar(i915, md, format))
 		return md->ccs.planar_aux_planes;
 	else
 		return md->ccs.packed_aux_planes;
@@ -478,7 +481,7 @@ bool intel_fb_is_ccs_aux_plane(const struct drm_framebuffer *fb, int color_plane
 {
 	const struct intel_modifier_desc *md = lookup_modifier(fb->modifier);
 
-	return ccs_aux_plane_mask(md, fb->format) & BIT(color_plane);
+	return ccs_aux_plane_mask(to_i915(fb->dev), md, fb->format) & BIT(color_plane);
 }
 
 /**
@@ -493,8 +496,11 @@ static bool intel_fb_is_gen12_ccs_aux_plane(const struct drm_framebuffer *fb, in
 {
 	const struct intel_modifier_desc *md = lookup_modifier(fb->modifier);
 
+	if (HAS_FLAT_CCS(to_i915(fb->dev)))
+		return false;
+
 	return check_modifier_display_ver_range(md, 12, 13) &&
-	       ccs_aux_plane_mask(md, fb->format) & BIT(color_plane);
+	       ccs_aux_plane_mask(to_i915(fb->dev), md, fb->format) & BIT(color_plane);
 }
 
 /**
@@ -524,8 +530,8 @@ static bool is_gen12_ccs_cc_plane(const struct drm_framebuffer *fb, int color_pl
 
 static bool is_semiplanar_uv_plane(const struct drm_framebuffer *fb, int color_plane)
 {
-	return intel_format_info_is_yuv_semiplanar(fb->format, fb->modifier) &&
-		color_plane == 1;
+	return intel_format_info_is_yuv_semiplanar(to_i915(fb->dev), fb->format,
+						   fb->modifier) && color_plane == 1;
 }
 
 bool is_surface_linear(const struct drm_framebuffer *fb, int color_plane)
@@ -590,10 +596,10 @@ int skl_main_to_aux_plane(const struct drm_framebuffer *fb, int main_plane)
 {
 	struct drm_i915_private *i915 = to_i915(fb->dev);
 
-	if (intel_fb_is_ccs_modifier(fb->modifier))
+	if (intel_fb_is_ccs_modifier(fb->modifier) && !HAS_FLAT_CCS(i915))
 		return main_to_ccs_plane(fb, main_plane);
 	else if (DISPLAY_VER(i915) < 11 &&
-		 intel_format_info_is_yuv_semiplanar(fb->format, fb->modifier))
+		 intel_format_info_is_yuv_semiplanar(i915, fb->format, fb->modifier))
 		return 1;
 	else
 		return 0;
