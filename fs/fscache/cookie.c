@@ -150,6 +150,11 @@ struct fscache_cookie *fscache_alloc_cookie(
 	if (!cookie)
 		return NULL;
 
+	/* move list_add_tail before any error handling code */
+	write_lock(&fscache_cookies_lock);
+	list_add_tail(&cookie->proc_link, &fscache_cookies);
+	write_unlock(&fscache_cookies_lock);
+
 	cookie->key_len = index_key_len;
 	cookie->aux_len = aux_data_len;
 
@@ -186,9 +191,6 @@ struct fscache_cookie *fscache_alloc_cookie(
 	 * told it may not wait */
 	INIT_RADIX_TREE(&cookie->stores, GFP_NOFS & ~__GFP_DIRECT_RECLAIM);
 
-	write_lock(&fscache_cookies_lock);
-	list_add_tail(&cookie->proc_link, &fscache_cookies);
-	write_unlock(&fscache_cookies_lock);
 	return cookie;
 
 nomem:
