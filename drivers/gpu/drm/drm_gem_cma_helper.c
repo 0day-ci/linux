@@ -22,6 +22,8 @@
 #include <drm/drm_gem_cma_helper.h>
 #include <drm/drm_vma_manager.h>
 
+MODULE_IMPORT_NS(DMA_BUF);
+
 /**
  * DOC: cma helpers
  *
