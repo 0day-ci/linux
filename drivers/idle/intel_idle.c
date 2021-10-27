@@ -1677,14 +1677,46 @@ static int intel_idle_cpu_online(unsigned int cpu)
 }
 
 /**
- * intel_idle_cpuidle_devices_uninit - Unregister all cpuidle devices.
+ * intel_idle_cpuidle_unregister - unregister from cpuidle framework
  */
-static void __init intel_idle_cpuidle_devices_uninit(void)
+static void __init intel_idle_cpuidle_unregister(struct cpuidle_driver *drv)
 {
 	int i;
 
 	for_each_online_cpu(i)
 		cpuidle_unregister_device(per_cpu_ptr(intel_idle_cpuidle_devices, i));
+	cpuidle_unregister_driver(drv);
+	free_percpu(intel_idle_cpuidle_devices);
+}
+
+/**
+ * intel_idle_cpuidle_register - register to cpuidle framework
+ */
+static int __init intel_idle_cpuidle_register(struct cpuidle_driver *drv)
+{
+	int retval;
+
+	intel_idle_cpuidle_devices = alloc_percpu(struct cpuidle_device);
+	if (!intel_idle_cpuidle_devices)
+		return -ENOMEM;
+
+	retval = cpuidle_register_driver(drv);
+	if (retval) {
+		struct cpuidle_driver *drv = cpuidle_get_driver();
+
+		printk(KERN_DEBUG pr_fmt("intel_idle yielding to %s\n"),
+			drv ? drv->name : "none");
+		free_percpu(intel_idle_cpuidle_devices);
+		return retval;
+	}
+
+	retval = cpuhp_setup_state(CPUHP_AP_ONLINE_DYN, "idle/intel:online",
+				intel_idle_cpu_online, NULL);
+	if (retval < 0) {
+		intel_idle_cpuidle_unregister(drv);
+		return retval;
+	}
+	return 0;
 }
 
 static int __init intel_idle_init(void)
@@ -1740,37 +1772,14 @@ static int __init intel_idle_init(void)
 	pr_debug("v" INTEL_IDLE_VERSION " model 0x%X\n",
 		 boot_cpu_data.x86_model);
 
-	intel_idle_cpuidle_devices = alloc_percpu(struct cpuidle_device);
-	if (!intel_idle_cpuidle_devices)
-		return -ENOMEM;
-
 	intel_idle_cpuidle_driver_init(&intel_idle_driver);
 
-	retval = cpuidle_register_driver(&intel_idle_driver);
-	if (retval) {
-		struct cpuidle_driver *drv = cpuidle_get_driver();
-		printk(KERN_DEBUG pr_fmt("intel_idle yielding to %s\n"),
-		       drv ? drv->name : "none");
-		goto init_driver_fail;
-	}
+	retval = intel_idle_cpuidle_register(&intel_idle_driver);
+	if (!retval)
+		pr_debug("Local APIC timer is reliable in %s\n",
+			boot_cpu_has(X86_FEATURE_ARAT) ? "all C-states" : "C1");
 
-	retval = cpuhp_setup_state(CPUHP_AP_ONLINE_DYN, "idle/intel:online",
-				   intel_idle_cpu_online, NULL);
-	if (retval < 0)
-		goto hp_setup_fail;
-
-	pr_debug("Local APIC timer is reliable in %s\n",
-		 boot_cpu_has(X86_FEATURE_ARAT) ? "all C-states" : "C1");
-
-	return 0;
-
-hp_setup_fail:
-	intel_idle_cpuidle_devices_uninit();
-	cpuidle_unregister_driver(&intel_idle_driver);
-init_driver_fail:
-	free_percpu(intel_idle_cpuidle_devices);
 	return retval;
-
 }
 device_initcall(intel_idle_init);
 
