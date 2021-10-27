@@ -212,6 +212,7 @@ static inline struct cpuset *parent_cs(struct cpuset *cs)
 typedef enum {
 	CS_ONLINE,
 	CS_CPU_EXCLUSIVE,
+	CS_CPU_ISOLATED,
 	CS_MEM_EXCLUSIVE,
 	CS_MEM_HARDWALL,
 	CS_MEMORY_MIGRATE,
@@ -229,6 +230,11 @@ static inline bool is_cpuset_online(struct cpuset *cs)
 static inline int is_cpu_exclusive(const struct cpuset *cs)
 {
 	return test_bit(CS_CPU_EXCLUSIVE, &cs->flags);
+}
+
+static inline int is_cpu_isolated(const struct cpuset *cs)
+{
+	return test_bit(CS_CPU_ISOLATED, &cs->flags);
 }
 
 static inline int is_mem_exclusive(const struct cpuset *cs)
@@ -1909,6 +1915,23 @@ static int update_relax_domain_level(struct cpuset *cs, s64 val)
 }
 
 /**
+ * update_isol_state - update isolated state for allowed cores
+ * @cs: the cpuset in which each core might need to be changed
+ *
+ */
+static void update_isol_state(struct cpuset *cs)
+{
+	struct cpumask *mask = cs->cpus_allowed;
+	int cpu, isolate = is_cpu_isolated(cs);
+
+	for_each_cpu(cpu, mask)
+		if (isolate)
+			isolate_cpu(cpu);
+		else
+			deisolate_cpu(cpu);
+}
+
+/**
  * update_tasks_flags - update the spread flags of tasks in the cpuset.
  * @cs: the cpuset in which each task's spread flags needs to be changed
  *
@@ -1942,6 +1965,7 @@ static int update_flag(cpuset_flagbits_t bit, struct cpuset *cs,
 	struct cpuset *trialcs;
 	int balance_flag_changed;
 	int spread_flag_changed;
+	int isol_flag_changed;
 	int err;
 
 	trialcs = alloc_trial_cpuset(cs);
@@ -1963,6 +1987,8 @@ static int update_flag(cpuset_flagbits_t bit, struct cpuset *cs,
 	spread_flag_changed = ((is_spread_slab(cs) != is_spread_slab(trialcs))
 			|| (is_spread_page(cs) != is_spread_page(trialcs)));
 
+	isol_flag_changed = (is_cpu_isolated(cs) != is_cpu_isolated(trialcs));
+
 	spin_lock_irq(&callback_lock);
 	cs->flags = trialcs->flags;
 	spin_unlock_irq(&callback_lock);
@@ -1972,6 +1998,9 @@ static int update_flag(cpuset_flagbits_t bit, struct cpuset *cs,
 
 	if (spread_flag_changed)
 		update_tasks_flags(cs);
+
+	if (isol_flag_changed)
+		update_isol_state(cs);
 out:
 	free_cpuset(trialcs);
 	return err;
@@ -2305,6 +2334,7 @@ typedef enum {
 	FILE_EFFECTIVE_MEMLIST,
 	FILE_SUBPARTS_CPULIST,
 	FILE_CPU_EXCLUSIVE,
+	FILE_CPU_ISOLATED,
 	FILE_MEM_EXCLUSIVE,
 	FILE_MEM_HARDWALL,
 	FILE_SCHED_LOAD_BALANCE,
@@ -2333,6 +2363,9 @@ static int cpuset_write_u64(struct cgroup_subsys_state *css, struct cftype *cft,
 	switch (type) {
 	case FILE_CPU_EXCLUSIVE:
 		retval = update_flag(CS_CPU_EXCLUSIVE, cs, val);
+		break;
+	case FILE_CPU_ISOLATED:
+		retval = update_flag(CS_CPU_ISOLATED, cs, val);
 		break;
 	case FILE_MEM_EXCLUSIVE:
 		retval = update_flag(CS_MEM_EXCLUSIVE, cs, val);
@@ -2506,6 +2539,8 @@ static u64 cpuset_read_u64(struct cgroup_subsys_state *css, struct cftype *cft)
 	switch (type) {
 	case FILE_CPU_EXCLUSIVE:
 		return is_cpu_exclusive(cs);
+	case FILE_CPU_ISOLATED:
+		return is_cpu_isolated(cs);
 	case FILE_MEM_EXCLUSIVE:
 		return is_mem_exclusive(cs);
 	case FILE_MEM_HARDWALL:
@@ -2634,6 +2669,13 @@ static struct cftype legacy_files[] = {
 		.read_u64 = cpuset_read_u64,
 		.write_u64 = cpuset_write_u64,
 		.private = FILE_CPU_EXCLUSIVE,
+	},
+
+	{
+		.name = "cpu_isolation",
+		.read_u64 = cpuset_read_u64,
+		.write_u64 = cpuset_write_u64,
+		.private = FILE_CPU_ISOLATED,
 	},
 
 	{
