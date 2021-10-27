@@ -1,0 +1,39 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/input/da9063-onkey.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: OnKey driver for Dialog DA9063/DA9063L Power Management Integrated Circuit (PMIC)
+
+maintainers:
+  - Support Opensource <support.opensource@diasemi.com>
+
+description: |
+  This module is part of the DA9063 MFD device. For more details, see
+  Documentation/devicetree/bindings/mfd/da9063.yaml.
+
+  The OnKey controller is represented as a sub-node of the PMIC node
+  on the device tree.
+
+  This node defines the OnKey settings for controlling the key
+  functionality of the device. The node should contain the compatible property
+  with the value "dlg,da9063-onkey".
+
+properties:
+  compatible:
+    const: dlg,da9063-onkey
+
+  dlg,disable-key-power:
+    description: |
+      Disable power-down using a long key-press. If this
+      entry exists the OnKey driver will remove support for the KEY_POWER key
+      press. If this entry does not exist then by default the key-press
+      triggered power down is enabled and the OnKey will support both KEY_POWER
+      and KEY_SLEEP.
+    type: boolean
+
+required:
+  - compatible
+
+additionalProperties: false
