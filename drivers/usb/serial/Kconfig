@@ -68,6 +68,7 @@ config USB_SERIAL_SIMPLE
 		- Motorola Tetra devices
 		- Novatel Wireless GPS receivers
 		- Siemens USB/MPI adapter.
+		- Sierra Wireless GPS receiver.
 		- ViVOtech ViVOpay USB device.
 		- Infineon Modem Flashloader USB interface
 		- ZIO Motherboard USB serial interface

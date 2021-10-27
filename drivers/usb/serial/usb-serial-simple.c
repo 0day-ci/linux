@@ -112,6 +112,11 @@ DEVICE(suunto, SUUNTO_IDS);
 	{ USB_DEVICE(0x908, 0x0004) }
 DEVICE(siemens_mpi, SIEMENS_IDS);
 
+/* Sierra Wireless_GNSS driver */
+#define SIERRA_IDS()		\
+	{ USB_DEVICE(0x1199, 0xb000) }
+DEVICE(sierra, SIERRA_IDS);
+
 /* All of the above structures mushed into two lists */
 static struct usb_serial_driver * const serial_drivers[] = {
 	&carelink_device,
@@ -127,6 +132,7 @@ static struct usb_serial_driver * const serial_drivers[] = {
 	&hp4x_device,
 	&suunto_device,
 	&siemens_mpi_device,
+	&sierra_device,
 	NULL
 };
 
@@ -144,6 +150,7 @@ static const struct usb_device_id id_table[] = {
 	HP4X_IDS(),
 	SUUNTO_IDS(),
 	SIEMENS_IDS(),
+	SIERRA_IDS(),
 	{ },
 };
 MODULE_DEVICE_TABLE(usb, id_table);
