@@ -1594,6 +1594,7 @@ static int reiserfs_remount(struct super_block *s, int *mount_flags, char *arg)
 	}
 
 out_ok_unlocked:
+	kfree(new_opts);
 	return 0;
 
 out_err_unlock:
