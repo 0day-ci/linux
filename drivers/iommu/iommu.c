@@ -2842,6 +2842,16 @@ int iommu_enable_nesting(struct iommu_domain *domain)
 }
 EXPORT_SYMBOL_GPL(iommu_enable_nesting);
 
+bool iommu_get_nesting(struct iommu_domain *domain)
+{
+	if (domain->type != IOMMU_DOMAIN_UNMANAGED)
+		return false;
+	if (!domain->ops->enable_nesting)
+		return false;
+	return domain->ops->get_nesting(domain);
+}
+EXPORT_SYMBOL_GPL(iommu_get_nesting);
+
 int iommu_set_pgtable_quirks(struct iommu_domain *domain,
 		unsigned long quirk)
 {

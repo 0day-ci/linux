@@ -213,6 +213,7 @@ struct iommu_iotlb_gather {
  *                  group and attached to the groups domain
  * @device_group: find iommu group for a particular device
  * @enable_nesting: Enable nesting
+ * @get_nesting: get whether the domain uses nested stages
  * @set_pgtable_quirks: Set io page table quirks (IO_PGTABLE_QUIRK_*)
  * @get_resv_regions: Request list of reserved regions for a device
  * @put_resv_regions: Free list of reserved regions for a device
@@ -271,6 +272,7 @@ struct iommu_ops {
 	void (*probe_finalize)(struct device *dev);
 	struct iommu_group *(*device_group)(struct device *dev);
 	int (*enable_nesting)(struct iommu_domain *domain);
+	bool (*get_nesting)(struct iommu_domain *domain);
 	int (*set_pgtable_quirks)(struct iommu_domain *domain,
 				  unsigned long quirks);
 
@@ -690,6 +692,7 @@ struct iommu_sva *iommu_sva_bind_device(struct device *dev,
 					void *drvdata);
 void iommu_sva_unbind_device(struct iommu_sva *handle);
 u32 iommu_sva_get_pasid(struct iommu_sva *handle);
+bool iommu_get_nesting(struct iommu_domain *domain);
 
 #else /* CONFIG_IOMMU_API */
 
@@ -1107,6 +1110,11 @@ static inline int iommu_sva_unbind_gpasid(struct iommu_domain *domain,
 static inline struct iommu_fwspec *dev_iommu_fwspec_get(struct device *dev)
 {
 	return NULL;
+}
+
+static inline bool iommu_get_nesting(struct iommu_domain *domain)
+{
+	return false;
 }
 #endif /* CONFIG_IOMMU_API */
 
