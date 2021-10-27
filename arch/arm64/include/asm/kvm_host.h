@@ -635,16 +635,16 @@ void kvm_arm_resume_guest(struct kvm *kvm);
 
 #define kvm_call_hyp_ret(f, ...)					\
 	({								\
-		typeof(f(__VA_ARGS__)) ret;				\
+		typeof(f(__VA_ARGS__)) __ret;				\
 									\
 		if (has_vhe()) {					\
-			ret = f(__VA_ARGS__);				\
+			__ret = f(__VA_ARGS__);				\
 			isb();						\
 		} else {						\
-			ret = kvm_call_hyp_nvhe(f, ##__VA_ARGS__);	\
+			__ret = kvm_call_hyp_nvhe(f, ##__VA_ARGS__);	\
 		}							\
 									\
-		ret;							\
+		__ret;							\
 	})
 #else /* __KVM_NVHE_HYPERVISOR__ */
 #define kvm_call_hyp(f, ...) f(__VA_ARGS__)
