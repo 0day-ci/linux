@@ -63,6 +63,28 @@ bool housekeeping_test_cpu(int cpu, enum hk_flags flags)
 }
 EXPORT_SYMBOL_GPL(housekeeping_test_cpu);
 
+void isolate_cpu(int cpu)
+{
+	pr_info("Isolating core %d\n", cpu);
+	if (rcu_nocb_cpu_offload(cpu))
+		pr_warn("RCU; unable to nocb offload CPU %d\n", cpu);
+#if 0	/* TODO */
+	housekeeping_clear_cpu(cpu);
+	tick_nohz_full_add_cpus_to(cpumask_of(cpu));
+#endif
+}
+
+void deisolate_cpu(int cpu)
+{
+	pr_info("Deisolating core %d\n", cpu);
+#if 0	/* TODO */
+	tick_nohz_full_clear_cpus_from(cpumask_of(cpu));
+	housekeeping_add_cpu(cpu);
+#endif
+	if (rcu_nocb_cpu_deoffload(cpu))
+		pr_warn("RCU: unable to nocb reload CPU %d\n", cpu);
+}
+
 void __init housekeeping_init(void)
 {
 	if (!housekeeping_flags)
