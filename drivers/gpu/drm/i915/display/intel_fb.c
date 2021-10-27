@@ -315,6 +315,9 @@ static bool plane_has_modifier(struct drm_i915_private *i915,
 	if (!IS_DISPLAY_VER(i915, md->display_ver.from, md->display_ver.until))
 		return false;
 
+	if (IS_DG2(i915) && md->tiling == I915_TILING_Y)
+		return false;
+
 	if (!md->is_linear &&
 	    !(plane_caps & PLANE_HAS_TILING))
 		return false;
