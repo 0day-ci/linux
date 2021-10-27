@@ -94,8 +94,10 @@ void warn_slowpath_fmt(const char *file, const int line, unsigned taint,
 #ifndef WARN_ON_ONCE
 #define WARN_ON_ONCE(condition) ({					\
 	int __ret_warn_on = !!(condition);				\
-	if (unlikely(__ret_warn_on))					\
+	if (unlikely(__ret_warn_on)) {					\
 		DO_ONCE_LITE(__WARN_printf, TAINT_WARN, NULL);		\
+		do_pkill_on_warn();					\
+	}								\
 	unlikely(__ret_warn_on);					\
 })
 #endif
@@ -151,15 +153,19 @@ void __warn(const char *file, int line, void *caller, unsigned taint,
 
 #define WARN_ONCE(condition, format...) ({				\
 	int __ret_warn_on = !!(condition);				\
-	if (unlikely(__ret_warn_on))					\
+	if (unlikely(__ret_warn_on)) {					\
 		DO_ONCE_LITE(__WARN_printf, TAINT_WARN, format);	\
+		do_pkill_on_warn();					\
+	}								\
 	unlikely(__ret_warn_on);					\
 })
 
 #define WARN_TAINT_ONCE(condition, taint, format...) ({			\
 	int __ret_warn_on = !!(condition);				\
-	if (unlikely(__ret_warn_on))					\
+	if (unlikely(__ret_warn_on)) {					\
 		DO_ONCE_LITE(__WARN_printf, taint, format);		\
+		do_pkill_on_warn();					\
+	}								\
 	unlikely(__ret_warn_on);					\
 })
 

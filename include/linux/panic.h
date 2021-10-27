@@ -27,6 +27,9 @@ extern int panic_on_oops;
 extern int panic_on_unrecovered_nmi;
 extern int panic_on_io_nmi;
 extern int panic_on_warn;
+extern int pkill_on_warn;
+
+extern void do_pkill_on_warn(void);
 
 extern unsigned long panic_on_taint;
 extern bool panic_on_taint_nousertaint;

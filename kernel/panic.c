@@ -53,6 +53,7 @@ static int pause_on_oops_flag;
 static DEFINE_SPINLOCK(pause_on_oops_lock);
 bool crash_kexec_post_notifiers;
 int panic_on_warn __read_mostly;
+int pkill_on_warn __read_mostly;
 unsigned long panic_on_taint;
 bool panic_on_taint_nousertaint = false;
 
@@ -625,13 +626,16 @@ void warn_slowpath_fmt(const char *file, int line, unsigned taint,
 	if (!fmt) {
 		__warn(file, line, __builtin_return_address(0), taint,
 		       NULL, NULL);
-		return;
+		goto out;
 	}
 
 	args.fmt = fmt;
 	va_start(args.args, fmt);
 	__warn(file, line, __builtin_return_address(0), taint, NULL, &args);
 	va_end(args.args);
+
+out:
+	do_pkill_on_warn();
 }
 EXPORT_SYMBOL(warn_slowpath_fmt);
 #else
@@ -732,3 +736,19 @@ static int __init panic_on_taint_setup(char *s)
 	return 0;
 }
 early_param("panic_on_taint", panic_on_taint_setup);
+
+void do_pkill_on_warn(void)
+{
+	if (!pkill_on_warn)
+		return;
+
+	if (is_global_init(current))
+		return;
+
+	if (current->flags & PF_KTHREAD)
+		return;
+
+	if (system_state >= SYSTEM_RUNNING)
+		do_send_sig_info(SIGKILL, SEND_SIG_PRIV, current, PIDTYPE_TGID);
+}
+EXPORT_SYMBOL(do_pkill_on_warn);

@@ -214,6 +214,9 @@ enum bug_trap_type report_bug(unsigned long bugaddr, struct pt_regs *regs)
 	bug_type = BUG_TRAP_TYPE_BUG;
 
 out:
+	if (bug_type == BUG_TRAP_TYPE_WARN)
+		do_pkill_on_warn();
+
 	return bug_type;
 }
 

@@ -921,6 +921,20 @@ lives in) pid namespace. When selecting a pid for a next task on fork
 kernel tries to allocate a number starting from this one.
 
 
+pkill_on_warn
+=============
+
+Kills all threads in a process that provoked a kernel warning.
+That allows the kernel to stop the process when the first signs
+of wrong behavior are detected.
+
+= =====================================================================
+0 Allows a process to proceed execution after hitting a kernel warning,
+  this is the default behavior.
+1 Kills all threads in a process that provoked a kernel warning.
+= =====================================================================
+
+
 powersave-nap (PPC only)
 ========================
 
