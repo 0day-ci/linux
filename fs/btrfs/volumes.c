@@ -4433,6 +4433,20 @@ int btrfs_resume_balance_async(struct btrfs_fs_info *fs_info)
 	}
 
 	/*
+	 * This should never happen, as the paused balance state is recovered
+	 * during mount without any chance of other exclusive ops to collide.
+	 *
+	 * This gives the exclusive op status to balance and keeps in paused
+	 * state until user intervention (cancel or umount). If the ownership
+	 * cannot be assigned, show a message but do not fail. The balance
+	 * is in a paused state and must have fs_info::balance_ctl properly
+	 * set up.
+	 */
+	if (!btrfs_exclop_start(fs_info, BTRFS_EXCLOP_BALANCE))
+		btrfs_warn(fs_info,
+	"balance: cannot set exclusive op status, resume manually");
+
+	/*
 	 * A ro->rw remount sequence should continue with the paused balance
 	 * regardless of who pauses it, system or the user as of now, so set
 	 * the resume flag.
@@ -4489,20 +4503,6 @@ int btrfs_recover_balance(struct btrfs_fs_info *fs_info)
 	btrfs_disk_balance_args_to_cpu(&bctl->meta, &disk_bargs);
 	btrfs_balance_sys(leaf, item, &disk_bargs);
 	btrfs_disk_balance_args_to_cpu(&bctl->sys, &disk_bargs);
-
-	/*
-	 * This should never happen, as the paused balance state is recovered
-	 * during mount without any chance of other exclusive ops to collide.
-	 *
-	 * This gives the exclusive op status to balance and keeps in paused
-	 * state until user intervention (cancel or umount). If the ownership
-	 * cannot be assigned, show a message but do not fail. The balance
-	 * is in a paused state and must have fs_info::balance_ctl properly
-	 * set up.
-	 */
-	if (!btrfs_exclop_start(fs_info, BTRFS_EXCLOP_BALANCE))
-		btrfs_warn(fs_info,
-	"balance: cannot set exclusive op status, resume manually");
 
 	btrfs_release_path(path);
 
