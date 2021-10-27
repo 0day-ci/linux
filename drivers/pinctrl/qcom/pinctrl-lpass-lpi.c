@@ -122,6 +122,7 @@ static const struct pinctrl_pin_desc lpass_lpi_pins[] = {
 	PINCTRL_PIN(11, "gpio11"),
 	PINCTRL_PIN(12, "gpio12"),
 	PINCTRL_PIN(13, "gpio13"),
+	PINCTRL_PIN(14, "gpio14"),
 };
 
 enum lpass_lpi_functions {
@@ -136,6 +137,7 @@ enum lpass_lpi_functions {
 	LPI_MUX_i2s1_ws,
 	LPI_MUX_i2s2_clk,
 	LPI_MUX_i2s2_data,
+	LPI_MUX_sc7280_i2s2_data,
 	LPI_MUX_i2s2_ws,
 	LPI_MUX_qua_mi2s_data,
 	LPI_MUX_qua_mi2s_sclk,
@@ -144,6 +146,7 @@ enum lpass_lpi_functions {
 	LPI_MUX_swr_rx_data,
 	LPI_MUX_swr_tx_clk,
 	LPI_MUX_swr_tx_data,
+	LPI_MUX_sc7280_swr_tx_data,
 	LPI_MUX_wsa_swr_clk,
 	LPI_MUX_wsa_swr_data,
 	LPI_MUX_gpio,
@@ -164,8 +167,11 @@ static const unsigned int gpio10_pins[] = { 10 };
 static const unsigned int gpio11_pins[] = { 11 };
 static const unsigned int gpio12_pins[] = { 12 };
 static const unsigned int gpio13_pins[] = { 13 };
+static const unsigned int gpio14_pins[] = { 14 };
+
 static const char * const swr_tx_clk_groups[] = { "gpio0" };
 static const char * const swr_tx_data_groups[] = { "gpio1", "gpio2", "gpio5" };
+static const char * const sc7280_swr_tx_data_groups[] = { "gpio1", "gpio2", "gpio14" };
 static const char * const swr_rx_clk_groups[] = { "gpio3" };
 static const char * const swr_rx_data_groups[] = { "gpio4", "gpio5" };
 static const char * const dmic1_clk_groups[] = { "gpio6" };
@@ -185,6 +191,7 @@ static const char * const i2s1_data_groups[] = { "gpio8", "gpio9" };
 static const char * const wsa_swr_clk_groups[] = { "gpio10" };
 static const char * const wsa_swr_data_groups[] = { "gpio11" };
 static const char * const i2s2_data_groups[] = { "gpio12", "gpio12" };
+static const char * const sc7280_i2s2_data_groups[] = { "gpio12", "gpio13" };
 
 static const struct lpi_pingroup sm8250_groups[] = {
 	LPI_PINGROUP(0, 0, swr_tx_clk, qua_mi2s_sclk, _, _),
@@ -203,6 +210,24 @@ static const struct lpi_pingroup sm8250_groups[] = {
 	LPI_PINGROUP(13, NO_SLEW, dmic3_data, i2s2_data, _, _),
 };
 
+static const struct lpi_pingroup sc7280_groups[] = {
+	LPI_PINGROUP(0, 0, swr_tx_clk, qua_mi2s_sclk, _, _),
+	LPI_PINGROUP(1, 2, swr_tx_data, qua_mi2s_ws, _, _),
+	LPI_PINGROUP(2, 4, swr_tx_data, qua_mi2s_data, _, _),
+	LPI_PINGROUP(3, 8, swr_rx_clk, qua_mi2s_data, _, _),
+	LPI_PINGROUP(4, 10, swr_rx_data, qua_mi2s_data, _, _),
+	LPI_PINGROUP(5, 12, swr_rx_data, _, _, _),
+	LPI_PINGROUP(6, NO_SLEW, dmic1_clk, i2s1_clk, _,  _),
+	LPI_PINGROUP(7, NO_SLEW, dmic1_data, i2s1_ws, _, _),
+	LPI_PINGROUP(8, NO_SLEW, dmic2_clk, i2s1_data, _, _),
+	LPI_PINGROUP(9, NO_SLEW, dmic2_data, i2s1_data, _, _),
+	LPI_PINGROUP(10, 16, i2s2_clk, wsa_swr_clk, _, _),
+	LPI_PINGROUP(11, 18, i2s2_ws, wsa_swr_data, _, _),
+	LPI_PINGROUP(12, NO_SLEW, dmic3_clk, sc7280_i2s2_data, _, _),
+	LPI_PINGROUP(13, NO_SLEW, dmic3_data, sc7280_i2s2_data, _, _),
+	LPI_PINGROUP(14, 6, sc7280_swr_tx_data, _, _, _),
+};
+
 static const struct lpi_function lpass_functions[] = {
 	LPI_FUNCTION(dmic1_clk),
 	LPI_FUNCTION(dmic1_data),
@@ -215,6 +240,7 @@ static const struct lpi_function lpass_functions[] = {
 	LPI_FUNCTION(i2s1_ws),
 	LPI_FUNCTION(i2s2_clk),
 	LPI_FUNCTION(i2s2_data),
+	LPI_FUNCTION(sc7280_i2s2_data),
 	LPI_FUNCTION(i2s2_ws),
 	LPI_FUNCTION(qua_mi2s_data),
 	LPI_FUNCTION(qua_mi2s_sclk),
@@ -223,6 +249,7 @@ static const struct lpi_function lpass_functions[] = {
 	LPI_FUNCTION(swr_rx_data),
 	LPI_FUNCTION(swr_tx_clk),
 	LPI_FUNCTION(swr_tx_data),
+	LPI_FUNCTION(sc7280_swr_tx_data),
 	LPI_FUNCTION(wsa_swr_clk),
 	LPI_FUNCTION(wsa_swr_data),
 };
@@ -232,6 +259,15 @@ static struct lpi_pinctrl_variant_data sm8250_lpi_data = {
 	.npins = ARRAY_SIZE(lpass_lpi_pins),
 	.groups = sm8250_groups,
 	.ngroups = ARRAY_SIZE(sm8250_groups),
+	.functions = lpass_functions,
+	.nfunctions = ARRAY_SIZE(lpass_functions),
+};
+
+static const struct lpi_pinctrl_variant_data sc7280_lpi_data = {
+	.pins = lpass_lpi_pins,
+	.npins = ARRAY_SIZE(lpass_lpi_pins),
+	.groups = sc7280_groups,
+	.ngroups = ARRAY_SIZE(sc7280_groups),
 	.functions = lpass_functions,
 	.nfunctions = ARRAY_SIZE(lpass_functions),
 };
@@ -676,6 +712,10 @@ static const struct of_device_id lpi_pinctrl_of_match[] = {
 	{
 	       .compatible = "qcom,sm8250-lpass-lpi-pinctrl",
 	       .data = &sm8250_lpi_data,
+	},
+	{
+	       .compatible = "qcom,sc7280-lpass-lpi-pinctrl",
+	       .data = &sc7280_lpi_data,
 	},
 	{ }
 };
