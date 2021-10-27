@@ -17,7 +17,7 @@
  * contrary, please update.
  *
  * Configuration options:
- * [0] - I/O port base base address
+ * [0] - I/O port base address
  * [1] - IRQ (unused)
  * [2] - Voltage unipolar/bipolar configuration
  *	0 == unipolar 5V  (0V -- +5V)
