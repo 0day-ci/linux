@@ -179,11 +179,8 @@ int virtio_finalize_features(struct virtio_device *dev)
 	if (ret) {
 		if (!virtio_has_feature(dev, VIRTIO_F_VERSION_1)) {
 			dev_warn(&dev->dev,
-				 "device must provide VIRTIO_F_VERSION_1\n");
-			return -ENODEV;
-		}
-
-		if (!virtio_has_feature(dev, VIRTIO_F_ACCESS_PLATFORM)) {
+				 "device does not provide VIRTIO_F_VERSION_1 while restricted memory access is enabled!.\n");
+		} else if (!virtio_has_feature(dev, VIRTIO_F_ACCESS_PLATFORM)) {
 			dev_warn(&dev->dev,
 				 "device must provide VIRTIO_F_ACCESS_PLATFORM\n");
 			return -ENODEV;
