@@ -1514,6 +1514,7 @@ static const struct block_device_operations btt_fops = {
 	.submit_bio =		btt_submit_bio,
 	.rw_page =		btt_rw_page,
 	.getgeo =		btt_getgeo,
+	.set_read_only = 	nd_set_ro,
 };
 
 static int btt_blk_init(struct btt *btt)
