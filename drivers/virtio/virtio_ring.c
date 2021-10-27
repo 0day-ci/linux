@@ -1074,10 +1074,45 @@ static void vring_unmap_desc_packed(const struct vring_virtqueue *vq,
 	}
 }
 
-static struct vring_packed_desc *alloc_indirect_packed(unsigned int total_sg,
+static void desc_cache_chain_free_packed(void *chain)
+{
+	struct vring_packed_desc *desc;
+
+	while (chain) {
+		desc = chain;
+		chain = (void *)desc->addr;
+		kfree(desc);
+	}
+}
+
+static void desc_cache_put_packed(struct vring_virtqueue *vq,
+				  struct vring_packed_desc *desc, int n)
+{
+	if (vq->use_desc_cache && n <= VIRT_QUEUE_CACHE_DESC_NUM) {
+		desc->addr = (u64)vq->desc_cache_chain;
+		vq->desc_cache_chain = desc;
+	} else {
+		kfree(desc);
+	}
+}
+
+static struct vring_packed_desc *alloc_indirect_packed(struct vring_virtqueue *vq,
+						       unsigned int total_sg,
 						       gfp_t gfp)
 {
 	struct vring_packed_desc *desc;
+	unsigned int n;
+
+	if (vq->use_desc_cache && total_sg <= VIRT_QUEUE_CACHE_DESC_NUM) {
+		if (vq->desc_cache_chain) {
+			desc = vq->desc_cache_chain;
+			vq->desc_cache_chain = (void *)desc->addr;
+			return desc;
+		}
+		n = VIRT_QUEUE_CACHE_DESC_NUM;
+	} else {
+		n = total_sg;
+	}
 
 	/*
 	 * We require lowmem mappings for the descriptors because
@@ -1086,7 +1121,7 @@ static struct vring_packed_desc *alloc_indirect_packed(unsigned int total_sg,
 	 */
 	gfp &= ~__GFP_HIGHMEM;
 
-	desc = kmalloc_array(total_sg, sizeof(struct vring_packed_desc), gfp);
+	desc = kmalloc_array(n, sizeof(struct vring_packed_desc), gfp);
 
 	return desc;
 }
@@ -1106,7 +1141,7 @@ static int virtqueue_add_indirect_packed(struct vring_virtqueue *vq,
 	dma_addr_t addr;
 
 	head = vq->packed.next_avail_idx;
-	desc = alloc_indirect_packed(total_sg, gfp);
+	desc = alloc_indirect_packed(vq, total_sg, gfp);
 
 	if (unlikely(vq->vq.num_free < 1)) {
 		pr_debug("Can't add buf len 1 - avail = 0\n");
@@ -1197,7 +1232,7 @@ unmap_release:
 	for (i = 0; i < err_idx; i++)
 		vring_unmap_desc_packed(vq, &desc[i]);
 
-	kfree(desc);
+	desc_cache_put_packed(vq, desc, total_sg);
 
 	END_USE(vq);
 	return -ENOMEM;
@@ -1422,20 +1457,22 @@ static void detach_buf_packed(struct vring_virtqueue *vq,
 	}
 
 	if (vq->indirect) {
-		u32 len;
+		u32 len, n;
 
 		/* Free the indirect table, if any, now that it's unmapped. */
 		desc = state->indir_desc;
 		if (!desc)
 			return;
 
+		n = len / sizeof(struct vring_packed_desc);
+
 		if (vq->use_dma_api) {
 			len = vq->packed.desc_extra[id].len;
-			for (i = 0; i < len / sizeof(struct vring_packed_desc);
-					i++)
+			for (i = 0; i < n; i++)
 				vring_unmap_desc_packed(vq, &desc[i]);
 		}
-		kfree(desc);
+
+		desc_cache_put_packed(vq, desc, n);
 		state->indir_desc = NULL;
 	} else if (ctx) {
 		*ctx = state->indir_desc;
@@ -1753,6 +1790,8 @@ static struct virtqueue *vring_create_virtqueue_packed(
 	vq->indirect = virtio_has_feature(vdev, VIRTIO_RING_F_INDIRECT_DESC) &&
 		!context;
 	vq->event = virtio_has_feature(vdev, VIRTIO_RING_F_EVENT_IDX);
+	vq->desc_cache_chain = NULL;
+	vq->use_desc_cache = vdev->desc_cache;
 
 	if (virtio_has_feature(vdev, VIRTIO_F_ORDER_PLATFORM))
 		vq->weak_barriers = false;
@@ -2374,6 +2413,8 @@ void vring_del_virtqueue(struct virtqueue *_vq)
 		kfree(vq->split.desc_state);
 		kfree(vq->split.desc_extra);
 		desc_cache_chain_free_split(vq->desc_cache_chain);
+	} else {
+		desc_cache_chain_free_packed(vq->desc_cache_chain);
 	}
 	kfree(vq);
 }
