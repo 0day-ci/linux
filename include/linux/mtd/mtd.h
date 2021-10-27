@@ -361,6 +361,25 @@ struct mtd_info {
 	void (*_put_device) (struct mtd_info *mtd);
 
 	/*
+	 * Security Operations
+	 */
+	int (*_secure_packet_read)(struct mtd_info *mtd, size_t len, u8 *buf);
+	int (*_secure_packet_write)(struct mtd_info *mtd, size_t len, u8 *buf);
+	int (*_read_vlock_bits)(struct mtd_info *mtd, u32 addr, size_t len,
+				u8 *buf);
+	int (*_write_vlock_bits)(struct mtd_info *mtd, u32 addr, size_t len,
+				 u8 *buf);
+	int (*_read_nvlock_bits)(struct mtd_info *mtd, u32 addr, size_t len,
+				 u8 *buf);
+	int (*_write_nvlock_bits)(struct mtd_info *mtd, u32 addr);
+	int (*_erase_nvlock_bits)(struct mtd_info *mtd);
+	int (*_read_global_freeze_bits)(struct mtd_info *mtd, size_t len,
+					u8 *buf);
+	int (*_write_global_freeze_bits)(struct mtd_info *mtd, size_t len,
+					 u8 *buf);
+	int (*_read_password)(struct mtd_info *mtd, size_t len, u8 *buf);
+
+	/*
 	 * flag indicates a panic write, low level drivers can take appropriate
 	 * action if required to ensure writes go through
 	 */

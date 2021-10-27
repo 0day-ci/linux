@@ -3199,6 +3199,8 @@ int spi_nor_scan(struct spi_nor *nor, const char *name,
 
 	spi_nor_register_locking_ops(nor);
 
+	spi_nor_register_security_ops(nor);
+
 	/* Send all the required SPI flash commands to initialize device */
 	ret = spi_nor_init(nor);
 	if (ret)
