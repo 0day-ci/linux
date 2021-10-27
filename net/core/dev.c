@@ -6019,7 +6019,7 @@ static void gro_flush_oldest(struct napi_struct *napi, struct list_head *head)
 {
 	struct sk_buff *oldest;
 
-	oldest = list_last_entry(head, struct sk_buff, list);
+	oldest = list_first_entry(head, struct sk_buff, list);
 
 	/* We are called with head length >= MAX_GRO_SKBS, so this is
 	 * impossible.
