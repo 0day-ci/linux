@@ -290,6 +290,9 @@ static __init int pci_mcfg_parse(struct acpi_table_header *header)
 		e->res.end = e->address + PCI_MMCFG_BUS_OFFSET(e->end_bus + 1) - 1;
 		e->res.flags = IORESOURCE_MEM | IORESOURCE_BUSY;
 		list_add(&e->list, &pci_mmcfg_list);
+		pr_info("MCFG entry for domain %04x [bus %02x-%02x] at %pR "
+			"(base %#lx)\n", e->segment, e->start_bus,
+			e->end_bus, &e->res, (unsigned long)e->address);
 	}
 
 #ifdef CONFIG_PCI_QUIRKS
