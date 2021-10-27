@@ -26,6 +26,8 @@ struct mcfg_fixup {
 	struct resource cfgres;
 };
 
+static bool pci_quirk_matched;
+
 #define MCFG_BUS_RANGE(start, end)	DEFINE_RES_NAMED((start),	\
 						((end) - (start) + 1),	\
 						NULL, IORESOURCE_BUS)
@@ -195,6 +197,7 @@ static void pci_mcfg_apply_quirks(struct acpi_pci_root *root,
 
 	for (i = 0, f = mcfg_quirks; i < ARRAY_SIZE(mcfg_quirks); i++, f++) {
 		if (pci_mcfg_quirk_matches(f, segment, bus_range)) {
+			pci_quirk_matched = true;
 			if (f->cfgres.start)
 				*cfgres = f->cfgres;
 			if (f->ops)
@@ -251,6 +254,11 @@ skip_lookup:
 
 	*cfgres = res;
 	*ecam_ops = ops;
+#ifdef CONFIG_PCI_QUIRKS
+	if (pci_quirk_matched)
+		pci_quirk_mcfg_res = res;
+#endif
+
 	return 0;
 }
 

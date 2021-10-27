@@ -2103,6 +2103,7 @@ enum pci_fixup_pass {
 		suspend_late##hook, vendor, device, PCI_ANY_ID, 0, hook)
 
 #ifdef CONFIG_PCI_QUIRKS
+extern struct resource pci_quirk_mcfg_res;
 void pci_fixup_device(enum pci_fixup_pass pass, struct pci_dev *dev);
 #else
 static inline void pci_fixup_device(enum pci_fixup_pass pass,
