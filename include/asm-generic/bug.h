@@ -91,7 +91,15 @@ void warn_slowpath_fmt(const char *file, const int line, unsigned taint,
 		warn_slowpath_fmt(__FILE__, __LINE__, taint, arg);	\
 		instrumentation_end();					\
 	} while (0)
-#else
+#ifndef WARN_ON_ONCE
+#define WARN_ON_ONCE(condition) ({					\
+	int __ret_warn_on = !!(condition);				\
+	if (unlikely(__ret_warn_on))					\
+		DO_ONCE_LITE(__WARN_printf, TAINT_WARN, NULL);		\
+	unlikely(__ret_warn_on);					\
+})
+#endif
+#else /* __WARN_FLAGS */
 extern __printf(1, 2) void __warn_printk(const char *fmt, ...);
 #define __WARN()		__WARN_FLAGS(BUGFLAG_TAINT(TAINT_WARN))
 #define __WARN_printf(taint, arg...) do {				\
@@ -141,16 +149,19 @@ void __warn(const char *file, int line, void *caller, unsigned taint,
 	unlikely(__ret_warn_on);					\
 })
 
-#ifndef WARN_ON_ONCE
-#define WARN_ON_ONCE(condition)					\
-	DO_ONCE_LITE_IF(condition, WARN_ON, 1)
-#endif
+#define WARN_ONCE(condition, format...) ({				\
+	int __ret_warn_on = !!(condition);				\
+	if (unlikely(__ret_warn_on))					\
+		DO_ONCE_LITE(__WARN_printf, TAINT_WARN, format);	\
+	unlikely(__ret_warn_on);					\
+})
 
-#define WARN_ONCE(condition, format...)				\
-	DO_ONCE_LITE_IF(condition, WARN, 1, format)
-
-#define WARN_TAINT_ONCE(condition, taint, format...)		\
-	DO_ONCE_LITE_IF(condition, WARN_TAINT, 1, taint, format)
+#define WARN_TAINT_ONCE(condition, taint, format...) ({			\
+	int __ret_warn_on = !!(condition);				\
+	if (unlikely(__ret_warn_on))					\
+		DO_ONCE_LITE(__WARN_printf, taint, format);		\
+	unlikely(__ret_warn_on);					\
+})
 
 #else /* !CONFIG_BUG */
 #ifndef HAVE_ARCH_BUG

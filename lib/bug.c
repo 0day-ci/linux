@@ -156,16 +156,17 @@ struct bug_entry *find_bug(unsigned long bugaddr)
 
 enum bug_trap_type report_bug(unsigned long bugaddr, struct pt_regs *regs)
 {
+	enum bug_trap_type bug_type = BUG_TRAP_TYPE_NONE;
 	struct bug_entry *bug;
 	const char *file;
 	unsigned line, warning, once, done;
 
 	if (!is_valid_bugaddr(bugaddr))
-		return BUG_TRAP_TYPE_NONE;
+		goto out;
 
 	bug = find_bug(bugaddr);
 	if (!bug)
-		return BUG_TRAP_TYPE_NONE;
+		goto out;
 
 	disable_trace_on_warning();
 
@@ -176,8 +177,10 @@ enum bug_trap_type report_bug(unsigned long bugaddr, struct pt_regs *regs)
 	done = (bug->flags & BUGFLAG_DONE) != 0;
 
 	if (warning && once) {
-		if (done)
-			return BUG_TRAP_TYPE_WARN;
+		if (done) {
+			bug_type = BUG_TRAP_TYPE_WARN;
+			goto out;
+		}
 
 		/*
 		 * Since this is the only store, concurrency is not an issue.
@@ -198,7 +201,8 @@ enum bug_trap_type report_bug(unsigned long bugaddr, struct pt_regs *regs)
 		/* this is a WARN_ON rather than BUG/BUG_ON */
 		__warn(file, line, (void *)bugaddr, BUG_GET_TAINT(bug), regs,
 		       NULL);
-		return BUG_TRAP_TYPE_WARN;
+		bug_type = BUG_TRAP_TYPE_WARN;
+		goto out;
 	}
 
 	if (file)
@@ -207,7 +211,10 @@ enum bug_trap_type report_bug(unsigned long bugaddr, struct pt_regs *regs)
 		pr_crit("Kernel BUG at %pB [verbose debug info unavailable]\n",
 			(void *)bugaddr);
 
-	return BUG_TRAP_TYPE_BUG;
+	bug_type = BUG_TRAP_TYPE_BUG;
+
+out:
+	return bug_type;
 }
 
 static void clear_once_table(struct bug_entry *start, struct bug_entry *end)
