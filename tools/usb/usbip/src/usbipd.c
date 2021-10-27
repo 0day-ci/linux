@@ -22,6 +22,7 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <stdbool.h>
 
 #ifdef HAVE_LIBWRAP
 #include <tcpd.h>
@@ -35,6 +36,7 @@
 #include "usbip_host_common.h"
 #include "usbip_device_driver.h"
 #include "usbip_common.h"
+#include "usbip_monitor.h"
 #include "usbip_network.h"
 #include "list.h"
 
@@ -88,13 +90,78 @@ static void usbipd_help(void)
 	printf("%s\n", usbipd_help_string);
 }
 
+static struct usbip_exported_device *get_exported_device(const char *busid)
+{
+	struct usbip_exported_device *exported_dev = NULL;
+	struct usbip_exported_device *edev = NULL;
+	struct list_head *i;
+
+	list_for_each(i, &driver->edev_list) {
+		edev = list_entry(i, struct usbip_exported_device, node);
+		if (!strncmp(busid, edev->udev.busid, SYSFS_BUS_ID_SIZE)) {
+			exported_dev = edev;
+			break;
+		}
+	}
+	return exported_dev;
+}
+
+static bool await_requested_device(usbip_monitor_t *monitor,
+				   struct op_import_request *req)
+{
+	usbip_monitor_set_busid(monitor, req->busid);
+	usbip_monitor_set_timeout(monitor, req->poll_timeout_ms);
+	return usbip_monitor_await_usb_bind(monitor, "usbip-host");
+}
+
+static int recv_subsequent_poll_request(int sockfd, struct op_import_request *req)
+{
+	uint16_t code = OP_UNSPEC;
+	int status;
+	int rc = 0;
+
+	rc = usbip_net_recv_op_common(sockfd, &code, &status);
+	if (rc < 0) {
+		dbg("could not receive opcode: %#0x", code);
+		return -1;
+	}
+	if (code != OP_REQ_IMPORT) {
+		dbg("Only subsequent OP_REQ_IMPORT allowed when polling");
+		return -1;
+	}
+	rc = usbip_net_recv(sockfd, req, sizeof(struct op_import_request));
+	if (rc < 0) {
+		dbg("usbip_net_recv failed: subsequent OP_REQ_IMPORT request");
+		return -1;
+	}
+	PACK_OP_IMPORT_REQUEST(0, req);
+	return rc;
+}
+
+static int monitor_requested_busid(int sockfd, struct op_import_request *req)
+{
+	int rc = 0;
+	usbip_monitor_t *monitor = usbip_monitor_new();
+
+	while (!await_requested_device(monitor, req)) {
+		int status = ST_POLL_TIMEOUT;
+
+		rc = usbip_net_send_op_common(sockfd, OP_REP_IMPORT, status);
+		if (rc < 0) {
+			dbg("usbip_net_send_op_common failed: %#0x", OP_REP_IMPORT);
+			break;
+		}
+		rc = recv_subsequent_poll_request(sockfd, req);
+	}
+	usbip_monitor_delete(monitor);
+	return rc;
+}
+
 static int recv_request_import(int sockfd)
 {
 	struct op_import_request req;
-	struct usbip_exported_device *edev;
+	struct usbip_exported_device *edev = NULL;
 	struct usbip_usb_device pdu_udev;
-	struct list_head *i;
-	int found = 0;
 	int status = ST_OK;
 	int rc;
 
@@ -107,16 +174,21 @@ static int recv_request_import(int sockfd)
 	}
 	PACK_OP_IMPORT_REQUEST(0, &req);
 
-	list_for_each(i, &driver->edev_list) {
-		edev = list_entry(i, struct usbip_exported_device, node);
-		if (!strncmp(req.busid, edev->udev.busid, SYSFS_BUS_ID_SIZE)) {
-			info("found requested device: %s", req.busid);
-			found = 1;
-			break;
+	edev = get_exported_device(req.busid);
+
+	if (!edev && req.poll_timeout_ms) {
+		info("Client polling for devices on busid: %s", req.busid);
+		rc = monitor_requested_busid(sockfd, &req);
+		if (rc < 0) {
+			dbg("monitor_requested_busid failed");
+			return -1;
 		}
+		usbip_refresh_device_list(driver);
+		edev = get_exported_device(req.busid);
 	}
 
-	if (found) {
+	if (edev) {
+		info("found requested device: %s", req.busid);
 		/* should set TCP_NODELAY for usbip */
 		usbip_net_set_nodelay(sockfd);
 

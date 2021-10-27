@@ -36,12 +36,7 @@ TCP/IP connection is closed.
 
 Once the client knows the list of exported USB devices it may decide to use one
 of them. First the client opens a TCP/IP connection to the server and
-sends an OP_REQ_IMPORT packet. The server replies with OP_REP_IMPORT. If the
-import was successful the TCP/IP connection remains open and will be used
-to transfer the URB traffic between the client and the server. The client may
-send two types of packets: the USBIP_CMD_SUBMIT to submit an URB, and
-USBIP_CMD_UNLINK to unlink a previously submitted URB. The answers of the
-server may be USBIP_RET_SUBMIT and USBIP_RET_UNLINK respectively.
+sends an OP_REQ_IMPORT packet. The server replies with OP_REP_IMPORT.
 
 ::
 
@@ -55,6 +50,47 @@ server may be USBIP_RET_SUBMIT and USBIP_RET_UNLINK respectively.
           |                  OP_REP_IMPORT                  |
           | <---------------------------------------------- |
           |                                                 |
+
+The client may also request to poll for devices to become exported on a given
+busid, instead of immediately receive an error. If no device becomes exported
+within the chosen time, the server replies with timeout. The TCP/IP connection
+remains open and subsequent poll requests can be sent.
+
+::
+
+ virtual host controller                                 usb host
+      "client"                                           "server"
+  (imports USB devices)                             (exports USB devices)
+          |                                                 |
+          |                  OP_REQ_IMPORT                  |
+          | ----------------------------------------------> |
+          |                        .                        |
+          |                        :                        |
+          |                                                 |
+          |                  OP_REP_IMPORT                  |
+          | <---------------------------------------------- |
+          |                                                 |
+          |                  OP_REQ_IMPORT                  |
+          | ----------------------------------------------> |
+          |                        .                        |
+          |                        :                        |
+          |                                                 |
+          |                  OP_REP_IMPORT                  |
+          | <---------------------------------------------- |
+          |                        .                        |
+          |                        :                        |
+
+If the import was successful the TCP/IP connection remains open and will be used
+to transfer the URB traffic between the client and the server. The client may
+send two types of packets: the USBIP_CMD_SUBMIT to submit an URB, and
+USBIP_CMD_UNLINK to unlink a previously submitted URB. The answers of the
+server may be USBIP_RET_SUBMIT and USBIP_RET_UNLINK respectively.
+
+::
+
+ virtual host controller                                 usb host
+      "client"                                           "server"
+  (imports USB devices)                             (exports USB devices)
           |                                                 |
           |            USBIP_CMD_SUBMIT(seqnum = n)         |
           | ----------------------------------------------> |
@@ -137,8 +173,8 @@ byte (MSB) is stored at the lowest address.
 Protocol Version
 ================
 
-The documented USBIP version is v1.1.1. The binary representation of this
-version in message headers is 0x0111.
+The documented USBIP version is v1.1.2. The binary representation of this
+version in message headers is 0x0112.
 
 This is defined in tools/usb/usbip/configure.ac
 
@@ -247,6 +283,10 @@ OP_REQ_IMPORT:
 |           |        |            | from the message field OP_REP_DEVLIST.busid.      |
 |           |        |            | A string closed with zero, the unused bytes       |
 |           |        |            | shall be filled with zeros.                       |
++-----------+--------+------------+---------------------------------------------------+
+| 40        | 4      |            | poll timeout: instead of returning immediately if |
+|           |        |            | device is not available, wait until usb device    |
+|           |        |            | becomes exported or a timeout occurs.             |
 +-----------+--------+------------+---------------------------------------------------+
 
 OP_REP_IMPORT:

@@ -61,6 +61,7 @@ struct op_devinfo_reply {
 
 struct op_import_request {
 	char busid[SYSFS_BUS_ID_SIZE];
+	uint32_t poll_timeout_ms;
 } __attribute__((packed));
 
 struct op_import_reply {
@@ -69,6 +70,7 @@ struct op_import_reply {
 } __attribute__((packed));
 
 #define PACK_OP_IMPORT_REQUEST(pack, request)  do {\
+	(request)->poll_timeout_ms = usbip_net_pack_uint32_t(pack, (request)->poll_timeout_ms);\
 } while (0)
 
 #define PACK_OP_IMPORT_REPLY(pack, reply)  do {\
