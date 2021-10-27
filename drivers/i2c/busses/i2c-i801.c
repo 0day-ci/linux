@@ -174,7 +174,6 @@
 #define SMBHSTCNT_KILL		BIT(1)
 #define SMBHSTCNT_LAST_BYTE	BIT(5)
 #define SMBHSTCNT_START		BIT(6)
-#define SMBHSTCNT_PEC_EN	BIT(7)	/* ICH3 and later */
 
 /* I801 Hosts Status register bits */
 #define SMBHSTSTS_BYTE_DONE	BIT(7)
@@ -494,8 +493,6 @@ static int i801_transaction(struct i801_priv *priv, int xact)
 		return i801_check_post(priv, result ? priv->status : -ETIMEDOUT);
 	}
 
-	/* the current contents of SMBHSTCNT can be overwritten, since PEC,
-	 * SMBSCMD are passed in xact */
 	outb_p(xact | SMBHSTCNT_START, SMBHSTCNT(priv));
 
 	status = i801_wait_intr(priv);
@@ -1657,7 +1654,6 @@ static void i801_setup_hstcfg(struct i801_priv *priv)
 	unsigned char hstcfg = priv->original_hstcfg;
 
 	hstcfg &= ~SMBHSTCFG_I2C_EN;	/* SMBus timing */
-	hstcfg &= ~SMBHSTCNT_PEC_EN;	/* Disable software PEC */
 	hstcfg |= SMBHSTCFG_HST_EN;
 	pci_write_config_byte(priv->pci_dev, SMBHSTCFG, hstcfg);
 }
