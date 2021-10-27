@@ -1687,8 +1687,13 @@ static void __init intel_idle_cpuidle_unregister(struct cpuidle_driver *drv)
 
 	if (intel_idle_cpuhp_state > 0)
 		cpuhp_remove_state(intel_idle_cpuhp_state);
-	for_each_online_cpu(i)
-		cpuidle_unregister_device(per_cpu_ptr(intel_idle_cpuidle_devices, i));
+	for_each_present_cpu(i) {
+		struct cpuidle_device *dev;
+
+		dev = per_cpu_ptr(intel_idle_cpuidle_devices, i);
+		if (dev->registered)
+			cpuidle_unregister_device(dev);
+	}
 	cpuidle_unregister_driver(drv);
 	free_percpu(intel_idle_cpuidle_devices);
 }
