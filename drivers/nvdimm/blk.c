@@ -226,6 +226,7 @@ static int nsblk_rw_bytes(struct nd_namespace_common *ndns,
 static const struct block_device_operations nd_blk_fops = {
 	.owner = THIS_MODULE,
 	.submit_bio =  nd_blk_submit_bio,
+	.set_read_only = nd_set_ro,
 };
 
 static void nd_blk_release_disk(void *disk)
