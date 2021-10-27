@@ -278,7 +278,12 @@ static int __init ic_open_devs(void)
 			if (ic_is_init_dev(dev) && netif_carrier_ok(dev))
 				goto have_carrier;
 
+		/* Give a chance to do complex initialization that
+		 * would require to take the rtnl lock.
+		 */
+		rtnl_unlock();
 		msleep(1);
+		rtnl_lock();
 
 		if (time_before(jiffies, next_msg))
 			continue;
