@@ -1676,6 +1676,8 @@ static int intel_idle_cpu_online(unsigned int cpu)
 	return 0;
 }
 
+static enum cpuhp_state intel_idle_cpuhp_state;
+
 /**
  * intel_idle_cpuidle_unregister - unregister from cpuidle framework
  */
@@ -1683,6 +1685,8 @@ static void __init intel_idle_cpuidle_unregister(struct cpuidle_driver *drv)
 {
 	int i;
 
+	if (intel_idle_cpuhp_state > 0)
+		cpuhp_remove_state(intel_idle_cpuhp_state);
 	for_each_online_cpu(i)
 		cpuidle_unregister_device(per_cpu_ptr(intel_idle_cpuidle_devices, i));
 	cpuidle_unregister_driver(drv);
@@ -1710,11 +1714,11 @@ static int __init intel_idle_cpuidle_register(struct cpuidle_driver *drv)
 		return retval;
 	}
 
-	retval = cpuhp_setup_state(CPUHP_AP_ONLINE_DYN, "idle/intel:online",
-				intel_idle_cpu_online, NULL);
-	if (retval < 0) {
+	intel_idle_cpuhp_state = cpuhp_setup_state(CPUHP_AP_ONLINE_DYN,
+		"idle/intel:online", intel_idle_cpu_online, NULL);
+	if (intel_idle_cpuhp_state < 0) {
 		intel_idle_cpuidle_unregister(drv);
-		return retval;
+		return intel_idle_cpuhp_state;
 	}
 	return 0;
 }
