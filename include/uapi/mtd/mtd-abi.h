@@ -208,6 +208,17 @@ struct otp_info {
 /* Erase a given range of user data (must be in mode %MTD_FILE_MODE_OTP_USER) */
 #define OTPERASE		_IOW('M', 25, struct otp_info)
 
+#define SECURE_PACKET_READ	_IOWR('M', 26, struct mtd_oob_buf)
+#define SECURE_PACKET_WRITE	_IOWR('M', 27, struct mtd_oob_buf)
+#define RD_VLOCK_BITS		_IOWR('M', 28, struct mtd_oob_buf)
+#define WR_VLOCK_BITS		_IOWR('M', 29, struct mtd_oob_buf)
+#define RD_NVLOCK_BITS		_IOWR('M', 30, struct mtd_oob_buf)
+#define WR_NVLOCK_BITS		_IOWR('M', 31, struct mtd_oob_buf)
+#define ER_NVLOCK_BITS		_IO('M', 32)
+#define RD_GLOBAL_FREEZE_BITS	_IOWR('M', 33, struct mtd_oob_buf)
+#define WR_GLOBAL_FREEZE_BITS	_IOWR('M', 34, struct mtd_oob_buf)
+#define RD_PASSWORD		_IOWR('M', 35, struct mtd_oob_buf)
+
 /*
  * Obsolete legacy interface. Keep it in order not to break userspace
  * interfaces

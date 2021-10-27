@@ -654,6 +654,16 @@ static int mtdchar_ioctl(struct file *file, u_int cmd, u_long arg)
 	case MTDFILEMODE:
 	case BLKPG:
 	case BLKRRPART:
+	case SECURE_PACKET_READ:
+	case SECURE_PACKET_WRITE:
+	case RD_VLOCK_BITS:
+	case WR_VLOCK_BITS:
+	case RD_NVLOCK_BITS:
+	case WR_NVLOCK_BITS:
+	case ER_NVLOCK_BITS:
+	case RD_GLOBAL_FREEZE_BITS:
+	case WR_GLOBAL_FREEZE_BITS:
+	case RD_PASSWORD:
 		break;
 
 	/* "dangerous" commands */
@@ -1015,6 +1025,141 @@ static int mtdchar_ioctl(struct file *file, u_int cmd, u_long arg)
 	{
 		/* No reread partition feature. Just return ok */
 		ret = 0;
+		break;
+	}
+	case SECURE_PACKET_READ:
+	{
+		struct mtd_oob_buf buf;
+		u8 *oobbuf;
+
+		if (copy_from_user(&buf, argp, sizeof(buf)))
+			ret = -EFAULT;
+
+		oobbuf = kmalloc(buf.length, GFP_KERNEL);
+		ret = master->_secure_packet_read(master, buf.length, oobbuf);
+		if (copy_to_user(buf.ptr, oobbuf, buf.length))
+			ret = -EFAULT;
+		break;
+	}
+
+	case SECURE_PACKET_WRITE:
+	{
+		struct mtd_oob_buf buf;
+		u8 *oobbuf;
+
+		if (copy_from_user(&buf, argp, sizeof(buf)))
+			ret = -EFAULT;
+
+		oobbuf = memdup_user(buf.ptr, buf.length);
+		ret = master->_secure_packet_write(master, buf.length, oobbuf);
+		break;
+	}
+
+	case RD_VLOCK_BITS:
+	{
+		struct mtd_oob_buf buf;
+		u8 *oobbuf;
+
+		if (copy_from_user(&buf, argp, sizeof(buf)))
+			ret = -EFAULT;
+
+		oobbuf = kmalloc(buf.length, GFP_KERNEL);
+		ret = master->_read_vlock_bits(master, buf.start, buf.length,
+					       oobbuf);
+		if (copy_to_user(buf.ptr, oobbuf, buf.length))
+			ret = -EFAULT;
+		break;
+	}
+
+	case WR_VLOCK_BITS:
+	{
+		struct mtd_oob_buf buf;
+		u8 *oobbuf;
+
+		if (copy_from_user(&buf, argp, sizeof(buf)))
+			ret = -EFAULT;
+
+		oobbuf = memdup_user(buf.ptr, buf.length);
+		ret = master->_write_vlock_bits(master, buf. start, buf.length,
+						oobbuf);
+		break;
+	}
+
+	case RD_NVLOCK_BITS:
+	{
+		struct mtd_oob_buf buf;
+		u8 *oobbuf;
+
+		if (copy_from_user(&buf, argp, sizeof(buf)))
+			ret = -EFAULT;
+
+		oobbuf = kmalloc(buf.length, GFP_KERNEL);
+		ret = master->_read_nvlock_bits(master, buf.start, buf.length,
+						oobbuf);
+		if (copy_to_user(buf.ptr, oobbuf, buf.length))
+			ret = -EFAULT;
+		break;
+	}
+
+	case WR_NVLOCK_BITS:
+	{
+		struct mtd_oob_buf buf;
+
+		if (copy_from_user(&buf, argp, sizeof(buf)))
+			ret = -EFAULT;
+
+		ret = master->_write_nvlock_bits(master, buf.start);
+		break;
+	}
+
+	case ER_NVLOCK_BITS:
+	{
+		ret = master->_erase_nvlock_bits(master);
+		break;
+	}
+
+	case RD_GLOBAL_FREEZE_BITS:
+	{
+		struct mtd_oob_buf buf;
+		u8 *oobbuf;
+
+		if (copy_from_user(&buf, argp, sizeof(buf)))
+			ret = -EFAULT;
+
+		oobbuf = kmalloc(buf.length, GFP_KERNEL);
+		ret = master->_read_global_freeze_bits(master, buf.length,
+						       oobbuf);
+		if (copy_to_user(buf.ptr, oobbuf, buf.length))
+			ret = -EFAULT;
+		break;
+	}
+
+	case WR_GLOBAL_FREEZE_BITS:
+	{
+		struct mtd_oob_buf buf;
+		u8 *oobbuf;
+
+		if (copy_from_user(&buf, argp, sizeof(buf)))
+			ret = -EFAULT;
+
+		oobbuf = memdup_user(buf.ptr, buf.length);
+		ret = master->_write_global_freeze_bits(master, buf.length,
+							oobbuf);
+		break;
+	}
+
+	case RD_PASSWORD:
+	{
+		struct mtd_oob_buf buf;
+		u8 *oobbuf;
+
+		if (copy_from_user(&buf, argp, sizeof(buf)))
+			ret = -EFAULT;
+
+		oobbuf = kmalloc(buf.length, GFP_KERNEL);
+		ret = master->_read_password(master, buf.length, oobbuf);
+		if (copy_to_user(buf.ptr, oobbuf, buf.length))
+			ret = -EFAULT;
 		break;
 	}
 	}
