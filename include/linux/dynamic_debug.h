@@ -28,14 +28,23 @@ struct _ddebug {
 	 */
 #define _DPRINTK_FLAGS_NONE	0
 #define _DPRINTK_FLAGS_PRINT	(1<<0) /* printk() a message using the format */
+#define _DPRINTK_FLAGS_TRACE	(1<<5) /* trace_printk() the message */
+#define _DPRINTK_ENABLED	(_DPRINTK_FLAGS_PRINT | _DPRINTK_FLAGS_TRACE)
+
+#define dyndbg_site_is_enabled(desc) (!!(desc->flags & _DPRINTK_ENABLED))
+#define dyndbg_site_is_logging(desc) (!!(desc->flags & _DPRINTK_FLAGS_PRINT))
+#define dyndbg_site_is_tracing(desc) (!!(desc->flags & _DPRINTK_FLAGS_TRACE))
+
 #define _DPRINTK_FLAGS_INCL_MODNAME	(1<<1)
 #define _DPRINTK_FLAGS_INCL_FUNCNAME	(1<<2)
 #define _DPRINTK_FLAGS_INCL_LINENO	(1<<3)
 #define _DPRINTK_FLAGS_INCL_TID		(1<<4)
 
-#define _DPRINTK_FLAGS_INCL_ANY		\
+#define _DPRINTK_FLAGS_INCL_ANY						\
 	(_DPRINTK_FLAGS_INCL_MODNAME | _DPRINTK_FLAGS_INCL_FUNCNAME |\
 	 _DPRINTK_FLAGS_INCL_LINENO  | _DPRINTK_FLAGS_INCL_TID)
+
+#define dyndbg_site_is_decorated(desc) (!!(desc->flags & _DPRINTK_FLAGS_INCL_ANY))
 
 #if defined DEBUG
 #define _DPRINTK_FLAGS_DEFAULT _DPRINTK_FLAGS_PRINT
