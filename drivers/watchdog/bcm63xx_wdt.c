@@ -18,6 +18,7 @@
 #include <linux/miscdevice.h>
 #include <linux/module.h>
 #include <linux/moduleparam.h>
+#include <linux/of_device.h>
 #include <linux/types.h>
 #include <linux/uaccess.h>
 #include <linux/watchdog.h>
@@ -39,7 +40,13 @@
 #define WDT_DEFAULT_TIME	30      /* seconds */
 #define WDT_MAX_TIME		256     /* seconds */
 
+enum bcm63xx_wdt_soc {
+	BCM63XX_WDT_SOC_BCM4908,
+	BCM63XX_WDT_SOC_BCM63XX,
+};
+
 static struct {
+	enum bcm63xx_wdt_soc soc;
 	void __iomem *regs;
 	struct timer_list timer;
 	unsigned long inuse;
@@ -54,11 +61,41 @@ module_param(nowayout, bool, 0);
 MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default="
 	__MODULE_STRING(WATCHDOG_NOWAYOUT) ")");
 
-static void bcm63xx_wdt_write_reg(u32 reg, u32 val)
+static const struct of_device_id bcm63xx_wdt_id_table[] = {
+	{ .compatible = "brcm,bcm4908-wdt", .data = (const void *)BCM63XX_WDT_SOC_BCM4908, },
+	{},
+};
+
+enum bcm63xx_wdt_regs {
+	BCM63XX_WDT_REG_DEFVAL = 0,
+	BCM63XX_WDT_REG_CTL,
+	BCM63XX_WDT_REG_SOFTRESET,
+};
+
+static const u16 bcm63xx_wdt_regs_bcm4908[] = {
+	[BCM63XX_WDT_REG_DEFVAL]	= 0x28,
+	[BCM63XX_WDT_REG_CTL]		= 0x2c,
+	[BCM63XX_WDT_REG_SOFTRESET]	= 0x34,
+};
+
+static const u16 bcm63xx_wdt_regs_bcm63xx[] = {
+	[BCM63XX_WDT_REG_DEFVAL]	= WDT_DEFVAL_REG,
+	[BCM63XX_WDT_REG_CTL]		= WDT_CTL_REG,
+};
+
+static void bcm63xx_wdt_write_reg(enum bcm63xx_wdt_regs reg, u32 val)
 {
 	void __iomem *addr = bcm63xx_wdt_device.regs;
 
-	addr += reg;
+	switch (bcm63xx_wdt_device.soc) {
+	case BCM63XX_WDT_SOC_BCM4908:
+		addr += bcm63xx_wdt_regs_bcm4908[reg];
+		break;
+	case BCM63XX_WDT_SOC_BCM63XX:
+		addr += bcm63xx_wdt_regs_bcm63xx[reg];
+		break;
+	}
+
 #ifdef BCM63XX
 	bcm_writel(val, addr);
 #else
@@ -69,15 +106,15 @@ static void bcm63xx_wdt_write_reg(u32 reg, u32 val)
 /* HW functions */
 static void bcm63xx_wdt_hw_start(void)
 {
-	bcm63xx_wdt_write_reg(WDT_DEFVAL_REG, 0xfffffffe);
-	bcm63xx_wdt_write_reg(WDT_CTL_REG, WDT_START_1);
-	bcm63xx_wdt_write_reg(WDT_CTL_REG, WDT_START_2);
+	bcm63xx_wdt_write_reg(BCM63XX_WDT_REG_DEFVAL, 0xfffffffe);
+	bcm63xx_wdt_write_reg(BCM63XX_WDT_REG_CTL, WDT_START_1);
+	bcm63xx_wdt_write_reg(BCM63XX_WDT_REG_CTL, WDT_START_2);
 }
 
 static void bcm63xx_wdt_hw_stop(void)
 {
-	bcm63xx_wdt_write_reg(WDT_CTL_REG, WDT_STOP_1);
-	bcm63xx_wdt_write_reg(WDT_CTL_REG, WDT_STOP_2);
+	bcm63xx_wdt_write_reg(BCM63XX_WDT_REG_CTL, WDT_STOP_1);
+	bcm63xx_wdt_write_reg(BCM63XX_WDT_REG_CTL, WDT_STOP_2);
 }
 
 #ifdef BCM63XX
@@ -250,8 +287,18 @@ static struct miscdevice bcm63xx_wdt_miscdev = {
 
 static int bcm63xx_wdt_probe(struct platform_device *pdev)
 {
+	struct device *dev = &pdev->dev;
+	const struct of_device_id *of_id;
 	int ret;
 	struct resource *r;
+
+	of_id = of_match_device(bcm63xx_wdt_id_table, dev);
+	if (of_id) {
+		bcm63xx_wdt_device.soc = (enum bcm63xx_wdt_soc)of_id->data;
+	} else {
+		/* Fallback */
+		bcm63xx_wdt_device.soc = BCM63XX_WDT_SOC_BCM63XX;
+	}
 
 	timer_setup(&bcm63xx_wdt_device.timer, bcm63xx_timer_tick, 0);
 
@@ -324,6 +371,7 @@ static struct platform_driver bcm63xx_wdt_driver = {
 	.shutdown = bcm63xx_wdt_shutdown,
 	.driver = {
 		.name = "bcm63xx-wdt",
+		.of_match_table = bcm63xx_wdt_id_table,
 	}
 };
 
@@ -331,6 +379,7 @@ module_platform_driver(bcm63xx_wdt_driver);
 
 MODULE_AUTHOR("Miguel Gaio <miguel.gaio@efixo.com>");
 MODULE_AUTHOR("Florian Fainelli <florian@openwrt.org>");
+MODULE_DEVICE_TABLE(of, bcm63xx_wdt_id_table);
 MODULE_DESCRIPTION("Driver for the Broadcom BCM63xx SoC watchdog");
 MODULE_LICENSE("GPL");
 MODULE_ALIAS("platform:bcm63xx-wdt");
