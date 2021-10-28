@@ -80,7 +80,7 @@ pgd_t *pgd_alloc(struct mm_struct *mm)
 	       * sizeof(pmd_t));
 	clean_dcache_area(new_pmd, PTRS_PER_PMD * sizeof(pmd_t));
 #endif /* CONFIG_KASAN */
-#endif /* CONFIG_LPAE */
+#endif /* CONFIG_ARM_LPAE */
 
 	if (!vectors_high()) {
 		/*
