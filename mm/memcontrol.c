@@ -2741,7 +2741,7 @@ static void add_hpage_to_queue(struct page *page, struct mem_cgroup *memcg)
 	struct hpage_reclaim *hr_queue;
 	unsigned long flags;
 
-	if (READ_ONCE(memcg->thp_reclaim) == THP_RECLAIM_DISABLE)
+	if (get_thp_reclaim_mode(memcg) == THP_RECLAIM_DISABLE)
 		return;
 
 	page = compound_head(page);

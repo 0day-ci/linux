@@ -2801,7 +2801,7 @@ static unsigned long reclaim_hpage_zero_subpages(struct lruvec *lruvec,
 		goto out;
 
 	hr_queue = &memcg->nodeinfo[nid]->hpage_reclaim_queue;
-	if (!READ_ONCE(memcg->thp_reclaim))
+	if (get_thp_reclaim_mode(memcg) == THP_RECLAIM_DISABLE)
 		goto out;
 
 	/* The last scan loop will scan all the huge pages.*/

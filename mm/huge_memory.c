@@ -60,6 +60,10 @@ unsigned long transparent_hugepage_flags __read_mostly =
 
 static struct shrinker deferred_split_shrinker;
 
+#ifdef CONFIG_MEMCG
+int global_thp_reclaim = THP_RECLAIM_MEMCG;
+#endif
+
 static atomic_t huge_zero_refcount;
 struct page *huge_zero_page __read_mostly;
 unsigned long huge_zero_pfn __read_mostly = ~0UL;
@@ -330,6 +334,43 @@ static ssize_t hpage_pmd_size_show(struct kobject *kobj,
 static struct kobj_attribute hpage_pmd_size_attr =
 	__ATTR_RO(hpage_pmd_size);
 
+#ifdef CONFIG_MEMCG
+static ssize_t reclaim_show(struct kobject *kobj,
+			    struct kobj_attribute *attr, char *buf)
+{
+	int thp_reclaim = READ_ONCE(global_thp_reclaim);
+
+	if (thp_reclaim == THP_RECLAIM_MEMCG)
+		return sprintf(buf, "[memcg] enable disable\n");
+	else if (thp_reclaim == THP_RECLAIM_ENABLE)
+		return sprintf(buf, "memcg [enable] disable\n");
+	else
+		return sprintf(buf, "memcg enable [disable]\n");
+}
+
+static ssize_t reclaim_store(struct kobject *kobj,
+			     struct kobj_attribute *attr,
+			     const char *buf, size_t count)
+{
+	if (!memcmp("memcg", buf,
+		    min(sizeof("memcg")-1, count)))
+		WRITE_ONCE(global_thp_reclaim, THP_RECLAIM_MEMCG);
+	else if (!memcmp("enable", buf,
+		    min(sizeof("enable")-1, count)))
+		WRITE_ONCE(global_thp_reclaim, THP_RECLAIM_ENABLE);
+	else if (!memcmp("disable", buf,
+		    min(sizeof("disable")-1, count)))
+		WRITE_ONCE(global_thp_reclaim, THP_RECLAIM_DISABLE);
+	else
+		return -EINVAL;
+
+	return count;
+}
+
+static struct kobj_attribute reclaim_attr =
+	__ATTR(reclaim, 0644, reclaim_show, reclaim_store);
+#endif
+
 static struct attribute *hugepage_attr[] = {
 	&enabled_attr.attr,
 	&defrag_attr.attr,
@@ -337,6 +378,9 @@ static struct attribute *hugepage_attr[] = {
 	&hpage_pmd_size_attr.attr,
 #ifdef CONFIG_SHMEM
 	&shmem_enabled_attr.attr,
+#endif
+#ifdef CONFIG_MEMCG
+	&reclaim_attr.attr,
 #endif
 	NULL,
 };

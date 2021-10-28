@@ -1123,6 +1123,14 @@ unsigned long mem_cgroup_soft_limit_reclaim(pg_data_t *pgdat, int order,
 
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
 void del_hpage_from_queue(struct page *page);
+
+static inline int get_thp_reclaim_mode(struct mem_cgroup *memcg)
+{
+	int reclaim = READ_ONCE(global_thp_reclaim);
+
+	return (reclaim != THP_RECLAIM_MEMCG) ? reclaim :
+			READ_ONCE(memcg->thp_reclaim);
+}
 #endif
 
 #else /* CONFIG_MEMCG */
