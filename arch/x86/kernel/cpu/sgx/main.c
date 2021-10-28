@@ -714,9 +714,11 @@ static bool __init sgx_page_cache_init(void)
 			spin_lock_init(&sgx_numa_nodes[nid].lock);
 			INIT_LIST_HEAD(&sgx_numa_nodes[nid].free_page_list);
 			node_set(nid, sgx_numa_mask);
+			sgx_numa_nodes[nid].size = 0;
 		}
 
 		sgx_epc_sections[i].node =  &sgx_numa_nodes[nid];
+		sgx_numa_nodes[nid].size += size;
 
 		sgx_nr_epc_sections++;
 	}
@@ -790,6 +792,81 @@ int sgx_set_attribute(unsigned long *allowed_attributes,
 }
 EXPORT_SYMBOL_GPL(sgx_set_attribute);
 
+#ifdef CONFIG_NUMA
+static ssize_t size_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	unsigned long size = 0;
+	int nid;
+
+	for (nid = 0; nid < num_possible_nodes(); nid++) {
+		if (dev == sgx_numa_nodes[nid].dev) {
+			size = sgx_numa_nodes[nid].size;
+			break;
+		}
+	}
+
+	return sysfs_emit(buf, "%lu\n", size);
+}
+DEVICE_ATTR_RO(size);
+
+static struct attribute *sgx_node_attrs[] = {
+	&dev_attr_size.attr,
+	NULL,
+};
+
+static const struct attribute_group sgx_node_attr_group = {
+	.name = "sgx",
+	.attrs = sgx_node_attrs,
+};
+
+static void sgx_numa_exit(void)
+{
+	struct device *dev;
+	int nid;
+
+	for (nid = 0; nid < num_possible_nodes(); nid++) {
+		dev = &node_devices[nid]->dev;
+		if (dev)
+			sysfs_remove_group(&dev->kobj, &sgx_node_attr_group);
+	}
+}
+
+static bool sgx_numa_init(void)
+{
+	struct sgx_numa_node *node;
+	struct device *dev;
+	int nid;
+	int ret;
+
+	for (nid = 0; nid < num_possible_nodes(); nid++) {
+		if (!sgx_numa_nodes[nid].size)
+			continue;
+
+		node = &sgx_numa_nodes[nid];
+		dev = &node_devices[nid]->dev;
+
+		ret = sysfs_create_group(&dev->kobj, &sgx_node_attr_group);
+		if (ret) {
+			sgx_numa_exit();
+			return false;
+		}
+
+		node->dev = dev;
+	}
+
+	return true;
+}
+#else
+static inline void sgx_numa_exit(void)
+{
+}
+
+static inline bool sgx_numa_init(void)
+{
+	return true;
+}
+#endif /* CONFIG_NUMA */
+
 static int __init sgx_init(void)
 {
 	int ret;
@@ -804,6 +881,11 @@ static int __init sgx_init(void)
 	if (!sgx_page_reclaimer_init()) {
 		ret = -ENOMEM;
 		goto err_reclaimer;
+	}
+
+	if (!sgx_numa_init()) {
+		ret = -ENOMEM;
+		goto err_numa_nodes;
 	}
 
 	ret = misc_register(&sgx_dev_provision);
@@ -829,6 +911,9 @@ err_driver:
 	misc_deregister(&sgx_dev_provision);
 
 err_provision:
+	sgx_numa_exit();
+
+err_numa_nodes:
 	kthread_stop(ksgxd_tsk);
 
 err_reclaimer:
