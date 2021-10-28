@@ -10,6 +10,7 @@
 #include <asm/ftrace.h>
 #include <asm/export.h>
 #include <asm/ptrace.h>
+#include <asm/bug.h>
 
 _GLOBAL(mcount)
 _GLOBAL(_mcount)
@@ -83,6 +84,9 @@ _GLOBAL(ftrace_regs_caller)
 	lis	r3,function_trace_op@ha
 	lwz	r5,function_trace_op@l(r3)
 
+#ifdef CONFIG_LIVEPATCH
+	mr	r14,r7		/* remember old NIP */
+#endif
 	/* Calculate ip from nip-4 into r3 for call below */
 	subi    r3, r7, MCOUNT_INSN_SIZE
 
@@ -107,6 +111,9 @@ ftrace_regs_call:
 	/* Load ctr with the possibly modified NIP */
 	lwz	r3, _NIP(r1)
 	mtctr	r3
+#ifdef CONFIG_LIVEPATCH
+	cmpw	r14, r3		/* has NIP been altered? */
+#endif
 
 	/* Restore gprs */
 	lmw	r2, GPR2(r1)
@@ -118,7 +125,69 @@ ftrace_regs_call:
 	/* Pop our stack frame */
 	addi r1, r1, INT_FRAME_SIZE
 
+#ifdef CONFIG_LIVEPATCH
+        /* Based on the cmpw above, if the NIP was altered handle livepatch */
+	bne-	livepatch_handler
+#endif
 	b	ftrace_caller_common
+
+#ifdef CONFIG_LIVEPATCH
+	/*
+	 * This function runs in the mcount context, between two functions. As
+	 * such it can only clobber registers which are volatile and used in
+	 * function linkage.
+	 *
+	 * We get here when a function A, calls another function B, but B has
+	 * been live patched with a new function C.
+	 *
+	 * On entry:
+	 *  - we have no stack frame and can not allocate one
+	 *  - LR points back to the original caller (in A)
+	 *  - CTR holds the new NIP in C
+	 *  - r0, r11 & r12 are free
+	 */
+livepatch_handler:
+	/* Allocate 2 x 8 bytes */
+	lwz	r11, TI_livepatch_sp+THREAD(r2)
+	addi	r11, r11, 16
+	stw	r11, TI_livepatch_sp+THREAD(r2)
+
+	/* Save real LR on livepatch stack */
+	mflr	r12
+	stw	r12, -16(r11)
+
+	/* Store stack end marker */
+	lis     r12, STACK_END_MAGIC@h
+	ori     r12, r12, STACK_END_MAGIC@l
+	stw	r12, -4(r11)
+
+	/* Branch to ctr */
+	bctrl
+
+	/*
+	 * Now we are returning from the patched function to the original
+	 * caller A. We are free to use r11 and r12.
+	 */
+
+	lwz	r11, TI_livepatch_sp+THREAD(r2)
+
+	/* Check stack marker hasn't been trashed */
+	lwz	r12, -4(r11)
+	subis	r12, r12, STACK_END_MAGIC@h
+1:	twnei	r12, STACK_END_MAGIC@l
+	EMIT_BUG_ENTRY 1b, __FILE__, __LINE__ - 1, 0
+
+	/* Restore LR from livepatch stack */
+	lwz	r12, -16(r11)
+	mtlr	r12
+
+	/* Pop livepatch stack frame */
+	subi	r11, r11, 16
+	stw	r11, TI_livepatch_sp+THREAD(r2)
+
+	/* Return to original caller of live patched function */
+	blr
+#endif /* CONFIG_LIVEPATCH */
 
 #ifdef CONFIG_FUNCTION_GRAPH_TRACER
 _GLOBAL(ftrace_graph_caller)
