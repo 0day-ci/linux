@@ -2818,7 +2818,7 @@ static unsigned long reclaim_hpage_zero_subpages(struct lruvec *lruvec,
 		if (!page)
 			continue;
 
-		nr_reclaimed += zsr_reclaim_hpage(lruvec, page);
+		nr_reclaimed += zsr_reclaim_hpage(hr_queue, lruvec, page);
 
 		cond_resched();
 

@@ -4575,6 +4575,49 @@ static ssize_t memcg_thp_reclaim_ctrl_write(struct kernfs_open_file *of,
 
 	return nbytes;
 }
+
+static int memcg_thp_reclaim_stat_show(struct seq_file *m, void *v)
+{
+	struct mem_cgroup *memcg = mem_cgroup_from_css(seq_css(m));
+	struct mem_cgroup_per_node *mz;
+	int nid;
+	unsigned long len;
+
+	seq_puts(m, "queue_length\t");
+	for_each_node(nid) {
+		mz = memcg->nodeinfo[nid];
+		len = READ_ONCE(mz->hpage_reclaim_queue.reclaim_queue_len);
+		seq_printf(m, "%-24lu", len);
+	}
+
+	seq_puts(m, "\n");
+	seq_puts(m, "split_hpage\t");
+	for_each_node(nid) {
+		mz = memcg->nodeinfo[nid];
+		len = atomic_long_read(&mz->hpage_reclaim_queue.split_hpage);
+		seq_printf(m, "%-24lu", len);
+	}
+
+	seq_puts(m, "\n");
+	seq_puts(m, "split_failed\t");
+	for_each_node(nid) {
+		mz = memcg->nodeinfo[nid];
+		len = atomic_long_read(&mz->hpage_reclaim_queue.split_failed);
+		seq_printf(m, "%-24lu", len);
+	}
+
+	seq_puts(m, "\n");
+	seq_puts(m, "reclaim_subpage\t");
+	for_each_node(nid) {
+		mz = memcg->nodeinfo[nid];
+		len = atomic_long_read(&mz->hpage_reclaim_queue.reclaim_subpage);
+		seq_printf(m, "%-24lu", len);
+	}
+
+	seq_puts(m, "\n");
+
+	return 0;
+}
 #endif
 
 #ifdef CONFIG_CGROUP_WRITEBACK
@@ -5149,6 +5192,10 @@ static struct cftype mem_cgroup_legacy_files[] = {
 		.name = "thp_reclaim_ctrl",
 		.seq_show = memcg_thp_reclaim_ctrl_show,
 		.write = memcg_thp_reclaim_ctrl_write,
+	},
+	{
+		.name = "thp_reclaim_stat",
+		.seq_show = memcg_thp_reclaim_stat_show,
 	},
 #endif
 	{ },	/* terminate */

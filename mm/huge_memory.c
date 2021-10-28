@@ -3508,7 +3508,8 @@ unlock:
 
 }
 
-unsigned long zsr_reclaim_hpage(struct lruvec *lruvec, struct page *page)
+unsigned long zsr_reclaim_hpage(struct hpage_reclaim *hr_queue,
+				struct lruvec *lruvec, struct page *page)
 {
 	struct pglist_data *pgdat = page_pgdat(page);
 	unsigned long reclaimed;
@@ -3525,12 +3526,15 @@ unsigned long zsr_reclaim_hpage(struct lruvec *lruvec, struct page *page)
 		putback_lru_page(page);
 		mod_node_page_state(pgdat, NR_ISOLATED_ANON,
 				    -HPAGE_PMD_NR);
+		atomic_long_inc(&hr_queue->split_failed);
 		return 0;
 	}
 
 	unlock_page(page);
 	list_add_tail(&page->lru, &split_list);
 	reclaimed = reclaim_zero_subpages(&split_list, &keep_list);
+	atomic_long_inc(&hr_queue->split_hpage);
+	atomic_long_add(reclaimed, &hr_queue->reclaim_subpage);
 
 	spin_lock_irqsave(&lruvec->lru_lock, flags);
 	move_pages_to_lru(lruvec, &keep_list);
@@ -3566,7 +3570,7 @@ void zsr_reclaim_memcg(struct mem_cgroup *memcg)
 			if (!page)
 				continue;
 
-			zsr_reclaim_hpage(lruvec, page);
+			zsr_reclaim_hpage(hr_queue, lruvec, page);
 
 			cond_resched();
 		}
