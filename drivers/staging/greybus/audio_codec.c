@@ -1028,7 +1028,7 @@ static int gbcodec_probe(struct snd_soc_component *comp)
 static void gbcodec_remove(struct snd_soc_component *comp)
 {
 	/* Empty function for now */
-	return;
+	return 0;
 }
 
 static int gbcodec_write(struct snd_soc_component *comp, unsigned int reg,
