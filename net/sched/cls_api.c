@@ -3025,6 +3025,29 @@ void tcf_exts_destroy(struct tcf_exts *exts)
 }
 EXPORT_SYMBOL(tcf_exts_destroy);
 
+static bool tcf_exts_validate_actions(const struct tcf_exts *exts, u32 flags)
+{
+#ifdef CONFIG_NET_CLS_ACT
+	bool skip_sw = tc_skip_sw(flags);
+	bool skip_hw = tc_skip_hw(flags);
+	int i;
+
+	if (!(skip_sw | skip_hw))
+		return true;
+
+	for (i = 0; i < exts->nr_actions; i++) {
+		struct tc_action *a = exts->actions[i];
+
+		if ((skip_sw && tc_act_skip_hw(a->tcfa_flags)) ||
+		    (skip_hw && tc_act_skip_sw(a->tcfa_flags)))
+			return false;
+	}
+	return true;
+#else
+	return true;
+#endif
+}
+
 int tcf_exts_validate(struct net *net, struct tcf_proto *tp, struct nlattr **tb,
 		      struct nlattr *rate_tlv, struct tcf_exts *exts,
 		      u32 flags, struct netlink_ext_ack *extack)
@@ -3066,6 +3089,9 @@ int tcf_exts_validate(struct net *net, struct tcf_proto *tp, struct nlattr **tb,
 				return err;
 			exts->nr_actions = err;
 		}
+
+		if (!tcf_exts_validate_actions(exts, flags))
+			return -EINVAL;
 	}
 #else
 	if ((exts->action && tb[exts->action]) ||
