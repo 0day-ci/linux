@@ -526,7 +526,10 @@ static int ocelot_chip_init(struct ocelot *ocelot, const struct ocelot_ops *ops)
 
 	ocelot_pll5_init(ocelot);
 
-	eth_random_addr(ocelot->base_mac);
+	ret = of_get_mac_address(ocelot->dev->of_node, ocelot->base_mac);
+	if (ret)
+		eth_random_addr(ocelot->base_mac);
+
 	ocelot->base_mac[5] &= 0xf0;
 
 	return 0;
