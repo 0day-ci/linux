@@ -135,14 +135,6 @@ static const struct neigh_ops arp_generic_ops = {
 	.connected_output =	neigh_connected_output,
 };
 
-static const struct neigh_ops arp_hh_ops = {
-	.family =		AF_INET,
-	.solicit =		arp_solicit,
-	.error_report =		arp_error_report,
-	.output =		neigh_resolve_output,
-	.connected_output =	neigh_resolve_output,
-};
-
 static const struct neigh_ops arp_direct_ops = {
 	.family =		AF_INET,
 	.output =		neigh_direct_output,
@@ -277,12 +269,9 @@ static int arp_constructor(struct neighbour *neigh)
 			memcpy(neigh->ha, dev->broadcast, dev->addr_len);
 		}
 
-		if (dev->header_ops->cache)
-			neigh->ops = &arp_hh_ops;
-		else
-			neigh->ops = &arp_generic_ops;
+		neigh->ops = &arp_generic_ops;
 
-		if (neigh->nud_state & NUD_VALID)
+		if (!dev->header_ops->cache && (neigh->nud_state & NUD_VALID))
 			neigh->output = neigh->ops->connected_output;
 		else
 			neigh->output = neigh->ops->output;
