@@ -172,6 +172,9 @@ void i40e_vc_notify_vf_reset(struct i40e_vf *vf)
 	    !test_bit(I40E_VF_STATE_ACTIVE, &vf->vf_states))
 		return;
 
+	if (ktime_get_ns() - vf->reset_timestamp < I40E_VF_RESET_TIME_MIN)
+		usleep_range(30000, 60000);
+
 	abs_vf_id = vf->vf_id + (int)vf->pf->hw.func_caps.vf_base_id;
 
 	pfe.event = VIRTCHNL_EVENT_RESET_IMPENDING;
@@ -1536,6 +1539,7 @@ bool i40e_reset_vf(struct i40e_vf *vf, bool flr)
 	i40e_cleanup_reset_vf(vf);
 
 	i40e_flush(hw);
+	vf->reset_timestamp = ktime_get_ns();
 	clear_bit(__I40E_VF_DISABLE, pf->state);
 
 	return true;
