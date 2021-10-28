@@ -14,7 +14,9 @@ maintainers:
 
 properties:
   compatible:
-    const: brcm,bcm7038-wdt
+    enum:
+      - brcm,bcm4908-wdt
+      - brcm,bcm7038-wdt
 
   reg:
     maxItems: 1
