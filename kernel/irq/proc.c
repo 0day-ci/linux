@@ -147,10 +147,16 @@ static ssize_t write_irq_affinity(int type, struct file *file,
 	if (!zalloc_cpumask_var(&new_value, GFP_KERNEL))
 		return -ENOMEM;
 
-	if (type)
+	switch (type) {
+	case AFFINITY_LIST:
 		err = cpumask_parselist_user(buffer, count, new_value);
-	else
+		break;
+	case AFFINITY:
 		err = cpumask_parse_user(buffer, count, new_value);
+		break;
+	default:
+		err = -EINVAL;
+	}
 	if (err)
 		goto free_cpumask;
 
@@ -179,13 +185,13 @@ free_cpumask:
 static ssize_t irq_affinity_proc_write(struct file *file,
 		const char __user *buffer, size_t count, loff_t *pos)
 {
-	return write_irq_affinity(0, file, buffer, count, pos);
+	return write_irq_affinity(AFFINITY, file, buffer, count, pos);
 }
 
 static ssize_t irq_affinity_list_proc_write(struct file *file,
 		const char __user *buffer, size_t count, loff_t *pos)
 {
-	return write_irq_affinity(1, file, buffer, count, pos);
+	return write_irq_affinity(AFFINITY_LIST, file, buffer, count, pos);
 }
 
 static int irq_affinity_proc_open(struct inode *inode, struct file *file)
