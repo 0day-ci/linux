@@ -90,7 +90,7 @@ size_t ZSTD_compressBound(size_t srcSize);
  * ZSTD_isError() - tells if a size_t function result is an error code
  * @code:  The function result to check for error.
  *
- * Return: Non-zero iff the code is an error.
+ * Return: Non-zero if the code is an error.
  */
 static __attribute__((unused)) unsigned int ZSTD_isError(size_t code)
 {
