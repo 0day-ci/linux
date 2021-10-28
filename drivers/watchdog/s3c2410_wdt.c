@@ -126,6 +126,8 @@ struct s3c2410_wdt_variant {
 struct s3c2410_wdt {
 	struct device		*dev;
 	struct clk		*clock;
+	struct clk		*clock_src;
+	unsigned long		freq_src;
 	void __iomem		*reg_base;
 	unsigned int		count;
 	spinlock_t		lock;
@@ -213,10 +215,8 @@ MODULE_DEVICE_TABLE(platform, s3c2410_wdt_ids);
 
 /* functions */
 
-static inline unsigned int s3c2410wdt_max_timeout(struct clk *clock)
+static inline unsigned int s3c2410wdt_max_timeout(unsigned long freq)
 {
-	unsigned long freq = clk_get_rate(clock);
-
 	return S3C2410_WTCNT_MAXCNT / (freq / (S3C2410_WTCON_PRESCALE_MAX + 1)
 				       / S3C2410_WTCON_MAXDIV);
 }
@@ -364,7 +364,7 @@ static int s3c2410wdt_set_heartbeat(struct watchdog_device *wdd,
 				    unsigned int timeout)
 {
 	struct s3c2410_wdt *wdt = watchdog_get_drvdata(wdd);
-	unsigned long freq = clk_get_rate(wdt->clock);
+	unsigned long freq = wdt->freq_src;
 	unsigned int count;
 	unsigned int divisor = 1;
 	unsigned long wtcon;
@@ -627,13 +627,27 @@ static int s3c2410wdt_probe(struct platform_device *pdev)
 		return ret;
 	}
 
+	/* "watchdog_src" clock is optional; if it's not present -- just skip */
+	wdt->clock_src = devm_clk_get(dev, "watchdog_src");
+	if (!IS_ERR(wdt->clock_src)) {
+		ret = clk_prepare_enable(wdt->clock_src);
+		if (ret < 0) {
+			dev_err(dev, "failed to enable source clock\n");
+			ret = PTR_ERR(wdt->clock_src);
+			goto err_clk;
+		}
+		wdt->freq_src = clk_get_rate(wdt->clock_src);
+	} else {
+		wdt->freq_src = clk_get_rate(wdt->clock);
+	}
+
 	wdt->wdt_device.min_timeout = 1;
-	wdt->wdt_device.max_timeout = s3c2410wdt_max_timeout(wdt->clock);
+	wdt->wdt_device.max_timeout = s3c2410wdt_max_timeout(wdt->freq_src);
 
 	ret = s3c2410wdt_cpufreq_register(wdt);
 	if (ret < 0) {
 		dev_err(dev, "failed to register cpufreq\n");
-		goto err_clk;
+		goto err_clk_src;
 	}
 
 	watchdog_set_drvdata(&wdt->wdt_device, wdt);
@@ -707,6 +721,10 @@ static int s3c2410wdt_probe(struct platform_device *pdev)
  err_cpufreq:
 	s3c2410wdt_cpufreq_deregister(wdt);
 
+ err_clk_src:
+	if (!IS_ERR(wdt->clock_src))
+		clk_disable_unprepare(wdt->clock_src);
+
  err_clk:
 	clk_disable_unprepare(wdt->clock);
 
@@ -726,6 +744,9 @@ static int s3c2410wdt_remove(struct platform_device *dev)
 	watchdog_unregister_device(&wdt->wdt_device);
 
 	s3c2410wdt_cpufreq_deregister(wdt);
+
+	if (!IS_ERR(wdt->clock_src))
+		clk_disable_unprepare(wdt->clock_src);
 
 	clk_disable_unprepare(wdt->clock);
 
