@@ -1078,4 +1078,20 @@ unsigned long arch_syscall_addr(int nr);
 
 #endif /* CONFIG_FTRACE_SYSCALLS */
 
+struct trace_event_file;
+
+#ifdef CONFIG_TRACE_OBJECT
+int init_trace_object(void);
+int exit_trace_object(void);
+void set_trace_object(void *obj);
+void record_trace_object(struct trace_event_file *trace_file,
+		struct pt_regs *regs);
+#else
+static inline int init_trace_object(void) { return 0; }
+static inline int exit_trace_object(void) { return 0; }
+static inline void set_trace_object(void *obj) { }
+static inline void record_trace_object(struct trace_event_file *trace_file,
+		struct pt_regs *regs) { }
+#endif /* CONFIG_TRACE_OBJECT */
+
 #endif /* _LINUX_FTRACE_H */
