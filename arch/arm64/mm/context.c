@@ -50,10 +50,10 @@ static u32 get_cpu_asid_bits(void)
 		pr_warn("CPU%d: Unknown ASID size (%d); assuming 8-bit\n",
 					smp_processor_id(),  fld);
 		fallthrough;
-	case 0:
+	case ID_AA64MMFR0_ASID_8:
 		asid = 8;
 		break;
-	case 2:
+	case ID_AA64MMFR0_ASID_16:
 		asid = 16;
 	}
 
@@ -162,7 +162,7 @@ static u64 new_context(struct mm_struct *mm)
 	u64 generation = atomic64_read(&asid_generation);
 
 	if (asid != 0) {
-		u64 newasid = generation | (asid & ~ASID_MASK);
+		u64 newasid = generation | asid2idx(asid);
 
 		/*
 		 * If our current ASID was active during a rollover, we
@@ -306,7 +306,7 @@ unsigned long arm64_mm_context_get(struct mm_struct *mm)
 out_unlock:
 	raw_spin_unlock_irqrestore(&cpu_asid_lock, flags);
 
-	asid &= ~ASID_MASK;
+	asid = asid2idx(asid);
 
 	/* Set the equivalent of USER_ASID_BIT */
 	if (asid && arm64_kernel_unmapped_at_el0())
