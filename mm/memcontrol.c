@@ -4516,6 +4516,8 @@ static int memcg_thp_reclaim_ctrl_show(struct seq_file *m, void *v)
 	return 0;
 }
 
+#define CTRL_RECLAIM_MEMCG 1 /* only relciam current memcg */
+#define CTRL_RECLAIM_ALL   2 /* reclaim current memcg and all the children memcgs */
 static ssize_t memcg_thp_reclaim_ctrl_write(struct kernfs_open_file *of,
 					    char *buf, size_t nbytes,
 					    loff_t off)
@@ -4543,6 +4545,31 @@ static ssize_t memcg_thp_reclaim_ctrl_write(struct kernfs_open_file *of,
 			return -EINVAL;
 
 		xchg(&memcg->thp_reclaim_threshold, threshold);
+	} else if (!strcmp(key, "reclaim")) {
+		struct mem_cgroup *iter;
+		int mode;
+
+		value = strsep_s(&buf, " \t\n");
+		if (!value)
+			return -EINVAL;
+
+		ret = kstrtouint(value, 0, &mode);
+		if (ret)
+			return ret;
+
+		switch (mode) {
+		case CTRL_RECLAIM_MEMCG:
+			zsr_reclaim_memcg(memcg);
+			break;
+		case CTRL_RECLAIM_ALL:
+			iter = mem_cgroup_iter(memcg, NULL, NULL);
+			do {
+				zsr_reclaim_memcg(iter);
+			} while ((iter = mem_cgroup_iter(memcg, iter, NULL)));
+			break;
+		default:
+			return -EINVAL;
+		}
 	} else
 		return -EINVAL;
 

@@ -3543,4 +3543,33 @@ unsigned long zsr_reclaim_hpage(struct lruvec *lruvec, struct page *page)
 
 	return reclaimed;
 }
+
+void zsr_reclaim_memcg(struct mem_cgroup *memcg)
+{
+	struct lruvec *lruvec;
+	struct hpage_reclaim *hr_queue;
+	int threshold, nid;
+
+	if (get_thp_reclaim_mode(memcg) == THP_RECLAIM_DISABLE)
+		return;
+
+	threshold = READ_ONCE(memcg->thp_reclaim_threshold);
+	for_each_online_node(nid) {
+		lruvec = mem_cgroup_lruvec(memcg, NODE_DATA(nid));
+		hr_queue = &memcg->nodeinfo[nid]->hpage_reclaim_queue;
+		for ( ; ; ) {
+			struct page *page = NULL;
+
+			if (zsr_get_hpage(hr_queue, &page, threshold))
+				break;
+
+			if (!page)
+				continue;
+
+			zsr_reclaim_hpage(lruvec, page);
+
+			cond_resched();
+		}
+	}
+}
 #endif

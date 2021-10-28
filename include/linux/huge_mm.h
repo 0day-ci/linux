@@ -190,6 +190,7 @@ extern int global_thp_reclaim;
 int zsr_get_hpage(struct hpage_reclaim *hr_queue, struct page **reclaim_page,
 		  int threshold);
 unsigned long zsr_reclaim_hpage(struct lruvec *lruvec, struct page *page);
+void zsr_reclaim_memcg(struct mem_cgroup *memcg);
 static inline struct list_head *hpage_reclaim_list(struct page *page)
 {
 	return &page[3].hpage_reclaim_list;
