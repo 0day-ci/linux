@@ -22,16 +22,24 @@ properties:
       - samsung,exynos5250-wdt                # for Exynos5250
       - samsung,exynos5420-wdt                # for Exynos5420
       - samsung,exynos7-wdt                   # for Exynos7
+      - samsung,exynos850-cl0-wdt             # for Exynos850 (CPU cluster 0)
+      - samsung,exynos850-cl1-wdt             # for Exynos850 (CPU cluster 1)
 
   reg:
     maxItems: 1
 
   clocks:
-    maxItems: 1
+    minItems: 1
+    items:
+      - description: Peripheral clock used for register interface; if it's the
+                     only clock, it's also a source clock
+      - description: Source clock (optional)
 
   clock-names:
+    minItems: 1
     items:
       - const: watchdog
+      - const: watchdog_src
 
   interrupts:
     maxItems: 1
@@ -40,7 +48,7 @@ properties:
     $ref: /schemas/types.yaml#/definitions/phandle
     description:
       Phandle to the PMU system controller node (in case of Exynos5250,
-      Exynos5420 and Exynos7).
+      Exynos5420, Exynos7 and Exynos850).
 
 required:
   - compatible
@@ -59,6 +67,8 @@ allOf:
               - samsung,exynos5250-wdt
               - samsung,exynos5420-wdt
               - samsung,exynos7-wdt
+              - samsung,exynos850-cl0-wdt
+              - samsung,exynos850-cl1-wdt
     then:
       required:
         - samsung,syscon-phandle
