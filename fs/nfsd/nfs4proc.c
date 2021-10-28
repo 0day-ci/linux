@@ -1654,9 +1654,10 @@ nfsd4_copy(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 	struct nfsd4_copy *copy = &u->copy;
 	__be32 status;
 	struct nfsd4_copy *async_copy = NULL;
+	int s2sc = (cstate->current_fh.fh_export->ex_flags & NFSEXP_S2SC);
 
 	if (!copy->cp_intra) { /* Inter server SSC */
-		if (!inter_copy_offload_enable || copy->cp_synchronous) {
+		if (s2sc == 0 && (!inter_copy_offload_enable || copy->cp_synchronous)) {
 			status = nfserr_notsupp;
 			goto out;
 		}
