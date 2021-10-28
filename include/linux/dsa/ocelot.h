@@ -207,19 +207,37 @@ static inline void ocelot_xfh_get_vlan_tci(void *extraction, u64 *vlan_tci)
 	packing(extraction, vlan_tci, 15, 0, OCELOT_TAG_LEN, UNPACK, 0);
 }
 
+static inline void ocelot_ifh_set_bypass_quirks(void *injection, u64 bypass,
+						u8 quirks)
+{
+	packing(injection, &bypass, 127, 127, OCELOT_TAG_LEN, PACK, quirks);
+}
+
 static inline void ocelot_ifh_set_bypass(void *injection, u64 bypass)
 {
-	packing(injection, &bypass, 127, 127, OCELOT_TAG_LEN, PACK, 0);
+	ocelot_ifh_set_bypass_quirks(injection, bypass, 0);
+}
+
+static inline void ocelot_ifh_set_rew_op_quirks(void *injection, u64 rew_op,
+						u8 quirks)
+{
+	packing(injection, &rew_op, 125, 117, OCELOT_TAG_LEN, PACK, quirks);
 }
 
 static inline void ocelot_ifh_set_rew_op(void *injection, u64 rew_op)
 {
-	packing(injection, &rew_op, 125, 117, OCELOT_TAG_LEN, PACK, 0);
+	ocelot_ifh_set_rew_op_quirks(injection, rew_op, 0);
+}
+
+static inline void ocelot_ifh_set_dest_quirks(void *injection, u64 dest,
+					      u8 quirks)
+{
+	packing(injection, &dest, 67, 56, OCELOT_TAG_LEN, PACK, quirks);
 }
 
 static inline void ocelot_ifh_set_dest(void *injection, u64 dest)
 {
-	packing(injection, &dest, 67, 56, OCELOT_TAG_LEN, PACK, 0);
+	ocelot_ifh_set_dest_quirks(injection, dest, 0);
 }
 
 static inline void ocelot_ifh_set_qos_class(void *injection, u64 qos_class)
@@ -237,14 +255,26 @@ static inline void ocelot_ifh_set_src(void *injection, u64 src)
 	packing(injection, &src, 46, 43, OCELOT_TAG_LEN, PACK, 0);
 }
 
+static inline void ocelot_ifh_set_tag_type_quirks(void *injection, u64 tag_type,
+						  u8 quirks)
+{
+	packing(injection, &tag_type, 16, 16, OCELOT_TAG_LEN, PACK, quirks);
+}
+
 static inline void ocelot_ifh_set_tag_type(void *injection, u64 tag_type)
 {
-	packing(injection, &tag_type, 16, 16, OCELOT_TAG_LEN, PACK, 0);
+	ocelot_ifh_set_tag_type_quirks(injection, tag_type, 0);
+}
+
+static inline void ocelot_ifh_set_vid_quirks(void *injection, u64 vid,
+					     u8 quirks)
+{
+	packing(injection, &vid, 11, 0, OCELOT_TAG_LEN, PACK, quirks);
 }
 
 static inline void ocelot_ifh_set_vid(void *injection, u64 vid)
 {
-	packing(injection, &vid, 11, 0, OCELOT_TAG_LEN, PACK, 0);
+	ocelot_ifh_set_vid_quirks(injection, vid, 0);
 }
 
 /* Determine the PTP REW_OP to use for injecting the given skb */

@@ -11,5 +11,6 @@ mscc_ocelot_switch_lib-y := \
 mscc_ocelot_switch_lib-$(CONFIG_BRIDGE_MRP) += ocelot_mrp.o
 obj-$(CONFIG_MSCC_OCELOT_SWITCH) += mscc_ocelot.o
 mscc_ocelot-y := \
+	ocelot_fdma.o \
 	ocelot_vsc7514.o \
 	ocelot_net.o

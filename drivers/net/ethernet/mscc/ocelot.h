@@ -9,6 +9,7 @@
 #define _MSCC_OCELOT_H_
 
 #include <linux/bitops.h>
+#include <linux/dsa/ocelot.h>
 #include <linux/etherdevice.h>
 #include <linux/if_vlan.h>
 #include <linux/net_tstamp.h>
@@ -45,6 +46,7 @@ struct ocelot_port_private {
 	struct phylink_config phylink_config;
 	u8 chip_port;
 	struct ocelot_port_tc tc;
+	u8 ifh[OCELOT_TAG_LEN];
 };
 
 struct ocelot_dump_ctx {
