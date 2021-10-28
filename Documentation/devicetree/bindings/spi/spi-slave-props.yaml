@@ -87,5 +87,7 @@ properties:
       Delay, in microseconds, after a write transfer.
 
 # The controller specific properties go here.
+allOf:
+  - $ref: cdns,qspi-nor-slave-props.yaml#
 
 additionalProperties: true
