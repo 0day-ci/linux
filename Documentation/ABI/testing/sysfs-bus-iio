@@ -1965,3 +1965,11 @@ KernelVersion:	5.15
 Contact:	linux-iio@vger.kernel.org
 Description:
 		Raw (unscaled) linear acceleration readings.
+
+What:		/sys/bus/iio/devices/iio:deviceX/in_rot_yaw_raw
+What:		/sys/bus/iio/devices/iio:deviceX/in_rot_pitch_raw
+What:		/sys/bus/iio/devices/iio:deviceX/in_rot_roll_raw
+KernelVersion:	5.15
+Contact:	linux-iio@vger.kernel.org
+Description:
+		Raw (unscaled) euler angles readings.
