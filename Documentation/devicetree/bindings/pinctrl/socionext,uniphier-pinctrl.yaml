@@ -26,10 +26,58 @@ properties:
       - socionext,uniphier-pxs3-pinctrl
       - socionext,uniphier-nx1-pinctrl
 
+additionalProperties:
+  type: object
+
+patternProperties:
+  "^.*$":
+    if:
+      type: object
+    then:
+      allOf:
+        - $ref: pincfg-node.yaml#
+        - $ref: pinmux-node.yaml#
+
+      properties:
+        phandle: true
+        function: true
+        groups: true
+        pins: true
+        bias-pull-up: true
+        bias-pull-down: true
+        bias-pull-pin-default: true
+        drive-strength: true
+
+      additionalProperties:
+        type: object
+
+      patternProperties:
+        "^.*$":
+          if:
+            type: object
+          then:
+            allOf:
+              - $ref: pincfg-node.yaml#
+              - $ref: pinmux-node.yaml#
+
+            properties:
+              phandle: true
+              function: true
+              groups: true
+              pins: true
+              bias-pull-up: true
+              bias-pull-down: true
+              bias-pull-pin-default: true
+              drive-strength: true
+
+            unevaluatedProperties: false
+
+      unevaluatedProperties: false
+
 required:
   - compatible
 
-additionalProperties: false
+unevaluatedProperties: false
 
 examples:
   - |
