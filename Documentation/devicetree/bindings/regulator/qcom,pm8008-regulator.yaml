@@ -1,0 +1,74 @@
+# SPDX-License-Identifier: GPL-2.0-only OR BSD-2-Clause
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/regulator/qcom,pm8008-regulator.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Qualcomm Technologies, Inc. PM8008 Regulator bindings
+
+maintainers:
+  - Satya Priya <skakit@codeaurora.org>
+
+description:
+  Qualcomm Technologies, Inc. PM8008 is an I2C controlled PMIC
+  containing 7 LDO regulators.
+
+properties:
+  compatible:
+    const: qcom,pm8008-regulator
+
+  "#address-cells":
+    const: 1
+
+  "#size-cells":
+    const: 0
+
+  vdd_l1_l2-supply:
+    description: Input supply phandle of ldo1 and ldo2 regulators.
+
+  vdd_l3_l4-supply:
+    description: Input supply phandle of ldo3 and ldo4 regulators.
+
+  vdd_l5-supply:
+    description: Input supply phandle of ldo5 regulator.
+
+  vdd_l6-supply:
+    description: Input supply phandle of ldo6 regulator.
+
+  vdd_l7-supply:
+    description: Input supply phandle of ldo7 regulator.
+
+patternProperties:
+  "^l[1-7]@[0-9a-f]+$":
+    type: object
+
+    $ref: "regulator.yaml#"
+
+    description: PM8008 regulator peripherals of PM8008 regulator device
+
+    properties:
+      reg:
+        maxItems: 1
+        description: Base address of the regulator.
+
+      regulator-name: true
+
+      regulator-min-dropout-voltage-microvolt:
+        description:
+          Specifies the minimum voltage in microvolts that the parent
+          supply regulator must output, above the output of this
+          regulator.
+
+    required:
+      - reg
+      - regulator-name
+
+    unevaluatedProperties: false
+
+required:
+  - compatible
+  - "#address-cells"
+  - "#size-cells"
+
+additionalProperties: false
+...
