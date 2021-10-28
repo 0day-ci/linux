@@ -3085,11 +3085,18 @@ ieee80211_rx_h_ctrl(struct ieee80211_rx_data *rx, struct sk_buff_head *frames)
 
 		tid = le16_to_cpu(bar_data.control) >> 12;
 
+		spin_lock_bh(&rx->sta->ampdu_mlme.rx_offl_lock);
 		if (!test_bit(tid, rx->sta->ampdu_mlme.agg_session_valid) &&
-		    !test_and_set_bit(tid, rx->sta->ampdu_mlme.unexpected_agg))
+		    /* back_req is allowed if the fw just received addba */
+		    !test_bit(tid, rx->sta->ampdu_mlme.tid_rx_manage_offl) &&
+		    !test_and_set_bit(tid, rx->sta->ampdu_mlme.unexpected_agg)) {
+			spin_unlock_bh(&rx->sta->ampdu_mlme.rx_offl_lock);
 			ieee80211_send_delba(rx->sdata, rx->sta->sta.addr, tid,
 					     WLAN_BACK_RECIPIENT,
 					     WLAN_REASON_QSTA_REQUIRE_SETUP);
+		} else {
+			spin_unlock_bh(&rx->sta->ampdu_mlme.rx_offl_lock);
+		}
 
 		tid_agg_rx = rcu_dereference(rx->sta->ampdu_mlme.tid_rx[tid]);
 		if (!tid_agg_rx)
