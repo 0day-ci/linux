@@ -169,7 +169,6 @@ struct klp_patch {
 	struct list_head obj_list;
 	bool enabled;
 	bool forced;
-	struct work_struct free_work;
 };
 
 #define klp_for_each_object_static(patch, obj) \
