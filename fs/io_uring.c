@@ -105,7 +105,7 @@
 
 #define SQE_VALID_FLAGS	(IOSQE_FIXED_FILE|IOSQE_IO_DRAIN|IOSQE_IO_LINK|	\
 				IOSQE_IO_HARDLINK | IOSQE_ASYNC | \
-				IOSQE_BUFFER_SELECT)
+				IOSQE_BUFFER_SELECT | IOSQE_IO_WITH_PI)
 #define IO_REQ_CLEAN_FLAGS (REQ_F_BUFFER_SELECTED | REQ_F_NEED_CLEANUP | \
 				REQ_F_POLLED | REQ_F_INFLIGHT | REQ_F_CREDS)
 
@@ -726,6 +726,7 @@ enum {
 	REQ_F_HARDLINK_BIT	= IOSQE_IO_HARDLINK_BIT,
 	REQ_F_FORCE_ASYNC_BIT	= IOSQE_ASYNC_BIT,
 	REQ_F_BUFFER_SELECT_BIT	= IOSQE_BUFFER_SELECT_BIT,
+	REQ_F_IO_WITH_PI_BIT    = IOSQE_IO_WITH_PI_BIT,
 
 	/* first byte is taken by user flags, shift it to not overlap */
 	REQ_F_FAIL_BIT		= 8,
@@ -2850,6 +2851,13 @@ static int io_prep_rw(struct io_kiocb *req, const struct io_uring_sqe *sqe,
 	if (unlikely(ret))
 		return ret;
 
+	if (sqe->flags & IOSQE_IO_WITH_PI) {
+		if (!(req->file->f_flags & O_DIRECT))
+			return -EINVAL;
+
+		kiocb->ki_flags |= IOCB_USE_PI;
+	}
+
 	/*
 	 * If the file is marked O_NONBLOCK, still allow retry for it if it
 	 * supports async. Otherwise it's impossible to use O_NONBLOCK files
@@ -3451,6 +3459,7 @@ static int io_read(struct io_kiocb *req, unsigned int issue_flags)
 	bool force_nonblock = issue_flags & IO_URING_F_NONBLOCK;
 	struct iov_iter_state __state, *state;
 	ssize_t ret, ret2;
+	size_t iov_data_size;
 
 	if (rw) {
 		iter = &rw->iter;
@@ -3483,7 +3492,15 @@ static int io_read(struct io_kiocb *req, unsigned int issue_flags)
 		return ret ?: -EAGAIN;
 	}
 
-	ret = rw_verify_area(READ, req->file, io_kiocb_ppos(kiocb), req->result);
+	iov_data_size = req->result;
+	/* in case of PI present we must verify ranges only by data size */
+	if (req->opcode == IORING_OP_READV &&
+	     kiocb->ki_flags & IOCB_USE_PI &&
+	     iter->nr_segs >= 2) {
+		iov_data_size -= iter->iov[iter->nr_segs-1].iov_len;
+	}
+
+	ret = rw_verify_area(READ, req->file, io_kiocb_ppos(kiocb), iov_data_size);
 	if (unlikely(ret)) {
 		kfree(iovec);
 		return ret;
@@ -3586,6 +3603,7 @@ static int io_write(struct io_kiocb *req, unsigned int issue_flags)
 	bool force_nonblock = issue_flags & IO_URING_F_NONBLOCK;
 	struct iov_iter_state __state, *state;
 	ssize_t ret, ret2;
+	size_t iov_data_size;
 
 	if (rw) {
 		iter = &rw->iter;
@@ -3616,7 +3634,15 @@ static int io_write(struct io_kiocb *req, unsigned int issue_flags)
 	    (req->flags & REQ_F_ISREG))
 		goto copy_iov;
 
-	ret = rw_verify_area(WRITE, req->file, io_kiocb_ppos(kiocb), req->result);
+	iov_data_size = req->result;
+	/* in case of PI present we must verify ranges only by data size */
+	if (req->opcode == IORING_OP_WRITEV &&
+	     kiocb->ki_flags & IOCB_USE_PI &&
+	     iter->nr_segs >= 2) {
+		iov_data_size -= iter->iov[iter->nr_segs-1].iov_len;
+	}
+
+	ret = rw_verify_area(WRITE, req->file, io_kiocb_ppos(kiocb), iov_data_size);
 	if (unlikely(ret))
 		goto out_free;
 
