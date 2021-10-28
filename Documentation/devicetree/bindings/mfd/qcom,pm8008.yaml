@@ -44,6 +44,10 @@ properties:
   "#size-cells":
     const: 0
 
+  regulators:
+    type: object
+    $ref: "../regulator/qcom,pm8008-regulator.yaml#"
+
 patternProperties:
   "^gpio@[0-9a-f]+$":
     type: object
@@ -121,6 +125,26 @@ examples:
           #gpio-cells = <2>;
           interrupt-controller;
           #interrupt-cells = <2>;
+        };
+
+        regulators {
+          compatible = "qcom,pm8008-regulator";
+          #address-cells = <1>;
+          #size-cells = <0>;
+
+          vdd_l1_l2-supply = <&vreg_s8b_1p2>;
+          vdd_l3_l4-supply = <&vreg_s1b_1p8>;
+          vdd_l5-supply = <&vreg_bob>;
+          vdd_l6-supply = <&vreg_bob>;
+          vdd_l7-supply = <&vreg_bob>;
+
+          pm8008_l1: l1@4000 {
+            reg = <0x4000>;
+            regulator-name = "pm8008_l1";
+            regulator-min-microvolt = <950000>;
+            regulator-max-microvolt = <1300000>;
+            regulator-min-dropout-voltage-microvolt = <96000>;
+          };
         };
       };
     };
