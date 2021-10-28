@@ -180,6 +180,16 @@ config SURFACE_PRO3_BUTTON
 	help
 	  This driver handles the power/home/volume buttons on the Microsoft Surface Pro 3/4 tablet.
 
+config SURFACE_XBL
+	tristate "Surface XBL Driver"
+	depends on ARM64 || COMPILE_TEST
+	help
+	  If you say 'Y' to this option, support will be included for the
+	  Surface XBL Driver.
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called surface-xbl.
+
 source "drivers/platform/surface/aggregator/Kconfig"
 
 endif # SURFACE_PLATFORMS
