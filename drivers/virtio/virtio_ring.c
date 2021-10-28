@@ -117,6 +117,15 @@ struct vring_virtqueue {
 	/* Hint for event idx: already triggered no need to disable. */
 	bool event_triggered;
 
+	/* desc cache threshold
+	 *    0   - disable desc cache
+	 *    > 0 - enable desc cache. As the threshold of the desc cache.
+	 */
+	u32 desc_cache_thr;
+
+	/* desc cache chain */
+	struct list_head desc_cache;
+
 	union {
 		/* Available for split ring */
 		struct {
@@ -423,7 +432,53 @@ out:
 	return extra[i].next;
 }
 
-static struct vring_desc *alloc_indirect_split(struct virtqueue *_vq,
+static void desc_cache_free(struct list_head *head)
+{
+	struct list_head *n, *pos;
+
+	BUILD_BUG_ON(sizeof(struct list_head) > sizeof(struct vring_desc));
+	BUILD_BUG_ON(sizeof(struct list_head) > sizeof(struct vring_packed_desc));
+
+	list_for_each_prev_safe(pos, n, head)
+		kfree(pos);
+}
+
+static void __desc_cache_put(struct vring_virtqueue *vq,
+			     struct list_head *node, int n)
+{
+	if (n <= vq->desc_cache_thr)
+		list_add(node, &vq->desc_cache);
+	else
+		kfree(node);
+}
+
+#define desc_cache_put(vq, desc, n) \
+	__desc_cache_put(vq, (struct list_head *)desc, n)
+
+static void *desc_cache_get(struct vring_virtqueue *vq,
+			    int size, int n, gfp_t gfp)
+{
+	struct list_head *node;
+
+	if (n > vq->desc_cache_thr)
+		return kmalloc_array(n, size, gfp);
+
+	if (!list_empty(&vq->desc_cache)) {
+		node = vq->desc_cache.next;
+		list_del(node);
+		return node;
+	}
+
+	return kmalloc_array(vq->desc_cache_thr, size, gfp);
+}
+
+#define _desc_cache_get(vq, n, gfp, tp) \
+	((tp *)desc_cache_get(vq, (sizeof(tp)), n, gfp))
+
+#define desc_cache_get_split(vq, n, gfp) \
+	_desc_cache_get(vq, n, gfp, struct vring_desc)
+
+static struct vring_desc *alloc_indirect_split(struct vring_virtqueue *vq,
 					       unsigned int total_sg,
 					       gfp_t gfp)
 {
@@ -437,12 +492,12 @@ static struct vring_desc *alloc_indirect_split(struct virtqueue *_vq,
 	 */
 	gfp &= ~__GFP_HIGHMEM;
 
-	desc = kmalloc_array(total_sg, sizeof(struct vring_desc), gfp);
+	desc = desc_cache_get_split(vq, total_sg, gfp);
 	if (!desc)
 		return NULL;
 
 	for (i = 0; i < total_sg; i++)
-		desc[i].next = cpu_to_virtio16(_vq->vdev, i + 1);
+		desc[i].next = cpu_to_virtio16(vq->vq.vdev, i + 1);
 	return desc;
 }
 
@@ -508,7 +563,7 @@ static inline int virtqueue_add_split(struct virtqueue *_vq,
 	head = vq->free_head;
 
 	if (virtqueue_use_indirect(_vq, total_sg))
-		desc = alloc_indirect_split(_vq, total_sg, gfp);
+		desc = alloc_indirect_split(vq, total_sg, gfp);
 	else {
 		desc = NULL;
 		WARN_ON_ONCE(total_sg > vq->split.vring.num && !vq->indirect);
@@ -652,7 +707,7 @@ unmap_release:
 	}
 
 	if (indirect)
-		kfree(desc);
+		desc_cache_put(vq, desc, total_sg);
 
 	END_USE(vq);
 	return -ENOMEM;
@@ -717,7 +772,7 @@ static void detach_buf_split(struct vring_virtqueue *vq, unsigned int head,
 	if (vq->indirect) {
 		struct vring_desc *indir_desc =
 				vq->split.desc_state[head].indir_desc;
-		u32 len;
+		u32 len, n;
 
 		/* Free the indirect table, if any, now that it's unmapped. */
 		if (!indir_desc)
@@ -729,10 +784,12 @@ static void detach_buf_split(struct vring_virtqueue *vq, unsigned int head,
 				VRING_DESC_F_INDIRECT));
 		BUG_ON(len == 0 || len % sizeof(struct vring_desc));
 
-		for (j = 0; j < len / sizeof(struct vring_desc); j++)
+		n = len / sizeof(struct vring_desc);
+
+		for (j = 0; j < n; j++)
 			vring_unmap_one_split_indirect(vq, &indir_desc[j]);
 
-		kfree(indir_desc);
+		desc_cache_put(vq, indir_desc, n);
 		vq->split.desc_state[head].indir_desc = NULL;
 	} else if (ctx) {
 		*ctx = vq->split.desc_state[head].indir_desc;
@@ -2199,6 +2256,9 @@ struct virtqueue *__vring_new_virtqueue(unsigned int index,
 	vq->indirect = virtio_has_feature(vdev, VIRTIO_RING_F_INDIRECT_DESC) &&
 		!context;
 	vq->event = virtio_has_feature(vdev, VIRTIO_RING_F_EVENT_IDX);
+	vq->desc_cache_thr = vdev->desc_cache_thr;
+
+	INIT_LIST_HEAD(&vq->desc_cache);
 
 	if (virtio_has_feature(vdev, VIRTIO_F_ORDER_PLATFORM))
 		vq->weak_barriers = false;
@@ -2329,6 +2389,7 @@ void vring_del_virtqueue(struct virtqueue *_vq)
 	if (!vq->packed_ring) {
 		kfree(vq->split.desc_state);
 		kfree(vq->split.desc_extra);
+		desc_cache_free(&vq->desc_cache);
 	}
 	kfree(vq);
 }
