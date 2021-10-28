@@ -97,12 +97,16 @@ struct s3c2410_wdt;
  * @rst_stat_reg: Offset in pmureg for the register that has the reset status.
  * @rst_stat_bit: Bit number in the rst_stat register indicating a watchdog
  * reset.
+ * @cnt_en_reg: Offset in pmureg for the register that enables WDT counter.
+ * @cnt_en_bit: Bit number for "watchdog counter enable" in cnt_en register.
  * @quirks: A bitfield of quirks.
  * @disable_auto_reset: If set, this function will be called to disable
  * automatic setting the WDT as a reset reason in RST_STAT on CPU reset; uses
  * disable_reg field.
  * @mask_reset: If set, this function will be called to mask WDT reset request;
  * uses mask_reset_reg and mask_bit fields.
+ * @enable_counter: If set, this function will be called to enable WDT counter;
+ * uses cnt_en_reg and cnt_en_bit fields.
  */
 
 struct s3c2410_wdt_variant {
@@ -111,9 +115,12 @@ struct s3c2410_wdt_variant {
 	int mask_bit;
 	int rst_stat_reg;
 	int rst_stat_bit;
+	int cnt_en_reg;
+	int cnt_en_bit;
 	u32 quirks;
 	int (*disable_auto_reset)(struct s3c2410_wdt *wdt, bool mask);
 	int (*mask_reset)(struct s3c2410_wdt *wdt, bool mask);
+	int (*enable_counter)(struct s3c2410_wdt *wdt, bool mask);
 };
 
 struct s3c2410_wdt {
@@ -132,6 +139,7 @@ struct s3c2410_wdt {
 
 static int s3c2410wdt_disable_wdt_reset(struct s3c2410_wdt *wdt, bool mask);
 static int s3c2410wdt_mask_wdt_reset(struct s3c2410_wdt *wdt, bool mask);
+static int s3c2410wdt_enable_counter(struct s3c2410_wdt *wdt, bool en);
 
 static const struct s3c2410_wdt_variant drv_data_s3c2410 = {
 	.quirks = 0
@@ -246,6 +254,20 @@ static int s3c2410wdt_mask_wdt_reset(struct s3c2410_wdt *wdt, bool mask)
 	return ret;
 }
 
+static int s3c2410wdt_enable_counter(struct s3c2410_wdt *wdt, bool en)
+{
+	const u32 mask_val = 1 << wdt->drv_data->cnt_en_bit;
+	const u32 val = en ? mask_val : 0;
+	int ret;
+
+	ret = regmap_update_bits(wdt->pmureg, wdt->drv_data->cnt_en_reg,
+				 mask_val, val);
+	if (ret < 0)
+		dev_err(wdt->dev, "failed to update reg(%d)\n", ret);
+
+	return ret;
+}
+
 static int s3c2410wdt_enable(struct s3c2410_wdt *wdt, bool en)
 {
 	int ret;
@@ -258,6 +280,12 @@ static int s3c2410wdt_enable(struct s3c2410_wdt *wdt, bool en)
 
 	if (wdt->drv_data->mask_reset) {
 		ret = wdt->drv_data->mask_reset(wdt, !en);
+		if (ret < 0)
+			return ret;
+	}
+
+	if (wdt->drv_data->enable_counter) {
+		ret = wdt->drv_data->enable_counter(wdt, en);
 		if (ret < 0)
 			return ret;
 	}
