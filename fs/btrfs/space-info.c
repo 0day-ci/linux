@@ -1380,6 +1380,22 @@ static int handle_reserve_ticket(struct btrfs_fs_info *fs_info,
 
 	spin_lock(&space_info->lock);
 	ret = ticket->error;
+
+	/*
+	 * If we can steal from the block rsv and we don't have an error and we
+	 * didn't make our reservation then go ahead and try to steal our
+	 * reservation.
+	 */
+	if (ticket->steal && !ret && ticket->bytes) {
+		/*
+		 * If we succeed we need to run btrfs_try_granting_tickets() for
+		 * the same reason as described below.
+		 */
+		if (steal_from_global_rsv(fs_info, space_info, ticket))
+			btrfs_try_granting_tickets(fs_info, space_info);
+	}
+
+
 	if (ticket->bytes || ticket->error) {
 		/*
 		 * We were a priority ticket, so we need to delete ourselves
@@ -1436,6 +1452,12 @@ static inline void maybe_clamp_preempt(struct btrfs_fs_info *fs_info,
 	 */
 	if (ordered < delalloc)
 		space_info->clamp = min(space_info->clamp + 1, 8);
+}
+
+static inline bool is_steal_flush_state(enum btrfs_reserve_flush_enum flush)
+{
+	return (flush == BTRFS_RESERVE_FLUSH_ALL_STEAL ||
+		flush == BTRFS_RESERVE_FLUSH_EVICT);
 }
 
 /**
@@ -1511,7 +1533,7 @@ static int __reserve_bytes(struct btrfs_fs_info *fs_info,
 		ticket.error = 0;
 		space_info->reclaim_size += ticket.bytes;
 		init_waitqueue_head(&ticket.wait);
-		ticket.steal = (flush == BTRFS_RESERVE_FLUSH_ALL_STEAL);
+		ticket.steal = is_steal_flush_state(flush);
 		if (trace_btrfs_reserve_ticket_enabled())
 			start_ns = ktime_get_ns();
 
