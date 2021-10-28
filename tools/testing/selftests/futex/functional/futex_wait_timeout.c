@@ -125,7 +125,7 @@ int main(int argc, char *argv[])
 	}
 
 	ksft_print_header();
-	ksft_set_plan(9);
+	ksft_set_plan(11);
 	ksft_print_msg("%s: Block on a futex and wait for timeout\n",
 	       basename(argv[0]));
 	ksft_print_msg("\tArguments: timeout=%ldns\n", timeout_ns);
@@ -181,6 +181,18 @@ int main(int argc, char *argv[])
 	/* Test operations that don't support FUTEX_CLOCK_REALTIME */
 	res = futex_lock_pi(&futex_pi, NULL, 0, FUTEX_CLOCK_REALTIME);
 	test_timeout(res, &ret, "futex_lock_pi invalid timeout flag", ENOSYS);
+
+	/* FUTEX_LOCK_PI2 with CLOCK_REALTIME */
+	if (futex_get_abs_timeout(CLOCK_REALTIME, &to, timeout_ns))
+		return RET_FAIL;
+	res = futex_lock_pi2(&futex_pi, &to, 0, FUTEX_CLOCK_REALTIME);
+	test_timeout(res, &ret, "futex_lock_pi2 realtime", ETIMEDOUT);
+
+	/* FUTEX_LOCK_PI2 with CLOCK_MONOTONIC */
+	if (futex_get_abs_timeout(CLOCK_MONOTONIC, &to, timeout_ns))
+		return RET_FAIL;
+	res = futex_lock_pi2(&futex_pi, &to, 0, 0);
+	test_timeout(res, &ret, "futex_lock_pi2 monotonic", ETIMEDOUT);
 
 	/* futex_waitv with CLOCK_MONOTONIC */
 	if (futex_get_abs_timeout(CLOCK_MONOTONIC, &to, timeout_ns))
