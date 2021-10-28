@@ -4154,7 +4154,8 @@ static int __dev_queue_xmit(struct sk_buff *skb, struct net_device *sb_dev)
 #ifdef CONFIG_NET_CLS_ACT
 	skb->tc_at_ingress = 0;
 # ifdef CONFIG_NET_EGRESS
-	if (static_branch_unlikely(&egress_needed_key)) {
+	if (static_branch_unlikely(&egress_needed_key) &&
+	    !skb_skip_tc_classify(skb)) {
 		skb = sch_handle_egress(skb, &rc, dev);
 		if (!skb)
 			goto out;

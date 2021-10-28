@@ -722,9 +722,6 @@ int tcf_action_exec(struct sk_buff *skb, struct tc_action **actions,
 	int i;
 	int ret = TC_ACT_OK;
 
-	if (skb_skip_tc_classify(skb))
-		return TC_ACT_OK;
-
 restart_act_graph:
 	for (i = 0; i < nr_actions; i++) {
 		const struct tc_action *a = actions[i];
