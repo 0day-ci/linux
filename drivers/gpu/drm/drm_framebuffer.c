@@ -195,6 +195,16 @@ static int framebuffer_check(struct drm_device *dev,
 	/* now let the driver pick its own format info */
 	info = drm_get_format_info(dev, r);
 
+	if (info->hsub == 0) {
+		DRM_DEBUG_KMS("bad horizontal chroma subsampling factor %u\n", info->hsub);
+		return -EINVAL;
+	}
+
+	if (info->vsub == 0) {
+		DRM_DEBUG_KMS("bad vertical chroma subsampling factor %u\n", info->vsub);
+		return -EINVAL;
+	}
+
 	for (i = 0; i < info->num_planes; i++) {
 		unsigned int width = fb_plane_width(r->width, info, i);
 		unsigned int height = fb_plane_height(r->height, info, i);
