@@ -578,7 +578,7 @@ static int powerclamp_cpu_online(unsigned int cpu)
 	return 0;
 }
 
-static int powerclamp_cpu_predown(unsigned int cpu)
+static int powerclamp_cpu_predown(int cpu)
 {
 	if (clamping == false)
 		return 0;
