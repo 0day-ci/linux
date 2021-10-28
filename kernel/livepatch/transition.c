@@ -32,12 +32,16 @@ static unsigned int klp_signals_cnt;
  */
 static void klp_transition_work_fn(struct work_struct *work)
 {
+	LIST_HEAD(to_free);
+
 	mutex_lock(&klp_mutex);
 
 	if (klp_transition_patch)
-		klp_try_complete_transition();
+		klp_try_complete_transition(&to_free);
 
 	mutex_unlock(&klp_mutex);
+
+	klp_free_patches_async(&to_free);
 }
 static DECLARE_DELAYED_WORK(klp_transition_work, klp_transition_work_fn);
 
@@ -384,7 +388,7 @@ static void klp_send_signals(void)
  *
  * If any tasks are still stuck in the initial patch state, schedule a retry.
  */
-void klp_try_complete_transition(void)
+void klp_try_complete_transition(struct list_head *to_free)
 {
 	unsigned int cpu;
 	struct task_struct *g, *task;
@@ -449,10 +453,17 @@ void klp_try_complete_transition(void)
 	 * klp_complete_transition() but it is called also
 	 * from klp_cancel_transition().
 	 */
-	if (!patch->enabled)
-		klp_free_patch_async(patch);
-	else if (patch->replace)
-		klp_free_replaced_patches_async(patch);
+	if (!patch->enabled) {
+		list_move(&patch->list, to_free);
+	} else if (patch->replace) {
+		struct klp_patch *old_patch, *tmp_patch;
+
+		klp_for_each_patch_safe(old_patch, tmp_patch) {
+			if (old_patch == patch)
+				break;
+			list_move(&old_patch->list, to_free);
+		}
+	}
 }
 
 /*

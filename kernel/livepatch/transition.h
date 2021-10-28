@@ -9,7 +9,7 @@ extern struct klp_patch *klp_transition_patch;
 void klp_init_transition(struct klp_patch *patch, int state);
 void klp_cancel_transition(void);
 void klp_start_transition(void);
-void klp_try_complete_transition(void);
+void klp_try_complete_transition(struct list_head *to_free);
 void klp_reverse_transition(void);
 void klp_force_transition(void);
 
