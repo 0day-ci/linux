@@ -2,6 +2,8 @@
 #ifndef _LINUX_HELPER_MACROS_H_
 #define _LINUX_HELPER_MACROS_H_
 
+#include <linux/math.h>
+
 #define __find_closest(x, a, as, op)					\
 ({									\
 	typeof(as) __fc_i, __fc_as = (as) - 1;				\
@@ -37,5 +39,29 @@
  * order.
  */
 #define find_closest_descending(x, a, as) __find_closest(x, a, as, >=)
+
+/**
+ * find_closest_unsorted - locate the closest element in a unsorted array
+ * @x: The reference value.
+ * @a: The array in which to look for the closest element.
+ * @as: Size of 'a'.
+ *
+ * Similar to find_closest() but 'a' has no requirement to being sorted
+ */
+#define find_closest_unsorted(x, a, as)					\
+({									\
+	typeof(x) __fc_best_delta, __fc_delta;				\
+	typeof(as) __fc_i, __fc_best_idx;				\
+	bool __fc_first = true;						\
+	for (__fc_i = 0; __fc_i < (as); __fc_i++) {			\
+		__fc_delta = abs(a[__fc_i] - (x));			\
+		if (__fc_first || __fc_delta < __fc_best_delta) {	\
+			__fc_best_delta = __fc_delta;			\
+			__fc_best_idx = __fc_i;				\
+		}							\
+		__fc_first = false;					\
+	}								\
+	(__fc_best_idx);						\
+})
 
 #endif
