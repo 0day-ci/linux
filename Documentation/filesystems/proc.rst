@@ -155,6 +155,7 @@ usually fail with ESRCH.
  wchan		Present with CONFIG_KALLSYMS=y: it shows the kernel function
 		symbol the task is blocked in - or "0" if not blocked.
  pagemap	Page table
+ pageflags	Process's memory page flag information
  stack		Report full stack trace, enable via CONFIG_STACKTRACE
  smaps		An extension based on maps, showing the memory consumption of
 		each mapping and flags associated with it
@@ -619,7 +620,9 @@ Any other value written to /proc/PID/clear_refs will have no effect.
 
 The /proc/pid/pagemap gives the PFN, which can be used to find the pageflags
 using /proc/kpageflags and number of times a page is mapped using
-/proc/kpagecount. For detailed explanation, see
+/proc/kpagecount. /proc/pid/pageflags provides the page flags of a process's
+virtual pages, so a task can learn the kpageflags for its address space with no
+need to be root. For detailed explanation, see
 Documentation/admin-guide/mm/pagemap.rst.
 
 The /proc/pid/numa_maps is an extension based on maps, showing the memory

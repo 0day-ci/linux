@@ -1291,6 +1291,10 @@ struct pagemapread {
 	int pos, len;		/* units: PM_ENTRY_BYTES, not bytes */
 	pagemap_entry_t *buffer;
 	bool show_pfn;
+	/* If to_flags is set, show the page flags for the virtual pages
+	 * instead of the mapping information.
+	 */
+	bool to_flags;
 };
 
 #define PAGEMAP_WALK_SIZE	(PMD_SIZE)
@@ -1331,7 +1335,8 @@ static int pagemap_pte_hole(unsigned long start, unsigned long end,
 
 	while (addr < end) {
 		struct vm_area_struct *vma = find_vma(walk->mm, addr);
-		pagemap_entry_t pme = make_pme(0, 0);
+		pagemap_entry_t pme =
+			make_pme(0, pm->to_flags ? stable_page_flags(NULL) : 0);
 		/* End of address space hole, which we mark as non-present. */
 		unsigned long hole_end;
 
@@ -1350,7 +1355,7 @@ static int pagemap_pte_hole(unsigned long start, unsigned long end,
 			break;
 
 		/* Addresses in the VMA. */
-		if (vma->vm_flags & VM_SOFTDIRTY)
+		if ((vma->vm_flags & VM_SOFTDIRTY) && !pm->to_flags)
 			pme = make_pme(0, PM_SOFT_DIRTY);
 		for (; addr < min(end, vma->vm_end); addr += PAGE_SIZE) {
 			err = add_to_pagemap(addr, &pme, pm);
@@ -1367,6 +1372,12 @@ static pagemap_entry_t pte_to_pagemap_entry(struct pagemapread *pm,
 {
 	u64 frame = 0, flags = 0;
 	struct page *page = NULL;
+
+	if (pm->to_flags) {
+		if (pte_present(pte))
+			page = vm_normal_page(vma, addr, pte);
+		return make_pme(0, stable_page_flags(page));
+	}
 
 	if (pte_present(pte)) {
 		if (pm->show_pfn)
@@ -1420,6 +1431,22 @@ static int pagemap_pmd_range(pmd_t *pmdp, unsigned long addr, unsigned long end,
 
 		if (vma->vm_flags & VM_SOFTDIRTY)
 			flags |= PM_SOFT_DIRTY;
+
+		if (pm->to_flags) {
+			pagemap_entry_t pme;
+			struct page *page =
+				pmd_present(pmd) ? pmd_page(pmd) : NULL;
+
+			for (; addr != end; addr += PAGE_SIZE) {
+				if (page)
+					page += (addr & ~PMD_MASK) >>
+						PAGE_SHIFT;
+				pme = make_pme(0, stable_page_flags(page));
+				add_to_pagemap(addr, &pme, pm);
+			}
+			spin_unlock(ptl);
+			return 0;
+		}
 
 		if (pmd_present(pmd)) {
 			page = pmd_page(pmd);
@@ -1514,6 +1541,20 @@ static int pagemap_hugetlb_range(pte_t *ptep, unsigned long hmask,
 		flags |= PM_SOFT_DIRTY;
 
 	pte = huge_ptep_get(ptep);
+
+	if (pm->to_flags) {
+		pagemap_entry_t pme;
+		struct page *page = pte_present(pte) ? pte_page(pte) : NULL;
+
+		for (; addr != end; addr += PAGE_SIZE) {
+			if (page)
+				page += (addr & ~hmask) >> PAGE_SHIFT;
+			pme = make_pme(0, stable_page_flags(page));
+			add_to_pagemap(addr, &pme, pm);
+		}
+		goto done;
+	}
+
 	if (pte_present(pte)) {
 		struct page *page = pte_page(pte);
 
@@ -1539,6 +1580,7 @@ static int pagemap_hugetlb_range(pte_t *ptep, unsigned long hmask,
 			frame++;
 	}
 
+done:
 	cond_resched();
 
 	return err;
@@ -1553,34 +1595,11 @@ static const struct mm_walk_ops pagemap_ops = {
 	.hugetlb_entry	= pagemap_hugetlb_range,
 };
 
-/*
- * /proc/pid/pagemap - an array mapping virtual pages to pfns
- *
- * For each page in the address space, this file contains one 64-bit entry
- * consisting of the following:
- *
- * Bits 0-54  page frame number (PFN) if present
- * Bits 0-4   swap type if swapped
- * Bits 5-54  swap offset if swapped
- * Bit  55    pte is soft-dirty (see Documentation/admin-guide/mm/soft-dirty.rst)
- * Bit  56    page exclusively mapped
- * Bits 57-60 zero
- * Bit  61    page is file-page or shared-anon
- * Bit  62    page swapped
- * Bit  63    page present
- *
- * If the page is not present but in swap, then the PFN contains an
- * encoding of the swap file number and the page's offset into the
- * swap. Unmapped pages return a null PFN. This allows determining
- * precisely which pages are mapped (or in swap) and comparing mapped
- * pages between processes.
- *
- * Efficient users of this interface will use /proc/pid/maps to
- * determine which areas of memory are actually mapped and llseek to
- * skip over unmapped regions.
+/* If to_flags is set, show the page flags for the virtual pages
+ * instead of the mapping information.
  */
-static ssize_t pagemap_read(struct file *file, char __user *buf,
-			    size_t count, loff_t *ppos)
+static ssize_t pagemap_pageflags_read(struct file *file, char __user *buf,
+				      size_t count, loff_t *ppos, bool to_flags)
 {
 	struct mm_struct *mm = file->private_data;
 	struct pagemapread pm;
@@ -1601,6 +1620,8 @@ static ssize_t pagemap_read(struct file *file, char __user *buf,
 	ret = 0;
 	if (!count)
 		goto out_mm;
+
+	pm.to_flags = to_flags;
 
 	/* do not disclose physical addresses: attack vector */
 	pm.show_pfn = file_ns_capable(file, &init_user_ns, CAP_SYS_ADMIN);
@@ -1668,6 +1689,78 @@ out:
 	return ret;
 }
 
+/*
+ * /proc/pid/pagemap - an array mapping virtual pages to pfns
+ *
+ * For each page in the address space, this file contains one 64-bit entry
+ * consisting of the following:
+ *
+ * Bits 0-54  page frame number (PFN) if present
+ * Bits 0-4   swap type if swapped
+ * Bits 5-54  swap offset if swapped
+ * Bit  55    pte is soft-dirty (see Documentation/admin-guide/mm/soft-dirty.rst)
+ * Bit  56    page exclusively mapped
+ * Bits 57-60 zero
+ * Bit  61    page is file-page or shared-anon
+ * Bit  62    page swapped
+ * Bit  63    page present
+ *
+ * If the page is not present but in swap, then the PFN contains an
+ * encoding of the swap file number and the page's offset into the
+ * swap. Unmapped pages return a null PFN. This allows determining
+ * precisely which pages are mapped (or in swap) and comparing mapped
+ * pages between processes.
+ *
+ * Efficient users of this interface will use /proc/pid/maps to
+ * determine which areas of memory are actually mapped and llseek to
+ * skip over unmapped regions.
+ */
+static ssize_t pagemap_read(struct file *file, char __user *buf, size_t count,
+			    loff_t *ppos)
+{
+	return pagemap_pageflags_read(file, buf, count, ppos, false);
+}
+
+/*
+ * /proc/pid/pageflags - an array mapping virtual pages to pageflags
+ *
+ * For each page in the address space, this file contains one 64-bit entry
+ * consisting of the following:
+ *
+ * 0. LOCKED
+ * 1. ERROR
+ * 2. REFERENCED
+ * 3. UPTODATE
+ * 4. DIRTY
+ * 5. LRU
+ * 6. ACTIVE
+ * 7. SLAB
+ * 8. WRITEBACK
+ * 9. RECLAIM
+ * 10. BUDDY
+ * 11. MMAP
+ * 12. ANON
+ * 13. SWAPCACHE
+ * 14. SWAPBACKED
+ * 15. COMPOUND_HEAD
+ * 16. COMPOUND_TAIL
+ * 17. HUGE
+ * 18. UNEVICTABLE
+ * 19. HWPOISON
+ * 20. NOPAGE
+ * 21. KSM
+ * 22. THP
+ * 23. OFFLINE
+ * 24. ZERO_PAGE
+ * 25. IDLE
+ * 26. PGTABLE
+ */
+static ssize_t pageflags_read(struct file *file, char __user *buf, size_t count,
+			      loff_t *ppos)
+{
+	return pagemap_pageflags_read(file, buf, count, ppos, true);
+}
+
 static int pagemap_open(struct inode *inode, struct file *file)
 {
 	struct mm_struct *mm;
@@ -1691,6 +1784,13 @@ static int pagemap_release(struct inode *inode, struct file *file)
 const struct file_operations proc_pagemap_operations = {
 	.llseek		= mem_lseek, /* borrow this */
 	.read		= pagemap_read,
+	.open		= pagemap_open,
+	.release	= pagemap_release,
+};
+
+const struct file_operations proc_pageflags_operations = {
+	.llseek		= mem_lseek,
+	.read		= pageflags_read,
 	.open		= pagemap_open,
 	.release	= pagemap_release,
 };

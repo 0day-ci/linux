@@ -8,7 +8,7 @@ pagemap is a new (as of 2.6.25) set of interfaces in the kernel that allow
 userspace programs to examine the page tables and related information by
 reading files in ``/proc``.
 
-There are four components to pagemap:
+There are five components to pagemap:
 
  * ``/proc/pid/pagemap``.  This file lets a userspace process find out which
    physical frame each virtual page is mapped to.  It contains one 64-bit
@@ -81,6 +81,13 @@ number of times a page is mapped.
     24. ZERO_PAGE
     25. IDLE
     26. PGTABLE
+
+ * ``/proc/pid/pageflags``.  This file lets a userspace process know the page
+   flags of each of its virtual pages.  It contains a 64-bit set of flags for
+   each virtual page, containing data identical to the one emitted by
+   /proc/kpageflags listed above.  The user-space task can learn the kpageflags
+   for the pages backing its address-space by consulting one file, without
+   needing to be root.
 
  * ``/proc/kpagecgroup``.  This file contains a 64-bit inode number of the
    memory cgroup each page is charged to, indexed by PFN. Only available when
