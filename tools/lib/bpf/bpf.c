@@ -65,13 +65,22 @@ static inline int sys_bpf(enum bpf_cmd cmd, union bpf_attr *attr,
 	return syscall(__NR_bpf, cmd, attr, size);
 }
 
+static inline int sys_bpf_fd(enum bpf_cmd cmd, union bpf_attr *attr,
+			     unsigned int size)
+{
+	int fd;
+
+	fd = sys_bpf(cmd, attr, size);
+	return ensure_good_fd(fd);
+}
+
 static inline int sys_bpf_prog_load(union bpf_attr *attr, unsigned int size)
 {
 	int retries = 5;
 	int fd;
 
 	do {
-		fd = sys_bpf(BPF_PROG_LOAD, attr, size);
+		fd = sys_bpf_fd(BPF_PROG_LOAD, attr, size);
 	} while (fd < 0 && errno == EAGAIN && retries-- > 0);
 
 	return fd;
@@ -103,7 +112,7 @@ int bpf_create_map_xattr(const struct bpf_create_map_attr *create_attr)
 	else
 		attr.inner_map_fd = create_attr->inner_map_fd;
 
-	fd = sys_bpf(BPF_MAP_CREATE, &attr, sizeof(attr));
+	fd = sys_bpf_fd(BPF_MAP_CREATE, &attr, sizeof(attr));
 	return libbpf_err_errno(fd);
 }
 
@@ -181,7 +190,7 @@ int bpf_create_map_in_map_node(enum bpf_map_type map_type, const char *name,
 		attr.numa_node = node;
 	}
 
-	fd = sys_bpf(BPF_MAP_CREATE, &attr, sizeof(attr));
+	fd = sys_bpf_fd(BPF_MAP_CREATE, &attr, sizeof(attr));
 	return libbpf_err_errno(fd);
 }
 
@@ -609,7 +618,7 @@ int bpf_obj_get(const char *pathname)
 	memset(&attr, 0, sizeof(attr));
 	attr.pathname = ptr_to_u64((void *)pathname);
 
-	fd = sys_bpf(BPF_OBJ_GET, &attr, sizeof(attr));
+	fd = sys_bpf_fd(BPF_OBJ_GET, &attr, sizeof(attr));
 	return libbpf_err_errno(fd);
 }
 
@@ -720,7 +729,7 @@ int bpf_link_create(int prog_fd, int target_fd,
 		break;
 	}
 proceed:
-	fd = sys_bpf(BPF_LINK_CREATE, &attr, sizeof(attr));
+	fd = sys_bpf_fd(BPF_LINK_CREATE, &attr, sizeof(attr));
 	return libbpf_err_errno(fd);
 }
 
@@ -763,7 +772,7 @@ int bpf_iter_create(int link_fd)
 	memset(&attr, 0, sizeof(attr));
 	attr.iter_create.link_fd = link_fd;
 
-	fd = sys_bpf(BPF_ITER_CREATE, &attr, sizeof(attr));
+	fd = sys_bpf_fd(BPF_ITER_CREATE, &attr, sizeof(attr));
 	return libbpf_err_errno(fd);
 }
 
@@ -921,7 +930,7 @@ int bpf_prog_get_fd_by_id(__u32 id)
 	memset(&attr, 0, sizeof(attr));
 	attr.prog_id = id;
 
-	fd = sys_bpf(BPF_PROG_GET_FD_BY_ID, &attr, sizeof(attr));
+	fd = sys_bpf_fd(BPF_PROG_GET_FD_BY_ID, &attr, sizeof(attr));
 	return libbpf_err_errno(fd);
 }
 
@@ -933,7 +942,7 @@ int bpf_map_get_fd_by_id(__u32 id)
 	memset(&attr, 0, sizeof(attr));
 	attr.map_id = id;
 
-	fd = sys_bpf(BPF_MAP_GET_FD_BY_ID, &attr, sizeof(attr));
+	fd = sys_bpf_fd(BPF_MAP_GET_FD_BY_ID, &attr, sizeof(attr));
 	return libbpf_err_errno(fd);
 }
 
@@ -945,7 +954,7 @@ int bpf_btf_get_fd_by_id(__u32 id)
 	memset(&attr, 0, sizeof(attr));
 	attr.btf_id = id;
 
-	fd = sys_bpf(BPF_BTF_GET_FD_BY_ID, &attr, sizeof(attr));
+	fd = sys_bpf_fd(BPF_BTF_GET_FD_BY_ID, &attr, sizeof(attr));
 	return libbpf_err_errno(fd);
 }
 
@@ -957,7 +966,7 @@ int bpf_link_get_fd_by_id(__u32 id)
 	memset(&attr, 0, sizeof(attr));
 	attr.link_id = id;
 
-	fd = sys_bpf(BPF_LINK_GET_FD_BY_ID, &attr, sizeof(attr));
+	fd = sys_bpf_fd(BPF_LINK_GET_FD_BY_ID, &attr, sizeof(attr));
 	return libbpf_err_errno(fd);
 }
 
@@ -988,7 +997,7 @@ int bpf_raw_tracepoint_open(const char *name, int prog_fd)
 	attr.raw_tracepoint.name = ptr_to_u64(name);
 	attr.raw_tracepoint.prog_fd = prog_fd;
 
-	fd = sys_bpf(BPF_RAW_TRACEPOINT_OPEN, &attr, sizeof(attr));
+	fd = sys_bpf_fd(BPF_RAW_TRACEPOINT_OPEN, &attr, sizeof(attr));
 	return libbpf_err_errno(fd);
 }
 
@@ -1008,7 +1017,7 @@ retry:
 		attr.btf_log_buf = ptr_to_u64(log_buf);
 	}
 
-	fd = sys_bpf(BPF_BTF_LOAD, &attr, sizeof(attr));
+	fd = sys_bpf_fd(BPF_BTF_LOAD, &attr, sizeof(attr));
 
 	if (fd < 0 && !do_log && log_buf && log_buf_size) {
 		do_log = true;
@@ -1050,7 +1059,7 @@ int bpf_enable_stats(enum bpf_stats_type type)
 	memset(&attr, 0, sizeof(attr));
 	attr.enable_stats.type = type;
 
-	fd = sys_bpf(BPF_ENABLE_STATS, &attr, sizeof(attr));
+	fd = sys_bpf_fd(BPF_ENABLE_STATS, &attr, sizeof(attr));
 	return libbpf_err_errno(fd);
 }
 
