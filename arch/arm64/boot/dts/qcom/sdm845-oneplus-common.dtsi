@@ -641,6 +641,10 @@
 	};
 };
 
+&venus {
+	firmware-name = "qcom/sdm845/oneplus6/venus.mbn";
+};
+
 &wifi {
 	status = "okay";
 	vdd-0.8-cx-mx-supply = <&vreg_l5a_0p8>;
