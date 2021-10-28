@@ -197,11 +197,38 @@ static ssize_t __blkdev_direct_IO(struct kiocb *iocb, struct iov_iter *iter,
 	struct blk_plug plug;
 	struct blkdev_dio *dio;
 	struct bio *bio;
+	struct iovec *pi_iov, _pi_iov;
 	bool is_poll = (iocb->ki_flags & IOCB_HIPRI) != 0;
 	bool is_read = (iov_iter_rw(iter) == READ), is_sync;
 	loff_t pos = iocb->ki_pos;
 	blk_qc_t qc = BLK_QC_T_NONE;
 	int ret = 0;
+
+	if (iocb->ki_flags & IOCB_USE_PI) {
+		struct blk_integrity *bi = blk_get_integrity(bdev->bd_disk);
+		unsigned int intervals;
+
+		/* Last iovec contains protection information. */
+		if (!iter->nr_segs)
+			return -EINVAL;
+
+		iter->nr_segs--;
+		pi_iov = (struct iovec *)(iter->iov + iter->nr_segs);
+
+		/* TODO: seems iter is in charge of this check ? */
+		if (pi_iov->iov_len > iter->count)
+			return -EINVAL;
+
+		iter->count -= pi_iov->iov_len;
+
+		intervals = bio_integrity_intervals(bi, iter->count >> 9);
+		if (unlikely(intervals * bi->tuple_size > pi_iov->iov_len)) {
+			pr_err("Integrity & data size mismatch data=%lu integrity=%u intervals=%u tupple=%u",
+				iter->count, (unsigned int)pi_iov->iov_len,
+				intervals, bi->tuple_size);
+				return -EINVAL;
+		}
+	}
 
 	if ((pos | iov_iter_alignment(iter)) &
 	    (bdev_logical_block_size(bdev) - 1))
@@ -258,6 +285,17 @@ static ssize_t __blkdev_direct_IO(struct kiocb *iocb, struct iov_iter *iter,
 		dio->size += bio->bi_iter.bi_size;
 		pos += bio->bi_iter.bi_size;
 
+		/* in case we can't add all data to one bio */
+		/* we must split integrity too */
+
+		if (iocb->ki_flags & IOCB_USE_PI) {
+			struct blk_integrity *bi = bdev_get_integrity(bio->bi_bdev);
+
+			_pi_iov.iov_base =  pi_iov->iov_base;
+			_pi_iov.iov_base += bio_integrity_bytes(bi, (dio->size-bio->bi_iter.bi_size) >> 9);
+			_pi_iov.iov_len  = bio_integrity_bytes(bi, bio->bi_iter.bi_size >> 9);
+		}
+
 		nr_pages = bio_iov_vecs_to_alloc(iter, BIO_MAX_VECS);
 		if (!nr_pages) {
 			bool polled = false;
@@ -265,6 +303,16 @@ static ssize_t __blkdev_direct_IO(struct kiocb *iocb, struct iov_iter *iter,
 			if (iocb->ki_flags & IOCB_HIPRI) {
 				bio_set_polled(bio, iocb);
 				polled = true;
+			}
+
+			/* Add protection information to bio */
+			if (iocb->ki_flags & IOCB_USE_PI) {
+				ret = bio_integrity_add_pi_iovec(bio, &_pi_iov);
+				if (ret) {
+					bio->bi_status = BLK_STS_IOERR;
+					bio_endio(bio);
+					break;
+				}
 			}
 
 			qc = submit_bio(bio);
@@ -286,6 +334,16 @@ static ssize_t __blkdev_direct_IO(struct kiocb *iocb, struct iov_iter *iter,
 			atomic_set(&dio->ref, 2);
 		} else {
 			atomic_inc(&dio->ref);
+		}
+
+
+		if (iocb->ki_flags & IOCB_USE_PI) {
+			ret = bio_integrity_add_pi_iovec(bio, &_pi_iov);
+			if (ret) {
+				bio->bi_status = BLK_STS_IOERR;
+				bio_endio(bio);
+				break;
+			}
 		}
 
 		submit_bio(bio);
@@ -509,6 +567,12 @@ static ssize_t blkdev_write_iter(struct kiocb *iocb, struct iov_iter *from)
 	if ((iocb->ki_flags & (IOCB_NOWAIT | IOCB_DIRECT)) == IOCB_NOWAIT)
 		return -EOPNOTSUPP;
 
+	if (iocb->ki_flags & IOCB_USE_PI) {
+		if (from->nr_segs < 2)
+			return -EINVAL;
+		size += from->iov[from->nr_segs-1].iov_len;
+	}
+
 	size -= iocb->ki_pos;
 	if (iov_iter_count(from) > size) {
 		shorted = iov_iter_count(from) - size;
@@ -537,6 +601,13 @@ static ssize_t blkdev_read_iter(struct kiocb *iocb, struct iov_iter *to)
 		return 0;
 
 	size -= pos;
+
+	if (iocb->ki_flags & IOCB_USE_PI) {
+		if (to->nr_segs < 2)
+			return -EINVAL;
+		size += to->iov[to->nr_segs-1].iov_len;
+	}
+
 	if (iov_iter_count(to) > size) {
 		shorted = iov_iter_count(to) - size;
 		iov_iter_truncate(to, size);
