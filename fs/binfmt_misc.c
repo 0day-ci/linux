@@ -60,12 +60,11 @@ typedef struct {
 	char *name;
 	struct dentry *dentry;
 	struct file *interp_file;
+	refcount_t ref;
 } Node;
 
 static DEFINE_RWLOCK(entries_lock);
 static struct file_system_type bm_fs_type;
-static struct vfsmount *bm_mnt;
-static int entry_count;
 
 /*
  * Max length of the register string.  Determined by:
@@ -126,6 +125,16 @@ static Node *check_file(struct linux_binprm *bprm)
 	return NULL;
 }
 
+/* Free node if we are sure load_misc_binary() is done with it. */
+static void put_node(Node *e)
+{
+	if (refcount_dec_and_test(&e->ref)) {
+		if (e->flags & MISC_FMT_OPEN_FILE)
+			filp_close(e->interp_file, NULL);
+		kfree(e);
+	}
+}
+
 /*
  * the loader itself
  */
@@ -142,8 +151,9 @@ static int load_misc_binary(struct linux_binprm *bprm)
 	/* to keep locking time low, we copy the interpreter string */
 	read_lock(&entries_lock);
 	fmt = check_file(bprm);
+	/* Make sure the node isn't freed behind our back. */
 	if (fmt)
-		dget(fmt->dentry);
+		refcount_inc(&fmt->ref);
 	read_unlock(&entries_lock);
 	if (!fmt)
 		return retval;
@@ -198,7 +208,16 @@ static int load_misc_binary(struct linux_binprm *bprm)
 
 	retval = 0;
 ret:
-	dput(fmt->dentry);
+
+	/*
+	 * If we actually put the node here all concurrent calls to
+	 * load_misc_binary() will have finished. We also know
+	 * that for the refcount to be zero ->evict_inode() must have removed
+	 * the node to be deleted from the list. All that is left for us is to
+	 * close and free.
+	 */
+	put_node(fmt);
+
 	return retval;
 }
 
@@ -557,26 +576,29 @@ static void bm_evict_inode(struct inode *inode)
 {
 	Node *e = inode->i_private;
 
-	if (e && e->flags & MISC_FMT_OPEN_FILE)
-		filp_close(e->interp_file, NULL);
-
 	clear_inode(inode);
-	kfree(e);
+
+	if (e) {
+		write_lock(&entries_lock);
+		list_del_init(&e->list);
+		write_unlock(&entries_lock);
+		put_node(e);
+	}
 }
 
 static void kill_node(Node *e)
 {
 	struct dentry *dentry;
 
-	write_lock(&entries_lock);
-	list_del_init(&e->list);
-	write_unlock(&entries_lock);
-
+	/*
+	 * It's fine to unconditionally drop the dentry since ->evict_inode()
+	 * will check the refcount before freeing the node and so it can't go
+	 * away behind load_misc_binary()'s back.
+	 */
 	dentry = e->dentry;
 	drop_nlink(d_inode(dentry));
 	d_drop(dentry);
 	dput(dentry);
-	simple_release_fs(&bm_mnt, &entry_count);
 }
 
 /* /<entry> */
@@ -683,13 +705,7 @@ static ssize_t bm_register_write(struct file *file, const char __user *buffer,
 	if (!inode)
 		goto out2;
 
-	err = simple_pin_fs(&bm_fs_type, &bm_mnt, &entry_count);
-	if (err) {
-		iput(inode);
-		inode = NULL;
-		goto out2;
-	}
-
+	refcount_set(&e->ref, 1);
 	e->dentry = dget(dentry);
 	inode->i_private = e;
 	inode->i_fop = &bm_entry_operations;
