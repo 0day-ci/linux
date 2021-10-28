@@ -421,3 +421,78 @@ support enabled just fine as always. No difference can be noted in
 hugetlbfs other than there will be less overall fragmentation. All
 usual features belonging to hugetlbfs are preserved and
 unaffected. libhugetlbfs will also work fine as usual.
+
+THP zero subpages reclaim
+=========================
+THP may lead to memory bloat which may cause OOM. The reason is a huge
+page may contain some zero subpages which users didn't really access them.
+To avoid this, a mechanism to reclaim these zero subpages is introduced::
+
+        echo 1 > /sys/fs/cgroup/memory/{memcg}/memory.thp_reclaim
+        echo 0 > /sys/fs/cgroup/memory/{memcg}/memory.thp_reclaim
+
+Echo 1 to enable and echo 0 to disable.
+The default value is inherited from its parent. The default mode of root
+memcg is disable.
+
+We also add a global interface, if you don't want to configure it by
+configuring every memory cgroup, you can use this one::
+
+        /sys/kernel/mm/transparent_hugepage/reclaim
+
+memcg
+        The default mode. It means every mem cgroup will use their own
+        configure.
+
+enable
+        means every mem cgroup will enable reclaim.
+
+disable
+        means every mem cgroup will disable reclaim.
+
+If zero subpages reclaim is enabled, the new huge page will be add to a
+reclaim queue in mem_cgroup, and the queue would be scanned when memory
+reclaiming. The queue stat can be checked like this::
+
+        cat /sys/fs/cgroup/memory/{memcg}/memory.thp_reclaim_stat
+
+queue_length
+        means the queue length of each node.
+
+split_hpage
+        means the numbers of huge pages split by thp reclaim of each node.
+
+split_failed
+        means the numbers of huge pages split failed by thp reclaim of
+        each node.
+
+reclaim_subpage
+        means the numbers of zero subpages reclaimed by thp reclaim of
+        each node.
+
+We also add a controller interface to set configs for thp reclaim::
+
+        /sys/fs/cgroup/memory/{memcg}/memory.thp_reclaim_ctrl
+
+threshold
+        means the huge page which contains at least threshold zero pages would
+        be split (estimate it by checking some discrete unsigned long values).
+        The default value of threshold is 16, and will inherit from it's parent.
+        The range of this value is (0, HPAGE_PMD_NR], which means the value must
+        be less than or equal to HPAGE_PMD_NR (512 in x86), and be greater than 0.
+        We can set reclaim threshold to be 8 by this::
+
+        echo "threshold 8" > memory.thp_reclaim_ctrl
+
+reclaim
+        triggers action immediately for the huge pages in the reclaim queue.
+        The action deponds on the thp reclaim config (reclaim, swap or disable,
+        disable means just remove the huge page from the queue).
+        This contronller has two value, 1 and 2. 1 means just reclaim the current
+        memcg, and 2 means reclaim the current memcg and all the children memcgs.
+        Like this::
+
+        echo "reclaim 1" > memory.thp_reclaim_ctrl
+        echo "reclaim 2" > memory.thp_reclaim_ctrl
+
+Only one of the configs mentioned above can be set at a time.
