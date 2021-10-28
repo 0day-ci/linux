@@ -296,10 +296,10 @@ int intel_lpe_audio_init(struct drm_i915_private *dev_priv)
  *
  * release all the resources for LPE audio <-> i915 bridge.
  */
-void intel_lpe_audio_teardown(struct drm_i915_private *dev_priv)
+int intel_lpe_audio_teardown(struct drm_i915_private *dev_priv)
 {
 	if (!HAS_LPE_AUDIO(dev_priv))
-		return;
+		return -ENODEV;
 
 	lpe_audio_platdev_destroy(dev_priv);
 
@@ -307,6 +307,8 @@ void intel_lpe_audio_teardown(struct drm_i915_private *dev_priv)
 
 	dev_priv->audio.lpe.irq = -1;
 	dev_priv->audio.lpe.platdev = NULL;
+
+	return 0;
 }
 
 /**
