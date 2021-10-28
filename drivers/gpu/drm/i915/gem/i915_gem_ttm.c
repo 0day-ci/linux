@@ -249,9 +249,8 @@ static void i915_ttm_tt_shmem_unpopulate(struct ttm_tt *ttm)
 	bool backup = ttm->page_flags & TTM_TT_FLAG_SWAPPED;
 	struct sg_table *st = &i915_tt->cached_rsgt.table;
 
-	if (st->sgl)
-		shmem_sg_free_table(st, file_inode(i915_tt->filp)->i_mapping,
-				    backup, backup);
+	shmem_sg_free_table(st, file_inode(i915_tt->filp)->i_mapping,
+			    backup, backup);
 }
 
 static void i915_ttm_tt_release(struct kref *ref)
