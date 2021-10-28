@@ -1316,6 +1316,7 @@ static int anx7625_attach_dsi(struct anx7625_data *ctx)
 		.channel = 0,
 		.node = NULL,
 	};
+	int ret;
 
 	DRM_DEV_DEBUG_DRIVER(dev, "attach dsi\n");
 
@@ -1325,7 +1326,7 @@ static int anx7625_attach_dsi(struct anx7625_data *ctx)
 		return -EINVAL;
 	}
 
-	dsi = mipi_dsi_device_register_full(host, &info);
+	dsi = devm_mipi_dsi_device_register_full(dev, host, &info);
 	if (IS_ERR(dsi)) {
 		DRM_DEV_ERROR(dev, "fail to create dsi device.\n");
 		return -EINVAL;
@@ -1337,10 +1338,10 @@ static int anx7625_attach_dsi(struct anx7625_data *ctx)
 		MIPI_DSI_MODE_VIDEO_SYNC_PULSE	|
 		MIPI_DSI_MODE_VIDEO_HSE;
 
-	if (mipi_dsi_attach(dsi) < 0) {
+	ret = devm_mipi_dsi_attach(dev, dsi);
+	if (ret) {
 		DRM_DEV_ERROR(dev, "fail to attach dsi to host.\n");
-		mipi_dsi_device_unregister(dsi);
-		return -EINVAL;
+		return ret;
 	}
 
 	ctx->dsi = dsi;
@@ -1348,16 +1349,6 @@ static int anx7625_attach_dsi(struct anx7625_data *ctx)
 	DRM_DEV_DEBUG_DRIVER(dev, "attach dsi succeeded.\n");
 
 	return 0;
-}
-
-static void anx7625_bridge_detach(struct drm_bridge *bridge)
-{
-	struct anx7625_data *ctx = bridge_to_anx7625(bridge);
-
-	if (ctx->dsi) {
-		mipi_dsi_detach(ctx->dsi);
-		mipi_dsi_device_unregister(ctx->dsi);
-	}
 }
 
 static int anx7625_bridge_attach(struct drm_bridge *bridge,
@@ -1374,12 +1365,6 @@ static int anx7625_bridge_attach(struct drm_bridge *bridge,
 	if (!bridge->encoder) {
 		DRM_DEV_ERROR(dev, "Parent encoder object not found");
 		return -ENODEV;
-	}
-
-	err = anx7625_attach_dsi(ctx);
-	if (err) {
-		DRM_DEV_ERROR(dev, "Fail to attach to dsi : %d\n", err);
-		return err;
 	}
 
 	if (ctx->pdata.panel_bridge) {
@@ -1624,7 +1609,6 @@ static struct edid *anx7625_bridge_get_edid(struct drm_bridge *bridge,
 
 static const struct drm_bridge_funcs anx7625_bridge_funcs = {
 	.attach = anx7625_bridge_attach,
-	.detach = anx7625_bridge_detach,
 	.disable = anx7625_bridge_disable,
 	.mode_valid = anx7625_bridge_mode_valid,
 	.mode_set = anx7625_bridge_mode_set,
@@ -1855,9 +1839,23 @@ static int anx7625_i2c_probe(struct i2c_client *client,
 	platform->bridge.type = DRM_MODE_CONNECTOR_eDP;
 	drm_bridge_add(&platform->bridge);
 
+	ret = anx7625_attach_dsi(platform);
+	if (ret) {
+		DRM_DEV_ERROR(dev, "Fail to attach to dsi : %d\n", ret);
+		goto unregister_bridge;
+	}
+
 	DRM_DEV_DEBUG_DRIVER(dev, "probe done\n");
 
 	return 0;
+
+unregister_bridge:
+	drm_bridge_remove(&platform->bridge);
+
+	if (!platform->pdata.low_power_mode)
+		pm_runtime_put_sync_suspend(&client->dev);
+
+	anx7625_unregister_i2c_dummy_clients(platform);
 
 free_wq:
 	if (platform->workqueue)
