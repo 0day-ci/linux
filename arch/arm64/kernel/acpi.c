@@ -22,6 +22,7 @@
 #include <linux/irq_work.h>
 #include <linux/memblock.h>
 #include <linux/of_fdt.h>
+#include <linux/libfdt.h>
 #include <linux/smp.h>
 #include <linux/serial_core.h>
 #include <linux/pgtable.h>
@@ -62,29 +63,12 @@ static int __init parse_acpi(char *arg)
 }
 early_param("acpi", parse_acpi);
 
-static int __init dt_scan_depth1_nodes(unsigned long node,
-				       const char *uname, int depth,
-				       void *data)
+static bool __init dt_is_populated(void)
 {
-	/*
-	 * Ignore anything not directly under the root node; we'll
-	 * catch its parent instead.
-	 */
-	if (depth != 1)
-		return 0;
+	const void *fdt = initial_boot_params;
+	int node = fdt_node_offset_by_compatible(fdt, -1, "arm,armv8-timer");
 
-	if (strcmp(uname, "chosen") == 0)
-		return 0;
-
-	if (strcmp(uname, "hypervisor") == 0 &&
-	    of_flat_dt_is_compatible(node, "xen,xen"))
-		return 0;
-
-	/*
-	 * This node at depth 1 is neither a chosen node nor a xen node,
-	 * which we do not expect.
-	 */
-	return 1;
+	return node > 0 ? true : false;
 }
 
 /*
@@ -205,8 +189,7 @@ void __init acpi_boot_table_init(void)
 	 *   and ACPI has not been [force] enabled (acpi=on|force)
 	 */
 	if (param_acpi_off ||
-	    (!param_acpi_on && !param_acpi_force &&
-	     of_scan_flat_dt(dt_scan_depth1_nodes, NULL)))
+	    (!param_acpi_on && !param_acpi_force && dt_is_populated()))
 		goto done;
 
 	/*
