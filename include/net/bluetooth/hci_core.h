@@ -87,6 +87,8 @@ struct discovery_state {
 	u8			(*uuids)[16];
 	unsigned long		scan_start;
 	unsigned long		scan_duration;
+	unsigned long		name_resolve_timeout;
+	unsigned long		name_resolve_duration;
 };
 
 #define SUSPEND_NOTIFIER_TIMEOUT	msecs_to_jiffies(2000) /* 2 seconds */
@@ -805,6 +807,8 @@ static inline void sco_recv_scodata(struct hci_conn *hcon, struct sk_buff *skb)
 #define INQUIRY_CACHE_AGE_MAX   (HZ*30)   /* 30 seconds */
 #define INQUIRY_ENTRY_AGE_MAX   (HZ*60)   /* 60 seconds */
 
+#define NAME_RESOLVE_INIT_DURATION	5120	/* msec */
+
 static inline void discovery_init(struct hci_dev *hdev)
 {
 	hdev->discovery.state = DISCOVERY_STOPPED;
@@ -813,6 +817,7 @@ static inline void discovery_init(struct hci_dev *hdev)
 	INIT_LIST_HEAD(&hdev->discovery.resolve);
 	hdev->discovery.report_invalid_rssi = true;
 	hdev->discovery.rssi = HCI_RSSI_INVALID;
+	hdev->discovery.name_resolve_duration = NAME_RESOLVE_INIT_DURATION;
 }
 
 static inline void hci_discovery_filter_clear(struct hci_dev *hdev)
