@@ -83,6 +83,8 @@ MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default="
 			__MODULE_STRING(WATCHDOG_NOWAYOUT) ")");
 MODULE_PARM_DESC(soft_noboot, "Watchdog action, set to 1 to ignore reboots, 0 to reboot (default 0)");
 
+struct s3c2410_wdt;
+
 /**
  * struct s3c2410_wdt_variant - Per-variant config data
  *
@@ -96,6 +98,11 @@ MODULE_PARM_DESC(soft_noboot, "Watchdog action, set to 1 to ignore reboots, 0 to
  * @rst_stat_bit: Bit number in the rst_stat register indicating a watchdog
  * reset.
  * @quirks: A bitfield of quirks.
+ * @disable_auto_reset: If set, this function will be called to disable
+ * automatic setting the WDT as a reset reason in RST_STAT on CPU reset; uses
+ * disable_reg field.
+ * @mask_reset: If set, this function will be called to mask WDT reset request;
+ * uses mask_reset_reg and mask_bit fields.
  */
 
 struct s3c2410_wdt_variant {
@@ -105,6 +112,8 @@ struct s3c2410_wdt_variant {
 	int rst_stat_reg;
 	int rst_stat_bit;
 	u32 quirks;
+	int (*disable_auto_reset)(struct s3c2410_wdt *wdt, bool mask);
+	int (*mask_reset)(struct s3c2410_wdt *wdt, bool mask);
 };
 
 struct s3c2410_wdt {
@@ -120,6 +129,9 @@ struct s3c2410_wdt {
 	const struct s3c2410_wdt_variant *drv_data;
 	struct regmap *pmureg;
 };
+
+static int s3c2410wdt_disable_wdt_reset(struct s3c2410_wdt *wdt, bool mask);
+static int s3c2410wdt_mask_wdt_reset(struct s3c2410_wdt *wdt, bool mask);
 
 static const struct s3c2410_wdt_variant drv_data_s3c2410 = {
 	.quirks = 0
@@ -138,6 +150,8 @@ static const struct s3c2410_wdt_variant drv_data_exynos5250  = {
 	.rst_stat_bit = 20,
 	.quirks = QUIRK_HAS_PMU_CONFIG | QUIRK_HAS_RST_STAT \
 		  | QUIRK_HAS_WTCLRINT_REG,
+	.disable_auto_reset = s3c2410wdt_disable_wdt_reset,
+	.mask_reset = s3c2410wdt_mask_wdt_reset,
 };
 
 static const struct s3c2410_wdt_variant drv_data_exynos5420 = {
@@ -148,6 +162,8 @@ static const struct s3c2410_wdt_variant drv_data_exynos5420 = {
 	.rst_stat_bit = 9,
 	.quirks = QUIRK_HAS_PMU_CONFIG | QUIRK_HAS_RST_STAT \
 		  | QUIRK_HAS_WTCLRINT_REG,
+	.disable_auto_reset = s3c2410wdt_disable_wdt_reset,
+	.mask_reset = s3c2410wdt_mask_wdt_reset,
 };
 
 static const struct s3c2410_wdt_variant drv_data_exynos7 = {
@@ -158,6 +174,8 @@ static const struct s3c2410_wdt_variant drv_data_exynos7 = {
 	.rst_stat_bit = 23,	/* A57 WDTRESET */
 	.quirks = QUIRK_HAS_PMU_CONFIG | QUIRK_HAS_RST_STAT \
 		  | QUIRK_HAS_WTCLRINT_REG,
+	.disable_auto_reset = s3c2410wdt_disable_wdt_reset,
+	.mask_reset = s3c2410wdt_mask_wdt_reset,
 };
 
 static const struct of_device_id s3c2410_wdt_match[] = {
@@ -200,33 +218,51 @@ static inline struct s3c2410_wdt *freq_to_wdt(struct notifier_block *nb)
 	return container_of(nb, struct s3c2410_wdt, freq_transition);
 }
 
-static int s3c2410wdt_mask_and_disable_reset(struct s3c2410_wdt *wdt, bool mask)
+static int s3c2410wdt_disable_wdt_reset(struct s3c2410_wdt *wdt, bool mask)
 {
+	const u32 mask_val = 1 << wdt->drv_data->mask_bit;
+	const u32 val = mask ? mask_val : 0;
 	int ret;
-	u32 mask_val = 1 << wdt->drv_data->mask_bit;
-	u32 val = 0;
 
-	/* No need to do anything if no PMU CONFIG needed */
-	if (!(wdt->drv_data->quirks & QUIRK_HAS_PMU_CONFIG))
-		return 0;
-
-	if (mask)
-		val = mask_val;
-
-	ret = regmap_update_bits(wdt->pmureg,
-			wdt->drv_data->disable_reg,
-			mask_val, val);
-	if (ret < 0)
-		goto error;
-
-	ret = regmap_update_bits(wdt->pmureg,
-			wdt->drv_data->mask_reset_reg,
-			mask_val, val);
- error:
+	ret = regmap_update_bits(wdt->pmureg, wdt->drv_data->disable_reg,
+				 mask_val, val);
 	if (ret < 0)
 		dev_err(wdt->dev, "failed to update reg(%d)\n", ret);
 
 	return ret;
+}
+
+static int s3c2410wdt_mask_wdt_reset(struct s3c2410_wdt *wdt, bool mask)
+{
+	const u32 mask_val = 1 << wdt->drv_data->mask_bit;
+	const u32 val = mask ? mask_val : 0;
+	int ret;
+
+	ret = regmap_update_bits(wdt->pmureg, wdt->drv_data->mask_reset_reg,
+				 mask_val, val);
+	if (ret < 0)
+		dev_err(wdt->dev, "failed to update reg(%d)\n", ret);
+
+	return ret;
+}
+
+static int s3c2410wdt_enable(struct s3c2410_wdt *wdt, bool en)
+{
+	int ret;
+
+	if (wdt->drv_data->disable_auto_reset) {
+		ret = wdt->drv_data->disable_auto_reset(wdt, !en);
+		if (ret < 0)
+			return ret;
+	}
+
+	if (wdt->drv_data->mask_reset) {
+		ret = wdt->drv_data->mask_reset(wdt, !en);
+		if (ret < 0)
+			return ret;
+	}
+
+	return 0;
 }
 
 static int s3c2410wdt_keepalive(struct watchdog_device *wdd)
@@ -609,7 +645,7 @@ static int s3c2410wdt_probe(struct platform_device *pdev)
 	if (ret)
 		goto err_cpufreq;
 
-	ret = s3c2410wdt_mask_and_disable_reset(wdt, false);
+	ret = s3c2410wdt_enable(wdt, true);
 	if (ret < 0)
 		goto err_unregister;
 
@@ -655,7 +691,7 @@ static int s3c2410wdt_remove(struct platform_device *dev)
 	int ret;
 	struct s3c2410_wdt *wdt = platform_get_drvdata(dev);
 
-	ret = s3c2410wdt_mask_and_disable_reset(wdt, true);
+	ret = s3c2410wdt_enable(wdt, false);
 	if (ret < 0)
 		return ret;
 
@@ -672,8 +708,7 @@ static void s3c2410wdt_shutdown(struct platform_device *dev)
 {
 	struct s3c2410_wdt *wdt = platform_get_drvdata(dev);
 
-	s3c2410wdt_mask_and_disable_reset(wdt, true);
-
+	s3c2410wdt_enable(wdt, false);
 	s3c2410wdt_stop(&wdt->wdt_device);
 }
 
@@ -688,7 +723,7 @@ static int s3c2410wdt_suspend(struct device *dev)
 	wdt->wtcon_save = readl(wdt->reg_base + S3C2410_WTCON);
 	wdt->wtdat_save = readl(wdt->reg_base + S3C2410_WTDAT);
 
-	ret = s3c2410wdt_mask_and_disable_reset(wdt, true);
+	ret = s3c2410wdt_enable(wdt, false);
 	if (ret < 0)
 		return ret;
 
@@ -708,7 +743,7 @@ static int s3c2410wdt_resume(struct device *dev)
 	writel(wdt->wtdat_save, wdt->reg_base + S3C2410_WTCNT);/* Reset count */
 	writel(wdt->wtcon_save, wdt->reg_base + S3C2410_WTCON);
 
-	ret = s3c2410wdt_mask_and_disable_reset(wdt, false);
+	ret = s3c2410wdt_enable(wdt, true);
 	if (ret < 0)
 		return ret;
 
