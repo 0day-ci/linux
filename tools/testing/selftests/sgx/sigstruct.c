@@ -59,13 +59,10 @@ static void reverse_bytes(void *data, int length)
 {
 	int i = 0;
 	int j = length - 1;
-	uint8_t temp;
 	uint8_t *ptr = data;
 
 	while (i < j) {
-		temp = ptr[i];
-		ptr[i] = ptr[j];
-		ptr[j] = temp;
+		swap(ptr[i], ptr[j]);
 		i++;
 		j--;
 	}
