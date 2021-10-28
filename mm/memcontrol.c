@@ -4493,6 +4493,61 @@ static int mem_cgroup_thp_reclaim_write(struct cgroup_subsys_state *css,
 
 	return 0;
 }
+
+static inline char *strsep_s(char **s, const char *ct)
+{
+	char *p;
+
+	while ((p = strsep(s, ct))) {
+		if (*p)
+			return p;
+	}
+
+	return NULL;
+}
+
+static int memcg_thp_reclaim_ctrl_show(struct seq_file *m, void *v)
+{
+	struct mem_cgroup *memcg = mem_cgroup_from_css(seq_css(m));
+	int thp_reclaim_threshold = READ_ONCE(memcg->thp_reclaim_threshold);
+
+	seq_printf(m, "threshold\t%d\n", thp_reclaim_threshold);
+
+	return 0;
+}
+
+static ssize_t memcg_thp_reclaim_ctrl_write(struct kernfs_open_file *of,
+					    char *buf, size_t nbytes,
+					    loff_t off)
+{
+	struct mem_cgroup *memcg = mem_cgroup_from_css(of_css(of));
+	char *key, *value;
+	int ret;
+
+	key = strsep_s(&buf, " \t\n");
+	if (!key)
+		return -EINVAL;
+
+	if (!strcmp(key, "threshold")) {
+		int threshold;
+
+		value = strsep_s(&buf, " \t\n");
+		if (!value)
+			return -EINVAL;
+
+		ret = kstrtouint(value, 0, &threshold);
+		if (ret)
+			return ret;
+
+		if (threshold > HPAGE_PMD_NR || threshold < 1)
+			return -EINVAL;
+
+		xchg(&memcg->thp_reclaim_threshold, threshold);
+	} else
+		return -EINVAL;
+
+	return nbytes;
+}
 #endif
 
 #ifdef CONFIG_CGROUP_WRITEBACK
@@ -5063,6 +5118,11 @@ static struct cftype mem_cgroup_legacy_files[] = {
 		.read_u64 = mem_cgroup_thp_reclaim_read,
 		.write_u64 = mem_cgroup_thp_reclaim_write,
 	},
+	{
+		.name = "thp_reclaim_ctrl",
+		.seq_show = memcg_thp_reclaim_ctrl_show,
+		.write = memcg_thp_reclaim_ctrl_write,
+	},
 #endif
 	{ },	/* terminate */
 };
@@ -5260,6 +5320,7 @@ static struct mem_cgroup *mem_cgroup_alloc(void)
 	memcg->deferred_split_queue.split_queue_len = 0;
 
 	memcg->thp_reclaim = THP_RECLAIM_DISABLE;
+	memcg->thp_reclaim_threshold = THP_RECLAIM_THRESHOLD_DEFAULT;
 #endif
 	idr_replace(&mem_cgroup_idr, memcg, memcg->id.id);
 	return memcg;
@@ -5295,6 +5356,7 @@ mem_cgroup_css_alloc(struct cgroup_subsys_state *parent_css)
 		page_counter_init(&memcg->tcpmem, &parent->tcpmem);
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
 		memcg->thp_reclaim = parent->thp_reclaim;
+		memcg->thp_reclaim_threshold = parent->thp_reclaim_threshold;
 #endif
 	} else {
 		page_counter_init(&memcg->memory, NULL);

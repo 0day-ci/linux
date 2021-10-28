@@ -237,6 +237,8 @@ enum thp_reclaim_state {
 	THP_RECLAIM_ENABLE,
 	THP_RECLAIM_MEMCG, /* For global configure*/
 };
+
+#define THP_RECLAIM_THRESHOLD_DEFAULT  16
 #endif
 /*
  * The memory controller data structure. The memory controller controls both
@@ -356,6 +358,7 @@ struct mem_cgroup {
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
 	struct deferred_split deferred_split_queue;
 	int thp_reclaim;
+	int thp_reclaim_threshold;
 #endif
 
 	struct mem_cgroup_per_node *nodeinfo[];

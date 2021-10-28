@@ -187,7 +187,8 @@ bool is_transparent_hugepage(struct page *page);
 
 #ifdef CONFIG_MEMCG
 extern int global_thp_reclaim;
-int zsr_get_hpage(struct hpage_reclaim *hr_queue, struct page **reclaim_page);
+int zsr_get_hpage(struct hpage_reclaim *hr_queue, struct page **reclaim_page,
+		  int threshold);
 unsigned long zsr_reclaim_hpage(struct lruvec *lruvec, struct page *page);
 static inline struct list_head *hpage_reclaim_list(struct page *page)
 {

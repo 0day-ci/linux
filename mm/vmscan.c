@@ -2794,6 +2794,7 @@ static unsigned long reclaim_hpage_zero_subpages(struct lruvec *lruvec,
 	struct mem_cgroup *memcg;
 	struct hpage_reclaim *hr_queue;
 	int nid = lruvec->pgdat->node_id;
+	int threshold;
 	unsigned long nr_reclaimed = 0, nr_scanned = 0, nr_to_scan;
 
 	memcg = lruvec_memcg(lruvec);
@@ -2806,11 +2807,12 @@ static unsigned long reclaim_hpage_zero_subpages(struct lruvec *lruvec,
 
 	/* The last scan loop will scan all the huge pages.*/
 	nr_to_scan = priority == 0 ? 0 : MAX_SCAN_HPAGE;
+	threshold = READ_ONCE(memcg->thp_reclaim_threshold);
 
 	do {
 		struct page *page = NULL;
 
-		if (zsr_get_hpage(hr_queue, &page))
+		if (zsr_get_hpage(hr_queue, &page, threshold))
 			break;
 
 		if (!page)
