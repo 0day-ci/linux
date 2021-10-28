@@ -319,6 +319,7 @@ enum bip_flags {
 	BIP_CTRL_NOCHECK	= 1 << 2, /* disable HBA integrity checking */
 	BIP_DISK_NOCHECK	= 1 << 3, /* disable disk integrity checking */
 	BIP_IP_CHECKSUM		= 1 << 4, /* IP checksum */
+	BIP_RELEASE_PAGES	= 1 << 5, /* release pages after io completion */
 };
 
 /*
@@ -706,6 +707,7 @@ extern struct bio_integrity_payload *bio_integrity_alloc(struct bio *, gfp_t, un
 extern int bio_integrity_add_page(struct bio *, struct page *, unsigned int, unsigned int);
 extern bool bio_integrity_prep(struct bio *);
 extern void bio_integrity_advance(struct bio *, unsigned int);
+extern int bio_integrity_add_pi_iovec(struct bio *bio, struct iovec *pi_iov);
 extern void bio_integrity_trim(struct bio *);
 extern int bio_integrity_clone(struct bio *, struct bio *, gfp_t);
 extern int bioset_integrity_create(struct bio_set *, int);
@@ -744,6 +746,12 @@ static inline void bio_integrity_advance(struct bio *bio,
 					 unsigned int bytes_done)
 {
 	return;
+}
+
+static inline int bio_integrity_add_pi_iovec(struct bio *bio,
+					struct iovec *pi_iov)
+{
+	return 0;
 }
 
 static inline void bio_integrity_trim(struct bio *bio)
