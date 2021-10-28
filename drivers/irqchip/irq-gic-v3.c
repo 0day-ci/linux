@@ -967,6 +967,7 @@ static void gic_cpu_sys_reg_init(void)
 	u64 need_rss = MPIDR_RS(mpidr);
 	bool group0;
 	u32 pribits;
+	u32 val;
 
 	/*
 	 * Need to check that the SRE bit has actually been set. If
@@ -1009,12 +1010,16 @@ static void gic_cpu_sys_reg_init(void)
 	 */
 	gic_write_bpr1(0);
 
+	val = gic_read_ctlr();
+
 	if (static_branch_likely(&supports_deactivate_key)) {
 		/* EOI drops priority only (mode 1) */
-		gic_write_ctlr(ICC_CTLR_EL1_EOImode_drop);
+		val |= ICC_CTLR_EL1_EOImode;
+		gic_write_ctlr(val);
 	} else {
 		/* EOI deactivates interrupt too (mode 0) */
-		gic_write_ctlr(ICC_CTLR_EL1_EOImode_drop_dir);
+		val &= ~ICC_CTLR_EL1_EOImode;
+		gic_write_ctlr(val);
 	}
 
 	/* Always whack Group0 before Group1 */
