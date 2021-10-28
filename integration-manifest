@@ -1,0 +1,34 @@
+drm drm-fixes 79516af3497a5b89acb09f4a644f61d6c69e5f16
+	Merge tag 'drm-misc-fixes-2021-10-28' of git://anongit.freedesktop.org/drm/drm-misc into drm-fixes
+drm-misc drm-misc-fixes 61b1d445f3bfe4c3ba4335ceeb7e8ba688fd31e2
+	drm: panel-orientation-quirks: Add quirk for GPD Win3
+drm-intel drm-intel-fixes 9a4aa3a2f1606a03c220b21049baa4a2b6169626
+	drm/i915: Revert 'guc_id' from i915_request tracepoint
+drm drm-next 31fa8cbce4664946a1688898410fee41ad05364d
+	drm: Add R10 and R12 FourCC
+drm-misc drm-misc-next-fixes 70982eef4d7eebb47a3b1ef25ec1bc742f3a21cf
+	drm/ttm: Fix a deadlock if the target BO is not idle during swap
+drm-intel drm-intel-next-fixes 5740211ea442dbfd143093f8eea39faba186042f
+	drm/i915/dmabuf: fix broken build
+drm-misc drm-misc-next 2b3374306b315be02db0f67d3102a0d1e1357270
+	drm/bridge: sn65dsi86: ti_sn65dsi86_read_u16() __maybe_unused
+drm-intel drm-intel-next 4c3d005307c87c7a35e85a307b8bcf49f1d56114
+	drm/i915/adlp: Extend PSR2 support in transcoder B
+drm-intel drm-intel-gt-next 64512a66b67e6546e2db15192b3603cd6d58b75c
+	drm/i915: Revert 'guc_id' from i915_request tracepoint
+sound-upstream for-linus 7cf3dead1ad70c72edb03e2d98e1f3dcd332cdb2
+	Linux 5.13
+sound-upstream for-next 7cf3dead1ad70c72edb03e2d98e1f3dcd332cdb2
+	Linux 5.13
+drm-intel topic/core-for-CI b4dd0381f66d0bddc2c4bfc75e18a8a6b8a0d4b7
+	component: do not leave master devres group open after bind
+drm topic/nouveau-ampere-modeset 584265dfec70e78ce2085b82ed389f27e06fbca0
+	Merge branch '04.01-ampere-lite' of git://github.com/skeggsb/linux into topic/nouveau-ampere-modeset
+drm-misc topic/i915-ttm 1e3944578b749449bd7fa6bf0bae4c3d3f5f1733
+	Merge tag 'amd-drm-next-5.16-2021-09-27' of https://gitlab.freedesktop.org/agd5f/linux into drm-next
+drm-intel topic/pxp e4e737bb5c170df6135a127739a9e6148ee3da82
+	Linux 5.15-rc2
+drm-intel topic/drm-dp-training-delay-helpers 02ed47aa6cc697fc34053c011fe72984a86273cb
+	drm/dp: reuse the 8b/10b link training delay helpers
+drm-misc topic/amdgpu-dp2.0-mst 00f965e700ef5aa2d889e7e65c7458531d2a4bcf
+	drm/amdgpu/display: fix build when CONFIG_DRM_AMD_DC_DCN is not set
