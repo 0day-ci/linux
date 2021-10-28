@@ -248,7 +248,8 @@ static struct sk_buff *codel_dequeue(void *ctx,
 						    vars->rec_inv_sqrt);
 	}
 end:
-	if (skb && codel_time_after(vars->ldelay, params->ce_threshold)) {
+	if (skb && codel_time_after(vars->ldelay, params->ce_threshold) &&
+	    *backlog > params->mtu) {
 		bool set_ce = true;
 
 		if (params->ce_threshold_mask) {
