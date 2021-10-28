@@ -787,6 +787,12 @@ struct deferred_split {
 	struct list_head split_queue;
 	unsigned long split_queue_len;
 };
+
+struct hpage_reclaim {
+	spinlock_t reclaim_queue_lock;
+	struct list_head reclaim_queue;
+	unsigned long reclaim_queue_len;
+};
 #endif
 
 /*

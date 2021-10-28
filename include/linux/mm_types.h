@@ -159,6 +159,12 @@ struct page {
 			/* For both global and memcg */
 			struct list_head deferred_list;
 		};
+		struct {	 /* Third tail page of compound page */
+			unsigned long _compound_pad_2;
+			unsigned long _compound_pad_3;
+			/* For zero subpages reclaim */
+			struct list_head hpage_reclaim_list;
+		};
 		struct {	/* Page table pages */
 			unsigned long _pt_pad_1;	/* compound_head */
 			pgtable_t pmd_huge_pte; /* protected by page->ptl */

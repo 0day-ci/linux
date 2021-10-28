@@ -185,6 +185,15 @@ void prep_transhuge_page(struct page *page);
 void free_transhuge_page(struct page *page);
 bool is_transparent_hugepage(struct page *page);
 
+#ifdef CONFIG_MEMCG
+int zsr_get_hpage(struct hpage_reclaim *hr_queue, struct page **reclaim_page);
+unsigned long zsr_reclaim_hpage(struct lruvec *lruvec, struct page *page);
+static inline struct list_head *hpage_reclaim_list(struct page *page)
+{
+	return &page[3].hpage_reclaim_list;
+}
+#endif
+
 bool can_split_huge_page(struct page *page, int *pextra_pins);
 int split_huge_page_to_list(struct page *page, struct list_head *list);
 static inline int split_huge_page(struct page *page)

@@ -2734,6 +2734,56 @@ static void cancel_charge(struct mem_cgroup *memcg, unsigned int nr_pages)
 }
 #endif
 
+#ifdef CONFIG_TRANSPARENT_HUGEPAGE
+/* Need the page lock if the page is not a newly allocated page. */
+static void add_hpage_to_queue(struct page *page, struct mem_cgroup *memcg)
+{
+	struct hpage_reclaim *hr_queue;
+	unsigned long flags;
+
+	if (READ_ONCE(memcg->thp_reclaim) == THP_RECLAIM_DISABLE)
+		return;
+
+	page = compound_head(page);
+	/*
+	 * we just want to add the anon page to the queue, but it is not sure
+	 * the page is anon or not when charging to memcg.
+	 * page_mapping return NULL if the page is a anon page or the mapping
+	 * is not yet set.
+	 */
+	if (!is_transparent_hugepage(page) || page_mapping(page))
+		return;
+
+	hr_queue = &memcg->nodeinfo[page_to_nid(page)]->hpage_reclaim_queue;
+	spin_lock_irqsave(&hr_queue->reclaim_queue_lock, flags);
+	if (list_empty(hpage_reclaim_list(page))) {
+		list_add(hpage_reclaim_list(page), &hr_queue->reclaim_queue);
+		hr_queue->reclaim_queue_len++;
+	}
+	spin_unlock_irqrestore(&hr_queue->reclaim_queue_lock, flags);
+}
+
+void del_hpage_from_queue(struct page *page)
+{
+	struct mem_cgroup *memcg;
+	struct hpage_reclaim *hr_queue;
+	unsigned long flags;
+
+	page = compound_head(page);
+	memcg = page_memcg(page);
+	if (!memcg || !is_transparent_hugepage(page))
+		return;
+
+	hr_queue = &memcg->nodeinfo[page_to_nid(page)]->hpage_reclaim_queue;
+	spin_lock_irqsave(&hr_queue->reclaim_queue_lock, flags);
+	if (!list_empty(hpage_reclaim_list(page))) {
+		list_del_init(hpage_reclaim_list(page));
+		hr_queue->reclaim_queue_len--;
+	}
+	spin_unlock_irqrestore(&hr_queue->reclaim_queue_lock, flags);
+}
+#endif
+
 static void commit_charge(struct page *page, struct mem_cgroup *memcg)
 {
 	VM_BUG_ON_PAGE(page_memcg(page), page);
@@ -2746,6 +2796,10 @@ static void commit_charge(struct page *page, struct mem_cgroup *memcg)
 	 * - exclusive reference
 	 */
 	page->memcg_data = (unsigned long)memcg;
+
+#ifdef CONFIG_TRANSPARENT_HUGEPAGE
+	add_hpage_to_queue(page, memcg);
+#endif
 }
 
 static struct mem_cgroup *get_mem_cgroup_from_objcg(struct obj_cgroup *objcg)
@@ -4420,6 +4474,26 @@ static int mem_cgroup_oom_control_write(struct cgroup_subsys_state *css,
 
 	return 0;
 }
+#ifdef CONFIG_TRANSPARENT_HUGEPAGE
+static u64 mem_cgroup_thp_reclaim_read(struct cgroup_subsys_state *css,
+				       struct cftype *cft)
+{
+	return READ_ONCE(mem_cgroup_from_css(css)->thp_reclaim);
+}
+
+static int mem_cgroup_thp_reclaim_write(struct cgroup_subsys_state *css,
+					struct cftype *cft, u64 val)
+{
+	struct mem_cgroup *memcg = mem_cgroup_from_css(css);
+
+	if (val != THP_RECLAIM_DISABLE && val != THP_RECLAIM_ENABLE)
+		return -EINVAL;
+
+	WRITE_ONCE(memcg->thp_reclaim, val);
+
+	return 0;
+}
+#endif
 
 #ifdef CONFIG_CGROUP_WRITEBACK
 
@@ -4983,6 +5057,13 @@ static struct cftype mem_cgroup_legacy_files[] = {
 		.write = mem_cgroup_reset,
 		.read_u64 = mem_cgroup_read_u64,
 	},
+#ifdef CONFIG_TRANSPARENT_HUGEPAGE
+	{
+		.name = "thp_reclaim",
+		.read_u64 = mem_cgroup_thp_reclaim_read,
+		.write_u64 = mem_cgroup_thp_reclaim_write,
+	},
+#endif
 	{ },	/* terminate */
 };
 
@@ -5083,6 +5164,12 @@ static int alloc_mem_cgroup_per_node_info(struct mem_cgroup *memcg, int node)
 	pn->on_tree = false;
 	pn->memcg = memcg;
 
+#ifdef CONFIG_TRANSPARENT_HUGEPAGE
+	spin_lock_init(&pn->hpage_reclaim_queue.reclaim_queue_lock);
+	INIT_LIST_HEAD(&pn->hpage_reclaim_queue.reclaim_queue);
+	pn->hpage_reclaim_queue.reclaim_queue_len = 0;
+#endif
+
 	memcg->nodeinfo[node] = pn;
 	return 0;
 }
@@ -5171,6 +5258,8 @@ static struct mem_cgroup *mem_cgroup_alloc(void)
 	spin_lock_init(&memcg->deferred_split_queue.split_queue_lock);
 	INIT_LIST_HEAD(&memcg->deferred_split_queue.split_queue);
 	memcg->deferred_split_queue.split_queue_len = 0;
+
+	memcg->thp_reclaim = THP_RECLAIM_DISABLE;
 #endif
 	idr_replace(&mem_cgroup_idr, memcg, memcg->id.id);
 	return memcg;
@@ -5204,6 +5293,9 @@ mem_cgroup_css_alloc(struct cgroup_subsys_state *parent_css)
 		page_counter_init(&memcg->swap, &parent->swap);
 		page_counter_init(&memcg->kmem, &parent->kmem);
 		page_counter_init(&memcg->tcpmem, &parent->tcpmem);
+#ifdef CONFIG_TRANSPARENT_HUGEPAGE
+		memcg->thp_reclaim = parent->thp_reclaim;
+#endif
 	} else {
 		page_counter_init(&memcg->memory, NULL);
 		page_counter_init(&memcg->swap, NULL);
@@ -5644,6 +5736,10 @@ static int mem_cgroup_move_account(struct page *page,
 		__mod_lruvec_state(to_vec, NR_WRITEBACK, nr_pages);
 	}
 
+#ifdef CONFIG_TRANSPARENT_HUGEPAGE
+	del_hpage_from_queue(page);
+#endif
+
 	/*
 	 * All state has been migrated, let's switch to the new memcg.
 	 *
@@ -5663,6 +5759,10 @@ static int mem_cgroup_move_account(struct page *page,
 	css_put(&from->css);
 
 	page->memcg_data = (unsigned long)to;
+
+#ifdef CONFIG_TRANSPARENT_HUGEPAGE
+	add_hpage_to_queue(page, to);
+#endif
 
 	__unlock_page_memcg(from);
 
@@ -6840,6 +6940,9 @@ static void uncharge_page(struct page *page, struct uncharge_gather *ug)
 
 	VM_BUG_ON_PAGE(PageLRU(page), page);
 
+#ifdef CONFIG_TRANSPARENT_HUGEPAGE
+	del_hpage_from_queue(page);
+#endif
 	/*
 	 * Nobody should be changing or seriously looking at
 	 * page memcg or objcg at this point, we have fully
@@ -7185,6 +7288,10 @@ void mem_cgroup_swapout(struct page *page, swp_entry_t entry)
 				   nr_entries);
 	VM_BUG_ON_PAGE(oldid, page);
 	mod_memcg_state(swap_memcg, MEMCG_SWAP, nr_entries);
+
+#ifdef CONFIG_TRANSPARENT_HUGEPAGE
+	del_hpage_from_queue(page);
+#endif
 
 	page->memcg_data = 0;
 

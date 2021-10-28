@@ -526,6 +526,9 @@ void prep_transhuge_page(struct page *page)
 	 */
 
 	INIT_LIST_HEAD(page_deferred_list(page));
+#ifdef CONFIG_MEMCG
+	INIT_LIST_HEAD(hpage_reclaim_list(page));
+#endif
 	set_compound_page_dtor(page, TRANSHUGE_PAGE_DTOR);
 }
 
@@ -2367,7 +2370,7 @@ static void __split_huge_page_tail(struct page *head, int tail,
 			 (1L << PG_dirty)));
 
 	/* ->mapping in first tail page is compound_mapcount */
-	VM_BUG_ON_PAGE(tail > 2 && page_tail->mapping != TAIL_MAPPING,
+	VM_BUG_ON_PAGE(tail > 3 && page_tail->mapping != TAIL_MAPPING,
 			page_tail);
 	page_tail->mapping = head->mapping;
 	page_tail->index = head->index + tail;
@@ -2620,6 +2623,7 @@ int split_huge_page_to_list(struct page *page, struct list_head *list)
 	VM_BUG_ON_PAGE(!PageLocked(head), head);
 	VM_BUG_ON_PAGE(!PageCompound(head), head);
 
+	del_hpage_from_queue(page);
 	if (PageWriteback(head))
 		return -EBUSY;
 
@@ -2781,6 +2785,7 @@ void deferred_split_huge_page(struct page *page)
 			set_shrinker_bit(memcg, page_to_nid(page),
 					 deferred_split_shrinker.id);
 #endif
+		del_hpage_from_queue(page);
 	}
 	spin_unlock_irqrestore(&ds_queue->split_queue_lock, flags);
 }
@@ -3203,5 +3208,294 @@ void remove_migration_pmd(struct page_vma_mapped_walk *pvmw, struct page *new)
 	if ((vma->vm_flags & VM_LOCKED) && !PageDoubleMap(new))
 		mlock_vma_page(new);
 	update_mmu_cache_pmd(vma, address, pvmw->pmd);
+}
+#endif
+
+#ifdef CONFIG_MEMCG
+static inline bool is_zero_page(struct page *page)
+{
+	void *addr = kmap(page);
+	bool ret = true;
+
+	if (memchr_inv(addr, 0, PAGE_SIZE))
+		ret = false;
+	kunmap(page);
+
+	return ret;
+}
+
+/*
+ * We'll split the huge page iff it contains at least 1/32 zeros,
+ * estimate it by checking some discrete unsigned long values.
+ */
+static bool hpage_estimate_zero(struct page *page)
+{
+	unsigned int i, maybe_zero_pages = 0, offset = 0;
+	void *addr;
+
+#define BYTES_PER_LONG (BITS_PER_LONG / BITS_PER_BYTE)
+	for (i = 0; i < HPAGE_PMD_NR; i++, page++, offset++) {
+		addr = kmap(page);
+		if (unlikely((offset + 1) * BYTES_PER_LONG > PAGE_SIZE))
+			offset = 0;
+		if (*(const unsigned long *)(addr + offset) == 0UL) {
+			if (++maybe_zero_pages == HPAGE_PMD_NR >> 5) {
+				kunmap(page);
+				return true;
+			}
+		}
+		kunmap(page);
+	}
+
+	return false;
+}
+
+static bool replace_zero_pte(struct page *page, struct vm_area_struct *vma,
+			     unsigned long addr, void *zero_page)
+{
+	struct page_vma_mapped_walk pvmw = {
+		.page = page,
+		.vma = vma,
+		.address = addr,
+		.flags = PVMW_SYNC | PVMW_MIGRATION,
+	};
+	pte_t pte;
+
+	VM_BUG_ON_PAGE(PageTail(page), page);
+
+	while (page_vma_mapped_walk(&pvmw)) {
+		pte = pte_mkspecial(
+			pfn_pte(page_to_pfn((struct page *)zero_page),
+			vma->vm_page_prot));
+		dec_mm_counter(vma->vm_mm, MM_ANONPAGES);
+		set_pte_at(vma->vm_mm, pvmw.address, pvmw.pte, pte);
+		update_mmu_cache(vma, pvmw.address, pvmw.pte);
+	}
+
+	return true;
+}
+
+static void replace_zero_ptes_locked(struct page *page)
+{
+	struct page *zero_page = ZERO_PAGE(0);
+	struct rmap_walk_control rwc = {
+		.rmap_one = replace_zero_pte,
+		.arg = zero_page,
+	};
+
+	rmap_walk_locked(page, &rwc);
+}
+
+static bool replace_zero_page(struct page *page)
+{
+	struct anon_vma *anon_vma = NULL;
+	bool unmap_success;
+	bool ret = true;
+
+	anon_vma = page_get_anon_vma(page);
+	if (!anon_vma)
+		return false;
+
+	anon_vma_lock_write(anon_vma);
+	try_to_migrate(page, TTU_RMAP_LOCKED);
+	unmap_success = !page_mapped(page);
+
+	if (!unmap_success || !is_zero_page(page)) {
+		/* remap the page */
+		remove_migration_ptes(page, page, true);
+		ret = false;
+	} else
+		replace_zero_ptes_locked(page);
+
+	anon_vma_unlock_write(anon_vma);
+	put_anon_vma(anon_vma);
+
+	return ret;
+}
+
+/*
+ * reclaim_zero_subpages - reclaim the zero subpages and putback the non-zero
+ * subpages.
+ *
+ * The non-zero subpages are putback to the keep_list, and will be putback to
+ * the lru list.
+ *
+ * Return the number of reclaimed zero subpages.
+ */
+static unsigned long reclaim_zero_subpages(struct list_head *list,
+					   struct list_head *keep_list)
+{
+	LIST_HEAD(zero_list);
+	struct page *page;
+	unsigned long reclaimed = 0;
+
+	while (!list_empty(list)) {
+		page = lru_to_page(list);
+		list_del_init(&page->lru);
+		if (is_zero_page(page)) {
+			if (!trylock_page(page))
+				goto keep;
+
+			if (!replace_zero_page(page)) {
+				unlock_page(page);
+				goto keep;
+			}
+
+			__ClearPageActive(page);
+			unlock_page(page);
+			if (put_page_testzero(page)) {
+				list_add(&page->lru, &zero_list);
+				reclaimed++;
+			}
+
+			/* someone may hold the zero page, we just skip it. */
+
+			continue;
+		}
+keep:
+		list_add(&page->lru, keep_list);
+	}
+
+	mem_cgroup_uncharge_list(&zero_list);
+	free_unref_page_list(&zero_list);
+
+	return reclaimed;
+
+}
+
+#ifdef CONFIG_MMU
+#define ZSR_PG_MLOCK(flag)	(1UL << flag)
+#else
+#define ZSR_PG_MLOCK(flag)	0
+#endif
+
+#ifdef CONFIG_ARCH_USES_PG_UNCACHED
+#define ZSR_PG_UNCACHED(flag)	(1UL << flag)
+#else
+#define ZSR_PG_UNCACHED(flag)	0
+#endif
+
+#ifdef CONFIG_MEMORY_FAILURE
+#define ZSR_PG_HWPOISON(flag)	(1UL << flag)
+#else
+#define ZSR_PG_HWPOISON(flag)	0
+#endif
+
+/* Filter unsupported page flags. */
+#define ZSR_FLAG_CHECK			\
+	((1UL << PG_error) |		\
+	 (1UL << PG_owner_priv_1) |	\
+	 (1UL << PG_arch_1) |		\
+	 (1UL << PG_reserved) |		\
+	 (1UL << PG_private) |		\
+	 (1UL << PG_private_2) |	\
+	 (1UL << PG_writeback) |	\
+	 (1UL << PG_swapcache) |	\
+	 (1UL << PG_mappedtodisk) |	\
+	 (1UL << PG_reclaim) |		\
+	 (1UL << PG_unevictable) |	\
+	 ZSR_PG_MLOCK(PG_mlocked) |	\
+	 ZSR_PG_UNCACHED(PG_uncached) |	\
+	 ZSR_PG_HWPOISON(PG_hwpoison))
+
+#define hpage_can_reclaim(page) \
+	(PageAnon(page) && !PageKsm(page) && !(page->flags & ZSR_FLAG_CHECK))
+
+#define hr_queue_list_to_page(head) \
+	compound_head(list_entry((head)->prev, struct page,\
+		      hpage_reclaim_list))
+
+/*
+ * zsr_get_hpage - get one huge page from huge page reclaim queue
+ *
+ * Return -EINVAL if the queue is empty; otherwise, return 0.
+ * If the queue is not empty, it will check whether the tail page of the
+ * queue can be reclaimed or not. If the page can be reclaimed, it will
+ * be stored in reclaim_page; otherwise, just delete the page from the
+ * queue.
+ */
+int zsr_get_hpage(struct hpage_reclaim *hr_queue, struct page **reclaim_page)
+{
+	struct page *page = NULL;
+	unsigned long flags;
+	int ret = 0;
+
+	spin_lock_irqsave(&hr_queue->reclaim_queue_lock, flags);
+	if (list_empty(&hr_queue->reclaim_queue)) {
+		ret = -EINVAL;
+		goto unlock;
+	}
+
+	page = hr_queue_list_to_page(&hr_queue->reclaim_queue);
+	list_del_init(hpage_reclaim_list(page));
+	hr_queue->reclaim_queue_len--;
+
+	if (!hpage_can_reclaim(page) || !get_page_unless_zero(page))
+		goto unlock;
+
+	if (!trylock_page(page)) {
+		put_page(page);
+		goto unlock;
+	}
+
+	spin_unlock_irqrestore(&hr_queue->reclaim_queue_lock, flags);
+
+	if (hpage_can_reclaim(page) && hpage_estimate_zero(page) &&
+	    !isolate_lru_page(page)) {
+		__mod_node_page_state(page_pgdat(page), NR_ISOLATED_ANON,
+				      HPAGE_PMD_NR);
+		/*
+		 *  dec the reference added in
+		 *  isolate_lru_page
+		 */
+		page_ref_dec(page);
+		*reclaim_page = page;
+	} else {
+		unlock_page(page);
+		put_page(page);
+	}
+
+	return ret;
+
+unlock:
+	spin_unlock_irqrestore(&hr_queue->reclaim_queue_lock, flags);
+	return ret;
+
+}
+
+unsigned long zsr_reclaim_hpage(struct lruvec *lruvec, struct page *page)
+{
+	struct pglist_data *pgdat = page_pgdat(page);
+	unsigned long reclaimed;
+	unsigned long flags;
+	LIST_HEAD(split_list);
+	LIST_HEAD(keep_list);
+
+	/*
+	 * Split the huge page and reclaim the zero subpages.
+	 * And putback the non-zero subpages to the lru list.
+	 */
+	if (split_huge_page_to_list(page, &split_list)) {
+		unlock_page(page);
+		putback_lru_page(page);
+		mod_node_page_state(pgdat, NR_ISOLATED_ANON,
+				    -HPAGE_PMD_NR);
+		return 0;
+	}
+
+	unlock_page(page);
+	list_add_tail(&page->lru, &split_list);
+	reclaimed = reclaim_zero_subpages(&split_list, &keep_list);
+
+	spin_lock_irqsave(&lruvec->lru_lock, flags);
+	move_pages_to_lru(lruvec, &keep_list);
+	spin_unlock_irqrestore(&lruvec->lru_lock, flags);
+	mod_node_page_state(pgdat, NR_ISOLATED_ANON,
+			    -HPAGE_PMD_NR);
+
+	mem_cgroup_uncharge_list(&keep_list);
+	free_unref_page_list(&keep_list);
+
+	return reclaimed;
 }
 #endif

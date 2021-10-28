@@ -2151,8 +2151,7 @@ static int too_many_isolated(struct pglist_data *pgdat, int file,
  *
  * Returns the number of pages moved to the given lruvec.
  */
-static unsigned int move_pages_to_lru(struct lruvec *lruvec,
-				      struct list_head *list)
+unsigned int move_pages_to_lru(struct lruvec *lruvec, struct list_head *list)
 {
 	int nr_pages, nr_moved = 0;
 	LIST_HEAD(pages_to_free);
@@ -2783,6 +2782,57 @@ static bool can_age_anon_pages(struct pglist_data *pgdat,
 	return can_demote(pgdat->node_id, sc);
 }
 
+#ifdef CONFIG_MEMCG
+#define MAX_SCAN_HPAGE 32UL
+/*
+ * Try to reclaim the zero subpages for the transparent huge page.
+ */
+static unsigned long reclaim_hpage_zero_subpages(struct lruvec *lruvec,
+						 int priority,
+						 unsigned long nr_to_reclaim)
+{
+	struct mem_cgroup *memcg;
+	struct hpage_reclaim *hr_queue;
+	int nid = lruvec->pgdat->node_id;
+	unsigned long nr_reclaimed = 0, nr_scanned = 0, nr_to_scan;
+
+	memcg = lruvec_memcg(lruvec);
+	if (!memcg)
+		goto out;
+
+	hr_queue = &memcg->nodeinfo[nid]->hpage_reclaim_queue;
+	if (!READ_ONCE(memcg->thp_reclaim))
+		goto out;
+
+	/* The last scan loop will scan all the huge pages.*/
+	nr_to_scan = priority == 0 ? 0 : MAX_SCAN_HPAGE;
+
+	do {
+		struct page *page = NULL;
+
+		if (zsr_get_hpage(hr_queue, &page))
+			break;
+
+		if (!page)
+			continue;
+
+		nr_reclaimed += zsr_reclaim_hpage(lruvec, page);
+
+		cond_resched();
+
+	} while ((nr_reclaimed < nr_to_reclaim) && (++nr_scanned != nr_to_scan));
+out:
+	return nr_reclaimed;
+}
+#else
+static unsigned long reclaim_hpage_zero_subpages(struct lruvec *lruvec,
+						 int priority,
+						 unsigned long nr_to_reclaim)
+{
+	return 0;
+}
+#endif
+
 static void shrink_lruvec(struct lruvec *lruvec, struct scan_control *sc)
 {
 	unsigned long nr[NR_LRU_LISTS];
@@ -2886,6 +2936,11 @@ static void shrink_lruvec(struct lruvec *lruvec, struct scan_control *sc)
 		scan_adjusted = true;
 	}
 	blk_finish_plug(&plug);
+#ifdef CONFIG_TRANSPARENT_HUGEPAGE
+	if (nr_reclaimed < nr_to_reclaim)
+		nr_reclaimed += reclaim_hpage_zero_subpages(lruvec,
+				sc->priority, nr_to_reclaim - nr_reclaimed);
+#endif
 	sc->nr_reclaimed += nr_reclaimed;
 
 	/*

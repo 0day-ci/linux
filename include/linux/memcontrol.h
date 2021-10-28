@@ -150,6 +150,9 @@ struct mem_cgroup_per_node {
 	unsigned long		usage_in_excess;/* Set to the value by which */
 						/* the soft limit is exceeded*/
 	bool			on_tree;
+#ifdef CONFIG_TRANSPARENT_HUGEPAGE
+	struct hpage_reclaim hpage_reclaim_queue;
+#endif
 	struct mem_cgroup	*memcg;		/* Back pointer, we cannot */
 						/* use container_of	   */
 };
@@ -228,6 +231,13 @@ struct obj_cgroup {
 	};
 };
 
+#ifdef CONFIG_TRANSPARENT_HUGEPAGE
+enum thp_reclaim_state {
+	THP_RECLAIM_DISABLE,
+	THP_RECLAIM_ENABLE,
+	THP_RECLAIM_MEMCG, /* For global configure*/
+};
+#endif
 /*
  * The memory controller data structure. The memory controller controls both
  * page cache and RSS per cgroup. We would eventually like to provide
@@ -345,6 +355,7 @@ struct mem_cgroup {
 
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
 	struct deferred_split deferred_split_queue;
+	int thp_reclaim;
 #endif
 
 	struct mem_cgroup_per_node *nodeinfo[];
@@ -1109,6 +1120,10 @@ void split_page_memcg(struct page *head, unsigned int nr);
 unsigned long mem_cgroup_soft_limit_reclaim(pg_data_t *pgdat, int order,
 						gfp_t gfp_mask,
 						unsigned long *total_scanned);
+
+#ifdef CONFIG_TRANSPARENT_HUGEPAGE
+void del_hpage_from_queue(struct page *page);
+#endif
 
 #else /* CONFIG_MEMCG */
 
