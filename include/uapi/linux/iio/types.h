@@ -95,6 +95,9 @@ enum iio_modifier {
 	IIO_MOD_ETHANOL,
 	IIO_MOD_H2,
 	IIO_MOD_O2,
+	IIO_MOD_ACCEL_LINEAR_X,
+	IIO_MOD_ACCEL_LINEAR_Y,
+	IIO_MOD_ACCEL_LINEAR_Z,
 };
 
 enum iio_event_type {
@@ -114,4 +117,3 @@ enum iio_event_direction {
 };
 
 #endif /* _UAPI_IIO_TYPES_H_ */
-
