@@ -1351,6 +1351,17 @@ struct netdev_net_notifier {
  *			  struct netlink_ext_ack *extack);
  *	Get the index of the source signal that's currently used as EEC's
  *	reference
+ * int (*ndo_get_rclk_range)(struct net_device *dev, u32 *min_idx, u32 *max_idx,
+ *			     struct netlink_ext_ack *extack);
+ *	Get range of valid output indices for the set/get Recovered Clock
+ *	functions
+ * int (*ndo_set_rclk_out)(struct net_device *dev, u32 out_idx, bool ena,
+ *			   struct netlink_ext_ack *extack);
+ *	Set the receive clock recovery redirection to a given Recovered Clock
+ *	output.
+ * int (*ndo_get_rclk_state)(struct net_device *dev, u32 out_idx, bool *ena,
+ *			     struct netlink_ext_ack *extack);
+ *	Get current state of the recovered clock to pin mapping.
  */
 struct net_device_ops {
 	int			(*ndo_init)(struct net_device *dev);
