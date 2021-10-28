@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0
 /*  Copyright(c) 2016-20 Intel Corporation. */
 
+#define _GNU_SOURCE
+#include <dirent.h>
 #include <elf.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -243,6 +245,118 @@ TEST_F(enclave, unclobbered_vdso)
 	EXPECT_EQ(op.buffer, MAGIC);
 	EXPECT_EEXIT(&self->run);
 	EXPECT_EQ(self->run.user_data, 0);
+}
+
+static bool sysfs_get_ulong(const char *path, unsigned long *value)
+{
+	struct stat sbuf;
+	char buf[128];
+	ssize_t ret;
+	int fd;
+
+	ret = stat(path, &sbuf);
+	if (ret)
+		return false;
+
+	fd = open(path, O_RDONLY);
+	if (fd < 0)
+		return false;
+
+	ret = read(fd, buf, sizeof(buf));
+	if (ret < 0) {
+		close(fd);
+		return false;
+	}
+
+	errno = 0;
+	*value = strtoul(buf, NULL, 0);
+
+	close(fd);
+
+	return errno ? false : true;
+}
+
+/*
+ * Sum total available physical SGX memory across all NUMA nodes
+ *
+ * Return: total available physical SGX memory available on system or 0 if a
+ * failure is encountered.
+ */
+static unsigned long get_total_epc_mem(void)
+{
+	char *node, *path = NULL;
+	unsigned long total = 0;
+	unsigned long size = 0;
+	struct dirent *entry;
+	struct stat statbuf;
+	DIR *dp;
+	int ret;
+
+	dp = opendir(SGX_TOTAL_MEM_PATH);
+	if (!dp)
+		return 0;
+
+	while ((entry = readdir(dp))) {
+		node = strstr(entry->d_name, "node");
+		if (!node)
+			continue;
+
+		ret = asprintf(&path, "%s/%s/sgx/size",
+				SGX_TOTAL_MEM_PATH, entry->d_name);
+		if (ret == -1) {
+			total = 0;
+			goto out;
+		}
+
+		ret = stat(path, &statbuf);
+		if (ret == -1) {
+			free(path);
+			continue;
+		}
+
+		if (S_ISREG(statbuf.st_mode) && statbuf.st_size > 0) {
+			if (sysfs_get_ulong(path, &size))
+				total += size;
+		}
+
+		free(path);
+	}
+
+out:
+	closedir(dp);
+
+	return total;
+}
+
+TEST_F(enclave, unclobbered_vdso_oversubscribed)
+{
+	unsigned long total_mem;
+	struct encl_op op;
+
+	total_mem = get_total_epc_mem();
+	ASSERT_NE(total_mem, 0);
+	ASSERT_TRUE(setup_test_encl(total_mem, &self->encl, _metadata));
+
+	memset(&self->run, 0, sizeof(self->run));
+	self->run.tcs = self->encl.encl_base;
+
+	op.type = ENCL_OP_PUT;
+	op.buffer = MAGIC;
+
+	EXPECT_EQ(ENCL_CALL(&op, &self->run, false), 0);
+
+	EXPECT_EEXIT(&self->run);
+	EXPECT_EQ(self->run.user_data, 0);
+
+	op.type = ENCL_OP_GET;
+	op.buffer = 0;
+
+	EXPECT_EQ(ENCL_CALL(&op, &self->run, false), 0);
+
+	EXPECT_EQ(op.buffer, MAGIC);
+	EXPECT_EEXIT(&self->run);
+	EXPECT_EQ(self->run.user_data, 0);
+
 }
 
 TEST_F(enclave, clobbered_vdso)

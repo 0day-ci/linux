@@ -7,6 +7,7 @@
 #define MAIN_H
 
 #define ENCL_HEAP_SIZE_DEFAULT	4096
+#define SGX_TOTAL_MEM_PATH	"/sys/devices/system/node"
 
 struct encl_segment {
 	void *src;
