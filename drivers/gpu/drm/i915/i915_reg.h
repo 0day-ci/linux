@@ -4698,11 +4698,11 @@ enum {
 #define  PSR_EVENT_LPSP_MODE_EXIT		(1 << 1)
 #define  PSR_EVENT_PSR_DISABLE			(1 << 0)
 
-#define _PSR2_STATUS_A			0x60940
-#define _PSR2_STATUS_EDP		0x6f940
-#define EDP_PSR2_STATUS(tran)		_MMIO_TRANS2(tran, _PSR2_STATUS_A)
-#define EDP_PSR2_STATUS_STATE_MASK     (0xf << 28)
-#define EDP_PSR2_STATUS_STATE_SHIFT    28
+#define _PSR2_STATUS_A				0x60940
+#define _PSR2_STATUS_EDP			0x6f940
+#define EDP_PSR2_STATUS(tran)			_MMIO_TRANS2(tran, _PSR2_STATUS_A)
+#define EDP_PSR2_STATUS_STATE_MASK		REG_GENMASK(31, 28)
+#define EDP_PSR2_STATUS_STATE_DEEP_SLEEP	REG_FIELD_PREP(EDP_PSR2_STATUS_STATE_MASK, 0x8)
 
 #define _PSR2_SU_STATUS_A		0x60914
 #define _PSR2_SU_STATUS_EDP		0x6f914
@@ -8263,7 +8263,7 @@ enum {
 
 /*
  * The below are numbered starting from "S1" on gen11/gen12, but starting
- * with gen13 display, the bspec switches to a 0-based numbering scheme
+ * with display 13, the bspec switches to a 0-based numbering scheme
  * (although the addresses stay the same so new S0 = old S1, new S1 = old S2).
  * We'll just use the 0-based numbering here for all platforms since it's the
  * way things will be named by the hardware team going forward, plus it's more
@@ -10212,8 +10212,6 @@ enum skl_power_gate {
 #define  TGL_TRANS_DDI_PORT_MASK	(0xf << TGL_TRANS_DDI_PORT_SHIFT)
 #define  TRANS_DDI_SELECT_PORT(x)	((x) << TRANS_DDI_PORT_SHIFT)
 #define  TGL_TRANS_DDI_SELECT_PORT(x)	(((x) + 1) << TGL_TRANS_DDI_PORT_SHIFT)
-#define  TRANS_DDI_FUNC_CTL_VAL_TO_PORT(val)	 (((val) & TRANS_DDI_PORT_MASK) >> TRANS_DDI_PORT_SHIFT)
-#define  TGL_TRANS_DDI_FUNC_CTL_VAL_TO_PORT(val) ((((val) & TGL_TRANS_DDI_PORT_MASK) >> TGL_TRANS_DDI_PORT_SHIFT) - 1)
 #define  TRANS_DDI_MODE_SELECT_MASK	(7 << 24)
 #define  TRANS_DDI_MODE_SELECT_HDMI	(0 << 24)
 #define  TRANS_DDI_MODE_SELECT_DVI	(1 << 24)
