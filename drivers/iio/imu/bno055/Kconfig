@@ -7,3 +7,9 @@ config BOSH_BNO055_SERIAL
 	tristate "Bosh BNO055 attached via serial bus"
 	depends on SERIAL_DEV_BUS
 	select BOSH_BNO055_IIO
+
+config BOSH_BNO055_I2C
+	tristate "Bosh BNO055 attached via I2C bus"
+	depends on I2C
+	select REGMAP_I2C
+	select BOSH_BNO055_IIO
