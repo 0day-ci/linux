@@ -6,3 +6,8 @@ config CLK_LGM_CGU
 	help
 	  Clock Generation Unit(CGU) driver for Intel Lightning Mountain(LGM)
 	  network processor SoC.
+
+config CLK_FIXED_FCH
+	bool "AMD FCH controller fixed 48MHz CLK support"
+	help
+	  Enable this option for 48MHz fixed mclk support on AMD platforms.
