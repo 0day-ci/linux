@@ -60,7 +60,7 @@ int __weak arch_kexec_kernel_image_probe(struct kimage *image, void *buf,
 	return kexec_image_probe_default(image, buf, buf_len);
 }
 
-static void *kexec_image_load_default(struct kimage *image)
+static void *kexec_kernel_image_load(struct kimage *image)
 {
 	if (!image->fops || !image->fops->load)
 		return ERR_PTR(-ENOEXEC);
@@ -69,11 +69,6 @@ static void *kexec_image_load_default(struct kimage *image)
 				 image->kernel_buf_len, image->initrd_buf,
 				 image->initrd_buf_len, image->cmdline_buf,
 				 image->cmdline_buf_len);
-}
-
-void * __weak arch_kexec_kernel_image_load(struct kimage *image)
-{
-	return kexec_image_load_default(image);
 }
 
 int kexec_image_post_load_cleanup_default(struct kimage *image)
@@ -279,7 +274,7 @@ kimage_file_prepare_segments(struct kimage *image, int kernel_fd, int initrd_fd,
 	ima_add_kexec_buffer(image);
 
 	/* Call arch image load handlers */
-	ldata = arch_kexec_kernel_image_load(image);
+	ldata = kexec_kernel_image_load(image);
 
 	if (IS_ERR(ldata)) {
 		ret = PTR_ERR(ldata);

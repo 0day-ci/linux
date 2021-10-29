@@ -186,7 +186,6 @@ void *kexec_purgatory_get_symbol_addr(struct kimage *image, const char *name);
 /* Architectures may override the below functions */
 int arch_kexec_kernel_image_probe(struct kimage *image, void *buf,
 				  unsigned long buf_len);
-void *arch_kexec_kernel_image_load(struct kimage *image);
 int arch_kexec_apply_relocations_add(struct purgatory_info *pi,
 				     Elf_Shdr *section,
 				     const Elf_Shdr *relsec,
