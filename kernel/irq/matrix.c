@@ -129,7 +129,7 @@ static unsigned int matrix_alloc_area(struct irq_matrix *m, struct cpumap *cm,
 static unsigned int matrix_find_best_cpu(struct irq_matrix *m,
 					const struct cpumask *msk)
 {
-	unsigned int cpu, best_cpu, maxavl = 0;
+	int cpu, best_cpu, maxavl = 0;
 	struct cpumap *cm;
 
 	best_cpu = UINT_MAX;
@@ -150,7 +150,7 @@ static unsigned int matrix_find_best_cpu(struct irq_matrix *m,
 static unsigned int matrix_find_best_cpu_managed(struct irq_matrix *m,
 						const struct cpumask *msk)
 {
-	unsigned int cpu, best_cpu, allocated = UINT_MAX;
+	int cpu, best_cpu, allocated = UINT_MAX;
 	struct cpumap *cm;
 
 	best_cpu = UINT_MAX;
@@ -209,7 +209,7 @@ void irq_matrix_assign_system(struct irq_matrix *m, unsigned int bit,
  */
 int irq_matrix_reserve_managed(struct irq_matrix *m, const struct cpumask *msk)
 {
-	unsigned int cpu, failed_cpu;
+	int cpu, failed_cpu;
 
 	for_each_cpu(cpu, msk) {
 		struct cpumap *cm = per_cpu_ptr(m->maps, cpu);
@@ -250,7 +250,7 @@ cleanup:
  */
 void irq_matrix_remove_managed(struct irq_matrix *m, const struct cpumask *msk)
 {
-	unsigned int cpu;
+	int cpu;
 
 	for_each_cpu(cpu, msk) {
 		struct cpumap *cm = per_cpu_ptr(m->maps, cpu);
