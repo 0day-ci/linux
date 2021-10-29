@@ -20,6 +20,7 @@ struct balloon_stats {
 	unsigned long max_schedule_delay;
 	unsigned long retry_count;
 	unsigned long max_retry_count;
+	unsigned long boot_timeout;
 };
 
 extern struct balloon_stats balloon_stats;

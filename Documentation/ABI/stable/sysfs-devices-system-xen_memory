@@ -84,3 +84,13 @@ Description:
 		Control scrubbing pages before returning them to Xen for others domains
 		use. Can be set with xen_scrub_pages cmdline
 		parameter. Default value controlled with CONFIG_XEN_SCRUB_PAGES_DEFAULT.
+
+What:		/sys/devices/system/xen_memory/xen_memory0/boot_timeout
+Date:		November 2021
+KernelVersion:	5.16
+Contact:	xen-devel@lists.xenproject.org
+Description:
+		The time (in seconds) to wait before giving up to boot in case
+		initial ballooning fails to free enough memory. Applies only
+		when running as HVM or PVH guest and started with less memory
+		configured than allowed at max.

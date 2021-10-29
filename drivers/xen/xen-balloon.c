@@ -150,6 +150,7 @@ static DEVICE_ULONG_ATTR(schedule_delay, 0444, balloon_stats.schedule_delay);
 static DEVICE_ULONG_ATTR(max_schedule_delay, 0644, balloon_stats.max_schedule_delay);
 static DEVICE_ULONG_ATTR(retry_count, 0444, balloon_stats.retry_count);
 static DEVICE_ULONG_ATTR(max_retry_count, 0644, balloon_stats.max_retry_count);
+static DEVICE_ULONG_ATTR(boot_timeout, 0644, balloon_stats.boot_timeout);
 static DEVICE_BOOL_ATTR(scrub_pages, 0644, xen_scrub_pages);
 
 static ssize_t target_kb_show(struct device *dev, struct device_attribute *attr,
@@ -211,6 +212,7 @@ static struct attribute *balloon_attrs[] = {
 	&dev_attr_max_schedule_delay.attr.attr,
 	&dev_attr_retry_count.attr.attr,
 	&dev_attr_max_retry_count.attr.attr,
+	&dev_attr_boot_timeout.attr.attr,
 	&dev_attr_scrub_pages.attr.attr,
 	NULL
 };
