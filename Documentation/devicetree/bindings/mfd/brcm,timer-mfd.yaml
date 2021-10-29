@@ -1,0 +1,64 @@
+# SPDX-License-Identifier: GPL-2.0-only OR BSD-2-Clause
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/mfd/brcm,timer-mfd.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Broadcom's timer MFD
+
+maintainers:
+  - Rafał Miłecki <rafal@milecki.pl>
+
+description: |
+  Broadcom's timer is a block used in multiple SoCs (e.g., BCM4908, BCM63xx,
+  BCM7038). Despite its name it's not strictly a timer device. It consists of:
+  timers, watchdog and software reset handler.
+
+properties:
+  compatible:
+    items:
+      - const: brcm,timer-mfd
+      - const: simple-mfd
+      - const: syscon
+
+  reg:
+    maxItems: 1
+
+  ranges: true
+
+  "#address-cells":
+    const: 1
+
+  "#size-cells":
+    const: 1
+
+patternProperties:
+  '^watchdog@[a-f0-9]+$':
+    $ref: ../watchdog/brcm,bcm7038-wdt.yaml
+
+additionalProperties: false
+
+required:
+  - reg
+
+examples:
+  - |
+    timer_mfd: timer-mfd@ff800400 {
+        compatible = "brcm,timer-mfd", "simple-mfd", "syscon";
+        reg = <0xff800400 0x4c>;
+        ranges = <0x0 0xff800400 0x4c>;
+        #address-cells = <1>;
+        #size-cells = <1>;
+
+        watchdog@28 {
+            compatible = "brcm,bcm7038-wdt";
+            reg = <0x28 0x8>;
+        };
+    };
+
+    reboot {
+        compatible = "syscon-reboot";
+        regmap = <&timer_mfd>;
+        offset = <0x34>;
+        mask = <1>;
+    };
