@@ -275,7 +275,7 @@ static int add_del_listener(pid_t pid, const struct cpumask *mask, int isadd)
 {
 	struct listener_list *listeners;
 	struct listener *s, *tmp, *s2;
-	unsigned int cpu;
+	int cpu;
 	int ret = 0;
 
 	if (!cpumask_subset(mask, cpu_possible_mask))
