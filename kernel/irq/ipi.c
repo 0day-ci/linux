@@ -264,7 +264,7 @@ int __ipi_send_mask(struct irq_desc *desc, const struct cpumask *dest)
 {
 	struct irq_data *data = irq_desc_get_irq_data(desc);
 	struct irq_chip *chip = irq_data_get_irq_chip(data);
-	unsigned int cpu;
+	int cpu;
 
 #ifdef DEBUG
 	/*
