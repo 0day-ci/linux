@@ -168,9 +168,9 @@ static bool ne_check_enclaves_created(void)
 static int ne_setup_cpu_pool(const char *ne_cpu_list)
 {
 	int core_id = -1;
-	unsigned int cpu = 0;
+	int cpu = 0;
 	cpumask_var_t cpu_pool;
-	unsigned int cpu_sibling = 0;
+	int cpu_sibling = 0;
 	unsigned int i = 0;
 	int numa_node = -1;
 	int rc = -EINVAL;
@@ -374,7 +374,7 @@ free_pool_cpumask:
  */
 static void ne_teardown_cpu_pool(void)
 {
-	unsigned int cpu = 0;
+	int cpu = 0;
 	unsigned int i = 0;
 	int rc = -EINVAL;
 
@@ -516,7 +516,7 @@ static int ne_get_unused_core_from_cpu_pool(void)
 static int ne_set_enclave_threads_per_core(struct ne_enclave *ne_enclave,
 					   int core_id, u32 vcpu_id)
 {
-	unsigned int cpu = 0;
+	int cpu = 0;
 
 	if (core_id < 0 && vcpu_id == 0) {
 		dev_err_ratelimited(ne_misc_dev.this_device,
@@ -562,7 +562,7 @@ static int ne_set_enclave_threads_per_core(struct ne_enclave *ne_enclave,
 static int ne_get_cpu_from_cpu_pool(struct ne_enclave *ne_enclave, u32 *vcpu_id)
 {
 	int core_id = -1;
-	unsigned int cpu = 0;
+	int cpu = 0;
 	unsigned int i = 0;
 	int rc = -EINVAL;
 
@@ -1017,7 +1017,7 @@ static int ne_start_enclave_ioctl(struct ne_enclave *ne_enclave,
 	struct ne_enclave_start_info *enclave_start_info)
 {
 	struct ne_pci_dev_cmd_reply cmd_reply = {};
-	unsigned int cpu = 0;
+	int cpu = 0;
 	struct enclave_start_req enclave_start_req = {};
 	unsigned int i = 0;
 	struct pci_dev *pdev = ne_devs.ne_pci_dev->pdev;
@@ -1360,7 +1360,7 @@ static void ne_enclave_remove_all_mem_region_entries(struct ne_enclave *ne_encla
  */
 static void ne_enclave_remove_all_vcpu_id_entries(struct ne_enclave *ne_enclave)
 {
-	unsigned int cpu = 0;
+	int cpu = 0;
 	unsigned int i = 0;
 
 	mutex_lock(&ne_cpu_pool.mutex);
