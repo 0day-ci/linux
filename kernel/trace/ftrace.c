@@ -2203,7 +2203,7 @@ static int ftrace_check_record(struct dyn_ftrace *rec, bool enable, bool update)
 	return FTRACE_UPDATE_MAKE_NOP;
 }
 
-/**
+/*
  * ftrace_update_record, set a record that now is tracing or not
  * @rec: the record to update
  * @enable: set to true if the record is tracing, false to force disable
@@ -2216,7 +2216,7 @@ int ftrace_update_record(struct dyn_ftrace *rec, bool enable)
 	return ftrace_check_record(rec, enable, true);
 }
 
-/**
+/*
  * ftrace_test_record, check if the record has been enabled or not
  * @rec: the record to test
  * @enable: set to true to check if enabled, false if it is disabled
@@ -2602,7 +2602,7 @@ struct ftrace_rec_iter {
 	int			index;
 };
 
-/**
+/*
  * ftrace_rec_iter_start, start up iterating over traced functions
  *
  * Returns an iterator handle that is used to iterate over all
@@ -2633,7 +2633,7 @@ struct ftrace_rec_iter *ftrace_rec_iter_start(void)
 	return iter;
 }
 
-/**
+/*
  * ftrace_rec_iter_next, get the next record to process.
  * @iter: The handle to the iterator.
  *
@@ -2658,7 +2658,7 @@ struct ftrace_rec_iter *ftrace_rec_iter_next(struct ftrace_rec_iter *iter)
 	return iter;
 }
 
-/**
+/*
  * ftrace_rec_iter_record, get the record at the iterator location
  * @iter: The current iterator location
  *
@@ -2761,7 +2761,7 @@ static int __ftrace_modify_code(void *data)
 	return 0;
 }
 
-/**
+/*
  * ftrace_run_stop_machine, go back to the stop machine method
  * @command: The command to tell ftrace what to do
  *
@@ -2773,7 +2773,7 @@ void ftrace_run_stop_machine(int command)
 	stop_machine(__ftrace_modify_code, &command, NULL);
 }
 
-/**
+/*
  * arch_ftrace_update_code, modify the code to trace or not trace
  * @command: The command that needs to be done
  *
@@ -7742,7 +7742,7 @@ void ftrace_kill(void)
 	ftrace_trace_function = ftrace_stub;
 }
 
-/**
+/*
  * Test if ftrace is dead or not.
  */
 int ftrace_is_dead(void)
@@ -7750,7 +7750,7 @@ int ftrace_is_dead(void)
 	return ftrace_disabled;
 }
 
-/**
+/*
  * register_ftrace_function - register a function for profiling
  * @ops - ops structure that holds the function for profiling.
  *
