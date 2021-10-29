@@ -118,6 +118,7 @@ struct virtio_device {
 	struct list_head vqs;
 	u64 features;
 	void *priv;
+	u32 desc_cache_thr;
 };
 
 static inline struct virtio_device *dev_to_virtio(struct device *_dev)
@@ -129,6 +130,19 @@ void virtio_add_status(struct virtio_device *dev, unsigned int status);
 int register_virtio_device(struct virtio_device *dev);
 void unregister_virtio_device(struct virtio_device *dev);
 bool is_virtio_device(struct device *dev);
+
+/**
+ * virtio_set_desc_cache - set virtio ring desc cache threshold
+ *
+ * virtio will cache the allocated indirect desc.
+ *
+ * This function must be called before find_vqs.
+ *
+ * @thr:
+ *    0   - disable desc cache
+ *    > 0 - enable desc cache. As the threshold of the desc cache.
+ */
+void virtio_set_desc_cache(struct virtio_device *dev, u32 thr);
 
 void virtio_break_device(struct virtio_device *dev);
 
