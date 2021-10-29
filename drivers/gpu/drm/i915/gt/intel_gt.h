@@ -50,6 +50,8 @@ void intel_gt_driver_late_release(struct intel_gt *gt);
 
 int intel_gt_wait_for_idle(struct intel_gt *gt, long timeout);
 
+int intel_gt_tile_setup(struct intel_gt *gt, unsigned int id, phys_addr_t phys_addr);
+
 void intel_gt_check_and_clear_faults(struct intel_gt *gt);
 void intel_gt_clear_error_registers(struct intel_gt *gt,
 				    intel_engine_mask_t engine_mask);
@@ -90,7 +92,7 @@ void intel_gt_release_all(struct drm_i915_private *i915);
 
 #define for_each_gt(i915__, id__, gt__) \
 	for ((id__) = 0; \
-	     (id__) < I915_MAX_TILES; \
+	     (id__) < I915_MAX_GTS; \
 	     (id__)++) \
 		for_each_if(((gt__) = (i915__)->gts[(id__)]))
 

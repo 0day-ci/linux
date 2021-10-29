@@ -136,6 +136,7 @@ enum intel_ppgtt_type {
 	func(has_pxp); \
 	func(has_rc6); \
 	func(has_rc6p); \
+	func(has_remote_tiles); \
 	func(has_rps); \
 	func(has_runtime_pm); \
 	func(has_snoop); \
@@ -166,6 +167,18 @@ enum intel_ppgtt_type {
 	func(overlay_needs_physical); \
 	func(supports_tv);
 
+enum intel_gt_type {
+	GT_PRIMARY,
+	GT_TILE,
+};
+
+struct intel_gt_definition {
+	enum intel_gt_type type;
+	char *name;
+	u32 mapping_base;
+	intel_engine_mask_t engine_mask;
+};
+
 struct intel_device_info {
 	u8 graphics_ver;
 	u8 graphics_rel;
@@ -184,6 +197,8 @@ struct intel_device_info {
 	unsigned int page_sizes; /* page sizes supported by the HW */
 
 	u32 memory_regions; /* regions supported by the HW */
+
+	const struct intel_gt_definition *extra_gts;
 
 	u32 display_mmio_offset;
 

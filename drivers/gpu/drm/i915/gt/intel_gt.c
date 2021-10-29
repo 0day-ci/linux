@@ -912,7 +912,7 @@ u32 intel_gt_read_register_fw(struct intel_gt *gt, i915_reg_t reg)
 	return intel_uncore_read_fw(gt->uncore, reg);
 }
 
-static int
+int
 intel_gt_tile_setup(struct intel_gt *gt, unsigned int id, phys_addr_t phys_addr)
 {
 	struct drm_i915_private *i915 = gt->i915;
@@ -921,6 +921,11 @@ intel_gt_tile_setup(struct intel_gt *gt, unsigned int id, phys_addr_t phys_addr)
 	int ret;
 
 	if (id) {
+		/* For multi-tile platforms BAR0 must have at least 16MB per tile */
+		if (GEM_WARN_ON(pci_resource_len(to_pci_dev(i915->drm.dev), 0) <
+				(id + 1) * SZ_16M))
+			return -EINVAL;
+
 		uncore = kzalloc(sizeof(*uncore), GFP_KERNEL);
 		if (!uncore)
 			return -ENOMEM;
@@ -943,6 +948,16 @@ intel_gt_tile_setup(struct intel_gt *gt, unsigned int id, phys_addr_t phys_addr)
 	if (ret)
 		return ret;
 
+	/* Which tile am I? default to zero on single tile systems */
+	if (HAS_REMOTE_TILES(i915)) {
+		u32 instance =
+			__raw_uncore_read32(gt->uncore, XEHPSDV_MTCFG_ADDR) &
+			TILE_NUMBER;
+
+		if (GEM_WARN_ON(instance != id))
+			return -ENXIO;
+	}
+
 	gt->phys_addr = phys_addr;
 
 	return 0;
@@ -959,25 +974,87 @@ intel_gt_tile_cleanup(struct intel_gt *gt)
 	}
 }
 
+static unsigned int tile_count(struct drm_i915_private *i915)
+{
+	u32 mtcfg;
+
+	/*
+	 * We use raw MMIO reads at this point since the
+	 * MMIO vfuncs are not setup yet
+	 */
+	mtcfg = __raw_uncore_read32(&i915->uncore, XEHPSDV_MTCFG_ADDR);
+	return REG_FIELD_GET(TILE_COUNT, mtcfg) + 1;
+}
+
 int intel_gt_probe_all(struct drm_i915_private *i915)
 {
 	struct pci_dev *pdev = to_pci_dev(i915->drm.dev);
+	const struct intel_gt_definition *gtdef;
+	struct intel_gt *gt;
 	phys_addr_t phys_addr;
 	unsigned int mmio_bar;
+	unsigned int i, tiles;
 	int ret;
 
 	mmio_bar = GRAPHICS_VER(i915) == 2 ? 1 : 0;
 	phys_addr = pci_resource_start(pdev, mmio_bar);
 
 	/* We always have at least one primary GT on any device */
-	ret = intel_gt_tile_setup(&i915->gt, 0, phys_addr);
+	gt = &i915->gt;
+	gt->name = "Primary GT";
+	gt->info.engine_mask = INTEL_INFO(i915)->platform_engine_mask;
+
+	drm_dbg(&i915->drm, "Setting up %s %u\n", gt->name, gt->info.id);
+	ret = intel_gt_tile_setup(gt, 0, phys_addr);
 	if (ret)
 		return ret;
 
 	i915->gts[0] = &i915->gt;
 
-	/* TODO: add more tiles */
+	tiles = tile_count(i915);
+	drm_dbg(&i915->drm, "Tile count: %u\n", tiles);
+
+	for (gtdef = INTEL_INFO(i915)->extra_gts, i = 1;
+	     gtdef && i < tiles;
+	     gtdef++, i++) {
+		if (GEM_WARN_ON(i >= I915_MAX_GTS)) {
+			ret = -EINVAL;
+			goto err;
+		}
+
+		gt = kzalloc(sizeof(*gt), GFP_KERNEL);
+		if (!gt) {
+			ret = -ENOMEM;
+			goto err;
+		}
+
+		gt->i915 = i915;
+		gt->name = gtdef->name;
+		gt->type = gtdef->type;
+		gt->info.engine_mask = gtdef->engine_mask;
+		gt->info.id = i;
+
+		drm_dbg(&i915->drm, "Setting up %s %u\n", gt->name, gt->info.id);
+		ret = intel_gt_tile_setup(gt, i, phys_addr + gtdef->mapping_base);
+		if (ret)
+			goto err;
+
+		i915->gts[i] = gt;
+	}
+
+	i915->remote_tiles = tiles - 1;
+
 	return 0;
+
+err:
+	drm_err(&i915->drm, "Failed to initialize %s %u! (%d)\n", gtdef->name, i, ret);
+
+	for_each_gt(i915, i, gt) {
+		intel_gt_tile_cleanup(gt);
+		i915->gts[i] = NULL;
+	}
+
+	return ret;
 }
 
 void intel_gt_release_all(struct drm_i915_private *i915)

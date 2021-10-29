@@ -12466,6 +12466,10 @@ enum skl_power_gate {
 
 #define GEN12_GLOBAL_MOCS(i)	_MMIO(0x4000 + (i) * 4) /* Global MOCS regs */
 
+#define XEHPSDV_MTCFG_ADDR			_MMIO(0x101800)
+#define   TILE_COUNT			REG_GENMASK(15, 8)
+#define   TILE_NUMBER			REG_GENMASK(7, 0)
+
 #define GEN12_GSMBASE			_MMIO(0x108100)
 #define GEN12_DSMBASE			_MMIO(0x1080C0)
 

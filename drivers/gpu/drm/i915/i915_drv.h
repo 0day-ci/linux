@@ -865,6 +865,8 @@ struct drm_i915_private {
 	 */
 	resource_size_t stolen_usable_size;	/* Total size minus reserved ranges */
 
+	unsigned int remote_tiles;
+
 	struct intel_uncore uncore;
 	struct intel_uncore_mmio_debug mmio_debug;
 
@@ -1196,8 +1198,8 @@ struct drm_i915_private {
 	/*
 	 * i915->gts[0] == &i915->gt
 	 */
-#define I915_MAX_TILES 4
-	struct intel_gt *gts[I915_MAX_TILES];
+#define I915_MAX_GTS 4
+	struct intel_gt *gts[I915_MAX_GTS];
 
 	struct {
 		struct i915_gem_contexts {
@@ -1724,6 +1726,7 @@ IS_SUBPLATFORM(const struct drm_i915_private *i915,
 
 #define HAS_REGION(i915, i) (INTEL_INFO(i915)->memory_regions & (i))
 #define HAS_LMEM(i915) HAS_REGION(i915, REGION_LMEM)
+#define HAS_REMOTE_TILES(dev_priv)   (INTEL_INFO(dev_priv)->has_remote_tiles)
 
 #define HAS_GT_UC(dev_priv)	(INTEL_INFO(dev_priv)->has_gt_uc)
 

@@ -29,6 +29,7 @@
 
 #include "i915_drv.h"
 #include "i915_pci.h"
+#include "gt/intel_gt.h"
 
 #define PLATFORM(x) .platform = (x)
 #define GEN(x) \
@@ -1008,6 +1009,37 @@ static const struct intel_device_info adl_p_info = {
 	.media_ver = 12, \
 	.media_rel = 50
 
+#define XE_HP_SDV_ENGINES \
+	BIT(BCS0) | \
+	BIT(VECS0) | BIT(VECS1) | BIT(VECS2) | BIT(VECS3) | \
+	BIT(VCS0) | BIT(VCS1) | BIT(VCS2) | BIT(VCS3) | \
+	BIT(VCS4) | BIT(VCS5) | BIT(VCS6) | BIT(VCS7)
+
+static const struct intel_gt_definition xehp_sdv_gts[] = {
+	{
+		.type = GT_TILE,
+		.name = "Remote Tile GT",
+		.mapping_base = SZ_16M,
+		.engine_mask = XE_HP_SDV_ENGINES,
+
+	},
+	{
+		.type = GT_TILE,
+		.name = "Remote Tile GT",
+		.mapping_base = SZ_16M * 2,
+		.engine_mask = XE_HP_SDV_ENGINES,
+
+	},
+	{
+		.type = GT_TILE,
+		.name = "Remote Tile GT",
+		.mapping_base = SZ_16M * 3,
+		.engine_mask = XE_HP_SDV_ENGINES,
+
+	},
+	{}
+};
+
 __maybe_unused
 static const struct intel_device_info xehpsdv_info = {
 	XE_HP_FEATURES,
@@ -1015,12 +1047,10 @@ static const struct intel_device_info xehpsdv_info = {
 	DGFX_FEATURES,
 	PLATFORM(INTEL_XEHPSDV),
 	.display = { },
+	.extra_gts = xehp_sdv_gts,
+	.has_remote_tiles = 1,
 	.pipe_mask = 0,
-	.platform_engine_mask =
-		BIT(RCS0) | BIT(BCS0) |
-		BIT(VECS0) | BIT(VECS1) | BIT(VECS2) | BIT(VECS3) |
-		BIT(VCS0) | BIT(VCS1) | BIT(VCS2) | BIT(VCS3) |
-		BIT(VCS4) | BIT(VCS5) | BIT(VCS6) | BIT(VCS7),
+	.platform_engine_mask = XE_HP_SDV_ENGINES,
 	.require_force_probe = 1,
 };
 
