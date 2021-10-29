@@ -7,44 +7,32 @@
 
 static void test_fail_cases(void)
 {
-	struct bpf_create_map_attr xattr = {
-		.name = "bloom_filter_map",
-		.map_type = BPF_MAP_TYPE_BLOOM_FILTER,
-		.max_entries = 100,
-		.value_size = 11,
-	};
 	__u32 value;
 	int fd, err;
 
 	/* Invalid key size */
-	xattr.key_size = 4;
-	fd = bpf_create_map_xattr(&xattr);
+	fd = bpf_create_map(BPF_MAP_TYPE_BLOOM_FILTER, 4, sizeof(value), 100, 0);
 	if (!ASSERT_LT(fd, 0, "bpf_create_map bloom filter invalid key size"))
 		close(fd);
-	xattr.key_size = 0;
 
 	/* Invalid value size */
-	xattr.value_size = 0;
-	fd = bpf_create_map_xattr(&xattr);
+	fd = bpf_create_map(BPF_MAP_TYPE_BLOOM_FILTER, 0, 0, 100, 0);
 	if (!ASSERT_LT(fd, 0, "bpf_create_map bloom filter invalid value size 0"))
 		close(fd);
-	xattr.value_size = 11;
 
 	/* Invalid max entries size */
-	xattr.max_entries = 0;
-	fd = bpf_create_map_xattr(&xattr);
-	if (!ASSERT_LT(fd, 0, "bpf_create_map bloom filter invalid max entries size"))
+	fd = bpf_create_map(BPF_MAP_TYPE_BLOOM_FILTER, 0, sizeof(value), 0, 0);
+	if (!ASSERT_LT(fd, 0,
+		       "bpf_create_map bloom filter invalid max entries size"))
 		close(fd);
-	xattr.max_entries = 100;
 
 	/* Bloom filter maps do not support BPF_F_NO_PREALLOC */
-	xattr.map_flags = BPF_F_NO_PREALLOC;
-	fd = bpf_create_map_xattr(&xattr);
+	fd = bpf_create_map(BPF_MAP_TYPE_BLOOM_FILTER, 0, sizeof(value), 100,
+			    BPF_F_NO_PREALLOC);
 	if (!ASSERT_LT(fd, 0, "bpf_create_map bloom filter invalid flags"))
 		close(fd);
-	xattr.map_flags = 0;
 
-	fd = bpf_create_map_xattr(&xattr);
+	fd = bpf_create_map(BPF_MAP_TYPE_BLOOM_FILTER, 0, sizeof(value), 100, 0);
 	if (!ASSERT_GE(fd, 0, "bpf_create_map bloom filter"))
 		return;
 
@@ -64,6 +52,30 @@ static void test_fail_cases(void)
 	err = bpf_map_update_elem(fd, NULL, &value, 10000);
 	ASSERT_EQ(err, -EINVAL, "bpf_map_update_elem bloom filter invalid flags");
 
+	close(fd);
+}
+
+static void test_success_cases(void)
+{
+	char value[11];
+	int fd, err;
+
+	/* Create a map */
+	fd = bpf_create_map(BPF_MAP_TYPE_BLOOM_FILTER, 0, sizeof(value), 100,
+			    BPF_F_ZERO_SEED | BPF_F_NUMA_NODE);
+	if (!ASSERT_GE(fd, 0, "bpf_create_map bloom filter success case"))
+		return;
+
+	/* Add a value to the bloom filter */
+	err = bpf_map_update_elem(fd, NULL, &value, 0);
+	if (!ASSERT_OK(err, "bpf_map_update_elem bloom filter success case"))
+		goto done;
+
+	 /* Lookup a value in the bloom filter */
+	err = bpf_map_lookup_elem(fd, NULL, &value);
+	ASSERT_OK(err, "bpf_map_update_elem bloom filter success case");
+
+done:
 	close(fd);
 }
 
@@ -190,6 +202,7 @@ void test_bloom_filter_map(void)
 	int err;
 
 	test_fail_cases();
+	test_success_cases();
 
 	err = setup_progs(&skel, &rand_vals, &nr_rand_vals);
 	if (err)
