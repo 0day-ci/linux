@@ -155,7 +155,6 @@ static inline struct bkey *bkey_idx(const struct bkey *k, unsigned int nr_keys)
 #define SB_LABEL_SIZE			32
 #define SB_JOURNAL_BUCKETS		256U
 /* SB_JOURNAL_BUCKETS must be divisible by BITS_PER_LONG */
-#define MAX_CACHES_PER_SET		8
 
 #define BDEV_DATA_START_DEFAULT		16	/* sectors */
 
@@ -356,7 +355,8 @@ struct jset {
 	__u16			btree_level;
 	__u16			pad[3];
 
-	__u64			prio_bucket[MAX_CACHES_PER_SET];
+	/* only a single cache is available */
+	__u64			prio_bucket[8];
 
 	union {
 		struct bkey	start[0];

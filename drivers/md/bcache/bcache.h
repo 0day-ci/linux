@@ -833,7 +833,7 @@ static inline uint8_t ptr_stale(struct cache_set *c, const struct bkey *k,
 static inline bool ptr_available(struct cache_set *c, const struct bkey *k,
 				 unsigned int i)
 {
-	return (PTR_DEV(k, i) < MAX_CACHES_PER_SET) && c->cache;
+	return (PTR_DEV(k, i) == 0) && c->cache;
 }
 
 /* Btree key macros */
