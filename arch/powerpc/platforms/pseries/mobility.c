@@ -22,6 +22,7 @@
 #include <linux/delay.h>
 #include <linux/slab.h>
 #include <linux/stringify.h>
+#include <linux/perf_event.h>
 
 #include <asm/machdep.h>
 #include <asm/rtas.h>
@@ -665,11 +666,17 @@ static int pseries_migrate_partition(u64 handle)
 	if (ret)
 		return ret;
 
+	/* Disable PMU before suspend */
+	on_each_cpu(&mobility_pmu_disable, NULL, 0);
+
 	ret = pseries_suspend(handle);
 	if (ret == 0)
 		post_mobility_fixup();
 	else
 		pseries_cancel_migration(handle, ret);
+
+	/* Enable PMU after resuming */
+	on_each_cpu(&mobility_pmu_enable, NULL, 0);
 
 	return ret;
 }

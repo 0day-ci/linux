@@ -1344,6 +1344,33 @@ static void power_pmu_disable(struct pmu *pmu)
 }
 
 /*
+ * Called from pseries_migrate_partition() function
+ * before migration, from powerpc/mobility code.
+ */
+void mobility_pmu_disable(void *unused)
+{
+	struct cpu_hw_events *cpuhw = this_cpu_ptr(&cpu_hw_events);
+	struct perf_event *event;
+
+	if (cpuhw->n_events != 0) {
+		int i;
+
+		power_pmu_disable(NULL);
+		/*
+		 * Read off any pre-existing events because the register
+		 * values may not be migrated.
+		 */
+		for (i = 0; i < cpuhw->n_events; ++i) {
+			event = cpuhw->event[i];
+			if (event->hw.idx) {
+				power_pmu_read(event);
+				event->hw.idx = 0;
+			}
+		}
+	}
+}
+
+/*
  * Re-enable all events if disable == 0.
  * If we were previously disabled and events were added, then
  * put the new config on the PMU.
@@ -1513,6 +1540,18 @@ static void power_pmu_enable(struct pmu *pmu)
  out:
 
 	local_irq_restore(flags);
+}
+
+/*
+ * Called from pseries_migrate_partition() function
+ * after migration, from powerpc/mobility code.
+ */
+void mobility_pmu_enable(void *unused)
+{
+	struct cpu_hw_events *cpuhw = this_cpu_ptr(&cpu_hw_events);
+
+	cpuhw->n_added = cpuhw->n_events;
+	power_pmu_enable(NULL);
 }
 
 static int collect_events(struct perf_event *group, int max_count,

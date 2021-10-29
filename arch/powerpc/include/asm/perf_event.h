@@ -17,6 +17,14 @@ static inline bool is_sier_available(void) { return false; }
 static inline unsigned long get_pmcs_ext_regs(int idx) { return 0; }
 #endif
 
+#ifdef CONFIG_PPC_PERF_CTRS
+void mobility_pmu_disable(void *unused);
+void mobility_pmu_enable(void *unused);
+#else
+static inline void mobility_pmu_disable(void *unused) { }
+static inline void mobility_pmu_enable(void *unused) { }
+#endif
+
 #ifdef CONFIG_FSL_EMB_PERF_EVENT
 #include <asm/perf_event_fsl_emb.h>
 #endif
