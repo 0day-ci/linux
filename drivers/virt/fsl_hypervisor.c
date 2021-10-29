@@ -849,8 +849,10 @@ static int __init fsl_hypervisor_init(void)
 		}
 
 		dbisr = kzalloc(sizeof(*dbisr), GFP_KERNEL);
-		if (!dbisr)
+		if (!dbisr) {
+			of_node_put(np);
 			goto out_of_memory;
+		}
 
 		dbisr->irq = irq;
 		dbisr->doorbell = be32_to_cpup(handle);
