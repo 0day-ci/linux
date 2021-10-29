@@ -106,7 +106,7 @@ static inline void wg_reset_packet(struct sk_buff *skb, bool encapsulating)
 
 static inline int wg_cpumask_choose_online(int *stored_cpu, unsigned int id)
 {
-	unsigned int cpu = *stored_cpu, cpu_index, i;
+	int cpu = *stored_cpu, cpu_index, i;
 
 	if (unlikely(cpu == nr_cpumask_bits ||
 		     !cpumask_test_cpu(cpu, cpu_online_mask))) {
