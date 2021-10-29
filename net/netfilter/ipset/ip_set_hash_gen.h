@@ -39,7 +39,7 @@
 /* Number of elements to store in an initial array block */
 #define AHASH_INIT_SIZE			2
 /* Max number of elements to store in an array block */
-#define AHASH_MAX_SIZE			(6 * AHASH_INIT_SIZE)
+#define AHASH_MAX_SIZE			(AHASH_INIT_SIZE + 6 * AHASH_INIT_SIZE)
 /* Max muber of elements in the array block when tuned */
 #define AHASH_MAX_TUNED			64
 
