@@ -4410,6 +4410,13 @@ static void alc245_fixup_hp_x360_amp(struct hda_codec *codec,
 	case HDA_FIXUP_ACT_PRE_PROBE:
 		spec->gpio_mask |= 0x01;
 		spec->gpio_dir |= 0x01;
+
+		/* use only amp at 0x02 for bottom(front) speaker,
+		 * otherwise it is set to use 0x02,0x03,0x06 and when used in conjunction
+		 * with top(rear) speaker 0x14, gets locked at full volume */
+		static const hda_nid_t conn1[] = { 0x02 };
+		snd_hda_override_conn_list(codec, 0x17, ARRAY_SIZE(conn1), conn1);
+
 		break;
 	case HDA_FIXUP_ACT_INIT:
 		/* need to toggle GPIO to enable the amp */
@@ -4500,6 +4507,26 @@ static void alc236_fixup_hp_mute_led_coefbit(struct hda_codec *codec,
 		spec->mute_led_coef.mask = 1 << 5;
 		spec->mute_led_coef.on = 0;
 		spec->mute_led_coef.off = 1 << 5;
+		snd_hda_gen_add_mute_led_cdev(codec, coef_mute_led_set);
+	}
+}
+
+static void alc245_fixup_hp_x360_mute_leds(struct hda_codec *codec,
+				const struct hda_fixup *fix, int action)
+{
+	struct alc_spec *spec = codec->spec;
+	if (action == HDA_FIXUP_ACT_PRE_PROBE) {
+		/* mic mute is set via gpio 0x04 */
+		spec->micmute_led_polarity = 1;
+		codec->power_filter = led_power_filter;
+		alc_fixup_hp_gpio_led(codec, action, 0x00, 0x04);
+
+		/* output mute is set via SET_COEF_INDEX,SET_PROC_COEF */
+		spec->mute_led_polarity = 0;
+		spec->mute_led_coef.idx = 0x0b;
+		spec->mute_led_coef.mask = 0xffff;
+		spec->mute_led_coef.on = 0xa02f;
+		spec->mute_led_coef.off = 0x7774;
 		snd_hda_gen_add_mute_led_cdev(codec, coef_mute_led_set);
 	}
 }
@@ -6558,6 +6585,8 @@ enum {
 	ALC269_FIXUP_HP_DOCK_GPIO_MIC1_LED,
 	ALC280_FIXUP_HP_9480M,
 	ALC245_FIXUP_HP_X360_AMP,
+	ALC245_FIXUP_HP_X360_MUTE_LEDS,
+	ALC245_FIXUP_HP_X360_GPIO_TOP_SPEAKER,
 	ALC288_FIXUP_DELL_HEADSET_MODE,
 	ALC288_FIXUP_DELL1_MIC_NO_PRESENCE,
 	ALC288_FIXUP_DELL_XPS_13,
@@ -7294,6 +7323,21 @@ static const struct hda_fixup alc269_fixups[] = {
 	[ALC245_FIXUP_HP_X360_AMP] = {
 		.type = HDA_FIXUP_FUNC,
 		.v.func = alc245_fixup_hp_x360_amp,
+		.chained = true,
+		.chain_id = ALC245_FIXUP_HP_X360_MUTE_LEDS
+	},
+	[ALC245_FIXUP_HP_X360_MUTE_LEDS] = {
+		.type = HDA_FIXUP_FUNC,
+		.v.func = alc245_fixup_hp_x360_mute_leds,
+		.chained = true,
+		.chain_id = ALC245_FIXUP_HP_X360_GPIO_TOP_SPEAKER
+	},
+	[ALC245_FIXUP_HP_X360_GPIO_TOP_SPEAKER] = {
+		.type = HDA_FIXUP_PINS,
+		.v.pins = (const struct hda_pintbl[]) {
+			{ 0x14, 0x90170110 }, /* enable top(back) speaker in addition to bottom(front) speaker at 0x17 */
+			{ },
+		}
 	},
 	[ALC288_FIXUP_DELL_HEADSET_MODE] = {
 		.type = HDA_FIXUP_FUNC,
@@ -9005,6 +9049,8 @@ static const struct hda_model_fixup alc269_fixup_models[] = {
 	{.id = ALC255_FIXUP_XIAOMI_HEADSET_MIC, .name = "alc255-xiaomi-headset"},
 	{.id = ALC274_FIXUP_HP_MIC, .name = "alc274-hp-mic-detect"},
 	{.id = ALC245_FIXUP_HP_X360_AMP, .name = "alc245-hp-x360-amp"},
+	{.id = ALC245_FIXUP_HP_X360_MUTE_LEDS, .name = "alc245-hp-x360-mute-leds"},
+	{.id = ALC245_FIXUP_HP_X360_GPIO_TOP_SPEAKER, .name = "alc245-hp-x360-gpio-top-speaker"},
 	{.id = ALC295_FIXUP_HP_OMEN, .name = "alc295-hp-omen"},
 	{.id = ALC285_FIXUP_HP_SPECTRE_X360, .name = "alc285-hp-spectre-x360"},
 	{.id = ALC287_FIXUP_IDEAPAD_BASS_SPK_AMP, .name = "alc287-ideapad-bass-spk-amp"},
