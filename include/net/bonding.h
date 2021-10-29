@@ -124,6 +124,7 @@ struct bond_params {
 	int arp_interval;
 	int arp_validate;
 	int arp_all_targets;
+	unsigned int missed_max;
 	int use_carrier;
 	int fail_over_mac;
 	int updelay;

@@ -421,6 +421,16 @@ arp_all_targets
 		consider the slave up only when all of the arp_ip_targets
 		are reachable
 
+missed_max
+
+        Maximum number of arp_interval for missed ARP replies.
+        If this number is exceeded, link is reported as down.
+
+        Note a small value means a strict time. e.g. missed_max is 1 means
+        the correct arp reply must be recived during the interval.
+
+        default 3
+
 downdelay
 
 	Specifies the time, in milliseconds, to wait before disabling
