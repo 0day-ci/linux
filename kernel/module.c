@@ -633,7 +633,7 @@ static void percpu_modcopy(struct module *mod,
 bool __is_module_percpu_address(unsigned long addr, unsigned long *can_addr)
 {
 	struct module *mod;
-	unsigned int cpu;
+	int cpu;
 
 	preempt_disable();
 
