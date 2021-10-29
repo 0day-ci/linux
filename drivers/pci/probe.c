@@ -2426,6 +2426,7 @@ static struct pci_dev *pci_scan_device(struct pci_bus *bus, int devfn)
 		kfree(dev);
 		return NULL;
 	}
+	pci_device_add(dev, bus);
 
 	return dev;
 }
@@ -2575,13 +2576,7 @@ struct pci_dev *pci_scan_single_device(struct pci_bus *bus, int devfn)
 		return dev;
 	}
 
-	dev = pci_scan_device(bus, devfn);
-	if (!dev)
-		return NULL;
-
-	pci_device_add(dev, bus);
-
-	return dev;
+	return pci_scan_device(bus, devfn);
 }
 EXPORT_SYMBOL(pci_scan_single_device);
 
