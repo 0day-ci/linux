@@ -30,6 +30,20 @@
 
 static bool amp;
 
+struct vhci_ext_create_device_req {
+	__u8	dev_type;
+	__u32	flags;
+} __packed;
+
+#define VHCI_FLAG_QUIRK_RAW_DEVICE		0x01
+#define VHCI_FLAG_QUIRK_EXTERNAL_CONFIG		0x02
+#define VHCI_FLAG_QUIRKS_INVALID_BDADDR		0x04
+
+struct vhci_ext_create_device_resp {
+	__u8	dev_type;
+	__u16	index;
+} __packed;
+
 struct vhci_data {
 	struct hci_dev *hdev;
 
@@ -278,6 +292,38 @@ static int vhci_setup(struct hci_dev *hdev)
 	return 0;
 }
 
+static void vhci_create_debugfs(struct hci_dev *hdev)
+{
+	struct vhci_data *data = hci_get_drvdata(hdev);
+
+	debugfs_create_file("force_suspend", 0644, hdev->debugfs, data,
+			    &force_suspend_fops);
+
+	debugfs_create_file("force_wakeup", 0644, hdev->debugfs, data,
+			    &force_wakeup_fops);
+
+	if (IS_ENABLED(CONFIG_BT_MSFTEXT))
+		debugfs_create_file("msft_opcode", 0644, hdev->debugfs, data,
+				    &msft_opcode_fops);
+
+	if (IS_ENABLED(CONFIG_BT_AOSPEXT))
+		debugfs_create_file("aosp_capable", 0644, hdev->debugfs, data,
+				    &aosp_capable_fops);
+}
+
+static void vhci_setup_hdev(struct hci_dev *hdev)
+{
+	hdev->open  = vhci_open_dev;
+	hdev->close = vhci_close_dev;
+	hdev->flush = vhci_flush;
+	hdev->send  = vhci_send_frame;
+	hdev->get_data_path_id = vhci_get_data_path_id;
+	hdev->get_codec_config_data = vhci_get_codec_config_data;
+	hdev->wakeup = vhci_wakeup;
+	hdev->setup = vhci_setup;
+	set_bit(HCI_QUIRK_NON_PERSISTENT_SETUP, &hdev->quirks);
+}
+
 static int __vhci_create_device(struct vhci_data *data, __u8 opcode)
 {
 	struct hci_dev *hdev;
@@ -313,15 +359,7 @@ static int __vhci_create_device(struct vhci_data *data, __u8 opcode)
 	hdev->dev_type = dev_type;
 	hci_set_drvdata(hdev, data);
 
-	hdev->open  = vhci_open_dev;
-	hdev->close = vhci_close_dev;
-	hdev->flush = vhci_flush;
-	hdev->send  = vhci_send_frame;
-	hdev->get_data_path_id = vhci_get_data_path_id;
-	hdev->get_codec_config_data = vhci_get_codec_config_data;
-	hdev->wakeup = vhci_wakeup;
-	hdev->setup = vhci_setup;
-	set_bit(HCI_QUIRK_NON_PERSISTENT_SETUP, &hdev->quirks);
+	vhci_setup_hdev(hdev);
 
 	/* bit 6 is for external configuration */
 	if (opcode & 0x40)
@@ -339,24 +377,73 @@ static int __vhci_create_device(struct vhci_data *data, __u8 opcode)
 		return -EBUSY;
 	}
 
-	debugfs_create_file("force_suspend", 0644, hdev->debugfs, data,
-			    &force_suspend_fops);
-
-	debugfs_create_file("force_wakeup", 0644, hdev->debugfs, data,
-			    &force_wakeup_fops);
-
-	if (IS_ENABLED(CONFIG_BT_MSFTEXT))
-		debugfs_create_file("msft_opcode", 0644, hdev->debugfs, data,
-				    &msft_opcode_fops);
-
-	if (IS_ENABLED(CONFIG_BT_AOSPEXT))
-		debugfs_create_file("aosp_capable", 0644, hdev->debugfs, data,
-				    &aosp_capable_fops);
+	vhci_create_debugfs(hdev);
 
 	hci_skb_pkt_type(skb) = HCI_VENDOR_PKT;
 
 	skb_put_u8(skb, 0xff);
 	skb_put_u8(skb, opcode);
+	put_unaligned_le16(hdev->id, skb_put(skb, 2));
+	skb_queue_tail(&data->readq, skb);
+
+	wake_up_interruptible(&data->read_wait);
+	return 0;
+}
+
+static int __vhci_ext_create_device(struct vhci_data *data, __u8 dev_type,
+								__u32 flags)
+{
+	struct hci_dev *hdev;
+	struct sk_buff *skb;
+	struct vhci_ext_create_device_resp *resp;
+
+	if (data->hdev)
+		return -EBADFD;
+
+	if (dev_type != HCI_PRIMARY && dev_type != HCI_AMP)
+		return -EINVAL;
+
+	skb = bt_skb_alloc(sizeof(*resp) + 1, GFP_KERNEL);
+	if (!skb)
+		return -ENOMEM;
+
+	hdev = hci_alloc_dev();
+	if (!hdev) {
+		kfree_skb(skb);
+		return -ENOMEM;
+	}
+
+	data->hdev = hdev;
+
+	hdev->bus = HCI_VIRTUAL;
+	hdev->dev_type = dev_type;
+	hci_set_drvdata(hdev, data);
+
+	vhci_setup_hdev(hdev);
+
+	/* Check quirks and set it for hdev */
+	if (flags & VHCI_FLAG_QUIRK_EXTERNAL_CONFIG)
+		set_bit(HCI_QUIRK_EXTERNAL_CONFIG, &hdev->quirks);
+
+	if (flags & VHCI_FLAG_QUIRK_RAW_DEVICE)
+		set_bit(HCI_QUIRK_RAW_DEVICE, &hdev->quirks);
+
+	if (flags & VHCI_FLAG_QUIRKS_INVALID_BDADDR)
+		set_bit(HCI_QUIRK_INVALID_BDADDR, &hdev->quirks);
+
+	if (hci_register_dev(hdev) < 0) {
+		BT_ERR("Can't register HCI device");
+		hci_free_dev(hdev);
+		data->hdev = NULL;
+		kfree_skb(skb);
+		return -EBUSY;
+	}
+
+	vhci_create_debugfs(hdev);
+
+	hci_skb_pkt_type(skb) = HCI_VHCI_PKT;
+	skb_put_u8(skb, HCI_VHCI_PKT);
+	skb_put_u8(skb, dev_type);
 	put_unaligned_le16(hdev->id, skb_put(skb, 2));
 	skb_queue_tail(&data->readq, skb);
 
@@ -370,6 +457,18 @@ static int vhci_create_device(struct vhci_data *data, __u8 opcode)
 
 	mutex_lock(&data->open_mutex);
 	err = __vhci_create_device(data, opcode);
+	mutex_unlock(&data->open_mutex);
+
+	return err;
+}
+
+static int vhci_ext_create_device(struct vhci_data *data, __u8 dev_type,
+								__u32 flags)
+{
+	int err;
+
+	mutex_lock(&data->open_mutex);
+	err = __vhci_ext_create_device(data, dev_type, flags);
 	mutex_unlock(&data->open_mutex);
 
 	return err;
@@ -427,6 +526,24 @@ static inline ssize_t vhci_get_user(struct vhci_data *data,
 		kfree_skb(skb);
 
 		ret = vhci_create_device(data, opcode);
+		break;
+
+	/* This packet type is for VHCI specific command */
+	case HCI_VHCI_PKT:
+		cancel_delayed_work_sync(&data->open_timeout);
+		struct vhci_ext_create_device_req *req;
+
+		if (skb->len != sizeof(*req)) {
+			kfree_skb(skb);
+			return -EINVAL;
+		}
+
+		req = (void *)skb->data;
+		skb_pull(skb, sizeof(*req));
+
+		ret = vhci_ext_create_device(data, req->dev_type, req->flags);
+
+		kfree_skb(skb);
 		break;
 
 	default:

@@ -355,6 +355,7 @@ enum {
 #define HCI_EVENT_PKT		0x04
 #define HCI_ISODATA_PKT		0x05
 #define HCI_DIAG_PKT		0xf0
+#define HCI_VHCI_PKT		0xfe
 #define HCI_VENDOR_PKT		0xff
 
 /* HCI packet types */
