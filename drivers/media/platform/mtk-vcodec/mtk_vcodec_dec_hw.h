@@ -34,6 +34,8 @@ enum mtk_comp_hw_reg_idx {
  * @master_dev: master device
  * @reg_base: Mapped address of MTK Vcodec registers.
  *
+ * @curr_ctx: The context that is waiting for codec hardware
+ *
  * @dec_irq: decoder irq resource
  * @pm: power management control
  * @comp_idx: each hardware index
@@ -42,6 +44,8 @@ struct mtk_vdec_hw_dev {
 	struct platform_device *plat_dev;
 	struct mtk_vcodec_dev *master_dev;
 	void __iomem *reg_base[VDEC_COMP_MAX];
+
+	struct mtk_vcodec_ctx *curr_ctx;
 
 	int dec_irq;
 	struct mtk_vcodec_pm pm;
