@@ -1469,7 +1469,7 @@ retry:
 			 * during migration.
 			 */
 			is_thp = PageTransHuge(page) && !PageHuge(page);
-			nr_subpages = thp_nr_pages(page);
+			nr_subpages = compound_nr(page);
 			cond_resched();
 
 			if (PageHuge(page))
@@ -1534,7 +1534,7 @@ retry:
 					nr_failed += nr_subpages;
 					goto out;
 				}
-				nr_failed++;
+				nr_failed += nr_subpages;
 				goto out;
 			case -EAGAIN:
 				if (is_thp) {
@@ -1544,14 +1544,14 @@ retry:
 				retry++;
 				break;
 			case MIGRATEPAGE_SUCCESS:
+				nr_succeeded += nr_subpages;
 				if (is_thp) {
 					nr_thp_succeeded++;
-					nr_succeeded += nr_subpages;
 					break;
 				}
-				nr_succeeded++;
 				break;
 			default:
+				nr_failed += nr_subpages;
 				/*
 				 * Permanent failure (-EBUSY, etc.):
 				 * unlike -EAGAIN case, the failed page is
@@ -1560,10 +1560,8 @@ retry:
 				 */
 				if (is_thp) {
 					nr_thp_failed++;
-					nr_failed += nr_subpages;
 					break;
 				}
-				nr_failed++;
 				break;
 			}
 		}
