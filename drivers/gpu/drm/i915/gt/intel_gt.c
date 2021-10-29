@@ -905,7 +905,7 @@ intel_gt_tile_setup(struct intel_gt *gt, unsigned int id, phys_addr_t phys_addr)
 {
 	int ret;
 
-	intel_uncore_init_early(gt->uncore, gt->i915);
+	intel_uncore_init_early(gt->uncore, gt);
 
 	ret = intel_uncore_setup_mmio(gt->uncore, phys_addr);
 	if (ret)
