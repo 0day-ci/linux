@@ -24,6 +24,7 @@
 #include <linux/pci.h>
 #include <linux/pci-ecam.h>
 #include <linux/printk.h>
+#include <linux/regulator/consumer.h>
 #include <linux/reset.h>
 #include <linux/sizes.h>
 #include <linux/slab.h>
@@ -192,6 +193,12 @@ static inline void brcm_pcie_perst_set_4908(struct brcm_pcie *pcie, u32 val);
 static inline void brcm_pcie_perst_set_7278(struct brcm_pcie *pcie, u32 val);
 static inline void brcm_pcie_perst_set_generic(struct brcm_pcie *pcie, u32 val);
 
+static const char * const supplies[] = {
+	"vpcie3v3",
+	"vpcie3v3aux",
+	"vpcie12v",
+};
+
 enum {
 	RGR1_SW_INIT_1,
 	EXT_CFG_INDEX,
@@ -295,7 +302,37 @@ struct brcm_pcie {
 	u32			hw_rev;
 	void			(*perst_set)(struct brcm_pcie *pcie, u32 val);
 	void			(*bridge_sw_init_set)(struct brcm_pcie *pcie, u32 val);
+	struct regulator_bulk_data supplies[ARRAY_SIZE(supplies)];
+	unsigned int		num_supplies;
 };
+
+static int brcm_regulators_on(struct brcm_pcie *pcie)
+{
+	struct device *dev = pcie->dev;
+	int ret;
+
+	if (!pcie->num_supplies)
+		return 0;
+	ret = regulator_bulk_enable(pcie->num_supplies, pcie->supplies);
+	if (ret)
+		dev_err(dev, "failed to enable EP regulators\n");
+
+	return ret;
+}
+
+static int brcm_regulators_off(struct brcm_pcie *pcie)
+{
+	struct device *dev = pcie->dev;
+	int ret;
+
+	if (!pcie->num_supplies)
+		return 0;
+	ret = regulator_bulk_disable(pcie->num_supplies, pcie->supplies);
+	if (ret)
+		dev_err(dev, "failed to disable EP regulators\n");
+
+	return ret;
+}
 
 /*
  * This is to convert the size of the inbound "BAR" region to the
@@ -1148,6 +1185,59 @@ static void brcm_pcie_turn_off(struct brcm_pcie *pcie)
 	pcie->bridge_sw_init_set(pcie, 1);
 }
 
+static int brcm_pcie_get_regulators(struct brcm_pcie *pcie, struct pci_dev *dev)
+{
+	const unsigned int ns = ARRAY_SIZE(supplies);
+	struct device_node *dn;
+	struct property *pp;
+	unsigned int i;
+	int ret;
+
+	/* This is for Broadcom STB/CM chips only */
+	if (pcie->type == BCM2711)
+		return 0;
+
+	pci_set_of_node(dev);
+	dn = dev->dev.of_node;
+	if (!dn)
+		return 0;
+
+	for_each_property_of_node(dn, pp) {
+		for (i = 0; i < ns; i++) {
+			char prop_name[64]; /* 64 is max size of property name */
+
+			snprintf(prop_name, 64, "%s-supply", supplies[i]);
+			if (strcmp(prop_name, pp->name) == 0)
+				break;
+		}
+		if (i >= ns || pcie->num_supplies >= ARRAY_SIZE(supplies))
+			continue;
+
+		pcie->supplies[pcie->num_supplies++].supply = supplies[i];
+	}
+
+	if (pcie->num_supplies == 0)
+		return 0;
+
+	/*
+	 * We set the name ahead of time as the regulator core expects
+	 * it to exist when regulator_bulk_get() is called.
+	 */
+	dev_set_name(&dev->dev, "%04x:%02x:%02x.%d",
+		     pci_domain_nr(dev->bus),
+		     dev->bus->number, PCI_SLOT(dev->devfn),
+		     PCI_FUNC(dev->devfn));
+	/*
+	 * We cannot use devm_regulator_bulk_get() because the
+	 * downstream device may be removed w/o the regulator
+	 * first being disabled by the host bridge.
+	 */
+	ret = regulator_bulk_get(&dev->dev, pcie->num_supplies,
+				 pcie->supplies);
+
+	return ret;
+}
+
 static int brcm_pcie_suspend(struct device *dev)
 {
 	struct brcm_pcie *pcie = dev_get_drvdata(dev);
@@ -1158,7 +1248,7 @@ static int brcm_pcie_suspend(struct device *dev)
 	reset_control_rearm(pcie->rescal);
 	clk_disable_unprepare(pcie->clk);
 
-	return ret;
+	return brcm_regulators_off(pcie);
 }
 
 static int brcm_pcie_resume(struct device *dev)
@@ -1174,6 +1264,9 @@ static int brcm_pcie_resume(struct device *dev)
 	ret = reset_control_reset(pcie->rescal);
 	if (ret)
 		goto err_disable_clk;
+	ret = brcm_regulators_on(pcie);
+	if (ret)
+		goto err_reset;
 
 	ret = brcm_phy_start(pcie);
 	if (ret)
@@ -1217,6 +1310,10 @@ static void __brcm_pcie_remove(struct brcm_pcie *pcie)
 	brcm_phy_stop(pcie);
 	reset_control_rearm(pcie->rescal);
 	clk_disable_unprepare(pcie->clk);
+	if (pcie->num_supplies) {
+		brcm_regulators_off(pcie);
+		regulator_bulk_free(pcie->num_supplies, pcie->supplies);
+	}
 }
 
 static int brcm_pcie_remove(struct platform_device *pdev)
@@ -1240,6 +1337,57 @@ static const struct of_device_id brcm_pcie_match[] = {
 	{ .compatible = "brcm,bcm7445-pcie", .data = &generic_cfg },
 	{},
 };
+
+static bool brcm_pcie_pci_subdev_can_prepare(struct pci_bus *bus, int devfn)
+{
+	/*
+	 * We only care about a device that is directly connected
+	 * to the root complex, ie bus == 1 and slot == 0.
+	 */
+	return (bus->number == 1 && PCI_SLOT(devfn) == 0);
+}
+
+static int brcm_pcie_pci_subdev_prepare(struct pci_bus *bus, int devfn,
+					struct pci_host_bridge *bridge,
+					struct pci_dev *pdev)
+{
+	struct brcm_pcie *pcie;
+	int ret = 0;
+
+	pcie = (struct brcm_pcie *) bridge->sysdata;
+	ret = brcm_pcie_get_regulators(pcie, pdev);
+	if (ret) {
+		pcie->num_supplies = 0;
+		if (ret != -EPROBE_DEFER)
+			dev_err(pcie->dev, "failed to get regulators (err=%d)\n", ret);
+		return ret;
+	}
+
+	ret = brcm_regulators_on(pcie);
+	if (ret)
+		goto err_out0;
+
+	ret = brcm_pcie_linkup(pcie);
+	if (ret)
+		goto err_out1;
+
+	/*
+	 * dev_set_name() was called in brcm_get_regulators().  Free the
+	 * string it allocated as it will be called again when
+	 * pci_setup_device() is invoked.
+	 */
+	kfree_const(pdev->dev.kobj.name);
+	pdev->dev.kobj.name = NULL;
+
+	return 0;
+
+err_out1:
+	brcm_regulators_off(pcie);
+err_out0:
+	regulator_bulk_free(pcie->num_supplies, pcie->supplies);
+	pcie->num_supplies = 0;
+	return ret;
+}
 
 static int brcm_pcie_probe(struct platform_device *pdev)
 {
@@ -1327,12 +1475,24 @@ static int brcm_pcie_probe(struct platform_device *pdev)
 		}
 	}
 
+	bridge->pci_subdev_can_prepare = brcm_pcie_pci_subdev_can_prepare;
+	bridge->pci_subdev_prepare = brcm_pcie_pci_subdev_prepare;
 	bridge->ops = &brcm_pcie_ops;
 	bridge->sysdata = pcie;
 
 	platform_set_drvdata(pdev, pcie);
 
-	return pci_host_probe(bridge);
+	ret = pci_host_probe(bridge);
+	if (!ret && !brcm_pcie_link_up(pcie))
+		ret = -ENODEV;
+
+	if (ret) {
+		brcm_pcie_remove(pdev);
+		return ret;
+	}
+
+	return 0;
+
 fail:
 	__brcm_pcie_remove(pcie);
 	return ret;
