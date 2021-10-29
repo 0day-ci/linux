@@ -295,6 +295,7 @@ int pci_iov_add_virtfn(struct pci_dev *dev, int id)
 		BUG_ON(rc);
 	}
 
+	device_initialize(&virtfn->dev);
 	pci_device_add(virtfn, virtfn->bus);
 	rc = pci_iov_sysfs_link(dev, virtfn, id);
 	if (rc)

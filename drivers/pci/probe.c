@@ -2426,6 +2426,7 @@ static struct pci_dev *pci_scan_device(struct pci_bus *bus, int devfn)
 		kfree(dev);
 		return NULL;
 	}
+	device_initialize(&dev->dev);
 	pci_device_add(dev, bus);
 
 	return dev;
@@ -2526,7 +2527,6 @@ void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
 
 	pci_configure_device(dev);
 
-	device_initialize(&dev->dev);
 	dev->dev.release = pci_release_dev;
 
 	set_dev_node(&dev->dev, pcibus_to_node(bus));
