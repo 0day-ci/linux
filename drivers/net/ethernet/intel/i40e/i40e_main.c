@@ -8483,8 +8483,7 @@ static int i40e_configure_clsflower(struct i40e_vsi *vsi,
 
 	if (err) {
 		dev_err(&pf->pdev->dev,
-			"Failed to add cloud filter, err %s\n",
-			i40e_stat_str(&pf->hw, err));
+			"Failed to add cloud filter, err %d\n", err);
 		goto err;
 	}
 
