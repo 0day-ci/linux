@@ -4,15 +4,15 @@ config PSTORE
 	select CRYPTO if PSTORE_COMPRESS
 	default n
 	help
-	   This option enables generic access to platform level
-	   persistent storage via "pstore" filesystem that can
-	   be mounted as /dev/pstore.  Only useful if you have
-	   a platform level driver that registers with pstore to
-	   provide the data, so you probably should just go say "Y"
-	   (or "M") to a platform specific persistent store driver
-	   (e.g. ACPI_APEI on X86) which will select this for you.
-	   If you don't have a platform persistent store driver,
-	   say N.
+	  This option enables generic access to platform level
+	  persistent storage via "pstore" filesystem that can
+	  be mounted as /dev/pstore.  Only useful if you have
+	  a platform level driver that registers with pstore to
+	  provide the data, so you probably should just go say "Y"
+	  (or "M") to a platform specific persistent store driver
+	  (e.g. ACPI_APEI on X86) which will select this for you.
+	  If you don't have a platform persistent store driver,
+	  say N.
 
 config PSTORE_DEFAULT_KMSG_BYTES
 	int "Default kernel log storage space" if EXPERT
