@@ -188,6 +188,7 @@ struct ufs_pm_lvl_states {
  * @task_tag: Task tag of the command
  * @lun: LUN of the command
  * @intr_cmd: Interrupt command (doesn't participate in interrupt aggregation)
+ * @issuing: Is in ufshcd_queuecommand()
  * @issue_time_stamp: time stamp for debug purposes
  * @compl_time_stamp: time stamp for statistics
  * @crypto_key_slot: the key slot to use for inline crypto (-1 if none)
@@ -214,6 +215,7 @@ struct ufshcd_lrb {
 	int task_tag;
 	u8 lun; /* UPIU LUN id field is only 8-bit wide */
 	bool intr_cmd;
+	bool issuing;
 	ktime_t issue_time_stamp;
 	ktime_t compl_time_stamp;
 #ifdef CONFIG_SCSI_UFS_CRYPTO
@@ -425,6 +427,7 @@ struct ufs_saved_pwr_info {
  * @is_initialized: Indicates whether clock scaling is initialized or not
  * @is_busy_started: tracks if busy period has started or not
  * @is_suspended: tracks if devfreq is suspended or not
+ * @in_progress: clock_scaling is in progress
  */
 struct ufs_clk_scaling {
 	int active_reqs;
@@ -442,6 +445,7 @@ struct ufs_clk_scaling {
 	bool is_initialized;
 	bool is_busy_started;
 	bool is_suspended;
+	bool in_progress;
 };
 
 #define UFS_EVENT_HIST_LENGTH 8

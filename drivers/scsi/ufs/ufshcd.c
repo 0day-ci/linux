@@ -294,6 +294,82 @@ static void ufshcd_scsi_block_requests(struct ufs_hba *hba)
 		scsi_block_requests(hba->host);
 }
 
+static void ufshcd_check_issuing(struct ufs_hba *hba, unsigned long *issuing)
+{
+	int tag;
+
+	/*
+	 * A memory barrier is needed to ensure changes to lrbp->issuing will be
+	 * seen here.
+	 */
+	smp_rmb();
+	for_each_set_bit(tag, issuing, hba->nutrs) {
+		struct ufshcd_lrb *lrbp = &hba->lrb[tag];
+
+		if (!lrbp->issuing)
+			__clear_bit(tag, issuing);
+	}
+}
+
+struct issuing {
+	struct ufs_hba *hba;
+	unsigned long issuing;
+};
+
+static bool ufshcd_is_issuing(struct request *req, void *priv, bool reserved)
+{
+	int tag = req->tag;
+	struct issuing *issuing = priv;
+	struct ufshcd_lrb *lrbp = &issuing->hba->lrb[tag];
+
+	if (lrbp->issuing)
+		__set_bit(tag, &issuing->issuing);
+	return false;
+}
+
+static void ufshcd_flush_queuecommand(struct ufs_hba *hba)
+{
+	struct request_queue *q = hba->cmd_queue;
+	struct issuing issuing = { .hba = hba };
+	int i;
+
+	/*
+	 * Ensure any changes will be visible in ufshcd_queuecommand(), before
+	 * finding requests that are currently in ufshcd_queuecommand(). Any
+	 * requests not yet past the memory barrier in ufshcd_queuecommand()
+	 * will therefore certainly see any changes that this task has made.
+	 * Any requests that are past the memory barrier in
+	 * ufshcd_queuecommand() will be found below, unless they are already
+	 * exiting ufshcd_queuecommand().
+	 */
+	smp_mb();
+
+	/*
+	 * Requests coming through ufshcd_queuecommand() will always have been
+	 * "started", so blk_mq_tagset_busy_iter() will find them.
+	 */
+	blk_mq_tagset_busy_iter(q->tag_set, ufshcd_is_issuing, &issuing);
+
+	/*
+	 * Spin briefly, to wait for tasks currently executing
+	 * ufshcd_queuecommand(), assuming ufshcd_queuecommand() typically takes
+	 * less that 10 microseconds.
+	 */
+	for (i = 0; i < 10 && issuing.issuing; i++) {
+		udelay(1);
+		ufshcd_check_issuing(hba, &issuing.issuing);
+	}
+
+	/*
+	 * Anything still in ufshcd_queuecommand() presumably got preempted, so
+	 * sleep while polling.
+	 */
+	while (issuing.issuing) {
+		usleep_range(100, 500);
+		ufshcd_check_issuing(hba, &issuing.issuing);
+	}
+}
+
 static void ufshcd_add_cmd_upiu_trace(struct ufs_hba *hba, unsigned int tag,
 				      enum ufs_trace_str_t str_t)
 {
@@ -1195,6 +1271,8 @@ static int ufshcd_clock_scaling_prepare(struct ufs_hba *hba)
 	/* let's not get into low power until clock scaling is completed */
 	ufshcd_hold(hba, false);
 
+	hba->clk_scaling.in_progress = true;
+	ufshcd_flush_queuecommand(hba);
 out:
 	return ret;
 }
@@ -1205,6 +1283,9 @@ static void ufshcd_clock_scaling_unprepare(struct ufs_hba *hba, bool writelock)
 		up_write(&hba->clk_scaling_lock);
 	else
 		up_read(&hba->clk_scaling_lock);
+	/* Ensure writes are done before setting in_progress to false */
+	smp_wmb();
+	hba->clk_scaling.in_progress = false;
 	ufshcd_scsi_unblock_requests(hba);
 	ufshcd_release(hba);
 }
@@ -2111,7 +2192,11 @@ void ufshcd_send_command(struct ufs_hba *hba, unsigned int task_tag)
 	ufshcd_writel(hba, 1 << task_tag, REG_UTP_TRANSFER_REQ_DOOR_BELL);
 	spin_unlock_irqrestore(&hba->outstanding_lock, flags);
 
-	/* Make sure that doorbell is committed immediately */
+	/*
+	 * Make sure that doorbell is committed immediately.
+	 * Also provides synchronization for ufshcd_queuecommand() wrt
+	 * ufshcd_flush_queuecommand().
+	 */
 	wmb();
 }
 
@@ -2698,8 +2783,15 @@ static int ufshcd_queuecommand(struct Scsi_Host *host, struct scsi_cmnd *cmd)
 
 	WARN_ONCE(tag < 0, "Invalid tag %d\n", tag);
 
-	if (!down_read_trylock(&hba->clk_scaling_lock))
-		return SCSI_MLQUEUE_HOST_BUSY;
+	lrbp = &hba->lrb[tag];
+	lrbp->issuing = true;
+	/* Synchronize with ufshcd_flush_queuecommand() */
+	smp_mb();
+
+	if (unlikely(hba->clk_scaling.in_progress)) {
+		err = SCSI_MLQUEUE_HOST_BUSY;
+		goto out;
+	}
 
 	switch (hba->ufshcd_state) {
 	case UFSHCD_STATE_OPERATIONAL:
@@ -2754,7 +2846,6 @@ static int ufshcd_queuecommand(struct Scsi_Host *host, struct scsi_cmnd *cmd)
 	WARN_ON(ufshcd_is_clkgating_allowed(hba) &&
 		(hba->clk_gating.state != CLKS_ON));
 
-	lrbp = &hba->lrb[tag];
 	WARN_ON(lrbp->cmd);
 	lrbp->cmd = cmd;
 	lrbp->sense_bufflen = UFS_SENSE_SIZE;
@@ -2785,7 +2876,12 @@ static int ufshcd_queuecommand(struct Scsi_Host *host, struct scsi_cmnd *cmd)
 
 	ufshcd_send_command(hba, tag);
 out:
-	up_read(&hba->clk_scaling_lock);
+	/*
+	 * Leverages wmb() in ufshcd_send_command() for synchronization with
+	 * ufshcd_flush_queuecommand(), otherwise if no command was sent, then
+	 * there is no need to synchronize anyway.
+	 */
+	lrbp->issuing = false;
 
 	if (ufs_trigger_eh()) {
 		unsigned long flags;
@@ -5990,9 +6086,7 @@ static void ufshcd_err_handling_prepare(struct ufs_hba *hba)
 		ufshcd_clk_scaling_allow(hba, false);
 	}
 	ufshcd_scsi_block_requests(hba);
-	/* Drain ufshcd_queuecommand() */
-	down_write(&hba->clk_scaling_lock);
-	up_write(&hba->clk_scaling_lock);
+	ufshcd_flush_queuecommand(hba);
 	cancel_work_sync(&hba->eeh_work);
 }
 
