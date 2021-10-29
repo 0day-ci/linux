@@ -202,6 +202,7 @@ static int kexec_file_add_ipl_report(struct kimage *image,
 	buf.buffer = ipl_report_finish(data->report);
 	buf.bufsz = data->report->size;
 	buf.memsz = buf.bufsz;
+	image->arch.ipl_buf = buf.buffer;
 
 	data->memsz += buf.memsz;
 
@@ -320,4 +321,12 @@ int arch_kexec_kernel_image_probe(struct kimage *image, void *buf,
 		return -ENOEXEC;
 
 	return kexec_image_probe_default(image, buf, buf_len);
+}
+
+int arch_kimage_file_post_load_cleanup(struct kimage *image)
+{
+	kvfree(image->arch.ipl_buf);
+	image->arch.ipl_buf = NULL;
+
+	return kexec_image_post_load_cleanup_default(image);
 }
