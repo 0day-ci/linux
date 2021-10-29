@@ -551,6 +551,10 @@ struct pci_host_bridge {
 	u8 (*swizzle_irq)(struct pci_dev *, u8 *); /* Platform IRQ swizzler */
 	int (*map_irq)(const struct pci_dev *, u8, u8);
 	void (*release_fn)(struct pci_host_bridge *);
+	bool (*pci_subdev_can_prepare)(struct pci_bus *bus, int devfn);
+	int (*pci_subdev_prepare)(struct pci_bus *bus, int devfn,
+				  struct pci_host_bridge *hb,
+				  struct pci_dev *pdev);
 	void		*release_data;
 	unsigned int	ignore_reset_delay:1;	/* For entire hierarchy */
 	unsigned int	no_ext_tags:1;		/* No Extended Tags */

@@ -2407,29 +2407,57 @@ EXPORT_SYMBOL(pci_bus_read_dev_vendor_id);
  */
 static struct pci_dev *pci_scan_device(struct pci_bus *bus, int devfn)
 {
-	struct pci_dev *dev;
+	struct pci_host_bridge *hb = pci_find_host_bridge(bus);
+	struct pci_dev *dev = NULL;
+	bool device_initialize_called = false;
 	u32 l;
 
-	if (!pci_bus_read_dev_vendor_id(bus, devfn, &l, 60*1000))
-		return NULL;
+	/*
+	 * If the host bridge has a pci_subdev_can_prepare() function, call
+	 * it to see if it "cares" about this device.  If it does,
+	 * partially allocate some of the device and call
+	 * pci_subdev_prepare().  This tells it to allow the host bridge
+	 * driver to pre-allocate some resources such as voltage
+	 * regulators so that the pcie linkup can be established.
+	 */
+	if (hb->pci_subdev_can_prepare
+	    && hb->pci_subdev_can_prepare(bus, devfn)) {
+		dev = pci_alloc_dev(bus);
+		if (!dev)
+			return NULL;
 
-	dev = pci_alloc_dev(bus);
-	if (!dev)
-		return NULL;
+		dev->devfn = devfn;
+		device_initialize(&dev->dev);
+		device_initialize_called = true;
 
+		if (hb->pci_subdev_prepare(bus, devfn, hb, dev)
+		    || !pci_bus_read_dev_vendor_id(bus, devfn, &l, 60*1000))
+			goto err_out;
+	} else {
+		if (!pci_bus_read_dev_vendor_id(bus, devfn, &l, 60*1000))
+			return NULL;
+		dev = pci_alloc_dev(bus);
+		if (!dev)
+			return NULL;
+	}
 	dev->devfn = devfn;
 	dev->vendor = l & 0xffff;
 	dev->device = (l >> 16) & 0xffff;
 
-	if (pci_setup_device(dev)) {
-		pci_bus_put(dev->bus);
-		kfree(dev);
-		return NULL;
-	}
-	device_initialize(&dev->dev);
+	if (pci_setup_device(dev))
+		goto err_out;
+
+	if (!device_initialize_called)
+		device_initialize(&dev->dev);
+
 	pci_device_add(dev, bus);
 
 	return dev;
+
+err_out:
+	pci_bus_put(dev->bus);
+	kfree(dev);
+	return NULL;
 }
 
 void pcie_report_downtraining(struct pci_dev *dev)
