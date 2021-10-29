@@ -87,10 +87,5 @@ int main(int argv, char **argc)
 	tx.offset = 0;
 	adjtimex(&tx);
 
-	if (ret) {
-		printf("[FAIL]");
-		return ksft_exit_fail();
-	}
-	printf("[OK]");
-	return ksft_exit_pass();
+	ksft_exit(!ret);
 }

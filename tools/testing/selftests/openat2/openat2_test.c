@@ -316,8 +316,5 @@ int main(int argc, char **argv)
 	test_openat2_struct();
 	test_openat2_flags();
 
-	if (ksft_get_fail_cnt() + ksft_get_error_cnt() > 0)
-		ksft_exit_fail();
-	else
-		ksft_exit_pass();
+	ksft_exit(!(ksft_get_fail_cnt() + ksft_get_error_cnt()));
 }

@@ -110,5 +110,5 @@ int main(void)
 					err, ksft_test_num());
 
 	/* need this return to keep gcc happy */
-	return ksft_exit_pass();
+	ksft_exit_pass();
 }

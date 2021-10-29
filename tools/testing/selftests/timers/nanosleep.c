@@ -153,7 +153,7 @@ int main(int argc, char **argv)
 			}
 			if (ret < 0) {
 				printf("[FAILED]\n");
-				return ksft_exit_fail();
+				ksft_exit_fail();
 			}
 			length *= 100;
 		}
@@ -161,5 +161,5 @@ int main(int argc, char **argv)
 next:
 		ret = 0;
 	}
-	return ksft_exit_pass();
+	ksft_exit_pass();
 }

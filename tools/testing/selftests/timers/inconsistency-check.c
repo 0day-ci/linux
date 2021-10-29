@@ -186,8 +186,8 @@ int main(int argc, char *argv[])
 		if (!clock_gettime(clockid, &ts)) {
 			printf("Consistent %-30s ", clockstring(clockid));
 			if (consistency_test(clockid, runtime))
-				return ksft_exit_fail();
+				ksft_exit_fail();
 		}
 	}
-	return ksft_exit_pass();
+	ksft_exit_pass();
 }

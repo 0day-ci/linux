@@ -162,7 +162,5 @@ int main(int argv, char **argc)
 out:
 	change_clocksource(orig_clk);
 
-	if (status)
-		return ksft_exit_fail();
-	return ksft_exit_pass();
+	ksft_exit(!status);
 }

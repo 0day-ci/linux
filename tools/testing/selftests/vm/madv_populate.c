@@ -326,7 +326,7 @@ int main(int argc, char **argv)
 	if (err)
 		ksft_exit_fail_msg("%d out of %d tests failed\n",
 				   err, ksft_test_num());
-	return ksft_exit_pass();
+	ksft_exit_pass();
 }
 
 #else /* defined(MADV_POPULATE_READ) && defined(MADV_POPULATE_WRITE) */

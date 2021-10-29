@@ -207,13 +207,13 @@ static inline void ksft_test_result_error(const char *msg, ...)
 	va_end(args);
 }
 
-static inline int ksft_exit_pass(void)
+static inline void __attribute__((noreturn)) ksft_exit_pass(void)
 {
 	ksft_print_cnts();
 	exit(KSFT_PASS);
 }
 
-static inline int ksft_exit_fail(void)
+static inline void __attribute__((noreturn)) ksft_exit_fail(void)
 {
 	ksft_print_cnts();
 	exit(KSFT_FAIL);
@@ -231,7 +231,7 @@ static inline int ksft_exit_fail(void)
 		ksft_exit_fail();	\
 	} while (0)
 
-static inline int ksft_exit_fail_msg(const char *msg, ...)
+static inline void __attribute__((noreturn)) ksft_exit_fail_msg(const char *msg, ...)
 {
 	int saved_errno = errno;
 	va_list args;
@@ -246,19 +246,19 @@ static inline int ksft_exit_fail_msg(const char *msg, ...)
 	exit(KSFT_FAIL);
 }
 
-static inline int ksft_exit_xfail(void)
+static inline void __attribute__((noreturn)) ksft_exit_xfail(void)
 {
 	ksft_print_cnts();
 	exit(KSFT_XFAIL);
 }
 
-static inline int ksft_exit_xpass(void)
+static inline void __attribute__((noreturn)) ksft_exit_xpass(void)
 {
 	ksft_print_cnts();
 	exit(KSFT_XPASS);
 }
 
-static inline int ksft_exit_skip(const char *msg, ...)
+static inline void __attribute__((noreturn)) ksft_exit_skip(const char *msg, ...)
 {
 	int saved_errno = errno;
 	va_list args;

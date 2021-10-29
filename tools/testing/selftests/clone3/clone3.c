@@ -191,5 +191,5 @@ int main(int argc, char *argv[])
 	test_clone3(CLONE_NEWPID, getpagesize() + 8, -E2BIG,
 			CLONE3_ARGS_NO_TEST);
 
-	return !ksft_get_fail_cnt() ? ksft_exit_pass() : ksft_exit_fail();
+	ksft_exit(!ksft_get_fail_cnt());
 }
