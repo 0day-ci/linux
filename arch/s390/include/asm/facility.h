@@ -9,6 +9,7 @@
 #define __ASM_FACILITY_H
 
 #include <asm/facility-defs.h>
+#include <linux/minmax.h>
 #include <linux/string.h>
 #include <linux/preempt.h>
 #include <asm/lowcore.h>
