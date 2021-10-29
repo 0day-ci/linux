@@ -17937,6 +17937,7 @@ SUNPLUS I2C CONTROLLER INTERFACE DRIVER
 M:	LH Kuo <lh.kuo@sunplus.com>
 L:	linux-i2c@vger.kernel.org
 S:	Maintained
+F:	Documentation/devicetree/bindings/i2c/i2c-sunplus.yaml
 F:	drivers/i2c/busses/i2c-sunplus.c
 
 SUPERH
