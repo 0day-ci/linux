@@ -393,7 +393,7 @@ static bool queue_stop_cpus_work(const struct cpumask *cpumask,
 				 struct cpu_stop_done *done)
 {
 	struct cpu_stop_work *work;
-	unsigned int cpu;
+	int cpu;
 	bool queued = false;
 
 	/*
