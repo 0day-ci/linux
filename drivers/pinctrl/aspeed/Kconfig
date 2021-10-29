@@ -11,6 +11,7 @@ config PINCTRL_ASPEED
 config PINCTRL_ASPEED_G4
 	bool "Aspeed G4 SoC pin control"
 	depends on (MACH_ASPEED_G4 || COMPILE_TEST) && OF
+	depends on MFD_SYSCON
 	select PINCTRL_ASPEED
 	help
 	  Say Y here to enable pin controller support for Aspeed's 4th
@@ -19,6 +20,7 @@ config PINCTRL_ASPEED_G4
 config PINCTRL_ASPEED_G5
 	bool "Aspeed G5 SoC pin control"
 	depends on (MACH_ASPEED_G5 || COMPILE_TEST) && OF
+	depends on MFD_SYSCON
 	select PINCTRL_ASPEED
 	help
 	  Say Y here to enable pin controller support for Aspeed's 5th
@@ -27,6 +29,7 @@ config PINCTRL_ASPEED_G5
 config PINCTRL_ASPEED_G6
 	bool "Aspeed G6 SoC pin control"
 	depends on (MACH_ASPEED_G6 || COMPILE_TEST) && OF
+	depends on MFD_SYSCON
 	select PINCTRL_ASPEED
 	help
 	  Say Y here to enable pin controller support for Aspeed's 6th
