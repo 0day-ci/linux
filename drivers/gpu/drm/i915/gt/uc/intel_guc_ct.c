@@ -33,15 +33,15 @@ static inline struct drm_device *ct_to_drm(struct intel_guc_ct *ct)
 }
 
 #define CT_ERROR(_ct, _fmt, ...) \
-	drm_err(ct_to_drm(_ct), "CT: " _fmt, ##__VA_ARGS__)
+	drm_err(ct_to_drm(_ct), "CT%u: " _fmt, ct_to_gt(_ct)->info.id, ##__VA_ARGS__)
 #ifdef CONFIG_DRM_I915_DEBUG_GUC
 #define CT_DEBUG(_ct, _fmt, ...) \
-	drm_dbg(ct_to_drm(_ct), "CT: " _fmt, ##__VA_ARGS__)
+	drm_dbg(ct_to_drm(_ct), "CT%u: " _fmt, ct_to_gt(_ct)->info.id, ##__VA_ARGS__)
 #else
 #define CT_DEBUG(...)	do { } while (0)
 #endif
 #define CT_PROBE_ERROR(_ct, _fmt, ...) \
-	i915_probe_error(ct_to_i915(ct), "CT: " _fmt, ##__VA_ARGS__)
+	i915_probe_error(ct_to_i915(ct), "CT%u: " _fmt, ct_to_gt(_ct)->info.id, ##__VA_ARGS__)
 
 /**
  * DOC: CTB Blob
