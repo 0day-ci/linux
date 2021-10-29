@@ -88,6 +88,12 @@ u32 intel_gt_read_register_fw(struct intel_gt *gt, i915_reg_t reg);
 int intel_gt_probe_all(struct drm_i915_private *i915);
 void intel_gt_release_all(struct drm_i915_private *i915);
 
+#define for_each_gt(i915__, id__, gt__) \
+	for ((id__) = 0; \
+	     (id__) < I915_MAX_TILES; \
+	     (id__)++) \
+		for_each_if(((gt__) = (i915__)->gts[(id__)]))
+
 void intel_gt_info_print(const struct intel_gt_info *info,
 			 struct drm_printer *p);
 

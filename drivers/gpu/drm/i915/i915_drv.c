@@ -381,10 +381,14 @@ err_workqueues:
  */
 static void i915_driver_late_release(struct drm_i915_private *dev_priv)
 {
+	struct intel_gt *gt;
+	unsigned int id;
+
 	intel_irq_fini(dev_priv);
 	intel_power_domains_cleanup(dev_priv);
 	i915_gem_cleanup_early(dev_priv);
-	intel_gt_driver_late_release(&dev_priv->gt);
+	for_each_gt(dev_priv, id, gt)
+		intel_gt_driver_late_release(gt);
 	intel_region_ttm_device_fini(dev_priv);
 	vlv_suspend_cleanup(dev_priv);
 	i915_workqueues_cleanup(dev_priv);
@@ -512,6 +516,28 @@ mask_err:
 }
 
 /**
+ * i915_init_tile_memory - initialize per-tile memory
+ * @i915: valid i915 instance
+ *
+ * Current multi-tile platforms include a GT and a memory region within each
+ * tile.  We need to initialize each.
+ */
+static int i915_init_tile_memory(struct drm_i915_private *i915)
+{
+	struct intel_gt *gt;
+	unsigned int id;
+	int ret;
+
+	for_each_gt(i915, id, gt) {
+		ret = intel_gt_probe_lmem(gt);
+		if (ret)
+			return ret;
+	}
+
+	return 0;
+}
+
+/**
  * i915_driver_hw_probe - setup state requiring device access
  * @dev_priv: device private
  *
@@ -578,7 +604,7 @@ static int i915_driver_hw_probe(struct drm_i915_private *dev_priv)
 
 	intel_gt_init_hw_early(&dev_priv->gt, &dev_priv->ggtt);
 
-	ret = intel_gt_probe_lmem(&dev_priv->gt);
+	ret = i915_init_tile_memory(dev_priv);
 	if (ret)
 		goto err_mem_regions;
 

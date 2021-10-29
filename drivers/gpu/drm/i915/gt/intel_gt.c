@@ -23,10 +23,13 @@
 #include "shmem_utils.h"
 #include "pxp/intel_pxp.h"
 
-void intel_gt_init_early(struct intel_gt *gt, struct drm_i915_private *i915)
+static void
+__intel_gt_init_early(struct intel_gt *gt,
+		      struct intel_uncore *uncore,
+		      struct drm_i915_private *i915)
 {
 	gt->i915 = i915;
-	gt->uncore = &i915->uncore;
+	gt->uncore = uncore;
 
 	spin_lock_init(&gt->irq_lock);
 
@@ -49,9 +52,14 @@ void intel_gt_init_early(struct intel_gt *gt, struct drm_i915_private *i915)
 int intel_gt_probe_lmem(struct intel_gt *gt)
 {
 	struct drm_i915_private *i915 = gt->i915;
+	unsigned int instance = gt->info.id;
 	struct intel_memory_region *mem;
 	int id;
 	int err;
+
+	id = INTEL_REGION_LMEM + instance;
+	if (drm_WARN_ON(&i915->drm, id >= INTEL_REGION_STOLEN_SMEM))
+		return -ENODEV;
 
 	mem = intel_gt_setup_lmem(gt);
 	if (mem == ERR_PTR(-ENODEV))
@@ -67,9 +75,8 @@ int intel_gt_probe_lmem(struct intel_gt *gt)
 		return err;
 	}
 
-	id = INTEL_REGION_LMEM;
-
 	mem->id = id;
+	mem->instance = instance;
 
 	intel_memory_region_set_name(mem, "local%u", mem->instance);
 
@@ -78,6 +85,11 @@ int intel_gt_probe_lmem(struct intel_gt *gt)
 	i915->mm.regions[id] = mem;
 
 	return 0;
+}
+
+void intel_gt_init_early(struct intel_gt *gt, struct drm_i915_private *i915)
+{
+	__intel_gt_init_early(gt, &i915->uncore, i915);
 }
 
 void intel_gt_init_hw_early(struct intel_gt *gt, struct i915_ggtt *ggtt)
@@ -903,9 +915,29 @@ u32 intel_gt_read_register_fw(struct intel_gt *gt, i915_reg_t reg)
 static int
 intel_gt_tile_setup(struct intel_gt *gt, unsigned int id, phys_addr_t phys_addr)
 {
+	struct drm_i915_private *i915 = gt->i915;
+	struct intel_uncore *uncore;
+	struct intel_uncore_mmio_debug *mmio_debug;
 	int ret;
 
-	intel_uncore_init_early(gt->uncore, gt);
+	if (id) {
+		uncore = kzalloc(sizeof(*uncore), GFP_KERNEL);
+		if (!uncore)
+			return -ENOMEM;
+
+		mmio_debug = kzalloc(sizeof(*mmio_debug), GFP_KERNEL);
+		if (!mmio_debug) {
+			kfree(uncore);
+			return -ENOMEM;
+		}
+
+		__intel_gt_init_early(gt, uncore, i915);
+	} else {
+		uncore = &i915->uncore;
+		mmio_debug = &i915->mmio_debug;
+	}
+
+	intel_uncore_init_early(uncore, gt);
 
 	ret = intel_uncore_setup_mmio(gt->uncore, phys_addr);
 	if (ret)
@@ -920,6 +952,11 @@ static void
 intel_gt_tile_cleanup(struct intel_gt *gt)
 {
 	intel_uncore_cleanup_mmio(gt->uncore);
+
+	if (gt->info.id) {
+		kfree(gt->uncore);
+		kfree(gt);
+	}
 }
 
 int intel_gt_probe_all(struct drm_i915_private *i915)
@@ -937,13 +974,21 @@ int intel_gt_probe_all(struct drm_i915_private *i915)
 	if (ret)
 		return ret;
 
+	i915->gts[0] = &i915->gt;
+
 	/* TODO: add more tiles */
 	return 0;
 }
 
 void intel_gt_release_all(struct drm_i915_private *i915)
 {
-	intel_gt_tile_cleanup(&i915->gt);
+	struct intel_gt *gt;
+	unsigned int id;
+
+	for_each_gt(i915, id, gt) {
+		intel_gt_tile_cleanup(gt);
+		i915->gts[id] = NULL;
+	}
 }
 
 void intel_gt_info_print(const struct intel_gt_info *info,
