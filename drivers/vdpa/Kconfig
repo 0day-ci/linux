@@ -80,7 +80,7 @@ config VP_VDPA
 
 config ALIBABA_ENI_VDPA
 	tristate "vDPA driver for Alibaba ENI"
-	select VIRTIO_PCI_LEGACY_LIB
+	select VIRTIO_PCI_LIB_LEGACY
 	depends on PCI_MSI && X86
 	help
 	  VDPA driver for Alibaba ENI (Elastic Network Interface) which is built upon
