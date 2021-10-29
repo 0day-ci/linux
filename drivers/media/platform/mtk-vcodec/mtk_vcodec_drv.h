@@ -15,7 +15,9 @@
 #include <media/v4l2-ioctl.h>
 #include <media/v4l2-mem2mem.h>
 #include <media/videobuf2-core.h>
+
 #include "mtk_vcodec_util.h"
+#include "vdec_msg_queue.h"
 
 #define MTK_VCODEC_DRV_NAME	"mtk_vcodec_drv"
 #define MTK_VCODEC_DEC_NAME	"mtk-vcodec-dec"
@@ -282,6 +284,8 @@ struct vdec_pic_info {
  * @decoded_frame_cnt: number of decoded frames
  * @lock: protect variables accessed by V4L2 threads and worker thread such as
  *	  mtk_video_dec_buf.
+ *
+ * @msg_queue: msg queue used to store lat buffer information.
  */
 struct mtk_vcodec_ctx {
 	enum mtk_instance_type type;
@@ -325,6 +329,7 @@ struct mtk_vcodec_ctx {
 	int decoded_frame_cnt;
 	struct mutex lock;
 
+	struct vdec_msg_queue msg_queue;
 };
 
 enum mtk_chip {
@@ -460,6 +465,8 @@ struct mtk_vcodec_enc_pdata {
  * @comp_dev: component hardware device
  * @component_node: component node
  *
+ * @msg_queue_core_ctx: msg queue context used for core thread
+ *
  * @hardware_bitmap: used to record hardware is ready or not
  */
 struct mtk_vcodec_dev {
@@ -501,6 +508,8 @@ struct mtk_vcodec_dev {
 
 	void *comp_dev[MTK_VDEC_HW_MAX];
 	struct device_node *component_node[MTK_VDEC_HW_MAX];
+
+	struct vdec_msg_queue_ctx msg_queue_core_ctx;
 
 	DECLARE_BITMAP(hardware_bitmap, MTK_VDEC_HW_MAX);
 };
