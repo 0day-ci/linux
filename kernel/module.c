@@ -2662,14 +2662,20 @@ static char elf_type(const Elf_Sym *sym, const struct load_info *info)
 	return '?';
 }
 
-static bool is_core_symbol(const Elf_Sym *src, const Elf_Shdr *sechdrs,
-			unsigned int shnum, unsigned int pcpundx)
+static inline int is_arm_mapping_symbol(const char *str);
+static bool is_core_symbol(const Elf_Sym *src, const struct load_info *info)
 {
 	const Elf_Shdr *sec;
+	const Elf_Shdr *sechdrs = info->sechdrs;
+	unsigned int shnum = info->hdr->e_shnum;
+	unsigned int pcpundx = info->index.pcpu;
 
 	if (src->st_shndx == SHN_UNDEF
 	    || src->st_shndx >= shnum
 	    || !src->st_name)
+		return false;
+
+	if (is_arm_mapping_symbol(&info->strtab[src->st_name]))
 		return false;
 
 #ifdef CONFIG_KALLSYMS_ALL
@@ -2714,8 +2720,7 @@ static void layout_symtab(struct module *mod, struct load_info *info)
 	/* Compute total space required for the core symbols' strtab. */
 	for (ndst = i = 0; i < nsrc; i++) {
 		if (i == 0 || is_livepatch_module(mod) ||
-		    is_core_symbol(src+i, info->sechdrs, info->hdr->e_shnum,
-				   info->index.pcpu)) {
+		    is_core_symbol(src+i, info)) {
 			strtab_size += strlen(&info->strtab[src[i].st_name])+1;
 			ndst++;
 		}
@@ -2778,8 +2783,7 @@ static void add_kallsyms(struct module *mod, const struct load_info *info)
 	for (ndst = i = 0; i < mod->kallsyms->num_symtab; i++) {
 		mod->kallsyms->typetab[i] = elf_type(src + i, info);
 		if (i == 0 || is_livepatch_module(mod) ||
-		    is_core_symbol(src+i, info->sechdrs, info->hdr->e_shnum,
-				   info->index.pcpu)) {
+		    is_core_symbol(src+i, info)) {
 			mod->core_kallsyms.typetab[ndst] =
 			    mod->kallsyms->typetab[i];
 			dst[ndst] = src[i];
@@ -4246,8 +4250,7 @@ static const char *find_kallsyms_symbol(struct module *mod,
 		 * We ignore unnamed symbols: they're uninformative
 		 * and inserted at a whim.
 		 */
-		if (*kallsyms_symbol_name(kallsyms, i) == '\0'
-		    || is_arm_mapping_symbol(kallsyms_symbol_name(kallsyms, i)))
+		if (*kallsyms_symbol_name(kallsyms, i) == '\0')
 			continue;
 
 		if (thisval <= addr && thisval > bestval) {
