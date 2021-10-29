@@ -267,10 +267,16 @@ static int __irq_build_affinity_masks(unsigned int startvec,
 	 * If the number of nodes in the mask is greater than or equal the
 	 * number of vectors we just spread the vectors across the nodes.
 	 */
-	if (numvecs <= nodes) {
+	if (numvecs - (curvec - firstvec) <= nodes) {
 		for_each_node_mask(n, nodemsk) {
+			unsigned int ncpus;
+
+			cpumask_and(nmsk, cpu_mask, node_to_cpumask[n]);
+			ncpus = cpumask_weight(nmsk);
+			if (!ncpus)
+				continue;
 			cpumask_or(&masks[curvec].mask, &masks[curvec].mask,
-				   node_to_cpumask[n]);
+				   nmsk);
 			if (++curvec == last_affv)
 				curvec = firstvec;
 		}
