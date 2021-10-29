@@ -1385,6 +1385,16 @@ config SCx200_ACB
 	  This support is also available as a module.  If so, the module
 	  will be called scx200_acb.
 
+config I2C_SUNPLUS
+	tristate "Sunplus I2C driver"
+	depends on SOC_SP7021 || SOC_Q645
+	help
+	  Say Y here to include support for I2C controller in the
+	  Sunplus SoCs.
+
+	  This driver can also be built as a module. If so, the module will be
+	  called as i2c-sunplus.
+
 config I2C_OPAL
 	tristate "IBM OPAL I2C driver"
 	depends on PPC_POWERNV
