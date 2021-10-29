@@ -1434,6 +1434,10 @@ void evsel__delete(struct evsel *evsel)
 {
 	evsel__exit(evsel);
 	free(evsel);
+
+	/* just free it for the first evsel */
+	hashmap__free(perf_missing_features.pmu);
+	perf_missing_features.pmu = NULL;
 }
 
 void evsel__compute_deltas(struct evsel *evsel, int cpu, int thread,
@@ -1791,6 +1795,23 @@ static int __evsel__prepare_open(struct evsel *evsel, struct perf_cpu_map *cpus,
 	return 0;
 }
 
+#define PMU_HASH_BITS  4
+
+static size_t pmu_hash(const void *key, void *ctx __maybe_unused)
+{
+	const struct evsel *evsel = key;
+
+	return hash_bits(evsel->core.attr.type, PMU_HASH_BITS);
+}
+
+static bool pmu_equal(const void *key1, const void *key2, void *ctx __maybe_unused)
+{
+	const struct evsel *a = key1;
+	const struct evsel *b = key2;
+
+	return a->core.attr.type == b->core.attr.type;
+}
+
 static void evsel__disable_missing_features(struct evsel *evsel)
 {
 	if (perf_missing_features.weight_struct) {
@@ -1807,8 +1828,14 @@ static void evsel__disable_missing_features(struct evsel *evsel)
 		evsel->open_flags &= ~(unsigned long)PERF_FLAG_FD_CLOEXEC;
 	if (perf_missing_features.mmap2)
 		evsel->core.attr.mmap2 = 0;
-	if (perf_missing_features.exclude_guest)
-		evsel->core.attr.exclude_guest = evsel->core.attr.exclude_host = 0;
+	if (perf_missing_features.exclude_guest) {
+		/* we only have EXCLUDE_GUEST bit, let's skip checking  */
+		if (perf_missing_features.pmu != NULL &&
+		    hashmap__find(perf_missing_features.pmu, evsel, NULL)) {
+			evsel->core.attr.exclude_guest = 0;
+			evsel->core.attr.exclude_host = 0;
+		}
+	}
 	if (perf_missing_features.lbr_flags)
 		evsel->core.attr.branch_sample_type &= ~(PERF_SAMPLE_BRANCH_NO_FLAGS |
 				     PERF_SAMPLE_BRANCH_NO_CYCLES);
@@ -1840,6 +1867,14 @@ int evsel__prepare_open(struct evsel *evsel, struct perf_cpu_map *cpus,
 
 bool evsel__detect_missing_features(struct evsel *evsel)
 {
+	if (perf_missing_features.pmu == NULL) {
+		perf_missing_features.pmu = hashmap__new(pmu_hash, pmu_equal, NULL);
+		if (IS_ERR(perf_missing_features.pmu)) {
+			pr_err("Memory allocation failure!\n");
+			perf_missing_features.pmu = NULL;
+		}
+	}
+
 	/*
 	 * Must probe features in the order they were added to the
 	 * perf_event_attr interface.
@@ -1900,10 +1935,17 @@ bool evsel__detect_missing_features(struct evsel *evsel)
 		perf_missing_features.mmap2 = true;
 		pr_debug2_peo("switching off mmap2\n");
 		return true;
-	} else if (!perf_missing_features.exclude_guest &&
-		   (evsel->core.attr.exclude_guest || evsel->core.attr.exclude_host)) {
-		perf_missing_features.exclude_guest = true;
-		pr_debug2_peo("switching off exclude_guest, exclude_host\n");
+	} else if ((evsel->core.attr.exclude_guest || evsel->core.attr.exclude_host) &&
+		   perf_missing_features.pmu != NULL &&
+		   !hashmap__find(perf_missing_features.pmu, evsel, NULL)) {
+		uintptr_t pmu_features = PERF_MISSING_PMU_EXCLUDE_GUEST;
+
+		hashmap__add(perf_missing_features.pmu, evsel, (void *)pmu_features);
+
+		if (!perf_missing_features.exclude_guest) {
+			perf_missing_features.exclude_guest = true;
+			pr_debug2_peo("switching off exclude_guest, exclude_host\n");
+		}
 		return true;
 	} else if (!perf_missing_features.sample_id_all) {
 		perf_missing_features.sample_id_all = true;
