@@ -879,11 +879,11 @@ be used in place of synchronize_rcu().
 
 The reader-writer analogy (illustrated by the previous section) is not
 always the best way to think about using RCU.  Another helpful analogy
-considers RCU a effective reference count on everything which is protected
-by RCU.
+considers RCU an effective reference count on everything which is
+protected by RCU.
 
 A reference count typically does not prevent the referenced object's
-values from changing, but does prevent changes to type - particularly the
+values from changing, but does prevent changes to type -- particularly the
 gross change of type that happens when that object's memory is freed and
 re-allocated for some other purpose.  Once a type-safe reference to the
 object is obtained, some other mechanism is needed to ensure consistent
@@ -895,7 +895,7 @@ RCU provides a number of support functions that embed the required
 operations and ordering, such as the list_for_each_entry_rcu() macro
 used in the previous section.
 
-A more focused view of the reference counting behaviour is that,
+A more focused view of the reference counting behavior is that,
 between rcu_read_lock() and rcu_read_unlock(), any reference taken with
 rcu_dereference() on a pointer marked as ``__rcu`` can be treated as
 though a reference-count on that object has been temporarily increased.
@@ -907,6 +907,7 @@ can be safely dereferenced.
 
 Some operations that one might expect to see on an object for
 which an RCU reference is held include:
+
  - Copying out data that is guaranteed to be stable by the object's type.
  - Using kref_get_unless_zero() or similar to get a longer-term
    reference.  This may fail of course.
@@ -924,18 +925,18 @@ found may not be the one expected, but it will be one where it is safe
 to take a reference or spinlock and then confirm that the identity
 matches the expectations.
 
-With traditional reference counting - such as that implemented by the
-kref library in Linux - there is typically code that runs when the last
+With traditional reference counting -- such as that implemented by the
+kref library in Linux -- there is typically code that runs when the last
 reference to an object is dropped.  With kref, this is the function
-passed to kref_put().  When RCU is being used such finalization code
+passed to kref_put().  When RCU is being used, such finalization code
 must not be run until all ``__rcu`` pointers referencing the object have
 been updated, and then a grace period has passed.  Every remaining
 globally visible pointer to the object must be considered to be a
-potential counted reference, and the finalization code it typically run
+potential counted reference, and the finalization code is typically run
 using call_rcu() only after all those pointers have been changed.
 
-To see how to choose between there two analogies - of RCU as a
-reader-writer lock and RCU as a reference counting system - it is useful
+To see how to choose between these two analogies -- of RCU as a
+reader-writer lock and RCU as a reference counting system -- it is useful
 to reflect on the scale of the thing being protected.  The reader-writer
 lock analogy looks at larger multi-part objects such as a linked list
 and shows how RCU can facilitate concurrency while elements are added
