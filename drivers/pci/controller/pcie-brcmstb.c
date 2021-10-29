@@ -192,6 +192,7 @@ static inline void brcm_pcie_bridge_sw_init_set_generic(struct brcm_pcie *pcie, 
 static inline void brcm_pcie_perst_set_4908(struct brcm_pcie *pcie, u32 val);
 static inline void brcm_pcie_perst_set_7278(struct brcm_pcie *pcie, u32 val);
 static inline void brcm_pcie_perst_set_generic(struct brcm_pcie *pcie, u32 val);
+static bool brcm_pcie_link_up(struct brcm_pcie *pcie);
 
 static const char * const supplies[] = {
 	"vpcie3v3",
@@ -304,7 +305,19 @@ struct brcm_pcie {
 	void			(*bridge_sw_init_set)(struct brcm_pcie *pcie, u32 val);
 	struct regulator_bulk_data supplies[ARRAY_SIZE(supplies)];
 	unsigned int		num_supplies;
+	bool			ep_wakeup_capable;
 };
+
+static int pci_dev_may_wakeup(struct pci_dev *dev, void *data)
+{
+	bool *ret = data;
+
+	if (device_may_wakeup(&dev->dev)) {
+		*ret = true;
+		dev_dbg(&dev->dev, "disable cancelled for wake-up device\n");
+	}
+	return (int) *ret;
+}
 
 static int brcm_regulators_on(struct brcm_pcie *pcie)
 {
@@ -313,6 +326,18 @@ static int brcm_regulators_on(struct brcm_pcie *pcie)
 
 	if (!pcie->num_supplies)
 		return 0;
+
+	if (pcie->ep_wakeup_capable) {
+		/*
+		 * We are resuming from a suspend.  In the previous suspend
+		 * we did not disable the power supplies, so there is no
+		 * need to enable them (and falsely increase their usage
+		 * count).
+		 */
+		pcie->ep_wakeup_capable = false;
+		return 0;
+	}
+
 	ret = regulator_bulk_enable(pcie->num_supplies, pcie->supplies);
 	if (ret)
 		dev_err(dev, "failed to enable EP regulators\n");
@@ -320,13 +345,28 @@ static int brcm_regulators_on(struct brcm_pcie *pcie)
 	return ret;
 }
 
-static int brcm_regulators_off(struct brcm_pcie *pcie)
+static int brcm_regulators_off(struct brcm_pcie *pcie, bool force)
 {
+	struct pci_host_bridge *bridge = pci_host_bridge_from_priv(pcie);
 	struct device *dev = pcie->dev;
 	int ret;
 
 	if (!pcie->num_supplies)
 		return 0;
+
+	pcie->ep_wakeup_capable = false;
+
+	if (!force && bridge->bus && brcm_pcie_link_up(pcie)) {
+		/*
+		 * If at least one device on this bus is enabled as a
+		 * wake-up source, do not turn off regulators.
+		 */
+		pci_walk_bus(bridge->bus, pci_dev_may_wakeup,
+			     &pcie->ep_wakeup_capable);
+		if (pcie->ep_wakeup_capable)
+			return 0;
+	}
+
 	ret = regulator_bulk_disable(pcie->num_supplies, pcie->supplies);
 	if (ret)
 		dev_err(dev, "failed to disable EP regulators\n");
@@ -1248,7 +1288,7 @@ static int brcm_pcie_suspend(struct device *dev)
 	reset_control_rearm(pcie->rescal);
 	clk_disable_unprepare(pcie->clk);
 
-	return brcm_regulators_off(pcie);
+	return brcm_regulators_off(pcie, false);
 }
 
 static int brcm_pcie_resume(struct device *dev)
@@ -1264,6 +1304,7 @@ static int brcm_pcie_resume(struct device *dev)
 	ret = reset_control_reset(pcie->rescal);
 	if (ret)
 		goto err_disable_clk;
+
 	ret = brcm_regulators_on(pcie);
 	if (ret)
 		goto err_reset;
@@ -1311,7 +1352,7 @@ static void __brcm_pcie_remove(struct brcm_pcie *pcie)
 	reset_control_rearm(pcie->rescal);
 	clk_disable_unprepare(pcie->clk);
 	if (pcie->num_supplies) {
-		brcm_regulators_off(pcie);
+		brcm_regulators_off(pcie, true);
 		regulator_bulk_free(pcie->num_supplies, pcie->supplies);
 	}
 }
@@ -1382,7 +1423,7 @@ static int brcm_pcie_pci_subdev_prepare(struct pci_bus *bus, int devfn,
 	return 0;
 
 err_out1:
-	brcm_regulators_off(pcie);
+	brcm_regulators_off(pcie, true);
 err_out0:
 	regulator_bulk_free(pcie->num_supplies, pcie->supplies);
 	pcie->num_supplies = 0;
