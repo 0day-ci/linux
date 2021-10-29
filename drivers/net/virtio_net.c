@@ -31,6 +31,12 @@ module_param(csum, bool, 0444);
 module_param(gso, bool, 0444);
 module_param(napi_tx, bool, 0644);
 
+/* Because virtio desc cache will increase memory overhead, users can turn it
+ * off or select an acceptable value. The maximum value is 2 + MAX_SKB_FRAGS.
+ */
+static u32 virtio_desc_cache_thr = 4;
+module_param(virtio_desc_cache_thr, uint, 0644);
+
 /* FIXME: MTU in config. */
 #define GOOD_PACKET_LEN (ETH_HLEN + VLAN_HLEN + ETH_DATA_LEN)
 #define GOOD_COPY_LEN	128
@@ -3213,6 +3219,11 @@ static int virtnet_probe(struct virtio_device *vdev)
 	else
 		vi->curr_queue_pairs = num_online_cpus();
 	vi->max_queue_pairs = max_queue_pairs;
+
+	if (virtio_desc_cache_thr > 2 + MAX_SKB_FRAGS)
+		virtio_set_desc_cache(vdev, 2 + MAX_SKB_FRAGS);
+	else
+		virtio_set_desc_cache(vdev, virtio_desc_cache_thr);
 
 	/* Allocate/initialize the rx/tx queues, and invoke find_vqs */
 	err = init_vqs(vi);
