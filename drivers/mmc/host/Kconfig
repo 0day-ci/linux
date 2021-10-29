@@ -14,6 +14,16 @@ config MMC_DEBUG
 	  added host drivers please don't invent their private macro for
 	  debugging.
 
+config SP_SDV2
+	tristate "Sunplus SP7021 SD/SDIO Controller"
+	depends on SOC_SP7021
+	default m
+	help
+	  This selects the Sunplus SP7021 SD/SDIO controller.
+	  If you have a controller with this interface, say Y or M here..
+
+	  If unsure, say N.
+
 config MMC_ARMMMCI
 	tristate "ARM AMBA Multimedia Card Interface support"
 	depends on ARM_AMBA
