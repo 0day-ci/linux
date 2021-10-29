@@ -3726,6 +3726,13 @@ out:
 
 bool cpus_share_cache(int this_cpu, int that_cpu)
 {
+	/*
+	 * When this_cpu and that_cpu are same, sd_llc_id for the same cpu may
+	 * change between two references. Return true regardless of sd_llc_id.
+	 */
+	if (this_cpu == that_cpu)
+		return true;
+
 	return per_cpu(sd_llc_id, this_cpu) == per_cpu(sd_llc_id, that_cpu);
 }
 
