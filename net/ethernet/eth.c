@@ -602,7 +602,9 @@ static int fwnode_get_mac_addr(struct fwnode_handle *fwnode,
  * checked first, because that is supposed to contain to "most recent" MAC
  * address. If that isn't set, then 'local-mac-address' is checked next,
  * because that is the default address.  If that isn't set, then the obsolete
- * 'address' is checked, just in case we're using an old device tree.
+ * 'address' is checked, just in case we're using an old device tree. If any
+ * of the above isn't set, then try to get MAC address from nvmem cell named
+ * 'mac-address'.
  *
  * Note that the 'address' property is supposed to contain a virtual address of
  * the register set, but some DTS files have redefined that property to be the
@@ -622,7 +624,7 @@ int fwnode_get_mac_address(struct fwnode_handle *fwnode, char *addr)
 	    !fwnode_get_mac_addr(fwnode, "address", addr))
 		return 0;
 
-	return -ENOENT;
+	return nvmem_get_mac_address(fwnode->dev, addr);
 }
 EXPORT_SYMBOL(fwnode_get_mac_address);
 
