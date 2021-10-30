@@ -62,12 +62,13 @@ static int copy_pte(struct trans_pgd_info *info, pmd_t *dst_pmdp,
 {
 	pte_t *src_ptep;
 	pte_t *dst_ptep;
+	struct page *page;
 	unsigned long addr = start;
 
-	dst_ptep = trans_alloc(info);
-	if (!dst_ptep)
+	page = virt_to_page(trans_alloc(info));
+	if (!page)
 		return -ENOMEM;
-	pmd_populate_kernel(NULL, dst_pmdp, dst_ptep);
+	pmd_populate(NULL, dst_pmdp, page);
 	dst_ptep = pte_offset_kernel(dst_pmdp, start);
 
 	src_ptep = pte_offset_kernel(src_pmdp, start);
