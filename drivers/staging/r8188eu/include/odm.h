@@ -230,17 +230,13 @@ enum odm_common_info_def {
 
 	/*  Dynamic value: */
 /*  POINTER REFERENCE-----------  */
-	ODM_CMNINFO_TX_UNI,
-	ODM_CMNINFO_RX_UNI,
 	ODM_CMNINFO_WM_MODE,		/*  ODM_WIRELESS_MODE_E */
 	ODM_CMNINFO_SEC_CHNL_OFFSET,	/*  ODM_SEC_CHNL_OFFSET_E */
-	ODM_CMNINFO_SEC_MODE,		/*  ODM_SECURITY_E */
 	ODM_CMNINFO_BW,			/*  ODM_BW_E */
 	ODM_CMNINFO_CHNL,
 
 	ODM_CMNINFO_SCAN,
 	ODM_CMNINFO_POWER_SAVING,
-	ODM_CMNINFO_NET_CLOSED,
 /*  POINTER REFERENCE----------- */
 
 /* CALL BY VALUE------------- */
@@ -490,16 +486,10 @@ struct odm_dm_struct {
 	bool	bool_temp;
 	struct adapter *adapter_temp;
 
-	/* TX Unicast byte count */
-	u64	*pNumTxBytesUnicast;
-	/* RX Unicast byte count */
-	u64	*pNumRxBytesUnicast;
 	/*  Wireless mode B/G/A/N = BIT(0)/BIT(1)/BIT(2)/BIT(3) */
 	u8	*pWirelessMode; /* ODM_WIRELESS_MODE_E */
 	/*  Secondary channel offset don't_care/below/above = 0/1/2 */
 	u8	*pSecChOffset;
-	/*  Security mode Open/WEP/AES/TKIP = 0/1/2/3 */
-	u8	*pSecurity;
 	/*  BW info 20M/40M/80M = 0/1/2 */
 	u8	*pBandWidth;
 	/*  Central channel location Ch1/Ch2/.... */
@@ -516,7 +506,6 @@ struct odm_dm_struct {
 	u8	*pOnePathCCA;
 	/* pMgntInfo->AntennaTest */
 	u8	*pAntennaTest;
-	bool	*pbNet_closed;
 /*  POINTER REFERENCE----------- */
 	/*  */
 /* CALL BY VALUE------------- */

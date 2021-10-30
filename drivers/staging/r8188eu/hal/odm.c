@@ -225,20 +225,11 @@ void ODM_CmnInfoHook(struct odm_dm_struct *pDM_Odm, enum odm_common_info_def Cmn
 	/*  */
 	switch	(CmnInfo) {
 	/*  Dynamic call by reference pointer. */
-	case	ODM_CMNINFO_TX_UNI:
-		pDM_Odm->pNumTxBytesUnicast = (u64 *)pValue;
-		break;
-	case	ODM_CMNINFO_RX_UNI:
-		pDM_Odm->pNumRxBytesUnicast = (u64 *)pValue;
-		break;
 	case	ODM_CMNINFO_WM_MODE:
 		pDM_Odm->pWirelessMode = (u8 *)pValue;
 		break;
 	case	ODM_CMNINFO_SEC_CHNL_OFFSET:
 		pDM_Odm->pSecChOffset = (u8 *)pValue;
-		break;
-	case	ODM_CMNINFO_SEC_MODE:
-		pDM_Odm->pSecurity = (u8 *)pValue;
 		break;
 	case	ODM_CMNINFO_BW:
 		pDM_Odm->pBandWidth = (u8 *)pValue;
@@ -251,9 +242,6 @@ void ODM_CmnInfoHook(struct odm_dm_struct *pDM_Odm, enum odm_common_info_def Cmn
 		break;
 	case	ODM_CMNINFO_POWER_SAVING:
 		pDM_Odm->pbPowerSaving = (bool *)pValue;
-		break;
-	case	ODM_CMNINFO_NET_CLOSED:
-		pDM_Odm->pbNet_closed = (bool *)pValue;
 		break;
 	/* To remove the compiler warning, must add an empty default statement to handle the other values. */
 	default:
