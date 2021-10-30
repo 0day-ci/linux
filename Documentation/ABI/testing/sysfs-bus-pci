@@ -446,3 +446,35 @@ Description:
 		Write 10 to enable 10-Bit Tag Requester when RC supports 10-Bit
 		Tag Completer capability. The typical use case is for host
 		memory targeted by DMA Requests.
+
+What:		/sys/bus/pci/devices/.../sriov_vf_tags
+Date:		September 2021
+Contact:	Dongdong Liu <liudongdong3@huawei.com>
+Description:
+		This file is associated with a SR-IOV physical function (PF).
+		It is visible when the device supports VF 10-Bit Tag
+		Requester. It contains the status of VF Tags Enable.
+		The file is read-only.
+
+What:		/sys/bus/pci/devices/.../sriov_vf_tags_ctl
+Date:		September 2021
+Contact:	Dongdong Liu <liudongdong3@huawei.com>
+Description:
+		This file is associated with a SR-IOV virtual function (VF).
+		It is visible when the device supports VF 10-Bit Tag
+		Requester. The file is only writeable when the VF driver
+		does not bind to a device.
+
+		The values accepted are:
+		* > 0 - this number will be reported as tags bit to be
+			enabled. current only 10 is accepted
+		* < 0 - not valid
+		* = 0 - disable 10-Bit Tag, use Extended Tags(8-Bit or 5-Bit)
+
+		Write 0 to any VF's file disables 10-Bit Tag Requester for all
+		VFs. The typical use case is for p2pdma when the peer device
+		does not support 10-Bit Tag Completer.
+
+		Write 10 to enable 10-Bit Tag Requester for all VFs when RC
+		supports 10-Bit Tag Completer capability. The typical use case
+		is for host memory targeted by DMA Requests.
