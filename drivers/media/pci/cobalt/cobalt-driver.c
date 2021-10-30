@@ -193,11 +193,11 @@ void cobalt_pcie_status_show(struct cobalt *cobalt)
 		return;
 
 	/* Device */
-	pcie_capability_read_dword(pci_dev, PCI_EXP_DEVCAP, &capa);
 	pcie_capability_read_word(pci_dev, PCI_EXP_DEVCTL, &ctrl);
 	pcie_capability_read_word(pci_dev, PCI_EXP_DEVSTA, &stat);
 	cobalt_info("PCIe device capability 0x%08x: Max payload %d\n",
-		    capa, get_payload_size(capa & PCI_EXP_DEVCAP_PAYLOAD));
+		    pci_dev->devcap,
+		    get_payload_size(pci_dev->devcap & PCI_EXP_DEVCAP_PAYLOAD));
 	cobalt_info("PCIe device control 0x%04x: Max payload %d. Max read request %d\n",
 		    ctrl,
 		    get_payload_size((ctrl & PCI_EXP_DEVCTL_PAYLOAD) >> 5),
