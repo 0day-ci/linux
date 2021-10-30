@@ -127,4 +127,7 @@ bool mc146818_does_rtc_work(void);
 unsigned int mc146818_get_time(struct rtc_time *time);
 int mc146818_set_time(struct rtc_time *time);
 
+typedef void (*mc146818_callback_t)(unsigned char seconds, void *param);
+bool mc146818_do_avoiding_UIP(mc146818_callback_t callback, void *param);
+
 #endif /* _MC146818RTC_H */
