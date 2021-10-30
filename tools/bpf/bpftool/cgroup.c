@@ -2,7 +2,7 @@
 // Copyright (C) 2017 Facebook
 // Author: Roman Gushchin <guro@fb.com>
 
-#define _XOPEN_SOURCE 500
+#define _GNU_SOURCE
 #include <errno.h>
 #include <fcntl.h>
 #include <ftw.h>
