@@ -28,4 +28,9 @@ if [ -n "${building_out_of_srctree}" ]; then
 	do
 		rm -f arch/arm/boot/compressed/${f}
 	done
+
+	for f in ashiftrt.S ashldi3.c ashrsi3.S ashlsi3.S lshrsi3.S
+	do
+		rm -f arch/sh/boot/compressed/${f}
+	done
 fi
