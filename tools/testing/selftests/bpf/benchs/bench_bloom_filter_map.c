@@ -296,6 +296,7 @@ static struct bloom_filter_bench *setup_skeleton(void)
 static void bloom_lookup_setup(void)
 {
 	struct bpf_link *link;
+	int err;
 
 	ctx.use_array_map = true;
 
@@ -304,7 +305,8 @@ static void bloom_lookup_setup(void)
 	populate_maps();
 
 	link = bpf_program__attach(ctx.skel->progs.bloom_lookup);
-	if (!link) {
+	err = libbpf_get_error(link);
+	if (err) {
 		fprintf(stderr, "failed to attach program!\n");
 		exit(1);
 	}
@@ -313,6 +315,7 @@ static void bloom_lookup_setup(void)
 static void bloom_update_setup(void)
 {
 	struct bpf_link *link;
+	int err;
 
 	ctx.use_array_map = true;
 
@@ -321,7 +324,8 @@ static void bloom_update_setup(void)
 	populate_maps();
 
 	link = bpf_program__attach(ctx.skel->progs.bloom_update);
-	if (!link) {
+	err = libbpf_get_error(link);
+	if (err) {
 		fprintf(stderr, "failed to attach program!\n");
 		exit(1);
 	}
@@ -330,6 +334,7 @@ static void bloom_update_setup(void)
 static void false_positive_setup(void)
 {
 	struct bpf_link *link;
+	int err;
 
 	ctx.use_hashmap = true;
 	ctx.hashmap_use_bloom = true;
@@ -340,7 +345,8 @@ static void false_positive_setup(void)
 	populate_maps();
 
 	link = bpf_program__attach(ctx.skel->progs.bloom_hashmap_lookup);
-	if (!link) {
+	err = libbpf_get_error(link);
+	if (err) {
 		fprintf(stderr, "failed to attach program!\n");
 		exit(1);
 	}
@@ -349,6 +355,7 @@ static void false_positive_setup(void)
 static void hashmap_with_bloom_setup(void)
 {
 	struct bpf_link *link;
+	int err;
 
 	ctx.use_hashmap = true;
 	ctx.hashmap_use_bloom = true;
@@ -358,7 +365,8 @@ static void hashmap_with_bloom_setup(void)
 	populate_maps();
 
 	link = bpf_program__attach(ctx.skel->progs.bloom_hashmap_lookup);
-	if (!link) {
+	err = libbpf_get_error(link);
+	if (err) {
 		fprintf(stderr, "failed to attach program!\n");
 		exit(1);
 	}
@@ -367,6 +375,7 @@ static void hashmap_with_bloom_setup(void)
 static void hashmap_no_bloom_setup(void)
 {
 	struct bpf_link *link;
+	int err;
 
 	ctx.use_hashmap = true;
 
@@ -375,7 +384,8 @@ static void hashmap_no_bloom_setup(void)
 	populate_maps();
 
 	link = bpf_program__attach(ctx.skel->progs.bloom_hashmap_lookup);
-	if (!link) {
+	err = libbpf_get_error(link);
+	if (err) {
 		fprintf(stderr, "failed to attach program!\n");
 		exit(1);
 	}
