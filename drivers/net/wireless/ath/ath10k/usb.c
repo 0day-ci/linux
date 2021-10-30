@@ -987,9 +987,11 @@ static int ath10k_usb_probe(struct usb_interface *interface,
 
 	ar = ath10k_core_create(sizeof(*ar_usb), &dev->dev, ATH10K_BUS_USB,
 				hw_rev, &ath10k_usb_hif_ops);
-	if (!ar) {
-		dev_err(&dev->dev, "failed to allocate core\n");
-		return -ENOMEM;
+	if (IS_ERR(ar)) {
+		ret = PTR_ERR(ar);
+		if (ret != -EPROBE_DEFER)
+			dev_err(&dev->dev, "failed to allocate core: %d\n", ret);
+		return ret;
 	}
 
 	usb_get_dev(dev);

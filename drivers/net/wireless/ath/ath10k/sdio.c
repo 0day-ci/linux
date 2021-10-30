@@ -2526,9 +2526,11 @@ static int ath10k_sdio_probe(struct sdio_func *func,
 
 	ar = ath10k_core_create(sizeof(*ar_sdio), &func->dev, ATH10K_BUS_SDIO,
 				hw_rev, &ath10k_sdio_hif_ops);
-	if (!ar) {
-		dev_err(&func->dev, "failed to allocate core\n");
-		return -ENOMEM;
+	if (IS_ERR(ar)) {
+		ret = PTR_ERR(ar);
+		if (ret != -EPROBE_DEFER)
+			dev_err(&func->dev, "failed to allocate core: %d\n", ret);
+		return ret;
 	}
 
 	netif_napi_add(&ar->napi_dev, &ar->napi, ath10k_sdio_napi_poll,

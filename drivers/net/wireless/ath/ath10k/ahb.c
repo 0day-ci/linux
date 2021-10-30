@@ -745,9 +745,11 @@ static int ath10k_ahb_probe(struct platform_device *pdev)
 	size = sizeof(*ar_pci) + sizeof(*ar_ahb);
 	ar = ath10k_core_create(size, &pdev->dev, ATH10K_BUS_AHB,
 				hw_rev, &ath10k_ahb_hif_ops);
-	if (!ar) {
-		dev_err(&pdev->dev, "failed to allocate core\n");
-		return -ENOMEM;
+	if (IS_ERR(ar)) {
+		ret = PTR_ERR(ar);
+		if (ret != -EPROBE_DEFER)
+			dev_err(&pdev->dev, "failed to allocate core: %d\n", ret);
+		return ret;
 	}
 
 	ath10k_dbg(ar, ATH10K_DBG_BOOT, "ahb probe\n");

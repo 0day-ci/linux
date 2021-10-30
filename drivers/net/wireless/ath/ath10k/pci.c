@@ -3602,9 +3602,11 @@ static int ath10k_pci_probe(struct pci_dev *pdev,
 
 	ar = ath10k_core_create(sizeof(*ar_pci), &pdev->dev, ATH10K_BUS_PCI,
 				hw_rev, &ath10k_pci_hif_ops);
-	if (!ar) {
-		dev_err(&pdev->dev, "failed to allocate core\n");
-		return -ENOMEM;
+	if (IS_ERR(ar)) {
+		ret = PTR_ERR(ar);
+		if (ret != -EPROBE_DEFER)
+			dev_err(&pdev->dev, "failed to allocate core: %d\n", ret);
+		return ret;
 	}
 
 	ath10k_dbg(ar, ATH10K_DBG_BOOT, "pci probe %04x:%04x %04x:%04x\n",

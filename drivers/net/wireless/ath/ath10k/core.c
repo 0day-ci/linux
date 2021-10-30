@@ -3231,8 +3231,6 @@ static int ath10k_core_probe_fw(struct ath10k *ar)
 		ath10k_debug_print_board_info(ar);
 	}
 
-	device_get_mac_address(ar->dev, ar->mac_addr);
-
 	ret = ath10k_core_init_firmware_features(ar);
 	if (ret) {
 		ath10k_err(ar, "fatal problem with firmware features: %d\n",
@@ -3391,11 +3389,11 @@ struct ath10k *ath10k_core_create(size_t priv_size, struct device *dev,
 				  const struct ath10k_hif_ops *hif_ops)
 {
 	struct ath10k *ar;
-	int ret;
+	int ret = -ENOMEM;
 
 	ar = ath10k_mac_create(priv_size);
 	if (!ar)
-		return NULL;
+		goto err_out;
 
 	ar->ath_common.priv = ar;
 	ar->ath_common.hw = ar->hw;
@@ -3403,6 +3401,10 @@ struct ath10k *ath10k_core_create(size_t priv_size, struct device *dev,
 	ar->hw_rev = hw_rev;
 	ar->hif.ops = hif_ops;
 	ar->hif.bus = bus;
+
+	ret = device_get_mac_address(dev, ar->mac_addr);
+	if (ret == -EPROBE_DEFER)
+		goto err_free_mac;
 
 	switch (hw_rev) {
 	case ATH10K_HW_QCA988X:
@@ -3520,8 +3522,8 @@ err_free_wq:
 	destroy_workqueue(ar->workqueue);
 err_free_mac:
 	ath10k_mac_destroy(ar);
-
-	return NULL;
+err_out:
+	return ERR_PTR(ret);
 }
 EXPORT_SYMBOL(ath10k_core_create);
 

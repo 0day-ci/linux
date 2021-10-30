@@ -1728,9 +1728,11 @@ static int ath10k_snoc_probe(struct platform_device *pdev)
 
 	ar = ath10k_core_create(sizeof(*ar_snoc), dev, ATH10K_BUS_SNOC,
 				drv_data->hw_rev, &ath10k_snoc_hif_ops);
-	if (!ar) {
-		dev_err(dev, "failed to allocate core\n");
-		return -ENOMEM;
+	if (IS_ERR(ar)) {
+		ret = PTR_ERR(ar);
+		if (ret != -EPROBE_DEFER)
+			dev_err(dev, "failed to allocate core: %d\n", ret);
+		return ret;
 	}
 
 	ar_snoc = ath10k_snoc_priv(ar);
