@@ -27,12 +27,42 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <unistd.h>
+#include <asm/unistd.h>
+#include <sys/syscall.h>
+#include <sys/types.h>
 
 #include "libbpf_common.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/*
+ * Kernel headers might be outdated, so define __NR_bpf explicitly, if necessary.
+ */
+#ifndef __NR_bpf
+# if defined(__i386__)
+#  define __NR_bpf 357
+# elif defined(__x86_64__)
+#  define __NR_bpf 321
+# elif defined(__aarch64__)
+#  define __NR_bpf 280
+# elif defined(__sparc__)
+#  define __NR_bpf 349
+# elif defined(__s390__)
+#  define __NR_bpf 351
+# elif defined(__arc__)
+#  define __NR_bpf 280
+# else
+#  error __NR_bpf not defined. libbpf does not support your arch.
+# endif
+#endif
+
+static inline long bpf(enum bpf_cmd cmd, union bpf_attr *attr, unsigned int size)
+{
+	return syscall(__NR_bpf, cmd, attr, size);
+}
 
 struct bpf_create_map_attr {
 	const char *name;
