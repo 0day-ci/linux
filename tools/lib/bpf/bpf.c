@@ -46,14 +46,15 @@ static inline int sys_bpf_fd(enum bpf_cmd cmd, union bpf_attr *attr,
 	return ensure_good_fd(fd);
 }
 
-static inline int sys_bpf_prog_load(union bpf_attr *attr, unsigned int size)
+#define PROG_LOAD_ATTEMPTS 5
+
+static inline int sys_bpf_prog_load(union bpf_attr *attr, unsigned int size, int attempts)
 {
-	int retries = 5;
 	int fd;
 
 	do {
 		fd = sys_bpf_fd(BPF_PROG_LOAD, attr, size);
-	} while (fd < 0 && errno == EAGAIN && retries-- > 0);
+	} while (fd < 0 && errno == EAGAIN && --attempts > 0);
 
 	return fd;
 }
@@ -276,7 +277,7 @@ int libbpf__bpf_prog_load(const struct bpf_prog_load_params *load_attr)
 		memcpy(attr.prog_name, load_attr->name,
 		       min(strlen(load_attr->name), (size_t)BPF_OBJ_NAME_LEN - 1));
 
-	fd = sys_bpf_prog_load(&attr, sizeof(attr));
+	fd = sys_bpf_prog_load(&attr, sizeof(attr), PROG_LOAD_ATTEMPTS);
 	if (fd >= 0)
 		return fd;
 
@@ -317,7 +318,7 @@ int libbpf__bpf_prog_load(const struct bpf_prog_load_params *load_attr)
 			break;
 		}
 
-		fd = sys_bpf_prog_load(&attr, sizeof(attr));
+		fd = sys_bpf_prog_load(&attr, sizeof(attr), PROG_LOAD_ATTEMPTS);
 		if (fd >= 0)
 			goto done;
 	}
@@ -331,7 +332,7 @@ int libbpf__bpf_prog_load(const struct bpf_prog_load_params *load_attr)
 	attr.log_level = 1;
 	load_attr->log_buf[0] = 0;
 
-	fd = sys_bpf_prog_load(&attr, sizeof(attr));
+	fd = sys_bpf_prog_load(&attr, sizeof(attr), PROG_LOAD_ATTEMPTS);
 done:
 	/* free() doesn't affect errno, so we don't need to restore it */
 	free(finfo);
@@ -421,7 +422,7 @@ int bpf_verify_program(enum bpf_prog_type type, const struct bpf_insn *insns,
 	attr.kern_version = kern_version;
 	attr.prog_flags = prog_flags;
 
-	fd = sys_bpf_prog_load(&attr, sizeof(attr));
+	fd = sys_bpf_prog_load(&attr, sizeof(attr), PROG_LOAD_ATTEMPTS);
 	return libbpf_err_errno(fd);
 }
 
