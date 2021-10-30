@@ -2042,6 +2042,20 @@ static void pci_configure_mps(struct pci_dev *dev)
 		 p_mps, mps, mpss);
 }
 
+bool pcie_rp_10bit_tag_cmp_supported(struct pci_dev *dev)
+{
+	struct pci_dev *root;
+
+	root = pcie_find_root_port(dev);
+	if (!root)
+		return false;
+
+	if (!(root->devcap2 & PCI_EXP_DEVCAP2_10BIT_TAG_COMP))
+		return false;
+
+	return true;
+}
+
 int pci_configure_extended_tags(struct pci_dev *dev, void *ign)
 {
 	struct pci_host_bridge *host;
@@ -2075,6 +2089,12 @@ int pci_configure_extended_tags(struct pci_dev *dev, void *ign)
 		return 0;
 	}
 
+	/*
+	 * PCIe r5.0, sec 2.2.6.2 says "Receivers/Completers must handle 8-bit
+	 * Tag values correctly regardless of the setting of their Extended Tag
+	 * Field Enable bit (see Section 7.5.3.4)", so it is safe to enable
+	 * Extented Tags.
+	 */
 	if (!(ctl & PCI_EXP_DEVCTL_EXT_TAG)) {
 		pci_info(dev, "enabling Extended Tags\n");
 		pcie_capability_set_word(dev, PCI_EXP_DEVCTL,

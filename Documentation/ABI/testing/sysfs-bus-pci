@@ -156,7 +156,7 @@ Description:
 		binary file containing the Vital Product Data for the
 		device.  It should follow the VPD format defined in
 		PCI Specification 2.1 or 2.2, but users should consider
-		that some devices may have incorrectly formatted data.  
+		that some devices may have incorrectly formatted data.
 		If the underlying VPD has a writable section then the
 		corresponding section of this file will be writable.
 
@@ -424,3 +424,25 @@ Description:
 
 		The file is writable if the PF is bound to a driver that
 		implements ->sriov_set_msix_vec_count().
+
+What:		/sys/bus/pci/devices/.../tags
+Date:		September 2021
+Contact:	Dongdong Liu <liudongdong3@huawei.com>
+Description:
+		The file will be visible when the device supports 10-Bit Tag
+		Requester. The file is readable, the value indicate current
+		status of Tags Enable(5-Bit, 8-Bit, 10-Bit).
+
+		The file is also writable, The values accepted are:
+		* > 0 - this number will be reported as tags bit to be
+			enabled. current only 10 is accepted
+		* < 0 - not valid
+		* = 0 - disable 10-Bit Tag, use Extended Tags(8-Bit or 5-Bit)
+
+		write 0 to disable 10-Bit Tag Requester when the driver does
+		not bind the device. The typical use case is for p2pdma when
+		the peer device does not support 10-Bit Tag Completer.
+
+		Write 10 to enable 10-Bit Tag Requester when RC supports 10-Bit
+		Tag Completer capability. The typical use case is for host
+		memory targeted by DMA Requests.

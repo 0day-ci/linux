@@ -306,6 +306,65 @@ static ssize_t enable_show(struct device *dev, struct device_attribute *attr,
 }
 static DEVICE_ATTR_RW(enable);
 
+static ssize_t tags_store(struct device *dev,
+			  struct device_attribute *attr,
+			  const char *buf, size_t count)
+{
+	struct pci_dev *pdev = to_pci_dev(dev);
+	unsigned long val;
+
+	if (!capable(CAP_SYS_ADMIN))
+		return -EPERM;
+
+	if (kstrtoul(buf, 0, &val) < 0)
+		return -EINVAL;
+
+	/* 10 - enable 10-Bit Tag, 0 - disable 10-Bit Tag */
+	if (val != 10 && val != 0)
+		return -EINVAL;
+
+	if (pdev->driver)
+		return -EBUSY;
+
+	if (!pcie_rp_10bit_tag_cmp_supported(pdev))
+		return -EPERM;
+
+	if (val == 10)
+		pcie_capability_set_word(pdev, PCI_EXP_DEVCTL2,
+					 PCI_EXP_DEVCTL2_10BIT_TAG_REQ_EN);
+	else
+		pcie_capability_clear_word(pdev, PCI_EXP_DEVCTL2,
+					   PCI_EXP_DEVCTL2_10BIT_TAG_REQ_EN);
+
+	return count;
+}
+
+static ssize_t tags_show(struct device *dev,
+			 struct device_attribute *attr,
+			 char *buf)
+{
+	struct pci_dev *pdev = to_pci_dev(dev);
+	u16 ctl;
+	int ret;
+
+	ret = pcie_capability_read_word(pdev, PCI_EXP_DEVCTL2, &ctl);
+	if (ret)
+		return -EINVAL;
+
+	if (ctl & PCI_EXP_DEVCTL2_10BIT_TAG_REQ_EN)
+		return sysfs_emit(buf, "%s\n", "10-Bit");
+
+	ret = pcie_capability_read_word(pdev, PCI_EXP_DEVCTL, &ctl);
+	if (ret)
+		return -EINVAL;
+
+	if (ctl & PCI_EXP_DEVCTL_EXT_TAG)
+		return sysfs_emit(buf, "%s\n", "8-Bit");
+
+	return sysfs_emit(buf, "%s\n", "5-Bit");
+}
+static DEVICE_ATTR_RW(tags);
+
 #ifdef CONFIG_NUMA
 static ssize_t numa_node_store(struct device *dev,
 			       struct device_attribute *attr, const char *buf,
@@ -632,6 +691,11 @@ static struct attribute *pcie_dev_attrs[] = {
 	&dev_attr_current_link_width.attr,
 	&dev_attr_max_link_width.attr,
 	&dev_attr_max_link_speed.attr,
+	NULL,
+};
+
+static struct attribute *pcie_dev_tags_attrs[] = {
+	&dev_attr_tags.attr,
 	NULL,
 };
 
@@ -1482,6 +1546,24 @@ static umode_t pcie_dev_attrs_are_visible(struct kobject *kobj,
 	return 0;
 }
 
+static umode_t pcie_dev_tags_attrs_is_visible(struct kobject *kobj,
+					      struct attribute *a, int n)
+{
+	struct device *dev = kobj_to_dev(kobj);
+	struct pci_dev *pdev = to_pci_dev(dev);
+
+	if (pdev->is_virtfn)
+		return 0;
+
+	if (pci_pcie_type(pdev) != PCI_EXP_TYPE_ENDPOINT)
+		return 0;
+
+	if (!(pdev->devcap2 & PCI_EXP_DEVCAP2_10BIT_TAG_REQ))
+		return 0;
+
+	return a->mode;
+}
+
 static const struct attribute_group pci_dev_group = {
 	.attrs = pci_dev_attrs,
 };
@@ -1522,6 +1604,11 @@ static const struct attribute_group pcie_dev_attr_group = {
 	.is_visible = pcie_dev_attrs_are_visible,
 };
 
+static const struct attribute_group pcie_dev_tags_attr_group = {
+	.attrs = pcie_dev_tags_attrs,
+	.is_visible = pcie_dev_tags_attrs_is_visible,
+};
+
 static const struct attribute_group *pci_dev_attr_groups[] = {
 	&pci_dev_attr_group,
 	&pci_dev_hp_attr_group,
@@ -1531,6 +1618,7 @@ static const struct attribute_group *pci_dev_attr_groups[] = {
 #endif
 	&pci_bridge_attr_group,
 	&pcie_dev_attr_group,
+	&pcie_dev_tags_attr_group,
 #ifdef CONFIG_PCIEAER
 	&aer_stats_attr_group,
 #endif
