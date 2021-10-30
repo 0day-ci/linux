@@ -13,6 +13,7 @@
 #include <linux/slab.h>
 #include <linux/module.h>
 #include <linux/of_device.h>
+#include <linux/of.h>
 
 /*
  * Ricoh has a family of I2C based RTCs, which differ only slightly from
@@ -560,6 +561,8 @@ static int rs5c_oscillator_setup(struct rs5c372 *rs5c372)
 {
 	unsigned char buf[2];
 	int addr, i, ret = 0;
+	struct i2c_client *client = rs5c372->client;
+	u8 trim = 0;
 
 	addr   = RS5C_ADDR(RS5C_REG_CTRL1);
 	buf[0] = rs5c372->regs[RS5C_REG_CTRL1];
@@ -599,9 +602,22 @@ static int rs5c_oscillator_setup(struct rs5c372 *rs5c372)
 		break;
 	}
 
+	/* optional setup of xtal trimming */
+	if (!of_property_read_u8(client->dev.of_node, "ricoh,trim", &trim)) {
+		if (rs5c372->type != rtc_r2221tl && (trim & ~RS5C372_TRIM_MASK)) {
+			dev_warn(&client->dev, "Erroneous setting for ricoh,trim in devicetree\n");
+		} else {
+			int addr = RS5C_ADDR(RS5C372_REG_TRIM);
+			int ret = i2c_smbus_write_byte_data(client, addr, trim);
+
+			if (unlikely(ret < 0))
+				return ret;
+		}
+	}
+
 	for (i = 0; i < sizeof(buf); i++) {
 		addr = RS5C_ADDR(RS5C_REG_CTRL1 + i);
-		ret = i2c_smbus_write_byte_data(rs5c372->client, addr, buf[i]);
+		ret = i2c_smbus_write_byte_data(client, addr, buf[i]);
 		if (unlikely(ret < 0))
 			return ret;
 	}
