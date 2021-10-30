@@ -118,6 +118,8 @@ enum pcie_bus_config_types pcie_bus_config = PCIE_BUS_PEER2PEER;
 enum pcie_bus_config_types pcie_bus_config = PCIE_BUS_DEFAULT;
 #endif
 
+enum pcie_tag_config_types pcie_tag_config = PCIE_TAG_DEFAULT;
+
 /*
  * The default CLS is used if arch didn't set CLS explicitly and not
  * all pci devices agree on the same value.  Arch can override either
@@ -6795,6 +6797,8 @@ static int __init pci_setup(char *str)
 				pci_add_flags(PCI_SCAN_ALL_PCIE_DEVS);
 			} else if (!strncmp(str, "disable_acs_redir=", 18)) {
 				disable_acs_redir_param = str + 18;
+			} else if (!strncmp(str, "pcie_tag_peer2peer", 18)) {
+				pcie_tag_config = PCIE_TAG_PEER2PEER;
 			} else {
 				pr_err("PCI: Unknown option `%s'\n", str);
 			}

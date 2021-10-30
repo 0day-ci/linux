@@ -241,6 +241,9 @@ static ssize_t sriov_vf_tags_ctl_store(struct device *dev,
 	if (vf_dev->driver)
 		return -EBUSY;
 
+	if (pcie_tag_config == PCIE_TAG_PEER2PEER)
+		return -EPERM;
+
 	if (!pcie_rp_10bit_tag_cmp_supported(pdev))
 		return -EPERM;
 
