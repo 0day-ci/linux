@@ -566,6 +566,20 @@ config FB_STI
 
 	  It is safe to enable this option, so you should probably say "Y".
 
+config FB_VISUALIZEFX
+	tristate "HP Visualize FX support"
+	depends on FB && PCI && PARISC
+	select FB_CFB_FILLRECT
+	select FB_CFB_COPYAREA
+	select FB_CFB_IMAGEBLIT
+	select RATIONAL
+	  help
+	    Frame buffer driver for the HP Visualize FX cards. These cards are
+	    commonly found in PA-RISC workstations. Currently only FX5 has been
+	    tested.
+
+	Say Y if you have such a card.
+
 config FB_MAC
 	bool "Generic Macintosh display support"
 	depends on (FB = y) && MAC
