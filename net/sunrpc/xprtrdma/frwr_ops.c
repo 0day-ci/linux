@@ -503,7 +503,7 @@ static void frwr_wc_localinv_wake(struct ib_cq *cq, struct ib_wc *wc)
  */
 void frwr_unmap_sync(struct rpcrdma_xprt *r_xprt, struct rpcrdma_req *req)
 {
-	struct ib_send_wr *first, **prev, *last;
+	struct ib_send_wr *first, **prev, *last = NULL;
 	struct rpcrdma_ep *ep = r_xprt->rx_ep;
 	const struct ib_send_wr *bad_wr;
 	struct rpcrdma_mr *mr;
@@ -608,7 +608,7 @@ static void frwr_wc_localinv_done(struct ib_cq *cq, struct ib_wc *wc)
  */
 void frwr_unmap_async(struct rpcrdma_xprt *r_xprt, struct rpcrdma_req *req)
 {
-	struct ib_send_wr *first, *last, **prev;
+	struct ib_send_wr *first, *last = NULL, **prev;
 	struct rpcrdma_ep *ep = r_xprt->rx_ep;
 	struct rpcrdma_mr *mr;
 	int rc;
