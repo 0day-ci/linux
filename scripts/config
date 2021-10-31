@@ -37,6 +37,7 @@ commands:
 
 options:
 	--file config-file   .config file to change (default .config)
+	O=config-dir         Specify the directory location of the config-file
 	--keep-case|-k       Keep next symbols' case (dont' upper-case it)
 
 $myname doesn't check the validity of the .config file. This is done at next
@@ -124,14 +125,47 @@ undef_var() {
 	txt_delete "^# $name is not set" "$FN"
 }
 
-if [ "$1" = "--file" ]; then
-	FN="$2"
-	if [ "$FN" = "" ] ; then
+DIR=
+FN=
+
+while [ "$DIR" = "" -o "$FN" = "" ]; do
+
+	if [ "$1" = "" ] ; then
 		usage
 	fi
-	shift 2
-else
+	if [ "$1" = "--file" ]; then
+		FN="$2"
+		if [ "$FN" = "" ] ; then
+			usage
+		fi
+		shift 2
+		continue
+	fi
+
+	optn=$1
+	optnlen=${#optn}
+	if [ $optnlen -gt 1 ] && [ ${optn:0:2} = "O=" ]; then
+		DIR=${optn:2}
+		shift
+		if [ "$DIR" = "" ]; then
+			usage
+		fi
+		continue
+	fi
+	break	# something other than --file or O=dir
+done
+
+if [ "$FN" = "" ]; then
 	FN=.config
+fi
+if [ "$DIR" != "" ]; then
+	DIR=$DIR"/"
+fi
+FN="$DIR""$FN"
+
+if [ ! -r $FN ]; then
+	echo "No such config file: $FN"
+	exit
 fi
 
 if [ "$1" = "" ] ; then
