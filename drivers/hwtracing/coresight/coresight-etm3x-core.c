@@ -340,6 +340,10 @@ static int etm_parse_event_config(struct etm_drvdata *drvdata,
 
 	config->ctrl = attr->config;
 
+	/* Don't trace contextID when runs in non-root PID namespace */
+	if (task_active_pid_ns(current) != &init_pid_ns)
+		config->ctrl &= ~ETMCR_CTXID_SIZE;
+
 	/*
 	 * Possible to have cores with PTM (supports ret stack) and ETM
 	 * (never has ret stack) on the same SoC. So if we have a request
