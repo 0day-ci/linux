@@ -669,10 +669,11 @@ u32 rtl8188eu_hal_init(struct adapter *Adapter)
 		Adapter->bFWReady = false;
 		haldata->fw_ractrl = false;
 		return status;
-	} else {
-		Adapter->bFWReady = true;
-		haldata->fw_ractrl = false;
 	}
+
+	Adapter->bFWReady = true;
+	haldata->fw_ractrl = false;
+
 	rtl8188e_InitializeFirmwareVars(Adapter);
 
 	HAL_INIT_PROFILE_TAG(HAL_INIT_STAGES_MAC);
