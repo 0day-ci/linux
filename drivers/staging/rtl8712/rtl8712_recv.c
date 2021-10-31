@@ -708,7 +708,7 @@ static void query_rx_phy_status(struct _adapter *padapter,
 	s8 rx_pwr[4], rx_pwr_all;
 	u8 pwdb_all;
 	u32 rssi, total_rssi = 0;
-	u8 bcck_rate = 0, rf_rx_num = 0, cck_highpwr = 0;
+	u8 bcck_rate = 0, rf_rx_num = 0;
 	struct phy_cck_rx_status *pcck_buf;
 	u8 sq;
 
@@ -723,55 +723,28 @@ static void query_rx_phy_status(struct _adapter *padapter,
 		 * (2)PWDB, Average PWDB calculated by hardware
 		 * (for rate adaptive)
 		 */
-		if (!cck_highpwr) {
-			report = pcck_buf->cck_agc_rpt & 0xc0;
-			report >>= 6;
-			switch (report) {
-			/* Modify the RF RNA gain value to -40, -20,
-			 * -2, 14 by Jenyu's suggestion
-			 * Note: different RF with the different
-			 * RNA gain.
-			 */
-			case 0x3:
-				rx_pwr_all = -40 - (pcck_buf->cck_agc_rpt &
-					     0x3e);
-				break;
-			case 0x2:
-				rx_pwr_all = -20 - (pcck_buf->cck_agc_rpt &
-					     0x3e);
-				break;
-			case 0x1:
-				rx_pwr_all = -2 - (pcck_buf->cck_agc_rpt &
-					     0x3e);
-				break;
-			case 0x0:
-				rx_pwr_all = 14 - (pcck_buf->cck_agc_rpt &
-					     0x3e);
-				break;
-			}
-		} else {
-			report = ((u8)(le32_to_cpu(pphy_stat->phydw1) >> 8)) &
-				 0x60;
-			report >>= 5;
-			switch (report) {
-			case 0x3:
-				rx_pwr_all = -40 - ((pcck_buf->cck_agc_rpt &
-					     0x1f) << 1);
-				break;
-			case 0x2:
-				rx_pwr_all = -20 - ((pcck_buf->cck_agc_rpt &
-					     0x1f) << 1);
-				break;
-			case 0x1:
-				rx_pwr_all = -2 - ((pcck_buf->cck_agc_rpt &
-					     0x1f) << 1);
-				break;
-			case 0x0:
-				rx_pwr_all = 14 - ((pcck_buf->cck_agc_rpt &
-					     0x1f) << 1);
-				break;
-			}
+		report = pcck_buf->cck_agc_rpt & 0xc0;
+		report >>= 6;
+		switch (report) {
+		/* Modify the RF RNA gain value to -40, -20,
+		 * -2, 14 by Jenyu's suggestion
+		 * Note: different RF with the different
+		 * RNA gain.
+		 */
+		case 0x3:
+			rx_pwr_all = -40 - (pcck_buf->cck_agc_rpt & 0x3e);
+			break;
+		case 0x2:
+			rx_pwr_all = -20 - (pcck_buf->cck_agc_rpt & 0x3e);
+			break;
+		case 0x1:
+			rx_pwr_all = -2 - (pcck_buf->cck_agc_rpt & 0x3e);
+			break;
+		case 0x0:
+			rx_pwr_all = 14 - (pcck_buf->cck_agc_rpt & 0x3e);
+			break;
 		}
+
 		pwdb_all = query_rx_pwr_percentage(rx_pwr_all);
 		/* CCK gain is smaller than OFDM/MCS gain,*/
 		/* so we add gain diff by experiences, the val is 6 */
