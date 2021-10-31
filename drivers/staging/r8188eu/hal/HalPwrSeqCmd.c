@@ -83,7 +83,6 @@ u8 HalPwrSeqCmdParsing(struct adapter *padapter, u8 cut_vers, u8 fab_vers,
 			case PWR_CMD_END:
 				/*  When this command is parsed, end the process */
 				return true;
-				break;
 			default:
 				break;
 			}
