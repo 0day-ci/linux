@@ -56,6 +56,14 @@
 #define EXYNOS5_RST_STAT_REG_OFFSET		0x0404
 #define EXYNOS5_WDT_DISABLE_REG_OFFSET		0x0408
 #define EXYNOS5_WDT_MASK_RESET_REG_OFFSET	0x040c
+#define EXYNOS850_CLUSTER0_NONCPU_OUT		0x1220
+#define EXYNOS850_CLUSTER0_NONCPU_INT_EN	0x1244
+#define EXYNOS850_CLUSTER1_NONCPU_OUT		0x1620
+#define EXYNOS850_CLUSTER1_NONCPU_INT_EN	0x1644
+
+#define EXYNOS850_CLUSTER0_WDTRESET_BIT		24
+#define EXYNOS850_CLUSTER1_WDTRESET_BIT		23
+
 #define QUIRK_HAS_WTCLRINT_REG			(1 << 0)
 #define QUIRK_HAS_PMU_MASK_RESET		(1 << 1)
 #define QUIRK_HAS_PMU_RST_STAT			(1 << 2)
@@ -171,6 +179,21 @@ static const struct s3c2410_wdt_variant drv_data_exynos7 = {
 		  QUIRK_HAS_PMU_RST_STAT | QUIRK_HAS_PMU_AUTO_DISABLE,
 };
 
+static const struct s3c2410_wdt_variant drv_data_exynos850 = {
+	/*
+	 * Next fields will be set in probe(), based on cluster index:
+	 *   - .mask_reset_reg
+	 *   - .rst_stat_bit
+	 *   - .cnt_en_reg
+	 */
+	.mask_reset_inv = true,
+	.mask_bit = 2,
+	.rst_stat_reg = EXYNOS5_RST_STAT_REG_OFFSET,
+	.cnt_en_bit = 7,
+	.quirks = QUIRK_HAS_WTCLRINT_REG | QUIRK_HAS_PMU_MASK_RESET | \
+		  QUIRK_HAS_PMU_RST_STAT | QUIRK_HAS_PMU_CNT_EN,
+};
+
 static const struct of_device_id s3c2410_wdt_match[] = {
 	{ .compatible = "samsung,s3c2410-wdt",
 	  .data = &drv_data_s3c2410 },
@@ -182,6 +205,8 @@ static const struct of_device_id s3c2410_wdt_match[] = {
 	  .data = &drv_data_exynos5420 },
 	{ .compatible = "samsung,exynos7-wdt",
 	  .data = &drv_data_exynos7 },
+	{ .compatible = "samsung,exynos850-wdt",
+	  .data = &drv_data_exynos850 },
 	{},
 };
 MODULE_DEVICE_TABLE(of, s3c2410_wdt_match);
@@ -548,15 +573,51 @@ static inline const struct s3c2410_wdt_variant *
 s3c2410_get_wdt_drv_data(struct platform_device *pdev)
 {
 	const struct s3c2410_wdt_variant *variant;
+	struct s3c2410_wdt_variant *data;
+	struct device *dev = &pdev->dev;
 
-	variant = of_device_get_match_data(&pdev->dev);
+	variant = of_device_get_match_data(dev);
 	if (!variant) {
 		/* Device matched by platform_device_id */
 		variant = (struct s3c2410_wdt_variant *)
 			   platform_get_device_id(pdev)->driver_data;
 	}
 
-	return variant;
+	/* Have to copy driver data over to keep its const qualifier intact */
+	data = devm_kmemdup(dev, variant, sizeof(*variant), GFP_KERNEL);
+	if (!data)
+		return NULL;
+
+	/* Populate missing fields for Exynos850 w.r.t. cluster index */
+	if (variant == &drv_data_exynos850) {
+		u32 index;
+		int err;
+
+		err = of_property_read_u32(dev->of_node, "samsung,index",
+					   &index);
+		if (err) {
+			dev_err(dev, "failed to get cluster index\n");
+			return NULL;
+		}
+
+		switch (index) {
+		case 0:
+			data->mask_reset_reg = EXYNOS850_CLUSTER0_NONCPU_INT_EN;
+			data->rst_stat_bit = EXYNOS850_CLUSTER0_WDTRESET_BIT;
+			data->cnt_en_reg = EXYNOS850_CLUSTER0_NONCPU_OUT;
+			break;
+		case 1:
+			data->mask_reset_reg = EXYNOS850_CLUSTER1_NONCPU_INT_EN;
+			data->rst_stat_bit = EXYNOS850_CLUSTER1_WDTRESET_BIT;
+			data->cnt_en_reg = EXYNOS850_CLUSTER1_NONCPU_OUT;
+			break;
+		default:
+			dev_err(dev, "wrong cluster index: %u\n", index);
+			return NULL;
+		}
+	}
+
+	return data;
 }
 
 static int s3c2410wdt_probe(struct platform_device *pdev)
@@ -576,6 +637,9 @@ static int s3c2410wdt_probe(struct platform_device *pdev)
 	wdt->wdt_device = s3c2410_wdd;
 
 	wdt->drv_data = s3c2410_get_wdt_drv_data(pdev);
+	if (!wdt->drv_data)
+		return -EINVAL;
+
 	if (wdt->drv_data->quirks & QUIRKS_HAVE_PMUREG) {
 		wdt->pmureg = syscon_regmap_lookup_by_phandle(dev->of_node,
 						"samsung,syscon-phandle");
