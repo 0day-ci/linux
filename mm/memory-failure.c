@@ -1271,7 +1271,7 @@ out:
  *
  * get_hwpoison_page() takes a page refcount of an error page to handle memory
  * error on it, after checking that the error page is in a well-defined state
- * (defined as a page-type we can successfully handle the memor error on it,
+ * (defined as a page-type we can successfully handle the memory error on it,
  * such as LRU page and hugetlb page).
  *
  * Memory error handling could be triggered at any time on any type of page,
@@ -1694,7 +1694,7 @@ try_again:
 
 	/*
 	 * We need/can do nothing about count=0 pages.
-	 * 1) it's a free page, and therefore in safe hand:
+	 * 1) it's a freed page, and therefore in safe hand:
 	 *    prep_new_page() will be the gate keeper.
 	 * 2) it's part of a non-compound high order page.
 	 *    Implies some kernel user: cannot stop them from
