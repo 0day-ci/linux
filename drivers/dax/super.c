@@ -23,7 +23,10 @@
  * @cdev: optional character interface for "device dax"
  * @host: optional name for lookups where the device path is not available
  * @private: dax driver private data
+ * @holder_data: holder of a dax_device: could be filesystem or mapped device
  * @flags: state and boolean properties
+ * @ops: operations for dax_device
+ * @holder_ops: operations for the inner holder
  */
 struct dax_device {
 	struct hlist_node list;
@@ -32,8 +35,10 @@ struct dax_device {
 	const char *host;
 	void *private;
 	struct percpu_rw_semaphore rwsem;
+	void *holder_data;
 	unsigned long flags;
 	const struct dax_operations *ops;
+	const struct dax_holder_operations *holder_ops;
 };
 
 static dev_t dax_devt;
@@ -376,6 +381,29 @@ int dax_zero_page_range(struct dax_device *dax_dev, pgoff_t pgoff,
 }
 EXPORT_SYMBOL_GPL(dax_zero_page_range);
 
+int dax_holder_notify_failure(struct dax_device *dax_dev, u64 off,
+			      u64 len, int mf_flags)
+{
+	int rc;
+
+	dax_read_lock(dax_dev);
+	if (!dax_alive(dax_dev)) {
+		rc = -ENXIO;
+		goto out;
+	}
+
+	if (!dax_dev->holder_ops) {
+		rc = -EOPNOTSUPP;
+		goto out;
+	}
+
+	rc = dax_dev->holder_ops->notify_failure(dax_dev, off, len, mf_flags);
+out:
+	dax_read_unlock(dax_dev);
+	return rc;
+}
+EXPORT_SYMBOL_GPL(dax_holder_notify_failure);
+
 #ifdef CONFIG_ARCH_HAS_PMEM_API
 void arch_wb_cache_pmem(void *addr, size_t size);
 void dax_flush(struct dax_device *dax_dev, void *addr, size_t size)
@@ -438,6 +466,10 @@ void kill_dax(struct dax_device *dax_dev)
 		return;
 	dax_write_lock(dax_dev);
 	clear_bit(DAXDEV_ALIVE, &dax_dev->flags);
+
+	/* clear holder data */
+	dax_dev->holder_ops = NULL;
+	dax_dev->holder_data = NULL;
 	dax_write_unlock(dax_dev);
 
 	spin_lock(&dax_host_lock);
@@ -621,6 +653,37 @@ void put_dax(struct dax_device *dax_dev)
 	iput(&dax_dev->inode);
 }
 EXPORT_SYMBOL_GPL(put_dax);
+
+void dax_set_holder(struct dax_device *dax_dev, void *holder,
+		const struct dax_holder_operations *ops)
+{
+	dax_write_lock(dax_dev);
+	if (!dax_alive(dax_dev)) {
+		dax_write_unlock(dax_dev);
+		return;
+	}
+
+	dax_dev->holder_data = holder;
+	dax_dev->holder_ops = ops;
+	dax_write_unlock(dax_dev);
+}
+EXPORT_SYMBOL_GPL(dax_set_holder);
+
+void *dax_get_holder(struct dax_device *dax_dev)
+{
+	void *holder;
+
+	dax_read_lock(dax_dev);
+	if (!dax_alive(dax_dev)) {
+		dax_read_unlock(dax_dev);
+		return NULL;
+	}
+
+	holder = dax_dev->holder_data;
+	dax_read_unlock(dax_dev);
+	return holder;
+}
+EXPORT_SYMBOL_GPL(dax_get_holder);
 
 /**
  * inode_dax: convert a public inode into its dax_dev
