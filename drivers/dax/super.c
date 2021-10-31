@@ -137,6 +137,25 @@ struct dax_device *fs_dax_get_by_bdev(struct block_device *bdev)
 }
 EXPORT_SYMBOL_GPL(fs_dax_get_by_bdev);
 
+void fs_dax_register_holder(struct dax_device *dax_dev, void *holder,
+		const struct dax_holder_operations *ops)
+{
+	dax_set_holder(dax_dev, holder, ops);
+}
+EXPORT_SYMBOL_GPL(fs_dax_register_holder);
+
+void fs_dax_unregister_holder(struct dax_device *dax_dev)
+{
+	dax_set_holder(dax_dev, NULL, NULL);
+}
+EXPORT_SYMBOL_GPL(fs_dax_unregister_holder);
+
+void *fs_dax_get_holder(struct dax_device *dax_dev)
+{
+	return dax_get_holder(dax_dev);
+}
+EXPORT_SYMBOL_GPL(fs_dax_get_holder);
+
 bool generic_fsdax_supported(struct dax_device *dax_dev,
 		struct block_device *bdev, int blocksize, sector_t start,
 		sector_t sectors)

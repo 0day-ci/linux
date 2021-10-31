@@ -145,6 +145,10 @@ static inline void fs_put_dax(struct dax_device *dax_dev)
 }
 
 struct dax_device *fs_dax_get_by_bdev(struct block_device *bdev);
+void fs_dax_register_holder(struct dax_device *dax_dev, void *holder,
+		const struct dax_holder_operations *ops);
+void fs_dax_unregister_holder(struct dax_device *dax_dev);
+void *fs_dax_get_holder(struct dax_device *dax_dev);
 int dax_writeback_mapping_range(struct address_space *mapping,
 		struct dax_device *dax_dev, struct writeback_control *wbc);
 
@@ -171,6 +175,20 @@ static inline void fs_put_dax(struct dax_device *dax_dev)
 }
 
 static inline struct dax_device *fs_dax_get_by_bdev(struct block_device *bdev)
+{
+	return NULL;
+}
+
+static inline void fs_dax_register_holder(struct dax_device *dax_dev,
+		void *holder, const struct dax_holder_operations *ops)
+{
+}
+
+static inline void fs_dax_unregister_holder(struct dax_device *dax_dev)
+{
+}
+
+static inline void *fs_dax_get_holder(struct dax_device *dax_dev)
 {
 	return NULL;
 }
