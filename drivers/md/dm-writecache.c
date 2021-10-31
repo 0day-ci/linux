@@ -260,7 +260,6 @@ static int persistent_memory_claim(struct dm_writecache *wc)
 	loff_t s;
 	long p, da;
 	pfn_t pfn;
-	int id;
 	struct page **pages;
 	sector_t offset;
 
@@ -284,7 +283,7 @@ static int persistent_memory_claim(struct dm_writecache *wc)
 	}
 	offset >>= PAGE_SHIFT - 9;
 
-	id = dax_read_lock();
+	dax_read_lock(wc->ssd_dev->dax_dev);
 
 	da = dax_direct_access(wc->ssd_dev->dax_dev, offset, p, &wc->memory_map, &pfn);
 	if (da < 0) {
@@ -334,7 +333,7 @@ static int persistent_memory_claim(struct dm_writecache *wc)
 		wc->memory_vmapped = true;
 	}
 
-	dax_read_unlock(id);
+	dax_read_unlock(wc->ssd_dev->dax_dev);
 
 	wc->memory_map += (size_t)wc->start_sector << SECTOR_SHIFT;
 	wc->memory_map_size -= (size_t)wc->start_sector << SECTOR_SHIFT;
@@ -343,7 +342,7 @@ static int persistent_memory_claim(struct dm_writecache *wc)
 err3:
 	kvfree(pages);
 err2:
-	dax_read_unlock(id);
+	dax_read_unlock(wc->ssd_dev->dax_dev);
 err1:
 	return r;
 }

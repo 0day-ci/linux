@@ -715,22 +715,21 @@ static int copy_cow_page_dax(struct block_device *bdev, struct dax_device *dax_d
 	void *vto, *kaddr;
 	pgoff_t pgoff;
 	long rc;
-	int id;
 
 	rc = bdev_dax_pgoff(bdev, sector, PAGE_SIZE, &pgoff);
 	if (rc)
 		return rc;
 
-	id = dax_read_lock();
+	dax_read_lock(dax_dev);
 	rc = dax_direct_access(dax_dev, pgoff, 1, &kaddr, NULL);
 	if (rc < 0) {
-		dax_read_unlock(id);
+		dax_read_unlock(dax_dev);
 		return rc;
 	}
 	vto = kmap_atomic(to);
 	copy_user_page(vto, (void __force *)kaddr, vaddr, to);
 	kunmap_atomic(vto);
-	dax_read_unlock(id);
+	dax_read_unlock(dax_dev);
 	return 0;
 }
 
@@ -1015,13 +1014,13 @@ static int dax_iomap_pfn(const struct iomap *iomap, loff_t pos, size_t size,
 {
 	const sector_t sector = dax_iomap_sector(iomap, pos);
 	pgoff_t pgoff;
-	int id, rc;
+	int rc;
 	long length;
 
 	rc = bdev_dax_pgoff(iomap->bdev, sector, size, &pgoff);
 	if (rc)
 		return rc;
-	id = dax_read_lock();
+	dax_read_lock(iomap->dax_dev);
 	length = dax_direct_access(iomap->dax_dev, pgoff, PHYS_PFN(size),
 				   NULL, pfnp);
 	if (length < 0) {
@@ -1038,7 +1037,7 @@ static int dax_iomap_pfn(const struct iomap *iomap, loff_t pos, size_t size,
 		goto out;
 	rc = 0;
 out:
-	dax_read_unlock(id);
+	dax_read_unlock(iomap->dax_dev);
 	return rc;
 }
 
@@ -1130,7 +1129,7 @@ s64 dax_iomap_zero(loff_t pos, u64 length, struct iomap *iomap)
 {
 	sector_t sector = iomap_sector(iomap, pos & PAGE_MASK);
 	pgoff_t pgoff;
-	long rc, id;
+	long rc;
 	void *kaddr;
 	bool page_aligned = false;
 	unsigned offset = offset_in_page(pos);
@@ -1144,14 +1143,14 @@ s64 dax_iomap_zero(loff_t pos, u64 length, struct iomap *iomap)
 	if (rc)
 		return rc;
 
-	id = dax_read_lock();
+	dax_read_lock(iomap->dax_dev);
 
 	if (page_aligned)
 		rc = dax_zero_page_range(iomap->dax_dev, pgoff, 1);
 	else
 		rc = dax_direct_access(iomap->dax_dev, pgoff, 1, &kaddr, NULL);
 	if (rc < 0) {
-		dax_read_unlock(id);
+		dax_read_unlock(iomap->dax_dev);
 		return rc;
 	}
 
@@ -1159,7 +1158,7 @@ s64 dax_iomap_zero(loff_t pos, u64 length, struct iomap *iomap)
 		memset(kaddr + offset, 0, size);
 		dax_flush(iomap->dax_dev, kaddr + offset, size);
 	}
-	dax_read_unlock(id);
+	dax_read_unlock(iomap->dax_dev);
 	return size;
 }
 
@@ -1174,7 +1173,6 @@ static loff_t dax_iomap_iter(const struct iomap_iter *iomi,
 	loff_t end = pos + length, done = 0;
 	ssize_t ret = 0;
 	size_t xfer;
-	int id;
 
 	if (iov_iter_rw(iter) == READ) {
 		end = min(end, i_size_read(iomi->inode));
@@ -1199,7 +1197,7 @@ static loff_t dax_iomap_iter(const struct iomap_iter *iomi,
 					      (end - 1) >> PAGE_SHIFT);
 	}
 
-	id = dax_read_lock();
+	dax_read_lock(dax_dev);
 	while (pos < end) {
 		unsigned offset = pos & (PAGE_SIZE - 1);
 		const size_t size = ALIGN(length + offset, PAGE_SIZE);
@@ -1251,7 +1249,7 @@ static loff_t dax_iomap_iter(const struct iomap_iter *iomi,
 		if (xfer < map_len)
 			break;
 	}
-	dax_read_unlock(id);
+	dax_read_unlock(dax_dev);
 
 	return done ? done : ret;
 }

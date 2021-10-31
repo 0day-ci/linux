@@ -31,12 +31,12 @@ struct dax_device {
 	struct cdev cdev;
 	const char *host;
 	void *private;
+	struct percpu_rw_semaphore rwsem;
 	unsigned long flags;
 	const struct dax_operations *ops;
 };
 
 static dev_t dax_devt;
-DEFINE_STATIC_SRCU(dax_srcu);
 static struct vfsmount *dax_mnt;
 static DEFINE_IDA(dax_minor_ida);
 static struct kmem_cache *dax_cache __read_mostly;
@@ -46,17 +46,27 @@ static struct super_block *dax_superblock __read_mostly;
 static struct hlist_head dax_host_list[DAX_HASH_SIZE];
 static DEFINE_SPINLOCK(dax_host_lock);
 
-int dax_read_lock(void)
+void dax_read_lock(struct dax_device *dax_dev)
 {
-	return srcu_read_lock(&dax_srcu);
+	percpu_down_read(&dax_dev->rwsem);
 }
 EXPORT_SYMBOL_GPL(dax_read_lock);
 
-void dax_read_unlock(int id)
+void dax_read_unlock(struct dax_device *dax_dev)
 {
-	srcu_read_unlock(&dax_srcu, id);
+	percpu_up_read(&dax_dev->rwsem);
 }
 EXPORT_SYMBOL_GPL(dax_read_unlock);
+
+void dax_write_lock(struct dax_device *dax_dev)
+{
+	percpu_down_write(&dax_dev->rwsem);
+}
+
+void dax_write_unlock(struct dax_device *dax_dev)
+{
+	percpu_up_write(&dax_dev->rwsem);
+}
 
 static int dax_host_hash(const char *host)
 {
@@ -70,26 +80,28 @@ static int dax_host_hash(const char *host)
 static struct dax_device *dax_get_by_host(const char *host)
 {
 	struct dax_device *dax_dev, *found = NULL;
-	int hash, id;
+	int hash;
 
 	if (!host)
 		return NULL;
 
 	hash = dax_host_hash(host);
 
-	id = dax_read_lock();
 	spin_lock(&dax_host_lock);
 	hlist_for_each_entry(dax_dev, &dax_host_list[hash], list) {
+		dax_read_lock(dax_dev);
 		if (!dax_alive(dax_dev)
-				|| strcmp(host, dax_dev->host) != 0)
+				|| strcmp(host, dax_dev->host) != 0) {
+			dax_read_unlock(dax_dev);
 			continue;
+		}
 
 		if (igrab(&dax_dev->inode))
 			found = dax_dev;
+		dax_read_unlock(dax_dev);
 		break;
 	}
 	spin_unlock(&dax_host_lock);
-	dax_read_unlock(id);
 
 	return found;
 }
@@ -130,7 +142,7 @@ bool generic_fsdax_supported(struct dax_device *dax_dev,
 	pfn_t pfn, end_pfn;
 	sector_t last_page;
 	long len, len2;
-	int err, id;
+	int err;
 
 	if (blocksize != PAGE_SIZE) {
 		pr_info("%pg: error: unsupported blocksize for dax\n", bdev);
@@ -155,14 +167,14 @@ bool generic_fsdax_supported(struct dax_device *dax_dev,
 		return false;
 	}
 
-	id = dax_read_lock();
+	dax_read_lock(dax_dev);
 	len = dax_direct_access(dax_dev, pgoff, 1, &kaddr, &pfn);
 	len2 = dax_direct_access(dax_dev, pgoff_end, 1, &end_kaddr, &end_pfn);
 
 	if (len < 1 || len2 < 1) {
 		pr_info("%pg: error: dax access failed (%ld)\n",
 				bdev, len < 1 ? len : len2);
-		dax_read_unlock(id);
+		dax_read_unlock(dax_dev);
 		return false;
 	}
 
@@ -192,7 +204,7 @@ bool generic_fsdax_supported(struct dax_device *dax_dev,
 		put_dev_pagemap(end_pgmap);
 
 	}
-	dax_read_unlock(id);
+	dax_read_unlock(dax_dev);
 
 	if (!dax_enabled) {
 		pr_info("%pg: error: dax support not enabled\n", bdev);
@@ -206,16 +218,15 @@ bool dax_supported(struct dax_device *dax_dev, struct block_device *bdev,
 		int blocksize, sector_t start, sector_t len)
 {
 	bool ret = false;
-	int id;
 
 	if (!dax_dev)
 		return false;
 
-	id = dax_read_lock();
+	dax_read_lock(dax_dev);
 	if (dax_alive(dax_dev) && dax_dev->ops->dax_supported)
 		ret = dax_dev->ops->dax_supported(dax_dev, bdev, blocksize,
 						  start, len);
-	dax_read_unlock(id);
+	dax_read_unlock(dax_dev);
 	return ret;
 }
 EXPORT_SYMBOL_GPL(dax_supported);
@@ -410,7 +421,7 @@ EXPORT_SYMBOL_GPL(__set_dax_synchronous);
 
 bool dax_alive(struct dax_device *dax_dev)
 {
-	lockdep_assert_held(&dax_srcu);
+	lockdep_assert_held(&dax_dev->rwsem);
 	return test_bit(DAXDEV_ALIVE, &dax_dev->flags);
 }
 EXPORT_SYMBOL_GPL(dax_alive);
@@ -425,10 +436,9 @@ void kill_dax(struct dax_device *dax_dev)
 {
 	if (!dax_dev)
 		return;
-
+	dax_write_lock(dax_dev);
 	clear_bit(DAXDEV_ALIVE, &dax_dev->flags);
-
-	synchronize_srcu(&dax_srcu);
+	dax_write_unlock(dax_dev);
 
 	spin_lock(&dax_host_lock);
 	hlist_del_init(&dax_dev->list);
@@ -590,6 +600,7 @@ struct dax_device *alloc_dax(void *private, const char *__host,
 	dax_add_host(dax_dev, host);
 	dax_dev->ops = ops;
 	dax_dev->private = private;
+	percpu_init_rwsem(&dax_dev->rwsem);
 	if (flags & DAXDEV_F_SYNC)
 		set_dax_synchronous(dax_dev);
 

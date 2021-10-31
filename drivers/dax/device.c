@@ -198,7 +198,6 @@ static vm_fault_t dev_dax_huge_fault(struct vm_fault *vmf,
 	struct file *filp = vmf->vma->vm_file;
 	unsigned long fault_size;
 	vm_fault_t rc = VM_FAULT_SIGBUS;
-	int id;
 	pfn_t pfn;
 	struct dev_dax *dev_dax = filp->private_data;
 
@@ -206,7 +205,7 @@ static vm_fault_t dev_dax_huge_fault(struct vm_fault *vmf,
 			(vmf->flags & FAULT_FLAG_WRITE) ? "write" : "read",
 			vmf->vma->vm_start, vmf->vma->vm_end, pe_size);
 
-	id = dax_read_lock();
+	dax_read_lock(dev_dax->dax_dev);
 	switch (pe_size) {
 	case PE_SIZE_PTE:
 		fault_size = PAGE_SIZE;
@@ -246,7 +245,7 @@ static vm_fault_t dev_dax_huge_fault(struct vm_fault *vmf,
 			page->index = pgoff + i;
 		}
 	}
-	dax_read_unlock(id);
+	dax_read_unlock(dev_dax->dax_dev);
 
 	return rc;
 }
@@ -284,7 +283,7 @@ static const struct vm_operations_struct dax_vm_ops = {
 static int dax_mmap(struct file *filp, struct vm_area_struct *vma)
 {
 	struct dev_dax *dev_dax = filp->private_data;
-	int rc, id;
+	int rc;
 
 	dev_dbg(&dev_dax->dev, "trace\n");
 
@@ -292,9 +291,9 @@ static int dax_mmap(struct file *filp, struct vm_area_struct *vma)
 	 * We lock to check dax_dev liveness and will re-check at
 	 * fault time.
 	 */
-	id = dax_read_lock();
+	dax_read_lock(dev_dax->dax_dev);
 	rc = check_vma(dev_dax, vma, __func__);
-	dax_read_unlock(id);
+	dax_read_unlock(dev_dax->dax_dev);
 	if (rc)
 		return rc;
 

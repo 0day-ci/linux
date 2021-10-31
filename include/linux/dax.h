@@ -177,15 +177,14 @@ static inline void dax_unlock_page(struct page *page, dax_entry_t cookie)
 #endif
 
 #if IS_ENABLED(CONFIG_DAX)
-int dax_read_lock(void);
-void dax_read_unlock(int id);
+void dax_read_lock(struct dax_device *dax_dev);
+void dax_read_unlock(struct dax_device *dax_dev);
 #else
-static inline int dax_read_lock(void)
+static inline void dax_read_lock(struct dax_device *dax_dev)
 {
-	return 0;
 }
 
-static inline void dax_read_unlock(int id)
+static inline void dax_read_unlock(struct dax_device *dax_dev)
 {
 }
 #endif /* CONFIG_DAX */
