@@ -147,7 +147,7 @@ struct apple_pcie_port {
 	void __iomem		*base;
 	struct irq_domain	*domain;
 	struct list_head	entry;
-	DECLARE_BITMAP(		sid_map, MAX_RID2SID);
+	DECLARE_BITMAP(sid_map, MAX_RID2SID);
 	int			sid_map_sz;
 	int			idx;
 };
