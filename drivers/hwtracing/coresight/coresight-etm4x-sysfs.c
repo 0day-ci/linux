@@ -2111,6 +2111,13 @@ static ssize_t vmid_val_show(struct device *dev,
 	struct etmv4_drvdata *drvdata = dev_get_drvdata(dev->parent);
 	struct etmv4_config *config = &drvdata->config;
 
+	/*
+	 * Don't use virtual contextID tracing if coming from a PID namespace.
+	 * See comment in ctxid_pid_store().
+	 */
+	if (task_active_pid_ns(current) != &init_pid_ns)
+		return -EINVAL;
+
 	spin_lock(&drvdata->spinlock);
 	val = (unsigned long)config->vmid_val[config->vmid_idx];
 	spin_unlock(&drvdata->spinlock);
@@ -2124,6 +2131,13 @@ static ssize_t vmid_val_store(struct device *dev,
 	unsigned long val;
 	struct etmv4_drvdata *drvdata = dev_get_drvdata(dev->parent);
 	struct etmv4_config *config = &drvdata->config;
+
+	/*
+	 * Don't use virtual contextID tracing if coming from a PID namespace.
+	 * See comment in ctxid_pid_store().
+	 */
+	if (task_active_pid_ns(current) != &init_pid_ns)
+		return -EINVAL;
 
 	/*
 	 * only implemented when vmid tracing is enabled, i.e. at least one
@@ -2148,6 +2162,13 @@ static ssize_t vmid_masks_show(struct device *dev,
 	struct etmv4_drvdata *drvdata = dev_get_drvdata(dev->parent);
 	struct etmv4_config *config = &drvdata->config;
 
+	/*
+	 * Don't use virtual contextID tracing if coming from a PID namespace.
+	 * See comment in ctxid_pid_store().
+	 */
+	if (task_active_pid_ns(current) != &init_pid_ns)
+		return -EINVAL;
+
 	spin_lock(&drvdata->spinlock);
 	val1 = config->vmid_mask0;
 	val2 = config->vmid_mask1;
@@ -2164,6 +2185,13 @@ static ssize_t vmid_masks_store(struct device *dev,
 	struct etmv4_drvdata *drvdata = dev_get_drvdata(dev->parent);
 	struct etmv4_config *config = &drvdata->config;
 	int nr_inputs;
+
+	/*
+	 * Don't use virtual contextID tracing if coming from a PID namespace.
+	 * See comment in ctxid_pid_store().
+	 */
+	if (task_active_pid_ns(current) != &init_pid_ns)
+		return -EINVAL;
 
 	/*
 	 * only implemented when vmid tracing is enabled, i.e. at least one
