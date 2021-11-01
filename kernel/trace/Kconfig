@@ -237,6 +237,15 @@ config FUNCTION_PROFILER
 
 	  If in doubt, say N.
 
+config TRACE_OBJECT
+	bool "Trace kernel object"
+	depends on FUNCTION_TRACER
+	default y
+	help
+	 This help kernel developer to trace any kernel object, and get the value
+	 of the object dynamically. the object can from the dynamic event(kprobe_event/
+	 uprobe_event) or the static event(tracepoint).
+
 config STACK_TRACER
 	bool "Trace max stack"
 	depends on HAVE_FUNCTION_TRACER

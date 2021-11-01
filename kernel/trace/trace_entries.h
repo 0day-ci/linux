@@ -401,3 +401,21 @@ FTRACE_ENTRY(timerlat, timerlat_entry,
 		 __entry->context,
 		 __entry->timer_latency)
 );
+
+/*
+ * trace object entry:
+ */
+FTRACE_ENTRY(object, trace_object_entry,
+
+	TRACE_OBJECT,
+
+	F_STRUCT(
+		__field(	unsigned long,		ip		)
+		__field(	unsigned long,		parent_ip	)
+		__field(	unsigned long,		object		)
+		__field(	unsigned long,		value		)
+	),
+
+	F_printk(" %ps <-- %ps object:%lx value=%lx\n", (void *)__entry->ip,
+		(void *)__entry->parent_ip, __entry->object, __entry->value)
+);
