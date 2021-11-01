@@ -41,7 +41,7 @@ static void klp_transition_work_fn(struct work_struct *work)
 
 	mutex_unlock(&klp_mutex);
 
-	klp_free_patches_async(&to_free);
+	klp_free_patches(&to_free);
 }
 static DECLARE_DELAYED_WORK(klp_transition_work, klp_transition_work_fn);
 

@@ -337,6 +337,7 @@ static ssize_t enabled_store(struct kobject *kobj, struct kobj_attribute *attr,
 	int ret;
 	bool enabled;
 	LIST_HEAD(to_free);
+	struct kernfs_node *kn = NULL;
 
 	ret = kstrtobool(buf, &enabled);
 	if (ret)
@@ -369,10 +370,18 @@ static ssize_t enabled_store(struct kobject *kobj, struct kobj_attribute *attr,
 out:
 	mutex_unlock(&klp_mutex);
 
-	klp_free_patches_async(&to_free);
-
 	if (ret)
 		return ret;
+
+	if (list_empty(&to_free)) {
+		kn = sysfs_break_active_protection(kobj, &attr->attr);
+		WARN_ON_ONCE(!kn);
+		sysfs_remove_file(kobj, &attr->attr);
+		klp_free_patches(&to_free);
+		if (kn)
+			sysfs_unbreak_active_protection(kn);
+	}
+
 	return count;
 }
 
@@ -684,32 +693,19 @@ static void klp_free_patch_finish(struct klp_patch *patch)
 	kobject_put(&patch->kobj);
 }
 
-/*
- * The livepatch might be freed from sysfs interface created by the patch.
- * This work allows to wait until the interface is destroyed in a separate
- * context.
- */
-static void klp_free_patch_work_fn(struct work_struct *work)
+static void klp_free_patch(struct klp_patch *patch)
 {
-	struct klp_patch *patch =
-		container_of(work, struct klp_patch, free_work);
-
+	klp_free_patch_start(patch);
 	klp_free_patch_finish(patch);
 }
 
-static void klp_free_patch_async(struct klp_patch *patch)
-{
-	klp_free_patch_start(patch);
-	schedule_work(&patch->free_work);
-}
-
-void klp_free_patches_async(struct list_head *to_free)
+void klp_free_patches(struct list_head *to_free)
 {
 	struct klp_patch *patch, *tmp_patch;
 
 	list_for_each_entry_safe(patch, tmp_patch, to_free, list) {
 		list_del_init(&patch->list);
-		klp_free_patch_async(patch);
+		klp_free_patch(patch);
 	}
 }
 
@@ -873,7 +869,6 @@ static int klp_init_patch_early(struct klp_patch *patch)
 	kobject_init(&patch->kobj, &klp_ktype_patch);
 	patch->enabled = false;
 	patch->forced = false;
-	INIT_WORK(&patch->free_work, klp_free_patch_work_fn);
 
 	klp_for_each_object_static(patch, obj) {
 		if (!obj->funcs)
