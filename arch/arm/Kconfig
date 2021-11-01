@@ -400,6 +400,7 @@ config ARCH_DOVE
 	select GENERIC_IRQ_MULTI_HANDLER
 	select GPIOLIB
 	select HAVE_PCI
+	select PCI_QUIRKS if PCI
 	select MVEBU_MBUS
 	select PINCTRL
 	select PINCTRL_DOVE

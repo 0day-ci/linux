@@ -346,6 +346,7 @@ config MIPS_COBALT
 	select CEVT_GT641XX
 	select DMA_NONCOHERENT
 	select FORCE_PCI
+	select PCI_QUIRKS
 	select I8253
 	select I8259
 	select IRQ_MIPS_CPU
