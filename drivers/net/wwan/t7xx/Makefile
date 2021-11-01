@@ -19,3 +19,6 @@ mtk_t7xx-y:=	t7xx_pci.o \
 		t7xx_hif_dpmaif_tx.o \
 		t7xx_hif_dpmaif_rx.o  \
 		t7xx_netdev.o \
+		t7xx_port_char.o  \
+		t7xx_port_tty.o \
+		t7xx_tty_ops.o

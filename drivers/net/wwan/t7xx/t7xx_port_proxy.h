@@ -82,8 +82,11 @@ struct port_msg {
 #define PORT_ENUM_VER_MISMATCH	0x00657272
 
 /* port operations mapping */
+extern struct port_ops char_port_ops;
 extern struct port_ops wwan_sub_port_ops;
 extern struct port_ops ctl_port_ops;
+extern struct port_ops tty_port_ops;
+extern struct tty_dev_ops tty_ops;
 
 int port_proxy_send_skb(struct t7xx_port *port, struct sk_buff *skb, bool from_pool);
 void port_proxy_set_seq_num(struct t7xx_port *port, struct ccci_header *ccci_h);

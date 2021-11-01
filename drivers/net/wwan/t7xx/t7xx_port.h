@@ -157,5 +157,7 @@ int port_write_room_to_md(struct t7xx_port *port);
 struct t7xx_port *port_get_by_minor(int minor);
 struct t7xx_port *port_get_by_name(char *port_name);
 int port_send_skb_to_md(struct t7xx_port *port, struct sk_buff *skb, bool blocking);
+int port_register_device(const char *name, int major, int minor);
+void port_unregister_device(int major, int minor);
 
 #endif /* __T7XX_PORT_H__ */

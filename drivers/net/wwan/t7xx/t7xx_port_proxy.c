@@ -44,6 +44,7 @@
 #define TTY_PORT_MINOR_INVALID			-1
 
 static struct port_proxy *port_prox;
+static struct class *dev_class;
 
 #define for_each_proxy_port(i, p, proxy)	\
 	for (i = 0, (p) = &(proxy)->ports[i];	\
@@ -53,8 +54,32 @@ static struct port_proxy *port_prox;
 static struct t7xx_port md_ccci_ports[] = {
 	{CCCI_UART2_TX, CCCI_UART2_RX, DATA_AT_CMD_Q, DATA_AT_CMD_Q, 0xff,
 	 0xff, ID_CLDMA1, PORT_F_RX_CHAR_NODE, &wwan_sub_port_ops, 0, "ttyC0", WWAN_PORT_AT},
+	{CCCI_MD_LOG_TX, CCCI_MD_LOG_RX, 7, 7, 7, 7, ID_CLDMA1,
+	 PORT_F_RX_CHAR_NODE, &char_port_ops, 2, "ttyCMdLog", WWAN_PORT_AT},
+	{CCCI_LB_IT_TX, CCCI_LB_IT_RX, 0, 0, 0xff, 0xff, ID_CLDMA1,
+	 PORT_F_RX_CHAR_NODE, &char_port_ops, 3, "ccci_lb_it",},
+	{CCCI_MIPC_TX, CCCI_MIPC_RX, 2, 2, 0, 0, ID_CLDMA1,
+	 PORT_F_RX_CHAR_NODE, &tty_port_ops, 1, "ttyCMIPC0",},
 	{CCCI_MBIM_TX, CCCI_MBIM_RX, 2, 2, 0, 0, ID_CLDMA1,
 	 PORT_F_RX_CHAR_NODE, &wwan_sub_port_ops, 10, "ttyCMBIM0", WWAN_PORT_MBIM},
+	{CCCI_UART1_TX, CCCI_UART1_RX, 1, 1, 1, 1, ID_CLDMA1,
+	 PORT_F_RX_CHAR_NODE, &char_port_ops, 11, "ttyCMdMeta",},
+	{CCCI_DSS0_TX, CCCI_DSS0_RX, 3, 3, 3, 3, ID_CLDMA1,
+	 PORT_F_RX_CHAR_NODE, &char_port_ops, 13, "ttyCMBIMDSS0",},
+	{CCCI_DSS1_TX, CCCI_DSS1_RX, 3, 3, 3, 3, ID_CLDMA1,
+	 PORT_F_RX_CHAR_NODE, &char_port_ops, 14, "ttyCMBIMDSS1",},
+	{CCCI_DSS2_TX, CCCI_DSS2_RX, 3, 3, 3, 3, ID_CLDMA1,
+	 PORT_F_RX_CHAR_NODE, &char_port_ops, 15, "ttyCMBIMDSS2",},
+	{CCCI_DSS3_TX, CCCI_DSS3_RX, 3, 3, 3, 3, ID_CLDMA1,
+	 PORT_F_RX_CHAR_NODE, &char_port_ops, 16, "ttyCMBIMDSS3",},
+	{CCCI_DSS4_TX, CCCI_DSS4_RX, 3, 3, 3, 3, ID_CLDMA1,
+	 PORT_F_RX_CHAR_NODE, &char_port_ops, 17, "ttyCMBIMDSS4",},
+	{CCCI_DSS5_TX, CCCI_DSS5_RX, 3, 3, 3, 3, ID_CLDMA1,
+	 PORT_F_RX_CHAR_NODE, &char_port_ops, 18, "ttyCMBIMDSS5",},
+	{CCCI_DSS6_TX, CCCI_DSS6_RX, 3, 3, 3, 3, ID_CLDMA1,
+	 PORT_F_RX_CHAR_NODE, &char_port_ops, 19, "ttyCMBIMDSS6",},
+	{CCCI_DSS7_TX, CCCI_DSS7_RX, 3, 3, 3, 3, ID_CLDMA1,
+	 PORT_F_RX_CHAR_NODE, &char_port_ops, 20, "ttyCMBIMDSS7",},
 	{CCCI_CONTROL_TX, CCCI_CONTROL_RX, 0, 0, 0, 0, ID_CLDMA1,
 	 0, &ctl_port_ops, 0xff, "ccci_ctrl",},
 };
@@ -658,6 +683,20 @@ struct t7xx_port *port_get_by_name(char *port_name)
 	return NULL;
 }
 
+int port_register_device(const char *name, int major, int minor)
+{
+	struct device *dev;
+
+	dev = device_create(dev_class, NULL, MKDEV(major, minor), NULL, "%s", name);
+
+	return IS_ERR(dev) ? PTR_ERR(dev) : 0;
+}
+
+void port_unregister_device(int major, int minor)
+{
+	device_destroy(dev_class, MKDEV(major, minor));
+}
+
 int port_proxy_broadcast_state(struct t7xx_port *port, int state)
 {
 	char msg[PORT_NETLINK_MSG_MAX_PAYLOAD];
@@ -695,9 +734,13 @@ int port_proxy_init(struct mtk_modem *md)
 {
 	int ret;
 
+	dev_class = class_create(THIS_MODULE, "ccci_node");
+	if (IS_ERR(dev_class))
+		return PTR_ERR(dev_class);
+
 	ret = proxy_alloc(md);
 	if (ret)
-		return ret;
+		goto err_proxy;
 
 	ret = port_netlink_init();
 	if (ret)
@@ -707,6 +750,8 @@ int port_proxy_init(struct mtk_modem *md)
 
 	return 0;
 
+err_proxy:
+	class_destroy(dev_class);
 err_netlink:
 	port_proxy_uninit();
 
@@ -725,6 +770,8 @@ void port_proxy_uninit(void)
 	unregister_chrdev_region(MKDEV(port_prox->major, port_prox->minor_base),
 				 TTY_IPC_MINOR_BASE);
 	port_netlink_uninit();
+
+	class_destroy(dev_class);
 }
 
 /**
