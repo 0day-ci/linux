@@ -270,6 +270,242 @@ static void md_sys_sw_init(struct mtk_pci_dev *mtk_dev)
 	mtk_pcie_register_rgu_isr(mtk_dev);
 }
 
+struct feature_query {
+	u32 head_pattern;
+	u8 feature_set[FEATURE_COUNT];
+	u32 tail_pattern;
+};
+
+static void prepare_host_rt_data_query(struct core_sys_info *core)
+{
+	struct ctrl_msg_header *ctrl_msg_h;
+	struct feature_query *ft_query;
+	struct ccci_header *ccci_h;
+	struct sk_buff *skb;
+	size_t packet_size;
+
+	packet_size = sizeof(struct ccci_header) +
+		      sizeof(struct ctrl_msg_header) +
+		      sizeof(struct feature_query);
+	skb = ccci_alloc_skb(packet_size, GFS_BLOCKING);
+	if (!skb)
+		return;
+
+	skb_put(skb, packet_size);
+	/* fill CCCI header */
+	ccci_h = (struct ccci_header *)skb->data;
+	ccci_h->data[0] = 0;
+	ccci_h->data[1] = packet_size;
+	ccci_h->status &= ~HDR_FLD_CHN;
+	ccci_h->status |= FIELD_PREP(HDR_FLD_CHN, core->ctl_port->tx_ch);
+	ccci_h->status &= ~HDR_FLD_SEQ;
+	ccci_h->reserved = 0;
+	/* fill control message */
+	ctrl_msg_h = (struct ctrl_msg_header *)(skb->data +
+						sizeof(struct ccci_header));
+	ctrl_msg_h->ctrl_msg_id = CTL_ID_HS1_MSG;
+	ctrl_msg_h->reserved = 0;
+	ctrl_msg_h->data_length = sizeof(struct feature_query);
+	/* fill feature query */
+	ft_query = (struct feature_query *)(skb->data +
+					    sizeof(struct ccci_header) +
+					    sizeof(struct ctrl_msg_header));
+	ft_query->head_pattern = MD_FEATURE_QUERY_ID;
+	memcpy(ft_query->feature_set, core->feature_set, FEATURE_COUNT);
+	ft_query->tail_pattern = MD_FEATURE_QUERY_ID;
+	/* send HS1 message to device */
+	port_proxy_send_skb(core->ctl_port, skb, 0);
+}
+
+static int prepare_device_rt_data(struct core_sys_info *core, struct device *dev,
+				  void *data, int data_length)
+{
+	struct mtk_runtime_feature rt_feature;
+	struct ctrl_msg_header *ctrl_msg_h;
+	struct feature_query *md_feature;
+	struct ccci_header *ccci_h;
+	struct sk_buff *skb;
+	int packet_size = 0;
+	char *rt_data;
+	int i;
+
+	skb = ccci_alloc_skb(MTK_SKB_4K, GFS_BLOCKING);
+	if (!skb)
+		return -EFAULT;
+
+	/* fill CCCI header */
+	ccci_h = (struct ccci_header *)skb->data;
+	ccci_h->data[0] = 0;
+	ccci_h->status &= ~HDR_FLD_CHN;
+	ccci_h->status |= FIELD_PREP(HDR_FLD_CHN, core->ctl_port->tx_ch);
+	ccci_h->status &= ~HDR_FLD_SEQ;
+	ccci_h->reserved = 0;
+	/* fill control message header */
+	ctrl_msg_h = (struct ctrl_msg_header *)(skb->data + sizeof(struct ccci_header));
+	ctrl_msg_h->ctrl_msg_id = CTL_ID_HS3_MSG;
+	ctrl_msg_h->reserved = 0;
+	rt_data = (skb->data + sizeof(struct ccci_header) + sizeof(struct ctrl_msg_header));
+
+	/* parse MD runtime data query */
+	md_feature = data;
+	if (md_feature->head_pattern != MD_FEATURE_QUERY_ID ||
+	    md_feature->tail_pattern != MD_FEATURE_QUERY_ID) {
+		dev_err(dev, "md_feature pattern is wrong: head 0x%x, tail 0x%x\n",
+			md_feature->head_pattern, md_feature->tail_pattern);
+		return -EINVAL;
+	}
+
+	/* fill runtime feature */
+	for (i = 0; i < FEATURE_COUNT; i++) {
+		u8 md_feature_mask = FIELD_GET(FEATURE_MSK, md_feature->feature_set[i]);
+
+		memset(&rt_feature, 0, sizeof(rt_feature));
+		rt_feature.feature_id = i;
+		switch (md_feature_mask) {
+		case MTK_FEATURE_DOES_NOT_EXIST:
+		case MTK_FEATURE_MUST_BE_SUPPORTED:
+			rt_feature.support_info = md_feature->feature_set[i];
+			break;
+
+		default:
+			break;
+		}
+
+		if (FIELD_GET(FEATURE_MSK, rt_feature.support_info) !=
+		    MTK_FEATURE_MUST_BE_SUPPORTED) {
+			rt_feature.data_len = 0;
+			memcpy(rt_data, &rt_feature, sizeof(struct mtk_runtime_feature));
+			rt_data += sizeof(struct mtk_runtime_feature);
+		}
+
+		packet_size += (sizeof(struct mtk_runtime_feature) + rt_feature.data_len);
+	}
+
+	ctrl_msg_h->data_length = packet_size;
+	ccci_h->data[1] = packet_size + sizeof(struct ctrl_msg_header) +
+			  sizeof(struct ccci_header);
+	skb_put(skb, ccci_h->data[1]);
+	/* send HS3 message to device */
+	port_proxy_send_skb(core->ctl_port, skb, 0);
+	return 0;
+}
+
+static int parse_host_rt_data(struct core_sys_info *core, struct device *dev,
+			      void *data, int data_length)
+{
+	enum mtk_feature_support_type ft_spt_st, ft_spt_cfg;
+	struct mtk_runtime_feature *rt_feature;
+	int i, offset;
+
+	offset = sizeof(struct feature_query);
+	for (i = 0; i < FEATURE_COUNT && offset < data_length; i++) {
+		rt_feature = (struct mtk_runtime_feature *)(data + offset);
+		ft_spt_st = FIELD_GET(FEATURE_MSK, rt_feature->support_info);
+		ft_spt_cfg = FIELD_GET(FEATURE_MSK, core->feature_set[i]);
+		offset += sizeof(struct mtk_runtime_feature) + rt_feature->data_len;
+
+		if (ft_spt_cfg == MTK_FEATURE_MUST_BE_SUPPORTED) {
+			if (ft_spt_st != MTK_FEATURE_MUST_BE_SUPPORTED) {
+				dev_err(dev, "mismatch: runtime feature%d (%d,%d)\n",
+					i, ft_spt_cfg, ft_spt_st);
+				return -EINVAL;
+			}
+
+			if (i == RT_ID_MD_PORT_ENUM)
+				port_proxy_node_control(dev, (struct port_msg *)rt_feature->data);
+		}
+	}
+
+	return 0;
+}
+
+static void core_reset(struct mtk_modem *md)
+{
+	struct ccci_fsm_ctl *fsm_ctl;
+
+	atomic_set(&md->core_md.ready, 0);
+	fsm_ctl = fsm_get_entry();
+
+	if (!fsm_ctl) {
+		dev_err(&md->mtk_dev->pdev->dev, "fsm ctl is not initialized\n");
+		return;
+	}
+
+	/* append HS2_EXIT event to cancel the ongoing handshake in core_hk_handler() */
+	if (atomic_read(&md->core_md.handshake_ongoing))
+		fsm_append_event(fsm_ctl, CCCI_EVENT_MD_HS2_EXIT, NULL, 0);
+
+	atomic_set(&md->core_md.handshake_ongoing, 0);
+}
+
+static void core_hk_handler(struct mtk_modem *md, struct ccci_fsm_ctl *ctl,
+			    enum ccci_fsm_event_state event_id,
+			    enum ccci_fsm_event_state err_detect)
+{
+	struct core_sys_info *core_info;
+	struct ccci_fsm_event *event, *event_next;
+	unsigned long flags;
+	struct device *dev;
+	int ret;
+
+	core_info = &md->core_md;
+	dev = &md->mtk_dev->pdev->dev;
+	prepare_host_rt_data_query(core_info);
+	while (!kthread_should_stop()) {
+		bool event_received = false;
+
+		spin_lock_irqsave(&ctl->event_lock, flags);
+		list_for_each_entry_safe(event, event_next, &ctl->event_queue, entry) {
+			if (event->event_id == err_detect) {
+				list_del(&event->entry);
+				spin_unlock_irqrestore(&ctl->event_lock, flags);
+				dev_err(dev, "core handshake error event received\n");
+				goto exit;
+			}
+
+			if (event->event_id == event_id) {
+				list_del(&event->entry);
+				event_received = true;
+				break;
+			}
+		}
+
+		spin_unlock_irqrestore(&ctl->event_lock, flags);
+
+		if (event_received)
+			break;
+
+		wait_event_interruptible(ctl->event_wq, !list_empty(&ctl->event_queue) ||
+					 kthread_should_stop());
+		if (kthread_should_stop())
+			goto exit;
+	}
+
+	if (atomic_read(&ctl->exp_flg))
+		goto exit;
+
+	ret = parse_host_rt_data(core_info, dev, event->data, event->length);
+	if (ret) {
+		dev_err(dev, "host runtime data parsing fail:%d\n", ret);
+		goto exit;
+	}
+
+	if (atomic_read(&ctl->exp_flg))
+		goto exit;
+
+	ret = prepare_device_rt_data(core_info, dev, event->data, event->length);
+	if (ret) {
+		dev_err(dev, "device runtime data parsing fail:%d", ret);
+		goto exit;
+	}
+
+	atomic_set(&core_info->ready, 1);
+	atomic_set(&core_info->handshake_ongoing, 0);
+	wake_up(&ctl->async_hk_wq);
+exit:
+	kfree(event);
+}
+
 static void md_hk_wq(struct work_struct *work)
 {
 	struct ccci_fsm_ctl *ctl;
@@ -277,12 +513,14 @@ static void md_hk_wq(struct work_struct *work)
 
 	ctl = fsm_get_entry();
 
+	/* clear the HS2 EXIT event appended in core_reset() */
+	fsm_clear_event(ctl, CCCI_EVENT_MD_HS2_EXIT);
 	cldma_switch_cfg(ID_CLDMA1);
 	cldma_start(ID_CLDMA1);
 	fsm_broadcast_state(ctl, MD_STATE_WAITING_FOR_HS2);
 	md = container_of(work, struct mtk_modem, handshake_work);
-	atomic_set(&md->core_md.ready, 1);
-	wake_up(&ctl->async_hk_wq);
+	atomic_set(&md->core_md.handshake_ongoing, 1);
+	core_hk_handler(md, ctl, CCCI_EVENT_MD_HS2, CCCI_EVENT_MD_HS2_EXIT);
 }
 
 void mtk_md_event_notify(struct mtk_modem *md, enum md_event_id evt_id)
@@ -394,6 +632,7 @@ static struct mtk_modem *ccci_md_alloc(struct mtk_pci_dev *mtk_dev)
 	md->mtk_dev = mtk_dev;
 	mtk_dev->md = md;
 	atomic_set(&md->core_md.ready, 0);
+	atomic_set(&md->core_md.handshake_ongoing, 0);
 	md->handshake_wq = alloc_workqueue("%s",
 					   WQ_UNBOUND | WQ_MEM_RECLAIM | WQ_HIGHPRI,
 					   0, "md_hk_wq");
@@ -418,6 +657,7 @@ void mtk_md_reset(struct mtk_pci_dev *mtk_dev)
 	cldma_reset(ID_CLDMA1);
 	port_proxy_reset(&mtk_dev->pdev->dev);
 	md->md_init_finish = true;
+	core_reset(md);
 }
 
 /**

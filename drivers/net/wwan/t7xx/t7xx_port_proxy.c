@@ -50,10 +50,9 @@ static struct port_proxy *port_prox;
 	     i < (proxy)->port_number;		\
 	     i++, (p) = &(proxy)->ports[i])
 
-static struct port_ops dummy_port_ops;
-
 static struct t7xx_port md_ccci_ports[] = {
-	{0, 0, 0, 0, 0, 0, ID_CLDMA1, 0, &dummy_port_ops, 0xff, "dummy_port",},
+	{CCCI_CONTROL_TX, CCCI_CONTROL_RX, 0, 0, 0, 0, ID_CLDMA1,
+	 0, &ctl_port_ops, 0xff, "ccci_ctrl",},
 };
 
 static int port_netlink_send_msg(struct t7xx_port *port, int grp,
@@ -586,6 +585,10 @@ static void proxy_init_all_ports(struct mtk_modem *md)
 
 	for_each_proxy_port(i, port, port_prox) {
 		port_struct_init(port);
+		if (port->tx_ch == CCCI_CONTROL_TX) {
+			port_prox->ctl_port = port;
+			md->core_md.ctl_port = port;
+		}
 
 		port->major = port_prox->major;
 		port->minor_base = port_prox->minor_base;

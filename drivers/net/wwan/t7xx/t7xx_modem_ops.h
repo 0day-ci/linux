@@ -60,7 +60,9 @@ enum md_event_id {
 
 struct core_sys_info {
 	atomic_t ready;
+	atomic_t handshake_ongoing;
 	u8 feature_set[FEATURE_COUNT];
+	struct t7xx_port *ctl_port;
 };
 
 struct mtk_modem {

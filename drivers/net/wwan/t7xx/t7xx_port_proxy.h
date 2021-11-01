@@ -45,6 +45,7 @@ struct port_proxy {
 	unsigned int		major;
 	unsigned int		minor_base;
 	struct t7xx_port	*ports;
+	struct t7xx_port	*ctl_port;
 	struct t7xx_port	*dedicated_ports[CLDMA_NUM][MTK_MAX_QUEUE_NUM];
 	/* port list of each RX channel, for RX dispatching */
 	struct list_head	rx_ch_ports[CCCI_MAX_CH_ID];
@@ -79,6 +80,9 @@ struct port_msg {
 #define PORT_ENUM_HEAD_PATTERN	0x5a5a5a5a
 #define PORT_ENUM_TAIL_PATTERN	0xa5a5a5a5
 #define PORT_ENUM_VER_MISMATCH	0x00657272
+
+/* port operations mapping */
+extern struct port_ops ctl_port_ops;
 
 int port_proxy_send_skb(struct t7xx_port *port, struct sk_buff *skb, bool from_pool);
 void port_proxy_set_seq_num(struct t7xx_port *port, struct ccci_header *ccci_h);

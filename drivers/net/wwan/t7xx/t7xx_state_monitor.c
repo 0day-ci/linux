@@ -334,6 +334,9 @@ static void fsm_routine_starting(struct ccci_fsm_ctl *ctl)
 
 	if (!atomic_read(&md->core_md.ready)) {
 		dev_err(dev, "MD handshake timeout\n");
+		if (atomic_read(&md->core_md.handshake_ongoing))
+			fsm_append_event(ctl, CCCI_EVENT_MD_HS2_EXIT, NULL, 0);
+
 		fsm_routine_exception(ctl, NULL, EXCEPTION_HS_TIMEOUT);
 	} else {
 		fsm_routine_ready(ctl);
