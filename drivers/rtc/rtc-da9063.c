@@ -490,7 +490,15 @@ static int da9063_rtc_probe(struct platform_device *pdev)
 					da9063_alarm_event,
 					IRQF_TRIGGER_LOW | IRQF_ONESHOT,
 					"ALARM", rtc);
-	if (ret)
+	if (!ret) {
+		if (device_property_present(&pdev->dev, "wakeup-source")) {
+			device_init_wakeup(&pdev->dev, true);
+			dev_info(&pdev->dev, "registered as wakeup source.\n");
+		} else {
+			device_set_wakeup_capable(&pdev->dev, true);
+			dev_info(&pdev->dev, "marked as wakeup capable.\n");
+		}
+	} else
 		dev_err(&pdev->dev, "Failed to request ALARM IRQ %d: %d\n",
 			irq_alarm, ret);
 
