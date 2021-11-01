@@ -173,6 +173,7 @@ static void fsm_routine_exception(struct ccci_fsm_ctl *ctl, struct ccci_fsm_comm
 
 	case EXCEPTION_EVENT:
 		fsm_broadcast_state(ctl, MD_STATE_EXCEPTION);
+		mtk_pci_pm_exp_detected(ctl->md->mtk_dev);
 		mtk_md_exception_handshake(ctl->md);
 		cnt = 0;
 		while (cnt < MD_EX_REC_OK_TIMEOUT_MS / EVENT_POLL_INTERVAL_MS) {
@@ -339,6 +340,7 @@ static void fsm_routine_starting(struct ccci_fsm_ctl *ctl)
 
 		fsm_routine_exception(ctl, NULL, EXCEPTION_HS_TIMEOUT);
 	} else {
+		mtk_pci_pm_init_late(md->mtk_dev);
 		fsm_routine_ready(ctl);
 	}
 }

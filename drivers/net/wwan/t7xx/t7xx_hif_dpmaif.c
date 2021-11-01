@@ -456,6 +456,98 @@ static int dpmaif_stop(struct dpmaif_ctrl *dpmaif_ctrl)
 	return 0;
 }
 
+static int dpmaif_suspend(struct mtk_pci_dev *mtk_dev, void *param)
+{
+	struct dpmaif_ctrl *dpmaif_ctrl;
+
+	dpmaif_ctrl = param;
+	dpmaif_suspend_tx_sw_stop(dpmaif_ctrl);
+	dpmaif_hw_stop_tx_queue(dpmaif_ctrl);
+	dpmaif_hw_stop_rx_queue(dpmaif_ctrl);
+	dpmaif_disable_irq(dpmaif_ctrl);
+	dpmaif_suspend_rx_sw_stop(dpmaif_ctrl);
+	return 0;
+}
+
+static void dpmaif_unmask_dlq_interrupt(struct dpmaif_ctrl *dpmaif_ctrl)
+{
+	int qno;
+
+	for (qno = 0; qno < DPMAIF_RXQ_NUM; qno++)
+		dpmaif_hw_dlq_unmask_rx_done(&dpmaif_ctrl->hif_hw_info, qno);
+}
+
+static void dpmaif_pre_start_hw(struct dpmaif_ctrl *dpmaif_ctrl)
+{
+	struct dpmaif_rx_queue *rxq;
+	struct dpmaif_tx_queue *txq;
+	unsigned int que_cnt;
+
+	/* Enable UL SW active */
+	for (que_cnt = 0; que_cnt < DPMAIF_TXQ_NUM; que_cnt++) {
+		txq = &dpmaif_ctrl->txq[que_cnt];
+		txq->que_started = true;
+	}
+
+	/* Enable DL/RX SW active */
+	for (que_cnt = 0; que_cnt < DPMAIF_RXQ_NUM; que_cnt++) {
+		rxq = &dpmaif_ctrl->rxq[que_cnt];
+		rxq->que_started = true;
+	}
+}
+
+static int dpmaif_resume(struct mtk_pci_dev *mtk_dev, void *param)
+{
+	struct dpmaif_ctrl *dpmaif_ctrl;
+
+	dpmaif_ctrl = param;
+	if (!dpmaif_ctrl)
+		return 0;
+
+	/* start dpmaif tx/rx queue SW */
+	dpmaif_pre_start_hw(dpmaif_ctrl);
+	/* unmask PCIe DPMAIF interrupt */
+	dpmaif_enable_irq(dpmaif_ctrl);
+	dpmaif_unmask_dlq_interrupt(dpmaif_ctrl);
+	dpmaif_start_hw(dpmaif_ctrl);
+	wake_up(&dpmaif_ctrl->tx_wq);
+	return 0;
+}
+
+static int dpmaif_pm_entity_init(struct dpmaif_ctrl *dpmaif_ctrl)
+{
+	struct md_pm_entity *dpmaif_pm_entity;
+	int ret;
+
+	dpmaif_pm_entity = &dpmaif_ctrl->dpmaif_pm_entity;
+	INIT_LIST_HEAD(&dpmaif_pm_entity->entity);
+	dpmaif_pm_entity->suspend = &dpmaif_suspend;
+	dpmaif_pm_entity->suspend_late = NULL;
+	dpmaif_pm_entity->resume_early = NULL;
+	dpmaif_pm_entity->resume = &dpmaif_resume;
+	dpmaif_pm_entity->id = PM_ENTITY_ID_DATA;
+	dpmaif_pm_entity->entity_param = dpmaif_ctrl;
+
+	ret = mtk_pci_pm_entity_register(dpmaif_ctrl->mtk_dev, dpmaif_pm_entity);
+	if (ret)
+		dev_err(dpmaif_ctrl->dev, "dpmaif register pm_entity fail\n");
+
+	return ret;
+}
+
+static int dpmaif_pm_entity_release(struct dpmaif_ctrl *dpmaif_ctrl)
+{
+	struct md_pm_entity *dpmaif_pm_entity;
+	int ret;
+
+	dpmaif_pm_entity = &dpmaif_ctrl->dpmaif_pm_entity;
+	ret = mtk_pci_pm_entity_unregister(dpmaif_ctrl->mtk_dev, dpmaif_pm_entity);
+	if (ret < 0)
+		dev_err(dpmaif_ctrl->dev, "dpmaif register pm_entity fail\n");
+
+	return ret;
+}
+
 int dpmaif_md_state_callback(struct dpmaif_ctrl *dpmaif_ctrl, unsigned char state)
 {
 	int ret = 0;
@@ -515,6 +607,10 @@ struct dpmaif_ctrl *dpmaif_hif_init(struct mtk_pci_dev *mtk_dev,
 	dpmaif_ctrl->hif_hw_info.pcie_base = mtk_dev->base_addr.pcie_ext_reg_base -
 					     mtk_dev->base_addr.pcie_dev_reg_trsl_addr;
 
+	ret = dpmaif_pm_entity_init(dpmaif_ctrl);
+	if (ret)
+		return NULL;
+
 	/* registers dpmaif irq by PCIe driver API */
 	dpmaif_platform_irq_init(dpmaif_ctrl);
 	dpmaif_disable_irq(dpmaif_ctrl);
@@ -523,6 +619,7 @@ struct dpmaif_ctrl *dpmaif_hif_init(struct mtk_pci_dev *mtk_dev,
 	ret = dpmaif_sw_init(dpmaif_ctrl);
 	if (ret) {
 		dev_err(&mtk_dev->pdev->dev, "DPMAIF SW initialization fail! %d\n", ret);
+		dpmaif_pm_entity_release(dpmaif_ctrl);
 		return NULL;
 	}
 
@@ -534,6 +631,7 @@ void dpmaif_hif_exit(struct dpmaif_ctrl *dpmaif_ctrl)
 {
 	if (dpmaif_ctrl->dpmaif_sw_init_done) {
 		dpmaif_stop(dpmaif_ctrl);
+		dpmaif_pm_entity_release(dpmaif_ctrl);
 		dpmaif_sw_release(dpmaif_ctrl);
 		dpmaif_ctrl->dpmaif_sw_init_done = false;
 	}

@@ -18,6 +18,11 @@
 #include "t7xx_pci.h"
 #include "t7xx_pcie_mac.h"
 
+#define D2H_INT_SR_ACK		(D2H_INT_SUSPEND_ACK |		\
+				 D2H_INT_RESUME_ACK |		\
+				 D2H_INT_SUSPEND_ACK_AP |	\
+				 D2H_INT_RESUME_ACK_AP)
+
 static void mhccif_clear_interrupts(struct mtk_pci_dev *mtk_dev, u32 mask)
 {
 	void __iomem *mhccif_pbase;
@@ -51,6 +56,17 @@ static irqreturn_t mhccif_isr_thread(int irq, void *data)
 
 	/* Clear 2 & 1 level interrupts */
 	mhccif_clear_interrupts(mtk_dev, int_sts);
+
+	if (int_sts & D2H_INT_SR_ACK)
+		complete(&mtk_dev->pm_sr_ack);
+
+	/* Use the 1 bits to avoid low power bits */
+	iowrite32(L1_DISABLE_BIT(1), IREG_BASE(mtk_dev) + DIS_ASPM_LOWPWR_CLR_0);
+
+	int_sts = mhccif_read_sw_int_sts(mtk_dev);
+	if (!int_sts)
+		iowrite32(L1_1_DISABLE_BIT(1) | L1_2_DISABLE_BIT(1),
+			  IREG_BASE(mtk_dev) + DIS_ASPM_LOWPWR_CLR_0);
 
 	/* Enable corresponding interrupt */
 	mtk_pcie_mac_set_int(mtk_dev, MHCCIF_INT);

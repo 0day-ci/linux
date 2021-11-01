@@ -1382,6 +1382,120 @@ void cldma_exception(enum cldma_id hif_id, enum hif_ex_stage stage)
 	}
 }
 
+static void cldma_resume_early(struct mtk_pci_dev *mtk_dev, void *entity_param)
+{
+	struct cldma_hw_info *hw_info;
+	struct cldma_ctrl *md_ctrl;
+	unsigned long flags;
+	int qno_t;
+
+	md_ctrl = entity_param;
+	hw_info = &md_ctrl->hw_info;
+	spin_lock_irqsave(&md_ctrl->cldma_lock, flags);
+	cldma_hw_restore(hw_info);
+
+	for (qno_t = 0; qno_t < CLDMA_TXQ_NUM; qno_t++) {
+		cldma_hw_set_start_address(hw_info, qno_t, md_ctrl->txq[qno_t].tx_xmit->gpd_addr,
+					   false);
+		cldma_hw_set_start_address(hw_info, qno_t, md_ctrl->rxq[qno_t].tr_done->gpd_addr,
+					   true);
+	}
+
+	cldma_enable_irq(md_ctrl);
+	cldma_hw_start_queue(hw_info, CLDMA_ALL_Q, true);
+	md_ctrl->rxq_active |= TXRX_STATUS_BITMASK;
+	cldma_hw_dismask_eqirq(hw_info, CLDMA_ALL_Q, true);
+	cldma_hw_dismask_txrxirq(hw_info, CLDMA_ALL_Q, true);
+	spin_unlock_irqrestore(&md_ctrl->cldma_lock, flags);
+}
+
+static int cldma_resume(struct mtk_pci_dev *mtk_dev, void *entity_param)
+{
+	struct cldma_ctrl *md_ctrl;
+	unsigned long flags;
+
+	md_ctrl = entity_param;
+	spin_lock_irqsave(&md_ctrl->cldma_lock, flags);
+	md_ctrl->txq_active |= TXRX_STATUS_BITMASK;
+	cldma_hw_dismask_txrxirq(&md_ctrl->hw_info, CLDMA_ALL_Q, false);
+	cldma_hw_dismask_eqirq(&md_ctrl->hw_info, CLDMA_ALL_Q, false);
+	spin_unlock_irqrestore(&md_ctrl->cldma_lock, flags);
+	if (md_ctrl->hif_id == ID_CLDMA1)
+		mhccif_mask_clr(mtk_dev, D2H_SW_INT_MASK);
+
+	return 0;
+}
+
+static void cldma_suspend_late(struct mtk_pci_dev *mtk_dev, void *entity_param)
+{
+	struct cldma_hw_info *hw_info;
+	struct cldma_ctrl *md_ctrl;
+	unsigned long flags;
+
+	md_ctrl = entity_param;
+	hw_info = &md_ctrl->hw_info;
+	spin_lock_irqsave(&md_ctrl->cldma_lock, flags);
+	cldma_hw_mask_eqirq(hw_info, CLDMA_ALL_Q, true);
+	cldma_hw_mask_txrxirq(hw_info, CLDMA_ALL_Q, true);
+	md_ctrl->rxq_active &= ~TXRX_STATUS_BITMASK;
+	cldma_hw_stop_queue(hw_info, CLDMA_ALL_Q, true);
+	cldma_clear_ip_busy(hw_info);
+	cldma_disable_irq(md_ctrl);
+	spin_unlock_irqrestore(&md_ctrl->cldma_lock, flags);
+}
+
+static int cldma_suspend(struct mtk_pci_dev *mtk_dev, void *entity_param)
+{
+	struct cldma_hw_info *hw_info;
+	struct cldma_ctrl *md_ctrl;
+	unsigned long flags;
+
+	md_ctrl = entity_param;
+	hw_info = &md_ctrl->hw_info;
+	if (md_ctrl->hif_id == ID_CLDMA1)
+		mhccif_mask_set(mtk_dev, D2H_SW_INT_MASK);
+
+	spin_lock_irqsave(&md_ctrl->cldma_lock, flags);
+	cldma_hw_mask_eqirq(hw_info, CLDMA_ALL_Q, false);
+	cldma_hw_mask_txrxirq(hw_info, CLDMA_ALL_Q, false);
+	md_ctrl->txq_active &= ~TXRX_STATUS_BITMASK;
+	cldma_hw_stop_queue(hw_info, CLDMA_ALL_Q, false);
+	md_ctrl->txq_started = 0;
+	spin_unlock_irqrestore(&md_ctrl->cldma_lock, flags);
+	return 0;
+}
+
+static int cldma_pm_init(struct cldma_ctrl *md_ctrl)
+{
+	md_ctrl->pm_entity = kzalloc(sizeof(*md_ctrl->pm_entity), GFP_KERNEL);
+	if (!md_ctrl->pm_entity)
+		return -ENOMEM;
+
+	md_ctrl->pm_entity->entity_param = md_ctrl;
+	if (md_ctrl->hif_id == ID_CLDMA1)
+		md_ctrl->pm_entity->id = PM_ENTITY_ID_CTRL1;
+	else
+		md_ctrl->pm_entity->id = PM_ENTITY_ID_CTRL2;
+
+	md_ctrl->pm_entity->suspend = cldma_suspend;
+	md_ctrl->pm_entity->suspend_late = cldma_suspend_late;
+	md_ctrl->pm_entity->resume = cldma_resume;
+	md_ctrl->pm_entity->resume_early = cldma_resume_early;
+
+	return mtk_pci_pm_entity_register(md_ctrl->mtk_dev, md_ctrl->pm_entity);
+}
+
+static int cldma_pm_uninit(struct cldma_ctrl *md_ctrl)
+{
+	if (!md_ctrl->pm_entity)
+		return -EINVAL;
+
+	mtk_pci_pm_entity_unregister(md_ctrl->mtk_dev, md_ctrl->pm_entity);
+	kfree_sensitive(md_ctrl->pm_entity);
+	md_ctrl->pm_entity = NULL;
+	return 0;
+}
+
 void cldma_hif_hw_init(enum cldma_id hif_id)
 {
 	struct cldma_hw_info *hw_info;
@@ -1423,6 +1537,7 @@ static irqreturn_t cldma_isr_handler(int irq, void *data)
  * cldma_init() - Initialize CLDMA
  * @hif_id: CLDMA ID (ID_CLDMA0 or ID_CLDMA1)
  *
+ * allocate and initialize device power management entity
  * initialize HIF TX/RX queue structure
  * register CLDMA callback isr with PCIe driver
  *
@@ -1433,7 +1548,7 @@ int cldma_init(enum cldma_id hif_id)
 	struct cldma_hw_info *hw_info;
 	struct cldma_ctrl *md_ctrl;
 	struct mtk_modem *md;
-	int i;
+	int ret, i;
 
 	md_ctrl = md_cd_get(hif_id);
 	md = md_ctrl->mtk_dev->md;
@@ -1442,6 +1557,9 @@ int cldma_init(enum cldma_id hif_id)
 	md_ctrl->rxq_active = 0;
 	md_ctrl->is_late_init = false;
 	hw_info = &md_ctrl->hw_info;
+	ret = cldma_pm_init(md_ctrl);
+	if (ret)
+		return ret;
 
 	spin_lock_init(&md_ctrl->cldma_lock);
 	/* initialize HIF queue structure */
@@ -1516,4 +1634,6 @@ void cldma_exit(enum cldma_id hif_id)
 			md_ctrl->rxq[i].worker = NULL;
 		}
 	}
+
+	cldma_pm_uninit(md_ctrl);
 }
