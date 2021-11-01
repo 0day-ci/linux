@@ -13,6 +13,7 @@
 #include <linux/vmalloc.h>
 #include <linux/set_memory.h>
 #include <linux/slab.h>
+#include <asm/cacheflush.h>
 #include "direct.h"
 
 /*
@@ -169,6 +170,9 @@ void *dma_direct_alloc(struct device *dev, size_t size,
 		if (!PageHighMem(page))
 			arch_dma_prep_coherent(page, size);
 		*dma_handle = phys_to_dma_direct(dev, page_to_phys(page));
+		/* remove kernel mapping for pages */
+		set_memory_valid((unsigned long)phys_to_virt(dma_to_phys(dev, *dma_handle)),
+				size >> PAGE_SHIFT, 0);
 		/* return the page pointer as the opaque cookie */
 		return page;
 	}
@@ -278,6 +282,10 @@ void dma_direct_free(struct device *dev, size_t size,
 
 	if ((attrs & DMA_ATTR_NO_KERNEL_MAPPING) &&
 	    !force_dma_unencrypted(dev) && !is_swiotlb_for_alloc(dev)) {
+		size = PAGE_ALIGN(size);
+		/* create kernel mapping for pages */
+		set_memory_valid((unsigned long)phys_to_virt(dma_to_phys(dev, dma_addr)),
+				size >> PAGE_SHIFT, 1);
 		/* cpu_addr is a struct page cookie, not a kernel address */
 		dma_free_contiguous(dev, cpu_addr, size);
 		return;
