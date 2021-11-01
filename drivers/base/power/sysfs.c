@@ -214,10 +214,8 @@ static ssize_t pm_qos_resume_latency_us_show(struct device *dev,
 {
 	s32 value = dev_pm_qos_requested_resume_latency(dev);
 
-	if (value == 0)
-		return sysfs_emit(buf, "n/a\n");
 	if (value == PM_QOS_RESUME_LATENCY_NO_CONSTRAINT)
-		value = 0;
+		return sysfs_emit(buf, "no constraint\n");
 
 	return sysfs_emit(buf, "%d\n", value);
 }
@@ -237,10 +235,8 @@ static ssize_t pm_qos_resume_latency_us_store(struct device *dev,
 		if (value < 0 || value == PM_QOS_RESUME_LATENCY_NO_CONSTRAINT)
 			return -EINVAL;
 
-		if (value == 0)
-			value = PM_QOS_RESUME_LATENCY_NO_CONSTRAINT;
 	} else if (sysfs_streq(buf, "n/a")) {
-		value = 0;
+		value = PM_QOS_RESUME_LATENCY_NO_CONSTRAINT;
 	} else {
 		return -EINVAL;
 	}
