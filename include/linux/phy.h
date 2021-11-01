@@ -1114,12 +1114,14 @@ int phy_read_mmd(struct phy_device *phydev, int devad, u32 regnum);
  * from an MMD on a given PHY.
  */
 int __phy_read_mmd(struct phy_device *phydev, int devad, u32 regnum);
+int __mmd_phy_read(struct mii_bus *bus, int phy_addr, int devad, u32 regnum);
 
 /*
  * phy_write_mmd - Convenience function for writing a register
  * on an MMD on a given PHY.
  */
 int phy_write_mmd(struct phy_device *phydev, int devad, u32 regnum, u16 val);
+int __mmd_phy_write(struct mii_bus *bus, int phy_addr, int devad, u32 regnum, u16 val);
 
 /*
  * __phy_write_mmd - Convenience function for writing a register

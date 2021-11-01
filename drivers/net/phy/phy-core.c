@@ -457,6 +457,28 @@ static void mmd_phy_indirect(struct mii_bus *bus, int phy_addr, int devad,
 			devad | MII_MMD_CTRL_NOINCR);
 }
 
+int __mmd_phy_read(struct mii_bus *bus, int phy_addr, int devad, u32 regnum)
+{
+	int retval;
+
+	mmd_phy_indirect(bus, phy_addr, devad, regnum);
+
+	/* Read the content of the MMD's selected register */
+	retval = __mdiobus_read(bus, phy_addr, MII_MMD_DATA);
+
+	return retval;
+}
+
+int __mmd_phy_write(struct mii_bus *bus, int phy_addr, int devad, u32 regnum, u16 val)
+{
+	mmd_phy_indirect(bus, phy_addr, devad, regnum);
+
+	/* Write the data into MMD's selected register */
+	__mdiobus_write(bus, phy_addr, MII_MMD_DATA, val);
+
+	return 0;
+}
+
 /**
  * __phy_read_mmd - Convenience function for reading a register
  * from an MMD on a given PHY.
@@ -482,10 +504,7 @@ int __phy_read_mmd(struct phy_device *phydev, int devad, u32 regnum)
 		struct mii_bus *bus = phydev->mdio.bus;
 		int phy_addr = phydev->mdio.addr;
 
-		mmd_phy_indirect(bus, phy_addr, devad, regnum);
-
-		/* Read the content of the MMD's selected register */
-		val = __mdiobus_read(bus, phy_addr, MII_MMD_DATA);
+		val = __mmd_phy_read(bus, phy_addr, devad, regnum);
 	}
 	return val;
 }
@@ -538,10 +557,7 @@ int __phy_write_mmd(struct phy_device *phydev, int devad, u32 regnum, u16 val)
 		struct mii_bus *bus = phydev->mdio.bus;
 		int phy_addr = phydev->mdio.addr;
 
-		mmd_phy_indirect(bus, phy_addr, devad, regnum);
-
-		/* Write the data into MMD's selected register */
-		__mdiobus_write(bus, phy_addr, MII_MMD_DATA, val);
+		__mmd_phy_write(bus, phy_addr, devad, regnum, val);
 
 		ret = 0;
 	}

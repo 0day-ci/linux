@@ -300,8 +300,19 @@ int phy_mii_ioctl(struct phy_device *phydev, struct ifreq *ifr, int cmd)
 			prtad = mii_data->phy_id;
 			devad = mii_data->reg_num;
 		}
-		mii_data->val_out = mdiobus_read(phydev->mdio.bus, prtad,
-						 devad);
+		if (mdio_phy_id_is_c45(mii_data->phy_id) &&
+		    phydev->mdio.bus->probe_capabilities <= MDIOBUS_C22) {
+			phy_lock_mdio_bus(phydev);
+
+			mii_data->val_out = __mmd_phy_read(phydev->mdio.bus,
+							   mdio_phy_id_devad(mii_data->phy_id),
+							   prtad,
+							   mii_data->reg_num);
+
+			phy_unlock_mdio_bus(phydev);
+		} else {
+			mii_data->val_out = mdiobus_read(phydev->mdio.bus, prtad, devad);
+		}
 		return 0;
 
 	case SIOCSMIIREG:
@@ -351,7 +362,19 @@ int phy_mii_ioctl(struct phy_device *phydev, struct ifreq *ifr, int cmd)
 			}
 		}
 
-		mdiobus_write(phydev->mdio.bus, prtad, devad, val);
+		if (mdio_phy_id_is_c45(mii_data->phy_id) &&
+		    phydev->mdio.bus->probe_capabilities <= MDIOBUS_C22) {
+			phy_lock_mdio_bus(phydev);
+
+			__mmd_phy_write(phydev->mdio.bus, mdio_phy_id_devad(mii_data->phy_id),
+					prtad,
+					mii_data->reg_num,
+					val);
+
+			phy_unlock_mdio_bus(phydev);
+		} else {
+			mdiobus_write(phydev->mdio.bus, prtad, devad, val);
+		}
 
 		if (prtad == phydev->mdio.addr &&
 		    devad == MII_BMCR &&
