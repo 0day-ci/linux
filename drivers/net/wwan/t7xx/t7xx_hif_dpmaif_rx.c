@@ -22,6 +22,7 @@
 #include <linux/kthread.h>
 #include <linux/list.h>
 #include <linux/mm.h>
+#include <linux/pm_runtime.h>
 #include <linux/skbuff.h>
 #include <linux/slab.h>
 #include <linux/spinlock.h>
@@ -1039,6 +1040,7 @@ static void dpmaif_rxq_work(struct work_struct *work)
 {
 	struct dpmaif_ctrl *dpmaif_ctrl;
 	struct dpmaif_rx_queue *rxq;
+	int ret;
 
 	rxq = container_of(work, struct dpmaif_rx_queue, dpmaif_rxq_work);
 	dpmaif_ctrl = rxq->dpmaif_ctrl;
@@ -1053,8 +1055,14 @@ static void dpmaif_rxq_work(struct work_struct *work)
 		return;
 	}
 
+	ret = pm_runtime_resume_and_get(dpmaif_ctrl->dev);
+	if (ret < 0 && ret != -EACCES)
+		return;
+
 	dpmaif_do_rx(dpmaif_ctrl, rxq);
 
+	pm_runtime_mark_last_busy(dpmaif_ctrl->dev);
+	pm_runtime_put_autosuspend(dpmaif_ctrl->dev);
 	atomic_set(&rxq->rx_processing, 0);
 }
 
@@ -1417,8 +1425,13 @@ static void dpmaif_bat_release_work(struct work_struct *work)
 {
 	struct dpmaif_ctrl *dpmaif_ctrl;
 	struct dpmaif_rx_queue *rxq;
+	int ret;
 
 	dpmaif_ctrl = container_of(work, struct dpmaif_ctrl, bat_release_work);
+
+	ret = pm_runtime_resume_and_get(dpmaif_ctrl->dev);
+	if (ret < 0 && ret != -EACCES)
+		return;
 
 	/* ALL RXQ use one BAT table, so choose DPF_RX_QNO_DFT */
 	rxq = &dpmaif_ctrl->rxq[DPF_RX_QNO_DFT];
@@ -1427,6 +1440,9 @@ static void dpmaif_bat_release_work(struct work_struct *work)
 	dpmaif_dl_pkt_bat_release_and_add(rxq);
 	/* frag BAT release and add */
 	dpmaif_dl_frag_bat_release_and_add(rxq);
+
+	pm_runtime_mark_last_busy(dpmaif_ctrl->dev);
+	pm_runtime_put_autosuspend(dpmaif_ctrl->dev);
 }
 
 int dpmaif_bat_release_work_alloc(struct dpmaif_ctrl *dpmaif_ctrl)

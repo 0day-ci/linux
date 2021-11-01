@@ -18,6 +18,7 @@
 #include <linux/kernel.h>
 #include <linux/kthread.h>
 #include <linux/list.h>
+#include <linux/pm_runtime.h>
 #include <linux/spinlock.h>
 
 #include "t7xx_common.h"
@@ -167,6 +168,10 @@ static void dpmaif_tx_done(struct work_struct *work)
 	txq = container_of(work, struct dpmaif_tx_queue, dpmaif_tx_work);
 	dpmaif_ctrl = txq->dpmaif_ctrl;
 
+	ret = pm_runtime_resume_and_get(dpmaif_ctrl->dev);
+	if (ret < 0 && ret != -EACCES)
+		return;
+
 	ret = dpmaif_tx_release(dpmaif_ctrl, txq->index, txq->drb_size_cnt);
 	if (ret == -EAGAIN ||
 	    (dpmaif_hw_check_clr_ul_done_status(&dpmaif_ctrl->hif_hw_info, txq->index) &&
@@ -179,6 +184,9 @@ static void dpmaif_tx_done(struct work_struct *work)
 		dpmaif_clr_ip_busy_sts(&dpmaif_ctrl->hif_hw_info);
 		dpmaif_unmask_ulq_interrupt(dpmaif_ctrl, txq->index);
 	}
+
+	pm_runtime_mark_last_busy(dpmaif_ctrl->dev);
+	pm_runtime_put_autosuspend(dpmaif_ctrl->dev);
 }
 
 static void set_drb_msg(struct dpmaif_ctrl *dpmaif_ctrl,
@@ -513,6 +521,7 @@ static void do_tx_hw_push(struct dpmaif_ctrl *dpmaif_ctrl)
 static int dpmaif_tx_hw_push_thread(void *arg)
 {
 	struct dpmaif_ctrl *dpmaif_ctrl;
+	int ret;
 
 	dpmaif_ctrl = arg;
 	while (!kthread_should_stop()) {
@@ -528,7 +537,13 @@ static int dpmaif_tx_hw_push_thread(void *arg)
 		if (kthread_should_stop())
 			break;
 
+		ret = pm_runtime_resume_and_get(dpmaif_ctrl->dev);
+		if (ret < 0 && ret != -EACCES)
+			return ret;
+
 		do_tx_hw_push(dpmaif_ctrl);
+		pm_runtime_mark_last_busy(dpmaif_ctrl->dev);
+		pm_runtime_put_autosuspend(dpmaif_ctrl->dev);
 	}
 
 	return 0;

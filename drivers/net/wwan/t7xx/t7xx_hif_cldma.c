@@ -22,6 +22,7 @@
 #include <linux/kernel.h>
 #include <linux/list.h>
 #include <linux/mutex.h>
+#include <linux/pm_runtime.h>
 #include <linux/skbuff.h>
 
 #include "t7xx_cldma.h"
@@ -310,6 +311,8 @@ static void cldma_rx_done(struct work_struct *work)
 	/* enable RX_DONE && EMPTY interrupt */
 	cldma_hw_dismask_txrxirq(&md_ctrl->hw_info, queue->index, true);
 	cldma_hw_dismask_eqirq(&md_ctrl->hw_info, queue->index, true);
+	pm_runtime_mark_last_busy(md_ctrl->dev);
+	pm_runtime_put_autosuspend(md_ctrl->dev);
 }
 
 static int cldma_gpd_tx_collect(struct cldma_queue *queue)
@@ -451,6 +454,8 @@ static void cldma_tx_done(struct work_struct *work)
 	}
 
 	spin_unlock_irqrestore(&md_ctrl->cldma_lock, flags);
+	pm_runtime_mark_last_busy(md_ctrl->dev);
+	pm_runtime_put_autosuspend(md_ctrl->dev);
 }
 
 static void cldma_ring_free(struct cldma_ctrl *md_ctrl,
@@ -674,6 +679,7 @@ static void cldma_irq_work_cb(struct cldma_ctrl *md_ctrl)
 		if (l2_tx_int & (TXRX_STATUS_BITMASK | EMPTY_STATUS_BITMASK)) {
 			for (i = 0; i < CLDMA_TXQ_NUM; i++) {
 				if (l2_tx_int & BIT(i)) {
+					pm_runtime_get(md_ctrl->dev);
 					/* disable TX_DONE interrupt */
 					cldma_hw_mask_eqirq(hw_info, i, false);
 					cldma_hw_mask_txrxirq(hw_info, i, false);
@@ -702,6 +708,7 @@ static void cldma_irq_work_cb(struct cldma_ctrl *md_ctrl)
 		if (l2_rx_int & (TXRX_STATUS_BITMASK | EMPTY_STATUS_BITMASK)) {
 			for (i = 0; i < CLDMA_RXQ_NUM; i++) {
 				if (l2_rx_int & (BIT(i) | EQ_STA_BIT(i))) {
+					pm_runtime_get(md_ctrl->dev);
 					/* disable RX_DONE and QUEUE_EMPTY interrupt */
 					cldma_hw_mask_eqirq(hw_info, i, true);
 					cldma_hw_mask_txrxirq(hw_info, i, true);
@@ -1133,8 +1140,12 @@ int cldma_send_skb(enum cldma_id hif_id, int qno, struct sk_buff *skb, bool skb_
 	struct cldma_queue *queue;
 	unsigned long flags;
 	int ret = 0;
+	int val;
 
 	md_ctrl = md_cd_get(hif_id);
+	val = pm_runtime_resume_and_get(md_ctrl->dev);
+	if (val < 0 && val != -EACCES)
+		return val;
 
 	if (qno >= CLDMA_TXQ_NUM) {
 		ret = -EINVAL;
@@ -1199,6 +1210,8 @@ int cldma_send_skb(enum cldma_id hif_id, int qno, struct sk_buff *skb, bool skb_
 	} while (!ret);
 
 exit:
+	pm_runtime_mark_last_busy(md_ctrl->dev);
+	pm_runtime_put_autosuspend(md_ctrl->dev);
 	return ret;
 }
 
