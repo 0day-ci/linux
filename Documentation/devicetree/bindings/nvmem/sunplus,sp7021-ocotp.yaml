@@ -1,0 +1,116 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+# Copyright (C) Sunplus Co., Ltd. 2021
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/nvmem/sunplus,sp7021-ocotp.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: On-Chip OTP Memory for Sunplus sp7021
+
+maintainers:
+  - Vincent Shih <vincent.shih@sunplus.com>
+
+allOf:
+  - $ref: "nvmem.yaml#"
+
+properties:
+  compatible:
+    const: sunplus,sp7021-ocotp
+
+  reg:
+    maxItems: 2
+
+  reg-names:
+    items:
+      - const: hb_gpio
+      - const: otprx
+
+  clocks:
+    maxItems: 1
+
+  resets:
+    maxItems: 1
+
+  "#address-cells":
+    const: 1
+
+  "#size-cells":
+    const: 1
+
+  therm_calib:
+    type: object
+    description: thermal calibration values
+    properties:
+      reg:
+        maxItems: 1
+
+    required:
+      - reg
+
+  mac_addr0:
+    type: object
+    description: MAC address of ethernet port 0
+    properties:
+      reg:
+        maxItems: 1
+
+    required:
+      - reg
+
+  mac_addr1:
+    type: object
+    description: MAC address of ethernet port 1
+    properties:
+      reg:
+        maxItems: 1
+
+    required:
+      - reg
+
+  disc_vol:
+    type: object
+    description: disconnect voltages of usb2 port 0 and port 1
+    properties:
+      reg:
+        maxItems: 1
+
+    required:
+      - reg
+
+required:
+  - compatible
+  - reg
+  - reg-names
+  - clocks
+  - resets
+
+unevaluatedProperties: false
+
+examples:
+  - |
+    #include <dt-bindings/clock/sp-sp7021.h>
+    #include <dt-bindings/reset/sp-sp7021.h>
+
+    otp: otp@9C00AF00 {
+        compatible = "sunplus,sp7021-ocotp";
+        reg = <0x9C00AF00 0x34>, <0x9C00AF80 0x58>;
+        reg-names = "hb_gpio", "otprx";
+        clocks = <&clks OTPRX>;
+        resets = <&rstc RST_OTPRX>;
+
+        #address-cells = <1>;
+        #size-cells = <1>;
+        therm_calib: therm_calib@14 {
+          reg = <0x14 0x3>;
+        };
+        mac_addr0: mac_addr0@34 {
+          reg = <0x34 0x6>;
+        };
+        mac_addr1: mac_addr1@3A {
+          reg = <0x3A 0x6>;
+        };
+        disc_vol: disc_vol@18 {
+          reg = <0x18 0x2>;
+        };
+    };
+...
