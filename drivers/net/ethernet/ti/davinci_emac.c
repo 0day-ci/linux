@@ -417,46 +417,47 @@ static int emac_set_coalesce(struct net_device *ndev,
 			     struct netlink_ext_ack *extack)
 {
 	struct emac_priv *priv = netdev_priv(ndev);
-	u32 int_ctrl, num_interrupts = 0;
+	u32 int_ctrl = 0, num_interrupts = 0;
 	u32 prescale = 0, addnl_dvdr = 1, coal_intvl = 0;
-
-	if (!coal->rx_coalesce_usecs)
-		return -EINVAL;
 
 	coal_intvl = coal->rx_coalesce_usecs;
 
 	switch (priv->version) {
 	case EMAC_VERSION_2:
-		int_ctrl =  emac_ctrl_read(EMAC_DM646X_CMINTCTRL);
-		prescale = priv->bus_freq_mhz * 4;
+		if (coal->rx_coalesce_usecs) {
+			int_ctrl =  emac_ctrl_read(EMAC_DM646X_CMINTCTRL);
+			prescale = priv->bus_freq_mhz * 4;
 
-		if (coal_intvl < EMAC_DM646X_CMINTMIN_INTVL)
-			coal_intvl = EMAC_DM646X_CMINTMIN_INTVL;
+			if (coal_intvl < EMAC_DM646X_CMINTMIN_INTVL)
+				coal_intvl = EMAC_DM646X_CMINTMIN_INTVL;
 
-		if (coal_intvl > EMAC_DM646X_CMINTMAX_INTVL) {
-			/*
-			 * Interrupt pacer works with 4us Pulse, we can
-			 * throttle further by dilating the 4us pulse.
-			 */
-			addnl_dvdr = EMAC_DM646X_INTPRESCALE_MASK / prescale;
+			if (coal_intvl > EMAC_DM646X_CMINTMAX_INTVL) {
+				/*
+				 * Interrupt pacer works with 4us Pulse, we can
+				 * throttle further by dilating the 4us pulse.
+				 */
+				addnl_dvdr =
+					EMAC_DM646X_INTPRESCALE_MASK / prescale;
 
-			if (addnl_dvdr > 1) {
-				prescale *= addnl_dvdr;
-				if (coal_intvl > (EMAC_DM646X_CMINTMAX_INTVL
-							* addnl_dvdr))
-					coal_intvl = (EMAC_DM646X_CMINTMAX_INTVL
-							* addnl_dvdr);
-			} else {
-				addnl_dvdr = 1;
-				coal_intvl = EMAC_DM646X_CMINTMAX_INTVL;
+				if (addnl_dvdr > 1) {
+					prescale *= addnl_dvdr;
+					if (coal_intvl > (EMAC_DM646X_CMINTMAX_INTVL
+								* addnl_dvdr))
+						coal_intvl = (EMAC_DM646X_CMINTMAX_INTVL
+								* addnl_dvdr);
+				} else {
+					addnl_dvdr = 1;
+					coal_intvl = EMAC_DM646X_CMINTMAX_INTVL;
+				}
 			}
+
+			num_interrupts = (1000 * addnl_dvdr) / coal_intvl;
+
+			int_ctrl |= EMAC_DM646X_INTPACEEN;
+			int_ctrl &= (~EMAC_DM646X_INTPRESCALE_MASK);
+			int_ctrl |= (prescale & EMAC_DM646X_INTPRESCALE_MASK);
 		}
 
-		num_interrupts = (1000 * addnl_dvdr) / coal_intvl;
-
-		int_ctrl |= EMAC_DM646X_INTPACEEN;
-		int_ctrl &= (~EMAC_DM646X_INTPRESCALE_MASK);
-		int_ctrl |= (prescale & EMAC_DM646X_INTPRESCALE_MASK);
 		emac_ctrl_write(EMAC_DM646X_CMINTCTRL, int_ctrl);
 
 		emac_ctrl_write(EMAC_DM646X_CMRXINTMAX, num_interrupts);
@@ -466,17 +467,21 @@ static int emac_set_coalesce(struct net_device *ndev,
 	default:
 		int_ctrl = emac_ctrl_read(EMAC_CTRL_EWINTTCNT);
 		int_ctrl &= (~EMAC_DM644X_EWINTCNT_MASK);
-		prescale = coal_intvl * priv->bus_freq_mhz;
-		if (prescale > EMAC_DM644X_EWINTCNT_MASK) {
-			prescale = EMAC_DM644X_EWINTCNT_MASK;
-			coal_intvl = prescale / priv->bus_freq_mhz;
+
+		if (coal->rx_coalesce_usecs) {
+			prescale = coal_intvl * priv->bus_freq_mhz;
+			if (prescale > EMAC_DM644X_EWINTCNT_MASK) {
+				prescale = EMAC_DM644X_EWINTCNT_MASK;
+				coal_intvl = prescale / priv->bus_freq_mhz;
+			}
 		}
+
 		emac_ctrl_write(EMAC_CTRL_EWINTTCNT, (int_ctrl | prescale));
 
 		break;
 	}
 
-	printk(KERN_INFO"Set coalesce to %d usecs.\n", coal_intvl);
+	netdev_info(ndev, "Set coalesce to %d usecs.\n", coal_intvl);
 	priv->coal_intvl = coal_intvl;
 
 	return 0;
