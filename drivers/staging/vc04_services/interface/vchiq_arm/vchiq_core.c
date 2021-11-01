@@ -3515,7 +3515,7 @@ int vchiq_dump_state(void *dump_context, struct vchiq_state *state)
 	if (err)
 		return err;
 
-	err = vchiq_dump_platform_instances(dump_context);
+	err = vchiq_dump_platform_instances(dump_context, state);
 	if (err)
 		return err;
 

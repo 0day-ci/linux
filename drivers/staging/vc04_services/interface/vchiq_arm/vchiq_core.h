@@ -11,6 +11,7 @@
 #include <linux/rcupdate.h>
 #include <linux/wait.h>
 #include <linux/raspberrypi/vchiq.h>
+#include <linux/miscdevice.h>
 
 #include "vchiq_cfg.h"
 
@@ -568,7 +569,7 @@ int vchiq_dump(void *dump_context, const char *str, int len);
 
 int vchiq_dump_platform_state(void *dump_context);
 
-int vchiq_dump_platform_instances(void *dump_context);
+int vchiq_dump_platform_instances(void *dump_context, struct vchiq_state *state);
 
 int vchiq_dump_platform_service_state(void *dump_context, struct vchiq_service *service);
 

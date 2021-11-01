@@ -39,6 +39,11 @@ static const char *const ioctl_names[] = {
 
 static_assert(ARRAY_SIZE(ioctl_names) == (VCHIQ_IOC_MAX + 1));
 
+static inline struct vchiq_device *to_vchiq_device(struct miscdevice *mdev)
+{
+	return container_of(mdev, struct vchiq_device, mdev);
+}
+
 static void
 user_service_free(void *userdata)
 {
@@ -208,9 +213,10 @@ static int vchiq_ioc_dequeue_message(struct vchiq_instance *instance,
 	struct user_service *user_service;
 	struct vchiq_service *service;
 	struct vchiq_header *header;
+	struct vchiq_state *state = instance->state;
 	int ret;
 
-	DEBUG_INITIALISE(g_state.local);
+	DEBUG_INITIALISE(state->local);
 	DEBUG_TRACE(DEQUEUE_MESSAGE_LINE);
 	service = find_service_for_instance(instance, args->handle);
 	if (!service)
@@ -435,12 +441,12 @@ static int vchiq_ioc_await_completion(struct vchiq_instance *instance,
 				      struct vchiq_await_completion *args,
 				      int __user *msgbufcountp)
 {
+	struct vchiq_state *state = instance->state;
 	int msgbufcount;
 	int remove;
 	int ret;
 
-	DEBUG_INITIALISE(g_state.local);
-
+	DEBUG_INITIALISE(state->local);
 	DEBUG_TRACE(AWAIT_COMPLETION_LINE);
 	if (!instance->connected)
 		return -ENOTCONN;
@@ -1167,12 +1173,19 @@ vchiq_compat_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 static int vchiq_open(struct inode *inode, struct file *file)
 {
-	struct vchiq_state *state = vchiq_get_state();
 	struct vchiq_instance *instance;
+	struct vchiq_state *state;
+	struct vchiq_device *vdev;
+	struct miscdevice *mdev;
+
+	mdev = file->private_data;
+
+	vdev = to_vchiq_device(mdev);
+	state = vdev->state;
 
 	vchiq_log_info(vchiq_arm_log_level, "vchiq_open");
 
-	if (!state) {
+	if (!vchiq_validate_state(state)) {
 		vchiq_log_error(vchiq_arm_log_level,
 				"vchiq has no connection to VideoCore");
 		return -ENOTCONN;
@@ -1201,7 +1214,7 @@ static int vchiq_open(struct inode *inode, struct file *file)
 static int vchiq_release(struct inode *inode, struct file *file)
 {
 	struct vchiq_instance *instance = file->private_data;
-	struct vchiq_state *state = vchiq_get_state();
+	struct vchiq_state *state = instance->state;
 	struct vchiq_service *service;
 	int ret = 0;
 	int i;
@@ -1209,7 +1222,7 @@ static int vchiq_release(struct inode *inode, struct file *file)
 	vchiq_log_info(vchiq_arm_log_level, "%s: instance=%lx", __func__,
 		       (unsigned long)instance);
 
-	if (!state) {
+	if (!vchiq_validate_state(state)) {
 		ret = -EPERM;
 		goto out;
 	}
@@ -1310,6 +1323,8 @@ static ssize_t
 vchiq_read(struct file *file, char __user *buf, size_t count, loff_t *ppos)
 {
 	struct dump_context context;
+	struct vchiq_instance *instance = file->private_data;
+	struct vchiq_state *state = instance->state;
 	int err;
 
 	context.buf = buf;
@@ -1317,7 +1332,7 @@ vchiq_read(struct file *file, char __user *buf, size_t count, loff_t *ppos)
 	context.space = count;
 	context.offset = *ppos;
 
-	err = vchiq_dump_state(&context, &g_state);
+	err = vchiq_dump_state(&context, state);
 	if (err)
 		return err;
 
@@ -1338,12 +1353,7 @@ vchiq_fops = {
 	.read = vchiq_read
 };
 
-static struct miscdevice vchiq_miscdev = {
-	.fops = &vchiq_fops,
-	.minor = MISC_DYNAMIC_MINOR,
-	.name = "vchiq",
-
-};
+static struct miscdevice *vchiq_miscdev;
 
 /**
  *	vchiq_register_chrdev - Register the char driver for vchiq
@@ -1353,11 +1363,25 @@ static struct miscdevice vchiq_miscdev = {
  *
  *	Returns 0 on success else returns the error code.
  */
-int vchiq_register_chrdev(struct device *parent)
+int vchiq_register_chrdev(struct vchiq_device *vdev)
 {
-	vchiq_miscdev.parent = parent;
+	int err;
 
-	return misc_register(&vchiq_miscdev);
+	vdev->mdev.fops = &vchiq_fops;
+	vdev->mdev.minor = MISC_DYNAMIC_MINOR;
+	vdev->mdev.parent = &vdev->vchiq_pdev.dev;
+	// TODO: Dynamically allocate name here
+	vdev->mdev.name = "vchiq";
+
+	err = misc_register(&vdev->mdev);
+	if (err) {
+		goto error;
+	}
+
+	vchiq_miscdev = &vdev->mdev;
+
+error:
+	return err;
 }
 
 /**
@@ -1366,5 +1390,9 @@ int vchiq_register_chrdev(struct device *parent)
  */
 void vchiq_deregister_chrdev(void)
 {
-	misc_deregister(&vchiq_miscdev);
+	// TODO: This deregsiter will not be able to handle multiple devices
+	// since the vchiq_miscdev pointer will always point to the most recent
+	// cdev.
+	misc_deregister(vchiq_miscdev);
+	vchiq_miscdev = NULL;
 }

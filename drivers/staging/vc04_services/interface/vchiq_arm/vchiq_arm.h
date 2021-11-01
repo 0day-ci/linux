@@ -69,6 +69,13 @@ struct vchiq_instance {
 	struct vchiq_debugfs_node debugfs_node;
 };
 
+/* Used to store per device information */
+struct vchiq_device {
+	struct vchiq_state *state;
+	struct miscdevice mdev;
+	struct platform_device vchiq_pdev;
+};
+
 struct dump_context {
 	char __user *buf;
 	size_t actual;
@@ -80,10 +87,9 @@ extern int vchiq_arm_log_level;
 extern int vchiq_susp_log_level;
 
 extern spinlock_t msg_queue_spinlock;
-extern struct vchiq_state g_state;
 
 extern struct vchiq_state *
-vchiq_get_state(void);
+vchiq_validate_state(struct vchiq_state *state);
 
 enum vchiq_status
 vchiq_use_service(unsigned int handle);
@@ -128,7 +134,7 @@ extern void
 vchiq_deregister_chrdev(void);
 
 extern int
-vchiq_register_chrdev(struct device *parent);
+vchiq_register_chrdev(struct vchiq_device *vdev);
 
 #else
 

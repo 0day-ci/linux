@@ -63,7 +63,7 @@ int vchiq_arm_log_level = VCHIQ_LOG_DEFAULT;
 int vchiq_susp_log_level = VCHIQ_LOG_ERROR;
 
 DEFINE_SPINLOCK(msg_queue_spinlock);
-struct vchiq_state g_state;
+static struct vchiq_state *g_state;
 
 static struct platform_device *bcm2835_camera;
 static struct platform_device *bcm2835_audio;
@@ -155,6 +155,13 @@ static DEFINE_SEMAPHORE(g_free_fragments_mutex);
 static enum vchiq_status
 vchiq_blocking_bulk_transfer(unsigned int handle, void *data,
 			     unsigned int size, enum vchiq_bulk_dir dir);
+
+/* Accessor function for static state variable */
+static inline struct vchiq_state *
+vchiq_get_state(void)
+{
+	return g_state;
+}
 
 static irqreturn_t
 vchiq_doorbell_irq(int irq, void *dev_id)
@@ -652,6 +659,17 @@ int vchiq_dump_platform_state(void *dump_context)
 #define VCHIQ_INIT_RETRIES 10
 int vchiq_initialise(struct vchiq_instance **instance_out)
 {
+	/*
+	 * TODO: vchiq_initialise is called from either the IOCTL functions of
+	 * the cdev or from other kernel modules directly. When called from ioctl
+	 * we have a reference to the state and we can pass it in, but this is not
+	 * possible when calling it from a different kernel module.
+	 *
+	 * This forces us to use a global state in the driver, which is not ideal
+	 * if we want to support multiple devices with a single driver. We need to
+	 * find a way around this
+	 */
+
 	struct vchiq_state *state;
 	struct vchiq_instance *instance = NULL;
 	int i, ret;
@@ -663,7 +681,7 @@ int vchiq_initialise(struct vchiq_instance **instance_out)
 	 */
 	for (i = 0; i < VCHIQ_INIT_RETRIES; i++) {
 		state = vchiq_get_state();
-		if (state)
+		if (vchiq_validate_state(state))
 			break;
 		usleep_range(500, 600);
 	}
@@ -984,9 +1002,10 @@ add_completion(struct vchiq_instance *instance, enum vchiq_reason reason,
 	       void *bulk_userdata)
 {
 	struct vchiq_completion_data_kernel *completion;
+	struct vchiq_state *state = instance->state;
 	int insert;
 
-	DEBUG_INITIALISE(g_state.local);
+	DEBUG_INITIALISE(state->local);
 
 	insert = instance->completion_insert;
 	while ((insert - instance->completion_remove) >= MAX_COMPLETIONS) {
@@ -1052,11 +1071,8 @@ service_callback(enum vchiq_reason reason, struct vchiq_header *header,
 	struct user_service *user_service;
 	struct vchiq_service *service;
 	struct vchiq_instance *instance;
+	struct vchiq_state *state;
 	bool skip_completion = false;
-
-	DEBUG_INITIALISE(g_state.local);
-
-	DEBUG_TRACE(SERVICE_CALLBACK_LINE);
 
 	service = handle_to_service(handle);
 	if (WARN_ON(!service))
@@ -1064,6 +1080,12 @@ service_callback(enum vchiq_reason reason, struct vchiq_header *header,
 
 	user_service = (struct user_service *)service->base.userdata;
 	instance = user_service->instance;
+
+	state = instance->state;
+
+	DEBUG_INITIALISE(state->local);
+
+	DEBUG_TRACE(SERVICE_CALLBACK_LINE);
 
 	if (!instance || instance->closing)
 		return VCHIQ_SUCCESS;
@@ -1186,12 +1208,14 @@ int vchiq_dump(void *dump_context, const char *str, int len)
 	return 0;
 }
 
-int vchiq_dump_platform_instances(void *dump_context)
+int vchiq_dump_platform_instances(void *dump_context, struct vchiq_state *state)
 {
-	struct vchiq_state *state = vchiq_get_state();
 	char buf[80];
 	int len;
 	int i;
+
+	if (!vchiq_validate_state(state))
+		return -EINVAL;
 
 	/*
 	 * There is no list of instances, so instead scan all services,
@@ -1271,17 +1295,25 @@ int vchiq_dump_platform_service_state(void *dump_context,
 	return vchiq_dump(dump_context, buf, len + 1);
 }
 
+/**
+ *	vchiq_validate_state -	Validate the state. Return NULL if invalid
+ *				else return the state back
+ *
+ *	@state			The state to validate
+ *
+ *	Returns unchanged state if state is valid, else returns NULL.
+ */
 struct vchiq_state *
-vchiq_get_state(void)
+vchiq_validate_state(struct vchiq_state *state)
 {
-	if (!g_state.remote)
-		pr_err("%s: g_state.remote == NULL\n", __func__);
-	else if (g_state.remote->initialised != 1)
-		pr_notice("%s: g_state.remote->initialised != 1 (%d)\n",
-			  __func__, g_state.remote->initialised);
+	if (!state->remote)
+		pr_err("%s: state->remote == NULL\n", __func__);
+	else if (state->remote->initialised != 1)
+		pr_notice("%s: state->remote->initialised != 1 (%d)\n",
+			  __func__, state->remote->initialised);
 
-	return (g_state.remote &&
-		(g_state.remote->initialised == 1)) ? &g_state : NULL;
+	return (state->remote &&
+		(state->remote->initialised == 1)) ? state : NULL;
 }
 
 /*
@@ -1763,6 +1795,7 @@ static int vchiq_probe(struct platform_device *pdev)
 	struct device_node *fw_node;
 	const struct of_device_id *of_id;
 	struct vchiq_drvdata *drvdata;
+	struct vchiq_device *vchiq_dev;
 	int err;
 
 	of_id = of_match_node(vchiq_of_match, pdev->dev.of_node);
@@ -1784,7 +1817,18 @@ static int vchiq_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, drvdata);
 
-	err = vchiq_platform_init(pdev, &g_state);
+	vchiq_dev = kzalloc(sizeof(struct vchiq_device), GFP_KERNEL);
+	vchiq_dev->state = kzalloc(sizeof(struct vchiq_state), GFP_KERNEL);
+	vchiq_dev->vchiq_pdev = *pdev;
+
+	g_state = vchiq_dev->state;
+
+	if (!vchiq_dev || !vchiq_dev->state) {
+		dev_err(&pdev->dev, "Out of memory\n");
+		return -ENOMEM;
+	}
+
+	err = vchiq_platform_init(pdev, vchiq_dev->state);
 	if (err)
 		goto failed_platform_init;
 
@@ -1798,7 +1842,7 @@ static int vchiq_probe(struct platform_device *pdev)
 	 * Simply exit on error since the function handles cleanup in
 	 * cases of failure.
 	 */
-	err = vchiq_register_chrdev(&pdev->dev);
+	err = vchiq_register_chrdev(vchiq_dev);
 	if (err) {
 		vchiq_log_warning(vchiq_arm_log_level,
 				  "Failed to initialize vchiq cdev");
@@ -1811,6 +1855,12 @@ static int vchiq_probe(struct platform_device *pdev)
 	return 0;
 
 failed_platform_init:
+	kfree(vchiq_dev->state);
+	vchiq_dev->state = NULL;
+
+	kfree(vchiq_dev);
+	vchiq_dev = NULL;
+
 	vchiq_log_warning(vchiq_arm_log_level, "could not initialize vchiq platform");
 error_exit:
 	return err;
@@ -1818,10 +1868,20 @@ error_exit:
 
 static int vchiq_remove(struct platform_device *pdev)
 {
+	struct vchiq_device *vchiq_dev;
+
 	platform_device_unregister(bcm2835_audio);
 	platform_device_unregister(bcm2835_camera);
 	vchiq_debugfs_deinit();
 	vchiq_deregister_chrdev();
+
+	vchiq_dev = container_of(pdev, struct vchiq_device, vchiq_pdev);
+
+	kfree(vchiq_dev->state);
+	vchiq_dev->state = NULL;
+
+	kfree(vchiq_dev);
+	vchiq_dev = NULL;
 
 	return 0;
 }
