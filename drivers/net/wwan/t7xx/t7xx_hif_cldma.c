@@ -1147,6 +1147,7 @@ int cldma_send_skb(enum cldma_id hif_id, int qno, struct sk_buff *skb, bool skb_
 	if (val < 0 && val != -EACCES)
 		return val;
 
+	mtk_pci_disable_sleep(md_ctrl->mtk_dev);
 	if (qno >= CLDMA_TXQ_NUM) {
 		ret = -EINVAL;
 		goto exit;
@@ -1182,6 +1183,11 @@ int cldma_send_skb(enum cldma_id hif_id, int qno, struct sk_buff *skb, bool skb_
 			queue->tx_xmit = cldma_ring_step_forward(queue->tr_ring, tx_req);
 			spin_unlock_irqrestore(&queue->ring_lock, flags);
 
+			if (!mtk_pci_sleep_disable_complete(md_ctrl->mtk_dev)) {
+				ret = -EBUSY;
+				break;
+			}
+
 			spin_lock_irqsave(&md_ctrl->cldma_lock, flags);
 			cldma_hw_start_send(md_ctrl, qno);
 			spin_unlock_irqrestore(&md_ctrl->cldma_lock, flags);
@@ -1189,6 +1195,10 @@ int cldma_send_skb(enum cldma_id hif_id, int qno, struct sk_buff *skb, bool skb_
 		}
 
 		spin_unlock_irqrestore(&queue->ring_lock, flags);
+		if (!mtk_pci_sleep_disable_complete(md_ctrl->mtk_dev)) {
+			ret = -EBUSY;
+			break;
+		}
 
 		/* check CLDMA status */
 		if (!cldma_hw_queue_status(&md_ctrl->hw_info, qno, false)) {
@@ -1210,6 +1220,7 @@ int cldma_send_skb(enum cldma_id hif_id, int qno, struct sk_buff *skb, bool skb_
 	} while (!ret);
 
 exit:
+	mtk_pci_enable_sleep(md_ctrl->mtk_dev);
 	pm_runtime_mark_last_busy(md_ctrl->dev);
 	pm_runtime_put_autosuspend(md_ctrl->dev);
 	return ret;

@@ -172,19 +172,26 @@ static void dpmaif_tx_done(struct work_struct *work)
 	if (ret < 0 && ret != -EACCES)
 		return;
 
-	ret = dpmaif_tx_release(dpmaif_ctrl, txq->index, txq->drb_size_cnt);
-	if (ret == -EAGAIN ||
-	    (dpmaif_hw_check_clr_ul_done_status(&dpmaif_ctrl->hif_hw_info, txq->index) &&
-	     dpmaif_no_remain_spurious_tx_done_intr(txq))) {
-		queue_work(dpmaif_ctrl->txq[txq->index].worker,
-			   &dpmaif_ctrl->txq[txq->index].dpmaif_tx_work);
-		/* clear IP busy to give the device time to enter the low power state */
-		dpmaif_clr_ip_busy_sts(&dpmaif_ctrl->hif_hw_info);
-	} else {
-		dpmaif_clr_ip_busy_sts(&dpmaif_ctrl->hif_hw_info);
-		dpmaif_unmask_ulq_interrupt(dpmaif_ctrl, txq->index);
+	/* The device may be in low power state. disable sleep if needed */
+	mtk_pci_disable_sleep(dpmaif_ctrl->mtk_dev);
+
+	/* ensure that we are not in deep sleep */
+	if (mtk_pci_sleep_disable_complete(dpmaif_ctrl->mtk_dev)) {
+		ret = dpmaif_tx_release(dpmaif_ctrl, txq->index, txq->drb_size_cnt);
+		if (ret == -EAGAIN ||
+		    (dpmaif_hw_check_clr_ul_done_status(&dpmaif_ctrl->hif_hw_info, txq->index) &&
+		     dpmaif_no_remain_spurious_tx_done_intr(txq))) {
+			queue_work(dpmaif_ctrl->txq[txq->index].worker,
+				   &dpmaif_ctrl->txq[txq->index].dpmaif_tx_work);
+			/* clear IP busy to give the device time to enter the low power state */
+			dpmaif_clr_ip_busy_sts(&dpmaif_ctrl->hif_hw_info);
+		} else {
+			dpmaif_clr_ip_busy_sts(&dpmaif_ctrl->hif_hw_info);
+			dpmaif_unmask_ulq_interrupt(dpmaif_ctrl, txq->index);
+		}
 	}
 
+	mtk_pci_enable_sleep(dpmaif_ctrl->mtk_dev);
 	pm_runtime_mark_last_busy(dpmaif_ctrl->dev);
 	pm_runtime_put_autosuspend(dpmaif_ctrl->dev);
 }
@@ -485,6 +492,8 @@ static bool check_all_txq_drb_lack(const struct dpmaif_ctrl *dpmaif_ctrl)
 
 static void do_tx_hw_push(struct dpmaif_ctrl *dpmaif_ctrl)
 {
+	bool first_time = true;
+
 	dpmaif_ctrl->txq_select_times = 0;
 	do {
 		int txq_id;
@@ -499,6 +508,11 @@ static void do_tx_hw_push(struct dpmaif_ctrl *dpmaif_ctrl)
 			if (ret > 0) {
 				int drb_send_cnt = ret;
 
+				/* wait for the PCIe resource locked done */
+				if (first_time &&
+				    !mtk_pci_sleep_disable_complete(dpmaif_ctrl->mtk_dev))
+					return;
+
 				/* notify the dpmaif HW */
 				ret = dpmaif_ul_add_wcnt(dpmaif_ctrl, (unsigned char)txq_id,
 							 drb_send_cnt * DPMAIF_UL_DRB_ENTRY_WORD);
@@ -512,6 +526,7 @@ static void do_tx_hw_push(struct dpmaif_ctrl *dpmaif_ctrl)
 			}
 		}
 
+		first_time = false;
 		cond_resched();
 
 	} while (!tx_lists_are_all_empty(dpmaif_ctrl) && !kthread_should_stop() &&
@@ -541,7 +556,9 @@ static int dpmaif_tx_hw_push_thread(void *arg)
 		if (ret < 0 && ret != -EACCES)
 			return ret;
 
+		mtk_pci_disable_sleep(dpmaif_ctrl->mtk_dev);
 		do_tx_hw_push(dpmaif_ctrl);
+		mtk_pci_enable_sleep(dpmaif_ctrl->mtk_dev);
 		pm_runtime_mark_last_busy(dpmaif_ctrl->dev);
 		pm_runtime_put_autosuspend(dpmaif_ctrl->dev);
 	}

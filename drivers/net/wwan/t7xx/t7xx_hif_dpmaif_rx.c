@@ -40,6 +40,8 @@
 #define DPMAIF_RX_PUSH_THRESHOLD_MASK	0x7
 #define DPMAIF_NOTIFY_RELEASE_COUNT	128
 #define DPMAIF_POLL_PIT_TIME_US		20
+#define DPMAIF_POLL_RX_TIME_US		10
+#define DPMAIF_POLL_RX_TIMEOUT_US	200
 #define DPMAIF_POLL_PIT_MAX_TIME_US	2000
 #define DPMAIF_WQ_TIME_LIMIT_MS		2
 #define DPMAIF_CS_RESULT_PASS		0
@@ -1020,6 +1022,7 @@ static int dpmaif_rx_data_collect(struct dpmaif_ctrl *dpmaif_ctrl,
 	return 0;
 }
 
+/* call after mtk_pci_disable_sleep */
 static void dpmaif_do_rx(struct dpmaif_ctrl *dpmaif_ctrl, struct dpmaif_rx_queue *rxq)
 {
 	int ret;
@@ -1059,7 +1062,13 @@ static void dpmaif_rxq_work(struct work_struct *work)
 	if (ret < 0 && ret != -EACCES)
 		return;
 
-	dpmaif_do_rx(dpmaif_ctrl, rxq);
+	mtk_pci_disable_sleep(dpmaif_ctrl->mtk_dev);
+
+	/* we can try blocking wait for lock resource here in process context */
+	if (mtk_pci_sleep_disable_complete(dpmaif_ctrl->mtk_dev))
+		dpmaif_do_rx(dpmaif_ctrl, rxq);
+
+	mtk_pci_enable_sleep(dpmaif_ctrl->mtk_dev);
 
 	pm_runtime_mark_last_busy(dpmaif_ctrl->dev);
 	pm_runtime_put_autosuspend(dpmaif_ctrl->dev);
@@ -1433,14 +1442,19 @@ static void dpmaif_bat_release_work(struct work_struct *work)
 	if (ret < 0 && ret != -EACCES)
 		return;
 
+	mtk_pci_disable_sleep(dpmaif_ctrl->mtk_dev);
+
 	/* ALL RXQ use one BAT table, so choose DPF_RX_QNO_DFT */
 	rxq = &dpmaif_ctrl->rxq[DPF_RX_QNO_DFT];
 
-	/* normal BAT release and add */
-	dpmaif_dl_pkt_bat_release_and_add(rxq);
-	/* frag BAT release and add */
-	dpmaif_dl_frag_bat_release_and_add(rxq);
+	if (mtk_pci_sleep_disable_complete(dpmaif_ctrl->mtk_dev)) {
+		/* normal BAT release and add */
+		dpmaif_dl_pkt_bat_release_and_add(rxq);
+		/* frag BAT release and add */
+		dpmaif_dl_frag_bat_release_and_add(rxq);
+	}
 
+	mtk_pci_enable_sleep(dpmaif_ctrl->mtk_dev);
 	pm_runtime_mark_last_busy(dpmaif_ctrl->dev);
 	pm_runtime_put_autosuspend(dpmaif_ctrl->dev);
 }

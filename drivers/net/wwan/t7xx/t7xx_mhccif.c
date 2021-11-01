@@ -57,6 +57,9 @@ static irqreturn_t mhccif_isr_thread(int irq, void *data)
 	/* Clear 2 & 1 level interrupts */
 	mhccif_clear_interrupts(mtk_dev, int_sts);
 
+	if (int_sts & D2H_INT_DS_LOCK_ACK)
+		complete_all(&mtk_dev->sleep_lock_acquire);
+
 	if (int_sts & D2H_INT_SR_ACK)
 		complete(&mtk_dev->pm_sr_ack);
 
