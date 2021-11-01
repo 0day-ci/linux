@@ -10103,18 +10103,24 @@ static void nfs41_free_stateid_prepare(struct rpc_task *task, void *calldata)
 static void nfs41_free_stateid_done(struct rpc_task *task, void *calldata)
 {
 	struct nfs_free_stateid_data *data = calldata;
+	struct nfs_client *clp = data->server->nfs_client;
 
 	nfs41_sequence_done(task, &data->res.seq_res);
 
 	switch (task->tk_status) {
 	case -NFS4ERR_DELAY:
 		if (nfs4_async_handle_error(task, data->server, NULL, NULL) == -EAGAIN)
-			rpc_restart_call_prepare(task);
+			if (refcount_read(&clp->cl_count) > 1)
+				rpc_restart_call_prepare(task);
 	}
 }
 
 static void nfs41_free_stateid_release(void *calldata)
 {
+	struct nfs_free_stateid_data *data = calldata;
+	struct nfs_client *clp = data->server->nfs_client;
+
+	nfs_put_client(clp);
 	kfree(calldata);
 }
 
@@ -10151,6 +10157,10 @@ static int nfs41_free_stateid(struct nfs_server *server,
 	};
 	struct nfs_free_stateid_data *data;
 	struct rpc_task *task;
+	struct nfs_client *clp = server->nfs_client;
+
+	if (!refcount_inc_not_zero(&clp->cl_count))
+		return -EIO;
 
 	nfs4_state_protect(server->nfs_client, NFS_SP4_MACH_CRED_STATEID,
 		&task_setup.rpc_client, &msg);
