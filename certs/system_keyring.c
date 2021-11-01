@@ -31,10 +31,16 @@ extern __initconst const unsigned long system_certificate_list_size;
 extern __initconst const unsigned long module_cert_size;
 
 /**
- * restrict_link_to_builtin_trusted - Restrict keyring addition by built in CA
+ * restrict_link_by_builtin_trusted - Restrict keyring addition by builtin CA
+ * @dest_keyring: Keyring being linked to.
+ * @type: The type of key being added.
+ * @payload: The payload of the new key.
+ * @restriction_key: Key providing additional data for evaluating restriction.
  *
  * Restrict the addition of keys into a keyring based on the key-to-be-added
- * being vouched for by a key in the built in system keyring.
+ * being vouched for by a key in the builtin system keyring.
+ *
+ * Return: %0 on success or a negative value on error
  */
 int restrict_link_by_builtin_trusted(struct key *dest_keyring,
 				     const struct key_type *type,
@@ -49,10 +55,16 @@ int restrict_link_by_builtin_trusted(struct key *dest_keyring,
 /**
  * restrict_link_by_builtin_and_secondary_trusted - Restrict keyring
  *   addition by both builtin and secondary keyrings
+ * @dest_keyring: Keyring being linked to.
+ * @type: The type of key being added.
+ * @payload: The payload of the new key.
+ * @restrict_key: Key providing additional data for evaluating restriction.
  *
  * Restrict the addition of keys into a keyring based on the key-to-be-added
- * being vouched for by a key in either the built-in or the secondary system
+ * being vouched for by a key in either the builtin or the secondary system
  * keyrings.
+ *
+ * Return: %0 on success or a negative value on error
  */
 int restrict_link_by_builtin_and_secondary_trusted(
 	struct key *dest_keyring,
@@ -73,7 +85,7 @@ int restrict_link_by_builtin_and_secondary_trusted(
 					  secondary_trusted_keys);
 }
 
-/**
+/*
  * Allocate a struct key_restriction for the "builtin and secondary trust"
  * keyring. Only for use in system_trusted_keyring_init().
  */
@@ -170,14 +182,17 @@ late_initcall(load_system_certificate_list);
 
 /**
  * verify_pkcs7_message_sig - Verify a PKCS#7-based signature on system data.
- * @data: The data to be verified (NULL if expecting internal data).
+ * @data: The data to be verified (%NULL if expecting internal data).
  * @len: Size of @data.
  * @pkcs7: The PKCS#7 message that is the signature.
- * @trusted_keys: Trusted keys to use (NULL for builtin trusted keys only,
- *					(void *)1UL for all trusted keys).
+ * @trusted_keys: Trusted keys to use (%NULL for builtin trusted keys only,
+ *		  %VERIFY_USE_SECONDARY_KEYRING for secondary trusted keys,
+ *		  %VERIFY_USE_PLATFORM_KEYRING for platform trusted keys).
  * @usage: The use to which the key is being put.
  * @view_content: Callback to gain access to content.
  * @ctx: Context for callback.
+ *
+ * Return: %0 on success or a negative value on error
  */
 int verify_pkcs7_message_sig(const void *data, size_t len,
 			     struct pkcs7_message *pkcs7,
@@ -254,15 +269,18 @@ error:
 
 /**
  * verify_pkcs7_signature - Verify a PKCS#7-based signature on system data.
- * @data: The data to be verified (NULL if expecting internal data).
+ * @data: The data to be verified (%NULL if expecting internal data).
  * @len: Size of @data.
  * @raw_pkcs7: The PKCS#7 message that is the signature.
  * @pkcs7_len: The size of @raw_pkcs7.
- * @trusted_keys: Trusted keys to use (NULL for builtin trusted keys only,
- *					(void *)1UL for all trusted keys).
+ * @trusted_keys: Trusted keys to use (%NULL for builtin trusted keys only,
+ *		  %VERIFY_USE_SECONDARY_KEYRING for secondary trusted keys,
+ *		  %VERIFY_USE_PLATFORM_KEYRING for platform trusted keys).
  * @usage: The use to which the key is being put.
  * @view_content: Callback to gain access to content.
  * @ctx: Context for callback.
+ *
+ * Return: %0 on success or a negative value on error
  */
 int verify_pkcs7_signature(const void *data, size_t len,
 			   const void *raw_pkcs7, size_t pkcs7_len,
