@@ -1044,6 +1044,13 @@ int batadv_v_ogm_init(struct batadv_priv *bat_priv)
 	unsigned char *ogm_buff;
 	u32 random_seqno;
 
+	/* randomize initial seqno to avoid collision */
+	get_random_bytes(&random_seqno, sizeof(random_seqno));
+	atomic_set(&bat_priv->bat_v.ogm_seqno, random_seqno);
+	INIT_DELAYED_WORK(&bat_priv->bat_v.ogm_wq, batadv_v_ogm_send);
+
+	mutex_init(&bat_priv->bat_v.ogm_buff_mutex);
+
 	bat_priv->bat_v.ogm_buff_len = BATADV_OGM2_HLEN;
 	ogm_buff = kzalloc(bat_priv->bat_v.ogm_buff_len, GFP_ATOMIC);
 	if (!ogm_buff)
@@ -1056,13 +1063,6 @@ int batadv_v_ogm_init(struct batadv_priv *bat_priv)
 	ogm_packet->ttl = BATADV_TTL;
 	ogm_packet->flags = BATADV_NO_FLAGS;
 	ogm_packet->throughput = htonl(BATADV_THROUGHPUT_MAX_VALUE);
-
-	/* randomize initial seqno to avoid collision */
-	get_random_bytes(&random_seqno, sizeof(random_seqno));
-	atomic_set(&bat_priv->bat_v.ogm_seqno, random_seqno);
-	INIT_DELAYED_WORK(&bat_priv->bat_v.ogm_wq, batadv_v_ogm_send);
-
-	mutex_init(&bat_priv->bat_v.ogm_buff_mutex);
 
 	return 0;
 }
