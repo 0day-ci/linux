@@ -10,6 +10,7 @@ void my_direct_func(unsigned long ip)
 	trace_printk("ip %lx\n", ip);
 }
 
+extern void my_direct_func(unsigned long ip);
 extern void my_tramp(void *);
 
 asm (
