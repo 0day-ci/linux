@@ -5,6 +5,11 @@
 #include <net/tcp_authopt.h>
 #include <crypto/hash.h>
 
+/* This is mainly intended to protect against local privilege escalations through
+ * a rarely used feature so it is deliberately not namespaced.
+ */
+int sysctl_tcp_authopt;
+
 /* This is enabled when first struct tcp_authopt_info is allocated and never released */
 DEFINE_STATIC_KEY_FALSE(tcp_authopt_needed);
 EXPORT_SYMBOL(tcp_authopt_needed);
@@ -362,6 +367,8 @@ int tcp_set_authopt(struct sock *sk, sockptr_t optval, unsigned int optlen)
 	int err;
 
 	sock_owned_by_me(sk);
+	if (!sysctl_tcp_authopt)
+		return -EPERM;
 
 	err = _copy_from_sockptr_tolerant((u8 *)&opt, sizeof(opt), optval, optlen);
 	if (err)
@@ -384,9 +391,11 @@ int tcp_get_authopt_val(struct sock *sk, struct tcp_authopt *opt)
 	struct tcp_sock *tp = tcp_sk(sk);
 	struct tcp_authopt_info *info;
 
-	sock_owned_by_me(sk);
-
 	memset(opt, 0, sizeof(*opt));
+	sock_owned_by_me(sk);
+	if (!sysctl_tcp_authopt)
+		return -EPERM;
+
 	info = rcu_dereference_check(tp->authopt_info, lockdep_sock_is_held(sk));
 	if (!info)
 		return -ENOENT;
@@ -453,6 +462,8 @@ int tcp_set_authopt_key(struct sock *sk, sockptr_t optval, unsigned int optlen)
 	int err;
 
 	sock_owned_by_me(sk);
+	if (!sysctl_tcp_authopt)
+		return -EPERM;
 
 	err = _copy_from_sockptr_tolerant((u8 *)&opt, sizeof(opt), optval, optlen);
 	if (err)
