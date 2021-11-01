@@ -170,7 +170,6 @@ struct klp_patch {
 	bool enabled;
 	bool forced;
 	struct work_struct free_work;
-	struct completion finish;
 };
 
 #define klp_for_each_object_static(patch, obj) \
