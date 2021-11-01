@@ -3983,6 +3983,7 @@ static long btrfs_ioctl_balance(struct file *file, void __user *arg)
 	struct btrfs_fs_info *fs_info = root->fs_info;
 	struct btrfs_ioctl_balance_args *bargs;
 	struct btrfs_balance_control *bctl;
+	bool paused = false;
 	bool need_unlock; /* for mut. excl. ops lock */
 	int ret;
 
@@ -4020,6 +4021,10 @@ again:
 			if (fs_info->balance_ctl &&
 			    !test_bit(BTRFS_FS_BALANCE_RUNNING, &fs_info->flags)) {
 				/* this is (3) */
+				spin_lock(&fs_info->super_lock);
+				ASSERT(fs_info->exclusive_operation == BTRFS_EXCLOP_BALANCE_PAUSED);
+				fs_info->exclusive_operation = BTRFS_EXCLOP_BALANCE;
+				spin_unlock(&fs_info->super_lock);
 				need_unlock = false;
 				goto locked;
 			}
@@ -4101,7 +4106,7 @@ do_balance:
 	 */
 	need_unlock = false;
 
-	ret = btrfs_balance(fs_info, bctl, bargs);
+	ret = btrfs_balance(fs_info, bctl, bargs, &paused);
 	bctl = NULL;
 
 	if ((ret == 0 || ret == -ECANCELED) && arg) {
@@ -4115,8 +4120,17 @@ out_bargs:
 	kfree(bargs);
 out_unlock:
 	mutex_unlock(&fs_info->balance_mutex);
-	if (need_unlock)
-		btrfs_exclop_finish(fs_info);
+	if (need_unlock) {
+		if (paused) {
+			/* Transition directly to BALANCE_PAUSED */
+			spin_lock(&fs_info->super_lock);
+			ASSERT(fs_info->exclusive_operation == BTRFS_EXCLOP_BALANCE);
+			fs_info->exclusive_operation = BTRFS_EXCLOP_BALANCE_PAUSED;
+			spin_unlock(&fs_info->super_lock);
+		} else {
+			btrfs_exclop_finish(fs_info);
+		}
+	}
 out:
 	mnt_drop_write_file(file);
 	return ret;
