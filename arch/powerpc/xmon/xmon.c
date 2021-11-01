@@ -4061,7 +4061,7 @@ static int xmon_dbgfs_get(void *data, u64 *val)
 	return 0;
 }
 
-DEFINE_SIMPLE_ATTRIBUTE(xmon_dbgfs_ops, xmon_dbgfs_get,
+DEFINE_DEBUGFS_ATTRIBUTE(xmon_dbgfs_ops, xmon_dbgfs_get,
 			xmon_dbgfs_set, "%llu\n");
 
 static int __init setup_xmon_dbgfs(void)
