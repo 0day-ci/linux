@@ -21,18 +21,59 @@
 
 DEFINE_STATIC_KEY_DEFERRED_FALSE(kvm_xen_enabled, HZ);
 
-static int kvm_xen_shared_info_init(struct kvm *kvm, gfn_t gfn)
+static void kvm_xen_shared_info_unmap(struct kvm *kvm)
+{
+	bool was_valid = false;
+
+	write_lock(&kvm->arch.xen.shinfo_lock);
+	if (kvm->arch.xen.shared_info)
+		was_valid = true;
+	kvm->arch.xen.shared_info = NULL;
+	kvm->arch.xen.shinfo_gfn = GPA_INVALID;
+	write_unlock(&kvm->arch.xen.shinfo_lock);
+
+	if (kvm_vcpu_mapped(&kvm->arch.xen.shinfo_map)) {
+		kvm_unmap_gfn(kvm, &kvm->arch.xen.shinfo_map,
+			      &kvm->arch.xen.shinfo_cache, was_valid, false);
+
+		/* If the MMU notifier invalidated it, the gfn_to_pfn_cache
+		 * may be invalid. Force it to notice */
+		if (!was_valid)
+			kvm->arch.xen.shinfo_cache.generation = -1;
+	}
+}
+
+static int kvm_xen_shared_info_init(struct kvm *kvm, gfn_t gfn, bool update_clock)
 {
 	gpa_t gpa = gfn_to_gpa(gfn);
 	int wc_ofs, sec_hi_ofs;
 	int ret = 0;
 	int idx = srcu_read_lock(&kvm->srcu);
 
-	if (kvm_is_error_hva(gfn_to_hva(kvm, gfn))) {
-		ret = -EFAULT;
+	kvm_xen_shared_info_unmap(kvm);
+
+	if (gfn == GPA_INVALID)
 		goto out;
-	}
+
+	/* Let the MMU notifier know that we are in the process of mapping it */
+	write_lock(&kvm->arch.xen.shinfo_lock);
+	kvm->arch.xen.shared_info = KVM_UNMAPPED_PAGE;
 	kvm->arch.xen.shinfo_gfn = gfn;
+	write_unlock(&kvm->arch.xen.shinfo_lock);
+
+	ret = kvm_map_gfn(kvm, gfn, &kvm->arch.xen.shinfo_map,
+			  &kvm->arch.xen.shinfo_cache, false);
+	if (ret)
+		goto out;
+
+	write_lock(&kvm->arch.xen.shinfo_lock);
+	/* Unless the MMU notifier already invalidated it */
+	if (kvm->arch.xen.shared_info == KVM_UNMAPPED_PAGE)
+		kvm->arch.xen.shared_info = kvm->arch.xen.shinfo_map.hva;
+	write_unlock(&kvm->arch.xen.shinfo_lock);
+
+	if (!update_clock)
+		goto out;
 
 	/* Paranoia checks on the 32-bit struct layout */
 	BUILD_BUG_ON(offsetof(struct compat_shared_info, wc) != 0x900);
@@ -243,14 +284,8 @@ int kvm_xen_hvm_set_attr(struct kvm *kvm, struct kvm_xen_hvm_attr *data)
 		break;
 
 	case KVM_XEN_ATTR_TYPE_SHARED_INFO:
-		if (data->u.shared_info.gfn == GPA_INVALID) {
-			kvm->arch.xen.shinfo_gfn = GPA_INVALID;
-			r = 0;
-			break;
-		}
-		r = kvm_xen_shared_info_init(kvm, data->u.shared_info.gfn);
+		r = kvm_xen_shared_info_init(kvm, data->u.shared_info.gfn, true);
 		break;
-
 
 	case KVM_XEN_ATTR_TYPE_UPCALL_VECTOR:
 		if (data->u.vector && data->u.vector < 0x10)
@@ -644,11 +679,17 @@ int kvm_xen_hvm_config(struct kvm *kvm, struct kvm_xen_hvm_config *xhc)
 
 void kvm_xen_init_vm(struct kvm *kvm)
 {
-	kvm->arch.xen.shinfo_gfn = GPA_INVALID;
+	rwlock_init(&kvm->arch.xen.shinfo_lock);
 }
 
 void kvm_xen_destroy_vm(struct kvm *kvm)
 {
+	struct gfn_to_pfn_cache *cache = &kvm->arch.xen.shinfo_cache;
+
+	kvm_xen_shared_info_unmap(kvm);
+
+	kvm_release_pfn(cache->pfn, cache->dirty, cache);
+
 	if (kvm->arch.xen_hvm_config.msr)
 		static_branch_slow_dec_deferred(&kvm_xen_enabled);
 }

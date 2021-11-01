@@ -25,6 +25,7 @@
 #include "kvm_emulate.h"
 #include "cpuid.h"
 #include "spte.h"
+#include "xen.h"
 
 #include <linux/kvm_host.h>
 #include <linux/types.h>
@@ -1577,6 +1578,28 @@ static __always_inline bool kvm_handle_gfn_range(struct kvm *kvm,
 bool kvm_unmap_gfn_range(struct kvm *kvm, struct kvm_gfn_range *range)
 {
 	bool flush = false;
+
+	if (static_branch_unlikely(&kvm_xen_enabled.key)) {
+		write_lock(&kvm->arch.xen.shinfo_lock);
+
+		if (kvm->arch.xen.shared_info &&
+		    kvm->arch.xen.shinfo_gfn >= range->start &&
+		    kvm->arch.xen.shinfo_cache.gfn < range->end) {
+			/*
+			 * If kvm_xen_shared_info_init() had *finished* mapping the
+			 * page and assigned the pointer for real, then mark the page
+			 * dirty now instead of via the eventual cache teardown.
+			 */
+			if (kvm->arch.xen.shared_info != KVM_UNMAPPED_PAGE) {
+				kvm_set_pfn_dirty(kvm->arch.xen.shinfo_cache.pfn);
+				kvm->arch.xen.shinfo_cache.dirty = false;
+			}
+
+			kvm->arch.xen.shared_info = NULL;
+		}
+
+		write_unlock(&kvm->arch.xen.shinfo_lock);
+	}
 
 	if (kvm_memslots_have_rmaps(kvm))
 		flush = kvm_handle_gfn_range(kvm, range, kvm_unmap_rmapp);
