@@ -14859,6 +14859,14 @@ S:	Maintained
 W:	http://www.st.com/spear
 F:	drivers/pinctrl/spear/
 
+PIN CONTROLLER - SUNPLUS / TIBBO
+M:	Dvorkin Dmitry <dvorkin@tibbo.com>
+M:	Wells Lu <wells.lu@sunplus.com>
+L:	linux-arm-kernel@lists.infradead.org (moderated for non-subscribers)
+S:	Maintained
+W:	https://sunplus-tibbo.atlassian.net/wiki/spaces/doc/overview
+F:	drivers/pinctrl/sunplus/
+
 PKTCDVD DRIVER
 M:	linux-block@vger.kernel.org
 S:	Orphan

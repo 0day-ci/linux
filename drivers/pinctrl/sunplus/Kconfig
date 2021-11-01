@@ -1,0 +1,33 @@
+# SPDX-License-Identifier: GPL-2.0
+#
+# Sunplus Pin control driver configuration
+#
+
+config PINCTRL_SPPCTL
+	bool "Sunplus SP7021 pinmux and GPIO driver"
+	depends on SOC_SP7021
+	depends on OF && HAS_IOMEM
+	select PINMUX
+	select GENERIC_PINCTRL_GROUPS
+	select GENERIC_PINMUX_FUNCTIONS
+	select PINCONF
+	select GENERIC_PINCONF
+	select OF_GPIO
+	select GPIOLIB
+	select GPIO_SYSFS
+	select GENERIC_IRQ_CHIP
+	select GPIOLIB_IRQCHIP
+	help
+	  Say Y here to support Sunplus SP7021 pinmux controller.
+	  The driver is selected automatically by platform.
+	  This driver requires the pinctrl framework.
+	  GPIO is provided by the same driver.
+
+config PINCTRL_SPPCTL_DEBUG
+	bool "Sunplus pinmux specific debug"
+	depends on SOC_SP7021 && DEBUG_PINCTRL
+	help
+	  Say Y if you need to debug Sunplus pinmux driver in-depth.
+	  Pin control driver will output more messages if you enable
+	  this item. This function is dependent on DEBUG_PINCTRL. It
+	  should be enabled first.
