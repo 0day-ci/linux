@@ -2738,6 +2738,13 @@ relock:
 			signr = ptrace_signal(signr, &ksig->info);
 			if (!signr)
 				continue;
+			/*
+			 * After calling the debugger anything could have changed.
+			 * If there's a pending SIGKILL stop processing the current
+			 * signal and skip straight to the end.
+			 */
+			if (signal_group_exit(signal))
+				goto kill;
 		}
 
 		ka = &sighand->action[signr-1];
