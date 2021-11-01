@@ -551,10 +551,10 @@ static int klp_add_nops(struct klp_patch *patch)
 
 static void klp_kobj_release_patch(struct kobject *kobj)
 {
-	struct klp_patch *patch;
+	struct klp_patch *patch = container_of(kobj, struct klp_patch, kobj);
 
-	patch = container_of(kobj, struct klp_patch, kobj);
-	complete(&patch->finish);
+	if (!patch->forced)
+		module_put(patch->mod);
 }
 
 static struct kobj_type klp_ktype_patch = {
@@ -678,11 +678,6 @@ static void klp_free_patch_finish(struct klp_patch *patch)
 	 * cannot get enabled again.
 	 */
 	kobject_put(&patch->kobj);
-	wait_for_completion(&patch->finish);
-
-	/* Put the module after the last access to struct klp_patch. */
-	if (!patch->forced)
-		module_put(patch->mod);
 }
 
 /*
@@ -876,7 +871,6 @@ static int klp_init_patch_early(struct klp_patch *patch)
 	patch->enabled = false;
 	patch->forced = false;
 	INIT_WORK(&patch->free_work, klp_free_patch_work_fn);
-	init_completion(&patch->finish);
 
 	klp_for_each_object_static(patch, obj) {
 		if (!obj->funcs)
