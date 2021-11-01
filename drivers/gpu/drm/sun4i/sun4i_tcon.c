@@ -47,12 +47,12 @@ static struct drm_connector *sun4i_tcon_get_connector(const struct drm_encoder *
 	drm_connector_list_iter_begin(encoder->dev, &iter);
 	drm_for_each_connector_iter(connector, &iter)
 		if (connector->encoder == encoder) {
-			drm_connector_list_iter_end(&iter);
-			return connector;
+			drm_connector_get(connector);
+			break;
 		}
 	drm_connector_list_iter_end(&iter);
 
-	return NULL;
+	return connector;
 }
 
 static int sun4i_tcon_get_pixel_depth(const struct drm_encoder *encoder)
@@ -65,6 +65,7 @@ static int sun4i_tcon_get_pixel_depth(const struct drm_encoder *encoder)
 		return -EINVAL;
 
 	info = &connector->display_info;
+	drm_connector_put(connector);
 	if (info->num_bus_formats != 1)
 		return -EINVAL;
 
@@ -361,6 +362,7 @@ static void sun4i_tcon0_mode_set_cpu(struct sun4i_tcon *tcon,
 	/* TODO support normal CPU interface modes */
 	struct sun6i_dsi *dsi = encoder_to_sun6i_dsi(encoder);
 	struct mipi_dsi_device *device = dsi->device;
+	struct drm_connector *connector;
 	u8 bpp = mipi_dsi_pixel_format_to_bpp(device->format);
 	u8 lanes = device->lanes;
 	u32 block_space, start_delay;
@@ -372,7 +374,9 @@ static void sun4i_tcon0_mode_set_cpu(struct sun4i_tcon *tcon,
 	sun4i_tcon0_mode_set_common(tcon, mode);
 
 	/* Set dithering if needed */
-	sun4i_tcon0_mode_set_dithering(tcon, sun4i_tcon_get_connector(encoder));
+	connector = sun4i_tcon_get_connector(encoder);
+	sun4i_tcon0_mode_set_dithering(tcon, connector);
+	drm_connector_put(connector);
 
 	regmap_update_bits(tcon->regs, SUN4I_TCON0_CTL_REG,
 			   SUN4I_TCON0_CTL_IF_MASK,
@@ -430,6 +434,7 @@ static void sun4i_tcon0_mode_set_lvds(struct sun4i_tcon *tcon,
 				      const struct drm_display_mode *mode)
 {
 	unsigned int bp;
+	struct drm_connector *connector;
 	u8 clk_delay;
 	u32 reg, val = 0;
 
@@ -440,7 +445,9 @@ static void sun4i_tcon0_mode_set_lvds(struct sun4i_tcon *tcon,
 	sun4i_tcon0_mode_set_common(tcon, mode);
 
 	/* Set dithering if needed */
-	sun4i_tcon0_mode_set_dithering(tcon, sun4i_tcon_get_connector(encoder));
+	connector = sun4i_tcon_get_connector(encoder);
+	sun4i_tcon0_mode_set_dithering(tcon, connector);
+	drm_connector_put(connector);
 
 	/* Adjust clock delay */
 	clk_delay = sun4i_tcon_get_clk_delay(mode, 0);
@@ -518,6 +525,7 @@ static void sun4i_tcon0_mode_set_rgb(struct sun4i_tcon *tcon,
 
 	/* Set dithering if needed */
 	sun4i_tcon0_mode_set_dithering(tcon, connector);
+	drm_connector_put(connector);
 
 	/* Adjust clock delay */
 	clk_delay = sun4i_tcon_get_clk_delay(mode, 0);
