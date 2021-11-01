@@ -24,6 +24,8 @@
 #include "t7xx_monitor.h"
 #include "t7xx_pci.h"
 #include "t7xx_pcie_mac.h"
+#include "t7xx_port.h"
+#include "t7xx_port_proxy.h"
 
 #define FSM_DRM_DISABLE_DELAY_MS 200
 #define FSM_EX_REASON GENMASK(23, 16)
@@ -84,6 +86,9 @@ void fsm_broadcast_state(struct ccci_fsm_ctl *ctl, enum md_state state)
 
 	ctl->md_state = state;
 
+	/* update to port first, otherwise sending message on HS2 may fail */
+	port_proxy_md_status_notify(state);
+
 	fsm_state_notify(state);
 }
 
@@ -141,7 +146,8 @@ static void fsm_flush_queue(struct ccci_fsm_ctl *ctl)
 static void fsm_routine_exception(struct ccci_fsm_ctl *ctl, struct ccci_fsm_command *cmd,
 				  enum ccci_ex_reason reason)
 {
-	bool rec_ok = false;
+	struct t7xx_port *log_port, *meta_port;
+	bool rec_ok = false, pass = false;
 	struct ccci_fsm_event *event;
 	unsigned long flags;
 	struct device *dev;
@@ -202,11 +208,29 @@ static void fsm_routine_exception(struct ccci_fsm_ctl *ctl, struct ccci_fsm_comm
 			if (!list_empty(&ctl->event_queue)) {
 				event = list_first_entry(&ctl->event_queue,
 							 struct ccci_fsm_event, entry);
-				if (event->event_id == CCCI_EVENT_MD_EX_PASS)
+				if (event->event_id == CCCI_EVENT_MD_EX_PASS) {
+					pass = true;
 					fsm_finish_event(ctl, event);
+				}
 			}
 
 			spin_unlock_irqrestore(&ctl->event_lock, flags);
+			if (pass) {
+				log_port = port_get_by_name("ttyCMdLog");
+				if (log_port)
+					log_port->ops->enable_chl(log_port);
+				else
+					dev_err(dev, "ttyCMdLog port not found\n");
+
+				meta_port = port_get_by_name("ttyCMdMeta");
+				if (meta_port)
+					meta_port->ops->enable_chl(meta_port);
+				else
+					dev_err(dev, "ttyCMdMeta port not found\n");
+
+				break;
+			}
+
 			cnt++;
 			msleep(EVENT_POLL_INTERVAL_MS);
 		}

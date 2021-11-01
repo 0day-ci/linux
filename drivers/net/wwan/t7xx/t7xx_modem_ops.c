@@ -23,6 +23,8 @@
 #include "t7xx_monitor.h"
 #include "t7xx_pci.h"
 #include "t7xx_pcie_mac.h"
+#include "t7xx_port.h"
+#include "t7xx_port_proxy.h"
 
 #define RGU_RESET_DELAY_US	20
 #define PORT_RESET_DELAY_US	2000
@@ -220,12 +222,14 @@ static void md_exception(struct mtk_modem *md, enum hif_ex_stage stage)
 
 	mtk_dev = md->mtk_dev;
 
-	if (stage == HIF_EX_CLEARQ_DONE)
+	if (stage == HIF_EX_CLEARQ_DONE) {
 		/* give DHL time to flush data.
 		 * this is an empirical value that assure
 		 * that DHL have enough time to flush all the date.
 		 */
 		msleep(PORT_RESET_DELAY_US);
+		port_proxy_reset(&mtk_dev->pdev->dev);
+	}
 
 	cldma_exception(ID_CLDMA1, stage);
 
@@ -412,6 +416,7 @@ void mtk_md_reset(struct mtk_pci_dev *mtk_dev)
 	md_structure_reset(md);
 	ccci_fsm_reset();
 	cldma_reset(ID_CLDMA1);
+	port_proxy_reset(&mtk_dev->pdev->dev);
 	md->md_init_finish = true;
 }
 
@@ -450,6 +455,10 @@ int mtk_md_init(struct mtk_pci_dev *mtk_dev)
 	if (ret)
 		goto err_fsm_init;
 
+	ret = port_proxy_init(mtk_dev->md);
+	if (ret)
+		goto err_cldma_init;
+
 	fsm_ctl = fsm_get_entry();
 	fsm_append_command(fsm_ctl, CCCI_COMMAND_START, 0);
 
@@ -458,6 +467,8 @@ int mtk_md_init(struct mtk_pci_dev *mtk_dev)
 	md->md_init_finish = true;
 	return 0;
 
+err_cldma_init:
+	cldma_exit(ID_CLDMA1);
 err_fsm_init:
 	ccci_fsm_uninit();
 err_alloc:
@@ -480,6 +491,7 @@ void mtk_md_exit(struct mtk_pci_dev *mtk_dev)
 	fsm_ctl = fsm_get_entry();
 	/* change FSM state, will auto jump to stopped */
 	fsm_append_command(fsm_ctl, CCCI_COMMAND_PRE_STOP, 1);
+	port_proxy_uninit();
 	cldma_exit(ID_CLDMA1);
 	ccci_fsm_uninit();
 	destroy_workqueue(md->handshake_wq);
