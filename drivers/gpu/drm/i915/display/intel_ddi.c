@@ -321,10 +321,11 @@ static void ddi_dotclock_get(struct intel_crtc_state *pipe_config)
 {
 	int dotclock;
 
+	/* CRT dotclock is determined via other means */
 	if (pipe_config->has_pch_encoder)
-		dotclock = intel_dotclock_calculate(pipe_config->port_clock,
-						    &pipe_config->fdi_m_n);
-	else if (intel_crtc_has_dp_encoder(pipe_config))
+		return;
+
+	if (intel_crtc_has_dp_encoder(pipe_config))
 		dotclock = intel_dotclock_calculate(pipe_config->port_clock,
 						    &pipe_config->dp_m_n);
 	else if (pipe_config->has_hdmi_sink && pipe_config->pipe_bpp > 24)
@@ -1938,7 +1939,7 @@ void intel_ddi_enable_clock(struct intel_encoder *encoder,
 		encoder->enable_clock(encoder, crtc_state);
 }
 
-static void intel_ddi_disable_clock(struct intel_encoder *encoder)
+void intel_ddi_disable_clock(struct intel_encoder *encoder)
 {
 	if (encoder->disable_clock)
 		encoder->disable_clock(encoder);
@@ -2385,7 +2386,10 @@ static void dg2_ddi_pre_enable_dp(struct intel_atomic_state *state,
 
 	/* 5.k Configure and enable FEC if needed */
 	intel_ddi_enable_fec(encoder, crtc_state);
-	intel_dsc_enable(encoder, crtc_state);
+
+	intel_dsc_dp_pps_write(encoder, crtc_state);
+
+	intel_dsc_enable(crtc_state);
 }
 
 static void tgl_ddi_pre_enable_dp(struct intel_atomic_state *state,
@@ -2519,8 +2523,11 @@ static void tgl_ddi_pre_enable_dp(struct intel_atomic_state *state,
 
 	/* 7.l Configure and enable FEC if needed */
 	intel_ddi_enable_fec(encoder, crtc_state);
+
+	intel_dsc_dp_pps_write(encoder, crtc_state);
+
 	if (!crtc_state->bigjoiner)
-		intel_dsc_enable(encoder, crtc_state);
+		intel_dsc_enable(crtc_state);
 }
 
 static void hsw_ddi_pre_enable_dp(struct intel_atomic_state *state,
@@ -2585,8 +2592,10 @@ static void hsw_ddi_pre_enable_dp(struct intel_atomic_state *state,
 	if (!is_mst)
 		intel_ddi_enable_pipe_clock(encoder, crtc_state);
 
+	intel_dsc_dp_pps_write(encoder, crtc_state);
+
 	if (!crtc_state->bigjoiner)
-		intel_dsc_enable(encoder, crtc_state);
+		intel_dsc_enable(crtc_state);
 }
 
 static void intel_ddi_pre_enable_dp(struct intel_atomic_state *state,
@@ -2824,12 +2833,10 @@ static void intel_ddi_post_disable(struct intel_atomic_state *state,
 	}
 
 	if (old_crtc_state->bigjoiner_linked_crtc) {
-		struct intel_atomic_state *state =
-			to_intel_atomic_state(old_crtc_state->uapi.state);
-		struct intel_crtc *slave =
+		struct intel_crtc *slave_crtc =
 			old_crtc_state->bigjoiner_linked_crtc;
 		const struct intel_crtc_state *old_slave_crtc_state =
-			intel_atomic_get_old_crtc_state(state, slave);
+			intel_atomic_get_old_crtc_state(state, slave_crtc);
 
 		intel_crtc_vblank_off(old_slave_crtc_state);
 
@@ -2864,41 +2871,6 @@ static void intel_ddi_post_disable(struct intel_atomic_state *state,
 
 	if (is_tc_port)
 		intel_tc_port_put_link(dig_port);
-}
-
-void intel_ddi_fdi_post_disable(struct intel_atomic_state *state,
-				struct intel_encoder *encoder,
-				const struct intel_crtc_state *old_crtc_state,
-				const struct drm_connector_state *old_conn_state)
-{
-	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
-	u32 val;
-
-	/*
-	 * Bspec lists this as both step 13 (before DDI_BUF_CTL disable)
-	 * and step 18 (after clearing PORT_CLK_SEL). Based on a BUN,
-	 * step 13 is the correct place for it. Step 18 is where it was
-	 * originally before the BUN.
-	 */
-	val = intel_de_read(dev_priv, FDI_RX_CTL(PIPE_A));
-	val &= ~FDI_RX_ENABLE;
-	intel_de_write(dev_priv, FDI_RX_CTL(PIPE_A), val);
-
-	intel_disable_ddi_buf(encoder, old_crtc_state);
-	intel_ddi_disable_clock(encoder);
-
-	val = intel_de_read(dev_priv, FDI_RX_MISC(PIPE_A));
-	val &= ~(FDI_RX_PWRDN_LANE1_MASK | FDI_RX_PWRDN_LANE0_MASK);
-	val |= FDI_RX_PWRDN_LANE1_VAL(2) | FDI_RX_PWRDN_LANE0_VAL(2);
-	intel_de_write(dev_priv, FDI_RX_MISC(PIPE_A), val);
-
-	val = intel_de_read(dev_priv, FDI_RX_CTL(PIPE_A));
-	val &= ~FDI_PCDCLK;
-	intel_de_write(dev_priv, FDI_RX_CTL(PIPE_A), val);
-
-	val = intel_de_read(dev_priv, FDI_RX_CTL(PIPE_A));
-	val &= ~FDI_RX_PLL_ENABLE;
-	intel_de_write(dev_priv, FDI_RX_CTL(PIPE_A), val);
 }
 
 static void trans_port_sync_stop_link_train(struct intel_atomic_state *state,
@@ -3095,6 +3067,12 @@ static void intel_disable_ddi_dp(struct intel_atomic_state *state,
 
 	intel_dp->link_trained = false;
 
+	if (old_crtc_state->has_audio)
+		intel_audio_codec_disable(encoder,
+					  old_crtc_state, old_conn_state);
+
+	intel_drrs_disable(intel_dp, old_crtc_state);
+	intel_psr_disable(intel_dp, old_crtc_state);
 	intel_edp_backlight_off(old_conn_state);
 	/* Disable the decompression in DP Sink */
 	intel_dp_sink_set_decompression_state(intel_dp, old_crtc_state,
@@ -3112,30 +3090,15 @@ static void intel_disable_ddi_hdmi(struct intel_atomic_state *state,
 	struct drm_i915_private *i915 = to_i915(encoder->base.dev);
 	struct drm_connector *connector = old_conn_state->connector;
 
+	if (old_crtc_state->has_audio)
+		intel_audio_codec_disable(encoder,
+					  old_crtc_state, old_conn_state);
+
 	if (!intel_hdmi_handle_sink_scrambling(encoder, connector,
 					       false, false))
 		drm_dbg_kms(&i915->drm,
 			    "[CONNECTOR:%d:%s] Failed to reset sink scrambling/TMDS bit clock ratio\n",
 			    connector->base.id, connector->name);
-}
-
-static void intel_pre_disable_ddi(struct intel_atomic_state *state,
-				  struct intel_encoder *encoder,
-				  const struct intel_crtc_state *old_crtc_state,
-				  const struct drm_connector_state *old_conn_state)
-{
-	struct intel_dp *intel_dp;
-
-	if (old_crtc_state->has_audio)
-		intel_audio_codec_disable(encoder, old_crtc_state,
-					  old_conn_state);
-
-	if (intel_crtc_has_type(old_crtc_state, INTEL_OUTPUT_HDMI))
-		return;
-
-	intel_dp = enc_to_intel_dp(encoder);
-	intel_drrs_disable(intel_dp, old_crtc_state);
-	intel_psr_disable(intel_dp, old_crtc_state);
 }
 
 static void intel_disable_ddi(struct intel_atomic_state *state,
@@ -3552,18 +3515,7 @@ static void intel_ddi_get_config(struct intel_encoder *encoder,
 	if (drm_WARN_ON(&dev_priv->drm, transcoder_is_dsi(cpu_transcoder)))
 		return;
 
-	if (pipe_config->bigjoiner_slave) {
-		/* read out pipe settings from master */
-		enum transcoder save = pipe_config->cpu_transcoder;
-
-		/* Our own transcoder needs to be disabled when reading it in intel_ddi_read_func_ctl() */
-		WARN_ON(pipe_config->output_types);
-		pipe_config->cpu_transcoder = (enum transcoder)pipe_config->bigjoiner_linked_crtc->pipe;
-		intel_ddi_read_func_ctl(encoder, pipe_config);
-		pipe_config->cpu_transcoder = save;
-	} else {
-		intel_ddi_read_func_ctl(encoder, pipe_config);
-	}
+	intel_ddi_read_func_ctl(encoder, pipe_config);
 
 	intel_ddi_mso_get_config(encoder, pipe_config);
 
@@ -3591,8 +3543,7 @@ static void intel_ddi_get_config(struct intel_encoder *encoder,
 		dev_priv->vbt.edp.bpp = pipe_config->pipe_bpp;
 	}
 
-	if (!pipe_config->bigjoiner_slave)
-		ddi_dotclock_get(pipe_config);
+	ddi_dotclock_get(pipe_config);
 
 	if (IS_GEMINILAKE(dev_priv) || IS_BROXTON(dev_priv))
 		pipe_config->lane_lat_optim_mask =
@@ -4471,7 +4422,6 @@ void intel_ddi_init(struct drm_i915_private *dev_priv, enum port port)
 	encoder->enable = intel_enable_ddi;
 	encoder->pre_pll_enable = intel_ddi_pre_pll_enable;
 	encoder->pre_enable = intel_ddi_pre_enable;
-	encoder->pre_disable = intel_pre_disable_ddi;
 	encoder->disable = intel_disable_ddi;
 	encoder->post_disable = intel_ddi_post_disable;
 	encoder->update_pipe = intel_ddi_update_pipe;
