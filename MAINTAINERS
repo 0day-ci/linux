@@ -17937,6 +17937,13 @@ L:	netdev@vger.kernel.org
 S:	Maintained
 F:	drivers/net/ethernet/dlink/sundance.c
 
+SUNPLUS OCOTP DRIVER
+M:	Vincent Shih <vincent.shih@sunplus.com>
+S:	Maintained
+F:	drivers/nvmem/sunplus-ocotp.c
+F:	drivers/nvmem/sunplus-ocotp.h
+F:	drivers/nvmem/sunplus-ocotp0.c
+
 SUPERH
 M:	Yoshinori Sato <ysato@users.sourceforge.jp>
 M:	Rich Felker <dalias@libc.org>
