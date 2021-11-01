@@ -137,18 +137,23 @@ const struct sysfs_ops slave_sysfs_ops = {
 
 int bond_sysfs_slave_add(struct slave *slave)
 {
-	const struct slave_attribute **a;
+	const struct slave_attribute **a, **b;
 	int err;
 
 	for (a = slave_attrs; *a; ++a) {
 		err = sysfs_create_file(&slave->kobj, &((*a)->attr));
 		if (err) {
-			kobject_put(&slave->kobj);
-			return err;
+			goto err_remove_file;
 		}
 	}
 
 	return 0;
+
+err_remove_file:
+	for (b = slave_attrs; b < a; ++b)
+		sysfs_remove_file(&slave->kobj, &((*b)->attr));
+
+	return err;
 }
 
 void bond_sysfs_slave_del(struct slave *slave)
