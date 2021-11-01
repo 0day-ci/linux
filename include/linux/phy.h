@@ -446,6 +446,11 @@ struct phy_device *mdiobus_scan(struct mii_bus *bus, int addr);
  * - irq or timer will set @PHY_NOLINK if link goes down
  * - phy_stop moves to @PHY_HALTED
  *
+ * @PHY_FORCING: PHY is being configured with forced settings.
+ * - if link is up, move to @PHY_RUNNING
+ * - if link is down, move to @PHY_NOLINK
+ * - phy_stop moves to @PHY_HALTED
+ *
  * @PHY_CABLETEST: PHY is performing a cable test. Packet reception/sending
  * is not expected to work, carrier will be indicated as down. PHY will be
  * poll once per second, or on interrupt for it current state.
@@ -463,6 +468,7 @@ enum phy_state {
 	PHY_UP,
 	PHY_RUNNING,
 	PHY_NOLINK,
+	PHY_FORCING,
 	PHY_CABLETEST,
 };
 

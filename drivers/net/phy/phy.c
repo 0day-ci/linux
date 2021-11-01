@@ -49,6 +49,7 @@ static const char *phy_state_to_str(enum phy_state st)
 	PHY_STATE_STR(UP)
 	PHY_STATE_STR(RUNNING)
 	PHY_STATE_STR(NOLINK)
+	PHY_STATE_STR(FORCING)
 	PHY_STATE_STR(CABLETEST)
 	PHY_STATE_STR(HALTED)
 	}
@@ -724,8 +725,12 @@ static int _phy_start_aneg(struct phy_device *phydev)
 	if (err < 0)
 		return err;
 
-	if (phy_is_started(phydev))
-		err = phy_check_link_status(phydev);
+	if (phy_is_started(phydev)) {
+		if (phydev->autoneg == AUTONEG_ENABLE)
+			err = phy_check_link_status(phydev);
+		else
+			phydev->state = PHY_FORCING;
+	}
 
 	return err;
 }
@@ -1120,6 +1125,7 @@ void phy_state_machine(struct work_struct *work)
 		needs_aneg = true;
 
 		break;
+	case PHY_FORCING:
 	case PHY_NOLINK:
 	case PHY_RUNNING:
 		err = phy_check_link_status(phydev);
