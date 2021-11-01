@@ -601,4 +601,13 @@ config APPLE_AIC
 	  Support for the Apple Interrupt Controller found on Apple Silicon SoCs,
 	  such as the M1.
 
+config SUNPLUS_SP7021_INTC
+	bool "Sunplus SP7021 interrupt controller"
+	help
+	  Support for the Sunplus SP7021 Interrupt Controller IP core.
+	  SP7021 SoC has 2 Chips: C-Chip & P-Chip. This is used as a
+	  chained controller, routed all interrupt source in P-Chip to
+	  the primary controller on C-Chip.
+	  This is selected automatically by platform config.
+
 endmenu
