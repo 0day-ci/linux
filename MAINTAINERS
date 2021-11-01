@@ -17938,6 +17938,8 @@ SUNPLUS UART DRIVER
 M:	Hammer Hsieh <hammer.hsieh@sunplus.com>
 S:	Maintained
 F:	Documentation/devicetree/bindings/serial/sunplus,uart.yaml
+F:	drivers/tty/serial/sunplus-uart.c
+F:	include/soc/sunplus/sp-uart.h
 
 SUPERH
 M:	Yoshinori Sato <ysato@users.sourceforge.jp>
