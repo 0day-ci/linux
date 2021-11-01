@@ -28,6 +28,10 @@ properties:
 
   trickle-diode-disable: true
 
+  irq-gpio:
+    description: |
+      gpio for INT signal. Set up gpio for irq and device wakeup.
+
 required:
   - compatible
   - reg
@@ -45,5 +49,6 @@ examples:
             reg = <0x32>;
             epson,vdet-disable;
             trickle-diode-disable;
+            irq-gpio = <&gpio1 11 GPIO_ACTIVE_LOW>;
         };
     };

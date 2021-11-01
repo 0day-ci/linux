@@ -16,6 +16,7 @@
 #include <linux/module.h>
 #include <linux/of_device.h>
 #include <linux/rtc.h>
+#include <linux/pm_wakeirq.h>
 
 #define RV8803_I2C_TRY_COUNT		4
 
@@ -509,6 +510,61 @@ static int rx8900_trickle_charger_init(struct rv8803_data *rv8803)
 					 flags);
 }
 
+static int rv8803_setup_gpio_irq(struct i2c_client *client)
+{
+	struct device *dev = &client->dev;
+	int err;
+	int irq;
+	unsigned long irqflags;
+	struct gpio_desc *gpiod;
+
+
+	gpiod = devm_gpiod_get_from_of_node(dev, dev->of_node, "irq-gpio",
+					    0, GPIOD_IN, "RTC irq pin");
+	if (!gpiod || IS_ERR(gpiod)) {
+		dev_dbg(dev, "no gpio for rtc: skipping\n");
+		return -ENOENT;
+	}
+
+	irq = gpiod_to_irq(gpiod);
+	if (irq < 0) {
+		dev_err(dev, "gpio found but no irq\n");
+		err = irq;
+		goto error_gpio;
+	}
+
+	irqflags = IRQF_ONESHOT;
+	irqflags |= gpiod_is_active_low(gpiod) ?
+		    IRQF_TRIGGER_FALLING : IRQF_TRIGGER_RISING;
+
+	err = devm_request_threaded_irq(dev, irq, NULL, rv8803_handle_irq,
+					irqflags, "rtc-rv8803-gpio", client);
+	if (err) {
+		dev_warn(dev, "unable to request IRQ\n");
+		goto error_gpio;
+	}
+
+	err = device_init_wakeup(dev, true);
+	if (err) {
+		dev_warn(dev, "unable to set as wakeup source\n");
+		goto error_irq;
+	}
+
+	err = dev_pm_set_wake_irq(dev, irq);
+	if (err) {
+		dev_warn(dev, "unable to set wake irq\n");
+		goto error_irq;
+	}
+
+	return 0;
+
+error_irq:
+	devm_free_irq(dev, irq, client);
+error_gpio:
+	devm_gpiod_put(dev, gpiod);
+	return err;
+}
+
 static int rv8803_probe(struct i2c_client *client,
 			const struct i2c_device_id *id)
 {
@@ -524,6 +580,7 @@ static int rv8803_probe(struct i2c_client *client,
 		.reg_write = rv8803_nvram_write,
 		.priv = client,
 	};
+	bool irq_setup = false;
 
 	if (!i2c_check_functionality(adapter, I2C_FUNC_SMBUS_BYTE_DATA |
 				     I2C_FUNC_SMBUS_I2C_BLOCK)) {
@@ -562,17 +619,23 @@ static int rv8803_probe(struct i2c_client *client,
 	if (IS_ERR(rv8803->rtc))
 		return PTR_ERR(rv8803->rtc);
 
-	if (client->irq > 0) {
+	if (client->dev.of_node) {
+		err = rv8803_setup_gpio_irq(client);
+		if (!err)
+			irq_setup = true;
+	}
+
+	if (!irq_setup && client->irq > 0) {
 		err = devm_request_threaded_irq(&client->dev, client->irq,
 						NULL, rv8803_handle_irq,
 						IRQF_TRIGGER_LOW | IRQF_ONESHOT,
 						"rv8803", client);
-		if (err) {
+		if (err)
 			dev_warn(&client->dev, "unable to request IRQ, alarms disabled\n");
-			client->irq = 0;
-		}
+		else
+			irq_setup = true;
 	}
-	if (!client->irq)
+	if (!irq_setup)
 		clear_bit(RTC_FEATURE_ALARM, rv8803->rtc->features);
 
 	err = rv8803_write_reg(rv8803->client, RV8803_EXT, RV8803_EXT_WADA);
