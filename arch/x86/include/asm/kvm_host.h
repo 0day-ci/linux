@@ -1017,6 +1017,10 @@ struct kvm_xen {
 	bool long_mode;
 	u8 upcall_vector;
 	gfn_t shinfo_gfn;
+	rwlock_t shinfo_lock;
+	void *shared_info;
+	struct kvm_host_map shinfo_map;
+	struct gfn_to_pfn_cache shinfo_cache;
 };
 
 enum kvm_irqchip_mode {
