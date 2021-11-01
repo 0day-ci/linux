@@ -249,6 +249,14 @@ config RESET_TI_SYSCON
 	  you wish to use the reset framework for such memory-mapped devices,
 	  say Y here. Otherwise, say N.
 
+config RESET_SUNPLUS
+	bool "Sunplus SoCs Reset Driver"
+	help
+	  This enables the reset driver support for Sunplus SP7021 SoC family.
+	  Say Y if you want to control reset signals by the reset controller.
+	  Otherwise, say N.
+	  This driver is selected automatically by platform config.
+
 config RESET_UNIPHIER
 	tristate "Reset controller driver for UniPhier SoCs"
 	depends on ARCH_UNIPHIER || COMPILE_TEST
