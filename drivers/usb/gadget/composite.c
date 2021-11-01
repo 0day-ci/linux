@@ -166,21 +166,21 @@ int config_ep_by_speed_and_alt(struct usb_gadget *g,
 	/* select desired speed */
 	switch (g->speed) {
 	case USB_SPEED_SUPER_PLUS:
-		if (gadget_is_superspeed_plus(g)) {
+		if (gadget_is_superspeed_plus(g) && f->ssp_descriptors) {
 			speed_desc = f->ssp_descriptors;
 			want_comp_desc = 1;
 			break;
 		}
 		fallthrough;
 	case USB_SPEED_SUPER:
-		if (gadget_is_superspeed(g)) {
+		if (gadget_is_superspeed(g) && f->ss_descriptors) {
 			speed_desc = f->ss_descriptors;
 			want_comp_desc = 1;
 			break;
 		}
 		fallthrough;
 	case USB_SPEED_HIGH:
-		if (gadget_is_dualspeed(g)) {
+		if (gadget_is_dualspeed(g) && f->hs_descriptors) {
 			speed_desc = f->hs_descriptors;
 			break;
 		}
