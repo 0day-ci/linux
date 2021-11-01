@@ -40,6 +40,7 @@ class TCP_AUTHOPT_KEY_FLAG(IntFlag):
     DEL = BIT(0)
     EXCLUDE_OPTS = BIT(1)
     BIND_ADDR = BIT(2)
+    IFINDEX = BIT(3)
 
 
 class TCP_AUTHOPT_ALG(IntEnum):
@@ -104,6 +105,7 @@ class tcp_authopt_key:
         key: KeyArgType = b"",
         addr: AddrArgType = None,
         auto_flags: bool = True,
+        ifindex: typing.Optional[int] = None,
         include_options=None,
     ):
         self.flags = flags
@@ -111,6 +113,7 @@ class tcp_authopt_key:
         self.recv_id = recv_id
         self.alg = alg
         self.key = key
+        self.ifindex = ifindex
         self.addr = addr
         self.auto_flags = auto_flags
         if include_options is not None:
@@ -119,6 +122,10 @@ class tcp_authopt_key:
     def get_real_flags(self) -> TCP_AUTHOPT_KEY_FLAG:
         result = self.flags
         if self.auto_flags:
+            if self.ifindex is not None:
+                result |= TCP_AUTHOPT_KEY_FLAG.IFINDEX
+            else:
+                result &= ~TCP_AUTHOPT_KEY_FLAG.IFINDEX
             if self.addr is not None:
                 result |= TCP_AUTHOPT_KEY_FLAG.BIND_ADDR
             else:
@@ -138,6 +145,8 @@ class tcp_authopt_key:
             self.key,
         )
         data += bytes(self.addrbuf.ljust(sockaddr_storage.sizeof, b"\x00"))
+        if self.ifindex is not None:
+            data += bytes(struct.pack("I", self.ifindex))
         return data
 
     def __bytes__(self):
