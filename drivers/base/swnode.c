@@ -1126,17 +1126,15 @@ void software_node_notify(struct device *dev)
 	if (!swnode)
 		return;
 
-	ret = sysfs_create_link(&dev->kobj, &swnode->kobj, "software_node");
-	if (ret)
+	ret = sysfs_create_link_nowarn(&dev->kobj, &swnode->kobj,
+				       "software_node");
+	if (ret && ret != -EEXIST)
 		return;
 
-	ret = sysfs_create_link(&swnode->kobj, &dev->kobj, dev_name(dev));
-	if (ret) {
+	if (!sysfs_create_link(&swnode->kobj, &dev->kobj, dev_name(dev)))
+		kobject_get(&swnode->kobj);
+	else if (!ret)
 		sysfs_remove_link(&dev->kobj, "software_node");
-		return;
-	}
-
-	kobject_get(&swnode->kobj);
 }
 
 void software_node_notify_remove(struct device *dev)
