@@ -17938,6 +17938,7 @@ SUNPLUS THERMAL DRIVER
 M:	LH Kuo <lh.kuo@sunplus.com>
 L:	linux-pm@vger.kernel.org
 S:	Maintained
+F:	Documentation/devicetree/bindings/thermal/sunplus_thermal.yaml
 F:	drivers/thermal/sunplus_thermal.c
 
 SUPERH
