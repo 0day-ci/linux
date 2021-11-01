@@ -50,7 +50,7 @@ efi_status_t efi_low_alloc_above(unsigned long size, unsigned long align,
 	if (align < EFI_ALLOC_ALIGN)
 		align = EFI_ALLOC_ALIGN;
 
-	size = round_up(size, EFI_ALLOC_ALIGN);
+	size = round_up(size, align);
 	nr_pages = size / EFI_PAGE_SIZE;
 	for (i = 0; i < map_size / desc_size; i++) {
 		efi_memory_desc_t *desc;
