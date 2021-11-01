@@ -292,6 +292,10 @@ static int drm_dp_dpcd_access(struct drm_dp_aux *aux, u8 request,
 	msg.buffer = buffer;
 	msg.size = size;
 
+	/* No transfer function is set, so not an available DP connector */
+	if (!aux->transfer)
+		return -EINVAL;
+
 	mutex_lock(&aux->hw_mutex);
 
 	/*
