@@ -140,9 +140,7 @@ static const char *read_super_common(struct cache_sb *sb,  struct block_device *
 		goto err;
 
 	err = "Bad cache device number in set";
-	if (!sb->nr_in_set ||
-	    sb->nr_in_set <= sb->nr_this_dev ||
-	    sb->nr_in_set > MAX_CACHES_PER_SET)
+	if (sb->nr_in_set != 1 || sb->nr_this_dev != 0)
 		goto err;
 
 	err = "Journal buckets not sequential";
