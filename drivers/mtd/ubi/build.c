@@ -467,6 +467,7 @@ static int uif_init(struct ubi_device *ubi)
 	if (err)
 		goto out_unreg;
 
+	spin_lock(&ubi->volumes_lock);
 	for (i = 0; i < ubi->vtbl_slots; i++)
 		if (ubi->volumes[i]) {
 			err = ubi_add_volume(ubi, ubi->volumes[i]);
@@ -475,11 +476,13 @@ static int uif_init(struct ubi_device *ubi)
 				goto out_volumes;
 			}
 		}
+	spin_unlock(&ubi->volumes_lock);
 
 	return 0;
 
 out_volumes:
 	kill_volumes(ubi);
+	spin_unlock(&ubi->volumes_lock);
 	cdev_device_del(&ubi->cdev, &ubi->dev);
 out_unreg:
 	unregister_chrdev_region(ubi->cdev.dev, ubi->vtbl_slots + 1);
