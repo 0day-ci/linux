@@ -551,7 +551,8 @@ alloc_pages_bulk_array(gfp_t gfp, unsigned long nr_pages, struct page **page_arr
 static inline unsigned long
 alloc_pages_bulk_array_node(gfp_t gfp, int nid, unsigned long nr_pages, struct page **page_array)
 {
-	if (nid == NUMA_NO_NODE)
+	if (nid == NUMA_NO_NODE || (!node_online(nid) &&
+					!(gfp & __GFP_THISNODE)))
 		nid = numa_mem_id();
 
 	return __alloc_pages_bulk(gfp, nid, NULL, nr_pages, NULL, page_array);
@@ -587,7 +588,8 @@ struct folio *__folio_alloc_node(gfp_t gfp, unsigned int order, int nid)
 static inline struct page *alloc_pages_node(int nid, gfp_t gfp_mask,
 						unsigned int order)
 {
-	if (nid == NUMA_NO_NODE)
+	if (nid == NUMA_NO_NODE || (!node_online(nid) &&
+					!(gfp_mask & __GFP_THISNODE)))
 		nid = numa_mem_id();
 
 	return __alloc_pages_node(nid, gfp_mask, order);
