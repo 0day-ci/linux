@@ -84,6 +84,10 @@ guests, such as launching, running, snapshotting, migrating and decommissioning.
 
 The KVM_SEV_INIT command is used by the hypervisor to initialize the SEV platform
 context. In a typical workflow, this command should be the first command issued.
+The AMD-SP can be initialized either by using its own non-volatile storage or
+the system can manage the NV storage for the AMD-SP using the module parameter
+``init_ex_path``. This file must exist, to create a new NV storage file allocate
+a the file with 32Kb of 0xFF as required by the SEV FW spec.
 
 Returns: 0 on success, -negative on error
 

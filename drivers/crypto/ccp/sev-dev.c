@@ -22,6 +22,7 @@
 #include <linux/firmware.h>
 #include <linux/gfp.h>
 #include <linux/cpufeature.h>
+#include <linux/fs.h>
 
 #include <asm/smp.h>
 
@@ -43,6 +44,10 @@ static int psp_probe_timeout = 5;
 module_param(psp_probe_timeout, int, 0644);
 MODULE_PARM_DESC(psp_probe_timeout, " default timeout value, in seconds, during PSP device probe");
 
+static char *init_ex_path;
+module_param(init_ex_path, charp, 0660);
+MODULE_PARM_DESC(init_ex_path, " Path for INIT_EX data; if set try INIT_EX");
+
 MODULE_FIRMWARE("amd/amd_sev_fam17h_model0xh.sbin"); /* 1st gen EPYC */
 MODULE_FIRMWARE("amd/amd_sev_fam17h_model3xh.sbin"); /* 2nd gen EPYC */
 MODULE_FIRMWARE("amd/amd_sev_fam19h_model0xh.sbin"); /* 3rd gen EPYC */
@@ -57,6 +62,14 @@ static int psp_timeout;
  */
 #define SEV_ES_TMR_SIZE		(1024 * 1024)
 static void *sev_es_tmr;
+
+/* INIT_EX NV Storage:
+ *   The NV Storage is a 32Kb area and must be 4Kb page aligned.  Use the page
+ *   allocator to allocate the memory, which will return aligned memory for the
+ *   specified allocation order.
+ */
+#define NV_LENGTH (32 * 1024)
+static void *sev_init_ex_nv_address;
 
 static inline bool sev_version_greater_or_equal(u8 maj, u8 min)
 {
@@ -107,6 +120,7 @@ static int sev_cmd_buffer_len(int cmd)
 {
 	switch (cmd) {
 	case SEV_CMD_INIT:			return sizeof(struct sev_data_init);
+	case SEV_CMD_INIT_EX:                   return sizeof(struct sev_data_init_ex);
 	case SEV_CMD_PLATFORM_STATUS:		return sizeof(struct sev_user_data_status);
 	case SEV_CMD_PEK_CSR:			return sizeof(struct sev_data_pek_csr);
 	case SEV_CMD_PEK_CERT_IMPORT:		return sizeof(struct sev_data_pek_cert_import);
@@ -150,6 +164,89 @@ static void *sev_fw_alloc(unsigned long len)
 		return NULL;
 
 	return page_address(page);
+}
+
+static int sev_read_nv_memory(void)
+{
+	struct file *fp;
+	ssize_t nread;
+
+	if (!sev_init_ex_nv_address)
+		return -EOPNOTSUPP;
+
+	fp = filp_open(init_ex_path, O_RDONLY, 0);
+	if (IS_ERR(fp)) {
+		const int ret = PTR_ERR(fp);
+
+		dev_err(psp_master->dev,
+			"sev could not open file for read, error %d\n",
+			ret);
+		return ret;
+	}
+
+	nread = kernel_read(fp, sev_init_ex_nv_address, NV_LENGTH, NULL);
+	dev_dbg(psp_master->dev, "sev NV read %d bytes\n", nread);
+	filp_close(fp, NULL);
+
+	return 0;
+}
+
+static int sev_write_nv_memory(void)
+{
+	struct sev_device *sev = psp_master->sev_data;
+	struct file *fp;
+	loff_t offset = 0;
+	int ret;
+
+	if (!sev_init_ex_nv_address)
+		return -EOPNOTSUPP;
+
+	fp = filp_open(init_ex_path, O_CREAT | O_WRONLY, 0600);
+	if (IS_ERR(fp)) {
+		dev_err(sev->dev, "sev NV data could not be created\n");
+		return PTR_ERR(fp);
+	}
+
+	ret = kernel_write(fp, sev_init_ex_nv_address, NV_LENGTH, &offset);
+	vfs_fsync(fp, 0);
+	filp_close(fp, NULL);
+
+	if (ret != NV_LENGTH) {
+		dev_err(sev->dev,
+			"failed to write %d bytes to non volatile memory area, ret=%lu\n",
+			NV_LENGTH, ret);
+		if (ret >= 0)
+			return -EIO;
+		return ret;
+	}
+
+	dev_dbg(sev->dev, "wrote to non volatile memory area\n");
+
+	return 0;
+}
+
+static void sev_write_nv_memory_if_required(int cmd_id)
+{
+	if (!sev_init_ex_nv_address)
+		return;
+
+	/*
+	 * Only a few platform commands modify the SPI/NV area, but none of the
+	 * non-platform commands do. Only INIT(_EX), PLATFORM_RESET, PEK_GEN,
+	 * PEK_CERT_IMPORT, and PDH_GEN do.
+	 */
+	switch (cmd_id) {
+	case SEV_CMD_FACTORY_RESET:
+	case SEV_CMD_INIT_EX:
+	case SEV_CMD_PDH_GEN:
+	case SEV_CMD_PEK_CERT_IMPORT:
+	case SEV_CMD_PEK_GEN:
+		break;
+	default:
+		return;
+	};
+
+	sev_write_nv_memory();
 }
 
 static int __sev_do_cmd_locked(int cmd, void *data, int *psp_ret)
@@ -221,6 +318,8 @@ static int __sev_do_cmd_locked(int cmd, void *data, int *psp_ret)
 		dev_dbg(sev->dev, "sev command %#x failed (%#010x)\n",
 			cmd, reg & PSP_CMDRESP_ERR_MASK);
 		ret = -EIO;
+	} else {
+		sev_write_nv_memory_if_required(cmd);
 	}
 
 	print_hex_dump_debug("(out): ", DUMP_PREFIX_OFFSET, 16, 2, data,
@@ -247,20 +346,9 @@ static int sev_do_cmd(int cmd, void *data, int *psp_ret)
 	return rc;
 }
 
-static int __sev_platform_init_locked(int *error)
+static int __sev_init_locked(int *error)
 {
-	struct psp_device *psp = psp_master;
 	struct sev_data_init data;
-	struct sev_device *sev;
-	int rc = 0;
-
-	if (!psp || !psp->sev_data)
-		return -ENODEV;
-
-	sev = psp->sev_data;
-
-	if (sev->state == SEV_STATE_INIT)
-		return 0;
 
 	memset(&data, 0, sizeof(data));
 	if (sev_es_tmr) {
@@ -277,7 +365,58 @@ static int __sev_platform_init_locked(int *error)
 		data.tmr_len = SEV_ES_TMR_SIZE;
 	}
 
-	rc = __sev_do_cmd_locked(SEV_CMD_INIT, &data, error);
+	return __sev_do_cmd_locked(SEV_CMD_INIT, &data, error);
+}
+
+static int __sev_init_ex_locked(int *error)
+{
+	struct sev_data_init_ex data;
+	int ret;
+
+	memset(&data, 0, sizeof(data));
+	data.length = sizeof(data);
+	data.nv_address = __psp_pa(sev_init_ex_nv_address);
+	data.nv_len = NV_LENGTH;
+
+	ret = sev_read_nv_memory();
+	if (ret)
+		return ret;
+
+	if (sev_es_tmr) {
+		u64 tmr_pa;
+
+		/*
+		 * Do not include the encryption mask on the physical
+		 * address of the TMR (firmware should clear it anyway).
+		 */
+		tmr_pa = __pa(sev_es_tmr);
+
+		data.flags |= SEV_INIT_FLAGS_SEV_ES;
+		data.tmr_address = tmr_pa;
+		data.tmr_len = SEV_ES_TMR_SIZE;
+	}
+
+	return __sev_do_cmd_locked(SEV_CMD_INIT_EX, &data, error);
+}
+
+static int __sev_platform_init_locked(int *error)
+{
+	struct psp_device *psp = psp_master;
+	struct sev_device *sev;
+	int rc;
+	int (*init_function)(int *error);
+
+	if (!psp || !psp->sev_data)
+		return -ENODEV;
+
+	sev = psp->sev_data;
+
+	if (sev->state == SEV_STATE_INIT)
+		return 0;
+
+	init_function = sev_init_ex_nv_address ? __sev_init_ex_locked :
+	    __sev_init_locked;
+	rc = init_function(error);
 	if (rc && *error == SEV_RET_SECURE_DATA_INVALID) {
 		/*
 		 * INIT command returned an integrity check failure
@@ -286,8 +425,8 @@ static int __sev_platform_init_locked(int *error)
 		 * failed and persistent state has been erased.
 		 * Retrying INIT command here should succeed.
 		 */
-		dev_dbg(sev->dev, "SEV: retrying INIT command");
-		rc = __sev_do_cmd_locked(SEV_CMD_INIT, &data, error);
+		dev_notice(sev->dev, "SEV: retrying INIT command");
+		rc = init_function(error);
 	}
 
 	if (rc)
@@ -303,7 +442,7 @@ static int __sev_platform_init_locked(int *error)
 
 	dev_dbg(sev->dev, "SEV firmware initialized\n");
 
-	return rc;
+	return 0;
 }
 
 int sev_platform_init(int *error)
@@ -1057,6 +1196,12 @@ static void sev_firmware_shutdown(struct sev_device *sev)
 			   get_order(SEV_ES_TMR_SIZE));
 		sev_es_tmr = NULL;
 	}
+
+	if (sev_init_ex_nv_address) {
+		free_pages((unsigned long)sev_init_ex_nv_address,
+			   get_order(NV_LENGTH));
+		sev_init_ex_nv_address = NULL;
+	}
 }
 
 void sev_dev_destroy(struct psp_device *psp)
@@ -1101,11 +1246,23 @@ void sev_pci_init(void)
 	    sev_update_firmware(sev->dev) == 0)
 		sev_get_api_version();
 
+	/* If an init_ex_path is provided rely on INIT_EX for PSP initialization
+	 * instead of INIT.
+	 */
+	if (init_ex_path) {
+		sev_init_ex_nv_address = sev_fw_alloc(NV_LENGTH);
+		if (!sev_init_ex_nv_address) {
+			dev_err(sev->dev,
+				"SEV: INIT_EX NV storage allocation failed, INIT-EX support unavailable\n");
+			goto err;
+		}
+	}
+
 	/* Obtain the TMR memory area for SEV-ES use */
 	sev_es_tmr = sev_fw_alloc(SEV_ES_TMR_SIZE);
 	if (!sev_es_tmr)
 		dev_warn(sev->dev,
-			 "SEV: TMR allocation failed, SEV-ES support unavailable\n");
+			 "SEV: TMR allocation failed\n");
 
 	/* Initialize the platform */
 	rc = sev_platform_init(&error);
