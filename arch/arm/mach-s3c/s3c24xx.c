@@ -678,3 +678,8 @@ struct platform_device s3c2410_device_dclk = {
 	},
 };
 #endif
+
+#pragma message "The platform is deprecated and scheduled in removal (see platform help). " \
+		"Please reach to the maintainers of the platform " \
+		"and linux-samsung-soc@vger.kernel.org if you still use it." \
+		"Without such feedback, the platform will be removed after 2022."
