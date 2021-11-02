@@ -1,0 +1,137 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/clock/qcom,sc7280-lpasscorecc.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Qualcomm LPASS Core & Audio Clock Controller Binding for SC7280
+
+maintainers:
+  - Taniya Das <tdas@codeaurora.org>
+
+description: |
+  Qualcomm LPASS core and audio clock control module which supports the
+  clocks and power domains on SC7280.
+
+  See also:
+  - dt-bindings/clock/qcom,lpasscorecc-sc7280.h
+  - dt-bindings/clock/qcom,lpassaudiocc-sc7280.h
+
+properties:
+  compatible:
+    enum:
+      - qcom,sc7280-lpassaoncc
+      - qcom,sc7280-lpassaudiocc
+      - qcom,sc7280-lpasscorecc
+      - qcom,sc7280-lpasshm
+
+  clocks:
+    items:
+      - description: gcc_cfg_noc_lpass_clk
+      - description: Board XO source
+      - description: lpass_aon_cc_main_rcg source clock
+
+  clock-names:
+    items:
+      - const: iface
+      - const: bi_tcxo
+      - const: lpass_aon_cc_main_rcg
+
+  power-domains:
+    maxItems: 1
+
+  '#clock-cells':
+    const: 1
+
+  '#power-domain-cells':
+    const: 1
+
+  reg:
+    maxItems: 1
+
+if:
+  properties:
+    compatible:
+      contains:
+        const: qcom,sc7280-lpasshm
+then:
+  properties:
+    clocks:
+      maxItems: 2
+
+else:
+  properties:
+    clocks:
+      minItems: 1
+
+
+required:
+  - compatible
+  - reg
+  - clocks
+  - clock-names
+  - '#clock-cells'
+  - '#power-domain-cells'
+
+additionalProperties: false
+
+examples:
+  - |
+    #include <dt-bindings/clock/qcom,rpmh.h>
+    #include <dt-bindings/clock/qcom,gcc-sc7280.h>
+    #include <dt-bindings/clock/qcom,lpassaudiocc-sc7280.h>
+    #include <dt-bindings/clock/qcom,lpasscorecc-sc7280.h>
+    clock-controller@3c00000 {
+      compatible = "qcom,sc7280-lpasshm";
+      reg = <0x3c00000 0x28>;
+      clocks = <&gcc GCC_CFG_NOC_LPASS_CLK>;
+      clock-names = "iface";
+      #clock-cells = <1>;
+      #power-domain-cells = <1>;
+    };
+
+  - |
+    #include <dt-bindings/clock/qcom,rpmh.h>
+    #include <dt-bindings/clock/qcom,gcc-sc7280.h>
+    #include <dt-bindings/clock/qcom,lpassaudiocc-sc7280.h>
+    #include <dt-bindings/clock/qcom,lpasscorecc-sc7280.h>
+    clock-controller@3900000 {
+      compatible = "qcom,sc7280-lpasscorecc";
+      reg = <0x3900000 0x50000>;
+      clocks = <&gcc GCC_CFG_NOC_LPASS_CLK>, <&rpmhcc RPMH_CXO_CLK>;
+      clock-names = "iface", "bi_tcxo";
+      power-domains = <&lpass_hm LPASS_CORE_CC_LPASS_CORE_HM_GDSC>;
+      #clock-cells = <1>;
+      #power-domain-cells = <1>;
+    };
+
+  - |
+    #include <dt-bindings/clock/qcom,rpmh.h>
+    #include <dt-bindings/clock/qcom,gcc-sc7280.h>
+    #include <dt-bindings/clock/qcom,lpassaudiocc-sc7280.h>
+    #include <dt-bindings/clock/qcom,lpasscorecc-sc7280.h>
+    clock-controller@3380000 {
+      compatible = "qcom,sc7280-lpassaoncc";
+      reg = <0x3380000 0x30000>;
+      clocks = <&lpasscc LPASS_CORE_CC_CORE_CLK>, <&rpmhcc RPMH_CXO_CLK>;
+      clock-names = "iface", "bi_tcxo";
+      #clock-cells = <1>;
+      #power-domain-cells = <1>;
+    };
+
+  - |
+    #include <dt-bindings/clock/qcom,rpmh.h>
+    #include <dt-bindings/clock/qcom,gcc-sc7280.h>
+    #include <dt-bindings/clock/qcom,lpassaudiocc-sc7280.h>
+    #include <dt-bindings/clock/qcom,lpasscorecc-sc7280.h>
+    clock-controller@3300000 {
+      compatible = "qcom,sc7280-lpassaudiocc";
+      reg = <0x3300000 0x30000>;
+      clocks = <&rpmhcc RPMH_CXO_CLK>,
+               <&lpass_aon LPASS_AON_CC_MAIN_RCG_CLK_SRC>;
+      clock-names = "bi_tcxo", "lpass_aon_cc_main_rcg";
+      power-domains = <&lpass_aon LPASS_AON_CC_LPASS_AUDIO_HM_GDSC>;
+      #clock-cells = <1>;
+      #power-domain-cells = <1>;
+    };
+...
