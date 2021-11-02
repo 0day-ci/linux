@@ -729,12 +729,6 @@ static bool intel_psr2_sel_fetch_config_valid(struct intel_dp *intel_dp,
 		return false;
 	}
 
-	if (crtc_state->uapi.async_flip) {
-		drm_dbg_kms(&dev_priv->drm,
-			    "PSR2 sel fetch not enabled, async flip enabled\n");
-		return false;
-	}
-
 	/* Wa_14010254185 Wa_14010103792 */
 	if (IS_TGL_DISPLAY_STEP(dev_priv, STEP_A0, STEP_C0)) {
 		drm_dbg_kms(&dev_priv->drm,
@@ -1747,6 +1741,9 @@ static void _intel_psr_pre_plane_update(const struct intel_atomic_state *state,
 		if (psr->enabled && needs_to_disable)
 			intel_psr_disable_locked(intel_dp);
 
+		if (psr->enabled && crtc_state->uapi.async_flip)
+			intel_psr_exit(intel_dp);
+
 		mutex_unlock(&psr->lock);
 	}
 }
@@ -1790,6 +1787,9 @@ static void _intel_psr_post_plane_update(const struct intel_atomic_state *state,
 		/* Force a PSR exit when enabling CRC to avoid CRC timeouts */
 		if (crtc_state->crc_enabled && psr->enabled)
 			psr_force_hw_tracking_exit(intel_dp);
+
+		if (psr->enabled && !psr->active && crtc_state->uapi.async_flip)
+			schedule_work(&intel_dp->psr.work);
 
 		mutex_unlock(&psr->lock);
 	}
