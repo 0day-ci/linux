@@ -192,14 +192,17 @@ void __init isa_bridge_init_non_pci(struct device_node *np)
 	u64 cbase, pbase, size = 0;
 
 	/* If we already have an ISA bridge, bail off */
-	if (isa_bridge_devnode != NULL)
+	if (isa_bridge_devnode != NULL) {
+		of_node_put(np);
 		return;
+	}
 
 	pna = of_n_addr_cells(np);
 	if (of_property_read_u32(np, "#address-cells", &na) ||
 	    of_property_read_u32(np, "#size-cells", &ns)) {
 		pr_warn("ISA: Non-PCI bridge %pOF is missing address format\n",
 			np);
+		of_node_put(np);
 		return;
 	}
 
@@ -207,6 +210,7 @@ void __init isa_bridge_init_non_pci(struct device_node *np)
 	if (na != 2 || ns != 1) {
 		pr_warn("ISA: Non-PCI bridge %pOF has unsupported address format\n",
 			np);
+		of_node_put(np);
 		return;
 	}
 	rs = na + ns + pna;
@@ -216,6 +220,7 @@ void __init isa_bridge_init_non_pci(struct device_node *np)
 	if (ranges == NULL || rlen < rs) {
 		pr_warn("ISA: Non-PCI bridge %pOF has absent or invalid ranges\n",
 			np);
+		of_node_put(np);
 		return;
 	}
 
@@ -233,6 +238,7 @@ void __init isa_bridge_init_non_pci(struct device_node *np)
 	if (!size || !pbasep) {
 		pr_warn("ISA: Non-PCI bridge %pOF has no usable IO range\n",
 			np);
+		of_node_put(np);
 		return;
 	}
 
@@ -246,6 +252,7 @@ void __init isa_bridge_init_non_pci(struct device_node *np)
 	if (pbase == OF_BAD_ADDR) {
 		pr_warn("ISA: Non-PCI bridge %pOF failed to translate IO base\n",
 			np);
+		of_node_put(np);
 		return;
 	}
 
@@ -253,6 +260,7 @@ void __init isa_bridge_init_non_pci(struct device_node *np)
 	if ((cbase & ~PAGE_MASK) || (pbase & ~PAGE_MASK)) {
 		pr_warn("ISA: Non-PCI bridge %pOF has non aligned IO range\n",
 			np);
+		of_node_put(np);
 		return;
 	}
 

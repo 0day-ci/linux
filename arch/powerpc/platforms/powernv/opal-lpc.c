@@ -398,8 +398,11 @@ void __init opal_lpc_init(void)
 		opal_lpc_chip_id = of_get_ibm_chip_id(np);
 		break;
 	}
-	if (opal_lpc_chip_id < 0)
+	if (opal_lpc_chip_id < 0) {
+		if (np)
+			of_node_put(np);
 		return;
+	}
 
 	/* Does it support direct mapping ? */
 	if (of_get_property(np, "ranges", NULL)) {
@@ -407,6 +410,7 @@ void __init opal_lpc_init(void)
 			opal_lpc_chip_id);
 		isa_bridge_init_non_pci(np);
 	} else {
+		of_node_put(np);
 		pr_info("OPAL: Found non-mapped LPC bus on chip %d\n",
 			opal_lpc_chip_id);
 
