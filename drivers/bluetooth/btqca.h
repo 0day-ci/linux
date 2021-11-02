@@ -46,6 +46,8 @@
 
 #define QCA_FW_BUILD_VER_LEN		255
 
+#define MAPLE_NVM_READY_DELAY_MS        1500
+#define MAPLE_POWER_CONTROL_DELAY_MS    50
 
 enum qca_baudrate {
 	QCA_BAUDRATE_115200 	= 0,
@@ -145,6 +147,7 @@ enum qca_btsoc_type {
 	QCA_WCN3991,
 	QCA_QCA6390,
 	QCA_WCN6750,
+	QCA_MAPLE,
 };
 
 #if IS_ENABLED(CONFIG_BT_QCA)
@@ -165,6 +168,11 @@ static inline bool qca_is_wcn399x(enum qca_btsoc_type soc_type)
 static inline bool qca_is_wcn6750(enum qca_btsoc_type soc_type)
 {
 	return soc_type == QCA_WCN6750;
+}
+
+static inline bool qca_is_maple(enum qca_btsoc_type soc_type)
+{
+	return soc_type == QCA_MAPLE;
 }
 
 #else
@@ -200,6 +208,11 @@ static inline bool qca_is_wcn399x(enum qca_btsoc_type soc_type)
 }
 
 static inline bool qca_is_wcn6750(enum qca_btsoc_type soc_type)
+{
+	return false;
+}
+
+static inline bool qca_is_maple(enum qca_btsoc_type soc_type)
 {
 	return false;
 }

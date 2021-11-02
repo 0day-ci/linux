@@ -70,6 +70,10 @@
 #define QCA_CRASHBYTE_PACKET_LEN	1096
 #define QCA_MEMDUMP_BYTE		0xFB
 
+#ifndef IOCTL_IPC_BOOT
+#define IOCTL_IPC_BOOT                  0xBE
+#endif
+
 enum qca_flags {
 	QCA_IBS_DISABLED,
 	QCA_DROP_VENDOR_EVENT,
@@ -1370,6 +1374,9 @@ static unsigned int qca_get_speed(struct hci_uart *hu,
 {
 	unsigned int speed = 0;
 
+	if (qca_is_maple(qca_soc_type(hu)))
+		return 0;
+
 	if (speed_type == QCA_INIT_SPEED) {
 		if (hu->init_speed)
 			speed = hu->init_speed;
@@ -1387,6 +1394,9 @@ static unsigned int qca_get_speed(struct hci_uart *hu,
 
 static int qca_check_speeds(struct hci_uart *hu)
 {
+	if (qca_is_maple(qca_soc_type(hu)))
+		return 0;
+
 	if (qca_is_wcn399x(qca_soc_type(hu)) ||
 	    qca_is_wcn6750(qca_soc_type(hu))) {
 		if (!qca_get_speed(hu, QCA_INIT_SPEED) &&
@@ -1660,6 +1670,21 @@ static int qca_regulator_init(struct hci_uart *hu)
 	return 0;
 }
 
+static int qca_maple_power_control(struct hci_uart *hu, bool on)
+{
+	int ret;
+	int power_arg = on ? 1 : 0;
+
+	ret = serdev_device_ioctl(hu->serdev, IOCTL_IPC_BOOT, power_arg);
+	if (ret)
+		bt_dev_err(hu->hdev, "%s: power %s failure: %d\n", __func__,
+			   on ? "ON" : "OFF", ret);
+	else
+		msleep(MAPLE_POWER_CONTROL_DELAY_MS);
+
+	return ret;
+}
+
 static int qca_power_on(struct hci_dev *hdev)
 {
 	struct hci_uart *hu = hci_get_drvdata(hdev);
@@ -1677,6 +1702,8 @@ static int qca_power_on(struct hci_dev *hdev)
 	if (qca_is_wcn399x(soc_type) ||
 	    qca_is_wcn6750(soc_type)) {
 		ret = qca_regulator_init(hu);
+	} else if (qca_is_maple(soc_type)) {
+		ret = qca_maple_power_control(hu, true);
 	} else {
 		qcadev = serdev_device_get_drvdata(hu->serdev);
 		if (qcadev->bt_en) {
@@ -1715,6 +1742,7 @@ static int qca_setup(struct hci_uart *hu)
 	set_bit(HCI_QUIRK_SIMULTANEOUS_DISCOVERY, &hdev->quirks);
 
 	bt_dev_info(hdev, "setting up %s",
+		qca_is_maple(soc_type) ? "maple" :
 		qca_is_wcn399x(soc_type) ? "wcn399x" :
 		(soc_type == QCA_WCN6750) ? "wcn6750" : "ROME/QCA6390");
 
@@ -1761,7 +1789,10 @@ retry:
 	ret = qca_uart_setup(hdev, qca_baudrate, soc_type, ver,
 			firmware_name);
 	if (!ret) {
-		clear_bit(QCA_IBS_DISABLED, &qca->flags);
+		if (qca_is_maple(soc_type))
+			set_bit(QCA_ROM_FW, &qca->flags);
+		else
+			clear_bit(QCA_IBS_DISABLED, &qca->flags);
 		qca_debugfs_init(hdev);
 		hu->hdev->hw_error = qca_hw_error;
 		hu->hdev->cmd_timeout = qca_cmd_timeout;
@@ -1858,6 +1889,11 @@ static const struct qca_device_data qca_soc_data_qca6390 = {
 	.num_vregs = 0,
 };
 
+static const struct qca_device_data qca_soc_data_maple = {
+	.soc_type = QCA_MAPLE,
+	.num_vregs = 0,
+};
+
 static const struct qca_device_data qca_soc_data_wcn6750 = {
 	.soc_type = QCA_WCN6750,
 	.vregs = (struct qca_vreg []) {
@@ -1912,6 +1948,8 @@ static void qca_power_shutdown(struct hci_uart *hu)
 			sw_ctrl_state = gpiod_get_value_cansleep(qcadev->sw_ctrl);
 			bt_dev_dbg(hu->hdev, "SW_CTRL is %d", sw_ctrl_state);
 		}
+	} else if (qca_is_maple(soc_type)) {
+		qca_maple_power_control(hu, false);
 	} else if (qcadev->bt_en) {
 		gpiod_set_value_cansleep(qcadev->bt_en, 0);
 	}
@@ -2089,6 +2127,10 @@ static int qca_serdev_probe(struct serdev_device *serdev)
 			dev_warn(&serdev->dev, "failed to acquire enable gpio\n");
 			power_ctrl_enabled = false;
 		}
+		if (qca_is_maple(qcadev->btsoc_type)) {
+			dev_info(&serdev->dev, "Maple: power ctrl enabled\n");
+			power_ctrl_enabled = true;
+		}
 
 		qcadev->susclk = devm_clk_get_optional(&serdev->dev, NULL);
 		if (IS_ERR(qcadev->susclk)) {
@@ -2141,6 +2183,8 @@ static void qca_serdev_remove(struct serdev_device *serdev)
 	if ((qca_is_wcn399x(qcadev->btsoc_type) ||
 	     qca_is_wcn6750(qcadev->btsoc_type)) &&
 	     power->vregs_on)
+		qca_power_shutdown(&qcadev->serdev_hu);
+	else if (qca_is_maple(qcadev->btsoc_type))
 		qca_power_shutdown(&qcadev->serdev_hu);
 	else if (qcadev->susclk)
 		clk_disable_unprepare(qcadev->susclk);
@@ -2312,6 +2356,7 @@ static SIMPLE_DEV_PM_OPS(qca_pm_ops, qca_suspend, qca_resume);
 static const struct of_device_id qca_bluetooth_of_match[] = {
 	{ .compatible = "qcom,qca6174-bt" },
 	{ .compatible = "qcom,qca6390-bt", .data = &qca_soc_data_qca6390},
+	{ .compatible = "qcom,maple-bt", .data = &qca_soc_data_maple},
 	{ .compatible = "qcom,qca9377-bt" },
 	{ .compatible = "qcom,wcn3990-bt", .data = &qca_soc_data_wcn3990},
 	{ .compatible = "qcom,wcn3991-bt", .data = &qca_soc_data_wcn3991},
