@@ -3271,7 +3271,7 @@ static bool ext4_inode_datasync_dirty(struct inode *inode)
 
 static void ext4_set_iomap(struct inode *inode, struct iomap *iomap,
 			   struct ext4_map_blocks *map, loff_t offset,
-			   loff_t length)
+			   loff_t length, int flags)
 {
 	u8 blkbits = inode->i_blkbits;
 
@@ -3281,8 +3281,8 @@ static void ext4_set_iomap(struct inode *inode, struct iomap *iomap,
 	 * there is no other metadata changes being made or are pending.
 	 */
 	iomap->flags = 0;
-	if (ext4_inode_datasync_dirty(inode) ||
-	    offset + length > i_size_read(inode))
+	if ((flags & IOMAP_WRITE) && (ext4_inode_datasync_dirty(inode) ||
+	    offset + length > i_size_read(inode)))
 		iomap->flags |= IOMAP_F_DIRTY;
 
 	if (map->m_flags & EXT4_MAP_NEW)
@@ -3420,7 +3420,7 @@ static int ext4_iomap_begin(struct inode *inode, loff_t offset, loff_t length,
 	if (ret < 0)
 		return ret;
 out:
-	ext4_set_iomap(inode, iomap, &map, offset, length);
+	ext4_set_iomap(inode, iomap, &map, offset, length, flags);
 
 	return 0;
 }
@@ -3540,7 +3540,7 @@ static int ext4_iomap_begin_report(struct inode *inode, loff_t offset,
 		delalloc = ext4_iomap_is_delalloc(inode, &map);
 
 set_iomap:
-	ext4_set_iomap(inode, iomap, &map, offset, length);
+	ext4_set_iomap(inode, iomap, &map, offset, length, flags);
 	if (delalloc && iomap->type == IOMAP_HOLE)
 		iomap->type = IOMAP_DELALLOC;
 
