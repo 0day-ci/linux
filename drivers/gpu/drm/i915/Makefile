@@ -300,7 +300,6 @@ i915-$(CONFIG_DRM_I915_GVT) += \
 
 kvmgt-y += \
 	gvt/kvmgt.o \
-	gvt/gvt.o \
 	gvt/aperture_gm.o \
 	gvt/handlers.o \
 	gvt/vgpu.o \
