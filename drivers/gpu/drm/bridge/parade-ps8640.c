@@ -293,19 +293,19 @@ static int ps8640_bridge_vdo_control(struct ps8640 *ps_bridge,
 	return 0;
 }
 
-static void ps8640_bridge_poweron(struct ps8640 *ps_bridge)
+static int ps8640_bridge_poweron(struct ps8640 *ps_bridge)
 {
 	struct regmap *map = ps_bridge->regmap[PAGE2_TOP_CNTL];
 	int ret, status;
 
 	if (ps_bridge->powered)
-		return;
+		return 0;
 
 	ret = regulator_bulk_enable(ARRAY_SIZE(ps_bridge->supplies),
 				    ps_bridge->supplies);
 	if (ret < 0) {
 		DRM_ERROR("cannot enable regulators %d\n", ret);
-		return;
+		return ret;
 	}
 
 	gpiod_set_value(ps_bridge->gpio_powerdown, 0);
@@ -352,11 +352,13 @@ static void ps8640_bridge_poweron(struct ps8640 *ps_bridge)
 
 	ps_bridge->powered = true;
 
-	return;
+	return 0;
 
 err_regulators_disable:
 	regulator_bulk_disable(ARRAY_SIZE(ps_bridge->supplies),
 			       ps_bridge->supplies);
+
+	return ret;
 }
 
 static void ps8640_bridge_poweroff(struct ps8640 *ps_bridge)
@@ -381,7 +383,9 @@ static void ps8640_pre_enable(struct drm_bridge *bridge)
 	struct ps8640 *ps_bridge = bridge_to_ps8640(bridge);
 	int ret;
 
-	ps8640_bridge_poweron(ps_bridge);
+	ret = ps8640_bridge_poweron(ps_bridge);
+	if (ret)
+		return;
 
 	ret = ps8640_bridge_vdo_control(ps_bridge, ENABLE);
 	if (ret < 0)
