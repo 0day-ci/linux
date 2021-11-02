@@ -887,8 +887,14 @@ int btrfs_parse_options(struct btrfs_fs_info *info, char *options,
 					     "disabling disk space caching");
 			}
 			if (btrfs_test_opt(info, FREE_SPACE_TREE)) {
+				/*
+				 * For v2 cache with nospace_cache mount option,
+				 * v2 cache can get out of sync if not cleared.
+				 * Thus here we set to clear v2 cache.
+				 */
+				btrfs_set_opt(info->mount_opt, CLEAR_CACHE);
 				btrfs_clear_and_info(info, FREE_SPACE_TREE,
-					     "disabling free space tree");
+				"disabling and clearing free space tree");
 			}
 			break;
 		case Opt_inode_cache:
@@ -1036,7 +1042,6 @@ out:
 	    !btrfs_test_opt(info, CLEAR_CACHE)) {
 		btrfs_err(info, "cannot disable free space tree");
 		ret = -EINVAL;
-
 	}
 	if (!ret)
 		ret = btrfs_check_mountopts_zoned(info);
