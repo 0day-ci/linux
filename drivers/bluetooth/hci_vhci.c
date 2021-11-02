@@ -30,6 +30,16 @@
 
 static bool amp;
 
+#define VHCI_EXT_OPCODE				0x03
+struct vhci_ext_config {
+	__u8  dev_type;
+	__u32 flags;
+} __packed;
+
+#define VHCI_FLAG_QUIRK_RAW_DEVICE		0x01
+#define VHCI_FLAG_QUIRK_EXTERNAL_CONFIG		0x02
+#define VHCI_FLAG_QUIRKS_INVALID_BDADDR		0x04
+
 struct vhci_data {
 	struct hci_dev *hdev;
 
@@ -278,7 +288,8 @@ static int vhci_setup(struct hci_dev *hdev)
 	return 0;
 }
 
-static int __vhci_create_device(struct vhci_data *data, __u8 opcode)
+static int __vhci_create_device(struct vhci_data *data, __u8 opcode,
+				struct vhci_ext_config *ext_config)
 {
 	struct hci_dev *hdev;
 	struct sk_buff *skb;
@@ -287,8 +298,20 @@ static int __vhci_create_device(struct vhci_data *data, __u8 opcode)
 	if (data->hdev)
 		return -EBADFD;
 
-	/* bits 0-1 are dev_type (Primary or AMP) */
-	dev_type = opcode & 0x03;
+	/* In case of legacy opcode, it doesn't allow to have 0x03 as an opcode,
+	 * So, it is ok to assume that device is in the extended device
+	 * creation mode when the opcode is 0x03. Also, it is required to have
+	 * a ext_config and check it here.
+	 */
+	if (ext_config && opcode != VHCI_EXT_OPCODE)
+		return -EINVAL;
+
+	if (opcode == VHCI_EXT_OPCODE)
+		dev_type = ext_config->dev_type;
+	else {
+		/* bits 0-1 are dev_type (Primary or AMP) */
+		dev_type = opcode & 0x03;
+	}
 
 	if (dev_type != HCI_PRIMARY && dev_type != HCI_AMP)
 		return -EINVAL;
@@ -331,6 +354,16 @@ static int __vhci_create_device(struct vhci_data *data, __u8 opcode)
 	if (opcode & 0x80)
 		set_bit(HCI_QUIRK_RAW_DEVICE, &hdev->quirks);
 
+	/* Flags for extended configuration */
+	if (ext_config && opcode == VHCI_EXT_OPCODE) {
+		if (ext_config->flags & VHCI_FLAG_QUIRK_EXTERNAL_CONFIG)
+			set_bit(HCI_QUIRK_EXTERNAL_CONFIG, &hdev->quirks);
+		if (ext_config->flags & VHCI_FLAG_QUIRK_RAW_DEVICE)
+			set_bit(HCI_QUIRK_RAW_DEVICE, &hdev->quirks);
+		if (ext_config->flags & VHCI_FLAG_QUIRKS_INVALID_BDADDR)
+			set_bit(HCI_QUIRK_INVALID_BDADDR, &hdev->quirks);
+	}
+
 	if (hci_register_dev(hdev) < 0) {
 		BT_ERR("Can't register HCI device");
 		hci_free_dev(hdev);
@@ -364,12 +397,13 @@ static int __vhci_create_device(struct vhci_data *data, __u8 opcode)
 	return 0;
 }
 
-static int vhci_create_device(struct vhci_data *data, __u8 opcode)
+static int vhci_create_device(struct vhci_data *data, __u8 opcode,
+			      struct vhci_ext_config *ext_config)
 {
 	int err;
 
 	mutex_lock(&data->open_mutex);
-	err = __vhci_create_device(data, opcode);
+	err = __vhci_create_device(data, opcode, ext_config);
 	mutex_unlock(&data->open_mutex);
 
 	return err;
@@ -379,6 +413,7 @@ static inline ssize_t vhci_get_user(struct vhci_data *data,
 				    struct iov_iter *from)
 {
 	size_t len = iov_iter_count(from);
+	struct vhci_ext_config *ext_config;
 	struct sk_buff *skb;
 	__u8 pkt_type, opcode;
 	int ret;
@@ -419,6 +454,21 @@ static inline ssize_t vhci_get_user(struct vhci_data *data,
 		opcode = *((__u8 *) skb->data);
 		skb_pull(skb, 1);
 
+		/* This opcode(0x03) is for extended device creation and it
+		 * requires the extra parameters for extra configuration.
+		 */
+		if (opcode == 0x03) {
+			if (skb->len != sizeof(*ext_config)) {
+				kfree_skb(skb);
+				return -EINVAL;
+			}
+
+			ext_config = (void *) (skb->data);
+			ret = vhci_create_device(data, opcode, ext_config);
+			kfree_skb(skb);
+			goto done;
+		}
+
 		if (skb->len > 0) {
 			kfree_skb(skb);
 			return -EINVAL;
@@ -426,7 +476,7 @@ static inline ssize_t vhci_get_user(struct vhci_data *data,
 
 		kfree_skb(skb);
 
-		ret = vhci_create_device(data, opcode);
+		ret = vhci_create_device(data, opcode, NULL);
 		break;
 
 	default:
@@ -434,6 +484,7 @@ static inline ssize_t vhci_get_user(struct vhci_data *data,
 		return -EINVAL;
 	}
 
+done:
 	return (ret < 0) ? ret : len;
 }
 
@@ -526,7 +577,7 @@ static void vhci_open_timeout(struct work_struct *work)
 	struct vhci_data *data = container_of(work, struct vhci_data,
 					      open_timeout.work);
 
-	vhci_create_device(data, amp ? HCI_AMP : HCI_PRIMARY);
+	vhci_create_device(data, amp ? HCI_AMP : HCI_PRIMARY, NULL);
 }
 
 static int vhci_open(struct inode *inode, struct file *file)
