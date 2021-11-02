@@ -1365,7 +1365,7 @@ eb_relocate_entry(struct i915_execbuffer *eb,
 		    GRAPHICS_VER(eb->i915) == 6) {
 			err = i915_vma_bind(target->vma,
 					    target->vma->obj->cache_level,
-					    PIN_GLOBAL, NULL);
+					    PIN_GLOBAL, NULL, NULL);
 			if (err)
 				return err;
 		}

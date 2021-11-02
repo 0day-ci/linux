@@ -206,7 +206,8 @@ struct i915_vma_work *i915_vma_work(void);
 int i915_vma_bind(struct i915_vma *vma,
 		  enum i915_cache_level cache_level,
 		  u32 flags,
-		  struct i915_vma_work *work);
+		  struct i915_vma_work *work,
+		  struct i915_vma_resource *vma_res);
 
 bool i915_gem_valid_gtt_space(struct i915_vma *vma, unsigned long color);
 bool i915_vma_misplaced(const struct i915_vma *vma,
@@ -433,7 +434,24 @@ static inline int i915_vma_sync(struct i915_vma *vma)
 	return i915_active_wait(&vma->active);
 }
 
+bool i915_vma_resource_hold(struct i915_vma_resource *vma_res,
+			    bool *lockdep_cookie);
+
+void i915_vma_resource_unhold(struct i915_vma_resource *vma_res,
+			      bool lockdep_cookie);
+
+void i915_vma_resource_put(struct i915_vma_resource *vma_res);
+
+struct i915_vma_resource *i915_vma_get_current_resource(struct i915_vma *vma);
+
+struct i915_vma_resource *i915_vma_resource_alloc(void);
+
 void i915_vma_module_exit(void);
 int i915_vma_module_init(void);
+
+#ifdef CONFIG_DRM_I915_SELFTEST
+void i915_vma_resource_init(struct i915_vma_resource *vma_res,
+			    struct i915_vma *vma);
+#endif
 
 #endif

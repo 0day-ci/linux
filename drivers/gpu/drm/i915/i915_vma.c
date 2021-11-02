@@ -38,7 +38,35 @@
 #include "i915_trace.h"
 #include "i915_vma.h"
 
+/**
+ * struct i915_vma_resource - Snapshotted unbind information.
+ * @unbind_fence: Fence to mark unbinding complete. Note that this fence
+ * is not considered published until unbind is scheduled, and as such it
+ * is illegal to access this fence before scheduled unbind other than
+ * for refcounting.
+ * @lock: The @unbind_fence lock. We're also using it to protect the weak
+ * pointer to the struct i915_vma, @vma during lookup and takedown.
+ * @vma: Weak back-pointer to the parent vma struct. This pointer is
+ * protected by @lock, and a reference on @vma needs to be taken
+ * using kref_get_unless_zero.
+ * @hold_count: Number of holders blocking the fence from finishing.
+ * The vma itself is keeping a hold, which is released when unbind
+ * is scheduled.
+ */
+struct i915_vma_resource {
+	struct dma_fence unbind_fence;
+	/* See above for description of the lock. */
+	spinlock_t lock;
+	struct i915_vma *vma;
+	refcount_t hold_count;
+};
+
 static struct kmem_cache *slab_vmas;
+static struct dma_fence *i915_vma_resource_unbind(struct i915_vma_resource *vma_res);
+#ifndef CONFIG_DRM_I915_SELFTEST
+static void i915_vma_resource_init(struct i915_vma_resource *vma_res,
+				   struct i915_vma *vma);
+#endif
 
 struct i915_vma *i915_vma_alloc(void)
 {
@@ -363,6 +391,8 @@ int i915_vma_wait_for_bind(struct i915_vma *vma)
  * @cache_level: mapping cache level
  * @flags: flags like global or local mapping
  * @work: preallocated worker for allocating and binding the PTE
+ * @vma_res: pointer to a preallocated vma resource. The resource is either
+ * consumed or freed.
  *
  * DMA addresses are taken from the scatter-gather table of this object (or of
  * this VMA in case of non-default GGTT views) and PTE entries set up.
@@ -371,7 +401,8 @@ int i915_vma_wait_for_bind(struct i915_vma *vma)
 int i915_vma_bind(struct i915_vma *vma,
 		  enum i915_cache_level cache_level,
 		  u32 flags,
-		  struct i915_vma_work *work)
+		  struct i915_vma_work *work,
+		  struct i915_vma_resource *vma_res)
 {
 	u32 bind_flags;
 	u32 vma_flags;
@@ -381,11 +412,15 @@ int i915_vma_bind(struct i915_vma *vma,
 
 	if (GEM_DEBUG_WARN_ON(range_overflows(vma->node.start,
 					      vma->node.size,
-					      vma->vm->total)))
+					      vma->vm->total))) {
+		kfree(vma_res);
 		return -ENODEV;
+	}
 
-	if (GEM_DEBUG_WARN_ON(!flags))
+	if (GEM_DEBUG_WARN_ON(!flags)) {
+		kfree(vma_res);
 		return -EINVAL;
+	}
 
 	bind_flags = flags;
 	bind_flags &= I915_VMA_GLOBAL_BIND | I915_VMA_LOCAL_BIND;
@@ -394,11 +429,25 @@ int i915_vma_bind(struct i915_vma *vma,
 	vma_flags &= I915_VMA_GLOBAL_BIND | I915_VMA_LOCAL_BIND;
 
 	bind_flags &= ~vma_flags;
-	if (bind_flags == 0)
+	if (bind_flags == 0) {
+		kfree(vma_res);
 		return 0;
+	}
 
 	GEM_BUG_ON(!vma->pages);
 
+	if (!i915_vma_is_pinned(vma))
+		lockdep_assert_held(&vma->vm->mutex);
+
+	if (vma->resource || !vma_res) {
+		/* Rebinding with an additional I915_VMA_*_BIND */
+		GEM_WARN_ON(!vma_flags);
+		kfree(vma_res);
+	} else {
+		lockdep_assert_held(&vma->vm->mutex);
+		i915_vma_resource_init(vma_res, vma);
+		vma->resource = vma_res;
+	}
 	trace_i915_vma_bind(vma, bind_flags);
 	if (work && bind_flags & vma->vm->bind_async_flags) {
 		struct dma_fence *prev;
@@ -870,6 +919,7 @@ int i915_vma_pin_ww(struct i915_vma *vma, struct i915_gem_ww_ctx *ww,
 		    u64 size, u64 alignment, u64 flags)
 {
 	struct i915_vma_work *work = NULL;
+	struct i915_vma_resource *vma_res;
 	intel_wakeref_t wakeref = 0;
 	unsigned int bound;
 	int err;
@@ -921,6 +971,12 @@ int i915_vma_pin_ww(struct i915_vma *vma, struct i915_gem_ww_ctx *ww,
 			if (err)
 				goto err_fence;
 		}
+	}
+
+	vma_res = i915_vma_resource_alloc();
+	if (IS_ERR(vma_res)) {
+		err = PTR_ERR(vma_res);
+		goto err_fence;
 	}
 
 	/*
@@ -984,7 +1040,7 @@ int i915_vma_pin_ww(struct i915_vma *vma, struct i915_gem_ww_ctx *ww,
 	GEM_BUG_ON(!vma->pages);
 	err = i915_vma_bind(vma,
 			    vma->obj ? vma->obj->cache_level : 0,
-			    flags, work);
+			    flags, work, vma_res);
 	if (err)
 		goto err_remove;
 
@@ -1014,6 +1070,7 @@ err_rpm:
 	if (wakeref)
 		intel_runtime_pm_put(&vma->vm->i915->runtime_pm, wakeref);
 	vma_put_pages(vma);
+
 	return err;
 }
 
@@ -1288,6 +1345,8 @@ int _i915_vma_move_to_active(struct i915_vma *vma,
 
 void __i915_vma_evict(struct i915_vma *vma)
 {
+	struct dma_fence *unbind_fence;
+
 	GEM_BUG_ON(i915_vma_is_pinned(vma));
 
 	if (i915_vma_is_map_and_fenceable(vma)) {
@@ -1327,6 +1386,16 @@ void __i915_vma_evict(struct i915_vma *vma)
 
 	i915_vma_detach(vma);
 	vma_unbind_pages(vma);
+
+	unbind_fence = i915_vma_resource_unbind(vma->resource);
+
+	/*
+	 * This uninterruptible wait under the vm mutex is currently
+	 * only ever blocking while the vma is being captured from.
+	 * With async unbinding, this wait here will be removed.
+	 */
+	dma_fence_wait(unbind_fence, false);
+	dma_fence_put(unbind_fence);
 }
 
 int __i915_vma_unbind(struct i915_vma *vma)
@@ -1356,6 +1425,7 @@ int __i915_vma_unbind(struct i915_vma *vma)
 	__i915_vma_evict(vma);
 
 	drm_mm_remove_node(&vma->node); /* pairs with i915_vma_release() */
+
 	return 0;
 }
 
@@ -1388,7 +1458,6 @@ int i915_vma_unbind(struct i915_vma *vma)
 
 	err = __i915_vma_unbind(vma);
 	mutex_unlock(&vm->mutex);
-
 out_rpm:
 	if (wakeref)
 		intel_runtime_pm_put(&vm->i915->runtime_pm, wakeref);
@@ -1409,6 +1478,131 @@ void i915_vma_make_shrinkable(struct i915_vma *vma)
 void i915_vma_make_purgeable(struct i915_vma *vma)
 {
 	i915_gem_object_make_purgeable(vma->obj);
+}
+
+static const char *get_driver_name(struct dma_fence *fence)
+{
+	return "vma unbind fence";
+}
+
+static const char *get_timeline_name(struct dma_fence *fence)
+{
+	return "unbound";
+}
+
+static struct dma_fence_ops unbind_fence_ops = {
+	.get_driver_name = get_driver_name,
+	.get_timeline_name = get_timeline_name,
+};
+
+struct i915_vma_resource *i915_vma_resource_alloc(void)
+{
+	struct i915_vma_resource *vma_res =
+		kzalloc(sizeof(*vma_res), GFP_KERNEL);
+
+	return vma_res ? vma_res : ERR_PTR(-ENOMEM);
+}
+
+I915_SELFTEST_EXPORT void
+i915_vma_resource_init(struct i915_vma_resource *vma_res,
+		       struct i915_vma *vma)
+{
+	vma_res->vma = vma;
+	spin_lock_init(&vma_res->lock);
+	dma_fence_init(&vma_res->unbind_fence, &unbind_fence_ops,
+		       &vma_res->lock, 0, 0);
+	refcount_set(&vma_res->hold_count, 1);
+}
+
+static void __i915_vma_resource_unhold(struct i915_vma_resource *vma_res)
+{
+	if (refcount_dec_and_test(&vma_res->hold_count))
+		dma_fence_signal(&vma_res->unbind_fence);
+}
+
+/**
+ * i915_vma_resource_unhold - Unhold the signaling of the vma resource unbind
+ * fence.
+ * @vma_res: The vma resource.
+ * @lockdep_cookie: The lockdep cookie returned from i915_vma_resource_hold.
+ *
+ * The function may leave a dma_fence critical section.
+ */
+void i915_vma_resource_unhold(struct i915_vma_resource *vma_res,
+			      bool lockdep_cookie)
+{
+	dma_fence_end_signalling(lockdep_cookie);
+
+	if (IS_ENABLED(CONFIG_PROVE_LOCKING)) {
+		unsigned long irq_flags;
+
+		/* Inefficient open-coded might_lock_irqsave() */
+		spin_lock_irqsave(&vma_res->lock, irq_flags);
+		spin_unlock_irqrestore(&vma_res->lock, irq_flags);
+	}
+
+	__i915_vma_resource_unhold(vma_res);
+}
+
+/**
+ * i915_vma_resource_hold - Hold the signaling of the vma resource unbind fence.
+ * @vma_res: The vma resource.
+ * @lockdep_cookie: Pointer to a bool serving as a lockdep cooke that should
+ * be given as an argument to the pairing i915_vma_resource_unhold.
+ *
+ * If returning true, the function enters a dma_fence signalling critical
+ * section is not in one already.
+ *
+ * Return: true if holding successful, false if not.
+ */
+bool i915_vma_resource_hold(struct i915_vma_resource *vma_res,
+			    bool *lockdep_cookie)
+{
+	bool held = refcount_inc_not_zero(&vma_res->hold_count);
+
+	if (held)
+		*lockdep_cookie = dma_fence_begin_signalling();
+
+	return held;
+}
+
+/**
+ * i915_vma_get_current_resource - Return the vma's current vma resource
+ * @vma: The vma referencing the resource.
+ *
+ * Return: A refcounted pointer to the vma's current vma resource.
+ */
+struct i915_vma_resource *i915_vma_get_current_resource(struct i915_vma *vma)
+{
+	GEM_BUG_ON(!vma->resource);
+
+	dma_fence_get(&vma->resource->unbind_fence);
+	return vma->resource;
+}
+
+/**
+ * i915_vma_resource_put - Release a reference to a struct i915_vma_resource
+ * @vma_res: The resource
+ */
+void i915_vma_resource_put(struct i915_vma_resource *vma_res)
+{
+	dma_fence_put(&vma_res->unbind_fence);
+}
+
+static struct dma_fence *
+i915_vma_resource_unbind(struct i915_vma_resource *vma_res)
+{
+	/* Reference is transferred to the returned dma_fence pointer */
+	vma_res->vma->resource = NULL;
+
+	spin_lock(&vma_res->lock);
+	/* Kill the weak reference under the spinlock. */
+	vma_res->vma = NULL;
+	spin_unlock(&vma_res->lock);
+
+	/* With async unbind, schedule it here. */
+	__i915_vma_resource_unhold(vma_res);
+	return &vma_res->unbind_fence;
 }
 
 #if IS_ENABLED(CONFIG_DRM_I915_SELFTEST)
