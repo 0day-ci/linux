@@ -405,6 +405,19 @@ int serdev_device_set_tiocm(struct serdev_device *serdev, int set, int clear)
 }
 EXPORT_SYMBOL_GPL(serdev_device_set_tiocm);
 
+int serdev_device_ioctl(struct serdev_device *serdev, unsigned int cmd, unsigned long arg)
+{
+	struct serdev_controller *ctrl = serdev->ctrl;
+
+	if (!ctrl)
+		return -ENOTTY;
+	else if	(!ctrl->ops->ioctl)
+		return -ENOSYS;
+	else
+		return ctrl->ops->ioctl(ctrl, cmd, arg);
+}
+EXPORT_SYMBOL_GPL(serdev_device_ioctl);
+
 static int serdev_drv_probe(struct device *dev)
 {
 	const struct serdev_device_driver *sdrv = to_serdev_device_driver(dev->driver);
