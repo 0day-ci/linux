@@ -344,7 +344,7 @@ static int ps8640_bridge_poweron(struct ps8640 *ps_bridge)
 
 	if (ret < 0) {
 		DRM_ERROR("failed read PAGE2_GPIO_H: %d\n", ret);
-		goto err_regulators_disable;
+		goto err_poweroff;
 	}
 
 	msleep(50);
@@ -360,23 +360,22 @@ static int ps8640_bridge_poweron(struct ps8640 *ps_bridge)
 	ret = regmap_update_bits(map, PAGE2_MCS_EN, MCS_EN, 0);
 	if (ret < 0) {
 		DRM_ERROR("failed write PAGE2_MCS_EN: %d\n", ret);
-		goto err_regulators_disable;
+		goto err_poweroff;
 	}
 
 	/* Switch access edp panel's edid through i2c */
 	ret = regmap_write(map, PAGE2_I2C_BYPASS, I2C_BYPASS_EN);
 	if (ret < 0) {
 		DRM_ERROR("failed write PAGE2_I2C_BYPASS: %d\n", ret);
-		goto err_regulators_disable;
+		goto err_poweroff;
 	}
 
 	ps_bridge->powered = true;
 
 	return 0;
 
-err_regulators_disable:
-	regulator_bulk_disable(ARRAY_SIZE(ps_bridge->supplies),
-			       ps_bridge->supplies);
+err_poweroff:
+	__ps8640_bridge_poweroff(ps_bridge);
 
 	return ret;
 }
