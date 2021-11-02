@@ -4,6 +4,7 @@
  */
 
 #include <linux/bitops.h>
+#include <linux/clk.h>
 #include <linux/delay.h>
 #include <linux/err.h>
 #include <linux/export.h>
@@ -256,6 +257,15 @@ static int _gdsc_enable(struct gdsc *sc)
 	if (sc->pwrsts == PWRSTS_ON)
 		return gdsc_deassert_reset(sc);
 
+	if (sc->clk) {
+		ret = clk_enable(sc->clk);
+		if (ret) {
+			pr_err("Failed to enable clock %s\n", sc->clk_name);
+			return ret;
+		}
+		sc->clk_enable = true;
+	}
+
 	if (sc->flags & SW_RESET) {
 		gdsc_assert_reset(sc);
 		udelay(1);
@@ -269,8 +279,11 @@ static int _gdsc_enable(struct gdsc *sc)
 	}
 
 	ret = gdsc_toggle_logic(sc, GDSC_ON);
-	if (ret)
+	if (ret) {
+		if (sc->clk)
+			clk_disable(sc->clk);
 		return ret;
+	}
 
 	if (sc->pwrsts & PWRSTS_OFF)
 		gdsc_force_mem_on(sc);
@@ -287,8 +300,12 @@ static int _gdsc_enable(struct gdsc *sc)
 	/* Turn on HW trigger mode if supported */
 	if (sc->flags & HW_CTRL) {
 		ret = gdsc_hwctrl(sc, true);
-		if (ret)
+		if (ret) {
+			if (sc->clk)
+				clk_disable(sc->clk);
 			return ret;
+		}
+
 		/*
 		 * Wait for the GDSC to go through a power down and
 		 * up cycle.  In case a firmware ends up polling status
@@ -329,7 +346,7 @@ static int _gdsc_disable(struct gdsc *sc)
 	if (sc->flags & HW_CTRL) {
 		ret = gdsc_hwctrl(sc, false);
 		if (ret < 0)
-			return ret;
+			goto disable_clk;
 		/*
 		 * Wait for the GDSC to go through a power down and
 		 * up cycle.  In case we end up polling status
@@ -340,7 +357,7 @@ static int _gdsc_disable(struct gdsc *sc)
 
 		ret = gdsc_poll_status(sc, GDSC_ON);
 		if (ret)
-			return ret;
+			goto disable_clk;
 	}
 
 	if (sc->pwrsts & PWRSTS_OFF)
@@ -348,12 +365,16 @@ static int _gdsc_disable(struct gdsc *sc)
 
 	ret = gdsc_toggle_logic(sc, GDSC_OFF);
 	if (ret)
-		return ret;
+		goto disable_clk;
 
 	if (sc->flags & CLAMP_IO)
 		gdsc_assert_clamp_io(sc);
 
-	return 0;
+disable_clk:
+	if (sc->clk && sc->clk_enable)
+		clk_disable(sc->clk);
+
+	return ret;
 }
 
 static int gdsc_disable(struct generic_pm_domain *domain)
@@ -476,6 +497,18 @@ int gdsc_register(struct gdsc_desc *desc,
 		scs[i]->rsupply = devm_regulator_get(dev, scs[i]->supply);
 		if (IS_ERR(scs[i]->rsupply))
 			return PTR_ERR(scs[i]->rsupply);
+	}
+
+	for (i = 0; i < num; i++) {
+		if (!scs[i])
+			continue;
+
+		scs[i]->clk = devm_clk_get(dev, scs[i]->clk_name);
+		if (IS_ERR(scs[i]->clk))
+			return PTR_ERR(scs[i]->clk);
+		ret = clk_prepare(scs[i]->clk);
+		if (ret)
+			return ret;
 	}
 
 	data->num_domains = num;

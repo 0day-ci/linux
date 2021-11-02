@@ -59,6 +59,9 @@ struct gdsc {
 
 	const char 			*supply;
 	struct regulator		*rsupply;
+	const char			*clk_name;
+	struct clk			*clk;
+	bool				clk_enable;
 	struct device 			*dev;
 };
 
