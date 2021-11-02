@@ -48,6 +48,7 @@ extern "C" {
 #define DRM_VIRTGPU_GET_CAPS  0x09
 #define DRM_VIRTGPU_RESOURCE_CREATE_BLOB 0x0a
 #define DRM_VIRTGPU_CONTEXT_INIT 0x0b
+#define DRM_VIRTGPU_PIN 0x0c
 
 #define VIRTGPU_EXECBUF_FENCE_FD_IN	0x01
 #define VIRTGPU_EXECBUF_FENCE_FD_OUT	0x02
@@ -82,6 +83,7 @@ struct drm_virtgpu_execbuffer {
 #define VIRTGPU_PARAM_CROSS_DEVICE 5 /* Cross virtio-device resource sharing  */
 #define VIRTGPU_PARAM_CONTEXT_INIT 6 /* DRM_VIRTGPU_CONTEXT_INIT */
 #define VIRTGPU_PARAM_SUPPORTED_CAPSET_IDs 7 /* Bitmask of supported capability set ids */
+#define VIRTGPU_PARAM_PIN_ON_DEMAND 8 /* is pinning on demand available? */
 
 struct drm_virtgpu_getparam {
 	__u64 param;
@@ -196,6 +198,10 @@ struct drm_virtgpu_context_init {
 	__u64 ctx_set_params;
 };
 
+struct drm_virtgpu_pin {
+	__u32 handle;
+};
+
 #define DRM_IOCTL_VIRTGPU_MAP \
 	DRM_IOWR(DRM_COMMAND_BASE + DRM_VIRTGPU_MAP, struct drm_virtgpu_map)
 
@@ -238,6 +244,10 @@ struct drm_virtgpu_context_init {
 #define DRM_IOCTL_VIRTGPU_CONTEXT_INIT					\
 	DRM_IOWR(DRM_COMMAND_BASE + DRM_VIRTGPU_CONTEXT_INIT,		\
 		struct drm_virtgpu_context_init)
+
+#define DRM_IOCTL_VIRTGPU_PIN					\
+	DRM_IOWR(DRM_COMMAND_BASE + DRM_VIRTGPU_PIN,		\
+		struct drm_virtgpu_pin)
 
 #if defined(__cplusplus)
 }

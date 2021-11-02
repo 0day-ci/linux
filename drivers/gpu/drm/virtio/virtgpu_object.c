@@ -80,9 +80,9 @@ void virtio_gpu_cleanup_object(struct virtio_gpu_object *bo)
 			kfree(shmem->pages);
 			shmem->pages = NULL;
 			drm_gem_shmem_unpin(&bo->base.base);
+			drm_gem_shmem_free_object(&bo->base.base);
 		}
 
-		drm_gem_shmem_free_object(&bo->base.base);
 	} else if (virtio_gpu_is_vram(bo)) {
 		struct virtio_gpu_object_vram *vram = to_virtio_gpu_vram(bo);
 
@@ -246,13 +246,6 @@ int virtio_gpu_object_create(struct virtio_gpu_device *vgdev,
 			goto err_put_objs;
 	}
 
-	ret = virtio_gpu_object_shmem_init(vgdev, bo, &ents, &nents);
-	if (ret != 0) {
-		virtio_gpu_array_put_free(objs);
-		virtio_gpu_free_object(&shmem_obj->base);
-		return ret;
-	}
-
 	if (params->blob) {
 		if (params->blob_mem == VIRTGPU_BLOB_MEM_GUEST)
 			bo->guest_blob = true;
@@ -262,8 +255,13 @@ int virtio_gpu_object_create(struct virtio_gpu_device *vgdev,
 	} else if (params->virgl) {
 		virtio_gpu_cmd_resource_create_3d(vgdev, bo, params,
 						  objs, fence);
-		virtio_gpu_object_attach(vgdev, bo, ents, nents);
 	} else {
+		ret = virtio_gpu_object_shmem_init(vgdev, bo, &ents, &nents);
+		if (ret != 0) {
+			virtio_gpu_array_put_free(objs);
+			virtio_gpu_free_object(&shmem_obj->base);
+			return ret;
+		}
 		virtio_gpu_cmd_create_resource(vgdev, bo, params,
 					       objs, fence);
 		virtio_gpu_object_attach(vgdev, bo, ents, nents);
@@ -279,4 +277,30 @@ err_put_id:
 err_free_gem:
 	drm_gem_shmem_free_object(&shmem_obj->base);
 	return ret;
+}
+
+int virtio_gpu_object_pin(struct virtio_gpu_device *vgdev,
+			  struct virtio_gpu_object_array *objs,
+			  int num_gem_objects)
+{
+	int i, ret;
+
+	for (i = 0; i < num_gem_objects; i++) {
+		struct virtio_gpu_mem_entry *ents;
+		unsigned int nents;
+
+		struct virtio_gpu_object *bo =
+			gem_to_virtio_gpu_obj(objs->objs[i]);
+		if (!bo) {
+			return -EFAULT;
+		}
+
+		ret = virtio_gpu_object_shmem_init(vgdev, bo, &ents, &nents);
+		if (ret != 0) {
+			return -EFAULT;
+		}
+
+		virtio_gpu_object_attach(vgdev, bo, ents, nents);
+	}
+	return 0;
 }

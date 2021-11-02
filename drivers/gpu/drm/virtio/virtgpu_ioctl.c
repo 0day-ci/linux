@@ -102,6 +102,25 @@ static int virtio_gpu_map_ioctl(struct drm_device *dev, void *data,
 {
 	struct virtio_gpu_device *vgdev = dev->dev_private;
 	struct drm_virtgpu_map *virtio_gpu_map = data;
+	struct virtio_gpu_object_array *objs;
+	struct virtio_gpu_object *bo;
+	struct virtio_gpu_object_shmem *shmem;
+
+	objs = virtio_gpu_array_from_handles(file, &virtio_gpu_map->handle, 1);
+	if (objs == NULL)
+		return -ENOENT;
+
+	bo = gem_to_virtio_gpu_obj(objs->objs[0]);
+	if (bo == NULL)
+		return -ENOENT;
+	
+	shmem = to_virtio_gpu_shmem(bo);
+	if (shmem == NULL)
+		return -ENOENT;
+
+	if (!shmem->pages) {
+		virtio_gpu_object_pin(vgdev, objs, 1);
+	}
 
 	return virtio_gpu_mode_dumb_mmap(file, vgdev->ddev,
 					 virtio_gpu_map->handle,
@@ -292,6 +311,9 @@ static int virtio_gpu_getparam_ioctl(struct drm_device *dev, void *data,
 	case VIRTGPU_PARAM_SUPPORTED_CAPSET_IDs:
 		value = vgdev->capset_id_mask;
 		break;
+	case VIRTGPU_PARAM_PIN_ON_DEMAND:
+		value = 1;
+		break;
 	default:
 		return -EINVAL;
 	}
@@ -397,6 +419,7 @@ static int virtio_gpu_transfer_from_host_ioctl(struct drm_device *dev,
 	struct virtio_gpu_object *bo;
 	struct virtio_gpu_object_array *objs;
 	struct virtio_gpu_fence *fence;
+	struct virtio_gpu_object_shmem *shmem;
 	int ret;
 	u32 offset = args->offset;
 
@@ -412,6 +435,11 @@ static int virtio_gpu_transfer_from_host_ioctl(struct drm_device *dev,
 	if (bo->guest_blob && !bo->host3d_blob) {
 		ret = -EINVAL;
 		goto err_put_free;
+	}
+
+	shmem = to_virtio_gpu_shmem(bo);
+	if (!shmem->pages) {
+		virtio_gpu_object_pin(vgdev, objs, 1);
 	}
 
 	if (!bo->host3d_blob && (args->stride || args->layer_stride)) {
@@ -451,6 +479,7 @@ static int virtio_gpu_transfer_to_host_ioctl(struct drm_device *dev, void *data,
 	struct drm_virtgpu_3d_transfer_to_host *args = data;
 	struct virtio_gpu_object *bo;
 	struct virtio_gpu_object_array *objs;
+	struct virtio_gpu_object_shmem *shmem;
 	struct virtio_gpu_fence *fence;
 	int ret;
 	u32 offset = args->offset;
@@ -463,6 +492,11 @@ static int virtio_gpu_transfer_to_host_ioctl(struct drm_device *dev, void *data,
 	if (bo->guest_blob && !bo->host3d_blob) {
 		ret = -EINVAL;
 		goto err_put_free;
+	}
+
+	shmem = to_virtio_gpu_shmem(bo);
+	if (!shmem->pages) {
+		virtio_gpu_object_pin(vgdev, objs, 1);
 	}
 
 	if (!vgdev->has_virgl_3d) {
@@ -836,6 +870,34 @@ out_unlock:
 	return ret;
 }
 
+static int virtio_gpu_pin_ioctl(struct drm_device *dev, void *data,
+				struct drm_file *file)
+{
+	struct virtio_gpu_device *vgdev = dev->dev_private;
+	struct drm_virtgpu_pin *virtio_gpu_pin = data;
+	struct virtio_gpu_object_array *objs;
+	struct virtio_gpu_object *bo;
+	struct virtio_gpu_object_shmem *shmem;
+
+	objs = virtio_gpu_array_from_handles(file, &virtio_gpu_pin->handle, 1);
+	if (objs == NULL)
+		return -ENOENT;
+
+	bo = gem_to_virtio_gpu_obj(objs->objs[0]);
+	if (bo == NULL)
+		return -ENOENT;
+	
+	shmem = to_virtio_gpu_shmem(bo);
+	if (shmem == NULL)
+		return -ENOENT;
+
+	if (!shmem->pages) {
+		return virtio_gpu_object_pin(vgdev, objs, 1);
+	}
+
+	return 0;
+}
+
 struct drm_ioctl_desc virtio_gpu_ioctls[DRM_VIRTIO_NUM_IOCTLS] = {
 	DRM_IOCTL_DEF_DRV(VIRTGPU_MAP, virtio_gpu_map_ioctl,
 			  DRM_RENDER_ALLOW),
@@ -874,5 +936,8 @@ struct drm_ioctl_desc virtio_gpu_ioctls[DRM_VIRTIO_NUM_IOCTLS] = {
 			  DRM_RENDER_ALLOW),
 
 	DRM_IOCTL_DEF_DRV(VIRTGPU_CONTEXT_INIT, virtio_gpu_context_init_ioctl,
+			  DRM_RENDER_ALLOW),
+
+	DRM_IOCTL_DEF_DRV(VIRTGPU_PIN, virtio_gpu_pin_ioctl,
 			  DRM_RENDER_ALLOW),
 };
