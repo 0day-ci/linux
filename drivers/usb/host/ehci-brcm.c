@@ -63,7 +63,8 @@ static int ehci_brcm_hub_control(
 	unsigned long flags;
 	int retval, irq_disabled = 0;
 
-	status_reg = &ehci->regs->port_status[(wIndex & 0xff) - 1];
+	if (wIndex && wIndex <= ports)
+		status_reg = &ehci->regs->port_status[(wIndex & 0xff) - 1];
 
 	/*
 	 * RESUME is cleared when GetPortStatus() is called 20ms after start
