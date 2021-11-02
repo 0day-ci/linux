@@ -1021,6 +1021,16 @@ config RTC_DRV_DS1685_FAMILY
 	  This driver can also be built as a module. If so, the module
 	  will be called rtc-ds1685.
 
+config RTC_DRV_SUNPLUS
+	bool "Sunplus SP7021 RTC"
+	depends on SOC_SP7021
+	help
+		Say 'yse' to get support for Sunplus SP7021 real-time clock
+		(RTC) for industrial applications.
+		It provides RTC status check, timer/alarm functionalities,
+		user data reservation only with battery with voltage over 2.5V,
+		RTC power status check and battery charge.
+
 choice
 	prompt "Subtype"
 	depends on RTC_DRV_DS1685_FAMILY
