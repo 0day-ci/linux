@@ -55,7 +55,7 @@ static int max9271_write(struct max9271_device *dev, u8 reg, u8 val)
 /*
  * max9271_pclk_detect() - Detect valid pixel clock from image sensor
  *
- * Wait up to 10ms for a valid pixel clock.
+ * Wait up to 15ms for a valid pixel clock.
  *
  * Returns 0 for success, < 0 for pixel clock not properly detected
  */
@@ -64,15 +64,15 @@ static int max9271_pclk_detect(struct max9271_device *dev)
 	unsigned int i;
 	int ret;
 
-	for (i = 0; i < 100; i++) {
+	for (i = 0; i < 10; i++) {
 		ret = max9271_read(dev, 0x15);
 		if (ret < 0)
-			return ret;
+			continue;
 
 		if (ret & MAX9271_PCLKDET)
 			return 0;
 
-		usleep_range(50, 100);
+		usleep_range(1000, 1500);
 	}
 
 	dev_err(&dev->client->dev, "Unable to detect valid pixel clock\n");
