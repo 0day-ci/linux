@@ -30,7 +30,7 @@ static int max9271_read(struct max9271_device *dev, u8 reg)
 
 	ret = i2c_smbus_read_byte_data(dev->client, reg);
 	if (ret < 0)
-		dev_dbg(&dev->client->dev,
+		dev_err(&dev->client->dev,
 			"%s: register 0x%02x read failed (%d)\n",
 			__func__, reg, ret);
 
