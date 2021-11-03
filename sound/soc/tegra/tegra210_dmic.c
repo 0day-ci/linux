@@ -185,20 +185,39 @@ static int tegra210_dmic_put_control(struct snd_kcontrol *kcontrol,
 	struct tegra210_dmic *dmic = snd_soc_component_get_drvdata(comp);
 	int value = ucontrol->value.integer.value[0];
 
-	if (strstr(kcontrol->id.name, "Boost Gain Volume"))
-		dmic->boost_gain = value;
-	else if (strstr(kcontrol->id.name, "Channel Select"))
-		dmic->ch_select = ucontrol->value.integer.value[0];
-	else if (strstr(kcontrol->id.name, "Mono To Stereo"))
-		dmic->mono_to_stereo = value;
-	else if (strstr(kcontrol->id.name, "Stereo To Mono"))
-		dmic->stereo_to_mono = value;
-	else if (strstr(kcontrol->id.name, "OSR Value"))
-		dmic->osr_val = value;
-	else if (strstr(kcontrol->id.name, "LR Polarity Select"))
-		dmic->lrsel = value;
+	if (strstr(kcontrol->id.name, "Boost Gain Volume")) {
+		if (dmic->boost_gain == value)
+			return 0;
 
-	return 0;
+		dmic->boost_gain = value;
+	} else if (strstr(kcontrol->id.name, "Channel Select")) {
+		if (dmic->ch_select == value)
+			return 0;
+
+		dmic->ch_select = value;
+	} else if (strstr(kcontrol->id.name, "Mono To Stereo")) {
+		if (dmic->mono_to_stereo == value)
+			return 0;
+
+		dmic->mono_to_stereo = value;
+	} else if (strstr(kcontrol->id.name, "Stereo To Mono")) {
+		if (dmic->stereo_to_mono == value)
+			return 0;
+
+		dmic->stereo_to_mono = value;
+	} else if (strstr(kcontrol->id.name, "OSR Value")) {
+		if (dmic->osr_val == value)
+			return 0;
+
+		dmic->osr_val = value;
+	} else if (strstr(kcontrol->id.name, "LR Polarity Select")) {
+		if (dmic->lrsel == value)
+			return 0;
+
+		dmic->lrsel = value;
+	}
+
+	return 1;
 }
 
 static const struct snd_soc_dai_ops tegra210_dmic_dai_ops = {
