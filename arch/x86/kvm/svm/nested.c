@@ -55,19 +55,20 @@ static void nested_svm_inject_npf_exit(struct kvm_vcpu *vcpu,
 
 static void svm_inject_page_fault_nested(struct kvm_vcpu *vcpu, struct x86_exception *fault)
 {
-       struct vcpu_svm *svm = to_svm(vcpu);
-       WARN_ON(!is_guest_mode(vcpu));
+	struct vcpu_svm *svm = to_svm(vcpu);
 
-       if (vmcb_is_intercept(&svm->nested.ctl, INTERCEPT_EXCEPTION_OFFSET + PF_VECTOR) &&
+	WARN_ON(!is_guest_mode(vcpu));
+
+	if (vmcb_is_intercept(&svm->nested.ctl, INTERCEPT_EXCEPTION_OFFSET + PF_VECTOR) &&
 	   !svm->nested.nested_run_pending) {
-               svm->vmcb->control.exit_code = SVM_EXIT_EXCP_BASE + PF_VECTOR;
-               svm->vmcb->control.exit_code_hi = 0;
-               svm->vmcb->control.exit_info_1 = fault->error_code;
-               svm->vmcb->control.exit_info_2 = fault->address;
-               nested_svm_vmexit(svm);
-       } else {
-               kvm_inject_page_fault(vcpu, fault);
-       }
+		svm->vmcb->control.exit_code = SVM_EXIT_EXCP_BASE + PF_VECTOR;
+		svm->vmcb->control.exit_code_hi = 0;
+		svm->vmcb->control.exit_info_1 = fault->error_code;
+		svm->vmcb->control.exit_info_2 = fault->address;
+		nested_svm_vmexit(svm);
+	} else {
+		kvm_inject_page_fault(vcpu, fault);
+	}
 }
 
 static u64 nested_svm_get_tdp_pdptr(struct kvm_vcpu *vcpu, int index)
@@ -1175,7 +1176,7 @@ static int svm_check_nested_events(struct kvm_vcpu *vcpu)
 		 * vmcb field, while delivering the pending exception.
 		 */
 		if (svm->nested.nested_run_pending)
-                        return -EBUSY;
+			return -EBUSY;
 		if (!nested_exit_on_exception(svm))
 			return 0;
 		nested_svm_inject_exception_vmexit(svm);
@@ -1376,7 +1377,7 @@ static int svm_set_nested_state(struct kvm_vcpu *vcpu,
 	 * valid for guest mode (see nested_vmcb_check_save).
 	 */
 	cr0 = kvm_read_cr0(vcpu);
-        if (((cr0 & X86_CR0_CD) == 0) && (cr0 & X86_CR0_NW))
+	if (((cr0 & X86_CR0_CD) == 0) && (cr0 & X86_CR0_NW))
 		goto out_free;
 
 	/*
