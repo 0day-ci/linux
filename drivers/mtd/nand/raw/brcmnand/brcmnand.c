@@ -714,7 +714,8 @@ static int brcmnand_revision_init(struct brcmnand_controller *ctrl)
 	if (ctrl->nand_version >= 0x0500)
 		ctrl->features |= BRCMNAND_HAS_1K_SECTORS;
 
-	if (ctrl->nand_version >= 0x0700)
+	if (ctrl->nand_version >= 0x0700 &&
+	    !of_property_read_bool(ctrl->dev->of_node, "no-wp"))
 		ctrl->features |= BRCMNAND_HAS_WP;
 	else if (of_property_read_bool(ctrl->dev->of_node, "brcm,nand-has-wp"))
 		ctrl->features |= BRCMNAND_HAS_WP;
