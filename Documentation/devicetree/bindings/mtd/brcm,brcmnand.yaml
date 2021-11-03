@@ -111,6 +111,11 @@ properties:
       earlier versions of this core that include WP
     type: boolean
 
+  no-wp:
+    description:
+      This property marks boards with WP pin not connected to the NAND chip.
+    type: boolean
+
 patternProperties:
   "^nand@[a-f0-9]$":
     type: object
