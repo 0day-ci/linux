@@ -151,6 +151,7 @@ if:
     compatible:
       contains:
         enum:
+          - renesas,scif-r9a07g044
           - renesas,rcar-gen2-scif
           - renesas,rcar-gen3-scif
 then:
