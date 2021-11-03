@@ -445,7 +445,7 @@ static inline bool acpi_data_node_match(const struct fwnode_handle *fwnode,
 
 static inline struct fwnode_handle *acpi_fwnode_handle(struct acpi_device *adev)
 {
-	return &adev->fwnode;
+	return adev ? &adev->fwnode : NULL;
 }
 
 static inline void *acpi_driver_data(struct acpi_device *d)
