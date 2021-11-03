@@ -311,15 +311,11 @@ case "$1" in
 		dogtags
 		;;
 
-	"tags")
-		rm -f tags
-		xtags ctags
-		remove_structs=y
-		;;
-
-	"TAGS")
-		rm -f TAGS
-		xtags etags
+	"TAGS" | "tags")
+		rm -f $1
+		xtags $([ $1 = "tags" ]	\
+			&& echo ctags		\
+			|| echo etags)
 		remove_structs=y
 		;;
 esac
