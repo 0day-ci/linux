@@ -77,7 +77,7 @@ transport_lookup_cmd_lun(struct se_cmd *se_cmd)
 
 		se_lun = rcu_dereference(deve->se_lun);
 
-		if (!percpu_ref_tryget_live(&se_lun->lun_ref)) {
+		if (!percpu_ref_tryget_live_rcu(&se_lun->lun_ref)) {
 			se_lun = NULL;
 			goto out_unlock;
 		}
@@ -154,7 +154,7 @@ int transport_lookup_tmr_lun(struct se_cmd *se_cmd)
 	if (deve) {
 		se_lun = rcu_dereference(deve->se_lun);
 
-		if (!percpu_ref_tryget_live(&se_lun->lun_ref)) {
+		if (!percpu_ref_tryget_live_rcu(&se_lun->lun_ref)) {
 			se_lun = NULL;
 			goto out_unlock;
 		}
