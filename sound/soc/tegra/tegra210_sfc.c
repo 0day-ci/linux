@@ -3273,16 +3273,27 @@ static int tegra210_sfc_put_control(struct snd_kcontrol *kcontrol,
 	struct tegra210_sfc *sfc = snd_soc_component_get_drvdata(cmpnt);
 	int value = ucontrol->value.integer.value[0];
 
-	if (strstr(kcontrol->id.name, "Input Stereo To Mono"))
+	if (strstr(kcontrol->id.name, "Input Stereo To Mono")) {
+		if (sfc->stereo_to_mono[SFC_RX_PATH] == value)
+			return 0;
+
 		sfc->stereo_to_mono[SFC_RX_PATH] = value;
-	else if (strstr(kcontrol->id.name, "Input Mono To Stereo"))
+	} else if (strstr(kcontrol->id.name, "Input Mono To Stereo")) {
+		if (sfc->mono_to_stereo[SFC_RX_PATH] == value)
+			return 0;
+
 		sfc->mono_to_stereo[SFC_RX_PATH] = value;
-	else if (strstr(kcontrol->id.name, "Output Stereo To Mono"))
+	} else if (strstr(kcontrol->id.name, "Output Stereo To Mono")) {
+		if (sfc->stereo_to_mono[SFC_TX_PATH] == value)
+			return 0;
+
 		sfc->stereo_to_mono[SFC_TX_PATH] = value;
-	else if (strstr(kcontrol->id.name, "Output Mono To Stereo"))
+	} else if (strstr(kcontrol->id.name, "Output Mono To Stereo")) {
+		if (sfc->mono_to_stereo[SFC_TX_PATH] == value)
+			return 0;
+
 		sfc->mono_to_stereo[SFC_TX_PATH] = value;
-	else
-		return 0;
+	}
 
 	return 1;
 }
