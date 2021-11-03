@@ -146,7 +146,14 @@ static const struct mmc_fixup __maybe_unused sdio_fixup_methods[] = {
 	END_FIXUP
 };
 
+static const char *const __maybe_unused wl1251_compatible_list[] = {
+	"ti,wl1251",
+	NULL
+};
+
 static const struct mmc_fixup __maybe_unused sdio_card_init_methods[] = {
+	SDIO_FIXUP_COMPATIBLE(wl1251_compatible_list, wl1251_quirk, 0),
+
 	END_FIXUP
 };
 
