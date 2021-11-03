@@ -1062,7 +1062,7 @@ static struct kioctx *lookup_ioctx(unsigned long ctx_id)
 	id = array_index_nospec(id, table->nr);
 	ctx = rcu_dereference(table->table[id]);
 	if (ctx && ctx->user_id == ctx_id) {
-		if (percpu_ref_tryget_live(&ctx->users))
+		if (percpu_ref_tryget_live_rcu(&ctx->users))
 			ret = ctx;
 	}
 out:
