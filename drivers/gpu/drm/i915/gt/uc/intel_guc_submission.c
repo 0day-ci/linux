@@ -1183,6 +1183,7 @@ static ktime_t guc_engine_busyness(struct intel_engine_cs *engine, ktime_t *now)
 	u64 total, gt_stamp_saved;
 	unsigned long flags;
 	u32 reset_count;
+	bool in_reset;
 
 	spin_lock_irqsave(&guc->timestamp.lock, flags);
 
@@ -1191,7 +1192,9 @@ static ktime_t guc_engine_busyness(struct intel_engine_cs *engine, ktime_t *now)
 	 * engine busyness from GuC, so we just use the driver stored
 	 * copy of busyness. Synchronize with gt reset using reset_count.
 	 */
-	reset_count = i915_reset_count(gpu_error);
+	rcu_read_lock();
+	in_reset = test_bit(I915_RESET_BACKOFF, &gt->reset.flags);
+	rcu_read_unlock();
 
 	*now = ktime_get();
 
@@ -1201,9 +1204,10 @@ static ktime_t guc_engine_busyness(struct intel_engine_cs *engine, ktime_t *now)
 	 * start_gt_clk is derived from GuC state. To get a consistent
 	 * view of activity, we query the GuC state only if gt is awake.
 	 */
-	stats_saved = *stats;
-	gt_stamp_saved = guc->timestamp.gt_stamp;
-	if (intel_gt_pm_get_if_awake(gt)) {
+	if (intel_gt_pm_get_if_awake(gt) && !in_reset) {
+		stats_saved = *stats;
+		gt_stamp_saved = guc->timestamp.gt_stamp;
+		reset_count = i915_reset_count(gpu_error);
 		guc_update_engine_gt_clks(engine);
 		guc_update_pm_timestamp(guc, engine, now);
 		intel_gt_pm_put_async(gt);
