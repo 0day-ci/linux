@@ -620,22 +620,18 @@ static ssize_t afs_write_back_from_locked_page(struct address_space *mapping,
 	default:
 		pr_notice("kAFS: Unexpected error from FS.StoreData %d\n", ret);
 		fallthrough;
-	case -EACCES:
-	case -EPERM:
-	case -ENOKEY:
 	case -EKEYEXPIRED:
-	case -EKEYREJECTED:
-	case -EKEYREVOKED:
 		afs_redirty_pages(wbc, mapping, start, len);
 		mapping_set_error(mapping, ret);
 		break;
 
+	case -EACCES:
+	case -EPERM:
+	case -ENOKEY:
+	case -EKEYREJECTED:
+	case -EKEYREVOKED:
 	case -EDQUOT:
 	case -ENOSPC:
-		afs_redirty_pages(wbc, mapping, start, len);
-		mapping_set_error(mapping, -ENOSPC);
-		break;
-
 	case -EROFS:
 	case -EIO:
 	case -EREMOTEIO:
