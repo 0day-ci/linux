@@ -210,6 +210,9 @@ static int tegra210_mixer_put_gain(struct snd_kcontrol *kcontrol,
 	id = (reg - TEGRA210_MIXER_GAIN_CFG_RAM_ADDR_0) /
 	     TEGRA210_MIXER_GAIN_CFG_RAM_ADDR_STRIDE;
 
+	if (mixer->gain_value[id] == ucontrol->value.integer.value[0])
+		return 0;
+
 	mixer->gain_value[id] = ucontrol->value.integer.value[0];
 
 	err = tegra210_mixer_configure_gain(cmpnt, id, instant_gain);
