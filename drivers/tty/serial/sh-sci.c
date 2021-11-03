@@ -37,6 +37,7 @@
 #include <linux/of_device.h>
 #include <linux/platform_device.h>
 #include <linux/pm_runtime.h>
+#include <linux/reset.h>
 #include <linux/scatterlist.h>
 #include <linux/serial.h>
 #include <linux/serial_sci.h>
@@ -3203,23 +3204,58 @@ static const struct of_device_id of_sci_match[] = {
 };
 MODULE_DEVICE_TABLE(of, of_sci_match);
 
+static void sci_reset_control_assert(void *data)
+{
+	reset_control_assert(data);
+}
+
 static struct plat_sci_port *sci_parse_dt(struct platform_device *pdev,
 					  unsigned int *dev_id)
 {
 	struct device_node *np = pdev->dev.of_node;
+	const struct of_device_id *of_id;
 	struct plat_sci_port *p;
 	struct sci_port *sp;
 	const void *data;
 	int id;
 
 	if (!IS_ENABLED(CONFIG_OF) || !np)
-		return NULL;
+		return ERR_PTR(-EINVAL);
 
-	data = of_device_get_match_data(&pdev->dev);
+	of_id = of_match_device(of_sci_match, &pdev->dev);
+	if (!of_id)
+		return ERR_PTR(-EINVAL);
+
+	if (!strcmp(of_id->compatible, "renesas,scif-r9a07g044") ||
+	    !strcmp(of_id->compatible, "renesas,sci")) {
+		struct reset_control *rstc;
+		int ret;
+
+		rstc = devm_reset_control_get_exclusive(&pdev->dev, NULL);
+		if (IS_ERR(rstc)) {
+			dev_err(&pdev->dev, "Error: missing reset ctrl\n");
+			return ERR_PTR(PTR_ERR(rstc));
+		}
+
+		ret = reset_control_deassert(rstc);
+		if (ret) {
+			dev_err(&pdev->dev, "failed to deassert %d\n", ret);
+			return ERR_PTR(ret);
+		}
+
+		ret = devm_add_action_or_reset(&pdev->dev, sci_reset_control_assert, rstc);
+		if (ret) {
+			dev_err(&pdev->dev, "failed to register assert devm action, %d\n",
+				ret);
+			return ERR_PTR(ret);
+		}
+	}
+
+	data = of_id->data;
 
 	p = devm_kzalloc(&pdev->dev, sizeof(struct plat_sci_port), GFP_KERNEL);
 	if (!p)
-		return NULL;
+		return ERR_PTR(-ENOMEM);
 
 	/* Get the line number from the aliases node. */
 	id = of_alias_get_id(np, "serial");
@@ -3227,11 +3263,11 @@ static struct plat_sci_port *sci_parse_dt(struct platform_device *pdev,
 		id = ffz(sci_ports_in_use);
 	if (id < 0) {
 		dev_err(&pdev->dev, "failed to get alias id (%d)\n", id);
-		return NULL;
+		return ERR_PTR(-EINVAL);
 	}
 	if (id >= ARRAY_SIZE(sci_ports)) {
 		dev_err(&pdev->dev, "serial%d out of range\n", id);
-		return NULL;
+		return ERR_PTR(-EINVAL);
 	}
 
 	sp = &sci_ports[id];
@@ -3318,8 +3354,8 @@ static int sci_probe(struct platform_device *dev)
 
 	if (dev->dev.of_node) {
 		p = sci_parse_dt(dev, &dev_id);
-		if (p == NULL)
-			return -EINVAL;
+		if (IS_ERR(p))
+			return PTR_ERR(p);
 	} else {
 		p = dev->dev.platform_data;
 		if (p == NULL) {
