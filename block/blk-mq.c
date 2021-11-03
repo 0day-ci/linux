@@ -2478,6 +2478,23 @@ static inline unsigned short blk_plug_max_rq_count(struct blk_plug *plug)
 	return BLK_MAX_REQUEST_COUNT;
 }
 
+static inline struct request *blk_get_plug_request(struct request_queue *q,
+						   struct blk_plug *plug,
+						   struct bio *bio)
+{
+	struct request *rq;
+
+	if (!plug)
+		return NULL;
+	rq = rq_list_peek(&plug->cached_rq);
+	if (rq) {
+		plug->cached_rq = rq_list_next(rq);
+		INIT_LIST_HEAD(&rq->queuelist);
+		return rq;
+	}
+	return NULL;
+}
+
 /**
  * blk_mq_submit_bio - Create and send a request to block device.
  * @bio: Bio pointer.
@@ -2517,11 +2534,8 @@ void blk_mq_submit_bio(struct bio *bio)
 
 	rq_qos_throttle(q, bio);
 
-	plug = blk_mq_plug(q, bio);
-	if (plug && plug->cached_rq) {
-		rq = rq_list_pop(&plug->cached_rq);
-		INIT_LIST_HEAD(&rq->queuelist);
-	} else {
+	rq = blk_get_plug_request(q, plug, bio);
+	if (!rq) {
 		struct blk_mq_alloc_data data = {
 			.q		= q,
 			.nr_tags	= 1,
