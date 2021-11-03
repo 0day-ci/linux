@@ -1122,6 +1122,9 @@ add_dev:
 
 	if (child->ops->add_bus) {
 		ret = child->ops->add_bus(child);
+		/* Don't return the child if w/o pcie link-up */
+		if (ret == -ENOLINK)
+			return NULL;
 		if (WARN_ON(ret < 0))
 			dev_err(&child->dev, "failed to add bus: %d\n", ret);
 	}
