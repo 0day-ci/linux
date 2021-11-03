@@ -22,6 +22,7 @@
 #include "xfs_refcount.h"
 #include "xfs_bmap.h"
 #include "xfs_alloc.h"
+#include "xfs_buf.h"
 
 static struct kmem_cache	*xfs_defer_pending_cache;
 
@@ -762,6 +763,33 @@ xfs_defer_ops_capture_and_commit(
 	return 0;
 }
 
+static void
+xfs_defer_relock_buffers(
+	struct xfs_defer_capture	*dfc)
+{
+	struct xfs_defer_resources	*dres = &dfc->dfc_held;
+	unsigned int			i, j;
+
+	/*
+	 * Sort the elements via bubble sort.  (Remember, there are at most 2
+	 * elements to sort, so this is adequate.)
+	 */
+	for (i = 0; i < dres->dr_bufs; i++) {
+		for (j = 1; j < dres->dr_bufs; j++) {
+			if (xfs_buf_daddr(dres->dr_bp[j]) <
+				xfs_buf_daddr(dres->dr_bp[j - 1])) {
+				struct xfs_buf  *temp = dres->dr_bp[j];
+
+				dres->dr_bp[j] = dres->dr_bp[j - 1];
+				dres->dr_bp[j - 1] = temp;
+			}
+		}
+	}
+
+	for (i = 0; i < dres->dr_bufs; i++)
+		xfs_buf_lock(dres->dr_bp[i]);
+}
+
 /*
  * Attach a chain of captured deferred ops to a new transaction and free the
  * capture structure.  If an inode was captured, it will be passed back to the
@@ -777,14 +805,24 @@ xfs_defer_ops_continue(
 	ASSERT(tp->t_flags & XFS_TRANS_PERM_LOG_RES);
 	ASSERT(!(tp->t_flags & XFS_TRANS_DIRTY));
 
-	/* Lock and join the captured inode to the new transaction. */
+	/* Lock the captured resources to the new transaction. */
 	if (dfc->dfc_held.dr_inos == 2)
 		xfs_lock_two_inodes(dfc->dfc_held.dr_ip[0], XFS_ILOCK_EXCL,
 				    dfc->dfc_held.dr_ip[1], XFS_ILOCK_EXCL);
 	else if (dfc->dfc_held.dr_inos == 1)
 		xfs_ilock(dfc->dfc_held.dr_ip[0], XFS_ILOCK_EXCL);
+
+	xfs_defer_relock_buffers(dfc);
+
+	/* Join the captured resources to the new transaction. */
 	xfs_defer_restore_resources(tp, &dfc->dfc_held);
 	memcpy(dres, &dfc->dfc_held, sizeof(struct xfs_defer_resources));
+
+	/*
+	 * Inodes must be passed back to the log recovery code to be unlocked,
+	 * but buffers do not.  Ignore the captured buffers
+	 */
+	dres->dr_bufs = 0;
 
 	/* Move captured dfops chain and state to the transaction. */
 	list_splice_init(&dfc->dfc_dfops, &tp->t_dfops);
