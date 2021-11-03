@@ -376,6 +376,7 @@ struct per_cpu_pages {
 
 	/* Lists of pages, one per migrate type stored on the pcp-lists */
 	struct list_head lists[NR_PCP_LISTS];
+	spinlock_t lock;
 };
 
 struct per_cpu_zonestat {
