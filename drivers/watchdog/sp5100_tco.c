@@ -48,12 +48,14 @@
 /* internal variables */
 
 enum tco_reg_layout {
-	sp5100, sb800, efch
+	sp5100, sb800, efch, efch_mmio
 };
 
 struct sp5100_tco {
 	struct watchdog_device wdd;
 	void __iomem *tcobase;
+	void __iomem *addr;
+	struct resource *res;
 	enum tco_reg_layout tco_reg_layout;
 };
 
@@ -161,6 +163,59 @@ static void sp5100_tco_update_pm_reg8(u8 index, u8 reset, u8 set)
 	outb(val, SP5100_IO_PM_DATA_REG);
 }
 
+static int sp5100_request_region_mmio(struct device *dev,
+				      struct watchdog_device *wdd)
+{
+	struct sp5100_tco *tco = watchdog_get_drvdata(wdd);
+	struct resource *res;
+	void __iomem *addr;
+
+	res = request_mem_region(EFCH_PM_ACPI_MMIO_PM_ADDR,
+				 EFCH_PM_ACPI_MMIO_PM_SIZE,
+				 "sp5100_tco");
+
+	if (!res) {
+		dev_err(dev,
+			"SMB base address memory region 0x%x already in use.\n",
+			EFCH_PM_ACPI_MMIO_PM_ADDR);
+		return -EBUSY;
+	}
+
+	addr = ioremap(EFCH_PM_ACPI_MMIO_PM_ADDR,
+		       EFCH_PM_ACPI_MMIO_PM_SIZE);
+	if (!addr) {
+		release_resource(res);
+		dev_err(dev, "SMB base address mapping failed.\n");
+		return -ENOMEM;
+	}
+
+	tco->res = res;
+	tco->addr = addr;
+	return 0;
+}
+
+static void sp5100_release_region_mmio(struct sp5100_tco *tco)
+{
+	iounmap(tco->addr);
+	release_resource(tco->res);
+}
+
+static u8 efch_read_pm_reg8(struct sp5100_tco *tco, u8 index)
+{
+	return readb(tco->addr + index);
+}
+
+static void efch_update_pm_reg8(struct sp5100_tco *tco,
+				u8 index, u8 reset, u8 set)
+{
+	u8 val;
+
+	val = readb(tco->addr + index);
+	val &= reset;
+	val |= set;
+	writeb(val, tco->addr + index);
+}
+
 static void tco_timer_enable(struct sp5100_tco *tco)
 {
 	u32 val;
@@ -200,6 +255,12 @@ static void tco_timer_enable(struct sp5100_tco *tco)
 		sp5100_tco_update_pm_reg8(EFCH_PM_DECODEEN3,
 					  ~EFCH_PM_WATCHDOG_DISABLE,
 					  EFCH_PM_DECODEEN_SECOND_RES);
+		break;
+	case efch_mmio:
+		/* Set the Watchdog timer resolution to 1 sec and enable */
+		efch_update_pm_reg8(tco, EFCH_PM_DECODEEN3,
+				    ~EFCH_PM_WATCHDOG_DISABLE,
+				    EFCH_PM_DECODEEN_SECOND_RES);
 		break;
 	}
 }
@@ -313,6 +374,44 @@ static int sp5100_tco_timer_init(struct sp5100_tco *tco)
 	return 0;
 }
 
+static int sp5100_tco_setupdevice_mmio(struct device *dev,
+				       struct watchdog_device *wdd)
+{
+	struct sp5100_tco *tco = watchdog_get_drvdata(wdd);
+	const char *dev_name = SB800_DEVNAME;
+	u32 mmio_addr = 0, alt_mmio_addr = 0;
+	int ret;
+
+	ret = sp5100_request_region_mmio(dev, wdd);
+	if (ret)
+		return ret;
+
+	/* Determine MMIO base address */
+	if (!(efch_read_pm_reg8(tco, EFCH_PM_DECODEEN) &
+	      EFCH_PM_DECODEEN_WDT_TMREN)) {
+		efch_update_pm_reg8(tco, EFCH_PM_DECODEEN,
+				    0xff,
+				    EFCH_PM_DECODEEN_WDT_TMREN);
+	}
+
+	if (efch_read_pm_reg8(tco, EFCH_PM_DECODEEN) &
+	    EFCH_PM_DECODEEN_WDT_TMREN)
+		mmio_addr = EFCH_PM_WDT_ADDR;
+
+	/* Determine alternate MMIO base address */
+	if (efch_read_pm_reg8(tco, EFCH_PM_ISACONTROL) &
+	    EFCH_PM_ISACONTROL_MMIOEN)
+		alt_mmio_addr = EFCH_PM_ACPI_MMIO_ADDR +
+			EFCH_PM_ACPI_MMIO_WDT_OFFSET;
+
+	ret = sp5100_tco_prepare_base(tco, mmio_addr, alt_mmio_addr, dev_name);
+	if (!ret)
+		ret = sp5100_tco_timer_init(tco);
+
+	sp5100_release_region_mmio(tco);
+	return ret;
+}
+
 static int sp5100_tco_setupdevice(struct device *dev,
 				  struct watchdog_device *wdd)
 {
@@ -321,6 +420,9 @@ static int sp5100_tco_setupdevice(struct device *dev,
 	u32 mmio_addr = 0, val;
 	u32 alt_mmio_addr = 0;
 	int ret;
+
+	if (tco->tco_reg_layout == efch_mmio)
+		return sp5100_tco_setupdevice_mmio(dev, wdd);
 
 	/* Request the IO ports used by this driver */
 	if (!request_muxed_region(SP5100_IO_PM_INDEX_REG,
