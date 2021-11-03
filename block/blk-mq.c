@@ -2487,12 +2487,21 @@ static inline struct request *blk_get_plug_request(struct request_queue *q,
 	if (!plug)
 		return NULL;
 	rq = rq_list_peek(&plug->cached_rq);
-	if (rq) {
-		plug->cached_rq = rq_list_next(rq);
-		INIT_LIST_HEAD(&rq->queuelist);
-		return rq;
-	}
-	return NULL;
+	if (!rq)
+		return NULL;
+	if (unlikely(!submit_bio_checks(bio)))
+		return ERR_PTR(-EIO);
+	plug->cached_rq = rq_list_next(rq);
+	INIT_LIST_HEAD(&rq->queuelist);
+	rq_qos_throttle(q, bio);
+	return rq;
+}
+
+static inline bool blk_mq_queue_enter(struct request_queue *q, struct bio *bio)
+{
+	if (!blk_try_enter_queue(q, false) && bio_queue_enter(bio))
+		return false;
+	return true;
 }
 
 /**
@@ -2518,30 +2527,40 @@ void blk_mq_submit_bio(struct bio *bio)
 	unsigned int nr_segs = 1;
 	blk_status_t ret;
 
+	if (unlikely(!blk_crypto_bio_prep(&bio)))
+		return;
+
 	blk_queue_bounce(q, &bio);
 	if (blk_may_split(q, bio))
 		__blk_queue_split(q, &bio, &nr_segs);
 
 	if (!bio_integrity_prep(bio))
-		goto queue_exit;
+		return;
 
 	if (!blk_queue_nomerges(q) && bio_mergeable(bio)) {
 		if (blk_attempt_plug_merge(q, bio, nr_segs, &same_queue_rq))
-			goto queue_exit;
+			return;
 		if (blk_mq_sched_bio_merge(q, bio, nr_segs))
-			goto queue_exit;
+			return;
 	}
-
-	rq_qos_throttle(q, bio);
 
 	plug = blk_mq_plug(q, bio);
 	rq = blk_get_plug_request(q, plug, bio);
-	if (!rq) {
+	if (IS_ERR(rq)) {
+		return;
+	} else if (!rq) {
 		struct blk_mq_alloc_data data = {
 			.q		= q,
 			.nr_tags	= 1,
 			.cmd_flags	= bio->bi_opf,
 		};
+
+		if (unlikely(!blk_mq_queue_enter(q, bio)))
+			return;
+		if (unlikely(!submit_bio_checks(bio)))
+			goto put_exit;
+
+		rq_qos_throttle(q, bio);
 
 		if (plug) {
 			data.nr_tags = plug->nr_ios;
@@ -2553,7 +2572,9 @@ void blk_mq_submit_bio(struct bio *bio)
 			rq_qos_cleanup(q, bio);
 			if (bio->bi_opf & REQ_NOWAIT)
 				bio_wouldblock_error(bio);
-			goto queue_exit;
+put_exit:
+			blk_queue_exit(q);
+			return;
 		}
 	}
 
@@ -2636,10 +2657,6 @@ void blk_mq_submit_bio(struct bio *bio)
 		/* Default case. */
 		blk_mq_sched_insert_request(rq, false, true, true);
 	}
-
-	return;
-queue_exit:
-	blk_queue_exit(q);
 }
 
 static size_t order_to_size(unsigned int order)
