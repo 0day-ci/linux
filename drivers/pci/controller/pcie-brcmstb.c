@@ -863,17 +863,10 @@ static inline int brcm_pcie_get_rc_bar2_size_and_offset(struct brcm_pcie *pcie,
 
 static int brcm_pcie_setup(struct brcm_pcie *pcie)
 {
-	struct pci_host_bridge *bridge = pci_host_bridge_from_priv(pcie);
 	u64 rc_bar2_offset, rc_bar2_size;
 	void __iomem *base = pcie->base;
-	struct device *dev = pcie->dev;
-	struct resource_entry *entry;
-	bool ssc_good = false;
-	struct resource *res;
-	int num_out_wins = 0;
-	u16 nlw, cls, lnksta;
-	int i, ret, memc;
-	u32 tmp, burst, aspm_support;
+	int ret, memc;
+	u32 tmp, burst;
 
 	/* Reset the bridge */
 	pcie->bridge_sw_init_set(pcie, 1);
@@ -956,6 +949,21 @@ static int brcm_pcie_setup(struct brcm_pcie *pcie)
 
 	if (pcie->gen)
 		brcm_pcie_set_gen(pcie, pcie->gen);
+	return 0;
+}
+
+static int brcm_pcie_linkup(struct brcm_pcie *pcie)
+{
+	struct pci_host_bridge *bridge = pci_host_bridge_from_priv(pcie);
+	struct device *dev = pcie->dev;
+	void __iomem *base = pcie->base;
+	struct resource_entry *entry;
+	struct resource *res;
+	int num_out_wins = 0;
+	u16 nlw, cls, lnksta;
+	bool ssc_good = false;
+	u32 aspm_support, tmp;
+	int ret, i;
 
 	/* Unassert the fundamental reset */
 	pcie->perst_set(pcie, 0);
@@ -1183,6 +1191,10 @@ static int brcm_pcie_resume(struct device *dev)
 	udelay(100);
 
 	ret = brcm_pcie_setup(pcie);
+	if (ret)
+		goto err_reset;
+
+	ret = brcm_pcie_linkup(pcie);
 	if (ret)
 		goto err_reset;
 
