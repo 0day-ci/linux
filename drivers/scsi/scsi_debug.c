@@ -3910,7 +3910,7 @@ static int resp_comp_write(struct scsi_cmnd *scp,
 		return ret;
 	dnum = 2 * num;
 	arr = kcalloc(lb_size, dnum, GFP_ATOMIC);
-	if (NULL == arr) {
+	if (ZERO_OR_NULL_PTR(arr)) {
 		mk_sense_buffer(scp, ILLEGAL_REQUEST, INSUFF_RES_ASC,
 				INSUFF_RES_ASCQ);
 		return check_condition_result;
@@ -4266,7 +4266,7 @@ static int resp_verify(struct scsi_cmnd *scp, struct sdebug_dev_info *devip)
 		return ret;
 
 	arr = kcalloc(lb_size, vnum, GFP_ATOMIC);
-	if (!arr) {
+	if (ZERO_OR_NULL_PTR(arr)) {
 		mk_sense_buffer(scp, ILLEGAL_REQUEST, INSUFF_RES_ASC,
 				INSUFF_RES_ASCQ);
 		return check_condition_result;
@@ -4335,7 +4335,7 @@ static int resp_report_zones(struct scsi_cmnd *scp,
 			    max_zones);
 
 	arr = kcalloc(RZONES_DESC_HD, alloc_len, GFP_ATOMIC);
-	if (!arr) {
+	if (ZERO_OR_NULL_PTR(arr)) {
 		mk_sense_buffer(scp, ILLEGAL_REQUEST, INSUFF_RES_ASC,
 				INSUFF_RES_ASCQ);
 		return check_condition_result;
