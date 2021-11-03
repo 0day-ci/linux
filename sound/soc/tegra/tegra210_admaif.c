@@ -452,16 +452,29 @@ static int tegra_admaif_put_control(struct snd_kcontrol *kcontrol,
 	struct tegra_admaif *admaif = snd_soc_component_get_drvdata(cmpnt);
 	int value = ucontrol->value.integer.value[0];
 
-	if (strstr(kcontrol->id.name, "Playback Mono To Stereo"))
-		admaif->mono_to_stereo[ADMAIF_TX_PATH][ec->reg] = value;
-	else if (strstr(kcontrol->id.name, "Capture Mono To Stereo"))
-		admaif->mono_to_stereo[ADMAIF_RX_PATH][ec->reg] = value;
-	else if (strstr(kcontrol->id.name, "Playback Stereo To Mono"))
-		admaif->stereo_to_mono[ADMAIF_TX_PATH][ec->reg] = value;
-	else if (strstr(kcontrol->id.name, "Capture Stereo To Mono"))
-		admaif->stereo_to_mono[ADMAIF_RX_PATH][ec->reg] = value;
+	if (strstr(kcontrol->id.name, "Playback Mono To Stereo")) {
+		if (admaif->mono_to_stereo[ADMAIF_TX_PATH][ec->reg] == value)
+			return 0;
 
-	return 0;
+		admaif->mono_to_stereo[ADMAIF_TX_PATH][ec->reg] = value;
+	} else if (strstr(kcontrol->id.name, "Capture Mono To Stereo")) {
+		if (admaif->mono_to_stereo[ADMAIF_RX_PATH][ec->reg] == value)
+			return 0;
+
+		admaif->mono_to_stereo[ADMAIF_RX_PATH][ec->reg] = value;
+	} else if (strstr(kcontrol->id.name, "Playback Stereo To Mono")) {
+		if (admaif->stereo_to_mono[ADMAIF_TX_PATH][ec->reg] == value)
+			return 0;
+
+		admaif->stereo_to_mono[ADMAIF_TX_PATH][ec->reg] = value;
+	} else if (strstr(kcontrol->id.name, "Capture Stereo To Mono")) {
+		if (admaif->stereo_to_mono[ADMAIF_RX_PATH][ec->reg] == value)
+			return 0;
+
+		admaif->stereo_to_mono[ADMAIF_RX_PATH][ec->reg] = value;
+	}
+
+	return 1;
 }
 
 static int tegra_admaif_dai_probe(struct snd_soc_dai *dai)
