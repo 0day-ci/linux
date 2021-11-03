@@ -15,6 +15,7 @@
 #include <linux/bitops.h>
 #include <linux/hardirq.h> /* for in_interrupt() */
 #include <linux/hugetlb_inline.h>
+#include <linux/sched/debug.h>
 
 struct pagevec;
 
@@ -737,7 +738,7 @@ static inline void folio_lock(struct folio *folio)
 /*
  * lock_page may only be called if we have the page's inode pinned.
  */
-static inline void lock_page(struct page *page)
+static inline __sched void lock_page(struct page *page)
 {
 	struct folio *folio;
 	might_sleep();
@@ -747,7 +748,7 @@ static inline void lock_page(struct page *page)
 		__folio_lock(folio);
 }
 
-static inline int folio_lock_killable(struct folio *folio)
+static inline __sched int folio_lock_killable(struct folio *folio)
 {
 	might_sleep();
 	if (!folio_trylock(folio))
@@ -760,7 +761,7 @@ static inline int folio_lock_killable(struct folio *folio)
  * signals.  It returns 0 if it locked the page and -EINTR if it was
  * killed while waiting.
  */
-static inline int lock_page_killable(struct page *page)
+static inline __sched int lock_page_killable(struct page *page)
 {
 	return folio_lock_killable(page_folio(page));
 }
@@ -772,7 +773,7 @@ static inline int lock_page_killable(struct page *page)
  * Return value and mmap_lock implications depend on flags; see
  * __folio_lock_or_retry().
  */
-static inline bool lock_page_or_retry(struct page *page, struct mm_struct *mm,
+static inline __sched bool lock_page_or_retry(struct page *page, struct mm_struct *mm,
 				     unsigned int flags)
 {
 	struct folio *folio;
@@ -796,25 +797,25 @@ int folio_wait_bit_killable(struct folio *folio, int bit_nr);
  * ie with increased "page->count" so that the folio won't
  * go away during the wait..
  */
-static inline void folio_wait_locked(struct folio *folio)
+static inline __sched void folio_wait_locked(struct folio *folio)
 {
 	if (folio_test_locked(folio))
 		folio_wait_bit(folio, PG_locked);
 }
 
-static inline int folio_wait_locked_killable(struct folio *folio)
+static inline __sched int folio_wait_locked_killable(struct folio *folio)
 {
 	if (!folio_test_locked(folio))
 		return 0;
 	return folio_wait_bit_killable(folio, PG_locked);
 }
 
-static inline void wait_on_page_locked(struct page *page)
+static inline __sched void wait_on_page_locked(struct page *page)
 {
 	folio_wait_locked(page_folio(page));
 }
 
-static inline int wait_on_page_locked_killable(struct page *page)
+static inline __sched int wait_on_page_locked_killable(struct page *page)
 {
 	return folio_wait_locked_killable(page_folio(page));
 }

@@ -1286,7 +1286,7 @@ static inline bool folio_trylock_flag(struct folio *folio, int bit_nr,
 /* How many times do we accept lock stealing from under a waiter? */
 int sysctl_page_lock_unfairness = 5;
 
-static inline int folio_wait_bit_common(struct folio *folio, int bit_nr,
+static inline __sched int folio_wait_bit_common(struct folio *folio, int bit_nr,
 		int state, enum behavior behavior)
 {
 	wait_queue_head_t *q = folio_waitqueue(folio);
@@ -1426,13 +1426,13 @@ repeat:
 	return wait->flags & WQ_FLAG_WOKEN ? 0 : -EINTR;
 }
 
-void folio_wait_bit(struct folio *folio, int bit_nr)
+__sched void folio_wait_bit(struct folio *folio, int bit_nr)
 {
 	folio_wait_bit_common(folio, bit_nr, TASK_UNINTERRUPTIBLE, SHARED);
 }
 EXPORT_SYMBOL(folio_wait_bit);
 
-int folio_wait_bit_killable(struct folio *folio, int bit_nr)
+__sched int folio_wait_bit_killable(struct folio *folio, int bit_nr)
 {
 	return folio_wait_bit_common(folio, bit_nr, TASK_KILLABLE, SHARED);
 }
@@ -1644,21 +1644,21 @@ EXPORT_SYMBOL_GPL(page_endio);
  * __folio_lock - Get a lock on the folio, assuming we need to sleep to get it.
  * @folio: The folio to lock
  */
-void __folio_lock(struct folio *folio)
+__sched void __folio_lock(struct folio *folio)
 {
 	folio_wait_bit_common(folio, PG_locked, TASK_UNINTERRUPTIBLE,
 				EXCLUSIVE);
 }
 EXPORT_SYMBOL(__folio_lock);
 
-int __folio_lock_killable(struct folio *folio)
+__sched int __folio_lock_killable(struct folio *folio)
 {
 	return folio_wait_bit_common(folio, PG_locked, TASK_KILLABLE,
 					EXCLUSIVE);
 }
 EXPORT_SYMBOL_GPL(__folio_lock_killable);
 
-static int __folio_lock_async(struct folio *folio, struct wait_page_queue *wait)
+static __sched int __folio_lock_async(struct folio *folio, struct wait_page_queue *wait)
 {
 	struct wait_queue_head *q = folio_waitqueue(folio);
 	int ret = 0;
@@ -1695,7 +1695,7 @@ static int __folio_lock_async(struct folio *folio, struct wait_page_queue *wait)
  * If neither ALLOW_RETRY nor KILLABLE are set, will always return true
  * with the folio locked and the mmap_lock unperturbed.
  */
-bool __folio_lock_or_retry(struct folio *folio, struct mm_struct *mm,
+__sched bool __folio_lock_or_retry(struct folio *folio, struct mm_struct *mm,
 			 unsigned int flags)
 {
 	if (fault_flag_allow_retry_first(flags)) {
