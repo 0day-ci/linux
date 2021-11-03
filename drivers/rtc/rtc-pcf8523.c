@@ -347,7 +347,7 @@ static int pcf8523_irq_enable(struct device *dev, unsigned int enabled)
 	if (err < 0)
 		return err;
 
-	value &= PCF8523_CONTROL1_AIE;
+	value &= ~PCF8523_CONTROL1_AIE;
 
 	if (enabled)
 		value |= PCF8523_CONTROL1_AIE;
