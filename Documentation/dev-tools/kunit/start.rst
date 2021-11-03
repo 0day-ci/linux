@@ -31,14 +31,15 @@ This file essentially contains the regular Kernel config, with the specific
 test targets as well. The ``.kunitconfig`` should also contain any other config
 options required by the tests.
 
-A good starting point for a ``.kunitconfig`` is the KUnit defconfig:
+If you run KUnit, it'll generate one automatically for you.
 
 .. code-block:: bash
 
 	cd $PATH_TO_LINUX_REPO
-	cp tools/testing/kunit/configs/default.config .kunitconfig
+	./tools/testing/kunit/kunit.py run
+	cat .kunit/.kunitconfig
 
-You can then add any other Kconfig options you wish, e.g.:
+You can then edit that file to add any other Kconfig options you wish, e.g.:
 
 .. code-block:: none
 
