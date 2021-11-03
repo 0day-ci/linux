@@ -347,6 +347,9 @@ static int tegra210_i2s_put_control(struct snd_kcontrol *kcontrol,
 	int value = ucontrol->value.integer.value[0];
 
 	if (strstr(kcontrol->id.name, "Loopback")) {
+		if (i2s->loopback == value)
+			return 0;
+
 		i2s->loopback = value;
 
 		regmap_update_bits(i2s->regmap, TEGRA210_I2S_CTRL,
@@ -362,6 +365,9 @@ static int tegra210_i2s_put_control(struct snd_kcontrol *kcontrol,
 		 * cases mixer control is used to update custom values. A value
 		 * of "N" here means, width is "N + 1" bit clock wide.
 		 */
+		if (i2s->fsync_width == value)
+			return 0;
+
 		i2s->fsync_width = value;
 
 		regmap_update_bits(i2s->regmap, TEGRA210_I2S_CTRL,
@@ -369,20 +375,38 @@ static int tegra210_i2s_put_control(struct snd_kcontrol *kcontrol,
 				   i2s->fsync_width << I2S_FSYNC_WIDTH_SHIFT);
 
 	} else if (strstr(kcontrol->id.name, "Capture Stereo To Mono")) {
+		if (i2s->stereo_to_mono[I2S_TX_PATH] == value)
+			return 0;
+
 		i2s->stereo_to_mono[I2S_TX_PATH] = value;
 	} else if (strstr(kcontrol->id.name, "Capture Mono To Stereo")) {
+		if (i2s->mono_to_stereo[I2S_TX_PATH] == value)
+			return 0;
+
 		i2s->mono_to_stereo[I2S_TX_PATH] = value;
 	} else if (strstr(kcontrol->id.name, "Playback Stereo To Mono")) {
+		if (i2s->stereo_to_mono[I2S_RX_PATH] == value)
+			return 0;
+
 		i2s->stereo_to_mono[I2S_RX_PATH] = value;
 	} else if (strstr(kcontrol->id.name, "Playback Mono To Stereo")) {
+		if (i2s->mono_to_stereo[I2S_RX_PATH] == value)
+			return 0;
+
 		i2s->mono_to_stereo[I2S_RX_PATH] = value;
 	} else if (strstr(kcontrol->id.name, "Playback FIFO Threshold")) {
+		if (i2s->rx_fifo_th == value)
+			return 0;
+
 		i2s->rx_fifo_th = value;
 	} else if (strstr(kcontrol->id.name, "BCLK Ratio")) {
+		if (i2s->bclk_ratio == value)
+			return 0;
+
 		i2s->bclk_ratio = value;
 	}
 
-	return 0;
+	return 1;
 }
 
 static int tegra210_i2s_set_timing_params(struct device *dev,
