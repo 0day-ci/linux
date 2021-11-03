@@ -4168,17 +4168,17 @@ try_onemore:
 	}
 
 	/* setup f2fs internal modules */
-	err = f2fs_build_segment_manager(sbi);
-	if (err) {
-		f2fs_err(sbi, "Failed to initialize F2FS segment manager (%d)",
-			 err);
-		goto free_sm;
-	}
 	err = f2fs_build_node_manager(sbi);
 	if (err) {
 		f2fs_err(sbi, "Failed to initialize F2FS node manager (%d)",
 			 err);
 		goto free_nm;
+	}
+	err = f2fs_build_segment_manager(sbi);
+	if (err) {
+		f2fs_err(sbi, "Failed to initialize F2FS segment manager (%d)",
+			 err);
+		goto free_sm;
 	}
 
 	/* For write statistics */
@@ -4384,10 +4384,10 @@ free_node_inode:
 	sbi->node_inode = NULL;
 free_stats:
 	f2fs_destroy_stats(sbi);
-free_nm:
-	f2fs_destroy_node_manager(sbi);
 free_sm:
 	f2fs_destroy_segment_manager(sbi);
+free_nm:
+	f2fs_destroy_node_manager(sbi);
 	f2fs_destroy_post_read_wq(sbi);
 stop_ckpt_thread:
 	f2fs_stop_ckpt_thread(sbi);
