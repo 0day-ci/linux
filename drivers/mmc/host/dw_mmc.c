@@ -54,6 +54,7 @@
 
 #define DW_MCI_FREQ_MAX	200000000	/* unit: HZ */
 #define DW_MCI_FREQ_MIN	100000		/* unit: HZ */
+#define DW_MCI_DATA_TMOUT_NS_MAX	83886075
 
 #define IDMAC_INT_CLR		(SDMMC_IDMAC_INT_AI | SDMMC_IDMAC_INT_NI | \
 				 SDMMC_IDMAC_INT_CES | SDMMC_IDMAC_INT_DU | \
@@ -1283,6 +1284,32 @@ static void dw_mci_setup_bus(struct dw_mci_slot *slot, bool force_clkinit)
 	mci_writel(host, CTYPE, (slot->ctype << slot->id));
 }
 
+static void dw_mci_set_data_timeout(struct dw_mci *host, u32 timeout_ns)
+{
+	u32 timeout, freq_mhz, tmp, tmout;
+
+	if (!timeout_ns || timeout_ns > DW_MCI_DATA_TMOUT_NS_MAX) {
+		/* Set maximum */
+		tmout = 0xFFFFFFFF;
+		goto tmout_done;
+	}
+
+	timeout = timeout_ns;
+	freq_mhz = DIV_ROUND_UP(host->bus_hz, NSEC_PER_MSEC);
+
+	/* TMOUT[7:0] (RESPONSE_TIMEOUT) */
+	tmout = 0xFF; /* Set maximum */
+
+	/* TMOUT[31:8] (DATA_TIMEOUT) */
+	tmp = DIV_ROUND_UP_ULL((u64)timeout * freq_mhz, MSEC_PER_SEC);
+	tmout |= (tmp & 0xFFFFFF) << 8;
+
+tmout_done:
+	mci_writel(host, TMOUT, tmout);
+	dev_dbg(host->dev, "timeout_ns: %u => TMOUT[31:8]: 0x%06x",
+		timeout_ns, tmout >> 8);
+}
+
 static void __dw_mci_start_request(struct dw_mci *host,
 				   struct dw_mci_slot *slot,
 				   struct mmc_command *cmd)
@@ -1303,7 +1330,7 @@ static void __dw_mci_start_request(struct dw_mci *host,
 
 	data = cmd->data;
 	if (data) {
-		mci_writel(host, TMOUT, 0xFFFFFFFF);
+		dw_mci_set_data_timeout(host, data->timeout_ns);
 		mci_writel(host, BYTCNT, data->blksz*data->blocks);
 		mci_writel(host, BLKSIZ, data->blksz);
 	}
