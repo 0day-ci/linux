@@ -634,6 +634,7 @@ EXPORT_SYMBOL(handle_sysrq);
 
 #ifdef CONFIG_INPUT
 static int sysrq_reset_downtime_ms;
+static unsigned short alternative_sysrq_key = KEY_F10;
 
 /* Simple translation table for the SysRq keys */
 static const unsigned char sysrq_xlate[KEY_CNT] =
@@ -653,6 +654,7 @@ struct sysrq_state {
 	unsigned int alt_use;
 	unsigned int shift;
 	unsigned int shift_use;
+	unsigned short sys
 	bool active;
 	bool need_reinject;
 	bool reinjecting;
@@ -802,10 +804,10 @@ static void sysrq_reinject_alt_sysrq(struct work_struct *work)
 
 		/* Simulate press and release of Alt + SysRq */
 		input_inject_event(handle, EV_KEY, alt_code, 1);
-		input_inject_event(handle, EV_KEY, KEY_SYSRQ, 1);
+		input_inject_event(handle, EV_KEY, sysrq->sysrq_key, 1);
 		input_inject_event(handle, EV_SYN, SYN_REPORT, 1);
 
-		input_inject_event(handle, EV_KEY, KEY_SYSRQ, 0);
+		input_inject_event(handle, EV_KEY, sysrq->sysrq_key, 0);
 		input_inject_event(handle, EV_KEY, alt_code, 0);
 		input_inject_event(handle, EV_SYN, SYN_REPORT, 1);
 
@@ -845,6 +847,7 @@ static bool sysrq_handle_keypress(struct sysrq_state *sysrq,
 			sysrq->shift = code;
 		break;
 
+key_sysrq:
 	case KEY_SYSRQ:
 		if (value == 1 && sysrq->alt != KEY_RESERVED) {
 			sysrq->active = true;
@@ -867,11 +870,15 @@ static bool sysrq_handle_keypress(struct sysrq_state *sysrq,
 		 * triggering print screen function.
 		 */
 		if (sysrq->active)
-			clear_bit(KEY_SYSRQ, sysrq->handle.dev->key);
+			clear_bit(sysrq->sysrq_key, sysrq->handle.dev->key);
 
 		break;
 
 	default:
+		/* handle non-default sysrq key */
+		if (code == sysrq->sysrq_key)
+			goto key_sysrq;
+
 		if (sysrq->active && value && value != 2) {
 			unsigned char c = sysrq_xlate[code];
 
@@ -969,6 +976,14 @@ static int sysrq_connect(struct input_handler *handler,
 	sysrq->handle.name = "sysrq";
 	sysrq->handle.private = sysrq;
 	timer_setup(&sysrq->keyreset_timer, sysrq_do_reset, 0);
+
+	if (test_bit(KEY_SYSRQ, dev->keybit)) {
+		sysrq->sysrq_key = KEY_SYSRQ;
+		pr_info("%s: using default sysrq key [%x]\n", dev->name, KEY_SYSRQ);
+	} else {
+		sysrq->sysrq_key = alternative_sysrq_key;
+		pr_info("%s: Using alternative sysrq key: [%x]\n", dev->name, sysrq->sysrq_key);
+	}
 
 	error = input_register_handle(&sysrq->handle);
 	if (error) {
@@ -1077,6 +1092,13 @@ module_param_array_named(reset_seq, sysrq_reset_seq, sysrq_reset_seq,
 			 &sysrq_reset_seq_len, 0644);
 
 module_param_named(sysrq_downtime_ms, sysrq_reset_downtime_ms, int, 0644);
+
+module_param(alternative_sysrq_key, ushort, 0644);
+MODULE_PARM_DESC(alternative_sysrq_key,
+	"Alternative SysRq key for input devices that don't have SysRq key. F10 by default.\n"
+	"Example\n"
+	"Using F9 as SysRq:\n"
+	"sysrq.alternative_sysrq_key=0x43\n");
 
 #else
 
