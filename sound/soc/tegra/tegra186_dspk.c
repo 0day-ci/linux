@@ -55,20 +55,39 @@ static int tegra186_dspk_put_control(struct snd_kcontrol *kcontrol,
 	struct tegra186_dspk *dspk = snd_soc_component_get_drvdata(codec);
 	int val = ucontrol->value.integer.value[0];
 
-	if (strstr(kcontrol->id.name, "FIFO Threshold"))
-		dspk->rx_fifo_th = val;
-	else if (strstr(kcontrol->id.name, "OSR Value"))
-		dspk->osr_val = val;
-	else if (strstr(kcontrol->id.name, "LR Polarity Select"))
-		dspk->lrsel = val;
-	else if (strstr(kcontrol->id.name, "Channel Select"))
-		dspk->ch_sel = val;
-	else if (strstr(kcontrol->id.name, "Mono To Stereo"))
-		dspk->mono_to_stereo = val;
-	else if (strstr(kcontrol->id.name, "Stereo To Mono"))
-		dspk->stereo_to_mono = val;
+	if (strstr(kcontrol->id.name, "FIFO Threshold")) {
+		if (dspk->rx_fifo_th == val)
+			return 0;
 
-	return 0;
+		dspk->rx_fifo_th = val;
+	} else if (strstr(kcontrol->id.name, "OSR Value")) {
+		if (dspk->osr_val == val)
+			return 0;
+
+		dspk->osr_val = val;
+	} else if (strstr(kcontrol->id.name, "LR Polarity Select")) {
+		if (dspk->lrsel == val)
+			return 0;
+
+		dspk->lrsel = val;
+	} else if (strstr(kcontrol->id.name, "Channel Select")) {
+		if (dspk->ch_sel == val)
+			return 0;
+
+		dspk->ch_sel = val;
+	} else if (strstr(kcontrol->id.name, "Mono To Stereo")) {
+		if (dspk->mono_to_stereo == val)
+			return 0;
+
+		dspk->mono_to_stereo = val;
+	} else if (strstr(kcontrol->id.name, "Stereo To Mono")) {
+		if (dspk->stereo_to_mono == val)
+			return 0;
+
+		dspk->stereo_to_mono = val;
+	}
+
+	return 1;
 }
 
 static int __maybe_unused tegra186_dspk_runtime_suspend(struct device *dev)
