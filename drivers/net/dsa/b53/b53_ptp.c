@@ -109,6 +109,64 @@ static void b53_ptp_overflow_check(struct work_struct *work)
 	schedule_delayed_work(&dev->overflow_work, B53_PTP_OVERFLOW_PERIOD);
 }
 
+static long b53_hwtstamp_work(struct ptp_clock_info *ptp)
+{
+	struct b53_device *dev =
+		container_of(ptp, struct b53_device, ptp_clock_info);
+	struct dsa_switch *ds = dev->ds;
+	int i;
+
+	for (i = 0; i < ds->num_ports; i++) {
+		struct b53_port_hwtstamp *ps;
+
+		if (!dsa_is_user_port(ds, i))
+			continue;
+
+		ps = &dev->ports[i].port_hwtstamp;
+
+		if (test_bit(B53_HWTSTAMP_TX_IN_PROGRESS, &ps->state) &&
+		    time_is_before_jiffies(ps->tx_tstamp_start +
+					   TX_TSTAMP_TIMEOUT)) {
+			dev_err(dev->dev,
+				"Timeout while waiting for Tx timestamp!\n");
+			dev_kfree_skb_any(ps->tx_skb);
+			ps->tx_skb = NULL;
+			clear_bit_unlock(B53_HWTSTAMP_TX_IN_PROGRESS,
+					 &ps->state);
+		}
+	}
+
+	return -1;
+}
+
+void b53_port_txtstamp(struct dsa_switch *ds, int port, struct sk_buff *skb)
+{
+	struct b53_device *dev = ds->priv;
+	struct b53_port_hwtstamp *ps = &dev->ports[port].port_hwtstamp;
+	struct sk_buff *clone;
+	unsigned int type;
+
+	type = ptp_classify_raw(skb);
+
+	if (type != PTP_CLASS_V2_L2)
+		return;
+
+	if (!test_bit(B53_HWTSTAMP_ENABLED, &ps->state))
+		return;
+
+	clone = skb_clone_sk(skb);
+	if (!clone)
+		return;
+
+	if (test_and_set_bit_lock(B53_HWTSTAMP_TX_IN_PROGRESS, &ps->state)) {
+		kfree_skb(clone);
+		return;
+	}
+
+	ps->tx_skb = clone;
+	ps->tx_tstamp_start = jiffies;
+}
+
 bool b53_port_rxtstamp(struct dsa_switch *ds, int port, struct sk_buff *skb,
 		       unsigned int type)
 {
@@ -172,6 +230,7 @@ int b53_ptp_init(struct b53_device *dev)
 	dev->ptp_clock_info.gettime64 = b53_ptp_gettime;
 	dev->ptp_clock_info.settime64 = b53_ptp_settime;
 	dev->ptp_clock_info.enable = b53_ptp_enable;
+	dev->ptp_clock_info.do_aux_work = b53_hwtstamp_work;
 
 	dev->ptp_clock = ptp_clock_register(&dev->ptp_clock_info, dev->dev);
 	if (IS_ERR(dev->ptp_clock))
