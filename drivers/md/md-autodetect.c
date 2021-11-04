@@ -175,7 +175,6 @@ static void __init md_setup_drive(struct md_setup_args *args)
 		return;
 	}
 
-	err = -EIO;
 	if (WARN(bdev->bd_disk->fops != &md_fops,
 			"Opening block device %x resulted in non-md device\n",
 			mdev))
