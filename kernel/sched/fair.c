@@ -9807,6 +9807,8 @@ static int need_active_balance(struct lb_env *env)
 }
 
 static int active_load_balance_cpu_stop(void *data);
+static void wakeup_cfs_migrater_nowait(unsigned int cpu, cpu_stop_fn_t fn, void *arg,
+				       struct cpu_stop_work *work_buf);
 
 static int should_we_balance(struct lb_env *env)
 {
@@ -10049,7 +10051,7 @@ more_balance:
 			raw_spin_rq_unlock_irqrestore(busiest, flags);
 
 			if (active_balance) {
-				stop_one_cpu_nowait(cpu_of(busiest),
+				wakeup_cfs_migrater_nowait(cpu_of(busiest),
 					active_load_balance_cpu_stop, busiest,
 					&busiest->active_balance_work);
 			}
@@ -10147,7 +10149,7 @@ update_next_balance(struct sched_domain *sd, unsigned long *next_balance)
 }
 
 /*
- * active_load_balance_cpu_stop is run by the CPU stopper. It pushes
+ * active_load_balance_cpu_stop is run by the CFS migrater. It pushes
  * running tasks off the busiest CPU onto idle CPUs. It requires at
  * least 1 task to be running on each physical CPU where possible, and
  * avoids physical / logical imbalances.
@@ -11947,6 +11949,37 @@ struct cfs_migrater {
 };
 
 DEFINE_PER_CPU(struct cfs_migrater, cfs_migrater);
+
+static void __cfs_migration_queue_work(struct cfs_migrater *migrater,
+				       struct cpu_stop_work *work,
+				       struct wake_q_head *wakeq)
+{
+	list_add_tail(&work->list, &migrater->works);
+	wake_q_add(wakeq, migrater->thread);
+}
+
+/* queue @work to @migrater.  if offline, @work is completed immediately */
+static void cfs_migration_queue_work(unsigned int cpu, struct cpu_stop_work *work)
+{
+	struct cfs_migrater *migrater = &per_cpu(cfs_migrater, cpu);
+	DEFINE_WAKE_Q(wakeq);
+	unsigned long flags;
+
+	preempt_disable();
+	raw_spin_lock_irqsave(&migrater->lock, flags);
+	__cfs_migration_queue_work(migrater, work, &wakeq);
+	raw_spin_unlock_irqrestore(&migrater->lock, flags);
+
+	wake_up_q(&wakeq);
+	preempt_enable();
+}
+
+static void wakeup_cfs_migrater_nowait(unsigned int cpu, cpu_stop_fn_t fn, void *arg,
+				       struct cpu_stop_work *work_buf)
+{
+	*work_buf = (struct cpu_stop_work){ .fn = fn, .arg = arg, .caller = _RET_IP_, };
+	cfs_migration_queue_work(cpu, work_buf);
+}
 
 static int cfs_migration_should_run(unsigned int cpu)
 {
