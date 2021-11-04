@@ -1635,6 +1635,24 @@ TRACE_EVENT(rdev_set_bitrate_mask,
 		  WIPHY_PR_ARG, NETDEV_PR_ARG, MAC_PR_ARG(peer))
 );
 
+TRACE_EVENT(rdev_set_ul_bitrate_mask,
+	TP_PROTO(struct wiphy *wiphy, struct net_device *netdev,
+		 const u8 *peer, const struct cfg80211_ul_bitrate_mask *mask),
+	TP_ARGS(wiphy, netdev, peer, mask),
+	TP_STRUCT__entry(
+		WIPHY_ENTRY
+		NETDEV_ENTRY
+		MAC_ENTRY(peer)
+	),
+	TP_fast_assign(
+		WIPHY_ASSIGN;
+		NETDEV_ASSIGN;
+		MAC_ASSIGN(peer, peer);
+	),
+	TP_printk(WIPHY_PR_FMT ", " NETDEV_PR_FMT ", peer: " MAC_PR_FMT,
+		  WIPHY_PR_ARG, NETDEV_PR_ARG, MAC_PR_ARG(peer))
+);
+
 TRACE_EVENT(rdev_update_mgmt_frame_registrations,
 	TP_PROTO(struct wiphy *wiphy, struct wireless_dev *wdev,
 		 struct mgmt_frame_regs *upd),

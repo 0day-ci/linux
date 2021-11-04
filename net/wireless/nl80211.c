@@ -386,6 +386,18 @@ static const struct nla_policy nl80211_txattr_policy[NL80211_TXRATE_MAX + 1] = {
 						   NL80211_RATE_INFO_HE_4XLTF),
 };
 
+static const struct nla_policy nl80211_ul_rate_attr_policy[NL80211_UL_RATE_MAX + 1] = {
+	[NL80211_UL_RATE_HE] = NLA_POLICY_EXACT_LEN(sizeof(struct nl80211_ul_rate_he)),
+	[NL80211_UL_RATE_HE_GI] =  NLA_POLICY_RANGE(NLA_U8,
+						   NL80211_RATE_INFO_HE_GI_0_8,
+						   NL80211_RATE_INFO_HE_GI_3_2),
+	[NL80211_UL_RATE_HE_LTF] = NLA_POLICY_RANGE(NLA_U8,
+						   NL80211_RATE_INFO_HE_1XLTF,
+						   NL80211_RATE_INFO_HE_4XLTF),
+	[NL80211_UL_RATE_HE_LDPC] = { .type = NLA_FLAG },
+	[NL80211_UL_RATE_HE_STBC] = { .type = NLA_FLAG },
+};
+
 static const struct nla_policy
 nl80211_tid_config_attr_policy[NL80211_TID_CONFIG_ATTR_MAX + 1] = {
 	[NL80211_TID_CONFIG_ATTR_VIF_SUPP] = { .type = NLA_U64 },
@@ -4951,6 +4963,63 @@ static int nl80211_parse_tx_bitrate_mask(struct genl_info *info,
 	}
 
 out:
+	return 0;
+}
+
+static int nl80211_parse_ul_bitrate_mask(struct genl_info *info,
+					 struct nlattr *attrs[],
+					 enum nl80211_attrs attr,
+					 struct cfg80211_ul_bitrate_mask *mask,
+					 struct net_device *dev,
+					 bool default_all_enabled)
+{
+	struct nlattr *tb[NL80211_TXRATE_MAX + 1];
+	struct cfg80211_registered_device *rdev = info->user_ptr[0];
+	struct wireless_dev *wdev = dev->ieee80211_ptr;
+	int rem;
+	struct nlattr *tx_rates;
+	struct ieee80211_supported_band *sband;
+
+	memset(mask, 0, sizeof(*mask));
+
+	/* The nested attribute uses enum nl80211_band as the index. This maps
+	 * directly to the enum nl80211_band values used in cfg80211.
+	 */
+	nla_for_each_nested(tx_rates, attrs[attr], rem) {
+		enum nl80211_band band = nla_type(tx_rates);
+		int err;
+
+		if (band < 0 || band >= NUM_NL80211_BANDS)
+			return -EINVAL;
+		sband = rdev->wiphy.bands[band];
+		if (!sband)
+			return -EINVAL;
+		err = nla_parse_nested_deprecated(tb, NL80211_UL_RATE_MAX,
+						  tx_rates,
+						  nl80211_ul_rate_attr_policy,
+						  info->extack);
+		if (err)
+			return err;
+		if (tb[NL80211_UL_RATE_HE] &&
+		    !he_set_mcs_mask(info, wdev, sband,
+				     nla_data(tb[NL80211_UL_RATE_HE]),
+				     mask->control[band].he_ul_mcs))
+			return -EINVAL;
+
+		if (tb[NL80211_UL_RATE_HE_GI])
+			mask->control[band].he_ul_gi =
+				nla_get_u8(tb[NL80211_UL_RATE_HE_GI]);
+		if (tb[NL80211_UL_RATE_HE_LTF])
+			mask->control[band].he_ul_ltf =
+				nla_get_u8(tb[NL80211_UL_RATE_HE_LTF]);
+		if (tb[NL80211_UL_RATE_HE_LDPC])
+			mask->control[band].he_ul_ldpc =
+				!nla_get_flag(tb[NL80211_UL_RATE_HE_LDPC]);
+		if (tb[NL80211_UL_RATE_HE_STBC])
+			mask->control[band].he_ul_stbc =
+				!nla_get_flag(tb[NL80211_UL_RATE_HE_STBC]);
+	}
+
 	return 0;
 }
 
@@ -11546,6 +11615,26 @@ static int nl80211_set_tx_bitrate_mask(struct sk_buff *skb,
 	return rdev_set_bitrate_mask(rdev, dev, NULL, &mask);
 }
 
+static int nl80211_set_ul_bitrate_mask(struct sk_buff *skb,
+				       struct genl_info *info)
+{
+	struct cfg80211_ul_bitrate_mask mask;
+	struct cfg80211_registered_device *rdev = info->user_ptr[0];
+	struct net_device *dev = info->user_ptr[1];
+	int err;
+
+	if (!rdev->ops->set_bitrate_mask)
+		return -EOPNOTSUPP;
+
+	err = nl80211_parse_ul_bitrate_mask(info, info->attrs,
+					    NL80211_ATTR_UL_RATES, &mask,
+					    dev, true);
+	if (err)
+		return err;
+
+	return rdev_set_ul_bitrate_mask(rdev, dev, NULL, &mask);
+}
+
 static int nl80211_register_mgmt(struct sk_buff *skb, struct genl_info *info)
 {
 	struct cfg80211_registered_device *rdev = info->user_ptr[0];
@@ -15736,6 +15825,13 @@ static const struct genl_small_ops nl80211_small_ops[] = {
 		.cmd = NL80211_CMD_SET_TX_BITRATE_MASK,
 		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_set_tx_bitrate_mask,
+		.flags = GENL_UNS_ADMIN_PERM,
+		.internal_flags = NL80211_FLAG_NEED_NETDEV,
+	},
+	{
+		.cmd = NL80211_CMD_SET_UL_BITRATE_MASK,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
+		.doit = nl80211_set_ul_bitrate_mask,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV,
 	},

@@ -697,6 +697,18 @@ struct cfg80211_bitrate_mask {
 	} control[NUM_NL80211_BANDS];
 };
 
+/*
+ * cfg80211_ul_bitrate_mask - masks for MU uplink bitrate control
+ */
+struct cfg80211_ul_bitrate_mask {
+	struct {
+		u16 he_ul_mcs[NL80211_HE_NSS_MAX];
+		enum nl80211_he_gi he_ul_gi;
+		enum nl80211_he_ltf he_ul_ltf;
+		bool he_ul_ldpc;
+		bool he_ul_stbc;
+	} control[NUM_NL80211_BANDS];
+};
 
 /**
  * struct cfg80211_tid_cfg - TID specific configuration
@@ -4232,6 +4244,11 @@ struct cfg80211_ops {
 				    struct net_device *dev,
 				    const u8 *peer,
 				    const struct cfg80211_bitrate_mask *mask);
+
+	int	(*set_ul_bitrate_mask)(struct wiphy *wiphy,
+				       struct net_device *dev,
+				       const u8 *peer,
+				       const struct cfg80211_ul_bitrate_mask *mask);
 
 	int	(*dump_survey)(struct wiphy *wiphy, struct net_device *netdev,
 			int idx, struct survey_info *info);

@@ -1232,6 +1232,10 @@
  *	&NL80211_ATTR_FILS_NONCES - for FILS Nonces
  *		(STA Nonce 16 bytes followed by AP Nonce 16 bytes)
  *
+ * @NL80211_CMD_SET_UL_BITRATE_MASK: Set the mask of rates to be used in MU
+ *	uplink rate selection. %NL80211_ATTR_IFINDEX is used to specify the
+ *	interface and @NL80211_ATTR_UL_RATES the set of allowed rates.
+ *
  * @NL80211_CMD_MAX: highest used command number
  * @__NL80211_CMD_AFTER_LAST: internal use
  */
@@ -1474,6 +1478,7 @@ enum nl80211_commands {
 
 	NL80211_CMD_SET_FILS_AAD,
 
+	NL80211_CMD_SET_UL_BITRATE_MASK,
 	/* add new commands above here */
 
 	/* used to define NL80211_CMD_MAX below */
@@ -2646,6 +2651,13 @@ enum nl80211_commands {
  *	switching on a different channel during CAC detection on the selected
  *	radar channel.
  *
+ * @NL80211_ATTR_UL_RATES: Nested set of attributes
+ *	(enum nl80211_ul_rate_attributes) describing MU uplink rates per
+ *	specified band.	The enum nl80211_band value is used as the index
+ *	nla_type() of the nested data. This attribute is used with
+ *	%NL80211_CMD_SET_UL_BITRATE_MASK and it must specify just a single
+ *	bitrate, which is to be used for MU uplink transmission.
+ *
  * @NUM_NL80211_ATTR: total number of nl80211_attrs available
  * @NL80211_ATTR_MAX: highest attribute number currently defined
  * @__NL80211_ATTR_AFTER_LAST: internal use
@@ -3154,6 +3166,7 @@ enum nl80211_attrs {
 
 	NL80211_ATTR_RADAR_OFFCHAN,
 
+	NL80211_ATTR_UL_RATES,
 	/* add attributes here, update the policy in nl80211.c */
 
 	__NL80211_ATTR_AFTER_LAST,
@@ -4978,6 +4991,38 @@ enum nl80211_txrate_gi {
 	NL80211_TXRATE_DEFAULT_GI,
 	NL80211_TXRATE_FORCE_SGI,
 	NL80211_TXRATE_FORCE_LGI,
+};
+
+/**
+ * enum nl80211_ul_rate_attributes - MU uplink rate set attributes
+ * @NL80211_UL_RATE_HE: HE MU UL MCS rates for MU uplink traffic,
+ *	see &struct nl80211_ul_rate_he
+ * @NL80211_UL_RATE_HE_GI: configure HE UL GI, 0.8us, 1.6us and 3.2us.
+ * @NL80211_UL_RATE_HE_LTF: configure HE UL LTF, 1XLTF, 2XLTF and 4XLTF.
+ * @NL80211_UL_RATE_HE_LDPC: configure HE UL LDPC, enable and disable.
+ * @NL80211_UL_RATE_HE_STBC: configure HE UL STBC, enable and disable.
+ * @__NL80211_TXRATE_AFTER_LAST: internal
+ * @NL80211_TXRATE_MAX: highest TX rate attribute
+ */
+enum nl80211_ul_rate_attributes {
+	NL80211_UL_RATE_HE,
+	NL80211_UL_RATE_HE_GI,
+	NL80211_UL_RATE_HE_LTF,
+	NL80211_UL_RATE_HE_LDPC,
+	NL80211_UL_RATE_HE_STBC,
+
+	/* keep last */
+	__NL80211_UL_RATE_AFTER_LAST,
+	NL80211_UL_RATE_MAX = __NL80211_UL_RATE_AFTER_LAST - 1
+};
+
+/**
+ * struct nl80211_ul_rate_he - Uplink HE MCS/NSS rate bitmap for MU
+ *	transmission.
+ * @mcs: MCS bitmap table for each NSS (array index 0 for 1 stream, etc.)
+ */
+struct nl80211_ul_rate_he {
+	__u16 mcs[NL80211_HE_NSS_MAX];
 };
 
 /**
