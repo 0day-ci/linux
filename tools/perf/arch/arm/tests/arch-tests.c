@@ -5,7 +5,7 @@
 
 DEFINE_SUITE("Vectors page", vectors_page);
 
-struct test *arch_tests[] = {
+struct test_suite *arch_tests[] = {
 #ifdef HAVE_DWARF_UNWIND_SUPPORT
 	&suite__dwarf_unwind,
 #endif
