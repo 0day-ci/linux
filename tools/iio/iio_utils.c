@@ -290,15 +290,12 @@ error_free_builtname:
 
 void bsort_channel_array_by_index(struct iio_channel_info *ci_array, int cnt)
 {
-	struct iio_channel_info temp;
 	int x, y;
 
 	for (x = 0; x < cnt; x++)
 		for (y = 0; y < (cnt - 1); y++)
 			if (ci_array[y].index > ci_array[y + 1].index) {
-				temp = ci_array[y + 1];
-				ci_array[y + 1] = ci_array[y];
-				ci_array[y] = temp;
+				swap(ci_array[y + 1], ci_array[y]);
 			}
 }
 
