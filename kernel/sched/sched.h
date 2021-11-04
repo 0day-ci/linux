@@ -3047,6 +3047,8 @@ static inline bool is_per_cpu_kthread(struct task_struct *p)
 
 	return true;
 }
+
+bool wakeup_cfs_migrater(unsigned int cpu, cpu_stop_fn_t fn, void *arg);
 #endif
 
 extern void swake_up_all_locked(struct swait_queue_head *q);

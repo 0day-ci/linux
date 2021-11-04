@@ -11981,6 +11981,19 @@ static void wakeup_cfs_migrater_nowait(unsigned int cpu, cpu_stop_fn_t fn, void 
 	cfs_migration_queue_work(cpu, work_buf);
 }
 
+bool wakeup_cfs_migrater(unsigned int cpu, cpu_stop_fn_t fn, void *arg)
+{
+	struct cpu_stop_done done;
+	struct cpu_stop_work work = { .fn = fn, .arg = arg, .done = &done, .caller = _RET_IP_ };
+
+	cpu_stop_init_done(&done, 1);
+	cfs_migration_queue_work(cpu, &work);
+	cond_resched();
+	wait_for_completion(&done.completion);
+
+	return done.ret;
+}
+
 static int cfs_migration_should_run(unsigned int cpu)
 {
 	struct cfs_migrater *migrater = &per_cpu(cfs_migrater, cpu);
