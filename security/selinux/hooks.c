@@ -5502,8 +5502,7 @@ static void selinux_sctp_sk_clone(struct sctp_association *asoc, struct sock *sk
 	if (!selinux_policycap_extsockclass())
 		return selinux_sk_clone_security(sk, newsk);
 
-	if (asoc->secid != SECSID_WILD)
-		newsksec->sid = asoc->secid;
+	newsksec->sid = asoc->secid;
 	newsksec->peer_sid = asoc->peer_secid;
 	newsksec->sclass = sksec->sclass;
 	selinux_netlbl_sctp_sk_clone(sk, newsk);
@@ -5566,7 +5565,7 @@ static void selinux_sctp_assoc_established(struct sctp_association *asoc,
 
 	selinux_inet_conn_established(asoc->base.sk, skb);
 	asoc->peer_secid = sksec->peer_sid;
-	asoc->secid = SECSID_WILD;
+	asoc->secid = sksec->sid;
 }
 
 static int selinux_secmark_relabel_packet(u32 sid)
