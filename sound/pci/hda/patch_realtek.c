@@ -125,7 +125,7 @@ struct alc_spec {
 	unsigned int pll_coef_idx, pll_coef_bit;
 	unsigned int coef0;
 	struct input_dev *kb_dev;
-	u8 alc_mute_keycode_map[1];
+	u8 alc_mute_keycode_map[];
 };
 
 /*
