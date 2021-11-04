@@ -20,6 +20,8 @@
  *  Adaptive scheduling granularity, math enhancements by Peter Zijlstra
  *  Copyright (C) 2007 Red Hat, Inc., Peter Zijlstra
  */
+#include <linux/smpboot.h>
+#include <linux/stop_machine.h>
 #include "sched.h"
 
 /*
@@ -11936,3 +11938,94 @@ int sched_trace_rq_nr_running(struct rq *rq)
         return rq ? rq->nr_running : -1;
 }
 EXPORT_SYMBOL_GPL(sched_trace_rq_nr_running);
+
+#ifdef CONFIG_SMP
+struct cfs_migrater {
+	struct task_struct *thread;
+	struct list_head works;
+	raw_spinlock_t lock;
+};
+
+DEFINE_PER_CPU(struct cfs_migrater, cfs_migrater);
+
+static int cfs_migration_should_run(unsigned int cpu)
+{
+	struct cfs_migrater *migrater = &per_cpu(cfs_migrater, cpu);
+	unsigned long flags;
+	int run;
+
+	raw_spin_lock_irqsave(&migrater->lock, flags);
+	run = !list_empty(&migrater->works);
+	raw_spin_unlock_irqrestore(&migrater->lock, flags);
+
+	return run;
+}
+
+static void cfs_migration_setup(unsigned int cpu)
+{
+	/* cfs_migration should have a higher priority than normal tasks,
+	 * but a lower priority than other FIFO tasks.
+	 */
+	sched_set_fifo_low(current);
+}
+
+static void cfs_migrater_thread(unsigned int cpu)
+{
+	struct cfs_migrater *migrater = &per_cpu(cfs_migrater, cpu);
+	struct cpu_stop_work *work;
+
+repeat:
+	work = NULL;
+	raw_spin_lock_irq(&migrater->lock);
+	if (!list_empty(&migrater->works)) {
+		work = list_first_entry(&migrater->works,
+					struct cpu_stop_work, list);
+		list_del_init(&work->list);
+	}
+	raw_spin_unlock_irq(&migrater->lock);
+
+	if (work) {
+		struct cpu_stop_done *done = work->done;
+		cpu_stop_fn_t fn = work->fn;
+		void *arg = work->arg;
+		int ret;
+
+		preempt_count_inc();
+		ret = fn(arg);
+		if (done) {
+			if (ret)
+				done->ret = ret;
+			cpu_stop_signal_done(done);
+		}
+		preempt_count_dec();
+		goto repeat;
+	}
+}
+
+static struct smp_hotplug_thread cfs_migration_threads = {
+	.store			= &cfs_migrater.thread,
+	.setup			= cfs_migration_setup,
+	.thread_fn		= cfs_migrater_thread,
+	.thread_comm		= "cfs_migration/%u",
+	.thread_should_run	= cfs_migration_should_run,
+};
+
+static int __init cfs_migration_init(void)
+{
+	struct cfs_migrater *cm = &per_cpu(cfs_migrater, raw_smp_processor_id());
+	unsigned int cpu;
+
+	for_each_possible_cpu(cpu) {
+		struct cfs_migrater *migrater = &per_cpu(cfs_migrater, cpu);
+
+		raw_spin_lock_init(&migrater->lock);
+		INIT_LIST_HEAD(&migrater->works);
+	}
+
+	WARN_ON_ONCE(smpboot_register_percpu_thread(&cfs_migration_threads));
+	kthread_unpark(cm->thread);
+
+	return 0;
+}
+early_initcall(cfs_migration_init)
+#endif
