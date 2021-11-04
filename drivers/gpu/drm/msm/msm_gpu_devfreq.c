@@ -20,8 +20,6 @@ static int msm_devfreq_target(struct device *dev, unsigned long *freq,
 	struct msm_gpu *gpu = dev_to_gpu(dev);
 	struct dev_pm_opp *opp;
 
-	opp = devfreq_recommended_opp(dev, freq, flags);
-
 	/*
 	 * If the GPU is idle, devfreq is not aware, so just ignore
 	 * it's requests
@@ -30,6 +28,8 @@ static int msm_devfreq_target(struct device *dev, unsigned long *freq,
 		gpu->devfreq.idle_freq = *freq;
 		return 0;
 	}
+
+	opp = devfreq_recommended_opp(dev, freq, flags);
 
 	if (IS_ERR(opp))
 		return PTR_ERR(opp);
